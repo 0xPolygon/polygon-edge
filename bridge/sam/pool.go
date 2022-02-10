@@ -24,6 +24,7 @@ type pool struct {
 	messageSignatures *messageSignaturesStore
 }
 
+// diffAddresses returns a list of the addresses that are in arr1 but not in arr2
 func diffAddresses(arr1, arr2 []types.Address) []types.Address {
 	arr2Map := make(map[types.Address]bool)
 	for _, addr := range arr2 {
@@ -53,12 +54,14 @@ func NewPool(validators []types.Address, threshold uint64) Pool {
 	}
 }
 
+// Add adds new message with the signature to pool
 func (p *pool) Add(msg *SignedMessage) {
 	p.changeValidatorsLock.RLock()
 	defer p.changeValidatorsLock.RUnlock()
 
 	consumed, ok := p.consumedMap.Load(msg.ID)
 	if ok && consumed.(bool) {
+		// we do no longer put the signature if the message has been consumed
 		return
 	}
 
@@ -66,11 +69,13 @@ func (p *pool) Add(msg *SignedMessage) {
 	p.tryToPromote(msg.ID)
 }
 
+// MarkAsKnown sets the known flag so that make the message promotable
 func (p *pool) MarkAsKnown(id uint64) {
 	p.knownMap.Store(id, true)
 	p.tryToPromote(id)
 }
 
+// Consume sets the consumed flag and delete the message from pool
 func (p *pool) Consume(id uint64) {
 	p.consumedMap.Store(id, true)
 
@@ -80,6 +85,7 @@ func (p *pool) Consume(id uint64) {
 	}
 }
 
+// GetReadyMessages returns the messages with enough signatures
 func (p *pool) GetReadyMessages() []MessageAndSignatures {
 	p.changeValidatorsLock.RLock()
 	defer p.changeValidatorsLock.RUnlock()
@@ -102,6 +108,8 @@ func (p *pool) GetReadyMessages() []MessageAndSignatures {
 	return res
 }
 
+// UpdateValidatorSet update validators and threshold
+// This process blocks other processes because messages would lose the signatures
 func (p *pool) UpdateValidatorSet(validators []types.Address, threshold uint64) {
 	p.changeValidatorsLock.Lock()
 	defer p.changeValidatorsLock.Unlock()
@@ -110,7 +118,6 @@ func (p *pool) UpdateValidatorSet(validators []types.Address, threshold uint64) 
 	oldThreshold := p.threshold //nolint
 
 	p.validators = validators
-
 	atomic.StoreUint64(&p.threshold, threshold)
 
 	removed := diffAddresses(oldValidators, validators)
@@ -120,6 +127,7 @@ func (p *pool) UpdateValidatorSet(validators []types.Address, threshold uint64) 
 		maybeDemotableIDs = p.messageSignatures.RemoveSignatures(removed)
 	}
 
+	// we need to check all messages if threshold changes
 	if oldThreshold != threshold {
 		p.tryToPromoteAndDemoteAll()
 	} else if len(maybeDemotableIDs) > 0 {
@@ -127,6 +135,8 @@ func (p *pool) UpdateValidatorSet(validators []types.Address, threshold uint64) 
 	}
 }
 
+// canPromote return the flag indicating it's possible to change status to ready
+// message need to have enough signatures and be known by pool for promotion
 func (p *pool) canPromote(id uint64) bool {
 	isKnown, ok := p.knownMap.Load(id)
 	numSignatures := p.messageSignatures.GetSignatureCount(id)
@@ -135,18 +145,21 @@ func (p *pool) canPromote(id uint64) bool {
 	return ok && isKnown.(bool) && numSignatures >= threshold
 }
 
+// canDemote return the flag indicating it's possible to change status to pending
 func (p *pool) canDemote(id uint64) bool {
 	isReady, ok := p.readyMap.Load(id)
 
 	return !p.canPromote(id) && ok && isReady.(bool)
 }
 
+// tryToPromote checks the number of signatures and threshold and update message status to ready if need
 func (p *pool) tryToPromote(id uint64) {
 	if p.canPromote(id) {
 		p.promote(id)
 	}
 }
 
+// tryToDemote checks the number of signatures and threshold and update message status to pending if need
 func (p *pool) tryToDemote(ids []uint64) {
 	for _, id := range ids {
 		if p.canDemote(id) {
@@ -155,6 +168,7 @@ func (p *pool) tryToDemote(ids []uint64) {
 	}
 }
 
+// tryToPromoteAndDemoteAll iterates all messages and update its statuses
 func (p *pool) tryToPromoteAndDemoteAll() {
 	threshold := atomic.LoadUint64(&p.threshold)
 
@@ -175,21 +189,25 @@ func (p *pool) tryToPromoteAndDemoteAll() {
 	})
 }
 
+// promote change message status to ready
 func (p *pool) promote(id uint64) {
 	p.readyMap.Store(id, true)
 }
 
+// promote change message status to pending
+// it deletes instead of unsetting for less-complexity on getting ready messages
 func (p *pool) demote(id uint64) {
 	p.readyMap.Delete(id)
 }
 
-// warning: SignatureCount optimistic concurrency
+// signedMessageEntry is representing the data stored in messageSignaturesStore
 type signedMessageEntry struct {
 	Message        Message
 	Signatures     sync.Map
 	SignatureCount int64
 }
 
+// NumSignatures returns number of signatures
 func (e *signedMessageEntry) NumSignatures() uint64 {
 	count := atomic.LoadInt64(&e.SignatureCount)
 	if count < 0 {
@@ -199,6 +217,7 @@ func (e *signedMessageEntry) NumSignatures() uint64 {
 	return uint64(count)
 }
 
+// IncrementNumSignatures increments SignatureCount and return new count
 func (e *signedMessageEntry) IncrementNumSignatures() uint64 {
 	newNumSignatures := atomic.AddInt64(&e.SignatureCount, 1)
 	if newNumSignatures < 0 {
@@ -208,6 +227,7 @@ func (e *signedMessageEntry) IncrementNumSignatures() uint64 {
 	return uint64(newNumSignatures)
 }
 
+// IncrementNumSignatures decrements SignatureCount and return new count
 func (e *signedMessageEntry) DecrementNumSignatures() uint64 {
 	newNumSignatures := atomic.AddInt64(&e.SignatureCount, ^int64(0))
 	if newNumSignatures < 0 {
@@ -217,7 +237,7 @@ func (e *signedMessageEntry) DecrementNumSignatures() uint64 {
 	return uint64(newNumSignatures)
 }
 
-// messageSignaturesStore is a nested map from ID to signatures
+// messageSignaturesStore is a nested map from message ID to signatures
 // messageID (uint64) -> address (types.Address) -> signature ([]byte)
 type messageSignaturesStore struct {
 	sync.Map
@@ -233,6 +253,7 @@ func (m *messageSignaturesStore) HasMessage(id uint64) bool {
 	return loaded
 }
 
+// GetSignatureCount returns the number of stored signatures for given message ID
 func (m *messageSignaturesStore) GetSignatureCount(id uint64) uint64 {
 	value, loaded := m.Load(id)
 	if !loaded {
@@ -244,6 +265,7 @@ func (m *messageSignaturesStore) GetSignatureCount(id uint64) uint64 {
 	return entry.NumSignatures()
 }
 
+// GetMessage returns the message and its signatures for given message ID
 func (m *messageSignaturesStore) GetMessage(id uint64) *MessageAndSignatures {
 	value, loaded := m.Load(id)
 	if !loaded {
@@ -266,6 +288,7 @@ func (m *messageSignaturesStore) GetMessage(id uint64) *MessageAndSignatures {
 	}
 }
 
+// RangeMessages iterates all messages in store
 func (m *messageSignaturesStore) RangeMessages(handler func(*signedMessageEntry) bool) {
 	m.Range(func(key, value interface{}) bool {
 		entry, _ := value.(*signedMessageEntry)
@@ -274,6 +297,7 @@ func (m *messageSignaturesStore) RangeMessages(handler func(*signedMessageEntry)
 	})
 }
 
+// PutMessage puts new signature to one message
 func (m *messageSignaturesStore) PutMessage(message *SignedMessage) uint64 {
 	value, _ := m.LoadOrStore(message.ID,
 		&signedMessageEntry{
@@ -292,12 +316,14 @@ func (m *messageSignaturesStore) PutMessage(message *SignedMessage) uint64 {
 	return entry.NumSignatures()
 }
 
+// RemoveMessage removes the message from store
 func (m *messageSignaturesStore) RemoveMessage(id uint64) bool {
 	_, existed := m.LoadAndDelete(id)
 
 	return existed
 }
 
+// RemoveMessage removes the signatures by given addresses from all messages
 func (m *messageSignaturesStore) RemoveSignatures(addresses []types.Address) []uint64 {
 	maybeDemotableIDs := make([]uint64, 0)
 
