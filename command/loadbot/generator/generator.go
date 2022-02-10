@@ -7,11 +7,13 @@ import (
 	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/umbracle/go-web3"
 	"github.com/umbracle/go-web3/abi"
 )
 
 type TransactionGenerator interface {
-	GenerateTransaction() (*types.Transaction, error)
+	GenerateTransaction(mode string) (*types.Transaction, error)
+	GenerateTokenTransferTransaction(mode string, contractAddr *types.Address) (*types.Transaction, error)
 	GetExampleTransaction() (*types.Transaction, error)
 	GetTransactionErrors() []*FailedTxnInfo
 	MarkFailedTxn(failedTxn *FailedTxnInfo)
@@ -57,11 +59,13 @@ type GeneratorParams struct {
 	Nonce            uint64
 	ChainID          uint64
 	SenderAddress    types.Address
+	RecieverAddress types.Address
 	SenderKey        *ecdsa.PrivateKey
 	Value            *big.Int
 	GasPrice         *big.Int
 	ContractArtifact *ContractArtifact
 	ConstructorArgs []byte // smart contract constructor arguments
+	ContractAddress web3.Address
 }
 
 // ReadContractArtifact reads the contract bytecode from the specified path

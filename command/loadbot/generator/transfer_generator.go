@@ -2,10 +2,11 @@ package generator
 
 import (
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/crypto"
-	"github.com/0xPolygon/polygon-edge/types"
 	"math/big"
 	"sync/atomic"
+
+	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 type TransferGenerator struct {
@@ -51,7 +52,7 @@ func (tg *TransferGenerator) generateReceiver() error {
 	return nil
 }
 
-func (tg *TransferGenerator) GenerateTransaction() (*types.Transaction, error) {
+func (tg *TransferGenerator) GenerateTransaction( mode string) (*types.Transaction, error) {
 	newNextNonce := atomic.AddUint64(&tg.params.Nonce, 1)
 
 	txn, err := tg.signer.SignTx(&types.Transaction{
@@ -69,4 +70,9 @@ func (tg *TransferGenerator) GenerateTransaction() (*types.Transaction, error) {
 	}
 
 	return txn, nil
+}
+
+// mock method it is never going to be called here
+func (tg *TransferGenerator) GenerateTokenTransferTransaction(mode string, contractAddres *types.Address) (*types.Transaction, error) {
+	return &types.Transaction{}, nil
 }

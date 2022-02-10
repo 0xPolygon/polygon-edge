@@ -241,17 +241,25 @@ func estimateGas(client *jsonrpc.Client, txn *types.Transaction) (uint64, error)
 func (l *Loadbot) executeTxn(
 	client txpoolOp.TxnPoolOperatorClient,
 	mode string,
+	contractAddr *types.Address,
 ) (web3.Hash, error) {
 	var (
 		txn *types.Transaction
 		err error
 	)
-	if ( mode == "contract" || mode == "transaction") {
-		txn, err = l.generator.GenerateTransaction()
-		if err != nil {
-			return web3.Hash{}, err
+		if mode == "erc20Transfer" {
+			// convert web3 to types address
+			txn, err = l.generator.GenerateTokenTransferTransaction(mode, contractAddr)
+			if err != nil {
+				return web3.Hash{}, err
+			}
+		} else {
+				txn, err = l.generator.GenerateTransaction(mode)
+				if err != nil {
+					return web3.Hash{}, err
+				}
 		}
-	} 
+
 	
 	addReq := &txpoolOp.AddTxnReq{
 		Raw: &any.Any{
@@ -308,6 +316,7 @@ func (l *Loadbot) Run() error {
 		Nonce:         nonce,
 		ChainID:       l.cfg.ChainID,
 		SenderAddress: sender.Address,
+		RecieverAddress: l.cfg.Receiver,
 		SenderKey:     sender.PrivateKey,
 		GasPrice:      gasPrice,
 		Value:         l.cfg.Value,
@@ -323,7 +332,7 @@ func (l *Loadbot) Run() error {
 	switch l.cfg.GeneratorMode {
 	case transfer:
 		txnGenerator, genErr = generator.NewTransferGenerator(generatorParams)
-	case deploy, erc20:
+	default:
 		txnGenerator, genErr = generator.NewDeployGenerator(generatorParams)
 	}
 
@@ -381,7 +390,8 @@ func (l *Loadbot) Run() error {
 			// run different transactions for different modes
 			if l.cfg.GeneratorMode == erc20 {
 					// Execute ERC20 Contract token transaction and report any errors
-				txHash, err = l.executeTxn(grpcClient, "transaction")
+				contractAddr := types.Address(l.metrics.ContractAddress)
+				txHash, err = l.executeTxn(grpcClient, "erc20Transfer", &contractAddr)
 				if err != nil {
 					l.generator.MarkFailedTxn(&generator.FailedTxnInfo{
 						Index:  index,
@@ -397,7 +407,7 @@ func (l *Loadbot) Run() error {
 				}
 			} else {
 			// Execute the transaction
-			txHash, err = l.executeTxn(grpcClient, "transaction")
+			txHash, err = l.executeTxn(grpcClient, "transaction", &types.ZeroAddress)
 			if err != nil {
 				l.generator.MarkFailedTxn(&generator.FailedTxnInfo{
 					Index:  index,

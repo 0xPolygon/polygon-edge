@@ -290,7 +290,7 @@ func (l *LoadbotCommand) Run(args []string) int {
 
 		// configure parameters for smart contract constructor
 		var err error
-		constructorArgs, err = abi.Encode([]string{"4300000000","ZexCoin","ZEX"},contractArtifact.ABI.Constructor.Inputs)
+		constructorArgs, err = abi.Encode([]string{"4314500000","ZexCoin","ZEX"},contractArtifact.ABI.Constructor.Inputs)
 		if err != nil {
 			log.Fatalln("Could not encode constructor parameters: "+err.Error())
 		}

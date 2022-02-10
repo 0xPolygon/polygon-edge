@@ -8,6 +8,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/loadbot/generator"
 	"github.com/0xPolygon/polygon-edge/helper/tests"
 	txpoolOp "github.com/0xPolygon/polygon-edge/txpool/proto"
+	"github.com/0xPolygon/polygon-edge/types"
 
 	"github.com/umbracle/go-web3/jsonrpc"
 )
@@ -24,7 +25,7 @@ func (l *Loadbot) deployContract(
 			start := time.Now()
 
 			// deploy ERC20 smart contract
-			txHash, err := l.executeTxn(grpcClient, "contract")
+			txHash, err := l.executeTxn(grpcClient, "contract", &types.ZeroAddress)
 			if err != nil {
 				l.generator.MarkFailedContractTxn(&generator.FailedContractTxnInfo{
 					TxHash: txHash.String(),
