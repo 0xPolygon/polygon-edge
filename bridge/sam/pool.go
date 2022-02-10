@@ -195,12 +195,10 @@ func (p *pool) tryToPromoteAndDemoteAll() {
 
 	p.messageSignatures.RangeMessages(func(entry *signedMessageEntry) bool {
 		id := entry.Message.ID
-
-		isKnown, ok := p.knownMap.Load(id)
+		isKnown := p.knows(id)
 		numSignatures := entry.NumSignatures()
-		isReady := numSignatures >= threshold && ok && isKnown.(bool)
 
-		if isReady {
+		if numSignatures >= threshold && isKnown {
 			p.promote(id)
 		} else {
 			p.demote(id)
