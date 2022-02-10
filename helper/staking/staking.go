@@ -150,6 +150,7 @@ func PredeployStakingSC(
 	if minValidatorCount > maxValidatorCount {
 		return nil, fmt.Errorf("minimum number of validator can not be greater than maximum number of validator")
 	}
+
 	if maxValidatorCount > math.MaxUint32 {
 		maxValidatorCount = math.MaxUint32
 	}
