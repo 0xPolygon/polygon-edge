@@ -68,6 +68,24 @@ func (t *TxPoolSubscribeCommand) DefineFlags() {
 		ArgumentsOptional: true,
 		FlagOptional:      true,
 	}
+
+	t.FlagMap["pruned-promoted"] = helper.FlagDescriptor{
+		Description: "Subscribes for pruned promoted tx events in the TxPool",
+		Arguments: []string{
+			"LISTEN_PRUNED_PROMOTED",
+		},
+		ArgumentsOptional: true,
+		FlagOptional:      true,
+	}
+
+	t.FlagMap["pruned-enqueued"] = helper.FlagDescriptor{
+		Description: "Subscribes for pruned enqueued tx events in the TxPool",
+		Arguments: []string{
+			"LISTEN_PRUNED_ENQUEUED",
+		},
+		ArgumentsOptional: true,
+		FlagOptional:      true,
+	}
 }
 
 // GetHelperText returns a simple description of the command
@@ -96,11 +114,13 @@ func (t *TxPoolSubscribeCommand) Run(args []string) int {
 	flags := t.Base.NewFlagSet(t.GetBaseCommand(), t.Formatter, t.GRPC)
 
 	var (
-		added    bool
-		promoted bool
-		enqueued bool
-		dropped  bool
-		demoted  bool
+		added          bool
+		promoted       bool
+		enqueued       bool
+		dropped        bool
+		demoted        bool
+		prunedPromoted bool
+		prunedEnqueued bool
 	)
 
 	flags.BoolVar(&added, "added", false, "")
@@ -108,6 +128,8 @@ func (t *TxPoolSubscribeCommand) Run(args []string) int {
 	flags.BoolVar(&enqueued, "enqueued", false, "")
 	flags.BoolVar(&dropped, "dropped", false, "")
 	flags.BoolVar(&demoted, "demoted", false, "")
+	flags.BoolVar(&prunedPromoted, "pruned-promoted", false, "")
+	flags.BoolVar(&prunedEnqueued, "pruned-enqueued", false, "")
 
 	if err := flags.Parse(args); err != nil {
 		t.Formatter.OutputError(err)
@@ -136,6 +158,14 @@ func (t *TxPoolSubscribeCommand) Run(args []string) int {
 		eventTypes = append(eventTypes, txpoolProto.EventType_DEMOTED)
 	}
 
+	if prunedPromoted {
+		eventTypes = append(eventTypes, txpoolProto.EventType_PRUNED_PROMOTED)
+	}
+
+	if prunedEnqueued {
+		eventTypes = append(eventTypes, txpoolProto.EventType_PRUNED_ENQUEUED)
+	}
+
 	if len(eventTypes) == 0 {
 		// Any kind of event subscription is default
 		eventTypes = append(
@@ -145,6 +175,8 @@ func (t *TxPoolSubscribeCommand) Run(args []string) int {
 			txpoolProto.EventType_ENQUEUED,
 			txpoolProto.EventType_DROPPED,
 			txpoolProto.EventType_DEMOTED,
+			txpoolProto.EventType_PRUNED_PROMOTED,
+			txpoolProto.EventType_PRUNED_ENQUEUED,
 		)
 	}
 
