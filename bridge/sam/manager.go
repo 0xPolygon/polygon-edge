@@ -151,7 +151,7 @@ func (m *manager) handleGossippedMessage(obj interface{}) {
 	m.isValidatorLock.RLock()
 	isValidator := m.isValidator[addr]
 
-	defer m.isValidatorLock.RUnlock()
+	m.isValidatorLock.RUnlock()
 
 	if !isValidator {
 		m.logger.Warn("ignored gossip message from non-validator", "ID", msg.Id, "from", types.AddressToString(addr))

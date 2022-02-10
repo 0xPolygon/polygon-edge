@@ -59,8 +59,7 @@ func (p *pool) Add(msg *SignedMessage) {
 	p.changeValidatorsLock.RLock()
 	defer p.changeValidatorsLock.RUnlock()
 
-	consumed, ok := p.consumedMap.Load(msg.ID)
-	if ok && consumed.(bool) {
+	if p.hasConsumed(msg.ID) {
 		// we do no longer put the signature if the message has been consumed
 		return
 	}
@@ -83,6 +82,30 @@ func (p *pool) Consume(id uint64) {
 		p.readyMap.Delete(id)
 		p.knownMap.Delete(id)
 	}
+}
+
+// knows returns the flag indicating the message is known
+func (p *pool) knows(id uint64) bool {
+	raw, ok := p.knownMap.Load(id)
+	if !ok {
+		return false
+	}
+
+	known, ok := raw.(bool)
+
+	return ok && known
+}
+
+// consumed returns the flag indicating the message is consumed
+func (p *pool) hasConsumed(id uint64) bool {
+	raw, ok := p.consumedMap.Load(id)
+	if !ok {
+		return false
+	}
+
+	consumed, ok := raw.(bool)
+
+	return ok && consumed
 }
 
 // GetReadyMessages returns the messages with enough signatures
@@ -138,18 +161,16 @@ func (p *pool) UpdateValidatorSet(validators []types.Address, threshold uint64) 
 // canPromote return the flag indicating it's possible to change status to ready
 // message need to have enough signatures and be known by pool for promotion
 func (p *pool) canPromote(id uint64) bool {
-	isKnown, ok := p.knownMap.Load(id)
+	isKnown := p.knows(id)
 	numSignatures := p.messageSignatures.GetSignatureCount(id)
 	threshold := atomic.LoadUint64(&p.threshold)
 
-	return ok && isKnown.(bool) && numSignatures >= threshold
+	return isKnown && numSignatures >= threshold
 }
 
 // canDemote return the flag indicating it's possible to change status to pending
 func (p *pool) canDemote(id uint64) bool {
-	isReady, ok := p.readyMap.Load(id)
-
-	return !p.canPromote(id) && ok && isReady.(bool)
+	return !p.canPromote(id)
 }
 
 // tryToPromote checks the number of signatures and threshold and update message status to ready if need
