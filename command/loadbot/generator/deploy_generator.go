@@ -3,10 +3,11 @@ package generator
 import (
 	"encoding/hex"
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/crypto"
-	"github.com/0xPolygon/polygon-edge/types"
 	"math/big"
 	"sync/atomic"
+
+	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 type DeployGenerator struct {
@@ -33,13 +34,14 @@ func NewDeployGenerator(params *GeneratorParams) (*DeployGenerator, error) {
 		params:     params,
 		signer:     crypto.NewEIP155Signer(params.ChainID),
 	}
-
+	
 	buf, err := hex.DecodeString(params.ContractArtifact.Bytecode)
 	if err != nil {
 		return nil, fmt.Errorf("unable to decode bytecode, %w", err)
 	}
 
 	deployGenerator.contractBytecode = buf
+	deployGenerator.contractBytecode = append(deployGenerator.contractBytecode, params.ConstructorArgs...)
 
 	return deployGenerator, nil
 }

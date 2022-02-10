@@ -4,13 +4,14 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/command/loadbot/generator"
-	txpoolOp "github.com/0xPolygon/polygon-edge/txpool/proto"
-	"github.com/golang/protobuf/ptypes/any"
 	"math/big"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/0xPolygon/polygon-edge/command/loadbot/generator"
+	txpoolOp "github.com/0xPolygon/polygon-edge/txpool/proto"
+	"github.com/golang/protobuf/ptypes/any"
 
 	"github.com/0xPolygon/polygon-edge/helper/tests"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -33,6 +34,7 @@ type Mode string
 const (
 	transfer Mode = "transfer"
 	deploy   Mode = "deploy"
+	erc20    Mode = "erc20"
 )
 
 type Account struct {
@@ -54,6 +56,7 @@ type Configuration struct {
 	GasPrice         *big.Int
 	GasLimit         *big.Int
 	ContractArtifact *generator.ContractArtifact
+	ConstructorArgs  []byte // smart contract constructor args
 }
 
 type metadata struct {
@@ -87,6 +90,9 @@ type ExecDuration struct {
 
 	// TotalExecTime is the total execution time for a single loadbot run
 	TotalExecTime time.Duration
+
+	// gas per block used
+	GasUsed map[uint64]uint64
 }
 
 // calcTurnAroundMetrics updates the turn around metrics based on the turnAroundMap
@@ -156,6 +162,13 @@ type Metrics struct {
 	TotalTransactionsSentCount uint64
 	FailedTransactionsCount    uint64
 	TransactionDuration        ExecDuration
+
+	// contracts
+	FailedContractTransactionsCount uint64
+	ContractDeploymentDuration ExecDuration
+	ContractAddress web3.Address
+
+	CumulativeGasUsed uint64
 }
 
 type Loadbot struct {
@@ -227,12 +240,19 @@ func estimateGas(client *jsonrpc.Client, txn *types.Transaction) (uint64, error)
 
 func (l *Loadbot) executeTxn(
 	client txpoolOp.TxnPoolOperatorClient,
+	mode string,
 ) (web3.Hash, error) {
-	txn, err := l.generator.GenerateTransaction()
-	if err != nil {
-		return web3.Hash{}, err
-	}
-
+	var (
+		txn *types.Transaction
+		err error
+	)
+	if ( mode == "contract" || mode == "transaction") {
+		txn, err = l.generator.GenerateTransaction()
+		if err != nil {
+			return web3.Hash{}, err
+		}
+	} 
+	
 	addReq := &txpoolOp.AddTxnReq{
 		Raw: &any.Any{
 			Value: txn.MarshalRLP(),
@@ -244,7 +264,6 @@ func (l *Loadbot) executeTxn(
 	if addErr != nil {
 		return web3.Hash{}, fmt.Errorf("unable to add transaction, %w", addErr)
 	}
-
 	return web3.Hash(types.StringToHash(addRes.TxHash)), nil
 }
 
@@ -292,6 +311,8 @@ func (l *Loadbot) Run() error {
 		SenderKey:     sender.PrivateKey,
 		GasPrice:      gasPrice,
 		Value:         l.cfg.Value,
+		ContractArtifact: l.cfg.ContractArtifact,
+		ConstructorArgs: l.cfg.ConstructorArgs,
 	}
 
 	var (
@@ -302,7 +323,7 @@ func (l *Loadbot) Run() error {
 	switch l.cfg.GeneratorMode {
 	case transfer:
 		txnGenerator, genErr = generator.NewTransferGenerator(generatorParams)
-	case deploy:
+	case deploy, erc20:
 		txnGenerator, genErr = generator.NewDeployGenerator(generatorParams)
 	}
 
@@ -340,6 +361,9 @@ func (l *Loadbot) Run() error {
 
 	startTime := time.Now()
 
+	// deploy contracts
+	l.deployContract(grpcClient, jsonClient, receiptTimeout)
+
 	for i := uint64(0); i < l.cfg.Count; i++ {
 		<-ticker.C
 
@@ -350,11 +374,30 @@ func (l *Loadbot) Run() error {
 		go func(index uint64) {
 			defer wg.Done()
 
+			var txHash web3.Hash
 			// Start the performance timer
 			start := time.Now()
 
+			// run different transactions for different modes
+			if l.cfg.GeneratorMode == erc20 {
+					// Execute ERC20 Contract token transaction and report any errors
+				txHash, err = l.executeTxn(grpcClient, "transaction")
+				if err != nil {
+					l.generator.MarkFailedTxn(&generator.FailedTxnInfo{
+						Index:  index,
+						TxHash: txHash.String(),
+						Error: &generator.TxnError{
+							Error:     err,
+							ErrorType: generator.AddErrorType,
+						},
+					})
+					atomic.AddUint64(&l.metrics.FailedTransactionsCount, 1)
+
+					return
+				}
+			} else {
 			// Execute the transaction
-			txHash, err := l.executeTxn(grpcClient)
+			txHash, err = l.executeTxn(grpcClient, "transaction")
 			if err != nil {
 				l.generator.MarkFailedTxn(&generator.FailedTxnInfo{
 					Index:  index,
@@ -368,11 +411,12 @@ func (l *Loadbot) Run() error {
 
 				return
 			}
-
+		}
 			ctx, cancel := context.WithTimeout(context.Background(), receiptTimeout)
 			defer cancel()
 
 			receipt, err := tests.WaitForReceipt(ctx, jsonClient.Eth(), txHash)
+			
 			if err != nil {
 				l.generator.MarkFailedTxn(&generator.FailedTxnInfo{
 					Index:  index,

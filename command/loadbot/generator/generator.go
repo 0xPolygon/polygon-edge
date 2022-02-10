@@ -3,9 +3,11 @@ package generator
 import (
 	"crypto/ecdsa"
 	"encoding/json"
-	"github.com/0xPolygon/polygon-edge/types"
 	"io/ioutil"
 	"math/big"
+
+	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/umbracle/go-web3/abi"
 )
 
 type TransactionGenerator interface {
@@ -13,6 +15,7 @@ type TransactionGenerator interface {
 	GetExampleTransaction() (*types.Transaction, error)
 	GetTransactionErrors() []*FailedTxnInfo
 	MarkFailedTxn(failedTxn *FailedTxnInfo)
+	MarkFailedContractTxn(failedContractTxn *FailedContractTxnInfo)
 	SetGasEstimate(gasEstimate uint64)
 }
 
@@ -21,6 +24,7 @@ type TxnErrorType string
 const (
 	ReceiptErrorType TxnErrorType = "ReceiptErrorType"
 	AddErrorType     TxnErrorType = "AddErrorType"
+	ContractDeployType     TxnErrorType = "ContractDeployErrorType"
 )
 
 const (
@@ -30,6 +34,7 @@ const (
 
 type ContractArtifact struct {
 	Bytecode string `json:"bytecode"`
+	ABI *abi.ABI `json:"abi"`
 }
 
 type TxnError struct {
@@ -43,6 +48,11 @@ type FailedTxnInfo struct {
 	Error  *TxnError
 }
 
+type FailedContractTxnInfo struct {
+	TxHash string
+	Error *TxnError
+}
+
 type GeneratorParams struct {
 	Nonce            uint64
 	ChainID          uint64
@@ -51,6 +61,7 @@ type GeneratorParams struct {
 	Value            *big.Int
 	GasPrice         *big.Int
 	ContractArtifact *ContractArtifact
+	ConstructorArgs []byte // smart contract constructor arguments
 }
 
 // ReadContractArtifact reads the contract bytecode from the specified path

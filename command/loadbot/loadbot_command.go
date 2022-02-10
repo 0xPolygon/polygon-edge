@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"log"
 	"math"
 	"math/big"
 	"net"
 	"net/url"
-	"sort"
 	"strings"
 
 	"github.com/0xPolygon/polygon-edge/command/helper"
@@ -16,6 +16,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/go-web3"
+	"github.com/umbracle/go-web3/abi"
 )
 
 type LoadbotCommand struct {
@@ -200,7 +201,7 @@ func (l *LoadbotCommand) Run(args []string) int {
 	}
 
 	convMode := Mode(strings.ToLower(mode))
-	if convMode != transfer && convMode != deploy {
+	if convMode != transfer && convMode != deploy && convMode != erc20 {
 		l.Formatter.OutputError(errors.New("invalid loadbot mode"))
 
 		return 1
@@ -217,6 +218,9 @@ func (l *LoadbotCommand) Run(args []string) int {
 
 		bigGasLimit *big.Int
 		gasLimitErr error
+
+		constructorArgs []byte
+
 	)
 
 	// Parse the gas price
@@ -274,12 +278,28 @@ func (l *LoadbotCommand) Run(args []string) int {
 	}
 
 	var (
+		contractArtifact = &generator.ContractArtifact{}
+		readErr error
+	)
+
+	if convMode == erc20 {
+		contractArtifact = &generator.ContractArtifact{
+			Bytecode: ERC20BIN,
+			ABI: abi.MustNewABI(ERC20ABI),
+		}
+
+		// configure parameters for smart contract constructor
+		var err error
+		constructorArgs, err = abi.Encode([]string{"4300000000","ZexCoin","ZEX"},contractArtifact.ABI.Constructor.Inputs)
+		if err != nil {
+			log.Fatalln("Could not encode constructor parameters: "+err.Error())
+		}
+
+	} else {
 		contractArtifact = &generator.ContractArtifact{
 			Bytecode: generator.DefaultContractBytecode,
 		}
-
-		readErr error
-	)
+	}
 
 	if contractPath != "" {
 		// Try to read the contract bytecode from the JSON path
@@ -290,6 +310,9 @@ func (l *LoadbotCommand) Run(args []string) int {
 			return 1
 		}
 	}
+
+	
+
 
 	configuration := &Configuration{
 		TPS:              tps,
@@ -305,6 +328,7 @@ func (l *LoadbotCommand) Run(args []string) int {
 		GasPrice:         bigGasPrice,
 		GasLimit:         bigGasLimit,
 		ContractArtifact: contractArtifact,
+		ConstructorArgs: constructorArgs,
 	}
 
 	// Create the metrics placeholder
@@ -312,6 +336,9 @@ func (l *LoadbotCommand) Run(args []string) int {
 		TotalTransactionsSentCount: 0,
 		FailedTransactionsCount:    0,
 		TransactionDuration: ExecDuration{
+			blockTransactions: make(map[uint64]uint64),
+		},
+		ContractDeploymentDuration: ExecDuration{
 			blockTransactions: make(map[uint64]uint64),
 		},
 	}
@@ -375,6 +402,11 @@ type LoadbotResult struct {
 	BlockData         TxnBlockData         `json:"blockData"`
 	DetailedErrorData TxnDetailedErrorData `json:"detailedErrorData,omitempty"`
 	ApproxTPS         uint64               `json:"approxTps"`
+	CumulativeGasUsed uint64 							 `json:"cumulativeGasUsed"`
+	// contract deployment Results
+	ContractTurnAroundData TxnTurnAroundData `json:"contractTurnaroundData"`
+	ContractBlockData TxnBlockData `json:"contractBlockData"`
+	ContractAddress string `json:"contractAddress"`
 }
 
 func (lr *LoadbotResult) extractExecutionData(metrics *Metrics) {
@@ -407,6 +439,36 @@ func (lr *LoadbotResult) extractExecutionData(metrics *Metrics) {
 		BlocksRequired:       uint64(len(metrics.TransactionDuration.blockTransactions)),
 		BlockTransactionsMap: metrics.TransactionDuration.blockTransactions,
 	}
+
+	// contract deplyment trunaround data
+	lr.ContractTurnAroundData.FastestTurnAround = common.ToFixedFloat(
+		metrics.ContractDeploymentDuration.FastestTurnAround.Seconds(),
+		durationPrecision,
+	)
+
+	lr.ContractTurnAroundData.SlowestTurnAround = common.ToFixedFloat(
+		metrics.ContractDeploymentDuration.SlowestTurnAround.Seconds(),
+		durationPrecision,
+	)
+
+	lr.ContractTurnAroundData.AverageTurnAround = common.ToFixedFloat(
+		metrics.ContractDeploymentDuration.AverageTurnAround.Seconds(),
+		durationPrecision,
+	)
+
+	lr.ContractTurnAroundData.TotalExecTime = common.ToFixedFloat(
+		metrics.ContractDeploymentDuration.TotalExecTime.Seconds(),
+		durationPrecision,
+	)
+
+	lr.ContractBlockData = TxnBlockData{
+		BlocksRequired:       uint64(len(metrics.ContractDeploymentDuration.blockTransactions)),
+		BlockTransactionsMap: metrics.ContractDeploymentDuration.blockTransactions,
+	}
+
+	lr.ContractAddress = metrics.ContractAddress.String()
+
+
 }
 
 func (lr *LoadbotResult) extractDetailedErrors(gen generator.TransactionGenerator) {
@@ -454,34 +516,20 @@ func (lr *LoadbotResult) Output() string {
 		fmt.Sprintf("Total loadbot execution time|%fs", lr.TurnAroundData.TotalExecTime),
 	}))
 
+	buffer.WriteString("\n\n[CONTRACT DEPLOYMENT DATA]\n")
+	buffer.WriteString(helper.FormatKV([]string{
+		fmt.Sprintf("Contract address|%s", lr.ContractAddress),
+		fmt.Sprintf("Total execution time|%fs", lr.ContractTurnAroundData.TotalExecTime),
+		fmt.Sprintf("Blocks required|%d", lr.ContractBlockData.BlocksRequired),
+	}))
+	displayTxnsInBlocks(&buffer, lr.ContractBlockData)
+
 	buffer.WriteString("\n\n[BLOCK DATA]\n")
 	buffer.WriteString(helper.FormatKV([]string{
 		fmt.Sprintf("Blocks required|%d", lr.BlockData.BlocksRequired),
 	}))
 
-	if lr.BlockData.BlocksRequired != 0 {
-		buffer.WriteString("\n\n")
-
-		keys := make([]uint64, 0, lr.BlockData.BlocksRequired)
-
-		for k := range lr.BlockData.BlockTransactionsMap {
-			keys = append(keys, k)
-		}
-
-		sort.Slice(keys, func(i, j int) bool {
-			return keys[i] < keys[j]
-		})
-
-		formattedStrings := make([]string, 0)
-
-		for _, blockNumber := range keys {
-			formattedStrings = append(formattedStrings,
-				fmt.Sprintf("Block #%d|%d txns", blockNumber, lr.BlockData.BlockTransactionsMap[blockNumber]),
-			)
-		}
-
-		buffer.WriteString(helper.FormatKV(formattedStrings))
-	}
+	displayTxnsInBlocks(&buffer, lr.BlockData)
 
 	// Write out the error logs if detailed view
 	// is requested
