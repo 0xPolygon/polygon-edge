@@ -143,18 +143,18 @@ func (p *pool) UpdateValidatorSet(validators []types.Address, threshold uint64) 
 	p.validators = validators
 	atomic.StoreUint64(&p.threshold, threshold)
 
-	removed := diffAddresses(oldValidators, validators)
-
 	var maybeDemotableIDs []uint64
-	if len(removed) > 0 {
+	if removed := diffAddresses(oldValidators, validators); len(removed) > 0 {
 		maybeDemotableIDs = p.messageSignatures.RemoveSignatures(removed)
 	}
 
-	// we need to check all messages if threshold changes
 	if oldThreshold != threshold {
+		// we need to check all messages if threshold changes
 		p.tryToPromoteAndDemoteAll()
 	} else if len(maybeDemotableIDs) > 0 {
-		p.tryToDemote(maybeDemotableIDs)
+		for _, id := range maybeDemotableIDs {
+			p.tryToDemote(id)
+		}
 	}
 }
 
@@ -181,11 +181,9 @@ func (p *pool) tryToPromote(id uint64) {
 }
 
 // tryToDemote checks the number of signatures and threshold and update message status to pending if need
-func (p *pool) tryToDemote(ids []uint64) {
-	for _, id := range ids {
-		if p.canDemote(id) {
-			p.demote(id)
-		}
+func (p *pool) tryToDemote(id uint64) {
+	if p.canDemote(id) {
+		p.demote(id)
 	}
 }
 

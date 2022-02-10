@@ -440,7 +440,7 @@ func Test_messageSignaturesStore_RangeMessage(t *testing.T) {
 	)
 
 	for id, expectedAddrs := range expected {
-		assert.Equalf(
+		assert.ElementsMatch(
 			t,
 			expectedAddrs,
 			actual[id],
