@@ -14,83 +14,83 @@ import (
 // is compatible with the grpc package it is being compiled against.
 const _ = grpc.SupportPackageIsVersion7
 
-// IbftClient is the client API for Ibft service.
+// SamClient is the client API for Sam service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
-type IbftClient interface {
+type SamClient interface {
 	PublishSignedMessage(ctx context.Context, in *SignedMessage, opts ...grpc.CallOption) (*empty.Empty, error)
 }
 
-type ibftClient struct {
+type samClient struct {
 	cc grpc.ClientConnInterface
 }
 
-func NewIbftClient(cc grpc.ClientConnInterface) IbftClient {
-	return &ibftClient{cc}
+func NewSamClient(cc grpc.ClientConnInterface) SamClient {
+	return &samClient{cc}
 }
 
-func (c *ibftClient) PublishSignedMessage(ctx context.Context, in *SignedMessage, opts ...grpc.CallOption) (*empty.Empty, error) {
+func (c *samClient) PublishSignedMessage(ctx context.Context, in *SignedMessage, opts ...grpc.CallOption) (*empty.Empty, error) {
 	out := new(empty.Empty)
-	err := c.cc.Invoke(ctx, "/v1.Ibft/PublishSignedMessage", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/v1.Sam/PublishSignedMessage", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-// IbftServer is the server API for Ibft service.
-// All implementations must embed UnimplementedIbftServer
+// SamServer is the server API for Sam service.
+// All implementations must embed UnimplementedSamServer
 // for forward compatibility
-type IbftServer interface {
+type SamServer interface {
 	PublishSignedMessage(context.Context, *SignedMessage) (*empty.Empty, error)
-	mustEmbedUnimplementedIbftServer()
+	mustEmbedUnimplementedSamServer()
 }
 
-// UnimplementedIbftServer must be embedded to have forward compatible implementations.
-type UnimplementedIbftServer struct {
+// UnimplementedSamServer must be embedded to have forward compatible implementations.
+type UnimplementedSamServer struct {
 }
 
-func (UnimplementedIbftServer) PublishSignedMessage(context.Context, *SignedMessage) (*empty.Empty, error) {
+func (UnimplementedSamServer) PublishSignedMessage(context.Context, *SignedMessage) (*empty.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PublishSignedMessage not implemented")
 }
-func (UnimplementedIbftServer) mustEmbedUnimplementedIbftServer() {}
+func (UnimplementedSamServer) mustEmbedUnimplementedSamServer() {}
 
-// UnsafeIbftServer may be embedded to opt out of forward compatibility for this service.
-// Use of this interface is not recommended, as added methods to IbftServer will
+// UnsafeSamServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to SamServer will
 // result in compilation errors.
-type UnsafeIbftServer interface {
-	mustEmbedUnimplementedIbftServer()
+type UnsafeSamServer interface {
+	mustEmbedUnimplementedSamServer()
 }
 
-func RegisterIbftServer(s grpc.ServiceRegistrar, srv IbftServer) {
-	s.RegisterService(&_Ibft_serviceDesc, srv)
+func RegisterSamServer(s grpc.ServiceRegistrar, srv SamServer) {
+	s.RegisterService(&_Sam_serviceDesc, srv)
 }
 
-func _Ibft_PublishSignedMessage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _Sam_PublishSignedMessage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(SignedMessage)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(IbftServer).PublishSignedMessage(ctx, in)
+		return srv.(SamServer).PublishSignedMessage(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/v1.Ibft/PublishSignedMessage",
+		FullMethod: "/v1.Sam/PublishSignedMessage",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(IbftServer).PublishSignedMessage(ctx, req.(*SignedMessage))
+		return srv.(SamServer).PublishSignedMessage(ctx, req.(*SignedMessage))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-var _Ibft_serviceDesc = grpc.ServiceDesc{
-	ServiceName: "v1.Ibft",
-	HandlerType: (*IbftServer)(nil),
+var _Sam_serviceDesc = grpc.ServiceDesc{
+	ServiceName: "v1.Sam",
+	HandlerType: (*SamServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
 			MethodName: "PublishSignedMessage",
-			Handler:    _Ibft_PublishSignedMessage_Handler,
+			Handler:    _Sam_PublishSignedMessage_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -6,7 +6,7 @@ option go_package = "/bridge/sam/proto";
 
 import "google/protobuf/empty.proto";
 
-service Ibft {
+service Sam {
     rpc PublishSignedMessage(SignedMessage) returns (google.protobuf.Empty);
 }
 
