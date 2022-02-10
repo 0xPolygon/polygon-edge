@@ -69,6 +69,7 @@ func NewTestServer(t *testing.T, rootDir string, callback TestServerConfigCallba
 		LibP2PPort:    ports[1].Port(),
 		JSONRPCPort:   ports[2].Port(),
 		RootDir:       rootDir,
+		Signer:        crypto.NewEIP155Signer(100),
 	}
 
 	if callback != nil {
@@ -358,17 +359,36 @@ func (t *TestServer) Start(ctx context.Context) error {
 	return err
 }
 
+// SignTx is a helper method for signing transactions
+func (t *TestServer) SignTx(
+	transaction *types.Transaction,
+	privateKey *ecdsa.PrivateKey,
+) (*types.Transaction, error) {
+	return t.Config.Signer.SignTx(transaction, privateKey)
+}
+
 // DeployContract deploys a contract with account 0 and returns the address
-func (t *TestServer) DeployContract(ctx context.Context, binary string) (web3.Address, error) {
+func (t *TestServer) DeployContract(
+	ctx context.Context,
+	binary string,
+	privateKey *ecdsa.PrivateKey,
+) (web3.Address, error) {
 	buf, err := hex.DecodeString(binary)
 	if err != nil {
 		return web3.Address{}, err
 	}
 
-	receipt, err := t.SendTxn(ctx, &web3.Transaction{
-		Input: buf,
-	})
+	sender, err := crypto.GetAddressFromKey(privateKey)
+	if err != nil {
+		return web3.ZeroAddress, fmt.Errorf("unable to extract key, %w", err)
+	}
 
+	receipt, err := t.SendRawTx(ctx, &PreparedTransaction{
+		From:     sender,
+		Gas:      DefaultGasLimit,
+		GasPrice: big.NewInt(DefaultGasPrice),
+		Input:    buf,
+	}, privateKey)
 	if err != nil {
 		return web3.Address{}, err
 	}
@@ -380,31 +400,6 @@ const (
 	DefaultGasPrice = 1879048192 // 0x70000000
 	DefaultGasLimit = 5242880    // 0x500000
 )
-
-var emptyAddr web3.Address
-
-func (t *TestServer) SendTxn(ctx context.Context, txn *web3.Transaction) (*web3.Receipt, error) {
-	client := t.JSONRPC()
-
-	if txn.From == emptyAddr {
-		txn.From = web3.Address(t.Config.PremineAccts[0].Addr)
-	}
-
-	if txn.GasPrice == 0 {
-		txn.GasPrice = DefaultGasPrice
-	}
-
-	if txn.Gas == 0 {
-		txn.Gas = DefaultGasLimit
-	}
-
-	hash, err := client.Eth().SendTransaction(txn)
-	if err != nil {
-		return nil, err
-	}
-
-	return tests.WaitForReceipt(ctx, t.JSONRPC().Eth(), hash)
-}
 
 type PreparedTransaction struct {
 	From     types.Address
@@ -421,7 +416,6 @@ func (t *TestServer) SendRawTx(
 	tx *PreparedTransaction,
 	signerKey *ecdsa.PrivateKey,
 ) (*web3.Receipt, error) {
-	signer := crypto.NewEIP155Signer(100)
 	client := t.JSONRPC()
 
 	nextNonce, err := client.Eth().GetNonce(web3.Address(tx.From), web3.Latest)
@@ -429,7 +423,7 @@ func (t *TestServer) SendRawTx(
 		return nil, err
 	}
 
-	signedTx, err := signer.SignTx(&types.Transaction{
+	signedTx, err := t.SignTx(&types.Transaction{
 		From:     tx.From,
 		GasPrice: tx.GasPrice,
 		Gas:      tx.Gas,
@@ -497,12 +491,26 @@ func (t *TestServer) WaitForReady(ctx context.Context) error {
 	return err
 }
 
-func (t *TestServer) TxnTo(ctx context.Context, address web3.Address, method string) *web3.Receipt {
+func (t *TestServer) InvokeMethod(
+	ctx context.Context,
+	contractAddress types.Address,
+	method string,
+	fromKey *ecdsa.PrivateKey,
+) *web3.Receipt {
 	sig := MethodSig(method)
-	receipt, err := t.SendTxn(ctx, &web3.Transaction{
-		To:    &address,
-		Input: sig,
-	})
+
+	fromAddress, err := crypto.GetAddressFromKey(fromKey)
+	if err != nil {
+		t.t.Fatalf("unable to extract key, %v", err)
+	}
+
+	receipt, err := t.SendRawTx(ctx, &PreparedTransaction{
+		Gas:      DefaultGasLimit,
+		GasPrice: big.NewInt(DefaultGasPrice),
+		To:       &contractAddress,
+		From:     fromAddress,
+		Input:    sig,
+	}, fromKey)
 
 	if err != nil {
 		t.t.Fatal(err)

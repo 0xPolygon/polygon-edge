@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"errors"
+	"fmt"
 	"io"
 	"math/big"
 	"sync"
@@ -296,6 +297,7 @@ func TestTxPool_TransactionCoalescing(t *testing.T) {
 type testAccount struct {
 	key     *ecdsa.PrivateKey
 	address types.Address
+	balance *big.Int
 }
 
 func generateTestAccounts(t *testing.T, numAccounts int) []*testAccount {
@@ -319,7 +321,7 @@ func TestTxPool_StressAddition(t *testing.T) {
 	defaultBalance := framework.EthToWei(10000)
 
 	// Each account should add 50 transactions
-	numAccounts := 4
+	numAccounts := 10
 	numTxPerAccount := 50
 
 	testAccounts := generateTestAccounts(t, numAccounts)
@@ -360,42 +362,78 @@ func TestTxPool_StressAddition(t *testing.T) {
 		return signedTx
 	}
 
-	var wg sync.WaitGroup
+	// Spawn numAccounts threads to act as sender workers that will send transactions.
+	// The sender worker forwards the transaction hash to the receipt worker.
+	// The numAccounts receipt worker threads wait for tx hashes to arrive and wait for their receipts
 
-	for _, account := range testAccounts {
-		for nonce := uint64(0); nonce < uint64(numTxPerAccount); nonce++ {
-			wg.Add(1)
+	var (
+		wg           sync.WaitGroup
+		errorsLock   sync.Mutex
+		workerErrors = make([]error, 0)
+	)
 
-			go func(account *testAccount, nonce uint64) {
-				defer wg.Done()
+	wg.Add(numAccounts)
 
-				tx := generateTx(account, nonce)
+	appendError := func(err error) {
+		errorsLock.Lock()
+		defer errorsLock.Unlock()
 
-				txHash, err := client.Eth().SendRawTransaction(tx.MarshalRLP())
-				if err != nil {
-					t.Errorf("Unable to send txn, %v", err)
+		workerErrors = append(workerErrors, err)
+	}
 
-					return
-				}
+	sendWorker := func(account *testAccount, receiptsChan chan web3.Hash) {
+		defer close(receiptsChan)
 
-				waitCtx, waitCancel := context.WithTimeout(context.Background(), time.Second*30)
-				defer waitCancel()
+		nonce := uint64(0)
 
-				// if we don't receive the receipt
-				// for the last tx from some account
-				// the test can be considered failed
-				// (also prevents broken pipe errors - tcp write
-				// by reducing the number of requests)
-				if nonce == uint64(numTxPerAccount)-1 {
-					if _, err := tests.WaitForReceipt(waitCtx, srv.JSONRPC().Eth(), txHash); err != nil {
-						t.Errorf("Unable to wait for receipt, %v", err)
-					}
-				}
-			}(account, nonce)
+		for i := 0; i < numTxPerAccount; i++ {
+			tx := generateTx(account, nonce)
+
+			txHash, err := client.Eth().SendRawTransaction(tx.MarshalRLP())
+			if err != nil {
+				appendError(fmt.Errorf("unable to send txn, %w", err))
+
+				return
+			}
+
+			receiptsChan <- txHash
+
+			nonce++
 		}
 	}
 
+	receiptWorker := func(receiptsChan chan web3.Hash) {
+		defer wg.Done()
+
+		for txHash := range receiptsChan {
+			waitCtx, waitCancel := context.WithTimeout(context.Background(), time.Second*30)
+
+			if _, err := tests.WaitForReceipt(waitCtx, srv.JSONRPC().Eth(), txHash); err != nil {
+				appendError(fmt.Errorf("unable to wait for receipt, %w", err))
+				waitCancel()
+
+				return
+			}
+
+			waitCancel()
+		}
+	}
+
+	for _, testAccount := range testAccounts {
+		receiptsCh := make(chan web3.Hash, numTxPerAccount)
+		go sendWorker(
+			testAccount,
+			receiptsCh,
+		)
+
+		go receiptWorker(receiptsCh)
+	}
+
 	wg.Wait()
+
+	if len(workerErrors) != 0 {
+		t.Fatalf("%v", workerErrors)
+	}
 
 	// Make sure the transactions went through
 	for _, account := range testAccounts {

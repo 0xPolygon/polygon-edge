@@ -6,6 +6,16 @@ var (
 	params = &subscribeParams{}
 )
 
+var (
+	addedFlag          = "added"
+	promotedFlag       = "promoted"
+	demotedFlag        = "demoted"
+	enqueuedFlag       = "enqueued"
+	droppedFlag        = "dropped"
+	prunedPromotedFlag = "pruned-promoted"
+	prunedEnqueuedFlag = "pruned-enqueued"
+)
+
 type subscribeParams struct {
 	eventSubscriptionMap map[proto.EventType]*bool
 	supportedEvents      []proto.EventType
@@ -14,11 +24,13 @@ type subscribeParams struct {
 func (sp *subscribeParams) initEventMap() {
 	falseRaw := false
 	sp.eventSubscriptionMap = map[proto.EventType]*bool{
-		proto.EventType_ADDED:    &falseRaw,
-		proto.EventType_ENQUEUED: &falseRaw,
-		proto.EventType_PROMOTED: &falseRaw,
-		proto.EventType_DROPPED:  &falseRaw,
-		proto.EventType_DEMOTED:  &falseRaw,
+		proto.EventType_ADDED:           &falseRaw,
+		proto.EventType_ENQUEUED:        &falseRaw,
+		proto.EventType_PROMOTED:        &falseRaw,
+		proto.EventType_DROPPED:         &falseRaw,
+		proto.EventType_DEMOTED:         &falseRaw,
+		proto.EventType_PRUNED_PROMOTED: &falseRaw,
+		proto.EventType_PRUNED_ENQUEUED: &falseRaw,
 	}
 }
 
@@ -51,5 +63,7 @@ func (sp *subscribeParams) setAllEvents() {
 		proto.EventType_PROMOTED,
 		proto.EventType_DROPPED,
 		proto.EventType_DEMOTED,
+		proto.EventType_PRUNED_PROMOTED,
+		proto.EventType_PRUNED_ENQUEUED,
 	}
 }

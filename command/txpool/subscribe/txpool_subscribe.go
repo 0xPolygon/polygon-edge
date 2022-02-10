@@ -29,33 +29,45 @@ func setFlags(cmd *cobra.Command) {
 
 	cmd.Flags().BoolVar(
 		params.eventSubscriptionMap[txpoolProto.EventType_ADDED],
-		"added",
+		addedFlag,
 		false,
 		"should subscribe to added events",
 	)
 	cmd.Flags().BoolVar(
 		params.eventSubscriptionMap[txpoolProto.EventType_PROMOTED],
-		"promoted",
+		promotedFlag,
 		false,
 		"should subscribe to promoted events",
 	)
 	cmd.Flags().BoolVar(
 		params.eventSubscriptionMap[txpoolProto.EventType_ENQUEUED],
-		"enqueued",
+		enqueuedFlag,
 		false,
 		"should subscribe to enqueued events",
 	)
 	cmd.Flags().BoolVar(
 		params.eventSubscriptionMap[txpoolProto.EventType_DROPPED],
-		"dropped",
+		droppedFlag,
 		false,
 		"should subscribe to dropped events",
 	)
 	cmd.Flags().BoolVar(
 		params.eventSubscriptionMap[txpoolProto.EventType_DEMOTED],
-		"demoted",
+		demotedFlag,
 		false,
 		"should subscribe to demoted events",
+	)
+	cmd.Flags().BoolVar(
+		params.eventSubscriptionMap[txpoolProto.EventType_PRUNED_PROMOTED],
+		prunedPromotedFlag,
+		false,
+		"should subscribe to pruned promoted tx events in the TxPool",
+	)
+	cmd.Flags().BoolVar(
+		params.eventSubscriptionMap[txpoolProto.EventType_PRUNED_ENQUEUED],
+		prunedEnqueuedFlag,
+		false,
+		"should subscribe to pruned enqueued tx events in the TxPool",
 	)
 }
 

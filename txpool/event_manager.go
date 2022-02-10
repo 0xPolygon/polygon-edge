@@ -66,10 +66,9 @@ func (em *eventManager) cancelSubscription(id subscriptionID) {
 
 	if subscription, ok := em.subscriptions[id]; ok {
 		subscription.close()
+		em.logger.Info(fmt.Sprintf("Canceled subscription %d", id))
 		delete(em.subscriptions, id)
 		atomic.AddInt64(&em.numSubscriptions, -1)
-
-		em.logger.Info(fmt.Sprintf("Canceled subscription %d", id))
 	}
 }
 

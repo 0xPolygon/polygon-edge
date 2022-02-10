@@ -1,8 +1,6 @@
 package crypto
 
 import (
-	"crypto"
-	"crypto/ecdsa"
 	"math/big"
 	"os"
 	"strconv"
@@ -158,21 +156,6 @@ func TestValidateSignatureValues(t *testing.T) {
 	}
 }
 
-func getAddressFromKey(t *testing.T, key crypto.PrivateKey) types.Address {
-	t.Helper()
-
-	privateKeyConv, ok := key.(*ecdsa.PrivateKey)
-	if !ok {
-		t.Fatalf("Unable to assert key type")
-	}
-
-	assert.NotNil(t, privateKeyConv)
-
-	publicKey := privateKeyConv.PublicKey
-
-	return PubKeyToAddress(&publicKey)
-}
-
 func TestPrivateKeyRead(t *testing.T) {
 	// Write private keys to disk, check if read is ok
 	testTable := []struct {
@@ -216,7 +199,11 @@ func TestPrivateKeyRead(t *testing.T) {
 			}
 
 			if !testCase.shouldFail {
-				address := getAddressFromKey(t, privateKey)
+				address, err := GetAddressFromKey(privateKey)
+				if err != nil {
+					t.Fatalf("unable to extract key, %v", err)
+				}
+
 				assert.Equal(t, testCase.checksummedAddress, address.String())
 			} else {
 				assert.Nil(t, privateKey)
@@ -238,7 +225,10 @@ func TestPrivateKeyGeneration(t *testing.T) {
 		t.Fatalf("Unable to generate private key, %v", err)
 	}
 
-	writtenAddress := getAddressFromKey(t, writtenKey)
+	writtenAddress, err := GetAddressFromKey(writtenKey)
+	if err != nil {
+		t.Fatalf("unable to extract key, %v", err)
+	}
 
 	// Read existing key and check if it matches
 	readKey, err := GenerateOrReadPrivateKey(tempFile)
@@ -246,7 +236,10 @@ func TestPrivateKeyGeneration(t *testing.T) {
 		t.Fatalf("Unable to read private key, %v", err)
 	}
 
-	readAddress := getAddressFromKey(t, readKey)
+	readAddress, err := GetAddressFromKey(readKey)
+	if err != nil {
+		t.Fatalf("unable to extract key, %v", err)
+	}
 
 	assert.True(t, writtenKey.Equal(readKey))
 	assert.Equal(t, writtenAddress.String(), readAddress.String())
