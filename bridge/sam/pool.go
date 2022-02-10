@@ -8,8 +8,8 @@ import (
 )
 
 type pool struct {
-	// Lock is called only when changing validators process
-	// otherwise Rlock is called
+	// write-lock is called only when changing validators process
+	// otherwise read-lock is called
 	// Changing validators will occur the most rarely (once per epoch)
 	changeValidatorsLock sync.RWMutex
 	validators           []types.Address
@@ -115,15 +115,15 @@ func (p *pool) UpdateValidatorSet(validators []types.Address, threshold uint64) 
 
 	removed := diffAddresses(oldValidators, validators)
 
-	var demotableIDs []uint64
+	var maybeDemotableIDs []uint64
 	if len(removed) > 0 {
-		demotableIDs = p.messageSignatures.RemoveSignatures(removed)
+		maybeDemotableIDs = p.messageSignatures.RemoveSignatures(removed)
 	}
 
 	if oldThreshold != threshold {
 		p.tryToPromoteAndDemoteAll()
-	} else if len(demotableIDs) > 0 {
-		p.tryToDemote(demotableIDs)
+	} else if len(maybeDemotableIDs) > 0 {
+		p.tryToDemote(maybeDemotableIDs)
 	}
 }
 
@@ -299,7 +299,7 @@ func (m *messageSignaturesStore) RemoveMessage(id uint64) bool {
 }
 
 func (m *messageSignaturesStore) RemoveSignatures(addresses []types.Address) []uint64 {
-	demotableIDs := make([]uint64, 0)
+	maybeDemotableIDs := make([]uint64, 0)
 
 	m.RangeMessages(func(entry *signedMessageEntry) bool {
 		count := 0
@@ -311,11 +311,11 @@ func (m *messageSignaturesStore) RemoveSignatures(addresses []types.Address) []u
 		}
 
 		if count > 0 {
-			demotableIDs = append(demotableIDs, entry.Message.ID)
+			maybeDemotableIDs = append(maybeDemotableIDs, entry.Message.ID)
 		}
 
 		return true
 	})
 
-	return demotableIDs
+	return maybeDemotableIDs
 }
