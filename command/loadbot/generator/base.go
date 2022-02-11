@@ -11,7 +11,7 @@ type BaseGenerator struct {
 	failedTxnsLock sync.RWMutex
 
 	// failed contract deployment transactions
-	failedContractTxns []*FailedContractTxnInfo
+	failedContractTxns     []*FailedContractTxnInfo
 	failedContractTxnsLock sync.RWMutex
 
 	params       *GeneratorParams

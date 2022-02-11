@@ -220,7 +220,6 @@ func (l *LoadbotCommand) Run(args []string) int {
 		gasLimitErr error
 
 		constructorArgs []byte
-
 	)
 
 	// Parse the gas price
@@ -278,23 +277,23 @@ func (l *LoadbotCommand) Run(args []string) int {
 	}
 
 	var (
-		contractArtifact = &generator.ContractArtifact{}
-		readErr error
+		contractArtifact *generator.ContractArtifact
+		readErr          error
 	)
 
 	if convMode == erc20 {
 		contractArtifact = &generator.ContractArtifact{
 			Bytecode: ERC20BIN,
-			ABI: abi.MustNewABI(ERC20ABI),
+			ABI:      abi.MustNewABI(ERC20ABI),
 		}
 
 		// configure parameters for smart contract constructor
 		var err error
-		constructorArgs, err = abi.Encode([]string{"4314500000","ZexCoin","ZEX"},contractArtifact.ABI.Constructor.Inputs)
-		if err != nil {
-			log.Fatalln("Could not encode constructor parameters: "+err.Error())
-		}
 
+		constructorArgs, err = abi.Encode([]string{"4314500000", "ZexCoin", "ZEX"}, contractArtifact.ABI.Constructor.Inputs)
+		if err != nil {
+			log.Fatalln("Could not encode constructor parameters: " + err.Error())
+		}
 	} else {
 		contractArtifact = &generator.ContractArtifact{
 			Bytecode: generator.DefaultContractBytecode,
@@ -311,9 +310,6 @@ func (l *LoadbotCommand) Run(args []string) int {
 		}
 	}
 
-	
-
-
 	configuration := &Configuration{
 		TPS:              tps,
 		Sender:           sender,
@@ -328,7 +324,7 @@ func (l *LoadbotCommand) Run(args []string) int {
 		GasPrice:         bigGasPrice,
 		GasLimit:         bigGasLimit,
 		ContractArtifact: contractArtifact,
-		ConstructorArgs: constructorArgs,
+		ConstructorArgs:  constructorArgs,
 	}
 
 	// Create the metrics placeholder
@@ -402,11 +398,11 @@ type LoadbotResult struct {
 	BlockData         TxnBlockData         `json:"blockData"`
 	DetailedErrorData TxnDetailedErrorData `json:"detailedErrorData,omitempty"`
 	ApproxTPS         uint64               `json:"approxTps"`
-	CumulativeGasUsed uint64 							 `json:"cumulativeGasUsed"`
+	CumulativeGasUsed uint64               `json:"cumulativeGasUsed"`
 	// contract deployment Results
 	ContractTurnAroundData TxnTurnAroundData `json:"contractTurnaroundData"`
-	ContractBlockData TxnBlockData `json:"contractBlockData"`
-	ContractAddress string `json:"contractAddress"`
+	ContractBlockData      TxnBlockData      `json:"contractBlockData"`
+	ContractAddress        string            `json:"contractAddress"`
 }
 
 func (lr *LoadbotResult) extractExecutionData(metrics *Metrics) {
@@ -467,8 +463,6 @@ func (lr *LoadbotResult) extractExecutionData(metrics *Metrics) {
 	}
 
 	lr.ContractAddress = metrics.ContractAddress.String()
-
-
 }
 
 func (lr *LoadbotResult) extractDetailedErrors(gen generator.TransactionGenerator) {

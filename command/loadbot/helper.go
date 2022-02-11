@@ -8,11 +8,8 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/helper"
 )
 
-
 func displayTxnsInBlocks(buffer *bytes.Buffer, bd TxnBlockData) {
-	
 	if bd.BlocksRequired != 0 {
-
 		buffer.WriteString("\n\n")
 
 		keys := make([]uint64, 0, bd.BlocksRequired)

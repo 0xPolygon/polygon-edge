@@ -24,9 +24,9 @@ type TransactionGenerator interface {
 type TxnErrorType string
 
 const (
-	ReceiptErrorType TxnErrorType = "ReceiptErrorType"
-	AddErrorType     TxnErrorType = "AddErrorType"
-	ContractDeployType     TxnErrorType = "ContractDeployErrorType"
+	ReceiptErrorType   TxnErrorType = "ReceiptErrorType"
+	AddErrorType       TxnErrorType = "AddErrorType"
+	ContractDeployType TxnErrorType = "ContractDeployErrorType"
 )
 
 const (
@@ -35,8 +35,8 @@ const (
 )
 
 type ContractArtifact struct {
-	Bytecode string `json:"bytecode"`
-	ABI *abi.ABI `json:"abi"`
+	Bytecode string   `json:"bytecode"`
+	ABI      *abi.ABI `json:"abi"`
 }
 
 type TxnError struct {
@@ -52,20 +52,20 @@ type FailedTxnInfo struct {
 
 type FailedContractTxnInfo struct {
 	TxHash string
-	Error *TxnError
+	Error  *TxnError
 }
 
 type GeneratorParams struct {
 	Nonce            uint64
 	ChainID          uint64
 	SenderAddress    types.Address
-	RecieverAddress types.Address
+	RecieverAddress  types.Address
 	SenderKey        *ecdsa.PrivateKey
 	Value            *big.Int
 	GasPrice         *big.Int
 	ContractArtifact *ContractArtifact
-	ConstructorArgs []byte // smart contract constructor arguments
-	ContractAddress web3.Address
+	ConstructorArgs  []byte // smart contract constructor arguments
+	ContractAddress  web3.Address
 }
 
 // ReadContractArtifact reads the contract bytecode from the specified path

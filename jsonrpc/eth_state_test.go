@@ -4,14 +4,15 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"math/big"
+	"testing"
+
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/umbracle/fastrlp"
-	"math/big"
-	"testing"
 )
 
 var (
@@ -642,7 +643,7 @@ func TestEth_EstimateGas(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.NotNil(t, res)
-		// nolint:forcetypeassert
+		//nolint:forcetypeassert
 		assert.Equal(t, fmt.Sprintf("0x%x", store.estimatedGasPivotValue+1), res.(string))
 	})
 
@@ -658,7 +659,7 @@ func TestEth_EstimateGas(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.NotNil(t, res)
-		// nolint:forcetypeassert
+		//nolint:forcetypeassert
 		assert.Equal(t, fmt.Sprintf("0x%x", txnGasLimit+1), res.(string))
 	})
 }

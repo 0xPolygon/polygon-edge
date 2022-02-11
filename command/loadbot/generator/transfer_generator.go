@@ -52,7 +52,7 @@ func (tg *TransferGenerator) generateReceiver() error {
 	return nil
 }
 
-func (tg *TransferGenerator) GenerateTransaction( mode string) (*types.Transaction, error) {
+func (tg *TransferGenerator) GenerateTransaction(mode string) (*types.Transaction, error) {
 	newNextNonce := atomic.AddUint64(&tg.params.Nonce, 1)
 
 	txn, err := tg.signer.SignTx(&types.Transaction{
@@ -73,6 +73,9 @@ func (tg *TransferGenerator) GenerateTransaction( mode string) (*types.Transacti
 }
 
 // mock method it is never going to be called here
-func (tg *TransferGenerator) GenerateTokenTransferTransaction(mode string, contractAddres *types.Address) (*types.Transaction, error) {
+func (tg *TransferGenerator) GenerateTokenTransferTransaction(
+	mode string,
+	contractAddres *types.Address,
+) (*types.Transaction, error) {
 	return &types.Transaction{}, nil
 }

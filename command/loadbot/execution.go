@@ -165,8 +165,8 @@ type Metrics struct {
 
 	// contracts
 	FailedContractTransactionsCount uint64
-	ContractDeploymentDuration ExecDuration
-	ContractAddress web3.Address
+	ContractDeploymentDuration      ExecDuration
+	ContractAddress                 web3.Address
 
 	CumulativeGasUsed uint64
 }
@@ -247,20 +247,20 @@ func (l *Loadbot) executeTxn(
 		txn *types.Transaction
 		err error
 	)
-		if mode == "erc20Transfer" {
-			// convert web3 to types address
-			txn, err = l.generator.GenerateTokenTransferTransaction(mode, contractAddr)
-			if err != nil {
-				return web3.Hash{}, err
-			}
-		} else {
-				txn, err = l.generator.GenerateTransaction(mode)
-				if err != nil {
-					return web3.Hash{}, err
-				}
-		}
 
-	
+	if mode == "erc20Transfer" {
+		// convert web3 to types address
+		txn, err = l.generator.GenerateTokenTransferTransaction(mode, contractAddr)
+		if err != nil {
+			return web3.Hash{}, err
+		}
+	} else {
+		txn, err = l.generator.GenerateTransaction(mode)
+		if err != nil {
+			return web3.Hash{}, err
+		}
+	}
+
 	addReq := &txpoolOp.AddTxnReq{
 		Raw: &any.Any{
 			Value: txn.MarshalRLP(),
@@ -272,6 +272,7 @@ func (l *Loadbot) executeTxn(
 	if addErr != nil {
 		return web3.Hash{}, fmt.Errorf("unable to add transaction, %w", addErr)
 	}
+
 	return web3.Hash(types.StringToHash(addRes.TxHash)), nil
 }
 
@@ -313,20 +314,20 @@ func (l *Loadbot) Run() error {
 
 	// Set up the transaction generator
 	generatorParams := &generator.GeneratorParams{
-		Nonce:         nonce,
-		ChainID:       l.cfg.ChainID,
-		SenderAddress: sender.Address,
-		RecieverAddress: l.cfg.Receiver,
-		SenderKey:     sender.PrivateKey,
-		GasPrice:      gasPrice,
-		Value:         l.cfg.Value,
+		Nonce:            nonce,
+		ChainID:          l.cfg.ChainID,
+		SenderAddress:    sender.Address,
+		RecieverAddress:  l.cfg.Receiver,
+		SenderKey:        sender.PrivateKey,
+		GasPrice:         gasPrice,
+		Value:            l.cfg.Value,
 		ContractArtifact: l.cfg.ContractArtifact,
-		ConstructorArgs: l.cfg.ConstructorArgs,
+		ConstructorArgs:  l.cfg.ConstructorArgs,
 	}
 
 	var (
 		txnGenerator generator.TransactionGenerator
-		genErr       error = nil
+		genErr       error
 	)
 
 	switch l.cfg.GeneratorMode {
@@ -389,8 +390,9 @@ func (l *Loadbot) Run() error {
 
 			// run different transactions for different modes
 			if l.cfg.GeneratorMode == erc20 {
-					// Execute ERC20 Contract token transaction and report any errors
+				// Execute ERC20 Contract token transaction and report any errors
 				contractAddr := types.Address(l.metrics.ContractAddress)
+
 				txHash, err = l.executeTxn(grpcClient, "erc20Transfer", &contractAddr)
 				if err != nil {
 					l.generator.MarkFailedTxn(&generator.FailedTxnInfo{
@@ -406,27 +408,28 @@ func (l *Loadbot) Run() error {
 					return
 				}
 			} else {
-			// Execute the transaction
-			txHash, err = l.executeTxn(grpcClient, "transaction", &types.ZeroAddress)
-			if err != nil {
-				l.generator.MarkFailedTxn(&generator.FailedTxnInfo{
-					Index:  index,
-					TxHash: txHash.String(),
-					Error: &generator.TxnError{
-						Error:     err,
-						ErrorType: generator.AddErrorType,
-					},
-				})
-				atomic.AddUint64(&l.metrics.FailedTransactionsCount, 1)
+				// Execute the transaction
+				txHash, err = l.executeTxn(grpcClient, "transaction", &types.ZeroAddress)
+				if err != nil {
+					l.generator.MarkFailedTxn(&generator.FailedTxnInfo{
+						Index:  index,
+						TxHash: txHash.String(),
+						Error: &generator.TxnError{
+							Error:     err,
+							ErrorType: generator.AddErrorType,
+						},
+					})
+					atomic.AddUint64(&l.metrics.FailedTransactionsCount, 1)
 
-				return
+					return
+				}
 			}
-		}
+
 			ctx, cancel := context.WithTimeout(context.Background(), receiptTimeout)
 			defer cancel()
 
 			receipt, err := tests.WaitForReceipt(ctx, jsonClient.Eth(), txHash)
-			
+
 			if err != nil {
 				l.generator.MarkFailedTxn(&generator.FailedTxnInfo{
 					Index:  index,
