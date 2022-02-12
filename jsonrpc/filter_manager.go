@@ -197,9 +197,9 @@ func (f *FilterManager) Run() {
 	for {
 		// check for the next filter to be removed
 		filter := f.nextTimeoutFilter()
-		if filter == nil {
-			timeoutCh = nil
-		} else {
+
+		//	uninstall filters only
+		if filter != nil && !filter.isWS() {
 			timeoutCh = time.After(time.Until(filter.timestamp))
 		}
 
@@ -383,6 +383,7 @@ func (f *FilterManager) addFilter(logFilter *LogFilter, ws wsConn) string {
 
 	f.filters[filter.id] = filter
 	filter.timestamp = time.Now().Add(f.timeout)
+	println("created", filter.timestamp.String())
 	heap.Push(&f.timer, filter)
 
 	f.lock.Unlock()
