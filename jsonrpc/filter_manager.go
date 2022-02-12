@@ -383,7 +383,6 @@ func (f *FilterManager) addFilter(logFilter *LogFilter, ws wsConn) string {
 
 	f.filters[filter.id] = filter
 	filter.timestamp = time.Now().Add(f.timeout)
-	println("created", filter.timestamp.String())
 	heap.Push(&f.timer, filter)
 
 	f.lock.Unlock()
