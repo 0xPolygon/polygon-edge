@@ -171,8 +171,8 @@ func (t *Tracker) startEventTracking(ctx context.Context) {
 //	it is sent to eventCh.
 func (t *Tracker) trackHeader(header *ethHeader) {
 	//	determine range of blocks to query
-	fromBlock, toBlock, ok := t.calculateRange(header)
-	if !ok {
+	fromBlock, toBlock := t.calculateRange(header)
+	if fromBlock == nil || toBlock == nil {
 		//	we are returning here because the calculated
 		//	range was already queried or the chain is not
 		//	at the desired depth.
@@ -191,7 +191,7 @@ func (t *Tracker) trackHeader(header *ethHeader) {
 
 //	calculateRange determines the next range of blocks
 //	to query for events.
-func (t *Tracker) calculateRange(header *ethHeader) (from, to uint64, ok bool) {
+func (t *Tracker) calculateRange(header *ethHeader) (from, to *big.Int) {
 	//	extract block number from header field
 	//	TODO: polygon-edge header
 	latestHeight := big.NewInt(0).SetUint64(header.Number)
@@ -228,7 +228,7 @@ func (t *Tracker) calculateRange(header *ethHeader) (from, to uint64, ok bool) {
 		return
 	}
 
-	return fromBlock.Uint64(), toBlock.Uint64(), true
+	return fromBlock, toBlock
 }
 
 //	loadLastBlock returns the block number of the last
@@ -268,7 +268,7 @@ func (t *Tracker) saveLastBlock(blockNumber *big.Int) error {
 
 //	queryEvents collects all events on the rootchain that occurred
 //	between blocks fromBlock and toBlock (inclusive).
-func (t *Tracker) queryEvents(fromBlock, toBlock uint64) []*web3.Log {
+func (t *Tracker) queryEvents(fromBlock, toBlock *big.Int) []*web3.Log {
 	//	create the query filter
 	queryFilter := setupQueryFilter(fromBlock, toBlock)
 
@@ -281,7 +281,7 @@ func (t *Tracker) queryEvents(fromBlock, toBlock uint64) []*web3.Log {
 	}
 
 	//	overwrite checkpoint
-	if err := t.saveLastBlock(big.NewInt(0).SetUint64(toBlock)); err != nil {
+	if err := t.saveLastBlock(toBlock); err != nil {
 		t.logger.Error("cannot save last block number proccesed", "err", err)
 	}
 

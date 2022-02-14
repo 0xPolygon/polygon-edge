@@ -8,6 +8,7 @@ import (
 	"github.com/umbracle/go-web3"
 	"github.com/umbracle/go-web3/abi"
 	client "github.com/umbracle/go-web3/jsonrpc"
+	"math/big"
 	"os"
 )
 
@@ -61,12 +62,12 @@ var (
 
 //	setupQueryFilter creates a log filter for the desired
 //	block range. Filter matches events defined in rootchain.go.
-func setupQueryFilter(from, to uint64) *web3.LogFilter {
+func setupQueryFilter(from, to *big.Int) *web3.LogFilter {
 	queryFilter := &web3.LogFilter{}
 
 	//	set range of blocks to query
-	queryFilter.SetFromUint64(from)
-	queryFilter.SetToUint64(to)
+	queryFilter.SetFromUint64(from.Uint64())
+	queryFilter.SetToUint64(to.Uint64())
 
 	//	set smart contract addresses
 	queryFilter.Address = []web3.Address{
