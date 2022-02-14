@@ -14,7 +14,11 @@ import (
 )
 
 const (
-	lastQueriedBlockNumber = "last-block-num" //	db key
+	//	required block depth for fetching events on the rootchain
+	BlockConfirmations = 6
+
+	//	db key for saving tracker's progress (chain height)
+	lastQueriedBlockNumber = "last-block-num"
 )
 
 //	Tracker represents an event listener that notifies

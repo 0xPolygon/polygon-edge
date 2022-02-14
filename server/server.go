@@ -196,7 +196,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		//	create and start event tracker
 		m.tracker, err = tracker.NewEventTracker(
 			logger,
-			6, /* default */
+			tracker.BlockConfirmations, /* default */
 		)
 
 		if err != nil {
