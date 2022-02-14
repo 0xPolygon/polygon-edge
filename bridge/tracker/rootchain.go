@@ -20,18 +20,16 @@ const (
 	rootchainWS = "ws://127.0.0.1:10002/ws"
 
 	//	Smart contract addresses
-	PoCSC          = "19DC3Af00E7f7502a2A40B7e0FeA194A86CeAA0c"
-	AnotherEventSC = "69ceed5Ff0FA5106F4Df7299C8812377394A9388"
-	ThirdEventSC   = "b22a1Cd34d39D46bB2f077bd6295c850702D8e81"
+	StateSender = ""
 )
 
 var (
 	//	db key for saving tracker's progress (chain height)
 	lastQueriedBlockNumber = []byte("last-block-num")
 
-	/*	ABI events (defined in the above smart contracts */
+	/*	ABI events (defined in the above smart contracts) */
 
-	//	StateSender.sol
+	//	StateSender
 	NewRegistrationEvent = abi.MustNewEvent(`event NewRegistration(
 	address indexed user,
 	address indexed sender,
@@ -49,15 +47,6 @@ var (
 	address indexed contractAddress,
 	bytes data)`,
 	)
-
-	//	PoC contract events
-	PoCEvent      = abi.MustNewEvent(`event MyEvent(address indexed sender)`)
-	topicPoCEvent = PoCEvent.ID()
-
-	AnotherEvent      = abi.MustNewEvent(`event AnotherEvent(address indexed sender)`)
-	topicAnotherEvent = AnotherEvent.ID()
-
-	ThirdEvent = abi.MustNewEvent(`event ThirdEvent(address indexed sender)`)
 )
 
 //	setupQueryFilter creates a log filter for the desired
@@ -69,19 +58,15 @@ func setupQueryFilter(from, to *big.Int) *web3.LogFilter {
 	queryFilter.SetFromUint64(from.Uint64())
 	queryFilter.SetToUint64(to.Uint64())
 
-	//	set smart contract addresses
+	/*	SC addresses and event topics are set here */
+
 	queryFilter.Address = []web3.Address{
-		web3.HexToAddress(PoCSC),
-		web3.HexToAddress(AnotherEventSC),
-		web3.HexToAddress(ThirdEventSC),
+		//	set smart contract addresses
 	}
 
-	//	set relevant topics to match specific events
-	//	emitted from smart contracts
 	queryFilter.Topics = [][]*web3.Hash{
 		{
-			&topicPoCEvent,
-			&topicAnotherEvent,
+			//	set event topics
 		},
 	}
 
