@@ -21,7 +21,7 @@ type MessageAndSignatures struct {
 type Signer interface {
 	Sign([]byte) ([]byte, error)
 	Address() types.Address
-	Recover(signature, digest []byte) (types.Address, error)
+	RecoverAddress(digest, signature []byte) (types.Address, error)
 }
 
 type Pool interface {
