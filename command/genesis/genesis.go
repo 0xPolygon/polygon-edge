@@ -85,7 +85,7 @@ func setFlags(cmd *cobra.Command) {
 		&params.ibftValidatorsRaw,
 		ibftValidatorFlag,
 		[]string{},
-		"addresses to be used as IBFT validators. "+
+		"addresses to be used as IBFT validators, can be used multiple times. "+
 			"Needs to be present if ibft-validators-prefix-path is omitted",
 	)
 
