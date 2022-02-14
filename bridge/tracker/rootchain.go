@@ -3,10 +3,11 @@ package tracker
 import (
 	"encoding/json"
 	"fmt"
-
+	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/umbracle/go-web3"
 	"github.com/umbracle/go-web3/abi"
 	client "github.com/umbracle/go-web3/jsonrpc"
+	"os"
 )
 
 const (
@@ -55,6 +56,26 @@ var (
 
 	ThirdEvent = abi.MustNewEvent(`event ThirdEvent(address indexed sender)`)
 )
+
+/* 	Rootchain storage (last processed block number) */
+
+//	initRootchainDB creates a new database (or loads existing)
+//	for storing the last processed block's number by the tracker.
+func initRootchainDB() (*leveldb.DB, error) {
+	//	get path
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
+
+	//	create or load db
+	db, err := leveldb.OpenFile(cwd+"/event_tracker/last_block_number", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return db, nil
+}
 
 /*	Rootchain subscription object	*/
 

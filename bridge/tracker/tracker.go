@@ -3,10 +3,8 @@ package tracker
 import (
 	"context"
 	"encoding/json"
-	"math/big"
-	"os"
-
 	"github.com/0xPolygon/polygon-edge/types"
+	"math/big"
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/syndtr/goleveldb/leveldb"
@@ -57,25 +55,21 @@ func NewEventTracker(logger hclog.Logger, confirmations uint64) (*Tracker, error
 		eventCh:       make(chan []byte),
 	}
 
+	var err error
+
 	//	create rootchain client
-	client, err := newRootchainClient(rootchainWS)
-	if err != nil {
+	if tracker.client, err = newRootchainClient(rootchainWS); err != nil {
 		logger.Error("cannot connect to rootchain", "err", err)
 
 		return nil, err
 	}
 
-	tracker.client = client
-
 	//	load db (last processed block number)
-	db, err := tracker.loadDB()
-	if err != nil {
-		logger.Error("cannot load db", "err", err)
+	if tracker.db, err = initRootchainDB(); err != nil {
+		logger.Error("cannot initialize db", "err", err)
 
 		return nil, err
 	}
-
-	tracker.db = db
 
 	return tracker, nil
 }
@@ -173,24 +167,6 @@ func (t *Tracker) startEventTracking(ctx context.Context) {
 			return
 		}
 	}
-}
-
-//	loadDB creates a new database (or loads existing)
-//	for storing the last processed block's number by the tracker.
-func (t *Tracker) loadDB() (*leveldb.DB, error) {
-	//	get path
-	cwd, err := os.Getwd()
-	if err != nil {
-		return nil, err
-	}
-
-	//	create or load db
-	db, err := leveldb.OpenFile(cwd+"/event_tracker/last_block_number", nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return db, nil
 }
 
 //	trackHeader determines the range of block to query
