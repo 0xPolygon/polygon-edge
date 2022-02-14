@@ -84,7 +84,7 @@ func DefaultConfig() *Config {
 		Telemetry: &Telemetry{},
 		Seal:      false,
 		TxPool: &TxPool{
-			PriceLimit: 0,
+			PriceLimit: 1,
 			MaxSlots:   4096,
 		},
 		Consensus:   map[string]interface{}{},
@@ -169,7 +169,9 @@ func (c *Config) BuildConfig() (*server.Config, error) {
 
 	// TxPool
 	{
-		conf.PriceLimit = c.TxPool.PriceLimit
+		if c.TxPool.PriceLimit > 0 {
+			conf.PriceLimit = c.TxPool.PriceLimit
+		}
 		conf.MaxSlots = c.TxPool.MaxSlots
 	}
 
