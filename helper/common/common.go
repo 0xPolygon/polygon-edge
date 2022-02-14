@@ -93,3 +93,8 @@ func GetTerminationSignalCh() <-chan os.Signal {
 
 	return signalCh
 }
+
+// GetDNSRegex returns a regex string  to match against a valid dns/dns4/dns6 addr
+func GetDNSRegex() string {
+	return `^/?(dns)(4|6)?/[^-|^/][A-Za-z0-9-]([^-|^/]?)+([\\-\\.]{1}[a-z0-9]+)*\\.[A-Za-z]{2,}(/?)$`
+}
