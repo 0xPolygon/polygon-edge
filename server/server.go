@@ -15,6 +15,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/bridge"
 	"github.com/0xPolygon/polygon-edge/bridge/signer"
+	"github.com/0xPolygon/polygon-edge/bridge/tracker"
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/crypto"
@@ -197,7 +198,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 			logger,
 			m.network,
 			signer.NewECDSASigner(key),
-			6,
+			tracker.BlockConfirmations,
 		)
 		if err != nil {
 			return nil, err

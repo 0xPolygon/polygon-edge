@@ -4,9 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"math/big"
-	"os"
-
-	"github.com/0xPolygon/polygon-edge/types"
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/syndtr/goleveldb/leveldb"
@@ -14,17 +11,18 @@ import (
 )
 
 const (
-	lastQueriedBlockNumber = "last-block-num" //	db key
+	//	required block depth for fetching events on the rootchain
+	BlockConfirmations = 6
 )
 
 //	Tracker represents an event listener that notifies
-//	for each event emitted on the rootchain (ethereum).
+//	for each event emitted on the rootchain.
 //	Events of interest are defined in rootchain.go
 type Tracker struct {
 	logger hclog.Logger
 
 	// required block confirmations
-	confirmations uint64
+	confirmations *big.Int
 
 	// newHeads subscription channel
 	headerCh chan *ethHeader
@@ -48,30 +46,26 @@ type Tracker struct {
 func NewEventTracker(logger hclog.Logger, confirmations uint64) (*Tracker, error) {
 	tracker := &Tracker{
 		logger:        logger.Named("event_tracker"),
-		confirmations: confirmations,
+		confirmations: big.NewInt(0).SetUint64(confirmations),
 		headerCh:      make(chan *ethHeader, 1),
 		eventCh:       make(chan []byte),
 	}
 
+	var err error
+
 	//	create rootchain client
-	client, err := newRootchainClient(rootchainWS)
-	if err != nil {
+	if tracker.client, err = newRootchainClient(rootchainWS); err != nil {
 		logger.Error("cannot connect to rootchain", "err", err)
 
 		return nil, err
 	}
 
-	tracker.client = client
-
 	//	load db (last processed block number)
-	db, err := tracker.loadDB()
-	if err != nil {
-		logger.Error("cannot load db", "err", err)
+	if tracker.db, err = initRootchainDB(); err != nil {
+		logger.Error("cannot initialize db", "err", err)
 
 		return nil, err
 	}
-
-	tracker.db = db
 
 	return tracker, nil
 }
@@ -171,32 +165,14 @@ func (t *Tracker) startEventTracking(ctx context.Context) {
 	}
 }
 
-//	loadDB creates a new database (or loads existing)
-//	for storing the last processed block's number by the tracker.
-func (t *Tracker) loadDB() (*leveldb.DB, error) {
-	//	get path
-	cwd, err := os.Getwd()
-	if err != nil {
-		return nil, err
-	}
-
-	//	create or load db
-	db, err := leveldb.OpenFile(cwd+"/event_tracker/last_block_number", nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return db, nil
-}
-
 //	trackHeader determines the range of block to query
 //	based on the blockNumber of the header and issues an appropriate
 //	eth_getLogs call. If an event of interest was emitted,
 //	it is sent to eventCh.
 func (t *Tracker) trackHeader(header *ethHeader) {
 	//	determine range of blocks to query
-	fromBlock, toBlock, ok := t.calculateRange(header)
-	if !ok {
+	fromBlock, toBlock := t.calculateRange(header)
+	if fromBlock == nil || toBlock == nil {
 		//	we are returning here because the calculated
 		//	range was already queried or the chain is not
 		//	at the desired depth.
@@ -215,7 +191,7 @@ func (t *Tracker) trackHeader(header *ethHeader) {
 
 //	calculateRange determines the next range of blocks
 //	to query for events.
-func (t *Tracker) calculateRange(header *ethHeader) (from, to uint64, ok bool) {
+func (t *Tracker) calculateRange(header *ethHeader) (from, to *big.Int) {
 	//	extract block number from header field
 	//	TODO: polygon-edge header
 	latestHeight := big.NewInt(0).SetUint64(header.Number)
@@ -224,21 +200,20 @@ func (t *Tracker) calculateRange(header *ethHeader) (from, to uint64, ok bool) {
 	//latestHeight, _ := types.ParseUint256orHex(&header.Number)
 
 	//	check if block number is at required depth
-	confirmations := big.NewInt(0).SetUint64(t.confirmations)
-	if latestHeight.Cmp(confirmations) < 0 {
+	if latestHeight.Cmp(t.confirmations) < 0 {
 		//	block height less than required
 		t.logger.Debug(
 			"not enough confirmations",
 			"current", latestHeight.Uint64(),
-			"required", confirmations.Uint64())
+			"required", t.confirmations.Uint64())
 
 		return
 	}
 
-	/*	right bound */
-	toBlock := big.NewInt(0).Sub(latestHeight, confirmations)
+	//	right bound
+	toBlock := big.NewInt(0).Sub(latestHeight, t.confirmations)
 
-	/*	left bound */
+	//	left bound
 	fromBlock := t.loadLastBlock()
 	if fromBlock == nil {
 		fromBlock = toBlock
@@ -253,14 +228,14 @@ func (t *Tracker) calculateRange(header *ethHeader) (from, to uint64, ok bool) {
 		return
 	}
 
-	return fromBlock.Uint64(), toBlock.Uint64(), true
+	return fromBlock, toBlock
 }
 
 //	loadLastBlock returns the block number of the last
 // 	block processed by the tracker (if available).
 func (t *Tracker) loadLastBlock() *big.Int {
 	//	read from db
-	bytesLastBlock, err := t.db.Get([]byte(lastQueriedBlockNumber), nil)
+	bytesLastBlock, err := t.db.Get(lastQueriedBlockNumber, nil)
 	if err != nil {
 		t.logger.Error("cannot read db", "err", err)
 
@@ -281,7 +256,7 @@ func (t *Tracker) loadLastBlock() *big.Int {
 func (t *Tracker) saveLastBlock(blockNumber *big.Int) error {
 	//	store last processed block number
 	if err := t.db.Put(
-		[]byte(lastQueriedBlockNumber),
+		lastQueriedBlockNumber,
 		[]byte(blockNumber.String()),
 		nil,
 	); err != nil {
@@ -293,27 +268,9 @@ func (t *Tracker) saveLastBlock(blockNumber *big.Int) error {
 
 //	queryEvents collects all events on the rootchain that occurred
 //	between blocks fromBlock and toBlock (inclusive).
-func (t *Tracker) queryEvents(fromBlock, toBlock uint64) []*web3.Log {
-	queryFilter := &web3.LogFilter{}
-
-	//	set range of blocks to query
-	queryFilter.SetFromUint64(fromBlock)
-	queryFilter.SetToUint64(toBlock)
-
-	//	set smart contract addresses
-	queryFilter.Address = []web3.Address{
-		web3.HexToAddress(PoCSC),
-		web3.HexToAddress(AnotherEventSC),
-		web3.HexToAddress(ThirdEventSC),
-	}
-
-	//	set relevant topics (defined in contracts)
-	queryFilter.Topics = [][]*web3.Hash{
-		{
-			&topicPoCEvent,
-			&topicAnotherEvent,
-		},
-	}
+func (t *Tracker) queryEvents(fromBlock, toBlock *big.Int) []*web3.Log {
+	//	create the query filter
+	queryFilter := setupQueryFilter(fromBlock, toBlock)
 
 	//	call eth_getLogs
 	logs, err := t.client.getLogs(queryFilter)
@@ -324,7 +281,7 @@ func (t *Tracker) queryEvents(fromBlock, toBlock uint64) []*web3.Log {
 	}
 
 	//	overwrite checkpoint
-	if err := t.saveLastBlock(big.NewInt(0).SetUint64(toBlock)); err != nil {
+	if err := t.saveLastBlock(toBlock); err != nil {
 		t.logger.Error("cannot save last block number proccesed", "err", err)
 	}
 
@@ -345,46 +302,4 @@ func (t *Tracker) notify(logs ...*web3.Log) {
 		default:
 		}
 	}
-}
-
-/* Header structs parsed by the client */
-
-//	Ethereum header
-//type ethHeader struct {
-//	Difficulty   string        `json:"difficulty"`
-//	ExtraData    string        `json:"extraData"`
-//	GasLimit     string        `json:"gasLimit"`
-//	GasUsed      string        `json:"gasUsed"`
-//	LogsBloom    types.Bloom   `json:"logsBloom"`
-//	Miner        types.Address `json:"miner"`
-//	Nonce        string        `json:"nonce"`
-//	Number       string        `json:"number"`
-//	ParentHash   types.Hash    `json:"parentHash"`
-//	ReceiptsRoot types.Hash    `json:"receiptsRoot"`
-//	Sha3Uncles   types.Hash    `json:"sha3Uncles"`
-//	StateRoot    types.Hash    `json:"stateRoot"`
-//	Timestamp    string        `json:"timestamp"`
-//	TxRoot       types.Hash    `json:"transactionsRoot"`
-//	MixHash      types.Hash    `json:"mixHash"`
-//	Hash         types.Hash    `json:"hash"`
-//}
-
-//	Polygon-Edge header
-type ethHeader struct {
-	Difficulty   uint64        `json:"difficulty"`
-	ExtraData    string        `json:"extraData"`
-	GasLimit     uint64        `json:"gasLimit"`
-	GasUsed      uint64        `json:"gasUsed"`
-	LogsBloom    types.Bloom   `json:"logsBloom"`
-	Miner        types.Address `json:"miner"`
-	Nonce        string        `json:"nonce"`
-	Number       uint64        `json:"number"`
-	ParentHash   types.Hash    `json:"parentHash"`
-	ReceiptsRoot types.Hash    `json:"receiptsRoot"`
-	Sha3Uncles   types.Hash    `json:"sha3Uncles"`
-	StateRoot    types.Hash    `json:"stateRoot"`
-	Timestamp    uint64        `json:"timestamp"`
-	TxRoot       types.Hash    `json:"transactionsRoot"`
-	MixHash      types.Hash    `json:"mixHash"`
-	Hash         types.Hash    `json:"hash"`
 }
