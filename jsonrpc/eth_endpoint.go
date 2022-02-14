@@ -583,11 +583,22 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 		return false, nil
 	}
 
+	isGasError := func(err error) bool {
+		return errors.Is(err, runtime.ErrOutOfGas) ||
+			errors.Is(err, runtime.ErrCodeStoreOutOfGas)
+	}
+
 	// Start the binary search for the lowest possible gas price
 	for lowEnd <= highEnd {
 		mid := (lowEnd + highEnd) / 2
 
 		failed, err := testTransaction(mid)
+		if isGasError(err) {
+			// Gas limit reached, jump out of the loop
+			// that's looking for the lower bound
+			break
+		}
+
 		if err != nil {
 			return 0, err
 		}
