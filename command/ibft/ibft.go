@@ -23,15 +23,14 @@ func GetCommand() *cobra.Command {
 }
 
 func registerSubcommands(baseCmd *cobra.Command) {
-	// ibft status
-	baseCmd.AddCommand(status.GetCommand())
-
-	// ibft snapshot
-	baseCmd.AddCommand(snapshot.GetCommand())
-
-	// ibft propose
-	baseCmd.AddCommand(propose.GetCommand())
-
-	// ibft candidates
-	baseCmd.AddCommand(candidates.GetCommand())
+	baseCmd.AddCommand(
+		// ibft status
+		status.GetCommand(),
+		// ibft snapshot
+		snapshot.GetCommand(),
+		// ibft propose
+		propose.GetCommand(),
+		// ibft candidates
+		candidates.GetCommand(),
+	)
 }

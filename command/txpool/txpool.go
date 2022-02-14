@@ -22,12 +22,12 @@ func GetCommand() *cobra.Command {
 }
 
 func registerSubcommands(baseCmd *cobra.Command) {
-	// txpool add
-	baseCmd.AddCommand(add.GetCommand())
-
-	// txpool status
-	baseCmd.AddCommand(status.GetCommand())
-
-	// txpool subscribe
-	baseCmd.AddCommand(subscribe.GetCommand())
+	baseCmd.AddCommand(
+		// txpool add
+		add.GetCommand(),
+		// txpool status
+		status.GetCommand(),
+		// txpool subscribe
+		subscribe.GetCommand(),
+	)
 }

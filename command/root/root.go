@@ -37,17 +37,19 @@ func NewRootCommand() *RootCommand {
 }
 
 func (rc *RootCommand) registerSubCommands() {
-	rc.baseCmd.AddCommand(version.GetCommand())
-	rc.baseCmd.AddCommand(txpool.GetCommand())
-	rc.baseCmd.AddCommand(status.GetCommand())
-	rc.baseCmd.AddCommand(secrets.GetCommand())
-	rc.baseCmd.AddCommand(peers.GetCommand())
-	rc.baseCmd.AddCommand(monitor.GetCommand())
-	rc.baseCmd.AddCommand(loadbot.GetCommand())
-	rc.baseCmd.AddCommand(ibft.GetCommand())
-	rc.baseCmd.AddCommand(backup.GetCommand())
-	rc.baseCmd.AddCommand(genesis.GetCommand())
-	rc.baseCmd.AddCommand(server.GetCommand())
+	rc.baseCmd.AddCommand(
+		version.GetCommand(),
+		txpool.GetCommand(),
+		status.GetCommand(),
+		secrets.GetCommand(),
+		peers.GetCommand(),
+		monitor.GetCommand(),
+		loadbot.GetCommand(),
+		ibft.GetCommand(),
+		backup.GetCommand(),
+		genesis.GetCommand(),
+		server.GetCommand(),
+	)
 }
 
 func (rc *RootCommand) Execute() {

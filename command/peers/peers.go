@@ -22,12 +22,12 @@ func GetCommand() *cobra.Command {
 }
 
 func registerSubcommands(baseCmd *cobra.Command) {
-	// peers status
-	baseCmd.AddCommand(status.GetCommand())
-
-	// peers list
-	baseCmd.AddCommand(list.GetCommand())
-
-	// peers add
-	baseCmd.AddCommand(add.GetCommand())
+	baseCmd.AddCommand(
+		// peers status
+		status.GetCommand(),
+		// peers list
+		list.GetCommand(),
+		// peers add
+		add.GetCommand(),
+	)
 }

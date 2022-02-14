@@ -21,9 +21,10 @@ func GetCommand() *cobra.Command {
 }
 
 func registerSubcommands(baseCmd *cobra.Command) {
-	// secrets init
-	baseCmd.AddCommand(initCmd.GetCommand())
-
-	// secrets generate
-	baseCmd.AddCommand(generate.GetCommand())
+	baseCmd.AddCommand(
+		// secrets init
+		initCmd.GetCommand(),
+		// secrets generate
+		generate.GetCommand(),
+	)
 }
