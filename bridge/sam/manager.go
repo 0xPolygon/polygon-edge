@@ -137,7 +137,7 @@ func (m *manager) handleGossippedMessage(obj interface{}) {
 		return
 	}
 
-	addr, err := m.signer.Recover(msg.Signature)
+	addr, err := m.signer.Recover(msg.Signature, msg.Body)
 	if err != nil {
 		m.logger.Error("failed to get address from signature", "err", err)
 
