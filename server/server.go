@@ -13,6 +13,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/archive"
 	"github.com/0xPolygon/polygon-edge/blockchain"
+	"github.com/0xPolygon/polygon-edge/bridge/tracker"
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/crypto"
@@ -63,6 +64,9 @@ type Server struct {
 
 	// transaction pool
 	txpool *txpool.TxPool
+
+	//	event tracker
+	tracker *tracker.Tracker
 
 	serverMetrics *serverMetrics
 
@@ -186,6 +190,22 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 			return nil, err
 		}
 		m.blockchain.SetConsensus(m.consensus)
+	}
+
+	if m.config.Tracker {
+		//	create and start event tracker
+		m.tracker, err = tracker.NewEventTracker(
+			logger,
+			6, /* default */
+		)
+
+		if err != nil {
+			return nil, err
+		}
+
+		if err := m.tracker.Start(); err != nil {
+			return nil, err
+		}
 	}
 
 	// after consensus is done, we can mine the genesis block in blockchain
@@ -574,6 +594,12 @@ func (s *Server) Close() {
 	if s.prometheusServer != nil {
 		if err := s.prometheusServer.Shutdown(context.Background()); err != nil {
 			s.logger.Error("Prometheus server shutdown error", err)
+		}
+	}
+
+	if s.tracker != nil {
+		if err := s.tracker.Stop(); err != nil {
+			s.logger.Error("failed to shutdown tracker", "err", err)
 		}
 	}
 
