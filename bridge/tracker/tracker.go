@@ -269,26 +269,8 @@ func (t *Tracker) saveLastBlock(blockNumber *big.Int) error {
 //	queryEvents collects all events on the rootchain that occurred
 //	between blocks fromBlock and toBlock (inclusive).
 func (t *Tracker) queryEvents(fromBlock, toBlock uint64) []*web3.Log {
-	queryFilter := &web3.LogFilter{}
-
-	//	set range of blocks to query
-	queryFilter.SetFromUint64(fromBlock)
-	queryFilter.SetToUint64(toBlock)
-
-	//	set smart contract addresses
-	queryFilter.Address = []web3.Address{
-		web3.HexToAddress(PoCSC),
-		web3.HexToAddress(AnotherEventSC),
-		web3.HexToAddress(ThirdEventSC),
-	}
-
-	//	set relevant topics (defined in contracts)
-	queryFilter.Topics = [][]*web3.Hash{
-		{
-			&topicPoCEvent,
-			&topicAnotherEvent,
-		},
-	}
+	//	create the query filter
+	queryFilter := setupQueryFilter(fromBlock, toBlock)
 
 	//	call eth_getLogs
 	logs, err := t.client.getLogs(queryFilter)

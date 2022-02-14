@@ -59,6 +59,34 @@ var (
 	ThirdEvent = abi.MustNewEvent(`event ThirdEvent(address indexed sender)`)
 )
 
+//	setupQueryFilter creates a log filter for the desired
+//	block range. Filter matches events defined in rootchain.go.
+func setupQueryFilter(from, to uint64) *web3.LogFilter {
+	queryFilter := &web3.LogFilter{}
+
+	//	set range of blocks to query
+	queryFilter.SetFromUint64(from)
+	queryFilter.SetToUint64(to)
+
+	//	set smart contract addresses
+	queryFilter.Address = []web3.Address{
+		web3.HexToAddress(PoCSC),
+		web3.HexToAddress(AnotherEventSC),
+		web3.HexToAddress(ThirdEventSC),
+	}
+
+	//	set relevant topics to match specific events
+	//	emitted from smart contracts
+	queryFilter.Topics = [][]*web3.Hash{
+		{
+			&topicPoCEvent,
+			&topicAnotherEvent,
+		},
+	}
+
+	return queryFilter
+}
+
 /* Header types parsed by the client */
 
 //	Ethereum header
