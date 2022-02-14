@@ -120,30 +120,29 @@ func TestPreminedBalance(t *testing.T) {
 }
 
 func TestEthTransfer(t *testing.T) {
-	validAccounts := []struct {
-		address types.Address
-		balance *big.Int
-	}{
-		// Valid account #1
-		{
-			types.StringToAddress("1"),
-			framework.EthToWei(50), // 50 ETH
-		},
-		// Empty account
-		{
-			types.StringToAddress("2"),
-			big.NewInt(0),
-		},
-		// Valid account #2
-		{
-			types.StringToAddress("3"),
-			framework.EthToWei(10), // 10 ETH
-		},
+	accountBalances := []*big.Int{
+		framework.EthToWei(50), // 50 ETH
+		big.NewInt(0),
+		framework.EthToWei(10), // 10 ETH
+
+	}
+
+	validAccounts := make([]testAccount, len(accountBalances))
+
+	for indx := 0; indx < len(accountBalances); indx++ {
+		key, addr := tests.GenerateKeyAndAddr(t)
+
+		validAccounts[indx] = testAccount{
+			address: addr,
+			key:     key,
+			balance: accountBalances[indx],
+		}
 	}
 
 	testTable := []struct {
 		name          string
 		sender        types.Address
+		senderKey     *ecdsa.PrivateKey
 		recipient     types.Address
 		amount        *big.Int
 		shouldSucceed bool
@@ -152,6 +151,7 @@ func TestEthTransfer(t *testing.T) {
 			// ACC #1 -> ACC #3
 			"Valid ETH transfer #1",
 			validAccounts[0].address,
+			validAccounts[0].key,
 			validAccounts[2].address,
 			framework.EthToWei(10),
 			true,
@@ -160,6 +160,7 @@ func TestEthTransfer(t *testing.T) {
 			// ACC #2 -> ACC #3
 			"Invalid ETH transfer",
 			validAccounts[1].address,
+			validAccounts[1].key,
 			validAccounts[2].address,
 			framework.EthToWei(100),
 			false,
@@ -168,6 +169,7 @@ func TestEthTransfer(t *testing.T) {
 			// ACC #3 -> ACC #2
 			"Valid ETH transfer #2",
 			validAccounts[2].address,
+			validAccounts[2].key,
 			validAccounts[1].address,
 			framework.EthToWei(5),
 			true,
@@ -204,29 +206,19 @@ func TestEthTransfer(t *testing.T) {
 			previousSenderBalance := balanceSender
 			previousReceiverBalance := balanceReceiver
 
-			// Create the transaction
-			toAddr := web3.Address(testCase.recipient)
-			txnObject := &web3.Transaction{
-				From:     web3.Address(testCase.sender),
-				To:       &toAddr,
-				GasPrice: uint64(1048576),
+			// Do the transfer
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+
+			txn := &framework.PreparedTransaction{
+				From:     testCase.sender,
+				To:       &testCase.recipient,
+				GasPrice: big.NewInt(1048576),
 				Gas:      1000000,
 				Value:    testCase.amount,
 			}
 
-			// Do the transfer
-			txnHash, err := rpcClient.Eth().SendTransaction(txnObject)
-			if testCase.shouldSucceed {
-				assert.NoError(t, err)
-			} else {
-				assert.Error(t, err)
-			}
-
-			assert.IsTypef(t, web3.Hash{}, txnHash, "Return type mismatch")
-
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
-			receipt, err := tests.WaitForReceipt(ctx, srv.JSONRPC().Eth(), txnHash)
+			receipt, err := srv.SendRawTx(ctx, txn, testCase.senderKey)
 
 			if testCase.shouldSucceed {
 				assert.NoError(t, err)
@@ -254,7 +246,7 @@ func TestEthTransfer(t *testing.T) {
 			if testCase.shouldSucceed {
 				fee := new(big.Int).Mul(
 					big.NewInt(int64(receipt.GasUsed)),
-					big.NewInt(int64(txnObject.GasPrice)),
+					txn.GasPrice,
 				)
 
 				expectedSenderBalance = previousSenderBalance.Sub(
@@ -384,7 +376,7 @@ func Test_TransactionDevLoop(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	contractAddr, err := srv.DeployContract(ctx, stressTestBytecode)
+	contractAddr, err := srv.DeployContract(ctx, stressTestBytecode, senderKey)
 
 	if err != nil {
 		t.Fatal(err)

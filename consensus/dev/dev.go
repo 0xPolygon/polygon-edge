@@ -53,9 +53,6 @@ func Factory(
 		d.interval = interval
 	}
 
-	// enable dev mode so that we can accept non-signed txns
-	params.Txpool.EnableDev()
-
 	return d, nil
 }
 
