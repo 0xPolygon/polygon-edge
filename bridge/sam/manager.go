@@ -13,11 +13,10 @@ import (
 var samProto = "/sam/0.1"
 
 type manager struct {
-	logger hclog.Logger // Output logger
+	logger hclog.Logger
 
 	// signing
-	signer    Signer
-	recoverer SignatureRecoverer
+	signer Signer
 
 	// network
 	network *network.Server
@@ -35,11 +34,9 @@ type manager struct {
 func NewManager(
 	logger hclog.Logger,
 	signer Signer,
-	recoverer SignatureRecoverer,
 	network *network.Server,
 	initialValidators []types.Address,
 	initialThreshold uint64,
-
 ) Manager {
 	isValidator := make(map[types.Address]bool, len(initialValidators))
 	for _, v := range initialValidators {
@@ -49,7 +46,6 @@ func NewManager(
 	return &manager{
 		logger:          logger.Named("sam"),
 		signer:          signer,
-		recoverer:       recoverer,
 		network:         network,
 		pool:            NewPool(initialValidators, initialThreshold),
 		eventTracker:    nil, // TODO
@@ -141,7 +137,7 @@ func (m *manager) handleGossippedMessage(obj interface{}) {
 		return
 	}
 
-	addr, err := m.recoverer.Recover(msg.Signature)
+	addr, err := m.signer.Recover(msg.Signature)
 	if err != nil {
 		m.logger.Error("failed to get address from signature", "err", err)
 
