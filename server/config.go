@@ -22,7 +22,6 @@ type Config struct {
 	Network        *network.Config
 	DataDir        string
 	Seal           bool
-	Tracker        bool
 	PriceLimit     uint64
 	MaxSlots       uint64
 	SecretsManager *secrets.SecretsManagerConfig

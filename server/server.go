@@ -14,7 +14,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/archive"
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/bridge"
-	"github.com/0xPolygon/polygon-edge/bridge/tracker"
+	"github.com/0xPolygon/polygon-edge/bridge/signer"
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/crypto"
@@ -37,27 +37,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"google.golang.org/grpc"
 )
-
-// workaround, mock
-type signer struct {
-	addr types.Address
-}
-
-func (s *signer) Sign(data []byte) ([]byte, error) {
-	return data, nil
-}
-
-func (s *signer) Address() types.Address {
-	return s.addr
-}
-
-type recoverer struct {
-	addr types.Address
-}
-
-func (r *recoverer) Recover(_data []byte) (types.Address, error) {
-	return r.addr, nil
-}
 
 // Minimal is the central manager of the blockchain client
 type Server struct {
@@ -87,8 +66,8 @@ type Server struct {
 	// transaction pool
 	txpool *txpool.TxPool
 
-	//	event tracker
-	tracker *tracker.Tracker
+	// bridge
+	bridge bridge.Bridge
 
 	serverMetrics *serverMetrics
 
@@ -99,9 +78,6 @@ type Server struct {
 
 	// restore
 	restoreProgression *progress.ProgressionWrapper
-
-	// bridge
-	bridge bridge.Bridge
 }
 
 var dirPaths = []string{
@@ -209,6 +185,25 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		m.txpool.SetSigner(signer)
 	}
 
+	// bridge
+	{
+		// FIXME: use new key?
+		key, err := crypto.ReadConsensusKey(m.secretsManager)
+		if err != nil {
+			return nil, fmt.Errorf("unable to read validator key from Secrets Manager, %w", err)
+		}
+
+		m.bridge, err = bridge.NewBridge(
+			logger,
+			m.network,
+			signer.NewECDSASigner(key),
+			6,
+		)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	{
 		// Setup consensus
 		if err := m.setupConsensus(); err != nil {
@@ -216,33 +211,6 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		}
 		m.blockchain.SetConsensus(m.consensus)
 	}
-
-	m.bridge, err = bridge.NewBridge(
-		logger,
-		m.network,
-		&signer{addr: types.StringToAddress("1")},
-		&recoverer{addr: types.StringToAddress("2")},
-		6,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	// if m.config.Tracker {
-	// 	//	create and start event tracker
-	// 	m.tracker, err = tracker.NewEventTracker(
-	// 		logger,
-	// 		6, /* default */
-	// 	)
-
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
-
-	// 	if err := m.tracker.Start(); err != nil {
-	// 		return nil, err
-	// 	}
-	// }
 
 	// after consensus is done, we can mine the genesis block in blockchain
 	// This is done because consensus might use a custom Hash function so we need
@@ -280,8 +248,11 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		return nil, err
 	}
 
-	if err := m.bridge.Start(); err != nil {
-		return nil, err
+	// start bridge
+	if m.bridge != nil {
+		if err := m.bridge.Start(); err != nil {
+			return nil, err
+		}
 	}
 
 	m.txpool.Start()
@@ -415,6 +386,7 @@ func (s *Server) setupConsensus() error {
 			Seal:           s.config.Seal,
 			Config:         config,
 			Txpool:         s.txpool,
+			Bridge:         s.bridge,
 			Network:        s.network,
 			Blockchain:     s.blockchain,
 			Executor:       s.executor,
