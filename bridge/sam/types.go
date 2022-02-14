@@ -37,5 +37,6 @@ type Manager interface {
 	Close() error
 	AddMessage(message *Message) error
 	GetReadyMessages() []MessageAndSignatures
+	Consume(uint64)
 	UpdateValidatorSet([]types.Address, uint64)
 }

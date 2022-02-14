@@ -93,6 +93,10 @@ func (m *manager) GetReadyMessages() []MessageAndSignatures {
 	return m.pool.GetReadyMessages()
 }
 
+func (m *manager) Consume(id uint64) {
+	m.pool.Consume(id)
+}
+
 func (m *manager) UpdateValidatorSet(validators []types.Address, threshold uint64) {
 	newIsValidator := make(map[types.Address]bool)
 	for _, v := range validators {
