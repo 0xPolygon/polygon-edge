@@ -3,6 +3,7 @@ package tracker
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/umbracle/go-web3"
 	"github.com/umbracle/go-web3/abi"
@@ -56,6 +57,48 @@ var (
 
 	ThirdEvent = abi.MustNewEvent(`event ThirdEvent(address indexed sender)`)
 )
+
+/* Header types parsed by the client */
+
+//	Ethereum header
+//type ethHeader struct {
+//	Difficulty   string        `json:"difficulty"`
+//	ExtraData    string        `json:"extraData"`
+//	GasLimit     string        `json:"gasLimit"`
+//	GasUsed      string        `json:"gasUsed"`
+//	LogsBloom    types.Bloom   `json:"logsBloom"`
+//	Miner        types.Address `json:"miner"`
+//	Nonce        string        `json:"nonce"`
+//	Number       string        `json:"number"`
+//	ParentHash   types.Hash    `json:"parentHash"`
+//	ReceiptsRoot types.Hash    `json:"receiptsRoot"`
+//	Sha3Uncles   types.Hash    `json:"sha3Uncles"`
+//	StateRoot    types.Hash    `json:"stateRoot"`
+//	Timestamp    string        `json:"timestamp"`
+//	TxRoot       types.Hash    `json:"transactionsRoot"`
+//	MixHash      types.Hash    `json:"mixHash"`
+//	Hash         types.Hash    `json:"hash"`
+//}
+
+//	Polygon-Edge header
+type ethHeader struct {
+	Difficulty   uint64        `json:"difficulty"`
+	ExtraData    string        `json:"extraData"`
+	GasLimit     uint64        `json:"gasLimit"`
+	GasUsed      uint64        `json:"gasUsed"`
+	LogsBloom    types.Bloom   `json:"logsBloom"`
+	Miner        types.Address `json:"miner"`
+	Nonce        string        `json:"nonce"`
+	Number       uint64        `json:"number"`
+	ParentHash   types.Hash    `json:"parentHash"`
+	ReceiptsRoot types.Hash    `json:"receiptsRoot"`
+	Sha3Uncles   types.Hash    `json:"sha3Uncles"`
+	StateRoot    types.Hash    `json:"stateRoot"`
+	Timestamp    uint64        `json:"timestamp"`
+	TxRoot       types.Hash    `json:"transactionsRoot"`
+	MixHash      types.Hash    `json:"mixHash"`
+	Hash         types.Hash    `json:"hash"`
+}
 
 /* 	Rootchain storage (last processed block number) */
 

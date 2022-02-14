@@ -3,7 +3,6 @@ package tracker
 import (
 	"context"
 	"encoding/json"
-	"github.com/0xPolygon/polygon-edge/types"
 	"math/big"
 
 	"github.com/hashicorp/go-hclog"
@@ -325,46 +324,4 @@ func (t *Tracker) notify(logs ...*web3.Log) {
 		default:
 		}
 	}
-}
-
-/* Header structs parsed by the client */
-
-//	Ethereum header
-//type ethHeader struct {
-//	Difficulty   string        `json:"difficulty"`
-//	ExtraData    string        `json:"extraData"`
-//	GasLimit     string        `json:"gasLimit"`
-//	GasUsed      string        `json:"gasUsed"`
-//	LogsBloom    types.Bloom   `json:"logsBloom"`
-//	Miner        types.Address `json:"miner"`
-//	Nonce        string        `json:"nonce"`
-//	Number       string        `json:"number"`
-//	ParentHash   types.Hash    `json:"parentHash"`
-//	ReceiptsRoot types.Hash    `json:"receiptsRoot"`
-//	Sha3Uncles   types.Hash    `json:"sha3Uncles"`
-//	StateRoot    types.Hash    `json:"stateRoot"`
-//	Timestamp    string        `json:"timestamp"`
-//	TxRoot       types.Hash    `json:"transactionsRoot"`
-//	MixHash      types.Hash    `json:"mixHash"`
-//	Hash         types.Hash    `json:"hash"`
-//}
-
-//	Polygon-Edge header
-type ethHeader struct {
-	Difficulty   uint64        `json:"difficulty"`
-	ExtraData    string        `json:"extraData"`
-	GasLimit     uint64        `json:"gasLimit"`
-	GasUsed      uint64        `json:"gasUsed"`
-	LogsBloom    types.Bloom   `json:"logsBloom"`
-	Miner        types.Address `json:"miner"`
-	Nonce        string        `json:"nonce"`
-	Number       uint64        `json:"number"`
-	ParentHash   types.Hash    `json:"parentHash"`
-	ReceiptsRoot types.Hash    `json:"receiptsRoot"`
-	Sha3Uncles   types.Hash    `json:"sha3Uncles"`
-	StateRoot    types.Hash    `json:"stateRoot"`
-	Timestamp    uint64        `json:"timestamp"`
-	TxRoot       types.Hash    `json:"transactionsRoot"`
-	MixHash      types.Hash    `json:"mixHash"`
-	Hash         types.Hash    `json:"hash"`
 }
