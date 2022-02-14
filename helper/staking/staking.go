@@ -12,7 +12,9 @@ import (
 )
 
 var (
-	StakingSCAddress = types.StringToAddress("1001")
+	StakingSCAddress  = types.StringToAddress("1001")
+	MinValidatorCount = uint(1)
+	MaxValidatorCount = uint(math.MaxUint32)
 )
 
 // PadLeftOrTrim left-pads the passed in byte array to the specified size,
@@ -95,6 +97,12 @@ func getStorageIndexes(address types.Address, index int64) *StorageIndexes {
 	return &storageIndexes
 }
 
+// PredeployParams contains the values used to predeploy the PoS staking contract
+type PredeployParams struct {
+	MinValidatorCount uint
+	MaxValidatorCount uint
+}
+
 // StorageIndexes is a wrapper for different storage indexes that
 // need to be modified
 type StorageIndexes struct {
@@ -129,8 +137,7 @@ const (
 // using the passed in validators as prestaked validators
 func PredeployStakingSC(
 	validators []types.Address,
-	minValidatorCount uint,
-	maxValidatorCount uint,
+	params PredeployParams,
 ) (*chain.GenesisAccount, error) {
 	// Set the code for the staking smart contract
 	// Code retrieved from https://github.com/0xPolygon/staking-contracts
@@ -147,20 +154,20 @@ func PredeployStakingSC(
 		return nil, fmt.Errorf("unable to generate DefaultStatkedBalance, %w", err)
 	}
 
-	if minValidatorCount > maxValidatorCount {
+	if params.MinValidatorCount > params.MaxValidatorCount {
 		return nil, fmt.Errorf("minimum number of validator can not be greater than maximum number of validator")
 	}
 
-	if maxValidatorCount > math.MaxUint32 {
-		maxValidatorCount = math.MaxUint32
+	if params.MaxValidatorCount > math.MaxUint32 {
+		params.MaxValidatorCount = math.MaxUint32
 	}
 
 	// Generate the empty account storage map
 	storageMap := make(map[types.Hash]types.Hash)
 	bigTrueValue := big.NewInt(1)
 	stakedAmount := big.NewInt(0)
-	minNumValidators := big.NewInt(int64(minValidatorCount))
-	maxNumValidators := big.NewInt(int64(maxValidatorCount))
+	minNumValidators := big.NewInt(int64(params.MinValidatorCount))
+	maxNumValidators := big.NewInt(int64(params.MaxValidatorCount))
 
 	for indx, validator := range validators {
 		// Update the total staked amount

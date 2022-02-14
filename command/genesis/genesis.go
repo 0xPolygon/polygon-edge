@@ -331,7 +331,10 @@ func (c *GenesisCommand) Run(args []string) int {
 	// If the consensus selected is IBFT and the mechanism is Proof of Stake,
 	// deploy the Staking SC
 	if isPos && (consensus == ibftConsensus || consensus == devConsensus) {
-		stakingAccount, predeployErr := staking.PredeployStakingSC(validators, minNumValidator, maxNumValidator)
+		stakingAccount, predeployErr := staking.PredeployStakingSC(validators, staking.PredeployParams{
+			MinValidatorCount: minNumValidator,
+			MaxValidatorCount: maxNumValidator,
+		})
 		if predeployErr != nil {
 			c.UI.Error(predeployErr.Error())
 
