@@ -25,7 +25,7 @@ type Tracker struct {
 	logger hclog.Logger
 
 	// required block confirmations
-	confirmations uint64
+	confirmations *big.Int
 
 	// newHeads subscription channel
 	headerCh chan *ethHeader
@@ -49,7 +49,7 @@ type Tracker struct {
 func NewEventTracker(logger hclog.Logger, confirmations uint64) (*Tracker, error) {
 	tracker := &Tracker{
 		logger:        logger.Named("event_tracker"),
-		confirmations: confirmations,
+		confirmations: big.NewInt(0).SetUint64(confirmations),
 		headerCh:      make(chan *ethHeader, 1),
 		eventCh:       make(chan []byte),
 	}
@@ -203,19 +203,18 @@ func (t *Tracker) calculateRange(header *ethHeader) (from, to uint64, ok bool) {
 	//latestHeight, _ := types.ParseUint256orHex(&header.Number)
 
 	//	check if block number is at required depth
-	confirmations := big.NewInt(0).SetUint64(t.confirmations)
-	if latestHeight.Cmp(confirmations) < 0 {
+	if latestHeight.Cmp(t.confirmations) < 0 {
 		//	block height less than required
 		t.logger.Debug(
 			"not enough confirmations",
 			"current", latestHeight.Uint64(),
-			"required", confirmations.Uint64())
+			"required", t.confirmations.Uint64())
 
 		return
 	}
 
 	//	right bound
-	toBlock := big.NewInt(0).Sub(latestHeight, confirmations)
+	toBlock := big.NewInt(0).Sub(latestHeight, t.confirmations)
 
 	//	left bound
 	fromBlock := t.loadLastBlock()
