@@ -1,6 +1,7 @@
 package staking
 
 import (
+	"errors"
 	"fmt"
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
@@ -155,7 +156,7 @@ func PredeployStakingSC(
 	}
 
 	if params.MinValidatorCount > params.MaxValidatorCount {
-		return nil, fmt.Errorf("minimum number of validator can not be greater than maximum number of validator")
+		return nil, errors.New("minimum number of validator can not be greater than maximum number of validator")
 	}
 
 	if params.MaxValidatorCount > math.MaxUint32 {
