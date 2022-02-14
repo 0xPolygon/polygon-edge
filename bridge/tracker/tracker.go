@@ -215,10 +215,10 @@ func (t *Tracker) calculateRange(header *ethHeader) (from, to uint64, ok bool) {
 		return
 	}
 
-	/*	right bound */
+	//	right bound
 	toBlock := big.NewInt(0).Sub(latestHeight, confirmations)
 
-	/*	left bound */
+	//	left bound
 	fromBlock := t.loadLastBlock()
 	if fromBlock == nil {
 		fromBlock = toBlock
