@@ -109,7 +109,7 @@ func (c *Config) BuildConfig() (*server.Config, error) {
 
 	conf.Chain = cc
 	conf.Seal = c.Seal
-	conf.Tracker = c.Tracker
+	// conf.Tracker = c.Tracker
 	conf.DataDir = c.DataDir
 	// Set the secrets manager config if it was passed in
 	if c.Secrets != "" {

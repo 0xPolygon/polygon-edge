@@ -18,6 +18,8 @@ type Bridge interface {
 	Start() error
 	Close() error
 	SetValidators([]types.Address, uint64)
+	GetReadyMessages() []sam.MessageAndSignatures
+	Consume(uint64)
 }
 
 type bridge struct {
@@ -33,10 +35,9 @@ func NewBridge(
 	logger hclog.Logger,
 	network *network.Server,
 	signer sam.Signer,
-	recoverer sam.SignatureRecoverer,
 	confirmations uint64,
 ) (Bridge, error) {
-	fmt.Printf("NewBridge confirmations %d\n", confirmations)
+	fmt.Printf("NewBridge, address=%+v, confirmations=%d\n", signer.Address(), confirmations)
 
 	bridgeLogger := logger.Named("bridge")
 
@@ -47,7 +48,7 @@ func NewBridge(
 
 	return &bridge{
 		logger:  bridgeLogger,
-		sampool: sam.NewManager(bridgeLogger, signer, recoverer, network, nil, 0),
+		sampool: sam.NewManager(bridgeLogger, signer, network, nil, 0),
 		tracker: tracker,
 		closeCh: make(chan struct{}),
 	}, nil
@@ -81,6 +82,7 @@ func (b *bridge) Close() error {
 }
 
 func (b *bridge) SetValidators(validators []types.Address, threshold uint64) {
+	fmt.Printf("Bridge Update Validators %+v, %d\n", validators, threshold)
 	b.sampool.UpdateValidatorSet(validators, threshold)
 }
 
@@ -95,6 +97,14 @@ func (b *bridge) processEvents(eventCh <-chan []byte) {
 			}
 		}
 	}
+}
+
+func (b *bridge) GetReadyMessages() []sam.MessageAndSignatures {
+	return b.sampool.GetReadyMessages()
+}
+
+func (b *bridge) Consume(id uint64) {
+	b.sampool.Consume(id)
 }
 
 func (b *bridge) processEthEvent(data []byte) error {
