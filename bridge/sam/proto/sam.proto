@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package v1;
+
+option go_package = "/bridge/sam/proto";
+
+import "google/protobuf/empty.proto";
+
+service Sam {
+    rpc PublishSignedMessage(SignedMessage) returns (google.protobuf.Empty);
+}
+
+message SignedMessage {
+    // id is the message ID
+    uint64 id = 1;
+
+    // body is message body
+    bytes body = 2;
+
+    // signatures is the signature of body
+    bytes signature = 3;
+}
