@@ -518,7 +518,7 @@ github.com/umbracle/fastrlp
 # github.com/umbracle/go-eth-bn256 v0.0.0-20190607160430-b36caf4e0f6b
 ## explicit
 github.com/umbracle/go-eth-bn256
-# github.com/umbracle/go-web3 v0.0.0-20220120123135-b6d93c310279
+# github.com/umbracle/go-web3 v0.0.0-20220202092803-51e43f9a3c27
 ## explicit
 github.com/umbracle/go-web3
 github.com/umbracle/go-web3/abi
@@ -551,7 +551,7 @@ go.uber.org/zap/internal/bufferpool
 go.uber.org/zap/internal/color
 go.uber.org/zap/internal/exit
 go.uber.org/zap/zapcore
-# golang.org/x/crypto v0.0.0-20220126234351-aa10faf2a1f8
+# golang.org/x/crypto v0.0.0-20220131195533-30dcbda58838
 ## explicit
 golang.org/x/crypto/blake2b
 golang.org/x/crypto/blake2s
@@ -593,7 +593,8 @@ golang.org/x/net/route
 golang.org/x/net/trace
 # golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 golang.org/x/sync/errgroup
-# golang.org/x/sys v0.0.0-20220114195835-da31bd327af9
+# golang.org/x/sys v0.0.0-20220204135822-1c1b9b1eba6a
+## explicit
 golang.org/x/sys/cpu
 golang.org/x/sys/execabs
 golang.org/x/sys/internal/unsafeheader
