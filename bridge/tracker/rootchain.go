@@ -17,9 +17,7 @@ const (
 
 	//	Polygon Edge
 	rootchainWS = "ws://127.0.0.1:10002/ws"
-)
 
-const (
 	//	Smart contract addresses
 	PoCSC          = "19DC3Af00E7f7502a2A40B7e0FeA194A86CeAA0c"
 	AnotherEventSC = "69ceed5Ff0FA5106F4Df7299C8812377394A9388"
@@ -27,9 +25,12 @@ const (
 )
 
 var (
-	//	ABI events (defined in the above smart contracts)
+	//	db key for saving tracker's progress (chain height)
+	lastQueriedBlockNumber = []byte("last-block-num")
 
-	/*	StateSender.sol	*/
+	/*	ABI events (defined in the above smart contracts */
+
+	//	StateSender.sol
 	NewRegistrationEvent = abi.MustNewEvent(`event NewRegistration(
 	address indexed user,
 	address indexed sender,
@@ -48,7 +49,7 @@ var (
 	bytes data)`,
 	)
 
-	/*	PoC contract events	*/
+	//	PoC contract events
 	PoCEvent      = abi.MustNewEvent(`event MyEvent(address indexed sender)`)
 	topicPoCEvent = PoCEvent.ID()
 

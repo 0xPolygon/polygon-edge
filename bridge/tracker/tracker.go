@@ -13,9 +13,6 @@ import (
 const (
 	//	required block depth for fetching events on the rootchain
 	BlockConfirmations = 6
-
-	//	db key for saving tracker's progress (chain height)
-	lastQueriedBlockNumber = "last-block-num"
 )
 
 //	Tracker represents an event listener that notifies
@@ -238,7 +235,7 @@ func (t *Tracker) calculateRange(header *ethHeader) (from, to uint64, ok bool) {
 // 	block processed by the tracker (if available).
 func (t *Tracker) loadLastBlock() *big.Int {
 	//	read from db
-	bytesLastBlock, err := t.db.Get([]byte(lastQueriedBlockNumber), nil)
+	bytesLastBlock, err := t.db.Get(lastQueriedBlockNumber, nil)
 	if err != nil {
 		t.logger.Error("cannot read db", "err", err)
 
@@ -259,7 +256,7 @@ func (t *Tracker) loadLastBlock() *big.Int {
 func (t *Tracker) saveLastBlock(blockNumber *big.Int) error {
 	//	store last processed block number
 	if err := t.db.Put(
-		[]byte(lastQueriedBlockNumber),
+		lastQueriedBlockNumber,
 		[]byte(blockNumber.String()),
 		nil,
 	); err != nil {
