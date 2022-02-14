@@ -22,7 +22,7 @@ const (
 )
 
 //	Tracker represents an event listener that notifies
-//	for each event emitted on the rootchain (ethereum).
+//	for each event emitted on the rootchain.
 //	Events of interest are defined in rootchain.go
 type Tracker struct {
 	logger hclog.Logger
