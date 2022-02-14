@@ -519,7 +519,9 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 	valueInt := new(big.Int).Set(transaction.Value)
 
 	// If the sender address is present, recalculate the ceiling to his balance
-	if transaction.From != types.ZeroAddress && transaction.GasPrice != nil && gasPriceInt.BitLen() != 0 {
+	if transaction.From != types.ZeroAddress &&
+		transaction.GasPrice != nil &&
+		gasPriceInt.BitLen() != 0 {
 		// Get the account balance
 		// If the account is not initialized yet in state,
 		// assume it's an empty account
@@ -538,7 +540,7 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 		available := new(big.Int).Set(accountBalance)
 
 		if transaction.Value != nil {
-			if valueInt.Cmp(available) >= 0 {
+			if valueInt.Cmp(available) > 0 {
 				return nil, fmt.Errorf("insufficient funds for execution")
 			}
 
@@ -566,13 +568,19 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 		txn := transaction.Copy()
 		txn.Gas = gas
 
-		result, err := e.store.ApplyTxn(header, txn)
+		result, applyErr := e.store.ApplyTxn(header, txn)
 
-		if err != nil {
-			return true, err
+		// Check the application error
+		if applyErr != nil {
+			return true, applyErr
 		}
 
-		return result.Failed(), nil
+		// Check the EVM error
+		if result.Failed() {
+			return true, result.Err
+		}
+
+		return false, nil
 	}
 
 	// Start the binary search for the lowest possible gas price
