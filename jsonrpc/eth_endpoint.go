@@ -575,12 +575,7 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 			return true, applyErr
 		}
 
-		// Check the EVM error
-		if result.Failed() {
-			return true, result.Err
-		}
-
-		return false, nil
+		return result.Failed(), result.Err
 	}
 
 	isGasError := func(err error) bool {
