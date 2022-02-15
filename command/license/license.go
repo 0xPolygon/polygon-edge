@@ -48,7 +48,7 @@ func (c *LicenseCommand) Run(args []string) int {
 
 	buffer.WriteString("\n[DEPENDENCY ATTRIBUTIONS]\n\n")
 
-	for idx, l := range params.BsdLicenses {
+	for idx, l := range params.BSDLicenses {
 		// put a blank line between attributions
 		if idx != 0 {
 			buffer.WriteString("\n")

@@ -22,11 +22,11 @@ var (
 	// Dependency Licenses
 	//go:embed bsd_licenses.json
 	bsdLicensesJSON string
-	BsdLicenses     []DepLicense
+	BSDLicenses     []DepLicense
 )
 
 func init() {
-	if err := json.Unmarshal([]byte(bsdLicensesJSON), &BsdLicenses); err != nil {
+	if err := json.Unmarshal([]byte(bsdLicensesJSON), &BSDLicenses); err != nil {
 		fmt.Printf("failed to parse bsd_licenses.json")
 		os.Exit(1)
 	}
