@@ -320,6 +320,122 @@ func (r *Receipt) UnmarshalJSON(buf []byte) error {
 	return nil
 }
 
+func (lf *LogFilter) UnmarshalJSON(buf []byte) error {
+	p := defaultPool.Get()
+	defer defaultPool.Put(p)
+
+	v, err := p.Parse(string(buf))
+	if err != nil {
+		return fmt.Errorf("unable to parse input, %w", err)
+	}
+
+	// Unmarshal the address field
+	lf.Address = lf.Address[:0]
+
+	appendAddress := func(addressRaw []byte) error {
+		address := new(Address)
+		if err := address.UnmarshalText(addressRaw); err != nil {
+			return err
+		}
+
+		lf.Address = append(lf.Address, *address)
+
+		return nil
+	}
+
+	for _, addressValue := range v.GetArray("address") {
+		addressRaw, err := addressValue.StringBytes()
+		if err != nil {
+			return err
+		}
+
+		if err := appendAddress(addressRaw); err != nil {
+			return err
+		}
+	}
+
+	// The address field can also be a single value
+	if addressRaw := v.GetStringBytes("address"); addressRaw != nil {
+		if err := appendAddress(addressRaw); err != nil {
+			return err
+		}
+	}
+
+	// Unmarshal the block hash
+	lf.BlockHash = nil
+	if v.Exists("blockHash") {
+		extractedHash := &Hash{}
+		if err := decodeHash(extractedHash, v, "blockHash"); err != nil {
+			return err
+		}
+
+		lf.BlockHash = extractedHash
+	}
+
+	// decodeBlockNum is a helper method for extracting a BlockNumber
+	decodeBlockNum := func(key string) (*BlockNumber, error) {
+		numRaw, err := decodeInt64(v, key)
+		if err != nil {
+			return nil, err
+		}
+
+		blockNum := BlockNumber(numRaw)
+
+		return &blockNum, nil
+	}
+
+	// Unmarshal the from field
+	lf.From = nil
+	if v.Exists("fromBlock") {
+		if lf.From, err = decodeBlockNum("fromBlock"); err != nil {
+			return err
+		}
+	}
+
+	// Unmarshal the to field
+	lf.To = nil
+	if v.Exists("toBlock") {
+		if lf.To, err = decodeBlockNum("toBlock"); err != nil {
+			return err
+		}
+	}
+
+	// Unmarshal the topics
+	lf.Topics = lf.Topics[:0]
+	for _, topicsValue := range v.GetArray("topics") {
+		// Check if the index is set
+		if topicsValue == nil || topicsValue.String() == "null" {
+			lf.Topics = append(lf.Topics, nil)
+
+			continue
+		}
+
+		innerTopics, err := topicsValue.Array()
+		if err != nil {
+			return err
+		}
+
+		resTopics := make([]*Hash, 0)
+		for _, innerTopic := range innerTopics {
+			hashValRaw, err := innerTopic.StringBytes()
+			if err != nil {
+				return err
+			}
+
+			hashVal := &Hash{}
+			if err := hashVal.UnmarshalText(hashValRaw); err != nil {
+				return err
+			}
+
+			resTopics = append(resTopics, hashVal)
+		}
+
+		lf.Topics = append(lf.Topics, resTopics)
+	}
+
+	return nil
+}
+
 // UnmarshalJSON implements the unmarshal interface
 func (r *Log) UnmarshalJSON(buf []byte) error {
 	p := defaultPool.Get()
@@ -446,6 +562,21 @@ func decodeUint(v *fastjson.Value, key string) (uint64, error) {
 		return 0, fmt.Errorf("field '%s' does not have 0x prefix: '%s'", key, str)
 	}
 	return strconv.ParseUint(str[2:], 16, 64)
+}
+
+func decodeInt64(v *fastjson.Value, key string) (int64, error) {
+	vv := v.Get(key)
+	if vv == nil {
+		return 0, fmt.Errorf("field '%s' not found", key)
+	}
+	str := vv.String()
+	str = strings.Trim(str, "\"")
+
+	if !strings.HasPrefix(str, "0x") {
+		return 0, fmt.Errorf("field '%s' does not have 0x prefix: '%s'", key, str)
+	}
+
+	return strconv.ParseInt(str[2:], 16, 64)
 }
 
 func decodeHash(h *Hash, v *fastjson.Value, key string) error {
