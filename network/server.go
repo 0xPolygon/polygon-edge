@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/chain"
-	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p"
@@ -43,6 +42,9 @@ const (
 
 	PriorityRandomDial uint64 = 10
 )
+
+// regex string  to match against a valid dns/dns4/dns6 addr
+const DNSRegex = `^/?(dns)(4|6)?/[^-|^/][A-Za-z0-9-]([^-|^/]?)+([\\-\\.]{1}[a-z0-9]+)*\\.[A-Za-z]{2,}(/?)$`
 
 var (
 	ErrNoBootnodes  = errors.New("no bootnodes specified")
@@ -769,7 +771,7 @@ var (
 	// /dns/foobar.com/tcp/<port>
 	loopbackRegex = regexp.MustCompile(
 		//nolint:lll
-		fmt.Sprintf(`^\/ip4\/127(?:\.[0-9]+){0,2}\.[0-9]+\/tcp\/\d+$|^\/ip4\/localhost\/tcp\/\d+$|^\/ip6\/(?:0*\:)*?:?0*1\/tcp\/\d+$|%s`, common.GetDNSRegex()),
+		fmt.Sprintf(`^\/ip4\/127(?:\.[0-9]+){0,2}\.[0-9]+\/tcp\/\d+$|^\/ip4\/localhost\/tcp\/\d+$|^\/ip6\/(?:0*\:)*?:?0*1\/tcp\/\d+$|%s`, DNSRegex),
 	)
 )
 
