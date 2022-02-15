@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/url"
 	"strings"
+	"sync"
 
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/command/loadbot/generator"
@@ -337,6 +338,8 @@ func (l *LoadbotCommand) Run(args []string) int {
 		ContractDeploymentDuration: ExecDuration{
 			blockTransactions: make(map[uint64]uint64),
 		},
+		GasMetrics: BlockGasMetrics{Blocks: make(map[uint64]GasMetrics), BlockGasMutex: &sync.Mutex{},},
+		ContractGasMetrics: BlockGasMetrics{Blocks: make(map[uint64]GasMetrics),BlockGasMutex: &sync.Mutex{},},
 	}
 
 	// create a loadbot instance
@@ -384,6 +387,8 @@ type TxnBlockData struct {
 
 	// BlockTransactionsMap maps the block number to the number of loadbot transactions in it
 	BlockTransactionsMap map[uint64]uint64 `json:"blockTransactionsMap"`
+
+	GasDataMap BlockGasMetrics `json:"blockGasDataMap"`
 }
 
 type TxnDetailedErrorData struct {
@@ -434,6 +439,7 @@ func (lr *LoadbotResult) extractExecutionData(metrics *Metrics) {
 	lr.BlockData = TxnBlockData{
 		BlocksRequired:       uint64(len(metrics.TransactionDuration.blockTransactions)),
 		BlockTransactionsMap: metrics.TransactionDuration.blockTransactions,
+		GasDataMap: metrics.GasMetrics,
 	}
 
 	// contract deplyment trunaround data
@@ -460,6 +466,7 @@ func (lr *LoadbotResult) extractExecutionData(metrics *Metrics) {
 	lr.ContractBlockData = TxnBlockData{
 		BlocksRequired:       uint64(len(metrics.ContractDeploymentDuration.blockTransactions)),
 		BlockTransactionsMap: metrics.ContractDeploymentDuration.blockTransactions,
+		GasDataMap: metrics.ContractGasMetrics,
 	}
 
 	lr.ContractAddress = metrics.ContractAddress.String()
@@ -510,21 +517,22 @@ func (lr *LoadbotResult) Output() string {
 		fmt.Sprintf("Total loadbot execution time|%fs", lr.TurnAroundData.TotalExecTime),
 	}))
 
+ if lr.ContractBlockData.BlocksRequired != 0 {
 	buffer.WriteString("\n\n[CONTRACT DEPLOYMENT DATA]\n")
 	buffer.WriteString(helper.FormatKV([]string{
 		fmt.Sprintf("Contract address|%s", lr.ContractAddress),
 		fmt.Sprintf("Total execution time|%fs", lr.ContractTurnAroundData.TotalExecTime),
 		fmt.Sprintf("Blocks required|%d", lr.ContractBlockData.BlocksRequired),
 	}))
-	displayTxnsInBlocks(&buffer, lr.ContractBlockData)
+	displayTxnsInBlocks(&buffer, &lr.ContractBlockData)
+}
 
 	buffer.WriteString("\n\n[BLOCK DATA]\n")
 	buffer.WriteString(helper.FormatKV([]string{
 		fmt.Sprintf("Blocks required|%d", lr.BlockData.BlocksRequired),
 	}))
 
-	displayTxnsInBlocks(&buffer, lr.BlockData)
-
+	displayTxnsInBlocks(&buffer, &lr.BlockData)
 	// Write out the error logs if detailed view
 	// is requested
 	if len(lr.DetailedErrorData.DetailedErrorMap) != 0 {

@@ -8,7 +8,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/helper"
 )
 
-func displayTxnsInBlocks(buffer *bytes.Buffer, bd TxnBlockData) {
+func displayTxnsInBlocks(buffer *bytes.Buffer, bd *TxnBlockData) {
 	if bd.BlocksRequired != 0 {
 		buffer.WriteString("\n\n")
 
@@ -26,7 +26,13 @@ func displayTxnsInBlocks(buffer *bytes.Buffer, bd TxnBlockData) {
 
 		for _, blockNumber := range keys {
 			formattedStrings = append(formattedStrings,
-				fmt.Sprintf("Block #%d|%d txns", blockNumber, bd.BlockTransactionsMap[blockNumber]),
+				fmt.Sprintf("Block #%d|%d txns (%d gasUsed / %d gasLimit = %d%%)", 
+					blockNumber, 
+					bd.BlockTransactionsMap[blockNumber],
+					bd.GasDataMap.Blocks[blockNumber].GasUsed,
+					bd.GasDataMap.Blocks[blockNumber].GasLimit,
+					int(float64(bd.GasDataMap.Blocks[blockNumber].GasUsed) / float64(bd.GasDataMap.Blocks[blockNumber].GasLimit) * 100),
+				),
 			)
 		}
 

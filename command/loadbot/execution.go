@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
+	"log"
 	"math/big"
 	"sync"
 	"sync/atomic"
@@ -21,7 +22,7 @@ import (
 
 const (
 	maxReceiptWait = 5 * time.Minute
-	minReceiptWait = 30 * time.Second
+	minReceiptWait = 60 * time.Second
 
 	defaultFastestTurnAround = time.Hour * 24
 	defaultSlowestTurnAround = time.Duration(0)
@@ -167,8 +168,11 @@ type Metrics struct {
 	FailedContractTransactionsCount uint64
 	ContractDeploymentDuration      ExecDuration
 	ContractAddress                 web3.Address
+	ContractGasMetrics BlockGasMetrics
 
 	CumulativeGasUsed uint64
+
+	GasMetrics BlockGasMetrics
 }
 
 type Loadbot struct {
@@ -176,6 +180,17 @@ type Loadbot struct {
 	metrics   *Metrics
 	generator generator.TransactionGenerator
 }
+
+type BlockGasMetrics struct {	
+	Blocks map[uint64]GasMetrics
+	BlockGasMutex *sync.Mutex
+}
+
+type GasMetrics struct {
+	GasUsed uint64
+	GasLimit uint64
+}
+
 
 // calcMaxTimeout calculates the max timeout for transactions receipts
 // based on the transaction count and tps params
@@ -429,7 +444,6 @@ func (l *Loadbot) Run() error {
 			defer cancel()
 
 			receipt, err := tests.WaitForReceipt(ctx, jsonClient.Eth(), txHash)
-
 			if err != nil {
 				l.generator.MarkFailedTxn(&generator.FailedTxnInfo{
 					Index:  index,
@@ -443,6 +457,11 @@ func (l *Loadbot) Run() error {
 
 				return
 			}
+			// store block number
+			l.metrics.GasMetrics.BlockGasMutex.Lock()
+			//todo check if block number exists
+			l.metrics.GasMetrics.Blocks[receipt.BlockNumber] = GasMetrics{}
+			l.metrics.GasMetrics.BlockGasMutex.Unlock()
 
 			// Stop the performance timer
 			end := time.Now()
@@ -460,6 +479,17 @@ func (l *Loadbot) Run() error {
 	wg.Wait()
 
 	endTime := time.Now()
+
+	// get block gas usage information
+	for k, v := range l.metrics.GasMetrics.Blocks {
+		blockInfom, err :=	jsonClient.Eth().GetBlockByNumber(web3.BlockNumber(k),false)
+		if err != nil {
+			log.Fatalln("Could not fetch block by number")
+		}
+		v.GasLimit = blockInfom.GasLimit
+		v.GasUsed = blockInfom.GasUsed
+		l.metrics.GasMetrics.Blocks[k] = v
+	}
 
 	// Calculate the turn around metrics now that the loadbot is done
 	l.metrics.TransactionDuration.calcTurnAroundMetrics()

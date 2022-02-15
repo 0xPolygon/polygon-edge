@@ -2,6 +2,7 @@ package loadbot
 
 import (
 	"context"
+	"log"
 	"sync/atomic"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	txpoolOp "github.com/0xPolygon/polygon-edge/txpool/proto"
 	"github.com/0xPolygon/polygon-edge/types"
 
+	"github.com/umbracle/go-web3"
 	"github.com/umbracle/go-web3/jsonrpc"
 )
 
@@ -41,6 +43,8 @@ func (l *Loadbot) deployContract(
 
 		// and wait for receipt
 		receipt, err := tests.WaitForReceipt(ctx, jsonClient.Eth(), txHash)
+		// set block number
+		l.metrics.ContractGasMetrics.Blocks[receipt.BlockNumber] = GasMetrics{}
 		if err != nil {
 			l.generator.MarkFailedContractTxn(&generator.FailedContractTxnInfo{
 				TxHash: txHash.String(),
@@ -67,6 +71,18 @@ func (l *Loadbot) deployContract(
 			},
 		)
 		// calculate contract deployment metrics
+		for k, v := range l.metrics.ContractGasMetrics.Blocks {
+			blockInfom, err :=	jsonClient.Eth().GetBlockByNumber(web3.BlockNumber(k),false)
+			if err != nil {
+				log.Fatalln("Could not fetch block by number")
+			}
+			v.GasLimit = blockInfom.GasLimit
+			v.GasUsed = blockInfom.GasUsed
+			l.metrics.ContractGasMetrics.Blocks[k] = v
+
+		}
+
+		
 		l.metrics.ContractDeploymentDuration.calcTurnAroundMetrics()
 		l.metrics.ContractDeploymentDuration.TotalExecTime = end.Sub(start)
 	}
