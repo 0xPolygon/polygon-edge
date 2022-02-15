@@ -1876,12 +1876,20 @@ func TestGetTxs(t *testing.T) {
 			pool.Start()
 			defer pool.Close()
 
-			subscription := pool.eventManager.subscribe(
-				[]proto.EventType{proto.EventType_PROMOTED},
+			promoteSubscription := pool.eventManager.subscribe(
+				[]proto.EventType{
+					proto.EventType_PROMOTED,
+				},
+			)
+
+			enqueueSubscription := pool.eventManager.subscribe(
+				[]proto.EventType{
+					proto.EventType_ENQUEUED,
+				},
 			)
 
 			// send txs
-			totalTx := 0
+			totalPromotedTx := 0
 			for _, txs := range test.allTxs {
 				nonce := uint64(0)
 				promotable := uint64(0)
@@ -1897,14 +1905,24 @@ func TestGetTxs(t *testing.T) {
 					}(tx)
 				}
 
-				totalTx += int(promotable)
+				totalPromotedTx += int(promotable)
 			}
 
 			ctx, cancelFn := context.WithTimeout(context.Background(), time.Second*10)
 			defer cancelFn()
 
-			// All txns should get added
-			assert.Len(t, waitForEvents(ctx, subscription, totalTx), totalTx)
+			// Wait for promoted transactions
+			assert.Len(t, waitForEvents(ctx, promoteSubscription, totalPromotedTx), totalPromotedTx)
+
+			// Wait for enqueued transactions, if any are present
+			totalEnqueuedTx := totalPromotedTx - len(test.allTxs)
+
+			if totalEnqueuedTx > 0 {
+				ctx, cancelFn = context.WithTimeout(context.Background(), time.Second*10)
+				defer cancelFn()
+
+				assert.Len(t, waitForEvents(ctx, enqueueSubscription, totalEnqueuedTx), totalEnqueuedTx)
+			}
 
 			allPromoted, allEnqueued := pool.GetTxs(true)
 
