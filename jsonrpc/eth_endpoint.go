@@ -467,6 +467,11 @@ func (e *Eth) Call(arg *txnArgs, filter BlockNumberOrHash) (interface{}, error) 
 		return nil, err
 	}
 
+	// Check if an EVM revert happened
+	if result.Reverted() {
+		return nil, constructErrorFromRevert(result)
+	}
+
 	if result.Failed() {
 		return nil, fmt.Errorf("unable to execute call: %w", result.Err)
 	}
@@ -573,6 +578,11 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 		// Check the application error
 		if applyErr != nil {
 			return true, applyErr
+		}
+
+		// Check if an EVM revert happened
+		if result.Reverted() {
+			return true, constructErrorFromRevert(result)
 		}
 
 		return result.Failed(), result.Err
