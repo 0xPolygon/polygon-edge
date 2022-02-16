@@ -7,8 +7,6 @@ import (
 	"net/url"
 	"strconv"
 	"time"
-
-	"github.com/huin/goupnp/httpu"
 )
 
 const (
@@ -27,6 +25,15 @@ const (
 	UPNPRootDevice = "upnp:rootdevice"
 )
 
+// HTTPUClient is the interface required to perform HTTP-over-UDP requests.
+type HTTPUClient interface {
+	Do(
+		req *http.Request,
+		timeout time.Duration,
+		numSends int,
+	) ([]*http.Response, error)
+}
+
 // SSDPRawSearch performs a fairly raw SSDP search request, and returns the
 // unique response(s) that it receives. Each response has the requested
 // searchTarget, a USN, and a valid location. maxWaitSeconds states how long to
@@ -34,13 +41,16 @@ const (
 // implementation waits an additional 100ms for responses to arrive), 2 is a
 // reasonable value for this. numSends is the number of requests to send - 3 is
 // a reasonable value for this.
-func SSDPRawSearch(httpu *httpu.HTTPUClient, searchTarget string, maxWaitSeconds int, numSends int) ([]*http.Response, error) {
+func SSDPRawSearch(
+	httpu HTTPUClient,
+	searchTarget string,
+	maxWaitSeconds int,
+	numSends int,
+) ([]*http.Response, error) {
 	if maxWaitSeconds < 1 {
 		return nil, errors.New("ssdp: maxWaitSeconds must be >= 1")
 	}
 
-	seenUsns := make(map[string]bool)
-	var responses []*http.Response
 	req := http.Request{
 		Method: methodSearch,
 		// TODO: Support both IPv4 and IPv6.
@@ -62,6 +72,8 @@ func SSDPRawSearch(httpu *httpu.HTTPUClient, searchTarget string, maxWaitSeconds
 
 	isExactSearch := searchTarget != SSDPAll && searchTarget != UPNPRootDevice
 
+	seenIDs := make(map[string]bool)
+	var responses []*http.Response
 	for _, response := range allResponses {
 		if response.StatusCode != 200 {
 			log.Printf("ssdp: got response status code %q in search response", response.Status)
@@ -70,18 +82,15 @@ func SSDPRawSearch(httpu *httpu.HTTPUClient, searchTarget string, maxWaitSeconds
 		if st := response.Header.Get("ST"); isExactSearch && st != searchTarget {
 			continue
 		}
-		location, err := response.Location()
+		usn := response.Header.Get("USN")
+		loc, err := response.Location()
 		if err != nil {
-			log.Printf("ssdp: no usable location in search response (discarding): %v", err)
+			// No usable location in search response - discard.
 			continue
 		}
-		usn := response.Header.Get("USN")
-		if usn == "" {
-			log.Printf("ssdp: empty/missing USN in search response (using location instead): %v", err)
-			usn = location.String()
-		}
-		if _, alreadySeen := seenUsns[usn]; !alreadySeen {
-			seenUsns[usn] = true
+		id := loc.String() + "\x00" + usn
+		if _, alreadySeen := seenIDs[id]; !alreadySeen {
+			seenIDs[id] = true
 			responses = append(responses, response)
 		}
 	}

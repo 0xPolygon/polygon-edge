@@ -27,7 +27,7 @@ type identifySnapshot struct {
 }
 
 type peerHandler struct {
-	ids *IDService
+	ids *idService
 
 	cancel context.CancelFunc
 
@@ -40,7 +40,7 @@ type peerHandler struct {
 	deltaCh chan struct{}
 }
 
-func newPeerHandler(pid peer.ID, ids *IDService) *peerHandler {
+func newPeerHandler(pid peer.ID, ids *idService) *peerHandler {
 	ph := &peerHandler{
 		ids: ids,
 		pid: pid,
@@ -178,6 +178,11 @@ func (ph *peerHandler) openStream(ctx context.Context, protos []string) (network
 	if !ph.peerSupportsProtos(ctx, protos) {
 		return nil, errProtocolNotSupported
 	}
+
+	ph.ids.pushSemaphore <- struct{}{}
+	defer func() {
+		<-ph.ids.pushSemaphore
+	}()
 
 	// negotiate a stream without opening a new connection as we "should" already have a connection.
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)

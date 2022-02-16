@@ -36,6 +36,8 @@ var (
 
 var log = logging.Logger("pubsub")
 
+type ProtocolMatchFn = func(string) func(string) bool
+
 // PubSub is the implementation of the pubsub system.
 type PubSub struct {
 	// atomic counter for seqnos
@@ -54,6 +56,8 @@ type PubSub struct {
 	disc *discover
 
 	tracer *pubsubTracer
+
+	peerFilter PeerFilter
 
 	// maxMessageSize is the maximum message size; it applies globally to all
 	// topics.
@@ -157,6 +161,9 @@ type PubSub struct {
 	// filter for tracking subscriptions in topics of interest; if nil, then we track all subscriptions
 	subFilter SubscriptionFilter
 
+	// protoMatchFunc is a matching function for protocol selection.
+	protoMatchFunc ProtocolMatchFn
+
 	ctx context.Context
 }
 
@@ -230,6 +237,7 @@ func NewPubSub(ctx context.Context, h host.Host, rt PubSubRouter, opts ...Option
 		ctx:                   ctx,
 		rt:                    rt,
 		val:                   newValidation(),
+		peerFilter:            DefaultPeerFilter,
 		disc:                  &discover{},
 		maxMessageSize:        DefaultMaxMessageSize,
 		peerOutboundQueueSize: 32,
@@ -292,7 +300,11 @@ func NewPubSub(ctx context.Context, h host.Host, rt PubSubRouter, opts ...Option
 	rt.Attach(ps)
 
 	for _, id := range rt.Protocols() {
-		h.SetStreamHandler(id, ps.handleNewStream)
+		if ps.protoMatchFunc != nil {
+			h.SetStreamHandlerMatch(id, ps.protoMatchFunc(string(id)), ps.handleNewStream)
+		} else {
+			h.SetStreamHandler(id, ps.handleNewStream)
+		}
 	}
 	h.Network().Notify((*PubSubNotif)(ps))
 
@@ -319,6 +331,21 @@ func WithMessageIdFn(fn MsgIdFunction) Option {
 		if p.tracer != nil {
 			p.tracer.msgID = fn
 		}
+		return nil
+	}
+}
+
+// PeerFilter is used to filter pubsub peers. It should return true for peers that are accepted for
+// a given topic. PubSub can be customized to use any implementation of this function by configuring
+// it with the Option from WithPeerFilter.
+type PeerFilter func(pid peer.ID, topic string) bool
+
+// WithPeerFilter is an option to set a filter for pubsub peers.
+// The default peer filter is DefaultPeerFilter (which always returns true), but it can be customized
+// to any custom implementation.
+func WithPeerFilter(filter PeerFilter) Option {
+	return func(p *PubSub) error {
+		p.peerFilter = filter
 		return nil
 	}
 }
@@ -475,6 +502,17 @@ func WithMaxMessageSize(maxMessageSize int) Option {
 	}
 }
 
+// WithProtocolMatchFn sets a custom matching function for protocol selection to
+// be used by the protocol handler on the Host's Mux. Should be combined with
+// WithGossipSubProtocols feature function for checking if certain protocol features
+// are supported
+func WithProtocolMatchFn(m ProtocolMatchFn) Option {
+	return func(ps *PubSub) error {
+		ps.protoMatchFunc = m
+		return nil
+	}
+}
+
 // processLoop handles all inputs arriving on the channels
 func (p *PubSub) processLoop(ctx context.Context) {
 	defer func() {
@@ -504,6 +542,7 @@ func (p *PubSub) processLoop(ctx context.Context) {
 			if p.blacklist.Contains(pid) {
 				log.Warn("closing stream for blacklisted peer: ", pid)
 				close(ch)
+				delete(p.peers, pid)
 				s.Reset()
 				continue
 			}
@@ -1019,6 +1058,11 @@ func (p *PubSub) handleIncomingRPC(rpc *RPC) {
 // DefaultMsgIdFn returns a unique ID of the passed Message
 func DefaultMsgIdFn(pmsg *pb.Message) string {
 	return string(pmsg.GetFrom()) + string(pmsg.GetSeqno())
+}
+
+// DefaultPeerFilter accepts all peers on all topics
+func DefaultPeerFilter(pid peer.ID, topic string) bool {
+	return true
 }
 
 // pushMsg pushes a message performing validation as necessary

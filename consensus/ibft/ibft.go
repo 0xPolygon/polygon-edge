@@ -99,6 +99,8 @@ type Ibft struct {
 	secretsManager secrets.SecretsManager
 
 	mechanisms []ConsensusMechanism // IBFT ConsensusMechanism used (PoA / PoS)
+
+	blockTime time.Duration // Minimum block generation time in seconds
 }
 
 // runHook runs a specified hook if it is present in the hook map
@@ -159,6 +161,7 @@ func Factory(
 		sealing:        params.Seal,
 		metrics:        params.Metrics,
 		secretsManager: params.SecretsManager,
+		blockTime:      time.Duration(params.BlockTime) * time.Second,
 	}
 
 	// Initialize the mechanism
@@ -535,8 +538,6 @@ func (i *Ibft) runSyncState() {
 	}
 }
 
-var defaultBlockPeriod = 2 * time.Second
-
 // shouldWriteTransactions checks if each consensus mechanism accepts a block with transactions at given height
 // returns true if all mechanisms accept
 // otherwise return false
@@ -580,9 +581,12 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 		i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", CandidateVoteHook, hookErr))
 	}
 
+	// calculate millisecond values from consensus custom functions in utils.go file
+	// to preserve go backward compatibility as time.UnixMili is available as of go 17
+
 	// set the timestamp
 	parentTime := time.Unix(int64(parent.Timestamp), 0)
-	headerTime := parentTime.Add(defaultBlockPeriod)
+	headerTime := parentTime.Add(i.blockTime)
 
 	if headerTime.Before(time.Now()) {
 		headerTime = time.Now()
@@ -708,8 +712,11 @@ func (i *Ibft) writeTransactions(gasLimit uint64, transition transitionInterface
 // If it turns out that the current node is the proposer, it builds a block,
 // and sends preprepare and then prepare messages.
 func (i *Ibft) runAcceptState() { // start new round
+	// set log output
 	logger := i.logger.Named("acceptState")
 	logger.Info("Accept state", "sequence", i.state.view.Sequence, "round", i.state.view.Round+1)
+	// set consensus_rounds metric output
+	i.metrics.Rounds.Set(float64(i.state.view.Round + 1))
 
 	// This is the state in which we either propose a block or wait for the pre-prepare message
 	parent := i.blockchain.Header()
@@ -946,15 +953,18 @@ func (i *Ibft) runValidateState() {
 // updateMetrics will update various metrics based on the given block
 // currently we capture No.of Txs and block interval metrics using this function
 func (i *Ibft) updateMetrics(block *types.Block) {
+	// get previous header
 	prvHeader, _ := i.blockchain.GetHeaderByNumber(block.Number() - 1)
 	parentTime := time.Unix(int64(prvHeader.Timestamp), 0)
 	headerTime := time.Unix(int64(block.Header.Timestamp), 0)
+
 	//Update the block interval metric
 	if block.Number() > 1 {
-		i.metrics.BlockInterval.Observe(
+		i.metrics.BlockInterval.Set(
 			headerTime.Sub(parentTime).Seconds(),
 		)
 	}
+
 	//Update the Number of transactions in the block metric
 	i.metrics.NumTxs.Set(float64(len(block.Body().Transactions)))
 }

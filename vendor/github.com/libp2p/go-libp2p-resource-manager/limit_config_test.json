@@ -1,0 +1,55 @@
+{
+    "System": {
+        "Dynamic": true,
+        "MinMemory": 16384,
+        "MaxMemory": 65536,
+        "MemoryFraction": 0.125,
+        "Streams": 64,
+        "StreamsInbound": 32,
+        "StreamsOutbound": 48,
+        "Conns": 16,
+        "ConnsInbound": 8,
+        "ConnsOutbound": 16,
+        "FD": 16
+    },
+    "Transient": {
+        "MinMemory": 1024,
+        "MaxMemory": 4096,
+        "MemoryFraction": 0.03125
+    },
+    "ServiceDefault": {
+        "Memory": 8192
+    },
+    "ServicePeerDefault": {
+        "Memory": 2048
+    },
+    "Service": {
+        "A": {
+            "Memory": 8192
+        }
+    },
+    "ServicePeer": {
+        "A": {
+            "Memory": 4096
+        }
+    },
+    "ProtocolDefault": {
+        "Memory": 2048
+    },
+    "ProtocolPeerDefault": {
+        "Memory": 1024
+    },
+    "Protocol": {
+        "/A": {
+            "Memory": 8192
+        }
+    },
+    "ProtocolPeer": {
+        "/A": {
+            "Memory": 4096
+        }
+    },
+    "PeerDefault": {
+        "Memory": 4096
+    }
+}
