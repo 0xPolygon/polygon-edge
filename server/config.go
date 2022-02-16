@@ -3,6 +3,7 @@ package server
 import (
 	"net"
 
+	"github.com/0xPolygon/polygon-edge/bridge"
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/secrets"
@@ -28,6 +29,7 @@ type Config struct {
 	JSONRPC        *JSONRPC
 	RestoreFile    *string
 	BlockTime      uint64
+	Bridge         *bridge.Config
 }
 
 // DefaultConfig returns the default config for JSON-RPC, GRPC (ports) and Networking
@@ -42,6 +44,7 @@ func DefaultConfig() *Config {
 			AccessControlAllowOrigin: nil,
 		},
 		BlockTime: DefaultBlockTime,
+		Bridge:    bridge.DefaultConfig(),
 	}
 }
 

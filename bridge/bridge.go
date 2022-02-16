@@ -46,13 +46,14 @@ func NewBridge(
 	logger hclog.Logger,
 	network *network.Server,
 	signer sam.Signer,
-	confirmations uint64,
+	dataDirURL string,
+	config *Config,
 ) (Bridge, error) {
-	fmt.Printf("NewBridge, address=%+v, confirmations=%d\n", signer.Address(), confirmations)
+	fmt.Printf("NewBridge, address=%+v, config=%+v\n", signer.Address(), config)
 
 	bridgeLogger := logger.Named("bridge")
 
-	tracker, err := tracker.NewEventTracker(bridgeLogger, confirmations)
+	tracker, err := tracker.NewEventTracker(bridgeLogger, config.RootChainURL.String(), dataDirURL, config.Confirmations)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +100,7 @@ func (b *bridge) Close() error {
 }
 
 func (b *bridge) SetValidators(validators []types.Address, threshold uint64) {
-	b.resetIsValidator(validators)
+	b.resetIsValidatorMap(validators)
 	b.sampool.UpdateValidatorSet(validators, threshold)
 }
 
@@ -111,7 +112,7 @@ func (b *bridge) Consume(id uint64) {
 	b.sampool.Consume(id)
 }
 
-func (b *bridge) resetIsValidator(validators []types.Address) {
+func (b *bridge) resetIsValidatorMap(validators []types.Address) {
 	isValidatorMap := make(map[types.Address]bool)
 	for _, address := range validators {
 		isValidatorMap[address] = true

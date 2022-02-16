@@ -15,7 +15,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/bridge"
 	"github.com/0xPolygon/polygon-edge/bridge/signer"
-	"github.com/0xPolygon/polygon-edge/bridge/tracker"
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/crypto"
@@ -187,7 +186,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	}
 
 	// bridge
-	{
+	if config.Bridge.Enable {
 		// FIXME: use new key?
 		key, err := crypto.ReadConsensusKey(m.secretsManager)
 		if err != nil {
@@ -198,7 +197,8 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 			logger,
 			m.network,
 			signer.NewECDSASigner(key),
-			tracker.BlockConfirmations,
+			config.DataDir,
+			config.Bridge,
 		)
 		if err != nil {
 			return nil, err
@@ -387,7 +387,6 @@ func (s *Server) setupConsensus() error {
 			Seal:           s.config.Seal,
 			Config:         config,
 			Txpool:         s.txpool,
-			Bridge:         s.bridge,
 			Network:        s.network,
 			Blockchain:     s.blockchain,
 			Executor:       s.executor,
