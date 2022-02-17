@@ -153,9 +153,6 @@ type TxPool struct {
 	// and should therefore gossip transactions
 	sealing bool
 
-	// flag indicating if the current node is running in dev mode (used for testing)
-	dev bool
-
 	// prometheus API
 	metrics *Metrics
 
@@ -251,12 +248,6 @@ func (p *TxPool) SetSigner(s signer) {
 	p.signer = s
 }
 
-// EnableDev enables the pool to accept
-// non-encrypted transactions. (used for testing)
-func (p *TxPool) EnableDev() {
-	p.dev = true
-}
-
 // AddTx adds a new transaction to the pool (sent from json-RPC/gRPC endpoints)
 // and broadcasts it to the network (if enabled).
 func (p *TxPool) AddTx(tx *types.Transaction) error {
@@ -266,9 +257,9 @@ func (p *TxPool) AddTx(tx *types.Transaction) error {
 		return err
 	}
 
-	// broadcast the transaction only if network is enabled
-	// and we are not in dev mode
-	if p.topic != nil && !p.dev {
+	// broadcast the transaction only if a topic
+	// subscription is present
+	if p.topic != nil {
 		tx := &proto.Txn{
 			Raw: &any.Any{
 				Value: tx.MarshalRLP(),
@@ -486,19 +477,23 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 		return ErrNegativeValue
 	}
 
-	if !p.dev && tx.From != types.ZeroAddress {
-		// Only if we are in dev mode we can accept
-		// a transaction without validation
-		return ErrNonEncryptedTx
+	// Check if the transaction is signed properly
+
+	// Extract the sender
+	from, signerErr := p.signer.Sender(tx)
+	if signerErr != nil {
+		return ErrInvalidSender
 	}
 
-	// Check if the transaction is signed properly
-	if tx.From == types.ZeroAddress {
-		from, signerErr := p.signer.Sender(tx)
-		if signerErr != nil {
-			return ErrInvalidSender
-		}
+	// If the from field is set, check that
+	// it matches the signer
+	if tx.From != types.ZeroAddress &&
+		tx.From != from {
+		return ErrInvalidSender
+	}
 
+	// If no address was set, update it
+	if tx.From == types.ZeroAddress {
 		tx.From = from
 	}
 
@@ -614,11 +609,12 @@ func (p *TxPool) handleEnqueueRequest(req enqueueRequest) {
 	}
 
 	p.logger.Debug("enqueue request", "hash", tx.Hash.String())
-	p.eventManager.signalEvent(proto.EventType_ENQUEUED, tx.Hash)
 
 	// update state
 	p.index.add(tx)
 	p.gauge.increase(slotsRequired(tx))
+
+	p.eventManager.signalEvent(proto.EventType_ENQUEUED, tx.Hash)
 
 	if tx.Nonce > account.getNonce() {
 		// don't signal promotion for
@@ -691,11 +687,16 @@ func (p *TxPool) resetAccount(addr types.Address, nonce uint64) {
 	defer account.promoted.unlock()
 
 	// prune promoted
-	pruned := account.promoted.prune(nonce)
+	pruned, prunedHashes := account.promoted.prune(nonce)
 
 	// update pool state
 	p.index.remove(pruned...)
 	p.gauge.decrease(slotsRequired(pruned...))
+
+	p.eventManager.signalEvent(
+		proto.EventType_PRUNED_PROMOTED,
+		prunedHashes...,
+	)
 
 	// update metrics
 	p.metrics.PendingTxs.Add(float64(-1 * len(pruned)))
@@ -710,7 +711,7 @@ func (p *TxPool) resetAccount(addr types.Address, nonce uint64) {
 	defer account.enqueued.unlock()
 
 	// prune enqueued
-	pruned = account.enqueued.prune(nonce)
+	pruned, prunedHashes = account.enqueued.prune(nonce)
 
 	// update pool state
 	p.index.remove(pruned...)
@@ -718,6 +719,11 @@ func (p *TxPool) resetAccount(addr types.Address, nonce uint64) {
 
 	// update next nonce
 	account.setNonce(nonce)
+
+	p.eventManager.signalEvent(
+		proto.EventType_PRUNED_ENQUEUED,
+		prunedHashes...,
+	)
 
 	if first := account.enqueued.peek(); first != nil &&
 		first.Nonce == nonce {

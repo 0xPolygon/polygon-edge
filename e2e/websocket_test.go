@@ -9,12 +9,10 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/e2e/framework"
-	"github.com/0xPolygon/polygon-edge/helper/tests"
 	"github.com/0xPolygon/polygon-edge/jsonrpc"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
-	"github.com/umbracle/go-web3"
 )
 
 type testWSRequest struct {
@@ -57,13 +55,9 @@ func getWSResponse(t *testing.T, ws *websocket.Conn, request []byte) jsonrpc.Suc
 }
 
 func TestWS_Response(t *testing.T) {
-	preminedAccounts := []struct {
-		address types.Address
-		balance *big.Int
-	}{
-		{types.StringToAddress("1"), framework.EthToWei(10)},
-		{types.StringToAddress("2"), framework.EthToWei(20)},
-	}
+	preminedAccounts := generateTestAccounts(t, 2)
+	preminedAccounts[0].balance = framework.EthToWei(10)
+	preminedAccounts[1].balance = framework.EthToWei(20)
 
 	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDev)
@@ -74,7 +68,6 @@ func TestWS_Response(t *testing.T) {
 		}
 	})
 	srv := srvs[0]
-	client := srv.JSONRPC()
 
 	// Convert the default JSONRPC address to a WebSocket one
 	wsURL := "ws" + strings.TrimPrefix(srv.JSONRPCAddr(), "http") + "/ws"
@@ -118,20 +111,19 @@ func TestWS_Response(t *testing.T) {
 	})
 
 	t.Run("Valid block number after transfer", func(t *testing.T) {
-		hash, err := client.Eth().SendTransaction(&web3.Transaction{
-			From:     web3.HexToAddress(srv.Config.PremineAccts[0].Addr.String()),
-			To:       (*web3.Address)(&preminedAccounts[1].address),
-			GasPrice: 10000,
-			Gas:      1000000,
-			Value:    big.NewInt(10000),
-			Nonce:    uint64(0),
-		})
-		assert.NoError(t, err)
-
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		_, err = tests.WaitForReceipt(ctx, srv.JSONRPC().Eth(), hash)
-		assert.NoError(t, err)
+
+		_, err = srv.SendRawTx(ctx, &framework.PreparedTransaction{
+			From:     preminedAccounts[0].address,
+			To:       &preminedAccounts[1].address,
+			GasPrice: big.NewInt(10000),
+			Gas:      1000000,
+			Value:    big.NewInt(10000),
+		}, preminedAccounts[0].key)
+		if err != nil {
+			t.Fatalf("Unable to send transaction, %v", err)
+		}
 
 		requestID := 2
 		request, constructErr := constructWSRequest(
