@@ -3,13 +3,16 @@ package tracker
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/0xPolygon/polygon-edge/blockchain/storage"
+	"github.com/0xPolygon/polygon-edge/blockchain/storage/leveldb"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/go-web3"
 	"github.com/umbracle/go-web3/abi"
 	client "github.com/umbracle/go-web3/jsonrpc"
 	"math/big"
 	"os"
+	"path/filepath"
 )
 
 const (
@@ -119,15 +122,13 @@ type ethHeader struct {
 
 //	initRootchainDB creates a new database (or loads existing)
 //	for storing the last processed block's number by the tracker.
-func initRootchainDB() (*leveldb.DB, error) {
-	//	get path
-	cwd, err := os.Getwd()
-	if err != nil {
-		return nil, err
+func initRootchainDB(logger hclog.Logger, dbPath string) (storage.Storage, error) {
+	if dbPath == "" {
+		dbPath, _ = os.Getwd()
+		dbPath = filepath.Join(dbPath, "last-processed-block")
 	}
 
-	//	create or load db
-	db, err := leveldb.OpenFile(cwd+"/event_tracker/last_block_number", nil)
+	db, err := leveldb.NewLevelDBStorage(dbPath, logger)
 	if err != nil {
 		return nil, err
 	}

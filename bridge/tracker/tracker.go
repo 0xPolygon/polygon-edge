@@ -3,11 +3,10 @@ package tracker
 import (
 	"context"
 	"encoding/json"
-	"math/big"
-
+	"github.com/0xPolygon/polygon-edge/blockchain/storage"
 	"github.com/hashicorp/go-hclog"
-	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/umbracle/go-web3"
+	"math/big"
 )
 
 const (
@@ -37,13 +36,13 @@ type Tracker struct {
 	client *rootchainClient
 
 	//	db for last processed block number
-	db *leveldb.DB
+	db storage.Storage
 }
 
 //	NewEventTracker returns a new tracker able to listen for events
 //	at the desired block depth. Events of interest are defined
 //	in rootchain.go
-func NewEventTracker(logger hclog.Logger, confirmations uint64) (*Tracker, error) {
+func NewEventTracker(logger hclog.Logger, confirmations uint64, dbPath string) (*Tracker, error) {
 	tracker := &Tracker{
 		logger:        logger.Named("event_tracker"),
 		confirmations: big.NewInt(0).SetUint64(confirmations),
@@ -61,7 +60,7 @@ func NewEventTracker(logger hclog.Logger, confirmations uint64) (*Tracker, error
 	}
 
 	//	load db (last processed block number)
-	if tracker.db, err = initRootchainDB(); err != nil {
+	if tracker.db, err = initRootchainDB(logger, dbPath); err != nil {
 		logger.Error("cannot initialize db", "err", err)
 
 		return nil, err
@@ -234,36 +233,18 @@ func (t *Tracker) calculateRange(header *ethHeader) (from, to *big.Int) {
 //	loadLastBlock returns the block number of the last
 // 	block processed by the tracker (if available).
 func (t *Tracker) loadLastBlock() *big.Int {
-	//	read from db
-	bytesLastBlock, err := t.db.Get(lastQueriedBlockNumber, nil)
-	if err != nil {
-		t.logger.Error("cannot read db", "err", err)
-
-		return nil
-	}
-
-	//	parse
-	lastBlock, ok := big.NewInt(0).SetString(string(bytesLastBlock), 10)
+	lastBlockNumber, ok := t.db.ReadHeadNumber()
 	if !ok {
 		return nil
 	}
 
-	return lastBlock
+	return big.NewInt(0).SetUint64(lastBlockNumber)
 }
 
 //	saveLastBlock stores the number of the last block processed
 //	into the tracker's database.	.
 func (t *Tracker) saveLastBlock(blockNumber *big.Int) error {
-	//	store last processed block number
-	if err := t.db.Put(
-		lastQueriedBlockNumber,
-		[]byte(blockNumber.String()),
-		nil,
-	); err != nil {
-		return err
-	}
-
-	return nil
+	return t.db.WriteHeadNumber(blockNumber.Uint64())
 }
 
 //	queryEvents collects all events on the rootchain that occurred
