@@ -12,7 +12,7 @@ import (
 
 const (
 	//	required block depth for fetching events on the rootchain
-	BlockConfirmations = 6
+	DefaultBlockConfirmations = 6
 )
 
 //	Tracker represents an event listener that notifies
