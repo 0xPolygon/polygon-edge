@@ -339,8 +339,8 @@ func (l *LoadbotCommand) Run(args []string) int {
 		ContractDeploymentDuration: ExecDuration{
 			blockTransactions: make(map[uint64]uint64),
 		},
-		GasMetrics: BlockGasMetrics{Blocks: make(map[uint64]GasMetrics), BlockGasMutex: &sync.Mutex{},},
-		ContractGasMetrics: BlockGasMetrics{Blocks: make(map[uint64]GasMetrics),BlockGasMutex: &sync.Mutex{},},
+		GasMetrics:         BlockGasMetrics{Blocks: make(map[uint64]GasMetrics), BlockGasMutex: &sync.Mutex{}},
+		ContractGasMetrics: BlockGasMetrics{Blocks: make(map[uint64]GasMetrics), BlockGasMutex: &sync.Mutex{}},
 	}
 
 	// create a loadbot instance
@@ -444,8 +444,8 @@ func (lr *LoadbotResult) extractExecutionData(metrics *Metrics) {
 	lr.BlockData = TxnBlockData{
 		BlocksRequired:       uint64(len(metrics.TransactionDuration.blockTransactions)),
 		BlockTransactionsMap: metrics.TransactionDuration.blockTransactions,
-		GasDataMap: metrics.GasMetrics,
-		AverageBlockUsed: make([]int, 0),
+		GasDataMap:           metrics.GasMetrics,
+		AverageBlockUsed:     make([]int, 0),
 	}
 
 	// contract deplyment trunaround data
@@ -472,8 +472,8 @@ func (lr *LoadbotResult) extractExecutionData(metrics *Metrics) {
 	lr.ContractBlockData = TxnBlockData{
 		BlocksRequired:       uint64(len(metrics.ContractDeploymentDuration.blockTransactions)),
 		BlockTransactionsMap: metrics.ContractDeploymentDuration.blockTransactions,
-		GasDataMap: metrics.ContractGasMetrics,
-		AverageBlockUsed: make([]int, 0),
+		GasDataMap:           metrics.ContractGasMetrics,
+		AverageBlockUsed:     make([]int, 0),
 	}
 
 	lr.ContractAddress = metrics.ContractAddress.String()
@@ -505,43 +505,49 @@ func (lr *LoadbotResult) Output() string {
 	var buffer bytes.Buffer
 
 	// helper average function
-	average := func (slice []int) (int) {
+	average := func(slice []int) int {
 		sum := 0
 		for _, i := range slice {
 			sum += i
 		}
+
 		return int(float64(sum) / float64(len(slice)))
 	}
-	
+
 	// helper output transactions in blocks
-	displayTxnsInBlocks := func (buffer *bytes.Buffer, bd *TxnBlockData) {
+	displayTxnsInBlocks := func(buffer *bytes.Buffer, bd *TxnBlockData) {
 		if bd.BlocksRequired != 0 {
 			buffer.WriteString("\n\n")
-	
+
 			keys := make([]uint64, 0, bd.BlocksRequired)
-	
+
 			for k := range bd.BlockTransactionsMap {
 				keys = append(keys, k)
 			}
-	
+
 			sort.Slice(keys, func(i, j int) bool {
 				return keys[i] < keys[j]
 			})
-	
+
 			formattedStrings := make([]string, 0)
-	
+
 			for _, blockNumber := range keys {
-				bd.AverageBlockUsed = append(bd.AverageBlockUsed,int(float64(bd.GasDataMap.Blocks[blockNumber].GasUsed) / float64(bd.GasDataMap.Blocks[blockNumber].GasLimit) * 100))
+				bd.AverageBlockUsed = append(
+					bd.AverageBlockUsed,
+					int(float64(bd.GasDataMap.Blocks[blockNumber].GasUsed)/
+						float64(bd.GasDataMap.Blocks[blockNumber].GasLimit)*100),
+				)
 				formattedStrings = append(formattedStrings,
-					fmt.Sprintf("Block #%d|%d txns (%d gasUsed / %d gasLimit) utilistaion|%d%%", 
-						blockNumber, 
+					fmt.Sprintf("Block #%d|%d txns (%d gasUsed / %d gasLimit) utilistaion|%d%%",
+						blockNumber,
 						bd.BlockTransactionsMap[blockNumber],
 						bd.GasDataMap.Blocks[blockNumber].GasUsed,
 						bd.GasDataMap.Blocks[blockNumber].GasLimit,
-						int(float64(bd.GasDataMap.Blocks[blockNumber].GasUsed) / float64(bd.GasDataMap.Blocks[blockNumber].GasLimit) * 100),
+						int(float64(bd.GasDataMap.Blocks[blockNumber].GasUsed)/float64(bd.GasDataMap.Blocks[blockNumber].GasLimit)*100),
 					),
 				)
 			}
+
 			buffer.WriteString(helper.FormatKV(formattedStrings))
 		}
 	}
@@ -566,19 +572,19 @@ func (lr *LoadbotResult) Output() string {
 		fmt.Sprintf("Total loadbot execution time|%fs", lr.TurnAroundData.TotalExecTime),
 	}))
 
- if lr.ContractBlockData.BlocksRequired != 0 {
-	buffer.WriteString("\n\n[CONTRACT DEPLOYMENT DATA]\n")
-	buffer.WriteString(helper.FormatKV([]string{
-		fmt.Sprintf("Contract address|%s", lr.ContractAddress),
-		fmt.Sprintf("Total execution time|%fs", lr.ContractTurnAroundData.TotalExecTime),
-		fmt.Sprintf("Blocks required|%d", lr.ContractBlockData.BlocksRequired),
-	}))
-	displayTxnsInBlocks(&buffer, &lr.ContractBlockData)
-	buffer.WriteString("\n\n")
-	buffer.WriteString(helper.FormatKV([]string{
-		fmt.Sprintf("Average utilisation across all blocks: %d%%",average(lr.ContractBlockData.AverageBlockUsed)),
-	}))
-}
+	if lr.ContractBlockData.BlocksRequired != 0 {
+		buffer.WriteString("\n\n[CONTRACT DEPLOYMENT DATA]\n")
+		buffer.WriteString(helper.FormatKV([]string{
+			fmt.Sprintf("Contract address|%s", lr.ContractAddress),
+			fmt.Sprintf("Total execution time|%fs", lr.ContractTurnAroundData.TotalExecTime),
+			fmt.Sprintf("Blocks required|%d", lr.ContractBlockData.BlocksRequired),
+		}))
+		displayTxnsInBlocks(&buffer, &lr.ContractBlockData)
+		buffer.WriteString("\n\n")
+		buffer.WriteString(helper.FormatKV([]string{
+			fmt.Sprintf("Average utilisation across all blocks: %d%%", average(lr.ContractBlockData.AverageBlockUsed)),
+		}))
+	}
 
 	buffer.WriteString("\n\n[BLOCK DATA]\n")
 	buffer.WriteString(helper.FormatKV([]string{
@@ -588,7 +594,7 @@ func (lr *LoadbotResult) Output() string {
 	displayTxnsInBlocks(&buffer, &lr.BlockData)
 	buffer.WriteString("\n\n")
 	buffer.WriteString(helper.FormatKV([]string{
-		fmt.Sprintf("Average utilisation across all blocks: %d%%",average(lr.BlockData.AverageBlockUsed)),
+		fmt.Sprintf("Average utilisation across all blocks: %d%%", average(lr.BlockData.AverageBlockUsed)),
 	}))
 	// Write out the error logs if detailed view
 	// is requested

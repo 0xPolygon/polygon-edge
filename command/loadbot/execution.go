@@ -168,7 +168,7 @@ type Metrics struct {
 	FailedContractTransactionsCount uint64
 	ContractDeploymentDuration      ExecDuration
 	ContractAddress                 web3.Address
-	ContractGasMetrics BlockGasMetrics
+	ContractGasMetrics              BlockGasMetrics
 
 	CumulativeGasUsed uint64
 
@@ -181,16 +181,15 @@ type Loadbot struct {
 	generator generator.TransactionGenerator
 }
 
-type BlockGasMetrics struct {	
-	Blocks map[uint64]GasMetrics
+type BlockGasMetrics struct {
+	Blocks        map[uint64]GasMetrics
 	BlockGasMutex *sync.Mutex
 }
 
 type GasMetrics struct {
-	GasUsed uint64
+	GasUsed  uint64
 	GasLimit uint64
 }
-
 
 // calcMaxTimeout calculates the max timeout for transactions receipts
 // based on the transaction count and tps params
@@ -457,9 +456,8 @@ func (l *Loadbot) Run() error {
 
 				return
 			}
-			// store block number
+			// initialise block numbers
 			l.metrics.GasMetrics.BlockGasMutex.Lock()
-			//todo check if block number exists
 			l.metrics.GasMetrics.Blocks[receipt.BlockNumber] = GasMetrics{}
 			l.metrics.GasMetrics.BlockGasMutex.Unlock()
 
@@ -482,10 +480,11 @@ func (l *Loadbot) Run() error {
 
 	// get block gas usage information
 	for k, v := range l.metrics.GasMetrics.Blocks {
-		blockInfom, err :=	jsonClient.Eth().GetBlockByNumber(web3.BlockNumber(k),false)
+		blockInfom, err := jsonClient.Eth().GetBlockByNumber(web3.BlockNumber(k), false)
 		if err != nil {
 			log.Fatalln("Could not fetch block by number")
 		}
+
 		v.GasLimit = blockInfom.GasLimit
 		v.GasUsed = blockInfom.GasUsed
 		l.metrics.GasMetrics.Blocks[k] = v

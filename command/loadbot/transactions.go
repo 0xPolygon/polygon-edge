@@ -72,17 +72,16 @@ func (l *Loadbot) deployContract(
 		)
 		// calculate contract deployment metrics
 		for k, v := range l.metrics.ContractGasMetrics.Blocks {
-			blockInfom, err :=	jsonClient.Eth().GetBlockByNumber(web3.BlockNumber(k),false)
+			blockInfom, err := jsonClient.Eth().GetBlockByNumber(web3.BlockNumber(k), false)
 			if err != nil {
 				log.Fatalln("Could not fetch block by number")
 			}
+
 			v.GasLimit = blockInfom.GasLimit
 			v.GasUsed = blockInfom.GasUsed
 			l.metrics.ContractGasMetrics.Blocks[k] = v
-
 		}
 
-		
 		l.metrics.ContractDeploymentDuration.calcTurnAroundMetrics()
 		l.metrics.ContractDeploymentDuration.TotalExecTime = end.Sub(start)
 	}
