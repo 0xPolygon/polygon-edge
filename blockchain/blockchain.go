@@ -54,10 +54,17 @@ type Blockchain struct {
 type Verifier interface {
 	VerifyHeader(parent, header *types.Header) error
 	GetBlockCreator(header *types.Header) (types.Address, error)
+	PreStateCommit(header *types.Header, txn *state.Transition) error
 }
 
 type Executor interface {
-	ProcessBlock(parentRoot types.Hash, block *types.Block, blockCreator types.Address) (*state.BlockResult, error)
+	ProcessBlock(parentRoot types.Hash, block *types.Block, blockCreator types.Address) (*state.Transition, error)
+}
+
+type BlockResult struct {
+	Root     types.Hash
+	Receipts []*types.Receipt
+	TotalGas uint64
 }
 
 // UpdateGasPriceAvg Updates the rolling average value of the gas price
@@ -682,7 +689,7 @@ func (b *Blockchain) ReadTxLookup(hash types.Hash) (types.Hash, bool) {
 }
 
 // processBlock Processes the block, and does validation
-func (b *Blockchain) processBlock(block *types.Block) (*state.BlockResult, error) {
+func (b *Blockchain) processBlock(block *types.Block) (*BlockResult, error) {
 	header := block.Header
 
 	// Process the block
@@ -696,25 +703,33 @@ func (b *Blockchain) processBlock(block *types.Block) (*state.BlockResult, error
 		return nil, err
 	}
 
-	result, err := b.executor.ProcessBlock(parent.StateRoot, block, blockCreator)
+	txn, err := b.executor.ProcessBlock(parent.StateRoot, block, blockCreator)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(result.Receipts) != len(block.Transactions) {
+	if err := b.consensus.PreStateCommit(header, txn); err != nil {
+		return nil, err
+	}
+
+	_, root := txn.Commit()
+	receipts := txn.Receipts()
+	totalGas := txn.TotalGas()
+
+	if len(receipts) != len(block.Transactions) {
 		return nil, fmt.Errorf("bad size of receipts and transactions")
 	}
 
 	// Validate the fields
-	if result.Root != header.StateRoot {
+	if root != header.StateRoot {
 		return nil, fmt.Errorf("invalid merkle root")
 	}
 
-	if result.TotalGas != header.GasUsed {
+	if totalGas != header.GasUsed {
 		return nil, fmt.Errorf("gas used is different")
 	}
 
-	receiptSha := buildroot.CalculateReceiptsRoot(result.Receipts)
+	receiptSha := buildroot.CalculateReceiptsRoot(receipts)
 	if receiptSha != header.ReceiptsRoot {
 		return nil, fmt.Errorf("invalid receipts root")
 	}
@@ -723,7 +738,11 @@ func (b *Blockchain) processBlock(block *types.Block) (*state.BlockResult, error
 		return nil, fmt.Errorf("invalid gas limit, %w", gasLimitErr)
 	}
 
-	return result, nil
+	return &BlockResult{
+		Root:     root,
+		Receipts: receipts,
+		TotalGas: totalGas,
+	}, nil
 }
 
 // verifyGasLimit is a helper function for validating a gas limit in a header

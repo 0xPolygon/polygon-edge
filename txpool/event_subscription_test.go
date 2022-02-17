@@ -124,7 +124,7 @@ func TestEventSubscription_ProcessedEvents(t *testing.T) {
 			processed := int64(0)
 			go func() {
 				for range subscription.outputCh {
-					processed++
+					atomic.AddInt64(&processed, 1)
 				}
 			}()
 

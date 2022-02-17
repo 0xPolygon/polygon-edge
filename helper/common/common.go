@@ -1,12 +1,17 @@
 package common
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"syscall"
+
+	"github.com/0xPolygon/polygon-edge/helper/hex"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 // Min returns the strictly lower number
@@ -27,8 +32,24 @@ func Max(a, b uint64) uint64 {
 	return b
 }
 
-func roundFloat(num float64) int {
-	return int(num + math.Copysign(0.5, num))
+func ConvertUnmarshalledInt(x interface{}) (int64, error) {
+	switch tx := x.(type) {
+	case float64:
+		return roundFloat(tx), nil
+	case string:
+		v, err := types.ParseUint64orHex(&tx)
+		if err != nil {
+			return 0, err
+		}
+
+		return int64(v), nil
+	default:
+		return 0, errors.New("unsupported type for unmarshalled integer")
+	}
+}
+
+func roundFloat(num float64) int64 {
+	return int64(num + math.Copysign(0.5, num))
 }
 
 func ToFixedFloat(num float64, precision int) float64 {
@@ -81,6 +102,35 @@ func createDir(path string) error {
 			return err
 		}
 	}
+
+	return nil
+}
+
+// JSONNumber is the number represented in decimal or hex in json
+type JSONNumber struct {
+	Value uint64
+}
+
+func (d *JSONNumber) MarshalJSON() ([]byte, error) {
+	return []byte(fmt.Sprintf(`"%s"`, hex.EncodeUint64(d.Value))), nil
+}
+
+func (d *JSONNumber) UnmarshalJSON(data []byte) error {
+	var rawValue interface{}
+	if err := json.Unmarshal(data, &rawValue); err != nil {
+		return err
+	}
+
+	val, err := ConvertUnmarshalledInt(rawValue)
+	if err != nil {
+		return err
+	}
+
+	if val < 0 {
+		return errors.New("must be positive value")
+	}
+
+	d.Value = uint64(val)
 
 	return nil
 }
