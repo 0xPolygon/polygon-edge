@@ -39,10 +39,14 @@ func Test_ValidWSResponse(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			sub := subscription{}
+			sub := subscription{
+				newHeadsCh: make(chan *ethHeader, 1),
+				errorCh:    make(chan error, 1),
+			}
 
-			_, err := sub.handleWSResponse(test.response)
-			assert.NoError(t, err)
+			sub.handleWSResponse(test.response)
+
+			assert.NotNil(t, <-sub.newHeadsCh)
 		})
 	}
 }
@@ -75,10 +79,13 @@ func Test_InvalidWSResponse(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			sub := subscription{}
+			sub := subscription{
+				newHeadsCh: make(chan *ethHeader, 1),
+				errorCh:    make(chan error, 1),
+			}
 
-			_, err := sub.handleWSResponse(test.response)
-			assert.Error(t, err)
+			sub.handleWSResponse(test.response)
+			assert.Error(t, <-sub.errorCh)
 		})
 	}
 }

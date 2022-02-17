@@ -178,7 +178,7 @@ func (s *subscription) err() <-chan error {
 //	received by the websocket into a header struct.
 func (s *subscription) handleWSResponse(response []byte) {
 	//	parse ws response
-	var header *ethHeader
+	header := &ethHeader{}
 	if err := json.Unmarshal(response, header); err != nil {
 		s.errorCh <- fmt.Errorf("unable to parse header - err: %w", err)
 		return
