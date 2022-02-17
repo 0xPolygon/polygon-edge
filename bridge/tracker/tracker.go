@@ -28,8 +28,8 @@ func (c *contextSubscription) done() <-chan struct{} {
 }
 
 //	Tracker represents an event listener that notifies
-//	for each event emitted on the rootchain.
-//	Events of interest are defined in rootchain.go
+//	for each event emitted by a smart contract on the rootchain.
+//	Events are collected from blocks at the desired depth (confirmations).
 type Tracker struct {
 	logger hclog.Logger
 
@@ -39,10 +39,10 @@ type Tracker struct {
 	// event channel
 	eventCh chan []byte
 
-	// cancel funcs
+	// cancel subscription
 	ctxSubscription contextSubscription
 
-	//	rootchain sub object
+	//	rootchain subscription object
 	sub subscription
 
 	//	rootchain client
@@ -55,9 +55,7 @@ type Tracker struct {
 	contracts []*contractABI
 }
 
-//	NewEventTracker returns a new tracker able to listen for events
-//	at the desired block depth. Events of interest are defined
-//	in rootchain.go
+//	NewEventTracker returns a new tracker object.
 func NewEventTracker(logger hclog.Logger, config *Config) (*Tracker, error) {
 	if config == nil {
 		//	load default
@@ -105,14 +103,8 @@ func NewEventTracker(logger hclog.Logger, config *Config) (*Tracker, error) {
 	return tracker, nil
 }
 
-//	Start runs the tracker's listening mechanism:
-//	1. startEventTracking - goroutine keeping track of
-//	the last block queried, as well as collecting events
-//	of interest.
-//
-//	2. startEventTracking - goroutine responsible for handling
-//	the sub object. This object is provided by the
-//	client's subscribeNewHeads method that initiates the sub.
+//	Start initializes context for the tracking mechanism
+//	and starts listening for events on the rootchain.
 func (t *Tracker) Start() {
 	// 	initialize tracking context
 	t.initContext()

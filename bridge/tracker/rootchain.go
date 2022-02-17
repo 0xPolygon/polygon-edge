@@ -26,9 +26,14 @@ const (
 	rootchainWS = "ws://127.0.0.1:10002/ws"
 )
 
+//	contractABI is used to create query filter
+//	that matches events defined in a smart contract.
 type contractABI struct {
+	//	address of smart contract
 	address web3.Address
-	events  []*abi.Event
+
+	// signatures of events defined in smart contract
+	events []*abi.Event
 }
 
 //	eventIDs returns all the event signatures (IDs)
