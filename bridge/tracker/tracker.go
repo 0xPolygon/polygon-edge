@@ -14,6 +14,15 @@ const (
 	DefaultBlockConfirmations = 6
 )
 
+type contextSubscription struct {
+	context context.Context
+	cancel  context.CancelFunc
+}
+
+func (c *contextSubscription) done() <-chan struct{} {
+	return c.context.Done()
+}
+
 //	Tracker represents an event listener that notifies
 //	for each event emitted on the rootchain.
 //	Events of interest are defined in rootchain.go
@@ -23,14 +32,14 @@ type Tracker struct {
 	// required block confirmations
 	confirmations *big.Int
 
-	// newHeads subscription channel
-	headerCh chan *ethHeader
-
 	// event channel
 	eventCh chan []byte
 
 	// cancel funcs
-	cancelSubscription, cancelEventTracking context.CancelFunc
+	ctxSubscription contextSubscription
+
+	//	rootchain sub object
+	sub subscription
 
 	//	rootchain client
 	client *rootchainClient
@@ -46,11 +55,17 @@ func NewEventTracker(logger hclog.Logger, confirmations uint64, dbPath string) (
 	tracker := &Tracker{
 		logger:        logger.Named("event_tracker"),
 		confirmations: big.NewInt(0).SetUint64(confirmations),
-		headerCh:      make(chan *ethHeader, 1),
 		eventCh:       make(chan []byte),
 	}
 
 	var err error
+
+	//	load db (last processed block number)
+	if tracker.db, err = initRootchainDB(logger, dbPath); err != nil {
+		logger.Error("cannot initialize db", "err", err)
+
+		return nil, err
+	}
 
 	//	create rootchain client
 	if tracker.client, err = newRootchainClient(rootchainWS); err != nil {
@@ -59,11 +74,9 @@ func NewEventTracker(logger hclog.Logger, confirmations uint64, dbPath string) (
 		return nil, err
 	}
 
-	//	load db (last processed block number)
-	if tracker.db, err = initRootchainDB(logger, dbPath); err != nil {
-		logger.Error("cannot initialize db", "err", err)
-
-		return nil, err
+	//	subscribe for new headers
+	if tracker.sub, err = tracker.client.subscribeNewHeads(); err != nil {
+		logger.Error("could not subscribe to rootchain", "err", err)
 	}
 
 	return tracker, nil
@@ -74,41 +87,23 @@ func NewEventTracker(logger hclog.Logger, confirmations uint64, dbPath string) (
 //	the last block queried, as well as collecting events
 //	of interest.
 //
-//	2. startSubscription - goroutine responsible for handling
-//	the subscription object. This object is provided by the
-//	client's subscribeNewHeads method that initiates the subscription.
+//	2. startEventTracking - goroutine responsible for handling
+//	the sub object. This object is provided by the
+//	client's subscribeNewHeads method that initiates the sub.
 func (t *Tracker) Start() error {
-	//	create cancellable contexts
-	ctxSubscription, cancelSubscription := context.WithCancel(context.Background())
-	t.cancelSubscription = cancelSubscription
-
-	ctxEventTracking, cancelEventTracking := context.WithCancel(context.Background())
-	t.cancelEventTracking = cancelEventTracking
-
-	//	start event tracking process early
-	go t.startEventTracking(ctxEventTracking)
-
-	//	create newHeads subscription
-	subscription, err := t.client.subscribeNewHeads(t.headerCh)
-	if err != nil {
-		t.logger.Error("cannot subscribe to rootchain", "err", err)
-
-		return err
-	}
+	// 	initialize tracking context
+	t.initContext()
 
 	//	start receiving new header events
-	go t.startSubscription(ctxSubscription, subscription)
+	go t.startEventTracking()
 
 	return nil
 }
 
 //	Stop stops the tracker's listening mechanism.
 func (t *Tracker) Stop() error {
-	//	stop subscription
-	t.cancelSubscription()
-
-	// 	stop processing headers
-	t.cancelEventTracking()
+	//	stop sub
+	t.ctxSubscription.cancel()
 
 	//	close rootchain client
 	if err := t.client.close(); err != nil {
@@ -125,39 +120,39 @@ func (t *Tracker) GetEventChannel() <-chan []byte {
 	return t.eventCh
 }
 
-//	startSubscription handles the subscription object (provided by the rootchain client).
-func (t *Tracker) startSubscription(ctx context.Context, sub subscription) {
+//	initContext initializes context for tracker's listening mechanism.
+func (t *Tracker) initContext() {
+	ctx, cancelFunc := context.WithCancel(context.Background())
+	t.ctxSubscription = contextSubscription{
+		context: ctx,
+		cancel:  cancelFunc,
+	}
+}
+
+//	startEventTracking handles the subscription object (provided by the rootchain client).
+func (t *Tracker) startEventTracking() {
 	for {
 		select {
-		case err := <-sub.err():
-			t.logger.Error("subscription error", err)
+		//	process new header
+		case header := <-t.sub.newHead():
+			t.trackHeader(header)
 
-			t.cancelSubscription()
-			t.logger.Debug("cancelling subscription")
+		//	handle sub error
+		case err := <-t.sub.err():
+			t.ctxSubscription.cancel()
+			t.logger.Error("sub cancelled", err)
 
 			return
-		case <-ctx.Done():
-			if err := sub.unsubscribe(); err != nil {
+
+		//	stop tracker's sub
+		case <-t.ctxSubscription.done():
+			if err := t.sub.unsubscribe(); err != nil {
 				t.logger.Error("cannot unsubscribe", "err", err)
 
 				return
 			}
 
-			t.logger.Debug("subscription stopped")
-
-			return
-		}
-	}
-}
-
-//	startEventTracking tracks each header (received by the subscription) for events.
-func (t *Tracker) startEventTracking(ctx context.Context) {
-	for {
-		select {
-		case header := <-t.headerCh:
-			t.trackHeader(header)
-		case <-ctx.Done():
-			t.logger.Debug("stopping header process")
+			t.logger.Debug("sub stopped")
 
 			return
 		}

@@ -136,14 +136,20 @@ func initRootchainDB(logger hclog.Logger, dbPath string) (storage.Storage, error
 	return db, nil
 }
 
-/*	Rootchain subscription object	*/
+/*	Rootchain sub object	*/
 
 type cancelSubCallback func() error
 
 //	rootchain subscription object
 type subscription struct {
-	errorCh chan error
-	cancel  cancelSubCallback
+	newHeadsCh chan *ethHeader
+	errorCh    chan error
+	cancel     cancelSubCallback
+}
+
+//	newHead returns the subscription's channel for new head events.
+func (s *subscription) newHead() <-chan *ethHeader {
+	return s.newHeadsCh
 }
 
 //	unsubscribe cancels the subscription.
@@ -158,13 +164,16 @@ func (s *subscription) err() <-chan error {
 
 //	handleWSResponse parses the json response
 //	received by the websocket into a header struct.
-func (s *subscription) handleWSResponse(response []byte) (*ethHeader, error) {
-	header := &ethHeader{}
+func (s *subscription) handleWSResponse(response []byte) {
+	//	parse ws response
+	var header *ethHeader
 	if err := json.Unmarshal(response, header); err != nil {
-		return nil, err
+		s.errorCh <- fmt.Errorf("unable to parse header - err: %w", err)
+		return
 	}
 
-	return header, nil
+	//	emit header
+	s.newHeadsCh <- header
 }
 
 /*	Rootchain client */
@@ -190,28 +199,20 @@ func (c *rootchainClient) close() error {
 }
 
 //	subscribeNewHeads returns a subscription for new header events.
-//	Each header received is sent to headerCh for further processing.
-func (c *rootchainClient) subscribeNewHeads(headerCh chan<- *ethHeader) (subscription, error) {
-	sub := subscription{errorCh: make(chan error, 1)}
-	cancelSub, err := c.impl.Subscribe("newHeads", func(b []byte) {
-		//	parse ws response
-		header, err := sub.handleWSResponse(b)
-		if err != nil {
-			//	send error to subscription object
-			err := fmt.Errorf("unable to parse header - err: %w", err)
-			sub.errorCh <- err
+func (c *rootchainClient) subscribeNewHeads() (subscription, error) {
+	//	create sub object
+	sub := subscription{
+		newHeadsCh: make(chan *ethHeader, 1),
+		errorCh:    make(chan error, 1),
+	}
 
-			return
-		}
-
-		//	send header for processing
-		headerCh <- header
-	})
-
+	//	subscribe to rootchain
+	cancelSub, err := c.impl.Subscribe("newHeads", sub.handleWSResponse)
 	if err != nil {
 		return sub, err
 	}
 
+	//	save cancel callback
 	sub.cancel = cancelSub
 
 	return sub, nil
