@@ -122,7 +122,7 @@ func (t *Tracker) Stop() error {
 }
 
 //	getEventChannel returns the tracker's event channel.
-func (t *Tracker) getEventChannel() <-chan []byte {
+func (t *Tracker) GetEventChannel() <-chan []byte {
 	return t.eventCh
 }
 
