@@ -16,61 +16,68 @@ import (
 )
 
 const (
+	//	required block depth for fetching events on the rootchain
+	DefaultBlockConfirmations = 6
+
 	//	Ropsten testnet
 	//rootchainWS   = "wss://ropsten.infura.io/ws/v3/17eac086ff36442ebd43737400eb71ca"
 
 	//	Polygon Edge
 	rootchainWS = "ws://127.0.0.1:10002/ws"
-
-	//	Smart contract addresses
-	StateSender = ""
 )
 
-var (
-	//	db key for saving tracker's progress (chain height)
-	lastQueriedBlockNumber = []byte("last-block-num")
+type contractABI struct {
+	address web3.Address
+	events  []*abi.Event
+}
 
-	/*	ABI events (defined in the above smart contracts) */
+//	eventIDs returns all the event signatures (IDs)
+//	defined in the smart contract.
+func (c *contractABI) eventIDs() (IDs []*web3.Hash) {
+	for _, ev := range c.events {
+		id := ev.ID()
+		IDs = append(IDs, &id)
+	}
 
-	//	StateSender
-	NewRegistrationEvent = abi.MustNewEvent(`event NewRegistration(
-	address indexed user,
-	address indexed sender,
-    address indexed receiver)`,
-	)
+	return
+}
 
-	RegistrationUpdatedEvent = abi.MustNewEvent(`event RegistrationUpdated(
-	address indexed user,
-	address indexed sender,
-	address indexed receiver)`,
-	)
+//	loadABIs parses contracts from raw map.
+func loadABIs(abisRaw map[string][]string) (contracts []*contractABI) {
+	for address, events := range abisRaw {
+		//	set smart contract address
+		contract := &contractABI{
+			address: web3.HexToAddress(address),
+		}
 
-	StateSyncedEvent = abi.MustNewEvent(`event StateSynced(
-	uint256 indexed id,
-	address indexed contractAddress,
-	bytes data)`,
-	)
-)
+		//	set each event (defined in contract)
+		for _, ev := range events {
+			contract.events = append(contract.events, abi.MustNewEvent(ev))
+		}
+
+		//	append result
+		contracts = append(contracts, contract)
+	}
+
+	return
+}
 
 //	setupQueryFilter creates a log filter for the desired
 //	block range. Filter matches events defined in rootchain.go.
-func setupQueryFilter(from, to *big.Int) *web3.LogFilter {
+func setupQueryFilter(from, to *big.Int, contracts []*contractABI) *web3.LogFilter {
 	queryFilter := &web3.LogFilter{}
 
 	//	set range of blocks to query
 	queryFilter.SetFromUint64(from.Uint64())
 	queryFilter.SetToUint64(to.Uint64())
 
-	/*	SC addresses and event topics are set here */
+	//	set contract addresses and topics
+	for _, contract := range contracts {
+		//	append address
+		queryFilter.Address = append(queryFilter.Address, contract.address)
 
-	queryFilter.Address = []web3.Address{
-		//	set smart contract addresses
-	}
-
-	queryFilter.Topics = [][]*web3.Hash{
-		{
-			//	set event topics
-		},
+		//	topics from all contracts must be in Topics[0]
+		queryFilter.Topics[0] = append(queryFilter.Topics[0], contract.eventIDs()...)
 	}
 
 	return queryFilter

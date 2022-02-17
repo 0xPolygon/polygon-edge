@@ -9,16 +9,20 @@ import (
 	"math/big"
 )
 
-const (
-	//	required block depth for fetching events on the rootchain
-	DefaultBlockConfirmations = 6
-)
+type Config struct {
+	Confirmations uint64
+	RootchainWS   string
+	DBPath        string
+	ContractABIs  map[string][]string
+}
 
+//	cancellable context for tracker's listening mechanism
 type contextSubscription struct {
 	context context.Context
 	cancel  context.CancelFunc
 }
 
+//	done returns the contexts Done channel.
 func (c *contextSubscription) done() <-chan struct{} {
 	return c.context.Done()
 }
@@ -46,29 +50,48 @@ type Tracker struct {
 
 	//	db for last processed block number
 	db storage.Storage
+
+	//	events that tracker will listen for
+	contracts []*contractABI
 }
 
 //	NewEventTracker returns a new tracker able to listen for events
 //	at the desired block depth. Events of interest are defined
 //	in rootchain.go
-func NewEventTracker(logger hclog.Logger, confirmations uint64, dbPath string) (*Tracker, error) {
+func NewEventTracker(logger hclog.Logger, config *Config) (*Tracker, error) {
+	if config == nil {
+		//	load default
+		config = &Config{
+			Confirmations: DefaultBlockConfirmations,
+			RootchainWS:   rootchainWS,
+			DBPath:        "",
+			ContractABIs:  nil,
+		}
+	}
+
+	//	create tracker
 	tracker := &Tracker{
 		logger:        logger.Named("event_tracker"),
-		confirmations: big.NewInt(0).SetUint64(confirmations),
+		confirmations: big.NewInt(0).SetUint64(config.Confirmations),
 		eventCh:       make(chan []byte),
 	}
 
 	var err error
 
+	//	load abi events
+	if config.ContractABIs != nil {
+		tracker.contracts = loadABIs(config.ContractABIs)
+	}
+
 	//	load db (last processed block number)
-	if tracker.db, err = initRootchainDB(logger, dbPath); err != nil {
+	if tracker.db, err = initRootchainDB(logger, config.DBPath); err != nil {
 		logger.Error("cannot initialize db", "err", err)
 
 		return nil, err
 	}
 
 	//	create rootchain client
-	if tracker.client, err = newRootchainClient(rootchainWS); err != nil {
+	if tracker.client, err = newRootchainClient(config.RootchainWS); err != nil {
 		logger.Error("cannot connect to rootchain", "err", err)
 
 		return nil, err
@@ -76,7 +99,7 @@ func NewEventTracker(logger hclog.Logger, confirmations uint64, dbPath string) (
 
 	//	subscribe for new headers
 	if tracker.sub, err = tracker.client.subscribeNewHeads(); err != nil {
-		logger.Error("could not subscribe to rootchain", "err", err)
+		logger.Error("cannot subscribe to rootchain", "err", err)
 	}
 
 	return tracker, nil
@@ -90,20 +113,21 @@ func NewEventTracker(logger hclog.Logger, confirmations uint64, dbPath string) (
 //	2. startEventTracking - goroutine responsible for handling
 //	the sub object. This object is provided by the
 //	client's subscribeNewHeads method that initiates the sub.
-func (t *Tracker) Start() error {
+func (t *Tracker) Start() {
 	// 	initialize tracking context
 	t.initContext()
 
 	//	start receiving new header events
 	go t.startEventTracking()
-
-	return nil
 }
 
 //	Stop stops the tracker's listening mechanism.
 func (t *Tracker) Stop() error {
-	//	stop sub
+	//	stop subscription
 	t.ctxSubscription.cancel()
+
+	//	close db
+	t.db.Close()
 
 	//	close rootchain client
 	if err := t.client.close(); err != nil {
@@ -246,7 +270,7 @@ func (t *Tracker) saveLastBlock(blockNumber *big.Int) error {
 //	between blocks fromBlock and toBlock (inclusive).
 func (t *Tracker) queryEvents(fromBlock, toBlock *big.Int) []*web3.Log {
 	//	create the query filter
-	queryFilter := setupQueryFilter(fromBlock, toBlock)
+	queryFilter := setupQueryFilter(fromBlock, toBlock, t.contracts)
 
 	//	call eth_getLogs
 	logs, err := t.client.getLogs(queryFilter)

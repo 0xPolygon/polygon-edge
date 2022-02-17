@@ -193,19 +193,16 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	}
 
 	if m.config.Tracker {
-		//	create and start event tracker
-		m.tracker, err = tracker.NewEventTracker(
+		//	create tracker
+		if m.tracker, err = tracker.NewEventTracker(
 			logger,
-			tracker.DefaultBlockConfirmations, /* default */
-		)
-
-		if err != nil {
+			nil,
+		); err != nil {
 			return nil, err
 		}
 
-		if err := m.tracker.Start(); err != nil {
-			return nil, err
-		}
+		//	start tracker's listening process
+		m.tracker.Start()
 	}
 
 	// after consensus is done, we can mine the genesis block in blockchain
