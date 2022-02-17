@@ -18,6 +18,10 @@ var (
 	MaxValidatorCount = uint(math.MaxUint32)
 )
 
+var (
+	ErrInvalidValidatorNumber = errors.New("minimum number of validator can not be greater than maximum number of validator")
+)
+
 // PadLeftOrTrim left-pads the passed in byte array to the specified size,
 // or trims the array if it exceeds the passed in size
 func PadLeftOrTrim(bb []byte, size int) []byte {
@@ -156,7 +160,7 @@ func PredeployStakingSC(
 	}
 
 	if params.MinValidatorCount > params.MaxValidatorCount {
-		return nil, errors.New("minimum number of validator can not be greater than maximum number of validator")
+		return nil, ErrInvalidValidatorNumber
 	}
 
 	if params.MaxValidatorCount > math.MaxUint32 {
