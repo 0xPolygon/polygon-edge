@@ -60,6 +60,11 @@ builds:
       # We need to build a static binary because we are building in a glibc based system and running in a musl container
       -s -w -linkmode external -extldflags "-static" -X 'github.com/0xPolygon/polygon-edge/versioning.Version=v{{ .Version }}'
 
+archives:
+  -
+    files:
+    - LICENSE
+
 #nfpms:
 #  - vendor: 0xPolygon
 #    homepage: https://polygon.technology
