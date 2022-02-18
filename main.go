@@ -15,11 +15,9 @@ var (
 	license string
 )
 
-func init() {
-	licenses.SetLicense(license)
-}
-
 func main() {
+	licenses.SetLicense(license)
+
 	os.Exit(Run(os.Args[1:]))
 }
 
