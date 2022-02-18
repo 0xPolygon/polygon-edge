@@ -3,6 +3,7 @@ package sam
 import (
 	"testing"
 
+	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
 )
@@ -13,39 +14,74 @@ var (
 		types.StringToAddress("2"),
 		types.StringToAddress("3"),
 	}
+
+	mockHashes = []types.Hash{
+		types.BytesToHash(crypto.Keccak256([]byte{0x01})),
+		types.BytesToHash(crypto.Keccak256([]byte{0x02})),
+		types.BytesToHash(crypto.Keccak256([]byte{0x03})),
+	}
 )
 
-func newTestSignedMessage(id uint64, address types.Address) *SignedMessage {
-	return &SignedMessage{
-		Message: Message{
-			ID: id,
-		},
-		Address:   address,
-		Signature: nil,
+func newTestMessage(hash types.Hash) *Message {
+	return &Message{
+		Hash: hash,
+		Body: []byte{0x01},
 	}
 }
 
-func newTestMessageSignaturesStore(msgs []SignedMessage) *messageSignaturesStore {
+func newTestMessageSignature(hash types.Hash, address types.Address) *MessageSignature {
+	return &MessageSignature{
+		Hash:      hash,
+		Address:   address,
+		Signature: []byte{0x01},
+	}
+}
+
+func newTestMessageSignaturesStore(signatures []MessageSignature) *messageSignaturesStore {
 	store := newMessageSignaturesStore()
 
-	for _, msg := range msgs {
-		msg := msg
-		store.PutMessage(&msg)
+	for _, sig := range signatures {
+		sig := sig
+		store.Put(&sig)
 	}
 
 	return store
 }
 
-func getMessageIDKeys(store *messageSignaturesStore) []uint64 {
-	ids := make([]uint64, 0)
+func newTestMessagePool(
+	validators []types.Address,
+	threshold uint64,
+	knownMessages []Message,
+	consumedHashes []types.Hash,
+	signatures []MessageSignature,
+) Pool {
+	pool := NewPool(validators, threshold)
+
+	for _, msg := range knownMessages {
+		pool.AddMessage(&msg)
+	}
+
+	for _, consumed := range consumedHashes {
+		pool.Consume(consumed)
+	}
+
+	for _, signature := range signatures {
+		pool.AddSignature(&signature)
+	}
+
+	return pool
+}
+
+func getMessageHashes(store *messageSignaturesStore) []types.Hash {
+	hashes := make([]types.Hash, 0)
 
 	store.RangeMessages(func(entry *signedMessageEntry) bool {
-		ids = append(ids, entry.Message.ID)
+		hashes = append(hashes, entry.Hash)
 
 		return true
 	})
 
-	return ids
+	return hashes
 }
 
 // Tests for Pool
@@ -53,26 +89,28 @@ func Test_Pool_Add(t *testing.T) {
 	tests := []struct {
 		name string
 		// initial state
-		validators  []types.Address
-		threshold   uint64
-		knownIDs    []uint64
-		consumedIDS []uint64
+		validators     []types.Address
+		threshold      uint64
+		knownMessages  []Message
+		consumedHashes []types.Hash
 		// inputs
-		messages []SignedMessage
+		signatures []MessageSignature
 		// outputs
 		numReadyMessages int
 	}{
 		{
-			name: "should promote message if the message doesn't have enough message",
+			name: "shouldn't promote message if the message doesn't have enough message",
 			validators: []types.Address{
 				mockAddresses[0],
 				mockAddresses[1],
 			},
-			threshold:   2,
-			knownIDs:    []uint64{1},
-			consumedIDS: nil,
-			messages: []SignedMessage{
-				*newTestSignedMessage(1, mockAddresses[0]),
+			threshold: 2,
+			knownMessages: []Message{
+				*newTestMessage(mockHashes[0]),
+			},
+			consumedHashes: nil,
+			signatures: []MessageSignature{
+				*newTestMessageSignature(mockHashes[0], mockAddresses[0]),
 			},
 			numReadyMessages: 0,
 		},
@@ -82,13 +120,16 @@ func Test_Pool_Add(t *testing.T) {
 				mockAddresses[0],
 				mockAddresses[1],
 			},
-			threshold:   2,
-			knownIDs:    []uint64{1, 2},
-			consumedIDS: nil,
-			messages: []SignedMessage{
-				*newTestSignedMessage(1, mockAddresses[0]),
-				*newTestSignedMessage(1, mockAddresses[1]),
-				*newTestSignedMessage(2, mockAddresses[1]),
+			threshold: 2,
+			knownMessages: []Message{
+				*newTestMessage(mockHashes[0]),
+				*newTestMessage(mockHashes[1]),
+			},
+			consumedHashes: nil,
+			signatures: []MessageSignature{
+				*newTestMessageSignature(mockHashes[0], mockAddresses[0]),
+				*newTestMessageSignature(mockHashes[0], mockAddresses[1]),
+				*newTestMessageSignature(mockHashes[1], mockAddresses[1]),
 			},
 			numReadyMessages: 1,
 		},
@@ -98,13 +139,13 @@ func Test_Pool_Add(t *testing.T) {
 				mockAddresses[0],
 				mockAddresses[1],
 			},
-			threshold:   2,
-			knownIDs:    nil,
-			consumedIDS: nil,
-			messages: []SignedMessage{
-				*newTestSignedMessage(1, mockAddresses[0]),
-				*newTestSignedMessage(1, mockAddresses[1]),
-				*newTestSignedMessage(2, mockAddresses[1]),
+			threshold:      2,
+			knownMessages:  nil,
+			consumedHashes: nil,
+			signatures: []MessageSignature{
+				*newTestMessageSignature(mockHashes[0], mockAddresses[0]),
+				*newTestMessageSignature(mockHashes[0], mockAddresses[1]),
+				*newTestMessageSignature(mockHashes[1], mockAddresses[1]),
 			},
 			numReadyMessages: 0,
 		},
@@ -114,13 +155,17 @@ func Test_Pool_Add(t *testing.T) {
 				mockAddresses[0],
 				mockAddresses[1],
 			},
-			threshold:   2,
-			knownIDs:    []uint64{1},
-			consumedIDS: []uint64{1},
-			messages: []SignedMessage{
-				*newTestSignedMessage(1, mockAddresses[0]),
-				*newTestSignedMessage(1, mockAddresses[1]),
-				*newTestSignedMessage(2, mockAddresses[1]),
+			threshold: 2,
+			knownMessages: []Message{
+				*newTestMessage(mockHashes[0]),
+			},
+			consumedHashes: []types.Hash{
+				mockHashes[0],
+			},
+			signatures: []MessageSignature{
+				*newTestMessageSignature(mockHashes[0], mockAddresses[0]),
+				*newTestMessageSignature(mockHashes[0], mockAddresses[1]),
+				*newTestMessageSignature(mockHashes[1], mockAddresses[1]),
 			},
 			numReadyMessages: 0,
 		},
@@ -130,15 +175,18 @@ func Test_Pool_Add(t *testing.T) {
 				mockAddresses[0],
 				mockAddresses[1],
 			},
-			threshold:   2,
-			knownIDs:    []uint64{1, 2},
-			consumedIDS: nil,
-			messages: []SignedMessage{
-				*newTestSignedMessage(1, mockAddresses[0]),
-				*newTestSignedMessage(1, mockAddresses[1]),
-				*newTestSignedMessage(1, mockAddresses[2]),
-				*newTestSignedMessage(2, mockAddresses[0]),
-				*newTestSignedMessage(2, mockAddresses[1]),
+			threshold: 2,
+			knownMessages: []Message{
+				*newTestMessage(mockHashes[0]),
+				*newTestMessage(mockHashes[1]),
+			},
+			consumedHashes: nil,
+			signatures: []MessageSignature{
+				*newTestMessageSignature(mockHashes[0], mockAddresses[0]),
+				*newTestMessageSignature(mockHashes[0], mockAddresses[1]),
+				*newTestMessageSignature(mockHashes[0], mockAddresses[2]),
+				*newTestMessageSignature(mockHashes[1], mockAddresses[0]),
+				*newTestMessageSignature(mockHashes[1], mockAddresses[1]),
 			},
 			numReadyMessages: 2,
 		},
@@ -148,12 +196,15 @@ func Test_Pool_Add(t *testing.T) {
 				mockAddresses[0],
 				mockAddresses[1],
 			},
-			threshold:   2,
-			knownIDs:    []uint64{1, 2},
-			consumedIDS: nil,
-			messages: []SignedMessage{
-				*newTestSignedMessage(1, mockAddresses[0]),
-				*newTestSignedMessage(1, mockAddresses[0]),
+			threshold: 2,
+			knownMessages: []Message{
+				*newTestMessage(mockHashes[0]),
+				*newTestMessage(mockHashes[1]),
+			},
+			consumedHashes: nil,
+			signatures: []MessageSignature{
+				*newTestMessageSignature(mockHashes[0], mockAddresses[0]),
+				*newTestMessageSignature(mockHashes[0], mockAddresses[0]),
 			},
 			numReadyMessages: 0,
 		},
@@ -161,21 +212,13 @@ func Test_Pool_Add(t *testing.T) {
 
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
-			// initialize
-			pool := NewPool(testCase.validators, testCase.threshold)
-			for _, id := range testCase.knownIDs {
-				pool.MarkAsKnown(id)
-			}
-
-			for _, id := range testCase.consumedIDS {
-				pool.Consume(id)
-			}
-
-			// put messages
-			for _, msg := range testCase.messages {
-				msg := msg
-				pool.Add(&msg)
-			}
+			pool := newTestMessagePool(
+				testCase.validators,
+				testCase.threshold,
+				testCase.knownMessages,
+				testCase.consumedHashes,
+				testCase.signatures,
+			)
 
 			// get result
 			assert.Len(t, pool.GetReadyMessages(), testCase.numReadyMessages)
@@ -187,13 +230,11 @@ func Test_Pool_MarkAsKnown(t *testing.T) {
 	tests := []struct {
 		name string
 		// initial state
-		validators  []types.Address
-		threshold   uint64
-		knownIDs    []uint64
-		consumedIDS []uint64
-		messages    []SignedMessage
+		validators []types.Address
+		threshold  uint64
+		signatures []MessageSignature
 		// inputs
-		newKnownIDs []uint64
+		newKnownMessage []Message
 		// outputs
 		numReadyMessages int
 	}{
@@ -203,14 +244,12 @@ func Test_Pool_MarkAsKnown(t *testing.T) {
 				mockAddresses[0],
 				mockAddresses[1],
 			},
-			threshold:   1,
-			knownIDs:    nil,
-			consumedIDS: nil,
-			messages: []SignedMessage{
-				*newTestSignedMessage(1, mockAddresses[0]),
-				*newTestSignedMessage(2, mockAddresses[1]),
+			threshold: 1,
+			signatures: []MessageSignature{
+				*newTestMessageSignature(mockHashes[0], mockAddresses[0]),
+				*newTestMessageSignature(mockHashes[1], mockAddresses[1]),
 			},
-			newKnownIDs:      nil,
+			newKnownMessage:  nil,
 			numReadyMessages: 0,
 		},
 		{
@@ -219,37 +258,30 @@ func Test_Pool_MarkAsKnown(t *testing.T) {
 				mockAddresses[0],
 				mockAddresses[1],
 			},
-			threshold:   1,
-			knownIDs:    nil,
-			consumedIDS: nil,
-			messages: []SignedMessage{
-				*newTestSignedMessage(1, mockAddresses[0]),
-				*newTestSignedMessage(2, mockAddresses[1]),
+			threshold: 1,
+			signatures: []MessageSignature{
+				*newTestMessageSignature(mockHashes[0], mockAddresses[0]),
+				*newTestMessageSignature(mockHashes[1], mockAddresses[1]),
 			},
-			newKnownIDs:      []uint64{1},
+			newKnownMessage: []Message{
+				*newTestMessage(mockHashes[0]),
+			},
 			numReadyMessages: 1,
 		},
 	}
 
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
-			// initialize
-			pool := NewPool(testCase.validators, testCase.threshold)
-			for _, id := range testCase.knownIDs {
-				pool.MarkAsKnown(id)
-			}
+			pool := newTestMessagePool(
+				testCase.validators,
+				testCase.threshold,
+				nil,
+				nil,
+				testCase.signatures,
+			)
 
-			for _, id := range testCase.consumedIDS {
-				pool.Consume(id)
-			}
-
-			for _, msg := range testCase.messages {
-				msg := msg
-				pool.Add(&msg)
-			}
-
-			for _, id := range testCase.newKnownIDs {
-				pool.MarkAsKnown(id)
+			for _, message := range testCase.newKnownMessage {
+				pool.AddMessage(&message)
 			}
 
 			// get result
@@ -264,9 +296,9 @@ func Test_Pool_UpdateValidatorSet(t *testing.T) {
 		// initial state
 		validators          []types.Address
 		threshold           uint64
-		knownIDs            []uint64
-		consumedIDS         []uint64
-		messages            []SignedMessage
+		knownMessages       []Message
+		consumedHashes      []types.Hash
+		signatures          []MessageSignature
 		oldNumReadyMessages int
 		// inputs
 		newValidators []types.Address
@@ -275,17 +307,19 @@ func Test_Pool_UpdateValidatorSet(t *testing.T) {
 		newNumReadyMessages int
 	}{
 		{
-			name: "should demote if the validator has signed message left from set",
+			name: "should demote if the validator that has signed message left from validator set",
 			validators: []types.Address{
 				mockAddresses[0],
 				mockAddresses[1],
 			},
-			threshold:   2,
-			knownIDs:    []uint64{1},
-			consumedIDS: nil,
-			messages: []SignedMessage{
-				*newTestSignedMessage(1, mockAddresses[0]),
-				*newTestSignedMessage(1, mockAddresses[1]),
+			threshold: 2,
+			knownMessages: []Message{
+				*newTestMessage(mockHashes[0]),
+			},
+			consumedHashes: nil,
+			signatures: []MessageSignature{
+				*newTestMessageSignature(mockHashes[0], mockAddresses[0]),
+				*newTestMessageSignature(mockHashes[0], mockAddresses[1]),
 			},
 			oldNumReadyMessages: 1,
 			newValidators: []types.Address{
@@ -301,11 +335,13 @@ func Test_Pool_UpdateValidatorSet(t *testing.T) {
 				mockAddresses[0],
 				mockAddresses[1],
 			},
-			threshold:   1,
-			knownIDs:    []uint64{1},
-			consumedIDS: nil,
-			messages: []SignedMessage{
-				*newTestSignedMessage(1, mockAddresses[0]),
+			threshold: 1,
+			knownMessages: []Message{
+				*newTestMessage(mockHashes[0]),
+			},
+			consumedHashes: nil,
+			signatures: []MessageSignature{
+				*newTestMessageSignature(mockHashes[0], mockAddresses[0]),
 			},
 			oldNumReadyMessages: 1,
 			newValidators: []types.Address{
@@ -321,11 +357,13 @@ func Test_Pool_UpdateValidatorSet(t *testing.T) {
 				mockAddresses[0],
 				mockAddresses[1],
 			},
-			threshold:   2,
-			knownIDs:    []uint64{1},
-			consumedIDS: nil,
-			messages: []SignedMessage{
-				*newTestSignedMessage(1, mockAddresses[0]),
+			threshold: 2,
+			knownMessages: []Message{
+				*newTestMessage(mockHashes[0]),
+			},
+			consumedHashes: nil,
+			signatures: []MessageSignature{
+				*newTestMessageSignature(mockHashes[0], mockAddresses[0]),
 			},
 			oldNumReadyMessages: 0,
 			newValidators: []types.Address{
@@ -339,20 +377,13 @@ func Test_Pool_UpdateValidatorSet(t *testing.T) {
 
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
-			// initialize
-			pool := NewPool(testCase.validators, testCase.threshold)
-			for _, id := range testCase.knownIDs {
-				pool.MarkAsKnown(id)
-			}
-
-			for _, id := range testCase.consumedIDS {
-				pool.Consume(id)
-			}
-
-			for _, msg := range testCase.messages {
-				msg := msg
-				pool.Add(&msg)
-			}
+			pool := newTestMessagePool(
+				testCase.validators,
+				testCase.threshold,
+				testCase.knownMessages,
+				testCase.consumedHashes,
+				testCase.signatures,
+			)
 
 			// check current ready messages
 			assert.Len(t, pool.GetReadyMessages(), testCase.oldNumReadyMessages)
@@ -367,51 +398,51 @@ func Test_Pool_UpdateValidatorSet(t *testing.T) {
 
 // Tests for messageSignaturesStore
 func Test_messageSignaturesStore_HasMessage(t *testing.T) {
-	store := newTestMessageSignaturesStore([]SignedMessage{
-		*newTestSignedMessage(1, mockAddresses[0]),
+	store := newTestMessageSignaturesStore([]MessageSignature{
+		*newTestMessageSignature(mockHashes[0], mockAddresses[0]),
 	})
 
-	assert.True(t, store.HasMessage(1), "should return true for the existing message, but got false")
-	assert.False(t, store.HasMessage(2), "should return false for non-existing message, but got true")
+	assert.True(t, store.HasMessage(mockHashes[0]), "should return true for the existing message, but got false")
+	assert.False(t, store.HasMessage(mockHashes[1]), "should return false for non-existing message, but got true")
 }
 
 func Test_messageSignaturesStore_GetSignatureCount(t *testing.T) {
-	store := newTestMessageSignaturesStore([]SignedMessage{
-		*newTestSignedMessage(1, mockAddresses[0]),
-		*newTestSignedMessage(1, mockAddresses[0]), // signature by same address
-		*newTestSignedMessage(1, mockAddresses[1]),
+	store := newTestMessageSignaturesStore([]MessageSignature{
+		*newTestMessageSignature(mockHashes[0], mockAddresses[0]),
+		*newTestMessageSignature(mockHashes[0], mockAddresses[0]), // signature by same address
+		*newTestMessageSignature(mockHashes[0], mockAddresses[1]),
 	})
 
 	assert.Equal(
 		t,
 		uint64(2),
-		store.GetSignatureCount(1),
+		store.GetSignatureCount(mockHashes[0]),
 		"should return number of signatures in store for the existing message",
 	)
 	assert.Equal(
 		t,
 		uint64(0),
-		store.GetSignatureCount(2),
+		store.GetSignatureCount(mockHashes[1]),
 		"should return zero for non-existing message",
 	)
 }
 
 func Test_messageSignaturesStore_RangeMessage(t *testing.T) {
-	store := newTestMessageSignaturesStore([]SignedMessage{
-		*newTestSignedMessage(1, mockAddresses[0]),
-		*newTestSignedMessage(1, mockAddresses[1]),
-		*newTestSignedMessage(2, mockAddresses[2]),
+	store := newTestMessageSignaturesStore([]MessageSignature{
+		*newTestMessageSignature(mockHashes[0], mockAddresses[0]),
+		*newTestMessageSignature(mockHashes[0], mockAddresses[1]),
+		*newTestMessageSignature(mockHashes[1], mockAddresses[2]),
 	})
-	expected := map[uint64][]types.Address{
-		1: {
+	expected := map[types.Hash][]types.Address{
+		mockHashes[0]: {
 			mockAddresses[0],
 			mockAddresses[1],
 		},
-		2: {
+		mockHashes[1]: {
 			mockAddresses[2],
 		},
 	}
-	actual := make(map[uint64][]types.Address)
+	actual := make(map[types.Hash][]types.Address)
 
 	store.RangeMessages(func(entry *signedMessageEntry) bool {
 		addresses := make([]types.Address, 0, entry.NumSignatures())
@@ -425,7 +456,7 @@ func Test_messageSignaturesStore_RangeMessage(t *testing.T) {
 			return true
 		})
 
-		actual[entry.Message.ID] = addresses
+		actual[entry.Hash] = addresses
 
 		return true
 	})
@@ -439,128 +470,127 @@ func Test_messageSignaturesStore_RangeMessage(t *testing.T) {
 		len(actual),
 	)
 
-	for id, expectedAddrs := range expected {
+	for hash, expectedAddrs := range expected {
 		assert.ElementsMatch(
 			t,
 			expectedAddrs,
-			actual[id],
-			"Store should have addresses who has signed messages, but missing some addresses for ID %d",
-			id,
+			actual[hash],
+			"Store should have addresses who has signed messages, but missing some addresses for %s",
+			hash.String(),
 		)
 	}
 }
 
 func Test_messageSignaturesStore_PutMessage(t *testing.T) {
 	store := newTestMessageSignaturesStore(nil)
-
-	messageID := uint64(1)
+	hash := mockHashes[0]
 
 	// before putting
 	assert.Nil(t,
-		store.GetMessage(messageID),
+		store.GetSignatures(hash),
 		"should return nil as default",
 	)
 	assert.Equal(
 		t,
 		uint64(0),
-		store.GetSignatureCount(messageID),
+		store.GetSignatureCount(hash),
 		"should return zero message as default",
 	)
 	assert.Len(
 		t,
-		getMessageIDKeys(store),
+		getMessageHashes(store),
 		0,
 		"should not have any keys as default",
 	)
 
-	store.PutMessage(newTestSignedMessage(1, mockAddresses[0]))
+	store.Put(newTestMessageSignature(mockHashes[0], mockAddresses[0]))
 
 	// after putting
 	assert.NotNil(t,
-		store.GetMessage(messageID),
+		store.GetSignatures(hash),
 		"should return entry after putting message",
 	)
 	assert.Equal(
 		t,
 		uint64(1),
-		store.GetSignatureCount(messageID),
+		store.GetSignatureCount(hash),
 		"should return number of signatures after putting message",
 	)
 	assert.Len(
 		t,
-		getMessageIDKeys(store),
+		getMessageHashes(store),
 		1,
 		"should have only one key after putting one message",
 	)
 }
 
 func Test_messageSignaturesStore_RemoveMessage(t *testing.T) {
-	messageID := uint64(1)
-	store := newTestMessageSignaturesStore([]SignedMessage{
-		*newTestSignedMessage(messageID, mockAddresses[0]),
+	hash := mockHashes[0]
+	store := newTestMessageSignaturesStore([]MessageSignature{
+		*newTestMessageSignature(hash, mockAddresses[0]),
 	})
 
 	// before removing
 	assert.NotNil(t,
-		store.GetMessage(messageID),
+		store.GetSignatures(hash),
 		"should return the entry before removing message",
 	)
 	assert.Equal(
 		t,
 		uint64(1),
-		store.GetSignatureCount(messageID),
+		store.GetSignatureCount(hash),
 		"should return number of signatures in store before removing message",
 	)
 	assert.Len(
 		t,
-		getMessageIDKeys(store),
+		getMessageHashes(store),
 		1,
 		"should have only one key in store after before removing message",
 	)
 
 	assert.Truef(
 		t,
-		store.RemoveMessage(messageID),
+		store.RemoveMessage(hash),
 		"RemoveMessage should return true for existing message, but got false",
 	)
 
 	// after removing
 	assert.Nil(
 		t,
-		store.GetMessage(messageID),
+		store.GetSignatures(hash),
 		"should return nil after removing",
 	)
 	assert.Equal(
 		t,
 		uint64(0),
-		store.GetSignatureCount(messageID),
+		store.GetSignatureCount(hash),
 		"should return zero message after removing",
 	)
 	assert.Len(
 		t,
-		getMessageIDKeys(store),
+		getMessageHashes(store),
 		0,
 		"should not have any keys after removing",
 	)
 }
 
 func Test_messageSignaturesStore_RemoveSignatures(t *testing.T) {
-	messageID := uint64(1)
-	store := newTestMessageSignaturesStore([]SignedMessage{
-		*newTestSignedMessage(messageID, mockAddresses[0]),
-		*newTestSignedMessage(messageID, mockAddresses[1]),
-		*newTestSignedMessage(messageID, mockAddresses[2]),
+	hash := mockHashes[0]
+	store := newTestMessageSignaturesStore([]MessageSignature{
+		*newTestMessageSignature(hash, mockAddresses[0]),
+		*newTestMessageSignature(hash, mockAddresses[1]),
+		*newTestMessageSignature(hash, mockAddresses[2]),
 	})
 
 	// before removing signatures
 	assert.NotNil(t,
-		store.GetMessage(messageID),
+		store.GetSignatures(hash),
 		"should return message as default",
 	)
 	assert.Equal(
 		t,
 		uint64(3),
-		store.GetSignatureCount(messageID),
+		store.GetSignatureCount(hash),
 		"should return 3 signatures as default",
 	)
 
@@ -572,13 +602,13 @@ func Test_messageSignaturesStore_RemoveSignatures(t *testing.T) {
 	// after removing signatures
 	assert.NotNil(
 		t,
-		store.GetMessage(messageID),
+		store.GetSignatures(hash),
 		"should return message",
 	)
 	assert.Equal(
 		t,
 		uint64(1),
-		store.GetSignatureCount(messageID),
+		store.GetSignatureCount(hash),
 		"should return only 1 signatures after removing signatures",
 	)
 }
