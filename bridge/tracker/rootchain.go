@@ -82,7 +82,7 @@ func setupQueryFilter(from, to *big.Int, contracts []*contractABI) *web3.LogFilt
 		queryFilter.Address = append(queryFilter.Address, contract.address)
 
 		//	topics from all contracts must be in Topics[0]
-		queryFilter.Topics[0] = append(queryFilter.Topics[0], contract.eventIDs()...)
+		queryFilter.Topics = append(queryFilter.Topics, contract.eventIDs())
 	}
 
 	return queryFilter
