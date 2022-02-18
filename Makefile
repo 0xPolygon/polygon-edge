@@ -20,7 +20,7 @@ protoc:
 build:
 	$(eval LATEST_VERSION = $(shell git describe --tags --abbrev=0))
 	$(eval COMMIT_HASH = $(shell git rev-parse --short HEAD))
-	go build -ldflags="-X 'github.com/0xPolygon/polygon-edge/params.Version=$(LATEST_VERSION)+$(COMMIT_HASH)'" main.go
+	go build -ldflags="-X 'github.com/0xPolygon/polygon-edge/versioning.Version=$(LATEST_VERSION)+$(COMMIT_HASH)'" main.go
 
 .PHONY: lint
 lint:
