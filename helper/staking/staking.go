@@ -85,8 +85,7 @@ func getStorageIndexes(address types.Address, index int64) *StorageIndexes {
 	// Get the indexes for _validators, _stakedAmount, _minNumValidators, _maxNumValidators
 	// Index for regular types is calculated as just the regular slot
 	storageIndexes.StakedAmountIndex = big.NewInt(stakedAmountSlot).Bytes()
-	storageIndexes.MinimumNumValidatorsIndex = big.NewInt(minimumNumValidator).Bytes()
-	storageIndexes.MaximumNumValidatorsIndex = big.NewInt(maximumNumValidator).Bytes()
+	storageIndexes.MinAndMaxNumValidatorsIndex = big.NewInt(minAndMaxNumValidator).Bytes()
 
 	// Index for array types is calculated as keccak(slot) + index
 	// The slot for the dynamic arrays that's put in the keccak needs to be in hex form (padded 64 chars)
@@ -117,8 +116,7 @@ type StorageIndexes struct {
 	AddressToStakedAmountIndex   []byte // mapping(address => uint256)
 	AddressToValidatorIndexIndex []byte // mapping(address => uint256)
 	StakedAmountIndex            []byte // uint256
-	MinimumNumValidatorsIndex    []byte // uint256
-	MaximumNumValidatorsIndex    []byte // uint256
+	MinAndMaxNumValidatorsIndex  []byte // uint256
 }
 
 // Slot definitions for SC storage
@@ -128,8 +126,7 @@ var (
 	addressToStakedAmountSlot   = int64(2) // Slot 2
 	addressToValidatorIndexSlot = int64(3) // Slot 3
 	stakedAmountSlot            = int64(4) // Slot 4
-	minimumNumValidator         = int64(5) // Slot 5
-	maximumNumValidator         = int64(6) // Slot 6
+	minAndMaxNumValidator       = int64(5) // Slot 5
 )
 
 const (
@@ -207,13 +204,15 @@ func PredeployStakingSC(
 		storageMap[types.BytesToHash(storageIndexes.ValidatorsArraySizeIndex)] =
 			types.StringToHash(hex.EncodeUint64(uint64(indx + 1)))
 
-		// Set the value for the minimum number of validators
-		storageMap[types.BytesToHash(storageIndexes.MinimumNumValidatorsIndex)] =
-			types.BytesToHash(minNumValidators.Bytes())
-
-		// Set the value for the maximum number of validators
-		storageMap[types.BytesToHash(storageIndexes.MaximumNumValidatorsIndex)] =
-			types.BytesToHash(maxNumValidators.Bytes())
+		// Set the value for the minimum and maximum number of validators
+		min := PadLeftOrTrim(minNumValidators.Bytes(), 4)
+		max := PadLeftOrTrim(maxNumValidators.Bytes(), 4)
+		storageMap[types.BytesToHash(storageIndexes.MinAndMaxNumValidatorsIndex)] = types.BytesToHash(
+			append(
+				max,
+				min...,
+			),
+		)
 	}
 
 	// Save the storage map
