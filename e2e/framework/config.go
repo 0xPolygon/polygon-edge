@@ -26,25 +26,26 @@ type SrvAccount struct {
 // TestServerConfig for the test server
 type TestServerConfig struct {
 	ReservedPorts           []ReservedPort
-	JSONRPCPort             int             // The JSON RPC endpoint port
-	GRPCPort                int             // The GRPC endpoint port
-	LibP2PPort              int             // The Libp2p endpoint port
-	Seal                    bool            // Flag indicating if blocks should be sealed
-	RootDir                 string          // The root directory for test environment
-	IBFTDirPrefix           string          // The prefix of data directory for IBFT
-	IBFTDir                 string          // The name of data directory for IBFT
-	PremineAccts            []*SrvAccount   // Accounts with existing balances (genesis accounts)
-	GenesisValidatorBalance *big.Int        // Genesis balance for the validators
-	DevStakers              []types.Address // List of initial staking addresses for the staking SC with dev consensus
-	Consensus               ConsensusType   // Consensus MechanismType
-	Bootnodes               []string        // Bootnode Addresses
-	PriceLimit              *uint64         // Minimum gas price limit to enforce for acceptance into the pool
-	DevInterval             int             // Dev consensus update interval [s]
-	EpochSize               uint64          // The epoch size in blocks for the IBFT layer
-	BlockGasLimit           uint64          // Block gas limit
-	BlockGasTarget          uint64          // Gas target for new blocks
-	ShowsLog                bool
-	IsPos                   bool // Specifies the mechanism used for IBFT (PoA / PoS)
+	JSONRPCPort             int                  // The JSON RPC endpoint port
+	GRPCPort                int                  // The GRPC endpoint port
+	LibP2PPort              int                  // The Libp2p endpoint port
+	Seal                    bool                 // Flag indicating if blocks should be sealed
+	RootDir                 string               // The root directory for test environment
+	IBFTDirPrefix           string               // The prefix of data directory for IBFT
+	IBFTDir                 string               // The name of data directory for IBFT
+	PremineAccts            []*SrvAccount        // Accounts with existing balances (genesis accounts)
+	GenesisValidatorBalance *big.Int             // Genesis balance for the validators
+	DevStakers              []types.Address      // List of initial staking addresses for the staking SC with dev consensus
+	Consensus               ConsensusType        // Consensus MechanismType
+	Bootnodes               []string             // Bootnode Addresses
+	PriceLimit              *uint64              // Minimum gas price limit to enforce for acceptance into the pool
+	DevInterval             int                  // Dev consensus update interval [s]
+	EpochSize               uint64               // The epoch size in blocks for the IBFT layer
+	BlockGasLimit           uint64               // Block gas limit
+	BlockGasTarget          uint64               // Gas target for new blocks
+	ShowsLog                bool                 // Flag specifying if logs are shown
+	IsPos                   bool                 // Specifies the mechanism used for IBFT (PoA / PoS)
+	Signer                  *crypto.EIP155Signer // Signer used for transactions
 }
 
 // DataDir returns path of data directory server uses
@@ -55,6 +56,10 @@ func (t *TestServerConfig) DataDir() string {
 	default:
 		return t.RootDir
 	}
+}
+
+func (t *TestServerConfig) SetSigner(signer *crypto.EIP155Signer) {
+	t.Signer = signer
 }
 
 // PrivateKey returns a private key in data directory

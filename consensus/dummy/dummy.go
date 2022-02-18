@@ -56,6 +56,11 @@ func (d *Dummy) GetBlockCreator(header *types.Header) (types.Address, error) {
 	return header.Miner, nil
 }
 
+// PreStateCommit a hook to be called before finalizing state transition on inserting block
+func (d *Dummy) PreStateCommit(_header *types.Header, _txn *state.Transition) error {
+	return nil
+}
+
 func (d *Dummy) GetSyncProgression() *progress.Progression {
 	return nil
 }
