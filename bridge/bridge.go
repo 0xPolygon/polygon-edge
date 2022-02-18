@@ -57,7 +57,7 @@ func NewBridge(
 	trackerConfig := &tracker.Config{
 		Confirmations: config.Confirmations,
 		RootchainWS:   config.RootChainURL.String(),
-		DBPath:        fmt.Sprintf("%s/last-processed-block", dataDirURL),
+		DBPath:        dataDirURL,
 		ContractABIs: map[string][]string{
 			config.RootChainContract.String(): {
 				StateSyncedABI,
@@ -187,14 +187,14 @@ func (b *bridge) addLocalMessage(data []byte) error {
 }
 
 func (b *bridge) addRemoteMessage(message *transport.SignedMessage) {
-	fmt.Printf("addRemoteMessage hash=%+v, signature=%+v\n", message.Hash, message.Signature)
-
 	sender, err := b.signer.RecoverAddress(message.Hash[:], message.Signature)
 	if err != nil {
 		b.logger.Error("failed to get address from signature", "err", err)
 
 		return
 	}
+
+	fmt.Printf("addRemoteMessage hash=%+v, signature=%+v, sender=%+v\n", message.Hash, message.Signature, sender)
 
 	if !b.isValidator(sender) {
 		b.logger.Warn("ignored gossip message from non-validator", "hash", message.Hash, "from", types.AddressToString(sender))

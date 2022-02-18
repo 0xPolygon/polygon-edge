@@ -733,11 +733,6 @@ func (i *Ibft) writeTransactions(gasLimit uint64, transition transitionInterface
 	return transactions
 }
 
-var (
-	hoge = false
-	num  = 5
-)
-
 // runAcceptState runs the Accept state loop
 //
 // The Accept state always checks the snapshot, and the validator set. If the current node is not in the validators set,
@@ -780,19 +775,12 @@ func (i *Ibft) runAcceptState() { // start new round
 	}
 
 	if i.bridge != nil {
-		i.bridge.SetValidators(snap.Set, uint64(num))
+		i.bridge.SetValidators(snap.Set, uint64(snap.Set.Len()))
+
 		for _, msg := range i.bridge.GetReadyMessages() {
-			fmt.Printf("ReadyMessage height=%d, hash=%+v, body=%+v, signatures=%d\n", parent.Number, msg.Hash, msg.Body, len(msg.Signatures))
+			fmt.Printf("ReadyMessage height=%d, hash=%+v, body=%+v, signatures=%d\n", parent.Number+1, msg.Hash, msg.Body, len(msg.Signatures))
 			i.bridge.Consume(msg.Hash)
 		}
-
-		go func() {
-			time.Sleep(time.Minute)
-			if !hoge {
-				hoge = true
-				num = 4
-			}
-		}()
 	}
 
 	if hookErr := i.runHook(AcceptStateLogHook, snap); hookErr != nil && !errors.Is(hookErr, ErrMissingHook) {
