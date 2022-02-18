@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
+	"github.com/0xPolygon/polygon-edge/bridge"
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/network"
@@ -66,6 +67,7 @@ type ConsensusParams struct {
 	Metrics        *Metrics
 	SecretsManager secrets.SecretsManager
 	BlockTime      uint64
+	Bridge         bridge.Bridge
 }
 
 // Factory is the factory function to create a discovery backend

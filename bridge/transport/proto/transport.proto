@@ -15,7 +15,7 @@ message SignedMessage {
     uint64 id = 1;
 
     // body is message body
-    bytes body = 2;
+    bytes hash = 2;
 
     // signatures is the signature of body
     bytes signature = 3;

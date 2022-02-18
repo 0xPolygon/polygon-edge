@@ -1,26 +1,28 @@
 package bridge
 
 import (
-	"encoding/json"
 	"fmt"
-	"math/big"
 	"sync"
 
 	"github.com/0xPolygon/polygon-edge/bridge/sam"
 	"github.com/0xPolygon/polygon-edge/bridge/tracker"
 	"github.com/0xPolygon/polygon-edge/bridge/transport"
+	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
-	"github.com/umbracle/go-web3"
+)
+
+const (
+	StateSyncedABI = `event StateSynced(uint256 indexed id, address indexed contractAddress, bytes data)`
 )
 
 type Bridge interface {
 	Start() error
 	Close() error
 	SetValidators([]types.Address, uint64)
-	GetReadyMessages() []sam.MessageAndSignatures
-	Consume(uint64)
+	GetReadyMessages() []sam.ReadyMessage
+	Consume(types.Hash)
 }
 
 type bridge struct {
@@ -57,14 +59,8 @@ func NewBridge(
 		RootchainWS:   config.RootChainURL.String(),
 		DBPath:        fmt.Sprintf("%s/last-processed-block", dataDirURL),
 		ContractABIs: map[string][]string{
-			types.AddressToString(config.RootChainContract): {
-				`
-				event RegistrationUpdated(
-					address indexed user,
-					address indexed sender,
-					address indexed receiver
-				)
-				`,
+			config.RootChainContract.String(): {
+				StateSyncedABI,
 			},
 		},
 	}
@@ -118,12 +114,12 @@ func (b *bridge) SetValidators(validators []types.Address, threshold uint64) {
 	b.sampool.UpdateValidatorSet(validators, threshold)
 }
 
-func (b *bridge) GetReadyMessages() []sam.MessageAndSignatures {
+func (b *bridge) GetReadyMessages() []sam.ReadyMessage {
 	return b.sampool.GetReadyMessages()
 }
 
-func (b *bridge) Consume(id uint64) {
-	b.sampool.Consume(id)
+func (b *bridge) Consume(hash types.Hash) {
+	b.sampool.Consume(hash)
 }
 
 func (b *bridge) resetIsValidatorMap(validators []types.Address) {
@@ -151,58 +147,49 @@ func (b *bridge) processEvents(eventCh <-chan []byte) {
 		case <-b.closeCh:
 			return
 		case data := <-eventCh:
-			if err := b.processLog(data); err != nil {
-				b.logger.Error("failed to process event", "err", err)
+			if err := b.addLocalMessage(data); err != nil {
+				b.logger.Error("failed process event", "err", err)
 			}
 		}
 	}
 }
 
-func (b *bridge) processLog(data []byte) error {
-	// workaround
-	var log web3.Log
-	if err := json.Unmarshal(data, &log); err != nil {
-		return err
-	}
-
-	// TODO: fix
-	id := big.NewInt(0)
-
-	if err := b.addLocalMessage(id.Uint64(), data); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (b *bridge) addLocalMessage(id uint64, body []byte) error {
-	// XXX: sign hash instead of body
-	signature, err := b.signer.Sign(body)
+func (b *bridge) addLocalMessage(data []byte) error {
+	hash := types.BytesToHash(crypto.Keccak256(data))
+	signature, err := b.signer.Sign(hash[:])
 	if err != nil {
 		return err
 	}
 
-	signedMessage := &sam.SignedMessage{
-		Message: sam.Message{
-			ID:   id,
-			Body: body,
-		},
+	fmt.Printf("addLocalMessage hash=%+v,signature=%+v, data=%+v\n", hash, signature, data)
+
+	b.sampool.AddMessage(&sam.Message{
+		Hash: hash,
+		Body: data,
+	})
+
+	b.sampool.AddSignature(&sam.MessageSignature{
+		Hash:      hash,
 		Address:   b.signer.Address(),
+		Signature: signature,
+	})
+
+	signedMessage := &transport.SignedMessage{
+		Hash:      hash,
 		Signature: signature,
 	}
 
-	b.sampool.MarkAsKnown(id)
-	b.sampool.Add(signedMessage)
-
-	if err := b.transport.Publish(&signedMessage.Message, signature); err != nil {
+	if err := b.transport.Publish(signedMessage); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (b *bridge) addRemoteMessage(message *sam.Message, signature []byte) {
-	sender, err := b.signer.RecoverAddress(message.Body, signature)
+func (b *bridge) addRemoteMessage(message *transport.SignedMessage) {
+	fmt.Printf("addRemoteMessage hash=%+v, signature=%+v\n", message.Hash, message.Signature)
+
+	sender, err := b.signer.RecoverAddress(message.Hash[:], message.Signature)
 	if err != nil {
 		b.logger.Error("failed to get address from signature", "err", err)
 
@@ -210,14 +197,14 @@ func (b *bridge) addRemoteMessage(message *sam.Message, signature []byte) {
 	}
 
 	if !b.isValidator(sender) {
-		b.logger.Warn("ignored gossip message from non-validator", "ID", message.ID, "from", types.AddressToString(sender))
+		b.logger.Warn("ignored gossip message from non-validator", "hash", message.Hash, "from", types.AddressToString(sender))
 
 		return
 	}
 
-	b.sampool.Add(&sam.SignedMessage{
-		Message:   *message,
+	b.sampool.AddSignature(&sam.MessageSignature{
+		Hash:      message.Hash,
 		Address:   sender,
-		Signature: signature,
+		Signature: message.Signature,
 	})
 }

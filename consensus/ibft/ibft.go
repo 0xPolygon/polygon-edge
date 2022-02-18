@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/bridge"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/crypto"
@@ -98,6 +99,8 @@ type Ibft struct {
 	mechanism ConsensusMechanism // IBFT ConsensusMechanism used (PoA / PoS)
 
 	blockTime time.Duration // Minimum block generation time in seconds
+
+	bridge bridge.Bridge
 }
 
 // Define the type of the IBFT consensus
@@ -248,6 +251,7 @@ func Factory(
 		metrics:        params.Metrics,
 		secretsManager: params.SecretsManager,
 		blockTime:      time.Duration(params.BlockTime) * time.Second,
+		bridge:         params.Bridge,
 	}
 
 	// Initialize the mechanism
@@ -729,6 +733,11 @@ func (i *Ibft) writeTransactions(gasLimit uint64, transition transitionInterface
 	return transactions
 }
 
+var (
+	hoge = false
+	num  = 5
+)
+
 // runAcceptState runs the Accept state loop
 //
 // The Accept state always checks the snapshot, and the validator set. If the current node is not in the validators set,
@@ -768,6 +777,22 @@ func (i *Ibft) runAcceptState() { // start new round
 		i.setState(SyncState)
 
 		return
+	}
+
+	if i.bridge != nil {
+		i.bridge.SetValidators(snap.Set, uint64(num))
+		for _, msg := range i.bridge.GetReadyMessages() {
+			fmt.Printf("ReadyMessage height=%d, hash=%+v, body=%+v, signatures=%d\n", parent.Number, msg.Hash, msg.Body, len(msg.Signatures))
+			i.bridge.Consume(msg.Hash)
+		}
+
+		go func() {
+			time.Sleep(time.Minute)
+			if !hoge {
+				hoge = true
+				num = 4
+			}
+		}()
 	}
 
 	if hookErr := i.runHook(AcceptStateLogHook, snap); hookErr != nil && !errors.Is(hookErr, ErrMissingHook) {

@@ -1,9 +1,9 @@
 package transport
 
 import (
-	"github.com/0xPolygon/polygon-edge/bridge/sam"
 	"github.com/0xPolygon/polygon-edge/bridge/transport/proto"
 	"github.com/0xPolygon/polygon-edge/network"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 )
 
@@ -11,8 +11,8 @@ var transportProto = "/bridge/sam/0.1"
 
 type MessageTransport interface {
 	Start() error
-	Publish(*sam.Message, []byte) error
-	Subscribe(func(*sam.Message, []byte)) error
+	Publish(*SignedMessage) error
+	Subscribe(func(*SignedMessage)) error
 }
 
 type libp2pGossipTransport struct {
@@ -39,15 +39,14 @@ func (t *libp2pGossipTransport) Start() error {
 	return nil
 }
 
-func (t *libp2pGossipTransport) Publish(message *sam.Message, signature []byte) error {
+func (t *libp2pGossipTransport) Publish(message *SignedMessage) error {
 	return t.topic.Publish(&proto.SignedMessage{
-		Id:        message.ID,
-		Body:      message.Body,
-		Signature: signature,
+		Hash:      message.Hash[:],
+		Signature: message.Signature,
 	})
 }
 
-func (t *libp2pGossipTransport) Subscribe(handler func(*sam.Message, []byte)) error {
+func (t *libp2pGossipTransport) Subscribe(handler func(*SignedMessage)) error {
 	return t.topic.Subscribe(func(obj interface{}) {
 		protoMessage, ok := obj.(*proto.SignedMessage)
 		if !ok {
@@ -56,16 +55,15 @@ func (t *libp2pGossipTransport) Subscribe(handler func(*sam.Message, []byte)) er
 			return
 		}
 
-		message := toSAMMessage(protoMessage)
-		signature := protoMessage.Signature
+		message := toSignedMessage(protoMessage)
 
-		handler(message, signature)
+		handler(message)
 	})
 }
 
-func toSAMMessage(protoMessage *proto.SignedMessage) *sam.Message {
-	return &sam.Message{
-		ID:   protoMessage.Id,
-		Body: protoMessage.Body,
+func toSignedMessage(protoMessage *proto.SignedMessage) *SignedMessage {
+	return &SignedMessage{
+		Hash:      types.BytesToHash(protoMessage.Hash),
+		Signature: protoMessage.Signature,
 	}
 }

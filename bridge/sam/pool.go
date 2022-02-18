@@ -1,7 +1,6 @@
 package sam
 
 import (
-	"fmt"
 	"sync"
 	"sync/atomic"
 
@@ -192,7 +191,6 @@ func (p *pool) canDemote(hash types.Hash) bool {
 
 // tryToPromote checks the number of signatures and threshold and update message status to ready if need
 func (p *pool) tryToPromote(hash types.Hash) {
-	fmt.Printf("tryToPromote %v\n", hash)
 	if p.canPromote(hash) {
 		p.promote(hash)
 	}
