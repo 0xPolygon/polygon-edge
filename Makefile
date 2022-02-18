@@ -30,4 +30,4 @@ lint:
 
 .PHONY: generate-bsd-licenses
 generate-bsd-licenses:
-	./generate_dependency_licenses.sh BSD-3-Clause,BSD-2-Clause > ./params/bsd_licenses.json
+	./generate_dependency_licenses.sh BSD-3-Clause,BSD-2-Clause > ./licenses/bsd_licenses.json
