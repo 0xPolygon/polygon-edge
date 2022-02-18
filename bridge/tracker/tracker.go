@@ -3,113 +3,123 @@ package tracker
 import (
 	"context"
 	"encoding/json"
-	"math/big"
-
+	"github.com/0xPolygon/polygon-edge/blockchain/storage"
 	"github.com/hashicorp/go-hclog"
-	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/umbracle/go-web3"
+	"math/big"
 )
 
-const (
-	//	required block depth for fetching events on the rootchain
-	BlockConfirmations = 6
-)
+type Config struct {
+	Confirmations uint64
+	RootchainWS   string
+	DBPath        string
+	ContractABIs  map[string][]string
+}
+
+//	cancellable context for tracker's listening mechanism
+type contextSubscription struct {
+	context context.Context
+	cancel  context.CancelFunc
+}
+
+//	done returns the contexts Done channel.
+func (c *contextSubscription) done() <-chan struct{} {
+	return c.context.Done()
+}
 
 //	Tracker represents an event listener that notifies
-//	for each event emitted on the rootchain.
-//	Events of interest are defined in rootchain.go
+//	for each event emitted by a smart contract on the rootchain.
+//	Events are collected from blocks at the desired depth (confirmations).
 type Tracker struct {
 	logger hclog.Logger
 
 	// required block confirmations
 	confirmations *big.Int
 
-	// newHeads subscription channel
-	headerCh chan *ethHeader
-
 	// event channel
 	eventCh chan []byte
 
-	// cancel funcs
-	cancelSubscription, cancelEventTracking context.CancelFunc
+	// cancel subscription
+	ctxSubscription contextSubscription
+
+	//	rootchain subscription object
+	sub subscription
 
 	//	rootchain client
 	client *rootchainClient
 
 	//	db for last processed block number
-	db *leveldb.DB
+	db storage.Storage
+
+	//	events that tracker will listen for
+	contracts []*contractABI
 }
 
-//	NewEventTracker returns a new tracker able to listen for events
-//	at the desired block depth. Events of interest are defined
-//	in rootchain.go
-func NewEventTracker(logger hclog.Logger, confirmations uint64) (*Tracker, error) {
+//	NewEventTracker returns a new tracker object.
+func NewEventTracker(logger hclog.Logger, config *Config) (*Tracker, error) {
+	if config == nil {
+		//	load default
+		config = &Config{
+			Confirmations: DefaultBlockConfirmations,
+			RootchainWS:   rootchainWS,
+			DBPath:        "",
+			ContractABIs:  nil,
+		}
+	}
+
+	//	create tracker
 	tracker := &Tracker{
 		logger:        logger.Named("event_tracker"),
-		confirmations: big.NewInt(0).SetUint64(confirmations),
-		headerCh:      make(chan *ethHeader, 1),
+		confirmations: big.NewInt(0).SetUint64(config.Confirmations),
 		eventCh:       make(chan []byte),
 	}
 
 	var err error
 
-	//	create rootchain client
-	if tracker.client, err = newRootchainClient(rootchainWS); err != nil {
-		logger.Error("cannot connect to rootchain", "err", err)
-
-		return nil, err
+	//	load abi events
+	if config.ContractABIs != nil {
+		tracker.contracts = loadABIs(config.ContractABIs)
 	}
 
 	//	load db (last processed block number)
-	if tracker.db, err = initRootchainDB(); err != nil {
+	if tracker.db, err = initRootchainDB(logger, config.DBPath); err != nil {
 		logger.Error("cannot initialize db", "err", err)
 
 		return nil, err
 	}
 
+	//	create rootchain client
+	if tracker.client, err = newRootchainClient(config.RootchainWS); err != nil {
+		logger.Error("cannot connect to rootchain", "err", err)
+
+		return nil, err
+	}
+
+	//	subscribe for new headers
+	if tracker.sub, err = tracker.client.subscribeNewHeads(); err != nil {
+		logger.Error("cannot subscribe to rootchain", "err", err)
+	}
+
 	return tracker, nil
 }
 
-//	Start runs the tracker's listening mechanism:
-//	1. startEventTracking - goroutine keeping track of
-//	the last block queried, as well as collecting events
-//	of interest.
-//
-//	2. startSubscription - goroutine responsible for handling
-//	the subscription object. This object is provided by the
-//	client's subscribeNewHeads method that initiates the subscription.
-func (t *Tracker) Start() error {
-	//	create cancellable contexts
-	ctxSubscription, cancelSubscription := context.WithCancel(context.Background())
-	t.cancelSubscription = cancelSubscription
-
-	ctxEventTracking, cancelEventTracking := context.WithCancel(context.Background())
-	t.cancelEventTracking = cancelEventTracking
-
-	//	start event tracking process early
-	go t.startEventTracking(ctxEventTracking)
-
-	//	create newHeads subscription
-	subscription, err := t.client.subscribeNewHeads(t.headerCh)
-	if err != nil {
-		t.logger.Error("cannot subscribe to rootchain", "err", err)
-
-		return err
-	}
+//	Start initializes context for the tracking mechanism
+//	and starts listening for events on the rootchain.
+func (t *Tracker) Start() {
+	// 	initialize tracking context
+	t.initContext()
 
 	//	start receiving new header events
-	go t.startSubscription(ctxSubscription, subscription)
-
-	return nil
+	go t.startEventTracking()
 }
 
 //	Stop stops the tracker's listening mechanism.
 func (t *Tracker) Stop() error {
 	//	stop subscription
-	t.cancelSubscription()
+	t.ctxSubscription.cancel()
 
-	// 	stop processing headers
-	t.cancelEventTracking()
+	//	close db
+	t.db.Close()
 
 	//	close rootchain client
 	if err := t.client.close(); err != nil {
@@ -122,43 +132,43 @@ func (t *Tracker) Stop() error {
 }
 
 //	getEventChannel returns the tracker's event channel.
-func (t *Tracker) getEventChannel() <-chan []byte {
+func (t *Tracker) GetEventChannel() <-chan []byte {
 	return t.eventCh
 }
 
-//	startSubscription handles the subscription object (provided by the rootchain client).
-func (t *Tracker) startSubscription(ctx context.Context, sub subscription) {
+//	initContext initializes context for tracker's listening mechanism.
+func (t *Tracker) initContext() {
+	ctx, cancelFunc := context.WithCancel(context.Background())
+	t.ctxSubscription = contextSubscription{
+		context: ctx,
+		cancel:  cancelFunc,
+	}
+}
+
+//	startEventTracking handles the subscription object (provided by the rootchain client).
+func (t *Tracker) startEventTracking() {
 	for {
 		select {
-		case err := <-sub.err():
-			t.logger.Error("subscription error", err)
+		//	process new header
+		case header := <-t.sub.newHead():
+			t.trackHeader(header)
 
-			t.cancelSubscription()
-			t.logger.Debug("cancelling subscription")
+		//	handle sub error
+		case err := <-t.sub.err():
+			t.ctxSubscription.cancel()
+			t.logger.Error("sub cancelled", err)
 
 			return
-		case <-ctx.Done():
-			if err := sub.unsubscribe(); err != nil {
+
+		//	stop tracker's sub
+		case <-t.ctxSubscription.done():
+			if err := t.sub.unsubscribe(); err != nil {
 				t.logger.Error("cannot unsubscribe", "err", err)
 
 				return
 			}
 
-			t.logger.Debug("subscription stopped")
-
-			return
-		}
-	}
-}
-
-//	startEventTracking tracks each header (received by the subscription) for events.
-func (t *Tracker) startEventTracking(ctx context.Context) {
-	for {
-		select {
-		case header := <-t.headerCh:
-			t.trackHeader(header)
-		case <-ctx.Done():
-			t.logger.Debug("stopping header process")
+			t.logger.Debug("sub stopped")
 
 			return
 		}
@@ -234,43 +244,25 @@ func (t *Tracker) calculateRange(header *ethHeader) (from, to *big.Int) {
 //	loadLastBlock returns the block number of the last
 // 	block processed by the tracker (if available).
 func (t *Tracker) loadLastBlock() *big.Int {
-	//	read from db
-	bytesLastBlock, err := t.db.Get(lastQueriedBlockNumber, nil)
-	if err != nil {
-		t.logger.Error("cannot read db", "err", err)
-
-		return nil
-	}
-
-	//	parse
-	lastBlock, ok := big.NewInt(0).SetString(string(bytesLastBlock), 10)
+	lastBlockNumber, ok := t.db.ReadHeadNumber()
 	if !ok {
 		return nil
 	}
 
-	return lastBlock
+	return big.NewInt(0).SetUint64(lastBlockNumber)
 }
 
 //	saveLastBlock stores the number of the last block processed
 //	into the tracker's database.	.
 func (t *Tracker) saveLastBlock(blockNumber *big.Int) error {
-	//	store last processed block number
-	if err := t.db.Put(
-		lastQueriedBlockNumber,
-		[]byte(blockNumber.String()),
-		nil,
-	); err != nil {
-		return err
-	}
-
-	return nil
+	return t.db.WriteHeadNumber(blockNumber.Uint64())
 }
 
 //	queryEvents collects all events on the rootchain that occurred
 //	between blocks fromBlock and toBlock (inclusive).
 func (t *Tracker) queryEvents(fromBlock, toBlock *big.Int) []*web3.Log {
 	//	create the query filter
-	queryFilter := setupQueryFilter(fromBlock, toBlock)
+	queryFilter := setupQueryFilter(fromBlock, toBlock, t.contracts)
 
 	//	call eth_getLogs
 	logs, err := t.client.getLogs(queryFilter)

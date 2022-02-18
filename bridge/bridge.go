@@ -2,7 +2,6 @@ package bridge
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math/big"
 	"sync"
@@ -53,7 +52,24 @@ func NewBridge(
 
 	bridgeLogger := logger.Named("bridge")
 
-	tracker, err := tracker.NewEventTracker(bridgeLogger, config.RootChainURL.String(), dataDirURL, config.Confirmations)
+	trackerConfig := &tracker.Config{
+		Confirmations: config.Confirmations,
+		RootchainWS:   config.RootChainURL.String(),
+		DBPath:        fmt.Sprintf("%s/last-processed-block", dataDirURL),
+		ContractABIs: map[string][]string{
+			types.AddressToString(config.RootChainContract): {
+				`
+				event RegistrationUpdated(
+					address indexed user,
+					address indexed sender,
+					address indexed receiver
+				)
+				`,
+			},
+		},
+	}
+
+	tracker, err := tracker.NewEventTracker(bridgeLogger, trackerConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -79,9 +95,7 @@ func (b *bridge) Start() error {
 		return err
 	}
 
-	if err := b.tracker.Start(); err != nil {
-		return err
-	}
+	b.tracker.Start()
 
 	eventCh := b.tracker.GetEventChannel()
 	go b.processEvents(eventCh)
@@ -150,38 +164,11 @@ func (b *bridge) processLog(data []byte) error {
 	if err := json.Unmarshal(data, &log); err != nil {
 		return err
 	}
-	if !tracker.StateSyncedEvent.Match(&log) {
-		return nil
-	}
 
-	record, err := tracker.StateSyncedEvent.ParseLog(&log)
-	if err != nil {
-		return err
-	}
+	// TODO: fix
+	id := big.NewInt(0)
 
-	var id *big.Int
-	var addr web3.Address
-	var ok bool
-
-	id, ok = record["id"].(*big.Int)
-	if !ok {
-		return errors.New("failed to parse ID")
-	}
-
-	addr, ok = record["contractAddress"].(web3.Address)
-	if !ok {
-		return errors.New("failed to parse contractAddress")
-	}
-
-	body, ok := record["data"].([]uint8)
-	if !ok {
-		return errors.New("failed to parse data")
-	}
-
-	fmt.Printf("id=%+v, addr=%+v\n", id, addr)
-	fmt.Printf("data=%+v\n", body)
-
-	if err := b.addLocalMessage(id.Uint64(), body); err != nil {
+	if err := b.addLocalMessage(id.Uint64(), data); err != nil {
 		return err
 	}
 

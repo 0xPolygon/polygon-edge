@@ -19,6 +19,6 @@ func DefaultConfig() *Config {
 		Enable:            false,
 		RootChainURL:      nil,
 		RootChainContract: types.ZeroAddress,
-		Confirmations:     tracker.BlockConfirmations,
+		Confirmations:     tracker.DefaultBlockConfirmations,
 	}
 }

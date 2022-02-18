@@ -3,71 +3,86 @@ package tracker
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/0xPolygon/polygon-edge/blockchain/storage"
+	"github.com/0xPolygon/polygon-edge/blockchain/storage/leveldb"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/go-web3"
 	"github.com/umbracle/go-web3/abi"
 	client "github.com/umbracle/go-web3/jsonrpc"
 	"math/big"
 	"os"
+	"path/filepath"
 )
 
 const (
+	//	required block depth for fetching events on the rootchain
+	DefaultBlockConfirmations = 6
+
 	//	Ropsten testnet
 	//rootchainWS   = "wss://ropsten.infura.io/ws/v3/17eac086ff36442ebd43737400eb71ca"
 
 	//	Polygon Edge
 	rootchainWS = "ws://127.0.0.1:10002/ws"
-
-	//	Smart contract addresses
-	StateSender = ""
 )
 
-var (
-	//	db key for saving tracker's progress (chain height)
-	lastQueriedBlockNumber = []byte("last-block-num")
+//	contractABI is used to create query filter
+//	that matches events defined in a smart contract.
+type contractABI struct {
+	//	address of smart contract
+	address web3.Address
 
-	/*	ABI events (defined in the above smart contracts) */
+	// signatures of events defined in smart contract
+	events []*abi.Event
+}
 
-	//	StateSender
-	NewRegistrationEvent = abi.MustNewEvent(`event NewRegistration(
-	address indexed user,
-	address indexed sender,
-    address indexed receiver)`,
-	)
+//	eventIDs returns all the event signatures (IDs)
+//	defined in the smart contract.
+func (c *contractABI) eventIDs() (IDs []*web3.Hash) {
+	for _, ev := range c.events {
+		id := ev.ID()
+		IDs = append(IDs, &id)
+	}
 
-	RegistrationUpdatedEvent = abi.MustNewEvent(`event RegistrationUpdated(
-	address indexed user,
-	address indexed sender,
-	address indexed receiver)`,
-	)
+	return
+}
 
-	StateSyncedEvent = abi.MustNewEvent(`event StateSynced(
-	uint256 indexed id,
-	address indexed contractAddress,
-	bytes data)`,
-	)
-)
+//	loadABIs parses contracts from raw map.
+func loadABIs(abisRaw map[string][]string) (contracts []*contractABI) {
+	for address, events := range abisRaw {
+		//	set smart contract address
+		contract := &contractABI{
+			address: web3.HexToAddress(address),
+		}
+
+		//	set each event (defined in contract)
+		for _, ev := range events {
+			contract.events = append(contract.events, abi.MustNewEvent(ev))
+		}
+
+		//	append result
+		contracts = append(contracts, contract)
+	}
+
+	return
+}
 
 //	setupQueryFilter creates a log filter for the desired
 //	block range. Filter matches events defined in rootchain.go.
-func setupQueryFilter(from, to *big.Int) *web3.LogFilter {
+func setupQueryFilter(from, to *big.Int, contracts []*contractABI) *web3.LogFilter {
 	queryFilter := &web3.LogFilter{}
 
 	//	set range of blocks to query
 	queryFilter.SetFromUint64(from.Uint64())
 	queryFilter.SetToUint64(to.Uint64())
 
-	/*	SC addresses and event topics are set here */
+	//	set contract addresses and topics
+	for _, contract := range contracts {
+		//	append address
+		queryFilter.Address = append(queryFilter.Address, contract.address)
 
-	queryFilter.Address = []web3.Address{
-		//	set smart contract addresses
-	}
-
-	queryFilter.Topics = [][]*web3.Hash{
-		{
-			//	set event topics
-		},
+		//	topics from all contracts must be in Topics[0]
+		queryFilter.Topics[0] = append(queryFilter.Topics[0], contract.eventIDs()...)
 	}
 
 	return queryFilter
@@ -119,15 +134,13 @@ type ethHeader struct {
 
 //	initRootchainDB creates a new database (or loads existing)
 //	for storing the last processed block's number by the tracker.
-func initRootchainDB() (*leveldb.DB, error) {
-	//	get path
-	cwd, err := os.Getwd()
-	if err != nil {
-		return nil, err
+func initRootchainDB(logger hclog.Logger, dbPath string) (storage.Storage, error) {
+	if dbPath == "" {
+		dbPath, _ = os.Getwd()
+		dbPath = filepath.Join(dbPath, "last-processed-block")
 	}
 
-	//	create or load db
-	db, err := leveldb.OpenFile(cwd+"/event_tracker/last_block_number", nil)
+	db, err := leveldb.NewLevelDBStorage(dbPath, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -135,14 +148,20 @@ func initRootchainDB() (*leveldb.DB, error) {
 	return db, nil
 }
 
-/*	Rootchain subscription object	*/
+/*	Rootchain sub object	*/
 
 type cancelSubCallback func() error
 
 //	rootchain subscription object
 type subscription struct {
-	errorCh chan error
-	cancel  cancelSubCallback
+	newHeadsCh chan *ethHeader
+	errorCh    chan error
+	cancel     cancelSubCallback
+}
+
+//	newHead returns the subscription's channel for new head events.
+func (s *subscription) newHead() <-chan *ethHeader {
+	return s.newHeadsCh
 }
 
 //	unsubscribe cancels the subscription.
@@ -157,13 +176,16 @@ func (s *subscription) err() <-chan error {
 
 //	handleWSResponse parses the json response
 //	received by the websocket into a header struct.
-func (s *subscription) handleWSResponse(response []byte) (*ethHeader, error) {
+func (s *subscription) handleWSResponse(response []byte) {
+	//	parse ws response
 	header := &ethHeader{}
 	if err := json.Unmarshal(response, header); err != nil {
-		return nil, err
+		s.errorCh <- fmt.Errorf("unable to parse header - err: %w", err)
+		return
 	}
 
-	return header, nil
+	//	emit header
+	s.newHeadsCh <- header
 }
 
 /*	Rootchain client */
@@ -189,28 +211,20 @@ func (c *rootchainClient) close() error {
 }
 
 //	subscribeNewHeads returns a subscription for new header events.
-//	Each header received is sent to headerCh for further processing.
-func (c *rootchainClient) subscribeNewHeads(headerCh chan<- *ethHeader) (subscription, error) {
-	sub := subscription{errorCh: make(chan error, 1)}
-	cancelSub, err := c.impl.Subscribe("newHeads", func(b []byte) {
-		//	parse ws response
-		header, err := sub.handleWSResponse(b)
-		if err != nil {
-			//	send error to subscription object
-			err := fmt.Errorf("unable to parse header - err: %w", err)
-			sub.errorCh <- err
+func (c *rootchainClient) subscribeNewHeads() (subscription, error) {
+	//	create sub object
+	sub := subscription{
+		newHeadsCh: make(chan *ethHeader, 1),
+		errorCh:    make(chan error, 1),
+	}
 
-			return
-		}
-
-		//	send header for processing
-		headerCh <- header
-	})
-
+	//	subscribe to rootchain
+	cancelSub, err := c.impl.Subscribe("newHeads", sub.handleWSResponse)
 	if err != nil {
 		return sub, err
 	}
 
+	//	save cancel callback
 	sub.cancel = cancelSub
 
 	return sub, nil
