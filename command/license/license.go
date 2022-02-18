@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/0xPolygon/polygon-edge/command/helper"
-	"github.com/0xPolygon/polygon-edge/params"
+	"github.com/0xPolygon/polygon-edge/licenses"
 )
 
 // LicenseCommand is the command to show the version of the agent
@@ -41,14 +41,21 @@ func (c *LicenseCommand) Synopsis() string {
 
 // Run implements the cli.Command interface
 func (c *LicenseCommand) Run(args []string) int {
+	bsdLicenses, err := licenses.GetBSDLicenses()
+	if err != nil {
+		c.UI.Error(err.Error())
+
+		return 1
+	}
+
 	var buffer bytes.Buffer
 
 	buffer.WriteString("\n[LICENSE]\n\n")
-	buffer.WriteString(params.License)
+	buffer.WriteString(licenses.License)
 
 	buffer.WriteString("\n[DEPENDENCY ATTRIBUTIONS]\n\n")
 
-	for idx, l := range params.BSDLicenses {
+	for idx, l := range bsdLicenses {
 		// put a blank line between attributions
 		if idx != 0 {
 			buffer.WriteString("\n")

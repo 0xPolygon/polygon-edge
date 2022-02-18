@@ -1,11 +1,9 @@
-package params
+package licenses
 
 import (
 	_ "embed"
 
 	"encoding/json"
-	"fmt"
-	"os"
 )
 
 type DepLicense struct {
@@ -22,16 +20,19 @@ var (
 	// Dependency Licenses
 	//go:embed bsd_licenses.json
 	bsdLicensesJSON string
-	BSDLicenses     []DepLicense
+	bsdLicenses     []DepLicense
 )
-
-func init() {
-	if err := json.Unmarshal([]byte(bsdLicensesJSON), &BSDLicenses); err != nil {
-		fmt.Printf("failed to parse bsd_licenses.json")
-		os.Exit(1)
-	}
-}
 
 func SetLicense(license string) {
 	License = license
+}
+
+func GetBSDLicenses() ([]DepLicense, error) {
+	if bsdLicenses == nil {
+		if err := json.Unmarshal([]byte(bsdLicensesJSON), &bsdLicenses); err != nil {
+			return nil, err
+		}
+	}
+
+	return bsdLicenses, nil
 }

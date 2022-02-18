@@ -4,7 +4,7 @@ import (
 	"bytes"
 
 	"github.com/0xPolygon/polygon-edge/command/helper"
-	"github.com/0xPolygon/polygon-edge/params"
+	"github.com/0xPolygon/polygon-edge/versioning"
 )
 
 // VersionCommand is the command to show the version of the agent
@@ -49,7 +49,7 @@ func (c *VersionCommand) Run(args []string) int {
 	}
 
 	c.Formatter.OutputResult(&VersionResult{
-		Version: params.Version,
+		Version: versioning.Version,
 	})
 
 	return 0
