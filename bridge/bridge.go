@@ -91,7 +91,9 @@ func (b *bridge) Start() error {
 		return err
 	}
 
-	b.tracker.Start()
+	if err := b.tracker.Start(); err != nil {
+		return err
+	}
 
 	eventCh := b.tracker.GetEventChannel()
 	go b.processEvents(eventCh)
@@ -156,6 +158,7 @@ func (b *bridge) processEvents(eventCh <-chan []byte) {
 
 func (b *bridge) addLocalMessage(data []byte) error {
 	hash := types.BytesToHash(crypto.Keccak256(data))
+
 	signature, err := b.signer.Sign(hash[:])
 	if err != nil {
 		return err
@@ -194,10 +197,21 @@ func (b *bridge) addRemoteMessage(message *transport.SignedMessage) {
 		return
 	}
 
-	fmt.Printf("addRemoteMessage hash=%+v, signature=%+v, sender=%+v\n", message.Hash, message.Signature, sender)
+	fmt.Printf(
+		"addRemoteMessage hash=%+v, signature=%+v, sender=%+v\n",
+		message.Hash,
+		message.Signature,
+		sender,
+	)
 
 	if !b.isValidator(sender) {
-		b.logger.Warn("ignored gossip message from non-validator", "hash", message.Hash, "from", types.AddressToString(sender))
+		b.logger.Warn(
+			"ignored gossip message from non-validator",
+			"hash",
+			message.Hash,
+			"from",
+			types.AddressToString(sender),
+		)
 
 		return
 	}

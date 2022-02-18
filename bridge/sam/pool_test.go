@@ -58,6 +58,7 @@ func newTestMessagePool(
 	pool := NewPool(validators, threshold)
 
 	for _, msg := range knownMessages {
+		msg := msg
 		pool.AddMessage(&msg)
 	}
 
@@ -66,6 +67,7 @@ func newTestMessagePool(
 	}
 
 	for _, signature := range signatures {
+		signature := signature
 		pool.AddSignature(&signature)
 	}
 
@@ -281,6 +283,7 @@ func Test_Pool_MarkAsKnown(t *testing.T) {
 			)
 
 			for _, message := range testCase.newKnownMessage {
+				message := message
 				pool.AddMessage(&message)
 			}
 
