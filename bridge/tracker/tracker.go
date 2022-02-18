@@ -95,22 +95,22 @@ func NewEventTracker(logger hclog.Logger, config *Config) (*Tracker, error) {
 		return nil, err
 	}
 
-	//	subscribe for new headers
-	if tracker.sub, err = tracker.client.subscribeNewHeads(); err != nil {
-		logger.Error("cannot subscribe to rootchain", "err", err)
-	}
-
 	return tracker, nil
 }
 
 //	Start initializes context for the tracking mechanism
 //	and starts listening for events on the rootchain.
-func (t *Tracker) Start() {
-	// 	initialize tracking context
-	t.initContext()
+func (t *Tracker) Start() error {
+	//	subscribe for new headers
+	if err := t.subscribeToRootchain(); err != nil {
+		t.logger.Error("cannot subscribe to rootchain", "err", err)
+		return err
+	}
 
-	//	start receiving new header events
+	//	start processing new header events
 	go t.startEventTracking()
+
+	return nil
 }
 
 //	Stop stops the tracker's listening mechanism.
@@ -136,13 +136,23 @@ func (t *Tracker) GetEventChannel() <-chan []byte {
 	return t.eventCh
 }
 
-//	initContext initializes context for tracker's listening mechanism.
-func (t *Tracker) initContext() {
+//	subscribeToRootchain subscribes the tracker for new
+//	header events on the rootchain.
+func (t *Tracker) subscribeToRootchain() error {
+	//	create cancellable context for tracker
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	t.ctxSubscription = contextSubscription{
 		context: ctx,
 		cancel:  cancelFunc,
 	}
+
+	//	create subscription for new header events
+	var err error
+	if t.sub, err = t.client.subscribeNewHeads(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 //	startEventTracking handles the subscription object (provided by the rootchain client).
@@ -156,7 +166,7 @@ func (t *Tracker) startEventTracking() {
 		//	handle sub error
 		case err := <-t.sub.err():
 			t.ctxSubscription.cancel()
-			t.logger.Error("sub cancelled", err)
+			t.logger.Error("subscription cancelled", err)
 
 			return
 
@@ -168,7 +178,7 @@ func (t *Tracker) startEventTracking() {
 				return
 			}
 
-			t.logger.Debug("sub stopped")
+			t.logger.Debug("subscription stopped")
 
 			return
 		}
