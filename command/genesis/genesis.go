@@ -2,7 +2,6 @@ package genesis
 
 import (
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/helper/staking"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -11,8 +10,10 @@ import (
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft"
+	"github.com/0xPolygon/polygon-edge/contracts/staking"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	helperFlags "github.com/0xPolygon/polygon-edge/helper/flags"
+	stakingHelper "github.com/0xPolygon/polygon-edge/helper/staking"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -308,7 +309,7 @@ func (c *GenesisCommand) Run(args []string) int {
 	// If the consensus selected is IBFT and the mechanism is Proof of Stake,
 	// deploy the Staking SC
 	if isPos && (consensus == ibftConsensus || consensus == devConsensus) {
-		stakingAccount, predeployErr := staking.PredeployStakingSC(validators)
+		stakingAccount, predeployErr := stakingHelper.PredeployStakingSC(validators)
 		if predeployErr != nil {
 			c.UI.Error(predeployErr.Error())
 
@@ -325,7 +326,7 @@ func (c *GenesisCommand) Run(args []string) int {
 		}
 
 		// Add the account to the premine map so the executor can apply it to state
-		cc.Genesis.Alloc[staking.StakingSCAddress] = stakingAccount
+		cc.Genesis.Alloc[staking.AddrStakingContract] = stakingAccount
 
 		// Set the epoch size if the consensus is IBFT
 		existingMap, ok := cc.Params.Engine[consensus].(map[string]interface{})

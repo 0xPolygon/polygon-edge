@@ -2,7 +2,6 @@ package ibft
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -173,13 +172,14 @@ func (i *Ibft) processHeaders(headers []*types.Header) error {
 
 		if hookErr := i.runHook(
 			ProcessHeadersHook,
+			h.Number,
 			&processHeadersHookParams{
 				header:     h,
 				snap:       snap,
 				parentSnap: parentSnap,
 				proposer:   proposer,
 				saveSnap:   saveSnap,
-			}); hookErr != nil && !errors.Is(hookErr, ErrMissingHook) {
+			}); hookErr != nil {
 			return hookErr
 		}
 
