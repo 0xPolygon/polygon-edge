@@ -2,13 +2,11 @@ package sam
 
 import "github.com/0xPolygon/polygon-edge/types"
 
-type Message struct {
-	ID   uint64
-	Body []byte
-}
+type Message []byte
 
 type SignedMessage struct {
-	Message
+	Message   Message
+	Hash      types.Hash
 	Address   types.Address
 	Signature []byte
 }
@@ -26,17 +24,8 @@ type Signer interface {
 
 type Pool interface {
 	Add(*SignedMessage)
-	MarkAsKnown(uint64)
-	Consume(uint64)
+	MarkAsKnown(types.Hash)
+	Consume(types.Hash)
 	GetReadyMessages() []MessageAndSignatures
-	UpdateValidatorSet([]types.Address, uint64)
-}
-
-type Manager interface {
-	Start() error
-	Close() error
-	AddMessage(message *Message) error
-	GetReadyMessages() []MessageAndSignatures
-	Consume(uint64)
 	UpdateValidatorSet([]types.Address, uint64)
 }
