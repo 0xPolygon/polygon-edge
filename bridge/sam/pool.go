@@ -1,6 +1,7 @@
 package sam
 
 import (
+	"fmt"
 	"sync"
 	"sync/atomic"
 
@@ -15,8 +16,10 @@ type pool struct {
 	validators           []types.Address
 	threshold            uint64 // required number of signatures for ready
 
-	// map from message ID (uint64) -> bool for message flags
-	knownMap    sync.Map
+	// storage for message body
+	messageMap sync.Map // types.Hash -> []byte
+
+	// map from message Hash -> bool for message flags
 	consumedMap sync.Map
 	readyMap    sync.Map
 
@@ -47,7 +50,7 @@ func NewPool(validators []types.Address, threshold uint64) Pool {
 		changeValidatorsLock: sync.RWMutex{},
 		validators:           validators,
 		threshold:            threshold,
-		knownMap:             sync.Map{},
+		messageMap:           sync.Map{},
 		consumedMap:          sync.Map{},
 		readyMap:             sync.Map{},
 		messageSignatures:    newMessageSignaturesStore(),
@@ -55,45 +58,50 @@ func NewPool(validators []types.Address, threshold uint64) Pool {
 }
 
 // Add adds new message with the signature to pool
-func (p *pool) Add(msg *SignedMessage) {
+func (p *pool) AddMessage(message *Message) {
 	p.changeValidatorsLock.RLock()
 	defer p.changeValidatorsLock.RUnlock()
 
-	if p.hasConsumed(msg.Hash) {
+	if p.hasConsumed(message.Hash) {
 		// we do no longer put the signature if the message has been consumed
 		return
 	}
 
-	p.messageSignatures.PutMessage(msg)
-	p.tryToPromote(msg.Hash)
+	p.setMessageBody(message.Hash, message.Body)
+	p.tryToPromote(message.Hash)
 }
 
-// MarkAsKnown sets the known flag so that make the message promotable
-func (p *pool) MarkAsKnown(hash types.Hash) {
-	p.knownMap.Store(hash, true)
-	p.tryToPromote(hash)
+// Add adds new message with the signature to pool
+func (p *pool) AddSignature(signature *MessageSignature) {
+	p.changeValidatorsLock.RLock()
+	defer p.changeValidatorsLock.RUnlock()
+
+	if p.hasConsumed(signature.Hash) {
+		// we do no longer put the signature if the message has been consumed
+		return
+	}
+
+	p.messageSignatures.Put(signature)
+	p.tryToPromote(signature.Hash)
 }
 
 // Consume sets the consumed flag and delete the message from pool
 func (p *pool) Consume(hash types.Hash) {
 	p.consumedMap.Store(hash, true)
 
-	if p.messageSignatures.RemoveMessage(hash) {
-		p.readyMap.Delete(hash)
-		p.knownMap.Delete(hash)
-	}
+	p.messageSignatures.RemoveMessage(hash)
+	p.messageMap.Delete(hash)
+	p.readyMap.Delete(hash)
 }
 
 // knows returns the flag indicating the message is known
 func (p *pool) knows(hash types.Hash) bool {
-	raw, ok := p.knownMap.Load(hash)
+	_, ok := p.messageMap.Load(hash)
 	if !ok {
 		return false
 	}
 
-	known, ok := raw.(bool)
-
-	return ok && known
+	return ok
 }
 
 // consumed returns the flag indicating the message is consumed
@@ -109,21 +117,30 @@ func (p *pool) hasConsumed(hash types.Hash) bool {
 }
 
 // GetReadyMessages returns the messages with enough signatures
-func (p *pool) GetReadyMessages() []MessageAndSignatures {
+func (p *pool) GetReadyMessages() []ReadyMessage {
 	p.changeValidatorsLock.RLock()
 	defer p.changeValidatorsLock.RUnlock()
 
-	res := make([]MessageAndSignatures, 0)
+	res := make([]ReadyMessage, 0)
 
 	p.readyMap.Range(func(key, value interface{}) bool {
 		hash, _ := key.(types.Hash)
-		ready, _ := value.(bool)
 
-		if ready {
-			if data := p.messageSignatures.GetMessage(hash); data != nil {
-				res = append(res, *data)
-			}
+		if ready, _ := value.(bool); !ready {
+			return true
 		}
+
+		body := p.getMessageBody(hash)
+		if body == nil {
+			return true
+		}
+
+		signatures := p.messageSignatures.GetSignatures(hash)
+		res = append(res, ReadyMessage{
+			Body:       body,
+			Hash:       hash,
+			Signatures: signatures,
+		})
 
 		return true
 	})
@@ -175,6 +192,7 @@ func (p *pool) canDemote(hash types.Hash) bool {
 
 // tryToPromote checks the number of signatures and threshold and update message status to ready if need
 func (p *pool) tryToPromote(hash types.Hash) {
+	fmt.Printf("tryToPromote %v\n", hash)
 	if p.canPromote(hash) {
 		p.promote(hash)
 	}
@@ -217,10 +235,29 @@ func (p *pool) demote(hash types.Hash) {
 	p.readyMap.Delete(hash)
 }
 
+func (p *pool) setMessageBody(hash types.Hash, body []byte) {
+	p.messageMap.Store(hash, body)
+}
+
+func (p *pool) getMessageBody(hash types.Hash) []byte {
+	raw, existed := p.messageMap.Load(hash)
+	if !existed {
+		return nil
+	}
+
+	body, ok := raw.([]byte)
+	if !ok {
+		// should not reach
+
+		return nil
+	}
+
+	return body
+}
+
 // signedMessageEntry is representing the data stored in messageSignaturesStore
 type signedMessageEntry struct {
 	Hash           types.Hash
-	Message        Message
 	Signatures     sync.Map
 	SignatureCount int64
 }
@@ -284,7 +321,7 @@ func (m *messageSignaturesStore) GetSignatureCount(hash types.Hash) uint64 {
 }
 
 // GetMessage returns the message and its signatures for given message ID
-func (m *messageSignaturesStore) GetMessage(hash types.Hash) *MessageAndSignatures {
+func (m *messageSignaturesStore) GetSignatures(hash types.Hash) [][]byte {
 	value, loaded := m.Load(hash)
 	if !loaded {
 		return nil
@@ -300,10 +337,7 @@ func (m *messageSignaturesStore) GetMessage(hash types.Hash) *MessageAndSignatur
 		return true
 	})
 
-	return &MessageAndSignatures{
-		Message:    &entry.Message,
-		Signatures: signatures,
-	}
+	return signatures
 }
 
 // RangeMessages iterates all messages in store
@@ -316,11 +350,10 @@ func (m *messageSignaturesStore) RangeMessages(handler func(*signedMessageEntry)
 }
 
 // PutMessage puts new signature to one message
-func (m *messageSignaturesStore) PutMessage(message *SignedMessage) uint64 {
-	value, _ := m.LoadOrStore(message.Hash,
+func (m *messageSignaturesStore) Put(signature *MessageSignature) uint64 {
+	value, _ := m.LoadOrStore(signature.Hash,
 		&signedMessageEntry{
-			Hash:           message.Hash,
-			Message:        message.Message,
+			Hash:           signature.Hash,
 			Signatures:     sync.Map{},
 			SignatureCount: 0,
 		},
@@ -328,7 +361,7 @@ func (m *messageSignaturesStore) PutMessage(message *SignedMessage) uint64 {
 
 	entry, _ := value.(*signedMessageEntry)
 
-	if _, loaded := entry.Signatures.LoadOrStore(message.Address, message.Signature); !loaded {
+	if _, loaded := entry.Signatures.LoadOrStore(signature.Address, signature.Signature); !loaded {
 		return entry.IncrementNumSignatures()
 	}
 
