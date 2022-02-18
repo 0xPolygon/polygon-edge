@@ -64,6 +64,7 @@ archives:
   -
     files:
     - LICENSE
+    - README.md
 
 #nfpms:
 #  - vendor: 0xPolygon
