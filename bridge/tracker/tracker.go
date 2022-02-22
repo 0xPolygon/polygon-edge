@@ -100,6 +100,7 @@ func (t *Tracker) Start() error {
 	//	subscribe for new headers
 	if err := t.subscribeToRootchain(); err != nil {
 		t.logger.Error("cannot subscribe to rootchain", "errCh", err)
+
 		return err
 	}
 

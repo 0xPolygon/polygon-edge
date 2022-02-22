@@ -175,6 +175,7 @@ func (s *subscription) handleWSResponse(response []byte) {
 	header := &ethHeader{}
 	if err := json.Unmarshal(response, header); err != nil {
 		s.errorCh <- fmt.Errorf("unable to parse header - err: %w", err)
+
 		return
 	}
 

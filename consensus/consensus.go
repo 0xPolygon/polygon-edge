@@ -25,6 +25,9 @@ type Consensus interface {
 	// GetBlockCreator retrieves the block creator (or signer) given the block header
 	GetBlockCreator(header *types.Header) (types.Address, error)
 
+	// PreStateCommit a hook to be called before finalizing state transition on inserting block
+	PreStateCommit(header *types.Header, txn *state.Transition) error
+
 	// GetSyncProgression retrieves the current sync progression, if any
 	GetSyncProgression() *progress.Progression
 

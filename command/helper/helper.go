@@ -13,9 +13,10 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/contracts/staking"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	helperFlags "github.com/0xPolygon/polygon-edge/helper/flags"
-	"github.com/0xPolygon/polygon-edge/helper/staking"
+	stakingHelper "github.com/0xPolygon/polygon-edge/helper/staking"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/mitchellh/cli"
 	"github.com/ryanuber/columnize"
@@ -353,14 +354,14 @@ func generateDevGenesis(params devGenesisParams) error {
 		Bootnodes: []string{},
 	}
 
-	stakingAccount, err := staking.PredeployStakingSC(
+	stakingAccount, err := stakingHelper.PredeployStakingSC(
 		[]types.Address{},
 	)
 	if err != nil {
 		return err
 	}
 
-	cc.Genesis.Alloc[staking.StakingSCAddress] = stakingAccount
+	cc.Genesis.Alloc[staking.AddrStakingContract] = stakingAccount
 
 	if err := FillPremineMap(cc.Genesis.Alloc, params.premine); err != nil {
 		return err
