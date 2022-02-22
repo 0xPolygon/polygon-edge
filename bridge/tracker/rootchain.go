@@ -18,12 +18,6 @@ import (
 const (
 	//	required block depth for fetching events on the rootchain
 	DefaultBlockConfirmations = 6
-
-	//	Ropsten testnet
-	//rootchainWS   = "wss://ropsten.infura.io/ws/v3/17eac086ff36442ebd43737400eb71ca"
-
-	//	Polygon Edge
-	rootchainWS = "ws://127.0.0.1:10002/ws"
 )
 
 //	contractABI is used to create query filter
@@ -48,11 +42,11 @@ func (c *contractABI) eventIDs() (IDs []*web3.Hash) {
 }
 
 //	loadABIs parses contracts from raw map.
-func loadABIs(abisRaw map[string][]string) (contracts []*contractABI) {
+func loadABIs(abisRaw map[types.Address][]string) (contracts []*contractABI) {
 	for address, events := range abisRaw {
 		//	set smart contract address
 		contract := &contractABI{
-			address: web3.HexToAddress(address),
+			address: web3.HexToAddress(address.String()),
 		}
 
 		//	set each event (defined in contract)
@@ -148,7 +142,7 @@ func initRootchainDB(logger hclog.Logger, dbPath string) (storage.Storage, error
 	return db, nil
 }
 
-/*	Rootchain sub object	*/
+/*	Rootchain subscription */
 
 type cancelSubCallback func() error
 
@@ -159,8 +153,8 @@ type subscription struct {
 	cancel     cancelSubCallback
 }
 
-//	newHead returns the subscription's channel for new head events.
-func (s *subscription) newHead() <-chan *ethHeader {
+//	newHeadCh returns the subscription's channel for new head events.
+func (s *subscription) newHeadCh() <-chan *ethHeader {
 	return s.newHeadsCh
 }
 
@@ -169,8 +163,8 @@ func (s *subscription) unsubscribe() error {
 	return s.cancel()
 }
 
-//	err	returns the subscription's error channel.
-func (s *subscription) err() <-chan error {
+//	errCh returns the subscription's error channel.
+func (s *subscription) errCh() <-chan error {
 	return s.errorCh
 }
 
