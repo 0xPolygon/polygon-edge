@@ -172,6 +172,9 @@ func PredeployStakingSC(
 	maxNumValidators := big.NewInt(int64(params.MaxValidatorCount))
 
 	for indx, validator := range validators {
+		if int64(indx) == maxNumValidators.Int64() {
+			break
+		}
 		// Update the total staked amount
 		stakedAmount.Add(stakedAmount, bigDefaultStakedBalance)
 
