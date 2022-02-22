@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/0xPolygon/polygon-edge/helper/staking"
 	"google.golang.org/grpc/credentials/insecure"
 	"io"
 	"math/big"
@@ -267,6 +268,17 @@ func (t *TestServer) GenerateGenesis() error {
 	// Make sure the correct mechanism is selected
 	if t.Config.IsPos {
 		args = append(args, "--pos")
+
+		if t.Config.MinValidatorCount == 0 {
+			t.Config.MinValidatorCount = uint32(staking.MinValidatorCount)
+		}
+
+		if t.Config.MaxValidatorCount == 0 {
+			t.Config.MaxValidatorCount = uint32(staking.MaxValidatorCount)
+		}
+
+		args = append(args, "--min-validator-count", strconv.FormatUint(uint64(t.Config.MinValidatorCount), 10))
+		args = append(args, "--max-validator-count", strconv.FormatUint(uint64(t.Config.MaxValidatorCount), 10))
 	}
 
 	// add block gas limit

@@ -45,6 +45,8 @@ type TestServerConfig struct {
 	BlockGasTarget          uint64          // Gas target for new blocks
 	ShowsLog                bool
 	IsPos                   bool // Specifies the mechanism used for IBFT (PoA / PoS)
+	MinValidatorCount       uint32
+	MaxValidatorCount       uint32
 }
 
 // DataDir returns path of data directory server uses
@@ -148,4 +150,12 @@ func (t *TestServerConfig) SetShowsLog(f bool) {
 // It controls the rate at which the validator set is updated
 func (t *TestServerConfig) SetEpochSize(epochSize uint64) {
 	t.EpochSize = epochSize
+}
+
+func (t *TestServerConfig) SetMinValidatorCount(val uint32) {
+	t.MinValidatorCount = val
+}
+
+func (t *TestServerConfig) SetMaxValidatorCount(val uint32) {
+	t.MaxValidatorCount = val
 }
