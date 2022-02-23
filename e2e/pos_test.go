@@ -228,6 +228,42 @@ func TestPoS_ValidatorBoundaries(t *testing.T) {
 	}
 }
 
+func TestPoS_DefaultValidatorBoundaries(t *testing.T) {
+	// Test scenario -> There are 4 default validators, and the validator limit is 4.
+	// When trying to add a new validator, it should not be added.
+	stakerKey, stakerAddr := tests.GenerateKeyAndAddr(t)
+	stakeAmount := framework.EthToWei(1)
+	numGenesisValidators := IBFTMinNodes
+	minValidatorCount := uint32(1)
+	maxValidatorCount := uint32(numGenesisValidators)
+
+	defaultBalance := framework.EthToWei(100)
+	ibftManager := framework.NewIBFTServersManager(
+		t,
+		numGenesisValidators,
+		IBFTDirPrefix,
+		func(i int, config *framework.TestServerConfig) {
+			config.SetSeal(true)
+			config.SetEpochSize(2)
+			config.PremineValidatorBalance(defaultBalance)
+			config.Premine(stakerAddr, defaultBalance)
+			config.SetIBFTPoS(true)
+			config.SetMinValidatorCount(minValidatorCount)
+			config.SetMaxValidatorCount(maxValidatorCount)
+		})
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	ibftManager.StartServers(ctx)
+
+	srv := ibftManager.GetServer(0)
+
+	client := srv.JSONRPC()
+
+	framework.StakeAmount(stakerAddr, stakerKey, stakeAmount, srv)
+	validateValidatorSet(t, stakerAddr, client, false, numGenesisValidators)
+}
+
 func TestPoS_Unstake(t *testing.T) {
 	stakingContractAddr := staking.AddrStakingContract
 	defaultBalance := framework.EthToWei(100)
