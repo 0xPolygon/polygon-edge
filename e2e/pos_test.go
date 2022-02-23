@@ -152,10 +152,11 @@ func TestPoS_ValidatorBoundaries(t *testing.T) {
 	numGenesisValidators := IBFTMinNodes
 	minValidatorCount := uint32(1)
 	maxValidatorCount := uint32(numGenesisValidators + 1)
-	numNewStakers := 3
+	numNewStakers := 2
 
 	for i := 0; i < numNewStakers; i++ {
 		k, a := tests.GenerateKeyAndAddr(t)
+
 		accounts = append(accounts, struct {
 			key     *ecdsa.PrivateKey
 			address types.Address
@@ -211,18 +212,12 @@ func TestPoS_ValidatorBoundaries(t *testing.T) {
 			expectedExistence: false,
 			expectedSize:      numGenesisValidators + 1,
 		},
-		{
-			name:              "Can not add a 7th validator",
-			address:           accounts[2].address,
-			key:               accounts[2].key,
-			expectedExistence: false,
-			expectedSize:      numGenesisValidators + 1,
-		},
 	}
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			framework.StakeAmount(tt.address, tt.key, stakeAmount, srv)
+			err := framework.StakeAmount(tt.address, tt.key, stakeAmount, srv)
+			assert.NoError(t, err)
 			validateValidatorSet(t, tt.address, client, tt.expectedExistence, tt.expectedSize)
 		})
 	}
@@ -260,7 +255,8 @@ func TestPoS_DefaultValidatorBoundaries(t *testing.T) {
 
 	client := srv.JSONRPC()
 
-	framework.StakeAmount(stakerAddr, stakerKey, stakeAmount, srv)
+	err := framework.StakeAmount(stakerAddr, stakerKey, stakeAmount, srv)
+	assert.NoError(t, err)
 	validateValidatorSet(t, stakerAddr, client, false, numGenesisValidators)
 }
 

@@ -25,6 +25,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/ibft"
 	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/crypto"
+	stakingHelper "github.com/0xPolygon/polygon-edge/helper/staking"
 	"github.com/0xPolygon/polygon-edge/helper/tests"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/secrets"
@@ -38,7 +39,6 @@ import (
 	"github.com/umbracle/go-web3/jsonrpc"
 	"google.golang.org/grpc"
 	empty "google.golang.org/protobuf/types/known/emptypb"
-  stakingHelper "github.com/0xPolygon/polygon-edge/helper/staking"
 )
 
 type TestServerConfigCallback func(*TestServerConfig)

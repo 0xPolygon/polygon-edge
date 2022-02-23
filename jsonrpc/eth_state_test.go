@@ -642,7 +642,6 @@ func TestEth_EstimateGas(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.NotNil(t, res)
-		// nolint:forcetypeassert
 		assert.Equal(t, fmt.Sprintf("0x%x", store.estimatedGasPivotValue+1), res.(string))
 	})
 
@@ -658,7 +657,6 @@ func TestEth_EstimateGas(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.NotNil(t, res)
-		// nolint:forcetypeassert
 		assert.Equal(t, fmt.Sprintf("0x%x", txnGasLimit+1), res.(string))
 	})
 }

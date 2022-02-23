@@ -18,7 +18,8 @@ var (
 )
 
 var (
-	ErrInvalidValidatorNumber = errors.New("minimum number of validator can not be greater than maximum number of validator")
+	ErrInvalidValidatorNumber = errors.New("minimum number of validator can not be greater than" +
+		"maximum number of validator")
 )
 
 // PadLeftOrTrim left-pads the passed in byte array to the specified size,
