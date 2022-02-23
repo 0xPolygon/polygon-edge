@@ -3,17 +3,16 @@ package staking
 import (
 	"errors"
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/chain"
-	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"math"
 	"math/big"
 
+	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/helper/keccak"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
 var (
-	StakingSCAddress  = types.StringToAddress("1001")
 	MinValidatorCount = uint(1)
 	MaxValidatorCount = uint(math.MaxUint32)
 )

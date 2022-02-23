@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"context"
+	"github.com/0xPolygon/polygon-edge/types"
 	"testing"
 	"time"
 
@@ -11,7 +12,7 @@ import (
 )
 
 func TestEncoding(t *testing.T) {
-	_, from := tests.GenerateKeyAndAddr(t)
+	key, from := tests.GenerateKeyAndAddr(t)
 
 	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDev)
@@ -23,7 +24,7 @@ func TestEncoding(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	contractAddr, err := srv.DeployContract(ctx, sampleByteCode)
+	contractAddr, err := srv.DeployContract(ctx, sampleByteCode, key)
 
 	if err != nil {
 		t.Fatal(err)
@@ -32,7 +33,7 @@ func TestEncoding(t *testing.T) {
 	ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	receipt := srv.TxnTo(ctx, contractAddr, "setA1")
+	receipt := srv.InvokeMethod(ctx, types.Address(contractAddr), "setA1", key)
 
 	// try to get the transaction
 	client := srv.JSONRPC().Eth()

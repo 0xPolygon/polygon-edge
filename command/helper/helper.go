@@ -13,9 +13,10 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/contracts/staking"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	helperFlags "github.com/0xPolygon/polygon-edge/helper/flags"
-	"github.com/0xPolygon/polygon-edge/helper/staking"
+	stakingHelper "github.com/0xPolygon/polygon-edge/helper/staking"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/mitchellh/cli"
 	"github.com/ryanuber/columnize"
@@ -353,7 +354,7 @@ func generateDevGenesis(params devGenesisParams) error {
 		Bootnodes: []string{},
 	}
 
-	stakingAccount, err := staking.PredeployStakingSC(
+	stakingAccount, err := stakingHelper.PredeployStakingSC(
 		[]types.Address{},
 		staking.PredeployParams{
 			MinValidatorCount: staking.MinValidatorCount,
@@ -364,7 +365,7 @@ func generateDevGenesis(params devGenesisParams) error {
 		return err
 	}
 
-	cc.Genesis.Alloc[staking.StakingSCAddress] = stakingAccount
+	cc.Genesis.Alloc[staking.AddrStakingContract] = stakingAccount
 
 	if err := FillPremineMap(cc.Genesis.Alloc, params.premine); err != nil {
 		return err
@@ -436,12 +437,16 @@ func ReadConfig(baseCommand string, args []string) (*Config, error) {
 		Network:   &Network{},
 		TxPool:    &TxPool{},
 		Telemetry: &Telemetry{},
+		Headers:   &Headers{},
 	}
 
 	flags := flag.NewFlagSet(baseCommand, flag.ContinueOnError)
 	flags.Usage = func() {}
 
-	var configFile string
+	var (
+		configFile                string
+		accessControlAllowOrigins helperFlags.ArrayFlags
+	)
 
 	flags.StringVar(&cliConfig.LogLevel, "log-level", "", "")
 	flags.BoolVar(&cliConfig.Seal, "seal", false, "")
@@ -475,12 +480,15 @@ func ReadConfig(baseCommand string, args []string) (*Config, error) {
 	flags.Uint64Var(&cliConfig.DevInterval, "dev-interval", 1, "")
 	flags.StringVar(&cliConfig.BlockGasTarget, "block-gas-target", strconv.FormatUint(0, 10), "")
 	flags.StringVar(&cliConfig.Secrets, "secrets-config", "", "")
+	flags.Var(&accessControlAllowOrigins, "access-control-allow-origins", "")
 	flags.StringVar(&cliConfig.RestoreFile, "restore", "", "")
 	flags.Uint64Var(&cliConfig.BlockTime, "block-time", config.BlockTime, "")
 
 	if err := flags.Parse(args); err != nil {
 		return nil, err
 	}
+
+	cliConfig.Headers.AccessControlAllowOrigins = accessControlAllowOrigins
 
 	if cliConfig.Network.MaxPeers != -1 {
 		if cliConfig.Network.MaxInboundPeers != -1 || cliConfig.Network.MaxOutboundPeers != -1 {
