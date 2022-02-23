@@ -356,9 +356,9 @@ func generateDevGenesis(params devGenesisParams) error {
 
 	stakingAccount, err := stakingHelper.PredeployStakingSC(
 		[]types.Address{},
-		staking.PredeployParams{
-			MinValidatorCount: staking.MinValidatorCount,
-			MaxValidatorCount: staking.MaxValidatorCount,
+		stakingHelper.PredeployParams{
+			MinValidatorCount: stakingHelper.MinValidatorCount,
+			MaxValidatorCount: stakingHelper.MaxValidatorCount,
 		},
 	)
 	if err != nil {

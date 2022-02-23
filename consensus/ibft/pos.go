@@ -146,7 +146,7 @@ func (pos *PoSMechanism) preStateCommitHook(rawParams interface{}) error {
 	}
 
 	// Deploy Staking contract
-	contractState, err := stakingHelper.PredeployStakingSC(nil)
+	contractState, err := stakingHelper.PredeployStakingSC(nil, stakingHelper.PredeployParams{})
 	if err != nil {
 		return err
 	}
