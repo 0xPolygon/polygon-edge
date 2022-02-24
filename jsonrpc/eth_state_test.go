@@ -2,8 +2,11 @@ package jsonrpc
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
+	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/state"
+	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/umbracle/fastrlp"
@@ -577,10 +580,94 @@ func TestEth_State_GetStorageAt(t *testing.T) {
 	}
 }
 
+func TestEth_EstimateGas(t *testing.T) {
+	newTxnArgs := func(gasLimit uint64) *txnArgs {
+		return &txnArgs{
+			From:     &addr0,
+			To:       &addr1,
+			Gas:      argUintPtr(gasLimit),
+			GasPrice: argBytesPtr([]byte{0x1}),
+			Value:    argBytesPtr([]byte{0x64}),
+			Input:    argBytesPtr([]byte{0x64}),
+			Data:     nil,
+			Nonce:    argUintPtr(0),
+		}
+	}
+
+	setupMockStore := func(accountBalance int64) *mockSpecialStore {
+		return &mockSpecialStore{
+			account: &mockAccount{
+				address: addr0,
+				account: &state.Account{
+					Balance: big.NewInt(accountBalance),
+					Nonce:   0,
+				},
+				storage: make(map[types.Hash][]byte),
+			},
+			block: &types.Block{
+				Header: &types.Header{
+					Hash:      hash1,
+					Number:    0,
+					StateRoot: types.EmptyRootHash,
+					GasLimit:  5000000,
+				},
+			},
+		}
+	}
+
+	t.Run("returns error if account doesn't have enough funds for transaction execution", func(t *testing.T) {
+		balance := int64(100)
+		txnGasLimit := uint64(30000)
+		store := setupMockStore(balance)
+		eth := newTestEthEndpoint(store)
+		txn := newTxnArgs(txnGasLimit)
+
+		res, err := eth.EstimateGas(txn, nil)
+
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "insufficient funds for execution")
+		assert.Nil(t, res)
+	})
+
+	// nolint:lll
+	t.Run("returns estimated gas value +1 when transaction has gas field greater than estimated gas value", func(t *testing.T) {
+		balance := int64(10000000)
+		txnGasLimit := uint64(30000)
+		store := setupMockStore(balance)
+		store.estimatedGasPivotValue = 25000
+		eth := newTestEthEndpoint(store)
+		txn := newTxnArgs(txnGasLimit)
+
+		res, err := eth.EstimateGas(txn, nil)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, res)
+		// nolint:forcetypeassert
+		assert.Equal(t, fmt.Sprintf("0x%x", store.estimatedGasPivotValue+1), res.(string))
+	})
+
+	t.Run("returns transaction's gas limit value +1 when estimated gas value exceeds it", func(t *testing.T) {
+		balance := int64(10000000)
+		txnGasLimit := uint64(23000)
+		store := setupMockStore(balance)
+		store.estimatedGasPivotValue = 25000
+		eth := newTestEthEndpoint(store)
+		txn := newTxnArgs(txnGasLimit)
+
+		res, err := eth.EstimateGas(txn, nil)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, res)
+		// nolint:forcetypeassert
+		assert.Equal(t, fmt.Sprintf("0x%x", txnGasLimit+1), res.(string))
+	})
+}
+
 type mockSpecialStore struct {
 	ethStore
-	account *mockAccount
-	block   *types.Block
+	account                *mockAccount
+	block                  *types.Block
+	estimatedGasPivotValue uint64
 }
 
 func (m *mockSpecialStore) GetBlockByHash(hash types.Hash, full bool) (*types.Block, bool) {
@@ -608,9 +695,7 @@ func (m *mockSpecialStore) GetHeaderByNumber(blockNumber uint64) (*types.Header,
 }
 
 func (m *mockSpecialStore) Header() *types.Header {
-	return &types.Header{
-		StateRoot: types.EmptyRootHash,
-	}
+	return m.block.Header
 }
 
 func (m *mockSpecialStore) GetNonce(addr types.Address) uint64 {
@@ -638,4 +723,16 @@ func (m *mockSpecialStore) GetCode(hash types.Hash) ([]byte, error) {
 	}
 
 	return nil, fmt.Errorf("code not found")
+}
+
+func (m *mockSpecialStore) GetForksInTime(blockNumber uint64) chain.ForksInTime {
+	return chain.ForksInTime{}
+}
+
+func (m *mockSpecialStore) ApplyTxn(header *types.Header, txn *types.Transaction) (*runtime.ExecutionResult, error) {
+	if txn.Gas <= m.estimatedGasPivotValue {
+		return &runtime.ExecutionResult{Err: errors.New("not enough gas")}, nil
+	} else {
+		return &runtime.ExecutionResult{}, nil
+	}
 }

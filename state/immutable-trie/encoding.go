@@ -1,60 +1,80 @@
 package itrie
 
-func hexToCompact(hex []byte) []byte {
-	terminator := byte(0)
-	if hasTerm(hex) {
-		terminator = 1
+// hasTerminator checks if hex is ending
+// with a terminator flag.
+func hasTerminator(hex []byte) bool {
+	if len(hex) == 0 {
+		return false
+	}
+
+	return hex[len(hex)-1] == 16
+}
+
+// encodeCompact packs a hex sequence (of nibbles)
+// into compact encoding.
+func encodeCompact(hex []byte) []byte {
+	var terminator int
+
+	if hasTerminator(hex) {
+		// remove terminator flag
 		hex = hex[:len(hex)-1]
+		terminator = 1
+	} else {
+		terminator = 0
 	}
 
-	buf := make([]byte, len(hex)/2+1)
-	buf[0] = terminator << 5 // the flag byte
+	// determine prefix flag
+	oddLen := len(hex) % 2
+	flag := 2*terminator + oddLen
 
-	if len(hex)&1 == 1 {
-		buf[0] |= 1 << 4 // odd flag
-		buf[0] |= hex[0] // first nibble is contained in the first byte
-		hex = hex[1:]
+	// insert flag
+	if oddLen == 1 {
+		hex = append([]byte{byte(flag)}, hex...)
+	} else {
+		hex = append([]byte{byte(flag), byte(0)}, hex...)
 	}
 
-	decodeNibbles(hex, buf[1:])
-
-	return buf
-}
-
-func decodeNibbles(nibbles []byte, bytes []byte) {
-	for bi, ni := 0, 0; ni < len(nibbles); bi, ni = bi+1, ni+2 {
-		bytes[bi] = nibbles[ni]<<4 | nibbles[ni+1]
+	// hex slice is of even length now - pack nibbles
+	result := make([]byte, len(hex)/2)
+	for i := 0; i < cap(result); i++ {
+		result[i] = hex[2*i]<<4 | hex[2*i+1]
 	}
+
+	return result
 }
 
-// hasTerm returns whether a hex key has the terminator flag.
-func hasTerm(s []byte) bool {
-	return len(s) > 0 && s[len(s)-1] == 16
-}
-
-func keybytesToHex(str []byte) []byte {
-	l := len(str)*2 + 1
-
-	var nibbles = make([]byte, l)
-
-	for i, b := range str {
+// bytesToHexNibbles splits bytes into nibbles
+// (with terminator flag). Prefix flag is not removed.
+func bytesToHexNibbles(bytes []byte) []byte {
+	nibbles := make([]byte, len(bytes)*2+1)
+	for i, b := range bytes {
 		nibbles[i*2] = b / 16
 		nibbles[i*2+1] = b % 16
 	}
 
-	nibbles[l-1] = 16
+	nibbles[len(nibbles)-1] = 16
 
 	return nibbles
 }
 
-func compactToHex(compact []byte) []byte {
-	base := keybytesToHex(compact)
-	// delete terminator flag
+// decodeCompact unpacks compact encoding
+// into a hex sequence of nibbles.
+func decodeCompact(compact []byte) []byte {
+	base := bytesToHexNibbles(compact)
+
+	// remove the terminator flag
 	if base[0] < 2 {
 		base = base[:len(base)-1]
 	}
-	// apply odd flag
-	chop := 2 - base[0]&1
 
-	return base[chop:]
+	// remove prefix flag
+	if base[0]&1 == 1 {
+		// odd length
+		base = base[1:]
+	} else {
+		// even length
+		base = base[2:]
+	}
+
+	return base
 }

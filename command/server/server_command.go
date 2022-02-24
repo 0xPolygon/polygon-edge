@@ -223,6 +223,15 @@ func (c *ServerCommand) DefineFlags() {
 		FlagOptional:      true,
 	}
 
+	c.FlagMap["access-control-allow-origins"] = helper.FlagDescriptor{
+		Description: "Sets the header indicating whether any JSON-RPC response can be shared with requesting code" +
+			" from the given origin",
+		Arguments: []string{
+			"ACCESS_CONTROL_ALLOW_ORIGINS",
+		},
+		FlagOptional: true,
+	}
+
 	c.FlagMap["restore"] = helper.FlagDescriptor{
 		Description: "Sets the path to the archive blockchain data to restore on initialization",
 		Arguments: []string{
@@ -232,7 +241,7 @@ func (c *ServerCommand) DefineFlags() {
 	}
 
 	c.FlagMap["block-time"] = helper.FlagDescriptor{
-		Description: fmt.Sprintf("Sets block time in miliseconds. Default: %d", helper.DefaultConfig().BlockTime),
+		Description: fmt.Sprintf("Sets block time in seconds. Default: %ds", helper.DefaultConfig().BlockTime),
 		Arguments: []string{
 			"BLOCK_TIME",
 		},
