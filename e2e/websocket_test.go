@@ -2,7 +2,6 @@ package e2e
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"encoding/json"
 	"math/big"
 	"strings"
@@ -11,7 +10,6 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/e2e/framework"
-	"github.com/0xPolygon/polygon-edge/helper/tests"
 	"github.com/0xPolygon/polygon-edge/jsonrpc"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/gorilla/websocket"
@@ -58,16 +56,9 @@ func getWSResponse(t *testing.T, ws *websocket.Conn, request []byte) jsonrpc.Suc
 }
 
 func TestWS_Response(t *testing.T) {
-	key1, addr1 := tests.GenerateKeyAndAddr(t)
-	key2, addr2 := tests.GenerateKeyAndAddr(t)
-	preminedAccounts := []struct {
-		address types.Address
-		privKey *ecdsa.PrivateKey
-		balance *big.Int
-	}{
-		{addr1, key1, framework.EthToWei(10)},
-		{addr2, key2, framework.EthToWei(20)},
-	}
+	preminedAccounts := generateTestAccounts(t, 2)
+	preminedAccounts[0].balance = framework.EthToWei(10)
+	preminedAccounts[1].balance = framework.EthToWei(20)
 
 	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDev)
@@ -130,18 +121,27 @@ func TestWS_Response(t *testing.T) {
 			Gas:      1000000,
 			Value:    big.NewInt(10000),
 			Nonce:    uint64(0),
-		}, preminedAccounts[0].privKey)
+		}, preminedAccounts[0].key)
 		if err != nil {
 			t.Log("Could not sign transaction")
 		}
 
-		hash, err := client.Eth().SendRawTransaction(signedTxn.MarshalRLP())
+		_, err = client.Eth().SendRawTransaction(signedTxn.MarshalRLP())
 		assert.NoError(t, err)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		_, err = tests.WaitForReceipt(ctx, srv.JSONRPC().Eth(), hash)
-		assert.NoError(t, err)
+
+		_, err = srv.SendRawTx(ctx, &framework.PreparedTransaction{
+			From:     preminedAccounts[0].address,
+			To:       &preminedAccounts[1].address,
+			GasPrice: big.NewInt(10000),
+			Gas:      1000000,
+			Value:    big.NewInt(10000),
+		}, preminedAccounts[0].key)
+		if err != nil {
+			t.Fatalf("Unable to send transaction, %v", err)
+		}
 
 		requestID := 2
 		request, constructErr := constructWSRequest(

@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	DefaultLeaveTimeout = 20 * time.Second
+	DefaultLeaveTimeout = 30 * time.Second
 )
 
 // JoinAndWait is a helper method for joining a destination server

@@ -20,16 +20,19 @@ const (
 	P_UTP               = 0x012E
 	P_UNIX              = 0x0190
 	P_P2P               = 0x01A5
-	P_IPFS              = 0x01A5 // alias for backwards compatability
+	P_IPFS              = 0x01A5 // alias for backwards compatibility
 	P_HTTP              = 0x01E0
-	P_HTTPS             = 0x01BB
+	P_HTTPS             = 0x01BB // deprecated alias for /tls/http
 	P_ONION             = 0x01BC // also for backwards compatibility
 	P_ONION3            = 0x01BD
 	P_GARLIC64          = 0x01BE
 	P_GARLIC32          = 0x01BF
 	P_P2P_WEBRTC_DIRECT = 0x0114
+	P_TLS               = 0x01c0
+	P_NOISE             = 0x01c6
 	P_WS                = 0x01DD
-	P_WSS               = 0x01DE
+	P_WSS               = 0x01DE // deprecated alias for /tls/ws
+	P_PLAINTEXTV2       = 0x706c61
 )
 
 var (
@@ -197,6 +200,21 @@ var (
 		Code:  P_P2P_WEBRTC_DIRECT,
 		VCode: CodeToVarint(P_P2P_WEBRTC_DIRECT),
 	}
+	protoTLS = Protocol{
+		Name:  "tls",
+		Code:  P_TLS,
+		VCode: CodeToVarint(P_TLS),
+	}
+	protoNOISE = Protocol{
+		Name:  "noise",
+		Code:  P_NOISE,
+		VCode: CodeToVarint(P_NOISE),
+	}
+	protoPlaintextV2 = Protocol{
+		Name:  "plaintextv2",
+		Code:  P_PLAINTEXTV2,
+		VCode: CodeToVarint(P_PLAINTEXTV2),
+	}
 	protoWS = Protocol{
 		Name:  "ws",
 		Code:  P_WS,
@@ -235,8 +253,11 @@ func init() {
 		protoP2P,
 		protoUNIX,
 		protoP2P_WEBRTC_DIRECT,
+		protoTLS,
+		protoNOISE,
 		protoWS,
 		protoWSS,
+		protoPlaintextV2,
 	} {
 		if err := AddProtocol(p); err != nil {
 			panic(err)

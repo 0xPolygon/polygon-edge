@@ -184,3 +184,19 @@ func (m *multiaddr) ValueForProtocol(code int) (value string, err error) {
 	})
 	return
 }
+
+// FilterAddrs is a filter that removes certain addresses, according to the given filters.
+// If all filters return true, the address is kept.
+func FilterAddrs(a []Multiaddr, filters ...func(Multiaddr) bool) []Multiaddr {
+	b := make([]Multiaddr, 0, len(a))
+addrloop:
+	for _, addr := range a {
+		for _, filter := range filters {
+			if !filter(addr) {
+				continue addrloop
+			}
+		}
+		b = append(b, addr)
+	}
+	return b
+}

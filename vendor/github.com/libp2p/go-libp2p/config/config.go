@@ -1,7 +1,6 @@
 package config
 
 import (
-	"context"
 	"crypto/rand"
 	"fmt"
 	"time"
@@ -15,17 +14,20 @@ import (
 	"github.com/libp2p/go-libp2p-core/peerstore"
 	"github.com/libp2p/go-libp2p-core/pnet"
 	"github.com/libp2p/go-libp2p-core/routing"
+	"github.com/libp2p/go-libp2p-core/sec"
 	"github.com/libp2p/go-libp2p-core/transport"
 	"github.com/libp2p/go-libp2p-peerstore/pstoremem"
 
+	drouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
+	"github.com/libp2p/go-libp2p/p2p/host/autonat"
+	"github.com/libp2p/go-libp2p/p2p/host/autorelay"
 	bhost "github.com/libp2p/go-libp2p/p2p/host/basic"
-	"github.com/libp2p/go-libp2p/p2p/host/relay"
 	routed "github.com/libp2p/go-libp2p/p2p/host/routed"
+	circuitv2 "github.com/libp2p/go-libp2p/p2p/protocol/circuitv2/client"
+	relayv2 "github.com/libp2p/go-libp2p/p2p/protocol/circuitv2/relay"
+	"github.com/libp2p/go-libp2p/p2p/protocol/holepunch"
 
-	autonat "github.com/libp2p/go-libp2p-autonat"
 	blankhost "github.com/libp2p/go-libp2p-blankhost"
-	circuit "github.com/libp2p/go-libp2p-circuit"
-	discovery "github.com/libp2p/go-libp2p-discovery"
 	swarm "github.com/libp2p/go-libp2p-swarm"
 	tptu "github.com/libp2p/go-libp2p-transport-upgrader"
 
@@ -73,18 +75,24 @@ type Config struct {
 	Insecure           bool
 	PSK                pnet.PSK
 
+	DialTimeout time.Duration
+
 	RelayCustom bool
-	Relay       bool
-	RelayOpts   []circuit.RelayOpt
+	Relay       bool // should the relay transport be used
+
+	EnableRelayService bool // should we run a circuitv2 relay (if publicly reachable)
+	RelayServiceOpts   []relayv2.Option
 
 	ListenAddrs     []ma.Multiaddr
 	AddrsFactory    bhost.AddrsFactory
 	ConnectionGater connmgr.ConnectionGater
 
-	ConnManager connmgr.ConnManager
-	NATManager  NATManagerC
-	Peerstore   peerstore.Peerstore
-	Reporter    metrics.Reporter
+	ConnManager     connmgr.ConnManager
+	ResourceManager network.ResourceManager
+
+	NATManager NATManagerC
+	Peerstore  peerstore.Peerstore
+	Reporter   metrics.Reporter
 
 	MultiaddrResolver *madns.Resolver
 
@@ -94,10 +102,13 @@ type Config struct {
 
 	EnableAutoRelay bool
 	AutoNATConfig
-	StaticRelays []peer.AddrInfo
+	StaticRelayOpt autorelay.StaticRelayOption
+
+	EnableHolePunching  bool
+	HolePunchingOptions []holepunch.Option
 }
 
-func (cfg *Config) makeSwarm(ctx context.Context) (*swarm.Swarm, error) {
+func (cfg *Config) makeSwarm() (*swarm.Swarm, error) {
 	if cfg.Peerstore == nil {
 		return nil, fmt.Errorf("no peerstore specified")
 	}
@@ -129,48 +140,69 @@ func (cfg *Config) makeSwarm(ctx context.Context) (*swarm.Swarm, error) {
 		return nil, err
 	}
 
+	opts := make([]swarm.Option, 0, 3)
+	if cfg.Reporter != nil {
+		opts = append(opts, swarm.WithMetrics(cfg.Reporter))
+	}
+	if cfg.ConnectionGater != nil {
+		opts = append(opts, swarm.WithConnectionGater(cfg.ConnectionGater))
+	}
+	if cfg.DialTimeout != 0 {
+		opts = append(opts, swarm.WithDialTimeout(cfg.DialTimeout))
+	}
+	if cfg.ResourceManager != nil {
+		opts = append(opts, swarm.WithResourceManager(cfg.ResourceManager))
+	}
 	// TODO: Make the swarm implementation configurable.
-	swrm := swarm.NewSwarm(ctx, pid, cfg.Peerstore, cfg.Reporter, cfg.ConnectionGater)
-	return swrm, nil
+	return swarm.NewSwarm(pid, cfg.Peerstore, opts...)
 }
 
-func (cfg *Config) addTransports(ctx context.Context, h host.Host) (err error) {
+func (cfg *Config) addTransports(h host.Host) error {
 	swrm, ok := h.Network().(transport.TransportNetwork)
 	if !ok {
 		// Should probably skip this if no transports.
 		return fmt.Errorf("swarm does not support transports")
 	}
-	upgrader := new(tptu.Upgrader)
-	upgrader.PSK = cfg.PSK
-	upgrader.ConnGater = cfg.ConnectionGater
+	var secure sec.SecureMuxer
 	if cfg.Insecure {
-		upgrader.Secure = makeInsecureTransport(h.ID(), cfg.PeerKey)
+		secure = makeInsecureTransport(h.ID(), cfg.PeerKey)
 	} else {
-		upgrader.Secure, err = makeSecurityMuxer(h, cfg.SecurityTransports)
+		var err error
+		secure, err = makeSecurityMuxer(h, cfg.SecurityTransports)
 		if err != nil {
 			return err
 		}
 	}
-
-	upgrader.Muxer, err = makeMuxer(h, cfg.Muxers)
+	muxer, err := makeMuxer(h, cfg.Muxers)
 	if err != nil {
 		return err
 	}
-
-	tpts, err := makeTransports(h, upgrader, cfg.ConnectionGater, cfg.Transports)
+	var opts []tptu.Option
+	if len(cfg.PSK) > 0 {
+		opts = append(opts, tptu.WithPSK(cfg.PSK))
+	}
+	if cfg.ConnectionGater != nil {
+		opts = append(opts, tptu.WithConnectionGater(cfg.ConnectionGater))
+	}
+	if cfg.ResourceManager != nil {
+		opts = append(opts, tptu.WithResourceManager(cfg.ResourceManager))
+	}
+	upgrader, err := tptu.New(secure, muxer, opts...)
+	if err != nil {
+		return err
+	}
+	tpts, err := makeTransports(h, upgrader, cfg.ConnectionGater, cfg.PSK, cfg.ResourceManager, cfg.Transports)
 	if err != nil {
 		return err
 	}
 	for _, t := range tpts {
-		err = swrm.AddTransport(t)
-		if err != nil {
+		if err := swrm.AddTransport(t); err != nil {
 			return err
 		}
 	}
 
 	if cfg.Relay {
-		err := circuit.AddRelayTransport(ctx, h, upgrader, cfg.RelayOpts...)
-		if err != nil {
+		if err := circuitv2.AddTransport(h, upgrader); err != nil {
 			h.Close()
 			return err
 		}
@@ -182,33 +214,28 @@ func (cfg *Config) addTransports(ctx context.Context, h host.Host) (err error) {
 // NewNode constructs a new libp2p Host from the Config.
 //
 // This function consumes the config. Do not reuse it (really!).
-func (cfg *Config) NewNode(ctx context.Context) (host.Host, error) {
-	swrm, err := cfg.makeSwarm(ctx)
+func (cfg *Config) NewNode() (host.Host, error) {
+	swrm, err := cfg.makeSwarm()
 	if err != nil {
 		return nil, err
 	}
 
-	h, err := bhost.NewHost(ctx, swrm, &bhost.HostOpts{
-		ConnManager:       cfg.ConnManager,
-		AddrsFactory:      cfg.AddrsFactory,
-		NATManager:        cfg.NATManager,
-		EnablePing:        !cfg.DisablePing,
-		UserAgent:         cfg.UserAgent,
-		MultiaddrResolver: cfg.MultiaddrResolver,
+	h, err := bhost.NewHost(swrm, &bhost.HostOpts{
+		ConnManager:         cfg.ConnManager,
+		AddrsFactory:        cfg.AddrsFactory,
+		NATManager:          cfg.NATManager,
+		EnablePing:          !cfg.DisablePing,
+		UserAgent:           cfg.UserAgent,
+		MultiaddrResolver:   cfg.MultiaddrResolver,
+		EnableHolePunching:  cfg.EnableHolePunching,
+		HolePunchingOptions: cfg.HolePunchingOptions,
+		EnableRelayService:  cfg.EnableRelayService,
+		RelayServiceOpts:    cfg.RelayServiceOpts,
 	})
-
 	if err != nil {
 		swrm.Close()
 		return nil, err
 	}
-
-	// XXX: This is the only sane way to get a context out that's guaranteed
-	// to be canceled when we shut down.
-	//
-	// TODO: Stop using contexts to stop services. This is just lazy.
-	// Contexts are for canceling requests, services should be managed
-	// explicitly.
-	ctx = swrm.Context()
 
 	if cfg.Relay {
 		// If we've enabled the relay, we should filter out relay
@@ -217,12 +244,11 @@ func (cfg *Config) NewNode(ctx context.Context) (host.Host, error) {
 		// TODO: We shouldn't be doing this here.
 		oldFactory := h.AddrsFactory
 		h.AddrsFactory = func(addrs []ma.Multiaddr) []ma.Multiaddr {
-			return oldFactory(relay.Filter(addrs))
+			return oldFactory(autorelay.Filter(addrs))
 		}
 	}
 
-	err = cfg.addTransports(ctx, h)
-	if err != nil {
+	if err := cfg.addTransports(h); err != nil {
 		h.Close()
 		return nil, err
 	}
@@ -246,6 +272,7 @@ func (cfg *Config) NewNode(ctx context.Context) (host.Host, error) {
 
 	// Note: h.AddrsFactory may be changed by AutoRelay, but non-relay version is
 	// used by AutoNAT below.
+	var ar *autorelay.AutoRelay
 	addrF := h.AddrsFactory
 	if cfg.EnableAutoRelay {
 		if !cfg.Relay {
@@ -253,36 +280,24 @@ func (cfg *Config) NewNode(ctx context.Context) (host.Host, error) {
 			return nil, fmt.Errorf("cannot enable autorelay; relay is not enabled")
 		}
 
-		hop := false
-		for _, opt := range cfg.RelayOpts {
-			if opt == circuit.OptHop {
-				hop = true
-				break
-			}
-		}
-
-		if !hop && len(cfg.StaticRelays) > 0 {
-			_ = relay.NewAutoRelay(ctx, h, nil, router, cfg.StaticRelays)
+		var opts []autorelay.Option
+		if cfg.StaticRelayOpt != nil {
+			opts = append(opts, autorelay.Option(cfg.StaticRelayOpt))
 		} else {
 			if router == nil {
 				h.Close()
 				return nil, fmt.Errorf("cannot enable autorelay; no routing for discovery")
 			}
-
 			crouter, ok := router.(routing.ContentRouting)
 			if !ok {
 				h.Close()
 				return nil, fmt.Errorf("cannot enable autorelay; no suitable routing for discovery")
 			}
-
-			discovery := discovery.NewRoutingDiscovery(crouter)
-
-			if hop {
-				// advertise ourselves
-				relay.Advertise(ctx, discovery)
-			} else {
-				_ = relay.NewAutoRelay(ctx, h, discovery, router, cfg.StaticRelays)
-			}
+			opts = append(opts, autorelay.WithDiscoverer(drouting.NewRoutingDiscovery(crouter)))
+		}
+		ar, err = autorelay.NewAutoRelay(h, router, opts...)
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -301,6 +316,10 @@ func (cfg *Config) NewNode(ctx context.Context) (host.Host, error) {
 		if err != nil {
 			return nil, err
 		}
+		ps, err := pstoremem.NewPeerstore()
+		if err != nil {
+			return nil, err
+		}
 
 		// Pull out the pieces of the config that we _actually_ care about.
 		// Specifically, don't setup things like autorelay, listeners,
@@ -314,18 +333,16 @@ func (cfg *Config) NewNode(ctx context.Context) (host.Host, error) {
 			ConnectionGater:    cfg.ConnectionGater,
 			Reporter:           cfg.Reporter,
 			PeerKey:            autonatPrivKey,
-
-			Peerstore: pstoremem.NewPeerstore(),
+			Peerstore:          ps,
 		}
 
-		dialer, err := autoNatCfg.makeSwarm(ctx)
+		dialer, err := autoNatCfg.makeSwarm()
 		if err != nil {
 			h.Close()
 			return nil, err
 		}
 		dialerHost := blankhost.NewBlankHost(dialer)
-		err = autoNatCfg.addTransports(ctx, dialerHost)
-		if err != nil {
+		if err := autoNatCfg.addTransports(dialerHost); err != nil {
 			dialerHost.Close()
 			h.Close()
 			return nil, err
@@ -339,7 +356,7 @@ func (cfg *Config) NewNode(ctx context.Context) (host.Host, error) {
 		autonatOpts = append(autonatOpts, autonat.WithReachability(*cfg.AutoNATConfig.ForceReachability))
 	}
 
-	autonat, err := autonat.New(ctx, h, autonatOpts...)
+	autonat, err := autonat.New(h, autonatOpts...)
 	if err != nil {
 		h.Close()
 		return nil, fmt.Errorf("cannot enable autorelay; autonat failed to start: %v", err)
@@ -349,10 +366,15 @@ func (cfg *Config) NewNode(ctx context.Context) (host.Host, error) {
 	// start the host background tasks
 	h.Start()
 
+	var ho host.Host
+	ho = h
 	if router != nil {
-		return routed.Wrap(h, router), nil
+		ho = routed.Wrap(h, router)
 	}
-	return h, nil
+	if ar != nil {
+		return autorelay.NewAutoRelayHost(ho, ar), nil
+	}
+	return ho, nil
 }
 
 // Option is a libp2p config option that can be given to the libp2p constructor

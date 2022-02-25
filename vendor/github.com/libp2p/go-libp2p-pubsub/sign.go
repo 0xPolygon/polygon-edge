@@ -123,7 +123,7 @@ func signMessage(pid peer.ID, key crypto.PrivKey, m *pb.Message) error {
 
 	pk, _ := pid.ExtractPublicKey()
 	if pk == nil {
-		pubk, err := key.GetPublic().Bytes()
+		pubk, err := crypto.MarshalPublicKey(key.GetPublic())
 		if err != nil {
 			return err
 		}

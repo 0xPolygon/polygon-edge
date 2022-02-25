@@ -2,9 +2,11 @@ package crypto
 
 import (
 	"bytes"
+	goCrypto "crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"math/big"
 
@@ -196,6 +198,18 @@ func PubKeyToAddress(pub *ecdsa.PublicKey) types.Address {
 	buf := Keccak256(MarshalPublicKey(pub)[1:])[12:]
 
 	return types.BytesToAddress(buf)
+}
+
+// GetAddressFromKey extracts an address from the private key
+func GetAddressFromKey(key goCrypto.PrivateKey) (types.Address, error) {
+	privateKeyConv, ok := key.(*ecdsa.PrivateKey)
+	if !ok {
+		return types.ZeroAddress, errors.New("unable to assert type")
+	}
+
+	publicKey := privateKeyConv.PublicKey
+
+	return PubKeyToAddress(&publicKey), nil
 }
 
 // generateKeyAndMarshal generates a new private key and serializes it to a byte array

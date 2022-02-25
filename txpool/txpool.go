@@ -84,18 +84,10 @@ through their designated channels. */
 
 // An enqueueRequest is created for any transaction
 // meant to be enqueued onto some account.
-// This request is made on 2 occasions:
-//
-// 	1. When a transaction is initially discovered with addTx
-// 	and passes validation.
-//
-//	2. When consensus is processing a previously
-// 	promoted transaction and decides to return it
-// 	to the pool (Demote). These requests have the
-// 	demoted flag set to true.
+// This request is created for (new) transactions
+// that passed validation in addTx.
 type enqueueRequest struct {
-	tx      *types.Transaction
-	demoted bool
+	tx *types.Transaction
 }
 
 // A promoteRequest is created each time some account
@@ -160,9 +152,6 @@ type TxPool struct {
 	// flag indicating if the current node is a sealer,
 	// and should therefore gossip transactions
 	sealing bool
-
-	// flag indicating if the current node is running in dev mode (used for testing)
-	dev bool
 
 	// prometheus API
 	metrics *Metrics
@@ -259,12 +248,6 @@ func (p *TxPool) SetSigner(s signer) {
 	p.signer = s
 }
 
-// EnableDev enables the pool to accept
-// non-encrypted transactions. (used for testing)
-func (p *TxPool) EnableDev() {
-	p.dev = true
-}
-
 // AddTx adds a new transaction to the pool (sent from json-RPC/gRPC endpoints)
 // and broadcasts it to the network (if enabled).
 func (p *TxPool) AddTx(tx *types.Transaction) error {
@@ -274,9 +257,9 @@ func (p *TxPool) AddTx(tx *types.Transaction) error {
 		return err
 	}
 
-	// broadcast the transaction only if network is enabled
-	// and we are not in dev mode
-	if p.topic != nil && !p.dev {
+	// broadcast the transaction only if a topic
+	// subscription is present
+	if p.topic != nil {
 		tx := &proto.Txn{
 			Raw: &any.Any{
 				Value: tx.MarshalRLP(),
@@ -346,63 +329,56 @@ func (p *TxPool) Pop(tx *types.Transaction) {
 	}
 }
 
-// Drop removes the given (unrecoverable) transaction from
-// its associated promoted queue (account) and rolls
-// back the account's nextNonce.
-// Will update executables with the next primary
-// from that account (if any).
+// Drop clears the entire account associated with the given transaction
+// and reverts its next (expected) nonce.
 func (p *TxPool) Drop(tx *types.Transaction) {
+	// fetch associated account
 	account := p.accounts.get(tx.From)
 
 	account.promoted.lock(true)
-	defer account.promoted.unlock()
+	account.enqueued.lock(true)
 
-	// pop the top most promoted tx
-	account.promoted.pop()
+	// num of all txs dropped
+	droppedCount := 0
 
-	// update state
-	p.index.remove(tx)
-	p.gauge.decrease(slotsRequired(tx))
+	// pool resource cleanup
+	clearAccountQueue := func(txs []*types.Transaction) {
+		p.index.remove(txs...)
+		p.gauge.decrease(slotsRequired(txs...))
+
+		// increase counter
+		droppedCount += len(txs)
+	}
+
+	defer func() {
+		account.enqueued.unlock()
+		account.promoted.unlock()
+	}()
+
+	// rollback nonce
+	nextNonce := tx.Nonce
+	account.setNonce(nextNonce)
+
+	// drop promoted
+	dropped := account.promoted.clear()
+	clearAccountQueue(dropped)
 
 	// update metrics
-	p.metrics.PendingTxs.Add(-1)
+	p.metrics.PendingTxs.Add(float64(-1 * len(dropped)))
 
-	if tx.Nonce < account.getNonce() {
-		// rollback nonce
-		account.setNonce(tx.Nonce)
-	}
-
-	// update executables
-	if tx := account.promoted.peek(); tx != nil {
-		p.executables.push(tx)
-	}
+	// drop enqueued
+	dropped = account.enqueued.clear()
+	clearAccountQueue(dropped)
 
 	p.eventManager.signalEvent(proto.EventType_DROPPED, tx.Hash)
+	p.logger.Debug("dropped account txs",
+		"num", droppedCount,
+		"next_nonce", nextNonce,
+		"address", tx.From.String(),
+	)
 }
 
-// Demote removes the (recoverable) transaction from
-// its associated promoted queue (account) and
-// issues an enqueueRequest for it.
-// Will update executables with the next primary
-// from that account (if any).
 func (p *TxPool) Demote(tx *types.Transaction) {
-	account := p.accounts.get(tx.From)
-
-	account.promoted.lock(true)
-	defer account.promoted.unlock()
-
-	// drop the tx from account promoted
-	account.promoted.pop()
-
-	// signal enqueue request [BLOCKING]
-	p.enqueueReqCh <- enqueueRequest{tx: tx, demoted: true}
-
-	// update executables
-	if tx := account.promoted.peek(); tx != nil {
-		p.executables.push(tx)
-	}
-
-	p.logger.Debug("demoted transaction", "hash", tx.Hash.String())
 	p.eventManager.signalEvent(proto.EventType_DEMOTED, tx.Hash)
 }
 
@@ -425,7 +401,7 @@ func (p *TxPool) processEvent(event *blockchain.Event) {
 
 	// Legacy reorg logic //
 	for _, header := range event.OldChain {
-		// transactios to be returned to the pool
+		// transactions to be returned to the pool
 		block, ok := p.store.GetBlockByHash(header.Hash, true)
 		if !ok {
 			continue
@@ -501,19 +477,23 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 		return ErrNegativeValue
 	}
 
-	if !p.dev && tx.From != types.ZeroAddress {
-		// Only if we are in dev mode we can accept
-		// a transaction without validation
-		return ErrNonEncryptedTx
+	// Check if the transaction is signed properly
+
+	// Extract the sender
+	from, signerErr := p.signer.Sender(tx)
+	if signerErr != nil {
+		return ErrInvalidSender
 	}
 
-	// Check if the transaction is signed properly
-	if tx.From == types.ZeroAddress {
-		from, signerErr := p.signer.Sender(tx)
-		if signerErr != nil {
-			return ErrInvalidSender
-		}
+	// If the from field is set, check that
+	// it matches the signer
+	if tx.From != types.ZeroAddress &&
+		tx.From != from {
+		return ErrInvalidSender
+	}
 
+	// If no address was set, update it
+	if tx.From == types.ZeroAddress {
 		tx.From = from
 	}
 
@@ -622,29 +602,27 @@ func (p *TxPool) handleEnqueueRequest(req enqueueRequest) {
 	account := p.accounts.get(addr)
 
 	// enqueue tx
-	if err := account.enqueue(tx, req.demoted); err != nil {
+	if err := account.enqueue(tx); err != nil {
 		p.logger.Error("enqueue request", "err", err)
 
 		return
 	}
 
 	p.logger.Debug("enqueue request", "hash", tx.Hash.String())
+
+	// update state
+	p.index.add(tx)
+	p.gauge.increase(slotsRequired(tx))
+
 	p.eventManager.signalEvent(proto.EventType_ENQUEUED, tx.Hash)
 
-	// update lookup
-	p.index.add(tx)
-
-	// demoted transactions never decrease the gauge
-	if !req.demoted {
-		p.gauge.increase(slotsRequired(tx))
+	if tx.Nonce > account.getNonce() {
+		// don't signal promotion for
+		// higher nonce txs
+		return
 	}
 
-	if tx.Nonce <= account.getNonce() {
-		// account queue is ready for promotion:
-		// 	1. New tx is matching nonce expected
-		// 	2. Demoted tx is eligible for promotion
-		p.promoteReqCh <- promoteRequest{account: addr} // BLOCKING
-	}
+	p.promoteReqCh <- promoteRequest{account: addr} // BLOCKING
 }
 
 // handlePromoteRequest handles moving promotable transactions
@@ -709,11 +687,16 @@ func (p *TxPool) resetAccount(addr types.Address, nonce uint64) {
 	defer account.promoted.unlock()
 
 	// prune promoted
-	pruned := account.promoted.prune(nonce)
+	pruned, prunedHashes := account.promoted.prune(nonce)
 
 	// update pool state
 	p.index.remove(pruned...)
 	p.gauge.decrease(slotsRequired(pruned...))
+
+	p.eventManager.signalEvent(
+		proto.EventType_PRUNED_PROMOTED,
+		prunedHashes...,
+	)
 
 	// update metrics
 	p.metrics.PendingTxs.Add(float64(-1 * len(pruned)))
@@ -728,7 +711,7 @@ func (p *TxPool) resetAccount(addr types.Address, nonce uint64) {
 	defer account.enqueued.unlock()
 
 	// prune enqueued
-	pruned = account.enqueued.prune(nonce)
+	pruned, prunedHashes = account.enqueued.prune(nonce)
 
 	// update pool state
 	p.index.remove(pruned...)
@@ -736,6 +719,11 @@ func (p *TxPool) resetAccount(addr types.Address, nonce uint64) {
 
 	// update next nonce
 	account.setNonce(nonce)
+
+	p.eventManager.signalEvent(
+		proto.EventType_PRUNED_ENQUEUED,
+		prunedHashes...,
+	)
 
 	if first := account.enqueued.peek(); first != nil &&
 		first.Nonce == nonce {

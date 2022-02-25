@@ -6,19 +6,18 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/crypto"
-	"github.com/0xPolygon/polygon-edge/helper/hex"
-	"github.com/0xPolygon/polygon-edge/types"
-	"golang.org/x/crypto/sha3"
-
 	"github.com/0xPolygon/polygon-edge/e2e/framework"
+	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/helper/tests"
+	"github.com/0xPolygon/polygon-edge/types"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/umbracle/go-web3"
+	"golang.org/x/crypto/sha3"
 )
 
 func TestNewFilter_Logs(t *testing.T) {
-	addrPrivKey, addr := tests.GenerateKeyAndAddr(t)
+	key, addr := tests.GenerateKeyAndAddr(t)
 	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDev)
 		config.Premine(addr, framework.EthToWei(10))
@@ -29,7 +28,7 @@ func TestNewFilter_Logs(t *testing.T) {
 	ctx1, cancel1 := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel1()
 
-	contractAddr, err := srv.DeployContract(ctx1, sampleByteCode, addrPrivKey)
+	contractAddr, err := srv.DeployContract(ctx1, sampleByteCode, key)
 
 	if err != nil {
 		t.Fatal(err)
@@ -43,7 +42,7 @@ func TestNewFilter_Logs(t *testing.T) {
 	for i := 0; i < numCalls; i++ {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		srv.TxnTo(ctx, contractAddr, "setA1", addrPrivKey)
+		srv.InvokeMethod(ctx, types.Address(contractAddr), "setA1", key)
 	}
 
 	res, err := client.Eth().GetFilterChanges(id)
@@ -52,7 +51,7 @@ func TestNewFilter_Logs(t *testing.T) {
 }
 
 func TestNewFilter_Block(t *testing.T) {
-	signerKey, from := tests.GenerateKeyAndAddr(t)
+	fromKey, from := tests.GenerateKeyAndAddr(t)
 	_, to := tests.GenerateKeyAndAddr(t)
 
 	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
@@ -62,33 +61,23 @@ func TestNewFilter_Block(t *testing.T) {
 	})
 	srv := srvs[0]
 	client := srv.JSONRPC()
-	signer := crypto.NewEIP155Signer(100)
 
 	id, err := client.Eth().NewBlockFilter()
 	assert.NoError(t, err)
 
 	for i := 0; i < 3; i++ {
-		signedTx, err := signer.SignTx(&types.Transaction{
-			From:     srv.Config.PremineAccts[0].Addr,
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		_, err := srv.SendRawTx(ctx, &framework.PreparedTransaction{
+			From:     from,
+			To:       &to,
 			GasPrice: big.NewInt(10000),
 			Gas:      1000000,
-			To:       &to,
 			Value:    big.NewInt(10000),
-			Nonce:    uint64(i),
-		}, signerKey)
-		if err != nil {
-			t.Error("Could not sign transacion")
-		}
-
-		hash, err := client.Eth().SendRawTransaction(signedTx.MarshalRLP())
+		}, fromKey)
 
 		assert.NoError(t, err)
 
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-
-		_, err = tests.WaitForReceipt(ctx, srv.JSONRPC().Eth(), hash)
-		assert.NoError(t, err)
+		cancel()
 	}
 
 	// there should be three changes
@@ -110,7 +99,7 @@ func TestFilterValue(t *testing.T) {
 	//
 	//	3.	Query the block's bloom filter to make sure the data has been properly inserted.
 	//
-	addrPrivKey, addr := tests.GenerateKeyAndAddr(t)
+	key, addr := tests.GenerateKeyAndAddr(t)
 	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDev)
 		config.Premine(addr, framework.EthToWei(10))
@@ -121,7 +110,7 @@ func TestFilterValue(t *testing.T) {
 	ctx1, cancel1 := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel1()
 
-	contractAddr, err := srv.DeployContract(ctx1, bloomFilterTestBytecode, addrPrivKey)
+	contractAddr, err := srv.DeployContract(ctx1, bloomFilterTestBytecode, key)
 
 	if err != nil {
 		t.Fatal(err)
@@ -159,7 +148,7 @@ func TestFilterValue(t *testing.T) {
 	for i := 0; i < numCalls; i++ {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		srv.TxnTo(ctx, contractAddr, "TriggerMyEvent", addrPrivKey)
+		srv.InvokeMethod(ctx, types.Address(contractAddr), "TriggerMyEvent", key)
 	}
 
 	res, err := client.Eth().GetFilterChanges(id)
