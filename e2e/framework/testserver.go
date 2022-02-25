@@ -91,6 +91,10 @@ func (t *TestServer) JSONRPCAddr() string {
 	return fmt.Sprintf("http://127.0.0.1:%d", t.Config.JSONRPCPort)
 }
 
+func (t *TestServer) WSJSONRPCAddr() string {
+	return fmt.Sprintf("ws://127.0.0.1:%d/ws", t.Config.JSONRPCPort)
+}
+
 func (t *TestServer) JSONRPC() *jsonrpc.Client {
 	clt, err := jsonrpc.NewClient(t.JSONRPCAddr())
 	if err != nil {
@@ -328,6 +332,22 @@ func (t *TestServer) Start(ctx context.Context) error {
 	// add block gas target
 	if t.Config.BlockGasTarget != 0 {
 		args = append(args, "--block-gas-target", *types.EncodeUint64(t.Config.BlockGasTarget))
+	}
+
+	if t.Config.UseBridge {
+		args = append(args, "--bridge")
+
+		if t.Config.BridgeRootChainURL != nil {
+			args = append(args, "--bridge-rootchain-url", *t.Config.BridgeRootChainURL)
+		}
+
+		if t.Config.BridgeRootChainContract != nil {
+			args = append(args, "--bridge-rootchain-contract", *t.Config.BridgeRootChainContract)
+		}
+
+		if t.Config.BridgeRootChainConfirmations != nil {
+			args = append(args, "bridge-rootchain-confirmations", *types.EncodeUint64(uint64(*t.Config.BridgeRootChainConfirmations)))
+		}
 	}
 
 	t.ReleaseReservedPorts()
