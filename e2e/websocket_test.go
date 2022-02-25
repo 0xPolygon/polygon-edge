@@ -111,7 +111,6 @@ func TestWS_Response(t *testing.T) {
 	})
 
 	t.Run("Valid block number after transfer", func(t *testing.T) {
-		
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
