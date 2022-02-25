@@ -36,6 +36,7 @@ const (
 	transfer Mode = "transfer"
 	deploy   Mode = "deploy"
 	erc20    Mode = "erc20"
+	erc721	 Mode = "erc721"
 )
 
 type Account struct {
@@ -262,8 +263,7 @@ func (l *Loadbot) executeTxn(
 		err error
 	)
 
-	if mode == "erc20Transfer" {
-		// convert web3 to types address
+	if  mode == "erc20" || mode == "erc721"  {
 		txn, err = l.generator.GenerateTokenTransferTransaction(mode, contractAddr)
 		if err != nil {
 			return web3.Hash{}, err
@@ -387,6 +387,8 @@ func (l *Loadbot) Run() error {
 
 	// deploy contracts
 	l.deployContract(grpcClient, jsonClient, receiptTimeout)
+	// Save contract address
+	contractAddr := types.Address(l.metrics.ContractAddress)
 
 	for i := uint64(0); i < l.cfg.Count; i++ {
 		<-ticker.C
@@ -402,12 +404,9 @@ func (l *Loadbot) Run() error {
 			// Start the performance timer
 			start := time.Now()
 
-			// run different transactions for different modes
-			if l.cfg.GeneratorMode == erc20 {
-				// Execute ERC20 Contract token transaction and report any errors
-				contractAddr := types.Address(l.metrics.ContractAddress)
-
-				txHash, err = l.executeTxn(grpcClient, "erc20Transfer", &contractAddr)
+			// check if this is SC transaction
+			if l.cfg.GeneratorMode == erc20 || l.cfg.GeneratorMode == erc721 {
+				txHash, err = l.executeTxn(grpcClient, string(l.cfg.GeneratorMode), &contractAddr)
 				if err != nil {
 					l.generator.MarkFailedTxn(&generator.FailedTxnInfo{
 						Index:  index,
@@ -422,7 +421,7 @@ func (l *Loadbot) Run() error {
 					return
 				}
 			} else {
-				// Execute the transaction
+				// Execute regular transaction
 				txHash, err = l.executeTxn(grpcClient, "transaction", &types.ZeroAddress)
 				if err != nil {
 					l.generator.MarkFailedTxn(&generator.FailedTxnInfo{

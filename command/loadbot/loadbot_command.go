@@ -203,7 +203,7 @@ func (l *LoadbotCommand) Run(args []string) int {
 	}
 
 	convMode := Mode(strings.ToLower(mode))
-	if convMode != transfer && convMode != deploy && convMode != erc20 {
+	if convMode != transfer && convMode != deploy && convMode != erc20 && convMode != erc721 {
 		l.Formatter.OutputError(errors.New("invalid loadbot mode"))
 
 		return 1
@@ -296,6 +296,17 @@ func (l *LoadbotCommand) Run(args []string) int {
 		if err != nil {
 			log.Fatalln("Could not encode constructor parameters: " + err.Error())
 		}
+	} else if convMode == erc721 {
+		contractArtifact = &generator.ContractArtifact{
+			Bytecode: ERC721BIN,
+			ABI: abi.MustNewABI(ERC721ABI),
+		}
+
+		constructorArgs, err = abi.Encode([]string{"ZEXFT", "ZEXES"}, contractArtifact.ABI.Constructor.Inputs)
+		if err != nil {
+			log.Fatalln("Could not encode constructor parameters: " + err.Error())
+		}
+		
 	} else {
 		contractArtifact = &generator.ContractArtifact{
 			Bytecode: generator.DefaultContractBytecode,
@@ -538,7 +549,7 @@ func (lr *LoadbotResult) Output() string {
 						float64(bd.GasDataMap.Blocks[blockNumber].GasLimit)*100),
 				)
 				formattedStrings = append(formattedStrings,
-					fmt.Sprintf("Block #%d|%d txns (%d gasUsed / %d gasLimit) utilistaion|%d%%",
+					fmt.Sprintf("Block #%d|%d txns (%d gasUsed / %d gasLimit) utilization|%d%%",
 						blockNumber,
 						bd.BlockTransactionsMap[blockNumber],
 						bd.GasDataMap.Blocks[blockNumber].GasUsed,
@@ -582,7 +593,7 @@ func (lr *LoadbotResult) Output() string {
 		displayTxnsInBlocks(&buffer, &lr.ContractBlockData)
 		buffer.WriteString("\n\n")
 		buffer.WriteString(helper.FormatKV([]string{
-			fmt.Sprintf("Average utilisation across all blocks: %d%%", average(lr.ContractBlockData.AverageBlockUsed)),
+			fmt.Sprintf("Average utilization across all blocks: %d%%", average(lr.ContractBlockData.AverageBlockUsed)),
 		}))
 	}
 
@@ -594,7 +605,7 @@ func (lr *LoadbotResult) Output() string {
 	displayTxnsInBlocks(&buffer, &lr.BlockData)
 	buffer.WriteString("\n\n")
 	buffer.WriteString(helper.FormatKV([]string{
-		fmt.Sprintf("Average utilisation across all blocks: %d%%", average(lr.BlockData.AverageBlockUsed)),
+		fmt.Sprintf("Average utilization across all blocks: %d%%", average(lr.BlockData.AverageBlockUsed)),
 	}))
 	// Write out the error logs if detailed view
 	// is requested

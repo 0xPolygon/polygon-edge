@@ -45,21 +45,34 @@ func (dg *DeployGenerator) GenerateTokenTransferTransaction(
 	mode string,
 	contractAddress *types.Address,
 ) (*types.Transaction, error) {
+
 	var (
 		txn    *types.Transaction
 		txnErr error
+		err error
+		encodedParams []byte
 	)
 
-	if mode == "erc20Transfer" {
-		newNextNonce := atomic.AddUint64(&dg.params.Nonce, 1)
+	newNextNonce := atomic.AddUint64(&dg.params.Nonce, 1)
 
-		encodedParams, err := dg.params.ContractArtifact.ABI.Methods["transfer"].Encode(
+	if mode == "erc20" {
+		// transfrer ERC20 tokens
+		encodedParams, err = dg.params.ContractArtifact.ABI.Methods["transfer"].Encode(
 			[]string{dg.params.RecieverAddress.String(),
 				"30000",
 			})
+			// if we can't encode params exit the program
 		if err != nil {
 			log.Fatalln("Could not encode parameters for transfer method: ", err.Error())
 		}
+	} else if mode == "erc721" {
+		// mint ERC721 Tokens
+		encodedParams, err = dg.params.ContractArtifact.ABI.Methods["createNFT"].Encode([]string{"https://realy-valuable-nft.token"})
+		// if we can't encode params exit the program
+		if err != nil {
+			log.Fatalln("Could not encode parameters for transfer method: ", err.Error())
+		}
+	}
 
 		dg.contractBytecode = encodedParams
 
@@ -78,7 +91,7 @@ func (dg *DeployGenerator) GenerateTokenTransferTransaction(
 		if txnErr != nil {
 			return nil, fmt.Errorf("failed to sign transaction: %w", err)
 		}
-	}
+	
 
 	return txn, nil
 }

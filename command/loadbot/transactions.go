@@ -2,6 +2,7 @@ package loadbot
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"sync/atomic"
 	"time"
@@ -20,22 +21,24 @@ func (l *Loadbot) deployContract(
 	jsonClient *jsonrpc.Client,
 	receiptTimeout time.Duration) {
 	// if the loadbot mode is set to ERC20 or ERC721 we need to deploy smart contract
-	if l.cfg.GeneratorMode == erc20 {
+	if l.cfg.GeneratorMode == erc20 || l.cfg.GeneratorMode == erc721 {
 		start := time.Now()
 
-		// deploy ERC20 smart contract
+		// deploy smart contract
 		txHash, err := l.executeTxn(grpcClient, "contract", &types.ZeroAddress)
 		if err != nil {
-			l.generator.MarkFailedContractTxn(&generator.FailedContractTxnInfo{
-				TxHash: txHash.String(),
-				Error: &generator.TxnError{
-					Error:     err,
-					ErrorType: generator.AddErrorType,
-				},
-			})
-			atomic.AddUint64(&l.metrics.FailedContractTransactionsCount, 1)
+			fmt.Println("Could not deploy SC. Fatal error:")
+			log.Fatalln(err.Error())
+			// l.generator.MarkFailedContractTxn(&generator.FailedContractTxnInfo{
+			// 	TxHash: txHash.String(),
+			// 	Error: &generator.TxnError{
+			// 		Error:     err,
+			// 		ErrorType: generator.AddErrorType,
+			// 	},
+			// })
+			// atomic.AddUint64(&l.metrics.FailedContractTransactionsCount, 1)
 
-			return
+			// return
 		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), receiptTimeout)
