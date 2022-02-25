@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/e2e/framework"
 	"github.com/0xPolygon/polygon-edge/jsonrpc"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -69,8 +68,6 @@ func TestWS_Response(t *testing.T) {
 		}
 	})
 	srv := srvs[0]
-	client := srv.JSONRPC()
-	signer := crypto.NewEIP155Signer(100)
 
 	// Convert the default JSONRPC address to a WebSocket one
 	wsURL := "ws" + strings.TrimPrefix(srv.JSONRPCAddr(), "http") + "/ws"
@@ -114,21 +111,7 @@ func TestWS_Response(t *testing.T) {
 	})
 
 	t.Run("Valid block number after transfer", func(t *testing.T) {
-		signedTxn, err := signer.SignTx(&types.Transaction{
-			From:     preminedAccounts[0].address,
-			To:       &preminedAccounts[1].address,
-			GasPrice: big.NewInt(10000),
-			Gas:      1000000,
-			Value:    big.NewInt(10000),
-			Nonce:    uint64(0),
-		}, preminedAccounts[0].key)
-		if err != nil {
-			t.Log("Could not sign transaction")
-		}
-
-		_, err = client.Eth().SendRawTransaction(signedTxn.MarshalRLP())
-		assert.NoError(t, err)
-
+		
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
