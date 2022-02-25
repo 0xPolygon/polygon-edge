@@ -502,6 +502,7 @@ func (i *Ibft) runSyncState() {
 		}
 
 		if err := i.syncer.BulkSyncWithPeer(p, func(newBlock *types.Block) {
+			i.ConsumeStateTransactions(newBlock)
 			callInsertBlockHook(newBlock.Number())
 			i.txpool.ResetWithHeaders(newBlock.Header)
 		}); err != nil {
@@ -522,6 +523,7 @@ func (i *Ibft) runSyncState() {
 		var isValidator bool
 
 		i.syncer.WatchSyncWithPeer(p, func(newBlock *types.Block) bool {
+			i.ConsumeStateTransactions(newBlock)
 			// After each written block, update the snapshot store for PoS.
 			// The snapshot store is currently updated for PoA inside the ProcessHeadersHook
 			callInsertBlockHook(newBlock.Number())
@@ -706,6 +708,38 @@ func (i *Ibft) writeTransactions(gasLimit uint64, transition transitionInterface
 	//nolint:lll
 	i.logger.Info("executed txns", "failed ", failedTxCount, "successful", successTxCount, "remaining in pool", i.txpool.Length())
 
+	if i.bridge != nil {
+		msgs, err := i.bridge.GetReadyMessages()
+		if err != nil {
+			i.logger.Error("failed to get ready messages from bridge", "err", err)
+		}
+
+		for _, msg := range msgs {
+			if len(msg.Signatures) < i.state.validators.Len() {
+				i.logger.Warn("message doesn't have enough signatures", "wanted", i.state.validators.Len(), "actual", len(msg.Signatures))
+				continue
+			}
+
+			signer := crypto.NewSigner(
+				i.config.Params.Forks.At(i.state.view.Sequence),
+				uint64(i.config.Params.ChainID),
+			)
+
+			tx, err := signer.SignTx(msg.Transaction, i.validatorKey)
+			if err != nil {
+				i.logger.Error("failed to sign state transaction", "err", err)
+				continue
+			}
+
+			if err := transition.Write(tx); err != nil {
+				i.logger.Warn("failed to apply state transaction", "tx", tx, "err", err)
+				continue
+			}
+
+			transactions = append(transactions, tx)
+		}
+	}
+
 	return transactions
 }
 
@@ -751,12 +785,8 @@ func (i *Ibft) runAcceptState() { // start new round
 	}
 
 	if i.bridge != nil {
+		// TODO: Check threshold
 		i.bridge.SetValidators(snap.Set, uint64(snap.Set.Len()))
-
-		for _, msg := range i.bridge.GetReadyMessages() {
-			fmt.Printf("ReadyMessage height=%d, hash=%+v, body=%+v, signatures=%d\n", parent.Number+1, msg.Hash, msg.Body, len(msg.Signatures))
-			i.bridge.Consume(msg.Hash)
-		}
 	}
 
 	if hookErr := i.runHook(AcceptStateLogHook, i.state.view.Sequence, snap); hookErr != nil {
@@ -959,6 +989,8 @@ func (i *Ibft) runValidateState() {
 
 			// move ahead to the next block
 			i.setState(AcceptState)
+
+			i.ConsumeStateTransactions(block)
 		}
 	}
 }
@@ -1279,6 +1311,19 @@ func (i *Ibft) VerifyHeader(parent, header *types.Header) error {
 // GetBlockCreator retrieves the block signer from the extra data field
 func (i *Ibft) GetBlockCreator(header *types.Header) (types.Address, error) {
 	return ecrecoverFromHeader(header)
+}
+
+// TODO: move to hook
+func (i *Ibft) ConsumeStateTransactions(block *types.Block) {
+	if i.bridge != nil {
+		for _, tx := range block.Transactions {
+			if tx.Type != types.TxTypeState {
+				continue
+			}
+
+			i.bridge.Consume(tx)
+		}
+	}
 }
 
 // PreStateCommit a hook to be called before finalizing state transition on inserting block
