@@ -217,9 +217,6 @@ func TestEthTransfer(t *testing.T) {
 				Gas:      1000000,
 				Value:    testCase.amount,
 			}
-			if err != nil {
-				t.Error("Could not sign transacion", err.Error())
-			}
 
 			receipt, err := srv.SendRawTx(ctx, txn, testCase.senderKey)
 
