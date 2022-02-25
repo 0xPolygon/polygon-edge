@@ -896,6 +896,21 @@ func (i *Ibft) runAcceptState() { // start new round
 				continue
 			}
 
+			if i.bridge != nil {
+			StateTxValidationLoop:
+				for _, tx := range block.Transactions {
+					if tx.Type != types.TxTypeState {
+						continue
+					}
+
+					if err := i.bridge.ValidateTx(tx); err != nil {
+						i.logger.Error("block has the invalid state transaction", "tx", tx.Hash, "err", err)
+						i.handleStateErr(errBlockVerificationFailed)
+						break StateTxValidationLoop
+					}
+				}
+			}
+
 			if hookErr := i.runHook(VerifyBlockHook, block.Number(), block); hookErr != nil {
 				if errors.As(hookErr, &errBlockVerificationFailed) {
 					i.logger.Error("block verification failed, block at the end of epoch has transactions")

@@ -28,6 +28,7 @@ type Bridge interface {
 	Close() error
 	SetValidators([]types.Address, uint64)
 	GetReadyMessages() ([]MessageWithSignatures, error)
+	ValidateTx(*types.Transaction) error
 	Consume(*types.Transaction)
 }
 
@@ -42,6 +43,7 @@ type bridge struct {
 
 	isValidatorMapLock sync.RWMutex
 	isValidatorMap     map[types.Address]bool
+	validatorThreshold uint64
 
 	// storage
 	sampool sam.Pool
@@ -117,6 +119,8 @@ func (b *bridge) Close() error {
 
 func (b *bridge) SetValidators(validators []types.Address, threshold uint64) {
 	b.resetIsValidatorMap(validators)
+	b.validatorThreshold = threshold
+
 	b.sampool.UpdateValidatorSet(validators, threshold)
 }
 
@@ -137,6 +141,21 @@ func (b *bridge) GetReadyMessages() ([]MessageWithSignatures, error) {
 	}
 
 	return data, nil
+}
+
+func (b *bridge) ValidateTx(tx *types.Transaction) error {
+	hash := getTransactionHash(tx)
+
+	if !b.sampool.Knows(hash) {
+		return fmt.Errorf("unknown state transaction, hash=%s", hash.String())
+	}
+
+	num, required := b.sampool.GetSignatureCount(hash), b.validatorThreshold
+	if num < required {
+		return fmt.Errorf("Bridge doesn't have enough signatures, hash=%s, required=%d, actual=%d", hash, required, num)
+	}
+
+	return nil
 }
 
 func (b *bridge) Consume(tx *types.Transaction) {
