@@ -4,7 +4,7 @@ import "github.com/0xPolygon/polygon-edge/types"
 
 type Message struct {
 	Hash types.Hash
-	Body []byte
+	Data interface{}
 }
 
 type MessageSignature struct {
@@ -14,7 +14,7 @@ type MessageSignature struct {
 }
 
 type ReadyMessage struct {
-	Body       []byte
+	Data       interface{}
 	Hash       types.Hash
 	Signatures [][]byte
 }

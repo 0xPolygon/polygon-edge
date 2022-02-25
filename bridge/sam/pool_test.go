@@ -25,7 +25,7 @@ var (
 func newTestMessage(hash types.Hash) *Message {
 	return &Message{
 		Hash: hash,
-		Body: []byte{0x01},
+		Data: []byte{0x01},
 	}
 }
 

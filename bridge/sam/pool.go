@@ -66,7 +66,7 @@ func (p *pool) AddMessage(message *Message) {
 		return
 	}
 
-	p.setMessageBody(message.Hash, message.Body)
+	p.setMessageData(message.Hash, message.Data)
 	p.tryToPromote(message.Hash)
 }
 
@@ -129,14 +129,14 @@ func (p *pool) GetReadyMessages() []ReadyMessage {
 			return true
 		}
 
-		body := p.getMessageBody(hash)
-		if body == nil {
+		data := p.getMessageData(hash)
+		if data == nil {
 			return true
 		}
 
 		signatures := p.messageSignatures.GetSignatures(hash)
 		res = append(res, ReadyMessage{
-			Body:       body,
+			Data:       data,
 			Hash:       hash,
 			Signatures: signatures,
 		})
@@ -233,24 +233,17 @@ func (p *pool) demote(hash types.Hash) {
 	p.readyMap.Delete(hash)
 }
 
-func (p *pool) setMessageBody(hash types.Hash, body []byte) {
-	p.messageMap.Store(hash, body)
+func (p *pool) setMessageData(hash types.Hash, data interface{}) {
+	p.messageMap.Store(hash, data)
 }
 
-func (p *pool) getMessageBody(hash types.Hash) []byte {
-	raw, existed := p.messageMap.Load(hash)
+func (p *pool) getMessageData(hash types.Hash) interface{} {
+	data, existed := p.messageMap.Load(hash)
 	if !existed {
 		return nil
 	}
 
-	body, ok := raw.([]byte)
-	if !ok {
-		// should not reach
-
-		return nil
-	}
-
-	return body
+	return data
 }
 
 // signedMessageEntry is representing the data stored in messageSignaturesStore
