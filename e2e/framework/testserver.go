@@ -451,12 +451,6 @@ func (t *TestServer) SendRawTx(
 ) (*web3.Receipt, error) {
 	client := t.JSONRPC()
 
-	// if there is no from addr passed in we can find it in test server configuration
-	var blankAddr types.Address
-	if tx.From == blankAddr {
-		tx.From = t.Config.PremineAccts[0].Addr
-	}
-
 	nextNonce, err := client.Eth().GetNonce(web3.Address(tx.From), web3.Latest)
 	if err != nil {
 		return nil, err
