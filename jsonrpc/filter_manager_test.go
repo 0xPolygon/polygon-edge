@@ -178,29 +178,6 @@ func TestFilterWebsocket(t *testing.T) {
 	}
 }
 
-// 	This test verifies that websocket subscriptions
-//	are not susceptible to timeouts (like filters).
-func TestWSResponsiveness(t *testing.T) {
-	store := newMockStore()
-	fm := NewFilterManager(hclog.NewNullLogger(), store)
-
-	//	set the timeout to 1s, so it starts early
-	fm.timeout = 1 * time.Second
-
-	//	create block filter (as subscription)
-	mockWS := &mockWsConn{msgCh: make(chan []byte, 1)}
-	filterID := fm.NewBlockFilter(mockWS)
-
-	//	start the manager
-	go fm.Run()
-
-	//	wait for timeout to
-	time.Sleep(2 * time.Second)
-
-	//	verify the filter (websocket) wasn't removed
-	assert.True(t, fm.Exists(filterID))
-}
-
 type mockWsConn struct {
 	msgCh chan []byte
 }
