@@ -18,7 +18,13 @@ type DeployGenerator struct {
 }
 
 func (dg *DeployGenerator) GetExampleTransaction() (*types.Transaction, error) {
-	dg.contractBytecode = []byte(dg.params.ContractArtifact.Bytecode)
+	buf, err := hex.DecodeString(dg.params.ContractArtifact.Bytecode)
+	if err != nil {
+		return nil, fmt.Errorf("unable to decode bytecode, %w", err)
+	}
+
+	dg.contractBytecode = buf
+	dg.contractBytecode = append(dg.contractBytecode, dg.params.ConstructorArgs...)
 
 	return dg.signer.SignTx(&types.Transaction{
 		From:     dg.params.SenderAddress,
@@ -61,8 +67,6 @@ func (dg *DeployGenerator) GenerateTokenTransferTransaction(
 			log.Fatalln("Could not encode parameters for transfer method: ", err.Error())
 		}
 
-		dg.contractBytecode = encodedParams
-
 		// token transaction txn
 		txn, txnErr = dg.signer.SignTx(&types.Transaction{
 			From:     dg.params.SenderAddress,
@@ -71,7 +75,7 @@ func (dg *DeployGenerator) GenerateTokenTransferTransaction(
 			Value:    big.NewInt(0),
 			GasPrice: dg.params.GasPrice,
 			Nonce:    newNextNonce - 1,
-			Input:    dg.contractBytecode,
+			Input:    encodedParams,
 			V:        big.NewInt(1), // it is necessary to encode in rlp
 		}, dg.params.SenderKey)
 
@@ -92,14 +96,6 @@ func (dg *DeployGenerator) GenerateTransaction(mode string) (*types.Transaction,
 	)
 
 	if mode == "contract" {
-		buf, err := hex.DecodeString(dg.params.ContractArtifact.Bytecode)
-		if err != nil {
-			return nil, fmt.Errorf("unable to decode bytecode, %w", err)
-		}
-
-		dg.contractBytecode = buf
-		dg.contractBytecode = append(dg.contractBytecode, dg.params.ConstructorArgs...)
-
 		// contract deployment txn
 		txn, txnErr = dg.signer.SignTx(&types.Transaction{
 			From:     dg.params.SenderAddress,
@@ -112,7 +108,7 @@ func (dg *DeployGenerator) GenerateTransaction(mode string) (*types.Transaction,
 		}, dg.params.SenderKey)
 
 		if txnErr != nil {
-			return nil, fmt.Errorf("failed to sign transaction: %w", err)
+			return nil, fmt.Errorf("failed to sign transaction: %w", txnErr)
 		}
 	}
 
