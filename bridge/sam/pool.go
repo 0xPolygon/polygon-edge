@@ -84,6 +84,14 @@ func (p *pool) AddSignature(signature *MessageSignature) {
 	p.tryToPromote(signature.Hash)
 }
 
+func (p *pool) Knows(hash types.Hash) bool {
+	return p.knows(hash)
+}
+
+func (p *pool) GetSignatureCount(hash types.Hash) uint64 {
+	return p.messageSignatures.GetSignatureCount(hash)
+}
+
 // Consume sets the consumed flag and delete the message from pool
 func (p *pool) Consume(hash types.Hash) {
 	p.consumedMap.Store(hash, true)

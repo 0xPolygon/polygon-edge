@@ -31,4 +31,6 @@ type Pool interface {
 	Consume(types.Hash)
 	GetReadyMessages() []ReadyMessage
 	UpdateValidatorSet([]types.Address, uint64)
+	Knows(hash types.Hash) bool
+	GetSignatureCount(hash types.Hash) uint64
 }
