@@ -1,5 +1,5 @@
 {
-    "name": "ETM3",
+    "name": "ETM3 TestNet",
     "genesis": {
         "nonce": "0x0000000000000000",
         "timestamp": "0x0",
