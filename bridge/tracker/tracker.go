@@ -79,14 +79,14 @@ func NewEventTracker(logger hclog.Logger, config *Config) (*Tracker, error) {
 
 	//	load db (last processed block number)
 	if tracker.db, err = initRootchainDB(logger, config.DBPath); err != nil {
-		logger.Error("cannot initialize db", "errCh", err)
+		logger.Error("cannot initialize db", "err", err)
 
 		return nil, err
 	}
 
 	//	create rootchain client
 	if tracker.client, err = newRootchainClient(config.RootchainWS); err != nil {
-		logger.Error("cannot connect to rootchain", "errCh", err)
+		logger.Error("cannot connect to rootchain", "err", err)
 
 		return nil, err
 	}
@@ -99,7 +99,7 @@ func NewEventTracker(logger hclog.Logger, config *Config) (*Tracker, error) {
 func (t *Tracker) Start() error {
 	//	subscribe for new headers
 	if err := t.subscribeToRootchain(); err != nil {
-		t.logger.Error("cannot subscribe to rootchain", "errCh", err)
+		t.logger.Error("cannot subscribe to rootchain", "err", err)
 
 		return err
 	}
@@ -120,7 +120,7 @@ func (t *Tracker) Stop() error {
 
 	//	close rootchain client
 	if err := t.client.close(); err != nil {
-		t.logger.Error("cannot close rootchain client", "errCh", err)
+		t.logger.Error("cannot close rootchain client", "err", err)
 
 		return err
 	}
@@ -170,7 +170,7 @@ func (t *Tracker) startEventTracking() {
 		//	stop tracker's sub
 		case <-t.ctxSubscription.done():
 			if err := t.sub.unsubscribe(); err != nil {
-				t.logger.Error("cannot unsubscribe", "errCh", err)
+				t.logger.Error("cannot unsubscribe", "err", err)
 
 				return
 			}
@@ -274,14 +274,14 @@ func (t *Tracker) queryEvents(fromBlock, toBlock *big.Int) []*web3.Log {
 	//	call eth_getLogs
 	logs, err := t.client.getLogs(queryFilter)
 	if err != nil {
-		t.logger.Error("eth_getLogs failed", "errCh", err)
+		t.logger.Error("eth_getLogs failed", "err", err)
 
 		return nil
 	}
 
 	//	overwrite checkpoint
 	if err := t.saveLastBlock(toBlock); err != nil {
-		t.logger.Error("cannot save last block number proccesed", "errCh", err)
+		t.logger.Error("cannot save last block number proccesed", "err", err)
 	}
 
 	return logs
@@ -292,7 +292,7 @@ func (t *Tracker) notify(logs ...*web3.Log) {
 	for _, log := range logs {
 		bytesLog, err := json.Marshal(log)
 		if err != nil {
-			t.logger.Error("cannot marshal log", "errCh", err)
+			t.logger.Error("cannot marshal log", "err", err)
 		}
 
 		// notify
