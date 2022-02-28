@@ -839,11 +839,3 @@ func (m *mockSpecialStore) ApplyTxn(header *types.Header, txn *types.Transaction
 
 	return &runtime.ExecutionResult{}, nil
 }
-
-func (m *mockSpecialStore) setAccount(account *mockAccount) {
-	m.account = account
-}
-
-func (m *mockSpecialStore) setBlock(block *types.Block) {
-	m.block = block
-}
