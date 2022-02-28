@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -580,12 +581,20 @@ func TestEth_State_GetStorageAt(t *testing.T) {
 	}
 }
 
-// TestEth_EstimateGas_GasLimit tests eth_estimateGas, by using
-// the latest block gas limit for the upper bound, or the specified
-// gas limit in the transaction
-func TestEth_EstimateGas_GasLimit(t *testing.T) {
-	blockGasLimit := uint64(500000)
-	store := &mockSpecialStore{
+func constructMockTx(gasLimit *argUint64, data *argBytes) *txnArgs {
+	return &txnArgs{
+		From:     &addr0,
+		To:       &addr1,
+		Gas:      gasLimit,
+		GasPrice: argBytesPtr([]byte{0x0}),
+		Value:    argBytesPtr([]byte{0x0}),
+		Nonce:    argUintPtr(0),
+		Data:     data,
+	}
+}
+
+func getExampleStore() *mockSpecialStore {
+	return &mockSpecialStore{
 		account: &mockAccount{
 			address: addr0,
 			account: &state.Account{
@@ -594,31 +603,23 @@ func TestEth_EstimateGas_GasLimit(t *testing.T) {
 			},
 			storage: make(map[types.Hash][]byte),
 		},
-	}
-
-	// Set the latest block for the chain
-	store.setBlock(&types.Block{
-		Header: &types.Header{
-			Hash:      hash1,
-			Number:    0,
-			StateRoot: types.EmptyRootHash,
-			GasLimit:  blockGasLimit,
+		block: &types.Block{
+			Header: &types.Header{
+				Hash:      hash1,
+				Number:    0,
+				StateRoot: types.EmptyRootHash,
+				GasLimit:  500000,
+			},
 		},
-	})
-
-	ethEndpoint := newTestEthEndpoint(store)
-
-	constructTxn := func(gasLimit *argUint64, data *argBytes) *txnArgs {
-		return &txnArgs{
-			From:     &addr0,
-			To:       &addr1,
-			Gas:      gasLimit,
-			GasPrice: argBytesPtr([]byte{0x0}),
-			Value:    argBytesPtr([]byte{0x0}),
-			Nonce:    argUintPtr(0),
-			Data:     data,
-		}
 	}
+}
+
+// TestEth_EstimateGas_GasLimit tests eth_estimateGas, by using
+// the latest block gas limit for the upper bound, or the specified
+// gas limit in the transaction
+func TestEth_EstimateGas_GasLimit(t *testing.T) {
+	store := getExampleStore()
+	ethEndpoint := newTestEthEndpoint(store)
 
 	testTable := []struct {
 		name             string
@@ -630,25 +631,25 @@ func TestEth_EstimateGas_GasLimit(t *testing.T) {
 			"valid gas limit from the latest block",
 			state.TxGas,
 			nil,
-			constructTxn(nil, nil),
+			constructMockTx(nil, nil),
 		},
 		{
 			"valid gas limit from the latest block for contract interaction",
 			state.TxGasContractCreation,
 			nil,
-			constructTxn(nil, argBytesPtr([]byte{0x12})),
+			constructMockTx(nil, argBytesPtr([]byte{0x12})),
 		},
 		{
 			"valid gas limit from the transaction",
 			state.TxGas,
 			nil,
-			constructTxn(argUintPtr(30000), nil),
+			constructMockTx(argUintPtr(30000), nil),
 		},
 		{
 			"insufficient gas limit from the transaction",
 			state.TxGas,
 			ErrGasCapOverflow,
-			constructTxn(argUintPtr(state.TxGas/2), nil),
+			constructMockTx(argUintPtr(state.TxGas/2), nil),
 		},
 	}
 
@@ -703,7 +704,42 @@ func TestEth_EstimateGas_GasLimit(t *testing.T) {
 }
 
 func TestEth_EstimateGas_Reverts(t *testing.T) {
+	// Example revert data that has the string "revert reason" as the revert reason
+	exampleReturnData := "08c379a000000000000000000000000000000000000000000000000000000000000000" +
+		"20000000000000000000000000000000000000000000000000000000000000000d72657665727420726561736f6e" +
+		"00000000000000000000000000000000000000"
+	rawReturnData, err := hex.DecodeHex(exampleReturnData)
+	assert.NoError(t, err)
 
+	revertReason := errors.New("revert reason")
+
+	store := getExampleStore()
+	ethEndpoint := newTestEthEndpoint(store)
+
+	// We want to simulate an EVM revert here
+	store.applyTxnHook = func(
+		header *types.Header,
+		txn *types.Transaction,
+	) (*runtime.ExecutionResult, error) {
+		return &runtime.ExecutionResult{
+			ReturnValue: rawReturnData,
+			Err:         runtime.ErrExecutionReverted,
+		}, nil
+	}
+
+	// Run the estimation
+	estimate, estimateErr := ethEndpoint.EstimateGas(
+		constructMockTx(nil, nil),
+		nil,
+	)
+
+	assert.Equal(t, 0, estimate)
+
+	// Make sure the EVM revert message is contained
+	assert.ErrorAs(t, estimateErr, &runtime.ErrExecutionReverted)
+
+	// Make sure the EVM revert reason is contained
+	assert.ErrorAs(t, estimateErr, &revertReason)
 }
 
 func TestEth_EstimateGas_Errors(t *testing.T) {
