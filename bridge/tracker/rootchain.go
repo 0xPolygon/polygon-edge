@@ -31,7 +31,7 @@ type contractABI struct {
 }
 
 //	eventIDs returns all the event signatures (IDs)
-//	defined in the smart contract.
+//	defined in the smart contract
 func (c *contractABI) eventIDs() (IDs []*web3.Hash) {
 	for _, ev := range c.events {
 		id := ev.ID()
@@ -41,7 +41,7 @@ func (c *contractABI) eventIDs() (IDs []*web3.Hash) {
 	return
 }
 
-//	loadABIs parses contracts from raw map.
+//	loadABIs parses contracts from raw map
 func loadABIs(abisRaw map[types.Address][]string) (contracts []*contractABI) {
 	for address, events := range abisRaw {
 		//	set smart contract address
@@ -62,7 +62,7 @@ func loadABIs(abisRaw map[types.Address][]string) (contracts []*contractABI) {
 }
 
 //	setupQueryFilter creates a log filter for the desired
-//	block range. Filter matches events defined in rootchain.go.
+//	block range. Filter matches events defined in rootchain.go
 func setupQueryFilter(from, to *big.Int, contracts []*contractABI) *web3.LogFilter {
 	queryFilter := &web3.LogFilter{}
 
@@ -127,7 +127,7 @@ type ethHeader struct {
 /* 	Rootchain storage (last processed block number) */
 
 //	initRootchainDB creates a new database (or loads existing)
-//	for storing the last processed block's number by the tracker.
+//	for storing the last processed block's number by the tracker
 func initRootchainDB(logger hclog.Logger, dbPath string) (storage.Storage, error) {
 	if dbPath == "" {
 		dbPath, _ = os.Getwd()
@@ -153,23 +153,23 @@ type subscription struct {
 	cancel     cancelSubCallback
 }
 
-//	newHeadCh returns the subscription's channel for new head events.
+//	newHeadCh returns the subscription's channel for new head events
 func (s *subscription) newHeadCh() <-chan *ethHeader {
 	return s.newHeadsCh
 }
 
-//	unsubscribe cancels the subscription.
+//	unsubscribe cancels the subscription
 func (s *subscription) unsubscribe() error {
 	return s.cancel()
 }
 
-//	errCh returns the subscription's error channel.
+//	errCh returns the subscription's error channel
 func (s *subscription) errCh() <-chan error {
 	return s.errorCh
 }
 
 //	handleWSResponse parses the json response
-//	received by the websocket into a header struct.
+//	received by the websocket into a header struct
 func (s *subscription) handleWSResponse(response []byte) {
 	//	parse ws response
 	header := &ethHeader{}
@@ -185,12 +185,12 @@ func (s *subscription) handleWSResponse(response []byte) {
 
 /*	Rootchain client */
 
-//	rootchainClient is a wrapper object for the web3 client.
+//	rootchainClient is a wrapper object for the web3 client
 type rootchainClient struct {
 	impl *client.Client
 }
 
-//	newRootchainClient returns a new client connected to the rootchain.
+//	newRootchainClient returns a new client connected to the rootchain
 func newRootchainClient(addr string) (*rootchainClient, error) {
 	impl, err := client.NewClient(addr)
 	if err != nil {
@@ -200,12 +200,12 @@ func newRootchainClient(addr string) (*rootchainClient, error) {
 	return &rootchainClient{impl: impl}, nil
 }
 
-//	close closes the client's connection to the rootchain.
+//	close closes the client's connection to the rootchain
 func (c *rootchainClient) close() error {
 	return c.impl.Close()
 }
 
-//	subscribeNewHeads returns a subscription for new header events.
+//	subscribeNewHeads returns a subscription for new header events
 func (c *rootchainClient) subscribeNewHeads() (subscription, error) {
 	//	create sub object
 	sub := subscription{
@@ -225,7 +225,7 @@ func (c *rootchainClient) subscribeNewHeads() (subscription, error) {
 	return sub, nil
 }
 
-//	getLogs returns all log events from the rootchain matching the filter's criteria.
+//	getLogs returns all log events from the rootchain matching the filter's criteria
 func (c *rootchainClient) getLogs(filter *web3.LogFilter) ([]*web3.Log, error) {
 	return c.impl.Eth().GetLogs(filter)
 }
