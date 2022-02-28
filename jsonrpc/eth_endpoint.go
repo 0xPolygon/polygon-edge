@@ -77,6 +77,11 @@ type Eth struct {
 	filterManager *FilterManager
 }
 
+var (
+	ErrInsufficientFunds = errors.New("insufficient funds for execution")
+	ErrGasCapOverflow    = errors.New("unable to apply transaction for gas cap")
+)
+
 // ChainId returns the chain id of the client
 //nolint:stylecheck
 func (e *Eth) ChainId() (interface{}, error) {
@@ -509,7 +514,6 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 	var (
 		lowEnd  = standardGas
 		highEnd uint64
-		gasCap  uint64
 	)
 
 	// If the gas limit was passed in, use it as a ceiling
@@ -523,9 +527,9 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 	gasPriceInt := new(big.Int).Set(transaction.GasPrice)
 	valueInt := new(big.Int).Set(transaction.Value)
 
-	// If the sender address is present, recalculate the ceiling to his balance
+	// If the sender address is present and a gas price was specified,
+	// recalculate the gas ceiling to his balance
 	if transaction.From != types.ZeroAddress &&
-		transaction.GasPrice != nil &&
 		gasPriceInt.BitLen() != 0 {
 		// Get the account balance
 		// If the account is not initialized yet in state,
@@ -546,28 +550,39 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 
 		if transaction.Value != nil {
 			if valueInt.Cmp(available) > 0 {
-				return nil, fmt.Errorf("insufficient funds for execution")
+				return nil, ErrInsufficientFunds
 			}
 
 			available.Sub(available, valueInt)
 		}
 
-		allowance := new(big.Int).Div(available, gasPriceInt)
+		gasAllowance := new(big.Int).Div(available, gasPriceInt)
 
-		// If the allowance is larger than maximum uint64, skip checking
-		if allowance.IsUint64() && highEnd > allowance.Uint64() {
-			highEnd = allowance.Uint64()
+		// Check the gas allowance for this account, make sure high end is capped to it
+		if gasAllowance.IsUint64() && highEnd > gasAllowance.Uint64() {
+			e.logger.Debug(
+				fmt.Sprintf(
+					"Gas estimation high-end capped by allowance [%d]",
+					gasAllowance.Uint64(),
+				),
+			)
+
+			// TODO check what happens when 0?
+			highEnd = gasAllowance.Uint64()
 		}
 	}
 
-	if highEnd > types.GasCap.Uint64() {
-		// The high end is greater than the environment gas cap
-		highEnd = types.GasCap.Uint64()
+	isGasApplyError := func(err error) bool {
+		return errors.As(err, &state.ErrNotEnoughIntrinsicGas)
 	}
 
-	gasCap = highEnd
+	isGasEVMError := func(err error) bool {
+		return errors.As(err, &runtime.ErrOutOfGas) ||
+			errors.As(err, &runtime.ErrCodeStoreOutOfGas)
+	}
 
-	// Run the transaction with the estimated gas
+	// Run the transaction with the specified gas value.
+	// Returns a status indicating if the transaction failed and the accompanying error
 	testTransaction := func(gas uint64) (bool, error) {
 		// Create a dummy transaction with the new gas
 		txn := transaction.Copy()
@@ -575,8 +590,16 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 
 		result, applyErr := e.store.ApplyTxn(header, txn)
 
-		// Check the application error
 		if applyErr != nil {
+			// Check the application error.
+			// Gas apply errors are valid, and should be ignored
+			if isGasApplyError(applyErr) {
+				// Specifying the transaction failed, but not providing an error
+				// is an indication that a valid error occurred due to low gas,
+				// which will increase the lower bound for the search
+				return true, nil
+			}
+
 			return true, applyErr
 		}
 
@@ -585,53 +608,51 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 			return true, constructErrorFromRevert(result)
 		}
 
-		return result.Failed(), result.Err
-	}
+		// Check if an out of gas error happened during EVM execution
+		if result.Failed() {
+			if isGasEVMError(result.Err) {
+				// Specifying the transaction failed, but not providing an error
+				// is an indication that a valid error occurred due to low gas,
+				// which will increase the lower bound for the search
+				return true, nil
+			}
 
-	isGasError := func(err error) bool {
-		return errors.Is(err, runtime.ErrOutOfGas) ||
-			errors.Is(err, runtime.ErrCodeStoreOutOfGas)
+			return true, result.Err
+		}
+
+		return false, nil
 	}
 
 	// Start the binary search for the lowest possible gas price
-	for lowEnd <= highEnd {
+	for lowEnd < highEnd {
 		mid := (lowEnd + highEnd) / 2
 
-		failed, err := testTransaction(mid)
-		if isGasError(err) {
-			// Gas limit reached, jump out of the loop
-			// that's looking for the lower bound
-			break
-		}
-
-		if err != nil {
-			return 0, err
+		failed, testErr := testTransaction(mid)
+		if testErr != nil {
+			return 0, testErr
 		}
 
 		if failed {
 			// If the transaction failed => increase the gas
 			lowEnd = mid + 1
 		} else {
-			// If the transaction didn't fail => lower the gas
-			highEnd = mid - 1
+			// If the transaction didn't fail => make this ok value the high end
+			highEnd = mid
 		}
 	}
 
-	// we stopped the binary search at the last gas limit
-	// at which the txn could not be executed
-	highEnd++
+	// Check if the highEnd is a good value to make the transaction pass
+	failed, err := testTransaction(highEnd)
+	if err != nil {
+		return 0, err
+	}
 
-	// Check the edge case if even the highest cap is not enough to complete the transaction
-	if highEnd == gasCap {
-		failed, err := testTransaction(gasCap)
-
-		if err != nil {
-			return 0, err
-		}
-
-		if failed {
-			return 0, fmt.Errorf("gas required exceeds allowance (%d)", gasCap)
-		}
+	if failed {
+		return 0, fmt.Errorf(
+			"%s %d",
+			ErrGasCapOverflow,
+			highEnd,
+		)
 	}
 
 	return hex.EncodeUint64(highEnd), nil
@@ -917,10 +938,6 @@ func (e *Eth) getNextNonce(address types.Address, number BlockNumber) (uint64, e
 }
 
 func (e *Eth) decodeTxn(arg *txnArgs) (*types.Transaction, error) {
-	if arg.Data != nil && arg.Input != nil {
-		return nil, fmt.Errorf("both input and data cannot be set")
-	}
-
 	// set default values
 	if arg.From == nil {
 		arg.From = &types.ZeroAddress
@@ -945,8 +962,6 @@ func (e *Eth) decodeTxn(arg *txnArgs) (*types.Transaction, error) {
 	var input []byte
 	if arg.Data != nil {
 		input = *arg.Data
-	} else if arg.Input != nil {
-		input = *arg.Input
 	}
 
 	if arg.To == nil {

@@ -68,7 +68,7 @@ func TestDecode_TxnArgs(t *testing.T) {
 			res: &txnArgs{
 				To:    &addr,
 				Gas:   &num,
-				Input: &hex,
+				Data:  &hex,
 				Value: &hex,
 			},
 		},

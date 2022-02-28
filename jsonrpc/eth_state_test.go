@@ -2,6 +2,7 @@ package jsonrpc
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/state"
@@ -579,102 +580,142 @@ func TestEth_State_GetStorageAt(t *testing.T) {
 	}
 }
 
-func TestEth_EstimateGas(t *testing.T) {
-	newTxnArgs := func(gasLimit uint64) *txnArgs {
+// TestEth_EstimateGas_GasLimit tests eth_estimateGas, by using
+// the latest block gas limit for the upper bound, or the specified
+// gas limit in the transaction
+func TestEth_EstimateGas_GasLimit(t *testing.T) {
+	blockGasLimit := uint64(500000)
+	store := &mockSpecialStore{
+		account: &mockAccount{
+			address: addr0,
+			account: &state.Account{
+				Balance: big.NewInt(100),
+				Nonce:   0,
+			},
+			storage: make(map[types.Hash][]byte),
+		},
+	}
+
+	// Set the latest block for the chain
+	store.setBlock(&types.Block{
+		Header: &types.Header{
+			Hash:      hash1,
+			Number:    0,
+			StateRoot: types.EmptyRootHash,
+			GasLimit:  blockGasLimit,
+		},
+	})
+
+	ethEndpoint := newTestEthEndpoint(store)
+
+	constructTxn := func(gasLimit *argUint64, data *argBytes) *txnArgs {
 		return &txnArgs{
 			From:     &addr0,
 			To:       &addr1,
-			Gas:      argUintPtr(gasLimit),
-			GasPrice: argBytesPtr([]byte{0x1}),
-			Value:    argBytesPtr([]byte{0x64}),
-			Input:    argBytesPtr([]byte{0x64}),
-			Data:     nil,
+			Gas:      gasLimit,
+			GasPrice: argBytesPtr([]byte{0x0}),
+			Value:    argBytesPtr([]byte{0x0}),
 			Nonce:    argUintPtr(0),
+			Data:     data,
 		}
 	}
 
-	setupMockStore := func(accountBalance int64) *mockSpecialStore {
-		return &mockSpecialStore{
-			account: &mockAccount{
-				address: addr0,
-				account: &state.Account{
-					Balance: big.NewInt(accountBalance),
-					Nonce:   0,
-				},
-				storage: make(map[types.Hash][]byte),
-			},
-			block: &types.Block{
-				Header: &types.Header{
-					Hash:      hash1,
-					Number:    0,
-					StateRoot: types.EmptyRootHash,
-					GasLimit:  5000000,
-				},
-			},
-		}
+	testTable := []struct {
+		name             string
+		intrinsicGasCost uint64
+		expectedError    error
+		transaction      *txnArgs
+	}{
+		{
+			"valid gas limit from the latest block",
+			state.TxGas,
+			nil,
+			constructTxn(nil, nil),
+		},
+		{
+			"valid gas limit from the latest block for contract interaction",
+			state.TxGasContractCreation,
+			nil,
+			constructTxn(nil, argBytesPtr([]byte{0x12})),
+		},
+		{
+			"valid gas limit from the transaction",
+			state.TxGas,
+			nil,
+			constructTxn(argUintPtr(30000), nil),
+		},
+		{
+			"insufficient gas limit from the transaction",
+			state.TxGas,
+			ErrGasCapOverflow,
+			constructTxn(argUintPtr(state.TxGas/2), nil),
+		},
 	}
 
-	t.Run(
-		"returns error if account doesn't have enough funds for transaction execution",
-		func(t *testing.T) {
-			balance := int64(100)
-			txnGasLimit := uint64(30000)
-			store := setupMockStore(balance)
-			eth := newTestEthEndpoint(store)
-			txn := newTxnArgs(txnGasLimit)
+	for _, testCase := range testTable {
+		t.Run(testCase.name, func(t *testing.T) {
+			// Set up the apply hook
+			if errors.Is(testCase.expectedError, ErrGasCapOverflow) {
+				// We want to trigger a situation where no value in the gas range is correct
+				store.applyTxnHook = func(
+					header *types.Header,
+					txn *types.Transaction,
+				) (*runtime.ExecutionResult, error) {
+					return &runtime.ExecutionResult{}, state.ErrNotEnoughIntrinsicGas
+				}
+			} else {
+				// We want to trigger a situation where only values that cover the intrinsic gas costs
+				// are correct
+				store.applyTxnHook = func(
+					header *types.Header,
+					txn *types.Transaction,
+				) (*runtime.ExecutionResult, error) {
+					if txn.Gas < testCase.intrinsicGasCost {
+						return &runtime.ExecutionResult{}, state.ErrNotEnoughIntrinsicGas
+					}
 
-			// The value of the transaction is greater than the balance
-			txn.Value = argBytesPtr(big.NewInt(300).Bytes())
+					return &runtime.ExecutionResult{}, nil
+				}
+			}
 
-			res, err := eth.EstimateGas(txn, nil)
+			// Run the estimation
+			estimate, estimateErr := ethEndpoint.EstimateGas(testCase.transaction, nil)
 
-			assert.Error(t, err)
-			assert.Contains(t, err.Error(), "insufficient funds for execution")
-			assert.Nil(t, res)
+			if testCase.expectedError != nil {
+				if estimateErr == nil {
+					t.Fatalf("no error occurred, although it was expected")
+				}
+
+				// Make sure the expected errors appear
+				assert.ErrorAs(t, estimateErr, &testCase.expectedError)
+
+				// Make sure the estimate is nullified
+				assert.Equal(t, 0, estimate)
+			} else {
+				// Make sure no errors occurred
+				assert.NoError(t, estimateErr)
+
+				// Make sure the estimate is correct
+				assert.Equal(t, fmt.Sprintf("0x%x", testCase.intrinsicGasCost), estimate)
+			}
 		})
+	}
+}
 
-	t.Run(
-		"returns estimated gas value +500 when transaction has gas field greater than estimated gas value",
-		func(t *testing.T) {
-			balance := int64(10000000)
-			txnGasLimit := uint64(30000)
-			store := setupMockStore(balance)
-			store.estimatedGasPivotValue = 25000
-			eth := newTestEthEndpoint(store)
-			txn := newTxnArgs(txnGasLimit)
+func TestEth_EstimateGas_Reverts(t *testing.T) {
 
-			res, err := eth.EstimateGas(txn, nil)
+}
 
-			assert.NoError(t, err)
-			assert.NotNil(t, res)
-			// nolint:forcetypeassert
-			assert.Equal(t, fmt.Sprintf("0x%x", store.estimatedGasPivotValue+500), res.(string))
-		})
+func TestEth_EstimateGas_Errors(t *testing.T) {
 
-	t.Run(
-		"returns transaction's gas limit value +1 when estimated gas value exceeds it",
-		func(t *testing.T) {
-			balance := int64(10000000)
-			txnGasLimit := uint64(23000)
-			store := setupMockStore(balance)
-			store.estimatedGasPivotValue = 25000
-			eth := newTestEthEndpoint(store)
-			txn := newTxnArgs(txnGasLimit)
-
-			res, err := eth.EstimateGas(txn, nil)
-
-			assert.NoError(t, err)
-			assert.NotNil(t, res)
-			// nolint:forcetypeassert
-			assert.Equal(t, fmt.Sprintf("0x%x", txnGasLimit+1), res.(string))
-		})
 }
 
 type mockSpecialStore struct {
 	ethStore
-	account                *mockAccount
-	block                  *types.Block
-	estimatedGasPivotValue uint64
+	account *mockAccount
+	block   *types.Block
+
+	applyTxnHook func(header *types.Header, txn *types.Transaction) (*runtime.ExecutionResult, error)
 }
 
 func (m *mockSpecialStore) GetBlockByHash(hash types.Hash, full bool) (*types.Block, bool) {
@@ -737,9 +778,17 @@ func (m *mockSpecialStore) GetForksInTime(blockNumber uint64) chain.ForksInTime 
 }
 
 func (m *mockSpecialStore) ApplyTxn(header *types.Header, txn *types.Transaction) (*runtime.ExecutionResult, error) {
-	if txn.Gas <= m.estimatedGasPivotValue {
-		return &runtime.ExecutionResult{Err: runtime.ErrOutOfGas}, nil
-	} else {
-		return &runtime.ExecutionResult{}, nil
+	if m.applyTxnHook != nil {
+		return m.applyTxnHook(header, txn)
 	}
+
+	return &runtime.ExecutionResult{}, nil
+}
+
+func (m *mockSpecialStore) setAccount(account *mockAccount) {
+	m.account = account
+}
+
+func (m *mockSpecialStore) setBlock(block *types.Block) {
+	m.block = block
 }

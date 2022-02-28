@@ -299,7 +299,6 @@ type txnArgs struct {
 	Gas      *argUint64
 	GasPrice *argBytes
 	Value    *argBytes
-	Input    *argBytes
 	Data     *argBytes
 	Nonce    *argUint64
 }
