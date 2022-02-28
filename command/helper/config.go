@@ -28,7 +28,6 @@ type Config struct {
 	Telemetry      *Telemetry             `json:"telemetry"`
 	Network        *Network               `json:"network"`
 	Seal           bool                   `json:"seal"`
-	Tracker        bool                   `json:"tracker"`
 	TxPool         *TxPool                `json:"tx_pool"`
 	LogLevel       string                 `json:"log_level"`
 	Dev            bool                   `json:"dev_mode"`
@@ -84,7 +83,6 @@ func DefaultConfig() *Config {
 		},
 		Telemetry: &Telemetry{},
 		Seal:      false,
-		Tracker:   false,
 		TxPool: &TxPool{
 			PriceLimit: 0,
 			MaxSlots:   4096,
@@ -109,7 +107,6 @@ func (c *Config) BuildConfig() (*server.Config, error) {
 
 	conf.Chain = cc
 	conf.Seal = c.Seal
-	conf.Tracker = c.Tracker
 	conf.DataDir = c.DataDir
 	// Set the secrets manager config if it was passed in
 	if c.Secrets != "" {
@@ -259,10 +256,6 @@ func (c *Config) mergeConfigWith(otherConfig *Config) error {
 
 	if otherConfig.Seal {
 		c.Seal = true
-	}
-
-	if otherConfig.Tracker {
-		c.Tracker = true
 	}
 
 	if otherConfig.LogLevel != "" {
