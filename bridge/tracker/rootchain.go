@@ -20,9 +20,9 @@ const (
 	DefaultBlockConfirmations = 6
 )
 
-//	contractABI is used to create query filter
-//	that matches events defined in a smart contract.
-type contractABI struct {
+//	eventABI is used to create query filter
+//	that matches events defined in a smart contract
+type eventABI struct {
 	//	address of smart contract
 	address web3.Address
 
@@ -32,7 +32,7 @@ type contractABI struct {
 
 //	eventIDs returns all the event signatures (IDs)
 //	defined in the smart contract
-func (c *contractABI) eventIDs() (IDs []*web3.Hash) {
+func (c *eventABI) eventIDs() (IDs []*web3.Hash) {
 	for _, ev := range c.events {
 		id := ev.ID()
 		IDs = append(IDs, &id)
@@ -41,11 +41,11 @@ func (c *contractABI) eventIDs() (IDs []*web3.Hash) {
 	return
 }
 
-//	loadABIs parses contracts from raw map
-func loadABIs(abisRaw map[types.Address][]string) (contracts []*contractABI) {
+//	loadEventABIs parses event abis (value) for the given contract address (key)
+func loadEventABIs(abisRaw map[types.Address][]string) (abis []*eventABI) {
 	for address, events := range abisRaw {
 		//	set smart contract address
-		contract := &contractABI{
+		contract := &eventABI{
 			address: web3.HexToAddress(address.String()),
 		}
 
@@ -55,7 +55,7 @@ func loadABIs(abisRaw map[types.Address][]string) (contracts []*contractABI) {
 		}
 
 		//	append result
-		contracts = append(contracts, contract)
+		abis = append(abis, contract)
 	}
 
 	return
@@ -63,7 +63,7 @@ func loadABIs(abisRaw map[types.Address][]string) (contracts []*contractABI) {
 
 //	setupQueryFilter creates a log filter for the desired
 //	block range. Filter matches events defined in rootchain.go
-func setupQueryFilter(from, to *big.Int, contracts []*contractABI) *web3.LogFilter {
+func setupQueryFilter(from, to *big.Int, contracts []*eventABI) *web3.LogFilter {
 	queryFilter := &web3.LogFilter{}
 
 	//	set range of blocks to query
@@ -75,7 +75,7 @@ func setupQueryFilter(from, to *big.Int, contracts []*contractABI) *web3.LogFilt
 		//	append address
 		queryFilter.Address = append(queryFilter.Address, contract.address)
 
-		//	topics from all contracts must be in Topics[0]
+		//	topics from all abis must be in Topics[0]
 		queryFilter.Topics = append(queryFilter.Topics, contract.eventIDs())
 	}
 

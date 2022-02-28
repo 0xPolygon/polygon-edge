@@ -15,7 +15,7 @@ type Config struct {
 	Confirmations uint64
 	RootchainWS   string
 	DBPath        string
-	ContractABIs  map[types.Address][]string
+	EventABIs     map[types.Address][]string
 }
 
 //	cancellable context for tracker's listening mechanism
@@ -54,7 +54,7 @@ type Tracker struct {
 	db storage.Storage
 
 	//	events that tracker will listen for
-	contracts []*contractABI
+	abis []*eventABI
 }
 
 //	NewEventTracker returns a new tracker object
@@ -73,8 +73,8 @@ func NewEventTracker(logger hclog.Logger, config *Config) (*Tracker, error) {
 	var err error
 
 	//	load abi events
-	if config.ContractABIs != nil {
-		tracker.contracts = loadABIs(config.ContractABIs)
+	if config.EventABIs != nil {
+		tracker.abis = loadEventABIs(config.EventABIs)
 	}
 
 	//	load db (last processed block number)
@@ -269,7 +269,7 @@ func (t *Tracker) saveLastBlock(blockNumber *big.Int) error {
 //	between blocks fromBlock and toBlock (inclusive)
 func (t *Tracker) queryEvents(fromBlock, toBlock *big.Int) []*web3.Log {
 	//	create the query filter
-	queryFilter := setupQueryFilter(fromBlock, toBlock, t.contracts)
+	queryFilter := setupQueryFilter(fromBlock, toBlock, t.abis)
 
 	//	call eth_getLogs
 	logs, err := t.client.getLogs(queryFilter)
