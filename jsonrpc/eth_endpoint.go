@@ -572,7 +572,6 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 				),
 			)
 
-			// TODO check what happens when 0?
 			highEnd = gasAllowance.Uint64()
 		}
 	}
