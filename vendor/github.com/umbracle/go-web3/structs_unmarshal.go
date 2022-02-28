@@ -306,6 +306,9 @@ func (r *Receipt) UnmarshalJSON(buf []byte) error {
 	if r.LogsBloom, err = decodeBytes(r.LogsBloom[:0], v, "logsBloom", 256); err != nil {
 		return err
 	}
+	if r.Status, err = decodeUint(v, "status"); err != nil {
+		return err
+	}
 
 	// logs
 	r.Logs = r.Logs[:0]

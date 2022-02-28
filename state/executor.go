@@ -92,7 +92,7 @@ func (e *Executor) ProcessBlock(
 	parentRoot types.Hash,
 	block *types.Block,
 	blockCreator types.Address,
-) (*BlockResult, error) {
+) (*Transition, error) {
 	txn, err := e.BeginTxn(parentRoot, block.Header, blockCreator)
 	if err != nil {
 		return nil, err
@@ -114,15 +114,7 @@ func (e *Executor) ProcessBlock(
 		}
 	}
 
-	_, root := txn.Commit()
-
-	res := &BlockResult{
-		Root:     root,
-		Receipts: txn.Receipts(),
-		TotalGas: txn.TotalGas(),
-	}
-
-	return res, nil
+	return txn, nil
 }
 
 // StateAt returns snapshot at given root
@@ -752,6 +744,25 @@ func (t *Transition) Callx(c *runtime.Contract, h runtime.Host) *runtime.Executi
 	}
 
 	return t.applyCall(c, c.Type, h)
+}
+
+// SetAccountDirectly sets an account to the given address
+// NOTE: SetAccountDirectly changes the world state without a transaction
+func (t *Transition) SetAccountDirectly(addr types.Address, account *chain.GenesisAccount) error {
+	if t.AccountExists(addr) {
+		return fmt.Errorf("can't add account to %+v because an account exists already", addr)
+	}
+
+	t.state.SetCode(addr, account.Code)
+
+	for key, value := range account.Storage {
+		t.state.SetStorage(addr, key, value, &t.config)
+	}
+
+	t.state.SetBalance(addr, account.Balance)
+	t.state.SetNonce(addr, account.Nonce)
+
+	return nil
 }
 
 func TransactionGasCost(msg *types.Transaction, isHomestead, isIstanbul bool) (uint64, error) {

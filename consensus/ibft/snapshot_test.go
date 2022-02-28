@@ -11,6 +11,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
@@ -19,8 +20,11 @@ import (
 // initIbftMechanism initializes the IBFT mechanism for unit tests
 func initIbftMechanism(mechanismType MechanismType, ibft *Ibft) {
 	mechanismFactory := mechanismBackends[mechanismType]
-	mechanism, _ := mechanismFactory(ibft)
-	ibft.mechanism = mechanism
+	mechanism, _ := mechanismFactory(ibft, &IBFTFork{
+		Type: mechanismType,
+		From: common.JSONNumber{Value: 0},
+	})
+	ibft.mechanisms = []ConsensusMechanism{mechanism}
 }
 
 func getTempDir(t *testing.T) string {

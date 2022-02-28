@@ -1,8 +1,10 @@
 package version
 
 import (
+	"bytes"
+
 	"github.com/0xPolygon/polygon-edge/command/helper"
-	"github.com/0xPolygon/polygon-edge/version"
+	"github.com/0xPolygon/polygon-edge/versioning"
 )
 
 // VersionCommand is the command to show the version of the agent
@@ -46,15 +48,23 @@ func (c *VersionCommand) Run(args []string) int {
 		return 1
 	}
 
-	c.Formatter.OutputResult(&VersionResult{Verstion: version.Version})
+	c.Formatter.OutputResult(&VersionResult{
+		Version: versioning.Version,
+	})
 
 	return 0
 }
 
 type VersionResult struct {
-	Verstion string `json:"version"`
+	Version string `json:"version"`
 }
 
 func (r *VersionResult) Output() string {
-	return version.GetVersion()
+	var buffer bytes.Buffer
+
+	buffer.WriteString("\n[POLYGON EDGE VERSION]\n")
+	buffer.WriteString(r.Version)
+	buffer.WriteString("\n")
+
+	return buffer.String()
 }

@@ -86,7 +86,7 @@ github.com/google/gopacket/routing
 # github.com/google/uuid v1.3.0
 ## explicit
 github.com/google/uuid
-# github.com/gorilla/websocket v1.4.2
+# github.com/gorilla/websocket v1.5.0
 ## explicit
 github.com/gorilla/websocket
 # github.com/hashicorp/errwrap v1.1.0
@@ -136,7 +136,7 @@ github.com/hashicorp/hcl/hcl/token
 github.com/hashicorp/hcl/json/parser
 github.com/hashicorp/hcl/json/scanner
 github.com/hashicorp/hcl/json/token
-# github.com/hashicorp/vault/api v1.3.0
+# github.com/hashicorp/vault/api v1.3.1
 ## explicit
 github.com/hashicorp/vault/api
 # github.com/hashicorp/vault/sdk v0.3.0
@@ -518,7 +518,7 @@ github.com/umbracle/fastrlp
 # github.com/umbracle/go-eth-bn256 v0.0.0-20190607160430-b36caf4e0f6b
 ## explicit
 github.com/umbracle/go-eth-bn256
-# github.com/umbracle/go-web3 v0.0.0-20220215144207-0b2d6792a03d
+# github.com/umbracle/go-web3 v0.0.0-20220224145938-aaa1038c1b69
 ## explicit
 github.com/umbracle/go-web3
 github.com/umbracle/go-web3/abi
@@ -592,7 +592,7 @@ golang.org/x/net/route
 golang.org/x/net/trace
 # golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 golang.org/x/sync/errgroup
-# golang.org/x/sys v0.0.0-20220209214540-3681064d5158
+# golang.org/x/sys v0.0.0-20220227234510-4e6760a101f9
 ## explicit
 golang.org/x/sys/cpu
 golang.org/x/sys/execabs
