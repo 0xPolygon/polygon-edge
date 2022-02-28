@@ -527,10 +527,11 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 	gasPriceInt := new(big.Int).Set(transaction.GasPrice)
 	valueInt := new(big.Int).Set(transaction.Value)
 
-	// If the sender address is present and a gas price was specified,
-	// recalculate the gas ceiling to his balance
-	if transaction.From != types.ZeroAddress &&
-		gasPriceInt.BitLen() != 0 {
+	var availableBalance *big.Int
+
+	// If the sender address is present, figure out how much available funds
+	// are we working with
+	if transaction.From != types.ZeroAddress {
 		// Get the account balance
 		// If the account is not initialized yet in state,
 		// assume it's an empty account
@@ -546,17 +547,21 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 			accountBalance = acc.Balance
 		}
 
-		available := new(big.Int).Set(accountBalance)
+		availableBalance = new(big.Int).Set(accountBalance)
 
 		if transaction.Value != nil {
-			if valueInt.Cmp(available) > 0 {
-				return nil, ErrInsufficientFunds
+			if valueInt.Cmp(availableBalance) > 0 {
+				return 0, ErrInsufficientFunds
 			}
 
-			available.Sub(available, valueInt)
+			availableBalance.Sub(availableBalance, valueInt)
 		}
+	}
 
-		gasAllowance := new(big.Int).Div(available, gasPriceInt)
+	// Recalculate the gas ceiling based on the available funds
+	// and the passed in gas price, if present
+	if gasPriceInt.BitLen() != 0 && availableBalance != nil {
+		gasAllowance := new(big.Int).Div(availableBalance, gasPriceInt)
 
 		// Check the gas allowance for this account, make sure high end is capped to it
 		if gasAllowance.IsUint64() && highEnd > gasAllowance.Uint64() {

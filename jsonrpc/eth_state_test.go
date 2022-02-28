@@ -743,7 +743,26 @@ func TestEth_EstimateGas_Reverts(t *testing.T) {
 }
 
 func TestEth_EstimateGas_Errors(t *testing.T) {
+	store := getExampleStore()
+	ethEndpoint := newTestEthEndpoint(store)
 
+	// Account doesn't have any balance
+	store.account.account.Balance = big.NewInt(0)
+
+	// The transaction has a value > 0
+	mockTx := constructMockTx(nil, nil)
+	mockTx.Value = argBytesPtr([]byte{0x1})
+
+	// Run the estimation
+	estimate, estimateErr := ethEndpoint.EstimateGas(
+		mockTx,
+		nil,
+	)
+
+	assert.Equal(t, 0, estimate)
+
+	// Make sure the insufficient funds error message is contained
+	assert.ErrorAs(t, estimateErr, &ErrInsufficientFunds)
 }
 
 type mockSpecialStore struct {
