@@ -75,6 +75,13 @@ func setFlags(cmd *cobra.Command) {
 			defaultNamespace,
 		),
 	)
+
+	cmd.Flags().StringVar(
+		&params.extra,
+		extraFlag,
+		"",
+		"Specifies the extra fields map in string format 'key1=val1,key2=val2'",
+	)
 }
 
 func setRequiredFlags(cmd *cobra.Command) {

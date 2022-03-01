@@ -12,6 +12,7 @@ type SecretsGenerateResult struct {
 	AccessToken string `json:"access_token"`
 	NodeName    string `json:"node_name"`
 	Namespace   string `json:"namespace"`
+	Extra       string `json:"extra"`
 }
 
 func (r *SecretsGenerateResult) GetOutput() string {
@@ -24,6 +25,7 @@ func (r *SecretsGenerateResult) GetOutput() string {
 		fmt.Sprintf("Access Token|%s", r.AccessToken),
 		fmt.Sprintf("Node Name|%s", r.NodeName),
 		fmt.Sprintf("Namespace|%s", r.Namespace),
+		fmt.Sprintf("Extra|%s", r.Extra),
 	}))
 	buffer.WriteString("\n")
 

@@ -1,14 +1,14 @@
 package server
 
 import (
+	"github.com/0xPolygon/polygon-edge/consensus"
 	consensusDev "github.com/0xPolygon/polygon-edge/consensus/dev"
 	consensusDummy "github.com/0xPolygon/polygon-edge/consensus/dummy"
 	consensusIBFT "github.com/0xPolygon/polygon-edge/consensus/ibft"
 	"github.com/0xPolygon/polygon-edge/secrets"
+	"github.com/0xPolygon/polygon-edge/secrets/awsssm"
 	"github.com/0xPolygon/polygon-edge/secrets/hashicorpvault"
 	"github.com/0xPolygon/polygon-edge/secrets/local"
-
-	"github.com/0xPolygon/polygon-edge/consensus"
 )
 
 type ConsensusType string
@@ -30,6 +30,7 @@ var consensusBackends = map[ConsensusType]consensus.Factory{
 var secretsManagerBackends = map[secrets.SecretsManagerType]secrets.SecretsManagerFactory{
 	secrets.Local:          local.SecretsManagerFactory,
 	secrets.HashicorpVault: hashicorpvault.SecretsManagerFactory,
+	secrets.AWSSSM:         awsssm.SecretsManagerFactory,
 }
 
 func ConsensusSupported(value string) bool {

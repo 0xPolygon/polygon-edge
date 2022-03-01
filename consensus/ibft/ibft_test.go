@@ -2,12 +2,14 @@ package ibft
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/protocol"
@@ -961,5 +963,337 @@ func (m *mockIbft) expect(res expectResult) {
 
 	if !errors.Is(m.state.err, res.err) {
 		m.t.Fatalf("incorrect error %v %v", m.state.err, res.err)
+	}
+}
+
+var (
+	hookTypes = []HookType{
+		VerifyHeadersHook,
+		ProcessHeadersHook,
+		InsertBlockHook,
+		CandidateVoteHook,
+		AcceptStateLogHook,
+		VerifyBlockHook,
+		PreStateCommitHook,
+	}
+)
+
+type mockMechanism struct {
+	BaseConsensusMechanism
+	fired                   map[HookType]uint
+	isAvailable             func(HookType, uint64) bool
+	shouldWriteTransactions func(uint64) bool
+}
+
+func newMockMechanism(t *testing.T, i *Ibft, params *IBFTFork) *mockMechanism {
+	t.Helper()
+
+	m := &mockMechanism{
+		BaseConsensusMechanism: BaseConsensusMechanism{
+			mechanismType: PoA,
+			ibft:          i,
+		},
+		fired: make(map[HookType]uint),
+	}
+
+	if err := m.initializeParams(params); err != nil {
+		t.Fatal(err)
+	}
+
+	m.initializeHookMap()
+
+	return m
+}
+
+func (m *mockMechanism) IsAvailable(hook HookType, height uint64) bool {
+	if m.isAvailable != nil {
+		return m.isAvailable(hook, height)
+	}
+
+	return true
+}
+
+func (m *mockMechanism) ShouldWriteTransactions(height uint64) bool {
+	if m.shouldWriteTransactions != nil {
+		return m.shouldWriteTransactions(height)
+	}
+
+	return true
+}
+
+func (m *mockMechanism) initializeHookMap() {
+	// Create the hook map
+	m.hookMap = make(map[HookType]func(interface{}) error)
+
+	for _, hook := range hookTypes {
+		// reassign as local variable
+		hook := hook
+
+		m.hookMap[hook] = func(_param interface{}) error {
+			m.fired[hook]++
+
+			return nil
+		}
+	}
+}
+
+func (m *mockMechanism) resetFiredCount() {
+	m.fired = make(map[HookType]uint)
+}
+
+func Test_runHook(t *testing.T) {
+	i := newMockIbft(t, []string{"A", "B", "C", "D"}, "A")
+	mockMechanism := newMockMechanism(t, i.Ibft, &IBFTFork{
+		Type: PoA,
+		From: common.JSONNumber{Value: 0},
+	})
+	i.mechanisms = []ConsensusMechanism{mockMechanism}
+
+	for _, hook := range hookTypes {
+		name := fmt.Sprintf("IBFT should emit %s", string(hook))
+		t.Run(name, func(t *testing.T) {
+			mockMechanism.resetFiredCount()
+
+			assert.NoError(t, i.runHook(hook, 0, nil))
+
+			for _, h := range hookTypes {
+				shouldReceive := h == hook
+				received := mockMechanism.fired[h] > 0
+
+				// check fired or not
+				if received != shouldReceive {
+					if shouldReceive {
+						t.Fatalf("should fire %s hook but it was not called", string(h))
+					} else {
+						t.Fatalf("shouldn't fire %s hook but it was called", string(h))
+					}
+				}
+
+				// check fired only one time
+				if shouldReceive && received {
+					assert.Equalf(t,
+						uint(1),
+						mockMechanism.fired[h],
+						"should fire %s hook only once, but it was called multiple times",
+						string(h),
+					)
+				}
+			}
+		})
+	}
+}
+
+func Test_shouldWriteTransactions(t *testing.T) {
+	tests := []struct {
+		name                    string
+		mechanismShouldWriteTxs []func(uint64) bool
+		res                     bool
+	}{
+		{
+			name: "should return true because all mechanisms returns true",
+			mechanismShouldWriteTxs: []func(uint64) bool{
+				func(_h uint64) bool {
+					return true
+				},
+				func(_h uint64) bool {
+					return true
+				},
+			},
+			res: true,
+		},
+		{
+			name: "should return false because all mechanisms return false",
+			mechanismShouldWriteTxs: []func(uint64) bool{
+				func(_h uint64) bool {
+					return false
+				},
+				func(_h uint64) bool {
+					return false
+				},
+			},
+			res: false,
+		},
+		{
+			name: "should return true because one of the mechanisms return true",
+			mechanismShouldWriteTxs: []func(uint64) bool{
+				func(_h uint64) bool {
+					return true
+				},
+				func(_h uint64) bool {
+					return false
+				},
+			},
+			res: true,
+		},
+	}
+
+	i := newMockIbft(t, []string{"A", "B", "C", "D"}, "A")
+	mockMechanism1 := newMockMechanism(t, i.Ibft, &IBFTFork{
+		Type: PoA,
+		From: common.JSONNumber{Value: 0},
+	})
+	mockMechanism2 := newMockMechanism(t, i.Ibft, &IBFTFork{
+		Type: PoA,
+		From: common.JSONNumber{Value: 0},
+	})
+	i.mechanisms = []ConsensusMechanism{mockMechanism1, mockMechanism2}
+
+	for _, testcase := range tests {
+		t.Run(testcase.name, func(t *testing.T) {
+			mockMechanism1.shouldWriteTransactions = testcase.mechanismShouldWriteTxs[0]
+			mockMechanism2.shouldWriteTransactions = testcase.mechanismShouldWriteTxs[1]
+
+			res := i.shouldWriteTransactions(0)
+			assert.Equalf(t, testcase.res, res, "shouldWriteTransactions should return %t", testcase.res)
+		})
+	}
+}
+
+func TestBaseConsensusMechanismIsInRange(t *testing.T) {
+	tests := []struct {
+		name string
+		// mechanism field
+		from common.JSONNumber
+		to   *common.JSONNumber
+		// arg
+		height uint64
+		// expected
+		res bool
+	}{
+		{
+			name:   "should return true if the given height equals to from and to is not set",
+			from:   common.JSONNumber{Value: 0},
+			to:     nil,
+			height: 0,
+			res:    true,
+		},
+		{
+			name:   "should return true if the given height is greater than from and to is not set",
+			from:   common.JSONNumber{Value: 0},
+			to:     nil,
+			height: 10,
+			res:    true,
+		},
+		{
+			name:   "should return true if the given height equals to from and less than to",
+			from:   common.JSONNumber{Value: 0},
+			to:     &common.JSONNumber{Value: 10},
+			height: 0,
+			res:    true,
+		},
+		{
+			name:   "should return true if the given height is grater than from and less than to",
+			from:   common.JSONNumber{Value: 0},
+			to:     &common.JSONNumber{Value: 10},
+			height: 5,
+			res:    true,
+		},
+		{
+			name:   "should return true if the given height is grater than from and equals to to",
+			from:   common.JSONNumber{Value: 0},
+			to:     &common.JSONNumber{Value: 10},
+			height: 10,
+			res:    true,
+		},
+		{
+			name:   "should return false if the given height is less than from and to",
+			from:   common.JSONNumber{Value: 5},
+			to:     &common.JSONNumber{Value: 10},
+			height: 0,
+			res:    false,
+		},
+		{
+			name:   "should return false if the given height is greater than from and to",
+			from:   common.JSONNumber{Value: 5},
+			to:     &common.JSONNumber{Value: 10},
+			height: 15,
+			res:    false,
+		},
+	}
+
+	i := newMockIbft(t, []string{"A", "B", "C", "D"}, "A")
+
+	for _, testcase := range tests {
+		t.Run(testcase.name, func(t *testing.T) {
+			mockMechanism := newMockMechanism(t, i.Ibft, &IBFTFork{
+				Type: PoA,
+				From: testcase.from,
+				To:   testcase.to,
+			})
+			i.mechanisms = []ConsensusMechanism{mockMechanism}
+
+			res := mockMechanism.IsInRange(testcase.height)
+
+			assert.Equal(t, testcase.res, res)
+		})
+	}
+}
+
+func TestGetIBFTForks(t *testing.T) {
+	tests := []struct {
+		name       string
+		ibftConfig map[string]interface{}
+		forks      []IBFTFork
+		err        error
+	}{
+		{
+			name: "should return a IBFTFork when ibftConfig has type",
+			ibftConfig: map[string]interface{}{
+				"type": string(PoA),
+			},
+			forks: []IBFTFork{
+				{
+					Type: PoA,
+					From: common.JSONNumber{Value: 0},
+				},
+			},
+			err: nil,
+		},
+		{
+			name: "should return multiple IBFTForks when ibftConfig has types",
+			ibftConfig: map[string]interface{}{
+				"types": []interface{}{
+					map[string]interface{}{
+						"type": PoA,
+						"from": 0,
+						"to":   100,
+					},
+					map[string]interface{}{
+						"type":       PoS,
+						"deployment": "0x32", // 50
+						"from":       "0x65", // 101
+					},
+				},
+			},
+			forks: []IBFTFork{
+				{
+					Type: PoA,
+					From: common.JSONNumber{Value: 0},
+					To:   &common.JSONNumber{Value: 100},
+				},
+				{
+					Type:       PoS,
+					Deployment: &common.JSONNumber{Value: 50},
+					From:       common.JSONNumber{Value: 101},
+				},
+			},
+			err: nil,
+		},
+		{
+			name: "should return error if neither type and types is not set",
+			ibftConfig: map[string]interface{}{
+				"foo": string(PoA),
+			},
+			forks: nil,
+			err:   errors.New("current IBFT type not found"),
+		},
+	}
+
+	for _, testcase := range tests {
+		t.Run(testcase.name, func(t *testing.T) {
+			forks, err := GetIBFTForks(testcase.ibftConfig)
+			assert.Equal(t, testcase.forks, forks)
+			assert.Equal(t, testcase.err, err)
+		})
 	}
 }

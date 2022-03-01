@@ -5,27 +5,30 @@ import (
 	"fmt"
 
 	"github.com/0xPolygon/polygon-edge/contracts/staking"
+	stakingHelper "github.com/0xPolygon/polygon-edge/helper/staking"
+	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
 // PoSMechanism defines specific hooks for the Proof of Stake IBFT mechanism
 type PoSMechanism struct {
-	// Reference to the main IBFT implementation
-	ibft *Ibft
-
-	// hookMap is the collection of registered hooks
-	hookMap map[string]func(interface{}) error
-
-	// Used for easy lookups
-	mechanismType MechanismType
+	BaseConsensusMechanism
+	// Params
+	ContractDeployment uint64 // The height when deploying staking contract
 }
 
 // PoSFactory initializes the required data
 // for the Proof of Stake mechanism
-func PoSFactory(ibft *Ibft) (ConsensusMechanism, error) {
+func PoSFactory(ibft *Ibft, params *IBFTFork) (ConsensusMechanism, error) {
 	pos := &PoSMechanism{
-		mechanismType: PoS,
-		ibft:          ibft,
+		BaseConsensusMechanism: BaseConsensusMechanism{
+			mechanismType: PoS,
+			ibft:          ibft,
+		},
+	}
+
+	if err := pos.initializeParams(params); err != nil {
+		return nil, err
 	}
 
 	pos.initializeHookMap()
@@ -33,14 +36,45 @@ func PoSFactory(ibft *Ibft) (ConsensusMechanism, error) {
 	return pos, nil
 }
 
-// GetType implements the ConsensusMechanism interface method
-func (pos *PoSMechanism) GetType() MechanismType {
-	return pos.mechanismType
+// IsAvailable returns indicates if mechanism should be called at given height
+func (pos *PoSMechanism) IsAvailable(hookType HookType, height uint64) bool {
+	switch hookType {
+	case AcceptStateLogHook, VerifyBlockHook, CalculateProposerHook:
+		return pos.IsInRange(height)
+	case PreStateCommitHook:
+		// deploy contract on ContractDeployment
+		return height == pos.ContractDeployment
+	case InsertBlockHook:
+		// update validators when the one before the beginning or the end of epoch
+		return height+1 == pos.From || pos.IsInRange(height) && pos.ibft.IsLastOfEpoch(height)
+	default:
+		return false
+	}
 }
 
-// GetHookMap implements the ConsensusMechanism interface method
-func (pos *PoSMechanism) GetHookMap() map[string]func(interface{}) error {
-	return pos.hookMap
+// initializeParams initializes mechanism parameters from chain config
+func (pos *PoSMechanism) initializeParams(params *IBFTFork) error {
+	if err := pos.BaseConsensusMechanism.initializeParams(params); err != nil {
+		return err
+	}
+
+	if pos.From != 0 {
+		if params.Deployment == nil {
+			return errors.New(`"deployment" must be specified in PoS fork`)
+		}
+
+		if params.Deployment.Value > pos.From {
+			return fmt.Errorf(
+				`"deployment" must be less than or equal to "from": deployment=%d, from=%d`,
+				params.Deployment.Value,
+				pos.From,
+			)
+		}
+
+		pos.ContractDeployment = params.Deployment.Value
+	}
+
+	return nil
 }
 
 // calculateProposerHook calculates the next proposer based on the last
@@ -81,31 +115,7 @@ func (pos *PoSMechanism) insertBlockHook(numberParam interface{}) error {
 		return ErrInvalidHookParam
 	}
 
-	if pos.ibft.IsLastOfEpoch(headerNumber) {
-		if err := pos.ibft.updateValidators(headerNumber); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// syncStateHook keeps the snapshot store up to date for a range of synced blocks
-func (pos *PoSMechanism) syncStateHook(referenceNumber interface{}) error {
-	oldLatestNumber, ok := referenceNumber.(uint64)
-	if !ok {
-		return ErrInvalidHookParam
-	}
-
-	// For the block range, update the snapshot store accordingly if an epoch occurred in the range
-	if err := pos.ibft.batchUpdateValidators(
-		oldLatestNumber+1,
-		pos.ibft.blockchain.Header().Number,
-	); err != nil {
-		pos.ibft.logger.Error("failed to bulk update validators", "err", err)
-	}
-
-	return nil
+	return pos.updateValidators(headerNumber)
 }
 
 // verifyBlockHook checks if the block is an epoch block and if it has any transactions
@@ -122,11 +132,37 @@ func (pos *PoSMechanism) verifyBlockHook(blockParam interface{}) error {
 	return nil
 }
 
+// preStateCommitHookParams are the params passed into the preStateCommitHook
+type preStateCommitHookParams struct {
+	header *types.Header
+	txn    *state.Transition
+}
+
+// verifyBlockHook checks if the block is an epoch block and if it has any transactions
+func (pos *PoSMechanism) preStateCommitHook(rawParams interface{}) error {
+	params, ok := rawParams.(*preStateCommitHookParams)
+	if !ok {
+		return ErrInvalidHookParam
+	}
+
+	// Deploy Staking contract
+	contractState, err := stakingHelper.PredeployStakingSC(nil)
+	if err != nil {
+		return err
+	}
+
+	if err := params.txn.SetAccountDirectly(staking.AddrStakingContract, contractState); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // initializeHookMap registers the hooks that the PoS mechanism
 // should have
 func (pos *PoSMechanism) initializeHookMap() {
 	// Create the hook map
-	pos.hookMap = make(map[string]func(interface{}) error)
+	pos.hookMap = make(map[HookType]func(interface{}) error)
 
 	// Register the AcceptStateLogHook
 	pos.hookMap[AcceptStateLogHook] = pos.acceptStateLogHook
@@ -134,11 +170,11 @@ func (pos *PoSMechanism) initializeHookMap() {
 	// Register the InsertBlockHook
 	pos.hookMap[InsertBlockHook] = pos.insertBlockHook
 
-	// Register the SyncStateHook
-	pos.hookMap[SyncStateHook] = pos.syncStateHook
-
 	// Register the VerifyBlockHook
 	pos.hookMap[VerifyBlockHook] = pos.verifyBlockHook
+
+	// Register the PreStateCommitHook
+	pos.hookMap[PreStateCommitHook] = pos.preStateCommitHook
 
 	// Register the CalculateProposerHook
 	pos.hookMap[CalculateProposerHook] = pos.calculateProposerHook
@@ -147,33 +183,33 @@ func (pos *PoSMechanism) initializeHookMap() {
 // ShouldWriteTransactions indicates if transactions should be written to a block
 func (pos *PoSMechanism) ShouldWriteTransactions(blockNumber uint64) bool {
 	// Epoch blocks should be empty
-	return !pos.ibft.IsLastOfEpoch(blockNumber)
+	return pos.IsInRange(blockNumber) && !pos.ibft.IsLastOfEpoch(blockNumber)
 }
 
 // getNextValidators is a helper function for fetching the validator set
 // from the Staking SC
-func (i *Ibft) getNextValidators(header *types.Header) (ValidatorSet, error) {
-	transition, err := i.executor.BeginTxn(header.StateRoot, header, types.ZeroAddress)
+func (pos *PoSMechanism) getNextValidators(header *types.Header) (ValidatorSet, error) {
+	transition, err := pos.ibft.executor.BeginTxn(header.StateRoot, header, types.ZeroAddress)
 	if err != nil {
 		return nil, err
 	}
 
-	return staking.QueryValidators(transition, i.validatorKeyAddr)
+	return staking.QueryValidators(transition, pos.ibft.validatorKeyAddr)
 }
 
 // updateSnapshotValidators updates validators in snapshot at given height
-func (i *Ibft) updateValidators(num uint64) error {
-	header, ok := i.blockchain.GetHeaderByNumber(num)
+func (pos *PoSMechanism) updateValidators(num uint64) error {
+	header, ok := pos.ibft.blockchain.GetHeaderByNumber(num)
 	if !ok {
 		return errors.New("header not found")
 	}
 
-	validators, err := i.getNextValidators(header)
+	validators, err := pos.getNextValidators(header)
 	if err != nil {
 		return err
 	}
 
-	snap, err := i.getSnapshot(header.Number)
+	snap, err := pos.ibft.getSnapshot(header.Number)
 	if err != nil {
 		return err
 	}
@@ -189,38 +225,11 @@ func (i *Ibft) updateValidators(num uint64) error {
 		newSnap.Hash = header.Hash.String()
 
 		if snap.Number != header.Number {
-			i.store.add(newSnap)
+			pos.ibft.store.add(newSnap)
 		} else {
-			i.store.replace(newSnap)
+			pos.ibft.store.replace(newSnap)
 		}
 	}
 
 	return nil
-}
-
-// batchUpdateValidators updates the validator set based on the passed in block range
-func (i *Ibft) batchUpdateValidators(from, to uint64) error {
-	for n := from; n <= to; n++ {
-		if i.IsLastOfEpoch(n) {
-			if err := i.updateValidators(n); err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
-}
-
-// GetEpoch returns the current epoch
-func (i *Ibft) GetEpoch(number uint64) uint64 {
-	if number%i.epochSize == 0 {
-		return number / i.epochSize
-	}
-
-	return number/i.epochSize + 1
-}
-
-// IsLastOfEpoch checks if the block number is the last of the epoch
-func (i *Ibft) IsLastOfEpoch(number uint64) bool {
-	return number > 0 && number%i.epochSize == 0
 }

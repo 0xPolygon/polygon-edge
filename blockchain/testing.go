@@ -201,6 +201,10 @@ func (m *MockVerifier) GetBlockCreator(header *types.Header) (types.Address, err
 	return header.Miner, nil
 }
 
+func (m *MockVerifier) PreStateCommit(header *types.Header, txn *state.Transition) error {
+	return nil
+}
+
 type mockExecutor struct {
 }
 
@@ -208,8 +212,8 @@ func (m *mockExecutor) ProcessBlock(
 	parentRoot types.Hash,
 	block *types.Block,
 	blockCreator types.Address,
-) (*state.BlockResult, error) {
-	return &state.BlockResult{}, nil
+) (*state.Transition, error) {
+	return nil, nil
 }
 
 func TestBlockchain(t *testing.T, genesis *chain.Genesis) *Blockchain {

@@ -10,10 +10,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-var (
-	StakingSCAddress = types.StringToAddress("1001")
-)
-
 // PadLeftOrTrim left-pads the passed in byte array to the specified size,
 // or trims the array if it exceeds the passed in size
 func PadLeftOrTrim(bb []byte, size int) []byte {

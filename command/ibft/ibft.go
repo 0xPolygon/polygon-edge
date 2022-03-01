@@ -6,6 +6,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/ibft/propose"
 	"github.com/0xPolygon/polygon-edge/command/ibft/snapshot"
 	"github.com/0xPolygon/polygon-edge/command/ibft/status"
+	_switch "github.com/0xPolygon/polygon-edge/command/ibft/switch"
 	"github.com/spf13/cobra"
 )
 
@@ -32,5 +33,7 @@ func registerSubcommands(baseCmd *cobra.Command) {
 		propose.GetCommand(),
 		// ibft candidates
 		candidates.GetCommand(),
+		// ibft switch
+		_switch.GetCommand(),
 	)
 }

@@ -1,8 +1,10 @@
 package helper
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/output"
 	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
@@ -13,6 +15,7 @@ import (
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"io/ioutil"
 	"net"
 	"net/url"
 	"regexp"
@@ -211,7 +214,7 @@ func MultiAddrFromDNS(addr string, port int) (multiaddr.Multiaddr, error) {
 	)
 
 	match, err := regexp.MatchString(
-		"^/?(dns)(4|6)?/[^-|^/][A-Za-z0-9-]([^-|^/]?)+([\\-\\.]{1}[a-z0-9]+)*\\.[A-Za-z]{2,6}(/?)$",
+		"^/?(dns)(4|6)?/[^-|^/][A-Za-z0-9-]([^-|^/]?)+([\\-\\.]{1}[a-z0-9]+)*\\.[A-Za-z]{2,}(/?)$",
 		addr,
 	)
 	if err != nil || !match {
@@ -252,4 +255,19 @@ func MultiAddrFromDNS(addr string, port int) (multiaddr.Multiaddr, error) {
 	}
 
 	return multiAddr, nil
+}
+
+// WriteGenesisConfigToDisk writes the passed in configuration to a genesis file at the specified path
+func WriteGenesisConfigToDisk(genesisConfig *chain.Chain, genesisPath string) error {
+	data, err := json.MarshalIndent(genesisConfig, "", "    ")
+	if err != nil {
+		return fmt.Errorf("failed to generate genesis: %w", err)
+	}
+
+	//nolint:gosec
+	if err := ioutil.WriteFile(genesisPath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write genesis: %w", err)
+	}
+
+	return nil
 }

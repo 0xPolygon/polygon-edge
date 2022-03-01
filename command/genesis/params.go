@@ -1,17 +1,17 @@
 package genesis
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
+	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/command/output"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft"
-	"github.com/0xPolygon/polygon-edge/helper/staking"
+	"github.com/0xPolygon/polygon-edge/contracts/staking"
+	stakingHelper "github.com/0xPolygon/polygon-edge/helper/staking"
 	"github.com/0xPolygon/polygon-edge/server"
 	"github.com/0xPolygon/polygon-edge/types"
-	"io/ioutil"
 )
 
 const (
@@ -203,7 +203,10 @@ func (p *genesisParams) generateGenesis() error {
 		return err
 	}
 
-	if err := p.writeGenesisToDisk(); err != nil {
+	if err := helper.WriteGenesisConfigToDisk(
+		p.genesisConfig,
+		p.genesisPath,
+	); err != nil {
 		return err
 	}
 
@@ -235,7 +238,7 @@ func (p *genesisParams) initGenesisConfig() error {
 			return err
 		}
 
-		chainConfig.Genesis.Alloc[staking.StakingSCAddress] = stakingAccount
+		chainConfig.Genesis.Alloc[staking.AddrStakingContract] = stakingAccount
 	}
 
 	// Premine accounts
@@ -255,27 +258,12 @@ func (p *genesisParams) shouldPredeployStakingSC() bool {
 }
 
 func (p *genesisParams) predeployStakingSC() (*chain.GenesisAccount, error) {
-	stakingAccount, predeployErr := staking.PredeployStakingSC(p.ibftValidators)
+	stakingAccount, predeployErr := stakingHelper.PredeployStakingSC(p.ibftValidators)
 	if predeployErr != nil {
 		return nil, predeployErr
 	}
 
 	return stakingAccount, nil
-}
-
-// writeGenesisToDisk writes the passed in configuration to a genesis file at the specified path
-func (p *genesisParams) writeGenesisToDisk() error {
-	data, err := json.MarshalIndent(p.genesisConfig, "", "    ")
-	if err != nil {
-		return fmt.Errorf("failed to generate genesis: %w", err)
-	}
-
-	//nolint:gosec
-	if err := ioutil.WriteFile(p.genesisPath, data, 0644); err != nil {
-		return fmt.Errorf("failed to write genesis: %w", err)
-	}
-
-	return nil
 }
 
 func (p *genesisParams) getResult() output.CommandResult {

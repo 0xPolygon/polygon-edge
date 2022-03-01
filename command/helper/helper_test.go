@@ -1,11 +1,14 @@
 package helper
 
 import (
+	"fmt"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestMultiAddrFromDns(t *testing.T) {
+	port := 12345
+
 	tests := []struct {
 		name       string
 		dnsAddress string
@@ -16,30 +19,30 @@ func TestMultiAddrFromDns(t *testing.T) {
 		{
 			name:       "Invalid DNS Version",
 			dnsAddress: "/dns8/example.io/",
-			port:       12345,
+			port:       port,
 			err:        true,
 			outcome:    "",
 		},
 		{
 			name:       "Invalid DNS String",
 			dnsAddress: "dns4rahul.io",
-			port:       12345,
+			port:       port,
 			err:        true,
 			outcome:    "",
 		},
 		{
 			name:       "Valid DNS Address with `/` ",
 			dnsAddress: "/dns4/rahul.io/",
-			port:       12345,
+			port:       port,
 			err:        false,
-			outcome:    "/dns4/rahul.io/tcp/12345",
+			outcome:    fmt.Sprintf("/dns4/rahul.io/tcp/%d", port),
 		},
 		{
 			name:       "Valid DNS Address without `/`",
 			dnsAddress: "dns6/example.io",
-			port:       12345,
+			port:       port,
 			err:        false,
-			outcome:    "/dns6/example.io/tcp/12345",
+			outcome:    fmt.Sprintf("/dns6/example.io/tcp/%d", port),
 		},
 		{
 			name:       "Invalid Port Number",
@@ -51,14 +54,14 @@ func TestMultiAddrFromDns(t *testing.T) {
 		{
 			name:       "Invalid Host name starting with `-` ",
 			dnsAddress: "dns6/-example.io",
-			port:       12345,
+			port:       port,
 			err:        true,
 			outcome:    "",
 		},
 		{
 			name:       "Invalid Host name starting with `/` ",
 			dnsAddress: "dns6//example.io",
-			port:       12345,
+			port:       port,
 			err:        true,
 			outcome:    "",
 		},
@@ -72,23 +75,30 @@ func TestMultiAddrFromDns(t *testing.T) {
 		{
 			name:       "Invalid Host name  with `-` ",
 			dnsAddress: "dns6/example-.io",
-			port:       12345,
+			port:       port,
 			err:        true,
 			outcome:    "",
 		},
 		{
 			name:       "Missing DNS version",
 			dnsAddress: "example.io",
-			port:       12345,
+			port:       port,
 			err:        true,
 			outcome:    "",
 		},
 		{
 			name:       "Invalid DNS version",
 			dnsAddress: "/dns8/example.io",
-			port:       12345,
+			port:       port,
 			err:        true,
 			outcome:    "",
+		},
+		{
+			name:       "valid long domain suffix",
+			dnsAddress: "dns/validator-1.foo.technology",
+			port:       port,
+			err:        false,
+			outcome:    fmt.Sprintf("/dns/validator-1.foo.technology/tcp/%d", port),
 		},
 	}
 

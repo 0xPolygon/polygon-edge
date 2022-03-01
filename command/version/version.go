@@ -2,7 +2,7 @@ package version
 
 import (
 	"github.com/0xPolygon/polygon-edge/command/output"
-	"github.com/0xPolygon/polygon-edge/version"
+	"github.com/0xPolygon/polygon-edge/versioning"
 	"github.com/spf13/cobra"
 )
 
@@ -21,7 +21,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 	outputter.SetCommandResult(
 		&VersionResult{
-			Version: version.GetVersion(),
+			Version: versioning.Version,
 		},
 	)
 }

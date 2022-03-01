@@ -76,12 +76,28 @@ func (ip *initParams) initFromConfig() error {
 		return err
 	}
 
-	vault, err := helper.SetupHashicorpVault(ip.secretsConfig)
-	if err != nil {
-		return err
+	var secretsManager secrets.SecretsManager
+
+	switch ip.secretsConfig.Type {
+	case secrets.HashicorpVault:
+		vault, err := helper.SetupHashicorpVault(ip.secretsConfig)
+		if err != nil {
+			return err
+		}
+
+		secretsManager = vault
+	case secrets.AWSSSM:
+		AWSSSM, err := helper.SetupAWSSSM(ip.secretsConfig)
+		if err != nil {
+			return err
+		}
+
+		secretsManager = AWSSSM
+	default:
+		return errUnsupportedType
 	}
 
-	ip.secretsManager = vault
+	ip.secretsManager = secretsManager
 
 	return nil
 }

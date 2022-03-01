@@ -2,17 +2,18 @@ package e2e
 
 import (
 	"context"
-	"github.com/0xPolygon/polygon-edge/helper/hex"
-	"github.com/0xPolygon/polygon-edge/types"
-	"golang.org/x/crypto/sha3"
 	"math/big"
 	"testing"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/e2e/framework"
+	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/helper/tests"
+	"github.com/0xPolygon/polygon-edge/types"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/umbracle/go-web3"
+	"golang.org/x/crypto/sha3"
 )
 
 func TestNewFilter_Logs(t *testing.T) {

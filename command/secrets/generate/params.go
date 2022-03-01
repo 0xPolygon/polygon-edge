@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/0xPolygon/polygon-edge/command/output"
 	"github.com/0xPolygon/polygon-edge/secrets"
+	"strings"
 )
 
 var (
@@ -18,6 +19,7 @@ const (
 	typeFlag      = "type"
 	nameFlag      = "name"
 	namespaceFlag = "namespace"
+	extraFlag     = "extra"
 )
 
 const (
@@ -37,6 +39,7 @@ type generateParams struct {
 	serviceType string
 	name        string
 	namespace   string
+	extra       string
 }
 
 func (p *generateParams) getRequiredFlags() []string {
@@ -67,6 +70,17 @@ func (p *generateParams) generateSecretsConfig() (*secrets.SecretsManagerConfig,
 		return nil, errUnsupportedType
 	}
 
+	// Init the extra map
+	extraMap := make(map[string]interface{})
+
+	if p.extra != "" {
+		entries := strings.Split(p.extra, ",")
+		for _, e := range entries {
+			parts := strings.Split(e, "=")
+			extraMap[parts[0]] = parts[1]
+		}
+	}
+
 	// Generate the configuration
 	return &secrets.SecretsManagerConfig{
 		Token:     p.token,
@@ -85,5 +99,6 @@ func (p *generateParams) getResult() output.CommandResult {
 		AccessToken: p.token,
 		NodeName:    p.name,
 		Namespace:   p.namespace,
+		Extra:       p.extra,
 	}
 }
