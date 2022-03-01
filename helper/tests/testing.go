@@ -146,7 +146,7 @@ func WaitForNonce(
 			return result{nonce, err}, false
 		}
 
-		if nonce == expectedNonce {
+		if nonce >= expectedNonce {
 			//	match -> return result
 			return result{nonce, nil}, false
 		}
