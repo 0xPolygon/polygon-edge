@@ -252,27 +252,10 @@ func estimateGas(client *jsonrpc.Client, txn *types.Transaction) (uint64, error)
 	return gasEstimate, nil
 }
 
-func (l *Loadbot) executeTxn(
-	client txpoolOp.TxnPoolOperatorClient,
-	mode string,
-	contractAddr *types.Address,
-) (web3.Hash, error) {
-	var (
-		txn *types.Transaction
-		err error
-	)
-
-	if mode == "erc20Transfer" {
-		// convert web3 to types address
-		txn, err = l.generator.GenerateTokenTransferTransaction(mode, contractAddr)
-		if err != nil {
-			return web3.Hash{}, err
-		}
-	} else {
-		txn, err = l.generator.GenerateTransaction(mode)
-		if err != nil {
-			return web3.Hash{}, err
-		}
+func (l *Loadbot) executeTxn(client txpoolOp.TxnPoolOperatorClient) (web3.Hash, error) {
+	txn, err := l.generator.GenerateTransaction()
+	if err != nil {
+		return web3.Hash{}, err
 	}
 
 	addReq := &txpoolOp.AddTxnReq{
@@ -347,8 +330,10 @@ func (l *Loadbot) Run() error {
 	switch l.cfg.GeneratorMode {
 	case transfer:
 		txnGenerator, genErr = generator.NewTransferGenerator(generatorParams)
-	default:
+	case deploy:
 		txnGenerator, genErr = generator.NewDeployGenerator(generatorParams)
+	case erc20:
+		txnGenerator, genErr = generator.NewERC20Generator(generatorParams)
 	}
 
 	if genErr != nil {
@@ -357,14 +342,14 @@ func (l *Loadbot) Run() error {
 
 	l.generator = txnGenerator
 
-	// Get the gas estimate
-	exampleTxn, err := l.generator.GetExampleTransaction()
-	if err != nil {
-		return fmt.Errorf("unable to get example transaction, %w", err)
-	}
-
 	gasLimit := l.cfg.GasLimit
 	if gasLimit == nil {
+		// Get the gas estimate
+		exampleTxn, err := l.generator.GetExampleTransaction()
+		if err != nil {
+			return fmt.Errorf("unable to get example transaction, %w", err)
+		}
+
 		// No gas limit specified, query the network for an estimation
 		gasEstimate, estimateErr := estimateGas(jsonClient, exampleTxn)
 		if estimateErr != nil {
@@ -386,7 +371,11 @@ func (l *Loadbot) Run() error {
 	startTime := time.Now()
 
 	// deploy contracts
-	l.deployContract(grpcClient, jsonClient, receiptTimeout)
+	if l.cfg.GeneratorMode == erc20 {
+		if err := l.deployContract(grpcClient, jsonClient, receiptTimeout); err != nil {
+			return err
+		}
+	}
 
 	for i := uint64(0); i < l.cfg.Count; i++ {
 		<-ticker.C
@@ -398,45 +387,23 @@ func (l *Loadbot) Run() error {
 		go func(index uint64) {
 			defer wg.Done()
 
-			var txHash web3.Hash
 			// Start the performance timer
 			start := time.Now()
 
-			// run different transactions for different modes
-			if l.cfg.GeneratorMode == erc20 {
-				// Execute ERC20 Contract token transaction and report any errors
-				contractAddr := types.Address(l.metrics.ContractAddress)
+			// Execute the transaction
+			txHash, err := l.executeTxn(grpcClient)
+			if err != nil {
+				l.generator.MarkFailedTxn(&generator.FailedTxnInfo{
+					Index:  index,
+					TxHash: txHash.String(),
+					Error: &generator.TxnError{
+						Error:     err,
+						ErrorType: generator.AddErrorType,
+					},
+				})
+				atomic.AddUint64(&l.metrics.FailedTransactionsCount, 1)
 
-				txHash, err = l.executeTxn(grpcClient, "erc20Transfer", &contractAddr)
-				if err != nil {
-					l.generator.MarkFailedTxn(&generator.FailedTxnInfo{
-						Index:  index,
-						TxHash: txHash.String(),
-						Error: &generator.TxnError{
-							Error:     err,
-							ErrorType: generator.AddErrorType,
-						},
-					})
-					atomic.AddUint64(&l.metrics.FailedTransactionsCount, 1)
-
-					return
-				}
-			} else {
-				// Execute the transaction
-				txHash, err = l.executeTxn(grpcClient, "transaction", &types.ZeroAddress)
-				if err != nil {
-					l.generator.MarkFailedTxn(&generator.FailedTxnInfo{
-						Index:  index,
-						TxHash: txHash.String(),
-						Error: &generator.TxnError{
-							Error:     err,
-							ErrorType: generator.AddErrorType,
-						},
-					})
-					atomic.AddUint64(&l.metrics.FailedTransactionsCount, 1)
-
-					return
-				}
+				return
 			}
 
 			ctx, cancel := context.WithTimeout(context.Background(), receiptTimeout)

@@ -12,8 +12,7 @@ import (
 )
 
 type TransactionGenerator interface {
-	GenerateTransaction(mode string) (*types.Transaction, error)
-	GenerateTokenTransferTransaction(mode string, contractAddr *types.Address) (*types.Transaction, error)
+	GenerateTransaction() (*types.Transaction, error)
 	GetExampleTransaction() (*types.Transaction, error)
 	GetTransactionErrors() []*FailedTxnInfo
 	MarkFailedTxn(failedTxn *FailedTxnInfo)
