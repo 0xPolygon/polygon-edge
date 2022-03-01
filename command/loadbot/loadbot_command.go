@@ -203,7 +203,7 @@ func (l *LoadbotCommand) Run(args []string) int {
 	}
 
 	convMode := Mode(strings.ToLower(mode))
-	if convMode != transfer && convMode != deploy && convMode != erc20 {
+	if convMode != transfer && convMode != deploy && convMode != erc20 && convMode != erc721 {
 		l.Formatter.OutputError(errors.New("invalid loadbot mode"))
 
 		return 1
@@ -296,6 +296,17 @@ func (l *LoadbotCommand) Run(args []string) int {
 		if err != nil {
 			log.Fatalln("Could not encode constructor parameters: " + err.Error())
 		}
+	} else if convMode == erc721 {
+		contractArtifact = &generator.ContractArtifact{
+			Bytecode: ERC721BIN,
+			ABI: abi.MustNewABI(ERC721ABI),
+		}
+
+		constructorArgs, err = abi.Encode([]string{"ZEXFT", "ZEXES"}, contractArtifact.ABI.Constructor.Inputs)
+		if err != nil {
+			log.Fatalln("Could not encode constructor parameters: " + err.Error())
+		}
+		
 	} else {
 		contractArtifact = &generator.ContractArtifact{
 			Bytecode: generator.DefaultContractBytecode,

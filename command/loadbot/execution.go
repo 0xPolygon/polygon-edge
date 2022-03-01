@@ -36,6 +36,7 @@ const (
 	transfer Mode = "transfer"
 	deploy   Mode = "deploy"
 	erc20    Mode = "erc20"
+	erc721	 Mode = "erc721"
 )
 
 type Account struct {
