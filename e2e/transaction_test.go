@@ -359,13 +359,11 @@ func addStressTestTxns(
 func Test_TransactionDevLoop(t *testing.T) {
 	senderKey, sender := tests.GenerateKeyAndAddr(t)
 	defaultBalance := framework.EthToWei(100)
-	//devInterval := 1 // s
 
 	// Set up the test server
 	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDev)
 		config.SetSeal(true)
-		//config.SetDevInterval(devInterval)
 		config.Premine(sender, defaultBalance)
 		config.SetBlockLimit(20000000)
 	})
