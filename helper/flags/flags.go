@@ -52,7 +52,7 @@ func MultiAddrFromDNS(addr string, port int) (multiaddr.Multiaddr, error) {
 	var domain string
 
 	match, err := regexp.MatchString(
-		"^/?(dns)(4|6)?/[^-|^/][A-Za-z0-9-]([^-|^/]?)+([\\-\\.]{1}[a-z0-9]+)*\\.[A-Za-z]{2,6}(/?)$",
+		"^/?(dns)(4|6)?/[^-|^/][A-Za-z0-9-]([^-|^/]?)+([\\-\\.]{1}[a-z0-9]+)*\\.[A-Za-z]{2,}(/?)$",
 		addr,
 	)
 	if err != nil || !match {

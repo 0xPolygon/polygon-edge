@@ -51,6 +51,12 @@ enum EventType {
 
   // For demoted transactions
   DEMOTED = 4;
+
+  // For pruned promoted transactions
+  PRUNED_PROMOTED = 5;
+
+  // For pruned enqueued transactions
+  PRUNED_ENQUEUED = 6;
 }
 
 message TxPoolEvent {
