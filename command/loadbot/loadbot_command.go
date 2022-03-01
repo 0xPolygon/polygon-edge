@@ -538,7 +538,7 @@ func (lr *LoadbotResult) Output() string {
 						float64(bd.GasDataMap.Blocks[blockNumber].GasLimit)*100),
 				)
 				formattedStrings = append(formattedStrings,
-					fmt.Sprintf("Block #%d|%d txns (%d gasUsed / %d gasLimit) utilistaion|%d%%",
+					fmt.Sprintf("Block #%d|%d txns (%d gasUsed / %d gasLimit) utilization|%d%%",
 						blockNumber,
 						bd.BlockTransactionsMap[blockNumber],
 						bd.GasDataMap.Blocks[blockNumber].GasUsed,
@@ -582,7 +582,7 @@ func (lr *LoadbotResult) Output() string {
 		displayTxnsInBlocks(&buffer, &lr.ContractBlockData)
 		buffer.WriteString("\n\n")
 		buffer.WriteString(helper.FormatKV([]string{
-			fmt.Sprintf("Average utilisation across all blocks: %d%%", average(lr.ContractBlockData.AverageBlockUsed)),
+			fmt.Sprintf("Average utilization across all blocks: %d%%", average(lr.ContractBlockData.AverageBlockUsed)),
 		}))
 	}
 
@@ -594,7 +594,7 @@ func (lr *LoadbotResult) Output() string {
 	displayTxnsInBlocks(&buffer, &lr.BlockData)
 	buffer.WriteString("\n\n")
 	buffer.WriteString(helper.FormatKV([]string{
-		fmt.Sprintf("Average utilisation across all blocks: %d%%", average(lr.BlockData.AverageBlockUsed)),
+		fmt.Sprintf("Average utilization across all blocks: %d%%", average(lr.BlockData.AverageBlockUsed)),
 	}))
 	// Write out the error logs if detailed view
 	// is requested

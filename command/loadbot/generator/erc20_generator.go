@@ -3,10 +3,11 @@ package generator
 import (
 	"encoding/hex"
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/crypto"
-	"github.com/0xPolygon/polygon-edge/types"
 	"math/big"
 	"sync/atomic"
+
+	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 type ERC20Generator struct {
@@ -37,7 +38,7 @@ func NewERC20Generator(params *GeneratorParams) (*ERC20Generator, error) {
 
 	if gen.encodedParams, err = params.ContractArtifact.ABI.Methods["transfer"].Encode(
 		[]string{params.RecieverAddress.String(),
-			"30000",
+			"3",
 		}); err != nil {
 		return nil, fmt.Errorf("cannot encode transfer method params: %w", err)
 	}
@@ -79,7 +80,7 @@ func (gen *ERC20Generator) GenerateTransaction() (*types.Transaction, error) {
 	newNextNonce := atomic.AddUint64(&gen.params.Nonce, 1)
 
 	if gen.contractAddress == nil {
-		fmt.Println("generating deployment tx")
+		// fmt.Println("generating deployment tx")
 		//	contract not deployed yet
 		//	generate contract deployment tx
 		return gen.signer.SignTx(&types.Transaction{
