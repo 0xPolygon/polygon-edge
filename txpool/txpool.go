@@ -666,14 +666,31 @@ func (p *TxPool) addGossipTx(obj interface{}) {
 
 // resetAccounts updates existing accounts with the new nonce.
 func (p *TxPool) resetAccounts(stateNonces map[types.Address]uint64) {
-	for addr, nonce := range stateNonces {
-		if !p.accounts.exists(addr) {
-			// unknown account
-			continue
+	//	lock all accounts (enqueued + promoted)
+	p.accounts.Range(func(key, value interface{}) bool {
+		addressKey, ok := key.(types.Address)
+		if !ok {
+			return false
 		}
 
-		p.resetAccount(addr, nonce)
-	}
+		account := p.accounts.get(addressKey)
+
+		newNonce, ok := stateNonces[addressKey]
+		if !ok {
+			return true
+		}
+
+		account.promoted.lock(true)
+		account.enqueued.lock(true)
+		defer func() {
+			account.promoted.unlock()
+			account.enqueued.unlock()
+		}()
+
+		p.resetAccount(addressKey, newNonce)
+
+		return true
+	})
 }
 
 // resetAccount aligns the account's state with the given nonce,
@@ -681,10 +698,6 @@ func (p *TxPool) resetAccounts(stateNonces map[types.Address]uint64) {
 // is eligible for promotion, a promoteRequest is signaled.
 func (p *TxPool) resetAccount(addr types.Address, nonce uint64) {
 	account := p.accounts.get(addr)
-
-	// lock promoted
-	account.promoted.lock(true)
-	defer account.promoted.unlock()
 
 	// prune promoted
 	pruned, prunedHashes := account.promoted.prune(nonce)
@@ -705,10 +718,6 @@ func (p *TxPool) resetAccount(addr types.Address, nonce uint64) {
 		// only the promoted queue needed pruning
 		return
 	}
-
-	// lock enqueued
-	account.enqueued.lock(true)
-	defer account.enqueued.unlock()
 
 	// prune enqueued
 	pruned, prunedHashes = account.enqueued.prune(nonce)
