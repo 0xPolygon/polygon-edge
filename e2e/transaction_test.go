@@ -406,7 +406,7 @@ func Test_TransactionDevLoop(t *testing.T) {
 	retryCtx, retryCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer retryCancel()
 
-	_, err = tests.WaitUntilNonce(
+	_, err = tests.WaitForNonce(
 		retryCtx,
 		client.Eth(),
 		web3.BytesToAddress(sender.Bytes()),

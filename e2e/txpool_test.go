@@ -620,7 +620,7 @@ func TestTxPool_ZeroPriceDev(t *testing.T) {
 	waitCtx, waitCancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer waitCancel()
 
-	_, err := tests.WaitUntilNonce(waitCtx, client.Eth(), web3.BytesToAddress(senderAddress.Bytes()), nonce)
+	_, err := tests.WaitForNonce(waitCtx, client.Eth(), web3.BytesToAddress(senderAddress.Bytes()), nonce)
 	assert.NoError(t, err)
 
 	receiverBalance, err := client.Eth().GetBalance(web3.Address(receiverAddress), web3.Latest)

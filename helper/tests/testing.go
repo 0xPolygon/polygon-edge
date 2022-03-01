@@ -125,7 +125,7 @@ func WaitUntilTxPoolEmpty(
 	return status, nil
 }
 
-func WaitUntilNonce(
+func WaitForNonce(
 	ctx context.Context,
 	ethClient *jsonrpc.Eth,
 	addr web3.Address,
