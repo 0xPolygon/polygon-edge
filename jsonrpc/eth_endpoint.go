@@ -607,10 +607,10 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 			return true, applyErr
 		}
 
-		//// Check if an EVM revert happened
-		//if result.Reverted() {
-		//	return true, constructErrorFromRevert(result)
-		//}
+		// Check if an EVM revert happened
+		if result.Reverted() {
+			return true, constructErrorFromRevert(result)
+		}
 
 		// Check if an out of gas error happened during EVM execution
 		if result.Failed() {
