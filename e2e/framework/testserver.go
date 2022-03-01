@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/0xPolygon/polygon-edge/command"
+	ibftswitch "github.com/0xPolygon/polygon-edge/command/ibft/switch"
 	initCmd "github.com/0xPolygon/polygon-edge/command/secrets/init"
 	"google.golang.org/grpc/credentials/insecure"
 	"io"
@@ -361,14 +362,18 @@ func (t *TestServer) Start(ctx context.Context) error {
 
 func (t *TestServer) SwitchIBFTType(typ ibft.MechanismType, from uint64, to, deployment *uint64) error {
 	t.t.Helper()
+	ibftSwitchCmd := ibftswitch.GetCommand()
+	args := make([]string, 0)
 
-	args := []string{
-		"ibft", "switch",
+	commandSlice := strings.Split(fmt.Sprintf("ibft %s", ibftSwitchCmd.Use), " ")
+
+	args = append(args, commandSlice...)
+	args = append(args, []string{
 		// add custom chain
 		"--chain", filepath.Join(t.Config.RootDir, "genesis.json"),
 		"--type", string(typ),
 		"--from", strconv.FormatUint(from, 10),
-	}
+	}...)
 
 	if to != nil {
 		args = append(args, "--to", strconv.FormatUint(*to, 10))
