@@ -1,4 +1,4 @@
-package _switch
+package ibftswitch
 
 import (
 	"errors"
@@ -69,7 +69,7 @@ func (p *switchParams) initRawParams() error {
 func (p *switchParams) initMechanismType() error {
 	mechanismType, err := ibft.ParseType(p.typeRaw)
 	if err != nil {
-		return fmt.Errorf("unable to parse mechanism type: %v", err)
+		return fmt.Errorf("unable to parse mechanism type: %w", err)
 	}
 
 	p.mechanismType = mechanismType
@@ -83,7 +83,7 @@ func (p *switchParams) initDeployment() error {
 			d, err := types.ParseUint64orHex(&p.deploymentRaw)
 			if err != nil {
 				return fmt.Errorf(
-					"unable to parse deployment value, %v",
+					"unable to parse deployment value, %w",
 					err,
 				)
 			}
@@ -103,7 +103,7 @@ func (p *switchParams) initDeployment() error {
 func (p *switchParams) initFrom() error {
 	from, err := types.ParseUint64orHex(&p.fromRaw)
 	if err != nil {
-		return fmt.Errorf("unable to parse from value, %v", err)
+		return fmt.Errorf("unable to parse from value, %w", err)
 	}
 
 	if from <= 0 {

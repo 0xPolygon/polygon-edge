@@ -1,4 +1,4 @@
-package _switch
+package ibftswitch
 
 import (
 	"fmt"
@@ -52,7 +52,6 @@ func setFlags(cmd *cobra.Command) {
 		"",
 		"the height to switch the new type",
 	)
-
 }
 
 func setRequiredFlags(cmd *cobra.Command) {
