@@ -25,7 +25,7 @@
                 },
                 "balance": "0x0"
             },
-            "0x00E14742568DCe8b551486f4c02c508711A3FCbc": {
+            "0xd4B3f7537755755aca28b0d948580DC40dCA458f": {
                 "balance": "0x19d971e4fe8401e74000000"
             }
         },
@@ -47,7 +47,7 @@
         "chainID": 36,
         "engine": {
             "ibft": {
-                "epochSize": 50,
+                "epochSize": 5000,
                 "type": "PoS"
             }
         },
