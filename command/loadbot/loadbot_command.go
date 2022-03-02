@@ -135,6 +135,13 @@ func (l *LoadbotCommand) DefineFlags() {
 			"MAX_CONNECTIONS_COUNT",
 		},
 	}
+
+	l.FlagMap["max-wait"] = helper.FlagDescriptor{
+		Description: "Sets the maximum time in minutes to wait for transaction receipts. Default: calulated dynamicaly based on txn count and tps",
+		Arguments: []string{
+			"MAX_WAIT",
+		},
+	}
 }
 
 func (l *LoadbotCommand) GetHelperText() string {
@@ -174,6 +181,7 @@ func (l *LoadbotCommand) Run(args []string) int {
 		gasPrice     string
 		gasLimit     string
 		contractPath string
+		maxWait uint
 	)
 
 	// Map flags to placeholders
@@ -187,10 +195,11 @@ func (l *LoadbotCommand) Run(args []string) int {
 	flags.Uint64Var(&count, "count", 1000, "")
 	flags.StringVar(&jsonrpc, "jsonrpc", "", "")
 	flags.StringVar(&grpc, "grpc-address", "", "")
-	flags.IntVar(&maxConns, "max-conns", 0, "")
+	flags.IntVar(&maxConns, "max-conns", 1000000000, "")
 	flags.StringVar(&gasPrice, "gas-price", "", "")
 	flags.StringVar(&gasLimit, "gas-limit", "", "")
 	flags.StringVar(&contractPath, "contract", "", "")
+	flags.UintVar(&maxWait, "max-wait", 0, "")
 
 	// configuration vars
 	var (
@@ -311,6 +320,7 @@ func (l *LoadbotCommand) Run(args []string) int {
 		GasLimit:         bigGasLimit,
 		ContractArtifact: contractArtifact,
 		ConstructorArgs:  constructorArgs,
+		MaxWait: 					maxWait,
 	}
 
 	// Create the metrics placeholder
