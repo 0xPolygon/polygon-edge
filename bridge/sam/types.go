@@ -28,7 +28,7 @@ type Signer interface {
 type Pool interface {
 	AddMessage(*Message)
 	AddSignature(*MessageSignature)
-	Consume(types.Hash)
+	ConsumeMessage(types.Hash)
 	GetReadyMessages() []ReadyMessage
 	UpdateValidatorSet([]types.Address, uint64)
 }

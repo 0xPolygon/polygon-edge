@@ -62,7 +62,7 @@ func newTestMessagePool(
 	}
 
 	for _, consumed := range consumedHashes {
-		pool.Consume(consumed)
+		pool.ConsumeMessage(consumed)
 	}
 
 	for _, signature := range signatures {
