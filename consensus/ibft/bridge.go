@@ -167,6 +167,7 @@ func (b *BridgeMechanism) initializeHookMap() {
 }
 
 // ShouldWriteTransactions indicates if transactions should be written to a block
+// Bridge will not affect this flag for now
 func (b *BridgeMechanism) ShouldWriteTransactions(_blockNumber uint64) bool {
-	return true
+	return false
 }

@@ -1006,7 +1006,7 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 		return err
 	}
 
-	if hookErr := i.runHook(InsertBlockHook, header.Number, header.Number); hookErr != nil {
+	if hookErr := i.runHook(InsertBlockHook, header.Number, block); hookErr != nil {
 		return hookErr
 	}
 
