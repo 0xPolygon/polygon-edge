@@ -58,7 +58,7 @@ type Configuration struct {
 	GasLimit         *big.Int
 	ContractArtifact *generator.ContractArtifact
 	ConstructorArgs  []byte // smart contract constructor args
-	MaxWait uint // max wait time for receipts in minutes
+	MaxWait          uint   // max wait time for receipts in minutes
 }
 
 type metadata struct {
@@ -368,7 +368,7 @@ func (l *Loadbot) Run() error {
 	defer ticker.Stop()
 
 	var (
-		wg sync.WaitGroup
+		wg             sync.WaitGroup
 		receiptTimeout time.Duration
 	)
 

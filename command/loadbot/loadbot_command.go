@@ -137,7 +137,8 @@ func (l *LoadbotCommand) DefineFlags() {
 	}
 
 	l.FlagMap["max-wait"] = helper.FlagDescriptor{
-		Description: "Sets the maximum time in minutes to wait for transaction receipts. Default: calulated dynamicaly based on txn count and tps",
+		Description: `Sets the maximum time in minutes to wait for transaction receipts. 
+									Default: calculated dynamically based on txn count and tps`,
 		Arguments: []string{
 			"MAX_WAIT",
 		},
@@ -181,7 +182,7 @@ func (l *LoadbotCommand) Run(args []string) int {
 		gasPrice     string
 		gasLimit     string
 		contractPath string
-		maxWait uint
+		maxWait      uint
 	)
 
 	// Map flags to placeholders
@@ -320,7 +321,7 @@ func (l *LoadbotCommand) Run(args []string) int {
 		GasLimit:         bigGasLimit,
 		ContractArtifact: contractArtifact,
 		ConstructorArgs:  constructorArgs,
-		MaxWait: 					maxWait,
+		MaxWait:          maxWait,
 	}
 
 	// Create the metrics placeholder

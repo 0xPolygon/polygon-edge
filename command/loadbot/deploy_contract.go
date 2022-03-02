@@ -47,7 +47,7 @@ func (l *Loadbot) deployContract(
 
 	// and wait for receipt
 	receipt, err := tests.WaitForReceipt(ctx, jsonClient.Eth(), txHash)
-	
+
 	if err != nil {
 		l.generator.MarkFailedContractTxn(&generator.FailedContractTxnInfo{
 			TxHash: txHash.String(),
