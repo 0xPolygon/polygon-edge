@@ -126,18 +126,17 @@ func TestBridge_StateSync(t *testing.T) {
 			config.SetSeal(true)
 		})
 
-	ctx1, cancel1 := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel1()
-	sourceIBFT.StartServers(ctx1)
+	startSourceIBFTCtx, startSourceIBFTCancel := context.WithTimeout(context.Background(), time.Minute)
+	defer startSourceIBFTCancel()
+	sourceIBFT.StartServers(startSourceIBFTCtx)
 
 	// deploy state syncer contract
-	ctx2, cancel2 := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel2()
-	syncerContractAddr, err := sourceIBFT.GetServer(0).DeployContract(ctx2, StateSyncerByteCode, senderKey)
+	deployStateSyncerCtx, deployStateSyncerCancel := context.WithTimeout(context.Background(), time.Minute)
+	defer deployStateSyncerCancel()
+	syncerContractAddr, err := sourceIBFT.GetServer(0).DeployContract(deployStateSyncerCtx, StateSyncerByteCode, senderKey)
 	if err != nil {
 		t.Fatal(err)
 	}
-	fmt.Printf("Deployed StateSyncerByteCode %s\n", syncerContractAddr)
 
 	// setup destination chain
 	destIBFT := framework.NewIBFTServersManager(
@@ -151,37 +150,36 @@ func TestBridge_StateSync(t *testing.T) {
 			config.SetBridgeRootChainURL(sourceIBFT.GetServer(0).WSJSONRPCAddr())
 			config.SetBridgeRootChainContract(syncerContractAddr.String())
 			config.SetBridgeRootChainConfirmations(5)
-
-			config.SetShowsLog(i == 0)
 		})
 
-	ctx3, cancel3 := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel3()
-	destIBFT.StartServers(ctx3)
+	startDestIBFTCtx, startDestIBFTCancel := context.WithTimeout(context.Background(), time.Minute)
+	defer startDestIBFTCancel()
+	destIBFT.StartServers(startDestIBFTCtx)
 
 	// deploy state reciever contract
-	ctx4, cancel4 := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel4()
-	reciverContractAddr, err := destIBFT.GetServer(0).DeployContract(ctx4, StateReceiverByteCode, senderKey)
+	deployStateReceiverCtx, deployStateReceiverCancel := context.WithTimeout(context.Background(), time.Minute)
+	defer deployStateReceiverCancel()
+	reciverContractAddr, err := destIBFT.GetServer(0).DeployContract(deployStateReceiverCtx, StateReceiverByteCode, senderKey)
 	if err != nil {
 		t.Fatal(err)
 	}
-	fmt.Printf("Deployed StateSyncerContractAddr %s\n", reciverContractAddr)
+
+	// syncData is sent to StateSync contract and forwarded to StateReceiver
+	syncData := "hello"
 
 	// Send state sync contract
-	ctx5, cancel5 := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel5()
 	to := types.BytesToAddress(syncerContractAddr[:])
 	input, err := StateSyncerABI.Methods["stateSync"].Encode(map[string]interface{}{
 		"contractAddress": reciverContractAddr.String(),
-		"data":            []byte{0x68, 0x65, 0x6c, 0x6c, 0x6f}, // hello
+		"data":            []byte(syncData),
 	})
-	fmt.Printf("input %+v\n", input)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, err = sourceIBFT.GetServer(0).SendRawTx(ctx5, &framework.PreparedTransaction{
+	sendStateSyncCtx, sendStateSyncCancel := context.WithTimeout(context.Background(), time.Minute)
+	defer sendStateSyncCancel()
+	_, err = sourceIBFT.GetServer(0).SendRawTx(sendStateSyncCtx, &framework.PreparedTransaction{
 		Gas:      framework.DefaultGasLimit,
 		GasPrice: big.NewInt(framework.DefaultGasPrice),
 		To:       &to,
@@ -222,7 +220,7 @@ func TestBridge_StateSync(t *testing.T) {
 
 	assert.Equal(
 		t,
-		"hello",
+		syncData,
 		resMap["0"].(string),
 	)
 }
