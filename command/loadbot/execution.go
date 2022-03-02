@@ -20,8 +20,8 @@ import (
 )
 
 const (
-	maxReceiptWait = 5 * time.Minute
-	minReceiptWait = 60 * time.Second
+	maxReceiptWait = 10 * time.Minute
+	minReceiptWait = 120 * time.Second
 
 	defaultFastestTurnAround = time.Hour * 24
 	defaultSlowestTurnAround = time.Duration(0)

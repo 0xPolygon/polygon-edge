@@ -47,8 +47,7 @@ func (l *Loadbot) deployContract(
 
 	// and wait for receipt
 	receipt, err := tests.WaitForReceipt(ctx, jsonClient.Eth(), txHash)
-	// initialize gas metrics map with block nuber as index
-	l.metrics.ContractGasMetrics.Blocks[receipt.BlockNumber] = GasMetrics{}
+	
 	if err != nil {
 		l.generator.MarkFailedContractTxn(&generator.FailedContractTxnInfo{
 			TxHash: txHash.String(),
@@ -63,6 +62,8 @@ func (l *Loadbot) deployContract(
 	}
 
 	end := time.Now()
+	// initialize gas metrics map with block nuber as index
+	l.metrics.ContractGasMetrics.Blocks[receipt.BlockNumber] = GasMetrics{}
 	// fetch contract address
 	l.metrics.ContractAddress = receipt.ContractAddress
 	// set contract address in order to get new example txn and gas estimate
