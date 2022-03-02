@@ -187,7 +187,6 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 
 	// bridge
 	if config.Bridge.Enable {
-		// FIXME: use new key?
 		key, err := crypto.ReadConsensusKey(m.secretsManager)
 		if err != nil {
 			return nil, fmt.Errorf("unable to read validator key from Secrets Manager, %w", err)
@@ -610,11 +609,6 @@ func (s *Server) Close() {
 		}
 	}
 
-	// if s.tracker != nil {
-	// 	if err := s.tracker.Stop(); err != nil {
-	// 		s.logger.Error("failed to shutdown tracker", "err", err)
-	// 	}
-	// }
 	if s.bridge != nil {
 		if err := s.bridge.Close(); err != nil {
 			s.logger.Error("Bridge shutdown error", err)
