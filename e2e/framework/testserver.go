@@ -362,6 +362,7 @@ func (t *TestServer) Start(ctx context.Context) error {
 
 func (t *TestServer) SwitchIBFTType(typ ibft.MechanismType, from uint64, to, deployment *uint64) error {
 	t.t.Helper()
+
 	ibftSwitchCmd := ibftswitch.GetCommand()
 	args := make([]string, 0)
 
