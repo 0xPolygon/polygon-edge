@@ -190,37 +190,50 @@ func TestBridge_StateSync(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// TODO: remove of course
-	time.Sleep(time.Minute * 1)
+	err = waitUntilStateReachesToContract(context.Background(), destIBFT.GetServer(0), senderAddr, reciverContractAddr, syncData)
+	assert.NoError(t, err)
+}
 
-	response, err := destIBFT.GetServer(0).JSONRPC().Eth().Call(
-		&web3.CallMsg{
-			From:     web3.Address(senderAddr),
-			To:       &reciverContractAddr,
-			Data:     StateRecieverABI.Methods["getState"].ID(),
-			GasPrice: 100000000,
-			Value:    big.NewInt(0),
-		},
-		web3.Latest,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
+// waitUntilStateReachesToContract repeats to get state in StateReceiver contract until expected state is set
+func waitUntilStateReachesToContract(
+	ctx context.Context,
+	srv *framework.TestServer,
+	senderAddress types.Address,
+	contractAddress web3.Address,
+	expectedState string,
+) error {
+	_, err := tests.RetryUntilTimeout(ctx, func() (interface{}, bool) {
+		response, err := srv.JSONRPC().Eth().Call(
+			&web3.CallMsg{
+				From:     web3.Address(senderAddress),
+				To:       &contractAddress,
+				Data:     StateRecieverABI.Methods["getState"].ID(),
+				GasPrice: 100000000,
+				Value:    big.NewInt(0),
+			},
+			web3.Latest,
+		)
+		if err != nil {
+			return err, true
+		}
 
-	byteData, err := types.ParseBytes(&response)
-	if err != nil {
-		t.Fatal(err)
-	}
+		byteData, err := types.ParseBytes(&response)
+		if err != nil {
+			return err, true
+		}
 
-	res, err := StateRecieverABI.Methods["getState"].Outputs.Decode(byteData)
-	if err != nil {
-		t.Fatal(err)
-	}
-	resMap := res.(map[string]interface{})
+		res, err := StateRecieverABI.Methods["getState"].Outputs.Decode(byteData)
+		if err != nil {
+			return err, true
+		}
+		resMap := res.(map[string]interface{})
 
-	assert.Equal(
-		t,
-		syncData,
-		resMap["0"].(string),
-	)
+		if resMap["0"].(string) == expectedState {
+			return nil, false
+		}
+
+		return nil, true
+	})
+
+	return err
 }
