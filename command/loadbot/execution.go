@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
-	"log"
 	"math/big"
 	"sync"
 	"sync/atomic"
@@ -36,7 +35,7 @@ const (
 	transfer Mode = "transfer"
 	deploy   Mode = "deploy"
 	erc20    Mode = "erc20"
-	erc721	 Mode = "erc721"
+	erc721   Mode = "erc721"
 )
 
 type Account struct {
@@ -375,7 +374,7 @@ func (l *Loadbot) Run() error {
 
 	// deploy contracts
 	if err := l.deployContract(grpcClient, jsonClient, receiptTimeout); err != nil {
-		return err
+		return fmt.Errorf("unable to deploy smart contract, %w", err)
 	}
 
 	for i := uint64(0); i < l.cfg.Count; i++ {
@@ -450,7 +449,7 @@ func (l *Loadbot) Run() error {
 	for k, v := range l.metrics.GasMetrics.Blocks {
 		blockInfom, err := jsonClient.Eth().GetBlockByNumber(web3.BlockNumber(k), false)
 		if err != nil {
-			log.Fatalln("Could not fetch block by number")
+			return fmt.Errorf("could not fetch block by number, %w", err)
 		}
 
 		v.GasLimit = blockInfom.GasLimit

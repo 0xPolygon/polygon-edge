@@ -3,7 +3,6 @@ package loadbot
 import (
 	"context"
 	"fmt"
-	"log"
 	"sync/atomic"
 	"time"
 
@@ -20,7 +19,6 @@ func (l *Loadbot) deployContract(
 	grpcClient txpoolOp.TxnPoolOperatorClient,
 	jsonClient *jsonrpc.Client,
 	receiptTimeout time.Duration) error {
-
 	// if this is a regular transfer skip token deployment
 	if l.cfg.GeneratorMode == transfer {
 		return nil
@@ -40,7 +38,7 @@ func (l *Loadbot) deployContract(
 		})
 		atomic.AddUint64(&l.metrics.FailedContractTransactionsCount, 1)
 
-		return err
+		return fmt.Errorf("could not execute transaction, %w", err)
 	}
 
 	// set timeout
@@ -49,7 +47,7 @@ func (l *Loadbot) deployContract(
 
 	// and wait for receipt
 	receipt, err := tests.WaitForReceipt(ctx, jsonClient.Eth(), txHash)
-	// set block number
+	// initialize gas metrics map with block nuber as index
 	l.metrics.ContractGasMetrics.Blocks[receipt.BlockNumber] = GasMetrics{}
 	if err != nil {
 		l.generator.MarkFailedContractTxn(&generator.FailedContractTxnInfo{
@@ -61,20 +59,20 @@ func (l *Loadbot) deployContract(
 		})
 		atomic.AddUint64(&l.metrics.FailedContractTransactionsCount, 1)
 
-		return err
+		return fmt.Errorf("could not get the receipt, %w", err)
 	}
 
 	end := time.Now()
 	// fetch contract address
 	l.metrics.ContractAddress = receipt.ContractAddress
-
-	// set contract address in order to get new example txn and gas esitmate
+	// set contract address in order to get new example txn and gas estimate
 	l.generator.SetContractAddress(types.StringToAddress(
 		receipt.ContractAddress.String(),
 	))
 
 	// we're done with SC deployment
-	// now get new gas estimates for token transfers
+	// we defined SC address and
+	// now get new gas estimates for CS token transfers
 	if l.cfg.GasLimit == nil {
 		// Get the gas estimate
 		exampleTxn, err := l.generator.GetExampleTransaction()
@@ -100,10 +98,11 @@ func (l *Loadbot) deployContract(
 		},
 	)
 	// calculate contract deployment metrics
+	// by getting gas info from each block number we recorded from the receipt
 	for k, v := range l.metrics.ContractGasMetrics.Blocks {
 		blockInfom, err := jsonClient.Eth().GetBlockByNumber(web3.BlockNumber(k), false)
 		if err != nil {
-			log.Fatalln("Could not fetch block by number")
+			return fmt.Errorf("could not fetch block by number, %w", err)
 		}
 
 		v.GasLimit = blockInfom.GasLimit

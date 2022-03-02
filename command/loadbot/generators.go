@@ -54,30 +54,31 @@ func extractSenderAccount(address types.Address) (*Account, error) {
 	return sender, nil
 }
 
-func generateContractArtifactAndArgs(mode Mode) (*generator.ContractArtifact, []byte, error ) {
+func generateContractArtifactAndArgs(mode Mode) (*generator.ContractArtifact, []byte, error) {
 	var (
 		ctrArtifact *generator.ContractArtifact
-		ctrArgs []byte
-		err error
+		ctrArgs     []byte
+		err         error
 	)
 
 	if mode == erc20 {
 		ctrArtifact = &generator.ContractArtifact{
 			Bytecode: ERC20BIN,
-			ABI: abi.MustNewABI(ERC20ABI),
+			ABI:      abi.MustNewABI(ERC20ABI),
 		}
 
-		if ctrArgs, err = abi.Encode([]string{"4314500000", "ZexCoin", "ZEX"}, ctrArtifact.ABI.Constructor.Inputs); err != nil {
-			return nil, nil , err
+		if ctrArgs, err = abi.Encode(
+			[]string{"4314500000", "ZexCoin", "ZEX"}, ctrArtifact.ABI.Constructor.Inputs); err != nil {
+			return nil, nil, err
 		}
 	} else if mode == erc721 {
 		ctrArtifact = &generator.ContractArtifact{
 			Bytecode: ERC721BIN,
-			ABI: abi.MustNewABI(ERC721ABI),
+			ABI:      abi.MustNewABI(ERC721ABI),
 		}
 
 		if ctrArgs, err = abi.Encode([]string{"ZEXFT", "ZEXES"}, ctrArtifact.ABI.Constructor.Inputs); err != nil {
-			return nil, nil , err
+			return nil, nil, err
 		}
 	} else {
 		ctrArtifact = &generator.ContractArtifact{

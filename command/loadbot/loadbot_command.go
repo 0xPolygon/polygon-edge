@@ -202,13 +202,13 @@ func (l *LoadbotCommand) Run(args []string) int {
 		bigGasLimit *big.Int
 		gasLimitErr error
 
-		constructorArgs []byte
+		constructorArgs  []byte
 		contractArtifact *generator.ContractArtifact
 
-		sender types.Address
+		sender   types.Address
 		receiver types.Address
 
-		readErr          error
+		readErr error
 	)
 
 	// Parse cli arguments
@@ -229,8 +229,6 @@ func (l *LoadbotCommand) Run(args []string) int {
 	if maxConns == 0 {
 		maxConns = int(2 * tps)
 	}
-
-
 
 	// Parse the gas price
 	if gasPrice != "" {
@@ -285,7 +283,7 @@ func (l *LoadbotCommand) Run(args []string) int {
 
 	// generate SC artifact and SC construstor args
 	if contractArtifact, constructorArgs, err = generateContractArtifactAndArgs(convMode); err != nil {
-		l.Formatter.OutputError(fmt.Errorf("could not encode constructor parameters: %w",err))
+		l.Formatter.OutputError(fmt.Errorf("could not encode constructor parameters: %w", err))
 	}
 
 	if contractPath != "" {
