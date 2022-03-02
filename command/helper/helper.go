@@ -434,6 +434,7 @@ func ReadConfig(baseCommand string, args []string) (*Config, error) {
 		TxPool:    &TxPool{},
 		Telemetry: &Telemetry{},
 		Headers:   &Headers{},
+		Bridge:    &Bridge{},
 	}
 
 	flags := flag.NewFlagSet(baseCommand, flag.ContinueOnError)
@@ -479,6 +480,10 @@ func ReadConfig(baseCommand string, args []string) (*Config, error) {
 	flags.Var(&accessControlAllowOrigins, "access-control-allow-origins", "")
 	flags.StringVar(&cliConfig.RestoreFile, "restore", "", "")
 	flags.Uint64Var(&cliConfig.BlockTime, "block-time", config.BlockTime, "")
+	flags.BoolVar(&cliConfig.Bridge.Enable, "bridge", false, "")
+	flags.StringVar(&cliConfig.Bridge.RootchainURL, "bridge-rootchain-url", "", "")
+	flags.StringVar(&cliConfig.Bridge.RootchainContract, "bridge-rootchain-contract", "", "")
+	flags.Uint64Var(&cliConfig.Bridge.Confirmations, "bridge-rootchain-confirmations", config.Bridge.Confirmations, "")
 
 	if err := flags.Parse(args); err != nil {
 		return nil, err

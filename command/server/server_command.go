@@ -247,6 +247,42 @@ func (c *ServerCommand) DefineFlags() {
 		},
 		FlagOptional: true,
 	}
+
+	c.FlagMap["bridge"] = helper.FlagDescriptor{
+		Description: "Sets the flag indicating that the server should use Bridge. Defaults to false",
+		Arguments: []string{
+			"ENABLE_BRIDGE",
+		},
+		ArgumentsOptional: true,
+		FlagOptional:      true,
+	}
+
+	c.FlagMap["bridge-rootchain-url"] = helper.FlagDescriptor{
+		Description: "Sets the source chain URL",
+		Arguments: []string{
+			"BRIDGE_ROOTCHAIN_SOURCE_URL",
+		},
+		ArgumentsOptional: false,
+		FlagOptional:      true,
+	}
+
+	c.FlagMap["bridge-rootchain-contract"] = helper.FlagDescriptor{
+		Description: "Sets the source chain contract address",
+		Arguments: []string{
+			"BRIDGE_ROOTCHAIN_CONTRACT",
+		},
+		ArgumentsOptional: false,
+		FlagOptional:      true,
+	}
+
+	c.FlagMap["bridge-rootchain-confirmations"] = helper.FlagDescriptor{
+		Description: "Sets the required confirmations on root chain",
+		Arguments: []string{
+			"BRIDGE_ROOTCHAIN_CONFIRMATIONS",
+		},
+		ArgumentsOptional: false,
+		FlagOptional:      true,
+	}
 }
 
 // GetHelperText returns a simple description of the command

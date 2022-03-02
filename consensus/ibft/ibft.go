@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/bridge"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/crypto"
@@ -101,6 +102,8 @@ type Ibft struct {
 	mechanisms []ConsensusMechanism // IBFT ConsensusMechanism used (PoA / PoS)
 
 	blockTime time.Duration // Minimum block generation time in seconds
+
+	bridge bridge.Bridge
 }
 
 // runHook runs a specified hook if it is present in the hook map
@@ -162,6 +165,7 @@ func Factory(
 		metrics:        params.Metrics,
 		secretsManager: params.SecretsManager,
 		blockTime:      time.Duration(params.BlockTime) * time.Second,
+		bridge:         params.Bridge,
 	}
 
 	// Initialize the mechanism
@@ -744,6 +748,15 @@ func (i *Ibft) runAcceptState() { // start new round
 		i.setState(SyncState)
 
 		return
+	}
+
+	if i.bridge != nil {
+		i.bridge.SetValidators(snap.Set, uint64(snap.Set.Len()))
+
+		for _, msg := range i.bridge.GetReadyMessages() {
+			fmt.Printf("ReadyMessage height=%d, hash=%+v, body=%+v, signatures=%d\n", parent.Number+1, msg.Hash, msg.Body, len(msg.Signatures))
+			i.bridge.Consume(msg.Hash)
+		}
 	}
 
 	if hookErr := i.runHook(AcceptStateLogHook, i.state.view.Sequence, snap); hookErr != nil {

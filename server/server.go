@@ -13,6 +13,9 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/archive"
 	"github.com/0xPolygon/polygon-edge/blockchain"
+
+	"github.com/0xPolygon/polygon-edge/bridge"
+	"github.com/0xPolygon/polygon-edge/bridge/signer"
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/crypto"
@@ -63,6 +66,9 @@ type Server struct {
 
 	// transaction pool
 	txpool *txpool.TxPool
+
+	// bridge
+	bridge bridge.Bridge
 
 	serverMetrics *serverMetrics
 
@@ -180,6 +186,26 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		m.txpool.SetSigner(signer)
 	}
 
+	// bridge
+	if config.Bridge.Enable {
+		// FIXME: use new key?
+		key, err := crypto.ReadConsensusKey(m.secretsManager)
+		if err != nil {
+			return nil, fmt.Errorf("unable to read validator key from Secrets Manager, %w", err)
+		}
+
+		m.bridge, err = bridge.NewBridge(
+			logger,
+			m.network,
+			signer.NewECDSASigner(key),
+			config.DataDir,
+			config.Bridge,
+		)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	{
 		// Setup consensus
 		if err := m.setupConsensus(); err != nil {
@@ -222,6 +248,13 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 
 	if err := m.network.Start(); err != nil {
 		return nil, err
+	}
+
+	// start bridge
+	if m.bridge != nil {
+		if err := m.bridge.Start(); err != nil {
+			return nil, err
+		}
 	}
 
 	m.txpool.Start()
@@ -363,6 +396,7 @@ func (s *Server) setupConsensus() error {
 			Metrics:        s.serverMetrics.consensus,
 			SecretsManager: s.secretsManager,
 			BlockTime:      s.config.BlockTime,
+			Bridge:         s.bridge,
 		},
 	)
 
@@ -574,6 +608,12 @@ func (s *Server) Close() {
 	if s.prometheusServer != nil {
 		if err := s.prometheusServer.Shutdown(context.Background()); err != nil {
 			s.logger.Error("Prometheus server shutdown error", err)
+		}
+	}
+
+	if s.bridge != nil {
+		if err := s.bridge.Close(); err != nil {
+			s.logger.Error("Bridge shutdown error", err)
 		}
 	}
 

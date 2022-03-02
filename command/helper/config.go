@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
+	"net/url"
 	"strings"
 
 	"github.com/0xPolygon/polygon-edge/chain"
@@ -37,6 +38,7 @@ type Config struct {
 	Headers        *Headers               `json:"headers"`
 	RestoreFile    string                 `json:"restore_file"`
 	BlockTime      uint64                 `json:"block_time_s"`
+	Bridge         *Bridge                `json:"bridge"`
 }
 
 // Telemetry holds the config details for metric services.
@@ -66,6 +68,13 @@ type Headers struct {
 	AccessControlAllowOrigins []string `json:"access_control_allow_origins"`
 }
 
+type Bridge struct {
+	Enable            bool   `json:"enable"`
+	RootchainURL      string `json:"rootchain_url"`
+	RootchainContract string `json:"rootchain_contract"`
+	Confirmations     uint64 `json:"confirmations"`
+}
+
 // minimum block generation time in seconds
 const defaultBlockTime uint64 = 2
 
@@ -91,6 +100,12 @@ func DefaultConfig() *Config {
 		LogLevel:    "INFO",
 		RestoreFile: "",
 		BlockTime:   defaultBlockTime,
+		Bridge: &Bridge{
+			Enable:            false,
+			RootchainURL:      "",
+			RootchainContract: "",
+			Confirmations:     6,
+		},
 	}
 }
 
@@ -194,6 +209,19 @@ func (c *Config) BuildConfig() (*server.Config, error) {
 	// set block time if not default
 	if c.BlockTime != defaultBlockTime {
 		conf.BlockTime = c.BlockTime
+	}
+
+	// Bridge
+	if c.Bridge.Enable {
+		if conf.Bridge.RootChainURL, err = url.Parse(c.Bridge.RootchainURL); err != nil {
+			return nil, err
+		}
+
+		conf.Bridge.Enable = c.Bridge.Enable
+
+		conf.Bridge.RootChainContract = types.StringToAddress(c.Bridge.RootchainContract)
+
+		conf.Bridge.Confirmations = c.Bridge.Confirmations
 	}
 
 	// if we are in dev mode, change the consensus protocol with 'dev'
@@ -337,6 +365,22 @@ func (c *Config) mergeConfigWith(otherConfig *Config) error {
 	// if block time not default, set to new value
 	if otherConfig.BlockTime != defaultBlockTime {
 		c.BlockTime = otherConfig.BlockTime
+	}
+
+	if otherConfig.Bridge != nil {
+		c.Bridge.Enable = otherConfig.Bridge.Enable
+
+		if otherConfig.Bridge.RootchainURL != "" {
+			c.Bridge.RootchainURL = otherConfig.Bridge.RootchainURL
+		}
+
+		if otherConfig.Bridge.RootchainContract != "" {
+			c.Bridge.RootchainContract = otherConfig.Bridge.RootchainContract
+		}
+
+		if otherConfig.Bridge.Confirmations != 0 {
+			c.Bridge.Confirmations = otherConfig.Bridge.Confirmations
+		}
 	}
 
 	if err := mergo.Merge(&c.Consensus, otherConfig.Consensus, mergo.WithOverride); err != nil {
