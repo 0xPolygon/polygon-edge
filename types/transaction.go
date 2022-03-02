@@ -69,11 +69,11 @@ func (t *Transaction) IsTypedTransaction() bool {
 
 // ComputeHash computes the hash of the transaction
 func (t *Transaction) ComputeHash() *Transaction {
-
 	hash := keccak.DefaultKeccakPool.Get()
-	hash.Write(t.MarshalRLP())
-	hash.Sum(t.Hash[:0])
-	keccak.DefaultKeccakPool.Put(hash)
+	if _, err := hash.Write(t.MarshalRLP()); err == nil {
+		hash.Sum(t.Hash[:0])
+		keccak.DefaultKeccakPool.Put(hash)
+	}
 
 	return t
 }

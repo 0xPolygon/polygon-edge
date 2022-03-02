@@ -3,6 +3,10 @@ package tracker
 import (
 	"encoding/json"
 	"fmt"
+	"math/big"
+	"os"
+	"path/filepath"
+
 	"github.com/0xPolygon/polygon-edge/blockchain/storage"
 	"github.com/0xPolygon/polygon-edge/blockchain/storage/leveldb"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -10,9 +14,6 @@ import (
 	"github.com/umbracle/go-web3"
 	"github.com/umbracle/go-web3/abi"
 	client "github.com/umbracle/go-web3/jsonrpc"
-	"math/big"
-	"os"
-	"path/filepath"
 )
 
 const (
@@ -181,6 +182,7 @@ func (s *subscription) handleWSResponse(response []byte) {
 	header := &ethHeader{}
 	if err := json.Unmarshal(response, header); err != nil {
 		s.errorCh <- fmt.Errorf("unable to parse header - err: %w", err)
+
 		return
 	}
 

@@ -128,6 +128,7 @@ func (b *bridge) GetReadyMessages() ([]MessageWithSignatures, error) {
 	readyMessages := b.sampool.GetReadyMessages()
 
 	data := make([]MessageWithSignatures, 0, len(readyMessages))
+
 	for _, readyMsg := range readyMessages {
 		msg, ok := readyMsg.Data.(*Message)
 		if !ok {
@@ -204,6 +205,7 @@ func (b *bridge) processEthEvent(data []byte) error {
 	if err != nil {
 		return err
 	}
+
 	if msg == nil {
 		return fmt.Errorf("unknown event: tx=%s, log index=%d", log.TransactionHash, log.LogIndex)
 	}

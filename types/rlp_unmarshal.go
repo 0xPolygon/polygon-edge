@@ -62,11 +62,13 @@ func (b *Block) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 
 	for i := 0; i < len(txns); i++ {
 		txType := TxTypeLegacy
+
 		if txns[i].Type() == fastrlp.TypeBytes {
 			bytes, err := txns[i].Bytes()
 			if err != nil {
 				return err
 			}
+
 			if l := len(bytes); l != 1 {
 				return fmt.Errorf("expected 1 byte transaction type, but size is %d", l)
 			}
@@ -195,6 +197,7 @@ func (r *Receipts) UnmarshalRLP(input []byte) error {
 	return UnmarshalRlp(r.UnmarshalRLPFrom, input)
 }
 
+//nolint:dupl
 func (r *Receipts) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	elems, err := v.GetElems()
 	if err != nil {
@@ -203,11 +206,13 @@ func (r *Receipts) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 
 	for i := 0; i < len(elems); i++ {
 		txType := TxTypeLegacy
+
 		if elems[i].Type() == fastrlp.TypeBytes {
 			bytes, err := elems[i].Bytes()
 			if err != nil {
 				return err
 			}
+
 			if l := len(bytes); l != 1 {
 				return fmt.Errorf("expected 1 byte transaction type, but size is %d", l)
 			}
@@ -235,11 +240,13 @@ func (r *Receipts) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 func (r *Receipt) UnmarshalRLP(input []byte) error {
 	txType := TxTypeLegacy
 	offset := 0
+
 	if len(input) > 0 && input[0] <= 0x7F {
 		var err error
 		if txType, err = ToTransactionType(input[0]); err != nil {
 			return err
 		}
+
 		offset = 1
 	}
 
@@ -346,11 +353,13 @@ func (l *Log) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 func (t *Transaction) UnmarshalRLP(input []byte) error {
 	txType := TxTypeLegacy
 	offset := 0
+
 	if len(input) > 0 && input[0] <= 0x7F {
 		var err error
 		if txType, err = ToTransactionType(input[0]); err != nil {
 			return err
 		}
+
 		offset = 1
 	}
 

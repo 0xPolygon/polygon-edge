@@ -346,7 +346,10 @@ func (t *TestServer) Start(ctx context.Context) error {
 		}
 
 		if t.Config.BridgeRootChainConfirmations != nil {
-			args = append(args, "bridge-rootchain-confirmations", *types.EncodeUint64(uint64(*t.Config.BridgeRootChainConfirmations)))
+			args = append(args,
+				"bridge-rootchain-confirmations",
+				*types.EncodeUint64(uint64(*t.Config.BridgeRootChainConfirmations)),
+			)
 		}
 	}
 

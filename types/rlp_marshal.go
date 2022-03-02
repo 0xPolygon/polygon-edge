@@ -96,10 +96,12 @@ func (r Receipts) MarshalRLPTo(dst []byte) []byte {
 
 func (r *Receipts) MarshalRLPWith(a *fastrlp.Arena) *fastrlp.Value {
 	vv := a.NewArray()
+
 	for _, rr := range *r {
 		if rr.IsTypedTransaction() {
 			vv.Set(a.NewBytes([]byte{byte(rr.TransactionType)}))
 		}
+
 		vv.Set(rr.MarshalRLPWith(a))
 	}
 

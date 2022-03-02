@@ -3,10 +3,11 @@ package tracker
 import (
 	"context"
 	"encoding/json"
+	"math/big"
+
 	"github.com/0xPolygon/polygon-edge/blockchain/storage"
 	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/go-web3"
-	"math/big"
 )
 
 type Config struct {
@@ -104,6 +105,7 @@ func (t *Tracker) Start() error {
 	//	subscribe for new headers
 	if err := t.subscribeToRootchain(); err != nil {
 		t.logger.Error("cannot subscribe to rootchain", "err", err)
+
 		return err
 	}
 

@@ -447,24 +447,28 @@ func (t *Transition) checkAndPreProcessStateTransaction(msg *types.Transaction) 
 			true,
 		)
 	}
+
 	if msg.GasPrice.Cmp(big.NewInt(0)) != 0 {
 		return 0, NewTransitionApplicationError(
 			errors.New("gasPrice of state transaction must be zero"),
 			true,
 		)
 	}
+
 	if msg.Gas != 0 {
 		return 0, NewTransitionApplicationError(
 			errors.New("gas of state transaction must be zero"),
 			true,
 		)
 	}
+
 	if msg.From != types.ZeroAddress {
 		return 0, NewTransitionApplicationError(
 			errors.New("from of state transaction must be zero"),
 			true,
 		)
 	}
+
 	if msg.To == nil || *msg.To == types.ZeroAddress {
 		return 0, NewTransitionApplicationError(
 			errors.New("to of state transaction must be specified"),

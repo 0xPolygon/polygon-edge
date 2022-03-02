@@ -300,12 +300,13 @@ func (i *Ibft) setupMechanism() error {
 	}
 
 	if i.bridge != nil {
-		bridgeMecanism, _ := BridgeFactory(i)
+		bridgeMechanism, _ := BridgeFactory(i)
+
 		if err != nil {
 			return err
 		}
 
-		i.mechanisms = append(i.mechanisms, bridgeMecanism)
+		i.mechanisms = append(i.mechanisms, bridgeMechanism)
 	}
 
 	return nil
@@ -1286,7 +1287,11 @@ func (i *Ibft) GetBlockCreator(header *types.Header) (types.Address, error) {
 }
 
 // PreStateCommit a hook to be called before finalizing state transition on inserting block
-func (i *Ibft) runInsertTransactionsHook(header *types.Header, transition *state.Transition, transactions *[]*types.Transaction) error {
+func (i *Ibft) runInsertTransactionsHook(
+	header *types.Header,
+	transition *state.Transition,
+	transactions *[]*types.Transaction,
+) error {
 	params := &insertTransactionHookParams{
 		header:       header,
 		transition:   transition,

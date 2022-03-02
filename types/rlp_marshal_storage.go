@@ -45,6 +45,7 @@ func (t *Transaction) MarshalStoreRLPWith(a *fastrlp.Arena) *fastrlp.Value {
 	if t.IsTypedTransaction() {
 		vv.Set(a.NewBytes([]byte{byte(t.Type)}))
 	}
+
 	vv.Set(t.MarshalRLPWith(a))
 	// context part
 	vv.Set(a.NewBytes(t.From.Bytes()))

@@ -94,7 +94,11 @@ func (b *BridgeMechanism) insertStateTransactionsHook(rawParams interface{}) err
 	signatureThreshold := b.calculateSignatureThreshold(b.ibft.state.validators)
 	for _, msg := range msgs {
 		if uint64(len(msg.Signatures)) < signatureThreshold {
-			b.ibft.logger.Warn("message doesn't have enough signatures", "wanted", signatureThreshold, "actual", len(msg.Signatures))
+			b.ibft.logger.Warn(
+				"message doesn't have enough signatures",
+				"wanted", signatureThreshold,
+				"actual", len(msg.Signatures),
+			)
 
 			continue
 		}
