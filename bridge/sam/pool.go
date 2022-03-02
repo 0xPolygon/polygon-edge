@@ -245,8 +245,6 @@ func (p *pool) getMessageBody(hash types.Hash) []byte {
 
 	body, ok := raw.([]byte)
 	if !ok {
-		// should not reach
-
 		return nil
 	}
 
