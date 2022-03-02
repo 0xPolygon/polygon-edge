@@ -110,12 +110,12 @@ func (pos *PoSMechanism) acceptStateLogHook(snapParam interface{}) error {
 // insertBlockHook checks if the block is the last block of the epoch,
 // in order to update the validator set
 func (pos *PoSMechanism) insertBlockHook(numberParam interface{}) error {
-	headerNumber, ok := numberParam.(uint64)
+	block, ok := numberParam.(*types.Block)
 	if !ok {
 		return ErrInvalidHookParam
 	}
 
-	return pos.updateValidators(headerNumber)
+	return pos.updateValidators(block.Number())
 }
 
 // verifyBlockHook checks if the block is an epoch block and if it has any transactions
@@ -126,6 +126,8 @@ func (pos *PoSMechanism) verifyBlockHook(blockParam interface{}) error {
 	}
 
 	if pos.ibft.IsLastOfEpoch(block.Number()) && len(block.Transactions) > 0 {
+		pos.ibft.logger.Error("block verification failed, block at the end of epoch has transactions")
+
 		return errBlockVerificationFailed
 	}
 

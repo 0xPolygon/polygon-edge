@@ -299,6 +299,15 @@ func (i *Ibft) setupMechanism() error {
 		}
 	}
 
+	if i.bridge != nil {
+		bridgeMecanism, _ := BridgeFactory(i)
+		if err != nil {
+			return err
+		}
+
+		i.mechanisms = append(i.mechanisms, bridgeMecanism)
+	}
+
 	return nil
 }
 
@@ -470,8 +479,8 @@ func (i *Ibft) isValidSnapshot() bool {
 func (i *Ibft) runSyncState() {
 	// updateSnapshotCallback keeps the snapshot store in sync with the updated
 	// chain data, by calling the SyncStateHook
-	callInsertBlockHook := func(blockNumber uint64) {
-		if hookErr := i.runHook(InsertBlockHook, blockNumber, blockNumber); hookErr != nil {
+	callInsertBlockHook := func(block *types.Block) {
+		if hookErr := i.runHook(InsertBlockHook, block.Number(), block); hookErr != nil {
 			i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", InsertBlockHook, hookErr))
 		}
 	}
@@ -502,8 +511,7 @@ func (i *Ibft) runSyncState() {
 		}
 
 		if err := i.syncer.BulkSyncWithPeer(p, func(newBlock *types.Block) {
-			i.ConsumeStateTransactions(newBlock)
-			callInsertBlockHook(newBlock.Number())
+			callInsertBlockHook(newBlock)
 			i.txpool.ResetWithHeaders(newBlock.Header)
 		}); err != nil {
 			i.logger.Error("failed to bulk sync", "err", err)
@@ -523,10 +531,9 @@ func (i *Ibft) runSyncState() {
 		var isValidator bool
 
 		i.syncer.WatchSyncWithPeer(p, func(newBlock *types.Block) bool {
-			i.ConsumeStateTransactions(newBlock)
 			// After each written block, update the snapshot store for PoS.
 			// The snapshot store is currently updated for PoA inside the ProcessHeadersHook
-			callInsertBlockHook(newBlock.Number())
+			callInsertBlockHook(newBlock)
 
 			i.syncer.Broadcast(newBlock)
 			i.txpool.ResetWithHeaders(newBlock.Header)
@@ -612,6 +619,10 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 	txns := []*types.Transaction{}
 	if i.shouldWriteTransactions(header.Number) {
 		txns = i.writeTransactions(gasLimit, transition)
+	}
+
+	if err := i.runInsertTransactionsHook(header, transition, &txns); err != nil {
+		return nil, err
 	}
 
 	if err := i.PreStateCommit(header, transition); err != nil {
@@ -708,38 +719,6 @@ func (i *Ibft) writeTransactions(gasLimit uint64, transition transitionInterface
 	//nolint:lll
 	i.logger.Info("executed txns", "failed ", failedTxCount, "successful", successTxCount, "remaining in pool", i.txpool.Length())
 
-	if i.bridge != nil {
-		msgs, err := i.bridge.GetReadyMessages()
-		if err != nil {
-			i.logger.Error("failed to get ready messages from bridge", "err", err)
-		}
-
-		for _, msg := range msgs {
-			if len(msg.Signatures) < i.state.validators.Len() {
-				i.logger.Warn("message doesn't have enough signatures", "wanted", i.state.validators.Len(), "actual", len(msg.Signatures))
-				continue
-			}
-
-			signer := crypto.NewSigner(
-				i.config.Params.Forks.At(i.state.view.Sequence),
-				uint64(i.config.Params.ChainID),
-			)
-
-			tx, err := signer.SignTx(msg.Transaction, i.validatorKey)
-			if err != nil {
-				i.logger.Error("failed to sign state transaction", "err", err)
-				continue
-			}
-
-			if err := transition.Write(tx); err != nil {
-				i.logger.Warn("failed to apply state transaction", "tx", tx, "err", err)
-				continue
-			}
-
-			transactions = append(transactions, tx)
-		}
-	}
-
 	return transactions
 }
 
@@ -782,11 +761,6 @@ func (i *Ibft) runAcceptState() { // start new round
 		i.setState(SyncState)
 
 		return
-	}
-
-	if i.bridge != nil {
-		// TODO: Check threshold
-		i.bridge.SetValidators(snap.Set, uint64(snap.Set.Len()))
 	}
 
 	if hookErr := i.runHook(AcceptStateLogHook, i.state.view.Sequence, snap); hookErr != nil {
@@ -896,24 +870,8 @@ func (i *Ibft) runAcceptState() { // start new round
 				continue
 			}
 
-			if i.bridge != nil {
-			StateTxValidationLoop:
-				for _, tx := range block.Transactions {
-					if tx.Type != types.TxTypeState {
-						continue
-					}
-
-					if err := i.bridge.ValidateTx(tx); err != nil {
-						i.logger.Error("block has the invalid state transaction", "tx", tx.Hash, "err", err)
-						i.handleStateErr(errBlockVerificationFailed)
-						break StateTxValidationLoop
-					}
-				}
-			}
-
 			if hookErr := i.runHook(VerifyBlockHook, block.Number(), block); hookErr != nil {
-				if errors.As(hookErr, &errBlockVerificationFailed) {
-					i.logger.Error("block verification failed, block at the end of epoch has transactions")
+				if errors.Is(hookErr, errBlockVerificationFailed) {
 					i.handleStateErr(errBlockVerificationFailed)
 				} else {
 					i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", VerifyBlockHook, hookErr))
@@ -1004,8 +962,6 @@ func (i *Ibft) runValidateState() {
 
 			// move ahead to the next block
 			i.setState(AcceptState)
-
-			i.ConsumeStateTransactions(block)
 		}
 	}
 }
@@ -1028,6 +984,7 @@ func (i *Ibft) updateMetrics(block *types.Block) {
 	//Update the Number of transactions in the block metric
 	i.metrics.NumTxs.Set(float64(len(block.Body().Transactions)))
 }
+
 func (i *Ibft) insertBlock(block *types.Block) error {
 	committedSeals := [][]byte{}
 	for _, commit := range i.state.committed {
@@ -1328,17 +1285,19 @@ func (i *Ibft) GetBlockCreator(header *types.Header) (types.Address, error) {
 	return ecrecoverFromHeader(header)
 }
 
-// TODO: move to hook
-func (i *Ibft) ConsumeStateTransactions(block *types.Block) {
-	if i.bridge != nil {
-		for _, tx := range block.Transactions {
-			if tx.Type != types.TxTypeState {
-				continue
-			}
-
-			i.bridge.Consume(tx)
-		}
+// PreStateCommit a hook to be called before finalizing state transition on inserting block
+func (i *Ibft) runInsertTransactionsHook(header *types.Header, transition *state.Transition, transactions *[]*types.Transaction) error {
+	params := &insertTransactionHookParams{
+		header:       header,
+		transition:   transition,
+		transactions: transactions,
 	}
+
+	if hookErr := i.runHook(InsertTransactionsHook, header.Number, params); hookErr != nil {
+		return hookErr
+	}
+
+	return nil
 }
 
 // PreStateCommit a hook to be called before finalizing state transition on inserting block
@@ -1347,6 +1306,7 @@ func (i *Ibft) PreStateCommit(header *types.Header, txn *state.Transition) error
 		header: header,
 		txn:    txn,
 	}
+
 	if hookErr := i.runHook(PreStateCommitHook, header.Number, params); hookErr != nil {
 		return hookErr
 	}

@@ -18,12 +18,17 @@ const (
 	// PoS defines the Proof of Stake IBFT type,
 	// where the validator set it changed through staking on the Staking SC
 	PoS MechanismType = "PoS"
+
+	// Bridge defines Bridge type
+	// Bridge allows to include StateTransactions into block
+	Bridge MechanismType = "Bridge"
 )
 
 // mechanismTypes is the map used for easy string -> mechanism MechanismType lookups
 var mechanismTypes = map[string]MechanismType{
-	"PoA": PoA,
-	"PoS": PoS,
+	"PoA":    PoA,
+	"PoS":    PoS,
+	"Bridge": Bridge,
 }
 
 // String is a helper method for casting a MechanismType to a string representation
@@ -82,6 +87,9 @@ const (
 	// CalculateProposerHook defines what is the next proposer
 	// based on the previous
 	CalculateProposerHook = "CalculateProposerHook"
+
+	// InsertTransactionsHook defines the process to insert additional transactions
+	InsertTransactionsHook = "InsertTransactionsHook"
 )
 
 type ConsensusMechanism interface {
