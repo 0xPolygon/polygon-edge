@@ -110,6 +110,8 @@ func (p *switchParams) initFrom() error {
 		return ErrFromPositive
 	}
 
+	p.from = from
+
 	return nil
 }
 
