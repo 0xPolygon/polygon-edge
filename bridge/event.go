@@ -3,9 +3,10 @@ package bridge
 import (
 	"errors"
 
+	"math/big"
+
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/go-web3"
-	"math/big"
 )
 
 type StateSyncEvent struct {
@@ -20,10 +21,12 @@ func ParseStateSyncEvent(log *web3.Log) (*StateSyncEvent, error) {
 		return nil, err
 	}
 
-	var id *big.Int
-	var contractAddr web3.Address
-	var data []byte
-	var ok bool
+	var (
+		id           *big.Int
+		contractAddr web3.Address
+		data         []byte
+		ok           bool
+	)
 
 	id, ok = event["id"].(*big.Int)
 	if !ok {
