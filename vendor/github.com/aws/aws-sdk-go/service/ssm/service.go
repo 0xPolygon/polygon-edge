@@ -49,29 +49,24 @@ const (
 //     svc := ssm.New(mySession, aws.NewConfig().WithRegion("us-west-2"))
 func New(p client.ConfigProvider, cfgs ...*aws.Config) *SSM {
 	c := p.ClientConfig(EndpointsID, cfgs...)
-	if c.SigningNameDerived || len(c.SigningName) == 0 {
-		c.SigningName = EndpointsID
-		// No Fallback
-	}
-	return newClient(*c.Config, c.Handlers, c.PartitionID, c.Endpoint, c.SigningRegion, c.SigningName, c.ResolvedRegion)
+	return newClient(*c.Config, c.Handlers, c.PartitionID, c.Endpoint, c.SigningRegion, c.SigningName)
 }
 
 // newClient creates, initializes and returns a new service client instance.
-func newClient(cfg aws.Config, handlers request.Handlers, partitionID, endpoint, signingRegion, signingName, resolvedRegion string) *SSM {
+func newClient(cfg aws.Config, handlers request.Handlers, partitionID, endpoint, signingRegion, signingName string) *SSM {
 	svc := &SSM{
 		Client: client.New(
 			cfg,
 			metadata.ClientInfo{
-				ServiceName:    ServiceName,
-				ServiceID:      ServiceID,
-				SigningName:    signingName,
-				SigningRegion:  signingRegion,
-				PartitionID:    partitionID,
-				Endpoint:       endpoint,
-				APIVersion:     "2014-11-06",
-				ResolvedRegion: resolvedRegion,
-				JSONVersion:    "1.1",
-				TargetPrefix:   "AmazonSSM",
+				ServiceName:   ServiceName,
+				ServiceID:     ServiceID,
+				SigningName:   signingName,
+				SigningRegion: signingRegion,
+				PartitionID:   partitionID,
+				Endpoint:      endpoint,
+				APIVersion:    "2014-11-06",
+				JSONVersion:   "1.1",
+				TargetPrefix:  "AmazonSSM",
 			},
 			handlers,
 		),

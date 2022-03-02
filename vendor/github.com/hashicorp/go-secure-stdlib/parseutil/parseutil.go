@@ -105,20 +105,22 @@ func ParseDurationSecond(in interface{}) (time.Duration, error) {
 		if inp == "" {
 			return dur, nil
 		}
+
+		if v, err := strconv.ParseInt(inp, 10, 64); err == nil {
+			return time.Duration(v) * time.Second, nil
+		}
+
+		if strings.HasSuffix(inp, "d") {
+			v, err := strconv.ParseInt(inp[:len(inp)-1], 10, 64)
+			if err != nil {
+				return dur, err
+			}
+			return time.Duration(v) * 24 * time.Hour, nil
+		}
+
 		var err error
-		// Look for a suffix otherwise its a plain second value
-		if strings.HasSuffix(inp, "s") || strings.HasSuffix(inp, "m") || strings.HasSuffix(inp, "h") || strings.HasSuffix(inp, "ms") {
-			dur, err = time.ParseDuration(inp)
-			if err != nil {
-				return dur, err
-			}
-		} else {
-			// Plain integer
-			secs, err := strconv.ParseInt(inp, 10, 64)
-			if err != nil {
-				return dur, err
-			}
-			dur = time.Duration(secs) * time.Second
+		if dur, err = time.ParseDuration(inp); err != nil {
+			return dur, err
 		}
 	case int:
 		dur = time.Duration(inp) * time.Second
@@ -228,6 +230,94 @@ func ParseInt(in interface{}) (int64, error) {
 	}
 
 	return ret, nil
+}
+
+func ParseDirectIntSlice(in interface{}) ([]int64, error) {
+	var ret []int64
+
+	switch in.(type) {
+	case []int:
+		for _, v := range in.([]int) {
+			ret = append(ret, int64(v))
+		}
+	case []int32:
+		for _, v := range in.([]int32) {
+			ret = append(ret, int64(v))
+		}
+	case []int64:
+		// For consistency to ensure callers can always modify ret without
+		// impacting in.
+		for _, v := range in.([]int64) {
+			ret = append(ret, v)
+		}
+	case []uint:
+		for _, v := range in.([]uint) {
+			ret = append(ret, int64(v))
+		}
+	case []uint32:
+		for _, v := range in.([]uint32) {
+			ret = append(ret, int64(v))
+		}
+	case []uint64:
+		for _, v := range in.([]uint64) {
+			ret = append(ret, int64(v))
+		}
+	case []json.Number:
+		for _, v := range in.([]json.Number) {
+			element, err := ParseInt(v)
+			if err != nil {
+				return nil, err
+			}
+			ret = append(ret, element)
+		}
+	case []string:
+		for _, v := range in.([]string) {
+			element, err := ParseInt(v)
+			if err != nil {
+				return nil, err
+			}
+			ret = append(ret, element)
+		}
+	default:
+		return nil, errors.New("could not parse value from input")
+	}
+
+	return ret, nil
+}
+
+// ParseIntSlice is a helper function for handling upgrades of optional
+// slices; that is, if the API accepts a type similar to <int|[]int>,
+// nicely handle the common cases of providing only an int-ish, providing
+// an actual slice of int-ishes, or providing a comma-separated list of
+// numbers.
+func ParseIntSlice(in interface{}) ([]int64, error) {
+	if ret, err := ParseInt(in); err == nil {
+		return []int64{ret}, nil
+	}
+
+	if ret, err := ParseDirectIntSlice(in); err == nil {
+		return ret, nil
+	}
+
+	if strings, err := ParseCommaStringSlice(in); err == nil {
+		var ret []int64
+		for _, v := range strings {
+			if v == "" {
+				// Ignore empty fields
+				continue
+			}
+
+			element, err := ParseInt(v)
+			if err != nil {
+				return nil, err
+			}
+			ret = append(ret, element)
+		}
+
+		return ret, nil
+	}
+
+	return nil, errors.New("could not parse value from input")
 }
 
 func ParseBool(in interface{}) (bool, error) {
