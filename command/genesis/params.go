@@ -26,6 +26,11 @@ const (
 	posFlag                 = "pos"
 )
 
+// Legacy flags that need to be preserved for running clients
+const (
+	chainIDFlagLEGACY = "chainid"
+)
+
 var (
 	params = &genesisParams{}
 )

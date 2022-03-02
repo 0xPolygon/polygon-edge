@@ -21,6 +21,7 @@ func GetCommand() *cobra.Command {
 	}
 
 	helper.RegisterGRPCAddressFlag(serverCmd)
+	helper.RegisterLegacyGRPCAddressFlag(serverCmd)
 	helper.RegisterJSONRPCFlag(serverCmd)
 
 	setFlags(serverCmd)

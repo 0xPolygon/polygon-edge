@@ -146,6 +146,11 @@ func GetGRPCConnection(address string) (*grpc.ClientConn, error) {
 
 // GetGRPCAddress extracts the set GRPC address
 func GetGRPCAddress(cmd *cobra.Command) string {
+	if cmd.Flags().Changed(command.GRPCAddressFlagLEGACY) {
+		// The legacy GRPC flag was set, use that value
+		return cmd.Flag(command.GRPCAddressFlagLEGACY).Value.String()
+	}
+
 	return cmd.Flag(command.GRPCAddressFlag).Value.String()
 }
 
@@ -170,6 +175,18 @@ func RegisterGRPCAddressFlag(cmd *cobra.Command) {
 		fmt.Sprintf("%s:%d", "127.0.0.1", server.DefaultGRPCPort),
 		"the GRPC interface",
 	)
+}
+
+// RegisterLegacyGRPCAddressFlag registers the legacy GRPC address flag for all child commands
+func RegisterLegacyGRPCAddressFlag(cmd *cobra.Command) {
+	cmd.PersistentFlags().String(
+		command.GRPCAddressFlagLEGACY,
+		fmt.Sprintf("%s:%d", "127.0.0.1", server.DefaultGRPCPort),
+		"the GRPC interface",
+	)
+
+	// Mark the legacy grpc flag as hidden
+	_ = cmd.PersistentFlags().MarkHidden(command.GRPCAddressFlagLEGACY)
 }
 
 // ParseGRPCAddress parses the passed in GRPC address

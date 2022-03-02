@@ -20,6 +20,7 @@ func GetCommand() *cobra.Command {
 	helper.RegisterGRPCAddressFlag(genesisCmd)
 
 	setFlags(genesisCmd)
+	setLegacyFlags(genesisCmd)
 	setRequiredFlags(genesisCmd)
 
 	return genesisCmd
@@ -126,6 +127,23 @@ func setFlags(cmd *cobra.Command) {
 			command.DefaultGenesisGasLimit,
 		),
 	)
+}
+
+// setLegacyFlags sets the legacy flags to preserve backwards compatibility
+// with running partners
+func setLegacyFlags(cmd *cobra.Command) {
+	// Legacy chainid flag
+	cmd.Flags().Uint64Var(
+		&params.chainID,
+		chainIDFlagLEGACY,
+		command.DefaultChainID,
+		fmt.Sprintf(
+			"the ID of the chain. Default: %d",
+			command.DefaultChainID,
+		),
+	)
+
+	_ = cmd.Flags().MarkHidden(chainIDFlagLEGACY)
 }
 
 func setRequiredFlags(cmd *cobra.Command) {
