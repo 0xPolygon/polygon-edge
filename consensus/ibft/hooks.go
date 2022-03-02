@@ -26,9 +26,8 @@ const (
 
 // mechanismTypes is the map used for easy string -> mechanism MechanismType lookups
 var mechanismTypes = map[string]MechanismType{
-	"PoA":    PoA,
-	"PoS":    PoS,
-	"Bridge": Bridge,
+	"PoA": PoA,
+	"PoS": PoS,
 }
 
 // String is a helper method for casting a MechanismType to a string representation

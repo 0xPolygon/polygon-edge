@@ -147,7 +147,7 @@ func (b *BridgeMechanism) calculateSignatureThreshold(set ValidatorSet) uint64 {
 	return uint64(set.Len())
 }
 
-// initializeHookMap registers the hooks that the PoS mechanism
+// initializeHookMap registers the hooks that the Bridge mechanism
 // should have
 func (b *BridgeMechanism) initializeHookMap() {
 	// Create the hook map
