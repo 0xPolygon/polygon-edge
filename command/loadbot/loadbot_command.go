@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"log"
 	"math"
 	"math/big"
 	"net"
@@ -18,7 +17,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/go-web3"
-	"github.com/umbracle/go-web3/abi"
 )
 
 type LoadbotCommand struct {
@@ -194,9 +192,27 @@ func (l *LoadbotCommand) Run(args []string) int {
 	flags.StringVar(&gasLimit, "gas-limit", "", "")
 	flags.StringVar(&contractPath, "contract", "", "")
 
-	var err error
+	// configuration vars
+	var (
+		err error
+
+		bigGasPrice *big.Int
+		gasPriceErr error
+
+		bigGasLimit *big.Int
+		gasLimitErr error
+
+		constructorArgs []byte
+		contractArtifact *generator.ContractArtifact
+
+		sender types.Address
+		receiver types.Address
+
+		readErr          error
+	)
+
 	// Parse cli arguments
-	if err = flags.Parse(args); err != nil {
+	if err := flags.Parse(args); err != nil {
 		l.Formatter.OutputError(fmt.Errorf("failed to parse args: %w", err))
 
 		return 1
@@ -214,15 +230,7 @@ func (l *LoadbotCommand) Run(args []string) int {
 		maxConns = int(2 * tps)
 	}
 
-	var (
-		bigGasPrice *big.Int
-		gasPriceErr error
 
-		bigGasLimit *big.Int
-		gasLimitErr error
-
-		constructorArgs []byte
-	)
 
 	// Parse the gas price
 	if gasPrice != "" {
@@ -244,15 +252,12 @@ func (l *LoadbotCommand) Run(args []string) int {
 		}
 	}
 
-	var sender types.Address
-
 	if err = sender.UnmarshalText([]byte(senderRaw)); err != nil {
 		l.Formatter.OutputError(fmt.Errorf("failed to decode sender address: %w", err))
 
 		return 1
 	}
 
-	var receiver types.Address
 	if err = receiver.UnmarshalText([]byte(receiverRaw)); err != nil {
 		l.Formatter.OutputError(fmt.Errorf("failed to decode receiver address: %w", err))
 
@@ -278,39 +283,9 @@ func (l *LoadbotCommand) Run(args []string) int {
 		return 1
 	}
 
-	var (
-		contractArtifact *generator.ContractArtifact
-		readErr          error
-	)
-
-	if convMode == erc20 {
-		contractArtifact = &generator.ContractArtifact{
-			Bytecode: ERC20BIN,
-			ABI:      abi.MustNewABI(ERC20ABI),
-		}
-
-		// configure parameters for smart contract constructor
-		var err error
-
-		constructorArgs, err = abi.Encode([]string{"4314500000", "ZexCoin", "ZEX"}, contractArtifact.ABI.Constructor.Inputs)
-		if err != nil {
-			log.Fatalln("Could not encode constructor parameters: " + err.Error())
-		}
-	} else if convMode == erc721 {
-		contractArtifact = &generator.ContractArtifact{
-			Bytecode: ERC721BIN,
-			ABI: abi.MustNewABI(ERC721ABI),
-		}
-
-		constructorArgs, err = abi.Encode([]string{"ZEXFT", "ZEXES"}, contractArtifact.ABI.Constructor.Inputs)
-		if err != nil {
-			log.Fatalln("Could not encode constructor parameters: " + err.Error())
-		}
-		
-	} else {
-		contractArtifact = &generator.ContractArtifact{
-			Bytecode: generator.DefaultContractBytecode,
-		}
+	// generate SC artifact and SC construstor args
+	if contractArtifact, constructorArgs, err = generateContractArtifactAndArgs(convMode); err != nil {
+		l.Formatter.OutputError(fmt.Errorf("could not encode constructor parameters: %w",err))
 	}
 
 	if contractPath != "" {

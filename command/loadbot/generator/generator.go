@@ -18,6 +18,7 @@ type TransactionGenerator interface {
 	MarkFailedTxn(failedTxn *FailedTxnInfo)
 	MarkFailedContractTxn(failedContractTxn *FailedContractTxnInfo)
 	SetGasEstimate(gasEstimate uint64)
+	SetContractAddress(types.Address)
 }
 
 type TxnErrorType string

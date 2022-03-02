@@ -335,6 +335,8 @@ func (l *Loadbot) Run() error {
 		txnGenerator, genErr = generator.NewDeployGenerator(generatorParams)
 	case erc20:
 		txnGenerator, genErr = generator.NewERC20Generator(generatorParams)
+	case erc721:
+		txnGenerator, genErr = generator.NewERC721Generator(generatorParams)
 	}
 
 	if genErr != nil {
@@ -372,10 +374,8 @@ func (l *Loadbot) Run() error {
 	startTime := time.Now()
 
 	// deploy contracts
-	if l.cfg.GeneratorMode == erc20 {
-		if err := l.deployContract(grpcClient, jsonClient, receiptTimeout); err != nil {
-			return err
-		}
+	if err := l.deployContract(grpcClient, jsonClient, receiptTimeout); err != nil {
+		return err
 	}
 
 	for i := uint64(0); i < l.cfg.Count; i++ {

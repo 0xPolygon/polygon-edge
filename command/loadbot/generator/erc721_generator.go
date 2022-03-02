@@ -10,15 +10,15 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-type ERC20Generator struct {
+type ERC721Generator struct {
 	BaseGenerator
 
 	contractBytecode []byte
 	encodedParams    []byte
 }
 
-func NewERC20Generator(params *GeneratorParams) (*ERC20Generator, error) {
-	gen := &ERC20Generator{}
+func NewERC721Generator(params *GeneratorParams) (*ERC721Generator, error) {
+	gen := &ERC721Generator{}
 
 	gen.BaseGenerator = BaseGenerator{
 		failedTxns: make([]*FailedTxnInfo, 0),
@@ -34,11 +34,8 @@ func NewERC20Generator(params *GeneratorParams) (*ERC20Generator, error) {
 	gen.contractBytecode = buf
 	gen.contractBytecode = append(gen.contractBytecode, params.ConstructorArgs...)
 
-	if gen.encodedParams, err = params.ContractArtifact.ABI.Methods["transfer"].Encode(
-		[]string{params.RecieverAddress.String(),
-			"3",
-		}); err != nil {
-		return nil, fmt.Errorf("cannot encode transfer method params: %w", err)
+	if gen.encodedParams, err = params.ContractArtifact.ABI.Methods["createNFT"].Encode([]string{"https://realy-valuable-nft-page.io"}); err != nil {
+		return nil, fmt.Errorf("cannot encode createNFT method params: %w", err)
 	}
 
 	return gen, nil
@@ -46,7 +43,7 @@ func NewERC20Generator(params *GeneratorParams) (*ERC20Generator, error) {
 
 //	Returns contract deployment tx if contractAddress is empty, otherwise returns
 //	a token transfer tx
-func (gen *ERC20Generator) GetExampleTransaction() (*types.Transaction, error) {
+func (gen *ERC721Generator) GetExampleTransaction() (*types.Transaction, error) {
 	if gen.contractAddress == nil {
 		//	contract not deployed yet
 		//	generate contract deployment tx
@@ -70,7 +67,7 @@ func (gen *ERC20Generator) GetExampleTransaction() (*types.Transaction, error) {
 	}, gen.params.SenderKey)
 }
 
-func (gen *ERC20Generator) GenerateTransaction() (*types.Transaction, error) {
+func (gen *ERC721Generator) GenerateTransaction() (*types.Transaction, error) {
 	newNextNonce := atomic.AddUint64(&gen.params.Nonce, 1)
 
 	if gen.contractAddress == nil {

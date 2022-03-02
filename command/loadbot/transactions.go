@@ -20,13 +20,15 @@ func (l *Loadbot) deployContract(
 	grpcClient txpoolOp.TxnPoolOperatorClient,
 	jsonClient *jsonrpc.Client,
 	receiptTimeout time.Duration) error {
-	// if the loadbot mode is set to ERC20 or ERC721 we need to deploy smart contract
 
-	ercGenerator, _ := l.generator.(*generator.ERC20Generator)
+	// if this is a regular transfer skip token deployment
+	if l.cfg.GeneratorMode == transfer {
+		return nil
+	}
 
 	start := time.Now()
 
-	// deploy ERC20 smart contract
+	// deploy SC
 	txHash, err := l.executeTxn(grpcClient)
 	if err != nil {
 		l.generator.MarkFailedContractTxn(&generator.FailedContractTxnInfo{
@@ -41,6 +43,7 @@ func (l *Loadbot) deployContract(
 		return err
 	}
 
+	// set timeout
 	ctx, cancel := context.WithTimeout(context.Background(), receiptTimeout)
 	defer cancel()
 
@@ -65,10 +68,13 @@ func (l *Loadbot) deployContract(
 	// fetch contract address
 	l.metrics.ContractAddress = receipt.ContractAddress
 
-	ercGenerator.SetContractAddress(types.StringToAddress(
+	// set contract address in order to get new example txn and gas esitmate
+	l.generator.SetContractAddress(types.StringToAddress(
 		receipt.ContractAddress.String(),
 	))
 
+	// we're done with SC deployment
+	// now get new gas estimates for token transfers
 	if l.cfg.GasLimit == nil {
 		// Get the gas estimate
 		exampleTxn, err := l.generator.GetExampleTransaction()

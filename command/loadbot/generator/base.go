@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 type BaseGenerator struct {
@@ -17,6 +18,8 @@ type BaseGenerator struct {
 	params       *GeneratorParams
 	signer       *crypto.EIP155Signer
 	estimatedGas uint64
+
+	contractAddress *types.Address
 }
 
 func (bg *BaseGenerator) GetTransactionErrors() []*FailedTxnInfo {
@@ -42,4 +45,8 @@ func (bg *BaseGenerator) MarkFailedContractTxn(failedContractTxn *FailedContract
 
 func (bg *BaseGenerator) SetGasEstimate(gasEstimate uint64) {
 	bg.estimatedGas = gasEstimate
+}
+
+func (bg *BaseGenerator) SetContractAddress(addr types.Address) {
+	bg.contractAddress = &addr
 }
