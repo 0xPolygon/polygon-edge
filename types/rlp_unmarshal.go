@@ -374,8 +374,6 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 		return fmt.Errorf("not enough elements to decode transaction, expected 9 but found %d", num)
 	}
 
-	// p.Hash(t.Hash[:0], v)
-
 	// nonce
 	if t.Nonce, err = elems[0].GetUint64(); err != nil {
 		return err

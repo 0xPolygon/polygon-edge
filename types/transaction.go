@@ -69,14 +69,6 @@ func (t *Transaction) IsTypedTransaction() bool {
 
 // ComputeHash computes the hash of the transaction
 func (t *Transaction) ComputeHash() *Transaction {
-	//ar := marshalArenaPool.Get()
-	//hash := keccak.DefaultKeccakPool.Get()
-	//
-	//v := t.MarshalRLPWith(ar)
-	//hash.WriteRlp(t.Hash[:0], v)
-	//
-	//marshalArenaPool.Put(ar)
-	//keccak.DefaultKeccakPool.Put(hash)
 
 	hash := keccak.DefaultKeccakPool.Get()
 	hash.Write(t.MarshalRLP())
