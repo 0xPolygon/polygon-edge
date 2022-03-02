@@ -397,7 +397,7 @@ func (t *Transition) checkAndPreProcessTransaction(txn *Txn, msg *types.Transact
 	case types.TxTypeLegacy:
 		return t.checkAndPreProcessNormalTransaction(txn, msg)
 	case types.TxTypeState:
-		return t.checkAndPreProcessStateTransaction(txn, msg)
+		return t.checkAndPreProcessStateTransaction(msg)
 	}
 
 	return 0, NewTransitionApplicationError(ErrInvalidTransactionType, false)
@@ -475,6 +475,14 @@ func (t *Transition) checkAndPreProcessStateTransaction(msg *types.Transaction) 
 	// FIXME: unbounded gas limit for now because it's hard to estimate how much the gas is used
 	// and not decided in spec yet
 	return math.MaxInt64, nil
+}
+
+func (t *Transition) incrementNonce(txn *Txn, msg *types.Transaction) {
+	if msg.Type == types.TxTypeState {
+		return
+	}
+
+	txn.IncrNonce(msg.From)
 }
 
 func (t *Transition) refundGas(txn *Txn, msg *types.Transaction, result *runtime.ExecutionResult, gasPrice *big.Int) {
@@ -564,7 +572,7 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 	if msg.IsContractCreation() {
 		result = t.Create2(msg.From, msg.Input, value, availableGas)
 	} else {
-		txn.IncrNonce(msg.From)
+		t.incrementNonce(txn, msg)
 		result = t.Call2(msg.From, *msg.To, msg.Input, value, availableGas)
 	}
 
