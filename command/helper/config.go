@@ -129,6 +129,10 @@ func (c *Config) BuildConfig() (*server.Config, error) {
 		if conf.JSONRPC.JSONRPCAddr, err = resolveAddr(c.JSONRPCAddr); err != nil {
 			return nil, err
 		}
+		// if user defines just the port number, bind it to all interfaces instead of localhost
+		if conf.JSONRPC.JSONRPCAddr.IP.IsLoopback() {
+			conf.JSONRPC.JSONRPCAddr.IP = net.ParseIP("0.0.0.0")
+		}
 	}
 
 	if c.Headers != nil {
