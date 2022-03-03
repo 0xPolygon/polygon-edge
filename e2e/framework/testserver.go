@@ -369,12 +369,12 @@ func (t *TestServer) SwitchIBFTType(typ ibft.MechanismType, from uint64, to, dep
 	commandSlice := strings.Split(fmt.Sprintf("ibft %s", ibftSwitchCmd.Use), " ")
 
 	args = append(args, commandSlice...)
-	args = append(args, []string{
+	args = append(args,
 		// add custom chain
 		"--chain", filepath.Join(t.Config.RootDir, "genesis.json"),
 		"--type", string(typ),
 		"--from", strconv.FormatUint(from, 10),
-	}...)
+	)
 
 	if to != nil {
 		args = append(args, "--to", strconv.FormatUint(*to, 10))
