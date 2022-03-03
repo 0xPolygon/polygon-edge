@@ -235,6 +235,15 @@ func TestAddrInfoToString(t *testing.T) {
 			),
 		},
 		{
+			// A dns name is explicitly specified
+			"Valid dial dns address",
+			[]string{formatMultiaddr("dns", "foobar.com", defaultPort)},
+			formatExpectedOutput(
+				formatMultiaddr("dns", "foobar.com", defaultPort),
+				defaultPeerID.String(),
+			),
+		},
+		{
 			// Multiple addresses that the host can listen on (0.0.0.0 special case)
 			"Ignore IPv4 loopback address",
 			[]string{

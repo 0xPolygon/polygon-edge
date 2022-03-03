@@ -214,7 +214,7 @@ func (c *ServerCommand) DefineFlags() {
 	}
 
 	c.FlagMap["secrets-config"] = helper.FlagDescriptor{
-		Description: "Sets the path to the SecretsManager config file. Used for Hashicorp Vault. " +
+		Description: "Sets the path to the SecretsManager config file. Used for Hashicorp Vault and AWS SSM. " +
 			"If omitted, the local FS secrets manager is used",
 		Arguments: []string{
 			"SECRETS_CONFIG",

@@ -210,18 +210,10 @@ func (e *Eth) SendRawTransaction(input string) (interface{}, error) {
 	return tx.Hash.String(), nil
 }
 
-// SendTransaction creates new message call transaction or a contract creation, if the data field contains code.
+// Reject eth_sendTransaction json-rpc call as we don't support wallet management
 func (e *Eth) SendTransaction(arg *txnArgs) (interface{}, error) {
-	transaction, err := e.decodeTxn(arg)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := e.store.AddTx(transaction); err != nil {
-		return nil, err
-	}
-
-	return transaction.Hash.String(), nil
+	return nil, fmt.Errorf("request calls to eth_sendTransaction method are not supported," +
+		" use eth_sendRawTransaction insead")
 }
 
 // GetTransactionByHash returns a transaction by its hash.
