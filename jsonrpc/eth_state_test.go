@@ -736,7 +736,7 @@ func TestEth_EstimateGas_Reverts(t *testing.T) {
 	assert.Equal(t, 0, estimate)
 
 	// Make sure the EVM revert message is contained
-	assert.ErrorAs(t, estimateErr, &runtime.ErrExecutionReverted)
+	assert.ErrorIs(t, estimateErr, runtime.ErrExecutionReverted)
 
 	// Make sure the EVM revert reason is contained
 	assert.ErrorAs(t, estimateErr, &revertReason)
@@ -762,7 +762,7 @@ func TestEth_EstimateGas_Errors(t *testing.T) {
 	assert.Equal(t, 0, estimate)
 
 	// Make sure the insufficient funds error message is contained
-	assert.ErrorAs(t, estimateErr, &ErrInsufficientFunds)
+	assert.ErrorIs(t, estimateErr, ErrInsufficientFunds)
 }
 
 type mockSpecialStore struct {
