@@ -9,7 +9,7 @@ func GetCommand() *cobra.Command {
 	secretsInitCmd := &cobra.Command{
 		Use: "init",
 		Short: "Initializes private keys for the Polygon Edge (Validator + Networking) " +
-			"to the specified SecretsConfigPath Manager",
+			"to the specified Secrets Manager",
 		PreRunE: runPreRun,
 		Run:     runCommand,
 	}
