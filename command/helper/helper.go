@@ -194,7 +194,7 @@ func ParseGRPCAddress(grpcAddress string) (*net.TCPAddr, error) {
 func RegisterJSONRPCFlag(cmd *cobra.Command) {
 	cmd.PersistentFlags().String(
 		command.JSONRPCFlag,
-		fmt.Sprintf("http://%s:%d", "127.0.0.1", server.DefaultJSONRPCPort),
+		fmt.Sprintf("%s:%d", "127.0.0.1", server.DefaultJSONRPCPort),
 		"the JSON-RPC interface",
 	)
 }
