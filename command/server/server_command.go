@@ -91,7 +91,7 @@ func (c *ServerCommand) DefineFlags() {
 
 	c.FlagMap["jsonrpc"] = helper.FlagDescriptor{
 		Description: fmt.Sprintf(
-			"Sets the address and port for the JSON-RPC service (address:port). Default: address: 127.0.0.1:%d",
+			"Sets the address and port for the JSON-RPC service (address:port). Default: address: 0.0.0.0:%d",
 			server.DefaultJSONRPCPort,
 		),
 		Arguments: []string{

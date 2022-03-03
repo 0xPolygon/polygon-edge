@@ -72,8 +72,8 @@ const defaultBlockTime uint64 = 2
 // DefaultConfig returns the default server configuration
 func DefaultConfig() *Config {
 	return &Config{
-		Chain:          "test",
-		DataDir:        "./test-chain",
+		Chain:          "polygon-edge",
+		DataDir:        "./polygon-edge-chain",
 		BlockGasTarget: "0x0", // Special value signaling the parent gas limit should be applied
 		Network: &Network{
 			NoDiscover:       false,

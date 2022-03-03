@@ -38,7 +38,7 @@ func DefaultConfig() *Config {
 		Telemetry:      &Telemetry{PrometheusAddr: nil},
 		SecretsManager: nil,
 		JSONRPC: &JSONRPC{
-			JSONRPCAddr:              &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: DefaultJSONRPCPort},
+			JSONRPCAddr:              &net.TCPAddr{IP: net.ParseIP("0.0.0.0"), Port: DefaultJSONRPCPort},
 			AccessControlAllowOrigin: nil,
 		},
 		BlockTime: DefaultBlockTime,
