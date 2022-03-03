@@ -79,7 +79,7 @@ type Eth struct {
 
 var (
 	ErrInsufficientFunds = errors.New("insufficient funds for execution")
-	ErrGasCapOverflow    = errors.New("unable to apply transaction for gas cap")
+	ErrGasCapOverflow    = errors.New("unable to apply transaction for the highest gas limit")
 )
 
 // ChainId returns the chain id of the client
