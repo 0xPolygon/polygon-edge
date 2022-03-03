@@ -96,7 +96,7 @@ type Server struct {
 	protocols     map[string]Protocol
 	protocolsLock sync.Mutex
 
-	// SecretsConfigPath manager
+	// Secrets manager
 	secretsManager secrets.SecretsManager
 
 	// pubsub
