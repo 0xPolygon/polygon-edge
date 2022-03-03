@@ -3,7 +3,6 @@ package server
 import (
 	"fmt"
 	"github.com/0xPolygon/polygon-edge/command"
-	"github.com/0xPolygon/polygon-edge/command/output"
 	"github.com/spf13/cobra"
 	"strconv"
 
@@ -256,7 +255,7 @@ func isConfigFileSpecified(cmd *cobra.Command) bool {
 }
 
 func runCommand(cmd *cobra.Command, _ []string) {
-	outputter := output.InitializeOutputter(cmd)
+	outputter := command.InitializeOutputter(cmd)
 
 	if err := runServerLoop(params.generateConfig(), outputter); err != nil {
 		outputter.SetError(err)
@@ -268,7 +267,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 func runServerLoop(
 	config *server.Config,
-	outputter output.OutputFormatter,
+	outputter command.OutputFormatter,
 ) error {
 	serverInstance, err := server.NewServer(config)
 	if err != nil {

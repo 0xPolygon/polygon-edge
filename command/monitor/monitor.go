@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/command/output"
+	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/spf13/cobra"
 	"io"
@@ -27,7 +27,7 @@ func GetCommand() *cobra.Command {
 }
 
 func runCommand(cmd *cobra.Command, _ []string) {
-	outputter := output.InitializeOutputter(cmd)
+	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
 	subscribeToEvents(
@@ -37,7 +37,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 }
 
 func subscribeToEvents(
-	outputter output.OutputFormatter,
+	outputter command.OutputFormatter,
 	grpcAddress string,
 ) {
 	ctx, cancelFn := context.WithCancel(context.Background())
@@ -71,7 +71,7 @@ func getMonitorStream(
 
 func runSubscribeLoop(
 	stream proto.System_SubscribeClient,
-	outputter output.OutputFormatter,
+	outputter command.OutputFormatter,
 ) {
 	doneCh := make(chan struct{})
 

@@ -3,8 +3,8 @@ package backup
 import (
 	"errors"
 	"github.com/0xPolygon/polygon-edge/archive"
+	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
-	"github.com/0xPolygon/polygon-edge/command/output"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 )
@@ -96,7 +96,7 @@ func (p *backupParams) createBackup(grpcAddress string) error {
 	return nil
 }
 
-func (p *backupParams) getResult() output.CommandResult {
+func (p *backupParams) getResult() command.CommandResult {
 	return &BackupResult{
 		From: p.resFrom,
 		To:   p.resTo,

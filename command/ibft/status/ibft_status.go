@@ -2,8 +2,8 @@ package status
 
 import (
 	"context"
+	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
-	"github.com/0xPolygon/polygon-edge/command/output"
 	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/spf13/cobra"
 	empty "google.golang.org/protobuf/types/known/emptypb"
@@ -18,7 +18,7 @@ func GetCommand() *cobra.Command {
 }
 
 func runCommand(cmd *cobra.Command, _ []string) {
-	outputter := output.InitializeOutputter(cmd)
+	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
 	statusResponse, err := getIBFTStatus(helper.GetGRPCAddress(cmd))

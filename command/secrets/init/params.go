@@ -3,7 +3,7 @@ package init
 import (
 	"crypto/ecdsa"
 	"errors"
-	"github.com/0xPolygon/polygon-edge/command/output"
+	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/secrets/helper"
@@ -161,7 +161,7 @@ func (ip *initParams) initNodeID() error {
 	return nil
 }
 
-func (ip *initParams) getResult() output.CommandResult {
+func (ip *initParams) getResult() command.CommandResult {
 	return &SecretsInitResult{
 		Address: crypto.PubKeyToAddress(&ip.validatorPrivateKey.PublicKey),
 		NodeID:  ip.nodeID.String(),

@@ -6,7 +6,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
-	"github.com/0xPolygon/polygon-edge/command/output"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft"
 	"github.com/0xPolygon/polygon-edge/contracts/staking"
 	stakingHelper "github.com/0xPolygon/polygon-edge/helper/staking"
@@ -271,7 +270,7 @@ func (p *genesisParams) predeployStakingSC() (*chain.GenesisAccount, error) {
 	return stakingAccount, nil
 }
 
-func (p *genesisParams) getResult() output.CommandResult {
+func (p *genesisParams) getResult() command.CommandResult {
 	return &GenesisResult{
 		Message: fmt.Sprintf("Genesis written to %s\n", p.genesisPath),
 	}

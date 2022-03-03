@@ -3,8 +3,8 @@ package add
 import (
 	"context"
 	"errors"
+	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
-	"github.com/0xPolygon/polygon-edge/command/output"
 	"github.com/0xPolygon/polygon-edge/server/proto"
 )
 
@@ -82,7 +82,7 @@ func (p *addParams) addPeer(peerAddress string) error {
 	return nil
 }
 
-func (p *addParams) getResult() output.CommandResult {
+func (p *addParams) getResult() command.CommandResult {
 	return &PeersAddResult{
 		NumRequested: len(p.peerAddresses),
 		NumAdded:     len(p.addedPeers),

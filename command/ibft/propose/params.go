@@ -3,8 +3,8 @@ package propose
 import (
 	"context"
 	"errors"
+	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
-	"github.com/0xPolygon/polygon-edge/command/output"
 	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -82,7 +82,7 @@ func (p *proposeParams) proposeCandidate(grpcAddress string) error {
 	return nil
 }
 
-func (p *proposeParams) getResult() output.CommandResult {
+func (p *proposeParams) getResult() command.CommandResult {
 	return &IBFTProposeResult{
 		Address: p.address.String(),
 		Vote:    p.vote,

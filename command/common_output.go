@@ -1,4 +1,4 @@
-package output
+package command
 
 type commonOutputFormatter struct {
 	errorOutput   error

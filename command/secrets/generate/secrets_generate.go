@@ -2,7 +2,7 @@ package generate
 
 import (
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/command/output"
+	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/spf13/cobra"
 
 	"github.com/0xPolygon/polygon-edge/secrets"
@@ -91,7 +91,7 @@ func setRequiredFlags(cmd *cobra.Command) {
 }
 
 func runCommand(cmd *cobra.Command, _ []string) {
-	outputter := output.InitializeOutputter(cmd)
+	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
 	if err := params.writeSecretsConfig(); err != nil {

@@ -3,7 +3,7 @@ package generate
 import (
 	"errors"
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/command/output"
+	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"strings"
 )
@@ -92,7 +92,7 @@ func (p *generateParams) generateSecretsConfig() (*secrets.SecretsManagerConfig,
 	}, nil
 }
 
-func (p *generateParams) getResult() output.CommandResult {
+func (p *generateParams) getResult() command.CommandResult {
 	return &SecretsGenerateResult{
 		ServiceType: p.serviceType,
 		ServerURL:   p.serverURL,

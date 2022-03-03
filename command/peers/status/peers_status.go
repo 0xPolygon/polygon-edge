@@ -1,8 +1,8 @@
 package status
 
 import (
+	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
-	"github.com/0xPolygon/polygon-edge/command/output"
 	"github.com/spf13/cobra"
 )
 
@@ -35,7 +35,7 @@ func setRequiredFlags(cmd *cobra.Command) {
 }
 
 func runCommand(cmd *cobra.Command, _ []string) {
-	outputter := output.InitializeOutputter(cmd)
+	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
 	if err := params.initPeerInfo(helper.GetGRPCAddress(cmd)); err != nil {

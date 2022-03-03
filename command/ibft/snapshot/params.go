@@ -2,8 +2,8 @@ package snapshot
 
 import (
 	"context"
+	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
-	"github.com/0xPolygon/polygon-edge/command/output"
 	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 )
 
@@ -53,6 +53,6 @@ func (p *snapshotParams) getSnapshotRequest() *ibftOp.SnapshotReq {
 	return req
 }
 
-func (p *snapshotParams) getResult() output.CommandResult {
+func (p *snapshotParams) getResult() command.CommandResult {
 	return newIBFTSnapshotResult(p.snapshot)
 }

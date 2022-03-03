@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
-	"github.com/0xPolygon/polygon-edge/command/output"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -156,7 +156,7 @@ func (p *switchParams) overrideGenesisConfig() error {
 	return nil
 }
 
-func (p *switchParams) getResult() output.CommandResult {
+func (p *switchParams) getResult() command.CommandResult {
 	result := &IBFTSwitchResult{
 		Chain: p.genesisPath,
 		Type:  p.mechanismType,

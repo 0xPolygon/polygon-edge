@@ -2,8 +2,8 @@ package list
 
 import (
 	"context"
+	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
-	"github.com/0xPolygon/polygon-edge/command/output"
 	"github.com/0xPolygon/polygon-edge/server/proto"
 	"github.com/spf13/cobra"
 	empty "google.golang.org/protobuf/types/known/emptypb"
@@ -20,7 +20,7 @@ func GetCommand() *cobra.Command {
 }
 
 func runCommand(cmd *cobra.Command, _ []string) {
-	outputter := output.InitializeOutputter(cmd)
+	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
 	peersList, err := getPeersList(helper.GetGRPCAddress(cmd))

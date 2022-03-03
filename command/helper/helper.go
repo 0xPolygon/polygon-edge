@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
-	"github.com/0xPolygon/polygon-edge/command/output"
 	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/server"
 	"github.com/0xPolygon/polygon-edge/server/proto"
@@ -35,7 +34,7 @@ func (r *ClientCloseResult) GetOutput() string {
 // Like stop, error, etc.
 func HandleSignals(
 	closeFn func(),
-	outputter output.OutputFormatter,
+	outputter command.OutputFormatter,
 ) error {
 	signalCh := common.GetTerminationSignalCh()
 	sig := <-signalCh

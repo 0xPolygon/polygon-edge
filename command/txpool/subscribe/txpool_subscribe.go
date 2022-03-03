@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
-	"github.com/0xPolygon/polygon-edge/command/output"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	txpoolProto "github.com/0xPolygon/polygon-edge/txpool/proto"
 	"github.com/spf13/cobra"
@@ -72,7 +72,7 @@ func setFlags(cmd *cobra.Command) {
 }
 
 func runCommand(cmd *cobra.Command, _ []string) {
-	outputter := output.InitializeOutputter(cmd)
+	outputter := command.InitializeOutputter(cmd)
 
 	params.init()
 
@@ -86,7 +86,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 }
 
 func subscribeToEvents(
-	outputter output.OutputFormatter,
+	outputter command.OutputFormatter,
 	subscribeRequest *txpoolProto.SubscribeRequest,
 	grpcAddress string,
 ) {
@@ -127,7 +127,7 @@ func getSubscribeStream(
 
 func runSubscribeLoop(
 	stream txpoolProto.TxnPoolOperator_SubscribeClient,
-	outputter output.OutputFormatter,
+	outputter command.OutputFormatter,
 ) {
 	doneCh := make(chan struct{})
 

@@ -2,8 +2,8 @@ package status
 
 import (
 	"context"
+	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
-	"github.com/0xPolygon/polygon-edge/command/output"
 	"github.com/spf13/cobra"
 
 	txpoolOp "github.com/0xPolygon/polygon-edge/txpool/proto"
@@ -19,7 +19,7 @@ func GetCommand() *cobra.Command {
 }
 
 func runCommand(cmd *cobra.Command, _ []string) {
-	outputter := output.InitializeOutputter(cmd)
+	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
 	statusResponse, err := getTxPoolStatus(helper.GetGRPCAddress(cmd))

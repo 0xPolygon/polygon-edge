@@ -2,7 +2,7 @@ package status
 
 import (
 	"context"
-	"github.com/0xPolygon/polygon-edge/command/output"
+	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/spf13/cobra"
 
@@ -24,7 +24,7 @@ func GetCommand() *cobra.Command {
 }
 
 func runCommand(cmd *cobra.Command, _ []string) {
-	outputter := output.InitializeOutputter(cmd)
+	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
 	statusResponse, err := getSystemStatus(helper.GetGRPCAddress(cmd))

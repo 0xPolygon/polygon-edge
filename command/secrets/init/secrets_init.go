@@ -1,7 +1,7 @@
 package init
 
 import (
-	"github.com/0xPolygon/polygon-edge/command/output"
+	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/spf13/cobra"
 )
 
@@ -41,7 +41,7 @@ func runPreRun(_ *cobra.Command, _ []string) error {
 }
 
 func runCommand(cmd *cobra.Command, _ []string) {
-	outputter := output.InitializeOutputter(cmd)
+	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
 	if err := params.initSecrets(); err != nil {
