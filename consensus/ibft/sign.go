@@ -127,7 +127,7 @@ func calculateHeaderHash(h *types.Header) ([]byte, error) {
 		return nil, err
 	}
 
-	// This will effectively remove the ShouldSeal and Committed ShouldSeal fields,
+	// This will effectively remove the Seal and Committed Seal fields,
 	// while keeping proposer vanity and validator set
 	// because extra.Validators is what we got from `h` in the first place.
 	putIbftExtraValidators(h, extra.Validators)
