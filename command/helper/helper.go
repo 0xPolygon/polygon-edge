@@ -11,15 +11,12 @@ import (
 	"github.com/0xPolygon/polygon-edge/server"
 	"github.com/0xPolygon/polygon-edge/server/proto"
 	txpoolOp "github.com/0xPolygon/polygon-edge/txpool/proto"
-	"github.com/multiformats/go-multiaddr"
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"io/ioutil"
 	"net"
 	"net/url"
-	"regexp"
-	"strings"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/helper/common"
@@ -221,57 +218,6 @@ func ResolveAddr(address string) (*net.TCPAddr, error) {
 	}
 
 	return addr, nil
-}
-
-// MultiAddrFromDNS constructs a multiAddr from the passed in DNS address and port combination
-func MultiAddrFromDNS(addr string, port int) (multiaddr.Multiaddr, error) {
-	var (
-		version string
-		domain  string
-	)
-
-	match, err := regexp.MatchString(
-		"^/?(dns)(4|6)?/[^-|^/][A-Za-z0-9-]([^-|^/]?)+([\\-\\.]{1}[a-z0-9]+)*\\.[A-Za-z]{2,}(/?)$",
-		addr,
-	)
-	if err != nil || !match {
-		return nil, errors.New("invalid DNS address")
-	}
-
-	s := strings.Trim(addr, "/")
-	split := strings.Split(s, "/")
-
-	if len(split) != 2 {
-		return nil, errors.New("invalid DNS address")
-	}
-
-	switch split[0] {
-	case "dns":
-		version = "dns"
-	case "dns4":
-		version = "dns4"
-	case "dns6":
-		version = "dns6"
-	default:
-		return nil, errors.New("invalid DNS version")
-	}
-
-	domain = split[1]
-
-	multiAddr, err := multiaddr.NewMultiaddr(
-		fmt.Sprintf(
-			"/%s/%s/tcp/%d",
-			version,
-			domain,
-			port,
-		),
-	)
-
-	if err != nil {
-		return nil, errors.New("could not create a multi address")
-	}
-
-	return multiAddr, nil
 }
 
 // WriteGenesisConfigToDisk writes the passed in configuration to a genesis file at the specified path

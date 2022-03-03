@@ -234,7 +234,7 @@ func (p *serverParams) initDNSAddress() error {
 
 	var parseErr error
 
-	if p.dnsAddress, parseErr = helper.MultiAddrFromDNS(
+	if p.dnsAddress, parseErr = network.MultiAddrFromDNS(
 		p.rawConfig.Network.DNSAddr, p.libp2pAddress.Port,
 	); parseErr != nil {
 		return parseErr
