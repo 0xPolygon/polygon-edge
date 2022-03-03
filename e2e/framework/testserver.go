@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/0xPolygon/polygon-edge/command"
-	ibftswitch "github.com/0xPolygon/polygon-edge/command/ibft/switch"
+	ibftSwitch "github.com/0xPolygon/polygon-edge/command/ibft/switch"
 	initCmd "github.com/0xPolygon/polygon-edge/command/secrets/init"
 	"google.golang.org/grpc/credentials/insecure"
 	"io"
@@ -363,7 +363,7 @@ func (t *TestServer) Start(ctx context.Context) error {
 func (t *TestServer) SwitchIBFTType(typ ibft.MechanismType, from uint64, to, deployment *uint64) error {
 	t.t.Helper()
 
-	ibftSwitchCmd := ibftswitch.GetCommand()
+	ibftSwitchCmd := ibftSwitch.GetCommand()
 	args := make([]string, 0)
 
 	commandSlice := strings.Split(fmt.Sprintf("ibft %s", ibftSwitchCmd.Use), " ")
