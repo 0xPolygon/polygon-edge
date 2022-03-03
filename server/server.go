@@ -188,7 +188,6 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 
 	// bridge
 	if config.Bridge.Enable {
-		// FIXME: use new key?
 		key, err := crypto.ReadConsensusKey(m.secretsManager)
 		if err != nil {
 			return nil, fmt.Errorf("unable to read validator key from Secrets Manager, %w", err)

@@ -754,7 +754,13 @@ func (i *Ibft) runAcceptState() { // start new round
 		i.bridge.SetValidators(snap.Set, uint64(snap.Set.Len()))
 
 		for _, msg := range i.bridge.GetReadyMessages() {
-			fmt.Printf("ReadyMessage height=%d, hash=%+v, body=%+v, signatures=%d\n", parent.Number+1, msg.Hash, msg.Body, len(msg.Signatures))
+			fmt.Printf(
+				"ReadyMessage height=%d, hash=%+v, body=%+v, signatures=%d\n",
+				parent.Number+1,
+				msg.Hash,
+				msg.Body,
+				len(msg.Signatures),
+			)
 			i.bridge.Consume(msg.Hash)
 		}
 	}
