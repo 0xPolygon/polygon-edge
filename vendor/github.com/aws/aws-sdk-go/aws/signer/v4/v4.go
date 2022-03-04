@@ -634,25 +634,21 @@ func (ctx *signingCtx) buildCanonicalHeaders(r rule, header http.Header) {
 		ctx.Query.Set("X-Amz-SignedHeaders", ctx.signedHeaders)
 	}
 
-	headerItems := make([]string, len(headers))
+	headerValues := make([]string, len(headers))
 	for i, k := range headers {
 		if k == "host" {
 			if ctx.Request.Host != "" {
-				headerItems[i] = "host:" + ctx.Request.Host
+				headerValues[i] = "host:" + ctx.Request.Host
 			} else {
-				headerItems[i] = "host:" + ctx.Request.URL.Host
+				headerValues[i] = "host:" + ctx.Request.URL.Host
 			}
 		} else {
-			headerValues := make([]string, len(ctx.SignedHeaderVals[k]))
-			for i, v := range ctx.SignedHeaderVals[k] {
-				headerValues[i] = strings.TrimSpace(v)
-			}
-			headerItems[i] = k + ":" +
-				strings.Join(headerValues, ",")
+			headerValues[i] = k + ":" +
+				strings.Join(ctx.SignedHeaderVals[k], ",")
 		}
 	}
-	stripExcessSpaces(headerItems)
-	ctx.canonicalHeaders = strings.Join(headerItems, "\n")
+	stripExcessSpaces(headerValues)
+	ctx.canonicalHeaders = strings.Join(headerValues, "\n")
 }
 
 func (ctx *signingCtx) buildCanonicalString() {

@@ -1,26 +1,39 @@
 package ibft
 
-import "github.com/mitchellh/cli"
+import (
+	"github.com/0xPolygon/polygon-edge/command/helper"
+	"github.com/0xPolygon/polygon-edge/command/ibft/candidates"
+	"github.com/0xPolygon/polygon-edge/command/ibft/propose"
+	"github.com/0xPolygon/polygon-edge/command/ibft/snapshot"
+	"github.com/0xPolygon/polygon-edge/command/ibft/status"
+	_switch "github.com/0xPolygon/polygon-edge/command/ibft/switch"
+	"github.com/spf13/cobra"
+)
 
-// IbftCommand is the top level ibft command
-type IbftCommand struct {
+func GetCommand() *cobra.Command {
+	ibftCmd := &cobra.Command{
+		Use:   "ibft",
+		Short: "Top level IBFT command for interacting with the IBFT consensus. Only accepts subcommands.",
+	}
+
+	helper.RegisterGRPCAddressFlag(ibftCmd)
+
+	registerSubcommands(ibftCmd)
+
+	return ibftCmd
 }
 
-// Help implements the cli.Command interface
-func (c *IbftCommand) Help() string {
-	return c.Synopsis()
-}
-
-func (c *IbftCommand) GetBaseCommand() string {
-	return "ibft"
-}
-
-// Synopsis implements the cli.Command interface
-func (c *IbftCommand) Synopsis() string {
-	return "Top level IBFT command for interacting with the IBFT consensus. Only accepts subcommands"
-}
-
-// Run implements the cli.Command interface
-func (c *IbftCommand) Run(args []string) int {
-	return cli.RunResultHelp
+func registerSubcommands(baseCmd *cobra.Command) {
+	baseCmd.AddCommand(
+		// ibft status
+		status.GetCommand(),
+		// ibft snapshot
+		snapshot.GetCommand(),
+		// ibft propose
+		propose.GetCommand(),
+		// ibft candidates
+		candidates.GetCommand(),
+		// ibft switch
+		_switch.GetCommand(),
+	)
 }

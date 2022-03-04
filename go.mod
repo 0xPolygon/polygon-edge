@@ -4,6 +4,8 @@ go 1.16
 
 require (
 	github.com/btcsuite/btcd v0.22.0-beta
+	github.com/containerd/cgroups v1.0.2 // indirect
+	github.com/elastic/gosigar v0.14.2 // indirect
 	github.com/go-kit/kit v0.12.0
 	github.com/golang/protobuf v1.5.2
 	github.com/google/uuid v1.3.0
@@ -14,18 +16,19 @@ require (
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/hashicorp/hcl v1.0.0
 	github.com/hashicorp/vault/api v1.3.1
-	github.com/imdario/mergo v0.3.12
 	github.com/libp2p/go-libp2p v0.18.0-rc2
 	github.com/libp2p/go-libp2p-core v0.14.0
 	github.com/libp2p/go-libp2p-kbucket v0.4.7
 	github.com/libp2p/go-libp2p-noise v0.3.0
 	github.com/libp2p/go-libp2p-pubsub v0.6.1
-	github.com/mitchellh/cli v1.1.2
+	github.com/miekg/dns v1.1.45 // indirect
+	github.com/multiformats/go-base32 v0.0.4 // indirect
 	github.com/multiformats/go-multiaddr v0.5.0
 	github.com/multiformats/go-multihash v0.1.0 // indirect
 	github.com/onsi/ginkgo v1.16.5 // indirect
 	github.com/prometheus/client_golang v1.12.1
 	github.com/ryanuber/columnize v2.1.2+incompatible
+	github.com/spf13/cobra v1.3.0
 	github.com/stretchr/testify v1.7.0
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
 	github.com/umbracle/fastrlp v0.0.0-20211229195328-c1416904ae17
@@ -38,15 +41,11 @@ require (
 )
 
 require (
+	github.com/aws/aws-sdk-go v1.40.45
 	github.com/benbjohnson/clock v1.3.0 // indirect
-	github.com/containerd/cgroups v1.0.2 // indirect
-	github.com/elastic/gosigar v0.14.2 // indirect
-	github.com/fsnotify/fsnotify v1.5.1 // indirect
 	github.com/godbus/dbus/v5 v5.0.6 // indirect
 	github.com/ipfs/go-cid v0.1.0 // indirect
 	github.com/klauspost/compress v1.14.2 // indirect
-	github.com/miekg/dns v1.1.45 // indirect
-	github.com/multiformats/go-base32 v0.0.4 // indirect
 	github.com/valyala/fastjson v1.6.3 // indirect
 	go.uber.org/zap v1.20.0 // indirect
 	golang.org/x/net v0.0.0-20220127074510-2fabfed7e28f // indirect
