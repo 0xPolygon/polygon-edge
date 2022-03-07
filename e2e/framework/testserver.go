@@ -6,6 +6,10 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/0xPolygon/polygon-edge/command"
+	ibftSwitch "github.com/0xPolygon/polygon-edge/command/ibft/switch"
+	initCmd "github.com/0xPolygon/polygon-edge/command/secrets/init"
+	"google.golang.org/grpc/credentials/insecure"
 	"io"
 	"math/big"
 	"os"
@@ -16,11 +20,7 @@ import (
 	"testing"
 	"time"
 
-	"google.golang.org/grpc/credentials/insecure"
-
 	"github.com/0xPolygon/polygon-edge/command/genesis"
-	"github.com/0xPolygon/polygon-edge/command/helper"
-	secretsCommand "github.com/0xPolygon/polygon-edge/command/secrets"
 	"github.com/0xPolygon/polygon-edge/command/server"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft"
 	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
@@ -162,12 +162,12 @@ type InitIBFTResult struct {
 	NodeID  string
 }
 
-func (t *TestServer) InitIBFT() (*InitIBFTResult, error) {
-	secretsInitCmd := secretsCommand.SecretsInit{}
+func (t *TestServer) SecretsInit() (*InitIBFTResult, error) {
+	secretsInitCmd := initCmd.GetCommand()
 
 	var args []string
 
-	commandSlice := strings.Split(secretsInitCmd.GetBaseCommand(), " ")
+	commandSlice := strings.Split(fmt.Sprintf("secrets %s", secretsInitCmd.Use), " ")
 	args = append(args, commandSlice...)
 	args = append(args, "--data-dir", t.Config.IBFTDir)
 
@@ -227,9 +227,9 @@ func (t *TestServer) InitIBFT() (*InitIBFTResult, error) {
 }
 
 func (t *TestServer) GenerateGenesis() error {
-	genesisCmd := genesis.GenesisCommand{}
+	genesisCmd := genesis.GetCommand()
 	args := []string{
-		genesisCmd.GetBaseCommand(),
+		genesisCmd.Use,
 	}
 
 	// add pre-mined accounts
@@ -273,7 +273,7 @@ func (t *TestServer) GenerateGenesis() error {
 
 	// add block gas limit
 	if t.Config.BlockGasLimit == 0 {
-		t.Config.BlockGasLimit = helper.GenesisGasLimit
+		t.Config.BlockGasLimit = command.DefaultGenesisGasLimit
 	}
 
 	blockGasLimit := strconv.FormatUint(t.Config.BlockGasLimit, 10)
@@ -286,13 +286,13 @@ func (t *TestServer) GenerateGenesis() error {
 }
 
 func (t *TestServer) Start(ctx context.Context) error {
-	serverCmd := server.ServerCommand{}
+	serverCmd := server.GetCommand()
 	args := []string{
-		serverCmd.GetBaseCommand(),
+		serverCmd.Use,
 		// add custom chain
 		"--chain", filepath.Join(t.Config.RootDir, "genesis.json"),
 		// enable grpc
-		"--grpc", fmt.Sprintf(":%d", t.Config.GRPCPort),
+		"--grpc-address", fmt.Sprintf(":%d", t.Config.GRPCPort),
 		// enable libp2p
 		"--libp2p", fmt.Sprintf(":%d", t.Config.LibP2PPort),
 		// enable jsonrpc
@@ -363,13 +363,18 @@ func (t *TestServer) Start(ctx context.Context) error {
 func (t *TestServer) SwitchIBFTType(typ ibft.MechanismType, from uint64, to, deployment *uint64) error {
 	t.t.Helper()
 
-	args := []string{
-		"ibft", "switch",
+	ibftSwitchCmd := ibftSwitch.GetCommand()
+	args := make([]string, 0)
+
+	commandSlice := strings.Split(fmt.Sprintf("ibft %s", ibftSwitchCmd.Use), " ")
+
+	args = append(args, commandSlice...)
+	args = append(args,
 		// add custom chain
 		"--chain", filepath.Join(t.Config.RootDir, "genesis.json"),
 		"--type", string(typ),
 		"--from", strconv.FormatUint(from, 10),
-	}
+	)
 
 	if to != nil {
 		args = append(args, "--to", strconv.FormatUint(*to, 10))

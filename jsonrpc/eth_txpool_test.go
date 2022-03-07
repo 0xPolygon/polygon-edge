@@ -1,12 +1,13 @@
 package jsonrpc
 
 import (
+	"math/big"
+	"testing"
+
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
-	"math/big"
-	"testing"
 )
 
 func TestEth_TxnPool_SendRawTransaction(t *testing.T) {
@@ -35,13 +36,14 @@ func TestEth_TxnPool_SendTransaction(t *testing.T) {
 	store.AddAccount(addr0)
 	eth := newTestEthEndpoint(store)
 
-	arg := &txnArgs{
-		From:     argAddrPtr(addr0),
+	txToSend := &types.Transaction{
+		From:     addr0,
 		To:       argAddrPtr(addr0),
-		Nonce:    argUintPtr(0),
-		GasPrice: argBytesPtr([]byte{0x1}),
+		Nonce:    uint64(0),
+		GasPrice: big.NewInt(int64(1)),
 	}
-	_, err := eth.SendTransaction(arg)
+
+	_, err := eth.SendRawTransaction(hex.EncodeToHex(txToSend.MarshalRLP()))
 	assert.NoError(t, err)
 	assert.NotEqual(t, store.txn.Hash, types.ZeroHash)
 }

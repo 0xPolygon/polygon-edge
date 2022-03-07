@@ -197,9 +197,9 @@ func (f *FilterManager) Run() {
 	for {
 		// check for the next filter to be removed
 		filter := f.nextTimeoutFilter()
-		if filter == nil {
-			timeoutCh = nil
-		} else {
+
+		//	uninstall filters only
+		if filter != nil && !filter.isWS() {
 			timeoutCh = time.After(time.Until(filter.timestamp))
 		}
 
