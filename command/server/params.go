@@ -9,7 +9,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/server"
-	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/multiformats/go-multiaddr"
 )
@@ -169,10 +168,10 @@ func (p *serverParams) generateConfig() *server.Config {
 		BlockTime:      p.rawConfig.BlockTime,
 		LogLevel:       hclog.LevelFromString(p.rawConfig.LogLevel),
 		Bridge: &bridge.Config{
-			Enable:            false,
-			RootChainURL:      nil,
-			RootChainContract: types.ZeroAddress,
-			Confirmations:     6,
+			Enable:            p.bridgeConfig.Enable,
+			RootChainURL:      p.bridgeConfig.RootChainURL,
+			RootChainContract: p.bridgeConfig.RootChainContract,
+			Confirmations:     p.bridgeConfig.Confirmations,
 		},
 	}
 }

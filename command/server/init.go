@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/url"
 
+	"github.com/0xPolygon/polygon-edge/bridge"
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/network"
@@ -274,6 +275,8 @@ func (p *serverParams) initGRPCAddress() error {
 }
 
 func (p *serverParams) initBridgeParams() error {
+	p.bridgeConfig = bridge.DefaultConfig()
+
 	p.bridgeConfig.Enable = p.rawConfig.Bridge.Enable
 
 	if p.bridgeConfig.Enable {
