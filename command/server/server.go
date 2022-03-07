@@ -71,8 +71,8 @@ func setFlags(cmd *cobra.Command) {
 		&params.rawConfig.Telemetry.PrometheusAddr,
 		prometheusAddressFlag,
 		"",
-		"the address and port for the prometheus instrumentation service (address:port). "+ 
-		"If only port is defined (:port) it will bind to 0.0.0.0:port",
+		"the address and port for the prometheus instrumentation service (address:port). "+
+			"If only port is defined (:port) it will bind to 0.0.0.0:port",
 	)
 
 	cmd.Flags().StringVar(
@@ -132,7 +132,7 @@ func setFlags(cmd *cobra.Command) {
 		"the client's max number of peers allowed.",
 	)
 	// override default usage value
-	cmd.Flag(maxPeersFlag).DefValue = fmt.Sprintf("%d",defaultConfig.Network.MaxPeers)
+	cmd.Flag(maxPeersFlag).DefValue = fmt.Sprintf("%d", defaultConfig.Network.MaxPeers)
 
 	cmd.Flags().Int64Var(
 		&params.rawConfig.Network.MaxInboundPeers,
@@ -141,7 +141,7 @@ func setFlags(cmd *cobra.Command) {
 		"the client's max number of inbound peers allowed.",
 	)
 	// override default usage value
-	cmd.Flag(maxInboundPeersFlag).DefValue = fmt.Sprintf("%d",defaultConfig.Network.MaxInboundPeers)
+	cmd.Flag(maxInboundPeersFlag).DefValue = fmt.Sprintf("%d", defaultConfig.Network.MaxInboundPeers)
 
 	cmd.Flags().Int64Var(
 		&params.rawConfig.Network.MaxOutboundPeers,
@@ -150,8 +150,7 @@ func setFlags(cmd *cobra.Command) {
 		"the client's max number of outbound peers allowed.",
 	)
 	// override default usage value
-	cmd.Flag(maxOutboundPeersFlag).DefValue = fmt.Sprintf("%d",defaultConfig.Network.MaxOutboundPeers)
-
+	cmd.Flag(maxOutboundPeersFlag).DefValue = fmt.Sprintf("%d", defaultConfig.Network.MaxOutboundPeers)
 
 	cmd.Flags().Uint64Var(
 		&params.rawConfig.TxPool.PriceLimit,
