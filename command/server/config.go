@@ -3,9 +3,10 @@ package server
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/network"
 	"io/ioutil"
 	"strings"
+
+	"github.com/0xPolygon/polygon-edge/network"
 
 	"github.com/hashicorp/hcl"
 )
@@ -82,7 +83,7 @@ func DefaultConfig() *Config {
 		RestoreFile: "",
 		BlockTime:   defaultBlockTime,
 		Headers: &Headers{
-			AccessControlAllowOrigins: nil,
+			AccessControlAllowOrigins: []string{"*"},
 		},
 	}
 }
