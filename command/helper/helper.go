@@ -4,6 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"net"
+	"net/url"
+	"time"
+
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
 	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
@@ -13,10 +18,6 @@ import (
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"io/ioutil"
-	"net"
-	"net/url"
-	"time"
 
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/ryanuber/columnize"
@@ -194,7 +195,7 @@ func ParseGRPCAddress(grpcAddress string) (*net.TCPAddr, error) {
 func RegisterJSONRPCFlag(cmd *cobra.Command) {
 	cmd.PersistentFlags().String(
 		command.JSONRPCFlag,
-		fmt.Sprintf("%s:%d", "127.0.0.1", server.DefaultJSONRPCPort),
+		fmt.Sprintf("%s:%d", "0.0.0.0", server.DefaultJSONRPCPort),
 		"the JSON-RPC interface",
 	)
 }
