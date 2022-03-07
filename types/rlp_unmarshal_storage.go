@@ -119,7 +119,7 @@ func (t *Transaction) UnmarshalStoreRLPFrom(p *fastrlp.Parser, v *fastrlp.Value)
 		}
 	} else if len(elems) == 3 {
 		// consensus part
-		if elems[1].Type() != fastrlp.TypeBytes {
+		if elems[0].Type() != fastrlp.TypeBytes {
 			return fmt.Errorf("expected ByteType")
 		}
 
@@ -139,6 +139,7 @@ func (t *Transaction) UnmarshalStoreRLPFrom(p *fastrlp.Parser, v *fastrlp.Value)
 		if err := t.UnmarshalRLPFrom(p, elems[1]); err != nil {
 			return err
 		}
+
 		// context part
 		if err = elems[2].GetAddr(t.From[:]); err != nil {
 			return err
