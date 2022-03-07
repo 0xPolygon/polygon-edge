@@ -56,8 +56,8 @@ const (
 	// HashicorpVault pertains to the Hashicorp Vault server
 	HashicorpVault SecretsManagerType = "hashicorp-vault"
 
-	// AwsSsm pertains to AWS SSM using configured EC2 instance role
-	AwsSsm SecretsManagerType = "aws-ssm"
+	// AWSSSM pertains to AWS SSM using configured EC2 instance role
+	AWSSSM SecretsManagerType = "aws-ssm"
 )
 
 // SecretsManager defines the base public interface that all
@@ -102,6 +102,6 @@ type SecretsManagerFactory func(
 
 // SupportedServiceManager checks if the passed in service manager type is supported
 func SupportedServiceManager(service SecretsManagerType) bool {
-	return service == HashicorpVault || service == AwsSsm ||
+	return service == HashicorpVault || service == AWSSSM ||
 		service == Local
 }

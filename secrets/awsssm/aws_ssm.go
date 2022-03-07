@@ -44,7 +44,7 @@ func SecretsManagerFactory(
 
 	/// Set up the base object
 	awsSsmManager := &AwsSsmManager{
-		logger: params.Logger.Named(string(secrets.AwsSsm)),
+		logger: params.Logger.Named(string(secrets.AWSSSM)),
 		region: fmt.Sprintf("%v", config.Extra["region"]),
 	}
 

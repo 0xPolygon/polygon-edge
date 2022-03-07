@@ -24,7 +24,7 @@ func TestSupportedServiceManager(t *testing.T) {
 		},
 		{
 			"Valid AWS SSM secrets manager",
-			AwsSsm,
+			AWSSSM,
 			true,
 		},
 		{
