@@ -161,7 +161,7 @@ func RegisterJSONOutputFlag(cmd *cobra.Command) {
 	cmd.PersistentFlags().Bool(
 		command.JSONOutputFlag,
 		false,
-		"the JSON-RPC interface",
+		"get all outputs in json format (default: false)",
 	)
 }
 
