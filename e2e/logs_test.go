@@ -140,9 +140,7 @@ func TestFilterValue(t *testing.T) {
 
 	id, err := client.Eth().NewFilter(&web3.LogFilter{
 		Address: filterAddresses,
-		Topics: [][]*web3.Hash{
-			filterEventHashes,
-		},
+		Topics:  filterEventHashes,
 	})
 	assert.NoError(t, err)
 
