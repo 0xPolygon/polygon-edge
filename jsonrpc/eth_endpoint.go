@@ -568,13 +568,20 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 		}
 	}
 
+	// Checks if executor level valid gas errors occurred
 	isGasApplyError := func(err error) bool {
 		return errors.As(err, &state.ErrNotEnoughIntrinsicGas)
 	}
 
+	// Checks if EVM level valid gas errors occurred
 	isGasEVMError := func(err error) bool {
-		return errors.As(err, &runtime.ErrOutOfGas) ||
-			errors.As(err, &runtime.ErrCodeStoreOutOfGas)
+		return errors.Is(err, runtime.ErrOutOfGas) ||
+			errors.Is(err, runtime.ErrCodeStoreOutOfGas)
+	}
+
+	// Checks if the EVM reverted during execution
+	isEVMRevertError := func(err error) bool {
+		return errors.Is(err, runtime.ErrExecutionReverted)
 	}
 
 	// Run the transaction with the specified gas value.
@@ -599,11 +606,6 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 			return true, applyErr
 		}
 
-		// Check if an EVM revert happened
-		if result.Reverted() {
-			return true, constructErrorFromRevert(result)
-		}
-
 		// Check if an out of gas error happened during EVM execution
 		if result.Failed() {
 			if isGasEVMError(result.Err) {
@@ -611,6 +613,12 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 				// is an indication that a valid error occurred due to low gas,
 				// which will increase the lower bound for the search
 				return true, nil
+			}
+
+			if isEVMRevertError(result.Err) {
+				// The EVM reverted during execution, attempt to extract the
+				// error message and return it
+				return true, constructErrorFromRevert(result)
 			}
 
 			return true, result.Err
@@ -624,7 +632,10 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 		mid := (lowEnd + highEnd) / 2
 
 		failed, testErr := testTransaction(mid)
-		if testErr != nil {
+		if testErr != nil &&
+			!isEVMRevertError(testErr) {
+			// Reverts are ignored in the binary search, but are checked later on
+			// during the execution for the optimal gas limit found
 			return 0, testErr
 		}
 
@@ -644,6 +655,7 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 	}
 
 	if failed {
+		// The transaction shouldn't fail, for whatever reason, at highEnd
 		return 0, fmt.Errorf(
 			"%w %d",
 			ErrGasCapOverflow,

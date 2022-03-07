@@ -688,7 +688,7 @@ func TestEth_EstimateGas_GasLimit(t *testing.T) {
 				}
 
 				// Make sure the expected errors appear
-				assert.ErrorAs(t, estimateErr, &testCase.expectedError)
+				assert.ErrorIs(t, estimateErr, testCase.expectedError)
 
 				// Make sure the estimate is nullified
 				assert.Equal(t, 0, estimate)
