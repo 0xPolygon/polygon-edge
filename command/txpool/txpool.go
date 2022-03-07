@@ -1,26 +1,33 @@
 package txpool
 
-import "github.com/mitchellh/cli"
+import (
+	"github.com/0xPolygon/polygon-edge/command/helper"
+	"github.com/0xPolygon/polygon-edge/command/txpool/add"
+	"github.com/0xPolygon/polygon-edge/command/txpool/status"
+	"github.com/0xPolygon/polygon-edge/command/txpool/subscribe"
+	"github.com/spf13/cobra"
+)
 
-// TxPoolCommand is the top level ibft command
-type TxPoolCommand struct {
+func GetCommand() *cobra.Command {
+	txPoolCmd := &cobra.Command{
+		Use:   "txpool",
+		Short: "Top level command for interacting with the transaction pool. Only accepts subcommands.",
+	}
+
+	helper.RegisterGRPCAddressFlag(txPoolCmd)
+
+	registerSubcommands(txPoolCmd)
+
+	return txPoolCmd
 }
 
-// Help implements the cli.Command interface
-func (c *TxPoolCommand) Help() string {
-	return c.Synopsis()
-}
-
-func (c *TxPoolCommand) GetBaseCommand() string {
-	return "txpool"
-}
-
-// Synopsis implements the cli.Command interface
-func (c *TxPoolCommand) Synopsis() string {
-	return "Top level command for interacting with the transaction pool. Only accepts subcommands"
-}
-
-// Run implements the cli.Command interface
-func (c *TxPoolCommand) Run(args []string) int {
-	return cli.RunResultHelp
+func registerSubcommands(baseCmd *cobra.Command) {
+	baseCmd.AddCommand(
+		// txpool add
+		add.GetCommand(),
+		// txpool status
+		status.GetCommand(),
+		// txpool subscribe
+		subscribe.GetCommand(),
+	)
 }

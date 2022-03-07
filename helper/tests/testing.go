@@ -95,8 +95,13 @@ func RetryUntilTimeout(ctx context.Context, f func() (interface{}, bool)) (inter
 
 // WaitUntilTxPoolEmpty waits until node has 0 transactions in txpool,
 // otherwise returns timeout
-func WaitUntilTxPoolEmpty(ctx context.Context, client txpoolOp.TxnPoolOperatorClient) (*txpoolOp.TxnPoolStatusResp,
-	error) {
+func WaitUntilTxPoolEmpty(
+	ctx context.Context,
+	client txpoolOp.TxnPoolOperatorClient,
+) (
+	*txpoolOp.TxnPoolStatusResp,
+	error,
+) {
 	res, err := RetryUntilTimeout(ctx, func() (interface{}, bool) {
 		subCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
@@ -118,6 +123,48 @@ func WaitUntilTxPoolEmpty(ctx context.Context, client txpoolOp.TxnPoolOperatorCl
 	}
 
 	return status, nil
+}
+
+func WaitForNonce(
+	ctx context.Context,
+	ethClient *jsonrpc.Eth,
+	addr web3.Address,
+	expectedNonce uint64,
+) (
+	interface{},
+	error,
+) {
+	type result struct {
+		nonce uint64
+		err   error
+	}
+
+	resObj, err := RetryUntilTimeout(ctx, func() (interface{}, bool) {
+		nonce, err := ethClient.GetNonce(addr, web3.Latest)
+		if err != nil {
+			//	error -> stop retrying
+			return result{nonce, err}, false
+		}
+
+		if nonce >= expectedNonce {
+			//	match -> return result
+			return result{nonce, nil}, false
+		}
+
+		//	continue retrying
+		return nil, true
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	res, ok := resObj.(result)
+	if !ok {
+		return nil, errors.New("invalid type assertion")
+	}
+
+	return res.nonce, res.err
 }
 
 // WaitForReceipt waits transaction receipt

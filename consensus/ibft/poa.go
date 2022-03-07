@@ -21,27 +21,36 @@ var (
 
 // PoAMechanism defines specific hooks for the Proof of Authority IBFT mechanism
 type PoAMechanism struct {
-	// Reference to the main IBFT implementation
-	ibft *Ibft
-
-	// hookMap is the collection of registered hooks
-	hookMap map[string]func(interface{}) error
-
-	// Used for easy lookups
-	mechanismType MechanismType
+	BaseConsensusMechanism
 }
 
 // PoAFactory initializes the required data
 // for the Proof of Authority mechanism
-func PoAFactory(ibft *Ibft) (ConsensusMechanism, error) {
+func PoAFactory(ibft *Ibft, params *IBFTFork) (ConsensusMechanism, error) {
 	poa := &PoAMechanism{
-		mechanismType: PoA,
-		ibft:          ibft,
+		BaseConsensusMechanism: BaseConsensusMechanism{
+			mechanismType: PoA,
+			ibft:          ibft,
+		},
+	}
+
+	if err := poa.initializeParams(params); err != nil {
+		return nil, err
 	}
 
 	poa.initializeHookMap()
 
 	return poa, nil
+}
+
+// IsAvailable returns indicates if mechanism should be called at given height
+func (poa *PoAMechanism) IsAvailable(hookType HookType, height uint64) bool {
+	switch hookType {
+	case AcceptStateLogHook, VerifyHeadersHook, ProcessHeadersHook, CandidateVoteHook, CalculateProposerHook:
+		return poa.IsInRange(height)
+	default:
+		return false
+	}
 }
 
 // acceptStateLogHook logs the current snapshot with the number of votes
@@ -101,7 +110,6 @@ func (poa *PoAMechanism) processHeadersHook(hookParam interface{}) error {
 	}
 
 	number := params.header.Number
-
 	if number%poa.ibft.epochSize == 0 {
 		// during a checkpoint block, we reset the votes
 		// and there cannot be any proposals
@@ -239,7 +247,7 @@ func (poa *PoAMechanism) calculateProposerHook(lastProposerParam interface{}) er
 // should have
 func (poa *PoAMechanism) initializeHookMap() {
 	// Create the hook map
-	poa.hookMap = make(map[string]func(interface{}) error)
+	poa.hookMap = make(map[HookType]func(interface{}) error)
 
 	// Register the AcceptStateLogHook
 	poa.hookMap[AcceptStateLogHook] = poa.acceptStateLogHook
@@ -261,15 +269,5 @@ func (poa *PoAMechanism) initializeHookMap() {
 func (poa *PoAMechanism) ShouldWriteTransactions(blockNumber uint64) bool {
 	// The PoA mechanism doesn't have special cases where transactions
 	// shouldn't be written to a block
-	return true
-}
-
-// GetType implements the ConsensusMechanism interface method
-func (poa *PoAMechanism) GetType() MechanismType {
-	return poa.mechanismType
-}
-
-// GetHookMap implements the ConsensusMechanism interface method
-func (poa *PoAMechanism) GetHookMap() map[string]func(interface{}) error {
-	return poa.hookMap
+	return poa.IsInRange(blockNumber)
 }
