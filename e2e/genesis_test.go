@@ -2,11 +2,11 @@ package e2e
 
 import (
 	"context"
+	"github.com/0xPolygon/polygon-edge/command"
 	"math/big"
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/e2e/framework"
 	"github.com/0xPolygon/polygon-edge/helper/tests"
@@ -40,7 +40,7 @@ func TestGenesisCustomBlockGasLimit(t *testing.T) {
 
 // Test if the default gas limit is properly set
 func TestGenesisDefaultBlockGasLimit(t *testing.T) {
-	var blockGasLimit uint64 = helper.GenesisGasLimit
+	var blockGasLimit uint64 = command.DefaultGenesisGasLimit
 
 	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDev)

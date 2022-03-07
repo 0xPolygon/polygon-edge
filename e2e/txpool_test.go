@@ -563,7 +563,6 @@ func TestTxPool_ZeroPriceDev(t *testing.T) {
 	servers := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDev)
 		config.SetSeal(true)
-		config.SetDevInterval(5)
 		config.SetPriceLimit(&zeroPriceLimit)
 		config.SetBlockLimit(20000000)
 		config.Premine(senderAddress, startingBalance)
@@ -618,7 +617,11 @@ func TestTxPool_ZeroPriceDev(t *testing.T) {
 
 	wg.Wait()
 
-	_ = waitForBlock(t, server, 1, 0)
+	waitCtx, waitCancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer waitCancel()
+
+	_, err := tests.WaitForNonce(waitCtx, client.Eth(), web3.BytesToAddress(senderAddress.Bytes()), nonce)
+	assert.NoError(t, err)
 
 	receiverBalance, err := client.Eth().GetBalance(web3.Address(receiverAddress), web3.Latest)
 	assert.NoError(t, err, "failed to retrieve receiver account balance")

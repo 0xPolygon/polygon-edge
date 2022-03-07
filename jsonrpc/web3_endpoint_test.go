@@ -2,8 +2,9 @@ package jsonrpc
 
 import (
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/version"
 	"testing"
+
+	"github.com/0xPolygon/polygon-edge/versioning"
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
@@ -36,5 +37,5 @@ func TestWeb3EndpointClientVersion(t *testing.T) {
 	var res string
 
 	assert.NoError(t, expectJSONResult(resp, &res))
-	assert.Contains(t, res, fmt.Sprintf("polygon-edge [%v]", version.GetVersionJsonrpc()))
+	assert.Contains(t, res, fmt.Sprintf("polygon-edge [%v]", versioning.Version))
 }

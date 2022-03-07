@@ -1,20 +1,55 @@
-# github.com/Masterminds/goutils v1.1.0
-github.com/Masterminds/goutils
-# github.com/Masterminds/semver v1.5.0
-github.com/Masterminds/semver
-# github.com/Masterminds/sprig v2.22.0+incompatible
-github.com/Masterminds/sprig
-# github.com/armon/go-metrics v0.3.9
+# github.com/armon/go-metrics v0.3.10
 github.com/armon/go-metrics
 # github.com/armon/go-radix v1.0.0
 github.com/armon/go-radix
+# github.com/aws/aws-sdk-go v1.40.45
+## explicit
+github.com/aws/aws-sdk-go/aws
+github.com/aws/aws-sdk-go/aws/awserr
+github.com/aws/aws-sdk-go/aws/awsutil
+github.com/aws/aws-sdk-go/aws/client
+github.com/aws/aws-sdk-go/aws/client/metadata
+github.com/aws/aws-sdk-go/aws/corehandlers
+github.com/aws/aws-sdk-go/aws/credentials
+github.com/aws/aws-sdk-go/aws/credentials/ec2rolecreds
+github.com/aws/aws-sdk-go/aws/credentials/endpointcreds
+github.com/aws/aws-sdk-go/aws/credentials/processcreds
+github.com/aws/aws-sdk-go/aws/credentials/ssocreds
+github.com/aws/aws-sdk-go/aws/credentials/stscreds
+github.com/aws/aws-sdk-go/aws/csm
+github.com/aws/aws-sdk-go/aws/defaults
+github.com/aws/aws-sdk-go/aws/ec2metadata
+github.com/aws/aws-sdk-go/aws/endpoints
+github.com/aws/aws-sdk-go/aws/request
+github.com/aws/aws-sdk-go/aws/session
+github.com/aws/aws-sdk-go/aws/signer/v4
+github.com/aws/aws-sdk-go/internal/context
+github.com/aws/aws-sdk-go/internal/ini
+github.com/aws/aws-sdk-go/internal/sdkio
+github.com/aws/aws-sdk-go/internal/sdkmath
+github.com/aws/aws-sdk-go/internal/sdkrand
+github.com/aws/aws-sdk-go/internal/sdkuri
+github.com/aws/aws-sdk-go/internal/shareddefaults
+github.com/aws/aws-sdk-go/internal/strings
+github.com/aws/aws-sdk-go/internal/sync/singleflight
+github.com/aws/aws-sdk-go/private/protocol
+github.com/aws/aws-sdk-go/private/protocol/json/jsonutil
+github.com/aws/aws-sdk-go/private/protocol/jsonrpc
+github.com/aws/aws-sdk-go/private/protocol/query
+github.com/aws/aws-sdk-go/private/protocol/query/queryutil
+github.com/aws/aws-sdk-go/private/protocol/rest
+github.com/aws/aws-sdk-go/private/protocol/restjson
+github.com/aws/aws-sdk-go/private/protocol/xml/xmlutil
+github.com/aws/aws-sdk-go/service/ssm
+github.com/aws/aws-sdk-go/service/sso
+github.com/aws/aws-sdk-go/service/sso/ssoiface
+github.com/aws/aws-sdk-go/service/sts
+github.com/aws/aws-sdk-go/service/sts/stsiface
 # github.com/benbjohnson/clock v1.3.0
 ## explicit
 github.com/benbjohnson/clock
 # github.com/beorn7/perks v1.0.1
 github.com/beorn7/perks/quantile
-# github.com/bgentry/speakeasy v0.1.0
-github.com/bgentry/speakeasy
 # github.com/btcsuite/btcd v0.22.0-beta
 ## explicit
 github.com/btcsuite/btcd/btcec
@@ -43,14 +78,13 @@ github.com/docker/go-units
 ## explicit
 github.com/elastic/gosigar
 github.com/elastic/gosigar/sys/windows
-# github.com/fatih/color v1.12.0
+# github.com/fatih/color v1.13.0
 github.com/fatih/color
 # github.com/flynn/noise v1.0.0
 github.com/flynn/noise
 # github.com/francoispqt/gojay v1.2.13
 github.com/francoispqt/gojay
 # github.com/fsnotify/fsnotify v1.5.1
-## explicit
 github.com/fsnotify/fsnotify
 # github.com/go-kit/kit v0.12.0
 ## explicit
@@ -86,7 +120,7 @@ github.com/google/gopacket/routing
 # github.com/google/uuid v1.3.0
 ## explicit
 github.com/google/uuid
-# github.com/gorilla/websocket v1.4.2
+# github.com/gorilla/websocket v1.5.0
 ## explicit
 github.com/gorilla/websocket
 # github.com/hashicorp/errwrap v1.1.0
@@ -136,7 +170,7 @@ github.com/hashicorp/hcl/hcl/token
 github.com/hashicorp/hcl/json/parser
 github.com/hashicorp/hcl/json/scanner
 github.com/hashicorp/hcl/json/token
-# github.com/hashicorp/vault/api v1.3.0
+# github.com/hashicorp/vault/api v1.3.1
 ## explicit
 github.com/hashicorp/vault/api
 # github.com/hashicorp/vault/sdk v0.3.0
@@ -160,8 +194,6 @@ github.com/hashicorp/vault/sdk/physical/inmem
 github.com/hashicorp/vault/sdk/version
 # github.com/hashicorp/yamux v0.0.0-20180604194846-3520598351bb
 github.com/hashicorp/yamux
-# github.com/huandu/xstrings v1.3.2
-github.com/huandu/xstrings
 # github.com/huin/goupnp v1.0.2
 github.com/huin/goupnp
 github.com/huin/goupnp/dcps/internetgateway1
@@ -170,9 +202,8 @@ github.com/huin/goupnp/httpu
 github.com/huin/goupnp/scpd
 github.com/huin/goupnp/soap
 github.com/huin/goupnp/ssdp
-# github.com/imdario/mergo v0.3.12
-## explicit
-github.com/imdario/mergo
+# github.com/inconshreveable/mousetrap v1.0.0
+github.com/inconshreveable/mousetrap
 # github.com/ipfs/go-cid v0.1.0
 ## explicit
 github.com/ipfs/go-cid
@@ -189,6 +220,8 @@ github.com/ipfs/go-log/v2
 github.com/jackpal/go-nat-pmp
 # github.com/jbenet/go-temp-err-catcher v0.1.0
 github.com/jbenet/go-temp-err-catcher
+# github.com/jmespath/go-jmespath v0.4.0
+github.com/jmespath/go-jmespath
 # github.com/klauspost/compress v1.14.2
 ## explicit
 github.com/klauspost/compress
@@ -354,7 +387,7 @@ github.com/marten-seemann/qtls-go1-17
 github.com/marten-seemann/qtls-go1-18
 # github.com/marten-seemann/tcp v0.0.0-20210406111302-dfbc87cc63fd
 github.com/marten-seemann/tcp
-# github.com/mattn/go-colorable v0.1.8
+# github.com/mattn/go-colorable v0.1.12
 github.com/mattn/go-colorable
 # github.com/mattn/go-isatty v0.0.14
 github.com/mattn/go-isatty
@@ -371,16 +404,13 @@ github.com/mikioh/tcpopt
 github.com/minio/blake2b-simd
 # github.com/minio/sha256-simd v1.0.0
 github.com/minio/sha256-simd
-# github.com/mitchellh/cli v1.1.2
-## explicit
-github.com/mitchellh/cli
 # github.com/mitchellh/copystructure v1.0.0
 github.com/mitchellh/copystructure
 # github.com/mitchellh/go-homedir v1.1.0
 github.com/mitchellh/go-homedir
 # github.com/mitchellh/go-testing-interface v1.0.0
 github.com/mitchellh/go-testing-interface
-# github.com/mitchellh/mapstructure v1.4.2
+# github.com/mitchellh/mapstructure v1.4.3
 github.com/mitchellh/mapstructure
 # github.com/mitchellh/reflectwalk v1.0.0
 github.com/mitchellh/reflectwalk
@@ -463,10 +493,6 @@ github.com/pierrec/lz4/internal/xxh32
 github.com/pkg/errors
 # github.com/pmezard/go-difflib v1.0.0
 github.com/pmezard/go-difflib/difflib
-# github.com/posener/complete v1.2.3
-github.com/posener/complete
-github.com/posener/complete/cmd
-github.com/posener/complete/cmd/install
 # github.com/prometheus/client_golang v1.12.1
 ## explicit
 github.com/prometheus/client_golang/prometheus
@@ -495,6 +521,11 @@ github.com/ryanuber/go-glob
 github.com/spacemonkeygo/spacelog
 # github.com/spaolacci/murmur3 v1.1.0
 github.com/spaolacci/murmur3
+# github.com/spf13/cobra v1.3.0
+## explicit
+github.com/spf13/cobra
+# github.com/spf13/pflag v1.0.5
+github.com/spf13/pflag
 # github.com/stretchr/testify v1.7.0
 ## explicit
 github.com/stretchr/testify/assert
@@ -570,7 +601,6 @@ golang.org/x/crypto/pbkdf2
 golang.org/x/crypto/poly1305
 golang.org/x/crypto/ripemd160
 golang.org/x/crypto/salsa20/salsa
-golang.org/x/crypto/scrypt
 golang.org/x/crypto/sha3
 # golang.org/x/mod v0.5.1
 golang.org/x/mod/internal/lazyregexp
@@ -629,7 +659,7 @@ golang.org/x/tools/internal/typesinternal
 # golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
 golang.org/x/xerrors
 golang.org/x/xerrors/internal
-# google.golang.org/genproto v0.0.0-20210917145530-b395a37504d4
+# google.golang.org/genproto v0.0.0-20211208223120-3a66f561d7aa
 google.golang.org/genproto/googleapis/rpc/status
 # google.golang.org/grpc v1.44.0
 ## explicit

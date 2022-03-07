@@ -1,33 +1,18 @@
 package main
 
 import (
-	"fmt"
-	"os"
+	_ "embed"
+	"github.com/0xPolygon/polygon-edge/command/root"
+	"github.com/0xPolygon/polygon-edge/licenses"
+)
 
-	"github.com/0xPolygon/polygon-edge/command/util"
-	"github.com/mitchellh/cli"
+var (
+	//go:embed LICENSE
+	license string
 )
 
 func main() {
-	os.Exit(Run(os.Args[1:]))
-}
+	licenses.SetLicense(license)
 
-// Run starts the cli
-func Run(args []string) int {
-	commands := util.Commands()
-
-	cli := &cli.CLI{
-		Name:     "polygon",
-		Args:     args,
-		Commands: commands,
-	}
-
-	exitCode, err := cli.Run()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error executing CLI: %s\n", err.Error())
-
-		return 1
-	}
-
-	return exitCode
+	root.NewRootCommand().Execute()
 }

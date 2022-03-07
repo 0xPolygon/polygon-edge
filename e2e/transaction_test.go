@@ -359,13 +359,11 @@ func addStressTestTxns(
 func Test_TransactionDevLoop(t *testing.T) {
 	senderKey, sender := tests.GenerateKeyAndAddr(t)
 	defaultBalance := framework.EthToWei(100)
-	devInterval := 5 // s
 
 	// Set up the test server
 	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDev)
 		config.SetSeal(true)
-		config.SetDevInterval(devInterval)
 		config.Premine(sender, defaultBalance)
 		config.SetBlockLimit(20000000)
 	})
@@ -402,8 +400,17 @@ func Test_TransactionDevLoop(t *testing.T) {
 		senderKey,
 	)
 
-	// Set up the blockchain listener to catch the added block event
-	_ = waitForBlock(t, srv, 1, 0)
+	// Wait for the final tx to be mined
+	retryCtx, retryCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer retryCancel()
+
+	_, err = tests.WaitForNonce(
+		retryCtx,
+		client.Eth(),
+		web3.BytesToAddress(sender.Bytes()),
+		1+uint64(numTransactions), // contract nonce is 1 (EIP-161)
+	)
+	assert.NoError(t, err)
 
 	count, countErr = getCount(sender, contractAddr, client)
 	if countErr != nil {
