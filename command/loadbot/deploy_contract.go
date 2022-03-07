@@ -108,6 +108,7 @@ func (l *Loadbot) deployContract(
 
 		v.GasLimit = blockInfom.GasLimit
 		v.GasUsed = blockInfom.GasUsed
+		v.Utilization = calculateBlockUtilization(v)
 		l.metrics.ContractGasMetrics.Blocks[k] = v
 	}
 

@@ -3,10 +3,12 @@ package loadbot
 import (
 	"errors"
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/command/loadbot/generator"
-	"github.com/0xPolygon/polygon-edge/types"
 	"math/big"
 	"strings"
+
+	"github.com/0xPolygon/polygon-edge/command/loadbot/generator"
+	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/umbracle/go-web3/abi"
 )
 
 var (
@@ -32,6 +34,7 @@ const (
 	gasPriceFlag = "gas-price"
 	gasLimitFlag = "gas-limit"
 	contractFlag = "contract"
+	maxWaitFlag  = "max-wait"
 )
 
 type loadbotParams struct {
@@ -39,6 +42,7 @@ type loadbotParams struct {
 	chainID  uint64
 	count    uint64
 	maxConns uint64
+	maxWait  uint64
 
 	contractPath string
 
@@ -58,22 +62,19 @@ type loadbotParams struct {
 	gasPrice         *big.Int
 	gasLimit         *big.Int
 	contractArtifact *generator.ContractArtifact
+	constructorArgs  []byte
 }
 
 func (p *loadbotParams) validateFlags() error {
-	// Validate the correct mode type
-	convMode := Mode(strings.ToLower(p.modeRaw))
-	if convMode != transfer && convMode != deploy {
+	// Set and validate the correct mode type
+	p.mode = Mode(strings.ToLower(p.modeRaw))
+	if p.mode != transfer && p.mode != deploy && p.mode != erc20 && p.mode != erc721 {
 		return errInvalidMode
 	}
 
 	// Validate the correct mode params
-	if convMode == deploy && p.contractPath == "" {
+	if p.mode == deploy && p.contractPath == "" {
 		return errContractPath
-	}
-
-	if err := p.initRawParams(); err != nil {
-		return errInvalidValues
 	}
 
 	return nil
@@ -93,6 +94,10 @@ func (p *loadbotParams) initRawParams() error {
 	}
 
 	if err := p.initContract(); err != nil {
+		return err
+	}
+
+	if err := p.initContractArtifactAndArgs(); err != nil {
 		return err
 	}
 
@@ -187,5 +192,49 @@ func (p *loadbotParams) generateConfig(
 		GasPrice:         p.gasPrice,
 		GasLimit:         p.gasLimit,
 		ContractArtifact: p.contractArtifact,
+		ConstructorArgs:  p.constructorArgs,
+		MaxWait:          p.maxWait,
 	}
+}
+
+func (p *loadbotParams) initContractArtifactAndArgs() error {
+	var (
+		ctrArtifact *generator.ContractArtifact
+		ctrArgs     []byte
+		err         error
+	)
+
+	switch p.mode {
+	case erc20:
+		ctrArtifact = &generator.ContractArtifact{
+			Bytecode: ERC20BIN,
+			ABI:      abi.MustNewABI(ERC20ABI),
+		}
+
+		if ctrArgs, err = abi.Encode(
+			[]string{"4314500000", "ZexCoin", "ZEX"}, ctrArtifact.ABI.Constructor.Inputs); err != nil {
+			return err
+		}
+
+	case erc721:
+		ctrArtifact = &generator.ContractArtifact{
+			Bytecode: ERC721BIN,
+			ABI:      abi.MustNewABI(ERC721ABI),
+		}
+
+		if ctrArgs, err = abi.Encode([]string{"ZEXFT", "ZEXES"}, ctrArtifact.ABI.Constructor.Inputs); err != nil {
+			return err
+		}
+
+	default:
+		ctrArtifact = &generator.ContractArtifact{
+			Bytecode: generator.DefaultContractBytecode,
+		}
+		ctrArgs = nil
+	}
+
+	p.contractArtifact = ctrArtifact
+	p.constructorArgs = ctrArgs
+
+	return nil
 }

@@ -3,16 +3,19 @@ package loadbot
 import (
 	"bytes"
 	"fmt"
+	"math"
+	"sort"
+
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/command/loadbot/generator"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/umbracle/go-web3"
-	"math"
-	"sort"
 )
 
 const (
-	durationPrecision = 5
+	durationPrecision     = 5
+	contractBlockDataType = "contract"
+	transferBlockDataType = "transfer"
 )
 
 type TxnCountData struct {
@@ -33,6 +36,9 @@ type TxnBlockData struct {
 
 	// BlockTransactionsMap maps the block number to the number of loadbot transactions in it
 	BlockTransactionsMap map[uint64]uint64 `json:"block_transactions_map"`
+
+	// Total amount of gas used in block
+	GasData map[uint64]GasMetrics `json:"gas_used"`
 }
 
 type TxnDetailedErrorData struct {
@@ -42,11 +48,14 @@ type TxnDetailedErrorData struct {
 }
 
 type LoadbotResult struct {
-	CountData         TxnCountData         `json:"count_data"`
-	TurnAroundData    TxnTurnAroundData    `json:"turn_around_data"`
-	BlockData         TxnBlockData         `json:"block_data"`
-	DetailedErrorData TxnDetailedErrorData `json:"detailed_error_data,omitempty"`
-	ApproxTPS         uint64               `json:"approx_tps"`
+	CountData              TxnCountData         `json:"count_data"`
+	TurnAroundData         TxnTurnAroundData    `json:"turn_around_data"`
+	ContractTurnAroundData TxnTurnAroundData    `json:"contract_turn_around_data"`
+	BlockData              TxnBlockData         `json:"block_data"`
+	DetailedErrorData      TxnDetailedErrorData `json:"detailed_error_data,omitempty"`
+	ApproxTPS              uint64               `json:"approx_tps"`
+	ContractAddress        web3.Address         `json:"contract_address"`
+	ContractBlockData      TxnBlockData         `json:"contract_block_data"`
 }
 
 func (lr *LoadbotResult) initExecutionData(metrics *Metrics) {
@@ -78,6 +87,33 @@ func (lr *LoadbotResult) initExecutionData(metrics *Metrics) {
 	lr.BlockData = TxnBlockData{
 		BlocksRequired:       uint64(len(metrics.TransactionDuration.blockTransactions)),
 		BlockTransactionsMap: metrics.TransactionDuration.blockTransactions,
+		GasData:              metrics.GasMetrics.Blocks,
+	}
+
+	// set contract deployment metrics
+	lr.ContractTurnAroundData.FastestTurnAround = common.ToFixedFloat(
+		metrics.ContractDeploymentDuration.FastestTurnAround.Seconds(),
+		durationPrecision,
+	)
+	lr.ContractTurnAroundData.SlowestTurnAround = common.ToFixedFloat(
+		metrics.ContractDeploymentDuration.SlowestTurnAround.Seconds(),
+		durationPrecision,
+	)
+	lr.ContractTurnAroundData.AverageTurnAround = common.ToFixedFloat(
+		metrics.ContractDeploymentDuration.AverageTurnAround.Seconds(),
+		durationPrecision,
+	)
+	lr.ContractTurnAroundData.TotalExecTime = common.ToFixedFloat(
+		metrics.ContractDeploymentDuration.TotalExecTime.Seconds(),
+		durationPrecision,
+	)
+	// set contract address
+	lr.ContractAddress = metrics.ContractAddress
+	// set contract block data
+	lr.ContractBlockData = TxnBlockData{
+		BlocksRequired:       uint64(len(metrics.ContractDeploymentDuration.blockTransactions)),
+		BlockTransactionsMap: metrics.ContractDeploymentDuration.blockTransactions,
+		GasData:              metrics.ContractGasMetrics.Blocks,
 	}
 }
 
@@ -103,18 +139,30 @@ func (lr *LoadbotResult) initDetailedErrors(gen generator.TransactionGenerator) 
 	lr.DetailedErrorData.DetailedErrorMap = errMap
 }
 
-func (lr *LoadbotResult) writeBlockData(buffer bytes.Buffer) {
-	buffer.WriteString("\n\n[BLOCK DATA]\n")
+func (lr *LoadbotResult) writeBlockData(buffer *bytes.Buffer, blockType string) {
+	var blockData *TxnBlockData
+
+	switch blockType {
+	case "contract":
+		blockData = &lr.ContractBlockData
+
+		buffer.WriteString("\n\n[CONTRACT BLOCK DATA]\n")
+	default:
+		blockData = &lr.BlockData
+
+		buffer.WriteString("\n\n[BLOCK DATA]\n")
+	}
+
 	buffer.WriteString(helper.FormatKV([]string{
-		fmt.Sprintf("Blocks required|%d", lr.BlockData.BlocksRequired),
+		fmt.Sprintf("Blocks required|%d", blockData.BlocksRequired),
 	}))
 
-	if lr.BlockData.BlocksRequired != 0 {
+	if blockData.BlocksRequired != 0 {
 		buffer.WriteString("\n\n")
 
-		keys := make([]uint64, 0, lr.BlockData.BlocksRequired)
+		keys := make([]uint64, 0, blockData.BlocksRequired)
 
-		for k := range lr.BlockData.BlockTransactionsMap {
+		for k := range blockData.BlockTransactionsMap {
 			keys = append(keys, k)
 		}
 
@@ -126,15 +174,20 @@ func (lr *LoadbotResult) writeBlockData(buffer bytes.Buffer) {
 
 		for _, blockNumber := range keys {
 			formattedStrings = append(formattedStrings,
-				fmt.Sprintf("Block #%d|%d txns", blockNumber, lr.BlockData.BlockTransactionsMap[blockNumber]),
-			)
+				fmt.Sprintf("Block #%d|%d txns (%d gasUsed / %d gasLimit) utilization | %.2f%%",
+					blockNumber,
+					blockData.BlockTransactionsMap[blockNumber],
+					blockData.GasData[blockNumber].GasUsed,
+					blockData.GasData[blockNumber].GasLimit,
+					blockData.GasData[blockNumber].Utilization,
+				))
 		}
 
 		buffer.WriteString(helper.FormatKV(formattedStrings))
 	}
 }
 
-func (lr *LoadbotResult) writeErrorData(buffer bytes.Buffer) {
+func (lr *LoadbotResult) writeErrorData(buffer *bytes.Buffer) {
 	// Write out the error logs if detailed view
 	// is requested
 	if len(lr.DetailedErrorData.DetailedErrorMap) != 0 {
@@ -176,26 +229,35 @@ func (lr *LoadbotResult) writeErrorData(buffer bytes.Buffer) {
 }
 
 func (lr *LoadbotResult) GetOutput() string {
-	var buffer bytes.Buffer
+	buffer := new(bytes.Buffer)
 
 	lr.writeLoadbotResults(buffer)
 
 	return buffer.String()
 }
 
-func (lr *LoadbotResult) writeLoadbotResults(buffer bytes.Buffer) {
+func (lr *LoadbotResult) writeLoadbotResults(buffer *bytes.Buffer) {
 	buffer.WriteString("\n=====[LOADBOT RUN]=====\n")
 
 	lr.writeCountData(buffer)
 	lr.writeApproximateTPSData(buffer)
+	lr.writeContractDeploymentData(buffer)
 	lr.writeTurnAroundData(buffer)
-	lr.writeBlockData(buffer)
+	lr.writeBlockData(buffer, transferBlockDataType)
+	lr.writeAverageBlockUtilization(buffer)
 	lr.writeErrorData(buffer)
 
 	buffer.WriteString("\n")
 }
 
-func (lr *LoadbotResult) writeCountData(buffer bytes.Buffer) {
+func (lr *LoadbotResult) writeAverageBlockUtilization(buffer *bytes.Buffer) {
+	buffer.WriteString("\n\n[AVERAGE BLOCK UTILIZATION]\n")
+	buffer.WriteString(helper.FormatKV([]string{
+		fmt.Sprintf("Average utilization acorss all blocks|%.2f%%", calculateAvgBlockUtil(lr.BlockData.GasData)),
+	}))
+}
+
+func (lr *LoadbotResult) writeCountData(buffer *bytes.Buffer) {
 	buffer.WriteString("\n[COUNT DATA]\n")
 	buffer.WriteString(helper.FormatKV([]string{
 		fmt.Sprintf("Transactions submitted|%d", lr.CountData.Total),
@@ -203,14 +265,14 @@ func (lr *LoadbotResult) writeCountData(buffer bytes.Buffer) {
 	}))
 }
 
-func (lr *LoadbotResult) writeApproximateTPSData(buffer bytes.Buffer) {
+func (lr *LoadbotResult) writeApproximateTPSData(buffer *bytes.Buffer) {
 	buffer.WriteString("\n\n[APPROXIMATE TPS]\n")
 	buffer.WriteString(helper.FormatKV([]string{
 		fmt.Sprintf("Approximate number of transactions per second|%d", lr.ApproxTPS),
 	}))
 }
 
-func (lr *LoadbotResult) writeTurnAroundData(buffer bytes.Buffer) {
+func (lr *LoadbotResult) writeTurnAroundData(buffer *bytes.Buffer) {
 	buffer.WriteString("\n\n[TURN AROUND DATA]\n")
 	buffer.WriteString(helper.FormatKV([]string{
 		fmt.Sprintf("Average transaction turn around|%fs", lr.TurnAroundData.AverageTurnAround),
@@ -218,6 +280,21 @@ func (lr *LoadbotResult) writeTurnAroundData(buffer bytes.Buffer) {
 		fmt.Sprintf("Slowest transaction turn around|%fs", lr.TurnAroundData.SlowestTurnAround),
 		fmt.Sprintf("Total loadbot execution time|%fs", lr.TurnAroundData.TotalExecTime),
 	}))
+}
+
+func (lr *LoadbotResult) writeContractDeploymentData(buffer *bytes.Buffer) {
+	// skip if contract was not deployed
+	if lr.ContractAddress == web3.ZeroAddress {
+		return
+	}
+
+	buffer.WriteString("\n\n[CONTRACT DEPLOYMENT DATA]\n")
+	buffer.WriteString(helper.FormatKV([]string{
+		fmt.Sprintf("Contract address|%s", lr.ContractAddress),
+		fmt.Sprintf("Total execution time|%fs", lr.ContractTurnAroundData.TotalExecTime),
+	}))
+
+	lr.writeBlockData(buffer, contractBlockDataType)
 }
 
 func newLoadbotResult(metrics *Metrics) *LoadbotResult {

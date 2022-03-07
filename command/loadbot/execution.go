@@ -20,9 +20,6 @@ import (
 )
 
 const (
-	maxReceiptWait = 10 * time.Minute
-	minReceiptWait = 2 * time.Minute
-
 	defaultFastestTurnAround = time.Hour * 24
 	defaultSlowestTurnAround = time.Duration(0)
 
@@ -58,7 +55,7 @@ type Configuration struct {
 	GasLimit         *big.Int
 	ContractArtifact *generator.ContractArtifact
 	ConstructorArgs  []byte // smart contract constructor args
-	MaxWait          uint   // max wait time for receipts in minutes
+	MaxWait          uint64 // max wait time for receipts in minutes
 }
 
 type metadata struct {
@@ -67,6 +64,17 @@ type metadata struct {
 
 	// block where it was sealed
 	blockNumber uint64
+}
+
+type GasMetrics struct {
+	GasUsed     uint64
+	GasLimit    uint64
+	Utilization float64
+}
+
+type BlockGasMetrics struct {
+	Blocks        map[uint64]GasMetrics
+	BlockGasMutex *sync.Mutex
 }
 
 type Metrics struct {
@@ -79,8 +87,6 @@ type Metrics struct {
 	ContractDeploymentDuration      ExecDuration
 	ContractAddress                 web3.Address
 	ContractGasMetrics              BlockGasMetrics
-
-	CumulativeGasUsed uint64
 
 	GasMetrics BlockGasMetrics
 }
@@ -99,6 +105,17 @@ func NewLoadbot(cfg *Configuration) *Loadbot {
 			FailedTransactionsCount:    0,
 			TransactionDuration: ExecDuration{
 				blockTransactions: make(map[uint64]uint64),
+			},
+			ContractDeploymentDuration: ExecDuration{
+				blockTransactions: make(map[uint64]uint64),
+			},
+			GasMetrics: BlockGasMetrics{
+				Blocks:        make(map[uint64]GasMetrics),
+				BlockGasMutex: &sync.Mutex{},
+			},
+			ContractGasMetrics: BlockGasMetrics{
+				Blocks:        make(map[uint64]GasMetrics),
+				BlockGasMutex: &sync.Mutex{},
 			},
 		},
 	}
@@ -194,7 +211,7 @@ func (l *Loadbot) Run() error {
 		// No gas limit specified, query the network for an estimation
 		gasEstimate, estimateErr := estimateGas(jsonClient, exampleTxn)
 		if estimateErr != nil {
-			return fmt.Errorf("unable to get gas estimate, %w", err)
+			return fmt.Errorf("unable to get gas estimate, %w", estimateErr)
 		}
 
 		gasLimit = new(big.Int).SetUint64(gasEstimate)
@@ -210,12 +227,8 @@ func (l *Loadbot) Run() error {
 		receiptTimeout time.Duration
 	)
 
-	// if max-wait not configured calculate it
-	if l.cfg.MaxWait == 0 {
-		receiptTimeout = calcMaxTimeout(l.cfg.Count, l.cfg.TPS)
-	} else {
-		receiptTimeout = time.Duration(l.cfg.MaxWait) * time.Minute
-	}
+	// max-wait by default is 2 min.
+	receiptTimeout = time.Duration(l.cfg.MaxWait) * time.Minute
 
 	startTime := time.Now()
 
@@ -301,6 +314,7 @@ func (l *Loadbot) Run() error {
 
 		v.GasLimit = blockInfom.GasLimit
 		v.GasUsed = blockInfom.GasUsed
+		v.Utilization = calculateBlockUtilization(v)
 		l.metrics.GasMetrics.Blocks[k] = v
 	}
 

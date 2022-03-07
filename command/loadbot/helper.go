@@ -2,10 +2,10 @@ package loadbot
 
 import (
 	"fmt"
+
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/go-web3"
 	"github.com/umbracle/go-web3/jsonrpc"
-	"time"
 )
 
 // getInitialSenderNonce queries the sender account nonce before starting the loadbot run.
@@ -52,18 +52,17 @@ func estimateGas(client *jsonrpc.Client, txn *types.Transaction) (uint64, error)
 	return gasEstimate, nil
 }
 
-// calcMaxTimeout calculates the max timeout for transactions receipts
-// based on the transaction count and tps params
-func calcMaxTimeout(count, tps uint64) time.Duration {
-	waitTime := minReceiptWait
-	// The receipt timeout should be at max maxReceiptWait
-	// or minReceiptWait + tps / count * 100
-	// This way the wait time scales linearly for more stressful situations
-	waitFactor := time.Duration(float64(tps)/float64(count)*100) * time.Second
+// calculate block utilization in percents
+func calculateBlockUtilization(blockInfo GasMetrics) float64 {
+	return float64(blockInfo.GasUsed) / float64(blockInfo.GasLimit) * 100
+}
 
-	if waitTime+waitFactor > maxReceiptWait {
-		return maxReceiptWait
+// calculate average block utilization across all blocks
+func calculateAvgBlockUtil(gasData map[uint64]GasMetrics) float64 {
+	sum := float64(0)
+	for _, i := range gasData {
+		sum += i.Utilization
 	}
 
-	return waitTime + waitFactor
+	return sum / float64(len(gasData))
 }
