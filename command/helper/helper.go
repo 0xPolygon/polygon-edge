@@ -220,6 +220,20 @@ func ResolveAddr(address string) (*net.TCPAddr, error) {
 	return addr, nil
 }
 
+func ResolveAddrDefaultBindAllInterfaces(address string) (*net.TCPAddr, error) {
+	addr, err := net.ResolveTCPAddr("tcp", address)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse addr '%s': %w", address, err)
+	}
+
+	if addr.IP == nil {
+		addr.IP = net.ParseIP("0.0.0.0")
+	}
+
+	return addr, nil
+}
+
 // WriteGenesisConfigToDisk writes the passed in configuration to a genesis file at the specified path
 func WriteGenesisConfigToDisk(genesisConfig *chain.Chain, genesisPath string) error {
 	data, err := json.MarshalIndent(genesisConfig, "", "    ")

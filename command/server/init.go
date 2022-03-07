@@ -2,14 +2,15 @@ package server
 
 import (
 	"fmt"
+	"math"
+	"net"
+
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/server"
 	"github.com/0xPolygon/polygon-edge/types"
-	"math"
-	"net"
 )
 
 func (p *serverParams) initConfigFromFile() error {
@@ -192,7 +193,7 @@ func (p *serverParams) initPrometheusAddress() error {
 
 	var parseErr error
 
-	if p.prometheusAddress, parseErr = helper.ResolveAddr(
+	if p.prometheusAddress, parseErr = helper.ResolveAddrDefaultBindAllInterfaces(
 		p.rawConfig.Telemetry.PrometheusAddr,
 	); parseErr != nil {
 		return parseErr
@@ -246,7 +247,7 @@ func (p *serverParams) initDNSAddress() error {
 func (p *serverParams) initJSONRPCAddress() error {
 	var parseErr error
 
-	if p.jsonRPCAddress, parseErr = helper.ResolveAddr(
+	if p.jsonRPCAddress, parseErr = helper.ResolveAddrDefaultBindAllInterfaces(
 		p.rawConfig.JSONRPCAddr,
 	); parseErr != nil {
 		return parseErr
