@@ -51,6 +51,7 @@ var (
 			Telemetry: &Telemetry{},
 			Network:   &Network{},
 			TxPool:    &TxPool{},
+			Bridge:    &Bridge{},
 		},
 	}
 )
