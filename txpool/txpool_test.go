@@ -1298,9 +1298,9 @@ func TestResetAccounts_Enqueued(t *testing.T) {
 
 		// setup prestate
 		totalTx := 0
-		totalPromoted := uint64(0)
+		expectedPromoted := uint64(0)
 		for addr, txs := range allTxs {
-			totalPromoted += expected.accounts[addr].promoted
+			expectedPromoted += expected.accounts[addr].promoted
 			for _, tx := range txs {
 				totalTx++
 				go func(tx *types.Transaction) {
@@ -1322,7 +1322,7 @@ func TestResetAccounts_Enqueued(t *testing.T) {
 		ctx, cancelFn = context.WithTimeout(context.Background(), time.Second*10)
 		defer cancelFn()
 
-		assert.Len(t, waitForEvents(ctx, promotedSubscription, int(totalPromoted)), int(totalPromoted))
+		assert.Len(t, waitForEvents(ctx, promotedSubscription, int(expectedPromoted)), int(expectedPromoted))
 
 		assert.Equal(t, expected.slots, pool.gauge.read())
 		commonAssert(expected.accounts, pool)
@@ -1385,12 +1385,12 @@ func TestResetAccounts_Enqueued(t *testing.T) {
 		)
 
 		// setup prestate
-		totalTx := 0
-		totalPromoted := uint64(0)
+		expectedEnqueuedTx := 0
+		expectedPromotedTx := uint64(0)
 		for addr, txs := range allTxs {
-			totalPromoted += expected.accounts[addr].promoted
+			expectedPromotedTx += expected.accounts[addr].promoted
 			for _, tx := range txs {
-				totalTx++
+				expectedEnqueuedTx++
 				go func(tx *types.Transaction) {
 					err := pool.addTx(local, tx)
 					assert.NoError(t, err)
@@ -1402,7 +1402,7 @@ func TestResetAccounts_Enqueued(t *testing.T) {
 		defer cancelFn()
 
 		// All txns should get added
-		assert.Len(t, waitForEvents(ctx, enqueuedSubscription, totalTx), totalTx)
+		assert.Len(t, waitForEvents(ctx, enqueuedSubscription, expectedEnqueuedTx), expectedEnqueuedTx)
 		pool.eventManager.cancelSubscription(enqueuedSubscription.subscriptionID)
 
 		pool.resetAccounts(newNonces)
@@ -1521,10 +1521,10 @@ func TestExecutablesOrder(t *testing.T) {
 				[]proto.EventType{proto.EventType_PROMOTED},
 			)
 
-			totalTx := 0
+			expectedPromotedTx := 0
 			for _, txs := range test.allTxs {
 				for _, tx := range txs {
-					totalTx++
+					expectedPromotedTx++
 					// send all txs
 					go func(tx *types.Transaction) {
 						err := pool.addTx(local, tx)
@@ -1537,7 +1537,7 @@ func TestExecutablesOrder(t *testing.T) {
 			defer cancelFn()
 
 			// All txns should get added
-			assert.Len(t, waitForEvents(ctx, subscription, totalTx), totalTx)
+			assert.Len(t, waitForEvents(ctx, subscription, expectedPromotedTx), expectedPromotedTx)
 			assert.Equal(t, uint64(len(test.expectedPriceOrder)), pool.accounts.promoted())
 
 			var successful []*types.Transaction
@@ -1890,12 +1890,20 @@ func TestGetTxs(t *testing.T) {
 			pool.Start()
 			defer pool.Close()
 
-			subscription := pool.eventManager.subscribe(
-				[]proto.EventType{proto.EventType_PROMOTED},
+			promoteSubscription := pool.eventManager.subscribe(
+				[]proto.EventType{
+					proto.EventType_PROMOTED,
+				},
+			)
+
+			enqueueSubscription := pool.eventManager.subscribe(
+				[]proto.EventType{
+					proto.EventType_ENQUEUED,
+				},
 			)
 
 			// send txs
-			totalTx := 0
+			expectedPromotedTx := 0
 			for _, txs := range test.allTxs {
 				nonce := uint64(0)
 				promotable := uint64(0)
@@ -1911,14 +1919,24 @@ func TestGetTxs(t *testing.T) {
 					}(tx)
 				}
 
-				totalTx += int(promotable)
+				expectedPromotedTx += int(promotable)
 			}
 
 			ctx, cancelFn := context.WithTimeout(context.Background(), time.Second*10)
 			defer cancelFn()
 
-			// All txns should get added
-			assert.Len(t, waitForEvents(ctx, subscription, totalTx), totalTx)
+			// Wait for promoted transactions
+			assert.Len(t, waitForEvents(ctx, promoteSubscription, expectedPromotedTx), expectedPromotedTx)
+
+			// Wait for enqueued transactions, if any are present
+			expectedEnqueuedTx := expectedPromotedTx - len(test.allTxs)
+
+			if expectedEnqueuedTx > 0 {
+				ctx, cancelFn = context.WithTimeout(context.Background(), time.Second*10)
+				defer cancelFn()
+
+				assert.Len(t, waitForEvents(ctx, enqueueSubscription, expectedEnqueuedTx), expectedEnqueuedTx)
+			}
 
 			allPromoted, allEnqueued := pool.GetTxs(true)
 
