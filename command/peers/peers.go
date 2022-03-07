@@ -1,26 +1,33 @@
 package peers
 
-import "github.com/mitchellh/cli"
+import (
+	"github.com/0xPolygon/polygon-edge/command/helper"
+	"github.com/0xPolygon/polygon-edge/command/peers/add"
+	"github.com/0xPolygon/polygon-edge/command/peers/list"
+	"github.com/0xPolygon/polygon-edge/command/peers/status"
+	"github.com/spf13/cobra"
+)
 
-// PeersCommand is the top level ibft command
-type PeersCommand struct {
+func GetCommand() *cobra.Command {
+	peersCmd := &cobra.Command{
+		Use:   "peers",
+		Short: "Top level command for interacting with the network peers. Only accepts subcommands.",
+	}
+
+	helper.RegisterGRPCAddressFlag(peersCmd)
+
+	registerSubcommands(peersCmd)
+
+	return peersCmd
 }
 
-// Help implements the cli.Command interface
-func (c *PeersCommand) Help() string {
-	return c.Synopsis()
-}
-
-func (c *PeersCommand) GetBaseCommand() string {
-	return "peers"
-}
-
-// Synopsis implements the cli.Command interface
-func (c *PeersCommand) Synopsis() string {
-	return "Top level command for interacting with the network peers. Only accepts subcommands"
-}
-
-// Run implements the cli.Command interface
-func (c *PeersCommand) Run(args []string) int {
-	return cli.RunResultHelp
+func registerSubcommands(baseCmd *cobra.Command) {
+	baseCmd.AddCommand(
+		// peers status
+		status.GetCommand(),
+		// peers list
+		list.GetCommand(),
+		// peers add
+		add.GetCommand(),
+	)
 }

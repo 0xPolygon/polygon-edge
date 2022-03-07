@@ -5,10 +5,10 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
-	"math"
 	"math/big"
 	"net"
 	"regexp"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -42,6 +42,9 @@ const (
 
 	PriorityRandomDial uint64 = 10
 )
+
+// regex string  to match against a valid dns/dns4/dns6 addr
+const DNSRegex = `^/?(dns)(4|6)?/[^-|^/][A-Za-z0-9-]([^-|^/]?)+([\\-\\.]{1}[a-z0-9]+)*\\.[A-Za-z]{2,}(/?)$`
 
 var (
 	ErrNoBootnodes  = errors.New("no bootnodes specified")
@@ -148,11 +151,6 @@ func setupLibp2pKey(secretsManager secrets.SecretsManager) (crypto.PrivKey, erro
 
 func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	logger = logger.Named("network")
-
-	if config.MaxPeers != DefaultConfig().MaxPeers {
-		config.MaxOutboundPeers = int64(math.Floor(float64(config.MaxPeers) * DefaultDialRatio))
-		config.MaxInboundPeers = config.MaxPeers - config.MaxOutboundPeers
-	}
 
 	key, err := setupLibp2pKey(config.SecretsManager)
 	if err != nil {
@@ -759,15 +757,19 @@ func StringToAddrInfo(addr string) (*peer.AddrInfo, error) {
 }
 
 var (
-	// Regex used for matching loopback addresses (IPv4 and IPv6)
+	// Regex used for matching loopback addresses (IPv4, IPv6, DNS)
 	// This regex will match:
 	// /ip4/localhost/tcp/<port>
 	// /ip4/127.0.0.1/tcp/<port>
 	// /ip4/<any other loopback>/tcp/<port>
 	// /ip6/<any loopback>/tcp/<port>
+	// /dns/foobar.com/tcp/<port>
 	loopbackRegex = regexp.MustCompile(
-		`^\/ip4\/127(?:\.[0-9]+){0,2}\.[0-9]+\/tcp\/\d+$|^\/ip4\/localhost\/tcp\/\d+$|^\/ip6\/(?:0*\:)*?:?0*1\/tcp\/\d+$`,
+		//nolint:lll
+		fmt.Sprintf(`^\/ip4\/127(?:\.[0-9]+){0,2}\.[0-9]+\/tcp\/\d+$|^\/ip4\/localhost\/tcp\/\d+$|^\/ip6\/(?:0*\:)*?:?0*1\/tcp\/\d+$|%s`, DNSRegex),
 	)
+
+	dnsRegex = "^/?(dns)(4|6)?/[^-|^/][A-Za-z0-9-]([^-|^/]?)+([\\-\\.]{1}[a-z0-9]+)*\\.[A-Za-z]{2,}(/?)$"
 )
 
 // AddrInfoToString converts an AddrInfo into a string representation that can be dialed from another node
@@ -794,6 +796,57 @@ func AddrInfoToString(addr *peer.AddrInfo) string {
 
 	// Format output and return
 	return dialAddress + "/p2p/" + addr.ID.String()
+}
+
+// MultiAddrFromDNS constructs a multiAddr from the passed in DNS address and port combination
+func MultiAddrFromDNS(addr string, port int) (multiaddr.Multiaddr, error) {
+	var (
+		version string
+		domain  string
+	)
+
+	match, err := regexp.MatchString(
+		dnsRegex,
+		addr,
+	)
+	if err != nil || !match {
+		return nil, errors.New("invalid DNS address")
+	}
+
+	s := strings.Trim(addr, "/")
+	split := strings.Split(s, "/")
+
+	if len(split) != 2 {
+		return nil, errors.New("invalid DNS address")
+	}
+
+	switch split[0] {
+	case "dns":
+		version = "dns"
+	case "dns4":
+		version = "dns4"
+	case "dns6":
+		version = "dns6"
+	default:
+		return nil, errors.New("invalid DNS version")
+	}
+
+	domain = split[1]
+
+	multiAddr, err := multiaddr.NewMultiaddr(
+		fmt.Sprintf(
+			"/%s/%s/tcp/%d",
+			version,
+			domain,
+			port,
+		),
+	)
+
+	if err != nil {
+		return nil, errors.New("could not create a multi address")
+	}
+
+	return multiAddr, nil
 }
 
 type PeerEventType uint

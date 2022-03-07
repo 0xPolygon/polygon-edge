@@ -3,6 +3,10 @@ package tracker
 import (
 	"encoding/json"
 	"fmt"
+	"math/big"
+	"os"
+	"path/filepath"
+
 	"github.com/0xPolygon/polygon-edge/blockchain/storage"
 	"github.com/0xPolygon/polygon-edge/blockchain/storage/leveldb"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -10,9 +14,6 @@ import (
 	"github.com/umbracle/go-web3"
 	"github.com/umbracle/go-web3/abi"
 	client "github.com/umbracle/go-web3/jsonrpc"
-	"math/big"
-	"os"
-	"path/filepath"
 )
 
 const (
@@ -82,7 +83,7 @@ func setupQueryFilter(from, to *big.Int, contracts []*contractABI) *web3.LogFilt
 		queryFilter.Address = append(queryFilter.Address, contract.address)
 
 		//	topics from all contracts must be in Topics[0]
-		queryFilter.Topics = append(queryFilter.Topics, contract.eventIDs())
+		queryFilter.Topics = append(queryFilter.Topics, contract.eventIDs()...)
 	}
 
 	return queryFilter

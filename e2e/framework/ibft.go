@@ -50,7 +50,7 @@ func NewIBFTServersManager(
 			config.SetIBFTDir(fmt.Sprintf("%s%d", ibftDirPrefix, i))
 			callback(i, config)
 		})
-		res, err := srv.InitIBFT()
+		res, err := srv.SecretsInit()
 
 		if err != nil {
 			t.Fatal(err)
