@@ -83,7 +83,7 @@ func DefaultConfig() *Config {
 		RestoreFile: "",
 		BlockTime:   defaultBlockTime,
 		Headers: &Headers{
-			AccessControlAllowOrigins: nil,
+			AccessControlAllowOrigins: []string{"*"},
 		},
 	}
 }
