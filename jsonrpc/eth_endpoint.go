@@ -77,6 +77,11 @@ type Eth struct {
 	filterManager *FilterManager
 }
 
+var (
+	ErrInsufficientFunds = errors.New("insufficient funds for execution")
+	ErrGasCapOverflow    = errors.New("unable to apply transaction for the highest gas limit")
+)
+
 // ChainId returns the chain id of the client
 //nolint:stylecheck
 func (e *Eth) ChainId() (interface{}, error) {
@@ -459,6 +464,11 @@ func (e *Eth) Call(arg *txnArgs, filter BlockNumberOrHash) (interface{}, error) 
 		return nil, err
 	}
 
+	// Check if an EVM revert happened
+	if result.Reverted() {
+		return nil, constructErrorFromRevert(result)
+	}
+
 	if result.Failed() {
 		return nil, fmt.Errorf("unable to execute call: %w", result.Err)
 	}
@@ -496,7 +506,6 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 	var (
 		lowEnd  = standardGas
 		highEnd uint64
-		gasCap  uint64
 	)
 
 	// If the gas limit was passed in, use it as a ceiling
@@ -510,8 +519,11 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 	gasPriceInt := new(big.Int).Set(transaction.GasPrice)
 	valueInt := new(big.Int).Set(transaction.Value)
 
-	// If the sender address is present, recalculate the ceiling to his balance
-	if transaction.From != types.ZeroAddress && transaction.GasPrice != nil && gasPriceInt.BitLen() != 0 {
+	var availableBalance *big.Int
+
+	// If the sender address is present, figure out how much available funds
+	// are we working with
+	if transaction.From != types.ZeroAddress {
 		// Get the account balance
 		// If the account is not initialized yet in state,
 		// assume it's an empty account
@@ -527,79 +539,126 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 			accountBalance = acc.Balance
 		}
 
-		available := new(big.Int).Set(accountBalance)
+		availableBalance = new(big.Int).Set(accountBalance)
 
 		if transaction.Value != nil {
-			if valueInt.Cmp(available) >= 0 {
-				return nil, fmt.Errorf("insufficient funds for execution")
+			if valueInt.Cmp(availableBalance) > 0 {
+				return 0, ErrInsufficientFunds
 			}
 
-			available.Sub(available, valueInt)
-		}
-
-		allowance := new(big.Int).Div(available, gasPriceInt)
-
-		// If the allowance is larger than maximum uint64, skip checking
-		if allowance.IsUint64() && highEnd > allowance.Uint64() {
-			highEnd = allowance.Uint64()
+			availableBalance.Sub(availableBalance, valueInt)
 		}
 	}
 
-	if highEnd > types.GasCap.Uint64() {
-		// The high end is greater than the environment gas cap
-		highEnd = types.GasCap.Uint64()
+	// Recalculate the gas ceiling based on the available funds (if any)
+	// and the passed in gas price (if present)
+	if gasPriceInt.BitLen() != 0 && // Gas price has been set
+		availableBalance != nil && // Available balance is found
+		availableBalance.Cmp(big.NewInt(0)) > 0 { // Available balance > 0
+		gasAllowance := new(big.Int).Div(availableBalance, gasPriceInt)
+
+		// Check the gas allowance for this account, make sure high end is capped to it
+		if gasAllowance.IsUint64() && highEnd > gasAllowance.Uint64() {
+			e.logger.Debug(
+				fmt.Sprintf(
+					"Gas estimation high-end capped by allowance [%d]",
+					gasAllowance.Uint64(),
+				),
+			)
+
+			highEnd = gasAllowance.Uint64()
+		}
 	}
 
-	gasCap = highEnd
+	// Checks if executor level valid gas errors occurred
+	isGasApplyError := func(err error) bool {
+		return errors.As(err, &state.ErrNotEnoughIntrinsicGas)
+	}
 
-	// Run the transaction with the estimated gas
-	testTransaction := func(gas uint64) (bool, error) {
+	// Checks if EVM level valid gas errors occurred
+	isGasEVMError := func(err error) bool {
+		return errors.Is(err, runtime.ErrOutOfGas) ||
+			errors.Is(err, runtime.ErrCodeStoreOutOfGas)
+	}
+
+	// Checks if the EVM reverted during execution
+	isEVMRevertError := func(err error) bool {
+		return errors.Is(err, runtime.ErrExecutionReverted)
+	}
+
+	// Run the transaction with the specified gas value.
+	// Returns a status indicating if the transaction failed and the accompanying error
+	testTransaction := func(gas uint64, shouldOmitErr bool) (bool, error) {
 		// Create a dummy transaction with the new gas
 		txn := transaction.Copy()
 		txn.Gas = gas
 
-		result, err := e.store.ApplyTxn(header, txn)
+		result, applyErr := e.store.ApplyTxn(header, txn)
 
-		if err != nil {
-			return true, err
+		if applyErr != nil {
+			// Check the application error.
+			// Gas apply errors are valid, and should be ignored
+			if isGasApplyError(applyErr) && shouldOmitErr {
+				// Specifying the transaction failed, but not providing an error
+				// is an indication that a valid error occurred due to low gas,
+				// which will increase the lower bound for the search
+				return true, nil
+			}
+
+			return true, applyErr
 		}
 
-		return result.Failed(), nil
+		// Check if an out of gas error happened during EVM execution
+		if result.Failed() {
+			if isGasEVMError(result.Err) && shouldOmitErr {
+				// Specifying the transaction failed, but not providing an error
+				// is an indication that a valid error occurred due to low gas,
+				// which will increase the lower bound for the search
+				return true, nil
+			}
+
+			if isEVMRevertError(result.Err) {
+				// The EVM reverted during execution, attempt to extract the
+				// error message and return it
+				return true, constructErrorFromRevert(result)
+			}
+
+			return true, result.Err
+		}
+
+		return false, nil
 	}
 
 	// Start the binary search for the lowest possible gas price
-	for lowEnd <= highEnd {
+	for lowEnd < highEnd {
 		mid := (lowEnd + highEnd) / 2
 
-		failed, err := testTransaction(mid)
-		if err != nil {
-			return 0, err
+		failed, testErr := testTransaction(mid, true)
+		if testErr != nil &&
+			!isEVMRevertError(testErr) {
+			// Reverts are ignored in the binary search, but are checked later on
+			// during the execution for the optimal gas limit found
+			return 0, testErr
 		}
 
 		if failed {
 			// If the transaction failed => increase the gas
 			lowEnd = mid + 1
 		} else {
-			// If the transaction didn't fail => lower the gas
-			highEnd = mid - 1
+			// If the transaction didn't fail => make this ok value the high end
+			highEnd = mid
 		}
 	}
 
-	// we stopped the binary search at the last gas limit
-	// at which the txn could not be executed
-	highEnd++
-
-	// Check the edge case if even the highest cap is not enough to complete the transaction
-	if highEnd == gasCap {
-		failed, err := testTransaction(gasCap)
-
-		if err != nil {
-			return 0, err
-		}
-
-		if failed {
-			return 0, fmt.Errorf("gas required exceeds allowance (%d)", gasCap)
-		}
+	// Check if the highEnd is a good value to make the transaction pass
+	failed, err := testTransaction(highEnd, false)
+	if failed {
+		// The transaction shouldn't fail, for whatever reason, at highEnd
+		return 0, fmt.Errorf(
+			"unable to apply transaction even for the highest gas limit %d: %w",
+			highEnd,
+			err,
+		)
 	}
 
 	return hex.EncodeUint64(highEnd), nil
@@ -885,10 +944,6 @@ func (e *Eth) getNextNonce(address types.Address, number BlockNumber) (uint64, e
 }
 
 func (e *Eth) decodeTxn(arg *txnArgs) (*types.Transaction, error) {
-	if arg.Data != nil && arg.Input != nil {
-		return nil, fmt.Errorf("both input and data cannot be set")
-	}
-
 	// set default values
 	if arg.From == nil {
 		arg.From = &types.ZeroAddress

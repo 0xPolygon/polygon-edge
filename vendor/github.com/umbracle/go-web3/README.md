@@ -155,12 +155,9 @@ Resolve names on the Ethereum Name Service registrar.
 import (
     "fmt"
 
-    web3 "github.com/umbracle/go-web3"
     "github.com/umbracle/go-web3/jsonrpc"
-    "github.com/umbracle/go-web3/contract/builtin/ens"
+    "github.com/umbracle/go-web3/ens"
 )
-
-var mainnetAddress = web3.HexToAddress("0x314159265dD8dbb310642f98f50C066173C1259b")
 
 func main() {
 	client, err := jsonrpc.NewClient("https://mainnet.infura.io")
@@ -168,12 +165,14 @@ func main() {
         panic(err)
     }
 
-	resolver := ens.NewENSResolver(mainnetAddress, client)
-	addr, err := resolver.Resolve("ens_address")
+	ens, err := ens.NewENS(ens.WithClient(client))
 	if err != nil {
 		panic(err)
 	}
-
+	addr, err := ens.Resolve("ens_address")
+	if err != nil {
+		panic(err)
+	}
     fmt.Println(addr)
 }
 ```
