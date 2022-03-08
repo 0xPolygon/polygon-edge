@@ -968,6 +968,8 @@ func (e *Eth) decodeTxn(arg *txnArgs) (*types.Transaction, error) {
 	var input []byte
 	if arg.Data != nil {
 		input = *arg.Data
+	} else if arg.Input != nil {
+		input = *arg.Input
 	}
 
 	if arg.To == nil {
