@@ -2,9 +2,10 @@ package server
 
 import (
 	"fmt"
+	"strconv"
+
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/spf13/cobra"
-	"strconv"
 
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/network"
@@ -35,20 +36,14 @@ func setFlags(cmd *cobra.Command) {
 		&params.rawConfig.LogLevel,
 		command.LogLevelFlag,
 		defaultConfig.LogLevel,
-		fmt.Sprintf(
-			"the log level for console output. Default: %s",
-			defaultConfig.LogLevel,
-		),
+		"the log level for console output",
 	)
 
 	cmd.Flags().StringVar(
 		&params.rawConfig.GenesisPath,
 		genesisPathFlag,
 		defaultConfig.GenesisPath,
-		fmt.Sprintf(
-			"the genesis file used for starting the chain. Default: %s",
-			defaultConfig.GenesisPath,
-		),
+		"the genesis file used for starting the chain",
 	)
 
 	cmd.Flags().StringVar(
@@ -62,27 +57,22 @@ func setFlags(cmd *cobra.Command) {
 		&params.rawConfig.DataDir,
 		dataDirFlag,
 		defaultConfig.DataDir,
-		fmt.Sprintf(
-			"the data directory used for storing Polygon Edge client data. Default: %s",
-			defaultConfig.DataDir,
-		),
+		"the data directory used for storing Polygon Edge client data",
 	)
 
 	cmd.Flags().StringVar(
 		&params.rawConfig.Network.Libp2pAddr,
 		libp2pAddressFlag,
 		fmt.Sprintf("127.0.0.1:%d", network.DefaultLibp2pPort),
-		fmt.Sprintf(
-			"the address and port for the libp2p service (address:port). Default: address: 127.0.0.1:%d",
-			network.DefaultLibp2pPort,
-		),
+		"the address and port for the libp2p service",
 	)
 
 	cmd.Flags().StringVar(
 		&params.rawConfig.Telemetry.PrometheusAddr,
 		prometheusAddressFlag,
 		"",
-		"the address and port for the prometheus instrumentation service (address:port)",
+		"the address and port for the prometheus instrumentation service (address:port). "+
+			"If only port is defined (:port) it will bind to 0.0.0.0:port",
 	)
 
 	cmd.Flags().StringVar(
@@ -125,55 +115,49 @@ func setFlags(cmd *cobra.Command) {
 		&params.rawConfig.ShouldSeal,
 		sealFlag,
 		true,
-		"the flag indicating that the client should seal blocks. Default: true",
+		"the flag indicating that the client should seal blocks",
 	)
 
 	cmd.Flags().BoolVar(
 		&params.rawConfig.Network.NoDiscover,
 		command.NoDiscoverFlag,
 		defaultConfig.Network.NoDiscover,
-		fmt.Sprintf(
-			"prevent the client from discovering other peers. Default: %t",
-			defaultConfig.Network.NoDiscover,
-		),
+		"prevent the client from discovering other peers (default: false)",
 	)
 
 	cmd.Flags().Int64Var(
 		&params.rawConfig.Network.MaxPeers,
 		maxPeersFlag,
 		-1,
-		fmt.Sprintf(
-			"the client's max number of peers allowed. Default: %d",
-			defaultConfig.Network.MaxPeers,
-		),
+		"the client's max number of peers allowed",
 	)
+	// override default usage value
+	cmd.Flag(maxPeersFlag).DefValue = fmt.Sprintf("%d", defaultConfig.Network.MaxPeers)
 
 	cmd.Flags().Int64Var(
 		&params.rawConfig.Network.MaxInboundPeers,
 		maxInboundPeersFlag,
 		-1,
-		fmt.Sprintf(
-			"the client's max number of inbound peers allowed. Default: %d",
-			defaultConfig.Network.MaxInboundPeers,
-		),
+		"the client's max number of inbound peers allowed",
 	)
+	// override default usage value
+	cmd.Flag(maxInboundPeersFlag).DefValue = fmt.Sprintf("%d", defaultConfig.Network.MaxInboundPeers)
 
 	cmd.Flags().Int64Var(
 		&params.rawConfig.Network.MaxOutboundPeers,
 		maxOutboundPeersFlag,
 		-1,
-		fmt.Sprintf(
-			"the client's max number of outbound peers allowed. Default: %d",
-			defaultConfig.Network.MaxOutboundPeers,
-		),
+		"the client's max number of outbound peers allowed",
 	)
+	// override default usage value
+	cmd.Flag(maxOutboundPeersFlag).DefValue = fmt.Sprintf("%d", defaultConfig.Network.MaxOutboundPeers)
 
 	cmd.Flags().Uint64Var(
 		&params.rawConfig.TxPool.PriceLimit,
 		priceLimitFlag,
 		0,
 		fmt.Sprintf(
-			"the minimum gas price limit to enforce for acceptance into the pool. Default: %d",
+			"the minimum gas price limit to enforce for acceptance into the pool (default %d)",
 			defaultConfig.TxPool.PriceLimit,
 		),
 	)
@@ -182,20 +166,14 @@ func setFlags(cmd *cobra.Command) {
 		&params.rawConfig.TxPool.MaxSlots,
 		maxSlotsFlag,
 		command.DefaultMaxSlots,
-		fmt.Sprintf(
-			"maximum slots in the pool. Default: %d",
-			command.DefaultMaxSlots,
-		),
+		"maximum slots in the pool",
 	)
 
 	cmd.Flags().Uint64Var(
 		&params.rawConfig.BlockTime,
 		blockTimeFlag,
 		defaultConfig.BlockTime,
-		fmt.Sprintf(
-			"minimum block time in seconds. Default: %ds",
-			defaultConfig.BlockTime,
-		),
+		"minimum block time in seconds",
 	)
 
 	cmd.Flags().StringArrayVar(
@@ -213,7 +191,7 @@ func setDevFlags(cmd *cobra.Command) {
 		&params.isDevMode,
 		devFlag,
 		false,
-		"should the client start in dev mode. Default: false",
+		"should the client start in dev mode (default false)",
 	)
 
 	_ = cmd.Flags().MarkHidden(devFlag)
@@ -222,7 +200,7 @@ func setDevFlags(cmd *cobra.Command) {
 		&params.devInterval,
 		devIntervalFlag,
 		0,
-		"the client's dev notification interval. Default: 1s",
+		"the client's dev notification interval in seconds (default 1)",
 	)
 
 	_ = cmd.Flags().MarkHidden(devIntervalFlag)

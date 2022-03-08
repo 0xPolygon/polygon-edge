@@ -3,9 +3,10 @@ package server
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/network"
 	"io/ioutil"
 	"strings"
+
+	"github.com/0xPolygon/polygon-edge/network"
 
 	"github.com/hashicorp/hcl"
 )
@@ -64,7 +65,7 @@ func DefaultConfig() *Config {
 
 	return &Config{
 		GenesisPath:    "./genesis.json",
-		DataDir:        "./test-chain",
+		DataDir:        "./polygon-edge-chain",
 		BlockGasTarget: "0x0", // Special value signaling the parent gas limit should be applied
 		Network: &Network{
 			NoDiscover:       defaultNetworkConfig.NoDiscover,
