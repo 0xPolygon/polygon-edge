@@ -648,7 +648,7 @@ func TestEth_EstimateGas_GasLimit(t *testing.T) {
 		{
 			"insufficient gas limit from the transaction",
 			state.TxGas,
-			ErrGasCapOverflow,
+			state.ErrNotEnoughIntrinsicGas,
 			constructMockTx(argUintPtr(state.TxGas/2), nil),
 		},
 	}
@@ -656,7 +656,7 @@ func TestEth_EstimateGas_GasLimit(t *testing.T) {
 	for _, testCase := range testTable {
 		t.Run(testCase.name, func(t *testing.T) {
 			// Set up the apply hook
-			if errors.Is(testCase.expectedError, ErrGasCapOverflow) {
+			if errors.Is(testCase.expectedError, state.ErrNotEnoughIntrinsicGas) {
 				// We want to trigger a situation where no value in the gas range is correct
 				store.applyTxnHook = func(
 					header *types.Header,

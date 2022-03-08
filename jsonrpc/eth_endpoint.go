@@ -550,9 +550,11 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 		}
 	}
 
-	// Recalculate the gas ceiling based on the available funds
-	// and the passed in gas price, if present
-	if gasPriceInt.BitLen() != 0 && availableBalance != nil {
+	// Recalculate the gas ceiling based on the available funds (if any)
+	// and the passed in gas price (if present)
+	if gasPriceInt.BitLen() != 0 && // Gas price has been set
+		availableBalance != nil && // Available balance is found
+		availableBalance.Cmp(big.NewInt(0)) > 0 { // Available balance > 0
 		gasAllowance := new(big.Int).Div(availableBalance, gasPriceInt)
 
 		// Check the gas allowance for this account, make sure high end is capped to it
@@ -586,7 +588,7 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 
 	// Run the transaction with the specified gas value.
 	// Returns a status indicating if the transaction failed and the accompanying error
-	testTransaction := func(gas uint64) (bool, error) {
+	testTransaction := func(gas uint64, shouldOmitErr bool) (bool, error) {
 		// Create a dummy transaction with the new gas
 		txn := transaction.Copy()
 		txn.Gas = gas
@@ -596,7 +598,7 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 		if applyErr != nil {
 			// Check the application error.
 			// Gas apply errors are valid, and should be ignored
-			if isGasApplyError(applyErr) {
+			if isGasApplyError(applyErr) && shouldOmitErr {
 				// Specifying the transaction failed, but not providing an error
 				// is an indication that a valid error occurred due to low gas,
 				// which will increase the lower bound for the search
@@ -608,7 +610,7 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 
 		// Check if an out of gas error happened during EVM execution
 		if result.Failed() {
-			if isGasEVMError(result.Err) {
+			if isGasEVMError(result.Err) && shouldOmitErr {
 				// Specifying the transaction failed, but not providing an error
 				// is an indication that a valid error occurred due to low gas,
 				// which will increase the lower bound for the search
@@ -631,7 +633,7 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 	for lowEnd < highEnd {
 		mid := (lowEnd + highEnd) / 2
 
-		failed, testErr := testTransaction(mid)
+		failed, testErr := testTransaction(mid, true)
 		if testErr != nil &&
 			!isEVMRevertError(testErr) {
 			// Reverts are ignored in the binary search, but are checked later on
@@ -649,17 +651,13 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 	}
 
 	// Check if the highEnd is a good value to make the transaction pass
-	failed, err := testTransaction(highEnd)
-	if err != nil {
-		return 0, err
-	}
-
+	failed, err := testTransaction(highEnd, false)
 	if failed {
 		// The transaction shouldn't fail, for whatever reason, at highEnd
 		return 0, fmt.Errorf(
-			"%w %d",
-			ErrGasCapOverflow,
+			"unable to apply transaction for the highest gas limit %d: %w",
 			highEnd,
+			err,
 		)
 	}
 
