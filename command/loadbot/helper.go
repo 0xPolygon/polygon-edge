@@ -68,17 +68,35 @@ func calculateAvgBlockUtil(gasData map[uint64]GasMetrics) float64 {
 }
 
 // fetch block gas usage and gas limit and calculate block utilization
-func (l *Loadbot) calculateGasMetrics(jsonClient *jsonrpc.Client, gasMetrics *BlockGasMetrics) (error){
-	for blockNum, blockData := range gasMetrics.Blocks {
-		blockInfom, err := jsonClient.Eth().GetBlockByNumber(web3.BlockNumber(blockNum), false)
-		if err != nil {
-			return fmt.Errorf("could not fetch block by number, %w", err)
-		}
+func (l *Loadbot) calculateGasMetrics(jsonClient *jsonrpc.Client, gasMetrics *BlockGasMetrics) error {
+	blockNumErr := make(chan error)
+	defer close(blockNumErr)
 
-		blockData.GasLimit = blockInfom.GasLimit
-		blockData.GasUsed = blockInfom.GasUsed
-		blockData.Utilization = calculateBlockUtilization(blockData)
-		gasMetrics.Blocks[blockNum] = blockData
+	for blockNum, blockData := range gasMetrics.Blocks {
+		go func(
+			jsonClient *jsonrpc.Client,
+			gasMetrics *BlockGasMetrics,
+			blockNum uint64,
+			blockData GasMetrics,
+			blockNumErr chan error,
+		) {
+			blockInfom, err := jsonClient.Eth().GetBlockByNumber(web3.BlockNumber(blockNum), false)
+			if err != nil {
+				blockNumErr <- fmt.Errorf("could not fetch block %d by number, %w", blockNum, err)
+			}
+
+			blockData.GasLimit = blockInfom.GasLimit
+			blockData.GasUsed = blockInfom.GasUsed
+			blockData.Utilization = calculateBlockUtilization(blockData)
+			gasMetrics.Blocks[blockNum] = blockData
+
+			blockNumErr <- nil
+		}(jsonClient, gasMetrics, blockNum, blockData, blockNumErr)
+
+		if err := <-blockNumErr; err != nil {
+			return err
+		}
 	}
+
 	return nil
 }

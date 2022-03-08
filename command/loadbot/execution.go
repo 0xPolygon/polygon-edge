@@ -302,7 +302,9 @@ func (l *Loadbot) Run() error {
 
 	endTime := time.Now()
 
-	l.calculateGasMetrics(jsonClient,l.metrics.GasMetrics)
+	if err := l.calculateGasMetrics(jsonClient, l.metrics.GasMetrics); err != nil {
+		return fmt.Errorf("unable to calculate block gas metrics: %w", err)
+	}
 
 	// Calculate the turn around metrics now that the loadbot is done
 	l.metrics.TransactionDuration.calcTurnAroundMetrics()

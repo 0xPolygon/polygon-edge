@@ -98,7 +98,9 @@ func (l *Loadbot) deployContract(
 		},
 	)
 	// calculate contract deployment metrics
-	l.calculateGasMetrics(jsonClient, l.metrics.ContractGasMetrics)
+	if err := l.calculateGasMetrics(jsonClient, l.metrics.ContractGasMetrics); err != nil {
+		return fmt.Errorf("unable to calculate contract block gas metrics: %w", err)
+	}
 
 	l.metrics.ContractDeploymentDuration.calcTurnAroundMetrics()
 	l.metrics.ContractDeploymentDuration.TotalExecTime = end.Sub(start)
