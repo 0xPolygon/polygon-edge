@@ -298,10 +298,7 @@ func (t *Tracker) notify(logs ...*web3.Log) {
 			t.logger.Error("cannot marshal log", "err", err)
 		}
 
-		// notify
-		select {
-		case t.eventCh <- bytesLog:
-		default:
-		}
+		// notify [BLOCKING]
+		t.eventCh <- bytesLog
 	}
 }
