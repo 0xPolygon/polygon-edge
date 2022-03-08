@@ -13,7 +13,7 @@ const (
 	// subscribeOutputBufferSize is the size of subscribe output buffer in go-libp2p-pubsub
 	// we should have enough capacity of the queue
 	// because when queue is full, if the consumer does not read fast enough, new messages are dropped
-	subscribeOutputBufferSize = 1000
+	subscribeOutputBufferSize = 1024
 )
 
 type Topic struct {

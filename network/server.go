@@ -47,12 +47,12 @@ const (
 	// peerOutboundBufferSize is the size of outbound messages to a peer buffers in go-libp2p-pubsub
 	// we should have enough capacity of the queue
 	// because we start dropping messages to a peer if the outbound queue is full
-	peerOutboundBufferSize = 1000
+	peerOutboundBufferSize = 1024
 
 	// validateBufferSize is the size of validate buffers in go-libp2p-pubsub
 	// we should have enough capacity of the queue
 	// because when queue is full, validation is throttled and new messages are dropped.
-	validateBufferSize = 1000
+	validateBufferSize = 1024
 )
 
 // regex string  to match against a valid dns/dns4/dns6 addr
