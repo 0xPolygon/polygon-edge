@@ -31,16 +31,11 @@ func (r *ClientCloseResult) GetOutput() string {
 	return r.Message
 }
 
-type IPBindings struct {
-	Localhost     string
-	AllInterfaces string
-}
+type IPBinding string
 
-var (
-	IPBinding = IPBindings{
-		Localhost:     "127.0.0.1",
-		AllInterfaces: "0.0.0.0",
-	}
+const (
+	LocalHostBinding     IPBinding = "127.0.0.1"
+	AllInterfacesBinding IPBinding = "0.0.0.0"
 )
 
 // HandleSignals is a helper method for handling signals sent to the console
@@ -181,7 +176,7 @@ func RegisterJSONOutputFlag(cmd *cobra.Command) {
 func RegisterGRPCAddressFlag(cmd *cobra.Command) {
 	cmd.PersistentFlags().String(
 		command.GRPCAddressFlag,
-		fmt.Sprintf("%s:%d", IPBinding.Localhost, server.DefaultGRPCPort),
+		fmt.Sprintf("%s:%d", LocalHostBinding, server.DefaultGRPCPort),
 		"the GRPC interface",
 	)
 }
@@ -190,7 +185,7 @@ func RegisterGRPCAddressFlag(cmd *cobra.Command) {
 func RegisterLegacyGRPCAddressFlag(cmd *cobra.Command) {
 	cmd.PersistentFlags().String(
 		command.GRPCAddressFlagLEGACY,
-		fmt.Sprintf("%s:%d", IPBinding.Localhost, server.DefaultGRPCPort),
+		fmt.Sprintf("%s:%d", LocalHostBinding, server.DefaultGRPCPort),
 		"the GRPC interface",
 	)
 
@@ -207,7 +202,7 @@ func ParseGRPCAddress(grpcAddress string) (*net.TCPAddr, error) {
 func RegisterJSONRPCFlag(cmd *cobra.Command) {
 	cmd.PersistentFlags().String(
 		command.JSONRPCFlag,
-		fmt.Sprintf("%s:%d", IPBinding.AllInterfaces, server.DefaultJSONRPCPort),
+		fmt.Sprintf("%s:%d", AllInterfacesBinding, server.DefaultJSONRPCPort),
 		"the JSON-RPC interface",
 	)
 }
@@ -219,7 +214,7 @@ func ParseJSONRPCAddress(jsonrpcAddress string) (*url.URL, error) {
 
 // ResolveAddr resolves the passed in TCP address
 // The second param is the default ip to bind to, if no ip address is specified
-func ResolveAddr(address string, defaultIP string) (*net.TCPAddr, error) {
+func ResolveAddr(address string, defaultIP IPBinding) (*net.TCPAddr, error) {
 	addr, err := net.ResolveTCPAddr("tcp", address)
 
 	if err != nil {
@@ -227,7 +222,7 @@ func ResolveAddr(address string, defaultIP string) (*net.TCPAddr, error) {
 	}
 
 	if addr.IP == nil {
-		addr.IP = net.ParseIP(defaultIP)
+		addr.IP = net.ParseIP(string(defaultIP))
 	}
 
 	return addr, nil
