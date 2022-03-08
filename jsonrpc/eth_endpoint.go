@@ -655,7 +655,7 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 	if failed {
 		// The transaction shouldn't fail, for whatever reason, at highEnd
 		return 0, fmt.Errorf(
-			"unable to apply transaction for the highest gas limit %d: %w",
+			"unable to apply transaction even for the highest gas limit %d: %w",
 			highEnd,
 			err,
 		)
