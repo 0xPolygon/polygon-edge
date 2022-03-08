@@ -161,7 +161,7 @@ func RegisterJSONOutputFlag(cmd *cobra.Command) {
 	cmd.PersistentFlags().Bool(
 		command.JSONOutputFlag,
 		false,
-		"get all outputs in json format (default: false)",
+		"get all outputs in json format (default false)",
 	)
 }
 

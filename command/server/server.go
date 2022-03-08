@@ -36,14 +36,14 @@ func setFlags(cmd *cobra.Command) {
 		&params.rawConfig.LogLevel,
 		command.LogLevelFlag,
 		defaultConfig.LogLevel,
-		"the log level for console output.",
+		"the log level for console output",
 	)
 
 	cmd.Flags().StringVar(
 		&params.rawConfig.GenesisPath,
 		genesisPathFlag,
 		defaultConfig.GenesisPath,
-		"the genesis file used for starting the chain.",
+		"the genesis file used for starting the chain",
 	)
 
 	cmd.Flags().StringVar(
@@ -57,14 +57,14 @@ func setFlags(cmd *cobra.Command) {
 		&params.rawConfig.DataDir,
 		dataDirFlag,
 		defaultConfig.DataDir,
-		"the data directory used for storing Polygon Edge client data.",
+		"the data directory used for storing Polygon Edge client data",
 	)
 
 	cmd.Flags().StringVar(
 		&params.rawConfig.Network.Libp2pAddr,
 		libp2pAddressFlag,
 		fmt.Sprintf("127.0.0.1:%d", network.DefaultLibp2pPort),
-		"the address and port for the libp2p service.",
+		"the address and port for the libp2p service",
 	)
 
 	cmd.Flags().StringVar(
@@ -115,21 +115,21 @@ func setFlags(cmd *cobra.Command) {
 		&params.rawConfig.ShouldSeal,
 		sealFlag,
 		true,
-		"the flag indicating that the client should seal blocks.",
+		"the flag indicating that the client should seal blocks",
 	)
 
 	cmd.Flags().BoolVar(
 		&params.rawConfig.Network.NoDiscover,
 		command.NoDiscoverFlag,
 		defaultConfig.Network.NoDiscover,
-		"prevent the client from discovering other peers. (default: false)",
+		"prevent the client from discovering other peers (default: false)",
 	)
 
 	cmd.Flags().Int64Var(
 		&params.rawConfig.Network.MaxPeers,
 		maxPeersFlag,
 		-1,
-		"the client's max number of peers allowed.",
+		"the client's max number of peers allowed",
 	)
 	// override default usage value
 	cmd.Flag(maxPeersFlag).DefValue = fmt.Sprintf("%d", defaultConfig.Network.MaxPeers)
@@ -138,7 +138,7 @@ func setFlags(cmd *cobra.Command) {
 		&params.rawConfig.Network.MaxInboundPeers,
 		maxInboundPeersFlag,
 		-1,
-		"the client's max number of inbound peers allowed.",
+		"the client's max number of inbound peers allowed",
 	)
 	// override default usage value
 	cmd.Flag(maxInboundPeersFlag).DefValue = fmt.Sprintf("%d", defaultConfig.Network.MaxInboundPeers)
@@ -147,7 +147,7 @@ func setFlags(cmd *cobra.Command) {
 		&params.rawConfig.Network.MaxOutboundPeers,
 		maxOutboundPeersFlag,
 		-1,
-		"the client's max number of outbound peers allowed.",
+		"the client's max number of outbound peers allowed",
 	)
 	// override default usage value
 	cmd.Flag(maxOutboundPeersFlag).DefValue = fmt.Sprintf("%d", defaultConfig.Network.MaxOutboundPeers)
@@ -157,7 +157,7 @@ func setFlags(cmd *cobra.Command) {
 		priceLimitFlag,
 		0,
 		fmt.Sprintf(
-			"the minimum gas price limit to enforce for acceptance into the pool. (default %d)",
+			"the minimum gas price limit to enforce for acceptance into the pool (default %d)",
 			defaultConfig.TxPool.PriceLimit,
 		),
 	)
@@ -166,14 +166,14 @@ func setFlags(cmd *cobra.Command) {
 		&params.rawConfig.TxPool.MaxSlots,
 		maxSlotsFlag,
 		command.DefaultMaxSlots,
-		"maximum slots in the pool.",
+		"maximum slots in the pool",
 	)
 
 	cmd.Flags().Uint64Var(
 		&params.rawConfig.BlockTime,
 		blockTimeFlag,
 		defaultConfig.BlockTime,
-		"minimum block time in seconds.",
+		"minimum block time in seconds",
 	)
 
 	cmd.Flags().StringArrayVar(
@@ -191,7 +191,7 @@ func setDevFlags(cmd *cobra.Command) {
 		&params.isDevMode,
 		devFlag,
 		false,
-		"should the client start in dev mode. (default false)",
+		"should the client start in dev mode (default false)",
 	)
 
 	_ = cmd.Flags().MarkHidden(devFlag)
@@ -200,7 +200,7 @@ func setDevFlags(cmd *cobra.Command) {
 		&params.devInterval,
 		devIntervalFlag,
 		0,
-		"the client's dev notification interval. Default: 1s",
+		"the client's dev notification interval in seconds (default 1)",
 	)
 
 	_ = cmd.Flags().MarkHidden(devIntervalFlag)
