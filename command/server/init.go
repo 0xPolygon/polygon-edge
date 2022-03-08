@@ -193,8 +193,9 @@ func (p *serverParams) initPrometheusAddress() error {
 
 	var parseErr error
 
-	if p.prometheusAddress, parseErr = helper.ResolveAddrDefaultBindAllInterfaces(
+	if p.prometheusAddress, parseErr = helper.ResolveAddr(
 		p.rawConfig.Telemetry.PrometheusAddr,
+		helper.IPBinding.AllInterfaces,
 	); parseErr != nil {
 		return parseErr
 	}
@@ -207,6 +208,7 @@ func (p *serverParams) initLibp2pAddress() error {
 
 	if p.libp2pAddress, parseErr = helper.ResolveAddr(
 		p.rawConfig.Network.Libp2pAddr,
+		helper.IPBinding.Localhost,
 	); parseErr != nil {
 		return parseErr
 	}
@@ -247,8 +249,9 @@ func (p *serverParams) initDNSAddress() error {
 func (p *serverParams) initJSONRPCAddress() error {
 	var parseErr error
 
-	if p.jsonRPCAddress, parseErr = helper.ResolveAddrDefaultBindAllInterfaces(
+	if p.jsonRPCAddress, parseErr = helper.ResolveAddr(
 		p.rawConfig.JSONRPCAddr,
+		helper.IPBinding.AllInterfaces,
 	); parseErr != nil {
 		return parseErr
 	}
@@ -261,6 +264,7 @@ func (p *serverParams) initGRPCAddress() error {
 
 	if p.grpcAddress, parseErr = helper.ResolveAddr(
 		p.rawConfig.GRPCAddr,
+		helper.IPBinding.Localhost,
 	); parseErr != nil {
 		return parseErr
 	}
