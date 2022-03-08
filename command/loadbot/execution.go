@@ -222,13 +222,8 @@ func (l *Loadbot) Run() error {
 	ticker := time.NewTicker(1 * time.Second / time.Duration(l.cfg.TPS))
 	defer ticker.Stop()
 
-	var (
-		wg             sync.WaitGroup
-		receiptTimeout time.Duration
-	)
-
 	// max-wait by default is 2 min.
-	receiptTimeout = time.Duration(l.cfg.MaxWait) * time.Minute
+	receiptTimeout := time.Duration(l.cfg.MaxWait) * time.Minute
 
 	startTime := time.Now()
 
@@ -236,6 +231,8 @@ func (l *Loadbot) Run() error {
 	if err := l.deployContract(grpcClient, jsonClient, receiptTimeout); err != nil {
 		return fmt.Errorf("unable to deploy smart contract, %w", err)
 	}
+
+	var wg sync.WaitGroup
 
 	for i := uint64(0); i < l.cfg.Count; i++ {
 		<-ticker.C
