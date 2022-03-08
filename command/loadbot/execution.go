@@ -86,9 +86,9 @@ type Metrics struct {
 	FailedContractTransactionsCount uint64
 	ContractDeploymentDuration      ExecDuration
 	ContractAddress                 web3.Address
-	ContractGasMetrics              BlockGasMetrics
+	ContractGasMetrics              *BlockGasMetrics
 
-	GasMetrics BlockGasMetrics
+	GasMetrics *BlockGasMetrics
 }
 
 type Loadbot struct {
@@ -109,11 +109,11 @@ func NewLoadbot(cfg *Configuration) *Loadbot {
 			ContractDeploymentDuration: ExecDuration{
 				blockTransactions: make(map[uint64]uint64),
 			},
-			GasMetrics: BlockGasMetrics{
+			GasMetrics: &BlockGasMetrics{
 				Blocks:        make(map[uint64]GasMetrics),
 				BlockGasMutex: &sync.Mutex{},
 			},
-			ContractGasMetrics: BlockGasMetrics{
+			ContractGasMetrics: &BlockGasMetrics{
 				Blocks:        make(map[uint64]GasMetrics),
 				BlockGasMutex: &sync.Mutex{},
 			},
@@ -302,18 +302,7 @@ func (l *Loadbot) Run() error {
 
 	endTime := time.Now()
 
-	// get block gas usage information
-	for k, v := range l.metrics.GasMetrics.Blocks {
-		blockInfom, err := jsonClient.Eth().GetBlockByNumber(web3.BlockNumber(k), false)
-		if err != nil {
-			return fmt.Errorf("could not fetch block by number, %w", err)
-		}
-
-		v.GasLimit = blockInfom.GasLimit
-		v.GasUsed = blockInfom.GasUsed
-		v.Utilization = calculateBlockUtilization(v)
-		l.metrics.GasMetrics.Blocks[k] = v
-	}
+	l.calculateGasMetrics(jsonClient,l.metrics.GasMetrics)
 
 	// Calculate the turn around metrics now that the loadbot is done
 	l.metrics.TransactionDuration.calcTurnAroundMetrics()

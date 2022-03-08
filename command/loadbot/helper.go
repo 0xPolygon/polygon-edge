@@ -66,3 +66,19 @@ func calculateAvgBlockUtil(gasData map[uint64]GasMetrics) float64 {
 
 	return sum / float64(len(gasData))
 }
+
+// fetch block gas usage and gas limit and calculate block utilization
+func (l *Loadbot) calculateGasMetrics(jsonClient *jsonrpc.Client, gasMetrics *BlockGasMetrics) (error){
+	for blockNum, blockData := range gasMetrics.Blocks {
+		blockInfom, err := jsonClient.Eth().GetBlockByNumber(web3.BlockNumber(blockNum), false)
+		if err != nil {
+			return fmt.Errorf("could not fetch block by number, %w", err)
+		}
+
+		blockData.GasLimit = blockInfom.GasLimit
+		blockData.GasUsed = blockInfom.GasUsed
+		blockData.Utilization = calculateBlockUtilization(blockData)
+		gasMetrics.Blocks[blockNum] = blockData
+	}
+	return nil
+}

@@ -11,7 +11,6 @@ import (
 	txpoolOp "github.com/0xPolygon/polygon-edge/txpool/proto"
 	"github.com/0xPolygon/polygon-edge/types"
 
-	"github.com/umbracle/go-web3"
 	"github.com/umbracle/go-web3/jsonrpc"
 )
 
@@ -99,18 +98,7 @@ func (l *Loadbot) deployContract(
 		},
 	)
 	// calculate contract deployment metrics
-	// by getting gas info from each block number we recorded from the receipt
-	for k, v := range l.metrics.ContractGasMetrics.Blocks {
-		blockInfom, err := jsonClient.Eth().GetBlockByNumber(web3.BlockNumber(k), false)
-		if err != nil {
-			return fmt.Errorf("could not fetch block by number, %w", err)
-		}
-
-		v.GasLimit = blockInfom.GasLimit
-		v.GasUsed = blockInfom.GasUsed
-		v.Utilization = calculateBlockUtilization(v)
-		l.metrics.ContractGasMetrics.Blocks[k] = v
-	}
+	l.calculateGasMetrics(jsonClient, l.metrics.ContractGasMetrics)
 
 	l.metrics.ContractDeploymentDuration.calcTurnAroundMetrics()
 	l.metrics.ContractDeploymentDuration.TotalExecTime = end.Sub(start)
