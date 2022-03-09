@@ -2,7 +2,7 @@
 github.com/armon/go-metrics
 # github.com/armon/go-radix v1.0.0
 github.com/armon/go-radix
-# github.com/aws/aws-sdk-go v1.40.45
+# github.com/aws/aws-sdk-go v1.43.13
 ## explicit
 github.com/aws/aws-sdk-go/aws
 github.com/aws/aws-sdk-go/aws/awserr
@@ -605,8 +605,7 @@ golang.org/x/crypto/sha3
 golang.org/x/mod/internal/lazyregexp
 golang.org/x/mod/module
 golang.org/x/mod/semver
-# golang.org/x/net v0.0.0-20220127074510-2fabfed7e28f
-## explicit
+# golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd
 golang.org/x/net/bpf
 golang.org/x/net/context
 golang.org/x/net/http/httpguts
