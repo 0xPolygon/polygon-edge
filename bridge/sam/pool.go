@@ -134,7 +134,7 @@ func (p *pool) UpdateValidatorSet(validators []types.Address, threshold uint64) 
 	defer p.changeValidatorsLock.Unlock()
 
 	oldValidators := p.validators
-	oldThreshold := p.signatureThreshold //nolint:ifshort //nolint:nolintlint
+	oldThreshold := p.signatureThreshold //nolint:nolintlint //nolint:ifshort
 
 	p.validators = validators
 	atomic.StoreUint64(&p.signatureThreshold, threshold)
