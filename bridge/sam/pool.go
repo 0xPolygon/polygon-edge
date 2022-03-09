@@ -79,9 +79,6 @@ func (p *pool) ConsumeMessage(hash types.Hash) {
 // knows returns the flag indicating the message is known
 func (p *pool) isMessageKnown(hash types.Hash) bool {
 	_, ok := p.messageMap.Load(hash)
-	if !ok {
-		return false
-	}
 
 	return ok
 }
@@ -137,7 +134,7 @@ func (p *pool) UpdateValidatorSet(validators []types.Address, threshold uint64) 
 	defer p.changeValidatorsLock.Unlock()
 
 	oldValidators := p.validators
-	oldThreshold := p.signatureThreshold //nolint
+	oldThreshold := p.signatureThreshold //nolint:ifshort
 
 	p.validators = validators
 	atomic.StoreUint64(&p.signatureThreshold, threshold)
@@ -228,8 +225,6 @@ func (p *pool) getMessageBody(hash types.Hash) []byte {
 
 	body, ok := raw.([]byte)
 	if !ok {
-		// should not reach
-
 		return nil
 	}
 
