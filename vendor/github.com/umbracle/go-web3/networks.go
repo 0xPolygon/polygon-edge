@@ -14,5 +14,5 @@ const (
 	Rinkeby Network = 4
 
 	// Goerli is the Clique testnet
-	Goerli = 5
+	Goerli Network = 5
 )

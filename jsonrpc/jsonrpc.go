@@ -112,8 +112,16 @@ func middlewareFactory(config *Config) func(http.Handler) http.Handler {
 			origin := r.Header.Get("Origin")
 
 			for _, allowedOrigin := range config.AccessControlAllowOrigin {
+				if allowedOrigin == "*" {
+					w.Header().Set("Access-Control-Allow-Origin", "*")
+
+					break
+				}
+
 				if allowedOrigin == origin {
 					w.Header().Set("Access-Control-Allow-Origin", origin)
+
+					break
 				}
 			}
 			next.ServeHTTP(w, r)
