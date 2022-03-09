@@ -109,7 +109,7 @@ func readConfigFile(path string) (*Config, error) {
 		return nil, fmt.Errorf("suffix of %s is neither hcl nor json", path)
 	}
 
-	config := new(Config)
+	config := DefaultConfig()
 	config.Network = new(Network)
 	config.Network.MaxPeers = -1
 	config.Network.MaxInboundPeers = -1
