@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"math/big"
 
+	"errors"
 	"github.com/0xPolygon/polygon-edge/blockchain/storage"
 	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/go-web3"
@@ -59,13 +60,7 @@ type Tracker struct {
 //	NewEventTracker returns a new tracker object.
 func NewEventTracker(logger hclog.Logger, config *Config) (*Tracker, error) {
 	if config == nil {
-		//	load default
-		config = &Config{
-			Confirmations: DefaultBlockConfirmations,
-			RootchainWS:   rootchainWS,
-			DBPath:        "",
-			ContractABIs:  nil,
-		}
+		return nil, errors.New("no config provided")
 	}
 
 	//	create tracker
