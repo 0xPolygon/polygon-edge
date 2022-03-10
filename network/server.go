@@ -323,7 +323,7 @@ func (s *Server) checkPeerConnections() {
 
 func (s *Server) runDial() {
 	// watch for events of peers included or removed
-	notifyCh := make(chan struct{})
+	notifyCh := make(chan struct{}, 100)
 	err := s.SubscribeFn(func(evnt *PeerEvent) {
 		// Only concerned about the listed event types
 		switch evnt.Type {
@@ -335,6 +335,7 @@ func (s *Server) runDial() {
 		select {
 		case notifyCh <- struct{}{}:
 		default:
+			panic("notify was full")
 		}
 	})
 
