@@ -101,7 +101,7 @@ func Test_Pool_Add(t *testing.T) {
 		numReadyMessages int
 	}{
 		{
-			name: "shouldn't promote message if the message doesn't have enough message",
+			name: "shouldn't promote message if the message doesn't have enough signatures",
 			validators: []types.Address{
 				mockAddresses[0],
 				mockAddresses[1],

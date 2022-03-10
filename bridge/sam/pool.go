@@ -139,16 +139,16 @@ func (p *pool) UpdateValidatorSet(validators []types.Address, threshold uint64) 
 	p.validators = validators
 	atomic.StoreUint64(&p.signatureThreshold, threshold)
 
-	var maybeDemotableHashes []types.Hash
+	var maybeDemotedHashes []types.Hash
 	if removed := common.DiffAddresses(oldValidators, validators); len(removed) > 0 {
-		maybeDemotableHashes = p.messageSignatures.RemoveSignatures(removed)
+		maybeDemotedHashes = p.messageSignatures.RemoveSignatures(removed)
 	}
 
 	if oldThreshold != threshold {
 		// we need to check all messages if threshold changes
 		p.tryToPromoteAndDemoteAll()
-	} else if len(maybeDemotableHashes) > 0 {
-		for _, hash := range maybeDemotableHashes {
+	} else if len(maybeDemotedHashes) > 0 {
+		for _, hash := range maybeDemotedHashes {
 			p.tryToDemote(hash)
 		}
 	}
@@ -350,7 +350,7 @@ func (m *messageSignaturesStore) RemoveMessage(hash types.Hash) bool {
 
 // RemoveMessage removes the signatures by given addresses from all messages
 func (m *messageSignaturesStore) RemoveSignatures(addresses []types.Address) []types.Hash {
-	maybeDemotableHashes := make([]types.Hash, 0)
+	maybeDemotedHashes := make([]types.Hash, 0)
 
 	m.RangeMessages(func(entry *signedMessageEntry) bool {
 		count := 0
@@ -362,11 +362,11 @@ func (m *messageSignaturesStore) RemoveSignatures(addresses []types.Address) []t
 		}
 
 		if count > 0 {
-			maybeDemotableHashes = append(maybeDemotableHashes, entry.Hash)
+			maybeDemotedHashes = append(maybeDemotedHashes, entry.Hash)
 		}
 
 		return true
 	})
 
-	return maybeDemotableHashes
+	return maybeDemotedHashes
 }
