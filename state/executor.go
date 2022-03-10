@@ -328,7 +328,7 @@ func (t *Transition) GetTxnHash() types.Hash {
 
 // Apply applies a new transaction
 func (t *Transition) Apply(msg *types.Transaction) (*runtime.ExecutionResult, error) {
-	s := t.state.Snapshot() //nolint:ifshort //nolint:nolintlint
+	s := t.state.Snapshot() //nolint:ifshort
 	result, err := t.apply(msg)
 
 	if err != nil {
@@ -535,7 +535,7 @@ type TransitionApplicationError struct {
 }
 
 func (e *TransitionApplicationError) Error() string {
-	return fmt.Sprintf("%v, recoverable [%t]", e.Err, e.IsRecoverable)
+	return e.Err.Error()
 }
 
 func NewTransitionApplicationError(err error, isRecoverable bool) *TransitionApplicationError {

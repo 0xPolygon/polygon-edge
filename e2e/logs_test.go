@@ -126,13 +126,17 @@ func TestFilterValue(t *testing.T) {
 	buf := hash.Sum(nil)
 
 	// Convert to right format
-	var placeholder web3.Hash
+	var (
+		placeholderWrapper []*web3.Hash
+		placeholder        web3.Hash
+	)
 
 	copy(placeholder[:], buf)
+	placeholderWrapper = append(placeholderWrapper, &placeholder)
 
-	var filterEventHashes []*web3.Hash
+	var filterEventHashes [][]*web3.Hash
 
-	filterEventHashes = append(filterEventHashes, &placeholder)
+	filterEventHashes = append(filterEventHashes, placeholderWrapper)
 
 	var filterAddresses []web3.Address
 

@@ -19,12 +19,6 @@ import (
 const (
 	//	required block depth for fetching events on the rootchain
 	DefaultBlockConfirmations = 6
-
-	//	Ropsten testnet
-	//rootchainWS   = "wss://ropsten.infura.io/ws/v3/17eac086ff36442ebd43737400eb71ca"
-
-	//	Polygon Edge
-	rootchainWS = "ws://127.0.0.1:10002/ws"
 )
 
 //	contractABI is used to create query filter
@@ -83,7 +77,7 @@ func setupQueryFilter(from, to *big.Int, contracts []*contractABI) *web3.LogFilt
 		queryFilter.Address = append(queryFilter.Address, contract.address)
 
 		//	topics from all contracts must be in Topics[0]
-		queryFilter.Topics = append(queryFilter.Topics, contract.eventIDs()...)
+		queryFilter.Topics = append(queryFilter.Topics, contract.eventIDs())
 	}
 
 	return queryFilter

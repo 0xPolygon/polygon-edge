@@ -74,7 +74,7 @@ func DefaultConfig() *Config {
 
 	return &Config{
 		GenesisPath:    "./genesis.json",
-		DataDir:        "./test-chain",
+		DataDir:        "./polygon-edge-chain",
 		BlockGasTarget: "0x0", // Special value signaling the parent gas limit should be applied
 		Network: &Network{
 			NoDiscover:       defaultNetworkConfig.NoDiscover,
@@ -92,7 +92,7 @@ func DefaultConfig() *Config {
 		RestoreFile: "",
 		BlockTime:   defaultBlockTime,
 		Headers: &Headers{
-			AccessControlAllowOrigins: nil,
+			AccessControlAllowOrigins: []string{"*"},
 		},
 		Bridge: &Bridge{
 			Enable:            false,

@@ -43,6 +43,18 @@ const (
 	PriorityRandomDial uint64 = 10
 )
 
+const (
+	// peerOutboundBufferSize is the size of outbound messages to a peer buffers in go-libp2p-pubsub
+	// we should have enough capacity of the queue
+	// because we start dropping messages to a peer if the outbound queue is full
+	peerOutboundBufferSize = 1024
+
+	// validateBufferSize is the size of validate buffers in go-libp2p-pubsub
+	// we should have enough capacity of the queue
+	// because when queue is full, validation is throttled and new messages are dropped.
+	validateBufferSize = 1024
+)
+
 // regex string  to match against a valid dns/dns4/dns6 addr
 const DNSRegex = `^/?(dns)(4|6)?/[^-|^/][A-Za-z0-9-]([^-|^/]?)+([\\-\\.]{1}[a-z0-9]+)*\\.[A-Za-z]{2,}(/?)$`
 
@@ -211,7 +223,11 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	srv.identity.setup()
 
 	// start gossip protocol
-	ps, err := pubsub.NewGossipSub(context.Background(), host)
+	ps, err := pubsub.NewGossipSub(
+		context.Background(),
+		host, pubsub.WithPeerOutboundQueueSize(peerOutboundBufferSize),
+		pubsub.WithValidateQueueSize(validateBufferSize),
+	)
 	if err != nil {
 		return nil, err
 	}

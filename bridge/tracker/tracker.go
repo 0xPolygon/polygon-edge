@@ -3,6 +3,7 @@ package tracker
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/blockchain/storage"
@@ -59,13 +60,7 @@ type Tracker struct {
 //	NewEventTracker returns a new tracker object.
 func NewEventTracker(logger hclog.Logger, config *Config) (*Tracker, error) {
 	if config == nil {
-		//	load default
-		config = &Config{
-			Confirmations: DefaultBlockConfirmations,
-			RootchainWS:   rootchainWS,
-			DBPath:        "",
-			ContractABIs:  nil,
-		}
+		return nil, errors.New("no config provided")
 	}
 
 	//	create tracker
@@ -300,10 +295,7 @@ func (t *Tracker) notify(logs ...*web3.Log) {
 			t.logger.Error("cannot marshal log", "err", err)
 		}
 
-		// notify
-		select {
-		case t.eventCh <- bytesLog:
-		default:
-		}
+		// notify [BLOCKING]
+		t.eventCh <- bytesLog
 	}
 }
