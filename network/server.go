@@ -334,6 +334,7 @@ func (s *Server) runDial() {
 
 		select {
 		case notifyCh <- struct{}{}:
+			println("notifyCh <-")
 		default:
 			panic("notify was full")
 		}
@@ -374,6 +375,7 @@ func (s *Server) runDial() {
 		// might involve a new dial slot available
 		select {
 		case <-notifyCh:
+			println("<- notifyCh")
 		case <-s.closeCh:
 			return
 		}
