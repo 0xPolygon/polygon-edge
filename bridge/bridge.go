@@ -121,7 +121,7 @@ func (b *bridge) GetReadyMessages() []sam.ReadyMessage {
 }
 
 func (b *bridge) Consume(hash types.Hash) {
-	b.sampool.Consume(hash)
+	b.sampool.ConsumeMessage(hash)
 }
 
 func (b *bridge) resetIsValidatorMap(validators []types.Address) {
