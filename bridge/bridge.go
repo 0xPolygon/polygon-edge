@@ -147,7 +147,7 @@ func (b *bridge) GetReadyMessages() ([]MessageWithSignatures, error) {
 func (b *bridge) ValidateTx(tx *types.Transaction) error {
 	hash := getTransactionHash(tx)
 
-	if !b.sampool.Knows(hash) {
+	if !b.sampool.IsMessageKnown(hash) {
 		return fmt.Errorf("unknown state transaction, hash=%s", hash.String())
 	}
 
@@ -160,7 +160,7 @@ func (b *bridge) ValidateTx(tx *types.Transaction) error {
 }
 
 func (b *bridge) Consume(tx *types.Transaction) {
-	b.sampool.Consume(getTransactionHash(tx))
+	b.sampool.ConsumeMessage(getTransactionHash(tx))
 }
 
 func (b *bridge) resetIsValidatorMap(validators []types.Address) {

@@ -28,9 +28,9 @@ type Signer interface {
 type Pool interface {
 	AddMessage(*Message)
 	AddSignature(*MessageSignature)
-	Consume(types.Hash)
+	ConsumeMessage(types.Hash)
 	GetReadyMessages() []ReadyMessage
 	UpdateValidatorSet([]types.Address, uint64)
-	Knows(hash types.Hash) bool
+	IsMessageKnown(hash types.Hash) bool
 	GetSignatureCount(hash types.Hash) uint64
 }
