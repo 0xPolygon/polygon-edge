@@ -467,88 +467,88 @@ func TestPeerReconnection(t *testing.T) {
 	assert.True(t, reconnected)
 }
 
-func TestReconnectionWithNewIP(t *testing.T) {
-	natIP := "127.0.0.1"
-
-	_, dir0 := GenerateTestLibp2pKey(t)
-	_, dir1 := GenerateTestLibp2pKey(t)
-
-	defaultConfig := func(c *Config) {
-		c.NoDiscover = true
-	}
-
-	servers, createErr := createServers(3,
-		map[int]*CreateServerParams{
-			0: {
-				ConfigCallback: func(c *Config) {
-					defaultConfig(c)
-					c.DataDir = dir0
-				},
-			},
-			1: {
-				ConfigCallback: func(c *Config) {
-					defaultConfig(c)
-					c.DataDir = dir1
-				},
-			},
-			2: {
-				ConfigCallback: func(c *Config) {
-					defaultConfig(c)
-					c.DataDir = dir1
-					// same ID to but different IP from servers[1]
-					c.NatAddr = net.ParseIP(natIP)
-				},
-			},
-		},
-	)
-	if createErr != nil {
-		t.Fatalf("Unable to create servers, %v", createErr)
-	}
-
-	t.Cleanup(func() {
-		closeTestServers(t, servers)
-	})
-
-	// Server 0 should connect to Server 1
-	if joinErr := JoinAndWait(servers[0], servers[1], DefaultBufferTimeout, DefaultJoinTimeout); joinErr != nil {
-		t.Fatalf("Unable to join servers, %v", joinErr)
-	}
-
-	// Server 1 terminates, so Server 0 should disconnect from it
-	peerID := servers[1].AddrInfo().ID
-
-	if err := servers[1].host.Close(); err != nil {
-		t.Fatalf("Unable to close peer server, %v", err)
-	}
-
-	disconnectCtx, disconnectFn := context.WithTimeout(context.Background(), DefaultJoinTimeout)
-	defer disconnectFn()
-
-	if _, disconnectErr := WaitUntilPeerDisconnectsFrom(disconnectCtx, servers[0], peerID); disconnectErr != nil {
-		t.Fatalf("Unable to wait for disconnect from peer, %v", disconnectErr)
-	}
-
-	// servers[0] connects to servers[2]
-	// Server 0 should connect to Server 2 (that has the NAT address set)
-	if joinErr := JoinAndWait(servers[0], servers[2], DefaultBufferTimeout, DefaultJoinTimeout); joinErr != nil {
-		t.Fatalf("Unable to join servers, %v", joinErr)
-	}
-
-	// Wait until Server 2 also has a connection to Server 0 before asserting
-	connectCtx, connectFn := context.WithTimeout(context.Background(), DefaultBufferTimeout)
-	defer connectFn()
-
-	if _, connectErr := WaitUntilPeerConnectsTo(
-		connectCtx,
-		servers[2],
-		servers[0].AddrInfo().ID,
-	); connectErr != nil {
-		t.Fatalf("Unable to wait for connection between Server 2 and Server 0, %v", connectErr)
-	}
-
-	assert.Equal(t, int64(1), servers[0].numPeers())
-	assert.Equal(t, int64(1), servers[2].numPeers())
-}
+//func TestReconnectionWithNewIP(t *testing.T) {
+//	natIP := "127.0.0.1"
+//
+//	_, dir0 := GenerateTestLibp2pKey(t)
+//	_, dir1 := GenerateTestLibp2pKey(t)
+//
+//	defaultConfig := func(c *Config) {
+//		c.NoDiscover = true
+//	}
+//
+//	servers, createErr := createServers(3,
+//		map[int]*CreateServerParams{
+//			0: {
+//				ConfigCallback: func(c *Config) {
+//					defaultConfig(c)
+//					c.DataDir = dir0
+//				},
+//			},
+//			1: {
+//				ConfigCallback: func(c *Config) {
+//					defaultConfig(c)
+//					c.DataDir = dir1
+//				},
+//			},
+//			2: {
+//				ConfigCallback: func(c *Config) {
+//					defaultConfig(c)
+//					c.DataDir = dir1
+//					// same ID to but different IP from servers[1]
+//					c.NatAddr = net.ParseIP(natIP)
+//				},
+//			},
+//		},
+//	)
+//	if createErr != nil {
+//		t.Fatalf("Unable to create servers, %v", createErr)
+//	}
+//
+//	t.Cleanup(func() {
+//		closeTestServers(t, servers)
+//	})
+//
+//	// Server 0 should connect to Server 1
+//	if joinErr := JoinAndWait(servers[0], servers[1], DefaultBufferTimeout, DefaultJoinTimeout); joinErr != nil {
+//		t.Fatalf("Unable to join servers, %v", joinErr)
+//	}
+//
+//	// Server 1 terminates, so Server 0 should disconnect from it
+//	peerID := servers[1].AddrInfo().ID
+//
+//	if err := servers[1].host.Close(); err != nil {
+//		t.Fatalf("Unable to close peer server, %v", err)
+//	}
+//
+//	disconnectCtx, disconnectFn := context.WithTimeout(context.Background(), DefaultJoinTimeout)
+//	defer disconnectFn()
+//
+//	if _, disconnectErr := WaitUntilPeerDisconnectsFrom(disconnectCtx, servers[0], peerID); disconnectErr != nil {
+//		t.Fatalf("Unable to wait for disconnect from peer, %v", disconnectErr)
+//	}
+//
+//	// servers[0] connects to servers[2]
+//	// Server 0 should connect to Server 2 (that has the NAT address set)
+//	if joinErr := JoinAndWait(servers[0], servers[2], DefaultBufferTimeout, DefaultJoinTimeout); joinErr != nil {
+//		t.Fatalf("Unable to join servers, %v", joinErr)
+//	}
+//
+//	// Wait until Server 2 also has a connection to Server 0 before asserting
+//	connectCtx, connectFn := context.WithTimeout(context.Background(), DefaultBufferTimeout)
+//	defer connectFn()
+//
+//	if _, connectErr := WaitUntilPeerConnectsTo(
+//		connectCtx,
+//		servers[2],
+//		servers[0].AddrInfo().ID,
+//	); connectErr != nil {
+//		t.Fatalf("Unable to wait for connection between Server 2 and Server 0, %v", connectErr)
+//	}
+//
+//	assert.Equal(t, int64(1), servers[0].numPeers())
+//	assert.Equal(t, int64(1), servers[2].numPeers())
+//}
 
 func TestSelfConnection_WithBootNodes(t *testing.T) {
 	// Create a temporary directory for storing the key file
