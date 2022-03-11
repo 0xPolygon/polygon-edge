@@ -334,7 +334,7 @@ func (s *Server) runDial() {
 
 		select {
 		case notifyCh <- struct{}{}:
-			println("notifyCh <-")
+			println("hostID", s.host.ID().String(), "notifyCh <-", evnt.Type.String(), "peerID")
 		default:
 			panic("notify was full")
 		}
@@ -375,7 +375,7 @@ func (s *Server) runDial() {
 		// might involve a new dial slot available
 		select {
 		case <-notifyCh:
-			println("<- notifyCh")
+			println("hostID", s.host.ID().String(), "notifyCh <-")
 		case <-s.closeCh:
 			return
 		}
