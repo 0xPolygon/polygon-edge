@@ -213,7 +213,7 @@ func runPreRun(cmd *cobra.Command, _ []string) error {
 	params.setRawJSONRPCAddress(helper.GetJSONRPCAddress(cmd))
 
 	// Check if the config file has been specified
-	// Config file settings will override --jsonrpc and --gprc flag settings
+	// Config file settings will override JSON-RPC and GRPC address values
 	if isConfigFileSpecified(cmd) {
 		if err := params.initConfigFromFile(); err != nil {
 			return err
