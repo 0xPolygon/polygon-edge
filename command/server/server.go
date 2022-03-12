@@ -207,7 +207,13 @@ func setDevFlags(cmd *cobra.Command) {
 }
 
 func runPreRun(cmd *cobra.Command, _ []string) error {
+	// Set the grpc and json ip:port bindings
+	// The config file will have presedence over --flag
+	params.setRawGRPCAddress(helper.GetGRPCAddress(cmd))
+	params.setRawJSONRPCAddress(helper.GetJSONRPCAddress(cmd))
+
 	// Check if the config file has been specified
+	// Config file settings will override JSON-RPC and GRPC address values
 	if isConfigFileSpecified(cmd) {
 		if err := params.initConfigFromFile(); err != nil {
 			return err
@@ -217,9 +223,6 @@ func runPreRun(cmd *cobra.Command, _ []string) error {
 	if err := params.validateFlags(); err != nil {
 		return err
 	}
-
-	params.setRawGRPCAddress(helper.GetGRPCAddress(cmd))
-	params.setRawJSONRPCAddress(helper.GetJSONRPCAddress(cmd))
 
 	if err := params.initRawParams(); err != nil {
 		return err
