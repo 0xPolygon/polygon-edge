@@ -558,8 +558,6 @@ func NewGasLimitReachedTransitionApplicationError(err error) *GasLimitReachedTra
 func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, error) {
 	txn := t.state
 
-	// First check this message satisfies all consensus rules before
-	// applying the message. The rules include these clauses
 	availableGas, err := t.checkAndPreProcessTransaction(txn, msg)
 	if err != nil {
 		return nil, err
