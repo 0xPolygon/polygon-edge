@@ -105,46 +105,27 @@ func (t *Transaction) UnmarshalStoreRLPFrom(p *fastrlp.Parser, v *fastrlp.Value)
 		return err
 	}
 
+	// come TransactionType first if exist
 	if len(elems) != 2 && len(elems) != 3 {
 		return errors.New("expected 2 or 3 elements")
 	}
 
-	if len(elems) == 2 {
-		// consensus part
-		if err := t.UnmarshalRLPFrom(p, elems[0]); err != nil {
-			return err
-		}
-		// context part
-		if err = elems[1].GetAddr(t.From[:]); err != nil {
-			return err
-		}
-	} else if len(elems) == 3 {
-		// consensus part
-		if elems[0].Type() != fastrlp.TypeBytes {
-			return errors.New("expected ByteType")
-		}
-
-		bytes, err := elems[0].Bytes()
-		if err != nil {
+	if len(elems) == 3 {
+		if err := t.Type.UnmarshalRLPFrom(p, elems[0]); err != nil {
 			return err
 		}
 
-		if l := len(bytes); l != 1 {
-			return fmt.Errorf("expected 1 byte transaction type, but size is %d", l)
-		}
+		elems = elems[1:]
+	}
 
-		if t.Type, err = ToTransactionType(bytes[0]); err != nil {
-			return err
-		}
+	// consensus part
+	if err := t.UnmarshalRLPFrom(p, elems[0]); err != nil {
+		return err
+	}
 
-		if err := t.UnmarshalRLPFrom(p, elems[1]); err != nil {
-			return err
-		}
-
-		// context part
-		if err = elems[2].GetAddr(t.From[:]); err != nil {
-			return err
-		}
+	// context part
+	if err = elems[1].GetAddr(t.From[:]); err != nil {
+		return err
 	}
 
 	t.ComputeHash()
@@ -209,8 +190,17 @@ func (r *Receipt) UnmarshalStoreRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) err
 		return err
 	}
 
-	if len(elems) != 3 {
-		return errors.New("expected 3 elements")
+	// come TransactionType first if exist
+	if len(elems) != 3 || len(elems) != 4 {
+		return errors.New("expected 3 or 4 elements")
+	}
+
+	if len(elems) == 4 {
+		if r.TransactionType.UnmarshalRLPFrom(p, elems[0]); err != nil {
+			return err
+		}
+
+		elems = elems[1:]
 	}
 
 	if err := r.UnmarshalRLPFrom(p, elems[0]); err != nil {
