@@ -224,41 +224,63 @@ func waitUntilStateReachesToContract(
 	expectedState string,
 ) error {
 	_, err := tests.RetryUntilTimeout(ctx, func() (interface{}, bool) {
-		response, err := srv.JSONRPC().Eth().Call(
-			&web3.CallMsg{
-				From:     web3.Address(senderAddress),
-				To:       &contractAddress,
-				Data:     StateRecieverABI.Methods["getState"].ID(),
-				GasPrice: 100000000,
-				Value:    big.NewInt(0),
-			},
-			web3.Latest,
+		state, err := getStateReceiverState(
+			srv,
+			senderAddress,
+			contractAddress,
 		)
 		if err != nil {
 			return err, true
 		}
 
-		byteData, err := types.ParseBytes(&response)
-		if err != nil {
-			return err, true
+		if state != expectedState {
+			return nil, true
 		}
 
-		res, err := StateRecieverABI.Methods["getState"].Outputs.Decode(byteData)
-		if err != nil {
-			return err, true
-		}
-
-		resMap, ok := res.(map[string]interface{})
-		if !ok {
-			return nil, false
-		}
-
-		if state, ok := resMap["0"].(string); ok && state == expectedState {
-			return nil, false
-		}
-
-		return nil, true
+		return nil, false
 	})
 
 	return err
+}
+
+func getStateReceiverState(
+	srv *framework.TestServer,
+	senderAddress types.Address,
+	contractAddress web3.Address,
+) (string, error) {
+	response, err := srv.JSONRPC().Eth().Call(
+		&web3.CallMsg{
+			From:     web3.Address(senderAddress),
+			To:       &contractAddress,
+			Data:     StateRecieverABI.Methods["getState"].ID(),
+			GasPrice: 100000000,
+			Value:    big.NewInt(0),
+		},
+		web3.Latest,
+	)
+	if err != nil {
+		return "", err
+	}
+
+	byteData, err := types.ParseBytes(&response)
+	if err != nil {
+		return "", err
+	}
+
+	res, err := StateRecieverABI.Methods["getState"].Outputs.Decode(byteData)
+	if err != nil {
+		return "", err
+	}
+
+	resMap, ok := res.(map[string]interface{})
+	if !ok {
+		return "", fmt.Errorf("expected map but got %T", resMap)
+	}
+
+	state, ok := resMap["0"].(string)
+	if !ok {
+		return "", fmt.Errorf("expected string in first returns but got %T", resMap["0"])
+	}
+
+	return state, nil
 }
