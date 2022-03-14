@@ -6,8 +6,8 @@ import (
 
 	pb "github.com/libp2p/go-libp2p-core/crypto/pb"
 
-	btcec "github.com/btcsuite/btcd/btcec"
-	sha256 "github.com/minio/sha256-simd"
+	"github.com/btcsuite/btcd/btcec"
+	"github.com/minio/sha256-simd"
 )
 
 // Secp256k1PrivateKey is an Secp256k1 private key
@@ -47,11 +47,6 @@ func UnmarshalSecp256k1PublicKey(data []byte) (PubKey, error) {
 	return (*Secp256k1PublicKey)(k), nil
 }
 
-// Bytes returns protobuf bytes from a private key
-func (k *Secp256k1PrivateKey) Bytes() ([]byte, error) {
-	return MarshalPrivateKey(k)
-}
-
 // Type returns the private key type
 func (k *Secp256k1PrivateKey) Type() pb.KeyType {
 	return pb.KeyType_Secp256k1
@@ -86,11 +81,6 @@ func (k *Secp256k1PrivateKey) Sign(data []byte) ([]byte, error) {
 // GetPublic returns a public key
 func (k *Secp256k1PrivateKey) GetPublic() PubKey {
 	return (*Secp256k1PublicKey)((*btcec.PrivateKey)(k).PubKey())
-}
-
-// Bytes returns protobuf bytes from a public key
-func (k *Secp256k1PublicKey) Bytes() ([]byte, error) {
-	return MarshalPublicKey(k)
 }
 
 // Type returns the public key type

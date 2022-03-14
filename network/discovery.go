@@ -5,7 +5,7 @@ import (
 	"sync/atomic"
 
 	"crypto/rand"
-
+	"errors"
 	"fmt"
 	"math/big"
 	"sync"
@@ -256,7 +256,12 @@ func (d *discovery) findPeersCall(peerID peer.ID) ([]string, error) {
 		return nil, err
 	}
 
-	clt := proto.NewDiscoveryClient(stream.(*rawGrpc.ClientConn))
+	rawGrpcConn, ok := stream.(*rawGrpc.ClientConn)
+	if !ok {
+		return nil, errors.New("invalid type assertion")
+	}
+
+	clt := proto.NewDiscoveryClient(rawGrpcConn)
 
 	resp, err := clt.FindPeers(context.Background(), &proto.FindPeersReq{Count: defaultPeerReqCount})
 	if err != nil {
@@ -346,7 +351,14 @@ func (d *discovery) bootnodeDiscovery() {
 		return
 	}
 
-	clt := proto.NewDiscoveryClient(stream.(*rawGrpc.ClientConn))
+	clientConnection, ok := stream.(*rawGrpc.ClientConn)
+	if !ok {
+		d.srv.logger.Error("invalid type assertion for client connection")
+
+		return
+	}
+
+	clt := proto.NewDiscoveryClient(clientConnection)
 
 	resp, err := clt.FindPeers(context.Background(), &proto.FindPeersReq{Count: defaultPeerReqCount})
 	if err != nil {
@@ -355,7 +367,7 @@ func (d *discovery) bootnodeDiscovery() {
 		return
 	}
 
-	if err := stream.(*rawGrpc.ClientConn).Close(); err != nil {
+	if err := clientConnection.Close(); err != nil {
 		d.srv.logger.Error("Error closing grpc stream", "peer", bootnode.ID, "err", err)
 
 		return
@@ -370,7 +382,12 @@ func (d *discovery) FindPeers(
 	ctx context.Context,
 	req *proto.FindPeersReq,
 ) (*proto.FindPeersResp, error) {
-	from := ctx.(*grpc.Context).PeerID
+	grpcContext, ok := ctx.(*grpc.Context)
+	if !ok {
+		return nil, errors.New("invalid type assertion")
+	}
+
+	from := grpcContext.PeerID
 
 	if req.Count > 16 {
 		// max limit
@@ -389,8 +406,9 @@ func (d *discovery) FindPeers(
 	for _, id := range closer {
 		// do not include himself
 		if id != from {
-			info := d.srv.host.Peerstore().PeerInfo(id)
-			filtered = append(filtered, AddrInfoToString(&info))
+			if info := d.srv.host.Peerstore().PeerInfo(id); len(info.Addrs) > 0 {
+				filtered = append(filtered, AddrInfoToString(&info))
+			}
 		}
 	}
 

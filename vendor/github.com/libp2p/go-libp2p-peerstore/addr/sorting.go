@@ -5,7 +5,7 @@ import (
 
 	ma "github.com/multiformats/go-multiaddr"
 	mafmt "github.com/multiformats/go-multiaddr-fmt"
-	manet "github.com/multiformats/go-multiaddr-net"
+	manet "github.com/multiformats/go-multiaddr/net"
 )
 
 func isFDCostlyTransport(a ma.Multiaddr) bool {
@@ -39,12 +39,7 @@ func (al AddrList) Less(i, j int) bool {
 	fda := isFDCostlyTransport(a)
 	fdb := isFDCostlyTransport(b)
 	if !fda {
-		if fdb {
-			return true
-		}
-
-		// if neither consume fd's, assume equal ordering
-		return false
+		return fdb
 	}
 
 	// if 'b' doesnt take a file descriptor

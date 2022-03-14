@@ -7,13 +7,24 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
+var mockHeader = &types.Header{
+	GasLimit: 4712388,
+}
+
 /* MOCK */
 
 type defaultMockStore struct {
+	DefaultHeader *types.Header
+}
+
+func NewDefaultMockStore(header *types.Header) defaultMockStore {
+	return defaultMockStore{
+		header,
+	}
 }
 
 func (m defaultMockStore) Header() *types.Header {
-	return &types.Header{}
+	return m.DefaultHeader
 }
 
 func (m defaultMockStore) GetNonce(types.Hash, types.Address) uint64 {

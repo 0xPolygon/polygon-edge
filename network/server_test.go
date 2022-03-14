@@ -22,6 +22,7 @@ func TestConnLimit_Inbound(t *testing.T) {
 	defaultConfig := &CreateServerParams{
 		ConfigCallback: func(c *Config) {
 			c.MaxInboundPeers = 1
+			c.MaxOutboundPeers = 1
 			c.NoDiscover = true
 		},
 	}
@@ -75,6 +76,7 @@ func TestConnLimit_Outbound(t *testing.T) {
 	// we should not try to make connections if we are already connected to max peers
 	defaultConfig := &CreateServerParams{
 		ConfigCallback: func(c *Config) {
+			c.MaxInboundPeers = 1
 			c.MaxOutboundPeers = 1
 			c.NoDiscover = true
 		},
@@ -230,6 +232,15 @@ func TestAddrInfoToString(t *testing.T) {
 			[]string{formatMultiaddr("ip4", "192.168.1.1", defaultPort)},
 			formatExpectedOutput(
 				formatMultiaddr("ip4", "192.168.1.1", defaultPort),
+				defaultPeerID.String(),
+			),
+		},
+		{
+			// A dns name is explicitly specified
+			"Valid dial dns address",
+			[]string{formatMultiaddr("dns", "foobar.com", defaultPort)},
+			formatExpectedOutput(
+				formatMultiaddr("dns", "foobar.com", defaultPort),
 				defaultPeerID.String(),
 			),
 		},
@@ -584,7 +595,7 @@ func TestSelfConnection_WithBootNodes(t *testing.T) {
 
 func TestRunDial(t *testing.T) {
 	// setupServers returns server and list of peer's server
-	setupServers := func(t *testing.T, maxPeers []uint64) []*Server {
+	setupServers := func(t *testing.T, maxPeers []int64) []*Server {
 		t.Helper()
 
 		servers := make([]*Server, len(maxPeers))
@@ -614,7 +625,7 @@ func TestRunDial(t *testing.T) {
 	}
 
 	t.Run("should connect to all peers", func(t *testing.T) {
-		maxPeers := []uint64{2, 1, 1}
+		maxPeers := []int64{2, 1, 1}
 		servers := setupServers(t, maxPeers)
 		srv, peers := servers[0], servers[1:]
 
@@ -627,12 +638,12 @@ func TestRunDial(t *testing.T) {
 	})
 
 	t.Run("should fail to connect to some peers due to reaching limit", func(t *testing.T) {
-		maxPeers := []uint64{2, 1, 1, 1}
+		maxPeers := []int64{2, 1, 1, 1}
 		servers := setupServers(t, maxPeers)
 		srv, peers := servers[0], servers[1:]
 
 		for idx, p := range peers {
-			if uint64(idx) < maxPeers[0] {
+			if int64(idx) < maxPeers[0] {
 				// Connection should be successful
 				joinErr := JoinAndWait(srv, p, DefaultBufferTimeout, DefaultJoinTimeout)
 				assert.NoError(t, joinErr)
@@ -647,7 +658,7 @@ func TestRunDial(t *testing.T) {
 	})
 
 	t.Run("should try to connect after adding a peer to queue", func(t *testing.T) {
-		maxPeers := []uint64{1, 0, 1}
+		maxPeers := []int64{1, 0, 1}
 		servers := setupServers(t, maxPeers)
 		srv, peers := servers[0], servers[1:]
 
@@ -696,6 +707,7 @@ func TestMinimumBootNodeCount(t *testing.T) {
 					server.config.Chain.Bootnodes = tt.bootNodes
 				},
 			})
+
 			assert.Equal(t, tt.expectedError, createErr)
 		})
 	}
@@ -726,4 +738,113 @@ func TestTemporaryDial(t *testing.T) {
 	// since it is temporary dial, server should not have a persistent connection to its peer
 	connected := isServerConnectedTo(servers[0], servers[1].host.ID())
 	assert.False(t, connected)
+}
+
+func TestMultiAddrFromDns(t *testing.T) {
+	port := 12345
+
+	tests := []struct {
+		name       string
+		dnsAddress string
+		port       int
+		err        bool
+		outcome    string
+	}{
+		{
+			name:       "Invalid DNS Version",
+			dnsAddress: "/dns8/example.io/",
+			port:       port,
+			err:        true,
+			outcome:    "",
+		},
+		{
+			name:       "Invalid DNS String",
+			dnsAddress: "dns4rahul.io",
+			port:       port,
+			err:        true,
+			outcome:    "",
+		},
+		{
+			name:       "Valid DNS Address with `/` ",
+			dnsAddress: "/dns4/rahul.io/",
+			port:       port,
+			err:        false,
+			outcome:    fmt.Sprintf("/dns4/rahul.io/tcp/%d", port),
+		},
+		{
+			name:       "Valid DNS Address without `/`",
+			dnsAddress: "dns6/example.io",
+			port:       port,
+			err:        false,
+			outcome:    fmt.Sprintf("/dns6/example.io/tcp/%d", port),
+		},
+		{
+			name:       "Invalid Port Number",
+			dnsAddress: "dns6/example.io",
+			port:       100000,
+			err:        true,
+			outcome:    "",
+		},
+		{
+			name:       "Invalid Host name starting with `-` ",
+			dnsAddress: "dns6/-example.io",
+			port:       port,
+			err:        true,
+			outcome:    "",
+		},
+		{
+			name:       "Invalid Host name starting with `/` ",
+			dnsAddress: "dns6//example.io",
+			port:       port,
+			err:        true,
+			outcome:    "",
+		},
+		{
+			name:       "Invalid Host name  with `/` ",
+			dnsAddress: "dns6/example/.io",
+			port:       12345,
+			err:        true,
+			outcome:    "",
+		},
+		{
+			name:       "Invalid Host name  with `-` ",
+			dnsAddress: "dns6/example-.io",
+			port:       port,
+			err:        true,
+			outcome:    "",
+		},
+		{
+			name:       "Missing DNS version",
+			dnsAddress: "example.io",
+			port:       port,
+			err:        true,
+			outcome:    "",
+		},
+		{
+			name:       "Invalid DNS version",
+			dnsAddress: "/dns8/example.io",
+			port:       port,
+			err:        true,
+			outcome:    "",
+		},
+		{
+			name:       "valid long domain suffix",
+			dnsAddress: "dns/validator-1.foo.technology",
+			port:       port,
+			err:        false,
+			outcome:    fmt.Sprintf("/dns/validator-1.foo.technology/tcp/%d", port),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			multiAddr, err := MultiAddrFromDNS(tt.dnsAddress, tt.port)
+			if !tt.err {
+				assert.NotNil(t, multiAddr, "Multi Address should not be nil")
+				assert.Equal(t, multiAddr.String(), tt.outcome)
+			} else {
+				assert.Error(t, err)
+			}
+		})
+	}
 }

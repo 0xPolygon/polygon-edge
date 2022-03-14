@@ -59,16 +59,12 @@ To explicitly enable the WebSocket transport while constructing a host, use the
 ``` go
 
 import (
-    "context"
-
     libp2p "github.com/libp2p/go-libp2p"
     ws "github.com/libp2p/go-ws-transport"
 )
 
-ctx := context.Background()
-
 // WebSockets only:
-h, err := libp2p.New(ctx,
+h, err := libp2p.New(
     libp2p.Transport(ws.New)
 )
 ```
@@ -78,7 +74,7 @@ transport. To add multiple tranports, use `ChainOptions`:
 
 ``` go
 // WebSockets and QUIC:
-h, err := libp2p.New(ctx,
+h, err := libp2p.New(
     libp2p.ChainOptions(
         libp2p.Transport(ws.New),
         libp2p.Transport(quic.NewTransport)) // see https://github.com/libp2p/go-libp2p-quic-transport

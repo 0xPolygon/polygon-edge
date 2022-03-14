@@ -2,6 +2,7 @@ package network
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -22,7 +23,7 @@ import (
 )
 
 const (
-	DefaultLeaveTimeout = 20 * time.Second
+	DefaultLeaveTimeout = 30 * time.Second
 )
 
 // JoinAndWait is a helper method for joining a destination server
@@ -99,7 +100,12 @@ func WaitUntilPeerConnectsTo(ctx context.Context, srv *Server, ids ...peer.ID) (
 		return false, err
 	}
 
-	return res.(bool), nil
+	resVal, ok := res.(bool)
+	if !ok {
+		return false, errors.New("invalid type assert")
+	}
+
+	return resVal, nil
 }
 
 func WaitUntilPeerDisconnectsFrom(ctx context.Context, srv *Server, ids ...peer.ID) (bool, error) {
@@ -123,7 +129,12 @@ func WaitUntilPeerDisconnectsFrom(ctx context.Context, srv *Server, ids ...peer.
 		return false, err
 	}
 
-	return res.(bool), nil
+	resVal, ok := res.(bool)
+	if !ok {
+		return false, errors.New("invalid type assert")
+	}
+
+	return resVal, nil
 }
 
 // WaitUntilRoutingTableToBeAdded check routing table has given ids and retry by timeout
@@ -139,7 +150,12 @@ func WaitUntilRoutingTableToBeFilled(ctx context.Context, srv *Server, size int)
 		return false, err
 	}
 
-	return res.(bool), nil
+	resVal, ok := res.(bool)
+	if !ok {
+		return false, errors.New("invalid type assert")
+	}
+
+	return resVal, nil
 }
 
 // constructMultiAddrs is a helper function for converting raw IPs to mutliaddrs

@@ -77,7 +77,6 @@
     ["libp2p/go-libp2p-http", "go-libp2p-http", "HTTP on top of libp2p streams"],
 
     "Testing and examples",
-    ["libp2p/go-libp2p-testing", "go-libp2p-testing", "a collection of testing utilities for libp2p"],
-    ["libp2p/go-libp2p-examples", "go-libp2p-examples", "go-libp2p examples and tutorials"]
+    ["libp2p/go-libp2p-testing", "go-libp2p-testing", "a collection of testing utilities for libp2p"]
   ]
 }

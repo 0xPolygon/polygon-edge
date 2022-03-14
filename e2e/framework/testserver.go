@@ -6,6 +6,10 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/0xPolygon/polygon-edge/command"
+	ibftSwitch "github.com/0xPolygon/polygon-edge/command/ibft/switch"
+	initCmd "github.com/0xPolygon/polygon-edge/command/secrets/init"
+	"google.golang.org/grpc/credentials/insecure"
 	"io"
 	"math/big"
 	"os"
@@ -16,12 +20,10 @@ import (
 	"testing"
 	"time"
 
-	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
-
 	"github.com/0xPolygon/polygon-edge/command/genesis"
-	"github.com/0xPolygon/polygon-edge/command/helper"
-	secretsCommand "github.com/0xPolygon/polygon-edge/command/secrets"
 	"github.com/0xPolygon/polygon-edge/command/server"
+	"github.com/0xPolygon/polygon-edge/consensus/ibft"
+	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/tests"
 	"github.com/0xPolygon/polygon-edge/network"
@@ -68,6 +70,7 @@ func NewTestServer(t *testing.T, rootDir string, callback TestServerConfigCallba
 		LibP2PPort:    ports[1].Port(),
 		JSONRPCPort:   ports[2].Port(),
 		RootDir:       rootDir,
+		Signer:        crypto.NewEIP155Signer(100),
 	}
 
 	if callback != nil {
@@ -98,7 +101,9 @@ func (t *TestServer) JSONRPC() *jsonrpc.Client {
 }
 
 func (t *TestServer) Operator() proto.SystemClient {
-	conn, err := grpc.Dial(fmt.Sprintf("127.0.0.1:%d", t.Config.GRPCPort), grpc.WithInsecure())
+	conn, err := grpc.Dial(
+		fmt.Sprintf("127.0.0.1:%d", t.Config.GRPCPort),
+		grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		t.t.Fatal(err)
 	}
@@ -107,7 +112,9 @@ func (t *TestServer) Operator() proto.SystemClient {
 }
 
 func (t *TestServer) TxnPoolOperator() txpoolProto.TxnPoolOperatorClient {
-	conn, err := grpc.Dial(fmt.Sprintf("127.0.0.1:%d", t.Config.GRPCPort), grpc.WithInsecure())
+	conn, err := grpc.Dial(
+		fmt.Sprintf("127.0.0.1:%d", t.Config.GRPCPort),
+		grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		t.t.Fatal(err)
 	}
@@ -116,7 +123,9 @@ func (t *TestServer) TxnPoolOperator() txpoolProto.TxnPoolOperatorClient {
 }
 
 func (t *TestServer) IBFTOperator() ibftOp.IbftOperatorClient {
-	conn, err := grpc.Dial(fmt.Sprintf("127.0.0.1:%d", t.Config.GRPCPort), grpc.WithInsecure())
+	conn, err := grpc.Dial(
+		fmt.Sprintf("127.0.0.1:%d", t.Config.GRPCPort),
+		grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		t.t.Fatal(err)
 	}
@@ -153,12 +162,12 @@ type InitIBFTResult struct {
 	NodeID  string
 }
 
-func (t *TestServer) InitIBFT() (*InitIBFTResult, error) {
-	secretsInitCmd := secretsCommand.SecretsInit{}
+func (t *TestServer) SecretsInit() (*InitIBFTResult, error) {
+	secretsInitCmd := initCmd.GetCommand()
 
 	var args []string
 
-	commandSlice := strings.Split(secretsInitCmd.GetBaseCommand(), " ")
+	commandSlice := strings.Split(fmt.Sprintf("secrets %s", secretsInitCmd.Use), " ")
 	args = append(args, commandSlice...)
 	args = append(args, "--data-dir", t.Config.IBFTDir)
 
@@ -218,9 +227,9 @@ func (t *TestServer) InitIBFT() (*InitIBFTResult, error) {
 }
 
 func (t *TestServer) GenerateGenesis() error {
-	genesisCmd := genesis.GenesisCommand{}
+	genesisCmd := genesis.GetCommand()
 	args := []string{
-		genesisCmd.GetBaseCommand(),
+		genesisCmd.Use,
 	}
 
 	// add pre-mined accounts
@@ -264,7 +273,7 @@ func (t *TestServer) GenerateGenesis() error {
 
 	// add block gas limit
 	if t.Config.BlockGasLimit == 0 {
-		t.Config.BlockGasLimit = helper.GenesisGasLimit
+		t.Config.BlockGasLimit = command.DefaultGenesisGasLimit
 	}
 
 	blockGasLimit := strconv.FormatUint(t.Config.BlockGasLimit, 10)
@@ -277,13 +286,13 @@ func (t *TestServer) GenerateGenesis() error {
 }
 
 func (t *TestServer) Start(ctx context.Context) error {
-	serverCmd := server.ServerCommand{}
+	serverCmd := server.GetCommand()
 	args := []string{
-		serverCmd.GetBaseCommand(),
+		serverCmd.Use,
 		// add custom chain
 		"--chain", filepath.Join(t.Config.RootDir, "genesis.json"),
 		// enable grpc
-		"--grpc", fmt.Sprintf(":%d", t.Config.GRPCPort),
+		"--grpc-address", fmt.Sprintf(":%d", t.Config.GRPCPort),
 		// enable libp2p
 		"--libp2p", fmt.Sprintf(":%d", t.Config.LibP2PPort),
 		// enable jsonrpc
@@ -351,17 +360,73 @@ func (t *TestServer) Start(ctx context.Context) error {
 	return err
 }
 
+func (t *TestServer) SwitchIBFTType(typ ibft.MechanismType, from uint64, to, deployment *uint64) error {
+	t.t.Helper()
+
+	ibftSwitchCmd := ibftSwitch.GetCommand()
+	args := make([]string, 0)
+
+	commandSlice := strings.Split(fmt.Sprintf("ibft %s", ibftSwitchCmd.Use), " ")
+
+	args = append(args, commandSlice...)
+	args = append(args,
+		// add custom chain
+		"--chain", filepath.Join(t.Config.RootDir, "genesis.json"),
+		"--type", string(typ),
+		"--from", strconv.FormatUint(from, 10),
+	)
+
+	if to != nil {
+		args = append(args, "--to", strconv.FormatUint(*to, 10))
+	}
+
+	if deployment != nil {
+		args = append(args, "--deployment", strconv.FormatUint(*deployment, 10))
+	}
+
+	// Start the server
+	t.cmd = exec.Command(binaryName, args...)
+	t.cmd.Dir = t.Config.RootDir
+
+	if t.Config.ShowsLog {
+		stdout := io.Writer(os.Stdout)
+		t.cmd.Stdout = stdout
+		t.cmd.Stderr = stdout
+	}
+
+	return t.cmd.Run()
+}
+
+// SignTx is a helper method for signing transactions
+func (t *TestServer) SignTx(
+	transaction *types.Transaction,
+	privateKey *ecdsa.PrivateKey,
+) (*types.Transaction, error) {
+	return t.Config.Signer.SignTx(transaction, privateKey)
+}
+
 // DeployContract deploys a contract with account 0 and returns the address
-func (t *TestServer) DeployContract(ctx context.Context, binary string) (web3.Address, error) {
+func (t *TestServer) DeployContract(
+	ctx context.Context,
+	binary string,
+	privateKey *ecdsa.PrivateKey,
+) (web3.Address, error) {
 	buf, err := hex.DecodeString(binary)
 	if err != nil {
 		return web3.Address{}, err
 	}
 
-	receipt, err := t.SendTxn(ctx, &web3.Transaction{
-		Input: buf,
-	})
+	sender, err := crypto.GetAddressFromKey(privateKey)
+	if err != nil {
+		return web3.ZeroAddress, fmt.Errorf("unable to extract key, %w", err)
+	}
 
+	receipt, err := t.SendRawTx(ctx, &PreparedTransaction{
+		From:     sender,
+		Gas:      DefaultGasLimit,
+		GasPrice: big.NewInt(DefaultGasPrice),
+		Input:    buf,
+	}, privateKey)
 	if err != nil {
 		return web3.Address{}, err
 	}
@@ -373,31 +438,6 @@ const (
 	DefaultGasPrice = 1879048192 // 0x70000000
 	DefaultGasLimit = 5242880    // 0x500000
 )
-
-var emptyAddr web3.Address
-
-func (t *TestServer) SendTxn(ctx context.Context, txn *web3.Transaction) (*web3.Receipt, error) {
-	client := t.JSONRPC()
-
-	if txn.From == emptyAddr {
-		txn.From = web3.Address(t.Config.PremineAccts[0].Addr)
-	}
-
-	if txn.GasPrice == 0 {
-		txn.GasPrice = DefaultGasPrice
-	}
-
-	if txn.Gas == 0 {
-		txn.Gas = DefaultGasLimit
-	}
-
-	hash, err := client.Eth().SendTransaction(txn)
-	if err != nil {
-		return nil, err
-	}
-
-	return tests.WaitForReceipt(ctx, t.JSONRPC().Eth(), hash)
-}
 
 type PreparedTransaction struct {
 	From     types.Address
@@ -414,7 +454,6 @@ func (t *TestServer) SendRawTx(
 	tx *PreparedTransaction,
 	signerKey *ecdsa.PrivateKey,
 ) (*web3.Receipt, error) {
-	signer := crypto.NewEIP155Signer(100)
 	client := t.JSONRPC()
 
 	nextNonce, err := client.Eth().GetNonce(web3.Address(tx.From), web3.Latest)
@@ -422,7 +461,7 @@ func (t *TestServer) SendRawTx(
 		return nil, err
 	}
 
-	signedTx, err := signer.SignTx(&types.Transaction{
+	signedTx, err := t.SignTx(&types.Transaction{
 		From:     tx.From,
 		GasPrice: tx.GasPrice,
 		Gas:      tx.Gas,
@@ -490,12 +529,26 @@ func (t *TestServer) WaitForReady(ctx context.Context) error {
 	return err
 }
 
-func (t *TestServer) TxnTo(ctx context.Context, address web3.Address, method string) *web3.Receipt {
+func (t *TestServer) InvokeMethod(
+	ctx context.Context,
+	contractAddress types.Address,
+	method string,
+	fromKey *ecdsa.PrivateKey,
+) *web3.Receipt {
 	sig := MethodSig(method)
-	receipt, err := t.SendTxn(ctx, &web3.Transaction{
-		To:    &address,
-		Input: sig,
-	})
+
+	fromAddress, err := crypto.GetAddressFromKey(fromKey)
+	if err != nil {
+		t.t.Fatalf("unable to extract key, %v", err)
+	}
+
+	receipt, err := t.SendRawTx(ctx, &PreparedTransaction{
+		Gas:      DefaultGasLimit,
+		GasPrice: big.NewInt(DefaultGasPrice),
+		To:       &contractAddress,
+		From:     fromAddress,
+		Input:    sig,
+	}, fromKey)
 
 	if err != nil {
 		t.t.Fatal(err)

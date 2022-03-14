@@ -45,7 +45,12 @@ func (m *accountsMap) exists(addr types.Address) bool {
 // from each of the promoted queues.
 func (m *accountsMap) getPrimaries() (primaries []*types.Transaction) {
 	m.Range(func(key, value interface{}) bool {
-		account := m.get(key.(types.Address))
+		addressKey, ok := key.(types.Address)
+		if !ok {
+			return false
+		}
+
+		account := m.get(addressKey)
 
 		account.promoted.lock(false)
 		defer account.promoted.unlock()
@@ -68,13 +73,23 @@ func (m *accountsMap) get(addr types.Address) *account {
 		return nil
 	}
 
-	return a.(*account)
+	fetchedAccount, ok := a.(*account)
+	if !ok {
+		return nil
+	}
+
+	return fetchedAccount
 }
 
 // promoted returns the number of all promoted transactons.
 func (m *accountsMap) promoted() (total uint64) {
 	m.Range(func(key, value interface{}) bool {
-		account := m.get(key.(types.Address))
+		accountKey, ok := key.(types.Address)
+		if !ok {
+			return false
+		}
+
+		account := m.get(accountKey)
 
 		account.promoted.lock(false)
 		defer account.promoted.unlock()
@@ -101,13 +116,17 @@ func (m *accountsMap) allTxs(includeEnqueued bool) (
 		account.promoted.lock(false)
 		defer account.promoted.unlock()
 
-		allPromoted[addr] = account.promoted.queue
+		if account.promoted.length() != 0 {
+			allPromoted[addr] = account.promoted.queue
+		}
 
 		if includeEnqueued {
 			account.enqueued.lock(false)
 			defer account.enqueued.unlock()
 
-			allEnqueued[addr] = account.enqueued.queue
+			if account.enqueued.length() != 0 {
+				allEnqueued[addr] = account.enqueued.queue
+			}
 		}
 
 		return true
@@ -144,14 +163,12 @@ func (a *account) setNonce(nonce uint64) {
 }
 
 // enqueue attempts tp push the transaction onto the enqueued queue.
-func (a *account) enqueue(tx *types.Transaction, demoted bool) error {
+func (a *account) enqueue(tx *types.Transaction) error {
 	a.enqueued.lock(true)
 	defer a.enqueued.unlock()
 
-	// only accept low nonce if
-	// tx was demoted
-	if tx.Nonce < a.getNonce() &&
-		!demoted {
+	// reject low nonce tx
+	if tx.Nonce < a.getNonce() {
 		return ErrNonceTooLow
 	}
 

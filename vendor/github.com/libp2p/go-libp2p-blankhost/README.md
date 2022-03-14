@@ -8,14 +8,12 @@ go-libp2p-blankhost
 [![Discourse posts](https://img.shields.io/discourse/https/discuss.libp2p.io/posts.svg)](https://discuss.libp2p.io)
 
 
-> A very thin implementation of go-libp2p-host. Does not contain any identify, relay, or NAT traversal code.
+A very thin implementation of go-libp2p-host. Does not contain any identify, relay, or NAT traversal code.
 
 
 ## Table of Contents
 
 - [Install](#install)
-- [Usage](#usage)
-- [API](#api)
 - [Contribute](#contribute)
 - [License](#license)
 

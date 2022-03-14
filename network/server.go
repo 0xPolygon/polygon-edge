@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"net"
 	"regexp"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -27,23 +28,39 @@ import (
 	"github.com/multiformats/go-multiaddr"
 )
 
-const DefaultLibp2pPort int = 1478
-
 const (
+	DefaultDialRatio = 0.2
+
+	DefaultLibp2pPort int = 1478
+
 	MinimumPeerConnections int64 = 1
 
 	MinimumBootNodes int = 1
+
+	// Priority for dial queue
+	PriorityRequestedDial uint64 = 1
+
+	PriorityRandomDial uint64 = 10
 )
+
+const (
+	// peerOutboundBufferSize is the size of outbound messages to a peer buffers in go-libp2p-pubsub
+	// we should have enough capacity of the queue
+	// because we start dropping messages to a peer if the outbound queue is full
+	peerOutboundBufferSize = 1024
+
+	// validateBufferSize is the size of validate buffers in go-libp2p-pubsub
+	// we should have enough capacity of the queue
+	// because when queue is full, validation is throttled and new messages are dropped.
+	validateBufferSize = 1024
+)
+
+// regex string  to match against a valid dns/dns4/dns6 addr
+const DNSRegex = `^/?(dns)(4|6)?/[^-|^/][A-Za-z0-9-]([^-|^/]?)+([\\-\\.]{1}[a-z0-9]+)*\\.[A-Za-z]{2,}(/?)$`
 
 var (
 	ErrNoBootnodes  = errors.New("no bootnodes specified")
 	ErrMinBootnodes = errors.New("minimum 1 bootnode is required")
-)
-
-// Priority for dial queue
-const (
-	PriorityRequestedDial uint64 = 1
-	PriorityRandomDial    uint64 = 10
 )
 
 type Config struct {
@@ -52,8 +69,9 @@ type Config struct {
 	NatAddr          net.IP
 	DNS              multiaddr.Multiaddr
 	DataDir          string
-	MaxInboundPeers  uint64
-	MaxOutboundPeers uint64
+	MaxPeers         int64
+	MaxInboundPeers  int64
+	MaxOutboundPeers int64
 	Chain            *chain.Chain
 	SecretsManager   secrets.SecretsManager
 	Metrics          *Metrics
@@ -63,8 +81,9 @@ func DefaultConfig() *Config {
 	return &Config{
 		NoDiscover:       false,
 		Addr:             &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: DefaultLibp2pPort},
-		MaxOutboundPeers: 8,
+		MaxPeers:         40,
 		MaxInboundPeers:  32,
+		MaxOutboundPeers: 8,
 	}
 }
 
@@ -172,7 +191,6 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	}
 
 	host, err := libp2p.New(
-		context.Background(),
 		// Use noise as the encryption protocol
 		libp2p.Security(noise.ID, noise.New),
 		libp2p.ListenAddrs(listenAddr),
@@ -207,7 +225,11 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	srv.identity.setup()
 
 	// start gossip protocol
-	ps, err := pubsub.NewGossipSub(context.Background(), host)
+	ps, err := pubsub.NewGossipSub(
+		context.Background(),
+		host, pubsub.WithPeerOutboundQueueSize(peerOutboundBufferSize),
+		pubsub.WithValidateQueueSize(validateBufferSize),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -441,11 +463,11 @@ func (s *Server) outboundConns() int64 {
 }
 
 func (s *Server) maxInboundConns() int64 {
-	return int64(s.config.MaxInboundPeers)
+	return s.config.MaxInboundPeers
 }
 
 func (s *Server) maxOutboundConns() int64 {
-	return int64(s.config.MaxOutboundPeers)
+	return s.config.MaxOutboundPeers
 }
 
 func (s *Server) isConnected(peerID peer.ID) bool {
@@ -750,23 +772,15 @@ func (s *Server) SubscribeFn(handler func(evnt *PeerEvent)) error {
 func (s *Server) SubscribeCh() (<-chan *PeerEvent, error) {
 	ch := make(chan *PeerEvent)
 
-	var closed bool
-
-	var mutex sync.Mutex
-
-	isClosed := func() bool {
-		mutex.Lock()
-		defer mutex.Unlock()
-
-		return closed
-	}
+	var isClosed int32 = 0
 
 	err := s.SubscribeFn(func(evnt *PeerEvent) {
-		if !isClosed() {
+		if atomic.LoadInt32(&isClosed) == 0 {
 			ch <- evnt
 		}
 	})
 	if err != nil {
+		atomic.StoreInt32(&isClosed, 1)
 		close(ch)
 
 		return nil, err
@@ -774,9 +788,7 @@ func (s *Server) SubscribeCh() (<-chan *PeerEvent, error) {
 
 	go func() {
 		<-s.closeCh
-		mutex.Lock()
-		closed = true
-		mutex.Unlock()
+		atomic.StoreInt32(&isClosed, 1)
 		close(ch)
 	}()
 
@@ -799,15 +811,19 @@ func StringToAddrInfo(addr string) (*peer.AddrInfo, error) {
 }
 
 var (
-	// Regex used for matching loopback addresses (IPv4 and IPv6)
+	// Regex used for matching loopback addresses (IPv4, IPv6, DNS)
 	// This regex will match:
 	// /ip4/localhost/tcp/<port>
 	// /ip4/127.0.0.1/tcp/<port>
 	// /ip4/<any other loopback>/tcp/<port>
 	// /ip6/<any loopback>/tcp/<port>
+	// /dns/foobar.com/tcp/<port>
 	loopbackRegex = regexp.MustCompile(
-		`^\/ip4\/127(?:\.[0-9]+){0,2}\.[0-9]+\/tcp\/\d+$|^\/ip4\/localhost\/tcp\/\d+$|^\/ip6\/(?:0*\:)*?:?0*1\/tcp\/\d+$`,
+		//nolint:lll
+		fmt.Sprintf(`^\/ip4\/127(?:\.[0-9]+){0,2}\.[0-9]+\/tcp\/\d+$|^\/ip4\/localhost\/tcp\/\d+$|^\/ip6\/(?:0*\:)*?:?0*1\/tcp\/\d+$|%s`, DNSRegex),
 	)
+
+	dnsRegex = "^/?(dns)(4|6)?/[^-|^/][A-Za-z0-9-]([^-|^/]?)+([\\-\\.]{1}[a-z0-9]+)*\\.[A-Za-z]{2,}(/?)$"
 )
 
 // AddrInfoToString converts an AddrInfo into a string representation that can be dialed from another node
@@ -834,6 +850,57 @@ func AddrInfoToString(addr *peer.AddrInfo) string {
 
 	// Format output and return
 	return dialAddress + "/p2p/" + addr.ID.String()
+}
+
+// MultiAddrFromDNS constructs a multiAddr from the passed in DNS address and port combination
+func MultiAddrFromDNS(addr string, port int) (multiaddr.Multiaddr, error) {
+	var (
+		version string
+		domain  string
+	)
+
+	match, err := regexp.MatchString(
+		dnsRegex,
+		addr,
+	)
+	if err != nil || !match {
+		return nil, errors.New("invalid DNS address")
+	}
+
+	s := strings.Trim(addr, "/")
+	split := strings.Split(s, "/")
+
+	if len(split) != 2 {
+		return nil, errors.New("invalid DNS address")
+	}
+
+	switch split[0] {
+	case "dns":
+		version = "dns"
+	case "dns4":
+		version = "dns4"
+	case "dns6":
+		version = "dns6"
+	default:
+		return nil, errors.New("invalid DNS version")
+	}
+
+	domain = split[1]
+
+	multiAddr, err := multiaddr.NewMultiaddr(
+		fmt.Sprintf(
+			"/%s/%s/tcp/%d",
+			version,
+			domain,
+			port,
+		),
+	)
+
+	if err != nil {
+		return nil, errors.New("could not create a multi address")
+	}
+
+	return multiAddr, nil
 }
 
 type PeerEventType uint

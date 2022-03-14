@@ -54,12 +54,13 @@ type JSONRPCStore interface {
 }
 
 type Config struct {
-	Store   JSONRPCStore
-	Addr    *net.TCPAddr
-	ChainID uint64
+	Store                    JSONRPCStore
+	Addr                     *net.TCPAddr
+	ChainID                  uint64
+	AccessControlAllowOrigin []string
 }
 
-// NewJSONRPC returns the JsonRPC http server
+// NewJSONRPC returns the JSONRPC http server
 func NewJSONRPC(logger hclog.Logger, config *Config) (*JSONRPC, error) {
 	srv := &JSONRPC{
 		logger:     logger.Named("jsonrpc"),
@@ -84,7 +85,11 @@ func (j *JSONRPC) setupHTTP() error {
 	}
 
 	mux := http.DefaultServeMux
-	mux.HandleFunc("/", j.handle)
+
+	// The middleware factory returns a handler, so we need to wrap the handler function properly.
+	jsonRPCHandler := http.HandlerFunc(j.handle)
+	mux.Handle("/", middlewareFactory(j.config)(jsonRPCHandler))
+
 	mux.HandleFunc("/ws", j.handleWs)
 
 	srv := http.Server{
@@ -98,6 +103,30 @@ func (j *JSONRPC) setupHTTP() error {
 	}()
 
 	return nil
+}
+
+// The middlewareFactory builds a middleware which enables CORS using the provided config.
+func middlewareFactory(config *Config) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			origin := r.Header.Get("Origin")
+
+			for _, allowedOrigin := range config.AccessControlAllowOrigin {
+				if allowedOrigin == "*" {
+					w.Header().Set("Access-Control-Allow-Origin", "*")
+
+					break
+				}
+
+				if allowedOrigin == origin {
+					w.Header().Set("Access-Control-Allow-Origin", origin)
+
+					break
+				}
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
 }
 
 // wsUpgrader defines upgrade parameters for the WS connection
@@ -118,10 +147,7 @@ type wsWrapper struct {
 }
 
 // WriteMessage writes out the message to the WS peer
-func (w *wsWrapper) WriteMessage(
-	messageType int,
-	data []byte,
-) error {
+func (w *wsWrapper) WriteMessage(messageType int, data []byte) error {
 	w.writeLock.Lock()
 	defer w.writeLock.Unlock()
 	writeErr := w.ws.WriteMessage(messageType, data)
@@ -206,7 +232,6 @@ func (j *JSONRPC) handleWs(w http.ResponseWriter, req *http.Request) {
 
 func (j *JSONRPC) handle(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
 	w.Header().Set(
 		"Access-Control-Allow-Headers",

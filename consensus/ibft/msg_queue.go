@@ -196,7 +196,12 @@ func (m msgQueueImpl) Swap(i, j int) {
 
 // Push adds a new item to the queue
 func (m *msgQueueImpl) Push(x interface{}) {
-	*m = append(*m, x.(*msgTask))
+	task, ok := x.(*msgTask)
+	if !ok {
+		return
+	}
+
+	*m = append(*m, task)
 }
 
 // Pop removes an item from the queue

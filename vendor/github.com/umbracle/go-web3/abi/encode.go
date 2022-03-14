@@ -1,6 +1,7 @@
 package abi
 
 import (
+	"encoding/hex"
 	"fmt"
 	"github.com/umbracle/go-web3"
 	"math/big"
@@ -172,6 +173,14 @@ func encodeFixedBytes(v reflect.Value) ([]byte, error) {
 	if v.Kind() == reflect.Array {
 		v = convertArrayToBytes(v)
 	}
+	if v.Kind() == reflect.String {
+		value, err := decodeHex(v.String())
+		if err != nil {
+			return nil, err
+		}
+
+		v = reflect.ValueOf(value)
+	}
 	return rightPad(v.Bytes(), 32), nil
 }
 
@@ -192,6 +201,14 @@ func encodeAddress(v reflect.Value) ([]byte, error) {
 func encodeBytes(v reflect.Value) ([]byte, error) {
 	if v.Kind() == reflect.Array {
 		v = convertArrayToBytes(v)
+	}
+	if v.Kind() == reflect.String {
+		value, err := decodeHex(v.String())
+		if err != nil {
+			return nil, err
+		}
+
+		v = reflect.ValueOf(value)
 	}
 	return packBytesSlice(v.Bytes(), v.Len())
 }
@@ -329,4 +346,19 @@ func leftPad(b []byte, size int) []byte {
 
 func rightPad(b []byte, size int) []byte {
 	return padBytes(b, size, false)
+}
+
+func encodeHex(b []byte) string {
+	return "0x" + hex.EncodeToString(b)
+}
+
+func decodeHex(str string) ([]byte, error) {
+	if strings.HasPrefix(str, "0x") {
+		str = str[2:]
+	}
+	buf, err := hex.DecodeString(str)
+	if err != nil {
+		return nil, fmt.Errorf("could not decode hex: %v", err)
+	}
+	return buf, nil
 }

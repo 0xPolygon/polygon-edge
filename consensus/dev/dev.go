@@ -5,10 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/protocol"
-
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/consensus"
+	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -54,10 +53,12 @@ func Factory(
 		d.interval = interval
 	}
 
-	// enable dev mode so that we can accept non-signed txns
-	params.Txpool.EnableDev()
-
 	return d, nil
+}
+
+// Initialize initializes the consensus
+func (d *Dev) Initialize() error {
+	return nil
 }
 
 // Start starts the consensus mechanism
@@ -214,7 +215,12 @@ func (d *Dev) GetBlockCreator(header *types.Header) (types.Address, error) {
 	return header.Miner, nil
 }
 
-func (d *Dev) GetSyncProgression() *protocol.Progression {
+// PreStateCommit a hook to be called before finalizing state transition on inserting block
+func (d *Dev) PreStateCommit(_header *types.Header, _txn *state.Transition) error {
+	return nil
+}
+
+func (d *Dev) GetSyncProgression() *progress.Progression {
 	return nil
 }
 

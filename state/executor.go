@@ -92,7 +92,7 @@ func (e *Executor) ProcessBlock(
 	parentRoot types.Hash,
 	block *types.Block,
 	blockCreator types.Address,
-) (*BlockResult, error) {
+) (*Transition, error) {
 	txn, err := e.BeginTxn(parentRoot, block.Header, blockCreator)
 	if err != nil {
 		return nil, err
@@ -114,15 +114,7 @@ func (e *Executor) ProcessBlock(
 		}
 	}
 
-	_, root := txn.Commit()
-
-	res := &BlockResult{
-		Root:     root,
-		Receipts: txn.Receipts(),
-		TotalGas: txn.TotalGas(),
-	}
-
-	return res, nil
+	return txn, nil
 }
 
 // StateAt returns snapshot at given root
@@ -340,7 +332,7 @@ func (t *Transition) GetTxnHash() types.Hash {
 
 // Apply applies a new transaction
 func (t *Transition) Apply(msg *types.Transaction) (*runtime.ExecutionResult, error) {
-	s := t.state.Snapshot() //nolint:ifshort //nolint:nolintlint
+	s := t.state.Snapshot() //nolint:ifshort
 	result, err := t.apply(msg)
 
 	if err != nil {
@@ -393,7 +385,6 @@ var (
 	ErrNonceIncorrect        = fmt.Errorf("incorrect nonce")
 	ErrNotEnoughFundsForGas  = fmt.Errorf("not enough funds to cover gas costs")
 	ErrBlockLimitReached     = fmt.Errorf("gas limit reached in the pool")
-	ErrBlockLimitExceeded    = fmt.Errorf("transaction's gas limit exceeds block gas limit")
 	ErrIntrinsicGasOverflow  = fmt.Errorf("overflow in intrinsic gas calculation")
 	ErrNotEnoughIntrinsicGas = fmt.Errorf("not enough gas supplied for intrinsic gas costs")
 	ErrNotEnoughFunds        = fmt.Errorf("not enough funds for transfer with given value")
@@ -405,7 +396,7 @@ type TransitionApplicationError struct {
 }
 
 func (e *TransitionApplicationError) Error() string {
-	return fmt.Sprintf("%v, recoverable [%t]", e.Err, e.IsRecoverable)
+	return e.Err.Error()
 }
 
 func NewTransitionApplicationError(err error, isRecoverable bool) *TransitionApplicationError {
@@ -752,6 +743,25 @@ func (t *Transition) Callx(c *runtime.Contract, h runtime.Host) *runtime.Executi
 	}
 
 	return t.applyCall(c, c.Type, h)
+}
+
+// SetAccountDirectly sets an account to the given address
+// NOTE: SetAccountDirectly changes the world state without a transaction
+func (t *Transition) SetAccountDirectly(addr types.Address, account *chain.GenesisAccount) error {
+	if t.AccountExists(addr) {
+		return fmt.Errorf("can't add account to %+v because an account exists already", addr)
+	}
+
+	t.state.SetCode(addr, account.Code)
+
+	for key, value := range account.Storage {
+		t.state.SetStorage(addr, key, value, &t.config)
+	}
+
+	t.state.SetBalance(addr, account.Balance)
+	t.state.SetNonce(addr, account.Nonce)
+
+	return nil
 }
 
 func TransactionGasCost(msg *types.Transaction, isHomestead, isIstanbul bool) (uint64, error) {

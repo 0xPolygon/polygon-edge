@@ -42,11 +42,6 @@ func (k *Ed25519PrivateKey) Type() pb.KeyType {
 	return pb.KeyType_Ed25519
 }
 
-// Bytes marshals an ed25519 private key to protobuf bytes.
-func (k *Ed25519PrivateKey) Bytes() ([]byte, error) {
-	return MarshalPrivateKey(k)
-}
-
 // Raw private key bytes.
 func (k *Ed25519PrivateKey) Raw() ([]byte, error) {
 	// The Ed25519 private key contains two 32-bytes curve points, the private
@@ -86,11 +81,6 @@ func (k *Ed25519PrivateKey) Sign(msg []byte) ([]byte, error) {
 // Type of the public key (Ed25519).
 func (k *Ed25519PublicKey) Type() pb.KeyType {
 	return pb.KeyType_Ed25519
-}
-
-// Bytes returns a ed25519 public key as protobuf bytes.
-func (k *Ed25519PublicKey) Bytes() ([]byte, error) {
-	return MarshalPublicKey(k)
 }
 
 // Raw public key bytes.

@@ -54,10 +54,17 @@ type Blockchain struct {
 type Verifier interface {
 	VerifyHeader(parent, header *types.Header) error
 	GetBlockCreator(header *types.Header) (types.Address, error)
+	PreStateCommit(header *types.Header, txn *state.Transition) error
 }
 
 type Executor interface {
-	ProcessBlock(parentRoot types.Hash, block *types.Block, blockCreator types.Address) (*state.BlockResult, error)
+	ProcessBlock(parentRoot types.Hash, block *types.Block, blockCreator types.Address) (*state.Transition, error)
+}
+
+type BlockResult struct {
+	Root     types.Hash
+	Receipts []*types.Receipt
+	TotalGas uint64
 }
 
 // UpdateGasPriceAvg Updates the rolling average value of the gas price
@@ -198,12 +205,22 @@ func (b *Blockchain) setCurrentHeader(h *types.Header, diff *big.Int) {
 
 // Header returns the current header (atomic)
 func (b *Blockchain) Header() *types.Header {
-	return b.currentHeader.Load().(*types.Header)
+	header, ok := b.currentHeader.Load().(*types.Header)
+	if !ok {
+		return nil
+	}
+
+	return header
 }
 
 // CurrentTD returns the current total difficulty (atomic)
 func (b *Blockchain) CurrentTD() *big.Int {
-	return b.currentDifficulty.Load().(*big.Int)
+	td, ok := b.currentDifficulty.Load().(*big.Int)
+	if !ok {
+		return nil
+	}
+
+	return td
 }
 
 // Config returns the blockchain configuration
@@ -412,7 +429,12 @@ func (b *Blockchain) readHeader(hash types.Hash) (*types.Header, bool) {
 	h, ok := b.headersCache.Get(hash)
 	if ok {
 		// Hit, return the3 header
-		return h.(*types.Header), true
+		header, ok := h.(*types.Header)
+		if !ok {
+			return nil, false
+		}
+
+		return header, true
 	}
 
 	// Cache miss, load it from the DB
@@ -446,7 +468,12 @@ func (b *Blockchain) readTotalDifficulty(headerHash types.Hash) (*big.Int, bool)
 	foundDifficulty, ok := b.difficultyCache.Get(headerHash)
 	if ok {
 		// Hit, return the difficulty
-		return foundDifficulty.(*big.Int), true
+		fd, ok := foundDifficulty.(*big.Int)
+		if !ok {
+			return nil, false
+		}
+
+		return fd, true
 	}
 
 	// Miss, read the difficulty from the DB
@@ -626,7 +653,7 @@ func (b *Blockchain) WriteBlock(block *types.Block) error {
 
 	if prevHeader, ok := b.GetHeaderByNumber(header.Number - 1); ok {
 		diff := header.Timestamp - prevHeader.Timestamp
-		logArgs = append(logArgs, "generation_time_in_sec", diff)
+		logArgs = append(logArgs, "generation_time_in_seconds", diff)
 	}
 
 	b.logger.Info("new block", logArgs...)
@@ -662,7 +689,7 @@ func (b *Blockchain) ReadTxLookup(hash types.Hash) (types.Hash, bool) {
 }
 
 // processBlock Processes the block, and does validation
-func (b *Blockchain) processBlock(block *types.Block) (*state.BlockResult, error) {
+func (b *Blockchain) processBlock(block *types.Block) (*BlockResult, error) {
 	header := block.Header
 
 	// Process the block
@@ -676,26 +703,33 @@ func (b *Blockchain) processBlock(block *types.Block) (*state.BlockResult, error
 		return nil, err
 	}
 
-	result, err := b.executor.ProcessBlock(parent.StateRoot, block, blockCreator)
+	txn, err := b.executor.ProcessBlock(parent.StateRoot, block, blockCreator)
 	if err != nil {
 		return nil, err
 	}
 
-	receipts := result.Receipts
+	if err := b.consensus.PreStateCommit(header, txn); err != nil {
+		return nil, err
+	}
+
+	_, root := txn.Commit()
+	receipts := txn.Receipts()
+	totalGas := txn.TotalGas()
+
 	if len(receipts) != len(block.Transactions) {
 		return nil, fmt.Errorf("bad size of receipts and transactions")
 	}
 
 	// Validate the fields
-	if result.Root != header.StateRoot {
+	if root != header.StateRoot {
 		return nil, fmt.Errorf("invalid merkle root")
 	}
 
-	if result.TotalGas != header.GasUsed {
+	if totalGas != header.GasUsed {
 		return nil, fmt.Errorf("gas used is different")
 	}
 
-	receiptSha := buildroot.CalculateReceiptsRoot(result.Receipts)
+	receiptSha := buildroot.CalculateReceiptsRoot(receipts)
 	if receiptSha != header.ReceiptsRoot {
 		return nil, fmt.Errorf("invalid receipts root")
 	}
@@ -704,7 +738,11 @@ func (b *Blockchain) processBlock(block *types.Block) (*state.BlockResult, error
 		return nil, fmt.Errorf("invalid gas limit, %w", gasLimitErr)
 	}
 
-	return result, nil
+	return &BlockResult{
+		Root:     root,
+		Receipts: receipts,
+		TotalGas: totalGas,
+	}, nil
 }
 
 // verifyGasLimit is a helper function for validating a gas limit in a header

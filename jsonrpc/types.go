@@ -299,12 +299,13 @@ type txnArgs struct {
 	Gas      *argUint64
 	GasPrice *argBytes
 	Value    *argBytes
-	Input    *argBytes
 	Data     *argBytes
+	Input    *argBytes
 	Nonce    *argUint64
 }
 
 type progression struct {
+	Type          string `json:"type"`
 	StartingBlock string `json:"startingBlock"`
 	CurrentBlock  string `json:"currentBlock"`
 	HighestBlock  string `json:"highestBlock"`
