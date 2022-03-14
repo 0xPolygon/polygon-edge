@@ -1,6 +1,7 @@
 package types
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/umbracle/fastrlp"
@@ -105,7 +106,7 @@ func (t *Transaction) UnmarshalStoreRLPFrom(p *fastrlp.Parser, v *fastrlp.Value)
 	}
 
 	if len(elems) != 2 && len(elems) != 3 {
-		return fmt.Errorf("expected 2 or 3 elements")
+		return errors.New("expected 2 or 3 elements")
 	}
 
 	if len(elems) == 2 {
@@ -120,7 +121,7 @@ func (t *Transaction) UnmarshalStoreRLPFrom(p *fastrlp.Parser, v *fastrlp.Value)
 	} else if len(elems) == 3 {
 		// consensus part
 		if elems[0].Type() != fastrlp.TypeBytes {
-			return fmt.Errorf("expected ByteType")
+			return errors.New("expected ByteType")
 		}
 
 		bytes, err := elems[0].Bytes()
@@ -220,7 +221,7 @@ func (r *Receipt) UnmarshalStoreRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) err
 	}
 
 	if len(elems) != 3 {
-		return fmt.Errorf("expected 3 elements")
+		return errors.New("expected 3 elements")
 	}
 
 	if err := r.UnmarshalRLPFrom(p, elems[0]); err != nil {

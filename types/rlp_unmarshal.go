@@ -1,6 +1,7 @@
 package types
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 
@@ -267,7 +268,7 @@ func (r *Receipt) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	}
 
 	if len(elems) != 4 {
-		return fmt.Errorf("expected 4 elements")
+		return errors.New("expected 4 elements")
 	}
 
 	// root or status
