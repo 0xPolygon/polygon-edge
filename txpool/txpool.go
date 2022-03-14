@@ -633,12 +633,12 @@ func (p *TxPool) handlePromoteRequest(req promoteRequest) {
 	account := p.accounts.get(addr)
 
 	// promote enqueued txs
-	promoted, promotedHashes := account.promote()
+	promoted := account.promote()
 	p.logger.Debug("promote request", "promoted", promoted, "addr", addr.String())
 
 	// update metrics
-	p.metrics.PendingTxs.Add(float64(promoted))
-	p.eventManager.signalEvent(proto.EventType_PROMOTED, promotedHashes...)
+	p.metrics.PendingTxs.Add(float64(len(promoted)))
+	p.eventManager.signalEvent(proto.EventType_PROMOTED, toHash(promoted...)...)
 }
 
 // addGossipTx handles receiving transactions
@@ -693,8 +693,10 @@ func (p *TxPool) resetAccounts(stateNonces map[types.Address]uint64) {
 		defer account.promoted.unlock()
 
 		//	prune the promoted txs
-		promoted, _ := account.promoted.prune(newNonce)
-		prunedPromoted = append(prunedPromoted, promoted...)
+		prunedPromoted = append(
+			prunedPromoted,
+			account.promoted.prune(newNonce)...,
+		)
 
 		if newNonce <= account.getNonce() {
 			// only the promoted queue needed pruning
@@ -705,9 +707,12 @@ func (p *TxPool) resetAccounts(stateNonces map[types.Address]uint64) {
 		defer account.enqueued.unlock()
 
 		//	prune the enqueued txs
-		enqueued, _ := account.enqueued.prune(newNonce)
-		prunedEnqueued = append(prunedEnqueued, enqueued...)
+		prunedEnqueued = append(
+			prunedEnqueued,
+			account.enqueued.prune(newNonce)...,
+		)
 
+		//	update nonce expected for this account
 		account.setNonce(newNonce)
 
 		if first := account.enqueued.peek(); first != nil &&
@@ -718,14 +723,6 @@ func (p *TxPool) resetAccounts(stateNonces map[types.Address]uint64) {
 
 		return true
 	})
-
-	toHash := func(txs ...*types.Transaction) (hashes []types.Hash) {
-		for _, tx := range txs {
-			hashes = append(hashes, tx.Hash)
-		}
-
-		return
-	}
 
 	//	update state
 	if len(prunedPromoted) > 0 {
@@ -814,4 +811,13 @@ func (p *TxPool) createAccountOnce(newAddr types.Address) *account {
 // Length returns the total number of all promoted transactions.
 func (p *TxPool) Length() uint64 {
 	return p.accounts.promoted()
+}
+
+//	toHash returns the hash(es) of given transaction(s)
+func toHash(txs ...*types.Transaction) (hashes []types.Hash) {
+	for _, tx := range txs {
+		hashes = append(hashes, tx.Hash)
+	}
+
+	return
 }
