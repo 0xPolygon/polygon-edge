@@ -135,9 +135,46 @@ func (m *accountsMap) allTxs(includeEnqueued bool) (
 	return
 }
 
+// resetWithNonce updates all accounts with the new nonce and clears any stale transactions.
+// May signal a promotion request if the account is eligible after pruning.
+func (m *accountsMap) resetWithNonce(newNonces map[types.Address]uint64, promoteCh chan<- promoteRequest) (
+	allPrunedPromoted,
+	allPrunedEnqueued []*types.Transaction,
+) {
+	//	prune each account with the new nonce
+	m.Range(func(key, value interface{}) bool {
+		addr, _ := key.(types.Address) //nolint:forcetypeassert
+		account, _ := value.(*account) //nolint:forcetypeassert
+
+		newNonce, ok := newNonces[addr]
+		if !ok {
+			// no updates for this account
+			return true
+		}
+
+		//	prune stale txs
+		prunedPromoted, prunedEnqueued := account.reset(newNonce, promoteCh)
+
+		//	update result
+		allPrunedPromoted = append(
+			allPrunedPromoted,
+			prunedPromoted...,
+		)
+
+		allPrunedEnqueued = append(
+			allPrunedEnqueued,
+			prunedEnqueued...,
+		)
+
+		return true
+	})
+
+	return
+}
+
 // An account is the core structure for processing
 // transactions from a specific address. The nextNonce
-// field is what separetes the enqueued from promoted:
+// field is what separates the enqueued from promoted transactions:
 //
 // 	1. enqueued - transactions higher than the nextNonce
 // 	2. promoted - transactions lower than the nextNonce
@@ -162,6 +199,10 @@ func (a *account) setNonce(nonce uint64) {
 	atomic.StoreUint64(&a.nextNonce, nonce)
 }
 
+//	reset aligns the account with the new nonce
+//	by pruning all transactions with nonce lesser than new.
+//	After pruning, a promotion may be signaled if the first
+// 	enqueued transaction matches the new nonce.
 func (a *account) reset(nonce uint64, promoteCh chan<- promoteRequest) (
 	prunedPromoted,
 	prunedEnqueued []*types.Transaction,

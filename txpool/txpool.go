@@ -666,38 +666,7 @@ func (p *TxPool) addGossipTx(obj interface{}) {
 
 // resetAccounts updates existing accounts with the new nonce.
 func (p *TxPool) resetAccounts(stateNonces map[types.Address]uint64) {
-	var (
-		allPrunedEnqueued []*types.Transaction
-		allPrunedPromoted []*types.Transaction
-	)
-
-	//	prune all accounts
-	p.accounts.Range(func(key, value interface{}) bool {
-		addr, _ := key.(types.Address) //nolint:forcetypeassert
-		account, _ := value.(*account) //nolint:forcetypeassert
-
-		newNonce, ok := stateNonces[addr]
-		if !ok {
-			// no updates for this account
-			return true
-		}
-
-		//	prune stale txs
-		prunedEnqueued, prunedPromoted := account.reset(newNonce, p.promoteReqCh)
-
-		//	update result
-		allPrunedEnqueued = append(
-			allPrunedEnqueued,
-			prunedEnqueued...,
-		)
-
-		allPrunedPromoted = append(
-			allPrunedPromoted,
-			prunedPromoted...,
-		)
-
-		return true
-	})
+	allPrunedPromoted, allPrunedEnqueued := p.accounts.resetWithNonce(stateNonces, p.promoteReqCh)
 
 	//	update state
 	if len(allPrunedPromoted) > 0 {
@@ -758,7 +727,7 @@ func (p *TxPool) resetAccounts(stateNonces map[types.Address]uint64) {
 //	account.setNonce(nonce)
 //
 //	p.eventManager.signalEvent(
-//		proto.EventType_PRUNED_ENQUEUED,
+//		proto.EventType_PRUNED_ENQUEUED,mis
 //		prunedHashes...,
 //	)
 //
