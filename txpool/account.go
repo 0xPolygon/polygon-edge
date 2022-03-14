@@ -143,8 +143,8 @@ func (m *accountsMap) resetWithNonce(newNonces map[types.Address]uint64, promote
 ) {
 	//	prune each account with the new nonce
 	m.Range(func(key, value interface{}) bool {
-		addr, _ := key.(types.Address) //nolint:forcetypeassert
-		account, _ := value.(*account) //nolint:forcetypeassert
+		addr, _ := key.(types.Address) //nolint:forcetypeassert, nolintlint
+		account, _ := value.(*account) //nolint:forcetypeassert, nolintlint
 
 		newNonce, ok := newNonces[addr]
 		if !ok {
