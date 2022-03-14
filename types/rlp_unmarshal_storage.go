@@ -187,7 +187,7 @@ func (r *Receipt) UnmarshalStoreRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) err
 	}
 
 	if len(elems) == 4 {
-		if r.TransactionType.UnmarshalRLPFrom(p, elems[0]); err != nil {
+		if err := r.TransactionType.UnmarshalRLPFrom(p, elems[0]); err != nil {
 			return err
 		}
 
