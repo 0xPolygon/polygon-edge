@@ -348,7 +348,6 @@ func TestEth_Call(t *testing.T) {
 			Gas:      argUintPtr(100000),
 			GasPrice: argBytesPtr([]byte{0x64}),
 			Value:    argBytesPtr([]byte{0x64}),
-			Input:    argBytesPtr([]byte{0x64}),
 			Data:     nil,
 			Nonce:    argUintPtr(0),
 		}
@@ -371,7 +370,6 @@ func TestEth_Call(t *testing.T) {
 			Gas:      argUintPtr(100000),
 			GasPrice: argBytesPtr([]byte{0x64}),
 			Value:    argBytesPtr([]byte{0x64}),
-			Input:    argBytesPtr([]byte{0x64}),
 			Data:     nil,
 			Nonce:    argUintPtr(0),
 		}

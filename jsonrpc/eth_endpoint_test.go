@@ -20,21 +20,6 @@ func TestEth_DecodeTxn(t *testing.T) {
 		err      error
 	}{
 		{
-			name: "should be failed when both Data and Input are given",
-			arg: &txnArgs{
-				From:     &addr1,
-				To:       &addr2,
-				Gas:      toArgUint64Ptr(21000),
-				GasPrice: toArgBytesPtr(big.NewInt(10000).Bytes()),
-				Value:    toArgBytesPtr(oneEther.Bytes()),
-				Input:    toArgBytesPtr(big.NewInt(100).Bytes()),
-				Data:     toArgBytesPtr(big.NewInt(200).Bytes()),
-				Nonce:    toArgUint64Ptr(0),
-			},
-			res: nil,
-			err: errors.New("both input and data cannot be set"),
-		},
-		{
 			name: "should be failed when both To and Data doesn't set",
 			arg: &txnArgs{
 				From:     &addr1,
@@ -54,7 +39,6 @@ func TestEth_DecodeTxn(t *testing.T) {
 				Gas:      toArgUint64Ptr(21000),
 				GasPrice: toArgBytesPtr(big.NewInt(10000).Bytes()),
 				Value:    toArgBytesPtr(oneEther.Bytes()),
-				Input:    nil,
 				Data:     nil,
 				Nonce:    toArgUint64Ptr(0),
 			},
@@ -76,7 +60,6 @@ func TestEth_DecodeTxn(t *testing.T) {
 				Gas:      toArgUint64Ptr(21000),
 				GasPrice: toArgBytesPtr(big.NewInt(10000).Bytes()),
 				Value:    toArgBytesPtr(oneEther.Bytes()),
-				Input:    nil,
 				Data:     nil,
 			},
 			res: &types.Transaction{
@@ -103,7 +86,6 @@ func TestEth_DecodeTxn(t *testing.T) {
 				Gas:      toArgUint64Ptr(21000),
 				GasPrice: toArgBytesPtr(big.NewInt(10000).Bytes()),
 				Value:    toArgBytesPtr(oneEther.Bytes()),
-				Input:    nil,
 				Data:     nil,
 			},
 			res: &types.Transaction{
@@ -124,7 +106,6 @@ func TestEth_DecodeTxn(t *testing.T) {
 				To:       &addr2,
 				Gas:      toArgUint64Ptr(21000),
 				GasPrice: toArgBytesPtr(big.NewInt(10000).Bytes()),
-				Input:    nil,
 				Data:     nil,
 				Nonce:    toArgUint64Ptr(1),
 			},
@@ -145,7 +126,6 @@ func TestEth_DecodeTxn(t *testing.T) {
 				From:     &addr1,
 				To:       &addr2,
 				GasPrice: toArgBytesPtr(big.NewInt(10000).Bytes()),
-				Input:    nil,
 				Data:     nil,
 				Nonce:    toArgUint64Ptr(1),
 			},

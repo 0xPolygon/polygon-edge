@@ -60,15 +60,15 @@ func TestDecode_TxnArgs(t *testing.T) {
 	}{
 		{
 			data: `{
-				"to": "{{.Addr}}",
+				"to": "{{.Libp2pAddr}}",
 				"gas": "0x10",
-				"input": "0x01",
+				"data": "0x01",
 				"value": "0x01"
 			}`,
 			res: &txnArgs{
 				To:    &addr,
 				Gas:   &num,
-				Input: &hex,
+				Data:  &hex,
 				Value: &hex,
 			},
 		},
@@ -79,8 +79,8 @@ func TestDecode_TxnArgs(t *testing.T) {
 		assert.NoError(t, err)
 
 		config := map[string]string{
-			"Addr": (types.Address{}).String(),
-			"Hash": (types.Hash{}).String(),
+			"Libp2pAddr": (types.Address{}).String(),
+			"Hash":       (types.Hash{}).String(),
 		}
 
 		buffer := new(bytes.Buffer)
@@ -90,7 +90,7 @@ func TestDecode_TxnArgs(t *testing.T) {
 		assert.NoError(t, json.Unmarshal(buffer.Bytes(), &r))
 
 		if !reflect.DeepEqual(r, c.res) {
-			t.Fatal("bad")
+			t.Fatal("Resulting data and expected values are not equal")
 		}
 	}
 }
