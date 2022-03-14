@@ -144,12 +144,10 @@ func (b *bridge) GetReadyMessages() ([]MessageWithSignatures, error) {
 	return data, nil
 }
 
+// ValidateTx validates given state transaction
+// Checks if local SAM Pool has enough signatures for the transaction hash
 func (b *bridge) ValidateTx(tx *types.Transaction) error {
 	hash := getTransactionHash(tx)
-
-	if !b.sampool.IsMessageKnown(hash) {
-		return fmt.Errorf("unknown state transaction, hash=%s", hash.String())
-	}
 
 	num, required := b.sampool.GetSignatureCount(hash), b.validatorThreshold
 	if num < required {
