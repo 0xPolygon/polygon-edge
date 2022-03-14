@@ -22,8 +22,6 @@ func GetCommand() *cobra.Command {
 
 func registerSubcommands(baseCmd *cobra.Command) {
 	baseCmd.AddCommand(
-		// txpool add - removed
-		// we don't support adding unsigned transactions
 		// txpool status
 		status.GetCommand(),
 		// txpool subscribe
