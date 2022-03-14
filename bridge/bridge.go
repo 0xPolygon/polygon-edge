@@ -276,7 +276,6 @@ func (b *bridge) addRemoteMessage(message *transport.SignedMessage) {
 }
 
 func getMessageHash(msg *Message) types.Hash {
-	// return msg.ComputeHash()
 	return msg.Transaction.ComputeHash().Hash
 }
 
