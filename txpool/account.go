@@ -164,8 +164,8 @@ func (a *account) setNonce(nonce uint64) {
 
 func (a *account) reset(nonce uint64) (
 	prunedPromoted,
-	prunedEnqueued []*types.Transaction) {
-
+	prunedEnqueued []*types.Transaction,
+) {
 	a.promoted.lock(true)
 	defer a.promoted.unlock()
 

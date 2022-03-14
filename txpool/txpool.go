@@ -676,6 +676,7 @@ func (p *TxPool) resetAccounts(stateNonces map[types.Address]uint64) {
 		addr, ok := key.(types.Address)
 		if !ok {
 			p.logger.Error("failed type casting")
+
 			return false
 		}
 
@@ -688,6 +689,7 @@ func (p *TxPool) resetAccounts(stateNonces map[types.Address]uint64) {
 		account, ok := value.(*account)
 		if !ok {
 			p.logger.Error("failed type casting")
+
 			return false
 		}
 
