@@ -3,6 +3,7 @@ package genesis
 import (
 	"errors"
 	"fmt"
+
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
@@ -23,6 +24,8 @@ const (
 	epochSizeFlag           = "epoch-size"
 	blockGasLimitFlag       = "block-gas-limit"
 	posFlag                 = "pos"
+	minNumValidators        = "min-validator-count"
+	maxNumValidators        = "max-validator-count"
 )
 
 // Legacy flags that need to be preserved for running clients
@@ -38,7 +41,7 @@ var (
 	errValidatorsNotSpecified         = errors.New("validator information not specified")
 	errValidatorsSpecifiedIncorrectly = errors.New("validator information specified through mutually exclusive flags")
 	errUnsupportedConsensus           = errors.New("specified consensusRaw not supported")
-	errMissingBootnode                = errors.New("at least 1 bootnode is required")
+	errMissingBootnode                = errors.New("at least 1 BootNode is required")
 	errInvalidEpochSize               = errors.New("epoch size must be greater than 1")
 )
 
@@ -57,6 +60,9 @@ type genesisParams struct {
 	epochSize     uint64
 	blockGasLimit uint64
 	isPos         bool
+
+	minNumValidators uint32
+	maxNumValidators uint32
 
 	extraData []byte
 	consensus server.ConsensusType
@@ -262,7 +268,11 @@ func (p *genesisParams) shouldPredeployStakingSC() bool {
 }
 
 func (p *genesisParams) predeployStakingSC() (*chain.GenesisAccount, error) {
-	stakingAccount, predeployErr := stakingHelper.PredeployStakingSC(p.ibftValidators)
+	stakingAccount, predeployErr := stakingHelper.PredeployStakingSC(p.ibftValidators,
+		stakingHelper.PredeployParams{
+			MinValidatorCount: p.minNumValidators,
+			MaxValidatorCount: p.maxNumValidators,
+		})
 	if predeployErr != nil {
 		return nil, predeployErr
 	}

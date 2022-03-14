@@ -272,11 +272,11 @@ func (t *TestServer) GenerateGenesis() error {
 		args = append(args, "--pos")
 
 		if t.Config.MinValidatorCount == 0 {
-			t.Config.MinValidatorCount = uint32(stakingHelper.MinValidatorCount)
+			t.Config.MinValidatorCount = stakingHelper.MinValidatorCount
 		}
 
 		if t.Config.MaxValidatorCount == 0 {
-			t.Config.MaxValidatorCount = uint32(stakingHelper.MaxValidatorCount)
+			t.Config.MaxValidatorCount = stakingHelper.MaxValidatorCount
 		}
 
 		args = append(args, "--min-validator-count", strconv.FormatUint(uint64(t.Config.MinValidatorCount), 10))

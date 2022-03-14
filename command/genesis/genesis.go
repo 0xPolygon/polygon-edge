@@ -128,21 +128,17 @@ func setFlags(cmd *cobra.Command) {
 			command.DefaultGenesisGasLimit,
 		),
 	)
-	cmd.Flags().Uint64Var(
-		&params.minNumValidator,
-		minNumValidator,
+	cmd.Flags().Uint32Var(
+		&params.minNumValidators,
+		minNumValidators,
 		1,
-		fmt.Sprintf(
-			"the minimum number of validators in the validator set for PoS.",
-		),
+		"the minimum number of validators in the validator set for PoS.",
 	)
-	cmd.Flags().Uint64Var(
-		&params.maxNumValidator,
-		maxNumValidator,
+	cmd.Flags().Uint32Var(
+		&params.maxNumValidators,
+		maxNumValidators,
 		math.MaxUint32,
-		fmt.Sprintf(
-			"the maximum number of validators in the validator set for PoS.",
-		),
+		"the maximum number of validators in the validator set for PoS.",
 	)
 }
 

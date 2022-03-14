@@ -3,7 +3,6 @@ package ibft
 import (
 	"errors"
 	"fmt"
-
 	"github.com/0xPolygon/polygon-edge/contracts/staking"
 	stakingHelper "github.com/0xPolygon/polygon-edge/helper/staking"
 	"github.com/0xPolygon/polygon-edge/state"
@@ -146,7 +145,10 @@ func (pos *PoSMechanism) preStateCommitHook(rawParams interface{}) error {
 	}
 
 	// Deploy Staking contract
-	contractState, err := stakingHelper.PredeployStakingSC(nil, stakingHelper.PredeployParams{})
+	contractState, err := stakingHelper.PredeployStakingSC(nil, stakingHelper.PredeployParams{
+		MinValidatorCount: stakingHelper.MinValidatorCount,
+		MaxValidatorCount: stakingHelper.MaxValidatorCount,
+	})
 	if err != nil {
 		return err
 	}
