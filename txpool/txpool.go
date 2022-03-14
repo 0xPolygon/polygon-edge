@@ -673,28 +673,17 @@ func (p *TxPool) resetAccounts(stateNonces map[types.Address]uint64) {
 
 	//	prune all accounts
 	p.accounts.Range(func(key, value interface{}) bool {
-		addr, ok := key.(types.Address)
-		if !ok {
-			p.logger.Error("failed type casting")
-
-			return false
-		}
+		addr, _ := key.(types.Address) //nolint:forcetypeassert
+		account, _ := value.(*account) //nolint:forcetypeassert
 
 		newNonce, ok := stateNonces[addr]
 		if !ok {
-			//	no updates for this account
+			// no updates for this account
 			return true
 		}
 
-		account, ok := value.(*account)
-		if !ok {
-			p.logger.Error("failed type casting")
-
-			return false
-		}
-
 		//	prune stale txs
-		prunedEnqueued, prunedPromoted := account.reset(newNonce)
+		prunedEnqueued, prunedPromoted := account.reset(newNonce, p.promoteReqCh)
 
 		//	update result
 		allPrunedEnqueued = append(
@@ -706,13 +695,6 @@ func (p *TxPool) resetAccounts(stateNonces map[types.Address]uint64) {
 			allPrunedPromoted,
 			prunedPromoted...,
 		)
-
-		//	check if account is ready for promotion
-		if first := account.enqueued.peek(); first != nil &&
-			first.Nonce == newNonce {
-			// first enqueued tx is expected -> signal promotion
-			p.promoteReqCh <- promoteRequest{account: addr}
-		}
 
 		return true
 	})

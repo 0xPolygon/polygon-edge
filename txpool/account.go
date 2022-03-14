@@ -162,7 +162,7 @@ func (a *account) setNonce(nonce uint64) {
 	atomic.StoreUint64(&a.nextNonce, nonce)
 }
 
-func (a *account) reset(nonce uint64) (
+func (a *account) reset(nonce uint64, promoteCh chan<- promoteRequest) (
 	prunedPromoted,
 	prunedEnqueued []*types.Transaction,
 ) {
@@ -191,6 +191,15 @@ func (a *account) reset(nonce uint64) (
 
 	//	update nonce expected for this account
 	a.setNonce(nonce)
+
+	//	it is important to signal promotion while
+	//	the locks are held to ensure no other
+	//	handler will mutate the account
+	if first := a.enqueued.peek(); first != nil &&
+		first.Nonce == nonce {
+		// first enqueued tx is expected -> signal promotion
+		promoteCh <- promoteRequest{account: first.From}
+	}
 
 	return
 }
