@@ -28,7 +28,7 @@ require (
 	github.com/onsi/ginkgo v1.16.5 // indirect
 	github.com/prometheus/client_golang v1.12.1
 	github.com/ryanuber/columnize v2.1.2+incompatible
-	github.com/spf13/cobra v1.3.0
+	github.com/spf13/cobra v1.4.0
 	github.com/stretchr/testify v1.7.0
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
 	github.com/umbracle/fastrlp v0.0.0-20211229195328-c1416904ae17
@@ -41,14 +41,20 @@ require (
 )
 
 require (
+	github.com/armon/go-metrics v0.3.10 // indirect
 	github.com/aws/aws-sdk-go v1.43.17
 	github.com/benbjohnson/clock v1.3.0 // indirect
+	github.com/fatih/color v1.13.0 // indirect
+	github.com/fsnotify/fsnotify v1.5.1 // indirect
 	github.com/godbus/dbus/v5 v5.0.6 // indirect
 	github.com/ipfs/go-cid v0.1.0 // indirect
 	github.com/klauspost/compress v1.14.2 // indirect
+	github.com/mattn/go-colorable v0.1.12 // indirect
+	github.com/mitchellh/mapstructure v1.4.3 // indirect
 	github.com/valyala/fastjson v1.6.3 // indirect
 	go.uber.org/zap v1.20.0 // indirect
 	golang.org/x/sys v0.0.0-20220227234510-4e6760a101f9 // indirect
 	golang.org/x/tools v0.1.9 // indirect
+	google.golang.org/genproto v0.0.0-20211208223120-3a66f561d7aa // indirect
 	lukechampine.com/blake3 v1.1.7 // indirect
 )
