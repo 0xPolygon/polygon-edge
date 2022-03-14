@@ -41,7 +41,7 @@ require (
 )
 
 require (
-	github.com/aws/aws-sdk-go v1.43.13
+	github.com/aws/aws-sdk-go v1.43.17
 	github.com/benbjohnson/clock v1.3.0 // indirect
 	github.com/godbus/dbus/v5 v5.0.6 // indirect
 	github.com/ipfs/go-cid v0.1.0 // indirect
