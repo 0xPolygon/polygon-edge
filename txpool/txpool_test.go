@@ -1188,10 +1188,7 @@ func TestResetAccounts_Promoted(t *testing.T) {
 		for _, tx := range txs {
 			totalTx++
 
-			go func(tx *types.Transaction) {
-				err := pool.addTx(local, tx)
-				assert.NoError(t, err)
-			}(tx)
+			assert.NoError(t, pool.addTx(local, tx))
 		}
 	}
 
