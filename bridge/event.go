@@ -2,11 +2,17 @@ package bridge
 
 import (
 	"errors"
-
+	"fmt"
 	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/go-web3"
+)
+
+var (
+	ErrInvalidID              = errors.New("id isn't in event or wrong type")
+	ErrInvalidContractAddress = errors.New("contractAddress isn't in event or wrong type")
+	ErrInvalidData            = errors.New("data isn't in event or wrong type")
 )
 
 type StateSyncEvent struct {
@@ -30,17 +36,17 @@ func ParseStateSyncEvent(log *web3.Log) (*StateSyncEvent, error) {
 
 	id, ok = event["id"].(*big.Int)
 	if !ok {
-		return nil, errors.New("failed to parse ID in StateSyncedEvent")
+		return nil, fmt.Errorf("failed to parse StateSyncEvent: %w", ErrInvalidID)
 	}
 
 	contractAddr, ok = event["contractAddress"].(web3.Address)
 	if !ok {
-		return nil, errors.New("failed to parse contractAddress in StateSyncedEvent")
+		return nil, fmt.Errorf("failed to parse StateSyncEvent: %w", ErrInvalidContractAddress)
 	}
 
 	data, ok = event["data"].([]uint8)
 	if !ok {
-		return nil, errors.New("failed to parse data in StateSyncedEvent")
+		return nil, fmt.Errorf("failed to parse StateSyncEvent: %w", ErrInvalidData)
 	}
 
 	return &StateSyncEvent{
