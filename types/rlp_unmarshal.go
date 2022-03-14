@@ -241,7 +241,7 @@ func (r *Receipt) UnmarshalRLP(input []byte) error {
 	txType := TxTypeLegacy
 	offset := 0
 
-	if len(input) > 0 && input[0] <= 0x7F {
+	if len(input) > 0 && input[0] <= RLPSingleByteUpperLimit {
 		var err error
 		if txType, err = ToTransactionType(input[0]); err != nil {
 			return err
@@ -354,7 +354,7 @@ func (t *Transaction) UnmarshalRLP(input []byte) error {
 	txType := TxTypeLegacy
 	offset := 0
 
-	if len(input) > 0 && input[0] <= 0x7F {
+	if len(input) > 0 && input[0] <= RLPSingleByteUpperLimit {
 		var err error
 		if txType, err = ToTransactionType(input[0]); err != nil {
 			return err

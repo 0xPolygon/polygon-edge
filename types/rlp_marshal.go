@@ -4,6 +4,10 @@ import (
 	"github.com/umbracle/fastrlp"
 )
 
+const (
+	RLPSingleByteUpperLimit = 0x7f
+)
+
 type RLPMarshaler interface {
 	MarshalRLPTo(dst []byte) []byte
 }

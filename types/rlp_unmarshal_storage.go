@@ -82,7 +82,7 @@ func (b *Body) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 func (t *Transaction) UnmarshalStoreRLP(input []byte) error {
 	txType := TxTypeLegacy
 
-	if len(input) > 0 && input[0] <= 0x7F {
+	if len(input) > 0 && input[0] <= RLPSingleByteUpperLimit {
 		var err error
 		if txType, err = ToTransactionType(input[0]); err != nil {
 			return err
@@ -197,7 +197,7 @@ func (r *Receipts) UnmarshalStoreRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) er
 func (r *Receipt) UnmarshalStoreRLP(input []byte) error {
 	txType := TxTypeLegacy
 
-	if len(input) > 0 && input[0] <= 0x7F {
+	if len(input) > 0 && input[0] <= RLPSingleByteUpperLimit {
 		var err error
 		if txType, err = ToTransactionType(input[0]); err != nil {
 			return err
