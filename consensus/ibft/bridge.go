@@ -144,7 +144,7 @@ func (b *BridgeMechanism) consumeStateTransactionsHook(numberParam interface{}) 
 }
 
 func (b *BridgeMechanism) calculateSignatureThreshold(set ValidatorSet) uint64 {
-	return uint64(set.Len())
+	return uint64(b.ibft.state.NumValid())
 }
 
 // initializeHookMap registers the hooks that the Bridge mechanism
