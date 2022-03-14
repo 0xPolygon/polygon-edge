@@ -84,7 +84,7 @@ func (i *identity) setup() {
 	proto.RegisterIdentityServer(grpc.GrpcServer(), i)
 	grpc.Serve()
 
-	i.srv.Register(identityProtoV1, grpc)
+	i.srv.RegisterProtocol(identityProtoV1, grpc)
 
 	// register callback messages to notify from new peers
 	// need to start our handshake protocol immediately but don't want to connect to any peer until initialized

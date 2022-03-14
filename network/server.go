@@ -313,7 +313,7 @@ func (s *Server) checkPeerConnections() {
 		}
 
 		if s.numPeers() < MinimumPeerConnections {
-			if s.config.NoDiscover || len(s.discovery.bootnodes) == 0 {
+			if s.config.NoDiscover || len(s.discovery.bootnodes.bootnodeArr) == 0 {
 				//TODO: dial peers from the peerstore
 			} else {
 				randomNode := s.getRandomBootNode()
@@ -389,20 +389,14 @@ func (s *Server) numPeers() int64 {
 }
 
 func (s *Server) getRandomBootNode() *peer.AddrInfo {
-	if size := int64(len(s.discovery.bootnodes)); size > 0 {
-		randNum, _ := rand.Int(rand.Reader, big.NewInt(size))
-
-		return s.discovery.bootnodes[randNum.Int64()]
-	}
-
-	return nil
+	return s.discovery.bootnodes.getRandomBootnode()
 }
 
 // getBootNode returns the address of a random bootnode which is not connected
 func (s *Server) getBootNode() *peer.AddrInfo {
 	nonConnectedNodes := make([]*peer.AddrInfo, 0)
 
-	for _, v := range s.discovery.bootnodes {
+	for _, v := range s.discovery.bootnodes.bootnodeArr {
 		if !s.hasPeer(v.ID) {
 			nonConnectedNodes = append(nonConnectedNodes, v)
 		}
@@ -498,8 +492,8 @@ func (s *Server) addPeer(id peer.ID, direction network.Direction) {
 		atomic.AddInt64(&s.inboundConnCount, 1)
 	}
 
-	if !s.config.NoDiscover && s.discovery.isBootNode(id) {
-		atomic.AddInt32(&s.discovery.bootnodeConnCount, 1)
+	if !s.config.NoDiscover && s.discovery.isBootnode(id) {
+		atomic.AddInt32(&s.discovery.bootnodes.bootnodeConnCount, 1)
 	}
 
 	s.emitEvent(id, PeerConnected)
@@ -517,8 +511,8 @@ func (s *Server) delPeer(id peer.ID) {
 			atomic.AddInt64(&s.inboundConnCount, -1)
 		}
 
-		if !s.config.NoDiscover && s.discovery.isBootNode(id) {
-			atomic.AddInt32(&s.discovery.bootnodeConnCount, -1)
+		if !s.config.NoDiscover && s.discovery.isBootnode(id) {
+			atomic.AddInt32(&s.discovery.bootnodes.bootnodeConnCount, -1)
 		}
 
 		delete(s.peers, id)
@@ -660,11 +654,12 @@ type Protocol interface {
 	Handler() func(network.Stream)
 }
 
-func (s *Server) Register(id string, p Protocol) {
+func (s *Server) RegisterProtocol(id string, p Protocol) {
 	s.protocolsLock.Lock()
+	defer s.protocolsLock.Unlock()
+
 	s.protocols[id] = p
 	s.wrapStream(id, p.Handler())
-	s.protocolsLock.Unlock()
 }
 
 func (s *Server) wrapStream(id string, handle func(network.Stream)) {

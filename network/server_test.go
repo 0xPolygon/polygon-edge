@@ -588,7 +588,7 @@ func TestSelfConnection_WithBootNodes(t *testing.T) {
 				t.Fatalf("Unable to create server, %v", createErr)
 			}
 
-			assert.Equal(t, tt.expectedList, server.discovery.bootnodes)
+			assert.Equal(t, tt.expectedList, server.discovery.bootnodes.bootnodeArr)
 		})
 	}
 }

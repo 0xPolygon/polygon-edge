@@ -362,7 +362,7 @@ func (s *Syncer) Start() {
 	grpcStream := libp2pGrpc.NewGrpcStream()
 	proto.RegisterV1Server(grpcStream.GrpcServer(), s.serviceV1)
 	grpcStream.Serve()
-	s.server.Register(syncerV1, grpcStream)
+	s.server.RegisterProtocol(syncerV1, grpcStream)
 
 	s.setupPeers()
 
