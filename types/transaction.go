@@ -13,9 +13,12 @@ import (
 type TransactionType uint8
 
 const (
+	// TxTypeAccessList and TxTypeDynamicFee have been added in Ethereum, but Edge doesn't support at the moment
+	// Keep both types for future work
+
 	TxTypeLegacy TransactionType = 0x0
-	// TxTypeAccessList TransactionType = 0x1
-	// TxTypeDynamicFee TransactionType = 0x2
+	// TxTypeAccessList TransactionType = 0x1 // EIP-2930
+	// TxTypeDynamicFee TransactionType = 0x2 // EIP-1559
 	TxTypeState TransactionType = 0x7f
 )
 
