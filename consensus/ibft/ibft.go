@@ -300,8 +300,7 @@ func (i *Ibft) setupMechanism() error {
 	}
 
 	if i.bridge != nil {
-		bridgeMechanism, _ := BridgeFactory(i)
-
+		bridgeMechanism, err := BridgeFactory(i)
 		if err != nil {
 			return err
 		}
