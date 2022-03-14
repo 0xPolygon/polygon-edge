@@ -679,24 +679,32 @@ func (p *TxPool) resetAccounts(stateNonces map[types.Address]uint64) {
 
 		newNonce, ok := stateNonces[addr]
 		if !ok {
+			//	no updates for this account
 			return true
 		}
 
-		account := p.accounts.get(addr)
+		account, ok := value.(*account)
+		if !ok {
+			p.logger.Error("failed type casting")
+			return false
+		}
 
 		account.promoted.lock(true)
 		defer account.promoted.unlock()
 
+		//	prune the promoted txs
 		promoted, _ := account.promoted.prune(newNonce)
 		prunedPromoted = append(prunedPromoted, promoted...)
 
 		if newNonce <= account.getNonce() {
+			// only the promoted queue needed pruning
 			return true
 		}
 
 		account.enqueued.lock(true)
 		defer account.enqueued.unlock()
 
+		//	prune the enqueued txs
 		enqueued, _ := account.enqueued.prune(newNonce)
 		prunedEnqueued = append(prunedEnqueued, enqueued...)
 
