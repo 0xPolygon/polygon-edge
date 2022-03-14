@@ -666,8 +666,10 @@ func (p *TxPool) addGossipTx(obj interface{}) {
 
 // resetAccounts updates existing accounts with the new nonce.
 func (p *TxPool) resetAccounts(stateNonces map[types.Address]uint64) {
-	prunedEnqueued := make([]*types.Transaction, 0)
-	prunedPromoted := make([]*types.Transaction, 0)
+	var (
+		allPrunedEnqueued []*types.Transaction
+		allPrunedPromoted []*types.Transaction
+	)
 
 	//	prune all accounts
 	p.accounts.Range(func(key, value interface{}) bool {
@@ -689,32 +691,21 @@ func (p *TxPool) resetAccounts(stateNonces map[types.Address]uint64) {
 			return false
 		}
 
-		account.promoted.lock(true)
-		defer account.promoted.unlock()
+		//	prune stale txs
+		prunedEnqueued, prunedPromoted := account.reset(newNonce)
 
-		//	prune the promoted txs
-		prunedPromoted = append(
-			prunedPromoted,
-			account.promoted.prune(newNonce)...,
+		//	update result
+		allPrunedEnqueued = append(
+			allPrunedEnqueued,
+			prunedEnqueued...,
 		)
 
-		if newNonce <= account.getNonce() {
-			// only the promoted queue needed pruning
-			return true
-		}
-
-		account.enqueued.lock(true)
-		defer account.enqueued.unlock()
-
-		//	prune the enqueued txs
-		prunedEnqueued = append(
-			prunedEnqueued,
-			account.enqueued.prune(newNonce)...,
+		allPrunedPromoted = append(
+			allPrunedPromoted,
+			prunedPromoted...,
 		)
 
-		//	update nonce expected for this account
-		account.setNonce(newNonce)
-
+		//	check if account is ready for promotion
 		if first := account.enqueued.peek(); first != nil &&
 			first.Nonce == newNonce {
 			// first enqueued tx is expected -> signal promotion
@@ -725,26 +716,25 @@ func (p *TxPool) resetAccounts(stateNonces map[types.Address]uint64) {
 	})
 
 	//	update state
-	if len(prunedPromoted) > 0 {
-		p.index.remove(prunedPromoted...)
-		p.gauge.decrease(slotsRequired(prunedPromoted...))
+	if len(allPrunedPromoted) > 0 {
+		p.index.remove(allPrunedPromoted...)
+		p.gauge.decrease(slotsRequired(allPrunedPromoted...))
 		p.eventManager.signalEvent(
 			proto.EventType_PRUNED_PROMOTED,
-			toHash(prunedPromoted...)...,
+			toHash(allPrunedPromoted...)...,
 		)
 
-		p.metrics.PendingTxs.Add(float64(-1 * len(prunedPromoted)))
+		p.metrics.PendingTxs.Add(float64(-1 * len(allPrunedPromoted)))
 	}
 
-	if len(prunedEnqueued) > 0 {
-		p.index.remove(prunedEnqueued...)
-		p.gauge.decrease(slotsRequired(prunedEnqueued...))
+	if len(allPrunedEnqueued) > 0 {
+		p.index.remove(allPrunedEnqueued...)
+		p.gauge.decrease(slotsRequired(allPrunedEnqueued...))
 		p.eventManager.signalEvent(
 			proto.EventType_PRUNED_ENQUEUED,
-			toHash(prunedEnqueued...)...,
+			toHash(allPrunedEnqueued...)...,
 		)
 	}
-
 }
 
 // resetAccount aligns the account's state with the given nonce,

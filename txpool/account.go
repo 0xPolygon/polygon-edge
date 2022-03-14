@@ -162,6 +162,39 @@ func (a *account) setNonce(nonce uint64) {
 	atomic.StoreUint64(&a.nextNonce, nonce)
 }
 
+func (a *account) reset(nonce uint64) (
+	prunedPromoted,
+	prunedEnqueued []*types.Transaction) {
+
+	a.promoted.lock(true)
+	defer a.promoted.unlock()
+
+	//	prune the promoted txs
+	prunedPromoted = append(
+		prunedPromoted,
+		a.promoted.prune(nonce)...,
+	)
+
+	if nonce <= a.getNonce() {
+		// only the promoted queue needed pruning
+		return
+	}
+
+	a.enqueued.lock(true)
+	defer a.enqueued.unlock()
+
+	//	prune the enqueued txs
+	prunedEnqueued = append(
+		prunedEnqueued,
+		a.enqueued.prune(nonce)...,
+	)
+
+	//	update nonce expected for this account
+	a.setNonce(nonce)
+
+	return
+}
+
 // enqueue attempts tp push the transaction onto the enqueued queue.
 func (a *account) enqueue(tx *types.Transaction) error {
 	a.enqueued.lock(true)
