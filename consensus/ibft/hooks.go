@@ -20,7 +20,7 @@ const (
 	PoS MechanismType = "PoS"
 
 	// Bridge defines Bridge type
-	// Bridge allows to include StateTransactions into block
+	// Bridge allows the inclusion of StateTransactions into a block
 	Bridge MechanismType = "Bridge"
 )
 
