@@ -671,7 +671,9 @@ func TestResetAccount(t *testing.T) {
 				assert.Equal(t, uint64(0), pool.accounts.get(addr1).enqueued.length())
 				assert.Equal(t, uint64(len(test.txs)), pool.accounts.get(addr1).promoted.length())
 
-				pool.resetAccount(addr1, test.newNonce)
+				pool.resetAccounts(map[types.Address]uint64{
+					addr1: test.newNonce,
+				})
 
 				assert.Equal(t, test.expected.slots, pool.gauge.read())
 				assert.Equal(t, // enqueued
@@ -785,10 +787,14 @@ func TestResetAccount(t *testing.T) {
 				assert.Equal(t, uint64(0), pool.accounts.get(addr1).promoted.length())
 
 				if test.signal {
-					go pool.resetAccount(addr1, test.newNonce)
+					go pool.resetAccounts(map[types.Address]uint64{
+						addr1: test.newNonce,
+					})
 					pool.handlePromoteRequest(<-pool.promoteReqCh)
 				} else {
-					pool.resetAccount(addr1, test.newNonce)
+					pool.resetAccounts(map[types.Address]uint64{
+						addr1: test.newNonce,
+					})
 				}
 
 				assert.Equal(t, test.expected.slots, pool.gauge.read())
@@ -940,10 +946,14 @@ func TestResetAccount(t *testing.T) {
 				pool.handlePromoteRequest(req)
 
 				if test.signal {
-					go pool.resetAccount(addr1, test.newNonce)
+					go pool.resetAccounts(map[types.Address]uint64{
+						addr1: test.newNonce,
+					})
 					pool.handlePromoteRequest(<-pool.promoteReqCh)
 				} else {
-					pool.resetAccount(addr1, test.newNonce)
+					pool.resetAccounts(map[types.Address]uint64{
+						addr1: test.newNonce,
+					})
 				}
 
 				assert.Equal(t, test.expected.slots, pool.gauge.read())
