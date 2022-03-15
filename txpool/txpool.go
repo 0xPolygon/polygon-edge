@@ -664,7 +664,7 @@ func (p *TxPool) addGossipTx(obj interface{}) {
 	}
 }
 
-// resetAccounts updates existing accounts with the new nonce.
+// resetAccounts updates existing accounts with the new nonce and prunes stale transactions.
 func (p *TxPool) resetAccounts(stateNonces map[types.Address]uint64) {
 	allPrunedPromoted, allPrunedEnqueued := p.accounts.resetWithNonce(stateNonces, p.promoteReqCh)
 
@@ -689,54 +689,6 @@ func (p *TxPool) resetAccounts(stateNonces map[types.Address]uint64) {
 		)
 	}
 }
-
-// resetAccount aligns the account's state with the given nonce,
-// pruning any present stale transaction. If, afterwards, the account
-// is eligible for promotion, a promoteRequest is signaled.
-//func (p *TxPool) resetAccount(addr types.Address, nonce uint64) {
-//	account := p.accounts.get(addr)
-//
-//	// prune promoted
-//	pruned, prunedHashes := account.promoted.prune(nonce)
-//
-//	// update pool state
-//	p.index.remove(pruned...)
-//	p.gauge.decrease(slotsRequired(pruned...))
-//
-//	p.eventManager.signalEvent(
-//		proto.EventType_PRUNED_PROMOTED,
-//		prunedHashes...,
-//	)
-//
-//	// update metrics
-//	p.metrics.PendingTxs.Add(float64(-1 * len(pruned)))
-//
-//	if nonce <= account.getNonce() {
-//		// only the promoted queue needed pruning
-//		return
-//	}
-//
-//	// prune enqueued
-//	pruned, prunedHashes = account.enqueued.prune(nonce)
-//
-//	// update pool state
-//	p.index.remove(pruned...)
-//	p.gauge.decrease(slotsRequired(pruned...))
-//
-//	// update next nonce
-//	account.setNonce(nonce)
-//
-//	p.eventManager.signalEvent(
-//		proto.EventType_PRUNED_ENQUEUED,mis
-//		prunedHashes...,
-//	)
-//
-//	if first := account.enqueued.peek(); first != nil &&
-//		first.Nonce == nonce {
-//		// first enqueued tx is expected -> signal promotion
-//		p.promoteReqCh <- promoteRequest{account: addr}
-//	}
-//}
 
 // createAccountOnce creates an account and
 // ensures it is only initialized once.
