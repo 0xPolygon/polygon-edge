@@ -35,7 +35,7 @@ type TestServerConfig struct {
 	IBFTDir                      string               // The name of data directory for IBFT
 	PremineAccts                 []*SrvAccount        // Accounts with existing balances (genesis accounts)
 	GenesisValidatorBalance      *big.Int             // Genesis balance for the validators
-	DevStakers                   []types.Address      // List of initial staking addresses for the staking SC with dev consensus
+	DevStakers                   []types.Address      // List of initial stakers for the staking SC with dev consensus
 	Consensus                    ConsensusType        // Consensus MechanismType
 	Bootnodes                    []string             // Bootnode Addresses
 	PriceLimit                   *uint64              // Minimum gas price limit to enforce for acceptance into the pool
