@@ -126,6 +126,7 @@ func TestBridge_StateSync(t *testing.T) {
 		func(i int, config *framework.TestServerConfig) {
 			config.Premine(senderAddr, framework.EthToWei(10))
 			config.SetSeal(true)
+			config.SetShowsLog(i == 0)
 		})
 
 	startSourceIBFTCtx, startSourceIBFTCancel := context.WithTimeout(context.Background(), time.Minute)
@@ -154,6 +155,7 @@ func TestBridge_StateSync(t *testing.T) {
 			config.SetBridgeRootChainURL(sourceIBFT.GetServer(0).WSJSONRPCAddr())
 			config.SetBridgeRootChainContract(syncerContractAddr.String())
 			config.SetBridgeRootChainConfirmations(5)
+			config.SetShowsLog(i == 0)
 		})
 
 	startDestIBFTCtx, startDestIBFTCancel := context.WithTimeout(context.Background(), time.Minute)
@@ -177,42 +179,48 @@ func TestBridge_StateSync(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// syncData is sent to StateSync contract and forwarded to StateReceiver
-	syncData := "hello"
+	// testSync is a helper function to bridge state between 2 chains
+	testSync := func(t *testing.T, syncData string) {
+		t.Helper()
 
-	// Send state sync contract
-	to := types.BytesToAddress(syncerContractAddr[:])
-	input, err := StateSyncerABI.Methods["stateSync"].Encode(map[string]interface{}{
-		"contractAddress": reciverContractAddr.String(),
-		"data":            []byte(syncData),
-	})
+		// Send state sync contract
+		to := types.BytesToAddress(syncerContractAddr[:])
+		input, err := StateSyncerABI.Methods["stateSync"].Encode(map[string]interface{}{
+			"contractAddress": reciverContractAddr.String(),
+			"data":            []byte(syncData),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	if err != nil {
-		t.Fatal(err)
+		sendStateSyncCtx, sendStateSyncCancel := context.WithTimeout(context.Background(), time.Minute)
+		defer sendStateSyncCancel()
+
+		_, err = sourceIBFT.GetServer(0).SendRawTx(sendStateSyncCtx, &framework.PreparedTransaction{
+			Gas:      framework.DefaultGasLimit,
+			GasPrice: big.NewInt(framework.DefaultGasPrice),
+			To:       &to,
+			From:     senderAddr,
+			Input:    input,
+		}, senderKey)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = waitUntilStateReachesToContract(
+			context.Background(),
+			destIBFT.GetServer(0),
+			senderAddr,
+			reciverContractAddr,
+			syncData,
+		)
+		assert.NoError(t, err)
 	}
 
-	sendStateSyncCtx, sendStateSyncCancel := context.WithTimeout(context.Background(), time.Minute)
-	defer sendStateSyncCancel()
+	testSync(t, "hello")
+	testSync(t, "hello, world")
+	testSync(t, "hello") // duplicate data
 
-	_, err = sourceIBFT.GetServer(0).SendRawTx(sendStateSyncCtx, &framework.PreparedTransaction{
-		Gas:      framework.DefaultGasLimit,
-		GasPrice: big.NewInt(framework.DefaultGasPrice),
-		To:       &to,
-		From:     senderAddr,
-		Input:    input,
-	}, senderKey)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = waitUntilStateReachesToContract(
-		context.Background(),
-		destIBFT.GetServer(0),
-		senderAddr,
-		reciverContractAddr,
-		syncData,
-	)
-	assert.NoError(t, err)
 }
 
 // waitUntilStateReachesToContract repeats to get state in StateReceiver contract until expected state is set
