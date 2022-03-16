@@ -43,7 +43,7 @@ import (
 type TestServerConfigCallback func(*TestServerConfig)
 
 const (
-	serverIP    = "0.0.0.0"
+	serverIP    = "127.0.0.1"
 	initialPort = 12000
 	binaryName  = "polygon-edge"
 )
