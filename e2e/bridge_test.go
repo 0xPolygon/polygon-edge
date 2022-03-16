@@ -187,6 +187,7 @@ func TestBridge_StateSync(t *testing.T) {
 			"contractAddress": reciverContractAddr.String(),
 			"data":            []byte(syncData),
 		})
+
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -218,7 +219,6 @@ func TestBridge_StateSync(t *testing.T) {
 	testSync(t, "hello")
 	testSync(t, "hello, world")
 	testSync(t, "hello") // duplicate data
-
 }
 
 // waitUntilStateReachesToContract repeats to get state in StateReceiver contract until expected state is set
