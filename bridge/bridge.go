@@ -223,9 +223,6 @@ func (b *bridge) addLocalMessage(msg *Message) error {
 		return err
 	}
 
-	// reset transaction nonce
-	msg.Transaction.Nonce = 0
-
 	b.sampool.AddMessage(&sam.Message{
 		Hash: hash,
 		Data: msg,
@@ -236,6 +233,8 @@ func (b *bridge) addLocalMessage(msg *Message) error {
 		Address:   b.signer.Address(),
 		Signature: signature,
 	})
+
+	b.logger.Info("added local signature to SAM Pool", "hash", hash)
 
 	signedMessage := &transport.SignedMessage{
 		Hash:      hash,
@@ -274,6 +273,8 @@ func (b *bridge) addRemoteMessage(message *transport.SignedMessage) {
 		Address:   sender,
 		Signature: message.Signature,
 	})
+
+	b.logger.Info("added remote signature to SAM Pool", "hash", message.Hash, "from", sender)
 }
 
 func getMessageHash(msg *Message) types.Hash {
@@ -285,6 +286,7 @@ func getTransactionHash(tx *types.Transaction) types.Hash {
 		Type:  types.TxTypeState,
 		To:    tx.To,
 		Input: tx.Input,
+		Nonce: tx.Nonce,
 	}
 
 	return msgTx.ComputeHash().Hash

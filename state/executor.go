@@ -441,13 +441,6 @@ func (t *Transition) checkAndPreProcessNormalTransaction(txn *Txn, msg *types.Tr
 }
 
 func (t *Transition) checkAndPreProcessStateTransaction(msg *types.Transaction) (uint64, error) {
-	if msg.Nonce != 0 {
-		return 0, NewTransitionApplicationError(
-			errors.New("nonce of state transaction must be zero"),
-			true,
-		)
-	}
-
 	if msg.GasPrice.Cmp(big.NewInt(0)) != 0 {
 		return 0, NewTransitionApplicationError(
 			errors.New("gasPrice of state transaction must be zero"),

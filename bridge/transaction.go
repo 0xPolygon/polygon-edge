@@ -50,7 +50,6 @@ func NewStateSyncedTx(event *StateSyncEvent) *types.Transaction {
 		Type:  types.TxTypeState,
 		To:    &event.ContractAddress,
 		Input: data,
-		// To avoid hash collision for the events with same address and data
 		Nonce: event.ID.Uint64(),
 	}
 }
