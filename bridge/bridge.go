@@ -223,6 +223,9 @@ func (b *bridge) addLocalMessage(msg *Message) error {
 		return err
 	}
 
+	// reset transaction nonce
+	msg.Transaction.Nonce = 0
+
 	b.sampool.AddMessage(&sam.Message{
 		Hash: hash,
 		Data: msg,
