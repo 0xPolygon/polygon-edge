@@ -126,7 +126,6 @@ func TestBridge_StateSync(t *testing.T) {
 		func(i int, config *framework.TestServerConfig) {
 			config.Premine(senderAddr, framework.EthToWei(10))
 			config.SetSeal(true)
-			config.SetShowsLog(i == 0)
 		})
 
 	startSourceIBFTCtx, startSourceIBFTCancel := context.WithTimeout(context.Background(), time.Minute)
@@ -155,7 +154,6 @@ func TestBridge_StateSync(t *testing.T) {
 			config.SetBridgeRootChainURL(sourceIBFT.GetServer(0).WSJSONRPCAddr())
 			config.SetBridgeRootChainContract(syncerContractAddr.String())
 			config.SetBridgeRootChainConfirmations(5)
-			config.SetShowsLog(i == 0)
 		})
 
 	startDestIBFTCtx, startDestIBFTCancel := context.WithTimeout(context.Background(), time.Minute)
