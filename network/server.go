@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/0xPolygon/polygon-edge/network/common"
 	"github.com/0xPolygon/polygon-edge/network/connections"
+	"github.com/0xPolygon/polygon-edge/network/dial"
 	"github.com/0xPolygon/polygon-edge/network/discovery"
 	"github.com/0xPolygon/polygon-edge/network/grpc"
 	"github.com/0xPolygon/polygon-edge/network/proto"
@@ -73,7 +74,7 @@ type Server struct {
 
 	metrics *Metrics // reference for metrics tracking
 
-	dialQueue *dialQueue // queue used to asynchronously connect to peers
+	dialQueue *dial.DialQueue // queue used to asynchronously connect to peers
 
 	identity  *identity                   // service used for handshaking with peers
 	discovery *discovery.DiscoveryService // service used for discovering other peers
@@ -215,7 +216,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		addrs:            host.Addrs(),
 		peers:            map[peer.ID]*Peer{},
 		metrics:          config.Metrics,
-		dialQueue:        newDialQueue(),
+		dialQueue:        dial.NewDialQueue(),
 		closeCh:          make(chan struct{}),
 		emitterPeerEvent: emitter,
 		protocols:        map[string]Protocol{},
@@ -316,7 +317,7 @@ func (s *Server) setupDiscovery() error {
 
 	// Set the PeerRemoved event handler
 	routingTable.PeerRemoved = func(p peer.ID) {
-		s.dialQueue.del(p)
+		s.dialQueue.DeleteTask(p)
 	}
 
 	// Create an instance of the discovery service
@@ -456,24 +457,27 @@ func (s *Server) runDial() {
 		// is a blocking request. In the future we should try to make up to
 		// maxDials requests concurrently
 		for s.connectionCounts.HasFreeOutboundConn() {
-			tt := s.dialQueue.pop()
+			tt := s.dialQueue.PopTask()
 			if tt == nil {
 				// dial closed
 				return
 			}
 
-			s.logger.Debug("dial", "local", s.host.ID(), "addr", tt.addr.String())
+			taskInfo := tt.GetTaskInfo()
 
-			if s.isConnected(tt.addr.ID) {
+			s.logger.Debug("dial", "local", s.host.ID(), "addr", taskInfo.String())
+
+			if s.isConnected(taskInfo.ID) {
 				// the node is already connected, send an event to wake up
 				// any join watchers
-				s.emitEvent(tt.addr.ID, peerEvent.PeerAlreadyConnected)
+				s.emitEvent(taskInfo.ID, peerEvent.PeerAlreadyConnected)
 			} else {
 				// the connection process is async because it involves connection (here) +
 				// the handshake done in the identity service.
-				if err := s.host.Connect(context.Background(), *tt.addr); err != nil {
-					s.logger.Debug("failed to dial", "addr", tt.addr.String(), "err", err)
-					s.emitEvent(tt.addr.ID, peerEvent.PeerFailedToConnect)
+				if err := s.host.Connect(context.Background(), *taskInfo); err != nil {
+					s.logger.Debug("failed to dial", "addr", taskInfo.String(), "err", err)
+
+					s.emitEvent(taskInfo.ID, peerEvent.PeerFailedToConnect)
 				}
 			}
 		}
@@ -778,7 +782,7 @@ func (s *Server) AddrInfo() *peer.AddrInfo {
 }
 
 func (s *Server) addToDialQueue(addr *peer.AddrInfo, priority common.DialPriority) {
-	s.dialQueue.add(addr, priority)
+	s.dialQueue.AddTask(addr, priority)
 	s.emitEvent(addr.ID, peerEvent.PeerAddedToDialQueue)
 }
 
