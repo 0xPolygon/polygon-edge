@@ -42,7 +42,7 @@ type networkingServer interface {
 	GetRandomBootnode() *peer.AddrInfo
 
 	// GetBootnodeConnCount fetches the number of bootnode connections [Thread safe]
-	GetBootnodeConnCount() int32
+	GetBootnodeConnCount() int64
 
 	// PROTOCOL MANIPULATION //
 
@@ -71,8 +71,8 @@ type networkingServer interface {
 
 	// CONNECTION INFORMATION //
 
-	// GetAvailableOutboundConnections fetches the number of available outbound connection slots [Thread safe]
-	GetAvailableOutboundConnections() int64
+	// HasFreeOutboundConnections checks if there are available outbound connection slots [Thread safe]
+	HasFreeOutboundConnections() bool
 }
 
 // DiscoveryService is a service that finds other peers in the network
@@ -315,7 +315,7 @@ func (d *DiscoveryService) startDiscovery() {
 // regularPeerDiscovery grabs a random peer from the list of
 // connected peers, and attempts to find / connect to their peer set
 func (d *DiscoveryService) regularPeerDiscovery() {
-	if d.baseServer.GetAvailableOutboundConnections() < 1 {
+	if !d.baseServer.HasFreeOutboundConnections() {
 		// No need to do peer discovery if no open connection slots
 		// are available
 		return
@@ -344,7 +344,7 @@ func (d *DiscoveryService) regularPeerDiscovery() {
 // bootnodeDiscovery queries a random (unconnected) bootnode for new peers
 // and adds them to the routing table
 func (d *DiscoveryService) bootnodePeerDiscovery() {
-	if d.baseServer.GetAvailableOutboundConnections() < 1 {
+	if !d.baseServer.HasFreeOutboundConnections() {
 		// No need to attempt bootnode dialing, since no
 		// open outbound slots are left
 		return

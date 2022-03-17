@@ -6,18 +6,17 @@ import (
 	"errors"
 	"fmt"
 	"github.com/0xPolygon/polygon-edge/network/common"
+	"github.com/0xPolygon/polygon-edge/network/connections"
 	"github.com/0xPolygon/polygon-edge/network/discovery"
 	"github.com/0xPolygon/polygon-edge/network/grpc"
 	"github.com/0xPolygon/polygon-edge/network/proto"
 	"github.com/libp2p/go-libp2p-core/peerstore"
 	kb "github.com/libp2p/go-libp2p-kbucket"
 	"math/big"
-	"net"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/chain"
 	peerEvent "github.com/0xPolygon/polygon-edge/network/event"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/hashicorp/go-hclog"
@@ -60,75 +59,49 @@ var (
 	ErrMinBootnodes = errors.New("minimum 1 bootnode is required")
 )
 
-type Config struct {
-	NoDiscover       bool
-	Addr             *net.TCPAddr
-	NatAddr          net.IP
-	DNS              multiaddr.Multiaddr
-	DataDir          string
-	MaxPeers         int64
-	MaxInboundPeers  int64
-	MaxOutboundPeers int64
-	Chain            *chain.Chain
-	SecretsManager   secrets.SecretsManager
-	Metrics          *Metrics
-}
-
-func DefaultConfig() *Config {
-	return &Config{
-		NoDiscover:       false,
-		Addr:             &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: DefaultLibp2pPort},
-		MaxPeers:         40,
-		MaxInboundPeers:  32,
-		MaxOutboundPeers: 8,
-	}
-}
-
 type Server struct {
-	logger hclog.Logger
-	config *Config
+	logger hclog.Logger // the logger
+	config *Config      // the base networking server configuration
 
-	closeCh chan struct{}
+	closeCh chan struct{} // the channel used for closing the networking server
 
-	host  host.Host
-	addrs []multiaddr.Multiaddr
+	host  host.Host             // the libp2p host reference
+	addrs []multiaddr.Multiaddr // the list of supported (bound) addresses
 
-	peers     map[peer.ID]*Peer
-	peersLock sync.Mutex
+	peers     map[peer.ID]*Peer // map of all peer connections
+	peersLock sync.Mutex        // lock for the peer map
 
-	metrics *Metrics
+	metrics *Metrics // reference for metrics tracking
 
-	dialQueue *dialQueue
+	dialQueue *dialQueue // queue used to asynchronously connect to peers
 
-	identity  *identity
-	discovery *discovery.DiscoveryService
+	identity  *identity                   // service used for handshaking with peers
+	discovery *discovery.DiscoveryService // service used for discovering other peers
 
-	protocols     map[string]Protocol
-	protocolsLock sync.Mutex
+	protocols     map[string]Protocol // supported protocols
+	protocolsLock sync.Mutex          // lock for the supported protocols map
 
-	// Secrets manager
-	secretsManager secrets.SecretsManager
+	secretsManager secrets.SecretsManager // secrets manager for networking keys
 
-	// pubsub
-	ps *pubsub.PubSub
+	ps *pubsub.PubSub // reference to the networking PubSub service
 
-	joinWatchers     map[peer.ID]chan error
-	joinWatchersLock sync.Mutex
+	joinWatchers     map[peer.ID]chan error // set of networking event watchers
+	joinWatchersLock sync.Mutex             // lock for the networking event watchers map
 
-	emitterPeerEvent event.Emitter
+	emitterPeerEvent event.Emitter // event emitter for listeners
 
-	inboundConnCount int64
+	connectionCounts *connections.ConnectionInfo
 
-	temporaryDials sync.Map
+	temporaryDials sync.Map // map of temporary connections; peerID -> bool
 
-	bootnodes *bootnodesWrapper
+	bootnodes *bootnodesWrapper // reference of all bootnodes for the node
 }
 
 func (s *Server) IsBootnode(peerID peer.ID) bool {
 	return s.bootnodes.isBootnode(peerID)
 }
 
-func (s *Server) GetBootnodeConnCount() int32 {
+func (s *Server) GetBootnodeConnCount() int64 {
 	return s.bootnodes.getBootnodeConnCount()
 }
 
@@ -146,8 +119,12 @@ func (s *Server) RemoveTemporaryDial(peerID peer.ID) {
 	s.temporaryDials.Delete(peerID)
 }
 
-func (s *Server) GetAvailableOutboundConnections() int64 {
-	return s.availableOutboundConns()
+func (s *Server) HasFreeOutboundConnections() bool {
+	return s.connectionCounts.HasFreeOutboundConn()
+}
+
+func (s *Server) HasFreeConnectionSlot(direction network.Direction) bool {
+	return s.connectionCounts.HasFreeConnectionSlot(direction)
 }
 
 type Peer struct {
@@ -248,6 +225,10 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 			bootnodesMap:      make(map[peer.ID]*peer.AddrInfo),
 			bootnodeConnCount: 0,
 		},
+		connectionCounts: connections.NewBlankConnectionInfo(
+			config.MaxInboundPeers,
+			config.MaxOutboundPeers,
+		),
 	}
 
 	// start identity
@@ -276,6 +257,7 @@ func (s *Server) Start() error {
 
 	s.logger.Info("LibP2P server running", "addr", common.AddrInfoToString(s.AddrInfo()))
 
+	// Set up the peer discovery mechanism if needed
 	if !s.config.NoDiscover {
 		// Parse the bootnode data
 		if setupErr := s.setupBootnodes(); setupErr != nil {
@@ -412,7 +394,7 @@ func (s *Server) setupBootnodes() error {
 	s.bootnodes = &bootnodesWrapper{
 		bootnodeArr:       bootnodesArr,
 		bootnodesMap:      bootnodesMap,
-		bootnodeConnCount: int32(len(bootnodesArr)),
+		bootnodeConnCount: int64(len(bootnodesArr)),
 	}
 
 	return nil
@@ -433,7 +415,7 @@ func (s *Server) checkPeerConnections() {
 		}
 
 		if s.numPeers() < MinimumPeerConnections {
-			if s.config.NoDiscover || s.bootnodes.getBootnodeCount() == 0 {
+			if s.config.NoDiscover || !s.bootnodes.hasBootnodes() {
 				//TODO: dial peers from the peerstore
 			} else {
 				randomNode := s.GetRandomBootnode()
@@ -472,8 +454,8 @@ func (s *Server) runDial() {
 	for {
 		// TODO: Right now the dial task are done sequentially because Connect
 		// is a blocking request. In the future we should try to make up to
-		// maxDials requests concurrently.
-		for i := int64(0); i < s.availableOutboundConns(); i++ {
+		// maxDials requests concurrently
+		for s.connectionCounts.HasFreeOutboundConn() {
 			tt := s.dialQueue.pop()
 			if tt == nil {
 				// dial closed
@@ -555,38 +537,6 @@ func (s *Server) hasPeer(peerID peer.ID) bool {
 	return ok
 }
 
-func (s *Server) availableOutboundConns() int64 {
-	n := s.maxOutboundConns() - s.outboundConns()
-	if n < 0 {
-		n = 0
-	}
-
-	return n
-}
-
-func (s *Server) inboundConns() int64 {
-	count := atomic.LoadInt64(&s.inboundConnCount)
-	if count < 0 {
-		count = 0
-	}
-
-	return count + s.identity.pendingInboundConns()
-}
-
-func (s *Server) outboundConns() int64 {
-	activeOutboundConns := s.numPeers() - atomic.LoadInt64(&s.inboundConnCount)
-
-	return activeOutboundConns + s.identity.pendingOutboundConns()
-}
-
-func (s *Server) maxInboundConns() int64 {
-	return s.config.MaxInboundPeers
-}
-
-func (s *Server) maxOutboundConns() int64 {
-	return s.config.MaxOutboundPeers
-}
-
 func (s *Server) isConnected(peerID peer.ID) bool {
 	return s.host.Network().Connectedness(peerID) == network.Connected
 }
@@ -602,55 +552,73 @@ func (s *Server) GetPeerInfo(peerID peer.ID) *peer.AddrInfo {
 }
 
 func (s *Server) addPeer(id peer.ID, direction network.Direction) {
-	s.logger.Info("Peer connected", "id", id.String())
 	s.peersLock.Lock()
-	defer s.peersLock.Unlock()
 
-	p := &Peer{
+	s.logger.Info("Peer connected", "id", id.String())
+
+	s.peers[id] = &Peer{
 		srv:           s,
 		Info:          s.host.Peerstore().PeerInfo(id),
 		connDirection: direction,
 	}
-	s.peers[id] = p
 
-	if direction == network.DirInbound {
-		atomic.AddInt64(&s.inboundConnCount, 1)
-	}
+	// Update connection counters
+	s.connectionCounts.UpdateConnCountByDirection(1, direction)
+	s.updateBootnodeConnCount(id, 1)
 
-	if !s.config.NoDiscover && s.bootnodes.isBootnode(id) {
-		s.bootnodes.increaseBootnodeConnCount(1)
-	}
-
-	s.emitEvent(id, peerEvent.PeerConnected)
+	// Update the metric stats
 	s.metrics.Peers.Set(float64(len(s.peers)))
+
+	s.peersLock.Unlock()
+
+	// Emit the event alerting listeners
+	s.emitEvent(id, peerEvent.PeerConnected)
 }
 
 func (s *Server) delPeer(id peer.ID) {
+	s.peersLock.Lock()
+
 	s.logger.Info("Peer disconnected", "id", id.String())
 
-	s.peersLock.Lock()
-	defer s.peersLock.Unlock()
-
+	// Remove the peer from the peers map
 	if peer, ok := s.peers[id]; ok {
-		if peer.connDirection == network.DirInbound {
-			atomic.AddInt64(&s.inboundConnCount, -1)
-		}
-
-		if !s.config.NoDiscover && s.bootnodes.isBootnode(id) {
-			s.bootnodes.increaseBootnodeConnCount(-1)
-		}
+		// Update connection counters
+		s.connectionCounts.UpdateConnCountByDirection(-1, peer.connDirection)
+		s.updateBootnodeConnCount(id, -1)
 
 		delete(s.peers, id)
 	}
 
+	// Close network connections to the peer
 	if closeErr := s.host.Network().ClosePeer(id); closeErr != nil {
 		s.logger.Error(
 			fmt.Sprintf("Unable to gracefully close connection to peer [%s], %v", id.String(), closeErr),
 		)
 	}
 
-	s.emitEvent(id, peerEvent.PeerDisconnected)
 	s.metrics.Peers.Set(float64(len(s.peers)))
+
+	s.peersLock.Unlock()
+
+	// Emit the event alerting listeners
+	s.emitEvent(id, peerEvent.PeerDisconnected)
+}
+
+// updateBootnodeConnCount attempts to update the bootnode connection count
+// by delta if the action is valid [Thread safe]
+func (s *Server) updateBootnodeConnCount(peerID peer.ID, delta int64) {
+	if s.config.NoDiscover || !s.bootnodes.isBootnode(peerID) {
+		// If the discovery service is not running
+		// or the peer is not a bootnode, there is no need
+		// to update bootnode connection counters
+		return
+	}
+
+	s.bootnodes.increaseBootnodeConnCount(delta)
+}
+
+func (s *Server) UpdatePendingConnCount(delta int64, direction network.Direction) {
+	s.connectionCounts.UpdatePendingConnCountByDirection(delta, direction)
 }
 
 func (s *Server) Disconnect(peer peer.ID, reason string) {

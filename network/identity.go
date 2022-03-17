@@ -30,30 +30,9 @@ type identity struct {
 	proto.UnimplementedIdentityServer
 
 	pending sync.Map
+	srv     *Server
 
-	pendingInboundCount int64
-
-	pendingOutboundCount int64
-
-	srv *Server
-
-	initialized uint32
-}
-
-func (i *identity) updatePendingCount(direction network.Direction, delta int64) {
-	switch direction {
-	case network.DirInbound:
-		atomic.AddInt64(&i.pendingInboundCount, delta)
-	case network.DirOutbound:
-		atomic.AddInt64(&i.pendingOutboundCount, delta)
-	}
-}
-func (i *identity) pendingInboundConns() int64 {
-	return atomic.LoadInt64(&i.pendingInboundCount)
-}
-
-func (i *identity) pendingOutboundConns() int64 {
-	return atomic.LoadInt64(&i.pendingOutboundCount)
+	initialized uint64
 }
 
 func (i *identity) isPending(id peer.ID) bool {
@@ -62,20 +41,20 @@ func (i *identity) isPending(id peer.ID) bool {
 	return ok
 }
 
-func (i *identity) delPending(id peer.ID) {
-	if value, loaded := i.pending.LoadAndDelete(id); loaded {
+func (i *identity) removePendingStatus(peerID peer.ID) {
+	if value, loaded := i.pending.LoadAndDelete(peerID); loaded {
 		direction, ok := value.(network.Direction)
 		if !ok {
 			return
 		}
 
-		i.updatePendingCount(direction, -1)
+		i.srv.UpdatePendingConnCount(-1, direction)
 	}
 }
 
-func (i *identity) setPending(id peer.ID, direction network.Direction) {
+func (i *identity) addPendingStatus(id peer.ID, direction network.Direction) {
 	if _, loaded := i.pending.LoadOrStore(id, direction); !loaded {
-		i.updatePendingCount(direction, 1)
+		i.srv.UpdatePendingConnCount(1, direction)
 	}
 }
 
@@ -94,44 +73,51 @@ func (i *identity) setup() {
 			peerID := conn.RemotePeer()
 			i.srv.logger.Debug("Conn", "peer", peerID, "direction", conn.Stat().Direction)
 
-			initialized := atomic.LoadUint32(&i.initialized)
-			if initialized == 0 {
-				i.srv.Disconnect(peerID, ErrNotReady.Error())
+			if atomic.LoadUint64(&i.initialized) == 0 {
+				i.disconnectFromPeer(peerID, ErrNotReady.Error())
 
 				return
 			}
 
-			// limit by MaxPeers on incoming / outgoing requests
 			if i.isPending(peerID) {
 				// handshake has already started
 				return
 			}
 
-			if i.checkSlotAndDisconnect(conn.Stat().Direction, peerID) {
+			if !i.srv.HasFreeConnectionSlot(conn.Stat().Direction) {
+				i.disconnectFromPeer(peerID, ErrNoAvailableSlots.Error())
+
 				return
 			}
 
-			// pending of handshake
-			i.setPending(peerID, conn.Stat().Direction)
+			// Mark the peer as pending (pending handshake)
+			i.addPendingStatus(peerID, conn.Stat().Direction)
 
 			go func() {
-				defer func() {
-					if i.isPending(peerID) {
-						i.delPending(peerID)
-						i.srv.emitEvent(peerID, event.PeerDialCompleted)
-					}
-				}()
+				connectEvent := &event.PeerEvent{
+					PeerID: peerID,
+					Type:   event.PeerDialCompleted,
+				}
 
 				if err := i.handleConnected(peerID, conn.Stat().Direction); err != nil {
-					i.srv.Disconnect(peerID, err.Error())
+					// Close the connection to the peer
+					i.disconnectFromPeer(peerID, err.Error())
+
+					connectEvent.Type = event.PeerFailedToConnect
 				}
+
+				// Mark the peer as no longer pending
+				i.removePendingStatus(connectEvent.PeerID)
+
+				// Emit an adequate event
+				i.srv.emitEvent(connectEvent.PeerID, connectEvent.Type)
 			}()
 		},
 	})
 }
 
 func (i *identity) start() error {
-	atomic.StoreUint32(&i.initialized, 1)
+	atomic.StoreUint64(&i.initialized, 1)
 
 	return nil
 }
@@ -148,22 +134,9 @@ func (i *identity) constructStatus(peerID peer.ID) *proto.Status {
 	return status
 }
 
-// checkSlotAndDisconnect checks for the available connection slots and disconnects if slots are full
-func (i *identity) checkSlotAndDisconnect(direction network.Direction, peerID peer.ID) (slotsFull bool) {
-	switch direction {
-	case network.DirInbound:
-		slotsFull = i.srv.inboundConns() >= i.srv.maxInboundConns()
-	case network.DirOutbound:
-		slotsFull = i.srv.availableOutboundConns() == 0
-	default:
-		i.srv.logger.Info("Invalid connection direction", "peer", peerID)
-	}
-
-	if slotsFull {
-		i.srv.Disconnect(peerID, ErrNoAvailableSlots.Error())
-	}
-
-	return slotsFull
+// disconnectFromPeer disconnects from the specified peer
+func (i *identity) disconnectFromPeer(peerID peer.ID, reason string) {
+	i.srv.Disconnect(peerID, reason)
 }
 
 func (i *identity) handleConnected(peerID peer.ID, direction network.Direction) error {
