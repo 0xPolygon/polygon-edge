@@ -55,7 +55,7 @@ func TestConnLimit_Inbound(t *testing.T) {
 	}
 
 	// Disconnect Server 0 from Server 1 so Server 1 will have free slots
-	servers[0].Disconnect(servers[1].host.ID(), "bye")
+	servers[0].DisconnectFromPeer(servers[1].host.ID(), "bye")
 
 	disconnectCtx, disconnectFn := context.WithTimeout(context.Background(), DefaultJoinTimeout)
 	defer disconnectFn()
@@ -110,7 +110,7 @@ func TestConnLimit_Outbound(t *testing.T) {
 	}
 
 	// Disconnect Server 0 from Server 1
-	servers[0].Disconnect(servers[1].host.ID(), "bye")
+	servers[0].DisconnectFromPeer(servers[1].host.ID(), "bye")
 
 	disconnectCtx, disconnectFn := context.WithTimeout(context.Background(), DefaultJoinTimeout)
 	defer disconnectFn()
@@ -416,7 +416,7 @@ func TestPeerReconnection(t *testing.T) {
 	})
 
 	disconnectFromPeer := func(server *Server, peerID peer.ID) {
-		server.Disconnect(peerID, "Bye")
+		server.DisconnectFromPeer(peerID, "Bye")
 
 		disconnectCtx, disconnectFn := context.WithTimeout(context.Background(), DefaultJoinTimeout)
 		defer disconnectFn()

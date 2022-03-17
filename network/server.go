@@ -10,9 +10,12 @@ import (
 	"github.com/0xPolygon/polygon-edge/network/dial"
 	"github.com/0xPolygon/polygon-edge/network/discovery"
 	"github.com/0xPolygon/polygon-edge/network/grpc"
+	"github.com/0xPolygon/polygon-edge/network/identity"
 	"github.com/0xPolygon/polygon-edge/network/proto"
+	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/peerstore"
 	kb "github.com/libp2p/go-libp2p-kbucket"
+	noise "github.com/libp2p/go-libp2p-noise"
 	"math/big"
 	"sync"
 	"sync/atomic"
@@ -21,14 +24,12 @@ import (
 	peerEvent "github.com/0xPolygon/polygon-edge/network/event"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/hashicorp/go-hclog"
-	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/event"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
-	noise "github.com/libp2p/go-libp2p-noise"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/multiformats/go-multiaddr"
 )
@@ -76,7 +77,7 @@ type Server struct {
 
 	dialQueue *dial.DialQueue // queue used to asynchronously connect to peers
 
-	identity  *identity                   // service used for handshaking with peers
+	identity  *identity.IdentityService   // service used for handshaking with peers
 	discovery *discovery.DiscoveryService // service used for discovering other peers
 
 	protocols     map[string]Protocol // supported protocols
@@ -98,74 +99,7 @@ type Server struct {
 	bootnodes *bootnodesWrapper // reference of all bootnodes for the node
 }
 
-func (s *Server) IsBootnode(peerID peer.ID) bool {
-	return s.bootnodes.isBootnode(peerID)
-}
-
-func (s *Server) GetBootnodeConnCount() int64 {
-	return s.bootnodes.getBootnodeConnCount()
-}
-
-func (s *Server) DisconnectFromPeer(peerID peer.ID, reason string) {
-	s.Disconnect(peerID, reason)
-}
-
-func (s *Server) FetchAndSetTemporaryDial(peerID peer.ID, newValue bool) bool {
-	_, loaded := s.temporaryDials.LoadOrStore(peerID, newValue)
-
-	return loaded
-}
-
-func (s *Server) RemoveTemporaryDial(peerID peer.ID) {
-	s.temporaryDials.Delete(peerID)
-}
-
-func (s *Server) HasFreeOutboundConnections() bool {
-	return s.connectionCounts.HasFreeOutboundConn()
-}
-
-func (s *Server) HasFreeConnectionSlot(direction network.Direction) bool {
-	return s.connectionCounts.HasFreeConnectionSlot(direction)
-}
-
-type Peer struct {
-	srv *Server
-
-	Info peer.AddrInfo
-
-	connDirection network.Direction
-}
-
-// setupLibp2pKey is a helper method for setting up the networking private key
-func setupLibp2pKey(secretsManager secrets.SecretsManager) (crypto.PrivKey, error) {
-	var key crypto.PrivKey
-
-	if secretsManager.HasSecret(secrets.NetworkKey) {
-		// The key is present in the secrets manager, read it
-		networkingKey, readErr := ReadLibp2pKey(secretsManager)
-		if readErr != nil {
-			return nil, fmt.Errorf("unable to read networking private key from Secrets Manager, %w", readErr)
-		}
-
-		key = networkingKey
-	} else {
-		// The key is not present in the secrets manager, generate it
-		libp2pKey, libp2pKeyEncoded, keyErr := GenerateAndEncodeLibp2pKey()
-		if keyErr != nil {
-			return nil, fmt.Errorf("unable to generate networking private key for Secrets Manager, %w", keyErr)
-		}
-
-		// Write the networking private key to disk
-		if setErr := secretsManager.SetSecret(secrets.NetworkKey, libp2pKeyEncoded); setErr != nil {
-			return nil, fmt.Errorf("unable to store networking private key to Secrets Manager, %w", setErr)
-		}
-
-		key = libp2pKey
-	}
-
-	return key, nil
-}
-
+// NewServer returns a new instance of the networking server
 func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	logger = logger.Named("network")
 
@@ -232,10 +166,6 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		),
 	}
 
-	// start identity
-	srv.identity = &identity{srv: srv}
-	srv.identity.setup()
-
 	// start gossip protocol
 	ps, err := pubsub.NewGossipSub(
 		context.Background(),
@@ -251,12 +181,91 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	return srv, nil
 }
 
-func (s *Server) Start() error {
-	if identityStartErr := s.identity.start(); identityStartErr != nil {
-		return identityStartErr
+// EmitEvent emits a specified event to the networking server's event bus
+func (s *Server) EmitEvent(event *peerEvent.PeerEvent) {
+	s.emitEvent(event.PeerID, event.Type)
+}
+
+// IsTemporaryDial checks if a peer connection is temporary [Thread safe]
+func (s *Server) IsTemporaryDial(peerID peer.ID) bool {
+	_, ok := s.temporaryDials.Load(peerID)
+
+	return ok
+}
+
+// IsBootnode checks if a peer is a bootnode [Thread safe]
+func (s *Server) IsBootnode(peerID peer.ID) bool {
+	return s.bootnodes.isBootnode(peerID)
+}
+
+// GetBootnodeConnCount fetches the number of active bootnode connections [Thread safe]
+func (s *Server) GetBootnodeConnCount() int64 {
+	return s.bootnodes.getBootnodeConnCount()
+}
+
+// FetchAndSetTemporaryDial loads the temporary status of a peer connection, and
+// sets a new value [Thread safe]
+func (s *Server) FetchAndSetTemporaryDial(peerID peer.ID, newValue bool) bool {
+	_, loaded := s.temporaryDials.LoadOrStore(peerID, newValue)
+
+	return loaded
+}
+
+// RemoveTemporaryDial removes a peer connection as temporary [Thread safe]
+func (s *Server) RemoveTemporaryDial(peerID peer.ID) {
+	s.temporaryDials.Delete(peerID)
+}
+
+// HasFreeConnectionSlot checks if there are free connection slots in the specified direction [Thread safe]
+func (s *Server) HasFreeConnectionSlot(direction network.Direction) bool {
+	return s.connectionCounts.HasFreeConnectionSlot(direction)
+}
+
+type Peer struct {
+	srv *Server
+
+	Info peer.AddrInfo
+
+	connDirection network.Direction
+}
+
+// setupLibp2pKey is a helper method for setting up the networking private key
+func setupLibp2pKey(secretsManager secrets.SecretsManager) (crypto.PrivKey, error) {
+	var key crypto.PrivKey
+
+	if secretsManager.HasSecret(secrets.NetworkKey) {
+		// The key is present in the secrets manager, read it
+		networkingKey, readErr := ReadLibp2pKey(secretsManager)
+		if readErr != nil {
+			return nil, fmt.Errorf("unable to read networking private key from Secrets Manager, %w", readErr)
+		}
+
+		key = networkingKey
+	} else {
+		// The key is not present in the secrets manager, generate it
+		libp2pKey, libp2pKeyEncoded, keyErr := GenerateAndEncodeLibp2pKey()
+		if keyErr != nil {
+			return nil, fmt.Errorf("unable to generate networking private key for Secrets Manager, %w", keyErr)
+		}
+
+		// Write the networking private key to disk
+		if setErr := secretsManager.SetSecret(secrets.NetworkKey, libp2pKeyEncoded); setErr != nil {
+			return nil, fmt.Errorf("unable to store networking private key to Secrets Manager, %w", setErr)
+		}
+
+		key = libp2pKey
 	}
 
+	return key, nil
+}
+
+// Start starts the networking services
+func (s *Server) Start() error {
 	s.logger.Info("LibP2P server running", "addr", common.AddrInfoToString(s.AddrInfo()))
+
+	if setupErr := s.setupIdentity(); setupErr != nil {
+		return fmt.Errorf("unable to setup identity, %w", setupErr)
+	}
 
 	// Set up the peer discovery mechanism if needed
 	if !s.config.NoDiscover {
@@ -284,7 +293,7 @@ func (s *Server) Start() error {
 	s.host.Network().Notify(&network.NotifyBundle{
 		DisconnectedF: func(net network.Network, conn network.Conn) {
 			go func() {
-				s.delPeer(conn.RemotePeer())
+				s.removePeer(conn.RemotePeer())
 			}()
 		},
 	})
@@ -401,6 +410,37 @@ func (s *Server) setupBootnodes() error {
 	return nil
 }
 
+// setupIdentity sets up the identity service for the node
+func (s *Server) setupIdentity() error {
+	// Create an instance of the identity service
+	identityService := identity.NewIdentityService(
+		s,
+		s.logger,
+		int64(s.config.Chain.Params.ChainID),
+		s.host.ID(),
+	)
+
+	// Register the identity service protocol
+	s.registerIdentityService(identityService)
+
+	// Register the network notify bundle handlers
+	s.host.Network().Notify(identityService.GetNotifyBundle())
+
+	// Set the identity service
+	s.identity = identityService
+
+	return nil
+}
+
+// registerIdentityService registers the identity service
+func (s *Server) registerIdentityService(identityService *identity.IdentityService) {
+	grpcStream := grpc.NewGrpcStream()
+	proto.RegisterIdentityServer(grpcStream.GrpcServer(), identityService)
+	grpcStream.Serve()
+
+	s.RegisterProtocol(common.IdentityProto, grpcStream)
+}
+
 // AddToPeerStore adds peer information to the node's peer store
 func (s *Server) AddToPeerStore(peerInfo *peer.AddrInfo) {
 	s.host.Peerstore().AddAddr(peerInfo.ID, peerInfo.Addrs[0], peerstore.AddressTTL)
@@ -426,6 +466,9 @@ func (s *Server) checkPeerConnections() {
 	}
 }
 
+// runDial starts the networking server's dial loop.
+// Essentially, the networking server monitors for any open connection slots
+// and attempts to fill them as soon as they open up
 func (s *Server) runDial() {
 	// watch for events of peers included or removed
 	notifyCh := make(chan struct{})
@@ -492,6 +535,7 @@ func (s *Server) runDial() {
 	}
 }
 
+// numPeers returns the number of connected peers [Thread safe]
 func (s *Server) numPeers() int64 {
 	s.peersLock.Lock()
 	defer s.peersLock.Unlock()
@@ -519,6 +563,7 @@ func (s *Server) GetRandomBootnode() *peer.AddrInfo {
 	return nil
 }
 
+// Peers returns a copy of the networking server's peer set [Thread safe]
 func (s *Server) Peers() []*Peer {
 	s.peersLock.Lock()
 	defer s.peersLock.Unlock()
@@ -531,7 +576,7 @@ func (s *Server) Peers() []*Peer {
 	return peers
 }
 
-// hasPeer checks if the peer is present in the peers list [Thread-safe]
+// hasPeer checks if the peer is present in the peers list [Thread safe]
 func (s *Server) hasPeer(peerID peer.ID) bool {
 	s.peersLock.Lock()
 	defer s.peersLock.Unlock()
@@ -541,21 +586,26 @@ func (s *Server) hasPeer(peerID peer.ID) bool {
 	return ok
 }
 
+// isConnected checks if the networking server is connected to a peer
 func (s *Server) isConnected(peerID peer.ID) bool {
 	return s.host.Network().Connectedness(peerID) == network.Connected
 }
 
+// GetProtocols fetches the list of node-supported protocols
 func (s *Server) GetProtocols(peerID peer.ID) ([]string, error) {
 	return s.host.Peerstore().GetProtocols(peerID)
 }
 
+// GetPeerInfo fetches the information of a peer
 func (s *Server) GetPeerInfo(peerID peer.ID) *peer.AddrInfo {
 	info := s.host.Peerstore().PeerInfo(peerID)
 
 	return &info
 }
 
-func (s *Server) addPeer(id peer.ID, direction network.Direction) {
+// AddPeer adds a new peer to the networking server's peer list,
+// and updates relevant counters and metrics
+func (s *Server) AddPeer(id peer.ID, direction network.Direction) {
 	s.peersLock.Lock()
 
 	s.logger.Info("Peer connected", "id", id.String())
@@ -580,7 +630,9 @@ func (s *Server) addPeer(id peer.ID, direction network.Direction) {
 	s.emitEvent(id, peerEvent.PeerConnected)
 }
 
-func (s *Server) delPeer(id peer.ID) {
+// removePeer removes a peer from the networking server's peer list,
+// and updates relevant counters and metrics
+func (s *Server) removePeer(id peer.ID) {
 	s.peersLock.Lock()
 
 	s.logger.Info("Peer disconnected", "id", id.String())
@@ -623,13 +675,15 @@ func (s *Server) updateBootnodeConnCount(peerID peer.ID, delta int64) {
 	s.bootnodes.increaseBootnodeConnCount(delta)
 }
 
+// UpdatePendingConnCount updates the pending connection count in the specified direction [Thread safe]
 func (s *Server) UpdatePendingConnCount(delta int64, direction network.Direction) {
 	s.connectionCounts.UpdatePendingConnCountByDirection(delta, direction)
 
 	s.updatePendingConnCountMetrics(direction)
 }
 
-func (s *Server) Disconnect(peer peer.ID, reason string) {
+// DisconnectFromPeer disconnects the networking server from the specified peer
+func (s *Server) DisconnectFromPeer(peer peer.ID, reason string) {
 	if s.host.Network().Connectedness(peer) == network.Connected {
 		s.logger.Info(fmt.Sprintf("Closing connection to peer [%s] for reason [%s]", peer.String(), reason))
 

@@ -74,7 +74,7 @@ func TestDeletePeer(t *testing.T) {
 
 			// disconnects from syncer
 			for i := 0; i < tt.numDisconnectedPeers; i++ {
-				peerSyncers[i].server.Disconnect(syncer.server.AddrInfo().ID, "bye")
+				peerSyncers[i].server.DisconnectFromPeer(syncer.server.AddrInfo().ID, "bye")
 			}
 			WaitUntilPeerConnected(t, syncer, len(tt.peerChains)-tt.numDisconnectedPeers, 10*time.Second)
 
@@ -633,7 +633,7 @@ func TestSyncer_PeerDisconnected(t *testing.T) {
 
 	// Disconnect peer2
 	peerToDisconnect := servers[2].AddrInfo().ID
-	servers[1].Disconnect(peerToDisconnect, "testing")
+	servers[1].DisconnectFromPeer(peerToDisconnect, "testing")
 
 	waitCtx, cancelWait = context.WithTimeout(context.Background(), time.Second*10)
 	defer cancelWait()

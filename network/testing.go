@@ -68,7 +68,7 @@ func LeaveAndWait(
 	}
 
 	go func() {
-		source.Disconnect(destination.host.ID(), "bye")
+		source.DisconnectFromPeer(destination.host.ID(), "bye")
 	}()
 
 	connectCtx, cancelFn := context.WithTimeout(context.Background(), disconnectTimeout)

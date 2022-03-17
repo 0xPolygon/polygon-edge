@@ -7,6 +7,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/network/common"
 	"github.com/0xPolygon/polygon-edge/network/event"
 	"github.com/hashicorp/go-hclog"
+	"github.com/libp2p/go-libp2p-core/network"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/network/grpc"
@@ -71,8 +72,8 @@ type networkingServer interface {
 
 	// CONNECTION INFORMATION //
 
-	// HasFreeOutboundConnections checks if there are available outbound connection slots [Thread safe]
-	HasFreeOutboundConnections() bool
+	// HasFreeConnectionSlot checks if there is an available connection slot for the set direction [Thread safe]
+	HasFreeConnectionSlot(direction network.Direction) bool
 }
 
 // DiscoveryService is a service that finds other peers in the network
@@ -315,7 +316,7 @@ func (d *DiscoveryService) startDiscovery() {
 // regularPeerDiscovery grabs a random peer from the list of
 // connected peers, and attempts to find / connect to their peer set
 func (d *DiscoveryService) regularPeerDiscovery() {
-	if !d.baseServer.HasFreeOutboundConnections() {
+	if !d.baseServer.HasFreeConnectionSlot(network.DirOutbound) {
 		// No need to do peer discovery if no open connection slots
 		// are available
 		return
@@ -344,7 +345,7 @@ func (d *DiscoveryService) regularPeerDiscovery() {
 // bootnodeDiscovery queries a random (unconnected) bootnode for new peers
 // and adds them to the routing table
 func (d *DiscoveryService) bootnodePeerDiscovery() {
-	if !d.baseServer.HasFreeOutboundConnections() {
+	if !d.baseServer.HasFreeConnectionSlot(network.DirOutbound) {
 		// No need to attempt bootnode dialing, since no
 		// open outbound slots are left
 		return
