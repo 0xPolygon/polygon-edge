@@ -306,6 +306,20 @@ func TestAddTxErrors(t *testing.T) {
 			ErrInsufficientFunds,
 		)
 	})
+
+	t.Run("ErrInvalidTxType", func(t *testing.T) {
+		pool := setupPool()
+
+		tx := newTx(defaultAddr, 0, 1)
+		tx.GasPrice.SetUint64(1000000000000)
+		tx.Type = types.TxTypeState
+		tx = signTx(tx)
+
+		assert.ErrorIs(t,
+			pool.addTx(local, tx),
+			ErrInvalidTxType,
+		)
+	})
 }
 
 func TestAddGossipTx(t *testing.T) {

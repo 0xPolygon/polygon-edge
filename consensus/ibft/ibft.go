@@ -299,6 +299,15 @@ func (i *Ibft) setupMechanism() error {
 		}
 	}
 
+	if i.bridge != nil {
+		bridgeMechanism, err := BridgeFactory(i)
+		if err != nil {
+			return err
+		}
+
+		i.mechanisms = append(i.mechanisms, bridgeMechanism)
+	}
+
 	return nil
 }
 
@@ -470,8 +479,8 @@ func (i *Ibft) isValidSnapshot() bool {
 func (i *Ibft) runSyncState() {
 	// updateSnapshotCallback keeps the snapshot store in sync with the updated
 	// chain data, by calling the SyncStateHook
-	callInsertBlockHook := func(blockNumber uint64) {
-		if hookErr := i.runHook(InsertBlockHook, blockNumber, blockNumber); hookErr != nil {
+	callInsertBlockHook := func(block *types.Block) {
+		if hookErr := i.runHook(InsertBlockHook, block.Number(), block); hookErr != nil {
 			i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", InsertBlockHook, hookErr))
 		}
 	}
@@ -502,7 +511,7 @@ func (i *Ibft) runSyncState() {
 		}
 
 		if err := i.syncer.BulkSyncWithPeer(p, func(newBlock *types.Block) {
-			callInsertBlockHook(newBlock.Number())
+			callInsertBlockHook(newBlock)
 			i.txpool.ResetWithHeaders(newBlock.Header)
 		}); err != nil {
 			i.logger.Error("failed to bulk sync", "err", err)
@@ -524,7 +533,7 @@ func (i *Ibft) runSyncState() {
 		i.syncer.WatchSyncWithPeer(p, func(newBlock *types.Block) bool {
 			// After each written block, update the snapshot store for PoS.
 			// The snapshot store is currently updated for PoA inside the ProcessHeadersHook
-			callInsertBlockHook(newBlock.Number())
+			callInsertBlockHook(newBlock)
 
 			i.syncer.Broadcast(newBlock)
 			i.txpool.ResetWithHeaders(newBlock.Header)
@@ -610,6 +619,10 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 	txns := []*types.Transaction{}
 	if i.shouldWriteTransactions(header.Number) {
 		txns = i.writeTransactions(gasLimit, transition)
+	}
+
+	if err := i.runInsertTransactionsHook(header, transition, &txns); err != nil {
+		return nil, err
 	}
 
 	if err := i.PreStateCommit(header, transition); err != nil {
@@ -750,21 +763,6 @@ func (i *Ibft) runAcceptState() { // start new round
 		return
 	}
 
-	if i.bridge != nil {
-		i.bridge.SetValidators(snap.Set, uint64(snap.Set.Len()))
-
-		for _, msg := range i.bridge.GetReadyMessages() {
-			fmt.Printf(
-				"ReadyMessage height=%d, hash=%+v, body=%+v, signatures=%d\n",
-				parent.Number+1,
-				msg.Hash,
-				msg.Body,
-				len(msg.Signatures),
-			)
-			i.bridge.Consume(msg.Hash)
-		}
-	}
-
 	if hookErr := i.runHook(AcceptStateLogHook, i.state.view.Sequence, snap); hookErr != nil {
 		i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", AcceptStateLogHook, hookErr))
 	}
@@ -866,15 +864,13 @@ func (i *Ibft) runAcceptState() { // start new round
 		} else {
 			// since it's a new block, we have to verify it first
 			if err := i.verifyHeaderImpl(snap, parent, block.Header); err != nil {
-				i.logger.Error("block verification failed", "err", err)
 				i.handleStateErr(errBlockVerificationFailed)
 
 				continue
 			}
 
 			if hookErr := i.runHook(VerifyBlockHook, block.Number(), block); hookErr != nil {
-				if errors.As(hookErr, &errBlockVerificationFailed) {
-					i.logger.Error("block verification failed, block at the end of epoch has transactions")
+				if errors.Is(hookErr, errBlockVerificationFailed) {
 					i.handleStateErr(errBlockVerificationFailed)
 				} else {
 					i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", VerifyBlockHook, hookErr))
@@ -987,6 +983,7 @@ func (i *Ibft) updateMetrics(block *types.Block) {
 	//Update the Number of transactions in the block metric
 	i.metrics.NumTxs.Set(float64(len(block.Body().Transactions)))
 }
+
 func (i *Ibft) insertBlock(block *types.Block) error {
 	committedSeals := [][]byte{}
 	for _, commit := range i.state.committed {
@@ -1007,7 +1004,7 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 		return err
 	}
 
-	if hookErr := i.runHook(InsertBlockHook, header.Number, header.Number); hookErr != nil {
+	if hookErr := i.runHook(InsertBlockHook, header.Number, block); hookErr != nil {
 		return hookErr
 	}
 
@@ -1288,11 +1285,31 @@ func (i *Ibft) GetBlockCreator(header *types.Header) (types.Address, error) {
 }
 
 // PreStateCommit a hook to be called before finalizing state transition on inserting block
+func (i *Ibft) runInsertTransactionsHook(
+	header *types.Header,
+	transition *state.Transition,
+	transactions *[]*types.Transaction,
+) error {
+	params := &insertTransactionHookParams{
+		header:       header,
+		transition:   transition,
+		transactions: transactions,
+	}
+
+	if hookErr := i.runHook(InsertTransactionsHook, header.Number, params); hookErr != nil {
+		return hookErr
+	}
+
+	return nil
+}
+
+// PreStateCommit a hook to be called before finalizing state transition on inserting block
 func (i *Ibft) PreStateCommit(header *types.Header, txn *state.Transition) error {
 	params := &preStateCommitHookParams{
 		header: header,
 		txn:    txn,
 	}
+
 	if hookErr := i.runHook(PreStateCommitHook, header.Number, params); hookErr != nil {
 		return hookErr
 	}

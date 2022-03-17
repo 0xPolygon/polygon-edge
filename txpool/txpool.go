@@ -37,6 +37,7 @@ var (
 	ErrInvalidAccountState = errors.New("invalid account state")
 	ErrAlreadyKnown        = errors.New("already known")
 	ErrOversizedData       = errors.New("oversized data")
+	ErrInvalidTxType       = errors.New("invalid tx type")
 )
 
 // indicates origin of a transaction
@@ -467,6 +468,11 @@ func (p *TxPool) processEvent(event *blockchain.Event) {
 // validateTx ensures the transaction conforms to specific
 // constraints before entering the pool.
 func (p *TxPool) validateTx(tx *types.Transaction) error {
+	// FIXME: Accepts only legacy transaction only for now
+	if tx.Type != types.TxTypeLegacy {
+		return ErrInvalidTxType
+	}
+
 	// Check the transaction size to overcome DOS Attacks
 	if uint64(len(tx.MarshalRLP())) > txMaxSize {
 		return ErrOversizedData

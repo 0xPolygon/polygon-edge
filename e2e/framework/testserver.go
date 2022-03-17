@@ -343,6 +343,25 @@ func (t *TestServer) Start(ctx context.Context) error {
 		args = append(args, "--block-gas-target", *types.EncodeUint64(t.Config.BlockGasTarget))
 	}
 
+	if t.Config.UseBridge {
+		args = append(args, "--bridge")
+
+		if t.Config.BridgeRootChainURL != nil {
+			args = append(args, "--bridge-rootchain-url", *t.Config.BridgeRootChainURL)
+		}
+
+		if t.Config.BridgeRootChainContract != nil {
+			args = append(args, "--bridge-rootchain-contract", *t.Config.BridgeRootChainContract)
+		}
+
+		if t.Config.BridgeRootChainConfirmations != nil {
+			args = append(args,
+				"bridge-rootchain-confirmations",
+				*types.EncodeUint64(uint64(*t.Config.BridgeRootChainConfirmations)),
+			)
+		}
+	}
+
 	t.ReleaseReservedPorts()
 
 	// Start the server

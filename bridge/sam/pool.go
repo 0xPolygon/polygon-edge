@@ -49,7 +49,7 @@ func (p *pool) AddMessage(message *Message) {
 		return
 	}
 
-	p.setMessageBody(message.Hash, message.Body)
+	p.setMessageData(message.Hash, message.Data)
 	p.tryToPromote(message.Hash)
 }
 
@@ -76,11 +76,15 @@ func (p *pool) ConsumeMessage(hash types.Hash) {
 	p.readyMap.Delete(hash)
 }
 
-// knows returns the flag indicating the message is known
-func (p *pool) isMessageKnown(hash types.Hash) bool {
+// IsMessageKnown returns the flag indicating the message is known
+func (p *pool) IsMessageKnown(hash types.Hash) bool {
 	_, ok := p.messageMap.Load(hash)
 
 	return ok
+}
+
+func (p *pool) GetSignatureCount(hash types.Hash) uint64 {
+	return p.messageSignatures.GetSignatureCount(hash)
 }
 
 // consumed returns the flag indicating the message is consumed
@@ -109,14 +113,14 @@ func (p *pool) GetReadyMessages() []ReadyMessage {
 			return true
 		}
 
-		body := p.getMessageBody(hash)
-		if body == nil {
+		data := p.getMessageData(hash)
+		if data == nil {
 			return true
 		}
 
 		signatures := p.messageSignatures.GetSignatures(hash)
 		res = append(res, ReadyMessage{
-			Body:       body,
+			Data:       data,
 			Hash:       hash,
 			Signatures: signatures,
 		})
@@ -157,7 +161,7 @@ func (p *pool) UpdateValidatorSet(validators []types.Address, threshold uint64) 
 // canPromote return the flag indicating it's possible to change status to ready
 // message need to have enough signatures and be known by pool for promotion
 func (p *pool) canPromote(hash types.Hash) bool {
-	isKnown := p.isMessageKnown(hash)
+	isKnown := p.IsMessageKnown(hash)
 	numSignatures := p.messageSignatures.GetSignatureCount(hash)
 	threshold := atomic.LoadUint64(&p.signatureThreshold)
 
@@ -189,7 +193,7 @@ func (p *pool) tryToPromoteAndDemoteAll() {
 
 	p.messageSignatures.RangeMessages(func(entry *signedMessageEntry) bool {
 		hash := entry.Hash
-		isKnown := p.isMessageKnown(hash)
+		isKnown := p.IsMessageKnown(hash)
 		numSignatures := entry.NumSignatures()
 
 		if numSignatures >= threshold && isKnown {
@@ -213,22 +217,17 @@ func (p *pool) demote(hash types.Hash) {
 	p.readyMap.Delete(hash)
 }
 
-func (p *pool) setMessageBody(hash types.Hash, body []byte) {
-	p.messageMap.Store(hash, body)
+func (p *pool) setMessageData(hash types.Hash, data interface{}) {
+	p.messageMap.Store(hash, data)
 }
 
-func (p *pool) getMessageBody(hash types.Hash) []byte {
-	raw, existed := p.messageMap.Load(hash)
+func (p *pool) getMessageData(hash types.Hash) interface{} {
+	data, existed := p.messageMap.Load(hash)
 	if !existed {
 		return nil
 	}
 
-	body, ok := raw.([]byte)
-	if !ok {
-		return nil
-	}
-
-	return body
+	return data
 }
 
 // signedMessageEntry is representing the data stored in messageSignaturesStore

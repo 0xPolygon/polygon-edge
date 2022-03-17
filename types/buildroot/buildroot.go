@@ -13,10 +13,8 @@ var arenaPool fastrlp.ArenaPool
 func CalculateReceiptsRoot(receipts []*types.Receipt) types.Hash {
 	ar := arenaPool.Get()
 
-	res := calculateRootWithRlp(len(receipts), func(i int) *fastrlp.Value {
-		ar.Reset()
-
-		return receipts[i].MarshalRLPWith(ar)
+	res := CalculateRoot(len(receipts), func(i int) []byte {
+		return receipts[i].MarshalRLP()
 	})
 
 	arenaPool.Put(ar)
@@ -28,10 +26,8 @@ func CalculateReceiptsRoot(receipts []*types.Receipt) types.Hash {
 func CalculateTransactionsRoot(transactions []*types.Transaction) types.Hash {
 	ar := arenaPool.Get()
 
-	res := calculateRootWithRlp(len(transactions), func(i int) *fastrlp.Value {
-		ar.Reset()
-
-		return transactions[i].MarshalRLPWith(ar)
+	res := CalculateRoot(len(transactions), func(i int) []byte {
+		return transactions[i].MarshalRLP()
 	})
 
 	arenaPool.Put(ar)
@@ -57,14 +53,6 @@ func CalculateUncleRoot(uncles []*types.Header) types.Hash {
 	arenaPool.Put(a)
 
 	return types.BytesToHash(root)
-}
-
-func calculateRootWithRlp(num int, h func(indx int) *fastrlp.Value) types.Hash {
-	hF := func(indx int) []byte {
-		return h(indx).MarshalTo(nil)
-	}
-
-	return CalculateRoot(num, hF)
 }
 
 // CalculateRoot calculates a root with a callback

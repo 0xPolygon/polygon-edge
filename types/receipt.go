@@ -31,10 +31,15 @@ type Receipt struct {
 	GasUsed         uint64
 	ContractAddress Address
 	TxHash          Hash
+	TransactionType TransactionType
 }
 
 func (r *Receipt) SetStatus(s ReceiptStatus) {
 	r.Status = &s
+}
+
+func (r *Receipt) IsTypedTransaction() bool {
+	return r.TransactionType != TxTypeLegacy
 }
 
 type Log struct {

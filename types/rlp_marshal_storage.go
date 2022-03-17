@@ -42,6 +42,10 @@ func (t *Transaction) MarshalStoreRLPTo(dst []byte) []byte {
 func (t *Transaction) MarshalStoreRLPWith(a *fastrlp.Arena) *fastrlp.Value {
 	vv := a.NewArray()
 	// consensus part
+	if t.IsTypedTransaction() {
+		vv.Set(a.NewBytes([]byte{byte(t.Type)}))
+	}
+
 	vv.Set(t.MarshalRLPWith(a))
 	// context part
 	vv.Set(a.NewBytes(t.From.Bytes()))
@@ -69,6 +73,11 @@ func (r *Receipt) MarshalStoreRLPTo(dst []byte) []byte {
 func (r *Receipt) MarshalStoreRLPWith(a *fastrlp.Arena) *fastrlp.Value {
 	// use the hash part
 	vv := a.NewArray()
+
+	if r.IsTypedTransaction() {
+		vv.Set(a.NewBytes([]byte{byte(r.TransactionType)}))
+	}
+
 	vv.Set(r.MarshalRLPWith(a))
 
 	if r.ContractAddress == ZeroAddress {
