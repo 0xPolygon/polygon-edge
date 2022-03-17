@@ -3,6 +3,8 @@ package network
 import (
 	"context"
 	"fmt"
+	"github.com/0xPolygon/polygon-edge/network/common"
+	peerEvent "github.com/0xPolygon/polygon-edge/network/event"
 	"net"
 	"strconv"
 	"testing"
@@ -147,16 +149,16 @@ func TestPeerEvent_EmitAndSubscribe(t *testing.T) {
 	assert.NoError(t, err)
 
 	count := 10
-	events := []PeerEventType{
-		PeerConnected,
-		PeerFailedToConnect,
-		PeerDisconnected,
-		PeerAlreadyConnected,
-		PeerDialCompleted,
-		PeerAddedToDialQueue,
+	events := []peerEvent.PeerEventType{
+		peerEvent.PeerConnected,
+		peerEvent.PeerFailedToConnect,
+		peerEvent.PeerDisconnected,
+		peerEvent.PeerAlreadyConnected,
+		peerEvent.PeerDialCompleted,
+		peerEvent.PeerAddedToDialQueue,
 	}
 
-	getIDAndEventType := func(i int) (peer.ID, PeerEventType) {
+	getIDAndEventType := func(i int) (peer.ID, peerEvent.PeerEventType) {
 		id := peer.ID(strconv.Itoa(i))
 		event := events[i%len(events)]
 
@@ -169,7 +171,10 @@ func TestPeerEvent_EmitAndSubscribe(t *testing.T) {
 			server.emitEvent(id, event)
 
 			received := sub.Get()
-			assert.Equal(t, &PeerEvent{id, event}, received)
+			assert.Equal(t, &peerEvent.PeerEvent{
+				PeerID: id,
+				Type:   event,
+			}, received)
 		}
 	})
 
@@ -181,7 +186,10 @@ func TestPeerEvent_EmitAndSubscribe(t *testing.T) {
 		for i := 0; i < count; i++ {
 			received := sub.Get()
 			id, event := getIDAndEventType(i)
-			assert.Equal(t, &PeerEvent{id, event}, received)
+			assert.Equal(t, &peerEvent.PeerEvent{
+				PeerID: id,
+				Type:   event,
+			}, received)
 		}
 	})
 }
@@ -201,8 +209,8 @@ func TestEncodingPeerAddr(t *testing.T) {
 		Addrs: []multiaddr.Multiaddr{addr},
 	}
 
-	str := AddrInfoToString(info)
-	info2, err := StringToAddrInfo(str)
+	str := common.AddrInfoToString(info)
+	info2, err := common.StringToAddrInfo(str)
 	assert.NoError(t, err)
 	assert.Equal(t, info, info2)
 }
@@ -279,7 +287,7 @@ func TestAddrInfoToString(t *testing.T) {
 				t.Fatalf("Unable to construct multiaddrs, %v", constructErr)
 			}
 
-			dialAddress := AddrInfoToString(&peer.AddrInfo{
+			dialAddress := common.AddrInfoToString(&peer.AddrInfo{
 				ID:    defaultPeerID,
 				Addrs: multiAddrs,
 			})
@@ -387,8 +395,8 @@ func TestPeerReconnection(t *testing.T) {
 		},
 		ServerCallback: func(server *Server) {
 			server.config.Chain.Bootnodes = []string{
-				AddrInfoToString(bootnodes[0].AddrInfo()),
-				AddrInfoToString(bootnodes[1].AddrInfo()),
+				common.AddrInfoToString(bootnodes[0].AddrInfo()),
+				common.AddrInfoToString(bootnodes[1].AddrInfo()),
 			}
 		},
 	}
@@ -557,7 +565,7 @@ func TestSelfConnection_WithBootNodes(t *testing.T) {
 	peerID, err := peer.IDFromPrivateKey(key)
 	assert.NoError(t, err)
 	testMultiAddr := tests.GenerateTestMultiAddr(t).String()
-	peerAddressInfo, err := StringToAddrInfo(testMultiAddr)
+	peerAddressInfo, err := common.StringToAddrInfo(testMultiAddr)
 	assert.NoError(t, err)
 
 	testTable := []struct {
@@ -588,7 +596,7 @@ func TestSelfConnection_WithBootNodes(t *testing.T) {
 				t.Fatalf("Unable to create server, %v", createErr)
 			}
 
-			assert.Equal(t, tt.expectedList, server.discovery.bootnodes.bootnodeArr)
+			assert.Equal(t, tt.expectedList, server.bootnodes.getBootnodes())
 		})
 	}
 }
@@ -708,7 +716,11 @@ func TestMinimumBootNodeCount(t *testing.T) {
 				},
 			})
 
-			assert.Equal(t, tt.expectedError, createErr)
+			if tt.expectedError != nil {
+				assert.ErrorAs(t, tt.expectedError, &createErr)
+			} else {
+				assert.NoError(t, createErr)
+			}
 		})
 	}
 }
@@ -838,7 +850,7 @@ func TestMultiAddrFromDns(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			multiAddr, err := MultiAddrFromDNS(tt.dnsAddress, tt.port)
+			multiAddr, err := common.MultiAddrFromDNS(tt.dnsAddress, tt.port)
 			if !tt.err {
 				assert.NotNil(t, multiAddr, "Multi Address should not be nil")
 				assert.Equal(t, multiAddr.String(), tt.outcome)

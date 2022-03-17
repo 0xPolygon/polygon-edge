@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"github.com/0xPolygon/polygon-edge/network/common"
 	"math"
 	"net"
 
@@ -237,7 +238,7 @@ func (p *serverParams) initDNSAddress() error {
 
 	var parseErr error
 
-	if p.dnsAddress, parseErr = network.MultiAddrFromDNS(
+	if p.dnsAddress, parseErr = common.MultiAddrFromDNS(
 		p.rawConfig.Network.DNSAddr, p.libp2pAddress.Port,
 	); parseErr != nil {
 		return parseErr

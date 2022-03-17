@@ -2,6 +2,7 @@ package network
 
 import (
 	"container/heap"
+	"github.com/0xPolygon/polygon-edge/network/common"
 	"sync"
 
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -83,13 +84,13 @@ func (d *dialQueue) del(peer peer.ID) {
 	}
 }
 
-func (d *dialQueue) add(addr *peer.AddrInfo, priority uint64) {
+func (d *dialQueue) add(addr *peer.AddrInfo, priority common.DialPriority) {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
 	task := &dialTask{
 		addr:     addr,
-		priority: priority,
+		priority: uint64(priority),
 	}
 	d.items[addr.ID] = task
 	heap.Push(&d.heap, task)

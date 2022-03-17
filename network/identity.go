@@ -3,6 +3,7 @@ package network
 import (
 	"context"
 	"errors"
+	"github.com/0xPolygon/polygon-edge/network/event"
 	"sync"
 	"sync/atomic"
 
@@ -117,7 +118,7 @@ func (i *identity) setup() {
 				defer func() {
 					if i.isPending(peerID) {
 						i.delPending(peerID)
-						i.srv.emitEvent(peerID, PeerDialCompleted)
+						i.srv.emitEvent(peerID, event.PeerDialCompleted)
 					}
 				}()
 

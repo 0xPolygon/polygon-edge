@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/0xPolygon/polygon-edge/network/common"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
@@ -37,7 +38,7 @@ func (s *systemService) GetStatus(ctx context.Context, req *empty.Empty) (*proto
 			Number: int64(header.Number),
 			Hash:   header.Hash.String(),
 		},
-		P2PAddr: network.AddrInfoToString(s.server.network.AddrInfo()),
+		P2PAddr: common.AddrInfoToString(s.server.network.AddrInfo()),
 	}
 
 	return status, nil

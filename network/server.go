@@ -5,15 +5,20 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"github.com/0xPolygon/polygon-edge/network/common"
+	"github.com/0xPolygon/polygon-edge/network/discovery"
+	"github.com/0xPolygon/polygon-edge/network/grpc"
+	"github.com/0xPolygon/polygon-edge/network/proto"
+	"github.com/libp2p/go-libp2p-core/peerstore"
+	kb "github.com/libp2p/go-libp2p-kbucket"
 	"math/big"
 	"net"
-	"regexp"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/chain"
+	peerEvent "github.com/0xPolygon/polygon-edge/network/event"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p"
@@ -29,21 +34,6 @@ import (
 )
 
 const (
-	DefaultDialRatio = 0.2
-
-	DefaultLibp2pPort int = 1478
-
-	MinimumPeerConnections int64 = 1
-
-	MinimumBootNodes int = 1
-
-	// Priority for dial queue
-	PriorityRequestedDial uint64 = 1
-
-	PriorityRandomDial uint64 = 10
-)
-
-const (
 	// peerOutboundBufferSize is the size of outbound messages to a peer buffers in go-libp2p-pubsub
 	// we should have enough capacity of the queue
 	// because we start dropping messages to a peer if the outbound queue is full
@@ -55,8 +45,15 @@ const (
 	validateBufferSize = 1024
 )
 
-// regex string  to match against a valid dns/dns4/dns6 addr
-const DNSRegex = `^/?(dns)(4|6)?/[^-|^/][A-Za-z0-9-]([^-|^/]?)+([\\-\\.]{1}[a-z0-9]+)*\\.[A-Za-z]{2,}(/?)$`
+const (
+	defaultBucketSize = 20
+	DefaultDialRatio  = 0.2
+
+	DefaultLibp2pPort int = 1478
+
+	MinimumPeerConnections int64 = 1
+	MinimumBootNodes       int   = 1
+)
 
 var (
 	ErrNoBootnodes  = errors.New("no bootnodes specified")
@@ -104,7 +101,7 @@ type Server struct {
 	dialQueue *dialQueue
 
 	identity  *identity
-	discovery *discovery
+	discovery *discovery.DiscoveryService
 
 	protocols     map[string]Protocol
 	protocolsLock sync.Mutex
@@ -123,6 +120,34 @@ type Server struct {
 	inboundConnCount int64
 
 	temporaryDials sync.Map
+
+	bootnodes *bootnodesWrapper
+}
+
+func (s *Server) IsBootnode(peerID peer.ID) bool {
+	return s.bootnodes.isBootnode(peerID)
+}
+
+func (s *Server) GetBootnodeConnCount() int32 {
+	return s.bootnodes.getBootnodeConnCount()
+}
+
+func (s *Server) DisconnectFromPeer(peerID peer.ID, reason string) {
+	s.Disconnect(peerID, reason)
+}
+
+func (s *Server) FetchAndSetTemporaryDial(peerID peer.ID, newValue bool) bool {
+	_, loaded := s.temporaryDials.LoadOrStore(peerID, newValue)
+
+	return loaded
+}
+
+func (s *Server) RemoveTemporaryDial(peerID peer.ID) {
+	s.temporaryDials.Delete(peerID)
+}
+
+func (s *Server) GetAvailableOutboundConnections() int64 {
+	return s.availableOutboundConns()
 }
 
 type Peer struct {
@@ -201,7 +226,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		return nil, fmt.Errorf("failed to create libp2p stack: %w", err)
 	}
 
-	emitter, err := host.EventBus().Emitter(new(PeerEvent))
+	emitter, err := host.EventBus().Emitter(new(peerEvent.PeerEvent))
 	if err != nil {
 		return nil, err
 	}
@@ -218,6 +243,11 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		emitterPeerEvent: emitter,
 		protocols:        map[string]Protocol{},
 		secretsManager:   config.SecretsManager,
+		bootnodes: &bootnodesWrapper{
+			bootnodeArr:       make([]*peer.AddrInfo, 0),
+			bootnodesMap:      make(map[peer.ID]*peer.AddrInfo),
+			bootnodeConnCount: 0,
+		},
 	}
 
 	// start identity
@@ -244,47 +274,23 @@ func (s *Server) Start() error {
 		return identityStartErr
 	}
 
-	s.logger.Info("LibP2P server running", "addr", AddrInfoToString(s.AddrInfo()))
+	s.logger.Info("LibP2P server running", "addr", common.AddrInfoToString(s.AddrInfo()))
 
 	if !s.config.NoDiscover {
-		// Check the bootnode config is present
-		if s.config.Chain.Bootnodes == nil {
-			return ErrNoBootnodes
+		// Parse the bootnode data
+		if setupErr := s.setupBootnodes(); setupErr != nil {
+			return fmt.Errorf("unable to parse bootnode data, %w", setupErr)
 		}
 
-		// Check if at least one bootnode is specified
-		if len(s.config.Chain.Bootnodes) < MinimumBootNodes {
-			return ErrMinBootnodes
-		}
-
-		// start discovery
-		s.discovery = &discovery{srv: s, closeCh: make(chan struct{})}
-
-		// try to decode the bootnodes
-		bootnodes := []*peer.AddrInfo{}
-
-		for _, raw := range s.config.Chain.Bootnodes {
-			node, err := StringToAddrInfo(raw)
-			if err != nil {
-				return fmt.Errorf("failed to parse bootnode %s: %w", raw, err)
-			}
-
-			if node.ID == s.host.ID() {
-				s.logger.Info("Omitting bootnode with same ID as host", "id", node.ID)
-
-				continue
-			}
-
-			bootnodes = append(bootnodes, node)
-		}
-
-		if setupErr := s.discovery.setup(bootnodes); setupErr != nil {
+		// Setup and start the discovery service
+		if setupErr := s.setupDiscovery(); setupErr != nil {
 			return fmt.Errorf("unable to setup discovery, %w", setupErr)
 		}
 	}
 
 	go s.runDial()
 	go s.checkPeerConnections()
+
 	go func() {
 		if err := s.runJoinWatcher(); err != nil {
 			s.logger.Error(fmt.Sprintf("Unable to start join watcher service, %v", err))
@@ -303,6 +309,120 @@ func (s *Server) Start() error {
 	return nil
 }
 
+// setupDiscovery Sets up the discovery service for the node
+func (s *Server) setupDiscovery() error {
+	// Set up a fresh routing table
+	keyID := kb.ConvertPeerID(s.host.ID())
+
+	routingTable, err := kb.NewRoutingTable(
+		defaultBucketSize,
+		keyID,
+		time.Minute,
+		s.host.Peerstore(),
+		10*time.Second,
+		nil,
+	)
+	if err != nil {
+		return err
+	}
+
+	// Set the PeerAdded event handler
+	routingTable.PeerAdded = func(p peer.ID) {
+		info := s.host.Peerstore().PeerInfo(p)
+		s.addToDialQueue(&info, common.PriorityRandomDial)
+	}
+
+	// Set the PeerRemoved event handler
+	routingTable.PeerRemoved = func(p peer.ID) {
+		s.dialQueue.del(p)
+	}
+
+	// Create an instance of the discovery service
+	discoveryService := discovery.NewDiscoveryService(
+		s,
+		routingTable,
+		s.logger,
+		make(chan struct{}),
+	)
+
+	// Register a network event handler
+	if subscribeErr := s.SubscribeFn(discoveryService.HandleNetworkEvent); subscribeErr != nil {
+		return fmt.Errorf("unable to subscribe to network events, %w", subscribeErr)
+	}
+
+	// Register the actual discovery service as a valid protocol
+	s.registerDiscoveryService(discoveryService)
+
+	// Make sure the discovery service has the bootnodes in its routing table,
+	// and instantiates connections to them
+	discoveryService.ConnectToBootnodes(s.bootnodes.getBootnodes())
+
+	// Start the discovery service
+	discoveryService.Start()
+
+	// Set the discovery service reference
+	s.discovery = discoveryService
+
+	return nil
+}
+
+// registerDiscoveryService registers the discovery protocol to be available
+func (s *Server) registerDiscoveryService(discovery *discovery.DiscoveryService) {
+	grpcStream := grpc.NewGrpcStream()
+	proto.RegisterDiscoveryServer(grpcStream.GrpcServer(), discovery)
+	grpcStream.Serve()
+
+	s.RegisterProtocol(common.DiscProto, grpcStream)
+}
+
+// setupBootnodes sets up the node's bootnode connections
+func (s *Server) setupBootnodes() error {
+	// Check the bootnode config is present
+	if s.config.Chain.Bootnodes == nil {
+		return ErrNoBootnodes
+	}
+
+	// Check if at least one bootnode is specified
+	if len(s.config.Chain.Bootnodes) < MinimumBootNodes {
+		return ErrMinBootnodes
+	}
+
+	bootnodesArr := make([]*peer.AddrInfo, 0)
+	bootnodesMap := make(map[peer.ID]*peer.AddrInfo)
+
+	for _, rawAddr := range s.config.Chain.Bootnodes {
+		bootnode, err := common.StringToAddrInfo(rawAddr)
+		if err != nil {
+			return fmt.Errorf("failed to parse bootnode %s: %w", rawAddr, err)
+		}
+
+		if bootnode.ID == s.host.ID() {
+			s.logger.Info("Omitting bootnode with same ID as host", "id", bootnode.ID)
+
+			continue
+		}
+
+		bootnodesArr = append(bootnodesArr, bootnode)
+		bootnodesMap[bootnode.ID] = bootnode
+	}
+
+	// It's fine for the bootnodes field to be unprotected
+	// at this point because it is initialized once (doesn't change),
+	// and used only after this point
+	s.bootnodes = &bootnodesWrapper{
+		bootnodeArr:       bootnodesArr,
+		bootnodesMap:      bootnodesMap,
+		bootnodeConnCount: int32(len(bootnodesArr)),
+	}
+
+	return nil
+}
+
+// AddToPeerStore adds peer information to the node's peer store
+func (s *Server) AddToPeerStore(peerInfo *peer.AddrInfo) {
+	s.host.Peerstore().AddAddr(peerInfo.ID, peerInfo.Addrs[0], peerstore.AddressTTL)
+}
+
 // checkPeerCount will attempt to make new connections if the active peer count is lesser than the specified limit.
 func (s *Server) checkPeerConnections() {
 	for {
@@ -313,11 +433,11 @@ func (s *Server) checkPeerConnections() {
 		}
 
 		if s.numPeers() < MinimumPeerConnections {
-			if s.config.NoDiscover || len(s.discovery.bootnodes.bootnodeArr) == 0 {
+			if s.config.NoDiscover || s.bootnodes.getBootnodeCount() == 0 {
 				//TODO: dial peers from the peerstore
 			} else {
-				randomNode := s.getRandomBootNode()
-				s.addToDialQueue(randomNode, PriorityRandomDial)
+				randomNode := s.GetRandomBootnode()
+				s.addToDialQueue(randomNode, common.PriorityRandomDial)
 			}
 		}
 	}
@@ -326,10 +446,15 @@ func (s *Server) checkPeerConnections() {
 func (s *Server) runDial() {
 	// watch for events of peers included or removed
 	notifyCh := make(chan struct{})
-	err := s.SubscribeFn(func(evnt *PeerEvent) {
+	err := s.SubscribeFn(func(event *peerEvent.PeerEvent) {
 		// Only concerned about the listed event types
-		switch evnt.Type {
-		case PeerConnected, PeerFailedToConnect, PeerDisconnected, PeerDialCompleted, PeerAddedToDialQueue:
+		switch event.Type {
+		case
+			peerEvent.PeerConnected,
+			peerEvent.PeerFailedToConnect,
+			peerEvent.PeerDisconnected,
+			peerEvent.PeerDialCompleted,
+			peerEvent.PeerAddedToDialQueue:
 		default:
 			return
 		}
@@ -360,13 +485,13 @@ func (s *Server) runDial() {
 			if s.isConnected(tt.addr.ID) {
 				// the node is already connected, send an event to wake up
 				// any join watchers
-				s.emitEvent(tt.addr.ID, PeerAlreadyConnected)
+				s.emitEvent(tt.addr.ID, peerEvent.PeerAlreadyConnected)
 			} else {
 				// the connection process is async because it involves connection (here) +
 				// the handshake done in the identity service.
 				if err := s.host.Connect(context.Background(), *tt.addr); err != nil {
 					s.logger.Debug("failed to dial", "addr", tt.addr.String(), "err", err)
-					s.emitEvent(tt.addr.ID, PeerFailedToConnect)
+					s.emitEvent(tt.addr.ID, peerEvent.PeerFailedToConnect)
 				}
 			}
 		}
@@ -388,15 +513,12 @@ func (s *Server) numPeers() int64 {
 	return int64(len(s.peers))
 }
 
-func (s *Server) getRandomBootNode() *peer.AddrInfo {
-	return s.discovery.bootnodes.getRandomBootnode()
-}
-
-// getBootNode returns the address of a random bootnode which is not connected
-func (s *Server) getBootNode() *peer.AddrInfo {
+// GetRandomBootnode fetches a random bootnode that's currently
+// NOT connected, if any
+func (s *Server) GetRandomBootnode() *peer.AddrInfo {
 	nonConnectedNodes := make([]*peer.AddrInfo, 0)
 
-	for _, v := range s.discovery.bootnodes.bootnodeArr {
+	for _, v := range s.bootnodes.getBootnodes() {
 		if !s.hasPeer(v.ID) {
 			nonConnectedNodes = append(nonConnectedNodes, v)
 		}
@@ -410,6 +532,7 @@ func (s *Server) getBootNode() *peer.AddrInfo {
 
 	return nil
 }
+
 func (s *Server) Peers() []*Peer {
 	s.peersLock.Lock()
 	defer s.peersLock.Unlock()
@@ -472,8 +595,10 @@ func (s *Server) GetProtocols(peerID peer.ID) ([]string, error) {
 	return s.host.Peerstore().GetProtocols(peerID)
 }
 
-func (s *Server) GetPeerInfo(peerID peer.ID) peer.AddrInfo {
-	return s.host.Peerstore().PeerInfo(peerID)
+func (s *Server) GetPeerInfo(peerID peer.ID) *peer.AddrInfo {
+	info := s.host.Peerstore().PeerInfo(peerID)
+
+	return &info
 }
 
 func (s *Server) addPeer(id peer.ID, direction network.Direction) {
@@ -492,11 +617,11 @@ func (s *Server) addPeer(id peer.ID, direction network.Direction) {
 		atomic.AddInt64(&s.inboundConnCount, 1)
 	}
 
-	if !s.config.NoDiscover && s.discovery.isBootnode(id) {
-		atomic.AddInt32(&s.discovery.bootnodes.bootnodeConnCount, 1)
+	if !s.config.NoDiscover && s.bootnodes.isBootnode(id) {
+		s.bootnodes.increaseBootnodeConnCount(1)
 	}
 
-	s.emitEvent(id, PeerConnected)
+	s.emitEvent(id, peerEvent.PeerConnected)
 	s.metrics.Peers.Set(float64(len(s.peers)))
 }
 
@@ -511,8 +636,8 @@ func (s *Server) delPeer(id peer.ID) {
 			atomic.AddInt64(&s.inboundConnCount, -1)
 		}
 
-		if !s.config.NoDiscover && s.discovery.isBootnode(id) {
-			atomic.AddInt32(&s.discovery.bootnodes.bootnodeConnCount, -1)
+		if !s.config.NoDiscover && s.bootnodes.isBootnode(id) {
+			s.bootnodes.increaseBootnodeConnCount(-1)
 		}
 
 		delete(s.peers, id)
@@ -524,7 +649,7 @@ func (s *Server) delPeer(id peer.ID) {
 		)
 	}
 
-	s.emitEvent(id, PeerDisconnected)
+	s.emitEvent(id, peerEvent.PeerDisconnected)
 	s.metrics.Peers.Set(float64(len(s.peers)))
 }
 
@@ -561,7 +686,7 @@ func (s *Server) JoinAddr(addr string, timeout time.Duration) error {
 
 func (s *Server) Join(addr *peer.AddrInfo, timeout time.Duration) error {
 	s.logger.Info("Join request", "addr", addr.String())
-	s.addToDialQueue(addr, PriorityRequestedDial)
+	s.addToDialQueue(addr, common.PriorityRequestedDial)
 
 	if timeout == 0 {
 		return nil
@@ -596,20 +721,22 @@ func (s *Server) watch(peerID peer.ID, dur time.Duration) error {
 }
 
 func (s *Server) runJoinWatcher() error {
-	return s.SubscribeFn(func(evnt *PeerEvent) {
-		switch evnt.Type {
-		// only concerned about PeerConnected, PeerFailedToConnect, and PeerAlreadyConnected
-		case PeerConnected, PeerFailedToConnect, PeerAlreadyConnected:
+	return s.SubscribeFn(func(event *peerEvent.PeerEvent) {
+		switch event.Type {
+		case
+			peerEvent.PeerConnected,
+			peerEvent.PeerFailedToConnect,
+			peerEvent.PeerAlreadyConnected:
 		default:
 			return
 		}
 
 		// try to find a watcher for this peer
 		s.joinWatchersLock.Lock()
-		errCh, ok := s.joinWatchers[evnt.PeerID]
+		errCh, ok := s.joinWatchers[event.PeerID]
 		if ok {
 			errCh <- nil
-			delete(s.joinWatchers, evnt.PeerID)
+			delete(s.joinWatchers, event.PeerID)
 		}
 		s.joinWatchersLock.Unlock()
 	})
@@ -678,15 +805,15 @@ func (s *Server) AddrInfo() *peer.AddrInfo {
 	}
 }
 
-func (s *Server) addToDialQueue(addr *peer.AddrInfo, priority uint64) {
+func (s *Server) addToDialQueue(addr *peer.AddrInfo, priority common.DialPriority) {
 	s.dialQueue.add(addr, priority)
-	s.emitEvent(addr.ID, PeerAddedToDialQueue)
+	s.emitEvent(addr.ID, peerEvent.PeerAddedToDialQueue)
 }
 
-func (s *Server) emitEvent(peerID peer.ID, typ PeerEventType) {
-	evnt := PeerEvent{
+func (s *Server) emitEvent(peerID peer.ID, peerEventType peerEvent.PeerEventType) {
+	evnt := peerEvent.PeerEvent{
 		PeerID: peerID,
-		Type:   typ,
+		Type:   peerEventType,
 	}
 
 	if err := s.emitterPeerEvent.Emit(evnt); err != nil {
@@ -696,24 +823,24 @@ func (s *Server) emitEvent(peerID peer.ID, typ PeerEventType) {
 
 type Subscription struct {
 	sub event.Subscription
-	ch  chan *PeerEvent
+	ch  chan *peerEvent.PeerEvent
 }
 
 func (s *Subscription) run() {
 	// convert interface{} to *PeerEvent channels
 	for {
 		evnt := <-s.sub.Out()
-		if obj, ok := evnt.(PeerEvent); ok {
+		if obj, ok := evnt.(peerEvent.PeerEvent); ok {
 			s.ch <- &obj
 		}
 	}
 }
 
-func (s *Subscription) GetCh() chan *PeerEvent {
+func (s *Subscription) GetCh() chan *peerEvent.PeerEvent {
 	return s.ch
 }
 
-func (s *Subscription) Get() *PeerEvent {
+func (s *Subscription) Get() *peerEvent.PeerEvent {
 	obj := <-s.ch
 
 	return obj
@@ -725,14 +852,14 @@ func (s *Subscription) Close() {
 
 // Subscribe starts a PeerEvent subscription
 func (s *Server) Subscribe() (*Subscription, error) {
-	raw, err := s.host.EventBus().Subscribe(new(PeerEvent))
+	raw, err := s.host.EventBus().Subscribe(new(peerEvent.PeerEvent))
 	if err != nil {
 		return nil, err
 	}
 
 	sub := &Subscription{
 		sub: raw,
-		ch:  make(chan *PeerEvent),
+		ch:  make(chan *peerEvent.PeerEvent),
 	}
 	go sub.run()
 
@@ -740,7 +867,7 @@ func (s *Server) Subscribe() (*Subscription, error) {
 }
 
 // SubscribeFn is a helper method to run subscription of PeerEvents
-func (s *Server) SubscribeFn(handler func(evnt *PeerEvent)) error {
+func (s *Server) SubscribeFn(handler func(evnt *peerEvent.PeerEvent)) error {
 	sub, err := s.Subscribe()
 	if err != nil {
 		return err
@@ -764,12 +891,12 @@ func (s *Server) SubscribeFn(handler func(evnt *PeerEvent)) error {
 }
 
 // SubscribeCh returns an event of of subscription events
-func (s *Server) SubscribeCh() (<-chan *PeerEvent, error) {
-	ch := make(chan *PeerEvent)
+func (s *Server) SubscribeCh() (<-chan *peerEvent.PeerEvent, error) {
+	ch := make(chan *peerEvent.PeerEvent)
 
 	var isClosed int32 = 0
 
-	err := s.SubscribeFn(func(evnt *PeerEvent) {
+	err := s.SubscribeFn(func(evnt *peerEvent.PeerEvent) {
 		if atomic.LoadInt32(&isClosed) == 0 {
 			ch <- evnt
 		}
@@ -788,150 +915,4 @@ func (s *Server) SubscribeCh() (<-chan *PeerEvent, error) {
 	}()
 
 	return ch, nil
-}
-
-func StringToAddrInfo(addr string) (*peer.AddrInfo, error) {
-	addr0, err := multiaddr.NewMultiaddr(addr)
-	if err != nil {
-		return nil, err
-	}
-
-	addr1, err := peer.AddrInfoFromP2pAddr(addr0)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return addr1, nil
-}
-
-var (
-	// Regex used for matching loopback addresses (IPv4, IPv6, DNS)
-	// This regex will match:
-	// /ip4/localhost/tcp/<port>
-	// /ip4/127.0.0.1/tcp/<port>
-	// /ip4/<any other loopback>/tcp/<port>
-	// /ip6/<any loopback>/tcp/<port>
-	// /dns/foobar.com/tcp/<port>
-	loopbackRegex = regexp.MustCompile(
-		//nolint:lll
-		fmt.Sprintf(`^\/ip4\/127(?:\.[0-9]+){0,2}\.[0-9]+\/tcp\/\d+$|^\/ip4\/localhost\/tcp\/\d+$|^\/ip6\/(?:0*\:)*?:?0*1\/tcp\/\d+$|%s`, DNSRegex),
-	)
-
-	dnsRegex = "^/?(dns)(4|6)?/[^-|^/][A-Za-z0-9-]([^-|^/]?)+([\\-\\.]{1}[a-z0-9]+)*\\.[A-Za-z]{2,}(/?)$"
-)
-
-// AddrInfoToString converts an AddrInfo into a string representation that can be dialed from another node
-func AddrInfoToString(addr *peer.AddrInfo) string {
-	// Safety check
-	if len(addr.Addrs) == 0 {
-		panic("No dial addresses found")
-	}
-
-	dialAddress := addr.Addrs[0].String()
-
-	// Try to see if a non loopback address is present in the list
-	if len(addr.Addrs) > 1 && loopbackRegex.MatchString(dialAddress) {
-		// Find an address that's not a loopback address
-		for _, address := range addr.Addrs {
-			if !loopbackRegex.MatchString(address.String()) {
-				// Not a loopback address, dial address found
-				dialAddress = address.String()
-
-				break
-			}
-		}
-	}
-
-	// Format output and return
-	return dialAddress + "/p2p/" + addr.ID.String()
-}
-
-// MultiAddrFromDNS constructs a multiAddr from the passed in DNS address and port combination
-func MultiAddrFromDNS(addr string, port int) (multiaddr.Multiaddr, error) {
-	var (
-		version string
-		domain  string
-	)
-
-	match, err := regexp.MatchString(
-		dnsRegex,
-		addr,
-	)
-	if err != nil || !match {
-		return nil, errors.New("invalid DNS address")
-	}
-
-	s := strings.Trim(addr, "/")
-	split := strings.Split(s, "/")
-
-	if len(split) != 2 {
-		return nil, errors.New("invalid DNS address")
-	}
-
-	switch split[0] {
-	case "dns":
-		version = "dns"
-	case "dns4":
-		version = "dns4"
-	case "dns6":
-		version = "dns6"
-	default:
-		return nil, errors.New("invalid DNS version")
-	}
-
-	domain = split[1]
-
-	multiAddr, err := multiaddr.NewMultiaddr(
-		fmt.Sprintf(
-			"/%s/%s/tcp/%d",
-			version,
-			domain,
-			port,
-		),
-	)
-
-	if err != nil {
-		return nil, errors.New("could not create a multi address")
-	}
-
-	return multiAddr, nil
-}
-
-type PeerEventType uint
-
-const (
-	PeerConnected        PeerEventType = iota // Emitted when a peer connected
-	PeerFailedToConnect                       // Emitted when a peer failed to connect
-	PeerDisconnected                          // Emitted when a peer disconnected from node
-	PeerAlreadyConnected                      // Emitted when a peer already connected on dial
-	PeerDialCompleted                         // Emitted when a peer completed dial
-	PeerAddedToDialQueue                      // Emitted when a peer is added to dial queue
-)
-
-var peerEventToName = map[PeerEventType]string{
-	PeerConnected:        "PeerConnected",
-	PeerFailedToConnect:  "PeerFailedToConnect",
-	PeerDisconnected:     "PeerDisconnected",
-	PeerAlreadyConnected: "PeerAlreadyConnected",
-	PeerDialCompleted:    "PeerDialCompleted",
-	PeerAddedToDialQueue: "PeerAddedToDialQueue",
-}
-
-func (s PeerEventType) String() string {
-	name, ok := peerEventToName[s]
-	if !ok {
-		return "unknown"
-	}
-
-	return name
-}
-
-type PeerEvent struct {
-	// PeerID is the id of the peer that triggered
-	// the event
-	PeerID peer.ID
-
-	// Type is the type of the event
-	Type PeerEventType
 }
