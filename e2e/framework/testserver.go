@@ -6,10 +6,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/command"
-	ibftSwitch "github.com/0xPolygon/polygon-edge/command/ibft/switch"
-	initCmd "github.com/0xPolygon/polygon-edge/command/secrets/init"
-	"google.golang.org/grpc/credentials/insecure"
 	"io"
 	"math/big"
 	"os"
@@ -20,7 +16,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/genesis"
+	ibftSwitch "github.com/0xPolygon/polygon-edge/command/ibft/switch"
+	initCmd "github.com/0xPolygon/polygon-edge/command/secrets/init"
 	"github.com/0xPolygon/polygon-edge/command/server"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft"
 	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
@@ -37,12 +36,14 @@ import (
 	"github.com/umbracle/go-web3"
 	"github.com/umbracle/go-web3/jsonrpc"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	empty "google.golang.org/protobuf/types/known/emptypb"
 )
 
 type TestServerConfigCallback func(*TestServerConfig)
 
 const (
+	serverIP    = "127.0.0.1"
 	initialPort = 12000
 	binaryName  = "polygon-edge"
 )
@@ -84,15 +85,27 @@ func NewTestServer(t *testing.T, rootDir string, callback TestServerConfigCallba
 }
 
 func (t *TestServer) GrpcAddr() string {
-	return fmt.Sprintf("http://127.0.0.1:%d", t.Config.GRPCPort)
+	return fmt.Sprintf("%s:%d", serverIP, t.Config.GRPCPort)
+}
+
+func (t *TestServer) LibP2PAddr() string {
+	return fmt.Sprintf("%s:%d", serverIP, t.Config.LibP2PPort)
 }
 
 func (t *TestServer) JSONRPCAddr() string {
-	return fmt.Sprintf("http://127.0.0.1:%d", t.Config.JSONRPCPort)
+	return fmt.Sprintf("%s:%d", serverIP, t.Config.JSONRPCPort)
+}
+
+func (t *TestServer) HTTPJSONRPCURL() string {
+	return fmt.Sprintf("http://%s", t.JSONRPCAddr())
+}
+
+func (t *TestServer) WSJSONRPCURL() string {
+	return fmt.Sprintf("ws://%s/ws", t.JSONRPCAddr())
 }
 
 func (t *TestServer) JSONRPC() *jsonrpc.Client {
-	clt, err := jsonrpc.NewClient(t.JSONRPCAddr())
+	clt, err := jsonrpc.NewClient(t.HTTPJSONRPCURL())
 	if err != nil {
 		t.t.Fatal(err)
 	}
@@ -102,7 +115,7 @@ func (t *TestServer) JSONRPC() *jsonrpc.Client {
 
 func (t *TestServer) Operator() proto.SystemClient {
 	conn, err := grpc.Dial(
-		fmt.Sprintf("127.0.0.1:%d", t.Config.GRPCPort),
+		t.GrpcAddr(),
 		grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		t.t.Fatal(err)
@@ -113,7 +126,7 @@ func (t *TestServer) Operator() proto.SystemClient {
 
 func (t *TestServer) TxnPoolOperator() txpoolProto.TxnPoolOperatorClient {
 	conn, err := grpc.Dial(
-		fmt.Sprintf("127.0.0.1:%d", t.Config.GRPCPort),
+		t.GrpcAddr(),
 		grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		t.t.Fatal(err)
@@ -124,7 +137,7 @@ func (t *TestServer) TxnPoolOperator() txpoolProto.TxnPoolOperatorClient {
 
 func (t *TestServer) IBFTOperator() ibftOp.IbftOperatorClient {
 	conn, err := grpc.Dial(
-		fmt.Sprintf("127.0.0.1:%d", t.Config.GRPCPort),
+		t.GrpcAddr(),
 		grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		t.t.Fatal(err)
@@ -292,11 +305,11 @@ func (t *TestServer) Start(ctx context.Context) error {
 		// add custom chain
 		"--chain", filepath.Join(t.Config.RootDir, "genesis.json"),
 		// enable grpc
-		"--grpc-address", fmt.Sprintf(":%d", t.Config.GRPCPort),
+		"--grpc-address", t.GrpcAddr(),
 		// enable libp2p
-		"--libp2p", fmt.Sprintf(":%d", t.Config.LibP2PPort),
+		"--libp2p", t.LibP2PAddr(),
 		// enable jsonrpc
-		"--jsonrpc", fmt.Sprintf(":%d", t.Config.JSONRPCPort),
+		"--jsonrpc", t.JSONRPCAddr(),
 	}
 
 	switch t.Config.Consensus {
