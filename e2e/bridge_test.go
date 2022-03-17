@@ -151,7 +151,7 @@ func TestBridge_StateSync(t *testing.T) {
 			config.SetSeal(true)
 			config.Premine(senderAddr, framework.EthToWei(10))
 			config.SetUseBridge(true)
-			config.SetBridgeRootChainURL(sourceIBFT.GetServer(0).WSJSONRPCAddr())
+			config.SetBridgeRootChainURL(sourceIBFT.GetServer(0).WSJSONRPCURL())
 			config.SetBridgeRootChainContract(syncerContractAddr.String())
 			config.SetBridgeRootChainConfirmations(5)
 		})
