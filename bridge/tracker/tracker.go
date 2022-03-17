@@ -3,9 +3,9 @@ package tracker
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"math/big"
 
-	"errors"
 	"github.com/0xPolygon/polygon-edge/blockchain/storage"
 	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/go-web3"

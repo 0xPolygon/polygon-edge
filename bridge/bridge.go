@@ -1,28 +1,35 @@
 package bridge
 
 import (
+	"encoding/json"
 	"fmt"
 	"sync"
 
 	"github.com/0xPolygon/polygon-edge/bridge/sam"
 	"github.com/0xPolygon/polygon-edge/bridge/tracker"
 	"github.com/0xPolygon/polygon-edge/bridge/transport"
-	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
+	"github.com/umbracle/go-web3"
+	"github.com/umbracle/go-web3/abi"
 )
 
 const (
-	StateSyncedABI = `event StateSynced(uint256 indexed id, address indexed contractAddress, bytes data)`
+	StateSyncedEventABI = `event StateSynced(uint256 indexed id, address indexed contractAddress, bytes data)`
+)
+
+var (
+	StateSyncedEvent = abi.MustNewEvent(StateSyncedEventABI)
 )
 
 type Bridge interface {
 	Start() error
 	Close() error
 	SetValidators([]types.Address, uint64)
-	GetReadyMessages() []sam.ReadyMessage
-	Consume(types.Hash)
+	GetReadyMessages() ([]MessageWithSignatures, error)
+	ValidateTx(*types.Transaction) error
+	Consume(*types.Transaction)
 }
 
 type bridge struct {
@@ -36,6 +43,7 @@ type bridge struct {
 
 	isValidatorMapLock sync.RWMutex
 	isValidatorMap     map[types.Address]bool
+	validatorThreshold uint64
 
 	// storage
 	sampool sam.Pool
@@ -50,8 +58,6 @@ func NewBridge(
 	dataDirURL string,
 	config *Config,
 ) (Bridge, error) {
-	fmt.Printf("NewBridge, address=%+v, config=%+v\n", signer.Address(), config)
-
 	bridgeLogger := logger.Named("bridge")
 
 	trackerConfig := &tracker.Config{
@@ -60,7 +66,7 @@ func NewBridge(
 		DBPath:        dataDirURL,
 		ContractABIs: map[string][]string{
 			config.RootChainContract.String(): {
-				StateSyncedABI,
+				StateSyncedEventABI,
 			},
 		},
 	}
@@ -113,15 +119,46 @@ func (b *bridge) Close() error {
 
 func (b *bridge) SetValidators(validators []types.Address, threshold uint64) {
 	b.resetIsValidatorMap(validators)
+	b.validatorThreshold = threshold
+
 	b.sampool.UpdateValidatorSet(validators, threshold)
 }
 
-func (b *bridge) GetReadyMessages() []sam.ReadyMessage {
-	return b.sampool.GetReadyMessages()
+func (b *bridge) GetReadyMessages() ([]MessageWithSignatures, error) {
+	readyMessages := b.sampool.GetReadyMessages()
+
+	data := make([]MessageWithSignatures, 0, len(readyMessages))
+
+	for _, readyMsg := range readyMessages {
+		msg, ok := readyMsg.Data.(*Message)
+		if !ok {
+			return nil, fmt.Errorf("get unknown type data %T when fetching ready messages", readyMsg.Data)
+		}
+
+		data = append(data, MessageWithSignatures{
+			Message:    *msg,
+			Signatures: readyMsg.Signatures,
+		})
+	}
+
+	return data, nil
 }
 
-func (b *bridge) Consume(hash types.Hash) {
-	b.sampool.ConsumeMessage(hash)
+// ValidateTx validates given state transaction
+// Checks if local SAM Pool has enough signatures for the transaction hash
+func (b *bridge) ValidateTx(tx *types.Transaction) error {
+	hash := getTransactionHash(tx)
+
+	num, required := b.sampool.GetSignatureCount(hash), b.validatorThreshold
+	if num < required {
+		return fmt.Errorf("Bridge doesn't have enough signatures, hash=%s, required=%d, actual=%d", hash, required, num)
+	}
+
+	return nil
+}
+
+func (b *bridge) Consume(tx *types.Transaction) {
+	b.sampool.ConsumeMessage(getTransactionHash(tx))
 }
 
 func (b *bridge) resetIsValidatorMap(validators []types.Address) {
@@ -149,26 +186,46 @@ func (b *bridge) processEvents(eventCh <-chan []byte) {
 		case <-b.closeCh:
 			return
 		case data := <-eventCh:
-			if err := b.addLocalMessage(data); err != nil {
-				b.logger.Error("failed process event", "err", err)
+			if err := b.processEthEvent(data); err != nil {
+				b.logger.Error("failed to process event", "err", err)
 			}
 		}
 	}
 }
 
-func (b *bridge) addLocalMessage(data []byte) error {
-	hash := types.BytesToHash(crypto.Keccak256(data))
+func (b *bridge) processEthEvent(data []byte) error {
+	var log web3.Log
+	if err := json.Unmarshal(data, &log); err != nil {
+		return err
+	}
+
+	msg, err := eventToMessage(&log)
+	if err != nil {
+		return err
+	}
+
+	if msg == nil {
+		return fmt.Errorf("unknown event: tx=%s, log index=%d", log.TransactionHash, log.LogIndex)
+	}
+
+	if err := b.addLocalMessage(msg); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (b *bridge) addLocalMessage(msg *Message) error {
+	hash := getMessageHash(msg)
 
 	signature, err := b.signer.Sign(hash[:])
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf("addLocalMessage hash=%+v,signature=%+v, data=%+v\n", hash, signature, data)
-
 	b.sampool.AddMessage(&sam.Message{
 		Hash: hash,
-		Body: data,
+		Data: msg,
 	})
 
 	b.sampool.AddSignature(&sam.MessageSignature{
@@ -176,6 +233,8 @@ func (b *bridge) addLocalMessage(data []byte) error {
 		Address:   b.signer.Address(),
 		Signature: signature,
 	})
+
+	b.logger.Info("added local signature to SAM Pool", "hash", hash)
 
 	signedMessage := &transport.SignedMessage{
 		Hash:      hash,
@@ -197,13 +256,6 @@ func (b *bridge) addRemoteMessage(message *transport.SignedMessage) {
 		return
 	}
 
-	fmt.Printf(
-		"addRemoteMessage hash=%+v, signature=%+v, sender=%+v\n",
-		message.Hash,
-		message.Signature,
-		sender,
-	)
-
 	if !b.isValidator(sender) {
 		b.logger.Warn(
 			"ignored gossip message from non-validator",
@@ -221,4 +273,40 @@ func (b *bridge) addRemoteMessage(message *transport.SignedMessage) {
 		Address:   sender,
 		Signature: message.Signature,
 	})
+
+	b.logger.Info("added remote signature to SAM Pool", "hash", message.Hash, "from", sender)
+}
+
+func getMessageHash(msg *Message) types.Hash {
+	return msg.Transaction.ComputeHash().Hash
+}
+
+func getTransactionHash(tx *types.Transaction) types.Hash {
+	msgTx := &types.Transaction{
+		Type:  types.TxTypeState,
+		To:    tx.To,
+		Input: tx.Input,
+		Nonce: tx.Nonce,
+	}
+
+	return msgTx.ComputeHash().Hash
+}
+
+func eventToMessage(log *web3.Log) (*Message, error) {
+	switch {
+	case StateSyncedEvent.Match(log):
+		event, err := ParseStateSyncEvent(log)
+		if err != nil {
+			return nil, err
+		}
+
+		tx := NewStateSyncedTx(event)
+
+		return &Message{
+			ID:          event.ID,
+			Transaction: tx,
+		}, nil
+	}
+
+	return nil, nil
 }

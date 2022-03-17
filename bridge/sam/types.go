@@ -4,7 +4,7 @@ import "github.com/0xPolygon/polygon-edge/types"
 
 type Message struct {
 	Hash types.Hash
-	Body []byte
+	Data interface{}
 }
 
 type MessageSignature struct {
@@ -14,7 +14,7 @@ type MessageSignature struct {
 }
 
 type ReadyMessage struct {
-	Body       []byte
+	Data       interface{}
 	Hash       types.Hash
 	Signatures [][]byte
 }
@@ -31,4 +31,6 @@ type Pool interface {
 	ConsumeMessage(types.Hash)
 	GetReadyMessages() []ReadyMessage
 	UpdateValidatorSet([]types.Address, uint64)
+	IsMessageKnown(hash types.Hash) bool
+	GetSignatureCount(hash types.Hash) uint64
 }

@@ -25,27 +25,31 @@ type SrvAccount struct {
 
 // TestServerConfig for the test server
 type TestServerConfig struct {
-	ReservedPorts           []ReservedPort
-	JSONRPCPort             int                  // The JSON RPC endpoint port
-	GRPCPort                int                  // The GRPC endpoint port
-	LibP2PPort              int                  // The Libp2p endpoint port
-	Seal                    bool                 // Flag indicating if blocks should be sealed
-	RootDir                 string               // The root directory for test environment
-	IBFTDirPrefix           string               // The prefix of data directory for IBFT
-	IBFTDir                 string               // The name of data directory for IBFT
-	PremineAccts            []*SrvAccount        // Accounts with existing balances (genesis accounts)
-	GenesisValidatorBalance *big.Int             // Genesis balance for the validators
-	DevStakers              []types.Address      // List of initial staking addresses for the staking SC with dev consensus
-	Consensus               ConsensusType        // Consensus MechanismType
-	Bootnodes               []string             // Bootnode Addresses
-	PriceLimit              *uint64              // Minimum gas price limit to enforce for acceptance into the pool
-	DevInterval             int                  // Dev consensus update interval [s]
-	EpochSize               uint64               // The epoch size in blocks for the IBFT layer
-	BlockGasLimit           uint64               // Block gas limit
-	BlockGasTarget          uint64               // Gas target for new blocks
-	ShowsLog                bool                 // Flag specifying if logs are shown
-	IsPos                   bool                 // Specifies the mechanism used for IBFT (PoA / PoS)
-	Signer                  *crypto.EIP155Signer // Signer used for transactions
+	ReservedPorts                []ReservedPort
+	JSONRPCPort                  int                  // The JSON RPC endpoint port
+	GRPCPort                     int                  // The GRPC endpoint port
+	LibP2PPort                   int                  // The Libp2p endpoint port
+	Seal                         bool                 // Flag indicating if blocks should be sealed
+	RootDir                      string               // The root directory for test environment
+	IBFTDirPrefix                string               // The prefix of data directory for IBFT
+	IBFTDir                      string               // The name of data directory for IBFT
+	PremineAccts                 []*SrvAccount        // Accounts with existing balances (genesis accounts)
+	GenesisValidatorBalance      *big.Int             // Genesis balance for the validators
+	DevStakers                   []types.Address      // List of initial stakers for the staking SC with dev consensus
+	Consensus                    ConsensusType        // Consensus MechanismType
+	Bootnodes                    []string             // Bootnode Addresses
+	PriceLimit                   *uint64              // Minimum gas price limit to enforce for acceptance into the pool
+	DevInterval                  int                  // Dev consensus update interval [s]
+	EpochSize                    uint64               // The epoch size in blocks for the IBFT layer
+	BlockGasLimit                uint64               // Block gas limit
+	BlockGasTarget               uint64               // Gas target for new blocks
+	ShowsLog                     bool                 // Flag specifying if logs are shown
+	IsPos                        bool                 // Specifies the mechanism used for IBFT (PoA / PoS)
+	Signer                       *crypto.EIP155Signer // Signer used for transactions
+	UseBridge                    bool                 // Enable Bridge
+	BridgeRootChainURL           *string              // RootChain JSON-RPC URL which Bridge subscribes to
+	BridgeRootChainContract      *string              // Contract Address in RootChain which Bridge watch to
+	BridgeRootChainConfirmations *uint                // Confirmations to make sure the transaction is mined in root chain
 }
 
 // DataDir returns path of data directory server uses
@@ -153,4 +157,24 @@ func (t *TestServerConfig) SetShowsLog(f bool) {
 // It controls the rate at which the validator set is updated
 func (t *TestServerConfig) SetEpochSize(epochSize uint64) {
 	t.EpochSize = epochSize
+}
+
+// SetUseBridge sets flag for Bridge
+func (t *TestServerConfig) SetUseBridge(f bool) {
+	t.UseBridge = f
+}
+
+// SetBridgeRootChainURL sets BridgeRootChainURL for Bridge
+func (t *TestServerConfig) SetBridgeRootChainURL(url string) {
+	t.BridgeRootChainURL = &url
+}
+
+// SetBridgeRootChainContract sets BridgeRootChainContract address for Bridge
+func (t *TestServerConfig) SetBridgeRootChainContract(address string) {
+	t.BridgeRootChainContract = &address
+}
+
+// SetBridgeRootChainConfirmations sets BridgeRootChainConfirmations for Bridge
+func (t *TestServerConfig) SetBridgeRootChainConfirmations(v uint) {
+	t.BridgeRootChainConfirmations = &v
 }
