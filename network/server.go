@@ -564,10 +564,11 @@ func (s *Server) addPeer(id peer.ID, direction network.Direction) {
 
 	// Update connection counters
 	s.connectionCounts.UpdateConnCountByDirection(1, direction)
+	s.updateConnCountMetrics(direction)
 	s.updateBootnodeConnCount(id, 1)
 
 	// Update the metric stats
-	s.metrics.Peers.Set(float64(len(s.peers)))
+	s.metrics.TotalPeerCount.Set(float64(len(s.peers)))
 
 	s.peersLock.Unlock()
 
@@ -584,6 +585,7 @@ func (s *Server) delPeer(id peer.ID) {
 	if peer, ok := s.peers[id]; ok {
 		// Update connection counters
 		s.connectionCounts.UpdateConnCountByDirection(-1, peer.connDirection)
+		s.updateConnCountMetrics(peer.connDirection)
 		s.updateBootnodeConnCount(id, -1)
 
 		delete(s.peers, id)
@@ -596,7 +598,7 @@ func (s *Server) delPeer(id peer.ID) {
 		)
 	}
 
-	s.metrics.Peers.Set(float64(len(s.peers)))
+	s.metrics.TotalPeerCount.Set(float64(len(s.peers)))
 
 	s.peersLock.Unlock()
 
@@ -619,6 +621,8 @@ func (s *Server) updateBootnodeConnCount(peerID peer.ID, delta int64) {
 
 func (s *Server) UpdatePendingConnCount(delta int64, direction network.Direction) {
 	s.connectionCounts.UpdatePendingConnCountByDirection(delta, direction)
+
+	s.updatePendingConnCountMetrics(direction)
 }
 
 func (s *Server) Disconnect(peer peer.ID, reason string) {
@@ -883,4 +887,32 @@ func (s *Server) SubscribeCh() (<-chan *peerEvent.PeerEvent, error) {
 	}()
 
 	return ch, nil
+}
+
+// updateConnCountMetrics updates the connection count metrics
+func (s *Server) updateConnCountMetrics(direction network.Direction) {
+	switch direction {
+	case network.DirInbound:
+		s.metrics.InboundConnectionsCount.Set(
+			float64(s.connectionCounts.GetInboundConnCount()),
+		)
+	case network.DirOutbound:
+		s.metrics.OutboundConnectionsCount.Set(
+			float64(s.connectionCounts.GetOutboundConnCount()),
+		)
+	}
+}
+
+// updatePendingConnCountMetrics updates the pending connection count metrics
+func (s *Server) updatePendingConnCountMetrics(direction network.Direction) {
+	switch direction {
+	case network.DirInbound:
+		s.metrics.PendingInboundConnectionsCount.Set(
+			float64(s.connectionCounts.GetPendingInboundConnCount()),
+		)
+	case network.DirOutbound:
+		s.metrics.PendingOutboundConnectionsCount.Set(
+			float64(s.connectionCounts.GetPendingOutboundConnCount()),
+		)
+	}
 }

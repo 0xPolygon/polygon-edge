@@ -42,23 +42,23 @@ func NewBlankConnectionInfo(
 	}
 }
 
-// getInboundConnCount returns the number of active inbound connections [Thread safe]
-func (ci *ConnectionInfo) getInboundConnCount() int64 {
+// GetInboundConnCount returns the number of active inbound connections [Thread safe]
+func (ci *ConnectionInfo) GetInboundConnCount() int64 {
 	return atomic.LoadInt64(&ci.inboundConnectionCount)
 }
 
-// getOutboundConnCount returns the number of active outbound connections [Thread safe]
-func (ci *ConnectionInfo) getOutboundConnCount() int64 {
+// GetOutboundConnCount returns the number of active outbound connections [Thread safe]
+func (ci *ConnectionInfo) GetOutboundConnCount() int64 {
 	return atomic.LoadInt64(&ci.outboundConnectionCount)
 }
 
-// getPendingInboundConnCount returns the number of pending inbound connections [Thread safe]
-func (ci *ConnectionInfo) getPendingInboundConnCount() int64 {
+// GetPendingInboundConnCount returns the number of pending inbound connections [Thread safe]
+func (ci *ConnectionInfo) GetPendingInboundConnCount() int64 {
 	return atomic.LoadInt64(&ci.pendingInboundConnectionCount)
 }
 
-// getPendingOutboundConnCount returns the number of pending outbound connections [Thread safe]
-func (ci *ConnectionInfo) getPendingOutboundConnCount() int64 {
+// GetPendingOutboundConnCount returns the number of pending outbound connections [Thread safe]
+func (ci *ConnectionInfo) GetPendingOutboundConnCount() int64 {
 	return atomic.LoadInt64(&ci.pendingOutboundConnectionCount)
 }
 
@@ -86,14 +86,14 @@ func (ci *ConnectionInfo) incOutboundConnCount(delta int64) {
 // It takes into account the number of current (active) outbound connections and
 // the number of pending outbound connections [Thread safe]
 func (ci *ConnectionInfo) HasFreeOutboundConn() bool {
-	return ci.getOutboundConnCount()+ci.getPendingOutboundConnCount() < ci.maxOutboundConnCount()
+	return ci.GetOutboundConnCount()+ci.GetPendingOutboundConnCount() < ci.maxOutboundConnCount()
 }
 
 // HasFreeInboundConn checks if there are any open inbound connection slots.
 // It takes into account the number of current (active) inbound connections and
 // the number of pending inbound connections [Thread safe]
 func (ci *ConnectionInfo) HasFreeInboundConn() bool {
-	return ci.getInboundConnCount()+ci.getPendingInboundConnCount() < ci.maxInboundConnCount()
+	return ci.GetInboundConnCount()+ci.GetPendingInboundConnCount() < ci.maxInboundConnCount()
 }
 
 // maxOutboundConnCount returns the maximum number of outbound connections.
