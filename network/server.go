@@ -261,8 +261,6 @@ func setupLibp2pKey(secretsManager secrets.SecretsManager) (crypto.PrivKey, erro
 
 // Start starts the networking services
 func (s *Server) Start() error {
-	s.logger.Info("LibP2P server running", "addr", common.AddrInfoToString(s.AddrInfo()))
-
 	if setupErr := s.setupIdentity(); setupErr != nil {
 		return fmt.Errorf("unable to setup identity, %w", setupErr)
 	}
@@ -297,6 +295,8 @@ func (s *Server) Start() error {
 			}()
 		},
 	})
+
+	s.logger.Info("LibP2P server running", "addr", common.AddrInfoToString(s.AddrInfo()))
 
 	return nil
 }
