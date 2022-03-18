@@ -66,8 +66,6 @@ type IdentityService struct {
 
 	chainID int64   // The chain ID of the network
 	hostID  peer.ID // The base networking server's host peer ID
-
-	initialized uint64 // Flag that keeps track if the identity service has been initialized
 }
 
 // NewIdentityService returns a new instance of the IdentityService
@@ -78,11 +76,10 @@ func NewIdentityService(
 	hostID peer.ID,
 ) *IdentityService {
 	return &IdentityService{
-		logger:      logger.Named("identity"),
-		baseServer:  server,
-		initialized: 0,
-		chainID:     chainID,
-		hostID:      hostID,
+		logger:     logger.Named("identity"),
+		baseServer: server,
+		chainID:    chainID,
+		hostID:     hostID,
 	}
 }
 
