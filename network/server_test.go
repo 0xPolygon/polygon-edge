@@ -859,3 +859,193 @@ func TestMultiAddrFromDns(t *testing.T) {
 		})
 	}
 }
+
+// TestPeerAdditionDeletion tests that the server's peer connection
+// information handling is valid
+func TestPeerAdditionDeletion(t *testing.T) {
+	createServer := func() *Server {
+		server, createErr := CreateServer(nil)
+		if createErr != nil {
+			t.Fatalf("Unable to create networking server, %v", createErr)
+		}
+
+		return server
+	}
+
+	generateAndAddPeers := func(server *Server, peersNum int) []*randomPeer {
+		randomPeers, err := generateRandomPeers(t, peersNum)
+		if err != nil {
+			t.Fatalf("Unable to generate random peers, %v", err)
+		}
+
+		for _, randomPeer := range randomPeers {
+			server.AddPeer(randomPeer.peerID, randomPeer.direction)
+
+			assert.True(t, true, server.hasPeer(randomPeer.peerID))
+		}
+
+		assert.Len(t, server.PeersDetailed(), peersNum)
+
+		return randomPeers
+	}
+
+	extractExpectedDirectionCounts := func(randomPeers []*randomPeer) (
+		expectedOutbound int64,
+		expectedInbound int64,
+	) {
+		for _, randPeer := range randomPeers {
+			if randPeer.direction == network.DirOutbound {
+				expectedOutbound++
+
+				continue
+			}
+
+			expectedInbound++
+		}
+
+		return
+	}
+
+	validateConnectionCounts := func(
+		server *Server,
+		expectedOutbound int64,
+		expectedInbound int64,
+	) {
+		assert.Equal(t, expectedOutbound, server.connectionCounts.GetOutboundConnCount())
+		assert.Equal(t, expectedInbound, server.connectionCounts.GetInboundConnCount())
+	}
+
+	t.Run("peers are added correctly", func(t *testing.T) {
+		server := createServer()
+
+		// TODO increase this number to something astronomical
+		// when the networking package has an event system that actually works,
+		// as emitEvent can completely bug out when under load inside Server.AddPeer
+		generateAndAddPeers(server, 10)
+	})
+
+	t.Run("no duplicate peers added", func(t *testing.T) {
+		server := createServer()
+
+		randomPeers, err := generateRandomPeers(t, 1)
+		if err != nil {
+			t.Fatalf("Unable to generate random peers, %v", err)
+		}
+
+		randomPeer := randomPeers[0]
+
+		server.AddPeer(randomPeer.peerID, randomPeer.direction)
+
+		assert.True(t, true, server.hasPeer(randomPeer.peerID))
+
+		server.AddPeer(randomPeer.peerID, randomPeer.direction)
+
+		assert.Len(t, server.PeersDetailed(), 1)
+
+		outbound, inbound := extractExpectedDirectionCounts(randomPeers)
+		validateConnectionCounts(server, outbound, inbound)
+	})
+
+	t.Run("existing peer with the opposite conn. direction", func(t *testing.T) {
+		server := createServer()
+
+		randomPeers, err := generateRandomPeers(t, 1)
+		if err != nil {
+			t.Fatalf("Unable to generate random peers, %v", err)
+		}
+
+		randPeer := randomPeers[0]
+
+		newDirection := network.DirInbound
+		if newDirection == randPeer.direction {
+			newDirection = network.DirOutbound
+		}
+
+		randomPeerOppositeDirection := &randomPeer{
+			peerID:    randPeer.peerID,
+			direction: newDirection,
+		}
+
+		// Add all peer variations to the server
+		allPeers := append(randomPeers, randomPeerOppositeDirection)
+		for _, peer := range allPeers {
+			server.AddPeer(peer.peerID, peer.direction)
+
+			assert.True(t, true, server.hasPeer(peer.peerID))
+		}
+
+		assert.Len(t, server.PeersDetailed(), 2)
+		assert.Len(t, server.Peers(), 1)
+
+		// Make sure the peer sets match
+		for indx, peer := range server.PeersDetailed() {
+			assert.Equal(t, allPeers[indx].peerID, peer.Info.ID)
+			assert.Equal(t, allPeers[indx].direction, peer.connDirection)
+		}
+
+		outbound, inbound := extractExpectedDirectionCounts(allPeers)
+		validateConnectionCounts(server, outbound, inbound)
+	})
+
+	t.Run("peers are removed correctly", func(t *testing.T) {
+		server := createServer()
+		peersNum := 10
+
+		// Generate and add the random peers
+		randomPeers := generateAndAddPeers(server, peersNum)
+
+		// Prune off every other peer
+		prunedPeers := 0
+		for i := 0; i < len(randomPeers); i += 2 {
+			prunedPeers++
+			server.removePeer(randomPeers[i].peerID)
+
+			assert.False(t, server.hasPeer(randomPeers[i].peerID))
+		}
+
+		leftoverPeers := make([]*randomPeer, 0)
+		for i := 1; i < len(randomPeers); i += 2 {
+			leftoverPeers = append(leftoverPeers, randomPeers[i])
+		}
+
+		// Make sure the peers lists match
+		assert.Len(t, server.Peers(), peersNum-prunedPeers)
+
+		outbound, inbound := extractExpectedDirectionCounts(leftoverPeers)
+		validateConnectionCounts(server, outbound, inbound)
+	})
+}
+
+type randomPeer struct {
+	peerID    peer.ID
+	direction network.Direction
+}
+
+// generateRandomPeers generates random peer data
+func generateRandomPeers(t *testing.T, count int) ([]*randomPeer, error) {
+	t.Helper()
+
+	randomPeers := make([]*randomPeer, count)
+
+	for i := 0; i < count; i++ {
+		testMultiAddr := tests.GenerateTestMultiAddr(t).String()
+
+		peerAddressInfo, err := common.StringToAddrInfo(testMultiAddr)
+		if err != nil {
+			return nil, err
+		}
+
+		// Get a random direction
+		randDirection := network.DirOutbound
+		if i%2 == 0 {
+			randDirection = network.DirInbound
+		}
+
+		randomPeers[i] = &randomPeer{
+			peerID:    peerAddressInfo.ID,
+			direction: randDirection,
+		}
+	}
+
+	return randomPeers, nil
+}

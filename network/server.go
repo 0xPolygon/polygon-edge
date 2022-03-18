@@ -70,8 +70,8 @@ type Server struct {
 	host  host.Host             // the libp2p host reference
 	addrs []multiaddr.Multiaddr // the list of supported (bound) addresses
 
-	peers     map[peer.ID]*Peer // map of all peer connections
-	peersLock sync.Mutex        // lock for the peer map
+	peers     map[peer.ID][]*PeerConnInfo // map of all peer connections
+	peersLock sync.Mutex                  // lock for the peer map
 
 	metrics *Metrics // reference for metrics tracking
 
@@ -145,7 +145,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		config:           config,
 		host:             host,
 		addrs:            host.Addrs(),
-		peers:            map[peer.ID]*Peer{},
+		peers:            make(map[peer.ID][]*PeerConnInfo),
 		metrics:          config.Metrics,
 		dialQueue:        dial.NewDialQueue(),
 		closeCh:          make(chan struct{}),
@@ -218,12 +218,20 @@ func (s *Server) HasFreeConnectionSlot(direction network.Direction) bool {
 	return s.connectionCounts.HasFreeConnectionSlot(direction)
 }
 
-type Peer struct {
-	srv *Server
-
+// PeerConnInfo holds the connection information about the peer
+type PeerConnInfo struct {
 	Info peer.AddrInfo
 
 	connDirection network.Direction
+}
+
+// isSameAs checks if the specified peer connection info
+// matches the current PeerConnInfo element
+func (pci *PeerConnInfo) isSameAs(
+	peerID peer.ID,
+	direction network.Direction,
+) bool {
+	return pci.Info.ID == peerID && pci.connDirection == direction
 }
 
 // setupLibp2pKey is a helper method for setting up the networking private key
@@ -461,6 +469,9 @@ func (s *Server) checkPeerConnections() {
 // Essentially, the networking server monitors for any open connection slots
 // and attempts to fill them as soon as they open up
 func (s *Server) runDial() {
+	// The notification channel needs to be buffered to avoid
+	// having events go missing, as they're crucial to the functioning
+	// of the runDial mechanism
 	notifyCh := make(chan struct{}, 1)
 	defer close(notifyCh)
 
@@ -558,14 +569,29 @@ func (s *Server) GetRandomBootnode() *peer.AddrInfo {
 	return nil
 }
 
-// Peers returns a copy of the networking server's peer set [Thread safe]
-func (s *Server) Peers() []*Peer {
+// Peers returns a copy of the networking server's peer connection info set.
+// Only one (initial) connection (inbound OR outbound) per peer is contained [Thread safe]
+func (s *Server) Peers() []*PeerConnInfo {
 	s.peersLock.Lock()
 	defer s.peersLock.Unlock()
 
-	peers := make([]*Peer, 0, len(s.peers))
-	for _, p := range s.peers {
-		peers = append(peers, p)
+	peers := make([]*PeerConnInfo, 0)
+	for _, connectionsArray := range s.peers {
+		peers = append(peers, connectionsArray[0])
+	}
+
+	return peers
+}
+
+// PeersDetailed returns a copy of the networking server's peers connection info set,
+// that contains all (inbound AND outbound) connections from peers [Thread safe]
+func (s *Server) PeersDetailed() []*PeerConnInfo {
+	s.peersLock.Lock()
+	defer s.peersLock.Unlock()
+
+	peers := make([]*PeerConnInfo, 0)
+	for _, connectionsArray := range s.peers {
+		peers = append(peers, connectionsArray...)
 	}
 
 	return peers
@@ -605,11 +631,28 @@ func (s *Server) AddPeer(id peer.ID, direction network.Direction) {
 
 	s.logger.Info("Peer connected", "id", id.String())
 
-	s.peers[id] = &Peer{
-		srv:           s,
+	connectionsArray, exists := s.peers[id]
+	if exists {
+		// Check if this peer already has an active connection status (saved info).
+		// There is no need to do further processing
+		for _, peerConnection := range connectionsArray {
+			if peerConnection.isSameAs(id, direction) {
+				s.peersLock.Unlock()
+
+				return
+			}
+		}
+	} else {
+		connectionsArray = make([]*PeerConnInfo, 0)
+	}
+
+	// Add new connection information on the peer
+	connectionsArray = append(connectionsArray, &PeerConnInfo{
 		Info:          s.host.Peerstore().PeerInfo(id),
 		connDirection: direction,
-	}
+	})
+
+	s.peers[id] = connectionsArray
 
 	// Update connection counters
 	s.connectionCounts.UpdateConnCountByDirection(1, direction)
@@ -622,6 +665,9 @@ func (s *Server) AddPeer(id peer.ID, direction network.Direction) {
 	s.peersLock.Unlock()
 
 	// Emit the event alerting listeners
+	// WARNING: THIS CALL IS POTENTIALLY BLOCKING
+	// UNDER HEAVY LOAD. IT SHOULD BE SUBSTITUTED
+	// WITH AN EVENT SYSTEM THAT ACTUALLY WOKS
 	s.emitEvent(id, peerEvent.PeerConnected)
 }
 
@@ -633,13 +679,16 @@ func (s *Server) removePeer(id peer.ID) {
 	s.logger.Info("Peer disconnected", "id", id.String())
 
 	// Remove the peer from the peers map
-	if peer, ok := s.peers[id]; ok {
-		// Update connection counters
-		s.connectionCounts.UpdateConnCountByDirection(-1, peer.connDirection)
-		s.updateConnCountMetrics(peer.connDirection)
-		s.updateBootnodeConnCount(id, -1)
-
+	if connectionsArray, ok := s.peers[id]; ok {
+		// Delete the peer from the peers map
 		delete(s.peers, id)
+
+		// Update connection counters
+		for _, peerConnection := range connectionsArray {
+			s.connectionCounts.UpdateConnCountByDirection(-1, peerConnection.connDirection)
+			s.updateConnCountMetrics(peerConnection.connDirection)
+			s.updateBootnodeConnCount(id, -1)
+		}
 	}
 
 	// Close network connections to the peer
@@ -794,13 +843,12 @@ func (s *Server) addToDialQueue(addr *peer.AddrInfo, priority common.DialPriorit
 }
 
 func (s *Server) emitEvent(peerID peer.ID, peerEventType peerEvent.PeerEventType) {
-	evnt := peerEvent.PeerEvent{
+	// POTENTIALLY BLOCKING
+	if err := s.emitterPeerEvent.Emit(peerEvent.PeerEvent{
 		PeerID: peerID,
 		Type:   peerEventType,
-	}
-
-	if err := s.emitterPeerEvent.Emit(evnt); err != nil {
-		s.logger.Info("failed to emit event", "peer", evnt.PeerID, "type", evnt.Type, "err", err)
+	}); err != nil {
+		s.logger.Info("failed to emit event", "peer", peerID, "type", peerEventType, "err", err)
 	}
 }
 
