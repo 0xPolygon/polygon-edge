@@ -507,7 +507,7 @@ func (s *Server) runDial() {
 
 			taskInfo := tt.GetTaskInfo()
 
-			s.logger.Debug("Dialing peer [%s] as local [%s]", taskInfo.String(), s.host.ID())
+			s.logger.Debug(fmt.Sprintf("Dialing peer [%s] as local [%s]", taskInfo.String(), s.host.ID()))
 
 			if !s.isConnected(taskInfo.ID) {
 				// the connection process is async because it involves connection (here) +
