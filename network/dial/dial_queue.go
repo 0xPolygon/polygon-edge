@@ -2,6 +2,7 @@ package dial
 
 import (
 	"container/heap"
+	"fmt"
 	"github.com/0xPolygon/polygon-edge/network/common"
 	"sync"
 
@@ -105,4 +106,11 @@ func (d *DialQueue) AddTask(
 	case d.updateCh <- struct{}{}:
 	default:
 	}
+}
+
+func (d *DialQueue) SizeInfo() string {
+	d.Lock()
+	defer d.Unlock()
+
+	return fmt.Sprintf("HEAP: %d, TASKS: %d", d.heap.Len(), len(d.tasks))
 }

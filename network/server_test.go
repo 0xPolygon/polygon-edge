@@ -643,6 +643,10 @@ func TestRunDial(t *testing.T) {
 		}
 	}
 
+	printDialQueues := func(server *Server) {
+		fmt.Printf("\n\nDIAL QUEUE FOR SERVER %s: %s\n\n", server.host.ID(), server.dialQueue.SizeInfo())
+	}
+
 	t.Run("should connect to all peers", func(t *testing.T) {
 		maxPeers := []int64{2, 1, 1}
 		servers := setupServers(t, maxPeers)
@@ -650,6 +654,7 @@ func TestRunDial(t *testing.T) {
 
 		for _, p := range peers {
 			if joinErr := JoinAndWait(srv, p, DefaultBufferTimeout, DefaultJoinTimeout); joinErr != nil {
+				printDialQueues(p)
 				t.Fatalf("Unable to join peer, %v", joinErr)
 			}
 		}
