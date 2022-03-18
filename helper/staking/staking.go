@@ -156,7 +156,6 @@ func PredeployStakingSC(
 		return nil, fmt.Errorf("unable to generate DefaultStatkedBalance, %w", err)
 	}
 
-	fmt.Println(params.MinValidatorCount, params.MaxValidatorCount)
 	//Validate min and max validators number
 	if err = validateMinMaxValidatorsNumber(params.MinValidatorCount, params.MaxValidatorCount); err != nil {
 		return nil, err

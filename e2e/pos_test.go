@@ -83,66 +83,6 @@ func validateValidatorSet(
 	}
 }
 
-func TestPoS_Stake(t *testing.T) {
-	stakerKey, stakerAddr := tests.GenerateKeyAndAddr(t)
-	defaultBalance := framework.EthToWei(100)
-	stakeAmount := framework.EthToWei(5)
-
-	numGenesisValidators := IBFTMinNodes
-	ibftManager := framework.NewIBFTServersManager(
-		t,
-		numGenesisValidators,
-		IBFTDirPrefix,
-		func(i int, config *framework.TestServerConfig) {
-			config.SetSeal(true)
-			config.SetEpochSize(2) // Need to leave room for the endblock
-			config.PremineValidatorBalance(defaultBalance)
-			config.Premine(stakerAddr, defaultBalance)
-			config.SetIBFTPoS(true)
-		})
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel()
-	ibftManager.StartServers(ctx)
-
-	srv := ibftManager.GetServer(0)
-
-	client := srv.JSONRPC()
-
-	// Stake Balance
-	stakeError := framework.StakeAmount(
-		stakerAddr,
-		stakerKey,
-		stakeAmount,
-		srv,
-	)
-	if stakeError != nil {
-		t.Fatalf("Unable to stake amount, %v", stakeError)
-	}
-
-	// Check validator set
-	validateValidatorSet(t, stakerAddr, client, true, numGenesisValidators+1)
-
-	// Check the SC balance
-	bigDefaultStakedBalance := getBigDefaultStakedBalance(t)
-
-	scBalance := framework.GetAccountBalance(t, staking.AddrStakingContract, client)
-	expectedBalance := big.NewInt(0).Mul(
-		bigDefaultStakedBalance,
-		big.NewInt(int64(numGenesisValidators)),
-	)
-	expectedBalance.Add(expectedBalance, stakeAmount)
-
-	assert.Equal(t, expectedBalance.String(), scBalance.String())
-
-	stakedAmount, stakedAmountErr := framework.GetStakedAmount(stakerAddr, client)
-	if stakedAmountErr != nil {
-		t.Fatalf("Unable to get staked amount, %v", stakedAmountErr)
-	}
-
-	assert.Equal(t, expectedBalance.String(), stakedAmount.String())
-}
-
 func TestPoS_ValidatorBoundaries(t *testing.T) {
 	accounts := []struct {
 		key     *ecdsa.PrivateKey
@@ -224,13 +164,11 @@ func TestPoS_ValidatorBoundaries(t *testing.T) {
 }
 
 func TestPoS_DefaultValidatorBoundaries(t *testing.T) {
-	// Test scenario -> There are 4 default validators, and the validator limit is 4.
-	// When trying to add a new validator, it should not be added.
+	// Test scenario -> There are 4 validators, and the validator limit is default (1, maxUint32)
+	// When trying to add a new validator, it should be added.
 	stakerKey, stakerAddr := tests.GenerateKeyAndAddr(t)
 	stakeAmount := framework.EthToWei(1)
 	numGenesisValidators := IBFTMinNodes
-	minValidatorCount := uint32(1)
-	maxValidatorCount := uint32(numGenesisValidators)
 
 	defaultBalance := framework.EthToWei(100)
 	ibftManager := framework.NewIBFTServersManager(
@@ -243,8 +181,6 @@ func TestPoS_DefaultValidatorBoundaries(t *testing.T) {
 			config.PremineValidatorBalance(defaultBalance)
 			config.Premine(stakerAddr, defaultBalance)
 			config.SetIBFTPoS(true)
-			config.SetMinValidatorCount(minValidatorCount)
-			config.SetMaxValidatorCount(maxValidatorCount)
 		})
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
@@ -257,7 +193,67 @@ func TestPoS_DefaultValidatorBoundaries(t *testing.T) {
 
 	err := framework.StakeAmount(stakerAddr, stakerKey, stakeAmount, srv)
 	assert.NoError(t, err)
-	validateValidatorSet(t, stakerAddr, client, false, numGenesisValidators)
+	validateValidatorSet(t, stakerAddr, client, true, numGenesisValidators+1)
+}
+
+func TestPoS_Stake(t *testing.T) {
+	stakerKey, stakerAddr := tests.GenerateKeyAndAddr(t)
+	defaultBalance := framework.EthToWei(100)
+	stakeAmount := framework.EthToWei(5)
+
+	numGenesisValidators := IBFTMinNodes
+	ibftManager := framework.NewIBFTServersManager(
+		t,
+		numGenesisValidators,
+		IBFTDirPrefix,
+		func(i int, config *framework.TestServerConfig) {
+			config.SetSeal(true)
+			config.SetEpochSize(2) // Need to leave room for the endblock
+			config.PremineValidatorBalance(defaultBalance)
+			config.Premine(stakerAddr, defaultBalance)
+			config.SetIBFTPoS(true)
+		})
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	ibftManager.StartServers(ctx)
+
+	srv := ibftManager.GetServer(0)
+
+	client := srv.JSONRPC()
+
+	// Stake Balance
+	stakeError := framework.StakeAmount(
+		stakerAddr,
+		stakerKey,
+		stakeAmount,
+		srv,
+	)
+	if stakeError != nil {
+		t.Fatalf("Unable to stake amount, %v", stakeError)
+	}
+
+	// Check validator set
+	validateValidatorSet(t, stakerAddr, client, true, numGenesisValidators+1)
+
+	// Check the SC balance
+	bigDefaultStakedBalance := getBigDefaultStakedBalance(t)
+
+	scBalance := framework.GetAccountBalance(t, staking.AddrStakingContract, client)
+	expectedBalance := big.NewInt(0).Mul(
+		bigDefaultStakedBalance,
+		big.NewInt(int64(numGenesisValidators)),
+	)
+	expectedBalance.Add(expectedBalance, stakeAmount)
+
+	assert.Equal(t, expectedBalance.String(), scBalance.String())
+
+	stakedAmount, stakedAmountErr := framework.GetStakedAmount(stakerAddr, client)
+	if stakedAmountErr != nil {
+		t.Fatalf("Unable to get staked amount, %v", stakedAmountErr)
+	}
+
+	assert.Equal(t, expectedBalance.String(), stakedAmount.String())
 }
 
 func TestPoS_Unstake(t *testing.T) {
