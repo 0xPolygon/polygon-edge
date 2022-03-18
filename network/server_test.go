@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"github.com/0xPolygon/polygon-edge/network/common"
 	peerEvent "github.com/0xPolygon/polygon-edge/network/event"
+	"github.com/hashicorp/go-hclog"
 	"net"
 	"strconv"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -602,11 +604,14 @@ func TestSelfConnection_WithBootNodes(t *testing.T) {
 }
 
 func TestRunDial(t *testing.T) {
+	count := int64(0)
+
 	// setupServers returns server and list of peer's server
 	setupServers := func(t *testing.T, maxPeers []int64) []*Server {
 		t.Helper()
 
 		servers := make([]*Server, len(maxPeers))
+
 		for idx := range servers {
 			server, createErr := CreateServer(
 				&CreateServerParams{
@@ -615,12 +620,18 @@ func TestRunDial(t *testing.T) {
 						c.MaxOutboundPeers = maxPeers[idx]
 						c.NoDiscover = true
 					},
+					Logger: hclog.New(&hclog.LoggerOptions{
+						Name:  fmt.Sprintf("polygon-%d", atomic.LoadInt64(&count)),
+						Level: hclog.Debug,
+					}),
 				})
 			if createErr != nil {
 				t.Fatalf("Unable to create servers, %v", createErr)
 			}
 
 			servers[idx] = server
+
+			atomic.AddInt64(&count, 1)
 		}
 
 		return servers
