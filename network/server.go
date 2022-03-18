@@ -699,32 +699,35 @@ var (
 	DefaultBufferTimeout = DefaultJoinTimeout + time.Second*5
 )
 
-func (s *Server) JoinAddr(addr string, timeout time.Duration) error {
-	addr0, err := multiaddr.NewMultiaddr(addr)
+// JoinPeer attempts to add a new peer to the networking server
+func (s *Server) JoinPeer(rawPeerMultiaddr string) error {
+	// Parse the raw string to a MultiAddr format
+	parsedMultiaddr, err := multiaddr.NewMultiaddr(rawPeerMultiaddr)
 	if err != nil {
 		return err
 	}
 
-	addr1, err := peer.AddrInfoFromP2pAddr(addr0)
-
+	// Extract the peer info from the Multiaddr
+	peerInfo, err := peer.AddrInfoFromP2pAddr(parsedMultiaddr)
 	if err != nil {
 		return err
 	}
 
-	return s.Join(addr1, timeout)
+	// Mark the peer as ripe for dialing (async)
+	s.joinPeer(peerInfo)
+
+	return nil
 }
 
-func (s *Server) Join(addr *peer.AddrInfo, timeout time.Duration) error {
-	s.logger.Info("Join request", "addr", addr.String())
-	s.addToDialQueue(addr, common.PriorityRequestedDial)
+// joinPeer creates a new dial task for the peer (for async joining)
+func (s *Server) joinPeer(peerInfo *peer.AddrInfo) {
+	s.logger.Info("Join request", "addr", peerInfo.String())
 
-	if timeout == 0 {
-		return nil
-	}
-
-	err := s.watch(addr.ID, timeout)
-
-	return err
+	// This method can be completely refactored to support some kind of active
+	// feedback information on the dial status, and not just asynchronous updates.
+	// For this feature to work, the networking server requires a flexible event subscription
+	// manager that is configurable and cancelable at any point in time
+	s.addToDialQueue(peerInfo, common.PriorityRequestedDial)
 }
 
 func (s *Server) watch(peerID peer.ID, dur time.Duration) error {

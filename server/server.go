@@ -4,13 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/big"
-	"net"
-	"net/http"
-	"os"
-	"path/filepath"
-	"time"
-
 	"github.com/0xPolygon/polygon-edge/archive"
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/chain"
@@ -34,6 +27,11 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"google.golang.org/grpc"
+	"math/big"
+	"net"
+	"net/http"
+	"os"
+	"path/filepath"
 )
 
 // Minimal is the central manager of the blockchain client
@@ -550,8 +548,9 @@ func (s *Server) Chain() *chain.Chain {
 	return s.chain
 }
 
-func (s *Server) Join(addr0 string, dur time.Duration) error {
-	return s.network.JoinAddr(addr0, dur)
+// JoinPeer attempts to add a new peer to the networking server
+func (s *Server) JoinPeer(rawPeerMultiaddr string) error {
+	return s.network.JoinPeer(rawPeerMultiaddr)
 }
 
 // Close closes the Minimal server (blockchain, networking, consensus)
