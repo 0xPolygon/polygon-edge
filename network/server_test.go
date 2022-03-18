@@ -153,7 +153,6 @@ func TestPeerEvent_EmitAndSubscribe(t *testing.T) {
 		peerEvent.PeerConnected,
 		peerEvent.PeerFailedToConnect,
 		peerEvent.PeerDisconnected,
-		peerEvent.PeerAlreadyConnected,
 		peerEvent.PeerDialCompleted,
 		peerEvent.PeerAddedToDialQueue,
 	}

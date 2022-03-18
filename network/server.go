@@ -461,16 +461,17 @@ func (s *Server) checkPeerConnections() {
 // Essentially, the networking server monitors for any open connection slots
 // and attempts to fill them as soon as they open up
 func (s *Server) runDial() {
-	// watch for events of peers included or removed
-	notifyCh := make(chan struct{})
-	err := s.SubscribeFn(func(event *peerEvent.PeerEvent) {
+	notifyCh := make(chan struct{}, 1)
+	defer close(notifyCh)
+
+	if err := s.SubscribeFn(func(event *peerEvent.PeerEvent) {
 		// Only concerned about the listed event types
 		switch event.Type {
 		case
 			peerEvent.PeerConnected,
 			peerEvent.PeerFailedToConnect,
 			peerEvent.PeerDisconnected,
-			peerEvent.PeerDialCompleted,
+			peerEvent.PeerDialCompleted, // @Yoshiki, not sure we need to monitor this event type here
 			peerEvent.PeerAddedToDialQueue:
 		default:
 			return
@@ -480,10 +481,16 @@ func (s *Server) runDial() {
 		case notifyCh <- struct{}{}:
 		default:
 		}
-	})
+	}); err != nil {
+		s.logger.Error(
+			"Cannot instantiate an event subscription for the dial manager",
+			"err",
+			err,
+		)
 
-	if err != nil {
-		s.logger.Error("dial manager failed to subscribe", "err", err)
+		// Failing to subscribe to network events is fatal since the
+		// dial manager relies on the event subscription routine to function
+		return
 	}
 
 	for {
@@ -493,19 +500,16 @@ func (s *Server) runDial() {
 		for s.connectionCounts.HasFreeOutboundConn() {
 			tt := s.dialQueue.PopTask()
 			if tt == nil {
-				// dial closed
+				// The dial queue is closed,
+				// no further dial tasks are incoming
 				return
 			}
 
 			taskInfo := tt.GetTaskInfo()
 
-			s.logger.Debug("dial", "local", s.host.ID(), "addr", taskInfo.String())
+			s.logger.Debug("Dialing peer [%s] as local [%s]", taskInfo.String(), s.host.ID())
 
-			if s.isConnected(taskInfo.ID) {
-				// the node is already connected, send an event to wake up
-				// any join watchers
-				s.emitEvent(taskInfo.ID, peerEvent.PeerAlreadyConnected)
-			} else {
+			if !s.isConnected(taskInfo.ID) {
 				// the connection process is async because it involves connection (here) +
 				// the handshake done in the identity service.
 				if err := s.host.Connect(context.Background(), *taskInfo); err != nil {
