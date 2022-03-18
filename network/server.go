@@ -87,9 +87,6 @@ type Server struct {
 
 	ps *pubsub.PubSub // reference to the networking PubSub service
 
-	joinWatchers     map[peer.ID]chan error // set of networking event watchers
-	joinWatchersLock sync.Mutex             // lock for the networking event watchers map
-
 	emitterPeerEvent event.Emitter // event emitter for listeners
 
 	connectionCounts *connections.ConnectionInfo
@@ -282,12 +279,6 @@ func (s *Server) Start() error {
 
 	go s.runDial()
 	go s.checkPeerConnections()
-
-	go func() {
-		if err := s.runJoinWatcher(); err != nil {
-			s.logger.Error(fmt.Sprintf("Unable to start join watcher service, %v", err))
-		}
-	}()
 
 	// watch for disconnected peers
 	s.host.Network().Notify(&network.NotifyBundle{
@@ -728,51 +719,6 @@ func (s *Server) joinPeer(peerInfo *peer.AddrInfo) {
 	// For this feature to work, the networking server requires a flexible event subscription
 	// manager that is configurable and cancelable at any point in time
 	s.addToDialQueue(peerInfo, common.PriorityRequestedDial)
-}
-
-func (s *Server) watch(peerID peer.ID, dur time.Duration) error {
-	ch := make(chan error)
-
-	s.joinWatchersLock.Lock()
-	if s.joinWatchers == nil {
-		s.joinWatchers = map[peer.ID]chan error{}
-	}
-
-	s.joinWatchers[peerID] = ch
-	s.joinWatchersLock.Unlock()
-
-	select {
-	case <-time.After(dur):
-		s.joinWatchersLock.Lock()
-		delete(s.joinWatchers, peerID)
-		s.joinWatchersLock.Unlock()
-
-		return fmt.Errorf("timeout %s %s", s.host.ID(), peerID)
-	case err := <-ch:
-		return err
-	}
-}
-
-func (s *Server) runJoinWatcher() error {
-	return s.SubscribeFn(func(event *peerEvent.PeerEvent) {
-		switch event.Type {
-		case
-			peerEvent.PeerConnected,
-			peerEvent.PeerFailedToConnect,
-			peerEvent.PeerAlreadyConnected:
-		default:
-			return
-		}
-
-		// try to find a watcher for this peer
-		s.joinWatchersLock.Lock()
-		errCh, ok := s.joinWatchers[event.PeerID]
-		if ok {
-			errCh <- nil
-			delete(s.joinWatchers, event.PeerID)
-		}
-		s.joinWatchersLock.Unlock()
-	})
 }
 
 func (s *Server) Close() error {
