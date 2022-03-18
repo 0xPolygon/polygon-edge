@@ -45,7 +45,8 @@ func JoinAndWait(
 
 	// The join routine should be separate
 	go func() {
-		_ = source.Join(destination.AddrInfo(), joinTimeout)
+		err := source.Join(destination.AddrInfo(), joinTimeout)
+		fmt.Printf("\n\nEncountered an error in join: %v\n\n", err)
 	}()
 
 	connectCtx, cancelFn := context.WithTimeout(context.Background(), connectTimeout)
