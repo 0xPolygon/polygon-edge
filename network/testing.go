@@ -13,6 +13,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/tests"
+	networkCommon "github.com/0xPolygon/polygon-edge/network/common"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/secrets/local"
 	"github.com/hashicorp/go-hclog"
@@ -32,22 +33,10 @@ func JoinAndWait(
 	source,
 	destination *Server,
 	connectTimeout time.Duration,
-	joinTimeout time.Duration,
+	_ time.Duration,
 ) error {
-	if joinTimeout == 0 {
-		joinTimeout = DefaultJoinTimeout
-	}
-
-	if connectTimeout < joinTimeout {
-		// In case the connect timeout is smaller than the join timeout, align them
-		connectTimeout = joinTimeout
-	}
-
 	// The join routine should be separate
-	go func() {
-		err := source.Join(destination.AddrInfo(), joinTimeout)
-		fmt.Printf("\n\nEncountered an error in join: %v\n\n", err)
-	}()
+	source.addToDialQueue(destination.AddrInfo(), networkCommon.PriorityRequestedDial)
 
 	connectCtx, cancelFn := context.WithTimeout(context.Background(), connectTimeout)
 	defer cancelFn()
