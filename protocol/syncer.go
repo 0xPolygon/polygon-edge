@@ -20,7 +20,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
-	any "google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/anypb"
 	empty "google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -328,7 +328,7 @@ func (s *Syncer) Broadcast(b *types.Block) {
 			Number:     b.Number(),
 			Difficulty: td.String(),
 		},
-		Raw: &any.Any{
+		Raw: &anypb.Any{
 			Value: b.MarshalRLP(),
 		},
 	}

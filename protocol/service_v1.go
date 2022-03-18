@@ -10,7 +10,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p-core/peer"
-	any "google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/anypb"
 	empty "google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -95,7 +95,7 @@ func (s *serviceV1) GetObjectsByHash(_ context.Context, req *proto.HashRequest) 
 		}
 
 		resp.Objs = append(resp.Objs, &proto.Response_Component{
-			Spec: &any.Any{
+			Spec: &anypb.Any{
 				Value: data,
 			},
 		})
@@ -142,7 +142,7 @@ func (s *serviceV1) GetHeaders(_ context.Context, req *proto.GetHeadersRequest) 
 	}
 	addData := func(h *types.Header) {
 		resp.Objs = append(resp.Objs, &proto.Response_Component{
-			Spec: &any.Any{
+			Spec: &anypb.Any{
 				Value: h.MarshalRLPTo(nil),
 			},
 		})
