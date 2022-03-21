@@ -39,6 +39,7 @@ type blockchainInterface interface {
 	Header() *types.Header
 	GetHeaderByNumber(i uint64) (*types.Header, bool)
 	WriteBlock(block *types.Block) error
+	GetLastEpochBlocks(epochSize uint64, latestBlockNumber uint64) ([]*types.Block, bool)
 	CalculateGasLimit(number uint64) (uint64, error)
 }
 
@@ -1025,6 +1026,24 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 
 	// broadcast the new block
 	i.syncer.Broadcast(block)
+
+	// On every Epoch start. we should start the checkpointing process
+	if i.IsLastOfEpoch(block.Number()) {
+		//Grab all blocks from previous epoch
+		epochBlocks, ok := i.blockchain.GetLastEpochBlocks(i.epochSize, block.Number())
+		if !ok {
+			//TODO return some error
+			return nil
+		}
+		fmt.Println("Epoch blocks", len(epochBlocks))
+		for _, block := range epochBlocks {
+			fmt.Println("Block num ", block.Number())
+		}
+		//Create checkpoint
+		_ = epochBlocks
+
+		//start Checkpointing process
+	}
 
 	// after the block has been written we reset the txpool so that
 	// the old transactions are removed
