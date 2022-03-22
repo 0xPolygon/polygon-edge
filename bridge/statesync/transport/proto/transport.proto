@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package v1;
 
-option go_package = "/bridge/transport/proto";
+option go_package = "/bridge/statesync/transport/proto";
 
 import "google/protobuf/empty.proto";
 

@@ -1,4 +1,4 @@
-package bridge
+package statesync
 
 import (
 	"github.com/0xPolygon/polygon-edge/types"
@@ -52,4 +52,15 @@ func NewStateSyncedTx(event *StateSyncEvent) *types.Transaction {
 		Input: data,
 		Nonce: event.ID.Uint64(),
 	}
+}
+
+func getTransactionHash(tx *types.Transaction) types.Hash {
+	msgTx := &types.Transaction{
+		Type:  types.TxTypeState,
+		To:    tx.To,
+		Input: tx.Input,
+		Nonce: tx.Nonce,
+	}
+
+	return msgTx.ComputeHash().Hash
 }

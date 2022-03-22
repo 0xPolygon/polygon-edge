@@ -1,4 +1,4 @@
-package bridge
+package statesync
 
 import (
 	"errors"
@@ -7,6 +7,15 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/go-web3"
+	"github.com/umbracle/go-web3/abi"
+)
+
+const (
+	StateSyncedEventABI = `event StateSynced(uint256 indexed id, address indexed contractAddress, bytes data)`
+)
+
+var (
+	StateSyncedEvent = abi.MustNewEvent(StateSyncedEventABI)
 )
 
 var (
@@ -14,6 +23,25 @@ var (
 	ErrInvalidContractAddress = errors.New("contractAddress isn't in event or wrong type")
 	ErrInvalidData            = errors.New("data isn't in event or wrong type")
 )
+
+func eventToMessage(log *web3.Log) (*Message, error) {
+	switch {
+	case StateSyncedEvent.Match(log):
+		event, err := ParseStateSyncEvent(log)
+		if err != nil {
+			return nil, err
+		}
+
+		tx := NewStateSyncedTx(event)
+
+		return &Message{
+			ID:          event.ID,
+			Transaction: tx,
+		}, nil
+	}
+
+	return nil, nil
+}
 
 type StateSyncEvent struct {
 	ID              *big.Int

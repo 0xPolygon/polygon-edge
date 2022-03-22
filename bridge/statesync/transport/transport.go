@@ -1,13 +1,13 @@
 package transport
 
 import (
-	"github.com/0xPolygon/polygon-edge/bridge/transport/proto"
+	"github.com/0xPolygon/polygon-edge/bridge/statesync/transport/proto"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 )
 
-var transportProto = "/bridge/sam/0.1"
+var transportProto = "/bridge/statesync/0.1"
 
 type MessageTransport interface {
 	Start() error
