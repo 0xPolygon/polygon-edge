@@ -1,6 +1,7 @@
 package bridge
 
 import (
+	"github.com/0xPolygon/polygon-edge/bridge/checkpoint"
 	"github.com/0xPolygon/polygon-edge/bridge/sam"
 	"github.com/0xPolygon/polygon-edge/bridge/statesync"
 	"github.com/0xPolygon/polygon-edge/network"
@@ -16,8 +17,9 @@ type Bridge interface {
 }
 
 type bridge struct {
-	logger    hclog.Logger
-	stateSync statesync.StateSync
+	logger     hclog.Logger
+	stateSync  statesync.StateSync
+	checkpoint checkpoint.Checkpoint
 }
 
 func NewBridge(
@@ -38,14 +40,23 @@ func NewBridge(
 		config.RootChainContract,
 		config.Confirmations,
 	)
+	if err != nil {
+		return nil, err
+	}
 
+	checkpoint, err := checkpoint.NewCheckpoint(
+		bridgeLogger,
+		network,
+		signer,
+	)
 	if err != nil {
 		return nil, err
 	}
 
 	return &bridge{
-		logger:    bridgeLogger,
-		stateSync: stateSync,
+		logger:     bridgeLogger,
+		stateSync:  stateSync,
+		checkpoint: checkpoint,
 	}, nil
 }
 
@@ -54,11 +65,19 @@ func (b *bridge) Start() error {
 		return err
 	}
 
+	if err := b.checkpoint.Start(); err != nil {
+		return err
+	}
+
 	return nil
 }
 
 func (b *bridge) Close() error {
 	if err := b.stateSync.Close(); err != nil {
+		return err
+	}
+
+	if err := b.checkpoint.Close(); err != nil {
 		return err
 	}
 
