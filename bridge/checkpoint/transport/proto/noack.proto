@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package v1;
+
+option go_package = "/bridge/checkpoint/transport/proto";
+
+message NoAckMessage {
+  //  start block number
+  uint64 start = 1;
+
+  // end block number
+  uint64 end = 2;
+}

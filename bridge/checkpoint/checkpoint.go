@@ -54,6 +54,15 @@ func NewCheckpoint(
 }
 
 func (c *checkpoint) Start() error {
+	if err := c.transport.Start(); err != nil {
+		return err
+	}
+
+	//	TODO: subscribe to CheckpointProposal, AckMessage, NoAckMessage
+	//if err := c.transport.Subscribe(...); err != nil {
+	//	return err
+	//}
+
 	return nil
 }
 
