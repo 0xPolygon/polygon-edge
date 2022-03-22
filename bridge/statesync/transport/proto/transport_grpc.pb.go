@@ -95,5 +95,5 @@ var _SignedMessageTransport_serviceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "bridge/transport/proto/transport.proto",
+	Metadata: "bridge/statesync/transport/proto/transport.proto",
 }

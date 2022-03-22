@@ -60,7 +60,7 @@ func (b *BridgeMechanism) verifyStateTransactionsHook(blockParam interface{}) er
 			continue
 		}
 
-		if err := b.bridge.ValidateTx(tx); err != nil {
+		if err := b.bridge.StateSync().ValidateTx(tx); err != nil {
 			b.ibft.logger.Error("block verification failed, block has invalid state transactions", "err", err)
 
 			return errBlockVerificationFailed
@@ -84,7 +84,7 @@ func (b *BridgeMechanism) insertStateTransactionsHook(rawParams interface{}) err
 		return ErrInvalidHookParam
 	}
 
-	msgs, err := b.bridge.GetReadyMessages()
+	msgs, err := b.bridge.StateSync().GetReadyMessages()
 	if err != nil {
 		b.ibft.logger.Warn("failed to get ready messages from bridge", "err", err)
 
@@ -137,7 +137,7 @@ func (b *BridgeMechanism) consumeStateTransactionsHook(numberParam interface{}) 
 			continue
 		}
 
-		b.bridge.Consume(tx)
+		b.bridge.StateSync().Consume(tx)
 	}
 
 	return nil
