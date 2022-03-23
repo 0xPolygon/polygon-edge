@@ -3,10 +3,9 @@ package identity
 import (
 	"context"
 	"errors"
-	"github.com/0xPolygon/polygon-edge/network/common"
+	"fmt"
 	"github.com/0xPolygon/polygon-edge/network/event"
 	"github.com/hashicorp/go-hclog"
-	rawGrpc "google.golang.org/grpc"
 	"sync"
 
 	"github.com/0xPolygon/polygon-edge/network/proto"
@@ -27,8 +26,8 @@ var (
 type networkingServer interface {
 	// PROTOCOL MANIPULATION //
 
-	// NewProtoStream opens a new protocol stream towards the referenced peer
-	NewProtoStream(protocol string, peerID peer.ID) (interface{}, error)
+	// NewIdentityClient returns an identity gRPC client connection
+	NewIdentityClient(peerID peer.ID) (proto.IdentityClient, error)
 
 	// PEER MANIPULATION //
 
@@ -164,17 +163,13 @@ func (i *IdentityService) disconnectFromPeer(peerID peer.ID, reason string) {
 
 // handleConnected handles new network connections (handshakes)
 func (i *IdentityService) handleConnected(peerID peer.ID, direction network.Direction) error {
-	conn, err := i.baseServer.NewProtoStream(common.IdentityProto, peerID)
-	if err != nil {
-		return err
+	clt, clientErr := i.baseServer.NewIdentityClient(peerID)
+	if clientErr != nil {
+		return fmt.Errorf(
+			"unable to create new identity client connection, %w",
+			clientErr,
+		)
 	}
-
-	rawGrpcConn, ok := conn.(*rawGrpc.ClientConn)
-	if !ok {
-		return errors.New("invalid type assert")
-	}
-
-	clt := proto.NewIdentityClient(rawGrpcConn)
 
 	status := i.constructStatus(peerID)
 	status.Metadata[PeerID] = i.hostID.Pretty()

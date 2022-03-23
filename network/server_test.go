@@ -884,7 +884,7 @@ func TestPeerAdditionDeletion(t *testing.T) {
 			assert.True(t, true, server.hasPeer(randomPeer.peerID))
 		}
 
-		assert.Len(t, server.PeersDetailed(), peersNum)
+		assert.Len(t, server.Peers(), peersNum)
 
 		return randomPeers
 	}
@@ -940,7 +940,7 @@ func TestPeerAdditionDeletion(t *testing.T) {
 
 		server.AddPeer(randomPeer.peerID, randomPeer.direction)
 
-		assert.Len(t, server.PeersDetailed(), 1)
+		assert.Len(t, server.Peers(), 1)
 
 		outbound, inbound := extractExpectedDirectionCounts(randomPeers)
 		validateConnectionCounts(server, outbound, inbound)
@@ -967,23 +967,23 @@ func TestPeerAdditionDeletion(t *testing.T) {
 		}
 
 		// Add all peer variations to the server
-		allPeers := append(randomPeers, randomPeerOppositeDirection)
-		for _, peer := range allPeers {
+		randomPeers = append(randomPeers, randomPeerOppositeDirection)
+		for _, peer := range randomPeers {
 			server.AddPeer(peer.peerID, peer.direction)
 
 			assert.True(t, true, server.hasPeer(peer.peerID))
 		}
 
-		assert.Len(t, server.PeersDetailed(), 2)
 		assert.Len(t, server.Peers(), 1)
 
-		// Make sure the peer sets match
-		for indx, peer := range server.PeersDetailed() {
-			assert.Equal(t, allPeers[indx].peerID, peer.Info.ID)
-			assert.Equal(t, allPeers[indx].direction, peer.connDirection)
+		// Make sure the directions match
+		for indx, connInfo := range server.Peers() {
+			assert.Equal(t, randomPeers[indx].peerID, connInfo.Info.ID)
+			assert.True(t, connInfo.connDirections[network.DirOutbound])
+			assert.True(t, connInfo.connDirections[network.DirInbound])
 		}
 
-		outbound, inbound := extractExpectedDirectionCounts(allPeers)
+		outbound, inbound := extractExpectedDirectionCounts(randomPeers)
 		validateConnectionCounts(server, outbound, inbound)
 	})
 

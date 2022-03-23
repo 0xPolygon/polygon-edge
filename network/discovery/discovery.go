@@ -14,7 +14,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/network/proto"
 	"github.com/libp2p/go-libp2p-core/peer"
 	kb "github.com/libp2p/go-libp2p-kbucket"
-	rawGrpc "google.golang.org/grpc"
 )
 
 const (
@@ -47,8 +46,11 @@ type networkingServer interface {
 
 	// PROTOCOL MANIPULATION //
 
-	// NewProtoStream opens a new protocol stream towards the referenced peer
-	NewProtoStream(protocol string, peerID peer.ID) (interface{}, error)
+	// NewDiscoveryClient returns a discovery gRPC client connection
+	NewDiscoveryClient(peerID peer.ID) (proto.DiscoveryClient, error)
+
+	// CloseProtocolStream closes a protocol stream to the peer
+	CloseProtocolStream(protocol string, peerID peer.ID) error
 
 	// PEER MANIPULATION //
 
@@ -60,6 +62,9 @@ type networkingServer interface {
 
 	// GetPeerInfo fetches the peer information from the server's peer store
 	GetPeerInfo(peerID peer.ID) *peer.AddrInfo
+
+	// GetRandomPeer fetches a random peer from the server's peer store
+	GetRandomPeer() *peer.ID
 
 	// TEMPORARY DIALING //
 
@@ -84,7 +89,6 @@ type DiscoveryService struct {
 	baseServer   networkingServer // The interface towards the base networking server
 	logger       hclog.Logger     // The DiscoveryService logger
 	routingTable *kb.RoutingTable // Kademlia 'k-bucket' routing table that contains connected nodes info
-	peers        *referencePeers  // List of the peers DiscoveryService queries about near peers
 
 	closeCh chan struct{} // Channel used for stopping the DiscoveryService
 }
@@ -97,10 +101,7 @@ func NewDiscoveryService(
 	closeCh chan struct{},
 ) *DiscoveryService {
 	return &DiscoveryService{
-		logger: logger.Named("discovery"),
-		peers: &referencePeers{
-			peersMap: make(map[peer.ID]*referencePeer),
-		},
+		logger:       logger.Named("discovery"),
 		baseServer:   server,
 		routingTable: routingTable,
 		closeCh:      closeCh,
@@ -148,12 +149,9 @@ func (d *DiscoveryService) HandleNetworkEvent(peerEvent *event.PeerEvent) {
 
 			return
 		}
-
-		d.peers.addPeer(peerID)
 	case event.PeerDisconnected, event.PeerFailedToConnect:
 		// Run cleanup for the local routing / reference peers table
 		d.routingTable.RemovePeer(peerID)
-		d.peers.deletePeer(peerID)
 	}
 }
 
@@ -234,54 +232,29 @@ func (d *DiscoveryService) attemptToFindPeers(peerID peer.ID) error {
 	return nil
 }
 
-// getPeerStream fetches a stream to a peer (if it exists), or
-// it opens a new one
-func (d *DiscoveryService) getPeerStream(peerID peer.ID) (interface{}, error) {
-	p := d.peers.isReferencePeer(peerID)
-	if p == nil {
-		return nil, fmt.Errorf("peer not found in list")
-	}
-
-	// return the existing stream if stream has been opened
-	if p.stream != nil {
-		return p.stream, nil
-	}
-
-	stream, err := d.baseServer.NewProtoStream(common.DiscProto, peerID)
-	if err != nil {
-		return nil, err
-	}
-
-	p.stream = stream
-
-	return p.stream, nil
-}
-
 // findPeersCall queries the set peer for their peer set
 func (d *DiscoveryService) findPeersCall(
 	peerID peer.ID,
 	shouldCloseConn bool,
 ) ([]string, error) {
-	stream, err := d.getPeerStream(peerID)
-	if err != nil {
-		return nil, err
+	clt, clientErr := d.baseServer.NewDiscoveryClient(peerID)
+	if clientErr != nil {
+		return nil, fmt.Errorf("unable to create new discovery client connection, %w", clientErr)
 	}
 
-	rawGrpcConn, ok := stream.(*rawGrpc.ClientConn)
-	if !ok {
-		return nil, errors.New("invalid type assertion")
-	}
-
-	clt := proto.NewDiscoveryClient(rawGrpcConn)
-
-	resp, err := clt.FindPeers(context.Background(), &proto.FindPeersReq{Count: maxDiscoveryPeerReqCount})
+	resp, err := clt.FindPeers(
+		context.Background(),
+		&proto.FindPeersReq{
+			Count: maxDiscoveryPeerReqCount,
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
 
 	// Check if the connection should be closed after getting the data
 	if shouldCloseConn {
-		if closeErr := rawGrpcConn.Close(); closeErr != nil {
+		if closeErr := d.baseServer.CloseProtocolStream(common.DiscProto, peerID); closeErr != nil {
 			return nil, closeErr
 		}
 	}
@@ -322,20 +295,20 @@ func (d *DiscoveryService) regularPeerDiscovery() {
 		return
 	}
 
-	// Grab a random peer from the current peer set to use as a reference
-	refPeer := d.peers.getRandomPeer()
-	if refPeer == nil {
+	// Grab a random peer from the base server's peer store
+	peerID := d.baseServer.GetRandomPeer()
+	if peerID == nil {
 		// The node cannot find a random peer to query
 		// from the current peer set
 		return
 	}
 
 	// Try to discover the peers connected to the reference peer
-	if err := d.attemptToFindPeers(refPeer.id); err != nil {
+	if err := d.attemptToFindPeers(*peerID); err != nil {
 		d.logger.Error(
 			"Failed to find new peers",
 			"peer",
-			refPeer.id,
+			peerID,
 			"err",
 			err,
 		)

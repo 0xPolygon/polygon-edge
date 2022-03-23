@@ -16,6 +16,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/peerstore"
 	kb "github.com/libp2p/go-libp2p-kbucket"
 	noise "github.com/libp2p/go-libp2p-noise"
+	rawGrpc "google.golang.org/grpc"
 	"math/big"
 	"sync"
 	"sync/atomic"
@@ -70,8 +71,8 @@ type Server struct {
 	host  host.Host             // the libp2p host reference
 	addrs []multiaddr.Multiaddr // the list of supported (bound) addresses
 
-	peers     map[peer.ID][]*PeerConnInfo // map of all peer connections
-	peersLock sync.Mutex                  // lock for the peer map
+	peers     map[peer.ID]*PeerConnInfo // map of all peer connections
+	peersLock sync.Mutex                // lock for the peer map
 
 	metrics *Metrics // reference for metrics tracking
 
@@ -145,7 +146,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		config:           config,
 		host:             host,
 		addrs:            host.Addrs(),
-		peers:            make(map[peer.ID][]*PeerConnInfo),
+		peers:            make(map[peer.ID]*PeerConnInfo),
 		metrics:          config.Metrics,
 		dialQueue:        dial.NewDialQueue(),
 		closeCh:          make(chan struct{}),
@@ -222,16 +223,34 @@ func (s *Server) HasFreeConnectionSlot(direction network.Direction) bool {
 type PeerConnInfo struct {
 	Info peer.AddrInfo
 
-	connDirection network.Direction
+	connDirections  map[network.Direction]bool
+	protocolStreams map[string]*rawGrpc.ClientConn
 }
 
-// isSameAs checks if the specified peer connection info
-// matches the current PeerConnInfo element
-func (pci *PeerConnInfo) isSameAs(
-	peerID peer.ID,
-	direction network.Direction,
-) bool {
-	return pci.Info.ID == peerID && pci.connDirection == direction
+// addProtocolStream adds a protocol stream
+func (pci *PeerConnInfo) addProtocolStream(protocol string, stream *rawGrpc.ClientConn) {
+	pci.protocolStreams[protocol] = stream
+}
+
+// removeProtocolStream removes and closes a protocol stream
+func (pci *PeerConnInfo) removeProtocolStream(protocol string) error {
+	stream, ok := pci.protocolStreams[protocol]
+	if !ok {
+		return nil
+	}
+
+	delete(pci.protocolStreams, protocol)
+
+	if stream != nil {
+		return stream.Close()
+	}
+
+	return nil
+}
+
+// getProtocolStream fetches the protocol stream, if any
+func (pci *PeerConnInfo) getProtocolStream(protocol string) *rawGrpc.ClientConn {
+	return pci.protocolStreams[protocol]
 }
 
 // setupLibp2pKey is a helper method for setting up the networking private key
@@ -576,22 +595,8 @@ func (s *Server) Peers() []*PeerConnInfo {
 	defer s.peersLock.Unlock()
 
 	peers := make([]*PeerConnInfo, 0)
-	for _, connectionsArray := range s.peers {
-		peers = append(peers, connectionsArray[0])
-	}
-
-	return peers
-}
-
-// PeersDetailed returns a copy of the networking server's peers connection info set,
-// that contains all (inbound AND outbound) connections from peers [Thread safe]
-func (s *Server) PeersDetailed() []*PeerConnInfo {
-	s.peersLock.Lock()
-	defer s.peersLock.Unlock()
-
-	peers := make([]*PeerConnInfo, 0)
-	for _, connectionsArray := range s.peers {
-		peers = append(peers, connectionsArray...)
+	for _, connectionInfo := range s.peers {
+		peers = append(peers, connectionInfo)
 	}
 
 	return peers
@@ -631,28 +636,26 @@ func (s *Server) AddPeer(id peer.ID, direction network.Direction) {
 
 	s.logger.Info("Peer connected", "id", id.String())
 
-	connectionsArray, exists := s.peers[id]
+	connectionInfo, exists := s.peers[id]
 	if exists {
 		// Check if this peer already has an active connection status (saved info).
 		// There is no need to do further processing
-		for _, peerConnection := range connectionsArray {
-			if peerConnection.isSameAs(id, direction) {
-				s.peersLock.Unlock()
+		if connectionInfo.connDirections[direction] {
+			s.peersLock.Unlock()
 
-				return
-			}
+			return
 		}
 	} else {
-		connectionsArray = make([]*PeerConnInfo, 0)
+		connectionInfo = &PeerConnInfo{
+			Info:            s.host.Peerstore().PeerInfo(id),
+			connDirections:  make(map[network.Direction]bool),
+			protocolStreams: make(map[string]*rawGrpc.ClientConn),
+		}
 	}
 
-	// Add new connection information on the peer
-	connectionsArray = append(connectionsArray, &PeerConnInfo{
-		Info:          s.host.Peerstore().PeerInfo(id),
-		connDirection: direction,
-	})
+	connectionInfo.connDirections[direction] = true
 
-	s.peers[id] = connectionsArray
+	s.peers[id] = connectionInfo
 
 	// Update connection counters
 	s.connectionCounts.UpdateConnCountByDirection(1, direction)
@@ -679,15 +682,17 @@ func (s *Server) removePeer(id peer.ID) {
 	s.logger.Info("Peer disconnected", "id", id.String())
 
 	// Remove the peer from the peers map
-	if connectionsArray, ok := s.peers[id]; ok {
+	if connectionInfo, ok := s.peers[id]; ok {
 		// Delete the peer from the peers map
 		delete(s.peers, id)
 
 		// Update connection counters
-		for _, peerConnection := range connectionsArray {
-			s.connectionCounts.UpdateConnCountByDirection(-1, peerConnection.connDirection)
-			s.updateConnCountMetrics(peerConnection.connDirection)
-			s.updateBootnodeConnCount(id, -1)
+		for connDirection, active := range connectionInfo.connDirections {
+			if active {
+				s.connectionCounts.UpdateConnCountByDirection(-1, connDirection)
+				s.updateConnCountMetrics(connDirection)
+				s.updateBootnodeConnCount(id, -1)
+			}
 		}
 	}
 
@@ -704,6 +709,34 @@ func (s *Server) removePeer(id peer.ID) {
 
 	// Emit the event alerting listeners
 	s.emitEvent(id, peerEvent.PeerDisconnected)
+}
+
+// GetRandomPeer fetches a random peer from the peers list
+func (s *Server) GetRandomPeer() *peer.ID {
+	s.peersLock.Lock()
+	defer s.peersLock.Unlock()
+
+	if len(s.peers) < 1 {
+		return nil
+	}
+
+	randNum, _ := rand.Int(
+		rand.Reader,
+		big.NewInt(int64(len(s.peers))),
+	)
+
+	randomPeerIndx := int(randNum.Int64())
+
+	counter := 0
+	for peerID := range s.peers {
+		if randomPeerIndx == counter {
+			return &peerID
+		}
+
+		counter++
+	}
+
+	return nil
 }
 
 // updateBootnodeConnCount attempts to update the bootnode connection count
@@ -787,16 +820,18 @@ func (s *Server) Close() error {
 	return err
 }
 
-func (s *Server) NewProtoStream(proto string, id peer.ID) (interface{}, error) {
+// newProtoConnection opens up a new stream on the set protocol to the peer,
+// and returns a reference to the connection
+func (s *Server) newProtoConnection(protocol string, peerID peer.ID) (*rawGrpc.ClientConn, error) {
 	s.protocolsLock.Lock()
 	defer s.protocolsLock.Unlock()
 
-	p, ok := s.protocols[proto]
+	p, ok := s.protocols[protocol]
 	if !ok {
-		return nil, fmt.Errorf("protocol not found: %s", proto)
+		return nil, fmt.Errorf("protocol not found: %s", protocol)
 	}
 
-	stream, err := s.NewStream(proto, id)
+	stream, err := s.NewStream(protocol, peerID)
 	if err != nil {
 		return nil, err
 	}
@@ -804,12 +839,74 @@ func (s *Server) NewProtoStream(proto string, id peer.ID) (interface{}, error) {
 	return p.Client(stream), nil
 }
 
+// getProtoStream returns an active protocol stream if present, otherwise
+// it returns nil
+func (s *Server) getProtoStream(protocol string, peerID peer.ID) *rawGrpc.ClientConn {
+	s.peersLock.Lock()
+	defer s.peersLock.Unlock()
+
+	connectionInfo, ok := s.peers[peerID]
+	if !ok {
+		return nil
+	}
+
+	return connectionInfo.getProtocolStream(protocol)
+}
+
+// NewDiscoveryClient returns a new or existing discovery service client connection
+func (s *Server) NewDiscoveryClient(peerID peer.ID) (proto.DiscoveryClient, error) {
+	// Check if there is an active stream connection already
+	if protoStream := s.getProtoStream(common.DiscProto, peerID); protoStream != nil {
+		return proto.NewDiscoveryClient(protoStream), nil
+	}
+
+	// Create a new stream connection and return it
+	protoStream, err := s.newProtoConnection(common.DiscProto, peerID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Discovery protocol streams should be saved,
+	// since they are referenced later on
+	s.peersLock.Lock()
+	connectionInfo := s.peers[peerID]
+	connectionInfo.addProtocolStream(common.DiscProto, protoStream)
+	s.peersLock.Unlock()
+
+	return proto.NewDiscoveryClient(protoStream), nil
+}
+
+// NewIdentityClient returns a new identity service client connection
+func (s *Server) NewIdentityClient(peerID peer.ID) (proto.IdentityClient, error) {
+	// Create a new stream connection and return it
+	protoStream, err := s.newProtoConnection(common.IdentityProto, peerID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Identity protocol connections are temporary and not saved anywhere
+	return proto.NewIdentityClient(protoStream), nil
+}
+
+// CloseProtocolStream closes a protocol stream to the specified peer
+func (s *Server) CloseProtocolStream(protocol string, peerID peer.ID) error {
+	s.peersLock.Lock()
+	defer s.peersLock.Unlock()
+
+	connectionInfo, ok := s.peers[peerID]
+	if !ok {
+		return nil
+	}
+
+	return connectionInfo.removeProtocolStream(protocol)
+}
+
 func (s *Server) NewStream(proto string, id peer.ID) (network.Stream, error) {
 	return s.host.NewStream(context.Background(), id, protocol.ID(proto))
 }
 
 type Protocol interface {
-	Client(network.Stream) interface{}
+	Client(network.Stream) *rawGrpc.ClientConn
 	Handler() func(network.Stream)
 }
 

@@ -67,7 +67,7 @@ func interceptor(
 	)
 }
 
-func (g *GrpcStream) Client(stream network.Stream) interface{} {
+func (g *GrpcStream) Client(stream network.Stream) *grpc.ClientConn {
 	return WrapClient(stream)
 }
 
