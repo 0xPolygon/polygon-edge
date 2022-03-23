@@ -52,6 +52,7 @@ func getRandomPeers(t *testing.T, count int) []*peer.AddrInfo {
 	t.Helper()
 
 	peersInfo := make([]*peer.AddrInfo, 0)
+
 	for i := 0; i < count; i++ {
 		info, err := peer.AddrInfoFromP2pAddr(
 			tests.GenerateTestMultiAddr(t),

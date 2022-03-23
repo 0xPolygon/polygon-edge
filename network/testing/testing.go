@@ -337,7 +337,6 @@ type MockPeerMetrics struct {
 }
 
 func (m *MockPeerMetrics) RecordLatency(id peer.ID, duration time.Duration) {
-	return
 }
 
 func (m *MockPeerMetrics) LatencyEWMA(id peer.ID) time.Duration {
@@ -345,5 +344,4 @@ func (m *MockPeerMetrics) LatencyEWMA(id peer.ID) time.Duration {
 }
 
 func (m *MockPeerMetrics) RemovePeer(id peer.ID) {
-	return
 }
