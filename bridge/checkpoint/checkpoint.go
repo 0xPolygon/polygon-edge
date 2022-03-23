@@ -1,6 +1,7 @@
 package checkpoint
 
 import (
+	"fmt"
 	"github.com/0xPolygon/polygon-edge/bridge/checkpoint/transport"
 	ctypes "github.com/0xPolygon/polygon-edge/bridge/checkpoint/types"
 	"github.com/0xPolygon/polygon-edge/bridge/sam"
@@ -18,7 +19,7 @@ type Checkpoint interface {
 
 type Blockchain interface {
 	Header() *types.Header
-	GetBlocks(start, end uint64, full bool) []*types.Block
+	GetBlocks(start, end uint64, full bool) ([]*types.Block, bool)
 }
 
 type checkpoint struct {
@@ -82,8 +83,12 @@ func (c *checkpoint) StartNewCheckpoint(epochSize uint64) error {
 	}
 
 	// Step2: Determine the range of next checkpoint and get blocks from local chain
-	start, end := c.determineCheckpointRange(lastChildBlock, epochSize)
-	blocks := c.blockchain.GetBlocks(start, end, true)
+	start, end := c.determineCheckpointRange(lastChildBlock)
+
+	blocks, ok := c.blockchain.GetBlocks(start, end, true)
+	if !ok {
+		return fmt.Errorf("Failed to fetch blocks from  %d to %d", start, end)
+	}
 
 	// Step3: Generate Checkpoint
 	checkpoint, err := c.generateCheckpoint(blocks)
@@ -117,9 +122,12 @@ func (c *checkpoint) StartNewCheckpoint(epochSize uint64) error {
 	return nil
 }
 
-func (c *checkpoint) determineCheckpointRange(lastChildBlock, epochSize uint64) (uint64, uint64) {
-	// TODO: implement
-	return lastChildBlock + 1, lastChildBlock + epochSize
+func (c *checkpoint) determineCheckpointRange(lastChildBlock uint64) (uint64, uint64) {
+	header := c.blockchain.Header()
+
+	lastBlockNumber := header.Number
+
+	return lastChildBlock + 1, lastBlockNumber
 }
 
 func (c *checkpoint) generateCheckpoint(blocks []*types.Block) (*ctypes.Checkpoint, error) {
@@ -277,7 +285,7 @@ type MockRootChainContractClient struct {
 func (m *MockRootChainContractClient) GetLastChildBlock() (uint64, error) {
 	header := m.blockchain.Header()
 
-	currentEpoch := header.Number/m.epochSize + 1
+	currentEpoch := header.Number/m.epochSize - 1
 
 	return currentEpoch * m.epochSize, nil
 }

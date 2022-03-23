@@ -89,6 +89,11 @@ const (
 
 	// InsertTransactionsHook defines the process to insert additional transactions
 	InsertTransactionsHook = "InsertTransactionsHook"
+
+	// Bridge //
+
+	// CreateCheckpointHook defines next checkpoint
+	CreateCheckpointHook HookType = "CreateCheckpointHook"
 )
 
 type ConsensusMechanism interface {

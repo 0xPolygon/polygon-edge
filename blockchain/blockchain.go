@@ -1048,16 +1048,18 @@ func (b *Blockchain) GetBlockByNumber(blockNumber uint64, full bool) (*types.Blo
 }
 
 // GetBlocks returns the bunch of block
-func (b *Blockchain) GetBlocks(start, end uint64, full bool) []*types.Block {
+func (b *Blockchain) GetBlocks(start, end uint64, full bool) ([]*types.Block, bool) {
 	blocks := make([]*types.Block, 0, end-start+1)
 
 	for i := start; i <= end; i++ {
-		block, _ := b.GetBlockByNumber(i, full)
-
+		block, ok := b.GetBlockByNumber(i, full)
+		if !ok {
+			return nil, false
+		}
 		blocks = append(blocks, block)
 	}
 
-	return blocks
+	return blocks, true
 }
 
 // Close closes the DB connection

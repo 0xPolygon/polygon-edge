@@ -16,6 +16,7 @@ type Bridge interface {
 	Close() error
 	SetValidators([]types.Address, uint64)
 	StateSync() statesync.StateSync
+	StartNewCheckpoint(epochSize uint64) error
 }
 
 type bridge struct {
@@ -101,4 +102,8 @@ func (b *bridge) SetValidators(validators []types.Address, threshold uint64) {
 
 func (b *bridge) StateSync() statesync.StateSync {
 	return b.stateSync
+}
+
+func (b *bridge) StartNewCheckpoint(epochSize uint64) error {
+	return b.checkpoint.StartNewCheckpoint(epochSize)
 }
