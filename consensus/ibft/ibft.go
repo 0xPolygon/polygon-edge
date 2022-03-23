@@ -21,7 +21,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"google.golang.org/grpc"
-	any "google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 const (
@@ -1145,7 +1145,7 @@ func (i *Ibft) gossip(typ proto.MessageReq_Type) {
 
 	// if we are sending a preprepare message we need to include the proposed block
 	if msg.Type == proto.MessageReq_Preprepare {
-		msg.Proposal = &any.Any{
+		msg.Proposal = &anypb.Any{
 			Value: i.state.block.MarshalRLP(),
 		}
 	}
