@@ -6,11 +6,7 @@ import (
 	"github.com/hashicorp/go-hclog"
 )
 
-const (
-	checkpointProto = "/bridge/topicCheckpoint/0.1"
-	ackProto        = "/bridge/topicAck/0.1"
-	noAckProto      = "/bridge/topicNoAck/0.1"
-)
+var transportProto = "/bridge/checkpoint/0.1"
 
 type CheckpointTransport interface {
 	Start() error
@@ -22,9 +18,7 @@ type CheckpointTransport interface {
 type libp2pGossipTransport struct {
 	logger  hclog.Logger
 	network *network.Server
-
-	//	topics for different gossip messages
-	topicCheckpoint, topicAck, topicNoAck *network.Topic
+	topic   *network.Topic
 }
 
 func NewLibp2pGossipTransport(logger hclog.Logger, network *network.Server) CheckpointTransport {
@@ -35,67 +29,45 @@ func NewLibp2pGossipTransport(logger hclog.Logger, network *network.Server) Chec
 }
 
 func (t *libp2pGossipTransport) Start() error {
-	var err error
-
-	//	TODO: generate proto message
-	if t.topicCheckpoint, err = t.network.NewTopic(
-		checkpointProto,
-		&proto.SignedMessage{},
-	); err != nil {
+	topic, err := t.network.NewTopic(transportProto, &proto.SignedMessage{})
+	if err != nil {
 		return err
 	}
 
-	//	TODO: generate proto message
-	if t.topicAck, err = t.network.NewTopic(
-		ackProto,
-		&proto.SignedMessage{},
-	); err != nil {
-		return err
-	}
-
-	//	TODO: generate proto message
-	if t.topicNoAck, err = t.network.NewTopic(
-		noAckProto,
-		&proto.SignedMessage{},
-	); err != nil {
-		return err
-	}
+	t.topic = topic
 
 	return nil
 }
 
 func (t *libp2pGossipTransport) ProposeCheckpoint(proposal *CheckpointProposalMessage) error {
-	//return t.topicCheckpoint.Publish(...)
+	// return t.topic.Publish(...)
 
 	return nil
 }
 
 func (t *libp2pGossipTransport) SendAck(ack *AckMessage) error {
-	//return t.topicAck.Publish(...)
+	// return t.topic.Publish(...)
 
 	return nil
 }
 
 func (t *libp2pGossipTransport) SendNoAck(noAck *NoAckMessage) error {
-	//return t.topicNoAck.Publish(...)
+	// return t.topic.Publish(...)
 
 	return nil
 }
 
-//	TODO: multiple subscribe
 func (t *libp2pGossipTransport) Subscribe(handler func(interface{})) error {
-	//return t.topic.Subscribe(func(obj interface{}) {
-	// protoMessage, ok := obj.(*proto.SignedMessage)
-	// if !ok {
-	// 	t.logger.Warn("received unexpected typed message", "message", obj)
+	return t.topic.Subscribe(func(obj interface{}) {
+		// protoMessage, ok := obj.(*proto.SignedMessage)
+		// if !ok {
+		// 	t.logger.Warn("received unexpected typed message", "message", obj)
 
-	// 	return
-	// }
+		// 	return
+		// }
 
-	// message := toSignedMessage(protoMessage)
+		// message := toSignedMessage(protoMessage)
 
-	// handler(message)
-	//})
-
-	return nil
+		// handler(message)
+	})
 }
