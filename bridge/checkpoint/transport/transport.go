@@ -42,8 +42,11 @@ func (t *libp2pGossipTransport) Start() error {
 }
 
 func (t *libp2pGossipTransport) SendCheckpoint(proposal *CheckpointMessage) error {
-	// return t.topic.Publish(...)
-	return nil
+	return t.topic.Publish(&proto.SignedMessage{
+		Type:      proto.SignedMessage_CHECKPOINT,
+		Payload:   proposal.Checkpoint.MarshalRLP(),
+		Signature: proposal.Signature,
+	})
 }
 
 func (t *libp2pGossipTransport) SendAck(ack *AckMessage) error {
