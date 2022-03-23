@@ -1050,6 +1050,7 @@ func (b *Blockchain) GetBlockByNumber(blockNumber uint64, full bool) (*types.Blo
 // GetBlocks returns the bunch of block
 func (b *Blockchain) GetBlocks(start, end uint64, full bool) []*types.Block {
 	blocks := make([]*types.Block, 0, end-start+1)
+
 	for i := start; i <= end; i++ {
 		block, _ := b.GetBlockByNumber(i, full)
 

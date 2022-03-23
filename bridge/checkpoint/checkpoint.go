@@ -94,6 +94,7 @@ func (c *checkpoint) StartNewCheckpoint(epochSize uint64) error {
 	// Calculate own signature for checkpoint
 	hash := checkpoint.Hash()
 	sig, err := c.signer.Sign(hash.Bytes())
+
 	if err != nil {
 		return err
 	}
@@ -134,11 +135,12 @@ func (c *checkpoint) getProposer(epoch uint64) types.Address {
 		return types.ZeroAddress
 	}
 
-	return validators[int(epoch)%int(len(validators))]
+	return validators[int(epoch)%len(validators)]
 }
 
 func (c *checkpoint) addCheckpointSignature(checkpoint *ctypes.Checkpoint, address types.Address, sig []byte) {
 	hash := checkpoint.Hash()
+
 	c.sampool.AddSignature(&sam.MessageSignature{
 		Hash:      hash,
 		Address:   address,
@@ -147,6 +149,7 @@ func (c *checkpoint) addCheckpointSignature(checkpoint *ctypes.Checkpoint, addre
 
 	total := c.sampool.GetSignatureCount(hash)
 	if total >= c.validatorSet.Threshold() && checkpoint.Proposer == c.signer.Address() {
+		// TODO: Submit Checkpoint into RootChain contract
 		c.logger.Info(
 			"received 2/3 signatures for checkpoint, submitting checkpoint to RootChain contract",
 			"checkpoint",
@@ -156,13 +159,12 @@ func (c *checkpoint) addCheckpointSignature(checkpoint *ctypes.Checkpoint, addre
 			"signatures",
 			total,
 		)
-
-		// TODO: Submit Checkpoint into RootChain contract
 	}
 }
 
 func (c *checkpoint) addAckSignature(ack *ctypes.Ack, address types.Address, sig []byte) {
 	hash := ack.Hash()
+
 	c.sampool.AddSignature(&sam.MessageSignature{
 		Hash:      hash,
 		Address:   address,
@@ -171,6 +173,7 @@ func (c *checkpoint) addAckSignature(ack *ctypes.Ack, address types.Address, sig
 
 	total := c.sampool.GetSignatureCount(hash)
 	if total >= c.validatorSet.Threshold() {
+		// TODO: Create Edge Transaction to change proposer in the contract in Edge
 		c.logger.Info(
 			"received 2/3 signatures for ack, change proposer",
 			"ack",
@@ -178,13 +181,12 @@ func (c *checkpoint) addAckSignature(ack *ctypes.Ack, address types.Address, sig
 			"signatures",
 			total,
 		)
-
-		// TODO: Create Edge Transaction to change proposer in the contract in Edge
 	}
 }
 
 func (c *checkpoint) addNoAckSignature(noAck *ctypes.NoAck, address types.Address, sig []byte) {
 	hash := noAck.Hash()
+
 	c.sampool.AddSignature(&sam.MessageSignature{
 		Hash:      hash,
 		Address:   address,
@@ -193,6 +195,7 @@ func (c *checkpoint) addNoAckSignature(noAck *ctypes.NoAck, address types.Addres
 
 	total := c.sampool.GetSignatureCount(hash)
 	if total >= c.validatorSet.Threshold() {
+		// TODO: Create Edge Transaction to change proposer in the contract in Edge
 		c.logger.Info(
 			"received 2/3 signatures for NoAck, change proposer",
 			"noack",
@@ -200,8 +203,6 @@ func (c *checkpoint) addNoAckSignature(noAck *ctypes.NoAck, address types.Addres
 			"signatures",
 			total,
 		)
-
-		// TODO: Create Edge Transaction to change proposer in the contract in Edge
 	}
 }
 
