@@ -31,8 +31,6 @@ type checkpoint struct {
 	transport         transport.CheckpointTransport
 	validators        []types.Address
 
-	sampool sam.Pool
-
 	closeCh chan struct{}
 }
 
@@ -49,7 +47,6 @@ func NewCheckpoint(
 		// blockchain: blockchain,
 		// rootchainContract: rootchainContractClient,
 		transport: transport.NewLibp2pGossipTransport(logger, network),
-		sampool:   sam.NewPool(nil, 0),
 	}, nil
 }
 
@@ -105,21 +102,6 @@ func (c *checkpoint) CreateNewCheckpoint() error {
 	if err != nil {
 		return err
 	}
-
-	//	TODO: add to sampool
-	//	1. add msg
-	c.sampool.AddMessage(&sam.Message{
-		Hash: hash,
-		Data: checkpoint,
-	})
-
-	//	2. add signature
-	c.sampool.AddSignature(&sam.MessageSignature{
-		Hash:      hash,
-		Signature: sig,
-	})
-
-	//	3. publish gossip (or only if proposer? == step5)
 
 	// Step5: Propose checkpoint if proposer
 	proposer := c.getProposer(currentEpoch)
