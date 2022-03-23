@@ -13,7 +13,11 @@ type MockNetworkingServer struct {
 	// Mock identity client that simulates another peer
 	mockIdentityClient *MockIdentityClient
 
-	// Hooks that the test can set
+	// Mock discovery client that simulates another peer
+	mockDiscoveryClient *MockDiscoveryClient
+
+	// Hooks that the test can set //
+	// Identity Hooks
 	newIdentityClientFn      newIdentityClientDelegate
 	disconnectFromPeerFn     disconnectFromPeerDelegate
 	addPeerFn                addPeerDelegate
@@ -21,11 +25,24 @@ type MockNetworkingServer struct {
 	emitEventFn              emitEventDelegate
 	isTemporaryDialFn        isTemporaryDialDelegate
 	hasFreeConnectionSlotFn  hasFreeConnectionSlotDelegate
+
+	// Discovery Hooks
+	newDiscoveryClientFn       newDiscoveryClientDelegate
+	isBootnodeFn               isBootnodeDelegate
+	getRandomBootnodeFn        getRandomBootnodeDelegate
+	getBootnodeConnCountFn     getBootnodeConnCountDelegate
+	closeProtocolStreamFn      closeProtocolStreamDelegate
+	addToPeerStoreFn           addToPeerStoreDelegate
+	getPeerInfoFn              getPeerInfoDelegate
+	getRandomPeerFn            getRandomPeerDelegate
+	fetchAndSetTemporaryDialFn fetchAndSetTemporaryDialDelegate
+	removeTemporaryDialFn      removeTemporaryDialDelegate
 }
 
 func NewMockNetworkingServer() *MockNetworkingServer {
 	return &MockNetworkingServer{
-		mockIdentityClient: &MockIdentityClient{},
+		mockIdentityClient:  &MockIdentityClient{},
+		mockDiscoveryClient: &MockDiscoveryClient{},
 	}
 }
 
@@ -33,14 +50,27 @@ func (m *MockNetworkingServer) GetMockIdentityClient() *MockIdentityClient {
 	return m.mockIdentityClient
 }
 
-// Define the mock hooks
+// Define the mock hooks //
+// Required for Identity
 type newIdentityClientDelegate func(peer.ID) (proto.IdentityClient, error)
 type disconnectFromPeerDelegate func(peer.ID, string)
 type addPeerDelegate func(peer.ID, network.Direction)
 type updatePendingConnCountDelegate func(int64, network.Direction)
 type emitEventDelegate func(*event.PeerEvent)
-type isTemporaryDialDelegate func(peerID peer.ID) bool
-type hasFreeConnectionSlotDelegate func(direction network.Direction) bool
+type isTemporaryDialDelegate func(peer.ID) bool
+type hasFreeConnectionSlotDelegate func(network.Direction) bool
+
+// Required for Discovery
+type isBootnodeDelegate func(peerID peer.ID) bool
+type getRandomBootnodeDelegate func() *peer.AddrInfo
+type getBootnodeConnCountDelegate func() int64
+type newDiscoveryClientDelegate func(peer.ID) (proto.DiscoveryClient, error)
+type closeProtocolStreamDelegate func(string, peer.ID) error
+type addToPeerStoreDelegate func(*peer.AddrInfo)
+type getPeerInfoDelegate func(peer.ID) *peer.AddrInfo
+type getRandomPeerDelegate func() *peer.ID
+type fetchAndSetTemporaryDialDelegate func(peer.ID, bool) bool
+type removeTemporaryDialDelegate func(peer.ID)
 
 func (m *MockNetworkingServer) NewIdentityClient(peerID peer.ID) (proto.IdentityClient, error) {
 	if m.newIdentityClientFn != nil {
@@ -118,6 +148,122 @@ func (m *MockNetworkingServer) HookHasFreeConnectionSlot(fn hasFreeConnectionSlo
 	m.hasFreeConnectionSlotFn = fn
 }
 
+func (m *MockNetworkingServer) IsBootnode(peerID peer.ID) bool {
+	if m.isBootnodeFn != nil {
+		return m.isBootnodeFn(peerID)
+	}
+
+	return false
+}
+
+func (m *MockNetworkingServer) HookIsBootnode(fn isBootnodeDelegate) {
+	m.isBootnodeFn = fn
+}
+
+func (m *MockNetworkingServer) GetRandomBootnode() *peer.AddrInfo {
+	if m.getRandomBootnodeFn != nil {
+		return m.getRandomBootnodeFn()
+	}
+
+	return nil
+}
+
+func (m *MockNetworkingServer) HookGetRandomBootnode(fn getRandomBootnodeDelegate) {
+	m.getRandomBootnodeFn = fn
+}
+
+func (m *MockNetworkingServer) GetBootnodeConnCount() int64 {
+	if m.getBootnodeConnCountFn != nil {
+		return m.getBootnodeConnCountFn()
+	}
+
+	return 0
+}
+
+func (m *MockNetworkingServer) HookGetBootnodeConnCount(fn getBootnodeConnCountDelegate) {
+	m.getBootnodeConnCountFn = fn
+}
+
+func (m *MockNetworkingServer) NewDiscoveryClient(peerID peer.ID) (proto.DiscoveryClient, error) {
+	if m.newDiscoveryClientFn != nil {
+		return m.newDiscoveryClientFn(peerID)
+	}
+
+	return m.mockDiscoveryClient, nil
+}
+
+func (m *MockNetworkingServer) HookNewDiscoveryClient(fn newDiscoveryClientDelegate) {
+	m.newDiscoveryClientFn = fn
+}
+
+func (m *MockNetworkingServer) CloseProtocolStream(protocol string, peerID peer.ID) error {
+	if m.closeProtocolStreamFn != nil {
+		return m.closeProtocolStreamFn(protocol, peerID)
+	}
+
+	return nil
+}
+
+func (m *MockNetworkingServer) HookCloseProtocolStream(fn closeProtocolStreamDelegate) {
+	m.closeProtocolStreamFn = fn
+}
+
+func (m *MockNetworkingServer) AddToPeerStore(peerInfo *peer.AddrInfo) {
+	if m.addToPeerStoreFn != nil {
+		m.addToPeerStoreFn(peerInfo)
+	}
+}
+
+func (m *MockNetworkingServer) HookAddToPeerStore(fn addToPeerStoreDelegate) {
+	m.addToPeerStoreFn = fn
+}
+
+func (m *MockNetworkingServer) GetPeerInfo(peerID peer.ID) *peer.AddrInfo {
+	if m.getPeerInfoFn != nil {
+		return m.getPeerInfoFn(peerID)
+	}
+
+	return nil
+}
+
+func (m *MockNetworkingServer) HookGetPeerInfo(fn getPeerInfoDelegate) {
+	m.getPeerInfoFn = fn
+}
+
+func (m *MockNetworkingServer) GetRandomPeer() *peer.ID {
+	if m.getRandomPeerFn != nil {
+		return m.getRandomPeerFn()
+	}
+
+	return nil
+}
+
+func (m *MockNetworkingServer) HookGetRandomPeer(fn getRandomPeerDelegate) {
+	m.getRandomPeerFn = fn
+}
+
+func (m *MockNetworkingServer) FetchAndSetTemporaryDial(peerID peer.ID, newValue bool) bool {
+	if m.fetchAndSetTemporaryDialFn != nil {
+		return m.fetchAndSetTemporaryDialFn(peerID, newValue)
+	}
+
+	return false
+}
+
+func (m *MockNetworkingServer) HookFetchAndSetTemporaryDial(fn fetchAndSetTemporaryDialDelegate) {
+	m.fetchAndSetTemporaryDialFn = fn
+}
+
+func (m *MockNetworkingServer) RemoveTemporaryDial(peerID peer.ID) {
+	if m.removeTemporaryDialFn != nil {
+		m.removeTemporaryDialFn(peerID)
+	}
+}
+
+func (m *MockNetworkingServer) HookRemoveTemporaryDial(fn removeTemporaryDialDelegate) {
+	m.removeTemporaryDialFn = fn
+}
+
 // MockIdentityClient mocks an identity client (other peer in the communication)
 type MockIdentityClient struct {
 	// Hooks that the test can set
@@ -141,6 +287,34 @@ func (mic *MockIdentityClient) Hello(
 ) (*proto.Status, error) {
 	if mic.helloFn != nil {
 		return mic.helloFn(ctx, in, opts...)
+	}
+
+	return nil, nil
+}
+
+// MockDiscoveryClient mocks a discovery client (other peer in the communication)
+type MockDiscoveryClient struct {
+	// Hooks that the test can set
+	findPeersFn findPeersDelegate
+}
+
+type findPeersDelegate func(
+	ctx context.Context,
+	in *proto.FindPeersReq,
+	opts ...grpc.CallOption,
+) (*proto.FindPeersResp, error)
+
+func (mdc *MockDiscoveryClient) HookFindPeers(fn findPeersDelegate) {
+	mdc.findPeersFn = fn
+}
+
+func (mdc *MockDiscoveryClient) FindPeers(
+	ctx context.Context,
+	in *proto.FindPeersReq,
+	opts ...grpc.CallOption,
+) (*proto.FindPeersResp, error) {
+	if mdc.findPeersFn != nil {
+		return mdc.findPeersFn(ctx, in, opts...)
 	}
 
 	return nil, nil
