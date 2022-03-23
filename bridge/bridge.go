@@ -46,6 +46,7 @@ func NewBridge(
 		config.RootChainContract,
 		config.Confirmations,
 	)
+
 	if err != nil {
 		return nil, err
 	}
@@ -57,6 +58,7 @@ func NewBridge(
 		signer,
 		valSet,
 	)
+
 	if err != nil {
 		return nil, err
 	}
