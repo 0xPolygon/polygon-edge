@@ -1047,6 +1047,18 @@ func (b *Blockchain) GetBlockByNumber(blockNumber uint64, full bool) (*types.Blo
 	return b.GetBlockByHash(blockHash, full)
 }
 
+// GetBlocks returns the bunch of block
+func (b *Blockchain) GetBlocks(start, end uint64, full bool) []*types.Block {
+	blocks := make([]*types.Block, 0, end-start+1)
+	for i := start; i <= end; i++ {
+		block, _ := b.GetBlockByNumber(i, full)
+
+		blocks = append(blocks, block)
+	}
+
+	return blocks
+}
+
 // Close closes the DB connection
 func (b *Blockchain) Close() error {
 	return b.db.Close()

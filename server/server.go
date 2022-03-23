@@ -200,6 +200,7 @@ func NewServer(config *Config) (*Server, error) {
 		m.bridge, err = bridge.NewBridge(
 			logger,
 			m.network,
+			m.blockchain,
 			signer.NewECDSASigner(key),
 			config.DataDir,
 			config.Bridge,

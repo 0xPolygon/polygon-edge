@@ -26,11 +26,13 @@ type Signer interface {
 }
 
 type Pool interface {
+	Start()
+	Close()
 	AddMessage(*Message)
 	AddSignature(*MessageSignature)
 	ConsumeMessage(types.Hash)
+	GetMessageByHash(types.Hash) ReadyMessage
 	GetReadyMessages() []ReadyMessage
-	UpdateValidatorSet([]types.Address, uint64)
 	IsMessageKnown(hash types.Hash) bool
 	GetSignatureCount(hash types.Hash) uint64
 }
