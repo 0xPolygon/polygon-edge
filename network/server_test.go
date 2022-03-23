@@ -724,33 +724,6 @@ func TestMinimumBootNodeCount(t *testing.T) {
 	}
 }
 
-func TestTemporaryDial(t *testing.T) {
-	defaultConfig := &CreateServerParams{
-		ConfigCallback: func(c *Config) {
-			c.NoDiscover = true
-		},
-	}
-	servers, err := createServers(2, map[int]*CreateServerParams{0: defaultConfig, 1: defaultConfig})
-
-	if err != nil {
-		t.Fatalf("Unable to create servers, %v", err)
-	}
-
-	t.Cleanup(func() {
-		closeTestServers(t, servers)
-	})
-
-	//make a temporary dail to server1
-	assert.NoError(t, dialServer(servers[0], *servers[1].AddrInfo(), true))
-
-	// ensure that the connection is established
-	assert.Equal(t, network.Connected, servers[0].host.Network().Connectedness(servers[1].host.ID()))
-
-	// since it is temporary dial, server should not have a persistent connection to its peer
-	connected := isServerConnectedTo(servers[0], servers[1].host.ID())
-	assert.False(t, connected)
-}
-
 func TestMultiAddrFromDns(t *testing.T) {
 	port := 12345
 
