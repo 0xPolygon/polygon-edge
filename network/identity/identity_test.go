@@ -3,6 +3,7 @@ package identity
 import (
 	"context"
 	"github.com/0xPolygon/polygon-edge/network/proto"
+	networkTesting "github.com/0xPolygon/polygon-edge/network/testing"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/stretchr/testify/assert"
@@ -13,9 +14,9 @@ import (
 // newIdentityService creates a new identity service instance
 // with mock-able backends
 func newIdentityService(
-	networkingServerCallback func(server *mockNetworkingServer),
+	networkingServerCallback func(server *networkTesting.MockNetworkingServer),
 ) *IdentityService {
-	baseServer := newMockNetworkingServer()
+	baseServer := networkTesting.NewMockNetworkingServer()
 
 	if networkingServerCallback != nil {
 		networkingServerCallback(baseServer)
@@ -34,22 +35,22 @@ func TestTemporaryDial(t *testing.T) {
 	// Create an instance of the identity service
 	identityService := newIdentityService(
 		// Set the relevant hook responses from the mock server
-		func(server *mockNetworkingServer) {
+		func(server *networkTesting.MockNetworkingServer) {
 			// Define the temporary dial hook
-			server.isTemporaryDialFn = func(peerID peer.ID) bool {
+			server.HookIsTemporaryDial(func(peerID peer.ID) bool {
 				return true
-			}
+			})
 
 			// Define the add peer hook
-			server.addPeerFn = func(
+			server.HookAddPeer(func(
 				id peer.ID,
 				direction network.Direction,
 			) {
 				peersArray = append(peersArray, id)
-			}
+			})
 
 			// Define the mock IdentityClient response
-			server.mockClient.helloFn = func(
+			server.GetMockIdentityClient().HookHello(func(
 				ctx context.Context,
 				in *proto.Status,
 				opts ...grpc.CallOption,
@@ -58,7 +59,7 @@ func TestTemporaryDial(t *testing.T) {
 					Chain:         0,
 					TemporaryDial: true, // make sure the dial is temporary
 				}, nil
-			}
+			})
 		},
 	)
 
@@ -81,17 +82,17 @@ func TestHandshake_Errors(t *testing.T) {
 	// Create an instance of the identity service
 	identityService := newIdentityService(
 		// Set the relevant hook responses from the mock server
-		func(server *mockNetworkingServer) {
+		func(server *networkTesting.MockNetworkingServer) {
 			// Define the add peer hook
-			server.addPeerFn = func(
+			server.HookAddPeer(func(
 				id peer.ID,
 				direction network.Direction,
 			) {
 				peersArray = append(peersArray, id)
-			}
+			})
 
 			// Define the mock IdentityClient response
-			server.mockClient.helloFn = func(
+			server.GetMockIdentityClient().HookHello(func(
 				ctx context.Context,
 				in *proto.Status,
 				opts ...grpc.CallOption,
@@ -100,7 +101,7 @@ func TestHandshake_Errors(t *testing.T) {
 					Chain:         responderChainID,
 					TemporaryDial: false,
 				}, nil
-			}
+			})
 		},
 	)
 

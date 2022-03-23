@@ -1,4 +1,4 @@
-package identity
+package testing
 
 import (
 	"context"
@@ -9,9 +9,9 @@ import (
 	"google.golang.org/grpc"
 )
 
-type mockNetworkingServer struct {
+type MockNetworkingServer struct {
 	// Mock identity client that simulates another peer
-	mockClient *mockIdentityClient
+	mockIdentityClient *MockIdentityClient
 
 	// Hooks that the test can set
 	newIdentityClientFn      newIdentityClientDelegate
@@ -23,10 +23,14 @@ type mockNetworkingServer struct {
 	hasFreeConnectionSlotFn  hasFreeConnectionSlotDelegate
 }
 
-func newMockNetworkingServer() *mockNetworkingServer {
-	return &mockNetworkingServer{
-		mockClient: &mockIdentityClient{},
+func NewMockNetworkingServer() *MockNetworkingServer {
+	return &MockNetworkingServer{
+		mockIdentityClient: &MockIdentityClient{},
 	}
+}
+
+func (m *MockNetworkingServer) GetMockIdentityClient() *MockIdentityClient {
+	return m.mockIdentityClient
 }
 
 // Define the mock hooks
@@ -38,59 +42,59 @@ type emitEventDelegate func(*event.PeerEvent)
 type isTemporaryDialDelegate func(peerID peer.ID) bool
 type hasFreeConnectionSlotDelegate func(direction network.Direction) bool
 
-func (m *mockNetworkingServer) NewIdentityClient(peerID peer.ID) (proto.IdentityClient, error) {
+func (m *MockNetworkingServer) NewIdentityClient(peerID peer.ID) (proto.IdentityClient, error) {
 	if m.newIdentityClientFn != nil {
 		return m.newIdentityClientFn(peerID)
 	}
 
-	return m.mockClient, nil
+	return m.mockIdentityClient, nil
 }
 
-func (m *mockNetworkingServer) HookNewIdentityClient(fn newIdentityClientDelegate) {
+func (m *MockNetworkingServer) HookNewIdentityClient(fn newIdentityClientDelegate) {
 	m.newIdentityClientFn = fn
 }
 
-func (m *mockNetworkingServer) DisconnectFromPeer(peerID peer.ID, reason string) {
+func (m *MockNetworkingServer) DisconnectFromPeer(peerID peer.ID, reason string) {
 	if m.disconnectFromPeerFn != nil {
 		m.disconnectFromPeerFn(peerID, reason)
 	}
 }
 
-func (m *mockNetworkingServer) HookDisconnectFromPeer(fn disconnectFromPeerDelegate) {
+func (m *MockNetworkingServer) HookDisconnectFromPeer(fn disconnectFromPeerDelegate) {
 	m.disconnectFromPeerFn = fn
 }
 
-func (m *mockNetworkingServer) AddPeer(id peer.ID, direction network.Direction) {
+func (m *MockNetworkingServer) AddPeer(id peer.ID, direction network.Direction) {
 	if m.addPeerFn != nil {
 		m.addPeerFn(id, direction)
 	}
 }
 
-func (m *mockNetworkingServer) HookAddPeer(fn addPeerDelegate) {
+func (m *MockNetworkingServer) HookAddPeer(fn addPeerDelegate) {
 	m.addPeerFn = fn
 }
 
-func (m *mockNetworkingServer) UpdatePendingConnCount(delta int64, direction network.Direction) {
+func (m *MockNetworkingServer) UpdatePendingConnCount(delta int64, direction network.Direction) {
 	if m.updatePendingConnCountFn != nil {
 		m.updatePendingConnCountFn(delta, direction)
 	}
 }
 
-func (m *mockNetworkingServer) HookUpdatePendingConnCount(fn updatePendingConnCountDelegate) {
+func (m *MockNetworkingServer) HookUpdatePendingConnCount(fn updatePendingConnCountDelegate) {
 	m.updatePendingConnCountFn = fn
 }
 
-func (m *mockNetworkingServer) EmitEvent(event *event.PeerEvent) {
+func (m *MockNetworkingServer) EmitEvent(event *event.PeerEvent) {
 	if m.emitEventFn != nil {
 		m.emitEventFn(event)
 	}
 }
 
-func (m *mockNetworkingServer) HookEmitEvent(fn emitEventDelegate) {
+func (m *MockNetworkingServer) HookEmitEvent(fn emitEventDelegate) {
 	m.emitEventFn = fn
 }
 
-func (m *mockNetworkingServer) IsTemporaryDial(peerID peer.ID) bool {
+func (m *MockNetworkingServer) IsTemporaryDial(peerID peer.ID) bool {
 	if m.isTemporaryDialFn != nil {
 		return m.isTemporaryDialFn(peerID)
 	}
@@ -98,11 +102,11 @@ func (m *mockNetworkingServer) IsTemporaryDial(peerID peer.ID) bool {
 	return false
 }
 
-func (m *mockNetworkingServer) HookIsTemporaryDial(fn isTemporaryDialDelegate) {
+func (m *MockNetworkingServer) HookIsTemporaryDial(fn isTemporaryDialDelegate) {
 	m.isTemporaryDialFn = fn
 }
 
-func (m *mockNetworkingServer) HasFreeConnectionSlot(direction network.Direction) bool {
+func (m *MockNetworkingServer) HasFreeConnectionSlot(direction network.Direction) bool {
 	if m.hasFreeConnectionSlotFn != nil {
 		return m.hasFreeConnectionSlotFn(direction)
 	}
@@ -110,12 +114,12 @@ func (m *mockNetworkingServer) HasFreeConnectionSlot(direction network.Direction
 	return true
 }
 
-func (m *mockNetworkingServer) HookHasFreeConnectionSlot(fn hasFreeConnectionSlotDelegate) {
+func (m *MockNetworkingServer) HookHasFreeConnectionSlot(fn hasFreeConnectionSlotDelegate) {
 	m.hasFreeConnectionSlotFn = fn
 }
 
-// mockIdentityClient mocks an identity client (other peer in the communication)
-type mockIdentityClient struct {
+// MockIdentityClient mocks an identity client (other peer in the communication)
+type MockIdentityClient struct {
 	// Hooks that the test can set
 	helloFn helloDelegate
 }
@@ -126,7 +130,11 @@ type helloDelegate func(
 	opts ...grpc.CallOption,
 ) (*proto.Status, error)
 
-func (mic *mockIdentityClient) Hello(
+func (mic *MockIdentityClient) HookHello(fn helloDelegate) {
+	mic.helloFn = fn
+}
+
+func (mic *MockIdentityClient) Hello(
 	ctx context.Context,
 	in *proto.Status,
 	opts ...grpc.CallOption,
