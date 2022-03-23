@@ -4,7 +4,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/0xPolygon/polygon-edge/helper/common"
+	"github.com/0xPolygon/polygon-edge/bridge/utils"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -13,8 +13,8 @@ type pool struct {
 	// otherwise read-lock is called
 	// Changing validators occurs rarely (once per epoch)
 	changeValidatorsLock sync.RWMutex
-	validators           []types.Address
-	signatureThreshold   uint64 // required number of signatures for ready
+	validatorSet         utils.ValidatorSet
+	validatorsChangeSub  utils.UpdateValidatorsSubscription
 
 	// storage for message body
 	messageMap sync.Map // types.Hash -> []byte
@@ -27,16 +27,34 @@ type pool struct {
 	messageSignatures *messageSignaturesStore
 }
 
-func NewPool(validators []types.Address, threshold uint64) Pool {
+func NewPool(validators utils.ValidatorSet) Pool {
 	return &pool{
-		changeValidatorsLock: sync.RWMutex{},
-		validators:           validators,
-		signatureThreshold:   threshold,
-		messageMap:           sync.Map{},
-		consumedMap:          sync.Map{},
-		readyMap:             sync.Map{},
-		messageSignatures:    newMessageSignaturesStore(),
+		validatorSet:      validators,
+		messageSignatures: newMessageSignaturesStore(),
 	}
+}
+
+func (p *pool) Start() {
+	p.watchValidatorsChange()
+}
+
+func (p *pool) Close() {
+	if p.validatorsChangeSub != nil {
+		p.validatorSet.Unsubscribe(p.validatorsChangeSub)
+		p.validatorsChangeSub = nil
+	}
+}
+
+func (p *pool) watchValidatorsChange() {
+	if p.validatorsChangeSub != nil {
+		p.validatorSet.Unsubscribe(p.validatorsChangeSub)
+	}
+
+	p.validatorsChangeSub = p.validatorSet.Subscribe()
+
+	p.validatorsChangeSub.Subscribe(func(ev utils.UpdateValidatorsEvent) {
+		p.updateValidatorSet(ev.ValidatorDeletion, ev.OldThreshold, ev.NewThreshold)
+	})
 }
 
 // Add adds new message with the signature to pool
@@ -133,22 +151,20 @@ func (p *pool) GetReadyMessages() []ReadyMessage {
 
 // UpdateValidatorSet update validators and threshold
 // This process blocks other processes because messages would lose the signatures
-func (p *pool) UpdateValidatorSet(validators []types.Address, threshold uint64) {
+func (p *pool) updateValidatorSet(
+	validatorDeletion []types.Address,
+	oldThreshold uint64,
+	newThreshold uint64,
+) {
 	p.changeValidatorsLock.Lock()
 	defer p.changeValidatorsLock.Unlock()
 
-	oldValidators := p.validators
-	oldThreshold := p.signatureThreshold //nolint:nolintlint //nolint:ifshort
-
-	p.validators = validators
-	atomic.StoreUint64(&p.signatureThreshold, threshold)
-
 	var maybeDemotedHashes []types.Hash
-	if removed := common.DiffAddresses(oldValidators, validators); len(removed) > 0 {
-		maybeDemotedHashes = p.messageSignatures.RemoveSignatures(removed)
+	if len(validatorDeletion) > 0 {
+		maybeDemotedHashes = p.messageSignatures.RemoveSignatures(validatorDeletion)
 	}
 
-	if oldThreshold != threshold {
+	if oldThreshold != newThreshold {
 		// we need to check all messages if threshold changes
 		p.tryToPromoteAndDemoteAll()
 	} else if len(maybeDemotedHashes) > 0 {
@@ -163,7 +179,7 @@ func (p *pool) UpdateValidatorSet(validators []types.Address, threshold uint64) 
 func (p *pool) canPromote(hash types.Hash) bool {
 	isKnown := p.IsMessageKnown(hash)
 	numSignatures := p.messageSignatures.GetSignatureCount(hash)
-	threshold := atomic.LoadUint64(&p.signatureThreshold)
+	threshold := p.validatorSet.Threshold()
 
 	return isKnown && numSignatures >= threshold
 }
@@ -189,7 +205,7 @@ func (p *pool) tryToDemote(hash types.Hash) {
 
 // tryToPromoteAndDemoteAll iterates all messages and update its statuses
 func (p *pool) tryToPromoteAndDemoteAll() {
-	threshold := atomic.LoadUint64(&p.signatureThreshold)
+	threshold := p.validatorSet.Threshold()
 
 	p.messageSignatures.RangeMessages(func(entry *signedMessageEntry) bool {
 		hash := entry.Hash

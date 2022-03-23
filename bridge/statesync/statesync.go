@@ -3,11 +3,11 @@ package statesync
 import (
 	"encoding/json"
 	"fmt"
-	"sync"
 
 	"github.com/0xPolygon/polygon-edge/bridge/sam"
 	"github.com/0xPolygon/polygon-edge/bridge/statesync/transport"
 	"github.com/0xPolygon/polygon-edge/bridge/tracker"
+	"github.com/0xPolygon/polygon-edge/bridge/utils"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
@@ -18,7 +18,6 @@ type StateSync interface {
 	Start() error
 	Close() error
 
-	SetValidators([]types.Address, uint64)
 	GetReadyMessages() ([]MessageWithSignatures, error)
 	ValidateTx(*types.Transaction) error
 	Consume(*types.Transaction)
@@ -27,11 +26,9 @@ type StateSync interface {
 type stateSync struct {
 	logger hclog.Logger
 
-	signer             sam.Signer
-	isValidatorMapLock sync.RWMutex
-	isValidatorMap     map[types.Address]bool
-	validatorThreshold uint64
-	sampool            sam.Pool
+	signer       sam.Signer
+	validatorSet utils.ValidatorSet
+	sampool      sam.Pool
 
 	tracker   *tracker.Tracker
 	transport transport.MessageTransport
@@ -43,6 +40,7 @@ func NewStateSync(
 	logger hclog.Logger,
 	network *network.Server,
 	signer sam.Signer,
+	validatorSet utils.ValidatorSet,
 	dataDirURL string,
 	rootchainURL string,
 	rootchainContract types.Address,
@@ -67,14 +65,13 @@ func NewStateSync(
 	}
 
 	return &stateSync{
-		logger:             statesyncLogger,
-		signer:             signer,
-		tracker:            tracker,
-		transport:          transport.NewLibp2pGossipTransport(logger, network),
-		isValidatorMapLock: sync.RWMutex{},
-		isValidatorMap:     map[types.Address]bool{},
-		sampool:            sam.NewPool(nil, 0),
-		closeCh:            make(chan struct{}),
+		logger:       statesyncLogger,
+		signer:       signer,
+		validatorSet: validatorSet,
+		tracker:      tracker,
+		transport:    transport.NewLibp2pGossipTransport(logger, network),
+		sampool:      sam.NewPool(validatorSet),
+		closeCh:      make(chan struct{}),
 	}, nil
 }
 
@@ -107,13 +104,6 @@ func (b *stateSync) Close() error {
 	return nil
 }
 
-func (b *stateSync) SetValidators(validators []types.Address, threshold uint64) {
-	b.resetIsValidatorMap(validators)
-	b.validatorThreshold = threshold
-
-	b.sampool.UpdateValidatorSet(validators, threshold)
-}
-
 func (b *stateSync) GetReadyMessages() ([]MessageWithSignatures, error) {
 	readyMessages := b.sampool.GetReadyMessages()
 
@@ -139,7 +129,7 @@ func (b *stateSync) GetReadyMessages() ([]MessageWithSignatures, error) {
 func (b *stateSync) ValidateTx(tx *types.Transaction) error {
 	hash := getTransactionHash(tx)
 
-	num, required := b.sampool.GetSignatureCount(hash), b.validatorThreshold
+	num, required := b.sampool.GetSignatureCount(hash), b.validatorSet.Threshold()
 	if num < required {
 		return fmt.Errorf("bridge doesn't have enough signatures, hash=%s, required=%d, actual=%d", hash, required, num)
 	}
@@ -149,25 +139,6 @@ func (b *stateSync) ValidateTx(tx *types.Transaction) error {
 
 func (b *stateSync) Consume(tx *types.Transaction) {
 	b.sampool.ConsumeMessage(getTransactionHash(tx))
-}
-
-func (b *stateSync) resetIsValidatorMap(validators []types.Address) {
-	isValidatorMap := make(map[types.Address]bool)
-	for _, address := range validators {
-		isValidatorMap[address] = true
-	}
-
-	b.isValidatorMapLock.Lock()
-	defer b.isValidatorMapLock.Unlock()
-
-	b.isValidatorMap = isValidatorMap
-}
-
-func (b *stateSync) isValidator(address types.Address) bool {
-	b.isValidatorMapLock.RLock()
-	defer b.isValidatorMapLock.RUnlock()
-
-	return b.isValidatorMap[address]
 }
 
 func (b *stateSync) processEvents(eventCh <-chan []byte) {
@@ -246,7 +217,7 @@ func (b *stateSync) addRemoteMessage(message *transport.SignedMessage) {
 		return
 	}
 
-	if !b.isValidator(sender) {
+	if !b.validatorSet.IsValidator(sender) {
 		b.logger.Warn(
 			"ignored gossip message from non-validator",
 			"hash",

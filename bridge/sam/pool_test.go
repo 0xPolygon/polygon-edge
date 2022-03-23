@@ -3,7 +3,9 @@ package sam
 import (
 	"testing"
 
+	"github.com/0xPolygon/polygon-edge/bridge/utils"
 	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
 )
@@ -49,29 +51,31 @@ func newTestMessageSignaturesStore(signatures []MessageSignature) *messageSignat
 }
 
 func newTestMessagePool(
-	validators []types.Address,
-	threshold uint64,
+	t *testing.T,
+	validatorSet utils.ValidatorSet,
 	knownMessages []Message,
 	consumedHashes []types.Hash,
 	signatures []MessageSignature,
-) Pool {
-	pool := NewPool(validators, threshold)
+) *pool {
+	t.Helper()
+
+	testPool := NewPool(validatorSet)
 
 	for _, msg := range knownMessages {
 		msg := msg
-		pool.AddMessage(&msg)
+		testPool.AddMessage(&msg)
 	}
 
 	for _, consumed := range consumedHashes {
-		pool.ConsumeMessage(consumed)
+		testPool.ConsumeMessage(consumed)
 	}
 
 	for _, signature := range signatures {
 		signature := signature
-		pool.AddSignature(&signature)
+		testPool.AddSignature(&signature)
 	}
 
-	return pool
+	return testPool.(*pool)
 }
 
 func getMessageHashes(store *messageSignaturesStore) []types.Hash {
@@ -215,8 +219,8 @@ func Test_Pool_Add(t *testing.T) {
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
 			pool := newTestMessagePool(
-				testCase.validators,
-				testCase.threshold,
+				t,
+				utils.NewValidatorSet(testCase.validators, testCase.threshold),
 				testCase.knownMessages,
 				testCase.consumedHashes,
 				testCase.signatures,
@@ -275,8 +279,8 @@ func Test_Pool_MarkAsKnown(t *testing.T) {
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
 			pool := newTestMessagePool(
-				testCase.validators,
-				testCase.threshold,
+				t,
+				utils.NewValidatorSet(testCase.validators, testCase.threshold),
 				nil,
 				nil,
 				testCase.signatures,
@@ -380,9 +384,10 @@ func Test_Pool_UpdateValidatorSet(t *testing.T) {
 
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
+			valSet := utils.NewValidatorSet(testCase.validators, testCase.threshold)
 			pool := newTestMessagePool(
-				testCase.validators,
-				testCase.threshold,
+				t,
+				valSet,
 				testCase.knownMessages,
 				testCase.consumedHashes,
 				testCase.signatures,
@@ -391,7 +396,13 @@ func Test_Pool_UpdateValidatorSet(t *testing.T) {
 			// check current ready messages
 			assert.Len(t, pool.GetReadyMessages(), testCase.oldNumReadyMessages)
 
-			pool.UpdateValidatorSet(testCase.newValidators, testCase.newThreshold)
+			// try to change validators without subscription
+			valSet.SetValidators(testCase.newValidators, testCase.newThreshold)
+			pool.updateValidatorSet(
+				common.DiffAddresses(testCase.validators, testCase.newValidators),
+				testCase.threshold,
+				testCase.newThreshold,
+			)
 
 			// get result
 			assert.Len(t, pool.GetReadyMessages(), testCase.newNumReadyMessages)
