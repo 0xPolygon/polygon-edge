@@ -35,28 +35,6 @@ func TestDiscovery_ConnectedPopulatesRoutingTable(t *testing.T) {
 	assert.Equal(t, servers[1].discovery.RoutingTableSize(), 1)
 }
 
-// TODO: refactor
-//func TestDiscovery_ProtocolFindPeers(t *testing.T) {
-//	servers, createErr := createServers(2, nil)
-//	if createErr != nil {
-//		t.Fatalf("Unable to create servers, %v", createErr)
-//	}
-//
-//	t.Cleanup(func() {
-//		closeTestServers(t, servers)
-//	})
-//
-//	joinErr := JoinAndWait(servers[0], servers[1], DefaultBufferTimeout, DefaultJoinTimeout)
-//	if joinErr != nil {
-//		t.Fatalf("Unable to join peers, %v", joinErr)
-//	}
-//
-//	// find peers should not include our identity
-//	resp, err := servers[0].discovery.findPeersCall(servers[1].AddrInfo().ID)
-//	assert.NoError(t, err)
-//	assert.Empty(t, resp)
-//}
-
 func TestRoutingTable_Connected(t *testing.T) {
 	defaultConfig := &CreateServerParams{
 		ConfigCallback: func(c *Config) {
