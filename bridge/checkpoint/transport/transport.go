@@ -1,7 +1,8 @@
 package transport
 
 import (
-	"github.com/0xPolygon/polygon-edge/bridge/statesync/transport/proto"
+	"github.com/0xPolygon/polygon-edge/bridge/checkpoint/transport/proto"
+	ctypes "github.com/0xPolygon/polygon-edge/bridge/checkpoint/types"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/hashicorp/go-hclog"
 )
@@ -62,15 +63,35 @@ func (t *libp2pGossipTransport) Subscribe(handler func(interface{})) error {
 
 		// and call handler
 
-		// protoMessage, ok := obj.(*proto.SignedMessage)
-		// if !ok {
-		// 	t.logger.Warn("received unexpected typed message", "message", obj)
+		protoMsg, ok := obj.(*proto.SignedMessage)
+		if !ok {
+			t.logger.Warn("received unexpected typed message", "message", obj)
 
-		// 	return
-		// }
+			return
+		}
 
-		// message := toSignedMessage(protoMessage)
+		//	convert message to appropriate type
+		var message interface{}
 
-		// handler(message)
+		switch protoMsg.Type {
+		case proto.SignedMessage_CHECKPOINT:
+			checkpoint := ctypes.Checkpoint{}
+			if err := checkpoint.UnmarshalRLP(protoMsg.Payload); err != nil {
+				t.logger.Error("unable to unmarshal payload from message", "err", err)
+				return
+			}
+
+			message = &CheckpointMessage{
+				Checkpoint: checkpoint,
+				Signature:  protoMsg.Signature,
+			}
+
+		case proto.SignedMessage_ACK:
+			//	TODO: phase2
+		case proto.SignedMessage_NOACK:
+			//	TODO: phase2
+		}
+
+		handler(message)
 	})
 }
