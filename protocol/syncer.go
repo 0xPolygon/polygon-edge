@@ -19,8 +19,8 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
-	any "google.golang.org/protobuf/types/known/anypb"
-	empty "google.golang.org/protobuf/types/known/emptypb"
+	"google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 const (
@@ -327,7 +327,7 @@ func (s *Syncer) Broadcast(b *types.Block) {
 			Number:     b.Number(),
 			Difficulty: td.String(),
 		},
-		Raw: &any.Any{
+		Raw: &anypb.Any{
 			Value: b.MarshalRLP(),
 		},
 	}
@@ -464,7 +464,7 @@ func (s *Syncer) AddPeer(peerID peer.ID) error {
 	// watch for changes of the other node first
 	clt := proto.NewV1Client(conn)
 
-	rawStatus, err := clt.GetCurrent(context.Background(), &empty.Empty{})
+	rawStatus, err := clt.GetCurrent(context.Background(), &emptypb.Empty{})
 	if err != nil {
 		return err
 	}
