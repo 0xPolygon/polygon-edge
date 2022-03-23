@@ -1047,30 +1047,17 @@ func (b *Blockchain) GetBlockByNumber(blockNumber uint64, full bool) (*types.Blo
 	return b.GetBlockByHash(blockHash, full)
 }
 
-func (b *Blockchain) GetLastEpochBlocks(epochSize uint64, latestBlockNumber uint64) ([]*types.Block, bool) {
-	blockNumber := latestBlockNumber
-	epochBlocks := make([]*types.Block, epochSize)
+// GetBlocks returns the bunch of block
+func (b *Blockchain) GetBlocks(start, end uint64, full bool) []*types.Block {
+	blocks := make([]*types.Block, 0, end-start+1)
 
-	for index := 0; index < int(epochSize); index++ {
-		blockHash, ok := b.db.ReadCanonicalHash(blockNumber)
-		if !ok {
-			return nil, false
-		}
+	for i := start; i <= end; i++ {
+		block, _ := b.GetBlockByNumber(i, full)
 
-		// if blockNumber 0 (genesis block), do not try and get the full block
-		if blockNumber != uint64(0) {
-			block, ok := b.GetBlockByHash(blockHash, true)
-			if !ok {
-				return nil, false
-			}
-
-			epochBlocks[index] = block
-			
-			blockNumber = blockNumber - 1
-		}
+		blocks = append(blocks, block)
 	}
 
-	return epochBlocks, true
+	return blocks
 }
 
 // Close closes the DB connection

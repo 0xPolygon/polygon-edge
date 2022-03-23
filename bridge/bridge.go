@@ -1,116 +1,94 @@
 package bridge
 
 import (
-	"encoding/json"
-	"fmt"
-	"sync"
-
+	"github.com/0xPolygon/polygon-edge/blockchain"
+	"github.com/0xPolygon/polygon-edge/bridge/checkpoint"
 	"github.com/0xPolygon/polygon-edge/bridge/sam"
-	"github.com/0xPolygon/polygon-edge/bridge/tracker"
-	"github.com/0xPolygon/polygon-edge/bridge/transport"
+	"github.com/0xPolygon/polygon-edge/bridge/statesync"
+	"github.com/0xPolygon/polygon-edge/bridge/utils"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
-	"github.com/umbracle/go-web3"
-	"github.com/umbracle/go-web3/abi"
-)
-
-const (
-	StateSyncedEventABI = `event StateSynced(uint256 indexed id, address indexed contractAddress, bytes data)`
-)
-
-var (
-	StateSyncedEvent = abi.MustNewEvent(StateSyncedEventABI)
 )
 
 type Bridge interface {
 	Start() error
 	Close() error
 	SetValidators([]types.Address, uint64)
-	GetReadyMessages() ([]MessageWithSignatures, error)
-	ValidateTx(*types.Transaction) error
-	Consume(*types.Transaction)
+	StateSync() statesync.StateSync
 }
 
 type bridge struct {
-	logger hclog.Logger
-
-	signer sam.Signer
-
-	// network
-	tracker   *tracker.Tracker
-	transport transport.MessageTransport
-
-	isValidatorMapLock sync.RWMutex
-	isValidatorMap     map[types.Address]bool
-	validatorThreshold uint64
-
-	// storage
-	sampool sam.Pool
-
-	closeCh chan struct{}
+	logger       hclog.Logger
+	stateSync    statesync.StateSync
+	checkpoint   checkpoint.Checkpoint
+	validatorSet utils.ValidatorSet
 }
 
 func NewBridge(
 	logger hclog.Logger,
 	network *network.Server,
+	blockchain *blockchain.Blockchain,
 	signer sam.Signer,
 	dataDirURL string,
 	config *Config,
 ) (Bridge, error) {
 	bridgeLogger := logger.Named("bridge")
 
-	trackerConfig := &tracker.Config{
-		Confirmations: config.Confirmations,
-		RootchainWS:   config.RootChainURL.String(),
-		DBPath:        dataDirURL,
-		ContractABIs: map[string][]string{
-			config.RootChainContract.String(): {
-				StateSyncedEventABI,
-			},
-		},
+	valSet := utils.NewValidatorSet(nil, 0)
+	stateSync, err := statesync.NewStateSync(
+		bridgeLogger,
+		network,
+		signer,
+		valSet,
+		dataDirURL,
+		config.RootChainURL.String(),
+		config.RootChainContract,
+		config.Confirmations,
+	)
+
+	if err != nil {
+		return nil, err
 	}
 
-	tracker, err := tracker.NewEventTracker(bridgeLogger, trackerConfig)
+	checkpoint, err := checkpoint.NewCheckpoint(
+		bridgeLogger,
+		network,
+		blockchain,
+		signer,
+		valSet,
+	)
+
 	if err != nil {
 		return nil, err
 	}
 
 	return &bridge{
-		logger:             bridgeLogger,
-		signer:             signer,
-		tracker:            tracker,
-		transport:          transport.NewLibp2pGossipTransport(logger, network),
-		isValidatorMapLock: sync.RWMutex{},
-		isValidatorMap:     map[types.Address]bool{},
-		sampool:            sam.NewPool(nil, 0),
-		closeCh:            make(chan struct{}),
+		logger:       bridgeLogger,
+		stateSync:    stateSync,
+		checkpoint:   checkpoint,
+		validatorSet: valSet,
 	}, nil
 }
 
 func (b *bridge) Start() error {
-	if err := b.transport.Start(); err != nil {
+	if err := b.stateSync.Start(); err != nil {
 		return err
 	}
 
-	if err := b.transport.Subscribe(b.addRemoteMessage); err != nil {
+	if err := b.checkpoint.Start(); err != nil {
 		return err
 	}
-
-	if err := b.tracker.Start(); err != nil {
-		return err
-	}
-
-	eventCh := b.tracker.GetEventChannel()
-	go b.processEvents(eventCh)
 
 	return nil
 }
 
 func (b *bridge) Close() error {
-	close(b.closeCh)
+	if err := b.stateSync.Close(); err != nil {
+		return err
+	}
 
-	if err := b.tracker.Stop(); err != nil {
+	if err := b.checkpoint.Close(); err != nil {
 		return err
 	}
 
@@ -118,195 +96,9 @@ func (b *bridge) Close() error {
 }
 
 func (b *bridge) SetValidators(validators []types.Address, threshold uint64) {
-	b.resetIsValidatorMap(validators)
-	b.validatorThreshold = threshold
-
-	b.sampool.UpdateValidatorSet(validators, threshold)
+	b.validatorSet.SetValidators(validators, threshold)
 }
 
-func (b *bridge) GetReadyMessages() ([]MessageWithSignatures, error) {
-	readyMessages := b.sampool.GetReadyMessages()
-
-	data := make([]MessageWithSignatures, 0, len(readyMessages))
-
-	for _, readyMsg := range readyMessages {
-		msg, ok := readyMsg.Data.(*Message)
-		if !ok {
-			return nil, fmt.Errorf("get unknown type data %T when fetching ready messages", readyMsg.Data)
-		}
-
-		data = append(data, MessageWithSignatures{
-			Message:    *msg,
-			Signatures: readyMsg.Signatures,
-		})
-	}
-
-	return data, nil
-}
-
-// ValidateTx validates given state transaction
-// Checks if local SAM Pool has enough signatures for the transaction hash
-func (b *bridge) ValidateTx(tx *types.Transaction) error {
-	hash := getTransactionHash(tx)
-
-	num, required := b.sampool.GetSignatureCount(hash), b.validatorThreshold
-	if num < required {
-		return fmt.Errorf("Bridge doesn't have enough signatures, hash=%s, required=%d, actual=%d", hash, required, num)
-	}
-
-	return nil
-}
-
-func (b *bridge) Consume(tx *types.Transaction) {
-	b.sampool.ConsumeMessage(getTransactionHash(tx))
-}
-
-func (b *bridge) resetIsValidatorMap(validators []types.Address) {
-	isValidatorMap := make(map[types.Address]bool)
-	for _, address := range validators {
-		isValidatorMap[address] = true
-	}
-
-	b.isValidatorMapLock.Lock()
-	defer b.isValidatorMapLock.Unlock()
-
-	b.isValidatorMap = isValidatorMap
-}
-
-func (b *bridge) isValidator(address types.Address) bool {
-	b.isValidatorMapLock.RLock()
-	defer b.isValidatorMapLock.RUnlock()
-
-	return b.isValidatorMap[address]
-}
-
-func (b *bridge) processEvents(eventCh <-chan []byte) {
-	for {
-		select {
-		case <-b.closeCh:
-			return
-		case data := <-eventCh:
-			if err := b.processEthEvent(data); err != nil {
-				b.logger.Error("failed to process event", "err", err)
-			}
-		}
-	}
-}
-
-func (b *bridge) processEthEvent(data []byte) error {
-	var log web3.Log
-	if err := json.Unmarshal(data, &log); err != nil {
-		return err
-	}
-
-	msg, err := eventToMessage(&log)
-	if err != nil {
-		return err
-	}
-
-	if msg == nil {
-		return fmt.Errorf("unknown event: tx=%s, log index=%d", log.TransactionHash, log.LogIndex)
-	}
-
-	if err := b.addLocalMessage(msg); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (b *bridge) addLocalMessage(msg *Message) error {
-	hash := getMessageHash(msg)
-
-	signature, err := b.signer.Sign(hash[:])
-	if err != nil {
-		return err
-	}
-
-	b.sampool.AddMessage(&sam.Message{
-		Hash: hash,
-		Data: msg,
-	})
-
-	b.sampool.AddSignature(&sam.MessageSignature{
-		Hash:      hash,
-		Address:   b.signer.Address(),
-		Signature: signature,
-	})
-
-	b.logger.Info("added local signature to SAM Pool", "hash", hash)
-
-	signedMessage := &transport.SignedMessage{
-		Hash:      hash,
-		Signature: signature,
-	}
-
-	if err := b.transport.Publish(signedMessage); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (b *bridge) addRemoteMessage(message *transport.SignedMessage) {
-	sender, err := b.signer.RecoverAddress(message.Hash[:], message.Signature)
-	if err != nil {
-		b.logger.Error("failed to get address from signature", "err", err)
-
-		return
-	}
-
-	if !b.isValidator(sender) {
-		b.logger.Warn(
-			"ignored gossip message from non-validator",
-			"hash",
-			message.Hash,
-			"from",
-			types.AddressToString(sender),
-		)
-
-		return
-	}
-
-	b.sampool.AddSignature(&sam.MessageSignature{
-		Hash:      message.Hash,
-		Address:   sender,
-		Signature: message.Signature,
-	})
-
-	b.logger.Info("added remote signature to SAM Pool", "hash", message.Hash, "from", sender)
-}
-
-func getMessageHash(msg *Message) types.Hash {
-	return msg.Transaction.ComputeHash().Hash
-}
-
-func getTransactionHash(tx *types.Transaction) types.Hash {
-	msgTx := &types.Transaction{
-		Type:  types.TxTypeState,
-		To:    tx.To,
-		Input: tx.Input,
-		Nonce: tx.Nonce,
-	}
-
-	return msgTx.ComputeHash().Hash
-}
-
-func eventToMessage(log *web3.Log) (*Message, error) {
-	switch {
-	case StateSyncedEvent.Match(log):
-		event, err := ParseStateSyncEvent(log)
-		if err != nil {
-			return nil, err
-		}
-
-		tx := NewStateSyncedTx(event)
-
-		return &Message{
-			ID:          event.ID,
-			Transaction: tx,
-		}, nil
-	}
-
-	return nil, nil
+func (b *bridge) StateSync() statesync.StateSync {
+	return b.stateSync
 }
