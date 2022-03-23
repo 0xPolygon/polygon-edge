@@ -117,6 +117,20 @@ func (p *pool) hasConsumed(hash types.Hash) bool {
 	return ok && consumed
 }
 
+func (p *pool) GetMessageByHash(hash types.Hash) ReadyMessage {
+	p.changeValidatorsLock.RLock()
+	defer p.changeValidatorsLock.RUnlock()
+
+	data := p.getMessageData(hash)
+	signatures := p.messageSignatures.GetSignatures(hash)
+
+	return ReadyMessage{
+		Hash:       hash,
+		Data:       data,
+		Signatures: signatures,
+	}
+}
+
 // GetReadyMessages returns the messages with enough signatures
 func (p *pool) GetReadyMessages() []ReadyMessage {
 	p.changeValidatorsLock.RLock()

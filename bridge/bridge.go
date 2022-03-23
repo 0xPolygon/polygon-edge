@@ -1,6 +1,7 @@
 package bridge
 
 import (
+	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/bridge/checkpoint"
 	"github.com/0xPolygon/polygon-edge/bridge/sam"
 	"github.com/0xPolygon/polygon-edge/bridge/statesync"
@@ -27,6 +28,7 @@ type bridge struct {
 func NewBridge(
 	logger hclog.Logger,
 	network *network.Server,
+	blockchain *blockchain.Blockchain,
 	signer sam.Signer,
 	dataDirURL string,
 	config *Config,
@@ -51,6 +53,7 @@ func NewBridge(
 	checkpoint, err := checkpoint.NewCheckpoint(
 		bridgeLogger,
 		network,
+		blockchain,
 		signer,
 		valSet,
 	)
