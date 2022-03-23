@@ -7,6 +7,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"google.golang.org/grpc"
+	"time"
 )
 
 type MockNetworkingServer struct {
@@ -15,6 +16,9 @@ type MockNetworkingServer struct {
 
 	// Mock discovery client that simulates another peer
 	mockDiscoveryClient *MockDiscoveryClient
+
+	// Mock libp2p peer metrics
+	mockPeerMetrics *MockPeerMetrics
 
 	// Hooks that the test can set //
 	// Identity Hooks
@@ -48,6 +52,14 @@ func NewMockNetworkingServer() *MockNetworkingServer {
 
 func (m *MockNetworkingServer) GetMockIdentityClient() *MockIdentityClient {
 	return m.mockIdentityClient
+}
+
+func (m *MockNetworkingServer) GetMockDiscoveryClient() *MockDiscoveryClient {
+	return m.mockDiscoveryClient
+}
+
+func (m *MockNetworkingServer) GetMockPeerMetrics() *MockPeerMetrics {
+	return m.mockPeerMetrics
 }
 
 // Define the mock hooks //
@@ -318,4 +330,20 @@ func (mdc *MockDiscoveryClient) FindPeers(
 	}
 
 	return nil, nil
+}
+
+// MockPeerMetrics is a mock used by the Kademlia routing table
+type MockPeerMetrics struct {
+}
+
+func (m *MockPeerMetrics) RecordLatency(id peer.ID, duration time.Duration) {
+	return
+}
+
+func (m *MockPeerMetrics) LatencyEWMA(id peer.ID) time.Duration {
+	return 0
+}
+
+func (m *MockPeerMetrics) RemovePeer(id peer.ID) {
+	return
 }

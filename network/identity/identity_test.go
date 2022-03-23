@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/0xPolygon/polygon-edge/network/proto"
 	networkTesting "github.com/0xPolygon/polygon-edge/network/testing"
+	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/stretchr/testify/assert"
@@ -24,6 +25,7 @@ func newIdentityService(
 
 	return &IdentityService{
 		baseServer: baseServer,
+		logger:     hclog.NewNullLogger(),
 	}
 }
 
