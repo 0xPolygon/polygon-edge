@@ -254,7 +254,7 @@ func (m *MockNetworkingServer) HookGetRandomPeer(fn getRandomPeerDelegate) {
 	m.getRandomPeerFn = fn
 }
 
-func (m *MockNetworkingServer) FetchAndSetTemporaryDial(peerID peer.ID, newValue bool) bool {
+func (m *MockNetworkingServer) FetchOrSetTemporaryDial(peerID peer.ID, newValue bool) bool {
 	if m.fetchAndSetTemporaryDialFn != nil {
 		return m.fetchAndSetTemporaryDialFn(peerID, newValue)
 	}

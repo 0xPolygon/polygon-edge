@@ -70,7 +70,7 @@ type networkingServer interface {
 
 	// FetchAndSetTemporaryDial checks if the peer connection is a temporary dial,
 	// and sets a new value accordingly
-	FetchAndSetTemporaryDial(peerID peer.ID, newValue bool) bool
+	FetchOrSetTemporaryDial(peerID peer.ID, newValue bool) bool
 
 	// RemoveTemporaryDial removes a peer from the temporary dial map
 	RemoveTemporaryDial(peerID peer.ID)
@@ -341,10 +341,11 @@ func (d *DiscoveryService) bootnodePeerDiscovery() {
 		// If one or more bootnode is connected the dial status is temporary
 		if d.baseServer.GetBootnodeConnCount() > 0 {
 			// Check if the peer is already a temporary dial
-			if alreadyTempDial := d.baseServer.FetchAndSetTemporaryDial(
+			if alreadyTempDial := d.baseServer.FetchOrSetTemporaryDial(
 				bootnode.ID,
 				true,
 			); alreadyTempDial {
+				bootnode = nil
 				continue
 			}
 

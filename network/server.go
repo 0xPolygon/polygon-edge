@@ -201,9 +201,9 @@ func (s *Server) GetBootnodeConnCount() int64 {
 	return s.bootnodes.getBootnodeConnCount()
 }
 
-// FetchAndSetTemporaryDial loads the temporary status of a peer connection, and
+// FetchOrSetTemporaryDial loads the temporary status of a peer connection, and
 // sets a new value [Thread safe]
-func (s *Server) FetchAndSetTemporaryDial(peerID peer.ID, newValue bool) bool {
+func (s *Server) FetchOrSetTemporaryDial(peerID peer.ID, newValue bool) bool {
 	_, loaded := s.temporaryDials.LoadOrStore(peerID, newValue)
 
 	return loaded
