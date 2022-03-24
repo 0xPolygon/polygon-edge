@@ -87,7 +87,7 @@ func (c *checkpoint) StartNewCheckpoint(epochSize uint64) error {
 
 	blocks, ok := c.blockchain.GetBlocks(start, end, true)
 	if !ok {
-		return fmt.Errorf("Failed to fetch blocks from  %d to %d", start, end)
+		return fmt.Errorf("failed to fetch blocks from %d to %d", start, end)
 	}
 
 	// Step3: Generate Checkpoint

@@ -1047,7 +1047,7 @@ func (b *Blockchain) GetBlockByNumber(blockNumber uint64, full bool) (*types.Blo
 	return b.GetBlockByHash(blockHash, full)
 }
 
-// GetBlocks returns the bunch of block
+// GetBlocks returns the blocks between start and end block number
 func (b *Blockchain) GetBlocks(start, end uint64, full bool) ([]*types.Block, bool) {
 	blocks := make([]*types.Block, 0, end-start+1)
 
@@ -1056,6 +1056,7 @@ func (b *Blockchain) GetBlocks(start, end uint64, full bool) ([]*types.Block, bo
 		if !ok {
 			return nil, false
 		}
+
 		blocks = append(blocks, block)
 	}
 

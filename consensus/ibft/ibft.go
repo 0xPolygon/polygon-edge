@@ -1026,13 +1026,6 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 	// broadcast the new block
 	i.syncer.Broadcast(block)
 
-	// On every epoch start create checkpoint
-	if i.IsLastOfEpoch(block.Number()) {
-		if hookErr := i.runHook(CreateCheckpointHook, block.Number(), i.epochSize); hookErr != nil {
-			i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", CreateCheckpointHook, hookErr))
-		}
-	}
-
 	// after the block has been written we reset the txpool so that
 	// the old transactions are removed
 	i.txpool.ResetWithHeaders(block.Header)
