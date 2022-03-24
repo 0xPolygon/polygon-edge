@@ -144,7 +144,7 @@ func (c *checkpoint) addCheckpointSignature(checkpoint *ctypes.Checkpoint, addre
 
 	total := c.sampool.GetSignatureCount(hash)
 
-	if c.sampool.IsMessageConsumed(hash) &&
+	if !c.sampool.IsMessageConsumed(hash) &&
 		total >= c.validatorSet.Threshold() &&
 		checkpoint.Proposer == c.signer.Address() {
 		// TODO: Submit Checkpoint into RootChain contract
