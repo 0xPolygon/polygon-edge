@@ -52,16 +52,10 @@ func NewCheckpoint(
 }
 
 func (c *checkpoint) Start() error {
-	return c.transport.Subscribe(func(msg interface{}) {
-		switch typedMsg := msg.(type) {
-		case *transport.CheckpointMessage:
-			c.handleCheckpointMessage(typedMsg)
-		case *transport.AckMessage:
-			c.handleAckMessage(typedMsg)
-		case *transport.NoAckMessage:
-			c.handleNoAckMessage(typedMsg)
-		}
-	})
+	if err := c.startTransport(); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (c *checkpoint) Close() error {
@@ -204,6 +198,23 @@ func (c *checkpoint) addNoAckSignature(noAck *ctypes.NoAck, address types.Addres
 			total,
 		)
 	}
+}
+
+func (c *checkpoint) startTransport() error {
+	if err := c.transport.Start(); err != nil {
+		return err
+	}
+
+	return c.transport.Subscribe(func(msg interface{}) {
+		switch typedMsg := msg.(type) {
+		case *transport.CheckpointMessage:
+			c.handleCheckpointMessage(typedMsg)
+		case *transport.AckMessage:
+			c.handleAckMessage(typedMsg)
+		case *transport.NoAckMessage:
+			c.handleNoAckMessage(typedMsg)
+		}
+	})
 }
 
 func (c *checkpoint) handleCheckpointMessage(msg *transport.CheckpointMessage) {
