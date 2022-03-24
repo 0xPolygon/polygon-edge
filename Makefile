@@ -16,6 +16,7 @@ protoc:
 	protoc --go_out=. --go-grpc_out=. ./txpool/proto/*.proto
 	protoc --go_out=. --go-grpc_out=. ./consensus/ibft/**/*.proto
 	protoc --go_out=. --go-grpc_out=. ./bridge/statesync/transport/proto/*.proto
+	protoc --go_out=. --go-grpc_out=. ./bridge/statesync/checkpoint/proto/*.proto
 
 .PHONY: build
 build:
