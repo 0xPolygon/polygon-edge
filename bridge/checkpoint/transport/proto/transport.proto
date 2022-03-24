@@ -4,7 +4,7 @@ package v1;
 
 option go_package = "/bridge/checkpoint/transport/proto";
 
-message SignedMessage {
+message CheckpointMessage {
   enum MsgType {
     CHECKPOINT = 0;
     ACK = 1;

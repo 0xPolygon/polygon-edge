@@ -31,7 +31,7 @@ func NewLibp2pGossipTransport(logger hclog.Logger, network *network.Server) Chec
 }
 
 func (t *libp2pGossipTransport) Start() error {
-	topic, err := t.network.NewTopic(transportProto, &proto.SignedMessage{})
+	topic, err := t.network.NewTopic(transportProto, &proto.CheckpointMessage{})
 	if err != nil {
 		return err
 	}
@@ -42,8 +42,8 @@ func (t *libp2pGossipTransport) Start() error {
 }
 
 func (t *libp2pGossipTransport) SendCheckpoint(proposal *CheckpointMessage) error {
-	return t.topic.Publish(&proto.SignedMessage{
-		Type:      proto.SignedMessage_CHECKPOINT,
+	return t.topic.Publish(&proto.CheckpointMessage{
+		Type:      proto.CheckpointMessage_CHECKPOINT,
 		Payload:   proposal.Checkpoint.MarshalRLP(),
 		Signature: proposal.Signature,
 	})
@@ -66,7 +66,7 @@ func (t *libp2pGossipTransport) Subscribe(handler func(interface{})) error {
 
 		// and call handler
 
-		protoMsg, ok := obj.(*proto.SignedMessage)
+		protoMsg, ok := obj.(*proto.CheckpointMessage)
 		if !ok {
 			t.logger.Warn("received unexpected typed message", "message", obj)
 
@@ -77,7 +77,7 @@ func (t *libp2pGossipTransport) Subscribe(handler func(interface{})) error {
 		var message interface{}
 
 		switch protoMsg.Type {
-		case proto.SignedMessage_CHECKPOINT:
+		case proto.CheckpointMessage_CHECKPOINT:
 			checkpoint := ctypes.Checkpoint{}
 			if err := checkpoint.UnmarshalRLP(protoMsg.Payload); err != nil {
 				t.logger.Error("unable to unmarshal payload from message", "err", err)
@@ -90,9 +90,9 @@ func (t *libp2pGossipTransport) Subscribe(handler func(interface{})) error {
 				Signature:  protoMsg.Signature,
 			}
 
-		case proto.SignedMessage_ACK:
+		case proto.CheckpointMessage_ACK:
 			//	TODO: phase2
-		case proto.SignedMessage_NOACK:
+		case proto.CheckpointMessage_NOACK:
 			//	TODO: phase2
 		}
 
