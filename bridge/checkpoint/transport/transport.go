@@ -81,6 +81,7 @@ func (t *libp2pGossipTransport) Subscribe(handler func(interface{})) error {
 			checkpoint := ctypes.Checkpoint{}
 			if err := checkpoint.UnmarshalRLP(protoMsg.Payload); err != nil {
 				t.logger.Error("unable to unmarshal payload from message", "err", err)
+
 				return
 			}
 
