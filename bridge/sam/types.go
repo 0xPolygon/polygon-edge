@@ -34,5 +34,6 @@ type Pool interface {
 	GetMessageByHash(types.Hash) ReadyMessage
 	GetReadyMessages() []ReadyMessage
 	IsMessageKnown(hash types.Hash) bool
+	IsMessageConsumed(types.Hash) bool
 	GetSignatureCount(hash types.Hash) uint64
 }

@@ -55,6 +55,7 @@ func (c *checkpoint) Start() error {
 	if err := c.startTransport(); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -142,7 +143,10 @@ func (c *checkpoint) addCheckpointSignature(checkpoint *ctypes.Checkpoint, addre
 	})
 
 	total := c.sampool.GetSignatureCount(hash)
-	if total >= c.validatorSet.Threshold() && checkpoint.Proposer == c.signer.Address() {
+
+	if c.sampool.IsMessageConsumed(hash) &&
+		total >= c.validatorSet.Threshold() &&
+		checkpoint.Proposer == c.signer.Address() {
 		// TODO: Submit Checkpoint into RootChain contract
 		c.logger.Info(
 			"received 2/3 signatures for checkpoint, submitting checkpoint to RootChain contract",
@@ -153,6 +157,8 @@ func (c *checkpoint) addCheckpointSignature(checkpoint *ctypes.Checkpoint, addre
 			"signatures",
 			total,
 		)
+
+		c.sampool.ConsumeMessage(hash)
 	}
 }
 
