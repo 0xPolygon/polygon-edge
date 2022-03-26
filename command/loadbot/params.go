@@ -22,6 +22,15 @@ var (
 )
 
 const (
+	erc20TokenSupply = "4314500000"
+	erc20TokenName = "ZexCoin"
+	erc20TokenSymbol = "ZEX"
+
+	erc721TokenName = "ZexNFT"
+	erc721TokenSymbol = "ZEXES"
+)
+
+const (
 	tpsFlag      = "tps"
 	modeFlag     = "mode"
 	detailedFlag = "detailed"
@@ -212,8 +221,8 @@ func (p *loadbotParams) initContractArtifactAndArgs() error {
 		}
 
 		if ctrArgs, err = abi.Encode(
-			[]string{"4314500000", "ZexCoin", "ZEX"}, ctrArtifact.ABI.Constructor.Inputs); err != nil {
-			return err
+			[]string{erc20TokenSupply, erc20TokenName, erc20TokenSymbol}, ctrArtifact.ABI.Constructor.Inputs); err != nil {
+			return fmt.Errorf("failed to encode erc20 constructor parameters: %w", err)
 		}
 
 	case erc721:
@@ -222,8 +231,8 @@ func (p *loadbotParams) initContractArtifactAndArgs() error {
 			ABI:      abi.MustNewABI(ERC721ABI),
 		}
 
-		if ctrArgs, err = abi.Encode([]string{"ZEXFT", "ZEXES"}, ctrArtifact.ABI.Constructor.Inputs); err != nil {
-			return err
+		if ctrArgs, err = abi.Encode([]string{erc721TokenName, erc721TokenSymbol}, ctrArtifact.ABI.Constructor.Inputs); err != nil {
+			return fmt.Errorf("failed to encode erc721 constructor parameters: %w", err)
 		}
 
 	default:
