@@ -200,24 +200,9 @@ func (l *Loadbot) Run() error {
 
 	l.generator = txnGenerator
 
-	gasLimit := l.cfg.GasLimit
-	if gasLimit == nil {
-		// Get the gas estimate
-		exampleTxn, err := l.generator.GetExampleTransaction()
-		if err != nil {
-			return fmt.Errorf("unable to get example transaction, %w", err)
-		}
-
-		// No gas limit specified, query the network for an estimation
-		gasEstimate, estimateErr := estimateGas(jsonClient, exampleTxn)
-		if estimateErr != nil {
-			return fmt.Errorf("unable to get gas estimate, %w", estimateErr)
-		}
-
-		gasLimit = new(big.Int).SetUint64(gasEstimate)
+	if err := l.updateGasEstimate(jsonClient); err != nil {
+		return fmt.Errorf("could not update gas estimate, %w",err)
 	}
-
-	l.generator.SetGasEstimate(gasLimit.Uint64())
 
 	ticker := time.NewTicker(1 * time.Second / time.Duration(l.cfg.TPS))
 	defer ticker.Stop()

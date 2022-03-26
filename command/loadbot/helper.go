@@ -2,6 +2,7 @@ package loadbot
 
 import (
 	"fmt"
+	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/go-web3"
@@ -96,6 +97,30 @@ func (l *Loadbot) calculateGasMetrics(jsonClient *jsonrpc.Client, gasMetrics *Bl
 		if err := <-blockNumErr; err != nil {
 			return err
 		}
+	}
+
+	return nil
+}
+
+func (l *Loadbot) updateGasEstimate(jsonClient *jsonrpc.Client) error {
+	gasLimit := l.cfg.GasLimit
+
+	if gasLimit == nil {
+		// Get the gas estimate
+		exampleTxn, err := l.generator.GetExampleTransaction()
+		if err != nil {
+			return fmt.Errorf("unable to get example transaction, %w", err)
+		}
+
+		// No gas limit specified, query the network for an estimation
+		gasEstimate, estimateErr := estimateGas(jsonClient, exampleTxn)
+		if estimateErr != nil {
+			return fmt.Errorf("unable to get gas estimate, %w", err)
+		}
+
+		gasLimit = new(big.Int).SetUint64(gasEstimate)
+
+		l.generator.SetGasEstimate(gasLimit.Uint64())
 	}
 
 	return nil

@@ -73,21 +73,7 @@ func (l *Loadbot) deployContract(
 	// we're done with SC deployment
 	// we defined SC address and
 	// now get new gas estimates for CS token transfers
-	if l.cfg.GasLimit == nil {
-		// Get the gas estimate
-		exampleTxn, err := l.generator.GetExampleTransaction()
-		if err != nil {
-			return fmt.Errorf("unable to get example transaction, %w", err)
-		}
-
-		// No gas limit specified, query the network for an estimation
-		gasEstimate, estimateErr := estimateGas(jsonClient, exampleTxn)
-		if estimateErr != nil {
-			return fmt.Errorf("unable to get gas estimate, %w", err)
-		}
-
-		l.generator.SetGasEstimate(gasEstimate)
-	}
+	l.updateGasEstimate(jsonClient)
 
 	// record contract deployment metrics
 	l.metrics.ContractDeploymentDuration.reportTurnAroundTime(
