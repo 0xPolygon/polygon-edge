@@ -187,8 +187,10 @@ func (l *Loadbot) Run() error {
 
 	var (
 		txnGenerator generator.TransactionGenerator
+		tokenTxnGenerator generator.ContractTxnGenerator
 		genErr       error
 	)
+
 
 	switch l.cfg.GeneratorMode {
 	case transfer:
@@ -196,16 +198,21 @@ func (l *Loadbot) Run() error {
 	case deploy:
 		txnGenerator, genErr = generator.NewDeployGenerator(generatorParams)
 	case erc20:
-		txnGenerator, genErr = generator.NewERC20Generator(generatorParams)
+		tokenTxnGenerator, genErr = generator.NewERC20Generator(generatorParams)
 	case erc721:
-		txnGenerator, genErr = generator.NewERC721Generator(generatorParams)
+		tokenTxnGenerator, genErr = generator.NewERC721Generator(generatorParams)
 	}
 
 	if genErr != nil {
 		return fmt.Errorf("unable to start generator, %w", genErr)
 	}
 
-	l.generator = txnGenerator
+	switch l.cfg.GeneratorMode {
+		case erc20, erc721:
+			l.generator = tokenTxnGenerator
+		default:
+			l.generator = txnGenerator
+	}
 
 	if err := l.updateGasEstimate(jsonClient); err != nil {
 		return fmt.Errorf("could not update gas estimate, %w",err)
@@ -278,10 +285,8 @@ func (l *Loadbot) Run() error {
 
 				return
 			}
-			// initialise block numbers
-			l.metrics.GasMetrics.BlockGasMutex.Lock()
-			l.metrics.GasMetrics.Blocks[receipt.BlockNumber] = GasMetrics{}
-			l.metrics.GasMetrics.BlockGasMutex.Unlock()
+
+			l.initGasMetricsBlocksMap(receipt.BlockNumber)
 
 			// Stop the performance timer
 			end := time.Now()

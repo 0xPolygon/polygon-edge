@@ -10,14 +10,17 @@ import (
 	"github.com/umbracle/go-web3"
 	"github.com/umbracle/go-web3/abi"
 )
-
 type TransactionGenerator interface {
 	GenerateTransaction() (*types.Transaction, error)
 	GetExampleTransaction() (*types.Transaction, error)
 	GetTransactionErrors() []*FailedTxnInfo
-	MarkFailedTxn(failedTxn *FailedTxnInfo)
-	MarkFailedContractTxn(failedContractTxn *FailedContractTxnInfo)
 	SetGasEstimate(gasEstimate uint64)
+	MarkFailedTxn(failedTxn *FailedTxnInfo)
+}
+
+type ContractTxnGenerator interface {
+	TransactionGenerator
+	MarkFailedContractTxn(failedContractTxn *FailedContractTxnInfo)
 	SetContractAddress(types.Address)
 }
 

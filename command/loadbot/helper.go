@@ -154,3 +154,10 @@ func (l *Loadbot) isTokenTransferMode() bool {
 		return false
 	}
 }
+
+//initialze gas metrics blocks map with block number as key
+func (l *Loadbot) initGasMetricsBlocksMap(blockNum uint64) {
+	l.metrics.GasMetrics.BlockGasMutex.Lock()
+	l.metrics.GasMetrics.Blocks[blockNum] = GasMetrics{}
+	l.metrics.GasMetrics.BlockGasMutex.Unlock()
+}

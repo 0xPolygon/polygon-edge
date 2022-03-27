@@ -2,6 +2,7 @@ package generator
 
 import (
 	"math/big"
+	"sync"
 	"sync/atomic"
 
 	"github.com/0xPolygon/polygon-edge/types"
@@ -12,6 +13,10 @@ type ContractTxnsGenerator struct {
 
 	contractBytecode []byte
 	encodedParams    []byte
+
+	contractAddress *types.Address
+	failedContractTxns     []*FailedContractTxnInfo
+	failedContractTxnsLock sync.RWMutex
 }
 
 //	Returns contract deployment tx if contractAddress is empty, otherwise returns
@@ -68,4 +73,17 @@ func (gen *ContractTxnsGenerator) GenerateTransaction() (*types.Transaction, err
 		Input:    gen.encodedParams,
 		V:        big.NewInt(1), // it is necessary to encode in rlp
 	}, gen.params.SenderKey)
+}
+
+func (gen *ContractTxnsGenerator) MarkFailedContractTxn(failedContractTxn *FailedContractTxnInfo) {
+	gen.failedContractTxnsLock.Lock()
+	defer gen.failedContractTxnsLock.Unlock()
+
+	gen.failedContractTxns = append(gen.failedContractTxns, failedContractTxn)
+}
+
+
+
+func (gen *ContractTxnsGenerator) SetContractAddress(addr types.Address) {
+	gen.contractAddress = &addr
 }

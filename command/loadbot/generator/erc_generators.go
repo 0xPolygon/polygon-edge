@@ -54,7 +54,7 @@ func NewERC721Generator(params *GeneratorParams) (*ContractTxnsGenerator, error)
 	gen.contractBytecode = append(gen.contractBytecode, params.ConstructorArgs...)
 
 	if gen.encodedParams, err = params.ContractArtifact.ABI.Methods["createNFT"].Encode(
-		[]string{"https://realy-valuable-nft-page.io"}); err != nil {
+		[]string{"https://really-valuable-nft-page.io"}); err != nil {
 		return nil, fmt.Errorf("cannot encode ERC721 createNFT method params: %w", err)
 	}
 
