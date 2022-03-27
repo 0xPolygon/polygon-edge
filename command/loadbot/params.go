@@ -75,17 +75,17 @@ type loadbotParams struct {
 }
 
 func (p *loadbotParams) validateFlags() error {
-	// Set and validate the correct mode type
-	p.mode = Mode(strings.ToLower(p.modeRaw))
-	if p.mode != transfer && p.mode != deploy && p.mode != erc20 && p.mode != erc721 {
-		return errInvalidMode
+	
+	// check if valid mode is selected
+	if err := p.isValidMode(); err != nil {
+		return err
 	}
 
-	// Validate the correct mode params
-	if p.mode == deploy && p.contractPath == "" {
-		return errContractPath
+	// validate the correct mode params
+	if err := p.hasValidDeployParams(); err != nil {
+		return err
 	}
-
+	
 	return nil
 }
 
@@ -204,6 +204,28 @@ func (p *loadbotParams) generateConfig(
 		ConstructorArgs:  p.constructorArgs,
 		MaxWait:          p.maxWait,
 	}
+}
+
+func (p *loadbotParams) isValidMode() error {
+	// Set and validate the correct mode type
+	p.mode = Mode(strings.ToLower(p.modeRaw))
+
+	switch p.mode {
+	case transfer,deploy,erc20,erc721:
+		return nil
+
+	default:
+		return errInvalidMode
+	}
+}
+
+func (p *loadbotParams) hasValidDeployParams() error {
+	// fail if mode is deploy but we have no contract 
+	if p.mode == deploy && p.contractPath == "" {
+		return errContractPath
+	}
+
+	return nil
 }
 
 func (p *loadbotParams) initContractArtifactAndArgs() error {
