@@ -14,7 +14,7 @@ type ContractTxnsGenerator struct {
 	contractBytecode []byte
 	encodedParams    []byte
 
-	contractAddress *types.Address
+	contractAddress        *types.Address
 	failedContractTxns     []*FailedContractTxnInfo
 	failedContractTxnsLock sync.RWMutex
 }
@@ -81,8 +81,6 @@ func (gen *ContractTxnsGenerator) MarkFailedContractTxn(failedContractTxn *Faile
 
 	gen.failedContractTxns = append(gen.failedContractTxns, failedContractTxn)
 }
-
-
 
 func (gen *ContractTxnsGenerator) SetContractAddress(addr types.Address) {
 	gen.contractAddress = &addr

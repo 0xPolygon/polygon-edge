@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	durationPrecision     = 5
+	durationPrecision = 5
 )
 
 type TxnCountData struct {
@@ -53,7 +53,7 @@ type LoadbotResult struct {
 	DetailedErrorData      TxnDetailedErrorData `json:"detailed_error_data,omitempty"`
 	ApproxTPS              uint64               `json:"approx_tps"`
 	ContractAddress        web3.Address         `json:"contract_address,omitempty"`
-	ContractBlockData    	 TxnBlockData 				`json:"contract_block_data,omitempty"`
+	ContractBlockData      TxnBlockData         `json:"contract_block_data,omitempty"`
 }
 
 func (lr *LoadbotResult) initExecutionData(metrics *Metrics) {
@@ -87,11 +87,9 @@ func (lr *LoadbotResult) initExecutionData(metrics *Metrics) {
 		BlockTransactionsMap: metrics.TransactionDuration.blockTransactions,
 		GasData:              metrics.GasMetrics.Blocks,
 	}
-
 }
 
 func (lr *LoadbotResult) initContractDeploymentModesExecutionData(metrics *Metrics) {
-	
 	// set contract deployment metrics
 	lr.ContractTurnAroundData.FastestTurnAround = common.ToFixedFloat(
 		metrics.ContractMetrics.ContractDeploymentDuration.FastestTurnAround.Seconds(),
@@ -141,10 +139,10 @@ func (lr *LoadbotResult) initDetailedErrors(gen generator.TransactionGenerator) 
 }
 
 func (lr *LoadbotResult) writeBlockData(buffer *bytes.Buffer) {
-	
+	//nolint: ifshort
 	blockData := &lr.BlockData
+
 	buffer.WriteString("\n\n[BLOCK DATA]\n")
-	
 
 	buffer.WriteString(helper.FormatKV([]string{
 		fmt.Sprintf("Blocks required|%d", blockData.BlocksRequired),
@@ -286,7 +284,7 @@ func (lr *LoadbotResult) writeContractDeploymentData(buffer *bytes.Buffer) {
 		fmt.Sprintf("Contract address|%s", lr.ContractAddress),
 		fmt.Sprintf("Total execution time|%fs", lr.ContractTurnAroundData.TotalExecTime),
 	}))
-	
+
 	buffer.WriteString("\n\n[CONTRACT DEPLOYMENT BLOCK DATA]\n")
 	buffer.WriteString(helper.FormatKV([]string{
 		fmt.Sprintf("Blocks required|%d", lr.ContractBlockData.BlocksRequired),
@@ -296,7 +294,6 @@ func (lr *LoadbotResult) writeContractDeploymentData(buffer *bytes.Buffer) {
 	formattedStrings := make([]string, 0)
 
 	for blockNumber := range lr.ContractBlockData.BlockTransactionsMap {
-
 		formattedStrings = append(formattedStrings,
 			fmt.Sprintf("Block #%d|%d txns (%d gasUsed / %d gasLimit) utilization | %.2f%%",
 				blockNumber,

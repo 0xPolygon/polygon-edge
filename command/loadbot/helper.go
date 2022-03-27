@@ -74,7 +74,6 @@ func calculateAvgBlockUtil(gasData map[uint64]GasMetrics) float64 {
 
 // fetch block gas usage and gas limit and calculate block utilization
 func (l *Loadbot) calculateGasMetrics(jsonClient *jsonrpc.Client, gasMetrics *BlockGasMetrics) error {
-	
 	errGr, _ := errgroup.WithContext(context.Background())
 
 	for num, data := range gasMetrics.Blocks {
@@ -95,9 +94,8 @@ func (l *Loadbot) calculateGasMetrics(jsonClient *jsonrpc.Client, gasMetrics *Bl
 			return nil
 		})
 	}
-	
-	err := errGr.Wait()
-	if err != nil {
+
+	if err := errGr.Wait(); err != nil {
 		return err
 	}
 
@@ -105,6 +103,7 @@ func (l *Loadbot) calculateGasMetrics(jsonClient *jsonrpc.Client, gasMetrics *Bl
 }
 
 func (l *Loadbot) updateGasEstimate(jsonClient *jsonrpc.Client) error {
+	//nolint: ifshort
 	gasLimit := l.cfg.GasLimit
 
 	if gasLimit == nil {
@@ -127,7 +126,6 @@ func (l *Loadbot) updateGasEstimate(jsonClient *jsonrpc.Client) error {
 
 	return nil
 }
-
 
 // calcMaxTimeout calculates the max timeout for transactions receipts
 // based on the transaction count and tps params

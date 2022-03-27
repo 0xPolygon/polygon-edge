@@ -91,8 +91,8 @@ type Metrics struct {
 	TotalTransactionsSentCount uint64
 	FailedTransactionsCount    uint64
 	TransactionDuration        ExecDuration
-	ContractMetrics ContractMetricsData
-	GasMetrics *BlockGasMetrics
+	ContractMetrics            ContractMetricsData
+	GasMetrics                 *BlockGasMetrics
 }
 
 type Loadbot struct {
@@ -123,7 +123,6 @@ func NewLoadbot(cfg *Configuration) *Loadbot {
 				Blocks:        make(map[uint64]GasMetrics),
 				BlockGasMutex: &sync.Mutex{},
 			},
-			
 		},
 	}
 }
@@ -186,11 +185,10 @@ func (l *Loadbot) Run() error {
 	}
 
 	var (
-		txnGenerator generator.TransactionGenerator
+		txnGenerator      generator.TransactionGenerator
 		tokenTxnGenerator generator.ContractTxnGenerator
-		genErr       error
+		genErr            error
 	)
-
 
 	switch l.cfg.GeneratorMode {
 	case transfer:
@@ -208,23 +206,23 @@ func (l *Loadbot) Run() error {
 	}
 
 	switch l.cfg.GeneratorMode {
-		case erc20, erc721:
-			l.generator = tokenTxnGenerator
-		default:
-			l.generator = txnGenerator
+	case erc20, erc721:
+		l.generator = tokenTxnGenerator
+	default:
+		l.generator = txnGenerator
 	}
 
 	if err := l.updateGasEstimate(jsonClient); err != nil {
-		return fmt.Errorf("could not update gas estimate, %w",err)
+		return fmt.Errorf("could not update gas estimate, %w", err)
 	}
 
 	ticker := time.NewTicker(1 * time.Second / time.Duration(l.cfg.TPS))
 	defer ticker.Stop()
 
 	var receiptTimeout time.Duration
-	// if max-wait flag is not set it will be calulated dynamicaly
+	// if max-wait flag is not set it will be calculated dynamically
 	if l.cfg.MaxWait == 0 {
-		receiptTimeout = calcMaxTimeout(l.cfg.Count,l.cfg.TPS)
+		receiptTimeout = calcMaxTimeout(l.cfg.Count, l.cfg.TPS)
 	} else {
 		receiptTimeout = time.Duration(l.cfg.MaxWait) * time.Minute
 	}

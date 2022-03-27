@@ -10,6 +10,7 @@ import (
 	"github.com/umbracle/go-web3"
 	"github.com/umbracle/go-web3/abi"
 )
+
 type TransactionGenerator interface {
 	GenerateTransaction() (*types.Transaction, error)
 	GetExampleTransaction() (*types.Transaction, error)

@@ -1,7 +1,6 @@
 package loadbot
 
 const (
-
 	ERC20ABI = `[
     {
        "inputs":[

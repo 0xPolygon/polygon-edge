@@ -18,12 +18,17 @@ func (l *Loadbot) deployContract(
 	grpcClient txpoolOp.TxnPoolOperatorClient,
 	jsonClient *jsonrpc.Client,
 	receiptTimeout time.Duration) error {
-
 	start := time.Now()
+
+	_, ok := l.generator.(generator.ContractTxnGenerator)
+	if !ok {
+		return fmt.Errorf("invalid generator type, it needs to be a generator.ContractTxnGenerator interface")
+	}
 
 	// deploy SC
 	txHash, err := l.executeTxn(grpcClient)
 	if err != nil {
+		//nolint:forcetypeassert
 		l.generator.(generator.ContractTxnGenerator).MarkFailedContractTxn(&generator.FailedContractTxnInfo{
 			TxHash: txHash.String(),
 			Error: &generator.TxnError{
@@ -44,6 +49,7 @@ func (l *Loadbot) deployContract(
 	receipt, err := tests.WaitForReceipt(ctx, jsonClient.Eth(), txHash)
 
 	if err != nil {
+		//nolint:forcetypeassert
 		l.generator.(generator.ContractTxnGenerator).MarkFailedContractTxn(&generator.FailedContractTxnInfo{
 			TxHash: txHash.String(),
 			Error: &generator.TxnError{
@@ -62,6 +68,7 @@ func (l *Loadbot) deployContract(
 	// fetch contract address
 	l.metrics.ContractMetrics.ContractAddress = receipt.ContractAddress
 	// set contract address in order to get new example txn and gas estimate
+	//nolint:forcetypeassert
 	l.generator.(generator.ContractTxnGenerator).SetContractAddress(types.StringToAddress(
 		receipt.ContractAddress.String(),
 	))
@@ -69,7 +76,9 @@ func (l *Loadbot) deployContract(
 	// we're done with SC deployment
 	// we defined SC address and
 	// now get new gas estimates for CS token transfers
-	l.updateGasEstimate(jsonClient)
+	if err := l.updateGasEstimate(jsonClient); err != nil {
+		return fmt.Errorf("unable to get gas estimate, %w", err)
+	}
 
 	// record contract deployment metrics
 	l.metrics.ContractMetrics.ContractDeploymentDuration.reportTurnAroundTime(

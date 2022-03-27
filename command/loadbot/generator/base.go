@@ -13,7 +13,6 @@ type BaseGenerator struct {
 	params       *GeneratorParams
 	signer       *crypto.EIP155Signer
 	estimatedGas uint64
-
 }
 
 func (bg *BaseGenerator) GetTransactionErrors() []*FailedTxnInfo {

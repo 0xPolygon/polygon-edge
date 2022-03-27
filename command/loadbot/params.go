@@ -23,10 +23,10 @@ var (
 
 const (
 	erc20TokenSupply = "4314500000"
-	erc20TokenName = "ZexCoin"
+	erc20TokenName   = "ZexCoin"
 	erc20TokenSymbol = "ZEX"
 
-	erc721TokenName = "ZexNFT"
+	erc721TokenName   = "ZexNFT"
 	erc721TokenSymbol = "ZEXES"
 )
 
@@ -75,7 +75,6 @@ type loadbotParams struct {
 }
 
 func (p *loadbotParams) validateFlags() error {
-	
 	// check if valid mode is selected
 	if err := p.isValidMode(); err != nil {
 		return err
@@ -85,7 +84,7 @@ func (p *loadbotParams) validateFlags() error {
 	if err := p.hasValidDeployParams(); err != nil {
 		return err
 	}
-	
+
 	return nil
 }
 
@@ -112,7 +111,6 @@ func (p *loadbotParams) initRawParams() error {
 
 	return nil
 }
-
 
 func (p *loadbotParams) initGasValues() error {
 	var parseErr error
@@ -212,7 +210,7 @@ func (p *loadbotParams) isValidMode() error {
 	p.mode = Mode(strings.ToLower(p.modeRaw))
 
 	switch p.mode {
-	case transfer,deploy,erc20,erc721:
+	case transfer, deploy, erc20, erc721:
 		return nil
 
 	default:
@@ -221,7 +219,7 @@ func (p *loadbotParams) isValidMode() error {
 }
 
 func (p *loadbotParams) hasValidDeployParams() error {
-	// fail if mode is deploy but we have no contract 
+	// fail if mode is deploy but we have no contract
 	if p.mode == deploy && p.contractPath == "" {
 		return errContractPath
 	}
@@ -254,7 +252,9 @@ func (p *loadbotParams) initContractArtifactAndArgs() error {
 			ABI:      abi.MustNewABI(ERC721ABI),
 		}
 
-		if ctrArgs, err = abi.Encode([]string{erc721TokenName, erc721TokenSymbol}, ctrArtifact.ABI.Constructor.Inputs); err != nil {
+		if ctrArgs, err = abi.Encode(
+			[]string{erc721TokenName, erc721TokenSymbol},
+			ctrArtifact.ABI.Constructor.Inputs); err != nil {
 			return fmt.Errorf("failed to encode erc721 constructor parameters: %w", err)
 		}
 
