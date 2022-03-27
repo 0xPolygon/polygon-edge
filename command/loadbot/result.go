@@ -90,6 +90,10 @@ func (lr *LoadbotResult) initExecutionData(metrics *Metrics) {
 		GasData:              metrics.GasMetrics.Blocks,
 	}
 
+}
+
+func (lr *LoadbotResult) initContractDeploymentModesExecutionData(metrics *Metrics) {
+	
 	// set contract deployment metrics
 	lr.ContractTurnAroundData.FastestTurnAround = common.ToFixedFloat(
 		metrics.ContractDeploymentDuration.FastestTurnAround.Seconds(),
@@ -143,7 +147,7 @@ func (lr *LoadbotResult) writeBlockData(buffer *bytes.Buffer, blockType string) 
 	var blockData *TxnBlockData
 
 	switch blockType {
-	case "contract":
+	case contractBlockDataType:
 		blockData = &lr.ContractBlockData
 
 		buffer.WriteString("\n\n[CONTRACT BLOCK DATA]\n")
@@ -297,12 +301,16 @@ func (lr *LoadbotResult) writeContractDeploymentData(buffer *bytes.Buffer) {
 	lr.writeBlockData(buffer, contractBlockDataType)
 }
 
-func newLoadbotResult(metrics *Metrics) *LoadbotResult {
+func newLoadbotResult(metrics *Metrics, mode Mode) *LoadbotResult {
 	res := &LoadbotResult{
 		CountData: TxnCountData{
 			Total:  metrics.TotalTransactionsSentCount,
 			Failed: metrics.FailedTransactionsCount,
 		},
+	}
+
+	if mode == erc20 || mode == erc721 {
+		res.initContractDeploymentModesExecutionData(metrics)
 	}
 
 	res.initExecutionData(metrics)

@@ -185,6 +185,7 @@ func runLoadbot(config *Configuration, detailed bool) (*LoadbotResult, error) {
 
 	result := newLoadbotResult(
 		loadbot.GetMetrics(),
+		config.GeneratorMode,
 	)
 
 	if detailed {
