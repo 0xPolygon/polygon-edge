@@ -93,9 +93,8 @@ func (l *Loadbot) calculateGasMetrics(jsonClient *jsonrpc.Client, gasMetrics *Bl
 
 			blockNumErr <- nil
 		}(jsonClient, gasMetrics, blockNum, blockData, blockNumErr)
-
 	}
-	
+
 	if err := <-blockNumErr; err != nil {
 		return err
 	}
