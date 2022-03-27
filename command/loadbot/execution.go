@@ -21,7 +21,7 @@ import (
 
 const (
 	maxReceiptWait = 5 * time.Minute
-	minReceiptWait = 30 * time.Second
+	minReceiptWait = 1 * time.Minute
 
 	defaultFastestTurnAround = time.Hour * 24
 	defaultSlowestTurnAround = time.Duration(0)
@@ -80,17 +80,18 @@ type BlockGasMetrics struct {
 	BlockGasMutex *sync.Mutex
 }
 
-type Metrics struct {
-	TotalTransactionsSentCount uint64
-	FailedTransactionsCount    uint64
-	TransactionDuration        ExecDuration
-
-	// contracts
+type ContractMetricsData struct {
 	FailedContractTransactionsCount uint64
 	ContractDeploymentDuration      ExecDuration
 	ContractAddress                 web3.Address
 	ContractGasMetrics              *BlockGasMetrics
+}
 
+type Metrics struct {
+	TotalTransactionsSentCount uint64
+	FailedTransactionsCount    uint64
+	TransactionDuration        ExecDuration
+	ContractMetrics ContractMetricsData
 	GasMetrics *BlockGasMetrics
 }
 
@@ -109,17 +110,20 @@ func NewLoadbot(cfg *Configuration) *Loadbot {
 			TransactionDuration: ExecDuration{
 				blockTransactions: make(map[uint64]uint64),
 			},
-			ContractDeploymentDuration: ExecDuration{
-				blockTransactions: make(map[uint64]uint64),
+			ContractMetrics: ContractMetricsData{
+				ContractDeploymentDuration: ExecDuration{
+					blockTransactions: make(map[uint64]uint64),
+				},
+				ContractGasMetrics: &BlockGasMetrics{
+					Blocks:        make(map[uint64]GasMetrics),
+					BlockGasMutex: &sync.Mutex{},
+				},
 			},
 			GasMetrics: &BlockGasMetrics{
 				Blocks:        make(map[uint64]GasMetrics),
 				BlockGasMutex: &sync.Mutex{},
 			},
-			ContractGasMetrics: &BlockGasMetrics{
-				Blocks:        make(map[uint64]GasMetrics),
-				BlockGasMutex: &sync.Mutex{},
-			},
+			
 		},
 	}
 }

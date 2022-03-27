@@ -35,7 +35,7 @@ func (l *Loadbot) deployContract(
 				ErrorType: generator.AddErrorType,
 			},
 		})
-		atomic.AddUint64(&l.metrics.FailedContractTransactionsCount, 1)
+		atomic.AddUint64(&l.metrics.ContractMetrics.FailedContractTransactionsCount, 1)
 
 		return fmt.Errorf("could not execute transaction, %w", err)
 	}
@@ -55,16 +55,16 @@ func (l *Loadbot) deployContract(
 				ErrorType: generator.ReceiptErrorType,
 			},
 		})
-		atomic.AddUint64(&l.metrics.FailedContractTransactionsCount, 1)
+		atomic.AddUint64(&l.metrics.ContractMetrics.FailedContractTransactionsCount, 1)
 
 		return fmt.Errorf("could not get the receipt, %w", err)
 	}
 
 	end := time.Now()
 	// initialize gas metrics map with block nuber as index
-	l.metrics.ContractGasMetrics.Blocks[receipt.BlockNumber] = GasMetrics{}
+	l.metrics.ContractMetrics.ContractGasMetrics.Blocks[receipt.BlockNumber] = GasMetrics{}
 	// fetch contract address
-	l.metrics.ContractAddress = receipt.ContractAddress
+	l.metrics.ContractMetrics.ContractAddress = receipt.ContractAddress
 	// set contract address in order to get new example txn and gas estimate
 	l.generator.SetContractAddress(types.StringToAddress(
 		receipt.ContractAddress.String(),
@@ -76,7 +76,7 @@ func (l *Loadbot) deployContract(
 	l.updateGasEstimate(jsonClient)
 
 	// record contract deployment metrics
-	l.metrics.ContractDeploymentDuration.reportTurnAroundTime(
+	l.metrics.ContractMetrics.ContractDeploymentDuration.reportTurnAroundTime(
 		txHash,
 		&metadata{
 			turnAroundTime: end.Sub(start),
@@ -84,12 +84,12 @@ func (l *Loadbot) deployContract(
 		},
 	)
 	// calculate contract deployment metrics
-	if err := l.calculateGasMetrics(jsonClient, l.metrics.ContractGasMetrics); err != nil {
+	if err := l.calculateGasMetrics(jsonClient, l.metrics.ContractMetrics.ContractGasMetrics); err != nil {
 		return fmt.Errorf("unable to calculate contract block gas metrics: %w", err)
 	}
 
-	l.metrics.ContractDeploymentDuration.calcTurnAroundMetrics()
-	l.metrics.ContractDeploymentDuration.TotalExecTime = end.Sub(start)
+	l.metrics.ContractMetrics.ContractDeploymentDuration.calcTurnAroundMetrics()
+	l.metrics.ContractMetrics.ContractDeploymentDuration.TotalExecTime = end.Sub(start)
 
 	return nil
 }

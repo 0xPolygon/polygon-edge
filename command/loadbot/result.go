@@ -94,27 +94,27 @@ func (lr *LoadbotResult) initContractDeploymentModesExecutionData(metrics *Metri
 	
 	// set contract deployment metrics
 	lr.ContractTurnAroundData.FastestTurnAround = common.ToFixedFloat(
-		metrics.ContractDeploymentDuration.FastestTurnAround.Seconds(),
+		metrics.ContractMetrics.ContractDeploymentDuration.FastestTurnAround.Seconds(),
 		durationPrecision,
 	)
 	lr.ContractTurnAroundData.SlowestTurnAround = common.ToFixedFloat(
-		metrics.ContractDeploymentDuration.SlowestTurnAround.Seconds(),
+		metrics.ContractMetrics.ContractDeploymentDuration.SlowestTurnAround.Seconds(),
 		durationPrecision,
 	)
 	lr.ContractTurnAroundData.AverageTurnAround = common.ToFixedFloat(
-		metrics.ContractDeploymentDuration.AverageTurnAround.Seconds(),
+		metrics.ContractMetrics.ContractDeploymentDuration.AverageTurnAround.Seconds(),
 		durationPrecision,
 	)
 	lr.ContractTurnAroundData.TotalExecTime = common.ToFixedFloat(
-		metrics.ContractDeploymentDuration.TotalExecTime.Seconds(),
+		metrics.ContractMetrics.ContractDeploymentDuration.TotalExecTime.Seconds(),
 		durationPrecision,
 	)
 	// set contract address
-	lr.ContractAddress = metrics.ContractAddress
+	lr.ContractAddress = metrics.ContractMetrics.ContractAddress
 	lr.ContractBlockData = TxnBlockData{
-		BlocksRequired:       uint64(len(metrics.ContractDeploymentDuration.blockTransactions)),
-		BlockTransactionsMap: metrics.ContractDeploymentDuration.blockTransactions,
-		GasData:              metrics.ContractGasMetrics.Blocks,
+		BlocksRequired:       uint64(len(metrics.ContractMetrics.ContractDeploymentDuration.blockTransactions)),
+		BlockTransactionsMap: metrics.ContractMetrics.ContractDeploymentDuration.blockTransactions,
+		GasData:              metrics.ContractMetrics.ContractGasMetrics.Blocks,
 	}
 }
 
