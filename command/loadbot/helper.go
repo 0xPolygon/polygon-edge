@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"time"
 
 	"golang.org/x/sync/errgroup"
 
@@ -125,4 +126,21 @@ func (l *Loadbot) updateGasEstimate(jsonClient *jsonrpc.Client) error {
 	}
 
 	return nil
+}
+
+
+// calcMaxTimeout calculates the max timeout for transactions receipts
+// based on the transaction count and tps params
+func calcMaxTimeout(count, tps uint64) time.Duration {
+	waitTime := minReceiptWait
+	// The receipt timeout should be at max maxReceiptWait
+	// or minReceiptWait + tps / count * 100
+	// This way the wait time scales linearly for more stressful situations
+	waitFactor := time.Duration(float64(tps)/float64(count)*100) * time.Second
+
+	if waitTime+waitFactor > maxReceiptWait {
+		return maxReceiptWait
+	}
+
+	return waitTime + waitFactor
 }

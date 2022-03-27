@@ -118,7 +118,7 @@ func setFlags(cmd *cobra.Command) {
 	cmd.Flags().Uint64Var(
 		&params.maxWait,
 		maxWaitFlag,
-		2,
+		0,
 		"sets the maximum wait time for transactions receipts in minutes.",
 	)
 }

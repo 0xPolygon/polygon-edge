@@ -20,6 +20,9 @@ import (
 )
 
 const (
+	maxReceiptWait = 5 * time.Minute
+	minReceiptWait = 30 * time.Second
+
 	defaultFastestTurnAround = time.Hour * 24
 	defaultSlowestTurnAround = time.Duration(0)
 
@@ -207,8 +210,13 @@ func (l *Loadbot) Run() error {
 	ticker := time.NewTicker(1 * time.Second / time.Duration(l.cfg.TPS))
 	defer ticker.Stop()
 
-	// max-wait by default is 2 min.
-	receiptTimeout := time.Duration(l.cfg.MaxWait) * time.Minute
+	var receiptTimeout time.Duration
+	// if max-wait flag is not set it will be calulated 
+	if l.cfg.MaxWait == 0 {
+		receiptTimeout = calcMaxTimeout(l.cfg.Count,l.cfg.TPS)
+	} else {
+		receiptTimeout = time.Duration(l.cfg.MaxWait) * time.Minute
+	}
 
 	startTime := time.Now()
 

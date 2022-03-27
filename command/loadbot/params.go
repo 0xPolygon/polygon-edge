@@ -113,6 +113,7 @@ func (p *loadbotParams) initRawParams() error {
 	return nil
 }
 
+
 func (p *loadbotParams) initGasValues() error {
 	var parseErr error
 
