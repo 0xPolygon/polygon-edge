@@ -14,8 +14,6 @@ import (
 
 const (
 	durationPrecision     = 5
-	contractBlockDataType = "contract"
-	transferBlockDataType = "transfer"
 )
 
 type TxnCountData struct {
@@ -55,7 +53,7 @@ type LoadbotResult struct {
 	DetailedErrorData      TxnDetailedErrorData `json:"detailed_error_data,omitempty"`
 	ApproxTPS              uint64               `json:"approx_tps"`
 	ContractAddress        web3.Address         `json:"contract_address,omitempty"`
-	ContractBlockData      TxnBlockData         `json:"contract_block_data,omitempty"`
+	ContractBlockData    	 TxnBlockData 				`json:"contract_block_data,omitempty"`
 }
 
 func (lr *LoadbotResult) initExecutionData(metrics *Metrics) {
@@ -113,7 +111,6 @@ func (lr *LoadbotResult) initContractDeploymentModesExecutionData(metrics *Metri
 	)
 	// set contract address
 	lr.ContractAddress = metrics.ContractAddress
-	// set contract block data
 	lr.ContractBlockData = TxnBlockData{
 		BlocksRequired:       uint64(len(metrics.ContractDeploymentDuration.blockTransactions)),
 		BlockTransactionsMap: metrics.ContractDeploymentDuration.blockTransactions,
@@ -143,19 +140,11 @@ func (lr *LoadbotResult) initDetailedErrors(gen generator.TransactionGenerator) 
 	lr.DetailedErrorData.DetailedErrorMap = errMap
 }
 
-func (lr *LoadbotResult) writeBlockData(buffer *bytes.Buffer, blockType string) {
-	var blockData *TxnBlockData
-
-	switch blockType {
-	case contractBlockDataType:
-		blockData = &lr.ContractBlockData
-
-		buffer.WriteString("\n\n[CONTRACT BLOCK DATA]\n")
-	default:
-		blockData = &lr.BlockData
-
-		buffer.WriteString("\n\n[BLOCK DATA]\n")
-	}
+func (lr *LoadbotResult) writeBlockData(buffer *bytes.Buffer) {
+	
+	blockData := &lr.BlockData
+	buffer.WriteString("\n\n[BLOCK DATA]\n")
+	
 
 	buffer.WriteString(helper.FormatKV([]string{
 		fmt.Sprintf("Blocks required|%d", blockData.BlocksRequired),
@@ -247,7 +236,7 @@ func (lr *LoadbotResult) writeLoadbotResults(buffer *bytes.Buffer) {
 	lr.writeApproximateTPSData(buffer)
 	lr.writeContractDeploymentData(buffer)
 	lr.writeTurnAroundData(buffer)
-	lr.writeBlockData(buffer, transferBlockDataType)
+	lr.writeBlockData(buffer)
 	lr.writeAverageBlockUtilization(buffer)
 	lr.writeErrorData(buffer)
 
@@ -292,13 +281,33 @@ func (lr *LoadbotResult) writeContractDeploymentData(buffer *bytes.Buffer) {
 		return
 	}
 
-	buffer.WriteString("\n\n[CONTRACT DEPLOYMENT DATA]\n")
+	buffer.WriteString("\n\n[CONTRACT DEPLOYMENT INFO]\n")
 	buffer.WriteString(helper.FormatKV([]string{
 		fmt.Sprintf("Contract address|%s", lr.ContractAddress),
 		fmt.Sprintf("Total execution time|%fs", lr.ContractTurnAroundData.TotalExecTime),
 	}))
+	
+	buffer.WriteString("\n\n[CONTRACT DEPLOYMENT BLOCK DATA]\n")
+	buffer.WriteString(helper.FormatKV([]string{
+		fmt.Sprintf("Blocks required|%d", lr.ContractBlockData.BlocksRequired),
+	}))
+	buffer.WriteString("\n")
 
-	lr.writeBlockData(buffer, contractBlockDataType)
+	formattedStrings := make([]string, 0)
+
+	for blockNumber := range lr.ContractBlockData.BlockTransactionsMap {
+
+		formattedStrings = append(formattedStrings,
+			fmt.Sprintf("Block #%d|%d txns (%d gasUsed / %d gasLimit) utilization | %.2f%%",
+				blockNumber,
+				lr.ContractBlockData.BlockTransactionsMap[blockNumber],
+				lr.ContractBlockData.GasData[blockNumber].GasUsed,
+				lr.ContractBlockData.GasData[blockNumber].GasLimit,
+				lr.ContractBlockData.GasData[blockNumber].Utilization,
+			))
+	}
+
+	buffer.WriteString(helper.FormatKV(formattedStrings))
 }
 
 func newLoadbotResult(metrics *Metrics, mode Mode) *LoadbotResult {

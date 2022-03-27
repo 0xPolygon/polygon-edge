@@ -1,8 +1,11 @@
 package loadbot
 
 import (
+	"context"
 	"fmt"
 	"math/big"
+
+	"golang.org/x/sync/errgroup"
 
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/go-web3"
@@ -70,20 +73,17 @@ func calculateAvgBlockUtil(gasData map[uint64]GasMetrics) float64 {
 
 // fetch block gas usage and gas limit and calculate block utilization
 func (l *Loadbot) calculateGasMetrics(jsonClient *jsonrpc.Client, gasMetrics *BlockGasMetrics) error {
-	blockNumErr := make(chan error)
-	defer close(blockNumErr)
+	
+	errGr, _ := errgroup.WithContext(context.Background())
 
-	for blockNum, blockData := range gasMetrics.Blocks {
-		go func(
-			jsonClient *jsonrpc.Client,
-			gasMetrics *BlockGasMetrics,
-			blockNum uint64,
-			blockData GasMetrics,
-			blockNumErr chan error,
-		) {
+	for num, data := range gasMetrics.Blocks {
+		blockNum := num
+		blockData := data
+
+		errGr.Go(func() error {
 			blockInfom, err := jsonClient.Eth().GetBlockByNumber(web3.BlockNumber(blockNum), false)
 			if err != nil {
-				blockNumErr <- fmt.Errorf("could not fetch block %d by number, %w", blockNum, err)
+				return fmt.Errorf("could not fetch block %d by number, %w", blockNum, err)
 			}
 
 			blockData.GasLimit = blockInfom.GasLimit
@@ -91,11 +91,12 @@ func (l *Loadbot) calculateGasMetrics(jsonClient *jsonrpc.Client, gasMetrics *Bl
 			blockData.Utilization = calculateBlockUtilization(blockData)
 			gasMetrics.Blocks[blockNum] = blockData
 
-			blockNumErr <- nil
-		}(jsonClient, gasMetrics, blockNum, blockData, blockNumErr)
+			return nil
+		})
 	}
-
-	if err := <-blockNumErr; err != nil {
+	
+	err := errGr.Wait()
+	if err != nil {
 		return err
 	}
 
