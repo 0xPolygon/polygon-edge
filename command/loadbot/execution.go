@@ -215,7 +215,7 @@ func (l *Loadbot) Run() error {
 	defer ticker.Stop()
 
 	var receiptTimeout time.Duration
-	// if max-wait flag is not set it will be calulated 
+	// if max-wait flag is not set it will be calulated dynamicaly
 	if l.cfg.MaxWait == 0 {
 		receiptTimeout = calcMaxTimeout(l.cfg.Count,l.cfg.TPS)
 	} else {
@@ -224,9 +224,10 @@ func (l *Loadbot) Run() error {
 
 	startTime := time.Now()
 
-	// deploy contracts
-	if err := l.deployContract(grpcClient, jsonClient, receiptTimeout); err != nil {
-		return fmt.Errorf("unable to deploy smart contract, %w", err)
+	if l.isTokenTransferMode() {
+		if err := l.deployContract(grpcClient, jsonClient, receiptTimeout); err != nil {
+			return fmt.Errorf("unable to deploy smart contract, %w", err)
+		}
 	}
 
 	var wg sync.WaitGroup

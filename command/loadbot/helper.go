@@ -144,3 +144,13 @@ func calcMaxTimeout(count, tps uint64) time.Duration {
 
 	return waitTime + waitFactor
 }
+
+// returns true if this is erc20 or erc721 mode
+func (l *Loadbot) isTokenTransferMode() bool {
+	switch l.cfg.GeneratorMode {
+	case erc20, erc721:
+		return true
+	default:
+		return false
+	}
+}

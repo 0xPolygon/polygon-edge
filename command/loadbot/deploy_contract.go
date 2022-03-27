@@ -18,10 +18,6 @@ func (l *Loadbot) deployContract(
 	grpcClient txpoolOp.TxnPoolOperatorClient,
 	jsonClient *jsonrpc.Client,
 	receiptTimeout time.Duration) error {
-	// if this is a regular transfer skip token deployment
-	if l.cfg.GeneratorMode == transfer {
-		return nil
-	}
 
 	start := time.Now()
 
