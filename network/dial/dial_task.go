@@ -12,7 +12,7 @@ type DialTask struct {
 	priority uint64
 }
 
-// GetTaskInfo returns the peer information associated with the dial
-func (dt *DialTask) GetTaskInfo() *peer.AddrInfo {
+// GetAddrInfo returns the peer information associated with the dial
+func (dt *DialTask) GetAddrInfo() *peer.AddrInfo {
 	return dt.addr
 }

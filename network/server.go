@@ -389,17 +389,17 @@ func (s *Server) runDial() {
 				return
 			}
 
-			taskInfo := tt.GetTaskInfo()
+			peerInfo := tt.GetAddrInfo()
 
-			s.logger.Debug(fmt.Sprintf("Dialing peer [%s] as local [%s]", taskInfo.String(), s.host.ID()))
+			s.logger.Debug(fmt.Sprintf("Dialing peer [%s] as local [%s]", peerInfo.String(), s.host.ID()))
 
-			if !s.isConnected(taskInfo.ID) {
+			if !s.isConnected(peerInfo.ID) {
 				// the connection process is async because it involves connection (here) +
 				// the handshake done in the identity service.
-				if err := s.host.Connect(context.Background(), *taskInfo); err != nil {
-					s.logger.Debug("failed to dial", "addr", taskInfo.String(), "err", err)
+				if err := s.host.Connect(context.Background(), *peerInfo); err != nil {
+					s.logger.Debug("failed to dial", "addr", peerInfo.String(), "err", err)
 
-					s.emitEvent(taskInfo.ID, peerEvent.PeerFailedToConnect)
+					s.emitEvent(peerInfo.ID, peerEvent.PeerFailedToConnect)
 				}
 			}
 		}
