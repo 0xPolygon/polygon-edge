@@ -666,12 +666,35 @@ func (p *TxPool) addGossipTx(obj interface{}) {
 
 // resetAccounts updates existing accounts with the new nonce and prunes stale transactions.
 func (p *TxPool) resetAccounts(stateNonces map[types.Address]uint64) {
-	allPrunedPromoted, allPrunedEnqueued := p.accounts.resetWithNonce(stateNonces, p.promoteReqCh)
+	var (
+		allPrunedPromoted []*types.Transaction
+		allPrunedEnqueued []*types.Transaction
+	)
 
-	//	update state
+	//	clear all accounts of stale txs
+	for addr, newNonce := range stateNonces {
+		if !p.accounts.exists(addr) {
+			// no updates for this account
+			continue
+		}
+
+		account := p.accounts.get(addr)
+		prunedPromoted, prunedEnqueued := account.reset(newNonce, p.promoteReqCh)
+
+		//	append pruned
+		allPrunedPromoted = append(allPrunedPromoted, prunedPromoted...)
+		allPrunedEnqueued = append(allPrunedEnqueued, prunedEnqueued...)
+	}
+
+	//	pool cleanup callback
+	cleanup := func(stale ...*types.Transaction) {
+		p.index.remove(stale...)
+		p.gauge.decrease(slotsRequired(stale...))
+	}
+
+	//	prune pool state
 	if len(allPrunedPromoted) > 0 {
-		p.index.remove(allPrunedPromoted...)
-		p.gauge.decrease(slotsRequired(allPrunedPromoted...))
+		cleanup(allPrunedPromoted...)
 		p.eventManager.signalEvent(
 			proto.EventType_PRUNED_PROMOTED,
 			toHash(allPrunedPromoted...)...,
@@ -681,8 +704,7 @@ func (p *TxPool) resetAccounts(stateNonces map[types.Address]uint64) {
 	}
 
 	if len(allPrunedEnqueued) > 0 {
-		p.index.remove(allPrunedEnqueued...)
-		p.gauge.decrease(slotsRequired(allPrunedEnqueued...))
+		cleanup(allPrunedEnqueued...)
 		p.eventManager.signalEvent(
 			proto.EventType_PRUNED_ENQUEUED,
 			toHash(allPrunedEnqueued...)...,

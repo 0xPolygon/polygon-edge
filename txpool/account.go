@@ -135,43 +135,6 @@ func (m *accountsMap) allTxs(includeEnqueued bool) (
 	return
 }
 
-// resetWithNonce updates all accounts with the new nonce and clears any stale transactions.
-// May signal a promotion request if the account is eligible after pruning.
-func (m *accountsMap) resetWithNonce(newNonces map[types.Address]uint64, promoteCh chan<- promoteRequest) (
-	allPrunedPromoted,
-	allPrunedEnqueued []*types.Transaction,
-) {
-	//	prune each account with the new nonce
-	m.Range(func(key, value interface{}) bool {
-		addr, _ := key.(types.Address) //nolint:forcetypeassert, nolintlint
-		account, _ := value.(*account) //nolint:forcetypeassert, nolintlint
-
-		newNonce, ok := newNonces[addr]
-		if !ok {
-			// no updates for this account
-			return true
-		}
-
-		//	prune stale txs
-		prunedPromoted, prunedEnqueued := account.reset(newNonce, promoteCh)
-
-		//	update result
-		allPrunedPromoted = append(
-			allPrunedPromoted,
-			prunedPromoted...,
-		)
-
-		allPrunedEnqueued = append(
-			allPrunedEnqueued,
-			prunedEnqueued...,
-		)
-
-		return true
-	})
-
-	return
-}
-
 // An account is the core structure for processing
 // transactions from a specific address. The nextNonce
 // field is what separates the enqueued from promoted transactions:
