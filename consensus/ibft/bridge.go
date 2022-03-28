@@ -45,13 +45,6 @@ func (b *BridgeMechanism) updateValidatorsHook(snapParam interface{}) error {
 
 	b.bridge.SetValidators(snap.Set, b.calculateSignatureThreshold(snap.Set))
 
-	// On every epoch end, create the checkpoint
-	if b.ibft.IsLastOfEpoch(b.ibft.store.getLastBlock()) {
-		if err := b.bridge.StartNewCheckpoint(b.ibft.epochSize); err != nil {
-			return err
-		}
-	}
-
 	return nil
 }
 
@@ -147,7 +140,12 @@ func (b *BridgeMechanism) consumeStateTransactionsHook(numberParam interface{}) 
 		b.bridge.StateSync().Consume(tx)
 	}
 
-	return nil
+	// On every epoch end, create the checkpoint
+	if b.ibft.state.getState() == SyncState && !b.ibft.IsLastOfEpoch(block.Number()) {
+		return nil
+	}
+
+	return b.bridge.StartNewCheckpoint(b.ibft.epochSize)
 }
 
 func (b *BridgeMechanism) calculateSignatureThreshold(set ValidatorSet) uint64 {
