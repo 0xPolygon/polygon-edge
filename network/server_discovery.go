@@ -2,12 +2,17 @@ package network
 
 import (
 	"crypto/rand"
+	"fmt"
 	"github.com/0xPolygon/polygon-edge/network/common"
+	"github.com/0xPolygon/polygon-edge/network/discovery"
+	"github.com/0xPolygon/polygon-edge/network/grpc"
 	"github.com/0xPolygon/polygon-edge/network/proto"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
+	kb "github.com/libp2p/go-libp2p-kbucket"
 	rawGrpc "google.golang.org/grpc"
 	"math/big"
+	"time"
 )
 
 // GetRandomBootnode fetches a random bootnode that's currently
@@ -152,4 +157,69 @@ func (s *Server) FetchOrSetTemporaryDial(peerID peer.ID, newValue bool) bool {
 // RemoveTemporaryDial removes a peer connection as temporary [Thread safe]
 func (s *Server) RemoveTemporaryDial(peerID peer.ID) {
 	s.temporaryDials.Delete(peerID)
+}
+
+// setupDiscovery Sets up the discovery service for the node
+func (s *Server) setupDiscovery() error {
+	// Set up a fresh routing table
+	keyID := kb.ConvertPeerID(s.host.ID())
+
+	routingTable, err := kb.NewRoutingTable(
+		defaultBucketSize,
+		keyID,
+		time.Minute,
+		s.host.Peerstore(),
+		10*time.Second,
+		nil,
+	)
+	if err != nil {
+		return err
+	}
+
+	// Set the PeerAdded event handler
+	routingTable.PeerAdded = func(p peer.ID) {
+		info := s.host.Peerstore().PeerInfo(p)
+		s.addToDialQueue(&info, common.PriorityRandomDial)
+	}
+
+	// Set the PeerRemoved event handler
+	routingTable.PeerRemoved = func(p peer.ID) {
+		s.dialQueue.DeleteTask(p)
+	}
+
+	// Create an instance of the discovery service
+	discoveryService := discovery.NewDiscoveryService(
+		s,
+		routingTable,
+		s.logger,
+	)
+
+	// Register a network event handler
+	if subscribeErr := s.SubscribeFn(discoveryService.HandleNetworkEvent); subscribeErr != nil {
+		return fmt.Errorf("unable to subscribe to network events, %w", subscribeErr)
+	}
+
+	// Register the actual discovery service as a valid protocol
+	s.registerDiscoveryService(discoveryService)
+
+	// Make sure the discovery service has the bootnodes in its routing table,
+	// and instantiates connections to them
+	discoveryService.ConnectToBootnodes(s.bootnodes.getBootnodes())
+
+	// Start the discovery service
+	discoveryService.Start()
+
+	// Set the discovery service reference
+	s.discovery = discoveryService
+
+	return nil
+}
+
+// registerDiscoveryService registers the discovery protocol to be available
+func (s *Server) registerDiscoveryService(discovery *discovery.DiscoveryService) {
+	grpcStream := grpc.NewGrpcStream()
+	proto.RegisterDiscoveryServer(grpcStream.GrpcServer(), discovery)
+	grpcStream.Serve()
+
+	s.RegisterProtocol(common.DiscProto, grpcStream)
 }

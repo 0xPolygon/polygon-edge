@@ -3,6 +3,8 @@ package network
 import (
 	"github.com/0xPolygon/polygon-edge/network/common"
 	peerEvent "github.com/0xPolygon/polygon-edge/network/event"
+	"github.com/0xPolygon/polygon-edge/network/grpc"
+	"github.com/0xPolygon/polygon-edge/network/identity"
 	"github.com/0xPolygon/polygon-edge/network/proto"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -83,4 +85,32 @@ func (s *Server) IsTemporaryDial(peerID peer.ID) bool {
 	_, ok := s.temporaryDials.Load(peerID)
 
 	return ok
+}
+
+// setupIdentity sets up the identity service for the node
+func (s *Server) setupIdentity() error {
+	// Create an instance of the identity service
+	identityService := identity.NewIdentityService(
+		s,
+		s.logger,
+		int64(s.config.Chain.Params.ChainID),
+		s.host.ID(),
+	)
+
+	// Register the identity service protocol
+	s.registerIdentityService(identityService)
+
+	// Register the network notify bundle handlers
+	s.host.Network().Notify(identityService.GetNotifyBundle())
+
+	return nil
+}
+
+// registerIdentityService registers the identity service
+func (s *Server) registerIdentityService(identityService *identity.IdentityService) {
+	grpcStream := grpc.NewGrpcStream()
+	proto.RegisterIdentityServer(grpcStream.GrpcServer(), identityService)
+	grpcStream.Serve()
+
+	s.RegisterProtocol(common.IdentityProto, grpcStream)
 }

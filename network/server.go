@@ -8,11 +8,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/network/connections"
 	"github.com/0xPolygon/polygon-edge/network/dial"
 	"github.com/0xPolygon/polygon-edge/network/discovery"
-	"github.com/0xPolygon/polygon-edge/network/grpc"
-	"github.com/0xPolygon/polygon-edge/network/identity"
-	"github.com/0xPolygon/polygon-edge/network/proto"
 	"github.com/libp2p/go-libp2p"
-	kb "github.com/libp2p/go-libp2p-kbucket"
 	noise "github.com/libp2p/go-libp2p-noise"
 	rawGrpc "google.golang.org/grpc"
 	"sync"
@@ -280,71 +276,6 @@ func (s *Server) Start() error {
 	return nil
 }
 
-// setupDiscovery Sets up the discovery service for the node
-func (s *Server) setupDiscovery() error {
-	// Set up a fresh routing table
-	keyID := kb.ConvertPeerID(s.host.ID())
-
-	routingTable, err := kb.NewRoutingTable(
-		defaultBucketSize,
-		keyID,
-		time.Minute,
-		s.host.Peerstore(),
-		10*time.Second,
-		nil,
-	)
-	if err != nil {
-		return err
-	}
-
-	// Set the PeerAdded event handler
-	routingTable.PeerAdded = func(p peer.ID) {
-		info := s.host.Peerstore().PeerInfo(p)
-		s.addToDialQueue(&info, common.PriorityRandomDial)
-	}
-
-	// Set the PeerRemoved event handler
-	routingTable.PeerRemoved = func(p peer.ID) {
-		s.dialQueue.DeleteTask(p)
-	}
-
-	// Create an instance of the discovery service
-	discoveryService := discovery.NewDiscoveryService(
-		s,
-		routingTable,
-		s.logger,
-	)
-
-	// Register a network event handler
-	if subscribeErr := s.SubscribeFn(discoveryService.HandleNetworkEvent); subscribeErr != nil {
-		return fmt.Errorf("unable to subscribe to network events, %w", subscribeErr)
-	}
-
-	// Register the actual discovery service as a valid protocol
-	s.registerDiscoveryService(discoveryService)
-
-	// Make sure the discovery service has the bootnodes in its routing table,
-	// and instantiates connections to them
-	discoveryService.ConnectToBootnodes(s.bootnodes.getBootnodes())
-
-	// Start the discovery service
-	discoveryService.Start()
-
-	// Set the discovery service reference
-	s.discovery = discoveryService
-
-	return nil
-}
-
-// registerDiscoveryService registers the discovery protocol to be available
-func (s *Server) registerDiscoveryService(discovery *discovery.DiscoveryService) {
-	grpcStream := grpc.NewGrpcStream()
-	proto.RegisterDiscoveryServer(grpcStream.GrpcServer(), discovery)
-	grpcStream.Serve()
-
-	s.RegisterProtocol(common.DiscProto, grpcStream)
-}
-
 // setupBootnodes sets up the node's bootnode connections
 func (s *Server) setupBootnodes() error {
 	// Check the bootnode config is present
@@ -386,34 +317,6 @@ func (s *Server) setupBootnodes() error {
 	}
 
 	return nil
-}
-
-// setupIdentity sets up the identity service for the node
-func (s *Server) setupIdentity() error {
-	// Create an instance of the identity service
-	identityService := identity.NewIdentityService(
-		s,
-		s.logger,
-		int64(s.config.Chain.Params.ChainID),
-		s.host.ID(),
-	)
-
-	// Register the identity service protocol
-	s.registerIdentityService(identityService)
-
-	// Register the network notify bundle handlers
-	s.host.Network().Notify(identityService.GetNotifyBundle())
-
-	return nil
-}
-
-// registerIdentityService registers the identity service
-func (s *Server) registerIdentityService(identityService *identity.IdentityService) {
-	grpcStream := grpc.NewGrpcStream()
-	proto.RegisterIdentityServer(grpcStream.GrpcServer(), identityService)
-	grpcStream.Serve()
-
-	s.RegisterProtocol(common.IdentityProto, grpcStream)
 }
 
 // checkPeerCount will attempt to make new connections if the active peer count is lesser than the specified limit.
