@@ -17,7 +17,6 @@ const PeerID = "peerID"
 
 var (
 	ErrInvalidChainID   = errors.New("invalid chain ID")
-	ErrNotReady         = errors.New("not ready")
 	ErrNoAvailableSlots = errors.New("no available Slots")
 )
 
