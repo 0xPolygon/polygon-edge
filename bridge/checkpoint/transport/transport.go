@@ -68,7 +68,7 @@ func (t *libp2pGossipTransport) Subscribe(handler func(interface{})) error {
 
 		protoMsg, ok := obj.(*proto.CheckpointMessage)
 		if !ok {
-			t.logger.Warn("received unexpected typed message", "message", obj)
+			t.logger.Error("received unexpected typed message", "message", obj)
 
 			return
 		}
