@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/0xPolygon/polygon-edge/network/common"
-	"github.com/0xPolygon/polygon-edge/network/connections"
 	"github.com/0xPolygon/polygon-edge/network/dial"
 	"github.com/0xPolygon/polygon-edge/network/discovery"
 	"github.com/libp2p/go-libp2p"
@@ -82,7 +81,7 @@ type Server struct {
 
 	emitterPeerEvent event.Emitter // event emitter for listeners
 
-	connectionCounts *connections.ConnectionInfo
+	connectionCounts *ConnectionInfo
 
 	temporaryDials sync.Map // map of temporary connections; peerID -> bool
 
@@ -150,7 +149,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 			bootnodesMap:      make(map[peer.ID]*peer.AddrInfo),
 			bootnodeConnCount: 0,
 		},
-		connectionCounts: connections.NewBlankConnectionInfo(
+		connectionCounts: NewBlankConnectionInfo(
 			config.MaxInboundPeers,
 			config.MaxOutboundPeers,
 		),

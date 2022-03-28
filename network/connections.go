@@ -1,4 +1,4 @@
-package connections
+package network
 
 import (
 	"github.com/libp2p/go-libp2p-core/network"
