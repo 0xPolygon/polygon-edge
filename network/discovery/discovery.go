@@ -60,6 +60,9 @@ type networkingServer interface {
 	// AddToPeerStore adds a peer to the networking server's peer store
 	AddToPeerStore(peerInfo *peer.AddrInfo)
 
+	// RemoveFromPeerStore removes peer information from the server's peer store
+	RemoveFromPeerStore(peerInfo *peer.AddrInfo)
+
 	// GetPeerInfo fetches the peer information from the server's peer store
 	GetPeerInfo(peerID peer.ID) *peer.AddrInfo
 
@@ -182,6 +185,11 @@ func (d *DiscoveryService) addToTable(node *peer.AddrInfo) error {
 		false,
 		false,
 	); err != nil {
+		// Since the routing table addition failed,
+		// the peer can be removed from the libp2p peer store
+		// in the base networking server
+		d.baseServer.RemoveFromPeerStore(node)
+
 		return err
 	}
 
@@ -345,6 +353,7 @@ func (d *DiscoveryService) bootnodePeerDiscovery() {
 				true,
 			); alreadyTempDial {
 				bootnode = nil
+
 				continue
 			}
 

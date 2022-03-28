@@ -181,3 +181,79 @@ func TestDiscoveryService_BootnodePeerDiscovery(t *testing.T) {
 		assert.Equal(t, randomPeer.ID, peerStore[indx].ID)
 	}
 }
+
+// TestDiscoveryService_AddToTable tests that peers are added correctly
+// both to the discovery routing table, and the networking server's peer store
+func TestDiscoveryService_AddToTable(t *testing.T) {
+	randomPeer := getRandomPeers(t, 1)[0]
+	peerStore := make(map[peer.ID]*peer.AddrInfo)
+
+	addToPeerStoreHook := func(info *peer.AddrInfo) {
+		peerStore[info.ID] = info
+	}
+
+	removeFromPeerStoreHook := func(info *peer.AddrInfo) {
+		delete(peerStore, info.ID)
+	}
+
+	highLatencyHook := func(id peer.ID) time.Duration {
+		// Set a high latency value to trigger an error
+		return 24 * time.Hour
+	}
+
+	lowLatencyHook := func(id peer.ID) time.Duration {
+		// Set a non-existing latency value
+		return 0
+	}
+
+	testTable := []struct {
+		name          string
+		latencyHook   func(id peer.ID) time.Duration
+		shouldSucceed bool
+	}{
+		{
+			"routing table and peer store updated",
+			lowLatencyHook,
+			true,
+		},
+		{
+			"peer store should not be updated due to error",
+			highLatencyHook,
+			false,
+		},
+	}
+
+	for _, testCase := range testTable {
+		t.Run(testCase.name, func(t *testing.T) {
+			// Create an instance of the identity service
+			discoveryService, setupErr := newDiscoveryService(
+				// Set the relevant hook responses from the mock server
+				func(server *networkTesting.MockNetworkingServer) {
+					// Define the peer store addition
+					server.HookAddToPeerStore(addToPeerStoreHook)
+
+					// Define the peer store deletion
+					server.HookRemoveFromPeerStore(removeFromPeerStoreHook)
+
+					// Define the routing table latency hook
+					server.GetMockPeerMetrics().HookLatencyEWMA(testCase.latencyHook)
+				},
+			)
+			if setupErr != nil {
+				t.Fatalf("Unable to setup the discovery service")
+			}
+
+			// Run the main method
+			additionErr := discoveryService.addToTable(randomPeer)
+
+			if testCase.shouldSucceed {
+				assert.NoError(t, additionErr)
+				assert.Len(t, peerStore, 1)
+				assert.Equal(t, randomPeer, peerStore[randomPeer.ID])
+			} else {
+				assert.Error(t, additionErr)
+				assert.Len(t, peerStore, 0)
+			}
+		})
+	}
+}

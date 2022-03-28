@@ -37,6 +37,7 @@ type MockNetworkingServer struct {
 	getBootnodeConnCountFn     getBootnodeConnCountDelegate
 	closeProtocolStreamFn      closeProtocolStreamDelegate
 	addToPeerStoreFn           addToPeerStoreDelegate
+	removeFromPeerStoreFn      removeFromPeerStoreDelegate
 	getPeerInfoFn              getPeerInfoDelegate
 	getRandomPeerFn            getRandomPeerDelegate
 	fetchAndSetTemporaryDialFn fetchAndSetTemporaryDialDelegate
@@ -47,6 +48,7 @@ func NewMockNetworkingServer() *MockNetworkingServer {
 	return &MockNetworkingServer{
 		mockIdentityClient:  &MockIdentityClient{},
 		mockDiscoveryClient: &MockDiscoveryClient{},
+		mockPeerMetrics:     &MockPeerMetrics{},
 	}
 }
 
@@ -79,6 +81,7 @@ type getBootnodeConnCountDelegate func() int64
 type newDiscoveryClientDelegate func(peer.ID) (proto.DiscoveryClient, error)
 type closeProtocolStreamDelegate func(string, peer.ID) error
 type addToPeerStoreDelegate func(*peer.AddrInfo)
+type removeFromPeerStoreDelegate func(peerInfo *peer.AddrInfo)
 type getPeerInfoDelegate func(peer.ID) *peer.AddrInfo
 type getRandomPeerDelegate func() *peer.ID
 type fetchAndSetTemporaryDialDelegate func(peer.ID, bool) bool
@@ -230,6 +233,16 @@ func (m *MockNetworkingServer) HookAddToPeerStore(fn addToPeerStoreDelegate) {
 	m.addToPeerStoreFn = fn
 }
 
+func (m *MockNetworkingServer) RemoveFromPeerStore(peerInfo *peer.AddrInfo) {
+	if m.removeFromPeerStoreFn != nil {
+		m.removeFromPeerStoreFn(peerInfo)
+	}
+}
+
+func (m *MockNetworkingServer) HookRemoveFromPeerStore(fn removeFromPeerStoreDelegate) {
+	m.removeFromPeerStoreFn = fn
+}
+
 func (m *MockNetworkingServer) GetPeerInfo(peerID peer.ID) *peer.AddrInfo {
 	if m.getPeerInfoFn != nil {
 		return m.getPeerInfoFn(peerID)
@@ -334,14 +347,43 @@ func (mdc *MockDiscoveryClient) FindPeers(
 
 // MockPeerMetrics is a mock used by the Kademlia routing table
 type MockPeerMetrics struct {
+	recordLatencyFn     recordLatencyDelegate
+	latencyEWMAFn       latencyEWMADelegate
+	removeMetricsPeerFn removeMetricsPeerDelegate
 }
 
+type recordLatencyDelegate func(id peer.ID, duration time.Duration)
+type latencyEWMADelegate func(id peer.ID) time.Duration
+type removeMetricsPeerDelegate func(id peer.ID)
+
 func (m *MockPeerMetrics) RecordLatency(id peer.ID, duration time.Duration) {
+	if m.recordLatencyFn != nil {
+		m.recordLatencyFn(id, duration)
+	}
+}
+
+func (m *MockPeerMetrics) HookRecordLatency(fn recordLatencyDelegate) {
+	m.recordLatencyFn = fn
 }
 
 func (m *MockPeerMetrics) LatencyEWMA(id peer.ID) time.Duration {
+	if m.latencyEWMAFn != nil {
+		return m.latencyEWMAFn(id)
+	}
+
 	return 0
 }
 
+func (m *MockPeerMetrics) HookLatencyEWMA(fn latencyEWMADelegate) {
+	m.latencyEWMAFn = fn
+}
+
 func (m *MockPeerMetrics) RemovePeer(id peer.ID) {
+	if m.removeMetricsPeerFn != nil {
+		m.removeMetricsPeerFn(id)
+	}
+}
+
+func (m *MockPeerMetrics) HookRemoveMetricsPeer(fn removeMetricsPeerDelegate) {
+	m.removeMetricsPeerFn = fn
 }

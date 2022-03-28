@@ -463,6 +463,11 @@ func (s *Server) AddToPeerStore(peerInfo *peer.AddrInfo) {
 	s.host.Peerstore().AddAddr(peerInfo.ID, peerInfo.Addrs[0], peerstore.AddressTTL)
 }
 
+// RemoveFromPeerStore removes peer information from the node's peer store
+func (s *Server) RemoveFromPeerStore(peerInfo *peer.AddrInfo) {
+	s.host.Peerstore().RemovePeer(peerInfo.ID)
+}
+
 // checkPeerCount will attempt to make new connections if the active peer count is lesser than the specified limit.
 func (s *Server) checkPeerConnections() {
 	for {
