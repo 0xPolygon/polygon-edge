@@ -352,7 +352,6 @@ func (s *Server) setupDiscovery() error {
 		s,
 		routingTable,
 		s.logger,
-		make(chan struct{}),
 	)
 
 	// Register a network event handler

@@ -98,13 +98,12 @@ func NewDiscoveryService(
 	server networkingServer,
 	routingTable *kb.RoutingTable,
 	logger hclog.Logger,
-	closeCh chan struct{},
 ) *DiscoveryService {
 	return &DiscoveryService{
 		logger:       logger.Named("discovery"),
 		baseServer:   server,
 		routingTable: routingTable,
-		closeCh:      closeCh,
+		closeCh:      make(chan struct{}),
 	}
 }
 
