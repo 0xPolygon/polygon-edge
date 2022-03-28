@@ -26,20 +26,39 @@ func (s *Server) NewIdentityClient(peerID peer.ID) (proto.IdentityClient, error)
 // AddPeer adds a new peer to the networking server's peer list,
 // and updates relevant counters and metrics
 func (s *Server) AddPeer(id peer.ID, direction network.Direction) {
-	s.peersLock.Lock()
-
 	s.logger.Info("Peer connected", "id", id.String())
 
-	connectionInfo, exists := s.peers[id]
-	if exists {
+	// Update the peer connection info
+	if connectionExists := s.addPeerInfo(id, direction); connectionExists {
+		// The peer connection information was already present in the networking
+		// server, so no connection metrics should be updated further
+		return
+	}
+
+	// Emit the event alerting listeners
+	// WARNING: THIS CALL IS POTENTIALLY BLOCKING
+	// UNDER HEAVY LOAD. IT SHOULD BE SUBSTITUTED
+	// WITH AN EVENT SYSTEM THAT ACTUALLY WORKS
+	s.emitEvent(id, peerEvent.PeerConnected)
+}
+
+// addPeerInfo updates the networking server's internal peer info table
+// and returns a flag indicating if the same peer connection previously existed.
+// In case the peer connection previously existed, this is a noop
+func (s *Server) addPeerInfo(id peer.ID, direction network.Direction) bool {
+	s.peersLock.Lock()
+	defer s.peersLock.Unlock()
+
+	connectionInfo, connectionExists := s.peers[id]
+	if connectionExists && connectionInfo.connDirections[direction] {
 		// Check if this peer already has an active connection status (saved info).
 		// There is no need to do further processing
-		if connectionInfo.connDirections[direction] {
-			s.peersLock.Unlock()
+		return true
+	}
 
-			return
-		}
-	} else {
+	// Check if the connection info is already initialized
+	if !connectionExists {
+		// Create a new record for the connection info
 		connectionInfo = &PeerConnInfo{
 			Info:            s.host.Peerstore().PeerInfo(id),
 			connDirections:  make(map[network.Direction]bool),
@@ -47,6 +66,7 @@ func (s *Server) AddPeer(id peer.ID, direction network.Direction) {
 		}
 	}
 
+	// Save the connection info to the networking server
 	connectionInfo.connDirections[direction] = true
 
 	s.peers[id] = connectionInfo
@@ -57,15 +77,11 @@ func (s *Server) AddPeer(id peer.ID, direction network.Direction) {
 	s.updateBootnodeConnCount(id, 1)
 
 	// Update the metric stats
-	s.metrics.TotalPeerCount.Set(float64(len(s.peers)))
+	s.metrics.TotalPeerCount.Set(
+		float64(len(s.peers)),
+	)
 
-	s.peersLock.Unlock()
-
-	// Emit the event alerting listeners
-	// WARNING: THIS CALL IS POTENTIALLY BLOCKING
-	// UNDER HEAVY LOAD. IT SHOULD BE SUBSTITUTED
-	// WITH AN EVENT SYSTEM THAT ACTUALLY WORKS
-	s.emitEvent(id, peerEvent.PeerConnected)
+	return false
 }
 
 // UpdatePendingConnCount updates the pending connection count in the specified direction [Thread safe]

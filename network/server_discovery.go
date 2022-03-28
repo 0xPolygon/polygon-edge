@@ -2,6 +2,7 @@ package network
 
 import (
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"github.com/0xPolygon/polygon-edge/network/common"
 	"github.com/0xPolygon/polygon-edge/network/discovery"
@@ -13,6 +14,10 @@ import (
 	rawGrpc "google.golang.org/grpc"
 	"math/big"
 	"time"
+)
+
+var (
+	errPeerDisconnected = errors.New("peer disconnected before the discovery client was initialized")
 )
 
 // GetRandomBootnode fetches a random bootnode that's currently
@@ -56,6 +61,12 @@ func (s *Server) getProtoStream(protocol string, peerID peer.ID) *rawGrpc.Client
 
 // NewDiscoveryClient returns a new or existing discovery service client connection
 func (s *Server) NewDiscoveryClient(peerID peer.ID) (proto.DiscoveryClient, error) {
+	// Check if there is a peer connection at this point in time,
+	// as there might have been a disconnection previously
+	if !s.isConnected(peerID) {
+		return nil, errPeerDisconnected
+	}
+
 	// Check if there is an active stream connection already
 	if protoStream := s.getProtoStream(common.DiscProto, peerID); protoStream != nil {
 		return proto.NewDiscoveryClient(protoStream), nil

@@ -1176,11 +1176,7 @@ func TestResetAccounts_Promoted(t *testing.T) {
 	for _, txs := range allTxs {
 		for _, tx := range txs {
 			totalTx++
-
-			go func(tx *types.Transaction) {
-				err := pool.addTx(local, tx)
-				assert.NoError(t, err)
-			}(tx)
+			assert.NoError(t, pool.addTx(local, tx))
 		}
 	}
 
@@ -1289,10 +1285,7 @@ func TestResetAccounts_Enqueued(t *testing.T) {
 			expectedPromoted += expected.accounts[addr].promoted
 			for _, tx := range txs {
 				totalTx++
-				go func(tx *types.Transaction) {
-					err := pool.addTx(local, tx)
-					assert.NoError(t, err)
-				}(tx)
+				assert.NoError(t, pool.addTx(local, tx))
 			}
 		}
 
@@ -1377,10 +1370,7 @@ func TestResetAccounts_Enqueued(t *testing.T) {
 			expectedPromotedTx += expected.accounts[addr].promoted
 			for _, tx := range txs {
 				expectedEnqueuedTx++
-				go func(tx *types.Transaction) {
-					err := pool.addTx(local, tx)
-					assert.NoError(t, err)
-				}(tx)
+				assert.NoError(t, pool.addTx(local, tx))
 			}
 		}
 
@@ -1512,10 +1502,7 @@ func TestExecutablesOrder(t *testing.T) {
 				for _, tx := range txs {
 					expectedPromotedTx++
 					// send all txs
-					go func(tx *types.Transaction) {
-						err := pool.addTx(local, tx)
-						assert.NoError(t, err)
-					}(tx)
+					assert.NoError(t, pool.addTx(local, tx))
 				}
 			}
 
@@ -1704,10 +1691,7 @@ func TestRecovery(t *testing.T) {
 				// send txs
 				for _, sTx := range txs {
 					totalTx++
-					go func(tx *types.Transaction) {
-						err := pool.addTx(local, tx)
-						assert.NoError(t, err)
-					}(sTx.tx)
+					assert.NoError(t, pool.addTx(local, sTx.tx))
 				}
 			}
 
@@ -1899,10 +1883,7 @@ func TestGetTxs(t *testing.T) {
 						promotable++
 					}
 
-					go func(tx *types.Transaction) {
-						err := pool.addTx(local, tx)
-						assert.NoError(t, err)
-					}(tx)
+					assert.NoError(t, pool.addTx(local, tx))
 				}
 
 				expectedPromotedTx += int(promotable)

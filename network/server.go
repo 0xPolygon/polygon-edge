@@ -266,10 +266,8 @@ func (s *Server) Start() error {
 	// watch for disconnected peers
 	s.host.Network().Notify(&network.NotifyBundle{
 		DisconnectedF: func(net network.Network, conn network.Conn) {
-			go func() {
-				// Update the local connection metrics
-				s.removePeer(conn.RemotePeer())
-			}()
+			// Update the local connection metrics
+			s.removePeer(conn.RemotePeer())
 		},
 	})
 
@@ -460,32 +458,55 @@ func (s *Server) GetProtocols(peerID peer.ID) ([]string, error) {
 // removePeer removes a peer from the networking server's peer list,
 // and updates relevant counters and metrics. It is called from the
 // disconnection callback of the libp2p network bundle (when the connection is closed)
-func (s *Server) removePeer(id peer.ID) {
-	s.peersLock.Lock()
-
-	s.logger.Info("Peer disconnected", "id", id.String())
+func (s *Server) removePeer(peerID peer.ID) {
+	s.logger.Info("Peer disconnected", "id", peerID.String())
 
 	// Remove the peer from the peers map
-	if connectionInfo, ok := s.peers[id]; ok {
-		// Delete the peer from the peers map
-		delete(s.peers, id)
+	connectionInfo := s.removePeerInfo(peerID)
+	if connectionInfo == nil {
+		// The peer wasn't present in the local peers info table
+		// so no action should be taken further
+		return
+	}
 
-		// Update connection counters
-		for connDirection, active := range connectionInfo.connDirections {
-			if active {
-				s.connectionCounts.UpdateConnCountByDirection(-1, connDirection)
-				s.updateConnCountMetrics(connDirection)
-				s.updateBootnodeConnCount(id, -1)
-			}
+	// Emit the event alerting listeners
+	s.emitEvent(peerID, peerEvent.PeerDisconnected)
+}
+
+// removePeerInfo removes (pops) peer connection info from the networking
+// server's peer map. Returns nil if no peer was removed
+func (s *Server) removePeerInfo(peerID peer.ID) *PeerConnInfo {
+	s.peersLock.Lock()
+	defer s.peersLock.Unlock()
+
+	// Remove the peer from the peers map
+	connectionInfo, ok := s.peers[peerID]
+	if !ok {
+		// Peer is not present in the peers map
+		s.logger.Warn(
+			fmt.Sprintf("Attempted removing missing peer info %s", peerID),
+		)
+
+		return nil
+	}
+
+	// Delete the peer from the peers map
+	delete(s.peers, peerID)
+
+	// Update connection counters
+	for connDirection, active := range connectionInfo.connDirections {
+		if active {
+			s.connectionCounts.UpdateConnCountByDirection(-1, connDirection)
+			s.updateConnCountMetrics(connDirection)
+			s.updateBootnodeConnCount(peerID, -1)
 		}
 	}
 
-	s.metrics.TotalPeerCount.Set(float64(len(s.peers)))
+	s.metrics.TotalPeerCount.Set(
+		float64(len(s.peers)),
+	)
 
-	s.peersLock.Unlock()
-
-	// Emit the event alerting listeners
-	s.emitEvent(id, peerEvent.PeerDisconnected)
+	return connectionInfo
 }
 
 // updateBootnodeConnCount attempts to update the bootnode connection count

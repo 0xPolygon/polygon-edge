@@ -2,6 +2,7 @@ package discovery
 
 import (
 	"context"
+	"errors"
 	"github.com/0xPolygon/polygon-edge/helper/tests"
 	"github.com/0xPolygon/polygon-edge/network/common"
 	"github.com/0xPolygon/polygon-edge/network/proto"
@@ -256,4 +257,41 @@ func TestDiscoveryService_AddToTable(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestDiscoveryService_RegularPeerDiscoveryUnconnected makes sure the peers who disconnected
+// in the middle of peer discovery are not queried for their peer sets
+func TestDiscoveryService_RegularPeerDiscoveryUnconnected(t *testing.T) {
+	randomPeer := getRandomPeers(t, 1)[0]
+	peerStore := make(map[peer.ID]*peer.AddrInfo)
+
+	// Create an instance of the identity service
+	discoveryService, setupErr := newDiscoveryService(
+		// Set the relevant hook responses from the mock server
+		func(server *networkTesting.MockNetworkingServer) {
+			// Define the random peer hook
+			server.HookGetRandomPeer(func() *peer.ID {
+				return &randomPeer.ID
+			})
+
+			// Define the new discovery client creation
+			server.HookNewDiscoveryClient(func(id peer.ID) (proto.DiscoveryClient, error) {
+				return nil, errors.New("peer is not connected anymore")
+			})
+
+			// Define the peer store addition
+			server.HookAddToPeerStore(func(info *peer.AddrInfo) {
+				peerStore[info.ID] = info
+			})
+		},
+	)
+	if setupErr != nil {
+		t.Fatalf("Unable to setup the discovery service")
+	}
+
+	// Run the regular peer discovery method
+	discoveryService.regularPeerDiscovery()
+
+	// Make sure that no peers were added to the peer store
+	assert.Len(t, peerStore, 0)
 }
