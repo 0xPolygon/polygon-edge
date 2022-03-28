@@ -1048,19 +1048,19 @@ func (b *Blockchain) GetBlockByNumber(blockNumber uint64, full bool) (*types.Blo
 }
 
 // GetBlocks returns the blocks between start and end block number
-func (b *Blockchain) GetBlocks(start, end uint64, full bool) ([]*types.Block, bool) {
+func (b *Blockchain) GetBlocks(start, end uint64, full bool) ([]*types.Block, error) {
 	blocks := make([]*types.Block, 0, end-start+1)
 
 	for i := start; i <= end; i++ {
 		block, ok := b.GetBlockByNumber(i, full)
 		if !ok {
-			return nil, false
+			return nil, fmt.Errorf("failed to fetch blocks from %d to %d", start, end)
 		}
 
 		blocks = append(blocks, block)
 	}
 
-	return blocks, true
+	return blocks, nil
 }
 
 // Close closes the DB connection
