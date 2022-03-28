@@ -69,12 +69,23 @@ func (s *Server) NewDiscoveryClient(peerID peer.ID) (proto.DiscoveryClient, erro
 
 	// Discovery protocol streams should be saved,
 	// since they are referenced later on
-	s.peersLock.Lock()
-	connectionInfo := s.peers[peerID]
-	connectionInfo.addProtocolStream(common.DiscProto, protoStream)
-	s.peersLock.Unlock()
+	s.saveProtocolStream(common.DiscProto, protoStream, peerID)
 
 	return proto.NewDiscoveryClient(protoStream), nil
+}
+
+// saveProtocolStream saves the protocol stream to the peer
+// protocol stream reference [Thread safe]
+func (s *Server) saveProtocolStream(
+	protocol string,
+	stream *rawGrpc.ClientConn,
+	peerID peer.ID,
+) {
+	s.peersLock.Lock()
+	defer s.peersLock.Unlock()
+
+	connectionInfo := s.peers[peerID]
+	connectionInfo.addProtocolStream(protocol, stream)
 }
 
 // CloseProtocolStream closes a protocol stream to the specified peer
