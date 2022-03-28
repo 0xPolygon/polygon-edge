@@ -267,6 +267,7 @@ func (s *Server) Start() error {
 	s.host.Network().Notify(&network.NotifyBundle{
 		DisconnectedF: func(net network.Network, conn network.Conn) {
 			go func() {
+				// Update the local connection metrics
 				s.removePeer(conn.RemotePeer())
 			}()
 		},
@@ -457,7 +458,8 @@ func (s *Server) GetProtocols(peerID peer.ID) ([]string, error) {
 }
 
 // removePeer removes a peer from the networking server's peer list,
-// and updates relevant counters and metrics
+// and updates relevant counters and metrics. It is called from the
+// disconnection callback of the libp2p network bundle (when the connection is closed)
 func (s *Server) removePeer(id peer.ID) {
 	s.peersLock.Lock()
 
@@ -476,13 +478,6 @@ func (s *Server) removePeer(id peer.ID) {
 				s.updateBootnodeConnCount(id, -1)
 			}
 		}
-	}
-
-	// Close network connections to the peer
-	if closeErr := s.host.Network().ClosePeer(id); closeErr != nil {
-		s.logger.Error(
-			fmt.Sprintf("Unable to gracefully close connection to peer [%s], %v", id.String(), closeErr),
-		)
 	}
 
 	s.metrics.TotalPeerCount.Set(float64(len(s.peers)))
