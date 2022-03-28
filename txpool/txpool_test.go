@@ -1176,6 +1176,7 @@ func TestResetAccounts_Promoted(t *testing.T) {
 	for _, txs := range allTxs {
 		for _, tx := range txs {
 			totalTx++
+
 			assert.NoError(t, pool.addTx(local, tx))
 		}
 	}
