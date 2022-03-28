@@ -119,19 +119,11 @@ func (d *DiscoveryService) Close() {
 
 // RoutingTableSize returns the size of the routing table
 func (d *DiscoveryService) RoutingTableSize() int {
-	if d.routingTable == nil {
-		return 0
-	}
-
 	return d.routingTable.Size()
 }
 
 // RoutingTablePeers fetches the peers from the routing table
 func (d *DiscoveryService) RoutingTablePeers() []peer.ID {
-	if d.routingTable == nil {
-		return []peer.ID{}
-	}
-
 	return d.routingTable.ListPeers()
 }
 
