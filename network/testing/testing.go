@@ -32,7 +32,6 @@ type MockNetworkingServer struct {
 
 	// Discovery Hooks
 	newDiscoveryClientFn       newDiscoveryClientDelegate
-	isBootnodeFn               isBootnodeDelegate
 	getRandomBootnodeFn        getRandomBootnodeDelegate
 	getBootnodeConnCountFn     getBootnodeConnCountDelegate
 	closeProtocolStreamFn      closeProtocolStreamDelegate
@@ -75,7 +74,6 @@ type isTemporaryDialDelegate func(peer.ID) bool
 type hasFreeConnectionSlotDelegate func(network.Direction) bool
 
 // Required for Discovery
-type isBootnodeDelegate func(peerID peer.ID) bool
 type getRandomBootnodeDelegate func() *peer.AddrInfo
 type getBootnodeConnCountDelegate func() int64
 type newDiscoveryClientDelegate func(peer.ID) (proto.DiscoveryClient, error)
@@ -161,18 +159,6 @@ func (m *MockNetworkingServer) HasFreeConnectionSlot(direction network.Direction
 
 func (m *MockNetworkingServer) HookHasFreeConnectionSlot(fn hasFreeConnectionSlotDelegate) {
 	m.hasFreeConnectionSlotFn = fn
-}
-
-func (m *MockNetworkingServer) IsBootnode(peerID peer.ID) bool {
-	if m.isBootnodeFn != nil {
-		return m.isBootnodeFn(peerID)
-	}
-
-	return false
-}
-
-func (m *MockNetworkingServer) HookIsBootnode(fn isBootnodeDelegate) {
-	m.isBootnodeFn = fn
 }
 
 func (m *MockNetworkingServer) GetRandomBootnode() *peer.AddrInfo {

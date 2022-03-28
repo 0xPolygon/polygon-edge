@@ -10,11 +10,6 @@ import (
 	"math/big"
 )
 
-// IsBootnode checks if a peer is a bootnode [Thread safe]
-func (s *Server) IsBootnode(peerID peer.ID) bool {
-	return s.bootnodes.isBootnode(peerID)
-}
-
 // GetRandomBootnode fetches a random bootnode that's currently
 // NOT connected, if any
 func (s *Server) GetRandomBootnode() *peer.AddrInfo {

@@ -35,9 +35,6 @@ const (
 type networkingServer interface {
 	// BOOTNODE QUERIES //
 
-	// IsBootnode checks if the peer is a registered bootnode
-	IsBootnode(peerID peer.ID) bool
-
 	// GetRandomBootnode fetches a random bootnode, if any
 	GetRandomBootnode() *peer.AddrInfo
 
