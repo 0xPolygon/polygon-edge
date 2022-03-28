@@ -75,7 +75,6 @@ type Server struct {
 
 	dialQueue *dial.DialQueue // queue used to asynchronously connect to peers
 
-	identity  *identity.IdentityService   // service used for handshaking with peers
 	discovery *discovery.DiscoveryService // service used for discovering other peers
 
 	protocols     map[string]Protocol // supported protocols
@@ -404,9 +403,6 @@ func (s *Server) setupIdentity() error {
 
 	// Register the network notify bundle handlers
 	s.host.Network().Notify(identityService.GetNotifyBundle())
-
-	// Set the identity service
-	s.identity = identityService
 
 	return nil
 }
