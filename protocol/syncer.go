@@ -20,7 +20,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 	anypb "google.golang.org/protobuf/types/known/anypb"
-	empty "google.golang.org/protobuf/types/known/emptypb"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 const (
@@ -464,7 +464,7 @@ func (s *Syncer) AddPeer(peerID peer.ID) error {
 	// watch for changes of the other node first
 	clt := proto.NewV1Client(conn)
 
-	rawStatus, err := clt.GetCurrent(context.Background(), &empty.Empty{})
+	rawStatus, err := clt.GetCurrent(context.Background(), &emptypb.Empty{})
 	if err != nil {
 		return err
 	}
