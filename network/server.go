@@ -2,7 +2,6 @@ package network
 
 import (
 	"context"
-	"crypto/rand"
 	"errors"
 	"fmt"
 	"github.com/0xPolygon/polygon-edge/network/common"
@@ -13,11 +12,9 @@ import (
 	"github.com/0xPolygon/polygon-edge/network/identity"
 	"github.com/0xPolygon/polygon-edge/network/proto"
 	"github.com/libp2p/go-libp2p"
-	"github.com/libp2p/go-libp2p-core/peerstore"
 	kb "github.com/libp2p/go-libp2p-kbucket"
 	noise "github.com/libp2p/go-libp2p-noise"
 	rawGrpc "google.golang.org/grpc"
-	"math/big"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -177,41 +174,6 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	srv.ps = ps
 
 	return srv, nil
-}
-
-// EmitEvent emits a specified event to the networking server's event bus
-func (s *Server) EmitEvent(event *peerEvent.PeerEvent) {
-	s.emitEvent(event.PeerID, event.Type)
-}
-
-// IsTemporaryDial checks if a peer connection is temporary [Thread safe]
-func (s *Server) IsTemporaryDial(peerID peer.ID) bool {
-	_, ok := s.temporaryDials.Load(peerID)
-
-	return ok
-}
-
-// IsBootnode checks if a peer is a bootnode [Thread safe]
-func (s *Server) IsBootnode(peerID peer.ID) bool {
-	return s.bootnodes.isBootnode(peerID)
-}
-
-// GetBootnodeConnCount fetches the number of active bootnode connections [Thread safe]
-func (s *Server) GetBootnodeConnCount() int64 {
-	return s.bootnodes.getBootnodeConnCount()
-}
-
-// FetchOrSetTemporaryDial loads the temporary status of a peer connection, and
-// sets a new value [Thread safe]
-func (s *Server) FetchOrSetTemporaryDial(peerID peer.ID, newValue bool) bool {
-	_, loaded := s.temporaryDials.LoadOrStore(peerID, newValue)
-
-	return loaded
-}
-
-// RemoveTemporaryDial removes a peer connection as temporary [Thread safe]
-func (s *Server) RemoveTemporaryDial(peerID peer.ID) {
-	s.temporaryDials.Delete(peerID)
 }
 
 // HasFreeConnectionSlot checks if there are free connection slots in the specified direction [Thread safe]
@@ -458,16 +420,6 @@ func (s *Server) registerIdentityService(identityService *identity.IdentityServi
 	s.RegisterProtocol(common.IdentityProto, grpcStream)
 }
 
-// AddToPeerStore adds peer information to the node's peer store
-func (s *Server) AddToPeerStore(peerInfo *peer.AddrInfo) {
-	s.host.Peerstore().AddAddr(peerInfo.ID, peerInfo.Addrs[0], peerstore.AddressTTL)
-}
-
-// RemoveFromPeerStore removes peer information from the node's peer store
-func (s *Server) RemoveFromPeerStore(peerInfo *peer.AddrInfo) {
-	s.host.Peerstore().RemovePeer(peerInfo.ID)
-}
-
 // checkPeerCount will attempt to make new connections if the active peer count is lesser than the specified limit.
 func (s *Server) checkPeerConnections() {
 	for {
@@ -572,26 +524,6 @@ func (s *Server) numPeers() int64 {
 	return int64(len(s.peers))
 }
 
-// GetRandomBootnode fetches a random bootnode that's currently
-// NOT connected, if any
-func (s *Server) GetRandomBootnode() *peer.AddrInfo {
-	nonConnectedNodes := make([]*peer.AddrInfo, 0)
-
-	for _, v := range s.bootnodes.getBootnodes() {
-		if !s.hasPeer(v.ID) {
-			nonConnectedNodes = append(nonConnectedNodes, v)
-		}
-	}
-
-	if len(nonConnectedNodes) > 0 {
-		randNum, _ := rand.Int(rand.Reader, big.NewInt(int64(len(nonConnectedNodes))))
-
-		return nonConnectedNodes[randNum.Int64()]
-	}
-
-	return nil
-}
-
 // Peers returns a copy of the networking server's peer connection info set.
 // Only one (initial) connection (inbound OR outbound) per peer is contained [Thread safe]
 func (s *Server) Peers() []*PeerConnInfo {
@@ -624,58 +556,6 @@ func (s *Server) isConnected(peerID peer.ID) bool {
 // GetProtocols fetches the list of node-supported protocols
 func (s *Server) GetProtocols(peerID peer.ID) ([]string, error) {
 	return s.host.Peerstore().GetProtocols(peerID)
-}
-
-// GetPeerInfo fetches the information of a peer
-func (s *Server) GetPeerInfo(peerID peer.ID) *peer.AddrInfo {
-	info := s.host.Peerstore().PeerInfo(peerID)
-
-	return &info
-}
-
-// AddPeer adds a new peer to the networking server's peer list,
-// and updates relevant counters and metrics
-func (s *Server) AddPeer(id peer.ID, direction network.Direction) {
-	s.peersLock.Lock()
-
-	s.logger.Info("Peer connected", "id", id.String())
-
-	connectionInfo, exists := s.peers[id]
-	if exists {
-		// Check if this peer already has an active connection status (saved info).
-		// There is no need to do further processing
-		if connectionInfo.connDirections[direction] {
-			s.peersLock.Unlock()
-
-			return
-		}
-	} else {
-		connectionInfo = &PeerConnInfo{
-			Info:            s.host.Peerstore().PeerInfo(id),
-			connDirections:  make(map[network.Direction]bool),
-			protocolStreams: make(map[string]*rawGrpc.ClientConn),
-		}
-	}
-
-	connectionInfo.connDirections[direction] = true
-
-	s.peers[id] = connectionInfo
-
-	// Update connection counters
-	s.connectionCounts.UpdateConnCountByDirection(1, direction)
-	s.updateConnCountMetrics(direction)
-	s.updateBootnodeConnCount(id, 1)
-
-	// Update the metric stats
-	s.metrics.TotalPeerCount.Set(float64(len(s.peers)))
-
-	s.peersLock.Unlock()
-
-	// Emit the event alerting listeners
-	// WARNING: THIS CALL IS POTENTIALLY BLOCKING
-	// UNDER HEAVY LOAD. IT SHOULD BE SUBSTITUTED
-	// WITH AN EVENT SYSTEM THAT ACTUALLY WOKS
-	s.emitEvent(id, peerEvent.PeerConnected)
 }
 
 // removePeer removes a peer from the networking server's peer list,
@@ -715,34 +595,6 @@ func (s *Server) removePeer(id peer.ID) {
 	s.emitEvent(id, peerEvent.PeerDisconnected)
 }
 
-// GetRandomPeer fetches a random peer from the peers list
-func (s *Server) GetRandomPeer() *peer.ID {
-	s.peersLock.Lock()
-	defer s.peersLock.Unlock()
-
-	if len(s.peers) < 1 {
-		return nil
-	}
-
-	randNum, _ := rand.Int(
-		rand.Reader,
-		big.NewInt(int64(len(s.peers))),
-	)
-
-	randomPeerIndx := int(randNum.Int64())
-
-	counter := 0
-	for peerID := range s.peers {
-		if randomPeerIndx == counter {
-			return &peerID
-		}
-
-		counter++
-	}
-
-	return nil
-}
-
 // updateBootnodeConnCount attempts to update the bootnode connection count
 // by delta if the action is valid [Thread safe]
 func (s *Server) updateBootnodeConnCount(peerID peer.ID, delta int64) {
@@ -754,13 +606,6 @@ func (s *Server) updateBootnodeConnCount(peerID peer.ID, delta int64) {
 	}
 
 	s.bootnodes.increaseBootnodeConnCount(delta)
-}
-
-// UpdatePendingConnCount updates the pending connection count in the specified direction [Thread safe]
-func (s *Server) UpdatePendingConnCount(delta int64, direction network.Direction) {
-	s.connectionCounts.UpdatePendingConnCountByDirection(delta, direction)
-
-	s.updatePendingConnCountMetrics(direction)
 }
 
 // DisconnectFromPeer disconnects the networking server from the specified peer
@@ -841,68 +686,6 @@ func (s *Server) newProtoConnection(protocol string, peerID peer.ID) (*rawGrpc.C
 	}
 
 	return p.Client(stream), nil
-}
-
-// getProtoStream returns an active protocol stream if present, otherwise
-// it returns nil
-func (s *Server) getProtoStream(protocol string, peerID peer.ID) *rawGrpc.ClientConn {
-	s.peersLock.Lock()
-	defer s.peersLock.Unlock()
-
-	connectionInfo, ok := s.peers[peerID]
-	if !ok {
-		return nil
-	}
-
-	return connectionInfo.getProtocolStream(protocol)
-}
-
-// NewDiscoveryClient returns a new or existing discovery service client connection
-func (s *Server) NewDiscoveryClient(peerID peer.ID) (proto.DiscoveryClient, error) {
-	// Check if there is an active stream connection already
-	if protoStream := s.getProtoStream(common.DiscProto, peerID); protoStream != nil {
-		return proto.NewDiscoveryClient(protoStream), nil
-	}
-
-	// Create a new stream connection and return it
-	protoStream, err := s.newProtoConnection(common.DiscProto, peerID)
-	if err != nil {
-		return nil, err
-	}
-
-	// Discovery protocol streams should be saved,
-	// since they are referenced later on
-	s.peersLock.Lock()
-	connectionInfo := s.peers[peerID]
-	connectionInfo.addProtocolStream(common.DiscProto, protoStream)
-	s.peersLock.Unlock()
-
-	return proto.NewDiscoveryClient(protoStream), nil
-}
-
-// NewIdentityClient returns a new identity service client connection
-func (s *Server) NewIdentityClient(peerID peer.ID) (proto.IdentityClient, error) {
-	// Create a new stream connection and return it
-	protoStream, err := s.newProtoConnection(common.IdentityProto, peerID)
-	if err != nil {
-		return nil, err
-	}
-
-	// Identity protocol connections are temporary and not saved anywhere
-	return proto.NewIdentityClient(protoStream), nil
-}
-
-// CloseProtocolStream closes a protocol stream to the specified peer
-func (s *Server) CloseProtocolStream(protocol string, peerID peer.ID) error {
-	s.peersLock.Lock()
-	defer s.peersLock.Unlock()
-
-	connectionInfo, ok := s.peers[peerID]
-	if !ok {
-		return nil
-	}
-
-	return connectionInfo.removeProtocolStream(protocol)
 }
 
 func (s *Server) NewStream(proto string, id peer.ID) (network.Stream, error) {

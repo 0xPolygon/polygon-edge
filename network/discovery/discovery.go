@@ -71,7 +71,7 @@ type networkingServer interface {
 
 	// TEMPORARY DIALING //
 
-	// FetchAndSetTemporaryDial checks if the peer connection is a temporary dial,
+	// FetchOrSetTemporaryDial checks if the peer connection is a temporary dial,
 	// and sets a new value accordingly
 	FetchOrSetTemporaryDial(peerID peer.ID, newValue bool) bool
 
