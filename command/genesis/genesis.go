@@ -130,15 +130,15 @@ func setFlags(cmd *cobra.Command) {
 	)
 	cmd.Flags().Uint32Var(
 		&params.minNumValidators,
-		minNumValidators,
+		minValidatorCount,
 		1,
-		"the minimum number of validators in the validator set for PoS.",
+		"the minimum number of validators in the validator set for PoS",
 	)
 	cmd.Flags().Uint32Var(
 		&params.maxNumValidators,
-		maxNumValidators,
+		maxValidatorCount,
 		math.MaxUint32,
-		"the maximum number of validators in the validator set for PoS.",
+		"the maximum number of validators in the validator set for PoS",
 	)
 }
 

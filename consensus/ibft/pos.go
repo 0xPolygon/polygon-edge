@@ -14,6 +14,8 @@ type PoSMechanism struct {
 	BaseConsensusMechanism
 	// Params
 	ContractDeployment uint64 // The height when deploying staking contract
+	MaxNumValidators   uint64
+	MinNumValidators   uint64
 }
 
 // PoSFactory initializes the required data
@@ -71,6 +73,8 @@ func (pos *PoSMechanism) initializeParams(params *IBFTFork) error {
 		}
 
 		pos.ContractDeployment = params.Deployment.Value
+		pos.MaxNumValidators = params.MaxValidatorCount.Value
+		pos.MinNumValidators = params.MinValidatorCount.Value
 	}
 
 	return nil
@@ -146,8 +150,8 @@ func (pos *PoSMechanism) preStateCommitHook(rawParams interface{}) error {
 
 	// Deploy Staking contract
 	contractState, err := stakingHelper.PredeployStakingSC(nil, stakingHelper.PredeployParams{
-		MinValidatorCount: stakingHelper.MinValidatorCount,
-		MaxValidatorCount: stakingHelper.MaxValidatorCount,
+		MinValidatorCount: uint32(pos.MinNumValidators),
+		MaxValidatorCount: uint32(pos.MaxNumValidators),
 	})
 	if err != nil {
 		return err

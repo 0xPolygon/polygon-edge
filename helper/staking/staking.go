@@ -1,7 +1,6 @@
 package staking
 
 import (
-	"errors"
 	"fmt"
 	"math"
 	"math/big"
@@ -15,12 +14,6 @@ import (
 var (
 	MinValidatorCount = uint32(1)
 	MaxValidatorCount = uint32(math.MaxUint32)
-)
-
-var (
-	errInvalidValidatorNumber = errors.New("minimum number of validators can not be greater than" +
-		"maximum number of validators")
-	errInvalidMinNumValidators = errors.New("minimum number of validators must be greater than 0")
 )
 
 // PadLeftOrTrim left-pads the passed in byte array to the specified size,
@@ -156,22 +149,14 @@ func PredeployStakingSC(
 		return nil, fmt.Errorf("unable to generate DefaultStatkedBalance, %w", err)
 	}
 
-	//Validate min and max validators number
-	if err = validateMinMaxValidatorsNumber(params.MinValidatorCount, params.MaxValidatorCount); err != nil {
-		return nil, err
-	}
-
 	// Generate the empty account storage map
 	storageMap := make(map[types.Hash]types.Hash)
 	bigTrueValue := big.NewInt(1)
 	stakedAmount := big.NewInt(0)
-	minNumValidators := big.NewInt(int64(params.MinValidatorCount))
-	maxNumValidators := big.NewInt(int64(params.MaxValidatorCount))
+	bigMinNumValidators := big.NewInt(int64(params.MinValidatorCount))
+	bigMaxNumValidators := big.NewInt(int64(params.MaxValidatorCount))
 
 	for indx, validator := range validators {
-		if int64(indx) == maxNumValidators.Int64() {
-			break
-		}
 		// Update the total staked amount
 		stakedAmount.Add(stakedAmount, bigDefaultStakedBalance)
 
@@ -206,8 +191,8 @@ func PredeployStakingSC(
 	}
 
 	// Set the value for the minimum and maximum number of validators
-	min := PadLeftOrTrim(minNumValidators.Bytes(), 4)
-	max := PadLeftOrTrim(maxNumValidators.Bytes(), 4)
+	min := PadLeftOrTrim(bigMinNumValidators.Bytes(), 4)
+	max := PadLeftOrTrim(bigMaxNumValidators.Bytes(), 4)
 	storageMap[types.BytesToHash(big.NewInt(minAndMaxNumValidator).Bytes())] = types.BytesToHash(
 		append(
 			max,
@@ -222,16 +207,4 @@ func PredeployStakingSC(
 	stakingAccount.Balance = stakedAmount
 
 	return stakingAccount, nil
-}
-
-func validateMinMaxValidatorsNumber(minValidatorCount uint32, maxValidatorCount uint32) error {
-	if minValidatorCount < 1 {
-		return errInvalidMinNumValidators
-	}
-
-	if minValidatorCount > maxValidatorCount {
-		return errInvalidValidatorNumber
-	}
-
-	return nil
 }

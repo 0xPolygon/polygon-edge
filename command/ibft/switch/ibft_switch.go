@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/spf13/cobra"
+	"math"
 )
 
 func GetCommand() *cobra.Command {
@@ -51,6 +52,18 @@ func setFlags(cmd *cobra.Command) {
 		"",
 		"the height to switch the new type",
 	)
+	cmd.Flags().Uint32Var(
+		&params.minValidatorCount,
+		minValidatorCount,
+		1,
+		"the minimum number of validators in the validator set for PoS",
+	)
+	cmd.Flags().Uint32Var(
+		&params.maxValidatorCount,
+		maxValidatorCount,
+		math.MaxUint32,
+		"the maximum number of validators in the validator set for PoS",
+	)
 }
 
 func setRequiredFlags(cmd *cobra.Command) {
@@ -60,6 +73,10 @@ func setRequiredFlags(cmd *cobra.Command) {
 }
 
 func runPreRun(_ *cobra.Command, _ []string) error {
+	if err := params.validateFlags(); err != nil {
+		return err
+	}
+
 	return params.initRawParams()
 }
 

@@ -163,39 +163,6 @@ func TestPoS_ValidatorBoundaries(t *testing.T) {
 	}
 }
 
-func TestPoS_DefaultValidatorBoundaries(t *testing.T) {
-	// Test scenario -> There are 4 validators, and the validator limit is default (1, maxUint32)
-	// When trying to add a new validator, it should be added.
-	stakerKey, stakerAddr := tests.GenerateKeyAndAddr(t)
-	stakeAmount := framework.EthToWei(1)
-	numGenesisValidators := IBFTMinNodes
-
-	defaultBalance := framework.EthToWei(100)
-	ibftManager := framework.NewIBFTServersManager(
-		t,
-		numGenesisValidators,
-		IBFTDirPrefix,
-		func(i int, config *framework.TestServerConfig) {
-			config.SetSeal(true)
-			config.SetEpochSize(2)
-			config.PremineValidatorBalance(defaultBalance)
-			config.Premine(stakerAddr, defaultBalance)
-			config.SetIBFTPoS(true)
-		})
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel()
-	ibftManager.StartServers(ctx)
-
-	srv := ibftManager.GetServer(0)
-
-	client := srv.JSONRPC()
-
-	err := framework.StakeAmount(stakerAddr, stakerKey, stakeAmount, srv)
-	assert.NoError(t, err)
-	validateValidatorSet(t, stakerAddr, client, true, numGenesisValidators+1)
-}
-
 func TestPoS_Stake(t *testing.T) {
 	stakerKey, stakerAddr := tests.GenerateKeyAndAddr(t)
 	defaultBalance := framework.EthToWei(100)

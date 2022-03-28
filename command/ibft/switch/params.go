@@ -13,10 +13,12 @@ import (
 )
 
 const (
-	chainFlag      = "chain"
-	typeFlag       = "type"
-	deploymentFlag = "deployment"
-	fromFlag       = "from"
+	chainFlag         = "chain"
+	typeFlag          = "type"
+	deploymentFlag    = "deployment"
+	fromFlag          = "from"
+	minValidatorCount = "min-validator-count"
+	maxValidatorCount = "max-validator-count"
 )
 
 var (
@@ -37,6 +39,18 @@ type switchParams struct {
 	deployment    *uint64
 	from          uint64
 	genesisConfig *chain.Chain
+
+	maxValidatorCount uint32
+	minValidatorCount uint32
+}
+
+func (p *switchParams) validateFlags() error {
+	//Validate min and max validators number
+	if err := command.ValidateMinMaxValidatorsNumber(p.minValidatorCount, p.maxValidatorCount); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (p *switchParams) getRequiredFlags() []string {
@@ -136,6 +150,8 @@ func (p *switchParams) updateGenesisConfig() error {
 		p.mechanismType,
 		p.from,
 		p.deployment,
+		p.maxValidatorCount,
+		p.minValidatorCount,
 	)
 }
 
@@ -158,9 +174,11 @@ func (p *switchParams) overrideGenesisConfig() error {
 
 func (p *switchParams) getResult() command.CommandResult {
 	result := &IBFTSwitchResult{
-		Chain: p.genesisPath,
-		Type:  p.mechanismType,
-		From:  common.JSONNumber{Value: p.from},
+		Chain:             p.genesisPath,
+		Type:              p.mechanismType,
+		From:              common.JSONNumber{Value: p.from},
+		MaxValidatorCount: common.JSONNumber{Value: uint64(p.maxValidatorCount)},
+		MinValidatorCount: common.JSONNumber{Value: uint64(p.minValidatorCount)},
 	}
 
 	if p.deployment != nil {
@@ -175,6 +193,8 @@ func appendIBFTForks(
 	mechanismType ibft.MechanismType,
 	from uint64,
 	deployment *uint64,
+	maxValidatorCount uint32,
+	minValidatorCount uint32,
 ) error {
 	ibftConfig, ok := cc.Params.Engine["ibft"].(map[string]interface{})
 	if !ok {
@@ -203,6 +223,8 @@ func appendIBFTForks(
 	}
 	if mechanismType == ibft.PoS {
 		newFork.Deployment = &common.JSONNumber{Value: *deployment}
+		newFork.MaxValidatorCount = common.JSONNumber{Value: uint64(maxValidatorCount)}
+		newFork.MinValidatorCount = common.JSONNumber{Value: uint64(minValidatorCount)}
 	}
 
 	ibftForks = append(ibftForks, newFork)

@@ -24,8 +24,8 @@ const (
 	epochSizeFlag           = "epoch-size"
 	blockGasLimitFlag       = "block-gas-limit"
 	posFlag                 = "pos"
-	minNumValidators        = "min-validator-count"
-	maxNumValidators        = "max-validator-count"
+	minValidatorCount       = "min-validator-count"
+	maxValidatorCount       = "max-validator-count"
 )
 
 // Legacy flags that need to be preserved for running clients
@@ -40,8 +40,9 @@ var (
 var (
 	errValidatorsNotSpecified         = errors.New("validator information not specified")
 	errValidatorsSpecifiedIncorrectly = errors.New("validator information specified through mutually exclusive flags")
+	errValidatorNumberExceedsMax      = errors.New("validator number exceeds max validator number")
 	errUnsupportedConsensus           = errors.New("specified consensusRaw not supported")
-	errMissingBootnode                = errors.New("at least 1 BootNode is required")
+	errMissingBootnode                = errors.New("at least 1 bootnode is required")
 	errInvalidEpochSize               = errors.New("epoch size must be greater than 1")
 )
 
@@ -110,6 +111,11 @@ func (p *genesisParams) validateFlags() error {
 		return errInvalidEpochSize
 	}
 
+	//Validate min and max validators number
+	if err := command.ValidateMinMaxValidatorsNumber(p.minNumValidators, p.maxNumValidators); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -153,6 +159,11 @@ func (p *genesisParams) initValidatorSet() error {
 			)
 		}
 
+		//Validate if validator number exceeds max number
+		if ok := p.isValidatorNumberValid(); !ok {
+			return errValidatorNumberExceedsMax
+		}
+
 		return nil
 	}
 
@@ -163,7 +174,16 @@ func (p *genesisParams) initValidatorSet() error {
 		return fmt.Errorf("failed to read from prefix: %w", readErr)
 	}
 
+	//Validate if validator number exceeds max number
+	if ok := p.isValidatorNumberValid(); !ok {
+		return errValidatorNumberExceedsMax
+	}
+
 	return nil
+}
+
+func (p *genesisParams) isValidatorNumberValid() bool {
+	return len(p.ibftValidators) <= int(p.maxNumValidators)
 }
 
 func (p *genesisParams) initIBFTExtraData() {
