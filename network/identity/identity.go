@@ -171,8 +171,8 @@ func (i *IdentityService) handleConnected(peerID peer.ID, direction network.Dire
 		)
 	}
 
+	// Construct the response status
 	status := i.constructStatus(peerID)
-	status.Metadata[PeerID] = i.hostID.Pretty()
 
 	// Initiate the handshake
 	resp, err := clt.Hello(context.Background(), status)
@@ -209,7 +209,9 @@ func (i *IdentityService) Hello(_ context.Context, req *proto.Status) (*proto.St
 // constructStatus constructs a status response of the current node
 func (i *IdentityService) constructStatus(peerID peer.ID) *proto.Status {
 	return &proto.Status{
-		Metadata:      make(map[string]string, 1),
+		Metadata: map[string]string{
+			PeerID: i.hostID.Pretty(),
+		},
 		Chain:         i.chainID,
 		TemporaryDial: i.baseServer.IsTemporaryDial(peerID),
 	}
