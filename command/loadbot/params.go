@@ -22,7 +22,10 @@ var (
 )
 
 const (
-	erc20TokenSupply = "4314500000"
+	// arbitrary value for total token supply
+	// token has 5 decimals
+	// transfers are done with 0.001 amount
+	erc20TokenSupply = "5000000000"
 	erc20TokenName   = "ZexCoin"
 	erc20TokenSymbol = "ZEX"
 
