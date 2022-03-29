@@ -2,11 +2,10 @@ package genesis
 
 import (
 	"fmt"
-	"math"
-
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/spf13/cobra"
 )
 
@@ -128,16 +127,16 @@ func setFlags(cmd *cobra.Command) {
 			command.DefaultGenesisGasLimit,
 		),
 	)
-	cmd.Flags().Uint32Var(
+	cmd.Flags().Uint64Var(
 		&params.minNumValidators,
 		minValidatorCount,
 		1,
 		"the minimum number of validators in the validator set for PoS",
 	)
-	cmd.Flags().Uint32Var(
+	cmd.Flags().Uint64Var(
 		&params.maxNumValidators,
 		maxValidatorCount,
-		math.MaxUint32,
+		common.MaxSafeJSInt,
 		"the maximum number of validators in the validator set for PoS",
 	)
 }

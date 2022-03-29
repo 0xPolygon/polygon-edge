@@ -62,8 +62,8 @@ type genesisParams struct {
 	blockGasLimit uint64
 	isPos         bool
 
-	minNumValidators uint32
-	maxNumValidators uint32
+	minNumValidators uint64
+	maxNumValidators uint64
 
 	extraData []byte
 	consensus server.ConsensusType
@@ -193,7 +193,7 @@ func (p *genesisParams) initValidatorSet() error {
 }
 
 func (p *genesisParams) isValidatorNumberValid() bool {
-	return len(p.ibftValidators) <= int(p.maxNumValidators)
+	return uint64(len(p.ibftValidators)) <= p.maxNumValidators
 }
 
 func (p *genesisParams) initIBFTExtraData() {

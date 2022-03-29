@@ -40,8 +40,8 @@ type switchParams struct {
 	from          uint64
 	genesisConfig *chain.Chain
 
-	maxValidatorCount uint32
-	minValidatorCount uint32
+	maxValidatorCount uint64
+	minValidatorCount uint64
 }
 
 func (p *switchParams) validateFlags() error {
@@ -193,8 +193,8 @@ func appendIBFTForks(
 	mechanismType ibft.MechanismType,
 	from uint64,
 	deployment *uint64,
-	maxValidatorCount uint32,
-	minValidatorCount uint32,
+	maxValidatorCount uint64,
+	minValidatorCount uint64,
 ) error {
 	ibftConfig, ok := cc.Params.Engine["ibft"].(map[string]interface{})
 	if !ok {
@@ -223,8 +223,8 @@ func appendIBFTForks(
 	}
 	if mechanismType == ibft.PoS {
 		newFork.Deployment = &common.JSONNumber{Value: *deployment}
-		newFork.MaxValidatorCount = common.JSONNumber{Value: uint64(maxValidatorCount)}
-		newFork.MinValidatorCount = common.JSONNumber{Value: uint64(minValidatorCount)}
+		newFork.MaxValidatorCount = common.JSONNumber{Value: maxValidatorCount}
+		newFork.MinValidatorCount = common.JSONNumber{Value: minValidatorCount}
 	}
 
 	ibftForks = append(ibftForks, newFork)

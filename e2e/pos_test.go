@@ -90,8 +90,8 @@ func TestPoS_ValidatorBoundaries(t *testing.T) {
 	}{}
 	stakeAmount := framework.EthToWei(1)
 	numGenesisValidators := IBFTMinNodes
-	minValidatorCount := uint32(1)
-	maxValidatorCount := uint32(numGenesisValidators + 1)
+	minValidatorCount := uint64(1)
+	maxValidatorCount := uint64(numGenesisValidators + 1)
 	numNewStakers := 2
 
 	for i := 0; i < numNewStakers; i++ {
