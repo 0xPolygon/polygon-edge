@@ -45,7 +45,7 @@ type switchParams struct {
 }
 
 func (p *switchParams) validateFlags() error {
-	//Validate min and max validators number
+	// Validate min and max validators number
 	if err := command.ValidateMinMaxValidatorsNumber(p.minValidatorCount, p.maxValidatorCount); err != nil {
 		return err
 	}

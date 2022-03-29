@@ -111,7 +111,7 @@ func (p *genesisParams) validateFlags() error {
 		return errInvalidEpochSize
 	}
 
-	//Validate min and max validators number
+	// Validate min and max validators number
 	if err := command.ValidateMinMaxValidatorsNumber(p.minNumValidators, p.maxNumValidators); err != nil {
 		return err
 	}
@@ -150,7 +150,8 @@ func (p *genesisParams) initRawParams() error {
 	return nil
 }
 
-func (p *genesisParams) initValidatorSet() error {
+// setValidatorSetFromCli sets validator set from cli command
+func (p *genesisParams) setValidatorSetFromCli() {
 	if len(p.ibftValidatorsRaw) != 0 {
 		for _, val := range p.ibftValidatorsRaw {
 			p.ibftValidators = append(
@@ -158,15 +159,11 @@ func (p *genesisParams) initValidatorSet() error {
 				types.StringToAddress(val),
 			)
 		}
-
-		//Validate if validator number exceeds max number
-		if ok := p.isValidatorNumberValid(); !ok {
-			return errValidatorNumberExceedsMax
-		}
-
-		return nil
 	}
+}
 
+// setValidatorSetFromPrefixPath sets validator set from prefix path
+func (p *genesisParams) setValidatorSetFromPrefixPath() error {
 	var readErr error
 	if p.ibftValidators, readErr = getValidatorsFromPrefixPath(
 		p.validatorPrefixPath,
@@ -174,7 +171,20 @@ func (p *genesisParams) initValidatorSet() error {
 		return fmt.Errorf("failed to read from prefix: %w", readErr)
 	}
 
-	//Validate if validator number exceeds max number
+	return nil
+}
+
+func (p *genesisParams) initValidatorSet() error {
+
+	// Set validator set
+	// Priority goes to cli command over prefix path
+	if err := p.setValidatorSetFromPrefixPath(); err != nil {
+		return err
+	}
+
+	p.setValidatorSetFromCli()
+
+	// Validate if validator number exceeds max number
 	if ok := p.isValidatorNumberValid(); !ok {
 		return errValidatorNumberExceedsMax
 	}
