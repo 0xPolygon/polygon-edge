@@ -3,7 +3,6 @@ package ibftswitch
 import (
 	"fmt"
 	"github.com/0xPolygon/polygon-edge/command"
-	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/spf13/cobra"
 )
 
@@ -52,16 +51,16 @@ func setFlags(cmd *cobra.Command) {
 		"",
 		"the height to switch the new type",
 	)
-	cmd.Flags().Uint64Var(
-		&params.minValidatorCount,
+	cmd.Flags().StringVar(
+		&params.minValidatorCountRaw,
 		minValidatorCount,
-		1,
+		"",
 		"the minimum number of validators in the validator set for PoS",
 	)
-	cmd.Flags().Uint64Var(
-		&params.maxValidatorCount,
+	cmd.Flags().StringVar(
+		&params.maxValidatorCountRaw,
 		maxValidatorCount,
-		common.MaxSafeJSInt,
+		"",
 		"the maximum number of validators in the validator set for PoS",
 	)
 }
@@ -73,10 +72,6 @@ func setRequiredFlags(cmd *cobra.Command) {
 }
 
 func runPreRun(_ *cobra.Command, _ []string) error {
-	if err := params.validateFlags(); err != nil {
-		return err
-	}
-
 	return params.initRawParams()
 }
 

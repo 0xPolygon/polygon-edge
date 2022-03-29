@@ -171,8 +171,8 @@ type IBFTFork struct {
 	Deployment        *common.JSONNumber `json:"deployment,omitempty"`
 	From              common.JSONNumber  `json:"from"`
 	To                *common.JSONNumber `json:"to,omitempty"`
-	MaxValidatorCount common.JSONNumber  `json:"maxValidatorCount"`
-	MinValidatorCount common.JSONNumber  `json:"minValidatorCount"`
+	MaxValidatorCount *common.JSONNumber `json:"maxValidatorCount,omitempty"`
+	MinValidatorCount *common.JSONNumber `json:"minValidatorCount,omitempty"`
 }
 
 // ConsensusMechanismFactory is the factory function to create a consensus mechanism

@@ -30,27 +30,20 @@ var (
 )
 
 type switchParams struct {
-	typeRaw       string
-	fromRaw       string
-	deploymentRaw string
-	genesisPath   string
+	typeRaw              string
+	fromRaw              string
+	deploymentRaw        string
+	maxValidatorCountRaw string
+	minValidatorCountRaw string
+	genesisPath          string
 
 	mechanismType ibft.MechanismType
 	deployment    *uint64
 	from          uint64
 	genesisConfig *chain.Chain
 
-	maxValidatorCount uint64
-	minValidatorCount uint64
-}
-
-func (p *switchParams) validateFlags() error {
-	// Validate min and max validators number
-	if err := command.ValidateMinMaxValidatorsNumber(p.minValidatorCount, p.maxValidatorCount); err != nil {
-		return err
-	}
-
-	return nil
+	maxValidatorCount *uint64
+	minValidatorCount *uint64
 }
 
 func (p *switchParams) getRequiredFlags() []string {
@@ -93,21 +86,68 @@ func (p *switchParams) initMechanismType() error {
 
 func (p *switchParams) initDeployment() error {
 	if p.deploymentRaw != "" {
-		if p.mechanismType == ibft.PoS {
-			d, err := types.ParseUint64orHex(&p.deploymentRaw)
-			if err != nil {
-				return fmt.Errorf(
-					"unable to parse deployment value, %w",
-					err,
-				)
-			}
-
-			p.deployment = &d
-		} else {
+		if p.mechanismType != ibft.PoS {
 			return fmt.Errorf(
 				"doesn't support contract deployment in %s",
 				string(p.mechanismType),
 			)
+		}
+		d, err := types.ParseUint64orHex(&p.deploymentRaw)
+		if err != nil {
+			return fmt.Errorf(
+				"unable to parse deployment value, %w",
+				err,
+			)
+		}
+
+		p.deployment = &d
+
+	}
+
+	if p.minValidatorCountRaw != "" {
+		if p.mechanismType != ibft.PoS {
+			return fmt.Errorf(
+				"doesn't support min validator count in %s",
+				string(p.mechanismType),
+			)
+		}
+		value, err := types.ParseUint64orHex(&p.minValidatorCountRaw)
+		if err != nil {
+			return fmt.Errorf(
+				"unable to parse min validator count value, %w",
+				err,
+			)
+		}
+
+		p.minValidatorCount = &value
+
+	}
+
+	if p.maxValidatorCountRaw != "" {
+		if p.mechanismType != ibft.PoS {
+			return fmt.Errorf(
+				"doesn't support max validator count in %s",
+				string(p.mechanismType),
+			)
+		}
+		value, err := types.ParseUint64orHex(&p.maxValidatorCountRaw)
+		if err != nil {
+			return fmt.Errorf(
+				"unable to parse min validator count value, %w",
+				err,
+			)
+		}
+
+		p.maxValidatorCount = &value
+
+	}
+
+	// Validate min and max validators number if not nil
+	// If they are not defined they will get default values
+	// in PoSMechanism
+	if p.minValidatorCount != nil && p.maxValidatorCount != nil {
+		if err := command.ValidateMinMaxValidatorsNumber(*p.minValidatorCount, *p.maxValidatorCount); err != nil {
+			return err
 		}
 	}
 
@@ -174,15 +214,25 @@ func (p *switchParams) overrideGenesisConfig() error {
 
 func (p *switchParams) getResult() command.CommandResult {
 	result := &IBFTSwitchResult{
-		Chain:             p.genesisPath,
-		Type:              p.mechanismType,
-		From:              common.JSONNumber{Value: p.from},
-		MaxValidatorCount: common.JSONNumber{Value: uint64(p.maxValidatorCount)},
-		MinValidatorCount: common.JSONNumber{Value: uint64(p.minValidatorCount)},
+		Chain: p.genesisPath,
+		Type:  p.mechanismType,
+		From:  common.JSONNumber{Value: p.from},
 	}
 
 	if p.deployment != nil {
 		result.Deployment = &common.JSONNumber{Value: *p.deployment}
+	}
+
+	if p.minValidatorCount != nil {
+		result.MinValidatorCount = common.JSONNumber{Value: *p.minValidatorCount}
+	} else {
+		result.MinValidatorCount = common.JSONNumber{Value: 1}
+	}
+
+	if p.maxValidatorCount != nil {
+		result.MaxValidatorCount = common.JSONNumber{Value: *p.maxValidatorCount}
+	} else {
+		result.MaxValidatorCount = common.JSONNumber{Value: common.MaxSafeJSInt}
 	}
 
 	return result
@@ -193,8 +243,8 @@ func appendIBFTForks(
 	mechanismType ibft.MechanismType,
 	from uint64,
 	deployment *uint64,
-	maxValidatorCount uint64,
-	minValidatorCount uint64,
+	maxValidatorCount *uint64,
+	minValidatorCount *uint64,
 ) error {
 	ibftConfig, ok := cc.Params.Engine["ibft"].(map[string]interface{})
 	if !ok {
@@ -222,9 +272,17 @@ func appendIBFTForks(
 		From: common.JSONNumber{Value: from},
 	}
 	if mechanismType == ibft.PoS {
-		newFork.Deployment = &common.JSONNumber{Value: *deployment}
-		newFork.MaxValidatorCount = common.JSONNumber{Value: maxValidatorCount}
-		newFork.MinValidatorCount = common.JSONNumber{Value: minValidatorCount}
+		if deployment != nil {
+			newFork.Deployment = &common.JSONNumber{Value: *deployment}
+		}
+
+		if maxValidatorCount != nil {
+			newFork.MaxValidatorCount = &common.JSONNumber{Value: *maxValidatorCount}
+		}
+
+		if minValidatorCount != nil {
+			newFork.MinValidatorCount = &common.JSONNumber{Value: *minValidatorCount}
+		}
 	}
 
 	ibftForks = append(ibftForks, newFork)
