@@ -46,8 +46,8 @@ type TestServerConfig struct {
 	ShowsLog                bool                 // Flag specifying if logs are shown
 	IsPos                   bool                 // Specifies the mechanism used for IBFT (PoA / PoS)
 	Signer                  *crypto.EIP155Signer // Signer used for transactions
-	MinValidatorCount       uint32               //Min validator count
-	MaxValidatorCount       uint32               //Max validator count
+	MinValidatorCount       uint32               // Min validator count
+	MaxValidatorCount       uint32               // Max validator count
 }
 
 // DataDir returns path of data directory server uses
