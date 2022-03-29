@@ -132,13 +132,11 @@ func (b *BridgeMechanism) insertBlockHook(numberParam interface{}) error {
 		return ErrInvalidHookParam
 	}
 
-	err := b.consumeStateTransactions(block)
-	if err != nil {
+	if err := b.consumeStateTransactions(block); err != nil {
 		return err
 	}
 
-	err = b.startCheckpointProcess(block)
-	if err != nil {
+	if err := b.startCheckpointProcess(block); err != nil {
 		return err
 	}
 
