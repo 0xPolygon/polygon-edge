@@ -101,6 +101,13 @@ func (p *pool) IsMessageKnown(hash types.Hash) bool {
 	return ok
 }
 
+// IsMessageKnown returns the flag indicating the message is known
+func (p *pool) IsMessageConsumed(hash types.Hash) bool {
+	raw, ok := p.consumedMap.Load(hash)
+
+	return ok && raw.(bool)
+}
+
 func (p *pool) GetSignatureCount(hash types.Hash) uint64 {
 	return p.messageSignatures.GetSignatureCount(hash)
 }
