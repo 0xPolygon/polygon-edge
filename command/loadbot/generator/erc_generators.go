@@ -27,7 +27,7 @@ func NewERC20Generator(params *GeneratorParams) (*ContractTxnsGenerator, error) 
 
 	if gen.encodedParams, err = params.ContractArtifact.ABI.Methods["transfer"].Encode(
 		[]string{params.RecieverAddress.String(),
-			"0.001", // token has 5 decimals 
+			"0.001", // token has 5 decimals
 		}); err != nil {
 		return nil, fmt.Errorf("cannot encode ERC20 transfer method params: %w", err)
 	}
