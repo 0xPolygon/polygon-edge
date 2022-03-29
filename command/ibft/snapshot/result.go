@@ -46,14 +46,14 @@ func (r *IBFTSnapshotResult) GetOutput() string {
 	var buffer bytes.Buffer
 
 	buffer.WriteString("\n[IBFT SNAPSHOT]\n")
-	r.writeBlockData(buffer)
-	r.writeVoteData(buffer)
-	r.writeValidatorData(buffer)
+	r.writeBlockData(&buffer)
+	r.writeVoteData(&buffer)
+	r.writeValidatorData(&buffer)
 
 	return buffer.String()
 }
 
-func (r *IBFTSnapshotResult) writeBlockData(buffer bytes.Buffer) {
+func (r *IBFTSnapshotResult) writeBlockData(buffer *bytes.Buffer) {
 	buffer.WriteString(helper.FormatKV([]string{
 		fmt.Sprintf("Block|%d", r.Number),
 		fmt.Sprintf("Hash|%s", r.Hash),
@@ -61,7 +61,7 @@ func (r *IBFTSnapshotResult) writeBlockData(buffer bytes.Buffer) {
 	buffer.WriteString("\n")
 }
 
-func (r *IBFTSnapshotResult) writeVoteData(buffer bytes.Buffer) {
+func (r *IBFTSnapshotResult) writeVoteData(buffer *bytes.Buffer) {
 	numVotes := len(r.Votes)
 	votes := make([]string, numVotes+1)
 
@@ -85,7 +85,7 @@ func (r *IBFTSnapshotResult) writeVoteData(buffer bytes.Buffer) {
 	buffer.WriteString("\n")
 }
 
-func (r *IBFTSnapshotResult) writeValidatorData(buffer bytes.Buffer) {
+func (r *IBFTSnapshotResult) writeValidatorData(buffer *bytes.Buffer) {
 	numValidators := len(r.Validators)
 	validators := make([]string, numValidators+1)
 	validators[0] = "No validators found"
