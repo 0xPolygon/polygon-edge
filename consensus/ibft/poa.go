@@ -109,8 +109,7 @@ func (poa *PoAMechanism) processHeadersHook(hookParam interface{}) error {
 		return ErrInvalidHookParam
 	}
 
-	number := params.header.Number
-	if number%poa.ibft.epochSize == 0 {
+	if number := params.header.Number; poa.ibft.IsLastOfEpoch(number) {
 		// during a checkpoint block, we reset the votes
 		// and there cannot be any proposals
 		params.snap.Votes = nil

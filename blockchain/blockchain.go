@@ -1047,17 +1047,20 @@ func (b *Blockchain) GetBlockByNumber(blockNumber uint64, full bool) (*types.Blo
 	return b.GetBlockByHash(blockHash, full)
 }
 
-// GetBlocks returns the bunch of block
-func (b *Blockchain) GetBlocks(start, end uint64, full bool) []*types.Block {
+// GetBlocks returns the blocks between start and end block number
+func (b *Blockchain) GetBlocks(start, end uint64, full bool) ([]*types.Block, error) {
 	blocks := make([]*types.Block, 0, end-start+1)
 
 	for i := start; i <= end; i++ {
-		block, _ := b.GetBlockByNumber(i, full)
+		block, ok := b.GetBlockByNumber(i, full)
+		if !ok {
+			return nil, fmt.Errorf("failed to fetch blocks from %d to %d", start, end)
+		}
 
 		blocks = append(blocks, block)
 	}
 
-	return blocks
+	return blocks, nil
 }
 
 // Close closes the DB connection

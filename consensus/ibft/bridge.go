@@ -125,13 +125,36 @@ func (b *BridgeMechanism) insertStateTransactionsHook(rawParams interface{}) err
 	return nil
 }
 
-// consumeStateTransactionsHook consumes all state transactions added in the block
-func (b *BridgeMechanism) consumeStateTransactionsHook(numberParam interface{}) error {
+// insertBlockHook runs hook from syncState and insertBlock
+func (b *BridgeMechanism) insertBlockHook(numberParam interface{}) error {
 	block, ok := numberParam.(*types.Block)
 	if !ok {
 		return ErrInvalidHookParam
 	}
 
+	if err := b.consumeStateTransactions(block); err != nil {
+		return err
+	}
+
+	if err := b.startCheckpointProcess(block); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// startCheckpointProcess starts checkpoint process on every epoch end from insertBlock
+func (b *BridgeMechanism) startCheckpointProcess(block *types.Block) error {
+	// On every epoch end, create the checkpoint
+	if b.ibft.state.getState() == SyncState && !b.ibft.IsLastOfEpoch(block.Number()) {
+		return nil
+	}
+
+	return b.bridge.StartNewCheckpoint(b.ibft.epochSize)
+}
+
+// consumeStateTransactionsHook consumes all state transactions added in the block
+func (b *BridgeMechanism) consumeStateTransactions(block *types.Block) error {
 	for _, tx := range block.Transactions {
 		if tx.Type != types.TxTypeState {
 			continue
@@ -163,7 +186,7 @@ func (b *BridgeMechanism) initializeHookMap() {
 	b.hookMap[InsertTransactionsHook] = b.insertStateTransactionsHook
 
 	// Register the InsertBlockHook
-	b.hookMap[InsertBlockHook] = b.consumeStateTransactionsHook
+	b.hookMap[InsertBlockHook] = b.insertBlockHook
 }
 
 // ShouldWriteTransactions indicates if transactions should be written to a block
