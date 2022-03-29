@@ -2,14 +2,15 @@ package server
 
 import (
 	"fmt"
+	"math"
+	"net"
+
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/server"
 	"github.com/0xPolygon/polygon-edge/types"
-	"math"
-	"net"
 )
 
 func (p *serverParams) initConfigFromFile() error {
@@ -194,6 +195,7 @@ func (p *serverParams) initPrometheusAddress() error {
 
 	if p.prometheusAddress, parseErr = helper.ResolveAddr(
 		p.rawConfig.Telemetry.PrometheusAddr,
+		helper.AllInterfacesBinding,
 	); parseErr != nil {
 		return parseErr
 	}
@@ -206,6 +208,7 @@ func (p *serverParams) initLibp2pAddress() error {
 
 	if p.libp2pAddress, parseErr = helper.ResolveAddr(
 		p.rawConfig.Network.Libp2pAddr,
+		helper.LocalHostBinding,
 	); parseErr != nil {
 		return parseErr
 	}
@@ -248,6 +251,7 @@ func (p *serverParams) initJSONRPCAddress() error {
 
 	if p.jsonRPCAddress, parseErr = helper.ResolveAddr(
 		p.rawConfig.JSONRPCAddr,
+		helper.AllInterfacesBinding,
 	); parseErr != nil {
 		return parseErr
 	}
@@ -260,6 +264,7 @@ func (p *serverParams) initGRPCAddress() error {
 
 	if p.grpcAddress, parseErr = helper.ResolveAddr(
 		p.rawConfig.GRPCAddr,
+		helper.LocalHostBinding,
 	); parseErr != nil {
 		return parseErr
 	}

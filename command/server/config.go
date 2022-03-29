@@ -3,9 +3,10 @@ package server
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/network"
 	"io/ioutil"
 	"strings"
+
+	"github.com/0xPolygon/polygon-edge/network"
 
 	"github.com/hashicorp/hcl"
 )
@@ -64,7 +65,7 @@ func DefaultConfig() *Config {
 
 	return &Config{
 		GenesisPath:    "./genesis.json",
-		DataDir:        "./test-chain",
+		DataDir:        "./polygon-edge-chain",
 		BlockGasTarget: "0x0", // Special value signaling the parent gas limit should be applied
 		Network: &Network{
 			NoDiscover:       defaultNetworkConfig.NoDiscover,
@@ -82,7 +83,7 @@ func DefaultConfig() *Config {
 		RestoreFile: "",
 		BlockTime:   defaultBlockTime,
 		Headers: &Headers{
-			AccessControlAllowOrigins: nil,
+			AccessControlAllowOrigins: []string{"*"},
 		},
 	}
 }
@@ -108,7 +109,7 @@ func readConfigFile(path string) (*Config, error) {
 		return nil, fmt.Errorf("suffix of %s is neither hcl nor json", path)
 	}
 
-	config := new(Config)
+	config := DefaultConfig()
 	config.Network = new(Network)
 	config.Network.MaxPeers = -1
 	config.Network.MaxInboundPeers = -1

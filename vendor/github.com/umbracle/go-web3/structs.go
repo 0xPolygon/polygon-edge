@@ -196,7 +196,7 @@ type CallMsg struct {
 
 type LogFilter struct {
 	Address   []Address
-	Topics    []*Hash
+	Topics    [][]*Hash
 	BlockHash *Hash
 	From      *BlockNumber
 	To        *BlockNumber
@@ -227,6 +227,7 @@ type Receipt struct {
 	CumulativeGasUsed uint64
 	LogsBloom         []byte
 	Logs              []*Log
+	Status            uint64
 }
 
 type Log struct {

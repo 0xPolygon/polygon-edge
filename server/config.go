@@ -1,8 +1,9 @@
 package server
 
 import (
-	"github.com/hashicorp/go-hclog"
 	"net"
+
+	"github.com/hashicorp/go-hclog"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/network"
