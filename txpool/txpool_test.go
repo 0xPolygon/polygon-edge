@@ -671,7 +671,9 @@ func TestResetAccount(t *testing.T) {
 				assert.Equal(t, uint64(0), pool.accounts.get(addr1).enqueued.length())
 				assert.Equal(t, uint64(len(test.txs)), pool.accounts.get(addr1).promoted.length())
 
-				pool.resetAccount(addr1, test.newNonce)
+				pool.resetAccounts(map[types.Address]uint64{
+					addr1: test.newNonce,
+				})
 
 				assert.Equal(t, test.expected.slots, pool.gauge.read())
 				assert.Equal(t, // enqueued
@@ -785,10 +787,14 @@ func TestResetAccount(t *testing.T) {
 				assert.Equal(t, uint64(0), pool.accounts.get(addr1).promoted.length())
 
 				if test.signal {
-					go pool.resetAccount(addr1, test.newNonce)
+					go pool.resetAccounts(map[types.Address]uint64{
+						addr1: test.newNonce,
+					})
 					pool.handlePromoteRequest(<-pool.promoteReqCh)
 				} else {
-					pool.resetAccount(addr1, test.newNonce)
+					pool.resetAccounts(map[types.Address]uint64{
+						addr1: test.newNonce,
+					})
 				}
 
 				assert.Equal(t, test.expected.slots, pool.gauge.read())
@@ -940,10 +946,14 @@ func TestResetAccount(t *testing.T) {
 				pool.handlePromoteRequest(req)
 
 				if test.signal {
-					go pool.resetAccount(addr1, test.newNonce)
+					go pool.resetAccounts(map[types.Address]uint64{
+						addr1: test.newNonce,
+					})
 					pool.handlePromoteRequest(<-pool.promoteReqCh)
 				} else {
-					pool.resetAccount(addr1, test.newNonce)
+					pool.resetAccounts(map[types.Address]uint64{
+						addr1: test.newNonce,
+					})
 				}
 
 				assert.Equal(t, test.expected.slots, pool.gauge.read())
@@ -1109,13 +1119,13 @@ func TestResetAccounts_Promoted(t *testing.T) {
 	allTxs :=
 		map[types.Address][]*types.Transaction{
 			addr1: {
-				newTx(addr1, 0, 1),
-				newTx(addr1, 1, 1),
+				newTx(addr1, 0, 1), // will be pruned
+				newTx(addr1, 1, 1), // will be pruned
 				newTx(addr1, 2, 1),
 				newTx(addr1, 3, 1),
 			},
 			addr2: {
-				newTx(addr2, 0, 1),
+				newTx(addr2, 0, 1), // will be pruned
 				newTx(addr2, 1, 1),
 			},
 			addr3: {
@@ -1124,6 +1134,7 @@ func TestResetAccounts_Promoted(t *testing.T) {
 				newTx(addr3, 2, 1),
 			},
 			addr4: {
+				//	all txs will be pruned
 				newTx(addr4, 0, 1),
 				newTx(addr4, 1, 1),
 				newTx(addr4, 2, 1),
@@ -1177,10 +1188,7 @@ func TestResetAccounts_Promoted(t *testing.T) {
 		for _, tx := range txs {
 			totalTx++
 
-			go func(tx *types.Transaction) {
-				err := pool.addTx(local, tx)
-				assert.NoError(t, err)
-			}(tx)
+			assert.NoError(t, pool.addTx(local, tx))
 		}
 	}
 
@@ -1191,7 +1199,18 @@ func TestResetAccounts_Promoted(t *testing.T) {
 	assert.Len(t, waitForEvents(ctx, promotedSubscription, totalTx), totalTx)
 	pool.eventManager.cancelSubscription(promotedSubscription.subscriptionID)
 
+	prunedSubscription := pool.eventManager.subscribe(
+		[]proto.EventType{
+			proto.EventType_PRUNED_PROMOTED,
+		})
+
 	pool.resetAccounts(newNonces)
+
+	ctx, cancelFn = context.WithTimeout(context.Background(), time.Second*10)
+	defer cancelFn()
+
+	assert.Len(t, waitForEvents(ctx, prunedSubscription, 8), 8)
+	pool.eventManager.cancelSubscription(prunedSubscription.subscriptionID)
 
 	assert.Equal(t, expected.slots, pool.gauge.read())
 
