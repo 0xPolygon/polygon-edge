@@ -142,13 +142,30 @@ func (p *switchParams) initDeployment() error {
 		p.maxValidatorCount = &value
 	}
 
+	if err := p.validateMinMaxValidatorNumber(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (p *switchParams) validateMinMaxValidatorNumber() error {
 	// Validate min and max validators number if not nil
 	// If they are not defined they will get default values
 	// in PoSMechanism
-	if p.minValidatorCount != nil && p.maxValidatorCount != nil {
-		if err := command.ValidateMinMaxValidatorsNumber(*p.minValidatorCount, *p.maxValidatorCount); err != nil {
-			return err
-		}
+	minValidatorCount := uint64(1)
+	maxValidatorCount := common.MaxSafeJSInt
+
+	if p.minValidatorCount != nil {
+		minValidatorCount = *p.minValidatorCount
+	}
+
+	if p.maxValidatorCount != nil {
+		maxValidatorCount = *p.maxValidatorCount
+	}
+
+	if err := command.ValidateMinMaxValidatorsNumber(minValidatorCount, maxValidatorCount); err != nil {
+		return err
 	}
 
 	return nil
