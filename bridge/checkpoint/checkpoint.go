@@ -246,6 +246,8 @@ func (c *checkpoint) handleCheckpointMessage(msg *transport.CheckpointMessage) {
 		return
 	}
 
+	//	TODO: validate checkpoint?
+
 	c.addCheckpointSignature(&msg.Checkpoint, sender, msg.Sig())
 }
 

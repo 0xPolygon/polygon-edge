@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package v1;
+
+option go_package = "/bridge/checkpoint/transport/proto";
+
+message CheckpointMessage {
+  enum MsgType {
+    CHECKPOINT = 0;
+    ACK = 1;
+    NOACK = 2;
+  }
+
+  //  type is the type of message
+  MsgType type = 1;
+
+  // payload is message body
+  bytes payload = 2;
+
+  // validator signature of the message
+  bytes signature = 3;
+}

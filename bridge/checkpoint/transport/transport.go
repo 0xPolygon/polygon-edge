@@ -1,7 +1,8 @@
 package transport
 
 import (
-	"github.com/0xPolygon/polygon-edge/bridge/statesync/transport/proto"
+	"github.com/0xPolygon/polygon-edge/bridge/checkpoint/transport/proto"
+	ctypes "github.com/0xPolygon/polygon-edge/bridge/checkpoint/types"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/hashicorp/go-hclog"
 )
@@ -30,7 +31,7 @@ func NewLibp2pGossipTransport(logger hclog.Logger, network *network.Server) Chec
 }
 
 func (t *libp2pGossipTransport) Start() error {
-	topic, err := t.network.NewTopic(transportProto, &proto.SignedMessage{})
+	topic, err := t.network.NewTopic(transportProto, &proto.CheckpointMessage{})
 	if err != nil {
 		return err
 	}
@@ -41,8 +42,11 @@ func (t *libp2pGossipTransport) Start() error {
 }
 
 func (t *libp2pGossipTransport) SendCheckpoint(proposal *CheckpointMessage) error {
-	// return t.topic.Publish(...)
-	return nil
+	return t.topic.Publish(&proto.CheckpointMessage{
+		Type:      proto.CheckpointMessage_CHECKPOINT,
+		Payload:   proposal.Checkpoint.MarshalRLP(),
+		Signature: proposal.Signature,
+	})
 }
 
 func (t *libp2pGossipTransport) SendAck(ack *AckMessage) error {
@@ -57,20 +61,36 @@ func (t *libp2pGossipTransport) SendNoAck(noAck *NoAckMessage) error {
 
 func (t *libp2pGossipTransport) Subscribe(handler func(interface{})) error {
 	return t.topic.Subscribe(func(obj interface{}) {
-		// TODO: convert proto.Message to CheckpointMessage,
-		// AckMessage, or NoAckMessage defined in bridge/checkpoint/transport/types.go
+		protoMsg, ok := obj.(*proto.CheckpointMessage)
+		if !ok {
+			t.logger.Error("received unexpected typed message", "message", obj)
 
-		// and call handler
+			return
+		}
 
-		// protoMessage, ok := obj.(*proto.SignedMessage)
-		// if !ok {
-		// 	t.logger.Warn("received unexpected typed message", "message", obj)
+		//	convert message to appropriate type
+		var message interface{}
 
-		// 	return
-		// }
+		switch protoMsg.Type {
+		case proto.CheckpointMessage_CHECKPOINT:
+			checkpoint := ctypes.Checkpoint{}
+			if err := checkpoint.UnmarshalRLP(protoMsg.Payload); err != nil {
+				t.logger.Error("unable to unmarshal payload from message", "err", err)
 
-		// message := toSignedMessage(protoMessage)
+				return
+			}
 
-		// handler(message)
+			message = &CheckpointMessage{
+				Checkpoint: checkpoint,
+				Signature:  protoMsg.Signature,
+			}
+
+		case proto.CheckpointMessage_ACK:
+			//	TODO: phase2
+		case proto.CheckpointMessage_NOACK:
+			//	TODO: phase2
+		}
+
+		handler(message)
 	})
 }

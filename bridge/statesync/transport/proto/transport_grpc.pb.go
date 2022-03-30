@@ -4,21 +4,22 @@ package proto
 
 import (
 	context "context"
-	empty "github.com/golang/protobuf/ptypes/empty"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the grpc package it is being compiled against.
+// Requires gRPC-Go v1.32.0 or later.
 const _ = grpc.SupportPackageIsVersion7
 
 // SignedMessageTransportClient is the client API for SignedMessageTransport service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type SignedMessageTransportClient interface {
-	Publish(ctx context.Context, in *SignedMessage, opts ...grpc.CallOption) (*empty.Empty, error)
+	Publish(ctx context.Context, in *SignedMessage, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type signedMessageTransportClient struct {
@@ -29,8 +30,8 @@ func NewSignedMessageTransportClient(cc grpc.ClientConnInterface) SignedMessageT
 	return &signedMessageTransportClient{cc}
 }
 
-func (c *signedMessageTransportClient) Publish(ctx context.Context, in *SignedMessage, opts ...grpc.CallOption) (*empty.Empty, error) {
-	out := new(empty.Empty)
+func (c *signedMessageTransportClient) Publish(ctx context.Context, in *SignedMessage, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, "/v1.SignedMessageTransport/Publish", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -42,7 +43,7 @@ func (c *signedMessageTransportClient) Publish(ctx context.Context, in *SignedMe
 // All implementations must embed UnimplementedSignedMessageTransportServer
 // for forward compatibility
 type SignedMessageTransportServer interface {
-	Publish(context.Context, *SignedMessage) (*empty.Empty, error)
+	Publish(context.Context, *SignedMessage) (*emptypb.Empty, error)
 	mustEmbedUnimplementedSignedMessageTransportServer()
 }
 
@@ -50,7 +51,7 @@ type SignedMessageTransportServer interface {
 type UnimplementedSignedMessageTransportServer struct {
 }
 
-func (UnimplementedSignedMessageTransportServer) Publish(context.Context, *SignedMessage) (*empty.Empty, error) {
+func (UnimplementedSignedMessageTransportServer) Publish(context.Context, *SignedMessage) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Publish not implemented")
 }
 func (UnimplementedSignedMessageTransportServer) mustEmbedUnimplementedSignedMessageTransportServer() {
@@ -64,7 +65,7 @@ type UnsafeSignedMessageTransportServer interface {
 }
 
 func RegisterSignedMessageTransportServer(s grpc.ServiceRegistrar, srv SignedMessageTransportServer) {
-	s.RegisterService(&_SignedMessageTransport_serviceDesc, srv)
+	s.RegisterService(&SignedMessageTransport_ServiceDesc, srv)
 }
 
 func _SignedMessageTransport_Publish_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -85,7 +86,10 @@ func _SignedMessageTransport_Publish_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
-var _SignedMessageTransport_serviceDesc = grpc.ServiceDesc{
+// SignedMessageTransport_ServiceDesc is the grpc.ServiceDesc for SignedMessageTransport service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var SignedMessageTransport_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "v1.SignedMessageTransport",
 	HandlerType: (*SignedMessageTransportServer)(nil),
 	Methods: []grpc.MethodDesc{
