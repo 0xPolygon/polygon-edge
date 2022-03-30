@@ -624,6 +624,7 @@ golang.org/x/net/ipv6
 golang.org/x/net/route
 golang.org/x/net/trace
 # golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
+## explicit
 golang.org/x/sync/errgroup
 # golang.org/x/sys v0.0.0-20220227234510-4e6760a101f9
 ## explicit

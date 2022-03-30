@@ -3,10 +3,12 @@ package loadbot
 import (
 	"errors"
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/command/loadbot/generator"
-	"github.com/0xPolygon/polygon-edge/types"
 	"math/big"
 	"strings"
+
+	"github.com/0xPolygon/polygon-edge/command/loadbot/generator"
+	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/umbracle/go-web3/abi"
 )
 
 var (
@@ -17,6 +19,18 @@ var (
 	errInvalidMode   = errors.New("invalid loadbot mode")
 	errInvalidValues = errors.New("invalid values")
 	errContractPath  = errors.New("contract path not specified")
+)
+
+const (
+	// arbitrary value for total token supply
+	// token has 5 decimals
+	// transfers are done with 0.001 amount
+	erc20TokenSupply = "5000000000"
+	erc20TokenName   = "ZexCoin"
+	erc20TokenSymbol = "ZEX"
+
+	erc721TokenName   = "ZexNFT"
+	erc721TokenSymbol = "ZEXES"
 )
 
 const (
@@ -32,6 +46,7 @@ const (
 	gasPriceFlag = "gas-price"
 	gasLimitFlag = "gas-limit"
 	contractFlag = "contract"
+	maxWaitFlag  = "max-wait"
 )
 
 type loadbotParams struct {
@@ -39,6 +54,7 @@ type loadbotParams struct {
 	chainID  uint64
 	count    uint64
 	maxConns uint64
+	maxWait  uint64
 
 	contractPath string
 
@@ -58,22 +74,18 @@ type loadbotParams struct {
 	gasPrice         *big.Int
 	gasLimit         *big.Int
 	contractArtifact *generator.ContractArtifact
+	constructorArgs  []byte
 }
 
 func (p *loadbotParams) validateFlags() error {
-	// Validate the correct mode type
-	convMode := Mode(strings.ToLower(p.modeRaw))
-	if convMode != transfer && convMode != deploy {
-		return errInvalidMode
+	// check if valid mode is selected
+	if err := p.isValidMode(); err != nil {
+		return err
 	}
 
-	// Validate the correct mode params
-	if convMode == deploy && p.contractPath == "" {
-		return errContractPath
-	}
-
-	if err := p.initRawParams(); err != nil {
-		return errInvalidValues
+	// validate the correct mode params
+	if err := p.hasValidDeployParams(); err != nil {
+		return err
 	}
 
 	return nil
@@ -93,6 +105,10 @@ func (p *loadbotParams) initRawParams() error {
 	}
 
 	if err := p.initContract(); err != nil {
+		return err
+	}
+
+	if err := p.initContractArtifactAndArgs(); err != nil {
 		return err
 	}
 
@@ -187,5 +203,73 @@ func (p *loadbotParams) generateConfig(
 		GasPrice:         p.gasPrice,
 		GasLimit:         p.gasLimit,
 		ContractArtifact: p.contractArtifact,
+		ConstructorArgs:  p.constructorArgs,
+		MaxWait:          p.maxWait,
 	}
+}
+
+func (p *loadbotParams) isValidMode() error {
+	// Set and validate the correct mode type
+	p.mode = Mode(strings.ToLower(p.modeRaw))
+
+	switch p.mode {
+	case transfer, deploy, erc20, erc721:
+		return nil
+
+	default:
+		return errInvalidMode
+	}
+}
+
+func (p *loadbotParams) hasValidDeployParams() error {
+	// fail if mode is deploy but we have no contract
+	if p.mode == deploy && p.contractPath == "" {
+		return errContractPath
+	}
+
+	return nil
+}
+
+func (p *loadbotParams) initContractArtifactAndArgs() error {
+	var (
+		ctrArtifact *generator.ContractArtifact
+		ctrArgs     []byte
+		err         error
+	)
+
+	switch p.mode {
+	case erc20:
+		ctrArtifact = &generator.ContractArtifact{
+			Bytecode: ERC20BIN,
+			ABI:      abi.MustNewABI(ERC20ABI),
+		}
+
+		if ctrArgs, err = abi.Encode(
+			[]string{erc20TokenSupply, erc20TokenName, erc20TokenSymbol}, ctrArtifact.ABI.Constructor.Inputs); err != nil {
+			return fmt.Errorf("failed to encode erc20 constructor parameters: %w", err)
+		}
+
+	case erc721:
+		ctrArtifact = &generator.ContractArtifact{
+			Bytecode: ERC721BIN,
+			ABI:      abi.MustNewABI(ERC721ABI),
+		}
+
+		if ctrArgs, err = abi.Encode(
+			[]string{erc721TokenName, erc721TokenSymbol},
+			ctrArtifact.ABI.Constructor.Inputs); err != nil {
+			return fmt.Errorf("failed to encode erc721 constructor parameters: %w", err)
+		}
+
+	default:
+		ctrArtifact = &generator.ContractArtifact{
+			Bytecode: generator.DefaultContractBytecode,
+		}
+		ctrArgs = nil
+	}
+
+	p.contractArtifact = ctrArtifact
+	p.constructorArgs = ctrArgs
+
+	return nil
 }

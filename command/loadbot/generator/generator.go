@@ -3,24 +3,34 @@ package generator
 import (
 	"crypto/ecdsa"
 	"encoding/json"
-	"github.com/0xPolygon/polygon-edge/types"
 	"io/ioutil"
 	"math/big"
+
+	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/umbracle/go-web3"
+	"github.com/umbracle/go-web3/abi"
 )
 
 type TransactionGenerator interface {
 	GenerateTransaction() (*types.Transaction, error)
 	GetExampleTransaction() (*types.Transaction, error)
 	GetTransactionErrors() []*FailedTxnInfo
-	MarkFailedTxn(failedTxn *FailedTxnInfo)
 	SetGasEstimate(gasEstimate uint64)
+	MarkFailedTxn(failedTxn *FailedTxnInfo)
+}
+
+type ContractTxnGenerator interface {
+	TransactionGenerator
+	MarkFailedContractTxn(failedContractTxn *FailedContractTxnInfo)
+	SetContractAddress(types.Address)
 }
 
 type TxnErrorType string
 
 const (
-	ReceiptErrorType TxnErrorType = "ReceiptErrorType"
-	AddErrorType     TxnErrorType = "AddErrorType"
+	ReceiptErrorType   TxnErrorType = "ReceiptErrorType"
+	AddErrorType       TxnErrorType = "AddErrorType"
+	ContractDeployType TxnErrorType = "ContractDeployErrorType"
 )
 
 const (
@@ -29,7 +39,8 @@ const (
 )
 
 type ContractArtifact struct {
-	Bytecode string `json:"bytecode"`
+	Bytecode string   `json:"bytecode"`
+	ABI      *abi.ABI `json:"abi"`
 }
 
 type TxnError struct {
@@ -43,14 +54,22 @@ type FailedTxnInfo struct {
 	Error  *TxnError
 }
 
+type FailedContractTxnInfo struct {
+	TxHash string
+	Error  *TxnError
+}
+
 type GeneratorParams struct {
 	Nonce            uint64
 	ChainID          uint64
 	SenderAddress    types.Address
+	RecieverAddress  types.Address
 	SenderKey        *ecdsa.PrivateKey
 	Value            *big.Int
 	GasPrice         *big.Int
 	ContractArtifact *ContractArtifact
+	ConstructorArgs  []byte // smart contract constructor arguments
+	ContractAddress  web3.Address
 }
 
 // ReadContractArtifact reads the contract bytecode from the specified path
