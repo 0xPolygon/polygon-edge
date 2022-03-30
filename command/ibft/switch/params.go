@@ -134,7 +134,7 @@ func (p *switchParams) initDeployment() error {
 		value, err := types.ParseUint64orHex(&p.maxValidatorCountRaw)
 		if err != nil {
 			return fmt.Errorf(
-				"unable to parse min validator count value, %w",
+				"unable to parse max validator count value, %w",
 				err,
 			)
 		}
