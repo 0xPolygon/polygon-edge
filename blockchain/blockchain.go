@@ -70,15 +70,16 @@ type BlockResult struct {
 // UpdateGasPriceAvg Updates the rolling average value of the gas price
 func (b *Blockchain) UpdateGasPriceAvg(newValue *big.Int) {
 	b.agpMux.Lock()
+	defer b.agpMux.Unlock()
 
 	b.averageGasPriceCount.Add(b.averageGasPriceCount, big.NewInt(1))
 
-	differential := big.NewInt(0)
-	differential.Div(newValue.Sub(newValue, b.averageGasPrice), b.averageGasPriceCount)
+	differential := big.NewInt(0).Div(
+		newValue.Sub(newValue, b.averageGasPrice),
+		b.averageGasPriceCount,
+	)
 
 	b.averageGasPrice.Add(b.averageGasPrice, differential)
-
-	b.agpMux.Unlock()
 }
 
 // GetAvgGasPrice returns the average gas price
