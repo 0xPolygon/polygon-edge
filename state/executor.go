@@ -559,7 +559,8 @@ func (t *Transition) applyCall(
 		}
 	}
 
-	snapshot := t.state.Snapshot() //nolint:ifshort
+	//nolint:ifshort
+	snapshot := t.state.Snapshot()
 	t.state.TouchAccount(c.Address)
 
 	if callType == runtime.Call {

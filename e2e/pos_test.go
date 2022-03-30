@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"fmt"
 	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"math/big"
@@ -79,6 +80,86 @@ func validateValidatorSet(
 			foundInValidatorSet(validatorSet, address),
 			"expected address to not be present in the validator set",
 		)
+	}
+}
+
+func TestPoS_ValidatorBoundaries(t *testing.T) {
+	accounts := []struct {
+		key     *ecdsa.PrivateKey
+		address types.Address
+	}{}
+	stakeAmount := framework.EthToWei(1)
+	numGenesisValidators := IBFTMinNodes
+	minValidatorCount := uint64(1)
+	maxValidatorCount := uint64(numGenesisValidators + 1)
+	numNewStakers := 2
+
+	for i := 0; i < numNewStakers; i++ {
+		k, a := tests.GenerateKeyAndAddr(t)
+
+		accounts = append(accounts, struct {
+			key     *ecdsa.PrivateKey
+			address types.Address
+		}{
+			key:     k,
+			address: a,
+		})
+	}
+
+	defaultBalance := framework.EthToWei(100)
+	ibftManager := framework.NewIBFTServersManager(
+		t,
+		numGenesisValidators,
+		IBFTDirPrefix,
+		func(i int, config *framework.TestServerConfig) {
+			config.SetSeal(true)
+			config.SetEpochSize(2)
+			config.PremineValidatorBalance(defaultBalance)
+			for j := 0; j < numNewStakers; j++ {
+				config.Premine(accounts[j].address, defaultBalance)
+			}
+			config.SetIBFTPoS(true)
+			config.SetMinValidatorCount(minValidatorCount)
+			config.SetMaxValidatorCount(maxValidatorCount)
+		})
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	ibftManager.StartServers(ctx)
+
+	srv := ibftManager.GetServer(0)
+
+	client := srv.JSONRPC()
+
+	testCases := []struct {
+		name              string
+		address           types.Address
+		key               *ecdsa.PrivateKey
+		expectedExistence bool
+		expectedSize      int
+	}{
+		{
+			name:              "Can add a 5th validator",
+			address:           accounts[0].address,
+			key:               accounts[0].key,
+			expectedExistence: true,
+			expectedSize:      numGenesisValidators + 1,
+		},
+		{
+			name:              "Can not add a 6th validator",
+			address:           accounts[1].address,
+			key:               accounts[1].key,
+			expectedExistence: false,
+			expectedSize:      numGenesisValidators + 1,
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			err := framework.StakeAmount(tt.address, tt.key, stakeAmount, srv)
+			assert.NoError(t, err)
+			validateValidatorSet(t, tt.address, client, tt.expectedExistence, tt.expectedSize)
+		})
 	}
 }
 
@@ -209,7 +290,7 @@ func TestPoS_Unstake(t *testing.T) {
 
 	assert.Equal(t, expectedBalance.String(), stakedAmount.String())
 
-	// Check the account balance
+	// Check the address balance
 	fee := new(big.Int).Mul(
 		big.NewInt(int64(receipt.GasUsed)),
 		big.NewInt(framework.DefaultGasPrice),
@@ -320,7 +401,7 @@ func TestPoS_UnstakeExploit(t *testing.T) {
 		t.Fatalf("Unable to fetch block")
 	}
 
-	// Find how much the account paid for all the transactions in this block
+	// Find how much the address paid for all the transactions in this block
 	paidFee := big.NewInt(0).Mul(bigGasPrice, big.NewInt(int64(block.GasUsed)))
 
 	// Check the balances
@@ -472,7 +553,7 @@ func TestPoS_StakeUnstakeExploit(t *testing.T) {
 		t.Fatalf("Unable to fetch block")
 	}
 
-	// Find how much the account paid for all the transactions in this block
+	// Find how much the address paid for all the transactions in this block
 	paidFee := big.NewInt(0).Mul(bigGasPrice, big.NewInt(int64(block.GasUsed)))
 
 	// Check the balances
@@ -492,7 +573,7 @@ func TestPoS_StakeUnstakeExploit(t *testing.T) {
 		"Staked address balance mismatch after stake / unstake exploit",
 	)
 
-	// Make sure the account balances match up
+	// Make sure the address balances match up
 
 	// expBalance = previousAccountBalance + stakeRefund - 1 ETH - block fees
 	expBalance := big.NewInt(0).Sub(big.NewInt(0).Add(defaultBalance, bigDefaultStakedBalance), oneEth)
@@ -600,7 +681,7 @@ func TestPoS_StakeUnstakeWithinSameBlock(t *testing.T) {
 		t.Fatalf("Unable to fetch block")
 	}
 
-	// Find how much the account paid for all the transactions in this block
+	// Find how much the address paid for all the transactions in this block
 	paidFee := big.NewInt(0).Mul(bigGasPrice, big.NewInt(int64(block.GasUsed)))
 
 	// Check the balances
@@ -617,7 +698,7 @@ func TestPoS_StakeUnstakeWithinSameBlock(t *testing.T) {
 		"Staked address balance mismatch after stake / unstake events",
 	)
 
-	// Make sure the account balances match up
+	// Make sure the address balances match up
 
 	// expBalance = previousAccountBalance - block fees
 	expBalance := big.NewInt(0).Sub(defaultBalance, paidFee)

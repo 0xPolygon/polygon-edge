@@ -3,7 +3,6 @@ package ibft
 import (
 	"errors"
 	"fmt"
-
 	"github.com/0xPolygon/polygon-edge/contracts/staking"
 	stakingHelper "github.com/0xPolygon/polygon-edge/helper/staking"
 	"github.com/0xPolygon/polygon-edge/state"
@@ -15,6 +14,8 @@ type PoSMechanism struct {
 	BaseConsensusMechanism
 	// Params
 	ContractDeployment uint64 // The height when deploying staking contract
+	MaxValidatorCount  uint64
+	MinValidatorCount  uint64
 }
 
 // PoSFactory initializes the required data
@@ -72,6 +73,18 @@ func (pos *PoSMechanism) initializeParams(params *IBFTFork) error {
 		}
 
 		pos.ContractDeployment = params.Deployment.Value
+
+		if params.MaxValidatorCount == nil {
+			pos.MaxValidatorCount = stakingHelper.MaxValidatorCount
+		} else {
+			pos.MaxValidatorCount = params.MaxValidatorCount.Value
+		}
+
+		if params.MinValidatorCount == nil {
+			pos.MinValidatorCount = stakingHelper.MinValidatorCount
+		} else {
+			pos.MinValidatorCount = params.MinValidatorCount.Value
+		}
 	}
 
 	return nil
@@ -146,7 +159,10 @@ func (pos *PoSMechanism) preStateCommitHook(rawParams interface{}) error {
 	}
 
 	// Deploy Staking contract
-	contractState, err := stakingHelper.PredeployStakingSC(nil)
+	contractState, err := stakingHelper.PredeployStakingSC(nil, stakingHelper.PredeployParams{
+		MinValidatorCount: pos.MinValidatorCount,
+		MaxValidatorCount: pos.MaxValidatorCount,
+	})
 	if err != nil {
 		return err
 	}
