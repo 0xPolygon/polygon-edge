@@ -165,6 +165,11 @@ func (p *genesisParams) setValidatorSetFromCli() {
 // setValidatorSetFromPrefixPath sets validator set from prefix path
 func (p *genesisParams) setValidatorSetFromPrefixPath() error {
 	var readErr error
+
+	if !p.areValidatorsSetByPrefix() {
+		return nil
+	}
+
 	if p.ibftValidators, readErr = getValidatorsFromPrefixPath(
 		p.validatorPrefixPath,
 	); readErr != nil {

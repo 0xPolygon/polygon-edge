@@ -271,6 +271,7 @@ func appendIBFTForks(
 		Type: mechanismType,
 		From: common.JSONNumber{Value: from},
 	}
+
 	if mechanismType == ibft.PoS {
 		if deployment != nil {
 			newFork.Deployment = &common.JSONNumber{Value: *deployment}
