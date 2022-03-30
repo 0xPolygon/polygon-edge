@@ -292,8 +292,8 @@ func (t *TestServer) GenerateGenesis() error {
 			t.Config.MaxValidatorCount = stakingHelper.MaxValidatorCount
 		}
 
-		args = append(args, "--min-validator-count", strconv.FormatUint(uint64(t.Config.MinValidatorCount), 10))
-		args = append(args, "--max-validator-count", strconv.FormatUint(uint64(t.Config.MaxValidatorCount), 10))
+		args = append(args, "--min-validator-count", strconv.FormatUint(t.Config.MinValidatorCount, 10))
+		args = append(args, "--max-validator-count", strconv.FormatUint(t.Config.MaxValidatorCount, 10))
 	}
 
 	// add block gas limit

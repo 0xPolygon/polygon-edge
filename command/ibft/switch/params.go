@@ -92,6 +92,7 @@ func (p *switchParams) initDeployment() error {
 				string(p.mechanismType),
 			)
 		}
+
 		d, err := types.ParseUint64orHex(&p.deploymentRaw)
 		if err != nil {
 			return fmt.Errorf(
@@ -101,7 +102,6 @@ func (p *switchParams) initDeployment() error {
 		}
 
 		p.deployment = &d
-
 	}
 
 	if p.minValidatorCountRaw != "" {
@@ -111,6 +111,7 @@ func (p *switchParams) initDeployment() error {
 				string(p.mechanismType),
 			)
 		}
+
 		value, err := types.ParseUint64orHex(&p.minValidatorCountRaw)
 		if err != nil {
 			return fmt.Errorf(
@@ -120,7 +121,6 @@ func (p *switchParams) initDeployment() error {
 		}
 
 		p.minValidatorCount = &value
-
 	}
 
 	if p.maxValidatorCountRaw != "" {
@@ -130,6 +130,7 @@ func (p *switchParams) initDeployment() error {
 				string(p.mechanismType),
 			)
 		}
+
 		value, err := types.ParseUint64orHex(&p.maxValidatorCountRaw)
 		if err != nil {
 			return fmt.Errorf(
@@ -139,7 +140,6 @@ func (p *switchParams) initDeployment() error {
 		}
 
 		p.maxValidatorCount = &value
-
 	}
 
 	// Validate min and max validators number if not nil

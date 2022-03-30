@@ -85,7 +85,6 @@ func (pos *PoSMechanism) initializeParams(params *IBFTFork) error {
 		} else {
 			pos.MinValidatorCount = params.MinValidatorCount.Value
 		}
-
 	}
 
 	return nil

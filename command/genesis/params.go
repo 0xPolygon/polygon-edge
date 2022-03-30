@@ -175,7 +175,6 @@ func (p *genesisParams) setValidatorSetFromPrefixPath() error {
 }
 
 func (p *genesisParams) initValidatorSet() error {
-
 	// Set validator set
 	// Priority goes to cli command over prefix path
 	if err := p.setValidatorSetFromPrefixPath(); err != nil {
