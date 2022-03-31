@@ -44,11 +44,15 @@ type Blockchain struct {
 
 	stream *eventStream // Event subscriptions
 
-	// Average gas price (rolling average)
-	averageGasPrice      *big.Int // The average gas price that gets queried
-	averageGasPriceCount *big.Int // Param used in the avg. gas price calculation
+	gpAverage *gasPriceAverage // A reference to the average gas price
+}
 
-	agpMux sync.Mutex // Mutex for the averageGasPrice calculation
+// gasPriceAverage keeps track of the average gas price (rolling average)
+type gasPriceAverage struct {
+	sync.RWMutex
+
+	price *big.Int // The average gas price that gets queried
+	count *big.Int // Param used in the avg. gas price calculation
 }
 
 type Verifier interface {
@@ -67,24 +71,82 @@ type BlockResult struct {
 	TotalGas uint64
 }
 
-// UpdateGasPriceAvg Updates the rolling average value of the gas price
-func (b *Blockchain) UpdateGasPriceAvg(newValue *big.Int) {
-	b.agpMux.Lock()
-	defer b.agpMux.Unlock()
+// updateGasPriceAvg updates the rolling average value of the gas price
+func (b *Blockchain) updateGasPriceAvg(newValues []*big.Int) {
+	b.gpAverage.Lock()
+	defer b.gpAverage.Unlock()
 
-	b.averageGasPriceCount.Add(b.averageGasPriceCount, big.NewInt(1))
+	//	Sum the values for quick reference
+	sum := big.NewInt(0)
+	for _, val := range newValues {
+		sum = sum.Add(sum, val)
+	}
 
-	differential := big.NewInt(0).Div(
-		newValue.Sub(newValue, b.averageGasPrice),
-		b.averageGasPriceCount,
-	)
+	// There is no previous average data,
+	// so this new value set will instantiate it
+	if b.gpAverage.count.Uint64() == 0 {
+		b.getArithmeticAverage(newValues, sum)
 
-	b.averageGasPrice.Add(b.averageGasPrice, differential)
+		return
+	}
+
+	// There is existing average data,
+	// use it to generate a new average
+	b.getRollingAverage(newValues, sum)
 }
 
-// GetAvgGasPrice returns the average gas price
+// getArithmeticAverage calculates and sets the arithmetic average
+// of the passed in data set
+func (b *Blockchain) getArithmeticAverage(newValues []*big.Int, sum *big.Int) {
+	newAverageCount := big.NewInt(int64(len(newValues)))
+	newAverage := sum.Div(sum, newAverageCount)
+
+	b.gpAverage.price = newAverage
+	b.gpAverage.count = newAverageCount
+}
+
+// getRollingAverage calculates the new average based on the
+// moving average formula:
+// new average = old average * (n-len(M))/n + (sum of values in M)/n)
+// where n is the old average data count, and M is the new data set
+func (b *Blockchain) getRollingAverage(newValues []*big.Int, sum *big.Int) {
+	var (
+		// Save references to old counts
+		oldCount   = b.gpAverage.count
+		oldAverage = b.gpAverage.price
+
+		inputSetCount = big.NewInt(0).SetInt64(int64(len(newValues)))
+	)
+
+	// old average * (n-len(M))/n
+	newAverage := big.NewInt(0).Div(
+		big.NewInt(0).Mul(
+			oldAverage,
+			big.NewInt(0).Sub(oldCount, inputSetCount),
+		),
+		oldCount,
+	)
+
+	// + (sum of values in M)/n
+	newAverage.Add(
+		newAverage,
+		big.NewInt(0).Div(
+			sum,
+			oldCount,
+		),
+	)
+
+	// Update the references
+	b.gpAverage.price = newAverage
+	b.gpAverage.count = inputSetCount.Add(inputSetCount, b.gpAverage.count)
+}
+
+// GetAvgGasPrice returns the average gas price for the chain
 func (b *Blockchain) GetAvgGasPrice() *big.Int {
-	return b.averageGasPrice
+	b.gpAverage.RLock()
+	defer b.gpAverage.RUnlock()
+
+	return b.gpAverage.price
 }
 
 // NewBlockchain creates a new blockchain object
@@ -101,6 +163,10 @@ func NewBlockchain(
 		consensus: consensus,
 		executor:  executor,
 		stream:    &eventStream{},
+		gpAverage: &gasPriceAverage{
+			price: big.NewInt(0),
+			count: big.NewInt(0),
+		},
 	}
 
 	var (
@@ -128,10 +194,6 @@ func NewBlockchain(
 
 	// Push the initial event to the stream
 	b.stream.push(&Event{})
-
-	// Initialize the average gas price
-	b.averageGasPrice = big.NewInt(0)
-	b.averageGasPriceCount = big.NewInt(0)
 
 	return b, nil
 }
@@ -311,9 +373,6 @@ func (b *Blockchain) writeGenesisImpl(header *types.Header) error {
 	if err := b.db.WriteHeader(header); err != nil {
 		return err
 	}
-
-	// Update the average gas price to take into account the genesis block
-	b.UpdateGasPriceAvg(new(big.Int).SetUint64(header.GasUsed))
 
 	// Advance the head
 	if _, err := b.advanceHead(header); err != nil {
@@ -644,7 +703,7 @@ func (b *Blockchain) WriteBlock(block *types.Block) error {
 	b.dispatchEvent(evnt)
 
 	// Update the average gas price
-	b.UpdateGasPriceAvg(new(big.Int).SetUint64(header.GasUsed))
+	b.updateGasPriceAvgWithBlock(block)
 
 	logArgs := []interface{}{
 		"number", header.Number,
@@ -660,6 +719,23 @@ func (b *Blockchain) WriteBlock(block *types.Block) error {
 	b.logger.Info("new block", logArgs...)
 
 	return nil
+}
+
+// updateGasPriceAvgWithBlock extracts the gas price information from the
+// block, and updates the average gas price for the chain accordingly
+func (b *Blockchain) updateGasPriceAvgWithBlock(block *types.Block) {
+	if len(block.Transactions) < 1 {
+		// No transactions in the block,
+		// so no gas price average to update
+		return
+	}
+
+	gasPrices := make([]*big.Int, len(block.Transactions))
+	for i, transaction := range block.Transactions {
+		gasPrices[i] = transaction.GasPrice
+	}
+
+	b.updateGasPriceAvg(gasPrices)
 }
 
 // writeBody writes the block body to the DB.
