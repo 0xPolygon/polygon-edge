@@ -311,7 +311,7 @@ func (s *Server) setupBootnodes() error {
 	s.bootnodes = &bootnodesWrapper{
 		bootnodeArr:       bootnodesArr,
 		bootnodesMap:      bootnodesMap,
-		bootnodeConnCount: int64(len(bootnodesArr)),
+		bootnodeConnCount: 0,
 	}
 
 	return nil
