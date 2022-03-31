@@ -2,45 +2,29 @@ package network
 
 import (
 	"context"
-	"crypto/rand"
 	"errors"
 	"fmt"
-	"math/big"
-	"net"
-	"regexp"
-	"strings"
+	"github.com/0xPolygon/polygon-edge/network/common"
+	"github.com/0xPolygon/polygon-edge/network/dial"
+	"github.com/0xPolygon/polygon-edge/network/discovery"
+	"github.com/libp2p/go-libp2p"
+	noise "github.com/libp2p/go-libp2p-noise"
+	rawGrpc "google.golang.org/grpc"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/chain"
+	peerEvent "github.com/0xPolygon/polygon-edge/network/event"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/hashicorp/go-hclog"
-	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/event"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
-	noise "github.com/libp2p/go-libp2p-noise"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/multiformats/go-multiaddr"
-)
-
-const (
-	DefaultDialRatio = 0.2
-
-	DefaultLibp2pPort int = 1478
-
-	MinimumPeerConnections int64 = 1
-
-	MinimumBootNodes int = 1
-
-	// Priority for dial queue
-	PriorityRequestedDial uint64 = 1
-
-	PriorityRandomDial uint64 = 10
 )
 
 const (
@@ -55,112 +39,56 @@ const (
 	validateBufferSize = 1024
 )
 
-// regex string  to match against a valid dns/dns4/dns6 addr
-const DNSRegex = `^/?(dns)(4|6)?/[^-|^/][A-Za-z0-9-]([^-|^/]?)+([\\-\\.]{1}[a-z0-9]+)*\\.[A-Za-z]{2,}(/?)$`
+const (
+	defaultBucketSize = 20
+	DefaultDialRatio  = 0.2
+
+	DefaultLibp2pPort int = 1478
+
+	MinimumPeerConnections int64 = 1
+	MinimumBootNodes       int   = 1
+)
 
 var (
 	ErrNoBootnodes  = errors.New("no bootnodes specified")
 	ErrMinBootnodes = errors.New("minimum 1 bootnode is required")
 )
 
-type Config struct {
-	NoDiscover       bool
-	Addr             *net.TCPAddr
-	NatAddr          net.IP
-	DNS              multiaddr.Multiaddr
-	DataDir          string
-	MaxPeers         int64
-	MaxInboundPeers  int64
-	MaxOutboundPeers int64
-	Chain            *chain.Chain
-	SecretsManager   secrets.SecretsManager
-	Metrics          *Metrics
-}
-
-func DefaultConfig() *Config {
-	return &Config{
-		NoDiscover:       false,
-		Addr:             &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: DefaultLibp2pPort},
-		MaxPeers:         40,
-		MaxInboundPeers:  32,
-		MaxOutboundPeers: 8,
-	}
-}
-
 type Server struct {
-	logger hclog.Logger
-	config *Config
+	logger hclog.Logger // the logger
+	config *Config      // the base networking server configuration
 
-	closeCh chan struct{}
+	closeCh chan struct{} // the channel used for closing the networking server
 
-	host  host.Host
-	addrs []multiaddr.Multiaddr
+	host  host.Host             // the libp2p host reference
+	addrs []multiaddr.Multiaddr // the list of supported (bound) addresses
 
-	peers     map[peer.ID]*Peer
-	peersLock sync.Mutex
+	peers     map[peer.ID]*PeerConnInfo // map of all peer connections
+	peersLock sync.Mutex                // lock for the peer map
 
-	metrics *Metrics
+	metrics *Metrics // reference for metrics tracking
 
-	dialQueue *dialQueue
+	dialQueue *dial.DialQueue // queue used to asynchronously connect to peers
 
-	identity  *identity
-	discovery *discovery
+	discovery *discovery.DiscoveryService // service used for discovering other peers
 
-	protocols     map[string]Protocol
-	protocolsLock sync.Mutex
+	protocols     map[string]Protocol // supported protocols
+	protocolsLock sync.Mutex          // lock for the supported protocols map
 
-	// Secrets manager
-	secretsManager secrets.SecretsManager
+	secretsManager secrets.SecretsManager // secrets manager for networking keys
 
-	// pubsub
-	ps *pubsub.PubSub
+	ps *pubsub.PubSub // reference to the networking PubSub service
 
-	joinWatchers     map[peer.ID]chan error
-	joinWatchersLock sync.Mutex
+	emitterPeerEvent event.Emitter // event emitter for listeners
 
-	emitterPeerEvent event.Emitter
+	connectionCounts *ConnectionInfo
 
-	inboundConnCount int64
+	temporaryDials sync.Map // map of temporary connections; peerID -> bool
+
+	bootnodes *bootnodesWrapper // reference of all bootnodes for the node
 }
 
-type Peer struct {
-	srv *Server
-
-	Info peer.AddrInfo
-
-	connDirection network.Direction
-}
-
-// setupLibp2pKey is a helper method for setting up the networking private key
-func setupLibp2pKey(secretsManager secrets.SecretsManager) (crypto.PrivKey, error) {
-	var key crypto.PrivKey
-
-	if secretsManager.HasSecret(secrets.NetworkKey) {
-		// The key is present in the secrets manager, read it
-		networkingKey, readErr := ReadLibp2pKey(secretsManager)
-		if readErr != nil {
-			return nil, fmt.Errorf("unable to read networking private key from Secrets Manager, %w", readErr)
-		}
-
-		key = networkingKey
-	} else {
-		// The key is not present in the secrets manager, generate it
-		libp2pKey, libp2pKeyEncoded, keyErr := GenerateAndEncodeLibp2pKey()
-		if keyErr != nil {
-			return nil, fmt.Errorf("unable to generate networking private key for Secrets Manager, %w", keyErr)
-		}
-
-		// Write the networking private key to disk
-		if setErr := secretsManager.SetSecret(secrets.NetworkKey, libp2pKeyEncoded); setErr != nil {
-			return nil, fmt.Errorf("unable to store networking private key to Secrets Manager, %w", setErr)
-		}
-
-		key = libp2pKey
-	}
-
-	return key, nil
-}
-
+// NewServer returns a new instance of the networking server
 func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	logger = logger.Named("network")
 
@@ -199,7 +127,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		return nil, fmt.Errorf("failed to create libp2p stack: %w", err)
 	}
 
-	emitter, err := host.EventBus().Emitter(new(PeerEvent))
+	emitter, err := host.EventBus().Emitter(new(peerEvent.PeerEvent))
 	if err != nil {
 		return nil, err
 	}
@@ -209,18 +137,23 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		config:           config,
 		host:             host,
 		addrs:            host.Addrs(),
-		peers:            map[peer.ID]*Peer{},
+		peers:            make(map[peer.ID]*PeerConnInfo),
 		metrics:          config.Metrics,
-		dialQueue:        newDialQueue(),
+		dialQueue:        dial.NewDialQueue(),
 		closeCh:          make(chan struct{}),
 		emitterPeerEvent: emitter,
 		protocols:        map[string]Protocol{},
 		secretsManager:   config.SecretsManager,
+		bootnodes: &bootnodesWrapper{
+			bootnodeArr:       make([]*peer.AddrInfo, 0),
+			bootnodesMap:      make(map[peer.ID]*peer.AddrInfo),
+			bootnodeConnCount: 0,
+		},
+		connectionCounts: NewBlankConnectionInfo(
+			config.MaxInboundPeers,
+			config.MaxOutboundPeers,
+		),
 	}
-
-	// start identity
-	srv.identity = &identity{srv: srv}
-	srv.identity.setup()
 
 	// start gossip protocol
 	ps, err := pubsub.NewGossipSub(
@@ -237,66 +170,149 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	return srv, nil
 }
 
-func (s *Server) Start() error {
-	if identityStartErr := s.identity.start(); identityStartErr != nil {
-		return identityStartErr
+// HasFreeConnectionSlot checks if there are free connection slots in the specified direction [Thread safe]
+func (s *Server) HasFreeConnectionSlot(direction network.Direction) bool {
+	return s.connectionCounts.HasFreeConnectionSlot(direction)
+}
+
+// PeerConnInfo holds the connection information about the peer
+type PeerConnInfo struct {
+	Info peer.AddrInfo
+
+	connDirections  map[network.Direction]bool
+	protocolStreams map[string]*rawGrpc.ClientConn
+}
+
+// addProtocolStream adds a protocol stream
+func (pci *PeerConnInfo) addProtocolStream(protocol string, stream *rawGrpc.ClientConn) {
+	pci.protocolStreams[protocol] = stream
+}
+
+// removeProtocolStream removes and closes a protocol stream
+func (pci *PeerConnInfo) removeProtocolStream(protocol string) error {
+	stream, ok := pci.protocolStreams[protocol]
+	if !ok {
+		return nil
 	}
 
-	go s.runDial()
-	go s.checkPeerConnections()
-	s.logger.Info("LibP2P server running", "addr", AddrInfoToString(s.AddrInfo()))
+	delete(pci.protocolStreams, protocol)
 
+	if stream != nil {
+		return stream.Close()
+	}
+
+	return nil
+}
+
+// getProtocolStream fetches the protocol stream, if any
+func (pci *PeerConnInfo) getProtocolStream(protocol string) *rawGrpc.ClientConn {
+	return pci.protocolStreams[protocol]
+}
+
+// setupLibp2pKey is a helper method for setting up the networking private key
+func setupLibp2pKey(secretsManager secrets.SecretsManager) (crypto.PrivKey, error) {
+	var key crypto.PrivKey
+
+	if secretsManager.HasSecret(secrets.NetworkKey) {
+		// The key is present in the secrets manager, read it
+		networkingKey, readErr := ReadLibp2pKey(secretsManager)
+		if readErr != nil {
+			return nil, fmt.Errorf("unable to read networking private key from Secrets Manager, %w", readErr)
+		}
+
+		key = networkingKey
+	} else {
+		// The key is not present in the secrets manager, generate it
+		libp2pKey, libp2pKeyEncoded, keyErr := GenerateAndEncodeLibp2pKey()
+		if keyErr != nil {
+			return nil, fmt.Errorf("unable to generate networking private key for Secrets Manager, %w", keyErr)
+		}
+
+		// Write the networking private key to disk
+		if setErr := secretsManager.SetSecret(secrets.NetworkKey, libp2pKeyEncoded); setErr != nil {
+			return nil, fmt.Errorf("unable to store networking private key to Secrets Manager, %w", setErr)
+		}
+
+		key = libp2pKey
+	}
+
+	return key, nil
+}
+
+// Start starts the networking services
+func (s *Server) Start() error {
+	s.logger.Info("LibP2P server running", "addr", common.AddrInfoToString(s.AddrInfo()))
+
+	if setupErr := s.setupIdentity(); setupErr != nil {
+		return fmt.Errorf("unable to setup identity, %w", setupErr)
+	}
+
+	// Set up the peer discovery mechanism if needed
 	if !s.config.NoDiscover {
-		// Check the bootnode config is present
-		if s.config.Chain.Bootnodes == nil {
-			return ErrNoBootnodes
+		// Parse the bootnode data
+		if setupErr := s.setupBootnodes(); setupErr != nil {
+			return fmt.Errorf("unable to parse bootnode data, %w", setupErr)
 		}
 
-		// Check if at least one bootnode is specified
-		if len(s.config.Chain.Bootnodes) < MinimumBootNodes {
-			return ErrMinBootnodes
-		}
-
-		// start discovery
-		s.discovery = &discovery{srv: s}
-
-		// try to decode the bootnodes
-		bootnodes := []*peer.AddrInfo{}
-
-		for _, raw := range s.config.Chain.Bootnodes {
-			node, err := StringToAddrInfo(raw)
-			if err != nil {
-				return fmt.Errorf("failed to parse bootnode %s: %w", raw, err)
-			}
-
-			if node.ID == s.host.ID() {
-				s.logger.Info("Omitting bootnode with same ID as host", "id", node.ID)
-
-				continue
-			}
-
-			bootnodes = append(bootnodes, node)
-		}
-
-		if setupErr := s.discovery.setup(bootnodes); setupErr != nil {
+		// Setup and start the discovery service
+		if setupErr := s.setupDiscovery(); setupErr != nil {
 			return fmt.Errorf("unable to setup discovery, %w", setupErr)
 		}
 	}
 
-	go func() {
-		if err := s.runJoinWatcher(); err != nil {
-			s.logger.Error(fmt.Sprintf("Unable to start join watcher service, %v", err))
-		}
-	}()
+	go s.runDial()
+	go s.checkPeerConnections()
 
 	// watch for disconnected peers
 	s.host.Network().Notify(&network.NotifyBundle{
 		DisconnectedF: func(net network.Network, conn network.Conn) {
-			go func() {
-				s.delPeer(conn.RemotePeer())
-			}()
+			// Update the local connection metrics
+			s.removePeer(conn.RemotePeer())
 		},
 	})
+
+	return nil
+}
+
+// setupBootnodes sets up the node's bootnode connections
+func (s *Server) setupBootnodes() error {
+	// Check the bootnode config is present
+	if s.config.Chain.Bootnodes == nil {
+		return ErrNoBootnodes
+	}
+
+	// Check if at least one bootnode is specified
+	if len(s.config.Chain.Bootnodes) < MinimumBootNodes {
+		return ErrMinBootnodes
+	}
+
+	bootnodesArr := make([]*peer.AddrInfo, 0)
+	bootnodesMap := make(map[peer.ID]*peer.AddrInfo)
+
+	for _, rawAddr := range s.config.Chain.Bootnodes {
+		bootnode, err := common.StringToAddrInfo(rawAddr)
+		if err != nil {
+			return fmt.Errorf("failed to parse bootnode %s: %w", rawAddr, err)
+		}
+
+		if bootnode.ID == s.host.ID() {
+			s.logger.Info("Omitting bootnode with same ID as host", "id", bootnode.ID)
+
+			continue
+		}
+
+		bootnodesArr = append(bootnodesArr, bootnode)
+		bootnodesMap[bootnode.ID] = bootnode
+	}
+
+	// It's fine for the bootnodes field to be unprotected
+	// at this point because it is initialized once (doesn't change),
+	// and used only after this point
+	s.bootnodes = &bootnodesWrapper{
+		bootnodeArr:       bootnodesArr,
+		bootnodesMap:      bootnodesMap,
+		bootnodeConnCount: 0,
+	}
 
 	return nil
 }
@@ -311,23 +327,35 @@ func (s *Server) checkPeerConnections() {
 		}
 
 		if s.numPeers() < MinimumPeerConnections {
-			if s.config.NoDiscover || len(s.discovery.bootnodes) == 0 {
+			if s.config.NoDiscover || !s.bootnodes.hasBootnodes() {
 				//TODO: dial peers from the peerstore
 			} else {
-				randomNode := s.getRandomBootNode()
-				s.addToDialQueue(randomNode, PriorityRandomDial)
+				randomNode := s.GetRandomBootnode()
+				s.addToDialQueue(randomNode, common.PriorityRandomDial)
 			}
 		}
 	}
 }
 
+// runDial starts the networking server's dial loop.
+// Essentially, the networking server monitors for any open connection slots
+// and attempts to fill them as soon as they open up
 func (s *Server) runDial() {
-	// watch for events of peers included or removed
-	notifyCh := make(chan struct{})
-	err := s.SubscribeFn(func(evnt *PeerEvent) {
+	// The notification channel needs to be buffered to avoid
+	// having events go missing, as they're crucial to the functioning
+	// of the runDial mechanism
+	notifyCh := make(chan struct{}, 1)
+	defer close(notifyCh)
+
+	if err := s.SubscribeFn(func(event *peerEvent.PeerEvent) {
 		// Only concerned about the listed event types
-		switch evnt.Type {
-		case PeerConnected, PeerFailedToConnect, PeerDisconnected, PeerDialCompleted, PeerAddedToDialQueue:
+		switch event.Type {
+		case
+			peerEvent.PeerConnected,
+			peerEvent.PeerFailedToConnect,
+			peerEvent.PeerDisconnected,
+			peerEvent.PeerDialCompleted, // @Yoshiki, not sure we need to monitor this event type here
+			peerEvent.PeerAddedToDialQueue:
 		default:
 			return
 		}
@@ -336,35 +364,41 @@ func (s *Server) runDial() {
 		case notifyCh <- struct{}{}:
 		default:
 		}
-	})
+	}); err != nil {
+		s.logger.Error(
+			"Cannot instantiate an event subscription for the dial manager",
+			"err",
+			err,
+		)
 
-	if err != nil {
-		s.logger.Error("dial manager failed to subscribe", "err", err)
+		// Failing to subscribe to network events is fatal since the
+		// dial manager relies on the event subscription routine to function
+		return
 	}
 
 	for {
 		// TODO: Right now the dial task are done sequentially because Connect
 		// is a blocking request. In the future we should try to make up to
-		// maxDials requests concurrently.
-		for i := int64(0); i < s.numOpenSlots(); i++ {
-			tt := s.dialQueue.pop()
+		// maxDials requests concurrently
+		for s.connectionCounts.HasFreeOutboundConn() {
+			tt := s.dialQueue.PopTask()
 			if tt == nil {
-				// dial closed
+				// The dial queue is closed,
+				// no further dial tasks are incoming
 				return
 			}
 
-			s.logger.Debug("dial", "local", s.host.ID(), "addr", tt.addr.String())
+			peerInfo := tt.GetAddrInfo()
 
-			if s.isConnected(tt.addr.ID) {
-				// the node is already connected, send an event to wake up
-				// any join watchers
-				s.emitEvent(tt.addr.ID, PeerAlreadyConnected)
-			} else {
+			s.logger.Debug(fmt.Sprintf("Dialing peer [%s] as local [%s]", peerInfo.String(), s.host.ID()))
+
+			if !s.isConnected(peerInfo.ID) {
 				// the connection process is async because it involves connection (here) +
 				// the handshake done in the identity service.
-				if err := s.host.Connect(context.Background(), *tt.addr); err != nil {
-					s.logger.Debug("failed to dial", "addr", tt.addr.String(), "err", err)
-					s.emitEvent(tt.addr.ID, PeerFailedToConnect)
+				if err := s.host.Connect(context.Background(), *peerInfo); err != nil {
+					s.logger.Debug("failed to dial", "addr", peerInfo.String(), "err", err)
+
+					s.emitEvent(peerInfo.ID, peerEvent.PeerFailedToConnect)
 				}
 			}
 		}
@@ -379,6 +413,7 @@ func (s *Server) runDial() {
 	}
 }
 
+// numPeers returns the number of connected peers [Thread safe]
 func (s *Server) numPeers() int64 {
 	s.peersLock.Lock()
 	defer s.peersLock.Unlock()
@@ -386,25 +421,21 @@ func (s *Server) numPeers() int64 {
 	return int64(len(s.peers))
 }
 
-func (s *Server) getRandomBootNode() *peer.AddrInfo {
-	randNum, _ := rand.Int(rand.Reader, big.NewInt(int64(len(s.discovery.bootnodes))))
-
-	return s.discovery.bootnodes[randNum.Int64()]
-}
-
-func (s *Server) Peers() []*Peer {
+// Peers returns a copy of the networking server's peer connection info set.
+// Only one (initial) connection (inbound OR outbound) per peer is contained [Thread safe]
+func (s *Server) Peers() []*PeerConnInfo {
 	s.peersLock.Lock()
 	defer s.peersLock.Unlock()
 
-	peers := make([]*Peer, 0, len(s.peers))
-	for _, p := range s.peers {
-		peers = append(peers, p)
+	peers := make([]*PeerConnInfo, 0)
+	for _, connectionInfo := range s.peers {
+		peers = append(peers, connectionInfo)
 	}
 
 	return peers
 }
 
-// hasPeer checks if the peer is present in the peers list [Thread-safe]
+// hasPeer checks if the peer is present in the peers list [Thread safe]
 func (s *Server) hasPeer(peerID peer.ID) bool {
 	s.peersLock.Lock()
 	defer s.peersLock.Unlock()
@@ -414,93 +445,85 @@ func (s *Server) hasPeer(peerID peer.ID) bool {
 	return ok
 }
 
-func (s *Server) numOpenSlots() int64 {
-	n := s.maxOutboundConns() - s.outboundConns()
-	if n < 0 {
-		n = 0
-	}
-
-	return n
-}
-
-func (s *Server) inboundConns() int64 {
-	count := atomic.LoadInt64(&s.inboundConnCount)
-	if count < 0 {
-		count = 0
-	}
-
-	return count + s.identity.pendingInboundConns()
-}
-
-func (s *Server) outboundConns() int64 {
-	return (s.numPeers() - atomic.LoadInt64(&s.inboundConnCount)) + s.identity.pendingOutboundConns()
-}
-
-func (s *Server) maxInboundConns() int64 {
-	return s.config.MaxInboundPeers
-}
-
-func (s *Server) maxOutboundConns() int64 {
-	return s.config.MaxOutboundPeers
-}
-
+// isConnected checks if the networking server is connected to a peer
 func (s *Server) isConnected(peerID peer.ID) bool {
 	return s.host.Network().Connectedness(peerID) == network.Connected
 }
 
+// GetProtocols fetches the list of node-supported protocols
 func (s *Server) GetProtocols(peerID peer.ID) ([]string, error) {
 	return s.host.Peerstore().GetProtocols(peerID)
 }
 
-func (s *Server) GetPeerInfo(peerID peer.ID) peer.AddrInfo {
-	return s.host.Peerstore().PeerInfo(peerID)
+// removePeer removes a peer from the networking server's peer list,
+// and updates relevant counters and metrics. It is called from the
+// disconnection callback of the libp2p network bundle (when the connection is closed)
+func (s *Server) removePeer(peerID peer.ID) {
+	s.logger.Info("Peer disconnected", "id", peerID.String())
+
+	// Remove the peer from the peers map
+	connectionInfo := s.removePeerInfo(peerID)
+	if connectionInfo == nil {
+		// The peer wasn't present in the local peers info table
+		// so no action should be taken further
+		return
+	}
+
+	// Emit the event alerting listeners
+	s.emitEvent(peerID, peerEvent.PeerDisconnected)
 }
 
-func (s *Server) addPeer(id peer.ID, direction network.Direction) {
-	s.logger.Info("Peer connected", "id", id.String())
+// removePeerInfo removes (pops) peer connection info from the networking
+// server's peer map. Returns nil if no peer was removed
+func (s *Server) removePeerInfo(peerID peer.ID) *PeerConnInfo {
 	s.peersLock.Lock()
 	defer s.peersLock.Unlock()
 
-	p := &Peer{
-		srv:           s,
-		Info:          s.host.Peerstore().PeerInfo(id),
-		connDirection: direction,
-	}
-	s.peers[id] = p
-
-	if direction == network.DirInbound {
-		atomic.AddInt64(&s.inboundConnCount, 1)
-	}
-
-	s.emitEvent(id, PeerConnected)
-	s.metrics.Peers.Set(float64(len(s.peers)))
-}
-
-func (s *Server) delPeer(id peer.ID) {
-	s.logger.Info("Peer disconnected", "id", id.String())
-
-	s.peersLock.Lock()
-	defer s.peersLock.Unlock()
-
-	if peer, ok := s.peers[id]; ok {
-		if peer.connDirection == network.DirInbound {
-			atomic.AddInt64(&s.inboundConnCount, -1)
-		}
-
-		delete(s.peers, id)
-	}
-
-	if closeErr := s.host.Network().ClosePeer(id); closeErr != nil {
-		s.logger.Error(
-			fmt.Sprintf("Unable to gracefully close connection to peer [%s], %v", id.String(), closeErr),
+	// Remove the peer from the peers map
+	connectionInfo, ok := s.peers[peerID]
+	if !ok {
+		// Peer is not present in the peers map
+		s.logger.Warn(
+			fmt.Sprintf("Attempted removing missing peer info %s", peerID),
 		)
+
+		return nil
 	}
 
-	s.emitEvent(id, PeerDisconnected)
-	s.metrics.Peers.Set(float64(len(s.peers)))
+	// Delete the peer from the peers map
+	delete(s.peers, peerID)
+
+	// Update connection counters
+	for connDirection, active := range connectionInfo.connDirections {
+		if active {
+			s.connectionCounts.UpdateConnCountByDirection(-1, connDirection)
+			s.updateConnCountMetrics(connDirection)
+			s.updateBootnodeConnCount(peerID, -1)
+		}
+	}
+
+	s.metrics.TotalPeerCount.Set(
+		float64(len(s.peers)),
+	)
+
+	return connectionInfo
 }
 
-func (s *Server) Disconnect(peer peer.ID, reason string) {
+// updateBootnodeConnCount attempts to update the bootnode connection count
+// by delta if the action is valid [Thread safe]
+func (s *Server) updateBootnodeConnCount(peerID peer.ID, delta int64) {
+	if s.config.NoDiscover || !s.bootnodes.isBootnode(peerID) {
+		// If the discovery service is not running
+		// or the peer is not a bootnode, there is no need
+		// to update bootnode connection counters
+		return
+	}
+
+	s.bootnodes.increaseBootnodeConnCount(delta)
+}
+
+// DisconnectFromPeer disconnects the networking server from the specified peer
+func (s *Server) DisconnectFromPeer(peer peer.ID, reason string) {
 	if s.host.Network().Connectedness(peer) == network.Connected {
 		s.logger.Info(fmt.Sprintf("Closing connection to peer [%s] for reason [%s]", peer.String(), reason))
 
@@ -516,96 +539,62 @@ var (
 	DefaultBufferTimeout = DefaultJoinTimeout + time.Second*5
 )
 
-func (s *Server) JoinAddr(addr string, timeout time.Duration) error {
-	addr0, err := multiaddr.NewMultiaddr(addr)
+// JoinPeer attempts to add a new peer to the networking server
+func (s *Server) JoinPeer(rawPeerMultiaddr string) error {
+	// Parse the raw string to a MultiAddr format
+	parsedMultiaddr, err := multiaddr.NewMultiaddr(rawPeerMultiaddr)
 	if err != nil {
 		return err
 	}
 
-	addr1, err := peer.AddrInfoFromP2pAddr(addr0)
-
+	// Extract the peer info from the Multiaddr
+	peerInfo, err := peer.AddrInfoFromP2pAddr(parsedMultiaddr)
 	if err != nil {
 		return err
 	}
 
-	return s.Join(addr1, timeout)
+	// Mark the peer as ripe for dialing (async)
+	s.joinPeer(peerInfo)
+
+	return nil
 }
 
-func (s *Server) Join(addr *peer.AddrInfo, timeout time.Duration) error {
-	s.logger.Info("Join request", "addr", addr.String())
-	s.addToDialQueue(addr, PriorityRequestedDial)
+// joinPeer creates a new dial task for the peer (for async joining)
+func (s *Server) joinPeer(peerInfo *peer.AddrInfo) {
+	s.logger.Info("Join request", "addr", peerInfo.String())
 
-	if timeout == 0 {
-		return nil
-	}
-
-	err := s.watch(addr.ID, timeout)
-
-	return err
-}
-
-func (s *Server) watch(peerID peer.ID, dur time.Duration) error {
-	ch := make(chan error)
-
-	s.joinWatchersLock.Lock()
-	if s.joinWatchers == nil {
-		s.joinWatchers = map[peer.ID]chan error{}
-	}
-
-	s.joinWatchers[peerID] = ch
-	s.joinWatchersLock.Unlock()
-
-	select {
-	case <-time.After(dur):
-		s.joinWatchersLock.Lock()
-		delete(s.joinWatchers, peerID)
-		s.joinWatchersLock.Unlock()
-
-		return fmt.Errorf("timeout %s %s", s.host.ID(), peerID)
-	case err := <-ch:
-		return err
-	}
-}
-
-func (s *Server) runJoinWatcher() error {
-	return s.SubscribeFn(func(evnt *PeerEvent) {
-		switch evnt.Type {
-		// only concerned about PeerConnected, PeerFailedToConnect, and PeerAlreadyConnected
-		case PeerConnected, PeerFailedToConnect, PeerAlreadyConnected:
-		default:
-			return
-		}
-
-		// try to find a watcher for this peer
-		s.joinWatchersLock.Lock()
-		errCh, ok := s.joinWatchers[evnt.PeerID]
-		if ok {
-			errCh <- nil
-			delete(s.joinWatchers, evnt.PeerID)
-		}
-		s.joinWatchersLock.Unlock()
-	})
+	// This method can be completely refactored to support some kind of active
+	// feedback information on the dial status, and not just asynchronous updates.
+	// For this feature to work, the networking server requires a flexible event subscription
+	// manager that is configurable and cancelable at any point in time
+	s.addToDialQueue(peerInfo, common.PriorityRequestedDial)
 }
 
 func (s *Server) Close() error {
 	err := s.host.Close()
 	s.dialQueue.Close()
+
+	if !s.config.NoDiscover {
+		s.discovery.Close()
+	}
+
 	close(s.closeCh)
 
 	return err
 }
 
-func (s *Server) NewProtoStream(proto string, id peer.ID) (interface{}, error) {
+// newProtoConnection opens up a new stream on the set protocol to the peer,
+// and returns a reference to the connection
+func (s *Server) newProtoConnection(protocol string, peerID peer.ID) (*rawGrpc.ClientConn, error) {
 	s.protocolsLock.Lock()
 	defer s.protocolsLock.Unlock()
 
-	p, ok := s.protocols[proto]
+	p, ok := s.protocols[protocol]
 	if !ok {
-		return nil, fmt.Errorf("protocol not found: %s", proto)
+		return nil, fmt.Errorf("protocol not found: %s", protocol)
 	}
 
-	stream, err := s.NewStream(proto, id)
-
+	stream, err := s.NewStream(protocol, peerID)
 	if err != nil {
 		return nil, err
 	}
@@ -618,15 +607,16 @@ func (s *Server) NewStream(proto string, id peer.ID) (network.Stream, error) {
 }
 
 type Protocol interface {
-	Client(network.Stream) interface{}
+	Client(network.Stream) *rawGrpc.ClientConn
 	Handler() func(network.Stream)
 }
 
-func (s *Server) Register(id string, p Protocol) {
+func (s *Server) RegisterProtocol(id string, p Protocol) {
 	s.protocolsLock.Lock()
+	defer s.protocolsLock.Unlock()
+
 	s.protocols[id] = p
 	s.wrapStream(id, p.Handler())
-	s.protocolsLock.Unlock()
 }
 
 func (s *Server) wrapStream(id string, handle func(network.Stream)) {
@@ -645,42 +635,41 @@ func (s *Server) AddrInfo() *peer.AddrInfo {
 	}
 }
 
-func (s *Server) addToDialQueue(addr *peer.AddrInfo, priority uint64) {
-	s.dialQueue.add(addr, priority)
-	s.emitEvent(addr.ID, PeerAddedToDialQueue)
+func (s *Server) addToDialQueue(addr *peer.AddrInfo, priority common.DialPriority) {
+	s.dialQueue.AddTask(addr, priority)
+	s.emitEvent(addr.ID, peerEvent.PeerAddedToDialQueue)
 }
 
-func (s *Server) emitEvent(peerID peer.ID, typ PeerEventType) {
-	evnt := PeerEvent{
+func (s *Server) emitEvent(peerID peer.ID, peerEventType peerEvent.PeerEventType) {
+	// POTENTIALLY BLOCKING
+	if err := s.emitterPeerEvent.Emit(peerEvent.PeerEvent{
 		PeerID: peerID,
-		Type:   typ,
-	}
-
-	if err := s.emitterPeerEvent.Emit(evnt); err != nil {
-		s.logger.Info("failed to emit event", "peer", evnt.PeerID, "type", evnt.Type, "err", err)
+		Type:   peerEventType,
+	}); err != nil {
+		s.logger.Info("failed to emit event", "peer", peerID, "type", peerEventType, "err", err)
 	}
 }
 
 type Subscription struct {
 	sub event.Subscription
-	ch  chan *PeerEvent
+	ch  chan *peerEvent.PeerEvent
 }
 
 func (s *Subscription) run() {
 	// convert interface{} to *PeerEvent channels
 	for {
 		evnt := <-s.sub.Out()
-		if obj, ok := evnt.(PeerEvent); ok {
+		if obj, ok := evnt.(peerEvent.PeerEvent); ok {
 			s.ch <- &obj
 		}
 	}
 }
 
-func (s *Subscription) GetCh() chan *PeerEvent {
+func (s *Subscription) GetCh() chan *peerEvent.PeerEvent {
 	return s.ch
 }
 
-func (s *Subscription) Get() *PeerEvent {
+func (s *Subscription) Get() *peerEvent.PeerEvent {
 	obj := <-s.ch
 
 	return obj
@@ -692,14 +681,14 @@ func (s *Subscription) Close() {
 
 // Subscribe starts a PeerEvent subscription
 func (s *Server) Subscribe() (*Subscription, error) {
-	raw, err := s.host.EventBus().Subscribe(new(PeerEvent))
+	raw, err := s.host.EventBus().Subscribe(new(peerEvent.PeerEvent))
 	if err != nil {
 		return nil, err
 	}
 
 	sub := &Subscription{
 		sub: raw,
-		ch:  make(chan *PeerEvent),
+		ch:  make(chan *peerEvent.PeerEvent),
 	}
 	go sub.run()
 
@@ -707,7 +696,7 @@ func (s *Server) Subscribe() (*Subscription, error) {
 }
 
 // SubscribeFn is a helper method to run subscription of PeerEvents
-func (s *Server) SubscribeFn(handler func(evnt *PeerEvent)) error {
+func (s *Server) SubscribeFn(handler func(evnt *peerEvent.PeerEvent)) error {
 	sub, err := s.Subscribe()
 	if err != nil {
 		return err
@@ -731,12 +720,12 @@ func (s *Server) SubscribeFn(handler func(evnt *PeerEvent)) error {
 }
 
 // SubscribeCh returns an event of of subscription events
-func (s *Server) SubscribeCh() (<-chan *PeerEvent, error) {
-	ch := make(chan *PeerEvent)
+func (s *Server) SubscribeCh() (<-chan *peerEvent.PeerEvent, error) {
+	ch := make(chan *peerEvent.PeerEvent)
 
 	var isClosed int32 = 0
 
-	err := s.SubscribeFn(func(evnt *PeerEvent) {
+	err := s.SubscribeFn(func(evnt *peerEvent.PeerEvent) {
 		if atomic.LoadInt32(&isClosed) == 0 {
 			ch <- evnt
 		}
@@ -757,148 +746,30 @@ func (s *Server) SubscribeCh() (<-chan *PeerEvent, error) {
 	return ch, nil
 }
 
-func StringToAddrInfo(addr string) (*peer.AddrInfo, error) {
-	addr0, err := multiaddr.NewMultiaddr(addr)
-	if err != nil {
-		return nil, err
+// updateConnCountMetrics updates the connection count metrics
+func (s *Server) updateConnCountMetrics(direction network.Direction) {
+	switch direction {
+	case network.DirInbound:
+		s.metrics.InboundConnectionsCount.Set(
+			float64(s.connectionCounts.GetInboundConnCount()),
+		)
+	case network.DirOutbound:
+		s.metrics.OutboundConnectionsCount.Set(
+			float64(s.connectionCounts.GetOutboundConnCount()),
+		)
 	}
-
-	addr1, err := peer.AddrInfoFromP2pAddr(addr0)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return addr1, nil
 }
 
-var (
-	// Regex used for matching loopback addresses (IPv4, IPv6, DNS)
-	// This regex will match:
-	// /ip4/localhost/tcp/<port>
-	// /ip4/127.0.0.1/tcp/<port>
-	// /ip4/<any other loopback>/tcp/<port>
-	// /ip6/<any loopback>/tcp/<port>
-	// /dns/foobar.com/tcp/<port>
-	loopbackRegex = regexp.MustCompile(
-		//nolint:lll
-		fmt.Sprintf(`^\/ip4\/127(?:\.[0-9]+){0,2}\.[0-9]+\/tcp\/\d+$|^\/ip4\/localhost\/tcp\/\d+$|^\/ip6\/(?:0*\:)*?:?0*1\/tcp\/\d+$|%s`, DNSRegex),
-	)
-
-	dnsRegex = "^/?(dns)(4|6)?/[^-|^/][A-Za-z0-9-]([^-|^/]?)+([\\-\\.]{1}[a-z0-9]+)*\\.[A-Za-z]{2,}(/?)$"
-)
-
-// AddrInfoToString converts an AddrInfo into a string representation that can be dialed from another node
-func AddrInfoToString(addr *peer.AddrInfo) string {
-	// Safety check
-	if len(addr.Addrs) == 0 {
-		panic("No dial addresses found")
+// updatePendingConnCountMetrics updates the pending connection count metrics
+func (s *Server) updatePendingConnCountMetrics(direction network.Direction) {
+	switch direction {
+	case network.DirInbound:
+		s.metrics.PendingInboundConnectionsCount.Set(
+			float64(s.connectionCounts.GetPendingInboundConnCount()),
+		)
+	case network.DirOutbound:
+		s.metrics.PendingOutboundConnectionsCount.Set(
+			float64(s.connectionCounts.GetPendingOutboundConnCount()),
+		)
 	}
-
-	dialAddress := addr.Addrs[0].String()
-
-	// Try to see if a non loopback address is present in the list
-	if len(addr.Addrs) > 1 && loopbackRegex.MatchString(dialAddress) {
-		// Find an address that's not a loopback address
-		for _, address := range addr.Addrs {
-			if !loopbackRegex.MatchString(address.String()) {
-				// Not a loopback address, dial address found
-				dialAddress = address.String()
-
-				break
-			}
-		}
-	}
-
-	// Format output and return
-	return dialAddress + "/p2p/" + addr.ID.String()
-}
-
-// MultiAddrFromDNS constructs a multiAddr from the passed in DNS address and port combination
-func MultiAddrFromDNS(addr string, port int) (multiaddr.Multiaddr, error) {
-	var (
-		version string
-		domain  string
-	)
-
-	match, err := regexp.MatchString(
-		dnsRegex,
-		addr,
-	)
-	if err != nil || !match {
-		return nil, errors.New("invalid DNS address")
-	}
-
-	s := strings.Trim(addr, "/")
-	split := strings.Split(s, "/")
-
-	if len(split) != 2 {
-		return nil, errors.New("invalid DNS address")
-	}
-
-	switch split[0] {
-	case "dns":
-		version = "dns"
-	case "dns4":
-		version = "dns4"
-	case "dns6":
-		version = "dns6"
-	default:
-		return nil, errors.New("invalid DNS version")
-	}
-
-	domain = split[1]
-
-	multiAddr, err := multiaddr.NewMultiaddr(
-		fmt.Sprintf(
-			"/%s/%s/tcp/%d",
-			version,
-			domain,
-			port,
-		),
-	)
-
-	if err != nil {
-		return nil, errors.New("could not create a multi address")
-	}
-
-	return multiAddr, nil
-}
-
-type PeerEventType uint
-
-const (
-	PeerConnected        PeerEventType = iota // Emitted when a peer connected
-	PeerFailedToConnect                       // Emitted when a peer failed to connect
-	PeerDisconnected                          // Emitted when a peer disconnected from node
-	PeerAlreadyConnected                      // Emitted when a peer already connected on dial
-	PeerDialCompleted                         // Emitted when a peer completed dial
-	PeerAddedToDialQueue                      // Emitted when a peer is added to dial queue
-)
-
-var peerEventToName = map[PeerEventType]string{
-	PeerConnected:        "PeerConnected",
-	PeerFailedToConnect:  "PeerFailedToConnect",
-	PeerDisconnected:     "PeerDisconnected",
-	PeerAlreadyConnected: "PeerAlreadyConnected",
-	PeerDialCompleted:    "PeerDialCompleted",
-	PeerAddedToDialQueue: "PeerAddedToDialQueue",
-}
-
-func (s PeerEventType) String() string {
-	name, ok := peerEventToName[s]
-	if !ok {
-		return "unknown"
-	}
-
-	return name
-}
-
-type PeerEvent struct {
-	// PeerID is the id of the peer that triggered
-	// the event
-	PeerID peer.ID
-
-	// Type is the type of the event
-	Type PeerEventType
 }

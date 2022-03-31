@@ -4,7 +4,6 @@ package proto
 
 import (
 	context "context"
-	empty "github.com/golang/protobuf/ptypes/empty"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -20,7 +19,6 @@ const _ = grpc.SupportPackageIsVersion7
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type IdentityClient interface {
 	Hello(ctx context.Context, in *Status, opts ...grpc.CallOption) (*Status, error)
-	Bye(ctx context.Context, in *ByeMsg, opts ...grpc.CallOption) (*empty.Empty, error)
 }
 
 type identityClient struct {
@@ -40,21 +38,11 @@ func (c *identityClient) Hello(ctx context.Context, in *Status, opts ...grpc.Cal
 	return out, nil
 }
 
-func (c *identityClient) Bye(ctx context.Context, in *ByeMsg, opts ...grpc.CallOption) (*empty.Empty, error) {
-	out := new(empty.Empty)
-	err := c.cc.Invoke(ctx, "/v1.Identity/Bye", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // IdentityServer is the server API for Identity service.
 // All implementations must embed UnimplementedIdentityServer
 // for forward compatibility
 type IdentityServer interface {
 	Hello(context.Context, *Status) (*Status, error)
-	Bye(context.Context, *ByeMsg) (*empty.Empty, error)
 	mustEmbedUnimplementedIdentityServer()
 }
 
@@ -64,9 +52,6 @@ type UnimplementedIdentityServer struct {
 
 func (UnimplementedIdentityServer) Hello(context.Context, *Status) (*Status, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Hello not implemented")
-}
-func (UnimplementedIdentityServer) Bye(context.Context, *ByeMsg) (*empty.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Bye not implemented")
 }
 func (UnimplementedIdentityServer) mustEmbedUnimplementedIdentityServer() {}
 
@@ -99,24 +84,6 @@ func _Identity_Hello_Handler(srv interface{}, ctx context.Context, dec func(inte
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Identity_Bye_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ByeMsg)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(IdentityServer).Bye(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/v1.Identity/Bye",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(IdentityServer).Bye(ctx, req.(*ByeMsg))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // Identity_ServiceDesc is the grpc.ServiceDesc for Identity service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -128,11 +95,7 @@ var Identity_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "Hello",
 			Handler:    _Identity_Hello_Handler,
 		},
-		{
-			MethodName: "Bye",
-			Handler:    _Identity_Bye_Handler,
-		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "network/proto/identity.proto",
+	Metadata: "identity.proto",
 }

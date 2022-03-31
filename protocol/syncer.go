@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/0xPolygon/polygon-edge/network/event"
 	"math"
 	"math/big"
 	"sync"
@@ -362,7 +363,7 @@ func (s *Syncer) Start() {
 	grpcStream := libp2pGrpc.NewGrpcStream()
 	proto.RegisterV1Server(grpcStream.GrpcServer(), s.serviceV1)
 	grpcStream.Serve()
-	s.server.Register(syncerV1, grpcStream)
+	s.server.RegisterProtocol(syncerV1, grpcStream)
 
 	s.setupPeers()
 
@@ -395,11 +396,11 @@ func (s *Syncer) handlePeerEvent() {
 			}
 
 			switch evnt.Type {
-			case network.PeerConnected:
+			case event.PeerConnected:
 				if err := s.AddPeer(evnt.PeerID); err != nil {
 					s.logger.Error("failed to add peer", "err", err)
 				}
-			case network.PeerDisconnected:
+			case event.PeerDisconnected:
 				if err := s.DeletePeer(evnt.PeerID); err != nil {
 					s.logger.Error("failed to delete user", "err", err)
 				}

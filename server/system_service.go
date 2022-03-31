@@ -5,10 +5,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
-
 	"github.com/0xPolygon/polygon-edge/blockchain"
-	"github.com/0xPolygon/polygon-edge/network"
+	"github.com/0xPolygon/polygon-edge/network/common"
 	"github.com/0xPolygon/polygon-edge/server/proto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -37,7 +35,7 @@ func (s *systemService) GetStatus(ctx context.Context, req *empty.Empty) (*proto
 			Number: int64(header.Number),
 			Hash:   header.Hash.String(),
 		},
-		P2PAddr: network.AddrInfoToString(s.server.network.AddrInfo()),
+		P2PAddr: common.AddrInfoToString(s.server.network.AddrInfo()),
 	}
 
 	return status, nil
@@ -85,15 +83,16 @@ func (s *systemService) Subscribe(req *empty.Empty, stream proto.System_Subscrib
 }
 
 // PeersAdd implements the 'peers add' operator service
-func (s *systemService) PeersAdd(ctx context.Context, req *proto.PeersAddRequest) (*empty.Empty, error) {
-	dur := time.Duration(0)
-	if req.Blocked {
-		dur = network.DefaultJoinTimeout
+func (s *systemService) PeersAdd(_ context.Context, req *proto.PeersAddRequest) (*proto.PeersAddResponse, error) {
+	if joinErr := s.server.JoinPeer(req.Id); joinErr != nil {
+		return &proto.PeersAddResponse{
+			Message: "Unable to successfully add peer",
+		}, joinErr
 	}
 
-	err := s.server.Join(req.Id, dur)
-
-	return &empty.Empty{}, err
+	return &proto.PeersAddResponse{
+		Message: "Peer address marked ready for dialing",
+	}, nil
 }
 
 // PeersStatus implements the 'peers status' operator service
@@ -156,7 +155,7 @@ func (s *systemService) PeersList(
 	return resp, nil
 }
 
-// BlockByNumberRequest implements the BlockByNumberRequest operator service
+// BlockByNumber implements the BlockByNumber operator service
 func (s *systemService) BlockByNumber(
 	ctx context.Context,
 	req *proto.BlockByNumberRequest,
