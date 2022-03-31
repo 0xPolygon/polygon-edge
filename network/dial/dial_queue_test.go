@@ -23,8 +23,8 @@ func TestDialQueue(t *testing.T) {
 	q.AddTask(info1, 1)
 	assert.Equal(t, 2, q.heap.Len())
 
-	assert.Equal(t, q.popTaskImpl().addr.ID, peer.ID("a"))
-	assert.Equal(t, q.popTaskImpl().addr.ID, peer.ID("b"))
+	assert.Equal(t, q.popTaskImpl().addrInfo.ID, peer.ID("a"))
+	assert.Equal(t, q.popTaskImpl().addrInfo.ID, peer.ID("b"))
 	assert.Equal(t, 0, q.heap.Len())
 
 	assert.Nil(t, q.popTaskImpl())
@@ -158,7 +158,7 @@ func TestDel(t *testing.T) {
 					q.DeleteTask(id)
 				case ActionPop:
 					d := q.PopTask()
-					assert.Equal(t, id, d.addr.ID)
+					assert.Equal(t, id, d.addrInfo.ID)
 				default:
 					t.Errorf("unsupported action: %s", task.action)
 				}

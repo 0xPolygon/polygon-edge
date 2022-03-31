@@ -88,17 +88,17 @@ func (d *DialQueue) DeleteTask(peer peer.ID) {
 
 // AddTask adds a new task to the dial queue
 func (d *DialQueue) AddTask(
-	addr *peer.AddrInfo,
+	addrInfo *peer.AddrInfo,
 	priority common.DialPriority,
 ) {
 	d.Lock()
 	defer d.Unlock()
 
 	task := &DialTask{
-		addr:     addr,
+		addrInfo: addrInfo,
 		priority: uint64(priority),
 	}
-	d.tasks[addr.ID] = task
+	d.tasks[addrInfo.ID] = task
 	heap.Push(&d.heap, task)
 
 	select {
