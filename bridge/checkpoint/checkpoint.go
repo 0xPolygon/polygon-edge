@@ -6,10 +6,12 @@ import (
 	ctypes "github.com/0xPolygon/polygon-edge/bridge/checkpoint/types"
 	"github.com/0xPolygon/polygon-edge/bridge/sam"
 	"github.com/0xPolygon/polygon-edge/bridge/utils"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/Trapesys/fastmerkle"
 	"github.com/hashicorp/go-hclog"
+	"math/big"
 )
 
 type Checkpoint interface {
@@ -132,7 +134,12 @@ func (c *checkpoint) generateCheckpoint(blocks []*types.Block) (*ctypes.Checkpoi
 	// Generate the Merkle root for the block hashes
 	blockHashes := make([][]byte, len(blocks))
 	for i, block := range blocks {
-		blockHashes[i] = block.Hash().Bytes()
+		blockHashes[i] = common.ConcatData([][]byte{
+			big.NewInt(int64(block.Header.Number)).Bytes(),
+			big.NewInt(int64(block.Header.Timestamp)).Bytes(),
+			block.Header.TxRoot.Bytes(),
+			block.Header.ReceiptsRoot.Bytes(),
+		})
 	}
 
 	blocksMerkleTree, treeErr := fastmerkle.GenerateMerkleTree(blockHashes)

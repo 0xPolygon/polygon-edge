@@ -56,6 +56,17 @@ func ConvertUnmarshalledInt(x interface{}) (int64, error) {
 	}
 }
 
+// ConcatData concatenates multiple slices
+// into a single byte array
+func ConcatData(slices [][]byte) []byte {
+	var tmp []byte
+	for _, s := range slices {
+		tmp = append(tmp, s...)
+	}
+
+	return tmp
+}
+
 func roundFloat(num float64) int64 {
 	return int64(num + math.Copysign(0.5, num))
 }
