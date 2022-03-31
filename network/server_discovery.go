@@ -102,7 +102,19 @@ func (s *Server) saveProtocolStream(
 	s.peersLock.Lock()
 	defer s.peersLock.Unlock()
 
-	connectionInfo := s.peers[peerID]
+	connectionInfo, ok := s.peers[peerID]
+	if !ok {
+		s.logger.Warn(
+			fmt.Sprintf(
+				"Attempted to save protocol %s stream for non-existing peer %s",
+				protocol,
+				peerID,
+			),
+		)
+
+		return
+	}
+
 	connectionInfo.addProtocolStream(protocol, stream)
 }
 
