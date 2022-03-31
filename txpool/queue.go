@@ -49,7 +49,6 @@ func (q *accountQueue) unlock() {
 // with nonce lower than given.
 func (q *accountQueue) prune(nonce uint64) (
 	pruned []*types.Transaction,
-	prunedHashes []types.Hash,
 ) {
 	for {
 		tx := q.peek()
@@ -60,7 +59,6 @@ func (q *accountQueue) prune(nonce uint64) (
 
 		tx = q.pop()
 		pruned = append(pruned, tx)
-		prunedHashes = append(prunedHashes, tx.Hash)
 	}
 
 	return

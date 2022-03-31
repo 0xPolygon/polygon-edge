@@ -1,8 +1,9 @@
 package generator
 
 import (
-	"github.com/0xPolygon/polygon-edge/crypto"
 	"sync"
+
+	"github.com/0xPolygon/polygon-edge/crypto"
 )
 
 type BaseGenerator struct {

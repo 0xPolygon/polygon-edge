@@ -2,10 +2,11 @@ package generator
 
 import (
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/crypto"
-	"github.com/0xPolygon/polygon-edge/types"
 	"math/big"
 	"sync/atomic"
+
+	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 type TransferGenerator struct {

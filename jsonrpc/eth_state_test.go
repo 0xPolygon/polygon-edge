@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"math/big"
+	"testing"
+
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state"
@@ -11,8 +14,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/umbracle/fastrlp"
-	"math/big"
-	"testing"
 )
 
 var (
