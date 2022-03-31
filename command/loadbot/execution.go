@@ -4,15 +4,16 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
+	"math/big"
+	"sync"
+	"sync/atomic"
+	"time"
+
 	"github.com/0xPolygon/polygon-edge/command/loadbot/generator"
 	"github.com/0xPolygon/polygon-edge/helper/tests"
 	txpoolOp "github.com/0xPolygon/polygon-edge/txpool/proto"
 	"github.com/golang/protobuf/ptypes/any"
 	"github.com/umbracle/go-web3/jsonrpc"
-	"math/big"
-	"sync"
-	"sync/atomic"
-	"time"
 
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/go-web3"
@@ -20,7 +21,7 @@ import (
 
 const (
 	maxReceiptWait = 5 * time.Minute
-	minReceiptWait = 30 * time.Second
+	minReceiptWait = 1 * time.Minute
 
 	defaultFastestTurnAround = time.Hour * 24
 	defaultSlowestTurnAround = time.Duration(0)
@@ -33,6 +34,8 @@ type Mode string
 const (
 	transfer Mode = "transfer"
 	deploy   Mode = "deploy"
+	erc20    Mode = "erc20"
+	erc721   Mode = "erc721"
 )
 
 type Account struct {
@@ -54,6 +57,8 @@ type Configuration struct {
 	GasPrice         *big.Int
 	GasLimit         *big.Int
 	ContractArtifact *generator.ContractArtifact
+	ConstructorArgs  []byte // smart contract constructor args
+	MaxWait          uint64 // max wait time for receipts in minutes
 }
 
 type metadata struct {
@@ -64,10 +69,30 @@ type metadata struct {
 	blockNumber uint64
 }
 
+type GasMetrics struct {
+	GasUsed     uint64
+	GasLimit    uint64
+	Utilization float64
+}
+
+type BlockGasMetrics struct {
+	Blocks        map[uint64]GasMetrics
+	BlockGasMutex *sync.Mutex
+}
+
+type ContractMetricsData struct {
+	FailedContractTransactionsCount uint64
+	ContractDeploymentDuration      ExecDuration
+	ContractAddress                 web3.Address
+	ContractGasMetrics              *BlockGasMetrics
+}
+
 type Metrics struct {
 	TotalTransactionsSentCount uint64
 	FailedTransactionsCount    uint64
 	TransactionDuration        ExecDuration
+	ContractMetrics            ContractMetricsData
+	GasMetrics                 *BlockGasMetrics
 }
 
 type Loadbot struct {
@@ -84,6 +109,19 @@ func NewLoadbot(cfg *Configuration) *Loadbot {
 			FailedTransactionsCount:    0,
 			TransactionDuration: ExecDuration{
 				blockTransactions: make(map[uint64]uint64),
+			},
+			ContractMetrics: ContractMetricsData{
+				ContractDeploymentDuration: ExecDuration{
+					blockTransactions: make(map[uint64]uint64),
+				},
+				ContractGasMetrics: &BlockGasMetrics{
+					Blocks:        make(map[uint64]GasMetrics),
+					BlockGasMutex: &sync.Mutex{},
+				},
+			},
+			GasMetrics: &BlockGasMetrics{
+				Blocks:        make(map[uint64]GasMetrics),
+				BlockGasMutex: &sync.Mutex{},
 			},
 		},
 	}
@@ -135,17 +173,21 @@ func (l *Loadbot) Run() error {
 
 	// Set up the transaction generator
 	generatorParams := &generator.GeneratorParams{
-		Nonce:         nonce,
-		ChainID:       l.cfg.ChainID,
-		SenderAddress: sender.Address,
-		SenderKey:     sender.PrivateKey,
-		GasPrice:      gasPrice,
-		Value:         l.cfg.Value,
+		Nonce:            nonce,
+		ChainID:          l.cfg.ChainID,
+		SenderAddress:    sender.Address,
+		RecieverAddress:  l.cfg.Receiver,
+		SenderKey:        sender.PrivateKey,
+		GasPrice:         gasPrice,
+		Value:            l.cfg.Value,
+		ContractArtifact: l.cfg.ContractArtifact,
+		ConstructorArgs:  l.cfg.ConstructorArgs,
 	}
 
 	var (
-		txnGenerator generator.TransactionGenerator
-		genErr       error = nil
+		txnGenerator      generator.TransactionGenerator
+		tokenTxnGenerator generator.ContractTxnGenerator
+		genErr            error
 	)
 
 	switch l.cfg.GeneratorMode {
@@ -153,41 +195,47 @@ func (l *Loadbot) Run() error {
 		txnGenerator, genErr = generator.NewTransferGenerator(generatorParams)
 	case deploy:
 		txnGenerator, genErr = generator.NewDeployGenerator(generatorParams)
+	case erc20:
+		tokenTxnGenerator, genErr = generator.NewERC20Generator(generatorParams)
+	case erc721:
+		tokenTxnGenerator, genErr = generator.NewERC721Generator(generatorParams)
 	}
 
 	if genErr != nil {
 		return fmt.Errorf("unable to start generator, %w", genErr)
 	}
 
-	l.generator = txnGenerator
-
-	// Get the gas estimate
-	exampleTxn, err := l.generator.GetExampleTransaction()
-	if err != nil {
-		return fmt.Errorf("unable to get example transaction, %w", err)
+	switch l.cfg.GeneratorMode {
+	case erc20, erc721:
+		l.generator = tokenTxnGenerator
+	default:
+		l.generator = txnGenerator
 	}
 
-	gasLimit := l.cfg.GasLimit
-	if gasLimit == nil {
-		// No gas limit specified, query the network for an estimation
-		gasEstimate, estimateErr := estimateGas(jsonClient, exampleTxn)
-		if estimateErr != nil {
-			return fmt.Errorf("unable to get gas estimate, %w", err)
-		}
-
-		gasLimit = new(big.Int).SetUint64(gasEstimate)
+	if err := l.updateGasEstimate(jsonClient); err != nil {
+		return fmt.Errorf("could not update gas estimate, %w", err)
 	}
-
-	l.generator.SetGasEstimate(gasLimit.Uint64())
 
 	ticker := time.NewTicker(1 * time.Second / time.Duration(l.cfg.TPS))
 	defer ticker.Stop()
 
-	var wg sync.WaitGroup
-
-	receiptTimeout := calcMaxTimeout(l.cfg.Count, l.cfg.TPS)
+	var receiptTimeout time.Duration
+	// if max-wait flag is not set it will be calculated dynamically
+	if l.cfg.MaxWait == 0 {
+		receiptTimeout = calcMaxTimeout(l.cfg.Count, l.cfg.TPS)
+	} else {
+		receiptTimeout = time.Duration(l.cfg.MaxWait) * time.Minute
+	}
 
 	startTime := time.Now()
+
+	if l.isTokenTransferMode() {
+		if err := l.deployContract(grpcClient, jsonClient, receiptTimeout); err != nil {
+			return fmt.Errorf("unable to deploy smart contract, %w", err)
+		}
+	}
+
+	var wg sync.WaitGroup
 
 	for i := uint64(0); i < l.cfg.Count; i++ {
 		<-ticker.C
@@ -236,6 +284,8 @@ func (l *Loadbot) Run() error {
 				return
 			}
 
+			l.initGasMetricsBlocksMap(receipt.BlockNumber)
+
 			// Stop the performance timer
 			end := time.Now()
 
@@ -252,6 +302,10 @@ func (l *Loadbot) Run() error {
 	wg.Wait()
 
 	endTime := time.Now()
+
+	if err := l.calculateGasMetrics(jsonClient, l.metrics.GasMetrics); err != nil {
+		return fmt.Errorf("unable to calculate block gas metrics: %w", err)
+	}
 
 	// Calculate the turn around metrics now that the loadbot is done
 	l.metrics.TransactionDuration.calcTurnAroundMetrics()

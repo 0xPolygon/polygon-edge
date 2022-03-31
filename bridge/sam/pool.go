@@ -105,6 +105,7 @@ func (p *pool) IsMessageKnown(hash types.Hash) bool {
 func (p *pool) IsMessageConsumed(hash types.Hash) bool {
 	raw, ok := p.consumedMap.Load(hash)
 
+	//nolint:forcetypeassert
 	return ok && raw.(bool)
 }
 

@@ -146,7 +146,7 @@ func (b *BridgeMechanism) insertBlockHook(numberParam interface{}) error {
 // startCheckpointProcess starts checkpoint process on every epoch end from insertBlock
 func (b *BridgeMechanism) startCheckpointProcess(block *types.Block) error {
 	// On every epoch end, create the checkpoint
-	if b.ibft.state.getState() == SyncState && !b.ibft.IsLastOfEpoch(block.Number()) {
+	if b.ibft.state.getState() == SyncState || !b.ibft.IsLastOfEpoch(block.Number()) {
 		return nil
 	}
 

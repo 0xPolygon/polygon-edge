@@ -2,14 +2,15 @@ package loadbot
 
 import (
 	"fmt"
+	"os"
+	"strings"
+
 	"github.com/0xPolygon/polygon-edge/crypto"
 	txpoolOp "github.com/0xPolygon/polygon-edge/txpool/proto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/go-web3/jsonrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"os"
-	"strings"
 )
 
 func createJSONRPCClient(endpoint string, maxConns int) (*jsonrpc.Client, error) {

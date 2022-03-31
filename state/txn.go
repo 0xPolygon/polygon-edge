@@ -1,4 +1,3 @@
-//nolint:forcetypeassert
 package state
 
 import (
@@ -355,7 +354,7 @@ func (txn *Txn) GetState(addr types.Address, key types.Hash) types.Hash {
 			if val == nil {
 				return types.Hash{}
 			}
-
+			//nolint:forcetypeassert
 			return types.BytesToHash(val.([]byte))
 		}
 	}
@@ -416,6 +415,7 @@ func (txn *Txn) GetCode(addr types.Address) []byte {
 	v, ok := txn.codeCache.Get(addr)
 
 	if ok {
+		//nolint:forcetypeassert
 		return v.([]byte)
 	}
 
@@ -482,7 +482,7 @@ func (txn *Txn) Logs() []*types.Log {
 	}
 
 	txn.txn.Delete(logIndex)
-
+	//nolint:forcetypeassert
 	return data.([]*types.Log)
 }
 
@@ -492,6 +492,7 @@ func (txn *Txn) GetRefund() uint64 {
 		return 0
 	}
 
+	//nolint:forcetypeassert
 	return data.(uint64)
 }
 
