@@ -9,10 +9,12 @@ import (
 )
 
 type IBFTSwitchResult struct {
-	Chain      string             `json:"chain"`
-	Type       ibft.MechanismType `json:"type"`
-	From       common.JSONNumber  `json:"from"`
-	Deployment *common.JSONNumber `json:"deployment,omitempty"`
+	Chain             string             `json:"chain"`
+	Type              ibft.MechanismType `json:"type"`
+	From              common.JSONNumber  `json:"from"`
+	Deployment        *common.JSONNumber `json:"deployment,omitempty"`
+	MaxValidatorCount common.JSONNumber  `json:"maxValidatorCount"`
+	MinValidatorCount common.JSONNumber  `json:"minValidatorCount"`
 }
 
 func (r *IBFTSwitchResult) GetOutput() string {
@@ -29,6 +31,8 @@ func (r *IBFTSwitchResult) GetOutput() string {
 	}
 
 	outputs = append(outputs, fmt.Sprintf("From|%d", r.From.Value))
+	outputs = append(outputs, fmt.Sprintf("MaxValidatorCount|%d", r.MaxValidatorCount.Value))
+	outputs = append(outputs, fmt.Sprintf("MinValidatorCount|%d", r.MinValidatorCount.Value))
 
 	buffer.WriteString(helper.FormatKV(outputs))
 	buffer.WriteString("\n")

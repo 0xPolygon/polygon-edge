@@ -3,13 +3,14 @@ package jsonrpc
 import (
 	"errors"
 	"fmt"
+	"math/big"
+	"strconv"
+	"testing"
+
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
-	"math/big"
-	"strconv"
-	"testing"
 )
 
 func TestEth_Block_GetBlockByNumber(t *testing.T) {
@@ -318,7 +319,7 @@ func TestEth_Syncing(t *testing.T) {
 		res, err := eth.Syncing()
 
 		assert.NoError(t, err)
-		// nolint:forcetypeassert
+		//nolint:forcetypeassert
 		assert.False(t, res.(bool))
 	})
 }

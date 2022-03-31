@@ -24,6 +24,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/ibft"
 	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/crypto"
+	stakingHelper "github.com/0xPolygon/polygon-edge/helper/staking"
 	"github.com/0xPolygon/polygon-edge/helper/tests"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/secrets"
@@ -282,6 +283,17 @@ func (t *TestServer) GenerateGenesis() error {
 	// Make sure the correct mechanism is selected
 	if t.Config.IsPos {
 		args = append(args, "--pos")
+
+		if t.Config.MinValidatorCount == 0 {
+			t.Config.MinValidatorCount = stakingHelper.MinValidatorCount
+		}
+
+		if t.Config.MaxValidatorCount == 0 {
+			t.Config.MaxValidatorCount = stakingHelper.MaxValidatorCount
+		}
+
+		args = append(args, "--min-validator-count", strconv.FormatUint(t.Config.MinValidatorCount, 10))
+		args = append(args, "--max-validator-count", strconv.FormatUint(t.Config.MaxValidatorCount, 10))
 	}
 
 	// add block gas limit

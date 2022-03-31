@@ -75,6 +75,7 @@ func newTestMessagePool(
 		testPool.AddSignature(&signature)
 	}
 
+	//nolint:forcetypeassert
 	return testPool.(*pool)
 }
 
