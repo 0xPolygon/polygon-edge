@@ -1,3 +1,6 @@
+# github.com/Trapesys/fastmerkle v0.0.0-20220331104143-3f5cc5f7937d
+## explicit
+github.com/Trapesys/fastmerkle
 # github.com/armon/go-metrics v0.3.10
 ## explicit
 github.com/armon/go-metrics
@@ -530,7 +533,7 @@ github.com/spaolacci/murmur3
 github.com/spf13/cobra
 # github.com/spf13/pflag v1.0.5
 github.com/spf13/pflag
-# github.com/stretchr/testify v1.7.0
+# github.com/stretchr/testify v1.7.1
 ## explicit
 github.com/stretchr/testify/assert
 # github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
@@ -586,7 +589,7 @@ go.uber.org/zap/internal/bufferpool
 go.uber.org/zap/internal/color
 go.uber.org/zap/internal/exit
 go.uber.org/zap/zapcore
-# golang.org/x/crypto v0.0.0-20220214200702-86341886e292
+# golang.org/x/crypto v0.0.0-20220315160706-3147a52a75dd
 ## explicit
 golang.org/x/crypto/blake2b
 golang.org/x/crypto/blake2s

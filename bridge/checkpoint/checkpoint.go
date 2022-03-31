@@ -1,12 +1,14 @@
 package checkpoint
 
 import (
+	"fmt"
 	"github.com/0xPolygon/polygon-edge/bridge/checkpoint/transport"
 	ctypes "github.com/0xPolygon/polygon-edge/bridge/checkpoint/types"
 	"github.com/0xPolygon/polygon-edge/bridge/sam"
 	"github.com/0xPolygon/polygon-edge/bridge/utils"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/Trapesys/fastmerkle"
 	"github.com/hashicorp/go-hclog"
 )
 
@@ -19,6 +21,7 @@ type Checkpoint interface {
 type Blockchain interface {
 	Header() *types.Header
 	GetBlocks(start, end uint64, full bool) ([]*types.Block, error)
+	GetChainID() uint64
 }
 
 type checkpoint struct {
@@ -126,8 +129,51 @@ func (c *checkpoint) determineCheckpointRange(lastChildBlock uint64) (start uint
 }
 
 func (c *checkpoint) generateCheckpoint(blocks []*types.Block) (*ctypes.Checkpoint, error) {
+	// Generate the Merkle root for the block hashes
+	blockHashes := make([][]byte, len(blocks))
+	for i, block := range blocks {
+		blockHashes[i] = block.Hash().Bytes()
+	}
+
+	blocksMerkleTree, treeErr := fastmerkle.GenerateMerkleTree(blockHashes)
+	if treeErr != nil {
+		return nil, fmt.Errorf(
+			"unable to construct a Merkle tree of block hashes, %w",
+			treeErr,
+		)
+	}
+
+	// Generate the Merkle root for the validator set
+	validators := c.validatorSet.Validators()
+	validatorsBytes := make([][]byte, len(validators))
+
+	for i, validator := range validators {
+		validatorsBytes[i] = validator.Bytes()
+	}
+
+	validatorsMerkleTree, treeErr := fastmerkle.GenerateMerkleTree(validatorsBytes)
+	if treeErr != nil {
+		return nil, fmt.Errorf(
+			"unable to construct a Merkle tree of validator addresses, %w",
+			treeErr,
+		)
+	}
+
+	// Create a placeholder checkpoint
+	return &ctypes.Checkpoint{
+		Proposer:        c.getProposer(c.getCheckpointEpoch()),
+		Start:           blocks[0].Number(),
+		End:             blocks[len(blocks)-1].Number(),
+		RootHash:        types.BytesToHash(blocksMerkleTree.RootHash()),
+		AccountRootHash: types.BytesToHash(validatorsMerkleTree.RootHash()),
+		ChainID:         c.blockchain.GetChainID(),
+	}, nil
+}
+
+// getCheckpointEpoch returns the epoch of the pending checkpoint
+func (c *checkpoint) getCheckpointEpoch() uint64 {
 	// TODO: implement
-	return nil, nil
+	return 0
 }
 
 func (c *checkpoint) getProposer(epoch uint64) types.Address {

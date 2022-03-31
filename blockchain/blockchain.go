@@ -213,6 +213,11 @@ func (b *Blockchain) Header() *types.Header {
 	return header
 }
 
+// GetChainID returns the blockchain's chain ID
+func (b *Blockchain) GetChainID() uint64 {
+	return uint64(b.config.Params.ChainID)
+}
+
 // CurrentTD returns the current total difficulty (atomic)
 func (b *Blockchain) CurrentTD() *big.Int {
 	td, ok := b.currentDifficulty.Load().(*big.Int)

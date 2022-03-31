@@ -1,0 +1,7 @@
+bin/
+dist/
+
+# MacOS Leftovers
+.DS_Store
+.vscode
+.idea
