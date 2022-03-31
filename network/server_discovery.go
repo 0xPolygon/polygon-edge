@@ -61,9 +61,13 @@ func (s *Server) getProtoStream(protocol string, peerID peer.ID) *rawGrpc.Client
 
 // NewDiscoveryClient returns a new or existing discovery service client connection
 func (s *Server) NewDiscoveryClient(peerID peer.ID) (proto.DiscoveryClient, error) {
+	// Temporary dials are never added to the peer store,
+	// so they have a special status when doing discovery
+	isTemporaryDial := s.IsTemporaryDial(peerID)
+
 	// Check if there is a peer connection at this point in time,
 	// as there might have been a disconnection previously
-	if !s.isConnected(peerID) {
+	if !s.isConnected(peerID) && !isTemporaryDial {
 		return nil, errPeerDisconnected
 	}
 
@@ -79,8 +83,11 @@ func (s *Server) NewDiscoveryClient(peerID peer.ID) (proto.DiscoveryClient, erro
 	}
 
 	// Discovery protocol streams should be saved,
-	// since they are referenced later on
-	s.saveProtocolStream(common.DiscProto, protoStream, peerID)
+	// since they are referenced later on,
+	// if they are not temporary
+	if !isTemporaryDial {
+		s.saveProtocolStream(common.DiscProto, protoStream, peerID)
+	}
 
 	return proto.NewDiscoveryClient(protoStream), nil
 }
