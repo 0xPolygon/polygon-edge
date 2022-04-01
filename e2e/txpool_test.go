@@ -210,6 +210,7 @@ func TestTxPool_TransactionCoalescing(t *testing.T) {
 		func(i int, config *framework.TestServerConfig) {
 			config.SetSeal(true)
 			config.Premine(referenceAddr, defaultBalance)
+			config.SetBlockTime(1)
 		},
 	)
 
