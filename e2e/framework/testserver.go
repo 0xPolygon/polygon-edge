@@ -13,6 +13,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -545,19 +547,44 @@ func (t *TestServer) WaitForReceipt(ctx context.Context, hash web3.Hash) (*web3.
 // WaitForGasTotal waits for the total gas used sum for the passed in
 // transactions
 func (t *TestServer) WaitForGasTotal(txHashes []web3.Hash) uint64 {
-	totalGasUsed := uint64(0)
+	var (
+		totalGasUsed    = uint64(0)
+		receiptErrs     = make([]error, 0)
+		receiptErrsLock sync.Mutex
+		wg              sync.WaitGroup
+	)
+
+	appendReceiptErr := func(receiptErr error) {
+		receiptErrsLock.Lock()
+		defer receiptErrsLock.Unlock()
+
+		receiptErrs = append(receiptErrs, receiptErr)
+	}
 
 	for _, txHash := range txHashes {
-		ctx, cancelFn := context.WithTimeout(context.Background(), 10*time.Second)
+		wg.Add(1)
 
-		receipt, receiptErr := tests.WaitForReceipt(ctx, t.JSONRPC().Eth(), txHash)
-		if receiptErr != nil {
-			t.t.Fatalf("unable to wait for receipt, %v", receiptErr)
-		}
+		go func(txHash web3.Hash) {
+			defer wg.Done()
 
-		cancelFn()
+			ctx, cancelFn := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancelFn()
 
-		totalGasUsed += receipt.GasUsed
+			receipt, receiptErr := tests.WaitForReceipt(ctx, t.JSONRPC().Eth(), txHash)
+			if receiptErr != nil {
+				appendReceiptErr(fmt.Errorf("unable to wait for receipt, %w", receiptErr))
+
+				return
+			}
+
+			atomic.AddUint64(&totalGasUsed, receipt.GasUsed)
+		}(txHash)
+	}
+
+	wg.Wait()
+
+	if len(receiptErrs) > 0 {
+		t.t.Fatalf("unable to wait for receipts, %v", receiptErrs)
 	}
 
 	return totalGasUsed
