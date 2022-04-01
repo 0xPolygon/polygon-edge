@@ -43,10 +43,8 @@ func JoinAndWait(
 		connectTimeout = joinTimeout
 	}
 
-	// The join routine should be separate
-	go func() {
-		_ = source.Join(destination.AddrInfo(), joinTimeout)
-	}()
+	// Mark the destination address as ready for dialing
+	source.joinPeer(destination.AddrInfo())
 
 	connectCtx, cancelFn := context.WithTimeout(context.Background(), connectTimeout)
 	defer cancelFn()
@@ -54,29 +52,6 @@ func JoinAndWait(
 	_, connectErr := WaitUntilPeerConnectsTo(connectCtx, source, destination.AddrInfo().ID)
 
 	return connectErr
-}
-
-// LeaveAndWait is a helper method for leaving a destination server
-// and waiting for the connection to be closed
-func LeaveAndWait(
-	source,
-	destination *Server,
-	disconnectTimeout time.Duration,
-) error {
-	if disconnectTimeout == 0 {
-		disconnectTimeout = DefaultLeaveTimeout
-	}
-
-	go func() {
-		source.Disconnect(destination.host.ID(), "bye")
-	}()
-
-	connectCtx, cancelFn := context.WithTimeout(context.Background(), disconnectTimeout)
-	defer cancelFn()
-
-	_, disconnectErr := WaitUntilPeerDisconnectsFrom(connectCtx, source, destination.AddrInfo().ID)
-
-	return disconnectErr
 }
 
 func WaitUntilPeerConnectsTo(ctx context.Context, srv *Server, ids ...peer.ID) (bool, error) {
@@ -140,7 +115,7 @@ func WaitUntilPeerDisconnectsFrom(ctx context.Context, srv *Server, ids ...peer.
 // WaitUntilRoutingTableToBeAdded check routing table has given ids and retry by timeout
 func WaitUntilRoutingTableToBeFilled(ctx context.Context, srv *Server, size int) (bool, error) {
 	res, err := tests.RetryUntilTimeout(ctx, func() (interface{}, bool) {
-		if size == srv.discovery.routingTable.Size() {
+		if size == srv.discovery.RoutingTableSize() {
 			return true, false
 		}
 

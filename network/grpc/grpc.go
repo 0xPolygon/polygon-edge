@@ -23,13 +23,11 @@ type GrpcStream struct {
 }
 
 func NewGrpcStream() *GrpcStream {
-	g := &GrpcStream{
+	return &GrpcStream{
 		ctx:        context.Background(),
 		streamCh:   make(chan network.Stream),
 		grpcServer: grpc.NewServer(grpc.UnaryInterceptor(interceptor)),
 	}
-
-	return g
 }
 
 type Context struct {
@@ -37,30 +35,39 @@ type Context struct {
 	PeerID peer.ID
 }
 
+// interceptor is the middleware function that wraps
+// gRPC peer data to custom Polygon Edge structures
 func interceptor(
 	ctx context.Context,
 	req interface{},
-	info *grpc.UnaryServerInfo,
+	_ *grpc.UnaryServerInfo,
 	handler grpc.UnaryHandler,
 ) (interface{}, error) {
-	peer, _ := grpcPeer.FromContext(ctx)
+	// Grab the peer info from the connection
+	contextPeer, ok := grpcPeer.FromContext(ctx)
+	if !ok {
+		return nil, errors.New("invalid type assertion for peer context")
+	}
 
-	// we expect our libp2p wrapper
-	addr, ok := peer.Addr.(*wrapLibp2pAddr)
+	// The peer address is expected to be wrapped in a custom
+	// structure that contains the PeerID
+	addr, ok := contextPeer.Addr.(*wrapLibp2pAddr)
 	if !ok {
 		return nil, errors.New("invalid type assertion")
 	}
 
-	ctx2 := &Context{
-		Context: ctx,
-		PeerID:  addr.id,
-	}
-	h, err := handler(ctx2, req)
-
-	return h, err
+	// Wrap the extracted PeerID and the context
+	// so the stream handler has access to the PeerID
+	return handler(
+		&Context{
+			Context: ctx,
+			PeerID:  addr.id,
+		},
+		req,
+	)
 }
 
-func (g *GrpcStream) Client(stream network.Stream) interface{} {
+func (g *GrpcStream) Client(stream network.Stream) *grpc.ClientConn {
 	return WrapClient(stream)
 }
 

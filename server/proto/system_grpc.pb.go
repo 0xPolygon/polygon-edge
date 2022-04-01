@@ -4,14 +4,15 @@ package proto
 
 import (
 	context "context"
-	empty "github.com/golang/protobuf/ptypes/empty"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the grpc package it is being compiled against.
+// Requires gRPC-Go v1.32.0 or later.
 const _ = grpc.SupportPackageIsVersion7
 
 // SystemClient is the client API for System service.
@@ -19,15 +20,15 @@ const _ = grpc.SupportPackageIsVersion7
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type SystemClient interface {
 	// GetInfo returns info about the client
-	GetStatus(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*ServerStatus, error)
+	GetStatus(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*ServerStatus, error)
 	// PeersAdd adds a new peer
-	PeersAdd(ctx context.Context, in *PeersAddRequest, opts ...grpc.CallOption) (*empty.Empty, error)
+	PeersAdd(ctx context.Context, in *PeersAddRequest, opts ...grpc.CallOption) (*PeersAddResponse, error)
 	// PeersList returns the list of peers
-	PeersList(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*PeersListResponse, error)
+	PeersList(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*PeersListResponse, error)
 	// PeersInfo returns the info of a peer
 	PeersStatus(ctx context.Context, in *PeersStatusRequest, opts ...grpc.CallOption) (*Peer, error)
 	// Subscribe subscribes to blockchain events
-	Subscribe(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (System_SubscribeClient, error)
+	Subscribe(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (System_SubscribeClient, error)
 	// Export returns blockchain data
 	BlockByNumber(ctx context.Context, in *BlockByNumberRequest, opts ...grpc.CallOption) (*BlockResponse, error)
 	// Export returns blockchain data
@@ -42,7 +43,7 @@ func NewSystemClient(cc grpc.ClientConnInterface) SystemClient {
 	return &systemClient{cc}
 }
 
-func (c *systemClient) GetStatus(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*ServerStatus, error) {
+func (c *systemClient) GetStatus(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*ServerStatus, error) {
 	out := new(ServerStatus)
 	err := c.cc.Invoke(ctx, "/v1.System/GetStatus", in, out, opts...)
 	if err != nil {
@@ -51,8 +52,8 @@ func (c *systemClient) GetStatus(ctx context.Context, in *empty.Empty, opts ...g
 	return out, nil
 }
 
-func (c *systemClient) PeersAdd(ctx context.Context, in *PeersAddRequest, opts ...grpc.CallOption) (*empty.Empty, error) {
-	out := new(empty.Empty)
+func (c *systemClient) PeersAdd(ctx context.Context, in *PeersAddRequest, opts ...grpc.CallOption) (*PeersAddResponse, error) {
+	out := new(PeersAddResponse)
 	err := c.cc.Invoke(ctx, "/v1.System/PeersAdd", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -60,7 +61,7 @@ func (c *systemClient) PeersAdd(ctx context.Context, in *PeersAddRequest, opts .
 	return out, nil
 }
 
-func (c *systemClient) PeersList(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*PeersListResponse, error) {
+func (c *systemClient) PeersList(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*PeersListResponse, error) {
 	out := new(PeersListResponse)
 	err := c.cc.Invoke(ctx, "/v1.System/PeersList", in, out, opts...)
 	if err != nil {
@@ -78,8 +79,8 @@ func (c *systemClient) PeersStatus(ctx context.Context, in *PeersStatusRequest, 
 	return out, nil
 }
 
-func (c *systemClient) Subscribe(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (System_SubscribeClient, error) {
-	stream, err := c.cc.NewStream(ctx, &_System_serviceDesc.Streams[0], "/v1.System/Subscribe", opts...)
+func (c *systemClient) Subscribe(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (System_SubscribeClient, error) {
+	stream, err := c.cc.NewStream(ctx, &System_ServiceDesc.Streams[0], "/v1.System/Subscribe", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +121,7 @@ func (c *systemClient) BlockByNumber(ctx context.Context, in *BlockByNumberReque
 }
 
 func (c *systemClient) Export(ctx context.Context, in *ExportRequest, opts ...grpc.CallOption) (System_ExportClient, error) {
-	stream, err := c.cc.NewStream(ctx, &_System_serviceDesc.Streams[1], "/v1.System/Export", opts...)
+	stream, err := c.cc.NewStream(ctx, &System_ServiceDesc.Streams[1], "/v1.System/Export", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -156,15 +157,15 @@ func (x *systemExportClient) Recv() (*ExportEvent, error) {
 // for forward compatibility
 type SystemServer interface {
 	// GetInfo returns info about the client
-	GetStatus(context.Context, *empty.Empty) (*ServerStatus, error)
+	GetStatus(context.Context, *emptypb.Empty) (*ServerStatus, error)
 	// PeersAdd adds a new peer
-	PeersAdd(context.Context, *PeersAddRequest) (*empty.Empty, error)
+	PeersAdd(context.Context, *PeersAddRequest) (*PeersAddResponse, error)
 	// PeersList returns the list of peers
-	PeersList(context.Context, *empty.Empty) (*PeersListResponse, error)
+	PeersList(context.Context, *emptypb.Empty) (*PeersListResponse, error)
 	// PeersInfo returns the info of a peer
 	PeersStatus(context.Context, *PeersStatusRequest) (*Peer, error)
 	// Subscribe subscribes to blockchain events
-	Subscribe(*empty.Empty, System_SubscribeServer) error
+	Subscribe(*emptypb.Empty, System_SubscribeServer) error
 	// Export returns blockchain data
 	BlockByNumber(context.Context, *BlockByNumberRequest) (*BlockResponse, error)
 	// Export returns blockchain data
@@ -176,19 +177,19 @@ type SystemServer interface {
 type UnimplementedSystemServer struct {
 }
 
-func (UnimplementedSystemServer) GetStatus(context.Context, *empty.Empty) (*ServerStatus, error) {
+func (UnimplementedSystemServer) GetStatus(context.Context, *emptypb.Empty) (*ServerStatus, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetStatus not implemented")
 }
-func (UnimplementedSystemServer) PeersAdd(context.Context, *PeersAddRequest) (*empty.Empty, error) {
+func (UnimplementedSystemServer) PeersAdd(context.Context, *PeersAddRequest) (*PeersAddResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PeersAdd not implemented")
 }
-func (UnimplementedSystemServer) PeersList(context.Context, *empty.Empty) (*PeersListResponse, error) {
+func (UnimplementedSystemServer) PeersList(context.Context, *emptypb.Empty) (*PeersListResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PeersList not implemented")
 }
 func (UnimplementedSystemServer) PeersStatus(context.Context, *PeersStatusRequest) (*Peer, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PeersStatus not implemented")
 }
-func (UnimplementedSystemServer) Subscribe(*empty.Empty, System_SubscribeServer) error {
+func (UnimplementedSystemServer) Subscribe(*emptypb.Empty, System_SubscribeServer) error {
 	return status.Errorf(codes.Unimplemented, "method Subscribe not implemented")
 }
 func (UnimplementedSystemServer) BlockByNumber(context.Context, *BlockByNumberRequest) (*BlockResponse, error) {
@@ -207,11 +208,11 @@ type UnsafeSystemServer interface {
 }
 
 func RegisterSystemServer(s grpc.ServiceRegistrar, srv SystemServer) {
-	s.RegisterService(&_System_serviceDesc, srv)
+	s.RegisterService(&System_ServiceDesc, srv)
 }
 
 func _System_GetStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(empty.Empty)
+	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -223,7 +224,7 @@ func _System_GetStatus_Handler(srv interface{}, ctx context.Context, dec func(in
 		FullMethod: "/v1.System/GetStatus",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SystemServer).GetStatus(ctx, req.(*empty.Empty))
+		return srv.(SystemServer).GetStatus(ctx, req.(*emptypb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -247,7 +248,7 @@ func _System_PeersAdd_Handler(srv interface{}, ctx context.Context, dec func(int
 }
 
 func _System_PeersList_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(empty.Empty)
+	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -259,7 +260,7 @@ func _System_PeersList_Handler(srv interface{}, ctx context.Context, dec func(in
 		FullMethod: "/v1.System/PeersList",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SystemServer).PeersList(ctx, req.(*empty.Empty))
+		return srv.(SystemServer).PeersList(ctx, req.(*emptypb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -283,7 +284,7 @@ func _System_PeersStatus_Handler(srv interface{}, ctx context.Context, dec func(
 }
 
 func _System_Subscribe_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(empty.Empty)
+	m := new(emptypb.Empty)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
@@ -342,7 +343,10 @@ func (x *systemExportServer) Send(m *ExportEvent) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-var _System_serviceDesc = grpc.ServiceDesc{
+// System_ServiceDesc is the grpc.ServiceDesc for System service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var System_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "v1.System",
 	HandlerType: (*SystemServer)(nil),
 	Methods: []grpc.MethodDesc{
@@ -379,5 +383,5 @@ var _System_serviceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 	},
-	Metadata: "server/proto/system.proto",
+	Metadata: "system.proto",
 }
