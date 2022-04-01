@@ -542,6 +542,27 @@ func (t *TestServer) WaitForReceipt(ctx context.Context, hash web3.Hash) (*web3.
 	return data.receipt, data.err
 }
 
+// WaitForGasTotal waits for the total gas used sum for the passed in
+// transactions
+func (t *TestServer) WaitForGasTotal(txHashes []web3.Hash) uint64 {
+	totalGasUsed := uint64(0)
+
+	for _, txHash := range txHashes {
+		ctx, cancelFn := context.WithTimeout(context.Background(), 10*time.Second)
+
+		receipt, receiptErr := tests.WaitForReceipt(ctx, t.JSONRPC().Eth(), txHash)
+		if receiptErr != nil {
+			t.t.Fatalf("unable to wait for receipt, %v", receiptErr)
+		}
+
+		cancelFn()
+
+		totalGasUsed += receipt.GasUsed
+	}
+
+	return totalGasUsed
+}
+
 func (t *TestServer) WaitForReady(ctx context.Context) error {
 	_, err := tests.RetryUntilTimeout(ctx, func() (interface{}, bool) {
 		num, err := t.GetLatestBlockHeight()
