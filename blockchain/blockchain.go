@@ -85,19 +85,19 @@ func (b *Blockchain) updateGasPriceAvg(newValues []*big.Int) {
 	// There is no previous average data,
 	// so this new value set will instantiate it
 	if b.gpAverage.count.Uint64() == 0 {
-		b.getArithmeticAverage(newValues, sum)
+		b.calcArithmeticAverage(newValues, sum)
 
 		return
 	}
 
 	// There is existing average data,
 	// use it to generate a new average
-	b.getRollingAverage(newValues, sum)
+	b.calcRollingAverage(newValues, sum)
 }
 
-// getArithmeticAverage calculates and sets the arithmetic average
+// calcArithmeticAverage calculates and sets the arithmetic average
 // of the passed in data set
-func (b *Blockchain) getArithmeticAverage(newValues []*big.Int, sum *big.Int) {
+func (b *Blockchain) calcArithmeticAverage(newValues []*big.Int, sum *big.Int) {
 	newAverageCount := big.NewInt(int64(len(newValues)))
 	newAverage := sum.Div(sum, newAverageCount)
 
@@ -105,11 +105,11 @@ func (b *Blockchain) getArithmeticAverage(newValues []*big.Int, sum *big.Int) {
 	b.gpAverage.count = newAverageCount
 }
 
-// getRollingAverage calculates the new average based on the
+// calcRollingAverage calculates the new average based on the
 // moving average formula:
 // new average = old average * (n-len(M))/n + (sum of values in M)/n)
 // where n is the old average data count, and M is the new data set
-func (b *Blockchain) getRollingAverage(newValues []*big.Int, sum *big.Int) {
+func (b *Blockchain) calcRollingAverage(newValues []*big.Int, sum *big.Int) {
 	var (
 		// Save references to old counts
 		oldCount   = b.gpAverage.count
