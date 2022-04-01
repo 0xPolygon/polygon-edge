@@ -202,16 +202,22 @@ func TestTxPool_TransactionCoalescing(t *testing.T) {
 	referenceKey, referenceAddr := tests.GenerateKeyAndAddr(t)
 	defaultBalance := framework.EthToWei(10)
 
-	devInterval := 5
-
 	// Set up the test server
-	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
-		config.SetConsensus(framework.ConsensusDev)
-		config.SetSeal(true)
-		config.SetDevInterval(devInterval)
-		config.Premine(referenceAddr, defaultBalance)
-	})
-	srv := srvs[0]
+	ibftManager := framework.NewIBFTServersManager(
+		t,
+		1,
+		IBFTDirPrefix,
+		func(i int, config *framework.TestServerConfig) {
+			config.SetSeal(true)
+			config.Premine(referenceAddr, defaultBalance)
+		},
+	)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	ibftManager.StartServers(ctx)
+
+	srv := ibftManager.GetServer(0)
 	client := srv.JSONRPC()
 
 	// Required default values
@@ -251,19 +257,40 @@ func TestTxPool_TransactionCoalescing(t *testing.T) {
 		return msg
 	}
 
+	// testTransaction is a helper structure for
+	// keeping track of test transaction execution
+	type testTransaction struct {
+		txHash web3.Hash // the transaction hash
+		block  *uint64   // the block the transaction was included in
+	}
+
+	testTransactions := make([]*testTransaction, 0)
+
 	// Add the transactions with the following nonce order
 	nonces := []uint64{0, 2}
 	for i := 0; i < len(nonces); i++ {
 		addReq := generateReq(nonces[i])
 
-		_, addErr := clt.AddTxn(context.Background(), addReq)
+		addResp, addErr := clt.AddTxn(context.Background(), addReq)
 		if addErr != nil {
 			t.Fatalf("Unable to add txn, %v", addErr)
 		}
+
+		testTransactions = append(testTransactions, &testTransaction{
+			txHash: web3.HexToHash(addResp.TxHash),
+		})
 	}
 
-	// Wait for the state transition to be executed
-	_ = waitForBlock(t, srv, 1, 0)
+	// Wait for the first transaction to go through
+	ctx, cancelFn := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancelFn()
+
+	receipt, receiptErr := tests.WaitForReceipt(ctx, client.Eth(), testTransactions[0].txHash)
+	if receiptErr != nil {
+		t.Fatalf("unable to wait for receipt, %v", receiptErr)
+	}
+
+	testTransactions[0].block = &receipt.BlockNumber
 
 	// Get to account balance
 	// Only the first tx should've gone through
@@ -277,13 +304,28 @@ func TestTxPool_TransactionCoalescing(t *testing.T) {
 	// Add the transaction with the gap nonce value
 	addReq := generateReq(1)
 
-	_, addErr := clt.AddTxn(context.Background(), addReq)
+	addResp, addErr := clt.AddTxn(context.Background(), addReq)
 	if addErr != nil {
 		t.Fatalf("Unable to add txn, %v", addErr)
 	}
 
-	// Wait for the state transition to be executed
-	_ = waitForBlock(t, srv, 1, 0)
+	testTransactions = append(testTransactions, &testTransaction{
+		txHash: web3.HexToHash(addResp.TxHash),
+	})
+
+	for i := 1; i < len(testTransactions); i++ {
+		// Wait for the first transaction to go through
+		ctx, cancelFn := context.WithTimeout(context.Background(), 10*time.Second)
+
+		receipt, receiptErr := tests.WaitForReceipt(ctx, client.Eth(), testTransactions[i].txHash)
+		if receiptErr != nil {
+			t.Fatalf("unable to wait for receipt, %v", receiptErr)
+		}
+
+		testTransactions[i].block = &receipt.BlockNumber
+
+		cancelFn()
+	}
 
 	// Now both the added tx and the shelved tx should've gone through
 	toAccountBalance = framework.GetAccountBalance(t, toAddress, client)
@@ -292,6 +334,9 @@ func TestTxPool_TransactionCoalescing(t *testing.T) {
 		toAccountBalance.String(),
 		"To address balance mismatch after gap transaction",
 	)
+
+	// Make sure the first transaction and the last transaction didn't get included in the same block
+	assert.NotEqual(t, *(testTransactions[0].block), *(testTransactions[2].block))
 }
 
 type testAccount struct {
