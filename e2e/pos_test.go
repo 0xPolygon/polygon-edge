@@ -375,6 +375,8 @@ func TestPoS_UnstakeExploit(t *testing.T) {
 		return signedTx
 	}
 
+	txHashes := make([]web3.Hash, 0)
+
 	for i := 0; i < numTransactions; i++ {
 		var msg *txpoolOp.AddTxnReq
 
@@ -387,22 +389,32 @@ func TestPoS_UnstakeExploit(t *testing.T) {
 			From: types.ZeroAddress.String(),
 		}
 
-		_, addErr := clt.AddTxn(context.Background(), msg)
+		addResp, addErr := clt.AddTxn(context.Background(), msg)
 		if addErr != nil {
 			t.Fatalf("Unable to add txn, %v", addErr)
 		}
+
+		txHashes = append(txHashes, web3.HexToHash(addResp.TxHash))
 	}
 
-	// Set up the blockchain listener to catch the added block event
-	blockNum := waitForBlock(t, srv, 1, 0)
+	// Wait for the transactions to go through
+	totalGasUsed := uint64(0)
 
-	block, blockErr := client.Eth().GetBlockByNumber(web3.BlockNumber(blockNum), true)
-	if blockErr != nil {
-		t.Fatalf("Unable to fetch block")
+	for _, txHash := range txHashes {
+		ctx, cancelFn := context.WithTimeout(context.Background(), 10*time.Second)
+
+		receipt, receiptErr := tests.WaitForReceipt(ctx, client.Eth(), txHash)
+		if receiptErr != nil {
+			t.Fatalf("unable to wait for receipt, %v", receiptErr)
+		}
+
+		cancelFn()
+
+		totalGasUsed += receipt.GasUsed
 	}
 
 	// Find how much the address paid for all the transactions in this block
-	paidFee := big.NewInt(0).Mul(bigGasPrice, big.NewInt(int64(block.GasUsed)))
+	paidFee := big.NewInt(0).Mul(bigGasPrice, big.NewInt(int64(totalGasUsed)))
 
 	// Check the balances
 	actualAccountBalance := framework.GetAccountBalance(t, senderAddr, client)
