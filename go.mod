@@ -34,13 +34,14 @@ require (
 	github.com/umbracle/fastrlp v0.0.0-20211229195328-c1416904ae17
 	github.com/umbracle/go-eth-bn256 v0.0.0-20190607160430-b36caf4e0f6b
 	github.com/umbracle/go-web3 v0.0.0-20220224145938-aaa1038c1b69
-	golang.org/x/crypto v0.0.0-20220214200702-86341886e292
+	golang.org/x/crypto v0.0.0-20220315160706-3147a52a75dd
 	google.golang.org/grpc v1.45.0
 	google.golang.org/protobuf v1.28.0
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce
 )
 
 require (
+	github.com/Trapesys/fastmerkle v0.0.0-20220331104143-3f5cc5f7937d
 	github.com/armon/go-metrics v0.3.10 // indirect
 	github.com/aws/aws-sdk-go v1.43.26
 	github.com/benbjohnson/clock v1.3.0 // indirect
