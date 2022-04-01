@@ -5,7 +5,6 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
-	"io"
 	"math/big"
 	"sync"
 	"testing"
@@ -18,7 +17,6 @@ import (
 	txpoolOp "github.com/0xPolygon/polygon-edge/txpool/proto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/golang/protobuf/ptypes/any"
-	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/stretchr/testify/assert"
 	"github.com/umbracle/go-web3"
 )
@@ -27,36 +25,6 @@ var (
 	oneEth = framework.EthToWei(1)
 	signer = crypto.NewEIP155Signer(100)
 )
-
-func waitForBlock(t *testing.T, srv *framework.TestServer, expectedBlocks int, index int) int64 {
-	t.Helper()
-
-	systemClient := srv.Operator()
-	ctx, cancelFn := context.WithCancel(context.Background())
-	stream, err := systemClient.Subscribe(ctx, &empty.Empty{})
-
-	if err != nil {
-		cancelFn()
-		t.Fatalf("Unable to subscribe to blockchain events")
-	}
-
-	evnt, err := stream.Recv()
-	if errors.Is(err, io.EOF) {
-		t.Fatalf("Invalid stream close")
-	}
-
-	if err != nil {
-		t.Fatalf("Unable to read blockchain event")
-	}
-
-	if len(evnt.Added) != expectedBlocks {
-		t.Fatalf("Invalid number of blocks added")
-	}
-
-	cancelFn()
-
-	return evnt.Added[index].Number
-}
 
 type generateTxReqParams struct {
 	nonce         uint64
