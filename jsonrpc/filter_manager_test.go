@@ -230,7 +230,7 @@ func TestClosedFilterDeletion(t *testing.T) {
 
 	assert.True(t, m.Exists(id))
 
-	// event is sent to filter, but fails to write to connection
+	// event is sent to the filter but writing to connection should fail
 	err := m.dispatchEvent(&blockchain.Event{
 		NewChain: []*types.Header{
 			{
@@ -239,7 +239,7 @@ func TestClosedFilterDeletion(t *testing.T) {
 		},
 	})
 
-	// should not return error if error is websocket.ErrCloseSen because filter was removed
+	// should not return error when the error is websocket.ErrCloseSen because filter is removed instead
 	assert.NoError(t, err)
 
 	// false because filter was removed automatically
