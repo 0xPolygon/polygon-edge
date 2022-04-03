@@ -3,6 +3,7 @@ package jsonrpc
 import (
 	"container/heap"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -146,8 +147,8 @@ type FilterManager struct {
 
 	subscription blockchain.Subscription
 
-	filters map[string]*Filter
-	lock    sync.Mutex
+	filters     map[string]*Filter
+	filtersLock sync.RWMutex
 
 	updateCh chan struct{}
 	timer    timeHeapImpl
@@ -227,23 +228,22 @@ func (f *FilterManager) Run() {
 }
 
 func (f *FilterManager) nextTimeoutFilter() *Filter {
-	f.lock.Lock()
+	f.filtersLock.RLock()
 	if len(f.filters) == 0 {
-		f.lock.Unlock()
+		f.filtersLock.RUnlock()
 
 		return nil
 	}
 
 	// pop the first item
 	item := f.timer[0]
-	f.lock.Unlock()
+	f.filtersLock.RUnlock()
 
 	return item
 }
 
 func (f *FilterManager) dispatchEvent(evnt *blockchain.Event) error {
-	f.lock.Lock()
-	defer f.lock.Unlock()
+	f.filtersLock.RLock()
 
 	// first include all the new headers in the blockstream for the block filters
 	for _, header := range evnt.NewChain {
@@ -296,22 +296,46 @@ func (f *FilterManager) dispatchEvent(evnt *blockchain.Event) error {
 		}
 	}
 
+	closedFilterIDs := make([]string, 0)
+
 	// flush all the websocket values
-	for _, filter := range f.filters {
+	for id, filter := range f.filters {
 		if filter.isWS() {
 			if flushErr := filter.flush(); flushErr != nil {
+				if errors.Is(flushErr, websocket.ErrCloseSent) {
+					closedFilterIDs = append(closedFilterIDs, id)
+
+					f.logger.Error(fmt.Sprintf("Subscription %s has been closed", id))
+
+					continue
+				}
+
 				f.logger.Error(fmt.Sprintf("Unable to process flush, %v", flushErr))
 			}
 		}
+	}
+
+	f.filtersLock.RUnlock()
+
+	if len(closedFilterIDs) > 0 {
+		f.filtersLock.Lock()
+
+		for _, id := range closedFilterIDs {
+			f.removeFilterByID(id)
+		}
+
+		f.logger.Error(fmt.Sprintf("Removed %d filters with closed connections", len(closedFilterIDs)))
+
+		f.filtersLock.Unlock()
 	}
 
 	return nil
 }
 
 func (f *FilterManager) Exists(id string) bool {
-	f.lock.Lock()
+	f.filtersLock.RLock()
 	_, ok := f.filters[id]
-	f.lock.Unlock()
+	f.filtersLock.RUnlock()
 
 	return ok
 }
@@ -319,13 +343,14 @@ func (f *FilterManager) Exists(id string) bool {
 var errFilterDoesNotExists = fmt.Errorf("filter does not exists")
 
 func (f *FilterManager) GetFilterChanges(id string) (string, error) {
-	f.lock.Lock()
-	defer f.lock.Unlock()
+	f.filtersLock.RLock()
 
 	item, ok := f.filters[id]
 	if !ok {
 		return "", errFilterDoesNotExists
 	}
+
+	f.filtersLock.RUnlock()
 
 	if item.isWS() {
 		// we cannot get updates from a ws filter with getFilterChanges
@@ -341,8 +366,17 @@ func (f *FilterManager) GetFilterChanges(id string) (string, error) {
 }
 
 func (f *FilterManager) Uninstall(id string) bool {
-	f.lock.Lock()
+	f.filtersLock.Lock()
 
+	removed := f.removeFilterByID(id)
+
+	f.filtersLock.Unlock()
+
+	return removed
+}
+
+// removeFilterByID removes a filter with given ID, unsafe agarint race condition
+func (f *FilterManager) removeFilterByID(id string) bool {
 	item, ok := f.filters[id]
 	if !ok {
 		return false
@@ -350,8 +384,6 @@ func (f *FilterManager) Uninstall(id string) bool {
 
 	delete(f.filters, id)
 	heap.Remove(&f.timer, item.index)
-
-	f.lock.Unlock()
 
 	return true
 }
@@ -365,8 +397,6 @@ func (f *FilterManager) NewLogFilter(logFilter *LogFilter, ws wsConn) string {
 }
 
 func (f *FilterManager) addFilter(logFilter *LogFilter, ws wsConn) string {
-	f.lock.Lock()
-
 	filter := &Filter{
 		id: uuid.New().String(),
 		ws: ws,
@@ -381,11 +411,13 @@ func (f *FilterManager) addFilter(logFilter *LogFilter, ws wsConn) string {
 		filter.logFilter = logFilter
 	}
 
+	f.filtersLock.Lock()
+
 	f.filters[filter.id] = filter
 	filter.timestamp = time.Now().Add(f.timeout)
 	heap.Push(&f.timer, filter)
 
-	f.lock.Unlock()
+	f.filtersLock.Unlock()
 
 	select {
 	case f.updateCh <- struct{}{}:

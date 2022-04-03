@@ -4,7 +4,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/gorilla/websocket"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
 )
@@ -208,4 +210,38 @@ func TestHeadStream(t *testing.T) {
 	// there are no new entries
 	updates, _ = next.getUpdates()
 	assert.Len(t, updates, 0)
+}
+
+type MockClosedWSConnection struct{}
+
+func (m *MockClosedWSConnection) WriteMessage(_messageType int, _data []byte) error {
+	return websocket.ErrCloseSent
+}
+
+func TestClosedFilterDeletion(t *testing.T) {
+	store := newMockStore()
+
+	m := NewFilterManager(hclog.NewNullLogger(), store)
+
+	go m.Run()
+
+	// add block filter
+	id := m.addFilter(nil, &MockClosedWSConnection{})
+
+	assert.True(t, m.Exists(id))
+
+	// event is sent to filter, but fails to write to connection
+	err := m.dispatchEvent(&blockchain.Event{
+		NewChain: []*types.Header{
+			{
+				Hash: types.StringToHash("1"),
+			},
+		},
+	})
+
+	// should not return error if error is websocket.ErrCloseSen because filter was removed
+	assert.NoError(t, err)
+
+	// false because filter was removed automatically
+	assert.False(t, m.Exists(id))
 }
