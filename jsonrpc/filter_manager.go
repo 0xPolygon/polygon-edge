@@ -305,7 +305,7 @@ func (f *FilterManager) dispatchEvent(evnt *blockchain.Event) error {
 				if errors.Is(flushErr, websocket.ErrCloseSent) {
 					closedFilterIDs = append(closedFilterIDs, id)
 
-					f.logger.Error(fmt.Sprintf("Subscription %s has been closed", id))
+					f.logger.Warn(fmt.Sprintf("Subscription %s has been closed", id))
 
 					continue
 				}
@@ -324,7 +324,7 @@ func (f *FilterManager) dispatchEvent(evnt *blockchain.Event) error {
 			f.removeFilterByID(id)
 		}
 
-		f.logger.Error(fmt.Sprintf("Removed %d filters with closed connections", len(closedFilterIDs)))
+		f.logger.Info(fmt.Sprintf("Removed %d filters due to closed connections", len(closedFilterIDs)))
 
 		f.filtersLock.Unlock()
 	}
