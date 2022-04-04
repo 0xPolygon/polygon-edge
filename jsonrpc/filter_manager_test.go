@@ -17,7 +17,7 @@ func TestFilterLog(t *testing.T) {
 	m := NewFilterManager(hclog.NewNullLogger(), store)
 	go m.Run()
 
-	id := m.addFilter(&LogFilter{
+	id := m.NewLogFilter(&LogQuery{
 		Topics: [][]types.Hash{
 			{hash1},
 		},
@@ -76,7 +76,7 @@ func TestFilterBlock(t *testing.T) {
 	go m.Run()
 
 	// add block filter
-	id := m.addFilter(nil, nil)
+	id := m.NewBlockFilter(nil)
 
 	// emit two events
 	store.emitEvent(&mockEvent{
@@ -139,7 +139,7 @@ func TestFilterTimeout(t *testing.T) {
 	go m.Run()
 
 	// add block filter
-	id := m.addFilter(nil, nil)
+	id := m.NewBlockFilter(nil)
 
 	assert.True(t, m.Exists(id))
 	time.Sleep(3 * time.Second)
@@ -160,7 +160,7 @@ func TestFilterWebsocket(t *testing.T) {
 
 	// we cannot call get filter changes for a websocket filter
 	_, err := m.GetFilterChanges(id)
-	assert.Equal(t, err, errFilterDoesNotExists)
+	assert.Equal(t, err, ErrFilterDoesNotExists)
 
 	// emit two events
 	store.emitEvent(&mockEvent{
@@ -226,7 +226,7 @@ func TestClosedFilterDeletion(t *testing.T) {
 	go m.Run()
 
 	// add block filter
-	id := m.addFilter(nil, &MockClosedWSConnection{})
+	id := m.NewBlockFilter(&MockClosedWSConnection{})
 
 	assert.True(t, m.Exists(id))
 

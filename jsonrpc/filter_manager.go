@@ -16,54 +16,137 @@ import (
 	"github.com/hashicorp/go-hclog"
 )
 
-type Filter struct {
+var ErrFilterDoesNotExists = errors.New("filter does not exists")
+
+// filter is an interface that BlockFilter and LogFilter will implement
+type filter interface {
+	isWS() bool
+	getFilterBase() *filterBase
+	getUpdates() (string, error)
+	sendUpdates() error
+}
+
+// filterBase is a struct that has common fields of BlockFilter and LogFilter
+type filterBase struct {
+	// UUID, a key of filter for client
 	id string
 
-	// block filter
-	block *headElem
-
-	// log cache
-	logs []*Log
-
-	// log filter
-	logFilter *LogFilter
-
-	// index of the filter in the timer array
+	// index in the timeouts heap, -1 for non-existing index
 	index int
 
-	// next time to timeout
-	timestamp time.Time
+	// timestamp to expire
+	expiredAt time.Time
 
 	// websocket connection
 	ws wsConn
 }
 
-func (f *Filter) getFilterUpdates() (string, error) {
-	if f.isBlockFilter() {
-		// block filter
-		headers, newHead := f.block.getUpdates()
-		f.block = newHead
+// newFilterBase initializes filterBase with unique ID
+func newFilterBase(ws wsConn) filterBase {
+	return filterBase{
+		id:    uuid.New().String(),
+		ws:    ws,
+		index: -1,
+	}
+}
 
-		updates := []string{}
-		for _, header := range headers {
-			updates = append(updates, header.Hash.String())
+// getFilterBase returns the own reference so that child struct can return base
+func (f *filterBase) getFilterBase() *filterBase {
+	return f
+}
+
+// isWS returns the flag indicating this filter has websocket connection
+func (f *filterBase) isWS() bool {
+	return f.ws != nil
+}
+
+// writeMessageToWs sends given message to websocket stream
+func (f *filterBase) writeMessageToWs(msg string) error {
+	res := fmt.Sprintf(ethSubscriptionTemplate, f.id, msg)
+	if err := f.ws.WriteMessage(websocket.TextMessage, []byte(res)); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+type BlockFilter struct {
+	filterBase
+	block *headElem
+}
+
+func (f *BlockFilter) takeBlockUpdates() []*types.Header {
+	updates, newHead := f.block.getUpdates()
+	f.block = newHead
+
+	return updates
+}
+
+func (f *BlockFilter) getUpdates() (string, error) {
+	headers := f.takeBlockUpdates()
+
+	updates := []string{}
+	for _, header := range headers {
+		updates = append(updates, header.Hash.String())
+	}
+
+	return fmt.Sprintf("[\"%s\"]", strings.Join(updates, "\",\"")), nil
+}
+
+func (f *BlockFilter) sendUpdates() error {
+	updates := f.takeBlockUpdates()
+
+	for _, block := range updates {
+		raw, err := json.Marshal(block)
+		if err != nil {
+			return err
 		}
 
-		return fmt.Sprintf("[\"%s\"]", strings.Join(updates, "\",\"")), nil
+		if err := f.writeMessageToWs(string(raw)); err != nil {
+			return err
+		}
 	}
-	// log filter
+
+	return nil
+}
+
+type LogFilter struct {
+	filterBase
+	query *LogQuery
+	logs  []*Log
+}
+
+func (f *LogFilter) appendLog(log *Log) {
+	// TODO: lock
+	f.logs = append(f.logs, log)
+}
+
+func (f *LogFilter) getUpdates() (string, error) {
 	res, err := json.Marshal(f.logs)
 	if err != nil {
 		return "", err
 	}
 
-	f.logs = []*Log{}
+	f.logs = f.logs[:0]
 
 	return string(res), nil
 }
 
-func (f *Filter) isWS() bool {
-	return f.ws != nil
+func (f *LogFilter) sendUpdates() error {
+	for _, log := range f.logs {
+		res, err := json.Marshal(log)
+		if err != nil {
+			return err
+		}
+
+		if err := f.writeMessageToWs(string(res)); err != nil {
+			return err
+		}
+	}
+
+	f.logs = f.logs[:0]
+
+	return nil
 }
 
 var ethSubscriptionTemplate = `{
@@ -74,56 +157,6 @@ var ethSubscriptionTemplate = `{
 		"result": %s
 	}
 }`
-
-func (f *Filter) sendMessage(msg string) error {
-	res := fmt.Sprintf(ethSubscriptionTemplate, f.id, msg)
-	if err := f.ws.WriteMessage(websocket.TextMessage, []byte(res)); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (f *Filter) flush() error {
-	if f.isBlockFilter() {
-		// send each block independently
-		updates, newHead := f.block.getUpdates()
-		f.block = newHead
-
-		for _, block := range updates {
-			raw, err := json.Marshal(block)
-			if err != nil {
-				return err
-			}
-
-			if err := f.sendMessage(string(raw)); err != nil {
-				return err
-			}
-		}
-	} else {
-		// log filter
-		for _, log := range f.logs {
-			res, err := json.Marshal(log)
-			if err != nil {
-				return err
-			}
-			if err := f.sendMessage(string(res)); err != nil {
-				return err
-			}
-		}
-		f.logs = []*Log{}
-	}
-
-	return nil
-}
-
-func (f *Filter) isLogFilter() bool {
-	return f.logFilter != nil
-}
-
-func (f *Filter) isBlockFilter() bool {
-	return f.block != nil
-}
 
 var defaultTimeout = 1 * time.Minute
 
@@ -142,31 +175,34 @@ type filterManagerStore interface {
 type FilterManager struct {
 	logger hclog.Logger
 
-	store   filterManagerStore
-	closeCh chan struct{}
+	timeout time.Duration
 
+	store        filterManagerStore
 	subscription blockchain.Subscription
+	blockStream  *blockStream
 
-	filters map[string]*Filter
-	timer   timeHeapImpl
-	lock    sync.RWMutex // Mutex for filters and timer
+	lock     sync.RWMutex
+	filters  map[string]filter
+	timeouts timeHeapImpl
 
 	updateCh chan struct{}
-	timeout  time.Duration
-
-	blockStream *blockStream
+	closeCh  chan struct{}
 }
 
 func NewFilterManager(logger hclog.Logger, store filterManagerStore) *FilterManager {
 	m := &FilterManager{
 		logger:      logger.Named("filter"),
-		store:       store,
-		closeCh:     make(chan struct{}),
-		filters:     map[string]*Filter{},
-		updateCh:    make(chan struct{}),
-		timer:       timeHeapImpl{},
-		blockStream: &blockStream{},
 		timeout:     defaultTimeout,
+		store:       store,
+		blockStream: &blockStream{},
+
+		// filters
+		lock:     sync.RWMutex{},
+		filters:  make(map[string]filter),
+		timeouts: timeHeapImpl{},
+
+		updateCh: make(chan struct{}),
+		closeCh:  make(chan struct{}),
 	}
 
 	// start blockstream with the current header
@@ -197,11 +233,11 @@ func (f *FilterManager) Run() {
 
 	for {
 		// check for the next filter to be removed
-		filter := f.nextTimeoutFilter()
+		filterBase := f.nextTimeoutFilter()
 
 		//	uninstall filters only
-		if filter != nil && !filter.isWS() {
-			timeoutCh = time.After(time.Until(filter.timestamp))
+		if filterBase != nil {
+			timeoutCh = time.After(time.Until(filterBase.expiredAt))
 		}
 
 		select {
@@ -213,8 +249,8 @@ func (f *FilterManager) Run() {
 
 		case <-timeoutCh:
 			// timeout for filter
-			if !f.Uninstall(filter.id) {
-				f.logger.Error("failed to uninstall filter", "id", filter.id)
+			if !f.Uninstall(filterBase.id) {
+				f.logger.Error("failed to uninstall filter", "id", filterBase.id)
 			}
 
 		case <-f.updateCh:
@@ -227,84 +263,101 @@ func (f *FilterManager) Run() {
 	}
 }
 
-func (f *FilterManager) nextTimeoutFilter() *Filter {
+func (f *FilterManager) nextTimeoutFilter() *filterBase {
 	f.lock.RLock()
-	defer f.lock.Unlock()
+	defer f.lock.RUnlock()
 
-	if len(f.filters) == 0 {
+	if len(f.timeouts) == 0 {
 		return nil
 	}
 
-	// pop the first item
-	item := f.timer[0]
+	// peek the first item
+	base := f.timeouts[0]
 
-	return item
+	return base
 }
 
 func (f *FilterManager) dispatchEvent(evnt *blockchain.Event) error {
-	f.lock.RLock()
-	// defer f.lock.RUnlock() is not called here because we may switch to write-lock inside
+	if err := f.processEvent(evnt); err != nil {
+		return err
+	}
 
-	// first include all the new headers in the blockstream for the block filters
+	// send data to WebSocket streams
+	if err := f.flushWsFilters(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (f *FilterManager) processEvent(evnt *blockchain.Event) error {
+	f.lock.RLock()
+	defer f.lock.RUnlock()
+
+	// first include all the new headers in the blockstream for BlockFilter
 	for _, header := range evnt.NewChain {
 		f.blockStream.push(header)
 	}
 
-	processBlock := func(h *types.Header, removed bool) error {
-		// get the logs from the transaction
-		receipts, err := f.store.GetReceiptsByHash(h.Hash)
-		if err != nil {
-			return err
+	// process old chain to include old logs marked removed for LogFilter
+	for _, header := range evnt.OldChain {
+		if processErr := f.appendLogsToFilters(header, true); processErr != nil {
+			f.logger.Error(fmt.Sprintf("Unable to process block, %v", processErr))
 		}
+	}
 
-		for indx, receipt := range receipts {
-			// check the logs with the filters
-			for _, log := range receipt.Logs {
-				for _, f := range f.filters {
-					if f.isLogFilter() {
-						if f.logFilter.Match(log) {
-							nn := &Log{
-								Address:     log.Address,
-								Topics:      log.Topics,
-								Data:        argBytes(log.Data),
-								BlockNumber: argUint64(h.Number),
-								BlockHash:   h.Hash,
-								TxHash:      receipt.TxHash,
-								TxIndex:     argUint64(indx),
-								Removed:     removed,
-							}
-							f.logs = append(f.logs, nn)
-						}
-					}
+	// process new chain to include new logs for LogFilter
+	for _, header := range evnt.NewChain {
+		if processErr := f.appendLogsToFilters(header, false); processErr != nil {
+			f.logger.Error(fmt.Sprintf("Unable to process block, %v", processErr))
+		}
+	}
+
+	return nil
+}
+
+func (f *FilterManager) appendLogsToFilters(header *types.Header, removed bool) error {
+	receipts, err := f.store.GetReceiptsByHash(header.Hash)
+	if err != nil {
+		return err
+	}
+
+	for indx, receipt := range receipts {
+		// check the logs with the filters
+		for _, log := range receipt.Logs {
+			nn := &Log{
+				Address:     log.Address,
+				Topics:      log.Topics,
+				Data:        argBytes(log.Data),
+				BlockNumber: argUint64(header.Number),
+				BlockHash:   header.Hash,
+				TxHash:      receipt.TxHash,
+				TxIndex:     argUint64(indx),
+				Removed:     removed,
+			}
+
+			for _, f := range f.filters {
+				if logFilter, ok := f.(*LogFilter); ok {
+					logFilter.appendLog(nn)
 				}
 			}
 		}
-
-		return nil
 	}
 
-	// process old chain
-	for _, i := range evnt.OldChain {
-		if processErr := processBlock(i, true); processErr != nil {
-			f.logger.Error(fmt.Sprintf("Unable to process block, %v", processErr))
-		}
-	}
-	// process new chain
-	for _, i := range evnt.NewChain {
-		if processErr := processBlock(i, false); processErr != nil {
-			f.logger.Error(fmt.Sprintf("Unable to process block, %v", processErr))
-		}
-	}
+	return nil
+}
 
+func (f *FilterManager) flushWsFilters() error {
 	closedFilterIDs := make([]string, 0)
 
-	// flush all the websocket values
+	f.lock.RLock()
+
 	for id, filter := range f.filters {
 		if !filter.isWS() {
 			continue
 		}
 
-		if flushErr := filter.flush(); flushErr != nil {
+		if flushErr := filter.sendUpdates(); flushErr != nil {
 			if errors.Is(flushErr, websocket.ErrCloseSent) {
 				closedFilterIDs = append(closedFilterIDs, id)
 
@@ -326,9 +379,9 @@ func (f *FilterManager) dispatchEvent(evnt *blockchain.Event) error {
 			f.removeFilterByID(id)
 		}
 
-		f.logger.Info(fmt.Sprintf("Removed %d filters due to closed connections", len(closedFilterIDs)))
-
 		f.lock.Unlock()
+		f.emitSignalToUpdateCh()
+		f.logger.Info(fmt.Sprintf("Removed %d filters due to closed connections", len(closedFilterIDs)))
 	}
 
 	return nil
@@ -343,23 +396,18 @@ func (f *FilterManager) Exists(id string) bool {
 	return ok
 }
 
-var errFilterDoesNotExists = fmt.Errorf("filter does not exists")
-
 func (f *FilterManager) GetFilterChanges(id string) (string, error) {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
 
 	filter, ok := f.filters[id]
-	if !ok {
-		return "", errFilterDoesNotExists
-	}
-
-	if filter.isWS() {
+	if !ok || filter.isWS() {
 		// we cannot get updates from a ws filter with getFilterChanges
-		return "", errFilterDoesNotExists
+
+		return "", ErrFilterDoesNotExists
 	}
 
-	res, err := filter.getFilterUpdates()
+	res, err := filter.getUpdates()
 	if err != nil {
 		return "", err
 	}
@@ -369,73 +417,95 @@ func (f *FilterManager) GetFilterChanges(id string) (string, error) {
 
 func (f *FilterManager) Uninstall(id string) bool {
 	f.lock.Lock()
-	defer f.lock.RUnlock()
+	defer f.lock.Unlock()
 
 	return f.removeFilterByID(id)
 }
 
 // removeFilterByID removes a filter with given ID, unsafe against race condition
 func (f *FilterManager) removeFilterByID(id string) bool {
-	item, ok := f.filters[id]
+	filter, ok := f.filters[id]
 	if !ok {
 		return false
 	}
 
 	delete(f.filters, id)
-	heap.Remove(&f.timer, item.index)
+	if removed := f.timeouts.removeFilter(filter.getFilterBase()); removed {
+		f.emitSignalToUpdateCh()
+	}
 
 	return true
 }
 
 func (f *FilterManager) NewBlockFilter(ws wsConn) string {
-	return f.addFilter(nil, ws)
-}
-
-func (f *FilterManager) NewLogFilter(logFilter *LogFilter, ws wsConn) string {
-	return f.addFilter(logFilter, ws)
-}
-
-func (f *FilterManager) addFilter(logFilter *LogFilter, ws wsConn) string {
-	filter := &Filter{
-		id: uuid.New().String(),
-		ws: ws,
+	filter := &BlockFilter{
+		filterBase: newFilterBase(ws),
+		block:      f.blockStream.Head(),
 	}
 
-	if logFilter == nil {
-		// block filter
-		// take the reference from the stream
-		filter.block = f.blockStream.Head()
-	} else {
-		// log filter
-		filter.logFilter = logFilter
+	return f.addFilter(filter)
+}
+
+func (f *FilterManager) NewLogFilter(logQuery *LogQuery, ws wsConn) string {
+	filter := &LogFilter{
+		filterBase: newFilterBase(ws),
+		query:      logQuery,
 	}
 
+	return f.addFilter(filter)
+}
+
+func (f *FilterManager) addFilter(filter filter) string {
 	f.lock.Lock()
+	defer f.lock.Unlock()
 
-	f.filters[filter.id] = filter
-	filter.timestamp = time.Now().Add(f.timeout)
-	heap.Push(&f.timer, filter)
+	base := filter.getFilterBase()
 
-	f.lock.Unlock()
+	f.filters[base.id] = filter
 
+	// Set timeout if filter is not WS
+	if !filter.isWS() {
+		f.timeouts.addFilter(base, f.timeout)
+		f.emitSignalToUpdateCh()
+	}
+
+	return base.id
+}
+
+func (f *FilterManager) emitSignalToUpdateCh() {
 	select {
+	// notify worker of new filter with timeout
 	case f.updateCh <- struct{}{}:
 	default:
 	}
-
-	return filter.id
 }
 
 func (f *FilterManager) Close() {
 	close(f.closeCh)
 }
 
-type timeHeapImpl []*Filter
+type timeHeapImpl []*filterBase
+
+func (t *timeHeapImpl) addFilter(filter *filterBase, timeout time.Duration) {
+	filter.expiredAt = time.Now().Add(timeout)
+	heap.Push(t, filter)
+}
+
+func (t *timeHeapImpl) removeFilter(filter *filterBase) bool {
+	fmt.Printf("filter %+v\n", filter)
+	if filter.index == -1 {
+		return false
+	}
+
+	heap.Remove(t, filter.index)
+
+	return true
+}
 
 func (t timeHeapImpl) Len() int { return len(t) }
 
 func (t timeHeapImpl) Less(i, j int) bool {
-	return t[i].timestamp.Before(t[j].timestamp)
+	return t[i].expiredAt.Before(t[j].expiredAt)
 }
 
 func (t timeHeapImpl) Swap(i, j int) {
@@ -446,7 +516,7 @@ func (t timeHeapImpl) Swap(i, j int) {
 
 func (t *timeHeapImpl) Push(x interface{}) {
 	n := len(*t)
-	item := x.(*Filter) //nolint: forcetypeassert
+	item := x.(*filterBase) //nolint: forcetypeassert
 	item.index = n
 	*t = append(*t, item)
 }
