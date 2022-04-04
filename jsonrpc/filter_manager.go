@@ -147,11 +147,11 @@ type FilterManager struct {
 
 	subscription blockchain.Subscription
 
-	filters     map[string]*Filter
-	filtersLock sync.RWMutex
+	filters map[string]*Filter
+	timer   timeHeapImpl
+	lock    sync.RWMutex // Mutex for filters and timer
 
 	updateCh chan struct{}
-	timer    timeHeapImpl
 	timeout  time.Duration
 
 	blockStream *blockStream
@@ -228,22 +228,22 @@ func (f *FilterManager) Run() {
 }
 
 func (f *FilterManager) nextTimeoutFilter() *Filter {
-	f.filtersLock.RLock()
+	f.lock.RLock()
 	if len(f.filters) == 0 {
-		f.filtersLock.RUnlock()
+		f.lock.RUnlock()
 
 		return nil
 	}
 
 	// pop the first item
 	item := f.timer[0]
-	f.filtersLock.RUnlock()
+	f.lock.RUnlock()
 
 	return item
 }
 
 func (f *FilterManager) dispatchEvent(evnt *blockchain.Event) error {
-	f.filtersLock.RLock()
+	f.lock.RLock()
 
 	// first include all the new headers in the blockstream for the block filters
 	for _, header := range evnt.NewChain {
@@ -315,10 +315,10 @@ func (f *FilterManager) dispatchEvent(evnt *blockchain.Event) error {
 		}
 	}
 
-	f.filtersLock.RUnlock()
+	f.lock.RUnlock()
 
 	if len(closedFilterIDs) > 0 {
-		f.filtersLock.Lock()
+		f.lock.Lock()
 
 		for _, id := range closedFilterIDs {
 			f.removeFilterByID(id)
@@ -326,16 +326,16 @@ func (f *FilterManager) dispatchEvent(evnt *blockchain.Event) error {
 
 		f.logger.Info(fmt.Sprintf("Removed %d filters due to closed connections", len(closedFilterIDs)))
 
-		f.filtersLock.Unlock()
+		f.lock.Unlock()
 	}
 
 	return nil
 }
 
 func (f *FilterManager) Exists(id string) bool {
-	f.filtersLock.RLock()
+	f.lock.RLock()
 	_, ok := f.filters[id]
-	f.filtersLock.RUnlock()
+	f.lock.RUnlock()
 
 	return ok
 }
@@ -343,14 +343,14 @@ func (f *FilterManager) Exists(id string) bool {
 var errFilterDoesNotExists = fmt.Errorf("filter does not exists")
 
 func (f *FilterManager) GetFilterChanges(id string) (string, error) {
-	f.filtersLock.RLock()
+	f.lock.RLock()
 
 	item, ok := f.filters[id]
 	if !ok {
 		return "", errFilterDoesNotExists
 	}
 
-	f.filtersLock.RUnlock()
+	f.lock.RUnlock()
 
 	if item.isWS() {
 		// we cannot get updates from a ws filter with getFilterChanges
@@ -366,11 +366,11 @@ func (f *FilterManager) GetFilterChanges(id string) (string, error) {
 }
 
 func (f *FilterManager) Uninstall(id string) bool {
-	f.filtersLock.Lock()
+	f.lock.Lock()
 
 	removed := f.removeFilterByID(id)
 
-	f.filtersLock.Unlock()
+	f.lock.Unlock()
 
 	return removed
 }
@@ -411,13 +411,13 @@ func (f *FilterManager) addFilter(logFilter *LogFilter, ws wsConn) string {
 		filter.logFilter = logFilter
 	}
 
-	f.filtersLock.Lock()
+	f.lock.Lock()
 
 	f.filters[filter.id] = filter
 	filter.timestamp = time.Now().Add(f.timeout)
 	heap.Push(&f.timer, filter)
 
-	f.filtersLock.Unlock()
+	f.lock.Unlock()
 
 	select {
 	case f.updateCh <- struct{}{}:
