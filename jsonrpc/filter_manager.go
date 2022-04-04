@@ -401,9 +401,9 @@ func (f *FilterManager) GetFilterChanges(id string) (string, error) {
 	defer f.lock.RUnlock()
 
 	filter, ok := f.filters[id]
-	if !ok || filter.isWS() {
-		// we cannot get updates from a ws filter with getFilterChanges
 
+	// we cannot get updates from a ws filter with getFilterChanges
+	if !ok || filter.isWS() {
 		return "", ErrFilterDoesNotExists
 	}
 
@@ -430,6 +430,7 @@ func (f *FilterManager) removeFilterByID(id string) bool {
 	}
 
 	delete(f.filters, id)
+
 	if removed := f.timeouts.removeFilter(filter.getFilterBase()); removed {
 		f.emitSignalToUpdateCh()
 	}
@@ -492,7 +493,6 @@ func (t *timeHeapImpl) addFilter(filter *filterBase, timeout time.Duration) {
 }
 
 func (t *timeHeapImpl) removeFilter(filter *filterBase) bool {
-	fmt.Printf("filter %+v\n", filter)
 	if filter.index == -1 {
 		return false
 	}
