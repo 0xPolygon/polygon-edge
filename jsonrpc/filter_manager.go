@@ -300,18 +300,20 @@ func (f *FilterManager) dispatchEvent(evnt *blockchain.Event) error {
 
 	// flush all the websocket values
 	for id, filter := range f.filters {
-		if filter.isWS() {
-			if flushErr := filter.flush(); flushErr != nil {
-				if errors.Is(flushErr, websocket.ErrCloseSent) {
-					closedFilterIDs = append(closedFilterIDs, id)
+		if !filter.isWS() {
+			continue
+		}
 
-					f.logger.Warn(fmt.Sprintf("Subscription %s has been closed", id))
+		if flushErr := filter.flush(); flushErr != nil {
+			if errors.Is(flushErr, websocket.ErrCloseSent) {
+				closedFilterIDs = append(closedFilterIDs, id)
 
-					continue
-				}
+				f.logger.Warn(fmt.Sprintf("Subscription %s has been closed", id))
 
-				f.logger.Error(fmt.Sprintf("Unable to process flush, %v", flushErr))
+				continue
 			}
+
+			f.logger.Error(fmt.Sprintf("Unable to process flush, %v", flushErr))
 		}
 	}
 
@@ -375,7 +377,7 @@ func (f *FilterManager) Uninstall(id string) bool {
 	return removed
 }
 
-// removeFilterByID removes a filter with given ID, unsafe agarint race condition
+// removeFilterByID removes a filter with given ID, unsafe against race condition
 func (f *FilterManager) removeFilterByID(id string) bool {
 	item, ok := f.filters[id]
 	if !ok {
