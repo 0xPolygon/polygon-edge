@@ -229,21 +229,21 @@ func (f *FilterManager) Run() {
 
 func (f *FilterManager) nextTimeoutFilter() *Filter {
 	f.lock.RLock()
-	if len(f.filters) == 0 {
-		f.lock.RUnlock()
+	defer f.lock.Unlock()
 
+	if len(f.filters) == 0 {
 		return nil
 	}
 
 	// pop the first item
 	item := f.timer[0]
-	f.lock.RUnlock()
 
 	return item
 }
 
 func (f *FilterManager) dispatchEvent(evnt *blockchain.Event) error {
 	f.lock.RLock()
+	// defer f.lock.RUnlock() is not called here because we may switch to write-lock inside
 
 	// first include all the new headers in the blockstream for the block filters
 	for _, header := range evnt.NewChain {
@@ -336,8 +336,9 @@ func (f *FilterManager) dispatchEvent(evnt *blockchain.Event) error {
 
 func (f *FilterManager) Exists(id string) bool {
 	f.lock.RLock()
+	defer f.lock.RUnlock()
+
 	_, ok := f.filters[id]
-	f.lock.RUnlock()
 
 	return ok
 }
@@ -346,20 +347,19 @@ var errFilterDoesNotExists = fmt.Errorf("filter does not exists")
 
 func (f *FilterManager) GetFilterChanges(id string) (string, error) {
 	f.lock.RLock()
+	defer f.lock.RUnlock()
 
-	item, ok := f.filters[id]
+	filter, ok := f.filters[id]
 	if !ok {
 		return "", errFilterDoesNotExists
 	}
 
-	f.lock.RUnlock()
-
-	if item.isWS() {
+	if filter.isWS() {
 		// we cannot get updates from a ws filter with getFilterChanges
 		return "", errFilterDoesNotExists
 	}
 
-	res, err := item.getFilterUpdates()
+	res, err := filter.getFilterUpdates()
 	if err != nil {
 		return "", err
 	}
@@ -369,12 +369,9 @@ func (f *FilterManager) GetFilterChanges(id string) (string, error) {
 
 func (f *FilterManager) Uninstall(id string) bool {
 	f.lock.Lock()
+	defer f.lock.RUnlock()
 
-	removed := f.removeFilterByID(id)
-
-	f.lock.Unlock()
-
-	return removed
+	return f.removeFilterByID(id)
 }
 
 // removeFilterByID removes a filter with given ID, unsafe against race condition
@@ -474,14 +471,15 @@ type blockStream struct {
 
 func (b *blockStream) Head() *headElem {
 	b.lock.Lock()
-	head := b.head
-	b.lock.Unlock()
+	defer b.lock.Unlock()
 
-	return head
+	return b.head
 }
 
 func (b *blockStream) push(header *types.Header) {
 	b.lock.Lock()
+	defer b.lock.Unlock()
+
 	newHead := &headElem{
 		header: header.Copy(),
 	}
@@ -491,8 +489,6 @@ func (b *blockStream) push(header *types.Header) {
 	}
 
 	b.head = newHead
-
-	b.lock.Unlock()
 }
 
 type headElem struct {
