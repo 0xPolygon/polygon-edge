@@ -665,7 +665,7 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 }
 
 // GetLogs returns an array of logs matching the filter options
-func (e *Eth) GetLogs(filterOptions *LogFilter) (interface{}, error) {
+func (e *Eth) GetLogs(filterOptions *LogQuery) (interface{}, error) {
 	result := make([]*Log, 0)
 	parseReceipts := func(block *types.Block) error {
 		receipts, err := e.store.GetReceiptsByHash(block.Header.Hash)
@@ -858,7 +858,7 @@ func (e *Eth) GetCode(address types.Address, filter BlockNumberOrHash) (interfac
 }
 
 // NewFilter creates a filter object, based on filter options, to notify when the state changes (logs).
-func (e *Eth) NewFilter(filter *LogFilter) (interface{}, error) {
+func (e *Eth) NewFilter(filter *LogQuery) (interface{}, error) {
 	return e.filterManager.NewLogFilter(filter, nil), nil
 }
 

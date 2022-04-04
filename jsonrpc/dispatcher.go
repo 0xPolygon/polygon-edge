@@ -137,11 +137,11 @@ func (d *Dispatcher) handleSubscribe(req Request, conn wsConn) (string, Error) {
 	if subscribeMethod == "newHeads" {
 		filterID = d.filterManager.NewBlockFilter(conn)
 	} else if subscribeMethod == "logs" {
-		logFilter, err := decodeLogFilterFromInterface(params[1])
+		logQuery, err := decodeLogQueryFromInterface(params[1])
 		if err != nil {
 			return "", NewInternalError(err.Error())
 		}
-		filterID = d.filterManager.NewLogFilter(logFilter, conn)
+		filterID = d.filterManager.NewLogFilter(logQuery, conn)
 	} else {
 		return "", NewSubscriptionNotFoundError(subscribeMethod)
 	}
