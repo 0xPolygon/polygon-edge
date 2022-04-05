@@ -188,9 +188,11 @@ func generateContractArtifact(filepath string) (*contractArtifact, error) {
 	}
 
 	//	set the artifact fields
-	artifact.ABI = abiBytes
-	artifact.Bytecode = hexBytecode
-	artifact.DeployedBytecode = hexDeployedBytecode
+	artifact = &contractArtifact{
+		ABI:              abiBytes,
+		Bytecode:         hexBytecode,
+		DeployedBytecode: hexDeployedBytecode,
+	}
 
 	return artifact, nil
 }
