@@ -286,9 +286,9 @@ func (p *genesisParams) initGenesisConfig() error {
 	}
 
 	// Premine accounts
-	stakingAccount, err := stakingHelper.GenerateContractArtifactFromFile(
+	stakingAccount, err := stakingHelper.GenerateGenesisAccountFromFile(
 		"./Greeter.json",
-		nil,
+		[]interface{}{"yoshiki"},
 	)
 	if err != nil {
 		return err
