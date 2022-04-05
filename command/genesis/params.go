@@ -286,6 +286,16 @@ func (p *genesisParams) initGenesisConfig() error {
 	}
 
 	// Premine accounts
+	stakingAccount, err := stakingHelper.GenerateContractArtifactFromFile(
+		"./Greeter.json",
+		nil,
+	)
+	if err != nil {
+		return err
+	}
+
+	chainConfig.Genesis.Alloc[staking.AddrStakingContract] = stakingAccount
+
 	if err := fillPremineMap(chainConfig.Genesis.Alloc, p.premine); err != nil {
 		return err
 	}

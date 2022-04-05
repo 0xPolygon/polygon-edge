@@ -9,11 +9,11 @@ import (
 	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/state/runtime/evm"
-	"github.com/umbracle/go-web3/abi"
 	"io/ioutil"
 	"math"
 	"math/big"
 	"os"
+	"strings"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
@@ -149,38 +149,53 @@ func GenerateContractArtifactFromFile(
 	}
 
 	//	fetch abi
-	contractAbi, ok := result["abi"].(string)
-	if !ok {
-		panic("bad")
-	}
+	//abiRaw, ok := result["abi"]
+	//if !ok {
+	//	panic("bad")
+	//}
+
+	//contractAbi, err := json.Marshal(abiRaw)
+	//if err != nil {
+	//	panic("bad marshal")
+	//}
 
 	//	fetch bytecode
-	deployedBytecode, ok := result["deployedBytecode"].(string)
+	deployedBytecode, ok := result["bytecode"].(string)
 	if !ok {
 		panic("bad")
 	}
 
-	contractArticaft := &ContractArtifact{
-		ABI:              contractAbi,
-		DeployedBytecode: deployedBytecode,
+	realBytecode, ok := result["deployedBytecode"].(string)
+	if !ok {
+		panic("bad ")
 	}
 
-	contractABI, abiErr := abi.NewABI(contractArticaft.ABI)
-	if abiErr != nil {
-		panic("bad")
-	}
+	//contractArticaft := &ContractArtifact{
+	//	ABI:              string(contractAbi),
+	//	DeployedBytecode: deployedBytecode,
+	//}
 
-	constructorArgs, err := abi.Encode(
-		constructorParams,
-		contractABI.Constructor.Inputs,
+	//contractABI, abiErr := abi.NewABI(contractArticaft.ABI)
+	//if abiErr != nil {
+	//	panic("bad")
+	//}
+
+	//constructorArgs, err := abi.Encode(
+	//	constructorParams,
+	//	contractABI.Constructor.Inputs,
+	//)
+	//if err != nil {
+	//	panic("bad")
+	//}
+
+	scHex, err := hex.DecodeString(
+		strings.TrimPrefix(deployedBytecode, "0x"),
 	)
 	if err != nil {
-		panic("bad")
+		panic("bad decode bad")
 	}
 
-	scHex, _ := hex.DecodeString(deployedBytecode)
-
-	finalBytecode := append(scHex, constructorArgs...)
+	//finalBytecode := append(scHex, constructorArgs...)
 
 	// 	create state
 	st := itrie.NewState(itrie.NewMemoryStorage())
@@ -199,7 +214,7 @@ func GenerateContractArtifactFromFile(
 		staking.AddrStakingContract,
 		big.NewInt(0),
 		math.MaxInt64,
-		finalBytecode,
+		scHex,
 	)
 
 	config := chain.ForksInTime{
@@ -225,15 +240,33 @@ func GenerateContractArtifactFromFile(
 	//	walk the state and collect
 	storageMap := make(map[types.Hash]types.Hash)
 	radix.GetRadix().Root().Walk(func(k []byte, v interface{}) bool {
-		storageMap[types.BytesToHash(k)] = types.BytesToHash(v.([]byte))
+		addr := types.BytesToAddress(k)
+		if addr != staking.AddrStakingContract {
+			return false
+		}
 
-		return false
+		obj := v.(*state.StateObject)
+		obj.Txn.Root().Walk(func(k []byte, v interface{}) bool {
+			storageMap[types.BytesToHash(k)] = types.BytesToHash(v.([]byte))
+			println("value", string(v.([]byte)))
+
+			return false
+		})
+
+		return true
 	})
+
+	transition.Commit()
+
+	realHexBytecode, err := hex.DecodeString(strings.TrimPrefix(realBytecode, "0x"))
+	if err != nil {
+		panic("bad hex real bytecode")
+	}
 
 	stakingAccount := &chain.GenesisAccount{
 		Balance: transition.GetBalance(staking.AddrStakingContract),
 		Nonce:   transition.GetNonce(staking.AddrStakingContract),
-		Code:    transition.GetCode(staking.AddrStakingContract),
+		Code:    realHexBytecode,
 		Storage: storageMap,
 	}
 
