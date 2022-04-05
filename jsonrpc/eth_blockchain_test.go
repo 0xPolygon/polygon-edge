@@ -111,7 +111,7 @@ func TestEth_Block_GetLogs(t *testing.T) {
 
 	testTable := []struct {
 		name           string
-		filterOptions  *LogQuery
+		query          *LogQuery
 		shouldFail     bool
 		expectedLength int
 	}{
@@ -176,7 +176,7 @@ func TestEth_Block_GetLogs(t *testing.T) {
 
 	for _, testCase := range testTable {
 		t.Run(testCase.name, func(t *testing.T) {
-			foundLogs, logError := eth.GetLogs(testCase.filterOptions)
+			foundLogs, logError := eth.GetLogs(testCase.query)
 
 			if logError != nil && !testCase.shouldFail {
 				// If there is an error and test isn't expected to fail

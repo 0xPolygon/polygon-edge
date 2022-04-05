@@ -92,13 +92,17 @@ func (f *filterBase) writeMessageToWs(msg string) error {
 // blockFilter is a filter to store the updates of block
 type blockFilter struct {
 	filterBase
+	sync.Mutex
 	block *headElem
 }
 
 // takeBlockUpdates advances blocks from head to latest and returns header array
 func (f *blockFilter) takeBlockUpdates() []*types.Header {
 	updates, newHead := f.block.getUpdates()
+
+	f.Lock()
 	f.block = newHead
+	f.Unlock()
 
 	return updates
 }
@@ -136,23 +140,23 @@ func (f *blockFilter) sendUpdates() error {
 // logFilter is a filter to store logs that meet the conditions in query
 type logFilter struct {
 	filterBase
-	query    *LogQuery
-	logs     []*Log
-	logsLock sync.Mutex
+	sync.Mutex
+	query *LogQuery
+	logs  []*Log
 }
 
 // appendLog appends new log to logs
 func (f *logFilter) appendLog(log *Log) {
-	f.logsLock.Lock()
-	defer f.logsLock.Unlock()
+	f.Lock()
+	defer f.Unlock()
 
 	f.logs = append(f.logs, log)
 }
 
 // takeLogUpdates returns all saved logs in filter and set new log slice
 func (f *logFilter) takeLogUpdates() []*Log {
-	f.logsLock.Lock()
-	defer f.logsLock.Unlock()
+	f.Lock()
+	defer f.Unlock()
 
 	logs := f.logs
 	f.logs = []*Log{} // create brand new slice so that prevent new logs from being added to current logs
