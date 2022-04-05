@@ -193,6 +193,13 @@ type Transition struct {
 	totalGas uint64
 }
 
+func NewTransition(config chain.ForksInTime, radix *Txn) *Transition {
+	return &Transition{
+		config: config,
+		state:  radix,
+	}
+}
+
 func (t *Transition) TotalGas() uint64 {
 	return t.totalGas
 }
