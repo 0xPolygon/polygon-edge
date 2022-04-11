@@ -55,19 +55,52 @@ func (b *BridgeMechanism) verifyStateTransactionsHook(blockParam interface{}) er
 		return ErrInvalidHookParam
 	}
 
+	return b.validateBlock(block)
+}
+
+// validateBlock validates state transactions in the given block
+func (b *BridgeMechanism) validateBlock(block *types.Block) error {
+	snapshot, err := b.ibft.getSnapshot(block.Number())
+	if err != nil {
+		return err
+	}
+
+	signer := b.bridge.Signer()
+	threshold := b.calculateSignatureThreshold(snapshot.Set)
+
 	for _, tx := range block.Transactions {
 		if tx.Type != types.TxTypeState {
 			continue
 		}
 
-		if err := b.bridge.StateSync().ValidateTx(tx); err != nil {
-			b.ibft.logger.Error("block verification failed, block has invalid state transactions", "err", err)
+		txHash := b.bridge.StateSync().GetTransactionHash(tx)
 
-			return errBlockVerificationFailed
+		sigCount := uint64(0)
+		checked := make(map[types.Address]bool)
+
+		for _, sig := range tx.StateSignatures {
+			address, err := signer.RecoverAddress(txHash[:], sig)
+			if err != nil {
+				return err
+			}
+
+			if checked[address] {
+				continue
+			}
+
+			if snapshot.Set.Includes(address) {
+				sigCount++
+			}
+
+			checked[address] = true
+		}
+
+		if sigCount < threshold {
+			return fmt.Errorf("state transaction doesn't have enough signatures, required=%d, have=%d", threshold, sigCount)
 		}
 	}
 
-	return nil
+	return err
 }
 
 // insertTransactionHookParams are the params passed into the InsertTransactionsHook
@@ -102,6 +135,8 @@ func (b *BridgeMechanism) insertStateTransactionsHook(rawParams interface{}) err
 
 			continue
 		}
+
+		msg.Transaction.StateSignatures = msg.Signatures
 
 		signer := crypto.NewSigner(
 			b.ibft.config.Params.Forks.At(b.ibft.state.view.Sequence),

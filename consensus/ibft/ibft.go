@@ -176,7 +176,7 @@ func Factory(
 	// Istanbul requires a different header hash function
 	types.HeaderHash = istanbulHeaderHash
 
-	p.syncer = protocol.NewSyncer(params.Logger, params.Network, params.Blockchain)
+	p.syncer = protocol.NewSyncer(params.Logger, params.Network, params.Blockchain, p.verifySyncBlock)
 
 	return p, nil
 }
@@ -1284,7 +1284,12 @@ func (i *Ibft) GetBlockCreator(header *types.Header) (types.Address, error) {
 	return ecrecoverFromHeader(header)
 }
 
-// PreStateCommit a hook to be called before finalizing state transition on inserting block
+// verifySyncBlock verifies block from syncer
+func (i *Ibft) verifySyncBlock(block *types.Block) error {
+	return i.runHook(VerifyBlockHook, block.Number(), block)
+}
+
+// runInsertTransactionsHook a hook to be called before finalizing state transition on inserting block
 func (i *Ibft) runInsertTransactionsHook(
 	header *types.Header,
 	transition *state.Transition,

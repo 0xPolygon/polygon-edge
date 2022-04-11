@@ -88,12 +88,13 @@ func (b *Block) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 			i++
 		}
 
-		bTxn := &Transaction{}
+		bTxn := &Transaction{
+			Type: txType,
+		}
 		if err := bTxn.UnmarshalRLPFrom(p, txns[i]); err != nil {
 			return err
 		}
 
-		bTxn.Type = txType
 		bTxn.ComputeHash()
 
 		b.Transactions = append(b.Transactions, bTxn)
@@ -222,12 +223,12 @@ func (r *Receipts) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 			i++
 		}
 
-		rr := &Receipt{}
+		rr := &Receipt{
+			TransactionType: txType,
+		}
 		if err := rr.UnmarshalRLPFrom(p, elems[i]); err != nil {
 			return err
 		}
-
-		rr.TransactionType = txType
 
 		*r = append(*r, rr)
 	}
@@ -248,11 +249,10 @@ func (r *Receipt) UnmarshalRLP(input []byte) error {
 		offset = 1
 	}
 
+	r.TransactionType = txType
 	if err := UnmarshalRlp(r.UnmarshalRLPFrom, input[offset:]); err != nil {
 		return err
 	}
-
-	r.TransactionType = txType
 
 	return nil
 }
@@ -361,11 +361,10 @@ func (t *Transaction) UnmarshalRLP(input []byte) error {
 		offset = 1
 	}
 
+	t.Type = txType
 	if err := UnmarshalRlp(t.UnmarshalRLPFrom, input[offset:]); err != nil {
 		return err
 	}
-
-	t.Type = txType
 
 	return nil
 }
@@ -377,8 +376,12 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 		return err
 	}
 
-	if num := len(elems); num != 9 {
+	num := len(elems)
+
+	if t.Type == TxTypeLegacy && num != 9 {
 		return fmt.Errorf("not enough elements to decode transaction, expected 9 but found %d", num)
+	} else if t.Type == TxTypeState && num != 10 {
+		return fmt.Errorf("not enough elements to decode transaction, expected 10 but found %d", num)
 	}
 
 	// nonce
@@ -428,6 +431,22 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 	t.S = new(big.Int)
 	if err = elems[8].GetBigInt(t.S); err != nil {
 		return err
+	}
+
+	// StateSignatures
+	if t.Type == TxTypeState {
+		sigElems, err := elems[9].GetElems()
+		if err != nil {
+			return err
+		}
+
+		t.StateSignatures = make([][]byte, len(sigElems))
+
+		for i, e := range sigElems {
+			if t.StateSignatures[i], err = e.GetBytes(t.StateSignatures[i][:0]); err != nil {
+				return err
+			}
+		}
 	}
 
 	return nil

@@ -201,6 +201,10 @@ func (m *MockVerifier) GetBlockCreator(header *types.Header) (types.Address, err
 	return header.Miner, nil
 }
 
+func (m *MockVerifier) PreProcessBlock(block *types.Block) error {
+	return nil
+}
+
 func (m *MockVerifier) PreStateCommit(header *types.Header, txn *state.Transition) error {
 	return nil
 }

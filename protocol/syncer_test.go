@@ -545,7 +545,7 @@ func createSyncers(count int, servers []*network.Server, blockStores []*mockBloc
 	syncers := make([]*Syncer, count)
 
 	for indx := 0; indx < count; indx++ {
-		syncers[indx] = NewSyncer(hclog.NewNullLogger(), servers[indx], blockStores[indx])
+		syncers[indx] = NewSyncer(hclog.NewNullLogger(), servers[indx], blockStores[indx], nil)
 	}
 
 	return syncers

@@ -42,12 +42,13 @@ func (b *Body) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 			i++
 		}
 
-		bTxn := &Transaction{}
+		bTxn := &Transaction{
+			Type: txType,
+		}
 		if err := bTxn.UnmarshalStoreRLPFrom(p, txns[i]); err != nil {
 			return err
 		}
 
-		bTxn.Type = txType
 		bTxn.ComputeHash()
 
 		b.Transactions = append(b.Transactions, bTxn)
@@ -81,11 +82,10 @@ func (t *Transaction) UnmarshalStoreRLP(input []byte) error {
 		}
 	}
 
+	t.Type = txType
 	if err := UnmarshalRlp(t.UnmarshalStoreRLPFrom, input); err != nil {
 		return err
 	}
-
-	t.Type = txType
 
 	return nil
 }
@@ -144,12 +144,13 @@ func (r *Receipts) UnmarshalStoreRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) er
 			i++
 		}
 
-		rr := &Receipt{}
+		rr := &Receipt{
+			TransactionType: txType,
+		}
 		if err := rr.UnmarshalStoreRLPFrom(p, elems[i]); err != nil {
 			return err
 		}
 
-		rr.TransactionType = txType
 		*r = append(*r, rr)
 	}
 
@@ -166,11 +167,10 @@ func (r *Receipt) UnmarshalStoreRLP(input []byte) error {
 		}
 	}
 
+	r.TransactionType = txType
 	if err := UnmarshalRlp(r.UnmarshalStoreRLPFrom, input); err != nil {
 		return err
 	}
-
-	r.TransactionType = txType
 
 	return nil
 }

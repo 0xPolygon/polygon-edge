@@ -88,13 +88,14 @@ func TestRLPMarshall_And_Unmarshall_TypedTransaction(t *testing.T) {
 		V:        big.NewInt(25),
 		S:        big.NewInt(26),
 		R:        big.NewInt(27),
+		StateSignatures: [][]byte{
+			{0x01},
+		},
 	}
 
 	txTypes := []TransactionType{
 		TxTypeState,
 	}
-
-	originalRLP := originalTx.MarshalRLP()
 
 	for _, txType := range txTypes {
 		txType := txType
@@ -103,11 +104,6 @@ func TestRLPMarshall_And_Unmarshall_TypedTransaction(t *testing.T) {
 			originalTx.ComputeHash()
 
 			txRLP := originalTx.MarshalRLP()
-
-			// RLP(Typed) = TxType || RLP(Tx)
-			assert.Equal(t, len(originalRLP)+1, len(txRLP))
-			assert.Equal(t, byte(txType), txRLP[0])
-			assert.Equal(t, originalRLP, txRLP[1:])
 
 			unmarshalledTx := new(Transaction)
 			assert.NoError(t, unmarshalledTx.UnmarshalRLP(txRLP))

@@ -19,6 +19,7 @@ type StateSync interface {
 	Close() error
 
 	GetReadyMessages() ([]MessageWithSignatures, error)
+	GetTransactionHash(*types.Transaction) types.Hash
 	ValidateTx(*types.Transaction) error
 	Consume(*types.Transaction)
 }
@@ -122,6 +123,10 @@ func (b *stateSync) GetReadyMessages() ([]MessageWithSignatures, error) {
 	}
 
 	return data, nil
+}
+
+func (b *stateSync) GetTransactionHash(tx *types.Transaction) types.Hash {
+	return getTransactionHash(tx)
 }
 
 // ValidateTx validates given state transaction

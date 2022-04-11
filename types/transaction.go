@@ -58,6 +58,9 @@ type Transaction struct {
 
 	Type TransactionType
 
+	// For StateTransaction
+	StateSignatures [][]byte
+
 	// Cache
 	size atomic.Value
 }
@@ -107,6 +110,14 @@ func (t *Transaction) Copy() *Transaction {
 
 	tt.Input = make([]byte, len(t.Input))
 	copy(tt.Input[:], t.Input[:])
+
+	if t.StateSignatures != nil {
+		tt.StateSignatures = make([][]byte, len(t.StateSignatures))
+		for i := range t.StateSignatures {
+			tt.StateSignatures[i] = make([]byte, len(t.StateSignatures[i]))
+			copy(tt.StateSignatures[i][:], t.StateSignatures[i][:])
+		}
+	}
 
 	return tt
 }

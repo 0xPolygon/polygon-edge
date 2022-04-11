@@ -193,6 +193,8 @@ func statusFromProto(p *proto.V1Status) (*Status, error) {
 	return s, nil
 }
 
+type VerifyBlock func(block *types.Block) error
+
 // Syncer is a sync protocol
 type Syncer struct {
 	logger     hclog.Logger
@@ -209,16 +211,24 @@ type Syncer struct {
 	server *network.Server
 
 	syncProgression *progress.ProgressionWrapper
+
+	verifyBlock VerifyBlock // additional handler to be called before inserting
 }
 
 // NewSyncer creates a new Syncer instance
-func NewSyncer(logger hclog.Logger, server *network.Server, blockchain blockchainShim) *Syncer {
+func NewSyncer(
+	logger hclog.Logger,
+	server *network.Server,
+	blockchain blockchainShim,
+	verifyBlock VerifyBlock,
+) *Syncer {
 	s := &Syncer{
 		logger:          logger.Named("syncer"),
 		stopCh:          make(chan struct{}),
 		blockchain:      blockchain,
 		server:          server,
 		syncProgression: progress.NewProgressionWrapper(progress.ChainSyncBulk),
+		verifyBlock:     verifyBlock,
 	}
 
 	return s
@@ -600,6 +610,14 @@ func (s *Syncer) WatchSyncWithPeer(p *SyncPeer, handler func(b *types.Block) boo
 			break
 		}
 
+		if s.verifyBlock != nil {
+			if err := s.verifyBlock(b); err != nil {
+				s.logger.Error("failed to verify block", "err", err)
+
+				break
+			}
+		}
+
 		if err := s.blockchain.WriteBlock(b); err != nil {
 			s.logger.Error("failed to write block", "err", err)
 
@@ -675,6 +693,12 @@ func (s *Syncer) BulkSyncWithPeer(p *SyncPeer, newBlockHandler func(block *types
 			// sync the data
 			for _, slot := range sk.slots {
 				for _, block := range slot.blocks {
+					if s.verifyBlock != nil {
+						if err := s.verifyBlock(block); err != nil {
+							return fmt.Errorf("failed to verify block: %w", err)
+						}
+					}
+
 					if err := s.blockchain.WriteBlock(block); err != nil {
 						return fmt.Errorf("failed to write bulk sync blocks: %w", err)
 					}

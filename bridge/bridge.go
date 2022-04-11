@@ -14,12 +14,14 @@ type Bridge interface {
 	Close() error
 	SetValidators([]types.Address, uint64)
 	StateSync() statesync.StateSync
+	Signer() sam.Signer
 }
 
 type bridge struct {
 	logger    hclog.Logger
 	stateSync statesync.StateSync
 
+	signer       sam.Signer
 	validatorSet utils.ValidatorSet
 }
 
@@ -51,6 +53,7 @@ func NewBridge(
 	return &bridge{
 		logger:       bridgeLogger,
 		stateSync:    stateSync,
+		signer:       signer,
 		validatorSet: valSet,
 	}, nil
 }
@@ -77,4 +80,8 @@ func (b *bridge) SetValidators(validators []types.Address, threshold uint64) {
 
 func (b *bridge) StateSync() statesync.StateSync {
 	return b.stateSync
+}
+
+func (b *bridge) Signer() sam.Signer {
+	return b.signer
 }

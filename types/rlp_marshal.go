@@ -206,5 +206,15 @@ func (t *Transaction) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 	vv.Set(arena.NewBigInt(t.R))
 	vv.Set(arena.NewBigInt(t.S))
 
+	if t.Type == TxTypeState {
+		sigs := arena.NewArray()
+
+		for _, sig := range t.StateSignatures {
+			sigs.Set(arena.NewCopyBytes(sig))
+		}
+
+		vv.Set(sigs)
+	}
+
 	return vv
 }
