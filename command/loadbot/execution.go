@@ -260,7 +260,7 @@ func (l *Loadbot) Run() error {
 	}
 
 	var (
-		seenBlockNums     map[uint64]struct{}
+		seenBlockNums     = make(map[uint64]struct{})
 		seenBlockNumsLock sync.Mutex
 		wg                sync.WaitGroup
 	)
