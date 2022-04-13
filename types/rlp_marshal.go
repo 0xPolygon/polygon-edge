@@ -32,15 +32,11 @@ func (b *Block) MarshalRLPTo(dst []byte) []byte {
 
 func (b *Block) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 	vv := ar.NewArray()
+
 	vv.Set(b.Header.MarshalRLPWith(ar))
 
-	if len(b.Transactions) == 0 {
-		vv.Set(ar.NewNullArray())
-	} else {
-		ts := Transactions(b.Transactions)
-
-		vv.Set(ts.MarshalRLPWith(ar))
-	}
+	ts := Transactions(b.Transactions)
+	vv.Set(ts.MarshalRLPWith(ar))
 
 	if len(b.Uncles) == 0 {
 		vv.Set(ar.NewNullArray())
@@ -170,8 +166,11 @@ func (tt Transactions) MarshalRLPTo(dst []byte) []byte {
 }
 
 func (tt *Transactions) MarshalRLPWith(a *fastrlp.Arena) *fastrlp.Value {
-	vv := a.NewArray()
+	if len(*tt) == 0 {
+		return a.NewNullArray()
+	}
 
+	vv := a.NewArray()
 	for _, tx := range *tt {
 		if tx.IsTypedTransaction() {
 			vv.Set(a.NewBytes([]byte{byte(tx.Type())}))

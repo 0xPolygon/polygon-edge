@@ -72,11 +72,9 @@ func (tt *Transactions) UnmarshalStoreRLPFrom(p *fastrlp.Parser, v *fastrlp.Valu
 			return err
 		}
 
-		if err := txn.Payload.UnmarshalStoreRLPFrom(p, txns[i]); err != nil {
+		if err := txn.UnmarshalStoreRLPFrom(p, txns[i]); err != nil {
 			return err
 		}
-
-		txn.ComputeHash()
 
 		*tt = append(*tt, txn)
 	}

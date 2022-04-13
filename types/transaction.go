@@ -417,3 +417,13 @@ func (t *StateTransaction) copy() TxPayload {
 
 	return tt
 }
+
+func (t *StateTransaction) SetSignatureValues(v, r, s *big.Int) {
+	t.V = v
+	t.R = r
+	t.S = s
+}
+
+func (t *StateTransaction) GetSignatureValues() (v, r, s *big.Int) {
+	return t.V, t.R, t.S
+}

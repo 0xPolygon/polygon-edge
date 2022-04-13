@@ -12,16 +12,12 @@ func (b *Body) MarshalRLPTo(dst []byte) []byte {
 
 func (b *Body) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 	vv := ar.NewArray()
-	if len(b.Transactions) == 0 {
-		vv.Set(ar.NewNullArray())
-	} else {
-		v0 := ar.NewArray()
-		for _, tx := range b.Transactions {
-			v0.Set(tx.MarshalStoreRLPWith(ar))
-		}
-		vv.Set(v0)
-	}
 
+	// transactions
+	txs := (Transactions)(b.Transactions)
+	vv.Set(txs.MarshalStoreRLPWith(ar))
+
+	// uncles
 	if len(b.Uncles) == 0 {
 		vv.Set(ar.NewNullArray())
 	} else {
@@ -33,6 +29,23 @@ func (b *Body) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 	}
 
 	return vv
+}
+
+func (t *Transactions) MarshalStoreRLPWith(a *fastrlp.Arena) *fastrlp.Value {
+	if len(*t) == 0 {
+		return a.NewNullArray()
+	}
+
+	v0 := a.NewArray()
+	for _, tx := range *t {
+		if tx.IsTypedTransaction() {
+			v0.Set(a.NewBytes([]byte{byte(tx.Type())}))
+		}
+
+		v0.Set(tx.MarshalStoreRLPWith(a))
+	}
+
+	return v0
 }
 
 func (t *Transaction) MarshalStoreRLPTo(dst []byte) []byte {
