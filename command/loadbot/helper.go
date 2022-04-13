@@ -78,11 +78,11 @@ func getBlockGasMetrics(
 ) (*BlockGasMetrics, error) {
 	var (
 		errors          = make([]error, 0)
+		errorsLock      sync.Mutex
 		blockGasMetrics = &BlockGasMetrics{
 			Blocks: make(map[uint64]GasMetrics),
 		}
-		errorsLock sync.Mutex
-		wg         sync.WaitGroup
+		wg sync.WaitGroup
 	)
 
 	// addError is a helper for accumulating errors
