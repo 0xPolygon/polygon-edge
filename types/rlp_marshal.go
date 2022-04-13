@@ -171,6 +171,7 @@ func (tt *Transactions) MarshalRLPWith(a *fastrlp.Arena) *fastrlp.Value {
 	}
 
 	vv := a.NewArray()
+
 	for _, tx := range *tt {
 		if tx.IsTypedTransaction() {
 			vv.Set(a.NewBytes([]byte{byte(tx.Type())}))

@@ -31,13 +31,14 @@ func (b *Body) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 	return vv
 }
 
-func (t *Transactions) MarshalStoreRLPWith(a *fastrlp.Arena) *fastrlp.Value {
-	if len(*t) == 0 {
+func (tt *Transactions) MarshalStoreRLPWith(a *fastrlp.Arena) *fastrlp.Value {
+	if len(*tt) == 0 {
 		return a.NewNullArray()
 	}
 
 	v0 := a.NewArray()
-	for _, tx := range *t {
+
+	for _, tx := range *tt {
 		if tx.IsTypedTransaction() {
 			v0.Set(a.NewBytes([]byte{byte(tx.Type())}))
 		}
