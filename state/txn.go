@@ -354,8 +354,13 @@ func (txn *Txn) GetState(addr types.Address, key types.Hash) types.Hash {
 			if val == nil {
 				return types.Hash{}
 			}
-			//nolint:forcetypeassert
-			return types.BytesToHash(val.([]byte))
+
+			data, ok := val.([]byte)
+			if !ok {
+				return types.Hash{}
+			}
+
+			return types.BytesToHash(data)
 		}
 	}
 
@@ -415,8 +420,11 @@ func (txn *Txn) GetCode(addr types.Address) []byte {
 	v, ok := txn.codeCache.Get(addr)
 
 	if ok {
-		//nolint:forcetypeassert
-		return v.([]byte)
+		data, ok := v.([]byte)
+
+		if ok {
+			return data
+		}
 	}
 
 	code, _ := txn.state.GetCode(types.BytesToHash(object.Account.CodeHash))
@@ -482,8 +490,13 @@ func (txn *Txn) Logs() []*types.Log {
 	}
 
 	txn.txn.Delete(logIndex)
-	//nolint:forcetypeassert
-	return data.([]*types.Log)
+
+	logs, ok := data.([]*types.Log)
+	if !ok {
+		return nil
+	}
+
+	return logs
 }
 
 func (txn *Txn) GetRefund() uint64 {
@@ -492,8 +505,12 @@ func (txn *Txn) GetRefund() uint64 {
 		return 0
 	}
 
-	//nolint:forcetypeassert
-	return data.(uint64)
+	refund, ok := data.(uint64)
+	if !ok {
+		return 0
+	}
+
+	return refund
 }
 
 // GetCommittedState returns the state of the address in the trie

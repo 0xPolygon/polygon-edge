@@ -28,7 +28,6 @@ func (l *Loadbot) deployContract(
 	// deploy SC
 	txHash, err := l.executeTxn(grpcClient)
 	if err != nil {
-		//nolint:forcetypeassert
 		l.generator.(generator.ContractTxnGenerator).MarkFailedContractTxn(&generator.FailedContractTxnInfo{
 			TxHash: txHash.String(),
 			Error: &generator.TxnError{
@@ -67,7 +66,6 @@ func (l *Loadbot) deployContract(
 	// fetch contract address
 	l.metrics.ContractMetrics.ContractAddress = receipt.ContractAddress
 	// set contract address in order to get new example txn and gas estimate
-	//nolint:forcetypeassert
 	l.generator.(generator.ContractTxnGenerator).SetContractAddress(types.StringToAddress(
 		receipt.ContractAddress.String(),
 	))

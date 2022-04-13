@@ -320,7 +320,9 @@ func (t *Transition) GetTxnHash() types.Hash {
 
 // Apply applies a new transaction
 func (t *Transition) Apply(msg *types.Transaction) (*runtime.ExecutionResult, error) {
-	s := t.state.Snapshot() //nolint:ifshort
+	// nolint:ifshort
+	s := t.state.Snapshot()
+
 	result, err := t.apply(msg)
 
 	if err != nil {
@@ -644,7 +646,7 @@ func (t *Transition) applyCall(
 		}
 	}
 
-	//nolint:ifshort
+	// nolint:ifshort
 	snapshot := t.state.Snapshot()
 	t.state.TouchAccount(c.Address)
 

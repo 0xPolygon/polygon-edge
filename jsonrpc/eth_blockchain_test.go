@@ -327,7 +327,10 @@ func TestEth_Syncing(t *testing.T) {
 		res, err := eth.Syncing()
 
 		assert.NoError(t, err)
-		assert.False(t, res.(bool)) //nolint:forcetypeassert
+
+		syncing, _ := res.(bool)
+
+		assert.False(t, syncing)
 	})
 }
 
