@@ -100,10 +100,6 @@ func (t *Transaction) IsContractCreation() bool {
 	return t.Payload.isContractCreation()
 }
 
-func (t *Transaction) FeeEnabled() bool {
-	return t.Payload.feeEnabled()
-}
-
 func (t *Transaction) ExceedsBlockGasLimit(blockGasLimit uint64) bool {
 	return t.Payload.exceedsBlockGasLimit(blockGasLimit)
 }
@@ -185,7 +181,6 @@ type TxPayload interface {
 	setGas(uint64)
 	gasPrice() *big.Int
 	isContractCreation() bool
-	feeEnabled() bool
 	exceedsBlockGasLimit(uint64) bool
 	copy() TxPayload
 
@@ -268,10 +263,6 @@ func (t *LegacyTransaction) gasPrice() *big.Int {
 
 func (t *LegacyTransaction) isContractCreation() bool {
 	return t.To == nil
-}
-
-func (t *LegacyTransaction) feeEnabled() bool {
-	return true
 }
 
 func (t *LegacyTransaction) exceedsBlockGasLimit(blockGasLimit uint64) bool {
@@ -380,10 +371,6 @@ func (t *StateTransaction) gasPrice() *big.Int {
 
 func (t *StateTransaction) isContractCreation() bool {
 	// StateTransaction doesn't support contract creation
-	return false
-}
-
-func (t *StateTransaction) feeEnabled() bool {
 	return false
 }
 
