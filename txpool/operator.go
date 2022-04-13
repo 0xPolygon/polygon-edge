@@ -35,7 +35,7 @@ func (p *TxPool) AddTxn(ctx context.Context, raw *proto.AddTxnReq) (*proto.AddTx
 			return nil, err
 		}
 
-		txn.From = from
+		txn.SetFrom(from)
 	}
 
 	if err := p.AddTx(txn); err != nil {
@@ -43,7 +43,7 @@ func (p *TxPool) AddTxn(ctx context.Context, raw *proto.AddTxnReq) (*proto.AddTx
 	}
 
 	return &proto.AddTxnResp{
-		TxHash: txn.Hash.String(),
+		TxHash: txn.Hash().String(),
 	}, nil
 }
 

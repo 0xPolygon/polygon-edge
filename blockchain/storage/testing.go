@@ -270,25 +270,29 @@ func testBody(t *testing.T, m MockStorage) {
 
 	addr1 := types.StringToAddress("11")
 	t0 := &types.Transaction{
-		Nonce:    0,
-		To:       &addr1,
-		Value:    big.NewInt(1),
-		Gas:      11,
-		GasPrice: big.NewInt(11),
-		Input:    []byte{1, 2},
-		V:        big.NewInt(1),
+		Payload: &types.LegacyTransaction{
+			Nonce:    0,
+			To:       &addr1,
+			Value:    big.NewInt(1),
+			Gas:      11,
+			GasPrice: big.NewInt(11),
+			Input:    []byte{1, 2},
+			V:        big.NewInt(1),
+		},
 	}
 	t0.ComputeHash()
 
 	addr2 := types.StringToAddress("22")
 	t1 := &types.Transaction{
-		Nonce:    0,
-		To:       &addr2,
-		Value:    big.NewInt(1),
-		Gas:      22,
-		GasPrice: big.NewInt(11),
-		Input:    []byte{4, 5},
-		V:        big.NewInt(2),
+		Payload: &types.LegacyTransaction{
+			Nonce:    0,
+			To:       &addr2,
+			Value:    big.NewInt(1),
+			Gas:      22,
+			GasPrice: big.NewInt(11),
+			Input:    []byte{4, 5},
+			V:        big.NewInt(2),
+		},
 	}
 	t1.ComputeHash()
 
@@ -312,7 +316,7 @@ func testBody(t *testing.T, m MockStorage) {
 	}
 
 	for indx, i := range tx0 {
-		if i.Hash != tx1[indx].Hash {
+		if i.Hash() != tx1[indx].Hash() {
 			t.Fatal("tx not correct")
 		}
 	}
@@ -334,11 +338,14 @@ func testReceipts(t *testing.T, m MockStorage) {
 	}
 
 	txn := &types.Transaction{
-		Nonce:    1000,
-		Gas:      50,
-		GasPrice: new(big.Int).SetUint64(100),
-		V:        big.NewInt(11),
+		Payload: &types.LegacyTransaction{
+			Nonce:    1000,
+			Gas:      50,
+			GasPrice: new(big.Int).SetUint64(100),
+			V:        big.NewInt(11),
+		},
 	}
+
 	body := &types.Body{
 		Transactions: []*types.Transaction{txn},
 	}
@@ -348,9 +355,10 @@ func testReceipts(t *testing.T, m MockStorage) {
 	}
 
 	r0 := &types.Receipt{
+		TransactionType:   types.TxTypeLegacy,
 		Root:              types.StringToHash("1"),
 		CumulativeGasUsed: 10,
-		TxHash:            txn.Hash,
+		TxHash:            h.Hash,
 		LogsBloom:         types.Bloom{0x1},
 		Logs: []*types.Log{
 			{
@@ -365,9 +373,10 @@ func testReceipts(t *testing.T, m MockStorage) {
 		},
 	}
 	r1 := &types.Receipt{
+		TransactionType:   types.TxTypeLegacy,
 		Root:              types.StringToHash("1"),
 		CumulativeGasUsed: 10,
-		TxHash:            txn.Hash,
+		TxHash:            h.Hash,
 		LogsBloom:         types.Bloom{0x1},
 		GasUsed:           10,
 		ContractAddress:   types.Address{0x1},

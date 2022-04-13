@@ -2,6 +2,7 @@ package crypto
 
 import (
 	"crypto/ecdsa"
+	"errors"
 	"fmt"
 	"math/big"
 	"math/bits"
@@ -10,6 +11,10 @@ import (
 	"github.com/0xPolygon/polygon-edge/helper/keccak"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/fastrlp"
+)
+
+var (
+	ErrUnsupportedTxSignatures = errors.New("tx doesn't support signature values")
 )
 
 // TxSigner is a utility interface used to recover data from a transaction
@@ -45,11 +50,13 @@ type FrontierSigner struct {
 
 var signerPool fastrlp.ArenaPool
 
-// calcTxHash calculates the transaction hash (keccak256 hash of the RLP value)
-func calcTxHash(tx *types.Transaction, chainID uint64) types.Hash {
-	a := signerPool.Get()
-
+func marshalLegacyTxRLPForDigest(
+	a *fastrlp.Arena,
+	tx *types.LegacyTransaction,
+	chainID uint64,
+) *fastrlp.Value {
 	v := a.NewArray()
+
 	v.Set(a.NewUint(tx.Nonce))
 	v.Set(a.NewBigInt(tx.GasPrice))
 	v.Set(a.NewUint(tx.Gas))
@@ -70,11 +77,80 @@ func calcTxHash(tx *types.Transaction, chainID uint64) types.Hash {
 		v.Set(a.NewUint(0))
 	}
 
+	return v
+}
+
+func marshalStateTxRLPForDigest(
+	a *fastrlp.Arena,
+	tx *types.StateTransaction,
+	chainID uint64,
+) *fastrlp.Value {
+	v := a.NewArray()
+
+	v.Set(a.NewUint(tx.Nonce))
+
+	if tx.To == nil {
+		v.Set(a.NewNull())
+	} else {
+		v.Set(a.NewCopyBytes((*tx.To).Bytes()))
+	}
+
+	v.Set(a.NewCopyBytes(tx.Input))
+
+	// EIP155
+	if chainID != 0 {
+		v.Set(a.NewUint(chainID))
+		v.Set(a.NewUint(0))
+		v.Set(a.NewUint(0))
+	}
+
+	return v
+}
+
+func marshalRLPForDigest(a *fastrlp.Arena, tx *types.Transaction, chainID uint64) *fastrlp.Value {
+	switch tp := tx.Payload.(type) {
+	case *types.LegacyTransaction:
+		return marshalLegacyTxRLPForDigest(a, tp, chainID)
+	case *types.StateTransaction:
+		return marshalStateTxRLPForDigest(a, tp, chainID)
+	}
+
+	return nil
+}
+
+// calcTxHash calculates the transaction hash (keccak256 hash of the RLP value)
+func calcTxHash(tx *types.Transaction, chainID uint64) types.Hash {
+	a := signerPool.Get()
+
+	v := marshalRLPForDigest(a, tx, chainID)
+
 	hash := keccak.Keccak256Rlp(nil, v)
 
 	signerPool.Put(a)
 
 	return types.BytesToHash(hash)
+}
+
+func wrapTxSignatures(tx *types.Transaction, v, r, s *big.Int) error {
+	settableTxPayload, ok := tx.Payload.(types.SignatureSetterGetter)
+	if !ok {
+		return ErrUnsupportedTxSignatures
+	}
+
+	settableTxPayload.SetSignatureValues(v, r, s)
+
+	return nil
+}
+
+func unwrapTxSignatures(tx *types.Transaction) (v, r, s *big.Int, err error) {
+	settableTxPayload, ok := tx.Payload.(types.SignatureSetterGetter)
+	if !ok {
+		return nil, nil, nil, ErrUnsupportedTxSignatures
+	}
+
+	v, r, s = settableTxPayload.GetSignatureValues()
+
+	return
 }
 
 // Hash is a wrapper function for the calcTxHash, with chainID 0
@@ -90,14 +166,19 @@ var (
 
 // Sender decodes the signature and returns the sender of the transaction
 func (f *FrontierSigner) Sender(tx *types.Transaction) (types.Address, error) {
+	v, r, s, err := unwrapTxSignatures(tx)
+	if err != nil {
+		return types.Address{}, err
+	}
+
 	refV := big.NewInt(0)
-	if tx.V != nil {
-		refV.SetBytes(tx.V.Bytes())
+	if v != nil {
+		refV.SetBytes(v.Bytes())
 	}
 
 	refV.Sub(refV, big27)
 
-	sig, err := encodeSignature(tx.R, tx.S, byte(refV.Int64()))
+	sig, err := encodeSignature(r, s, byte(refV.Int64()))
 	if err != nil {
 		return types.Address{}, err
 	}
@@ -126,9 +207,16 @@ func (f *FrontierSigner) SignTx(
 		return nil, err
 	}
 
-	tx.R = new(big.Int).SetBytes(sig[:32])
-	tx.S = new(big.Int).SetBytes(sig[32:64])
-	tx.V = new(big.Int).SetBytes(f.CalculateV(sig[64]))
+	err = wrapTxSignatures(
+		tx,
+		new(big.Int).SetBytes(f.CalculateV(sig[64])), // V
+		new(big.Int).SetBytes(sig[:32]),              // R
+		new(big.Int).SetBytes(sig[32:64]),            // S
+	)
+
+	if err != nil {
+		return nil, err
+	}
 
 	return tx, nil
 }
@@ -159,10 +247,15 @@ func (e *EIP155Signer) Hash(tx *types.Transaction) types.Hash {
 func (e *EIP155Signer) Sender(tx *types.Transaction) (types.Address, error) {
 	protected := true
 
+	v, r, s, err := unwrapTxSignatures(tx)
+	if err != nil {
+		return types.Address{}, err
+	}
+
 	// Check if v value conforms to an earlier standard (before EIP155)
 	bigV := big.NewInt(0)
-	if tx.V != nil {
-		bigV.SetBytes(tx.V.Bytes())
+	if v != nil {
+		bigV.SetBytes(v.Bytes())
 	}
 
 	if vv := bigV.Uint64(); bits.Len(uint(vv)) <= 8 {
@@ -179,7 +272,7 @@ func (e *EIP155Signer) Sender(tx *types.Transaction) (types.Address, error) {
 	bigV.Sub(bigV, mulOperand)
 	bigV.Sub(bigV, big35)
 
-	sig, err := encodeSignature(tx.R, tx.S, byte(bigV.Int64()))
+	sig, err := encodeSignature(r, s, byte(bigV.Int64()))
 	if err != nil {
 		return types.Address{}, err
 	}
@@ -208,9 +301,16 @@ func (e *EIP155Signer) SignTx(
 		return nil, err
 	}
 
-	tx.R = new(big.Int).SetBytes(sig[:32])
-	tx.S = new(big.Int).SetBytes(sig[32:64])
-	tx.V = new(big.Int).SetBytes(e.CalculateV(sig[64]))
+	err = wrapTxSignatures(
+		tx,
+		new(big.Int).SetBytes(e.CalculateV(sig[64])), // V
+		new(big.Int).SetBytes(sig[:32]),              // R
+		new(big.Int).SetBytes(sig[32:64]),            // S
+	)
+
+	if err != nil {
+		return nil, err
+	}
 
 	return tx, nil
 }

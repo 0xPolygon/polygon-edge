@@ -673,7 +673,7 @@ func (b *Blockchain) writeBody(block *types.Block) error {
 
 	// Write txn lookups (txHash -> block)
 	for _, txn := range block.Transactions {
-		if err := b.db.WriteTxLookup(txn.Hash, block.Hash()); err != nil {
+		if err := b.db.WriteTxLookup(txn.Hash(), block.Hash()); err != nil {
 			return err
 		}
 	}

@@ -504,11 +504,24 @@ func TestWriteTransactions(t *testing.T) {
 		return mockTransition
 	}
 
+	newTx := func(nonce, gas uint64) *types.Transaction {
+		return &types.Transaction{
+			Payload: &types.LegacyTransaction{
+				Nonce: nonce,
+				Gas:   gas,
+			},
+		}
+	}
+
 	testCases := []testCase{
 		{
 			"transaction whose gas exceeds block gas limit is included but with failedReceipt",
 			testParams{
-				[]*types.Transaction{{Nonce: 1, Gas: 10000000000001}, {Nonce: 2, Gas: 10000000000002}, {Nonce: 1}},
+				[]*types.Transaction{
+					newTx(1, 10000000000001),
+					newTx(2, 10000000000002),
+					newTx(1, 0),
+				},
 				nil,
 				nil,
 				-1,
@@ -520,7 +533,9 @@ func TestWriteTransactions(t *testing.T) {
 		{
 			"valid transaction is included in transition",
 			testParams{
-				[]*types.Transaction{{Nonce: 1}},
+				[]*types.Transaction{
+					newTx(1, 0),
+				},
 				nil,
 				nil,
 				-1,
@@ -532,7 +547,9 @@ func TestWriteTransactions(t *testing.T) {
 		{
 			"recoverable transaction is returned to pool and not included in transition",
 			testParams{
-				[]*types.Transaction{{Nonce: 1}},
+				[]*types.Transaction{
+					newTx(1, 0),
+				},
 				[]int{0},
 				nil,
 				-1,
@@ -544,7 +561,9 @@ func TestWriteTransactions(t *testing.T) {
 		{
 			"unrecoverable transaction is not returned to pool and not included in transition",
 			testParams{
-				[]*types.Transaction{{Nonce: 1}},
+				[]*types.Transaction{
+					newTx(1, 0),
+				},
 				nil,
 				[]int{0},
 				-1,
@@ -556,7 +575,7 @@ func TestWriteTransactions(t *testing.T) {
 		{
 			"only valid transactions are ever included in transition",
 			testParams{
-				[]*types.Transaction{{Nonce: 1}, {Nonce: 2}, {Nonce: 3}, {Nonce: 4}, {Nonce: 5}},
+				[]*types.Transaction{newTx(1, 0), newTx(2, 0), newTx(3, 0), newTx(4, 0), newTx(5, 0)},
 				[]int{0},
 				[]int{3, 4},
 				-1,
@@ -569,13 +588,14 @@ func TestWriteTransactions(t *testing.T) {
 			"write stops when next included transaction reaches block gas limit",
 			testParams{
 				[]*types.Transaction{
-					{Nonce: 1},             // recoverable - returned to pool
-					{Nonce: 2},             // unrecoverable
-					{Nonce: 3},             // included
-					{Nonce: 4, Gas: 10001}, // exceeds block gas limit
-					{Nonce: 5},             // included
-					{Nonce: 6},             // reaches gas limit - returned to pool
-					{Nonce: 7}},            // not considered - stays in pool
+					newTx(1, 0),     // recoverable - returned to pool
+					newTx(2, 0),     // unrecoverable
+					newTx(3, 0),     // included
+					newTx(4, 10001), // exceeds block gas limit
+					newTx(5, 0),     // included
+					newTx(6, 0),     // reaches gas limit - returned to pool
+					newTx(7, 0),     // not considered - stays in pool
+				},
 				[]int{0},
 				[]int{1},
 				5,

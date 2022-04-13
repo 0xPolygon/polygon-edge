@@ -18,7 +18,7 @@ func (m *lookupMap) add(txs ...*types.Transaction) {
 	defer m.Unlock()
 
 	for _, tx := range txs {
-		m.all[tx.Hash] = tx
+		m.all[tx.Hash()] = tx
 	}
 }
 
@@ -28,7 +28,7 @@ func (m *lookupMap) remove(txs ...*types.Transaction) {
 	defer m.Unlock()
 
 	for _, tx := range txs {
-		delete(m.all, tx.Hash)
+		delete(m.all, tx.Hash())
 	}
 }
 

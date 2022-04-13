@@ -52,8 +52,7 @@ func (q *accountQueue) prune(nonce uint64) (
 ) {
 	for {
 		tx := q.peek()
-		if tx == nil ||
-			tx.Nonce >= nonce {
+		if tx == nil || tx.Nonce() >= nonce {
 			break
 		}
 
@@ -130,7 +129,7 @@ func (q *minNonceQueue) Swap(i, j int) {
 }
 
 func (q *minNonceQueue) Less(i, j int) bool {
-	return (*q)[i].Nonce < (*q)[j].Nonce
+	return (*q)[i].Nonce() < (*q)[j].Nonce()
 }
 
 func (q *minNonceQueue) Push(x interface{}) {
@@ -217,7 +216,7 @@ func (q *maxPriceQueue) Swap(i, j int) {
 }
 
 func (q *maxPriceQueue) Less(i, j int) bool {
-	return (*q)[i].GasPrice.Uint64() > (*q)[j].GasPrice.Uint64()
+	return (*q)[i].GasPrice().Uint64() > (*q)[j].GasPrice().Uint64()
 }
 
 func (q *maxPriceQueue) Push(x interface{}) {

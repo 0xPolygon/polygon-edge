@@ -39,11 +39,11 @@ func getAverageGasPrice(client *jsonrpc.Client) (uint64, error) {
 // the loadbot run
 func estimateGas(client *jsonrpc.Client, txn *types.Transaction) (uint64, error) {
 	gasEstimate, err := client.Eth().EstimateGas(&web3.CallMsg{
-		From:     web3.Address(txn.From),
-		To:       (*web3.Address)(txn.To),
-		Data:     txn.Input,
-		GasPrice: txn.GasPrice.Uint64(),
-		Value:    txn.Value,
+		From:     web3.Address(txn.From()),
+		To:       (*web3.Address)(txn.To()),
+		Data:     txn.Input(),
+		GasPrice: txn.GasPrice().Uint64(),
+		Value:    txn.Value(),
 	})
 
 	if err != nil {

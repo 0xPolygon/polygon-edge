@@ -70,13 +70,15 @@ type generateTxReqParams struct {
 
 func generateTx(params generateTxReqParams) *types.Transaction {
 	signedTx, signErr := signer.SignTx(&types.Transaction{
-		Nonce:    params.nonce,
-		From:     params.referenceAddr,
-		To:       &params.toAddress,
-		GasPrice: params.gasPrice,
-		Gas:      1000000,
-		Value:    params.value,
-		V:        big.NewInt(27), // it is necessary to encode in rlp
+		Payload: &types.LegacyTransaction{
+			Nonce:    params.nonce,
+			From:     params.referenceAddr,
+			To:       &params.toAddress,
+			GasPrice: params.gasPrice,
+			Gas:      1000000,
+			Value:    params.value,
+			V:        big.NewInt(27), // it is necessary to encode in rlp
+		},
 	}, params.referenceKey)
 
 	if signErr != nil {
@@ -224,13 +226,15 @@ func TestTxPool_TransactionCoalescing(t *testing.T) {
 
 	generateTx := func(nonce uint64) *types.Transaction {
 		signedTx, signErr := signer.SignTx(&types.Transaction{
-			Nonce:    nonce,
-			From:     referenceAddr,
-			To:       &toAddress,
-			GasPrice: gasPrice,
-			Gas:      1000000,
-			Value:    oneEth,
-			V:        big.NewInt(1), // it is necessary to encode in rlp
+			Payload: &types.LegacyTransaction{
+				Nonce:    nonce,
+				From:     referenceAddr,
+				To:       &toAddress,
+				GasPrice: gasPrice,
+				Gas:      1000000,
+				Value:    oneEth,
+				V:        big.NewInt(1), // it is necessary to encode in rlp
+			},
 		}, referenceKey)
 
 		if signErr != nil {
@@ -346,13 +350,15 @@ func TestTxPool_StressAddition(t *testing.T) {
 
 	generateTx := func(account *testAccount, nonce uint64) *types.Transaction {
 		signedTx, signErr := signer.SignTx(&types.Transaction{
-			Nonce:    nonce,
-			From:     account.address,
-			To:       &toAddress,
-			GasPrice: big.NewInt(10),
-			Gas:      framework.DefaultGasLimit,
-			Value:    defaultValue,
-			V:        big.NewInt(27), // it is necessary to encode in rlp
+			Payload: &types.LegacyTransaction{
+				Nonce:    nonce,
+				From:     account.address,
+				To:       &toAddress,
+				GasPrice: big.NewInt(10),
+				Gas:      framework.DefaultGasLimit,
+				Value:    defaultValue,
+				V:        big.NewInt(27), // it is necessary to encode in rlp
+			},
 		}, account.key)
 
 		if signErr != nil {
@@ -461,31 +467,37 @@ func TestTxPool_RecoverableError(t *testing.T) {
 
 	transactions := []*types.Transaction{
 		{
-			Nonce:    0,
-			GasPrice: big.NewInt(framework.DefaultGasPrice),
-			Gas:      22000,
-			To:       &receiverAddress,
-			Value:    oneEth,
-			V:        big.NewInt(27),
-			From:     senderAddress,
+			Payload: &types.LegacyTransaction{
+				Nonce:    0,
+				GasPrice: big.NewInt(framework.DefaultGasPrice),
+				Gas:      22000,
+				To:       &receiverAddress,
+				Value:    oneEth,
+				V:        big.NewInt(27),
+				From:     senderAddress,
+			},
 		},
 		{
-			Nonce:    1,
-			GasPrice: big.NewInt(framework.DefaultGasPrice),
-			Gas:      22000,
-			To:       &receiverAddress,
-			Value:    oneEth,
-			V:        big.NewInt(27),
-			From:     senderAddress,
+			Payload: &types.LegacyTransaction{
+				Nonce:    1,
+				GasPrice: big.NewInt(framework.DefaultGasPrice),
+				Gas:      22000,
+				To:       &receiverAddress,
+				Value:    oneEth,
+				V:        big.NewInt(27),
+				From:     senderAddress,
+			},
 		},
 		{
-			Nonce:    2,
-			GasPrice: big.NewInt(framework.DefaultGasPrice),
-			Gas:      22000,
-			To:       &receiverAddress,
-			Value:    oneEth,
-			V:        big.NewInt(27),
-			From:     senderAddress,
+			Payload: &types.LegacyTransaction{
+				Nonce:    2,
+				GasPrice: big.NewInt(framework.DefaultGasPrice),
+				Gas:      22000,
+				To:       &receiverAddress,
+				Value:    oneEth,
+				V:        big.NewInt(27),
+				From:     senderAddress,
+			},
 		},
 	}
 
@@ -582,13 +594,15 @@ func TestTxPool_ZeroPriceDev(t *testing.T) {
 	sendTx := func() {
 		nonceMux.Lock()
 		tx, err := signer.SignTx(&types.Transaction{
-			Nonce:    nonce,
-			GasPrice: big.NewInt(0),
-			Gas:      framework.DefaultGasLimit - 1,
-			To:       &receiverAddress,
-			Value:    oneEth,
-			V:        big.NewInt(27),
-			From:     types.ZeroAddress,
+			Payload: &types.LegacyTransaction{
+				Nonce:    nonce,
+				GasPrice: big.NewInt(0),
+				Gas:      framework.DefaultGasLimit - 1,
+				To:       &receiverAddress,
+				Value:    oneEth,
+				V:        big.NewInt(27),
+				From:     types.ZeroAddress,
+			},
 		}, senderKey)
 		assert.NoError(t, err, "failed to sign transaction")
 
@@ -657,13 +671,15 @@ func TestTxPool_GetPendingTx(t *testing.T) {
 
 	// Construct the transaction
 	signedTx, err := signer.SignTx(&types.Transaction{
-		Nonce:    0,
-		GasPrice: big.NewInt(0),
-		Gas:      framework.DefaultGasLimit - 1,
-		To:       &receiverAddress,
-		Value:    oneEth,
-		V:        big.NewInt(1),
-		From:     types.ZeroAddress,
+		Payload: &types.LegacyTransaction{
+			Nonce:    0,
+			GasPrice: big.NewInt(0),
+			Gas:      framework.DefaultGasLimit - 1,
+			To:       &receiverAddress,
+			Value:    oneEth,
+			V:        big.NewInt(1),
+			From:     types.ZeroAddress,
+		},
 	}, senderKey)
 	assert.NoError(t, err, "failed to sign transaction")
 

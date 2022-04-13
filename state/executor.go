@@ -204,21 +204,13 @@ func (t *Transition) Receipts() []*types.Receipt {
 var emptyFrom = types.Address{}
 
 func (t *Transition) WriteFailedReceipt(txn *types.Transaction) error {
-	signer := crypto.NewSigner(t.config, uint64(t.r.config.ChainID))
-
-	if txn.From == emptyFrom {
-		// Decrypt the from address
-		from, err := signer.Sender(txn)
-		if err != nil {
-			return NewTransitionApplicationError(err, false)
-		}
-
-		txn.From = from
+	if err := t.recoverFrom(txn); err != nil {
+		return err
 	}
 
 	receipt := &types.Receipt{
 		CumulativeGasUsed: t.totalGas,
-		TxHash:            txn.Hash,
+		TxHash:            txn.Hash(),
 		Logs:              t.state.Logs(),
 	}
 
@@ -226,8 +218,8 @@ func (t *Transition) WriteFailedReceipt(txn *types.Transaction) error {
 	receipt.SetStatus(types.ReceiptFailed)
 	t.receipts = append(t.receipts, receipt)
 
-	if txn.To == nil {
-		receipt.ContractAddress = crypto.CreateAddress(txn.From, txn.Nonce)
+	if txn.IsContractCreation() {
+		receipt.ContractAddress = crypto.CreateAddress(txn.From(), txn.Nonce())
 	}
 
 	return nil
@@ -250,7 +242,7 @@ func (t *Transition) Write(txn *types.Transaction) error {
 		return e
 	}
 
-	if txn.Type != types.TxTypeState {
+	if txn.Type() != types.TxTypeState {
 		t.totalGas += result.GasUsed
 	}
 
@@ -260,7 +252,7 @@ func (t *Transition) Write(txn *types.Transaction) error {
 
 	receipt := &types.Receipt{
 		CumulativeGasUsed: t.totalGas,
-		TxHash:            txn.Hash,
+		TxHash:            txn.Hash(),
 		GasUsed:           result.GasUsed,
 	}
 
@@ -281,8 +273,8 @@ func (t *Transition) Write(txn *types.Transaction) error {
 	}
 
 	// if the transaction created a contract, store the creation address in the receipt.
-	if msg.To == nil {
-		receipt.ContractAddress = crypto.CreateAddress(msg.From, txn.Nonce)
+	if msg.To() == nil {
+		receipt.ContractAddress = crypto.CreateAddress(msg.From(), txn.Nonce())
 	}
 
 	// Set the receipt logs and create a bloom for filtering
@@ -348,12 +340,12 @@ func (t *Transition) ContextPtr() *runtime.TxContext {
 	return &t.ctx
 }
 
-func (t *Transition) subGasLimitPrice(msg *types.Transaction) error {
+func (t *Transition) subGasLimitPrice(from types.Address, gas uint64, gasPrice *big.Int) error {
 	// deduct the upfront max gas cost
-	upfrontGasCost := new(big.Int).Set(msg.GasPrice)
-	upfrontGasCost.Mul(upfrontGasCost, new(big.Int).SetUint64(msg.Gas))
+	upfrontGasCost := new(big.Int).Set(gasPrice)
+	upfrontGasCost.Mul(upfrontGasCost, new(big.Int).SetUint64(gas))
 
-	if err := t.state.SubBalance(msg.From, upfrontGasCost); err != nil {
+	if err := t.state.SubBalance(from, upfrontGasCost); err != nil {
 		if errors.Is(err, runtime.ErrNotEnoughFunds) {
 			return ErrNotEnoughFundsForGas
 		}
@@ -364,10 +356,10 @@ func (t *Transition) subGasLimitPrice(msg *types.Transaction) error {
 	return nil
 }
 
-func (t *Transition) nonceCheck(msg *types.Transaction) error {
-	nonce := t.state.GetNonce(msg.From)
+func (t *Transition) nonceCheck(from types.Address, nonce uint64) error {
+	stateNonce := t.state.GetNonce(from)
 
-	if nonce != msg.Nonce {
+	if stateNonce != nonce {
 		return ErrNonceIncorrect
 	}
 
@@ -375,42 +367,46 @@ func (t *Transition) nonceCheck(msg *types.Transaction) error {
 }
 
 func (t *Transition) recoverFrom(txn *types.Transaction) error {
-	if txn.Type == types.TxTypeState {
+	if txn.Type() == types.TxTypeState {
 		return nil
 	}
 
 	signer := crypto.NewSigner(t.config, uint64(t.r.config.ChainID))
 
-	if txn.From == emptyFrom {
+	if txn.From() == emptyFrom {
 		// Decrypt the from address
 		var err error
-		if txn.From, err = signer.Sender(txn); err != nil {
+		from, err := signer.Sender(txn)
+
+		if err != nil {
 			return NewTransitionApplicationError(err, false)
 		}
+
+		txn.SetFrom(from)
 	}
 
 	return nil
 }
 
 func (t *Transition) checkAndPreProcessTransaction(txn *Txn, msg *types.Transaction) (uint64, error) {
-	switch msg.Type {
-	case types.TxTypeLegacy:
-		return t.checkAndPreProcessNormalTransaction(txn, msg)
-	case types.TxTypeState:
-		return t.checkAndPreProcessStateTransaction(msg)
+	switch tPayload := msg.Payload.(type) {
+	case *types.LegacyTransaction:
+		return t.checkAndPreProcessLegacyTransaction(txn, tPayload)
+	case *types.StateTransaction:
+		return t.checkAndPreProcessStateTransaction(tPayload)
 	}
 
-	return 0, NewTransitionApplicationError(ErrInvalidTransactionType, false)
+	return 0, ErrInvalidTransactionType
 }
 
-func (t *Transition) checkAndPreProcessNormalTransaction(txn *Txn, msg *types.Transaction) (uint64, error) {
+func (t *Transition) checkAndPreProcessLegacyTransaction(txn *Txn, msg *types.LegacyTransaction) (uint64, error) {
 	// 1. the nonce of the message caller is correct
-	if err := t.nonceCheck(msg); err != nil {
+	if err := t.nonceCheck(msg.From, msg.Nonce); err != nil {
 		return 0, NewTransitionApplicationError(err, true)
 	}
 
 	// 2. caller has enough balance to cover transaction fee(gaslimit * gasprice)
-	if err := t.subGasLimitPrice(msg); err != nil {
+	if err := t.subGasLimitPrice(msg.From, msg.Gas, msg.GasPrice); err != nil {
 		return 0, NewTransitionApplicationError(err, true)
 	}
 
@@ -420,7 +416,12 @@ func (t *Transition) checkAndPreProcessNormalTransaction(txn *Txn, msg *types.Tr
 	}
 
 	// 4. there is no overflow when calculating intrinsic gas
-	intrinsicGasCost, err := TransactionGasCost(msg, t.config.Homestead, t.config.Istanbul)
+	intrinsicGasCost, err := TransactionGasCost(
+		msg.Input,
+		msg.To == nil,
+		t.config.Homestead,
+		t.config.Istanbul,
+	)
 	if err != nil {
 		return 0, NewTransitionApplicationError(err, false)
 	}
@@ -440,28 +441,7 @@ func (t *Transition) checkAndPreProcessNormalTransaction(txn *Txn, msg *types.Tr
 	return gasLeft, nil
 }
 
-func (t *Transition) checkAndPreProcessStateTransaction(msg *types.Transaction) (uint64, error) {
-	if msg.GasPrice.Cmp(big.NewInt(0)) != 0 {
-		return 0, NewTransitionApplicationError(
-			errors.New("gasPrice of state transaction must be zero"),
-			true,
-		)
-	}
-
-	if msg.Gas != 0 {
-		return 0, NewTransitionApplicationError(
-			errors.New("gas of state transaction must be zero"),
-			true,
-		)
-	}
-
-	if msg.From != types.ZeroAddress {
-		return 0, NewTransitionApplicationError(
-			errors.New("from of state transaction must be zero"),
-			true,
-		)
-	}
-
+func (t *Transition) checkAndPreProcessStateTransaction(msg *types.StateTransaction) (uint64, error) {
 	if msg.To == nil || *msg.To == types.ZeroAddress {
 		return 0, NewTransitionApplicationError(
 			errors.New("to of state transaction must be specified"),
@@ -474,35 +454,55 @@ func (t *Transition) checkAndPreProcessStateTransaction(msg *types.Transaction) 
 	return math.MaxInt64, nil
 }
 
-func (t *Transition) incrementNonce(txn *Txn, msg *types.Transaction) {
-	if msg.Type == types.TxTypeState {
-		return
+func (t *Transition) postProcessTransaction(
+	txn *Txn,
+	msg *types.Transaction,
+	result *runtime.ExecutionResult,
+) error {
+	switch payload := msg.Payload.(type) {
+	case *types.LegacyTransaction:
+		t.refundGas(txn, payload.From, payload.Gas, payload.GasPrice, result)
+		t.payCoinbase(txn, result, payload.GasPrice)
+
+		return nil
+	case *types.StateTransaction:
+		// do nothing
 	}
 
-	txn.IncrNonce(msg.From)
+	return ErrInvalidTransactionType
 }
 
-func (t *Transition) refundGas(txn *Txn, msg *types.Transaction, result *runtime.ExecutionResult, gasPrice *big.Int) {
-	if msg.Type == types.TxTypeState {
+func (t *Transition) incrementNonce(txn *Txn, msg *types.Transaction) {
+	if msg.Type() == types.TxTypeState {
 		return
 	}
 
+	txn.IncrNonce(msg.From())
+}
+
+func (t *Transition) refundGas(
+	txn *Txn,
+	from types.Address,
+	txGasLimit uint64,
+	gasPrice *big.Int,
+	result *runtime.ExecutionResult,
+) {
 	refund := txn.GetRefund()
-	result.UpdateGasUsed(msg.Gas, refund)
+	result.UpdateGasUsed(txGasLimit, refund)
 
 	// refund the sender
 	remaining := new(big.Int).Mul(new(big.Int).SetUint64(result.GasLeft), gasPrice)
-	txn.AddBalance(msg.From, remaining)
+	txn.AddBalance(from, remaining)
 
 	// return gas to the pool
 	t.addGasPool(result.GasLeft)
 }
 
-func (t *Transition) payCoinbase(txn *Txn, msg *types.Transaction, result *runtime.ExecutionResult, gasPrice *big.Int) {
-	if msg.Type == types.TxTypeState {
-		return
-	}
-
+func (t *Transition) payCoinbase(
+	txn *Txn,
+	result *runtime.ExecutionResult,
+	gasPrice *big.Int,
+) {
 	coinbaseFee := new(big.Int).Mul(new(big.Int).SetUint64(result.GasUsed), gasPrice)
 	txn.AddBalance(t.ctx.Coinbase, coinbaseFee)
 }
@@ -556,24 +556,24 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 		return nil, err
 	}
 
-	gasPrice := new(big.Int).Set(msg.GasPrice)
-	value := new(big.Int).Set(msg.Value)
+	gasPrice := new(big.Int).Set(msg.GasPrice())
+	value := new(big.Int).Set(msg.Value())
 
 	// Set the specific transaction fields in the context
 	t.ctx.GasPrice = types.BytesToHash(gasPrice.Bytes())
-	t.ctx.Origin = msg.From
+	t.ctx.Origin = msg.From()
 
 	var result *runtime.ExecutionResult
 	if msg.IsContractCreation() {
-		result = t.Create2(msg.From, msg.Input, value, availableGas)
+		result = t.Create2(msg.From(), msg.Input(), value, availableGas)
 	} else {
 		t.incrementNonce(txn, msg)
-		result = t.Call2(msg.From, *msg.To, msg.Input, value, availableGas)
+		result = t.Call2(msg.From(), *msg.To(), msg.Input(), value, availableGas)
 	}
 
-	t.refundGas(txn, msg, result, gasPrice)
-
-	t.payCoinbase(txn, msg, result, gasPrice)
+	if err := t.postProcessTransaction(txn, msg, result); err != nil {
+		return nil, err
+	}
 
 	return result, nil
 }
@@ -850,17 +850,19 @@ func (t *Transition) SetAccountDirectly(addr types.Address, account *chain.Genes
 	return nil
 }
 
-func TransactionGasCost(msg *types.Transaction, isHomestead, isIstanbul bool) (uint64, error) {
+func TransactionGasCost(
+	payload []byte,
+	isContractCreation, isHomestead, isIstanbul bool,
+) (uint64, error) {
 	cost := uint64(0)
 
 	// Contract creation is only paid on the homestead fork
-	if msg.IsContractCreation() && isHomestead {
+	if isContractCreation && isHomestead {
 		cost += TxGasContractCreation
 	} else {
 		cost += TxGas
 	}
 
-	payload := msg.Input
 	if len(payload) > 0 {
 		zeros := uint64(0)
 

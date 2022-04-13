@@ -33,11 +33,13 @@ func NewTransferGenerator(params *GeneratorParams) (*TransferGenerator, error) {
 
 func (tg *TransferGenerator) GetExampleTransaction() (*types.Transaction, error) {
 	return tg.signer.SignTx(&types.Transaction{
-		From:     tg.params.SenderAddress,
-		To:       &tg.receiverAddress,
-		Value:    tg.params.Value,
-		GasPrice: tg.params.GasPrice,
-		V:        big.NewInt(1), // it is necessary to encode in rlp
+		Payload: &types.LegacyTransaction{
+			From:     tg.params.SenderAddress,
+			To:       &tg.receiverAddress,
+			Value:    tg.params.Value,
+			GasPrice: tg.params.GasPrice,
+			V:        big.NewInt(1), // it is necessary to encode in rlp
+		},
 	}, tg.params.SenderKey)
 }
 
@@ -56,13 +58,15 @@ func (tg *TransferGenerator) GenerateTransaction() (*types.Transaction, error) {
 	newNextNonce := atomic.AddUint64(&tg.params.Nonce, 1)
 
 	txn, err := tg.signer.SignTx(&types.Transaction{
-		From:     tg.params.SenderAddress,
-		To:       &tg.receiverAddress,
-		Gas:      tg.estimatedGas,
-		Value:    tg.params.Value,
-		GasPrice: tg.params.GasPrice,
-		Nonce:    newNextNonce - 1,
-		V:        big.NewInt(1), // it is necessary to encode in rlp
+		Payload: &types.LegacyTransaction{
+			From:     tg.params.SenderAddress,
+			To:       &tg.receiverAddress,
+			Gas:      tg.estimatedGas,
+			Value:    tg.params.Value,
+			GasPrice: tg.params.GasPrice,
+			Nonce:    newNextNonce - 1,
+			V:        big.NewInt(1), // it is necessary to encode in rlp
+		},
 	}, tg.params.SenderKey)
 
 	if err != nil {

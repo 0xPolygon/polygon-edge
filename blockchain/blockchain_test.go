@@ -552,8 +552,10 @@ func TestBlockchainWriteBody(t *testing.T) {
 		Header: &types.Header{},
 		Transactions: []*types.Transaction{
 			{
-				Value: big.NewInt(10),
-				V:     big.NewInt(1),
+				Payload: &types.LegacyTransaction{
+					Value: big.NewInt(10),
+					V:     big.NewInt(1),
+				},
 			},
 		},
 	}

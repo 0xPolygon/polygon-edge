@@ -37,15 +37,9 @@ func (b *Block) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 	if len(b.Transactions) == 0 {
 		vv.Set(ar.NewNullArray())
 	} else {
-		v0 := ar.NewArray()
-		for _, tx := range b.Transactions {
-			if tx.IsTypedTransaction() {
-				v0.Set(ar.NewBytes([]byte{byte(tx.Type)}))
-			}
+		ts := Transactions(b.Transactions)
 
-			v0.Set(tx.MarshalRLPWith(ar))
-		}
-		vv.Set(v0)
+		vv.Set(ts.MarshalRLPWith(ar))
 	}
 
 	if len(b.Uncles) == 0 {
@@ -171,20 +165,43 @@ func (l *Log) MarshalRLPWith(a *fastrlp.Arena) *fastrlp.Value {
 	return v
 }
 
+func (tt Transactions) MarshalRLPTo(dst []byte) []byte {
+	return MarshalRLPTo(tt.MarshalRLPWith, dst)
+}
+
+func (tt *Transactions) MarshalRLPWith(a *fastrlp.Arena) *fastrlp.Value {
+	vv := a.NewArray()
+
+	for _, tx := range *tt {
+		if tx.IsTypedTransaction() {
+			vv.Set(a.NewBytes([]byte{byte(tx.Type())}))
+		}
+
+		vv.Set(tx.MarshalRLPWith(a))
+	}
+
+	return vv
+}
+
 func (t *Transaction) MarshalRLP() []byte {
 	return t.MarshalRLPTo(nil)
 }
 
 func (t *Transaction) MarshalRLPTo(dst []byte) []byte {
 	if t.IsTypedTransaction() {
-		dst = append(dst, byte(t.Type))
+		dst = append(dst, byte(t.Type()))
 	}
 
 	return MarshalRLPTo(t.MarshalRLPWith, dst)
 }
 
-// MarshalRLPWith marshals the transaction to RLP with a specific fastrlp.Arena
 func (t *Transaction) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
+	// Payload defines RLP encoding rule instead of transaction
+	return t.Payload.MarshalRLPWith(arena)
+}
+
+// MarshalRLPWith marshals the LegacyTransaction to RLP with a specific fastrlp.Arena
+func (t *LegacyTransaction) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 	vv := arena.NewArray()
 
 	vv.Set(arena.NewUint(t.Nonce))
@@ -206,15 +223,37 @@ func (t *Transaction) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 	vv.Set(arena.NewBigInt(t.R))
 	vv.Set(arena.NewBigInt(t.S))
 
-	if t.Type == TxTypeState {
-		sigs := arena.NewArray()
+	return vv
+}
 
-		for _, sig := range t.StateSignatures {
-			sigs.Set(arena.NewCopyBytes(sig))
-		}
+// MarshalRLPWith marshals the StateTransaction to RLP with a specific fastrlp.Arena
+func (t *StateTransaction) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
+	vv := arena.NewArray()
 
-		vv.Set(sigs)
+	vv.Set(arena.NewUint(t.Nonce))
+
+	// Address may be empty
+	if t.To != nil {
+		vv.Set(arena.NewBytes((*t.To).Bytes()))
+	} else {
+		vv.Set(arena.NewNull())
 	}
+
+	vv.Set(arena.NewCopyBytes(t.Input))
+
+	// Signatures
+	sigs := arena.NewArray()
+
+	for _, sig := range t.Signatures {
+		sigs.Set(arena.NewCopyBytes(sig))
+	}
+
+	vv.Set(sigs)
+
+	// signature values
+	vv.Set(arena.NewBigInt(t.V))
+	vv.Set(arena.NewBigInt(t.R))
+	vv.Set(arena.NewBigInt(t.S))
 
 	return vv
 }

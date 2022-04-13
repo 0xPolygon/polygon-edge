@@ -72,13 +72,15 @@ func TestBroadcast(t *testing.T) {
 			time.Sleep(time.Second * 2)
 
 			tx, err := signer.SignTx(&types.Transaction{
-				Nonce:    0,
-				From:     senderAddr,
-				To:       &receiverAddr,
-				Value:    framework.EthToWei(1),
-				Gas:      1000000,
-				GasPrice: big.NewInt(10000),
-				Input:    []byte{},
+				Payload: &types.LegacyTransaction{
+					Nonce:    0,
+					From:     senderAddr,
+					To:       &receiverAddr,
+					Value:    framework.EthToWei(1),
+					Gas:      1000000,
+					GasPrice: big.NewInt(10000),
+					Input:    []byte{},
+				},
 			}, senderKey)
 			if err != nil {
 				t.Fatalf("failed to sign transaction, err=%+v", err)

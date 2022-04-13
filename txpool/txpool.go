@@ -310,7 +310,7 @@ func (p *TxPool) Peek() *types.Transaction {
 // from that account (if any).
 func (p *TxPool) Pop(tx *types.Transaction) {
 	// fetch the associated account
-	account := p.accounts.get(tx.From)
+	account := p.accounts.get(tx.From())
 
 	account.promoted.lock(true)
 	defer account.promoted.unlock()
@@ -334,7 +334,7 @@ func (p *TxPool) Pop(tx *types.Transaction) {
 // and reverts its next (expected) nonce.
 func (p *TxPool) Drop(tx *types.Transaction) {
 	// fetch associated account
-	account := p.accounts.get(tx.From)
+	account := p.accounts.get(tx.From())
 
 	account.promoted.lock(true)
 	account.enqueued.lock(true)
@@ -357,7 +357,7 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 	}()
 
 	// rollback nonce
-	nextNonce := tx.Nonce
+	nextNonce := tx.Nonce()
 	account.setNonce(nextNonce)
 
 	// drop promoted
@@ -371,16 +371,16 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 	dropped = account.enqueued.clear()
 	clearAccountQueue(dropped)
 
-	p.eventManager.signalEvent(proto.EventType_DROPPED, tx.Hash)
+	p.eventManager.signalEvent(proto.EventType_DROPPED, tx.Hash())
 	p.logger.Debug("dropped account txs",
 		"num", droppedCount,
 		"next_nonce", nextNonce,
-		"address", tx.From.String(),
+		"address", tx.From().String(),
 	)
 }
 
 func (p *TxPool) Demote(tx *types.Transaction) {
-	p.eventManager.signalEvent(proto.EventType_DEMOTED, tx.Hash)
+	p.eventManager.signalEvent(proto.EventType_DEMOTED, tx.Hash())
 }
 
 // ResetWithHeaders processes the transactions from the new
@@ -409,7 +409,7 @@ func (p *TxPool) processEvent(event *blockchain.Event) {
 		}
 
 		for _, tx := range block.Transactions {
-			oldTxs[tx.Hash] = tx
+			oldTxs[tx.Hash()] = tx
 		}
 	}
 
@@ -431,7 +431,7 @@ func (p *TxPool) processEvent(event *blockchain.Event) {
 
 		// etract latest nonces
 		for _, tx := range block.Transactions {
-			addr := tx.From
+			addr := tx.From()
 
 			// skip already processed accounts
 			if _, processed := stateNonces[addr]; processed {
@@ -446,7 +446,7 @@ func (p *TxPool) processEvent(event *blockchain.Event) {
 
 			// Legacy reorg logic //
 			// Update the addTxns in case of reorgs
-			delete(oldTxs, tx.Hash)
+			delete(oldTxs, tx.Hash())
 		}
 	}
 
@@ -469,7 +469,7 @@ func (p *TxPool) processEvent(event *blockchain.Event) {
 // constraints before entering the pool.
 func (p *TxPool) validateTx(tx *types.Transaction) error {
 	// FIXME: Accepts only legacy transaction only for now
-	if tx.Type != types.TxTypeLegacy {
+	if tx.Type() != types.TxTypeLegacy {
 		return ErrInvalidTxType
 	}
 
@@ -479,7 +479,7 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 	}
 
 	// Check if the transaction has a strictly positive value
-	if tx.Value.Sign() < 0 {
+	if tx.Value().Sign() < 0 {
 		return ErrNegativeValue
 	}
 
@@ -493,14 +493,13 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 
 	// If the from field is set, check that
 	// it matches the signer
-	if tx.From != types.ZeroAddress &&
-		tx.From != from {
+	if txFrom := tx.From(); txFrom != types.ZeroAddress && txFrom != from {
 		return ErrInvalidSender
 	}
 
 	// If no address was set, update it
-	if tx.From == types.ZeroAddress {
-		tx.From = from
+	if tx.From() == types.ZeroAddress {
+		tx.SetFrom(from)
 	}
 
 	// Reject underpriced transactions
@@ -512,11 +511,11 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 	stateRoot := p.store.Header().StateRoot
 
 	// Check nonce ordering
-	if p.store.GetNonce(stateRoot, tx.From) > tx.Nonce {
+	if p.store.GetNonce(stateRoot, tx.From()) > tx.Nonce() {
 		return ErrNonceTooLow
 	}
 
-	accountBalance, balanceErr := p.store.GetBalance(stateRoot, tx.From)
+	accountBalance, balanceErr := p.store.GetBalance(stateRoot, tx.From())
 	if balanceErr != nil {
 		return ErrInvalidAccountState
 	}
@@ -527,19 +526,19 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 	}
 
 	// Make sure the transaction has more gas than the basic transaction fee
-	intrinsicGas, err := state.TransactionGasCost(tx, p.forks.Homestead, p.forks.Istanbul)
+	intrinsicGas, err := state.TransactionGasCost(tx.Input(), tx.IsContractCreation(), p.forks.Homestead, p.forks.Istanbul)
 	if err != nil {
 		return err
 	}
 
-	if tx.Gas < intrinsicGas {
+	if tx.Gas() < intrinsicGas {
 		return ErrIntrinsicGas
 	}
 
 	// Grab the block gas limit for the latest block
 	latestBlockGasLimit := p.store.Header().GasLimit
 
-	if tx.Gas > latestBlockGasLimit {
+	if tx.Gas() > latestBlockGasLimit {
 		return ErrBlockLimitExceeded
 	}
 
@@ -553,7 +552,7 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 	p.logger.Debug("add tx",
 		"origin", origin.String(),
-		"hash", tx.Hash.String(),
+		"hash", tx.Hash().String(),
 	)
 
 	// validate incoming tx
@@ -569,13 +568,13 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 	tx.ComputeHash()
 
 	// check if already known
-	if _, ok := p.index.get(tx.Hash); ok {
+	if _, ok := p.index.get(tx.Hash()); ok {
 		if origin == gossip {
 			// silently drop known tx
 			// that is gossiped back
 			p.logger.Debug(
 				"dropping known gossiped transaction",
-				"hash", tx.Hash.String(),
+				"hash", tx.Hash().String(),
 			)
 
 			return nil
@@ -585,13 +584,13 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 	}
 
 	// initialize account for this address once
-	if !p.accounts.exists(tx.From) {
-		p.createAccountOnce(tx.From)
+	if txFrom := tx.From(); !p.accounts.exists(txFrom) {
+		p.createAccountOnce(txFrom)
 	}
 
 	// send request [BLOCKING]
 	p.enqueueReqCh <- enqueueRequest{tx: tx}
-	p.eventManager.signalEvent(proto.EventType_ADDED, tx.Hash)
+	p.eventManager.signalEvent(proto.EventType_ADDED, tx.Hash())
 
 	return nil
 }
@@ -602,7 +601,7 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 // a promoteRequest is signaled.
 func (p *TxPool) handleEnqueueRequest(req enqueueRequest) {
 	tx := req.tx
-	addr := req.tx.From
+	addr := req.tx.From()
 
 	// fetch account
 	account := p.accounts.get(addr)
@@ -614,15 +613,15 @@ func (p *TxPool) handleEnqueueRequest(req enqueueRequest) {
 		return
 	}
 
-	p.logger.Debug("enqueue request", "hash", tx.Hash.String())
+	p.logger.Debug("enqueue request", "hash", tx.Hash().String())
 
 	// update state
 	p.index.add(tx)
 	p.gauge.increase(slotsRequired(tx))
 
-	p.eventManager.signalEvent(proto.EventType_ENQUEUED, tx.Hash)
+	p.eventManager.signalEvent(proto.EventType_ENQUEUED, tx.Hash())
 
-	if tx.Nonce > account.getNonce() {
+	if tx.Nonce() > account.getNonce() {
 		// don't signal promotion for
 		// higher nonce txs
 		return
@@ -739,7 +738,7 @@ func (p *TxPool) Length() uint64 {
 //	toHash returns the hash(es) of given transaction(s)
 func toHash(txs ...*types.Transaction) (hashes []types.Hash) {
 	for _, tx := range txs {
-		hashes = append(hashes, tx.Hash)
+		hashes = append(hashes, tx.Hash())
 	}
 
 	return

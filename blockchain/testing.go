@@ -107,13 +107,15 @@ func NewTestBodyChain(n int) ([]*types.Header, []*types.Block, [][]*types.Receip
 
 		addr0 := types.StringToAddress("00")
 		t0 := &types.Transaction{
-			Nonce:    uint64(i),
-			To:       &addr0,
-			Value:    big.NewInt(0),
-			Gas:      0,
-			GasPrice: big.NewInt(0),
-			Input:    header.Hash.Bytes(),
-			V:        big.NewInt(27),
+			Payload: &types.LegacyTransaction{
+				Nonce:    uint64(i),
+				To:       &addr0,
+				Value:    big.NewInt(0),
+				Gas:      0,
+				GasPrice: big.NewInt(0),
+				Input:    header.Hash.Bytes(),
+				V:        big.NewInt(27),
+			},
 		}
 		t0.ComputeHash()
 

@@ -57,13 +57,15 @@ func QueryValidators(t TxQueryHandler, from types.Address) ([]types.Address, err
 
 	selector := method.ID()
 	res, err := t.Apply(&types.Transaction{
-		From:     from,
-		To:       &AddrStakingContract,
-		Value:    big.NewInt(0),
-		Input:    selector,
-		GasPrice: big.NewInt(0),
-		Gas:      queryGasLimit,
-		Nonce:    t.GetNonce(from),
+		Payload: &types.LegacyTransaction{
+			From:     from,
+			To:       &AddrStakingContract,
+			Value:    big.NewInt(0),
+			Input:    selector,
+			GasPrice: big.NewInt(0),
+			Gas:      queryGasLimit,
+			Nonce:    t.GetNonce(from),
+		},
 	})
 
 	if err != nil {

@@ -449,14 +449,16 @@ func generateStressTestTx(
 	}
 
 	signedTx, signErr := signer.SignTx(&types.Transaction{
-		Nonce:    currentNonce,
-		From:     types.ZeroAddress,
-		To:       &contractAddr,
-		GasPrice: bigGasPrice,
-		Gas:      framework.DefaultGasLimit,
-		Value:    big.NewInt(0),
-		V:        big.NewInt(1), // it is necessary to encode in rlp,
-		Input:    append(setNameMethod.ID(), encodedInput...),
+		Payload: &types.LegacyTransaction{
+			Nonce:    currentNonce,
+			From:     types.ZeroAddress,
+			To:       &contractAddr,
+			GasPrice: bigGasPrice,
+			Gas:      framework.DefaultGasLimit,
+			Value:    big.NewInt(0),
+			V:        big.NewInt(1), // it is necessary to encode in rlp,
+			Input:    append(setNameMethod.ID(), encodedInput...),
+		},
 	}, senderKey)
 
 	if signErr != nil {

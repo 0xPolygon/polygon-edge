@@ -40,16 +40,21 @@ func TestRLPEncoding(t *testing.T) {
 func TestRLPMarshall_And_Unmarshall_Transaction(t *testing.T) {
 	addrTo := StringToAddress("11")
 	txn := &Transaction{
-		Nonce:    0,
-		GasPrice: big.NewInt(11),
-		Gas:      11,
-		To:       &addrTo,
-		Value:    big.NewInt(1),
-		Input:    []byte{1, 2},
-		V:        big.NewInt(25),
-		S:        big.NewInt(26),
-		R:        big.NewInt(27),
+		Payload: &LegacyTransaction{
+			Nonce:    0,
+			GasPrice: big.NewInt(11),
+			Gas:      11,
+			To:       &addrTo,
+			Value:    big.NewInt(1),
+			Input:    []byte{1, 2},
+			V:        big.NewInt(25),
+			S:        big.NewInt(26),
+			R:        big.NewInt(27),
+		},
 	}
+
+	txn.ComputeHash()
+
 	unmarshalledTxn := new(Transaction)
 	marshaledRlp := txn.MarshalRLP()
 
@@ -59,7 +64,6 @@ func TestRLPMarshall_And_Unmarshall_Transaction(t *testing.T) {
 
 	unmarshalledTxn.ComputeHash()
 
-	txn.Hash = unmarshalledTxn.Hash
 	if !reflect.DeepEqual(txn, unmarshalledTxn) {
 		t.Fatal("[ERROR] Unmarshalled transaction not equal to base transaction")
 	}
@@ -76,40 +80,29 @@ func TestRLPUnmarshal_Header_ComputeHash(t *testing.T) {
 	assert.Equal(t, h.Hash, h2.Hash)
 }
 
-func TestRLPMarshall_And_Unmarshall_TypedTransaction(t *testing.T) {
+func TestRLPMarshall_And_Unmarshall_StateTransaction(t *testing.T) {
 	addrTo := StringToAddress("11")
 	originalTx := &Transaction{
-		Nonce:    0,
-		GasPrice: big.NewInt(11),
-		Gas:      11,
-		To:       &addrTo,
-		Value:    big.NewInt(1),
-		Input:    []byte{1, 2},
-		V:        big.NewInt(25),
-		S:        big.NewInt(26),
-		R:        big.NewInt(27),
-		StateSignatures: [][]byte{
-			{0x01},
+		Payload: &StateTransaction{
+			Nonce: 0,
+			To:    &addrTo,
+			Input: []byte{1, 2},
+			Signatures: [][]byte{
+				{0x01},
+			},
+			V: big.NewInt(25),
+			S: big.NewInt(26),
+			R: big.NewInt(27),
 		},
 	}
 
-	txTypes := []TransactionType{
-		TxTypeState,
-	}
+	txRLP := originalTx.MarshalRLP()
 
-	for _, txType := range txTypes {
-		txType := txType
-		t.Run(txType.String(), func(t *testing.T) {
-			originalTx.Type = txType
-			originalTx.ComputeHash()
+	unmarshalledTx := new(Transaction)
+	assert.NoError(t, unmarshalledTx.UnmarshalRLP(txRLP))
 
-			txRLP := originalTx.MarshalRLP()
+	originalTx.ComputeHash()
+	unmarshalledTx.ComputeHash()
 
-			unmarshalledTx := new(Transaction)
-			assert.NoError(t, unmarshalledTx.UnmarshalRLP(txRLP))
-
-			unmarshalledTx.ComputeHash()
-			assert.Equal(t, originalTx, unmarshalledTx)
-		})
-	}
+	assert.Equal(t, originalTx, unmarshalledTx)
 }

@@ -36,19 +36,37 @@ func (b *Body) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 }
 
 func (t *Transaction) MarshalStoreRLPTo(dst []byte) []byte {
+	if t.IsTypedTransaction() {
+		dst = append(dst, byte(t.Type()))
+	}
+
 	return MarshalRLPTo(t.MarshalStoreRLPWith, dst)
 }
 
 func (t *Transaction) MarshalStoreRLPWith(a *fastrlp.Arena) *fastrlp.Value {
-	vv := a.NewArray()
-	// consensus part
-	if t.IsTypedTransaction() {
-		vv.Set(a.NewBytes([]byte{byte(t.Type)}))
-	}
+	// Payload defines RLP encoding rule instead of transaction
+	return t.Payload.MarshalStoreRLPWith(a)
+}
 
+func (t *LegacyTransaction) MarshalStoreRLPWith(a *fastrlp.Arena) *fastrlp.Value {
+	vv := a.NewArray()
+
+	// consensus part
 	vv.Set(t.MarshalRLPWith(a))
+
 	// context part
 	vv.Set(a.NewBytes(t.From.Bytes()))
+
+	return vv
+}
+
+func (t *StateTransaction) MarshalStoreRLPWith(a *fastrlp.Arena) *fastrlp.Value {
+	vv := a.NewArray()
+
+	// consensus part
+	vv.Set(t.MarshalRLPWith(a))
+
+	// context part
 
 	return vv
 }
@@ -59,7 +77,12 @@ func (r Receipts) MarshalStoreRLPTo(dst []byte) []byte {
 
 func (r *Receipts) MarshalStoreRLPWith(a *fastrlp.Arena) *fastrlp.Value {
 	vv := a.NewArray()
+
 	for _, rr := range *r {
+		if rr.IsTypedTransaction() {
+			vv.Set(a.NewBytes([]byte{byte(rr.TransactionType)}))
+		}
+
 		vv.Set(rr.MarshalStoreRLPWith(a))
 	}
 
@@ -67,16 +90,16 @@ func (r *Receipts) MarshalStoreRLPWith(a *fastrlp.Arena) *fastrlp.Value {
 }
 
 func (r *Receipt) MarshalStoreRLPTo(dst []byte) []byte {
+	if r.IsTypedTransaction() {
+		dst = append(dst, byte(r.TransactionType))
+	}
+
 	return MarshalRLPTo(r.MarshalStoreRLPWith, dst)
 }
 
 func (r *Receipt) MarshalStoreRLPWith(a *fastrlp.Arena) *fastrlp.Value {
 	// use the hash part
 	vv := a.NewArray()
-
-	if r.IsTypedTransaction() {
-		vv.Set(a.NewBytes([]byte{byte(r.TransactionType)}))
-	}
 
 	vv.Set(r.MarshalRLPWith(a))
 

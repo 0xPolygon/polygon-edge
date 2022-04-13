@@ -102,17 +102,18 @@ func TestToTransaction_Returns_V_R_S_ValuesWithoutLeading0(t *testing.T) {
 	r, _ := hex.DecodeHex(hexWithLeading0)
 	s, _ := hex.DecodeHex(hexWithLeading0)
 	txn := types.Transaction{
-		Nonce:    0,
-		GasPrice: big.NewInt(0),
-		Gas:      0,
-		To:       nil,
-		Value:    big.NewInt(0),
-		Input:    nil,
-		V:        new(big.Int).SetBytes(v),
-		R:        new(big.Int).SetBytes(r),
-		S:        new(big.Int).SetBytes(s),
-		Hash:     types.Hash{},
-		From:     types.Address{},
+		Payload: &types.LegacyTransaction{
+			Nonce:    0,
+			GasPrice: big.NewInt(0),
+			Gas:      0,
+			To:       nil,
+			Value:    big.NewInt(0),
+			Input:    nil,
+			V:        new(big.Int).SetBytes(v),
+			R:        new(big.Int).SetBytes(r),
+			S:        new(big.Int).SetBytes(s),
+			From:     types.Address{},
+		},
 	}
 
 	jsonTx := toTransaction(&txn, nil, nil, nil)

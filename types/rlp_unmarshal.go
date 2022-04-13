@@ -73,32 +73,12 @@ func (b *Block) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	}
 
 	// transactions
-	txns, err := elems[1].GetElems()
-	if err != nil {
+	var txns Transactions
+	if err := txns.UnmarshalRLPFrom(p, elems[1]); err != nil {
 		return err
 	}
 
-	for i := 0; i < len(txns); i++ {
-		txType := TxTypeLegacy
-		if txns[i].Type() == fastrlp.TypeBytes {
-			if err := txType.UnmarshalRLPFrom(p, txns[i]); err != nil {
-				return err
-			}
-
-			i++
-		}
-
-		bTxn := &Transaction{
-			Type: txType,
-		}
-		if err := bTxn.UnmarshalRLPFrom(p, txns[i]); err != nil {
-			return err
-		}
-
-		bTxn.ComputeHash()
-
-		b.Transactions = append(b.Transactions, bTxn)
-	}
+	b.Transactions = txns
 
 	// uncles
 	uncles, err := elems[2].GetElems()
@@ -348,12 +328,46 @@ func (l *Log) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	return nil
 }
 
+func (tt *Transactions) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
+	txns, err := v.GetElems()
+	if err != nil {
+		return err
+	}
+
+	for i := 0; i < len(txns); i++ {
+		txType := TxTypeLegacy
+		if txns[i].Type() == fastrlp.TypeBytes {
+			if err := txType.UnmarshalRLPFrom(p, txns[i]); err != nil {
+				return err
+			}
+
+			i++
+		}
+
+		txn := &Transaction{}
+
+		if txn.Payload, err = newTxPayload(txType); err != nil {
+			return err
+		}
+
+		if err := txn.Payload.UnmarshalRLPFrom(p, txns[i]); err != nil {
+			return err
+		}
+
+		txn.ComputeHash()
+
+		*tt = append(*tt, txn)
+	}
+
+	return nil
+}
+
 func (t *Transaction) UnmarshalRLP(input []byte) error {
 	txType := TxTypeLegacy
 	offset := 0
 
+	var err error
 	if len(input) > 0 && input[0] <= RLPSingleByteUpperLimit {
-		var err error
 		if txType, err = ToTransactionType(input[0]); err != nil {
 			return err
 		}
@@ -361,8 +375,11 @@ func (t *Transaction) UnmarshalRLP(input []byte) error {
 		offset = 1
 	}
 
-	t.Type = txType
-	if err := UnmarshalRlp(t.UnmarshalRLPFrom, input[offset:]); err != nil {
+	if t.Payload, err = newTxPayload(txType); err != nil {
+		return err
+	}
+
+	if err := UnmarshalRlp(t.Payload.UnmarshalRLPFrom, input[offset:]); err != nil {
 		return err
 	}
 
@@ -370,33 +387,32 @@ func (t *Transaction) UnmarshalRLP(input []byte) error {
 }
 
 // UnmarshalRLP unmarshals a Transaction in RLP format
-func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
+func (t *LegacyTransaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	elems, err := v.GetElems()
 	if err != nil {
 		return err
 	}
 
-	num := len(elems)
-
-	if t.Type == TxTypeLegacy && num != 9 {
+	if num := len(elems); num != 9 {
 		return fmt.Errorf("not enough elements to decode transaction, expected 9 but found %d", num)
-	} else if t.Type == TxTypeState && num != 10 {
-		return fmt.Errorf("not enough elements to decode transaction, expected 10 but found %d", num)
 	}
 
 	// nonce
 	if t.Nonce, err = elems[0].GetUint64(); err != nil {
 		return err
 	}
+
 	// gasPrice
 	t.GasPrice = new(big.Int)
 	if err := elems[1].GetBigInt(t.GasPrice); err != nil {
 		return err
 	}
+
 	// gas
 	if t.Gas, err = elems[2].GetUint64(); err != nil {
 		return err
 	}
+
 	// to
 	if vv, _ := v.Get(3).Bytes(); len(vv) == 20 {
 		// address
@@ -406,11 +422,13 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 		// reset To
 		t.To = nil
 	}
+
 	// value
 	t.Value = new(big.Int)
 	if err := elems[4].GetBigInt(t.Value); err != nil {
 		return err
 	}
+
 	// input
 	if t.Input, err = elems[5].GetBytes(t.Input[:0]); err != nil {
 		return err
@@ -427,26 +445,75 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 	if err = elems[7].GetBigInt(t.R); err != nil {
 		return err
 	}
+
 	// S
 	t.S = new(big.Int)
 	if err = elems[8].GetBigInt(t.S); err != nil {
 		return err
 	}
 
-	// StateSignatures
-	if t.Type == TxTypeState {
-		sigElems, err := elems[9].GetElems()
-		if err != nil {
+	return nil
+}
+
+func (t *StateTransaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
+	elems, err := v.GetElems()
+	if err != nil {
+		return err
+	}
+
+	if num := len(elems); num != 7 {
+		return fmt.Errorf("not enough elements to decode transaction, expected 7 but found %d", num)
+	}
+
+	// nonce
+	if t.Nonce, err = elems[0].GetUint64(); err != nil {
+		return err
+	}
+
+	// to
+	if vv, _ := v.Get(1).Bytes(); len(vv) == 20 {
+		// address
+		addr := BytesToAddress(vv)
+		t.To = &addr
+	} else {
+		// reset To
+		t.To = nil
+	}
+
+	// input
+	if t.Input, err = elems[2].GetBytes(t.Input[:0]); err != nil {
+		return err
+	}
+
+	// Signatures
+	sigElems, err := elems[3].GetElems()
+	if err != nil {
+		return err
+	}
+
+	t.Signatures = make([][]byte, len(sigElems))
+	for i, e := range sigElems {
+		if t.Signatures[i], err = e.GetBytes(t.Signatures[i][:0]); err != nil {
 			return err
 		}
+	}
 
-		t.StateSignatures = make([][]byte, len(sigElems))
+	// V
+	t.V = new(big.Int)
+	if err = elems[4].GetBigInt(t.V); err != nil {
+		return err
+	}
 
-		for i, e := range sigElems {
-			if t.StateSignatures[i], err = e.GetBytes(t.StateSignatures[i][:0]); err != nil {
-				return err
-			}
-		}
+	// R
+	t.R = new(big.Int)
+	if err = elems[5].GetBigInt(t.R); err != nil {
+		return err
+	}
+
+	// S
+	t.S = new(big.Int)
+	if err = elems[6].GetBigInt(t.S); err != nil {
+		return err
 	}
 
 	return nil

@@ -2,10 +2,11 @@ package e2e
 
 import (
 	"context"
-	"github.com/0xPolygon/polygon-edge/command"
 	"math/big"
 	"testing"
 	"time"
+
+	"github.com/0xPolygon/polygon-edge/command"
 
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/e2e/framework"
@@ -89,13 +90,15 @@ func TestCustomBlockGasLimitPropagation(t *testing.T) {
 
 	for i := 0; i < 20; i++ {
 		signedTx, err := signer.SignTx(&types.Transaction{
-			Nonce:    uint64(i),
-			GasPrice: big.NewInt(framework.DefaultGasPrice),
-			Gas:      blockGasLimit,
-			To:       &receiverAddress,
-			Value:    framework.EthToWei(1),
-			V:        big.NewInt(1),
-			From:     senderAddress,
+			Payload: &types.LegacyTransaction{
+				Nonce:    uint64(i),
+				GasPrice: big.NewInt(framework.DefaultGasPrice),
+				Gas:      blockGasLimit,
+				To:       &receiverAddress,
+				Value:    framework.EthToWei(1),
+				V:        big.NewInt(1),
+				From:     senderAddress,
+			},
 		}, senderKey)
 		if err != nil {
 			t.Fatalf("failed to sign txn: %v", err)

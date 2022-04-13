@@ -52,18 +52,32 @@ func toTransaction(
 	blockHash *types.Hash,
 	txIndex *int,
 ) *transaction {
-	res := &transaction{
-		Nonce:    argUint64(t.Nonce),
-		GasPrice: argBig(*t.GasPrice),
-		Gas:      argUint64(t.Gas),
-		To:       t.To,
-		Value:    argBig(*t.Value),
-		Input:    t.Input,
-		V:        argBig(*t.V),
-		R:        argBig(*t.R),
-		S:        argBig(*t.S),
-		Hash:     t.Hash,
-		From:     t.From,
+	var res *transaction
+	switch payload := t.Payload.(type) {
+	case *types.LegacyTransaction:
+		res = &transaction{
+			Nonce:    argUint64(payload.Nonce),
+			GasPrice: argBig(*payload.GasPrice),
+			Gas:      argUint64(payload.Gas),
+			To:       payload.To,
+			Value:    argBig(*payload.Value),
+			Input:    payload.Input,
+			V:        argBig(*payload.V),
+			R:        argBig(*payload.R),
+			S:        argBig(*payload.S),
+			Hash:     t.Hash(),
+			From:     payload.From,
+		}
+	case *types.StateTransaction:
+		res = &transaction{
+			Nonce: argUint64(payload.Nonce),
+			To:    payload.To,
+			Input: payload.Input,
+			V:     argBig(*payload.V),
+			R:     argBig(*payload.R),
+			S:     argBig(*payload.S),
+			Hash:  t.Hash(),
+		}
 	}
 
 	if blockNumber != nil {
@@ -143,7 +157,7 @@ func toBlock(b *types.Block, fullTx bool) *block {
 		} else {
 			res.Transactions = append(
 				res.Transactions,
-				transactionHash(txn.Hash),
+				transactionHash(txn.Hash()),
 			)
 		}
 	}

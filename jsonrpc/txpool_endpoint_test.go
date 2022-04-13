@@ -1,10 +1,11 @@
 package jsonrpc
 
 import (
-	"github.com/0xPolygon/polygon-edge/types"
 	"math/big"
 	"strconv"
 	"testing"
+
+	"github.com/0xPolygon/polygon-edge/types"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -39,14 +40,14 @@ func TestContentEndpoint(t *testing.T) {
 		assert.Equal(t, 0, len(response.Queued))
 		assert.Equal(t, 1, len(response.Pending[address1]))
 
-		txData := response.Pending[address1][testTx.Nonce]
+		txData := response.Pending[address1][testTx.Nonce()]
 		assert.NotNil(t, txData)
-		assert.Equal(t, testTx.Gas, uint64(txData.Gas))
-		assert.Equal(t, *testTx.GasPrice, big.Int(txData.GasPrice))
-		assert.Equal(t, testTx.To, txData.To)
-		assert.Equal(t, testTx.From, txData.From)
-		assert.Equal(t, *testTx.Value, big.Int(txData.Value))
-		assert.Equal(t, testTx.Input, []byte(txData.Input))
+		assert.Equal(t, testTx.Gas(), uint64(txData.Gas))
+		assert.Equal(t, *testTx.GasPrice(), big.Int(txData.GasPrice))
+		assert.Equal(t, testTx.To(), txData.To)
+		assert.Equal(t, testTx.From(), txData.From)
+		assert.Equal(t, *testTx.Value(), big.Int(txData.Value))
+		assert.Equal(t, testTx.Input(), []byte(txData.Input))
 		assert.Equal(t, nil, txData.BlockNumber)
 		assert.Equal(t, nil, txData.TxIndex)
 	})
@@ -67,14 +68,14 @@ func TestContentEndpoint(t *testing.T) {
 		assert.Equal(t, 1, len(response.Queued))
 		assert.Equal(t, 1, len(response.Queued[address1]))
 
-		txData := response.Queued[address1][testTx.Nonce]
+		txData := response.Queued[address1][testTx.Nonce()]
 		assert.NotNil(t, txData)
-		assert.Equal(t, testTx.Gas, uint64(txData.Gas))
-		assert.Equal(t, *testTx.GasPrice, big.Int(txData.GasPrice))
-		assert.Equal(t, testTx.To, txData.To)
-		assert.Equal(t, testTx.From, txData.From)
-		assert.Equal(t, *testTx.Value, big.Int(txData.Value))
-		assert.Equal(t, testTx.Input, []byte(txData.Input))
+		assert.Equal(t, testTx.Gas(), uint64(txData.Gas))
+		assert.Equal(t, *testTx.GasPrice(), big.Int(txData.GasPrice))
+		assert.Equal(t, testTx.To(), txData.To)
+		assert.Equal(t, testTx.From(), txData.From)
+		assert.Equal(t, *testTx.Value(), big.Int(txData.Value))
+		assert.Equal(t, testTx.Input(), []byte(txData.Input))
 		assert.Equal(t, nil, txData.BlockNumber)
 		assert.Equal(t, nil, txData.TxIndex)
 	})
@@ -138,9 +139,9 @@ func TestInspectEndpoint(t *testing.T) {
 		assert.Equal(t, 0, len(response.Pending))
 		assert.Equal(t, 1, len(response.Queued))
 		assert.Equal(t, uint64(1), response.CurrentCapacity)
-		transactionInfo := response.Queued[testTx.From.String()]
+		transactionInfo := response.Queued[testTx.From().String()]
 		assert.NotNil(t, transactionInfo)
-		assert.NotNil(t, transactionInfo[strconv.FormatUint(testTx.Nonce, 10)])
+		assert.NotNil(t, transactionInfo[strconv.FormatUint(testTx.Nonce(), 10)])
 	})
 
 	t.Run("returns correct data for pending transactions", func(t *testing.T) {
@@ -159,10 +160,10 @@ func TestInspectEndpoint(t *testing.T) {
 		assert.Equal(t, 1, len(response.Pending))
 		assert.Equal(t, 0, len(response.Queued))
 		assert.Equal(t, uint64(2), response.CurrentCapacity)
-		transactionInfo := response.Pending[testTx.From.String()]
+		transactionInfo := response.Pending[testTx.From().String()]
 		assert.NotNil(t, transactionInfo)
-		assert.NotNil(t, transactionInfo[strconv.FormatUint(testTx.Nonce, 10)])
-		assert.NotNil(t, transactionInfo[strconv.FormatUint(testTx2.Nonce, 10)])
+		assert.NotNil(t, transactionInfo[strconv.FormatUint(testTx.Nonce(), 10)])
+		assert.NotNil(t, transactionInfo[strconv.FormatUint(testTx2.Nonce(), 10)])
 	})
 }
 
@@ -231,16 +232,18 @@ func (s *mockTxPoolStore) GetCapacity() (uint64, uint64) {
 
 func newTestTransaction(nonce uint64, from types.Address) *types.Transaction {
 	txn := &types.Transaction{
-		Nonce:    nonce,
-		GasPrice: big.NewInt(1),
-		Gas:      nonce * 100,
-		Value:    big.NewInt(200),
-		Input:    []byte{0xff},
-		From:     from,
-		To:       &addr1,
-		V:        big.NewInt(1),
-		R:        big.NewInt(1),
-		S:        big.NewInt(1),
+		Payload: &types.LegacyTransaction{
+			Nonce:    nonce,
+			GasPrice: big.NewInt(1),
+			Gas:      nonce * 100,
+			Value:    big.NewInt(200),
+			Input:    []byte{0xff},
+			From:     from,
+			To:       &addr1,
+			V:        big.NewInt(1),
+			R:        big.NewInt(1),
+			S:        big.NewInt(1),
+		},
 	}
 
 	txn.ComputeHash()

@@ -50,7 +50,10 @@ func TestIbft_Transfer(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.NotNil(t, receipt)
-		assert.NotNil(t, receipt.TransactionHash)
+
+		if receipt != nil {
+			assert.NotNil(t, receipt.TransactionHash)
+		}
 	}
 }
 

@@ -69,16 +69,21 @@ func (b *BridgeMechanism) validateBlock(block *types.Block) error {
 	threshold := b.calculateSignatureThreshold(snapshot.Set)
 
 	for _, tx := range block.Transactions {
-		if tx.Type != types.TxTypeState {
+		payload, ok := tx.Payload.(*types.StateTransaction)
+		if !ok {
+			// validates signatures in state transaction only
 			continue
 		}
 
-		txHash := b.bridge.StateSync().GetTransactionHash(tx)
+		txHash, err := b.bridge.StateSync().GetTransactionHash(tx)
+		if err != nil {
+			return err
+		}
 
 		sigCount := uint64(0)
 		checked := make(map[types.Address]bool)
 
-		for _, sig := range tx.StateSignatures {
+		for _, sig := range payload.Signatures {
 			address, err := signer.RecoverAddress(txHash[:], sig)
 			if err != nil {
 				return err
@@ -136,7 +141,18 @@ func (b *BridgeMechanism) insertStateTransactionsHook(rawParams interface{}) err
 			continue
 		}
 
-		msg.Transaction.StateSignatures = msg.Signatures
+		stateTx, ok := msg.Transaction.Payload.(*types.StateTransaction)
+		if !ok {
+			b.ibft.logger.Warn(
+				"SAM Pool has wrong tx message in SAM Pool",
+				"wanted", types.TxTypeState,
+				"actual", msg.Transaction.Type(),
+			)
+
+			continue
+		}
+
+		stateTx.Signatures = msg.Signatures
 
 		signer := crypto.NewSigner(
 			b.ibft.config.Params.Forks.At(b.ibft.state.view.Sequence),
@@ -168,11 +184,13 @@ func (b *BridgeMechanism) consumeStateTransactionsHook(numberParam interface{}) 
 	}
 
 	for _, tx := range block.Transactions {
-		if tx.Type != types.TxTypeState {
+		if tx.Type() != types.TxTypeState {
 			continue
 		}
 
-		b.bridge.StateSync().Consume(tx)
+		if err := b.bridge.StateSync().Consume(tx); err != nil {
+			return err
+		}
 	}
 
 	return nil

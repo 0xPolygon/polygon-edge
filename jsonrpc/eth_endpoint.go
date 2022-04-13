@@ -212,7 +212,7 @@ func (e *Eth) SendRawTransaction(input string) (interface{}, error) {
 		return nil, err
 	}
 
-	return tx.Hash.String(), nil
+	return tx.Hash().String(), nil
 }
 
 // Reject eth_sendTransaction json-rpc call as we don't support wallet management
@@ -244,7 +244,7 @@ func (e *Eth) GetTransactionByHash(hash types.Hash) (interface{}, error) {
 
 		// Find the transaction within the block
 		for idx, txn := range block.Transactions {
-			if txn.Hash == hash {
+			if txn.Hash() == hash {
 				return toTransaction(
 					txn,
 					argUintPtr(block.Number()),
@@ -327,7 +327,7 @@ func (e *Eth) GetTransactionReceipt(hash types.Hash) (interface{}, error) {
 	indx := -1
 
 	for i, txn := range block.Transactions {
-		if txn.Hash == hash {
+		if txn.Hash() == hash {
 			indx = i
 
 			break
@@ -350,7 +350,7 @@ func (e *Eth) GetTransactionReceipt(hash types.Hash) (interface{}, error) {
 			Data:        argBytes(elem.Data),
 			BlockHash:   block.Hash(),
 			BlockNumber: argUint64(block.Number()),
-			TxHash:      txn.Hash,
+			TxHash:      txn.Hash(),
 			TxIndex:     argUint64(indx),
 			LogIndex:    argUint64(indx),
 			Removed:     false,
@@ -362,14 +362,14 @@ func (e *Eth) GetTransactionReceipt(hash types.Hash) (interface{}, error) {
 		CumulativeGasUsed: argUint64(raw.CumulativeGasUsed),
 		LogsBloom:         raw.LogsBloom,
 		Status:            argUint64(*raw.Status),
-		TxHash:            txn.Hash,
+		TxHash:            txn.Hash(),
 		TxIndex:           argUint64(indx),
 		BlockHash:         block.Hash(),
 		BlockNumber:       argUint64(block.Number()),
 		GasUsed:           argUint64(raw.GasUsed),
 		ContractAddress:   raw.ContractAddress,
-		FromAddr:          txn.From,
-		ToAddr:            txn.To,
+		FromAddr:          txn.From(),
+		ToAddr:            txn.To(),
 		Logs:              logs,
 	}
 
@@ -454,8 +454,8 @@ func (e *Eth) Call(arg *txnArgs, filter BlockNumberOrHash) (interface{}, error) 
 		return nil, err
 	}
 	// If the caller didn't supply the gas limit in the message, then we set it to maximum possible => block gas limit
-	if transaction.Gas == 0 {
-		transaction.Gas = header.GasLimit
+	if transaction.Gas() == 0 {
+		transaction.SetGas(header.GasLimit)
 	}
 
 	// The return value of the execution is saved in the transition (returnValue field)
@@ -509,26 +509,26 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 	)
 
 	// If the gas limit was passed in, use it as a ceiling
-	if transaction.Gas != 0 && transaction.Gas >= standardGas {
-		highEnd = transaction.Gas
+	if transaction.Gas() != 0 && transaction.Gas() >= standardGas {
+		highEnd = transaction.Gas()
 	} else {
 		// If not, use the referenced block number
 		highEnd = header.GasLimit
 	}
 
-	gasPriceInt := new(big.Int).Set(transaction.GasPrice)
-	valueInt := new(big.Int).Set(transaction.Value)
+	gasPriceInt := new(big.Int).Set(transaction.GasPrice())
+	valueInt := new(big.Int).Set(transaction.Value())
 
 	var availableBalance *big.Int
 
 	// If the sender address is present, figure out how much available funds
 	// are we working with
-	if transaction.From != types.ZeroAddress {
+	if txFrom := transaction.From(); txFrom != types.ZeroAddress {
 		// Get the account balance
 		// If the account is not initialized yet in state,
 		// assume it's an empty account
 		accountBalance := big.NewInt(0)
-		acc, err := e.store.GetAccount(header.StateRoot, transaction.From)
+		acc, err := e.store.GetAccount(header.StateRoot, txFrom)
 
 		if err != nil && !errors.As(err, &ErrStateNotFound) {
 			// An unrelated error occurred, return it
@@ -541,7 +541,7 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 
 		availableBalance = new(big.Int).Set(accountBalance)
 
-		if transaction.Value != nil {
+		if transaction.Value() != nil {
 			if valueInt.Cmp(availableBalance) > 0 {
 				return 0, ErrInsufficientFunds
 			}
@@ -591,7 +591,7 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 	testTransaction := func(gas uint64, shouldOmitErr bool) (bool, error) {
 		// Create a dummy transaction with the new gas
 		txn := transaction.Copy()
-		txn.Gas = gas
+		txn.SetGas(gas)
 
 		result, applyErr := e.store.ApplyTxn(header, txn)
 
@@ -682,7 +682,7 @@ func (e *Eth) GetLogs(filterOptions *LogFilter) (interface{}, error) {
 						Data:        argBytes(log.Data),
 						BlockNumber: argUint64(block.Header.Number),
 						BlockHash:   block.Header.Hash,
-						TxHash:      block.Transactions[indx].Hash,
+						TxHash:      block.Transactions[indx].Hash(),
 						TxIndex:     argUint64(indx),
 						LogIndex:    argUint64(logIndx),
 					})
@@ -987,15 +987,15 @@ func (e *Eth) decodeTxn(arg *txnArgs) (*types.Transaction, error) {
 	}
 
 	txn := &types.Transaction{
-		From:     *arg.From,
-		Gas:      uint64(*arg.Gas),
-		GasPrice: new(big.Int).SetBytes(*arg.GasPrice),
-		Value:    new(big.Int).SetBytes(*arg.Value),
-		Input:    input,
-		Nonce:    uint64(*arg.Nonce),
-	}
-	if arg.To != nil {
-		txn.To = arg.To
+		Payload: &types.LegacyTransaction{
+			From:     *arg.From,
+			To:       arg.To,
+			Gas:      uint64(*arg.Gas),
+			GasPrice: new(big.Int).SetBytes(*arg.GasPrice),
+			Value:    new(big.Int).SetBytes(*arg.Value),
+			Input:    input,
+			Nonce:    uint64(*arg.Nonce),
+		},
 	}
 
 	txn.ComputeHash()

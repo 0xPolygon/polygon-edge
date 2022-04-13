@@ -12,7 +12,7 @@ type Message struct {
 }
 
 func (m *Message) Hash() types.Hash {
-	return m.Transaction.ComputeHash().Hash
+	return m.Transaction.ComputeHash().Hash()
 }
 
 type MessageWithSignatures struct {

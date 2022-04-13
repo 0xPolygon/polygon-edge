@@ -26,22 +26,26 @@ func (gen *ContractTxnsGenerator) GetExampleTransaction() (*types.Transaction, e
 		//	contract not deployed yet
 		//	generate contract deployment tx
 		return gen.signer.SignTx(&types.Transaction{
-			From:     gen.params.SenderAddress,
-			Value:    big.NewInt(0),
-			GasPrice: gen.params.GasPrice,
-			Input:    gen.contractBytecode,
-			V:        big.NewInt(1), // it is necessary to encode in rlp
+			Payload: &types.LegacyTransaction{
+				From:     gen.params.SenderAddress,
+				Value:    big.NewInt(0),
+				GasPrice: gen.params.GasPrice,
+				Input:    gen.contractBytecode,
+				V:        big.NewInt(1), // it is necessary to encode in rlp
+			},
 		}, gen.params.SenderKey)
 	}
 
 	//	return token transfer tx
 	return gen.signer.SignTx(&types.Transaction{
-		From:     gen.params.SenderAddress,
-		To:       gen.contractAddress,
-		Value:    big.NewInt(0),
-		GasPrice: gen.params.GasPrice,
-		Input:    gen.encodedParams,
-		V:        big.NewInt(1), // it is necessary to encode in rlp
+		Payload: &types.LegacyTransaction{
+			From:     gen.params.SenderAddress,
+			To:       gen.contractAddress,
+			Value:    big.NewInt(0),
+			GasPrice: gen.params.GasPrice,
+			Input:    gen.encodedParams,
+			V:        big.NewInt(1), // it is necessary to encode in rlp
+		},
 	}, gen.params.SenderKey)
 }
 
@@ -52,26 +56,30 @@ func (gen *ContractTxnsGenerator) GenerateTransaction() (*types.Transaction, err
 		//	contract not deployed yet
 		//	generate contract deployment tx
 		return gen.signer.SignTx(&types.Transaction{
-			From:     gen.params.SenderAddress,
-			Value:    big.NewInt(0),
-			Gas:      gen.estimatedGas,
-			GasPrice: gen.params.GasPrice,
-			Nonce:    newNextNonce - 1,
-			Input:    gen.contractBytecode,
-			V:        big.NewInt(1), // it is necessary to encode in rlp
+			Payload: &types.LegacyTransaction{
+				From:     gen.params.SenderAddress,
+				Value:    big.NewInt(0),
+				Gas:      gen.estimatedGas,
+				GasPrice: gen.params.GasPrice,
+				Nonce:    newNextNonce - 1,
+				Input:    gen.contractBytecode,
+				V:        big.NewInt(1), // it is necessary to encode in rlp
+			},
 		}, gen.params.SenderKey)
 	}
 
 	//	return token transfer tx
 	return gen.signer.SignTx(&types.Transaction{
-		From:     gen.params.SenderAddress,
-		To:       gen.contractAddress,
-		Value:    big.NewInt(0),
-		Gas:      gen.estimatedGas,
-		GasPrice: gen.params.GasPrice,
-		Nonce:    newNextNonce - 1,
-		Input:    gen.encodedParams,
-		V:        big.NewInt(1), // it is necessary to encode in rlp
+		Payload: &types.LegacyTransaction{
+			From:     gen.params.SenderAddress,
+			To:       gen.contractAddress,
+			Value:    big.NewInt(0),
+			Gas:      gen.estimatedGas,
+			GasPrice: gen.params.GasPrice,
+			Nonce:    newNextNonce - 1,
+			Input:    gen.encodedParams,
+			V:        big.NewInt(1), // it is necessary to encode in rlp
+		},
 	}, gen.params.SenderKey)
 }
 

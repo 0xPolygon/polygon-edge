@@ -4,12 +4,12 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
-	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"math/big"
 	"strconv"
 	"testing"
 	"time"
 
+	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/contracts/staking"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/e2e/framework"
@@ -356,14 +356,16 @@ func TestPoS_UnstakeExploit(t *testing.T) {
 
 	generateTx := func() *types.Transaction {
 		signedTx, signErr := signer.SignTx(&types.Transaction{
-			Nonce:    uint64(currentNonce),
-			From:     types.ZeroAddress,
-			To:       &stakingContractAddr,
-			GasPrice: bigGasPrice,
-			Gas:      framework.DefaultGasLimit,
-			Value:    big.NewInt(0),
-			V:        big.NewInt(1), // it is necessary to encode in rlp,
-			Input:    framework.MethodSig("unstake"),
+			Payload: &types.LegacyTransaction{
+				Nonce:    uint64(currentNonce),
+				From:     types.ZeroAddress,
+				To:       &stakingContractAddr,
+				GasPrice: bigGasPrice,
+				Gas:      framework.DefaultGasLimit,
+				Value:    big.NewInt(0),
+				V:        big.NewInt(1), // it is necessary to encode in rlp,
+				Input:    framework.MethodSig("unstake"),
+			},
 		}, senderKey)
 
 		if signErr != nil {
@@ -496,14 +498,16 @@ func TestPoS_StakeUnstakeExploit(t *testing.T) {
 
 	generateTx := func(value *big.Int, methodName string) *types.Transaction {
 		signedTx, signErr := signer.SignTx(&types.Transaction{
-			Nonce:    uint64(currentNonce),
-			From:     types.ZeroAddress,
-			To:       &stakingContractAddr,
-			GasPrice: bigGasPrice,
-			Gas:      framework.DefaultGasLimit,
-			Value:    value,
-			V:        big.NewInt(1), // it is necessary to encode in rlp
-			Input:    framework.MethodSig(methodName),
+			Payload: &types.LegacyTransaction{
+				Nonce:    uint64(currentNonce),
+				From:     types.ZeroAddress,
+				To:       &stakingContractAddr,
+				GasPrice: bigGasPrice,
+				Gas:      framework.DefaultGasLimit,
+				Value:    value,
+				V:        big.NewInt(1), // it is necessary to encode in rlp
+				Input:    framework.MethodSig(methodName),
+			},
 		}, senderKey)
 
 		if signErr != nil {
@@ -630,14 +634,16 @@ func TestPoS_StakeUnstakeWithinSameBlock(t *testing.T) {
 
 	generateTx := func(value *big.Int, methodName string) *types.Transaction {
 		signedTx, signErr := signer.SignTx(&types.Transaction{
-			Nonce:    uint64(currentNonce),
-			From:     types.ZeroAddress,
-			To:       &stakingContractAddr,
-			GasPrice: bigGasPrice,
-			Gas:      framework.DefaultGasLimit,
-			Value:    value,
-			V:        big.NewInt(1), // it is necessary to encode in rlp
-			Input:    framework.MethodSig(methodName),
+			Payload: &types.LegacyTransaction{
+				Nonce:    uint64(currentNonce),
+				From:     types.ZeroAddress,
+				To:       &stakingContractAddr,
+				GasPrice: bigGasPrice,
+				Gas:      framework.DefaultGasLimit,
+				Value:    value,
+				V:        big.NewInt(1), // it is necessary to encode in rlp
+				Input:    framework.MethodSig(methodName),
+			},
 		}, senderKey)
 
 		if signErr != nil {

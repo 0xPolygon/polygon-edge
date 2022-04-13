@@ -126,6 +126,7 @@ func TestBridge_StateSync(t *testing.T) {
 		func(i int, config *framework.TestServerConfig) {
 			config.Premine(senderAddr, framework.EthToWei(10))
 			config.SetSeal(true)
+			config.SetShowsLog(i == 0)
 		})
 
 	startSourceIBFTCtx, startSourceIBFTCancel := context.WithTimeout(context.Background(), time.Minute)

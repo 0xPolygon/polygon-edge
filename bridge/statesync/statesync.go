@@ -19,9 +19,9 @@ type StateSync interface {
 	Close() error
 
 	GetReadyMessages() ([]MessageWithSignatures, error)
-	GetTransactionHash(*types.Transaction) types.Hash
+	GetTransactionHash(*types.Transaction) (types.Hash, error)
 	ValidateTx(*types.Transaction) error
-	Consume(*types.Transaction)
+	Consume(*types.Transaction) error
 }
 
 type stateSync struct {
@@ -125,14 +125,17 @@ func (b *stateSync) GetReadyMessages() ([]MessageWithSignatures, error) {
 	return data, nil
 }
 
-func (b *stateSync) GetTransactionHash(tx *types.Transaction) types.Hash {
+func (b *stateSync) GetTransactionHash(tx *types.Transaction) (types.Hash, error) {
 	return getTransactionHash(tx)
 }
 
 // ValidateTx validates given state transaction
 // Checks if local SAM Pool has enough signatures for the transaction hash
 func (b *stateSync) ValidateTx(tx *types.Transaction) error {
-	hash := getTransactionHash(tx)
+	hash, err := getTransactionHash(tx)
+	if err != nil {
+		return err
+	}
 
 	num, required := b.sampool.GetSignatureCount(hash), b.validatorSet.Threshold()
 	if num < required {
@@ -142,8 +145,15 @@ func (b *stateSync) ValidateTx(tx *types.Transaction) error {
 	return nil
 }
 
-func (b *stateSync) Consume(tx *types.Transaction) {
-	b.sampool.ConsumeMessage(getTransactionHash(tx))
+func (b *stateSync) Consume(tx *types.Transaction) error {
+	txHash, err := getTransactionHash(tx)
+	if err != nil {
+		return err
+	}
+
+	b.sampool.ConsumeMessage(txHash)
+
+	return nil
 }
 
 func (b *stateSync) processEvents(eventCh <-chan []byte) {
