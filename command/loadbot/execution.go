@@ -125,16 +125,19 @@ func NewLoadbot(cfg *Configuration) *Loadbot {
 		},
 	}
 
-	if loadbot.needsContractMetrics() {
-		loadbot.initContractMetrics()
-	}
+	// Attempt to initialize contract metrics if needed
+	loadbot.initContractMetricsIfNeeded()
 
 	return loadbot
 }
 
 // initContractMetrics initializes contract metrics for
 // the loadbot instance
-func (l *Loadbot) initContractMetrics() {
+func (l *Loadbot) initContractMetricsIfNeeded() {
+	if !l.needsContractMetrics() {
+		return
+	}
+
 	l.metrics.ContractMetrics = &ContractMetricsData{
 		ContractDeploymentDuration: ExecDuration{
 			blockTransactions: make(map[uint64]uint64),
