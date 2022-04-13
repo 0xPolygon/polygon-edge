@@ -75,8 +75,7 @@ func newTestMessagePool(
 		testPool.AddSignature(&signature)
 	}
 
-	//nolint:forcetypeassert
-	return testPool.(*pool)
+	return testPool.(*pool) // nolint:forcetypeassert
 }
 
 func getMessageHashes(store *messageSignaturesStore) []types.Hash {

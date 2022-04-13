@@ -327,8 +327,7 @@ func TestEth_Syncing(t *testing.T) {
 		res, err := eth.Syncing()
 
 		assert.NoError(t, err)
-		//nolint:forcetypeassert
-		assert.False(t, res.(bool))
+		assert.False(t, res.(bool)) //nolint:forcetypeassert
 	})
 }
 
@@ -341,8 +340,7 @@ func TestEth_GasPrice(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, res)
 
-	// nolint:forcetypeassert
-	response := res.(string)
+	response := res.(string) // nolint:forcetypeassert
 	assert.Equal(t, fmt.Sprintf("0x%x", store.averageGasPrice), response)
 }
 

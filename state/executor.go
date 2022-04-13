@@ -466,7 +466,7 @@ func (t *Transition) postProcessTransaction(
 
 		return nil
 	case *types.StateTransaction:
-		// do nothing
+		return nil
 	}
 
 	return ErrInvalidTransactionType
