@@ -603,7 +603,12 @@ func (s *Server) newProtoConnection(protocol string, peerID peer.ID) (*rawGrpc.C
 }
 
 func (s *Server) NewStream(proto string, id peer.ID) (network.Stream, error) {
-	return s.host.NewStream(context.Background(), id, protocol.ID(proto))
+	libp2pStream, err := s.host.NewStream(context.Background(), id, protocol.ID(proto))
+	if err != nil {
+		return nil, err
+	}
+
+	return s.config.StreamCompressor(libp2pStream), nil
 }
 
 type Protocol interface {

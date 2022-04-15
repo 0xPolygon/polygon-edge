@@ -13,7 +13,7 @@ import (
 const DefaultGRPCPort int = 9632
 const DefaultJSONRPCPort int = 8545
 
-// Config is used to parametrize the minimal client
+// Config is used to parametrize the Polygon Edge client
 type Config struct {
 	Chain *chain.Chain
 

@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"github.com/0xPolygon/polygon-edge/network/compress"
 	"strconv"
 
 	"github.com/0xPolygon/polygon-edge/command"
@@ -109,6 +110,13 @@ func setFlags(cmd *cobra.Command) {
 		restoreFlag,
 		"",
 		"the path to the archive blockchain data to restore on initialization",
+	)
+
+	cmd.Flags().StringVar(
+		&params.streamCompressRaw,
+		streamCompressFlag,
+		string(compress.NoCompressor),
+		"the type of stream compression to be used",
 	)
 
 	cmd.Flags().BoolVar(

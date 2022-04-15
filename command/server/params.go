@@ -4,6 +4,7 @@ import (
 	"errors"
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/network"
+	"github.com/0xPolygon/polygon-edge/network/compress"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/server"
 	"github.com/hashicorp/go-hclog"
@@ -32,6 +33,7 @@ const (
 	devIntervalFlag       = "dev-interval"
 	devFlag               = "dev"
 	corsOriginFlag        = "access-control-allow-origins"
+	streamCompressFlag    = "stream-compress"
 )
 
 const (
@@ -70,8 +72,11 @@ type serverParams struct {
 
 	corsAllowedOrigins []string
 
-	genesisConfig *chain.Chain
-	secretsConfig *secrets.SecretsManagerConfig
+	streamCompressRaw string
+
+	genesisConfig    *chain.Chain
+	secretsConfig    *secrets.SecretsManagerConfig
+	streamCompressor compress.CompressStream
 }
 
 func (p *serverParams) validateFlags() error {
@@ -150,6 +155,7 @@ func (p *serverParams) generateConfig() *server.Config {
 			MaxInboundPeers:  p.rawConfig.Network.MaxInboundPeers,
 			MaxOutboundPeers: p.rawConfig.Network.MaxOutboundPeers,
 			Chain:            p.genesisConfig,
+			StreamCompressor: p.streamCompressor,
 		},
 		DataDir:        p.rawConfig.DataDir,
 		Seal:           p.rawConfig.ShouldSeal,

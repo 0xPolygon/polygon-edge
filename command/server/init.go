@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 	"github.com/0xPolygon/polygon-edge/network/common"
+	"github.com/0xPolygon/polygon-edge/network/compress"
 	"math"
 	"net"
 
@@ -34,6 +35,10 @@ func (p *serverParams) initRawParams() error {
 	}
 
 	if err := p.initGenesisConfig(); err != nil {
+		return err
+	}
+
+	if err := p.initStreamCompressor(); err != nil {
 		return err
 	}
 
@@ -84,6 +89,14 @@ func (p *serverParams) initGenesisConfig() error {
 	}
 
 	return nil
+}
+
+func (p *serverParams) initStreamCompressor() error {
+	var err error
+
+	p.streamCompressor, err = compress.GetStreamCompressor(compress.StreamCompressorType(p.streamCompressRaw))
+
+	return err
 }
 
 func (p *serverParams) initDevMode() {
