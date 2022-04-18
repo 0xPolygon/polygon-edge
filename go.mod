@@ -17,7 +17,7 @@ require (
 	github.com/hashicorp/hcl v1.0.0
 	github.com/hashicorp/vault/api v1.3.1
 	github.com/libp2p/go-libp2p v0.18.0-rc2
-	github.com/libp2p/go-libp2p-core v0.14.0
+	github.com/libp2p/go-libp2p-core v0.15.0
 	github.com/libp2p/go-libp2p-kbucket v0.4.7
 	github.com/libp2p/go-libp2p-noise v0.3.0
 	github.com/libp2p/go-libp2p-pubsub v0.6.1
