@@ -100,6 +100,8 @@ func (b *BridgeMechanism) validateBlock(block *types.Block) error {
 			checked[address] = true
 		}
 
+		fmt.Printf("Found StateTx when validating the proposed block: block height=%d, signatures=%d, required=%d\n", block.Number(), sigCount, threshold)
+
 		if sigCount < threshold {
 			return fmt.Errorf("state transaction doesn't have enough signatures, required=%d, have=%d", threshold, sigCount)
 		}
@@ -170,6 +172,8 @@ func (b *BridgeMechanism) insertStateTransactionsHook(rawParams interface{}) err
 			continue
 		}
 
+		fmt.Printf("Add StateTx into propose block txHash=%s, nonce=%d, signatures=%d\n", tx.Hash(), tx.Nonce(), len(stateTx.Signatures))
+
 		*params.transactions = append(*params.transactions, tx)
 	}
 
@@ -197,7 +201,8 @@ func (b *BridgeMechanism) consumeStateTransactionsHook(numberParam interface{}) 
 }
 
 func (b *BridgeMechanism) calculateSignatureThreshold(set ValidatorSet) uint64 {
-	return uint64(b.ibft.state.NumValid())
+	// Must exceed NumValid()
+	return uint64(b.ibft.state.NumValid() + 1)
 }
 
 // initializeHookMap registers the hooks that the Bridge mechanism

@@ -20,7 +20,6 @@ type StateSync interface {
 
 	GetReadyMessages() ([]MessageWithSignatures, error)
 	GetTransactionHash(*types.Transaction) (types.Hash, error)
-	ValidateTx(*types.Transaction) error
 	Consume(*types.Transaction) error
 }
 
@@ -129,22 +128,6 @@ func (b *stateSync) GetTransactionHash(tx *types.Transaction) (types.Hash, error
 	return getTransactionHash(tx)
 }
 
-// ValidateTx validates given state transaction
-// Checks if local SAM Pool has enough signatures for the transaction hash
-func (b *stateSync) ValidateTx(tx *types.Transaction) error {
-	hash, err := getTransactionHash(tx)
-	if err != nil {
-		return err
-	}
-
-	num, required := b.sampool.GetSignatureCount(hash), b.validatorSet.Threshold()
-	if num < required {
-		return fmt.Errorf("bridge doesn't have enough signatures, hash=%s, required=%d, actual=%d", hash, required, num)
-	}
-
-	return nil
-}
-
 func (b *stateSync) Consume(tx *types.Transaction) error {
 	txHash, err := getTransactionHash(tx)
 	if err != nil {
@@ -231,6 +214,8 @@ func (b *stateSync) addRemoteMessage(message *transport.SignedMessage) {
 
 		return
 	}
+
+	fmt.Printf("Received signature from other validator: sender=%s\n", sender.String())
 
 	if !b.validatorSet.IsValidator(sender) {
 		b.logger.Warn(
