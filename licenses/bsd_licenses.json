@@ -1,36 +1,42 @@
 [
   {
-    "name": "flynn/noise",
-    "version": "v1.0.0",
+    "name": "marten-seemann/qtls-go1-16",
+    "version": "v0.1.4",
     "type": "BSD-3-Clause",
-    "path": "vendor/github.com/flynn/noise/LICENSE"
+    "path": "vendor/github.com/marten-seemann/qtls-go1-16/LICENSE"
   },
   {
-    "name": "x/sync/errgroup",
+    "name": "spaolacci/murmur3",
+    "version": "v1.1.0",
     "type": "BSD-3-Clause",
-    "path": "vendor/golang.org/x/sync/LICENSE"
+    "path": "vendor/github.com/spaolacci/murmur3/LICENSE"
   },
   {
-    "name": "klauspost/compress/internal/snapref",
+    "name": "google/gopacket/routing",
     "type": "BSD-3-Clause",
-    "path": "vendor/github.com/klauspost/compress/internal/snapref/LICENSE"
+    "path": "vendor/github.com/google/gopacket/LICENSE"
   },
   {
-    "name": "marten-seemann/tcp",
-    "version": "v0.0.0-20210406111302-dfbc87cc63fd",
-    "type": "BSD-2-Clause",
-    "path": "vendor/github.com/marten-seemann/tcp/LICENSE"
+    "name": "pmezard/go-difflib/difflib",
+    "type": "BSD-3-Clause",
+    "path": "vendor/github.com/pmezard/go-difflib/LICENSE"
   },
   {
-    "name": "syndtr/goleveldb/leveldb",
-    "type": "BSD-2-Clause",
-    "path": "vendor/github.com/syndtr/goleveldb/LICENSE"
+    "name": "multiformats/go-base32",
+    "version": "v0.0.4",
+    "type": "BSD-3-Clause",
+    "path": "vendor/github.com/multiformats/go-base32/LICENSE"
   },
   {
     "name": "pbnjay/memory",
     "version": "v0.0.0-20210728143218-7b4eea64cf58",
     "type": "BSD-3-Clause",
     "path": "vendor/github.com/pbnjay/memory/LICENSE"
+  },
+  {
+    "name": "square/go-jose.v2/json",
+    "type": "BSD-3-Clause",
+    "path": "vendor/gopkg.in/square/go-jose.v2/json/LICENSE"
   },
   {
     "name": "x/crypto",
@@ -45,45 +51,10 @@
     "path": "vendor/golang.org/x/text/LICENSE"
   },
   {
-    "name": "umbracle/go-eth-bn256",
-    "version": "v0.0.0-20190607160430-b36caf4e0f6b",
+    "name": "google/uuid",
+    "version": "v1.3.0",
     "type": "BSD-3-Clause",
-    "path": "vendor/github.com/umbracle/go-eth-bn256/LICENSE"
-  },
-  {
-    "name": "protobuf",
-    "version": "v1.27.1",
-    "type": "BSD-3-Clause",
-    "path": "vendor/google.golang.org/protobuf/LICENSE"
-  },
-  {
-    "name": "gogo/protobuf/proto",
-    "type": "BSD-3-Clause",
-    "path": "vendor/github.com/gogo/protobuf/LICENSE"
-  },
-  {
-    "name": "spf13/pflag",
-    "version": "v1.0.5",
-    "type": "BSD-3-Clause",
-    "path": "vendor/github.com/spf13/pflag/LICENSE"
-  },
-  {
-    "name": "multiformats/go-base32",
-    "version": "v0.0.4",
-    "type": "BSD-3-Clause",
-    "path": "vendor/github.com/multiformats/go-base32/LICENSE"
-  },
-  {
-    "name": "marten-seemann/qtls-go1-17",
-    "version": "v0.1.0",
-    "type": "BSD-3-Clause",
-    "path": "vendor/github.com/marten-seemann/qtls-go1-17/LICENSE"
-  },
-  {
-    "name": "x/sys",
-    "version": "v0.0.0-20220227234510-4e6760a101f9",
-    "type": "BSD-3-Clause",
-    "path": "vendor/golang.org/x/sys/LICENSE"
+    "path": "vendor/github.com/google/uuid/LICENSE"
   },
   {
     "name": "golang/snappy",
@@ -92,43 +63,10 @@
     "path": "vendor/github.com/golang/snappy/LICENSE"
   },
   {
-    "name": "prometheus/common/internal/bitbucket.org/ww/goautoneg",
-    "type": "BSD-3-Clause",
-    "path": "vendor/github.com/prometheus/common/internal/bitbucket.org/ww/goautoneg/README.txt"
-  },
-  {
     "name": "libp2p/go-netroute",
     "version": "v0.2.0",
     "type": "BSD-3-Clause",
     "path": "vendor/github.com/libp2p/go-netroute/LICENSE"
-  },
-  {
-    "name": "x/time/rate",
-    "type": "BSD-3-Clause",
-    "path": "vendor/golang.org/x/time/LICENSE"
-  },
-  {
-    "name": "mikioh/tcpopt",
-    "version": "v0.0.0-20190314235656-172688c1accc",
-    "type": "BSD-2-Clause",
-    "path": "vendor/github.com/mikioh/tcpopt/LICENSE"
-  },
-  {
-    "name": "pmezard/go-difflib/difflib",
-    "type": "BSD-3-Clause",
-    "path": "vendor/github.com/pmezard/go-difflib/LICENSE"
-  },
-  {
-    "name": "x/net",
-    "version": "v0.0.0-20220127200216-cd36cc0744dd",
-    "type": "BSD-3-Clause",
-    "path": "vendor/golang.org/x/net/LICENSE"
-  },
-  {
-    "name": "spaolacci/murmur3",
-    "version": "v1.1.0",
-    "type": "BSD-3-Clause",
-    "path": "vendor/github.com/spaolacci/murmur3/LICENSE"
   },
   {
     "name": "gorilla/websocket",
@@ -137,26 +75,16 @@
     "path": "vendor/github.com/gorilla/websocket/LICENSE"
   },
   {
-    "name": "miekg/dns",
-    "version": "v1.1.45",
+    "name": "flynn/noise",
+    "version": "v1.0.0",
     "type": "BSD-3-Clause",
-    "path": "vendor/github.com/miekg/dns/LICENSE"
+    "path": "vendor/github.com/flynn/noise/LICENSE"
   },
   {
-    "name": "aws/aws-sdk-go/internal/sync/singleflight",
-    "type": "BSD-3-Clause",
-    "path": "vendor/github.com/aws/aws-sdk-go/internal/sync/singleflight/LICENSE"
-  },
-  {
-    "name": "mikioh/tcpinfo",
-    "version": "v0.0.0-20190314235526-30a79bb1804b",
+    "name": "marten-seemann/tcp",
+    "version": "v0.0.0-20210406111302-dfbc87cc63fd",
     "type": "BSD-2-Clause",
-    "path": "vendor/github.com/mikioh/tcpinfo/LICENSE"
-  },
-  {
-    "name": "square/go-jose.v2/json",
-    "type": "BSD-3-Clause",
-    "path": "vendor/gopkg.in/square/go-jose.v2/json/LICENSE"
+    "path": "vendor/github.com/marten-seemann/tcp/LICENSE"
   },
   {
     "name": "huin/goupnp",
@@ -171,10 +99,72 @@
     "path": "vendor/github.com/pierrec/lz4/LICENSE"
   },
   {
-    "name": "google/uuid",
-    "version": "v1.3.0",
+    "name": "x/sys",
+    "version": "v0.0.0-20220227234510-4e6760a101f9",
     "type": "BSD-3-Clause",
-    "path": "vendor/github.com/google/uuid/LICENSE"
+    "path": "vendor/golang.org/x/sys/LICENSE"
+  },
+  {
+    "name": "spf13/pflag",
+    "version": "v1.0.5",
+    "type": "BSD-3-Clause",
+    "path": "vendor/github.com/spf13/pflag/LICENSE"
+  },
+  {
+    "name": "x/time/rate",
+    "type": "BSD-3-Clause",
+    "path": "vendor/golang.org/x/time/LICENSE"
+  },
+  {
+    "name": "umbracle/go-eth-bn256",
+    "version": "v0.0.0-20190607160430-b36caf4e0f6b",
+    "type": "BSD-3-Clause",
+    "path": "vendor/github.com/umbracle/go-eth-bn256/LICENSE"
+  },
+  {
+    "name": "miekg/dns",
+    "version": "v1.1.45",
+    "type": "BSD-3-Clause",
+    "path": "vendor/github.com/miekg/dns/LICENSE"
+  },
+  {
+    "name": "protobuf",
+    "version": "v1.28.0",
+    "type": "BSD-3-Clause",
+    "path": "vendor/google.golang.org/protobuf/LICENSE"
+  },
+  {
+    "name": "klauspost/compress/internal/snapref",
+    "type": "BSD-3-Clause",
+    "path": "vendor/github.com/klauspost/compress/internal/snapref/LICENSE"
+  },
+  {
+    "name": "mikioh/tcpopt",
+    "version": "v0.0.0-20190314235656-172688c1accc",
+    "type": "BSD-2-Clause",
+    "path": "vendor/github.com/mikioh/tcpopt/LICENSE"
+  },
+  {
+    "name": "aws/aws-sdk-go/internal/sync/singleflight",
+    "type": "BSD-3-Clause",
+    "path": "vendor/github.com/aws/aws-sdk-go/internal/sync/singleflight/LICENSE"
+  },
+  {
+    "name": "prometheus/common/internal/bitbucket.org/ww/goautoneg",
+    "type": "BSD-3-Clause",
+    "path": "vendor/github.com/prometheus/common/internal/bitbucket.org/ww/goautoneg/README.txt"
+  },
+  {
+    "name": "x/net",
+    "version": "v0.0.0-20220127200216-cd36cc0744dd",
+    "type": "BSD-3-Clause",
+    "path": "vendor/golang.org/x/net/LICENSE"
+  },
+  {
+    "name": "mikioh/tcpinfo",
+    "version": "v0.0.0-20190314235526-30a79bb1804b",
+    "type": "BSD-2-Clause",
+    "path": "vendor/github.com/mikioh/tcpinfo/LICENSE"
   },
   {
     "name": "golang/protobuf",
@@ -183,9 +173,19 @@
     "path": "vendor/github.com/golang/protobuf/LICENSE"
   },
   {
-    "name": "google/gopacket/routing",
+    "name": "x/sync/errgroup",
     "type": "BSD-3-Clause",
-    "path": "vendor/github.com/google/gopacket/LICENSE"
+    "path": "vendor/golang.org/x/sync/LICENSE"
+  },
+  {
+    "name": "syndtr/goleveldb/leveldb",
+    "type": "BSD-2-Clause",
+    "path": "vendor/github.com/syndtr/goleveldb/LICENSE"
+  },
+  {
+    "name": "gogo/protobuf/proto",
+    "type": "BSD-3-Clause",
+    "path": "vendor/github.com/gogo/protobuf/LICENSE"
   },
   {
     "name": "libp2p/go-netroute",

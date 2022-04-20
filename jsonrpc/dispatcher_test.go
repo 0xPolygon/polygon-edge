@@ -187,7 +187,7 @@ func (m *mockService) BlockPtr(a string, f *BlockNumber) (interface{}, error) {
 	return nil, nil
 }
 
-func (m *mockService) Filter(f LogFilter) (interface{}, error) {
+func (m *mockService) Filter(f LogQuery) (interface{}, error) {
 	m.msgCh <- f
 
 	return nil, nil
@@ -249,9 +249,10 @@ func TestDispatcherFuncDecode(t *testing.T) {
 		{
 			"filter",
 			`[{"fromBlock": "pending", "toBlock": "earliest"}]`,
-			LogFilter{fromBlock: PendingBlockNumber, toBlock: EarliestBlockNumber},
+			LogQuery{fromBlock: PendingBlockNumber, toBlock: EarliestBlockNumber},
 		},
 	}
+
 	for _, c := range cases {
 		res := handleReq(c.typ, c.msg)
 		if !reflect.DeepEqual(res, c.res) {

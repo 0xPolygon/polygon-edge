@@ -665,7 +665,7 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 }
 
 // GetLogs returns an array of logs matching the filter options
-func (e *Eth) GetLogs(filterOptions *LogFilter) (interface{}, error) {
+func (e *Eth) GetLogs(query *LogQuery) (interface{}, error) {
 	result := make([]*Log, 0)
 	parseReceipts := func(block *types.Block) error {
 		receipts, err := e.store.GetReceiptsByHash(block.Header.Hash)
@@ -675,7 +675,7 @@ func (e *Eth) GetLogs(filterOptions *LogFilter) (interface{}, error) {
 
 		for indx, receipt := range receipts {
 			for logIndx, log := range receipt.Logs {
-				if filterOptions.Match(log) {
+				if query.Match(log) {
 					result = append(result, &Log{
 						Address:     log.Address,
 						Topics:      log.Topics,
@@ -693,8 +693,8 @@ func (e *Eth) GetLogs(filterOptions *LogFilter) (interface{}, error) {
 		return nil
 	}
 
-	if filterOptions.BlockHash != nil {
-		block, ok := e.store.GetBlockByHash(*filterOptions.BlockHash, true)
+	if query.BlockHash != nil {
+		block, ok := e.store.GetBlockByHash(*query.BlockHash, true)
 		if !ok {
 			return nil, fmt.Errorf("not found")
 		}
@@ -729,8 +729,8 @@ func (e *Eth) GetLogs(filterOptions *LogFilter) (interface{}, error) {
 		return uint64(num)
 	}
 
-	from := resolveNum(filterOptions.fromBlock)
-	to := resolveNum(filterOptions.toBlock)
+	from := resolveNum(query.fromBlock)
+	to := resolveNum(query.toBlock)
 
 	if to < from {
 		return nil, fmt.Errorf("incorrect range")
@@ -858,7 +858,7 @@ func (e *Eth) GetCode(address types.Address, filter BlockNumberOrHash) (interfac
 }
 
 // NewFilter creates a filter object, based on filter options, to notify when the state changes (logs).
-func (e *Eth) NewFilter(filter *LogFilter) (interface{}, error) {
+func (e *Eth) NewFilter(filter *LogQuery) (interface{}, error) {
 	return e.filterManager.NewLogFilter(filter, nil), nil
 }
 

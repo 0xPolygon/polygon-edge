@@ -20,11 +20,11 @@ var (
 func TestFilterDecode(t *testing.T) {
 	cases := []struct {
 		str string
-		res *LogFilter
+		res *LogQuery
 	}{
 		{
 			`{}`,
-			&LogFilter{
+			&LogQuery{
 				fromBlock: LatestBlockNumber,
 				toBlock:   LatestBlockNumber,
 			},
@@ -39,7 +39,7 @@ func TestFilterDecode(t *testing.T) {
 			`{
 				"address": "` + addr1.String() + `"
 			}`,
-			&LogFilter{
+			&LogQuery{
 				fromBlock: LatestBlockNumber,
 				toBlock:   LatestBlockNumber,
 				Addresses: []types.Address{
@@ -54,7 +54,7 @@ func TestFilterDecode(t *testing.T) {
 					"` + addr2.String() + `"
 				]
 			}`,
-			&LogFilter{
+			&LogQuery{
 				fromBlock: LatestBlockNumber,
 				toBlock:   LatestBlockNumber,
 				Addresses: []types.Address{
@@ -78,7 +78,7 @@ func TestFilterDecode(t *testing.T) {
 					"` + hash1.String() + `"
 				]
 			}`,
-			&LogFilter{
+			&LogQuery{
 				fromBlock: LatestBlockNumber,
 				toBlock:   LatestBlockNumber,
 				Topics: [][]types.Hash{
@@ -104,7 +104,7 @@ func TestFilterDecode(t *testing.T) {
 				"fromBlock": "pending",
 				"toBlock": "earliest"
 			}`,
-			&LogFilter{
+			&LogQuery{
 				fromBlock: PendingBlockNumber,
 				toBlock:   EarliestBlockNumber,
 			},
@@ -113,7 +113,7 @@ func TestFilterDecode(t *testing.T) {
 			`{
 				"blockHash": "` + hash1.String() + `"
 			}`,
-			&LogFilter{
+			&LogQuery{
 				BlockHash: &hash1,
 				fromBlock: LatestBlockNumber,
 				toBlock:   LatestBlockNumber,
@@ -122,7 +122,7 @@ func TestFilterDecode(t *testing.T) {
 	}
 
 	for indx, c := range cases {
-		res := &LogFilter{}
+		res := &LogQuery{}
 		err := res.UnmarshalJSON([]byte(c.str))
 
 		if err != nil && c.res != nil {
@@ -143,13 +143,13 @@ func TestFilterDecode(t *testing.T) {
 
 func TestFilterMatch(t *testing.T) {
 	cases := []struct {
-		filter LogFilter
+		filter LogQuery
 		log    *types.Log
 		match  bool
 	}{
 		{
 			// correct, exact match
-			LogFilter{
+			LogQuery{
 				Topics: [][]types.Hash{
 					{
 						hash1,
@@ -165,7 +165,7 @@ func TestFilterMatch(t *testing.T) {
 		},
 		{
 			// bad, the filter has two hashes
-			LogFilter{
+			LogQuery{
 				Topics: [][]types.Hash{
 					{
 						hash1,
@@ -184,7 +184,7 @@ func TestFilterMatch(t *testing.T) {
 		},
 		{
 			// correct, wildcard in one hash
-			LogFilter{
+			LogQuery{
 				Topics: [][]types.Hash{
 					{},
 					{
@@ -202,7 +202,7 @@ func TestFilterMatch(t *testing.T) {
 		},
 		{
 			// correct, more topics than in filter
-			LogFilter{
+			LogQuery{
 				Topics: [][]types.Hash{
 					{
 						hash1,

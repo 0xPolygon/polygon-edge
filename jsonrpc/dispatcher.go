@@ -137,11 +137,11 @@ func (d *Dispatcher) handleSubscribe(req Request, conn wsConn) (string, Error) {
 	if subscribeMethod == "newHeads" {
 		filterID = d.filterManager.NewBlockFilter(conn)
 	} else if subscribeMethod == "logs" {
-		logFilter, err := decodeLogFilterFromInterface(params[1])
+		logQuery, err := decodeLogQueryFromInterface(params[1])
 		if err != nil {
 			return "", NewInternalError(err.Error())
 		}
-		filterID = d.filterManager.NewLogFilter(logFilter, conn)
+		filterID = d.filterManager.NewLogFilter(logQuery, conn)
 	} else {
 		return "", NewSubscriptionNotFoundError(subscribeMethod)
 	}
@@ -178,8 +178,7 @@ func (d *Dispatcher) HandleWs(reqBody []byte, conn wsConn) ([]byte, error) {
 	if req.Method == "eth_subscribe" {
 		filterID, err := d.handleSubscribe(req, conn)
 		if err != nil {
-			//nolint
-			NewRPCResponse(req.ID, "2.0", nil, err).Bytes()
+			return NewRPCResponse(req.ID, "2.0", nil, err).Bytes()
 		}
 
 		resp, err := formatFilterResponse(req.ID, filterID)
@@ -209,6 +208,7 @@ func (d *Dispatcher) HandleWs(reqBody []byte, conn wsConn) ([]byte, error) {
 
 		return []byte(resp), nil
 	}
+
 	// its a normal query that we handle with the dispatcher
 	resp, err := d.handleReq(req)
 	if err != nil {
