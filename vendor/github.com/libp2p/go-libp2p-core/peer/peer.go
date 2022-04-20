@@ -9,6 +9,7 @@ import (
 	"github.com/ipfs/go-cid"
 	ic "github.com/libp2p/go-libp2p-core/crypto"
 	b58 "github.com/mr-tron/base58/base58"
+	mc "github.com/multiformats/go-multicodec"
 	mh "github.com/multiformats/go-multihash"
 )
 
@@ -162,13 +163,9 @@ func Encode(id ID) string {
 
 // FromCid converts a CID to a peer ID, if possible.
 func FromCid(c cid.Cid) (ID, error) {
-	ty := c.Type()
-	if ty != cid.Libp2pKey {
-		s := cid.CodecToStr[ty]
-		if s == "" {
-			s = fmt.Sprintf("[unknown multicodec %d]", ty)
-		}
-		return "", fmt.Errorf("can't convert CID of type %s to a peer ID", s)
+	code := mc.Code(c.Type())
+	if code != mc.Libp2pKey {
+		return "", fmt.Errorf("can't convert CID of type %q to a peer ID", code)
 	}
 	return ID(c.Hash()), nil
 }
@@ -209,3 +206,11 @@ type IDSlice []ID
 func (es IDSlice) Len() int           { return len(es) }
 func (es IDSlice) Swap(i, j int)      { es[i], es[j] = es[j], es[i] }
 func (es IDSlice) Less(i, j int) bool { return string(es[i]) < string(es[j]) }
+
+func (es IDSlice) String() string {
+	peersStrings := make([]string, len(es))
+	for i, id := range es {
+		peersStrings[i] = id.String()
+	}
+	return strings.Join(peersStrings, ", ")
+}
