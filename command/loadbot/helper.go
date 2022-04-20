@@ -94,6 +94,33 @@ func getBlockGasMetrics(
 		errors = append(errors, fetchErr)
 	}
 
+	queryBlockInfo := func(
+		blockNum uint64,
+	) {
+		// Query node for block
+		blockInfo, err := jsonClient.Eth().GetBlockByNumber(
+			web3.BlockNumber(blockNum),
+			false,
+		)
+		if err != nil {
+			addError(
+				fmt.Errorf("could not fetch block %d by number, %w", blockNum, err),
+			)
+
+			return
+		}
+
+		// Update the block gas metrics
+		blockGasMetrics.AddBlockMetric(
+			blockNum,
+			GasMetrics{
+				GasUsed:     blockInfo.GasUsed,
+				GasLimit:    blockInfo.GasLimit,
+				Utilization: calculateBlockUtilization(blockInfo.GasUsed, blockInfo.GasLimit),
+			},
+		)
+	}
+
 	// For each block number, fetch the corresponding
 	// block info data
 	for blockNum := range blockNums {
@@ -102,31 +129,17 @@ func getBlockGasMetrics(
 		go func(blockNum uint64) {
 			defer wg.Done()
 
-			blockInfo, err := jsonClient.Eth().GetBlockByNumber(
-				web3.BlockNumber(blockNum),
-				false,
-			)
-			if err != nil {
-				addError(fmt.Errorf("could not fetch block %d by number, %w", blockNum, err))
-
-				return
-			}
-
-			blockGasMetrics.AddBlockMetric(
-				blockNum,
-				GasMetrics{
-					GasUsed:     blockInfo.GasUsed,
-					GasLimit:    blockInfo.GasLimit,
-					Utilization: calculateBlockUtilization(blockInfo.GasUsed, blockInfo.GasLimit),
-				},
-			)
+			queryBlockInfo(blockNum)
 		}(blockNum)
 	}
 
 	wg.Wait()
 
 	if len(errors) > 1 {
-		return nil, fmt.Errorf("unable to find gas metrics, %v", errors)
+		return nil, fmt.Errorf(
+			"unable to successfully fetch gas metrics, %v",
+			errors,
+		)
 	}
 
 	return blockGasMetrics, nil
