@@ -162,9 +162,6 @@ func (ePub *ECDSAPublicKey) Verify(data, sigBytes []byte) (bool, error) {
 	if _, err := asn1.Unmarshal(sigBytes, sig); err != nil {
 		return false, err
 	}
-	if sig == nil {
-		return false, ErrNilSig
-	}
 
 	hash := sha256.Sum256(data)
 

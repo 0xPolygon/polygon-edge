@@ -279,7 +279,7 @@ github.com/libp2p/go-libp2p/p2p/protocol/ping
 github.com/libp2p/go-libp2p-asn-util
 # github.com/libp2p/go-libp2p-blankhost v0.3.0
 github.com/libp2p/go-libp2p-blankhost
-# github.com/libp2p/go-libp2p-core v0.14.0
+# github.com/libp2p/go-libp2p-core v0.15.0
 ## explicit
 github.com/libp2p/go-libp2p-core/connmgr
 github.com/libp2p/go-libp2p-core/control
@@ -435,6 +435,8 @@ github.com/multiformats/go-multiaddr-dns
 github.com/multiformats/go-multiaddr-fmt
 # github.com/multiformats/go-multibase v0.0.3
 github.com/multiformats/go-multibase
+# github.com/multiformats/go-multicodec v0.4.1
+github.com/multiformats/go-multicodec
 # github.com/multiformats/go-multihash v0.1.0
 ## explicit
 github.com/multiformats/go-multihash
