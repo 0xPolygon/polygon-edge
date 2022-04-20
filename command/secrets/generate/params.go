@@ -3,9 +3,10 @@ package generate
 import (
 	"errors"
 	"fmt"
+	"strings"
+
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/secrets"
-	"strings"
 )
 
 var (
@@ -44,9 +45,6 @@ type generateParams struct {
 
 func (p *generateParams) getRequiredFlags() []string {
 	return []string{
-		dirFlag,
-		tokenFlag,
-		serverURLFlag,
 		nameFlag,
 	}
 }
@@ -88,7 +86,7 @@ func (p *generateParams) generateSecretsConfig() (*secrets.SecretsManagerConfig,
 		Type:      secrets.SecretsManagerType(p.serviceType),
 		Name:      p.name,
 		Namespace: p.namespace,
-		Extra:     nil,
+		Extra:     extraMap,
 	}, nil
 }
 
