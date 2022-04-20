@@ -16,10 +16,18 @@ import (
 	"github.com/hashicorp/go-hclog"
 )
 
-var ErrFilterDoesNotExists = errors.New("filter does not exists")
+var (
+	ErrFilterDoesNotExists              = errors.New("filter does not exists")
+	ErrWSFilterDoesNotSupportGetChanges = errors.New("web socket Filter doesn't support to return a batch of the changes")
+)
 
-// defaultTimeout is the timeout to remove the filters that doesn't have web socket stream
+// defaultTimeout is the timeout to remove the filters that don't have a web socket stream
 var defaultTimeout = 1 * time.Minute
+
+const (
+	// The index in heap which is indicating the element is not in the heap
+	NoIndexInHeap = -1
+)
 
 // filter is an interface that BlockFilter and LogFilter implement
 type filter interface {
@@ -56,7 +64,7 @@ func newFilterBase(ws wsConn) filterBase {
 	return filterBase{
 		id:        uuid.New().String(),
 		ws:        ws,
-		heapIndex: -1,
+		heapIndex: NoIndexInHeap,
 	}
 }
 
@@ -338,9 +346,13 @@ func (f *FilterManager) GetFilterChanges(id string) (string, error) {
 
 	filter, ok := f.filters[id]
 
-	// we cannot get updates from a ws filter with getFilterChanges
-	if !ok || filter.isWS() {
+	if !ok {
 		return "", ErrFilterDoesNotExists
+	}
+
+	// we cannot get updates from a ws filter with getFilterChanges
+	if filter.isWS() {
+		return "", ErrWSFilterDoesNotSupportGetChanges
 	}
 
 	res, err := filter.getUpdates()
@@ -565,7 +577,7 @@ func (t *timeHeapImpl) addFilter(filter *filterBase) {
 }
 
 func (t *timeHeapImpl) removeFilter(filter *filterBase) bool {
-	if filter.heapIndex == -1 {
+	if filter.heapIndex == NoIndexInHeap {
 		return false
 	}
 
