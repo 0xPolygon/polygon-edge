@@ -244,7 +244,7 @@ func (lr *LoadbotResult) writeLoadbotResults(buffer *bytes.Buffer) {
 func (lr *LoadbotResult) writeAverageBlockUtilization(buffer *bytes.Buffer) {
 	buffer.WriteString("\n\n[AVERAGE BLOCK UTILIZATION]\n")
 	buffer.WriteString(helper.FormatKV([]string{
-		fmt.Sprintf("Average utilization acorss all blocks|%.2f%%", calculateAvgBlockUtil(lr.BlockData.GasData)),
+		fmt.Sprintf("Average utilization across all blocks|%.2f%%", calculateAvgBlockUtil(lr.BlockData.GasData)),
 	}))
 }
 
