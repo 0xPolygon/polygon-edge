@@ -3,10 +3,11 @@ package init
 import (
 	"crypto/ecdsa"
 	"errors"
-	"github.com/0xPolygon/polygon-edge/command"
-	"github.com/0xPolygon/polygon-edge/crypto"
-	"github.com/0xPolygon/polygon-edge/secrets"
-	"github.com/0xPolygon/polygon-edge/secrets/helper"
+
+	"github.com/dogechain-lab/jury/command"
+	"github.com/dogechain-lab/jury/crypto"
+	"github.com/dogechain-lab/jury/secrets"
+	"github.com/dogechain-lab/jury/secrets/helper"
 	libp2pCrypto "github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
 )

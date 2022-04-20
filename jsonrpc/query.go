@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/dogechain-lab/jury/types"
 )
 
 // LogFilter is a filter for logs

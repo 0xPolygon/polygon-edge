@@ -2,21 +2,22 @@ package root
 
 import (
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/command/backup"
-	"github.com/0xPolygon/polygon-edge/command/genesis"
-	"github.com/0xPolygon/polygon-edge/command/helper"
-	"github.com/0xPolygon/polygon-edge/command/ibft"
-	"github.com/0xPolygon/polygon-edge/command/license"
-	"github.com/0xPolygon/polygon-edge/command/loadbot"
-	"github.com/0xPolygon/polygon-edge/command/monitor"
-	"github.com/0xPolygon/polygon-edge/command/peers"
-	"github.com/0xPolygon/polygon-edge/command/secrets"
-	"github.com/0xPolygon/polygon-edge/command/server"
-	"github.com/0xPolygon/polygon-edge/command/status"
-	"github.com/0xPolygon/polygon-edge/command/txpool"
-	"github.com/0xPolygon/polygon-edge/command/version"
-	"github.com/spf13/cobra"
 	"os"
+
+	"github.com/dogechain-lab/jury/command/backup"
+	"github.com/dogechain-lab/jury/command/genesis"
+	"github.com/dogechain-lab/jury/command/helper"
+	"github.com/dogechain-lab/jury/command/ibft"
+	"github.com/dogechain-lab/jury/command/license"
+	"github.com/dogechain-lab/jury/command/loadbot"
+	"github.com/dogechain-lab/jury/command/monitor"
+	"github.com/dogechain-lab/jury/command/peers"
+	"github.com/dogechain-lab/jury/command/secrets"
+	"github.com/dogechain-lab/jury/command/server"
+	"github.com/dogechain-lab/jury/command/status"
+	"github.com/dogechain-lab/jury/command/txpool"
+	"github.com/dogechain-lab/jury/command/version"
+	"github.com/spf13/cobra"
 )
 
 type RootCommand struct {
@@ -26,7 +27,7 @@ type RootCommand struct {
 func NewRootCommand() *RootCommand {
 	rootCommand := &RootCommand{
 		baseCmd: &cobra.Command{
-			Short: "Polygon Edge is a framework for building Ethereum-compatible Blockchain networks",
+			Short: "DogeChain-Lab Jury is a framework for building Ethereum-compatible Blockchain networks",
 		},
 	}
 

@@ -1,6 +1,6 @@
 package txpool
 
-import "github.com/0xPolygon/polygon-edge/types"
+import "github.com/dogechain-lab/jury/types"
 
 /* QUERY methods */
 // Used to query the pool for specific state info.

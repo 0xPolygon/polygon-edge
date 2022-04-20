@@ -2,16 +2,17 @@ package server
 
 import (
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/network/common"
 	"math"
 	"net"
 
-	"github.com/0xPolygon/polygon-edge/chain"
-	"github.com/0xPolygon/polygon-edge/command/helper"
-	"github.com/0xPolygon/polygon-edge/network"
-	"github.com/0xPolygon/polygon-edge/secrets"
-	"github.com/0xPolygon/polygon-edge/server"
-	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/dogechain-lab/jury/network/common"
+
+	"github.com/dogechain-lab/jury/chain"
+	"github.com/dogechain-lab/jury/command/helper"
+	"github.com/dogechain-lab/jury/network"
+	"github.com/dogechain-lab/jury/secrets"
+	"github.com/dogechain-lab/jury/server"
+	"github.com/dogechain-lab/jury/types"
 )
 
 func (p *serverParams) initConfigFromFile() error {

@@ -2,12 +2,13 @@ package txpool
 
 import (
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/txpool/proto"
-	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/google/uuid"
-	"github.com/hashicorp/go-hclog"
 	"sync"
 	"sync/atomic"
+
+	"github.com/dogechain-lab/jury/txpool/proto"
+	"github.com/dogechain-lab/jury/types"
+	"github.com/google/uuid"
+	"github.com/hashicorp/go-hclog"
 )
 
 type eventManager struct {

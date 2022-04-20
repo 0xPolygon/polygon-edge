@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/e2e/framework"
-	"github.com/0xPolygon/polygon-edge/server/proto"
+	"github.com/dogechain-lab/jury/e2e/framework"
+	"github.com/dogechain-lab/jury/server/proto"
 	empty "google.golang.org/protobuf/types/known/emptypb"
 )
 

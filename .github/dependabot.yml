@@ -2,13 +2,12 @@ version: 2
 updates:
   - package-ecosystem: gomod
     directory: /
-    target-branch: "develop"
+    target-branch: "dev"
     schedule:
       interval: weekly
     open-pull-requests-limit: 10
     pull-request-branch-name:
       separator: "-"
     reviewers:
-      - "lazartravica"
-      - "Kourin1996"
-      - "zivkovicmilos"
+      - "abrahamcruise321"
+      - "DarianShawn"

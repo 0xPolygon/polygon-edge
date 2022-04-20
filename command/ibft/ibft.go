@@ -1,12 +1,12 @@
 package ibft
 
 import (
-	"github.com/0xPolygon/polygon-edge/command/helper"
-	"github.com/0xPolygon/polygon-edge/command/ibft/candidates"
-	"github.com/0xPolygon/polygon-edge/command/ibft/propose"
-	"github.com/0xPolygon/polygon-edge/command/ibft/snapshot"
-	"github.com/0xPolygon/polygon-edge/command/ibft/status"
-	_switch "github.com/0xPolygon/polygon-edge/command/ibft/switch"
+	"github.com/dogechain-lab/jury/command/helper"
+	"github.com/dogechain-lab/jury/command/ibft/candidates"
+	"github.com/dogechain-lab/jury/command/ibft/propose"
+	"github.com/dogechain-lab/jury/command/ibft/snapshot"
+	"github.com/dogechain-lab/jury/command/ibft/status"
+	_switch "github.com/dogechain-lab/jury/command/ibft/switch"
 	"github.com/spf13/cobra"
 )
 

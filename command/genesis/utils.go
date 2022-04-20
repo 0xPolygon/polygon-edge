@@ -2,15 +2,16 @@ package genesis
 
 import (
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/chain"
-	"github.com/0xPolygon/polygon-edge/command"
-	"github.com/0xPolygon/polygon-edge/consensus/ibft"
-	"github.com/0xPolygon/polygon-edge/crypto"
-	"github.com/0xPolygon/polygon-edge/types"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/dogechain-lab/jury/chain"
+	"github.com/dogechain-lab/jury/command"
+	"github.com/dogechain-lab/jury/consensus/ibft"
+	"github.com/dogechain-lab/jury/crypto"
+	"github.com/dogechain-lab/jury/types"
 )
 
 const (

@@ -4,7 +4,7 @@ import (
 	"container/heap"
 	"sync"
 
-	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
+	"github.com/dogechain-lab/jury/consensus/ibft/proto"
 )
 
 // msgQueue defines the structure that holds message queues for different IBFT states

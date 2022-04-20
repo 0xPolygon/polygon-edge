@@ -3,10 +3,11 @@ package ibft
 import (
 	"errors"
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/contracts/staking"
-	stakingHelper "github.com/0xPolygon/polygon-edge/helper/staking"
-	"github.com/0xPolygon/polygon-edge/state"
-	"github.com/0xPolygon/polygon-edge/types"
+
+	"github.com/dogechain-lab/jury/contracts/staking"
+	stakingHelper "github.com/dogechain-lab/jury/helper/staking"
+	"github.com/dogechain-lab/jury/state"
+	"github.com/dogechain-lab/jury/types"
 )
 
 // PoSMechanism defines specific hooks for the Proof of Stake IBFT mechanism

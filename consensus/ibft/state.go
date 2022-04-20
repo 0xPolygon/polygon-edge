@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"sync/atomic"
 
-	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
-	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/dogechain-lab/jury/consensus/ibft/proto"
+	"github.com/dogechain-lab/jury/types"
 )
 
 type IbftState uint32

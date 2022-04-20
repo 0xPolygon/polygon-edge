@@ -6,9 +6,9 @@ import (
 	"math/big"
 	"math/bits"
 
-	"github.com/0xPolygon/polygon-edge/chain"
-	"github.com/0xPolygon/polygon-edge/helper/keccak"
-	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/dogechain-lab/jury/chain"
+	"github.com/dogechain-lab/jury/helper/keccak"
+	"github.com/dogechain-lab/jury/types"
 	"github.com/umbracle/fastrlp"
 )
 

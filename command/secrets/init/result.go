@@ -3,8 +3,9 @@ package init
 import (
 	"bytes"
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/command/helper"
-	"github.com/0xPolygon/polygon-edge/types"
+
+	"github.com/dogechain-lab/jury/command/helper"
+	"github.com/dogechain-lab/jury/types"
 )
 
 type SecretsInitResult struct {

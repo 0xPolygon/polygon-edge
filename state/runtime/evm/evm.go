@@ -2,8 +2,9 @@ package evm
 
 import (
 	"errors"
-	"github.com/0xPolygon/polygon-edge/chain"
-	"github.com/0xPolygon/polygon-edge/state/runtime"
+
+	"github.com/dogechain-lab/jury/chain"
+	"github.com/dogechain-lab/jury/state/runtime"
 )
 
 var _ runtime.Runtime = &EVM{}

@@ -1,13 +1,14 @@
 package txpool
 
 import (
-	"github.com/0xPolygon/polygon-edge/txpool/proto"
-	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/hashicorp/go-hclog"
-	"github.com/stretchr/testify/assert"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/dogechain-lab/jury/txpool/proto"
+	"github.com/dogechain-lab/jury/types"
+	"github.com/hashicorp/go-hclog"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestEventManager_SubscribeCancel(t *testing.T) {

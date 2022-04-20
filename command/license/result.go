@@ -3,7 +3,8 @@ package license
 import (
 	"bytes"
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/licenses"
+
+	"github.com/dogechain-lab/jury/licenses"
 )
 
 type LicenseResult struct {

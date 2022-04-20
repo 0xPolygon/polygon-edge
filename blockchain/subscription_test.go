@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/dogechain-lab/jury/types"
 )
 
 func TestSubscriptionLinear(t *testing.T) {

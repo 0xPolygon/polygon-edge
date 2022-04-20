@@ -8,8 +8,8 @@ import (
 	iradix "github.com/hashicorp/go-immutable-radix"
 	"github.com/umbracle/fastrlp"
 
-	"github.com/0xPolygon/polygon-edge/crypto"
-	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/dogechain-lab/jury/crypto"
+	"github.com/dogechain-lab/jury/types"
 )
 
 type State interface {

@@ -6,9 +6,9 @@ import (
 	"math"
 	"sort"
 
-	"github.com/0xPolygon/polygon-edge/command/helper"
-	"github.com/0xPolygon/polygon-edge/command/loadbot/generator"
-	"github.com/0xPolygon/polygon-edge/helper/common"
+	"github.com/dogechain-lab/jury/command/helper"
+	"github.com/dogechain-lab/jury/command/loadbot/generator"
+	"github.com/dogechain-lab/jury/helper/common"
 	"github.com/umbracle/go-web3"
 )
 

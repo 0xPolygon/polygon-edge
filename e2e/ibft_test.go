@@ -6,13 +6,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/umbracle/go-web3"
-
-	"github.com/0xPolygon/polygon-edge/consensus/ibft"
-	"github.com/0xPolygon/polygon-edge/e2e/framework"
-	"github.com/0xPolygon/polygon-edge/helper/tests"
-	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/dogechain-lab/jury/consensus/ibft"
+	"github.com/dogechain-lab/jury/e2e/framework"
+	"github.com/dogechain-lab/jury/helper/tests"
+	"github.com/dogechain-lab/jury/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/umbracle/go-web3"
 )
 
 func TestIbft_Transfer(t *testing.T) {

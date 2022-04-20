@@ -6,9 +6,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/crypto"
-	"github.com/0xPolygon/polygon-edge/helper/common"
-	"github.com/0xPolygon/polygon-edge/secrets"
+	"github.com/dogechain-lab/jury/crypto"
+	"github.com/dogechain-lab/jury/helper/common"
+	"github.com/dogechain-lab/jury/secrets"
 	"github.com/hashicorp/go-hclog"
 	libp2pCrypto "github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/stretchr/testify/assert"

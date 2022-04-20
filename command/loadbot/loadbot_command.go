@@ -3,8 +3,8 @@ package loadbot
 import (
 	"fmt"
 
-	"github.com/0xPolygon/polygon-edge/command"
-	"github.com/0xPolygon/polygon-edge/command/helper"
+	"github.com/dogechain-lab/jury/command"
+	"github.com/dogechain-lab/jury/command/helper"
 	"github.com/spf13/cobra"
 )
 

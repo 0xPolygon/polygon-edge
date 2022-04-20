@@ -2,13 +2,14 @@ package staking
 
 import (
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/helper/common"
 	"math/big"
 
-	"github.com/0xPolygon/polygon-edge/chain"
-	"github.com/0xPolygon/polygon-edge/helper/hex"
-	"github.com/0xPolygon/polygon-edge/helper/keccak"
-	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/dogechain-lab/jury/helper/common"
+
+	"github.com/dogechain-lab/jury/chain"
+	"github.com/dogechain-lab/jury/helper/hex"
+	"github.com/dogechain-lab/jury/helper/keccak"
+	"github.com/dogechain-lab/jury/types"
 )
 
 var (
@@ -46,7 +47,7 @@ func getIndexWithOffset(keccakHash []byte, offset int64) []byte {
 // of the storage slots which need to be modified during bootstrap.
 //
 // It is SC dependant, and based on the SC located at:
-// https://github.com/0xPolygon/staking-contracts/
+// https://github.com/dogechain-lab/jury-contracts
 func getStorageIndexes(address types.Address, index int64) *StorageIndexes {
 	storageIndexes := StorageIndexes{}
 
@@ -117,7 +118,7 @@ func PredeployStakingSC(
 	params PredeployParams,
 ) (*chain.GenesisAccount, error) {
 	// Set the code for the staking smart contract
-	// Code retrieved from https://github.com/0xPolygon/staking-contracts
+	// Code retrieved from https://github.com/dogechain-lab/jury-contracts
 	scHex, _ := hex.DecodeHex(StakingSCBytecode)
 	stakingAccount := &chain.GenesisAccount{
 		Code: scHex,

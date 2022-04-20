@@ -1,14 +1,14 @@
 package server
 
 import (
-	"github.com/0xPolygon/polygon-edge/consensus"
-	consensusDev "github.com/0xPolygon/polygon-edge/consensus/dev"
-	consensusDummy "github.com/0xPolygon/polygon-edge/consensus/dummy"
-	consensusIBFT "github.com/0xPolygon/polygon-edge/consensus/ibft"
-	"github.com/0xPolygon/polygon-edge/secrets"
-	"github.com/0xPolygon/polygon-edge/secrets/awsssm"
-	"github.com/0xPolygon/polygon-edge/secrets/hashicorpvault"
-	"github.com/0xPolygon/polygon-edge/secrets/local"
+	"github.com/dogechain-lab/jury/consensus"
+	consensusDev "github.com/dogechain-lab/jury/consensus/dev"
+	consensusDummy "github.com/dogechain-lab/jury/consensus/dummy"
+	consensusIBFT "github.com/dogechain-lab/jury/consensus/ibft"
+	"github.com/dogechain-lab/jury/secrets"
+	"github.com/dogechain-lab/jury/secrets/awsssm"
+	"github.com/dogechain-lab/jury/secrets/hashicorpvault"
+	"github.com/dogechain-lab/jury/secrets/local"
 )
 
 type ConsensusType string

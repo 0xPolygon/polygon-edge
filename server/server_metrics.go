@@ -1,9 +1,9 @@
 package server
 
 import (
-	"github.com/0xPolygon/polygon-edge/consensus"
-	"github.com/0xPolygon/polygon-edge/network"
-	"github.com/0xPolygon/polygon-edge/txpool"
+	"github.com/dogechain-lab/jury/consensus"
+	"github.com/dogechain-lab/jury/network"
+	"github.com/dogechain-lab/jury/txpool"
 )
 
 // serverMetrics holds the metric instances of all sub systems

@@ -6,7 +6,7 @@ import (
 	"io/ioutil"
 	"strings"
 
-	"github.com/0xPolygon/polygon-edge/network"
+	"github.com/dogechain-lab/jury/network"
 
 	"github.com/hashicorp/hcl"
 )
@@ -65,7 +65,7 @@ func DefaultConfig() *Config {
 
 	return &Config{
 		GenesisPath:    "./genesis.json",
-		DataDir:        "./polygon-edge-chain",
+		DataDir:        "./jury-chain",
 		BlockGasTarget: "0x0", // Special value signaling the parent gas limit should be applied
 		Network: &Network{
 			NoDiscover:       defaultNetworkConfig.NoDiscover,

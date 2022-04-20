@@ -2,12 +2,13 @@ package testing
 
 import (
 	"context"
-	"github.com/0xPolygon/polygon-edge/network/event"
-	"github.com/0xPolygon/polygon-edge/network/proto"
+	"time"
+
+	"github.com/dogechain-lab/jury/network/event"
+	"github.com/dogechain-lab/jury/network/proto"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"google.golang.org/grpc"
-	"time"
 )
 
 type MockNetworkingServer struct {

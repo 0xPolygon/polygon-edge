@@ -3,7 +3,8 @@ package generate
 import (
 	"bytes"
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/command/helper"
+
+	"github.com/dogechain-lab/jury/command/helper"
 )
 
 type SecretsGenerateResult struct {

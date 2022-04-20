@@ -4,16 +4,17 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/network/common"
-	"github.com/0xPolygon/polygon-edge/network/discovery"
-	"github.com/0xPolygon/polygon-edge/network/grpc"
-	"github.com/0xPolygon/polygon-edge/network/proto"
+	"math/big"
+	"time"
+
+	"github.com/dogechain-lab/jury/network/common"
+	"github.com/dogechain-lab/jury/network/discovery"
+	"github.com/dogechain-lab/jury/network/grpc"
+	"github.com/dogechain-lab/jury/network/proto"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
 	kb "github.com/libp2p/go-libp2p-kbucket"
 	rawGrpc "google.golang.org/grpc"
-	"math/big"
-	"time"
 )
 
 var (

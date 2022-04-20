@@ -4,19 +4,20 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
-	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"math/big"
 	"strconv"
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/contracts/staking"
-	"github.com/0xPolygon/polygon-edge/crypto"
-	"github.com/0xPolygon/polygon-edge/e2e/framework"
-	stakingHelper "github.com/0xPolygon/polygon-edge/helper/staking"
-	"github.com/0xPolygon/polygon-edge/helper/tests"
-	txpoolOp "github.com/0xPolygon/polygon-edge/txpool/proto"
-	"github.com/0xPolygon/polygon-edge/types"
+	ibftOp "github.com/dogechain-lab/jury/consensus/ibft/proto"
+
+	"github.com/dogechain-lab/jury/contracts/staking"
+	"github.com/dogechain-lab/jury/crypto"
+	"github.com/dogechain-lab/jury/e2e/framework"
+	stakingHelper "github.com/dogechain-lab/jury/helper/staking"
+	"github.com/dogechain-lab/jury/helper/tests"
+	txpoolOp "github.com/dogechain-lab/jury/txpool/proto"
+	"github.com/dogechain-lab/jury/types"
 	"github.com/golang/protobuf/ptypes/any"
 	"github.com/stretchr/testify/assert"
 	"github.com/umbracle/go-web3"
@@ -756,7 +757,7 @@ func TestSnapshotUpdating(t *testing.T) {
 				config.PremineValidatorBalance(defaultBalance)
 			} else {
 				// Other nodes should not be in the validator set
-				dirPrefix := "polygon-edge-non-validator-"
+				dirPrefix := "jury-non-validator-"
 				config.SetIBFTDirPrefix(dirPrefix)
 				config.SetIBFTDir(fmt.Sprintf("%s%d", dirPrefix, i))
 			}

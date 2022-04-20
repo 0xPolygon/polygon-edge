@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/0xPolygon/polygon-edge/chain"
-	"github.com/0xPolygon/polygon-edge/helper/hex"
-	"github.com/0xPolygon/polygon-edge/helper/progress"
-	"github.com/0xPolygon/polygon-edge/state"
-	"github.com/0xPolygon/polygon-edge/state/runtime"
-	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/dogechain-lab/jury/chain"
+	"github.com/dogechain-lab/jury/helper/hex"
+	"github.com/dogechain-lab/jury/helper/progress"
+	"github.com/dogechain-lab/jury/state"
+	"github.com/dogechain-lab/jury/state/runtime"
+	"github.com/dogechain-lab/jury/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/fastrlp"
 )

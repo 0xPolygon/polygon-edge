@@ -7,7 +7,7 @@ config*.json
 bin/
 
 test-chain*
-polygon-edge-chain*
+jury-chain*
 .idea
 
 # Exclude the build .exe file from version control

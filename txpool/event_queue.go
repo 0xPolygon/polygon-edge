@@ -1,8 +1,9 @@
 package txpool
 
 import (
-	"github.com/0xPolygon/polygon-edge/txpool/proto"
 	"sync"
+
+	"github.com/dogechain-lab/jury/txpool/proto"
 )
 
 type eventQueue struct {

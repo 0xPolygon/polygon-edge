@@ -8,10 +8,10 @@ import (
 	"os"
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/blockchain"
-	"github.com/0xPolygon/polygon-edge/helper/progress"
-	"github.com/0xPolygon/polygon-edge/protocol"
-	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/dogechain-lab/jury/blockchain"
+	"github.com/dogechain-lab/jury/helper/progress"
+	"github.com/dogechain-lab/jury/protocol"
+	"github.com/dogechain-lab/jury/types"
 	"github.com/stretchr/testify/assert"
 )
 

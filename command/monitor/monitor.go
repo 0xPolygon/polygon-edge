@@ -4,13 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/command"
-	"github.com/0xPolygon/polygon-edge/helper/common"
-	"github.com/spf13/cobra"
 	"io"
 
-	"github.com/0xPolygon/polygon-edge/command/helper"
-	"github.com/0xPolygon/polygon-edge/server/proto"
+	"github.com/dogechain-lab/jury/command"
+	"github.com/dogechain-lab/jury/helper/common"
+	"github.com/spf13/cobra"
+
+	"github.com/dogechain-lab/jury/command/helper"
+	"github.com/dogechain-lab/jury/server/proto"
 	empty "google.golang.org/protobuf/types/known/emptypb"
 )
 

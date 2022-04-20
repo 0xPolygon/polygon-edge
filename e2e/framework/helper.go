@@ -14,14 +14,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/contracts/abis"
-	"github.com/0xPolygon/polygon-edge/contracts/staking"
-	"github.com/0xPolygon/polygon-edge/crypto"
-	"github.com/0xPolygon/polygon-edge/helper/hex"
-	"github.com/0xPolygon/polygon-edge/helper/tests"
-	"github.com/0xPolygon/polygon-edge/server/proto"
-	txpoolProto "github.com/0xPolygon/polygon-edge/txpool/proto"
-	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/dogechain-lab/jury/contracts/abis"
+	"github.com/dogechain-lab/jury/contracts/staking"
+	"github.com/dogechain-lab/jury/crypto"
+	"github.com/dogechain-lab/jury/helper/hex"
+	"github.com/dogechain-lab/jury/helper/tests"
+	"github.com/dogechain-lab/jury/server/proto"
+	txpoolProto "github.com/dogechain-lab/jury/txpool/proto"
+	"github.com/dogechain-lab/jury/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/umbracle/go-web3"
 	"github.com/umbracle/go-web3/jsonrpc"
@@ -335,7 +335,7 @@ func MethodSig(name string) []byte {
 
 // tempDir returns directory path in tmp with random directory name
 func tempDir() (string, error) {
-	return ioutil.TempDir("/tmp", "polygon-edge-e2e-")
+	return ioutil.TempDir("/tmp", "jury-e2e-")
 }
 
 func ToLocalIPv4LibP2pAddr(port int, nodeID string) string {

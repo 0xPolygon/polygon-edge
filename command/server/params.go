@@ -2,13 +2,14 @@ package server
 
 import (
 	"errors"
-	"github.com/0xPolygon/polygon-edge/chain"
-	"github.com/0xPolygon/polygon-edge/network"
-	"github.com/0xPolygon/polygon-edge/secrets"
-	"github.com/0xPolygon/polygon-edge/server"
+	"net"
+
+	"github.com/dogechain-lab/jury/chain"
+	"github.com/dogechain-lab/jury/network"
+	"github.com/dogechain-lab/jury/secrets"
+	"github.com/dogechain-lab/jury/server"
 	"github.com/hashicorp/go-hclog"
 	"github.com/multiformats/go-multiaddr"
-	"net"
 )
 
 const (

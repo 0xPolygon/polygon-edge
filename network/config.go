@@ -1,10 +1,11 @@
 package network
 
 import (
-	"github.com/0xPolygon/polygon-edge/chain"
-	"github.com/0xPolygon/polygon-edge/secrets"
-	"github.com/multiformats/go-multiaddr"
 	"net"
+
+	"github.com/dogechain-lab/jury/chain"
+	"github.com/dogechain-lab/jury/secrets"
+	"github.com/multiformats/go-multiaddr"
 )
 
 // Config details the params for the base networking server

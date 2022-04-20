@@ -3,7 +3,7 @@ package leveldb
 import (
 	"fmt"
 
-	"github.com/0xPolygon/polygon-edge/blockchain/storage"
+	"github.com/dogechain-lab/jury/blockchain/storage"
 	"github.com/hashicorp/go-hclog"
 	"github.com/syndtr/goleveldb/leveldb"
 )

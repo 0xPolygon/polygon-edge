@@ -5,9 +5,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/0xPolygon/polygon-edge/crypto"
-	txpoolOp "github.com/0xPolygon/polygon-edge/txpool/proto"
-	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/dogechain-lab/jury/crypto"
+	txpoolOp "github.com/dogechain-lab/jury/txpool/proto"
+	"github.com/dogechain-lab/jury/types"
 	"github.com/umbracle/go-web3/jsonrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"

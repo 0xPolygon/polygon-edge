@@ -3,13 +3,14 @@ package ibftswitch
 import (
 	"errors"
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/chain"
-	"github.com/0xPolygon/polygon-edge/command"
-	"github.com/0xPolygon/polygon-edge/command/helper"
-	"github.com/0xPolygon/polygon-edge/consensus/ibft"
-	"github.com/0xPolygon/polygon-edge/helper/common"
-	"github.com/0xPolygon/polygon-edge/types"
 	"os"
+
+	"github.com/dogechain-lab/jury/chain"
+	"github.com/dogechain-lab/jury/command"
+	"github.com/dogechain-lab/jury/command/helper"
+	"github.com/dogechain-lab/jury/consensus/ibft"
+	"github.com/dogechain-lab/jury/helper/common"
+	"github.com/dogechain-lab/jury/types"
 )
 
 const (

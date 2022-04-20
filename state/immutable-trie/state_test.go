@@ -3,7 +3,7 @@ package itrie
 import (
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/state"
+	"github.com/dogechain-lab/jury/state"
 )
 
 func TestState(t *testing.T) {

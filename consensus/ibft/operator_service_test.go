@@ -4,10 +4,10 @@ import (
 	"context"
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/blockchain"
-	"github.com/0xPolygon/polygon-edge/consensus"
-	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
-	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/dogechain-lab/jury/blockchain"
+	"github.com/dogechain-lab/jury/consensus"
+	"github.com/dogechain-lab/jury/consensus/ibft/proto"
+	"github.com/dogechain-lab/jury/types"
 	"github.com/stretchr/testify/assert"
 )
 

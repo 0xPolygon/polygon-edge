@@ -3,10 +3,11 @@ package propose
 import (
 	"context"
 	"errors"
-	"github.com/0xPolygon/polygon-edge/command"
-	"github.com/0xPolygon/polygon-edge/command/helper"
-	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
-	"github.com/0xPolygon/polygon-edge/types"
+
+	"github.com/dogechain-lab/jury/command"
+	"github.com/dogechain-lab/jury/command/helper"
+	ibftOp "github.com/dogechain-lab/jury/consensus/ibft/proto"
+	"github.com/dogechain-lab/jury/types"
 )
 
 const (

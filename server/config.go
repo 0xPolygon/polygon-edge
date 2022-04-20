@@ -5,9 +5,9 @@ import (
 
 	"github.com/hashicorp/go-hclog"
 
-	"github.com/0xPolygon/polygon-edge/chain"
-	"github.com/0xPolygon/polygon-edge/network"
-	"github.com/0xPolygon/polygon-edge/secrets"
+	"github.com/dogechain-lab/jury/chain"
+	"github.com/dogechain-lab/jury/network"
+	"github.com/dogechain-lab/jury/secrets"
 )
 
 const DefaultGRPCPort int = 9632

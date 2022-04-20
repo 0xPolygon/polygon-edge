@@ -4,11 +4,11 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 
-	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
-	"github.com/0xPolygon/polygon-edge/crypto"
-	"github.com/0xPolygon/polygon-edge/helper/hex"
-	"github.com/0xPolygon/polygon-edge/helper/keccak"
-	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/dogechain-lab/jury/consensus/ibft/proto"
+	"github.com/dogechain-lab/jury/crypto"
+	"github.com/dogechain-lab/jury/helper/hex"
+	"github.com/dogechain-lab/jury/helper/keccak"
+	"github.com/dogechain-lab/jury/types"
 	"github.com/umbracle/fastrlp"
 )
 

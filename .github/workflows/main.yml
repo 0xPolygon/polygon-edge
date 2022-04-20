@@ -2,7 +2,7 @@ on:
   push:
     branches:
       - main
-      - develop
+      - dev
   pull_request:
 
 jobs:
@@ -23,8 +23,7 @@ jobs:
         uses: golangci/golangci-lint-action@v2
         with:
           version: latest
-          args:
-            --timeout=3m
+          args: --timeout=3m
             -E whitespace
             -E wsl
             -E wastedassign
@@ -63,9 +62,8 @@ jobs:
         with:
           submodules: recursive
 
-
       - name: Go build with race
-        run: CGO_ENABLED=1 GOOS=linux go build -race -a -o artifacts/polygon-edge .
+        run: CGO_ENABLED=1 GOOS=linux go build -race -a -o artifacts/jury .
 
       - name: Add race artifacts directory to the path
         run: echo "$(pwd)/artifacts" >> $GITHUB_PATH
@@ -74,7 +72,7 @@ jobs:
         run: go test -timeout 28m ./...
 
       - name: Go build without race
-        run: CGO_ENABLED=0 GOOS=linux go build -a -o artifacts/polygon-edge .
+        run: CGO_ENABLED=0 GOOS=linux go build -a -o artifacts/jury .
 
       - name: Replace artificats
         run: echo "$(pwd)/artifacts" >> $GITHUB_PATH
@@ -88,7 +86,7 @@ jobs:
         if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v2
         with:
-          name: polygon-edge_${{ github.sha }}_${{ steps.extract_branch.outputs.branch }}
+          name: jury_${{ github.sha }}_${{ steps.extract_branch.outputs.branch }}
           path: artifacts/
   notify-deployer:
     needs: test
@@ -101,7 +99,7 @@ jobs:
         id: extract_branch
       - name: Notify Deployer
         env:
-          ARTIFACT_NAME: polygon-edge_${{ github.sha }}_${{ steps.extract_branch.outputs.branch }}
+          ARTIFACT_NAME: jury_${{ github.sha }}_${{ steps.extract_branch.outputs.branch }}
           COMMITER: ${{ github.actor }}
         run: |
           curl -X POST ${{ secrets.DEPLOYER_API }} -H 'Accept: application/vnd.github.everest-preview+json' -u ${{ secrets.DEPLOYER_ACCESS_TOKEN }} --data '{"event_type": "new_artefact", "client_payload": { "commiter":"'"$COMMITER"'","commit":"'"$GITHUB_SHA"'","branch":"'"$GITHUB_REF"'","repository": "'"$GITHUB_REPOSITORY"'","artefact_name":"'"$ARTIFACT_NAME"'" }}'

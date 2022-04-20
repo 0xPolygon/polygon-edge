@@ -2,10 +2,11 @@ package generate
 
 import (
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/command"
+
+	"github.com/dogechain-lab/jury/command"
 	"github.com/spf13/cobra"
 
-	"github.com/0xPolygon/polygon-edge/secrets"
+	"github.com/dogechain-lab/jury/secrets"
 )
 
 func GetCommand() *cobra.Command {

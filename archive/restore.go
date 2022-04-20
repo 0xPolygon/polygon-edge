@@ -7,10 +7,10 @@ import (
 	"math/big"
 	"os"
 
-	"github.com/0xPolygon/polygon-edge/blockchain"
-	"github.com/0xPolygon/polygon-edge/helper/common"
-	"github.com/0xPolygon/polygon-edge/helper/progress"
-	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/dogechain-lab/jury/blockchain"
+	"github.com/dogechain-lab/jury/helper/common"
+	"github.com/dogechain-lab/jury/helper/progress"
+	"github.com/dogechain-lab/jury/types"
 )
 
 type blockchainInterface interface {

@@ -4,9 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	testproto "github.com/0xPolygon/polygon-edge/network/proto"
 	"testing"
 	"time"
+
+	testproto "github.com/dogechain-lab/jury/network/proto"
 )
 
 func NumSubscribers(srv *Server, topic string) int {

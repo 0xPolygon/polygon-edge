@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/0xPolygon/polygon-edge/command"
-	"github.com/0xPolygon/polygon-edge/secrets"
+	"github.com/dogechain-lab/jury/command"
+	"github.com/dogechain-lab/jury/secrets"
 )
 
 var (
@@ -24,7 +24,7 @@ const (
 )
 
 const (
-	defaultNodeName       = "polygon-edge-node"
+	defaultNodeName       = "jury-node"
 	defaultConfigFileName = "./secretsManagerConfig.json"
 	defaultNamespace      = "admin"
 )

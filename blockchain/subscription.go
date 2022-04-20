@@ -4,7 +4,7 @@ import (
 	"math/big"
 	"sync"
 
-	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/dogechain-lab/jury/types"
 )
 
 type void struct{}

@@ -3,16 +3,17 @@ package helper
 import (
 	"crypto/ecdsa"
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/crypto"
-	"github.com/0xPolygon/polygon-edge/helper/common"
-	"github.com/0xPolygon/polygon-edge/network"
-	"github.com/0xPolygon/polygon-edge/secrets"
-	"github.com/0xPolygon/polygon-edge/secrets/awsssm"
-	"github.com/0xPolygon/polygon-edge/secrets/hashicorpvault"
-	"github.com/0xPolygon/polygon-edge/secrets/local"
+	"path/filepath"
+
+	"github.com/dogechain-lab/jury/crypto"
+	"github.com/dogechain-lab/jury/helper/common"
+	"github.com/dogechain-lab/jury/network"
+	"github.com/dogechain-lab/jury/secrets"
+	"github.com/dogechain-lab/jury/secrets/awsssm"
+	"github.com/dogechain-lab/jury/secrets/hashicorpvault"
+	"github.com/dogechain-lab/jury/secrets/local"
 	"github.com/hashicorp/go-hclog"
 	libp2pCrypto "github.com/libp2p/go-libp2p-core/crypto"
-	"path/filepath"
 )
 
 // SetupLocalSecretsManager is a helper method for boilerplate local secrets manager setup

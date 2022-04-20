@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/network/event"
-	"github.com/hashicorp/go-hclog"
 	"sync"
 
-	"github.com/0xPolygon/polygon-edge/network/proto"
+	"github.com/dogechain-lab/jury/network/event"
+	"github.com/hashicorp/go-hclog"
+
+	"github.com/dogechain-lab/jury/network/proto"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 )

@@ -4,18 +4,18 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/0xPolygon/polygon-edge/command"
+	"github.com/dogechain-lab/jury/command"
 	"github.com/spf13/cobra"
 
-	"github.com/0xPolygon/polygon-edge/command/helper"
-	"github.com/0xPolygon/polygon-edge/network"
-	"github.com/0xPolygon/polygon-edge/server"
+	"github.com/dogechain-lab/jury/command/helper"
+	"github.com/dogechain-lab/jury/network"
+	"github.com/dogechain-lab/jury/server"
 )
 
 func GetCommand() *cobra.Command {
 	serverCmd := &cobra.Command{
 		Use:     "server",
-		Short:   "The default command that starts the Polygon Edge client, by bootstrapping all modules together",
+		Short:   "The default command that starts the DogeChain-Lab Jury client, by bootstrapping all modules together",
 		PreRunE: runPreRun,
 		Run:     runCommand,
 	}
@@ -57,7 +57,7 @@ func setFlags(cmd *cobra.Command) {
 		&params.rawConfig.DataDir,
 		dataDirFlag,
 		defaultConfig.DataDir,
-		"the data directory used for storing Polygon Edge client data",
+		"the data directory used for storing DogeChain-Lab Jury client data",
 	)
 
 	cmd.Flags().StringVar(

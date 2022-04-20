@@ -7,7 +7,7 @@ Describe your issue in as much detail as possible here
 ### Your environment
 
 * OS and version
-* version of the Polygon Edge
+* version of the Jury
 * branch that causes this issue
 
 ### Steps to reproduce

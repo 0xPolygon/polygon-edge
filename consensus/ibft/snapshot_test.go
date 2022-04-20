@@ -7,12 +7,12 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/blockchain"
-	"github.com/0xPolygon/polygon-edge/chain"
-	"github.com/0xPolygon/polygon-edge/consensus"
-	"github.com/0xPolygon/polygon-edge/crypto"
-	"github.com/0xPolygon/polygon-edge/helper/common"
-	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/dogechain-lab/jury/blockchain"
+	"github.com/dogechain-lab/jury/chain"
+	"github.com/dogechain-lab/jury/consensus"
+	"github.com/dogechain-lab/jury/crypto"
+	"github.com/dogechain-lab/jury/helper/common"
+	"github.com/dogechain-lab/jury/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
 )

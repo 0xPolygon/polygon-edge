@@ -2,12 +2,13 @@ package precompiled
 
 import (
 	"crypto/sha256"
-	"golang.org/x/crypto/ripemd160" //nolint:staticcheck
 	"math/big"
 
-	"github.com/0xPolygon/polygon-edge/chain"
-	"github.com/0xPolygon/polygon-edge/crypto"
-	"github.com/0xPolygon/polygon-edge/helper/keccak"
+	"golang.org/x/crypto/ripemd160" //nolint:staticcheck
+
+	"github.com/dogechain-lab/jury/chain"
+	"github.com/dogechain-lab/jury/crypto"
+	"github.com/dogechain-lab/jury/helper/keccak"
 )
 
 type ecrecover struct {

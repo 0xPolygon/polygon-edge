@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/e2e/framework"
+	"github.com/dogechain-lab/jury/e2e/framework"
 )
 
 func TestClusterBlockSync(t *testing.T) {
@@ -22,7 +22,7 @@ func TestClusterBlockSync(t *testing.T) {
 		IBFTDirPrefix, func(i int, config *framework.TestServerConfig) {
 			if i >= IBFTMinNodes {
 				// Other nodes should not be in the validator set
-				dirPrefix := "polygon-edge-non-validator-"
+				dirPrefix := "jury-non-validator-"
 				config.SetIBFTDirPrefix(dirPrefix)
 				config.SetIBFTDir(fmt.Sprintf("%s%d", dirPrefix, i))
 			}

@@ -4,14 +4,14 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/0xPolygon/polygon-edge/chain"
-	"github.com/0xPolygon/polygon-edge/command"
-	"github.com/0xPolygon/polygon-edge/command/helper"
-	"github.com/0xPolygon/polygon-edge/consensus/ibft"
-	"github.com/0xPolygon/polygon-edge/contracts/staking"
-	stakingHelper "github.com/0xPolygon/polygon-edge/helper/staking"
-	"github.com/0xPolygon/polygon-edge/server"
-	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/dogechain-lab/jury/chain"
+	"github.com/dogechain-lab/jury/command"
+	"github.com/dogechain-lab/jury/command/helper"
+	"github.com/dogechain-lab/jury/consensus/ibft"
+	"github.com/dogechain-lab/jury/contracts/staking"
+	stakingHelper "github.com/dogechain-lab/jury/helper/staking"
+	"github.com/dogechain-lab/jury/server"
+	"github.com/dogechain-lab/jury/types"
 )
 
 const (

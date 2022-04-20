@@ -4,7 +4,7 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/dogechain-lab/jury/types"
 	"github.com/stretchr/testify/assert"
 )
 

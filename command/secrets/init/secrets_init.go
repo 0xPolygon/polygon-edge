@@ -1,14 +1,14 @@
 package init
 
 import (
-	"github.com/0xPolygon/polygon-edge/command"
+	"github.com/dogechain-lab/jury/command"
 	"github.com/spf13/cobra"
 )
 
 func GetCommand() *cobra.Command {
 	secretsInitCmd := &cobra.Command{
 		Use: "init",
-		Short: "Initializes private keys for the Polygon Edge (Validator + Networking) " +
+		Short: "Initializes private keys for the DogeChain-Lab Jury (Validator + Networking) " +
 			"to the specified Secrets Manager",
 		PreRunE: runPreRun,
 		Run:     runCommand,
@@ -24,7 +24,7 @@ func setFlags(cmd *cobra.Command) {
 		&params.dataDir,
 		dataDirFlag,
 		"",
-		"the directory for the Polygon Edge data if the local FS is used",
+		"the directory for the DogeChain-Lab Jury data if the local FS is used",
 	)
 
 	cmd.Flags().StringVar(

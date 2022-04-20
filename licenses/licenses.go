@@ -14,7 +14,7 @@ type DepLicense struct {
 }
 
 var (
-	// Polygon Edge License
+	// DogeChain-Lab Jury License
 	License string
 
 	// Dependency Licenses

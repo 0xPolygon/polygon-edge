@@ -5,13 +5,13 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/chain"
-	"github.com/0xPolygon/polygon-edge/state"
-	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
+	"github.com/dogechain-lab/jury/chain"
+	"github.com/dogechain-lab/jury/state"
+	itrie "github.com/dogechain-lab/jury/state/immutable-trie"
 	"github.com/hashicorp/go-hclog"
 
-	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/0xPolygon/polygon-edge/types/buildroot"
+	"github.com/dogechain-lab/jury/types"
+	"github.com/dogechain-lab/jury/types/buildroot"
 )
 
 var (

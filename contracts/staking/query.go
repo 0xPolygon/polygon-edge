@@ -4,9 +4,9 @@ import (
 	"errors"
 	"math/big"
 
-	"github.com/0xPolygon/polygon-edge/contracts/abis"
-	"github.com/0xPolygon/polygon-edge/state/runtime"
-	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/dogechain-lab/jury/contracts/abis"
+	"github.com/dogechain-lab/jury/state/runtime"
+	"github.com/dogechain-lab/jury/types"
 	"github.com/umbracle/go-web3"
 	"github.com/umbracle/go-web3/abi"
 )

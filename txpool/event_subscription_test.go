@@ -3,16 +3,17 @@ package txpool
 import (
 	"context"
 	"crypto/rand"
-	"github.com/0xPolygon/polygon-edge/helper/tests"
-	"github.com/0xPolygon/polygon-edge/txpool/proto"
-	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/stretchr/testify/assert"
 	"math/big"
 	mathRand "math/rand"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/dogechain-lab/jury/helper/tests"
+	"github.com/dogechain-lab/jury/txpool/proto"
+	"github.com/dogechain-lab/jury/types"
+	"github.com/stretchr/testify/assert"
 )
 
 func shuffleTxPoolEvents(

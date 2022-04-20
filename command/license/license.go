@@ -1,16 +1,16 @@
 package license
 
 import (
-	"github.com/0xPolygon/polygon-edge/command"
+	"github.com/dogechain-lab/jury/command"
 	"github.com/spf13/cobra"
 
-	"github.com/0xPolygon/polygon-edge/licenses"
+	"github.com/dogechain-lab/jury/licenses"
 )
 
 func GetCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "license",
-		Short: "Returns Polygon Edge license and dependency attributions",
+		Short: "Returns DogeChain-Lab Jury license and dependency attributions",
 		Args:  cobra.NoArgs,
 		Run:   runCommand,
 	}

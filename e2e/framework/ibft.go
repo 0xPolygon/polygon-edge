@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/dogechain-lab/jury/types"
 )
 
 type IBFTServersManager struct {

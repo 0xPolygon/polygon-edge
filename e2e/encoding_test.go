@@ -5,10 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/types"
-
-	"github.com/0xPolygon/polygon-edge/e2e/framework"
-	"github.com/0xPolygon/polygon-edge/helper/tests"
+	"github.com/dogechain-lab/jury/e2e/framework"
+	"github.com/dogechain-lab/jury/helper/tests"
+	"github.com/dogechain-lab/jury/types"
 	"github.com/stretchr/testify/assert"
 )
 

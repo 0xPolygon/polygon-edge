@@ -3,9 +3,10 @@ package grpc
 import (
 	"context"
 	"errors"
-	"google.golang.org/grpc/credentials/insecure"
 	"io"
 	"net"
+
+	"google.golang.org/grpc/credentials/insecure"
 
 	manet "github.com/multiformats/go-multiaddr/net"
 
@@ -36,7 +37,7 @@ type Context struct {
 }
 
 // interceptor is the middleware function that wraps
-// gRPC peer data to custom Polygon Edge structures
+// gRPC peer data to custom DogeChain-Lab Jury structures
 func interceptor(
 	ctx context.Context,
 	req interface{},

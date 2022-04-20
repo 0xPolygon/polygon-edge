@@ -2,10 +2,11 @@ package genesis
 
 import (
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/command"
-	"github.com/0xPolygon/polygon-edge/command/helper"
-	"github.com/0xPolygon/polygon-edge/consensus/ibft"
-	"github.com/0xPolygon/polygon-edge/helper/common"
+
+	"github.com/dogechain-lab/jury/command"
+	"github.com/dogechain-lab/jury/command/helper"
+	"github.com/dogechain-lab/jury/consensus/ibft"
+	"github.com/dogechain-lab/jury/helper/common"
 	"github.com/spf13/cobra"
 )
 
@@ -32,7 +33,7 @@ func setFlags(cmd *cobra.Command) {
 		dirFlag,
 		fmt.Sprintf("./%s", command.DefaultGenesisFileName),
 		fmt.Sprintf(
-			"the directory for the Polygon Edge genesis data. Default: %s",
+			"the directory for the DogeChain-Lab Jury genesis data. Default: %s",
 			fmt.Sprintf("./%s", command.DefaultGenesisFileName),
 		),
 	)

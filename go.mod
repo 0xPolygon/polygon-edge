@@ -1,4 +1,4 @@
-module github.com/0xPolygon/polygon-edge
+module github.com/dogechain-lab/jury
 
 go 1.16
 

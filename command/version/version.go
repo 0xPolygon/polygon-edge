@@ -1,15 +1,15 @@
 package version
 
 import (
-	"github.com/0xPolygon/polygon-edge/command"
-	"github.com/0xPolygon/polygon-edge/versioning"
+	"github.com/dogechain-lab/jury/command"
+	"github.com/dogechain-lab/jury/versioning"
 	"github.com/spf13/cobra"
 )
 
 func GetCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "version",
-		Short: "Returns the current Polygon Edge version",
+		Short: "Returns the current DogeChain-Lab Jury version",
 		Args:  cobra.NoArgs,
 		Run:   runCommand,
 	}

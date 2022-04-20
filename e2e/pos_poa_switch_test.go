@@ -7,11 +7,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/consensus/ibft"
-	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
-	"github.com/0xPolygon/polygon-edge/crypto"
-	"github.com/0xPolygon/polygon-edge/e2e/framework"
-	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/dogechain-lab/jury/consensus/ibft"
+	ibftOp "github.com/dogechain-lab/jury/consensus/ibft/proto"
+	"github.com/dogechain-lab/jury/crypto"
+	"github.com/dogechain-lab/jury/e2e/framework"
+	"github.com/dogechain-lab/jury/types"
 	"github.com/stretchr/testify/assert"
 )
 

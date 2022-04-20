@@ -4,34 +4,35 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/archive"
-	"github.com/0xPolygon/polygon-edge/blockchain"
-	"github.com/0xPolygon/polygon-edge/chain"
-	"github.com/0xPolygon/polygon-edge/consensus"
-	"github.com/0xPolygon/polygon-edge/crypto"
-	"github.com/0xPolygon/polygon-edge/helper/common"
-	"github.com/0xPolygon/polygon-edge/helper/keccak"
-	"github.com/0xPolygon/polygon-edge/helper/progress"
-	"github.com/0xPolygon/polygon-edge/jsonrpc"
-	"github.com/0xPolygon/polygon-edge/network"
-	"github.com/0xPolygon/polygon-edge/secrets"
-	"github.com/0xPolygon/polygon-edge/server/proto"
-	"github.com/0xPolygon/polygon-edge/state"
-	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
-	"github.com/0xPolygon/polygon-edge/state/runtime"
-	"github.com/0xPolygon/polygon-edge/state/runtime/evm"
-	"github.com/0xPolygon/polygon-edge/state/runtime/precompiled"
-	"github.com/0xPolygon/polygon-edge/txpool"
-	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/hashicorp/go-hclog"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"google.golang.org/grpc"
 	"math/big"
 	"net"
 	"net/http"
 	"os"
 	"path/filepath"
+
+	"github.com/dogechain-lab/jury/archive"
+	"github.com/dogechain-lab/jury/blockchain"
+	"github.com/dogechain-lab/jury/chain"
+	"github.com/dogechain-lab/jury/consensus"
+	"github.com/dogechain-lab/jury/crypto"
+	"github.com/dogechain-lab/jury/helper/common"
+	"github.com/dogechain-lab/jury/helper/keccak"
+	"github.com/dogechain-lab/jury/helper/progress"
+	"github.com/dogechain-lab/jury/jsonrpc"
+	"github.com/dogechain-lab/jury/network"
+	"github.com/dogechain-lab/jury/secrets"
+	"github.com/dogechain-lab/jury/server/proto"
+	"github.com/dogechain-lab/jury/state"
+	itrie "github.com/dogechain-lab/jury/state/immutable-trie"
+	"github.com/dogechain-lab/jury/state/runtime"
+	"github.com/dogechain-lab/jury/state/runtime/evm"
+	"github.com/dogechain-lab/jury/state/runtime/precompiled"
+	"github.com/dogechain-lab/jury/txpool"
+	"github.com/dogechain-lab/jury/types"
+	"github.com/hashicorp/go-hclog"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"google.golang.org/grpc"
 )
 
 // Minimal is the central manager of the blockchain client
@@ -82,7 +83,7 @@ var dirPaths = []string{
 // NewServer creates a new Minimal server, using the passed in configuration
 func NewServer(config *Config) (*Server, error) {
 	logger := hclog.New(&hclog.LoggerOptions{
-		Name:  "polygon",
+		Name:  "jury",
 		Level: config.LogLevel,
 	})
 
@@ -102,10 +103,10 @@ func NewServer(config *Config) (*Server, error) {
 	}
 
 	if config.Telemetry.PrometheusAddr != nil {
-		m.serverMetrics = metricProvider("polygon", config.Chain.Name, true)
+		m.serverMetrics = metricProvider("jury", config.Chain.Name, true)
 		m.prometheusServer = m.startPrometheusServer(config.Telemetry.PrometheusAddr)
 	} else {
-		m.serverMetrics = metricProvider("polygon", config.Chain.Name, false)
+		m.serverMetrics = metricProvider("jury", config.Chain.Name, false)
 	}
 
 	// Set up the secrets manager
@@ -591,7 +592,7 @@ type Entry struct {
 	Config  map[string]interface{}
 }
 
-// SetupDataDir sets up the polygon-edge data directory and sub-folders
+// SetupDataDir sets up the jury data directory and sub-folders
 func SetupDataDir(dataDir string, paths []string) error {
 	if err := createDir(dataDir); err != nil {
 		return fmt.Errorf("failed to create data dir: (%s): %w", dataDir, err)

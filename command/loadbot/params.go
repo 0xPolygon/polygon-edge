@@ -6,8 +6,8 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/0xPolygon/polygon-edge/command/loadbot/generator"
-	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/dogechain-lab/jury/command/loadbot/generator"
+	"github.com/dogechain-lab/jury/types"
 	"github.com/umbracle/go-web3/abi"
 )
 

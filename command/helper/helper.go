@@ -9,17 +9,17 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/chain"
-	"github.com/0xPolygon/polygon-edge/command"
-	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
-	"github.com/0xPolygon/polygon-edge/server"
-	"github.com/0xPolygon/polygon-edge/server/proto"
-	txpoolOp "github.com/0xPolygon/polygon-edge/txpool/proto"
+	"github.com/dogechain-lab/jury/chain"
+	"github.com/dogechain-lab/jury/command"
+	ibftOp "github.com/dogechain-lab/jury/consensus/ibft/proto"
+	"github.com/dogechain-lab/jury/server"
+	"github.com/dogechain-lab/jury/server/proto"
+	txpoolOp "github.com/dogechain-lab/jury/txpool/proto"
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	"github.com/0xPolygon/polygon-edge/helper/common"
+	"github.com/dogechain-lab/jury/helper/common"
 	"github.com/ryanuber/columnize"
 )
 
