@@ -4,8 +4,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/dogechain-lab/jury/contracts/staking"
-	stakingHelper "github.com/dogechain-lab/jury/helper/staking"
+	"github.com/dogechain-lab/jury/contracts/systemcontracts"
+	"github.com/dogechain-lab/jury/contracts/validatorset"
+	validatorsetHelper "github.com/dogechain-lab/jury/helper/validatorset"
 	"github.com/dogechain-lab/jury/state"
 	"github.com/dogechain-lab/jury/types"
 )
@@ -14,9 +15,7 @@ import (
 type PoSMechanism struct {
 	BaseConsensusMechanism
 	// Params
-	ContractDeployment uint64 // The height when deploying staking contract
-	MaxValidatorCount  uint64
-	MinValidatorCount  uint64
+	ContractDeployment uint64 // The height when deploying ValidatorSet contract
 }
 
 // PoSFactory initializes the required data
@@ -74,18 +73,6 @@ func (pos *PoSMechanism) initializeParams(params *IBFTFork) error {
 		}
 
 		pos.ContractDeployment = params.Deployment.Value
-
-		if params.MaxValidatorCount == nil {
-			pos.MaxValidatorCount = stakingHelper.MaxValidatorCount
-		} else {
-			pos.MaxValidatorCount = params.MaxValidatorCount.Value
-		}
-
-		if params.MinValidatorCount == nil {
-			pos.MinValidatorCount = stakingHelper.MinValidatorCount
-		} else {
-			pos.MinValidatorCount = params.MinValidatorCount.Value
-		}
 	}
 
 	return nil
@@ -159,16 +146,16 @@ func (pos *PoSMechanism) preStateCommitHook(rawParams interface{}) error {
 		return ErrInvalidHookParam
 	}
 
-	// Deploy Staking contract
-	contractState, err := stakingHelper.PredeployStakingSC(nil, stakingHelper.PredeployParams{
-		MinValidatorCount: pos.MinValidatorCount,
-		MaxValidatorCount: pos.MaxValidatorCount,
+	// Deploy ValidatorSet contract
+	contractState, err := validatorsetHelper.PredeploySC(validatorsetHelper.PredeployParams{
+		Owner:      types.ZeroAddress,
+		Validators: nil,
 	})
 	if err != nil {
 		return err
 	}
 
-	if err := params.txn.SetAccountDirectly(staking.AddrStakingContract, contractState); err != nil {
+	if err := params.txn.SetAccountDirectly(systemcontracts.AddrValidatorSetContract, contractState); err != nil {
 		return err
 	}
 
@@ -204,14 +191,14 @@ func (pos *PoSMechanism) ShouldWriteTransactions(blockNumber uint64) bool {
 }
 
 // getNextValidators is a helper function for fetching the validator set
-// from the Staking SC
+// from the ValidatorSet SC
 func (pos *PoSMechanism) getNextValidators(header *types.Header) (ValidatorSet, error) {
 	transition, err := pos.ibft.executor.BeginTxn(header.StateRoot, header, types.ZeroAddress)
 	if err != nil {
 		return nil, err
 	}
 
-	return staking.QueryValidators(transition, pos.ibft.validatorKeyAddr)
+	return validatorset.QueryValidators(transition, pos.ibft.validatorKeyAddr)
 }
 
 // updateSnapshotValidators updates validators in snapshot at given height

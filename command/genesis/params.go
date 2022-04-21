@@ -8,8 +8,10 @@ import (
 	"github.com/dogechain-lab/jury/command"
 	"github.com/dogechain-lab/jury/command/helper"
 	"github.com/dogechain-lab/jury/consensus/ibft"
-	"github.com/dogechain-lab/jury/contracts/staking"
-	stakingHelper "github.com/dogechain-lab/jury/helper/staking"
+	"github.com/dogechain-lab/jury/contracts/systemcontracts"
+	bridgeHelper "github.com/dogechain-lab/jury/helper/bridge"
+	validatorsetHelper "github.com/dogechain-lab/jury/helper/validatorset"
+	vaultHelper "github.com/dogechain-lab/jury/helper/vault"
 	"github.com/dogechain-lab/jury/server"
 	"github.com/dogechain-lab/jury/types"
 )
@@ -24,8 +26,10 @@ const (
 	epochSizeFlag           = "epoch-size"
 	blockGasLimitFlag       = "block-gas-limit"
 	posFlag                 = "pos"
-	minValidatorCount       = "min-validator-count"
-	maxValidatorCount       = "max-validator-count"
+	validatorsetOwner       = "validatorset-owner"
+	bridgeOwner             = "bridge-owner"
+	bridgeSigner            = "bridge-signer"
+	vaultOwner              = "vault-owner"
 )
 
 // Legacy flags that need to be preserved for running clients
@@ -40,7 +44,6 @@ var (
 var (
 	errValidatorsNotSpecified         = errors.New("validator information not specified")
 	errValidatorsSpecifiedIncorrectly = errors.New("validator information specified through mutually exclusive flags")
-	errValidatorNumberExceedsMax      = errors.New("validator number exceeds max validator number")
 	errUnsupportedConsensus           = errors.New("specified consensusRaw not supported")
 	errMissingBootnode                = errors.New("at least 1 bootnode is required")
 	errInvalidEpochSize               = errors.New("epoch size must be greater than 1")
@@ -62,8 +65,11 @@ type genesisParams struct {
 	blockGasLimit uint64
 	isPos         bool
 
-	minNumValidators uint64
-	maxNumValidators uint64
+	validatorsetOwner string
+	bridgeOwner       string
+	bridgeSignersRaw  []string
+	bridgeSigners     []types.Address
+	vaultOwner        string
 
 	extraData []byte
 	consensus server.ConsensusType
@@ -111,11 +117,6 @@ func (p *genesisParams) validateFlags() error {
 		return errInvalidEpochSize
 	}
 
-	// Validate min and max validators number
-	if err := command.ValidateMinMaxValidatorsNumber(p.minNumValidators, p.maxNumValidators); err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -144,6 +145,7 @@ func (p *genesisParams) initRawParams() error {
 		return err
 	}
 
+	p.initBridgeSigners()
 	p.initIBFTExtraData()
 	p.initConsensusEngineConfig()
 
@@ -188,16 +190,7 @@ func (p *genesisParams) initValidatorSet() error {
 
 	p.setValidatorSetFromCli()
 
-	// Validate if validator number exceeds max number
-	if ok := p.isValidatorNumberValid(); !ok {
-		return errValidatorNumberExceedsMax
-	}
-
 	return nil
-}
-
-func (p *genesisParams) isValidatorNumberValid() bool {
-	return uint64(len(p.ibftValidators)) <= p.maxNumValidators
 }
 
 func (p *genesisParams) initIBFTExtraData() {
@@ -275,14 +268,31 @@ func (p *genesisParams) initGenesisConfig() error {
 		Bootnodes: p.bootnodes,
 	}
 
-	// Predeploy staking smart contract if needed
-	if p.shouldPredeployStakingSC() {
-		stakingAccount, err := p.predeployStakingSC()
+	// Predeploy ValidatorSet smart contract if needed
+	if p.shouldPredeployValidatorSetSC() {
+		account, err := p.predeployValidatorSetSC()
 		if err != nil {
 			return err
 		}
 
-		chainConfig.Genesis.Alloc[staking.AddrStakingContract] = stakingAccount
+		chainConfig.Genesis.Alloc[systemcontracts.AddrValidatorSetContract] = account
+	}
+
+	// Predeploy bridge contract
+	if bridgeAccount, err := p.predeployBridgeSC(); err != nil {
+		return err
+	} else {
+		chainConfig.Genesis.Alloc[systemcontracts.AddrBridgeContract] = bridgeAccount
+	}
+
+	// Predeploy vault contract if needed
+	if p.shouldPredeployValidatorSetSC() {
+		vaultAccount, err := p.predeployVaultSC()
+		if err != nil {
+			return err
+		}
+
+		chainConfig.Genesis.Alloc[systemcontracts.AddrVaultContract] = vaultAccount
 	}
 
 	// Premine accounts
@@ -295,27 +305,52 @@ func (p *genesisParams) initGenesisConfig() error {
 	return nil
 }
 
-func (p *genesisParams) shouldPredeployStakingSC() bool {
+func (p *genesisParams) shouldPredeployValidatorSetSC() bool {
 	// If the consensus selected is IBFT / Dev and the mechanism is Proof of Stake,
-	// deploy the Staking SC
+	// deploy the ValidatorSet SC
 	return p.isPos && (p.consensus == server.IBFTConsensus || p.consensus == server.DevConsensus)
 }
 
-func (p *genesisParams) predeployStakingSC() (*chain.GenesisAccount, error) {
-	stakingAccount, predeployErr := stakingHelper.PredeployStakingSC(p.ibftValidators,
-		stakingHelper.PredeployParams{
-			MinValidatorCount: p.minNumValidators,
-			MaxValidatorCount: p.maxNumValidators,
+func (p *genesisParams) predeployValidatorSetSC() (*chain.GenesisAccount, error) {
+	account, predeployErr := validatorsetHelper.PredeploySC(
+		validatorsetHelper.PredeployParams{
+			Owner:      types.StringToAddress(p.validatorsetOwner),
+			Validators: p.ibftValidators,
 		})
 	if predeployErr != nil {
 		return nil, predeployErr
 	}
 
-	return stakingAccount, nil
+	return account, nil
+}
+
+func (p *genesisParams) predeployVaultSC() (*chain.GenesisAccount, error) {
+	return vaultHelper.PredeployVaultSC(
+		vaultHelper.PredeployParams{
+			Owner: types.StringToAddress(p.vaultOwner),
+		},
+	)
 }
 
 func (p *genesisParams) getResult() command.CommandResult {
 	return &GenesisResult{
 		Message: fmt.Sprintf("Genesis written to %s\n", p.genesisPath),
 	}
+}
+
+func (p *genesisParams) initBridgeSigners() {
+	p.bridgeSigners = make([]types.Address, 0, len(p.bridgeSignersRaw))
+
+	for _, signer := range p.bridgeSignersRaw {
+		p.bridgeSigners = append(p.bridgeSigners, types.StringToAddress(signer))
+	}
+}
+
+func (p *genesisParams) predeployBridgeSC() (*chain.GenesisAccount, error) {
+	return bridgeHelper.PredeployBridgeSC(
+		bridgeHelper.PredeployParams{
+			Owner:   types.StringToAddress(p.bridgeOwner),
+			Signers: p.bridgeSigners,
+		},
+	)
 }

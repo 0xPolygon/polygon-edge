@@ -1,4 +1,4 @@
-package staking
+package validatorset
 
 import (
 	"errors"
@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/dogechain-lab/jury/contracts/abis"
+	"github.com/dogechain-lab/jury/contracts/systemcontracts"
 	"github.com/dogechain-lab/jury/state/runtime"
 	"github.com/dogechain-lab/jury/types"
 	"github.com/stretchr/testify/assert"
@@ -82,6 +83,15 @@ func Test_decodeValidators(t *testing.T) {
 			succeed: false,
 		},
 		{
+			name: "should succeed with empty array",
+			value: appendAll(
+				leftPad([]byte{0x20}, 32), // Offset of the beginning of array
+				leftPad([]byte{0x00}, 32), // Number of addresses
+			),
+			succeed:  true,
+			expected: []types.Address{},
+		},
+		{
 			name: "should succeed",
 			value: appendAll(
 				leftPad([]byte{0x20}, 32), // Offset of the beginning of array
@@ -99,9 +109,8 @@ func Test_decodeValidators(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			method := abis.StakingABI.Methods["validators"]
+			method := abis.ValidatorSetABI.Methods["validators"]
 			assert.NotNil(t, method)
-
 			res, err := DecodeValidators(method, tt.value)
 			if tt.succeed {
 				assert.NoError(t, err)
@@ -114,7 +123,7 @@ func Test_decodeValidators(t *testing.T) {
 }
 
 func TestQueryValidators(t *testing.T) {
-	method := abis.StakingABI.Methods["validators"]
+	method := abis.ValidatorSetABI.Methods["validators"]
 	if method == nil {
 		t.Fail()
 	}
@@ -146,7 +155,7 @@ func TestQueryValidators(t *testing.T) {
 				addr: addr1,
 				tx: &types.Transaction{
 					From:     addr1,
-					To:       &AddrStakingContract,
+					To:       &systemcontracts.AddrValidatorSetContract,
 					Value:    big.NewInt(0),
 					Input:    method.ID(),
 					GasPrice: big.NewInt(0),
@@ -172,7 +181,7 @@ func TestQueryValidators(t *testing.T) {
 				addr: addr1,
 				tx: &types.Transaction{
 					From:     addr1,
-					To:       &AddrStakingContract,
+					To:       &systemcontracts.AddrValidatorSetContract,
 					Value:    big.NewInt(0),
 					Input:    method.ID(),
 					GasPrice: big.NewInt(0),
@@ -198,7 +207,7 @@ func TestQueryValidators(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			method := abis.StakingABI.Methods["validators"]
+			method := abis.ValidatorSetABI.Methods["validators"]
 			assert.NotNil(t, method)
 
 			mock := &TxMock{

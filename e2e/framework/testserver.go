@@ -24,7 +24,6 @@ import (
 	"github.com/dogechain-lab/jury/consensus/ibft"
 	ibftOp "github.com/dogechain-lab/jury/consensus/ibft/proto"
 	"github.com/dogechain-lab/jury/crypto"
-	stakingHelper "github.com/dogechain-lab/jury/helper/staking"
 	"github.com/dogechain-lab/jury/helper/tests"
 	"github.com/dogechain-lab/jury/network"
 	"github.com/dogechain-lab/jury/secrets"
@@ -268,7 +267,7 @@ func (t *TestServer) GenerateGenesis() error {
 	case ConsensusDev:
 		args = append(args, "--consensus", "dev")
 
-		// Set up any initial staker addresses for the predeployed Staking SC
+		// Set up any initial staker addresses for the predeployed ValidatorSet SC
 		for _, stakerAddress := range t.Config.DevStakers {
 			args = append(args, "--ibft-validator", stakerAddress.String())
 		}
@@ -283,17 +282,6 @@ func (t *TestServer) GenerateGenesis() error {
 	// Make sure the correct mechanism is selected
 	if t.Config.IsPos {
 		args = append(args, "--pos")
-
-		if t.Config.MinValidatorCount == 0 {
-			t.Config.MinValidatorCount = stakingHelper.MinValidatorCount
-		}
-
-		if t.Config.MaxValidatorCount == 0 {
-			t.Config.MaxValidatorCount = stakingHelper.MaxValidatorCount
-		}
-
-		args = append(args, "--min-validator-count", strconv.FormatUint(t.Config.MinValidatorCount, 10))
-		args = append(args, "--max-validator-count", strconv.FormatUint(t.Config.MaxValidatorCount, 10))
 	}
 
 	// add block gas limit

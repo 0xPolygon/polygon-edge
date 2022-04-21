@@ -52,18 +52,6 @@ func setFlags(cmd *cobra.Command) {
 		"",
 		"the height to switch the new type",
 	)
-	cmd.Flags().StringVar(
-		&params.minValidatorCountRaw,
-		minValidatorCount,
-		"",
-		"the minimum number of validators in the validator set for PoS",
-	)
-	cmd.Flags().StringVar(
-		&params.maxValidatorCountRaw,
-		maxValidatorCount,
-		"",
-		"the maximum number of validators in the validator set for PoS",
-	)
 }
 
 func setRequiredFlags(cmd *cobra.Command) {

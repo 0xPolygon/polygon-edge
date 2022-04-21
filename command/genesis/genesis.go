@@ -6,7 +6,6 @@ import (
 	"github.com/dogechain-lab/jury/command"
 	"github.com/dogechain-lab/jury/command/helper"
 	"github.com/dogechain-lab/jury/consensus/ibft"
-	"github.com/dogechain-lab/jury/helper/common"
 	"github.com/spf13/cobra"
 )
 
@@ -128,17 +127,33 @@ func setFlags(cmd *cobra.Command) {
 			command.DefaultGenesisGasLimit,
 		),
 	)
-	cmd.Flags().Uint64Var(
-		&params.minNumValidators,
-		minValidatorCount,
-		1,
-		"the minimum number of validators in the validator set for PoS",
+
+	cmd.Flags().StringVar(
+		&params.validatorsetOwner,
+		validatorsetOwner,
+		"",
+		"the system ValidatorSet contract owner address",
 	)
-	cmd.Flags().Uint64Var(
-		&params.maxNumValidators,
-		maxValidatorCount,
-		common.MaxSafeJSInt,
-		"the maximum number of validators in the validator set for PoS",
+
+	cmd.Flags().StringVar(
+		&params.bridgeOwner,
+		bridgeOwner,
+		"",
+		"the system bridge contract owner address",
+	)
+
+	cmd.Flags().StringArrayVar(
+		&params.bridgeSignersRaw,
+		bridgeSigner,
+		[]string{},
+		"the system bridge contract signer address. This flag can be used multiple times",
+	)
+
+	cmd.Flags().StringVar(
+		&params.vaultOwner,
+		vaultOwner,
+		"",
+		"the system vault contract owner address",
 	)
 }
 

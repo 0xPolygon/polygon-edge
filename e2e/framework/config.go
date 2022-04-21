@@ -35,7 +35,7 @@ type TestServerConfig struct {
 	IBFTDir                 string               // The name of data directory for IBFT
 	PremineAccts            []*SrvAccount        // Accounts with existing balances (genesis accounts)
 	GenesisValidatorBalance *big.Int             // Genesis the balance for the validators
-	DevStakers              []types.Address      // List of initial staking addresses for the staking SC with dev consensus
+	DevStakers              []types.Address      // List of initial staking addresses for the ValidatorSet SC with dev consensus
 	Consensus               ConsensusType        // Consensus MechanismType
 	Bootnodes               []string             // Bootnode Addresses
 	PriceLimit              *uint64              // Minimum gas price limit to enforce for acceptance into the pool
@@ -46,8 +46,6 @@ type TestServerConfig struct {
 	ShowsLog                bool                 // Flag specifying if logs are shown
 	IsPos                   bool                 // Specifies the mechanism used for IBFT (PoA / PoS)
 	Signer                  *crypto.EIP155Signer // Signer used for transactions
-	MinValidatorCount       uint64               // Min validator count
-	MaxValidatorCount       uint64               // Max validator count
 }
 
 // DataDir returns path of data directory server uses
@@ -103,7 +101,7 @@ func (t *TestServerConfig) SetDevInterval(interval int) {
 	t.DevInterval = interval
 }
 
-// SetDevStakingAddresses sets the Staking smart contract staker addresses for the dev mode.
+// SetDevStakingAddresses sets the ValidatorSet smart contract staker addresses for the dev mode.
 // These addresses should be passed into the `ibft-validator` flag in genesis generation.
 // Since invoking the dev consensus will not generate the ibft base folders, this is the only way
 // to signalize to the genesis creation process who the validators are
@@ -155,14 +153,4 @@ func (t *TestServerConfig) SetShowsLog(f bool) {
 // It controls the rate at which the validator set is updated
 func (t *TestServerConfig) SetEpochSize(epochSize uint64) {
 	t.EpochSize = epochSize
-}
-
-// SetMinValidatorCount sets the min validator count
-func (t *TestServerConfig) SetMinValidatorCount(val uint64) {
-	t.MinValidatorCount = val
-}
-
-// SetMaxValidatorCount sets the max validator count
-func (t *TestServerConfig) SetMaxValidatorCount(val uint64) {
-	t.MaxValidatorCount = val
 }
