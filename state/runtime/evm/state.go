@@ -49,6 +49,8 @@ var (
 
 // Instructions is the code of instructions
 
+type State state
+
 type state struct {
 	ip   int
 	code []byte
@@ -97,6 +99,7 @@ func (c *state) reset() {
 		c.memory[i] = 0
 	}
 
+	c.stack = c.stack[:0]
 	c.tmp = c.tmp[:0]
 	c.ret = c.ret[:0]
 	c.code = c.code[:0]
@@ -211,23 +214,51 @@ func (c *state) resetReturnData() {
 // Run executes the virtual machine
 func (c *state) Run() ([]byte, error) {
 	var vmerr error
+	var pcCopy uint64
+	var gasCopy uint64
+	var cost uint64
+	var logged bool
+	var op OpCode
+	var scope runtime.ScopeContext
 
 	codeSize := len(c.code)
+
+	tracer := c.host.GetTracer()
+	if tracer != nil {
+		defer func() {
+			if c.err != nil {
+				if !logged {
+					tracer.CaptureState(pcCopy, int(op), gasCopy, cost, scope, c.ret, c.msg.Depth, c.err)
+				} else {
+					tracer.CaptureFault(pcCopy, int(op), gasCopy, cost, scope, c.msg.Depth, c.err)
+				}
+			}
+		}()
+	}
 	for !c.stop {
+		if tracer != nil {
+			logged = false
+			pcCopy = uint64(c.ip)
+			gasCopy = c.gas
+		}
 		if c.ip >= codeSize {
 			c.halt()
 
 			break
 		}
 
-		op := OpCode(c.code[c.ip])
-
+		op = OpCode(c.code[c.ip])
 		inst := dispatchTable[op]
 		if inst.inst == nil {
 			c.exit(errOpCodeNotFound)
 
 			break
 		}
+
+		if tracer != nil {
+			cost = inst.gas
+		}
+
 		// check if the depth of the stack is enough for the instruction
 		if c.sp < inst.stack {
 			c.exit(errStackUnderflow)
@@ -241,9 +272,17 @@ func (c *state) Run() ([]byte, error) {
 			break
 		}
 
+		if tracer != nil {
+			scope = runtime.ScopeContext{
+				Memory:   c.memory,
+				Stack:    c.stack,
+				Contract: c.msg,
+			}
+			tracer.CaptureState(pcCopy, int(op), gasCopy, cost, scope, c.ret, c.msg.Depth, c.err)
+			logged = true
+		}
 		// execute the instruction
 		inst.inst(c)
-
 		// check if stack size exceeds the max size
 		if c.sp > stackSize {
 			c.exit(errStackOverflow)
@@ -270,6 +309,18 @@ func bigToHash(b *big.Int) types.Hash {
 
 func (c *state) Len() int {
 	return len(c.memory)
+}
+
+func (c *state) Memory() []byte {
+	return c.memory
+}
+
+func (c *state) Stack() []*big.Int {
+	return c.stack
+}
+
+func (c *state) Msg() *runtime.Contract {
+	return c.msg
 }
 
 func (c *state) checkMemory(offset, size *big.Int) bool {

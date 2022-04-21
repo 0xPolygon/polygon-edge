@@ -1,11 +1,20 @@
 package types
 
 import (
+	"github.com/0xPolygon/polygon-edge/helper/keccak"
 	"math/big"
 	"sync/atomic"
-
-	"github.com/0xPolygon/polygon-edge/helper/keccak"
 )
+
+// Config are the configuration options for structured logger the EVM
+type LoggerConfig struct {
+	EnableMemory     bool // enable memory capture
+	DisableStack     bool // disable stack capture
+	DisableStorage   bool // disable storage capture
+	EnableReturnData bool // enable return data capture
+	Debug            bool // print output during capture end
+	Limit            int  // maximum length of output, but zero means unlimited
+}
 
 type Transaction struct {
 	Nonce    uint64
@@ -22,6 +31,8 @@ type Transaction struct {
 
 	// Cache
 	size atomic.Value
+
+	LoggerConfig *LoggerConfig
 }
 
 func (t *Transaction) IsContractCreation() bool {
@@ -102,4 +113,8 @@ func (t *Transaction) ExceedsBlockGasLimit(blockGasLimit uint64) bool {
 
 func (t *Transaction) IsUnderpriced(priceLimit uint64) bool {
 	return t.GasPrice.Cmp(big.NewInt(0).SetUint64(priceLimit)) < 0
+}
+
+func (t *Transaction) SetLoggerConfig(config *LoggerConfig) {
+	t.LoggerConfig = config
 }

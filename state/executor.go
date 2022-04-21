@@ -3,10 +3,11 @@ package state
 import (
 	"errors"
 	"fmt"
+	"github.com/0xPolygon/polygon-edge/state/runtime/evm"
+	"github.com/hashicorp/go-hclog"
 	"math"
 	"math/big"
-
-	"github.com/hashicorp/go-hclog"
+	"time"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/crypto"
@@ -138,7 +139,7 @@ func (e *Executor) BeginTxn(
 	coinbaseReceiver types.Address,
 ) (*Transition, error) {
 	config := e.config.Forks.At(header.Number)
-
+	fmt.Printf("parentRoot", parentRoot)
 	auxSnap2, err := e.state.NewSnapshotAt(parentRoot)
 	if err != nil {
 		return nil, err
@@ -191,6 +192,8 @@ type Transition struct {
 	// result
 	receipts []*types.Receipt
 	totalGas uint64
+
+	tracer *evm.StructLogger
 }
 
 func (t *Transition) TotalGas() uint64 {
@@ -469,6 +472,12 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 	t.ctx.GasPrice = types.BytesToHash(gasPrice.Bytes())
 	t.ctx.Origin = msg.From
 
+	// Set Tracer
+	t.tracer = evm.NewStructLogger(msg.LoggerConfig, txn)
+	defer func() {
+		t.tracer = nil
+	}()
+
 	var result *runtime.ExecutionResult
 	if msg.IsContractCreation() {
 		result = t.Create2(msg.From, msg.Input, value, gasLeft)
@@ -513,9 +522,14 @@ func (t *Transition) Call2(
 	value *big.Int,
 	gas uint64,
 ) *runtime.ExecutionResult {
-	c := runtime.NewContractCall(1, caller, caller, to, value, gas, t.state.GetCode(to), input)
 
-	return t.applyCall(c, runtime.Call, t)
+	c := runtime.NewContractCall(1, caller, caller, to, value, gas, t.state.GetCode(to), input)
+	ret := t.applyCall(c, runtime.Call, t)
+	tracer := t.GetTracer()
+	if tracer != nil {
+		ret.Tracer = tracer
+	}
+	return ret
 }
 
 func (t *Transition) run(contract *runtime.Contract, host runtime.Host) *runtime.ExecutionResult {
@@ -548,6 +562,10 @@ func (t *Transition) transfer(from, to types.Address, amount *big.Int) error {
 	return nil
 }
 
+func (t *Transition) GetTracer() runtime.Tracer {
+	return t.tracer
+}
+
 func (t *Transition) applyCall(
 	c *runtime.Contract,
 	callType runtime.CallType,
@@ -573,7 +591,40 @@ func (t *Transition) applyCall(
 		}
 	}
 
-	result := t.run(c, host)
+	var result *runtime.ExecutionResult
+
+	tracer := host.GetTracer()
+	if tracer != nil {
+		if c.Depth == 1 {
+			// 创建
+			tracer.CaptureStart()
+			defer func(startGas uint64, startTime time.Time) { // Lazy evaluation of the parameters
+				tracer.CaptureEnd(result.ReturnValue, startGas-c.Gas, time.Since(startTime), result.Err)
+			}(c.Gas, time.Now())
+		} else {
+			switch callType {
+			case runtime.Call:
+				tracer.CaptureEnter(evm.CALL, c.Caller, c.Address, c.Input, c.Gas, c.Value)
+			case runtime.CallCode:
+				tracer.CaptureEnter(evm.CALLCODE, c.Caller, c.Address, c.Input, c.Gas, c.Value)
+			case runtime.DelegateCall:
+				tracer.CaptureEnter(evm.DELEGATECALL, c.Caller, c.Address, c.Input, c.Gas, c.Value)
+			case runtime.StaticCall:
+				tracer.CaptureEnter(evm.STATICCALL, c.Caller, c.Address, c.Input, c.Gas, c.Value)
+			case runtime.Create:
+				tracer.CaptureEnter(evm.CREATE, c.Caller, c.Address, c.Input, c.Gas, c.Value)
+			case runtime.Create2:
+				tracer.CaptureEnter(evm.CREATE2, c.Caller, c.Address, c.Input, c.Gas, c.Value)
+			}
+
+			defer func(startGas uint64) {
+				tracer.CaptureExit(result.ReturnValue, startGas-c.Gas, result.Err)
+			}(c.Gas)
+		}
+	}
+
+	result = t.run(c, host)
+
 	if result.Failed() {
 		t.state.RevertToSnapshot(snapshot)
 	}
@@ -636,7 +687,24 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 		}
 	}
 
-	result := t.run(c, host)
+	var result *runtime.ExecutionResult
+
+	tracer := host.GetTracer()
+	if tracer != nil {
+		if c.Depth == 1 {
+			tracer.CaptureStart()
+			defer func(startGas uint64, startTime time.Time) { // Lazy evaluation of the parameters
+				tracer.CaptureEnd(result.ReturnValue, startGas-c.Gas, time.Since(startTime), result.Err)
+			}(c.Gas, time.Now())
+		} else {
+			tracer.CaptureEnter(evm.CREATE, c.Caller, c.Address, c.Input, c.Gas, c.Value)
+			defer func(startGas uint64) {
+				tracer.CaptureExit(result.ReturnValue, startGas-c.Gas, result.Err)
+			}(c.Gas)
+		}
+	}
+
+	result = t.run(c, host)
 
 	if result.Failed() {
 		t.state.RevertToSnapshot(snapshot)
