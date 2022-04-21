@@ -15,4 +15,7 @@ var (
 )
 
 // Temporarily deployed contract ABI
-var StressTestABI = abi.MustNewABI(StressTestJSONABI)
+var (
+	// StressTest contract abi
+	StressTestABI = abi.MustNewABI(StressTestJSONABI)
+)

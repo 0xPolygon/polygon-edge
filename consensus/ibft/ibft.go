@@ -900,7 +900,20 @@ func (i *Ibft) runValidateState() {
 		}
 
 		if msg == nil {
+			i.logger.Debug("ValidateState got message timeout, should change round",
+				"sequence", i.state.view.Sequence, "round", i.state.view.Round+1)
+			i.state.unlock()
 			i.setState(RoundChangeState)
+
+			continue
+		}
+
+		// check msg number and round, might from some faulty nodes
+		if i.state.view.Sequence != msg.View.GetSequence() ||
+			i.state.view.Round != msg.View.GetRound() {
+			i.logger.Debug("ValidateState got message not matching sequence and round",
+				"my-sequence", i.state.view.Sequence, "my-round", i.state.view.Round+1,
+				"other-sequence", msg.View.GetSequence(), "other-round", msg.View.GetRound())
 
 			continue
 		}
