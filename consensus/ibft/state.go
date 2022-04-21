@@ -99,12 +99,9 @@ func (c *currentState) setState(s IbftState) {
 
 // NumValid returns the number of required messages
 func NumValid(validators ValidatorSet) int {
-	// According to the IBFT spec, the number of valid messages
-	// needs to be 2F + 1
-	// The 1 missing from this equation is accounted for elsewhere
-	// (the current node tallying the messages will include its own message)
+	// 	Q = ceil(2/3 * N)
+	//	quorum optimal
 	return int(math.Ceil(2.0 * float64(validators.Len()) / 3))
-	//return 2 * c.validators.MaxFaultyNodes()
 }
 
 // getErr returns the current error, if any, and consumes it
