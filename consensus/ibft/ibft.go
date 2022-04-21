@@ -1102,17 +1102,15 @@ func (i *Ibft) runRoundChangeState() {
 		// we only expect RoundChange messages right now
 		num := i.state.AddRoundMessage(msg)
 
-		if num == NumValid(i.state.validators) {
+		if num == i.state.validators.MaxFaultyNodes()+1 && i.state.view.Round < msg.View.Round {
+			// weak certificate, try to catch up if our round number is smaller
+			// update timer
+			timeout = exponentialTimeout(i.state.view.Round)
+			sendRoundChange(msg.View.Round)
+		} else if num == NumValid(i.state.validators) {
 			// start a new round immediately
 			i.state.view.Round = msg.View.Round
 			i.setState(AcceptState)
-		} else if num == i.state.validators.MaxFaultyNodes()+1 {
-			// weak certificate, try to catch up if our round number is smaller
-			if i.state.view.Round < msg.View.Round {
-				// update timer
-				timeout = exponentialTimeout(i.state.view.Round)
-				sendRoundChange(msg.View.Round)
-			}
 		}
 	}
 }

@@ -99,8 +99,13 @@ func (c *currentState) setState(s IbftState) {
 
 // NumValid returns the number of required messages
 func NumValid(validators ValidatorSet) int {
-	// 	Q = ceil(2/3 * N)
-	//	quorum optimal
+	//	if the number of validators is less than 4,
+	//	then the entire set is required
+	if validators.MaxFaultyNodes() == 0 {
+		return validators.Len()
+	}
+
+	// 	Q = ceil(2/3 * N) - (quorum optimal)
 	return int(math.Ceil(2.0 * float64(validators.Len()) / 3))
 }
 
@@ -152,7 +157,12 @@ func (c *currentState) unlock() {
 
 // cleanRound deletes the specific round messages
 func (c *currentState) cleanRound(round uint64) {
-	delete(c.roundMessages, round)
+	//	clear messages from previous round
+	for r := range c.roundMessages {
+		if r < round {
+			delete(c.roundMessages, r)
+		}
+	}
 }
 
 // AddRoundMessage adds a message to the round, and returns the round message size
