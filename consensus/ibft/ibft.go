@@ -916,12 +916,12 @@ func (i *Ibft) runValidateState() {
 			panic(fmt.Sprintf("BUG: %s", reflect.TypeOf(msg.Type)))
 		}
 
-		if i.state.numPrepared() > i.state.NumValid() {
+		if i.state.numPrepared() >= NumValid(i.state.validators) {
 			// we have received enough pre-prepare messages
 			sendCommit()
 		}
 
-		if i.state.numCommitted() > i.state.NumValid() {
+		if i.state.numCommitted() >= NumValid(i.state.validators) {
 			// we have received enough commit messages
 			sendCommit()
 
@@ -1102,7 +1102,7 @@ func (i *Ibft) runRoundChangeState() {
 		// we only expect RoundChange messages right now
 		num := i.state.AddRoundMessage(msg)
 
-		if num == i.state.NumValid() {
+		if num == NumValid(i.state.validators) {
 			// start a new round immediately
 			i.state.view.Round = msg.View.Round
 			i.setState(AcceptState)
