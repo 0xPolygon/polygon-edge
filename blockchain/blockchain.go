@@ -1092,7 +1092,7 @@ func (b *Blockchain) GetBlockByHash(hash types.Hash, full bool) (*types.Block, b
 		Header: header,
 	}
 
-	if !full {
+	if !full || header.Number == 0 {
 		return block, true
 	}
 
