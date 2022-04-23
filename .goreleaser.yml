@@ -93,7 +93,7 @@ snapshot:
 
 dockers:
   - image_templates:
-      - kourin1996/{{ .ProjectName }}:{{ .Version }}-amd64
+      - 0xpolygon/{{ .ProjectName }}:{{ .Version }}-amd64
     dockerfile: Dockerfile.release
     use: buildx
     goarch: amd64
@@ -104,7 +104,7 @@ dockers:
     skip_push: false
 
   - image_templates:
-      - kourin1996/{{ .ProjectName }}:{{ .Version }}-arm64
+      - 0xpolygon/{{ .ProjectName }}:{{ .Version }}-arm64
     dockerfile: Dockerfile.release
     use: buildx
     goarch: arm64
@@ -115,14 +115,14 @@ dockers:
     skip_push: false
 
 docker_manifests:
-  - name_template: kourin1996/{{ .ProjectName }}:{{ .Version }}
+  - name_template: 0xpolygon/{{ .ProjectName }}:{{ .Version }}
     image_templates:
-      - kourin1996/{{ .ProjectName }}:{{ .Version }}-amd64
-      - kourin1996/{{ .ProjectName }}:{{ .Version }}-arm64
+      - 0xpolygon/{{ .ProjectName }}:{{ .Version }}-amd64
+      - 0xpolygon/{{ .ProjectName }}:{{ .Version }}-arm64
     skip_push: false
 
-  - name_template: kourin1996/{{ .ProjectName }}:latest
+  - name_template: 0xpolygon/{{ .ProjectName }}:latest
     image_templates:
-      - kourin1996/{{ .ProjectName }}:{{ .Version }}-amd64
-      - kourin1996/{{ .ProjectName }}:{{ .Version }}-arm64
+      - 0xpolygon/{{ .ProjectName }}:{{ .Version }}-amd64
+      - 0xpolygon/{{ .ProjectName }}:{{ .Version }}-arm64
     skip_push: false
