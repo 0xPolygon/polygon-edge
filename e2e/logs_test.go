@@ -3,6 +3,7 @@ package e2e
 import (
 	"context"
 	"math/big"
+	"sync"
 	"testing"
 	"time"
 
@@ -18,36 +19,86 @@ import (
 
 func TestNewFilter_Logs(t *testing.T) {
 	key, addr := tests.GenerateKeyAndAddr(t)
-	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
-		config.SetConsensus(framework.ConsensusDev)
-		config.Premine(addr, framework.EthToWei(10))
-		config.SetSeal(true)
-	})
-	srv := srvs[0]
+
+	ibftManager := framework.NewIBFTServersManager(
+		t,
+		1,
+		IBFTDirPrefix,
+		func(i int, config *framework.TestServerConfig) {
+			config.Premine(addr, framework.EthToWei(10))
+			config.SetBlockTime(1)
+		},
+	)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	ibftManager.StartServers(ctx)
+	srv := ibftManager.GetServer(0)
 
 	ctx1, cancel1 := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel1()
 
 	contractAddr, err := srv.DeployContract(ctx1, sampleByteCode, key)
+	castedContractAddr := types.Address(contractAddr)
 
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	client := srv.JSONRPC()
-	id, err := client.Eth().NewFilter(&web3.LogFilter{})
+	txpoolClient := srv.TxnPoolOperator()
+	jsonRPCClient := srv.JSONRPC()
+	id, err := jsonRPCClient.Eth().NewFilter(&web3.LogFilter{})
 	assert.NoError(t, err)
 
 	numCalls := 10
-	for i := 0; i < numCalls; i++ {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		srv.InvokeMethod(ctx, types.Address(contractAddr), "setA1", key)
+
+	var (
+		wg sync.WaitGroup
+	)
+
+	for i := 1; i <= numCalls; i++ {
+		wg.Add(1)
+
+		go func(nonce uint64) {
+			defer wg.Done()
+
+			txn, err := tests.GenerateAddTxnReq(tests.GenerateTxReqParams{
+				Nonce:         nonce,
+				ReferenceAddr: addr,
+				ReferenceKey:  key,
+				ToAddress:     castedContractAddr,
+				GasPrice:      big.NewInt(framework.DefaultGasPrice),
+				Input:         framework.MethodSig("setA1"),
+			})
+			if err != nil {
+				return
+			}
+
+			addTxnContext, cancelFn := context.WithTimeout(context.Background(), time.Second*10)
+			defer cancelFn()
+
+			addResp, addErr := txpoolClient.AddTxn(addTxnContext, txn)
+			if addErr != nil {
+				return
+			}
+
+			receiptContext, cancelFn := context.WithTimeout(context.Background(), time.Second*10)
+			defer cancelFn()
+
+			txHash := web3.Hash(types.StringToHash(addResp.TxHash))
+			if _, receiptErr := srv.WaitForReceipt(receiptContext, txHash); receiptErr != nil {
+				return
+			}
+		}(uint64(i))
 	}
 
-	res, err := client.Eth().GetFilterChanges(id)
+	wg.Wait()
+
+	res, err := jsonRPCClient.Eth().GetFilterChanges(id)
+
 	assert.NoError(t, err)
-	assert.Equal(t, len(res), numCalls)
+	assert.Equal(t, numCalls, len(res))
 }
 
 func TestNewFilter_Block(t *testing.T) {

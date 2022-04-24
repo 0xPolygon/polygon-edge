@@ -58,45 +58,6 @@ func waitForBlock(t *testing.T, srv *framework.TestServer, expectedBlocks int, i
 	return evnt.Added[index].Number
 }
 
-type generateTxReqParams struct {
-	nonce         uint64
-	referenceAddr types.Address
-	referenceKey  *ecdsa.PrivateKey
-	toAddress     types.Address
-	gasPrice      *big.Int
-	value         *big.Int
-	t             *testing.T
-}
-
-func generateTx(params generateTxReqParams) *types.Transaction {
-	signedTx, signErr := signer.SignTx(&types.Transaction{
-		Nonce:    params.nonce,
-		From:     params.referenceAddr,
-		To:       &params.toAddress,
-		GasPrice: params.gasPrice,
-		Gas:      1000000,
-		Value:    params.value,
-		V:        big.NewInt(27), // it is necessary to encode in rlp
-	}, params.referenceKey)
-
-	if signErr != nil {
-		params.t.Fatalf("Unable to sign transaction, %v", signErr)
-	}
-
-	return signedTx
-}
-
-func generateReq(params generateTxReqParams) *txpoolOp.AddTxnReq {
-	msg := &txpoolOp.AddTxnReq{
-		Raw: &any.Any{
-			Value: generateTx(params).MarshalRLP(),
-		},
-		From: types.ZeroAddress.String(),
-	}
-
-	return msg
-}
-
 func TestTxPool_ErrorCodes(t *testing.T) {
 	gasPrice := big.NewInt(10000)
 	devInterval := 5
@@ -147,15 +108,17 @@ func TestTxPool_ErrorCodes(t *testing.T) {
 			toAddress := types.StringToAddress("1")
 
 			// Add the initial transaction
-			addReq := generateReq(generateTxReqParams{
-				nonce:         0,
-				referenceAddr: referenceAddr,
-				referenceKey:  referenceKey,
-				toAddress:     toAddress,
-				gasPrice:      gasPrice,
-				value:         testCase.txValue,
-				t:             t,
+			addReq, err := tests.GenerateAddTxnReq(tests.GenerateTxReqParams{
+				Nonce:         0,
+				ReferenceAddr: referenceAddr,
+				ReferenceKey:  referenceKey,
+				ToAddress:     toAddress,
+				GasPrice:      gasPrice,
+				Value:         testCase.txValue,
 			})
+			if err != nil {
+				t.Fatalf("unable to generate txn, %v", err)
+			}
 
 			addResponse, addErr := clt.AddTxn(context.Background(), addReq)
 

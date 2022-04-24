@@ -5,9 +5,11 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
+	"github.com/golang/protobuf/ptypes/any"
 	libp2pCrypto "github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/multiformats/go-multiaddr"
+	"math/big"
 	"net"
 	"testing"
 	"time"
@@ -220,4 +222,51 @@ func GetFreePort() (port int, err error) {
 	}
 
 	return
+}
+
+type GenerateTxReqParams struct {
+	Nonce         uint64
+	ReferenceAddr types.Address
+	ReferenceKey  *ecdsa.PrivateKey
+	ToAddress     types.Address
+	GasPrice      *big.Int
+	Value         *big.Int
+	Input         []byte
+}
+
+func generateTx(params GenerateTxReqParams) (*types.Transaction, error) {
+	signer := crypto.NewEIP155Signer(100)
+
+	signedTx, signErr := signer.SignTx(&types.Transaction{
+		Nonce:    params.Nonce,
+		From:     params.ReferenceAddr,
+		To:       &params.ToAddress,
+		GasPrice: params.GasPrice,
+		Gas:      1000000,
+		Value:    params.Value,
+		Input:    params.Input,
+		V:        big.NewInt(27), // it is necessary to encode in rlp
+	}, params.ReferenceKey)
+
+	if signErr != nil {
+		return nil, fmt.Errorf("unable to sign transaction, %w", signErr)
+	}
+
+	return signedTx, nil
+}
+
+func GenerateAddTxnReq(params GenerateTxReqParams) (*txpoolOp.AddTxnReq, error) {
+	txn, err := generateTx(params)
+	if err != nil {
+		return nil, err
+	}
+
+	msg := &txpoolOp.AddTxnReq{
+		Raw: &any.Any{
+			Value: txn.MarshalRLP(),
+		},
+		From: types.ZeroAddress.String(),
+	}
+
+	return msg, nil
 }

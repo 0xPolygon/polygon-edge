@@ -355,6 +355,10 @@ func (t *TestServer) Start(ctx context.Context) error {
 		args = append(args, "--block-gas-target", *types.EncodeUint64(t.Config.BlockGasTarget))
 	}
 
+	if t.Config.BlockTime != 0 {
+		args = append(args, "--block-time", strconv.FormatUint(t.Config.BlockTime, 10))
+	}
+
 	t.ReleaseReservedPorts()
 
 	// Start the server
