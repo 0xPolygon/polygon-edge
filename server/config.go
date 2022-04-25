@@ -36,6 +36,9 @@ type Config struct {
 	SecretsManager *secrets.SecretsManagerConfig
 
 	LogLevel hclog.Level
+
+	Daemon       bool
+	ValidatorKey string
 }
 
 // Telemetry holds the config details for metric services

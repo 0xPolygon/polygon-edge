@@ -2,7 +2,6 @@ package secrets
 
 import (
 	"errors"
-
 	"github.com/hashicorp/go-hclog"
 )
 
@@ -87,6 +86,9 @@ type SecretsManagerParams struct {
 
 	// Extra contains additional data needed for the SecretsManager to function
 	Extra map[string]interface{}
+
+	IsDaemon           bool
+	DaemonValidatorKey string
 }
 
 // SecretsManagerFactory is the factory method for secrets managers

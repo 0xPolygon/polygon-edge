@@ -2,13 +2,13 @@ package server
 
 import (
 	"errors"
+	"github.com/hashicorp/go-hclog"
 	"net"
 
 	"github.com/dogechain-lab/jury/chain"
 	"github.com/dogechain-lab/jury/network"
 	"github.com/dogechain-lab/jury/secrets"
 	"github.com/dogechain-lab/jury/server"
-	"github.com/hashicorp/go-hclog"
 	"github.com/multiformats/go-multiaddr"
 )
 
@@ -33,6 +33,7 @@ const (
 	devIntervalFlag       = "dev-interval"
 	devFlag               = "dev"
 	corsOriginFlag        = "access-control-allow-origins"
+	daemonFlag            = "daemon"
 )
 
 const (
@@ -68,6 +69,8 @@ type serverParams struct {
 	blockGasTarget uint64
 	devInterval    uint64
 	isDevMode      bool
+	isDaemon       bool
+	validatorKey   string
 
 	corsAllowedOrigins []string
 
@@ -160,5 +163,7 @@ func (p *serverParams) generateConfig() *server.Config {
 		RestoreFile:    p.getRestoreFilePath(),
 		BlockTime:      p.rawConfig.BlockTime,
 		LogLevel:       hclog.LevelFromString(p.rawConfig.LogLevel),
+		Daemon:         p.isDaemon,
+		ValidatorKey:   p.validatorKey,
 	}
 }

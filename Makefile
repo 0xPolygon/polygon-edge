@@ -21,7 +21,7 @@ build:
 	$(eval LATEST_VERSION = $(shell git describe --tags --abbrev=0))
 	$(eval COMMIT_HASH = $(shell git rev-parse --short HEAD))
 	$(eval DATE = $(shell date +'%Y-%m-%d_%T'))
-	go build -ldflags="-X 'github.com/dogechain-lab/jury/versioning.Version=$(LATEST_VERSION)+$(COMMIT_HASH)+$(DATE)'" main.go
+	go build -ldflags="-X 'github.com/dogechain-lab/jury/versioning.Version=$(LATEST_VERSION)+$(COMMIT_HASH)+$(DATE)'" -o bin/jury main.go
 
 .PHONY: lint
 lint:

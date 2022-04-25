@@ -305,10 +305,16 @@ func (s *Server) setupSecretsManager() error {
 	}
 
 	if secretsManagerType == secrets.Local {
-		// Only the base directory is required for
-		// the local secrets manager
+		// The base directory is required for the local secrets manager
 		secretsManagerParams.Extra = map[string]interface{}{
 			secrets.Path: s.config.DataDir,
+		}
+
+		// When server started as daemon,
+		// ValidatorKey is required for the local secrets manager
+		if s.config.Daemon {
+			secretsManagerParams.DaemonValidatorKey = s.config.ValidatorKey
+			secretsManagerParams.IsDaemon = s.config.Daemon
 		}
 	}
 

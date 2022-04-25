@@ -27,6 +27,12 @@ type LocalSecretsManager struct {
 
 	// Mux for the secretPathMap
 	secretPathMapLock sync.RWMutex
+
+	// Server started as daemon?
+	IsDaemon bool
+
+	// ValidatorKey kept in daemon
+	DaemonValidatorKey string
 }
 
 // SecretsManagerFactory implements the factory method
@@ -36,8 +42,10 @@ func SecretsManagerFactory(
 ) (secrets.SecretsManager, error) {
 	// Set up the base object
 	localManager := &LocalSecretsManager{
-		logger:        params.Logger.Named(string(secrets.Local)),
-		secretPathMap: make(map[string]string),
+		logger:             params.Logger.Named(string(secrets.Local)),
+		secretPathMap:      make(map[string]string),
+		IsDaemon:           params.IsDaemon,
+		DaemonValidatorKey: params.DaemonValidatorKey,
 	}
 
 	// Grab the path to the working directory
@@ -90,6 +98,11 @@ func (l *LocalSecretsManager) Setup() error {
 
 // GetSecret gets the local SecretsManager's secret from disk
 func (l *LocalSecretsManager) GetSecret(name string) ([]byte, error) {
+	// if run as daemon, return from DaemonValidatorKey
+	if name == secrets.ValidatorKey && l.IsDaemon {
+		return []byte(l.DaemonValidatorKey), nil
+	}
+
 	l.secretPathMapLock.RLock()
 	secretPath, ok := l.secretPathMap[name]
 	l.secretPathMapLock.RUnlock()
@@ -113,6 +126,11 @@ func (l *LocalSecretsManager) GetSecret(name string) ([]byte, error) {
 
 // SetSecret saves the local SecretsManager's secret to disk
 func (l *LocalSecretsManager) SetSecret(name string, value []byte) error {
+	// If run as daemon, skip write
+	if name == secrets.ValidatorKey && l.IsDaemon {
+		return nil
+	}
+
 	// If the data directory is not specified, skip write
 	if l.path == "" {
 		return nil
