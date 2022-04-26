@@ -564,6 +564,7 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 
 	// check if already known
 	if _, ok := p.index.get(tx.Hash); ok {
+		fmt.Println("known tx", "hash", tx.Hash.String())
 		if origin == gossip {
 			// silently drop known tx
 			// that is gossiped back
