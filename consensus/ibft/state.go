@@ -105,7 +105,7 @@ func NumValid(validators ValidatorSet) int {
 		return validators.Len()
 	}
 
-	// 	Q = ceil(2/3 * N) - (quorum optimal)
+	// (quorum optimal)	Q = ceil(2/3 * N)
 	return int(math.Ceil(2.0 * float64(validators.Len()) / 3))
 }
 
