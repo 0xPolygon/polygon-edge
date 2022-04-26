@@ -62,7 +62,7 @@ func TestNumValid(t *testing.T) {
 
 		assert.Equal(t,
 			int(c.Quorum),
-			NumValid(pool.ValidatorSet()),
+			QuorumSize(pool.ValidatorSet()),
 		)
 	}
 }

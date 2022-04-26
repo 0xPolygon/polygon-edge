@@ -97,8 +97,8 @@ func (c *currentState) setState(s IbftState) {
 	atomic.StoreUint64(stateAddr, uint64(s))
 }
 
-// NumValid returns the number of required messages
-func NumValid(validators ValidatorSet) int {
+// QuorumSize returns the number of required messages for consensus
+func QuorumSize(validators ValidatorSet) int {
 	//	if the number of validators is less than 4,
 	//	then the entire set is required
 	if validators.MaxFaultyNodes() == 0 {
