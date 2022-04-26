@@ -97,18 +97,6 @@ func (c *currentState) setState(s IbftState) {
 	atomic.StoreUint64(stateAddr, uint64(s))
 }
 
-// QuorumSize returns the number of required messages for consensus
-func QuorumSize(validators ValidatorSet) int {
-	//	if the number of validators is less than 4,
-	//	then the entire set is required
-	if validators.MaxFaultyNodes() == 0 {
-		return validators.Len()
-	}
-
-	// (quorum optimal)	Q = ceil(2/3 * N)
-	return int(math.Ceil(2.0 * float64(validators.Len()) / 3))
-}
-
 // getErr returns the current error, if any, and consumes it
 func (c *currentState) getErr() error {
 	err := c.err
@@ -314,4 +302,21 @@ func (v *ValidatorSet) MaxFaultyNodes() int {
 	// 7 = 3 * 2 + 1
 	// It should always take the floor of the result
 	return (len(*v) - 1) / 3
+}
+
+// QuorumSize returns the number of required messages for consensus
+func (v ValidatorSet) QuorumSize() int {
+	//	if the number of validators is less than 4,
+	//	then the entire set is required
+	if v.MaxFaultyNodes() == 0 {
+		/*
+			N: 1 -> Q: 1
+			N: 2 -> Q: 2
+			N: 3 -> Q: 3
+		*/
+		return v.Len()
+	}
+
+	// (quorum optimal)	Q = ceil(2/3 * N)
+	return int(math.Ceil(2 * float64(v.Len()) / 3))
 }
