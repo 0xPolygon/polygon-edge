@@ -1078,10 +1078,6 @@ func TestAddTxns(t *testing.T) {
 			"send 100k txns",
 			100000,
 		},
-		{
-			"send 1m txns",
-			1000000,
-		},
 	}
 
 	for _, testCase := range testTable {
