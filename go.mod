@@ -19,7 +19,7 @@ require (
 	github.com/libp2p/go-libp2p v0.18.0-rc2
 	github.com/libp2p/go-libp2p-core v0.15.1
 	github.com/libp2p/go-libp2p-kbucket v0.4.7
-	github.com/libp2p/go-libp2p-noise v0.3.0
+	github.com/libp2p/go-libp2p-noise v0.4.0
 	github.com/libp2p/go-libp2p-pubsub v0.6.1
 	github.com/miekg/dns v1.1.45 // indirect
 	github.com/multiformats/go-base32 v0.0.4 // indirect

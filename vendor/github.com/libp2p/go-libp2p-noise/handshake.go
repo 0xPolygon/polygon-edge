@@ -5,6 +5,8 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"fmt"
+	"os"
+	"runtime/debug"
 	"time"
 
 	"golang.org/x/crypto/poly1305"
@@ -28,7 +30,14 @@ var cipherSuite = noise.NewCipherSuite(noise.DH25519, noise.CipherChaChaPoly, no
 
 // runHandshake exchanges handshake messages with the remote peer to establish
 // a noise-libp2p session. It blocks until the handshake completes or fails.
-func (s *secureSession) runHandshake(ctx context.Context) error {
+func (s *secureSession) runHandshake(ctx context.Context) (err error) {
+	defer func() {
+		if rerr := recover(); rerr != nil {
+			fmt.Fprintf(os.Stderr, "caught panic: %s\n%s\n", rerr, debug.Stack())
+			err = fmt.Errorf("panic in Noise handshake: %s", rerr)
+		}
+	}()
+
 	kp, err := noise.DH25519.GenerateKeypair(rand.Reader)
 	if err != nil {
 		return fmt.Errorf("error generating static keypair: %w", err)
@@ -102,7 +111,7 @@ func (s *secureSession) runHandshake(ctx context.Context) error {
 
 		// stage 1 //
 		// Handshake Msg Len = len(DH ephemeral key) + len(DHT static key) +  MAC(static key is encrypted) + len(Payload) +
-		//MAC(payload is encrypted)
+		// MAC(payload is encrypted)
 		err = s.sendHandshakeMessage(hs, payload, hbuf)
 		if err != nil {
 			return fmt.Errorf("error sending handshake message: %w", err)
