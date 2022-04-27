@@ -16,9 +16,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/e2e/framework"
 	"github.com/0xPolygon/polygon-edge/helper/tests"
-	txpoolOp "github.com/0xPolygon/polygon-edge/txpool/proto"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/golang/protobuf/ptypes/any"
 	"github.com/stretchr/testify/assert"
 	"github.com/umbracle/go-web3"
 	"github.com/umbracle/go-web3/jsonrpc"
@@ -266,45 +264,6 @@ func getCount(
 	}
 
 	return bigResponse, nil
-}
-
-// addStressTestTxns adds numTransactions that call the
-// passed in StressTest smart contract method
-func addStressTestTxns(
-	t *testing.T,
-	srv *framework.TestServer,
-	numTransactions int,
-	contractAddr types.Address,
-	senderKey *ecdsa.PrivateKey,
-) {
-	t.Helper()
-
-	currentNonce := 1 // 1 because the first transaction was deployment
-	clt := srv.TxnPoolOperator()
-
-	for i := 0; i < numTransactions; i++ {
-		var msg *txpoolOp.AddTxnReq
-
-		setNameTxn := generateStressTestTx(
-			t,
-			uint64(currentNonce),
-			contractAddr,
-			senderKey,
-		)
-		currentNonce++
-
-		msg = &txpoolOp.AddTxnReq{
-			Raw: &any.Any{
-				Value: setNameTxn.MarshalRLP(),
-			},
-			From: types.ZeroAddress.String(),
-		}
-
-		_, addErr := clt.AddTxn(context.Background(), msg)
-		if addErr != nil {
-			t.Fatalf("Unable to add txn #%d, %v", i, addErr)
-		}
-	}
 }
 
 // generateStressTestTx generates a transaction for the

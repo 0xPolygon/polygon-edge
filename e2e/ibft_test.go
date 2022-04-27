@@ -61,6 +61,8 @@ func TestIbft_Transfer(t *testing.T) {
 }
 
 func TestIbft_TransactionFeeRecipient(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		name         string
 		contractCall bool
