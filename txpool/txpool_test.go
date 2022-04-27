@@ -132,6 +132,7 @@ func TestAddTxErrors(t *testing.T) {
 	}
 
 	t.Run("ErrNegativeValue", func(t *testing.T) {
+		t.Parallel()
 		pool := setupPool()
 
 		tx := newTx(defaultAddr, 0, 1)
@@ -144,6 +145,7 @@ func TestAddTxErrors(t *testing.T) {
 	})
 
 	t.Run("ErrBlockLimitExceeded", func(t *testing.T) {
+		t.Parallel()
 		pool := setupPool()
 
 		tx := newTx(defaultAddr, 0, 1)
@@ -159,6 +161,7 @@ func TestAddTxErrors(t *testing.T) {
 	})
 
 	t.Run("ErrNonSignedTx", func(t *testing.T) {
+		t.Parallel()
 		pool := setupPool()
 
 		tx := newTx(defaultAddr, 0, 1)
@@ -170,6 +173,7 @@ func TestAddTxErrors(t *testing.T) {
 	})
 
 	t.Run("ErrInvalidSender", func(t *testing.T) {
+		t.Parallel()
 		pool := setupPool()
 
 		tx := newTx(addr1, 0, 1)
@@ -185,6 +189,7 @@ func TestAddTxErrors(t *testing.T) {
 	})
 
 	t.Run("ErrUnderpriced", func(t *testing.T) {
+		t.Parallel()
 		pool := setupPool()
 		pool.priceLimit = 1000000
 
@@ -198,6 +203,7 @@ func TestAddTxErrors(t *testing.T) {
 	})
 
 	t.Run("ErrInvalidAccountState", func(t *testing.T) {
+		t.Parallel()
 		pool := setupPool()
 		pool.store = faultyMockStore{}
 
@@ -213,6 +219,7 @@ func TestAddTxErrors(t *testing.T) {
 	})
 
 	t.Run("ErrTxPoolOverflow", func(t *testing.T) {
+		t.Parallel()
 		pool := setupPool()
 
 		// fill the pool
@@ -228,6 +235,7 @@ func TestAddTxErrors(t *testing.T) {
 	})
 
 	t.Run("ErrIntrinsicGas", func(t *testing.T) {
+		t.Parallel()
 		pool := setupPool()
 
 		tx := newTx(defaultAddr, 0, 1)
@@ -241,6 +249,7 @@ func TestAddTxErrors(t *testing.T) {
 	})
 
 	t.Run("ErrAlreadyKnown", func(t *testing.T) {
+		t.Parallel()
 		pool := setupPool()
 
 		tx := newTx(defaultAddr, 0, 1)
@@ -262,6 +271,7 @@ func TestAddTxErrors(t *testing.T) {
 	})
 
 	t.Run("ErrOversizedData", func(t *testing.T) {
+		t.Parallel()
 		pool := setupPool()
 
 		tx := newTx(defaultAddr, 0, 1)
@@ -281,6 +291,7 @@ func TestAddTxErrors(t *testing.T) {
 	})
 
 	t.Run("ErrNonceTooLow", func(t *testing.T) {
+		t.Parallel()
 		pool := setupPool()
 
 		// faultyMockStore.GetNonce() == 99999
@@ -295,6 +306,7 @@ func TestAddTxErrors(t *testing.T) {
 	})
 
 	t.Run("ErrInsufficientFunds", func(t *testing.T) {
+		t.Parallel()
 		pool := setupPool()
 
 		tx := newTx(defaultAddr, 0, 1)
