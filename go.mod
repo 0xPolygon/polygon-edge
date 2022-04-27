@@ -15,7 +15,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/hashicorp/hcl v1.0.0
-	github.com/hashicorp/vault/api v1.3.1
+	github.com/hashicorp/vault/api v1.5.0
 	github.com/libp2p/go-libp2p v0.18.0-rc2
 	github.com/libp2p/go-libp2p-core v0.15.1
 	github.com/libp2p/go-libp2p-kbucket v0.4.7
