@@ -1255,12 +1255,12 @@ func (i *Ibft) VerifyHeader(parent, header *types.Header) error {
 		return err
 	}
 
-	// process the new block in order to update the snapshot
-	if err := i.processHeaders([]*types.Header{header}); err != nil {
-		return err
-	}
-
 	return nil
+}
+
+// ProcessHeaders updates the snapshot based on previously verified headers
+func (i *Ibft) ProcessHeaders(headers []*types.Header) error {
+	return i.processHeaders(headers)
 }
 
 // GetBlockCreator retrieves the block signer from the extra data field

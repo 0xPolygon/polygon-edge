@@ -22,6 +22,9 @@ type Consensus interface {
 	// VerifyHeader verifies the header is correct
 	VerifyHeader(parent, header *types.Header) error
 
+	// ProcessHeaders updates the snapshot based on the verified headers
+	ProcessHeaders(headers []*types.Header) error
+
 	// GetBlockCreator retrieves the block creator (or signer) given the block header
 	GetBlockCreator(header *types.Header) (types.Address, error)
 
