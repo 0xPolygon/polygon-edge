@@ -4,6 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
+	"net"
+	"net/http"
+	"os"
+	"path/filepath"
+
 	"github.com/0xPolygon/polygon-edge/archive"
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/chain"
@@ -27,11 +33,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"google.golang.org/grpc"
-	"math/big"
-	"net"
-	"net/http"
-	"os"
-	"path/filepath"
 )
 
 // Minimal is the central manager of the blockchain client
@@ -79,12 +80,45 @@ var dirPaths = []string{
 	"trie",
 }
 
+// set log output to the designated file
+func setLogFileWriter(logFilePath string) (*os.File, error) {
+	logFile, err := os.Create(logFilePath)
+	if err != nil {
+		return nil, fmt.Errorf("could not create log file, %w", err)
+	}
+
+	// if file path is empty string return error
+	if logFilePath == "" {
+		return nil, fmt.Errorf("no file path defined")
+	}
+
+	return logFile, nil
+}
+
+// create new logger; log to file if log path is defined
+func newLogger(config *Config) hclog.Logger {
+	var logFile *os.File
+
+	// if there is an error output logs to console
+	logFile, err := setLogFileWriter(config.LogFilePath)
+	if err != nil {
+		return hclog.New(&hclog.LoggerOptions{
+			Name:  "polygon",
+			Level: config.LogLevel,
+		})
+	}
+
+	// write logs to specified file
+	return hclog.New(&hclog.LoggerOptions{
+		Name:   "polygon",
+		Level:  config.LogLevel,
+		Output: logFile,
+	})
+}
+
 // NewServer creates a new Minimal server, using the passed in configuration
 func NewServer(config *Config) (*Server, error) {
-	logger := hclog.New(&hclog.LoggerOptions{
-		Name:  "polygon",
-		Level: config.LogLevel,
-	})
+	logger := newLogger(config)
 
 	m := &Server{
 		logger:             logger,

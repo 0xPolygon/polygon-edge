@@ -2,13 +2,14 @@ package server
 
 import (
 	"errors"
+	"net"
+
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/server"
 	"github.com/hashicorp/go-hclog"
 	"github.com/multiformats/go-multiaddr"
-	"net"
 )
 
 const (
@@ -32,6 +33,7 @@ const (
 	devIntervalFlag       = "dev-interval"
 	devFlag               = "dev"
 	corsOriginFlag        = "access-control-allow-origins"
+	logFileLocationFlag   = "log-to"
 )
 
 const (
@@ -72,6 +74,8 @@ type serverParams struct {
 
 	genesisConfig *chain.Chain
 	secretsConfig *secrets.SecretsManagerConfig
+
+	logFileLocation string
 }
 
 func (p *serverParams) validateFlags() error {
@@ -159,5 +163,6 @@ func (p *serverParams) generateConfig() *server.Config {
 		RestoreFile:    p.getRestoreFilePath(),
 		BlockTime:      p.rawConfig.BlockTime,
 		LogLevel:       hclog.LevelFromString(p.rawConfig.LogLevel),
+		LogFilePath:    p.logFileLocation,
 	}
 }

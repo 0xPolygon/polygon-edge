@@ -183,6 +183,13 @@ func setFlags(cmd *cobra.Command) {
 		"the CORS header indicating whether any JSON-RPC response can be shared with the specified origin",
 	)
 
+	cmd.Flags().StringVar(
+		&params.logFileLocation,
+		logFileLocationFlag,
+		"",
+		"write all logs to the file at specified location instead of writing them to console",
+	)
+
 	setDevFlags(cmd)
 }
 
