@@ -23,7 +23,7 @@ func newTestTransition(preState map[types.Address]*PreState) *Transition {
 
 func TestSubGasLimitPrice(t *testing.T) {
 	t.Parallel()
-	
+
 	tests := []struct {
 		name        string
 		preState    map[types.Address]*PreState

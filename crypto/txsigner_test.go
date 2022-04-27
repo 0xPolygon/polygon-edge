@@ -30,7 +30,7 @@ func TestFrontierSigner(t *testing.T) {
 
 func TestEIP155Signer_Sender(t *testing.T) {
 	t.Parallel()
-	
+
 	toAddress := types.StringToAddress("1")
 
 	testTable := []struct {

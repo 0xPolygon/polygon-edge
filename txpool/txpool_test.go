@@ -324,7 +324,7 @@ func TestAddTxErrors(t *testing.T) {
 
 func TestAddGossipTx(t *testing.T) {
 	t.Parallel()
-	
+
 	key, sender := tests.GenerateKeyAndAddr(t)
 	signer := crypto.NewEIP155Signer(uint64(100))
 	tx := newTx(types.ZeroAddress, 1, 1)
@@ -521,10 +521,7 @@ func TestPromoteHandler(t *testing.T) {
 
 	t.Run("promote one tx", func(t *testing.T) {
 		t.Parallel()
-<<<<<<< Updated upstream
-=======
 
->>>>>>> Stashed changes
 		pool, err := newTestPool()
 		assert.NoError(t, err)
 		pool.SetSigner(&mockSigner{})

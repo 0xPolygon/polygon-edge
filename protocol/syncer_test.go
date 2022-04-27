@@ -17,7 +17,7 @@ import (
 
 func TestHandleNewPeer(t *testing.T) {
 	t.Parallel()
-	
+
 	tests := []struct {
 		name       string
 		chain      blockchainShim
