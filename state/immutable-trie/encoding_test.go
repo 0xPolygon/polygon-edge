@@ -6,6 +6,8 @@ import (
 )
 
 func TestEncoding_HasTermSymbol(t *testing.T) {
+	t.Parallel()
+
 	testTable := []struct {
 		name           string
 		value          []byte
@@ -40,6 +42,8 @@ func TestEncoding_HasTermSymbol(t *testing.T) {
 
 	for _, testCase := range testTable {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
 			assert.Equal(t, testCase.shouldHaveTerm, hasTerminator(testCase.value))
 		})
 	}
@@ -50,6 +54,8 @@ const (
 )
 
 func TestEncoding_KeyBytesToHexNibbles(t *testing.T) {
+	t.Parallel()
+
 	testTable := []struct {
 		name           string
 		inputString    []byte
@@ -101,6 +107,8 @@ func TestEncoding_KeyBytesToHexNibbles(t *testing.T) {
 
 	for _, testCase := range testTable {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
 			output := bytesToHexNibbles(testCase.inputString)
 
 			assert.Len(t, output, len(testCase.expectedOutput))
@@ -119,6 +127,8 @@ func TestEncoding_HexCompact(t *testing.T) {
 	// 1        0001    |       extension              odd
 	// 2        0010    |   terminating (leaf)         even
 	// 3        0011    |   terminating (leaf)         odd
+	t.Parallel()
+
 	testTable := []struct {
 		name           string
 		inputHex       []byte
@@ -148,6 +158,8 @@ func TestEncoding_HexCompact(t *testing.T) {
 
 	for _, testCase := range testTable {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
 			compactOutput := encodeCompact(testCase.inputHex)
 
 			// Check if the compact outputs match

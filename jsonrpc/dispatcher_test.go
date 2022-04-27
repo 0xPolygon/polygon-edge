@@ -56,7 +56,11 @@ func expectBatchJSONResult(data []byte, v interface{}) error {
 }
 
 func TestDispatcher_HandleWebsocketConnection_EthSubscribe(t *testing.T) {
+	t.Parallel()
+
 	t.Run("clients should be able to receive \"newHeads\" event thru eth_subscribe", func(t *testing.T) {
+		t.Parallel()
+
 		store := newMockStore()
 		dispatcher := newDispatcher(hclog.NewNullLogger(), store, 0)
 

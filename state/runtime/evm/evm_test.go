@@ -88,6 +88,8 @@ func (m *mockHost) GetNonce(addr types.Address) uint64 {
 }
 
 func TestRun(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		value    *big.Int
@@ -152,6 +154,8 @@ func TestRun(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			evm := NewEVM()
 			contract := newMockContract(tt.value, tt.gas, tt.code)
 			host := &mockHost{}

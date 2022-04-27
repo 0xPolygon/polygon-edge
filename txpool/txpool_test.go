@@ -323,11 +323,15 @@ func TestAddTxErrors(t *testing.T) {
 }
 
 func TestAddGossipTx(t *testing.T) {
+	t.Parallel()
+	
 	key, sender := tests.GenerateKeyAndAddr(t)
 	signer := crypto.NewEIP155Signer(uint64(100))
 	tx := newTx(types.ZeroAddress, 1, 1)
 
 	t.Run("node is a validator", func(t *testing.T) {
+		t.Parallel()
+
 		pool, err := newTestPool()
 		assert.NoError(t, err)
 		pool.SetSigner(signer)
@@ -354,6 +358,8 @@ func TestAddGossipTx(t *testing.T) {
 	})
 
 	t.Run("node is a non validator", func(t *testing.T) {
+		t.Parallel()
+
 		pool, err := newTestPool()
 		assert.NoError(t, err)
 		pool.SetSigner(signer)
@@ -403,7 +409,11 @@ func TestDropKnownGossipTx(t *testing.T) {
 }
 
 func TestAddHandler(t *testing.T) {
+	t.Parallel()
+
 	t.Run("enqueue new tx with higher nonce", func(t *testing.T) {
+		t.Parallel()
+
 		pool, err := newTestPool()
 		assert.NoError(t, err)
 		pool.SetSigner(&mockSigner{})
@@ -420,6 +430,8 @@ func TestAddHandler(t *testing.T) {
 	})
 
 	t.Run("reject new tx with low nonce", func(t *testing.T) {
+		t.Parallel()
+
 		pool, err := newTestPool()
 		assert.NoError(t, err)
 		pool.SetSigner(&mockSigner{})
@@ -440,6 +452,8 @@ func TestAddHandler(t *testing.T) {
 	})
 
 	t.Run("signal promotion for new tx with expected nonce", func(t *testing.T) {
+		t.Parallel()
+
 		pool, err := newTestPool()
 		assert.NoError(t, err)
 		pool.SetSigner(&mockSigner{})
@@ -468,6 +482,8 @@ func TestPromoteHandler(t *testing.T) {
 		/* This test demonstrates that if some promotion handler
 		got its job done by a previous one, it will not perform any logic
 		by doing an early return. */
+		t.Parallel()
+
 		pool, err := newTestPool()
 		assert.NoError(t, err)
 		pool.SetSigner(&mockSigner{})
@@ -505,6 +521,10 @@ func TestPromoteHandler(t *testing.T) {
 
 	t.Run("promote one tx", func(t *testing.T) {
 		t.Parallel()
+<<<<<<< Updated upstream
+=======
+
+>>>>>>> Stashed changes
 		pool, err := newTestPool()
 		assert.NoError(t, err)
 		pool.SetSigner(&mockSigner{})
@@ -531,6 +551,8 @@ func TestPromoteHandler(t *testing.T) {
 		One promotion handler can be executed at any time after it
 		was invoked (when the runtime decides), resulting in promotion
 		of several enqueued txs. */
+		t.Parallel()
+
 		pool, err := newTestPool()
 		assert.NoError(t, err)
 		pool.SetSigner(&mockSigner{})
@@ -572,6 +594,8 @@ func TestPromoteHandler(t *testing.T) {
 		t.Parallel()
 		/* In this scenario, each received tx will be instantly promoted.
 		All txs are sent in the order of expected nonce. */
+		t.Parallel()
+
 		pool, err := newTestPool()
 		assert.NoError(t, err)
 		pool.SetSigner(&mockSigner{})

@@ -139,6 +139,8 @@ func rlpHashLogs(logs []*types.Log) (res types.Hash) {
 }
 
 func TestEVM(t *testing.T) {
+	t.Parallel()
+
 	folders, err := listFolders(vmTests)
 	if err != nil {
 		t.Fatal(err)
@@ -158,6 +160,8 @@ func TestEVM(t *testing.T) {
 
 		for _, file := range files {
 			t.Run(file, func(t *testing.T) {
+				t.Parallel()
+
 				if !strings.HasSuffix(file, ".json") {
 					return
 				}

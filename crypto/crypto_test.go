@@ -37,6 +37,8 @@ func TestKeyEncoding(t *testing.T) {
 }
 
 func TestCreate2(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		address  string
 		salt     string
@@ -89,6 +91,8 @@ func TestCreate2(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run("", func(t *testing.T) {
+			t.Parallel()
+
 			address := types.StringToAddress(c.address)
 			initCode := hex.MustDecodeHex(c.initCode)
 
@@ -157,6 +161,8 @@ func TestValidateSignatureValues(t *testing.T) {
 }
 
 func TestPrivateKeyRead(t *testing.T) {
+	t.Parallel()
+
 	// Write private keys to disk, check if read is ok
 	testTable := []struct {
 		name               string
@@ -193,6 +199,8 @@ func TestPrivateKeyRead(t *testing.T) {
 
 	for _, testCase := range testTable {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
 			privateKey, err := BytesToPrivateKey([]byte(testCase.privateKeyHex))
 			if err != nil && !testCase.shouldFail {
 				t.Fatalf("Unable to parse private key, %v", err)

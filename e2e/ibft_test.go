@@ -61,8 +61,6 @@ func TestIbft_Transfer(t *testing.T) {
 }
 
 func TestIbft_TransactionFeeRecipient(t *testing.T) {
-	t.Parallel()
-
 	testCases := []struct {
 		name         string
 		contractCall bool
@@ -82,8 +80,6 @@ func TestIbft_TransactionFeeRecipient(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
 			senderKey, senderAddr := tests.GenerateKeyAndAddr(t)
 			_, receiverAddr := tests.GenerateKeyAndAddr(t)
 

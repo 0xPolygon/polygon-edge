@@ -16,6 +16,8 @@ import (
 )
 
 func TestHandleNewPeer(t *testing.T) {
+	t.Parallel()
+	
 	tests := []struct {
 		name       string
 		chain      blockchainShim
@@ -34,6 +36,8 @@ func TestHandleNewPeer(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			syncer, peerSyncers := SetupSyncerNetwork(t, tt.chain, tt.peerChains)
 
 			// Check peer's status in Syncer's peer list
@@ -50,6 +54,8 @@ func TestHandleNewPeer(t *testing.T) {
 }
 
 func TestDeletePeer(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name                 string
 		chain                blockchainShim
@@ -70,6 +76,8 @@ func TestDeletePeer(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			syncer, peerSyncers := SetupSyncerNetwork(t, tt.chain, tt.peerChains)
 
 			// disconnects from syncer
@@ -92,6 +100,8 @@ func TestDeletePeer(t *testing.T) {
 }
 
 func TestBroadcast(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name          string
 		syncerHeaders []*types.Header
@@ -108,6 +118,8 @@ func TestBroadcast(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			chain, peerChain := NewMockBlockchain(tt.syncerHeaders), NewMockBlockchain(tt.peerHeaders)
 			syncer, peerSyncers := SetupSyncerNetwork(t, chain, []blockchainShim{peerChain})
 			peerSyncer := peerSyncers[0]
@@ -196,6 +208,8 @@ func TestBestPeer(t *testing.T) {
 }
 
 func TestFindCommonAncestor(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name          string
 		syncerHeaders []*types.Header
@@ -226,6 +240,8 @@ func TestFindCommonAncestor(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			chain, peerChain := blockchain.NewTestBlockchain(
 				t,
 				tt.syncerHeaders,
@@ -251,6 +267,8 @@ func TestFindCommonAncestor(t *testing.T) {
 }
 
 func TestWatchSyncWithPeer(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name           string
 		headers        []*types.Header
@@ -279,6 +297,8 @@ func TestWatchSyncWithPeer(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			chain, peerChain := NewMockBlockchain(tt.headers), NewMockBlockchain(tt.peerHeaders)
 
 			syncer, peerSyncers := SetupSyncerNetwork(t, chain, []blockchainShim{peerChain})
@@ -319,6 +339,8 @@ func TestWatchSyncWithPeer(t *testing.T) {
 }
 
 func TestBulkSyncWithPeer(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name        string
 		headers     []*types.Header
@@ -348,6 +370,8 @@ func TestBulkSyncWithPeer(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			chain, peerChain := NewMockBlockchain(tt.headers), NewMockBlockchain(tt.peerHeaders)
 			syncer, peerSyncers := SetupSyncerNetwork(t, chain, []blockchainShim{peerChain})
 			peerSyncer := peerSyncers[0]
