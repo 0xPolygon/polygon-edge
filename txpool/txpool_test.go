@@ -461,7 +461,10 @@ func TestAddHandler(t *testing.T) {
 }
 
 func TestPromoteHandler(t *testing.T) {
+	t.Parallel()
+
 	t.Run("nothing to promote", func(t *testing.T) {
+		t.Parallel()
 		/* This test demonstrates that if some promotion handler
 		got its job done by a previous one, it will not perform any logic
 		by doing an early return. */
@@ -501,6 +504,7 @@ func TestPromoteHandler(t *testing.T) {
 	})
 
 	t.Run("promote one tx", func(t *testing.T) {
+		t.Parallel()
 		pool, err := newTestPool()
 		assert.NoError(t, err)
 		pool.SetSigner(&mockSigner{})
@@ -522,6 +526,7 @@ func TestPromoteHandler(t *testing.T) {
 	})
 
 	t.Run("promote several txs", func(t *testing.T) {
+		t.Parallel()
 		/* This example illustrates the flexibility of the handlers:
 		One promotion handler can be executed at any time after it
 		was invoked (when the runtime decides), resulting in promotion
@@ -564,6 +569,7 @@ func TestPromoteHandler(t *testing.T) {
 	})
 
 	t.Run("one tx -> one promotion", func(t *testing.T) {
+		t.Parallel()
 		/* In this scenario, each received tx will be instantly promoted.
 		All txs are sent in the order of expected nonce. */
 		pool, err := newTestPool()
