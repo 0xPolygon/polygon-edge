@@ -24,51 +24,6 @@ import (
 	"github.com/umbracle/go-web3/jsonrpc"
 )
 
-func TestSignedTransaction(t *testing.T) {
-	senderKey, senderAddr := tests.GenerateKeyAndAddr(t)
-	_, receiverAddr := tests.GenerateKeyAndAddr(t)
-
-	preminedAmount := framework.EthToWei(10)
-	ibftManager := framework.NewIBFTServersManager(
-		t,
-		IBFTMinNodes,
-		IBFTDirPrefix,
-		func(i int, config *framework.TestServerConfig) {
-			config.Premine(senderAddr, preminedAmount)
-			config.SetSeal(true)
-		})
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	defer cancel()
-	ibftManager.StartServers(ctx)
-
-	srv := ibftManager.GetServer(0)
-	clt := srv.JSONRPC()
-
-	// check there is enough balance
-	balance, err := clt.Eth().GetBalance(web3.Address(senderAddr), web3.Latest)
-	assert.NoError(t, err)
-	assert.Equal(t, preminedAmount, balance)
-
-	for i := 0; i < 5; i++ {
-		txn := &framework.PreparedTransaction{
-			From:     senderAddr,
-			To:       &receiverAddr,
-			GasPrice: big.NewInt(10000),
-			Gas:      1000000,
-			Value:    big.NewInt(10000),
-		}
-
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-
-		receipt, err := srv.SendRawTx(ctx, txn, senderKey)
-		assert.NoError(t, err)
-		assert.NotNil(t, receipt)
-		assert.NotNil(t, receipt.TransactionHash)
-	}
-}
-
 func TestPreminedBalance(t *testing.T) {
 	preminedAccounts := []struct {
 		address types.Address
