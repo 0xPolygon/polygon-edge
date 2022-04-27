@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/0xPolygon/polygon-edge/network/event"
 	"math"
-	"math/big"
 	"sync"
 	"time"
 
@@ -137,9 +136,8 @@ func (s *SyncPeer) updateStatus(status *Status) {
 
 // Status defines the up to date information regarding the peer
 type Status struct {
-	Difficulty *big.Int   // Current difficulty
-	Hash       types.Hash // Latest block hash
-	Number     uint64     // Latest block number
+	Hash   types.Hash // Latest block hash
+	Number uint64     // Latest block number
 }
 
 // Copy creates a copy of the status
@@ -147,7 +145,6 @@ func (s *Status) Copy() *Status {
 	ss := new(Status)
 	ss.Hash = s.Hash
 	ss.Number = s.Number
-	ss.Difficulty = new(big.Int).Set(s.Difficulty)
 
 	return ss
 }
@@ -155,23 +152,16 @@ func (s *Status) Copy() *Status {
 // toProto converts a Status object to a proto.V1Status
 func (s *Status) toProto() *proto.V1Status {
 	return &proto.V1Status{
-		Number:     s.Number,
-		Hash:       s.Hash.String(),
-		Difficulty: s.Difficulty.String(),
+		Number: s.Number,
+		Hash:   s.Hash.String(),
 	}
 }
 
 // fromProto converts a proto.V1Status to a Status object
 func fromProto(status *proto.V1Status) (*Status, error) {
-	diff, ok := new(big.Int).SetString(status.Difficulty, 10)
-	if !ok {
-		return nil, fmt.Errorf("failed to parse difficulty: %s", status.Difficulty)
-	}
-
 	return &Status{
-		Number:     status.Number,
-		Hash:       types.StringToHash(status.Hash),
-		Difficulty: diff,
+		Number: status.Number,
+		Hash:   types.StringToHash(status.Hash),
 	}, nil
 }
 
@@ -183,13 +173,6 @@ func statusFromProto(p *proto.V1Status) (*Status, error) {
 	}
 
 	s.Number = p.Number
-
-	diff, ok := new(big.Int).SetString(p.Difficulty, 10)
-	if !ok {
-		return nil, fmt.Errorf("failed to decode difficulty")
-	}
-
-	s.Difficulty = diff
 
 	return s, nil
 }
@@ -250,9 +233,8 @@ func (s *Syncer) syncCurrentStatus() {
 			}
 
 			status := &Status{
-				Difficulty: evnt.Difficulty,
-				Hash:       evnt.NewChain[0].Hash,
-				Number:     evnt.NewChain[0].Number,
+				Hash:   evnt.NewChain[0].Hash,
+				Number: evnt.NewChain[0].Number,
 			}
 
 			s.statusLock.Lock()
@@ -295,7 +277,6 @@ func (s *Syncer) updatePeerStatus(peerID peer.ID, status *Status) {
 		status.Number,
 		"latest block hash",
 		status.Hash, "difficulty",
-		status.Difficulty,
 	)
 
 	if peer, ok := s.peers.Load(peerID); ok {
@@ -312,21 +293,11 @@ func (s *Syncer) updatePeerStatus(peerID peer.ID, status *Status) {
 
 // Broadcast broadcasts a block to all peers
 func (s *Syncer) Broadcast(b *types.Block) {
-	// Get the chain difficulty associated with block
-	td, ok := s.blockchain.GetTD(b.Hash())
-	if !ok {
-		// not supposed to happen
-		s.logger.Error("total difficulty not found", "block number", b.Number())
-
-		return
-	}
-
 	// broadcast the new block to all the peers
 	req := &proto.NotifyReq{
 		Status: &proto.V1Status{
-			Hash:       b.Hash().String(),
-			Number:     b.Number(),
-			Difficulty: td.String(),
+			Hash:   b.Hash().String(),
+			Number: b.Number(),
 		},
 		Raw: &anypb.Any{
 			Value: b.MarshalRLP(),
@@ -348,12 +319,10 @@ func (s *Syncer) Start() {
 
 	// Get the current status of the syncer
 	currentHeader := s.blockchain.Header()
-	diff, _ := s.blockchain.GetTD(currentHeader.Hash)
 
 	s.status = &Status{
-		Hash:       currentHeader.Hash,
-		Number:     currentHeader.Number,
-		Difficulty: diff,
+		Hash:   currentHeader.Hash,
+		Number: currentHeader.Number,
 	}
 
 	// Run the blockchain event listener loop
@@ -409,12 +378,14 @@ func (s *Syncer) handlePeerEvent() {
 	}()
 }
 
-// BestPeer returns the best peer by difficulty (if any)
+// BestPeer returns the best peer by block height (if any)
 func (s *Syncer) BestPeer() *SyncPeer {
-	var bestPeer *SyncPeer
+	var (
+		bestPeer        *SyncPeer
+		bestBlockNumber uint64
+	)
 
-	var bestTd *big.Int
-
+	// Find the peer with the biggest block height available
 	s.peers.Range(func(peerID, peer interface{}) bool {
 		syncPeer, ok := peer.(*SyncPeer)
 		if !ok {
@@ -422,7 +393,10 @@ func (s *Syncer) BestPeer() *SyncPeer {
 		}
 
 		status := syncPeer.status
-		if bestPeer == nil || status.Difficulty.Cmp(bestTd) > 0 {
+		if bestPeer == nil || status.Number > bestBlockNumber {
+			// There is currently no best peer set, or the peer's block number
+			// is currently the highest
+
 			var correctAssertion bool
 
 			bestPeer, correctAssertion = peer.(*SyncPeer)
@@ -430,19 +404,15 @@ func (s *Syncer) BestPeer() *SyncPeer {
 				return false
 			}
 
-			bestTd = status.Difficulty
+			bestBlockNumber = status.Number
 		}
 
 		return true
 	})
 
-	if bestPeer == nil {
-		return nil
-	}
-
-	curDiff := s.blockchain.CurrentTD()
-	if bestTd.Cmp(curDiff) <= 0 {
-		return nil
+	// Fetch the highest local block height
+	if bestBlockNumber < s.blockchain.Header().Number {
+		bestPeer = nil
 	}
 
 	return bestPeer

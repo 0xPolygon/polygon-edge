@@ -216,23 +216,16 @@ func TryPopBlock(t *testing.T, syncer *Syncer, peerID peer.ID, timeout time.Dura
 // GetCurrentStatus return status by latest block in blockchain
 func GetCurrentStatus(b blockchainShim) *Status {
 	return &Status{
-		Hash:       b.Header().Hash,
-		Number:     b.Header().Number,
-		Difficulty: b.CurrentTD(),
+		Hash:   b.Header().Hash,
+		Number: b.Header().Number,
 	}
 }
 
 // HeaderToStatus converts given header to Status
 func HeaderToStatus(h *types.Header) *Status {
-	var td uint64 = 0
-	for i := uint64(1); i <= h.Difficulty; i++ {
-		td = td + i
-	}
-
 	return &Status{
-		Hash:       h.Hash,
-		Number:     h.Number,
-		Difficulty: big.NewInt(0).SetUint64(td),
+		Hash:   h.Hash,
+		Number: h.Number,
 	}
 }
 
@@ -352,10 +345,8 @@ func NewMockSubscription() *mockSubscription {
 }
 
 func (s *mockSubscription) AppendBlock(block *types.Block) {
-	status := HeaderToStatus(block.Header)
 	s.eventCh <- &blockchain.Event{
-		Difficulty: status.Difficulty,
-		NewChain:   []*types.Header{block.Header},
+		NewChain: []*types.Header{block.Header},
 	}
 }
 
