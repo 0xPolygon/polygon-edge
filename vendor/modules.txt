@@ -279,7 +279,7 @@ github.com/libp2p/go-libp2p/p2p/protocol/ping
 github.com/libp2p/go-libp2p-asn-util
 # github.com/libp2p/go-libp2p-blankhost v0.3.0
 github.com/libp2p/go-libp2p-blankhost
-# github.com/libp2p/go-libp2p-core v0.15.0
+# github.com/libp2p/go-libp2p-core v0.15.1
 ## explicit
 github.com/libp2p/go-libp2p-core/connmgr
 github.com/libp2p/go-libp2p-core/control
@@ -288,6 +288,7 @@ github.com/libp2p/go-libp2p-core/crypto/pb
 github.com/libp2p/go-libp2p-core/discovery
 github.com/libp2p/go-libp2p-core/event
 github.com/libp2p/go-libp2p-core/host
+github.com/libp2p/go-libp2p-core/internal/catch
 github.com/libp2p/go-libp2p-core/introspection
 github.com/libp2p/go-libp2p-core/introspection/pb
 github.com/libp2p/go-libp2p-core/metrics
@@ -626,7 +627,6 @@ golang.org/x/net/ipv6
 golang.org/x/net/route
 golang.org/x/net/trace
 # golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-## explicit
 golang.org/x/sync/errgroup
 # golang.org/x/sys v0.0.0-20220227234510-4e6760a101f9
 ## explicit
