@@ -186,7 +186,7 @@ func setFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(
 		&params.logFileLocation,
 		logFileLocationFlag,
-		"",
+		defaultConfig.LogFilePath,
 		"write all logs to the file at specified location instead of writing them to console",
 	)
 

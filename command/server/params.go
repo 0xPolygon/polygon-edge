@@ -112,6 +112,10 @@ func (p *serverParams) isDNSAddressSet() bool {
 	return p.rawConfig.Network.DNSAddr != ""
 }
 
+func (p *serverParams) isLogFileLocationSet() bool {
+	return p.rawConfig.LogFilePath != ""
+}
+
 func (p *serverParams) isDevConsensus() bool {
 	return server.ConsensusType(p.genesisConfig.Params.GetEngine()) == server.DevConsensus
 }

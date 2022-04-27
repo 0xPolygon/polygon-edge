@@ -56,5 +56,6 @@ require (
 	golang.org/x/sys v0.0.0-20220227234510-4e6760a101f9 // indirect
 	golang.org/x/tools v0.1.9 // indirect
 	google.golang.org/genproto v0.0.0-20211208223120-3a66f561d7aa // indirect
+	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 	lukechampine.com/blake3 v1.1.7 // indirect
 )

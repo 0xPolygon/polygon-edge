@@ -2,9 +2,10 @@ package server
 
 import (
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/network/common"
 	"math"
 	"net"
+
+	"github.com/0xPolygon/polygon-edge/network/common"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command/helper"
@@ -42,8 +43,15 @@ func (p *serverParams) initRawParams() error {
 	}
 
 	p.initPeerLimits()
+	p.initLogFileLocation()
 
 	return p.initAddresses()
+}
+
+func (p *serverParams) initLogFileLocation() {
+	if p.isLogFileLocationSet() {
+		p.logFileLocation = p.rawConfig.LogFilePath
+	}
 }
 
 func (p *serverParams) initBlockGasTarget() error {

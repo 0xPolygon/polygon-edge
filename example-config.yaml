@@ -1,0 +1,10 @@
+chain_config: test-chain/genesis.json
+data_dir: test-chain
+jsonrpc_addr: "0.0.0.0:10001"
+grpc_addr: "0.0.0.0:20001"
+seal: true
+network:
+  libp2p_addr: "127.0.0.1:1478"
+log_to: node.log
+
+# for additional parameters check out the docs page: https://edge-docs.polygon.technology/docs/configuration/sample-config
