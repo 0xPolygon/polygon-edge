@@ -916,12 +916,12 @@ func (i *Ibft) runValidateState() {
 			panic(fmt.Sprintf("BUG: %s", reflect.TypeOf(msg.Type)))
 		}
 
-		if i.state.numPrepared() > i.state.NumValid() {
+		if i.state.numPrepared() >= i.state.validators.QuorumSize() {
 			// we have received enough pre-prepare messages
 			sendCommit()
 		}
 
-		if i.state.numCommitted() > i.state.NumValid() {
+		if i.state.numCommitted() >= i.state.validators.QuorumSize() {
 			// we have received enough commit messages
 			sendCommit()
 
@@ -1102,17 +1102,15 @@ func (i *Ibft) runRoundChangeState() {
 		// we only expect RoundChange messages right now
 		num := i.state.AddRoundMessage(msg)
 
-		if num == i.state.NumValid() {
+		if num == i.state.validators.MaxFaultyNodes()+1 && i.state.view.Round < msg.View.Round {
+			// weak certificate, try to catch up if our round number is smaller
+			// update timer
+			timeout = exponentialTimeout(i.state.view.Round)
+			sendRoundChange(msg.View.Round)
+		} else if num == i.state.validators.QuorumSize() {
 			// start a new round immediately
 			i.state.view.Round = msg.View.Round
 			i.setState(AcceptState)
-		} else if num == i.state.validators.MaxFaultyNodes()+1 {
-			// weak certificate, try to catch up if our round number is smaller
-			if i.state.view.Round < msg.View.Round {
-				// update timer
-				timeout = exponentialTimeout(i.state.view.Round)
-				sendRoundChange(msg.View.Round)
-			}
 		}
 	}
 }
