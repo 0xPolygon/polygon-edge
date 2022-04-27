@@ -141,6 +141,8 @@ func TestBroadcast(t *testing.T) {
 }
 
 func TestBestPeer(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name          string
 		chain         blockchainShim
@@ -174,6 +176,8 @@ func TestBestPeer(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			syncer, peerSyncers := SetupSyncerNetwork(t, tt.chain, tt.peersChain)
 
 			bestPeer := syncer.BestPeer()
