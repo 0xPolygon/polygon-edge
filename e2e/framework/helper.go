@@ -326,8 +326,13 @@ func WaitUntilBlockMined(ctx context.Context, srv *TestServer, desiredHeight uin
 
 // MethodSig returns the signature of a non-parametrized function
 func MethodSig(name string) []byte {
+	return MethodSigWithParams(fmt.Sprintf("%s()", name))
+}
+
+// MethodSigWithParams returns the signature of a function
+func MethodSigWithParams(nameWithParams string) []byte {
 	h := sha3.NewLegacyKeccak256()
-	h.Write([]byte(name + "()"))
+	h.Write([]byte(nameWithParams))
 	b := h.Sum(nil)
 
 	return b[:4]

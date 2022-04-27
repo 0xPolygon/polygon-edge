@@ -151,23 +151,34 @@ func TestFilterValue(t *testing.T) {
 	//	3.	Query the block's bloom filter to make sure the data has been properly inserted.
 	//
 	key, addr := tests.GenerateKeyAndAddr(t)
-	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
-		config.SetConsensus(framework.ConsensusDev)
-		config.Premine(addr, framework.EthToWei(10))
-		config.SetSeal(true)
-	})
-	srv := srvs[0]
 
-	ctx1, cancel1 := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel1()
+	ibftManager := framework.NewIBFTServersManager(
+		t,
+		1,
+		IBFTDirPrefix,
+		func(i int, config *framework.TestServerConfig) {
+			config.Premine(addr, framework.EthToWei(10))
+			config.SetBlockTime(1)
+		},
+	)
 
-	contractAddr, err := srv.DeployContract(ctx1, bloomFilterTestBytecode, key)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	ibftManager.StartServers(ctx)
+	srv := ibftManager.GetServer(0)
+
+	deployCtx, deployCancel := context.WithTimeout(context.Background(), time.Minute)
+	defer deployCancel()
+
+	contractAddr, err := srv.DeployContract(deployCtx, bloomFilterTestBytecode, key)
 
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	client := srv.JSONRPC()
+	txpoolClient := srv.TxnPoolOperator()
+	jsonRPCClient := srv.JSONRPC()
 
 	// Encode event signature
 	hash := sha3.NewLegacyKeccak256()
@@ -180,33 +191,60 @@ func TestFilterValue(t *testing.T) {
 	var (
 		placeholderWrapper []*web3.Hash
 		placeholder        web3.Hash
+		filterEventHashes  [][]*web3.Hash
+		filterAddresses    []web3.Address
 	)
 
 	copy(placeholder[:], buf)
 	placeholderWrapper = append(placeholderWrapper, &placeholder)
 
-	var filterEventHashes [][]*web3.Hash
-
 	filterEventHashes = append(filterEventHashes, placeholderWrapper)
-
-	var filterAddresses []web3.Address
-
 	filterAddresses = append(filterAddresses, contractAddr)
 
-	id, err := client.Eth().NewFilter(&web3.LogFilter{
+	filterID, err := jsonRPCClient.Eth().NewFilter(&web3.LogFilter{
 		Address: filterAddresses,
 		Topics:  filterEventHashes,
 	})
+
 	assert.NoError(t, err)
 
-	numCalls := 1
-	for i := 0; i < numCalls; i++ {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		srv.InvokeMethod(ctx, types.Address(contractAddr), "TriggerMyEvent", key)
+	castedContractAddr := types.Address(contractAddr)
+
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	res, err := client.Eth().GetFilterChanges(id)
+	txn, err := tests.GenerateAddTxnReq(tests.GenerateTxReqParams{
+		Nonce:         1,
+		ReferenceAddr: addr,
+		ReferenceKey:  key,
+		ToAddress:     castedContractAddr,
+		GasPrice:      big.NewInt(framework.DefaultGasPrice),
+		Input:         framework.MethodSig("TriggerMyEvent"),
+	})
+
+	if err != nil {
+		return
+	}
+
+	addTxnContext, cancelFn := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancelFn()
+
+	addResp, addErr := txpoolClient.AddTxn(addTxnContext, txn)
+	if addErr != nil {
+		return
+	}
+
+	receiptContext, cancelFn := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancelFn()
+
+	txHash := web3.Hash(types.StringToHash(addResp.TxHash))
+	if _, receiptErr := srv.WaitForReceipt(receiptContext, txHash); receiptErr != nil {
+		return
+	}
+
+	res, err := jsonRPCClient.Eth().GetFilterChanges(filterID)
+
 	assert.NoError(t, err)
 	assert.Len(t, res, 1)
 	assert.Equal(t, "0x000000000000000000000000000000000000000000000000000000000000002a", hex.EncodeToHex(res[0].Data))

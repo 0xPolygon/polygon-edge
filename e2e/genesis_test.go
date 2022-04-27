@@ -16,46 +16,58 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Test if the custom block gas limit is properly set
-func TestGenesisCustomBlockGasLimit(t *testing.T) {
-	var blockGasLimit uint64 = 5000000000
-
-	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
-		config.SetConsensus(framework.ConsensusDev)
-		config.SetBlockLimit(blockGasLimit)
-	})
-	srv := srvs[0]
-
-	client := srv.JSONRPC()
-
-	block, err := client.Eth().GetBlockByNumber(0, true)
-	if err != nil {
-		t.Fatalf("failed to retrieve block: %v", err)
+// TestGenesisBlockGasLimit tests the genesis block limit setting
+func TestGenesisBlockGasLimit(t *testing.T) {
+	testTable := []struct {
+		name                  string
+		blockGasLimit         uint64
+		expectedBlockGasLimit uint64
+	}{
+		{
+			"Custom block gas limit",
+			5000000000,
+			5000000000,
+		},
+		{
+			"Default block gas limit",
+			0,
+			command.DefaultGenesisGasLimit,
+		},
 	}
 
-	if block.GasLimit != blockGasLimit {
-		t.Fatalf("invalid block gas limit, expected [%d] but got [%d]", blockGasLimit, block.GasLimit)
-	}
-}
+	for _, testCase := range testTable {
+		t.Run(testCase.name, func(t *testing.T) {
+			_, addr := tests.GenerateKeyAndAddr(t)
 
-// Test if the default gas limit is properly set
-func TestGenesisDefaultBlockGasLimit(t *testing.T) {
-	var blockGasLimit uint64 = command.DefaultGenesisGasLimit
+			ibftManager := framework.NewIBFTServersManager(
+				t,
+				1,
+				IBFTDirPrefix,
+				func(i int, config *framework.TestServerConfig) {
+					config.Premine(addr, framework.EthToWei(10))
+					config.SetBlockTime(1)
 
-	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
-		config.SetConsensus(framework.ConsensusDev)
-	})
-	srv := srvs[0]
+					if testCase.blockGasLimit != 0 {
+						config.SetBlockLimit(testCase.blockGasLimit)
+					}
+				},
+			)
 
-	client := srv.JSONRPC()
+			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+			defer cancel()
 
-	block, err := client.Eth().GetBlockByNumber(0, true)
-	if err != nil {
-		t.Fatalf("failed to retrieve block: %v", err)
-	}
+			ibftManager.StartServers(ctx)
+			srv := ibftManager.GetServer(0)
 
-	if block.GasLimit != blockGasLimit {
-		t.Fatalf("invalid block gas limit, expected [%d] but got [%d]", blockGasLimit, block.GasLimit)
+			client := srv.JSONRPC()
+
+			block, err := client.Eth().GetBlockByNumber(0, true)
+			if err != nil {
+				t.Fatalf("failed to retrieve block: %v", err)
+			}
+
+			assert.Equal(t, testCase.expectedBlockGasLimit, block.GasLimit)
+		})
 	}
 }
 
