@@ -35,7 +35,7 @@ require (
 	github.com/umbracle/go-eth-bn256 v0.0.0-20190607160430-b36caf4e0f6b
 	github.com/umbracle/go-web3 v0.0.0-20220224145938-aaa1038c1b69
 	golang.org/x/crypto v0.0.0-20220214200702-86341886e292
-	google.golang.org/grpc v1.45.0
+	google.golang.org/grpc v1.46.0
 	google.golang.org/protobuf v1.28.0
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce
 )
