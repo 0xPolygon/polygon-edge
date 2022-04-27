@@ -106,6 +106,8 @@ type result struct {
 /* Single account cases (unit tests) */
 
 func TestAddTxErrors(t *testing.T) {
+	t.Parallel()
+
 	poolSigner := crypto.NewEIP155Signer(100)
 
 	// Generate a private key and address
