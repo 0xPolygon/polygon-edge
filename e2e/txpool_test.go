@@ -14,7 +14,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/e2e/framework"
 	"github.com/0xPolygon/polygon-edge/helper/tests"
-	"github.com/0xPolygon/polygon-edge/txpool"
 	txpoolOp "github.com/0xPolygon/polygon-edge/txpool/proto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/golang/protobuf/ptypes/any"
@@ -56,99 +55,6 @@ func waitForBlock(t *testing.T, srv *framework.TestServer, expectedBlocks int, i
 	cancelFn()
 
 	return evnt.Added[index].Number
-}
-
-func TestTxPool_ErrorCodes(t *testing.T) {
-	gasPrice := big.NewInt(10000)
-	devInterval := 5
-
-	testTable := []struct {
-		name           string
-		defaultBalance *big.Int
-		txValue        *big.Int
-		expectedError  error
-	}{
-		{
-			// Test scenario:
-			// Add tx with nonce 0
-			// -> Check if tx has been parsed
-			// Add tx with nonce 0
-			// -> tx shouldn't be added, since the nonce is too low
-			"ErrNonceTooLow",
-			framework.EthToWei(10),
-			oneEth,
-			txpool.ErrNonceTooLow,
-		},
-		{
-			// Test scenario:
-			// Add tx with insufficient funds
-			// -> Tx should be discarded because of low funds
-			"ErrInsufficientFunds",
-			framework.EthToWei(1),
-			framework.EthToWei(5),
-			txpool.ErrInsufficientFunds,
-		},
-	}
-
-	for _, testCase := range testTable {
-		t.Run(testCase.name, func(t *testing.T) {
-			referenceKey, referenceAddr := tests.GenerateKeyAndAddr(t)
-
-			// Set up the test server
-			srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
-				config.SetConsensus(framework.ConsensusDev)
-				config.SetSeal(true)
-				config.SetDevInterval(devInterval)
-				config.Premine(referenceAddr, testCase.defaultBalance)
-			})
-			srv := srvs[0]
-
-			// TxPool client
-			clt := srv.TxnPoolOperator()
-			toAddress := types.StringToAddress("1")
-
-			// Add the initial transaction
-			addReq, err := tests.GenerateAddTxnReq(tests.GenerateTxReqParams{
-				Nonce:         0,
-				ReferenceAddr: referenceAddr,
-				ReferenceKey:  referenceKey,
-				ToAddress:     toAddress,
-				GasPrice:      gasPrice,
-				Value:         testCase.txValue,
-			})
-			if err != nil {
-				t.Fatalf("unable to generate txn, %v", err)
-			}
-
-			addResponse, addErr := clt.AddTxn(context.Background(), addReq)
-
-			if errors.Is(testCase.expectedError, txpool.ErrNonceTooLow) {
-				if addErr != nil {
-					t.Fatalf("Unable to add txn, %v", addErr)
-				}
-
-				// Wait for the state transition to be executed
-				receiptCtx, waitCancelFn := context.WithTimeout(
-					context.Background(),
-					time.Duration(devInterval*2)*time.Second,
-				)
-				defer waitCancelFn()
-
-				convertedHash := types.StringToHash(addResponse.TxHash)
-				_, receiptErr := tests.WaitForReceipt(receiptCtx, srv.JSONRPC().Eth(), web3.Hash(convertedHash))
-				if receiptErr != nil {
-					t.Fatalf("Unable to get receipt, %v", receiptErr)
-				}
-
-				// Add the transaction with lower nonce value than what is
-				// currently in the world state
-				_, addErr = clt.AddTxn(context.Background(), addReq)
-			}
-
-			assert.NotNil(t, addErr)
-			assert.Contains(t, addErr.Error(), testCase.expectedError.Error())
-		})
-	}
 }
 
 func TestTxPool_TransactionCoalescing(t *testing.T) {
