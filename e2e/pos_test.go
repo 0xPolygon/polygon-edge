@@ -328,6 +328,7 @@ func TestPoS_UnstakeExploit(t *testing.T) {
 		config.Premine(senderAddr, defaultBalance)
 		config.SetDevStakingAddresses(append(generateStakingAddresses(numDummyValidators), senderAddr))
 		config.SetIBFTPoS(true)
+		config.SetBlockLimit(5000000000)
 	})
 	srv := srvs[0]
 	client := srv.JSONRPC()
