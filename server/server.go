@@ -82,21 +82,21 @@ var dirPaths = []string{
 
 // set log output to the designated file
 func setLogFileWriter(logFilePath string) (*os.File, error) {
+	// if file path is empty string return error
+	if logFilePath == "" {
+		return nil, fmt.Errorf("log file path not defined")
+	}
+
 	logFile, err := os.Create(logFilePath)
 	if err != nil {
 		return nil, fmt.Errorf("could not create log file, %w", err)
-	}
-
-	// if file path is empty string return error
-	if logFilePath == "" {
-		return nil, fmt.Errorf("no file path defined")
 	}
 
 	return logFile, nil
 }
 
 // create new logger; log to file if log path is defined
-func newLogger(config *Config) hclog.Logger {
+func newLogger(config *Config) (hclog.Logger, error) {
 	var logFile *os.File
 
 	// if there is an error output logs to console
@@ -105,7 +105,7 @@ func newLogger(config *Config) hclog.Logger {
 		return hclog.New(&hclog.LoggerOptions{
 			Name:  "polygon",
 			Level: config.LogLevel,
-		})
+		}), err
 	}
 
 	// write logs to specified file
@@ -113,12 +113,12 @@ func newLogger(config *Config) hclog.Logger {
 		Name:   "polygon",
 		Level:  config.LogLevel,
 		Output: logFile,
-	})
+	}), nil
 }
 
 // NewServer creates a new Minimal server, using the passed in configuration
 func NewServer(config *Config) (*Server, error) {
-	logger := newLogger(config)
+	logger, logFileErr := newLogger(config)
 
 	m := &Server{
 		logger:             logger,
@@ -126,6 +126,10 @@ func NewServer(config *Config) (*Server, error) {
 		chain:              config.Chain,
 		grpcServer:         grpc.NewServer(),
 		restoreProgression: progress.NewProgressionWrapper(progress.ChainSyncRestore),
+	}
+
+	if logFileErr != nil {
+		m.logger.Info("Log file", "fallback to console output err", logFileErr.Error())
 	}
 
 	m.logger.Info("Data dir", "path", config.DataDir)
