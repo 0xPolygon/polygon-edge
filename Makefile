@@ -34,4 +34,6 @@ generate-bsd-licenses:
 
 .PHONY: test
 test:
+	go build -o artifacts/polygon-edge .
+	$(eval export PATH=$(shell pwd)/artifacts:$(PATH))
 	go test -timeout 28m ./...
