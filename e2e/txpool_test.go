@@ -277,7 +277,10 @@ func TestTxPool_TransactionCoalescing(t *testing.T) {
 	// Add the transaction with the gap nonce value
 	addReq := generateReq(1)
 
-	addResp, addErr := clt.AddTxn(context.Background(), addReq)
+	addCtx, addCtxCn := context.WithTimeout(context.Background(), time.Second*10)
+	defer addCtxCn()
+
+	addResp, addErr := clt.AddTxn(addCtx, addReq)
 	if addErr != nil {
 		t.Fatalf("Unable to add txn, %v", addErr)
 	}
