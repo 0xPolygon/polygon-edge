@@ -44,28 +44,14 @@ func TestBroadcast(t *testing.T) {
 	}
 
 	for _, tt := range testCases {
-		t.Run(tt.name, func(t *testing.T) {
-			srvs := framework.NewTestServers(t, tt.numNodes, conf)
-			framework.MultiJoinSerial(t, srvs[0:tt.numConnectedNodes])
+		tt := tt
 
-			// Check the connections
-			for i, srv := range srvs {
-				// Required number of connections
-				numRequiredConnections := 0
-				if i < tt.numConnectedNodes {
-					if i == 0 || i == tt.numConnectedNodes-1 {
-						numRequiredConnections = 1
-					} else {
-						numRequiredConnections = 2
-					}
-				}
-				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-				defer cancel()
-				_, err := framework.WaitUntilPeerConnects(ctx, srv, numRequiredConnections)
-				if err != nil {
-					t.Fatal(err)
-				}
-			}
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			srvs := framework.NewTestServers(t, tt.numNodes, conf)
+
+			framework.MultiJoinSerial(t, srvs[0:tt.numConnectedNodes])
 
 			// wait until gossip protocol build mesh network
 			// (https://github.com/libp2p/specs/blob/master/pubsub/gossipsub/gossipsub-v1.0.md)
@@ -90,6 +76,8 @@ func TestBroadcast(t *testing.T) {
 			}
 
 			for i, srv := range srvs {
+				srv := srv
+
 				shouldHaveTxPool := false
 				subTestName := fmt.Sprintf("node %d shouldn't have tx in txpool", i)
 				if i < tt.numConnectedNodes {
@@ -98,7 +86,9 @@ func TestBroadcast(t *testing.T) {
 				}
 
 				t.Run(subTestName, func(t *testing.T) {
-					ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+					t.Parallel()
+
+					ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 					defer cancel()
 					res, err := framework.WaitUntilTxPoolFilled(ctx, srv, 1)
 
