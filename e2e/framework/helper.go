@@ -34,7 +34,7 @@ var (
 )
 
 type AtomicErrors struct {
-	sync.Mutex
+	sync.RWMutex
 	errors []error
 }
 
@@ -52,6 +52,9 @@ func (a *AtomicErrors) Append(err error) {
 }
 
 func (a *AtomicErrors) Errors() []error {
+	a.RLock()
+	defer a.RUnlock()
+
 	return a.errors
 }
 
