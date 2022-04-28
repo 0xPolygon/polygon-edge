@@ -115,8 +115,8 @@ func (r *Receipt) UnmarshalStoreRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) err
 		return err
 	}
 
-	if len(elems) != 3 {
-		return fmt.Errorf("expected 3 elements")
+	if len(elems) != 4 {
+		return fmt.Errorf("expected 4 elements")
 	}
 
 	if err := r.UnmarshalRLPFrom(p, elems[0]); err != nil {
@@ -138,6 +138,15 @@ func (r *Receipt) UnmarshalStoreRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) err
 	// gas used
 	if r.GasUsed, err = elems[2].GetUint64(); err != nil {
 		return err
+	}
+
+	// tx hash
+	if (elems[3] != nil) {
+		vv, err := elems[3].Bytes()
+		if err != nil {
+			return err
+		}
+		r.TxHash = BytesToHash(vv)
 	}
 
 	return nil

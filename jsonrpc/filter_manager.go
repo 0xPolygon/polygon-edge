@@ -212,6 +212,9 @@ type filterManagerStore interface {
 
 	// GetReceiptsByHash returns the receipts for a block hash
 	GetReceiptsByHash(hash types.Hash) ([]*types.Receipt, error)
+
+	// GetBlockByHash returns the block using the block hash
+	GetBlockByHash(hash types.Hash, full bool) (*types.Block, bool)
 }
 
 // FilterManager manages all running filters
@@ -487,6 +490,18 @@ func (f *FilterManager) appendLogsToFilters(header *types.Header, removed bool) 
 
 	for indx, receipt := range receipts {
 		// check the logs with the filters
+
+		if receipt.TxHash == types.ZeroHash {
+			// Get ad full block
+			block, ok := f.store.GetBlockByHash(header.Hash, true)
+			if !ok {
+				f.logger.Error("could not find block in store", "hash", header.Hash.String())
+				return nil
+			}
+
+			receipt.TxHash = block.Transactions[indx].Hash
+		}
+
 		for _, log := range receipt.Logs {
 			nn := &Log{
 				Address:     log.Address,
