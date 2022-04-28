@@ -6,7 +6,6 @@ import (
 	"errors"
 	"io"
 	"math/big"
-	"sync"
 	"testing"
 	"time"
 
