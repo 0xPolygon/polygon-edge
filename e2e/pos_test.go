@@ -398,7 +398,7 @@ func TestPoS_UnstakeExploit(t *testing.T) {
 	}
 
 	// Wait for the transactions to go through
-	totalGasUsed := srv.WaitForGasTotal(txHashes)
+	totalGasUsed := srv.GetGasTotal(txHashes)
 
 	// Find how much the address paid for all the transactions in this block
 	paidFee := big.NewInt(0).Mul(bigGasPrice, big.NewInt(int64(totalGasUsed)))
@@ -548,7 +548,7 @@ func TestPoS_StakeUnstakeExploit(t *testing.T) {
 	}
 
 	// Set up the blockchain listener to catch the added block event
-	totalGasUsed := srv.WaitForGasTotal(txHashes)
+	totalGasUsed := srv.GetGasTotal(txHashes)
 
 	// Find how much the address paid for all the transactions in this block
 	paidFee := big.NewInt(0).Mul(bigGasPrice, big.NewInt(int64(totalGasUsed)))
@@ -675,7 +675,7 @@ func TestPoS_StakeUnstakeWithinSameBlock(t *testing.T) {
 	addTxn(zeroEth, "unstake")
 
 	// Wait for the transactions to go through
-	totalGasUsed := srv.WaitForGasTotal(txHashes)
+	totalGasUsed := srv.GetGasTotal(txHashes)
 
 	// Find how much the address paid for all the transactions in this block
 	paidFee := big.NewInt(0).Mul(bigGasPrice, big.NewInt(int64(totalGasUsed)))
