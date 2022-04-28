@@ -38,9 +38,9 @@ type AtomicErrors struct {
 	errors []error
 }
 
-func NewAtomicErrors(cap int) AtomicErrors {
+func NewAtomicErrors(capacity int) AtomicErrors {
 	return AtomicErrors{
-		errors: make([]error, 0, cap),
+		errors: make([]error, 0, capacity),
 	}
 }
 
@@ -237,11 +237,13 @@ func MultiJoin(t *testing.T, srvs ...*TestServer) {
 		srcIndex, dstIndex := i, i+1
 
 		wg.Add(1)
+
 		go func() {
 			defer wg.Done()
 
 			srcClient, dstClient := src.Operator(), dst.Operator()
 			ctxFotStatus, cancelForStatus := context.WithTimeout(context.Background(), DefaultTimeout)
+
 			defer cancelForStatus()
 
 			dstStatus, err := dstClient.GetStatus(ctxFotStatus, &empty.Empty{})
@@ -253,6 +255,7 @@ func MultiJoin(t *testing.T, srvs ...*TestServer) {
 
 			dstAddr := strings.Split(dstStatus.P2PAddr, ",")[0]
 			ctxForConnecting, cancelForConnecting := context.WithTimeout(context.Background(), DefaultTimeout)
+
 			defer cancelForConnecting()
 
 			_, err = srcClient.PeersAdd(ctxForConnecting, &proto.PeersAddRequest{
@@ -475,6 +478,7 @@ func NewTestServers(t *testing.T, num int, conf func(*TestServerConfig)) []*Test
 		wg.Add(1)
 
 		i, srv := i, srv
+
 		go func() {
 			defer wg.Done()
 
