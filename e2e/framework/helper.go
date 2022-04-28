@@ -33,6 +33,28 @@ var (
 	DefaultTimeout = time.Second * 10
 )
 
+type AtomicErrors struct {
+	sync.Mutex
+	errors []error
+}
+
+func NewAtomicErrors(cap int) AtomicErrors {
+	return AtomicErrors{
+		errors: make([]error, 0, cap),
+	}
+}
+
+func (a *AtomicErrors) Append(err error) {
+	a.Lock()
+	defer a.Unlock()
+
+	a.errors = append(a.errors, err)
+}
+
+func (a *AtomicErrors) Errors() []error {
+	return a.errors
+}
+
 func EthToWei(ethValue int64) *big.Int {
 	return EthToWeiPrecise(ethValue, 18)
 }
@@ -206,14 +228,7 @@ func MultiJoin(t *testing.T, srvs ...*TestServer) {
 		t.Fatal("not an even number")
 	}
 
-	errors := make([]error, 0, len(srvs)/2)
-	errLock := sync.Mutex{}
-	appendError := func(err error) {
-		errLock.Lock()
-		defer errLock.Unlock()
-
-		errors = append(errors, err)
-	}
+	errors := NewAtomicErrors(len(srvs) / 2)
 
 	var wg sync.WaitGroup
 
@@ -231,7 +246,7 @@ func MultiJoin(t *testing.T, srvs ...*TestServer) {
 
 			dstStatus, err := dstClient.GetStatus(ctxFotStatus, &empty.Empty{})
 			if err != nil {
-				appendError(fmt.Errorf("failed to get status from server %d, error=%w", dstIndex, err))
+				errors.Append(fmt.Errorf("failed to get status from server %d, error=%w", dstIndex, err))
 
 				return
 			}
@@ -245,18 +260,18 @@ func MultiJoin(t *testing.T, srvs ...*TestServer) {
 			})
 
 			if err != nil {
-				appendError(fmt.Errorf("failed to connect from %d to %d, error=%w", srcIndex, dstIndex, err))
+				errors.Append(fmt.Errorf("failed to connect from %d to %d, error=%w", srcIndex, dstIndex, err))
 			}
 		}()
 	}
 
 	wg.Wait()
 
-	for _, err := range errors {
+	for _, err := range errors.Errors() {
 		t.Error(err)
 	}
 
-	if len(errors) > 0 {
+	if len(errors.Errors()) > 0 {
 		t.Fail()
 	}
 }
@@ -452,14 +467,7 @@ func NewTestServers(t *testing.T, num int, conf func(*TestServerConfig)) []*Test
 		srvs = append(srvs, srv)
 	}
 
-	errs := make([]error, 0, len(srvs))
-	errLock := sync.Mutex{}
-	appendError := func(err error) {
-		errLock.Lock()
-		defer errLock.Unlock()
-
-		errs = append(errs, err)
-	}
+	errors := NewAtomicErrors(len(srvs))
 
 	var wg sync.WaitGroup
 
@@ -471,7 +479,7 @@ func NewTestServers(t *testing.T, num int, conf func(*TestServerConfig)) []*Test
 			defer wg.Done()
 
 			if err := srv.GenerateGenesis(); err != nil {
-				appendError(fmt.Errorf("server %d failed genesis command, error=%w", i, err))
+				errors.Append(fmt.Errorf("server %d failed genesis command, error=%w", i, err))
 
 				return
 			}
@@ -481,18 +489,18 @@ func NewTestServers(t *testing.T, num int, conf func(*TestServerConfig)) []*Test
 
 			err := srv.Start(ctx)
 			if err != nil {
-				appendError(fmt.Errorf("server %d failed to start, error=%w", i, err))
+				errors.Append(fmt.Errorf("server %d failed to start, error=%w", i, err))
 			}
 		}()
 	}
 
 	wg.Wait()
 
-	for _, err := range errs {
+	for _, err := range errors.Errors() {
 		t.Error(err)
 	}
 
-	if len(errs) > 0 {
+	if len(errors.Errors()) > 0 {
 		t.Fail()
 	}
 
