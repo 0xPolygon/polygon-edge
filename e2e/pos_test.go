@@ -389,12 +389,16 @@ func TestPoS_UnstakeExploit(t *testing.T) {
 			From: types.ZeroAddress.String(),
 		}
 
-		addResp, addErr := clt.AddTxn(context.Background(), msg)
+		addCtx, addCtxCn := context.WithTimeout(context.Background(), time.Second*10)
+
+		addResp, addErr := clt.AddTxn(addCtx, msg)
 		if addErr != nil {
 			t.Fatalf("Unable to add txn, %v", addErr)
 		}
 
 		txHashes = append(txHashes, web3.HexToHash(addResp.TxHash))
+
+		addCtxCn()
 	}
 
 	// Wait for the transactions to go through
