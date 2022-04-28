@@ -100,6 +100,8 @@ func TestEth_Block_GetBlockTransactionCountByNumber(t *testing.T) {
 }
 
 func TestEth_Block_GetLogs(t *testing.T) {
+	t.Parallel()
+
 	blockHash := types.StringToHash("1")
 
 	// Topics we're searching for
@@ -176,6 +178,8 @@ func TestEth_Block_GetLogs(t *testing.T) {
 
 	for _, testCase := range testTable {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
 			foundLogs, logError := eth.GetLogs(testCase.query)
 
 			if logError != nil && !testCase.shouldFail {
@@ -191,7 +195,11 @@ func TestEth_Block_GetLogs(t *testing.T) {
 }
 
 func TestEth_GetTransactionByHash(t *testing.T) {
+	t.Parallel()
+
 	t.Run("returns correct transaction data if transaction is found in a sealed block", func(t *testing.T) {
+		t.Parallel()
+
 		store := &mockBlockStore{}
 		eth := newTestEthEndpoint(store)
 		block := newTestBlock(1, hash1)
@@ -218,6 +226,8 @@ func TestEth_GetTransactionByHash(t *testing.T) {
 	})
 
 	t.Run("returns correct transaction data if transaction is found in tx pool (pending)", func(t *testing.T) {
+		t.Parallel()
+
 		store := &mockBlockStore{}
 		eth := newTestEthEndpoint(store)
 
@@ -241,6 +251,8 @@ func TestEth_GetTransactionByHash(t *testing.T) {
 	})
 
 	t.Run("returns nil if transaction is nowhere to be found", func(t *testing.T) {
+		t.Parallel()
+
 		eth := newTestEthEndpoint(&mockBlockStore{})
 
 		res, err := eth.GetTransactionByHash(types.StringToHash("abcdef"))
@@ -251,7 +263,11 @@ func TestEth_GetTransactionByHash(t *testing.T) {
 }
 
 func TestEth_GetTransactionReceipt(t *testing.T) {
+	t.Parallel()
+
 	t.Run("returns nil if transaction with same hash not found", func(t *testing.T) {
+		t.Parallel()
+
 		store := &mockBlockStore{}
 		eth := newTestEthEndpoint(store)
 
@@ -262,6 +278,8 @@ func TestEth_GetTransactionReceipt(t *testing.T) {
 	})
 
 	t.Run("returns correct receipt data for found transaction", func(t *testing.T) {
+		t.Parallel()
+
 		store := newMockBlockStore()
 		eth := newTestEthEndpoint(store)
 		block := newTestBlock(1, hash4)
@@ -339,7 +357,11 @@ func TestEth_GasPrice(t *testing.T) {
 }
 
 func TestEth_Call(t *testing.T) {
+	t.Parallel()
+
 	t.Run("returns error if transaction execution fails", func(t *testing.T) {
+		t.Parallel()
+
 		store := newMockBlockStore()
 		store.add(newTestBlock(100, hash1))
 		store.ethCallError = errors.New("an arbitrary error")
@@ -362,6 +384,8 @@ func TestEth_Call(t *testing.T) {
 	})
 
 	t.Run("returns a value representing result of the successful transaction execution", func(t *testing.T) {
+		t.Parallel()
+
 		store := newMockBlockStore()
 		store.add(newTestBlock(100, hash1))
 		store.ethCallError = nil

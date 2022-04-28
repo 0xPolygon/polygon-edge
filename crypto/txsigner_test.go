@@ -29,6 +29,8 @@ func TestFrontierSigner(t *testing.T) {
 }
 
 func TestEIP155Signer_Sender(t *testing.T) {
+	t.Parallel()
+
 	toAddress := types.StringToAddress("1")
 
 	testTable := []struct {
@@ -71,6 +73,8 @@ func TestEIP155Signer_Sender(t *testing.T) {
 
 	for _, testCase := range testTable {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
 			key, keyGenError := GenerateKey()
 			if keyGenError != nil {
 				t.Fatalf("Unable to generate key")

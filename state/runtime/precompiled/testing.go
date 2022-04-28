@@ -31,6 +31,7 @@ func decodeHex(t *testing.T, input string) []byte {
 
 func ReadTestCase(t *testing.T, path string, f func(t *testing.T, c *TestCase)) {
 	t.Helper()
+	t.Parallel()
 
 	data, err := ioutil.ReadFile(filepath.Join("./fixtures", path))
 	if err != nil {
@@ -62,6 +63,8 @@ func ReadTestCase(t *testing.T, path string, f func(t *testing.T, c *TestCase)) 
 		}
 
 		t.Run(i.Name, func(t *testing.T) {
+			t.Parallel()
+
 			f(t, c)
 		})
 	}

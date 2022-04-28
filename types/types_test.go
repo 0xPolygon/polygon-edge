@@ -9,6 +9,8 @@ import (
 )
 
 func TestEIP55(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		address  string
 		expected string
@@ -53,6 +55,8 @@ func TestEIP55(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run("", func(t *testing.T) {
+			t.Parallel()
+
 			addr := StringToAddress(c.address)
 			assert.Equal(t, c.expected, addr.String())
 		})

@@ -22,6 +22,8 @@ func hash(str string) types.Hash {
 }
 
 func TestGenesisAlloc(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		input  string
 		output map[types.Address]GenesisAccount
@@ -82,6 +84,8 @@ func TestGenesisAlloc(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run("", func(t *testing.T) {
+			t.Parallel()
+
 			var dec map[types.Address]GenesisAccount
 			if err := json.Unmarshal([]byte(c.input), &dec); err != nil {
 				if c.output != nil {
@@ -95,6 +99,8 @@ func TestGenesisAlloc(t *testing.T) {
 }
 
 func TestGenesisX(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		input  string
 		output *Genesis
@@ -129,6 +135,8 @@ func TestGenesisX(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run("", func(t *testing.T) {
+			t.Parallel()
+
 			var dec *Genesis
 			if err := json.Unmarshal([]byte(c.input), &dec); err != nil {
 				if c.output != nil {
