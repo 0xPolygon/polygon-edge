@@ -3,7 +3,7 @@
 github.com/armon/go-metrics
 # github.com/armon/go-radix v1.0.0
 github.com/armon/go-radix
-# github.com/aws/aws-sdk-go v1.43.26
+# github.com/aws/aws-sdk-go v1.44.1
 ## explicit
 github.com/aws/aws-sdk-go/aws
 github.com/aws/aws-sdk-go/aws/awserr
@@ -106,6 +106,7 @@ github.com/gogo/protobuf/proto
 github.com/gogo/protobuf/protoc-gen-gogo/descriptor
 # github.com/golang/protobuf v1.5.2
 ## explicit
+github.com/golang/protobuf/jsonpb
 github.com/golang/protobuf/proto
 github.com/golang/protobuf/ptypes
 github.com/golang/protobuf/ptypes/any
@@ -279,7 +280,7 @@ github.com/libp2p/go-libp2p/p2p/protocol/ping
 github.com/libp2p/go-libp2p-asn-util
 # github.com/libp2p/go-libp2p-blankhost v0.3.0
 github.com/libp2p/go-libp2p-blankhost
-# github.com/libp2p/go-libp2p-core v0.14.0
+# github.com/libp2p/go-libp2p-core v0.15.1
 ## explicit
 github.com/libp2p/go-libp2p-core/connmgr
 github.com/libp2p/go-libp2p-core/control
@@ -288,6 +289,7 @@ github.com/libp2p/go-libp2p-core/crypto/pb
 github.com/libp2p/go-libp2p-core/discovery
 github.com/libp2p/go-libp2p-core/event
 github.com/libp2p/go-libp2p-core/host
+github.com/libp2p/go-libp2p-core/internal/catch
 github.com/libp2p/go-libp2p-core/introspection
 github.com/libp2p/go-libp2p-core/introspection/pb
 github.com/libp2p/go-libp2p-core/metrics
@@ -316,7 +318,7 @@ github.com/libp2p/go-libp2p-kbucket/peerdiversity
 github.com/libp2p/go-libp2p-mplex
 # github.com/libp2p/go-libp2p-nat v0.1.0
 github.com/libp2p/go-libp2p-nat
-# github.com/libp2p/go-libp2p-noise v0.3.0
+# github.com/libp2p/go-libp2p-noise v0.4.0
 ## explicit
 github.com/libp2p/go-libp2p-noise
 github.com/libp2p/go-libp2p-noise/pb
@@ -435,6 +437,8 @@ github.com/multiformats/go-multiaddr-dns
 github.com/multiformats/go-multiaddr-fmt
 # github.com/multiformats/go-multibase v0.0.3
 github.com/multiformats/go-multibase
+# github.com/multiformats/go-multicodec v0.4.1
+github.com/multiformats/go-multicodec
 # github.com/multiformats/go-multihash v0.1.0
 ## explicit
 github.com/multiformats/go-multihash
@@ -624,7 +628,6 @@ golang.org/x/net/ipv6
 golang.org/x/net/route
 golang.org/x/net/trace
 # golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-## explicit
 golang.org/x/sync/errgroup
 # golang.org/x/sys v0.0.0-20220227234510-4e6760a101f9
 ## explicit
@@ -666,7 +669,7 @@ golang.org/x/xerrors/internal
 # google.golang.org/genproto v0.0.0-20211208223120-3a66f561d7aa
 ## explicit
 google.golang.org/genproto/googleapis/rpc/status
-# google.golang.org/grpc v1.45.0
+# google.golang.org/grpc v1.46.0
 ## explicit
 google.golang.org/grpc
 google.golang.org/grpc/attributes
@@ -676,6 +679,7 @@ google.golang.org/grpc/balancer/base
 google.golang.org/grpc/balancer/grpclb/state
 google.golang.org/grpc/balancer/roundrobin
 google.golang.org/grpc/binarylog/grpc_binarylog_v1
+google.golang.org/grpc/channelz
 google.golang.org/grpc/codes
 google.golang.org/grpc/connectivity
 google.golang.org/grpc/credentials
@@ -687,6 +691,7 @@ google.golang.org/grpc/health
 google.golang.org/grpc/health/grpc_health_v1
 google.golang.org/grpc/internal
 google.golang.org/grpc/internal/backoff
+google.golang.org/grpc/internal/balancer/gracefulswitch
 google.golang.org/grpc/internal/balancerload
 google.golang.org/grpc/internal/binarylog
 google.golang.org/grpc/internal/buffer
@@ -698,6 +703,7 @@ google.golang.org/grpc/internal/grpcrand
 google.golang.org/grpc/internal/grpcsync
 google.golang.org/grpc/internal/grpcutil
 google.golang.org/grpc/internal/metadata
+google.golang.org/grpc/internal/pretty
 google.golang.org/grpc/internal/resolver
 google.golang.org/grpc/internal/resolver/dns
 google.golang.org/grpc/internal/resolver/passthrough
@@ -719,12 +725,14 @@ google.golang.org/grpc/status
 google.golang.org/grpc/tap
 # google.golang.org/protobuf v1.28.0
 ## explicit
+google.golang.org/protobuf/encoding/protojson
 google.golang.org/protobuf/encoding/prototext
 google.golang.org/protobuf/encoding/protowire
 google.golang.org/protobuf/internal/descfmt
 google.golang.org/protobuf/internal/descopts
 google.golang.org/protobuf/internal/detrand
 google.golang.org/protobuf/internal/encoding/defval
+google.golang.org/protobuf/internal/encoding/json
 google.golang.org/protobuf/internal/encoding/messageset
 google.golang.org/protobuf/internal/encoding/tag
 google.golang.org/protobuf/internal/encoding/text

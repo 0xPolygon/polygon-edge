@@ -63,7 +63,7 @@ func TestSign_CommittedSeals(t *testing.T) {
 	}
 
 	// Correct
-	assert.NoError(t, buildCommittedSeal([]string{"A", "B", "C"}))
+	assert.NoError(t, buildCommittedSeal([]string{"A", "B", "C", "D"}))
 
 	// Failed - Repeated signature
 	assert.Error(t, buildCommittedSeal([]string{"A", "A"}))

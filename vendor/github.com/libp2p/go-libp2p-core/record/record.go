@@ -3,6 +3,8 @@ package record
 import (
 	"errors"
 	"reflect"
+
+	"github.com/libp2p/go-libp2p-core/internal/catch"
 )
 
 var (
@@ -70,7 +72,9 @@ func RegisterType(prototype Record) {
 	payloadTypeRegistry[string(prototype.Codec())] = getValueType(prototype)
 }
 
-func unmarshalRecordPayload(payloadType []byte, payloadBytes []byte) (Record, error) {
+func unmarshalRecordPayload(payloadType []byte, payloadBytes []byte) (_rec Record, err error) {
+	defer func() { catch.HandlePanic(recover(), &err, "libp2p envelope record unmarshal") }()
+
 	rec, err := blankRecordForPayloadType(payloadType)
 	if err != nil {
 		return nil, err

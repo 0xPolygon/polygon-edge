@@ -4,7 +4,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/gorilla/websocket"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
 )
@@ -15,7 +17,7 @@ func TestFilterLog(t *testing.T) {
 	m := NewFilterManager(hclog.NewNullLogger(), store)
 	go m.Run()
 
-	id := m.addFilter(&LogFilter{
+	id := m.NewLogFilter(&LogQuery{
 		Topics: [][]types.Hash{
 			{hash1},
 		},
@@ -74,7 +76,7 @@ func TestFilterBlock(t *testing.T) {
 	go m.Run()
 
 	// add block filter
-	id := m.addFilter(nil, nil)
+	id := m.NewBlockFilter(nil)
 
 	// emit two events
 	store.emitEvent(&mockEvent{
@@ -137,7 +139,7 @@ func TestFilterTimeout(t *testing.T) {
 	go m.Run()
 
 	// add block filter
-	id := m.addFilter(nil, nil)
+	id := m.NewBlockFilter(nil)
 
 	assert.True(t, m.Exists(id))
 	time.Sleep(3 * time.Second)
@@ -158,7 +160,7 @@ func TestFilterWebsocket(t *testing.T) {
 
 	// we cannot call get filter changes for a websocket filter
 	_, err := m.GetFilterChanges(id)
-	assert.Equal(t, err, errFilterDoesNotExists)
+	assert.Equal(t, err, ErrWSFilterDoesNotSupportGetChanges)
 
 	// emit two events
 	store.emitEvent(&mockEvent{
@@ -208,4 +210,38 @@ func TestHeadStream(t *testing.T) {
 	// there are no new entries
 	updates, _ = next.getUpdates()
 	assert.Len(t, updates, 0)
+}
+
+type MockClosedWSConnection struct{}
+
+func (m *MockClosedWSConnection) WriteMessage(_messageType int, _data []byte) error {
+	return websocket.ErrCloseSent
+}
+
+func TestClosedFilterDeletion(t *testing.T) {
+	store := newMockStore()
+
+	m := NewFilterManager(hclog.NewNullLogger(), store)
+
+	go m.Run()
+
+	// add block filter
+	id := m.NewBlockFilter(&MockClosedWSConnection{})
+
+	assert.True(t, m.Exists(id))
+
+	// event is sent to the filter but writing to connection should fail
+	err := m.dispatchEvent(&blockchain.Event{
+		NewChain: []*types.Header{
+			{
+				Hash: types.StringToHash("1"),
+			},
+		},
+	})
+
+	// should not return error when the error is websocket.ErrCloseSen because filter is removed instead
+	assert.NoError(t, err)
+
+	// false because filter was removed automatically
+	assert.False(t, m.Exists(id))
 }

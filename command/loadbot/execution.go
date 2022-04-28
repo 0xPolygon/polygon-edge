@@ -76,8 +76,17 @@ type GasMetrics struct {
 }
 
 type BlockGasMetrics struct {
-	Blocks        map[uint64]GasMetrics
-	BlockGasMutex *sync.Mutex
+	sync.Mutex
+
+	Blocks map[uint64]GasMetrics
+}
+
+// AddBlockMetric adds a block gas metric for the specified block number [Thread safe]
+func (b *BlockGasMetrics) AddBlockMetric(blockNum uint64, gasMetric GasMetrics) {
+	b.Lock()
+	defer b.Unlock()
+
+	b.Blocks[blockNum] = gasMetric
 }
 
 type ContractMetricsData struct {
@@ -91,7 +100,7 @@ type Metrics struct {
 	TotalTransactionsSentCount uint64
 	FailedTransactionsCount    uint64
 	TransactionDuration        ExecDuration
-	ContractMetrics            ContractMetricsData
+	ContractMetrics            *ContractMetricsData
 	GasMetrics                 *BlockGasMetrics
 }
 
@@ -102,7 +111,7 @@ type Loadbot struct {
 }
 
 func NewLoadbot(cfg *Configuration) *Loadbot {
-	return &Loadbot{
+	loadbot := &Loadbot{
 		cfg: cfg,
 		metrics: &Metrics{
 			TotalTransactionsSentCount: 0,
@@ -110,21 +119,39 @@ func NewLoadbot(cfg *Configuration) *Loadbot {
 			TransactionDuration: ExecDuration{
 				blockTransactions: make(map[uint64]uint64),
 			},
-			ContractMetrics: ContractMetricsData{
-				ContractDeploymentDuration: ExecDuration{
-					blockTransactions: make(map[uint64]uint64),
-				},
-				ContractGasMetrics: &BlockGasMetrics{
-					Blocks:        make(map[uint64]GasMetrics),
-					BlockGasMutex: &sync.Mutex{},
-				},
-			},
 			GasMetrics: &BlockGasMetrics{
-				Blocks:        make(map[uint64]GasMetrics),
-				BlockGasMutex: &sync.Mutex{},
+				Blocks: make(map[uint64]GasMetrics),
 			},
 		},
 	}
+
+	// Attempt to initialize contract metrics if needed
+	loadbot.initContractMetricsIfNeeded()
+
+	return loadbot
+}
+
+// initContractMetrics initializes contract metrics for
+// the loadbot instance
+func (l *Loadbot) initContractMetricsIfNeeded() {
+	if !l.needsContractMetrics() {
+		return
+	}
+
+	l.metrics.ContractMetrics = &ContractMetricsData{
+		ContractDeploymentDuration: ExecDuration{
+			blockTransactions: make(map[uint64]uint64),
+		},
+		ContractGasMetrics: &BlockGasMetrics{
+			Blocks: make(map[uint64]GasMetrics),
+		},
+	}
+}
+
+func (l *Loadbot) needsContractMetrics() bool {
+	return l.cfg.GeneratorMode == deploy ||
+		l.cfg.GeneratorMode == erc20 ||
+		l.cfg.GeneratorMode == erc721
 }
 
 func (l *Loadbot) GetMetrics() *Metrics {
@@ -235,7 +262,18 @@ func (l *Loadbot) Run() error {
 		}
 	}
 
-	var wg sync.WaitGroup
+	var (
+		seenBlockNums     = make(map[uint64]struct{})
+		seenBlockNumsLock sync.Mutex
+		wg                sync.WaitGroup
+	)
+
+	markSeenBlock := func(blockNum uint64) {
+		seenBlockNumsLock.Lock()
+		defer seenBlockNumsLock.Unlock()
+
+		seenBlockNums[blockNum] = struct{}{}
+	}
 
 	for i := uint64(0); i < l.cfg.Count; i++ {
 		<-ticker.C
@@ -284,7 +322,9 @@ func (l *Loadbot) Run() error {
 				return
 			}
 
-			l.initGasMetricsBlocksMap(receipt.BlockNumber)
+			// Mark the block as seen so data on it
+			// is gathered later
+			markSeenBlock(receipt.BlockNumber)
 
 			// Stop the performance timer
 			end := time.Now()
@@ -303,7 +343,9 @@ func (l *Loadbot) Run() error {
 
 	endTime := time.Now()
 
-	if err := l.calculateGasMetrics(jsonClient, l.metrics.GasMetrics); err != nil {
+	// Fetch the block gas metrics for seen blocks
+	l.metrics.GasMetrics, err = getBlockGasMetrics(jsonClient, seenBlockNums)
+	if err != nil {
 		return fmt.Errorf("unable to calculate block gas metrics: %w", err)
 	}
 

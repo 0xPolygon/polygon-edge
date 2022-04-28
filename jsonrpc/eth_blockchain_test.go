@@ -111,36 +111,36 @@ func TestEth_Block_GetLogs(t *testing.T) {
 
 	testTable := []struct {
 		name           string
-		filterOptions  *LogFilter
+		query          *LogQuery
 		shouldFail     bool
 		expectedLength int
 	}{
 		{"Found matching logs, fromBlock < toBlock",
-			&LogFilter{
+			&LogQuery{
 				fromBlock: 1,
 				toBlock:   3,
 				Topics:    topics,
 			},
 			false, 3},
 		{"Found matching logs, fromBlock == toBlock",
-			&LogFilter{
+			&LogQuery{
 				fromBlock: 2,
 				toBlock:   2,
 				Topics:    topics,
 			},
 			false, 1},
 		{"Found matching logs, BlockHash present",
-			&LogFilter{
+			&LogQuery{
 				BlockHash: &blockHash,
 				Topics:    topics,
 			},
 			false, 1},
-		{"No logs found", &LogFilter{
+		{"No logs found", &LogQuery{
 			fromBlock: 4,
 			toBlock:   5,
 			Topics:    topics,
 		}, false, 0},
-		{"Invalid block range", &LogFilter{
+		{"Invalid block range", &LogQuery{
 			fromBlock: 10,
 			toBlock:   5,
 			Topics:    topics,
@@ -176,7 +176,7 @@ func TestEth_Block_GetLogs(t *testing.T) {
 
 	for _, testCase := range testTable {
 		t.Run(testCase.name, func(t *testing.T) {
-			foundLogs, logError := eth.GetLogs(testCase.filterOptions)
+			foundLogs, logError := eth.GetLogs(testCase.query)
 
 			if logError != nil && !testCase.shouldFail {
 				// If there is an error and test isn't expected to fail

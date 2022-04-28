@@ -1,12 +1,10 @@
 package loadbot
 
 import (
-	"context"
 	"fmt"
 	"math/big"
+	"sync"
 	"time"
-
-	"golang.org/x/sync/errgroup"
 
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/go-web3"
@@ -57,12 +55,12 @@ func estimateGas(client *jsonrpc.Client, txn *types.Transaction) (uint64, error)
 	return gasEstimate, nil
 }
 
-// calculate block utilization in percents
-func calculateBlockUtilization(blockInfo GasMetrics) float64 {
-	return float64(blockInfo.GasUsed) / float64(blockInfo.GasLimit) * 100
+// calculateBlockUtilization calculates block utilization in percents
+func calculateBlockUtilization(gasUsed, gasLimit uint64) float64 {
+	return float64(gasUsed) / float64(gasLimit) * 100
 }
 
-// calculate average block utilization across all blocks
+// calculateAvgBlockUtil calculates average block utilization across all blocks
 func calculateAvgBlockUtil(gasData map[uint64]GasMetrics) float64 {
 	sum := float64(0)
 	for _, i := range gasData {
@@ -72,57 +70,106 @@ func calculateAvgBlockUtil(gasData map[uint64]GasMetrics) float64 {
 	return sum / float64(len(gasData))
 }
 
-// fetch block gas usage and gas limit and calculate block utilization
-func (l *Loadbot) calculateGasMetrics(jsonClient *jsonrpc.Client, gasMetrics *BlockGasMetrics) error {
-	errGr, _ := errgroup.WithContext(context.Background())
+// getBlockGasMetrics fetches block gas metrics from the JSON-RPC client
+// for the specified blocks
+func getBlockGasMetrics(
+	jsonClient *jsonrpc.Client,
+	blockNums map[uint64]struct{},
+) (*BlockGasMetrics, error) {
+	var (
+		errors          = make([]error, 0)
+		errorsLock      sync.Mutex
+		blockGasMetrics = &BlockGasMetrics{
+			Blocks: make(map[uint64]GasMetrics),
+		}
+		wg sync.WaitGroup
+	)
 
-	for num, data := range gasMetrics.Blocks {
-		blockNum := num
-		blockData := data
+	// addError is a helper for accumulating errors
+	// in go routines
+	addError := func(fetchErr error) {
+		errorsLock.Lock()
+		defer errorsLock.Unlock()
 
-		errGr.Go(func() error {
-			blockInfom, err := jsonClient.Eth().GetBlockByNumber(web3.BlockNumber(blockNum), false)
-			if err != nil {
-				return fmt.Errorf("could not fetch block %d by number, %w", blockNum, err)
-			}
-
-			blockData.GasLimit = blockInfom.GasLimit
-			blockData.GasUsed = blockInfom.GasUsed
-			blockData.Utilization = calculateBlockUtilization(blockData)
-			gasMetrics.Blocks[blockNum] = blockData
-
-			return nil
-		})
+		errors = append(errors, fetchErr)
 	}
 
-	if err := errGr.Wait(); err != nil {
-		return err
+	queryBlockInfo := func(
+		blockNum uint64,
+	) {
+		// Query node for block
+		blockInfo, err := jsonClient.Eth().GetBlockByNumber(
+			web3.BlockNumber(blockNum),
+			false,
+		)
+		if err != nil {
+			addError(
+				fmt.Errorf("could not fetch block %d by number, %w", blockNum, err),
+			)
+
+			return
+		}
+
+		// Update the block gas metrics
+		blockGasMetrics.AddBlockMetric(
+			blockNum,
+			GasMetrics{
+				GasUsed:     blockInfo.GasUsed,
+				GasLimit:    blockInfo.GasLimit,
+				Utilization: calculateBlockUtilization(blockInfo.GasUsed, blockInfo.GasLimit),
+			},
+		)
 	}
 
-	return nil
+	// For each block number, fetch the corresponding
+	// block info data
+	for blockNum := range blockNums {
+		wg.Add(1)
+
+		go func(blockNum uint64) {
+			defer wg.Done()
+
+			queryBlockInfo(blockNum)
+		}(blockNum)
+	}
+
+	wg.Wait()
+
+	if len(errors) > 1 {
+		return nil, fmt.Errorf(
+			"unable to successfully fetch gas metrics, %v",
+			errors,
+		)
+	}
+
+	return blockGasMetrics, nil
 }
 
+// updateGasEstimate updates the loadbot generator gas estimate
 func (l *Loadbot) updateGasEstimate(jsonClient *jsonrpc.Client) error {
-	//nolint: ifshort
 	gasLimit := l.cfg.GasLimit
 
-	if gasLimit == nil {
-		// Get the gas estimate
-		exampleTxn, err := l.generator.GetExampleTransaction()
-		if err != nil {
-			return fmt.Errorf("unable to get example transaction, %w", err)
-		}
-
-		// No gas limit specified, query the network for an estimation
-		gasEstimate, estimateErr := estimateGas(jsonClient, exampleTxn)
-		if estimateErr != nil {
-			return fmt.Errorf("unable to get gas estimate, %w", err)
-		}
-
-		gasLimit = new(big.Int).SetUint64(gasEstimate)
-
-		l.generator.SetGasEstimate(gasLimit.Uint64())
+	if gasLimit != nil {
+		// User specified a gas limit to use,
+		// no need to calculate one
+		return nil
 	}
+
+	// User didn't specify a gas limit to use, calculate it
+	exampleTxn, err := l.generator.GetExampleTransaction()
+	if err != nil {
+		return fmt.Errorf("unable to get example transaction, %w", err)
+	}
+
+	// No gas limit specified, query the network for an estimation
+	gasEstimate, estimateErr := estimateGas(jsonClient, exampleTxn)
+	if estimateErr != nil {
+		return fmt.Errorf("unable to get gas estimate, %w", err)
+	}
+
+	gasLimit = new(big.Int).SetUint64(gasEstimate)
+
+	l.generator.SetGasEstimate(gasLimit.Uint64())
 
 	return nil
 }
@@ -143,7 +190,7 @@ func calcMaxTimeout(count, tps uint64) time.Duration {
 	return waitTime + waitFactor
 }
 
-// returns true if this is erc20 or erc721 mode
+// isTokenTransferMode checks if the mode is erc20 or erc721
 func (l *Loadbot) isTokenTransferMode() bool {
 	switch l.cfg.GeneratorMode {
 	case erc20, erc721:
@@ -151,11 +198,4 @@ func (l *Loadbot) isTokenTransferMode() bool {
 	default:
 		return false
 	}
-}
-
-//initialze gas metrics blocks map with block number as key
-func (l *Loadbot) initGasMetricsBlocksMap(blockNum uint64) {
-	l.metrics.GasMetrics.BlockGasMutex.Lock()
-	l.metrics.GasMetrics.Blocks[blockNum] = GasMetrics{}
-	l.metrics.GasMetrics.BlockGasMutex.Unlock()
 }
