@@ -289,6 +289,7 @@ func TestTxPool_TransactionCoalescing(t *testing.T) {
 		txHash: web3.HexToHash(addResp.TxHash),
 	})
 
+	// Start from 1 since there was previously a txn with nonce 0
 	for i := 1; i < len(testTransactions); i++ {
 		// Wait for the first transaction to go through
 		ctx, cancelFn := context.WithTimeout(context.Background(), 10*time.Second)
