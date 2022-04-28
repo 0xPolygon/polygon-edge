@@ -547,6 +547,8 @@ func (t *TestServer) WaitForReceipt(ctx context.Context, hash web3.Hash) (*web3.
 // GetGasTotal waits for the total gas used sum for the passed in
 // transactions
 func (t *TestServer) GetGasTotal(txHashes []web3.Hash) uint64 {
+	t.t.Helper()
+
 	var (
 		totalGasUsed    = uint64(0)
 		receiptErrs     = make([]error, 0)
