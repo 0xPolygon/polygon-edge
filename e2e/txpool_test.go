@@ -240,7 +240,9 @@ func TestTxPool_TransactionCoalescing(t *testing.T) {
 	for i := 0; i < len(nonces); i++ {
 		addReq := generateReq(nonces[i])
 
-		addResp, addErr := clt.AddTxn(context.Background(), addReq)
+		addCtx, addCtxCn := context.WithTimeout(context.Background(), time.Second*10)
+
+		addResp, addErr := clt.AddTxn(addCtx, addReq)
 		if addErr != nil {
 			t.Fatalf("Unable to add txn, %v", addErr)
 		}
@@ -248,6 +250,8 @@ func TestTxPool_TransactionCoalescing(t *testing.T) {
 		testTransactions = append(testTransactions, &testTransaction{
 			txHash: web3.HexToHash(addResp.TxHash),
 		})
+
+		addCtxCn()
 	}
 
 	// Wait for the first transaction to go through
