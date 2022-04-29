@@ -489,19 +489,18 @@ func (f *FilterManager) appendLogsToFilters(header *types.Header, removed bool) 
 	}
 
 	for indx, receipt := range receipts {
-		// check the logs with the filters
-
 		if receipt.TxHash == types.ZeroHash {
-			// Get ad full block
+			// Get a block where tx was sealed
 			block, ok := f.store.GetBlockByHash(header.Hash, true)
 			if !ok {
 				f.logger.Error("could not find block in store", "hash", header.Hash.String())
+
 				return nil
 			}
-
+			// Extract tx Hash
 			receipt.TxHash = block.Transactions[indx].Hash
 		}
-
+		// check the logs with the filters
 		for _, log := range receipt.Logs {
 			nn := &Log{
 				Address:     log.Address,

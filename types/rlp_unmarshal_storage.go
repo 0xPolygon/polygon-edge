@@ -141,11 +141,12 @@ func (r *Receipt) UnmarshalStoreRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) err
 	}
 
 	// tx hash
-	if (elems[3] != nil) {
+	if elems[3] != nil {
 		vv, err := elems[3].Bytes()
 		if err != nil {
 			return err
 		}
+
 		r.TxHash = BytesToHash(vv)
 	}
 
