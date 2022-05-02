@@ -51,7 +51,7 @@ github.com/aws/aws-sdk-go/service/sts/stsiface
 github.com/benbjohnson/clock
 # github.com/beorn7/perks v1.0.1
 github.com/beorn7/perks/quantile
-# github.com/btcsuite/btcd v0.22.0-beta
+# github.com/btcsuite/btcd v0.22.1
 ## explicit
 github.com/btcsuite/btcd/btcec
 # github.com/cenkalti/backoff/v3 v3.0.0
