@@ -7,7 +7,10 @@ on:
 
 jobs:
   lint:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, macos-latest ]
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Install Go
         uses: actions/setup-go@v3
@@ -48,7 +51,10 @@ jobs:
             -E errname
             -E errorlint
   test:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, macos-latest ]
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Install Go
         uses: actions/setup-go@v3
@@ -60,14 +66,14 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Go build without race
+      - name: Go build
         run: go build -a -o artifacts/polygon-edge .
 
-      - name: Add race artifacts directory to the path
+      - name: Add artifacts directory to the path
         run: echo "$(pwd)/artifacts" >> $GITHUB_PATH
 
       - name: Go test
-        run: go test -timeout 28m ./...
+        run: go test -v -timeout 28m ./...
 
       - name: Extract branch name
         if: github.event_name != 'pull_request'
