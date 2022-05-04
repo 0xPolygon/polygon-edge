@@ -328,6 +328,7 @@ func TestPoS_UnstakeExploit(t *testing.T) {
 		config.Premine(senderAddr, defaultBalance)
 		config.SetDevStakingAddresses(append(generateStakingAddresses(numDummyValidators), senderAddr))
 		config.SetIBFTPoS(true)
+		config.SetBlockLimit(5000000000)
 	})
 	srv := srvs[0]
 	client := srv.JSONRPC()
@@ -375,6 +376,8 @@ func TestPoS_UnstakeExploit(t *testing.T) {
 		return signedTx
 	}
 
+	txHashes := make([]web3.Hash, 0)
+
 	for i := 0; i < numTransactions; i++ {
 		var msg *txpoolOp.AddTxnReq
 
@@ -387,22 +390,23 @@ func TestPoS_UnstakeExploit(t *testing.T) {
 			From: types.ZeroAddress.String(),
 		}
 
-		_, addErr := clt.AddTxn(context.Background(), msg)
+		addCtx, addCtxCn := context.WithTimeout(context.Background(), time.Second*10)
+
+		addResp, addErr := clt.AddTxn(addCtx, msg)
 		if addErr != nil {
 			t.Fatalf("Unable to add txn, %v", addErr)
 		}
+
+		txHashes = append(txHashes, web3.HexToHash(addResp.TxHash))
+
+		addCtxCn()
 	}
 
-	// Set up the blockchain listener to catch the added block event
-	blockNum := waitForBlock(t, srv, 1, 0)
-
-	block, blockErr := client.Eth().GetBlockByNumber(web3.BlockNumber(blockNum), true)
-	if blockErr != nil {
-		t.Fatalf("Unable to fetch block")
-	}
+	// Wait for the transactions to go through
+	totalGasUsed := srv.GetGasTotal(txHashes)
 
 	// Find how much the address paid for all the transactions in this block
-	paidFee := big.NewInt(0).Mul(bigGasPrice, big.NewInt(int64(block.GasUsed)))
+	paidFee := big.NewInt(0).Mul(bigGasPrice, big.NewInt(int64(totalGasUsed)))
 
 	// Check the balances
 	actualAccountBalance := framework.GetAccountBalance(t, senderAddr, client)
@@ -517,6 +521,7 @@ func TestPoS_StakeUnstakeExploit(t *testing.T) {
 
 	oneEth := framework.EthToWei(1)
 	zeroEth := framework.EthToWei(0)
+	txHashes := make([]web3.Hash, 0)
 
 	for i := 0; i < numTransactions; i++ {
 		var msg *txpoolOp.AddTxnReq
@@ -539,22 +544,19 @@ func TestPoS_StakeUnstakeExploit(t *testing.T) {
 			}
 		}
 
-		_, addErr := txpoolClient.AddTxn(context.Background(), msg)
+		addResp, addErr := txpoolClient.AddTxn(context.Background(), msg)
 		if addErr != nil {
 			t.Fatalf("Unable to add txn, %v", addErr)
 		}
+
+		txHashes = append(txHashes, web3.HexToHash(addResp.TxHash))
 	}
 
 	// Set up the blockchain listener to catch the added block event
-	blockNum := waitForBlock(t, srv, 1, 0)
-
-	block, blockErr := client.Eth().GetBlockByNumber(web3.BlockNumber(blockNum), true)
-	if blockErr != nil {
-		t.Fatalf("Unable to fetch block")
-	}
+	totalGasUsed := srv.GetGasTotal(txHashes)
 
 	// Find how much the address paid for all the transactions in this block
-	paidFee := big.NewInt(0).Mul(bigGasPrice, big.NewInt(int64(block.GasUsed)))
+	paidFee := big.NewInt(0).Mul(bigGasPrice, big.NewInt(int64(totalGasUsed)))
 
 	// Check the balances
 	actualAccountBalance := framework.GetAccountBalance(t, senderAddr, client)
@@ -650,6 +652,8 @@ func TestPoS_StakeUnstakeWithinSameBlock(t *testing.T) {
 	}
 
 	zeroEth := framework.EthToWei(0)
+	txHashes := make([]web3.Hash, 0)
+
 	// addTxn is a helper method for generating and adding a transaction
 	// through the operator command
 	addTxn := func(value *big.Int, methodName string) {
@@ -661,10 +665,12 @@ func TestPoS_StakeUnstakeWithinSameBlock(t *testing.T) {
 			From: types.ZeroAddress.String(),
 		}
 
-		_, addErr := txpoolClient.AddTxn(context.Background(), txnMsg)
+		addResp, addErr := txpoolClient.AddTxn(context.Background(), txnMsg)
 		if addErr != nil {
 			t.Fatalf("Unable to add txn, %v", addErr)
 		}
+
+		txHashes = append(txHashes, web3.HexToHash(addResp.TxHash))
 	}
 
 	// Stake transaction
@@ -673,16 +679,11 @@ func TestPoS_StakeUnstakeWithinSameBlock(t *testing.T) {
 	// Unstake transaction
 	addTxn(zeroEth, "unstake")
 
-	// Set up the blockchain listener to catch the added block event
-	blockNum := waitForBlock(t, srv, 1, 0)
-
-	block, blockErr := client.Eth().GetBlockByNumber(web3.BlockNumber(blockNum), true)
-	if blockErr != nil {
-		t.Fatalf("Unable to fetch block")
-	}
+	// Wait for the transactions to go through
+	totalGasUsed := srv.GetGasTotal(txHashes)
 
 	// Find how much the address paid for all the transactions in this block
-	paidFee := big.NewInt(0).Mul(bigGasPrice, big.NewInt(int64(block.GasUsed)))
+	paidFee := big.NewInt(0).Mul(bigGasPrice, big.NewInt(int64(totalGasUsed)))
 
 	// Check the balances
 	actualAccountBalance := framework.GetAccountBalance(t, senderAddr, client)
