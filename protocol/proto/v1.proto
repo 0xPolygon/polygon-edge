@@ -14,10 +14,6 @@ service V1 {
   rpc Notify(NotifyReq) returns (google.protobuf.Empty);
 }
 
-message GetCurrentResponse {
-
-}
-
 message GetHeadersRequest {
   // Provide a number or hash
   int64 number = 1;
@@ -52,8 +48,7 @@ message Response {
 }
 
 message V1Status {
-  reserved 1;
-
+  string difficulty = 1;
   string hash = 2;
   uint64 number = 3;
 }

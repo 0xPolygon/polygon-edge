@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/0xPolygon/polygon-edge/network/event"
 	"math"
+	"math/big"
 	"sync"
 	"time"
 
@@ -136,8 +137,9 @@ func (s *SyncPeer) updateStatus(status *Status) {
 
 // Status defines the up to date information regarding the peer
 type Status struct {
-	Hash   types.Hash // Latest block hash
-	Number uint64     // Latest block number
+	Difficulty *big.Int   // Current difficulty
+	Hash       types.Hash // Latest block hash
+	Number     uint64     // Latest block number
 }
 
 // Copy creates a copy of the status
@@ -145,6 +147,7 @@ func (s *Status) Copy() *Status {
 	ss := new(Status)
 	ss.Hash = s.Hash
 	ss.Number = s.Number
+	ss.Difficulty = new(big.Int).Set(s.Difficulty)
 
 	return ss
 }
@@ -152,16 +155,23 @@ func (s *Status) Copy() *Status {
 // toProto converts a Status object to a proto.V1Status
 func (s *Status) toProto() *proto.V1Status {
 	return &proto.V1Status{
-		Number: s.Number,
-		Hash:   s.Hash.String(),
+		Number:     s.Number,
+		Hash:       s.Hash.String(),
+		Difficulty: s.Difficulty.String(),
 	}
 }
 
 // fromProto converts a proto.V1Status to a Status object
 func fromProto(status *proto.V1Status) (*Status, error) {
+	diff, ok := new(big.Int).SetString(status.Difficulty, 10)
+	if !ok {
+		return nil, fmt.Errorf("failed to parse difficulty: %s", status.Difficulty)
+	}
+
 	return &Status{
-		Number: status.Number,
-		Hash:   types.StringToHash(status.Hash),
+		Number:     status.Number,
+		Hash:       types.StringToHash(status.Hash),
+		Difficulty: diff,
 	}, nil
 }
 
@@ -173,6 +183,13 @@ func statusFromProto(p *proto.V1Status) (*Status, error) {
 	}
 
 	s.Number = p.Number
+
+	diff, ok := new(big.Int).SetString(p.Difficulty, 10)
+	if !ok {
+		return nil, fmt.Errorf("failed to decode difficulty")
+	}
+
+	s.Difficulty = diff
 
 	return s, nil
 }
@@ -233,8 +250,9 @@ func (s *Syncer) syncCurrentStatus() {
 			}
 
 			status := &Status{
-				Hash:   evnt.NewChain[0].Hash,
-				Number: evnt.NewChain[0].Number,
+				Difficulty: evnt.Difficulty,
+				Hash:       evnt.NewChain[0].Hash,
+				Number:     evnt.NewChain[0].Number,
 			}
 
 			s.statusLock.Lock()
@@ -276,7 +294,9 @@ func (s *Syncer) updatePeerStatus(peerID peer.ID, status *Status) {
 		"latest block number",
 		status.Number,
 		"latest block hash",
-		status.Hash, "difficulty",
+		status.Hash,
+		"difficulty",
+		status.Difficulty,
 	)
 
 	if peer, ok := s.peers.Load(peerID); ok {
@@ -293,11 +313,21 @@ func (s *Syncer) updatePeerStatus(peerID peer.ID, status *Status) {
 
 // Broadcast broadcasts a block to all peers
 func (s *Syncer) Broadcast(b *types.Block) {
+	// Get the chain difficulty associated with block
+	td, ok := s.blockchain.GetTD(b.Hash())
+	if !ok {
+		// not supposed to happen
+		s.logger.Error("total difficulty not found", "block number", b.Number())
+
+		return
+	}
+
 	// broadcast the new block to all the peers
 	req := &proto.NotifyReq{
 		Status: &proto.V1Status{
-			Hash:   b.Hash().String(),
-			Number: b.Number(),
+			Hash:       b.Hash().String(),
+			Number:     b.Number(),
+			Difficulty: td.String(),
 		},
 		Raw: &anypb.Any{
 			Value: b.MarshalRLP(),
@@ -319,10 +349,12 @@ func (s *Syncer) Start() {
 
 	// Get the current status of the syncer
 	currentHeader := s.blockchain.Header()
+	diff, _ := s.blockchain.GetTD(currentHeader.Hash)
 
 	s.status = &Status{
-		Hash:   currentHeader.Hash,
-		Number: currentHeader.Number,
+		Hash:       currentHeader.Hash,
+		Number:     currentHeader.Number,
+		Difficulty: diff,
 	}
 
 	// Run the blockchain event listener loop
