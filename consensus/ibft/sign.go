@@ -2,7 +2,7 @@ package ibft
 
 import (
 	"crypto/ecdsa"
-	"fmt"
+	"errors"
 
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/crypto"
@@ -10,6 +10,15 @@ import (
 	"github.com/0xPolygon/polygon-edge/helper/keccak"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/fastrlp"
+)
+
+var (
+	ErrEmptyCommittedSeals        = errors.New("empty committed seals")
+	ErrInvalidCommittedSealLength = errors.New("invalid committed seal length")
+	ErrRepeatedCommittedSeal      = errors.New("repeated seal in committed seals")
+	ErrNonValidatorCommittedSeal  = errors.New("found committed seal signed by non validator")
+	ErrNotEnoughCommittedSeals    = errors.New("not enough seals to seal block")
+	ErrSignerNotFound             = errors.New("not found signer in validator set")
 )
 
 func commitMsg(b []byte) []byte {
@@ -28,18 +37,18 @@ func ecrecoverImpl(sig, msg []byte) (types.Address, error) {
 }
 
 func ecrecoverFromHeader(h *types.Header) (types.Address, error) {
-	// get the extra part that contains the seal
-	extra, err := getIbftExtra(h)
+	seal, err := unpackSealFromIbftExtra(h)
 	if err != nil {
 		return types.Address{}, err
 	}
+
 	// get the sig
 	msg, err := calculateHeaderHash(h)
 	if err != nil {
 		return types.Address{}, err
 	}
 
-	return ecrecoverImpl(extra.Seal, msg)
+	return ecrecoverImpl(seal, msg)
 }
 
 func signSealImpl(prv *ecdsa.PrivateKey, h *types.Header, committed bool) ([]byte, error) {
@@ -63,6 +72,7 @@ func signSealImpl(prv *ecdsa.PrivateKey, h *types.Header, committed bool) ([]byt
 	return seal, nil
 }
 
+// writeSeal creates and sets a signatures to Seal in IBFT Extra
 func writeSeal(prv *ecdsa.PrivateKey, h *types.Header) (*types.Header, error) {
 	h = h.Copy()
 	seal, err := signSealImpl(prv, h, false)
@@ -71,43 +81,33 @@ func writeSeal(prv *ecdsa.PrivateKey, h *types.Header) (*types.Header, error) {
 		return nil, err
 	}
 
-	extra, err := getIbftExtra(h)
-	if err != nil {
-		return nil, err
-	}
-
-	extra.Seal = seal
-	if err := PutIbftExtra(h, extra); err != nil {
+	if err := packSealIntoIbftExtra(h, seal); err != nil {
 		return nil, err
 	}
 
 	return h, nil
 }
 
-func writeCommittedSeal(prv *ecdsa.PrivateKey, h *types.Header) ([]byte, error) {
+// getCommittedSeal returns the commit signature
+func getCommittedSeal(prv *ecdsa.PrivateKey, h *types.Header) ([]byte, error) {
 	return signSealImpl(prv, h, true)
 }
 
+// writeCommittedSeals sets given commit signatures to CommittedSeal in IBFT Extra
 func writeCommittedSeals(h *types.Header, seals [][]byte) (*types.Header, error) {
 	h = h.Copy()
 
 	if len(seals) == 0 {
-		return nil, fmt.Errorf("empty committed seals")
+		return nil, ErrEmptyCommittedSeals
 	}
 
 	for _, seal := range seals {
 		if len(seal) != IstanbulExtraSeal {
-			return nil, fmt.Errorf("invalid committed seal length")
+			return nil, ErrInvalidCommittedSealLength
 		}
 	}
 
-	extra, err := getIbftExtra(h)
-	if err != nil {
-		return nil, err
-	}
-
-	extra.CommittedSeal = seals
-	if err := PutIbftExtra(h, extra); err != nil {
+	if err := packCommittedSealIntoIbftExtra(h, seals); err != nil {
 		return nil, err
 	}
 
@@ -120,17 +120,9 @@ func calculateHeaderHash(h *types.Header) ([]byte, error) {
 	arena := fastrlp.DefaultArenaPool.Get()
 	defer fastrlp.DefaultArenaPool.Put(arena)
 
-	// when hashing the block for signing we have to remove from
-	// the extra field the seal and committed seal items
-	extra, err := getIbftExtra(h)
-	if err != nil {
+	if err := filterIbftExtraForHash(h); err != nil {
 		return nil, err
 	}
-
-	// This will effectively remove the Seal and Committed Seal fields,
-	// while keeping proposer vanity and validator set
-	// because extra.Validators is what we got from `h` in the first place.
-	putIbftExtraValidators(h, extra.Validators)
 
 	vv := arena.NewArray()
 	vv.Set(arena.NewBytes(h.ParentHash.Bytes()))
@@ -159,22 +151,22 @@ func verifySigner(snap *Snapshot, header *types.Header) error {
 	}
 
 	if !snap.Set.Includes(signer) {
-		return fmt.Errorf("not found signer")
+		return ErrSignerNotFound
 	}
 
 	return nil
 }
 
 // verifyCommitedFields is checking for consensus proof in the header
-func verifyCommitedFields(snap *Snapshot, header *types.Header) error {
-	extra, err := getIbftExtra(header)
+func verifyCommittedFields(snap *Snapshot, header *types.Header) error {
+	committedSeal, err := unpackCommittedSealFromIbftExtra(header)
 	if err != nil {
 		return err
 	}
 
 	// Committed seals shouldn't be empty
-	if len(extra.CommittedSeal) == 0 {
-		return fmt.Errorf("empty committed seals")
+	if len(committedSeal) == 0 {
+		return ErrEmptyCommittedSeals
 	}
 
 	// get the message that needs to be signed
@@ -188,17 +180,17 @@ func verifyCommitedFields(snap *Snapshot, header *types.Header) error {
 
 	visited := map[types.Address]struct{}{}
 
-	for _, seal := range extra.CommittedSeal {
+	for _, seal := range committedSeal {
 		addr, err := ecrecoverImpl(seal, rawMsg)
 		if err != nil {
 			return err
 		}
 
 		if _, ok := visited[addr]; ok {
-			return fmt.Errorf("repeated seal")
+			return ErrRepeatedCommittedSeal
 		} else {
 			if !snap.Set.Includes(addr) {
-				return fmt.Errorf("signed by non validator")
+				return ErrNonValidatorCommittedSeal
 			}
 			visited[addr] = struct{}{}
 		}
@@ -208,7 +200,7 @@ func verifyCommitedFields(snap *Snapshot, header *types.Header) error {
 	// 	2F 	is the required number of honest validators who provided the committed seals
 	// 	+1	is the proposer
 	if validSeals := len(visited); validSeals < snap.Set.QuorumSize() {
-		return fmt.Errorf("not enough seals to seal block")
+		return ErrNotEnoughCommittedSeals
 	}
 
 	return nil

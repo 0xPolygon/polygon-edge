@@ -21,28 +21,17 @@ var (
 
 var zeroBytes = make([]byte, 32)
 
-// putIbftExtraValidators is a helper method that adds validators to the extra field in the header
-func putIbftExtraValidators(h *types.Header, validators []types.Address) {
-	// Pad zeros to the right up to istanbul vanity
-	extra := h.ExtraData
-	if len(extra) < IstanbulExtraVanity {
-		extra = append(extra, zeroBytes[:IstanbulExtraVanity-len(extra)]...)
-	} else {
-		extra = extra[:IstanbulExtraVanity]
-	}
-
-	ibftExtra := &IstanbulExtra{
+// initIbftExtra initializes ExtraData in Header for IBFT Extra
+func initIbftExtra(h *types.Header, validators []types.Address) error {
+	return putIbftExtra(h, &IstanbulExtra{
 		Validators:    validators,
 		Seal:          []byte{},
 		CommittedSeal: [][]byte{},
-	}
-
-	extra = ibftExtra.MarshalRLPTo(extra)
-	h.ExtraData = extra
+	})
 }
 
-// PutIbftExtra sets the extra data field in the header to the passed in istanbul extra data
-func PutIbftExtra(h *types.Header, istanbulExtra *IstanbulExtra) error {
+// putIbftExtra sets the extra data field in the header to the passed in istanbul extra data
+func putIbftExtra(h *types.Header, istanbulExtra *IstanbulExtra) error {
 	// Pad zeros to the right up to istanbul vanity
 	extra := h.ExtraData
 	if len(extra) < IstanbulExtraVanity {
@@ -51,9 +40,7 @@ func PutIbftExtra(h *types.Header, istanbulExtra *IstanbulExtra) error {
 		extra = extra[:IstanbulExtraVanity]
 	}
 
-	data := istanbulExtra.MarshalRLPTo(nil)
-	extra = append(extra, data...)
-	h.ExtraData = extra
+	h.ExtraData = istanbulExtra.MarshalRLPTo(extra)
 
 	return nil
 }
@@ -61,7 +48,7 @@ func PutIbftExtra(h *types.Header, istanbulExtra *IstanbulExtra) error {
 // getIbftExtra returns the istanbul extra data field from the passed in header
 func getIbftExtra(h *types.Header) (*IstanbulExtra, error) {
 	if len(h.ExtraData) < IstanbulExtraVanity {
-		return nil, fmt.Errorf("wrong extra size: %d", len(h.ExtraData))
+		return nil, fmt.Errorf("wrong extra size, expected greater than or equal to %d but actual %d", IstanbulExtraVanity, len(h.ExtraData))
 	}
 
 	data := h.ExtraData[IstanbulExtraVanity:]
@@ -72,6 +59,75 @@ func getIbftExtra(h *types.Header) (*IstanbulExtra, error) {
 	}
 
 	return extra, nil
+}
+
+// unpackValidatorsFromIbftExtra extracts Validators from IBFT Extra in Header
+func unpackValidatorsFromIbftExtra(h *types.Header) ([]types.Address, error) {
+	extra, err := getIbftExtra(h)
+	if err != nil {
+		return nil, err
+	}
+
+	return extra.Validators, nil
+}
+
+// unpackValidatorsFromIbftExtra extracts Seal from IBFT Extra in Header
+func unpackSealFromIbftExtra(h *types.Header) ([]byte, error) {
+	extra, err := getIbftExtra(h)
+	if err != nil {
+		return nil, err
+	}
+
+	return extra.Seal, nil
+}
+
+// unpackValidatorsFromIbftExtra extracts CommittedSeal from IBFT Extra in Header
+func unpackCommittedSealFromIbftExtra(h *types.Header) ([][]byte, error) {
+	extra, err := getIbftExtra(h)
+	if err != nil {
+		return nil, err
+	}
+
+	return extra.CommittedSeal, nil
+}
+
+// packFieldIntoIbftExtra is a helper method to update fields in IBFT Extra of header
+func packFieldIntoIbftExtra(h *types.Header, updateFn func(*IstanbulExtra)) error {
+	extra, err := getIbftExtra(h)
+	if err != nil {
+		return err
+	}
+
+	updateFn(extra)
+
+	return putIbftExtra(h, extra)
+}
+
+// packSealIntoIbftExtra set the given seal to Seal field in IBFT extra of header
+func packSealIntoIbftExtra(h *types.Header, seal []byte) error {
+	return packFieldIntoIbftExtra(h, func(extra *IstanbulExtra) {
+		extra.Seal = seal
+	})
+}
+
+// packCommittedSealIntoIbftExtra set the given committed seals to CommittedSeal field in IBFT extra of header
+func packCommittedSealIntoIbftExtra(h *types.Header, seals [][]byte) error {
+	return packFieldIntoIbftExtra(h, func(extra *IstanbulExtra) {
+		extra.CommittedSeal = seals
+	})
+}
+
+// filterIbftExtraForHash clears unnecessary fields in IBFT Extra for hash calculation
+func filterIbftExtraForHash(h *types.Header) error {
+	extra, err := getIbftExtra(h)
+	if err != nil {
+		return err
+	}
+
+	// This will effectively remove the Seal and Committed Seal fields,
+	// while keeping proposer vanity and validator set
+	// because extra.Validators is what we got from `h` in the first place.
+	return initIbftExtra(h, extra.Validators)
 }
 
 // IstanbulExtra defines the structure of the extra field for Istanbul
@@ -143,7 +199,7 @@ func (i *IstanbulExtra) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) er
 	{
 		vals, err := elems[0].GetElems()
 		if err != nil {
-			return fmt.Errorf("list expected for validators")
+			return fmt.Errorf("mismatch of RLP type for Validators, expected list but found %s", elems[0].Type())
 		}
 		i.Validators = make([]types.Address, len(vals))
 		for indx, val := range vals {
@@ -156,7 +212,7 @@ func (i *IstanbulExtra) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) er
 	// Seal
 	{
 		if i.Seal, err = elems[1].GetBytes(i.Seal); err != nil {
-			return err
+			return fmt.Errorf("failed to decode Seal: %w", err)
 		}
 	}
 
@@ -164,7 +220,7 @@ func (i *IstanbulExtra) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) er
 	{
 		vals, err := elems[2].GetElems()
 		if err != nil {
-			return fmt.Errorf("list expected for committed")
+			return fmt.Errorf("mismatch of RLP type for CommittedSeal, expected list but found %s", elems[0].Type())
 		}
 		i.CommittedSeal = make([][]byte, len(vals))
 		for indx, val := range vals {

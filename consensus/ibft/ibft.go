@@ -595,7 +595,7 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 	header.Timestamp = uint64(headerTime.Unix())
 
 	// we need to include in the extra field the current set of validators
-	putIbftExtraValidators(header, snap.Set)
+	initIbftExtra(header, snap.Set)
 
 	transition, err := i.executor.BeginTxn(parent.StateRoot, header, i.validatorKeyAddr)
 	if err != nil {
@@ -1150,7 +1150,7 @@ func (i *Ibft) gossip(typ proto.MessageReq_Type) {
 
 	// if the message is commit, we need to add the committed seal
 	if msg.Type == proto.MessageReq_Commit {
-		seal, err := writeCommittedSeal(i.validatorKey, i.state.block.Header)
+		seal, err := getCommittedSeal(i.validatorKey, i.state.block.Header)
 		if err != nil {
 			i.logger.Error("failed to commit seal", "err", err)
 
@@ -1249,7 +1249,7 @@ func (i *Ibft) VerifyHeader(parent, header *types.Header) error {
 	}
 
 	// verify the committed seals
-	if err := verifyCommitedFields(snap, header); err != nil {
+	if err := verifyCommittedFields(snap, header); err != nil {
 		return err
 	}
 

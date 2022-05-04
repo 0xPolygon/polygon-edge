@@ -15,14 +15,10 @@ func istanbulHeaderHash(h *types.Header) types.Hash {
 	arena := fastrlp.DefaultArenaPool.Get()
 	defer fastrlp.DefaultArenaPool.Put(arena)
 
-	// when hashing the block for signing we have to remove from
-	// the extra field the seal and committed seal items
-	extra, err := getIbftExtra(h)
-	if err != nil {
+	// clear unnecessary fields in IBFT Extra for hash calculation
+	if err := filterIbftExtraForHash(h); err != nil {
 		return types.Hash{}
 	}
-
-	putIbftExtraValidators(h, extra.Validators)
 
 	vv := arena.NewArray()
 	vv.Set(arena.NewBytes(h.ParentHash.Bytes()))
