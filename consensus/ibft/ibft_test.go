@@ -342,7 +342,7 @@ func TestTransition_RoundChangeState_CatchupRound(t *testing.T) {
 	m.expect(expectResult{
 		sequence: 1,
 		round:    2,
-		outgoing: 1, // our new round change
+		outgoing: 2, // our new round change
 		state:    AcceptState,
 	})
 }

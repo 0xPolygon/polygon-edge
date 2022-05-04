@@ -12,16 +12,19 @@ import (
 
 	btcec "github.com/btcsuite/btcd/btcec"
 	openssl "github.com/libp2p/go-openssl"
+
+	"github.com/libp2p/go-libp2p-core/internal/catch"
 )
 
 // KeyPairFromStdKey wraps standard library (and secp256k1) private keys in libp2p/go-libp2p-core/crypto keys
-func KeyPairFromStdKey(priv crypto.PrivateKey) (PrivKey, PubKey, error) {
+func KeyPairFromStdKey(priv crypto.PrivateKey) (_priv PrivKey, _pub PubKey, err error) {
 	if priv == nil {
 		return nil, nil, ErrNilPrivateKey
 	}
 
 	switch p := priv.(type) {
 	case *rsa.PrivateKey:
+		defer func() { catch.HandlePanic(recover(), &err, "x509 private key marshaling") }()
 		pk, err := openssl.LoadPrivateKeyFromDER(x509.MarshalPKCS1PrivateKey(p))
 		if err != nil {
 			return nil, nil, err
@@ -48,12 +51,13 @@ func KeyPairFromStdKey(priv crypto.PrivateKey) (PrivKey, PubKey, error) {
 }
 
 // PrivKeyToStdKey converts libp2p/go-libp2p-core/crypto private keys to standard library (and secp256k1) private keys
-func PrivKeyToStdKey(priv PrivKey) (crypto.PrivateKey, error) {
+func PrivKeyToStdKey(priv PrivKey) (_priv crypto.PrivateKey, err error) {
 	if priv == nil {
 		return nil, ErrNilPrivateKey
 	}
 	switch p := priv.(type) {
 	case *opensslPrivateKey:
+		defer func() { catch.HandlePanic(recover(), &err, "x509 private key parsing") }()
 		raw, err := p.Raw()
 		if err != nil {
 			return nil, err
@@ -71,13 +75,15 @@ func PrivKeyToStdKey(priv PrivKey) (crypto.PrivateKey, error) {
 }
 
 // PubKeyToStdKey converts libp2p/go-libp2p-core/crypto private keys to standard library (and secp256k1) public keys
-func PubKeyToStdKey(pub PubKey) (crypto.PublicKey, error) {
+func PubKeyToStdKey(pub PubKey) (key crypto.PublicKey, err error) {
 	if pub == nil {
 		return nil, ErrNilPublicKey
 	}
 
 	switch p := pub.(type) {
 	case *opensslPublicKey:
+		defer func() { catch.HandlePanic(recover(), &err, "x509 public key parsing") }()
+
 		raw, err := p.Raw()
 		if err != nil {
 			return nil, err
