@@ -22,11 +22,12 @@ var (
 var zeroBytes = make([]byte, 32)
 
 // initIbftExtra initializes ExtraData in Header for IBFT Extra
-func initIbftExtra(h *types.Header, validators []types.Address) error {
+func initIbftExtra(h *types.Header, validators []types.Address, parentCommittedSeals [][]byte) error {
 	return putIbftExtra(h, &IstanbulExtra{
-		Validators:    validators,
-		Seal:          []byte{},
-		CommittedSeal: [][]byte{},
+		Validators:          validators,
+		Seal:                []byte{},
+		CommittedSeal:       [][]byte{},
+		ParentCommittedSeal: parentCommittedSeals,
 	})
 }
 
@@ -81,7 +82,7 @@ func unpackSealFromIbftExtra(h *types.Header) ([]byte, error) {
 	return extra.Seal, nil
 }
 
-// unpackValidatorsFromIbftExtra extracts CommittedSeal from IBFT Extra in Header
+// unpackCommittedSealFromIbftExtra extracts CommittedSeal from IBFT Extra in Header
 func unpackCommittedSealFromIbftExtra(h *types.Header) ([][]byte, error) {
 	extra, err := getIbftExtra(h)
 	if err != nil {
@@ -89,6 +90,16 @@ func unpackCommittedSealFromIbftExtra(h *types.Header) ([][]byte, error) {
 	}
 
 	return extra.CommittedSeal, nil
+}
+
+// unpackParentCommittedSealFromIbftExtra extracts ParentCommittedSeal from IBFT Extra in Header
+func unpackParentCommittedSealFromIbftExtra(h *types.Header) ([][]byte, error) {
+	extra, err := getIbftExtra(h)
+	if err != nil {
+		return nil, err
+	}
+
+	return extra.ParentCommittedSeal, nil
 }
 
 // packFieldIntoIbftExtra is a helper method to update fields in IBFT Extra of header
@@ -117,7 +128,7 @@ func packCommittedSealIntoIbftExtra(h *types.Header, seals [][]byte) error {
 	})
 }
 
-// filterIbftExtraForHash clears unnecessary fields in IBFT Extra for hash calculation
+// filterIbftExtraForHash clears unnecessary fields from IBFT Extra for hash calculation
 func filterIbftExtraForHash(h *types.Header) error {
 	extra, err := getIbftExtra(h)
 	if err != nil {
@@ -126,15 +137,16 @@ func filterIbftExtraForHash(h *types.Header) error {
 
 	// This will effectively remove the Seal and Committed Seal fields,
 	// while keeping proposer vanity and validator set
-	// because extra.Validators is what we got from `h` in the first place.
-	return initIbftExtra(h, extra.Validators)
+	// because extra.Validators, extra.ParentCommittedSeal is what we got from `h` in the first place.
+	return initIbftExtra(h, extra.Validators, extra.ParentCommittedSeal)
 }
 
 // IstanbulExtra defines the structure of the extra field for Istanbul
 type IstanbulExtra struct {
-	Validators    []types.Address
-	Seal          []byte
-	CommittedSeal [][]byte
+	Validators          []types.Address
+	Seal                []byte
+	CommittedSeal       [][]byte
+	ParentCommittedSeal [][]byte
 }
 
 // MarshalRLPTo defines the marshal function wrapper for IstanbulExtra
@@ -176,6 +188,23 @@ func (i *IstanbulExtra) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 		vv.Set(committed)
 	}
 
+	// ParentCommittedSeal
+	if i.ParentCommittedSeal != nil {
+		if len(i.ParentCommittedSeal) == 0 {
+			vv.Set(ar.NewNullArray())
+		} else {
+			committed := ar.NewArray()
+			for _, a := range i.ParentCommittedSeal {
+				if len(a) == 0 {
+					vv.Set(ar.NewNull())
+				} else {
+					committed.Set(ar.NewBytes(a))
+				}
+			}
+			vv.Set(committed)
+		}
+	}
+
 	return vv
 }
 
@@ -191,8 +220,8 @@ func (i *IstanbulExtra) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) er
 		return err
 	}
 
-	if num := len(elems); num != 3 {
-		return fmt.Errorf("not enough elements to decode istambul extra, expected 3 but found %d", num)
+	if num := len(elems); num != 3 && num != 4 {
+		return fmt.Errorf("not enough elements to decode istambul extra, expected 3 or 4 but found %d", num)
 	}
 
 	// Validators
@@ -220,11 +249,26 @@ func (i *IstanbulExtra) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) er
 	{
 		vals, err := elems[2].GetElems()
 		if err != nil {
-			return fmt.Errorf("mismatch of RLP type for CommittedSeal, expected list but found %s", elems[0].Type())
+			return fmt.Errorf("mismatch of RLP type for CommittedSeal, expected list but found %s", elems[2].Type())
 		}
 		i.CommittedSeal = make([][]byte, len(vals))
 		for indx, val := range vals {
 			if i.CommittedSeal[indx], err = val.GetBytes(i.CommittedSeal[indx]); err != nil {
+				return err
+			}
+		}
+	}
+
+	// LastCommitted
+	if len(elems) == 4 {
+		vals, err := elems[3].GetElems()
+		if err != nil {
+			return fmt.Errorf("mismatch of RLP type for ParentCommittedSeal, expected list but found %s", elems[3].Type())
+		}
+
+		i.ParentCommittedSeal = make([][]byte, len(vals))
+		for indx, val := range vals {
+			if i.ParentCommittedSeal[indx], err = val.GetBytes(i.ParentCommittedSeal[indx]); err != nil {
 				return err
 			}
 		}

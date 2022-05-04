@@ -9,6 +9,7 @@ import (
 
 func TestExtraEncoding(t *testing.T) {
 	seal1 := types.StringToHash("1").Bytes()
+	seal2 := types.StringToHash("2").Bytes()
 
 	cases := []struct {
 		extra []byte
@@ -22,6 +23,9 @@ func TestExtraEncoding(t *testing.T) {
 				Seal: seal1,
 				CommittedSeal: [][]byte{
 					seal1,
+				},
+				ParentCommittedSeal: [][]byte{
+					seal2,
 				},
 			},
 		},

@@ -101,7 +101,8 @@ func (ap *testerAccountPool) genesis() *chain.Genesis {
 	genesis := &types.Header{
 		MixHash: IstanbulDigest,
 	}
-	initIbftExtra(genesis, ap.ValidatorSet())
+
+	initIbftExtra(genesis, ap.ValidatorSet(), nil)
 	genesis.ComputeHash()
 
 	c := &chain.Genesis{

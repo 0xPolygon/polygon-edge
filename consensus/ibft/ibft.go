@@ -595,7 +595,14 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 	header.Timestamp = uint64(headerTime.Unix())
 
 	// we need to include in the extra field the current set of validators
-	initIbftExtra(header, snap.Set)
+	var parentCommittedSeal [][]byte
+	if parent.Number >= 1 {
+		if parentCommittedSeal, err = unpackCommittedSealFromIbftExtra(parent); err != nil {
+			return nil, err
+		}
+	}
+
+	initIbftExtra(header, snap.Set, parentCommittedSeal)
 
 	transition, err := i.executor.BeginTxn(parent.StateRoot, header, i.validatorKeyAddr)
 	if err != nil {
@@ -968,6 +975,7 @@ func (i *Ibft) updateMetrics(block *types.Block) {
 	//Update the Number of transactions in the block metric
 	i.metrics.NumTxs.Set(float64(len(block.Body().Transactions)))
 }
+
 func (i *Ibft) insertBlock(block *types.Block) error {
 	committedSeals := [][]byte{}
 	for _, commit := range i.state.committed {
@@ -987,6 +995,15 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 	if err := i.blockchain.WriteBlock(block); err != nil {
 		return err
 	}
+
+	x, _ := unpackCommittedSealFromIbftExtra(header)
+
+	fmt.Printf("\nInserted Block #%d \n", header.Number)
+	fmt.Printf("hash=%s\n", hex.EncodeToString(header.Hash[:]))
+	for i, c := range x {
+		fmt.Printf("CommittedSeal[%d]: %+v\n", i, c)
+	}
+	fmt.Printf("\n")
 
 	if hookErr := i.runHook(InsertBlockHook, header.Number, header.Number); hookErr != nil {
 		return hookErr
@@ -1233,6 +1250,19 @@ func (i *Ibft) verifyHeaderImpl(snap *Snapshot, parent, header *types.Header) er
 		return err
 	}
 
+	// verify last committed seals
+	if parent.Number >= 1 {
+		// find validators who validated last block
+		parentSnap, err := i.getSnapshot(parent.Number - 1)
+		if err != nil {
+			return err
+		}
+
+		if err := verifyParentCommittedSeal(parentSnap, parent, header); err != nil {
+			return fmt.Errorf("failed to verify ParentCommittedSeal: %w", err)
+		}
+	}
+
 	return nil
 }
 
@@ -1249,7 +1279,7 @@ func (i *Ibft) VerifyHeader(parent, header *types.Header) error {
 	}
 
 	// verify the committed seals
-	if err := verifyCommittedFields(snap, header); err != nil {
+	if err := verifyCommittedSeal(snap, header); err != nil {
 		return err
 	}
 

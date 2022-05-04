@@ -157,16 +157,11 @@ func verifySigner(snap *Snapshot, header *types.Header) error {
 	return nil
 }
 
-// verifyCommitedFields is checking for consensus proof in the header
-func verifyCommittedFields(snap *Snapshot, header *types.Header) error {
+// verifyCommittedFields verifies CommittedSeal in IBFT Extra of Header
+func verifyCommittedSeal(snap *Snapshot, header *types.Header) error {
 	committedSeal, err := unpackCommittedSealFromIbftExtra(header)
 	if err != nil {
 		return err
-	}
-
-	// Committed seals shouldn't be empty
-	if len(committedSeal) == 0 {
-		return ErrEmptyCommittedSeals
 	}
 
 	// get the message that needs to be signed
@@ -178,10 +173,38 @@ func verifyCommittedFields(snap *Snapshot, header *types.Header) error {
 
 	rawMsg := commitMsg(hash)
 
+	return verifyCommittedSealsImpl(committedSeal, rawMsg, snap.Set)
+}
+
+// verifyCommittedFields verifies ParentCommittedSeal in IBFT Extra of Header
+func verifyParentCommittedSeal(parentSnap *Snapshot, parent, header *types.Header) error {
+	parentCommittedSeals, err := unpackParentCommittedSealFromIbftExtra(header)
+	if err != nil {
+		return err
+	}
+
+	hash, err := calculateHeaderHash(parent)
+	if err != nil {
+		return err
+	}
+
+	rawMsg := commitMsg(hash)
+
+	return verifyCommittedSealsImpl(parentCommittedSeals, rawMsg, parentSnap.Set)
+}
+
+// verifyCommittedSealsImpl verifies given committedSeals
+// checks committedSeals are the correct signatures signed by the validators and the number of seals
+func verifyCommittedSealsImpl(committedSeals [][]byte, msg []byte, validators ValidatorSet) error {
+	// Committed seals shouldn't be empty
+	if len(committedSeals) == 0 {
+		return ErrEmptyCommittedSeals
+	}
+
 	visited := map[types.Address]struct{}{}
 
-	for _, seal := range committedSeal {
-		addr, err := ecrecoverImpl(seal, rawMsg)
+	for _, seal := range committedSeals {
+		addr, err := ecrecoverImpl(seal, msg)
 		if err != nil {
 			return err
 		}
@@ -189,7 +212,7 @@ func verifyCommittedFields(snap *Snapshot, header *types.Header) error {
 		if _, ok := visited[addr]; ok {
 			return ErrRepeatedCommittedSeal
 		} else {
-			if !snap.Set.Includes(addr) {
+			if !validators.Includes(addr) {
 				return ErrNonValidatorCommittedSeal
 			}
 			visited[addr] = struct{}{}
@@ -199,7 +222,7 @@ func verifyCommittedFields(snap *Snapshot, header *types.Header) error {
 	// Valid committed seals must be at least 2F+1
 	// 	2F 	is the required number of honest validators who provided the committed seals
 	// 	+1	is the proposer
-	if validSeals := len(visited); validSeals < snap.Set.QuorumSize() {
+	if validSeals := len(visited); validSeals < validators.QuorumSize() {
 		return ErrNotEnoughCommittedSeals
 	}
 
