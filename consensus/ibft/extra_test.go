@@ -12,8 +12,7 @@ func TestExtraEncoding(t *testing.T) {
 	seal2 := types.StringToHash("2").Bytes()
 
 	cases := []struct {
-		extra []byte
-		data  *IstanbulExtra
+		data *IstanbulExtra
 	}{
 		{
 			data: &IstanbulExtra{

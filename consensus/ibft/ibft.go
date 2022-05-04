@@ -596,13 +596,16 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 
 	// we need to include in the extra field the current set of validators
 	var parentCommittedSeal [][]byte
+
 	if parent.Number >= 1 {
 		if parentCommittedSeal, err = unpackCommittedSealFromIbftExtra(parent); err != nil {
 			return nil, err
 		}
 	}
 
-	initIbftExtra(header, snap.Set, parentCommittedSeal)
+	if err := initIbftExtra(header, snap.Set, parentCommittedSeal); err != nil {
+		return nil, err
+	}
 
 	transition, err := i.executor.BeginTxn(parent.StateRoot, header, i.validatorKeyAddr)
 	if err != nil {
@@ -995,15 +998,6 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 	if err := i.blockchain.WriteBlock(block); err != nil {
 		return err
 	}
-
-	x, _ := unpackCommittedSealFromIbftExtra(header)
-
-	fmt.Printf("\nInserted Block #%d \n", header.Number)
-	fmt.Printf("hash=%s\n", hex.EncodeToString(header.Hash[:]))
-	for i, c := range x {
-		fmt.Printf("CommittedSeal[%d]: %+v\n", i, c)
-	}
-	fmt.Printf("\n")
 
 	if hookErr := i.runHook(InsertBlockHook, header.Number, header.Number); hookErr != nil {
 		return hookErr

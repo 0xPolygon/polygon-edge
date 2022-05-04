@@ -49,7 +49,11 @@ func putIbftExtra(h *types.Header, istanbulExtra *IstanbulExtra) error {
 // getIbftExtra returns the istanbul extra data field from the passed in header
 func getIbftExtra(h *types.Header) (*IstanbulExtra, error) {
 	if len(h.ExtraData) < IstanbulExtraVanity {
-		return nil, fmt.Errorf("wrong extra size, expected greater than or equal to %d but actual %d", IstanbulExtraVanity, len(h.ExtraData))
+		return nil, fmt.Errorf(
+			"wrong extra size, expected greater than or equal to %d but actual %d",
+			IstanbulExtraVanity,
+			len(h.ExtraData),
+		)
 	}
 
 	data := h.ExtraData[IstanbulExtraVanity:]
@@ -62,17 +66,7 @@ func getIbftExtra(h *types.Header) (*IstanbulExtra, error) {
 	return extra, nil
 }
 
-// unpackValidatorsFromIbftExtra extracts Validators from IBFT Extra in Header
-func unpackValidatorsFromIbftExtra(h *types.Header) ([]types.Address, error) {
-	extra, err := getIbftExtra(h)
-	if err != nil {
-		return nil, err
-	}
-
-	return extra.Validators, nil
-}
-
-// unpackValidatorsFromIbftExtra extracts Seal from IBFT Extra in Header
+// unpackSealFromIbftExtra extracts Seal from IBFT Extra in Header
 func unpackSealFromIbftExtra(h *types.Header) ([]byte, error) {
 	extra, err := getIbftExtra(h)
 	if err != nil {

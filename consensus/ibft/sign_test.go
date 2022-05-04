@@ -17,7 +17,7 @@ func TestSign_Sealer(t *testing.T) {
 	}
 
 	h := &types.Header{}
-	initIbftExtra(h, pool.ValidatorSet(), nil)
+	assert.NoError(t, initIbftExtra(h, pool.ValidatorSet(), nil))
 
 	// non-validator address
 	pool.add("X")
@@ -39,7 +39,7 @@ func TestSign_CommittedSeals(t *testing.T) {
 	}
 
 	h := &types.Header{}
-	initIbftExtra(h, pool.ValidatorSet(), nil)
+	assert.NoError(t, initIbftExtra(h, pool.ValidatorSet(), nil))
 
 	// non-validator address
 	pool.add("X")
