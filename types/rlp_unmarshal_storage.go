@@ -115,24 +115,22 @@ func (r *Receipt) UnmarshalStoreRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) err
 		return err
 	}
 
-	if len(elems) != 4 {
-		return fmt.Errorf("expected 4 elements")
+	if len(elems) < 3 {
+		return fmt.Errorf("expected at least 3 elements")
 	}
 
 	if err := r.UnmarshalRLPFrom(p, elems[0]); err != nil {
 		return err
 	}
 
-	{
-		// contract address
-		vv, err := elems[1].Bytes()
-		if err != nil {
-			return err
-		}
-		if len(vv) == 20 {
-			// address
-			r.ContractAddress = BytesToAddress(vv)
-		}
+	// contract address
+	vv, err := elems[1].Bytes()
+	if err != nil {
+		return err
+	}
+	if len(vv) == 20 {
+		// address
+		r.ContractAddress = BytesToAddress(vv)
 	}
 
 	// gas used
@@ -141,7 +139,8 @@ func (r *Receipt) UnmarshalStoreRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) err
 	}
 
 	// tx hash
-	if elems[3] != nil {
+	// backwards compatibility, old receipts did not marshal a TxHash
+	if len(elems) == 4 {
 		vv, err := elems[3].Bytes()
 		if err != nil {
 			return err
