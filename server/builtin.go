@@ -7,6 +7,7 @@ import (
 	consensusIBFT "github.com/0xPolygon/polygon-edge/consensus/ibft"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/secrets/awsssm"
+	"github.com/0xPolygon/polygon-edge/secrets/gcpssm"
 	"github.com/0xPolygon/polygon-edge/secrets/hashicorpvault"
 	"github.com/0xPolygon/polygon-edge/secrets/local"
 )
@@ -31,6 +32,7 @@ var secretsManagerBackends = map[secrets.SecretsManagerType]secrets.SecretsManag
 	secrets.Local:          local.SecretsManagerFactory,
 	secrets.HashicorpVault: hashicorpvault.SecretsManagerFactory,
 	secrets.AWSSSM:         awsssm.SecretsManagerFactory,
+	secrets.GCPSSM:         gcpssm.SecretsManagerFactory,
 }
 
 func ConsensusSupported(value string) bool {
