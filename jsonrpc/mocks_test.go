@@ -114,6 +114,10 @@ func (m *mockStore) SubscribeEvents() blockchain.Subscription {
 	return m.subscription
 }
 
+func (m *mockStore) GetBlockByHash(hash types.Hash, full bool) (*types.Block, bool) {
+	return nil, false
+}
+
 func (m *mockStore) GetBlockByNumber(num uint64, full bool) (*types.Block, bool) {
 	return nil, false
 }
