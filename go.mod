@@ -3,7 +3,7 @@ module github.com/0xPolygon/polygon-edge
 go 1.16
 
 require (
-	github.com/btcsuite/btcd v0.22.0-beta
+	github.com/btcsuite/btcd v0.22.1
 	github.com/containerd/cgroups v1.0.2 // indirect
 	github.com/elastic/gosigar v0.14.2 // indirect
 	github.com/go-kit/kit v0.12.0
