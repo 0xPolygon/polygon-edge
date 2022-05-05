@@ -88,8 +88,8 @@ func writeSeal(prv *ecdsa.PrivateKey, h *types.Header) (*types.Header, error) {
 	return h, nil
 }
 
-// getCommittedSeal returns the commit signature
-func getCommittedSeal(prv *ecdsa.PrivateKey, h *types.Header) ([]byte, error) {
+// createCommittedSeal returns the commit signature
+func createCommittedSeal(prv *ecdsa.PrivateKey, h *types.Header) ([]byte, error) {
 	return signSealImpl(prv, h, true)
 }
 

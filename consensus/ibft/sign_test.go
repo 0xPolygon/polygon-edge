@@ -48,7 +48,7 @@ func TestSign_CommittedSeals(t *testing.T) {
 		seals := [][]byte{}
 
 		for _, accnt := range accnt {
-			seal, err := getCommittedSeal(pool.get(accnt).priv, h)
+			seal, err := createCommittedSeal(pool.get(accnt).priv, h)
 
 			assert.NoError(t, err)
 

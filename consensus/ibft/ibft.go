@@ -1161,7 +1161,7 @@ func (i *Ibft) gossip(typ proto.MessageReq_Type) {
 
 	// if the message is commit, we need to add the committed seal
 	if msg.Type == proto.MessageReq_Commit {
-		seal, err := getCommittedSeal(i.validatorKey, i.state.block.Header)
+		seal, err := createCommittedSeal(i.validatorKey, i.state.block.Header)
 		if err != nil {
 			i.logger.Error("failed to commit seal", "err", err)
 

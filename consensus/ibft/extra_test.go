@@ -128,7 +128,7 @@ func TestAppendCommittedSeal(t *testing.T) {
 		// write committed seal
 		committedSeal := make([][]byte, len(normalValidatorKeys))
 		for i, key := range normalValidatorKeys {
-			committedSeal[i], err = getCommittedSeal(key, header)
+			committedSeal[i], err = createCommittedSeal(key, header)
 			assert.NoError(t, err)
 		}
 
@@ -165,7 +165,7 @@ func TestAppendCommittedSeal(t *testing.T) {
 		}
 
 		// create new committed seal
-		faultyCommittedSeal, err := getCommittedSeal(faultyValidatorKey, header)
+		faultyCommittedSeal, err := createCommittedSeal(faultyValidatorKey, header)
 		assert.NoError(t, err)
 
 		// append new committed seal
