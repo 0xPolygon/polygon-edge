@@ -100,8 +100,6 @@ func (b *BridgeMechanism) validateBlock(block *types.Block) error {
 			checked[address] = true
 		}
 
-		fmt.Printf("Found StateTx when validating the proposed block: block height=%d, signatures=%d, required=%d\n", block.Number(), sigCount, threshold)
-
 		if sigCount < threshold {
 			return fmt.Errorf("state transaction doesn't have enough signatures, required=%d, have=%d", threshold, sigCount)
 		}
@@ -171,8 +169,6 @@ func (b *BridgeMechanism) insertStateTransactionsHook(rawParams interface{}) err
 
 			continue
 		}
-
-		fmt.Printf("Add StateTx into propose block txHash=%s, nonce=%d, signatures=%d\n", tx.Hash(), tx.Nonce(), len(stateTx.Signatures))
 
 		*params.transactions = append(*params.transactions, tx)
 	}
