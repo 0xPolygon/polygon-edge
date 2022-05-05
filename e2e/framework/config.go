@@ -48,6 +48,7 @@ type TestServerConfig struct {
 	Signer                  *crypto.EIP155Signer // Signer used for transactions
 	MinValidatorCount       uint64               // Min validator count
 	MaxValidatorCount       uint64               // Max validator count
+	BlockTime               uint64               // Minimum block generation time (in s)
 }
 
 // DataDir returns path of data directory server uses
@@ -62,6 +63,10 @@ func (t *TestServerConfig) DataDir() string {
 
 func (t *TestServerConfig) SetSigner(signer *crypto.EIP155Signer) {
 	t.Signer = signer
+}
+
+func (t *TestServerConfig) SetBlockTime(blockTime uint64) {
+	t.BlockTime = blockTime
 }
 
 // PrivateKey returns a private key in data directory

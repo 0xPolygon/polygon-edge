@@ -1,6 +1,7 @@
 package ibft
 
 import (
+	"strconv"
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
@@ -25,6 +26,44 @@ func TestState_FaultyNodes(t *testing.T) {
 		pool := newTesterAccountPool(int(c.Network))
 		vals := pool.ValidatorSet()
 		assert.Equal(t, vals.MaxFaultyNodes(), int(c.Faulty))
+	}
+}
+
+//	TestNumValid checks if the quorum size is calculated
+//	correctly based on number of validators (network size).
+func TestNumValid(t *testing.T) {
+	cases := []struct {
+		Network, Quorum uint64
+	}{
+		{1, 1},
+		{2, 2},
+		{3, 3},
+		{4, 3},
+		{5, 4},
+		{6, 4},
+		{7, 5},
+		{8, 6},
+		{9, 6},
+	}
+
+	addAccounts := func(
+		pool *testerAccountPool,
+		numAccounts int,
+	) {
+		// add accounts
+		for i := 0; i < numAccounts; i++ {
+			pool.add(strconv.Itoa(i))
+		}
+	}
+
+	for _, c := range cases {
+		pool := newTesterAccountPool(int(c.Network))
+		addAccounts(pool, int(c.Network))
+
+		assert.Equal(t,
+			int(c.Quorum),
+			pool.ValidatorSet().QuorumSize(),
+		)
 	}
 }
 

@@ -57,6 +57,7 @@ type gasPriceAverage struct {
 
 type Verifier interface {
 	VerifyHeader(parent, header *types.Header) error
+	ProcessHeaders(headers []*types.Header) error
 	GetBlockCreator(header *types.Header) (types.Address, error)
 	PreStateCommit(header *types.Header, txn *state.Transition) error
 }
@@ -697,6 +698,11 @@ func (b *Blockchain) WriteBlock(block *types.Block) error {
 	// Otherwise, a client might ask for a header once the receipt is valid
 	// but before it is written into the storage
 	if err := b.db.WriteReceipts(block.Hash(), res.Receipts); err != nil {
+		return err
+	}
+
+	//	update snapshot
+	if err := b.consensus.ProcessHeaders([]*types.Header{header}); err != nil {
 		return err
 	}
 
