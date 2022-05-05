@@ -159,6 +159,7 @@ func TestEVM(t *testing.T) {
 		}
 
 		for _, file := range files {
+			file := file
 			t.Run(file, func(t *testing.T) {
 				t.Parallel()
 

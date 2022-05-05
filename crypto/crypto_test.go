@@ -90,6 +90,8 @@ func TestCreate2(t *testing.T) {
 	}
 
 	for _, c := range cases {
+		c := c
+
 		t.Run("", func(t *testing.T) {
 			t.Parallel()
 
@@ -198,6 +200,7 @@ func TestPrivateKeyRead(t *testing.T) {
 	}
 
 	for _, testCase := range testTable {
+		testCase := testCase
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 

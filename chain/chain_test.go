@@ -83,6 +83,8 @@ func TestGenesisAlloc(t *testing.T) {
 	}
 
 	for _, c := range cases {
+		c := c
+
 		t.Run("", func(t *testing.T) {
 			t.Parallel()
 
@@ -134,6 +136,8 @@ func TestGenesisX(t *testing.T) {
 	}
 
 	for _, c := range cases {
+		c := c
+
 		t.Run("", func(t *testing.T) {
 			t.Parallel()
 

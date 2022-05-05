@@ -123,6 +123,7 @@ func TestState(t *testing.T) {
 	}
 
 	for _, folder := range folders {
+		folder := folder
 		t.Run(folder, func(t *testing.T) {
 			t.Parallel()
 

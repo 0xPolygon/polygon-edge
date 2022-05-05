@@ -52,6 +52,8 @@ func ReadTestCase(t *testing.T, path string, f func(t *testing.T, c *TestCase)) 
 	}
 
 	for _, i := range cases {
+		i := i
+
 		inputDecode := decodeHex(t, fmt.Sprintf("0x%s", i.Input))
 		expectedDecode := decodeHex(t, fmt.Sprintf("0x%s", i.Expected))
 

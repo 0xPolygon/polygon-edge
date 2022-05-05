@@ -619,8 +619,8 @@ func getExampleStore() *mockSpecialStore {
 // the latest block gas limit for the upper bound, or the specified
 // gas limit in the transaction
 func TestEth_EstimateGas_GasLimit(t *testing.T) {
-	t.Parallel()
-
+	// TODO Make this test run in parallel when the race
+	// condition is fixed in gas estimation
 	store := getExampleStore()
 	ethEndpoint := newTestEthEndpoint(store)
 
@@ -658,8 +658,6 @@ func TestEth_EstimateGas_GasLimit(t *testing.T) {
 
 	for _, testCase := range testTable {
 		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-
 			// Set up the apply hook
 			if errors.Is(testCase.expectedError, state.ErrNotEnoughIntrinsicGas) {
 				// We want to trigger a situation where no value in the gas range is correct

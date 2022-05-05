@@ -177,6 +177,7 @@ func TestEth_Block_GetLogs(t *testing.T) {
 	eth := newTestEthEndpoint(store)
 
 	for _, testCase := range testTable {
+		testCase := testCase
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
