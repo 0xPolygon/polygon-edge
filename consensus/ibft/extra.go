@@ -21,7 +21,7 @@ var (
 
 var zeroBytes = make([]byte, 32)
 
-// initIbftExtra initializes ExtraData in Header for IBFT Extra
+// initIbftExtra initializes ExtraData in Header for IBFT
 func initIbftExtra(h *types.Header, validators []types.Address, parentCommittedSeals [][]byte) error {
 	return putIbftExtra(h, &IstanbulExtra{
 		Validators:          validators,
@@ -31,7 +31,7 @@ func initIbftExtra(h *types.Header, validators []types.Address, parentCommittedS
 	})
 }
 
-// putIbftExtra sets the extra data field in the header to the passed in istanbul extra data
+// putIbftExtra sets the IBFT extra data field into the header
 func putIbftExtra(h *types.Header, istanbulExtra *IstanbulExtra) error {
 	// Pad zeros to the right up to istanbul vanity
 	extra := h.ExtraData
@@ -46,7 +46,7 @@ func putIbftExtra(h *types.Header, istanbulExtra *IstanbulExtra) error {
 	return nil
 }
 
-// getIbftExtra returns the istanbul extra data field from the passed in header
+// getIbftExtra extracts the istanbul extra data from the given header
 func getIbftExtra(h *types.Header) (*IstanbulExtra, error) {
 	if len(h.ExtraData) < IstanbulExtraVanity {
 		return nil, fmt.Errorf(
@@ -66,7 +66,7 @@ func getIbftExtra(h *types.Header) (*IstanbulExtra, error) {
 	return extra, nil
 }
 
-// unpackSealFromIbftExtra extracts Seal from IBFT Extra in Header
+// unpackSealFromIbftExtra extracts Seal from the istanbul extra of the given Header
 func unpackSealFromIbftExtra(h *types.Header) ([]byte, error) {
 	extra, err := getIbftExtra(h)
 	if err != nil {
@@ -76,7 +76,7 @@ func unpackSealFromIbftExtra(h *types.Header) ([]byte, error) {
 	return extra.Seal, nil
 }
 
-// unpackCommittedSealFromIbftExtra extracts CommittedSeal from IBFT Extra in Header
+// unpackCommittedSealFromIbftExtra extracts CommittedSeal from the istanbul extra of the given Header
 func unpackCommittedSealFromIbftExtra(h *types.Header) ([][]byte, error) {
 	extra, err := getIbftExtra(h)
 	if err != nil {
@@ -86,7 +86,7 @@ func unpackCommittedSealFromIbftExtra(h *types.Header) ([][]byte, error) {
 	return extra.CommittedSeal, nil
 }
 
-// unpackParentCommittedSealFromIbftExtra extracts ParentCommittedSeal from IBFT Extra in Header
+// unpackParentCommittedSealFromIbftExtra extracts ParentCommittedSeal from the istanbul extra of the given Header
 func unpackParentCommittedSealFromIbftExtra(h *types.Header) ([][]byte, error) {
 	extra, err := getIbftExtra(h)
 	if err != nil {
@@ -96,7 +96,7 @@ func unpackParentCommittedSealFromIbftExtra(h *types.Header) ([][]byte, error) {
 	return extra.ParentCommittedSeal, nil
 }
 
-// packFieldIntoIbftExtra is a helper method to update fields in IBFT Extra of header
+// packFieldIntoIbftExtra is a helper function to update fields in the istanbul Extra of the given header
 func packFieldIntoIbftExtra(h *types.Header, updateFn func(*IstanbulExtra)) error {
 	extra, err := getIbftExtra(h)
 	if err != nil {
@@ -108,21 +108,21 @@ func packFieldIntoIbftExtra(h *types.Header, updateFn func(*IstanbulExtra)) erro
 	return putIbftExtra(h, extra)
 }
 
-// packSealIntoIbftExtra set the given seal to Seal field in IBFT extra of header
+// packSealIntoIbftExtra sets the seal to Seal field in istanbul extra of the given header
 func packSealIntoIbftExtra(h *types.Header, seal []byte) error {
 	return packFieldIntoIbftExtra(h, func(extra *IstanbulExtra) {
 		extra.Seal = seal
 	})
 }
 
-// packCommittedSealIntoIbftExtra set the given committed seals to CommittedSeal field in IBFT extra of header
+// packCommittedSealIntoIbftExtra sets the seals to CommittedSeal field in istanbul extra of the given header
 func packCommittedSealIntoIbftExtra(h *types.Header, seals [][]byte) error {
 	return packFieldIntoIbftExtra(h, func(extra *IstanbulExtra) {
 		extra.CommittedSeal = seals
 	})
 }
 
-// filterIbftExtraForHash clears unnecessary fields from IBFT Extra for hash calculation
+// filterIbftExtraForHash clears unnecessary fields in istanbul Extra of the given header for hash calculation
 func filterIbftExtraForHash(h *types.Header) error {
 	extra, err := getIbftExtra(h)
 	if err != nil {
