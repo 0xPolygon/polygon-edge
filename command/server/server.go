@@ -3,6 +3,8 @@ package server
 import (
 	"fmt"
 	"github.com/0xPolygon/polygon-edge/command"
+	"github.com/0xPolygon/polygon-edge/command/server/config"
+	"github.com/0xPolygon/polygon-edge/command/server/export"
 	"github.com/spf13/cobra"
 
 	"github.com/0xPolygon/polygon-edge/command/helper"
@@ -21,15 +23,21 @@ func GetCommand() *cobra.Command {
 	helper.RegisterLegacyGRPCAddressFlag(serverCmd)
 	helper.RegisterJSONRPCFlag(serverCmd)
 
-	// register subcommand used to generate config file on the fly
-	serverCmd.AddCommand(getGenerateConfigCmd())
+	registerSubcommands(serverCmd)
 	setFlags(serverCmd)
 
 	return serverCmd
 }
 
+func registerSubcommands(baseCmd *cobra.Command) {
+	baseCmd.AddCommand(
+		// server export
+		export.GetCommand(),
+	)
+}
+
 func setFlags(cmd *cobra.Command) {
-	defaultConfig := DefaultConfig()
+	defaultConfig := config.DefaultConfig()
 
 	cmd.Flags().StringVar(
 		&params.rawConfig.LogLevel,

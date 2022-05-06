@@ -1,4 +1,4 @@
-package server
+package config
 
 import (
 	"encoding/json"
@@ -15,7 +15,7 @@ import (
 // Config defines the server configuration params
 type Config struct {
 	GenesisPath       string     `json:"chain_config" yaml:"chain_config"`
-	SecretsConfigPath string     `json:"secrets_config" yaml:"secrets_config,omitempty"`
+	SecretsConfigPath string     `json:"secrets_config" yaml:"secrets_config"`
 	DataDir           string     `json:"data_dir" yaml:"data_dir"`
 	BlockGasTarget    string     `json:"block_gas_target" yaml:"block_gas_target"`
 	GRPCAddr          string     `json:"grpc_addr" yaml:"grpc_addr"`
@@ -95,11 +95,11 @@ func DefaultConfig() *Config {
 	}
 }
 
-// readConfigFile reads the config file from the specified path, builds a Config object
+// ReadConfigFile reads the config file from the specified path, builds a Config object
 // and returns it.
 //
 //Supported file types: .json, .hcl, .yaml, .yml
-func readConfigFile(path string) (*Config, error) {
+func ReadConfigFile(path string) (*Config, error) {
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
 		return nil, err

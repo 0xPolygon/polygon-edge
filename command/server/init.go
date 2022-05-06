@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"github.com/0xPolygon/polygon-edge/command/server/config"
 	"math"
 	"net"
 
@@ -18,7 +19,7 @@ import (
 func (p *serverParams) initConfigFromFile() error {
 	var parseErr error
 
-	if p.rawConfig, parseErr = readConfigFile(p.configPath); parseErr != nil {
+	if p.rawConfig, parseErr = config.ReadConfigFile(p.configPath); parseErr != nil {
 		return parseErr
 	}
 

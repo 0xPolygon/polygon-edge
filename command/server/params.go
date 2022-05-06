@@ -2,6 +2,7 @@ package server
 
 import (
 	"errors"
+	"github.com/0xPolygon/polygon-edge/command/server/config"
 	"net"
 
 	"github.com/0xPolygon/polygon-edge/chain"
@@ -42,10 +43,10 @@ const (
 
 var (
 	params = &serverParams{
-		rawConfig: &Config{
-			Telemetry: &Telemetry{},
-			Network:   &Network{},
-			TxPool:    &TxPool{},
+		rawConfig: &config.Config{
+			Telemetry: &config.Telemetry{},
+			Network:   &config.Network{},
+			TxPool:    &config.TxPool{},
 		},
 	}
 )
@@ -56,7 +57,7 @@ var (
 )
 
 type serverParams struct {
-	rawConfig  *Config
+	rawConfig  *config.Config
 	configPath string
 
 	libp2pAddress     *net.TCPAddr
