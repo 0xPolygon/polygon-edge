@@ -2,13 +2,10 @@ package server
 
 import (
 	"fmt"
-	"strconv"
-
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/spf13/cobra"
 
 	"github.com/0xPolygon/polygon-edge/command/helper"
-	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/server"
 )
 
@@ -24,6 +21,8 @@ func GetCommand() *cobra.Command {
 	helper.RegisterLegacyGRPCAddressFlag(serverCmd)
 	helper.RegisterJSONRPCFlag(serverCmd)
 
+	// register subcommand used to generate config file on the fly
+	serverCmd.AddCommand(getGenerateConfigCmd())
 	setFlags(serverCmd)
 
 	return serverCmd
@@ -63,7 +62,7 @@ func setFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(
 		&params.rawConfig.Network.Libp2pAddr,
 		libp2pAddressFlag,
-		fmt.Sprintf("127.0.0.1:%d", network.DefaultLibp2pPort),
+		defaultConfig.Network.Libp2pAddr,
 		"the address and port for the libp2p service",
 	)
 
@@ -92,7 +91,7 @@ func setFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(
 		&params.rawConfig.BlockGasTarget,
 		blockGasTargetFlag,
-		strconv.FormatUint(0, 10),
+		defaultConfig.BlockGasTarget,
 		"the target block gas limit for the chain. If omitted, the value of the parent block is used",
 	)
 
@@ -114,7 +113,7 @@ func setFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVar(
 		&params.rawConfig.ShouldSeal,
 		sealFlag,
-		true,
+		defaultConfig.ShouldSeal,
 		"the flag indicating that the client should seal blocks",
 	)
 
@@ -155,7 +154,7 @@ func setFlags(cmd *cobra.Command) {
 	cmd.Flags().Uint64Var(
 		&params.rawConfig.TxPool.PriceLimit,
 		priceLimitFlag,
-		0,
+		defaultConfig.TxPool.PriceLimit,
 		fmt.Sprintf(
 			"the minimum gas price limit to enforce for acceptance into the pool (default %d)",
 			defaultConfig.TxPool.PriceLimit,
@@ -165,7 +164,7 @@ func setFlags(cmd *cobra.Command) {
 	cmd.Flags().Uint64Var(
 		&params.rawConfig.TxPool.MaxSlots,
 		maxSlotsFlag,
-		command.DefaultMaxSlots,
+		defaultConfig.TxPool.MaxSlots,
 		"maximum slots in the pool",
 	)
 
@@ -215,7 +214,7 @@ func setDevFlags(cmd *cobra.Command) {
 
 func runPreRun(cmd *cobra.Command, _ []string) error {
 	// Set the grpc and json ip:port bindings
-	// The config file will have presedence over --flag
+	// The config file will have precedence over --flag
 	params.setRawGRPCAddress(helper.GetGRPCAddress(cmd))
 	params.setRawJSONRPCAddress(helper.GetJSONRPCAddress(cmd))
 

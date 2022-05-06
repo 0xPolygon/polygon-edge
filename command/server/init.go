@@ -38,6 +38,10 @@ func (p *serverParams) initRawParams() error {
 		return err
 	}
 
+	if err := p.initDataDirLocation(); err != nil {
+		return err
+	}
+
 	if p.isDevMode {
 		p.initDevMode()
 	}
@@ -46,6 +50,14 @@ func (p *serverParams) initRawParams() error {
 	p.initLogFileLocation()
 
 	return p.initAddresses()
+}
+
+func (p *serverParams) initDataDirLocation() error {
+	if p.rawConfig.DataDir == "" {
+		return fmt.Errorf("data directory not defined")
+	}
+
+	return nil
 }
 
 func (p *serverParams) initLogFileLocation() {

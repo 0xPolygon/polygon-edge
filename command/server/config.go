@@ -67,16 +67,20 @@ func DefaultConfig() *Config {
 
 	return &Config{
 		GenesisPath:    "./genesis.json",
-		DataDir:        "./polygon-edge-chain",
+		DataDir:        "",
 		BlockGasTarget: "0x0", // Special value signaling the parent gas limit should be applied
 		Network: &Network{
 			NoDiscover:       defaultNetworkConfig.NoDiscover,
 			MaxPeers:         defaultNetworkConfig.MaxPeers,
 			MaxOutboundPeers: defaultNetworkConfig.MaxOutboundPeers,
 			MaxInboundPeers:  defaultNetworkConfig.MaxInboundPeers,
+			Libp2pAddr: fmt.Sprintf("%s:%d",
+				defaultNetworkConfig.Addr.IP,
+				defaultNetworkConfig.Addr.Port,
+			),
 		},
 		Telemetry:  &Telemetry{},
-		ShouldSeal: false,
+		ShouldSeal: true,
 		TxPool: &TxPool{
 			PriceLimit: 0,
 			MaxSlots:   4096,
