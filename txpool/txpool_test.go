@@ -1057,11 +1057,6 @@ func TestDrop(t *testing.T) {
 	assert.Equal(t, uint64(0), pool.accounts.get(addr1).promoted.length())
 }
 
-func TestDemote(t *testing.T) {
-	// TODO dbrajovic
-	t.SkipNow()
-}
-
 /* "Integrated" tests */
 
 // The following tests ensure that the pool's inner event loop
