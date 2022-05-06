@@ -160,7 +160,7 @@ func TestEthTransfer(t *testing.T) {
 			previousReceiverBalance := balanceReceiver
 
 			// Do the transfer
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), framework.DefaultTimeout)
 			defer cancel()
 
 			txn := &framework.PreparedTransaction{
@@ -371,7 +371,7 @@ func Test_TransactionIBFTLoop(t *testing.T) {
 	client := srv.JSONRPC()
 
 	// Deploy the stress test contract
-	deployCtx, deployCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	deployCtx, deployCancel := context.WithTimeout(context.Background(), framework.DefaultTimeout)
 	defer deployCancel()
 
 	buf, err := hex.DecodeString(stressTestBytecode)

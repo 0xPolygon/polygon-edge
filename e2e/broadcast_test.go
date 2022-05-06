@@ -129,7 +129,7 @@ func TestBroadcast(t *testing.T) {
 				t.Run(subTestName, func(t *testing.T) {
 					t.Parallel()
 
-					ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+					ctx, cancel := context.WithTimeout(context.Background(), framework.DefaultTimeout)
 					defer cancel()
 					res, err := framework.WaitUntilTxPoolFilled(ctx, srv, 1)
 

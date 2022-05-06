@@ -238,7 +238,7 @@ func TestTxPool_TransactionCoalescing(t *testing.T) {
 	for i := 0; i < len(nonces); i++ {
 		addReq := generateReq(nonces[i])
 
-		addCtx, addCtxCn := context.WithTimeout(context.Background(), time.Second*10)
+		addCtx, addCtxCn := context.WithTimeout(context.Background(), framework.DefaultTimeout)
 
 		addResp, addErr := clt.AddTxn(addCtx, addReq)
 		if addErr != nil {
@@ -253,7 +253,7 @@ func TestTxPool_TransactionCoalescing(t *testing.T) {
 	}
 
 	// Wait for the first transaction to go through
-	ctx, cancelFn := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancelFn := context.WithTimeout(context.Background(), framework.DefaultTimeout)
 	defer cancelFn()
 
 	receipt, receiptErr := tests.WaitForReceipt(ctx, client.Eth(), testTransactions[0].txHash)
@@ -275,7 +275,7 @@ func TestTxPool_TransactionCoalescing(t *testing.T) {
 	// Add the transaction with the gap nonce value
 	addReq := generateReq(1)
 
-	addCtx, addCtxCn := context.WithTimeout(context.Background(), time.Second*10)
+	addCtx, addCtxCn := context.WithTimeout(context.Background(), framework.DefaultTimeout)
 	defer addCtxCn()
 
 	addResp, addErr := clt.AddTxn(addCtx, addReq)
@@ -290,7 +290,7 @@ func TestTxPool_TransactionCoalescing(t *testing.T) {
 	// Start from 1 since there was previously a txn with nonce 0
 	for i := 1; i < len(testTransactions); i++ {
 		// Wait for the first transaction to go through
-		ctx, cancelFn := context.WithTimeout(context.Background(), 10*time.Second)
+		ctx, cancelFn := context.WithTimeout(context.Background(), framework.DefaultTimeout)
 
 		receipt, receiptErr := tests.WaitForReceipt(ctx, client.Eth(), testTransactions[i].txHash)
 		if receiptErr != nil {

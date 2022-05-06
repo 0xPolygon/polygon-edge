@@ -36,7 +36,7 @@ func TestNewFilter_Logs(t *testing.T) {
 	ibftManager.StartServers(ctx)
 	srv := ibftManager.GetServer(0)
 
-	ctx1, cancel1 := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx1, cancel1 := context.WithTimeout(context.Background(), framework.DefaultTimeout)
 	defer cancel1()
 
 	contractAddr, err := srv.DeployContract(ctx1, sampleByteCode, key)
@@ -75,7 +75,7 @@ func TestNewFilter_Logs(t *testing.T) {
 				return
 			}
 
-			addTxnContext, cancelFn := context.WithTimeout(context.Background(), time.Second*10)
+			addTxnContext, cancelFn := context.WithTimeout(context.Background(), framework.DefaultTimeout)
 			defer cancelFn()
 
 			addResp, addErr := txpoolClient.AddTxn(addTxnContext, txn)
@@ -83,7 +83,7 @@ func TestNewFilter_Logs(t *testing.T) {
 				return
 			}
 
-			receiptContext, cancelFn := context.WithTimeout(context.Background(), time.Second*10)
+			receiptContext, cancelFn := context.WithTimeout(context.Background(), framework.DefaultTimeout)
 			defer cancelFn()
 
 			txHash := web3.Hash(types.StringToHash(addResp.TxHash))
@@ -117,7 +117,7 @@ func TestNewFilter_Block(t *testing.T) {
 	assert.NoError(t, err)
 
 	for i := 0; i < 3; i++ {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), framework.DefaultTimeout)
 		_, err := srv.SendRawTx(ctx, &framework.PreparedTransaction{
 			From:     from,
 			To:       &to,
@@ -227,7 +227,7 @@ func TestFilterValue(t *testing.T) {
 		return
 	}
 
-	addTxnContext, cancelFn := context.WithTimeout(context.Background(), time.Second*10)
+	addTxnContext, cancelFn := context.WithTimeout(context.Background(), framework.DefaultTimeout)
 	defer cancelFn()
 
 	addResp, addErr := txpoolClient.AddTxn(addTxnContext, txn)
@@ -235,7 +235,7 @@ func TestFilterValue(t *testing.T) {
 		return
 	}
 
-	receiptContext, cancelFn := context.WithTimeout(context.Background(), time.Second*10)
+	receiptContext, cancelFn := context.WithTimeout(context.Background(), framework.DefaultTimeout)
 	defer cancelFn()
 
 	txHash := web3.Hash(types.StringToHash(addResp.TxHash))

@@ -47,7 +47,7 @@ func TestIbft_Transfer(t *testing.T) {
 		Value:    framework.EthToWei(1),
 	}
 
-	ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel = context.WithTimeout(context.Background(), framework.DefaultTimeout)
 	defer cancel()
 
 	//	send tx and wait for receipt
@@ -116,7 +116,7 @@ func TestIbft_TransactionFeeRecipient(t *testing.T) {
 					Value:    big.NewInt(0),
 					Input:    framework.MethodSig("setA1"),
 				}
-				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				ctx, cancel := context.WithTimeout(context.Background(), framework.DefaultTimeout)
 				defer cancel()
 				receipt, err := srv.SendRawTx(ctx, deployTx, senderKey)
 				assert.NoError(t, err)
@@ -127,7 +127,7 @@ func TestIbft_TransactionFeeRecipient(t *testing.T) {
 				txn.Input = framework.MethodSig("setA1")
 			}
 
-			ctx1, cancel1 := context.WithTimeout(context.Background(), 10*time.Second)
+			ctx1, cancel1 := context.WithTimeout(context.Background(), framework.DefaultTimeout)
 			defer cancel1()
 			receipt, err := srv.SendRawTx(ctx1, txn, senderKey)
 			assert.NoError(t, err)

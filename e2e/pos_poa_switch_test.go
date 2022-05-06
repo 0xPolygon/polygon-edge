@@ -98,7 +98,7 @@ func TestPoAPoSSwitch(t *testing.T) {
 		go func(srv *framework.TestServer) {
 			defer wg.Done()
 
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), framework.DefaultTimeout)
 			defer cancel()
 
 			// every validator should have 4 validators in validator set
@@ -157,7 +157,7 @@ func TestPoAPoSSwitch(t *testing.T) {
 		go func(srv *framework.TestServer) {
 			defer wg.Done()
 
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), framework.DefaultTimeout)
 			defer cancel()
 
 			// every validator should have only 3 validators in validator set
