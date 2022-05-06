@@ -76,7 +76,6 @@ type Server struct {
 
 var dirPaths = []string{
 	"blockchain",
-	"keystore",
 	"trie",
 }
 

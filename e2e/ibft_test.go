@@ -15,43 +15,49 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+/**
+	TestIbft_Transfer sends a transfer transaction (EOA -> EOA)
+	and verifies it was mined
+**/
 func TestIbft_Transfer(t *testing.T) {
-	senderKey, senderAddr := tests.GenerateKeyAndAddr(t)
-	_, receiverAddr := tests.GenerateKeyAndAddr(t)
+	var (
+		senderKey, senderAddr = tests.GenerateKeyAndAddr(t)
+		_, receiverAddr       = tests.GenerateKeyAndAddr(t)
+	)
 
-	ibftManager := framework.NewIBFTServersManager(
-		t,
+	ibftManager := framework.NewIBFTServersManager(t,
 		IBFTMinNodes,
 		IBFTDirPrefix,
 		func(i int, config *framework.TestServerConfig) {
 			config.Premine(senderAddr, framework.EthToWei(10))
 			config.SetSeal(true)
-		})
+		},
+	)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
+
 	ibftManager.StartServers(ctx)
 
-	srv := ibftManager.GetServer(0)
-
-	for i := 0; i < IBFTMinNodes-1; i++ {
-		txn := &framework.PreparedTransaction{
-			From:     senderAddr,
-			To:       &receiverAddr,
-			GasPrice: big.NewInt(10000),
-			Gas:      1000000,
-			Value:    framework.EthToWei(1),
-		}
-
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-
-		receipt, err := srv.SendRawTx(ctx, txn, senderKey)
-
-		assert.NoError(t, err)
-		assert.NotNil(t, receipt)
-		assert.NotNil(t, receipt.TransactionHash)
+	txn := &framework.PreparedTransaction{
+		From:     senderAddr,
+		To:       &receiverAddr,
+		GasPrice: big.NewInt(10000),
+		Gas:      1000000,
+		Value:    framework.EthToWei(1),
 	}
+
+	ctx, cancel = context.WithTimeout(context.Background(), framework.DefaultTimeout)
+	defer cancel()
+
+	//	send tx and wait for receipt
+	receipt, err := ibftManager.
+		GetServer(0).
+		SendRawTx(ctx, txn, senderKey)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, receipt)
+	assert.NotNil(t, receipt.TransactionHash)
 }
 
 func TestIbft_TransactionFeeRecipient(t *testing.T) {
@@ -110,7 +116,7 @@ func TestIbft_TransactionFeeRecipient(t *testing.T) {
 					Value:    big.NewInt(0),
 					Input:    framework.MethodSig("setA1"),
 				}
-				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				ctx, cancel := context.WithTimeout(context.Background(), framework.DefaultTimeout)
 				defer cancel()
 				receipt, err := srv.SendRawTx(ctx, deployTx, senderKey)
 				assert.NoError(t, err)
@@ -121,7 +127,7 @@ func TestIbft_TransactionFeeRecipient(t *testing.T) {
 				txn.Input = framework.MethodSig("setA1")
 			}
 
-			ctx1, cancel1 := context.WithTimeout(context.Background(), 10*time.Second)
+			ctx1, cancel1 := context.WithTimeout(context.Background(), framework.DefaultTimeout)
 			defer cancel1()
 			receipt, err := srv.SendRawTx(ctx1, txn, senderKey)
 			assert.NoError(t, err)

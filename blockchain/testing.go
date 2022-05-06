@@ -197,6 +197,10 @@ func (m *MockVerifier) VerifyHeader(parent, header *types.Header) error {
 	return nil
 }
 
+func (m *MockVerifier) ProcessHeaders(headers []*types.Header) error {
+	return nil
+}
+
 func (m *MockVerifier) GetBlockCreator(header *types.Header) (types.Address, error) {
 	return header.Miner, nil
 }
