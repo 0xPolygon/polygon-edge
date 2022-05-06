@@ -12,6 +12,8 @@ import (
 )
 
 func TestEth_DecodeTxn(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		accounts map[types.Address]*state.Account
@@ -143,7 +145,10 @@ func TestEth_DecodeTxn(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			if tt.res != nil {
 				tt.res.ComputeHash()
 			}
@@ -161,6 +166,8 @@ func TestEth_DecodeTxn(t *testing.T) {
 }
 
 func TestEth_GetNextNonce(t *testing.T) {
+	t.Parallel()
+
 	// Set up the mock accounts
 	accounts := []struct {
 		address types.Address
@@ -209,7 +216,10 @@ func TestEth_GetNextNonce(t *testing.T) {
 	}
 
 	for _, testCase := range testTable {
+		testCase := testCase
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
 			// Grab the nonce
 			nonce, err := eth.getNextNonce(testCase.account, testCase.number)
 

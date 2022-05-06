@@ -29,6 +29,35 @@ import (
 	empty "google.golang.org/protobuf/types/known/emptypb"
 )
 
+var (
+	DefaultTimeout = time.Second * 10
+)
+
+type AtomicErrors struct {
+	sync.RWMutex
+	errors []error
+}
+
+func NewAtomicErrors(capacity int) AtomicErrors {
+	return AtomicErrors{
+		errors: make([]error, 0, capacity),
+	}
+}
+
+func (a *AtomicErrors) Append(err error) {
+	a.Lock()
+	defer a.Unlock()
+
+	a.errors = append(a.errors, err)
+}
+
+func (a *AtomicErrors) Errors() []error {
+	a.RLock()
+	defer a.RUnlock()
+
+	return a.errors
+}
+
 func EthToWei(ethValue int64) *big.Int {
 	return EthToWeiPrecise(ethValue, 18)
 }
@@ -102,7 +131,7 @@ func StakeAmount(
 		Input:    MethodSig("stake"),
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
 	defer cancel()
 
 	_, err := srv.SendRawTx(ctx, txn, senderKey)
@@ -130,7 +159,7 @@ func UnstakeAmount(
 		Input:    MethodSig("unstake"),
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
 	defer cancel()
 
 	receipt, err := srv.SendRawTx(ctx, txn, senderKey)
@@ -202,41 +231,53 @@ func MultiJoin(t *testing.T, srvs ...*TestServer) {
 		t.Fatal("not an even number")
 	}
 
-	errCh := make(chan error, len(srvs)/2)
+	errors := NewAtomicErrors(len(srvs) / 2)
+
+	var wg sync.WaitGroup
 
 	for i := 0; i < len(srvs); i += 2 {
 		src, dst := srvs[i], srvs[i+1]
+		srcIndex, dstIndex := i, i+1
+
+		wg.Add(1)
 
 		go func() {
-			srcClient, dstClient := src.Operator(), dst.Operator()
-			dstStatus, err := dstClient.GetStatus(context.Background(), &empty.Empty{})
+			defer wg.Done()
 
+			srcClient, dstClient := src.Operator(), dst.Operator()
+			ctxFotStatus, cancelForStatus := context.WithTimeout(context.Background(), DefaultTimeout)
+
+			defer cancelForStatus()
+
+			dstStatus, err := dstClient.GetStatus(ctxFotStatus, &empty.Empty{})
 			if err != nil {
-				errCh <- err
+				errors.Append(fmt.Errorf("failed to get status from server %d, error=%w", dstIndex, err))
 
 				return
 			}
 
 			dstAddr := strings.Split(dstStatus.P2PAddr, ",")[0]
-			_, err = srcClient.PeersAdd(context.Background(), &proto.PeersAddRequest{
+			ctxForConnecting, cancelForConnecting := context.WithTimeout(context.Background(), DefaultTimeout)
+
+			defer cancelForConnecting()
+
+			_, err = srcClient.PeersAdd(ctxForConnecting, &proto.PeersAddRequest{
 				Id: dstAddr,
 			})
 
-			errCh <- err
+			if err != nil {
+				errors.Append(fmt.Errorf("failed to connect from %d to %d, error=%w", srcIndex, dstIndex, err))
+			}
 		}()
 	}
 
-	errCount := 0
+	wg.Wait()
 
-	for i := 0; i < len(srvs)/2; i++ {
-		if err := <-errCh; err != nil {
-			errCount++
-
-			t.Errorf("failed to connect from %d to %d, error=%+v ", 2*i, 2*i+1, err)
-		}
+	for _, err := range errors.Errors() {
+		t.Error(err)
 	}
 
-	if errCount > 0 {
+	if len(errors.Errors()) > 0 {
 		t.Fail()
 	}
 }
@@ -326,8 +367,13 @@ func WaitUntilBlockMined(ctx context.Context, srv *TestServer, desiredHeight uin
 
 // MethodSig returns the signature of a non-parametrized function
 func MethodSig(name string) []byte {
+	return MethodSigWithParams(fmt.Sprintf("%s()", name))
+}
+
+// MethodSigWithParams returns the signature of a function
+func MethodSigWithParams(nameWithParams string) []byte {
 	h := sha3.NewLegacyKeccak256()
-	h.Write([]byte(name + "()"))
+	h.Write([]byte(nameWithParams))
 	b := h.Sum(nil)
 
 	return b[:4]
@@ -429,18 +475,45 @@ func NewTestServers(t *testing.T, num int, conf func(*TestServerConfig)) []*Test
 		srv := NewTestServer(t, dataDir, conf)
 		srv.Config.SetBootnodes(bootnodes)
 
-		if genesisErr := srv.GenerateGenesis(); genesisErr != nil {
-			t.Fatal(genesisErr)
-		}
-
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-
-		if err := srv.Start(ctx); err != nil {
-			t.Fatal(err)
-		}
-
 		srvs = append(srvs, srv)
+	}
+
+	errors := NewAtomicErrors(len(srvs))
+
+	var wg sync.WaitGroup
+
+	for i, srv := range srvs {
+		wg.Add(1)
+
+		i, srv := i, srv
+
+		go func() {
+			defer wg.Done()
+
+			if err := srv.GenerateGenesis(); err != nil {
+				errors.Append(fmt.Errorf("server %d failed genesis command, error=%w", i, err))
+
+				return
+			}
+
+			ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
+			defer cancel()
+
+			err := srv.Start(ctx)
+			if err != nil {
+				errors.Append(fmt.Errorf("server %d failed to start, error=%w", i, err))
+			}
+		}()
+	}
+
+	wg.Wait()
+
+	for _, err := range errors.Errors() {
+		t.Error(err)
+	}
+
+	if len(errors.Errors()) > 0 {
+		t.Fail()
 	}
 
 	return srvs

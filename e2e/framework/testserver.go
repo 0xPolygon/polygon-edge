@@ -569,7 +569,7 @@ func (t *TestServer) GetGasTotal(txHashes []web3.Hash) uint64 {
 		go func(txHash web3.Hash) {
 			defer wg.Done()
 
-			ctx, cancelFn := context.WithTimeout(context.Background(), 10*time.Second)
+			ctx, cancelFn := context.WithTimeout(context.Background(), DefaultTimeout)
 			defer cancelFn()
 
 			receipt, receiptErr := tests.WaitForReceipt(ctx, t.JSONRPC().Eth(), txHash)

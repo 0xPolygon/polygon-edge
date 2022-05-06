@@ -106,6 +106,8 @@ type result struct {
 /* Single account cases (unit tests) */
 
 func TestAddTxErrors(t *testing.T) {
+	t.Parallel()
+
 	poolSigner := crypto.NewEIP155Signer(100)
 
 	// Generate a private key and address
@@ -132,6 +134,7 @@ func TestAddTxErrors(t *testing.T) {
 	}
 
 	t.Run("ErrNegativeValue", func(t *testing.T) {
+		t.Parallel()
 		pool := setupPool()
 
 		tx := newTx(defaultAddr, 0, 1)
@@ -144,6 +147,7 @@ func TestAddTxErrors(t *testing.T) {
 	})
 
 	t.Run("ErrBlockLimitExceeded", func(t *testing.T) {
+		t.Parallel()
 		pool := setupPool()
 
 		tx := newTx(defaultAddr, 0, 1)
@@ -159,6 +163,7 @@ func TestAddTxErrors(t *testing.T) {
 	})
 
 	t.Run("ErrNonSignedTx", func(t *testing.T) {
+		t.Parallel()
 		pool := setupPool()
 
 		tx := newTx(defaultAddr, 0, 1)
@@ -170,6 +175,7 @@ func TestAddTxErrors(t *testing.T) {
 	})
 
 	t.Run("ErrInvalidSender", func(t *testing.T) {
+		t.Parallel()
 		pool := setupPool()
 
 		tx := newTx(addr1, 0, 1)
@@ -185,6 +191,7 @@ func TestAddTxErrors(t *testing.T) {
 	})
 
 	t.Run("ErrUnderpriced", func(t *testing.T) {
+		t.Parallel()
 		pool := setupPool()
 		pool.priceLimit = 1000000
 
@@ -198,6 +205,7 @@ func TestAddTxErrors(t *testing.T) {
 	})
 
 	t.Run("ErrInvalidAccountState", func(t *testing.T) {
+		t.Parallel()
 		pool := setupPool()
 		pool.store = faultyMockStore{}
 
@@ -213,6 +221,7 @@ func TestAddTxErrors(t *testing.T) {
 	})
 
 	t.Run("ErrTxPoolOverflow", func(t *testing.T) {
+		t.Parallel()
 		pool := setupPool()
 
 		// fill the pool
@@ -228,6 +237,7 @@ func TestAddTxErrors(t *testing.T) {
 	})
 
 	t.Run("ErrIntrinsicGas", func(t *testing.T) {
+		t.Parallel()
 		pool := setupPool()
 
 		tx := newTx(defaultAddr, 0, 1)
@@ -241,6 +251,7 @@ func TestAddTxErrors(t *testing.T) {
 	})
 
 	t.Run("ErrAlreadyKnown", func(t *testing.T) {
+		t.Parallel()
 		pool := setupPool()
 
 		tx := newTx(defaultAddr, 0, 1)
@@ -262,6 +273,7 @@ func TestAddTxErrors(t *testing.T) {
 	})
 
 	t.Run("ErrOversizedData", func(t *testing.T) {
+		t.Parallel()
 		pool := setupPool()
 
 		tx := newTx(defaultAddr, 0, 1)
@@ -281,6 +293,7 @@ func TestAddTxErrors(t *testing.T) {
 	})
 
 	t.Run("ErrNonceTooLow", func(t *testing.T) {
+		t.Parallel()
 		pool := setupPool()
 
 		// faultyMockStore.GetNonce() == 99999
@@ -295,6 +308,7 @@ func TestAddTxErrors(t *testing.T) {
 	})
 
 	t.Run("ErrInsufficientFunds", func(t *testing.T) {
+		t.Parallel()
 		pool := setupPool()
 
 		tx := newTx(defaultAddr, 0, 1)
@@ -309,11 +323,15 @@ func TestAddTxErrors(t *testing.T) {
 }
 
 func TestAddGossipTx(t *testing.T) {
+	t.Parallel()
+
 	key, sender := tests.GenerateKeyAndAddr(t)
 	signer := crypto.NewEIP155Signer(uint64(100))
 	tx := newTx(types.ZeroAddress, 1, 1)
 
 	t.Run("node is a validator", func(t *testing.T) {
+		t.Parallel()
+
 		pool, err := newTestPool()
 		assert.NoError(t, err)
 		pool.SetSigner(signer)
@@ -340,6 +358,8 @@ func TestAddGossipTx(t *testing.T) {
 	})
 
 	t.Run("node is a non validator", func(t *testing.T) {
+		t.Parallel()
+
 		pool, err := newTestPool()
 		assert.NoError(t, err)
 		pool.SetSigner(signer)
@@ -389,7 +409,11 @@ func TestDropKnownGossipTx(t *testing.T) {
 }
 
 func TestAddHandler(t *testing.T) {
+	t.Parallel()
+
 	t.Run("enqueue new tx with higher nonce", func(t *testing.T) {
+		t.Parallel()
+
 		pool, err := newTestPool()
 		assert.NoError(t, err)
 		pool.SetSigner(&mockSigner{})
@@ -406,6 +430,8 @@ func TestAddHandler(t *testing.T) {
 	})
 
 	t.Run("reject new tx with low nonce", func(t *testing.T) {
+		t.Parallel()
+
 		pool, err := newTestPool()
 		assert.NoError(t, err)
 		pool.SetSigner(&mockSigner{})
@@ -426,6 +452,8 @@ func TestAddHandler(t *testing.T) {
 	})
 
 	t.Run("signal promotion for new tx with expected nonce", func(t *testing.T) {
+		t.Parallel()
+
 		pool, err := newTestPool()
 		assert.NoError(t, err)
 		pool.SetSigner(&mockSigner{})
@@ -447,10 +475,14 @@ func TestAddHandler(t *testing.T) {
 }
 
 func TestPromoteHandler(t *testing.T) {
+	t.Parallel()
+
 	t.Run("nothing to promote", func(t *testing.T) {
 		/* This test demonstrates that if some promotion handler
 		got its job done by a previous one, it will not perform any logic
 		by doing an early return. */
+		t.Parallel()
+
 		pool, err := newTestPool()
 		assert.NoError(t, err)
 		pool.SetSigner(&mockSigner{})
@@ -487,6 +519,8 @@ func TestPromoteHandler(t *testing.T) {
 	})
 
 	t.Run("promote one tx", func(t *testing.T) {
+		t.Parallel()
+
 		pool, err := newTestPool()
 		assert.NoError(t, err)
 		pool.SetSigner(&mockSigner{})
@@ -508,10 +542,12 @@ func TestPromoteHandler(t *testing.T) {
 	})
 
 	t.Run("promote several txs", func(t *testing.T) {
+		t.Parallel()
 		/* This example illustrates the flexibility of the handlers:
 		One promotion handler can be executed at any time after it
 		was invoked (when the runtime decides), resulting in promotion
 		of several enqueued txs. */
+
 		pool, err := newTestPool()
 		assert.NoError(t, err)
 		pool.SetSigner(&mockSigner{})
@@ -552,6 +588,8 @@ func TestPromoteHandler(t *testing.T) {
 	t.Run("one tx -> one promotion", func(t *testing.T) {
 		/* In this scenario, each received tx will be instantly promoted.
 		All txs are sent in the order of expected nonce. */
+		t.Parallel()
+
 		pool, err := newTestPool()
 		assert.NoError(t, err)
 		pool.SetSigner(&mockSigner{})
@@ -1019,11 +1057,6 @@ func TestDrop(t *testing.T) {
 	assert.Equal(t, uint64(0), pool.accounts.get(addr1).promoted.length())
 }
 
-func TestDemote(t *testing.T) {
-	// TODO dbrajovic
-	t.SkipNow()
-}
-
 /* "Integrated" tests */
 
 // The following tests ensure that the pool's inner event loop
@@ -1077,10 +1110,6 @@ func TestAddTxns(t *testing.T) {
 		{
 			"send 100k txns",
 			100000,
-		},
-		{
-			"send 1m txns",
-			1000000,
 		},
 	}
 
