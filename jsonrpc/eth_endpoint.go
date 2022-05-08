@@ -867,6 +867,11 @@ func (e *Eth) NewBlockFilter() (interface{}, error) {
 	return e.filterManager.NewBlockFilter(nil), nil
 }
 
+// GetFilterLogs returns an array of logs for the specified filter.
+func (e *Eth) GetFilterLogs(id string) (interface{}, error) {
+	return e.filterManager.GetFilterLogs(id)
+}
+
 // GetFilterChanges is a polling method for a filter, which returns an array of logs which occurred since last poll.
 func (e *Eth) GetFilterChanges(id string) (interface{}, error) {
 	return e.filterManager.GetFilterChanges(id)

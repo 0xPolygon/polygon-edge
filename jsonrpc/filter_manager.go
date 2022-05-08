@@ -212,6 +212,9 @@ type filterManagerStore interface {
 
 	// GetReceiptsByHash returns the receipts for a block hash
 	GetReceiptsByHash(hash types.Hash) ([]*types.Receipt, error)
+
+	// GetBlockByNumber returns the block using the block number
+	GetBlockByNumber(blockNumber uint64, full bool) (*types.Block, bool)
 }
 
 // FilterManager manages all running filters
@@ -337,6 +340,70 @@ func (f *FilterManager) Exists(id string) bool {
 	_, ok := f.filters[id]
 
 	return ok
+}
+
+// GetFilterLogs returns an array of logs for the specified filter.
+func (f *FilterManager) GetFilterLogs(id string) ([]*Log, error) {
+	f.lock.RLock()
+	defer f.lock.RUnlock()
+
+	result := make([]*Log, 0)
+
+	parseReceipts := func(block *types.Block, logFilter *logFilter) error {
+		receipts, err := f.store.GetReceiptsByHash(block.Header.Hash)
+		if err != nil {
+			return err
+		}
+
+		for indx, receipt := range receipts {
+			// check the logs with the filters
+			for _, log := range receipt.Logs {
+				if logFilter.query.Match(log) {
+					result = append(result, &Log{
+						Address:     log.Address,
+						Topics:      log.Topics,
+						Data:        argBytes(log.Data),
+						BlockNumber: argUint64(block.Header.Number),
+						BlockHash:   block.Header.Hash,
+						TxHash:      receipt.TxHash,
+						TxIndex:     argUint64(indx),
+					})
+				}
+			}
+		}
+
+		return nil
+	}
+
+	filter, ok := f.filters[id]
+
+	logFilters, ok := filter.(*logFilter)
+
+	if !ok {
+		return nil, ErrFilterDoesNotExists
+	}
+
+	//getAllBlocks
+	from := uint64(0)
+	to := f.store.Header().Number
+
+	for i := from; i <= to; i++ {
+		block, ok := f.store.GetBlockByNumber(i, true)
+		if !ok {
+			break
+		}
+
+		if block.Header.Number == 0 || len(block.Transactions) == 0 {
+			// do not check logs in genesis and skip if no txs
+			continue
+		}
+
+		if err := parseReceipts(block, logFilters); err != nil {
+			return nil, err
+		}
+	}
+
+	return result, nil
 }
 
 // GetFilterChanges returns the updates of the filter with given ID in string
