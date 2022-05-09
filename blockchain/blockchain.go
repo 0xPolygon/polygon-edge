@@ -52,6 +52,7 @@ type Blockchain struct {
 
 	headersCache    *lru.Cache // LRU cache for the headers
 	difficultyCache *lru.Cache // LRU cache for the difficulty
+	receiptsCache   *lru.Cache // LRU cache for the block receipts
 
 	currentHeader     atomic.Value // The current header
 	currentDifficulty atomic.Value // The current difficulty of the chain (total difficulty)
@@ -204,8 +205,22 @@ func NewBlockchain(
 
 	b.db = db
 
-	b.headersCache, _ = lru.New(100)
-	b.difficultyCache, _ = lru.New(100)
+	var cacheErr error
+
+	b.headersCache, cacheErr = lru.New(100)
+	if cacheErr != nil {
+		return nil, fmt.Errorf("unable to create headers cache, %w", cacheErr)
+	}
+
+	b.difficultyCache, cacheErr = lru.New(100)
+	if cacheErr != nil {
+		return nil, fmt.Errorf("unable to create difficulty cache, %w", cacheErr)
+	}
+
+	b.receiptsCache, cacheErr = lru.New(100)
+	if cacheErr != nil {
+		return nil, fmt.Errorf("unable to create receipts cache, %w", cacheErr)
+	}
 
 	// Push the initial event to the stream
 	b.stream.push(&Event{})
@@ -757,9 +772,27 @@ func (br *BlockResult) verifyBlockResult(result *referenceBlockResult) error {
 	return nil
 }
 
-func (b *Blockchain) extractBlockReceipts(block *types.Block) []*types.Receipt {
-	// TODO implement
-	return nil
+// extractBlockReceipts extracts the receipts from the passed in block
+func (b *Blockchain) extractBlockReceipts(block *types.Block) ([]*types.Receipt, error) {
+	// Check the cache for the block receipts
+	receipts, ok := b.receiptsCache.Get(block.Header.Hash)
+	if !ok {
+		// No receipts found in the cache, execute the transactions from the block
+		// and fetch them
+		blockResult, err := b.executeBlockTransactions(block)
+		if err != nil {
+			return nil, err
+		}
+
+		return blockResult.Receipts, nil
+	}
+
+	extractedReceipts, ok := receipts.([]*types.Receipt)
+	if !ok {
+		return nil, errors.New("invalid type assertion for receipts")
+	}
+
+	return extractedReceipts, nil
 }
 
 // executeBlockTransactions executes the transactions in the block locally,
@@ -788,6 +821,9 @@ func (b *Blockchain) executeBlockTransactions(block *types.Block) (*BlockResult,
 	}
 
 	_, root := txn.Commit()
+
+	// Append the receipts to the receipts cache
+	b.receiptsCache.Add(header.Hash, txn.Receipts())
 
 	return &BlockResult{
 		Root:     root,
@@ -863,10 +899,16 @@ func (b *Blockchain) WriteBlock(block *types.Block) error {
 		return err
 	}
 
+	// Fetch the block receipts
+	blockReceipts, receiptsErr := b.extractBlockReceipts(block)
+	if receiptsErr != nil {
+		return receiptsErr
+	}
+
 	// write the receipts, do it only after the header has been written.
 	// Otherwise, a client might ask for a header once the receipt is valid,
 	// but before it is written into the storage
-	if err := b.db.WriteReceipts(block.Hash(), b.extractBlockReceipts(block)); err != nil {
+	if err := b.db.WriteReceipts(block.Hash(), blockReceipts); err != nil {
 		return err
 	}
 
