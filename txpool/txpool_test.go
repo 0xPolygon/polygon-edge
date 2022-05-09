@@ -612,7 +612,11 @@ func TestPromoteHandler(t *testing.T) {
 }
 
 func TestResetAccount(t *testing.T) {
+	t.Parallel()
+
 	t.Run("reset promoted", func(t *testing.T) {
+		t.Parallel()
+
 		testCases := []struct {
 			name     string
 			txs      []*types.Transaction
@@ -674,7 +678,10 @@ func TestResetAccount(t *testing.T) {
 			},
 		}
 		for _, test := range testCases {
+			test := test
 			t.Run(test.name, func(t *testing.T) {
+				t.Parallel()
+
 				pool, err := newTestPool()
 				assert.NoError(t, err)
 				pool.SetSigner(&mockSigner{})
@@ -725,6 +732,8 @@ func TestResetAccount(t *testing.T) {
 	})
 
 	t.Run("reset enqueued", func(t *testing.T) {
+		t.Parallel()
+
 		testCases := []struct {
 			name     string
 			txs      []*types.Transaction
@@ -807,7 +816,10 @@ func TestResetAccount(t *testing.T) {
 		}
 
 		for _, test := range testCases {
+			test := test
 			t.Run(test.name, func(t *testing.T) {
+				t.Parallel()
+
 				pool, err := newTestPool()
 				assert.NoError(t, err)
 				pool.SetSigner(&mockSigner{})
@@ -847,6 +859,8 @@ func TestResetAccount(t *testing.T) {
 	})
 
 	t.Run("reset enqueued and promoted", func(t *testing.T) {
+		t.Parallel()
+
 		testCases := []struct {
 			name     string
 			txs      []*types.Transaction
@@ -950,7 +964,10 @@ func TestResetAccount(t *testing.T) {
 		}
 
 		for _, test := range testCases {
+			test := test
 			t.Run(test.name, func(t *testing.T) {
+				t.Parallel()
+
 				pool, err := newTestPool()
 				assert.NoError(t, err)
 				pool.SetSigner(&mockSigner{})
