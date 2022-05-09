@@ -56,7 +56,7 @@ func (m *mockChain) WriteBlock(block *types.Block) error {
 	return nil
 }
 
-func (m *mockChain) VerifyBlock(block *types.Block) error {
+func (m *mockChain) VerifySealedBlock(block *types.Block) error {
 	return nil
 }
 

@@ -130,7 +130,7 @@ func TestBroadcast(t *testing.T) {
 			newBlocks := GenerateNewBlocks(t, peerSyncer.blockchain, tt.numNewBlocks)
 
 			for _, newBlock := range newBlocks {
-				assert.NoError(t, peerSyncer.blockchain.VerifyBlock(newBlock))
+				assert.NoError(t, peerSyncer.blockchain.VerifySealedBlock(newBlock))
 				assert.NoError(t, peerSyncer.blockchain.WriteBlock(newBlock))
 			}
 
@@ -314,7 +314,7 @@ func TestWatchSyncWithPeer(t *testing.T) {
 			newBlocks := GenerateNewBlocks(t, peerChain, tt.numNewBlocks)
 
 			for _, newBlock := range newBlocks {
-				assert.NoError(t, peerSyncer.blockchain.VerifyBlock(newBlock))
+				assert.NoError(t, peerSyncer.blockchain.VerifySealedBlock(newBlock))
 				assert.NoError(t, peerSyncer.blockchain.WriteBlock(newBlock))
 			}
 
@@ -521,7 +521,7 @@ func (m *mockBlockStore) WriteBlocks(blocks []*types.Block) error {
 	return nil
 }
 
-func (m *mockBlockStore) VerifyBlock(block *types.Block) error {
+func (m *mockBlockStore) VerifySealedBlock(block *types.Block) error {
 	return nil
 }
 

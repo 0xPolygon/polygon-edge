@@ -811,16 +811,22 @@ func (b *Blockchain) verifyBlock(block *types.Block) error {
 	return nil
 }
 
-// VerifyBlock verifies that the block is valid by performing a series of checks
+// VerifyBlock does the minimal block verificaiton without consulting the
+// consensus layer. Should only be used if consensus checks are done
+// outside the method call
 func (b *Blockchain) VerifyBlock(block *types.Block) error {
+	// Do just the initial block verification
+	return b.verifyBlock(block)
+}
+
+// VerifySealedBlock verifies that the block is valid by performing a series of checks
+func (b *Blockchain) VerifySealedBlock(block *types.Block) error {
 	// Do the initial block verification
 	if err := b.verifyBlock(block); err != nil {
 		return err
 	}
 
-	// TODO Consensus should not be calling this in AcceptState...
-	// Consensus doesn't need to verify committed seals in AcceptState!
-	// This method should be called in VerifySealedBlock
+	// Make sure the consensus layer verifies this block header
 	if err := b.consensus.VerifyHeader(block.Header); err != nil {
 		return fmt.Errorf("failed to verify the header: %w", err)
 	}

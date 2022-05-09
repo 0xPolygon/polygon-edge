@@ -330,7 +330,7 @@ func (b *mockBlockchain) WriteBlock(block *types.Block) error {
 	return nil
 }
 
-func (b *mockBlockchain) VerifyBlock(block *types.Block) error {
+func (b *mockBlockchain) VerifySealedBlock(block *types.Block) error {
 	return nil
 }
 

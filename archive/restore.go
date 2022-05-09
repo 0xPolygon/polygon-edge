@@ -19,7 +19,7 @@ type blockchainInterface interface {
 	GetBlockByNumber(uint64, bool) (*types.Block, bool)
 	GetHashByNumber(uint64) types.Hash
 	WriteBlock(*types.Block) error
-	VerifyBlock(*types.Block) error
+	VerifySealedBlock(*types.Block) error
 }
 
 // RestoreChain reads blocks from the archive and write to the chain
@@ -74,7 +74,7 @@ func importBlocks(chain blockchainInterface, blockStream *blockStream, progressi
 	nextBlock := firstBlock
 
 	for {
-		if err := chain.VerifyBlock(nextBlock); err != nil {
+		if err := chain.VerifySealedBlock(nextBlock); err != nil {
 			return err
 		}
 
