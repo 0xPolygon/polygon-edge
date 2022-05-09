@@ -1057,6 +1057,58 @@ func TestDrop(t *testing.T) {
 	assert.Equal(t, uint64(0), pool.accounts.get(addr1).promoted.length())
 }
 
+func TestDemote(t *testing.T) {
+	//	create pool
+	pool, err := newTestPool()
+	assert.NoError(t, err)
+	pool.SetSigner(&mockSigner{})
+
+	//	send tx
+	go func() {
+		err := pool.addTx(local, newTx(addr1, 0, 1))
+		assert.NoError(t, err)
+	}()
+	go pool.handleEnqueueRequest(<-pool.enqueueReqCh)
+	pool.handlePromoteRequest(<-pool.promoteReqCh)
+
+	assert.Equal(t, uint64(1), pool.gauge.read())
+	assert.Equal(t, uint64(1), pool.accounts.get(addr1).getNonce())
+	assert.Equal(t, uint64(1), pool.accounts.get(addr1).promoted.length())
+
+	//	call demote
+	pool.Prepare()
+	tx := pool.Peek()
+	pool.Demote(tx)
+
+	//	assert counter was incremented
+}
+
+func TestDemoteToDrop(t *testing.T) {
+	//	create pool
+	pool, err := newTestPool()
+	assert.NoError(t, err)
+	pool.SetSigner(&mockSigner{})
+
+	//	set counter to max allowed skips
+	//	TODO
+
+	//	send tx
+	go func() {
+		err := pool.addTx(local, newTx(addr1, 0, 1))
+		assert.NoError(t, err)
+	}()
+	go pool.handleEnqueueRequest(<-pool.enqueueReqCh)
+	pool.handlePromoteRequest(<-pool.promoteReqCh)
+
+	//	call demote
+	pool.Prepare()
+	tx := pool.Peek()
+	pool.Demote(tx)
+
+	//	assert: counter, account state
+	//	TODO
+}
+
 /* "Integrated" tests */
 
 // The following tests ensure that the pool's inner event loop
