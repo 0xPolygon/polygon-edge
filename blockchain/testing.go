@@ -193,7 +193,7 @@ func NewTestBlockchain(t *testing.T, headers []*types.Header) *Blockchain {
 type MockVerifier struct {
 }
 
-func (m *MockVerifier) VerifyHeader(parent, header *types.Header) error {
+func (m *MockVerifier) VerifyHeader(header *types.Header) error {
 	return nil
 }
 

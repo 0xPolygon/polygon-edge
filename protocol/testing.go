@@ -330,6 +330,10 @@ func (b *mockBlockchain) WriteBlock(block *types.Block) error {
 	return nil
 }
 
+func (b *mockBlockchain) VerifyBlock(block *types.Block) error {
+	return nil
+}
+
 func (b *mockBlockchain) WriteBlocks(blocks []*types.Block) error {
 	for _, block := range blocks {
 		if writeErr := b.WriteBlock(block); writeErr != nil {

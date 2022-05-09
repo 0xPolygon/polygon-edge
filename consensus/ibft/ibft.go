@@ -38,6 +38,7 @@ type blockchainInterface interface {
 	Header() *types.Header
 	GetHeaderByNumber(i uint64) (*types.Header, bool)
 	WriteBlock(block *types.Block) error
+	VerifyBlock(block *types.Block) error
 	CalculateGasLimit(number uint64) (uint64, error)
 }
 
@@ -581,9 +582,6 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 		i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", CandidateVoteHook, hookErr))
 	}
 
-	// calculate millisecond values from consensus custom functions in utils.go file
-	// to preserve go backward compatibility as time.UnixMili is available as of go 17
-
 	// set the timestamp
 	parentTime := time.Unix(int64(parent.Timestamp), 0)
 	headerTime := parentTime.Add(i.blockTime)
@@ -847,6 +845,14 @@ func (i *Ibft) runAcceptState() { // start new round
 		} else {
 			// since it's a new block, we have to verify it first
 			if err := i.verifyHeaderImpl(snap, parent, block.Header); err != nil {
+				i.logger.Error("block header verification failed", "err", err)
+				i.handleStateErr(errBlockVerificationFailed)
+
+				continue
+			}
+
+			// Verify other block params
+			if err := i.blockchain.VerifyBlock(block); err != nil {
 				i.logger.Error("block verification failed", "err", err)
 				i.handleStateErr(errBlockVerificationFailed)
 
@@ -1237,7 +1243,15 @@ func (i *Ibft) verifyHeaderImpl(snap *Snapshot, parent, header *types.Header) er
 }
 
 // VerifyHeader wrapper for verifying headers
-func (i *Ibft) VerifyHeader(parent, header *types.Header) error {
+func (i *Ibft) VerifyHeader(header *types.Header) error {
+	parent, ok := i.blockchain.GetHeaderByNumber(header.Number - 1)
+	if !ok {
+		return fmt.Errorf(
+			"unable to get parent header for block number %d",
+			header.Number,
+		)
+	}
+
 	snap, err := i.getSnapshot(parent.Number)
 	if err != nil {
 		return err
