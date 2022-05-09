@@ -33,6 +33,10 @@ var (
 	ErrInvalidBlockSequence = errors.New("invalid block sequence")
 	ErrInvalidSha3Uncles    = errors.New("invalid block sha3 uncles root")
 	ErrInvalidTxRoot        = errors.New("invalid block transactions root")
+	ErrInvalidReceiptsSize  = errors.New("invalid number of receipts")
+	ErrInvalidStateRoot     = errors.New("invalid block state root")
+	ErrInvalidGasUsed       = errors.New("invalid block gas used")
+	ErrInvalidReceiptsRoot  = errors.New("invalid block receipts root")
 )
 
 // Blockchain is a blockchain reference
@@ -731,23 +735,23 @@ type referenceBlockResult struct {
 func (br *BlockResult) verifyBlockResult(result *referenceBlockResult) error {
 	// Make sure the number of receipts matches the number of transactions
 	if len(br.Receipts) != result.numTransactions {
-		return fmt.Errorf("bad size of receipts and transactions")
+		return ErrInvalidReceiptsSize
 	}
 
 	// Make sure the world state root matches up
 	if br.Root != result.stateRoot {
-		return fmt.Errorf("invalid merkle root")
+		return ErrInvalidStateRoot
 	}
 
 	// Make sure the gas used is valid
 	if br.TotalGas != result.gasUsed {
-		return fmt.Errorf("gas used is different")
+		return ErrInvalidGasUsed
 	}
 
 	// Make sure the receipts root matches up
 	receiptsRoot := buildroot.CalculateReceiptsRoot(br.Receipts)
 	if receiptsRoot != result.receiptsRoot {
-		return fmt.Errorf("invalid receipts root")
+		return ErrInvalidReceiptsRoot
 	}
 
 	return nil
