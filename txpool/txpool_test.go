@@ -1030,6 +1030,7 @@ func TestPop(t *testing.T) {
 	assert.Equal(t, uint64(0), pool.gauge.read())
 	assert.Equal(t, uint64(0), pool.accounts.get(addr1).promoted.length())
 }
+
 func TestDrop(t *testing.T) {
 	pool, err := newTestPool()
 	assert.NoError(t, err)
@@ -1058,55 +1059,77 @@ func TestDrop(t *testing.T) {
 }
 
 func TestDemote(t *testing.T) {
-	//	create pool
-	pool, err := newTestPool()
-	assert.NoError(t, err)
-	pool.SetSigner(&mockSigner{})
+	t.Parallel()
 
-	//	send tx
-	go func() {
-		err := pool.addTx(local, newTx(addr1, 0, 1))
+	t.Run("Demote increments counter", func(t *testing.T) {
+		t.Parallel()
+		//	create pool
+		pool, err := newTestPool()
 		assert.NoError(t, err)
-	}()
-	go pool.handleEnqueueRequest(<-pool.enqueueReqCh)
-	pool.handlePromoteRequest(<-pool.promoteReqCh)
+		pool.SetSigner(&mockSigner{})
 
-	assert.Equal(t, uint64(1), pool.gauge.read())
-	assert.Equal(t, uint64(1), pool.accounts.get(addr1).getNonce())
-	assert.Equal(t, uint64(1), pool.accounts.get(addr1).promoted.length())
+		//	send tx
+		go func() {
+			err := pool.addTx(local, newTx(addr1, 0, 1))
+			assert.NoError(t, err)
+		}()
+		go pool.handleEnqueueRequest(<-pool.enqueueReqCh)
+		pool.handlePromoteRequest(<-pool.promoteReqCh)
 
-	//	call demote
-	pool.Prepare()
-	tx := pool.Peek()
-	pool.Demote(tx)
+		assert.Equal(t, uint64(1), pool.gauge.read())
+		assert.Equal(t, uint64(1), pool.accounts.get(addr1).getNonce())
+		assert.Equal(t, uint64(1), pool.accounts.get(addr1).promoted.length())
+		assert.Equal(t, uint(0), pool.accounts.get(addr1).demotions)
 
-	//	assert counter was incremented
-}
+		//	call demote
+		pool.Prepare()
+		tx := pool.Peek()
+		pool.Demote(tx)
 
-func TestDemoteToDrop(t *testing.T) {
-	//	create pool
-	pool, err := newTestPool()
-	assert.NoError(t, err)
-	pool.SetSigner(&mockSigner{})
+		assert.Equal(t, uint64(1), pool.gauge.read())
+		assert.Equal(t, uint64(1), pool.accounts.get(addr1).getNonce())
+		assert.Equal(t, uint64(1), pool.accounts.get(addr1).promoted.length())
 
-	//	set counter to max allowed skips
-	//	TODO
+		//	assert counter was incremented
+		assert.Equal(t, uint(1), pool.accounts.get(addr1).demotions)
+	})
 
-	//	send tx
-	go func() {
-		err := pool.addTx(local, newTx(addr1, 0, 1))
+	t.Run("Demote calls Drop", func(t *testing.T) {
+		t.Parallel()
+
+		//	create pool
+		pool, err := newTestPool()
 		assert.NoError(t, err)
-	}()
-	go pool.handleEnqueueRequest(<-pool.enqueueReqCh)
-	pool.handlePromoteRequest(<-pool.promoteReqCh)
+		pool.SetSigner(&mockSigner{})
 
-	//	call demote
-	pool.Prepare()
-	tx := pool.Peek()
-	pool.Demote(tx)
+		//	send tx
+		go func() {
+			err := pool.addTx(local, newTx(addr1, 0, 1))
+			assert.NoError(t, err)
+		}()
+		go pool.handleEnqueueRequest(<-pool.enqueueReqCh)
+		pool.handlePromoteRequest(<-pool.promoteReqCh)
 
-	//	assert: counter, account state
-	//	TODO
+		assert.Equal(t, uint64(1), pool.gauge.read())
+		assert.Equal(t, uint64(1), pool.accounts.get(addr1).getNonce())
+		assert.Equal(t, uint64(1), pool.accounts.get(addr1).promoted.length())
+
+		//	set counter to max allowed demotions
+		pool.accounts.get(addr1).demotions = maxAccountDemotions
+
+		//	call demote
+		pool.Prepare()
+		tx := pool.Peek()
+		pool.Demote(tx)
+
+		//	account was dropped
+		assert.Equal(t, uint64(0), pool.gauge.read())
+		assert.Equal(t, uint64(0), pool.accounts.get(addr1).getNonce())
+		assert.Equal(t, uint64(0), pool.accounts.get(addr1).promoted.length())
+
+		//	demotions are reset to 0
+		assert.Equal(t, uint(0), pool.accounts.get(addr1).demotions)
+	})
 }
 
 /* "Integrated" tests */
