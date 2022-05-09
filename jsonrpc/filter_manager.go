@@ -488,17 +488,11 @@ func (f *FilterManager) appendLogsToFilters(header *types.Header, removed bool) 
 		return nil
 	}
 
-	block := &types.Block{}
+	block, ok := f.store.GetBlockByHash(header.Hash, true)
+	if !ok {
+		f.logger.Error("could not find block in store", "hash", header.Hash.String())
 
-	if len(receipts) > 0 && receipts[0].TxHash == types.ZeroHash {
-		var ok bool
-		// Get a block where tx was sealed
-		block, ok = f.store.GetBlockByHash(header.Hash, true)
-		if !ok {
-			f.logger.Error("could not find block in store", "hash", header.Hash.String())
-
-			return nil
-		}
+		return nil
 	}
 
 	for indx, receipt := range receipts {
