@@ -811,15 +811,16 @@ func (b *Blockchain) verifyBlock(block *types.Block) error {
 	return nil
 }
 
-// VerifyBlock does the minimal block verificaiton without consulting the
+// VerifyProposedBlock does the minimal block verification without consulting the
 // consensus layer. Should only be used if consensus checks are done
 // outside the method call
-func (b *Blockchain) VerifyBlock(block *types.Block) error {
+func (b *Blockchain) VerifyProposedBlock(block *types.Block) error {
 	// Do just the initial block verification
 	return b.verifyBlock(block)
 }
 
-// VerifySealedBlock verifies that the block is valid by performing a series of checks
+// VerifySealedBlock verifies that the block is valid by performing a series of checks.
+// It is assumed that the block status is sealed (committed)
 func (b *Blockchain) VerifySealedBlock(block *types.Block) error {
 	// Do the initial block verification
 	if err := b.verifyBlock(block); err != nil {

@@ -38,7 +38,7 @@ type blockchainInterface interface {
 	Header() *types.Header
 	GetHeaderByNumber(i uint64) (*types.Header, bool)
 	WriteBlock(block *types.Block) error
-	VerifyBlock(block *types.Block) error
+	VerifyProposedBlock(block *types.Block) error
 	CalculateGasLimit(number uint64) (uint64, error)
 }
 
@@ -852,7 +852,7 @@ func (i *Ibft) runAcceptState() { // start new round
 			}
 
 			// Verify other block params
-			if err := i.blockchain.VerifyBlock(block); err != nil {
+			if err := i.blockchain.VerifyProposedBlock(block); err != nil {
 				i.logger.Error("block verification failed", "err", err)
 				i.handleStateErr(errBlockVerificationFailed)
 

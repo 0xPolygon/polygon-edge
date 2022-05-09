@@ -835,7 +835,7 @@ func (m *mockIbft) WriteBlock(block *types.Block) error {
 	return nil
 }
 
-func (m *mockIbft) VerifyBlock(block *types.Block) error {
+func (m *mockIbft) VerifyProposedBlock(block *types.Block) error {
 	return nil
 }
 
