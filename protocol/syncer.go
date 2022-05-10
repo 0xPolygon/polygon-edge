@@ -311,6 +311,10 @@ func (s *Syncer) updatePeerStatus(peerID peer.ID, status *Status) {
 	}
 }
 
+var (
+	notifyTimeout = 10 * time.Second
+)
+
 // Broadcast broadcasts a block to all peers
 func (s *Syncer) Broadcast(b *types.Block) {
 	// Get the chain difficulty associated with block
@@ -335,7 +339,10 @@ func (s *Syncer) Broadcast(b *types.Block) {
 	}
 
 	s.peers.Range(func(peerID, peer interface{}) bool {
-		if _, err := peer.(*SyncPeer).client.Notify(context.Background(), req); err != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), notifyTimeout)
+		defer cancel()
+
+		if _, err := peer.(*SyncPeer).client.Notify(ctx, req); err != nil {
 			s.logger.Error("failed to notify", "err", err)
 		}
 
