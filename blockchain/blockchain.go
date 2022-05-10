@@ -661,6 +661,7 @@ func (b *Blockchain) WriteHeadersWithBodies(headers []*types.Header) error {
 // - The parent exists
 // - The hashes match up
 // - The block numbers match up
+// - The block gas limit / used matches up
 func (b *Blockchain) verifyBlockParent(childBlock *types.Block) error {
 	// Grab the parent block
 	parentHash := childBlock.ParentHash()
@@ -698,14 +699,18 @@ func (b *Blockchain) verifyBlockParent(childBlock *types.Block) error {
 		return ErrInvalidBlockSequence
 	}
 
+	// Make sure the gas limit is within correct bounds
+	if gasLimitErr := b.verifyGasLimit(childBlock.Header); gasLimitErr != nil {
+		return fmt.Errorf("invalid gas limit, %w", gasLimitErr)
+	}
+
 	return nil
 }
 
 // verifyBlockBody verifies that the block body is valid. This means checking:
 // - The trie roots match up (state, transactions, receipts, uncles)
 // - The receipts match up
-// - The gas used is correct
-// - The gas limit is correct
+// - The execution result matches up
 func (b *Blockchain) verifyBlockBody(block *types.Block) error {
 	// Make sure the Uncles root matches up
 	if hash := buildroot.CalculateUncleRoot(block.Uncles); hash != block.Header.Sha3Uncles {
@@ -743,11 +748,6 @@ func (b *Blockchain) verifyBlockBody(block *types.Block) error {
 		gasUsed:         block.Header.GasUsed,
 	}); err != nil {
 		return fmt.Errorf("unable to verify block execution result, %w", err)
-	}
-
-	// Make sure the gas limit is within correct bounds
-	if gasLimitErr := b.verifyGasLimit(block.Header); gasLimitErr != nil {
-		return fmt.Errorf("invalid gas limit, %w", gasLimitErr)
 	}
 
 	return nil
@@ -819,10 +819,9 @@ func (b *Blockchain) extractBlockReceipts(block *types.Block) ([]*types.Receipt,
 func (b *Blockchain) executeBlockTransactions(block *types.Block) (*BlockResult, error) {
 	header := block.Header
 
-	// Process the block
 	parent, ok := b.readHeader(header.ParentHash)
 	if !ok {
-		return nil, fmt.Errorf("unknown ancestor")
+		return nil, ErrParentNotFound
 	}
 
 	blockCreator, err := b.consensus.GetBlockCreator(header)
