@@ -700,7 +700,7 @@ func (b *Blockchain) verifyBlockParent(childBlock *types.Block) error {
 	}
 
 	// Make sure the gas limit is within correct bounds
-	if gasLimitErr := b.verifyGasLimit(childBlock.Header); gasLimitErr != nil {
+	if gasLimitErr := b.verifyGasLimit(childBlock.Header, parent); gasLimitErr != nil {
 		return fmt.Errorf("invalid gas limit, %w", gasLimitErr)
 	}
 
@@ -1001,7 +1001,7 @@ func (b *Blockchain) ReadTxLookup(hash types.Hash) (types.Hash, bool) {
 }
 
 // verifyGasLimit is a helper function for validating a gas limit in a header
-func (b *Blockchain) verifyGasLimit(header *types.Header) error {
+func (b *Blockchain) verifyGasLimit(header *types.Header, parentHeader *types.Header) error {
 	if header.GasUsed > header.GasLimit {
 		return fmt.Errorf(
 			"block gas used exceeds gas limit, limit = %d, used=%d",
@@ -1015,24 +1015,18 @@ func (b *Blockchain) verifyGasLimit(header *types.Header) error {
 		return nil
 	}
 
-	// Grab the parent block
-	parent, ok := b.GetHeaderByNumber(header.Number - 1)
-	if !ok {
-		return fmt.Errorf("parent of %d not found", header.Number)
-	}
-
 	// Find the absolute delta between the limits
-	diff := int64(parent.GasLimit) - int64(header.GasLimit)
+	diff := int64(parentHeader.GasLimit) - int64(header.GasLimit)
 	if diff < 0 {
 		diff *= -1
 	}
 
-	limit := parent.GasLimit / BlockGasTargetDivisor
+	limit := parentHeader.GasLimit / BlockGasTargetDivisor
 	if uint64(diff) > limit {
 		return fmt.Errorf(
 			"invalid gas limit, limit = %d, want %d +- %d",
 			header.GasLimit,
-			parent.GasLimit,
+			parentHeader.GasLimit,
 			limit-1,
 		)
 	}
