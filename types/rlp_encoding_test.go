@@ -112,7 +112,7 @@ func TestRLPStorage_Marshall_And_Unmarshall_Receipt(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			if !reflect.DeepEqual(receipt, unmarshalledReceipt) {
+			if !assert.Exactly(t, receipt, unmarshalledReceipt) {
 				t.Fatal("[ERROR] Unmarshalled receipt not equal to base receipt")
 			}
 		})
