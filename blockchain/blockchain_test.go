@@ -523,7 +523,7 @@ func TestInsertHeaders(t *testing.T) {
 	}
 }
 
-func TestForkUnkwonParents(t *testing.T) {
+func TestForkUnknownParents(t *testing.T) {
 	b := NewTestBlockchain(t, nil)
 
 	h0 := NewTestHeaderChain(10)
