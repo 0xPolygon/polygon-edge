@@ -1,7 +1,10 @@
 package blockchain
 
 import (
+	"errors"
 	"fmt"
+	"github.com/0xPolygon/polygon-edge/blockchain/storage"
+	"math/big"
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/chain"
@@ -15,6 +18,10 @@ import (
 var (
 	// defaultBlockGasTarget is the default value for the block gas target for new blocks
 	defaultBlockGasTarget uint64 = 8000000
+)
+
+var (
+	errInvalidTypeAssertion = errors.New("invalid type assertion")
 )
 
 // NewTestHeaderChainWithSeed creates a new chain with a seed factor
@@ -118,6 +125,97 @@ func NewTestBlockchain(t *testing.T, headers []*types.Header) *Blockchain {
 	// TODO, find a way to add the snapshot, this will fail until that is fixed.
 	// snap, _ := state.NewSnapshot(types.Hash{})
 	return b
+}
+
+type TestCallbackType string
+
+const (
+	VerifierCallback TestCallbackType = "VerifierCallback"
+	ExecutorCallback TestCallbackType = "ExecutorCallback"
+	ChainCallback    TestCallbackType = "ChainCallback"
+	StorageCallback  TestCallbackType = "StorageCallback"
+)
+
+// newMockBlockchain constructs a new mock blockchain
+func newMockBlockchain(
+	callbackMap map[TestCallbackType]interface{},
+) (*Blockchain, error) {
+	var (
+		mockVerifier = &MockVerifier{}
+		executor     = &mockExecutor{}
+		config       = &chain.Chain{
+			Genesis: &chain.Genesis{
+				Number:   0,
+				GasLimit: 0,
+			},
+			Params: &chain.Params{
+				Forks: chain.AllForksEnabled,
+			},
+		}
+		mockStorage = storage.NewMockStorage()
+	)
+
+	// Set up the mocks and callbacks
+	if callbackMap != nil {
+		// Execute the verifier callback
+		if verifierCallback, ok := callbackMap[VerifierCallback]; ok {
+			callback, ok := verifierCallback.(func(verifier *MockVerifier))
+			if !ok {
+				return nil, errInvalidTypeAssertion
+			}
+
+			callback(mockVerifier)
+		}
+
+		// Execute the executor callback
+		if executorCallback, ok := callbackMap[ExecutorCallback]; ok {
+			callback, ok := executorCallback.(func(executor *mockExecutor))
+			if !ok {
+				return nil, errInvalidTypeAssertion
+			}
+
+			callback(executor)
+		}
+
+		// Execute the chain config callback
+		if chainCallback, ok := callbackMap[ChainCallback]; ok {
+			callback, ok := chainCallback.(func(chain *chain.Chain))
+			if !ok {
+				return nil, errInvalidTypeAssertion
+			}
+
+			callback(config)
+		}
+
+		// Execute the storage callback
+		if storageCallback, ok := callbackMap[StorageCallback]; ok {
+			callback, ok := storageCallback.(func(storage *storage.MockStorage))
+			if !ok {
+				return nil, errInvalidTypeAssertion
+			}
+
+			callback(mockStorage)
+		}
+	}
+
+	blockchain := &Blockchain{
+		logger:    hclog.NewNullLogger(),
+		db:        mockStorage,
+		consensus: mockVerifier,
+		executor:  executor,
+		config:    config,
+		stream:    &eventStream{},
+		gpAverage: &gasPriceAverage{
+			price: big.NewInt(0),
+			count: big.NewInt(0),
+		},
+	}
+
+	if err := blockchain.initCaches(10); err != nil {
+		return nil, err
+	}
+
+	return blockchain, nil
 }
 
 // Verifier delegators

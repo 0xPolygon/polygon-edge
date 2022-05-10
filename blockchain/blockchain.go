@@ -59,7 +59,7 @@ type Blockchain struct {
 	// in a cache, so we can grab it later when inserting the block.
 	// This is of course not an optimal solution - a better one would be to add
 	// the receipts to the proposed block (like we do with Transactions and Uncles), but
-	// that is currently not possible because it would break backwards compatability due to
+	// that is currently not possible because it would break backwards compatibility due to
 	// insane conditionals in the RLP unmarshal methods for the Block structure, which prevent
 	// any new fields from being added
 	receiptsCache *lru.Cache // LRU cache for the block receipts
@@ -215,27 +215,36 @@ func NewBlockchain(
 
 	b.db = db
 
-	var cacheErr error
-
-	b.headersCache, cacheErr = lru.New(100)
-	if cacheErr != nil {
-		return nil, fmt.Errorf("unable to create headers cache, %w", cacheErr)
-	}
-
-	b.difficultyCache, cacheErr = lru.New(100)
-	if cacheErr != nil {
-		return nil, fmt.Errorf("unable to create difficulty cache, %w", cacheErr)
-	}
-
-	b.receiptsCache, cacheErr = lru.New(100)
-	if cacheErr != nil {
-		return nil, fmt.Errorf("unable to create receipts cache, %w", cacheErr)
+	if err := b.initCaches(100); err != nil {
+		return nil, err
 	}
 
 	// Push the initial event to the stream
 	b.stream.push(&Event{})
 
 	return b, nil
+}
+
+// initCaches initializes the blockchain caches with the specified size
+func (b *Blockchain) initCaches(size int) error {
+	var cacheErr error
+
+	b.headersCache, cacheErr = lru.New(100)
+	if cacheErr != nil {
+		return fmt.Errorf("unable to create headers cache, %w", cacheErr)
+	}
+
+	b.difficultyCache, cacheErr = lru.New(100)
+	if cacheErr != nil {
+		return fmt.Errorf("unable to create difficulty cache, %w", cacheErr)
+	}
+
+	b.receiptsCache, cacheErr = lru.New(100)
+	if cacheErr != nil {
+		return fmt.Errorf("unable to create receipts cache, %w", cacheErr)
+	}
+
+	return nil
 }
 
 // ComputeGenesis computes the genesis hash, and updates the blockchain reference
