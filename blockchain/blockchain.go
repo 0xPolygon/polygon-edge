@@ -52,7 +52,17 @@ type Blockchain struct {
 
 	headersCache    *lru.Cache // LRU cache for the headers
 	difficultyCache *lru.Cache // LRU cache for the difficulty
-	receiptsCache   *lru.Cache // LRU cache for the block receipts
+
+	// We need to keep track of block receipts between the verification phase
+	// and the insertion phase of a new block coming in. To avoid having to
+	// execute the transactions twice, we save the receipts from the initial execution
+	// in a cache, so we can grab it later when inserting the block.
+	// This is of course not an optimal solution - a better one would be to add
+	// the receipts to the proposed block (like we do with Transactions and Uncles), but
+	// that is currently not possible because it would break backwards compatability due to
+	// insane conditionals in the RLP unmarshal methods for the Block structure, which prevent
+	// any new fields from being added
+	receiptsCache *lru.Cache // LRU cache for the block receipts
 
 	currentHeader     atomic.Value // The current header
 	currentDifficulty atomic.Value // The current difficulty of the chain (total difficulty)
