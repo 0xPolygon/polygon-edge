@@ -88,7 +88,7 @@ func createIBFTHeader(
 		ParentHash: parentHash,
 	}
 
-	assert.NoError(t, initIbftExtra(header, validators, lastCommittedSeal))
+	initIbftExtra(header, validators, lastCommittedSeal)
 
 	return header
 }
@@ -96,7 +96,7 @@ func createIBFTHeader(
 // Test Scenario
 // 1. 4 IBFT Validators create headers
 // 2. A faulty node scans the past headers and appends new committed seal
-// 3. Check each hashes of headers are wrong
+// 3. Check if each hash of the headers is wrong
 func TestAppendCommittedSeal(t *testing.T) {
 	useIstanbulHeaderHash(t)
 

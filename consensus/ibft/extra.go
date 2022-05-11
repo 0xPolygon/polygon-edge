@@ -22,8 +22,8 @@ var (
 var zeroBytes = make([]byte, 32)
 
 // initIbftExtra initializes ExtraData in Header for IBFT
-func initIbftExtra(h *types.Header, validators []types.Address, parentCommittedSeals [][]byte) error {
-	return putIbftExtra(h, &IstanbulExtra{
+func initIbftExtra(h *types.Header, validators []types.Address, parentCommittedSeals [][]byte) {
+	putIbftExtra(h, &IstanbulExtra{
 		Validators:          validators,
 		Seal:                []byte{},
 		CommittedSeal:       [][]byte{},
@@ -32,7 +32,7 @@ func initIbftExtra(h *types.Header, validators []types.Address, parentCommittedS
 }
 
 // putIbftExtra sets the IBFT extra data field into the header
-func putIbftExtra(h *types.Header, istanbulExtra *IstanbulExtra) error {
+func putIbftExtra(h *types.Header, istanbulExtra *IstanbulExtra) {
 	// Pad zeros to the right up to istanbul vanity
 	extra := h.ExtraData
 	if len(extra) < IstanbulExtraVanity {
@@ -42,8 +42,6 @@ func putIbftExtra(h *types.Header, istanbulExtra *IstanbulExtra) error {
 	}
 
 	h.ExtraData = istanbulExtra.MarshalRLPTo(extra)
-
-	return nil
 }
 
 // getIbftExtra extracts the istanbul extra data from the given header
@@ -105,7 +103,9 @@ func packFieldIntoIbftExtra(h *types.Header, updateFn func(*IstanbulExtra)) erro
 
 	updateFn(extra)
 
-	return putIbftExtra(h, extra)
+	putIbftExtra(h, extra)
+
+	return nil
 }
 
 // packSealIntoIbftExtra sets the seal to Seal field in istanbul extra of the given header
@@ -132,7 +132,9 @@ func filterIbftExtraForHash(h *types.Header) error {
 	// This will effectively remove the Seal and Committed Seal fields,
 	// while keeping proposer vanity and validator set
 	// because extra.Validators, extra.ParentCommittedSeal is what we got from `h` in the first place.
-	return initIbftExtra(h, extra.Validators, extra.ParentCommittedSeal)
+	initIbftExtra(h, extra.Validators, extra.ParentCommittedSeal)
+
+	return nil
 }
 
 // IstanbulExtra defines the structure of the extra field for Istanbul

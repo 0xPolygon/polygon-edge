@@ -603,9 +603,7 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 		}
 	}
 
-	if err := initIbftExtra(header, snap.Set, parentCommittedSeal); err != nil {
-		return nil, err
-	}
+	initIbftExtra(header, snap.Set, parentCommittedSeal)
 
 	transition, err := i.executor.BeginTxn(parent.StateRoot, header, i.validatorKeyAddr)
 	if err != nil {
