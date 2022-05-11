@@ -552,16 +552,11 @@ func (s *Syncer) BulkSyncWithPeer(p *SyncPeer, newBlockHandler func(block *types
 	localMaxHeader := s.blockchain.Header()
 	localMaxHeight := localMaxHeader.Number
 
-	s.statusLock.Lock()
-	defer s.statusLock.Unlock()
-
 	if localMaxHeight >= p.Number() {
 		// No need to sync with this peer
 		// since the local chain on the node is longer
 		return nil
 	}
-
-	var lastTarget uint64
 
 	// Create a blockchain subscription for the sync progression and start tracking
 	s.syncProgression.StartProgression(localMaxHeader.Number, s.blockchain.SubscribeEvents())
@@ -570,7 +565,10 @@ func (s *Syncer) BulkSyncWithPeer(p *SyncPeer, newBlockHandler func(block *types
 	defer s.syncProgression.StopProgression()
 
 	// Keep track of the progress
-	currentSyncHeight := localMaxHeight + 1
+	var (
+		lastTarget        uint64
+		currentSyncHeight = localMaxHeight + 1
+	)
 
 	// Sync up to the peer's latest header
 	for {
