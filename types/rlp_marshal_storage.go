@@ -71,7 +71,7 @@ func (r *Receipt) MarshalStoreRLPWith(a *fastrlp.Arena) *fastrlp.Value {
 	vv := a.NewArray()
 	vv.Set(r.MarshalRLPWith(a))
 
-	if r.ContractAddress == ZeroAddress {
+	if r.ContractAddress == nil {
 		vv.Set(a.NewNull())
 	} else {
 		vv.Set(a.NewBytes(r.ContractAddress.Bytes()))

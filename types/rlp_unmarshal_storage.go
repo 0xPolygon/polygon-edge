@@ -131,7 +131,7 @@ func (r *Receipt) UnmarshalStoreRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) err
 		}
 		if len(vv) == 20 {
 			// address
-			r.ContractAddress = BytesToAddress(vv)
+			r.SetContractAddress(BytesToAddress(vv))
 		}
 	}
 
