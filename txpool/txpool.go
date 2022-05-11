@@ -388,9 +388,17 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 	)
 }
 
+//	Demote excludes an account from being further processed during block building
+//	due to a recoverable error. If an account has been demoted too many times (maxAccountDemotions),
+//	it is Dropped instead.
 func (p *TxPool) Demote(tx *types.Transaction) {
 	account := p.accounts.get(tx.From)
 	if account.demotions == maxAccountDemotions {
+		p.logger.Debug(
+			"Demote: threshold reached - dropping account",
+			"addr", tx.From.String(),
+		)
+
 		p.Drop(tx)
 
 		return
