@@ -606,11 +606,22 @@ func TestCalculateGasLimit(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			b := NewTestBlockchain(t, nil)
-			err := b.writeGenesis(&chain.Genesis{
-				GasLimit: tt.parentGasLimit,
+			storageCallback := func(storage *storage.MockStorage) {
+				storage.HookReadHeader(func(hash types.Hash) (*types.Header, error) {
+					return &types.Header{
+						// This is going to be the parent block header
+						GasLimit: tt.parentGasLimit,
+					}, nil
+				})
+			}
+
+			b, blockchainErr := NewMockBlockchain(map[TestCallbackType]interface{}{
+				StorageCallback: storageCallback,
 			})
-			assert.NoError(t, err, "failed to write genesis")
+			if blockchainErr != nil {
+				t.Fatalf("unable to construct the blockchain, %v", blockchainErr)
+			}
+
 			b.config.Params = &chain.Params{
 				BlockGasTarget: tt.blockGasTarget,
 			}
@@ -704,7 +715,7 @@ func TestBlockchain_VerifyBlockParent(t *testing.T) {
 			})
 		}
 
-		blockchain, err := newMockBlockchain(map[TestCallbackType]interface{}{
+		blockchain, err := NewMockBlockchain(map[TestCallbackType]interface{}{
 			StorageCallback: storageCallback,
 		})
 		if err != nil {
@@ -731,7 +742,7 @@ func TestBlockchain_VerifyBlockParent(t *testing.T) {
 			})
 		}
 
-		blockchain, err := newMockBlockchain(map[TestCallbackType]interface{}{
+		blockchain, err := NewMockBlockchain(map[TestCallbackType]interface{}{
 			StorageCallback: storageCallback,
 		})
 		if err != nil {
@@ -757,7 +768,7 @@ func TestBlockchain_VerifyBlockParent(t *testing.T) {
 			})
 		}
 
-		blockchain, err := newMockBlockchain(map[TestCallbackType]interface{}{
+		blockchain, err := NewMockBlockchain(map[TestCallbackType]interface{}{
 			StorageCallback: storageCallback,
 		})
 		if err != nil {
@@ -784,7 +795,7 @@ func TestBlockchain_VerifyBlockParent(t *testing.T) {
 			})
 		}
 
-		blockchain, err := newMockBlockchain(map[TestCallbackType]interface{}{
+		blockchain, err := NewMockBlockchain(map[TestCallbackType]interface{}{
 			StorageCallback: storageCallback,
 		})
 		if err != nil {
@@ -815,7 +826,7 @@ func TestBlockchain_VerifyBlockParent(t *testing.T) {
 			})
 		}
 
-		blockchain, err := newMockBlockchain(map[TestCallbackType]interface{}{
+		blockchain, err := NewMockBlockchain(map[TestCallbackType]interface{}{
 			StorageCallback: storageCallback,
 		})
 		if err != nil {
@@ -847,7 +858,7 @@ func TestBlockchain_VerifyBlockBody(t *testing.T) {
 	t.Run("Invalid SHA3 Uncles root", func(t *testing.T) {
 		t.Parallel()
 
-		blockchain, err := newMockBlockchain(nil)
+		blockchain, err := NewMockBlockchain(nil)
 		if err != nil {
 			t.Fatalf("unable to instantiate new blockchain, %v", err)
 		}
@@ -864,7 +875,7 @@ func TestBlockchain_VerifyBlockBody(t *testing.T) {
 	t.Run("Invalid Transactions root", func(t *testing.T) {
 		t.Parallel()
 
-		blockchain, err := newMockBlockchain(nil)
+		blockchain, err := NewMockBlockchain(nil)
 		if err != nil {
 			t.Fatalf("unable to instantiate new blockchain, %v", err)
 		}
@@ -888,7 +899,7 @@ func TestBlockchain_VerifyBlockBody(t *testing.T) {
 			})
 		}
 
-		blockchain, err := newMockBlockchain(map[TestCallbackType]interface{}{
+		blockchain, err := NewMockBlockchain(map[TestCallbackType]interface{}{
 			StorageCallback: storageCallback,
 		})
 		if err != nil {
@@ -926,7 +937,7 @@ func TestBlockchain_VerifyBlockBody(t *testing.T) {
 			})
 		}
 
-		blockchain, err := newMockBlockchain(map[TestCallbackType]interface{}{
+		blockchain, err := NewMockBlockchain(map[TestCallbackType]interface{}{
 			StorageCallback:  storageCallback,
 			VerifierCallback: verifierCallback,
 		})
@@ -968,7 +979,7 @@ func TestBlockchain_VerifyBlockBody(t *testing.T) {
 			})
 		}
 
-		blockchain, err := newMockBlockchain(map[TestCallbackType]interface{}{
+		blockchain, err := NewMockBlockchain(map[TestCallbackType]interface{}{
 			StorageCallback:  storageCallback,
 			ExecutorCallback: executorCallback,
 		})

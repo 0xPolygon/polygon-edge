@@ -136,8 +136,8 @@ const (
 	StorageCallback  TestCallbackType = "StorageCallback"
 )
 
-// newMockBlockchain constructs a new mock blockchain
-func newMockBlockchain(
+// NewMockBlockchain constructs a new mock blockchain
+func NewMockBlockchain(
 	callbackMap map[TestCallbackType]interface{},
 ) (*Blockchain, error) {
 	var (
