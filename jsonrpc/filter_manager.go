@@ -19,6 +19,7 @@ import (
 var (
 	ErrFilterDoesNotExists              = errors.New("filter does not exists")
 	ErrWSFilterDoesNotSupportGetChanges = errors.New("web socket Filter doesn't support to return a batch of the changes")
+	ErrFilterToLogFilterer              = errors.New("casting filter object to logFilter error")
 )
 
 // defaultTimeout is the timeout to remove the filters that don't have a web socket stream
@@ -347,8 +348,6 @@ func (f *FilterManager) Exists(id string) bool {
 
 // GetFilterLogs returns an array of logs for the specified filter.
 func (f *FilterManager) GetFilterLogs(id string) ([]*Log, error) {
-	f.lock.RLock()
-	defer f.lock.RUnlock()
 
 	result := make([]*Log, 0)
 
@@ -378,12 +377,20 @@ func (f *FilterManager) GetFilterLogs(id string) ([]*Log, error) {
 		return nil
 	}
 
+	f.lock.RLock()
+	
 	filter, ok := f.filters[id]
 
-	logFilters, ok := filter.(*logFilter)
+	f.lock.RUnlock()
 
 	if !ok {
 		return nil, ErrFilterDoesNotExists
+	}
+
+	logFilters, ok := filter.(*logFilter)
+	if !ok {
+		//TODO FIx error message
+		return nil, ErrFilterToLogFilterer
 	}
 
 	//getAllBlocks
