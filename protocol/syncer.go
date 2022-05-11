@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/0xPolygon/polygon-edge/network/event"
-	"math"
 	"math/big"
 	"sync"
 	"time"
@@ -30,12 +29,8 @@ const (
 )
 
 var (
-	ErrLoadLocalGenesisFailed = errors.New("failed to read local genesis")
-	ErrMismatchGenesis        = errors.New("genesis does not match")
-	ErrCommonAncestorNotFound = errors.New("header is nil")
-	ErrForkNotFound           = errors.New("fork not found")
-	ErrPopTimeout             = errors.New("timeout")
-	ErrConnectionClosed       = errors.New("connection closed")
+	ErrPopTimeout       = errors.New("timeout")
+	ErrConnectionClosed = errors.New("connection closed")
 )
 
 // SyncPeer is a representation of the peer the node is syncing with
@@ -508,80 +503,6 @@ func (s *Syncer) DeletePeer(peerID peer.ID) error {
 	return nil
 }
 
-// findCommonAncestor returns the common ancestor header and fork
-func (s *Syncer) findCommonAncestor(clt proto.V1Client, status *Status) (*types.Header, *types.Header, error) {
-	h := s.blockchain.Header()
-
-	min := uint64(0) // genesis
-	max := h.Number
-
-	targetHeight := status.Number
-
-	if heightNumber := targetHeight; max > heightNumber {
-		max = heightNumber
-	}
-
-	var header *types.Header
-
-	for min <= max {
-		m := uint64(math.Floor(float64(min+max) / 2))
-
-		if m == 0 {
-			// our common ancestor is the genesis
-			genesis, ok := s.blockchain.GetHeaderByNumber(0)
-			if !ok {
-				return nil, nil, ErrLoadLocalGenesisFailed
-			}
-
-			header = genesis
-
-			break
-		}
-
-		found, err := getHeader(clt, &m, nil)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		if found == nil {
-			// peer does not have the m peer, search in lower bounds
-			max = m - 1
-		} else {
-			expectedHeader, ok := s.blockchain.GetHeaderByNumber(m)
-			if !ok {
-				return nil, nil, fmt.Errorf("cannot find the header %d in local chain", m)
-			}
-			if expectedHeader.Hash == found.Hash {
-				header = found
-				min = m + 1
-			} else {
-				if m == 0 {
-					return nil, nil, ErrMismatchGenesis
-				}
-				max = m - 1
-			}
-		}
-	}
-
-	if header == nil {
-		return nil, nil, ErrCommonAncestorNotFound
-	}
-
-	// get the block fork
-	forkNum := header.Number + 1
-	fork, err := getHeader(clt, &forkNum, nil)
-
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get fork at num %d", header.Number)
-	}
-
-	if fork == nil {
-		return nil, nil, ErrForkNotFound
-	}
-
-	return header, fork, nil
-}
-
 // WatchSyncWithPeer subscribes and adds peer's latest block
 func (s *Syncer) WatchSyncWithPeer(p *SyncPeer, handler func(b *types.Block) bool) {
 	// purge from the cache of broadcasted blocks all the ones we have written so far
@@ -624,31 +545,40 @@ func (s *Syncer) logSyncPeerPopBlockError(err error, peer *SyncPeer) {
 	}
 }
 
-// BulkSyncWithPeer finds common ancestor with a peer and syncs block until latest block
+// BulkSyncWithPeer finds common ancestor with a peer and syncs block until latest block.
+// Only missing blocks are synced up to the peer's highest block number
 func (s *Syncer) BulkSyncWithPeer(p *SyncPeer, newBlockHandler func(block *types.Block)) error {
-	// find the common ancestor
-	ancestor, fork, err := s.findCommonAncestor(p.client, p.status)
-	if err != nil {
-		return err
+	// Find the local height
+	localMaxHeader := s.blockchain.Header()
+	localMaxHeight := localMaxHeader.Number
+
+	s.statusLock.Lock()
+	defer s.statusLock.Unlock()
+
+	if localMaxHeight >= p.Number() {
+		// No need to sync with this peer
+		// since the local chain on the node is longer
+		return nil
 	}
-
-	// find in batches
-	s.logger.Debug("fork found", "ancestor", ancestor.Number)
-
-	startBlock := fork
 
 	var lastTarget uint64
 
 	// Create a blockchain subscription for the sync progression and start tracking
-	s.syncProgression.StartProgression(startBlock.Number, s.blockchain.SubscribeEvents())
+	s.syncProgression.StartProgression(localMaxHeader.Number, s.blockchain.SubscribeEvents())
 
 	// Stop monitoring the sync progression upon exit
 	defer s.syncProgression.StopProgression()
 
-	// sync up to the current known header
+	// Keep track of the progress
+	currentSyncHeight := localMaxHeight + 1
+
+	// Sync up to the peer's latest header
 	for {
-		// update target
-		target := p.status.Number
+		// Update the target. This entire outer loop
+		// is there in order to make sure bulk syncing is entirely done
+		// as the peer's status can change over time if block writes have a significant
+		// time impact on the node in question
+		target := p.Number()
 
 		s.syncProgression.UpdateHighestProgression(target)
 
@@ -658,38 +588,36 @@ func (s *Syncer) BulkSyncWithPeer(p *SyncPeer, newBlockHandler func(block *types
 		}
 
 		for {
-			s.logger.Debug("sync up to block", "from", startBlock.Number, "to", target)
+			s.logger.Debug(
+				"sync up to block",
+				"from",
+				currentSyncHeight,
+				"to",
+				target,
+			)
 
-			// start to synchronize with it
+			// Create the base request skeleton
 			sk := &skeleton{
-				span: 10,
-				num:  5,
+				amount: MaxSkeletonHeadersAmount,
 			}
 
-			if err := sk.build(p.client, startBlock.Hash); err != nil {
-				return fmt.Errorf("failed to build skeleton: %w", err)
+			// Fetch the blocks from the peer
+			if err := sk.getBlocksFromPeer(p.client, currentSyncHeight); err != nil {
+				return fmt.Errorf("unable to fetch blocks from peer, %w", err)
 			}
 
-			// fill skeleton
-			for indx := range sk.slots {
-				sk.fillSlot(uint64(indx), p.client) //nolint
-			}
-
-			// sync the data
-			for _, slot := range sk.slots {
-				for _, block := range slot.blocks {
-					if err := s.blockchain.WriteBlock(block); err != nil {
-						return fmt.Errorf("failed to write bulk sync blocks: %w", err)
-					}
-
-					newBlockHandler(block)
+			// Verify and write the data locally
+			for _, block := range sk.blocks {
+				if err := s.blockchain.WriteBlock(block); err != nil {
+					return fmt.Errorf("failed to write block while bulk syncing: %w", err)
 				}
+
+				newBlockHandler(block)
+				currentSyncHeight++
 			}
 
-			// try to get the next block
-			startBlock = sk.LastHeader()
-
-			if startBlock.Number >= target {
+			if currentSyncHeight >= target {
+				// Target has been reached
 				break
 			}
 		}
@@ -698,36 +626,4 @@ func (s *Syncer) BulkSyncWithPeer(p *SyncPeer, newBlockHandler func(block *types
 	}
 
 	return nil
-}
-
-func getHeader(clt proto.V1Client, num *uint64, hash *types.Hash) (*types.Header, error) {
-	req := &proto.GetHeadersRequest{}
-	if num != nil {
-		req.Number = int64(*num)
-	}
-
-	if hash != nil {
-		req.Hash = (*hash).String()
-	}
-
-	resp, err := clt.GetHeaders(context.Background(), req)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(resp.Objs) == 0 {
-		return nil, nil
-	}
-
-	if len(resp.Objs) != 1 {
-		return nil, fmt.Errorf("unexpected more than 1 result")
-	}
-
-	header := &types.Header{}
-
-	if err := header.UnmarshalRLP(resp.Objs[0].Spec.Value); err != nil {
-		return nil, err
-	}
-
-	return header, nil
 }

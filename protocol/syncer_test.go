@@ -211,66 +211,6 @@ func TestBestPeer(t *testing.T) {
 	}
 }
 
-func TestFindCommonAncestor(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name          string
-		syncerHeaders []*types.Header
-		peerHeaders   []*types.Header
-		// result
-		found       bool
-		headerIndex int
-		forkIndex   int
-		err         error
-	}{
-		{
-			name:          "should find common ancestor",
-			syncerHeaders: blockchain.NewTestHeaderChainWithSeed(nil, 10, 0),
-			peerHeaders:   blockchain.NewTestHeaderChainWithSeed(nil, 20, 0),
-			found:         true,
-			headerIndex:   9,
-			forkIndex:     10,
-			err:           nil,
-		},
-		{
-			name:          "should return error if there is no fork",
-			syncerHeaders: blockchain.NewTestHeaderChainWithSeed(nil, 11, 0),
-			peerHeaders:   blockchain.NewTestHeaderChainWithSeed(nil, 10, 0),
-			found:         false,
-			err:           errors.New("fork not found"),
-		},
-	}
-
-	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			chain, peerChain := blockchain.NewTestBlockchain(
-				t,
-				tt.syncerHeaders,
-			), blockchain.NewTestBlockchain(t, tt.peerHeaders)
-			syncer, peerSyncers := SetupSyncerNetwork(t, chain, []blockchainShim{peerChain})
-			peerSyncer := peerSyncers[0]
-
-			peer := getPeer(syncer, peerSyncer.server.AddrInfo().ID)
-			assert.NotNil(t, peer)
-
-			header, fork, err := syncer.findCommonAncestor(peer.client, peer.status)
-			if tt.found {
-				assert.Equal(t, tt.peerHeaders[tt.headerIndex], header)
-				assert.Equal(t, tt.peerHeaders[tt.forkIndex], fork)
-				assert.Nil(t, err)
-			} else {
-				assert.Nil(t, header)
-				assert.Nil(t, fork)
-				assert.Equal(t, tt.err, err)
-			}
-		})
-	}
-}
-
 func TestWatchSyncWithPeer(t *testing.T) {
 	t.Parallel()
 

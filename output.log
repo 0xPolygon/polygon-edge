@@ -1,0 +1,43 @@
+2022-05-11T21:45:27.863+0200 [INFO]  polygon: Data dir: path=./test-chain-2
+2022-05-11T21:45:28.102+0200 [INFO]  polygon.blockchain: Current header: hash=0xdcbf97cfbecbf631e585240ac71d23bdacd67f1677b7d1f8cd4aeecd52b4f5cd number=1462
+2022-05-11T21:45:28.102+0200 [INFO]  polygon.blockchain: genesis: hash=0x711e854a5d2aee9c42ff2cd19fa097cb46e065ad44ba485c4bcf0c16f7f428d2
+2022-05-11T21:45:28.104+0200 [INFO]  polygon.consensus.ibft: syncing past snapshots: from=303 to=1462
+2022-05-11T21:45:28.469+0200 [INFO]  polygon.jsonrpc: http server started: addr=0.0.0.0:20002
+2022-05-11T21:45:28.469+0200 [INFO]  polygon.consensus.ibft: validator key: addr=0x209FDC8Fa6861c50B7AcACb68341CD2865f4a4a3
+2022-05-11T21:45:28.469+0200 [INFO]  polygon.consensus.ibft: state change: new=SyncState
+2022-05-11T21:45:28.469+0200 [DEBUG] polygon.consensus.ibft: current sequence: sequence=1463
+2022-05-11T21:45:28.469+0200 [INFO]  polygon: GRPC server running: addr=127.0.0.1:20000
+2022-05-11T21:45:28.469+0200 [INFO]  polygon.network: LibP2P server running: addr=/ip4/127.0.0.1/tcp/20001/p2p/16Uiu2HAkzFGX6m8vR8pLk8rihgLAWvmzHmD2k9FCY3vxhxDbRNYn
+2022-05-11T21:45:28.470+0200 [DEBUG] polygon.network: Dialing peer [{16Uiu2HAmJAjctm7Kx6rQnPqAMrrWZ8KxXbuaRVmsh96iamira9ui: [/ip4/127.0.0.1/tcp/10001]}] as local [16Uiu2HAkzFGX6m8vR8pLk8rihgLAWvmzHmD2k9FCY3vxhxDbRNYn]
+2022-05-11T21:45:28.473+0200 [DEBUG] polygon.network.identity: Conn: peer=16Uiu2HAmJAjctm7Kx6rQnPqAMrrWZ8KxXbuaRVmsh96iamira9ui direction=Outbound
+2022-05-11T21:45:28.474+0200 [DEBUG] polygon.network: open stream: protocol=/id/0.1 peer=16Uiu2HAmJAjctm7Kx6rQnPqAMrrWZ8KxXbuaRVmsh96iamira9ui
+2022-05-11T21:45:28.476+0200 [INFO]  polygon.network: Peer connected: id=16Uiu2HAmJAjctm7Kx6rQnPqAMrrWZ8KxXbuaRVmsh96iamira9ui
+2022-05-11T21:45:28.476+0200 [DEBUG] polygon.network: open stream: protocol=/syncer/0.1 peer=16Uiu2HAmJAjctm7Kx6rQnPqAMrrWZ8KxXbuaRVmsh96iamira9ui
+2022-05-11T21:45:29.470+0200 [DEBUG] polygon.consensus.syncer: sync up to block: from=1463 to=1468
+2022-05-11T21:45:29.471+0200 [INFO]  polygon.blockchain: write block: num=1463 parent=0xdcbf97cfbecbf631e585240ac71d23bdacd67f1677b7d1f8cd4aeecd52b4f5cd
+2022-05-11T21:45:29.473+0200 [INFO]  polygon.blockchain: new block: number=1463 hash=0x16daad3fe518c9d4ebb2cf29f4145123ee0f496800473186fdd9e2aedc7b5345 txns=0 generation_time_in_seconds=2
+2022-05-11T21:45:29.473+0200 [INFO]  polygon.blockchain: write block: num=1464 parent=0x16daad3fe518c9d4ebb2cf29f4145123ee0f496800473186fdd9e2aedc7b5345
+2022-05-11T21:45:29.474+0200 [INFO]  polygon.blockchain: new block: number=1464 hash=0x38a67c8da1bbc8e3f2a2e16a9b2f9799e93caa6e804ec91093b688c16b21e7a8 txns=0 generation_time_in_seconds=2
+2022-05-11T21:45:29.474+0200 [INFO]  polygon.blockchain: write block: num=1465 parent=0x38a67c8da1bbc8e3f2a2e16a9b2f9799e93caa6e804ec91093b688c16b21e7a8
+2022-05-11T21:45:29.476+0200 [INFO]  polygon.blockchain: new block: number=1465 hash=0x249e405afccb6c68735a977985f1e89956084c64b8e93d453d6a9969a767937a txns=0 generation_time_in_seconds=2
+2022-05-11T21:45:29.476+0200 [INFO]  polygon.blockchain: write block: num=1466 parent=0x249e405afccb6c68735a977985f1e89956084c64b8e93d453d6a9969a767937a
+2022-05-11T21:45:29.477+0200 [INFO]  polygon.blockchain: new block: number=1466 hash=0xbc73f702840ec9dad85c0e06c675e6a6f840aeca276f7c0dce49751c48e133b8 txns=0 generation_time_in_seconds=2
+2022-05-11T21:45:29.477+0200 [INFO]  polygon.blockchain: write block: num=1467 parent=0xbc73f702840ec9dad85c0e06c675e6a6f840aeca276f7c0dce49751c48e133b8
+2022-05-11T21:45:29.478+0200 [INFO]  polygon.blockchain: new block: number=1467 hash=0x484054eb385a6de2714e399f7de7c7cba91a87891831ad32624e822dfaa486ba txns=0 generation_time_in_seconds=2
+2022-05-11T21:45:29.478+0200 [INFO]  polygon.blockchain: write block: num=1468 parent=0x484054eb385a6de2714e399f7de7c7cba91a87891831ad32624e822dfaa486ba
+2022-05-11T21:45:29.479+0200 [INFO]  polygon.blockchain: new block: number=1468 hash=0x9758108d02e25de6a24b935f505cdf689af0054808a2300088e9e375d6d96cb5 txns=0 generation_time_in_seconds=2
+2022-05-11T21:45:30.006+0200 [DEBUG] polygon.consensus.syncer: enqueue block: peer=16Uiu2HAmJAjctm7Kx6rQnPqAMrrWZ8KxXbuaRVmsh96iamira9ui number=1469 hash=0x7425565d7f22b24f332c31a8d38597c565cd10ab3797e5522d3e681e16ee9fb5
+2022-05-11T21:45:30.006+0200 [DEBUG] polygon.consensus.syncer: update peer status: peer=16Uiu2HAmJAjctm7Kx6rQnPqAMrrWZ8KxXbuaRVmsh96iamira9ui latest block number=1469 latest block hash=0x7425565d7f22b24f332c31a8d38597c565cd10ab3797e5522d3e681e16ee9fb5 difficulty=1079716
+2022-05-11T21:45:30.006+0200 [INFO]  polygon.blockchain: write block: num=1469 parent=0x9758108d02e25de6a24b935f505cdf689af0054808a2300088e9e375d6d96cb5
+2022-05-11T21:45:30.007+0200 [INFO]  polygon.blockchain: new block: number=1469 hash=0x7425565d7f22b24f332c31a8d38597c565cd10ab3797e5522d3e681e16ee9fb5 txns=0 generation_time_in_seconds=2
+2022-05-11T21:45:32.005+0200 [DEBUG] polygon.consensus.syncer: enqueue block: peer=16Uiu2HAmJAjctm7Kx6rQnPqAMrrWZ8KxXbuaRVmsh96iamira9ui number=1470 hash=0x4025a78856411d85af0cf7b60599fd65e562dba391d0b65104f5e3d03d0bdfe8
+2022-05-11T21:45:32.005+0200 [DEBUG] polygon.consensus.syncer: update peer status: peer=16Uiu2HAmJAjctm7Kx6rQnPqAMrrWZ8KxXbuaRVmsh96iamira9ui latest block number=1470 latest block hash=0x4025a78856411d85af0cf7b60599fd65e562dba391d0b65104f5e3d03d0bdfe8 difficulty=1081186
+2022-05-11T21:45:32.005+0200 [INFO]  polygon.blockchain: write block: num=1470 parent=0x7425565d7f22b24f332c31a8d38597c565cd10ab3797e5522d3e681e16ee9fb5
+2022-05-11T21:45:32.007+0200 [INFO]  polygon.blockchain: new block: number=1470 hash=0x4025a78856411d85af0cf7b60599fd65e562dba391d0b65104f5e3d03d0bdfe8 txns=0 generation_time_in_seconds=2
+2022-05-11T21:45:32.479+0200 [DEBUG] polygon.network: open stream: protocol=/disc/0.1 peer=16Uiu2HAmJAjctm7Kx6rQnPqAMrrWZ8KxXbuaRVmsh96iamira9ui
+2022-05-11T21:45:33.471+0200 [DEBUG] polygon.network.discovery: Querying a peer for near peers: peer=16Uiu2HAmJAjctm7Kx6rQnPqAMrrWZ8KxXbuaRVmsh96iamira9ui
+2022-05-11T21:45:33.474+0200 [DEBUG] polygon.network.discovery: Found new near peers: peer=0
+2022-05-11T21:45:34.015+0200 [DEBUG] polygon.consensus.syncer: enqueue block: peer=16Uiu2HAmJAjctm7Kx6rQnPqAMrrWZ8KxXbuaRVmsh96iamira9ui number=1471 hash=0x45cac23971686ec227f6542562cc5f9d1b2e7689ae135bee8c7806b830ad2393
+2022-05-11T21:45:34.015+0200 [DEBUG] polygon.consensus.syncer: update peer status: peer=16Uiu2HAmJAjctm7Kx6rQnPqAMrrWZ8KxXbuaRVmsh96iamira9ui latest block number=1471 latest block hash=0x45cac23971686ec227f6542562cc5f9d1b2e7689ae135bee8c7806b830ad2393 difficulty=1082657
+2022-05-11T21:45:34.015+0200 [INFO]  polygon.blockchain: write block: num=1471 parent=0x4025a78856411d85af0cf7b60599fd65e562dba391d0b65104f5e3d03d0bdfe8
+2022-05-11T21:45:34.017+0200 [INFO]  polygon.blockchain: new block: number=1471 hash=0x45cac23971686ec227f6542562cc5f9d1b2e7689ae135bee8c7806b830ad2393 txns=0 generation_time_in_seconds=2
