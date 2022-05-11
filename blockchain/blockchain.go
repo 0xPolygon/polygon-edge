@@ -97,6 +97,17 @@ type BlockResult struct {
 	TotalGas uint64
 }
 
+// referenceBlockResult is used for cross-referencing
+// the execution result of pending block transactions
+// and the proposed block data
+type referenceBlockResult struct {
+	stateRoot    types.Hash
+	receiptsRoot types.Hash
+
+	numTransactions int
+	gasUsed         uint64
+}
+
 // updateGasPriceAvg updates the rolling average value of the gas price
 func (b *Blockchain) updateGasPriceAvg(newValues []*big.Int) {
 	b.gpAverage.Lock()
@@ -656,6 +667,51 @@ func (b *Blockchain) WriteHeadersWithBodies(headers []*types.Header) error {
 	return nil
 }
 
+// VerifyProposedBlock does the minimal block verification without consulting the
+// consensus layer. Should only be used if consensus checks are done
+// outside the method call
+func (b *Blockchain) VerifyProposedBlock(block *types.Block) error {
+	// Do just the initial block verification
+	return b.verifyBlock(block)
+}
+
+// VerifySealedBlock verifies that the block is valid by performing a series of checks.
+// It is assumed that the block status is sealed (committed)
+func (b *Blockchain) VerifySealedBlock(block *types.Block) error {
+	// Do the initial block verification
+	if err := b.verifyBlock(block); err != nil {
+		return err
+	}
+
+	// Make sure the consensus layer verifies this block header
+	if err := b.consensus.VerifyHeader(block.Header); err != nil {
+		return fmt.Errorf("failed to verify the header: %w", err)
+	}
+
+	return nil
+}
+
+// verifyBlock does the base (common) block verification steps by
+// verifying the block body as well as the parent information
+func (b *Blockchain) verifyBlock(block *types.Block) error {
+	// Make sure the block is present
+	if block == nil {
+		return ErrNoBlock
+	}
+
+	// Make sure the block is in line with the parent block
+	if err := b.verifyBlockParent(block); err != nil {
+		return err
+	}
+
+	// Make sure the block body data is valid
+	if err := b.verifyBlockBody(block); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // verifyBlockParent makes sure that the child block is in line
 // with the locally saved parent block. This means checking:
 // - The parent exists
@@ -753,17 +809,6 @@ func (b *Blockchain) verifyBlockBody(block *types.Block) error {
 	return nil
 }
 
-// referenceBlockResult is used for cross-referencing
-// the execution result of pending block transactions
-// and the proposed block data
-type referenceBlockResult struct {
-	stateRoot    types.Hash
-	receiptsRoot types.Hash
-
-	numTransactions int
-	gasUsed         uint64
-}
-
 // verifyBlockResult verifies that the block transaction execution result
 // matches up to the expected values
 func (br *BlockResult) verifyBlockResult(result *referenceBlockResult) error {
@@ -789,29 +834,6 @@ func (br *BlockResult) verifyBlockResult(result *referenceBlockResult) error {
 	}
 
 	return nil
-}
-
-// extractBlockReceipts extracts the receipts from the passed in block
-func (b *Blockchain) extractBlockReceipts(block *types.Block) ([]*types.Receipt, error) {
-	// Check the cache for the block receipts
-	receipts, ok := b.receiptsCache.Get(block.Header.Hash)
-	if !ok {
-		// No receipts found in the cache, execute the transactions from the block
-		// and fetch them
-		blockResult, err := b.executeBlockTransactions(block)
-		if err != nil {
-			return nil, err
-		}
-
-		return blockResult.Receipts, nil
-	}
-
-	extractedReceipts, ok := receipts.([]*types.Receipt)
-	if !ok {
-		return nil, errors.New("invalid type assertion for receipts")
-	}
-
-	return extractedReceipts, nil
 }
 
 // executeBlockTransactions executes the transactions in the block locally,
@@ -848,49 +870,6 @@ func (b *Blockchain) executeBlockTransactions(block *types.Block) (*BlockResult,
 		Receipts: txn.Receipts(),
 		TotalGas: txn.TotalGas(),
 	}, nil
-}
-
-func (b *Blockchain) verifyBlock(block *types.Block) error {
-	// Make sure the block is present
-	if block == nil {
-		return ErrNoBlock
-	}
-
-	// Make sure the block is in line with the parent block
-	if err := b.verifyBlockParent(block); err != nil {
-		return err
-	}
-
-	// Make sure the block body data is valid
-	if err := b.verifyBlockBody(block); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// VerifyProposedBlock does the minimal block verification without consulting the
-// consensus layer. Should only be used if consensus checks are done
-// outside the method call
-func (b *Blockchain) VerifyProposedBlock(block *types.Block) error {
-	// Do just the initial block verification
-	return b.verifyBlock(block)
-}
-
-// VerifySealedBlock verifies that the block is valid by performing a series of checks.
-// It is assumed that the block status is sealed (committed)
-func (b *Blockchain) VerifySealedBlock(block *types.Block) error {
-	// Do the initial block verification
-	if err := b.verifyBlock(block); err != nil {
-		return err
-	}
-
-	// Make sure the consensus layer verifies this block header
-	if err := b.consensus.VerifyHeader(block.Header); err != nil {
-		return fmt.Errorf("failed to verify the header: %w", err)
-	}
-
-	return nil
 }
 
 // WriteBlock writes a single block
@@ -954,6 +933,29 @@ func (b *Blockchain) WriteBlock(block *types.Block) error {
 	b.logger.Info("new block", logArgs...)
 
 	return nil
+}
+
+// extractBlockReceipts extracts the receipts from the passed in block
+func (b *Blockchain) extractBlockReceipts(block *types.Block) ([]*types.Receipt, error) {
+	// Check the cache for the block receipts
+	receipts, ok := b.receiptsCache.Get(block.Header.Hash)
+	if !ok {
+		// No receipts found in the cache, execute the transactions from the block
+		// and fetch them
+		blockResult, err := b.executeBlockTransactions(block)
+		if err != nil {
+			return nil, err
+		}
+
+		return blockResult.Receipts, nil
+	}
+
+	extractedReceipts, ok := receipts.([]*types.Receipt)
+	if !ok {
+		return nil, errors.New("invalid type assertion for receipts")
+	}
+
+	return extractedReceipts, nil
 }
 
 // updateGasPriceAvgWithBlock extracts the gas price information from the
