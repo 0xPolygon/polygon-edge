@@ -153,7 +153,7 @@ func TestAppendCommittedSeal(t *testing.T) {
 			// update parent hash
 			header.ParentHash = parentHeader.Hash
 
-			// get parent committeed seal
+			// get parent committed seal
 			parentCommittedSeal, err = unpackCommittedSealFromIbftExtra(parentHeader)
 			assert.NoError(t, err)
 

@@ -72,7 +72,7 @@ func signSealImpl(prv *ecdsa.PrivateKey, h *types.Header, committed bool) ([]byt
 	return seal, nil
 }
 
-// writeSeal creates and sets a signatures to Seal in IBFT Extra
+// writeSeal creates and sets a signature to Seal in IBFT Extra
 func writeSeal(prv *ecdsa.PrivateKey, h *types.Header) (*types.Header, error) {
 	h = h.Copy()
 	seal, err := signSealImpl(prv, h, false)
