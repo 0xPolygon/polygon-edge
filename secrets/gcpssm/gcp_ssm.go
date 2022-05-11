@@ -2,7 +2,6 @@ package gcpssm
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/hashicorp/go-hclog"
@@ -12,7 +11,7 @@ import (
 	smpb "google.golang.org/genproto/googleapis/cloud/secretmanager/v1"
 )
 
-type GcpSsmManager struct {
+type GCPSecretsManager struct {
 	// project id in which to store the secrets
 	projectID string
 	// gcp secrets manager client
@@ -27,26 +26,47 @@ type GcpSsmManager struct {
 	nodeName string
 }
 
+type (
+	configExtraParamFields string
+	envVarsName            string
+	errorMessages          error
+)
+
+const (
+	projectID configExtraParamFields = "project-id"
+	//nolint:gosec
+	gcpSSMCredFile configExtraParamFields = "gcp-ssm-cred"
+	//nolint:gosec
+	secretsManagerCredentials envVarsName = "GOOGLE_APPLICATION_CREDENTIALS"
+)
+
+var (
+	errNoProjectID   errorMessages = fmt.Errorf("no %s variable specified", projectID)
+	errNoCredsFile   errorMessages = fmt.Errorf("no %s variable specified", gcpSSMCredFile)
+	errParamsEmpty   errorMessages = fmt.Errorf("name, %s or %s, can not be an empty string", projectID, gcpSSMCredFile)
+	errCantSetEnvVar errorMessages = fmt.Errorf("could not set %s environment variable", secretsManagerCredentials)
+)
+
 func SecretsManagerFactory(
 	config *secrets.SecretsManagerConfig,
 	params *secrets.SecretsManagerParams,
 ) (secrets.SecretsManager, error) {
 	// Check if project id is defined
-	if _, ok := config.Extra["project-id"]; !ok {
-		return nil, errors.New("no project-id variable specified")
+	if _, ok := config.Extra[string(projectID)]; !ok {
+		return nil, errNoProjectID
 	}
 	// Check if gcp-ssm-cred is defined
-	if _, ok := config.Extra["gcp-ssm-cred"]; !ok {
-		return nil, errors.New("no gcp-ssm-cred variable specified")
+	if _, ok := config.Extra[string(gcpSSMCredFile)]; !ok {
+		return nil, errNoCredsFile
 	}
 	// Check if the variables are present
-	if config.Name == "" || config.Extra["project-id"] == "" || config.Extra["gcp-ssm-cred"] == "" {
-		return nil, errors.New("name, project-id or gcp-ssm-cred can't be empty string")
+	if config.Name == "" || config.Extra[string(projectID)] == "" || config.Extra[string(gcpSSMCredFile)] == "" {
+		return nil, errParamsEmpty
 	}
 
-	gcpSsmManager := &GcpSsmManager{
-		projectID:    fmt.Sprintf("%s", config.Extra["project-id"]),
-		credFilePath: fmt.Sprintf("%s", config.Extra["gcp-ssm-cred"]),
+	gcpSsmManager := &GCPSecretsManager{
+		projectID:    fmt.Sprintf("%s", config.Extra[string(projectID)]),
+		credFilePath: fmt.Sprintf("%s", config.Extra[string(projectID)]),
 		nodeName:     config.Name,
 		logger:       params.Logger.Named(string(secrets.GCPSSM)),
 	}
@@ -59,14 +79,14 @@ func SecretsManagerFactory(
 }
 
 // Setup performs secret manager-specific setup
-func (gm *GcpSsmManager) Setup() error {
+func (gm *GCPSecretsManager) Setup() error {
 	var clientErr error
 	// Set environment variable that specifies credentials.json file path
 	if err := os.Setenv(
-		"GOOGLE_APPLICATION_CREDENTIALS",
+		string(secretsManagerCredentials),
 		gm.credFilePath,
 	); err != nil {
-		return errors.New("could not set GOOGLE_APPLICATION_CREDENTIALS environment variable")
+		return errCantSetEnvVar
 	}
 
 	gm.context = context.Background()
@@ -80,7 +100,7 @@ func (gm *GcpSsmManager) Setup() error {
 }
 
 // GetSecret gets the secret by name
-func (gm *GcpSsmManager) GetSecret(name string) ([]byte, error) {
+func (gm *GCPSecretsManager) GetSecret(name string) ([]byte, error) {
 	// create get secret request
 	getSecretReq := &smpb.AccessSecretVersionRequest{
 		Name: gm.getFullyQualifiedSecretName(name),
@@ -96,7 +116,7 @@ func (gm *GcpSsmManager) GetSecret(name string) ([]byte, error) {
 }
 
 // SetSecret sets the secret to a provided value
-func (gm *GcpSsmManager) SetSecret(name string, value []byte) error {
+func (gm *GCPSecretsManager) SetSecret(name string, value []byte) error {
 	// create the request to create the secret placeholder.
 	createSecretReq := &smpb.CreateSecretRequest{
 		Parent:   fmt.Sprintf("projects/%s", gm.projectID),
@@ -134,7 +154,7 @@ func (gm *GcpSsmManager) SetSecret(name string, value []byte) error {
 }
 
 // HasSecret checks if the secret is present
-func (gm *GcpSsmManager) HasSecret(name string) bool {
+func (gm *GCPSecretsManager) HasSecret(name string) bool {
 	_, err := gm.GetSecret(name)
 
 	// if there is no error fetching secret return true
@@ -142,7 +162,7 @@ func (gm *GcpSsmManager) HasSecret(name string) bool {
 }
 
 // RemoveSecret removes the secret from storage used only for tests
-func (gm *GcpSsmManager) RemoveSecret(name string) error {
+func (gm *GCPSecretsManager) RemoveSecret(name string) error {
 	// create delete secret request
 	req := &smpb.DeleteSecretRequest{
 		Name: gm.getFullyQualifiedSecretName(name),
@@ -158,11 +178,11 @@ func (gm *GcpSsmManager) RemoveSecret(name string) error {
 }
 
 // getSecretID is used to format secret id with nodeName_secretName
-func (gm *GcpSsmManager) getSecretID(secretName string) string {
+func (gm *GCPSecretsManager) getSecretID(secretName string) string {
 	return fmt.Sprintf("%s_%s", gm.nodeName, secretName)
 }
 
 // getFullyQualifiedSecretName returns the full path of the secret in the store manager
-func (gm *GcpSsmManager) getFullyQualifiedSecretName(secretName string) string {
+func (gm *GCPSecretsManager) getFullyQualifiedSecretName(secretName string) string {
 	return fmt.Sprintf("projects/%s/secrets/%s/versions/1", gm.projectID, gm.getSecretID(secretName))
 }
