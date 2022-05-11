@@ -211,12 +211,13 @@ func verifyCommittedSealsImpl(committedSeals [][]byte, msg []byte, validators Va
 
 		if _, ok := visited[addr]; ok {
 			return ErrRepeatedCommittedSeal
-		} else {
-			if !validators.Includes(addr) {
-				return ErrNonValidatorCommittedSeal
-			}
-			visited[addr] = struct{}{}
 		}
+
+		if !validators.Includes(addr) {
+			return ErrNonValidatorCommittedSeal
+		}
+
+		visited[addr] = struct{}{}
 	}
 
 	// Valid committed seals must be at least 2F+1
