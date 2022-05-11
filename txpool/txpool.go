@@ -377,9 +377,6 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 	dropped = account.enqueued.clear()
 	clearAccountQueue(dropped)
 
-	//	reset the demotions counter
-	account.demotions = 0
-
 	p.eventManager.signalEvent(proto.EventType_DROPPED, tx.Hash)
 	p.logger.Debug("dropped account txs",
 		"num", droppedCount,
@@ -400,6 +397,9 @@ func (p *TxPool) Demote(tx *types.Transaction) {
 		)
 
 		p.Drop(tx)
+
+		//	reset the demotions counter
+		account.demotions = 0
 
 		return
 	}
