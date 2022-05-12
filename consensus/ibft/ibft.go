@@ -1256,6 +1256,24 @@ func (i *Ibft) VerifyHeader(parent, header *types.Header) error {
 	return nil
 }
 
+func (i *Ibft) quorumSize(validators ValidatorSet, blockNumber uint64) int {
+	rawUint64, ok := i.config.Config["quorumSizeBlockNum"]
+	if !ok {
+		return OptimalQuorumSize(validators)
+	}
+
+	cfgQuorumSizeBlockNum, ok := rawUint64.(uint64)
+	if !ok {
+		panic("bad")
+	}
+
+	if blockNumber < cfgQuorumSizeBlockNum {
+		return LegacyQuorumSize(validators)
+	} else {
+		return OptimalQuorumSize(validators)
+	}
+}
+
 // ProcessHeaders updates the snapshot based on previously verified headers
 func (i *Ibft) ProcessHeaders(headers []*types.Header) error {
 	return i.processHeaders(headers)
