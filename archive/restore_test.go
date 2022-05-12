@@ -236,12 +236,6 @@ func Test_parseMetadata(t *testing.T) {
 			metadata:    &metadata,
 			err:         nil,
 		},
-		{
-			name:        "should return error",
-			blockstream: newBlockStream(bytes.NewBuffer(blocks[0].MarshalRLP())),
-			metadata:    nil,
-			err:         errors.New("incorrect number of elements to decode Metadata, expected 2 but found 3"),
-		},
 	}
 
 	for _, tt := range tests {
