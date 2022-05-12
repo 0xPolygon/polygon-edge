@@ -1262,12 +1262,12 @@ func (i *Ibft) quorumSize(blockNumber uint64) QuorumImplementation {
 		return OptimalQuorumSize
 	}
 
-	cfgQuorumSizeBlockNum, ok := rawUint64.(uint64)
+	cfgQuorumSizeBlockNum, ok := rawUint64.(float64)
 	if !ok {
-		panic("bad")
+		panic("invalid block number format")
 	}
 
-	if blockNumber < cfgQuorumSizeBlockNum {
+	if blockNumber < uint64(cfgQuorumSizeBlockNum) {
 		return LegacyQuorumSize
 	} else {
 		return OptimalQuorumSize
