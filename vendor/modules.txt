@@ -3,7 +3,7 @@
 github.com/armon/go-metrics
 # github.com/armon/go-radix v1.0.0
 github.com/armon/go-radix
-# github.com/aws/aws-sdk-go v1.44.1
+# github.com/aws/aws-sdk-go v1.44.9
 ## explicit
 github.com/aws/aws-sdk-go/aws
 github.com/aws/aws-sdk-go/aws/awserr
@@ -51,7 +51,7 @@ github.com/aws/aws-sdk-go/service/sts/stsiface
 github.com/benbjohnson/clock
 # github.com/beorn7/perks v1.0.1
 github.com/beorn7/perks/quantile
-# github.com/btcsuite/btcd v0.22.0-beta
+# github.com/btcsuite/btcd v0.22.1
 ## explicit
 github.com/btcsuite/btcd/btcec
 # github.com/cenkalti/backoff/v3 v3.0.0
@@ -769,6 +769,7 @@ gopkg.in/square/go-jose.v2/jwt
 # gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7
 gopkg.in/tomb.v1
 # gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
+## explicit
 gopkg.in/yaml.v3
 # lukechampine.com/blake3 v1.1.7
 ## explicit

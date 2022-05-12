@@ -294,7 +294,8 @@ func (s *Syncer) updatePeerStatus(peerID peer.ID, status *Status) {
 		"latest block number",
 		status.Number,
 		"latest block hash",
-		status.Hash, "difficulty",
+		status.Hash,
+		"difficulty",
 		status.Difficulty,
 	)
 
@@ -409,12 +410,14 @@ func (s *Syncer) handlePeerEvent() {
 	}()
 }
 
-// BestPeer returns the best peer by difficulty (if any)
+// BestPeer returns the best peer by block height (if any)
 func (s *Syncer) BestPeer() *SyncPeer {
-	var bestPeer *SyncPeer
+	var (
+		bestPeer        *SyncPeer
+		bestBlockNumber uint64
+	)
 
-	var bestTd *big.Int
-
+	// Find the peer with the biggest block height available
 	s.peers.Range(func(peerID, peer interface{}) bool {
 		syncPeer, ok := peer.(*SyncPeer)
 		if !ok {
@@ -422,7 +425,10 @@ func (s *Syncer) BestPeer() *SyncPeer {
 		}
 
 		status := syncPeer.status
-		if bestPeer == nil || status.Difficulty.Cmp(bestTd) > 0 {
+		if bestPeer == nil || status.Number > bestBlockNumber {
+			// There is currently no best peer set, or the peer's block number
+			// is currently the highest
+
 			var correctAssertion bool
 
 			bestPeer, correctAssertion = peer.(*SyncPeer)
@@ -430,19 +436,15 @@ func (s *Syncer) BestPeer() *SyncPeer {
 				return false
 			}
 
-			bestTd = status.Difficulty
+			bestBlockNumber = status.Number
 		}
 
 		return true
 	})
 
-	if bestPeer == nil {
-		return nil
-	}
-
-	curDiff := s.blockchain.CurrentTD()
-	if bestTd.Cmp(curDiff) <= 0 {
-		return nil
+	// Fetch the highest local block height
+	if bestBlockNumber < s.blockchain.Header().Number {
+		bestPeer = nil
 	}
 
 	return bestPeer

@@ -3,15 +3,13 @@ package e2e
 import (
 	"context"
 	"encoding/json"
-	"math/big"
-	"testing"
-	"time"
-
 	"github.com/0xPolygon/polygon-edge/e2e/framework"
 	"github.com/0xPolygon/polygon-edge/jsonrpc"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
+	"math/big"
+	"testing"
 )
 
 type testWSRequest struct {
@@ -110,7 +108,7 @@ func TestWS_Response(t *testing.T) {
 	})
 
 	t.Run("Valid block number after transfer", func(t *testing.T) {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), framework.DefaultTimeout)
 		defer cancel()
 
 		_, err = srv.SendRawTx(ctx, &framework.PreparedTransaction{

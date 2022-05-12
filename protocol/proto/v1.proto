@@ -8,56 +8,52 @@ import "google/protobuf/empty.proto";
 import "google/protobuf/any.proto";
 
 service V1 {
-    rpc GetCurrent(google.protobuf.Empty) returns (V1Status);
-    rpc GetObjectsByHash(HashRequest) returns (Response);
-    rpc GetHeaders(GetHeadersRequest) returns (Response);
-    rpc Notify(NotifyReq) returns (google.protobuf.Empty);
-}
-
-message GetCurrentResponse {
-
+  rpc GetCurrent(google.protobuf.Empty) returns (V1Status);
+  rpc GetObjectsByHash(HashRequest) returns (Response);
+  rpc GetHeaders(GetHeadersRequest) returns (Response);
+  rpc Notify(NotifyReq) returns (google.protobuf.Empty);
 }
 
 message GetHeadersRequest {
-    // Provide a number or hash
-    int64 number = 1;
-    // Provide a number or hash
-    string hash = 2;
-    int64 skip = 3;
-    // Provide an amount not greater than 190
-    int64 amount = 4;
+  // Provide a number or hash
+  int64 number = 1;
+  // Provide a number or hash
+  string hash = 2;
+  int64 skip = 3;
+  // Provide an amount not greater than 190
+  int64 amount = 4;
 }
 
 message HashRequest  {
-    repeated string hash = 1;
-    Type type = 2;
+  repeated string hash = 1;
+  Type type = 2;
 
-    enum Type {
-        UNKNOWN = 0;
-        BODIES = 1;
-        RECEIPTS = 2;
-    }
+  enum Type {
+    UNKNOWN = 0;
+    BODIES = 1;
+    RECEIPTS = 2;
+  }
 }
 
 message NumberRequest {
-    repeated int64 number = 1;
+  repeated int64 number = 1;
 }
 
 message Response {
-    repeated Component objs = 1;
+  repeated Component objs = 1;
 
-    message Component {
-        google.protobuf.Any spec = 1;
-    }
+  message Component {
+    google.protobuf.Any spec = 1;
+  }
 }
 
 message V1Status {
-    string difficulty = 1;
-    string hash = 2;
-    uint64 number = 3;
+  string difficulty = 1;
+  string hash = 2;
+  uint64 number = 3;
 }
 
 message NotifyReq {
-    V1Status status = 1;
-    google.protobuf.Any raw = 2;
+  V1Status status = 1;
+  google.protobuf.Any raw = 2;
 }
