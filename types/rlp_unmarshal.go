@@ -45,7 +45,7 @@ func (b *Block) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	}
 
 	if len(elems) < 3 {
-		return fmt.Errorf("not enough elements to decode block, expected 3 but found %d", len(elems))
+		return fmt.Errorf("incorrect number of elements to decode block, expected 3 but found %d", len(elems))
 	}
 
 	// header
@@ -98,7 +98,7 @@ func (h *Header) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	}
 
 	if len(elems) < 15 {
-		return fmt.Errorf("not enough elements to decode header, expected 15 but found %d", len(elems))
+		return fmt.Errorf("incorrect number of elements to decode header, expected 15 but found %d", len(elems))
 	}
 
 	// parentHash
@@ -205,7 +205,7 @@ func (r *Receipt) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	}
 
 	if len(elems) < 4 {
-		return fmt.Errorf("not enough elements to decode receipt, expected 4 but found %d", len(elems))
+		return fmt.Errorf("incorrect number of elements to decode receipt, expected 4 but found %d", len(elems))
 	}
 
 	// root or status
@@ -259,7 +259,7 @@ func (l *Log) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	}
 
 	if len(elems) < 3 {
-		return fmt.Errorf("not enough elements to decode log, expected 3 but found %d", len(elems))
+		return fmt.Errorf("incorrect number of elements to decode log, expected 3 but found %d", len(elems))
 	}
 
 	// address
@@ -300,7 +300,7 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 	}
 
 	if len(elems) < 9 {
-		return fmt.Errorf("not enough elements to decode transaction, expected 9 but found %d", len(elems))
+		return fmt.Errorf("incorrect number of elements to decode transaction, expected 9 but found %d", len(elems))
 	}
 
 	p.Hash(t.Hash[:0], v)
