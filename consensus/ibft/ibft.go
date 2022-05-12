@@ -1256,10 +1256,10 @@ func (i *Ibft) VerifyHeader(parent, header *types.Header) error {
 	return nil
 }
 
-func (i *Ibft) quorumSize(validators ValidatorSet, blockNumber uint64) int {
+func (i *Ibft) quorumSize(blockNumber uint64) QuorumImplementation {
 	rawUint64, ok := i.config.Config["quorumSizeBlockNum"]
 	if !ok {
-		return OptimalQuorumSize(validators)
+		return OptimalQuorumSize
 	}
 
 	cfgQuorumSizeBlockNum, ok := rawUint64.(uint64)
@@ -1268,9 +1268,9 @@ func (i *Ibft) quorumSize(validators ValidatorSet, blockNumber uint64) int {
 	}
 
 	if blockNumber < cfgQuorumSizeBlockNum {
-		return LegacyQuorumSize(validators)
+		return LegacyQuorumSize
 	} else {
-		return OptimalQuorumSize(validators)
+		return OptimalQuorumSize
 	}
 }
 

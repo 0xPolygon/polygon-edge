@@ -304,6 +304,8 @@ func (v *ValidatorSet) MaxFaultyNodes() int {
 	return (len(*v) - 1) / 3
 }
 
+type QuorumImplementation func(ValidatorSet) int
+
 //	LegacyQuorumSize returns the legacy quorum size for the given validator set
 func LegacyQuorumSize(set ValidatorSet) int {
 	// According to the IBFT spec, the number of valid messages
