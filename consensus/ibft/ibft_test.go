@@ -1303,7 +1303,7 @@ func TestQuorumSizeSwitch(t *testing.T) {
 
 	testTable := []struct {
 		name           string
-		switchBlock    uint64
+		switchBlock    float64
 		currentBlock   uint64
 		set            ValidatorSet
 		expectedQuorum int
