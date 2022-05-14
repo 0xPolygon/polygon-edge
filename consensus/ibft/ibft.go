@@ -1269,9 +1269,9 @@ func (i *Ibft) quorumSize(blockNumber uint64) QuorumImplementation {
 
 	if blockNumber < uint64(cfgQuorumSizeBlockNum) {
 		return LegacyQuorumSize
-	} else {
-		return OptimalQuorumSize
 	}
+
+	return OptimalQuorumSize
 }
 
 // ProcessHeaders updates the snapshot based on previously verified headers
