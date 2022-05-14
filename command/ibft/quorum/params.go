@@ -79,12 +79,10 @@ func (p *quorumParams) overrideGenesisConfig() error {
 }
 
 func (p *quorumParams) getResult() command.CommandResult {
-	result := &IBFTQuorumResult{
+	return &IBFTQuorumResult{
 		Chain: p.genesisPath,
 		From:  common.JSONNumber{Value: p.from},
 	}
-
-	return result
 }
 
 func appendIBFTQuorum(
