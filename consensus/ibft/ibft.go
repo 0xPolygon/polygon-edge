@@ -1256,6 +1256,9 @@ func (i *Ibft) VerifyHeader(parent, header *types.Header) error {
 	return nil
 }
 
+//	quorumSize returns a callback that when executed on a ValidatorSet computes
+//	number of votes required to reach quorum based on the size of the set.
+//	The blockNumber argument indicates which formula was used to calculate the result (see PRs #513, #549)
 func (i *Ibft) quorumSize(blockNumber uint64) QuorumImplementation {
 	rawUint64, ok := i.config.Config["quorumSizeBlockNum"]
 	if !ok {
