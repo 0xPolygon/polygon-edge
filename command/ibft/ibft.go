@@ -36,7 +36,7 @@ func registerSubcommands(baseCmd *cobra.Command) {
 		candidates.GetCommand(),
 		// ibft switch
 		_switch.GetCommand(),
-		//	ibft quorum
+		// ibft quorum
 		quorum.GetCommand(),
 	)
 }
