@@ -883,7 +883,6 @@ func (b *Blockchain) WriteBlock(block *types.Block) error {
 		block.ParentHash(),
 	)
 
-	// Checks are passed, write the chain
 	header := block.Header
 
 	if err := b.writeBody(block); err != nil {
