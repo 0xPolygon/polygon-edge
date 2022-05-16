@@ -78,7 +78,7 @@ func SecretsManagerFactory(
 	return gcpSsmManager, nil
 }
 
-// Setup performs secret manager-specific setup
+// Setup performs secret manager specific setup
 func (gm *GCPSecretsManager) Setup() error {
 	var clientErr error
 	// Set environment variable that specifies credentials.json file path
