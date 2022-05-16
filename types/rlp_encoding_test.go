@@ -79,7 +79,7 @@ func TestRLPStorage_Marshall_And_Unmarshall_Receipt(t *testing.T) {
 			&Receipt{
 				CumulativeGasUsed: 10,
 				GasUsed:           100,
-				ContractAddress:   addr,
+				ContractAddress:   &addr,
 				TxHash:            hash,
 			},
 			true,
@@ -90,7 +90,7 @@ func TestRLPStorage_Marshall_And_Unmarshall_Receipt(t *testing.T) {
 				Root:              hash,
 				CumulativeGasUsed: 10,
 				GasUsed:           100,
-				ContractAddress:   addr,
+				ContractAddress:   &addr,
 				TxHash:            hash,
 			},
 			false,
