@@ -25,9 +25,7 @@ func setFlags(cmd *cobra.Command) {
 		&params.genesisPath,
 		chainFlag,
 		fmt.Sprintf("./%s", command.DefaultGenesisFileName),
-		fmt.Sprintf(
-			"the genesis file to update",
-		),
+		"the genesis file to update",
 	)
 
 	cmd.Flags().Uint64Var(
