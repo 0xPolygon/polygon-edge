@@ -62,7 +62,7 @@ func (s *skeleton) getBlocksFromPeer(
 	}
 
 	// Construct the body request
-	headerHashes := make([]types.Hash, 0)
+	headerHashes := make([]types.Hash, len(headers))
 	for _, header := range headers {
 		headerHashes = append(headerHashes, header.Hash)
 	}
