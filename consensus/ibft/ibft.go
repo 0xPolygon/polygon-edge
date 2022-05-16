@@ -78,8 +78,9 @@ type Ibft struct {
 
 	txpool txPoolInterface // Reference to the transaction pool
 
-	store     *snapshotStore // Snapshot store that keeps track of all snapshots
-	epochSize uint64
+	store              *snapshotStore // Snapshot store that keeps track of all snapshots
+	epochSize          uint64
+	quorumSizeBlockNum uint64
 
 	msgQueue *msgQueue     // Structure containing different message queues
 	updateCh chan struct{} // Update channel
@@ -133,11 +134,13 @@ func (i *Ibft) runHook(hookName HookType, height uint64, hookParam interface{}) 
 func Factory(
 	params *consensus.ConsensusParams,
 ) (consensus.Consensus, error) {
-	var epochSize uint64
-	if definedEpochSize, ok := params.Config.Config["epochSize"]; !ok {
-		// No epoch size defined, use the default one
-		epochSize = DefaultEpochSize
-	} else {
+	//	defaults for user set fields in genesis
+	var (
+		epochSize          = uint64(DefaultEpochSize)
+		quorumSizeBlockNum = uint64(0)
+	)
+
+	if definedEpochSize, ok := params.Config.Config["epochSize"]; ok {
 		// Epoch size is defined, use the passed in one
 		readSize, ok := definedEpochSize.(float64)
 		if !ok {
@@ -147,21 +150,32 @@ func Factory(
 		epochSize = uint64(readSize)
 	}
 
+	if rawBlockNum, ok := params.Config.Config["quorumSizeBlockNum"]; ok {
+		//	Block number specified for quorum size switch
+		readBlockNum, ok := rawBlockNum.(float64)
+		if !ok {
+			return nil, errors.New("invalid type assertion")
+		}
+
+		quorumSizeBlockNum = uint64(readBlockNum)
+	}
+
 	p := &Ibft{
-		logger:         params.Logger.Named("ibft"),
-		config:         params.Config,
-		Grpc:           params.Grpc,
-		blockchain:     params.Blockchain,
-		executor:       params.Executor,
-		closeCh:        make(chan struct{}),
-		txpool:         params.Txpool,
-		state:          &currentState{},
-		network:        params.Network,
-		epochSize:      epochSize,
-		sealing:        params.Seal,
-		metrics:        params.Metrics,
-		secretsManager: params.SecretsManager,
-		blockTime:      time.Duration(params.BlockTime) * time.Second,
+		logger:             params.Logger.Named("ibft"),
+		config:             params.Config,
+		Grpc:               params.Grpc,
+		blockchain:         params.Blockchain,
+		executor:           params.Executor,
+		closeCh:            make(chan struct{}),
+		txpool:             params.Txpool,
+		state:              &currentState{},
+		network:            params.Network,
+		epochSize:          epochSize,
+		quorumSizeBlockNum: quorumSizeBlockNum,
+		sealing:            params.Seal,
+		metrics:            params.Metrics,
+		secretsManager:     params.SecretsManager,
+		blockTime:          time.Duration(params.BlockTime) * time.Second,
 	}
 
 	// Initialize the mechanism
@@ -1260,17 +1274,7 @@ func (i *Ibft) VerifyHeader(parent, header *types.Header) error {
 //	number of votes required to reach quorum based on the size of the set.
 //	The blockNumber argument indicates which formula was used to calculate the result (see PRs #513, #549)
 func (i *Ibft) quorumSize(blockNumber uint64) QuorumImplementation {
-	rawUint64, ok := i.config.Config["quorumSizeBlockNum"]
-	if !ok {
-		return OptimalQuorumSize
-	}
-
-	cfgQuorumSizeBlockNum, ok := rawUint64.(float64)
-	if !ok {
-		panic("invalid block number format")
-	}
-
-	if blockNumber < uint64(cfgQuorumSizeBlockNum) {
+	if blockNumber < i.quorumSizeBlockNum {
 		return LegacyQuorumSize
 	}
 
