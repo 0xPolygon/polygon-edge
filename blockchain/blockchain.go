@@ -238,21 +238,21 @@ func NewBlockchain(
 
 // initCaches initializes the blockchain caches with the specified size
 func (b *Blockchain) initCaches(size int) error {
-	var cacheErr error
+	var err error
 
-	b.headersCache, cacheErr = lru.New(100)
-	if cacheErr != nil {
-		return fmt.Errorf("unable to create headers cache, %w", cacheErr)
+	b.headersCache, err = lru.New(size)
+	if err != nil {
+		return fmt.Errorf("unable to create headers cache, %w", err)
 	}
 
-	b.difficultyCache, cacheErr = lru.New(100)
-	if cacheErr != nil {
-		return fmt.Errorf("unable to create difficulty cache, %w", cacheErr)
+	b.difficultyCache, err = lru.New(size)
+	if err != nil {
+		return fmt.Errorf("unable to create difficulty cache, %w", err)
 	}
 
-	b.receiptsCache, cacheErr = lru.New(100)
-	if cacheErr != nil {
-		return fmt.Errorf("unable to create receipts cache, %w", cacheErr)
+	b.receiptsCache, err = lru.New(size)
+	if err != nil {
+		return fmt.Errorf("unable to create receipts cache, %w", err)
 	}
 
 	return nil
