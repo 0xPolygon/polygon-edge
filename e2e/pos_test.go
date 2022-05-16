@@ -390,7 +390,7 @@ func TestPoS_UnstakeExploit(t *testing.T) {
 			From: types.ZeroAddress.String(),
 		}
 
-		addCtx, addCtxCn := context.WithTimeout(context.Background(), time.Second*10)
+		addCtx, addCtxCn := context.WithTimeout(context.Background(), framework.DefaultTimeout)
 
 		addResp, addErr := clt.AddTxn(addCtx, msg)
 		if addErr != nil {

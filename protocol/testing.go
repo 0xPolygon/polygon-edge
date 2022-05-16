@@ -352,10 +352,9 @@ func NewMockSubscription() *mockSubscription {
 }
 
 func (s *mockSubscription) AppendBlock(block *types.Block) {
-	status := HeaderToStatus(block.Header)
 	s.eventCh <- &blockchain.Event{
-		Difficulty: status.Difficulty,
 		NewChain:   []*types.Header{block.Header},
+		Difficulty: HeaderToStatus(block.Header).Difficulty,
 	}
 }
 
