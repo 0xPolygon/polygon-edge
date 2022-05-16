@@ -31,3 +31,9 @@ lint:
 .PHONY: generate-bsd-licenses
 generate-bsd-licenses:
 	./generate_dependency_licenses.sh BSD-3-Clause,BSD-2-Clause > ./licenses/bsd_licenses.json
+
+.PHONY: test
+test:
+	go build -o artifacts/polygon-edge .
+	$(eval export PATH=$(shell pwd)/artifacts:$(PATH))
+	go test -timeout 28m ./...

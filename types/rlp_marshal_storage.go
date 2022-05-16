@@ -1,6 +1,8 @@
 package types
 
-import "github.com/umbracle/fastrlp"
+import (
+	"github.com/umbracle/fastrlp"
+)
 
 type RLPStoreMarshaler interface {
 	MarshalStoreRLPTo(dst []byte) []byte
@@ -79,6 +81,9 @@ func (r *Receipt) MarshalStoreRLPWith(a *fastrlp.Arena) *fastrlp.Value {
 
 	// gas used
 	vv.Set(a.NewUint(r.GasUsed))
+
+	// TxHash
+	vv.Set(a.NewBytes(r.TxHash.Bytes()))
 
 	return vv
 }
