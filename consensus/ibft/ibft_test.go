@@ -1303,7 +1303,7 @@ func TestQuorumSizeSwitch(t *testing.T) {
 
 	testTable := []struct {
 		name           string
-		switchBlock    float64
+		switchBlock    uint64
 		currentBlock   uint64
 		set            ValidatorSet
 		expectedQuorum int
@@ -1344,11 +1344,7 @@ func TestQuorumSizeSwitch(t *testing.T) {
 			t.Parallel()
 
 			ibft := &Ibft{
-				config: &consensus.Config{
-					Config: map[string]interface{}{
-						"quorumSizeBlockNum": test.switchBlock,
-					},
-				},
+				quorumSizeBlockNum: test.switchBlock,
 			}
 
 			assert.Equal(t,
