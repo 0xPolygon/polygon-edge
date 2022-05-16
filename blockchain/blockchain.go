@@ -679,14 +679,14 @@ func (b *Blockchain) VerifyProposedBlock(block *types.Block) error {
 // VerifySealedBlock verifies that the block is valid by performing a series of checks.
 // It is assumed that the block status is sealed (committed)
 func (b *Blockchain) VerifySealedBlock(block *types.Block) error {
-	// Do the initial block verification
-	if err := b.verifyBlock(block); err != nil {
-		return err
-	}
-
 	// Make sure the consensus layer verifies this block header
 	if err := b.consensus.VerifyHeader(block.Header); err != nil {
 		return fmt.Errorf("failed to verify the header: %w", err)
+	}
+
+	// Do the initial block verification
+	if err := b.verifyBlock(block); err != nil {
+		return err
 	}
 
 	return nil
