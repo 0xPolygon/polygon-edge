@@ -41,11 +41,7 @@ func (p *quorumParams) initChain() error {
 }
 
 func (p *quorumParams) initRawParams() error {
-	if err := p.initChain(); err != nil {
-		return err
-	}
-
-	return nil
+	return p.initChain()
 }
 
 func (p *quorumParams) getRequiredFlags() []string {
