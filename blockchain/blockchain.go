@@ -23,6 +23,7 @@ import (
 
 const (
 	BlockGasTargetDivisor uint64 = 1024 // The bound divisor of the gas limit, used in update calculations
+	defaultCacheSize      int    = 100  // The default size for Blockchain LRU cache structures
 )
 
 var (
@@ -226,7 +227,7 @@ func NewBlockchain(
 
 	b.db = db
 
-	if err := b.initCaches(100); err != nil {
+	if err := b.initCaches(defaultCacheSize); err != nil {
 		return nil, err
 	}
 
