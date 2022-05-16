@@ -66,7 +66,7 @@ func SecretsManagerFactory(
 
 	gcpSsmManager := &GCPSecretsManager{
 		projectID:    fmt.Sprintf("%s", config.Extra[string(projectID)]),
-		credFilePath: fmt.Sprintf("%s", config.Extra[string(projectID)]),
+		credFilePath: fmt.Sprintf("%s", config.Extra[string(gcpSSMCredFile)]),
 		nodeName:     config.Name,
 		logger:       params.Logger.Named(string(secrets.GCPSSM)),
 	}
