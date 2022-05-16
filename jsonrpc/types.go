@@ -166,7 +166,7 @@ type receipt struct {
 	BlockHash         types.Hash     `json:"blockHash"`
 	BlockNumber       argUint64      `json:"blockNumber"`
 	GasUsed           argUint64      `json:"gasUsed"`
-	ContractAddress   types.Address  `json:"contractAddress"`
+	ContractAddress   *types.Address `json:"contractAddress"`
 	FromAddr          types.Address  `json:"from"`
 	ToAddr            *types.Address `json:"to"`
 }
