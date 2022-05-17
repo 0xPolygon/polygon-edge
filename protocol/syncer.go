@@ -273,7 +273,7 @@ func (s *Syncer) BestPeer() *SyncPeer {
 	})
 
 	// Fetch the highest local block height
-	if bestBlockNumber < s.blockchain.Header().Number {
+	if bestBlockNumber <= s.blockchain.Header().Number {
 		bestPeer = nil
 	}
 
