@@ -89,23 +89,26 @@ func (s *SyncPeer) popBlock(timeout time.Duration) (b *types.Block, err error) {
 	timeoutCh := time.After(timeout)
 
 	for {
-		if !s.IsClosed() {
-			s.enqueueLock.Lock()
-			if len(s.enqueue) != 0 {
-				b, s.enqueue = s.enqueue[0], s.enqueue[1:]
-				s.enqueueLock.Unlock()
-
-				return
-			}
-
-			s.enqueueLock.Unlock()
-			select {
-			case <-s.enqueueCh:
-			case <-timeoutCh:
-				return nil, ErrPopTimeout
-			}
-		} else {
+		if s.IsClosed() {
 			return nil, ErrConnectionClosed
+		}
+
+		s.enqueueLock.Lock()
+		fmt.Println("pop block:", "enqueued=", len(s.enqueue))
+		if len(s.enqueue) != 0 {
+			b, s.enqueue = s.enqueue[0], s.enqueue[1:]
+			fmt.Println("pop block:", "number=", b.Number(), "enqueued=", len(s.enqueue))
+			s.enqueueLock.Unlock()
+
+			return
+		}
+
+		s.enqueueLock.Unlock()
+		select {
+		case <-s.enqueueCh:
+			fmt.Println("pop block:", "new block from peer")
+		case <-timeoutCh:
+			return nil, ErrPopTimeout
 		}
 	}
 }
@@ -463,8 +466,10 @@ func (s *Syncer) BestPeer() *SyncPeer {
 
 	// Fetch the highest local block height
 	if bestBlockNumber < s.blockchain.Header().Number {
-		bestPeer = nil
+		return nil
 	}
+
+	s.logger.Debug("found best peer", "id", bestPeer.peer.String(), "number", bestBlockNumber)
 
 	return bestPeer
 }
@@ -603,10 +608,14 @@ func (s *Syncer) findCommonAncestor(clt proto.V1Client, status *Status) (*types.
 
 // WatchSyncWithPeer subscribes and adds peer's latest block
 func (s *Syncer) WatchSyncWithPeer(p *SyncPeer, handler func(b *types.Block) bool) {
+	s.logger.Debug("entering watch sync with peer", "id", p.peer.String())
+	defer s.logger.Debug("exiting watch sync")
+
 	// purge from the cache of broadcasted blocks all the ones we have written so far
 	header := s.blockchain.Header()
 	p.purgeBlocks(header.Hash)
 
+	s.logger.Debug("Watch Sync: local block number", header.Number)
 	// listen and enqueue the messages
 	for {
 		if p.IsClosed() {

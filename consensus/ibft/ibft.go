@@ -491,6 +491,7 @@ func (i *Ibft) runSyncState() {
 
 				i.setState(AcceptState)
 			} else {
+				i.logger.Debug("best peer not found. Retrying in 1 sec...")
 				time.Sleep(1 * time.Second)
 			}
 
