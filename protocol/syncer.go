@@ -338,6 +338,11 @@ func (s *Syncer) Broadcast(b *types.Block) {
 		},
 	}
 
+	//	notify all peers of new block
+	go s.requestNotifyFromPeers(req)
+}
+
+func (s *Syncer) requestNotifyFromPeers(req *proto.NotifyReq) {
 	s.peers.Range(func(peerID, peer interface{}) bool {
 		ctx, cancel := context.WithTimeout(context.Background(), notifyTimeout)
 		defer cancel()
