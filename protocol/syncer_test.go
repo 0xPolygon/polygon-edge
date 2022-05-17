@@ -141,7 +141,7 @@ func TestBroadcast(t *testing.T) {
 			assert.NotNil(t, peer)
 
 			// Check peer's queue
-			assert.Len(t, peer.enqueuedBlocks, tt.numNewBlocks)
+			assert.Len(t, peer.enqueue, tt.numNewBlocks)
 			for _, newBlock := range newBlocks {
 				block, ok := TryPopBlock(t, syncer, peerSyncer.server.AddrInfo().ID, 10*time.Second)
 				assert.True(t, ok, "syncer should be able to pop new block from peer %s", peerSyncer.server.AddrInfo().ID)

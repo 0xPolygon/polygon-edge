@@ -80,9 +80,9 @@ type SyncPeer struct {
 	status     *Status
 	statusLock sync.RWMutex
 
-	enqueueLock    sync.Mutex
-	enqueuedBlocks []*types.Block
-	enqueueCh      chan struct{}
+	enqueueLock sync.Mutex
+	enqueue     []*types.Block
+	enqueueCh   chan struct{}
 }
 
 // Number returns the latest peer block height
@@ -100,68 +100,46 @@ func (s *SyncPeer) IsClosed() bool {
 
 // purgeBlocks purges the cache of broadcasted blocks the node has written so far
 // from the SyncPeer
-func (s *SyncPeer) purgeBlocks(blockHash types.Hash) uint64 {
+func (s *SyncPeer) purgeBlocks(lastSeen types.Hash) {
 	s.enqueueLock.Lock()
 	defer s.enqueueLock.Unlock()
 
 	indx := -1
 
-	for i, b := range s.enqueuedBlocks {
-		if b.Hash() == blockHash {
+	for i, b := range s.enqueue {
+		if b.Hash() == lastSeen {
 			indx = i
 		}
 	}
 
-	if indx == -1 {
-		//	block not found, nothing to purge
-		return 0
+	if indx != -1 {
+		s.enqueue = s.enqueue[indx+1:]
 	}
-
-	//	drop all previously enqueued blocks older than latestBlock
-	s.enqueuedBlocks = s.enqueuedBlocks[indx+1:]
-
-	return uint64(indx + 1)
 }
 
 // popBlock pops a block from the block queue [BLOCKING]
 func (s *SyncPeer) popBlock(timeout time.Duration) (b *types.Block, err error) {
+	timeoutCh := time.After(timeout)
+
 	for {
 		if s.IsClosed() {
 			return nil, ErrConnectionClosed
 		}
 
-		if block := s.pop(); block != nil {
-			return block, nil
+		s.enqueueLock.Lock()
+		if len(s.enqueue) != 0 {
+			b, s.enqueue = s.enqueue[0], s.enqueue[1:]
+			s.enqueueLock.Unlock()
+
+			return
 		}
 
-		//	no enqueued blocks, wait for a new one
-		if err := s.waitForBlock(timeout); err != nil {
-			return nil, err
+		s.enqueueLock.Unlock()
+		select {
+		case <-s.enqueueCh:
+		case <-timeoutCh:
+			return nil, ErrPopTimeout
 		}
-	}
-}
-
-func (s *SyncPeer) pop() (b *types.Block) {
-	s.enqueueLock.Lock()
-	defer s.enqueueLock.Unlock()
-
-	if len(s.enqueuedBlocks) == 0 {
-		return nil
-	}
-
-	//	"pop" the first enqueued block
-	b, s.enqueuedBlocks = s.enqueuedBlocks[0], s.enqueuedBlocks[1:]
-
-	return
-}
-
-func (s *SyncPeer) waitForBlock(timeout time.Duration) error {
-	select {
-	case <-s.enqueueCh:
-		//	new block enqueued, return to pop it
-		return nil
-	case <-time.After(timeout):
-		return ErrPopTimeout
 	}
 }
 
@@ -170,14 +148,17 @@ func (s *SyncPeer) appendBlock(b *types.Block) {
 	s.enqueueLock.Lock()
 	defer s.enqueueLock.Unlock()
 
-	if len(s.enqueuedBlocks) == maxEnqueueSize {
+	if len(s.enqueue) == maxEnqueueSize {
 		// pop first element
-		s.enqueuedBlocks = s.enqueuedBlocks[1:]
+		s.enqueue = s.enqueue[1:]
 	}
 	// append to the end
-	s.enqueuedBlocks = append(s.enqueuedBlocks, b)
+	s.enqueue = append(s.enqueue, b)
 
-	s.enqueueCh <- struct{}{}
+	select {
+	case s.enqueueCh <- struct{}{}:
+	default:
+	}
 }
 
 func (s *SyncPeer) updateStatus(status *Status) {
