@@ -98,17 +98,6 @@ type BlockResult struct {
 	TotalGas uint64
 }
 
-// referenceBlockResult is used for cross-referencing
-// the execution result of pending block transactions
-// and the proposed block data
-type referenceBlockResult struct {
-	stateRoot    types.Hash
-	receiptsRoot types.Hash
-
-	numTransactions int
-	gasUsed         uint64
-}
-
 // updateGasPriceAvg updates the rolling average value of the gas price
 func (b *Blockchain) updateGasPriceAvg(newValues []*big.Int) {
 	b.gpAverage.Lock()
@@ -798,12 +787,7 @@ func (b *Blockchain) verifyBlockBody(block *types.Block) error {
 	}
 
 	// Verify the local execution result with the proposed block data
-	if err := blockResult.verifyBlockResult(&referenceBlockResult{
-		stateRoot:       block.Header.StateRoot,
-		receiptsRoot:    block.Header.ReceiptsRoot,
-		numTransactions: len(block.Transactions),
-		gasUsed:         block.Header.GasUsed,
-	}); err != nil {
+	if err := blockResult.verifyBlockResult(block); err != nil {
 		return fmt.Errorf("unable to verify block execution result, %w", err)
 	}
 
@@ -812,25 +796,25 @@ func (b *Blockchain) verifyBlockBody(block *types.Block) error {
 
 // verifyBlockResult verifies that the block transaction execution result
 // matches up to the expected values
-func (br *BlockResult) verifyBlockResult(result *referenceBlockResult) error {
+func (br *BlockResult) verifyBlockResult(referenceBlock *types.Block) error {
 	// Make sure the number of receipts matches the number of transactions
-	if len(br.Receipts) != result.numTransactions {
+	if len(br.Receipts) != len(referenceBlock.Transactions) {
 		return ErrInvalidReceiptsSize
 	}
 
 	// Make sure the world state root matches up
-	if br.Root != result.stateRoot {
+	if br.Root != referenceBlock.Header.StateRoot {
 		return ErrInvalidStateRoot
 	}
 
 	// Make sure the gas used is valid
-	if br.TotalGas != result.gasUsed {
+	if br.TotalGas != referenceBlock.Header.GasUsed {
 		return ErrInvalidGasUsed
 	}
 
 	// Make sure the receipts root matches up
 	receiptsRoot := buildroot.CalculateReceiptsRoot(br.Receipts)
-	if receiptsRoot != result.receiptsRoot {
+	if receiptsRoot != referenceBlock.Header.ReceiptsRoot {
 		return ErrInvalidReceiptsRoot
 	}
 
