@@ -343,13 +343,20 @@ func (s *Syncer) Broadcast(b *types.Block) {
 }
 
 func (s *Syncer) requestNotifyFromPeers(req *proto.NotifyReq) {
-	s.peers.Range(func(peerID, peer interface{}) bool {
+	s.peers.Range(func(peerID, syncpeer interface{}) bool {
 		ctx, cancel := context.WithTimeout(context.Background(), notifyTimeout)
 		defer cancel()
 
-		if _, err := peer.(*SyncPeer).client.Notify(ctx, req); err != nil {
+		startTime := time.Now()
+
+		if _, err := syncpeer.(*SyncPeer).client.Notify(ctx, req); err != nil {
 			s.logger.Error("failed to notify", "err", err)
 		}
+
+		duration := time.Now().Sub(startTime)
+
+		peerID = peerID.(peer.ID)
+		s.logger.Debug("notify peer", "id", peerID, "duration", duration.Seconds())
 
 		return true
 	})
