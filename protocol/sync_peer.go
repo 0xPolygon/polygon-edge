@@ -125,27 +125,43 @@ func (s *SyncPeer) purgeBlocks(blockHash types.Hash) uint64 {
 
 // popBlock pops a block from the block queue [BLOCKING]
 func (s *SyncPeer) popBlock(timeout time.Duration) (b *types.Block, err error) {
-	timeoutCh := time.After(timeout)
-
 	for {
 		if s.IsClosed() {
 			return nil, ErrConnectionClosed
 		}
 
-		s.enqueueLock.Lock()
-		if len(s.enqueuedBlocks) != 0 {
-			b, s.enqueuedBlocks = s.enqueuedBlocks[0], s.enqueuedBlocks[1:]
-			s.enqueueLock.Unlock()
-
-			return
+		if block := s.pop(); block != nil {
+			return block, nil
 		}
 
-		s.enqueueLock.Unlock()
-		select {
-		case <-s.enqueueCh:
-		case <-timeoutCh:
-			return nil, ErrPopTimeout
+		//	no enqueued blocks, wait for a new one
+		if err := s.waitForBlock(timeout); err != nil {
+			return nil, err
 		}
+	}
+}
+
+func (s *SyncPeer) pop() (b *types.Block) {
+	s.enqueueLock.Lock()
+	defer s.enqueueLock.Unlock()
+
+	if len(s.enqueuedBlocks) == 0 {
+		return nil
+	}
+
+	//	"pop" the first enqueued block
+	b, s.enqueuedBlocks = s.enqueuedBlocks[0], s.enqueuedBlocks[1:]
+
+	return
+}
+
+func (s *SyncPeer) waitForBlock(timeout time.Duration) error {
+	select {
+	case <-s.enqueueCh:
+		//	new block enqueued, return to pop it
+		return nil
+	case <-time.After(timeout):
+		return ErrPopTimeout
 	}
 }
 
