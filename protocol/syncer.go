@@ -313,7 +313,7 @@ func (s *Syncer) AddPeer(peerID peer.ID) error {
 		conn:      conn,
 		client:    clt,
 		status:    status,
-		enqueueCh: make(chan struct{}),
+		enqueueCh: make(chan struct{}, 1),
 	})
 
 	return nil

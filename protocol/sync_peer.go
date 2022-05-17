@@ -177,10 +177,7 @@ func (s *SyncPeer) appendBlock(b *types.Block) {
 	// append to the end
 	s.enqueuedBlocks = append(s.enqueuedBlocks, b)
 
-	select {
-	case s.enqueueCh <- struct{}{}:
-	default:
-	}
+	s.enqueueCh <- struct{}{}
 }
 
 func (s *SyncPeer) updateStatus(status *Status) {
