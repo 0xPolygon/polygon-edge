@@ -80,9 +80,9 @@ type SyncPeer struct {
 	status     *Status
 	statusLock sync.RWMutex
 
-	enqueueLock sync.Mutex
-	enqueue     []*types.Block
-	enqueueCh   chan struct{}
+	enqueueLock    sync.Mutex
+	enqueuedBlocks []*types.Block
+	enqueueCh      chan struct{}
 }
 
 // Number returns the latest peer block height
@@ -100,21 +100,27 @@ func (s *SyncPeer) IsClosed() bool {
 
 // purgeBlocks purges the cache of broadcasted blocks the node has written so far
 // from the SyncPeer
-func (s *SyncPeer) purgeBlocks(lastSeen types.Hash) {
+func (s *SyncPeer) purgeBlocks(latestBlock *types.Block) uint64 {
 	s.enqueueLock.Lock()
 	defer s.enqueueLock.Unlock()
 
 	indx := -1
 
-	for i, b := range s.enqueue {
-		if b.Hash() == lastSeen {
+	for i, b := range s.enqueuedBlocks {
+		if b.Hash() == latestBlock.Hash() {
 			indx = i
 		}
 	}
 
-	if indx != -1 {
-		s.enqueue = s.enqueue[indx+1:]
+	if indx == -1 {
+		//	block not found, nothing to purge
+		return 0
 	}
+
+	//	drop all previously enqueued blocks older than latestBlock
+	s.enqueuedBlocks = s.enqueuedBlocks[indx+1:]
+
+	return uint64(indx + 1)
 }
 
 // popBlock pops a block from the block queue [BLOCKING]
@@ -127,8 +133,8 @@ func (s *SyncPeer) popBlock(timeout time.Duration) (b *types.Block, err error) {
 		}
 
 		s.enqueueLock.Lock()
-		if len(s.enqueue) != 0 {
-			b, s.enqueue = s.enqueue[0], s.enqueue[1:]
+		if len(s.enqueuedBlocks) != 0 {
+			b, s.enqueuedBlocks = s.enqueuedBlocks[0], s.enqueuedBlocks[1:]
 			s.enqueueLock.Unlock()
 
 			return
@@ -148,12 +154,12 @@ func (s *SyncPeer) appendBlock(b *types.Block) {
 	s.enqueueLock.Lock()
 	defer s.enqueueLock.Unlock()
 
-	if len(s.enqueue) == maxEnqueueSize {
+	if len(s.enqueuedBlocks) == maxEnqueueSize {
 		// pop first element
-		s.enqueue = s.enqueue[1:]
+		s.enqueuedBlocks = s.enqueuedBlocks[1:]
 	}
 	// append to the end
-	s.enqueue = append(s.enqueue, b)
+	s.enqueuedBlocks = append(s.enqueuedBlocks, b)
 
 	select {
 	case s.enqueueCh <- struct{}{}:

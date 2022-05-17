@@ -108,7 +108,7 @@ const syncerV1 = "/syncer/0.1"
 
 // enqueueBlock adds the specific block to the peerID queue
 func (s *Syncer) enqueueBlock(peerID peer.ID, b *types.Block) {
-	s.logger.Debug("enqueue block", "peer", peerID, "number", b.Number(), "hash", b.Hash())
+	s.logger.Debug("enqueuedBlocks block", "peer", peerID, "number", b.Number(), "hash", b.Hash())
 
 	peer, ok := s.peers.Load(peerID)
 	if ok {
@@ -340,11 +340,7 @@ func (s *Syncer) DeletePeer(peerID peer.ID) error {
 
 // WatchSyncWithPeer subscribes and adds peer's latest block
 func (s *Syncer) WatchSyncWithPeer(p *SyncPeer, handler func(b *types.Block) bool) {
-	// purge from the cache of broadcasted blocks all the ones we have written so far
-	header := s.blockchain.Header()
-	p.purgeBlocks(header.Hash)
-
-	// listen and enqueue the messages
+	// listen for new blocks from peers
 	for {
 		if p.IsClosed() {
 			s.logger.Info("Connection to a peer has closed already", "id", p.peer)
@@ -364,6 +360,9 @@ func (s *Syncer) WatchSyncWithPeer(p *SyncPeer, handler func(b *types.Block) boo
 
 			break
 		}
+
+		//	purge old blocks
+		s.pruneEnqueuedBlocks(b)
 
 		if handler(b) {
 			break
@@ -449,6 +448,9 @@ func (s *Syncer) BulkSyncWithPeer(p *SyncPeer, newBlockHandler func(block *types
 				currentSyncHeight++
 			}
 
+			latestBlock := sk.blocks[len(sk.blocks)-1]
+			s.pruneEnqueuedBlocks(latestBlock)
+
 			if currentSyncHeight >= target {
 				// Target has been reached
 				break
@@ -459,4 +461,23 @@ func (s *Syncer) BulkSyncWithPeer(p *SyncPeer, newBlockHandler func(block *types
 	}
 
 	return nil
+}
+
+func (s *Syncer) pruneEnqueuedBlocks(block *types.Block) {
+	//	for each sync peer in the map, clear old blocks
+	//	previously enqueued from all peers
+	s.peers.Range(func(key, value interface{}) bool {
+		peerID, _ := key.(peer.ID)
+		syncPeer, _ := value.(*SyncPeer)
+
+		purged := syncPeer.purgeBlocks(block)
+		s.logger.Debug(
+			"pruned blocks from peer",
+			"num", purged,
+			"id", peerID.String(),
+			"reference_block", block.Number(),
+		)
+
+		return true
+	})
 }
