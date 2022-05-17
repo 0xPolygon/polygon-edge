@@ -122,23 +122,23 @@ func (s *SyncPeer) popBlock(timeout time.Duration) (b *types.Block, err error) {
 	timeoutCh := time.After(timeout)
 
 	for {
-		if !s.IsClosed() {
-			s.enqueueLock.Lock()
-			if len(s.enqueue) != 0 {
-				b, s.enqueue = s.enqueue[0], s.enqueue[1:]
-				s.enqueueLock.Unlock()
-
-				return
-			}
-
-			s.enqueueLock.Unlock()
-			select {
-			case <-s.enqueueCh:
-			case <-timeoutCh:
-				return nil, ErrPopTimeout
-			}
-		} else {
+		if s.IsClosed() {
 			return nil, ErrConnectionClosed
+		}
+
+		s.enqueueLock.Lock()
+		if len(s.enqueue) != 0 {
+			b, s.enqueue = s.enqueue[0], s.enqueue[1:]
+			s.enqueueLock.Unlock()
+
+			return
+		}
+
+		s.enqueueLock.Unlock()
+		select {
+		case <-s.enqueueCh:
+		case <-timeoutCh:
+			return nil, ErrPopTimeout
 		}
 	}
 }
