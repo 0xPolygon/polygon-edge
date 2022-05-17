@@ -340,6 +340,10 @@ func (s *Syncer) DeletePeer(peerID peer.ID) error {
 
 // WatchSyncWithPeer subscribes and adds peer's latest block
 func (s *Syncer) WatchSyncWithPeer(p *SyncPeer, handler func(b *types.Block) bool) {
+	//	purge previously enqueued blocks
+	header := s.blockchain.Header()
+	p.purgeBlocks(header.Hash)
+
 	// listen for new blocks from peers
 	for {
 		if p.IsClosed() {
@@ -362,7 +366,7 @@ func (s *Syncer) WatchSyncWithPeer(p *SyncPeer, handler func(b *types.Block) boo
 		}
 
 		//	purge old blocks
-		s.pruneEnqueuedBlocks(b)
+		s.prunePeerEnqueuedBlocks(b)
 
 		if handler(b) {
 			break
@@ -449,7 +453,7 @@ func (s *Syncer) BulkSyncWithPeer(p *SyncPeer, newBlockHandler func(block *types
 			}
 
 			latestBlock := sk.blocks[len(sk.blocks)-1]
-			s.pruneEnqueuedBlocks(latestBlock)
+			s.prunePeerEnqueuedBlocks(latestBlock)
 
 			if currentSyncHeight >= target {
 				// Target has been reached
@@ -463,14 +467,14 @@ func (s *Syncer) BulkSyncWithPeer(p *SyncPeer, newBlockHandler func(block *types
 	return nil
 }
 
-func (s *Syncer) pruneEnqueuedBlocks(block *types.Block) {
+func (s *Syncer) prunePeerEnqueuedBlocks(block *types.Block) {
 	//	for each sync peer in the map, clear old blocks
 	//	previously enqueued from all peers
 	s.peers.Range(func(key, value interface{}) bool {
 		peerID, _ := key.(peer.ID)
 		syncPeer, _ := value.(*SyncPeer)
 
-		purged := syncPeer.purgeBlocks(block)
+		purged := syncPeer.purgeBlocks(block.Hash())
 		s.logger.Debug(
 			"pruned blocks from peer",
 			"num", purged,

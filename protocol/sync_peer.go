@@ -100,14 +100,14 @@ func (s *SyncPeer) IsClosed() bool {
 
 // purgeBlocks purges the cache of broadcasted blocks the node has written so far
 // from the SyncPeer
-func (s *SyncPeer) purgeBlocks(latestBlock *types.Block) uint64 {
+func (s *SyncPeer) purgeBlocks(blockHash types.Hash) uint64 {
 	s.enqueueLock.Lock()
 	defer s.enqueueLock.Unlock()
 
 	indx := -1
 
 	for i, b := range s.enqueuedBlocks {
-		if b.Hash() == latestBlock.Hash() {
+		if b.Hash() == blockHash {
 			indx = i
 		}
 	}
