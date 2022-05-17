@@ -365,9 +365,11 @@ func (s *Syncer) WatchSyncWithPeer(p *SyncPeer, handler func(b *types.Block) boo
 			break
 		}
 
+		exit := handler(b)
+
 		s.prunePeerEnqueuedBlocks(b)
 
-		if handler(b) {
+		if exit {
 			break
 		}
 	}
