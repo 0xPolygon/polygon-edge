@@ -261,19 +261,12 @@ func (s *Syncer) BestPeer() *SyncPeer {
 			return false
 		}
 
-		status := syncPeer.status
-		if bestPeer == nil || status.Number > bestBlockNumber {
+		peerBlockNumber := syncPeer.Number()
+		if bestPeer == nil || peerBlockNumber > bestBlockNumber {
 			// There is currently no best peer set, or the peer's block number
 			// is currently the highest
-
-			var correctAssertion bool
-
-			bestPeer, correctAssertion = peer.(*SyncPeer)
-			if !correctAssertion {
-				return false
-			}
-
-			bestBlockNumber = status.Number
+			bestPeer = syncPeer
+			bestBlockNumber = peerBlockNumber
 		}
 
 		return true
