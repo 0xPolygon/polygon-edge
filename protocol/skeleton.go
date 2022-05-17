@@ -63,8 +63,8 @@ func (s *skeleton) getBlocksFromPeer(
 
 	// Construct the body request
 	headerHashes := make([]types.Hash, len(headers))
-	for _, header := range headers {
-		headerHashes = append(headerHashes, header.Hash)
+	for index, header := range headers {
+		headerHashes[index] = header.Hash
 	}
 
 	getBodiesContext, cancelFn := context.WithTimeout(

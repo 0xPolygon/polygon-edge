@@ -294,7 +294,6 @@ func TestBulkSyncWithPeer(t *testing.T) {
 		// result
 		shouldSync    bool
 		syncFromBlock int
-		err           error
 	}{
 		{
 			name:          "should sync until peer's latest block",
@@ -302,7 +301,6 @@ func TestBulkSyncWithPeer(t *testing.T) {
 			peerHeaders:   blockchain.NewTestHeaderChainWithSeed(nil, 30, 0),
 			shouldSync:    true,
 			syncFromBlock: 10,
-			err:           nil,
 		},
 		{
 			name:          "shouldn't sync if peer's latest block is behind",
@@ -310,7 +308,6 @@ func TestBulkSyncWithPeer(t *testing.T) {
 			peerHeaders:   blockchain.NewTestHeaderChainWithSeed(nil, 10, 0),
 			shouldSync:    false,
 			syncFromBlock: 0,
-			err:           errors.New("fork not found"),
 		},
 	}
 
@@ -331,7 +328,7 @@ func TestBulkSyncWithPeer(t *testing.T) {
 			assert.NotNil(t, peer)
 
 			err := syncer.BulkSyncWithPeer(peer, newBlocksHandler)
-			assert.Equal(t, tt.err, err)
+			assert.NoError(t, err)
 			WaitUntilProcessedAllEvents(t, syncer, 10*time.Second)
 
 			var expectedStatus *Status
