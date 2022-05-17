@@ -95,6 +95,7 @@ func (s *SyncPeer) popBlock(timeout time.Duration) (b *types.Block, err error) {
 
 		s.enqueueLock.Lock()
 		fmt.Println("pop block:", "enqueued=", len(s.enqueue))
+
 		if len(s.enqueue) != 0 {
 			b, s.enqueue = s.enqueue[0], s.enqueue[1:]
 			fmt.Println("pop block:", "number=", b.Number(), "enqueued=", len(s.enqueue))
@@ -356,9 +357,9 @@ func (s *Syncer) requestNotifyFromPeers(req *proto.NotifyReq) {
 			s.logger.Error("failed to notify", "err", err)
 		}
 
-		duration := time.Now().Sub(startTime)
+		duration := time.Since(startTime)
 
-		peerID = peerID.(peer.ID)
+		peerID, _ = peerID.(peer.ID)
 		s.logger.Debug("notify peer", "id", peerID, "duration", duration.Seconds())
 
 		return true
