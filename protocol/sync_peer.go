@@ -100,7 +100,7 @@ func (s *SyncPeer) IsClosed() bool {
 
 // purgeBlocks purges the cache of broadcasted blocks the node has written so far
 // from the SyncPeer
-func (s *SyncPeer) purgeBlocks(lastSeen types.Hash) {
+func (s *SyncPeer) purgeBlocks(lastSeen types.Hash) uint64 {
 	s.enqueueLock.Lock()
 	defer s.enqueueLock.Unlock()
 
@@ -112,9 +112,14 @@ func (s *SyncPeer) purgeBlocks(lastSeen types.Hash) {
 		}
 	}
 
-	if indx != -1 {
-		s.enqueue = s.enqueue[indx+1:]
+	if indx == -1 {
+		// no blocks enqueued
+		return 0
 	}
+
+	s.enqueue = s.enqueue[indx+1:]
+
+	return uint64(indx + 1)
 }
 
 // popBlock pops a block from the block queue [BLOCKING]

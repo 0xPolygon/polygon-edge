@@ -365,6 +365,8 @@ func (s *Syncer) WatchSyncWithPeer(p *SyncPeer, handler func(b *types.Block) boo
 			break
 		}
 
+		s.prunePeerEnqueuedBlocks(b)
+
 		if handler(b) {
 			break
 		}
@@ -446,6 +448,7 @@ func (s *Syncer) BulkSyncWithPeer(p *SyncPeer, newBlockHandler func(block *types
 				}
 
 				newBlockHandler(block)
+				s.prunePeerEnqueuedBlocks(block)
 				currentSyncHeight++
 			}
 
@@ -459,4 +462,22 @@ func (s *Syncer) BulkSyncWithPeer(p *SyncPeer, newBlockHandler func(block *types
 	}
 
 	return nil
+}
+
+func (s *Syncer) prunePeerEnqueuedBlocks(block *types.Block) {
+	s.peers.Range(func(key, value interface{}) bool {
+		peerID, _ := key.(peer.ID)
+		syncPeer, _ := value.(*SyncPeer)
+
+		pruned := syncPeer.purgeBlocks(block.Hash())
+
+		s.logger.Debug(
+			"pruned peer enqueued blocks",
+			"num", pruned,
+			"id", peerID.String(),
+			"reference_block_num", block.Number(),
+		)
+
+		return true
+	})
 }
