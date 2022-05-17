@@ -3,13 +3,14 @@ package init
 import (
 	"bytes"
 	"fmt"
+
 	"github.com/0xPolygon/polygon-edge/command/helper"
-	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/0xPolygon/polygon-edge/helper/hex"
 )
 
 type SecretsInitResult struct {
-	Address types.Address `json:"address"`
-	NodeID  string        `json:"node_id"`
+	Address []byte `json:"address"`
+	NodeID  string `json:"node_id"`
 }
 
 func (r *SecretsInitResult) GetOutput() string {
@@ -17,7 +18,7 @@ func (r *SecretsInitResult) GetOutput() string {
 
 	buffer.WriteString("\n[SECRETS INIT]\n")
 	buffer.WriteString(helper.FormatKV([]string{
-		fmt.Sprintf("Public key (address)|%s", r.Address),
+		fmt.Sprintf("Public key (address)|%s", hex.EncodeToHex(r.Address)),
 		fmt.Sprintf("Node ID|%s", r.NodeID),
 	}))
 	buffer.WriteString("\n")

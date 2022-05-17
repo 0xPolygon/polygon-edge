@@ -15,9 +15,8 @@ import (
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/btcsuite/btcd/btcec"
-	"golang.org/x/crypto/sha3"
-
 	"github.com/umbracle/fastrlp"
+	"golang.org/x/crypto/sha3"
 )
 
 var (
@@ -31,6 +30,23 @@ var (
 	secp256k1N = hex.MustDecodeHex("0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141")
 	one        = []byte{0x01}
 )
+
+type KeyType string
+
+const (
+	KeySecp256k1 KeyType = "secp256k1"
+	KeyBLS       KeyType = "bls"
+)
+
+func ToKeyType(s string) (KeyType, error) {
+	x := KeyType(s)
+	switch x {
+	case KeySecp256k1, KeyBLS:
+		return x, nil
+	default:
+		return x, fmt.Errorf("invalid key type: %s", s)
+	}
+}
 
 func trimLeftZeros(b []byte) []byte {
 	i := 0

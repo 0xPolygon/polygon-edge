@@ -1,3 +1,6 @@
+# filippo.io/edwards25519 v1.0.0-rc.1
+filippo.io/edwards25519
+filippo.io/edwards25519/field
 # github.com/armon/go-metrics v0.3.10
 ## explicit
 github.com/armon/go-metrics
@@ -54,6 +57,9 @@ github.com/beorn7/perks/quantile
 # github.com/btcsuite/btcd v0.22.1
 ## explicit
 github.com/btcsuite/btcd/btcec
+# github.com/bwesterb/go-ristretto v1.2.0
+github.com/bwesterb/go-ristretto
+github.com/bwesterb/go-ristretto/edwards25519
 # github.com/cenkalti/backoff/v3 v3.0.0
 github.com/cenkalti/backoff/v3
 # github.com/cespare/xxhash/v2 v2.1.2
@@ -63,6 +69,33 @@ github.com/cheekybits/genny
 github.com/cheekybits/genny/generic
 github.com/cheekybits/genny/out
 github.com/cheekybits/genny/parse
+# github.com/coinbase/kryptology v1.8.0
+## explicit
+github.com/coinbase/kryptology/internal
+github.com/coinbase/kryptology/pkg/core
+github.com/coinbase/kryptology/pkg/core/curves
+github.com/coinbase/kryptology/pkg/core/curves/native
+github.com/coinbase/kryptology/pkg/core/curves/native/bls12381
+github.com/coinbase/kryptology/pkg/core/curves/native/k256
+github.com/coinbase/kryptology/pkg/core/curves/native/k256/fp
+github.com/coinbase/kryptology/pkg/core/curves/native/k256/fq
+github.com/coinbase/kryptology/pkg/core/curves/native/p256
+github.com/coinbase/kryptology/pkg/core/curves/native/p256/fp
+github.com/coinbase/kryptology/pkg/core/curves/native/p256/fq
+github.com/coinbase/kryptology/pkg/core/curves/native/pasta/fp
+github.com/coinbase/kryptology/pkg/core/curves/native/pasta/fq
+github.com/coinbase/kryptology/pkg/sharing
+github.com/coinbase/kryptology/pkg/signatures/bls/bls_sig
+# github.com/consensys/gnark-crypto v0.5.3
+github.com/consensys/gnark-crypto/ecc
+github.com/consensys/gnark-crypto/ecc/bls12-377
+github.com/consensys/gnark-crypto/ecc/bls12-377/fp
+github.com/consensys/gnark-crypto/ecc/bls12-377/fr
+github.com/consensys/gnark-crypto/ecc/bls12-377/fr/mimc
+github.com/consensys/gnark-crypto/ecc/bls12-377/internal/fptower
+github.com/consensys/gnark-crypto/field
+github.com/consensys/gnark-crypto/internal/generator/config
+github.com/consensys/gnark-crypto/internal/parallel
 # github.com/containerd/cgroups v1.0.2
 ## explicit
 github.com/containerd/cgroups

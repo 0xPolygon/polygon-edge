@@ -1,8 +1,8 @@
 package init
 
 import (
-	"crypto/ecdsa"
 	"errors"
+
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/secrets"
@@ -14,6 +14,7 @@ import (
 const (
 	dataDirFlag = "data-dir"
 	configFlag  = "config"
+	keyTypeFlag = "key-type"
 )
 
 var (
@@ -29,11 +30,13 @@ var (
 type initParams struct {
 	dataDir    string
 	configPath string
+	rawKeyType string
+	keyType    crypto.KeyType
 
 	secretsManager secrets.SecretsManager
 	secretsConfig  *secrets.SecretsManagerConfig
 
-	validatorPrivateKey  *ecdsa.PrivateKey
+	validatorAddress     []byte // ECDSA: Address, BLS: PubKey
 	networkingPrivateKey libp2pCrypto.PrivKey
 
 	nodeID peer.ID
@@ -43,11 +46,18 @@ func (ip *initParams) validateFlags() error {
 	if ip.dataDir == "" && ip.configPath == "" {
 		return errInvalidParams
 	}
+	if ip.rawKeyType == "" {
+		return errInvalidParams
+	}
 
 	return nil
 }
 
 func (ip *initParams) initSecrets() error {
+	if err := ip.initKeyType(); err != nil {
+		return err
+	}
+
 	if err := ip.initSecretsManager(); err != nil {
 		return err
 	}
@@ -57,6 +67,17 @@ func (ip *initParams) initSecrets() error {
 	}
 
 	return ip.initNetworkingKey()
+}
+
+func (ip *initParams) initKeyType() error {
+	key, err := crypto.ToKeyType(ip.rawKeyType)
+	if err != nil {
+		return err
+	}
+
+	ip.keyType = key
+
+	return nil
 }
 
 func (ip *initParams) initSecretsManager() error {
@@ -129,12 +150,12 @@ func (ip *initParams) initLocalSecretsManager() error {
 }
 
 func (ip *initParams) initValidatorKey() error {
-	validatorKey, err := helper.InitValidatorKey(ip.secretsManager)
+	address, err := helper.InitValidatorKey(ip.secretsManager, ip.keyType)
 	if err != nil {
 		return err
 	}
 
-	ip.validatorPrivateKey = validatorKey
+	ip.validatorAddress = address
 
 	return nil
 }
@@ -163,7 +184,7 @@ func (ip *initParams) initNodeID() error {
 
 func (ip *initParams) getResult() command.CommandResult {
 	return &SecretsInitResult{
-		Address: crypto.PubKeyToAddress(&ip.validatorPrivateKey.PublicKey),
+		Address: ip.validatorAddress,
 		NodeID:  ip.nodeID.String(),
 	}
 }

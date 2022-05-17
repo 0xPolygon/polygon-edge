@@ -1,11 +1,8 @@
 package ibft
 
 import (
-	"context"
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/blockchain"
-	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
@@ -74,54 +71,54 @@ func TestOperator_GetNextCandidate(t *testing.T) {
 	assert.Len(t, o.candidates, 0)
 }
 
-func TestOperator_Propose(t *testing.T) {
-	pool := newTesterAccountPool()
-	pool.add("A", "B", "C")
+// func TestOperator_Propose(t *testing.T) {
+// 	pool := newTesterAccountPool()
+// 	pool.add("A", "B", "C")
 
-	ibft := &Ibft{
-		blockchain: blockchain.TestBlockchain(t, pool.genesis()),
-		config:     &consensus.Config{},
-		epochSize:  DefaultEpochSize,
-	}
-	assert.NoError(t, ibft.setupSnapshot())
+// 	ibft := &Ibft{
+// 		blockchain: blockchain.TestBlockchain(t, pool.genesis()),
+// 		config:     &consensus.Config{},
+// 		epochSize:  DefaultEpochSize,
+// 	}
+// 	assert.NoError(t, ibft.setupSnapshot())
 
-	o := &operator{ibft: ibft}
+// 	o := &operator{ibft: ibft}
 
-	pool.add("X")
+// 	pool.add("X")
 
-	// we cannot propose to add a validator already in the set
-	_, err := o.Propose(context.Background(), &proto.Candidate{
-		Address: pool.get("A").Address().String(),
-		Auth:    true,
-	})
-	assert.Error(t, err)
+// 	// we cannot propose to add a validator already in the set
+// 	_, err := o.Propose(context.Background(), &proto.Candidate{
+// 		Address: pool.get("A").Address().String(),
+// 		Auth:    true,
+// 	})
+// 	assert.Error(t, err)
 
-	// we cannot propose remove a validator that is not part of the set
-	_, err = o.Propose(context.Background(), &proto.Candidate{
-		Address: pool.get("X").Address().String(),
-		Auth:    false,
-	})
-	assert.Error(t, err)
+// 	// we cannot propose remove a validator that is not part of the set
+// 	_, err = o.Propose(context.Background(), &proto.Candidate{
+// 		Address: pool.get("X").Address().String(),
+// 		Auth:    false,
+// 	})
+// 	assert.Error(t, err)
 
-	// we can send either add or del proposals
-	_, err = o.Propose(context.Background(), &proto.Candidate{
-		Address: pool.get("X").Address().String(),
-		Auth:    true,
-	})
-	assert.NoError(t, err)
-	assert.Len(t, o.candidates, 1)
+// 	// we can send either add or del proposals
+// 	_, err = o.Propose(context.Background(), &proto.Candidate{
+// 		Address: pool.get("X").Address().String(),
+// 		Auth:    true,
+// 	})
+// 	assert.NoError(t, err)
+// 	assert.Len(t, o.candidates, 1)
 
-	_, err = o.Propose(context.Background(), &proto.Candidate{
-		Address: pool.get("A").Address().String(),
-		Auth:    false,
-	})
-	assert.NoError(t, err)
-	assert.Len(t, o.candidates, 2)
+// 	_, err = o.Propose(context.Background(), &proto.Candidate{
+// 		Address: pool.get("A").Address().String(),
+// 		Auth:    false,
+// 	})
+// 	assert.NoError(t, err)
+// 	assert.Len(t, o.candidates, 2)
 
-	// we cannot send the same proposal twice
-	_, err = o.Propose(context.Background(), &proto.Candidate{
-		Address: pool.get("A").Address().String(),
-		Auth:    false,
-	})
-	assert.Error(t, err)
-}
+// 	// we cannot send the same proposal twice
+// 	_, err = o.Propose(context.Background(), &proto.Candidate{
+// 		Address: pool.get("A").Address().String(),
+// 		Auth:    false,
+// 	})
+// 	assert.Error(t, err)
+// }

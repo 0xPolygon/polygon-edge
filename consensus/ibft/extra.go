@@ -2,6 +2,7 @@ package ibft
 
 import (
 	"fmt"
+	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/fastrlp"
@@ -22,12 +23,17 @@ var (
 var zeroBytes = make([]byte, 32)
 
 // initIbftExtra initializes ExtraData in Header for IBFT
-func initIbftExtra(h *types.Header, validators []types.Address, parentCommittedSeals [][]byte) {
+func initIbftExtra(h *types.Header, validators [][]byte, parentCommittedSeal Sealer, bls bool) {
+	var committedSeal Sealer = new(BLSSeal)
+	if bls {
+		committedSeal = new(BLSSeal)
+	}
+
 	putIbftExtra(h, &IstanbulExtra{
 		Validators:          validators,
 		Seal:                []byte{},
-		CommittedSeal:       [][]byte{},
-		ParentCommittedSeal: parentCommittedSeals,
+		CommittedSeal:       committedSeal,
+		ParentCommittedSeal: parentCommittedSeal,
 	})
 }
 
@@ -55,7 +61,11 @@ func getIbftExtra(h *types.Header) (*IstanbulExtra, error) {
 	}
 
 	data := h.ExtraData[IstanbulExtraVanity:]
-	extra := &IstanbulExtra{}
+	extra := &IstanbulExtra{
+		// TODO
+		CommittedSeal:       &BLSSeal{},
+		ParentCommittedSeal: &BLSSeal{},
+	}
 
 	if err := extra.UnmarshalRLP(data); err != nil {
 		return nil, err
@@ -74,8 +84,17 @@ func unpackSealFromIbftExtra(h *types.Header) ([]byte, error) {
 	return extra.Seal, nil
 }
 
+func unpackValidatorsFromIbftExtra(h *types.Header) ([][]byte, error) {
+	extra, err := getIbftExtra(h)
+	if err != nil {
+		return nil, err
+	}
+
+	return extra.Validators, nil
+}
+
 // unpackCommittedSealFromIbftExtra extracts CommittedSeal from the istanbul extra of the given Header
-func unpackCommittedSealFromIbftExtra(h *types.Header) ([][]byte, error) {
+func unpackCommittedSealFromIbftExtra(h *types.Header) (Sealer, error) {
 	extra, err := getIbftExtra(h)
 	if err != nil {
 		return nil, err
@@ -85,7 +104,7 @@ func unpackCommittedSealFromIbftExtra(h *types.Header) ([][]byte, error) {
 }
 
 // unpackParentCommittedSealFromIbftExtra extracts ParentCommittedSeal from the istanbul extra of the given Header
-func unpackParentCommittedSealFromIbftExtra(h *types.Header) ([][]byte, error) {
+func unpackParentCommittedSealFromIbftExtra(h *types.Header) (Sealer, error) {
 	extra, err := getIbftExtra(h)
 	if err != nil {
 		return nil, err
@@ -116,14 +135,14 @@ func packSealIntoIbftExtra(h *types.Header, seal []byte) error {
 }
 
 // packCommittedSealIntoIbftExtra sets the seals to CommittedSeal field in istanbul extra of the given header
-func packCommittedSealIntoIbftExtra(h *types.Header, seals [][]byte) error {
+func packCommittedSealIntoIbftExtra(h *types.Header, seals Sealer) error {
 	return packFieldIntoIbftExtra(h, func(extra *IstanbulExtra) {
 		extra.CommittedSeal = seals
 	})
 }
 
 // filterIbftExtraForHash clears unnecessary fields in istanbul Extra of the given header for hash calculation
-func filterIbftExtraForHash(h *types.Header) error {
+func filterIbftExtraForHash(h *types.Header, bls bool) error {
 	extra, err := getIbftExtra(h)
 	if err != nil {
 		return err
@@ -132,17 +151,29 @@ func filterIbftExtraForHash(h *types.Header) error {
 	// This will effectively remove the Seal and Committed Seal fields,
 	// while keeping proposer vanity and validator set
 	// because extra.Validators, extra.ParentCommittedSeal is what we got from `h` in the first place.
-	initIbftExtra(h, extra.Validators, extra.ParentCommittedSeal)
+	initIbftExtra(h, extra.Validators, extra.ParentCommittedSeal, bls)
 
 	return nil
 }
 
 // IstanbulExtra defines the structure of the extra field for Istanbul
 type IstanbulExtra struct {
-	Validators          []types.Address
+	Validators          [][]byte // ECDSA: Address, BLS: PubKey
 	Seal                []byte
-	CommittedSeal       [][]byte
-	ParentCommittedSeal [][]byte
+	CommittedSeal       Sealer
+	ParentCommittedSeal Sealer
+}
+
+type Sealer interface {
+	MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value
+	UnmarshalRLPFrom(*fastrlp.Parser, *fastrlp.Value) error
+}
+
+type SerializedSeal [][]byte
+
+type BLSSeal struct {
+	Bitmap    *big.Int
+	Signature []byte
 }
 
 // MarshalRLPTo defines the marshal function wrapper for IstanbulExtra
@@ -157,7 +188,7 @@ func (i *IstanbulExtra) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 	// Validators
 	vals := ar.NewArray()
 	for _, a := range i.Validators {
-		vals.Set(ar.NewBytes(a.Bytes()))
+		vals.Set(ar.NewBytes(a))
 	}
 
 	vv.Set(vals)
@@ -170,35 +201,11 @@ func (i *IstanbulExtra) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 	}
 
 	// CommittedSeal
-	if len(i.CommittedSeal) == 0 {
-		vv.Set(ar.NewNullArray())
-	} else {
-		committed := ar.NewArray()
-		for _, a := range i.CommittedSeal {
-			if len(a) == 0 {
-				vv.Set(ar.NewNull())
-			} else {
-				committed.Set(ar.NewBytes(a))
-			}
-		}
-		vv.Set(committed)
-	}
+	vv.Set(i.CommittedSeal.MarshalRLPWith(ar))
 
 	// ParentCommittedSeal
 	if i.ParentCommittedSeal != nil {
-		if len(i.ParentCommittedSeal) == 0 {
-			vv.Set(ar.NewNullArray())
-		} else {
-			committed := ar.NewArray()
-			for _, a := range i.ParentCommittedSeal {
-				if len(a) == 0 {
-					vv.Set(ar.NewNull())
-				} else {
-					committed.Set(ar.NewBytes(a))
-				}
-			}
-			vv.Set(committed)
-		}
+		vv.Set(i.ParentCommittedSeal.MarshalRLPWith(ar))
 	}
 
 	return vv
@@ -226,9 +233,10 @@ func (i *IstanbulExtra) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) er
 		if err != nil {
 			return fmt.Errorf("mismatch of RLP type for Validators, expected list but found %s", elems[0].Type())
 		}
-		i.Validators = make([]types.Address, len(vals))
+
+		i.Validators = make([][]byte, len(vals))
 		for indx, val := range vals {
-			if err = val.GetAddr(i.Validators[indx][:]); err != nil {
+			if i.Validators[indx], err = val.GetBytes(i.Validators[indx]); err != nil {
 				return err
 			}
 		}
@@ -242,32 +250,96 @@ func (i *IstanbulExtra) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) er
 	}
 
 	// Committed
-	{
-		vals, err := elems[2].GetElems()
-		if err != nil {
-			return fmt.Errorf("mismatch of RLP type for CommittedSeal, expected list but found %s", elems[2].Type())
-		}
-		i.CommittedSeal = make([][]byte, len(vals))
-		for indx, val := range vals {
-			if i.CommittedSeal[indx], err = val.GetBytes(i.CommittedSeal[indx]); err != nil {
-				return err
-			}
-		}
+	if err := i.CommittedSeal.UnmarshalRLPFrom(p, elems[2]); err != nil {
+		return err
 	}
 
 	// LastCommitted
-	if len(elems) == 4 {
-		vals, err := elems[3].GetElems()
-		if err != nil {
-			return fmt.Errorf("mismatch of RLP type for ParentCommittedSeal, expected list but found %s", elems[3].Type())
+	if len(elems) >= 4 {
+		if err := i.ParentCommittedSeal.UnmarshalRLPFrom(p, elems[3]); err != nil {
+			return err
 		}
+	}
 
-		i.ParentCommittedSeal = make([][]byte, len(vals))
-		for indx, val := range vals {
-			if i.ParentCommittedSeal[indx], err = val.GetBytes(i.ParentCommittedSeal[indx]); err != nil {
-				return err
-			}
+	return nil
+}
+
+func (s *SerializedSeal) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
+	if len(*s) == 0 {
+		return ar.NewNullArray()
+	}
+
+	committed := ar.NewArray()
+	for _, a := range *s {
+		if len(a) == 0 {
+			committed.Set(ar.NewNull())
+		} else {
+			committed.Set(ar.NewBytes(a))
 		}
+	}
+
+	return committed
+}
+
+func (s *SerializedSeal) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
+	vals, err := v.GetElems()
+	if err != nil {
+		return fmt.Errorf("mismatch of RLP type for CommittedSeal, expected list but found %s", v.Type())
+	}
+
+	(*s) = make([][]byte, len(vals))
+
+	for indx, val := range vals {
+		if (*s)[indx], err = val.GetBytes((*s)[indx]); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (s *BLSSeal) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
+	x := ar.NewArray()
+
+	if s.Bitmap == nil {
+		x.Set(ar.NewNull())
+	} else {
+		x.Set(ar.NewBytes(s.Bitmap.Bytes()))
+	}
+
+	if s.Signature == nil {
+		x.Set(ar.NewNull())
+	} else {
+		x.Set(ar.NewBytes(s.Signature))
+	}
+
+	return x
+}
+
+func (s *BLSSeal) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
+	vals, err := v.GetElems()
+	if err != nil {
+		return fmt.Errorf("mismatch of RLP type for CommittedSeal, expected list but found %s", v.Type())
+	}
+	if len(vals) == 0 {
+		// FIXME?: Empty
+		return nil
+	}
+
+	if len(vals) != 2 {
+		return fmt.Errorf("mismatch of RLP type for AggregatedCommittedSeal")
+	}
+
+	var rawBitMap []byte
+
+	rawBitMap, err = vals[0].GetBytes(rawBitMap)
+	if err != nil {
+		return err
+	}
+
+	s.Bitmap = new(big.Int).SetBytes(rawBitMap)
+	if s.Signature, err = vals[1].GetBytes(s.Signature); err != nil {
+		return err
 	}
 
 	return nil

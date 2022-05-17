@@ -405,6 +405,7 @@ func (s *Server) setupConsensus() error {
 			Metrics:        s.serverMetrics.consensus,
 			SecretsManager: s.secretsManager,
 			BlockTime:      s.config.BlockTime,
+			BLS:            s.config.BLS,
 		},
 	)
 

@@ -2,6 +2,7 @@ package init
 
 import (
 	"github.com/0xPolygon/polygon-edge/command"
+	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/spf13/cobra"
 )
 
@@ -33,6 +34,13 @@ func setFlags(cmd *cobra.Command) {
 		"",
 		"the path to the SecretsManager config file, "+
 			"if omitted, the local FS secrets manager is used",
+	)
+
+	cmd.Flags().StringVar(
+		&params.rawKeyType,
+		keyTypeFlag,
+		string(crypto.KeySecp256k1),
+		"the type of key to generate",
 	)
 }
 

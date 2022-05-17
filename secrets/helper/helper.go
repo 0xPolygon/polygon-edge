@@ -1,8 +1,10 @@
 package helper
 
 import (
-	"crypto/ecdsa"
+	"crypto/rand"
 	"fmt"
+	"path/filepath"
+
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/network"
@@ -10,9 +12,9 @@ import (
 	"github.com/0xPolygon/polygon-edge/secrets/awsssm"
 	"github.com/0xPolygon/polygon-edge/secrets/hashicorpvault"
 	"github.com/0xPolygon/polygon-edge/secrets/local"
+	"github.com/coinbase/kryptology/pkg/signatures/bls/bls_sig"
 	"github.com/hashicorp/go-hclog"
 	libp2pCrypto "github.com/libp2p/go-libp2p-core/crypto"
-	"path/filepath"
 )
 
 // SetupLocalSecretsManager is a helper method for boilerplate local secrets manager setup
@@ -65,22 +67,52 @@ func SetupAWSSSM(
 	)
 }
 
-func InitValidatorKey(secretsManager secrets.SecretsManager) (*ecdsa.PrivateKey, error) {
+func InitValidatorKey(secretsManager secrets.SecretsManager, keyType crypto.KeyType) ([]byte, error) {
+	var (
+		address         []byte
+		privateKeyBytes []byte
+	)
+
 	// Generate the IBFT validator private key
-	validatorKey, validatorKeyEncoded, keyErr := crypto.GenerateAndEncodePrivateKey()
-	if keyErr != nil {
-		return nil, keyErr
+	if keyType == crypto.KeySecp256k1 {
+		validatorKey, validatorKeyEncoded, err := crypto.GenerateAndEncodePrivateKey()
+		if err != nil {
+			return nil, err
+		}
+
+		x := crypto.PubKeyToAddress(&validatorKey.PublicKey)
+
+		address = ([]byte)(x[:])
+		privateKeyBytes = validatorKeyEncoded
+	} else if keyType == crypto.KeyBLS {
+		r := make([]byte, 32)
+		rand.Read(r)
+		bls := bls_sig.NewSigPop()
+
+		pk, sk, err := bls.KeygenWithSeed(r)
+		if err != nil {
+			return nil, err
+		}
+
+		address, err = pk.MarshalBinary()
+		if err != nil {
+			return nil, err
+		}
+
+		if privateKeyBytes, err = sk.MarshalBinary(); err != nil {
+			return nil, err
+		}
 	}
 
 	// Write the validator private key to the secrets manager storage
 	if setErr := secretsManager.SetSecret(
 		secrets.ValidatorKey,
-		validatorKeyEncoded,
+		privateKeyBytes,
 	); setErr != nil {
 		return nil, setErr
 	}
 
-	return validatorKey, nil
+	return address, nil
 }
 
 func InitNetworkingPrivateKey(secretsManager secrets.SecretsManager) (libp2pCrypto.PrivKey, error) {

@@ -1,15 +1,16 @@
 package genesis
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft"
 	"github.com/0xPolygon/polygon-edge/contracts/staking"
-	stakingHelper "github.com/0xPolygon/polygon-edge/helper/staking"
 	"github.com/0xPolygon/polygon-edge/server"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -53,7 +54,7 @@ type genesisParams struct {
 	validatorPrefixPath string
 	premine             []string
 	bootnodes           []string
-	ibftValidators      []types.Address
+	ibftValidators      [][]byte
 
 	ibftValidatorsRaw []string
 
@@ -154,9 +155,14 @@ func (p *genesisParams) initRawParams() error {
 func (p *genesisParams) setValidatorSetFromCli() {
 	if len(p.ibftValidatorsRaw) != 0 {
 		for _, val := range p.ibftValidatorsRaw {
+			bytes, err := hex.DecodeString(strings.TrimPrefix(val, "0x"))
+			if err != nil {
+				panic(err)
+			}
+
 			p.ibftValidators = append(
 				p.ibftValidators,
-				types.StringToAddress(val),
+				bytes,
 			)
 		}
 	}
@@ -164,17 +170,17 @@ func (p *genesisParams) setValidatorSetFromCli() {
 
 // setValidatorSetFromPrefixPath sets validator set from prefix path
 func (p *genesisParams) setValidatorSetFromPrefixPath() error {
-	var readErr error
+	// var readErr error
 
 	if !p.areValidatorsSetByPrefix() {
 		return nil
 	}
 
-	if p.ibftValidators, readErr = getValidatorsFromPrefixPath(
-		p.validatorPrefixPath,
-	); readErr != nil {
-		return fmt.Errorf("failed to read from prefix: %w", readErr)
-	}
+	// if p.ibftValidators, readErr = getValidatorsFromPrefixPath(
+	// 	p.validatorPrefixPath,
+	// ); readErr != nil {
+	// 	return fmt.Errorf("failed to read from prefix: %w", readErr)
+	// }
 
 	return nil
 }
@@ -205,10 +211,11 @@ func (p *genesisParams) initIBFTExtraData() {
 		return
 	}
 
+	seal := new(ibft.SerializedSeal)
 	ibftExtra := &ibft.IstanbulExtra{
 		Validators:    p.ibftValidators,
 		Seal:          []byte{},
-		CommittedSeal: [][]byte{},
+		CommittedSeal: seal,
 	}
 
 	p.extraData = make([]byte, ibft.IstanbulExtraVanity)
@@ -302,16 +309,18 @@ func (p *genesisParams) shouldPredeployStakingSC() bool {
 }
 
 func (p *genesisParams) predeployStakingSC() (*chain.GenesisAccount, error) {
-	stakingAccount, predeployErr := stakingHelper.PredeployStakingSC(p.ibftValidators,
-		stakingHelper.PredeployParams{
-			MinValidatorCount: p.minNumValidators,
-			MaxValidatorCount: p.maxNumValidators,
-		})
-	if predeployErr != nil {
-		return nil, predeployErr
-	}
+	// stakingAccount, predeployErr := stakingHelper.PredeployStakingSC(p.ibftValidators,
+	// 	stakingHelper.PredeployParams{
+	// 		MinValidatorCount: p.minNumValidators,
+	// 		MaxValidatorCount: p.maxNumValidators,
+	// 	})
+	// if predeployErr != nil {
+	// 	return nil, predeployErr
+	// }
 
-	return stakingAccount, nil
+	// return stakingAccount, nil
+
+	return nil, nil
 }
 
 func (p *genesisParams) getResult() command.CommandResult {

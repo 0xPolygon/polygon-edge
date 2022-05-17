@@ -16,7 +16,7 @@ func istanbulHeaderHash(h *types.Header) types.Hash {
 	defer fastrlp.DefaultArenaPool.Put(arena)
 
 	// clear unnecessary fields in IBFT Extra for hash calculation
-	if err := filterIbftExtraForHash(h); err != nil {
+	if err := filterIbftExtraForHash(h, true); err != nil {
 		return types.Hash{}
 	}
 

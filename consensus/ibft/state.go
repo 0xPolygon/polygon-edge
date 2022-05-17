@@ -60,13 +60,13 @@ type currentState struct {
 	view *proto.View
 
 	// List of prepared messages
-	prepared map[types.Address]*proto.MessageReq
+	prepared map[string]*proto.MessageReq
 
 	// List of committed messages
-	committed map[types.Address]*proto.MessageReq
+	committed map[string]*proto.MessageReq
 
 	// List of round change messages
-	roundMessages map[uint64]map[types.Address]*proto.MessageReq
+	roundMessages map[uint64]map[string]*proto.MessageReq
 
 	// Locked signals whether the proposal is locked
 	locked bool
@@ -124,9 +124,9 @@ func (c *currentState) maxRound() (maxRound uint64, found bool) {
 
 // resetRoundMsgs resets the prepared, committed and round messages in the current state
 func (c *currentState) resetRoundMsgs() {
-	c.prepared = map[types.Address]*proto.MessageReq{}
-	c.committed = map[types.Address]*proto.MessageReq{}
-	c.roundMessages = map[uint64]map[types.Address]*proto.MessageReq{}
+	c.prepared = map[string]*proto.MessageReq{}
+	c.committed = map[string]*proto.MessageReq{}
+	c.roundMessages = map[uint64]map[string]*proto.MessageReq{}
 }
 
 // CalcProposer calculates the proposer and sets it to the state
@@ -184,11 +184,13 @@ func (c *currentState) addCommitted(msg *proto.MessageReq) {
 
 // addMessage adds a new message to one of the following message lists: committed, prepared, roundMessages
 func (c *currentState) addMessage(msg *proto.MessageReq) {
-	addr := msg.FromAddr()
-	if !c.validators.Includes(addr) {
-		// only include messages from validators
-		return
-	}
+	// addr := msg.FromAddr()
+	// if !c.validators.Includes(addr) {
+	// 	// only include messages from validators
+	// 	return
+	// }
+
+	addr := msg.From
 
 	switch {
 	case msg.Type == proto.MessageReq_Commit:
@@ -198,7 +200,7 @@ func (c *currentState) addMessage(msg *proto.MessageReq) {
 	case msg.Type == proto.MessageReq_RoundChange:
 		view := msg.View
 		if _, ok := c.roundMessages[view.Round]; !ok {
-			c.roundMessages[view.Round] = map[types.Address]*proto.MessageReq{}
+			c.roundMessages[view.Round] = map[string]*proto.MessageReq{}
 		}
 
 		c.roundMessages[view.Round][addr] = msg
