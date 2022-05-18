@@ -1032,6 +1032,7 @@ func TestPop(t *testing.T) {
 	assert.Equal(t, uint64(0), pool.gauge.read())
 	assert.Equal(t, uint64(0), pool.accounts.get(addr1).promoted.length())
 }
+
 func TestDrop(t *testing.T) {
 	pool, err := newTestPool()
 	assert.NoError(t, err)
