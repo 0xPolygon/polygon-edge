@@ -349,6 +349,7 @@ func (f *FilterManager) Exists(id string) bool {
 	return ok
 }
 
+// GetLogsForQuery return array of logs for given query
 func (f *FilterManager) GetLogsForQuery(query *LogQuery) ([]*Log, error) {
 	result := make([]*Log, 0)
 	parseReceipts := func(block *types.Block) error {
@@ -439,10 +440,11 @@ func (f *FilterManager) GetLogsForQuery(query *LogQuery) ([]*Log, error) {
 	return result, nil
 }
 
-func (f *FilterManager) GetLogFilterFromID(id string) (*logFilter, error) {
+//GetLogFilterFromID return log filter for given filterID
+func (f *FilterManager) GetLogFilterFromID(filterID string) (*logFilter, error) {
 	f.lock.RLock()
 
-	filter, ok := f.filters[id]
+	filter, ok := f.filters[filterID]
 	f.lock.RUnlock()
 
 	if !ok {
