@@ -2,6 +2,7 @@ package txpool
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"crypto/rand"
 	"math/big"
 	"testing"
@@ -1182,6 +1183,28 @@ func waitForEvents(
 	return receivedEvents
 }
 
+type eoa struct {
+	Address    types.Address
+	PrivateKey *ecdsa.PrivateKey
+}
+
+func (e *eoa) create(t *testing.T) *eoa {
+	e.PrivateKey, e.Address = tests.GenerateKeyAndAddr(t)
+
+	return e
+}
+
+func (e *eoa) signTx(tx *types.Transaction, signer crypto.TxSigner) *types.Transaction {
+	signedTx, err := signer.SignTx(tx, e.PrivateKey)
+	if err != nil {
+		panic("signTx failed")
+	}
+
+	return signedTx
+}
+
+var signerEIP155 = crypto.NewEIP155Signer(100)
+
 func TestAddTxns(t *testing.T) {
 	slotSize := uint64(1)
 
@@ -1239,30 +1262,46 @@ func TestAddTxns(t *testing.T) {
 }
 
 func TestResetAccounts_Promoted(t *testing.T) {
+
+	var (
+		eoa1 = new(eoa).create(t)
+		eoa2 = new(eoa).create(t)
+		eoa3 = new(eoa).create(t)
+		eoa4 = new(eoa).create(t)
+
+		addr1 = eoa1.Address
+		addr2 = eoa2.Address
+		addr3 = eoa3.Address
+		addr4 = eoa4.Address
+	)
+
 	allTxs :=
 		map[types.Address][]*types.Transaction{
 			addr1: {
-				newTx(addr1, 0, 1), // will be pruned
-				newTx(addr1, 1, 1), // will be pruned
-				newTx(addr1, 2, 1),
-				newTx(addr1, 3, 1),
+				eoa1.signTx(newTx(addr1, 0, 1), signerEIP155), // will be pruned
+				eoa1.signTx(newTx(addr1, 1, 1), signerEIP155), // will be pruned
+				eoa1.signTx(newTx(addr1, 2, 1), signerEIP155), // will be pruned
+				eoa1.signTx(newTx(addr1, 3, 1), signerEIP155), // will be pruned
 			},
+
 			addr2: {
-				newTx(addr2, 0, 1), // will be pruned
-				newTx(addr2, 1, 1),
+				eoa2.signTx(newTx(addr2, 0, 1), signerEIP155), // will be pruned
+				eoa2.signTx(newTx(addr2, 1, 1), signerEIP155), // will be pruned
 			},
+
 			addr3: {
-				newTx(addr3, 0, 1),
-				newTx(addr3, 1, 1),
-				newTx(addr3, 2, 1),
+				eoa3.signTx(newTx(addr3, 0, 1), signerEIP155), // will be pruned
+				eoa3.signTx(newTx(addr3, 1, 1), signerEIP155), // will be pruned
+				eoa3.signTx(newTx(addr3, 2, 1), signerEIP155), // will be pruned
 			},
+
 			addr4: {
 				//	all txs will be pruned
-				newTx(addr4, 0, 1),
-				newTx(addr4, 1, 1),
-				newTx(addr4, 2, 1),
-				newTx(addr4, 3, 1),
-				newTx(addr4, 4, 1),
+				eoa4.signTx(newTx(addr4, 0, 1), signerEIP155), // will be pruned
+				eoa4.signTx(newTx(addr4, 1, 1), signerEIP155), // will be pruned
+				eoa4.signTx(newTx(addr4, 2, 1), signerEIP155), // will be pruned
+				eoa4.signTx(newTx(addr4, 3, 1), signerEIP155), // will be pruned
+				eoa4.signTx(newTx(addr4, 4, 1), signerEIP155), // will be pruned
 			},
 		}
 
@@ -1275,25 +1314,17 @@ func TestResetAccounts_Promoted(t *testing.T) {
 
 	expected := result{
 		accounts: map[types.Address]accountState{
-			addr1: {
-				promoted: 2,
-			},
-			addr2: {
-				promoted: 1,
-			},
-			addr3: {
-				promoted: 3,
-			},
-			addr4: {
-				promoted: 0,
-			},
+			addr1: {promoted: 2},
+			addr2: {promoted: 1},
+			addr3: {promoted: 3},
+			addr4: {promoted: 0},
 		},
 		slots: 2 + 1 + 3 + 0,
 	}
 
 	pool, err := newTestPool()
 	assert.NoError(t, err)
-	pool.SetSigner(&mockSigner{})
+	pool.SetSigner(signerEIP155)
 
 	pool.Start()
 	defer pool.Close()
