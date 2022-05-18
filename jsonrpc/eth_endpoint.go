@@ -664,8 +664,22 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 	return hex.EncodeUint64(highEnd), nil
 }
 
+// GetFilterLogs returns an array of logs for the specified filter.
+func (e *Eth) GetFilterLogs(id string) (interface{}, error) {
+	logFilter, err := e.filterManager.GetLogFilterFromID(id)
+	if err != nil {
+		return nil, err
+	}
+
+	return e.getLogsForQuery(logFilter.query)
+}
+
 // GetLogs returns an array of logs matching the filter options
 func (e *Eth) GetLogs(query *LogQuery) (interface{}, error) {
+	return e.getLogsForQuery(query)
+}
+
+func (e *Eth) getLogsForQuery(query *LogQuery) ([]*Log, error) {
 	result := make([]*Log, 0)
 	parseReceipts := func(block *types.Block) error {
 		receipts, err := e.store.GetReceiptsByHash(block.Header.Hash)
@@ -865,11 +879,6 @@ func (e *Eth) NewFilter(filter *LogQuery) (interface{}, error) {
 // NewBlockFilter creates a filter in the node, to notify when a new block arrives
 func (e *Eth) NewBlockFilter() (interface{}, error) {
 	return e.filterManager.NewBlockFilter(nil), nil
-}
-
-// GetFilterLogs returns an array of logs for the specified filter.
-func (e *Eth) GetFilterLogs(id string) (interface{}, error) {
-	return e.filterManager.GetFilterLogs(id)
 }
 
 // GetFilterChanges is a polling method for a filter, which returns an array of logs which occurred since last poll.

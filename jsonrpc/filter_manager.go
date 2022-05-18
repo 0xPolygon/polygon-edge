@@ -346,74 +346,22 @@ func (f *FilterManager) Exists(id string) bool {
 	return ok
 }
 
-// GetFilterLogs returns an array of logs for the specified filter.
-func (f *FilterManager) GetFilterLogs(id string) ([]*Log, error) {
-
-	result := make([]*Log, 0)
-
-	parseReceipts := func(block *types.Block, logFilter *logFilter) error {
-		receipts, err := f.store.GetReceiptsByHash(block.Header.Hash)
-		if err != nil {
-			return err
-		}
-
-		for indx, receipt := range receipts {
-			// check the logs with the filters
-			for _, log := range receipt.Logs {
-				if logFilter.query.Match(log) {
-					result = append(result, &Log{
-						Address:     log.Address,
-						Topics:      log.Topics,
-						Data:        argBytes(log.Data),
-						BlockNumber: argUint64(block.Header.Number),
-						BlockHash:   block.Header.Hash,
-						TxHash:      receipt.TxHash,
-						TxIndex:     argUint64(indx),
-					})
-				}
-			}
-		}
-
-		return nil
-	}
-
+func (f *FilterManager) GetLogFilterFromID(id string) (*logFilter, error) {
 	f.lock.RLock()
 
 	filter, ok := f.filters[id]
-
 	f.lock.RUnlock()
 
 	if !ok {
 		return nil, ErrFilterDoesNotExists
 	}
 
-	logFilters, ok := filter.(*logFilter)
+	logFilter, ok := filter.(*logFilter)
 	if !ok {
-		//TODO FIx error message
 		return nil, ErrFilterToLogFilterer
 	}
 
-	//getAllBlocks
-	from := uint64(0)
-	to := f.store.Header().Number
-
-	for i := from; i <= to; i++ {
-		block, ok := f.store.GetBlockByNumber(i, true)
-		if !ok {
-			break
-		}
-
-		if block.Header.Number == 0 || len(block.Transactions) == 0 {
-			// do not check logs in genesis and skip if no txs
-			continue
-		}
-
-		if err := parseReceipts(block, logFilters); err != nil {
-			return nil, err
-		}
-	}
-
-	return result, nil
+	return logFilter, nil
 }
 
 // GetFilterChanges returns the updates of the filter with given ID in string
