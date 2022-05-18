@@ -110,7 +110,6 @@ func Test_GetLogsForQuery(t *testing.T) {
 }
 
 func Test_GetLogFilterFromID(t *testing.T) {
-	t.Parallel()
 	store := newMockStore()
 
 	m := NewFilterManager(hclog.NewNullLogger(), store)
@@ -129,7 +128,6 @@ func Test_GetLogFilterFromID(t *testing.T) {
 	retrivedLogFilter, err := m.GetLogFilterFromID(id)
 	assert.Nil(t, err, "No Error expected")
 	assert.Equal(t, logFilter, retrivedLogFilter.query)
-
 }
 
 func TestFilterLog(t *testing.T) {

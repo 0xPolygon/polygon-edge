@@ -19,7 +19,7 @@ import (
 var (
 	ErrFilterDoesNotExists              = errors.New("filter does not exists")
 	ErrWSFilterDoesNotSupportGetChanges = errors.New("web socket Filter doesn't support to return a batch of the changes")
-	ErrFilterToLogFilterer              = errors.New("casting filter object to logFilter error")
+	ErrCastingFilterToLogFilter         = errors.New("casting filter object to logFilter error")
 )
 
 // defaultTimeout is the timeout to remove the filters that don't have a web socket stream
@@ -451,7 +451,7 @@ func (f *FilterManager) GetLogFilterFromID(id string) (*logFilter, error) {
 
 	logFilter, ok := filter.(*logFilter)
 	if !ok {
-		return nil, ErrFilterToLogFilterer
+		return nil, ErrCastingFilterToLogFilter
 	}
 
 	return logFilter, nil

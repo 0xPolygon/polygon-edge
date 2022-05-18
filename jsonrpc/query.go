@@ -78,7 +78,7 @@ func (q *LogQuery) UnmarshalJSON(data []byte) error {
 		BlockHash *types.Hash   `json:"blockHash"`
 		FromBlock string        `json:"fromBlock"`
 		ToBlock   string        `json:"toBlock"`
-		Address   interface{}   `json:"addresses"`
+		Address   interface{}   `json:"address"`
 		Topics    []interface{} `json:"topics"`
 	}
 
