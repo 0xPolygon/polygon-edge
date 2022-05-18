@@ -95,7 +95,9 @@ func newTestPoolWithSlots(maxSlots uint64, mockStore ...store) (*TxPool, error) 
 }
 
 type accountState struct {
-	enqueued, promoted, nextNonce uint64
+	enqueued,
+	promoted,
+	nextNonce uint64
 }
 
 type result struct {
