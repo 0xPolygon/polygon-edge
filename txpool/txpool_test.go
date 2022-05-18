@@ -1499,7 +1499,7 @@ func TestResetAccounts_Enqueued(t *testing.T) {
 
 	t.Run("reset will not promote", func(t *testing.T) {
 		t.Parallel()
-		
+
 		allTxs := map[types.Address][]*types.Transaction{
 			addr1: {
 				newTx(addr1, 1, 1),
@@ -1581,6 +1581,8 @@ func TestResetAccounts_Enqueued(t *testing.T) {
 }
 
 func TestExecutablesOrder(t *testing.T) {
+	t.Parallel()
+
 	newPricedTx := func(addr types.Address, nonce, gasPrice uint64) *types.Transaction {
 		tx := newTx(addr, nonce, 1)
 		tx.GasPrice.SetUint64(gasPrice)
@@ -1677,7 +1679,10 @@ func TestExecutablesOrder(t *testing.T) {
 	}
 
 	for _, test := range testCases {
+		test := test
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			pool, err := newTestPool()
 			assert.NoError(t, err)
 			pool.SetSigner(&mockSigner{})
@@ -1748,6 +1753,8 @@ type statusTx struct {
 }
 
 func TestRecovery(t *testing.T) {
+	t.Parallel()
+
 	commonAssert := func(accounts map[types.Address]accountState, pool *TxPool) {
 		for addr := range accounts {
 			assert.Equal(t, // nextNonce
@@ -1844,11 +1851,14 @@ func TestRecovery(t *testing.T) {
 		},
 	}
 
-	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
+	for _, test := range testCases {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			
 			// helper callback for transition errors
 			status := func(tx *types.Transaction) (s status) {
-				txs := testCase.allTxs[tx.From]
+				txs := test.allTxs[tx.From]
 				for _, sTx := range txs {
 					if tx.Nonce == sTx.tx.Nonce {
 						s = sTx.status
@@ -1873,12 +1883,12 @@ func TestRecovery(t *testing.T) {
 			// setup prestate
 			totalTx := 0
 			expectedEnqueued := uint64(0)
-			for addr, txs := range testCase.allTxs {
+			for addr, txs := range test.allTxs {
 				// preset nonce so promotions can happen
 				acc := pool.createAccountOnce(addr)
 				acc.setNonce(txs[0].tx.Nonce)
 
-				expectedEnqueued += testCase.expected.accounts[addr].enqueued
+				expectedEnqueued += test.expected.accounts[addr].enqueued
 
 				// send txs
 				for _, sTx := range txs {
@@ -1912,8 +1922,8 @@ func TestRecovery(t *testing.T) {
 				}
 			}()
 
-			assert.Equal(t, testCase.expected.slots, pool.gauge.read())
-			commonAssert(testCase.expected.accounts, pool)
+			assert.Equal(t, test.expected.slots, pool.gauge.read())
+			commonAssert(test.expected.accounts, pool)
 		})
 	}
 }
