@@ -689,7 +689,11 @@ func (s *mockSyncer) BulkSyncWithPeer(p *protocol.SyncPeer, handler func(block *
 	return nil
 }
 
-func (s *mockSyncer) WatchSyncWithPeer(p *protocol.SyncPeer, newBlockHandler func(b *types.Block) bool, blockTimeout time.Duration) {
+func (s *mockSyncer) WatchSyncWithPeer(
+	p *protocol.SyncPeer,
+	newBlockHandler func(b *types.Block) bool,
+	blockTimeout time.Duration,
+) {
 	if s.receivedNewHeadFromPeer != nil {
 		newBlockHandler(s.receivedNewHeadFromPeer)
 	}
