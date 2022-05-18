@@ -1262,7 +1262,6 @@ func TestAddTxns(t *testing.T) {
 }
 
 func TestResetAccounts_Promoted(t *testing.T) {
-
 	var (
 		eoa1 = new(eoa).create(t)
 		eoa2 = new(eoa).create(t)
@@ -1380,6 +1379,8 @@ func TestResetAccounts_Promoted(t *testing.T) {
 }
 
 func TestResetAccounts_Enqueued(t *testing.T) {
+	t.Parallel()
+
 	commonAssert := func(accounts map[types.Address]accountState, pool *TxPool) {
 		for addr := range accounts {
 			assert.Equal(t, // enqueued
@@ -1392,25 +1393,37 @@ func TestResetAccounts_Enqueued(t *testing.T) {
 		}
 	}
 
+	var (
+		eoa1 = new(eoa).create(t)
+		eoa2 = new(eoa).create(t)
+		eoa3 = new(eoa).create(t)
+
+		addr1 = eoa1.Address
+		addr2 = eoa2.Address
+		addr3 = eoa3.Address
+	)
+
 	t.Run("reset will promote", func(t *testing.T) {
+		t.Parallel()
+
 		allTxs := map[types.Address][]*types.Transaction{
 			addr1: {
-				newTx(addr1, 3, 1),
-				newTx(addr1, 4, 1),
-				newTx(addr1, 5, 1),
+				eoa1.signTx(newTx(addr1, 3, 1), signerEIP155),
+				eoa1.signTx(newTx(addr1, 4, 1), signerEIP155),
+				eoa1.signTx(newTx(addr1, 5, 1), signerEIP155),
 			},
 			addr2: {
-				newTx(addr2, 2, 1),
-				newTx(addr2, 3, 1),
-				newTx(addr2, 4, 1),
-				newTx(addr2, 5, 1),
-				newTx(addr2, 6, 1),
-				newTx(addr2, 7, 1),
+				eoa2.signTx(newTx(addr2, 2, 1), signerEIP155),
+				eoa2.signTx(newTx(addr2, 3, 1), signerEIP155),
+				eoa2.signTx(newTx(addr2, 4, 1), signerEIP155),
+				eoa2.signTx(newTx(addr2, 5, 1), signerEIP155),
+				eoa2.signTx(newTx(addr2, 6, 1), signerEIP155),
+				eoa2.signTx(newTx(addr2, 7, 1), signerEIP155),
 			},
 			addr3: {
-				newTx(addr3, 7, 1),
-				newTx(addr3, 8, 1),
-				newTx(addr3, 9, 1),
+				eoa3.signTx(newTx(addr3, 7, 1), signerEIP155),
+				eoa3.signTx(newTx(addr3, 8, 1), signerEIP155),
+				eoa3.signTx(newTx(addr3, 9, 1), signerEIP155),
 			},
 		}
 		newNonces := map[types.Address]uint64{
@@ -1485,6 +1498,8 @@ func TestResetAccounts_Enqueued(t *testing.T) {
 	})
 
 	t.Run("reset will not promote", func(t *testing.T) {
+		t.Parallel()
+		
 		allTxs := map[types.Address][]*types.Transaction{
 			addr1: {
 				newTx(addr1, 1, 1),
