@@ -612,7 +612,11 @@ func TestPromoteHandler(t *testing.T) {
 }
 
 func TestResetAccount(t *testing.T) {
+	t.Parallel()
+
 	t.Run("reset promoted", func(t *testing.T) {
+		t.Parallel()
+
 		testCases := []struct {
 			name     string
 			txs      []*types.Transaction
@@ -674,7 +678,10 @@ func TestResetAccount(t *testing.T) {
 			},
 		}
 		for _, test := range testCases {
+			test := test
 			t.Run(test.name, func(t *testing.T) {
+				t.Parallel()
+
 				pool, err := newTestPool()
 				assert.NoError(t, err)
 				pool.SetSigner(&mockSigner{})
@@ -725,6 +732,8 @@ func TestResetAccount(t *testing.T) {
 	})
 
 	t.Run("reset enqueued", func(t *testing.T) {
+		t.Parallel()
+
 		testCases := []struct {
 			name     string
 			txs      []*types.Transaction
@@ -807,7 +816,10 @@ func TestResetAccount(t *testing.T) {
 		}
 
 		for _, test := range testCases {
+			test := test
 			t.Run(test.name, func(t *testing.T) {
+				t.Parallel()
+
 				pool, err := newTestPool()
 				assert.NoError(t, err)
 				pool.SetSigner(&mockSigner{})
@@ -847,6 +859,8 @@ func TestResetAccount(t *testing.T) {
 	})
 
 	t.Run("reset enqueued and promoted", func(t *testing.T) {
+		t.Parallel()
+
 		testCases := []struct {
 			name     string
 			txs      []*types.Transaction
@@ -950,7 +964,10 @@ func TestResetAccount(t *testing.T) {
 		}
 
 		for _, test := range testCases {
+			test := test
 			t.Run(test.name, func(t *testing.T) {
+				t.Parallel()
+
 				pool, err := newTestPool()
 				assert.NoError(t, err)
 				pool.SetSigner(&mockSigner{})
@@ -1030,6 +1047,7 @@ func TestPop(t *testing.T) {
 	assert.Equal(t, uint64(0), pool.gauge.read())
 	assert.Equal(t, uint64(0), pool.accounts.get(addr1).promoted.length())
 }
+
 func TestDrop(t *testing.T) {
 	pool, err := newTestPool()
 	assert.NoError(t, err)
@@ -1055,6 +1073,80 @@ func TestDrop(t *testing.T) {
 	assert.Equal(t, uint64(0), pool.gauge.read())
 	assert.Equal(t, uint64(0), pool.accounts.get(addr1).getNonce())
 	assert.Equal(t, uint64(0), pool.accounts.get(addr1).promoted.length())
+}
+
+func TestDemote(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Demote increments counter", func(t *testing.T) {
+		t.Parallel()
+		//	create pool
+		pool, err := newTestPool()
+		assert.NoError(t, err)
+		pool.SetSigner(&mockSigner{})
+
+		//	send tx
+		go func() {
+			err := pool.addTx(local, newTx(addr1, 0, 1))
+			assert.NoError(t, err)
+		}()
+		go pool.handleEnqueueRequest(<-pool.enqueueReqCh)
+		pool.handlePromoteRequest(<-pool.promoteReqCh)
+
+		assert.Equal(t, uint64(1), pool.gauge.read())
+		assert.Equal(t, uint64(1), pool.accounts.get(addr1).getNonce())
+		assert.Equal(t, uint64(1), pool.accounts.get(addr1).promoted.length())
+		assert.Equal(t, uint(0), pool.accounts.get(addr1).demotions)
+
+		//	call demote
+		pool.Prepare()
+		tx := pool.Peek()
+		pool.Demote(tx)
+
+		assert.Equal(t, uint64(1), pool.gauge.read())
+		assert.Equal(t, uint64(1), pool.accounts.get(addr1).getNonce())
+		assert.Equal(t, uint64(1), pool.accounts.get(addr1).promoted.length())
+
+		//	assert counter was incremented
+		assert.Equal(t, uint(1), pool.accounts.get(addr1).demotions)
+	})
+
+	t.Run("Demote calls Drop", func(t *testing.T) {
+		t.Parallel()
+
+		//	create pool
+		pool, err := newTestPool()
+		assert.NoError(t, err)
+		pool.SetSigner(&mockSigner{})
+
+		//	send tx
+		go func() {
+			err := pool.addTx(local, newTx(addr1, 0, 1))
+			assert.NoError(t, err)
+		}()
+		go pool.handleEnqueueRequest(<-pool.enqueueReqCh)
+		pool.handlePromoteRequest(<-pool.promoteReqCh)
+
+		assert.Equal(t, uint64(1), pool.gauge.read())
+		assert.Equal(t, uint64(1), pool.accounts.get(addr1).getNonce())
+		assert.Equal(t, uint64(1), pool.accounts.get(addr1).promoted.length())
+
+		//	set counter to max allowed demotions
+		pool.accounts.get(addr1).demotions = maxAccountDemotions
+
+		//	call demote
+		pool.Prepare()
+		tx := pool.Peek()
+		pool.Demote(tx)
+
+		//	account was dropped
+		assert.Equal(t, uint64(0), pool.gauge.read())
+		assert.Equal(t, uint64(0), pool.accounts.get(addr1).getNonce())
+		assert.Equal(t, uint64(0), pool.accounts.get(addr1).promoted.length())
+
+		//	demotions are reset to 0
+		assert.Equal(t, uint(0), pool.accounts.get(addr1).demotions)
+	})
 }
 
 /* "Integrated" tests */

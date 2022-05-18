@@ -3,7 +3,6 @@ package e2e
 import (
 	"context"
 	"math/big"
-	"sync"
 	"testing"
 	"time"
 
@@ -48,88 +47,83 @@ func TestNewFilter_Logs(t *testing.T) {
 
 	txpoolClient := srv.TxnPoolOperator()
 	jsonRPCClient := srv.JSONRPC()
+
 	id, err := jsonRPCClient.Eth().NewFilter(&web3.LogFilter{})
 	assert.NoError(t, err)
 
-	numCalls := 10
-
-	var (
-		wg sync.WaitGroup
-	)
-
-	for i := 1; i <= numCalls; i++ {
-		wg.Add(1)
-
-		go func(nonce uint64) {
-			defer wg.Done()
-
-			txn, err := tests.GenerateAddTxnReq(tests.GenerateTxReqParams{
-				Nonce:         nonce,
-				ReferenceAddr: addr,
-				ReferenceKey:  key,
-				ToAddress:     castedContractAddr,
-				GasPrice:      big.NewInt(framework.DefaultGasPrice),
-				Input:         framework.MethodSig("setA1"),
-			})
-			if err != nil {
-				return
-			}
-
-			addTxnContext, cancelFn := context.WithTimeout(context.Background(), framework.DefaultTimeout)
-			defer cancelFn()
-
-			addResp, addErr := txpoolClient.AddTxn(addTxnContext, txn)
-			if addErr != nil {
-				return
-			}
-
-			receiptContext, cancelFn := context.WithTimeout(context.Background(), framework.DefaultTimeout)
-			defer cancelFn()
-
-			txHash := web3.Hash(types.StringToHash(addResp.TxHash))
-			if _, receiptErr := srv.WaitForReceipt(receiptContext, txHash); receiptErr != nil {
-				return
-			}
-		}(uint64(i))
+	txn, err := tests.GenerateAddTxnReq(tests.GenerateTxReqParams{
+		Nonce:         1, // The first transaction was a contract deployment
+		ReferenceAddr: addr,
+		ReferenceKey:  key,
+		ToAddress:     castedContractAddr,
+		GasPrice:      big.NewInt(framework.DefaultGasPrice),
+		Input:         framework.MethodSig("setA1"),
+	})
+	if err != nil {
+		return
 	}
 
-	wg.Wait()
+	addTxnContext, addTxnCancelFn := context.WithTimeout(context.Background(), framework.DefaultTimeout)
+	defer addTxnCancelFn()
+
+	addResp, addErr := txpoolClient.AddTxn(addTxnContext, txn)
+	if addErr != nil {
+		t.Fatalf("Unable to add transaction, %v", addErr)
+	}
+
+	receiptContext, cancelFn := context.WithTimeout(context.Background(), framework.DefaultTimeout)
+	defer cancelFn()
+
+	txHash := web3.Hash(types.StringToHash(addResp.TxHash))
+	if _, receiptErr := srv.WaitForReceipt(receiptContext, txHash); receiptErr != nil {
+		t.Fatalf("Unable to wait for receipt, %v", receiptErr)
+	}
 
 	res, err := jsonRPCClient.Eth().GetFilterChanges(id)
 
 	assert.NoError(t, err)
-	assert.Equal(t, numCalls, len(res))
+	assert.Equal(t, 1, len(res))
 }
 
 func TestNewFilter_Block(t *testing.T) {
 	fromKey, from := tests.GenerateKeyAndAddr(t)
 	_, to := tests.GenerateKeyAndAddr(t)
 
-	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
-		config.SetConsensus(framework.ConsensusDev)
-		config.Premine(from, framework.EthToWei(10))
-		config.SetSeal(true)
-	})
-	srv := srvs[0]
+	ibftManager := framework.NewIBFTServersManager(
+		t,
+		1,
+		IBFTDirPrefix,
+		func(i int, config *framework.TestServerConfig) {
+			config.Premine(from, framework.EthToWei(10))
+			config.SetBlockTime(1)
+		},
+	)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	ibftManager.StartServers(ctx)
+	srv := ibftManager.GetServer(0)
+
 	client := srv.JSONRPC()
 
 	id, err := client.Eth().NewBlockFilter()
 	assert.NoError(t, err)
 
-	for i := 0; i < 3; i++ {
-		ctx, cancel := context.WithTimeout(context.Background(), framework.DefaultTimeout)
-		_, err := srv.SendRawTx(ctx, &framework.PreparedTransaction{
-			From:     from,
-			To:       &to,
-			GasPrice: big.NewInt(10000),
-			Gas:      1000000,
-			Value:    big.NewInt(10000),
-		}, fromKey)
+	ctx, cancelFn := context.WithTimeout(context.Background(), framework.DefaultTimeout)
+	defer cancelFn()
 
-		assert.NoError(t, err)
-
-		cancel()
+	if _, sendErr := srv.SendRawTx(ctx, &framework.PreparedTransaction{
+		From:     from,
+		To:       &to,
+		GasPrice: big.NewInt(10000),
+		Gas:      1000000,
+		Value:    big.NewInt(10000),
+	}, fromKey); err != nil {
+		t.Fatalf("Unable to send transaction %v", sendErr)
 	}
+
+	assert.NoError(t, err)
 
 	// verify filter picked up block changes
 	blocks, err := client.Eth().GetFilterChangesBlock(id)
