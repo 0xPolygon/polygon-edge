@@ -1,6 +1,8 @@
 package jsonrpc
 
 import (
+	"math/big"
+	"strconv"
 	"testing"
 	"time"
 
@@ -10,6 +12,125 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
 )
+
+func Test_GetLogsForQuery(t *testing.T) {
+	t.Parallel()
+
+	blockHash := types.StringToHash("1")
+
+	// Topics we're searching for
+	topic1 := types.StringToHash("4")
+	topic2 := types.StringToHash("5")
+	topic3 := types.StringToHash("6")
+
+	var topics = [][]types.Hash{{topic1}, {topic2}, {topic3}}
+
+	testTable := []struct {
+		name           string
+		query          *LogQuery
+		shouldFail     bool
+		expectedLength int
+	}{
+		{"Found matching logs, fromBlock < toBlock",
+			&LogQuery{
+				fromBlock: 1,
+				toBlock:   3,
+				Topics:    topics,
+			},
+			false, 3},
+		{"Found matching logs, fromBlock == toBlock",
+			&LogQuery{
+				fromBlock: 2,
+				toBlock:   2,
+				Topics:    topics,
+			},
+			false, 1},
+		{"Found matching logs, BlockHash present",
+			&LogQuery{
+				BlockHash: &blockHash,
+				Topics:    topics,
+			},
+			false, 1},
+		{"No logs found", &LogQuery{
+			fromBlock: 4,
+			toBlock:   5,
+			Topics:    topics,
+		}, false, 0},
+		{"Invalid block range", &LogQuery{
+			fromBlock: 10,
+			toBlock:   5,
+			Topics:    topics,
+		}, true, 0},
+	}
+
+	// setup test
+	store := &mockBlockStore{}
+	store.topics = []types.Hash{topic1, topic2, topic3}
+	store.setupLogs()
+
+	for i := 0; i < 5; i++ {
+		store.add(&types.Block{
+			Header: &types.Header{
+				Number: uint64(i),
+				Hash:   types.StringToHash(strconv.Itoa(i)),
+			},
+			Transactions: []*types.Transaction{
+				{
+					Value: big.NewInt(10),
+				},
+				{
+					Value: big.NewInt(11),
+				},
+				{
+					Value: big.NewInt(12),
+				},
+			},
+		})
+	}
+
+	f := NewFilterManager(hclog.NewNullLogger(), store)
+
+	for _, testCase := range testTable {
+		testCase := testCase
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			foundLogs, logError := f.GetLogsForQuery(testCase.query)
+
+			if logError != nil && !testCase.shouldFail {
+				// If there is an error and test isn't expected to fail
+				t.Fatalf("Error: %v", logError)
+			} else if !testCase.shouldFail {
+				assert.Lenf(t, foundLogs, testCase.expectedLength, "Invalid number of logs found")
+			} else {
+				assert.Nil(t, foundLogs, "Expected first return param to be nil")
+			}
+		})
+	}
+}
+
+func Test_GetLogFilterFromID(t *testing.T) {
+	t.Parallel()
+	store := newMockStore()
+
+	m := NewFilterManager(hclog.NewNullLogger(), store)
+
+	go m.Run()
+
+	logFilter := &LogQuery{
+		Addresses: []types.Address{addr1},
+		toBlock:   10,
+		fromBlock: 0,
+	}
+
+	// add log filter
+	id := m.NewLogFilter(logFilter, &MockClosedWSConnection{})
+
+	retrivedLogFilter, err := m.GetLogFilterFromID(id)
+	assert.Nil(t, err, "No Error expected")
+	assert.Equal(t, logFilter, retrivedLogFilter.query)
+
+}
 
 func TestFilterLog(t *testing.T) {
 	store := newMockStore()
