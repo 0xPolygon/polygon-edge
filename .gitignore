@@ -18,3 +18,6 @@ main
 # MacOS Leftovers
 .DS_Store
 .vscode
+
+# exclude build folder
+artifacts
