@@ -55,7 +55,7 @@ type syncerInterface interface {
 	Start()
 	BestPeer() *protocol.SyncPeer
 	BulkSyncWithPeer(p *protocol.SyncPeer, newBlockHandler func(block *types.Block)) error
-	WatchSyncWithPeer(p *protocol.SyncPeer, newBlockHandler func(b *types.Block) bool)
+	WatchSyncWithPeer(p *protocol.SyncPeer, newBlockHandler func(b *types.Block) bool, blockTimeout time.Duration)
 	GetSyncProgression() *progress.Progression
 	Broadcast(b *types.Block)
 }
@@ -527,7 +527,7 @@ func (i *Ibft) runSyncState() {
 			isValidator = i.isValidSnapshot()
 
 			return isValidator
-		})
+		}, i.blockTime)
 
 		if isValidator {
 			// at this point, we are in sync with the latest chain we know of

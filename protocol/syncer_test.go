@@ -273,7 +273,7 @@ func TestWatchSyncWithPeer(t *testing.T) {
 				}
 				// sync until latest block
 				return b.Header.Number >= latestBlock.Header.Number
-			})
+			}, 0)
 
 			if tt.shouldSync {
 				assert.Equal(t, HeaderToStatus(latestBlock.Header), syncer.status)
