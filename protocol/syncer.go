@@ -352,7 +352,7 @@ func (s *Syncer) WatchSyncWithPeer(p *SyncPeer, newBlockHandler func(b *types.Bl
 			break
 		}
 
-		b, err := p.popBlock(blockTimeout * 5)
+		b, err := p.popBlock(blockTimeout * 3)
 		if err != nil {
 			s.logSyncPeerPopBlockError(err, p)
 
