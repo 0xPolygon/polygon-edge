@@ -145,7 +145,7 @@ func Test_GetLogFilterFromID(t *testing.T) {
 	id := m.NewLogFilter(logFilter, &MockClosedWSConnection{})
 
 	retrivedLogFilter, err := m.GetLogFilterFromID(id)
-	assert.Nil(t, err, "No Error expected")
+	assert.NoError(t, err)
 	assert.Equal(t, logFilter, retrivedLogFilter.query)
 }
 
