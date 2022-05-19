@@ -171,10 +171,27 @@ func (s *Syncer) Broadcast(b *types.Block) {
 		},
 	}
 
-	s.peers.Range(func(peerID, peer interface{}) bool {
-		if _, err := peer.(*SyncPeer).client.Notify(context.Background(), req); err != nil {
+	//	notify peers in the background
+	go s.notifyPeers(req)
+}
+
+func (s *Syncer) notifyPeers(req *proto.NotifyReq) {
+	s.peers.Range(func(key, value interface{}) bool {
+		peerID, _ := key.(peer.ID)
+		syncPeer, _ := value.(*SyncPeer)
+
+		startTime := time.Now()
+		if _, err := syncPeer.client.Notify(context.Background(), req); err != nil {
 			s.logger.Error("failed to notify", "err", err)
 		}
+
+		duration := time.Since(startTime)
+
+		s.logger.Debug(
+			"notifying peer",
+			"id", peerID.String(),
+			"duration", duration.Seconds(),
+		)
 
 		return true
 	})
