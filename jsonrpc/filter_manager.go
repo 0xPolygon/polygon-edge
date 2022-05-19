@@ -298,10 +298,8 @@ func (f *FilterManager) Run() {
 		case <-timeoutCh:
 			// timeout for filter
 			// if filter still exists
-			if filterBase != nil {
-				if !f.Uninstall(filterBase.id) {
-					f.logger.Error("failed to uninstall filter", "id", filterBase.id)
-				}
+			if filterBase != nil && !f.Uninstall(filterBase.id) {
+				f.logger.Error("failed to uninstall filter", "id", filterBase.id)
 			}
 
 		case <-f.updateCh:
