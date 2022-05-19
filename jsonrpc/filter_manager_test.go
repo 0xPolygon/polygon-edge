@@ -30,6 +30,7 @@ func Test_GetLogsForQuery(t *testing.T) {
 		query          *LogQuery
 		shouldFail     bool
 		expectedLength int
+		expectedError  error
 	}{
 		{
 			"Found matching logs, fromBlock < toBlock",
@@ -40,6 +41,7 @@ func Test_GetLogsForQuery(t *testing.T) {
 			},
 			false,
 			3,
+			nil,
 		},
 		{
 			"Found matching logs, fromBlock == toBlock",
@@ -50,6 +52,7 @@ func Test_GetLogsForQuery(t *testing.T) {
 			},
 			false,
 			1,
+			nil,
 		},
 		{
 			"Found matching logs, BlockHash present",
@@ -59,6 +62,7 @@ func Test_GetLogsForQuery(t *testing.T) {
 			},
 			false,
 			1,
+			nil,
 		},
 		{
 			"No logs found",
@@ -69,6 +73,7 @@ func Test_GetLogsForQuery(t *testing.T) {
 			},
 			false,
 			0,
+			nil,
 		},
 		{
 			"Invalid block range",
@@ -79,6 +84,7 @@ func Test_GetLogsForQuery(t *testing.T) {
 			},
 			true,
 			0,
+			ErrIncorrectBlockRange,
 		},
 	}
 
@@ -123,7 +129,7 @@ func Test_GetLogsForQuery(t *testing.T) {
 			} else if !testCase.shouldFail {
 				assert.Lenf(t, foundLogs, testCase.expectedLength, "Invalid number of logs found")
 			} else {
-				assert.Nil(t, foundLogs, "Expected first return param to be nil")
+				assert.Equal(t, logError, testCase.expectedError)
 			}
 		})
 	}
