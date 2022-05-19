@@ -975,21 +975,28 @@ func (i *Ibft) updateMetrics(block *types.Block) {
 	i.metrics.NumTxs.Set(float64(len(block.Body().Transactions)))
 }
 func (i *Ibft) insertBlock(block *types.Block) error {
-	committedSeals := [][]byte{}
+	// Gather the committed seals for the block
+	committedSeals := make([][]byte, 0)
 	for _, commit := range i.state.committed {
-		// no need to check the format of seal here because writeCommittedSeals will check
 		committedSeals = append(committedSeals, hex.MustDecodeHex(commit.Seal))
 	}
 
+	// Push the committed seals to the header
 	header, err := writeCommittedSeals(block.Header, committedSeals)
 	if err != nil {
 		return err
 	}
 
-	// we need to recompute the hash since we have change extra-data
+	// The hash needs to be recomputed since the extra data was changed
 	block.Header = header
 	block.Header.ComputeHash()
 
+	// Verify the header only, since the block body is already verified
+	if err := i.VerifyHeader(block.Header); err != nil {
+		return err
+	}
+
+	// Save the block locally
 	if err := i.blockchain.WriteBlock(block); err != nil {
 		return err
 	}
