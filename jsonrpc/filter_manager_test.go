@@ -126,11 +126,13 @@ func Test_GetLogsForQuery(t *testing.T) {
 			if logError != nil && !testCase.shouldFail {
 				// If there is an error and test isn't expected to fail
 				t.Fatalf("Error: %v", logError)
-			} else if !testCase.shouldFail {
-				assert.Lenf(t, foundLogs, testCase.expectedLength, "Invalid number of logs found")
-			} else {
-				assert.Equal(t, logError, testCase.expectedError)
 			}
+
+			if !testCase.shouldFail {
+				assert.Lenf(t, foundLogs, testCase.expectedLength, "Invalid number of logs found")
+			}
+
+			assert.Equal(t, logError, testCase.expectedError)
 		})
 	}
 }
