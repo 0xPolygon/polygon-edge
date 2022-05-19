@@ -20,6 +20,8 @@ var (
 	ErrFilterDoesNotExists              = errors.New("filter does not exists")
 	ErrWSFilterDoesNotSupportGetChanges = errors.New("web socket Filter doesn't support to return a batch of the changes")
 	ErrCastingFilterToLogFilter         = errors.New("casting filter object to logFilter error")
+	ErrBlockNotFound                    = errors.New("block not found")
+	ErrIncorrectBlockRange              = errors.New("incorrect range")
 )
 
 // defaultTimeout is the timeout to remove the filters that don't have a web socket stream
@@ -379,7 +381,7 @@ func (f *FilterManager) GetLogsForQuery(query *LogQuery) ([]*Log, error) {
 	if query.BlockHash != nil {
 		block, ok := f.store.GetBlockByHash(*query.BlockHash, true)
 		if !ok {
-			return nil, fmt.Errorf("not found")
+			return nil, ErrBlockNotFound
 		}
 
 		if len(block.Transactions) == 0 {
@@ -416,7 +418,7 @@ func (f *FilterManager) GetLogsForQuery(query *LogQuery) ([]*Log, error) {
 	to := resolveNum(query.toBlock)
 
 	if to < from {
-		return nil, fmt.Errorf("incorrect range")
+		return nil, ErrIncorrectBlockRange
 	}
 
 	for i := from; i <= to; i++ {
