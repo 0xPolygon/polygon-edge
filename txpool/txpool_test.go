@@ -165,7 +165,7 @@ func TestAddTxErrors(t *testing.T) {
 		)
 	})
 
-	t.Run("ErrNonSignedTx", func(t *testing.T) {
+	t.Run("ErrExtractSignature", func(t *testing.T) {
 		t.Parallel()
 		pool := setupPool()
 
@@ -173,7 +173,7 @@ func TestAddTxErrors(t *testing.T) {
 
 		assert.ErrorIs(t,
 			pool.addTx(local, tx),
-			ErrInvalidSender,
+			ErrExtractSignature,
 		)
 	})
 
