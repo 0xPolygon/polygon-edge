@@ -83,8 +83,9 @@ func Test_GetLogsForQuery(t *testing.T) {
 	}
 
 	// setup test
-	store := &mockBlockStore{}
-	store.topics = []types.Hash{topic1, topic2, topic3}
+	store := &mockBlockStore{
+		topics: []types.Hash{topic1, topic2, topic3},
+	}
 	store.setupLogs()
 
 	for i := 0; i < 5; i++ {
