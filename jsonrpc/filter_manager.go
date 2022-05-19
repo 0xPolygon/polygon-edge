@@ -396,7 +396,7 @@ func (f *FilterManager) GetLogsForQuery(query *LogQuery) ([]*Log, error) {
 		return result, nil
 	}
 
-	head := f.store.Header().Number
+	latestBlockNumber := f.store.Header().Number
 
 	resolveNum := func(num BlockNumber) uint64 {
 		if num == PendingBlockNumber {
@@ -408,7 +408,7 @@ func (f *FilterManager) GetLogsForQuery(query *LogQuery) ([]*Log, error) {
 		}
 
 		if num == LatestBlockNumber {
-			return head
+			return latestBlockNumber
 		}
 
 		return uint64(num)
