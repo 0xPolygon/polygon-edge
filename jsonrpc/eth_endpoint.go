@@ -664,7 +664,7 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 	return hex.EncodeUint64(highEnd), nil
 }
 
-// GetFilterLogs returns an array of logs for the specified filter.
+// GetFilterLogs returns an array of logs for the specified filter
 func (e *Eth) GetFilterLogs(id string) (interface{}, error) {
 	logFilter, err := e.filterManager.GetLogFilterFromID(id)
 	if err != nil {
