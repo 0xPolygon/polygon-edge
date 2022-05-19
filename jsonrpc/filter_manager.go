@@ -421,14 +421,22 @@ func (f *FilterManager) GetLogsForQuery(query *LogQuery) ([]*Log, error) {
 		return nil, ErrIncorrectBlockRange
 	}
 
+	genesisBlockNum := uint64(0)
+
+	// If from equals genesis block
+	// skip it
+	if from == genesisBlockNum {
+		from = genesisBlockNum + 1
+	}
+
 	for i := from; i <= to; i++ {
 		block, ok := f.store.GetBlockByNumber(i, true)
 		if !ok {
 			break
 		}
 
-		if block.Header.Number == 0 || len(block.Transactions) == 0 {
-			// do not check logs in genesis and skip if no txs
+		if len(block.Transactions) == 0 {
+			// do not check logs if no txs
 			continue
 		}
 
