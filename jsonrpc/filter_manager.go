@@ -399,15 +399,12 @@ func (f *FilterManager) GetLogsForQuery(query *LogQuery) ([]*Log, error) {
 	latestBlockNumber := f.store.Header().Number
 
 	resolveNum := func(num BlockNumber) uint64 {
-		if num == PendingBlockNumber {
+		switch num {
+		case PendingBlockNumber:
 			num = LatestBlockNumber
-		}
-
-		if num == EarliestBlockNumber {
+		case EarliestBlockNumber:
 			num = 0
-		}
-
-		if num == LatestBlockNumber {
+		case LatestBlockNumber:
 			return latestBlockNumber
 		}
 
