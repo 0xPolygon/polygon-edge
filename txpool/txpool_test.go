@@ -1189,6 +1189,8 @@ type eoa struct {
 }
 
 func (e *eoa) create(t *testing.T) *eoa {
+	t.Helper()
+
 	e.PrivateKey, e.Address = tests.GenerateKeyAndAddr(t)
 
 	return e
