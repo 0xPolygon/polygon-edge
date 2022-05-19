@@ -590,7 +590,7 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 	tx.ComputeHash()
 
 	// check if already known
-	if existing, ok := p.index.get(tx.Hash); ok {
+	if _, ok := p.index.get(tx.Hash); ok {
 		if origin == gossip {
 			// silently drop known tx
 			// that is gossiped back
@@ -601,13 +601,6 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 
 			return nil
 		} else {
-			fmt.Println("matching hash:", tx.Hash.String())
-			fmt.Printf("existing: nonce=%d addr=%s, received: nonce=%d addr=%s\n",
-				existing.Nonce,
-				existing.From.String(),
-				tx.Nonce,
-				tx.From.String(),
-			)
 			return ErrAlreadyKnown
 		}
 	}
