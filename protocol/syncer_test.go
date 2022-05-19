@@ -3,6 +3,8 @@ package protocol
 import (
 	"context"
 	"errors"
+	"github.com/0xPolygon/polygon-edge/protocol/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 	"math/big"
 	"testing"
 	"time"
@@ -14,6 +16,34 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
 )
+
+// !! [Used only for testing] !!
+// SyncBroadcast broadcasts a block to all peers [synchronous]/
+func (s *Syncer) SyncBroadcast(b *types.Block) {
+	// Get the chain difficulty associated with block
+	td, ok := s.blockchain.GetTD(b.Hash())
+	if !ok {
+		// not supposed to happen
+		s.logger.Error("total difficulty not found", "block number", b.Number())
+
+		return
+	}
+
+	// broadcast the new block to all the peers
+	req := &proto.NotifyReq{
+		Status: &proto.V1Status{
+			Hash:       b.Hash().String(),
+			Number:     b.Number(),
+			Difficulty: td.String(),
+		},
+		Raw: &anypb.Any{
+			Value: b.MarshalRLP(),
+		},
+	}
+
+	//	notify peers in the background
+	s.notifyPeers(req)
+}
 
 func TestHandleNewPeer(t *testing.T) {
 	t.Parallel()
@@ -134,7 +164,7 @@ func TestBroadcast(t *testing.T) {
 			}
 
 			for _, newBlock := range newBlocks {
-				peerSyncer.Broadcast(newBlock)
+				peerSyncer.SyncBroadcast(newBlock)
 			}
 
 			peer := getPeer(syncer, peerSyncer.server.AddrInfo().ID)
@@ -257,7 +287,7 @@ func TestWatchSyncWithPeer(t *testing.T) {
 			}
 
 			for _, b := range newBlocks {
-				peerSyncer.Broadcast(b)
+				peerSyncer.SyncBroadcast(b)
 			}
 
 			peer := getPeer(syncer, peerSyncer.server.AddrInfo().ID)
