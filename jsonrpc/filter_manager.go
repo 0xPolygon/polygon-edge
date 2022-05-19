@@ -418,12 +418,10 @@ func (f *FilterManager) GetLogsForQuery(query *LogQuery) ([]*Log, error) {
 		return nil, ErrIncorrectBlockRange
 	}
 
-	genesisBlockNum := uint64(0)
-
 	// If from equals genesis block
 	// skip it
-	if from == genesisBlockNum {
-		from = genesisBlockNum + 1
+	if from == 0 {
+		from = 1
 	}
 
 	for i := from; i <= to; i++ {
