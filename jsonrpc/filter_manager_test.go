@@ -31,36 +31,55 @@ func Test_GetLogsForQuery(t *testing.T) {
 		shouldFail     bool
 		expectedLength int
 	}{
-		{"Found matching logs, fromBlock < toBlock",
+		{
+			"Found matching logs, fromBlock < toBlock",
 			&LogQuery{
 				fromBlock: 1,
 				toBlock:   3,
 				Topics:    topics,
 			},
-			false, 3},
-		{"Found matching logs, fromBlock == toBlock",
+			false,
+			3,
+		},
+		{
+			"Found matching logs, fromBlock == toBlock",
 			&LogQuery{
 				fromBlock: 2,
 				toBlock:   2,
 				Topics:    topics,
 			},
-			false, 1},
-		{"Found matching logs, BlockHash present",
+			false,
+			1,
+		},
+		{
+			"Found matching logs, BlockHash present",
 			&LogQuery{
 				BlockHash: &blockHash,
 				Topics:    topics,
 			},
-			false, 1},
-		{"No logs found", &LogQuery{
-			fromBlock: 4,
-			toBlock:   5,
-			Topics:    topics,
-		}, false, 0},
-		{"Invalid block range", &LogQuery{
-			fromBlock: 10,
-			toBlock:   5,
-			Topics:    topics,
-		}, true, 0},
+			false,
+			1,
+		},
+		{
+			"No logs found",
+			&LogQuery{
+				fromBlock: 4,
+				toBlock:   5,
+				Topics:    topics,
+			},
+			false,
+			0,
+		},
+		{
+			"Invalid block range",
+			&LogQuery{
+				fromBlock: 10,
+				toBlock:   5,
+				Topics:    topics,
+			},
+			true,
+			0,
+		},
 	}
 
 	// setup test
