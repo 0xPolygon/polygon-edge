@@ -1208,6 +1208,8 @@ func (e *eoa) signTx(tx *types.Transaction, signer crypto.TxSigner) *types.Trans
 var signerEIP155 = crypto.NewEIP155Signer(100)
 
 func TestAddTxns(t *testing.T) {
+	t.Parallel()
+
 	slotSize := uint64(1)
 
 	testTable := []struct {
@@ -1232,9 +1234,12 @@ func TestAddTxns(t *testing.T) {
 		},
 	}
 
-	for _, testCase := range testTable {
-		t.Run(testCase.name, func(t *testing.T) {
-			pool, err := newTestPoolWithSlots(testCase.numTxs * slotSize)
+	for _, test := range testTable {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			pool, err := newTestPoolWithSlots(test.numTxs * slotSize)
 
 			assert.NoError(t, err)
 
@@ -1246,7 +1251,7 @@ func TestAddTxns(t *testing.T) {
 			subscription := pool.eventManager.subscribe([]proto.EventType{proto.EventType_PROMOTED})
 
 			addr := types.Address{0x1}
-			for nonce := uint64(0); nonce < testCase.numTxs; nonce++ {
+			for nonce := uint64(0); nonce < test.numTxs; nonce++ {
 				err := pool.addTx(local, newTx(addr, nonce, slotSize))
 				assert.NoError(t, err)
 			}
@@ -1254,16 +1259,18 @@ func TestAddTxns(t *testing.T) {
 			ctx, cancelFunc := context.WithTimeout(context.Background(), time.Second*20)
 			defer cancelFunc()
 
-			waitForEvents(ctx, subscription, int(testCase.numTxs))
+			waitForEvents(ctx, subscription, int(test.numTxs))
 
-			assert.Equal(t, testCase.numTxs, pool.accounts.get(addr).promoted.length())
+			assert.Equal(t, test.numTxs, pool.accounts.get(addr).promoted.length())
 
-			assert.Equal(t, testCase.numTxs*slotSize, pool.gauge.read())
+			assert.Equal(t, test.numTxs*slotSize, pool.gauge.read())
 		})
 	}
 }
 
 func TestResetAccounts_Promoted(t *testing.T) {
+	t.Parallel()
+
 	var (
 		eoa1 = new(eoa).create(t)
 		eoa2 = new(eoa).create(t)
