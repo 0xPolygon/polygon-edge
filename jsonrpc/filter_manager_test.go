@@ -132,7 +132,7 @@ func Test_GetLogsForQuery(t *testing.T) {
 				assert.Lenf(t, foundLogs, testCase.expectedLength, "Invalid number of logs found")
 			}
 
-			assert.Equal(t, logError, testCase.expectedError)
+			assert.ErrorIs(t, logError, testCase.expectedError)
 		})
 	}
 }
