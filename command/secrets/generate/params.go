@@ -1,7 +1,6 @@
 package generate
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 
@@ -24,13 +23,15 @@ const (
 )
 
 const (
-	defaultNodeName       = "polygon-edge-node"
+	defaultNodeName       = ""
 	defaultConfigFileName = "./secretsManagerConfig.json"
 	defaultNamespace      = "admin"
 )
 
 var (
-	errUnsupportedType = errors.New("unsupported service manager type")
+	errUnsupportedType = fmt.Errorf(
+		"unsupported service manager type; only %s, %s, %s and %s are supported for now",
+		secrets.Local, secrets.HashicorpVault, secrets.AWSSSM, secrets.GCPSSM)
 )
 
 type generateParams struct {

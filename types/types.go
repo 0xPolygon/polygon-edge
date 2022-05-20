@@ -91,6 +91,10 @@ func (a Address) checksumEncode() string {
 	return "0x" + string(result)
 }
 
+func (a Address) Ptr() *Address {
+	return &a
+}
+
 func (a Address) String() string {
 	return a.checksumEncode()
 }
