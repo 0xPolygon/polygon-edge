@@ -28,7 +28,6 @@ func Test_GetLogsForQuery(t *testing.T) {
 	testTable := []struct {
 		name           string
 		query          *LogQuery
-		shouldFail     bool
 		expectedLength int
 		expectedError  error
 	}{
@@ -39,7 +38,6 @@ func Test_GetLogsForQuery(t *testing.T) {
 				toBlock:   3,
 				Topics:    topics,
 			},
-			false,
 			3,
 			nil,
 		},
@@ -50,7 +48,6 @@ func Test_GetLogsForQuery(t *testing.T) {
 				toBlock:   2,
 				Topics:    topics,
 			},
-			false,
 			1,
 			nil,
 		},
@@ -60,7 +57,6 @@ func Test_GetLogsForQuery(t *testing.T) {
 				BlockHash: &blockHash,
 				Topics:    topics,
 			},
-			false,
 			1,
 			nil,
 		},
@@ -71,7 +67,6 @@ func Test_GetLogsForQuery(t *testing.T) {
 				toBlock:   5,
 				Topics:    topics,
 			},
-			false,
 			0,
 			nil,
 		},
@@ -82,7 +77,6 @@ func Test_GetLogsForQuery(t *testing.T) {
 				toBlock:   5,
 				Topics:    topics,
 			},
-			true,
 			0,
 			ErrIncorrectBlockRange,
 		},
@@ -123,12 +117,12 @@ func Test_GetLogsForQuery(t *testing.T) {
 
 			foundLogs, logError := f.GetLogsForQuery(testCase.query)
 
-			if logError != nil && !testCase.shouldFail {
+			if logError != nil && testCase.expectedError == nil {
 				// If there is an error and test isn't expected to fail
 				t.Fatalf("Error: %v", logError)
 			}
 
-			if !testCase.shouldFail {
+			if testCase.expectedError != nil {
 				assert.Lenf(t, foundLogs, testCase.expectedLength, "Invalid number of logs found")
 			}
 
