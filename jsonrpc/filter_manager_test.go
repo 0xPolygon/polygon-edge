@@ -150,10 +150,9 @@ func Test_GetLogFilterFromID(t *testing.T) {
 		fromBlock: 0,
 	}
 
-	// add log filter
-	id := m.NewLogFilter(logFilter, &MockClosedWSConnection{})
-
-	retrivedLogFilter, err := m.GetLogFilterFromID(id)
+	retrivedLogFilter, err := m.GetLogFilterFromID(
+		m.NewLogFilter(logFilter, &MockClosedWSConnection{}),
+	)
 	assert.NoError(t, err)
 	assert.Equal(t, logFilter, retrivedLogFilter.query)
 }
