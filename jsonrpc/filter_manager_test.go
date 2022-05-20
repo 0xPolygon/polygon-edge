@@ -141,7 +141,6 @@ func Test_GetLogFilterFromID(t *testing.T) {
 	store := newMockStore()
 
 	m := NewFilterManager(hclog.NewNullLogger(), store)
-	m.timeout = 2 * time.Second
 
 	go m.Run()
 
