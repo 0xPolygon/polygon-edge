@@ -150,6 +150,7 @@ type account struct {
 	init               sync.Once
 	enqueued, promoted *accountQueue
 	nextNonce          uint64
+	demotions          uint
 }
 
 // getNonce returns the next expected nonce for this account.

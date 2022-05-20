@@ -1301,3 +1301,60 @@ func TestGetIBFTForks(t *testing.T) {
 		})
 	}
 }
+
+func TestQuorumSizeSwitch(t *testing.T) {
+	t.Parallel()
+
+	testTable := []struct {
+		name           string
+		switchBlock    uint64
+		currentBlock   uint64
+		set            ValidatorSet
+		expectedQuorum int
+	}{
+		{
+			"use old quorum calculation",
+			10,
+			5,
+			[]types.Address{
+				types.ZeroAddress,
+				types.ZeroAddress,
+				types.ZeroAddress,
+				types.ZeroAddress,
+				types.ZeroAddress,
+				types.ZeroAddress,
+			},
+			3,
+		},
+		{
+			"use new quorum calculation",
+			10,
+			15,
+			[]types.Address{
+				types.ZeroAddress,
+				types.ZeroAddress,
+				types.ZeroAddress,
+				types.ZeroAddress,
+				types.ZeroAddress,
+				types.ZeroAddress,
+			},
+			4,
+		},
+	}
+
+	for _, test := range testTable {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			ibft := &Ibft{
+				quorumSizeBlockNum: test.switchBlock,
+			}
+
+			assert.Equal(t,
+				test.expectedQuorum,
+				ibft.quorumSize(test.currentBlock)(test.set),
+			)
+		})
+	}
+}
