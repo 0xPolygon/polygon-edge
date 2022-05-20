@@ -338,6 +338,20 @@ func (m *mockBlockStore) add(blocks ...*types.Block) {
 	m.blocks = append(m.blocks, blocks...)
 }
 
+func (m *mockBlockStore) appendBlocksToStore(blocks []*types.Block) {
+	if m.blocks == nil {
+		m.blocks = []*types.Block{}
+	}
+
+	for _, block := range blocks {
+		if block == nil {
+			continue
+		}
+
+		m.blocks = append(m.blocks, block)
+	}
+}
+
 func (m *mockBlockStore) setupLogs() {
 	m.receipts = make(map[types.Hash][]*types.Receipt)
 

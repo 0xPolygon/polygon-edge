@@ -88,8 +88,10 @@ func Test_GetLogsForQuery(t *testing.T) {
 	}
 	store.setupLogs()
 
-	for i := 0; i < 5; i++ {
-		store.add(&types.Block{
+	blocks := make([]*types.Block, 5)
+
+	for i := range blocks {
+		blocks[i] = &types.Block{
 			Header: &types.Header{
 				Number: uint64(i),
 				Hash:   types.StringToHash(strconv.Itoa(i)),
@@ -105,8 +107,10 @@ func Test_GetLogsForQuery(t *testing.T) {
 					Value: big.NewInt(12),
 				},
 			},
-		})
+		}
 	}
+
+	store.appendBlocksToStore(blocks)
 
 	f := NewFilterManager(hclog.NewNullLogger(), store)
 
