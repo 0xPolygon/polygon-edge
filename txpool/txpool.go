@@ -21,6 +21,10 @@ const (
 	txSlotSize  = 32 * 1024  // 32kB
 	txMaxSize   = 128 * 1024 //128Kb
 	topicNameV1 = "txpool/0.1"
+
+	//	maximum allowed number of times an account
+	//	was excluded from block building (ibft.writeTransactions)
+	maxAccountDemotions = uint(10)
 )
 
 // errors
@@ -28,7 +32,7 @@ var (
 	ErrIntrinsicGas        = errors.New("intrinsic gas too low")
 	ErrBlockLimitExceeded  = errors.New("exceeds block gas limit")
 	ErrNegativeValue       = errors.New("negative value")
-	ErrNonEncryptedTx      = errors.New("non-encrypted transaction")
+	ErrExtractSignature    = errors.New("cannot extract signature")
 	ErrInvalidSender       = errors.New("invalid sender")
 	ErrTxPoolOverflow      = errors.New("txpool is full")
 	ErrUnderpriced         = errors.New("transaction underpriced")
@@ -317,6 +321,9 @@ func (p *TxPool) Pop(tx *types.Transaction) {
 	// pop the top most promoted tx
 	account.promoted.pop()
 
+	//	successfully popping an account resets its demotions count to 0
+	account.demotions = 0
+
 	// update state
 	p.gauge.decrease(slotsRequired(tx))
 
@@ -378,7 +385,27 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 	)
 }
 
+//	Demote excludes an account from being further processed during block building
+//	due to a recoverable error. If an account has been demoted too many times (maxAccountDemotions),
+//	it is Dropped instead.
 func (p *TxPool) Demote(tx *types.Transaction) {
+	account := p.accounts.get(tx.From)
+	if account.demotions == maxAccountDemotions {
+		p.logger.Debug(
+			"Demote: threshold reached - dropping account",
+			"addr", tx.From.String(),
+		)
+
+		p.Drop(tx)
+
+		//	reset the demotions counter
+		account.demotions = 0
+
+		return
+	}
+
+	account.demotions++
+
 	p.eventManager.signalEvent(proto.EventType_DEMOTED, tx.Hash)
 }
 
@@ -482,7 +509,7 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 	// Extract the sender
 	from, signerErr := p.signer.Sender(tx)
 	if signerErr != nil {
-		return ErrInvalidSender
+		return ErrExtractSignature
 	}
 
 	// If the from field is set, check that
@@ -633,12 +660,12 @@ func (p *TxPool) handlePromoteRequest(req promoteRequest) {
 	account := p.accounts.get(addr)
 
 	// promote enqueued txs
-	promoted, promotedHashes := account.promote()
+	promoted := account.promote()
 	p.logger.Debug("promote request", "promoted", promoted, "addr", addr.String())
 
 	// update metrics
-	p.metrics.PendingTxs.Add(float64(promoted))
-	p.eventManager.signalEvent(proto.EventType_PROMOTED, promotedHashes...)
+	p.metrics.PendingTxs.Add(float64(len(promoted)))
+	p.eventManager.signalEvent(proto.EventType_PROMOTED, toHash(promoted...)...)
 }
 
 // addGossipTx handles receiving transactions
@@ -664,71 +691,54 @@ func (p *TxPool) addGossipTx(obj interface{}) {
 	}
 }
 
-// resetAccounts updates existing accounts with the new nonce.
+// resetAccounts updates existing accounts with the new nonce and prunes stale transactions.
 func (p *TxPool) resetAccounts(stateNonces map[types.Address]uint64) {
-	for addr, nonce := range stateNonces {
+	var (
+		allPrunedPromoted []*types.Transaction
+		allPrunedEnqueued []*types.Transaction
+	)
+
+	//	clear all accounts of stale txs
+	for addr, newNonce := range stateNonces {
 		if !p.accounts.exists(addr) {
-			// unknown account
+			// no updates for this account
 			continue
 		}
 
-		p.resetAccount(addr, nonce)
-	}
-}
+		account := p.accounts.get(addr)
+		prunedPromoted, prunedEnqueued := account.reset(newNonce, p.promoteReqCh)
 
-// resetAccount aligns the account's state with the given nonce,
-// pruning any present stale transaction. If, afterwards, the account
-// is eligible for promotion, a promoteRequest is signaled.
-func (p *TxPool) resetAccount(addr types.Address, nonce uint64) {
-	account := p.accounts.get(addr)
+		//	append pruned
+		allPrunedPromoted = append(allPrunedPromoted, prunedPromoted...)
+		allPrunedEnqueued = append(allPrunedEnqueued, prunedEnqueued...)
 
-	// lock promoted
-	account.promoted.lock(true)
-	defer account.promoted.unlock()
-
-	// prune promoted
-	pruned, prunedHashes := account.promoted.prune(nonce)
-
-	// update pool state
-	p.index.remove(pruned...)
-	p.gauge.decrease(slotsRequired(pruned...))
-
-	p.eventManager.signalEvent(
-		proto.EventType_PRUNED_PROMOTED,
-		prunedHashes...,
-	)
-
-	// update metrics
-	p.metrics.PendingTxs.Add(float64(-1 * len(pruned)))
-
-	if nonce <= account.getNonce() {
-		// only the promoted queue needed pruning
-		return
+		//	new state for account -> demotions are reset to 0
+		account.demotions = 0
 	}
 
-	// lock enqueued
-	account.enqueued.lock(true)
-	defer account.enqueued.unlock()
+	//	pool cleanup callback
+	cleanup := func(stale ...*types.Transaction) {
+		p.index.remove(stale...)
+		p.gauge.decrease(slotsRequired(stale...))
+	}
 
-	// prune enqueued
-	pruned, prunedHashes = account.enqueued.prune(nonce)
+	//	prune pool state
+	if len(allPrunedPromoted) > 0 {
+		cleanup(allPrunedPromoted...)
+		p.eventManager.signalEvent(
+			proto.EventType_PRUNED_PROMOTED,
+			toHash(allPrunedPromoted...)...,
+		)
 
-	// update pool state
-	p.index.remove(pruned...)
-	p.gauge.decrease(slotsRequired(pruned...))
+		p.metrics.PendingTxs.Add(float64(-1 * len(allPrunedPromoted)))
+	}
 
-	// update next nonce
-	account.setNonce(nonce)
-
-	p.eventManager.signalEvent(
-		proto.EventType_PRUNED_ENQUEUED,
-		prunedHashes...,
-	)
-
-	if first := account.enqueued.peek(); first != nil &&
-		first.Nonce == nonce {
-		// first enqueued tx is expected -> signal promotion
-		p.promoteReqCh <- promoteRequest{account: addr}
+	if len(allPrunedEnqueued) > 0 {
+		cleanup(allPrunedEnqueued...)
+		p.eventManager.signalEvent(
+			proto.EventType_PRUNED_ENQUEUED,
+			toHash(allPrunedEnqueued...)...,
+		)
 	}
 }
 
@@ -748,4 +758,13 @@ func (p *TxPool) createAccountOnce(newAddr types.Address) *account {
 // Length returns the total number of all promoted transactions.
 func (p *TxPool) Length() uint64 {
 	return p.accounts.promoted()
+}
+
+//	toHash returns the hash(es) of given transaction(s)
+func toHash(txs ...*types.Transaction) (hashes []types.Hash) {
+	for _, tx := range txs {
+		hashes = append(hashes, tx.Hash)
+	}
+
+	return
 }

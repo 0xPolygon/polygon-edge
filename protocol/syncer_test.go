@@ -16,6 +16,8 @@ import (
 )
 
 func TestHandleNewPeer(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name       string
 		chain      blockchainShim
@@ -33,7 +35,10 @@ func TestHandleNewPeer(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			syncer, peerSyncers := SetupSyncerNetwork(t, tt.chain, tt.peerChains)
 
 			// Check peer's status in Syncer's peer list
@@ -50,6 +55,8 @@ func TestHandleNewPeer(t *testing.T) {
 }
 
 func TestDeletePeer(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name                 string
 		chain                blockchainShim
@@ -69,12 +76,15 @@ func TestDeletePeer(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			syncer, peerSyncers := SetupSyncerNetwork(t, tt.chain, tt.peerChains)
 
 			// disconnects from syncer
 			for i := 0; i < tt.numDisconnectedPeers; i++ {
-				peerSyncers[i].server.Disconnect(syncer.server.AddrInfo().ID, "bye")
+				peerSyncers[i].server.DisconnectFromPeer(syncer.server.AddrInfo().ID, "bye")
 			}
 			WaitUntilPeerConnected(t, syncer, len(tt.peerChains)-tt.numDisconnectedPeers, 10*time.Second)
 
@@ -92,6 +102,8 @@ func TestDeletePeer(t *testing.T) {
 }
 
 func TestBroadcast(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name          string
 		syncerHeaders []*types.Header
@@ -107,7 +119,10 @@ func TestBroadcast(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			chain, peerChain := NewMockBlockchain(tt.syncerHeaders), NewMockBlockchain(tt.peerHeaders)
 			syncer, peerSyncers := SetupSyncerNetwork(t, chain, []blockchainShim{peerChain})
 			peerSyncer := peerSyncers[0]
@@ -141,6 +156,8 @@ func TestBroadcast(t *testing.T) {
 }
 
 func TestBestPeer(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name          string
 		chain         blockchainShim
@@ -173,7 +190,10 @@ func TestBestPeer(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			syncer, peerSyncers := SetupSyncerNetwork(t, tt.chain, tt.peersChain)
 
 			bestPeer := syncer.BestPeer()
@@ -192,6 +212,8 @@ func TestBestPeer(t *testing.T) {
 }
 
 func TestFindCommonAncestor(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name          string
 		syncerHeaders []*types.Header
@@ -221,7 +243,10 @@ func TestFindCommonAncestor(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			chain, peerChain := blockchain.NewTestBlockchain(
 				t,
 				tt.syncerHeaders,
@@ -247,6 +272,8 @@ func TestFindCommonAncestor(t *testing.T) {
 }
 
 func TestWatchSyncWithPeer(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name           string
 		headers        []*types.Header
@@ -274,7 +301,10 @@ func TestWatchSyncWithPeer(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			chain, peerChain := NewMockBlockchain(tt.headers), NewMockBlockchain(tt.peerHeaders)
 
 			syncer, peerSyncers := SetupSyncerNetwork(t, chain, []blockchainShim{peerChain})
@@ -315,6 +345,8 @@ func TestWatchSyncWithPeer(t *testing.T) {
 }
 
 func TestBulkSyncWithPeer(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name        string
 		headers     []*types.Header
@@ -343,7 +375,10 @@ func TestBulkSyncWithPeer(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			chain, peerChain := NewMockBlockchain(tt.headers), NewMockBlockchain(tt.peerHeaders)
 			syncer, peerSyncers := SetupSyncerNetwork(t, chain, []blockchainShim{peerChain})
 			peerSyncer := peerSyncers[0]
@@ -633,7 +668,7 @@ func TestSyncer_PeerDisconnected(t *testing.T) {
 
 	// Disconnect peer2
 	peerToDisconnect := servers[2].AddrInfo().ID
-	servers[1].Disconnect(peerToDisconnect, "testing")
+	servers[1].DisconnectFromPeer(peerToDisconnect, "testing")
 
 	waitCtx, cancelWait = context.WithTimeout(context.Background(), time.Second*10)
 	defer cancelWait()

@@ -620,3 +620,64 @@ func TestCalculateGasLimit(t *testing.T) {
 		})
 	}
 }
+
+// TestGasPriceAverage tests the average gas price of the
+// blockchain
+func TestGasPriceAverage(t *testing.T) {
+	testTable := []struct {
+		name               string
+		previousAverage    *big.Int
+		previousCount      *big.Int
+		newValues          []*big.Int
+		expectedNewAverage *big.Int
+	}{
+		{
+			"no previous average data",
+			big.NewInt(0),
+			big.NewInt(0),
+			[]*big.Int{
+				big.NewInt(1),
+				big.NewInt(2),
+				big.NewInt(3),
+				big.NewInt(4),
+				big.NewInt(5),
+			},
+			big.NewInt(3),
+		},
+		{
+			"previous average data",
+			// For example (5 + 5 + 5 + 5 + 5) / 5
+			big.NewInt(5),
+			big.NewInt(5),
+			[]*big.Int{
+				big.NewInt(1),
+				big.NewInt(2),
+				big.NewInt(3),
+			},
+			// (5 * 5 + 1 + 2 + 3) / 8
+			big.NewInt(3),
+		},
+	}
+
+	for _, testCase := range testTable {
+		t.Run(testCase.name, func(t *testing.T) {
+			// Setup the mock data
+			blockchain := NewTestBlockchain(t, nil)
+			blockchain.gpAverage.price = testCase.previousAverage
+			blockchain.gpAverage.count = testCase.previousCount
+
+			// Update the average gas price
+			blockchain.updateGasPriceAvg(testCase.newValues)
+
+			// Make sure the average gas price count is correct
+			assert.Equal(
+				t,
+				int64(len(testCase.newValues))+testCase.previousCount.Int64(),
+				blockchain.gpAverage.count.Int64(),
+			)
+
+			// Make sure the average gas price is correct
+			assert.Equal(t, testCase.expectedNewAverage.String(), blockchain.gpAverage.price.String())
+		})
+	}
+}

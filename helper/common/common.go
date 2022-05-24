@@ -14,6 +14,14 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
+var (
+	// MaxSafeJSInt represents max value which JS support
+	// It is used for smartContract fields
+	// Our staking repo is written in JS, as are many other clients
+	// If we use higher value JS will not be able to parse it
+	MaxSafeJSInt = uint64(math.Pow(2, 53) - 2)
+)
+
 // Min returns the strictly lower number
 func Min(a, b uint64) uint64 {
 	if a < b {
@@ -139,7 +147,30 @@ func (d *JSONNumber) UnmarshalJSON(data []byte) error {
 func GetTerminationSignalCh() <-chan os.Signal {
 	// wait for the user to quit with ctrl-c
 	signalCh := make(chan os.Signal, 1)
-	signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
+	signal.Notify(
+		signalCh,
+		os.Interrupt,
+		syscall.SIGTERM,
+		syscall.SIGHUP,
+	)
 
 	return signalCh
+}
+
+// PadLeftOrTrim left-pads the passed in byte array to the specified size,
+// or trims the array if it exceeds the passed in size
+func PadLeftOrTrim(bb []byte, size int) []byte {
+	l := len(bb)
+	if l == size {
+		return bb
+	}
+
+	if l > size {
+		return bb[l-size:]
+	}
+
+	tmp := make([]byte, size)
+	copy(tmp[size-l:], bb)
+
+	return tmp
 }

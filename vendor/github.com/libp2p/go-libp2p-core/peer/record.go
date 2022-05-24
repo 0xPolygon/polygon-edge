@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/libp2p/go-libp2p-core/internal/catch"
 	pb "github.com/libp2p/go-libp2p-core/peer/pb"
 	"github.com/libp2p/go-libp2p-core/record"
 
@@ -160,13 +161,15 @@ func (r *PeerRecord) Codec() []byte {
 // This method is called automatically when consuming a record.Envelope
 // whose PayloadType indicates that it contains a PeerRecord.
 // It is generally not necessary or recommended to call this method directly.
-func (r *PeerRecord) UnmarshalRecord(bytes []byte) error {
+func (r *PeerRecord) UnmarshalRecord(bytes []byte) (err error) {
 	if r == nil {
 		return fmt.Errorf("cannot unmarshal PeerRecord to nil receiver")
 	}
 
+	defer func() { catch.HandlePanic(recover(), &err, "libp2p peer record unmarshal") }()
+
 	var msg pb.PeerRecord
-	err := proto.Unmarshal(bytes, &msg)
+	err = proto.Unmarshal(bytes, &msg)
 	if err != nil {
 		return err
 	}
@@ -183,7 +186,9 @@ func (r *PeerRecord) UnmarshalRecord(bytes []byte) error {
 // MarshalRecord serializes a PeerRecord to a byte slice.
 // This method is called automatically when constructing a routing.Envelope
 // using Seal or PeerRecord.Sign.
-func (r *PeerRecord) MarshalRecord() ([]byte, error) {
+func (r *PeerRecord) MarshalRecord() (res []byte, err error) {
+	defer func() { catch.HandlePanic(recover(), &err, "libp2p peer record marshal") }()
+
 	msg, err := r.ToProtobuf()
 	if err != nil {
 		return nil, err

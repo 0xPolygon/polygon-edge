@@ -12,6 +12,8 @@ import (
 )
 
 func TestEth_DecodeTxn(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		accounts map[types.Address]*state.Account
@@ -19,21 +21,6 @@ func TestEth_DecodeTxn(t *testing.T) {
 		res      *types.Transaction
 		err      error
 	}{
-		{
-			name: "should be failed when both Data and Input are given",
-			arg: &txnArgs{
-				From:     &addr1,
-				To:       &addr2,
-				Gas:      toArgUint64Ptr(21000),
-				GasPrice: toArgBytesPtr(big.NewInt(10000).Bytes()),
-				Value:    toArgBytesPtr(oneEther.Bytes()),
-				Input:    toArgBytesPtr(big.NewInt(100).Bytes()),
-				Data:     toArgBytesPtr(big.NewInt(200).Bytes()),
-				Nonce:    toArgUint64Ptr(0),
-			},
-			res: nil,
-			err: errors.New("both input and data cannot be set"),
-		},
 		{
 			name: "should be failed when both To and Data doesn't set",
 			arg: &txnArgs{
@@ -54,7 +41,6 @@ func TestEth_DecodeTxn(t *testing.T) {
 				Gas:      toArgUint64Ptr(21000),
 				GasPrice: toArgBytesPtr(big.NewInt(10000).Bytes()),
 				Value:    toArgBytesPtr(oneEther.Bytes()),
-				Input:    nil,
 				Data:     nil,
 				Nonce:    toArgUint64Ptr(0),
 			},
@@ -76,7 +62,6 @@ func TestEth_DecodeTxn(t *testing.T) {
 				Gas:      toArgUint64Ptr(21000),
 				GasPrice: toArgBytesPtr(big.NewInt(10000).Bytes()),
 				Value:    toArgBytesPtr(oneEther.Bytes()),
-				Input:    nil,
 				Data:     nil,
 			},
 			res: &types.Transaction{
@@ -103,7 +88,6 @@ func TestEth_DecodeTxn(t *testing.T) {
 				Gas:      toArgUint64Ptr(21000),
 				GasPrice: toArgBytesPtr(big.NewInt(10000).Bytes()),
 				Value:    toArgBytesPtr(oneEther.Bytes()),
-				Input:    nil,
 				Data:     nil,
 			},
 			res: &types.Transaction{
@@ -124,7 +108,6 @@ func TestEth_DecodeTxn(t *testing.T) {
 				To:       &addr2,
 				Gas:      toArgUint64Ptr(21000),
 				GasPrice: toArgBytesPtr(big.NewInt(10000).Bytes()),
-				Input:    nil,
 				Data:     nil,
 				Nonce:    toArgUint64Ptr(1),
 			},
@@ -145,7 +128,6 @@ func TestEth_DecodeTxn(t *testing.T) {
 				From:     &addr1,
 				To:       &addr2,
 				GasPrice: toArgBytesPtr(big.NewInt(10000).Bytes()),
-				Input:    nil,
 				Data:     nil,
 				Nonce:    toArgUint64Ptr(1),
 			},
@@ -163,7 +145,10 @@ func TestEth_DecodeTxn(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			if tt.res != nil {
 				tt.res.ComputeHash()
 			}
@@ -181,6 +166,8 @@ func TestEth_DecodeTxn(t *testing.T) {
 }
 
 func TestEth_GetNextNonce(t *testing.T) {
+	t.Parallel()
+
 	// Set up the mock accounts
 	accounts := []struct {
 		address types.Address
@@ -229,7 +216,10 @@ func TestEth_GetNextNonce(t *testing.T) {
 	}
 
 	for _, testCase := range testTable {
+		testCase := testCase
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
 			// Grab the nonce
 			nonce, err := eth.getNextNonce(testCase.account, testCase.number)
 

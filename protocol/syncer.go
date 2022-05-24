@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/0xPolygon/polygon-edge/network/event"
 	"math"
 	"math/big"
 	"sync"
@@ -19,8 +20,8 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
-	any "google.golang.org/protobuf/types/known/anypb"
-	empty "google.golang.org/protobuf/types/known/emptypb"
+	anypb "google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 const (
@@ -293,7 +294,8 @@ func (s *Syncer) updatePeerStatus(peerID peer.ID, status *Status) {
 		"latest block number",
 		status.Number,
 		"latest block hash",
-		status.Hash, "difficulty",
+		status.Hash,
+		"difficulty",
 		status.Difficulty,
 	)
 
@@ -327,7 +329,7 @@ func (s *Syncer) Broadcast(b *types.Block) {
 			Number:     b.Number(),
 			Difficulty: td.String(),
 		},
-		Raw: &any.Any{
+		Raw: &anypb.Any{
 			Value: b.MarshalRLP(),
 		},
 	}
@@ -362,7 +364,7 @@ func (s *Syncer) Start() {
 	grpcStream := libp2pGrpc.NewGrpcStream()
 	proto.RegisterV1Server(grpcStream.GrpcServer(), s.serviceV1)
 	grpcStream.Serve()
-	s.server.Register(syncerV1, grpcStream)
+	s.server.RegisterProtocol(syncerV1, grpcStream)
 
 	s.setupPeers()
 
@@ -395,11 +397,11 @@ func (s *Syncer) handlePeerEvent() {
 			}
 
 			switch evnt.Type {
-			case network.PeerConnected:
+			case event.PeerConnected:
 				if err := s.AddPeer(evnt.PeerID); err != nil {
 					s.logger.Error("failed to add peer", "err", err)
 				}
-			case network.PeerDisconnected:
+			case event.PeerDisconnected:
 				if err := s.DeletePeer(evnt.PeerID); err != nil {
 					s.logger.Error("failed to delete user", "err", err)
 				}
@@ -408,12 +410,14 @@ func (s *Syncer) handlePeerEvent() {
 	}()
 }
 
-// BestPeer returns the best peer by difficulty (if any)
+// BestPeer returns the best peer by block height (if any)
 func (s *Syncer) BestPeer() *SyncPeer {
-	var bestPeer *SyncPeer
+	var (
+		bestPeer        *SyncPeer
+		bestBlockNumber uint64
+	)
 
-	var bestTd *big.Int
-
+	// Find the peer with the biggest block height available
 	s.peers.Range(func(peerID, peer interface{}) bool {
 		syncPeer, ok := peer.(*SyncPeer)
 		if !ok {
@@ -421,7 +425,10 @@ func (s *Syncer) BestPeer() *SyncPeer {
 		}
 
 		status := syncPeer.status
-		if bestPeer == nil || status.Difficulty.Cmp(bestTd) > 0 {
+		if bestPeer == nil || status.Number > bestBlockNumber {
+			// There is currently no best peer set, or the peer's block number
+			// is currently the highest
+
 			var correctAssertion bool
 
 			bestPeer, correctAssertion = peer.(*SyncPeer)
@@ -429,19 +436,15 @@ func (s *Syncer) BestPeer() *SyncPeer {
 				return false
 			}
 
-			bestTd = status.Difficulty
+			bestBlockNumber = status.Number
 		}
 
 		return true
 	})
 
-	if bestPeer == nil {
-		return nil
-	}
-
-	curDiff := s.blockchain.CurrentTD()
-	if bestTd.Cmp(curDiff) <= 0 {
-		return nil
+	// Fetch the highest local block height
+	if bestBlockNumber < s.blockchain.Header().Number {
+		bestPeer = nil
 	}
 
 	return bestPeer
@@ -464,7 +467,7 @@ func (s *Syncer) AddPeer(peerID peer.ID) error {
 	// watch for changes of the other node first
 	clt := proto.NewV1Client(conn)
 
-	rawStatus, err := clt.GetCurrent(context.Background(), &empty.Empty{})
+	rawStatus, err := clt.GetCurrent(context.Background(), &emptypb.Empty{})
 	if err != nil {
 		return err
 	}

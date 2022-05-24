@@ -7,8 +7,8 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-// LogFilter is a filter for logs
-type LogFilter struct {
+// LogQuery is a query to filter logs
+type LogQuery struct {
 	BlockHash *types.Hash
 
 	fromBlock BlockNumber
@@ -19,9 +19,9 @@ type LogFilter struct {
 }
 
 // addTopicSet adds specific topics to the log filter topics
-func (l *LogFilter) addTopicSet(set ...string) error {
-	if l.Topics == nil {
-		l.Topics = [][]types.Hash{}
+func (q *LogQuery) addTopicSet(set ...string) error {
+	if q.Topics == nil {
+		q.Topics = [][]types.Hash{}
 	}
 
 	res := []types.Hash{}
@@ -35,15 +35,15 @@ func (l *LogFilter) addTopicSet(set ...string) error {
 		res = append(res, item)
 	}
 
-	l.Topics = append(l.Topics, res)
+	q.Topics = append(q.Topics, res)
 
 	return nil
 }
 
 // addAddress Adds the address to the log filter
-func (l *LogFilter) addAddress(raw string) error {
-	if l.Addresses == nil {
-		l.Addresses = []types.Address{}
+func (q *LogQuery) addAddress(raw string) error {
+	if q.Addresses == nil {
+		q.Addresses = []types.Address{}
 	}
 
 	addr := types.Address{}
@@ -52,28 +52,28 @@ func (l *LogFilter) addAddress(raw string) error {
 		return err
 	}
 
-	l.Addresses = append(l.Addresses, addr)
+	q.Addresses = append(q.Addresses, addr)
 
 	return nil
 }
 
-func decodeLogFilterFromInterface(i interface{}) (*LogFilter, error) {
+func decodeLogQueryFromInterface(i interface{}) (*LogQuery, error) {
 	// once the log filter is decoded as map[string]interface we cannot use unmarshal json
 	raw, err := json.Marshal(i)
 	if err != nil {
 		return nil, err
 	}
 
-	filter := &LogFilter{}
-	if err := json.Unmarshal(raw, &filter); err != nil {
+	query := &LogQuery{}
+	if err := json.Unmarshal(raw, &query); err != nil {
 		return nil, err
 	}
 
-	return filter, nil
+	return query, nil
 }
 
 // UnmarshalJSON decodes a json object
-func (l *LogFilter) UnmarshalJSON(data []byte) error {
+func (q *LogQuery) UnmarshalJSON(data []byte) error {
 	var obj struct {
 		BlockHash *types.Hash   `json:"blockHash"`
 		FromBlock string        `json:"fromBlock"`
@@ -88,20 +88,20 @@ func (l *LogFilter) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	l.BlockHash = obj.BlockHash
+	q.BlockHash = obj.BlockHash
 
 	if obj.FromBlock == "" {
-		l.fromBlock = LatestBlockNumber
+		q.fromBlock = LatestBlockNumber
 	} else {
-		if l.fromBlock, err = stringToBlockNumber(obj.FromBlock); err != nil {
+		if q.fromBlock, err = stringToBlockNumber(obj.FromBlock); err != nil {
 			return err
 		}
 	}
 
 	if obj.ToBlock == "" {
-		l.toBlock = LatestBlockNumber
+		q.toBlock = LatestBlockNumber
 	} else {
-		if l.toBlock, err = stringToBlockNumber(obj.ToBlock); err != nil {
+		if q.toBlock, err = stringToBlockNumber(obj.ToBlock); err != nil {
 			return err
 		}
 	}
@@ -111,7 +111,7 @@ func (l *LogFilter) UnmarshalJSON(data []byte) error {
 		switch raw := obj.Address.(type) {
 		case string:
 			// ""
-			if err := l.addAddress(raw); err != nil {
+			if err := q.addAddress(raw); err != nil {
 				return err
 			}
 
@@ -119,7 +119,7 @@ func (l *LogFilter) UnmarshalJSON(data []byte) error {
 			// ["", ""]
 			for _, addr := range raw {
 				if item, ok := addr.(string); ok {
-					if err := l.addAddress(item); err != nil {
+					if err := q.addAddress(item); err != nil {
 						return err
 					}
 				} else {
@@ -138,7 +138,7 @@ func (l *LogFilter) UnmarshalJSON(data []byte) error {
 			switch raw := item.(type) {
 			case string:
 				// ""
-				if err := l.addTopicSet(raw); err != nil {
+				if err := q.addTopicSet(raw); err != nil {
 					return err
 				}
 
@@ -154,13 +154,13 @@ func (l *LogFilter) UnmarshalJSON(data []byte) error {
 					}
 				}
 
-				if err := l.addTopicSet(res...); err != nil {
+				if err := q.addTopicSet(res...); err != nil {
 					return err
 				}
 
 			case nil:
 				// null
-				if err := l.addTopicSet(); err != nil {
+				if err := q.addTopicSet(); err != nil {
 					return err
 				}
 
@@ -175,12 +175,12 @@ func (l *LogFilter) UnmarshalJSON(data []byte) error {
 }
 
 // Match returns whether the receipt includes topics for this filter
-func (l *LogFilter) Match(log *types.Log) bool {
+func (q *LogQuery) Match(log *types.Log) bool {
 	// check addresses
-	if len(l.Addresses) > 0 {
+	if len(q.Addresses) > 0 {
 		match := false
 
-		for _, addr := range l.Addresses {
+		for _, addr := range q.Addresses {
 			if addr == log.Address {
 				match = true
 			}
@@ -191,11 +191,11 @@ func (l *LogFilter) Match(log *types.Log) bool {
 		}
 	}
 	// check topics
-	if len(l.Topics) > len(log.Topics) {
+	if len(q.Topics) > len(log.Topics) {
 		return false
 	}
 
-	for i, sub := range l.Topics {
+	for i, sub := range q.Topics {
 		match := len(sub) == 0
 
 		for _, topic := range sub {

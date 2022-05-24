@@ -56,7 +56,11 @@ func expectBatchJSONResult(data []byte, v interface{}) error {
 }
 
 func TestDispatcher_HandleWebsocketConnection_EthSubscribe(t *testing.T) {
+	t.Parallel()
+
 	t.Run("clients should be able to receive \"newHeads\" event thru eth_subscribe", func(t *testing.T) {
+		t.Parallel()
+
 		store := newMockStore()
 		dispatcher := newDispatcher(hclog.NewNullLogger(), store, 0)
 
@@ -187,7 +191,7 @@ func (m *mockService) BlockPtr(a string, f *BlockNumber) (interface{}, error) {
 	return nil, nil
 }
 
-func (m *mockService) Filter(f LogFilter) (interface{}, error) {
+func (m *mockService) Filter(f LogQuery) (interface{}, error) {
 	m.msgCh <- f
 
 	return nil, nil
@@ -249,9 +253,10 @@ func TestDispatcherFuncDecode(t *testing.T) {
 		{
 			"filter",
 			`[{"fromBlock": "pending", "toBlock": "earliest"}]`,
-			LogFilter{fromBlock: PendingBlockNumber, toBlock: EarliestBlockNumber},
+			LogQuery{fromBlock: PendingBlockNumber, toBlock: EarliestBlockNumber},
 		},
 	}
+
 	for _, c := range cases {
 		res := handleReq(c.typ, c.msg)
 		if !reflect.DeepEqual(res, c.res) {

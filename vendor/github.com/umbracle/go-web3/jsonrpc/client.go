@@ -16,6 +16,7 @@ type endpoints struct {
 	n *Net
 	d *Debug
 }
+
 type Config struct {
 	headers map[string]string
 }

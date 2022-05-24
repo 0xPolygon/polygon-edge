@@ -13,18 +13,20 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
-	"google.golang.org/grpc/credentials/insecure"
-
+	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/genesis"
-	"github.com/0xPolygon/polygon-edge/command/helper"
-	secretsCommand "github.com/0xPolygon/polygon-edge/command/secrets"
+	ibftSwitch "github.com/0xPolygon/polygon-edge/command/ibft/switch"
+	initCmd "github.com/0xPolygon/polygon-edge/command/secrets/init"
 	"github.com/0xPolygon/polygon-edge/command/server"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft"
 	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/crypto"
+	stakingHelper "github.com/0xPolygon/polygon-edge/helper/staking"
 	"github.com/0xPolygon/polygon-edge/helper/tests"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/secrets"
@@ -37,12 +39,14 @@ import (
 	"github.com/umbracle/go-web3"
 	"github.com/umbracle/go-web3/jsonrpc"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	empty "google.golang.org/protobuf/types/known/emptypb"
 )
 
 type TestServerConfigCallback func(*TestServerConfig)
 
 const (
+	serverIP    = "127.0.0.1"
 	initialPort = 12000
 	binaryName  = "polygon-edge"
 )
@@ -84,15 +88,27 @@ func NewTestServer(t *testing.T, rootDir string, callback TestServerConfigCallba
 }
 
 func (t *TestServer) GrpcAddr() string {
-	return fmt.Sprintf("http://127.0.0.1:%d", t.Config.GRPCPort)
+	return fmt.Sprintf("%s:%d", serverIP, t.Config.GRPCPort)
+}
+
+func (t *TestServer) LibP2PAddr() string {
+	return fmt.Sprintf("%s:%d", serverIP, t.Config.LibP2PPort)
 }
 
 func (t *TestServer) JSONRPCAddr() string {
-	return fmt.Sprintf("http://127.0.0.1:%d", t.Config.JSONRPCPort)
+	return fmt.Sprintf("%s:%d", serverIP, t.Config.JSONRPCPort)
+}
+
+func (t *TestServer) HTTPJSONRPCURL() string {
+	return fmt.Sprintf("http://%s", t.JSONRPCAddr())
+}
+
+func (t *TestServer) WSJSONRPCURL() string {
+	return fmt.Sprintf("ws://%s/ws", t.JSONRPCAddr())
 }
 
 func (t *TestServer) JSONRPC() *jsonrpc.Client {
-	clt, err := jsonrpc.NewClient(t.JSONRPCAddr())
+	clt, err := jsonrpc.NewClient(t.HTTPJSONRPCURL())
 	if err != nil {
 		t.t.Fatal(err)
 	}
@@ -102,7 +118,7 @@ func (t *TestServer) JSONRPC() *jsonrpc.Client {
 
 func (t *TestServer) Operator() proto.SystemClient {
 	conn, err := grpc.Dial(
-		fmt.Sprintf("127.0.0.1:%d", t.Config.GRPCPort),
+		t.GrpcAddr(),
 		grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		t.t.Fatal(err)
@@ -113,7 +129,7 @@ func (t *TestServer) Operator() proto.SystemClient {
 
 func (t *TestServer) TxnPoolOperator() txpoolProto.TxnPoolOperatorClient {
 	conn, err := grpc.Dial(
-		fmt.Sprintf("127.0.0.1:%d", t.Config.GRPCPort),
+		t.GrpcAddr(),
 		grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		t.t.Fatal(err)
@@ -124,7 +140,7 @@ func (t *TestServer) TxnPoolOperator() txpoolProto.TxnPoolOperatorClient {
 
 func (t *TestServer) IBFTOperator() ibftOp.IbftOperatorClient {
 	conn, err := grpc.Dial(
-		fmt.Sprintf("127.0.0.1:%d", t.Config.GRPCPort),
+		t.GrpcAddr(),
 		grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		t.t.Fatal(err)
@@ -162,12 +178,12 @@ type InitIBFTResult struct {
 	NodeID  string
 }
 
-func (t *TestServer) InitIBFT() (*InitIBFTResult, error) {
-	secretsInitCmd := secretsCommand.SecretsInit{}
+func (t *TestServer) SecretsInit() (*InitIBFTResult, error) {
+	secretsInitCmd := initCmd.GetCommand()
 
 	var args []string
 
-	commandSlice := strings.Split(secretsInitCmd.GetBaseCommand(), " ")
+	commandSlice := strings.Split(fmt.Sprintf("secrets %s", secretsInitCmd.Use), " ")
 	args = append(args, commandSlice...)
 	args = append(args, "--data-dir", t.Config.IBFTDir)
 
@@ -227,9 +243,9 @@ func (t *TestServer) InitIBFT() (*InitIBFTResult, error) {
 }
 
 func (t *TestServer) GenerateGenesis() error {
-	genesisCmd := genesis.GenesisCommand{}
+	genesisCmd := genesis.GetCommand()
 	args := []string{
-		genesisCmd.GetBaseCommand(),
+		genesisCmd.Use,
 	}
 
 	// add pre-mined accounts
@@ -269,11 +285,22 @@ func (t *TestServer) GenerateGenesis() error {
 	// Make sure the correct mechanism is selected
 	if t.Config.IsPos {
 		args = append(args, "--pos")
+
+		if t.Config.MinValidatorCount == 0 {
+			t.Config.MinValidatorCount = stakingHelper.MinValidatorCount
+		}
+
+		if t.Config.MaxValidatorCount == 0 {
+			t.Config.MaxValidatorCount = stakingHelper.MaxValidatorCount
+		}
+
+		args = append(args, "--min-validator-count", strconv.FormatUint(t.Config.MinValidatorCount, 10))
+		args = append(args, "--max-validator-count", strconv.FormatUint(t.Config.MaxValidatorCount, 10))
 	}
 
 	// add block gas limit
 	if t.Config.BlockGasLimit == 0 {
-		t.Config.BlockGasLimit = helper.GenesisGasLimit
+		t.Config.BlockGasLimit = command.DefaultGenesisGasLimit
 	}
 
 	blockGasLimit := strconv.FormatUint(t.Config.BlockGasLimit, 10)
@@ -286,17 +313,17 @@ func (t *TestServer) GenerateGenesis() error {
 }
 
 func (t *TestServer) Start(ctx context.Context) error {
-	serverCmd := server.ServerCommand{}
+	serverCmd := server.GetCommand()
 	args := []string{
-		serverCmd.GetBaseCommand(),
+		serverCmd.Use,
 		// add custom chain
 		"--chain", filepath.Join(t.Config.RootDir, "genesis.json"),
 		// enable grpc
-		"--grpc", fmt.Sprintf(":%d", t.Config.GRPCPort),
+		"--grpc-address", t.GrpcAddr(),
 		// enable libp2p
-		"--libp2p", fmt.Sprintf(":%d", t.Config.LibP2PPort),
+		"--libp2p", t.LibP2PAddr(),
 		// enable jsonrpc
-		"--jsonrpc", fmt.Sprintf(":%d", t.Config.JSONRPCPort),
+		"--jsonrpc", t.JSONRPCAddr(),
 	}
 
 	switch t.Config.Consensus {
@@ -328,6 +355,10 @@ func (t *TestServer) Start(ctx context.Context) error {
 	// add block gas target
 	if t.Config.BlockGasTarget != 0 {
 		args = append(args, "--block-gas-target", *types.EncodeUint64(t.Config.BlockGasTarget))
+	}
+
+	if t.Config.BlockTime != 0 {
+		args = append(args, "--block-time", strconv.FormatUint(t.Config.BlockTime, 10))
 	}
 
 	t.ReleaseReservedPorts()
@@ -363,13 +394,18 @@ func (t *TestServer) Start(ctx context.Context) error {
 func (t *TestServer) SwitchIBFTType(typ ibft.MechanismType, from uint64, to, deployment *uint64) error {
 	t.t.Helper()
 
-	args := []string{
-		"ibft", "switch",
+	ibftSwitchCmd := ibftSwitch.GetCommand()
+	args := make([]string, 0)
+
+	commandSlice := strings.Split(fmt.Sprintf("ibft %s", ibftSwitchCmd.Use), " ")
+
+	args = append(args, commandSlice...)
+	args = append(args,
 		// add custom chain
 		"--chain", filepath.Join(t.Config.RootDir, "genesis.json"),
 		"--type", string(typ),
 		"--from", strconv.FormatUint(from, 10),
-	}
+	)
 
 	if to != nil {
 		args = append(args, "--to", strconv.FormatUint(*to, 10))
@@ -506,6 +542,54 @@ func (t *TestServer) WaitForReceipt(ctx context.Context, hash web3.Hash) (*web3.
 	}
 
 	return data.receipt, data.err
+}
+
+// GetGasTotal waits for the total gas used sum for the passed in
+// transactions
+func (t *TestServer) GetGasTotal(txHashes []web3.Hash) uint64 {
+	t.t.Helper()
+
+	var (
+		totalGasUsed    = uint64(0)
+		receiptErrs     = make([]error, 0)
+		receiptErrsLock sync.Mutex
+		wg              sync.WaitGroup
+	)
+
+	appendReceiptErr := func(receiptErr error) {
+		receiptErrsLock.Lock()
+		defer receiptErrsLock.Unlock()
+
+		receiptErrs = append(receiptErrs, receiptErr)
+	}
+
+	for _, txHash := range txHashes {
+		wg.Add(1)
+
+		go func(txHash web3.Hash) {
+			defer wg.Done()
+
+			ctx, cancelFn := context.WithTimeout(context.Background(), DefaultTimeout)
+			defer cancelFn()
+
+			receipt, receiptErr := tests.WaitForReceipt(ctx, t.JSONRPC().Eth(), txHash)
+			if receiptErr != nil {
+				appendReceiptErr(fmt.Errorf("unable to wait for receipt, %w", receiptErr))
+
+				return
+			}
+
+			atomic.AddUint64(&totalGasUsed, receipt.GasUsed)
+		}(txHash)
+	}
+
+	wg.Wait()
+
+	if len(receiptErrs) > 0 {
+		t.t.Fatalf("unable to wait for receipts, %v", receiptErrs)
+	}
+
+	return totalGasUsed
 }
 
 func (t *TestServer) WaitForReady(ctx context.Context) error {

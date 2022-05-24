@@ -370,7 +370,7 @@ func testReceipts(t *testing.T, m MockStorage) {
 		TxHash:            txn.Hash,
 		LogsBloom:         types.Bloom{0x1},
 		GasUsed:           10,
-		ContractAddress:   types.Address{0x1},
+		ContractAddress:   &types.Address{0x1},
 		Logs: []*types.Log{
 			{
 				Address: addr2,

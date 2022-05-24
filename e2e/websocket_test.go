@@ -3,16 +3,13 @@ package e2e
 import (
 	"context"
 	"encoding/json"
-	"math/big"
-	"strings"
-	"testing"
-	"time"
-
 	"github.com/0xPolygon/polygon-edge/e2e/framework"
 	"github.com/0xPolygon/polygon-edge/jsonrpc"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
+	"math/big"
+	"testing"
 )
 
 type testWSRequest struct {
@@ -70,7 +67,7 @@ func TestWS_Response(t *testing.T) {
 	srv := srvs[0]
 
 	// Convert the default JSONRPC address to a WebSocket one
-	wsURL := "ws" + strings.TrimPrefix(srv.JSONRPCAddr(), "http") + "/ws"
+	wsURL := srv.WSJSONRPCURL()
 
 	// Connect to the websocket server
 	ws, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
@@ -111,7 +108,7 @@ func TestWS_Response(t *testing.T) {
 	})
 
 	t.Run("Valid block number after transfer", func(t *testing.T) {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), framework.DefaultTimeout)
 		defer cancel()
 
 		_, err = srv.SendRawTx(ctx, &framework.PreparedTransaction{

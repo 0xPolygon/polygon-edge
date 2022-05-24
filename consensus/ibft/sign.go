@@ -127,8 +127,9 @@ func calculateHeaderHash(h *types.Header) ([]byte, error) {
 		return nil, err
 	}
 
-	// This will effectively remove the Seal and Committed Seal fields, while keeping proposer vanity and validator set
-	// 		because extra.Validators is what we got from `h` in the first place.
+	// This will effectively remove the Seal and Committed Seal fields,
+	// while keeping proposer vanity and validator set
+	// because extra.Validators is what we got from `h` in the first place.
 	putIbftExtraValidators(h, extra.Validators)
 
 	vv := arena.NewArray()
@@ -165,7 +166,11 @@ func verifySigner(snap *Snapshot, header *types.Header) error {
 }
 
 // verifyCommitedFields is checking for consensus proof in the header
-func verifyCommitedFields(snap *Snapshot, header *types.Header) error {
+func verifyCommitedFields(
+	snap *Snapshot,
+	header *types.Header,
+	quorumSizeFn QuorumImplementation,
+) error {
 	extra, err := getIbftExtra(header)
 	if err != nil {
 		return err
@@ -206,7 +211,7 @@ func verifyCommitedFields(snap *Snapshot, header *types.Header) error {
 	// Valid committed seals must be at least 2F+1
 	// 	2F 	is the required number of honest validators who provided the committed seals
 	// 	+1	is the proposer
-	if validSeals := len(visited); validSeals <= 2*snap.Set.MaxFaultyNodes() {
+	if validSeals := len(visited); validSeals < quorumSizeFn(snap.Set) {
 		return fmt.Errorf("not enough seals to seal block")
 	}
 

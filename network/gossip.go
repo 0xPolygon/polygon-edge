@@ -10,10 +10,10 @@ import (
 )
 
 const (
-	// bufferSize is the size of the queue in go-libp2p-pubsub
+	// subscribeOutputBufferSize is the size of subscribe output buffer in go-libp2p-pubsub
 	// we should have enough capacity of the queue
-	// because there is possibility of that node lose gossip messages when the queue is full
-	bufferSize = 512
+	// because when queue is full, if the consumer does not read fast enough, new messages are dropped
+	subscribeOutputBufferSize = 1024
 )
 
 type Topic struct {
@@ -43,7 +43,7 @@ func (t *Topic) Publish(obj proto.Message) error {
 }
 
 func (t *Topic) Subscribe(handler func(obj interface{})) error {
-	sub, err := t.topic.Subscribe(pubsub.WithBufferSize(bufferSize))
+	sub, err := t.topic.Subscribe(pubsub.WithBufferSize(subscribeOutputBufferSize))
 	if err != nil {
 		return err
 	}

@@ -59,11 +59,11 @@ func TestSign_CommittedSeals(t *testing.T) {
 
 		assert.NoError(t, err)
 
-		return verifyCommitedFields(snap, sealed)
+		return verifyCommitedFields(snap, sealed, OptimalQuorumSize)
 	}
 
 	// Correct
-	assert.NoError(t, buildCommittedSeal([]string{"A", "B", "C"}))
+	assert.NoError(t, buildCommittedSeal([]string{"A", "B", "C", "D"}))
 
 	// Failed - Repeated signature
 	assert.Error(t, buildCommittedSeal([]string{"A", "A"}))

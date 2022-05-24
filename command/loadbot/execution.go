@@ -4,23 +4,24 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/command/loadbot/generator"
-	txpoolOp "github.com/0xPolygon/polygon-edge/txpool/proto"
-	"github.com/golang/protobuf/ptypes/any"
 	"math/big"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/command/loadbot/generator"
 	"github.com/0xPolygon/polygon-edge/helper/tests"
+	txpoolOp "github.com/0xPolygon/polygon-edge/txpool/proto"
+	"github.com/golang/protobuf/ptypes/any"
+	"github.com/umbracle/go-web3/jsonrpc"
+
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/go-web3"
-	"github.com/umbracle/go-web3/jsonrpc"
 )
 
 const (
 	maxReceiptWait = 5 * time.Minute
-	minReceiptWait = 30 * time.Second
+	minReceiptWait = 1 * time.Minute
 
 	defaultFastestTurnAround = time.Hour * 24
 	defaultSlowestTurnAround = time.Duration(0)
@@ -33,6 +34,8 @@ type Mode string
 const (
 	transfer Mode = "transfer"
 	deploy   Mode = "deploy"
+	erc20    Mode = "erc20"
+	erc721   Mode = "erc721"
 )
 
 type Account struct {
@@ -54,6 +57,8 @@ type Configuration struct {
 	GasPrice         *big.Int
 	GasLimit         *big.Int
 	ContractArtifact *generator.ContractArtifact
+	ConstructorArgs  []byte // smart contract constructor args
+	MaxWait          uint64 // max wait time for receipts in minutes
 }
 
 type metadata struct {
@@ -64,98 +69,39 @@ type metadata struct {
 	blockNumber uint64
 }
 
-type ExecDuration struct {
-	// turnAroundMap maps the transaction hash -> turn around time for passing transactions
-	turnAroundMap     sync.Map
-	turnAroundMapSize uint64
-
-	// blockTransactions maps how many transactions went into a block
-	blockTransactions map[uint64]uint64
-
-	// Arrival Time - Time at which the transaction is added
-	// Completion Time -Time at which the transaction is sealed
-	// Turn around time - Completion Time – Arrival Time
-
-	// AverageTurnAround is the average turn around time for all passing transactions
-	AverageTurnAround time.Duration
-
-	// FastestTurnAround is the fastest turn around time recorded for a transaction
-	FastestTurnAround time.Duration
-
-	// SlowestTurnAround is the slowest turn around time recorded for a transaction
-	SlowestTurnAround time.Duration
-
-	// TotalExecTime is the total execution time for a single loadbot run
-	TotalExecTime time.Duration
+type GasMetrics struct {
+	GasUsed     uint64
+	GasLimit    uint64
+	Utilization float64
 }
 
-// calcTurnAroundMetrics updates the turn around metrics based on the turnAroundMap
-func (ed *ExecDuration) calcTurnAroundMetrics() {
-	// Set the initial values
-	fastestTurnAround := defaultFastestTurnAround
-	slowestTurnAround := defaultSlowestTurnAround
-	totalPassing := atomic.LoadUint64(&ed.turnAroundMapSize)
+type BlockGasMetrics struct {
+	sync.Mutex
 
-	var (
-		zeroTime  time.Time // Zero time
-		totalTime time.Time // Zero time used for tracking
-	)
-
-	if totalPassing == 0 {
-		// No data to show, use zero data
-		zeroDuration := time.Duration(0)
-		ed.SlowestTurnAround = zeroDuration
-		ed.FastestTurnAround = zeroDuration
-		ed.AverageTurnAround = zeroDuration
-
-		return
-	}
-
-	ed.turnAroundMap.Range(func(_, value interface{}) bool {
-		data, ok := value.(*metadata)
-		if !ok {
-			return false
-		}
-
-		turnAroundTime := data.turnAroundTime
-
-		// Update the duration metrics
-		if turnAroundTime < fastestTurnAround {
-			fastestTurnAround = turnAroundTime
-		}
-
-		if turnAroundTime > slowestTurnAround {
-			slowestTurnAround = turnAroundTime
-		}
-
-		totalTime = totalTime.Add(turnAroundTime)
-
-		ed.blockTransactions[data.blockNumber]++
-
-		return true
-	})
-
-	averageDuration := (totalTime.Sub(zeroTime)) / time.Duration(totalPassing)
-
-	ed.SlowestTurnAround = slowestTurnAround
-	ed.FastestTurnAround = fastestTurnAround
-	ed.AverageTurnAround = averageDuration
+	Blocks map[uint64]GasMetrics
 }
 
-// reportExecTime reports the turn around time for a transaction
-// for a single loadbot run
-func (ed *ExecDuration) reportTurnAroundTime(
-	txHash web3.Hash,
-	data *metadata,
-) {
-	ed.turnAroundMap.Store(txHash, data)
-	atomic.AddUint64(&ed.turnAroundMapSize, 1)
+// AddBlockMetric adds a block gas metric for the specified block number [Thread safe]
+func (b *BlockGasMetrics) AddBlockMetric(blockNum uint64, gasMetric GasMetrics) {
+	b.Lock()
+	defer b.Unlock()
+
+	b.Blocks[blockNum] = gasMetric
+}
+
+type ContractMetricsData struct {
+	FailedContractTransactionsCount uint64
+	ContractDeploymentDuration      ExecDuration
+	ContractAddress                 web3.Address
+	ContractGasMetrics              *BlockGasMetrics
 }
 
 type Metrics struct {
 	TotalTransactionsSentCount uint64
 	FailedTransactionsCount    uint64
 	TransactionDuration        ExecDuration
+	ContractMetrics            *ContractMetricsData
+	GasMetrics                 *BlockGasMetrics
 }
 
 type Loadbot struct {
@@ -164,88 +110,56 @@ type Loadbot struct {
 	generator generator.TransactionGenerator
 }
 
-// calcMaxTimeout calculates the max timeout for transactions receipts
-// based on the transaction count and tps params
-func calcMaxTimeout(count, tps uint64) time.Duration {
-	waitTime := minReceiptWait
-	// The receipt timeout should be at max maxReceiptWait
-	// or minReceiptWait + tps / count * 100
-	// This way the wait time scales linearly for more stressful situations
-	waitFactor := time.Duration(float64(tps)/float64(count)*100) * time.Second
-
-	if waitTime+waitFactor > maxReceiptWait {
-		return maxReceiptWait
-	}
-
-	return waitTime + waitFactor
-}
-
-func NewLoadBot(cfg *Configuration, metrics *Metrics) *Loadbot {
-	return &Loadbot{
-		cfg:     cfg,
-		metrics: metrics,
-	}
-}
-
-func getInitialSenderNonce(client *jsonrpc.Client, address types.Address) (uint64, error) {
-	nonce, err := client.Eth().GetNonce(web3.Address(address), web3.Latest)
-	if err != nil {
-		return 0, fmt.Errorf("failed to query initial sender nonce: %w", err)
-	}
-
-	return nonce, nil
-}
-
-func getAverageGasPrice(client *jsonrpc.Client) (uint64, error) {
-	gasPrice, err := client.Eth().GasPrice()
-	if err != nil {
-		return 0, fmt.Errorf("failed to query initial gas price: %w", err)
-	}
-
-	return gasPrice, nil
-}
-
-func estimateGas(client *jsonrpc.Client, txn *types.Transaction) (uint64, error) {
-	gasEstimate, err := client.Eth().EstimateGas(&web3.CallMsg{
-		From:     web3.Address(txn.From),
-		To:       (*web3.Address)(txn.To),
-		Data:     txn.Input,
-		GasPrice: txn.GasPrice.Uint64(),
-		Value:    txn.Value,
-	})
-
-	if err != nil {
-		return 0, fmt.Errorf("failed to query gas estimate: %w", err)
-	}
-
-	if gasEstimate == 0 {
-		gasEstimate = defaultGasLimit
-	}
-
-	return gasEstimate, nil
-}
-
-func (l *Loadbot) executeTxn(
-	client txpoolOp.TxnPoolOperatorClient,
-) (web3.Hash, error) {
-	txn, err := l.generator.GenerateTransaction()
-	if err != nil {
-		return web3.Hash{}, err
-	}
-
-	addReq := &txpoolOp.AddTxnReq{
-		Raw: &any.Any{
-			Value: txn.MarshalRLP(),
+func NewLoadbot(cfg *Configuration) *Loadbot {
+	loadbot := &Loadbot{
+		cfg: cfg,
+		metrics: &Metrics{
+			TotalTransactionsSentCount: 0,
+			FailedTransactionsCount:    0,
+			TransactionDuration: ExecDuration{
+				blockTransactions: make(map[uint64]uint64),
+			},
+			GasMetrics: &BlockGasMetrics{
+				Blocks: make(map[uint64]GasMetrics),
+			},
 		},
-		From: types.ZeroAddress.String(),
 	}
 
-	addRes, addErr := client.AddTxn(context.Background(), addReq)
-	if addErr != nil {
-		return web3.Hash{}, fmt.Errorf("unable to add transaction, %w", addErr)
+	// Attempt to initialize contract metrics if needed
+	loadbot.initContractMetricsIfNeeded()
+
+	return loadbot
+}
+
+// initContractMetrics initializes contract metrics for
+// the loadbot instance
+func (l *Loadbot) initContractMetricsIfNeeded() {
+	if !l.needsContractMetrics() {
+		return
 	}
 
-	return web3.Hash(types.StringToHash(addRes.TxHash)), nil
+	l.metrics.ContractMetrics = &ContractMetricsData{
+		ContractDeploymentDuration: ExecDuration{
+			blockTransactions: make(map[uint64]uint64),
+		},
+		ContractGasMetrics: &BlockGasMetrics{
+			Blocks: make(map[uint64]GasMetrics),
+		},
+	}
+}
+
+func (l *Loadbot) needsContractMetrics() bool {
+	return l.cfg.GeneratorMode == deploy ||
+		l.cfg.GeneratorMode == erc20 ||
+		l.cfg.GeneratorMode == erc721
+}
+
+func (l *Loadbot) GetMetrics() *Metrics {
+	return l.metrics
+}
+
+func (l *Loadbot) GetGenerator() generator.TransactionGenerator {
+	return l.generator
 }
 
 func (l *Loadbot) Run() error {
@@ -286,17 +200,21 @@ func (l *Loadbot) Run() error {
 
 	// Set up the transaction generator
 	generatorParams := &generator.GeneratorParams{
-		Nonce:         nonce,
-		ChainID:       l.cfg.ChainID,
-		SenderAddress: sender.Address,
-		SenderKey:     sender.PrivateKey,
-		GasPrice:      gasPrice,
-		Value:         l.cfg.Value,
+		Nonce:            nonce,
+		ChainID:          l.cfg.ChainID,
+		SenderAddress:    sender.Address,
+		RecieverAddress:  l.cfg.Receiver,
+		SenderKey:        sender.PrivateKey,
+		GasPrice:         gasPrice,
+		Value:            l.cfg.Value,
+		ContractArtifact: l.cfg.ContractArtifact,
+		ConstructorArgs:  l.cfg.ConstructorArgs,
 	}
 
 	var (
-		txnGenerator generator.TransactionGenerator
-		genErr       error = nil
+		txnGenerator      generator.TransactionGenerator
+		tokenTxnGenerator generator.ContractTxnGenerator
+		genErr            error
 	)
 
 	switch l.cfg.GeneratorMode {
@@ -304,41 +222,58 @@ func (l *Loadbot) Run() error {
 		txnGenerator, genErr = generator.NewTransferGenerator(generatorParams)
 	case deploy:
 		txnGenerator, genErr = generator.NewDeployGenerator(generatorParams)
+	case erc20:
+		tokenTxnGenerator, genErr = generator.NewERC20Generator(generatorParams)
+	case erc721:
+		tokenTxnGenerator, genErr = generator.NewERC721Generator(generatorParams)
 	}
 
 	if genErr != nil {
 		return fmt.Errorf("unable to start generator, %w", genErr)
 	}
 
-	l.generator = txnGenerator
-
-	// Get the gas estimate
-	exampleTxn, err := l.generator.GetExampleTransaction()
-	if err != nil {
-		return fmt.Errorf("unable to get example transaction, %w", err)
+	switch l.cfg.GeneratorMode {
+	case erc20, erc721:
+		l.generator = tokenTxnGenerator
+	default:
+		l.generator = txnGenerator
 	}
 
-	gasLimit := l.cfg.GasLimit
-	if gasLimit == nil {
-		// No gas limit specified, query the network for an estimation
-		gasEstimate, estimateErr := estimateGas(jsonClient, exampleTxn)
-		if estimateErr != nil {
-			return fmt.Errorf("unable to get gas estimate, %w", err)
-		}
-
-		gasLimit = new(big.Int).SetUint64(gasEstimate)
+	if err := l.updateGasEstimate(jsonClient); err != nil {
+		return fmt.Errorf("could not update gas estimate, %w", err)
 	}
-
-	l.generator.SetGasEstimate(gasLimit.Uint64())
 
 	ticker := time.NewTicker(1 * time.Second / time.Duration(l.cfg.TPS))
 	defer ticker.Stop()
 
-	var wg sync.WaitGroup
-
-	receiptTimeout := calcMaxTimeout(l.cfg.Count, l.cfg.TPS)
+	var receiptTimeout time.Duration
+	// if max-wait flag is not set it will be calculated dynamically
+	if l.cfg.MaxWait == 0 {
+		receiptTimeout = calcMaxTimeout(l.cfg.Count, l.cfg.TPS)
+	} else {
+		receiptTimeout = time.Duration(l.cfg.MaxWait) * time.Minute
+	}
 
 	startTime := time.Now()
+
+	if l.isTokenTransferMode() {
+		if err := l.deployContract(grpcClient, jsonClient, receiptTimeout); err != nil {
+			return fmt.Errorf("unable to deploy smart contract, %w", err)
+		}
+	}
+
+	var (
+		seenBlockNums     = make(map[uint64]struct{})
+		seenBlockNumsLock sync.Mutex
+		wg                sync.WaitGroup
+	)
+
+	markSeenBlock := func(blockNum uint64) {
+		seenBlockNumsLock.Lock()
+		defer seenBlockNumsLock.Unlock()
+
+		seenBlockNums[blockNum] = struct{}{}
+	}
 
 	for i := uint64(0); i < l.cfg.Count; i++ {
 		<-ticker.C
@@ -387,6 +322,10 @@ func (l *Loadbot) Run() error {
 				return
 			}
 
+			// Mark the block as seen so data on it
+			// is gathered later
+			markSeenBlock(receipt.BlockNumber)
+
 			// Stop the performance timer
 			end := time.Now()
 
@@ -404,9 +343,38 @@ func (l *Loadbot) Run() error {
 
 	endTime := time.Now()
 
+	// Fetch the block gas metrics for seen blocks
+	l.metrics.GasMetrics, err = getBlockGasMetrics(jsonClient, seenBlockNums)
+	if err != nil {
+		return fmt.Errorf("unable to calculate block gas metrics: %w", err)
+	}
+
 	// Calculate the turn around metrics now that the loadbot is done
 	l.metrics.TransactionDuration.calcTurnAroundMetrics()
 	l.metrics.TransactionDuration.TotalExecTime = endTime.Sub(startTime)
 
 	return nil
+}
+
+func (l *Loadbot) executeTxn(
+	client txpoolOp.TxnPoolOperatorClient,
+) (web3.Hash, error) {
+	txn, err := l.generator.GenerateTransaction()
+	if err != nil {
+		return web3.Hash{}, err
+	}
+
+	addReq := &txpoolOp.AddTxnReq{
+		Raw: &any.Any{
+			Value: txn.MarshalRLP(),
+		},
+		From: types.ZeroAddress.String(),
+	}
+
+	addRes, addErr := client.AddTxn(context.Background(), addReq)
+	if addErr != nil {
+		return web3.Hash{}, fmt.Errorf("unable to add transaction, %w", addErr)
+	}
+
+	return web3.Hash(types.StringToHash(addRes.TxHash)), nil
 }

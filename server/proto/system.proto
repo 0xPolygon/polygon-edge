@@ -7,89 +7,92 @@ option go_package = "/server/proto";
 import "google/protobuf/empty.proto";
 
 service System {
-    // GetInfo returns info about the client
-    rpc GetStatus(google.protobuf.Empty) returns (ServerStatus);
+  // GetInfo returns info about the client
+  rpc GetStatus(google.protobuf.Empty) returns (ServerStatus);
 
-    // PeersAdd adds a new peer
-    rpc PeersAdd(PeersAddRequest) returns (google.protobuf.Empty);
+  // PeersAdd adds a new peer
+  rpc PeersAdd(PeersAddRequest) returns (PeersAddResponse);
 
-    // PeersList returns the list of peers
-    rpc PeersList(google.protobuf.Empty) returns (PeersListResponse);
+  // PeersList returns the list of peers
+  rpc PeersList(google.protobuf.Empty) returns (PeersListResponse);
 
-    // PeersInfo returns the info of a peer
-    rpc PeersStatus(PeersStatusRequest) returns (Peer);
+  // PeersInfo returns the info of a peer
+  rpc PeersStatus(PeersStatusRequest) returns (Peer);
 
-    // Subscribe subscribes to blockchain events
-    rpc Subscribe(google.protobuf.Empty) returns (stream BlockchainEvent);
+  // Subscribe subscribes to blockchain events
+  rpc Subscribe(google.protobuf.Empty) returns (stream BlockchainEvent);
 
-    // Export returns blockchain data
-    rpc BlockByNumber(BlockByNumberRequest) returns (BlockResponse);
+  // Export returns blockchain data
+  rpc BlockByNumber(BlockByNumberRequest) returns (BlockResponse);
 
-    // Export returns blockchain data
-    rpc Export(ExportRequest) returns (stream ExportEvent);
+  // Export returns blockchain data
+  rpc Export(ExportRequest) returns (stream ExportEvent);
 }
 
 message BlockchainEvent {
-    repeated Header added = 1;
-    repeated Header removed = 2;
+  repeated Header added = 1;
+  repeated Header removed = 2;
 
-    message Header {
-        int64 number = 1;
-        string hash = 2;
-    }
+  message Header {
+    int64 number = 1;
+    string hash = 2;
+  }
 }
 
 message ServerStatus {
-    int64 network = 1;
+  int64 network = 1;
 
-    string genesis = 2;
+  string genesis = 2;
 
-    Block current = 3;
+  Block current = 3;
 
-    string p2pAddr = 4;
+  string p2pAddr = 4;
 
-    message Block {
-        int64 number = 1;
-        string hash = 2;
-    }
+  message Block {
+    int64 number = 1;
+    string hash = 2;
+  }
 }
 
 message Peer {
-    string id = 1;
-    repeated string protocols = 2;
-    repeated string addrs = 3;
+  string id = 1;
+  repeated string protocols = 2;
+  repeated string addrs = 3;
 }
 
 message PeersAddRequest {
-    string id = 1;
-    bool blocked = 2;
+  string id = 1;
+}
+
+message PeersAddResponse {
+  string message = 1;
 }
 
 message PeersStatusRequest {
-    string id = 1;
+  string id = 1;
 }
 
 message PeersListResponse {
-    repeated Peer peers = 1;
+  repeated Peer peers = 1;
 }
 
 message BlockByNumberRequest {
-    uint64 number = 1;
+  uint64 number = 1;
 }
 
 message BlockResponse {
-    bytes data = 1;
+  bytes data = 1;
 }
 
 message ExportRequest {
-    uint64 from = 1;
-    uint64 to = 2;
+  uint64 from = 1;
+  uint64 to = 2;
 }
 
 message ExportEvent {
-    uint64 from = 1;
-    // null when zero
-    uint64 to = 2;
-    uint64 latest = 3;
-    bytes data = 4;
+  uint64 from = 1;
+  // null when zero
+  uint64 to = 2;
+  uint64 latest = 3;
+  bytes data = 4;
 }

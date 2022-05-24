@@ -156,6 +156,8 @@ func TestEventSubscription_ProcessedEvents(t *testing.T) {
 }
 
 func TestEventSubscription_EventSupported(t *testing.T) {
+	t.Parallel()
+
 	supportedEvents := []proto.EventType{
 		proto.EventType_ADDED,
 		proto.EventType_PROMOTED,
@@ -187,7 +189,10 @@ func TestEventSubscription_EventSupported(t *testing.T) {
 	}
 
 	for _, testCase := range testTable {
+		testCase := testCase
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
 			for _, eventType := range testCase.events {
 				assert.Equal(t, testCase.supported, subscription.eventSupported(eventType))
 			}

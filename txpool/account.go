@@ -137,7 +137,7 @@ func (m *accountsMap) allTxs(includeEnqueued bool) (
 
 // An account is the core structure for processing
 // transactions from a specific address. The nextNonce
-// field is what separetes the enqueued from promoted:
+// field is what separates the enqueued from promoted transactions:
 //
 // 	1. enqueued - transactions higher than the nextNonce
 // 	2. promoted - transactions lower than the nextNonce
@@ -150,6 +150,7 @@ type account struct {
 	init               sync.Once
 	enqueued, promoted *accountQueue
 	nextNonce          uint64
+	demotions          uint
 }
 
 // getNonce returns the next expected nonce for this account.
@@ -160,6 +161,52 @@ func (a *account) getNonce() uint64 {
 // setNonce sets the next expected nonce for this account.
 func (a *account) setNonce(nonce uint64) {
 	atomic.StoreUint64(&a.nextNonce, nonce)
+}
+
+//	reset aligns the account with the new nonce
+//	by pruning all transactions with nonce lesser than new.
+//	After pruning, a promotion may be signaled if the first
+// 	enqueued transaction matches the new nonce.
+func (a *account) reset(nonce uint64, promoteCh chan<- promoteRequest) (
+	prunedPromoted,
+	prunedEnqueued []*types.Transaction,
+) {
+	a.promoted.lock(true)
+	defer a.promoted.unlock()
+
+	//	prune the promoted txs
+	prunedPromoted = append(
+		prunedPromoted,
+		a.promoted.prune(nonce)...,
+	)
+
+	if nonce <= a.getNonce() {
+		// only the promoted queue needed pruning
+		return
+	}
+
+	a.enqueued.lock(true)
+	defer a.enqueued.unlock()
+
+	//	prune the enqueued txs
+	prunedEnqueued = append(
+		prunedEnqueued,
+		a.enqueued.prune(nonce)...,
+	)
+
+	//	update nonce expected for this account
+	a.setNonce(nonce)
+
+	//	it is important to signal promotion while
+	//	the locks are held to ensure no other
+	//	handler will mutate the account
+	if first := a.enqueued.peek(); first != nil &&
+		first.Nonce == nonce {
+		// first enqueued tx is expected -> signal promotion
+		promoteCh <- promoteRequest{account: first.From}
+	}
+
+	return
 }
 
 // enqueue attempts tp push the transaction onto the enqueued queue.
@@ -183,7 +230,7 @@ func (a *account) enqueue(tx *types.Transaction) error {
 // Eligible transactions are all sequential in order of nonce
 // and the first one has to have nonce less (or equal) to the account's
 // nextNonce.
-func (a *account) promote() (uint64, []types.Hash) {
+func (a *account) promote() []*types.Transaction {
 	a.promoted.lock(true)
 	a.enqueued.lock(true)
 
@@ -192,17 +239,19 @@ func (a *account) promote() (uint64, []types.Hash) {
 		a.promoted.unlock()
 	}()
 
+	//	sanity check
 	currentNonce := a.getNonce()
 	if a.enqueued.length() == 0 ||
 		a.enqueued.peek().Nonce > currentNonce {
 		// nothing to promote
-		return 0, nil
+		return nil
 	}
 
-	promoted := uint64(0)
-	promotedTxnHashes := make([]types.Hash, 0)
+	promoted := make([]*types.Transaction, 0)
 	nextNonce := a.enqueued.peek().Nonce
 
+	//	move all promotable txs (enqueued txs that are sequential in nonce)
+	//	to the account's promoted queue
 	for {
 		tx := a.enqueued.peek()
 		if tx == nil ||
@@ -215,11 +264,12 @@ func (a *account) promote() (uint64, []types.Hash) {
 
 		// push to promoted
 		a.promoted.push(tx)
-		promotedTxnHashes = append(promotedTxnHashes, tx.Hash)
 
 		// update counters
 		nextNonce += 1
-		promoted += 1
+
+		// update return result
+		promoted = append(promoted, tx)
 	}
 
 	// only update the nonce map if the new nonce
@@ -228,5 +278,5 @@ func (a *account) promote() (uint64, []types.Hash) {
 		a.setNonce(nextNonce)
 	}
 
-	return promoted, promotedTxnHashes
+	return promoted
 }

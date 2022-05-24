@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"fmt"
 	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"math/big"
@@ -79,6 +80,86 @@ func validateValidatorSet(
 			foundInValidatorSet(validatorSet, address),
 			"expected address to not be present in the validator set",
 		)
+	}
+}
+
+func TestPoS_ValidatorBoundaries(t *testing.T) {
+	accounts := []struct {
+		key     *ecdsa.PrivateKey
+		address types.Address
+	}{}
+	stakeAmount := framework.EthToWei(1)
+	numGenesisValidators := IBFTMinNodes
+	minValidatorCount := uint64(1)
+	maxValidatorCount := uint64(numGenesisValidators + 1)
+	numNewStakers := 2
+
+	for i := 0; i < numNewStakers; i++ {
+		k, a := tests.GenerateKeyAndAddr(t)
+
+		accounts = append(accounts, struct {
+			key     *ecdsa.PrivateKey
+			address types.Address
+		}{
+			key:     k,
+			address: a,
+		})
+	}
+
+	defaultBalance := framework.EthToWei(100)
+	ibftManager := framework.NewIBFTServersManager(
+		t,
+		numGenesisValidators,
+		IBFTDirPrefix,
+		func(i int, config *framework.TestServerConfig) {
+			config.SetSeal(true)
+			config.SetEpochSize(2)
+			config.PremineValidatorBalance(defaultBalance)
+			for j := 0; j < numNewStakers; j++ {
+				config.Premine(accounts[j].address, defaultBalance)
+			}
+			config.SetIBFTPoS(true)
+			config.SetMinValidatorCount(minValidatorCount)
+			config.SetMaxValidatorCount(maxValidatorCount)
+		})
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	ibftManager.StartServers(ctx)
+
+	srv := ibftManager.GetServer(0)
+
+	client := srv.JSONRPC()
+
+	testCases := []struct {
+		name              string
+		address           types.Address
+		key               *ecdsa.PrivateKey
+		expectedExistence bool
+		expectedSize      int
+	}{
+		{
+			name:              "Can add a 5th validator",
+			address:           accounts[0].address,
+			key:               accounts[0].key,
+			expectedExistence: true,
+			expectedSize:      numGenesisValidators + 1,
+		},
+		{
+			name:              "Can not add a 6th validator",
+			address:           accounts[1].address,
+			key:               accounts[1].key,
+			expectedExistence: false,
+			expectedSize:      numGenesisValidators + 1,
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			err := framework.StakeAmount(tt.address, tt.key, stakeAmount, srv)
+			assert.NoError(t, err)
+			validateValidatorSet(t, tt.address, client, tt.expectedExistence, tt.expectedSize)
+		})
 	}
 }
 
@@ -209,7 +290,7 @@ func TestPoS_Unstake(t *testing.T) {
 
 	assert.Equal(t, expectedBalance.String(), stakedAmount.String())
 
-	// Check the account balance
+	// Check the address balance
 	fee := new(big.Int).Mul(
 		big.NewInt(int64(receipt.GasUsed)),
 		big.NewInt(framework.DefaultGasPrice),
@@ -247,6 +328,7 @@ func TestPoS_UnstakeExploit(t *testing.T) {
 		config.Premine(senderAddr, defaultBalance)
 		config.SetDevStakingAddresses(append(generateStakingAddresses(numDummyValidators), senderAddr))
 		config.SetIBFTPoS(true)
+		config.SetBlockLimit(5000000000)
 	})
 	srv := srvs[0]
 	client := srv.JSONRPC()
@@ -294,6 +376,8 @@ func TestPoS_UnstakeExploit(t *testing.T) {
 		return signedTx
 	}
 
+	txHashes := make([]web3.Hash, 0)
+
 	for i := 0; i < numTransactions; i++ {
 		var msg *txpoolOp.AddTxnReq
 
@@ -306,22 +390,23 @@ func TestPoS_UnstakeExploit(t *testing.T) {
 			From: types.ZeroAddress.String(),
 		}
 
-		_, addErr := clt.AddTxn(context.Background(), msg)
+		addCtx, addCtxCn := context.WithTimeout(context.Background(), framework.DefaultTimeout)
+
+		addResp, addErr := clt.AddTxn(addCtx, msg)
 		if addErr != nil {
 			t.Fatalf("Unable to add txn, %v", addErr)
 		}
+
+		txHashes = append(txHashes, web3.HexToHash(addResp.TxHash))
+
+		addCtxCn()
 	}
 
-	// Set up the blockchain listener to catch the added block event
-	blockNum := waitForBlock(t, srv, 1, 0)
+	// Wait for the transactions to go through
+	totalGasUsed := srv.GetGasTotal(txHashes)
 
-	block, blockErr := client.Eth().GetBlockByNumber(web3.BlockNumber(blockNum), true)
-	if blockErr != nil {
-		t.Fatalf("Unable to fetch block")
-	}
-
-	// Find how much the account paid for all the transactions in this block
-	paidFee := big.NewInt(0).Mul(bigGasPrice, big.NewInt(int64(block.GasUsed)))
+	// Find how much the address paid for all the transactions in this block
+	paidFee := big.NewInt(0).Mul(bigGasPrice, big.NewInt(int64(totalGasUsed)))
 
 	// Check the balances
 	actualAccountBalance := framework.GetAccountBalance(t, senderAddr, client)
@@ -436,6 +521,7 @@ func TestPoS_StakeUnstakeExploit(t *testing.T) {
 
 	oneEth := framework.EthToWei(1)
 	zeroEth := framework.EthToWei(0)
+	txHashes := make([]web3.Hash, 0)
 
 	for i := 0; i < numTransactions; i++ {
 		var msg *txpoolOp.AddTxnReq
@@ -458,22 +544,19 @@ func TestPoS_StakeUnstakeExploit(t *testing.T) {
 			}
 		}
 
-		_, addErr := txpoolClient.AddTxn(context.Background(), msg)
+		addResp, addErr := txpoolClient.AddTxn(context.Background(), msg)
 		if addErr != nil {
 			t.Fatalf("Unable to add txn, %v", addErr)
 		}
+
+		txHashes = append(txHashes, web3.HexToHash(addResp.TxHash))
 	}
 
 	// Set up the blockchain listener to catch the added block event
-	blockNum := waitForBlock(t, srv, 1, 0)
+	totalGasUsed := srv.GetGasTotal(txHashes)
 
-	block, blockErr := client.Eth().GetBlockByNumber(web3.BlockNumber(blockNum), true)
-	if blockErr != nil {
-		t.Fatalf("Unable to fetch block")
-	}
-
-	// Find how much the account paid for all the transactions in this block
-	paidFee := big.NewInt(0).Mul(bigGasPrice, big.NewInt(int64(block.GasUsed)))
+	// Find how much the address paid for all the transactions in this block
+	paidFee := big.NewInt(0).Mul(bigGasPrice, big.NewInt(int64(totalGasUsed)))
 
 	// Check the balances
 	actualAccountBalance := framework.GetAccountBalance(t, senderAddr, client)
@@ -492,7 +575,7 @@ func TestPoS_StakeUnstakeExploit(t *testing.T) {
 		"Staked address balance mismatch after stake / unstake exploit",
 	)
 
-	// Make sure the account balances match up
+	// Make sure the address balances match up
 
 	// expBalance = previousAccountBalance + stakeRefund - 1 ETH - block fees
 	expBalance := big.NewInt(0).Sub(big.NewInt(0).Add(defaultBalance, bigDefaultStakedBalance), oneEth)
@@ -569,6 +652,8 @@ func TestPoS_StakeUnstakeWithinSameBlock(t *testing.T) {
 	}
 
 	zeroEth := framework.EthToWei(0)
+	txHashes := make([]web3.Hash, 0)
+
 	// addTxn is a helper method for generating and adding a transaction
 	// through the operator command
 	addTxn := func(value *big.Int, methodName string) {
@@ -580,10 +665,12 @@ func TestPoS_StakeUnstakeWithinSameBlock(t *testing.T) {
 			From: types.ZeroAddress.String(),
 		}
 
-		_, addErr := txpoolClient.AddTxn(context.Background(), txnMsg)
+		addResp, addErr := txpoolClient.AddTxn(context.Background(), txnMsg)
 		if addErr != nil {
 			t.Fatalf("Unable to add txn, %v", addErr)
 		}
+
+		txHashes = append(txHashes, web3.HexToHash(addResp.TxHash))
 	}
 
 	// Stake transaction
@@ -592,16 +679,11 @@ func TestPoS_StakeUnstakeWithinSameBlock(t *testing.T) {
 	// Unstake transaction
 	addTxn(zeroEth, "unstake")
 
-	// Set up the blockchain listener to catch the added block event
-	blockNum := waitForBlock(t, srv, 1, 0)
+	// Wait for the transactions to go through
+	totalGasUsed := srv.GetGasTotal(txHashes)
 
-	block, blockErr := client.Eth().GetBlockByNumber(web3.BlockNumber(blockNum), true)
-	if blockErr != nil {
-		t.Fatalf("Unable to fetch block")
-	}
-
-	// Find how much the account paid for all the transactions in this block
-	paidFee := big.NewInt(0).Mul(bigGasPrice, big.NewInt(int64(block.GasUsed)))
+	// Find how much the address paid for all the transactions in this block
+	paidFee := big.NewInt(0).Mul(bigGasPrice, big.NewInt(int64(totalGasUsed)))
 
 	// Check the balances
 	actualAccountBalance := framework.GetAccountBalance(t, senderAddr, client)
@@ -617,7 +699,7 @@ func TestPoS_StakeUnstakeWithinSameBlock(t *testing.T) {
 		"Staked address balance mismatch after stake / unstake events",
 	)
 
-	// Make sure the account balances match up
+	// Make sure the address balances match up
 
 	// expBalance = previousAccountBalance - block fees
 	expBalance := big.NewInt(0).Sub(defaultBalance, paidFee)

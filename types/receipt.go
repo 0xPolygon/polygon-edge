@@ -29,12 +29,16 @@ type Receipt struct {
 
 	// context fields
 	GasUsed         uint64
-	ContractAddress Address
+	ContractAddress *Address
 	TxHash          Hash
 }
 
 func (r *Receipt) SetStatus(s ReceiptStatus) {
 	r.Status = &s
+}
+
+func (r *Receipt) SetContractAddress(contractAddress Address) {
+	r.ContractAddress = &contractAddress
 }
 
 type Log struct {

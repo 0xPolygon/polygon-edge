@@ -3,29 +3,24 @@ syntax = "proto3";
 package v1;
 
 option go_package = "/network/proto";
-import "google/protobuf/empty.proto";
 
 service Identity {
-    rpc Hello(Status) returns (Status);
-
-    rpc Bye(ByeMsg) returns (google.protobuf.Empty);
-}
-
-message ByeMsg {
-    string reason = 1;
+  rpc Hello(Status) returns (Status);
 }
 
 message Status {
-    map<string, string> metadata = 1;
-    
-    repeated Key keys = 2;
+  map<string, string> metadata = 1;
 
-    int64 chain = 3;
+  repeated Key keys = 2;
 
-    string genesis = 4;
-    
-    message Key {
-        string signature = 1;
-        string message = 2;
-    }
+  int64 chain = 3;
+
+  string genesis = 4;
+
+  bool temporaryDial = 5;
+
+  message Key {
+    string signature = 1;
+    string message = 2;
+  }
 }
