@@ -5,5 +5,5 @@ var (
 	// Embedded by --ldflags on build time
 	// Versioning should follow the SemVer guidelines
 	// https://semver.org/
-	Version = "v0.1.0"
+	Version = "v0.4.1"
 )
