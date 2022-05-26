@@ -1,0 +1,78 @@
+// Copyright 2021 The go-ethereum Authors
+// This file is part of the go-ethereum library.
+//
+// The go-ethereum library is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// The go-ethereum library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
+
+package native
+
+import (
+	"encoding/json"
+	"math/big"
+	"time"
+
+	"github.com/0xPolygon/polygon-edge/state/runtime"
+	"github.com/0xPolygon/polygon-edge/tracers"
+	"github.com/0xPolygon/polygon-edge/types"
+)
+
+func init() {
+	register("noopTracer", newNoopTracer)
+}
+
+// noopTracer is a go implementation of the Tracer interface which
+// performs no action. It's mostly useful for testing purposes.
+type noopTracer struct{}
+
+// newNoopTracer returns a new noop tracer.
+func newNoopTracer(ctx *tracers.Context) tracers.Tracer {
+	return &noopTracer{}
+}
+
+// CaptureStart implements the EVMLogger interface to initialize the tracing operation.
+func (t *noopTracer) CaptureStart(txn interface{}, from types.Address, to types.Address, create bool, input []byte, gas uint64, value *big.Int) {
+}
+
+// CaptureEnd is called after the call finishes to finalize the tracing.
+func (t *noopTracer) CaptureEnd(output []byte, gasUsed uint64, _ time.Duration, err error) {
+}
+
+// CaptureState implements the EVMLogger interface to trace a single step of VM execution.
+func (t *noopTracer) CaptureState(pc uint64, op int, gas, cost uint64, scope *runtime.ScopeContext, rData []byte, depth int, err error) {
+}
+
+// CaptureFault implements the EVMLogger interface to trace an execution fault.
+func (t *noopTracer) CaptureFault(pc uint64, op int, gas, cost uint64, _ *runtime.ScopeContext, depth int, err error) {
+}
+
+// CaptureEnter is called when EVM enters a new scope (via call, create or selfdestruct).
+func (t *noopTracer) CaptureEnter(typ int, from types.Address, to types.Address, input []byte, gas uint64, value *big.Int) {
+}
+
+// CaptureExit is called when EVM exits a scope, even if the scope didn't
+// execute any code.
+func (t *noopTracer) CaptureExit(output []byte, gasUsed uint64, err error) {
+}
+
+func (*noopTracer) CaptureTxStart(gasLimit uint64) {}
+
+func (*noopTracer) CaptureTxEnd(restGas uint64) {}
+
+// GetResult returns an empty json object.
+func (t *noopTracer) GetResult() (json.RawMessage, error) {
+	return json.RawMessage(`{}`), nil
+}
+
+// Stop terminates execution of the tracer at the first opportune moment.
+func (t *noopTracer) Stop(err error) {
+}

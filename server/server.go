@@ -517,6 +517,28 @@ func (j *jsonRPCHub) ApplyTxn(
 	return
 }
 
+func (j *jsonRPCHub) ApplyMessage(
+	header *types.Header,
+	txn *types.Transaction,
+	tracerConfig runtime.TraceConfig,
+) (result *runtime.ExecutionResult, err error) {
+	blockCreator, err := j.GetConsensus().GetBlockCreator(header)
+	if err != nil {
+		return nil, err
+	}
+
+	// using tracerConfig to capture log
+	transition, err := j.BeginTxnTracer(header.StateRoot, header, blockCreator, tracerConfig)
+
+	if err != nil {
+		return
+	}
+
+	result, err = transition.Apply(txn)
+
+	return
+}
+
 func (j *jsonRPCHub) GetSyncProgression() *progress.Progression {
 	// restore progression
 	if restoreProg := j.restoreProgression.GetProgression(); restoreProg != nil {

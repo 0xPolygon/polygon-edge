@@ -3,11 +3,12 @@ package state
 import (
 	"errors"
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/state/runtime/evm"
-	"github.com/hashicorp/go-hclog"
 	"math"
 	"math/big"
 	"time"
+
+	"github.com/0xPolygon/polygon-edge/state/runtime/evm"
+	"github.com/hashicorp/go-hclog"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/crypto"
@@ -173,6 +174,48 @@ func (e *Executor) BeginTxn(
 	return txn, nil
 }
 
+func (e *Executor) BeginTxnTracer(
+	parentRoot types.Hash,
+	header *types.Header,
+	coinbaseReceiver types.Address,
+	tracerConfig runtime.TraceConfig,
+) (*Transition, error) {
+	config := e.config.Forks.At(header.Number)
+	// fmt.Printf("parentRoot", parentRoot)
+	auxSnap2, err := e.state.NewSnapshotAt(parentRoot)
+	if err != nil {
+		return nil, err
+	}
+
+	newTxn := NewTxn(e.state, auxSnap2)
+
+	env2 := runtime.TxContext{
+		Coinbase:   coinbaseReceiver,
+		Timestamp:  int64(header.Timestamp),
+		Number:     int64(header.Number),
+		Difficulty: types.BytesToHash(new(big.Int).SetUint64(header.Difficulty).Bytes()),
+		GasLimit:   int64(header.GasLimit),
+		ChainID:    int64(e.config.ChainID),
+	}
+
+	txn := &Transition{
+		logger:   e.logger,
+		r:        e,
+		ctx:      env2,
+		state:    newTxn,
+		getHash:  e.GetHash(header),
+		auxState: e.state,
+		config:   config,
+		gasPool:  uint64(env2.GasLimit),
+
+		receipts:    []*types.Receipt{},
+		totalGas:    0,
+		traceConfig: tracerConfig, // 由调用者传入新的tracerConfig...
+	}
+
+	return txn, nil
+}
+
 type Transition struct {
 	logger hclog.Logger
 
@@ -193,7 +236,7 @@ type Transition struct {
 	receipts []*types.Receipt
 	totalGas uint64
 
-	tracer *evm.StructLogger
+	traceConfig runtime.TraceConfig
 }
 
 func (t *Transition) TotalGas() uint64 {
@@ -333,6 +376,10 @@ func (t *Transition) GetTxnHash() types.Hash {
 	return t.block.Hash()
 }
 
+func (t *Transition) Block() *types.Block {
+	return t.block
+}
+
 // Apply applies a new transaction
 func (t *Transition) Apply(msg *types.Transaction) (*runtime.ExecutionResult, error) {
 	s := t.state.Snapshot() //nolint:ifshort
@@ -429,6 +476,15 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 	// 4. there is no overflow when calculating intrinsic gas
 	// 5. the purchased gas is enough to cover intrinsic usage
 	// 6. caller has enough balance to cover asset transfer for **topmost** call
+
+	// start tracing
+	if t.traceConfig.Debug {
+		t.traceConfig.Tracer.CaptureTxStart(msg.Gas)
+		defer func() {
+			t.traceConfig.Tracer.CaptureTxEnd(msg.Gas)
+		}()
+	}
+
 	txn := t.state
 
 	// 1. the nonce of the message caller is correct
@@ -470,12 +526,6 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 	// Set the specific transaction fields in the context
 	t.ctx.GasPrice = types.BytesToHash(gasPrice.Bytes())
 	t.ctx.Origin = msg.From
-
-	// Set Tracer
-	t.tracer = evm.NewStructLogger(msg.LoggerConfig, txn)
-	defer func() {
-		t.tracer = nil
-	}()
 
 	var result *runtime.ExecutionResult
 	if msg.IsContractCreation() {
@@ -521,13 +571,9 @@ func (t *Transition) Call2(
 	value *big.Int,
 	gas uint64,
 ) *runtime.ExecutionResult {
-
 	c := runtime.NewContractCall(1, caller, caller, to, value, gas, t.state.GetCode(to), input)
 	ret := t.applyCall(c, runtime.Call, t)
-	tracer := t.GetTracer()
-	if tracer != nil {
-		ret.Tracer = tracer
-	}
+
 	return ret
 }
 
@@ -561,8 +607,12 @@ func (t *Transition) transfer(from, to types.Address, amount *big.Int) error {
 	return nil
 }
 
-func (t *Transition) GetTracer() runtime.Tracer {
-	return t.tracer
+func (t *Transition) GetTxn() *Txn {
+	return t.state
+}
+
+func (t *Transition) GetTracerConfig() runtime.TraceConfig {
+	return t.traceConfig
 }
 
 func (t *Transition) applyCall(
@@ -592,33 +642,16 @@ func (t *Transition) applyCall(
 	}
 
 	var result *runtime.ExecutionResult
-
-	tracer := host.GetTracer()
-	if tracer != nil {
+	if t.traceConfig.Debug {
 		if c.Depth == 1 {
-			// 创建
-			tracer.CaptureStart()
-			defer func(startGas uint64, startTime time.Time) { // Lazy evaluation of the parameters
-				tracer.CaptureEnd(result.ReturnValue, startGas-c.Gas, time.Since(startTime), result.Err)
+			t.traceConfig.Tracer.CaptureStart(t, c.Caller, c.Address, false, c.Input, c.Gas, c.Value)
+			defer func(startGas uint64, startTime time.Time) {
+				t.traceConfig.Tracer.CaptureEnd(result.ReturnValue, startGas-c.Gas, time.Since(startTime), result.Err)
 			}(c.Gas, time.Now())
 		} else {
-			switch callType {
-			case runtime.Call:
-				tracer.CaptureEnter(evm.CALL, c.Caller, c.Address, c.Input, c.Gas, c.Value)
-			case runtime.CallCode:
-				tracer.CaptureEnter(evm.CALLCODE, c.Caller, c.Address, c.Input, c.Gas, c.Value)
-			case runtime.DelegateCall:
-				tracer.CaptureEnter(evm.DELEGATECALL, c.Caller, c.Address, c.Input, c.Gas, c.Value)
-			case runtime.StaticCall:
-				tracer.CaptureEnter(evm.STATICCALL, c.Caller, c.Address, c.Input, c.Gas, c.Value)
-			case runtime.Create:
-				tracer.CaptureEnter(evm.CREATE, c.Caller, c.Address, c.Input, c.Gas, c.Value)
-			case runtime.Create2:
-				tracer.CaptureEnter(evm.CREATE2, c.Caller, c.Address, c.Input, c.Gas, c.Value)
-			}
-
+			t.traceConfig.Tracer.CaptureEnter(evm.CALL, c.Caller, c.Address, c.Input, c.Gas, c.Value)
 			defer func(startGas uint64) {
-				tracer.CaptureExit(result.ReturnValue, startGas-c.Gas, result.Err)
+				t.traceConfig.Tracer.CaptureExit(result.ReturnValue, startGas-c.Gas, result.Err)
 			}(c.Gas)
 		}
 	}
@@ -687,22 +720,15 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 		}
 	}
 
-	var result *runtime.ExecutionResult
-
-	tracer := host.GetTracer()
-	if tracer != nil {
+	if t.traceConfig.Debug {
 		if c.Depth == 1 {
-			tracer.CaptureStart()
-			defer func(startGas uint64, startTime time.Time) { // Lazy evaluation of the parameters
-				tracer.CaptureEnd(result.ReturnValue, startGas-c.Gas, time.Since(startTime), result.Err)
-			}(c.Gas, time.Now())
+			t.traceConfig.Tracer.CaptureStart(t, c.Caller, c.Address, true, c.Code, c.Gas, c.Value)
 		} else {
-			tracer.CaptureEnter(evm.CREATE, c.Caller, c.Address, c.Input, c.Gas, c.Value)
-			defer func(startGas uint64) {
-				tracer.CaptureExit(result.ReturnValue, startGas-c.Gas, result.Err)
-			}(c.Gas)
+			t.traceConfig.Tracer.CaptureEnter(evm.CREATE, c.Caller, c.Address, c.Code, c.Gas, c.Value)
 		}
 	}
+
+	var result *runtime.ExecutionResult
 
 	result = t.run(c, host)
 

@@ -1,90 +1,99 @@
 package jsonrpc
 
 import (
-	"encoding/json"
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/state/runtime/evm"
+
+	"github.com/0xPolygon/polygon-edge/state/runtime"
+	"github.com/0xPolygon/polygon-edge/tracers"
+	"github.com/0xPolygon/polygon-edge/tracers/logger"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-// Debug is the debug jsonrpc endpoint
-type Debug struct {
-	store ethStore
+type debugTraceStore interface {
+	// add new method to handle tracer
+	ApplyMessage(header *types.Header, txn *types.Transaction, tracer runtime.TraceConfig) (*runtime.ExecutionResult, error)
 }
 
-type ExecutionResult struct {
-	Gas         uint64             `json:"gas"`
-	Failed      bool               `json:"failed"`
-	ReturnValue string             `json:"returnValue"`
-	StructLogs  []evm.StructLogRes `json:"structLogs"`
+type debugStore interface {
+	// inherit some methods of ethStore
+	ethStore
+	debugTraceStore
+}
+
+// Debug is the debug jsonrpc endpoint
+type Debug struct {
+	store debugStore
+}
+
+// TraceConfig holds extra parameters to trace functions.
+type TraceConfig struct {
+	*logger.Config
+	Tracer  *string
+	Timeout *string
+	Reexec  *uint64
 }
 
 // TraceTransaction returns the version of the web3 client (web3_clientVersion)
-func (d *Debug) TraceTransaction(hash types.Hash, config types.LoggerConfig) (interface{}, error) {
-	// findSealedTx is a helper method for checking the world state
-	// for the transaction with the provided hash
-	findSealedTx := func() (*types.Transaction, *types.Block) {
+func (d *Debug) TraceTransaction(hash types.Hash, config *TraceConfig) (interface{}, error) {
+	findSealedTx := func() (*types.Transaction, *types.Block, uint64) {
 		// Check the chain state for the transaction
 		blockHash, ok := d.store.ReadTxLookup(hash)
 		if !ok {
 			// Block not found in storage
-			return nil, nil
+			return nil, nil, 0
 		}
 
 		block, ok := d.store.GetBlockByHash(blockHash, true)
 
-		preBlock, ok := d.store.GetBlockByNumber(block.Number()-1, false)
-
 		if !ok {
 			// Block receipts not found in storage
-			return nil, nil
+			return nil, nil, 0
 		}
 
 		// Find the transaction within the block
-		for _, txn := range block.Transactions {
+		for txIndx, txn := range block.Transactions {
 			if txn.Hash == hash {
-				return txn, preBlock
+				return txn, block, uint64(txIndx)
 			}
 		}
 
-		return nil, nil
+		return nil, nil, 0
 	}
-
-	msg, block := findSealedTx()
+	// get transaction + block
+	msg, block, txIndx := findSealedTx()
 
 	if msg == nil {
 		return nil, fmt.Errorf("hash not found")
 	}
+	// construct tracer
+	txctx := &tracers.Context{
+		BlockHash: block.Hash(),
+		TxIndex:   int(txIndx),
+		TxHash:    hash,
+	}
 
-	traceTransaction := func(gas uint64) (*ExecutionResult, error) {
-		// Create a dummy transaction with the new gas
-		txn := msg.Copy()
-		txn.Gas = gas
-		txn.SetLoggerConfig(&config)
-		result, err := d.store.ApplyTxn(block.Header, txn)
+	var tracer tracers.Tracer
+	var err error
+	if config == nil {
+		config = &TraceConfig{}
+	}
+	tracer = logger.NewStructLogger(config.Config)
+	if config.Tracer != nil {
+		tracer, err = tracers.New(*config.Tracer, txctx)
 		if err != nil {
 			return nil, err
 		}
-
-		logs, _err := result.Tracer.FormatLogs()
-
-		if _err != nil {
-			return nil, err
-		}
-
-		var logsRes []evm.StructLogRes
-
-		json.Unmarshal(logs, &logsRes)
-
-		return &ExecutionResult{
-			Gas:         result.GasUsed,
-			Failed:      result.Failed(),
-			ReturnValue: types.BytesToHash(result.ReturnValue).String(),
-			StructLogs:  logsRes,
-		}, nil
 	}
 
-	ret, err := traceTransaction(msg.Gas)
+	txn := msg.Copy()
+	txn.Gas = msg.Gas
+	// is an ugly but simple way to match the mechanism of pe
+	txn.Nonce = txn.Nonce + 1
+	_, err = d.store.ApplyMessage(block.Header, txn, runtime.TraceConfig{Debug: true, Tracer: tracer, NoBaseFee: true})
 
-	return ret, err
+	if err != nil {
+		return nil, err
+	}
+
+	return tracer.GetResult()
 }

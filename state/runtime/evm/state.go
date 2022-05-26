@@ -213,33 +213,46 @@ func (c *state) resetReturnData() {
 
 // Run executes the virtual machine
 func (c *state) Run() ([]byte, error) {
-	var vmerr error
-	var pcCopy uint64
-	var gasCopy uint64
-	var cost uint64
-	var logged bool
-	var op OpCode
-	var scope runtime.ScopeContext
-
-	codeSize := len(c.code)
-
-	tracer := c.host.GetTracer()
-	if tracer != nil {
+	var (
+		vmerr       error
+		op          OpCode                // current opcode
+		mem         = runtime.NewMemory() // bound memory
+		stack       = runtime.Newstack()  // local stack
+		callContext = &runtime.ScopeContext{
+			Memory:   mem,
+			Stack:    stack,
+			Contract: c.msg,
+		}
+		// For optimisation reason we're using uint64 as the program counter.
+		// It's theoretically possible to go above 2^64. The YP defines the PC
+		// to be uint256. Practically much less so feasible.
+		pc   = uint64(0) // program counter
+		cost uint64
+		// copies used by tracer
+		pcCopy  uint64 // needed for the deferred EVMLogger
+		gasCopy uint64 // for EVMLogger to log gas remaining before execution
+		logged  bool   // deferred EVMLogger should ignore already logged steps
+		// res     []byte // result of the opcode execution function
+	)
+	// get tracer from host
+	tracer := c.host.GetTracerConfig()
+	if tracer.Debug {
 		defer func() {
-			if c.err != nil {
+			if vmerr != nil {
 				if !logged {
-					tracer.CaptureState(pcCopy, int(op), gasCopy, cost, scope, c.ret, c.msg.Depth, c.err)
+					tracer.Tracer.CaptureState(pcCopy, int(op), gasCopy, cost, callContext, c.ret, c.msg.Depth, vmerr)
 				} else {
-					tracer.CaptureFault(pcCopy, int(op), gasCopy, cost, scope, c.msg.Depth, c.err)
+					tracer.Tracer.CaptureFault(pcCopy, int(op), gasCopy, cost, callContext, c.msg.Depth, vmerr)
 				}
 			}
 		}()
 	}
+
+	codeSize := len(c.code)
 	for !c.stop {
-		if tracer != nil {
-			logged = false
-			pcCopy = uint64(c.ip)
-			gasCopy = c.gas
+		if tracer.Debug {
+			logged, pc, gasCopy = false, uint64(c.ip), c.gas
+			pcCopy = pc
 		}
 		if c.ip >= codeSize {
 			c.halt()
@@ -255,10 +268,6 @@ func (c *state) Run() ([]byte, error) {
 			break
 		}
 
-		if tracer != nil {
-			cost = inst.gas
-		}
-
 		// check if the depth of the stack is enough for the instruction
 		if c.sp < inst.stack {
 			c.exit(errStackUnderflow)
@@ -272,15 +281,13 @@ func (c *state) Run() ([]byte, error) {
 			break
 		}
 
-		if tracer != nil {
-			scope = runtime.ScopeContext{
-				Memory:   c.memory,
-				Stack:    c.stack,
-				Contract: c.msg,
-			}
-			tracer.CaptureState(pcCopy, int(op), gasCopy, cost, scope, c.ret, c.msg.Depth, c.err)
+		cost = inst.gas
+		// trace
+		if tracer.Debug {
+			tracer.Tracer.CaptureState(pc, int(op), gasCopy, cost, callContext, c.ret, c.msg.Depth, vmerr)
 			logged = true
 		}
+
 		// execute the instruction
 		inst.inst(c)
 		// check if stack size exceeds the max size
