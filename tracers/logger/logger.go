@@ -143,8 +143,8 @@ func (l *StructLogger) Reset() {
 
 // CaptureStart implements the EVMLogger interface to initialize the tracing operation.
 func (l *StructLogger) CaptureStart(txr interface{}, from types.Address, to types.Address, create bool, input []byte, gas uint64, value *big.Int) {
-	// l.env = env
-	txn, ok := txr.(*state.Transition) // dexiang: 为避免循环引用，通过接口传入并强转！
+	// using interface to receive param(Transition) avoid of cycle import
+	txn, ok := txr.(*state.Transition)
 	if !ok {
 		return
 	}

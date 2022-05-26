@@ -22,6 +22,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types/hexutil"
 
 	"github.com/0xPolygon/polygon-edge/state/runtime"
@@ -43,6 +44,7 @@ type account struct {
 
 type prestateTracer struct {
 	// env       *vm.EVM
+	txn       *state.Transition
 	prestate  prestate
 	create    bool
 	to        types.Address
@@ -58,8 +60,12 @@ func newPrestateTracer(ctx *tracers.Context) tracers.Tracer {
 }
 
 // CaptureStart implements the EVMLogger interface to initialize the tracing operation.
-func (t *prestateTracer) CaptureStart(txn interface{}, from types.Address, to types.Address, create bool, input []byte, gas uint64, value *big.Int) {
+func (t *prestateTracer) CaptureStart(txr interface{}, from types.Address, to types.Address, create bool, input []byte, gas uint64, value *big.Int) {
 	// t.env = env
+	txn, ok := txr.(*state.Transition)
+	if !ok {
+		return
+	}
 	t.create = create
 	t.to = to
 
@@ -75,8 +81,8 @@ func (t *prestateTracer) CaptureStart(txn interface{}, from types.Address, to ty
 	// We need to re-add them to get the pre-tx balance.
 	fromBal := hexutil.MustDecodeBig(t.prestate[from].Balance)
 	// gasPrice := env.TxContext.GasPrice
-	// dexiang: 需要传入evm记录gasPrice!!
-	gasPrice := new(big.Int)
+
+	gasPrice := txn.GetTxContext().GasPrice.Big()
 	consumedGas := new(big.Int).Mul(gasPrice, new(big.Int).SetUint64(t.gasLimit))
 	fromBal.Add(fromBal, new(big.Int).Add(value, consumedGas))
 	t.prestate[from].Balance = hexutil.EncodeBig(fromBal)

@@ -61,6 +61,9 @@ const (
 
 	// GCPSSM pertains to the Google Cloud Computing secret store manager
 	GCPSSM SecretsManagerType = "gcp-ssm"
+
+	// Aws Kms type
+	AwsKms SecretsManagerType = "aws-kms"
 )
 
 // SecretsManager defines the base public interface that all
@@ -80,6 +83,15 @@ type SecretsManager interface {
 
 	// RemoveSecret removes the secret from storage
 	RemoveSecret(name string) error
+
+	// Sign data by key
+	SignBySecret(key string, data []byte) ([]byte, error)
+
+	// retrive secret info , pubkey and address
+	GetSecretInfo(name string) (*SecretInfo, error)
+
+	// get SecretsManagerType
+	GetSecretsManagerType() SecretsManagerType
 }
 
 // SecretsManagerParams defines the configuration params for the
@@ -90,6 +102,12 @@ type SecretsManagerParams struct {
 
 	// Extra contains additional data needed for the SecretsManager to function
 	Extra map[string]interface{}
+}
+
+// to store the publicKey and public address
+type SecretInfo struct {
+	Pubkey  string
+	Address string
 }
 
 // SecretsManagerFactory is the factory method for secrets managers
@@ -106,5 +124,5 @@ type SecretsManagerFactory func(
 // SupportedServiceManager checks if the passed in service manager type is supported
 func SupportedServiceManager(service SecretsManagerType) bool {
 	return service == HashicorpVault || service == AWSSSM ||
-		service == Local || service == GCPSSM
+		service == Local || service == GCPSSM || service == AwsKms
 }
