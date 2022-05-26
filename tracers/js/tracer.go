@@ -431,7 +431,7 @@ type jsTracer struct {
 	frame       *frame       // Represents entry into call frame. Fields are swappable
 	frameResult *frameResult // Represents exit from a call frame. Fields are swappable
 
-	transition state.Transition
+	transition *state.Transition
 	ctx        map[string]interface{} // Transaction context gathered throughout execution
 	err        error                  // Error, if one has occurred
 
@@ -718,7 +718,7 @@ func (*jsTracer) CaptureTxEnd(restGas uint64) {}
 // env这个参数是否可以不传？  有比较多不一致的地方！
 func (jst *jsTracer) CaptureStart(txr interface{}, from types.Address, to types.Address, create bool, input []byte, gas uint64, value *big.Int) {
 	//jst.env = env
-	txn, ok := txr.(state.Transition) // dexiang: 为避免循环引用，通过接口传入并强转！
+	txn, ok := txr.(*state.Transition) // dexiang: 为避免循环引用，通过接口传入并强转！
 	if !ok {
 		return
 	}
