@@ -13,6 +13,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/secrets/local"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 )
 
@@ -176,26 +177,33 @@ func (k *KmsSecretManager) RemoveSecret(name string) error {
 }
 
 // Sign data by key
-func (k *KmsSecretManager) SignBySecret(key string, data []byte) ([]byte, error) {
+func (k *KmsSecretManager) SignBySecret(key string, data types.Hash) ([]byte, error) {
 
 	type SignRaw struct {
 		KmsKeyId string `json:"kms_key_id"`
-		Data     string `json:"data"`
+		Data     []int  `json:"data"`
 		ChainId  string `json:"chainId"`
 	}
 
 	type Req struct {
 		Operation string  `json:"operation"`
-		SignRaw   SignRaw `json:"sign_raw_1559"`
+		SignRaw   SignRaw `json:"signBytes1559"`
 	}
+
+	intArray := []int{}
+	for _, v := range data.Bytes() {
+		intArray = append(intArray, int(v))
+	}
+
 	req := &Req{
-		Operation: "sign_raw_1559",
+		Operation: "signBytes1559",
 		SignRaw: SignRaw{
 			KmsKeyId: k.name,
-			Data:     string(data),
+			Data:     intArray,
 			ChainId:  "0x25",
 		},
 	}
+	fmt.Println(" hash ------ ", data)
 
 	bs, err := json.Marshal(req)
 	if err != nil {
@@ -255,10 +263,24 @@ func (k *KmsSecretManager) SignBySecret(key string, data []byte) ([]byte, error)
 		return nil, errors.New("R to big int error")
 	}
 
-	S, ok := (&big.Int{}).SetString(signResp.Data.R[2:], 16)
+	S, ok := (&big.Int{}).SetString(signResp.Data.S[2:], 16)
 	if !ok {
 		return nil, errors.New("S to big int error")
 	}
+
+	// Check if v value conforms to an earlier standard (before EIP155)
+	// bigV := big.NewInt(0)
+	// if tx.V != nil {
+	// 	bigV.SetBytes(tx.V.Bytes())
+	// }
+
+	// Reverse the V calculation to find the original V in the range [0, 1]
+	// v = CHAIN_ID * 2 + 35 + {0, 1}
+	// mulOperand := big.NewInt(0).Mul(big.NewInt(int64(e.chainID)), big.NewInt(2))
+	// bigV.Sub(bigV, mulOperand)
+	// bigV.Sub(bigV, big35)
+
+	// sig, err := encodeSignature(tx.R, tx.S, byte(bigV.Int64()))
 
 	v := int64(signResp.Data.V)
 	bigV := big.NewInt(v)
