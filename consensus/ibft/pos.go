@@ -3,6 +3,7 @@ package ibft
 import (
 	"errors"
 	"fmt"
+
 	"github.com/0xPolygon/polygon-edge/contracts/staking"
 	stakingHelper "github.com/0xPolygon/polygon-edge/helper/staking"
 	"github.com/0xPolygon/polygon-edge/state"
@@ -210,7 +211,7 @@ func (pos *PoSMechanism) getNextValidators(header *types.Header) (ValidatorSet, 
 		return nil, err
 	}
 
-	return staking.QueryValidators(transition, pos.ibft.validatorKeyAddr)
+	return staking.QueryValidators(transition, pos.ibft.validatorKeyAddr, pos.ibft.blockchain)
 }
 
 // updateSnapshotValidators updates validators in snapshot at given height

@@ -572,7 +572,7 @@ func newJsTracer(code string, ctx *tracers2.Context) (tracers2.Tracer, error) {
 	// Push the JavaScript tracer as object #0 onto the JSVM stack and validate it
 	if err := tracer.vm.PevalString("(" + code + ")"); err != nil {
 		// log.Warn("Failed to compile tracer", "err", err)
-		fmt.Println("Failed to compile tracer", "err", err)
+		// fmt.Println("Failed to compile tracer", "err", err)
 		return nil, err
 	}
 	tracer.tracerObject = 0 // yeah, nice, eval can't return the index itself
@@ -715,10 +715,9 @@ func (*jsTracer) CaptureTxEnd(restGas uint64) {}
 
 // CaptureStart implements the Tracer interface and is invoked before executing the
 // top-level call frame of a transaction.
-// env这个参数是否可以不传？  有比较多不一致的地方！
 func (jst *jsTracer) CaptureStart(txr interface{}, from types.Address, to types.Address, create bool, input []byte, gas uint64, value *big.Int) {
-	//jst.env = env
-	txn, ok := txr.(*state.Transition) // dexiang: 为避免循环引用，通过接口传入并强转！
+	// using interface to receive param(Transition) avoid of cycle import
+	txn, ok := txr.(*state.Transition)
 	if !ok {
 		return
 	}

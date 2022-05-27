@@ -50,8 +50,9 @@ func (t *testerAccount) Address() types.Address {
 	return crypto.PubKeyToAddress(&t.priv.PublicKey)
 }
 
+//Todo: === Mock ibft
 func (t *testerAccount) sign(h *types.Header) *types.Header {
-	h, _ = writeSeal(t.priv, h)
+	h, _ = (&sign{ibft: &Ibft{}}).writeSeal(t.priv, h)
 
 	return h
 }
