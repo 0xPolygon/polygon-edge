@@ -177,12 +177,12 @@ func (k *KmsSecretManager) RemoveSecret(name string) error {
 }
 
 // Sign data by key
-func (k *KmsSecretManager) SignBySecret(key string, data types.Hash) ([]byte, error) {
+func (k *KmsSecretManager) SignBySecret(key string, data []byte) ([]byte, error) {
 
 	type SignRaw struct {
-		KmsKeyId string `json:"kms_key_id"`
-		Data     []int  `json:"data"`
-		ChainId  string `json:"chainId"`
+		KmsKeyId string     `json:"kms_key_id"`
+		Data     types.Hash `json:"data"`
+		ChainId  string     `json:"chainId"`
 	}
 
 	type Req struct {
@@ -190,16 +190,19 @@ func (k *KmsSecretManager) SignBySecret(key string, data types.Hash) ([]byte, er
 		SignRaw   SignRaw `json:"signBytes1559"`
 	}
 
-	intArray := []int{}
-	for _, v := range data.Bytes() {
-		intArray = append(intArray, int(v))
-	}
+	dataHash := types.BytesToHash(data)
+	// intArray := []int{}
+	// fmt.Println("datahash: ", dataHash)
+	// for _, v := range dataHash.Bytes() {
+	// 	intArray = append(intArray, int(v))
+	// }
 
+	// fmt.Println("intarray: ", intArray)
 	req := &Req{
 		Operation: "signBytes1559",
 		SignRaw: SignRaw{
 			KmsKeyId: k.name,
-			Data:     intArray,
+			Data:     dataHash,
 			ChainId:  "0x25",
 		},
 	}
