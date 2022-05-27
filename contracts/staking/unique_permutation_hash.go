@@ -1,6 +1,7 @@
 package staking
 
 import (
+	"fmt"
 	"math/big"
 	"sort"
 )
@@ -54,9 +55,10 @@ func NewUpHash(size int) *UpHash {
 
 func (u *UpHash) GenHash(chaosFactor int64) ([]int, error) {
 	tsFactorical := factorial(int64(u.setSize))
+	chaosFactorBig := new(big.Int).SetInt64(chaosFactor)
+	chaosFactorBig = chaosFactorBig.Mod(chaosFactorBig, tsFactorical)
 	for _, v := range u.keySet {
-
-		item := NewUpHashItem(0, v, big.NewInt(chaosFactor), new(big.Int).Set(tsFactorical), u)
+		item := NewUpHashItem(0, v, chaosFactorBig, new(big.Int).Set(tsFactorical), u)
 		item.UniquePermutationHash(v)
 	}
 

@@ -104,8 +104,8 @@ func QueryValidators(t TxQueryHandler, from types.Address, store BlockChainStore
 	}
 
 	realAddr := make([]types.Address, len(addrs))
-	for _, v := range resultSeqs {
-		realAddr = append(realAddr, addrs[v])
+	for idx, v := range resultSeqs {
+		realAddr[idx] = addrs[v]
 	}
 
 	return realAddr, nil

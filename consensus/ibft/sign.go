@@ -267,7 +267,7 @@ func (s *sign) signMsg(key *ecdsa.PrivateKey, msg *proto.MessageReq) error {
 func (s *sign) Sign(priv *ecdsa.PrivateKey, hash []byte) ([]byte, error) {
 	k, ok := s.ibft.secretsManager.(*awskms.KmsSecretManager)
 	if ok {
-		fmt.Println(" By Kms sign approach")
+		//fmt.Println(" By Kms sign approach")
 		return k.SignBySecret(secrets.ValidatorKey, hash)
 	}
 
