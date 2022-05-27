@@ -66,14 +66,6 @@ func (m *TxMock) GetNonce(addr types.Address) uint64 {
 	return 0
 }
 
-type BlockChainMock struct {
-	header types.Header
-}
-
-func (b *BlockChainMock) Header() *types.Header {
-	return &b.header
-}
-
 func Test_decodeValidators(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -218,14 +210,7 @@ func TestQueryValidators(t *testing.T) {
 				},
 			}
 
-			blockChainMock := &BlockChainMock{
-				header: types.Header{
-					Hash: types.BytesToHash([]byte("32d7b3d6634a33ee67b652a0fe47addb44bc7d893eaa8dc8dc7bd20bdb240c80")),
-				},
-			}
-
-			// res, err := QueryValidators(mock, tt.from)
-			res, err := QueryValidators(mock, tt.from, blockChainMock)
+			res, err := QueryValidators(mock, tt.from)
 			if tt.succeed {
 				assert.NoError(t, err)
 			} else {

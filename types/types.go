@@ -4,7 +4,6 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
-	"math/big"
 	"strings"
 	"unicode"
 
@@ -229,6 +228,3 @@ func HexToAddress(s string) Address { return BytesToAddress(FromHex(s)) }
 // HexToHash sets byte representation of s to hash.
 // If b is larger than len(h), b will be cropped from the left.
 func HexToHash(s string) Hash { return BytesToHash(FromHex(s)) }
-
-// Big converts a hash to a big integer.
-func (h Hash) Big() *big.Int { return new(big.Int).SetBytes(h[:]) }

@@ -3,10 +3,9 @@ package gcpssm
 import (
 	"context"
 	"fmt"
-	"os"
-
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/hashicorp/go-hclog"
+	"os"
 
 	sm "cloud.google.com/go/secretmanager/apiv1"
 	smpb "google.golang.org/genproto/googleapis/cloud/secretmanager/v1"
@@ -186,19 +185,4 @@ func (gm *GCPSecretsManager) getSecretID(secretName string) string {
 // getFullyQualifiedSecretName returns the full path of the secret in the store manager
 func (gm *GCPSecretsManager) getFullyQualifiedSecretName(secretName string) string {
 	return fmt.Sprintf("projects/%s/secrets/%s/versions/1", gm.projectID, gm.getSecretID(secretName))
-}
-
-// Sign data by private key
-func (gm *GCPSecretsManager) SignBySecret(name string, data []byte) ([]byte, error) {
-	return nil, nil
-}
-
-// retrive secret info , pubkey and address
-func (gm *GCPSecretsManager) GetSecretInfo(name string) (*secrets.SecretInfo, error) {
-	return nil, nil
-}
-
-// get SecretsManagerType
-func (gm *GCPSecretsManager) GetSecretsManagerType() secrets.SecretsManagerType {
-	return secrets.GCPSSM
 }

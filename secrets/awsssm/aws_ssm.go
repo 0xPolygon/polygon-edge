@@ -132,18 +132,3 @@ func (a *AwsSsmManager) RemoveSecret(name string) error {
 
 	return nil
 }
-
-// Sign data by private key
-func (v *AwsSsmManager) SignBySecret(name string, data []byte) ([]byte, error) {
-	return nil, nil
-}
-
-// retrive secret info , pubkey and address
-func (v *AwsSsmManager) GetSecretInfo(name string) (*secrets.SecretInfo, error) {
-	return nil, nil
-}
-
-// get SecretsManagerType
-func (v *AwsSsmManager) GetSecretsManagerType() secrets.SecretsManagerType {
-	return secrets.HashicorpVault
-}

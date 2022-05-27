@@ -1,9 +1,7 @@
 package staking
 
 import (
-	"encoding/binary"
 	"errors"
-	"fmt"
 	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/contracts/abis"
@@ -51,15 +49,7 @@ type TxQueryHandler interface {
 	GetNonce(types.Address) uint64
 }
 
-type StoreInterface interface {
-}
-
-type BlockChainStoreQueryHandler interface {
-	// Header returns the current header of the chain (genesis if empty)
-	Header() *types.Header
-}
-
-func QueryValidators(t TxQueryHandler, from types.Address, store BlockChainStoreQueryHandler) ([]types.Address, error) {
+func QueryValidators(t TxQueryHandler, from types.Address) ([]types.Address, error) {
 	method, ok := abis.StakingABI.Methods["validators"]
 	if !ok {
 		return nil, errors.New("validators method doesn't exist in Staking contract ABI")
@@ -84,29 +74,5 @@ func QueryValidators(t TxQueryHandler, from types.Address, store BlockChainStore
 		return nil, res.Err
 	}
 
-	addrs, err := DecodeValidators(method, res.ReturnValue)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(addrs) == 0 {
-		fmt.Println("addrs is empty: ", len(addrs))
-		return []types.Address{}, nil
-	}
-
-	u := NewUpHash(len(addrs))
-	headHash := store.Header().Hash //取链上最新区块的hash
-	fmt.Println(" head hash ", headHash)
-	factor := int64(binary.BigEndian.Uint64(headHash.Bytes()))
-	resultSeqs, err := u.GenHash(factor)
-	if err != nil {
-		return nil, err
-	}
-
-	realAddr := make([]types.Address, len(addrs))
-	for _, v := range resultSeqs {
-		realAddr = append(realAddr, addrs[v])
-	}
-
-	return realAddr, nil
+	return DecodeValidators(method, res.ReturnValue)
 }

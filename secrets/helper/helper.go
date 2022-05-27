@@ -9,7 +9,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/secrets"
-	"github.com/0xPolygon/polygon-edge/secrets/awskms"
 	"github.com/0xPolygon/polygon-edge/secrets/awsssm"
 	"github.com/0xPolygon/polygon-edge/secrets/gcpssm"
 	"github.com/0xPolygon/polygon-edge/secrets/hashicorpvault"
@@ -76,34 +75,6 @@ func SetupGCPSSM(
 		secretsConfig,
 		&secrets.SecretsManagerParams{
 			Logger: hclog.NewNullLogger(),
-		},
-	)
-}
-
-// SetupAwsKms is a helper method for boilerplate Google Cloud Computing secrets manager setup
-func SetupAwsKms(
-	secretsConfig *secrets.SecretsManagerConfig, dataDir string,
-) (secrets.SecretsManager, error) {
-	subDirectories := []string{secrets.ConsensusFolderLocal, secrets.NetworkFolderLocal}
-
-	// Check if the sub-directories exist / are already populated
-	for _, subDirectory := range subDirectories {
-		if common.DirectoryExists(filepath.Join(dataDir, subDirectory)) {
-			return nil,
-				fmt.Errorf(
-					"directory %s has previously initialized secrets data",
-					dataDir,
-				)
-		}
-	}
-
-	return awskms.SecretsManagerFactory(
-		secretsConfig,
-		&secrets.SecretsManagerParams{
-			Logger: hclog.NewNullLogger(),
-			Extra: map[string]interface{}{
-				secrets.Path: dataDir,
-			},
 		},
 	)
 }

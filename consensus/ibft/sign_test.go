@@ -22,11 +22,11 @@ func TestSign_Sealer(t *testing.T) {
 	// non-validator address
 	pool.add("X")
 
-	badSealedBlock, _ := (&sign{ibft: &Ibft{}}).writeSeal(pool.get("X").priv, h)
+	badSealedBlock, _ := writeSeal(pool.get("X").priv, h)
 	assert.Error(t, verifySigner(snap, badSealedBlock))
 
 	// seal the block with a validator
-	goodSealedBlock, _ := (&sign{ibft: &Ibft{}}).writeSeal(pool.get("A").priv, h)
+	goodSealedBlock, _ := writeSeal(pool.get("A").priv, h)
 	assert.NoError(t, verifySigner(snap, goodSealedBlock))
 }
 
@@ -48,7 +48,7 @@ func TestSign_CommittedSeals(t *testing.T) {
 		seals := [][]byte{}
 
 		for _, accnt := range accnt {
-			seal, err := (&sign{ibft: &Ibft{}}).writeCommittedSeal(pool.get(accnt).priv, h)
+			seal, err := writeCommittedSeal(pool.get(accnt).priv, h)
 
 			assert.NoError(t, err)
 
@@ -80,7 +80,7 @@ func TestSign_Messages(t *testing.T) {
 	pool.add("A")
 
 	msg := &proto.MessageReq{}
-	assert.NoError(t, (&sign{ibft: &Ibft{}}).signMsg(pool.get("A").priv, msg))
+	assert.NoError(t, signMsg(pool.get("A").priv, msg))
 	assert.NoError(t, validateMsg(msg))
 
 	assert.Equal(t, msg.From, pool.get("A").Address().String())

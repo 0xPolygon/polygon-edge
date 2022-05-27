@@ -163,18 +163,3 @@ func (l *LocalSecretsManager) RemoveSecret(name string) error {
 
 	return nil
 }
-
-// Sign data by key
-func (l *LocalSecretsManager) SignBySecret(key string, data []byte) ([]byte, error) {
-	return nil, nil
-}
-
-// retrive secret info , pubkey and address
-func (l *LocalSecretsManager) GetSecretInfo(name string) (*secrets.SecretInfo, error) {
-	return nil, nil
-}
-
-// get SecretsManagerType
-func (l *LocalSecretsManager) GetSecretsManagerType() secrets.SecretsManagerType {
-	return secrets.Local
-}

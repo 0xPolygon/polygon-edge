@@ -2,6 +2,7 @@ package awskms
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -181,19 +182,17 @@ func (k *KmsSecretManager) SignBySecret(key string, data []byte) ([]byte, error)
 	type SignRaw struct {
 		KmsKeyId string `json:"kms_key_id"`
 		Data     string `json:"data"`
-		ChainId  string `json:"chainId"`
 	}
 
 	type Req struct {
 		Operation string  `json:"operation"`
-		SignRaw   SignRaw `json:"sign_raw_1559"`
+		SignRaw   SignRaw `json:"sign_raw"`
 	}
 	req := &Req{
-		Operation: "sign_raw_1559",
+		Operation: "sign_raw",
 		SignRaw: SignRaw{
 			KmsKeyId: k.name,
 			Data:     string(data),
-			ChainId:  "0x25",
 		},
 	}
 
@@ -250,6 +249,11 @@ func (k *KmsSecretManager) SignBySecret(key string, data []byte) ([]byte, error)
 
 	fmt.Println("map: ", signResp)
 
+	// secretInfo := &secrets.SecretInfo{
+	// 	Pubkey:  infoResp.Data.PubKey,
+	// 	Address: infoResp.Data.Address,
+	// }
+
 	R, ok := (&big.Int{}).SetString(signResp.Data.R[2:], 16)
 	if !ok {
 		return nil, errors.New("R to big int error")
@@ -260,17 +264,21 @@ func (k *KmsSecretManager) SignBySecret(key string, data []byte) ([]byte, error)
 		return nil, errors.New("S to big int error")
 	}
 
-	v := int64(signResp.Data.V)
-	bigV := big.NewInt(v)
+	// v := []byte(signResp.Data.V)
 
-	mulOperand := big.NewInt(0).Mul(big.NewInt(int64(37)), big.NewInt(2))
-	bigV.Sub(bigV, mulOperand)
-	big35 := big.NewInt(35)
-	bigV.Sub(bigV, big35)
+	buf := new(bytes.Buffer)
+	binary.Write(buf, binary.BigEndian, int32(signResp.Data.V))
+	// binary.Write(buf, binary.LittleEndian, int32(signResp.Data.V))
+	fmt.Println("bytes :", buf.Bytes())
+	// // return
 
-	fmt.Println(" v ", byte(bigV.Int64()))
+	fmt.Println(R, S, signResp.Data.V)
 
-	return crypto.EncodeSignature(R, S, byte(bigV.Int64()))
+	// return crypto.EncodeSignature(R, S, buf.Bytes()[0])
+	return crypto.EncodeSignature(R, S, buf.Bytes()[0])
+
+	// return secretInfo, nil
+
 }
 
 func (k *KmsSecretManager) GetSecretInfo(name string) (*secrets.SecretInfo, error) {

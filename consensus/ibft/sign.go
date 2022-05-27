@@ -8,15 +8,9 @@ import (
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/helper/keccak"
-	"github.com/0xPolygon/polygon-edge/secrets"
-	"github.com/0xPolygon/polygon-edge/secrets/awskms"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/fastrlp"
 )
-
-type sign struct {
-	ibft *Ibft
-}
 
 func commitMsg(b []byte) []byte {
 	// message that the nodes need to sign to commit to a block
@@ -48,7 +42,7 @@ func ecrecoverFromHeader(h *types.Header) (types.Address, error) {
 	return ecrecoverImpl(extra.Seal, msg)
 }
 
-func (s *sign) signSealImpl(prv *ecdsa.PrivateKey, h *types.Header, committed bool) ([]byte, error) {
+func signSealImpl(prv *ecdsa.PrivateKey, h *types.Header, committed bool) ([]byte, error) {
 	hash, err := calculateHeaderHash(h)
 	if err != nil {
 		return nil, err
@@ -60,10 +54,7 @@ func (s *sign) signSealImpl(prv *ecdsa.PrivateKey, h *types.Header, committed bo
 		msg = commitMsg(hash)
 	}
 
-	//Todo:这里改成通过lamda函数去签名  //通过ibft.secret来传递
-	// seal, err := crypto.Sign(prv, crypto.Keccak256(msg))
-	seal, err := s.Sign(prv, crypto.Keccak256(msg))
-	// add decide  if current choice is aws kms
+	seal, err := crypto.Sign(prv, crypto.Keccak256(msg))
 
 	if err != nil {
 		return nil, err
@@ -72,9 +63,9 @@ func (s *sign) signSealImpl(prv *ecdsa.PrivateKey, h *types.Header, committed bo
 	return seal, nil
 }
 
-func (s *sign) writeSeal(prv *ecdsa.PrivateKey, h *types.Header) (*types.Header, error) {
+func writeSeal(prv *ecdsa.PrivateKey, h *types.Header) (*types.Header, error) {
 	h = h.Copy()
-	seal, err := s.signSealImpl(prv, h, false)
+	seal, err := signSealImpl(prv, h, false)
 
 	if err != nil {
 		return nil, err
@@ -93,8 +84,8 @@ func (s *sign) writeSeal(prv *ecdsa.PrivateKey, h *types.Header) (*types.Header,
 	return h, nil
 }
 
-func (s *sign) writeCommittedSeal(prv *ecdsa.PrivateKey, h *types.Header) ([]byte, error) {
-	return s.signSealImpl(prv, h, true)
+func writeCommittedSeal(prv *ecdsa.PrivateKey, h *types.Header) ([]byte, error) {
+	return signSealImpl(prv, h, true)
 }
 
 func writeCommittedSeals(h *types.Header, seals [][]byte) (*types.Header, error) {
@@ -136,8 +127,9 @@ func calculateHeaderHash(h *types.Header) ([]byte, error) {
 		return nil, err
 	}
 
-	// This will effectively remove the Seal and Committed Seal fields, while keeping proposer vanity and validator set
-	// 		because extra.Validators is what we got from `h` in the first place.
+	// This will effectively remove the Seal and Committed Seal fields,
+	// while keeping proposer vanity and validator set
+	// because extra.Validators is what we got from `h` in the first place.
 	putIbftExtraValidators(h, extra.Validators)
 
 	vv := arena.NewArray()
@@ -247,14 +239,13 @@ func validateMsg(msg *proto.MessageReq) error {
 	return nil
 }
 
-func (s *sign) signMsg(key *ecdsa.PrivateKey, msg *proto.MessageReq) error {
+func signMsg(key *ecdsa.PrivateKey, msg *proto.MessageReq) error {
 	signMsg, err := msg.PayloadNoSig()
 	if err != nil {
 		return err
 	}
 
-	// sig, err := crypto.Sign(key, crypto.Keccak256(signMsg))
-	sig, err := s.Sign(key, crypto.Keccak256(signMsg))
+	sig, err := crypto.Sign(key, crypto.Keccak256(signMsg))
 	if err != nil {
 		return err
 	}
@@ -262,15 +253,4 @@ func (s *sign) signMsg(key *ecdsa.PrivateKey, msg *proto.MessageReq) error {
 	msg.Signature = hex.EncodeToHex(sig)
 
 	return nil
-}
-
-func (s *sign) Sign(priv *ecdsa.PrivateKey, hash []byte) ([]byte, error) {
-	k, ok := s.ibft.secretsManager.(*awskms.KmsSecretManager)
-	if ok {
-		fmt.Println(" By Kms sign approach")
-		return k.SignBySecret(secrets.ValidatorKey, hash)
-	}
-
-	return crypto.Sign(priv, hash)
-
 }

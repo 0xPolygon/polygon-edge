@@ -367,45 +367,35 @@ func (i *Ibft) createKey() error {
 	i.updateCh = make(chan struct{})
 
 	if i.validatorKey == nil {
+		// Check if the validator key is initialized
+		var key *ecdsa.PrivateKey
 
-		if i.secretsManager.GetSecretsManagerType() != secrets.AwsKms {
-			// Check if the validator key is initialized
-			var key *ecdsa.PrivateKey
-			if i.secretsManager.HasSecret(secrets.ValidatorKey) {
-				// The validator key is present in the secrets manager, load it
-				validatorKey, readErr := crypto.ReadConsensusKey(i.secretsManager)
-				if readErr != nil {
-					return fmt.Errorf("unable to read validator key from Secrets Manager, %w", readErr)
-				}
-
-				key = validatorKey
-			} else {
-				// The validator key is not present in the secrets manager, generate it
-				validatorKey, validatorKeyEncoded, genErr := crypto.GenerateAndEncodePrivateKey()
-				if genErr != nil {
-					return fmt.Errorf("unable to generate validator key for Secrets Manager, %w", genErr)
-				}
-
-				// Save the key to the secrets manager
-				saveErr := i.secretsManager.SetSecret(secrets.ValidatorKey, validatorKeyEncoded)
-				if saveErr != nil {
-					return fmt.Errorf("unable to save validator key to Secrets Manager, %w", saveErr)
-				}
-
-				key = validatorKey
-
+		if i.secretsManager.HasSecret(secrets.ValidatorKey) {
+			// The validator key is present in the secrets manager, load it
+			validatorKey, readErr := crypto.ReadConsensusKey(i.secretsManager)
+			if readErr != nil {
+				return fmt.Errorf("unable to read validator key from Secrets Manager, %w", readErr)
 			}
-			i.validatorKey = key
-			i.validatorKeyAddr = crypto.PubKeyToAddress(&key.PublicKey)
+
+			key = validatorKey
 		} else {
-			//Todo  ToVerify
-			i.validatorKey = &ecdsa.PrivateKey{}
-			info, err := i.secretsManager.GetSecretInfo(secrets.ValidatorKey)
-			if err != nil {
-				return err
+			// The validator key is not present in the secrets manager, generate it
+			validatorKey, validatorKeyEncoded, genErr := crypto.GenerateAndEncodePrivateKey()
+			if genErr != nil {
+				return fmt.Errorf("unable to generate validator key for Secrets Manager, %w", genErr)
 			}
-			i.validatorKeyAddr = types.StringToAddress(info.Address)
+
+			// Save the key to the secrets manager
+			saveErr := i.secretsManager.SetSecret(secrets.ValidatorKey, validatorKeyEncoded)
+			if saveErr != nil {
+				return fmt.Errorf("unable to save validator key to Secrets Manager, %w", saveErr)
+			}
+
+			key = validatorKey
 		}
+
+		i.validatorKey = key
+		i.validatorKeyAddr = crypto.PubKeyToAddress(&key.PublicKey)
 	}
 
 	return nil
@@ -648,8 +638,7 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 	})
 
 	// write the seal of the block after all the fields are completed
-	sign := &sign{ibft: i}
-	header, err = sign.writeSeal(i.validatorKey, block.Header)
+	header, err = writeSeal(i.validatorKey, block.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -1175,8 +1164,7 @@ func (i *Ibft) gossip(typ proto.MessageReq_Type) {
 
 	// if the message is commit, we need to add the committed seal
 	if msg.Type == proto.MessageReq_Commit {
-		sign := &sign{ibft: i}
-		seal, err := sign.writeCommittedSeal(i.validatorKey, i.state.block.Header)
+		seal, err := writeCommittedSeal(i.validatorKey, i.state.block.Header)
 		if err != nil {
 			i.logger.Error("failed to commit seal", "err", err)
 
@@ -1192,8 +1180,8 @@ func (i *Ibft) gossip(typ proto.MessageReq_Type) {
 		msg2.From = i.validatorKeyAddr.String()
 		i.pushMessage(msg2)
 	}
-	sign := &sign{ibft: i}
-	if err := sign.signMsg(i.validatorKey, msg); err != nil {
+
+	if err := signMsg(i.validatorKey, msg); err != nil {
 		i.logger.Error("failed to sign message", "err", err)
 
 		return
