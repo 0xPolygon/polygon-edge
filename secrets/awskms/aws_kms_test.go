@@ -7,7 +7,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/hashicorp/go-hclog"
@@ -73,9 +72,6 @@ func TestKmsSecretsManager_SignData(t *testing.T) {
 
 	content, err := manager.SignBySecret("validator-key", []byte("hellokms"))
 	// fmt.Println("sing data ", encoding.Base64(content))
-	pub, err := crypto.RecoverPubkey(content, []byte("hellokms"))
-	pubaddr := crypto.PubKeyToAddress(pub)
-	fmt.Println("pubaddr: ", pubaddr)
 	fmt.Println("sing data ", base64.StdEncoding.EncodeToString(content))
 	assert.Nil(t, err)
 	// assert.True(t, true)
