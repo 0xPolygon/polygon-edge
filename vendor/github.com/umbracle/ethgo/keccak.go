@@ -1,4 +1,4 @@
-package web3
+package ethgo
 
 import "golang.org/x/crypto/sha3"
 

@@ -1,4 +1,4 @@
-package web3
+package ethgo
 
 // Network is a chain id
 type Network uint64

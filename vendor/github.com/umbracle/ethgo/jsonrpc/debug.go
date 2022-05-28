@@ -1,6 +1,6 @@
 package jsonrpc
 
-import "github.com/umbracle/go-web3"
+import "github.com/umbracle/ethgo"
 
 type Debug struct {
 	c *Client
@@ -28,7 +28,7 @@ type StructLogs struct {
 	Storage map[string]string
 }
 
-func (d *Debug) TraceTransaction(hash web3.Hash) (*TransactionTrace, error) {
+func (d *Debug) TraceTransaction(hash ethgo.Hash) (*TransactionTrace, error) {
 	var res *TransactionTrace
 	err := d.c.Call("debug_traceTransaction", &res, hash)
 	return res, err

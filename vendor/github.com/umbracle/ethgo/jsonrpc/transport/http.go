@@ -3,21 +3,21 @@ package transport
 import (
 	"encoding/json"
 
-	"github.com/umbracle/go-web3/jsonrpc/codec"
+	"github.com/umbracle/ethgo/jsonrpc/codec"
 	"github.com/valyala/fasthttp"
 )
 
 // HTTP is an http transport
 type HTTP struct {
-	addr   string
-	client *fasthttp.Client
+	addr    string
+	client  *fasthttp.Client
 	headers map[string]string
 }
 
 func newHTTP(addr string, headers map[string]string) *HTTP {
 	return &HTTP{
-		addr:   addr,
-		client: &fasthttp.Client{},
+		addr:    addr,
+		client:  &fasthttp.Client{},
 		headers: headers,
 	}
 }

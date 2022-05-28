@@ -573,19 +573,19 @@ github.com/syndtr/goleveldb/leveldb/opt
 github.com/syndtr/goleveldb/leveldb/storage
 github.com/syndtr/goleveldb/leveldb/table
 github.com/syndtr/goleveldb/leveldb/util
+# github.com/umbracle/ethgo v0.1.2
+## explicit
+github.com/umbracle/ethgo
+github.com/umbracle/ethgo/abi
+github.com/umbracle/ethgo/jsonrpc
+github.com/umbracle/ethgo/jsonrpc/codec
+github.com/umbracle/ethgo/jsonrpc/transport
 # github.com/umbracle/fastrlp v0.0.0-20220527094140-59d5dd30e722
 ## explicit
 github.com/umbracle/fastrlp
 # github.com/umbracle/go-eth-bn256 v0.0.0-20190607160430-b36caf4e0f6b
 ## explicit
 github.com/umbracle/go-eth-bn256
-# github.com/umbracle/go-web3 v0.0.0-20220224145938-aaa1038c1b69
-## explicit
-github.com/umbracle/go-web3
-github.com/umbracle/go-web3/abi
-github.com/umbracle/go-web3/jsonrpc
-github.com/umbracle/go-web3/jsonrpc/codec
-github.com/umbracle/go-web3/jsonrpc/transport
 # github.com/valyala/bytebufferpool v1.0.0
 github.com/valyala/bytebufferpool
 # github.com/valyala/fasthttp v1.4.0

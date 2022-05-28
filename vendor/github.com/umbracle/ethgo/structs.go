@@ -1,4 +1,4 @@
-package web3
+package ethgo
 
 import (
 	"encoding/hex"
@@ -35,6 +35,16 @@ func BytesToAddress(b []byte) Address {
 
 	copy(a[20-min:], b[len(b)-min:])
 	return a
+}
+
+// Address implements the ethgo.Key interface Address method.
+func (a Address) Address() Address {
+	return a
+}
+
+// Sign implements the ethgo.Key interface Sign method.
+func (a Address) Sign(hash []byte) ([]byte, error) {
+	panic("an address cannot sign messages")
 }
 
 // UnmarshalText implements the unmarshal interface
@@ -138,6 +148,20 @@ type Block struct {
 	Uncles             []Hash
 }
 
+func (b *Block) Copy() *Block {
+	bb := new(Block)
+	*bb = *b
+	if b.Difficulty != nil {
+		bb.Difficulty = new(big.Int).Set(b.Difficulty)
+	}
+	bb.ExtraData = append(bb.ExtraData[:0], b.ExtraData...)
+	bb.Transactions = make([]*Transaction, len(b.Transactions))
+	for indx, txn := range b.Transactions {
+		bb.Transactions[indx] = txn.Copy()
+	}
+	return bb
+}
+
 type TransactionType int
 
 const (
@@ -178,9 +202,34 @@ type Transaction struct {
 	MaxFeePerGas         *big.Int
 }
 
+func (t *Transaction) Copy() *Transaction {
+	tt := new(Transaction)
+	if t.To != nil {
+		to := Address(*t.To)
+		tt.To = &to
+	}
+	tt.Input = append(tt.Input[:0], t.Input...)
+	if t.Value != nil {
+		tt.Value = new(big.Int).Set(t.Value)
+	}
+	tt.V = append(tt.V[:0], t.V...)
+	tt.R = append(tt.R[:0], t.R...)
+	tt.S = append(tt.S[:0], t.S...)
+	if t.ChainID != nil {
+		tt.ChainID = new(big.Int).Set(t.ChainID)
+	}
+	if t.MaxPriorityFeePerGas != nil {
+		tt.MaxPriorityFeePerGas = new(big.Int).Set(t.MaxPriorityFeePerGas)
+	}
+	if t.MaxFeePerGas != nil {
+		tt.MaxFeePerGas = new(big.Int).Set(t.MaxFeePerGas)
+	}
+	return tt
+}
+
 type AccessEntry struct {
-	Address Address
-	Storage []Hash
+	Address Address `json:"address"`
+	Storage []Hash  `json:"storageKeys"`
 }
 
 type AccessList []AccessEntry
@@ -230,6 +279,17 @@ type Receipt struct {
 	Status            uint64
 }
 
+func (r *Receipt) Copy() *Receipt {
+	rr := new(Receipt)
+	*rr = *r
+	rr.LogsBloom = append(rr.LogsBloom[:0], r.LogsBloom...)
+	rr.Logs = make([]*Log, len(r.Logs))
+	for indx, log := range r.Logs {
+		rr.Logs[indx] = log.Copy()
+	}
+	return rr
+}
+
 type Log struct {
 	Removed          bool
 	LogIndex         uint64
@@ -240,6 +300,13 @@ type Log struct {
 	Address          Address
 	Topics           []Hash
 	Data             []byte
+}
+
+func (l *Log) Copy() *Log {
+	ll := new(Log)
+	*ll = *l
+	ll.Data = append(ll.Data[:0], l.Data...)
+	return ll
 }
 
 type BlockNumber int
@@ -278,12 +345,6 @@ func EncodeBlock(block ...BlockNumber) BlockNumber {
 
 type BlockNumberOrHash interface {
 	Location() string
-}
-
-func (b *Block) Copy() *Block {
-	bb := new(Block)
-	*bb = *b
-	return bb
 }
 
 func min(i, j int) int {

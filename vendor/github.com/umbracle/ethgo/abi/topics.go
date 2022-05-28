@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/umbracle/go-web3"
+	"github.com/umbracle/ethgo"
 )
 
 // ParseLog parses an event log
-func ParseLog(args *Type, log *web3.Log) (map[string]interface{}, error) {
+func ParseLog(args *Type, log *ethgo.Log) (map[string]interface{}, error) {
 	var indexed, nonIndexed []*TupleElem
 
 	for _, arg := range args.TupleElems() {
@@ -53,7 +53,7 @@ func ParseLog(args *Type, log *web3.Log) (map[string]interface{}, error) {
 }
 
 // ParseTopics parses topics from a log event
-func ParseTopics(args *Type, topics []web3.Hash) ([]interface{}, error) {
+func ParseTopics(args *Type, topics []ethgo.Hash) ([]interface{}, error) {
 	if args.kind != KindTuple {
 		return nil, fmt.Errorf("expected a tuple type")
 	}
@@ -74,7 +74,7 @@ func ParseTopics(args *Type, topics []web3.Hash) ([]interface{}, error) {
 }
 
 // ParseTopic parses an individual topic
-func ParseTopic(t *Type, topic web3.Hash) (interface{}, error) {
+func ParseTopic(t *Type, topic ethgo.Hash) (interface{}, error) {
 	switch t.kind {
 	case KindBool:
 		if bytes.Equal(topic[:], topicTrue[:]) {
@@ -90,17 +90,20 @@ func ParseTopic(t *Type, topic web3.Hash) (interface{}, error) {
 	case KindAddress:
 		return readAddr(topic[:])
 
+	case KindFixedBytes:
+		return readFixedBytes(t, topic[:])
+
 	default:
-		return nil, fmt.Errorf("Topic parsing for type %s not supported", t.String())
+		return nil, fmt.Errorf("topic parsing for type %s not supported", t.String())
 	}
 }
 
 // EncodeTopic encodes a topic
-func EncodeTopic(t *Type, val interface{}) (web3.Hash, error) {
+func EncodeTopic(t *Type, val interface{}) (ethgo.Hash, error) {
 	return encodeTopic(t, reflect.ValueOf(val))
 }
 
-func encodeTopic(t *Type, val reflect.Value) (web3.Hash, error) {
+func encodeTopic(t *Type, val reflect.Value) (ethgo.Hash, error) {
 	switch t.kind {
 	case KindBool:
 		return encodeTopicBool(val)
@@ -112,16 +115,16 @@ func encodeTopic(t *Type, val reflect.Value) (web3.Hash, error) {
 		return encodeTopicAddress(val)
 
 	}
-	return web3.Hash{}, fmt.Errorf("not found")
+	return ethgo.Hash{}, fmt.Errorf("not found")
 }
 
-var topicTrue, topicFalse web3.Hash
+var topicTrue, topicFalse ethgo.Hash
 
 func init() {
 	topicTrue[31] = 1
 }
 
-func encodeTopicAddress(val reflect.Value) (res web3.Hash, err error) {
+func encodeTopicAddress(val reflect.Value) (res ethgo.Hash, err error) {
 	var b []byte
 	b, err = encodeAddress(val)
 	if err != nil {
@@ -131,7 +134,7 @@ func encodeTopicAddress(val reflect.Value) (res web3.Hash, err error) {
 	return
 }
 
-func encodeTopicNum(t *Type, val reflect.Value) (res web3.Hash, err error) {
+func encodeTopicNum(t *Type, val reflect.Value) (res ethgo.Hash, err error) {
 	var b []byte
 	b, err = encodeNum(val)
 	if err != nil {
@@ -141,16 +144,12 @@ func encodeTopicNum(t *Type, val reflect.Value) (res web3.Hash, err error) {
 	return
 }
 
-func encodeTopicBool(v reflect.Value) (res web3.Hash, err error) {
+func encodeTopicBool(v reflect.Value) (res ethgo.Hash, err error) {
 	if v.Kind() != reflect.Bool {
-		return web3.Hash{}, encodeErr(v, "bool")
+		return ethgo.Hash{}, encodeErr(v, "bool")
 	}
 	if v.Bool() {
 		return topicTrue, nil
 	}
 	return topicFalse, nil
-}
-
-func encodeTopicErr(val reflect.Value, str string) error {
-	return fmt.Errorf("cannot encode %s as %s", val.Type().String(), str)
 }

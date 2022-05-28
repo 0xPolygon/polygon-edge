@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/umbracle/go-web3"
+	"github.com/umbracle/ethgo"
 )
 
 // batch of predefined reflect types
@@ -22,7 +22,7 @@ var (
 	int16T        = reflect.TypeOf(int16(0))
 	int32T        = reflect.TypeOf(int32(0))
 	int64T        = reflect.TypeOf(int64(0))
-	addressT      = reflect.TypeOf(web3.Address{})
+	addressT      = reflect.TypeOf(ethgo.Address{})
 	stringT       = reflect.TypeOf("")
 	dynamicBytesT = reflect.SliceOf(reflect.TypeOf(byte(0)))
 	functionT     = reflect.ArrayOf(24, reflect.TypeOf(byte(0)))
@@ -131,7 +131,7 @@ func NewTupleTypeFromArgs(inputs []*ArgumentStr) (*Type, error) {
 }
 
 // ParseLog parses a log using this type
-func (t *Type) ParseLog(log *web3.Log) (map[string]interface{}, error) {
+func (t *Type) ParseLog(log *ethgo.Log) (map[string]interface{}, error) {
 	return ParseLog(t, log)
 }
 
@@ -165,7 +165,9 @@ func (t *Type) Format(includeArgs bool) string {
 				name += " indexed"
 			}
 			if includeArgs {
-				name += " " + i.Name
+				if i.Name != "" {
+					name += " " + i.Name
+				}
 			}
 			rawAux = append(rawAux, name)
 		}
@@ -328,11 +330,17 @@ func readType(l *lexer) (*Type, error) {
 	var tt *Type
 
 	tok := l.nextToken()
+
+	isTuple := false
 	if tok.typ == tupleToken {
 		if l.nextToken().typ != lparenToken {
 			return nil, expectedToken(lparenToken)
 		}
-
+		isTuple = true
+	} else if tok.typ == lparenToken {
+		isTuple = true
+	}
+	if isTuple {
 		var next token
 		elems := []*TupleElem{}
 		for {

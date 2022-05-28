@@ -10,7 +10,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/umbracle/go-web3"
+	"github.com/umbracle/ethgo"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -292,7 +292,7 @@ func (e *Event) Sig() string {
 }
 
 // ID returns the id of the event used during logs
-func (e *Event) ID() (res web3.Hash) {
+func (e *Event) ID() (res ethgo.Hash) {
 	k := acquireKeccak()
 	k.Write([]byte(e.Sig()))
 	dst := k.Sum(nil)
@@ -364,7 +364,7 @@ func NewEventFromType(name string, typ *Type) *Event {
 }
 
 // Match checks wheter the log is from this event
-func (e *Event) Match(log *web3.Log) bool {
+func (e *Event) Match(log *ethgo.Log) bool {
 	if len(log.Topics) == 0 {
 		return false
 	}
@@ -375,7 +375,7 @@ func (e *Event) Match(log *web3.Log) bool {
 }
 
 // ParseLog parses a log with this event
-func (e *Event) ParseLog(log *web3.Log) (map[string]interface{}, error) {
+func (e *Event) ParseLog(log *ethgo.Log) (map[string]interface{}, error) {
 	if !e.Match(log) {
 		return nil, fmt.Errorf("log does not match this event")
 	}

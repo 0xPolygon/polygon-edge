@@ -1,4 +1,4 @@
-package web3
+package ethgo
 
 import (
 	"encoding/hex"

@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/umbracle/go-web3"
+	"github.com/umbracle/ethgo"
 )
 
 func randomInt(min, max int) int {
@@ -113,7 +113,7 @@ func generateRandomType(t *Type) interface{} {
 		return false
 
 	case KindAddress:
-		buf := web3.Address{}
+		buf := ethgo.Address{}
 		rand.Read(buf[:])
 		return buf
 

@@ -3,11 +3,12 @@ package abi
 import (
 	"encoding/hex"
 	"fmt"
-	"github.com/umbracle/go-web3"
 	"math/big"
 	"reflect"
 	"strconv"
 	"strings"
+
+	"github.com/umbracle/ethgo"
 )
 
 var (
@@ -189,7 +190,7 @@ func encodeAddress(v reflect.Value) ([]byte, error) {
 		v = convertArrayToBytes(v)
 	}
 	if v.Kind() == reflect.String {
-		var addr web3.Address
+		var addr ethgo.Address
 		if err := addr.UnmarshalText([]byte(v.String())); err != nil {
 			return nil, err
 		}

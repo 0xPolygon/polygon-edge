@@ -8,7 +8,7 @@ import (
 	"strconv"
 
 	"github.com/mitchellh/mapstructure"
-	"github.com/umbracle/go-web3"
+	"github.com/umbracle/ethgo"
 )
 
 // Decode decodes the input with a given type
@@ -101,8 +101,8 @@ var (
 		big.NewInt(-1))
 )
 
-func readAddr(b []byte) (web3.Address, error) {
-	res := web3.Address{}
+func readAddr(b []byte) (ethgo.Address, error) {
+	res := ethgo.Address{}
 	if len(b) != 32 {
 		return res, fmt.Errorf("len is not correct")
 	}

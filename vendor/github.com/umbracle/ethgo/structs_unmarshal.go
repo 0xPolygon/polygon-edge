@@ -1,4 +1,4 @@
-package web3
+package ethgo
 
 import (
 	"encoding/hex"
@@ -143,11 +143,6 @@ func (t *Transaction) unmarshalJSON(v *fastjson.Value) error {
 	}
 	t.Type = typ
 
-	// 'to' must exists
-	if err := exists("to"); err != nil {
-		return err
-	}
-
 	var err error
 	if err := decodeHash(&t.Hash, v, "hash"); err != nil {
 		return err
@@ -169,12 +164,15 @@ func (t *Transaction) unmarshalJSON(v *fastjson.Value) error {
 	}
 
 	{
-		if v.Get("to").String() != "null" {
-			var to Address
-			if err = decodeAddr(&to, v, "to"); err != nil {
-				return err
+		// Do not decode 'to' if it doesn't exist.
+		if err := exists("to"); err == nil {
+			if v.Get("to").String() != "null" {
+				var to Address
+				if err = decodeAddr(&to, v, "to"); err != nil {
+					return err
+				}
+				t.To = &to
 			}
-			t.To = &to
 		}
 	}
 
@@ -199,15 +197,15 @@ func (t *Transaction) unmarshalJSON(v *fastjson.Value) error {
 		}
 	}
 
+	if t.Gas, err = decodeUint(v, "gas"); err != nil {
+		return err
+	}
+
 	if typ == TransactionDynamicFee {
 		if t.MaxPriorityFeePerGas, err = decodeBigInt(t.MaxPriorityFeePerGas, v, "maxPriorityFeePerGas"); err != nil {
 			return err
 		}
 		if t.MaxFeePerGas, err = decodeBigInt(t.MaxFeePerGas, v, "maxFeePerGas"); err != nil {
-			return err
-		}
-	} else {
-		if t.Gas, err = decodeUint(v, "gas"); err != nil {
 			return err
 		}
 	}
@@ -453,8 +451,11 @@ func (r *Log) UnmarshalJSON(buf []byte) error {
 
 func (r *Log) unmarshalJSON(v *fastjson.Value) error {
 	var err error
-	if r.Removed, err = decodeBool(v, "removed"); err != nil {
-		return err
+	if v.Exists("removed") {
+		// it is empty in etherscan API endpoint
+		if r.Removed, err = decodeBool(v, "removed"); err != nil {
+			return err
+		}
 	}
 	if r.LogIndex, err = decodeUint(v, "logIndex"); err != nil {
 		return err
@@ -468,8 +469,11 @@ func (r *Log) unmarshalJSON(v *fastjson.Value) error {
 	if err := decodeHash(&r.TransactionHash, v, "transactionHash"); err != nil {
 		return err
 	}
-	if err := decodeHash(&r.BlockHash, v, "blockHash"); err != nil {
-		return err
+	if v.Exists("blockHash") {
+		// it is empty in etherscan API endpoint
+		if err := decodeHash(&r.BlockHash, v, "blockHash"); err != nil {
+			return err
+		}
 	}
 	if err := decodeAddr(&r.Address, v, "address"); err != nil {
 		return err
@@ -564,7 +568,16 @@ func decodeUint(v *fastjson.Value, key string) (uint64, error) {
 	if !strings.HasPrefix(str, "0x") {
 		return 0, fmt.Errorf("field '%s' does not have 0x prefix: '%s'", key, str)
 	}
-	return strconv.ParseUint(str[2:], 16, 64)
+	str = str[2:]
+	if str == "" {
+		str = "0"
+	}
+
+	num, err := strconv.ParseUint(str, 16, 64)
+	if err != nil {
+		return 0, fmt.Errorf("field '%s' failed to decode uint: %s", key, str)
+	}
+	return num, nil
 }
 
 func decodeInt64(v *fastjson.Value, key string) (int64, error) {
@@ -578,8 +591,16 @@ func decodeInt64(v *fastjson.Value, key string) (int64, error) {
 	if !strings.HasPrefix(str, "0x") {
 		return 0, fmt.Errorf("field '%s' does not have 0x prefix: '%s'", key, str)
 	}
+	str = str[2:]
+	if str == "" {
+		str = "0"
+	}
 
-	return strconv.ParseInt(str[2:], 16, 64)
+	num, err := strconv.ParseInt(str, 16, 64)
+	if err != nil {
+		return 0, fmt.Errorf("field '%s' failed to decode int64: %s", key, str)
+	}
+	return num, nil
 }
 
 func decodeHash(h *Hash, v *fastjson.Value, key string) error {
