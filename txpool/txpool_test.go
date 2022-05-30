@@ -539,19 +539,30 @@ func TestAccountTxLimit(t *testing.T) {
 	)
 
 	t.Run(
-		"counter decreased (reset promoted)",
+		"counter decreased (reset enqueued)",
 		func(t *testing.T) {
+			pool, err := newTestPool()
+			assert.NoError(t, err)
+			pool.SetSigner(&mockSigner{})
 
-			//	create pool
+			// enqueue tx
+			go func() {
+				err := pool.addTx(local, newTx(addr1, 5, 1))
+				assert.NoError(t, err)
+			}()
+			pool.handleEnqueueRequest(<-pool.enqueueReqCh)
 
-			//	add tx
+			acc := pool.accounts.get(addr1)
 
-			//	assert counter is decreased
+			assert.Equal(t, uint64(1), acc.enqueued.length())
+			assert.Equal(t, uint64(1), acc.loadCount())
 
-			//	pop the tx
+			pool.resetAccounts(map[types.Address]uint64{
+				addr1: 6, // 6 > 5 (nonce)
+			})
 
-			//	assert counter is decreased
-
+			assert.Equal(t, uint64(0), acc.enqueued.length())
+			assert.Equal(t, uint64(0), acc.loadCount())
 		},
 	)
 
