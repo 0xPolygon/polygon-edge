@@ -238,8 +238,8 @@ func (a *account) enqueue(tx *types.Transaction) error {
 	a.enqueued.lock(true)
 	defer a.enqueued.unlock()
 
-	if a.slotsOccupied() == maxAccountSlots {
-		return ErrAccountTxLimitReached
+	if a.slotsOccupied()+slotsRequired(tx) > maxAccountSlots {
+		return ErrAccountOverflow
 	}
 
 	// reject low nonce tx
