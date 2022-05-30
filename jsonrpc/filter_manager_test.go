@@ -148,6 +148,24 @@ func TestFilterTimeout(t *testing.T) {
 	assert.False(t, m.Exists(id))
 }
 
+func TestRemoveFilterByWebsocket(t *testing.T) {
+	store := newMockStore()
+
+	mock := &mockWsConn{
+		msgCh: make(chan []byte, 1),
+	}
+
+	m := NewFilterManager(hclog.NewNullLogger(), store)
+	go m.Run()
+
+	id := m.NewBlockFilter(mock)
+
+	m.RemoveFilterByWs(mock)
+
+	// false because filter was removed
+	assert.False(t, m.Exists(id))
+}
+
 func TestFilterWebsocket(t *testing.T) {
 	store := newMockStore()
 

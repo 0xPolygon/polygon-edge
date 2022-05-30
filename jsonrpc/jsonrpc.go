@@ -40,6 +40,7 @@ type JSONRPC struct {
 }
 
 type dispatcher interface {
+	RemoveFilterByWs(conn wsConn) bool
 	HandleWs(reqBody []byte, conn wsConn) ([]byte, error)
 	Handle(reqBody []byte) ([]byte, error)
 }
@@ -207,6 +208,11 @@ func (j *JSONRPC) handleWs(w http.ResponseWriter, req *http.Request) {
 			} else {
 				j.logger.Error(fmt.Sprintf("Unable to read WS message, %s", err.Error()))
 				j.logger.Info("Closing WS connection with error")
+			}
+
+			ok := j.dispatcher.RemoveFilterByWs(wrapConn)
+			if !ok {
+				j.logger.Error("Unable to remove filter with specific WS")
 			}
 
 			break

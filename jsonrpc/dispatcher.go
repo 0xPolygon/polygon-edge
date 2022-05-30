@@ -167,6 +167,10 @@ func (d *Dispatcher) handleUnsubscribe(req Request) (bool, Error) {
 	return d.filterManager.Uninstall(filterID), nil
 }
 
+func (d *Dispatcher) RemoveFilterByWs(conn wsConn) bool {
+	return d.filterManager.RemoveFilterByWs(conn)
+}
+
 func (d *Dispatcher) HandleWs(reqBody []byte, conn wsConn) ([]byte, error) {
 	var req Request
 	if err := json.Unmarshal(reqBody, &req); err != nil {

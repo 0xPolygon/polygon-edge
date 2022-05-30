@@ -390,6 +390,25 @@ func (f *FilterManager) removeFilterByID(id string) bool {
 	return true
 }
 
+// removeFilterByWs removes the filter with given WS, unsafe against race condition
+func (f *FilterManager) RemoveFilterByWs(ws wsConn) bool {
+	for _, filter := range f.filters {
+		if filter.getFilterBase().ws != ws {
+			continue
+		}
+
+		delete(f.filters, filter.getFilterBase().id)
+
+		if removed := f.timeouts.removeFilter(filter.getFilterBase()); removed {
+			f.emitSignalToUpdateCh()
+		}
+
+		return true
+	}
+
+	return false
+}
+
 // addFilter is an internal method to add given filter to list and heap
 func (f *FilterManager) addFilter(filter filter) string {
 	f.lock.Lock()
