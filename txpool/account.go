@@ -156,7 +156,7 @@ type account struct {
 	slots uint64
 }
 
-func (a *account) increaseCount(num uint64) {
+func (a *account) increaseSlots(num uint64) {
 	atomic.AddUint64(&a.slots, num)
 }
 
@@ -241,7 +241,7 @@ func (a *account) enqueue(tx *types.Transaction) error {
 	// enqueue tx
 	a.enqueued.push(tx)
 
-	a.increaseCount(1)
+	a.increaseSlots(1)
 
 	return nil
 }
