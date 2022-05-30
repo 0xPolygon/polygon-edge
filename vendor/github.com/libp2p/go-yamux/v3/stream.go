@@ -31,6 +31,8 @@ const (
 type Stream struct {
 	sendWindow uint32
 
+	memory int
+
 	id      uint32
 	session *Session
 
@@ -49,14 +51,15 @@ type Stream struct {
 	readDeadline, writeDeadline pipeDeadline
 }
 
-// newStream is used to construct a new stream within
-// a given session for an ID
+// newStream is used to construct a new stream within a given session for an ID.
+// It assumes that a memory allocation has been obtained for the initialWindow.
 func newStream(session *Session, id uint32, state streamState, initialWindow uint32) *Stream {
 	s := &Stream{
 		id:            id,
 		session:       session,
 		state:         state,
 		sendWindow:    initialStreamWindow,
+		memory:        int(initialWindow),
 		readDeadline:  makePipeDeadline(),
 		writeDeadline: makePipeDeadline(),
 		// Initialize the recvBuf with initialStreamWindow, not config.InitialStreamWindowSize.
@@ -228,6 +231,7 @@ func (s *Stream) sendWindowUpdate() error {
 			grow := recvWindow - s.recvWindow
 			if err := s.session.memoryManager.ReserveMemory(int(grow), 128); err == nil {
 				s.recvWindow = recvWindow
+				s.memory += int(grow)
 				_, delta = s.recvBuf.GrowTo(s.recvWindow, true)
 			}
 		}

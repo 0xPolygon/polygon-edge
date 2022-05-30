@@ -26,10 +26,8 @@ func newPeerConnectWatcher(emitter event.Emitter) *peerConnectWatcher {
 	}
 }
 
-func (w *peerConnectWatcher) Listen(network.Network, ma.Multiaddr)         {}
-func (w *peerConnectWatcher) ListenClose(network.Network, ma.Multiaddr)    {}
-func (w *peerConnectWatcher) OpenedStream(network.Network, network.Stream) {}
-func (w *peerConnectWatcher) ClosedStream(network.Network, network.Stream) {}
+func (w *peerConnectWatcher) Listen(network.Network, ma.Multiaddr)      {}
+func (w *peerConnectWatcher) ListenClose(network.Network, ma.Multiaddr) {}
 
 func (w *peerConnectWatcher) Connected(n network.Network, conn network.Conn) {
 	p := conn.RemotePeer()
