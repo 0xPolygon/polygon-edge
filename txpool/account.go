@@ -204,10 +204,10 @@ func (a *account) reset(nonce uint64, promoteCh chan<- promoteRequest) (
 	defer a.enqueued.unlock()
 
 	//	prune the enqueued txs
-	prunedEnqueued = append(
-		prunedEnqueued,
-		a.enqueued.prune(nonce)...,
-	)
+	pruned := a.enqueued.prune(nonce)
+
+	a.decreaseCount(uint64(len(pruned)))
+	prunedEnqueued = append(prunedEnqueued, pruned...)
 
 	//	update nonce expected for this account
 	a.setNonce(nonce)
