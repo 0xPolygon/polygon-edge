@@ -469,7 +469,7 @@ func TestAccountTxLimit(t *testing.T) {
 	)
 
 	t.Run(
-		"counter decreased (drop)",
+		"counter decreased (drop promoted)",
 		func(t *testing.T) {
 			pool, err := newTestPool()
 			assert.NoError(t, err)

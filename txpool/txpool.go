@@ -371,6 +371,7 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 
 	// drop promoted
 	dropped := account.promoted.clear()
+	account.decreaseCount(uint64(len(dropped)))
 	clearAccountQueue(dropped)
 
 	// update metrics
