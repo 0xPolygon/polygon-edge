@@ -21,13 +21,6 @@ const (
 	txSlotSize  = 32 * 1024  // 32kB
 	txMaxSize   = 128 * 1024 //128Kb
 	topicNameV1 = "txpool/0.1"
-
-	//	maximum allowed number of times an account
-	//	was excluded from block building (ibft.writeTransactions)
-	maxAccountDemotions = uint(10)
-
-	//	maximum allowed number of transactions an account may contain at any moment
-	maxAccountTxs = uint64(50)
 )
 
 // errors

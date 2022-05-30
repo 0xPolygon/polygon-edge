@@ -7,6 +7,15 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
+const (
+	//	maximum allowed number of times an account
+	//	was excluded from block building (ibft.writeTransactions)
+	maxAccountDemotions = uint(10)
+
+	//	maximum allowed number of transactions an account may contain at any moment
+	maxAccountSlots = uint64(50)
+)
+
 // Thread safe map of all accounts registered by the pool.
 // Each account (value) is bound to one address (key).
 type accountsMap struct {
@@ -229,7 +238,7 @@ func (a *account) enqueue(tx *types.Transaction) error {
 	a.enqueued.lock(true)
 	defer a.enqueued.unlock()
 
-	if a.slotsOccupied() == maxAccountTxs {
+	if a.slotsOccupied() == maxAccountSlots {
 		return ErrAccountTxLimitReached
 	}
 

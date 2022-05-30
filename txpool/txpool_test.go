@@ -605,10 +605,10 @@ func TestAccountTxLimit(t *testing.T) {
 			acc := pool.createAccountOnce(addr1)
 
 			//	set the limit to max
-			acc.slots = maxAccountTxs
+			acc.slots = maxAccountSlots
 
 			assert.Equal(t, uint64(0), acc.enqueued.length())
-			assert.Equal(t, maxAccountTxs, acc.slotsOccupied())
+			assert.Equal(t, maxAccountSlots, acc.slotsOccupied())
 
 			//	send tx
 			go func() {
@@ -619,7 +619,7 @@ func TestAccountTxLimit(t *testing.T) {
 
 			//	verify it was rejected
 			assert.Equal(t, uint64(0), acc.enqueued.length())
-			assert.Equal(t, maxAccountTxs, acc.slotsOccupied())
+			assert.Equal(t, maxAccountSlots, acc.slotsOccupied())
 		},
 	)
 }
