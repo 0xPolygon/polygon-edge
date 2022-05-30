@@ -415,7 +415,7 @@ func TestAccountTxLimit(t *testing.T) {
 	t.Parallel()
 
 	t.Run(
-		"counter increased (enqueue tx)",
+		"counter increased (enqueue)",
 		func(t *testing.T) {
 			//	create pool
 			pool, err := newTestPool()
@@ -434,12 +434,46 @@ func TestAccountTxLimit(t *testing.T) {
 			assert.Equal(t, uint64(1), acc.enqueued.length())
 
 			//	assert counter is increased
-			assert.Equal(t, uint64(1), acc.count())
+			assert.Equal(t, uint64(1), acc.loadCount())
 		},
 	)
 
 	t.Run(
-		"counter decreased (pop tx)",
+		"counter decreased (pop)",
+		func(t *testing.T) {
+
+			//	create pool
+
+			//	add tx
+
+			//	assert counter is decreased
+
+			//	pop the tx
+
+			//	assert counter is decreased
+
+		},
+	)
+
+	t.Run(
+		"counter decreased (drop)",
+		func(t *testing.T) {
+
+			//	create pool
+
+			//	add tx
+
+			//	assert counter is decreased
+
+			//	pop the tx
+
+			//	assert counter is decreased
+
+		},
+	)
+
+	t.Run(
+		"counter decreased (reset)",
 		func(t *testing.T) {
 
 			//	create pool

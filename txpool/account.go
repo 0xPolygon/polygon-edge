@@ -151,6 +151,21 @@ type account struct {
 	enqueued, promoted *accountQueue
 	nextNonce          uint64
 	demotions          uint
+
+	//	number of txs present in the account
+	count uint64
+}
+
+func (a *account) increaseCount(num uint64) {
+	atomic.AddUint64(&a.count, num)
+}
+
+func (a *account) decreaseCount(num uint64) {
+	atomic.AddUint64(&a.count, ^num+1)
+}
+
+func (a *account) loadCount() uint64 {
+	return atomic.LoadUint64(&a.count)
 }
 
 // getNonce returns the next expected nonce for this account.
@@ -221,6 +236,8 @@ func (a *account) enqueue(tx *types.Transaction) error {
 
 	// enqueue tx
 	a.enqueued.push(tx)
+
+	a.increaseCount(1)
 
 	return nil
 }
