@@ -164,7 +164,7 @@ func (a *account) decreaseCount(num uint64) {
 	atomic.AddUint64(&a.count, ^num+1)
 }
 
-func (a *account) loadCount() uint64 {
+func (a *account) slotsOccupied() uint64 {
 	return atomic.LoadUint64(&a.count)
 }
 
@@ -229,7 +229,7 @@ func (a *account) enqueue(tx *types.Transaction) error {
 	a.enqueued.lock(true)
 	defer a.enqueued.unlock()
 
-	if a.loadCount() == maxAccountTxs {
+	if a.slotsOccupied() == maxAccountTxs {
 		return ErrAccountTxLimitReached
 	}
 

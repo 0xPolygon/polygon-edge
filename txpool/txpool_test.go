@@ -434,7 +434,7 @@ func TestAccountTxLimit(t *testing.T) {
 			assert.Equal(t, uint64(1), acc.enqueued.length())
 
 			//	assert counter is increased
-			assert.Equal(t, uint64(1), acc.loadCount())
+			assert.Equal(t, uint64(1), acc.slotsOccupied())
 		},
 	)
 
@@ -455,7 +455,7 @@ func TestAccountTxLimit(t *testing.T) {
 			acc := pool.accounts.get(addr1)
 
 			assert.Equal(t, uint64(1), acc.promoted.length())
-			assert.Equal(t, uint64(1), acc.loadCount())
+			assert.Equal(t, uint64(1), acc.slotsOccupied())
 
 			//	pop the tx
 			pool.Prepare()
@@ -464,7 +464,7 @@ func TestAccountTxLimit(t *testing.T) {
 
 			//	assert counter is decreased
 			assert.Equal(t, uint64(0), acc.promoted.length())
-			assert.Equal(t, uint64(0), acc.loadCount())
+			assert.Equal(t, uint64(0), acc.slotsOccupied())
 		},
 	)
 
@@ -485,7 +485,7 @@ func TestAccountTxLimit(t *testing.T) {
 			acc := pool.accounts.get(addr1)
 
 			assert.Equal(t, uint64(1), acc.promoted.length())
-			assert.Equal(t, uint64(1), acc.loadCount())
+			assert.Equal(t, uint64(1), acc.slotsOccupied())
 
 			//	drop the tx
 			pool.Prepare()
@@ -494,7 +494,7 @@ func TestAccountTxLimit(t *testing.T) {
 
 			//	assert counter is decreased
 			assert.Equal(t, uint64(0), acc.promoted.length())
-			assert.Equal(t, uint64(0), acc.loadCount())
+			assert.Equal(t, uint64(0), acc.slotsOccupied())
 		},
 	)
 
@@ -524,7 +524,7 @@ func TestAccountTxLimit(t *testing.T) {
 
 			assert.Equal(t, uint64(1), acc.enqueued.length())
 			assert.Equal(t, uint64(1), acc.promoted.length())
-			assert.Equal(t, uint64(2), acc.loadCount())
+			assert.Equal(t, uint64(2), acc.slotsOccupied())
 
 			//	drop
 			pool.Prepare()
@@ -534,7 +534,7 @@ func TestAccountTxLimit(t *testing.T) {
 			//	assert counter is decreased
 			assert.Equal(t, uint64(0), acc.enqueued.length())
 			assert.Equal(t, uint64(0), acc.promoted.length())
-			assert.Equal(t, uint64(0), acc.loadCount())
+			assert.Equal(t, uint64(0), acc.slotsOccupied())
 		},
 	)
 
@@ -555,14 +555,14 @@ func TestAccountTxLimit(t *testing.T) {
 			acc := pool.accounts.get(addr1)
 
 			assert.Equal(t, uint64(1), acc.enqueued.length())
-			assert.Equal(t, uint64(1), acc.loadCount())
+			assert.Equal(t, uint64(1), acc.slotsOccupied())
 
 			pool.resetAccounts(map[types.Address]uint64{
 				addr1: 6, // 6 > 5 (nonce)
 			})
 
 			assert.Equal(t, uint64(0), acc.enqueued.length())
-			assert.Equal(t, uint64(0), acc.loadCount())
+			assert.Equal(t, uint64(0), acc.slotsOccupied())
 		},
 	)
 
@@ -584,14 +584,14 @@ func TestAccountTxLimit(t *testing.T) {
 			acc := pool.accounts.get(addr1)
 
 			assert.Equal(t, uint64(1), acc.promoted.length())
-			assert.Equal(t, uint64(1), acc.loadCount())
+			assert.Equal(t, uint64(1), acc.slotsOccupied())
 
 			pool.resetAccounts(map[types.Address]uint64{
 				addr1: 5, // 5 > 0 (nonce)
 			})
 
 			assert.Equal(t, uint64(0), acc.promoted.length())
-			assert.Equal(t, uint64(0), acc.loadCount())
+			assert.Equal(t, uint64(0), acc.slotsOccupied())
 		},
 	)
 
@@ -608,7 +608,7 @@ func TestAccountTxLimit(t *testing.T) {
 			acc.count = maxAccountTxs
 
 			assert.Equal(t, uint64(0), acc.enqueued.length())
-			assert.Equal(t, maxAccountTxs, acc.loadCount())
+			assert.Equal(t, maxAccountTxs, acc.slotsOccupied())
 
 			//	send tx
 			go func() {
@@ -619,7 +619,7 @@ func TestAccountTxLimit(t *testing.T) {
 
 			//	verify it was rejected
 			assert.Equal(t, uint64(0), acc.enqueued.length())
-			assert.Equal(t, maxAccountTxs, acc.loadCount())
+			assert.Equal(t, maxAccountTxs, acc.slotsOccupied())
 		},
 	)
 }
