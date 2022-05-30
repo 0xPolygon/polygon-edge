@@ -622,6 +622,35 @@ func TestAccountSlots(t *testing.T) {
 			assert.Equal(t, maxAccountSlots, acc.slotsOccupied())
 		},
 	)
+
+	t.Run(
+		"reject new tx if oversized",
+		func(t *testing.T) {
+			pool, err := newTestPool()
+			assert.NoError(t, err)
+			pool.SetSigner(&mockSigner{})
+
+			acc := pool.createAccountOnce(addr1)
+
+			//	set limit near max
+			nearLimit := maxAccountSlots - 2
+			acc.slots = nearLimit
+
+			assert.Equal(t, uint64(0), acc.enqueued.length())
+			assert.Equal(t, nearLimit, acc.slotsOccupied())
+
+			//	send tx
+			go func() {
+				err := pool.addTx(local, newTx(addr1, 5, 3)) // 3 > 2(available)
+				assert.NoError(t, err)
+			}()
+			pool.handleEnqueueRequest(<-pool.enqueueReqCh)
+
+			//	verify it was rejected
+			assert.Equal(t, uint64(0), acc.enqueued.length())
+			assert.Equal(t, nearLimit, acc.slotsOccupied())
+		},
+	)
 }
 
 func TestAddHandler(t *testing.T) {
