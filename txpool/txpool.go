@@ -321,6 +321,9 @@ func (p *TxPool) Pop(tx *types.Transaction) {
 	// pop the top most promoted tx
 	account.promoted.pop()
 
+	// decrease count
+	account.decreaseCount(1)
+
 	//	successfully popping an account resets its demotions count to 0
 	account.demotions = 0
 
