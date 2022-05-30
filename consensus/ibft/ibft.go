@@ -995,6 +995,8 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 					commit.From,
 				),
 			)
+
+			continue
 		}
 
 		committedSeals = append(committedSeals, committedSeal)
