@@ -983,10 +983,21 @@ func (i *Ibft) updateMetrics(block *types.Block) {
 	i.metrics.NumTxs.Set(float64(len(block.Body().Transactions)))
 }
 func (i *Ibft) insertBlock(block *types.Block) error {
-	committedSeals := [][]byte{}
+	committedSeals := make([][]byte, 0)
+
 	for _, commit := range i.state.committed {
 		// no need to check the format of seal here because writeCommittedSeals will check
-		committedSeals = append(committedSeals, hex.MustDecodeHex(commit.Seal))
+		committedSeal, decodeErr := hex.DecodeHex(commit.Seal)
+		if decodeErr != nil {
+			i.logger.Error(
+				fmt.Sprintf(
+					"unable to decode committed seal from %s",
+					commit.From,
+				),
+			)
+		}
+
+		committedSeals = append(committedSeals, committedSeal)
 	}
 
 	header, err := writeCommittedSeals(block.Header, committedSeals)
@@ -1263,7 +1274,7 @@ func (i *Ibft) VerifyHeader(parent, header *types.Header) error {
 	}
 
 	// verify the committed seals
-	if err := verifyCommitedFields(snap, header, i.quorumSize(header.Number)); err != nil {
+	if err := verifyCommittedFields(snap, header, i.quorumSize(header.Number)); err != nil {
 		return err
 	}
 

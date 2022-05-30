@@ -165,8 +165,8 @@ func verifySigner(snap *Snapshot, header *types.Header) error {
 	return nil
 }
 
-// verifyCommitedFields is checking for consensus proof in the header
-func verifyCommitedFields(
+// verifyCommittedFields is checking for consensus proof in the header
+func verifyCommittedFields(
 	snap *Snapshot,
 	header *types.Header,
 	quorumSizeFn QuorumImplementation,

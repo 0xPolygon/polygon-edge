@@ -3,6 +3,7 @@ package types
 import (
 	"database/sql/driver"
 	"errors"
+	"fmt"
 
 	goHex "encoding/hex"
 
@@ -74,7 +75,11 @@ func (b *Bloom) Scan(src interface{}) error {
 		return errors.New("invalid type assert")
 	}
 
-	bb := hex.MustDecodeHex(string(stringVal))
+	bb, decodeErr := hex.DecodeHex(string(stringVal))
+	if decodeErr != nil {
+		return fmt.Errorf("unable to decode value, %w", decodeErr)
+	}
+
 	copy(b[:], bb[:])
 
 	return nil
