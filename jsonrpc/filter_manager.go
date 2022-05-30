@@ -349,53 +349,35 @@ func (f *FilterManager) Exists(id string) bool {
 	return ok
 }
 
-// GetLogsForQuery return array of logs for given query
-func (f *FilterManager) GetLogsForQuery(query *LogQuery) ([]*Log, error) {
-	result := make([]*Log, 0)
-	parseReceipts := func(block *types.Block) error {
-		receipts, err := f.store.GetReceiptsByHash(block.Header.Hash)
-		if err != nil {
-			return err
-		}
+func (f *FilterManager) getLogsFromBlock(query *LogQuery, block *types.Block) ([]*Log, error) {
+	receipts, err := f.store.GetReceiptsByHash(block.Header.Hash)
+	if err != nil {
+		return nil, err
+	}
 
-		for indx, receipt := range receipts {
-			for logIndx, log := range receipt.Logs {
-				if query.Match(log) {
-					result = append(result, &Log{
-						Address:     log.Address,
-						Topics:      log.Topics,
-						Data:        argBytes(log.Data),
-						BlockNumber: argUint64(block.Header.Number),
-						BlockHash:   block.Header.Hash,
-						TxHash:      block.Transactions[indx].Hash,
-						TxIndex:     argUint64(indx),
-						LogIndex:    argUint64(logIndx),
-					})
-				}
+	logs := make([]*Log, 0)
+
+	for idx, receipt := range receipts {
+		for logIdx, log := range receipt.Logs {
+			if query.Match(log) {
+				logs = append(logs, &Log{
+					Address:     log.Address,
+					Topics:      log.Topics,
+					Data:        argBytes(log.Data),
+					BlockNumber: argUint64(block.Header.Number),
+					BlockHash:   block.Header.Hash,
+					TxHash:      block.Transactions[idx].Hash,
+					TxIndex:     argUint64(idx),
+					LogIndex:    argUint64(logIdx),
+				})
 			}
 		}
-
-		return nil
 	}
 
-	if query.BlockHash != nil {
-		block, ok := f.store.GetBlockByHash(*query.BlockHash, true)
-		if !ok {
-			return nil, ErrBlockNotFound
-		}
+	return logs, nil
+}
 
-		if len(block.Transactions) == 0 {
-			// no txs in block, return empty response
-			return result, nil
-		}
-
-		if err := parseReceipts(block); err != nil {
-			return nil, err
-		}
-
-		return result, nil
-	}
-
+func (f *FilterManager) getLogsFromBlocks(query *LogQuery) ([]*Log, error) {
 	latestBlockNumber := f.store.Header().Number
 
 	resolveNum := func(num BlockNumber) uint64 {
@@ -424,6 +406,8 @@ func (f *FilterManager) GetLogsForQuery(query *LogQuery) ([]*Log, error) {
 		from = 1
 	}
 
+	logs := make([]*Log, 0)
+
 	for i := from; i <= to; i++ {
 		block, ok := f.store.GetBlockByNumber(i, true)
 		if !ok {
@@ -435,12 +419,36 @@ func (f *FilterManager) GetLogsForQuery(query *LogQuery) ([]*Log, error) {
 			continue
 		}
 
-		if err := parseReceipts(block); err != nil {
+		blockLogs, err := f.getLogsFromBlock(query, block)
+		if err != nil {
 			return nil, err
 		}
+
+		logs = append(logs, blockLogs...)
 	}
 
-	return result, nil
+	return logs, nil
+}
+
+// GetLogsForQuery return array of logs for given query
+func (f *FilterManager) GetLogsForQuery(query *LogQuery) ([]*Log, error) {
+	if query.BlockHash != nil {
+		//	BlockHash is set -> fetch logs from this block only
+		block, ok := f.store.GetBlockByHash(*query.BlockHash, true)
+		if !ok {
+			return nil, ErrBlockNotFound
+		}
+
+		if len(block.Transactions) == 0 {
+			// no txs in block, return empty response
+			return []*Log{}, nil
+		}
+
+		return f.getLogsFromBlock(query, block)
+	}
+
+	//	gets logs from a range of blocks
+	return f.getLogsFromBlocks(query)
 }
 
 //GetLogFilterFromID return log filter for given filterID
