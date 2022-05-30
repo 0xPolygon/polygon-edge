@@ -160,7 +160,7 @@ func (a *account) increaseSlots(num uint64) {
 	atomic.AddUint64(&a.slots, num)
 }
 
-func (a *account) decreaseCount(num uint64) {
+func (a *account) decreaseSlots(num uint64) {
 	atomic.AddUint64(&a.slots, ^num+1)
 }
 
@@ -191,7 +191,7 @@ func (a *account) reset(nonce uint64, promoteCh chan<- promoteRequest) (
 
 	//	prune the promoted txs
 	pruned := a.promoted.prune(nonce)
-	a.decreaseCount(uint64(len(pruned)))
+	a.decreaseSlots(uint64(len(pruned)))
 
 	prunedPromoted = append(prunedPromoted, pruned...)
 
@@ -206,7 +206,7 @@ func (a *account) reset(nonce uint64, promoteCh chan<- promoteRequest) (
 	//	prune the enqueued txs
 	pruned = a.enqueued.prune(nonce)
 
-	a.decreaseCount(uint64(len(pruned)))
+	a.decreaseSlots(uint64(len(pruned)))
 	prunedEnqueued = append(prunedEnqueued, pruned...)
 
 	//	update nonce expected for this account
