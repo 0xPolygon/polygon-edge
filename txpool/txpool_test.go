@@ -411,7 +411,7 @@ func TestDropKnownGossipTx(t *testing.T) {
 	assert.Equal(t, uint64(1), pool.accounts.get(addr1).enqueued.length())
 }
 
-func TestAccountTxLimit(t *testing.T) {
+func TestAccountSlots(t *testing.T) {
 	t.Parallel()
 
 	t.Run(
