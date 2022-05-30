@@ -473,39 +473,7 @@ func TestAccountSlots(t *testing.T) {
 	)
 
 	t.Run(
-		"counter decreased (drop promoted)",
-		func(t *testing.T) {
-			t.Parallel()
-
-			pool, err := newTestPool()
-			assert.NoError(t, err)
-			pool.SetSigner(&mockSigner{})
-
-			go func() {
-				err := pool.addTx(local, newTx(addr1, 0, 1))
-				assert.NoError(t, err)
-			}()
-			go pool.handleEnqueueRequest(<-pool.enqueueReqCh)
-			pool.handlePromoteRequest(<-pool.promoteReqCh)
-
-			acc := pool.accounts.get(addr1)
-
-			assert.Equal(t, uint64(1), acc.promoted.length())
-			assert.Equal(t, uint64(1), acc.slotsOccupied())
-
-			//	drop the tx
-			pool.Prepare()
-			tx := pool.Peek()
-			pool.Drop(tx)
-
-			//	assert counter is decreased
-			assert.Equal(t, uint64(0), acc.promoted.length())
-			assert.Equal(t, uint64(0), acc.slotsOccupied())
-		},
-	)
-
-	t.Run(
-		"counter decreased (drop promoted + enqueued)",
+		"counter decreased (drop)",
 		func(t *testing.T) {
 			t.Parallel()
 
