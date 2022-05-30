@@ -11,12 +11,6 @@ type Notifiee interface {
 	ListenClose(Network, ma.Multiaddr) // called when network stops listening on an addr
 	Connected(Network, Conn)           // called when a connection opened
 	Disconnected(Network, Conn)        // called when a connection closed
-	OpenedStream(Network, Stream)      // called when a stream opened
-	ClosedStream(Network, Stream)      // called when a stream closed
-
-	// TODO
-	// PeerConnected(Network, peer.ID)    // called when a peer connected
-	// PeerDisconnected(Network, peer.ID) // called when a peer disconnected
 }
 
 // NotifyBundle implements Notifiee by calling any of the functions set on it,
@@ -28,9 +22,6 @@ type NotifyBundle struct {
 
 	ConnectedF    func(Network, Conn)
 	DisconnectedF func(Network, Conn)
-
-	OpenedStreamF func(Network, Stream)
-	ClosedStreamF func(Network, Stream)
 }
 
 var _ Notifiee = (*NotifyBundle)(nil)
@@ -63,20 +54,6 @@ func (nb *NotifyBundle) Disconnected(n Network, c Conn) {
 	}
 }
 
-// OpenedStream calls OpenedStreamF if it is not null.
-func (nb *NotifyBundle) OpenedStream(n Network, s Stream) {
-	if nb.OpenedStreamF != nil {
-		nb.OpenedStreamF(n, s)
-	}
-}
-
-// ClosedStream calls ClosedStreamF if it is not null.
-func (nb *NotifyBundle) ClosedStream(n Network, s Stream) {
-	if nb.ClosedStreamF != nil {
-		nb.ClosedStreamF(n, s)
-	}
-}
-
 // Global noop notifiee. Do not change.
 var GlobalNoopNotifiee = &NoopNotifiee{}
 
@@ -88,5 +65,3 @@ func (nn *NoopNotifiee) Connected(n Network, c Conn)              {}
 func (nn *NoopNotifiee) Disconnected(n Network, c Conn)           {}
 func (nn *NoopNotifiee) Listen(n Network, addr ma.Multiaddr)      {}
 func (nn *NoopNotifiee) ListenClose(n Network, addr ma.Multiaddr) {}
-func (nn *NoopNotifiee) OpenedStream(Network, Stream)             {}
-func (nn *NoopNotifiee) ClosedStream(Network, Stream)             {}
