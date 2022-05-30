@@ -3,6 +3,8 @@ package protocol
 import (
 	"context"
 	"errors"
+	"github.com/0xPolygon/polygon-edge/protocol/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 	"math/big"
 	"testing"
 	"time"
@@ -688,4 +690,57 @@ func TestSyncer_PeerDisconnected(t *testing.T) {
 	// Make sure that the disconnected peer is not in the
 	// reference node's sync peer map
 	assert.False(t, found)
+}
+
+func TestVerifyNotifyRequest(t *testing.T) {
+	t.Parallel()
+
+	testTable := []struct {
+		name        string
+		request     *proto.NotifyReq
+		expectedErr error
+	}{
+		{
+			"Valid notify request",
+			&proto.NotifyReq{
+				Status: &proto.V1Status{},
+				Raw:    &anypb.Any{},
+			},
+			nil,
+		},
+		{
+			"No notify request",
+			nil,
+			errMalformedNotifyRequest,
+		},
+		{
+			"No notify body",
+			&proto.NotifyReq{
+				Status: &proto.V1Status{},
+				Raw:    nil,
+			},
+			errMalformedNotifyBody,
+		},
+		{
+			"No notify status",
+			&proto.NotifyReq{
+				Status: nil,
+				Raw:    &anypb.Any{},
+			},
+			errMalformedNotifyStatus,
+		},
+	}
+
+	for _, testCase := range testTable {
+		testCase := testCase
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.ErrorIs(
+				t,
+				verifyNotifyRequest(testCase.request),
+				testCase.expectedErr,
+			)
+		})
+	}
 }
