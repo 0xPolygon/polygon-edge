@@ -487,7 +487,7 @@ func TestAccountTxLimit(t *testing.T) {
 			assert.Equal(t, uint64(1), acc.promoted.length())
 			assert.Equal(t, uint64(1), acc.loadCount())
 
-			//	pop the tx
+			//	drop the tx
 			pool.Prepare()
 			tx := pool.Peek()
 			pool.Drop(tx)
@@ -499,7 +499,47 @@ func TestAccountTxLimit(t *testing.T) {
 	)
 
 	t.Run(
-		"counter decreased (reset)",
+		"counter decreased (drop promoted + enqueued)",
+		func(t *testing.T) {
+			pool, err := newTestPool()
+			assert.NoError(t, err)
+			pool.SetSigner(&mockSigner{})
+
+			// 1st tx will end up promoted
+			go func() {
+				err := pool.addTx(local, newTx(addr1, 0, 1))
+				assert.NoError(t, err)
+			}()
+			go pool.handleEnqueueRequest(<-pool.enqueueReqCh)
+			pool.handlePromoteRequest(<-pool.promoteReqCh)
+
+			// 2nd tx will end up enqueued
+			go func() {
+				err := pool.addTx(local, newTx(addr1, 5, 1))
+				assert.NoError(t, err)
+			}()
+			pool.handleEnqueueRequest(<-pool.enqueueReqCh)
+
+			acc := pool.accounts.get(addr1)
+
+			assert.Equal(t, uint64(1), acc.enqueued.length())
+			assert.Equal(t, uint64(1), acc.promoted.length())
+			assert.Equal(t, uint64(2), acc.loadCount())
+
+			//	drop
+			pool.Prepare()
+			tx := pool.Peek()
+			pool.Drop(tx)
+
+			//	assert counter is decreased
+			assert.Equal(t, uint64(0), acc.enqueued.length())
+			assert.Equal(t, uint64(0), acc.promoted.length())
+			assert.Equal(t, uint64(0), acc.loadCount())
+		},
+	)
+
+	t.Run(
+		"counter decreased (reset promoted)",
 		func(t *testing.T) {
 
 			//	create pool
