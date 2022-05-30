@@ -27,7 +27,7 @@ func (m *accountsMap) initOnce(addr types.Address, nonce uint64) *account {
 		// set the nonce
 		newAccount.setNonce(nonce)
 
-		// update global count
+		// update global slots
 		atomic.AddUint64(&m.count, 1)
 	})
 
@@ -153,19 +153,19 @@ type account struct {
 	demotions          uint
 
 	//	number of txs present in the account
-	count uint64
+	slots uint64
 }
 
 func (a *account) increaseCount(num uint64) {
-	atomic.AddUint64(&a.count, num)
+	atomic.AddUint64(&a.slots, num)
 }
 
 func (a *account) decreaseCount(num uint64) {
-	atomic.AddUint64(&a.count, ^num+1)
+	atomic.AddUint64(&a.slots, ^num+1)
 }
 
 func (a *account) slotsOccupied() uint64 {
-	return atomic.LoadUint64(&a.count)
+	return atomic.LoadUint64(&a.slots)
 }
 
 // getNonce returns the next expected nonce for this account.

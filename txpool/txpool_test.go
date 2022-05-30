@@ -605,7 +605,7 @@ func TestAccountTxLimit(t *testing.T) {
 			acc := pool.createAccountOnce(addr1)
 
 			//	set the limit to max
-			acc.count = maxAccountTxs
+			acc.slots = maxAccountTxs
 
 			assert.Equal(t, uint64(0), acc.enqueued.length())
 			assert.Equal(t, maxAccountTxs, acc.slotsOccupied())
