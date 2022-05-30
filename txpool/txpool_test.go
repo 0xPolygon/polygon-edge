@@ -417,6 +417,8 @@ func TestAccountSlots(t *testing.T) {
 	t.Run(
 		"counter increased (enqueue)",
 		func(t *testing.T) {
+			t.Parallel()
+
 			//	create pool
 			pool, err := newTestPool()
 			assert.NoError(t, err)
@@ -441,6 +443,8 @@ func TestAccountSlots(t *testing.T) {
 	t.Run(
 		"counter decreased (pop)",
 		func(t *testing.T) {
+			t.Parallel()
+
 			pool, err := newTestPool()
 			assert.NoError(t, err)
 			pool.SetSigner(&mockSigner{})
@@ -471,6 +475,8 @@ func TestAccountSlots(t *testing.T) {
 	t.Run(
 		"counter decreased (drop promoted)",
 		func(t *testing.T) {
+			t.Parallel()
+
 			pool, err := newTestPool()
 			assert.NoError(t, err)
 			pool.SetSigner(&mockSigner{})
@@ -501,6 +507,8 @@ func TestAccountSlots(t *testing.T) {
 	t.Run(
 		"counter decreased (drop promoted + enqueued)",
 		func(t *testing.T) {
+			t.Parallel()
+
 			pool, err := newTestPool()
 			assert.NoError(t, err)
 			pool.SetSigner(&mockSigner{})
@@ -541,6 +549,8 @@ func TestAccountSlots(t *testing.T) {
 	t.Run(
 		"counter decreased (reset enqueued)",
 		func(t *testing.T) {
+			t.Parallel()
+
 			pool, err := newTestPool()
 			assert.NoError(t, err)
 			pool.SetSigner(&mockSigner{})
@@ -569,6 +579,8 @@ func TestAccountSlots(t *testing.T) {
 	t.Run(
 		"counter decreased (reset promoted)",
 		func(t *testing.T) {
+			t.Parallel()
+
 			pool, err := newTestPool()
 			assert.NoError(t, err)
 			pool.SetSigner(&mockSigner{})
@@ -598,6 +610,8 @@ func TestAccountSlots(t *testing.T) {
 	t.Run(
 		"reject new tx when limit is reached",
 		func(t *testing.T) {
+			t.Parallel()
+
 			pool, err := newTestPool()
 			assert.NoError(t, err)
 			pool.SetSigner(&mockSigner{})
@@ -626,6 +640,8 @@ func TestAccountSlots(t *testing.T) {
 	t.Run(
 		"reject new tx if oversized",
 		func(t *testing.T) {
+			t.Parallel()
+
 			pool, err := newTestPool()
 			assert.NoError(t, err)
 			pool.SetSigner(&mockSigner{})
