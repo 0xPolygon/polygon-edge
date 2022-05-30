@@ -1,5 +1,4 @@
 # cloud.google.com/go v0.100.2
-## explicit
 cloud.google.com/go
 # cloud.google.com/go/compute v1.5.0
 cloud.google.com/go/compute/metadata
@@ -14,7 +13,7 @@ cloud.google.com/go/secretmanager/internal
 github.com/armon/go-metrics
 # github.com/armon/go-radix v1.0.0
 github.com/armon/go-radix
-# github.com/aws/aws-sdk-go v1.44.14
+# github.com/aws/aws-sdk-go v1.44.24
 ## explicit
 github.com/aws/aws-sdk-go/aws
 github.com/aws/aws-sdk-go/aws/awserr
