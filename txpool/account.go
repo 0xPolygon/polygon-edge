@@ -190,10 +190,10 @@ func (a *account) reset(nonce uint64, promoteCh chan<- promoteRequest) (
 	defer a.promoted.unlock()
 
 	//	prune the promoted txs
-	prunedPromoted = append(
-		prunedPromoted,
-		a.promoted.prune(nonce)...,
-	)
+	pruned := a.promoted.prune(nonce)
+	a.decreaseCount(uint64(len(pruned)))
+
+	prunedPromoted = append(prunedPromoted, pruned...)
 
 	if nonce <= a.getNonce() {
 		// only the promoted queue needed pruning
@@ -204,7 +204,7 @@ func (a *account) reset(nonce uint64, promoteCh chan<- promoteRequest) (
 	defer a.enqueued.unlock()
 
 	//	prune the enqueued txs
-	pruned := a.enqueued.prune(nonce)
+	pruned = a.enqueued.prune(nonce)
 
 	a.decreaseCount(uint64(len(pruned)))
 	prunedEnqueued = append(prunedEnqueued, pruned...)
