@@ -744,3 +744,46 @@ func TestVerifyNotifyRequest(t *testing.T) {
 		})
 	}
 }
+
+func TestVerifyHeadersResponse(t *testing.T) {
+	t.Parallel()
+
+	testTable := []struct {
+		name        string
+		response    *proto.Response_Component
+		expectedErr error
+	}{
+		{
+			"Valid headers response",
+			&proto.Response_Component{
+				Spec: &anypb.Any{},
+			},
+			nil,
+		},
+		{
+			"No headers response",
+			nil,
+			errMalformedHeadersResponse,
+		},
+		{
+			"No headers data",
+			&proto.Response_Component{
+				Spec: nil,
+			},
+			errMalformedHeadersBody,
+		},
+	}
+
+	for _, testCase := range testTable {
+		testCase := testCase
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.ErrorIs(
+				t,
+				verifyHeadersResponse(testCase.response),
+				testCase.expectedErr,
+			)
+		})
+	}
+}
