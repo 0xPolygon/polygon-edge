@@ -319,7 +319,7 @@ func (p *TxPool) Pop(tx *types.Transaction) {
 	account.promoted.pop()
 
 	// decrease slots
-	account.decreaseSlots(1)
+	account.decreaseSlots(slotsRequired(tx))
 
 	//	successfully popping an account resets its demotions slots to 0
 	account.demotions = 0
@@ -368,7 +368,7 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 
 	// drop promoted
 	dropped := account.promoted.clear()
-	account.decreaseSlots(uint64(len(dropped)))
+	account.decreaseSlots(slotsRequired(dropped...))
 	clearAccountQueue(dropped)
 
 	// update metrics
@@ -376,7 +376,7 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 
 	// drop enqueued
 	dropped = account.enqueued.clear()
-	account.decreaseSlots(uint64(len(dropped)))
+	account.decreaseSlots(slotsRequired(dropped...))
 	clearAccountQueue(dropped)
 
 	p.eventManager.signalEvent(proto.EventType_DROPPED, tx.Hash)

@@ -200,7 +200,7 @@ func (a *account) reset(nonce uint64, promoteCh chan<- promoteRequest) (
 
 	//	prune the promoted txs
 	pruned := a.promoted.prune(nonce)
-	a.decreaseSlots(uint64(len(pruned)))
+	a.decreaseSlots(slotsRequired(pruned...))
 
 	prunedPromoted = append(prunedPromoted, pruned...)
 
@@ -215,7 +215,7 @@ func (a *account) reset(nonce uint64, promoteCh chan<- promoteRequest) (
 	//	prune the enqueued txs
 	pruned = a.enqueued.prune(nonce)
 
-	a.decreaseSlots(uint64(len(pruned)))
+	a.decreaseSlots(slotsRequired(pruned...))
 	prunedEnqueued = append(prunedEnqueued, pruned...)
 
 	//	update nonce expected for this account
@@ -250,7 +250,7 @@ func (a *account) enqueue(tx *types.Transaction) error {
 	// enqueue tx
 	a.enqueued.push(tx)
 
-	a.increaseSlots(1)
+	a.increaseSlots(slotsRequired(tx))
 
 	return nil
 }
