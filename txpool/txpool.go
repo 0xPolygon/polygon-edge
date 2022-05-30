@@ -379,6 +379,7 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 
 	// drop enqueued
 	dropped = account.enqueued.clear()
+	account.decreaseCount(uint64(len(dropped)))
 	clearAccountQueue(dropped)
 
 	p.eventManager.signalEvent(proto.EventType_DROPPED, tx.Hash)
