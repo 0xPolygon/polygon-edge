@@ -608,7 +608,7 @@ func TestAccountTxLimit(t *testing.T) {
 			acc.count = maxAccountTxs
 
 			assert.Equal(t, uint64(0), acc.enqueued.length())
-			assert.Equal(t, uint64(0), acc.loadCount())
+			assert.Equal(t, maxAccountTxs, acc.loadCount())
 
 			//	send tx
 			go func() {
@@ -619,10 +619,9 @@ func TestAccountTxLimit(t *testing.T) {
 
 			//	verify it was rejected
 			assert.Equal(t, uint64(0), acc.enqueued.length())
-			assert.Equal(t, uint64(0), acc.loadCount())
+			assert.Equal(t, maxAccountTxs, acc.loadCount())
 		},
 	)
-
 }
 
 func TestAddHandler(t *testing.T) {

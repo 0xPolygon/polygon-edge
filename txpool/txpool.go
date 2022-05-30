@@ -32,18 +32,19 @@ const (
 
 // errors
 var (
-	ErrIntrinsicGas        = errors.New("intrinsic gas too low")
-	ErrBlockLimitExceeded  = errors.New("exceeds block gas limit")
-	ErrNegativeValue       = errors.New("negative value")
-	ErrExtractSignature    = errors.New("cannot extract signature")
-	ErrInvalidSender       = errors.New("invalid sender")
-	ErrTxPoolOverflow      = errors.New("txpool is full")
-	ErrUnderpriced         = errors.New("transaction underpriced")
-	ErrNonceTooLow         = errors.New("nonce too low")
-	ErrInsufficientFunds   = errors.New("insufficient funds for gas * price + value")
-	ErrInvalidAccountState = errors.New("invalid account state")
-	ErrAlreadyKnown        = errors.New("already known")
-	ErrOversizedData       = errors.New("oversized data")
+	ErrIntrinsicGas          = errors.New("intrinsic gas too low")
+	ErrBlockLimitExceeded    = errors.New("exceeds block gas limit")
+	ErrNegativeValue         = errors.New("negative value")
+	ErrExtractSignature      = errors.New("cannot extract signature")
+	ErrInvalidSender         = errors.New("invalid sender")
+	ErrTxPoolOverflow        = errors.New("txpool is full")
+	ErrUnderpriced           = errors.New("transaction underpriced")
+	ErrNonceTooLow           = errors.New("nonce too low")
+	ErrInsufficientFunds     = errors.New("insufficient funds for gas * price + value")
+	ErrInvalidAccountState   = errors.New("invalid account state")
+	ErrAlreadyKnown          = errors.New("already known")
+	ErrOversizedData         = errors.New("oversized data")
+	ErrAccountTxLimitReached = errors.New("account tx limit reached")
 )
 
 // indicates origin of a transaction

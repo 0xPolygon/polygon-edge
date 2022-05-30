@@ -229,6 +229,10 @@ func (a *account) enqueue(tx *types.Transaction) error {
 	a.enqueued.lock(true)
 	defer a.enqueued.unlock()
 
+	if a.loadCount() == maxAccountTxs {
+		return ErrAccountTxLimitReached
+	}
+
 	// reject low nonce tx
 	if tx.Nonce < a.getNonce() {
 		return ErrNonceTooLow
