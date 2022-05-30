@@ -25,6 +25,9 @@ const (
 	//	maximum allowed number of times an account
 	//	was excluded from block building (ibft.writeTransactions)
 	maxAccountDemotions = uint(10)
+
+	//	maximum allowed number of transactions an account may contain at any moment
+	maxAccountTxs = uint64(50)
 )
 
 // errors

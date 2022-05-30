@@ -596,39 +596,30 @@ func TestAccountTxLimit(t *testing.T) {
 	)
 
 	t.Run(
-		"account tx limit reached (enqueued)",
-		func(t *testing.T) {
-			//	create the pool
-
-			//	send X transactions which will be enqueued
-
-			//	verify limit is reached
-
-		},
-	)
-
-	t.Run(
-		"account tx limit reached (promoted)",
-		func(t *testing.T) {
-			//	create the pool
-
-			//	send X transactions which will be promoted
-
-			//	verify limit is reached
-
-		},
-	)
-
-	t.Run(
 		"reject new tx when limit is reached",
 		func(t *testing.T) {
-			//	create pool
+			pool, err := newTestPool()
+			assert.NoError(t, err)
+			pool.SetSigner(&mockSigner{})
+
+			acc := pool.createAccountOnce(addr1)
 
 			//	set the limit to max
+			acc.count = maxAccountTxs
+
+			assert.Equal(t, uint64(0), acc.enqueued.length())
+			assert.Equal(t, uint64(0), acc.loadCount())
 
 			//	send tx
+			go func() {
+				err := pool.addTx(local, newTx(addr1, 5, 1))
+				assert.NoError(t, err)
+			}()
+			pool.handleEnqueueRequest(<-pool.enqueueReqCh)
 
 			//	verify it was rejected
+			assert.Equal(t, uint64(0), acc.enqueued.length())
+			assert.Equal(t, uint64(0), acc.loadCount())
 		},
 	)
 
