@@ -411,6 +411,89 @@ func TestDropKnownGossipTx(t *testing.T) {
 	assert.Equal(t, uint64(1), pool.accounts.get(addr1).enqueued.length())
 }
 
+func TestAccountTxLimit(t *testing.T) {
+	t.Parallel()
+
+	t.Run(
+		"counter increased (enqueue tx)",
+		func(t *testing.T) {
+			//	create pool
+			pool, err := newTestPool()
+			assert.NoError(t, err)
+			pool.SetSigner(&mockSigner{})
+
+			//	add tx
+			tx := newTx(addr1, 5, 1)
+			go func() {
+				err := pool.addTx(local, tx)
+				assert.NoError(t, err)
+			}()
+			pool.handleEnqueueRequest(<-pool.enqueueReqCh)
+
+			acc := pool.accounts.get(addr1)
+			assert.Equal(t, uint64(1), acc.enqueued.length())
+
+			//	assert counter is increased
+			assert.Equal(t, uint64(1), acc.count())
+		},
+	)
+
+	t.Run(
+		"counter decreased (pop tx)",
+		func(t *testing.T) {
+
+			//	create pool
+
+			//	add tx
+
+			//	assert counter is decreased
+
+			//	pop the tx
+
+			//	assert counter is decreased
+
+		},
+	)
+
+	t.Run(
+		"account tx limit reached (enqueued)",
+		func(t *testing.T) {
+			//	create the pool
+
+			//	send X transactions which will be enqueued
+
+			//	verify limit is reached
+
+		},
+	)
+
+	t.Run(
+		"account tx limit reached (promoted)",
+		func(t *testing.T) {
+			//	create the pool
+
+			//	send X transactions which will be promoted
+
+			//	verify limit is reached
+
+		},
+	)
+
+	t.Run(
+		"reject new tx when limit is reached",
+		func(t *testing.T) {
+			//	create pool
+
+			//	set the limit to max
+
+			//	send tx
+
+			//	verify it was rejected
+		},
+	)
+
+}
+
 func TestAddHandler(t *testing.T) {
 	t.Parallel()
 
