@@ -1152,6 +1152,34 @@ func TestDemote(t *testing.T) {
 	})
 }
 
+func TestEnqueuedPruning(t *testing.T) {
+	//	create pool
+	pool, err := newTestPool()
+	assert.NoError(t, err)
+	pool.SetSigner(&mockSigner{})
+
+	//	enqueue some txs
+	go func() {
+		err := pool.addTx(local, newTx(addr1, 0, 1))
+		assert.NoError(t, err)
+	}()
+	pool.handleEnqueueRequest(<-pool.enqueueReqCh)
+
+	assert.Equal(t, uint64(1), acc.enqueued.length())
+
+	acc := pool.accounts.get(addr1)
+
+	//	fake lastPromoted
+	acc.lastPromoted = time.Now().Add(-3 * time.Hour)
+
+	//	pretend 3 hours have passed
+	//	and trigger the pruning cycle
+	pool.pruneStaleTxs()
+
+	//	enqueued txs are removed
+	assert.Equal(t, uint64(0), acc.enqueued.length())
+}
+
 /* "Integrated" tests */
 
 // The following tests ensure that the pool's inner event loop
