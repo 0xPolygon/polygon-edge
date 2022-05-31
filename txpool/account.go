@@ -8,6 +8,10 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
+var (
+	maxAccountInactivity = 3 * time.Hour
+)
+
 // Thread safe map of all accounts registered by the pool.
 // Each account (value) is bound to one address (key).
 type accountsMap struct {

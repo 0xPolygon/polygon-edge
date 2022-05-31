@@ -676,7 +676,7 @@ func (p *TxPool) pruneStaleEnqueued() {
 		account.enqueued.lock(true)
 		defer account.enqueued.unlock()
 
-		if time.Since(account.lastPromoted) >= 3*time.Hour {
+		if time.Since(account.lastPromoted) >= maxAccountInactivity {
 			account.enqueued.clear()
 		}
 
