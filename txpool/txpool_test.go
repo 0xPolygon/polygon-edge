@@ -1155,66 +1155,61 @@ func TestDemote(t *testing.T) {
 func TestEnqueuedPruning(t *testing.T) {
 	t.Parallel()
 
-	t.Run(
-		"prune stale tx",
-		func(t *testing.T) {
-			t.Parallel()
+	testTable := []struct {
+		name            string
+		lastPromoted    time.Time
+		expectedTxCount uint64
+		expectedGauge   uint64
+	}{
+		{
+			"prune stale tx",
+			time.Now().Add(-1 * maxAccountInactivity),
+			0,
+			0,
+		},
 
-			pool, err := newTestPool()
-			assert.NoError(t, err)
-			pool.SetSigner(&mockSigner{})
+		{
+			"no stale tx to prune",
+			time.Now().Add(-5 * time.Second),
+			1,
+			1,
+		},
+	}
 
-			go func() {
-				err := pool.addTx(local, newTx(addr1, 5, 1))
+	for _, test := range testTable {
+		test := test
+
+		t.Run(
+			test.name,
+			func(t *testing.T) {
+				t.Parallel()
+
+				pool, err := newTestPool()
 				assert.NoError(t, err)
-			}()
-			pool.handleEnqueueRequest(<-pool.enqueueReqCh)
+				pool.SetSigner(&mockSigner{})
 
-			acc := pool.accounts.get(addr1)
-			acc.lastPromoted = time.Now().Add(-3 * time.Hour) // fake lastPromoted
+				go func() {
+					err := pool.addTx(local, newTx(addr1, 5, 1))
+					assert.NoError(t, err)
+				}()
+				pool.handleEnqueueRequest(<-pool.enqueueReqCh)
 
-			assert.Equal(t, uint64(1), acc.enqueued.length())
-			assert.Equal(t, uint64(1), pool.gauge.read())
+				acc := pool.accounts.get(addr1)
+				acc.lastPromoted = test.lastPromoted
 
-			//	pretend 3 hours have passed
-			//	and trigger the pruning cycle
-			pool.pruneStaleAccounts()
+				assert.Equal(t, uint64(1), acc.enqueued.length())
+				assert.Equal(t, uint64(1), pool.gauge.read())
 
-			//	enqueued tx is removed
-			assert.Equal(t, uint64(0), acc.enqueued.length())
-			assert.Equal(t, uint64(0), pool.gauge.read())
-		})
+				//	pretend 3 hours have passed
+				//	and trigger the pruning cycle
+				pool.pruneStaleAccounts()
 
-	t.Run(
-		"no stale tx to prune",
-		func(t *testing.T) {
-			t.Parallel()
-
-			//	create pool
-			pool, err := newTestPool()
-			assert.NoError(t, err)
-			pool.SetSigner(&mockSigner{})
-
-			go func() {
-				err := pool.addTx(local, newTx(addr1, 5, 1))
-				assert.NoError(t, err)
-			}()
-			pool.handleEnqueueRequest(<-pool.enqueueReqCh)
-
-			acc := pool.accounts.get(addr1)
-			acc.lastPromoted = time.Now().Add(-5 * time.Second) // fake lastPromoted
-
-			assert.Equal(t, uint64(1), acc.enqueued.length())
-			assert.Equal(t, uint64(1), pool.gauge.read())
-
-			//	pretend 3 hours have passed
-			//	and trigger the pruning cycle
-			pool.pruneStaleAccounts()
-
-			//	enqueued tx is not removed
-			assert.Equal(t, uint64(1), acc.enqueued.length())
-			assert.Equal(t, uint64(1), pool.gauge.read())
-		})
+				//	enqueued tx is removed
+				assert.Equal(t, test.expectedTxCount, acc.enqueued.length())
+				assert.Equal(t, test.expectedGauge, pool.gauge.read())
+			},
+		)
+	}
 }
 
 /* "Integrated" tests */
