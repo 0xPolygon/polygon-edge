@@ -381,11 +381,11 @@ func (s *Syncer) WatchSyncWithPeer(p *SyncPeer, newBlockHandler func(b *types.Bl
 			break
 		}
 
-		exit := newBlockHandler(b)
+		shouldExit := newBlockHandler(b)
 
 		s.prunePeerEnqueuedBlocks(b)
 
-		if exit {
+		if shouldExit {
 			break
 		}
 	}
