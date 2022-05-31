@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/golang/protobuf/ptypes/any"
 	"github.com/hashicorp/go-hclog"
@@ -666,6 +667,21 @@ func (p *TxPool) handlePromoteRequest(req promoteRequest) {
 	// update metrics
 	p.metrics.PendingTxs.Add(float64(len(promoted)))
 	p.eventManager.signalEvent(proto.EventType_PROMOTED, toHash(promoted...)...)
+}
+
+func (p *TxPool) pruneStaleEnqueued() {
+	p.accounts.Range(func(_, value interface{}) bool {
+		account, _ := value.(*account)
+
+		account.enqueued.lock(true)
+		defer account.enqueued.unlock()
+
+		if time.Since(account.lastPromoted) >= 3*time.Hour {
+			account.enqueued.clear()
+		}
+
+		return true
+	})
 }
 
 // addGossipTx handles receiving transactions

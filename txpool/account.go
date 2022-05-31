@@ -3,6 +3,7 @@ package txpool
 import (
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -151,6 +152,8 @@ type account struct {
 	enqueued, promoted *accountQueue
 	nextNonce          uint64
 	demotions          uint
+
+	lastPromoted time.Time
 }
 
 // getNonce returns the next expected nonce for this account.
@@ -277,6 +280,9 @@ func (a *account) promote() []*types.Transaction {
 	if nextNonce > currentNonce {
 		a.setNonce(nextNonce)
 	}
+
+	//	update timestamp (pruning)
+	a.lastPromoted = time.Now()
 
 	return promoted
 }
