@@ -44,6 +44,7 @@ func (d *Debug) TraceTransaction(hash types.Hash, config *TraceConfig) (interfac
 		}
 
 		block, ok := d.store.GetBlockByHash(blockHash, true)
+		parent, ok := d.store.GetBlockByNumber(block.Number()-1, false)
 
 		if !ok {
 			// Block receipts not found in storage
@@ -53,13 +54,13 @@ func (d *Debug) TraceTransaction(hash types.Hash, config *TraceConfig) (interfac
 		// Find the transaction within the block
 		for txIndx, txn := range block.Transactions {
 			if txn.Hash == hash {
-				return txn, block, uint64(txIndx)
+				return txn, parent, uint64(txIndx)
 			}
 		}
 
 		return nil, nil, 0
 	}
-	// get transaction + block
+	// get transaction + block(parent)
 	msg, block, txIndx := findSealedTx()
 
 	if msg == nil {
@@ -87,8 +88,6 @@ func (d *Debug) TraceTransaction(hash types.Hash, config *TraceConfig) (interfac
 
 	txn := msg.Copy()
 	txn.Gas = msg.Gas
-	// is an ugly but simple way to match the mechanism of pe
-	txn.Nonce = txn.Nonce + 1
 	_, err = d.store.ApplyMessage(block.Header, txn, runtime.TraceConfig{Debug: true, Tracer: tracer, NoBaseFee: true})
 
 	if err != nil {

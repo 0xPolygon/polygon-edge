@@ -19,6 +19,7 @@ package logger
 import (
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math/big"
@@ -253,9 +254,9 @@ func (l *StructLogger) GetResult() (json.RawMessage, error) {
 	returnData := types.CopyBytes(l.output)
 	// Return data when successful and revert reason when reverted, otherwise empty.
 	returnVal := fmt.Sprintf("%x", returnData)
-	// if failed && l.err != evm.ErrExecutionReverted {
-	// 	returnVal = ""
-	// }
+	if failed && l.err != errors.New("execution reverted") {
+		returnVal = ""
+	}
 	if failed {
 		returnVal = ""
 	}

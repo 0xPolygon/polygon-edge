@@ -561,7 +561,7 @@ func (t *Transition) Create2(
 	address := crypto.CreateAddress(caller, t.state.GetNonce(caller))
 	contract := runtime.NewContractCreation(1, caller, caller, address, value, gas, code)
 
-	return t.applyCreate(contract, t)
+	return t.applyCreate(contract, t, evm.CREATE2)
 }
 
 func (t *Transition) Call2(
@@ -649,7 +649,26 @@ func (t *Transition) applyCall(
 				t.traceConfig.Tracer.CaptureEnd(result.ReturnValue, startGas-c.Gas, time.Since(startTime), result.Err)
 			}(c.Gas, time.Now())
 		} else {
-			t.traceConfig.Tracer.CaptureEnter(evm.CALL, c.Caller, c.Address, c.Input, c.Gas, c.Value)
+			// Change to OpCode according to callType
+			var opCallType evm.OpCode
+			switch callType {
+			case runtime.Call:
+				opCallType = evm.CALL
+			case runtime.StaticCall:
+				opCallType = evm.STATICCALL
+			case runtime.DelegateCall:
+				opCallType = evm.DELEGATECALL
+			case runtime.CallCode:
+				opCallType = evm.CALLCODE
+			case runtime.Create:
+				opCallType = evm.CREATE
+			case runtime.Create2:
+				opCallType = evm.CREATE2
+			default:
+				panic("not expected")
+			}
+
+			t.traceConfig.Tracer.CaptureEnter(int(opCallType), c.Caller, c.Address, c.Input, c.Gas, c.Value)
 			defer func(startGas uint64) {
 				t.traceConfig.Tracer.CaptureExit(result.ReturnValue, startGas-c.Gas, result.Err)
 			}(c.Gas)
@@ -682,7 +701,7 @@ func (t *Transition) hasCodeOrNonce(addr types.Address) bool {
 	return false
 }
 
-func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtime.ExecutionResult {
+func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host, op evm.OpCode) *runtime.ExecutionResult {
 	gasLimit := c.Gas
 
 	if c.Depth > int(1024)+1 {
@@ -724,7 +743,7 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 		if c.Depth == 1 {
 			t.traceConfig.Tracer.CaptureStart(t, c.Caller, c.Address, true, c.Code, c.Gas, c.Value)
 		} else {
-			t.traceConfig.Tracer.CaptureEnter(evm.CREATE, c.Caller, c.Address, c.Code, c.Gas, c.Value)
+			t.traceConfig.Tracer.CaptureEnter(int(op), c.Caller, c.Address, c.Code, c.Gas, c.Value)
 		}
 	}
 
@@ -834,7 +853,7 @@ func (t *Transition) Selfdestruct(addr types.Address, beneficiary types.Address)
 
 func (t *Transition) Callx(c *runtime.Contract, h runtime.Host) *runtime.ExecutionResult {
 	if c.Type == runtime.Create {
-		return t.applyCreate(c, h)
+		return t.applyCreate(c, h, evm.CREATE)
 	}
 
 	return t.applyCall(c, c.Type, h)

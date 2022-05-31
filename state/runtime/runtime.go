@@ -3,7 +3,6 @@ package runtime
 import (
 	"errors"
 	"math/big"
-	"time"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -60,16 +59,6 @@ type State interface {
 	Msg() *Contract
 }
 
-type Tracer interface {
-	CaptureStart()
-	CaptureState(pc uint64, op int, gas, cost uint64, scope ScopeContext, rData []byte, depth int, err error)
-	CaptureFault(pc uint64, op int, gas, cost uint64, scope ScopeContext, depth int, err error)
-	CaptureEnd(output []byte, gasUsed uint64, t time.Duration, err error)
-	CaptureEnter(typ int, from types.Address, to types.Address, input []byte, gas uint64, value *big.Int)
-	CaptureExit(output []byte, gasUsed uint64, err error)
-	FormatLogs() ([]byte, error)
-}
-
 // Host is the execution host
 type Host interface {
 	AccountExists(addr types.Address) bool
@@ -96,7 +85,6 @@ type ExecutionResult struct {
 	GasLeft     uint64 // Total gas left as result of execution
 	GasUsed     uint64 // Total gas used as result of execution
 	Err         error  // Any error encountered during the execution, listed below
-	Tracer      Tracer
 }
 
 func (r *ExecutionResult) Succeeded() bool { return r.Err == nil }

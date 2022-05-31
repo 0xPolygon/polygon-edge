@@ -240,7 +240,7 @@ func (c *state) Run() ([]byte, error) {
 		defer func() {
 			if vmerr != nil {
 				if !logged {
-					tracer.Tracer.CaptureState(pcCopy, int(op), gasCopy, cost, callContext, c.ret, c.msg.Depth, vmerr)
+					tracer.Tracer.CaptureState(pcCopy, int(op), gasCopy, cost, callContext, c.ret, c.msg.Depth-1, vmerr)
 				} else {
 					tracer.Tracer.CaptureFault(pcCopy, int(op), gasCopy, cost, callContext, c.msg.Depth, vmerr)
 				}
@@ -284,7 +284,7 @@ func (c *state) Run() ([]byte, error) {
 		cost = inst.gas
 		// trace
 		if tracer.Debug {
-			tracer.Tracer.CaptureState(pc, int(op), gasCopy, cost, callContext, c.ret, c.msg.Depth, vmerr)
+			tracer.Tracer.CaptureState(pc, int(op), gasCopy, cost, callContext, c.ret, c.msg.Depth-1, vmerr)
 			logged = true
 		}
 
