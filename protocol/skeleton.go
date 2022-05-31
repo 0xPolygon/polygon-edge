@@ -14,6 +14,10 @@ var (
 	errHeaderBodyMismatch    = errors.New("requested body and header mismatch")
 )
 
+const (
+	defaultBodyFetchTimeout = time.Second * 10
+)
+
 func getHeaders(clt proto.V1Client, req *proto.GetHeadersRequest) ([]*types.Header, error) {
 	resp, err := clt.GetHeaders(context.Background(), req)
 	if err != nil {
@@ -74,7 +78,7 @@ func (s *skeleton) getBlocksFromPeer(
 
 	getBodiesContext, cancelFn := context.WithTimeout(
 		context.Background(),
-		time.Second*10,
+		defaultBodyFetchTimeout,
 	)
 	defer cancelFn()
 
