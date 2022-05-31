@@ -20,6 +20,6 @@ type blockchainShim interface {
 	GetHeaderByNumber(n uint64) (*types.Header, bool)
 
 	WriteBlock(block *types.Block) error
-	VerifySealedBlock(block *types.Block) error
+	VerifyFinalizedBlock(block *types.Block) error
 	CalculateGasLimit(number uint64) (uint64, error)
 }

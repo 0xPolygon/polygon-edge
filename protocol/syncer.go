@@ -603,7 +603,7 @@ func (s *Syncer) WatchSyncWithPeer(p *SyncPeer, handler func(b *types.Block) boo
 			break
 		}
 
-		if err := s.blockchain.VerifySealedBlock(b); err != nil {
+		if err := s.blockchain.VerifyFinalizedBlock(b); err != nil {
 			s.logger.Error("unable to verify block, %w", err)
 
 			return
@@ -684,7 +684,7 @@ func (s *Syncer) BulkSyncWithPeer(p *SyncPeer, newBlockHandler func(block *types
 			// sync the data
 			for _, slot := range sk.slots {
 				for _, block := range slot.blocks {
-					if err := s.blockchain.VerifySealedBlock(block); err != nil {
+					if err := s.blockchain.VerifyFinalizedBlock(block); err != nil {
 						return fmt.Errorf("unable to verify block, %w", err)
 					}
 

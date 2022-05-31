@@ -657,17 +657,17 @@ func (b *Blockchain) WriteHeadersWithBodies(headers []*types.Header) error {
 	return nil
 }
 
-// VerifyProposedBlock does the minimal block verification without consulting the
+// VerifyPotentialBlock does the minimal block verification without consulting the
 // consensus layer. Should only be used if consensus checks are done
 // outside the method call
-func (b *Blockchain) VerifyProposedBlock(block *types.Block) error {
+func (b *Blockchain) VerifyPotentialBlock(block *types.Block) error {
 	// Do just the initial block verification
 	return b.verifyBlock(block)
 }
 
-// VerifySealedBlock verifies that the block is valid by performing a series of checks.
+// VerifyFinalizedBlock verifies that the block is valid by performing a series of checks.
 // It is assumed that the block status is sealed (committed)
-func (b *Blockchain) VerifySealedBlock(block *types.Block) error {
+func (b *Blockchain) VerifyFinalizedBlock(block *types.Block) error {
 	// Make sure the consensus layer verifies this block header
 	if err := b.consensus.VerifyHeader(block.Header); err != nil {
 		return fmt.Errorf("failed to verify the header: %w", err)
