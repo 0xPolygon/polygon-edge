@@ -32,6 +32,9 @@ func (m *accountsMap) initOnce(addr types.Address, nonce uint64) *account {
 		// set the nonce
 		newAccount.setNonce(nonce)
 
+		// set the timestamp (pruning)
+		newAccount.lastPromoted = time.Now()
+
 		// update global count
 		atomic.AddUint64(&m.count, 1)
 	})
