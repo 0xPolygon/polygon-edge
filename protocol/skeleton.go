@@ -20,15 +20,15 @@ func getHeaders(clt proto.V1Client, req *proto.GetHeadersRequest) ([]*types.Head
 		return nil, err
 	}
 
-	headers := make([]*types.Header, 0)
+	headers := make([]*types.Header, len(resp.Objs))
 
-	for _, obj := range resp.Objs {
+	for index, obj := range resp.Objs {
 		header := &types.Header{}
 		if err := header.UnmarshalRLP(obj.Spec.Value); err != nil {
 			return nil, err
 		}
 
-		headers = append(headers, header)
+		headers[index] = header
 	}
 
 	return headers, nil
