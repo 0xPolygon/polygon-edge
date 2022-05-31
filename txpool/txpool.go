@@ -380,7 +380,7 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 	clearAccountQueue(dropped)
 
 	p.eventManager.signalEvent(proto.EventType_DROPPED, tx.Hash)
-	p.logger.Debug("dropped account txs",
+	p.logger.Info("dropped account txs",
 		"num", droppedCount,
 		"next_nonce", nextNonce,
 		"address", tx.From.String(),
@@ -393,7 +393,7 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 func (p *TxPool) Demote(tx *types.Transaction) {
 	account := p.accounts.get(tx.From)
 	if account.demotions == maxAccountDemotions {
-		p.logger.Debug(
+		p.logger.Info(
 			"Demote: threshold reached - dropping account",
 			"addr", tx.From.String(),
 		)
