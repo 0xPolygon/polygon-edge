@@ -1174,13 +1174,15 @@ func TestEnqueuedPruning(t *testing.T) {
 			acc.lastPromoted = time.Now().Add(-3 * time.Hour) // fake lastPromoted
 
 			assert.Equal(t, uint64(1), acc.enqueued.length())
+			assert.Equal(t, uint64(1), pool.gauge.read())
 
 			//	pretend 3 hours have passed
 			//	and trigger the pruning cycle
 			pool.pruneStaleAccounts()
 
-			//	enqueued tx is not removed
+			//	enqueued tx is removed
 			assert.Equal(t, uint64(0), acc.enqueued.length())
+			assert.Equal(t, uint64(0), pool.gauge.read())
 		})
 
 	t.Run(
@@ -1203,13 +1205,15 @@ func TestEnqueuedPruning(t *testing.T) {
 			acc.lastPromoted = time.Now().Add(-5 * time.Second) // fake lastPromoted
 
 			assert.Equal(t, uint64(1), acc.enqueued.length())
+			assert.Equal(t, uint64(1), pool.gauge.read())
 
 			//	pretend 3 hours have passed
 			//	and trigger the pruning cycle
 			pool.pruneStaleAccounts()
 
-			//	enqueued tx is removed
+			//	enqueued tx is not removed
 			assert.Equal(t, uint64(1), acc.enqueued.length())
+			assert.Equal(t, uint64(1), pool.gauge.read())
 		})
 }
 
