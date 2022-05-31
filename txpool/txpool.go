@@ -632,7 +632,9 @@ func (p *TxPool) handleEnqueueRequest(req enqueueRequest) {
 
 	// enqueue tx
 	if err := account.enqueue(tx); err != nil {
-		p.logger.Error("enqueue request", "err", err)
+		p.logger.Error("enqueue request", "err", err,
+			"expected_nonce", account.getNonce(),
+			"actual_nonce", tx.Nonce)
 
 		return
 	}
