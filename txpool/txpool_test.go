@@ -1177,7 +1177,7 @@ func TestEnqueuedPruning(t *testing.T) {
 
 			//	pretend 3 hours have passed
 			//	and trigger the pruning cycle
-			pool.pruneStaleEnqueued()
+			pool.pruneStaleAccounts()
 
 			//	enqueued txs are removed
 			assert.Equal(t, uint64(0), acc.enqueued.length())
@@ -1207,7 +1207,7 @@ func TestEnqueuedPruning(t *testing.T) {
 
 			//	pretend 3 hours have passed
 			//	and trigger the pruning cycle
-			pool.pruneStaleEnqueued()
+			pool.pruneStaleAccounts()
 
 			//	enqueued txs are removed
 			assert.Equal(t, uint64(1), acc.enqueued.length())

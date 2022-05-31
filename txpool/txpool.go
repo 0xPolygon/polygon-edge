@@ -240,7 +240,7 @@ func (p *TxPool) Start() {
 			case req := <-p.promoteReqCh:
 				go p.handlePromoteRequest(req)
 			case <-pruningTicker.C:
-				go p.pruneStaleEnqueued()
+				go p.pruneStaleAccounts()
 			}
 		}
 	}()
@@ -674,7 +674,7 @@ func (p *TxPool) handlePromoteRequest(req promoteRequest) {
 	p.eventManager.signalEvent(proto.EventType_PROMOTED, toHash(promoted...)...)
 }
 
-func (p *TxPool) pruneStaleEnqueued() {
+func (p *TxPool) pruneStaleAccounts() {
 	pruned := p.accounts.pruneStaleEnqueuedTxs()
 
 	p.logger.Debug("pruned stale enqueued txs", "num", pruned)
