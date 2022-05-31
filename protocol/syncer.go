@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/network/event"
 	"math"
 	"math/big"
 	"sync"
 	"time"
+
+	"github.com/0xPolygon/polygon-edge/network/event"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
@@ -570,6 +571,7 @@ func (s *Syncer) findCommonAncestor(clt proto.V1Client, status *Status) (*types.
 	// get the block fork
 	forkNum := header.Number + 1
 	fork, err := getHeader(clt, &forkNum, nil)
+	s.logger.Info("findCommonAncestor fork ", "num", forkNum)
 
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get fork at num %d", header.Number)
