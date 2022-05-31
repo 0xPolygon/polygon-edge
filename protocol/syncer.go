@@ -110,8 +110,7 @@ const syncerV1 = "/syncer/0.1"
 func (s *Syncer) enqueueBlock(peerID peer.ID, b *types.Block) {
 	s.logger.Debug("enqueue block", "peer", peerID, "number", b.Number(), "hash", b.Hash())
 
-	peer, ok := s.peers.Load(peerID)
-	if ok {
+	if peer, peerPresent := s.peers.Load(peerID); peerPresent {
 		syncPeer, ok := peer.(*SyncPeer)
 		if !ok {
 			s.logger.Error("invalid sync peer type cast")
