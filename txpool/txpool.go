@@ -7,6 +7,7 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"google.golang.org/grpc"
 	"math/big"
+	"time"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/chain"
@@ -225,15 +226,21 @@ func (p *TxPool) Start() {
 	// set default value of txpool pending transactions gauge
 	p.metrics.PendingTxs.Set(0)
 
+	pruningTicker := time.NewTicker(maxAccountInactivity)
+
 	go func() {
 		for {
 			select {
 			case <-p.shutdownCh:
+				pruningTicker.Stop()
+
 				return
 			case req := <-p.enqueueReqCh:
 				go p.handleEnqueueRequest(req)
 			case req := <-p.promoteReqCh:
 				go p.handlePromoteRequest(req)
+			case <-pruningTicker.C:
+				go p.pruneStaleEnqueued()
 			}
 		}
 	}()
