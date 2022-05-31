@@ -1,7 +1,7 @@
 package protocol
 
 import (
-	"fmt"
+	"errors"
 	"github.com/0xPolygon/polygon-edge/protocol/proto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -10,6 +10,10 @@ import (
 	"math/big"
 	"sync"
 	"time"
+)
+
+var (
+	errInvalidDifficulty = errors.New("failed to decode difficulty")
 )
 
 // Status defines the up to date information regarding the peer
@@ -38,37 +42,21 @@ func (s *Status) toProto() *proto.V1Status {
 	}
 }
 
-// fromProto converts a proto.V1Status to a Status object
-func fromProto(status *proto.V1Status) (*Status, error) {
-	diff, ok := new(big.Int).SetString(status.Difficulty, 10)
-	if !ok {
-		return nil, fmt.Errorf("failed to parse difficulty: %s", status.Difficulty)
-	}
-
-	return &Status{
-		Number:     status.Number,
-		Hash:       types.StringToHash(status.Hash),
-		Difficulty: diff,
-	}, nil
-}
-
 // statusFromProto extracts a Status object from a passed in proto.V1Status
 func statusFromProto(p *proto.V1Status) (*Status, error) {
-	s := new(Status)
-	if err := s.Hash.UnmarshalText([]byte(p.Hash)); err != nil {
-		return nil, err
+	status := &Status{
+		Hash:   types.StringToHash(p.Hash),
+		Number: p.Number,
 	}
-
-	s.Number = p.Number
 
 	diff, ok := new(big.Int).SetString(p.Difficulty, 10)
 	if !ok {
-		return nil, fmt.Errorf("failed to decode difficulty")
+		return nil, errInvalidDifficulty
 	}
 
-	s.Difficulty = diff
+	status.Difficulty = diff
 
-	return s, nil
+	return status, nil
 }
 
 // SyncPeer is a representation of the peer the node is syncing with
