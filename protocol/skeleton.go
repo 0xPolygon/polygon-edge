@@ -9,6 +9,11 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
+var (
+	errInvalidHeaderSequence = errors.New("invalid header sequence")
+	errHeaderBodyMismatch    = errors.New("requested body and header mismatch")
+)
+
 func getHeaders(clt proto.V1Client, req *proto.GetHeadersRequest) ([]*types.Header, error) {
 	resp, err := clt.GetHeaders(context.Background(), req)
 	if err != nil {
@@ -57,7 +62,7 @@ func (s *skeleton) getBlocksFromPeer(
 	// Make sure the number sequences match up
 	for i := 1; i < len(headers); i++ {
 		if headers[i].Number-headers[i-1].Number != 1 {
-			return errors.New("invalid header sequence")
+			return errInvalidHeaderSequence
 		}
 	}
 
@@ -80,7 +85,7 @@ func (s *skeleton) getBlocksFromPeer(
 	}
 
 	if len(bodies) != len(headers) {
-		return errors.New("requested body and header mismatch")
+		return errHeaderBodyMismatch
 	}
 
 	s.blocks = make([]*types.Block, len(headers))
