@@ -8,8 +8,10 @@ import (
 	"sync"
 	"time"
 
+	inat "github.com/libp2p/go-libp2p/p2p/net/nat"
+
 	"github.com/libp2p/go-libp2p-core/network"
-	inat "github.com/libp2p/go-libp2p-nat"
+
 	ma "github.com/multiformats/go-multiaddr"
 )
 
@@ -226,7 +228,5 @@ func (nn *nmgrNetNotifiee) ListenClose(n network.Network, addr ma.Multiaddr) {
 	nn.natManager().sync()
 }
 
-func (nn *nmgrNetNotifiee) Connected(network.Network, network.Conn)      {}
-func (nn *nmgrNetNotifiee) Disconnected(network.Network, network.Conn)   {}
-func (nn *nmgrNetNotifiee) OpenedStream(network.Network, network.Stream) {}
-func (nn *nmgrNetNotifiee) ClosedStream(network.Network, network.Stream) {}
+func (nn *nmgrNetNotifiee) Connected(network.Network, network.Conn)    {}
+func (nn *nmgrNetNotifiee) Disconnected(network.Network, network.Conn) {}

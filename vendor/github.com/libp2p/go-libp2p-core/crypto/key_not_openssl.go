@@ -9,7 +9,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rsa"
 
-	btcec "github.com/btcsuite/btcd/btcec"
+	btcec "github.com/btcsuite/btcd/btcec/v2"
 )
 
 // KeyPairFromStdKey wraps standard library (and secp256k1) private keys in libp2p/go-libp2p-core/crypto keys
