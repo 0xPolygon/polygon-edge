@@ -22,6 +22,7 @@ var (
 	ErrCastingFilterToLogFilter         = errors.New("casting filter object to logFilter error")
 	ErrBlockNotFound                    = errors.New("block not found")
 	ErrIncorrectBlockRange              = errors.New("incorrect range")
+	ErrPendingBlockNumber               = errors.New("pending block number is not supported")
 )
 
 // defaultTimeout is the timeout to remove the filters that don't have a web socket stream
@@ -380,21 +381,28 @@ func (f *FilterManager) getLogsFromBlock(query *LogQuery, block *types.Block) ([
 func (f *FilterManager) getLogsFromBlocks(query *LogQuery) ([]*Log, error) {
 	latestBlockNumber := f.store.Header().Number
 
-	resolveNum := func(num BlockNumber) uint64 {
+	resolveNum := func(num BlockNumber) (uint64, error) {
 		switch num {
 		case PendingBlockNumber:
-			num = LatestBlockNumber
+			return 0, ErrPendingBlockNumber
 		case EarliestBlockNumber:
 			num = 0
 		case LatestBlockNumber:
-			return latestBlockNumber
+			return latestBlockNumber, nil
 		}
 
-		return uint64(num)
+		return uint64(num), nil
 	}
 
-	from := resolveNum(query.fromBlock)
-	to := resolveNum(query.toBlock)
+	from, err := resolveNum(query.fromBlock)
+	if err != nil {
+		return nil, err
+	}
+
+	to, err := resolveNum(query.toBlock)
+	if err != nil {
+		return nil, err
+	}
 
 	if to < from {
 		return nil, ErrIncorrectBlockRange
