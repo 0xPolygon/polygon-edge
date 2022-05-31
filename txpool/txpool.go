@@ -3,12 +3,10 @@ package txpool
 import (
 	"errors"
 	"fmt"
-	"math/big"
-	"time"
-
 	"github.com/golang/protobuf/ptypes/any"
 	"github.com/hashicorp/go-hclog"
 	"google.golang.org/grpc"
+	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/chain"
@@ -670,18 +668,9 @@ func (p *TxPool) handlePromoteRequest(req promoteRequest) {
 }
 
 func (p *TxPool) pruneStaleEnqueued() {
-	p.accounts.Range(func(_, value interface{}) bool {
-		account, _ := value.(*account)
+	pruned := p.accounts.pruneStaleEnqueuedTxs()
 
-		account.enqueued.lock(true)
-		defer account.enqueued.unlock()
-
-		if time.Since(account.lastPromoted) >= maxAccountInactivity {
-			account.enqueued.clear()
-		}
-
-		return true
-	})
+	p.logger.Debug("pruned stale enqueued txs", "num", pruned)
 }
 
 // addGossipTx handles receiving transactions

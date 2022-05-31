@@ -140,6 +140,27 @@ func (m *accountsMap) allTxs(includeEnqueued bool) (
 	return
 }
 
+func (m *accountsMap) pruneStaleEnqueuedTxs() uint64 {
+	total := uint64(0)
+
+	m.Range(func(_, value interface{}) bool {
+		account, _ := value.(*account)
+
+		account.enqueued.lock(true)
+		defer account.enqueued.unlock()
+
+		if time.Since(account.lastPromoted) >= maxAccountInactivity {
+			removed := account.enqueued.clear()
+
+			total += uint64(len(removed))
+		}
+
+		return true
+	})
+
+	return total
+}
+
 // An account is the core structure for processing
 // transactions from a specific address. The nextNonce
 // field is what separates the enqueued from promoted transactions:
