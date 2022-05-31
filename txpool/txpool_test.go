@@ -1153,31 +1153,66 @@ func TestDemote(t *testing.T) {
 }
 
 func TestEnqueuedPruning(t *testing.T) {
-	//	create pool
-	pool, err := newTestPool()
-	assert.NoError(t, err)
-	pool.SetSigner(&mockSigner{})
+	t.Run(
+		"prune stale tx",
+		func(t *testing.T) {
+			//	create pool
+			pool, err := newTestPool()
+			assert.NoError(t, err)
+			pool.SetSigner(&mockSigner{})
 
-	//	enqueue some txs
-	go func() {
-		err := pool.addTx(local, newTx(addr1, 0, 1))
-		assert.NoError(t, err)
-	}()
-	pool.handleEnqueueRequest(<-pool.enqueueReqCh)
+			//	enqueue some txs
+			go func() {
+				err := pool.addTx(local, newTx(addr1, 5, 1))
+				assert.NoError(t, err)
+			}()
+			pool.handleEnqueueRequest(<-pool.enqueueReqCh)
 
-	assert.Equal(t, uint64(1), acc.enqueued.length())
+			acc := pool.accounts.get(addr1)
 
-	acc := pool.accounts.get(addr1)
+			assert.Equal(t, uint64(1), acc.enqueued.length())
 
-	//	fake lastPromoted
-	acc.lastPromoted = time.Now().Add(-3 * time.Hour)
+			//	fake lastPromoted
+			acc.lastPromoted = time.Now().Add(-3 * time.Hour)
 
-	//	pretend 3 hours have passed
-	//	and trigger the pruning cycle
-	pool.pruneStaleTxs()
+			//	pretend 3 hours have passed
+			//	and trigger the pruning cycle
+			pool.pruneStaleEnqueued()
 
-	//	enqueued txs are removed
-	assert.Equal(t, uint64(0), acc.enqueued.length())
+			//	enqueued txs are removed
+			assert.Equal(t, uint64(0), acc.enqueued.length())
+		})
+
+	t.Run(
+		"no stale tx to prune",
+		func(t *testing.T) {
+			//	create pool
+			pool, err := newTestPool()
+			assert.NoError(t, err)
+			pool.SetSigner(&mockSigner{})
+
+			//	enqueue some txs
+			go func() {
+				err := pool.addTx(local, newTx(addr1, 5, 1))
+				assert.NoError(t, err)
+			}()
+			pool.handleEnqueueRequest(<-pool.enqueueReqCh)
+
+			acc := pool.accounts.get(addr1)
+
+			assert.Equal(t, uint64(1), acc.enqueued.length())
+
+			//	fake lastPromoted
+			acc.lastPromoted = time.Now().Add(-5 * time.Second)
+
+			//	pretend 3 hours have passed
+			//	and trigger the pruning cycle
+			pool.pruneStaleEnqueued()
+
+			//	enqueued txs are removed
+			assert.Equal(t, uint64(1), acc.enqueued.length())
+		})
+
 }
 
 /* "Integrated" tests */
