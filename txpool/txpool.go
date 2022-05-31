@@ -663,7 +663,7 @@ func (p *TxPool) handlePromoteRequest(req promoteRequest) {
 
 	// promote enqueued txs
 	promoted := account.promote()
-	p.logger.Debug("promote request", "promoted", promoted, "addr", addr.String())
+	p.logger.Debug("promote request", "promoted", len(promoted), "addr", addr.String())
 
 	// update metrics
 	p.metrics.PendingTxs.Add(float64(len(promoted)))
