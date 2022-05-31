@@ -143,8 +143,8 @@ func (m *accountsMap) allTxs(includeEnqueued bool) (
 	return
 }
 
-func (m *accountsMap) pruneStaleEnqueuedTxs() uint64 {
-	total := uint64(0)
+func (m *accountsMap) pruneStaleEnqueuedTxs() []*types.Transaction {
+	pruned := make([]*types.Transaction, 0)
 
 	m.Range(func(_, value interface{}) bool {
 		account, _ := value.(*account)
@@ -153,15 +153,16 @@ func (m *accountsMap) pruneStaleEnqueuedTxs() uint64 {
 		defer account.enqueued.unlock()
 
 		if time.Since(account.lastPromoted) >= maxAccountInactivity {
-			removed := account.enqueued.clear()
-
-			total += uint64(len(removed))
+			pruned = append(
+				pruned,
+				account.enqueued.clear()...,
+			)
 		}
 
 		return true
 	})
 
-	return total
+	return pruned
 }
 
 // An account is the core structure for processing
