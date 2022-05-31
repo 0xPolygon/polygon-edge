@@ -491,7 +491,7 @@ func (s *Syncer) prunePeerEnqueuedBlocks(block *types.Block) {
 		pruned := syncPeer.purgeBlocks(block.Hash())
 
 		s.logger.Debug(
-			"pruned peer enqueued blocks",
+			"pruned peer enqueued block",
 			"num", pruned,
 			"id", peerID.String(),
 			"reference_block_num", block.Number(),
