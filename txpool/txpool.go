@@ -677,6 +677,9 @@ func (p *TxPool) handlePromoteRequest(req promoteRequest) {
 func (p *TxPool) pruneStaleAccounts() {
 	pruned := p.accounts.pruneStaleEnqueuedTxs()
 
+	p.index.remove(pruned...)
+	p.gauge.decrease(slotsRequired(pruned...))
+
 	p.logger.Debug("pruned stale enqueued txs", "num", pruned)
 }
 
