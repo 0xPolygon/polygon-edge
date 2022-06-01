@@ -595,21 +595,31 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 
 	tx.ComputeHash()
 
-	// check if already known
-	if _, ok := p.index.get(tx.Hash); ok {
+	if exists := p.index.add(tx); exists {
 		if origin == gossip {
-			// silently drop known tx
-			// that is gossiped back
-			p.logger.Debug(
-				"dropping known gossiped transaction",
-				"hash", tx.Hash.String(),
-			)
+			p.logger.Debug("rejecting gossiped tx (already known)", "hash", tx.Hash.String())
 
 			return nil
-		} else {
-			return ErrAlreadyKnown
 		}
+
+		return ErrAlreadyKnown
 	}
+
+	//// check if already known
+	//if _, ok := p.index.get(tx.Hash); ok {
+	//	if origin == gossip {
+	//		// silently drop known tx
+	//		// that is gossiped back
+	//		p.logger.Debug(
+	//			"dropping known gossiped transaction",
+	//			"hash", tx.Hash.String(),
+	//		)
+	//
+	//		return nil
+	//	} else {
+	//		return ErrAlreadyKnown
+	//	}
+	//}
 
 	// initialize account for this address once
 	if !p.accounts.exists(tx.From) {
@@ -641,6 +651,8 @@ func (p *TxPool) handleEnqueueRequest(req enqueueRequest) {
 			"actual_nonce", tx.Nonce,
 			"addr", tx.From.String())
 
+		p.index.remove(tx)
+
 		return
 	}
 
@@ -650,7 +662,6 @@ func (p *TxPool) handleEnqueueRequest(req enqueueRequest) {
 		"hash", tx.Hash.String())
 
 	// update state
-	p.index.add(tx)
 	p.gauge.increase(slotsRequired(tx))
 
 	p.eventManager.signalEvent(proto.EventType_ENQUEUED, tx.Hash)
