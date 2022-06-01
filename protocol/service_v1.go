@@ -29,6 +29,12 @@ type rlpObject interface {
 	UnmarshalRLP(input []byte) error
 }
 
+var (
+	errMalformedNotifyRequest = errors.New("malformed notify request")
+	errMalformedNotifyBody    = errors.New("malformed notify body")
+	errMalformedNotifyStatus  = errors.New("malformed notify status")
+)
+
 func (s *serviceV1) Notify(ctx context.Context, req *proto.NotifyReq) (*empty.Empty, error) {
 	var id peer.ID
 
@@ -36,6 +42,11 @@ func (s *serviceV1) Notify(ctx context.Context, req *proto.NotifyReq) (*empty.Em
 		id = ctx.PeerID
 	} else {
 		return &empty.Empty{}, nil
+	}
+
+	// Do the initial notify request verification
+	if verifyErr := verifyNotifyRequest(req); verifyErr != nil {
+		return nil, fmt.Errorf("unable to verify notify request, %w", verifyErr)
 	}
 
 	b := new(types.Block)
@@ -53,6 +64,26 @@ func (s *serviceV1) Notify(ctx context.Context, req *proto.NotifyReq) (*empty.Em
 	s.syncer.updatePeerStatus(id, status)
 
 	return &empty.Empty{}, nil
+}
+
+// verifyNotifyRequest verifies the notify request to the peer
+func verifyNotifyRequest(request *proto.NotifyReq) error {
+	// Make sure the request is formed
+	if request == nil {
+		return errMalformedNotifyRequest
+	}
+
+	// Make sure the notify body (block) is present
+	if request.Raw == nil {
+		return errMalformedNotifyBody
+	}
+
+	// Make sure the notify status is present
+	if request.Status == nil {
+		return errMalformedNotifyStatus
+	}
+
+	return nil
 }
 
 // GetCurrent implements the V1Server interface

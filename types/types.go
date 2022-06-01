@@ -60,7 +60,11 @@ func (h *Hash) Scan(src interface{}) error {
 		return errors.New("invalid type assert")
 	}
 
-	hh := hex.MustDecodeHex(string(stringVal))
+	hh, decodeErr := hex.DecodeHex(string(stringVal))
+	if decodeErr != nil {
+		return fmt.Errorf("unable to decode value, %w", decodeErr)
+	}
+
 	copy(h[:], hh[:])
 
 	return nil
@@ -113,7 +117,11 @@ func (a *Address) Scan(src interface{}) error {
 		return errors.New("invalid type assert")
 	}
 
-	aa := hex.MustDecodeHex(string(stringVal))
+	aa, decodeErr := hex.DecodeHex(string(stringVal))
+	if decodeErr != nil {
+		return fmt.Errorf("unable to decode value, %w", decodeErr)
+	}
+
 	copy(a[:], aa[:])
 
 	return nil
