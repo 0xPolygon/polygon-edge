@@ -286,6 +286,10 @@ func (p *TxPool) Prepare() {
 	// fetch primary from each account
 	primaries := p.accounts.getPrimaries()
 
+	for _, tx := range primaries {
+		p.logger.Info("prepare primary", "nonce", tx.Nonce, "addr", tx.From.String())
+	}
+
 	// push primaries to the executables queue
 	for _, tx := range primaries {
 		p.executables.push(tx)
@@ -634,7 +638,8 @@ func (p *TxPool) handleEnqueueRequest(req enqueueRequest) {
 	if err := account.enqueue(tx); err != nil {
 		p.logger.Error("enqueue request", "err", err,
 			"expected_nonce", account.getNonce(),
-			"actual_nonce", tx.Nonce)
+			"actual_nonce", tx.Nonce,
+			"addr", tx.From.String())
 
 		return
 	}
@@ -666,6 +671,10 @@ func (p *TxPool) handlePromoteRequest(req promoteRequest) {
 	// promote enqueued txs
 	promoted := account.promote()
 	p.logger.Debug("promote request", "promoted", len(promoted), "addr", addr.String())
+
+	p.logger.Info("account promoted",
+		"next_nonce", account.getNonce(),
+		"addr", addr.String())
 
 	// update metrics
 	p.metrics.PendingTxs.Add(float64(len(promoted)))
