@@ -75,7 +75,6 @@ func (t *prestateTracer) CaptureStart(txn interface{}, from types.Address, to ty
 	// We need to re-add them to get the pre-tx balance.
 	fromBal := hexutil.MustDecodeBig(t.prestate[from].Balance)
 	// gasPrice := env.TxContext.GasPrice
-	// dexiang: 需要传入evm记录gasPrice!!
 	gasPrice := new(big.Int)
 	consumedGas := new(big.Int).Mul(gasPrice, new(big.Int).SetUint64(t.gasLimit))
 	fromBal.Add(fromBal, new(big.Int).Add(value, consumedGas))

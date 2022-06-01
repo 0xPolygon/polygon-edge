@@ -236,6 +236,9 @@ type Transition struct {
 	receipts []*types.Receipt
 	totalGas uint64
 
+	// trace
+	gas         uint64
+	initialGas  uint64
 	traceConfig runtime.TraceConfig
 }
 
@@ -476,15 +479,6 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 	// 4. there is no overflow when calculating intrinsic gas
 	// 5. the purchased gas is enough to cover intrinsic usage
 	// 6. caller has enough balance to cover asset transfer for **topmost** call
-
-	// start tracing
-	if t.traceConfig.Debug {
-		t.traceConfig.Tracer.CaptureTxStart(msg.Gas)
-		defer func() {
-			t.traceConfig.Tracer.CaptureTxEnd(msg.Gas)
-		}()
-	}
-
 	txn := t.state
 
 	// 1. the nonce of the message caller is correct
@@ -500,6 +494,15 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 	// 3. the amount of gas required is available in the block
 	if err := t.subGasPool(msg.Gas); err != nil {
 		return nil, NewGasLimitReachedTransitionApplicationError(err)
+	}
+
+	// start tracing
+	var result *runtime.ExecutionResult
+	if t.traceConfig.Debug {
+		t.traceConfig.Tracer.CaptureTxStart(msg.Gas)
+		defer func() {
+			t.traceConfig.Tracer.CaptureTxEnd(result.GasLeft)
+		}()
 	}
 
 	// 4. there is no overflow when calculating intrinsic gas
@@ -527,7 +530,6 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 	t.ctx.GasPrice = types.BytesToHash(gasPrice.Bytes())
 	t.ctx.Origin = msg.From
 
-	var result *runtime.ExecutionResult
 	if msg.IsContractCreation() {
 		result = t.Create2(msg.From, msg.Input, value, gasLeft)
 	} else {
@@ -645,9 +647,9 @@ func (t *Transition) applyCall(
 	if t.traceConfig.Debug {
 		if c.Depth == 1 {
 			t.traceConfig.Tracer.CaptureStart(t, c.Caller, c.Address, false, c.Input, c.Gas, c.Value)
-			defer func(startGas uint64, startTime time.Time) {
-				t.traceConfig.Tracer.CaptureEnd(result.ReturnValue, startGas-c.Gas, time.Since(startTime), result.Err)
-			}(c.Gas, time.Now())
+			defer func(startTime time.Time) {
+				t.traceConfig.Tracer.CaptureEnd(result.ReturnValue, c.Gas-result.GasLeft, time.Since(startTime), result.Err)
+			}(time.Now())
 		} else {
 			// Change to OpCode according to callType
 			var opCallType evm.OpCode
@@ -669,12 +671,11 @@ func (t *Transition) applyCall(
 			}
 
 			t.traceConfig.Tracer.CaptureEnter(int(opCallType), c.Caller, c.Address, c.Input, c.Gas, c.Value)
-			defer func(startGas uint64) {
-				t.traceConfig.Tracer.CaptureExit(result.ReturnValue, startGas-c.Gas, result.Err)
-			}(c.Gas)
+			defer func() {
+				t.traceConfig.Tracer.CaptureExit(result.ReturnValue, c.Gas-result.GasLeft, result.Err)
+			}()
 		}
 	}
-
 	result = t.run(c, host)
 
 	if result.Failed() {
@@ -748,6 +749,7 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host, op evm.
 	}
 
 	var result *runtime.ExecutionResult
+	start := time.Now()
 
 	result = t.run(c, host)
 
@@ -785,6 +787,15 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host, op evm.
 
 	result.GasLeft -= gasCost
 	t.state.SetCode(c.Address, result.ReturnValue)
+
+	// capture trace end
+	if t.traceConfig.Debug {
+		if c.Depth == 1 {
+			t.traceConfig.Tracer.CaptureEnd(result.ReturnValue, gasCost, time.Since(start), result.Err)
+		} else {
+			t.traceConfig.Tracer.CaptureExit(result.ReturnValue, gasCost, result.Err)
+		}
+	}
 
 	return result
 }
