@@ -644,7 +644,10 @@ func (p *TxPool) handleEnqueueRequest(req enqueueRequest) {
 		return
 	}
 
-	p.logger.Debug("enqueue request", "hash", tx.Hash.String())
+	p.logger.Debug("enqueue request",
+		"nonce", tx.Nonce,
+		"addr", addr.String(),
+		"hash", tx.Hash.String())
 
 	// update state
 	p.index.add(tx)
