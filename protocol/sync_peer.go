@@ -97,6 +97,8 @@ func (s *SyncPeer) purgeBlocks(lastSeen types.Hash) uint64 {
 	for i, b := range s.enqueue {
 		if b.Hash() == lastSeen {
 			indx = i
+
+			break
 		}
 	}
 
