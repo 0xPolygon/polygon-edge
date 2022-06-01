@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/network/event"
 	"math"
 	"math/big"
 	"sync"
 	"time"
+
+	"github.com/0xPolygon/polygon-edge/network/event"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/helper/progress"

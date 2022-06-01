@@ -122,6 +122,8 @@ func (v *ECDSAValidatorSet) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 	valSet := ar.NewArray()
 
 	for _, addr := range *v {
+		addr := addr
+
 		if len(addr) == 0 {
 			valSet.Set(ar.NewNull())
 		} else {
@@ -141,7 +143,7 @@ func (v *ECDSAValidatorSet) UnmarshalRLPFrom(p *fastrlp.Parser, vv *fastrlp.Valu
 	valSet := make([]types.Address, len(vals))
 
 	for index, val := range vals {
-		raw := new(types.Address)[:]
+		raw := make([]byte, 0)
 		if raw, err = val.GetBytes(raw); err != nil {
 			return err
 		}

@@ -1,16 +1,19 @@
 package genesis
 
 import (
+	"crypto/ecdsa"
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/chain"
-	"github.com/0xPolygon/polygon-edge/command"
-	"github.com/0xPolygon/polygon-edge/consensus/ibft"
-	"github.com/0xPolygon/polygon-edge/crypto"
-	"github.com/0xPolygon/polygon-edge/types"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/command"
+	"github.com/0xPolygon/polygon-edge/consensus/ibft"
+	"github.com/0xPolygon/polygon-edge/consensus/ibft/validators"
+	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 const (
@@ -87,13 +90,13 @@ func fillPremineMap(
 
 // getValidatorsFromPrefixPath extracts the addresses of the validators based on the directory
 // prefix. It scans the directories for validator private keys and compiles a list of addresses
-func getValidatorsFromPrefixPath(prefix string) ([]types.Address, error) {
-	validators := make([]types.Address, 0)
-
+func getValidatorsFromPrefixPath(prefix string, keyType crypto.KeyType) (validators.ValidatorSet, error) {
 	files, err := ioutil.ReadDir(".")
 	if err != nil {
 		return nil, err
 	}
+
+	privateKeys := make([]*ecdsa.PrivateKey, 0)
 
 	for _, file := range files {
 		path := file.Name()
@@ -119,8 +122,47 @@ func getValidatorsFromPrefixPath(prefix string) ([]types.Address, error) {
 			return nil, err
 		}
 
-		validators = append(validators, crypto.PubKeyToAddress(&priv.PublicKey))
+		privateKeys = append(privateKeys, priv)
 	}
 
-	return validators, nil
+	switch keyType {
+	case crypto.KeySecp256k1:
+		return toECDSAValidatorSet(privateKeys), nil
+	case crypto.KeyBLS:
+		return toBLSValidatorSet(privateKeys)
+	default:
+		return nil, fmt.Errorf("invalid key type: %s", keyType)
+	}
+}
+
+func toECDSAValidatorSet(keys []*ecdsa.PrivateKey) validators.ValidatorSet {
+	addrs := make([]types.Address, len(keys))
+
+	for idx, key := range keys {
+		addrs[idx] = crypto.PubKeyToAddress(&key.PublicKey)
+	}
+
+	valSet := validators.ECDSAValidatorSet(addrs)
+
+	return &valSet
+}
+
+func toBLSValidatorSet(keys []*ecdsa.PrivateKey) (validators.ValidatorSet, error) {
+	vals := make([]validators.BLSValidator, len(keys))
+
+	for idx, key := range keys {
+		pubkey, err := crypto.ECDSAToBLSPubkey(key)
+		if err != nil {
+			return nil, err
+		}
+
+		vals[idx] = validators.BLSValidator{
+			Address:   crypto.PubKeyToAddress(&key.PublicKey),
+			BLSPubKey: pubkey,
+		}
+	}
+
+	valSet := validators.BLSValidatorSet(vals)
+
+	return &valSet, nil
 }

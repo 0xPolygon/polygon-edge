@@ -15,6 +15,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/btcsuite/btcd/btcec"
+	"github.com/coinbase/kryptology/pkg/signatures/bls/bls_sig"
 	"github.com/umbracle/fastrlp"
 	"golang.org/x/crypto/sha3"
 )
@@ -305,4 +306,30 @@ func ReadConsensusKey(manager secrets.SecretsManager) (*ecdsa.PrivateKey, error)
 	}
 
 	return BytesToPrivateKey(validatorKey)
+}
+
+func ECDSAToBLS(key *ecdsa.PrivateKey) (*bls_sig.SecretKey, error) {
+	blsPop := bls_sig.NewSigPop()
+	keyBytes := (*btcec.PrivateKey)(key).Serialize()
+
+	_, sk, err := blsPop.KeygenWithSeed(keyBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	return sk, nil
+}
+
+func ECDSAToBLSPubkey(ecdsaKey *ecdsa.PrivateKey) ([]byte, error) {
+	secKey, err := ECDSAToBLS(ecdsaKey)
+	if err != nil {
+		return nil, err
+	}
+
+	pubKey, err := secKey.GetPublicKey()
+	if err != nil {
+		return nil, err
+	}
+
+	return pubKey.MarshalBinary()
 }

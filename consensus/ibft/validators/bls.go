@@ -2,15 +2,43 @@ package validators
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 
+	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/fastrlp"
 )
 
+type BLSPubKey []byte
+
+func (k BLSPubKey) String() string {
+	return hex.EncodeToHex(k[:])
+}
+
+func (k BLSPubKey) MarshalText() ([]byte, error) {
+	return []byte(k.String()), nil
+}
+
+func (k *BLSPubKey) Scan(src interface{}) error {
+	stringVal, ok := src.([]byte)
+	if !ok {
+		return errors.New("invalid type assert")
+	}
+
+	x, err := hex.DecodeHex(string(stringVal))
+	if err != nil {
+		return err
+	}
+
+	copy(*k, x)
+
+	return nil
+}
+
 type BLSValidator struct {
 	Address   types.Address
-	BLSPubKey []byte
+	BLSPubKey BLSPubKey
 }
 
 func (v *BLSValidator) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
@@ -34,7 +62,7 @@ func (v *BLSValidator) UnmarshalRLPFrom(p *fastrlp.Parser, vv *fastrlp.Value) er
 	}
 
 	{
-		raw := new(types.Address)[:]
+		raw := make([]byte, 0)
 		if raw, err = vals[0].GetBytes(raw); err != nil {
 			return err
 		}
@@ -180,7 +208,9 @@ func (v *BLSValidatorSet) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 	}
 
 	valSet := ar.NewArray()
+
 	for _, val := range *v {
+		val := val
 		valSet.Set(val.MarshalRLPWith(ar))
 	}
 
@@ -194,8 +224,10 @@ func (v *BLSValidatorSet) UnmarshalRLPFrom(p *fastrlp.Parser, vv *fastrlp.Value)
 	}
 
 	valSet := make([]BLSValidator, len(vals))
+
 	for index := range vals {
-		if err := valSet[index].UnmarshalRLPFrom(p, vals[0]); err != nil {
+		vals := vals
+		if err := valSet[index].UnmarshalRLPFrom(p, vals[index]); err != nil {
 			return err
 		}
 	}

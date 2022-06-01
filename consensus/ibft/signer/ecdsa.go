@@ -45,23 +45,51 @@ func (s *ECDSASigner) Address() types.Address {
 	return s.address
 }
 
-func (s *ECDSASigner) InitIbftExtra(header, parent *types.Header) error {
-	validators, err := unpackValidatorsFromIbftExtra(parent)
-	if err != nil {
-		return err
-	}
-
+func (s *ECDSASigner) InitIBFTExtra(header, parent *types.Header, set validators.ValidatorSet) error {
 	var parentCommittedSeal Sealer
 
 	if parent.Number >= 1 {
-		if parentCommittedSeal, err = unpackCommittedSealFromIbftExtra(parent); err != nil {
+		parentExtra, err := s.GetIBFTExtra(parent)
+		if err != nil {
 			return err
 		}
+
+		parentCommittedSeal = parentExtra.CommittedSeal
 	}
 
-	s.initIbftExtra(header, validators, parentCommittedSeal)
+	s.initIbftExtra(header, set, parentCommittedSeal)
 
 	return nil
+}
+
+func (s *ECDSASigner) GetIBFTExtra(h *types.Header) (*IstanbulExtra, error) {
+	if len(h.ExtraData) < IstanbulExtraVanity {
+		// return nil, fmt.Errorf(
+		// 	"wrong extra size, expected greater than or equal to %d but actual %d",
+		// 	IstanbulExtraVanity,
+		// 	len(h.ExtraData),
+		// )
+		err := fmt.Errorf(
+			"wrong extra size, expected greater than or equal to %d but actual %d",
+			IstanbulExtraVanity,
+			len(h.ExtraData),
+		)
+
+		panic(err)
+	}
+
+	data := h.ExtraData[IstanbulExtraVanity:]
+	extra := &IstanbulExtra{
+		Validators:          &validators.ECDSAValidatorSet{},
+		CommittedSeal:       &SerializedSeal{},
+		ParentCommittedSeal: &SerializedSeal{},
+	}
+
+	if err := extra.UnmarshalRLP(data); err != nil {
+		return nil, err
+	}
+
+	return extra, nil
 }
 
 func (s *ECDSASigner) WriteSeal(header *types.Header) (*types.Header, error) {
@@ -75,7 +103,11 @@ func (s *ECDSASigner) WriteSeal(header *types.Header) (*types.Header, error) {
 		return nil, err
 	}
 
-	if err := packSealIntoIbftExtra(header, seal); err != nil {
+	err = s.packFieldIntoIbftExtra(header, func(ie *IstanbulExtra) {
+		ie.Seal = seal
+	})
+
+	if err != nil {
 		return nil, err
 	}
 
@@ -83,7 +115,7 @@ func (s *ECDSASigner) WriteSeal(header *types.Header) (*types.Header, error) {
 }
 
 func (s *ECDSASigner) EcrecoverFromHeader(header *types.Header) (types.Address, error) {
-	seal, err := unpackSealFromIbftExtra(header)
+	extra, err := s.GetIBFTExtra(header)
 	if err != nil {
 		return types.Address{}, err
 	}
@@ -93,7 +125,7 @@ func (s *ECDSASigner) EcrecoverFromHeader(header *types.Header) (types.Address, 
 		return types.Address{}, err
 	}
 
-	return ecrecoverImpl(seal, hash[:])
+	return ecrecoverImpl(extra.Seal, hash[:])
 }
 
 func (s *ECDSASigner) CreateCommittedSeal(header *types.Header) ([]byte, error) {
@@ -126,7 +158,12 @@ func (s *ECDSASigner) WriteCommittedSeals(
 	}
 
 	serializedSeal := SerializedSeal(seals)
-	if err := packCommittedSealIntoIbftExtra(header, &serializedSeal); err != nil {
+
+	err := s.packFieldIntoIbftExtra(header, func(ie *IstanbulExtra) {
+		ie.CommittedSeal = &serializedSeal
+	})
+
+	if err != nil {
 		return nil, err
 	}
 
@@ -134,12 +171,12 @@ func (s *ECDSASigner) WriteCommittedSeals(
 }
 
 func (s *ECDSASigner) VerifyCommittedSeal(rawSet validators.ValidatorSet, header *types.Header) error {
-	rawCs, err := unpackCommittedSealFromIbftExtra(header)
+	extra, err := s.GetIBFTExtra(header)
 	if err != nil {
 		return err
 	}
 
-	cs, ok := rawCs.(*SerializedSeal)
+	cs, ok := extra.CommittedSeal.(*SerializedSeal)
 	if !ok {
 		return ErrInvalidCommittedSealType
 	}
@@ -165,12 +202,12 @@ func (s *ECDSASigner) VerifyParentCommittedSeal(
 	rawParentSet validators.ValidatorSet,
 	parent, header *types.Header,
 ) error {
-	rawParentCs, err := unpackParentCommittedSealFromIbftExtra(header)
+	extra, err := s.GetIBFTExtra(header)
 	if err != nil {
 		return err
 	}
 
-	parentCs, ok := rawParentCs.(*SerializedSeal)
+	parentCs, ok := extra.ParentCommittedSeal.(*SerializedSeal)
 	if !ok {
 		return ErrInvalidCommittedSealType
 	}
@@ -209,13 +246,26 @@ func (s *ECDSASigner) initIbftExtra(header *types.Header, vals validators.Valida
 	})
 }
 
+func (s *ECDSASigner) packFieldIntoIbftExtra(h *types.Header, updateFn func(*IstanbulExtra)) error {
+	extra, err := s.GetIBFTExtra(h)
+	if err != nil {
+		return err
+	}
+
+	updateFn(extra)
+
+	putIbftExtra(h, extra)
+
+	return nil
+}
+
 func (s *ECDSASigner) filterHeaderForHash(header *types.Header) (*types.Header, error) {
 	// This will effectively remove the Seal and Committed Seal fields,
 	// while keeping proposer vanity and validator set
 	// because extra.Validators, extra.ParentCommittedSeal is what we got from `h` in the first place.
 	clone := header.Copy()
 
-	extra, err := GetIbftExtra(clone)
+	extra, err := s.GetIBFTExtra(clone)
 	if err != nil {
 		return nil, err
 	}

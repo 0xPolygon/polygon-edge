@@ -7,6 +7,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/secrets/helper"
+	"github.com/0xPolygon/polygon-edge/types"
 	libp2pCrypto "github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
 )
@@ -36,7 +37,9 @@ type initParams struct {
 	secretsManager secrets.SecretsManager
 	secretsConfig  *secrets.SecretsManagerConfig
 
-	validatorAddress     []byte // ECDSA: Address, BLS: PubKey
+	validatorAddress types.Address
+	blsPublicKey     []byte
+
 	networkingPrivateKey libp2pCrypto.PrivKey
 
 	nodeID peer.ID
@@ -151,12 +154,18 @@ func (ip *initParams) initLocalSecretsManager() error {
 }
 
 func (ip *initParams) initValidatorKey() error {
-	address, err := helper.InitValidatorKey(ip.secretsManager, ip.keyType)
+	address, err := helper.InitValidatorKey(ip.secretsManager)
 	if err != nil {
 		return err
 	}
 
 	ip.validatorAddress = address
+
+	if ip.keyType == crypto.KeyBLS {
+		if ip.blsPublicKey, err = helper.GetBLSPubkeyFromValidatorKey(ip.secretsManager); err != nil {
+			return err
+		}
+	}
 
 	return nil
 }
@@ -185,7 +194,8 @@ func (ip *initParams) initNodeID() error {
 
 func (ip *initParams) getResult() command.CommandResult {
 	return &SecretsInitResult{
-		Address: ip.validatorAddress,
-		NodeID:  ip.nodeID.String(),
+		Address:   ip.validatorAddress,
+		BLSPubkey: ip.blsPublicKey,
+		NodeID:    ip.nodeID.String(),
 	}
 }

@@ -1,7 +1,6 @@
 package helper
 
 import (
-	"crypto/rand"
 	"fmt"
 	"path/filepath"
 
@@ -12,7 +11,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/secrets/awsssm"
 	"github.com/0xPolygon/polygon-edge/secrets/hashicorpvault"
 	"github.com/0xPolygon/polygon-edge/secrets/local"
-	"github.com/coinbase/kryptology/pkg/signatures/bls/bls_sig"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	libp2pCrypto "github.com/libp2p/go-libp2p-core/crypto"
 )
@@ -67,57 +66,37 @@ func SetupAWSSSM(
 	)
 }
 
-func InitValidatorKey(secretsManager secrets.SecretsManager, keyType crypto.KeyType) ([]byte, error) {
-	var (
-		address         []byte
-		privateKeyBytes []byte
-	)
-
-	// Generate the IBFT validator private key
-	if keyType == crypto.KeySecp256k1 {
-		validatorKey, validatorKeyEncoded, err := crypto.GenerateAndEncodePrivateKey()
-		if err != nil {
-			return nil, err
-		}
-
-		x := crypto.PubKeyToAddress(&validatorKey.PublicKey)
-
-		address = x[:]
-		privateKeyBytes = validatorKeyEncoded
-	} else if keyType == crypto.KeyBLS {
-		r := make([]byte, 32)
-
-		_, err := rand.Read(r)
-		if err != nil {
-			return nil, err
-		}
-
-		bls := bls_sig.NewSigPop()
-
-		pk, sk, err := bls.KeygenWithSeed(r)
-		if err != nil {
-			return nil, err
-		}
-
-		address, err = pk.MarshalBinary()
-		if err != nil {
-			return nil, err
-		}
-
-		if privateKeyBytes, err = sk.MarshalBinary(); err != nil {
-			return nil, err
-		}
+func InitValidatorKey(secretsManager secrets.SecretsManager) (types.Address, error) {
+	validatorKey, validatorKeyEncoded, err := crypto.GenerateAndEncodePrivateKey()
+	if err != nil {
+		return types.ZeroAddress, err
 	}
+
+	address := crypto.PubKeyToAddress(&validatorKey.PublicKey)
 
 	// Write the validator private key to the secrets manager storage
 	if setErr := secretsManager.SetSecret(
 		secrets.ValidatorKey,
-		privateKeyBytes,
+		validatorKeyEncoded,
 	); setErr != nil {
-		return nil, setErr
+		return types.ZeroAddress, setErr
 	}
 
 	return address, nil
+}
+
+func GetBLSPubkeyFromValidatorKey(secretsManager secrets.SecretsManager) ([]byte, error) {
+	ecdsaKey, err := crypto.ReadConsensusKey(secretsManager)
+	if err != nil {
+		return nil, err
+	}
+
+	pubkeyBytes, err := crypto.ECDSAToBLSPubkey(ecdsaKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return pubkeyBytes, nil
 }
 
 func InitNetworkingPrivateKey(secretsManager secrets.SecretsManager) (libp2pCrypto.PrivKey, error) {

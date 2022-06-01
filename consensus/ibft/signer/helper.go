@@ -10,8 +10,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/helper/keccak"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/btcsuite/btcd/btcec"
-	"github.com/coinbase/kryptology/pkg/signatures/bls/bls_sig"
 	"github.com/umbracle/fastrlp"
 )
 
@@ -37,18 +35,6 @@ func obtainOrCreateECDSAKey(manager secrets.SecretsManager) (*ecdsa.PrivateKey, 
 	}
 
 	return key, nil
-}
-
-func ecdsaToBLS(key *ecdsa.PrivateKey) (*bls_sig.SecretKey, error) {
-	blsPop := bls_sig.NewSigPop()
-	keyBytes := (*btcec.PrivateKey)(key).Serialize()
-
-	_, sk, err := blsPop.KeygenWithSeed(keyBytes)
-	if err != nil {
-		return nil, err
-	}
-
-	return sk, nil
 }
 
 func calculateHeaderHash(h *types.Header) types.Hash {

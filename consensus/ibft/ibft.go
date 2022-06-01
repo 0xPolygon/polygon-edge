@@ -570,7 +570,7 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 
 	header.Timestamp = uint64(headerTime.Unix())
 
-	if err := i.signer.InitIbftExtra(header, parent); err != nil {
+	if err := i.signer.InitIBFTExtra(header, parent, snap.Set); err != nil {
 		return nil, err
 	}
 
@@ -1192,7 +1192,7 @@ func (i *Ibft) isSealing() bool {
 // verifyHeaderImpl implements the actual header verification logic
 func (i *Ibft) verifyHeaderImpl(snap *Snapshot, parent, header *types.Header) error {
 	// ensure the extra data is correctly formatted
-	if _, err := signer.GetIbftExtra(header); err != nil {
+	if _, err := i.signer.GetIBFTExtra(header); err != nil {
 		return err
 	}
 

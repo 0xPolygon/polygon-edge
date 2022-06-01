@@ -13,6 +13,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/validators"
 	"github.com/0xPolygon/polygon-edge/contracts/staking"
+	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/server"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -29,6 +30,7 @@ const (
 	posFlag                 = "pos"
 	minValidatorCount       = "min-validator-count"
 	maxValidatorCount       = "max-validator-count"
+	keyTypeFlag             = "key-type"
 )
 
 // Legacy flags that need to be preserved for running clients
@@ -56,7 +58,7 @@ type genesisParams struct {
 	validatorPrefixPath string
 	premine             []string
 	bootnodes           []string
-	ibftValidators      []types.Address
+	ibftValidators      validators.ValidatorSet
 
 	ibftValidatorsRaw []string
 
@@ -67,6 +69,9 @@ type genesisParams struct {
 
 	minNumValidators uint64
 	maxNumValidators uint64
+
+	rawKeyType string
+	keyType    crypto.KeyType
 
 	extraData []byte
 	consensus server.ConsensusType
@@ -143,6 +148,10 @@ func (p *genesisParams) getRequiredFlags() []string {
 func (p *genesisParams) initRawParams() error {
 	p.consensus = server.ConsensusType(p.consensusRaw)
 
+	if err := p.initKeyType(); err != nil {
+		return err
+	}
+
 	if err := p.initValidatorSet(); err != nil {
 		return err
 	}
@@ -154,20 +163,23 @@ func (p *genesisParams) initRawParams() error {
 }
 
 // setValidatorSetFromCli sets validator set from cli command
-func (p *genesisParams) setValidatorSetFromCli() {
+func (p *genesisParams) setValidatorSetFromCli() error {
 	if len(p.ibftValidatorsRaw) != 0 {
-		for _, rawVal := range p.ibftValidatorsRaw {
-			bytes, err := hex.DecodeString(strings.TrimPrefix(rawVal, "0x"))
-			if err != nil {
-				panic(err)
-			}
+		var err error
 
-			p.ibftValidators = append(
-				p.ibftValidators,
-				types.BytesToAddress(bytes),
-			)
+		switch p.keyType {
+		case crypto.KeySecp256k1:
+			p.ibftValidators, err = parseECDSAValidators(p.ibftValidators, p.ibftValidatorsRaw)
+		case crypto.KeyBLS:
+			p.ibftValidators, err = parseBLSValidators(p.ibftValidators, p.ibftValidatorsRaw)
+		}
+
+		if err != nil {
+			return err
 		}
 	}
+
+	return nil
 }
 
 // setValidatorSetFromPrefixPath sets validator set from prefix path
@@ -180,9 +192,21 @@ func (p *genesisParams) setValidatorSetFromPrefixPath() error {
 
 	if p.ibftValidators, readErr = getValidatorsFromPrefixPath(
 		p.validatorPrefixPath,
+		p.keyType,
 	); readErr != nil {
 		return fmt.Errorf("failed to read from prefix: %w", readErr)
 	}
+
+	return nil
+}
+
+func (p *genesisParams) initKeyType() error {
+	key, err := crypto.ToKeyType(p.rawKeyType)
+	if err != nil {
+		return err
+	}
+
+	p.keyType = key
 
 	return nil
 }
@@ -194,7 +218,9 @@ func (p *genesisParams) initValidatorSet() error {
 		return err
 	}
 
-	p.setValidatorSetFromCli()
+	if err := p.setValidatorSetFromCli(); err != nil {
+		return err
+	}
 
 	// Validate if validator number exceeds max number
 	if ok := p.isValidatorNumberValid(); !ok {
@@ -205,7 +231,7 @@ func (p *genesisParams) initValidatorSet() error {
 }
 
 func (p *genesisParams) isValidatorNumberValid() bool {
-	return uint64(len(p.ibftValidators)) <= p.maxNumValidators
+	return uint64(p.ibftValidators.Len()) <= p.maxNumValidators
 }
 
 func (p *genesisParams) initIBFTExtraData() {
@@ -213,12 +239,19 @@ func (p *genesisParams) initIBFTExtraData() {
 		return
 	}
 
-	vals := validators.ECDSAValidatorSet(p.ibftValidators)
+	var committedSeal signer.Sealer
+
+	switch p.keyType {
+	case crypto.KeySecp256k1:
+		committedSeal = new(signer.SerializedSeal)
+	case crypto.KeyBLS:
+		committedSeal = new(signer.BLSSeal)
+	}
 
 	ibftExtra := &signer.IstanbulExtra{
-		Validators:    &vals,
+		Validators:    p.ibftValidators,
 		Seal:          []byte{},
-		CommittedSeal: new(signer.SerializedSeal),
+		CommittedSeal: committedSeal,
 	}
 
 	p.extraData = make([]byte, signer.IstanbulExtraVanity)
@@ -329,4 +362,70 @@ func (p *genesisParams) getResult() command.CommandResult {
 	return &GenesisResult{
 		Message: fmt.Sprintf("Genesis written to %s\n", p.genesisPath),
 	}
+}
+
+func parseECDSAValidators(set validators.ValidatorSet, values []string) (validators.ValidatorSet, error) {
+	addrs := make([]types.Address, 0)
+
+	if set != nil {
+		valSet, ok := set.(*validators.ECDSAValidatorSet)
+		if !ok {
+			return nil, fmt.Errorf("invalid validator set, expected ECDSAValidatorSet but got %T", set)
+		}
+
+		addrs = []types.Address(*valSet)
+	}
+
+	for _, v := range values {
+		bytes, err := hex.DecodeString(strings.TrimPrefix(v, "0x"))
+		if err != nil {
+			return nil, err
+		}
+
+		addrs = append(addrs, types.BytesToAddress(bytes))
+	}
+
+	newValSet := validators.ECDSAValidatorSet(addrs)
+
+	return &newValSet, nil
+}
+
+func parseBLSValidators(set validators.ValidatorSet, values []string) (validators.ValidatorSet, error) {
+	vals := make([]validators.BLSValidator, 0)
+
+	if set != nil {
+		valSet, ok := set.(*validators.BLSValidatorSet)
+		if !ok {
+			return nil, fmt.Errorf("invalid validator set, expected BLSValidatorSet but got %T", set)
+		}
+
+		vals = []validators.BLSValidator(*valSet)
+	}
+
+	for _, value := range values {
+		subValues := strings.Split(value, ":")
+
+		if len(subValues) != 2 {
+			return nil, fmt.Errorf("invalid validator format, expected [Validator Address]:[BLS Public Key]")
+		}
+
+		addrBytes, err := hex.DecodeString(strings.TrimPrefix(subValues[0], "0x"))
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse address: %w", err)
+		}
+
+		pubKeyBytes, err := hex.DecodeString(strings.TrimPrefix(subValues[1], "0x"))
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse BLS Public Key: %w", err)
+		}
+
+		vals = append(vals, validators.BLSValidator{
+			Address:   types.BytesToAddress(addrBytes),
+			BLSPubKey: pubKeyBytes,
+		})
+	}
+
+	newValSet := validators.BLSValidatorSet(vals)
+
+	return &newValSet, nil
 }

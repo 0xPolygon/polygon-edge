@@ -2,9 +2,11 @@ package genesis
 
 import (
 	"fmt"
+
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft"
+	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/spf13/cobra"
 )
@@ -138,6 +140,13 @@ func setFlags(cmd *cobra.Command) {
 		maxValidatorCount,
 		common.MaxSafeJSInt,
 		"the maximum number of validators in the validator set for PoS",
+	)
+
+	cmd.Flags().StringVar(
+		&params.rawKeyType,
+		keyTypeFlag,
+		string(crypto.KeySecp256k1),
+		"the type of key",
 	)
 }
 

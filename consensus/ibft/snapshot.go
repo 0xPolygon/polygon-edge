@@ -11,7 +11,6 @@ import (
 	"sync/atomic"
 
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
-	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/validators"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
@@ -101,7 +100,7 @@ func (i *Ibft) setupSnapshot() error {
 func (i *Ibft) addHeaderSnap(header *types.Header) error {
 	// Genesis header needs to be set by hand, all the other
 	// snapshots are set as part of processHeaders
-	extra, err := signer.GetIbftExtra(header)
+	extra, err := i.signer.GetIBFTExtra(header)
 	if err != nil {
 		return err
 	}
@@ -257,6 +256,64 @@ type Snapshot struct {
 
 	// current set of validators
 	Set validators.ValidatorSet
+}
+
+// TODO: fix this
+func (s *Snapshot) UnmarshalJSON(data []byte) error {
+	raw := struct {
+		Number uint64
+		Hash   string
+		Votes  []*Vote
+		Set    []interface{}
+	}{}
+
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	s.Number = raw.Number
+	s.Hash = raw.Hash
+	s.Votes = raw.Votes
+
+	switch raw.Set[0].(type) {
+	case []string:
+		set := validators.ECDSAValidatorSet{}
+		for _, x := range raw.Set {
+			set = append(set, types.StringToAddress(x.(string)))
+		}
+
+		s.Set = &set
+	case map[string]interface{}:
+		set := validators.BLSValidatorSet{}
+
+		for _, x := range raw.Set {
+			m, ok := x.(map[string]interface{})
+			if !ok {
+				return fmt.Errorf("expected map")
+			}
+
+			rawAddr, ok := m["Address"].(string)
+			if !ok {
+				return fmt.Errorf("expected Address")
+			}
+
+			addr := types.StringToAddress(rawAddr)
+
+			rawBLSPubkey, ok := m["BLSPubKey"].(string)
+			if !ok {
+				return fmt.Errorf("expected BLSPubKey")
+			}
+
+			set = append(set, validators.BLSValidator{
+				Address:   addr,
+				BLSPubKey: []byte(rawBLSPubkey),
+			})
+		}
+
+		s.Set = &set
+	}
+
+	return nil
 }
 
 // snapshotMetadata defines the metadata for the snapshot

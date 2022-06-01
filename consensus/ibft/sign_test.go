@@ -1,79 +1,87 @@
 package ibft
 
-// func TestSign_Sealer(t *testing.T) {
-// 	pool := newTesterAccountPool()
-// 	pool.add("A")
+import (
+	"testing"
 
-// 	snap := &Snapshot{
-// 		Set: pool.ValidatorSet(),
-// 	}
+	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
+	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/stretchr/testify/assert"
+)
 
-// 	h := &types.Header{}
-// 	initIbftExtra(h, pool.ValidatorSet(), nil, false)
+func TestSign_Sealer(t *testing.T) {
+	pool := newTesterAccountPool()
+	pool.add("A")
 
-// 	// non-validator address
-// 	pool.add("X")
+	snap := &Snapshot{
+		Set: pool.ValidatorSet(),
+	}
 
-// 	badSealedBlock, _ := writeSeal(pool.get("X").priv, h)
-// 	assert.Error(t, verifySigner(snap, badSealedBlock))
+	h := &types.Header{}
+	initIbftExtra(h, pool.ValidatorSet(), nil, false)
 
-// 	// seal the block with a validator
-// 	goodSealedBlock, _ := writeSeal(pool.get("A").priv, h)
-// 	assert.NoError(t, verifySigner(snap, goodSealedBlock))
-// }
+	// non-validator address
+	pool.add("X")
 
-// func TestSign_CommittedSeals(t *testing.T) {
-// 	pool := newTesterAccountPool()
-// 	pool.add("A", "B", "C", "D", "E")
+	badSealedBlock, _ := writeSeal(pool.get("X").priv, h)
+	assert.Error(t, verifySigner(snap, badSealedBlock))
 
-// 	snap := &Snapshot{
-// 		Set: pool.ValidatorSet(),
-// 	}
+	// seal the block with a validator
+	goodSealedBlock, _ := writeSeal(pool.get("A").priv, h)
+	assert.NoError(t, verifySigner(snap, goodSealedBlock))
+}
 
-// 	h := &types.Header{}
-// 	initIbftExtra(h, pool.ValidatorSet(), nil, false)
+func TestSign_CommittedSeals(t *testing.T) {
+	pool := newTesterAccountPool()
+	pool.add("A", "B", "C", "D", "E")
 
-// 	// non-validator address
-// 	pool.add("X")
+	snap := &Snapshot{
+		Set: pool.ValidatorSet(),
+	}
 
-// 	buildCommittedSeal := func(accnt []string) error {
-// 		seals := [][]byte{}
+	h := &types.Header{}
+	initIbftExtra(h, pool.ValidatorSet(), nil, false)
 
-// 		for _, accnt := range accnt {
-// 			seal, err := createCommittedSeal(pool.get(accnt).priv, h)
+	// non-validator address
+	pool.add("X")
 
-// 			assert.NoError(t, err)
+	buildCommittedSeal := func(accnt []string) error {
+		seals := [][]byte{}
 
-// 			seals = append(seals, seal)
-// 		}
+		for _, accnt := range accnt {
+			seal, err := createCommittedSeal(pool.get(accnt).priv, h)
 
-// 		sealed, err := writeCommittedSeals(h, seals, false, nil)
+			assert.NoError(t, err)
 
-// 		assert.NoError(t, err)
+			seals = append(seals, seal)
+		}
 
-// 		return verifyCommittedSeal(snap, sealed)
-// 	}
+		sealed, err := writeCommittedSeals(h, seals, false, nil)
 
-// 	// Correct
-// 	assert.NoError(t, buildCommittedSeal([]string{"A", "B", "C", "D"}))
+		assert.NoError(t, err)
 
-// 	// Failed - Repeated signature
-// 	assert.Error(t, buildCommittedSeal([]string{"A", "A"}))
+		return verifyCommittedSeal(snap, sealed)
+	}
 
-// 	// Failed - Non validator signature
-// 	assert.Error(t, buildCommittedSeal([]string{"A", "X"}))
+	// Correct
+	assert.NoError(t, buildCommittedSeal([]string{"A", "B", "C", "D"}))
 
-// 	// Failed - Not enough signatures
-// 	assert.Error(t, buildCommittedSeal([]string{"A"}))
-// }
+	// Failed - Repeated signature
+	assert.Error(t, buildCommittedSeal([]string{"A", "A"}))
 
-// func TestSign_Messages(t *testing.T) {
-// 	pool := newTesterAccountPool()
-// 	pool.add("A")
+	// Failed - Non validator signature
+	assert.Error(t, buildCommittedSeal([]string{"A", "X"}))
 
-// 	msg := &proto.MessageReq{}
-// 	assert.NoError(t, signMsg(pool.get("A").priv, msg))
-// 	assert.NoError(t, validateMsg(msg))
+	// Failed - Not enough signatures
+	assert.Error(t, buildCommittedSeal([]string{"A"}))
+}
 
-// 	assert.Equal(t, msg.From, pool.get("A").Address().String())
-// }
+func TestSign_Messages(t *testing.T) {
+	pool := newTesterAccountPool()
+	pool.add("A")
+
+	msg := &proto.MessageReq{}
+	assert.NoError(t, signMsg(pool.get("A").priv, msg))
+	assert.NoError(t, validateMsg(msg))
+
+	assert.Equal(t, msg.From, pool.get("A").Address().String())
+}

@@ -24,7 +24,8 @@ var (
 // Signer is responsible for signing for blocks and messages in IBFT
 type Signer interface {
 	Address() types.Address
-	InitIbftExtra(header, parent *types.Header) error
+	InitIBFTExtra(header, parent *types.Header, set validators.ValidatorSet) error
+	GetIBFTExtra(*types.Header) (*IstanbulExtra, error)
 	WriteSeal(*types.Header) (*types.Header, error)
 	EcrecoverFromHeader(*types.Header) (types.Address, error)
 	CreateCommittedSeal(*types.Header) ([]byte, error)

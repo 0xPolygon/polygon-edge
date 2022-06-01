@@ -26,7 +26,7 @@ func NewBLSSigner(manager secrets.SecretsManager) (Signer, error) {
 		return nil, err
 	}
 
-	blsKey, err := ecdsaToBLS(ecdsaKey)
+	blsKey, err := crypto.ECDSAToBLS(ecdsaKey)
 	if err != nil {
 		return nil, err
 	}
@@ -42,23 +42,44 @@ func (s *BLSSigner) Address() types.Address {
 	return s.address
 }
 
-func (s *BLSSigner) InitIbftExtra(header, parent *types.Header) error {
-	validators, err := unpackValidatorsFromIbftExtra(parent)
-	if err != nil {
-		return err
-	}
-
+func (s *BLSSigner) InitIBFTExtra(header, parent *types.Header, set validators.ValidatorSet) error {
 	var parentCommittedSeal Sealer
 
 	if parent.Number >= 1 {
-		if parentCommittedSeal, err = unpackCommittedSealFromIbftExtra(parent); err != nil {
+		parentExtra, err := s.GetIBFTExtra(parent)
+		if err != nil {
 			return err
 		}
+
+		parentCommittedSeal = parentExtra.CommittedSeal
 	}
 
-	s.initIbftExtra(header, validators, parentCommittedSeal)
+	s.initIbftExtra(header, set, parentCommittedSeal)
 
 	return nil
+}
+
+func (s *BLSSigner) GetIBFTExtra(h *types.Header) (*IstanbulExtra, error) {
+	if len(h.ExtraData) < IstanbulExtraVanity {
+		return nil, fmt.Errorf(
+			"wrong extra size, expected greater than or equal to %d but actual %d",
+			IstanbulExtraVanity,
+			len(h.ExtraData),
+		)
+	}
+
+	data := h.ExtraData[IstanbulExtraVanity:]
+	extra := &IstanbulExtra{
+		Validators:          &validators.BLSValidatorSet{},
+		CommittedSeal:       &BLSSeal{},
+		ParentCommittedSeal: &BLSSeal{},
+	}
+
+	if err := extra.UnmarshalRLP(data); err != nil {
+		return nil, err
+	}
+
+	return extra, nil
 }
 
 func (s *BLSSigner) WriteSeal(header *types.Header) (*types.Header, error) {
@@ -72,7 +93,11 @@ func (s *BLSSigner) WriteSeal(header *types.Header) (*types.Header, error) {
 		return nil, err
 	}
 
-	if err := packSealIntoIbftExtra(header, seal); err != nil {
+	err = s.packFieldIntoIbftExtra(header, func(ie *IstanbulExtra) {
+		ie.Seal = seal
+	})
+
+	if err != nil {
 		return nil, err
 	}
 
@@ -80,7 +105,7 @@ func (s *BLSSigner) WriteSeal(header *types.Header) (*types.Header, error) {
 }
 
 func (s *BLSSigner) EcrecoverFromHeader(header *types.Header) (types.Address, error) {
-	seal, err := unpackSealFromIbftExtra(header)
+	extra, err := s.GetIBFTExtra(header)
 	if err != nil {
 		return types.Address{}, err
 	}
@@ -90,7 +115,7 @@ func (s *BLSSigner) EcrecoverFromHeader(header *types.Header) (types.Address, er
 		return types.Address{}, err
 	}
 
-	return ecrecoverImpl(seal, hash[:])
+	return ecrecoverImpl(extra.Seal, hash[:])
 }
 
 func (s *BLSSigner) CreateCommittedSeal(header *types.Header) ([]byte, error) {
@@ -109,12 +134,12 @@ func (s *BLSSigner) WriteCommittedSeals(header *types.Header, sealMap map[types.
 		return nil, ErrEmptyCommittedSeals
 	}
 
-	rawValidators, err := unpackValidatorsFromIbftExtra(header)
+	extra, err := s.GetIBFTExtra(header)
 	if err != nil {
 		return nil, err
 	}
 
-	validators, ok := rawValidators.(*validators.BLSValidatorSet)
+	validators, ok := extra.Validators.(*validators.BLSValidatorSet)
 	if !ok {
 		return nil, ErrInvalidValidatorSet
 	}
@@ -155,7 +180,11 @@ func (s *BLSSigner) WriteCommittedSeals(header *types.Header, sealMap map[types.
 		Signature: multiSignatureBytes,
 	}
 
-	if err := packCommittedSealIntoIbftExtra(header, &blsSeal); err != nil {
+	err = s.packFieldIntoIbftExtra(header, func(ie *IstanbulExtra) {
+		ie.CommittedSeal = &blsSeal
+	})
+
+	if err != nil {
 		return nil, err
 	}
 
@@ -163,12 +192,12 @@ func (s *BLSSigner) WriteCommittedSeals(header *types.Header, sealMap map[types.
 }
 
 func (s *BLSSigner) VerifyCommittedSeal(rawSet validators.ValidatorSet, header *types.Header) error {
-	rawCs, err := unpackCommittedSealFromIbftExtra(header)
+	extra, err := s.GetIBFTExtra(header)
 	if err != nil {
 		return err
 	}
 
-	cs, ok := rawCs.(*BLSSeal)
+	cs, ok := extra.CommittedSeal.(*BLSSeal)
 	if !ok {
 		return ErrInvalidCommittedSealType
 	}
@@ -194,12 +223,12 @@ func (s *BLSSigner) VerifyParentCommittedSeal(
 	rawParentSet validators.ValidatorSet,
 	parent, header *types.Header,
 ) error {
-	rawParentCs, err := unpackParentCommittedSealFromIbftExtra(header)
+	extra, err := s.GetIBFTExtra(header)
 	if err != nil {
 		return err
 	}
 
-	parentCs, ok := rawParentCs.(*BLSSeal)
+	parentCs, ok := extra.ParentCommittedSeal.(*BLSSeal)
 	if !ok {
 		return ErrInvalidCommittedSealType
 	}
@@ -238,6 +267,19 @@ func (s *BLSSigner) initIbftExtra(header *types.Header, vals validators.Validato
 	})
 }
 
+func (s *BLSSigner) packFieldIntoIbftExtra(h *types.Header, updateFn func(*IstanbulExtra)) error {
+	extra, err := s.GetIBFTExtra(h)
+	if err != nil {
+		return err
+	}
+
+	updateFn(extra)
+
+	putIbftExtra(h, extra)
+
+	return nil
+}
+
 func (s *BLSSigner) CalculateHeaderHash(header *types.Header) (types.Hash, error) {
 	filteredHeader, err := s.filterHeaderForHash(header)
 	if err != nil {
@@ -253,7 +295,7 @@ func (s *BLSSigner) filterHeaderForHash(header *types.Header) (*types.Header, er
 	// because extra.Validators, extra.ParentCommittedSeal is what we got from `h` in the first place.
 	clone := header.Copy()
 
-	extra, err := GetIbftExtra(clone)
+	extra, err := s.GetIBFTExtra(clone)
 	if err != nil {
 		return nil, err
 	}
