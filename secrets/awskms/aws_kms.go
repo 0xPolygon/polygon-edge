@@ -214,11 +214,16 @@ func (k *KmsSecretManager) SignBySecret(key string, data []byte) ([]byte, error)
 	}
 	//fmt.Println("reqData: ", string(bs))
 
+	beginTime := time.Now().UnixNano()
 	resp, err := k.client.Post(k.serverURL, "application/json", bytes.NewBuffer(bs))
 	if err != nil {
 		fmt.Println("http post errr", err)
 		return nil, err
 	}
+	endTime := time.Now().UnixNano()
+	k.logger.Info(
+		"kms sign cost time: ", (endTime-beginTime)/1e6,
+	)
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
