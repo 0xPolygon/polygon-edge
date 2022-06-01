@@ -82,11 +82,16 @@ func InitValidatorKey(secretsManager secrets.SecretsManager, keyType crypto.KeyT
 
 		x := crypto.PubKeyToAddress(&validatorKey.PublicKey)
 
-		address = ([]byte)(x[:])
+		address = x[:]
 		privateKeyBytes = validatorKeyEncoded
 	} else if keyType == crypto.KeyBLS {
 		r := make([]byte, 32)
-		rand.Read(r)
+
+		_, err := rand.Read(r)
+		if err != nil {
+			return nil, err
+		}
+
 		bls := bls_sig.NewSigPop()
 
 		pk, sk, err := bls.KeygenWithSeed(r)

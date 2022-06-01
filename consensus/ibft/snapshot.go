@@ -11,7 +11,8 @@ import (
 	"sync/atomic"
 
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
-	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
+	"github.com/0xPolygon/polygon-edge/consensus/ibft/validators"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 )
@@ -100,24 +101,9 @@ func (i *Ibft) setupSnapshot() error {
 func (i *Ibft) addHeaderSnap(header *types.Header) error {
 	// Genesis header needs to be set by hand, all the other
 	// snapshots are set as part of processHeaders
-	extra, err := getIbftExtra(header)
+	extra, err := signer.GetIbftExtra(header)
 	if err != nil {
 		return err
-	}
-
-	toAddresses := func(v [][]byte) ValidatorSet {
-		vs := make([]types.Address, len(v))
-
-		for idx, a := range v {
-			if i.BLS {
-				buf := crypto.Keccak256(a)[12:]
-				vs[idx] = types.BytesToAddress(buf)
-			} else {
-				vs[idx] = types.BytesToAddress(a)
-			}
-		}
-
-		return vs
 	}
 
 	// Create the first snapshot from the genesis
@@ -125,7 +111,7 @@ func (i *Ibft) addHeaderSnap(header *types.Header) error {
 		Hash:   header.Hash.String(),
 		Number: header.Number,
 		Votes:  []*Vote{},
-		Set:    toAddresses(extra.Validators),
+		Set:    extra.Validators,
 	}
 
 	i.store.add(snap)
@@ -176,15 +162,15 @@ func (i *Ibft) processHeaders(headers []*types.Header) error {
 	}
 
 	for _, h := range headers {
-		proposer, err := ecrecoverFromHeader(h)
+		proposer, err := i.signer.EcrecoverFromHeader(h)
 		if err != nil {
 			return err
 		}
 
 		// Check if the recovered proposer is part of the validator set
-		// if !snap.Set.Includes(proposer) {
-		// 	return fmt.Errorf("unauthorized proposer")
-		// }
+		if !snap.Set.Includes(proposer) {
+			return fmt.Errorf("unauthorized proposer")
+		}
 
 		if hookErr := i.runHook(
 			ProcessHeadersHook,
@@ -270,7 +256,7 @@ type Snapshot struct {
 	Votes []*Vote
 
 	// current set of validators
-	Set ValidatorSet
+	Set validators.ValidatorSet
 }
 
 // snapshotMetadata defines the metadata for the snapshot
@@ -293,7 +279,7 @@ func (s *Snapshot) Equal(ss *Snapshot) bool {
 		}
 	}
 
-	return s.Set.Equal(&ss.Set)
+	return s.Set.Equal(ss.Set)
 }
 
 // Count returns the vote tally.
@@ -323,14 +309,12 @@ func (s *Snapshot) Copy() *Snapshot {
 	// Do not need to copy Number and Hash
 	ss := &Snapshot{
 		Votes: make([]*Vote, len(s.Votes)),
-		Set:   ValidatorSet{},
+		Set:   s.Set.Copy(),
 	}
 
 	for indx, vote := range s.Votes {
 		ss.Votes[indx] = vote.Copy()
 	}
-
-	ss.Set = append(ss.Set, s.Set...)
 
 	return ss
 }
@@ -338,26 +322,27 @@ func (s *Snapshot) Copy() *Snapshot {
 // ToProto converts the snapshot to a Proto snapshot
 func (s *Snapshot) ToProto() *proto.Snapshot {
 	resp := &proto.Snapshot{
-		Validators: []*proto.Snapshot_Validator{},
-		Votes:      []*proto.Snapshot_Vote{},
+		Validators: make([]*proto.Snapshot_Validator, s.Set.Len()),
+		Votes:      make([]*proto.Snapshot_Vote, len(s.Votes)),
 		Number:     s.Number,
 		Hash:       s.Hash,
 	}
 
 	// add votes
-	for _, vote := range s.Votes {
-		resp.Votes = append(resp.Votes, &proto.Snapshot_Vote{
+	for index, vote := range s.Votes {
+		resp.Votes[index] = &proto.Snapshot_Vote{
 			Validator: vote.Validator.String(),
 			Proposed:  vote.Address.String(),
 			Auth:      vote.Authorize,
-		})
+		}
 	}
 
 	// add addresses
-	for _, val := range s.Set {
-		resp.Validators = append(resp.Validators, &proto.Snapshot_Validator{
-			Address: val.String(),
-		})
+	setSize := s.Set.Len()
+	for index := 0; index < setSize; index++ {
+		resp.Validators[index] = &proto.Snapshot_Validator{
+			Address: s.Set.GetAddress(index).String(),
+		}
 	}
 
 	return resp

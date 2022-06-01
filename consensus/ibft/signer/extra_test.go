@@ -1,24 +1,23 @@
-package ibft
-
-import (
-	"crypto/ecdsa"
-	"testing"
-
-	"github.com/0xPolygon/polygon-edge/helper/tests"
-	"github.com/0xPolygon/polygon-edge/types"
-)
+package signer
 
 // useIstanbulHeaderHash is a helper function so that test use istanbulHeaderHash during the test
-func useIstanbulHeaderHash(t *testing.T) {
-	t.Helper()
+// func useIstanbulHeaderHash(t *testing.T, signer Signer) {
+// 	t.Helper()
 
-	originalHashCalc := types.HeaderHash
-	types.HeaderHash = istanbulHeaderHash
+// 	originalHashCalc := types.HeaderHash
+// 	types.HeaderHash = func(h *types.Header) types.Hash {
+// 		hash, err := signer.CalculateHeaderHash(h)
+// 		if err != nil {
+// 			return types.ZeroHash
+// 		}
 
-	t.Cleanup(func() {
-		types.HeaderHash = originalHashCalc
-	})
-}
+// 		return hash
+// 	}
+
+// 	t.Cleanup(func() {
+// 		types.HeaderHash = originalHashCalc
+// 	})
+// }
 
 // func TestExtraEncoding(t *testing.T) {
 // 	seal1 := types.StringToHash("1").Bytes()
@@ -57,20 +56,20 @@ func useIstanbulHeaderHash(t *testing.T) {
 // 	}
 // }
 
-func generateKeysAndAddresses(t *testing.T, num int) ([]*ecdsa.PrivateKey, []types.Address) {
-	t.Helper()
+// func generateKeysAndAddresses(t *testing.T, num int) ([]*ecdsa.PrivateKey, []types.Address) {
+// 	t.Helper()
 
-	keys := make([]*ecdsa.PrivateKey, num)
-	addrs := make([]types.Address, num)
+// 	keys := make([]*ecdsa.PrivateKey, num)
+// 	addrs := make([]types.Address, num)
 
-	for i := range keys {
-		pk, addr := tests.GenerateKeyAndAddr(t)
-		keys[i] = pk
-		addrs[i] = addr
-	}
+// 	for i := range keys {
+// 		pk, addr := tests.GenerateKeyAndAddr(t)
+// 		keys[i] = pk
+// 		addrs[i] = addr
+// 	}
 
-	return keys, addrs
-}
+// 	return keys, addrs
+// }
 
 // func createIBFTHeader(
 // 	t *testing.T,

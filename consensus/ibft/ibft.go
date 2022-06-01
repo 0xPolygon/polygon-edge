@@ -1,28 +1,22 @@
 package ibft
 
 import (
-	"bytes"
-	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math/big"
 	"reflect"
-	"strings"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
-	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/protocol"
-	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/coinbase/kryptology/pkg/signatures/bls/bls_sig"
 	"github.com/hashicorp/go-hclog"
 	"google.golang.org/grpc"
 	anypb "google.golang.org/protobuf/types/known/anypb"
@@ -36,6 +30,7 @@ var (
 	ErrInvalidHookParam     = errors.New("invalid IBFT hook param passed in")
 	ErrInvalidMechanismType = errors.New("invalid consensus mechanism type in params")
 	ErrMissingMechanismType = errors.New("missing consensus mechanism type in params")
+	ErrSignerNotFound       = errors.New("not found signer in validator set")
 )
 
 type blockchainInterface interface {
@@ -77,10 +72,6 @@ type Ibft struct {
 	executor   *state.Executor     // Reference to the state executor
 	closeCh    chan struct{}       // Channel for closing
 
-	validatorKey     *ecdsa.PrivateKey // Private key for the validator
-	blsValidatorKey  *bls_sig.SecretKey
-	validatorKeyAddr types.Address
-
 	txpool txPoolInterface // Reference to the transaction pool
 
 	store     *snapshotStore // Snapshot store that keeps track of all snapshots
@@ -101,13 +92,11 @@ type Ibft struct {
 
 	metrics *consensus.Metrics
 
-	secretsManager secrets.SecretsManager
-
 	mechanisms []ConsensusMechanism // IBFT ConsensusMechanism used (PoA / PoS)
 
 	blockTime time.Duration // Minimum block generation time in seconds
 
-	BLS bool
+	signer signer.Signer
 }
 
 // runHook runs a specified hook if it is present in the hook map
@@ -154,22 +143,36 @@ func Factory(
 		epochSize = uint64(readSize)
 	}
 
+	var (
+		s   signer.Signer
+		err error
+	)
+
+	if params.BLS {
+		if s, err = signer.NewBLSSigner(params.SecretsManager); err != nil {
+			return nil, err
+		}
+	} else {
+		if s, err = signer.NewECDSASigner(params.SecretsManager); err != nil {
+			return nil, err
+		}
+	}
+
 	p := &Ibft{
-		logger:         params.Logger.Named("ibft"),
-		config:         params.Config,
-		Grpc:           params.Grpc,
-		blockchain:     params.Blockchain,
-		executor:       params.Executor,
-		closeCh:        make(chan struct{}),
-		txpool:         params.Txpool,
-		state:          &currentState{},
-		network:        params.Network,
-		epochSize:      epochSize,
-		sealing:        params.Seal,
-		metrics:        params.Metrics,
-		secretsManager: params.SecretsManager,
-		blockTime:      time.Duration(params.BlockTime) * time.Second,
-		BLS:            params.BLS,
+		logger:     params.Logger.Named("ibft"),
+		config:     params.Config,
+		Grpc:       params.Grpc,
+		blockchain: params.Blockchain,
+		executor:   params.Executor,
+		closeCh:    make(chan struct{}),
+		txpool:     params.Txpool,
+		state:      &currentState{},
+		network:    params.Network,
+		epochSize:  epochSize,
+		sealing:    params.Seal,
+		metrics:    params.Metrics,
+		blockTime:  time.Duration(params.BlockTime) * time.Second,
+		signer:     s,
 	}
 
 	// Initialize the mechanism
@@ -178,7 +181,14 @@ func Factory(
 	}
 
 	// Istanbul requires a different header hash function
-	types.HeaderHash = istanbulHeaderHash
+	types.HeaderHash = func(h *types.Header) types.Hash {
+		hash, err := s.CalculateHeaderHash(h)
+		if err != nil {
+			return types.ZeroHash
+		}
+
+		return hash
+	}
 
 	p.syncer = protocol.NewSyncer(params.Logger, params.Network, params.Blockchain)
 
@@ -203,12 +213,11 @@ func (i *Ibft) Start() error {
 		proto.RegisterIbftOperatorServer(i.Grpc, i.operator)
 	}
 
-	// Set up the node's validator key
-	if err := i.createKey(); err != nil {
-		return err
-	}
+	i.msgQueue = newMsgQueue()
+	i.closeCh = make(chan struct{})
+	i.updateCh = make(chan struct{})
 
-	i.logger.Info("validator key", "addr", i.validatorKeyAddr.String())
+	i.logger.Info("validator key", "addr", i.signer.Address())
 
 	// start the transport protocol
 	if err := i.setupTransport(); err != nil {
@@ -330,33 +339,15 @@ func (i *Ibft) setupTransport() error {
 		}
 
 		// decode sender
-		if err := validateMsg(msg); err != nil {
+		if err := signer.ValidateMsg(msg); err != nil {
 			i.logger.Error("failed to validate msg", "err", err)
 
 			return
 		}
 
-		// if msg.From == i.validatorKeyAddr.String() {
-		// 	// we are the sender, skip this message since we already
-		// 	// relay our own messages internally.
-		// 	return
-		// }
-
-		pubKey, err := i.blsValidatorKey.GetPublicKey()
-		if err != nil {
-			i.logger.Error("failed to get pub key", "err", err)
-
-			return
-		}
-
-		pubkeyBytes, err := pubKey.MarshalBinary()
-		if err != nil {
-			i.logger.Error("failed to marshal pub key", "err", err)
-
-			return
-		}
-
-		if msg.From == hex.EncodeToHex(pubkeyBytes) {
+		if msg.From == i.signer.Address().String() {
+			// we are the sender, skip this message since we already
+			// relay our own messages internally.
 			return
 		}
 
@@ -368,79 +359,6 @@ func (i *Ibft) setupTransport() error {
 	}
 
 	i.transport = &gossipTransport{topic: topic}
-
-	return nil
-}
-
-// createKey sets the validator's private key from the secrets manager
-func (i *Ibft) createKey() error {
-	i.msgQueue = newMsgQueue()
-	i.closeCh = make(chan struct{})
-	i.updateCh = make(chan struct{})
-
-	if i.validatorKey == nil || i.blsValidatorKey == nil {
-		// Check if the validator key is initialized
-		var (
-			key    *ecdsa.PrivateKey
-			blsKey *bls_sig.SecretKey
-		)
-
-		if i.secretsManager.HasSecret(secrets.ValidatorKey) {
-			if i.BLS {
-				keyBytes, err := i.secretsManager.GetSecret(secrets.ValidatorKey)
-				if err != nil {
-					return err
-				}
-
-				blsKey = &bls_sig.SecretKey{}
-
-				if err := blsKey.UnmarshalBinary(keyBytes); err != nil {
-					return err
-				}
-
-				pk, err := blsKey.GetPublicKey()
-				if err != nil {
-					return err
-				}
-
-				pkBytes, err := pk.MarshalBinary()
-				if err != nil {
-					return err
-				}
-
-				buf := crypto.Keccak256(pkBytes)[12:]
-				i.validatorKeyAddr = types.BytesToAddress(buf)
-			} else {
-				// The validator key is present in the secrets manager, load it
-				validatorKey, readErr := crypto.ReadConsensusKey(i.secretsManager)
-				if readErr != nil {
-					return fmt.Errorf("unable to read validator key from Secrets Manager, %w", readErr)
-				}
-
-				key = validatorKey
-				i.validatorKeyAddr = crypto.PubKeyToAddress(&key.PublicKey)
-			}
-
-		} else {
-			// The validator key is not present in the secrets manager, generate it
-			validatorKey, validatorKeyEncoded, genErr := crypto.GenerateAndEncodePrivateKey()
-			if genErr != nil {
-				return fmt.Errorf("unable to generate validator key for Secrets Manager, %w", genErr)
-			}
-
-			// Save the key to the secrets manager
-			saveErr := i.secretsManager.SetSecret(secrets.ValidatorKey, validatorKeyEncoded)
-			if saveErr != nil {
-				return fmt.Errorf("unable to save validator key to Secrets Manager, %w", saveErr)
-			}
-
-			key = validatorKey
-			i.validatorKeyAddr = crypto.PubKeyToAddress(&key.PublicKey)
-		}
-
-		i.validatorKey = key
-		i.blsValidatorKey = blsKey
-	}
 
 	return nil
 }
@@ -506,7 +424,7 @@ func (i *Ibft) isValidSnapshot() bool {
 		return false
 	}
 
-	if snap.Set.Includes(i.validatorKeyAddr) {
+	if snap.Set.Includes(i.signer.Address()) {
 		i.state.view = &proto.View{
 			Sequence: header.Number + 1,
 			Round:    0,
@@ -616,7 +534,7 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 		Number:     parent.Number + 1,
 		Miner:      types.Address{},
 		Nonce:      types.Nonce{},
-		MixHash:    IstanbulDigest,
+		MixHash:    signer.IstanbulDigest,
 		// this is required because blockchain needs difficulty to organize blocks and forks
 		Difficulty: parent.Number + 1,
 		StateRoot:  types.EmptyRootHash, // this avoids needing state for now
@@ -652,26 +570,15 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 
 	header.Timestamp = uint64(headerTime.Unix())
 
-	// we need to include in the extra field the current set of validators
-	var parentCommittedSeal Sealer
-
-	if parent.Number >= 1 {
-		if parentCommittedSeal, err = unpackCommittedSealFromIbftExtra(parent); err != nil {
-			return nil, err
-		}
+	if err := i.signer.InitIbftExtra(header, parent); err != nil {
+		return nil, err
 	}
 
-	validators, err := unpackValidatorsFromIbftExtra(parent)
+	transition, err := i.executor.BeginTxn(parent.StateRoot, header, i.signer.Address())
 	if err != nil {
 		return nil, err
 	}
 
-	initIbftExtra(header, validators, parentCommittedSeal, i.BLS)
-
-	transition, err := i.executor.BeginTxn(parent.StateRoot, header, i.validatorKeyAddr)
-	if err != nil {
-		return nil, err
-	}
 	// If the mechanism is PoS -> build a regular block if it's not an end-of-epoch block
 	// If the mechanism is PoA -> always build a regular block, regardless of epoch
 	txns := []*types.Transaction{}
@@ -695,16 +602,9 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 	})
 
 	// write the seal of the block after all the fields are completed
-	if i.BLS {
-		header, err = writeSealByBLS(i.blsValidatorKey, block.Header)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		header, err = writeSeal(i.validatorKey, block.Header, i.BLS, i.blsValidatorKey)
-		if err != nil {
-			return nil, err
-		}
+	header, err = i.signer.WriteSeal(header)
+	if err != nil {
+		return nil, err
 	}
 
 	block.Header = header
@@ -816,7 +716,7 @@ func (i *Ibft) runAcceptState() { // start new round
 		return
 	}
 
-	if !snap.Set.Includes(i.validatorKeyAddr) {
+	if !snap.Set.Includes(i.signer.Address()) {
 		// we are not a validator anymore, move back to sync state
 		i.logger.Info("we are not a validator anymore")
 		i.setState(SyncState)
@@ -830,23 +730,23 @@ func (i *Ibft) runAcceptState() { // start new round
 
 	i.state.validators = snap.Set
 
-	//Update the No.of validator metric
-	i.metrics.Validators.Set(float64(len(snap.Set)))
+	// Update the No.of validator metric
+	i.metrics.Validators.Set(float64(snap.Set.Len()))
+
 	// reset round messages
 	i.state.resetRoundMsgs()
 
 	// select the proposer of the block
 	var lastProposer types.Address
 	if parent.Number != 0 {
-		// lastProposer, _ = ecrecoverFromHeader(parent)
-		lastProposer = i.state.validators[0]
+		lastProposer, _ = i.signer.EcrecoverFromHeader(parent)
 	}
 
 	if hookErr := i.runHook(CalculateProposerHook, i.state.view.Sequence, lastProposer); hookErr != nil {
 		i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", CalculateProposerHook, hookErr))
 	}
 
-	if i.state.proposer == i.validatorKeyAddr {
+	if i.state.proposer == i.signer.Address() {
 		logger.Info("we are the proposer", "block", number)
 
 		if !i.state.locked {
@@ -1049,41 +949,18 @@ func (i *Ibft) updateMetrics(block *types.Block) {
 }
 
 func (i *Ibft) insertBlock(block *types.Block) error {
-	validators, err := unpackValidatorsFromIbftExtra(block.Header)
-	if err != nil {
-		return err
-	}
+	committedSeals := make(map[types.Address][]byte)
 
-	committedSeals := [][]byte{}
-	bitMap := new(big.Int)
 	for addr, commit := range i.state.committed {
-		// no need to check the format of seal here because writeCommittedSeals will check
-		committedSeals = append(committedSeals, hex.MustDecodeHex(commit.Seal))
-
-		// idx := i.state.validators.Index(addr)
-		// if idx == -1 {
-		// 	return fmt.Errorf("validator not found")
-		// }
-
-		jdx := -1
-		for k, v := range validators {
-			from, err := hex.DecodeHex(strings.TrimPrefix(addr, "0x"))
-			if err != nil {
-				return err
-			}
-
-			if bytes.Equal(from, v) {
-				jdx = k
-				break
-			}
+		committedSeal, err := hex.DecodeHex(commit.Seal)
+		if err != nil {
+			return fmt.Errorf("failed to decode committed seal from %s: %w", addr, err)
 		}
 
-		if jdx != -1 {
-			bitMap = bitMap.SetBit(bitMap, jdx, 1)
-		}
+		committedSeals[addr] = committedSeal
 	}
 
-	header, err := writeCommittedSeals(block.Header, committedSeals, i.BLS, bitMap)
+	header, err := i.signer.WriteCommittedSeals(block.Header, committedSeals)
 	if err != nil {
 		return err
 	}
@@ -1104,7 +981,7 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 		"block committed",
 		"sequence", i.state.view.Sequence,
 		"hash", block.Hash(),
-		"validators", len(i.state.validators),
+		"validators", i.state.validators.Len(),
 		"rounds", i.state.view.Round+1,
 		"committed", i.state.numCommitted(),
 	)
@@ -1246,24 +1123,6 @@ func (i *Ibft) gossip(typ proto.MessageReq_Type) {
 		Type: typ,
 	}
 
-	if i.BLS {
-		pubKey, err := i.blsValidatorKey.GetPublicKey()
-		if err != nil {
-			i.logger.Error("failed to get pub key", "err", err)
-
-			return
-		}
-
-		pubKeyBytes, err := pubKey.MarshalBinary()
-		if err != nil {
-			i.logger.Error("failed to marshal pubkey", "err", err)
-
-			return
-		}
-
-		msg.From = hex.EncodeToHex(pubKeyBytes)
-	}
-
 	// add View
 	msg.View = i.state.view.Copy()
 
@@ -1276,35 +1135,27 @@ func (i *Ibft) gossip(typ proto.MessageReq_Type) {
 
 	// if the message is commit, we need to add the committed seal
 	if msg.Type == proto.MessageReq_Commit {
-		seal, err := createCommittedSeal(i.validatorKey, i.state.block.Header, i.BLS, i.blsValidatorKey)
+		committedSeal, err := i.signer.CreateCommittedSeal(i.state.block.Header)
 		if err != nil {
 			i.logger.Error("failed to commit seal", "err", err)
 
 			return
 		}
 
-		msg.Seal = hex.EncodeToHex(seal)
+		msg.Seal = hex.EncodeToHex(committedSeal)
 	}
 
 	if msg.Type != proto.MessageReq_Preprepare {
 		// send a copy to ourselves so that we can process this message as well
 		msg2 := msg.Copy()
-		// msg2.From = i.validatorKeyAddr.String()
+		msg2.From = i.signer.Address().String()
 		i.pushMessage(msg2)
 	}
 
-	if i.BLS {
-		if err := signMsgByBLS(i.blsValidatorKey, msg); err != nil {
-			i.logger.Error("failed to sign message", "err", err)
+	if err := i.signer.SignGossipMessage(msg); err != nil {
+		i.logger.Error("failed to sign message", "err", err)
 
-			return
-		}
-	} else {
-		if err := signMsg(i.validatorKey, msg); err != nil {
-			i.logger.Error("failed to sign message", "err", err)
-
-			return
-		}
+		return
 	}
 
 	if err := i.transport.Gossip(msg); err != nil {
@@ -1329,9 +1180,9 @@ func (i *Ibft) setState(s IbftState) {
 }
 
 // forceTimeout sets the forceTimeoutCh flag to true
-func (i *Ibft) forceTimeout() {
-	i.forceTimeoutCh = true
-}
+// func (i *Ibft) forceTimeout() {
+// 	i.forceTimeoutCh = true
+// }
 
 // isSealing checks if the current node is sealing blocks
 func (i *Ibft) isSealing() bool {
@@ -1341,7 +1192,7 @@ func (i *Ibft) isSealing() bool {
 // verifyHeaderImpl implements the actual header verification logic
 func (i *Ibft) verifyHeaderImpl(snap *Snapshot, parent, header *types.Header) error {
 	// ensure the extra data is correctly formatted
-	if _, err := getIbftExtra(header); err != nil {
+	if _, err := signer.GetIbftExtra(header); err != nil {
 		return err
 	}
 
@@ -1349,7 +1200,7 @@ func (i *Ibft) verifyHeaderImpl(snap *Snapshot, parent, header *types.Header) er
 		return hookErr
 	}
 
-	if header.MixHash != IstanbulDigest {
+	if header.MixHash != signer.IstanbulDigest {
 		return fmt.Errorf("invalid mixhash")
 	}
 
@@ -1363,9 +1214,9 @@ func (i *Ibft) verifyHeaderImpl(snap *Snapshot, parent, header *types.Header) er
 	}
 
 	// verify the sealer
-	// if err := verifySigner(snap, header); err != nil {
-	// 	return err
-	// }
+	if err := i.verifySigner(snap, header); err != nil {
+		return err
+	}
 
 	// verify last committed seals
 	if parent.Number >= 1 {
@@ -1375,7 +1226,7 @@ func (i *Ibft) verifyHeaderImpl(snap *Snapshot, parent, header *types.Header) er
 			return err
 		}
 
-		if err := verifyParentCommittedSeal(parentSnap, parent, header, i.BLS); err != nil {
+		if err := i.signer.VerifyParentCommittedSeal(parentSnap.Set, parent, header); err != nil {
 			return fmt.Errorf("failed to verify ParentCommittedSeal: %w", err)
 		}
 	}
@@ -1396,7 +1247,7 @@ func (i *Ibft) VerifyHeader(parent, header *types.Header) error {
 	}
 
 	// verify the committed seals
-	if err := verifyCommittedSeal(snap, header, true); err != nil {
+	if err := i.signer.VerifyCommittedSeal(snap.Set, header); err != nil {
 		return err
 	}
 
@@ -1410,8 +1261,7 @@ func (i *Ibft) ProcessHeaders(headers []*types.Header) error {
 
 // GetBlockCreator retrieves the block signer from the extra data field
 func (i *Ibft) GetBlockCreator(header *types.Header) (types.Address, error) {
-	// return ecrecoverFromHeader(header)
-	return i.state.validators[0], nil
+	return i.signer.EcrecoverFromHeader(header)
 }
 
 // PreStateCommit a hook to be called before finalizing state transition on inserting block
@@ -1499,4 +1349,17 @@ func (i *Ibft) pushMessage(msg *proto.MessageReq) {
 	case i.updateCh <- struct{}{}:
 	default:
 	}
+}
+
+func (i *Ibft) verifySigner(snap *Snapshot, header *types.Header) error {
+	signer, err := i.signer.EcrecoverFromHeader(header)
+	if err != nil {
+		return err
+	}
+
+	if !snap.Set.Includes(signer) {
+		return ErrSignerNotFound
+	}
+
+	return nil
 }

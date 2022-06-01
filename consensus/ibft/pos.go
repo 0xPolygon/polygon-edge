@@ -3,6 +3,8 @@ package ibft
 import (
 	"errors"
 	"fmt"
+
+	"github.com/0xPolygon/polygon-edge/consensus/ibft/validators"
 	"github.com/0xPolygon/polygon-edge/contracts/staking"
 	stakingHelper "github.com/0xPolygon/polygon-edge/helper/staking"
 	"github.com/0xPolygon/polygon-edge/state"
@@ -114,7 +116,7 @@ func (pos *PoSMechanism) acceptStateLogHook(snapParam interface{}) error {
 	pos.ibft.logger.Info(
 		"current snapshot",
 		"validators",
-		len(snap.Set),
+		snap.Set.Len(),
 	)
 
 	return nil
@@ -204,13 +206,21 @@ func (pos *PoSMechanism) ShouldWriteTransactions(blockNumber uint64) bool {
 
 // getNextValidators is a helper function for fetching the validator set
 // from the Staking SC
-func (pos *PoSMechanism) getNextValidators(header *types.Header) (ValidatorSet, error) {
+func (pos *PoSMechanism) getNextValidators(header *types.Header) (validators.ValidatorSet, error) {
 	transition, err := pos.ibft.executor.BeginTxn(header.StateRoot, header, types.ZeroAddress)
 	if err != nil {
 		return nil, err
 	}
 
-	return staking.QueryValidators(transition, pos.ibft.validatorKeyAddr)
+	valAddrs, err := staking.QueryValidators(transition, pos.ibft.signer.Address())
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: PoS contract doesn't hold BLS PubKeys
+	valSet := validators.ECDSAValidatorSet(valAddrs)
+
+	return &valSet, nil
 }
 
 // updateSnapshotValidators updates validators in snapshot at given height
@@ -234,7 +244,7 @@ func (pos *PoSMechanism) updateValidators(num uint64) error {
 		return fmt.Errorf("cannot find snapshot at %d", header.Number)
 	}
 
-	if !snap.Set.Equal(&validators) {
+	if !snap.Set.Equal(validators) {
 		newSnap := snap.Copy()
 		newSnap.Set = validators
 		newSnap.Number = header.Number

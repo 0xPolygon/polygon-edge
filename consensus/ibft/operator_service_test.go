@@ -4,7 +4,8 @@ import (
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
-	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
+	"github.com/0xPolygon/polygon-edge/consensus/ibft/validators"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -14,7 +15,7 @@ func TestOperator_GetNextCandidate(t *testing.T) {
 	pool.add("A", "B", "C")
 
 	ibft := &Ibft{
-		validatorKeyAddr: pool.get("A").Address(),
+		signer: signer.NewMockECDSASigner(pool.get("A").Address()),
 	}
 
 	snap := &Snapshot{
@@ -45,7 +46,7 @@ func TestOperator_GetNextCandidate(t *testing.T) {
 	// there are no votes so it can vote
 	assert.NotNil(t, o.getNextCandidate(snap))
 
-	snap.Set = []types.Address{}
+	snap.Set = &validators.ECDSAValidatorSet{}
 
 	// it was a removal and since the candidate is not on the set anymore
 	// is removed from the candidates list

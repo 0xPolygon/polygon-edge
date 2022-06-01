@@ -7,24 +7,22 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/blockchain"
-	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/consensus/ibft/validators"
 	"github.com/0xPolygon/polygon-edge/crypto"
-	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
 )
 
 // initIbftMechanism initializes the IBFT mechanism for unit tests
-func initIbftMechanism(mechanismType MechanismType, ibft *Ibft) {
-	mechanismFactory := mechanismBackends[mechanismType]
-	mechanism, _ := mechanismFactory(ibft, &IBFTFork{
-		Type: mechanismType,
-		From: common.JSONNumber{Value: 0},
-	})
-	ibft.mechanisms = []ConsensusMechanism{mechanism}
-}
+// func initIbftMechanism(mechanismType MechanismType, ibft *Ibft) {
+// 	mechanismFactory := mechanismBackends[mechanismType]
+// 	mechanism, _ := mechanismFactory(ibft, &IBFTFork{
+// 		Type: mechanismType,
+// 		From: common.JSONNumber{Value: 0},
+// 	})
+// 	ibft.mechanisms = []ConsensusMechanism{mechanism}
+// }
 
 func getTempDir(t *testing.T) string {
 	t.Helper()
@@ -49,11 +47,13 @@ func (t *testerAccount) Address() types.Address {
 	return crypto.PubKeyToAddress(&t.priv.PublicKey)
 }
 
-func (t *testerAccount) sign(h *types.Header) *types.Header {
-	h, _ = writeSeal(t.priv, h)
+// func (t *testerAccount) sign(h *types.Header) *types.Header {
+// 	signer := signer.NewECDSASignerFromKey(t.priv)
 
-	return h
-}
+// 	h, _ = signer.WriteSeal(h)
+
+// 	return h
+// }
 
 type testerAccountPool struct {
 	accounts []*testerAccount
@@ -98,7 +98,7 @@ func (ap *testerAccountPool) add(accounts ...string) {
 
 // func (ap *testerAccountPool) genesis() *chain.Genesis {
 // 	genesis := &types.Header{
-// 		MixHash: IstanbulDigest,
+// 		MixHash: signer.IstanbulDigest,
 // 	}
 
 // 	initIbftExtra(genesis, ap.ValidatorSet(), nil, false)
@@ -122,120 +122,120 @@ func (ap *testerAccountPool) get(name string) *testerAccount {
 	return nil
 }
 
-func (ap *testerAccountPool) ValidatorSet() ValidatorSet {
-	v := ValidatorSet{}
+func (ap *testerAccountPool) ValidatorSet() validators.ValidatorSet {
+	v := validators.ECDSAValidatorSet{}
 	for _, i := range ap.accounts {
 		v = append(v, i.Address())
 	}
 
-	return v
+	return &v
 }
 
-type mockVote struct {
-	validator string
-	candidate string
-	auth      bool
-}
+// type mockVote struct {
+// 	validator string
+// 	candidate string
+// 	auth      bool
+// }
 
-func skipVote(validator string) mockVote {
-	return mockVote{validator: validator}
-}
+// func skipVote(validator string) mockVote {
+// 	return mockVote{validator: validator}
+// }
 
-func vote(validator, candidate string, auth bool) mockVote {
-	return mockVote{
-		validator: validator,
-		candidate: candidate,
-		auth:      auth,
-	}
-}
+// func vote(validator, candidate string, auth bool) mockVote {
+// 	return mockVote{
+// 		validator: validator,
+// 		candidate: candidate,
+// 		auth:      auth,
+// 	}
+// }
 
-type mockSnapshot struct {
-	validators []string
-	votes      []mockVote
-}
+// type mockSnapshot struct {
+// 	validators []string
+// 	votes      []mockVote
+// }
 
-type mockHeader struct {
-	action   mockVote
-	snapshot *mockSnapshot
-}
+// type mockHeader struct {
+// 	action   mockVote
+// 	snapshot *mockSnapshot
+// }
 
-func newMockHeader(validators []string, vote mockVote) mockHeader {
-	return mockHeader{
-		action: vote,
-		snapshot: &mockSnapshot{
-			validators: validators,
-			votes:      []mockVote{},
-		},
-	}
-}
+// // func newMockHeader(validators []string, vote mockVote) mockHeader {
+// // 	return mockHeader{
+// // 		action: vote,
+// // 		snapshot: &mockSnapshot{
+// // 			validators: validators,
+// // 			votes:      []mockVote{},
+// // 		},
+// // 	}
+// // }
 
-func buildHeaders(pool *testerAccountPool, genesis *chain.Genesis, mockHeaders []mockHeader) []*types.Header {
-	headers := make([]*types.Header, 0, len(mockHeaders))
-	parentHash := genesis.Hash()
+// func buildHeaders(pool *testerAccountPool, genesis *chain.Genesis, mockHeaders []mockHeader) []*types.Header {
+// 	headers := make([]*types.Header, 0, len(mockHeaders))
+// 	parentHash := genesis.Hash()
 
-	for num, header := range mockHeaders {
-		v := header.action
-		pool.add(v.validator)
+// 	for num, header := range mockHeaders {
+// 		v := header.action
+// 		pool.add(v.validator)
 
-		h := &types.Header{
-			Number:     uint64(num + 1),
-			ParentHash: parentHash,
-			Miner:      types.ZeroAddress,
-			MixHash:    IstanbulDigest,
-			ExtraData:  genesis.ExtraData,
-		}
+// 		h := &types.Header{
+// 			Number:     uint64(num + 1),
+// 			ParentHash: parentHash,
+// 			Miner:      types.ZeroAddress,
+// 			MixHash:    signer.IstanbulDigest,
+// 			ExtraData:  genesis.ExtraData,
+// 		}
 
-		if v.candidate != "" {
-			// if candidate is empty, we are just creating a new block
-			// without votes
-			pool.add(v.candidate)
-			h.Miner = pool.get(v.candidate).Address()
-		}
+// 		if v.candidate != "" {
+// 			// if candidate is empty, we are just creating a new block
+// 			// without votes
+// 			pool.add(v.candidate)
+// 			h.Miner = pool.get(v.candidate).Address()
+// 		}
 
-		if v.auth {
-			// add auth to the vote
-			h.Nonce = nonceAuthVote
-		} else {
-			h.Nonce = nonceDropVote
-		}
+// 		if v.auth {
+// 			// add auth to the vote
+// 			h.Nonce = nonceAuthVote
+// 		} else {
+// 			h.Nonce = nonceDropVote
+// 		}
 
-		// sign the vote
-		h = pool.get(v.validator).sign(h)
-		h.ComputeHash()
+// 		// sign the vote
+// 		h = pool.get(v.validator).sign(h)
+// 		h.ComputeHash()
 
-		parentHash = h.Hash
-		headers = append(headers, h)
-	}
+// 		parentHash = h.Hash
+// 		headers = append(headers, h)
+// 	}
 
-	return headers
-}
+// 	return headers
+// }
 
-func updateHashesInSnapshots(t *testing.T, b *blockchain.Blockchain, snapshots []*Snapshot) {
-	t.Helper()
+// func updateHashesInSnapshots(t *testing.T, b *blockchain.Blockchain, snapshots []*Snapshot) {
+// 	t.Helper()
 
-	for _, s := range snapshots {
-		hash := b.GetHashByNumber(s.Number)
-		assert.NotNil(t, hash)
-		s.Hash = hash.String()
-	}
-}
+// 	for _, s := range snapshots {
+// 		hash := b.GetHashByNumber(s.Number)
+// 		assert.NotNil(t, hash)
+// 		s.Hash = hash.String()
+// 	}
+// }
 
-func saveSnapshots(t *testing.T, path string, snapshots []*Snapshot) {
-	t.Helper()
+// func saveSnapshots(t *testing.T, path string, snapshots []*Snapshot) {
+// 	t.Helper()
 
-	if snapshots == nil {
-		return
-	}
+// 	if snapshots == nil {
+// 		return
+// 	}
 
-	store := newSnapshotStore()
-	for _, snap := range snapshots {
-		store.add(snap)
-	}
+// 	store := newSnapshotStore()
+// 	for _, snap := range snapshots {
+// 		store.add(snap)
+// 	}
 
-	err := store.saveToPath(path)
+// 	err := store.saveToPath(path)
 
-	assert.NoError(t, err)
-}
+// 	assert.NoError(t, err)
+// }
 
 // func TestSnapshot_setupSnapshot(t *testing.T) {
 // 	// Current validators

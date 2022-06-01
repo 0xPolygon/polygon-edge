@@ -8,7 +8,7 @@ import (
 
 	"github.com/umbracle/go-web3"
 
-	"github.com/0xPolygon/polygon-edge/consensus/ibft"
+	ibftSigner "github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/e2e/framework"
 	"github.com/0xPolygon/polygon-edge/helper/tests"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -137,8 +137,8 @@ func TestIbft_TransactionFeeRecipient(t *testing.T) {
 			assert.NotNil(t, receipt.BlockHash)
 			block, err := clt.Eth().GetBlockByHash(receipt.BlockHash, false)
 			assert.NoError(t, err)
-			extraData := &ibft.IstanbulExtra{}
-			extraDataWithoutVanity := block.ExtraData[ibft.IstanbulExtraVanity:]
+			extraData := &ibftSigner.IstanbulExtra{}
+			extraDataWithoutVanity := block.ExtraData[ibftSigner.IstanbulExtraVanity:]
 			err = extraData.UnmarshalRLP(extraDataWithoutVanity)
 			assert.NoError(t, err)
 

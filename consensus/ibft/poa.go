@@ -65,7 +65,7 @@ func (poa *PoAMechanism) acceptStateLogHook(snapParam interface{}) error {
 	poa.ibft.logger.Info(
 		"current snapshot",
 		"validators",
-		len(snap.Set),
+		snap.Set.Len(),
 		"votes",
 		len(snap.Votes),
 	)

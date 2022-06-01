@@ -46,6 +46,7 @@ func (ip *initParams) validateFlags() error {
 	if ip.dataDir == "" && ip.configPath == "" {
 		return errInvalidParams
 	}
+
 	if ip.rawKeyType == "" {
 		return errInvalidParams
 	}

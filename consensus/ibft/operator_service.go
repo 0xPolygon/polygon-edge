@@ -22,7 +22,7 @@ type operator struct {
 // Status returns the status of the IBFT client
 func (o *operator) Status(ctx context.Context, req *empty.Empty) (*proto.IbftStatusResp, error) {
 	resp := &proto.IbftStatusResp{
-		Key: o.ibft.validatorKeyAddr.String(),
+		Key: o.ibft.signer.Address().String(),
 	}
 
 	return resp, nil
@@ -64,7 +64,7 @@ func (o *operator) getNextCandidate(snap *Snapshot) *proto.Candidate {
 		addr := types.StringToAddress(c.Address)
 
 		count := snap.Count(func(v *Vote) bool {
-			return v.Address == addr && v.Validator == o.ibft.validatorKeyAddr
+			return v.Address == addr && v.Validator == o.ibft.signer.Address()
 		})
 
 		if count == 0 {
@@ -135,7 +135,7 @@ func (o *operator) Propose(ctx context.Context, req *proto.Candidate) (*empty.Em
 
 	// check if we have already voted for this candidate
 	count := snap.Count(func(v *Vote) bool {
-		return v.Address == addr && v.Validator == o.ibft.validatorKeyAddr
+		return v.Address == addr && v.Validator == o.ibft.signer.Address()
 	})
 	if count == 1 {
 		return nil, fmt.Errorf("already voted for this address")

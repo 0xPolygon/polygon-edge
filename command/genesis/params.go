@@ -10,6 +10,8 @@ import (
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft"
+	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
+	"github.com/0xPolygon/polygon-edge/consensus/ibft/validators"
 	"github.com/0xPolygon/polygon-edge/contracts/staking"
 	"github.com/0xPolygon/polygon-edge/server"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -54,7 +56,7 @@ type genesisParams struct {
 	validatorPrefixPath string
 	premine             []string
 	bootnodes           []string
-	ibftValidators      [][]byte
+	ibftValidators      []types.Address
 
 	ibftValidatorsRaw []string
 
@@ -154,15 +156,15 @@ func (p *genesisParams) initRawParams() error {
 // setValidatorSetFromCli sets validator set from cli command
 func (p *genesisParams) setValidatorSetFromCli() {
 	if len(p.ibftValidatorsRaw) != 0 {
-		for _, val := range p.ibftValidatorsRaw {
-			bytes, err := hex.DecodeString(strings.TrimPrefix(val, "0x"))
+		for _, rawVal := range p.ibftValidatorsRaw {
+			bytes, err := hex.DecodeString(strings.TrimPrefix(rawVal, "0x"))
 			if err != nil {
 				panic(err)
 			}
 
 			p.ibftValidators = append(
 				p.ibftValidators,
-				bytes,
+				types.BytesToAddress(bytes),
 			)
 		}
 	}
@@ -170,17 +172,17 @@ func (p *genesisParams) setValidatorSetFromCli() {
 
 // setValidatorSetFromPrefixPath sets validator set from prefix path
 func (p *genesisParams) setValidatorSetFromPrefixPath() error {
-	// var readErr error
+	var readErr error
 
 	if !p.areValidatorsSetByPrefix() {
 		return nil
 	}
 
-	// if p.ibftValidators, readErr = getValidatorsFromPrefixPath(
-	// 	p.validatorPrefixPath,
-	// ); readErr != nil {
-	// 	return fmt.Errorf("failed to read from prefix: %w", readErr)
-	// }
+	if p.ibftValidators, readErr = getValidatorsFromPrefixPath(
+		p.validatorPrefixPath,
+	); readErr != nil {
+		return fmt.Errorf("failed to read from prefix: %w", readErr)
+	}
 
 	return nil
 }
@@ -211,14 +213,15 @@ func (p *genesisParams) initIBFTExtraData() {
 		return
 	}
 
-	seal := new(ibft.SerializedSeal)
-	ibftExtra := &ibft.IstanbulExtra{
-		Validators:    p.ibftValidators,
+	vals := validators.ECDSAValidatorSet(p.ibftValidators)
+
+	ibftExtra := &signer.IstanbulExtra{
+		Validators:    &vals,
 		Seal:          []byte{},
-		CommittedSeal: seal,
+		CommittedSeal: new(signer.SerializedSeal),
 	}
 
-	p.extraData = make([]byte, ibft.IstanbulExtraVanity)
+	p.extraData = make([]byte, signer.IstanbulExtraVanity)
 	p.extraData = ibftExtra.MarshalRLPTo(p.extraData)
 }
 
@@ -308,18 +311,17 @@ func (p *genesisParams) shouldPredeployStakingSC() bool {
 	return p.isPos && (p.consensus == server.IBFTConsensus || p.consensus == server.DevConsensus)
 }
 
+// stakingAccount, predeployErr := stakingHelper.PredeployStakingSC(p.ibftValidators,
+// 	stakingHelper.PredeployParams{
+// 		MinValidatorCount: p.minNumValidators,
+// 		MaxValidatorCount: p.maxNumValidators,
+// 	})
+// if predeployErr != nil {
+// 	return nil, predeployErr
+// }
+
+// return stakingAccount, nil
 func (p *genesisParams) predeployStakingSC() (*chain.GenesisAccount, error) {
-	// stakingAccount, predeployErr := stakingHelper.PredeployStakingSC(p.ibftValidators,
-	// 	stakingHelper.PredeployParams{
-	// 		MinValidatorCount: p.minNumValidators,
-	// 		MaxValidatorCount: p.maxNumValidators,
-	// 	})
-	// if predeployErr != nil {
-	// 	return nil, predeployErr
-	// }
-
-	// return stakingAccount, nil
-
 	return nil, nil
 }
 
