@@ -298,7 +298,7 @@ func (b *mockBlockchain) GetReceiptsByHash(types.Hash) ([]*types.Receipt, error)
 }
 
 func (b *mockBlockchain) GetBodyByHash(types.Hash) (*types.Body, bool) {
-	panic("not implement")
+	return &types.Body{}, true
 }
 
 func (b *mockBlockchain) GetHeaderByHash(h types.Hash) (*types.Header, bool) {

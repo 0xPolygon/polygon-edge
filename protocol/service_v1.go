@@ -30,6 +30,7 @@ type rlpObject interface {
 }
 
 var (
+	errInvalidHeadersRequest  = errors.New("invalid headers request")
 	errMalformedNotifyRequest = errors.New("malformed notify request")
 	errMalformedNotifyBody    = errors.New("malformed notify body")
 	errMalformedNotifyStatus  = errors.New("malformed notify status")
@@ -54,7 +55,7 @@ func (s *serviceV1) Notify(ctx context.Context, req *proto.NotifyReq) (*empty.Em
 		return nil, err
 	}
 
-	status, err := fromProto(req.Status)
+	status, err := statusFromProto(req.Status)
 
 	if err != nil {
 		return nil, err
@@ -135,21 +136,22 @@ func (s *serviceV1) GetObjectsByHash(_ context.Context, req *proto.HashRequest) 
 	return resp, nil
 }
 
-const maxHeadersAmount = 190
+const MaxSkeletonHeadersAmount = 190
 
 // GetHeaders implements the V1Server interface
 func (s *serviceV1) GetHeaders(_ context.Context, req *proto.GetHeadersRequest) (*proto.Response, error) {
 	if req.Number != 0 && req.Hash != "" {
-		return nil, errors.New("cannot provide both a number and a hash")
+		return nil, errInvalidHeadersRequest
 	}
 
-	if req.Amount > maxHeadersAmount {
-		req.Amount = maxHeadersAmount
+	if req.Amount > MaxSkeletonHeadersAmount {
+		req.Amount = MaxSkeletonHeadersAmount
 	}
 
-	var origin *types.Header
-
-	var ok bool
+	var (
+		origin *types.Header
+		ok     bool
+	)
 
 	if req.Number != 0 {
 		origin, ok = s.store.GetHeaderByNumber(uint64(req.Number))
@@ -171,6 +173,7 @@ func (s *serviceV1) GetHeaders(_ context.Context, req *proto.GetHeadersRequest) 
 	resp := &proto.Response{
 		Objs: []*proto.Response_Component{},
 	}
+
 	addData := func(h *types.Header) {
 		resp.Objs = append(resp.Objs, &proto.Response_Component{
 			Spec: &anypb.Any{
@@ -211,7 +214,13 @@ func getBodies(ctx context.Context, clt proto.V1Client, hashes []types.Hash) ([]
 		input = append(input, h.String())
 	}
 
-	resp, err := clt.GetObjectsByHash(ctx, &proto.HashRequest{Hash: input, Type: proto.HashRequest_BODIES})
+	resp, err := clt.GetObjectsByHash(
+		ctx,
+		&proto.HashRequest{
+			Hash: input,
+			Type: proto.HashRequest_BODIES,
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
