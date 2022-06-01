@@ -3,6 +3,7 @@ package blockchain
 import (
 	"errors"
 	"fmt"
+	"github.com/0xPolygon/polygon-edge/state"
 	"math/big"
 	"reflect"
 	"testing"
@@ -523,11 +524,11 @@ func TestInsertHeaders(t *testing.T) {
 	}
 }
 
-func TestForkUnkwonParents(t *testing.T) {
+func TestForkUnknownParents(t *testing.T) {
 	b := NewTestBlockchain(t, nil)
 
-	h0 := NewTestHeaderChain(10)
-	h1 := NewTestHeaderFromChain(h0[:5], 10)
+	h0 := NewTestHeaders(10)
+	h1 := AppendNewTestHeaders(h0[:5], 10)
 
 	// Write genesis
 	_, err := b.advanceHead(h0[0])
@@ -605,11 +606,22 @@ func TestCalculateGasLimit(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			b := NewTestBlockchain(t, nil)
-			err := b.writeGenesis(&chain.Genesis{
-				GasLimit: tt.parentGasLimit,
+			storageCallback := func(storage *storage.MockStorage) {
+				storage.HookReadHeader(func(hash types.Hash) (*types.Header, error) {
+					return &types.Header{
+						// This is going to be the parent block header
+						GasLimit: tt.parentGasLimit,
+					}, nil
+				})
+			}
+
+			b, blockchainErr := NewMockBlockchain(map[TestCallbackType]interface{}{
+				StorageCallback: storageCallback,
 			})
-			assert.NoError(t, err, "failed to write genesis")
+			if blockchainErr != nil {
+				t.Fatalf("unable to construct the blockchain, %v", blockchainErr)
+			}
+
 			b.config.Params = &chain.Params{
 				BlockGasTarget: tt.blockGasTarget,
 			}
@@ -680,4 +692,308 @@ func TestGasPriceAverage(t *testing.T) {
 			assert.Equal(t, testCase.expectedNewAverage.String(), blockchain.gpAverage.price.String())
 		})
 	}
+}
+
+// TestBlockchain_VerifyBlockParent verifies that parent block verification
+// errors are handled correctly
+func TestBlockchain_VerifyBlockParent(t *testing.T) {
+	t.Parallel()
+
+	emptyHeader := &types.Header{
+		Hash:       types.ZeroHash,
+		ParentHash: types.ZeroHash,
+	}
+	emptyHeader.ComputeHash()
+
+	t.Run("Missing parent block", func(t *testing.T) {
+		t.Parallel()
+
+		// Set up the storage callback
+		storageCallback := func(storage *storage.MockStorage) {
+			storage.HookReadHeader(func(hash types.Hash) (*types.Header, error) {
+				return nil, errors.New("not found")
+			})
+		}
+
+		blockchain, err := NewMockBlockchain(map[TestCallbackType]interface{}{
+			StorageCallback: storageCallback,
+		})
+		if err != nil {
+			t.Fatalf("unable to instantiate new blockchain, %v", err)
+		}
+
+		// Create a dummy block
+		block := &types.Block{
+			Header: &types.Header{
+				ParentHash: types.ZeroHash,
+			},
+		}
+
+		assert.ErrorIs(t, blockchain.verifyBlockParent(block), ErrParentNotFound)
+	})
+
+	t.Run("Parent hash mismatch", func(t *testing.T) {
+		t.Parallel()
+
+		// Set up the storage callback
+		storageCallback := func(storage *storage.MockStorage) {
+			storage.HookReadHeader(func(hash types.Hash) (*types.Header, error) {
+				return emptyHeader, nil
+			})
+		}
+
+		blockchain, err := NewMockBlockchain(map[TestCallbackType]interface{}{
+			StorageCallback: storageCallback,
+		})
+		if err != nil {
+			t.Fatalf("unable to instantiate new blockchain, %v", err)
+		}
+
+		// Create a dummy block whose parent hash will
+		// not match the computed parent hash
+		block := &types.Block{
+			Header: emptyHeader,
+		}
+
+		assert.ErrorIs(t, blockchain.verifyBlockParent(block), ErrParentHashMismatch)
+	})
+
+	t.Run("Invalid block sequence", func(t *testing.T) {
+		t.Parallel()
+
+		// Set up the storage callback
+		storageCallback := func(storage *storage.MockStorage) {
+			storage.HookReadHeader(func(hash types.Hash) (*types.Header, error) {
+				return emptyHeader, nil
+			})
+		}
+
+		blockchain, err := NewMockBlockchain(map[TestCallbackType]interface{}{
+			StorageCallback: storageCallback,
+		})
+		if err != nil {
+			t.Fatalf("unable to instantiate new blockchain, %v", err)
+		}
+
+		// Create a dummy block with a number much higher than the parent
+		block := &types.Block{
+			Header: &types.Header{
+				Number: 10,
+			},
+		}
+
+		assert.ErrorIs(t, blockchain.verifyBlockParent(block), ErrParentHashMismatch)
+	})
+
+	t.Run("Invalid block sequence", func(t *testing.T) {
+		t.Parallel()
+
+		// Set up the storage callback
+		storageCallback := func(storage *storage.MockStorage) {
+			storage.HookReadHeader(func(hash types.Hash) (*types.Header, error) {
+				return emptyHeader, nil
+			})
+		}
+
+		blockchain, err := NewMockBlockchain(map[TestCallbackType]interface{}{
+			StorageCallback: storageCallback,
+		})
+		if err != nil {
+			t.Fatalf("unable to instantiate new blockchain, %v", err)
+		}
+
+		// Create a dummy block with a number much higher than the parent
+		block := &types.Block{
+			Header: &types.Header{
+				Number:     10,
+				ParentHash: emptyHeader.Hash,
+			},
+		}
+
+		assert.ErrorIs(t, blockchain.verifyBlockParent(block), ErrInvalidBlockSequence)
+	})
+
+	t.Run("Invalid block gas limit", func(t *testing.T) {
+		t.Parallel()
+
+		parentHeader := emptyHeader.Copy()
+		parentHeader.GasLimit = 5000
+
+		// Set up the storage callback
+		storageCallback := func(storage *storage.MockStorage) {
+			storage.HookReadHeader(func(hash types.Hash) (*types.Header, error) {
+				return emptyHeader, nil
+			})
+		}
+
+		blockchain, err := NewMockBlockchain(map[TestCallbackType]interface{}{
+			StorageCallback: storageCallback,
+		})
+		if err != nil {
+			t.Fatalf("unable to instantiate new blockchain, %v", err)
+		}
+
+		// Create a dummy block with a number much higher than the parent
+		block := &types.Block{
+			Header: &types.Header{
+				Number:     1,
+				ParentHash: parentHeader.Hash,
+				GasLimit:   parentHeader.GasLimit + 1000, // The gas limit is greater than the allowed rate
+			},
+		}
+
+		assert.Error(t, blockchain.verifyBlockParent(block))
+	})
+}
+
+// TestBlockchain_VerifyBlockBody makes sure that the block body is verified correctly
+func TestBlockchain_VerifyBlockBody(t *testing.T) {
+	t.Parallel()
+
+	emptyHeader := &types.Header{
+		Hash:       types.ZeroHash,
+		ParentHash: types.ZeroHash,
+	}
+
+	t.Run("Invalid SHA3 Uncles root", func(t *testing.T) {
+		t.Parallel()
+
+		blockchain, err := NewMockBlockchain(nil)
+		if err != nil {
+			t.Fatalf("unable to instantiate new blockchain, %v", err)
+		}
+
+		block := &types.Block{
+			Header: &types.Header{
+				Sha3Uncles: types.ZeroHash,
+			},
+		}
+
+		assert.ErrorIs(t, blockchain.verifyBlockBody(block), ErrInvalidSha3Uncles)
+	})
+
+	t.Run("Invalid Transactions root", func(t *testing.T) {
+		t.Parallel()
+
+		blockchain, err := NewMockBlockchain(nil)
+		if err != nil {
+			t.Fatalf("unable to instantiate new blockchain, %v", err)
+		}
+
+		block := &types.Block{
+			Header: &types.Header{
+				Sha3Uncles: types.EmptyUncleHash,
+			},
+		}
+
+		assert.ErrorIs(t, blockchain.verifyBlockBody(block), ErrInvalidTxRoot)
+	})
+
+	t.Run("Invalid execution result - missing parent", func(t *testing.T) {
+		t.Parallel()
+
+		// Set up the storage callback
+		storageCallback := func(storage *storage.MockStorage) {
+			storage.HookReadHeader(func(hash types.Hash) (*types.Header, error) {
+				return nil, errors.New("not found")
+			})
+		}
+
+		blockchain, err := NewMockBlockchain(map[TestCallbackType]interface{}{
+			StorageCallback: storageCallback,
+		})
+		if err != nil {
+			t.Fatalf("unable to instantiate new blockchain, %v", err)
+		}
+
+		block := &types.Block{
+			Header: &types.Header{
+				Sha3Uncles: types.EmptyUncleHash,
+				TxRoot:     types.EmptyRootHash,
+			},
+		}
+
+		assert.ErrorIs(t, blockchain.verifyBlockBody(block), ErrParentNotFound)
+	})
+
+	t.Run("Invalid execution result - unable to fetch block creator", func(t *testing.T) {
+		t.Parallel()
+
+		errBlockCreatorNotFound := errors.New("not found")
+
+		// Set up the storage callback
+		storageCallback := func(storage *storage.MockStorage) {
+			// This is used for parent fetching
+			storage.HookReadHeader(func(hash types.Hash) (*types.Header, error) {
+				return emptyHeader, nil
+			})
+		}
+
+		// Set up the verifier callback
+		verifierCallback := func(verifier *MockVerifier) {
+			// This is used for error-ing out on the block creator fetch
+			verifier.HookGetBlockCreator(func(t *types.Header) (types.Address, error) {
+				return types.ZeroAddress, errBlockCreatorNotFound
+			})
+		}
+
+		blockchain, err := NewMockBlockchain(map[TestCallbackType]interface{}{
+			StorageCallback:  storageCallback,
+			VerifierCallback: verifierCallback,
+		})
+		if err != nil {
+			t.Fatalf("unable to instantiate new blockchain, %v", err)
+		}
+
+		block := &types.Block{
+			Header: &types.Header{
+				Sha3Uncles: types.EmptyUncleHash,
+				TxRoot:     types.EmptyRootHash,
+			},
+		}
+
+		assert.ErrorIs(t, blockchain.verifyBlockBody(block), errBlockCreatorNotFound)
+	})
+
+	t.Run("Invalid execution result - unable to execute transactions", func(t *testing.T) {
+		t.Parallel()
+
+		errUnableToExecute := errors.New("unable to execute transactions")
+
+		// Set up the storage callback
+		storageCallback := func(storage *storage.MockStorage) {
+			// This is used for parent fetching
+			storage.HookReadHeader(func(hash types.Hash) (*types.Header, error) {
+				return emptyHeader, nil
+			})
+		}
+
+		executorCallback := func(executor *mockExecutor) {
+			// This is executor processing
+			executor.HookProcessBlock(func(
+				hash types.Hash,
+				block *types.Block,
+				address types.Address,
+			) (*state.Transition, error) {
+				return nil, errUnableToExecute
+			})
+		}
+
+		blockchain, err := NewMockBlockchain(map[TestCallbackType]interface{}{
+			StorageCallback:  storageCallback,
+			ExecutorCallback: executorCallback,
+		})
+		if err != nil {
+			t.Fatalf("unable to instantiate new blockchain, %v", err)
+		}
+
+		block := &types.Block{
+			Header: &types.Header{
+				Sha3Uncles: types.EmptyUncleHash,
+				TxRoot:     types.EmptyRootHash,
+			},
+		}
+
+		assert.ErrorIs(t, blockchain.verifyBlockBody(block), errUnableToExecute)
+	})
 }

@@ -675,7 +675,20 @@ func (p *TxPool) addGossipTx(obj interface{}) {
 		return
 	}
 
-	raw := obj.(*proto.Txn) // nolint:forcetypeassert
+	raw, ok := obj.(*proto.Txn)
+	if !ok {
+		p.logger.Error("failed to cast gossiped message to txn")
+
+		return
+	}
+
+	// Verify that the gossiped transaction message is not empty
+	if raw == nil || raw.Raw == nil {
+		p.logger.Error("malformed gossip transaction message received")
+
+		return
+	}
+
 	tx := new(types.Transaction)
 
 	// decode tx

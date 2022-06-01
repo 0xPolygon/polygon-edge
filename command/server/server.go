@@ -180,7 +180,7 @@ func setFlags(cmd *cobra.Command) {
 		&params.rawConfig.BlockTime,
 		blockTimeFlag,
 		defaultConfig.BlockTime,
-		"minimum block time in seconds",
+		"minimum block time in seconds (at least 1s)",
 	)
 
 	cmd.Flags().StringArrayVar(
