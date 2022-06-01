@@ -3,19 +3,22 @@ package protocol
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/protocol/proto"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-var (
-	errInvalidHeaderSequence = errors.New("invalid header sequence")
-	errHeaderBodyMismatch    = errors.New("requested body and header mismatch")
-)
-
 const (
 	defaultBodyFetchTimeout = time.Second * 10
+)
+
+var (
+	errMalformedHeadersResponse = errors.New("malformed headers response")
+	errMalformedHeadersBody     = errors.New("malformed headers body")
+	errInvalidHeaderSequence    = errors.New("invalid header sequence")
+	errHeaderBodyMismatch       = errors.New("requested body and header mismatch")
 )
 
 func getHeaders(clt proto.V1Client, req *proto.GetHeadersRequest) ([]*types.Header, error) {
@@ -27,6 +30,14 @@ func getHeaders(clt proto.V1Client, req *proto.GetHeadersRequest) ([]*types.Head
 	headers := make([]*types.Header, len(resp.Objs))
 
 	for index, obj := range resp.Objs {
+		// Verify the header response is correctly formed
+		if verifyErr := verifyHeadersResponse(obj); verifyErr != nil {
+			return nil, fmt.Errorf(
+				"unable to verify headers response, %w",
+				verifyErr,
+			)
+		}
+
 		header := &types.Header{}
 		if err := header.UnmarshalRLP(obj.Spec.Value); err != nil {
 			return nil, err
@@ -36,6 +47,21 @@ func getHeaders(clt proto.V1Client, req *proto.GetHeadersRequest) ([]*types.Head
 	}
 
 	return headers, nil
+}
+
+// verifyHeadersResponse verifies the headers response to the peer
+func verifyHeadersResponse(headersResp *proto.Response_Component) error {
+	// Make sure the header response is present
+	if headersResp == nil {
+		return errMalformedHeadersResponse
+	}
+
+	// Make sure the header body is present
+	if headersResp.Spec == nil {
+		return errMalformedHeadersBody
+	}
+
+	return nil
 }
 
 type skeleton struct {

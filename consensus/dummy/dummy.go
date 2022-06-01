@@ -47,7 +47,7 @@ func (d *Dummy) Start() error {
 	return nil
 }
 
-func (d *Dummy) VerifyHeader(parent *types.Header, header *types.Header) error {
+func (d *Dummy) VerifyHeader(header *types.Header) error {
 	// All blocks are valid
 	return nil
 }

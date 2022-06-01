@@ -142,8 +142,8 @@ func TestBroadcast(t *testing.T) {
 	}{
 		{
 			name:          "syncer should receive new block in peer",
-			syncerHeaders: blockchain.NewTestHeaderChainWithSeed(nil, 5, 0),
-			peerHeaders:   blockchain.NewTestHeaderChainWithSeed(nil, 10, 0),
+			syncerHeaders: blockchain.NewTestHeadersWithSeed(nil, 5, 0),
+			peerHeaders:   blockchain.NewTestHeadersWithSeed(nil, 10, 0),
 			numNewBlocks:  5,
 		},
 	}
@@ -160,6 +160,7 @@ func TestBroadcast(t *testing.T) {
 			newBlocks := GenerateNewBlocks(t, peerSyncer.blockchain, tt.numNewBlocks)
 
 			for _, newBlock := range newBlocks {
+				assert.NoError(t, peerSyncer.blockchain.VerifyFinalizedBlock(newBlock))
 				assert.NoError(t, peerSyncer.blockchain.WriteBlock(newBlock))
 			}
 
@@ -254,16 +255,16 @@ func TestWatchSyncWithPeer(t *testing.T) {
 	}{
 		{
 			name:           "should sync until peer's latest block",
-			headers:        blockchain.NewTestHeaderChainWithSeed(nil, 10, 0),
-			peerHeaders:    blockchain.NewTestHeaderChainWithSeed(nil, 1, 0),
+			headers:        blockchain.NewTestHeadersWithSeed(nil, 10, 0),
+			peerHeaders:    blockchain.NewTestHeadersWithSeed(nil, 1, 0),
 			numNewBlocks:   15,
 			shouldSync:     true,
 			expectedHeight: 15,
 		},
 		{
 			name:           "shouldn't sync",
-			headers:        blockchain.NewTestHeaderChainWithSeed(nil, 10, 0),
-			peerHeaders:    blockchain.NewTestHeaderChainWithSeed(nil, 1, 0),
+			headers:        blockchain.NewTestHeadersWithSeed(nil, 10, 0),
+			peerHeaders:    blockchain.NewTestHeadersWithSeed(nil, 1, 0),
 			numNewBlocks:   9,
 			shouldSync:     false,
 			expectedHeight: 9,
@@ -283,6 +284,7 @@ func TestWatchSyncWithPeer(t *testing.T) {
 			newBlocks := GenerateNewBlocks(t, peerChain, tt.numNewBlocks)
 
 			for _, newBlock := range newBlocks {
+				assert.NoError(t, peerSyncer.blockchain.VerifyFinalizedBlock(newBlock))
 				assert.NoError(t, peerSyncer.blockchain.WriteBlock(newBlock))
 			}
 
@@ -327,15 +329,15 @@ func TestBulkSyncWithPeer(t *testing.T) {
 	}{
 		{
 			name:          "should sync until peer's latest block",
-			headers:       blockchain.NewTestHeaderChainWithSeed(nil, 10, 0),
-			peerHeaders:   blockchain.NewTestHeaderChainWithSeed(nil, 30, 0),
+			headers:       blockchain.NewTestHeadersWithSeed(nil, 10, 0),
+			peerHeaders:   blockchain.NewTestHeadersWithSeed(nil, 30, 0),
 			shouldSync:    true,
 			syncFromBlock: 10,
 		},
 		{
 			name:          "shouldn't sync if peer's latest block is behind",
-			headers:       blockchain.NewTestHeaderChainWithSeed(nil, 20, 0),
-			peerHeaders:   blockchain.NewTestHeaderChainWithSeed(nil, 10, 0),
+			headers:       blockchain.NewTestHeadersWithSeed(nil, 20, 0),
+			peerHeaders:   blockchain.NewTestHeadersWithSeed(nil, 10, 0),
 			shouldSync:    false,
 			syncFromBlock: 0,
 		},
@@ -380,11 +382,11 @@ func TestSyncer_GetSyncProgression(t *testing.T) {
 	initialChainSize := 10
 	targetChainSize := 1000
 
-	existingChain := blockchain.NewTestHeaderChainWithSeed(nil, initialChainSize, 0)
+	existingChain := blockchain.NewTestHeadersWithSeed(nil, initialChainSize, 0)
 	syncerChain := NewMockBlockchain(existingChain)
 	syncer := CreateSyncer(t, syncerChain, nil)
 
-	syncHeaders := blockchain.NewTestHeaderChainWithSeed(nil, targetChainSize, 0)
+	syncHeaders := blockchain.NewTestHeadersWithSeed(nil, targetChainSize, 0)
 	syncBlocks := blockchain.HeadersToBlocks(syncHeaders)
 
 	syncer.syncProgression.StartProgression(uint64(initialChainSize), syncerChain.SubscribeEvents())
@@ -483,6 +485,10 @@ func (m *mockBlockStore) WriteBlocks(blocks []*types.Block) error {
 		}
 	}
 
+	return nil
+}
+
+func (m *mockBlockStore) VerifyFinalizedBlock(block *types.Block) error {
 	return nil
 }
 
@@ -655,4 +661,100 @@ func TestSyncer_PeerDisconnected(t *testing.T) {
 	// Make sure that the disconnected peer is not in the
 	// reference node's sync peer map
 	assert.False(t, found)
+}
+
+func TestVerifyNotifyRequest(t *testing.T) {
+	t.Parallel()
+
+	testTable := []struct {
+		name        string
+		request     *proto.NotifyReq
+		expectedErr error
+	}{
+		{
+			"Valid notify request",
+			&proto.NotifyReq{
+				Status: &proto.V1Status{},
+				Raw:    &anypb.Any{},
+			},
+			nil,
+		},
+		{
+			"No notify request",
+			nil,
+			errMalformedNotifyRequest,
+		},
+		{
+			"No notify body",
+			&proto.NotifyReq{
+				Status: &proto.V1Status{},
+				Raw:    nil,
+			},
+			errMalformedNotifyBody,
+		},
+		{
+			"No notify status",
+			&proto.NotifyReq{
+				Status: nil,
+				Raw:    &anypb.Any{},
+			},
+			errMalformedNotifyStatus,
+		},
+	}
+
+	for _, testCase := range testTable {
+		testCase := testCase
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.ErrorIs(
+				t,
+				verifyNotifyRequest(testCase.request),
+				testCase.expectedErr,
+			)
+		})
+	}
+}
+
+func TestVerifyHeadersResponse(t *testing.T) {
+	t.Parallel()
+
+	testTable := []struct {
+		name        string
+		response    *proto.Response_Component
+		expectedErr error
+	}{
+		{
+			"Valid headers response",
+			&proto.Response_Component{
+				Spec: &anypb.Any{},
+			},
+			nil,
+		},
+		{
+			"No headers response",
+			nil,
+			errMalformedHeadersResponse,
+		},
+		{
+			"No headers data",
+			&proto.Response_Component{
+				Spec: nil,
+			},
+			errMalformedHeadersBody,
+		},
+	}
+
+	for _, testCase := range testTable {
+		testCase := testCase
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.ErrorIs(
+				t,
+				verifyHeadersResponse(testCase.response),
+				testCase.expectedErr,
+			)
+		})
+	}
 }
