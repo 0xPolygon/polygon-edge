@@ -137,7 +137,7 @@ func NewRandomChain(t *testing.T, height int) blockchainShim {
 
 	return blockchain.NewTestBlockchain(
 		t,
-		blockchain.NewTestHeaderChainWithSeed(
+		blockchain.NewTestHeadersWithSeed(
 			nil,
 			height,
 			randNum.Uint64(),
@@ -185,7 +185,7 @@ func GenerateNewBlocks(t *testing.T, chain blockchainShim, num int) []*types.Blo
 		assert.Truef(t, ok, "chain should have header at %d, but empty", i)
 	}
 
-	headers := blockchain.NewTestHeaderFromChain(oldHeaders, num)
+	headers := blockchain.AppendNewTestHeaders(oldHeaders, num)
 
 	return blockchain.HeadersToBlocks(headers[currentHeight+1:])
 }
@@ -327,6 +327,10 @@ func (b *mockBlockchain) WriteBlock(block *types.Block) error {
 		subscription.AppendBlock(block)
 	}
 
+	return nil
+}
+
+func (b *mockBlockchain) VerifyFinalizedBlock(block *types.Block) error {
 	return nil
 }
 

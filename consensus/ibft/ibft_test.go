@@ -835,6 +835,10 @@ func (m *mockIbft) WriteBlock(block *types.Block) error {
 	return nil
 }
 
+func (m *mockIbft) VerifyPotentialBlock(block *types.Block) error {
+	return nil
+}
+
 func (m *mockIbft) emitMsg(msg *proto.MessageReq) {
 	// convert the address from the address pool
 	from := m.pool.get(msg.From).Address()
