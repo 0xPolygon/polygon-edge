@@ -83,6 +83,7 @@ func TestOperator_Propose(t *testing.T) {
 		blockchain: blockchain.TestBlockchain(t, pool.genesis()),
 		config:     &consensus.Config{},
 		epochSize:  DefaultEpochSize,
+		signer:     signer.NewECDSASignerFromKey(pool.get("A").priv),
 	}
 	assert.NoError(t, ibft.setupSnapshot())
 

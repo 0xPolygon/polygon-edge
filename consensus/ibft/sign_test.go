@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
+	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
 )
@@ -17,17 +18,27 @@ func TestSign_Sealer(t *testing.T) {
 	}
 
 	h := &types.Header{}
-	initIbftExtra(h, pool.ValidatorSet(), nil, false)
+	signerA := signer.NewECDSASignerFromKey(pool.get("A").priv)
+
+	signerA.InitIBFTExtra(h, &types.Header{}, pool.ValidatorSet())
 
 	// non-validator address
 	pool.add("X")
 
-	badSealedBlock, _ := writeSeal(pool.get("X").priv, h)
-	assert.Error(t, verifySigner(snap, badSealedBlock))
+	signerX := signer.NewECDSASignerFromKey(pool.get("X").priv)
+
+	badSealedHeader, _ := signerX.WriteSeal(h)
+
+	signerBySeal1, err := signerA.EcrecoverFromHeader(badSealedHeader)
+	assert.NoError(t, err)
+	assert.False(t, snap.Set.Includes(signerBySeal1), "signer shouldn't exist")
 
 	// seal the block with a validator
-	goodSealedBlock, _ := writeSeal(pool.get("A").priv, h)
-	assert.NoError(t, verifySigner(snap, goodSealedBlock))
+	goodSealedHeader, _ := signerA.WriteSeal(h)
+
+	signerBySeal2, err := signerA.EcrecoverFromHeader(goodSealedHeader)
+	assert.NoError(t, err)
+	assert.True(t, snap.Set.Includes(signerBySeal2), "signer shouldn't exist")
 }
 
 func TestSign_CommittedSeals(t *testing.T) {
@@ -39,27 +50,31 @@ func TestSign_CommittedSeals(t *testing.T) {
 	}
 
 	h := &types.Header{}
-	initIbftExtra(h, pool.ValidatorSet(), nil, false)
+
+	signerA := signer.NewECDSASignerFromKey(pool.get("A").priv)
+	signerA.InitIBFTExtra(h, &types.Header{}, pool.ValidatorSet())
 
 	// non-validator address
 	pool.add("X")
 
-	buildCommittedSeal := func(accnt []string) error {
-		seals := [][]byte{}
+	buildCommittedSeal := func(names []string) error {
+		seals := map[types.Address][]byte{}
 
-		for _, accnt := range accnt {
-			seal, err := createCommittedSeal(pool.get(accnt).priv, h)
+		for _, name := range names {
+			account := pool.get(name)
+
+			signer := signer.NewECDSASignerFromKey(account.priv)
+			seal, err := signer.CreateCommittedSeal(h)
 
 			assert.NoError(t, err)
-
-			seals = append(seals, seal)
+			seals[account.Address()] = seal
 		}
 
-		sealed, err := writeCommittedSeals(h, seals, false, nil)
+		sealed, err := signerA.WriteCommittedSeals(h, seals)
 
 		assert.NoError(t, err)
 
-		return verifyCommittedSeal(snap, sealed)
+		return signerA.VerifyCommittedSeal(snap.Set, sealed)
 	}
 
 	// Correct
@@ -80,8 +95,9 @@ func TestSign_Messages(t *testing.T) {
 	pool.add("A")
 
 	msg := &proto.MessageReq{}
-	assert.NoError(t, signMsg(pool.get("A").priv, msg))
-	assert.NoError(t, validateMsg(msg))
+	signerA := signer.NewECDSASignerFromKey(pool.get("A").priv)
+	assert.NoError(t, signerA.SignGossipMessage(msg))
+	assert.NoError(t, signerA.ValidateGossipMessage(msg))
 
 	assert.Equal(t, msg.From, pool.get("A").Address().String())
 }

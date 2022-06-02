@@ -181,14 +181,6 @@ func Factory(
 	}
 
 	// Istanbul requires a different header hash function
-	types.HeaderHash = func(h *types.Header) types.Hash {
-		hash, err := s.CalculateHeaderHash(h)
-		if err != nil {
-			return types.ZeroHash
-		}
-
-		return hash
-	}
 
 	p.syncer = protocol.NewSyncer(params.Logger, params.Network, params.Blockchain)
 
@@ -799,11 +791,11 @@ func (i *Ibft) runAcceptState() { // start new round
 			continue
 		}
 
-		// if msg.From != i.state.proposer.String() {
-		// 	i.logger.Error("msg received from wrong proposer")
+		if msg.From != i.state.proposer.String() {
+			i.logger.Error("msg received from wrong proposer")
 
-		// 	continue
-		// }
+			continue
+		}
 
 		// retrieve the block proposal
 		block := &types.Block{}
@@ -1304,6 +1296,18 @@ func (i *Ibft) Close() error {
 	}
 
 	return nil
+}
+
+// SetHeaderHash updates hash calculation function for IBFT
+func (i *Ibft) SetHeaderHash() {
+	types.HeaderHash = func(h *types.Header) types.Hash {
+		hash, err := i.signer.CalculateHeaderHash(h)
+		if err != nil {
+			return types.ZeroHash
+		}
+
+		return hash
+	}
 }
 
 // getNextMessage reads a new message from the message queue
