@@ -182,7 +182,7 @@ func WithPeerGater(params *PeerGaterParams) Option {
 			ps.tracer = &pubsubTracer{
 				raw:   []RawTracer{gs.gate},
 				pid:   ps.host.ID(),
-				msgID: ps.msgID,
+				idGen: ps.idGen,
 			}
 		}
 

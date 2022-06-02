@@ -1,7 +1,7 @@
 package abis
 
 import (
-	"github.com/umbracle/go-web3/abi"
+	"github.com/umbracle/ethgo/abi"
 )
 
 var StakingABI = abi.MustNewABI(StakingJSONABI)

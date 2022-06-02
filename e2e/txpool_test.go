@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"github.com/0xPolygon/polygon-edge/txpool"
+	"github.com/umbracle/ethgo"
 	"math/big"
 	"testing"
 	"time"
@@ -16,7 +17,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/golang/protobuf/ptypes/any"
 	"github.com/stretchr/testify/assert"
-	"github.com/umbracle/go-web3"
 )
 
 var (
@@ -138,7 +138,7 @@ func TestTxPool_ErrorCodes(t *testing.T) {
 				defer waitCancelFn()
 
 				convertedHash := types.StringToHash(addResponse.TxHash)
-				_, receiptErr := tests.WaitForReceipt(receiptCtx, srv.JSONRPC().Eth(), web3.Hash(convertedHash))
+				_, receiptErr := tests.WaitForReceipt(receiptCtx, srv.JSONRPC().Eth(), ethgo.Hash(convertedHash))
 				if receiptErr != nil {
 					t.Fatalf("Unable to get receipt, %v", receiptErr)
 				}
@@ -227,8 +227,8 @@ func TestTxPool_TransactionCoalescing(t *testing.T) {
 	// testTransaction is a helper structure for
 	// keeping track of test transaction execution
 	type testTransaction struct {
-		txHash web3.Hash // the transaction hash
-		block  *uint64   // the block the transaction was included in
+		txHash ethgo.Hash // the transaction hash
+		block  *uint64    // the block the transaction was included in
 	}
 
 	testTransactions := make([]*testTransaction, 0)
@@ -246,7 +246,7 @@ func TestTxPool_TransactionCoalescing(t *testing.T) {
 		}
 
 		testTransactions = append(testTransactions, &testTransaction{
-			txHash: web3.HexToHash(addResp.TxHash),
+			txHash: ethgo.HexToHash(addResp.TxHash),
 		})
 
 		addCtxCn()
@@ -284,7 +284,7 @@ func TestTxPool_TransactionCoalescing(t *testing.T) {
 	}
 
 	testTransactions = append(testTransactions, &testTransaction{
-		txHash: web3.HexToHash(addResp.TxHash),
+		txHash: ethgo.HexToHash(addResp.TxHash),
 	})
 
 	// Start from 1 since there was previously a txn with nonce 0
@@ -387,7 +387,7 @@ func TestTxPool_RecoverableError(t *testing.T) {
 
 	client := server.JSONRPC()
 	operator := server.TxnPoolOperator()
-	hashes := make([]web3.Hash, 3)
+	hashes := make([]ethgo.Hash, 3)
 
 	for i, tx := range transactions {
 		signedTx, err := signer.SignTx(tx, senderKey)
@@ -401,7 +401,7 @@ func TestTxPool_RecoverableError(t *testing.T) {
 		})
 		assert.NoError(t, err, "Unable to send transaction, %v", err)
 
-		txHash := web3.Hash(types.StringToHash(response.TxHash))
+		txHash := ethgo.Hash(types.StringToHash(response.TxHash))
 
 		// save for later querying
 		hashes[i] = txHash
@@ -416,7 +416,7 @@ func TestTxPool_RecoverableError(t *testing.T) {
 	assert.NotNil(t, receipt)
 
 	// assert balance moved
-	balance, err := client.Eth().GetBalance(web3.Address(receiverAddress), web3.Latest)
+	balance, err := client.Eth().GetBalance(ethgo.Address(receiverAddress), ethgo.Latest)
 	assert.NoError(t, err, "failed to retrieve receiver account balance")
 	assert.Equal(t, framework.EthToWei(3).String(), balance.String())
 
@@ -477,7 +477,7 @@ func TestTxPool_GetPendingTx(t *testing.T) {
 	})
 	assert.NoError(t, err, "Unable to send transaction, %v", err)
 
-	txHash := web3.Hash(types.StringToHash(response.TxHash))
+	txHash := ethgo.Hash(types.StringToHash(response.TxHash))
 
 	// Grab the pending transaction from the pool
 	tx, err := client.Eth().GetTransactionByHash(txHash)
@@ -487,7 +487,7 @@ func TestTxPool_GetPendingTx(t *testing.T) {
 	// Make sure the specific fields are not filled yet
 	assert.Equal(t, uint64(0), tx.TxnIndex)
 	assert.Equal(t, uint64(0), tx.BlockNumber)
-	assert.Equal(t, web3.ZeroHash, tx.BlockHash)
+	assert.Equal(t, ethgo.ZeroHash, tx.BlockHash)
 
 	// Wait for the transaction to be included into a block
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

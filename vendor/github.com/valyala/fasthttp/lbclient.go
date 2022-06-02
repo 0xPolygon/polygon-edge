@@ -17,7 +17,7 @@ type BalancingClient interface {
 //
 // It has the following features:
 //
-//   - Balances load among available clients using 'least loaded' + 'round robin'
+//   - Balances load among available clients using 'least loaded' + 'least total'
 //     hybrid technique.
 //   - Dynamically decreases load on unhealthy clients.
 //
@@ -25,7 +25,7 @@ type BalancingClient interface {
 //
 // It is safe calling LBClient methods from concurrently running goroutines.
 type LBClient struct {
-	noCopy noCopy
+	noCopy noCopy //nolint:unused,structcheck
 
 	// Clients must contain non-zero clients list.
 	// Incoming requests are balanced among these clients.
@@ -49,11 +49,8 @@ type LBClient struct {
 
 	cs []*lbClient
 
-	// nextIdx is for spreading requests among equally loaded clients
-	// in a round-robin fashion.
-	nextIdx uint32
-
 	once sync.Once
+	mu   sync.RWMutex
 }
 
 // DefaultLBClientTimeout is the default request timeout used by LBClient
@@ -84,6 +81,8 @@ func (cc *LBClient) Do(req *Request, resp *Response) error {
 }
 
 func (cc *LBClient) init() {
+	cc.mu.Lock()
+	defer cc.mu.Unlock()
 	if len(cc.Clients) == 0 {
 		panic("BUG: LBClient.Clients cannot be empty")
 	}
@@ -93,44 +92,61 @@ func (cc *LBClient) init() {
 			healthCheck: cc.HealthCheck,
 		})
 	}
+}
 
-	// Randomize nextIdx in order to prevent initial servers'
-	// hammering from a cluster of identical LBClients.
-	cc.nextIdx = uint32(time.Now().UnixNano())
+// AddClient adds a new client to the balanced clients
+// returns the new total number of clients
+func (cc *LBClient) AddClient(c BalancingClient) int {
+	cc.mu.Lock()
+	cc.cs = append(cc.cs, &lbClient{
+		c:           c,
+		healthCheck: cc.HealthCheck,
+	})
+	cc.mu.Unlock()
+	return len(cc.cs)
+}
+
+// RemoveClients removes clients using the provided callback
+// if rc returns true, the passed client will be removed
+// returns the new total number of clients
+func (cc *LBClient) RemoveClients(rc func(BalancingClient) bool) int {
+	cc.mu.Lock()
+	n := 0
+	for _, cs := range cc.cs {
+		if rc(cs.c) {
+			continue
+		}
+		cc.cs[n] = cs
+		n++
+	}
+	for i := n; i < len(cc.cs); i++ {
+		cc.cs[i] = nil
+	}
+	cc.cs = cc.cs[:n]
+
+	cc.mu.Unlock()
+	return len(cc.cs)
 }
 
 func (cc *LBClient) get() *lbClient {
 	cc.once.Do(cc.init)
 
+	cc.mu.RLock()
 	cs := cc.cs
-	idx := atomic.AddUint32(&cc.nextIdx, 1)
-	idx %= uint32(len(cs))
 
-	minC := cs[idx]
+	minC := cs[0]
 	minN := minC.PendingRequests()
-	if minN == 0 {
-		return minC
-	}
-	for _, c := range cs[idx+1:] {
+	minT := atomic.LoadUint64(&minC.total)
+	for _, c := range cs[1:] {
 		n := c.PendingRequests()
-		if n == 0 {
-			return c
-		}
-		if n < minN {
+		t := atomic.LoadUint64(&c.total)
+		if n < minN || (n == minN && t < minT) {
 			minC = c
 			minN = n
+			minT = t
 		}
 	}
-	for _, c := range cs[:idx] {
-		n := c.PendingRequests()
-		if n == 0 {
-			return c
-		}
-		if n < minN {
-			minC = c
-			minN = n
-		}
-	}
+	cc.mu.RUnlock()
 	return minC
 }
 
@@ -138,6 +154,9 @@ type lbClient struct {
 	c           BalancingClient
 	healthCheck func(req *Request, resp *Response, err error) bool
 	penalty     uint32
+
+	// total amount of requests handled.
+	total uint64
 }
 
 func (c *lbClient) DoDeadline(req *Request, resp *Response, deadline time.Time) error {
@@ -146,6 +165,8 @@ func (c *lbClient) DoDeadline(req *Request, resp *Response, deadline time.Time) 
 		// Penalize the client returning error, so the next requests
 		// are routed to another clients.
 		time.AfterFunc(penaltyDuration, c.decPenalty)
+	} else {
+		atomic.AddUint64(&c.total, 1)
 	}
 	return err
 }

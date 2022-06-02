@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
+	"github.com/umbracle/ethgo"
 	"math/big"
 	"strconv"
 	"testing"
@@ -19,8 +20,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/golang/protobuf/ptypes/any"
 	"github.com/stretchr/testify/assert"
-	"github.com/umbracle/go-web3"
-	"github.com/umbracle/go-web3/jsonrpc"
+	"github.com/umbracle/ethgo/jsonrpc"
 )
 
 // foundInValidatorSet is a helper function for searching through the passed in set for a specific
@@ -376,7 +376,7 @@ func TestPoS_UnstakeExploit(t *testing.T) {
 		return signedTx
 	}
 
-	txHashes := make([]web3.Hash, 0)
+	txHashes := make([]ethgo.Hash, 0)
 
 	for i := 0; i < numTransactions; i++ {
 		var msg *txpoolOp.AddTxnReq
@@ -397,7 +397,7 @@ func TestPoS_UnstakeExploit(t *testing.T) {
 			t.Fatalf("Unable to add txn, %v", addErr)
 		}
 
-		txHashes = append(txHashes, web3.HexToHash(addResp.TxHash))
+		txHashes = append(txHashes, ethgo.HexToHash(addResp.TxHash))
 
 		addCtxCn()
 	}
@@ -521,7 +521,7 @@ func TestPoS_StakeUnstakeExploit(t *testing.T) {
 
 	oneEth := framework.EthToWei(1)
 	zeroEth := framework.EthToWei(0)
-	txHashes := make([]web3.Hash, 0)
+	txHashes := make([]ethgo.Hash, 0)
 
 	for i := 0; i < numTransactions; i++ {
 		var msg *txpoolOp.AddTxnReq
@@ -549,7 +549,7 @@ func TestPoS_StakeUnstakeExploit(t *testing.T) {
 			t.Fatalf("Unable to add txn, %v", addErr)
 		}
 
-		txHashes = append(txHashes, web3.HexToHash(addResp.TxHash))
+		txHashes = append(txHashes, ethgo.HexToHash(addResp.TxHash))
 	}
 
 	// Set up the blockchain listener to catch the added block event
@@ -652,7 +652,7 @@ func TestPoS_StakeUnstakeWithinSameBlock(t *testing.T) {
 	}
 
 	zeroEth := framework.EthToWei(0)
-	txHashes := make([]web3.Hash, 0)
+	txHashes := make([]ethgo.Hash, 0)
 
 	// addTxn is a helper method for generating and adding a transaction
 	// through the operator command
@@ -670,7 +670,7 @@ func TestPoS_StakeUnstakeWithinSameBlock(t *testing.T) {
 			t.Fatalf("Unable to add txn, %v", addErr)
 		}
 
-		txHashes = append(txHashes, web3.HexToHash(addResp.TxHash))
+		txHashes = append(txHashes, ethgo.HexToHash(addResp.TxHash))
 	}
 
 	// Stake transaction
