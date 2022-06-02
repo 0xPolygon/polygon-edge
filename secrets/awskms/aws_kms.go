@@ -214,21 +214,31 @@ func (k *KmsSecretManager) SignBySecret(key string, data []byte) ([]byte, error)
 	}
 	//fmt.Println("reqData: ", string(bs))
 
-	beginTime := time.Now().UnixNano()
-	resp, err := k.client.Post(k.serverURL, "application/json", bytes.NewBuffer(bs))
-	if err != nil {
-		fmt.Println("http post errr", err)
-		return nil, err
-	}
-	endTime := time.Now().UnixNano()
-	k.logger.Info(
-		"kms sign cost time: ", (endTime-beginTime)/1e6,
-	)
-	defer resp.Body.Close()
+	var resp *http.Response
+	// retry max 3 times
+	for retryCnt := 0; retryCnt < 3; retryCnt++ {
+		beginTime := time.Now().UnixNano()
+		resp, err = k.client.Post(k.serverURL, "application/json", bytes.NewBuffer(bs))
+		if err != nil {
+			fmt.Println("http post errr", err)
+			return nil, err
+		}
+		endTime := time.Now().UnixNano()
+		k.logger.Info(
+			"kms sign cost time: ", (endTime-beginTime)/1e6,
+		)
 
-	if resp.StatusCode != http.StatusOK {
-		fmt.Println("Status code err", resp.StatusCode)
-		return nil, errors.New("http status error")
+		if resp.StatusCode != http.StatusOK {
+			fmt.Println("Status code err", resp.StatusCode)
+			return nil, fmt.Errorf("http status error %d", resp.StatusCode)
+		}
+	}
+
+	// var rspIns SignResp
+	defer resp.Body.Close()
+	respData, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
 	}
 
 	type SignRawData struct {
@@ -243,18 +253,7 @@ func (k *KmsSecretManager) SignBySecret(key string, data []byte) ([]byte, error)
 		Data SignRawData `json:"data"`
 	}
 
-	// var rspIns SignResp
-
-	respData, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	//fmt.Println("respData: ", string(respData))
-
-	// var respMap map[string]interface{}
 	var signResp Resp
-
 	err = json.Unmarshal(respData, &signResp)
 	if err != nil {
 		return nil, err
@@ -268,12 +267,12 @@ func (k *KmsSecretManager) SignBySecret(key string, data []byte) ([]byte, error)
 
 	R, ok := (&big.Int{}).SetString(signResp.Data.R[2:], 16)
 	if !ok {
-		return nil, errors.New("R to big int error")
+		return nil, errors.New("r to big int error")
 	}
 
 	S, ok := (&big.Int{}).SetString(signResp.Data.S[2:], 16)
 	if !ok {
-		return nil, errors.New("S to big int error")
+		return nil, errors.New("s to big int error")
 	}
 
 	// Check if v value conforms to an earlier standard (before EIP155)
