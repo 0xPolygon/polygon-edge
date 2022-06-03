@@ -594,22 +594,6 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 		return ErrAlreadyKnown
 	}
 
-	//// check if already known
-	//if _, ok := p.index.get(tx.Hash); ok {
-	//	if origin == gossip {
-	//		// silently drop known tx
-	//		// that is gossiped back
-	//		p.logger.Debug(
-	//			"dropping known gossiped transaction",
-	//			"hash", tx.Hash.String(),
-	//		)
-	//
-	//		return nil
-	//	} else {
-	//		return ErrAlreadyKnown
-	//	}
-	//}
-
 	// initialize account for this address once
 	if !p.accounts.exists(tx.From) {
 		p.createAccountOnce(tx.From)
