@@ -226,7 +226,7 @@ func (pos *PoSMechanism) updateValidators(num uint64) error {
 	validators, err := pos.getNextValidators(header)
 	endTime := time.Now().UnixNano()
 	pos.ibft.logger.Info(
-		"query next validators cost time: ", (endTime-beginTime)/1e6,
+		"query next validators cost time", "duration", (endTime-beginTime)/1e6,
 	)
 
 	if err != nil {

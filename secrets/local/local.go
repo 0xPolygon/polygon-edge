@@ -165,7 +165,7 @@ func (l *LocalSecretsManager) RemoveSecret(name string) error {
 }
 
 // Sign data by key
-func (l *LocalSecretsManager) SignBySecret(key string, data []byte) ([]byte, error) {
+func (l *LocalSecretsManager) SignBySecret(key string, chainId int, data []byte) ([]byte, error) {
 	return nil, nil
 }
 

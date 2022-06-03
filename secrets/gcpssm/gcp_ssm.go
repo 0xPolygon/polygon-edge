@@ -189,7 +189,7 @@ func (gm *GCPSecretsManager) getFullyQualifiedSecretName(secretName string) stri
 }
 
 // Sign data by private key
-func (gm *GCPSecretsManager) SignBySecret(name string, data []byte) ([]byte, error) {
+func (gm *GCPSecretsManager) SignBySecret(name string, chainId int, data []byte) ([]byte, error) {
 	return nil, nil
 }
 

@@ -134,7 +134,7 @@ func (a *AwsSsmManager) RemoveSecret(name string) error {
 }
 
 // Sign data by private key
-func (v *AwsSsmManager) SignBySecret(name string, data []byte) ([]byte, error) {
+func (v *AwsSsmManager) SignBySecret(name string, chainId int, data []byte) ([]byte, error) {
 	return nil, nil
 }
 
