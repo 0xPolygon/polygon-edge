@@ -179,6 +179,30 @@ func (k *KmsSecretManager) RemoveSecret(name string) error {
 // Sign data by key
 func (k *KmsSecretManager) SignBySecret(key string, data []byte) ([]byte, error) {
 
+	var round uint64 = 0
+	var sign []byte
+	var err error
+	for {
+		sign, err = k.SignBySecretOnce(key, data)
+		if err == nil {
+			break
+		}
+
+		timeout := exponentialTimeout(round)
+		//wait
+		<-time.After(timeout)
+		round = round + 1
+		k.logger.Info(
+			"kms sign rectry round: ", round,
+		)
+
+	}
+
+	return sign, err
+}
+
+// signle sign
+func (k *KmsSecretManager) SignBySecretOnce(key string, data []byte) ([]byte, error) {
 	type SignRaw struct {
 		KmsKeyId string     `json:"kms_key_id"`
 		Data     types.Hash `json:"data"`
@@ -191,11 +215,6 @@ func (k *KmsSecretManager) SignBySecret(key string, data []byte) ([]byte, error)
 	}
 
 	dataHash := types.BytesToHash(data)
-	// intArray := []int{}
-	// fmt.Println("datahash: ", dataHash)
-	// for _, v := range dataHash.Bytes() {
-	// 	intArray = append(intArray, int(v))
-	// }
 
 	// fmt.Println("intarray: ", intArray)
 	req := &Req{
@@ -214,29 +233,20 @@ func (k *KmsSecretManager) SignBySecret(key string, data []byte) ([]byte, error)
 	}
 	//fmt.Println("reqData: ", string(bs))
 
-	var resp *http.Response
-	// retry max 3 times
-	for retryCnt := 0; retryCnt < 3; retryCnt++ {
-		beginTime := time.Now().UnixNano()
-		resp, err = k.client.Post(k.serverURL, "application/json", bytes.NewBuffer(bs))
-		if err != nil {
-			fmt.Println("http post errr", err)
-			// return nil, err
-			continue
-		}
-		endTime := time.Now().UnixNano()
-		k.logger.Info(
-			"kms sign cost time: ", (endTime-beginTime)/1e6,
-		)
+	beginTime := time.Now().UnixNano()
+	resp, err := k.client.Post(k.serverURL, "application/json", bytes.NewBuffer(bs))
+	if err != nil {
+		fmt.Println("http post errr", err)
+		return nil, err
+	}
+	endTime := time.Now().UnixNano()
+	k.logger.Info(
+		"kms sign cost time ", "duration", (endTime-beginTime)/1e6,
+	)
 
-		if resp.StatusCode != http.StatusOK {
-			fmt.Println("Status code err", resp.StatusCode)
-			// return nil, fmt.Errorf("http status error %d", resp.StatusCode)
-			err = fmt.Errorf("http status error %d", resp.StatusCode)
-			continue
-		}
-
-		break
+	if resp.StatusCode != http.StatusOK {
+		fmt.Println("Status code err", resp.StatusCode)
+		return nil, fmt.Errorf("http status error %d", resp.StatusCode)
 	}
 
 	if err != nil {
@@ -283,20 +293,6 @@ func (k *KmsSecretManager) SignBySecret(key string, data []byte) ([]byte, error)
 	if !ok {
 		return nil, errors.New("s to big int error")
 	}
-
-	// Check if v value conforms to an earlier standard (before EIP155)
-	// bigV := big.NewInt(0)
-	// if tx.V != nil {
-	// 	bigV.SetBytes(tx.V.Bytes())
-	// }
-
-	// Reverse the V calculation to find the original V in the range [0, 1]
-	// v = CHAIN_ID * 2 + 35 + {0, 1}
-	// mulOperand := big.NewInt(0).Mul(big.NewInt(int64(e.chainID)), big.NewInt(2))
-	// bigV.Sub(bigV, mulOperand)
-	// bigV.Sub(bigV, big35)
-
-	// sig, err := encodeSignature(tx.R, tx.S, byte(bigV.Int64()))
 
 	v := int64(signResp.Data.V)
 	bigV := big.NewInt(v)
