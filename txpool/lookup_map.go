@@ -12,7 +12,8 @@ type lookupMap struct {
 	all map[types.Hash]*types.Transaction
 }
 
-// add inserts the given transaction into the map. [thread-safe]
+// add inserts the given transaction into the map. Returns false
+// if it already exists. [thread-safe]
 func (m *lookupMap) add(tx *types.Transaction) bool {
 	m.Lock()
 	defer m.Unlock()

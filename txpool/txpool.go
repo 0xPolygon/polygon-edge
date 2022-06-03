@@ -590,7 +590,7 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 	tx.ComputeHash()
 
 	//	add to index
-	if known := p.index.add(tx); !known {
+	if ok := p.index.add(tx); !ok {
 		return ErrAlreadyKnown
 	}
 
