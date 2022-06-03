@@ -402,7 +402,7 @@ func TestDropKnownGossipTx(t *testing.T) {
 		err := pool.addTx(local, tx)
 		assert.NoError(t, err)
 	}()
-	pool.handleEnqueueRequest(<-pool.enqueueReqCh)
+	<-pool.enqueueReqCh
 
 	assert.Equal(t, uint64(1), pool.accounts.get(addr1).enqueued.length())
 
