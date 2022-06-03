@@ -95,11 +95,6 @@ func (v *ECDSAValidatorSet) MaxFaultyNodes() int {
 	return CalcMaxFaultyNodes(v)
 }
 
-// QuorumSize returns the number of required messages for consensus
-func (v *ECDSAValidatorSet) QuorumSize() int {
-	return CalcQuorumSize(v)
-}
-
 // Add adds a new address to the validator set
 func (v *ECDSAValidatorSet) Add(addr types.Address) {
 	*v = append(*v, addr)

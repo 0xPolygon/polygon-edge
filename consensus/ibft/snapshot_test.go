@@ -68,11 +68,15 @@ func (t *testerAccount) sign(h *types.Header) (*types.Header, error) {
 }
 
 type testerAccountPool struct {
+	t        *testing.T
 	accounts []*testerAccount
 }
 
-func newTesterAccountPool(num ...int) *testerAccountPool {
-	t := &testerAccountPool{
+func newTesterAccountPool(t *testing.T, num ...int) *testerAccountPool {
+	t.Helper()
+
+	pool := &testerAccountPool{
+		t:        t,
 		accounts: []*testerAccount{},
 	}
 
@@ -80,17 +84,19 @@ func newTesterAccountPool(num ...int) *testerAccountPool {
 		for i := 0; i < num[0]; i++ {
 			key, _ := crypto.GenerateKey()
 
-			t.accounts = append(t.accounts, &testerAccount{
+			pool.accounts = append(pool.accounts, &testerAccount{
 				alias: strconv.Itoa(i),
 				priv:  key,
 			})
 		}
 	}
 
-	return t
+	return pool
 }
 
 func (ap *testerAccountPool) add(accounts ...string) {
+	ap.t.Helper()
+
 	for _, account := range accounts {
 		if acct := ap.get(account); acct != nil {
 			continue
@@ -109,13 +115,17 @@ func (ap *testerAccountPool) add(accounts ...string) {
 }
 
 func (ap *testerAccountPool) genesis() *chain.Genesis {
+	ap.t.Helper()
+
 	genesis := &types.Header{
 		MixHash: signer.IstanbulDigest,
 	}
 
 	signer, _ := newMockSigner()
 
-	signer.InitIBFTExtra(genesis, &types.Header{}, ap.ValidatorSet())
+	err := signer.InitIBFTExtra(genesis, &types.Header{}, ap.ValidatorSet())
+	assert.NoError(ap.t, err)
+
 	genesis.ComputeHash()
 
 	c := &chain.Genesis{
@@ -127,6 +137,8 @@ func (ap *testerAccountPool) genesis() *chain.Genesis {
 }
 
 func (ap *testerAccountPool) get(name string) *testerAccount {
+	ap.t.Helper()
+
 	for _, i := range ap.accounts {
 		if i.alias == name {
 			return i
@@ -137,6 +149,8 @@ func (ap *testerAccountPool) get(name string) *testerAccount {
 }
 
 func (ap *testerAccountPool) ValidatorSet() validators.ValidatorSet {
+	ap.t.Helper()
+
 	v := validators.ECDSAValidatorSet{}
 	for _, i := range ap.accounts {
 		v = append(v, i.Address())
@@ -183,7 +197,12 @@ func newMockHeader(validators []string, vote mockVote) mockHeader {
 	}
 }
 
-func buildHeaders(t *testing.T, pool *testerAccountPool, genesis *chain.Genesis, mockHeaders []mockHeader) []*types.Header {
+func buildHeaders(
+	t *testing.T,
+	pool *testerAccountPool,
+	genesis *chain.Genesis,
+	mockHeaders []mockHeader,
+) []*types.Header {
 	t.Helper()
 
 	headers := make([]*types.Header, 0, len(mockHeaders))
@@ -261,7 +280,7 @@ func TestSnapshot_setupSnapshot(t *testing.T) {
 	// New voted validators
 	candidateVals := []string{"E", "F"}
 
-	pool := newTesterAccountPool()
+	pool := newTesterAccountPool(t)
 	pool.add(vals...)
 	validatorSet := pool.ValidatorSet()
 	genesis := pool.genesis()
@@ -727,7 +746,7 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 				epochSize = 1000
 			}
 
-			pool := newTesterAccountPool()
+			pool := newTesterAccountPool(t)
 			pool.add(c.validators...)
 			genesis := pool.genesis()
 
@@ -816,7 +835,7 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 }
 
 func TestSnapshot_PurgeSnapshots(t *testing.T) {
-	pool := newTesterAccountPool()
+	pool := newTesterAccountPool(t)
 	pool.add("a", "b", "c")
 
 	genesis := pool.genesis()

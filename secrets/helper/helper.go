@@ -9,6 +9,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/secrets/awsssm"
+	"github.com/0xPolygon/polygon-edge/secrets/gcpssm"
 	"github.com/0xPolygon/polygon-edge/secrets/hashicorpvault"
 	"github.com/0xPolygon/polygon-edge/secrets/local"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -59,6 +60,18 @@ func SetupAWSSSM(
 	secretsConfig *secrets.SecretsManagerConfig,
 ) (secrets.SecretsManager, error) {
 	return awsssm.SecretsManagerFactory(
+		secretsConfig,
+		&secrets.SecretsManagerParams{
+			Logger: hclog.NewNullLogger(),
+		},
+	)
+}
+
+// SetupGCPSSM is a helper method for boilerplate Google Cloud Computing secrets manager setup
+func SetupGCPSSM(
+	secretsConfig *secrets.SecretsManagerConfig,
+) (secrets.SecretsManager, error) {
+	return gcpssm.SecretsManagerFactory(
 		secretsConfig,
 		&secrets.SecretsManagerParams{
 			Logger: hclog.NewNullLogger(),

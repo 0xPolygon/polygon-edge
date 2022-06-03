@@ -14,7 +14,7 @@ import (
 
 func TestOperator_GetNextCandidate(t *testing.T) {
 	// we cannot vote if there is already a pending vote for our proposal
-	pool := newTesterAccountPool()
+	pool := newTesterAccountPool(t)
 	pool.add("A", "B", "C")
 
 	ibft := &Ibft{
@@ -76,7 +76,7 @@ func TestOperator_GetNextCandidate(t *testing.T) {
 }
 
 func TestOperator_Propose(t *testing.T) {
-	pool := newTesterAccountPool()
+	pool := newTesterAccountPool(t)
 	pool.add("A", "B", "C")
 
 	ibft := &Ibft{

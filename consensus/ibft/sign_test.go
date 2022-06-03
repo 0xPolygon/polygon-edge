@@ -5,12 +5,13 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
+	"github.com/0xPolygon/polygon-edge/consensus/ibft/validators"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestSign_Sealer(t *testing.T) {
-	pool := newTesterAccountPool()
+	pool := newTesterAccountPool(t)
 	pool.add("A")
 
 	snap := &Snapshot{
@@ -20,7 +21,8 @@ func TestSign_Sealer(t *testing.T) {
 	h := &types.Header{}
 	signerA := signer.NewECDSASignerFromKey(pool.get("A").priv)
 
-	signerA.InitIBFTExtra(h, &types.Header{}, pool.ValidatorSet())
+	err := signerA.InitIBFTExtra(h, &types.Header{}, pool.ValidatorSet())
+	assert.NoError(t, err)
 
 	// non-validator address
 	pool.add("X")
@@ -42,7 +44,7 @@ func TestSign_Sealer(t *testing.T) {
 }
 
 func TestSign_CommittedSeals(t *testing.T) {
-	pool := newTesterAccountPool()
+	pool := newTesterAccountPool(t)
 	pool.add("A", "B", "C", "D", "E")
 
 	snap := &Snapshot{
@@ -52,7 +54,8 @@ func TestSign_CommittedSeals(t *testing.T) {
 	h := &types.Header{}
 
 	signerA := signer.NewECDSASignerFromKey(pool.get("A").priv)
-	signerA.InitIBFTExtra(h, &types.Header{}, pool.ValidatorSet())
+	err := signerA.InitIBFTExtra(h, &types.Header{}, pool.ValidatorSet())
+	assert.NoError(t, err)
 
 	// non-validator address
 	pool.add("X")
@@ -67,6 +70,7 @@ func TestSign_CommittedSeals(t *testing.T) {
 			seal, err := signer.CreateCommittedSeal(h)
 
 			assert.NoError(t, err)
+
 			seals[account.Address()] = seal
 		}
 
@@ -74,7 +78,7 @@ func TestSign_CommittedSeals(t *testing.T) {
 
 		assert.NoError(t, err)
 
-		return signerA.VerifyCommittedSeal(snap.Set, sealed)
+		return signerA.VerifyCommittedSeal(snap.Set, sealed, validators.OptimalQuorumSize)
 	}
 
 	// Correct
@@ -91,7 +95,7 @@ func TestSign_CommittedSeals(t *testing.T) {
 }
 
 func TestSign_Messages(t *testing.T) {
-	pool := newTesterAccountPool()
+	pool := newTesterAccountPool(t)
 	pool.add("A")
 
 	msg := &proto.MessageReq{}

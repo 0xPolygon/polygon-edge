@@ -33,7 +33,10 @@
 package protoio
 
 import (
+	"fmt"
 	"io"
+	"os"
+	"runtime/debug"
 
 	"github.com/gogo/protobuf/proto"
 
@@ -51,6 +54,13 @@ func NewDelimitedWriter(w io.Writer) WriteCloser {
 }
 
 func (uw *uvarintWriter) WriteMsg(msg proto.Message) (err error) {
+	defer func() {
+		if rerr := recover(); rerr != nil {
+			fmt.Fprintf(os.Stderr, "caught panic: %s\n%s\n", rerr, debug.Stack())
+			err = fmt.Errorf("panic reading message: %s", rerr)
+		}
+	}()
+
 	var data []byte
 	if m, ok := msg.(interface {
 		MarshalTo(data []byte) (n int, err error)

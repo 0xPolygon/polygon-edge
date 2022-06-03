@@ -77,6 +77,10 @@ func (l *lazyClientConn) doReadHandshake() {
 			return
 		}
 
+		if tok == "na" {
+			l.rerr = ErrNotSupported
+			return
+		}
 		if tok != proto {
 			l.rerr = fmt.Errorf("protocol mismatch in lazy handshake ( %s != %s )", tok, proto)
 			return

@@ -17,18 +17,28 @@ func CalcMaxFaultyNodes(s ValidatorSet) int {
 	return (s.Len() - 1) / 3
 }
 
-func CalcQuorumSize(s ValidatorSet) int {
+type QuorumImplementation func(ValidatorSet) int
+
+//	LegacyQuorumSize returns the legacy quorum size for the given validator set
+func LegacyQuorumSize(set ValidatorSet) int {
+	// According to the IBFT spec, the number of valid messages
+	// needs to be 2F + 1
+	return 2*set.MaxFaultyNodes() + 1
+}
+
+// OptimalQuorumSize returns the optimal quorum size for the given validator set
+func OptimalQuorumSize(set ValidatorSet) int {
 	//	if the number of validators is less than 4,
 	//	then the entire set is required
-	if s.MaxFaultyNodes() == 0 {
+	if set.MaxFaultyNodes() == 0 {
 		/*
 			N: 1 -> Q: 1
 			N: 2 -> Q: 2
 			N: 3 -> Q: 3
 		*/
-		return s.Len()
+		return set.Len()
 	}
 
 	// (quorum optimal)	Q = ceil(2/3 * N)
-	return int(math.Ceil(2 * float64(s.Len()) / 3))
+	return int(math.Ceil(2 * float64(set.Len()) / 3))
 }

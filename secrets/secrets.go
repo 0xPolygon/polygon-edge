@@ -58,6 +58,9 @@ const (
 
 	// AWSSSM pertains to AWS SSM using configured EC2 instance role
 	AWSSSM SecretsManagerType = "aws-ssm"
+
+	// GCPSSM pertains to the Google Cloud Computing secret store manager
+	GCPSSM SecretsManagerType = "gcp-ssm"
 )
 
 // SecretsManager defines the base public interface that all
@@ -103,5 +106,5 @@ type SecretsManagerFactory func(
 // SupportedServiceManager checks if the passed in service manager type is supported
 func SupportedServiceManager(service SecretsManagerType) bool {
 	return service == HashicorpVault || service == AWSSSM ||
-		service == Local
+		service == Local || service == GCPSSM
 }

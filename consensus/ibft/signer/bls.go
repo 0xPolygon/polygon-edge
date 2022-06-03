@@ -191,7 +191,11 @@ func (s *BLSSigner) WriteCommittedSeals(header *types.Header, sealMap map[types.
 	return header, nil
 }
 
-func (s *BLSSigner) VerifyCommittedSeal(rawSet validators.ValidatorSet, header *types.Header) error {
+func (s *BLSSigner) VerifyCommittedSeal(
+	rawSet validators.ValidatorSet,
+	header *types.Header,
+	quorumFn validators.QuorumImplementation,
+) error {
 	extra, err := s.GetIBFTExtra(header)
 	if err != nil {
 		return err
@@ -216,12 +220,13 @@ func (s *BLSSigner) VerifyCommittedSeal(rawSet validators.ValidatorSet, header *
 
 	rawMsg := commitMsg(hash[:])
 
-	return s.verifyCommittedSealsImpl(cs, rawMsg, *validatorSet)
+	return s.verifyCommittedSealsImpl(cs, rawMsg, *validatorSet, quorumFn)
 }
 
 func (s *BLSSigner) VerifyParentCommittedSeal(
 	rawParentSet validators.ValidatorSet,
 	parent, header *types.Header,
+	quorumFn validators.QuorumImplementation,
 ) error {
 	extra, err := s.GetIBFTExtra(header)
 	if err != nil {
@@ -247,7 +252,7 @@ func (s *BLSSigner) VerifyParentCommittedSeal(
 
 	rawMsg := commitMsg(hash[:])
 
-	return s.verifyCommittedSealsImpl(parentCs, rawMsg, *validatorSet)
+	return s.verifyCommittedSealsImpl(parentCs, rawMsg, *validatorSet, quorumFn)
 }
 
 func (s *BLSSigner) SignGossipMessage(msg *proto.MessageReq) error {
@@ -309,6 +314,7 @@ func (s *BLSSigner) verifyCommittedSealsImpl(
 	committedSeal *BLSSeal,
 	msg []byte,
 	validators validators.BLSValidatorSet,
+	quorumFn validators.QuorumImplementation,
 ) error {
 	if len(committedSeal.Signature) == 0 || committedSeal.Bitmap.BitLen() == 0 {
 		return ErrEmptyCommittedSeals
@@ -347,6 +353,13 @@ func (s *BLSSigner) verifyCommittedSealsImpl(
 
 	if !ok {
 		return ErrInvalidBLSSignature
+	}
+
+	// Valid committed seals must be at least 2F+1
+	// 	2F 	is the required number of honest validators who provided the committed seals
+	// 	+1	is the proposer
+	if validSeals := len(pubkeys); validSeals < quorumFn(&validators) {
+		return ErrNotEnoughCommittedSeals
 	}
 
 	return nil

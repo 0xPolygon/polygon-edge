@@ -12,6 +12,7 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/host/autonat"
 	"github.com/libp2p/go-libp2p/p2p/host/pstoremanager"
 	"github.com/libp2p/go-libp2p/p2p/host/relaysvc"
+	inat "github.com/libp2p/go-libp2p/p2p/net/nat"
 	relayv2 "github.com/libp2p/go-libp2p/p2p/protocol/circuitv2/relay"
 	"github.com/libp2p/go-libp2p/p2p/protocol/holepunch"
 	"github.com/libp2p/go-libp2p/p2p/protocol/identify"
@@ -28,7 +29,6 @@ import (
 	"github.com/libp2p/go-libp2p-core/record"
 
 	"github.com/libp2p/go-eventbus"
-	inat "github.com/libp2p/go-libp2p-nat"
 	"github.com/libp2p/go-netroute"
 
 	logging "github.com/ipfs/go-log/v2"
@@ -376,7 +376,7 @@ func (h *BasicHost) newStreamHandler(s network.Stream) {
 		}
 	}
 
-	lzc, protoID, handle, err := h.Mux().NegotiateLazy(s)
+	protoID, handle, err := h.Mux().Negotiate(s)
 	took := time.Since(before)
 	if err != nil {
 		if err == io.EOF {
@@ -390,11 +390,6 @@ func (h *BasicHost) newStreamHandler(s network.Stream) {
 		}
 		s.Reset()
 		return
-	}
-
-	s = &streamWrapper{
-		Stream: s,
-		rw:     lzc,
 	}
 
 	if h.negtimeout > 0 {
@@ -605,6 +600,17 @@ func (h *BasicHost) RemoveStreamHandler(pid protocol.ID) {
 // to create one. If ProtocolID is "", writes no header.
 // (Threadsafe)
 func (h *BasicHost) NewStream(ctx context.Context, p peer.ID, pids ...protocol.ID) (network.Stream, error) {
+	// Ensure we have a connection, with peer addresses resolved by the routing system (#207)
+	// It is not sufficient to let the underlying host connect, it will most likely not have
+	// any addresses for the peer without any prior connections.
+	// If the caller wants to prevent the host from dialing, it should use the NoDial option.
+	if nodial, _ := network.GetNoDial(ctx); !nodial {
+		err := h.Connect(ctx, peer.AddrInfo{ID: p})
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	s, err := h.Network().NewStream(ctx, p)
 	if err != nil {
 		return nil, err
@@ -1054,6 +1060,10 @@ func (h *BasicHost) Close() error {
 		}
 
 		h.refCount.Wait()
+
+		if h.Network().ResourceManager() != nil {
+			h.Network().ResourceManager().Close()
+		}
 	})
 
 	return nil

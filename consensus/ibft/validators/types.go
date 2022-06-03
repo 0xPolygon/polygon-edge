@@ -16,7 +16,6 @@ type ValidatorSet interface {
 	Add(addr types.Address)
 	Del(target types.Address)
 	MaxFaultyNodes() int
-	QuorumSize() int
 	MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value
 	UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error
 }

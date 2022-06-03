@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/umbracle/ethgo"
 	"math/big"
 	"strconv"
 	"sync"
@@ -18,8 +19,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/helper/tests"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
-	"github.com/umbracle/go-web3"
-	"github.com/umbracle/go-web3/jsonrpc"
+	"github.com/umbracle/ethgo/jsonrpc"
 )
 
 func TestPreminedBalance(t *testing.T) {
@@ -65,7 +65,7 @@ func TestPreminedBalance(t *testing.T) {
 
 	for _, testCase := range testTable {
 		t.Run(testCase.name, func(t *testing.T) {
-			balance, err := rpcClient.Eth().GetBalance(web3.Address(testCase.address), web3.Latest)
+			balance, err := rpcClient.Eth().GetBalance(ethgo.Address(testCase.address), ethgo.Latest)
 			assert.NoError(t, err)
 			assert.Equal(t, testCase.balance, balance)
 		})
@@ -144,14 +144,14 @@ func TestEthTransfer(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			// Fetch the balances before sending
 			balanceSender, err := rpcClient.Eth().GetBalance(
-				web3.Address(testCase.sender),
-				web3.Latest,
+				ethgo.Address(testCase.sender),
+				ethgo.Latest,
 			)
 			assert.NoError(t, err)
 
 			balanceReceiver, err := rpcClient.Eth().GetBalance(
-				web3.Address(testCase.recipient),
-				web3.Latest,
+				ethgo.Address(testCase.recipient),
+				ethgo.Latest,
 			)
 			assert.NoError(t, err)
 
@@ -183,14 +183,14 @@ func TestEthTransfer(t *testing.T) {
 
 			// Fetch the balances after sending
 			balanceSender, err = rpcClient.Eth().GetBalance(
-				web3.Address(testCase.sender),
-				web3.Latest,
+				ethgo.Address(testCase.sender),
+				ethgo.Latest,
 			)
 			assert.NoError(t, err)
 
 			balanceReceiver, err = rpcClient.Eth().GetBalance(
-				web3.Address(testCase.recipient),
-				web3.Latest,
+				ethgo.Address(testCase.recipient),
+				ethgo.Latest,
 			)
 			assert.NoError(t, err)
 
@@ -229,7 +229,7 @@ func TestEthTransfer(t *testing.T) {
 // getCount is a helper function for the stress test SC
 func getCount(
 	from types.Address,
-	contractAddress web3.Address,
+	contractAddress ethgo.Address,
 	rpcClient *jsonrpc.Client,
 ) (*big.Int, error) {
 	stressTestMethod, ok := abis.StressTestABI.Methods["getCount"]
@@ -239,14 +239,14 @@ func getCount(
 
 	selector := stressTestMethod.ID()
 	response, err := rpcClient.Eth().Call(
-		&web3.CallMsg{
-			From:     web3.Address(from),
+		&ethgo.CallMsg{
+			From:     ethgo.Address(from),
 			To:       &contractAddress,
 			Data:     selector,
 			GasPrice: 100000000,
 			Value:    big.NewInt(0),
 		},
-		web3.Latest,
+		ethgo.Latest,
 	)
 
 	if err != nil {
@@ -320,12 +320,12 @@ func addStressTxnsWithHashes(
 	numTransactions int,
 	contractAddr types.Address,
 	senderKey *ecdsa.PrivateKey,
-) []web3.Hash {
+) []ethgo.Hash {
 	t.Helper()
 
 	currentNonce := 1 // 1 because the first transaction was deployment
 
-	txHashes := make([]web3.Hash, 0)
+	txHashes := make([]ethgo.Hash, 0)
 
 	for i := 0; i < numTransactions; i++ {
 		setNameTxn := generateStressTestTx(

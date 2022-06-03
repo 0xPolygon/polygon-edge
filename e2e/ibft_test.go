@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/umbracle/go-web3"
+	"github.com/umbracle/ethgo"
 
 	ibftSigner "github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/e2e/framework"
@@ -146,7 +146,7 @@ func TestIbft_TransactionFeeRecipient(t *testing.T) {
 			assert.NoError(t, err)
 
 			// Given that this is the first transaction on the blockchain, proposer's balance should be equal to the tx fee
-			balanceProposer, err := clt.Eth().GetBalance(web3.Address(proposerAddr), web3.Latest)
+			balanceProposer, err := clt.Eth().GetBalance(ethgo.Address(proposerAddr), ethgo.Latest)
 			assert.NoError(t, err)
 
 			txFee := new(big.Int).Mul(new(big.Int).SetUint64(receipt.GasUsed), txn.GasPrice)

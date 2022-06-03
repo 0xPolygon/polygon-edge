@@ -28,6 +28,11 @@ func TestSupportedServiceManager(t *testing.T) {
 			true,
 		},
 		{
+			"Valid GCP secrets manager",
+			GCPSSM,
+			true,
+		},
+		{
 			"Invalid secrets manager",
 			"MarsSecretsManager",
 			false,

@@ -30,8 +30,12 @@ type Signer interface {
 	EcrecoverFromHeader(*types.Header) (types.Address, error)
 	CreateCommittedSeal(*types.Header) ([]byte, error)
 	WriteCommittedSeals(*types.Header, map[types.Address][]byte) (*types.Header, error)
-	VerifyCommittedSeal(validators.ValidatorSet, *types.Header) error
-	VerifyParentCommittedSeal(set validators.ValidatorSet, parent, header *types.Header) error
+	VerifyCommittedSeal(validators.ValidatorSet, *types.Header, validators.QuorumImplementation) error
+	VerifyParentCommittedSeal(
+		set validators.ValidatorSet,
+		parent, header *types.Header,
+		quorumFn validators.QuorumImplementation,
+	) error
 	SignGossipMessage(*proto.MessageReq) error
 	ValidateGossipMessage(*proto.MessageReq) error
 	CalculateHeaderHash(*types.Header) (types.Hash, error)

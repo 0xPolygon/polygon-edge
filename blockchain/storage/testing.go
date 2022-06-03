@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-type MockStorage func(t *testing.T) (Storage, func())
+type PlaceholderStorage func(t *testing.T) (Storage, func())
 
 var (
 	addr1 = types.StringToAddress("1")
@@ -22,7 +22,7 @@ var (
 )
 
 // TestStorage tests a set of tests on a storage
-func TestStorage(t *testing.T, m MockStorage) {
+func TestStorage(t *testing.T, m PlaceholderStorage) {
 	t.Helper()
 
 	t.Run("", func(t *testing.T) {
@@ -51,7 +51,7 @@ func TestStorage(t *testing.T, m MockStorage) {
 	})
 }
 
-func testCanonicalChain(t *testing.T, m MockStorage) {
+func testCanonicalChain(t *testing.T, m PlaceholderStorage) {
 	t.Helper()
 
 	s, closeFn := m(t)
@@ -104,7 +104,7 @@ func testCanonicalChain(t *testing.T, m MockStorage) {
 	}
 }
 
-func testDifficulty(t *testing.T, m MockStorage) {
+func testDifficulty(t *testing.T, m PlaceholderStorage) {
 	t.Helper()
 
 	s, closeFn := m(t)
@@ -151,7 +151,7 @@ func testDifficulty(t *testing.T, m MockStorage) {
 	}
 }
 
-func testHead(t *testing.T, m MockStorage) {
+func testHead(t *testing.T, m PlaceholderStorage) {
 	t.Helper()
 
 	s, closeFn := m(t)
@@ -196,7 +196,7 @@ func testHead(t *testing.T, m MockStorage) {
 	}
 }
 
-func testForks(t *testing.T, m MockStorage) {
+func testForks(t *testing.T, m PlaceholderStorage) {
 	t.Helper()
 
 	s, closeFn := m(t)
@@ -223,7 +223,7 @@ func testForks(t *testing.T, m MockStorage) {
 	}
 }
 
-func testHeader(t *testing.T, m MockStorage) {
+func testHeader(t *testing.T, m PlaceholderStorage) {
 	t.Helper()
 
 	s, closeFn := m(t)
@@ -251,7 +251,7 @@ func testHeader(t *testing.T, m MockStorage) {
 	}
 }
 
-func testBody(t *testing.T, m MockStorage) {
+func testBody(t *testing.T, m PlaceholderStorage) {
 	t.Helper()
 
 	s, closeFn := m(t)
@@ -318,7 +318,7 @@ func testBody(t *testing.T, m MockStorage) {
 	}
 }
 
-func testReceipts(t *testing.T, m MockStorage) {
+func testReceipts(t *testing.T, m PlaceholderStorage) {
 	t.Helper()
 
 	s, closeFn := m(t)
@@ -370,7 +370,7 @@ func testReceipts(t *testing.T, m MockStorage) {
 		TxHash:            txn.Hash,
 		LogsBloom:         types.Bloom{0x1},
 		GasUsed:           10,
-		ContractAddress:   types.Address{0x1},
+		ContractAddress:   &types.Address{0x1},
 		Logs: []*types.Log{
 			{
 				Address: addr2,
@@ -394,7 +394,7 @@ func testReceipts(t *testing.T, m MockStorage) {
 	assert.True(t, reflect.DeepEqual(receipts, found))
 }
 
-func testWriteCanonicalHeader(t *testing.T, m MockStorage) {
+func testWriteCanonicalHeader(t *testing.T, m PlaceholderStorage) {
 	t.Helper()
 
 	s, closeFn := m(t)
@@ -450,4 +450,322 @@ func testWriteCanonicalHeader(t *testing.T, m MockStorage) {
 	if canHash != h.Hash {
 		t.Fatal("canonical hash not correct")
 	}
+}
+
+// Storage delegators
+
+type readCanonicalHashDelegate func(uint64) (types.Hash, bool)
+type writeCanonicalHashDelegate func(uint64, types.Hash) error
+type readHeadHashDelegate func() (types.Hash, bool)
+type readHeadNumberDelegate func() (uint64, bool)
+type writeHeadHashDelegate func(types.Hash) error
+type writeHeadNumberDelegate func(uint64) error
+type writeForksDelegate func([]types.Hash) error
+type readForksDelegate func() ([]types.Hash, error)
+type writeTotalDifficultyDelegate func(types.Hash, *big.Int) error
+type readTotalDifficultyDelegate func(types.Hash) (*big.Int, bool)
+type writeHeaderDelegate func(*types.Header) error
+type readHeaderDelegate func(types.Hash) (*types.Header, error)
+type writeCanonicalHeaderDelegate func(*types.Header, *big.Int) error
+type writeBodyDelegate func(types.Hash, *types.Body) error
+type readBodyDelegate func(types.Hash) (*types.Body, error)
+type writeSnapshotDelegate func(types.Hash, []byte) error
+type readSnapshotDelegate func(types.Hash) ([]byte, bool)
+type writeReceiptsDelegate func(types.Hash, []*types.Receipt) error
+type readReceiptsDelegate func(types.Hash) ([]*types.Receipt, error)
+type writeTxLookupDelegate func(types.Hash, types.Hash) error
+type readTxLookupDelegate func(types.Hash) (types.Hash, bool)
+type closeDelegate func() error
+
+type MockStorage struct {
+	readCanonicalHashFn    readCanonicalHashDelegate
+	writeCanonicalHashFn   writeCanonicalHashDelegate
+	readHeadHashFn         readHeadHashDelegate
+	readHeadNumberFn       readHeadNumberDelegate
+	writeHeadHashFn        writeHeadHashDelegate
+	writeHeadNumberFn      writeHeadNumberDelegate
+	writeForksFn           writeForksDelegate
+	readForksFn            readForksDelegate
+	writeTotalDifficultyFn writeTotalDifficultyDelegate
+	readTotalDifficultyFn  readTotalDifficultyDelegate
+	writeHeaderFn          writeHeaderDelegate
+	readHeaderFn           readHeaderDelegate
+	writeCanonicalHeaderFn writeCanonicalHeaderDelegate
+	writeBodyFn            writeBodyDelegate
+	readBodyFn             readBodyDelegate
+	writeSnapshotFn        writeSnapshotDelegate
+	readSnapshotFn         readSnapshotDelegate
+	writeReceiptsFn        writeReceiptsDelegate
+	readReceiptsFn         readReceiptsDelegate
+	writeTxLookupFn        writeTxLookupDelegate
+	readTxLookupFn         readTxLookupDelegate
+	closeFn                closeDelegate
+}
+
+func NewMockStorage() *MockStorage {
+	return &MockStorage{}
+}
+
+func (m *MockStorage) ReadCanonicalHash(n uint64) (types.Hash, bool) {
+	if m.readCanonicalHashFn != nil {
+		return m.readCanonicalHashFn(n)
+	}
+
+	return types.Hash{}, true
+}
+
+func (m *MockStorage) HookReadCanonicalHash(fn readCanonicalHashDelegate) {
+	m.readCanonicalHashFn = fn
+}
+
+func (m *MockStorage) WriteCanonicalHash(n uint64, hash types.Hash) error {
+	if m.writeCanonicalHashFn != nil {
+		return m.writeCanonicalHashFn(n, hash)
+	}
+
+	return nil
+}
+
+func (m *MockStorage) HookWriteCanonicalHash(fn writeCanonicalHashDelegate) {
+	m.writeCanonicalHashFn = fn
+}
+
+func (m *MockStorage) ReadHeadHash() (types.Hash, bool) {
+	if m.readHeadHashFn != nil {
+		return m.readHeadHashFn()
+	}
+
+	return types.Hash{}, true
+}
+
+func (m *MockStorage) HookReadHeadHash(fn readHeadHashDelegate) {
+	m.readHeadHashFn = fn
+}
+
+func (m *MockStorage) ReadHeadNumber() (uint64, bool) {
+	if m.readHeadNumberFn != nil {
+		return m.readHeadNumberFn()
+	}
+
+	return 0, true
+}
+
+func (m *MockStorage) HookReadHeadNumber(fn readHeadNumberDelegate) {
+	m.readHeadNumberFn = fn
+}
+
+func (m *MockStorage) WriteHeadHash(h types.Hash) error {
+	if m.writeHeadHashFn != nil {
+		return m.writeHeadHashFn(h)
+	}
+
+	return nil
+}
+
+func (m *MockStorage) HookWriteHeadHash(fn writeHeadHashDelegate) {
+	m.writeHeadHashFn = fn
+}
+
+func (m *MockStorage) WriteHeadNumber(n uint64) error {
+	if m.writeHeadNumberFn != nil {
+		return m.writeHeadNumberFn(n)
+	}
+
+	return nil
+}
+
+func (m *MockStorage) HookWriteHeadNumber(fn writeHeadNumberDelegate) {
+	m.writeHeadNumberFn = fn
+}
+
+func (m *MockStorage) WriteForks(forks []types.Hash) error {
+	if m.writeForksFn != nil {
+		return m.writeForksFn(forks)
+	}
+
+	return nil
+}
+
+func (m *MockStorage) HookWriteForks(fn writeForksDelegate) {
+	m.writeForksFn = fn
+}
+
+func (m *MockStorage) ReadForks() ([]types.Hash, error) {
+	if m.readForksFn != nil {
+		return m.readForksFn()
+	}
+
+	return []types.Hash{}, nil
+}
+
+func (m *MockStorage) HookReadForks(fn readForksDelegate) {
+	m.readForksFn = fn
+}
+
+func (m *MockStorage) WriteTotalDifficulty(hash types.Hash, diff *big.Int) error {
+	if m.writeTotalDifficultyFn != nil {
+		return m.writeTotalDifficultyFn(hash, diff)
+	}
+
+	return nil
+}
+
+func (m *MockStorage) HookWriteTotalDifficulty(fn writeTotalDifficultyDelegate) {
+	m.writeTotalDifficultyFn = fn
+}
+
+func (m *MockStorage) ReadTotalDifficulty(hash types.Hash) (*big.Int, bool) {
+	if m.readTotalDifficultyFn != nil {
+		return m.readTotalDifficultyFn(hash)
+	}
+
+	return big.NewInt(0), true
+}
+
+func (m *MockStorage) HookReadTotalDifficulty(fn readTotalDifficultyDelegate) {
+	m.readTotalDifficultyFn = fn
+}
+
+func (m *MockStorage) WriteHeader(h *types.Header) error {
+	if m.writeHeaderFn != nil {
+		return m.writeHeaderFn(h)
+	}
+
+	return nil
+}
+
+func (m *MockStorage) HookWriteHeader(fn writeHeaderDelegate) {
+	m.writeHeaderFn = fn
+}
+
+func (m *MockStorage) ReadHeader(hash types.Hash) (*types.Header, error) {
+	if m.readHeaderFn != nil {
+		return m.readHeaderFn(hash)
+	}
+
+	return &types.Header{}, nil
+}
+
+func (m *MockStorage) HookReadHeader(fn readHeaderDelegate) {
+	m.readHeaderFn = fn
+}
+
+func (m *MockStorage) WriteCanonicalHeader(h *types.Header, diff *big.Int) error {
+	if m.writeCanonicalHeaderFn != nil {
+		return m.writeCanonicalHeaderFn(h, diff)
+	}
+
+	return nil
+}
+
+func (m *MockStorage) HookWriteCanonicalHeader(fn writeCanonicalHeaderDelegate) {
+	m.writeCanonicalHeaderFn = fn
+}
+
+func (m *MockStorage) WriteBody(hash types.Hash, body *types.Body) error {
+	if m.writeBodyFn != nil {
+		return m.writeBodyFn(hash, body)
+	}
+
+	return nil
+}
+
+func (m *MockStorage) HookWriteBody(fn writeBodyDelegate) {
+	m.writeBodyFn = fn
+}
+
+func (m *MockStorage) ReadBody(hash types.Hash) (*types.Body, error) {
+	if m.readBodyFn != nil {
+		return m.readBodyFn(hash)
+	}
+
+	return &types.Body{}, nil
+}
+
+func (m *MockStorage) HookReadBody(fn readBodyDelegate) {
+	m.readBodyFn = fn
+}
+
+func (m *MockStorage) WriteSnapshot(hash types.Hash, blob []byte) error {
+	if m.writeSnapshotFn != nil {
+		return m.writeSnapshotFn(hash, blob)
+	}
+
+	return nil
+}
+
+func (m *MockStorage) HookWriteSnapshot(fn writeSnapshotDelegate) {
+	m.writeSnapshotFn = fn
+}
+
+func (m *MockStorage) ReadSnapshot(hash types.Hash) ([]byte, bool) {
+	if m.readSnapshotFn != nil {
+		return m.readSnapshotFn(hash)
+	}
+
+	return []byte{}, true
+}
+
+func (m *MockStorage) HookReadSnapshot(fn readSnapshotDelegate) {
+	m.readSnapshotFn = fn
+}
+
+func (m *MockStorage) WriteReceipts(hash types.Hash, receipts []*types.Receipt) error {
+	if m.writeReceiptsFn != nil {
+		return m.writeReceiptsFn(hash, receipts)
+	}
+
+	return nil
+}
+
+func (m *MockStorage) HookWriteReceipts(fn writeReceiptsDelegate) {
+	m.writeReceiptsFn = fn
+}
+
+func (m *MockStorage) ReadReceipts(hash types.Hash) ([]*types.Receipt, error) {
+	if m.readReceiptsFn != nil {
+		return m.readReceiptsFn(hash)
+	}
+
+	return []*types.Receipt{}, nil
+}
+
+func (m *MockStorage) HookReadReceipts(fn readReceiptsDelegate) {
+	m.readReceiptsFn = fn
+}
+
+func (m *MockStorage) WriteTxLookup(hash types.Hash, blockHash types.Hash) error {
+	if m.writeTxLookupFn != nil {
+		return m.writeTxLookupFn(hash, blockHash)
+	}
+
+	return nil
+}
+
+func (m *MockStorage) HookWriteTxLookup(fn writeTxLookupDelegate) {
+	m.writeTxLookupFn = fn
+}
+
+func (m *MockStorage) ReadTxLookup(hash types.Hash) (types.Hash, bool) {
+	if m.readTxLookupFn != nil {
+		return m.readTxLookupFn(hash)
+	}
+
+	return types.Hash{}, true
+}
+
+func (m *MockStorage) HookReadTxLookup(fn readTxLookupDelegate) {
+	m.readTxLookupFn = fn
+}
+
+func (m *MockStorage) Close() error {
+	if m.closeFn != nil {
+		return m.closeFn()
+	}
+
+	return nil
+}
+
+func (m *MockStorage) HookClose(fn closeDelegate) {
+	m.closeFn = fn
 }

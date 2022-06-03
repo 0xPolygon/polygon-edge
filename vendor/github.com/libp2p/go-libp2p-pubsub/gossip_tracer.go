@@ -15,7 +15,7 @@ import (
 type gossipTracer struct {
 	sync.Mutex
 
-	msgID MsgIdFunction
+	idGen *msgIDGenerator
 
 	followUpTime time.Duration
 
@@ -29,7 +29,7 @@ type gossipTracer struct {
 
 func newGossipTracer() *gossipTracer {
 	return &gossipTracer{
-		msgID:        DefaultMsgIdFn,
+		idGen:        newMsgIdGenerator(),
 		promises:     make(map[string]map[peer.ID]time.Time),
 		peerPromises: make(map[peer.ID]map[string]struct{}),
 	}
@@ -40,7 +40,7 @@ func (gt *gossipTracer) Start(gs *GossipSubRouter) {
 		return
 	}
 
-	gt.msgID = gs.p.msgID
+	gt.idGen = gs.p.idGen
 	gt.followUpTime = gs.params.IWantFollowupTime
 }
 
@@ -117,7 +117,7 @@ func (gt *gossipTracer) GetBrokenPromises() map[peer.ID]int {
 var _ RawTracer = (*gossipTracer)(nil)
 
 func (gt *gossipTracer) fulfillPromise(msg *Message) {
-	mid := gt.msgID(msg.Message)
+	mid := gt.idGen.ID(msg)
 
 	gt.Lock()
 	defer gt.Unlock()

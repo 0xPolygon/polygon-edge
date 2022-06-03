@@ -187,11 +187,6 @@ func (v *BLSValidatorSet) MaxFaultyNodes() int {
 	return CalcMaxFaultyNodes(v)
 }
 
-// QuorumSize returns the number of required messages for consensus
-func (v *BLSValidatorSet) QuorumSize() int {
-	return CalcQuorumSize(v)
-}
-
 // Add adds a new address to the validator set
 func (v *BLSValidatorSet) Add(addr types.Address) {
 	// TODO: doesn't support right now

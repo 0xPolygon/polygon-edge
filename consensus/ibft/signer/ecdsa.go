@@ -170,7 +170,11 @@ func (s *ECDSASigner) WriteCommittedSeals(
 	return header, nil
 }
 
-func (s *ECDSASigner) VerifyCommittedSeal(rawSet validators.ValidatorSet, header *types.Header) error {
+func (s *ECDSASigner) VerifyCommittedSeal(
+	rawSet validators.ValidatorSet,
+	header *types.Header,
+	quorumFn validators.QuorumImplementation,
+) error {
 	extra, err := s.GetIBFTExtra(header)
 	if err != nil {
 		return err
@@ -195,12 +199,13 @@ func (s *ECDSASigner) VerifyCommittedSeal(rawSet validators.ValidatorSet, header
 
 	rawMsg := commitMsg(hash[:])
 
-	return s.verifyCommittedSealsImpl(cs, rawMsg, *validatorSet)
+	return s.verifyCommittedSealsImpl(cs, rawMsg, *validatorSet, quorumFn)
 }
 
 func (s *ECDSASigner) VerifyParentCommittedSeal(
 	rawParentSet validators.ValidatorSet,
 	parent, header *types.Header,
+	quorumFn validators.QuorumImplementation,
 ) error {
 	extra, err := s.GetIBFTExtra(header)
 	if err != nil {
@@ -226,7 +231,7 @@ func (s *ECDSASigner) VerifyParentCommittedSeal(
 
 	rawMsg := commitMsg(hash[:])
 
-	return s.verifyCommittedSealsImpl(parentCs, rawMsg, *validatorSet)
+	return s.verifyCommittedSealsImpl(parentCs, rawMsg, *validatorSet, quorumFn)
 }
 
 func (s *ECDSASigner) SignGossipMessage(msg *proto.MessageReq) error {
@@ -288,6 +293,7 @@ func (s *ECDSASigner) verifyCommittedSealsImpl(
 	committedSeal *SerializedSeal,
 	msg []byte,
 	validators validators.ECDSAValidatorSet,
+	quorumFn validators.QuorumImplementation,
 ) error {
 	// Committed seals shouldn't be empty
 	if len(*committedSeal) == 0 {
@@ -316,7 +322,7 @@ func (s *ECDSASigner) verifyCommittedSealsImpl(
 	// Valid committed seals must be at least 2F+1
 	// 	2F 	is the required number of honest validators who provided the committed seals
 	// 	+1	is the proposer
-	if validSeals := len(visited); validSeals < validators.QuorumSize() {
+	if validSeals := len(visited); validSeals < quorumFn(&validators) {
 		return ErrNotEnoughCommittedSeals
 	}
 

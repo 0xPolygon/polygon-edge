@@ -77,8 +77,8 @@ func (i *IstanbulExtra) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) er
 		return err
 	}
 
-	if num := len(elems); num != 3 && num != 4 {
-		return fmt.Errorf("not enough elements to decode istambul extra, expected 3 or 4 but found %d", num)
+	if len(elems) < 3 {
+		return fmt.Errorf("incorrect number of elements to decode istambul extra, expected 3 but found %d", len(elems))
 	}
 
 	// Validators

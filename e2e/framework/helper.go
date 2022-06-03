@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
+	"github.com/umbracle/ethgo"
 	"io/ioutil"
 	"math/big"
 	"net"
@@ -23,8 +24,7 @@ import (
 	txpoolProto "github.com/0xPolygon/polygon-edge/txpool/proto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
-	"github.com/umbracle/go-web3"
-	"github.com/umbracle/go-web3/jsonrpc"
+	"github.com/umbracle/ethgo/jsonrpc"
 	"golang.org/x/crypto/sha3"
 	empty "google.golang.org/protobuf/types/known/emptypb"
 )
@@ -73,8 +73,8 @@ func GetAccountBalance(t *testing.T, address types.Address, rpcClient *jsonrpc.C
 	t.Helper()
 
 	accountBalance, err := rpcClient.Eth().GetBalance(
-		web3.Address(address),
-		web3.Latest,
+		ethgo.Address(address),
+		ethgo.Latest,
 	)
 
 	assert.NoError(t, err)
@@ -89,17 +89,17 @@ func GetValidatorSet(from types.Address, rpcClient *jsonrpc.Client) ([]types.Add
 		return nil, errors.New("validators method doesn't exist in Staking contract ABI")
 	}
 
-	toAddress := web3.Address(staking.AddrStakingContract)
+	toAddress := ethgo.Address(staking.AddrStakingContract)
 	selector := validatorsMethod.ID()
 	response, err := rpcClient.Eth().Call(
-		&web3.CallMsg{
-			From:     web3.Address(from),
+		&ethgo.CallMsg{
+			From:     ethgo.Address(from),
 			To:       &toAddress,
 			Data:     selector,
 			GasPrice: 100000000,
 			Value:    big.NewInt(0),
 		},
-		web3.Latest,
+		ethgo.Latest,
 	)
 
 	if err != nil {
@@ -148,7 +148,7 @@ func UnstakeAmount(
 	from types.Address,
 	senderKey *ecdsa.PrivateKey,
 	srv *TestServer,
-) (*web3.Receipt, error) {
+) (*ethgo.Receipt, error) {
 	// Stake Balance
 	txn := &PreparedTransaction{
 		From:     from,
@@ -178,17 +178,17 @@ func GetStakedAmount(from types.Address, rpcClient *jsonrpc.Client) (*big.Int, e
 		return nil, errors.New("stakedAmount method doesn't exist in Staking contract ABI")
 	}
 
-	toAddress := web3.Address(staking.AddrStakingContract)
+	toAddress := ethgo.Address(staking.AddrStakingContract)
 	selector := stakedAmountMethod.ID()
 	response, err := rpcClient.Eth().Call(
-		&web3.CallMsg{
-			From:     web3.Address(from),
+		&ethgo.CallMsg{
+			From:     ethgo.Address(from),
 			To:       &toAddress,
 			Data:     selector,
 			GasPrice: 100000000,
 			Value:    big.NewInt(0),
 		},
-		web3.Latest,
+		ethgo.Latest,
 	)
 
 	if err != nil {

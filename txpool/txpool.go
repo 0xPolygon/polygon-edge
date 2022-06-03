@@ -32,7 +32,7 @@ var (
 	ErrIntrinsicGas        = errors.New("intrinsic gas too low")
 	ErrBlockLimitExceeded  = errors.New("exceeds block gas limit")
 	ErrNegativeValue       = errors.New("negative value")
-	ErrNonEncryptedTx      = errors.New("non-encrypted transaction")
+	ErrExtractSignature    = errors.New("cannot extract signature")
 	ErrInvalidSender       = errors.New("invalid sender")
 	ErrTxPoolOverflow      = errors.New("txpool is full")
 	ErrUnderpriced         = errors.New("transaction underpriced")
@@ -509,7 +509,7 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 	// Extract the sender
 	from, signerErr := p.signer.Sender(tx)
 	if signerErr != nil {
-		return ErrInvalidSender
+		return ErrExtractSignature
 	}
 
 	// If the from field is set, check that
@@ -675,7 +675,20 @@ func (p *TxPool) addGossipTx(obj interface{}) {
 		return
 	}
 
-	raw := obj.(*proto.Txn) // nolint:forcetypeassert
+	raw, ok := obj.(*proto.Txn)
+	if !ok {
+		p.logger.Error("failed to cast gossiped message to txn")
+
+		return
+	}
+
+	// Verify that the gossiped transaction message is not empty
+	if raw == nil || raw.Raw == nil {
+		p.logger.Error("malformed gossip transaction message received")
+
+		return
+	}
+
 	tx := new(types.Transaction)
 
 	// decode tx
