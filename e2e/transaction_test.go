@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/umbracle/ethgo"
 	"math/big"
 	"strconv"
 	"sync"
@@ -16,58 +17,10 @@ import (
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/e2e/framework"
 	"github.com/0xPolygon/polygon-edge/helper/tests"
-	txpoolOp "github.com/0xPolygon/polygon-edge/txpool/proto"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/golang/protobuf/ptypes/any"
 	"github.com/stretchr/testify/assert"
-	"github.com/umbracle/go-web3"
-	"github.com/umbracle/go-web3/jsonrpc"
+	"github.com/umbracle/ethgo/jsonrpc"
 )
-
-func TestSignedTransaction(t *testing.T) {
-	senderKey, senderAddr := tests.GenerateKeyAndAddr(t)
-	_, receiverAddr := tests.GenerateKeyAndAddr(t)
-
-	preminedAmount := framework.EthToWei(10)
-	ibftManager := framework.NewIBFTServersManager(
-		t,
-		IBFTMinNodes,
-		IBFTDirPrefix,
-		func(i int, config *framework.TestServerConfig) {
-			config.Premine(senderAddr, preminedAmount)
-			config.SetSeal(true)
-		})
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	defer cancel()
-	ibftManager.StartServers(ctx)
-
-	srv := ibftManager.GetServer(0)
-	clt := srv.JSONRPC()
-
-	// check there is enough balance
-	balance, err := clt.Eth().GetBalance(web3.Address(senderAddr), web3.Latest)
-	assert.NoError(t, err)
-	assert.Equal(t, preminedAmount, balance)
-
-	for i := 0; i < 5; i++ {
-		txn := &framework.PreparedTransaction{
-			From:     senderAddr,
-			To:       &receiverAddr,
-			GasPrice: big.NewInt(10000),
-			Gas:      1000000,
-			Value:    big.NewInt(10000),
-		}
-
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-
-		receipt, err := srv.SendRawTx(ctx, txn, senderKey)
-		assert.NoError(t, err)
-		assert.NotNil(t, receipt)
-		assert.NotNil(t, receipt.TransactionHash)
-	}
-}
 
 func TestPreminedBalance(t *testing.T) {
 	preminedAccounts := []struct {
@@ -112,7 +65,7 @@ func TestPreminedBalance(t *testing.T) {
 
 	for _, testCase := range testTable {
 		t.Run(testCase.name, func(t *testing.T) {
-			balance, err := rpcClient.Eth().GetBalance(web3.Address(testCase.address), web3.Latest)
+			balance, err := rpcClient.Eth().GetBalance(ethgo.Address(testCase.address), ethgo.Latest)
 			assert.NoError(t, err)
 			assert.Equal(t, testCase.balance, balance)
 		})
@@ -191,14 +144,14 @@ func TestEthTransfer(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			// Fetch the balances before sending
 			balanceSender, err := rpcClient.Eth().GetBalance(
-				web3.Address(testCase.sender),
-				web3.Latest,
+				ethgo.Address(testCase.sender),
+				ethgo.Latest,
 			)
 			assert.NoError(t, err)
 
 			balanceReceiver, err := rpcClient.Eth().GetBalance(
-				web3.Address(testCase.recipient),
-				web3.Latest,
+				ethgo.Address(testCase.recipient),
+				ethgo.Latest,
 			)
 			assert.NoError(t, err)
 
@@ -207,7 +160,7 @@ func TestEthTransfer(t *testing.T) {
 			previousReceiverBalance := balanceReceiver
 
 			// Do the transfer
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), framework.DefaultTimeout)
 			defer cancel()
 
 			txn := &framework.PreparedTransaction{
@@ -230,14 +183,14 @@ func TestEthTransfer(t *testing.T) {
 
 			// Fetch the balances after sending
 			balanceSender, err = rpcClient.Eth().GetBalance(
-				web3.Address(testCase.sender),
-				web3.Latest,
+				ethgo.Address(testCase.sender),
+				ethgo.Latest,
 			)
 			assert.NoError(t, err)
 
 			balanceReceiver, err = rpcClient.Eth().GetBalance(
-				web3.Address(testCase.recipient),
-				web3.Latest,
+				ethgo.Address(testCase.recipient),
+				ethgo.Latest,
 			)
 			assert.NoError(t, err)
 
@@ -276,7 +229,7 @@ func TestEthTransfer(t *testing.T) {
 // getCount is a helper function for the stress test SC
 func getCount(
 	from types.Address,
-	contractAddress web3.Address,
+	contractAddress ethgo.Address,
 	rpcClient *jsonrpc.Client,
 ) (*big.Int, error) {
 	stressTestMethod, ok := abis.StressTestABI.Methods["getCount"]
@@ -286,14 +239,14 @@ func getCount(
 
 	selector := stressTestMethod.ID()
 	response, err := rpcClient.Eth().Call(
-		&web3.CallMsg{
-			From:     web3.Address(from),
+		&ethgo.CallMsg{
+			From:     ethgo.Address(from),
 			To:       &contractAddress,
 			Data:     selector,
 			GasPrice: 100000000,
 			Value:    big.NewInt(0),
 		},
-		web3.Latest,
+		ethgo.Latest,
 	)
 
 	if err != nil {
@@ -311,114 +264,6 @@ func getCount(
 	}
 
 	return bigResponse, nil
-}
-
-// addStressTestTxns adds numTransactions that call the
-// passed in StressTest smart contract method
-func addStressTestTxns(
-	t *testing.T,
-	srv *framework.TestServer,
-	numTransactions int,
-	contractAddr types.Address,
-	senderKey *ecdsa.PrivateKey,
-) {
-	t.Helper()
-
-	currentNonce := 1 // 1 because the first transaction was deployment
-	clt := srv.TxnPoolOperator()
-
-	for i := 0; i < numTransactions; i++ {
-		var msg *txpoolOp.AddTxnReq
-
-		setNameTxn := generateStressTestTx(
-			t,
-			uint64(currentNonce),
-			contractAddr,
-			senderKey,
-		)
-		currentNonce++
-
-		msg = &txpoolOp.AddTxnReq{
-			Raw: &any.Any{
-				Value: setNameTxn.MarshalRLP(),
-			},
-			From: types.ZeroAddress.String(),
-		}
-
-		_, addErr := clt.AddTxn(context.Background(), msg)
-		if addErr != nil {
-			t.Fatalf("Unable to add txn #%d, %v", i, addErr)
-		}
-	}
-}
-
-// Test scenario (Dev mode):
-// Deploy the StressTest smart contract and send ~50 transactions
-// that modify it's state, and make sure that all
-// transactions were correctly executed
-func Test_TransactionDevLoop(t *testing.T) {
-	senderKey, sender := tests.GenerateKeyAndAddr(t)
-	defaultBalance := framework.EthToWei(100)
-
-	// Set up the test server
-	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
-		config.SetConsensus(framework.ConsensusDev)
-		config.SetSeal(true)
-		config.Premine(sender, defaultBalance)
-		config.SetBlockLimit(20000000)
-	})
-	srv := srvs[0]
-	client := srv.JSONRPC()
-
-	// Deploy the stress test contract
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	contractAddr, err := srv.DeployContract(ctx, stressTestBytecode, senderKey)
-
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	count, countErr := getCount(sender, contractAddr, client)
-	if countErr != nil {
-		t.Fatalf("Unable to call count method, %v", countErr)
-	}
-
-	// Check that the count is 0 before running the test
-	assert.Equalf(t, "0", count.String(), "Count doesn't match")
-
-	// Send ~50 transactions
-	numTransactions := 50
-
-	// Add stress test transactions
-	addStressTestTxns(
-		t,
-		srv,
-		numTransactions,
-		types.StringToAddress(contractAddr.String()),
-		senderKey,
-	)
-
-	// Wait for the final tx to be mined
-	retryCtx, retryCancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer retryCancel()
-
-	_, err = tests.WaitForNonce(
-		retryCtx,
-		client.Eth(),
-		web3.BytesToAddress(sender.Bytes()),
-		1+uint64(numTransactions), // contract nonce is 1 (EIP-161)
-	)
-	assert.NoError(t, err)
-
-	count, countErr = getCount(sender, contractAddr, client)
-	if countErr != nil {
-		t.Fatalf("Unable to call count method, %v", countErr)
-	}
-
-	// Check that the count is 0 before running the test
-	assert.Equalf(t, strconv.Itoa(numTransactions), count.String(), "Count doesn't match")
 }
 
 // generateStressTestTx generates a transaction for the
@@ -475,12 +320,12 @@ func addStressTxnsWithHashes(
 	numTransactions int,
 	contractAddr types.Address,
 	senderKey *ecdsa.PrivateKey,
-) []web3.Hash {
+) []ethgo.Hash {
 	t.Helper()
 
 	currentNonce := 1 // 1 because the first transaction was deployment
 
-	txHashes := make([]web3.Hash, 0)
+	txHashes := make([]ethgo.Hash, 0)
 
 	for i := 0; i < numTransactions; i++ {
 		setNameTxn := generateStressTestTx(
@@ -526,7 +371,7 @@ func Test_TransactionIBFTLoop(t *testing.T) {
 	client := srv.JSONRPC()
 
 	// Deploy the stress test contract
-	deployCtx, deployCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	deployCtx, deployCancel := context.WithTimeout(context.Background(), framework.DefaultTimeout)
 	defer deployCancel()
 
 	buf, err := hex.DecodeString(stressTestBytecode)

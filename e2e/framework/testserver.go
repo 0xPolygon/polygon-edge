@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/umbracle/ethgo"
 	"io"
 	"math/big"
 	"os"
@@ -13,6 +14,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -34,8 +37,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/umbracle/go-web3"
-	"github.com/umbracle/go-web3/jsonrpc"
+	"github.com/umbracle/ethgo/jsonrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	empty "google.golang.org/protobuf/types/known/emptypb"
@@ -355,6 +357,10 @@ func (t *TestServer) Start(ctx context.Context) error {
 		args = append(args, "--block-gas-target", *types.EncodeUint64(t.Config.BlockGasTarget))
 	}
 
+	if t.Config.BlockTime != 0 {
+		args = append(args, "--block-time", strconv.FormatUint(t.Config.BlockTime, 10))
+	}
+
 	t.ReleaseReservedPorts()
 
 	// Start the server
@@ -435,15 +441,15 @@ func (t *TestServer) DeployContract(
 	ctx context.Context,
 	binary string,
 	privateKey *ecdsa.PrivateKey,
-) (web3.Address, error) {
+) (ethgo.Address, error) {
 	buf, err := hex.DecodeString(binary)
 	if err != nil {
-		return web3.Address{}, err
+		return ethgo.Address{}, err
 	}
 
 	sender, err := crypto.GetAddressFromKey(privateKey)
 	if err != nil {
-		return web3.ZeroAddress, fmt.Errorf("unable to extract key, %w", err)
+		return ethgo.ZeroAddress, fmt.Errorf("unable to extract key, %w", err)
 	}
 
 	receipt, err := t.SendRawTx(ctx, &PreparedTransaction{
@@ -453,7 +459,7 @@ func (t *TestServer) DeployContract(
 		Input:    buf,
 	}, privateKey)
 	if err != nil {
-		return web3.Address{}, err
+		return ethgo.Address{}, err
 	}
 
 	return receipt.ContractAddress, nil
@@ -478,10 +484,10 @@ func (t *TestServer) SendRawTx(
 	ctx context.Context,
 	tx *PreparedTransaction,
 	signerKey *ecdsa.PrivateKey,
-) (*web3.Receipt, error) {
+) (*ethgo.Receipt, error) {
 	client := t.JSONRPC()
 
-	nextNonce, err := client.Eth().GetNonce(web3.Address(tx.From), web3.Latest)
+	nextNonce, err := client.Eth().GetNonce(ethgo.Address(tx.From), ethgo.Latest)
 	if err != nil {
 		return nil, err
 	}
@@ -507,11 +513,11 @@ func (t *TestServer) SendRawTx(
 	return tests.WaitForReceipt(ctx, t.JSONRPC().Eth(), txHash)
 }
 
-func (t *TestServer) WaitForReceipt(ctx context.Context, hash web3.Hash) (*web3.Receipt, error) {
+func (t *TestServer) WaitForReceipt(ctx context.Context, hash ethgo.Hash) (*ethgo.Receipt, error) {
 	client := t.JSONRPC()
 
 	type result struct {
-		receipt *web3.Receipt
+		receipt *ethgo.Receipt
 		err     error
 	}
 
@@ -538,6 +544,54 @@ func (t *TestServer) WaitForReceipt(ctx context.Context, hash web3.Hash) (*web3.
 	return data.receipt, data.err
 }
 
+// GetGasTotal waits for the total gas used sum for the passed in
+// transactions
+func (t *TestServer) GetGasTotal(txHashes []ethgo.Hash) uint64 {
+	t.t.Helper()
+
+	var (
+		totalGasUsed    = uint64(0)
+		receiptErrs     = make([]error, 0)
+		receiptErrsLock sync.Mutex
+		wg              sync.WaitGroup
+	)
+
+	appendReceiptErr := func(receiptErr error) {
+		receiptErrsLock.Lock()
+		defer receiptErrsLock.Unlock()
+
+		receiptErrs = append(receiptErrs, receiptErr)
+	}
+
+	for _, txHash := range txHashes {
+		wg.Add(1)
+
+		go func(txHash ethgo.Hash) {
+			defer wg.Done()
+
+			ctx, cancelFn := context.WithTimeout(context.Background(), DefaultTimeout)
+			defer cancelFn()
+
+			receipt, receiptErr := tests.WaitForReceipt(ctx, t.JSONRPC().Eth(), txHash)
+			if receiptErr != nil {
+				appendReceiptErr(fmt.Errorf("unable to wait for receipt, %w", receiptErr))
+
+				return
+			}
+
+			atomic.AddUint64(&totalGasUsed, receipt.GasUsed)
+		}(txHash)
+	}
+
+	wg.Wait()
+
+	if len(receiptErrs) > 0 {
+		t.t.Fatalf("unable to wait for receipts, %v", receiptErrs)
+	}
+
+	return totalGasUsed
+}
+
 func (t *TestServer) WaitForReady(ctx context.Context) error {
 	_, err := tests.RetryUntilTimeout(ctx, func() (interface{}, bool) {
 		num, err := t.GetLatestBlockHeight()
@@ -559,7 +613,7 @@ func (t *TestServer) InvokeMethod(
 	contractAddress types.Address,
 	method string,
 	fromKey *ecdsa.PrivateKey,
-) *web3.Receipt {
+) *ethgo.Receipt {
 	sig := MethodSig(method)
 
 	fromAddress, err := crypto.GetAddressFromKey(fromKey)

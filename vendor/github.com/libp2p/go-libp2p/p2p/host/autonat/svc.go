@@ -126,7 +126,8 @@ func (as *autoNATService) handleDial(p peer.ID, obsaddr ma.Multiaddr, mpi *pb.Me
 	// need to know their public IP address, and it needs to be different from our public IP
 	// address.
 	if as.config.dialPolicy.skipDial(obsaddr) {
-		return newDialResponseError(pb.Message_E_DIAL_ERROR, "refusing to dial peer with blocked observed address")
+		// Note: versions < v0.20.0 return Message_E_DIAL_ERROR here, thus we can not rely on this error code.
+		return newDialResponseError(pb.Message_E_DIAL_REFUSED, "refusing to dial peer with blocked observed address")
 	}
 
 	// Determine the peer's IP address.
@@ -187,7 +188,8 @@ func (as *autoNATService) handleDial(p peer.ID, obsaddr ma.Multiaddr, mpi *pb.Me
 	}
 
 	if len(addrs) == 0 {
-		return newDialResponseError(pb.Message_E_DIAL_ERROR, "no dialable addresses")
+		// Note: versions < v0.20.0 return Message_E_DIAL_ERROR here, thus we can not rely on this error code.
+		return newDialResponseError(pb.Message_E_DIAL_REFUSED, "no dialable addresses")
 	}
 
 	return as.doDial(peer.AddrInfo{ID: p, Addrs: addrs})
@@ -242,6 +244,7 @@ func (as *autoNATService) Enable() {
 	ctx, cancel := context.WithCancel(context.Background())
 	as.instance = cancel
 	as.backgroundRunning = make(chan struct{})
+	as.config.host.SetStreamHandler(AutoNATProto, as.handleStream)
 
 	go as.background(ctx)
 }
@@ -251,6 +254,7 @@ func (as *autoNATService) Disable() {
 	as.instanceLock.Lock()
 	defer as.instanceLock.Unlock()
 	if as.instance != nil {
+		as.config.host.RemoveStreamHandler(AutoNATProto)
 		as.instance()
 		as.instance = nil
 		<-as.backgroundRunning
@@ -259,7 +263,6 @@ func (as *autoNATService) Disable() {
 
 func (as *autoNATService) background(ctx context.Context) {
 	defer close(as.backgroundRunning)
-	as.config.host.SetStreamHandler(AutoNATProto, as.handleStream)
 
 	timer := time.NewTimer(as.config.throttleResetPeriod)
 	defer timer.Stop()
@@ -274,7 +277,6 @@ func (as *autoNATService) background(ctx context.Context) {
 			jitter := rand.Float32() * float32(as.config.throttleResetJitter)
 			timer.Reset(as.config.throttleResetPeriod + time.Duration(int64(jitter)))
 		case <-ctx.Done():
-			as.config.host.RemoveStreamHandler(AutoNATProto)
 			return
 		}
 	}

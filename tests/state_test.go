@@ -101,6 +101,8 @@ func RunSpecificTest(t *testing.T, file string, c stateCase, name, fork string, 
 }
 
 func TestState(t *testing.T) {
+	t.Parallel()
+
 	long := []string{
 		"static_Call50000",
 		"static_Return50000",
@@ -121,7 +123,10 @@ func TestState(t *testing.T) {
 	}
 
 	for _, folder := range folders {
+		folder := folder
 		t.Run(folder, func(t *testing.T) {
+			t.Parallel()
+
 			files, err := listFiles(folder)
 			if err != nil {
 				t.Fatal(err)

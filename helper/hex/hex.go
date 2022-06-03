@@ -8,16 +8,6 @@ import (
 	"strings"
 )
 
-// TODO Remove
-var (
-	ErrSyntax        = &DecError{"invalid hex string"}
-	ErrMissingPrefix = &DecError{"hex string without 0x prefix"}
-	ErrEmptyNumber   = &DecError{"hex string \"0x\""}
-	ErrLeadingZero   = &DecError{"hex number with leading zero digits"}
-	ErrUint64Range   = &DecError{"hex number > 64 bits"}
-	ErrBig256Range   = &DecError{"hex number > 256 bits"}
-)
-
 type DecError struct{ msg string }
 
 func (err DecError) Error() string { return err.msg }

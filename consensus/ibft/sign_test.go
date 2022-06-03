@@ -59,7 +59,7 @@ func TestSign_CommittedSeals(t *testing.T) {
 
 		assert.NoError(t, err)
 
-		return verifyCommittedSeal(snap, sealed)
+		return verifyCommittedFields(snap, sealed, OptimalQuorumSize)
 	}
 
 	// Correct

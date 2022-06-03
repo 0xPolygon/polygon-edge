@@ -10,17 +10,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Install Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v3
         with:
-          go-version: 1.16.x
+          go-version: 1.17.x
 
       - name: Checkout code
-        uses: actions/checkout@v2
-        with:
-          submodules: recursive
+        uses: actions/checkout@v3
 
       - name: Lint
-        uses: golangci/golangci-lint-action@v2
+        uses: golangci/golangci-lint-action@v3
         with:
           version: latest
           args:
@@ -49,25 +47,26 @@ jobs:
             -E dupl
             -E errname
             -E errorlint
-          skip-go-installation: true
   test:
     runs-on: ubuntu-latest
     steps:
       - name: Install Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v3
         with:
-          go-version: 1.16.x
+          go-version: 1.17.x
 
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           submodules: recursive
 
-
+      # We need to build the binary with the race flag enabled
+      # because it will get picked up and run during e2e tests
+      # and the e2e tests should error out if any kind of race is found
       - name: Go build with race
         run: CGO_ENABLED=1 GOOS=linux go build -race -a -o artifacts/polygon-edge .
 
-      - name: Add race artifacts directory to the path
+      - name: Add artifacts directory to the path
         run: echo "$(pwd)/artifacts" >> $GITHUB_PATH
 
       - name: Go test
@@ -76,7 +75,7 @@ jobs:
       - name: Go build without race
         run: CGO_ENABLED=0 GOOS=linux go build -a -o artifacts/polygon-edge .
 
-      - name: Replace artificats
+      - name: Replace artifacts
         run: echo "$(pwd)/artifacts" >> $GITHUB_PATH
 
       - name: Extract branch name

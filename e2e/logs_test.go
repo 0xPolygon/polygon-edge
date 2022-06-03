@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"context"
+	"github.com/umbracle/ethgo"
 	"math/big"
 	"testing"
 	"time"
@@ -12,73 +13,117 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/umbracle/go-web3"
 	"golang.org/x/crypto/sha3"
 )
 
 func TestNewFilter_Logs(t *testing.T) {
 	key, addr := tests.GenerateKeyAndAddr(t)
-	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
-		config.SetConsensus(framework.ConsensusDev)
-		config.Premine(addr, framework.EthToWei(10))
-		config.SetSeal(true)
-	})
-	srv := srvs[0]
 
-	ctx1, cancel1 := context.WithTimeout(context.Background(), 10*time.Second)
+	ibftManager := framework.NewIBFTServersManager(
+		t,
+		1,
+		IBFTDirPrefix,
+		func(i int, config *framework.TestServerConfig) {
+			config.Premine(addr, framework.EthToWei(10))
+			config.SetBlockTime(1)
+		},
+	)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	ibftManager.StartServers(ctx)
+	srv := ibftManager.GetServer(0)
+
+	ctx1, cancel1 := context.WithTimeout(context.Background(), framework.DefaultTimeout)
 	defer cancel1()
 
 	contractAddr, err := srv.DeployContract(ctx1, sampleByteCode, key)
+	castedContractAddr := types.Address(contractAddr)
 
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	client := srv.JSONRPC()
-	id, err := client.Eth().NewFilter(&web3.LogFilter{})
+	txpoolClient := srv.TxnPoolOperator()
+	jsonRPCClient := srv.JSONRPC()
+
+	id, err := jsonRPCClient.Eth().NewFilter(&ethgo.LogFilter{})
 	assert.NoError(t, err)
 
-	numCalls := 10
-	for i := 0; i < numCalls; i++ {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		srv.InvokeMethod(ctx, types.Address(contractAddr), "setA1", key)
+	txn, err := tests.GenerateAddTxnReq(tests.GenerateTxReqParams{
+		Nonce:         1, // The first transaction was a contract deployment
+		ReferenceAddr: addr,
+		ReferenceKey:  key,
+		ToAddress:     castedContractAddr,
+		GasPrice:      big.NewInt(framework.DefaultGasPrice),
+		Input:         framework.MethodSig("setA1"),
+	})
+	if err != nil {
+		return
 	}
 
-	res, err := client.Eth().GetFilterChanges(id)
+	addTxnContext, addTxnCancelFn := context.WithTimeout(context.Background(), framework.DefaultTimeout)
+	defer addTxnCancelFn()
+
+	addResp, addErr := txpoolClient.AddTxn(addTxnContext, txn)
+	if addErr != nil {
+		t.Fatalf("Unable to add transaction, %v", addErr)
+	}
+
+	receiptContext, cancelFn := context.WithTimeout(context.Background(), framework.DefaultTimeout)
+	defer cancelFn()
+
+	txHash := ethgo.Hash(types.StringToHash(addResp.TxHash))
+	if _, receiptErr := srv.WaitForReceipt(receiptContext, txHash); receiptErr != nil {
+		t.Fatalf("Unable to wait for receipt, %v", receiptErr)
+	}
+
+	res, err := jsonRPCClient.Eth().GetFilterChanges(id)
+
 	assert.NoError(t, err)
-	assert.Equal(t, len(res), numCalls)
+	assert.Equal(t, 1, len(res))
 }
 
 func TestNewFilter_Block(t *testing.T) {
 	fromKey, from := tests.GenerateKeyAndAddr(t)
 	_, to := tests.GenerateKeyAndAddr(t)
 
-	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
-		config.SetConsensus(framework.ConsensusDev)
-		config.Premine(from, framework.EthToWei(10))
-		config.SetSeal(true)
-	})
-	srv := srvs[0]
+	ibftManager := framework.NewIBFTServersManager(
+		t,
+		1,
+		IBFTDirPrefix,
+		func(i int, config *framework.TestServerConfig) {
+			config.Premine(from, framework.EthToWei(10))
+			config.SetBlockTime(1)
+		},
+	)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	ibftManager.StartServers(ctx)
+	srv := ibftManager.GetServer(0)
+
 	client := srv.JSONRPC()
 
 	id, err := client.Eth().NewBlockFilter()
 	assert.NoError(t, err)
 
-	for i := 0; i < 3; i++ {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		_, err := srv.SendRawTx(ctx, &framework.PreparedTransaction{
-			From:     from,
-			To:       &to,
-			GasPrice: big.NewInt(10000),
-			Gas:      1000000,
-			Value:    big.NewInt(10000),
-		}, fromKey)
+	ctx, cancelFn := context.WithTimeout(context.Background(), framework.DefaultTimeout)
+	defer cancelFn()
 
-		assert.NoError(t, err)
-
-		cancel()
+	if _, sendErr := srv.SendRawTx(ctx, &framework.PreparedTransaction{
+		From:     from,
+		To:       &to,
+		GasPrice: big.NewInt(10000),
+		Gas:      1000000,
+		Value:    big.NewInt(10000),
+	}, fromKey); err != nil {
+		t.Fatalf("Unable to send transaction %v", sendErr)
 	}
+
+	assert.NoError(t, err)
 
 	// verify filter picked up block changes
 	blocks, err := client.Eth().GetFilterChangesBlock(id)
@@ -100,23 +145,34 @@ func TestFilterValue(t *testing.T) {
 	//	3.	Query the block's bloom filter to make sure the data has been properly inserted.
 	//
 	key, addr := tests.GenerateKeyAndAddr(t)
-	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
-		config.SetConsensus(framework.ConsensusDev)
-		config.Premine(addr, framework.EthToWei(10))
-		config.SetSeal(true)
-	})
-	srv := srvs[0]
 
-	ctx1, cancel1 := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel1()
+	ibftManager := framework.NewIBFTServersManager(
+		t,
+		1,
+		IBFTDirPrefix,
+		func(i int, config *framework.TestServerConfig) {
+			config.Premine(addr, framework.EthToWei(10))
+			config.SetBlockTime(1)
+		},
+	)
 
-	contractAddr, err := srv.DeployContract(ctx1, bloomFilterTestBytecode, key)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	ibftManager.StartServers(ctx)
+	srv := ibftManager.GetServer(0)
+
+	deployCtx, deployCancel := context.WithTimeout(context.Background(), time.Minute)
+	defer deployCancel()
+
+	contractAddr, err := srv.DeployContract(deployCtx, bloomFilterTestBytecode, key)
 
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	client := srv.JSONRPC()
+	txpoolClient := srv.TxnPoolOperator()
+	jsonRPCClient := srv.JSONRPC()
 
 	// Encode event signature
 	hash := sha3.NewLegacyKeccak256()
@@ -127,35 +183,62 @@ func TestFilterValue(t *testing.T) {
 
 	// Convert to right format
 	var (
-		placeholderWrapper []*web3.Hash
-		placeholder        web3.Hash
+		placeholderWrapper []*ethgo.Hash
+		placeholder        ethgo.Hash
+		filterEventHashes  [][]*ethgo.Hash
+		filterAddresses    []ethgo.Address
 	)
 
 	copy(placeholder[:], buf)
 	placeholderWrapper = append(placeholderWrapper, &placeholder)
 
-	var filterEventHashes [][]*web3.Hash
-
 	filterEventHashes = append(filterEventHashes, placeholderWrapper)
-
-	var filterAddresses []web3.Address
-
 	filterAddresses = append(filterAddresses, contractAddr)
 
-	id, err := client.Eth().NewFilter(&web3.LogFilter{
+	filterID, err := jsonRPCClient.Eth().NewFilter(&ethgo.LogFilter{
 		Address: filterAddresses,
 		Topics:  filterEventHashes,
 	})
+
 	assert.NoError(t, err)
 
-	numCalls := 1
-	for i := 0; i < numCalls; i++ {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		srv.InvokeMethod(ctx, types.Address(contractAddr), "TriggerMyEvent", key)
+	castedContractAddr := types.Address(contractAddr)
+
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	res, err := client.Eth().GetFilterChanges(id)
+	txn, err := tests.GenerateAddTxnReq(tests.GenerateTxReqParams{
+		Nonce:         1,
+		ReferenceAddr: addr,
+		ReferenceKey:  key,
+		ToAddress:     castedContractAddr,
+		GasPrice:      big.NewInt(framework.DefaultGasPrice),
+		Input:         framework.MethodSig("TriggerMyEvent"),
+	})
+
+	if err != nil {
+		return
+	}
+
+	addTxnContext, cancelFn := context.WithTimeout(context.Background(), framework.DefaultTimeout)
+	defer cancelFn()
+
+	addResp, addErr := txpoolClient.AddTxn(addTxnContext, txn)
+	if addErr != nil {
+		return
+	}
+
+	receiptContext, cancelFn := context.WithTimeout(context.Background(), framework.DefaultTimeout)
+	defer cancelFn()
+
+	txHash := ethgo.Hash(types.StringToHash(addResp.TxHash))
+	if _, receiptErr := srv.WaitForReceipt(receiptContext, txHash); receiptErr != nil {
+		return
+	}
+
+	res, err := jsonRPCClient.Eth().GetFilterChanges(filterID)
+
 	assert.NoError(t, err)
 	assert.Len(t, res, 1)
 	assert.Equal(t, "0x000000000000000000000000000000000000000000000000000000000000002a", hex.EncodeToHex(res[0].Data))

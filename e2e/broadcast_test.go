@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"sync"
 	"testing"
 	"time"
 
@@ -44,12 +45,21 @@ func TestBroadcast(t *testing.T) {
 	}
 
 	for _, tt := range testCases {
+		tt := tt
+
 		t.Run(tt.name, func(t *testing.T) {
 			srvs := framework.NewTestServers(t, tt.numNodes, conf)
+
 			framework.MultiJoinSerial(t, srvs[0:tt.numConnectedNodes])
 
 			// Check the connections
+			connectionErrors := framework.NewAtomicErrors(len(srvs))
+
+			var wgForConnections sync.WaitGroup
+
 			for i, srv := range srvs {
+				srv := srv
+
 				// Required number of connections
 				numRequiredConnections := 0
 				if i < tt.numConnectedNodes {
@@ -59,12 +69,29 @@ func TestBroadcast(t *testing.T) {
 						numRequiredConnections = 2
 					}
 				}
-				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-				defer cancel()
-				_, err := framework.WaitUntilPeerConnects(ctx, srv, numRequiredConnections)
-				if err != nil {
-					t.Fatal(err)
-				}
+
+				wgForConnections.Add(1)
+				go func() {
+					defer wgForConnections.Done()
+
+					ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+					defer cancel()
+
+					_, err := framework.WaitUntilPeerConnects(ctx, srv, numRequiredConnections)
+					if err != nil {
+						connectionErrors.Append(err)
+					}
+				}()
+			}
+
+			wgForConnections.Wait()
+
+			for _, err := range connectionErrors.Errors() {
+				t.Error(err)
+			}
+
+			if len(connectionErrors.Errors()) > 0 {
+				t.Fail()
 			}
 
 			// wait until gossip protocol build mesh network
@@ -90,6 +117,8 @@ func TestBroadcast(t *testing.T) {
 			}
 
 			for i, srv := range srvs {
+				srv := srv
+
 				shouldHaveTxPool := false
 				subTestName := fmt.Sprintf("node %d shouldn't have tx in txpool", i)
 				if i < tt.numConnectedNodes {
@@ -98,7 +127,9 @@ func TestBroadcast(t *testing.T) {
 				}
 
 				t.Run(subTestName, func(t *testing.T) {
-					ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+					t.Parallel()
+
+					ctx, cancel := context.WithTimeout(context.Background(), framework.DefaultTimeout)
 					defer cancel()
 					res, err := framework.WaitUntilTxPoolFilled(ctx, srv, 1)
 

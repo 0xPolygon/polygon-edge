@@ -18,10 +18,12 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"time"
 
+	"github.com/huin/goupnp/httpu"
 	"github.com/huin/goupnp/ssdp"
 )
 
@@ -63,6 +65,9 @@ type MaybeRootDevice struct {
 	// the discovery of a device, regardless of if there was an error probing it.
 	Location *url.URL
 
+	// The address from which the device was discovered (if known - otherwise nil).
+	LocalAddr net.IP
+
 	// Any error encountered probing a discovered device.
 	Err error
 }
@@ -98,6 +103,9 @@ func DiscoverDevices(searchTarget string) ([]MaybeRootDevice, error) {
 			maybe.Err = err
 		} else {
 			maybe.Root = root
+		}
+		if i := response.Header.Get(httpu.LocalAddressHeader); len(i) > 0 {
+			maybe.LocalAddr = net.ParseIP(i)
 		}
 	}
 

@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/libp2p/go-libp2p-core/crypto"
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -14,6 +15,12 @@ import (
 
 // ErrTopicClosed is returned if a Topic is utilized after it has been closed
 var ErrTopicClosed = errors.New("this Topic is closed, try opening a new one")
+
+// ErrNilSignKey is returned if a nil private key was provided
+var ErrNilSignKey = errors.New("nil sign key")
+
+// ErrEmptyPeerID is returned if an empty peer ID was provided
+var ErrEmptyPeerID = errors.New("empty peer ID")
 
 // Topic is the handle for a pubsub topic
 type Topic struct {
@@ -202,8 +209,12 @@ func (t *Topic) Relay() (RelayCancelFunc, error) {
 // RouterReady is a function that decides if a router is ready to publish
 type RouterReady func(rt PubSubRouter, topic string) (bool, error)
 
+// ProvideKey is a function that provides a private key and its associated peer ID when publishing a new message
+type ProvideKey func() (crypto.PrivKey, peer.ID)
+
 type PublishOptions struct {
-	ready RouterReady
+	ready     RouterReady
+	customKey ProvideKey
 }
 
 type PubOpt func(pub *PublishOptions) error
@@ -216,27 +227,40 @@ func (t *Topic) Publish(ctx context.Context, data []byte, opts ...PubOpt) error 
 		return ErrTopicClosed
 	}
 
+	pid := t.p.signID
+	key := t.p.signKey
+
+	pub := &PublishOptions{}
+	for _, opt := range opts {
+		err := opt(pub)
+		if err != nil {
+			return err
+		}
+	}
+
+	if pub.customKey != nil {
+		key, pid = pub.customKey()
+		if key == nil {
+			return ErrNilSignKey
+		}
+		if len(pid) == 0 {
+			return ErrEmptyPeerID
+		}
+	}
+
 	m := &pb.Message{
 		Data:  data,
 		Topic: &t.topic,
 		From:  nil,
 		Seqno: nil,
 	}
-	if t.p.signID != "" {
-		m.From = []byte(t.p.signID)
+	if pid != "" {
+		m.From = []byte(pid)
 		m.Seqno = t.p.nextSeqno()
 	}
-	if t.p.signKey != nil {
-		m.From = []byte(t.p.signID)
-		err := signMessage(t.p.signID, t.p.signKey, m)
-		if err != nil {
-			return err
-		}
-	}
-
-	pub := &PublishOptions{}
-	for _, opt := range opts {
-		err := opt(pub)
+	if key != nil {
+		m.From = []byte(pid)
+		err := signMessage(pid, key, m)
 		if err != nil {
 			return err
 		}
@@ -283,7 +307,7 @@ func (t *Topic) Publish(ctx context.Context, data []byte, opts ...PubOpt) error 
 		}
 	}
 
-	return t.p.val.PushLocal(&Message{m, t.p.host.ID(), nil})
+	return t.p.val.PushLocal(&Message{m, "", t.p.host.ID(), nil})
 }
 
 // WithReadiness returns a publishing option for only publishing when the router is ready.
@@ -291,6 +315,18 @@ func (t *Topic) Publish(ctx context.Context, data []byte, opts ...PubOpt) error 
 func WithReadiness(ready RouterReady) PubOpt {
 	return func(pub *PublishOptions) error {
 		pub.ready = ready
+		return nil
+	}
+}
+
+// WithSecretKeyAndPeerId returns a publishing option for providing a custom private key and its corresponding peer ID
+// This option is useful when we want to send messages from "virtual", never-connectable peers in the network
+func WithSecretKeyAndPeerId(key crypto.PrivKey, pid peer.ID) PubOpt {
+	return func(pub *PublishOptions) error {
+		pub.customKey = func() (crypto.PrivKey, peer.ID) {
+			return key, pid
+		}
+
 		return nil
 	}
 }

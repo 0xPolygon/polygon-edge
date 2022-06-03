@@ -1,10 +1,13 @@
 package server
 
 import (
+	"errors"
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/network/common"
+	"github.com/0xPolygon/polygon-edge/command/server/config"
 	"math"
 	"net"
+
+	"github.com/0xPolygon/polygon-edge/network/common"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command/helper"
@@ -14,10 +17,15 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
+var (
+	errInvalidBlockTime       = errors.New("invalid block time specified")
+	errDataDirectoryUndefined = errors.New("data directory not defined")
+)
+
 func (p *serverParams) initConfigFromFile() error {
 	var parseErr error
 
-	if p.rawConfig, parseErr = readConfigFile(p.configPath); parseErr != nil {
+	if p.rawConfig, parseErr = config.ReadConfigFile(p.configPath); parseErr != nil {
 		return parseErr
 	}
 
@@ -37,13 +45,44 @@ func (p *serverParams) initRawParams() error {
 		return err
 	}
 
+	if err := p.initDataDirLocation(); err != nil {
+		return err
+	}
+
+	if err := p.initBlockTime(); err != nil {
+		return err
+	}
+
 	if p.isDevMode {
 		p.initDevMode()
 	}
 
 	p.initPeerLimits()
+	p.initLogFileLocation()
 
 	return p.initAddresses()
+}
+
+func (p *serverParams) initBlockTime() error {
+	if p.rawConfig.BlockTime < 1 {
+		return errInvalidBlockTime
+	}
+
+	return nil
+}
+
+func (p *serverParams) initDataDirLocation() error {
+	if p.rawConfig.DataDir == "" {
+		return errDataDirectoryUndefined
+	}
+
+	return nil
+}
+
+func (p *serverParams) initLogFileLocation() {
+	if p.isLogFileLocationSet() {
+		p.logFileLocation = p.rawConfig.LogFilePath
+	}
 }
 
 func (p *serverParams) initBlockGasTarget() error {

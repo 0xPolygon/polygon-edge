@@ -56,6 +56,10 @@ func (m *mockChain) WriteBlock(block *types.Block) error {
 	return nil
 }
 
+func (m *mockChain) VerifyFinalizedBlock(block *types.Block) error {
+	return nil
+}
+
 func (m *mockChain) SubscribeEvents() blockchain.Subscription {
 	return protocol.NewMockSubscription()
 }
@@ -209,7 +213,7 @@ func Test_parseBlock(t *testing.T) {
 			blockstream: newBlockStream(bytes.NewBuffer((&Metadata{}).MarshalRLP())),
 			block:       nil,
 			// should fail by wrong format
-			err: errors.New("not enough elements to decode block, expected 3 but found 2"),
+			err: errors.New("incorrect number of elements to decode block, expected 3 but found 2"),
 		},
 	}
 
@@ -235,12 +239,6 @@ func Test_parseMetadata(t *testing.T) {
 			blockstream: newBlockStream(bytes.NewBuffer(metadata.MarshalRLP())),
 			metadata:    &metadata,
 			err:         nil,
-		},
-		{
-			name:        "should return error",
-			blockstream: newBlockStream(bytes.NewBuffer(blocks[0].MarshalRLP())),
-			metadata:    nil,
-			err:         errors.New("not enough elements to decode Metadata, expected 2 but found 3"),
 		},
 	}
 

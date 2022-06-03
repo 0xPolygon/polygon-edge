@@ -82,3 +82,13 @@ func WithStacktrace(l *ZapEventLogger, level LogLevel) *ZapEventLogger {
 	copyLogger.skipLogger = *copyLogger.SugaredLogger.Desugar().WithOptions(zap.AddCallerSkip(1)).Sugar()
 	return &copyLogger
 }
+
+// WithSkip returns a new logger that skips the specified number of stack frames when reporting the
+// line/file.
+func WithSkip(l *ZapEventLogger, skip int) *ZapEventLogger {
+	copyLogger := *l
+	copyLogger.SugaredLogger = *copyLogger.SugaredLogger.Desugar().
+		WithOptions(zap.AddCallerSkip(skip)).Sugar()
+	copyLogger.skipLogger = *copyLogger.SugaredLogger.Desugar().WithOptions(zap.AddCallerSkip(1)).Sugar()
+	return &copyLogger
+}

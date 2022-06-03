@@ -36,8 +36,9 @@ const (
 	HeaderVary              = "Vary"
 
 	// Connection management
-	HeaderConnection = "Connection"
-	HeaderKeepAlive  = "Keep-Alive"
+	HeaderConnection      = "Connection"
+	HeaderKeepAlive       = "Keep-Alive"
+	HeaderProxyConnection = "Proxy-Connection"
 
 	// Content negotiation
 	HeaderAccept         = "Accept"
@@ -158,7 +159,7 @@ const (
 	HeaderUpgrade             = "Upgrade"
 	HeaderXDNSPrefetchControl = "X-DNS-Prefetch-Control"
 	HeaderXPingback           = "X-Pingback"
-	HeaderXRequestedWith      = "X-RequestedWith"
+	HeaderXRequestedWith      = "X-Requested-With"
 	HeaderXRobotsTag          = "X-Robots-Tag"
 	HeaderXUACompatible       = "X-UA-Compatible"
 )
