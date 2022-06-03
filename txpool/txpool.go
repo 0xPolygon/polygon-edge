@@ -698,14 +698,20 @@ func (p *TxPool) addGossipTx(obj interface{}) {
 
 	// decode tx
 	if err := tx.UnmarshalRLP(raw.Raw.Value); err != nil {
-		p.logger.Error("failed to decode broadcasted tx", "err", err)
+		p.logger.Error("failed to decode broadcast tx", "err", err)
 
 		return
 	}
 
 	// add tx
 	if err := p.addTx(gossip, tx); err != nil {
-		p.logger.Error("failed to add broadcasted txn", "err", err)
+		if errors.Is(err, ErrAlreadyKnown) {
+			p.logger.Debug("rejecting known tx (gossip)", "hash", tx.Hash.String())
+
+			return
+		}
+
+		p.logger.Error("failed to add broadcast tx", "err", err, "hash", tx.Hash.String())
 	}
 }
 
