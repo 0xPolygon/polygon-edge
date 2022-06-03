@@ -389,6 +389,8 @@ func TestAddGossipTx(t *testing.T) {
 }
 
 func TestDropKnownGossipTx(t *testing.T) {
+	t.Parallel()
+
 	pool, err := newTestPool()
 	assert.NoError(t, err)
 	pool.SetSigner(&mockSigner{})
