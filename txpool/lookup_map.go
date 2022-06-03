@@ -13,13 +13,17 @@ type lookupMap struct {
 }
 
 // add inserts the given transaction into the map. [thread-safe]
-func (m *lookupMap) add(txs ...*types.Transaction) {
+func (m *lookupMap) add(tx *types.Transaction) bool {
 	m.Lock()
 	defer m.Unlock()
 
-	for _, tx := range txs {
-		m.all[tx.Hash] = tx
+	if _, exists := m.all[tx.Hash]; exists {
+		return false
 	}
+
+	m.all[tx.Hash] = tx
+
+	return true
 }
 
 // remove removes the given transactions from the map. [thread-safe]
