@@ -199,7 +199,7 @@ func (k *KmsSecretManager) SignBySecret(key string, chainId int, data []byte) ([
 		<-time.After(timeout)
 		round = round + 1
 		k.logger.Info(
-			"kms sign rectry round: ", round,
+			"kms sign retry ", "round", round,
 		)
 
 	}

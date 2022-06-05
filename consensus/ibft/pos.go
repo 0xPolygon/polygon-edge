@@ -226,7 +226,11 @@ func (pos *PoSMechanism) updateValidators(num uint64) error {
 	validators, err := pos.getNextValidators(header)
 	endTime := time.Now().UnixNano()
 	pos.ibft.logger.Info(
-		"query next validators cost time", "duration", (endTime-beginTime)/1e6,
+		"query next validators cost time", "", (endTime-beginTime)/1e6,
+	)
+
+	pos.ibft.logger.Info(
+		"query validators ", "info", fmt.Sprintf("arrays: %v", validators),
 	)
 
 	if err != nil {
