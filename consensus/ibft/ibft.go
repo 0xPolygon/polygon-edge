@@ -464,10 +464,7 @@ func (i *Ibft) isValidSnapshot() bool {
 	}
 
 	if snap.Set.Includes(i.validatorKeyAddr) {
-		i.state.view = &proto.View{
-			Sequence: header.Number + 1,
-			Round:    0,
-		}
+		i.startNewSequence(header.Number + 1)
 
 		return true
 	}
@@ -497,10 +494,9 @@ func (i *Ibft) runSyncState() {
 			if i.isValidSnapshot() {
 				// initialize the round and sequence
 				header := i.blockchain.Header()
-				i.state.view = &proto.View{
-					Round:    0,
-					Sequence: header.Number + 1,
-				}
+
+				i.startNewSequence(header.Number + 1)
+
 				//Set the round metric
 				i.metrics.Rounds.Set(float64(i.state.view.Round))
 
@@ -734,6 +730,14 @@ func (i *Ibft) runAcceptState() { // start new round
 	parent := i.blockchain.Header()
 	number := parent.Number + 1
 
+	if number > i.state.view.Sequence {
+		if i.state.locked {
+			i.state.unlock()
+		}
+
+		i.startNewSequence(number)
+	}
+
 	if number != i.state.view.Sequence {
 		i.logger.Error("sequence not correct", "parent", parent.Number, "sequence", i.state.view.Sequence)
 		i.setState(SyncState)
@@ -843,6 +847,13 @@ func (i *Ibft) runAcceptState() { // start new round
 		if err := block.UnmarshalRLP(msg.Proposal.Value); err != nil {
 			i.logger.Error("failed to unmarshal block", "err", err)
 			i.setState(RoundChangeState)
+
+			return
+		}
+
+		if block.Number() != i.state.view.Sequence {
+			i.logger.Error("sequence not correct", "block", block.Number, "sequence", i.state.view.Sequence)
+			i.setState(SyncState)
 
 			return
 		}
@@ -1042,10 +1053,7 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 	)
 
 	// increase the sequence number and reset the round if any
-	i.state.view = &proto.View{
-		Sequence: header.Number + 1,
-		Round:    0,
-	}
+	i.startNewSequence(header.Number + 1)
 
 	// broadcast the new block
 	i.syncer.Broadcast(block)
@@ -1072,7 +1080,7 @@ func (i *Ibft) runRoundChangeState() {
 	sendRoundChange := func(round uint64) {
 		i.logger.Debug("local round change", "round", round+1)
 		// set the new round and update the round metric
-		i.state.view.Round = round
+		i.startNewRound(round)
 		i.metrics.Rounds.Set(float64(round))
 		// clean the round
 		i.state.cleanRound(round)
@@ -1149,7 +1157,7 @@ func (i *Ibft) runRoundChangeState() {
 			sendRoundChange(msg.View.Round)
 		} else if num == i.quorumSize(i.state.view.Sequence)(i.state.validators) {
 			// start a new round immediately
-			i.state.view.Round = msg.View.Round
+			i.startNewRound(msg.View.Round)
 			i.setState(AcceptState)
 		}
 	}
@@ -1409,5 +1417,21 @@ func (i *Ibft) pushMessage(msg *proto.MessageReq) {
 	select {
 	case i.updateCh <- struct{}{}:
 	default:
+	}
+}
+
+// startNewSequence changes the sequence and resets the round in the view of state
+func (i *Ibft) startNewSequence(newSequence uint64) {
+	i.state.view = &proto.View{
+		Sequence: newSequence,
+		Round:    0,
+	}
+}
+
+// startNewRound changes the round in the view of state
+func (i *Ibft) startNewRound(newRound uint64) {
+	i.state.view = &proto.View{
+		Sequence: i.state.view.Sequence,
+		Round:    newRound,
 	}
 }
