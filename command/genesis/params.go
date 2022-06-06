@@ -14,6 +14,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/validators"
 	"github.com/0xPolygon/polygon-edge/contracts/staking"
 	"github.com/0xPolygon/polygon-edge/crypto"
+	stakingHelper "github.com/0xPolygon/polygon-edge/helper/staking"
 	"github.com/0xPolygon/polygon-edge/server"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -231,7 +232,7 @@ func (p *genesisParams) initValidatorSet() error {
 }
 
 func (p *genesisParams) isValidatorNumberValid() bool {
-	return uint64(p.ibftValidators.Len()) <= p.maxNumValidators
+	return p.ibftValidators == nil || uint64(p.ibftValidators.Len()) <= p.maxNumValidators
 }
 
 func (p *genesisParams) initIBFTExtraData() {
@@ -344,18 +345,23 @@ func (p *genesisParams) shouldPredeployStakingSC() bool {
 	return p.isPos && (p.consensus == server.IBFTConsensus || p.consensus == server.DevConsensus)
 }
 
-// stakingAccount, predeployErr := stakingHelper.PredeployStakingSC(p.ibftValidators,
-// 	stakingHelper.PredeployParams{
-// 		MinValidatorCount: p.minNumValidators,
-// 		MaxValidatorCount: p.maxNumValidators,
-// 	})
-// if predeployErr != nil {
-// 	return nil, predeployErr
-// }
-
-// return stakingAccount, nil
 func (p *genesisParams) predeployStakingSC() (*chain.GenesisAccount, error) {
-	return nil, nil
+	validators, ok := p.ibftValidators.(*validators.ECDSAValidatorSet)
+	if !ok {
+		return nil, fmt.Errorf("%t can't be set in PoS contract", p.ibftValidators)
+	}
+
+	stakingAccount, predeployErr := stakingHelper.PredeployStakingSC(
+		[]types.Address(*validators),
+		stakingHelper.PredeployParams{
+			MinValidatorCount: p.minNumValidators,
+			MaxValidatorCount: p.maxNumValidators,
+		})
+	if predeployErr != nil {
+		return nil, predeployErr
+	}
+
+	return stakingAccount, nil
 }
 
 func (p *genesisParams) getResult() command.CommandResult {

@@ -900,6 +900,7 @@ func newMockIbft(t *testing.T, accounts []string, account string) *mockIbft {
 		logger:     hclog.NewNullLogger(),
 		config:     &consensus.Config{},
 		blockchain: m,
+		msgQueue:   newMsgQueue(),
 		closeCh:    make(chan struct{}),
 		updateCh:   make(chan struct{}),
 		operator:   &operator{},

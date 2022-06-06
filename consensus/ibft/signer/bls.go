@@ -45,7 +45,11 @@ func (s *BLSSigner) Address() types.Address {
 func (s *BLSSigner) InitIBFTExtra(header, parent *types.Header, set validators.ValidatorSet) error {
 	var parentCommittedSeal Sealer
 
-	if parent.Number >= 1 {
+	if header.Number > 1 {
+		if parent == nil {
+			return ErrNilParentHeader
+		}
+
 		parentExtra, err := s.GetIBFTExtra(parent)
 		if err != nil {
 			return err

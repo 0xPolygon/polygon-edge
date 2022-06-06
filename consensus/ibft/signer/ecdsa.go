@@ -48,7 +48,11 @@ func (s *ECDSASigner) Address() types.Address {
 func (s *ECDSASigner) InitIBFTExtra(header, parent *types.Header, set validators.ValidatorSet) error {
 	var parentCommittedSeal Sealer
 
-	if parent.Number >= 1 {
+	if header.Number > 1 {
+		if parent == nil {
+			return ErrNilParentHeader
+		}
+
 		parentExtra, err := s.GetIBFTExtra(parent)
 		if err != nil {
 			return err
@@ -64,18 +68,11 @@ func (s *ECDSASigner) InitIBFTExtra(header, parent *types.Header, set validators
 
 func (s *ECDSASigner) GetIBFTExtra(h *types.Header) (*IstanbulExtra, error) {
 	if len(h.ExtraData) < IstanbulExtraVanity {
-		// return nil, fmt.Errorf(
-		// 	"wrong extra size, expected greater than or equal to %d but actual %d",
-		// 	IstanbulExtraVanity,
-		// 	len(h.ExtraData),
-		// )
-		err := fmt.Errorf(
+		return nil, fmt.Errorf(
 			"wrong extra size, expected greater than or equal to %d but actual %d",
 			IstanbulExtraVanity,
 			len(h.ExtraData),
 		)
-
-		panic(err)
 	}
 
 	data := h.ExtraData[IstanbulExtraVanity:]

@@ -43,15 +43,6 @@ func getTempDir(t *testing.T) string {
 	return tmpDir
 }
 
-func newMockSigner() (signer.Signer, error) {
-	key, err := crypto.GenerateKey()
-	if err != nil {
-		return nil, err
-	}
-
-	return signer.NewECDSASignerFromKey(key), nil
-}
-
 type testerAccount struct {
 	alias string
 	priv  *ecdsa.PrivateKey
@@ -121,9 +112,9 @@ func (ap *testerAccountPool) genesis() *chain.Genesis {
 		MixHash: signer.IstanbulDigest,
 	}
 
-	signer, _ := newMockSigner()
+	signer := signer.NewECDSASignerFromKey(ap.get("A").priv)
 
-	err := signer.InitIBFTExtra(genesis, &types.Header{}, ap.ValidatorSet())
+	err := signer.InitIBFTExtra(genesis, nil, ap.ValidatorSet())
 	assert.NoError(ap.t, err)
 
 	genesis.ComputeHash()
@@ -200,13 +191,20 @@ func newMockHeader(validators []string, vote mockVote) mockHeader {
 func buildHeaders(
 	t *testing.T,
 	pool *testerAccountPool,
+	validatorSet validators.ValidatorSet,
 	genesis *chain.Genesis,
 	mockHeaders []mockHeader,
 ) []*types.Header {
 	t.Helper()
 
-	headers := make([]*types.Header, 0, len(mockHeaders))
-	parentHash := genesis.Hash()
+	var (
+		headers    = make([]*types.Header, 0, len(mockHeaders))
+		parent     *types.Header
+		parentHash = genesis.Hash()
+		extraData  = make([]byte, len(genesis.ExtraData))
+	)
+
+	copy(extraData, genesis.ExtraData)
 
 	for num, header := range mockHeaders {
 		v := header.action
@@ -217,7 +215,7 @@ func buildHeaders(
 			ParentHash: parentHash,
 			Miner:      types.ZeroAddress,
 			MixHash:    signer.IstanbulDigest,
-			ExtraData:  genesis.ExtraData,
+			ExtraData:  extraData,
 		}
 
 		if v.candidate != "" {
@@ -234,13 +232,19 @@ func buildHeaders(
 			h.Nonce = nonceDropVote
 		}
 
+		signer := signer.NewECDSASignerFromKey(pool.get(v.validator).priv)
+		err := signer.InitIBFTExtra(h, parent, validatorSet)
+		assert.NoError(t, err)
+
 		// sign the vote
-		h, err := pool.get(v.validator).sign(h)
+		h, err = pool.get(v.validator).sign(h)
 		assert.NoError(t, err)
 
 		h.ComputeHash()
 
+		parent = h
 		parentHash = h.Hash
+
 		headers = append(headers, h)
 	}
 
@@ -282,7 +286,9 @@ func TestSnapshot_setupSnapshot(t *testing.T) {
 
 	pool := newTesterAccountPool(t)
 	pool.add(vals...)
+
 	validatorSet := pool.ValidatorSet()
+
 	genesis := pool.genesis()
 
 	pool.add(candidateVals...)
@@ -307,32 +313,32 @@ func TestSnapshot_setupSnapshot(t *testing.T) {
 		savedSnapshots []*Snapshot
 		expectedResult snapshotData
 	}{
-		// {
-		// 	name:    "should create genesis",
-		// 	headers: []mockHeader{},
-		// 	expectedResult: snapshotData{
-		// 		LastBlock: 0,
-		// 		Snapshots: []*Snapshot{
-		// 			newSnapshot(0, validatorSet, []*Vote{}),
-		// 		},
-		// 	},
-		// },
-		// {
-		// 	name: "should load from file and advance to latest height without any update if they are in same epoch",
-		// 	headers: []mockHeader{
-		// 		newMockHeader(vals, skipVote("A")),
-		// 		newMockHeader(vals, skipVote("B")),
-		// 	},
-		// 	savedSnapshots: []*Snapshot{
-		// 		newSnapshot(0, validatorSet, []*Vote{}),
-		// 	},
-		// 	expectedResult: snapshotData{
-		// 		LastBlock: 2,
-		// 		Snapshots: []*Snapshot{
-		// 			newSnapshot(0, validatorSet, []*Vote{}),
-		// 		},
-		// 	},
-		// },
+		{
+			name:    "should create genesis",
+			headers: []mockHeader{},
+			expectedResult: snapshotData{
+				LastBlock: 0,
+				Snapshots: []*Snapshot{
+					newSnapshot(0, validatorSet, []*Vote{}),
+				},
+			},
+		},
+		{
+			name: "should load from file and advance to latest height without any update if they are in same epoch",
+			headers: []mockHeader{
+				newMockHeader(vals, skipVote("A")),
+				newMockHeader(vals, skipVote("B")),
+			},
+			savedSnapshots: []*Snapshot{
+				newSnapshot(0, validatorSet, []*Vote{}),
+			},
+			expectedResult: snapshotData{
+				LastBlock: 2,
+				Snapshots: []*Snapshot{
+					newSnapshot(0, validatorSet, []*Vote{}),
+				},
+			},
+		},
 		{
 			name: "should generate snapshot from genesis because of no snapshot file",
 			headers: []mockHeader{
@@ -436,9 +442,8 @@ func TestSnapshot_setupSnapshot(t *testing.T) {
 				signer: signer.NewECDSASignerFromKey(pool.get("A").priv),
 			}
 
-			ibft.SetHeaderHash()
+			initialHeaders := buildHeaders(t, pool, validatorSet, genesis, c.headers)
 
-			initialHeaders := buildHeaders(t, pool, genesis, c.headers)
 			for _, h := range initialHeaders {
 				err := blockchain.WriteHeaders([]*types.Header{h})
 				assert.NoError(t, err)
@@ -750,15 +755,17 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 			pool.add(c.validators...)
 			genesis := pool.genesis()
 
-			// create votes
-			headers := buildHeaders(t, pool, genesis, c.headers)
-
 			// process the headers independently
 			ibft := &Ibft{
 				epochSize:  epochSize,
 				blockchain: blockchain.TestBlockchain(t, genesis),
 				config:     &consensus.Config{},
+				signer:     signer.NewECDSASignerFromKey(pool.get("A").priv),
 			}
+
+			// create votes
+			headers := buildHeaders(t, pool, pool.ValidatorSet(), genesis, c.headers)
+
 			initIbftMechanism(PoA, ibft)
 
 			assert.NoError(t, ibft.setupSnapshot())
@@ -809,6 +816,7 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 				epochSize:  epochSize,
 				blockchain: blockchain.TestBlockchain(t, genesis),
 				config:     &consensus.Config{},
+				signer:     signer.NewECDSASignerFromKey(pool.get("A").priv),
 			}
 
 			initIbftMechanism(PoA, ibft1)
@@ -836,20 +844,24 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 
 func TestSnapshot_PurgeSnapshots(t *testing.T) {
 	pool := newTesterAccountPool(t)
-	pool.add("a", "b", "c")
+	pool.add("A", "B", "C")
 
 	genesis := pool.genesis()
 	ibft1 := &Ibft{
 		epochSize:  10,
 		blockchain: blockchain.TestBlockchain(t, genesis),
 		config:     &consensus.Config{},
+		signer:     signer.NewECDSASignerFromKey(pool.get("A").priv),
 	}
 	assert.NoError(t, ibft1.setupSnapshot())
 	initIbftMechanism(PoA, ibft1)
 
-	// write a header that creates a snapshot
-	headers := []*types.Header{}
+	var (
+		headers = []*types.Header{}
+		parent  *types.Header
+	)
 
+	// write a header that creates a snapshot
 	for i := 1; i < 51; i++ {
 		id := strconv.Itoa(i)
 		pool.add(id)
@@ -865,11 +877,15 @@ func TestSnapshot_PurgeSnapshots(t *testing.T) {
 		h.Miner = pool.get(id).Address()
 		h.Nonce = nonceAuthVote
 
-		h, err := pool.get("a").sign(h)
+		err := ibft1.signer.InitIBFTExtra(h, parent, pool.ValidatorSet())
+		assert.NoError(t, err)
+
+		h, err = pool.get("A").sign(h)
 		assert.NoError(t, err)
 
 		h.ComputeHash()
 		headers = append(headers, h)
+		parent = h
 	}
 
 	err := ibft1.processHeaders(headers)

@@ -87,10 +87,8 @@ func (i *IstanbulExtra) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) er
 	}
 
 	// Seal
-	{
-		if i.Seal, err = elems[1].GetBytes(i.Seal); err != nil {
-			return fmt.Errorf("failed to decode Seal: %w", err)
-		}
+	if i.Seal, err = elems[1].GetBytes(i.Seal); err != nil {
+		return fmt.Errorf("failed to decode Seal: %w", err)
 	}
 
 	// Committed

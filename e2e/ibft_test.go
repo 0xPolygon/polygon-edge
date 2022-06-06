@@ -9,6 +9,7 @@ import (
 	"github.com/umbracle/ethgo"
 
 	ibftSigner "github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
+	"github.com/0xPolygon/polygon-edge/consensus/ibft/validators"
 	"github.com/0xPolygon/polygon-edge/e2e/framework"
 	"github.com/0xPolygon/polygon-edge/helper/tests"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -31,6 +32,7 @@ func TestIbft_Transfer(t *testing.T) {
 		func(i int, config *framework.TestServerConfig) {
 			config.Premine(senderAddr, framework.EthToWei(10))
 			config.SetSeal(true)
+			config.SetShowsLog(i == 0)
 		},
 	)
 
@@ -137,8 +139,13 @@ func TestIbft_TransactionFeeRecipient(t *testing.T) {
 			assert.NotNil(t, receipt.BlockHash)
 			block, err := clt.Eth().GetBlockByHash(receipt.BlockHash, false)
 			assert.NoError(t, err)
-			extraData := &ibftSigner.IstanbulExtra{}
+			extraData := &ibftSigner.IstanbulExtra{
+				Validators:          &validators.ECDSAValidatorSet{},
+				CommittedSeal:       &ibftSigner.SerializedSeal{},
+				ParentCommittedSeal: &ibftSigner.SerializedSeal{},
+			}
 			extraDataWithoutVanity := block.ExtraData[ibftSigner.IstanbulExtraVanity:]
+
 			err = extraData.UnmarshalRLP(extraDataWithoutVanity)
 			assert.NoError(t, err)
 

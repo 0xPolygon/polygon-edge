@@ -197,6 +197,7 @@ func Factory(
 	}
 
 	// Istanbul requires a different header hash function
+	p.SetHeaderHash()
 
 	p.syncer = protocol.NewSyncer(params.Logger, params.Network, params.Blockchain)
 

@@ -275,42 +275,44 @@ func (s *Snapshot) UnmarshalJSON(data []byte) error {
 	s.Hash = raw.Hash
 	s.Votes = raw.Votes
 
-	switch raw.Set[0].(type) {
-	case []string:
-		set := validators.ECDSAValidatorSet{}
-		for _, x := range raw.Set {
-			set = append(set, types.StringToAddress(x.(string)))
+	if len(raw.Set) > 0 {
+		switch raw.Set[0].(type) {
+		case string:
+			set := validators.ECDSAValidatorSet{}
+			for _, x := range raw.Set {
+				set = append(set, types.StringToAddress(x.(string)))
+			}
+
+			s.Set = &set
+		case map[string]interface{}:
+			set := validators.BLSValidatorSet{}
+
+			for _, x := range raw.Set {
+				m, ok := x.(map[string]interface{})
+				if !ok {
+					return fmt.Errorf("expected map")
+				}
+
+				rawAddr, ok := m["Address"].(string)
+				if !ok {
+					return fmt.Errorf("expected Address")
+				}
+
+				addr := types.StringToAddress(rawAddr)
+
+				rawBLSPubkey, ok := m["BLSPubKey"].(string)
+				if !ok {
+					return fmt.Errorf("expected BLSPubKey")
+				}
+
+				set = append(set, validators.BLSValidator{
+					Address:   addr,
+					BLSPubKey: []byte(rawBLSPubkey),
+				})
+			}
+
+			s.Set = &set
 		}
-
-		s.Set = &set
-	case map[string]interface{}:
-		set := validators.BLSValidatorSet{}
-
-		for _, x := range raw.Set {
-			m, ok := x.(map[string]interface{})
-			if !ok {
-				return fmt.Errorf("expected map")
-			}
-
-			rawAddr, ok := m["Address"].(string)
-			if !ok {
-				return fmt.Errorf("expected Address")
-			}
-
-			addr := types.StringToAddress(rawAddr)
-
-			rawBLSPubkey, ok := m["BLSPubKey"].(string)
-			if !ok {
-				return fmt.Errorf("expected BLSPubKey")
-			}
-
-			set = append(set, validators.BLSValidator{
-				Address:   addr,
-				BLSPubKey: []byte(rawBLSPubkey),
-			})
-		}
-
-		s.Set = &set
 	}
 
 	return nil
