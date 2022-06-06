@@ -853,7 +853,7 @@ func (i *Ibft) runAcceptState() { // start new round
 
 		if block.Number() != i.state.view.Sequence {
 			i.logger.Error("sequence not correct", "block", block.Number, "sequence", i.state.view.Sequence)
-			i.setState(SyncState)
+			i.handleStateErr(errIncorrectBlockHeight)
 
 			return
 		}
@@ -1066,9 +1066,10 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 }
 
 var (
-	errIncorrectBlockLocked    = fmt.Errorf("block locked is incorrect")
-	errBlockVerificationFailed = fmt.Errorf("block verification failed")
-	errFailedToInsertBlock     = fmt.Errorf("failed to insert block")
+	errIncorrectBlockLocked    = errors.New("block locked is incorrect")
+	errIncorrectBlockHeight    = errors.New("proposed block number is incorrect")
+	errBlockVerificationFailed = errors.New("block verification failed")
+	errFailedToInsertBlock     = errors.New("failed to insert block")
 )
 
 func (i *Ibft) handleStateErr(err error) {
