@@ -2,6 +2,7 @@ package ibft
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -258,7 +259,6 @@ type Snapshot struct {
 	Set validators.ValidatorSet
 }
 
-// TODO: fix this
 func (s *Snapshot) UnmarshalJSON(data []byte) error {
 	raw := struct {
 		Number uint64
@@ -280,7 +280,12 @@ func (s *Snapshot) UnmarshalJSON(data []byte) error {
 		case string:
 			set := validators.ECDSAValidatorSet{}
 			for _, x := range raw.Set {
-				set = append(set, types.StringToAddress(x.(string)))
+				addrString, ok := x.(string)
+				if !ok {
+					return errors.New("invalid address type")
+				}
+
+				set = append(set, types.StringToAddress(addrString))
 			}
 
 			s.Set = &set
