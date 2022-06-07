@@ -8,6 +8,7 @@ import (
 	"io"
 	"math/big"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/crypto"
@@ -46,6 +47,9 @@ type KmsSecretManager struct {
 
 	// init phase, cache the validator address
 	validatorAddress string
+
+	// chainId
+	ChainID int
 }
 
 // SecretsManagerFactory implements the factory method
@@ -98,6 +102,8 @@ func SecretsManagerFactory(
 	if err != nil {
 		return nil, err
 	}
+
+	// chainId =
 
 	return kmsManager, nil
 }
@@ -177,8 +183,32 @@ func (k *KmsSecretManager) RemoveSecret(name string) error {
 }
 
 // Sign data by key
-func (k *KmsSecretManager) SignBySecret(key string, data []byte) ([]byte, error) {
+func (k *KmsSecretManager) SignBySecret(key string, chainId int, data []byte) ([]byte, error) {
 
+	var round uint64 = 0
+	var sign []byte
+	var err error
+	for {
+		sign, err = k.SignBySecretOnce(key, chainId, data)
+		if err == nil {
+			break
+		}
+
+		timeout := exponentialTimeout(round)
+		//wait
+		<-time.After(timeout)
+		round = round + 1
+		k.logger.Info(
+			"kms sign retry ", "round", round,
+		)
+
+	}
+
+	return sign, err
+}
+
+// signle sign
+func (k *KmsSecretManager) SignBySecretOnce(key string, chainId int, data []byte) ([]byte, error) {
 	type SignRaw struct {
 		KmsKeyId string     `json:"kms_key_id"`
 		Data     types.Hash `json:"data"`
@@ -191,11 +221,6 @@ func (k *KmsSecretManager) SignBySecret(key string, data []byte) ([]byte, error)
 	}
 
 	dataHash := types.BytesToHash(data)
-	// intArray := []int{}
-	// fmt.Println("datahash: ", dataHash)
-	// for _, v := range dataHash.Bytes() {
-	// 	intArray = append(intArray, int(v))
-	// }
 
 	// fmt.Println("intarray: ", intArray)
 	req := &Req{
@@ -203,7 +228,7 @@ func (k *KmsSecretManager) SignBySecret(key string, data []byte) ([]byte, error)
 		SignRaw: SignRaw{
 			KmsKeyId: k.name,
 			Data:     dataHash,
-			ChainId:  "0x25",
+			ChainId:  strconv.FormatInt(int64(chainId), 16),
 		},
 	}
 	//fmt.Println(" hash ------ ", data)
@@ -214,16 +239,31 @@ func (k *KmsSecretManager) SignBySecret(key string, data []byte) ([]byte, error)
 	}
 	//fmt.Println("reqData: ", string(bs))
 
+	beginTime := time.Now().UnixNano()
 	resp, err := k.client.Post(k.serverURL, "application/json", bytes.NewBuffer(bs))
 	if err != nil {
 		fmt.Println("http post errr", err)
 		return nil, err
 	}
-	defer resp.Body.Close()
+	endTime := time.Now().UnixNano()
+	k.logger.Info(
+		"kms sign cost time ", "duration", (endTime-beginTime)/1e6,
+	)
 
 	if resp.StatusCode != http.StatusOK {
 		fmt.Println("Status code err", resp.StatusCode)
-		return nil, errors.New("http status error")
+		return nil, fmt.Errorf("http status error %d", resp.StatusCode)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	// var rspIns SignResp
+	defer resp.Body.Close()
+	respData, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
 	}
 
 	type SignRawData struct {
@@ -238,18 +278,7 @@ func (k *KmsSecretManager) SignBySecret(key string, data []byte) ([]byte, error)
 		Data SignRawData `json:"data"`
 	}
 
-	// var rspIns SignResp
-
-	respData, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	//fmt.Println("respData: ", string(respData))
-
-	// var respMap map[string]interface{}
 	var signResp Resp
-
 	err = json.Unmarshal(respData, &signResp)
 	if err != nil {
 		return nil, err
@@ -263,27 +292,13 @@ func (k *KmsSecretManager) SignBySecret(key string, data []byte) ([]byte, error)
 
 	R, ok := (&big.Int{}).SetString(signResp.Data.R[2:], 16)
 	if !ok {
-		return nil, errors.New("R to big int error")
+		return nil, errors.New("r to big int error")
 	}
 
 	S, ok := (&big.Int{}).SetString(signResp.Data.S[2:], 16)
 	if !ok {
-		return nil, errors.New("S to big int error")
+		return nil, errors.New("s to big int error")
 	}
-
-	// Check if v value conforms to an earlier standard (before EIP155)
-	// bigV := big.NewInt(0)
-	// if tx.V != nil {
-	// 	bigV.SetBytes(tx.V.Bytes())
-	// }
-
-	// Reverse the V calculation to find the original V in the range [0, 1]
-	// v = CHAIN_ID * 2 + 35 + {0, 1}
-	// mulOperand := big.NewInt(0).Mul(big.NewInt(int64(e.chainID)), big.NewInt(2))
-	// bigV.Sub(bigV, mulOperand)
-	// bigV.Sub(bigV, big35)
-
-	// sig, err := encodeSignature(tx.R, tx.S, byte(bigV.Int64()))
 
 	v := int64(signResp.Data.V)
 	bigV := big.NewInt(v)

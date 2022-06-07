@@ -85,7 +85,7 @@ type SecretsManager interface {
 	RemoveSecret(name string) error
 
 	// Sign data by key
-	SignBySecret(key string, data []byte) ([]byte, error)
+	SignBySecret(key string, chainId int, data []byte) ([]byte, error)
 
 	// retrive secret info , pubkey and address
 	GetSecretInfo(name string) (*SecretInfo, error)

@@ -205,7 +205,7 @@ func (v *VaultSecretsManager) RemoveSecret(name string) error {
 }
 
 // Sign data by private key
-func (v *VaultSecretsManager) SignBySecret(name string, data []byte) ([]byte, error) {
+func (v *VaultSecretsManager) SignBySecret(name string, chainId int, data []byte) ([]byte, error) {
 	return nil, nil
 }
 

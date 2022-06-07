@@ -268,7 +268,7 @@ func (s *sign) Sign(priv *ecdsa.PrivateKey, hash []byte) ([]byte, error) {
 	k, ok := s.ibft.secretsManager.(*awskms.KmsSecretManager)
 	if ok {
 		//fmt.Println(" By Kms sign approach")
-		return k.SignBySecret(secrets.ValidatorKey, hash)
+		return k.SignBySecret(secrets.ValidatorKey, s.ibft.config.Params.ChainID, hash)
 	}
 
 	return crypto.Sign(priv, hash)

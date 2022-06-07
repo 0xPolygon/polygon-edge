@@ -3,6 +3,7 @@ package ibft
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/0xPolygon/polygon-edge/contracts/staking"
 	stakingHelper "github.com/0xPolygon/polygon-edge/helper/staking"
@@ -221,7 +222,17 @@ func (pos *PoSMechanism) updateValidators(num uint64) error {
 		return errors.New("header not found")
 	}
 
+	beginTime := time.Now().UnixNano()
 	validators, err := pos.getNextValidators(header)
+	endTime := time.Now().UnixNano()
+	pos.ibft.logger.Info(
+		"query next validators cost time", "", (endTime-beginTime)/1e6,
+	)
+
+	pos.ibft.logger.Info(
+		"query validators ", "info", fmt.Sprintf("arrays: %v", validators),
+	)
+
 	if err != nil {
 		return err
 	}

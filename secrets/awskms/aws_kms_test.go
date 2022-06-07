@@ -71,7 +71,7 @@ func TestKmsSecretsManager_SignData(t *testing.T) {
 	// Set the secret
 	manager := getLocalSecretsManager(t)
 
-	content, err := manager.SignBySecret("validator-key", []byte("hellokms"))
+	content, err := manager.SignBySecret("validator-key", 37, []byte("hellokms"))
 	// fmt.Println("sing data ", encoding.Base64(content))
 	pub, err := crypto.RecoverPubkey(content, []byte("hellokms"))
 	pubaddr := crypto.PubKeyToAddress(pub)

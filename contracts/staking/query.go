@@ -95,7 +95,7 @@ func QueryValidators(t TxQueryHandler, from types.Address, store BlockChainStore
 	}
 
 	u := NewUpHash(len(addrs))
-	headHash := store.Header().Hash //取链上最新区块的hash
+	headHash := store.Header().Hash //get latest block from the chain
 	fmt.Println(" head hash ", headHash)
 	factor := int64(binary.BigEndian.Uint64(headHash.Bytes()))
 	resultSeqs, err := u.GenHash(factor)

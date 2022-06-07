@@ -820,6 +820,7 @@ func (i *Ibft) runAcceptState() { // start new round
 
 		// send the prepare message since we are ready to move the state
 		i.sendPrepareMsg()
+		i.logger.Debug("ibft proposer send prepreparemsg", "number", number)
 
 		// move to validation state for new prepare messages
 		i.setState(ValidateState)
@@ -892,6 +893,7 @@ func (i *Ibft) runAcceptState() { // start new round
 			i.state.block = block
 			// send prepare message and wait for validations
 			i.sendPrepareMsg()
+			i.logger.Debug("ibft validators send preparemsg", "number", number)
 			i.setState(ValidateState)
 		}
 	}
