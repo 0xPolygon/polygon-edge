@@ -547,7 +547,7 @@ func TestTransition_AcceptState_Reject_WrongHeight_Block(t *testing.T) {
 		Proposal: &anypb.Any{
 			Value: proposedBlock.MarshalRLP(),
 		},
-		// Proposer propose block #3 but set sequence 2 in order to pass message queue in validator
+		// Proposer propose block #3 but set sequence 2 in View in order to pass message queue in other validators
 		View: proto.ViewMsg(nextSequence, 0),
 	})
 
@@ -557,7 +557,7 @@ func TestTransition_AcceptState_Reject_WrongHeight_Block(t *testing.T) {
 		sequence: nextSequence,
 		state:    RoundChangeState,
 		locked:   false,
-		outgoing: 0, // prepare message
+		outgoing: 0,
 		err:      errIncorrectBlockHeight,
 	})
 }
