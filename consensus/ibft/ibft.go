@@ -730,6 +730,7 @@ func (i *Ibft) runAcceptState() { // start new round
 	parent := i.blockchain.Header()
 	number := parent.Number + 1
 
+	// Check whether current sequence matches the next height
 	switch {
 	case number > i.state.view.Sequence:
 		// Node has synced already but state needs to update
