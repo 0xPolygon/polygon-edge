@@ -730,17 +730,22 @@ func (i *Ibft) runAcceptState() { // start new round
 	parent := i.blockchain.Header()
 	number := parent.Number + 1
 
-	if number > i.state.view.Sequence {
+	switch {
+	case number > i.state.view.Sequence:
+		// Node has synced already but state needs to update
+
+		i.logger.Info("next block height exceeds current sequence, unlock block & catch up", "next block height", number, "current sequence", i.state.view.Sequence)
 		if i.state.locked {
 			i.state.unlock()
 		}
 
 		i.startNewSequence(number)
-	}
+	case number < i.state.view.Sequence:
+		// For some reason, sequence exceeds current block height
+		// Needs to wait until other validators catch up
 
-	if number != i.state.view.Sequence {
-		i.logger.Error("sequence not correct", "parent", parent.Number, "sequence", i.state.view.Sequence)
-		i.setState(SyncState)
+		i.logger.Warn("sequence exceeds latest block height", "latest", parent.Number, "sequence", i.state.view.Sequence)
+		i.handleStateErr(errIncorrectSequence)
 
 		return
 	}
@@ -1066,6 +1071,7 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 }
 
 var (
+	errIncorrectSequence       = errors.New("sequence doesn't match next block height")
 	errIncorrectBlockLocked    = errors.New("block locked is incorrect")
 	errIncorrectBlockHeight    = errors.New("proposed block number is incorrect")
 	errBlockVerificationFailed = errors.New("block verification failed")
