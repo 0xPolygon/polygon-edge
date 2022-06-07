@@ -66,6 +66,9 @@ func parseValue(b []byte, c *cache) (*Value, []byte, error) {
 	}
 	if cur < 0xC0 {
 		intSize := int(cur - 0xB7)
+		if len(b) < intSize+1 {
+			return nil, nil, fmt.Errorf("bad size")
+		}
 		size := readUint(b[1:intSize+1], c.buf[:])
 		if size < 56 {
 			return nil, nil, fmt.Errorf("bad size")
@@ -85,6 +88,9 @@ func parseValue(b []byte, c *cache) (*Value, []byte, error) {
 	}
 
 	intSize := int(cur - 0xF7)
+	if len(b) < intSize+1 {
+		return nil, nil, fmt.Errorf("bad size")
+	}
 	size := readUint(b[1:intSize+1], c.buf[:])
 	if size < 56 {
 		return nil, nil, fmt.Errorf("bad size")
