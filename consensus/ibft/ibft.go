@@ -857,6 +857,7 @@ func (i *Ibft) runAcceptState() { // start new round
 			return
 		}
 
+		// Make sure the proposing block height match the current sequence
 		if block.Number() != i.state.view.Sequence {
 			i.logger.Error("sequence not correct", "block", block.Number, "sequence", i.state.view.Sequence)
 			i.handleStateErr(errIncorrectBlockHeight)
