@@ -983,6 +983,9 @@ func (i *Ibft) runValidateState() {
 			// update metrics
 			i.updateMetrics(block)
 
+			// increase the sequence number and reset the round if any
+			i.startNewSequence()
+
 			// move ahead to the next block
 			i.setState(AcceptState)
 		}
@@ -1059,9 +1062,6 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 		"rounds", i.state.view.Round+1,
 		"committed", i.state.numCommitted(),
 	)
-
-	// increase the sequence number and reset the round if any
-	i.startNewSequence()
 
 	// broadcast the new block
 	i.syncer.Broadcast(block)
