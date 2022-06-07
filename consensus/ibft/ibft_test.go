@@ -919,6 +919,7 @@ func TestRunSyncState_BulkSyncWithPeer_CallsTxPoolResetWithHeaders(t *testing.T)
 	)
 }
 
+// Tests whether validator unlock block if it syncs blocks during sync process
 func TestRunSyncState_Unlock_After_Sync(t *testing.T) {
 	pool := newTesterAccountPool()
 	pool.add("A", "B", "C", "D")
@@ -933,6 +934,7 @@ func TestRunSyncState_Unlock_After_Sync(t *testing.T) {
 	// Locking block #1
 	m.state.locked = true
 
+	// Sync blocks to #3
 	expectedNewBlocksToSync := []*types.Block{
 		{Header: &types.Header{Number: 1}},
 		{Header: &types.Header{Number: 2}},
@@ -955,7 +957,7 @@ func TestRunSyncState_Unlock_After_Sync(t *testing.T) {
 
 	m.runSyncState()
 
-	// Validator should start new round from next of latest block and unlock block
+	// Validator should start new sequence from the next of the latest block and unlock block in state
 	m.expect(expectResult{
 		sequence: 4,
 		state:    AcceptState,
