@@ -132,6 +132,7 @@ func (s *serviceV1) GetHeaders(_ context.Context, req *proto.GetHeadersRequest) 
 
 	if !ok {
 		// return empty
+		s.logger.Info("server GetHeaders not ok ", req.Number, req.Hash)
 		return &proto.Response{}, nil
 	}
 

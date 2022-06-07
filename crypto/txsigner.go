@@ -240,3 +240,17 @@ func encodeSignature(R, S *big.Int, V byte) ([]byte, error) {
 
 	return sig, nil
 }
+
+// EncodeSignature generates a signature value based on the R, S and V value
+func EncodeSignature(R, S *big.Int, V byte) ([]byte, error) {
+	if !ValidateSignatureValues(V, R, S) {
+		return nil, fmt.Errorf("invalid txn signature")
+	}
+
+	sig := make([]byte, 65)
+	copy(sig[32-len(R.Bytes()):32], R.Bytes())
+	copy(sig[64-len(S.Bytes()):64], S.Bytes())
+	sig[64] = V
+
+	return sig, nil
+}

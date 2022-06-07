@@ -350,6 +350,11 @@ func (s *Server) setupSecretsManager() error {
 		}
 	}
 
+	if secretsManagerType == secrets.AwsKms {
+		secretsManagerParams.Extra = map[string]interface{}{
+			secrets.Path: s.config.DataDir,
+		}
+	}
 	// Grab the factory method
 	secretsManagerFactory, ok := secretsManagerBackends[secretsManagerType]
 	if !ok {

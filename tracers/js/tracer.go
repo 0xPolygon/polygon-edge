@@ -572,7 +572,7 @@ func newJsTracer(code string, ctx *tracers2.Context) (tracers2.Tracer, error) {
 	// Push the JavaScript tracer as object #0 onto the JSVM stack and validate it
 	if err := tracer.vm.PevalString("(" + code + ")"); err != nil {
 		// log.Warn("Failed to compile tracer", "err", err)
-		fmt.Println("Failed to compile tracer", "err", err)
+		// fmt.Println("Failed to compile tracer", "err", err)
 		return nil, err
 	}
 	tracer.tracerObject = 0 // yeah, nice, eval can't return the index itself

@@ -203,3 +203,18 @@ func (v *VaultSecretsManager) RemoveSecret(name string) error {
 
 	return nil
 }
+
+// Sign data by private key
+func (v *VaultSecretsManager) SignBySecret(name string, chainId int, data []byte) ([]byte, error) {
+	return nil, nil
+}
+
+// retrive secret info , pubkey and address
+func (v *VaultSecretsManager) GetSecretInfo(name string) (*secrets.SecretInfo, error) {
+	return nil, nil
+}
+
+// get SecretsManagerType
+func (v *VaultSecretsManager) GetSecretsManagerType() secrets.SecretsManagerType {
+	return secrets.HashicorpVault
+}
