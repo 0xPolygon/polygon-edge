@@ -86,7 +86,7 @@ func (m *MockBlockchain) CalculateGasLimit(number uint64) (uint64, error) {
 }
 
 // helper method
-func (m *MockBlockchain) MockGenesis(validators []types.Address) *types.Block {
+func (m *MockBlockchain) SetGenesis(validators []types.Address) *types.Block {
 	m.t.Helper()
 
 	header := &types.Header{
@@ -102,9 +102,13 @@ func (m *MockBlockchain) MockGenesis(validators []types.Address) *types.Block {
 
 	header = header.ComputeHash()
 
-	return &types.Block{
+	block := &types.Block{
 		Header: header,
 	}
+
+	m.writeBlock(block)
+
+	return block
 }
 
 func (m *MockBlockchain) MockBlock(height uint64, parentHash types.Hash, proposer *ecdsa.PrivateKey, validators []types.Address) *types.Block {
@@ -161,7 +165,7 @@ func (m *MockBlockchain) writeBlock(block *types.Block) error {
 	number := block.Number()
 	m.blocks[number] = block
 
-	if _, ok := m.headers[number]; ok {
+	if _, ok := m.headers[number]; !ok {
 		m.headers[number] = block.Header
 
 		if m.latestBlockNumber == nil || *m.latestBlockNumber < number {
@@ -493,71 +497,13 @@ func TestTransition_AcceptState_Validator_LockCorrect(t *testing.T) {
 	})
 }
 
-// Test whether a validator catch up block height based on latest block height
-func TestTransition_AcceptState_CatchUp_Sequence(t *testing.T) {
-	pool := newTesterAccountPool()
-	pool.add("A", "B", "C", "D")
-
-	blockchain := NewMockBlockchain(t)
-	blockchain.HeaderHandler = func() *types.Header {
-		return blockchain.MockGenesis(pool.ValidatorSet()).Header
-	}
-
-	i := newMockIBFTWithMockBlockchain(t, pool, blockchain, "A")
-
-	// Initialize IBFT state
-	// Validator starts new sequence 1, but there is mismatch between next block height and the sequence
-	// and the validator is locking a block at the sequence
-	var (
-		validatorSequence uint64 = 1 // The next validator sequence
-		latestBlockHeight uint64 = 2 // The latest block in the chain
-
-		// The block this validator is locking
-		lockedBlock = blockchain.MockBlock(validatorSequence, types.ZeroHash, pool.get("B").priv, pool.ValidatorSet())
-		// The latest block in the chain
-		latestBlock = blockchain.MockBlock(latestBlockHeight, types.ZeroHash, pool.get("C").priv, pool.ValidatorSet())
-		// The next proposed block in the network
-		proposedBlock = blockchain.MockBlock(latestBlockHeight+1, types.ZeroHash, pool.get("D").priv, pool.ValidatorSet())
-	)
-
-	i.state.view = proto.ViewMsg(validatorSequence, 1)
-	i.setState(AcceptState)
-
-	i.state.block = lockedBlock
-	i.state.locked = true
-
-	blockchain.HeaderHandler = func() *types.Header {
-		return latestBlock.Header
-	}
-
-	i.emitMsg(&proto.MessageReq{
-		From: "D",
-		Type: proto.MessageReq_Preprepare,
-		Proposal: &anypb.Any{
-			Value: proposedBlock.MarshalRLP(),
-		},
-		View: proto.ViewMsg(proposedBlock.Number(), 0),
-	})
-
-	i.runCycle()
-
-	i.expect(expectResult{
-		sequence: latestBlock.Number() + 1,
-		state:    ValidateState,
-		locked:   false,
-		outgoing: 1, // prepare message
-	})
-}
-
 // Test whether a validator rejects the proposed block with the wrong height
 func TestTransition_AcceptState_Reject_WrongHeight_Block(t *testing.T) {
 	pool := newTesterAccountPool()
 	pool.add("A", "B", "C", "D")
 
 	blockchain := NewMockBlockchain(t)
-	blockchain.HeaderHandler = func() *types.Header {
-		return blockchain.MockGenesis(pool.ValidatorSet()).Header
-	}
+	blockchain.SetGenesis(pool.ValidatorSet())
 
 	i := newMockIBFTWithMockBlockchain(t, pool, blockchain, "A")
 
@@ -961,11 +907,56 @@ func TestRunSyncState_BulkSyncWithPeer_CallsTxPoolResetWithHeaders(t *testing.T)
 	)
 }
 
+func TestRunSyncState_Unlock_After_Sync(t *testing.T) {
+	pool := newTesterAccountPool()
+	pool.add("A", "B", "C", "D")
+
+	blockchain := NewMockBlockchain(t)
+	blockchain.SetGenesis(pool.ValidatorSet())
+
+	m := newMockIBFTWithMockBlockchain(t, pool, blockchain, "A")
+	m.sealing = true
+	m.setState(SyncState)
+
+	// Locking block #1
+	m.state.locked = true
+
+	expectedNewBlocksToSync := []*types.Block{
+		{Header: &types.Header{Number: 1}},
+		{Header: &types.Header{Number: 2}},
+		{Header: &types.Header{Number: 3}},
+	}
+
+	m.syncer = &mockSyncer{
+		bulkSyncBlocksFromPeer: expectedNewBlocksToSync,
+		blockchain:             blockchain,
+	}
+	m.txpool = &mockTxPool{}
+
+	// we need to change state from Sync in order to break from the loop inside runSyncState
+	stateChangeDelay := time.After(100 * time.Millisecond)
+
+	go func() {
+		<-stateChangeDelay
+		m.setState(AcceptState)
+	}()
+
+	m.runSyncState()
+
+	// Validator should start new round from next of latest block and unlock block
+	m.expect(expectResult{
+		sequence: 4,
+		state:    AcceptState,
+		locked:   false,
+	})
+}
+
 type mockSyncer struct {
 	bulkSyncBlocksFromPeer  []*types.Block
 	receivedNewHeadFromPeer *types.Block
 	broadcastedBlock        *types.Block
 	broadcastCalled         bool
+	blockchain              blockchainInterface
 }
 
 func (s *mockSyncer) Start() {}
@@ -976,6 +967,12 @@ func (s *mockSyncer) BestPeer() *protocol.SyncPeer {
 
 func (s *mockSyncer) BulkSyncWithPeer(p *protocol.SyncPeer, handler func(block *types.Block)) error {
 	for _, block := range s.bulkSyncBlocksFromPeer {
+		if s.blockchain != nil {
+			if err := s.blockchain.WriteBlock(block); err != nil {
+				return err
+			}
+		}
+
 		handler(block)
 	}
 
@@ -988,6 +985,12 @@ func (s *mockSyncer) WatchSyncWithPeer(
 	blockTimeout time.Duration,
 ) {
 	if s.receivedNewHeadFromPeer != nil {
+		if s.blockchain != nil {
+			if err := s.blockchain.WriteBlock(s.receivedNewHeadFromPeer); err != nil {
+				return
+			}
+		}
+
 		newBlockHandler(s.receivedNewHeadFromPeer)
 	}
 }

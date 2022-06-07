@@ -464,8 +464,6 @@ func (i *Ibft) isValidSnapshot() bool {
 	}
 
 	if snap.Set.Includes(i.validatorKeyAddr) {
-		i.startNewSequence(header.Number + 1)
-
 		return true
 	}
 
@@ -484,6 +482,12 @@ func (i *Ibft) runSyncState() {
 		}
 	}
 
+	// save current height in order to check new blocks are added or not during sync
+	beginningHeight := uint64(0)
+	if header := i.blockchain.Header(); header != nil {
+		beginningHeight = header.Number
+	}
+
 	for i.isState(SyncState) {
 		// try to sync with the best-suited peer
 		p := i.syncer.BestPeer()
@@ -493,9 +497,7 @@ func (i *Ibft) runSyncState() {
 			// reverted later
 			if i.isValidSnapshot() {
 				// initialize the round and sequence
-				header := i.blockchain.Header()
-
-				i.startNewSequence(header.Number + 1)
+				i.startNewSequence()
 
 				//Set the round metric
 				i.metrics.Rounds.Set(float64(i.state.view.Round))
@@ -520,6 +522,7 @@ func (i *Ibft) runSyncState() {
 		// if we are a validator we do not even want to wait here
 		// we can just move ahead
 		if i.isValidSnapshot() {
+			i.startNewSequence()
 			i.setState(AcceptState)
 
 			continue
@@ -544,8 +547,20 @@ func (i *Ibft) runSyncState() {
 			// at this point, we are in sync with the latest chain we know of
 			// and we are a validator of that chain so we need to change to AcceptState
 			// so that we can start to do some stuff there
+			i.startNewSequence()
 			i.setState(AcceptState)
 		}
+	}
+
+	// check that new blocks are added during sync
+	endingHeight := uint64(0)
+	if header := i.blockchain.Header(); header != nil {
+		endingHeight = header.Number
+	}
+
+	// if new blocks are added, validator will unlock current block
+	if endingHeight > beginningHeight {
+		i.state.unlock()
 	}
 }
 
@@ -730,23 +745,9 @@ func (i *Ibft) runAcceptState() { // start new round
 	parent := i.blockchain.Header()
 	number := parent.Number + 1
 
-	// Check whether current sequence matches the next height
-	switch {
-	case number > i.state.view.Sequence:
-		// Node has synced already but state needs to update
-
-		i.logger.Info("next block height exceeds current sequence, unlock block & catch up", "next block height", number, "current sequence", i.state.view.Sequence)
-		if i.state.locked {
-			i.state.unlock()
-		}
-
-		i.startNewSequence(number)
-	case number < i.state.view.Sequence:
-		// For some reason, sequence exceeds current block height
-		// Needs to wait until other validators catch up
-
-		i.logger.Warn("sequence exceeds latest block height", "latest", parent.Number, "sequence", i.state.view.Sequence)
-		i.handleStateErr(errIncorrectSequence)
+	if number != i.state.view.Sequence {
+		i.logger.Error("sequence not correct", "parent", parent.Number, "sequence", i.state.view.Sequence)
+		i.setState(SyncState)
 
 		return
 	}
@@ -1060,7 +1061,7 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 	)
 
 	// increase the sequence number and reset the round if any
-	i.startNewSequence(header.Number + 1)
+	i.startNewSequence()
 
 	// broadcast the new block
 	i.syncer.Broadcast(block)
@@ -1073,7 +1074,6 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 }
 
 var (
-	errIncorrectSequence       = errors.New("sequence doesn't match next block height")
 	errIncorrectBlockLocked    = errors.New("block locked is incorrect")
 	errIncorrectBlockHeight    = errors.New("proposed block number is incorrect")
 	errBlockVerificationFailed = errors.New("block verification failed")
@@ -1430,9 +1430,11 @@ func (i *Ibft) pushMessage(msg *proto.MessageReq) {
 }
 
 // startNewSequence changes the sequence and resets the round in the view of state
-func (i *Ibft) startNewSequence(newSequence uint64) {
+func (i *Ibft) startNewSequence() {
+	header := i.blockchain.Header()
+
 	i.state.view = &proto.View{
-		Sequence: newSequence,
+		Sequence: header.Number + 1,
 		Round:    0,
 	}
 }
