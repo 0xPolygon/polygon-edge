@@ -42,6 +42,7 @@ type MockBlockchain struct {
 
 func (m *MockBlockchain) Header() *types.Header {
 	m.t.Helper()
+
 	if m.HeaderHandler == nil {
 		m.errorByUndefinedMethod("Header")
 	}
@@ -51,6 +52,7 @@ func (m *MockBlockchain) Header() *types.Header {
 
 func (m *MockBlockchain) GetHeaderByNumber(i uint64) (*types.Header, bool) {
 	m.t.Helper()
+
 	if m.GetHeaderByNumberHandler == nil {
 		m.errorByUndefinedMethod("GetHeaderByNumber")
 	}
@@ -60,6 +62,7 @@ func (m *MockBlockchain) GetHeaderByNumber(i uint64) (*types.Header, bool) {
 
 func (m *MockBlockchain) WriteBlock(block *types.Block) error {
 	m.t.Helper()
+
 	if m.WriteBlockHandler == nil {
 		m.errorByUndefinedMethod("WriteBlock")
 	}
@@ -69,6 +72,7 @@ func (m *MockBlockchain) WriteBlock(block *types.Block) error {
 
 func (m *MockBlockchain) VerifyPotentialBlock(block *types.Block) error {
 	m.t.Helper()
+
 	if m.VerifyPotentialBlockHandler == nil {
 		m.errorByUndefinedMethod("VerifyPotentialBlock")
 	}
@@ -78,6 +82,7 @@ func (m *MockBlockchain) VerifyPotentialBlock(block *types.Block) error {
 
 func (m *MockBlockchain) CalculateGasLimit(number uint64) (uint64, error) {
 	m.t.Helper()
+
 	if m.CalculateGasLimitHandler == nil {
 		m.errorByUndefinedMethod("CalculateGasLimit")
 	}
@@ -106,12 +111,19 @@ func (m *MockBlockchain) SetGenesis(validators []types.Address) *types.Block {
 		Header: header,
 	}
 
-	m.writeBlock(block)
+	if err := m.writeBlock(block); err != nil {
+		m.t.Errorf("failed to insert genesis block: %v", err)
+	}
 
 	return block
 }
 
-func (m *MockBlockchain) MockBlock(height uint64, parentHash types.Hash, proposer *ecdsa.PrivateKey, validators []types.Address) *types.Block {
+func (m *MockBlockchain) MockBlock(
+	height uint64,
+	parentHash types.Hash,
+	proposer *ecdsa.PrivateKey,
+	validators []types.Address,
+) *types.Block {
 	m.t.Helper()
 
 	var err error
@@ -1221,7 +1233,12 @@ func newMockIbft(t *testing.T, accounts []string, account string) *mockIbft {
 	return m
 }
 
-func newMockIBFTWithMockBlockchain(t *testing.T, pool *testerAccountPool, mockBlockchain *MockBlockchain, account string) *mockIbft {
+func newMockIBFTWithMockBlockchain(
+	t *testing.T,
+	pool *testerAccountPool,
+	mockBlockchain *MockBlockchain,
+	account string,
+) *mockIbft {
 	t.Helper()
 
 	m := &mockIbft{
