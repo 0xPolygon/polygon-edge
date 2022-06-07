@@ -17,7 +17,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
-	anypb "google.golang.org/protobuf/types/known/anypb"
+	any "google.golang.org/protobuf/types/known/anypb"
 )
 
 func TestTransition_ValidateState_Prepare(t *testing.T) {
@@ -159,7 +159,8 @@ func TestTransition_AcceptState_Validator_VerifyCorrect(t *testing.T) {
 	i.setState(AcceptState)
 
 	block := i.DummyBlock()
-	header, err := writeSeal(i.pool.get("A").priv, block.Header)
+	//Todo: mock ibft
+	header, err := (&sign{ibft: &Ibft{}}).writeSeal(i.pool.get("A").priv, block.Header)
 
 	assert.NoError(t, err)
 
@@ -169,7 +170,7 @@ func TestTransition_AcceptState_Validator_VerifyCorrect(t *testing.T) {
 	i.emitMsg(&proto.MessageReq{
 		From: "A",
 		Type: proto.MessageReq_Preprepare,
-		Proposal: &anypb.Any{
+		Proposal: &any.Any{
 			Value: block.MarshalRLP(),
 		},
 		View: proto.ViewMsg(1, 0),
@@ -192,7 +193,7 @@ func TestTransition_AcceptState_Validator_VerifyFails(t *testing.T) {
 	block := i.DummyBlock()
 	block.Header.MixHash = types.Hash{} // invalidates the block
 
-	header, err := writeSeal(i.pool.get("A").priv, block.Header)
+	header, err := (&sign{ibft: &Ibft{}}).writeSeal(i.pool.get("A").priv, block.Header)
 
 	assert.NoError(t, err)
 
@@ -202,7 +203,7 @@ func TestTransition_AcceptState_Validator_VerifyFails(t *testing.T) {
 	i.emitMsg(&proto.MessageReq{
 		From: "A",
 		Type: proto.MessageReq_Preprepare,
-		Proposal: &anypb.Any{
+		Proposal: &any.Any{
 			Value: block.MarshalRLP(),
 		},
 		View: proto.ViewMsg(1, 0),
@@ -227,7 +228,7 @@ func TestTransition_AcceptState_Validator_ProposerInvalid(t *testing.T) {
 	i.emitMsg(&proto.MessageReq{
 		From: "C",
 		Type: proto.MessageReq_Preprepare,
-		Proposal: &anypb.Any{
+		Proposal: &any.Any{
 			Value: i.DummyBlock().MarshalRLP(),
 		},
 		View: proto.ViewMsg(1, 0),
@@ -263,7 +264,7 @@ func TestTransition_AcceptState_Validator_LockWrong(t *testing.T) {
 	i.emitMsg(&proto.MessageReq{
 		From: "A",
 		Type: proto.MessageReq_Preprepare,
-		Proposal: &anypb.Any{
+		Proposal: &any.Any{
 			Value: block1.MarshalRLP(),
 		},
 		View: proto.ViewMsg(1, 0),
@@ -295,7 +296,7 @@ func TestTransition_AcceptState_Validator_LockCorrect(t *testing.T) {
 	i.emitMsg(&proto.MessageReq{
 		From: "A",
 		Type: proto.MessageReq_Preprepare,
-		Proposal: &anypb.Any{
+		Proposal: &any.Any{
 			Value: block.MarshalRLP(),
 		},
 		View: proto.ViewMsg(1, 0),
@@ -342,7 +343,7 @@ func TestTransition_RoundChangeState_CatchupRound(t *testing.T) {
 	m.expect(expectResult{
 		sequence: 1,
 		round:    2,
-		outgoing: 2, // our new round change
+		outgoing: 1, // our new round change
 		state:    AcceptState,
 	})
 }
@@ -1302,63 +1303,6 @@ func TestGetIBFTForks(t *testing.T) {
 			forks, err := GetIBFTForks(testcase.ibftConfig)
 			assert.Equal(t, testcase.forks, forks)
 			assert.Equal(t, testcase.err, err)
-		})
-	}
-}
-
-func TestQuorumSizeSwitch(t *testing.T) {
-	t.Parallel()
-
-	testTable := []struct {
-		name           string
-		switchBlock    uint64
-		currentBlock   uint64
-		set            ValidatorSet
-		expectedQuorum int
-	}{
-		{
-			"use old quorum calculation",
-			10,
-			5,
-			[]types.Address{
-				types.ZeroAddress,
-				types.ZeroAddress,
-				types.ZeroAddress,
-				types.ZeroAddress,
-				types.ZeroAddress,
-				types.ZeroAddress,
-			},
-			3,
-		},
-		{
-			"use new quorum calculation",
-			10,
-			15,
-			[]types.Address{
-				types.ZeroAddress,
-				types.ZeroAddress,
-				types.ZeroAddress,
-				types.ZeroAddress,
-				types.ZeroAddress,
-				types.ZeroAddress,
-			},
-			4,
-		},
-	}
-
-	for _, test := range testTable {
-		test := test
-		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
-
-			ibft := &Ibft{
-				quorumSizeBlockNum: test.switchBlock,
-			}
-
-			assert.Equal(t,
-				test.expectedQuorum,
-				ibft.quorumSize(test.currentBlock)(test.set),
-			)
 		})
 	}
 }

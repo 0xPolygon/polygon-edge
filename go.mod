@@ -53,11 +53,16 @@ require (
 	github.com/umbracle/ethgo v0.1.2
 	github.com/valyala/fastjson v1.6.3 // indirect
 	go.uber.org/zap v1.21.0 // indirect
-	golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a // indirect
+	golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a
 	golang.org/x/tools v0.1.10 // indirect
 	google.golang.org/genproto v0.0.0-20220531173845-685668d2de03
 	gopkg.in/yaml.v3 v3.0.1
 	lukechampine.com/blake3 v1.1.7 // indirect
+)
+
+require (
+	github.com/holiman/uint256 v1.2.0
+	gopkg.in/olebedev/go-duktape.v3 v3.0.0-20210326210528-650f7c854440
 )
 
 require (

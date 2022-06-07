@@ -12,10 +12,11 @@ import (
 	anypb "google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/emptypb"
 
+	"github.com/0xPolygon/polygon-edge/network/event"
+
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/network"
-	"github.com/0xPolygon/polygon-edge/network/event"
 	libp2pGrpc "github.com/0xPolygon/polygon-edge/network/grpc"
 	"github.com/0xPolygon/polygon-edge/protocol/proto"
 	"github.com/0xPolygon/polygon-edge/types"

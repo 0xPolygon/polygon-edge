@@ -43,9 +43,14 @@ func (r *Receipt) SetContractAddress(contractAddress Address) {
 }
 
 type Log struct {
-	Address Address
-	Topics  []Hash
-	Data    []byte
+	Address     Address
+	Topics      []Hash
+	Data        []byte
+	BlockNumber uint64 `json:"blockNumber"`
+	// hash of the transaction
+	TxHash Hash `json:"transactionHash" gencodec:"required"`
+	// index of the transaction in the block
+	TxIndex uint `json:"transactionIndex"`
 }
 
 const BloomByteLength = 256

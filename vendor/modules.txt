@@ -271,6 +271,9 @@ github.com/hashicorp/vault/sdk/version
 # github.com/hashicorp/yamux v0.0.0-20211028200310-0bc27b27de87
 ## explicit; go 1.15
 github.com/hashicorp/yamux
+# github.com/holiman/uint256 v1.2.0
+## explicit; go 1.13
+github.com/holiman/uint256
 # github.com/huin/goupnp v1.0.3
 ## explicit; go 1.14
 github.com/huin/goupnp
@@ -969,6 +972,9 @@ google.golang.org/protobuf/types/known/timestamppb
 # gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce
 ## explicit
 gopkg.in/natefinch/npipe.v2
+# gopkg.in/olebedev/go-duktape.v3 v3.0.0-20210326210528-650f7c854440
+## explicit
+gopkg.in/olebedev/go-duktape.v3
 # gopkg.in/square/go-jose.v2 v2.6.0
 ## explicit
 gopkg.in/square/go-jose.v2

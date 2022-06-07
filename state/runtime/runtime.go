@@ -60,12 +60,6 @@ type State interface {
 	Msg() *Contract
 }
 
-type ScopeContext struct {
-	Memory   []byte
-	Stack    []*big.Int
-	Contract *Contract
-}
-
 type Tracer interface {
 	CaptureStart()
 	CaptureState(pc uint64, op int, gas, cost uint64, scope ScopeContext, rData []byte, depth int, err error)
@@ -92,7 +86,7 @@ type Host interface {
 	Callx(*Contract, Host) *ExecutionResult
 	Empty(addr types.Address) bool
 	GetNonce(addr types.Address) uint64
-	GetTracer() Tracer
+	GetTracerConfig() TraceConfig
 }
 
 // ExecutionResult includes all output after executing given evm

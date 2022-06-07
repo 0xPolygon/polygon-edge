@@ -85,3 +85,19 @@ func DecodeHexToBig(hexNum string) *big.Int {
 
 	return createdNum
 }
+
+const hextable = "0123456789abcdef"
+
+// Encode encodes src into EncodedLen(len(src))
+// bytes of dst. As a convenience, it returns the number
+// of bytes written to dst, but this value is always EncodedLen(len(src)).
+// Encode implements hexadecimal encoding.
+func Encode(dst, src []byte) int {
+	j := 0
+	for _, v := range src {
+		dst[j] = hextable[v>>4]
+		dst[j+1] = hextable[v&0x0f]
+		j += 2
+	}
+	return len(src) * 2
+}

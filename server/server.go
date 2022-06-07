@@ -350,6 +350,11 @@ func (s *Server) setupSecretsManager() error {
 		}
 	}
 
+	if secretsManagerType == secrets.AwsKms {
+		secretsManagerParams.Extra = map[string]interface{}{
+			secrets.Path: s.config.DataDir,
+		}
+	}
 	// Grab the factory method
 	secretsManagerFactory, ok := secretsManagerBackends[secretsManagerType]
 	if !ok {
@@ -507,6 +512,28 @@ func (j *jsonRPCHub) ApplyTxn(
 	}
 
 	transition, err := j.BeginTxn(header.StateRoot, header, blockCreator)
+
+	if err != nil {
+		return
+	}
+
+	result, err = transition.Apply(txn)
+
+	return
+}
+
+func (j *jsonRPCHub) ApplyMessage(
+	header *types.Header,
+	txn *types.Transaction,
+	tracerConfig runtime.TraceConfig,
+) (result *runtime.ExecutionResult, err error) {
+	blockCreator, err := j.GetConsensus().GetBlockCreator(header)
+	if err != nil {
+		return nil, err
+	}
+
+	// using tracerConfig to capture log
+	transition, err := j.BeginTxnTracer(header.StateRoot, header, blockCreator, tracerConfig)
 
 	if err != nil {
 		return
