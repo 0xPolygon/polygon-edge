@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"context"
+	"github.com/umbracle/ethgo"
 	"math/big"
 	"testing"
 	"time"
@@ -12,7 +13,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/umbracle/go-web3"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -48,7 +48,7 @@ func TestNewFilter_Logs(t *testing.T) {
 	txpoolClient := srv.TxnPoolOperator()
 	jsonRPCClient := srv.JSONRPC()
 
-	id, err := jsonRPCClient.Eth().NewFilter(&web3.LogFilter{})
+	id, err := jsonRPCClient.Eth().NewFilter(&ethgo.LogFilter{})
 	assert.NoError(t, err)
 
 	txn, err := tests.GenerateAddTxnReq(tests.GenerateTxReqParams{
@@ -74,7 +74,7 @@ func TestNewFilter_Logs(t *testing.T) {
 	receiptContext, cancelFn := context.WithTimeout(context.Background(), framework.DefaultTimeout)
 	defer cancelFn()
 
-	txHash := web3.Hash(types.StringToHash(addResp.TxHash))
+	txHash := ethgo.Hash(types.StringToHash(addResp.TxHash))
 	if _, receiptErr := srv.WaitForReceipt(receiptContext, txHash); receiptErr != nil {
 		t.Fatalf("Unable to wait for receipt, %v", receiptErr)
 	}
@@ -183,10 +183,10 @@ func TestFilterValue(t *testing.T) {
 
 	// Convert to right format
 	var (
-		placeholderWrapper []*web3.Hash
-		placeholder        web3.Hash
-		filterEventHashes  [][]*web3.Hash
-		filterAddresses    []web3.Address
+		placeholderWrapper []*ethgo.Hash
+		placeholder        ethgo.Hash
+		filterEventHashes  [][]*ethgo.Hash
+		filterAddresses    []ethgo.Address
 	)
 
 	copy(placeholder[:], buf)
@@ -195,7 +195,7 @@ func TestFilterValue(t *testing.T) {
 	filterEventHashes = append(filterEventHashes, placeholderWrapper)
 	filterAddresses = append(filterAddresses, contractAddr)
 
-	filterID, err := jsonRPCClient.Eth().NewFilter(&web3.LogFilter{
+	filterID, err := jsonRPCClient.Eth().NewFilter(&ethgo.LogFilter{
 		Address: filterAddresses,
 		Topics:  filterEventHashes,
 	})
@@ -232,7 +232,7 @@ func TestFilterValue(t *testing.T) {
 	receiptContext, cancelFn := context.WithTimeout(context.Background(), framework.DefaultTimeout)
 	defer cancelFn()
 
-	txHash := web3.Hash(types.StringToHash(addResp.TxHash))
+	txHash := ethgo.Hash(types.StringToHash(addResp.TxHash))
 	if _, receiptErr := srv.WaitForReceipt(receiptContext, txHash); receiptErr != nil {
 		return
 	}

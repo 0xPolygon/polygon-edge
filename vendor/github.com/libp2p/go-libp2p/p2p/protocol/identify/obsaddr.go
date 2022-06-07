@@ -588,5 +588,3 @@ func (on *obsAddrNotifiee) Connected(n network.Network, v network.Conn)   {}
 func (on *obsAddrNotifiee) Disconnected(n network.Network, v network.Conn) {
 	(*ObservedAddrManager)(on).removeConn(v)
 }
-func (on *obsAddrNotifiee) OpenedStream(n network.Network, s network.Stream) {}
-func (on *obsAddrNotifiee) ClosedStream(n network.Network, s network.Stream) {}

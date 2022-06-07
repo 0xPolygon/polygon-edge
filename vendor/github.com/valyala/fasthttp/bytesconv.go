@@ -1,3 +1,5 @@
+//go:generate go run bytesconv_table_gen.go
+
 package fasthttp
 
 import (
@@ -9,7 +11,6 @@ import (
 	"math"
 	"net"
 	"reflect"
-	"strings"
 	"sync"
 	"time"
 	"unsafe"
@@ -17,29 +18,24 @@ import (
 
 // AppendHTMLEscape appends html-escaped s to dst and returns the extended dst.
 func AppendHTMLEscape(dst []byte, s string) []byte {
-	if strings.IndexByte(s, '<') < 0 &&
-		strings.IndexByte(s, '>') < 0 &&
-		strings.IndexByte(s, '"') < 0 &&
-		strings.IndexByte(s, '\'') < 0 {
+	var (
+		prev int
+		sub  string
+	)
 
-		// fast path - nothing to escape
-		return append(dst, s...)
-	}
-
-	// slow path
-	var prev int
-	var sub string
 	for i, n := 0, len(s); i < n; i++ {
 		sub = ""
 		switch s[i] {
+		case '&':
+			sub = "&amp;"
 		case '<':
 			sub = "&lt;"
 		case '>':
 			sub = "&gt;"
 		case '"':
-			sub = "&quot;"
+			sub = "&#34;" // "&#34;" is shorter than "&quot;".
 		case '\'':
-			sub = "&#39;"
+			sub = "&#39;" // "&#39;" is shorter than "&apos;" and apos was not in HTML until HTML5.
 		}
 		if len(sub) > 0 {
 			dst = append(dst, s[prev:i]...)
@@ -96,7 +92,7 @@ func ParseIPv4(dst net.IP, ipStr []byte) (net.IP, error) {
 		}
 		v, err := ParseUint(b[:n])
 		if err != nil {
-			return dst, fmt.Errorf("cannot parse ipStr %q: %s", ipStr, err)
+			return dst, fmt.Errorf("cannot parse ipStr %q: %w", ipStr, err)
 		}
 		if v > 255 {
 			return dst, fmt.Errorf("cannot parse ipStr %q: ip part cannot exceed 255: parsed %d", ipStr, v)
@@ -106,7 +102,7 @@ func ParseIPv4(dst net.IP, ipStr []byte) (net.IP, error) {
 	}
 	v, err := ParseUint(b)
 	if err != nil {
-		return dst, fmt.Errorf("cannot parse ipStr %q: %s", ipStr, err)
+		return dst, fmt.Errorf("cannot parse ipStr %q: %w", ipStr, err)
 	}
 	if v > 255 {
 		return dst, fmt.Errorf("cannot parse ipStr %q: ip part cannot exceed 255: parsed %d", ipStr, v)
@@ -183,11 +179,12 @@ func parseUintBuf(b []byte) (int, int, error) {
 			}
 			return v, i, nil
 		}
+		vNew := 10*v + int(k)
 		// Test for overflow.
-		if v*10 < v {
+		if vNew < v {
 			return -1, i, errTooLongInt
 		}
-		v = 10*v + int(k)
+		v = vNew
 	}
 	return v, n, nil
 }
@@ -271,7 +268,9 @@ func readHexInt(r *bufio.Reader) (int, error) {
 			if i == 0 {
 				return -1, errEmptyHexNum
 			}
-			r.UnreadByte()
+			if err := r.UnreadByte(); err != nil {
+				return -1, err
+			}
 			return n, nil
 		}
 		if i >= maxHexIntChars {
@@ -296,7 +295,7 @@ func writeHexInt(w *bufio.Writer, n int) error {
 	buf := v.([]byte)
 	i := len(buf) - 1
 	for {
-		buf[i] = int2hexbyte(n & 0xf)
+		buf[i] = lowerhex[n&0xf]
 		n >>= 4
 		if n == 0 {
 			break
@@ -308,61 +307,10 @@ func writeHexInt(w *bufio.Writer, n int) error {
 	return err
 }
 
-func int2hexbyte(n int) byte {
-	if n < 10 {
-		return '0' + byte(n)
-	}
-	return 'a' + byte(n) - 10
-}
-
-func hexCharUpper(c byte) byte {
-	if c < 10 {
-		return '0' + c
-	}
-	return c - 10 + 'A'
-}
-
-var hex2intTable = func() []byte {
-	b := make([]byte, 256)
-	for i := 0; i < 256; i++ {
-		c := byte(16)
-		if i >= '0' && i <= '9' {
-			c = byte(i) - '0'
-		} else if i >= 'a' && i <= 'f' {
-			c = byte(i) - 'a' + 10
-		} else if i >= 'A' && i <= 'F' {
-			c = byte(i) - 'A' + 10
-		}
-		b[i] = c
-	}
-	return b
-}()
-
-const toLower = 'a' - 'A'
-
-var toLowerTable = func() [256]byte {
-	var a [256]byte
-	for i := 0; i < 256; i++ {
-		c := byte(i)
-		if c >= 'A' && c <= 'Z' {
-			c += toLower
-		}
-		a[i] = c
-	}
-	return a
-}()
-
-var toUpperTable = func() [256]byte {
-	var a [256]byte
-	for i := 0; i < 256; i++ {
-		c := byte(i)
-		if c >= 'a' && c <= 'z' {
-			c -= toLower
-		}
-		a[i] = c
-	}
-	return a
-}()
+const (
+	upperhex = "0123456789ABCDEF"
+	lowerhex = "0123456789abcdef"
+)
 
 func lowercaseBytes(b []byte) {
 	for i := 0; i < len(b); i++ {
@@ -377,6 +325,7 @@ func lowercaseBytes(b []byte) {
 // Note it may break if string and/or slice header will change
 // in the future go versions.
 func b2s(b []byte) string {
+	/* #nosec G103 */
 	return *(*string)(unsafe.Pointer(&b))
 }
 
@@ -384,14 +333,15 @@ func b2s(b []byte) string {
 //
 // Note it may break if string and/or slice header will change
 // in the future go versions.
-func s2b(s string) []byte {
+func s2b(s string) (b []byte) {
+	/* #nosec G103 */
+	bh := (*reflect.SliceHeader)(unsafe.Pointer(&b))
+	/* #nosec G103 */
 	sh := (*reflect.StringHeader)(unsafe.Pointer(&s))
-	bh := reflect.SliceHeader{
-		Data: sh.Data,
-		Len:  sh.Len,
-		Cap:  sh.Len,
-	}
-	return *(*[]byte)(unsafe.Pointer(&bh))
+	bh.Data = sh.Data
+	bh.Cap = sh.Len
+	bh.Len = sh.Len
+	return b
 }
 
 // AppendUnquotedArg appends url-decoded src to dst and returns appended dst.
@@ -404,33 +354,29 @@ func AppendUnquotedArg(dst, src []byte) []byte {
 // AppendQuotedArg appends url-encoded src to dst and returns appended dst.
 func AppendQuotedArg(dst, src []byte) []byte {
 	for _, c := range src {
-		// See http://www.w3.org/TR/html5/forms.html#form-submission-algorithm
-		if c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' ||
-			c == '*' || c == '-' || c == '.' || c == '_' {
+		switch {
+		case c == ' ':
+			dst = append(dst, '+')
+		case quotedArgShouldEscapeTable[int(c)] != 0:
+			dst = append(dst, '%', upperhex[c>>4], upperhex[c&0xf])
+		default:
 			dst = append(dst, c)
-		} else {
-			dst = append(dst, '%', hexCharUpper(c>>4), hexCharUpper(c&15))
 		}
 	}
 	return dst
 }
 
 func appendQuotedPath(dst, src []byte) []byte {
+	// Fix issue in https://github.com/golang/go/issues/11202
+	if len(src) == 1 && src[0] == '*' {
+		return append(dst, '*')
+	}
+
 	for _, c := range src {
-		// From the spec: http://tools.ietf.org/html/rfc3986#section-3.3
-		// an path can contain zero or more of pchar that is defined as follows:
-		// pchar       = unreserved / pct-encoded / sub-delims / ":" / "@"
-		// pct-encoded = "%" HEXDIG HEXDIG
-		// unreserved  = ALPHA / DIGIT / "-" / "." / "_" / "~"
-		// sub-delims  = "!" / "$" / "&" / "'" / "(" / ")"
-		//             / "*" / "+" / "," / ";" / "="
-		if c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' ||
-			c == '-' || c == '.' || c == '_' || c == '~' || c == '!' || c == '$' ||
-			c == '&' || c == '\'' || c == '(' || c == ')' || c == '*' || c == '+' ||
-			c == ',' || c == ';' || c == '=' || c == ':' || c == '@' || c == '/' {
-			dst = append(dst, c)
+		if quotedPathShouldEscapeTable[int(c)] != 0 {
+			dst = append(dst, '%', upperhex[c>>4], upperhex[c&0xf])
 		} else {
-			dst = append(dst, '%', hexCharUpper(c>>4), hexCharUpper(c&15))
+			dst = append(dst, c)
 		}
 	}
 	return dst

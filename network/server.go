@@ -8,7 +8,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/network/dial"
 	"github.com/0xPolygon/polygon-edge/network/discovery"
 	"github.com/libp2p/go-libp2p"
-	noise "github.com/libp2p/go-libp2p-noise"
+	"github.com/libp2p/go-libp2p/p2p/security/noise"
 	rawGrpc "google.golang.org/grpc"
 	"sync"
 	"sync/atomic"

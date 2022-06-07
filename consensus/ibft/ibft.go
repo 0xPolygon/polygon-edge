@@ -38,6 +38,7 @@ type blockchainInterface interface {
 	Header() *types.Header
 	GetHeaderByNumber(i uint64) (*types.Header, bool)
 	WriteBlock(block *types.Block) error
+	VerifyPotentialBlock(block *types.Block) error
 	CalculateGasLimit(number uint64) (uint64, error)
 }
 
@@ -55,7 +56,7 @@ type syncerInterface interface {
 	Start()
 	BestPeer() *protocol.SyncPeer
 	BulkSyncWithPeer(p *protocol.SyncPeer, newBlockHandler func(block *types.Block)) error
-	WatchSyncWithPeer(p *protocol.SyncPeer, newBlockHandler func(b *types.Block) bool)
+	WatchSyncWithPeer(p *protocol.SyncPeer, newBlockHandler func(b *types.Block) bool, blockTimeout time.Duration)
 	GetSyncProgression() *progress.Progression
 	Broadcast(b *types.Block)
 }
@@ -541,7 +542,7 @@ func (i *Ibft) runSyncState() {
 			isValidator = i.isValidSnapshot()
 
 			return isValidator
-		})
+		}, i.blockTime)
 
 		if isValidator {
 			// at this point, we are in sync with the latest chain we know of
@@ -594,9 +595,6 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 	}); hookErr != nil {
 		i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", CandidateVoteHook, hookErr))
 	}
-
-	// calculate millisecond values from consensus custom functions in utils.go file
-	// to preserve go backward compatibility as time.UnixMili is available as of go 17
 
 	// set the timestamp
 	parentTime := time.Unix(int64(parent.Timestamp), 0)
@@ -861,6 +859,14 @@ func (i *Ibft) runAcceptState() { // start new round
 		} else {
 			// since it's a new block, we have to verify it first
 			if err := i.verifyHeaderImpl(snap, parent, block.Header); err != nil {
+				i.logger.Error("block header verification failed", "err", err)
+				i.handleStateErr(errBlockVerificationFailed)
+
+				continue
+			}
+
+			// Verify other block params
+			if err := i.blockchain.VerifyPotentialBlock(block); err != nil {
 				i.logger.Error("block verification failed", "err", err)
 				i.handleStateErr(errBlockVerificationFailed)
 
@@ -983,21 +989,41 @@ func (i *Ibft) updateMetrics(block *types.Block) {
 	i.metrics.NumTxs.Set(float64(len(block.Body().Transactions)))
 }
 func (i *Ibft) insertBlock(block *types.Block) error {
-	committedSeals := [][]byte{}
+	committedSeals := make([][]byte, 0)
+
 	for _, commit := range i.state.committed {
 		// no need to check the format of seal here because writeCommittedSeals will check
-		committedSeals = append(committedSeals, hex.MustDecodeHex(commit.Seal))
+		committedSeal, decodeErr := hex.DecodeHex(commit.Seal)
+		if decodeErr != nil {
+			i.logger.Error(
+				fmt.Sprintf(
+					"unable to decode committed seal from %s",
+					commit.From,
+				),
+			)
+
+			continue
+		}
+
+		committedSeals = append(committedSeals, committedSeal)
 	}
 
+	// Push the committed seals to the header
 	header, err := writeCommittedSeals(block.Header, committedSeals)
 	if err != nil {
 		return err
 	}
 
-	// we need to recompute the hash since we have change extra-data
+	// The hash needs to be recomputed since the extra data was changed
 	block.Header = header
 	block.Header.ComputeHash()
 
+	// Verify the header only, since the block body is already verified
+	if err := i.VerifyHeader(block.Header); err != nil {
+		return err
+	}
+
+	// Save the block locally
 	if err := i.blockchain.WriteBlock(block); err != nil {
 		return err
 	}
@@ -1251,7 +1277,15 @@ func (i *Ibft) verifyHeaderImpl(snap *Snapshot, parent, header *types.Header) er
 }
 
 // VerifyHeader wrapper for verifying headers
-func (i *Ibft) VerifyHeader(parent, header *types.Header) error {
+func (i *Ibft) VerifyHeader(header *types.Header) error {
+	parent, ok := i.blockchain.GetHeaderByNumber(header.Number - 1)
+	if !ok {
+		return fmt.Errorf(
+			"unable to get parent header for block number %d",
+			header.Number,
+		)
+	}
+
 	snap, err := i.getSnapshot(parent.Number)
 	if err != nil {
 		return err
@@ -1263,7 +1297,7 @@ func (i *Ibft) VerifyHeader(parent, header *types.Header) error {
 	}
 
 	// verify the committed seals
-	if err := verifyCommitedFields(snap, header, i.quorumSize(header.Number)); err != nil {
+	if err := verifyCommittedFields(snap, header, i.quorumSize(header.Number)); err != nil {
 		return err
 	}
 

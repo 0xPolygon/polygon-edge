@@ -7,8 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/libp2p/go-libp2p-peerstore/addr"
-
 	"github.com/libp2p/go-libp2p-core/peer"
 	pstore "github.com/libp2p/go-libp2p-core/peerstore"
 	"github.com/libp2p/go-libp2p-core/record"
@@ -51,14 +49,25 @@ func (segments *addrSegments) get(p peer.ID) *addrSegment {
 	return segments[byte(p[len(p)-1])]
 }
 
+type clock interface {
+	Now() time.Time
+}
+
+type realclock struct{}
+
+func (rc realclock) Now() time.Time {
+	return time.Now()
+}
+
 // memoryAddrBook manages addresses.
 type memoryAddrBook struct {
 	segments addrSegments
 
-	ctx    context.Context
-	cancel func()
+	refCount sync.WaitGroup
+	cancel   func()
 
 	subManager *AddrSubManager
+	clock      clock
 }
 
 var _ pstore.AddrBook = (*memoryAddrBook)(nil)
@@ -77,16 +86,26 @@ func NewAddrBook() *memoryAddrBook {
 			return ret
 		}(),
 		subManager: NewAddrSubManager(),
-		ctx:        ctx,
 		cancel:     cancel,
+		clock:      realclock{},
 	}
-
-	go ab.background()
+	ab.refCount.Add(1)
+	go ab.background(ctx)
 	return ab
 }
 
+type AddrBookOption func(book *memoryAddrBook) error
+
+func WithClock(clock clock) AddrBookOption {
+	return func(book *memoryAddrBook) error {
+		book.clock = clock
+		return nil
+	}
+}
+
 // background periodically schedules a gc
-func (mab *memoryAddrBook) background() {
+func (mab *memoryAddrBook) background(ctx context.Context) {
+	defer mab.refCount.Done()
 	ticker := time.NewTicker(1 * time.Hour)
 	defer ticker.Stop()
 
@@ -94,8 +113,7 @@ func (mab *memoryAddrBook) background() {
 		select {
 		case <-ticker.C:
 			mab.gc()
-
-		case <-mab.ctx.Done():
+		case <-ctx.Done():
 			return
 		}
 	}
@@ -103,15 +121,15 @@ func (mab *memoryAddrBook) background() {
 
 func (mab *memoryAddrBook) Close() error {
 	mab.cancel()
+	mab.refCount.Wait()
 	return nil
 }
 
 // gc garbage collects the in-memory address book.
 func (mab *memoryAddrBook) gc() {
-	now := time.Now()
+	now := mab.clock.Now()
 	for _, s := range mab.segments {
 		s.Lock()
-		var collectedPeers []peer.ID
 		for p, amap := range s.addrs {
 			for k, addr := range amap {
 				if addr.ExpiredBy(now) {
@@ -120,12 +138,8 @@ func (mab *memoryAddrBook) gc() {
 			}
 			if len(amap) == 0 {
 				delete(s.addrs, p)
-				collectedPeers = append(collectedPeers, p)
+				delete(s.signedPeerRecords, p)
 			}
-		}
-		// remove signed records for peers whose signed addrs have all been removed
-		for _, p := range collectedPeers {
-			delete(s.signedPeerRecords, p)
 		}
 		s.Unlock()
 	}
@@ -196,11 +210,6 @@ func (mab *memoryAddrBook) ConsumePeerRecord(recordEnvelope *record.Envelope, tt
 }
 
 func (mab *memoryAddrBook) addAddrs(p peer.ID, addrs []ma.Multiaddr, ttl time.Duration) {
-	if err := p.Validate(); err != nil {
-		log.Warnw("tried to set addrs for invalid peer ID", "peer", p, "error", err)
-		return
-	}
-
 	s := mab.segments.get(p)
 	s.Lock()
 	defer s.Unlock()
@@ -220,24 +229,20 @@ func (mab *memoryAddrBook) addAddrsUnlocked(s *addrSegment, p peer.ID, addrs []m
 		s.addrs[p] = amap
 	}
 
-	exp := time.Now().Add(ttl)
-	addrSet := make(map[string]struct{}, len(addrs))
+	exp := mab.clock.Now().Add(ttl)
 	for _, addr := range addrs {
 		if addr == nil {
 			log.Warnw("was passed nil multiaddr", "peer", p)
 			continue
 		}
-		k := string(addr.Bytes())
-		addrSet[k] = struct{}{}
 
 		// find the highest TTL and Expiry time between
 		// existing records and function args
-		a, found := amap[k] // won't allocate.
-
+		a, found := amap[string(addr.Bytes())] // won't allocate.
 		if !found {
 			// not found, announce it.
 			entry := &expiringAddr{Addr: addr, Expires: exp, TTL: ttl}
-			amap[k] = entry
+			amap[string(addr.Bytes())] = entry
 			mab.subManager.BroadcastAddr(p, addr)
 		} else {
 			// update ttl & exp to whichever is greater between new and existing entry
@@ -253,22 +258,12 @@ func (mab *memoryAddrBook) addAddrsUnlocked(s *addrSegment, p peer.ID, addrs []m
 
 // SetAddr calls mgr.SetAddrs(p, addr, ttl)
 func (mab *memoryAddrBook) SetAddr(p peer.ID, addr ma.Multiaddr, ttl time.Duration) {
-	if err := p.Validate(); err != nil {
-		log.Warnw("tried to set addrs for invalid peer ID", "peer", p, "error", err)
-		return
-	}
-
 	mab.SetAddrs(p, []ma.Multiaddr{addr}, ttl)
 }
 
 // SetAddrs sets the ttl on addresses. This clears any TTL there previously.
 // This is used when we receive the best estimate of the validity of an address.
 func (mab *memoryAddrBook) SetAddrs(p peer.ID, addrs []ma.Multiaddr, ttl time.Duration) {
-	if err := p.Validate(); err != nil {
-		log.Warnw("tried to set addrs for invalid peer ID", "peer", p, "error", err)
-		return
-	}
-
 	s := mab.segments.get(p)
 	s.Lock()
 	defer s.Unlock()
@@ -279,7 +274,7 @@ func (mab *memoryAddrBook) SetAddrs(p peer.ID, addrs []ma.Multiaddr, ttl time.Du
 		s.addrs[p] = amap
 	}
 
-	exp := time.Now().Add(ttl)
+	exp := mab.clock.Now().Add(ttl)
 	for _, addr := range addrs {
 		if addr == nil {
 			log.Warnw("was passed nil multiaddr", "peer", p)
@@ -301,15 +296,10 @@ func (mab *memoryAddrBook) SetAddrs(p peer.ID, addrs []ma.Multiaddr, ttl time.Du
 // UpdateAddrs updates the addresses associated with the given peer that have
 // the given oldTTL to have the given newTTL.
 func (mab *memoryAddrBook) UpdateAddrs(p peer.ID, oldTTL time.Duration, newTTL time.Duration) {
-	if err := p.Validate(); err != nil {
-		log.Warnw("tried to set addrs for invalid peer ID", "peer", p, "error", err)
-		return
-	}
-
 	s := mab.segments.get(p)
 	s.Lock()
 	defer s.Unlock()
-	exp := time.Now().Add(newTTL)
+	exp := mab.clock.Now().Add(newTTL)
 	amap, found := s.addrs[p]
 	if !found {
 		return
@@ -330,20 +320,14 @@ func (mab *memoryAddrBook) UpdateAddrs(p peer.ID, oldTTL time.Duration, newTTL t
 
 // Addrs returns all known (and valid) addresses for a given peer
 func (mab *memoryAddrBook) Addrs(p peer.ID) []ma.Multiaddr {
-	if err := p.Validate(); err != nil {
-		// invalid peer ID = no addrs
-		return nil
-	}
-
 	s := mab.segments.get(p)
 	s.RLock()
 	defer s.RUnlock()
 
-	return validAddrs(s.addrs[p])
+	return validAddrs(mab.clock.Now(), s.addrs[p])
 }
 
-func validAddrs(amap map[string]*expiringAddr) []ma.Multiaddr {
-	now := time.Now()
+func validAddrs(now time.Time, amap map[string]*expiringAddr) []ma.Multiaddr {
 	good := make([]ma.Multiaddr, 0, len(amap))
 	if amap == nil {
 		return good
@@ -361,11 +345,6 @@ func validAddrs(amap map[string]*expiringAddr) []ma.Multiaddr {
 // given peer id, if one exists.
 // Returns nil if no signed PeerRecord exists for the peer.
 func (mab *memoryAddrBook) GetPeerRecord(p peer.ID) *record.Envelope {
-	if err := p.Validate(); err != nil {
-		// invalid peer ID = no addrs
-		return nil
-	}
-
 	s := mab.segments.get(p)
 	s.RLock()
 	defer s.RUnlock()
@@ -373,7 +352,7 @@ func (mab *memoryAddrBook) GetPeerRecord(p peer.ID) *record.Envelope {
 	// although the signed record gets garbage collected when all addrs inside it are expired,
 	// we may be in between the expiration time and the GC interval
 	// so, we check to see if we have any valid signed addrs before returning the record
-	if len(validAddrs(s.addrs[p])) == 0 {
+	if len(validAddrs(mab.clock.Now(), s.addrs[p])) == 0 {
 		return nil
 	}
 
@@ -386,11 +365,6 @@ func (mab *memoryAddrBook) GetPeerRecord(p peer.ID) *record.Envelope {
 
 // ClearAddrs removes all previously stored addresses
 func (mab *memoryAddrBook) ClearAddrs(p peer.ID) {
-	if err := p.Validate(); err != nil {
-		// nothing to clear
-		return
-	}
-
 	s := mab.segments.get(p)
 	s.Lock()
 	defer s.Unlock()
@@ -402,13 +376,6 @@ func (mab *memoryAddrBook) ClearAddrs(p peer.ID) {
 // AddrStream returns a channel on which all new addresses discovered for a
 // given peer ID will be published.
 func (mab *memoryAddrBook) AddrStream(ctx context.Context, p peer.ID) <-chan ma.Multiaddr {
-	if err := p.Validate(); err != nil {
-		log.Warnw("tried to set addrs for invalid peer ID", "peer", p, "error", err)
-		ch := make(chan ma.Multiaddr)
-		close(ch)
-		return ch
-	}
-
 	s := mab.segments.get(p)
 	s.RLock()
 	defer s.RUnlock()
@@ -495,18 +462,17 @@ func (mgr *AddrSubManager) AddrStream(ctx context.Context, p peer.ID, initial []
 	mgr.subs[p] = append(mgr.subs[p], sub)
 	mgr.mu.Unlock()
 
-	sort.Sort(addr.AddrList(initial))
+	sort.Sort(addrList(initial))
 
 	go func(buffer []ma.Multiaddr) {
 		defer close(out)
 
-		sent := make(map[string]bool, len(buffer))
-		var outch chan ma.Multiaddr
-
+		sent := make(map[string]struct{}, len(buffer))
 		for _, a := range buffer {
-			sent[string(a.Bytes())] = true
+			sent[string(a.Bytes())] = struct{}{}
 		}
 
+		var outch chan ma.Multiaddr
 		var next ma.Multiaddr
 		if len(buffer) > 0 {
 			next = buffer[0]
@@ -525,11 +491,11 @@ func (mgr *AddrSubManager) AddrStream(ctx context.Context, p peer.ID, initial []
 					next = nil
 				}
 			case naddr := <-sub.pubch:
-				if sent[string(naddr.Bytes())] {
+				if _, ok := sent[string(naddr.Bytes())]; ok {
 					continue
 				}
+				sent[string(naddr.Bytes())] = struct{}{}
 
-				sent[string(naddr.Bytes())] = true
 				if next == nil {
 					next = naddr
 					outch = out
@@ -541,7 +507,6 @@ func (mgr *AddrSubManager) AddrStream(ctx context.Context, p peer.ID, initial []
 				return
 			}
 		}
-
 	}(initial)
 
 	return out

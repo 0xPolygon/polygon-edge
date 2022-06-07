@@ -689,9 +689,13 @@ func (s *mockSyncer) BulkSyncWithPeer(p *protocol.SyncPeer, handler func(block *
 	return nil
 }
 
-func (s *mockSyncer) WatchSyncWithPeer(p *protocol.SyncPeer, handler func(b *types.Block) bool) {
+func (s *mockSyncer) WatchSyncWithPeer(
+	p *protocol.SyncPeer,
+	newBlockHandler func(b *types.Block) bool,
+	blockTimeout time.Duration,
+) {
 	if s.receivedNewHeadFromPeer != nil {
-		handler(s.receivedNewHeadFromPeer)
+		newBlockHandler(s.receivedNewHeadFromPeer)
 	}
 }
 
@@ -832,6 +836,10 @@ func (m *mockIbft) GetHeaderByNumber(i uint64) (*types.Header, bool) {
 }
 
 func (m *mockIbft) WriteBlock(block *types.Block) error {
+	return nil
+}
+
+func (m *mockIbft) VerifyPotentialBlock(block *types.Block) error {
 	return nil
 }
 

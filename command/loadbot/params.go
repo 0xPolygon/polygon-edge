@@ -8,7 +8,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/command/loadbot/generator"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/umbracle/go-web3/abi"
+	"github.com/umbracle/ethgo/abi"
 )
 
 var (

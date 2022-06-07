@@ -199,7 +199,10 @@ func (e *Eth) BlockNumber() (interface{}, error) {
 
 // SendRawTransaction sends a raw transaction
 func (e *Eth) SendRawTransaction(input string) (interface{}, error) {
-	buf := hex.MustDecodeHex(input)
+	buf, decodeErr := hex.DecodeHex(input)
+	if decodeErr != nil {
+		return nil, fmt.Errorf("unable to decode input, %w", decodeErr)
+	}
 
 	tx := &types.Transaction{}
 	if err := tx.UnmarshalRLP(buf); err != nil {
@@ -664,95 +667,19 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 	return hex.EncodeUint64(highEnd), nil
 }
 
+// GetFilterLogs returns an array of logs for the specified filter
+func (e *Eth) GetFilterLogs(id string) (interface{}, error) {
+	logFilter, err := e.filterManager.GetLogFilterFromID(id)
+	if err != nil {
+		return nil, err
+	}
+
+	return e.filterManager.GetLogsForQuery(logFilter.query)
+}
+
 // GetLogs returns an array of logs matching the filter options
 func (e *Eth) GetLogs(query *LogQuery) (interface{}, error) {
-	result := make([]*Log, 0)
-	parseReceipts := func(block *types.Block) error {
-		receipts, err := e.store.GetReceiptsByHash(block.Header.Hash)
-		if err != nil {
-			return err
-		}
-
-		for indx, receipt := range receipts {
-			for logIndx, log := range receipt.Logs {
-				if query.Match(log) {
-					result = append(result, &Log{
-						Address:     log.Address,
-						Topics:      log.Topics,
-						Data:        argBytes(log.Data),
-						BlockNumber: argUint64(block.Header.Number),
-						BlockHash:   block.Header.Hash,
-						TxHash:      block.Transactions[indx].Hash,
-						TxIndex:     argUint64(indx),
-						LogIndex:    argUint64(logIndx),
-					})
-				}
-			}
-		}
-
-		return nil
-	}
-
-	if query.BlockHash != nil {
-		block, ok := e.store.GetBlockByHash(*query.BlockHash, true)
-		if !ok {
-			return nil, fmt.Errorf("not found")
-		}
-
-		if len(block.Transactions) == 0 {
-			// no txs in block, return empty response
-			return result, nil
-		}
-
-		if err := parseReceipts(block); err != nil {
-			return nil, err
-		}
-
-		return result, nil
-	}
-
-	head := e.store.Header().Number
-
-	resolveNum := func(num BlockNumber) uint64 {
-		if num == PendingBlockNumber {
-			num = LatestBlockNumber
-		}
-
-		if num == EarliestBlockNumber {
-			num = 0
-		}
-
-		if num == LatestBlockNumber {
-			return head
-		}
-
-		return uint64(num)
-	}
-
-	from := resolveNum(query.fromBlock)
-	to := resolveNum(query.toBlock)
-
-	if to < from {
-		return nil, fmt.Errorf("incorrect range")
-	}
-
-	for i := from; i <= to; i++ {
-		block, ok := e.store.GetBlockByNumber(i, true)
-		if !ok {
-			break
-		}
-
-		if block.Header.Number == 0 || len(block.Transactions) == 0 {
-			// do not check logs in genesis and skip if no txs
-			continue
-		}
-
-		if err := parseReceipts(block); err != nil {
-			return nil, err
-		}
-	}
-
-	return result, nil
+	return e.filterManager.GetLogsForQuery(query)
 }
 
 // GetBalance returns the account's balance at the referenced block.
