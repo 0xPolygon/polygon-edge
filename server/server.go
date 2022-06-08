@@ -393,18 +393,19 @@ func (s *Server) setupConsensus() error {
 
 	consensus, err := engine(
 		&consensus.ConsensusParams{
-			Context:        context.Background(),
-			Seal:           s.config.Seal,
-			Config:         config,
-			Txpool:         s.txpool,
-			Network:        s.network,
-			Blockchain:     s.blockchain,
-			Executor:       s.executor,
-			Grpc:           s.grpcServer,
-			Logger:         s.logger.Named("consensus"),
-			Metrics:        s.serverMetrics.consensus,
-			SecretsManager: s.secretsManager,
-			BlockTime:      s.config.BlockTime,
+			Context:         context.Background(),
+			Seal:            s.config.Seal,
+			Config:          config,
+			Txpool:          s.txpool,
+			Network:         s.network,
+			Blockchain:      s.blockchain,
+			Executor:        s.executor,
+			Grpc:            s.grpcServer,
+			Logger:          s.logger.Named("consensus"),
+			Metrics:         s.serverMetrics.consensus,
+			SecretsManager:  s.secretsManager,
+			BlockTime:       s.config.BlockTime,
+			IBFTBaseTimeout: s.config.IBFTBaseTimeout,
 		},
 	)
 

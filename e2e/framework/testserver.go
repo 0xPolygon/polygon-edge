@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/umbracle/ethgo"
 	"io"
 	"math/big"
 	"os"
@@ -18,6 +17,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/umbracle/ethgo"
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/genesis"
@@ -359,6 +360,10 @@ func (t *TestServer) Start(ctx context.Context) error {
 
 	if t.Config.BlockTime != 0 {
 		args = append(args, "--block-time", strconv.FormatUint(t.Config.BlockTime, 10))
+	}
+
+	if t.Config.IBFTBaseTimeout != 0 {
+		args = append(args, "--ibft-base-timeout", strconv.FormatUint(t.Config.IBFTBaseTimeout, 10))
 	}
 
 	t.ReleaseReservedPorts()

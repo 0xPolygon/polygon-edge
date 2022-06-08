@@ -2,11 +2,13 @@ package e2e
 
 import (
 	"context"
-	"github.com/umbracle/ethgo"
 	"math/big"
 	"testing"
 	"time"
 
+	"github.com/umbracle/ethgo"
+
+	"github.com/0xPolygon/polygon-edge/command/server/config"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft"
 	"github.com/0xPolygon/polygon-edge/e2e/framework"
 	"github.com/0xPolygon/polygon-edge/helper/tests"
@@ -152,4 +154,30 @@ func TestIbft_TransactionFeeRecipient(t *testing.T) {
 			assert.Equalf(t, txFee, balanceProposer, "Proposer didn't get appropriate transaction fee")
 		})
 	}
+}
+
+func TestIbft_Long_BlockGenerationTime(t *testing.T) {
+	// Set the longer value than default timeout into block generation time
+	blockTime := config.DefaultIBFTBaseTimeout + 10
+
+	// Change base timeout from 10 seconds to 30 seconds
+	ibftTimeout := uint64(blockTime + 10)
+
+	ibftManager := framework.NewIBFTServersManager(
+		t,
+		IBFTMinNodes,
+		IBFTDirPrefix,
+		func(i int, config *framework.TestServerConfig) {
+			config.SetShowsLog(i == 1)
+			config.SetSeal(true)
+			config.SetBlockTime(blockTime)
+			config.SetIBFTBaseTimeout(ibftTimeout)
+		})
+
+	timeoutForBlockProduction := time.Duration(ibftTimeout+10) * time.Second
+	ctxForStart, cancelForStart := context.WithTimeout(context.Background(), timeoutForBlockProduction)
+	defer cancelForStart()
+
+	// StartServers waits until the first block is generated
+	ibftManager.StartServers(ctxForStart)
 }

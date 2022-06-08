@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/server/config"
 	"github.com/0xPolygon/polygon-edge/command/server/export"
@@ -181,6 +182,13 @@ func setFlags(cmd *cobra.Command) {
 		blockTimeFlag,
 		defaultConfig.BlockTime,
 		"minimum block time in seconds (at least 1s)",
+	)
+
+	cmd.Flags().Uint64Var(
+		&params.rawConfig.IBFTBaseTimeout,
+		ibftBaseTimeoutFlag,
+		defaultConfig.IBFTBaseTimeout,
+		"base IBFT timeout in seconds, it needs to be larger than block time",
 	)
 
 	cmd.Flags().StringArrayVar(
