@@ -1148,6 +1148,7 @@ func (i *Ibft) runRoundChangeState() {
 			// weak certificate, try to catch up if our round number is smaller
 			// update timer
 			timeout = i.getTimeout()
+
 			sendRoundChange(msg.View.Round)
 		} else if num == i.quorumSize(i.state.view.Sequence)(i.state.validators) {
 			// start a new round immediately

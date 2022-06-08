@@ -161,7 +161,7 @@ func TestIbft_Long_BlockGenerationTime(t *testing.T) {
 	blockTime := config.DefaultIBFTBaseTimeout + 10
 
 	// Change base timeout from 10 seconds to 30 seconds
-	ibftTimeout := uint64(blockTime + 10)
+	ibftTimeout := blockTime + 10
 
 	ibftManager := framework.NewIBFTServersManager(
 		t,
@@ -176,6 +176,7 @@ func TestIbft_Long_BlockGenerationTime(t *testing.T) {
 
 	timeoutForBlockProduction := time.Duration(ibftTimeout+10) * time.Second
 	ctxForStart, cancelForStart := context.WithTimeout(context.Background(), timeoutForBlockProduction)
+
 	defer cancelForStart()
 
 	// StartServers waits until the first block is generated
