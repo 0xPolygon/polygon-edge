@@ -59,10 +59,16 @@ type Headers struct {
 	AccessControlAllowOrigins []string `json:"access_control_allow_origins" yaml:"access_control_allow_origins"`
 }
 
-// minimum block generation time in seconds
 const (
-	DefaultBlockTime       uint64 = 2
+	// minimum block generation time in seconds
+	DefaultBlockTime uint64 = 2
+
+	// IBFT timeout in seconds
 	DefaultIBFTBaseTimeout uint64 = 10
+
+	// Multiplier to get IBFT timeout from block time
+	// timeout is calculated when IBFT timeout is not specified
+	BlockTimeMultiplierForTimeout uint64 = 5
 )
 
 // DefaultConfig returns the default server configuration

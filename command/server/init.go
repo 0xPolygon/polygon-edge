@@ -79,6 +79,13 @@ func (p *serverParams) initBlockTime() error {
 }
 
 func (p *serverParams) initIBFTBaseTimeout() error {
+	if p.rawConfig.IBFTBaseTimeout == 0 {
+		// Calculate from block time
+		p.rawConfig.IBFTBaseTimeout = p.rawConfig.BlockTime * config.BlockTimeMultiplierForTimeout
+
+		return nil
+	}
+
 	if p.rawConfig.IBFTBaseTimeout < 1 {
 		return errInvalidIBFTBaseTimeout
 	}
