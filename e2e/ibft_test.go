@@ -168,7 +168,6 @@ func TestIbft_Long_BlockGenerationTime(t *testing.T) {
 		IBFTMinNodes,
 		IBFTDirPrefix,
 		func(i int, config *framework.TestServerConfig) {
-			config.SetShowsLog(i == 1)
 			config.SetSeal(true)
 			config.SetBlockTime(blockTime)
 			config.SetIBFTBaseTimeout(ibftTimeout)
