@@ -13,7 +13,7 @@ const (
 // where maximum value returned can't exceed 30 * baseTimeout
 // t = baseTimeout * maxTimeoutMultiplier where exponent > 8
 // t = baseTimeout + 2^exponent	          where exponent > 0
-// t = baseTimeout				                where exponent = 0
+// t = baseTimeout												where exponent = 0
 func exponentialTimeout(exponent uint64, baseTimeout time.Duration) time.Duration {
 	maxTimeout := baseTimeout * maxTimeoutMultiplier
 	if exponent > 8 {
