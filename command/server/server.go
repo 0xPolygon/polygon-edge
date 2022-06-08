@@ -189,7 +189,10 @@ func setFlags(cmd *cobra.Command) {
 		ibftBaseTimeoutFlag,
 		// Calculate from block time if it is not given
 		0,
-		fmt.Sprintf("base IBFT timeout in seconds, it needs to be larger than block time. (%d * block time) is set as default", config.BlockTimeMultiplierForTimeout),
+		fmt.Sprintf(
+			"base IBFT timeout in seconds, it needs to be larger than block time. (%d * block time) is set as default",
+			config.BlockTimeMultiplierForTimeout,
+		),
 	)
 
 	cmd.Flags().StringArrayVar(
