@@ -104,7 +104,6 @@ func ValidateMsg(msg *proto.MessageReq) error {
 	return nil
 }
 
-// TODO: move to IBFT?
 func ecrecoverImpl(sig, msg []byte) (types.Address, error) {
 	pub, err := crypto.RecoverPubkey(sig, crypto.Keccak256(msg))
 	if err != nil {

@@ -113,10 +113,9 @@ func (s *SignerImpl) WriteSeal(header *types.Header) (*types.Header, error) {
 		return nil, err
 	}
 
-	err = s.packFieldIntoIbftExtra(header, func(ie *IstanbulExtra) {
+	if err = s.packFieldIntoIbftExtra(header, func(ie *IstanbulExtra) {
 		ie.Seal = seal
-	})
-	if err != nil {
+	}); err != nil {
 		return nil, err
 	}
 
@@ -166,10 +165,9 @@ func (s *SignerImpl) WriteCommittedSeals(
 		return nil, err
 	}
 
-	err = s.packFieldIntoIbftExtra(header, func(ie *IstanbulExtra) {
+	if err = s.packFieldIntoIbftExtra(header, func(ie *IstanbulExtra) {
 		ie.CommittedSeal = committedSeal
-	})
-	if err != nil {
+	}); err != nil {
 		return nil, err
 	}
 
@@ -278,9 +276,6 @@ func (s *SignerImpl) CalculateHeaderHash(header *types.Header) (types.Hash, erro
 }
 
 func (s *SignerImpl) filterHeaderForHash(header *types.Header) (*types.Header, error) {
-	// This will effectively remove the Seal and Committed Seal fields,
-	// while keeping proposer vanity and validator set
-	// because extra.Validators, extra.ParentCommittedSeal is what we got from `h` in the first place.
 	clone := header.Copy()
 
 	extra, err := s.GetIBFTExtra(clone)
@@ -288,6 +283,9 @@ func (s *SignerImpl) filterHeaderForHash(header *types.Header) (*types.Header, e
 		return nil, err
 	}
 
+	// This will effectively remove the Seal and Committed Seal fields,
+	// while keeping proposer vanity and validator set
+	// because extra.Validators, extra.ParentCommittedSeal is what we got from `h` in the first place.
 	s.initIbftExtra(clone, extra.Validators, extra.ParentCommittedSeal)
 
 	return clone, nil

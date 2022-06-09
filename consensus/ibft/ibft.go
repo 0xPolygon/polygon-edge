@@ -1244,14 +1244,12 @@ func (i *Ibft) verifyHeaderImpl(snap *Snapshot, parent, header *types.Header) er
 			return err
 		}
 
-		err = i.signer.VerifyParentCommittedSeal(
+		if i.signer.VerifyParentCommittedSeal(
 			parentSnap.Set,
 			parent,
 			header,
 			i.quorumSize(header.Number),
-		)
-
-		if err != nil {
+		); err != nil {
 			return fmt.Errorf("failed to verify ParentCommittedSeal: %w", err)
 		}
 	}
