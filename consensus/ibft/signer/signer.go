@@ -17,7 +17,6 @@ var (
 	ErrRepeatedCommittedSeal      = errors.New("repeated seal in committed seals")
 	ErrNonValidatorCommittedSeal  = errors.New("found committed seal signed by non validator")
 	ErrNotEnoughCommittedSeals    = errors.New("not enough seals to seal block")
-	ErrSignerNotFound             = errors.New("not found signer in validator set")
 	ErrValidatorNotFound          = errors.New("not found validator in validator set")
 	ErrInvalidValidatorSet        = errors.New("invalid validator set type")
 	ErrInvalidBLSSignature        = errors.New("invalid BLS signature")

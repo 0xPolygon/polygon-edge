@@ -32,7 +32,7 @@ var (
 	ErrInvalidHookParam     = errors.New("invalid IBFT hook param passed in")
 	ErrInvalidMechanismType = errors.New("invalid consensus mechanism type in params")
 	ErrMissingMechanismType = errors.New("missing consensus mechanism type in params")
-	ErrSignerNotFound       = errors.New("not found signer in validator set")
+	ErrSignerNotFound       = errors.New("signer not found in validator set")
 )
 
 type blockchainInterface interface {
