@@ -25,6 +25,7 @@ var (
 var (
 	errInvalidConfig   = errors.New("invalid secrets configuration")
 	errInvalidParams   = errors.New("no config file or data directory passed in")
+	errEmptyKeyType    = errors.New("key type is not specified")
 	errUnsupportedType = errors.New("unsupported secrets manager")
 )
 
@@ -51,7 +52,7 @@ func (ip *initParams) validateFlags() error {
 	}
 
 	if ip.rawKeyType == "" {
-		return errInvalidParams
+		return errEmptyKeyType
 	}
 
 	return nil
