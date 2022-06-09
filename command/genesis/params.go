@@ -1,10 +1,8 @@
 package genesis
 
 import (
-	"encoding/hex"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
@@ -166,18 +164,26 @@ func (p *genesisParams) initRawParams() error {
 // setValidatorSetFromCli sets validator set from cli command
 func (p *genesisParams) setValidatorSetFromCli() error {
 	if len(p.ibftValidatorsRaw) != 0 {
-		var err error
+		var (
+			newValidators validators.ValidatorSet
+			err           error
+		)
 
 		switch p.keyType {
 		case crypto.KeySecp256k1:
-			p.ibftValidators, err = parseECDSAValidators(p.ibftValidators, p.ibftValidatorsRaw)
+			newValidators, err = validators.ParseECDSAValidators(p.ibftValidatorsRaw)
 		case crypto.KeyBLS:
-			p.ibftValidators, err = parseBLSValidators(p.ibftValidators, p.ibftValidatorsRaw)
+			newValidators, err = validators.ParseBLSValidators(p.ibftValidatorsRaw)
 		}
 
 		if err != nil {
 			return err
 		}
+
+		if err = p.ibftValidators.Merge(newValidators); err != nil {
+			return err
+		}
+
 	}
 
 	return nil
@@ -368,70 +374,4 @@ func (p *genesisParams) getResult() command.CommandResult {
 	return &GenesisResult{
 		Message: fmt.Sprintf("Genesis written to %s\n", p.genesisPath),
 	}
-}
-
-func parseECDSAValidators(set validators.ValidatorSet, values []string) (validators.ValidatorSet, error) {
-	addrs := make([]types.Address, 0)
-
-	if set != nil {
-		valSet, ok := set.(*validators.ECDSAValidatorSet)
-		if !ok {
-			return nil, fmt.Errorf("invalid validator set, expected ECDSAValidatorSet but got %T", set)
-		}
-
-		addrs = []types.Address(*valSet)
-	}
-
-	for _, v := range values {
-		bytes, err := hex.DecodeString(strings.TrimPrefix(v, "0x"))
-		if err != nil {
-			return nil, err
-		}
-
-		addrs = append(addrs, types.BytesToAddress(bytes))
-	}
-
-	newValSet := validators.ECDSAValidatorSet(addrs)
-
-	return &newValSet, nil
-}
-
-func parseBLSValidators(set validators.ValidatorSet, values []string) (validators.ValidatorSet, error) {
-	vals := make([]validators.BLSValidator, 0)
-
-	if set != nil {
-		valSet, ok := set.(*validators.BLSValidatorSet)
-		if !ok {
-			return nil, fmt.Errorf("invalid validator set, expected BLSValidatorSet but got %T", set)
-		}
-
-		vals = []validators.BLSValidator(*valSet)
-	}
-
-	for _, value := range values {
-		subValues := strings.Split(value, ":")
-
-		if len(subValues) != 2 {
-			return nil, fmt.Errorf("invalid validator format, expected [Validator Address]:[BLS Public Key]")
-		}
-
-		addrBytes, err := hex.DecodeString(strings.TrimPrefix(subValues[0], "0x"))
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse address: %w", err)
-		}
-
-		pubKeyBytes, err := hex.DecodeString(strings.TrimPrefix(subValues[1], "0x"))
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse BLS Public Key: %w", err)
-		}
-
-		vals = append(vals, validators.BLSValidator{
-			Address:   types.BytesToAddress(addrBytes),
-			BLSPubKey: pubKeyBytes,
-		})
-	}
-
-	newValSet := validators.BLSValidatorSet(vals)
-
-	return &newValSet, nil
 }

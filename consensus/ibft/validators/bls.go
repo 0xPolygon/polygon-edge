@@ -197,6 +197,22 @@ func (v *BLSValidatorSet) Del(target types.Address) {
 	// TODO: doesn't support right now
 }
 
+// Merge adds set of validators
+func (v *BLSValidatorSet) Merge(newRawSet ValidatorSet) error {
+	newSet, ok := newRawSet.(*BLSValidatorSet)
+	if !ok {
+		return fmt.Errorf("can't merge with BLSValidatorSet and %T", newRawSet)
+	}
+
+	for _, newVal := range *newSet {
+		if !v.Includes(newVal.Address) {
+			*v = append(*v, newVal)
+		}
+	}
+
+	return nil
+}
+
 func (v *BLSValidatorSet) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 	if len(*v) == 0 {
 		return ar.NewNullArray()

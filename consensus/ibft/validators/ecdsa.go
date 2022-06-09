@@ -109,6 +109,22 @@ func (v *ECDSAValidatorSet) Del(target types.Address) {
 	}
 }
 
+// Merge adds set of validators
+func (v *ECDSAValidatorSet) Merge(newRawSet ValidatorSet) error {
+	newSet, ok := newRawSet.(*ECDSAValidatorSet)
+	if !ok {
+		return fmt.Errorf("can't merge with ECDSAValidatorSet and %T", newRawSet)
+	}
+
+	for _, newVal := range *newSet {
+		if !v.Includes(newVal) {
+			v.Add(newVal)
+		}
+	}
+
+	return nil
+}
+
 func (v *ECDSAValidatorSet) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 	if len(*v) == 0 {
 		return ar.NewNullArray()

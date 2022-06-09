@@ -15,6 +15,7 @@ type ValidatorSet interface {
 	CalcProposer(round uint64, lastProposer types.Address) types.Address
 	Add(addr types.Address)
 	Del(target types.Address)
+	Merge(ValidatorSet) error
 	MaxFaultyNodes() int
 	MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value
 	UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error
