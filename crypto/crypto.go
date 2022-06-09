@@ -317,6 +317,20 @@ func ReadConsensusKey(manager secrets.SecretsManager) (*ecdsa.PrivateKey, error)
 	return BytesToPrivateKey(validatorKey)
 }
 
+func GetBLSPubkeyFromValidatorKey(secretsManager secrets.SecretsManager) ([]byte, error) {
+	ecdsaKey, err := ReadConsensusKey(secretsManager)
+	if err != nil {
+		return nil, err
+	}
+
+	pubkeyBytes, err := ECDSAToBLSPubkey(ecdsaKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return pubkeyBytes, nil
+}
+
 func ECDSAToBLS(key *ecdsa.PrivateKey) (*bls_sig.SecretKey, error) {
 	blsPop := bls_sig.NewSigPop()
 	keyBytes := (*btcec.PrivateKey)(key).Serialize()

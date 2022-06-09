@@ -170,7 +170,7 @@ func (ip *initParams) initValidatorKey() error {
 	ip.validatorAddress = address
 
 	if ip.keyType == crypto.KeyBLS {
-		if ip.blsPublicKey, err = helper.GetBLSPubkeyFromValidatorKey(ip.secretsManager); err != nil {
+		if ip.blsPublicKey, err = crypto.GetBLSPubkeyFromValidatorKey(ip.secretsManager); err != nil {
 			return err
 		}
 	}
