@@ -127,42 +127,10 @@ func getValidatorsFromPrefixPath(prefix string, keyType crypto.KeyType) (validat
 
 	switch keyType {
 	case crypto.KeySecp256k1:
-		return toECDSAValidatorSet(privateKeys), nil
+		return validators.ConvertKeysToECDSAValidatorSet(privateKeys), nil
 	case crypto.KeyBLS:
-		return toBLSValidatorSet(privateKeys)
+		return validators.ConvertKeysToBLSValidatorSet(privateKeys)
 	default:
 		return nil, fmt.Errorf("invalid key type: %s", keyType)
 	}
-}
-
-func toECDSAValidatorSet(keys []*ecdsa.PrivateKey) validators.ValidatorSet {
-	addrs := make([]types.Address, len(keys))
-
-	for idx, key := range keys {
-		addrs[idx] = crypto.PubKeyToAddress(&key.PublicKey)
-	}
-
-	valSet := validators.ECDSAValidatorSet(addrs)
-
-	return &valSet
-}
-
-func toBLSValidatorSet(keys []*ecdsa.PrivateKey) (validators.ValidatorSet, error) {
-	vals := make([]validators.BLSValidator, len(keys))
-
-	for idx, key := range keys {
-		pubkey, err := crypto.ECDSAToBLSPubkey(key)
-		if err != nil {
-			return nil, err
-		}
-
-		vals[idx] = validators.BLSValidator{
-			Address:   crypto.PubKeyToAddress(&key.PublicKey),
-			BLSPubKey: pubkey,
-		}
-	}
-
-	valSet := validators.BLSValidatorSet(vals)
-
-	return &valSet, nil
 }

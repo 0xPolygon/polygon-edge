@@ -2,9 +2,12 @@ package validators
 
 import (
 	"bytes"
+	"crypto/ecdsa"
 	"errors"
 	"fmt"
+	"strings"
 
+	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/fastrlp"
@@ -93,6 +96,57 @@ func (v *BLSValidator) Equals(t *BLSValidator) bool {
 }
 
 type BLSValidatorSet []BLSValidator
+
+func ParseBLSValidators(values []string) (ValidatorSet, error) {
+	vals := make([]BLSValidator, 0)
+
+	for _, value := range values {
+		subValues := strings.Split(value, ":")
+
+		if len(subValues) != 2 {
+			return nil, fmt.Errorf("invalid validator format, expected [Validator Address]:[BLS Public Key]")
+		}
+
+		addrBytes, err := hex.DecodeString(strings.TrimPrefix(subValues[0], "0x"))
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse address: %w", err)
+		}
+
+		pubKeyBytes, err := hex.DecodeString(strings.TrimPrefix(subValues[1], "0x"))
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse BLS Public Key: %w", err)
+		}
+
+		vals = append(vals, BLSValidator{
+			Address:   types.BytesToAddress(addrBytes),
+			BLSPubKey: pubKeyBytes,
+		})
+	}
+
+	newValSet := BLSValidatorSet(vals)
+
+	return &newValSet, nil
+}
+
+func ConvertKeysToBLSValidatorSet(keys []*ecdsa.PrivateKey) (*BLSValidatorSet, error) {
+	vals := make([]BLSValidator, len(keys))
+
+	for idx, key := range keys {
+		pubkey, err := crypto.ECDSAToBLSPubkey(key)
+		if err != nil {
+			return nil, err
+		}
+
+		vals[idx] = BLSValidator{
+			Address:   crypto.PubKeyToAddress(&key.PublicKey),
+			BLSPubKey: pubkey,
+		}
+	}
+
+	valSet := BLSValidatorSet(vals)
+
+	return &valSet, nil
+}
 
 // Len returns the size of the validator set
 func (v *BLSValidatorSet) Len() int {

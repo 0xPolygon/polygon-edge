@@ -1,13 +1,46 @@
 package validators
 
 import (
+	"crypto/ecdsa"
 	"fmt"
+	"strings"
 
+	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/fastrlp"
 )
 
 type ECDSAValidatorSet []types.Address
+
+func ParseECDSAValidators(values []string) (ValidatorSet, error) {
+	addrs := make([]types.Address, 0)
+
+	for _, v := range values {
+		bytes, err := hex.DecodeString(strings.TrimPrefix(v, "0x"))
+		if err != nil {
+			return nil, err
+		}
+
+		addrs = append(addrs, types.BytesToAddress(bytes))
+	}
+
+	newValSet := ECDSAValidatorSet(addrs)
+
+	return &newValSet, nil
+}
+
+func ConvertKeysToECDSAValidatorSet(keys []*ecdsa.PrivateKey) *ECDSAValidatorSet {
+	addrs := make([]types.Address, len(keys))
+
+	for idx, key := range keys {
+		addrs[idx] = crypto.PubKeyToAddress(&key.PublicKey)
+	}
+
+	valSet := ECDSAValidatorSet(addrs)
+
+	return &valSet
+}
 
 // Len returns the size of the validator set
 func (v *ECDSAValidatorSet) Len() int {
