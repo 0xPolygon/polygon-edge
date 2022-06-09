@@ -190,7 +190,7 @@ func setFlags(cmd *cobra.Command) {
 		// Calculate from block time if it is not given
 		0,
 		fmt.Sprintf(
-			"base IBFT timeout in seconds, it needs to be larger than block time. (%d * block time) is set as default",
+			"base IBFT timeout in seconds, it needs to be larger than block time. (block time * %d) is set if it's zero",
 			config.BlockTimeMultiplierForTimeout,
 		),
 	)
