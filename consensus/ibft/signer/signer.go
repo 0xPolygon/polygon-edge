@@ -223,7 +223,7 @@ func (s *SignerImpl) VerifyParentCommittedSeal(
 
 	rawMsg := commitMsg(hash[:])
 
-	numSeals, err := s.keyManager.VerifyCommittedSeal(extra.CommittedSeal, rawMsg, parentValidators)
+	numSeals, err := s.keyManager.VerifyCommittedSeal(extra.ParentCommittedSeal, rawMsg, parentValidators)
 	if err != nil {
 		return err
 	}
