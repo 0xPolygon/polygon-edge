@@ -71,7 +71,7 @@ jobs:
         run: echo "$(pwd)/artifacts" >> $GITHUB_PATH
 
       - name: Go test
-        run: go test -race -covermode atomic -coverprofile coverage.out -timeout 28m ./...
+        run: go test -coverprofile coverage.out -timeout 28m ./...
 
       - name: Upload coverage file to Codecov
         uses: codecov/codecov-action@v3
