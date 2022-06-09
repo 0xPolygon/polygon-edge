@@ -907,7 +907,7 @@ func newMockIbft(t *testing.T, accounts []string, account string) *mockIbft {
 		state:      newState(),
 		epochSize:  DefaultEpochSize,
 		metrics:    consensus.NilMetrics(),
-		signer:     signer.NewECDSASignerFromKey(addr.priv),
+		signer:     signer.NewSigner(signer.NewECDSAKeyManagerFromKey(addr.priv)),
 	}
 
 	initIbftMechanism(PoA, ibft)

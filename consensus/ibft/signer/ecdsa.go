@@ -12,138 +12,67 @@ import (
 	"github.com/umbracle/fastrlp"
 )
 
-type ECDSASigner struct {
+type ECDSAKeyManager struct {
 	key     *ecdsa.PrivateKey
 	address types.Address
 }
 
 type SerializedSeal [][]byte
 
-func NewECDSASigner(manager secrets.SecretsManager) (Signer, error) {
+func NewECDSAKeyManager(manager secrets.SecretsManager) (KeyManager, error) {
 	key, err := obtainOrCreateECDSAKey(manager)
 	if err != nil {
 		return nil, err
 	}
 
-	return NewECDSASignerFromKey(key), nil
+	return NewECDSAKeyManagerFromKey(key), nil
 }
 
-func NewECDSASignerFromKey(key *ecdsa.PrivateKey) Signer {
-	return &ECDSASigner{
+func NewECDSAKeyManagerFromKey(key *ecdsa.PrivateKey) KeyManager {
+	return &ECDSAKeyManager{
 		key:     key,
 		address: crypto.PubKeyToAddress(&key.PublicKey),
 	}
 }
 
-func NewMockECDSASigner(addr types.Address) Signer {
-	return &ECDSASigner{
+func NewMockECDSAKeyManager(addr types.Address) KeyManager {
+	return &ECDSAKeyManager{
 		address: addr,
 	}
 }
 
-func (s *ECDSASigner) Address() types.Address {
+func (s *ECDSAKeyManager) Address() types.Address {
 	return s.address
 }
 
-func (s *ECDSASigner) InitIBFTExtra(header, parent *types.Header, set validators.ValidatorSet) error {
-	var parentCommittedSeal Sealer
-
-	if header.Number > 1 {
-		if parent == nil {
-			return ErrNilParentHeader
-		}
-
-		parentExtra, err := s.GetIBFTExtra(parent)
-		if err != nil {
-			return err
-		}
-
-		parentCommittedSeal = parentExtra.CommittedSeal
-	}
-
-	s.initIbftExtra(header, set, parentCommittedSeal)
-
-	return nil
-}
-
-func (s *ECDSASigner) GetIBFTExtra(h *types.Header) (*IstanbulExtra, error) {
-	if len(h.ExtraData) < IstanbulExtraVanity {
-		return nil, fmt.Errorf(
-			"wrong extra size, expected greater than or equal to %d but actual %d",
-			IstanbulExtraVanity,
-			len(h.ExtraData),
-		)
-	}
-
-	data := h.ExtraData[IstanbulExtraVanity:]
-	extra := &IstanbulExtra{
+func (s *ECDSAKeyManager) NewEmptyIstanbulExtra() *IstanbulExtra {
+	return &IstanbulExtra{
 		Validators:          &validators.ECDSAValidatorSet{},
 		CommittedSeal:       &SerializedSeal{},
 		ParentCommittedSeal: &SerializedSeal{},
 	}
-
-	if err := extra.UnmarshalRLP(data); err != nil {
-		return nil, err
-	}
-
-	return extra, nil
 }
 
-func (s *ECDSASigner) WriteSeal(header *types.Header) (*types.Header, error) {
-	hash, err := s.CalculateHeaderHash(header)
-	if err != nil {
-		return nil, err
-	}
-
-	seal, err := crypto.Sign(s.key, crypto.Keccak256(hash[:]))
-	if err != nil {
-		return nil, err
-	}
-
-	err = s.packFieldIntoIbftExtra(header, func(ie *IstanbulExtra) {
-		ie.Seal = seal
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	return header, nil
+func (s *ECDSAKeyManager) NewEmptyCommittedSeal() Sealer {
+	return &SerializedSeal{}
 }
 
-func (s *ECDSASigner) EcrecoverFromHeader(header *types.Header) (types.Address, error) {
-	extra, err := s.GetIBFTExtra(header)
-	if err != nil {
-		return types.Address{}, err
-	}
-
-	hash, err := s.CalculateHeaderHash(header)
-	if err != nil {
-		return types.Address{}, err
-	}
-
-	return ecrecoverImpl(extra.Seal, hash[:])
+func (s *ECDSAKeyManager) SignSeal(data []byte) ([]byte, error) {
+	return crypto.Sign(s.key, data)
 }
 
-func (s *ECDSASigner) CreateCommittedSeal(header *types.Header) ([]byte, error) {
-	hash, err := s.CalculateHeaderHash(header)
-	if err != nil {
-		return nil, err
-	}
-
-	msg := commitMsg(hash[:])
-
-	return crypto.Sign(s.key, crypto.Keccak256(msg))
+func (s *ECDSAKeyManager) SignCommittedSeal(data []byte) ([]byte, error) {
+	return crypto.Sign(s.key, data)
 }
 
-func (s *ECDSASigner) WriteCommittedSeals(
-	header *types.Header,
+func (s *ECDSAKeyManager) Ecrecover(sig, digest []byte) (types.Address, error) {
+	return ecrecoverImpl(sig, digest)
+}
+
+func (s *ECDSAKeyManager) GenerateCommittedSeals(
 	sealMap map[types.Address][]byte,
-) (*types.Header, error) {
-	if len(sealMap) == 0 {
-		return nil, ErrEmptyCommittedSeals
-	}
-
+	extra *IstanbulExtra,
+) (Sealer, error) {
 	seals := [][]byte{}
 
 	for _, seal := range sealMap {
@@ -156,174 +85,65 @@ func (s *ECDSASigner) WriteCommittedSeals(
 
 	serializedSeal := SerializedSeal(seals)
 
-	err := s.packFieldIntoIbftExtra(header, func(ie *IstanbulExtra) {
-		ie.CommittedSeal = &serializedSeal
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	return header, nil
+	return &serializedSeal, nil
 }
 
-func (s *ECDSASigner) VerifyCommittedSeal(
+func (s *ECDSAKeyManager) VerifyCommittedSeal(
+	rawCommittedSeal Sealer,
+	digest []byte,
 	rawSet validators.ValidatorSet,
-	header *types.Header,
-	quorumFn validators.QuorumImplementation,
-) error {
-	extra, err := s.GetIBFTExtra(header)
-	if err != nil {
-		return err
-	}
-
-	cs, ok := extra.CommittedSeal.(*SerializedSeal)
+) (int, error) {
+	committedSeal, ok := rawCommittedSeal.(*SerializedSeal)
 	if !ok {
-		return ErrInvalidCommittedSealType
+		return 0, ErrInvalidCommittedSealType
 	}
 
 	validatorSet, ok := rawSet.(*validators.ECDSAValidatorSet)
 	if !ok {
-		return ErrInvalidValidatorSet
+		return 0, ErrInvalidValidatorSet
 	}
 
-	// get the message that needs to be signed
-	// this not signing! just removing the fields that should be signed
-	hash, err := s.CalculateHeaderHash(header)
-	if err != nil {
-		return err
-	}
-
-	rawMsg := commitMsg(hash[:])
-
-	return s.verifyCommittedSealsImpl(cs, rawMsg, *validatorSet, quorumFn)
+	return s.verifyCommittedSealsImpl(committedSeal, digest, *validatorSet)
 }
 
-func (s *ECDSASigner) VerifyParentCommittedSeal(
-	rawParentSet validators.ValidatorSet,
-	parent, header *types.Header,
-	quorumFn validators.QuorumImplementation,
-) error {
-	extra, err := s.GetIBFTExtra(header)
-	if err != nil {
-		return err
-	}
-
-	parentCs, ok := extra.ParentCommittedSeal.(*SerializedSeal)
-	if !ok {
-		return ErrInvalidCommittedSealType
-	}
-
-	validatorSet, ok := rawParentSet.(*validators.ECDSAValidatorSet)
-	if !ok {
-		return ErrInvalidValidatorSet
-	}
-
-	// get the message that needs to be signed
-	// this not signing! just removing the fields that should be signed
-	hash, err := s.CalculateHeaderHash(parent)
-	if err != nil {
-		return err
-	}
-
-	rawMsg := commitMsg(hash[:])
-
-	return s.verifyCommittedSealsImpl(parentCs, rawMsg, *validatorSet, quorumFn)
-}
-
-func (s *ECDSASigner) SignGossipMessage(msg *proto.MessageReq) error {
+func (s *ECDSAKeyManager) SignIBFTMessage(msg *proto.MessageReq) error {
 	return signMsg(s.key, msg)
 }
 
-func (s *ECDSASigner) ValidateGossipMessage(msg *proto.MessageReq) error {
+func (s *ECDSAKeyManager) ValidateIBFTMessage(msg *proto.MessageReq) error {
 	return ValidateMsg(msg)
 }
 
-func (s *ECDSASigner) initIbftExtra(header *types.Header, vals validators.ValidatorSet, parentCommittedSeal Sealer) {
-	putIbftExtra(header, &IstanbulExtra{
-		Validators:          vals,
-		Seal:                nil,
-		CommittedSeal:       &SerializedSeal{},
-		ParentCommittedSeal: parentCommittedSeal,
-	})
-}
-
-func (s *ECDSASigner) packFieldIntoIbftExtra(h *types.Header, updateFn func(*IstanbulExtra)) error {
-	extra, err := s.GetIBFTExtra(h)
-	if err != nil {
-		return err
-	}
-
-	updateFn(extra)
-
-	putIbftExtra(h, extra)
-
-	return nil
-}
-
-func (s *ECDSASigner) filterHeaderForHash(header *types.Header) (*types.Header, error) {
-	// This will effectively remove the Seal and Committed Seal fields,
-	// while keeping proposer vanity and validator set
-	// because extra.Validators, extra.ParentCommittedSeal is what we got from `h` in the first place.
-	clone := header.Copy()
-
-	extra, err := s.GetIBFTExtra(clone)
-	if err != nil {
-		return nil, err
-	}
-
-	s.initIbftExtra(clone, extra.Validators, extra.ParentCommittedSeal)
-
-	return clone, nil
-}
-
-func (s *ECDSASigner) CalculateHeaderHash(header *types.Header) (types.Hash, error) {
-	filteredHeader, err := s.filterHeaderForHash(header)
-	if err != nil {
-		return types.ZeroHash, err
-	}
-
-	return calculateHeaderHash(filteredHeader), nil
-}
-
-func (s *ECDSASigner) verifyCommittedSealsImpl(
+func (s *ECDSAKeyManager) verifyCommittedSealsImpl(
 	committedSeal *SerializedSeal,
 	msg []byte,
 	validators validators.ECDSAValidatorSet,
-	quorumFn validators.QuorumImplementation,
-) error {
-	// Committed seals shouldn't be empty
-	if len(*committedSeal) == 0 {
-		return ErrEmptyCommittedSeals
+) (int, error) {
+	numSeals := len(*committedSeal)
+	if numSeals == 0 {
+		return 0, ErrEmptyCommittedSeals
 	}
 
 	visited := map[types.Address]struct{}{}
 
 	for _, seal := range *committedSeal {
-		addr, err := ecrecoverImpl(seal, msg)
+		addr, err := s.Ecrecover(seal, msg)
 		if err != nil {
-			return err
+			return 0, err
 		}
 
 		if _, ok := visited[addr]; ok {
-			return ErrRepeatedCommittedSeal
+			return 0, ErrRepeatedCommittedSeal
 		}
 
 		if !validators.Includes(addr) {
-			return ErrNonValidatorCommittedSeal
+			return 0, ErrNonValidatorCommittedSeal
 		}
 
 		visited[addr] = struct{}{}
 	}
 
-	// Valid committed seals must be at least 2F+1
-	// 	2F 	is the required number of honest validators who provided the committed seals
-	// 	+1	is the proposer
-	if validSeals := len(visited); validSeals < quorumFn(&validators) {
-		return ErrNotEnoughCommittedSeals
-	}
-
-	return nil
+	return numSeals, nil
 }
 
 func (s *SerializedSeal) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {

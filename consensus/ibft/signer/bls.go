@@ -14,13 +14,13 @@ import (
 	"github.com/umbracle/fastrlp"
 )
 
-type BLSSigner struct {
+type BLSKeyManager struct {
 	ecdsaKey *ecdsa.PrivateKey
 	blsKey   *bls_sig.SecretKey
 	address  types.Address
 }
 
-func NewBLSSigner(manager secrets.SecretsManager) (Signer, error) {
+func NewBLSKeyManager(manager secrets.SecretsManager) (KeyManager, error) {
 	ecdsaKey, err := obtainOrCreateECDSAKey(manager)
 	if err != nil {
 		return nil, err
@@ -31,143 +31,53 @@ func NewBLSSigner(manager secrets.SecretsManager) (Signer, error) {
 		return nil, err
 	}
 
-	return &BLSSigner{
+	return &BLSKeyManager{
 		ecdsaKey: ecdsaKey,
 		blsKey:   blsKey,
 		address:  crypto.PubKeyToAddress(&ecdsaKey.PublicKey),
 	}, nil
 }
 
-func (s *BLSSigner) Address() types.Address {
+func (s *BLSKeyManager) Address() types.Address {
 	return s.address
 }
 
-func (s *BLSSigner) InitIBFTExtra(header, parent *types.Header, set validators.ValidatorSet) error {
-	var parentCommittedSeal Sealer
-
-	if header.Number > 1 {
-		if parent == nil {
-			return ErrNilParentHeader
-		}
-
-		parentExtra, err := s.GetIBFTExtra(parent)
-		if err != nil {
-			return err
-		}
-
-		parentCommittedSeal = parentExtra.CommittedSeal
-	}
-
-	s.initIbftExtra(header, set, parentCommittedSeal)
-
-	return nil
-}
-
-func (s *BLSSigner) GetIBFTExtra(h *types.Header) (*IstanbulExtra, error) {
-	if len(h.ExtraData) < IstanbulExtraVanity {
-		return nil, fmt.Errorf(
-			"wrong extra size, expected greater than or equal to %d but actual %d",
-			IstanbulExtraVanity,
-			len(h.ExtraData),
-		)
-	}
-
-	data := h.ExtraData[IstanbulExtraVanity:]
-	extra := &IstanbulExtra{
+func (s *BLSKeyManager) NewEmptyIstanbulExtra() *IstanbulExtra {
+	return &IstanbulExtra{
 		Validators:          &validators.BLSValidatorSet{},
 		CommittedSeal:       &BLSSeal{},
 		ParentCommittedSeal: &BLSSeal{},
 	}
-
-	if err := extra.UnmarshalRLP(data); err != nil {
-		return nil, err
-	}
-
-	return extra, nil
 }
 
-func (s *BLSSigner) WriteSeal(header *types.Header) (*types.Header, error) {
-	hash, err := s.CalculateHeaderHash(header)
-	if err != nil {
-		return nil, err
-	}
-
-	seal, err := crypto.Sign(s.ecdsaKey, crypto.Keccak256(hash[:]))
-	if err != nil {
-		return nil, err
-	}
-
-	err = s.packFieldIntoIbftExtra(header, func(ie *IstanbulExtra) {
-		ie.Seal = seal
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	return header, nil
+func (s *BLSKeyManager) NewEmptyCommittedSeal() Sealer {
+	return &BLSSeal{}
 }
 
-func (s *BLSSigner) EcrecoverFromHeader(header *types.Header) (types.Address, error) {
-	extra, err := s.GetIBFTExtra(header)
-	if err != nil {
-		return types.Address{}, err
-	}
-
-	hash, err := s.CalculateHeaderHash(header)
-	if err != nil {
-		return types.Address{}, err
-	}
-
-	return ecrecoverImpl(extra.Seal, hash[:])
+func (s *BLSKeyManager) SignSeal(data []byte) ([]byte, error) {
+	return crypto.Sign(s.ecdsaKey, data)
 }
 
-func (s *BLSSigner) CreateCommittedSeal(header *types.Header) ([]byte, error) {
-	hash, err := s.CalculateHeaderHash(header)
-	if err != nil {
-		return nil, err
-	}
-
-	msg := commitMsg(hash[:])
-
-	return signByBLS(s.blsKey, msg)
+func (s *BLSKeyManager) SignCommittedSeal(data []byte) ([]byte, error) {
+	return signByBLS(s.blsKey, data)
 }
 
-func (s *BLSSigner) WriteCommittedSeals(header *types.Header, sealMap map[types.Address][]byte) (*types.Header, error) {
-	if len(sealMap) == 0 {
-		return nil, ErrEmptyCommittedSeals
-	}
+func (s *BLSKeyManager) Ecrecover(sig, digest []byte) (types.Address, error) {
+	return ecrecoverImpl(sig, digest)
+}
 
-	extra, err := s.GetIBFTExtra(header)
-	if err != nil {
-		return nil, err
-	}
-
+func (s *BLSKeyManager) GenerateCommittedSeals(sealMap map[types.Address][]byte, extra *IstanbulExtra) (Sealer, error) {
 	validators, ok := extra.Validators.(*validators.BLSValidatorSet)
 	if !ok {
 		return nil, ErrInvalidValidatorSet
 	}
 
-	blsPop := bls_sig.NewSigPop()
-
-	bitMap := new(big.Int)
-	blsSignatures := make([]*bls_sig.Signature, 0, len(sealMap))
-
-	for addr, seal := range sealMap {
-		index := validators.Index(addr)
-		if index == -1 {
-			return nil, ErrNonValidatorCommittedSeal
-		}
-
-		bitMap = bitMap.SetBit(bitMap, index, 1)
-
-		bsig := &bls_sig.Signature{}
-		if err := bsig.UnmarshalBinary(seal); err != nil {
-			return nil, err
-		}
-
-		blsSignatures = append(blsSignatures, bsig)
+	blsSignatures, bitMap, err := s.getBLSSignatures(sealMap, validators)
+	if err != nil {
+		return nil, err
 	}
+
+	blsPop := bls_sig.NewSigPop()
 
 	multiSignature, err := blsPop.AggregateSignatures(blsSignatures...)
 	if err != nil {
@@ -179,194 +89,124 @@ func (s *BLSSigner) WriteCommittedSeals(header *types.Header, sealMap map[types.
 		return nil, err
 	}
 
-	blsSeal := BLSSeal{
+	return &BLSSeal{
 		Bitmap:    bitMap,
 		Signature: multiSignatureBytes,
-	}
-
-	err = s.packFieldIntoIbftExtra(header, func(ie *IstanbulExtra) {
-		ie.CommittedSeal = &blsSeal
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	return header, nil
+	}, nil
 }
 
-func (s *BLSSigner) VerifyCommittedSeal(
+func (s *BLSKeyManager) VerifyCommittedSeal(
+	rawCommittedSeal Sealer,
+	digest []byte,
 	rawSet validators.ValidatorSet,
-	header *types.Header,
-	quorumFn validators.QuorumImplementation,
-) error {
-	extra, err := s.GetIBFTExtra(header)
-	if err != nil {
-		return err
-	}
-
-	cs, ok := extra.CommittedSeal.(*BLSSeal)
+) (int, error) {
+	committedSeal, ok := rawCommittedSeal.(*BLSSeal)
 	if !ok {
-		return ErrInvalidCommittedSealType
+		return 0, ErrInvalidCommittedSealType
 	}
 
 	validatorSet, ok := rawSet.(*validators.BLSValidatorSet)
 	if !ok {
-		return ErrInvalidValidatorSet
+		return 0, ErrInvalidValidatorSet
 	}
 
-	// get the message that needs to be signed
-	// this not signing! just removing the fields that should be signed
-	hash, err := s.CalculateHeaderHash(header)
-	if err != nil {
-		return err
-	}
-
-	rawMsg := commitMsg(hash[:])
-
-	return s.verifyCommittedSealsImpl(cs, rawMsg, *validatorSet, quorumFn)
+	return s.verifyCommittedSealsImpl(committedSeal, digest, *validatorSet)
 }
 
-func (s *BLSSigner) VerifyParentCommittedSeal(
-	rawParentSet validators.ValidatorSet,
-	parent, header *types.Header,
-	quorumFn validators.QuorumImplementation,
-) error {
-	extra, err := s.GetIBFTExtra(header)
-	if err != nil {
-		return err
-	}
-
-	parentCs, ok := extra.ParentCommittedSeal.(*BLSSeal)
-	if !ok {
-		return ErrInvalidCommittedSealType
-	}
-
-	validatorSet, ok := rawParentSet.(*validators.BLSValidatorSet)
-	if !ok {
-		return ErrInvalidValidatorSet
-	}
-
-	// get the message that needs to be signed
-	// this not signing! just removing the fields that should be signed
-	hash, err := s.CalculateHeaderHash(parent)
-	if err != nil {
-		return err
-	}
-
-	rawMsg := commitMsg(hash[:])
-
-	return s.verifyCommittedSealsImpl(parentCs, rawMsg, *validatorSet, quorumFn)
-}
-
-func (s *BLSSigner) SignGossipMessage(msg *proto.MessageReq) error {
+func (s *BLSKeyManager) SignIBFTMessage(msg *proto.MessageReq) error {
 	return signMsg(s.ecdsaKey, msg)
 }
 
-func (s *BLSSigner) ValidateGossipMessage(msg *proto.MessageReq) error {
+func (s *BLSKeyManager) ValidateIBFTMessage(msg *proto.MessageReq) error {
 	return ValidateMsg(msg)
 }
 
-func (s *BLSSigner) initIbftExtra(header *types.Header, vals validators.ValidatorSet, parentCommittedSeal Sealer) {
-	putIbftExtra(header, &IstanbulExtra{
-		Validators:          vals,
-		Seal:                nil,
-		CommittedSeal:       &BLSSeal{},
-		ParentCommittedSeal: parentCommittedSeal,
-	})
-}
+func (s *BLSKeyManager) getBLSSignatures(
+	sealMap map[types.Address][]byte,
+	validators *validators.BLSValidatorSet,
+) ([]*bls_sig.Signature, *big.Int, error) {
+	blsSignatures := make([]*bls_sig.Signature, 0, len(sealMap))
+	bitMap := new(big.Int)
 
-func (s *BLSSigner) packFieldIntoIbftExtra(h *types.Header, updateFn func(*IstanbulExtra)) error {
-	extra, err := s.GetIBFTExtra(h)
-	if err != nil {
-		return err
+	for addr, seal := range sealMap {
+		index := validators.Index(addr)
+		if index == -1 {
+			return nil, nil, ErrNonValidatorCommittedSeal
+		}
+
+		bsig := &bls_sig.Signature{}
+		if err := bsig.UnmarshalBinary(seal); err != nil {
+			return nil, nil, err
+		}
+
+		bitMap = bitMap.SetBit(bitMap, index, 1)
+
+		blsSignatures = append(blsSignatures, bsig)
 	}
 
-	updateFn(extra)
-
-	putIbftExtra(h, extra)
-
-	return nil
+	return blsSignatures, bitMap, nil
 }
 
-func (s *BLSSigner) CalculateHeaderHash(header *types.Header) (types.Hash, error) {
-	filteredHeader, err := s.filterHeaderForHash(header)
-	if err != nil {
-		return types.ZeroHash, err
-	}
-
-	return calculateHeaderHash(filteredHeader), nil
-}
-
-func (s *BLSSigner) filterHeaderForHash(header *types.Header) (*types.Header, error) {
-	// This will effectively remove the Seal and Committed Seal fields,
-	// while keeping proposer vanity and validator set
-	// because extra.Validators, extra.ParentCommittedSeal is what we got from `h` in the first place.
-	clone := header.Copy()
-
-	extra, err := s.GetIBFTExtra(clone)
-	if err != nil {
-		return nil, err
-	}
-
-	s.initIbftExtra(clone, extra.Validators, extra.ParentCommittedSeal)
-
-	return clone, nil
-}
-
-func (s *BLSSigner) verifyCommittedSealsImpl(
+func (s *BLSKeyManager) verifyCommittedSealsImpl(
 	committedSeal *BLSSeal,
 	msg []byte,
 	validators validators.BLSValidatorSet,
-	quorumFn validators.QuorumImplementation,
-) error {
+) (int, error) {
 	if len(committedSeal.Signature) == 0 || committedSeal.Bitmap.BitLen() == 0 {
-		return ErrEmptyCommittedSeals
+		return 0, ErrEmptyCommittedSeals
+	}
+
+	aggregatedPubKey, numKeys, err := s.createAggregatedBLSPubKeys(validators, committedSeal.Bitmap)
+	if err != nil {
+		return 0, fmt.Errorf("failed to aggregate BLS Public Keys: %w", err)
+	}
+
+	signature := &bls_sig.MultiSignature{}
+	if err := signature.UnmarshalBinary(committedSeal.Signature); err != nil {
+		return 0, err
 	}
 
 	blsPop := bls_sig.NewSigPop()
+
+	ok, err := blsPop.VerifyMultiSignature(aggregatedPubKey, msg, signature)
+	if err != nil {
+		return 0, err
+	}
+
+	if !ok {
+		return 0, ErrInvalidBLSSignature
+	}
+
+	return numKeys, nil
+}
+
+func (s *BLSKeyManager) createAggregatedBLSPubKeys(
+	validators validators.BLSValidatorSet,
+	bitMap *big.Int,
+) (*bls_sig.MultiPublicKey, int, error) {
 	pubkeys := make([]*bls_sig.PublicKey, 0, validators.Len())
 
 	for idx, val := range validators {
-		if committedSeal.Bitmap.Bit(idx) == 0 {
+		if bitMap.Bit(idx) == 0 {
 			continue
 		}
 
 		pubKey := &bls_sig.PublicKey{}
 		if err := pubKey.UnmarshalBinary(val.BLSPubKey); err != nil {
-			return err
+			return nil, 0, err
 		}
 
 		pubkeys = append(pubkeys, pubKey)
 	}
 
-	multiPubKey, err := blsPop.AggregatePublicKeys(pubkeys...)
+	blsPop := bls_sig.NewSigPop()
+
+	key, err := blsPop.AggregatePublicKeys(pubkeys...)
 	if err != nil {
-		return err
+		return nil, 0, err
 	}
 
-	signature := &bls_sig.MultiSignature{}
-	if err := signature.UnmarshalBinary(committedSeal.Signature); err != nil {
-		return err
-	}
-
-	ok, err := blsPop.VerifyMultiSignature(multiPubKey, msg, signature)
-	if err != nil {
-		return err
-	}
-
-	if !ok {
-		return ErrInvalidBLSSignature
-	}
-
-	// Valid committed seals must be at least 2F+1
-	// 	2F 	is the required number of honest validators who provided the committed seals
-	// 	+1	is the proposer
-	if validSeals := len(pubkeys); validSeals < quorumFn(&validators) {
-		return ErrNotEnoughCommittedSeals
-	}
-
-	return nil
+	return key, len(pubkeys), nil
 }
 
 type BLSSeal struct {
@@ -438,25 +278,3 @@ func signByBLS(prv *bls_sig.SecretKey, msg []byte) ([]byte, error) {
 
 	return sealBytes, nil
 }
-
-// func signMsgByBLS(key *bls_sig.SecretKey, msg *proto.MessageReq) error {
-// 	signMsg, err := msg.PayloadNoSig()
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	blsPop := bls_sig.NewSigPop()
-// 	sig, err := blsPop.Sign(key, crypto.Keccak256(signMsg))
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	sigBytes, err := sig.MarshalBinary()
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	msg.Signature = hex.EncodeToHex(sigBytes)
-
-// 	return nil
-// }

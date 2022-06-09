@@ -279,6 +279,7 @@ func (s *Snapshot) UnmarshalJSON(data []byte) error {
 		switch raw.Set[0].(type) {
 		case string:
 			set := validators.ECDSAValidatorSet{}
+
 			for _, x := range raw.Set {
 				addrString, ok := x.(string)
 				if !ok {

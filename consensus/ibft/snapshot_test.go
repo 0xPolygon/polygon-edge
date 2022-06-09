@@ -53,7 +53,7 @@ func (t *testerAccount) Address() types.Address {
 }
 
 func (t *testerAccount) sign(h *types.Header) (*types.Header, error) {
-	signer := signer.NewECDSASignerFromKey(t.priv)
+	signer := signer.NewSigner(signer.NewECDSAKeyManagerFromKey(t.priv))
 
 	return signer.WriteSeal(h)
 }
@@ -112,7 +112,7 @@ func (ap *testerAccountPool) genesis() *chain.Genesis {
 		MixHash: signer.IstanbulDigest,
 	}
 
-	signer := signer.NewECDSASignerFromKey(ap.get("A").priv)
+	signer := signer.NewSigner(signer.NewECDSAKeyManagerFromKey(ap.get("A").priv))
 
 	err := signer.InitIBFTExtra(genesis, nil, ap.ValidatorSet())
 	assert.NoError(ap.t, err)
@@ -232,7 +232,7 @@ func buildHeaders(
 			h.Nonce = nonceDropVote
 		}
 
-		signer := signer.NewECDSASignerFromKey(pool.get(v.validator).priv)
+		signer := signer.NewSigner(signer.NewECDSAKeyManagerFromKey(pool.get(v.validator).priv))
 		err := signer.InitIBFTExtra(h, parent, validatorSet)
 		assert.NoError(t, err)
 
@@ -439,7 +439,7 @@ func TestSnapshot_setupSnapshot(t *testing.T) {
 					Path: tmpDir,
 				},
 				logger: hclog.NewNullLogger(),
-				signer: signer.NewECDSASignerFromKey(pool.get("A").priv),
+				signer: signer.NewSigner(signer.NewECDSAKeyManagerFromKey(pool.get("A").priv)),
 			}
 
 			initialHeaders := buildHeaders(t, pool, validatorSet, genesis, c.headers)
@@ -760,7 +760,7 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 				epochSize:  epochSize,
 				blockchain: blockchain.TestBlockchain(t, genesis),
 				config:     &consensus.Config{},
-				signer:     signer.NewECDSASignerFromKey(pool.get("A").priv),
+				signer:     signer.NewSigner(signer.NewECDSAKeyManagerFromKey(pool.get("A").priv)),
 			}
 
 			// create votes
@@ -816,7 +816,7 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 				epochSize:  epochSize,
 				blockchain: blockchain.TestBlockchain(t, genesis),
 				config:     &consensus.Config{},
-				signer:     signer.NewECDSASignerFromKey(pool.get("A").priv),
+				signer:     signer.NewSigner(signer.NewECDSAKeyManagerFromKey(pool.get("A").priv)),
 			}
 
 			initIbftMechanism(PoA, ibft1)
@@ -851,7 +851,7 @@ func TestSnapshot_PurgeSnapshots(t *testing.T) {
 		epochSize:  10,
 		blockchain: blockchain.TestBlockchain(t, genesis),
 		config:     &consensus.Config{},
-		signer:     signer.NewECDSASignerFromKey(pool.get("A").priv),
+		signer:     signer.NewSigner(signer.NewECDSAKeyManagerFromKey(pool.get("A").priv)),
 	}
 	assert.NoError(t, ibft1.setupSnapshot())
 	initIbftMechanism(PoA, ibft1)

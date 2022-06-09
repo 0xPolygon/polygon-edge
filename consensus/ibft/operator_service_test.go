@@ -18,7 +18,7 @@ func TestOperator_GetNextCandidate(t *testing.T) {
 	pool.add("A", "B", "C")
 
 	ibft := &Ibft{
-		signer: signer.NewMockECDSASigner(pool.get("A").Address()),
+		signer: signer.NewSigner(signer.NewMockECDSAKeyManager(pool.get("A").Address())),
 	}
 
 	snap := &Snapshot{
@@ -83,7 +83,7 @@ func TestOperator_Propose(t *testing.T) {
 		blockchain: blockchain.TestBlockchain(t, pool.genesis()),
 		config:     &consensus.Config{},
 		epochSize:  DefaultEpochSize,
-		signer:     signer.NewECDSASignerFromKey(pool.get("A").priv),
+		signer:     signer.NewSigner(signer.NewECDSAKeyManagerFromKey(pool.get("A").priv)),
 	}
 	assert.NoError(t, ibft.setupSnapshot())
 

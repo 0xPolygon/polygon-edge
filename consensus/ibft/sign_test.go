@@ -19,7 +19,7 @@ func TestSign_Sealer(t *testing.T) {
 	}
 
 	h := &types.Header{}
-	signerA := signer.NewECDSASignerFromKey(pool.get("A").priv)
+	signerA := signer.NewSigner(signer.NewECDSAKeyManagerFromKey(pool.get("A").priv))
 
 	err := signerA.InitIBFTExtra(h, &types.Header{}, pool.ValidatorSet())
 	assert.NoError(t, err)
@@ -27,7 +27,7 @@ func TestSign_Sealer(t *testing.T) {
 	// non-validator address
 	pool.add("X")
 
-	signerX := signer.NewECDSASignerFromKey(pool.get("X").priv)
+	signerX := signer.NewSigner(signer.NewECDSAKeyManagerFromKey(pool.get("X").priv))
 
 	badSealedHeader, _ := signerX.WriteSeal(h)
 
@@ -53,7 +53,7 @@ func TestSign_CommittedSeals(t *testing.T) {
 
 	h := &types.Header{}
 
-	signerA := signer.NewECDSASignerFromKey(pool.get("A").priv)
+	signerA := signer.NewSigner(signer.NewECDSAKeyManagerFromKey(pool.get("A").priv))
 	err := signerA.InitIBFTExtra(h, &types.Header{}, pool.ValidatorSet())
 	assert.NoError(t, err)
 
@@ -65,8 +65,7 @@ func TestSign_CommittedSeals(t *testing.T) {
 
 		for _, name := range names {
 			account := pool.get(name)
-
-			signer := signer.NewECDSASignerFromKey(account.priv)
+			signer := signer.NewSigner(signer.NewECDSAKeyManagerFromKey(account.priv))
 			seal, err := signer.CreateCommittedSeal(h)
 
 			assert.NoError(t, err)
@@ -84,7 +83,7 @@ func TestSign_CommittedSeals(t *testing.T) {
 	// Correct
 	assert.NoError(t, buildCommittedSeal([]string{"A", "B", "C", "D"}))
 
-	// Failed - Repeated signature
+	// // Failed - Repeated signature
 	assert.Error(t, buildCommittedSeal([]string{"A", "A"}))
 
 	// Failed - Non validator signature
@@ -99,9 +98,9 @@ func TestSign_Messages(t *testing.T) {
 	pool.add("A")
 
 	msg := &proto.MessageReq{}
-	signerA := signer.NewECDSASignerFromKey(pool.get("A").priv)
-	assert.NoError(t, signerA.SignGossipMessage(msg))
-	assert.NoError(t, signerA.ValidateGossipMessage(msg))
+	signerA := signer.NewECDSAKeyManagerFromKey(pool.get("A").priv)
+	assert.NoError(t, signerA.SignIBFTMessage(msg))
+	assert.NoError(t, signerA.ValidateIBFTMessage(msg))
 
 	assert.Equal(t, msg.From, pool.get("A").Address().String())
 }

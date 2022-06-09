@@ -16,6 +16,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/protocol"
+	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
@@ -158,19 +159,9 @@ func Factory(
 		quorumSizeBlockNum = uint64(readBlockNum)
 	}
 
-	var (
-		s   signer.Signer
-		err error
-	)
-
-	if params.BLS {
-		if s, err = signer.NewBLSSigner(params.SecretsManager); err != nil {
-			return nil, err
-		}
-	} else {
-		if s, err = signer.NewECDSASigner(params.SecretsManager); err != nil {
-			return nil, err
-		}
+	signer, err := InitSigner(params.SecretsManager, params.BLS)
+	if err != nil {
+		return nil, err
 	}
 
 	p := &Ibft{
@@ -188,7 +179,7 @@ func Factory(
 		sealing:            params.Seal,
 		metrics:            params.Metrics,
 		blockTime:          time.Duration(params.BlockTime) * time.Second,
-		signer:             s,
+		signer:             signer,
 	}
 
 	// Initialize the mechanism
@@ -1172,7 +1163,7 @@ func (i *Ibft) gossip(typ proto.MessageReq_Type) {
 		i.pushMessage(msg2)
 	}
 
-	if err := i.signer.SignGossipMessage(msg); err != nil {
+	if err := i.signer.SignIBFTMessage(msg); err != nil {
 		i.logger.Error("failed to sign message", "err", err)
 
 		return
@@ -1425,4 +1416,23 @@ func (i *Ibft) verifySigner(snap *Snapshot, header *types.Header) error {
 // forceTimeout sets the forceTimeoutCh flag to true
 func (i *Ibft) forceTimeout() {
 	i.forceTimeoutCh = true
+}
+
+func InitSigner(secretManager secrets.SecretsManager, isBLS bool) (signer.Signer, error) {
+	var (
+		km  signer.KeyManager
+		err error
+	)
+
+	if isBLS {
+		km, err = signer.NewBLSKeyManager(secretManager)
+	} else {
+		km, err = signer.NewECDSAKeyManager(secretManager)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return signer.NewSigner(km), nil
 }
