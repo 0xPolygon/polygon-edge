@@ -1198,9 +1198,9 @@ func (i *Ibft) setState(s IbftState) {
 }
 
 // forceTimeout sets the forceTimeoutCh flag to true
-// func (i *Ibft) forceTimeout() {
-// 	i.forceTimeoutCh = true
-// }
+func (i *Ibft) forceTimeout() {
+	i.forceTimeoutCh = true
+}
 
 // isSealing checks if the current node is sealing blocks
 func (i *Ibft) isSealing() bool {
@@ -1418,11 +1418,6 @@ func (i *Ibft) verifySigner(snap *Snapshot, header *types.Header) error {
 	}
 
 	return nil
-}
-
-// forceTimeout sets the forceTimeoutCh flag to true
-func (i *Ibft) forceTimeout() {
-	i.forceTimeoutCh = true
 }
 
 func InitSigner(secretManager secrets.SecretsManager, isBLS bool) (signer.Signer, error) {
