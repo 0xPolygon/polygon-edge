@@ -323,7 +323,7 @@ func GetBLSPubkeyFromValidatorKey(secretsManager secrets.SecretsManager) ([]byte
 		return nil, err
 	}
 
-	pubkeyBytes, err := ECDSAToBLSPubkey(ecdsaKey)
+	pubkeyBytes, err := ECDSAToMarshalledBLSPubkey(ecdsaKey)
 	if err != nil {
 		return nil, err
 	}
@@ -343,7 +343,7 @@ func ECDSAToBLS(key *ecdsa.PrivateKey) (*bls_sig.SecretKey, error) {
 	return sk, nil
 }
 
-func ECDSAToBLSPubkey(ecdsaKey *ecdsa.PrivateKey) ([]byte, error) {
+func ECDSAToMarshalledBLSPubkey(ecdsaKey *ecdsa.PrivateKey) ([]byte, error) {
 	secKey, err := ECDSAToBLS(ecdsaKey)
 	if err != nil {
 		return nil, err

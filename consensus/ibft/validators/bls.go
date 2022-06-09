@@ -132,7 +132,7 @@ func ConvertKeysToBLSValidatorSet(keys []*ecdsa.PrivateKey) (*BLSValidatorSet, e
 	vals := make([]BLSValidator, len(keys))
 
 	for idx, key := range keys {
-		pubkey, err := crypto.ECDSAToBLSPubkey(key)
+		pubkey, err := crypto.ECDSAToMarshalledBLSPubkey(key)
 		if err != nil {
 			return nil, err
 		}

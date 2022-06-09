@@ -98,20 +98,6 @@ func InitValidatorKey(secretsManager secrets.SecretsManager) (types.Address, err
 	return address, nil
 }
 
-func GetBLSPubkeyFromValidatorKey(secretsManager secrets.SecretsManager) ([]byte, error) {
-	ecdsaKey, err := crypto.ReadConsensusKey(secretsManager)
-	if err != nil {
-		return nil, err
-	}
-
-	pubkeyBytes, err := crypto.ECDSAToBLSPubkey(ecdsaKey)
-	if err != nil {
-		return nil, err
-	}
-
-	return pubkeyBytes, nil
-}
-
 func InitNetworkingPrivateKey(secretsManager secrets.SecretsManager) (libp2pCrypto.PrivKey, error) {
 	// Generate the libp2p private key
 	libp2pKey, libp2pKeyEncoded, keyErr := network.GenerateAndEncodeLibp2pKey()
