@@ -32,7 +32,6 @@ func TestIbft_Transfer(t *testing.T) {
 		func(i int, config *framework.TestServerConfig) {
 			config.Premine(senderAddr, framework.EthToWei(10))
 			config.SetSeal(true)
-			config.SetShowsLog(i == 0)
 		},
 	)
 
