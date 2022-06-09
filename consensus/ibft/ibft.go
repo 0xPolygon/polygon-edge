@@ -959,7 +959,14 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 	for addr, commit := range i.state.committed {
 		committedSeal, err := hex.DecodeHex(commit.Seal)
 		if err != nil {
-			return fmt.Errorf("failed to decode committed seal from %s: %w", addr, err)
+			i.logger.Error(
+				fmt.Sprintf(
+					"unable to decode committed seal from %s",
+					commit.From,
+				),
+			)
+
+			continue
 		}
 
 		committedSeals[addr] = committedSeal
