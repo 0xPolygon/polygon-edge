@@ -589,20 +589,9 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 
 	tx.ComputeHash()
 
-	// check if already known
-	if _, ok := p.index.get(tx.Hash); ok {
-		if origin == gossip {
-			// silently drop known tx
-			// that is gossiped back
-			p.logger.Debug(
-				"dropping known gossiped transaction",
-				"hash", tx.Hash.String(),
-			)
-
-			return nil
-		} else {
-			return ErrAlreadyKnown
-		}
+	//	add to index
+	if ok := p.index.add(tx); !ok {
+		return ErrAlreadyKnown
 	}
 
 	// initialize account for this address once
@@ -632,13 +621,13 @@ func (p *TxPool) handleEnqueueRequest(req enqueueRequest) {
 	if err := account.enqueue(tx); err != nil {
 		p.logger.Error("enqueue request", "err", err)
 
+		p.index.remove(tx)
+
 		return
 	}
 
 	p.logger.Debug("enqueue request", "hash", tx.Hash.String())
 
-	// update state
-	p.index.add(tx)
 	p.gauge.increase(slotsRequired(tx))
 
 	p.eventManager.signalEvent(proto.EventType_ENQUEUED, tx.Hash)
@@ -693,14 +682,20 @@ func (p *TxPool) addGossipTx(obj interface{}) {
 
 	// decode tx
 	if err := tx.UnmarshalRLP(raw.Raw.Value); err != nil {
-		p.logger.Error("failed to decode broadcasted tx", "err", err)
+		p.logger.Error("failed to decode broadcast tx", "err", err)
 
 		return
 	}
 
 	// add tx
 	if err := p.addTx(gossip, tx); err != nil {
-		p.logger.Error("failed to add broadcasted txn", "err", err)
+		if errors.Is(err, ErrAlreadyKnown) {
+			p.logger.Debug("rejecting known tx (gossip)", "hash", tx.Hash.String())
+
+			return
+		}
+
+		p.logger.Error("failed to add broadcast tx", "err", err, "hash", tx.Hash.String())
 	}
 }
 
