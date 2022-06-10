@@ -35,7 +35,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-// Minimal is the central manager of the blockchain client
+// Server is the central manager of the blockchain client
 type Server struct {
 	logger       hclog.Logger
 	config       *Config
@@ -550,6 +550,7 @@ func (s *Server) setupJSONRPC() error {
 		Addr:                     s.config.JSONRPC.JSONRPCAddr,
 		ChainID:                  uint64(s.config.Chain.Params.ChainID),
 		AccessControlAllowOrigin: s.config.JSONRPC.AccessControlAllowOrigin,
+		PriceLimit:               s.config.PriceLimit,
 	}
 
 	srv, err := jsonrpc.NewJSONRPC(s.logger, conf)
