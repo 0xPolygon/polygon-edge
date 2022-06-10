@@ -428,7 +428,7 @@ func (e *Eth) GetStorageAt(
 
 // GasPrice returns the average gas price based on the last x blocks
 // taking into consideration operator defined price limit
-func (e *Eth) GasPrice() (interface{}, error) {
+func (e *Eth) GasPrice() (string, error) {
 	// Fetch average gas price in uint64
 	avgGasPrice := e.store.GetAvgGasPrice().Uint64()
 
