@@ -12,22 +12,22 @@ import (
 
 // Header represents a block header in the Ethereum blockchain.
 type Header struct {
-	ParentHash   Hash
-	Sha3Uncles   Hash
-	Miner        Address
-	StateRoot    Hash
-	TxRoot       Hash
-	ReceiptsRoot Hash
-	LogsBloom    Bloom
-	Difficulty   uint64
-	Number       uint64
-	GasLimit     uint64
-	GasUsed      uint64
-	Timestamp    uint64
-	ExtraData    []byte
-	MixHash      Hash
-	Nonce        Nonce
-	Hash         Hash
+	ParentHash   Hash    `json:"parentHash"`
+	Sha3Uncles   Hash    `json:"sha3Uncles"`
+	Miner        Address `json:"miner"`
+	StateRoot    Hash    `json:"stateRoot"`
+	TxRoot       Hash    `json:"transactionsRoot"`
+	ReceiptsRoot Hash    `json:"receiptsRoot"`
+	LogsBloom    Bloom   `json:"logsBloom"`
+	Difficulty   uint64  `json:"difficulty"`
+	Number       uint64  `json:"number"`
+	GasLimit     uint64  `json:"gasLimit"`
+	GasUsed      uint64  `json:"gasUsed"`
+	Timestamp    uint64  `json:"timestamp"`
+	ExtraData    []byte  `json:"extraData"`
+	MixHash      Hash    `json:"mixHash"`
+	Nonce        Nonce   `json:"nonce"`
+	Hash         Hash    `json:"hash"`
 }
 
 func (h *Header) Equal(hh *Header) bool {
@@ -62,7 +62,11 @@ func (n *Nonce) Scan(src interface{}) error {
 		return errors.New("invalid type assert")
 	}
 
-	nn := hex.MustDecodeHex(string(stringVal))
+	nn, decodeErr := hex.DecodeHex(string(stringVal))
+	if decodeErr != nil {
+		return fmt.Errorf("unable to decode value, %w", decodeErr)
+	}
+
 	copy(n[:], nn[:])
 
 	return nil

@@ -5,7 +5,10 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
+	"os"
+	"runtime/debug"
 	"strconv"
 	"strings"
 )
@@ -28,7 +31,14 @@ const (
 // to inform the muxer of the protocol that will be used to communicate
 // on this ReadWriteCloser. It returns an error if, for example,
 // the muxer does not know how to handle this protocol.
-func SelectProtoOrFail(proto string, rwc io.ReadWriteCloser) error {
+func SelectProtoOrFail(proto string, rwc io.ReadWriteCloser) (err error) {
+	defer func() {
+		if rerr := recover(); rerr != nil {
+			fmt.Fprintf(os.Stderr, "caught panic: %s\n%s\n", rerr, debug.Stack())
+			err = fmt.Errorf("panic selecting protocol: %s", rerr)
+		}
+	}()
+
 	errCh := make(chan error, 1)
 	go func() {
 		var buf bytes.Buffer
@@ -56,7 +66,14 @@ func SelectProtoOrFail(proto string, rwc io.ReadWriteCloser) error {
 
 // SelectOneOf will perform handshakes with the protocols on the given slice
 // until it finds one which is supported by the muxer.
-func SelectOneOf(protos []string, rwc io.ReadWriteCloser) (string, error) {
+func SelectOneOf(protos []string, rwc io.ReadWriteCloser) (proto string, err error) {
+	defer func() {
+		if rerr := recover(); rerr != nil {
+			fmt.Fprintf(os.Stderr, "caught panic: %s\n%s\n", rerr, debug.Stack())
+			err = fmt.Errorf("panic selecting one of protocols: %s", rerr)
+		}
+	}()
+
 	if len(protos) == 0 {
 		return "", ErrNoProtocols
 	}
@@ -78,9 +95,16 @@ func SelectOneOf(protos []string, rwc io.ReadWriteCloser) (string, error) {
 
 const simOpenProtocol = "/libp2p/simultaneous-connect"
 
-// Performs protocol negotiation with the simultaneous open extension; the returned boolean
-// indicator will be true if we should act as a server.
-func SelectWithSimopenOrFail(protos []string, rwc io.ReadWriteCloser) (string, bool, error) {
+// SelectWithSimopenOrFail performs protocol negotiation with the simultaneous open extension.
+// The returned boolean indicator will be true if we should act as a server.
+func SelectWithSimopenOrFail(protos []string, rwc io.ReadWriteCloser) (proto string, isServer bool, err error) {
+	defer func() {
+		if rerr := recover(); rerr != nil {
+			fmt.Fprintf(os.Stderr, "caught panic: %s\n%s\n", rerr, debug.Stack())
+			err = fmt.Errorf("panic selecting protocol with simopen: %s", rerr)
+		}
+	}()
+
 	if len(protos) == 0 {
 		return "", false, ErrNoProtocols
 	}
@@ -97,8 +121,7 @@ func SelectWithSimopenOrFail(protos []string, rwc io.ReadWriteCloser) (string, b
 		werrCh <- err
 	}()
 
-	err := readMultistreamHeader(rwc)
-	if err != nil {
+	if err := readMultistreamHeader(rwc); err != nil {
 		return "", false, err
 	}
 
@@ -282,18 +305,6 @@ func simOpenSelectClient(protos []string, rwc io.ReadWriteCloser) (string, error
 	}
 
 	return selectProtosOrFail(protos, rwc)
-}
-
-func handshake(rw io.ReadWriter) error {
-	errCh := make(chan error, 1)
-	go func() {
-		errCh <- delimWriteBuffered(rw, []byte(ProtocolID))
-	}()
-
-	if err := readMultistreamHeader(rw); err != nil {
-		return err
-	}
-	return <-errCh
 }
 
 func readMultistreamHeader(r io.Reader) error {

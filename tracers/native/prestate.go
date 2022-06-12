@@ -62,7 +62,7 @@ func newPrestateTracer(ctx *tracers.Context) tracers.Tracer {
 // CaptureStart implements the EVMLogger interface to initialize the tracing operation.
 func (t *prestateTracer) CaptureStart(txr interface{}, from types.Address, to types.Address, create bool, input []byte, gas uint64, value *big.Int) {
 	// t.env = env
-	txn, ok := txr.(*state.Transition)
+	_, ok := txr.(*state.Transition)
 	if !ok {
 		return
 	}

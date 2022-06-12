@@ -3,13 +3,13 @@ package loadbot
 import (
 	"bytes"
 	"fmt"
+	"github.com/umbracle/ethgo"
 	"math"
 	"sort"
 
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/command/loadbot/generator"
 	"github.com/0xPolygon/polygon-edge/helper/common"
-	"github.com/umbracle/go-web3"
 )
 
 const (
@@ -52,7 +52,7 @@ type LoadbotResult struct {
 	BlockData              TxnBlockData         `json:"block_data"`
 	DetailedErrorData      TxnDetailedErrorData `json:"detailed_error_data,omitempty"`
 	ApproxTPS              uint64               `json:"approx_tps"`
-	ContractAddress        web3.Address         `json:"contract_address,omitempty"`
+	ContractAddress        ethgo.Address        `json:"contract_address,omitempty"`
 	ContractBlockData      TxnBlockData         `json:"contract_block_data,omitempty"`
 }
 
@@ -185,7 +185,7 @@ func (lr *LoadbotResult) writeErrorData(buffer *bytes.Buffer) {
 		buffer.WriteString("\n\n[DETAILED ERRORS]\n")
 
 		addToBuffer := func(detailedError *generator.FailedTxnInfo) {
-			if detailedError.TxHash != web3.ZeroHash.String() {
+			if detailedError.TxHash != ethgo.ZeroHash.String() {
 				buffer.WriteString(fmt.Sprintf("\n\n[%s]\n", detailedError.TxHash))
 			} else {
 				buffer.WriteString("\n\n[Tx Hash Unavailable]\n")
@@ -275,7 +275,7 @@ func (lr *LoadbotResult) writeTurnAroundData(buffer *bytes.Buffer) {
 
 func (lr *LoadbotResult) writeContractDeploymentData(buffer *bytes.Buffer) {
 	// skip if contract was not deployed
-	if lr.ContractAddress == web3.ZeroAddress {
+	if lr.ContractAddress == ethgo.ZeroAddress {
 		return
 	}
 

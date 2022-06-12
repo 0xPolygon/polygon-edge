@@ -10,7 +10,7 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 
-	btcec "github.com/btcsuite/btcd/btcec"
+	btcec "github.com/btcsuite/btcd/btcec/v2"
 	openssl "github.com/libp2p/go-openssl"
 
 	"github.com/libp2p/go-libp2p-core/internal/catch"

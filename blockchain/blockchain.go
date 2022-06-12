@@ -23,6 +23,21 @@ import (
 
 const (
 	BlockGasTargetDivisor uint64 = 1024 // The bound divisor of the gas limit, used in update calculations
+	defaultCacheSize      int    = 100  // The default size for Blockchain LRU cache structures
+)
+
+var (
+	ErrNoBlock              = errors.New("no block data passed in")
+	ErrParentNotFound       = errors.New("parent block not found")
+	ErrInvalidParentHash    = errors.New("parent block hash is invalid")
+	ErrParentHashMismatch   = errors.New("invalid parent block hash")
+	ErrInvalidBlockSequence = errors.New("invalid block sequence")
+	ErrInvalidSha3Uncles    = errors.New("invalid block sha3 uncles root")
+	ErrInvalidTxRoot        = errors.New("invalid block transactions root")
+	ErrInvalidReceiptsSize  = errors.New("invalid number of receipts")
+	ErrInvalidStateRoot     = errors.New("invalid block state root")
+	ErrInvalidGasUsed       = errors.New("invalid block gas used")
+	ErrInvalidReceiptsRoot  = errors.New("invalid block receipts root")
 )
 
 // Blockchain is a blockchain reference
@@ -38,6 +53,17 @@ type Blockchain struct {
 
 	headersCache    *lru.Cache // LRU cache for the headers
 	difficultyCache *lru.Cache // LRU cache for the difficulty
+
+	// We need to keep track of block receipts between the verification phase
+	// and the insertion phase of a new block coming in. To avoid having to
+	// execute the transactions twice, we save the receipts from the initial execution
+	// in a cache, so we can grab it later when inserting the block.
+	// This is of course not an optimal solution - a better one would be to add
+	// the receipts to the proposed block (like we do with Transactions and Uncles), but
+	// that is currently not possible because it would break backwards compatibility due to
+	// insane conditionals in the RLP unmarshal methods for the Block structure, which prevent
+	// any new fields from being added
+	receiptsCache *lru.Cache // LRU cache for the block receipts
 
 	currentHeader     atomic.Value // The current header
 	currentDifficulty atomic.Value // The current difficulty of the chain (total difficulty)
@@ -56,7 +82,7 @@ type gasPriceAverage struct {
 }
 
 type Verifier interface {
-	VerifyHeader(parent, header *types.Header) error
+	VerifyHeader(header *types.Header) error
 	ProcessHeaders(headers []*types.Header) error
 	GetBlockCreator(header *types.Header) (types.Address, error)
 	PreStateCommit(header *types.Header, txn *state.Transition) error
@@ -190,13 +216,36 @@ func NewBlockchain(
 
 	b.db = db
 
-	b.headersCache, _ = lru.New(100)
-	b.difficultyCache, _ = lru.New(100)
+	if err := b.initCaches(defaultCacheSize); err != nil {
+		return nil, err
+	}
 
 	// Push the initial event to the stream
 	b.stream.push(&Event{})
 
 	return b, nil
+}
+
+// initCaches initializes the blockchain caches with the specified size
+func (b *Blockchain) initCaches(size int) error {
+	var err error
+
+	b.headersCache, err = lru.New(size)
+	if err != nil {
+		return fmt.Errorf("unable to create headers cache, %w", err)
+	}
+
+	b.difficultyCache, err = lru.New(size)
+	if err != nil {
+		return fmt.Errorf("unable to create difficulty cache, %w", err)
+	}
+
+	b.receiptsCache, err = lru.New(size)
+	if err != nil {
+		return fmt.Errorf("unable to create receipts cache, %w", err)
+	}
+
+	return nil
 }
 
 // ComputeGenesis computes the genesis hash, and updates the blockchain reference
@@ -608,13 +657,209 @@ func (b *Blockchain) WriteHeadersWithBodies(headers []*types.Header) error {
 	return nil
 }
 
-// WriteBlock writes a single block
-func (b *Blockchain) WriteBlock(block *types.Block) error {
-	// Check the param
-	if block == nil {
-		return fmt.Errorf("the passed in block is empty")
+// VerifyPotentialBlock does the minimal block verification without consulting the
+// consensus layer. Should only be used if consensus checks are done
+// outside the method call
+func (b *Blockchain) VerifyPotentialBlock(block *types.Block) error {
+	// Do just the initial block verification
+	return b.verifyBlock(block)
+}
+
+// VerifyFinalizedBlock verifies that the block is valid by performing a series of checks.
+// It is assumed that the block status is sealed (committed)
+func (b *Blockchain) VerifyFinalizedBlock(block *types.Block) error {
+	// Make sure the consensus layer verifies this block header
+	if err := b.consensus.VerifyHeader(block.Header); err != nil {
+		return fmt.Errorf("failed to verify the header: %w", err)
 	}
 
+	// Do the initial block verification
+	if err := b.verifyBlock(block); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// verifyBlock does the base (common) block verification steps by
+// verifying the block body as well as the parent information
+func (b *Blockchain) verifyBlock(block *types.Block) error {
+	// Make sure the block is present
+	if block == nil {
+		return ErrNoBlock
+	}
+
+	// Make sure the block is in line with the parent block
+	if err := b.verifyBlockParent(block); err != nil {
+		return err
+	}
+
+	// Make sure the block body data is valid
+	if err := b.verifyBlockBody(block); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// verifyBlockParent makes sure that the child block is in line
+// with the locally saved parent block. This means checking:
+// - The parent exists
+// - The hashes match up
+// - The block numbers match up
+// - The block gas limit / used matches up
+func (b *Blockchain) verifyBlockParent(childBlock *types.Block) error {
+	// Grab the parent block
+	parentHash := childBlock.ParentHash()
+	parent, ok := b.readHeader(parentHash)
+
+	if !ok {
+		b.logger.Error(fmt.Sprintf(
+			"parent of %s (%d) not found: %s",
+			childBlock.Hash().String(),
+			childBlock.Number(),
+			parentHash,
+		))
+
+		return ErrParentNotFound
+	}
+
+	// Make sure the hash is valid
+	if parent.Hash == types.ZeroHash {
+		return ErrInvalidParentHash
+	}
+
+	// Make sure the hashes match up
+	if parentHash != parent.Hash {
+		return ErrParentHashMismatch
+	}
+
+	// Make sure the block numbers are correct
+	if childBlock.Number()-1 != parent.Number {
+		b.logger.Error(fmt.Sprintf(
+			"number sequence not correct at %d and %d",
+			childBlock.Number(),
+			parent.Number,
+		))
+
+		return ErrInvalidBlockSequence
+	}
+
+	// Make sure the gas limit is within correct bounds
+	if gasLimitErr := b.verifyGasLimit(childBlock.Header, parent); gasLimitErr != nil {
+		return fmt.Errorf("invalid gas limit, %w", gasLimitErr)
+	}
+
+	return nil
+}
+
+// verifyBlockBody verifies that the block body is valid. This means checking:
+// - The trie roots match up (state, transactions, receipts, uncles)
+// - The receipts match up
+// - The execution result matches up
+func (b *Blockchain) verifyBlockBody(block *types.Block) error {
+	// Make sure the Uncles root matches up
+	if hash := buildroot.CalculateUncleRoot(block.Uncles); hash != block.Header.Sha3Uncles {
+		b.logger.Error(fmt.Sprintf(
+			"uncle root hash mismatch: have %s, want %s",
+			hash,
+			block.Header.Sha3Uncles,
+		))
+
+		return ErrInvalidSha3Uncles
+	}
+
+	// Make sure the transactions root matches up
+	if hash := buildroot.CalculateTransactionsRoot(block.Transactions); hash != block.Header.TxRoot {
+		b.logger.Error(fmt.Sprintf(
+			"transaction root hash mismatch: have %s, want %s",
+			hash,
+			block.Header.TxRoot,
+		))
+
+		return ErrInvalidTxRoot
+	}
+
+	// Execute the transactions in the block and grab the result
+	blockResult, executeErr := b.executeBlockTransactions(block)
+	if executeErr != nil {
+		return fmt.Errorf("unable to execute block transactions, %w", executeErr)
+	}
+
+	// Verify the local execution result with the proposed block data
+	if err := blockResult.verifyBlockResult(block); err != nil {
+		return fmt.Errorf("unable to verify block execution result, %w", err)
+	}
+
+	return nil
+}
+
+// verifyBlockResult verifies that the block transaction execution result
+// matches up to the expected values
+func (br *BlockResult) verifyBlockResult(referenceBlock *types.Block) error {
+	// Make sure the number of receipts matches the number of transactions
+	if len(br.Receipts) != len(referenceBlock.Transactions) {
+		return ErrInvalidReceiptsSize
+	}
+
+	// Make sure the world state root matches up
+	if br.Root != referenceBlock.Header.StateRoot {
+		return ErrInvalidStateRoot
+	}
+
+	// Make sure the gas used is valid
+	if br.TotalGas != referenceBlock.Header.GasUsed {
+		return ErrInvalidGasUsed
+	}
+
+	// Make sure the receipts root matches up
+	receiptsRoot := buildroot.CalculateReceiptsRoot(br.Receipts)
+	if receiptsRoot != referenceBlock.Header.ReceiptsRoot {
+		return ErrInvalidReceiptsRoot
+	}
+
+	return nil
+}
+
+// executeBlockTransactions executes the transactions in the block locally,
+// and reports back the block execution result
+func (b *Blockchain) executeBlockTransactions(block *types.Block) (*BlockResult, error) {
+	header := block.Header
+
+	parent, ok := b.readHeader(header.ParentHash)
+	if !ok {
+		return nil, ErrParentNotFound
+	}
+
+	blockCreator, err := b.consensus.GetBlockCreator(header)
+	if err != nil {
+		return nil, err
+	}
+
+	txn, err := b.executor.ProcessBlock(parent.StateRoot, block, blockCreator)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := b.consensus.PreStateCommit(header, txn); err != nil {
+		return nil, err
+	}
+
+	_, root := txn.Commit()
+
+	// Append the receipts to the receipts cache
+	b.receiptsCache.Add(header.Hash, txn.Receipts())
+
+	return &BlockResult{
+		Root:     root,
+		Receipts: txn.Receipts(),
+		TotalGas: txn.TotalGas(),
+	}, nil
+}
+
+// WriteBlock writes a single block to the local blockchain.
+// It doesn't do any kind of verification, only commits the block to the DB
+func (b *Blockchain) WriteBlock(block *types.Block) error {
 	// Log the information
 	b.logger.Info(
 		"write block",
@@ -624,65 +869,7 @@ func (b *Blockchain) WriteBlock(block *types.Block) error {
 		block.ParentHash(),
 	)
 
-	parent, ok := b.readHeader(block.ParentHash())
-	if !ok {
-		return fmt.Errorf(
-			"parent of %s (%d) not found: %s",
-			block.Hash().String(),
-			block.Number(),
-			block.ParentHash(),
-		)
-	}
-
-	if parent.Hash == types.ZeroHash {
-		return fmt.Errorf("parent not found")
-	}
-
-	// Validate the chain
-	// Check the parent numbers
-	if block.Number()-1 != parent.Number {
-		return fmt.Errorf(
-			"number sequence not correct at %d and %d",
-			block.Number(),
-			parent.Number,
-		)
-	}
-
-	// Check the parent hash
-	if block.ParentHash() != parent.Hash {
-		return fmt.Errorf("parent hash not correct")
-	}
-
-	// Verify the header
-	if err := b.consensus.VerifyHeader(parent, block.Header); err != nil {
-		return fmt.Errorf("failed to verify the header: %w", err)
-	}
-
-	// Verify body data
-	if hash := buildroot.CalculateUncleRoot(block.Uncles); hash != block.Header.Sha3Uncles {
-		return fmt.Errorf(
-			"uncle root hash mismatch: have %s, want %s",
-			hash,
-			block.Header.Sha3Uncles,
-		)
-	}
-
-	if hash := buildroot.CalculateTransactionsRoot(block.Transactions); hash != block.Header.TxRoot {
-		return fmt.Errorf(
-			"transaction root hash mismatch: have %s, want %s",
-			hash,
-			block.Header.TxRoot,
-		)
-	}
-
-	// Checks are passed, write the chain
 	header := block.Header
-
-	// Process and validate the block
-	res, err := b.processBlock(block)
-	if err != nil {
-		return err
-	}
 
 	if err := b.writeBody(block); err != nil {
 		return err
@@ -694,10 +881,16 @@ func (b *Blockchain) WriteBlock(block *types.Block) error {
 		return err
 	}
 
+	// Fetch the block receipts
+	blockReceipts, receiptsErr := b.extractBlockReceipts(block)
+	if receiptsErr != nil {
+		return receiptsErr
+	}
+
 	// write the receipts, do it only after the header has been written.
-	// Otherwise, a client might ask for a header once the receipt is valid
+	// Otherwise, a client might ask for a header once the receipt is valid,
 	// but before it is written into the storage
-	if err := b.db.WriteReceipts(block.Hash(), res.Receipts); err != nil {
+	if err := b.db.WriteReceipts(block.Hash(), blockReceipts); err != nil {
 		return err
 	}
 
@@ -725,6 +918,29 @@ func (b *Blockchain) WriteBlock(block *types.Block) error {
 	b.logger.Info("new block", logArgs...)
 
 	return nil
+}
+
+// extractBlockReceipts extracts the receipts from the passed in block
+func (b *Blockchain) extractBlockReceipts(block *types.Block) ([]*types.Receipt, error) {
+	// Check the cache for the block receipts
+	receipts, ok := b.receiptsCache.Get(block.Header.Hash)
+	if !ok {
+		// No receipts found in the cache, execute the transactions from the block
+		// and fetch them
+		blockResult, err := b.executeBlockTransactions(block)
+		if err != nil {
+			return nil, err
+		}
+
+		return blockResult.Receipts, nil
+	}
+
+	extractedReceipts, ok := receipts.([]*types.Receipt)
+	if !ok {
+		return nil, errors.New("invalid type assertion for receipts")
+	}
+
+	return extractedReceipts, nil
 }
 
 // updateGasPriceAvgWithBlock extracts the gas price information from the
@@ -771,65 +987,8 @@ func (b *Blockchain) ReadTxLookup(hash types.Hash) (types.Hash, bool) {
 	return v, ok
 }
 
-// processBlock Processes the block, and does validation
-func (b *Blockchain) processBlock(block *types.Block) (*BlockResult, error) {
-	header := block.Header
-
-	// Process the block
-	parent, ok := b.readHeader(header.ParentHash)
-	if !ok {
-		return nil, fmt.Errorf("unknown ancestor")
-	}
-
-	blockCreator, err := b.consensus.GetBlockCreator(header)
-	if err != nil {
-		return nil, err
-	}
-
-	txn, err := b.executor.ProcessBlock(parent.StateRoot, block, blockCreator)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := b.consensus.PreStateCommit(header, txn); err != nil {
-		return nil, err
-	}
-
-	_, root := txn.Commit()
-	receipts := txn.Receipts()
-	totalGas := txn.TotalGas()
-
-	if len(receipts) != len(block.Transactions) {
-		return nil, fmt.Errorf("bad size of receipts and transactions")
-	}
-
-	// Validate the fields
-	if root != header.StateRoot {
-		return nil, fmt.Errorf("invalid merkle root")
-	}
-
-	if totalGas != header.GasUsed {
-		return nil, fmt.Errorf("gas used is different")
-	}
-
-	receiptSha := buildroot.CalculateReceiptsRoot(receipts)
-	if receiptSha != header.ReceiptsRoot {
-		return nil, fmt.Errorf("invalid receipts root")
-	}
-
-	if gasLimitErr := b.verifyGasLimit(header); gasLimitErr != nil {
-		return nil, fmt.Errorf("invalid gas limit, %w", gasLimitErr)
-	}
-
-	return &BlockResult{
-		Root:     root,
-		Receipts: receipts,
-		TotalGas: totalGas,
-	}, nil
-}
-
 // verifyGasLimit is a helper function for validating a gas limit in a header
-func (b *Blockchain) verifyGasLimit(header *types.Header) error {
+func (b *Blockchain) verifyGasLimit(header *types.Header, parentHeader *types.Header) error {
 	if header.GasUsed > header.GasLimit {
 		return fmt.Errorf(
 			"block gas used exceeds gas limit, limit = %d, used=%d",
@@ -843,24 +1002,18 @@ func (b *Blockchain) verifyGasLimit(header *types.Header) error {
 		return nil
 	}
 
-	// Grab the parent block
-	parent, ok := b.GetHeaderByNumber(header.Number - 1)
-	if !ok {
-		return fmt.Errorf("parent of %d not found", header.Number)
-	}
-
 	// Find the absolute delta between the limits
-	diff := int64(parent.GasLimit) - int64(header.GasLimit)
+	diff := int64(parentHeader.GasLimit) - int64(header.GasLimit)
 	if diff < 0 {
 		diff *= -1
 	}
 
-	limit := parent.GasLimit / BlockGasTargetDivisor
+	limit := parentHeader.GasLimit / BlockGasTargetDivisor
 	if uint64(diff) > limit {
 		return fmt.Errorf(
 			"invalid gas limit, limit = %d, want %d +- %d",
 			header.GasLimit,
-			parent.GasLimit,
+			parentHeader.GasLimit,
 			limit-1,
 		)
 	}

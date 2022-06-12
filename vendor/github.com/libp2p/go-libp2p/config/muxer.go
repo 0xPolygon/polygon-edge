@@ -3,7 +3,7 @@ package config
 import (
 	"fmt"
 
-	msmux "github.com/libp2p/go-stream-muxer-multistream"
+	msmux "github.com/libp2p/go-libp2p/p2p/muxer/muxer-multistream"
 
 	"github.com/libp2p/go-libp2p-core/network"
 
