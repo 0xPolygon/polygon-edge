@@ -10,7 +10,7 @@ require (
 	github.com/golang/protobuf v1.5.2
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/websocket v1.5.0
-	github.com/hashicorp/go-hclog v1.2.0
+	github.com/hashicorp/go-hclog v1.2.1
 	github.com/hashicorp/go-immutable-radix v1.3.1
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/golang-lru v0.5.4
@@ -28,7 +28,7 @@ require (
 	github.com/prometheus/client_golang v1.12.2
 	github.com/ryanuber/columnize v2.1.2+incompatible
 	github.com/spf13/cobra v1.4.0
-	github.com/stretchr/testify v1.7.1
+	github.com/stretchr/testify v1.7.2
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
 	github.com/umbracle/fastrlp v0.0.0-20220527094140-59d5dd30e722
 	github.com/umbracle/go-eth-bn256 v0.0.0-20190607160430-b36caf4e0f6b
