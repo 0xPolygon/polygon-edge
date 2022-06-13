@@ -10,12 +10,12 @@ require (
 	github.com/golang/protobuf v1.5.2
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/websocket v1.5.0
-	github.com/hashicorp/go-hclog v1.2.0
+	github.com/hashicorp/go-hclog v1.2.1
 	github.com/hashicorp/go-immutable-radix v1.3.1
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/hashicorp/hcl v1.0.0
-	github.com/hashicorp/vault/api v1.6.0
+	github.com/hashicorp/vault/api v1.7.2
 	github.com/libp2p/go-libp2p v0.20.0
 	github.com/libp2p/go-libp2p-core v0.16.1
 	github.com/libp2p/go-libp2p-kbucket v0.4.7
@@ -28,7 +28,7 @@ require (
 	github.com/prometheus/client_golang v1.12.2
 	github.com/ryanuber/columnize v2.1.2+incompatible
 	github.com/spf13/cobra v1.4.0
-	github.com/stretchr/testify v1.7.1
+	github.com/stretchr/testify v1.7.2
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
 	github.com/umbracle/fastrlp v0.0.0-20220527094140-59d5dd30e722
 	github.com/umbracle/go-eth-bn256 v0.0.0-20190607160430-b36caf4e0f6b
@@ -41,7 +41,7 @@ require (
 require (
 	cloud.google.com/go/secretmanager v1.4.0
 	github.com/armon/go-metrics v0.4.0 // indirect
-	github.com/aws/aws-sdk-go v1.44.25
+	github.com/aws/aws-sdk-go v1.44.32
 	github.com/benbjohnson/clock v1.3.0 // indirect
 	github.com/fatih/color v1.13.0 // indirect
 	github.com/fsnotify/fsnotify v1.5.4 // indirect
@@ -93,12 +93,12 @@ require (
 	github.com/hashicorp/go-retryablehttp v0.7.1 // indirect
 	github.com/hashicorp/go-rootcerts v1.0.2 // indirect
 	github.com/hashicorp/go-secure-stdlib/mlock v0.1.2 // indirect
-	github.com/hashicorp/go-secure-stdlib/parseutil v0.1.5 // indirect
+	github.com/hashicorp/go-secure-stdlib/parseutil v0.1.6 // indirect
 	github.com/hashicorp/go-secure-stdlib/strutil v0.1.2 // indirect
 	github.com/hashicorp/go-sockaddr v1.0.2 // indirect
 	github.com/hashicorp/go-uuid v1.0.3 // indirect
 	github.com/hashicorp/go-version v1.5.0 // indirect
-	github.com/hashicorp/vault/sdk v0.5.0 // indirect
+	github.com/hashicorp/vault/sdk v0.5.1 // indirect
 	github.com/hashicorp/yamux v0.0.0-20211028200310-0bc27b27de87 // indirect
 	github.com/huin/goupnp v1.0.3 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
