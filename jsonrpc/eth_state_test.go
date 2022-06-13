@@ -706,18 +706,6 @@ func TestEth_EstimateGas_GasLimit(t *testing.T) {
 	}
 }
 
-// When price-limit flag is set, its value should be the minimum gas estimate
-func TestEth_EstimateGas_PriceLimitSet(t *testing.T) {
-	priceLimit := uint64(50354)
-	eth := newTestEthEndpointWithPriceLimit(getExampleStore(), priceLimit)
-
-	gasEst, err := eth.EstimateGas(constructMockTx(nil, nil), nil)
-	assert.NoError(t, err)
-	assert.NotNil(t, gasEst)
-
-	assert.Equal(t, hex.EncodeUint64(priceLimit), gasEst)
-}
-
 func TestEth_EstimateGas_Reverts(t *testing.T) {
 	// Example revert data that has the string "revert reason" as the revert reason
 	exampleReturnData := "08c379a000000000000000000000000000000000000000000000000000000000000000" +

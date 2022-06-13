@@ -508,11 +508,6 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 		standardGas = state.TxGas
 	}
 
-	// take into account --price-limit flag and set it as minimum gas price
-	if e.priceLimit > standardGas {
-		standardGas = e.priceLimit
-	}
-
 	var (
 		lowEnd  = standardGas
 		highEnd uint64
