@@ -303,7 +303,7 @@ func (k *KmsSecretManager) SignBySecretOnce(key string, chainId int, data []byte
 	v := int64(signResp.Data.V)
 	bigV := big.NewInt(v)
 
-	mulOperand := big.NewInt(0).Mul(big.NewInt(int64(37)), big.NewInt(2))
+	mulOperand := big.NewInt(0).Mul(big.NewInt(int64(chainId)), big.NewInt(2))
 	bigV.Sub(bigV, mulOperand)
 	big35 := big.NewInt(35)
 	bigV.Sub(bigV, big35)
