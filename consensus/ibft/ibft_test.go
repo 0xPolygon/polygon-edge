@@ -1,6 +1,7 @@
 package ibft
 
 import (
+	"crypto/ecdsa"
 	"errors"
 	"fmt"
 	"testing"
@@ -19,6 +20,203 @@ import (
 	"github.com/stretchr/testify/assert"
 	anypb "google.golang.org/protobuf/types/known/anypb"
 )
+
+var (
+	defaultBlockGasLimit uint64 = 8000000
+)
+
+type MockBlockchain struct {
+	t *testing.T
+
+	latestBlockNumber *uint64
+	headers           map[uint64]*types.Header
+	blocks            map[uint64]*types.Block
+
+	// Handlers to change mock's behavior
+	HeaderHandler               func() *types.Header
+	GetHeaderByNumberHandler    func(uint64) (*types.Header, bool)
+	WriteBlockHandler           func(*types.Block) error
+	VerifyPotentialBlockHandler func(block *types.Block) error
+	CalculateGasLimitHandler    func(number uint64) (uint64, error)
+}
+
+func (m *MockBlockchain) Header() *types.Header {
+	m.t.Helper()
+
+	if m.HeaderHandler == nil {
+		m.errorByUndefinedMethod("Header")
+	}
+
+	return m.HeaderHandler()
+}
+
+func (m *MockBlockchain) GetHeaderByNumber(i uint64) (*types.Header, bool) {
+	m.t.Helper()
+
+	if m.GetHeaderByNumberHandler == nil {
+		m.errorByUndefinedMethod("GetHeaderByNumber")
+	}
+
+	return m.GetHeaderByNumberHandler(i)
+}
+
+func (m *MockBlockchain) WriteBlock(block *types.Block) error {
+	m.t.Helper()
+
+	if m.WriteBlockHandler == nil {
+		m.errorByUndefinedMethod("WriteBlock")
+	}
+
+	return m.WriteBlockHandler(block)
+}
+
+func (m *MockBlockchain) VerifyPotentialBlock(block *types.Block) error {
+	m.t.Helper()
+
+	if m.VerifyPotentialBlockHandler == nil {
+		m.errorByUndefinedMethod("VerifyPotentialBlock")
+	}
+
+	return m.VerifyPotentialBlockHandler(block)
+}
+
+func (m *MockBlockchain) CalculateGasLimit(number uint64) (uint64, error) {
+	m.t.Helper()
+
+	if m.CalculateGasLimitHandler == nil {
+		m.errorByUndefinedMethod("CalculateGasLimit")
+	}
+
+	return m.CalculateGasLimitHandler(number)
+}
+
+// helper method
+func (m *MockBlockchain) SetGenesis(validators []types.Address) *types.Block {
+	m.t.Helper()
+
+	header := &types.Header{
+		Number:     0,
+		Difficulty: 0,
+		ParentHash: types.ZeroHash,
+		MixHash:    IstanbulDigest,
+		Sha3Uncles: types.EmptyUncleHash,
+		GasLimit:   defaultBlockGasLimit,
+	}
+
+	putIbftExtraValidators(header, validators)
+
+	header = header.ComputeHash()
+
+	block := &types.Block{
+		Header: header,
+	}
+
+	if err := m.writeBlock(block); err != nil {
+		m.t.Errorf("failed to insert genesis block: %v", err)
+	}
+
+	return block
+}
+
+func (m *MockBlockchain) MockBlock(
+	height uint64,
+	parentHash types.Hash,
+	proposer *ecdsa.PrivateKey,
+	validators []types.Address,
+) *types.Block {
+	m.t.Helper()
+
+	var err error
+
+	gasLimit, _ := m.CalculateGasLimit(height - 1)
+
+	header := &types.Header{
+		Number:     height,
+		Difficulty: height,
+		ParentHash: parentHash,
+		MixHash:    IstanbulDigest,
+		Sha3Uncles: types.EmptyUncleHash,
+		GasLimit:   gasLimit,
+	}
+
+	putIbftExtraValidators(header, validators)
+
+	header = header.ComputeHash()
+
+	header, err = writeSeal(proposer, header)
+	if err != nil {
+		m.t.Errorf("failed to write seal in DummyBlock: %v", err)
+	}
+
+	return &types.Block{
+		Header: header,
+	}
+}
+
+func (m *MockBlockchain) errorByUndefinedMethod(methodName string) {
+	m.t.Helper()
+	m.t.Errorf("%s method is not defined in MockBlockchain", methodName)
+}
+
+// default behaviors
+func (m *MockBlockchain) header() *types.Header {
+	if m.latestBlockNumber == nil {
+		return nil
+	}
+
+	return m.headers[*m.latestBlockNumber]
+}
+
+func (m *MockBlockchain) getHeaderByNumber(i uint64) (*types.Header, bool) {
+	header, ok := m.headers[i]
+
+	return header, ok
+}
+
+func (m *MockBlockchain) writeBlock(block *types.Block) error {
+	number := block.Number()
+	m.blocks[number] = block
+
+	if _, ok := m.headers[number]; !ok {
+		m.headers[number] = block.Header
+
+		if m.latestBlockNumber == nil || *m.latestBlockNumber < number {
+			m.latestBlockNumber = &number
+		}
+	}
+
+	return nil
+}
+
+func (m *MockBlockchain) verifyPotentialBlock(block *types.Block) error {
+	return nil
+}
+
+func (m *MockBlockchain) calculateGasLimit(number uint64) (uint64, error) {
+	return defaultBlockGasLimit, nil
+}
+
+// interface check
+var _ blockchainInterface = (*MockBlockchain)(nil)
+
+func NewMockBlockchain(t *testing.T) *MockBlockchain {
+	t.Helper()
+
+	m := &MockBlockchain{
+		t:                 t,
+		latestBlockNumber: nil,
+		headers:           make(map[uint64]*types.Header),
+		blocks:            make(map[uint64]*types.Block),
+	}
+
+	m.HeaderHandler = m.header
+	m.GetHeaderByNumberHandler = m.getHeaderByNumber
+	m.WriteBlockHandler = m.writeBlock
+	m.VerifyPotentialBlockHandler = m.verifyPotentialBlock
+	m.CalculateGasLimitHandler = m.calculateGasLimit
+
+	return m
+}
 
 func TestTransition_ValidateState_Prepare(t *testing.T) {
 	t.Skip()
@@ -275,7 +473,7 @@ func TestTransition_AcceptState_Validator_LockWrong(t *testing.T) {
 		sequence: 1,
 		state:    RoundChangeState,
 		locked:   true,
-		err:      errIncorrectBlockLocked,
+		err:      errIncorrectBlockHeight,
 	})
 }
 
@@ -308,6 +506,59 @@ func TestTransition_AcceptState_Validator_LockCorrect(t *testing.T) {
 		state:    ValidateState,
 		locked:   true,
 		outgoing: 1, // prepare message
+	})
+}
+
+// Test whether a validator rejects the proposed block with the wrong height
+func TestTransition_AcceptState_Reject_WrongHeight_Block(t *testing.T) {
+	pool := newTesterAccountPool()
+	pool.add("A", "B", "C", "D")
+
+	blockchain := NewMockBlockchain(t)
+	blockchain.SetGenesis(pool.ValidatorSet())
+
+	i := newMockIBFTWithMockBlockchain(t, pool, blockchain, "A")
+
+	// Initialize IBFT state
+	var (
+		// The next sequence validator enters
+		nextSequence uint64 = 2
+
+		// The height in the next proposed block. This height doesn't match the sequence
+		proposeBlockHeight uint64 = 3
+
+		// The latest block in the chain
+		latestBlock = blockchain.MockBlock(nextSequence-1, types.ZeroHash, pool.get("B").priv, pool.ValidatorSet())
+
+		// The next proposed block in the network
+		proposedBlock = blockchain.MockBlock(proposeBlockHeight, types.ZeroHash, pool.get("C").priv, pool.ValidatorSet())
+	)
+
+	i.state.view = proto.ViewMsg(nextSequence, 0)
+	i.setState(AcceptState)
+
+	blockchain.HeaderHandler = func() *types.Header {
+		return latestBlock.Header
+	}
+
+	i.emitMsg(&proto.MessageReq{
+		From: "C",
+		Type: proto.MessageReq_Preprepare,
+		Proposal: &anypb.Any{
+			Value: proposedBlock.MarshalRLP(),
+		},
+		// Proposer propose block #3 but set sequence 2 in View in order to pass message queue in other validators
+		View: proto.ViewMsg(nextSequence, 0),
+	})
+
+	i.runCycle()
+
+	i.expect(expectResult{
+		sequence: nextSequence,
+		state:    RoundChangeState,
+		locked:   false,
+		outgoing: 0,
+		err:      errIncorrectBlockHeight,
 	})
 }
 
@@ -668,11 +919,58 @@ func TestRunSyncState_BulkSyncWithPeer_CallsTxPoolResetWithHeaders(t *testing.T)
 	)
 }
 
+// Tests whether validator unlock block if it syncs blocks during sync process
+func TestRunSyncState_Unlock_After_Sync(t *testing.T) {
+	pool := newTesterAccountPool()
+	pool.add("A", "B", "C", "D")
+
+	blockchain := NewMockBlockchain(t)
+	blockchain.SetGenesis(pool.ValidatorSet())
+
+	m := newMockIBFTWithMockBlockchain(t, pool, blockchain, "A")
+	m.sealing = true
+	m.setState(SyncState)
+
+	// Locking block #1
+	m.state.locked = true
+
+	// Sync blocks to #3
+	expectedNewBlocksToSync := []*types.Block{
+		{Header: &types.Header{Number: 1}},
+		{Header: &types.Header{Number: 2}},
+		{Header: &types.Header{Number: 3}},
+	}
+
+	m.syncer = &mockSyncer{
+		bulkSyncBlocksFromPeer: expectedNewBlocksToSync,
+		blockchain:             blockchain,
+	}
+	m.txpool = &mockTxPool{}
+
+	// we need to change state from Sync in order to break from the loop inside runSyncState
+	stateChangeDelay := time.After(100 * time.Millisecond)
+
+	go func() {
+		<-stateChangeDelay
+		m.setState(AcceptState)
+	}()
+
+	m.runSyncState()
+
+	// Validator should start new sequence from the next of the latest block and unlock block in state
+	m.expect(expectResult{
+		sequence: 4,
+		state:    AcceptState,
+		locked:   false,
+	})
+}
+
 type mockSyncer struct {
 	bulkSyncBlocksFromPeer  []*types.Block
 	receivedNewHeadFromPeer *types.Block
 	broadcastedBlock        *types.Block
 	broadcastCalled         bool
+	blockchain              blockchainInterface
 }
 
 func (s *mockSyncer) Start() {}
@@ -683,6 +981,12 @@ func (s *mockSyncer) BestPeer() *protocol.SyncPeer {
 
 func (s *mockSyncer) BulkSyncWithPeer(p *protocol.SyncPeer, handler func(block *types.Block)) error {
 	for _, block := range s.bulkSyncBlocksFromPeer {
+		if s.blockchain != nil {
+			if err := s.blockchain.WriteBlock(block); err != nil {
+				return err
+			}
+		}
+
 		handler(block)
 	}
 
@@ -695,6 +999,12 @@ func (s *mockSyncer) WatchSyncWithPeer(
 	blockTimeout time.Duration,
 ) {
 	if s.receivedNewHeadFromPeer != nil {
+		if s.blockchain != nil {
+			if err := s.blockchain.WriteBlock(s.receivedNewHeadFromPeer); err != nil {
+				return
+			}
+		}
+
 		newBlockHandler(s.receivedNewHeadFromPeer)
 	}
 }
@@ -799,7 +1109,7 @@ type mockIbft struct {
 	t *testing.T
 	*Ibft
 
-	blockchain *blockchain.Blockchain
+	blockchain blockchainInterface
 	pool       *testerAccountPool
 	respMsg    []*proto.MessageReq
 }
@@ -925,6 +1235,64 @@ func newMockIbft(t *testing.T, accounts []string, account string) *mockIbft {
 	return m
 }
 
+func newMockIBFTWithMockBlockchain(
+	t *testing.T,
+	pool *testerAccountPool,
+	mockBlockchain *MockBlockchain,
+	account string,
+) *mockIbft {
+	t.Helper()
+
+	m := &mockIbft{
+		t:          t,
+		pool:       pool,
+		blockchain: mockBlockchain,
+		respMsg:    []*proto.MessageReq{},
+	}
+
+	var addr *testerAccount
+
+	if account == "" {
+		// account not in validator set, create a new one that is not part
+		// of the genesis
+		pool.add("xx")
+		addr = pool.get("xx")
+	} else {
+		addr = pool.get(account)
+	}
+
+	ibft := &Ibft{
+		logger:           hclog.NewNullLogger(),
+		config:           &consensus.Config{},
+		blockchain:       m,
+		validatorKey:     addr.priv,
+		validatorKeyAddr: addr.Address(),
+		closeCh:          make(chan struct{}),
+		updateCh:         make(chan struct{}),
+		operator:         &operator{},
+		state:            newState(),
+		epochSize:        DefaultEpochSize,
+		metrics:          consensus.NilMetrics(),
+	}
+
+	initIbftMechanism(PoA, ibft)
+
+	// by default set the state to (1, 0)
+	ibft.state.view = proto.ViewMsg(1, 0)
+
+	m.Ibft = ibft
+
+	assert.NoError(t, ibft.setupSnapshot())
+	assert.NoError(t, ibft.createKey())
+
+	// set the initial validators frrom the snapshot
+	ibft.state.validators = pool.ValidatorSet()
+
+	m.Ibft.transport = m
+
+	return m
+}
+
 type expectResult struct {
 	state    IbftState
 	sequence uint64
@@ -942,35 +1310,35 @@ type expectResult struct {
 
 func (m *mockIbft) expect(res expectResult) {
 	if sequence := m.state.view.Sequence; sequence != res.sequence {
-		m.t.Fatalf("incorrect sequence %d %d", sequence, res.sequence)
+		m.t.Fatalf("incorrect sequence got=%d expected=%d", sequence, res.sequence)
 	}
 
 	if round := m.state.view.Round; round != res.round {
-		m.t.Fatalf("incorrect round %d %d", round, res.round)
+		m.t.Fatalf("incorrect round got=%d expected=%d", round, res.round)
 	}
 
 	if m.getState() != res.state {
-		m.t.Fatalf("incorrect state %s %s", m.getState(), res.state)
+		m.t.Fatalf("incorrect state got=%s expected=%s", m.getState(), res.state)
 	}
 
 	if size := len(m.state.prepared); uint64(size) != res.prepareMsgs {
-		m.t.Fatalf("incorrect prepared messages %d %d", size, res.prepareMsgs)
+		m.t.Fatalf("incorrect prepared messages got=%d expected=%d", size, res.prepareMsgs)
 	}
 
 	if size := len(m.state.committed); uint64(size) != res.commitMsgs {
-		m.t.Fatalf("incorrect commit messages %d %d", size, res.commitMsgs)
+		m.t.Fatalf("incorrect commit messages got=%d expected=%d", size, res.commitMsgs)
 	}
 
 	if m.state.locked != res.locked {
-		m.t.Fatalf("incorrect locked %v %v", m.state.locked, res.locked)
+		m.t.Fatalf("incorrect locked got=%v expected=%v", m.state.locked, res.locked)
 	}
 
 	if size := len(m.respMsg); uint64(size) != res.outgoing {
-		m.t.Fatalf("incorrect outgoing messages %v %v", size, res.outgoing)
+		m.t.Fatalf("incorrect outgoing messages got=%v expected=%v", size, res.outgoing)
 	}
 
 	if !errors.Is(m.state.err, res.err) {
-		m.t.Fatalf("incorrect error %v %v", m.state.err, res.err)
+		m.t.Fatalf("incorrect error got=%v expected=%v", m.state.err, res.err)
 	}
 }
 
