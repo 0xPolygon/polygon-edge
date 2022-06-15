@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package v1;
+
+option go_package = "/syncer/proto";
+
+import "google/protobuf/empty.proto";
+
+service Syncer {
+  rpc GetBlocks(GetBlocksRequest) returns (stream Block);
+  rpc GetBlock(GetBlockRequest) returns (Block);
+  rpc GetStatus(google.protobuf.Empty) returns (Status);
+  rpc NotifyStatus(Status) returns (google.protobuf.Empty);
+}
+
+message GetBlocksRequest {
+  // The beginning height
+  uint64 from = 1;
+}
+
+message GetBlockRequest {
+  // The beginning height
+  uint64 number = 1;
+}
+
+message Block {
+  // RLP Encoded Block Data
+  bytes block = 1;
+}
+
+message Status {
+  // Latest block height
+  uint64 number = 1;
+}

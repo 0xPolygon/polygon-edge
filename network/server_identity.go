@@ -1,6 +1,8 @@
 package network
 
 import (
+	"math/big"
+
 	"github.com/0xPolygon/polygon-edge/network/common"
 	peerEvent "github.com/0xPolygon/polygon-edge/network/event"
 	"github.com/0xPolygon/polygon-edge/network/grpc"
@@ -8,6 +10,8 @@ import (
 	"github.com/0xPolygon/polygon-edge/network/proto"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
+	kbucket "github.com/libp2p/go-libp2p-kbucket"
+	"github.com/libp2p/go-libp2p-kbucket/keyspace"
 	rawGrpc "google.golang.org/grpc"
 )
 
@@ -129,4 +133,11 @@ func (s *Server) registerIdentityService(identityService *identity.IdentityServi
 	grpcStream.Serve()
 
 	s.RegisterProtocol(common.IdentityProto, grpcStream)
+}
+
+func (s *Server) GetPeerDistance(peerID peer.ID) *big.Int {
+	nodeKey := keyspace.Key{Space: keyspace.XORKeySpace, Bytes: kbucket.ConvertPeerID(s.AddrInfo().ID)}
+	peerKey := keyspace.Key{Space: keyspace.XORKeySpace, Bytes: kbucket.ConvertPeerID(peerID)}
+
+	return nodeKey.Distance(peerKey)
 }

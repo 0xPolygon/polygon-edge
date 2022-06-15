@@ -18,6 +18,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/protocol"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/state"
+	"github.com/0xPolygon/polygon-edge/syncer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"google.golang.org/grpc"
@@ -52,15 +53,6 @@ type txPoolInterface interface {
 	ResetWithHeaders(headers ...*types.Header)
 }
 
-type syncerInterface interface {
-	Start()
-	BestPeer() *protocol.SyncPeer
-	BulkSyncWithPeer(p *protocol.SyncPeer, newBlockHandler func(block *types.Block)) error
-	WatchSyncWithPeer(p *protocol.SyncPeer, newBlockHandler func(b *types.Block) bool, blockTimeout time.Duration)
-	GetSyncProgression() *progress.Progression
-	Broadcast(b *types.Block)
-}
-
 // Ibft represents the IBFT consensus mechanism object
 type Ibft struct {
 	sealing bool // Flag indicating if the node is a sealer
@@ -86,7 +78,7 @@ type Ibft struct {
 	msgQueue *msgQueue     // Structure containing different message queues
 	updateCh chan struct{} // Update channel
 
-	syncer syncerInterface // Reference to the sync protocol
+	syncer syncer.Syncer // Reference to the sync protocol
 
 	network   *network.Server // Reference to the networking layer
 	transport transport       // Reference to the transport protocol
@@ -490,8 +482,7 @@ func (i *Ibft) runSyncState() {
 
 	for i.isState(SyncState) {
 		// try to sync with the best-suited peer
-		p := i.syncer.BestPeer()
-		if p == nil {
+		if !i.syncer.HasSyncPeer() {
 			// if we do not have any peers, and we have been a validator
 			// we can start now. In case we start on another fork this will be
 			// reverted later
@@ -536,7 +527,7 @@ func (i *Ibft) runSyncState() {
 			// The snapshot store is currently updated for PoA inside the ProcessHeadersHook
 			callInsertBlockHook(newBlock.Number())
 
-			i.syncer.Broadcast(newBlock)
+			i.syncer.UpdateLocalLatestBlock(newBlock)
 			i.txpool.ResetWithHeaders(newBlock.Header)
 			isValidator = i.isValidSnapshot()
 
@@ -1062,9 +1053,6 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 		"rounds", i.state.view.Round+1,
 		"committed", i.state.numCommitted(),
 	)
-
-	// broadcast the new block
-	i.syncer.Broadcast(block)
 
 	// after the block has been written we reset the txpool so that
 	// the old transactions are removed
