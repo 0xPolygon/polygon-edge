@@ -76,12 +76,12 @@ func NewSyncer(logger hclog.Logger, network Network, blockchain Blockchain) Sync
 		logger:     logger.Named(LoggerName),
 		network:    network,
 		blockchain: blockchain,
-		peerHeap:   newPeerHeap(),
 	}
 }
 
 func (s *syncer) Start() {
 	s.setupGRPCService()
+	s.setupPeers()
 }
 
 func (s *syncer) setupGRPCService() {
@@ -91,6 +91,10 @@ func (s *syncer) setupGRPCService() {
 	proto.RegisterSyncerServer(grpcStream.GrpcServer(), s.service)
 	grpcStream.Serve()
 	s.network.RegisterProtocol(SyncerProto, grpcStream)
+}
+
+func (s *syncer) setupPeers() {
+	s.peerHeap = newPeerHeap(nil)
 }
 
 func (s *syncer) updatePeerStatus(e *UpdatePeerStatusEvent) {
