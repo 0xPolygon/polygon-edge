@@ -1,33 +1,25 @@
-package syncer
+package peers
 
 import (
 	"container/heap"
 	"sync"
 )
 
-type PeerHeap interface {
-	Put(*Peer)
-	BestPeer() *Peer
-	Remove(id string)
-}
-
-type Peer struct {
+type Peer interface {
 	// identifier
-	ID string
-	// peer's latest block number
-	Number uint64
-	// peer's distance
-	Distance uint64
+	ID() string
+	// comparator
+	Less(Peer) bool
 }
 
-type peerHeap struct {
+type PeerHeap struct {
 	sync.RWMutex
-	peers     []*Peer
+	peers     []Peer
 	lookupMap map[string]int
 }
 
-func newPeerHeap(peers []*Peer) PeerHeap {
-	peerHeap := &peerHeap{
+func NewPeerHeap(peers []Peer) *PeerHeap {
+	peerHeap := &PeerHeap{
 		peers:     peers,
 		lookupMap: make(map[string]int, len(peers)),
 	}
@@ -35,7 +27,7 @@ func newPeerHeap(peers []*Peer) PeerHeap {
 	heap.Init(peerHeap)
 
 	for i, p := range peerHeap.peers {
-		peerHeap.lookupMap[p.ID] = i
+		peerHeap.lookupMap[p.ID()] = i
 	}
 
 	return peerHeap
@@ -44,11 +36,11 @@ func newPeerHeap(peers []*Peer) PeerHeap {
 // Put puts peer into heap
 // Case 1: Appends a peer if it doesn't exist
 // Case 2: Update peer info and reorder if it exists already
-func (h *peerHeap) Put(peer *Peer) {
+func (h *PeerHeap) Put(peer Peer) {
 	h.RWMutex.Lock()
 	defer h.RWMutex.Unlock()
 
-	index, ok := h.lookupMap[peer.ID]
+	index, ok := h.lookupMap[peer.ID()]
 	if ok {
 		// exists already
 		h.peers[index] = peer
@@ -59,7 +51,7 @@ func (h *peerHeap) Put(peer *Peer) {
 }
 
 // BestPeer returns the top of heap
-func (h *peerHeap) BestPeer() *Peer {
+func (h *PeerHeap) BestPeer() Peer {
 	h.RWMutex.RLock()
 	defer h.RWMutex.RUnlock()
 
@@ -67,7 +59,7 @@ func (h *peerHeap) BestPeer() *Peer {
 }
 
 // Remove removes a peer from heap if it exists
-func (h *peerHeap) Remove(id string) {
+func (h *PeerHeap) Remove(id string) {
 	h.RWMutex.Lock()
 	defer h.RWMutex.Unlock()
 
@@ -77,26 +69,20 @@ func (h *peerHeap) Remove(id string) {
 	}
 }
 
-func (h peerHeap) Len() int {
+func (h PeerHeap) Len() int {
 	return len(h.peers)
 }
 
 // Less compares the priorities of two items at the passed in indexes (A < B)
-func (h peerHeap) Less(i, j int) bool {
+func (h PeerHeap) Less(i, j int) bool {
 	pi, pj := h.peers[i], h.peers[j]
 
-	// sort by number
-	if pi.Number != pj.Number {
-		// reverse operator because go heap is min heap as default
-		return pi.Number > pj.Number
-	}
-
-	return pi.Distance < pj.Distance
+	return pi.Less(pj)
 }
 
 // Swap swaps the places of the items at the passed-in indexes
-func (m peerHeap) Swap(i, j int) {
-	iid, jid := m.peers[i].ID, m.peers[j].ID
+func (m PeerHeap) Swap(i, j int) {
+	iid, jid := m.peers[i].ID(), m.peers[j].ID()
 	m.lookupMap[iid] = j
 	m.lookupMap[jid] = i
 
@@ -104,25 +90,25 @@ func (m peerHeap) Swap(i, j int) {
 }
 
 // Push adds a new item to the queue
-func (m *peerHeap) Push(x interface{}) {
-	peer, ok := x.(*Peer)
+func (m *PeerHeap) Push(x interface{}) {
+	peer, ok := x.(Peer)
 	if !ok {
 		return
 	}
 
-	m.lookupMap[peer.ID] = len(m.peers)
+	m.lookupMap[peer.ID()] = len(m.peers)
 	m.peers = append(m.peers, peer)
 }
 
 // Pop removes an item from the queue
-func (m *peerHeap) Pop() interface{} {
+func (m *PeerHeap) Pop() interface{} {
 	old := m.peers
 	n := len(old)
 	item := old[n-1]
 	old[n-1] = nil
 	m.peers = old[0 : n-1]
 
-	delete(m.lookupMap, item.ID)
+	delete(m.lookupMap, item.ID())
 
 	return item
 }

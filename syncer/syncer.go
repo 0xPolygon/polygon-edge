@@ -3,18 +3,12 @@ package syncer
 import (
 	"context"
 	"fmt"
-	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
-	"github.com/0xPolygon/polygon-edge/network"
-	"github.com/0xPolygon/polygon-edge/network/event"
-	"github.com/0xPolygon/polygon-edge/network/grpc"
-	"github.com/0xPolygon/polygon-edge/syncer/proto"
+	"github.com/0xPolygon/polygon-edge/syncer/peers"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
-	libp2pNetwork "github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
 )
 
 const (
@@ -24,22 +18,10 @@ const (
 type Syncer interface {
 	Start()
 	GetSyncProgression() *progress.Progression
+	BestPeer() *peers.BestPeer
 	HasSyncPeer() bool
-	BulkSync(context.Context) error
-	WatchSync(context.Context) error
-}
-
-type Network interface {
-	// Register gRPC service
-	RegisterProtocol(string, network.Protocol)
-	// Get current connected peers
-	Peers() []*network.PeerConnInfo
-	// Subscribe peer added/removed events
-	SubscribeCh() (<-chan *event.PeerEvent, error)
-	// Get distance between node and peer
-	GetPeerDistance(peer.ID) *big.Int
-	//
-	NewStream(string, peer.ID) (libp2pNetwork.Stream, error)
+	BulkSync(context.Context, func(*types.Block)) error
+	WatchSync(context.Context, func(*types.Block) bool) error
 }
 
 type Blockchain interface {
@@ -47,8 +29,6 @@ type Blockchain interface {
 	SubscribeEvents() blockchain.Subscription
 	// Get latest header
 	Header() *types.Header
-	// Get block from chain
-	GetBlockByNumber(uint64, bool) (*types.Block, bool)
 	// Verify fetched block
 	VerifyFinalizedBlock(*types.Block) error
 	// Write block to chain
@@ -58,71 +38,89 @@ type Blockchain interface {
 type Progression interface {
 	StartProgression(startingBlock uint64, subscription blockchain.Subscription)
 	UpdateHighestProgression(highestBlock uint64)
-	StopProgression()
 	GetProgression() *progress.Progression
+	StopProgression()
 }
 
 type syncer struct {
-	logger      hclog.Logger
-	network     Network
-	blockchain  Blockchain
-	progression Progression
-	service     SyncerService
-	peerHeap    PeerHeap
+	logger          hclog.Logger
+	blockchain      Blockchain
+	syncProgression Progression
+	syncPeers       peers.SyncPeers
 }
 
-func NewSyncer(logger hclog.Logger, network Network, blockchain Blockchain) Syncer {
+func NewSyncer(
+	logger hclog.Logger,
+	blockchain Blockchain,
+	syncPeers peers.SyncPeers,
+) Syncer {
 	return &syncer{
-		logger:     logger.Named(LoggerName),
-		network:    network,
-		blockchain: blockchain,
+		logger:          logger.Named(LoggerName),
+		blockchain:      blockchain,
+		syncProgression: progress.NewProgressionWrapper(progress.ChainSyncBulk),
+		syncPeers:       syncPeers,
 	}
 }
 
 func (s *syncer) Start() {
-	s.setupGRPCService()
-	s.setupPeers()
-}
-
-func (s *syncer) setupGRPCService() {
-	s.service = NewSyncerService(s.blockchain, s.updatePeerStatus)
-
-	grpcStream := grpc.NewGrpcStream()
-	proto.RegisterSyncerServer(grpcStream.GrpcServer(), s.service)
-	grpcStream.Serve()
-	s.network.RegisterProtocol(SyncerProto, grpcStream)
-}
-
-func (s *syncer) setupPeers() {
-	s.peerHeap = newPeerHeap(nil)
-}
-
-func (s *syncer) updatePeerStatus(e *UpdatePeerStatusEvent) {
-	// TODO
+	s.syncPeers.Start()
 }
 
 func (s *syncer) GetSyncProgression() *progress.Progression {
-	// TODO
-	return nil
+	return s.syncProgression.GetProgression()
+}
+
+func (s *syncer) BestPeer() *peers.BestPeer {
+	return s.syncPeers.BestPeer()
 }
 
 // HasSyncPeer returns whether syncer has the peer to syncs blocks
 // return false if syncer has no peer whose latest block height doesn't exceed local height
 func (s *syncer) HasSyncPeer() bool {
-	// TODO
-	return false
+	return s.syncPeers.BestPeer() != nil
 }
 
-func (s *syncer) BulkSync(context.Context) error {
-	// pick one best peer
+func (s *syncer) BulkSync(ctx context.Context, newBlockCallback func(*types.Block)) error {
+	localLatest := uint64(0)
+	if header := s.blockchain.Header(); header != nil {
+		localLatest = header.Number
+	}
 
-	// open stream and subscribe blocks
-	// verify and write blocks
+	bestPeer := s.syncPeers.BestPeer()
+	if bestPeer == nil || bestPeer.Number <= localLatest {
+		return nil
+	}
+
+	blockCh, err := s.syncPeers.GetBlocks(ctx, bestPeer.ID, localLatest)
+	if err != nil {
+		return err
+	}
+
+	// Create a blockchain subscription for the sync progression and start tracking
+	s.syncProgression.StartProgression(localLatest, s.blockchain.SubscribeEvents())
+
+	// Stop monitoring the sync progression upon exit
+	defer s.syncProgression.StopProgression()
+
+	// Set the target height
+	s.syncProgression.UpdateHighestProgression(bestPeer.Number)
+
+	for block := range blockCh {
+		if err := s.blockchain.VerifyFinalizedBlock(block); err != nil {
+			return fmt.Errorf("unable to verify block, %w", err)
+		}
+
+		if err := s.blockchain.WriteBlock(block); err != nil {
+			return fmt.Errorf("failed to write block while bulk syncing: %w", err)
+		}
+
+		newBlockCallback(block)
+	}
 
 	return nil
 }
 
-func (s *syncer) WatchSync(ctx context.Context) error {
+func (s *syncer) WatchSync(ctx context.Context, callback func(*types.Block) bool) error {
 	// Loop until context is canceled
 	for {
 		// pick one best peer
@@ -140,15 +138,4 @@ func (s *syncer) WatchSync(ctx context.Context) error {
 			break
 		}
 	}
-}
-
-func (s *syncer) newSyncerClient(id peer.ID) (proto.SyncerClient, error) {
-	stream, err := s.network.NewStream(SyncerProto, id)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open a stream, err %w", err)
-	}
-
-	conn := grpc.WrapClient(stream)
-
-	return proto.NewSyncerClient(conn), nil
 }

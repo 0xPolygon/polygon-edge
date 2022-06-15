@@ -2,11 +2,11 @@ syntax = "proto3";
 
 package v1;
 
-option go_package = "/syncer/proto";
+option go_package = "/syncer/peers/nofork/proto";
 
 import "google/protobuf/empty.proto";
 
-service Syncer {
+service SyncPeer {
   rpc GetBlocks(GetBlocksRequest) returns (stream Block);
   rpc GetBlock(GetBlockRequest) returns (Block);
   rpc GetStatus(google.protobuf.Empty) returns (Status);
@@ -19,7 +19,7 @@ message GetBlocksRequest {
 }
 
 message GetBlockRequest {
-  // The beginning height
+  // The height
   uint64 number = 1;
 }
 
@@ -29,6 +29,9 @@ message Block {
 }
 
 message Status {
+  // Peer ID
+  string id = 1;
+
   // Latest block height
-  uint64 number = 1;
+  uint64 number = 2;
 }
