@@ -2,8 +2,10 @@ package syncer
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
@@ -21,12 +23,17 @@ const (
 	LoggerName = "syncer"
 )
 
+var (
+	ErrPopTimeout       = errors.New("timeout")
+	ErrNoPeersConnected = errors.New("no peers connected")
+)
+
 type Syncer interface {
 	Start()
 	GetSyncProgression() *progress.Progression
 	HasSyncPeer() bool
 	BulkSync(context.Context) error
-	WatchSync(context.Context) error
+	WatchSync(context.Context, func(*types.Block) bool, time.Duration) error
 }
 
 type Network interface {
@@ -63,25 +70,27 @@ type Progression interface {
 }
 
 type syncer struct {
-	logger      hclog.Logger
-	network     Network
-	blockchain  Blockchain
-	progression Progression
-	service     SyncerService
-	peerHeap    PeerHeap
+	logger       hclog.Logger
+	network      Network
+	blockchain   Blockchain
+	progression  Progression
+	service      SyncerService
+	peerHeap     PeerHeap
+	syncNewBlock chan struct{}
 }
 
 func NewSyncer(logger hclog.Logger, network Network, blockchain Blockchain) Syncer {
 	return &syncer{
-		logger:     logger.Named(LoggerName),
-		network:    network,
-		blockchain: blockchain,
-		peerHeap:   newPeerHeap(),
+		logger:       logger.Named(LoggerName),
+		network:      network,
+		blockchain:   blockchain,
+		syncNewBlock: make(chan struct{}),
 	}
 }
 
 func (s *syncer) Start() {
 	s.setupGRPCService()
+	s.setupPeers()
 }
 
 func (s *syncer) setupGRPCService() {
@@ -91,6 +100,10 @@ func (s *syncer) setupGRPCService() {
 	proto.RegisterSyncerServer(grpcStream.GrpcServer(), s.service)
 	grpcStream.Serve()
 	s.network.RegisterProtocol(SyncerProto, grpcStream)
+}
+
+func (s *syncer) setupPeers() {
+	s.peerHeap = newPeerHeap(nil)
 }
 
 func (s *syncer) updatePeerStatus(e *UpdatePeerStatusEvent) {
@@ -118,22 +131,52 @@ func (s *syncer) BulkSync(context.Context) error {
 	return nil
 }
 
-func (s *syncer) WatchSync(ctx context.Context) error {
-	// Loop until context is canceled
+func (s *syncer) WatchSync(ctx context.Context, callback func(*types.Block) bool, timeout time.Duration) error {
+	timeoutCh := time.After(timeout * 3)
+	localLatest := uint64(0)
+	isValidator := false
 	for {
-		// pick one best peer
-		// peer := s.peerHeap.BestPeer()
-
-		// fetch block from the peer
-
-		// verify the block
-
-		// write the block
-
+		//wait for a new block event
 		select {
-		case <-ctx.Done():
-			// context is canceled
-			break
+		case <-s.syncNewBlock:
+		case <-timeoutCh:
+			return ErrPopTimeout
+		}
+
+		if header := s.blockchain.Header(); header != nil {
+			localLatest = header.Number
+		}
+
+		// pick one best peer
+		bestPeer := s.peerHeap.BestPeer()
+		if bestPeer == nil || bestPeer.Number <= localLatest {
+			return ErrNoPeersConnected
+		}
+
+		// fetch blocks from the peer
+		// TODO sync with yoshiki not to have to write double logic
+		blocks := []*types.Block{}
+
+		// iterate over blocks
+		for _, block := range blocks {
+
+			// verify the block
+			if err := s.blockchain.VerifyFinalizedBlock(block); err != nil {
+				return fmt.Errorf("unable to verify block, %w", err)
+			}
+
+			// write the block
+			if err := s.blockchain.WriteBlock(block); err != nil {
+				return fmt.Errorf("failed to write block while bulk syncing: %w", err)
+			}
+
+			//check if node is validator
+			isValidator = callback(block)
+		}
+
+		//After syncing all blocks from your best peer, if a validator return from watchSync
+		if isValidator {
+			return nil
 		}
 	}
 }
