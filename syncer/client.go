@@ -82,6 +82,7 @@ func (m *syncPeerClient) GetConnectedPeerStatuses() []*NoForkPeer {
 
 	for _, p := range ps {
 		p := p
+
 		wg.Add(1)
 
 		go func() {
@@ -177,9 +178,11 @@ func (m *syncPeerClient) startNewBlockProcess() {
 			}
 
 			// Publish status
-			m.topic.Publish(&proto.Status{
+			if err := m.topic.Publish(&proto.Status{
 				Number: latest.Number,
-			})
+			}); err != nil {
+				m.logger.Warn("failed to publish status", "err", err)
+			}
 		}
 	}
 }

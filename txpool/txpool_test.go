@@ -353,7 +353,7 @@ func TestAddGossipTx(t *testing.T) {
 					Value: signedTx.MarshalRLP(),
 				},
 			}
-			pool.addGossipTx(protoTx)
+			pool.addGossipTx(protoTx, "")
 		}()
 		pool.handleEnqueueRequest(<-pool.enqueueReqCh)
 
@@ -382,7 +382,7 @@ func TestAddGossipTx(t *testing.T) {
 				Value: signedTx.MarshalRLP(),
 			},
 		}
-		pool.addGossipTx(protoTx)
+		pool.addGossipTx(protoTx, "")
 
 		assert.Equal(t, uint64(0), pool.accounts.get(sender).enqueued.length())
 	})

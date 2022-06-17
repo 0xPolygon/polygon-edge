@@ -20,7 +20,8 @@ var (
 	errTimeout = errors.New("timeout")
 )
 
-// XXX: Don't use this syncer for the consensus that may cause fork. This syncer doesn't assume fork. Consensus may be broken.
+// XXX: Don't use this syncer for the consensus that may cause fork.
+// This syncer doesn't assume fork. Consensus may be broken.
 // TODO: Add extensibility for fork before merge
 type syncer struct {
 	logger          hclog.Logger
@@ -51,12 +52,17 @@ func NewSyncer(
 	}
 }
 
-func (s *syncer) Start() {
-	s.syncPeerClient.Start()
+func (s *syncer) Start() error {
+	if err := s.syncPeerClient.Start(); err != nil {
+		return err
+	}
+
 	s.syncPeerService.Start()
 
 	go s.initializePeerMap()
 	go s.startPeerDisconnectEventProcess()
+
+	return nil
 }
 
 func (s *syncer) initializePeerMap() {

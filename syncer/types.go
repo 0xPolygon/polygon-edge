@@ -46,7 +46,7 @@ type Network interface {
 }
 
 type Syncer interface {
-	Start()
+	Start() error
 	GetSyncProgression() *progress.Progression
 	HasSyncPeer() bool
 	BulkSync(context.Context, func(*types.Block)) error

@@ -215,7 +215,9 @@ func (i *Ibft) Start() error {
 	}
 
 	// Start the syncer
-	i.syncer.Start()
+	if err := i.syncer.Start(); err != nil {
+		return err
+	}
 
 	// Start the actual IBFT protocol
 	go i.start()
