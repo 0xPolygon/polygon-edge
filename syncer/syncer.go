@@ -75,35 +75,46 @@ func (s *syncer) BulkSync(ctx context.Context, newBlockCallback func(*types.Bloc
 		localLatest = header.Number
 	}
 
-	bestPeer := s.peerHeap.BestPeer()
-	if bestPeer == nil || bestPeer.Number <= localLatest {
-		return nil
-	}
-
-	blockCh, err := s.syncPeerClient.GetBlocks(ctx, bestPeer.ID, localLatest)
-	if err != nil {
-		return err
-	}
-
 	// Create a blockchain subscription for the sync progression and start tracking
 	s.syncProgression.StartProgression(localLatest, s.blockchain.SubscribeEvents())
 
 	// Stop monitoring the sync progression upon exit
 	defer s.syncProgression.StopProgression()
 
-	// Set the target height
-	s.syncProgression.UpdateHighestProgression(bestPeer.Number)
-
-	for block := range blockCh {
-		if err := s.blockchain.VerifyFinalizedBlock(block); err != nil {
-			return fmt.Errorf("unable to verify block, %w", err)
+	for {
+		bestPeer := s.peerHeap.BestPeer()
+		if bestPeer == nil || bestPeer.Number <= localLatest {
+			break
 		}
 
-		if err := s.blockchain.WriteBlock(block); err != nil {
-			return fmt.Errorf("failed to write block while bulk syncing: %w", err)
+		blockCh, err := s.syncPeerClient.GetBlocks(ctx, bestPeer.ID, localLatest)
+		if err != nil {
+			return err
 		}
 
-		newBlockCallback(block)
+		// Set the target height
+		s.syncProgression.UpdateHighestProgression(bestPeer.Number)
+
+		var lastReceivedNumber uint64
+
+		for block := range blockCh {
+			if err := s.blockchain.VerifyFinalizedBlock(block); err != nil {
+				return fmt.Errorf("unable to verify block, %w", err)
+			}
+
+			if err := s.blockchain.WriteBlock(block); err != nil {
+				return fmt.Errorf("failed to write block while bulk syncing: %w", err)
+			}
+
+			newBlockCallback(block)
+
+			lastReceivedNumber = block.Number()
+		}
+
+		// when can fetch blocks to the latest, then return
+		if lastReceivedNumber >= bestPeer.Number {
+			break
+		}
 	}
 
 	return nil
