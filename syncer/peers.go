@@ -56,7 +56,7 @@ func (m *PeerMap) BestPeer(skipMap map[string]bool) *NoForkPeer {
 			return false
 		}
 
-		if skipMap != nil && skipMap[bestPeer.ID] {
+		if skipMap != nil && skipMap[peer.ID] {
 			return true
 		}
 

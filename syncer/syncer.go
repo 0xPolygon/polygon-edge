@@ -95,9 +95,14 @@ func (s *syncer) HasSyncPeer() bool {
 
 func (s *syncer) BulkSync(ctx context.Context, newBlockCallback func(*types.Block)) error {
 	localLatest := uint64(0)
-	if header := s.blockchain.Header(); header != nil {
-		localLatest = header.Number
+
+	updateLocalLatest := func() {
+		if header := s.blockchain.Header(); header != nil {
+			localLatest = header.Number
+		}
 	}
+
+	updateLocalLatest()
 
 	// Create a blockchain subscription for the sync progression and start tracking
 	s.syncProgression.StartProgression(localLatest, s.blockchain.SubscribeEvents())
@@ -121,12 +126,14 @@ func (s *syncer) BulkSync(ctx context.Context, newBlockCallback func(*types.Bloc
 			s.logger.Warn("failed to complete bulk sync with peer, try to next one", "peer ID", bestPeer.ID)
 		}
 
-		if err != nil || lastNumber < bestPeer.Number {
-			skipList[bestPeer.ID] = true
-
-			// continue to next peer
-			continue
+		// if node could sync with the peer fully, then exit loop
+		if err == nil && lastNumber >= bestPeer.Number {
+			break
 		}
+
+		updateLocalLatest()
+
+		skipList[bestPeer.ID] = true
 	}
 
 	return nil
@@ -155,7 +162,7 @@ func (s *syncer) WatchSync(ctx context.Context, callback func(*types.Block) bool
 func (s *syncer) bulkSyncWithPeer(peerID string, newBlockCallback func(*types.Block)) (uint64, error) {
 	localLatest := s.blockchain.Header().Number
 
-	blockCh, err := s.syncPeerClient.GetBlocks(context.Background(), peerID, localLatest)
+	blockCh, err := s.syncPeerClient.GetBlocks(context.Background(), peerID, localLatest+1)
 	if err != nil {
 		return 0, err
 	}
@@ -165,6 +172,11 @@ func (s *syncer) bulkSyncWithPeer(peerID string, newBlockCallback func(*types.Bl
 	for {
 		select {
 		case block, ok := <-blockCh:
+			// safe check
+			if block.Number() == 0 {
+				continue
+			}
+
 			if !ok {
 				return lastReceivedNumber, nil
 			}
