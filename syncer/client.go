@@ -2,9 +2,7 @@ package syncer
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"io"
 	"sync"
 	"time"
 
@@ -225,7 +223,7 @@ func (m *syncPeerClient) GetBlocks(
 
 		for {
 			protoBlock, err := stream.Recv()
-			if errors.Is(err, io.EOF) {
+			if err != nil {
 				break
 			}
 
