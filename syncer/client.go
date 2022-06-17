@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sync"
+	"time"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/network"
@@ -20,6 +22,7 @@ import (
 const (
 	SyncPeersManagerLoggerName = "sync-peers-manager"
 	statusTopicName            = "syncer/status/0.1"
+	defaultTimeoutForStatus    = 10 * time.Second
 )
 
 type syncPeerClient struct {
@@ -72,32 +75,52 @@ func (m *syncPeerClient) Close() {
 }
 
 func (m *syncPeerClient) GetConnectedPeerStatuses() []*NoForkPeer {
-	ps := m.network.Peers()
-	syncPeers := make([]*NoForkPeer, 0, len(ps))
+	var (
+		ps            = m.network.Peers()
+		syncPeers     = make([]*NoForkPeer, 0, len(ps))
+		syncPeersLock = sync.Mutex{}
+		wg            sync.WaitGroup
+	)
 
 	for _, p := range ps {
-		peerID := p.Info.ID
+		p := p
+		wg.Add(1)
 
-		clt, err := m.newSyncPeerClient(peerID)
-		if err != nil {
-			m.logger.Warn("failed to create sync peer client, skip", "id", peerID, "err", err)
+		go func() {
+			defer wg.Done()
 
-			continue
-		}
+			peerID := p.Info.ID
 
-		status, err := clt.GetStatus(context.Background(), &emptypb.Empty{})
-		if err != nil {
-			m.logger.Warn("failed to get sync status from peer, skip", "id", peerID, "err", err)
+			clt, err := m.newSyncPeerClient(peerID)
+			if err != nil {
+				m.logger.Warn("failed to create sync peer client, skip", "id", peerID, "err", err)
 
-			continue
-		}
+				return
+			}
 
-		syncPeers = append(syncPeers, &NoForkPeer{
-			ID:       p.Info.ID.String(),
-			Number:   status.Number,
-			Distance: m.network.GetPeerDistance(peer.ID(p.Info.ID.String())),
-		})
+			timeoutCtx, cancel := context.WithTimeout(context.Background(), defaultTimeoutForStatus)
+			defer cancel()
+
+			status, err := clt.GetStatus(timeoutCtx, &emptypb.Empty{})
+			if err != nil {
+				m.logger.Warn("failed to get sync status from peer, skip", "id", peerID, "err", err)
+
+				return
+			}
+
+			syncPeersLock.Lock()
+
+			syncPeers = append(syncPeers, &NoForkPeer{
+				ID:       p.Info.ID.String(),
+				Number:   status.Number,
+				Distance: m.network.GetPeerDistance(peer.ID(p.Info.ID.String())),
+			})
+
+			syncPeersLock.Unlock()
+		}()
 	}
+
+	wg.Wait()
 
 	return syncPeers
 }
