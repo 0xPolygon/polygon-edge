@@ -28,11 +28,11 @@ type syncPeerClient struct {
 	network    Network
 	blockchain Blockchain
 
-	subscription       blockchain.Subscription
-	topic              *network.Topic
-	id                 string // node ID
-	peerStatusUpdateCh chan *NoForkPeer
-	peerDisconnectCh   chan string
+	subscription           blockchain.Subscription
+	topic                  *network.Topic
+	id                     string // node ID
+	peerStatusUpdateCh     chan *NoForkPeer
+	peerConnectionUpdateCh chan *event.PeerEvent
 }
 
 func NewSyncPeerClient(
@@ -41,12 +41,12 @@ func NewSyncPeerClient(
 	blockchain Blockchain,
 ) SyncPeerClient {
 	return &syncPeerClient{
-		logger:             logger.Named(SyncPeersManagerLoggerName),
-		network:            network,
-		blockchain:         blockchain,
-		id:                 network.AddrInfo().ID.String(),
-		peerStatusUpdateCh: make(chan *NoForkPeer, 1),
-		peerDisconnectCh:   make(chan string, 1),
+		logger:                 logger.Named(SyncPeersManagerLoggerName),
+		network:                network,
+		blockchain:             blockchain,
+		id:                     network.AddrInfo().ID.String(),
+		peerStatusUpdateCh:     make(chan *NoForkPeer, 1),
+		peerConnectionUpdateCh: make(chan *event.PeerEvent, 1),
 	}
 }
 
@@ -69,7 +69,28 @@ func (m *syncPeerClient) Close() {
 	}
 
 	close(m.peerStatusUpdateCh)
-	close(m.peerDisconnectCh)
+	close(m.peerConnectionUpdateCh)
+}
+
+func (m *syncPeerClient) GetPeerStatus(peerID peer.ID) (*NoForkPeer, error) {
+	clt, err := m.newSyncPeerClient(peerID)
+	if err != nil {
+		return nil, err
+	}
+
+	timeoutCtx, cancel := context.WithTimeout(context.Background(), defaultTimeoutForStatus)
+	defer cancel()
+
+	status, err := clt.GetStatus(timeoutCtx, &emptypb.Empty{})
+	if err != nil {
+		return nil, err
+	}
+
+	return &NoForkPeer{
+		ID:       peerID.String(),
+		Number:   status.Number,
+		Distance: m.network.GetPeerDistance(peerID),
+	}, nil
 }
 
 func (m *syncPeerClient) GetConnectedPeerStatuses() []*NoForkPeer {
@@ -90,30 +111,14 @@ func (m *syncPeerClient) GetConnectedPeerStatuses() []*NoForkPeer {
 
 			peerID := p.Info.ID
 
-			clt, err := m.newSyncPeerClient(peerID)
+			status, err := m.GetPeerStatus(peerID)
 			if err != nil {
-				m.logger.Warn("failed to create sync peer client, skip", "id", peerID, "err", err)
-
-				return
-			}
-
-			timeoutCtx, cancel := context.WithTimeout(context.Background(), defaultTimeoutForStatus)
-			defer cancel()
-
-			status, err := clt.GetStatus(timeoutCtx, &emptypb.Empty{})
-			if err != nil {
-				m.logger.Warn("failed to get sync status from peer, skip", "id", peerID, "err", err)
-
-				return
+				m.logger.Warn("failed to get status from a peer, skip", "id", peerID, "err", err)
 			}
 
 			syncPeersLock.Lock()
 
-			syncPeers = append(syncPeers, &NoForkPeer{
-				ID:       p.Info.ID.String(),
-				Number:   status.Number,
-				Distance: m.network.GetPeerDistance(peer.ID(p.Info.ID.String())),
-			})
+			syncPeers = append(syncPeers, status)
 
 			syncPeersLock.Unlock()
 		}()
@@ -128,8 +133,8 @@ func (m *syncPeerClient) GetPeerStatusUpdateCh() <-chan *NoForkPeer {
 	return m.peerStatusUpdateCh
 }
 
-func (m *syncPeerClient) GetPeerDisconnectCh() <-chan string {
-	return m.peerDisconnectCh
+func (m *syncPeerClient) GetPeerConnectionUpdateEventCh() <-chan *event.PeerEvent {
+	return m.peerConnectionUpdateCh
 }
 
 func (m *syncPeerClient) startGossip() error {
@@ -196,9 +201,7 @@ func (m *syncPeerClient) startPeerEventProcess() {
 	}
 
 	for e := range peerEventCh {
-		if e.Type == event.PeerDisconnected {
-			m.peerDisconnectCh <- string(e.PeerID)
-		}
+		m.peerConnectionUpdateCh <- e
 	}
 }
 

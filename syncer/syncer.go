@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/helper/progress"
+	"github.com/0xPolygon/polygon-edge/network/event"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 )
@@ -75,8 +76,25 @@ func (s *syncer) initializePeerMap() {
 }
 
 func (s *syncer) startPeerDisconnectEventProcess() {
-	for peerID := range s.syncPeerClient.GetPeerDisconnectCh() {
-		s.peerMap.Delete(peerID)
+	for e := range s.syncPeerClient.GetPeerConnectionUpdateEventCh() {
+		e := e
+
+		switch e.Type {
+		case event.PeerConnected:
+			go func() {
+				status, err := s.syncPeerClient.GetPeerStatus(e.PeerID)
+				if err != nil {
+					s.logger.Warn("failed to get peer status, skip", "id", e.PeerID, "err", err)
+
+					return
+				}
+
+				s.peerMap.Put(status)
+			}()
+
+		case event.PeerDisconnected:
+			s.peerMap.Delete(e.PeerID)
+		}
 	}
 }
 
