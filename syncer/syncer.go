@@ -115,6 +115,10 @@ func (s *syncer) BulkSync(ctx context.Context, newBlockCallback func(*types.Bloc
 		if lastReceivedNumber >= bestPeer.Number {
 			break
 		}
+
+		// remove because peer failed to sync
+		// TODO: check this
+		s.peerHeap.Remove(bestPeer.ID)
 	}
 
 	return nil
