@@ -4,6 +4,9 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"math/big"
+	"time"
+
 	"github.com/0xPolygon/polygon-edge/network/common"
 	"github.com/0xPolygon/polygon-edge/network/discovery"
 	"github.com/0xPolygon/polygon-edge/network/grpc"
@@ -12,8 +15,6 @@ import (
 	"github.com/libp2p/go-libp2p-core/peerstore"
 	kb "github.com/libp2p/go-libp2p-kbucket"
 	rawGrpc "google.golang.org/grpc"
-	"math/big"
-	"time"
 )
 
 var (
@@ -67,7 +68,7 @@ func (s *Server) NewDiscoveryClient(peerID peer.ID) (proto.DiscoveryClient, erro
 
 	// Check if there is a peer connection at this point in time,
 	// as there might have been a disconnection previously
-	if !s.isConnected(peerID) && !isTemporaryDial {
+	if !s.IsConnected(peerID) && !isTemporaryDial {
 		return nil, errPeerDisconnected
 	}
 

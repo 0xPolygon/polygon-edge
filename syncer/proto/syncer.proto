@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package v1;
 
-option go_package = "/syncer/peers/nofork/proto";
+option go_package = "/syncer/proto";
 
 import "google/protobuf/empty.proto";
 
@@ -10,7 +10,6 @@ service SyncPeer {
   rpc GetBlocks(GetBlocksRequest) returns (stream Block);
   rpc GetBlock(GetBlockRequest) returns (Block);
   rpc GetStatus(google.protobuf.Empty) returns (Status);
-  rpc NotifyStatus(Status) returns (google.protobuf.Empty);
 }
 
 message GetBlocksRequest {

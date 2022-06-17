@@ -1,24 +1,27 @@
-package peers
+package syncer
 
 import (
 	"container/heap"
+	"math/big"
 	"sync"
 )
 
-type Peer interface {
+type NoForkPeer struct {
 	// identifier
-	ID() string
-	// comparator
-	Less(Peer) bool
+	ID string
+	// peer's latest block number
+	Number uint64
+	// peer's distance
+	Distance *big.Int
 }
 
 type PeerHeap struct {
 	sync.RWMutex
-	peers     []Peer
+	peers     []*NoForkPeer
 	lookupMap map[string]int
 }
 
-func NewPeerHeap(peers []Peer) *PeerHeap {
+func NewPeerHeap(peers []*NoForkPeer) *PeerHeap {
 	peerHeap := &PeerHeap{
 		peers:     peers,
 		lookupMap: make(map[string]int, len(peers)),
@@ -27,7 +30,7 @@ func NewPeerHeap(peers []Peer) *PeerHeap {
 	heap.Init(peerHeap)
 
 	for i, p := range peerHeap.peers {
-		peerHeap.lookupMap[p.ID()] = i
+		peerHeap.lookupMap[p.ID] = i
 	}
 
 	return peerHeap
@@ -36,14 +39,14 @@ func NewPeerHeap(peers []Peer) *PeerHeap {
 // Put puts peer into heap
 // Case 1: Appends a peer if it doesn't exist
 // Case 2: Update peer info and reorder if it exists already
-func (h *PeerHeap) Put(peer Peer) {
+func (h *PeerHeap) Put(peer *NoForkPeer) {
 	h.RWMutex.Lock()
 	defer h.RWMutex.Unlock()
 
-	index, ok := h.lookupMap[peer.ID()]
+	index, ok := h.lookupMap[peer.ID]
 	if ok {
-		// exists already
-		h.peers[index] = peer
+		// update Number
+		h.peers[index].Number = peer.Number
 		heap.Fix(h, index)
 	} else {
 		heap.Push(h, peer)
@@ -51,7 +54,7 @@ func (h *PeerHeap) Put(peer Peer) {
 }
 
 // BestPeer returns the top of heap
-func (h *PeerHeap) BestPeer() Peer {
+func (h *PeerHeap) BestPeer() *NoForkPeer {
 	h.RWMutex.RLock()
 	defer h.RWMutex.RUnlock()
 
@@ -77,12 +80,18 @@ func (h PeerHeap) Len() int {
 func (h PeerHeap) Less(i, j int) bool {
 	pi, pj := h.peers[i], h.peers[j]
 
-	return pi.Less(pj)
+	// sort by number
+	if pi.Number != pj.Number {
+		// reverse operator because go heap is min heap as default
+		return pi.Number > pj.Number
+	}
+
+	return pi.Distance.Cmp(pj.Distance) < 0
 }
 
 // Swap swaps the places of the items at the passed-in indexes
 func (m PeerHeap) Swap(i, j int) {
-	iid, jid := m.peers[i].ID(), m.peers[j].ID()
+	iid, jid := m.peers[i].ID, m.peers[j].ID
 	m.lookupMap[iid] = j
 	m.lookupMap[jid] = i
 
@@ -91,12 +100,12 @@ func (m PeerHeap) Swap(i, j int) {
 
 // Push adds a new item to the queue
 func (m *PeerHeap) Push(x interface{}) {
-	peer, ok := x.(Peer)
+	peer, ok := x.(*NoForkPeer)
 	if !ok {
 		return
 	}
 
-	m.lookupMap[peer.ID()] = len(m.peers)
+	m.lookupMap[peer.ID] = len(m.peers)
 	m.peers = append(m.peers, peer)
 }
 
@@ -108,7 +117,7 @@ func (m *PeerHeap) Pop() interface{} {
 	old[n-1] = nil
 	m.peers = old[0 : n-1]
 
-	delete(m.lookupMap, item.ID())
+	delete(m.lookupMap, item.ID)
 
 	return item
 }

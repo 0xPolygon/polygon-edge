@@ -21,7 +21,6 @@ type SyncPeerClient interface {
 	GetBlocks(ctx context.Context, in *GetBlocksRequest, opts ...grpc.CallOption) (SyncPeer_GetBlocksClient, error)
 	GetBlock(ctx context.Context, in *GetBlockRequest, opts ...grpc.CallOption) (*Block, error)
 	GetStatus(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*Status, error)
-	NotifyStatus(ctx context.Context, in *Status, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type syncPeerClient struct {
@@ -82,15 +81,6 @@ func (c *syncPeerClient) GetStatus(ctx context.Context, in *emptypb.Empty, opts 
 	return out, nil
 }
 
-func (c *syncPeerClient) NotifyStatus(ctx context.Context, in *Status, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	out := new(emptypb.Empty)
-	err := c.cc.Invoke(ctx, "/v1.SyncPeer/NotifyStatus", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // SyncPeerServer is the server API for SyncPeer service.
 // All implementations must embed UnimplementedSyncPeerServer
 // for forward compatibility
@@ -98,7 +88,6 @@ type SyncPeerServer interface {
 	GetBlocks(*GetBlocksRequest, SyncPeer_GetBlocksServer) error
 	GetBlock(context.Context, *GetBlockRequest) (*Block, error)
 	GetStatus(context.Context, *emptypb.Empty) (*Status, error)
-	NotifyStatus(context.Context, *Status) (*emptypb.Empty, error)
 	mustEmbedUnimplementedSyncPeerServer()
 }
 
@@ -114,9 +103,6 @@ func (UnimplementedSyncPeerServer) GetBlock(context.Context, *GetBlockRequest) (
 }
 func (UnimplementedSyncPeerServer) GetStatus(context.Context, *emptypb.Empty) (*Status, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetStatus not implemented")
-}
-func (UnimplementedSyncPeerServer) NotifyStatus(context.Context, *Status) (*emptypb.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method NotifyStatus not implemented")
 }
 func (UnimplementedSyncPeerServer) mustEmbedUnimplementedSyncPeerServer() {}
 
@@ -188,24 +174,6 @@ func _SyncPeer_GetStatus_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
-func _SyncPeer_NotifyStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(Status)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(SyncPeerServer).NotifyStatus(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/v1.SyncPeer/NotifyStatus",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SyncPeerServer).NotifyStatus(ctx, req.(*Status))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 var _SyncPeer_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "v1.SyncPeer",
 	HandlerType: (*SyncPeerServer)(nil),
@@ -218,10 +186,6 @@ var _SyncPeer_serviceDesc = grpc.ServiceDesc{
 			MethodName: "GetStatus",
 			Handler:    _SyncPeer_GetStatus_Handler,
 		},
-		{
-			MethodName: "NotifyStatus",
-			Handler:    _SyncPeer_NotifyStatus_Handler,
-		},
 	},
 	Streams: []grpc.StreamDesc{
 		{
@@ -230,5 +194,5 @@ var _SyncPeer_serviceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 	},
-	Metadata: "syncer/peers/nofork/proto/syncer.proto",
+	Metadata: "syncer/proto/syncer.proto",
 }

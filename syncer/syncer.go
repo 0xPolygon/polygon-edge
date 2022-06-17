@@ -4,80 +4,69 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
-	"github.com/0xPolygon/polygon-edge/syncer/peers"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 )
 
 const (
-	LoggerName = "syncer"
+	LoggerName  = "syncer"
+	SyncerProto = "/syncer/0.2"
 )
 
-type Syncer interface {
-	Start()
-	GetSyncProgression() *progress.Progression
-	BestPeer() *peers.BestPeer
-	HasSyncPeer() bool
-	BulkSync(context.Context, func(*types.Block)) error
-	WatchSync(context.Context, func(*types.Block) bool) error
-}
-
-type Blockchain interface {
-	// Subscribe new block event
-	SubscribeEvents() blockchain.Subscription
-	// Get latest header
-	Header() *types.Header
-	// Verify fetched block
-	VerifyFinalizedBlock(*types.Block) error
-	// Write block to chain
-	WriteBlock(*types.Block) error
-}
-
-type Progression interface {
-	StartProgression(startingBlock uint64, subscription blockchain.Subscription)
-	UpdateHighestProgression(highestBlock uint64)
-	GetProgression() *progress.Progression
-	StopProgression()
-}
-
+// XXX: Don't use this syncer for the consensus that may cause fork. This syncer doesn't assume fork. Consensus may be broken
+// TODO: Add extensibility for fork before merge
 type syncer struct {
 	logger          hclog.Logger
 	blockchain      Blockchain
 	syncProgression Progression
-	syncPeers       peers.SyncPeers
+
+	peerHeap        *PeerHeap
+	syncPeerService SyncPeerService
+	syncPeerClient  SyncPeerClient
 }
 
 func NewSyncer(
 	logger hclog.Logger,
 	blockchain Blockchain,
-	syncPeers peers.SyncPeers,
+	network Network,
 ) Syncer {
 	return &syncer{
 		logger:          logger.Named(LoggerName),
 		blockchain:      blockchain,
 		syncProgression: progress.NewProgressionWrapper(progress.ChainSyncBulk),
-		syncPeers:       syncPeers,
+		syncPeerService: NewSyncPeerService(network, blockchain),
+		syncPeerClient:  NewSyncPeerClient(logger, network, blockchain),
 	}
 }
 
 func (s *syncer) Start() {
-	s.syncPeers.Start()
+	s.syncPeerService.Start()
+
+	go s.startPeerHeapProcess()
+}
+
+func (s *syncer) startPeerHeapProcess() {
+	peerStatuses := s.syncPeerClient.GetConnectedPeerStatuses()
+	s.peerHeap = NewPeerHeap(peerStatuses)
+
+	for peerStatus := range s.syncPeerClient.GetPeerStatusChangeCh() {
+		s.peerHeap.Put(peerStatus)
+	}
 }
 
 func (s *syncer) GetSyncProgression() *progress.Progression {
 	return s.syncProgression.GetProgression()
 }
 
-func (s *syncer) BestPeer() *peers.BestPeer {
-	return s.syncPeers.BestPeer()
+func (s *syncer) BestPeer() *NoForkPeer {
+	return s.peerHeap.BestPeer()
 }
 
 // HasSyncPeer returns whether syncer has the peer to syncs blocks
 // return false if syncer has no peer whose latest block height doesn't exceed local height
 func (s *syncer) HasSyncPeer() bool {
-	return s.syncPeers.BestPeer() != nil
+	return s.peerHeap.BestPeer() != nil
 }
 
 func (s *syncer) BulkSync(ctx context.Context, newBlockCallback func(*types.Block)) error {
@@ -86,12 +75,12 @@ func (s *syncer) BulkSync(ctx context.Context, newBlockCallback func(*types.Bloc
 		localLatest = header.Number
 	}
 
-	bestPeer := s.syncPeers.BestPeer()
+	bestPeer := s.peerHeap.BestPeer()
 	if bestPeer == nil || bestPeer.Number <= localLatest {
 		return nil
 	}
 
-	blockCh, err := s.syncPeers.GetBlocks(ctx, bestPeer.ID, localLatest)
+	blockCh, err := s.syncPeerClient.GetBlocks(ctx, bestPeer.ID, localLatest)
 	if err != nil {
 		return err
 	}
