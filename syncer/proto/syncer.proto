@@ -9,7 +9,7 @@ import "google/protobuf/empty.proto";
 service SyncPeer {
   rpc GetBlocks(GetBlocksRequest) returns (stream Block);
   rpc GetBlock(GetBlockRequest) returns (Block);
-  rpc GetStatus(google.protobuf.Empty) returns (Status);
+  rpc GetStatus(google.protobuf.Empty) returns (SyncPeerStatus);
 }
 
 message GetBlocksRequest {
@@ -27,7 +27,7 @@ message Block {
   bytes block = 1;
 }
 
-message Status {
+message SyncPeerStatus {
   // Latest block height
   uint64 number = 1;
 }

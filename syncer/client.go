@@ -138,7 +138,7 @@ func (m *syncPeerClient) GetPeerConnectionUpdateEventCh() <-chan *event.PeerEven
 }
 
 func (m *syncPeerClient) startGossip() error {
-	topic, err := m.network.NewTopic(statusTopicName, &proto.Status{})
+	topic, err := m.network.NewTopic(statusTopicName, &proto.SyncPeerStatus{})
 	if err != nil {
 		return err
 	}
@@ -153,7 +153,7 @@ func (m *syncPeerClient) startGossip() error {
 }
 
 func (m *syncPeerClient) handleStatusUpdate(obj interface{}, from string) {
-	status, ok := obj.(*proto.Status)
+	status, ok := obj.(*proto.SyncPeerStatus)
 	if !ok {
 		m.logger.Error("failed to cast gossiped message to txn")
 
@@ -183,7 +183,7 @@ func (m *syncPeerClient) startNewBlockProcess() {
 			}
 
 			// Publish status
-			if err := m.topic.Publish(&proto.Status{
+			if err := m.topic.Publish(&proto.SyncPeerStatus{
 				Number: latest.Number,
 			}); err != nil {
 				m.logger.Warn("failed to publish status", "err", err)

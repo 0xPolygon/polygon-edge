@@ -20,7 +20,7 @@ const _ = grpc.SupportPackageIsVersion7
 type SyncPeerClient interface {
 	GetBlocks(ctx context.Context, in *GetBlocksRequest, opts ...grpc.CallOption) (SyncPeer_GetBlocksClient, error)
 	GetBlock(ctx context.Context, in *GetBlockRequest, opts ...grpc.CallOption) (*Block, error)
-	GetStatus(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*Status, error)
+	GetStatus(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*SyncPeerStatus, error)
 }
 
 type syncPeerClient struct {
@@ -72,8 +72,8 @@ func (c *syncPeerClient) GetBlock(ctx context.Context, in *GetBlockRequest, opts
 	return out, nil
 }
 
-func (c *syncPeerClient) GetStatus(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*Status, error) {
-	out := new(Status)
+func (c *syncPeerClient) GetStatus(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*SyncPeerStatus, error) {
+	out := new(SyncPeerStatus)
 	err := c.cc.Invoke(ctx, "/v1.SyncPeer/GetStatus", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -87,7 +87,7 @@ func (c *syncPeerClient) GetStatus(ctx context.Context, in *emptypb.Empty, opts 
 type SyncPeerServer interface {
 	GetBlocks(*GetBlocksRequest, SyncPeer_GetBlocksServer) error
 	GetBlock(context.Context, *GetBlockRequest) (*Block, error)
-	GetStatus(context.Context, *emptypb.Empty) (*Status, error)
+	GetStatus(context.Context, *emptypb.Empty) (*SyncPeerStatus, error)
 	mustEmbedUnimplementedSyncPeerServer()
 }
 
@@ -101,7 +101,7 @@ func (UnimplementedSyncPeerServer) GetBlocks(*GetBlocksRequest, SyncPeer_GetBloc
 func (UnimplementedSyncPeerServer) GetBlock(context.Context, *GetBlockRequest) (*Block, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetBlock not implemented")
 }
-func (UnimplementedSyncPeerServer) GetStatus(context.Context, *emptypb.Empty) (*Status, error) {
+func (UnimplementedSyncPeerServer) GetStatus(context.Context, *emptypb.Empty) (*SyncPeerStatus, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetStatus not implemented")
 }
 func (UnimplementedSyncPeerServer) mustEmbedUnimplementedSyncPeerServer() {}

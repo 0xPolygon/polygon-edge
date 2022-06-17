@@ -87,13 +87,13 @@ func (s *syncPeerService) GetBlock(
 func (s *syncPeerService) GetStatus(
 	ctx context.Context,
 	req *empty.Empty,
-) (*proto.Status, error) {
+) (*proto.SyncPeerStatus, error) {
 	var number uint64
 	if header := s.blockchain.Header(); header != nil {
 		number = header.Number
 	}
 
-	return &proto.Status{
+	return &proto.SyncPeerStatus{
 		Number: number,
 	}, nil
 }
