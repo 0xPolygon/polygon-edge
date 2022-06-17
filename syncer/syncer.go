@@ -55,11 +55,11 @@ func (s *syncer) Start() {
 	s.syncPeerClient.Start()
 	s.syncPeerService.Start()
 
-	go s.startPeerHeapProcess()
+	go s.initializePeerMap()
 	go s.startPeerDisconnectEventProcess()
 }
 
-func (s *syncer) startPeerHeapProcess() {
+func (s *syncer) initializePeerMap() {
 	peerStatuses := s.syncPeerClient.GetConnectedPeerStatuses()
 	s.peerMap = NewPeerMap(peerStatuses)
 
