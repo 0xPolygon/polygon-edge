@@ -10,6 +10,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/network/event"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
+	"github.com/libp2p/go-libp2p-core/peer"
 )
 
 const (
@@ -50,6 +51,7 @@ func NewSyncer(
 		syncPeerService: NewSyncPeerService(network, blockchain),
 		syncPeerClient:  NewSyncPeerClient(logger, network, blockchain),
 		blockTimeout:    blockTimeout,
+		peerMap:         new(PeerMap),
 	}
 }
 
@@ -68,7 +70,7 @@ func (s *syncer) Start() error {
 
 func (s *syncer) initializePeerMap() {
 	peerStatuses := s.syncPeerClient.GetConnectedPeerStatuses()
-	s.peerMap = NewPeerMap(peerStatuses)
+	s.peerMap.PutPeers(peerStatuses)
 
 	for peerStatus := range s.syncPeerClient.GetPeerStatusUpdateCh() {
 		s.peerMap.Put(peerStatus)
@@ -104,6 +106,10 @@ func (s *syncer) GetSyncProgression() *progress.Progression {
 // HasSyncPeer returns whether syncer has the peer to syncs blocks
 // return false if syncer has no peer whose latest block height doesn't exceed local height
 func (s *syncer) HasSyncPeer() bool {
+	if s.peerMap == nil {
+		return false
+	}
+
 	bestPeer := s.peerMap.BestPeer(nil)
 	header := s.blockchain.Header()
 
@@ -127,7 +133,7 @@ func (s *syncer) BulkSync(ctx context.Context, newBlockCallback func(*types.Bloc
 	// Stop monitoring the sync progression upon exit
 	defer s.syncProgression.StopProgression()
 
-	skipList := make(map[string]bool)
+	skipList := make(map[peer.ID]bool)
 
 	for {
 		bestPeer := s.peerMap.BestPeer(skipList)
@@ -176,7 +182,7 @@ func (s *syncer) WatchSync(ctx context.Context, callback func(*types.Block) bool
 	}
 }
 
-func (s *syncer) bulkSyncWithPeer(peerID string, newBlockCallback func(*types.Block)) (uint64, error) {
+func (s *syncer) bulkSyncWithPeer(peerID peer.ID, newBlockCallback func(*types.Block)) (uint64, error) {
 	localLatest := s.blockchain.Header().Number
 
 	blockCh, err := s.syncPeerClient.GetBlocks(context.Background(), peerID, localLatest+1)

@@ -21,6 +21,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/syncer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
+	"github.com/libp2p/go-libp2p-core/peer"
 	"google.golang.org/grpc"
 	anypb "google.golang.org/protobuf/types/known/anypb"
 )
@@ -316,7 +317,7 @@ func (i *Ibft) setupTransport() error {
 	}
 
 	// Subscribe to the newly created topic
-	err = topic.Subscribe(func(obj interface{}, _ string) {
+	err = topic.Subscribe(func(obj interface{}, _ peer.ID) {
 		msg, ok := obj.(*proto.MessageReq)
 		if !ok {
 			i.logger.Error("invalid type assertion for message request")

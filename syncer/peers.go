@@ -3,11 +3,13 @@ package syncer
 import (
 	"math/big"
 	"sync"
+
+	"github.com/libp2p/go-libp2p-core/peer"
 )
 
 type NoForkPeer struct {
 	// identifier
-	ID string
+	ID peer.ID
 	// peer's latest block number
 	Number uint64
 	// peer's distance
@@ -29,11 +31,15 @@ type PeerMap struct {
 func NewPeerMap(peers []*NoForkPeer) *PeerMap {
 	peerMap := new(PeerMap)
 
-	for _, p := range peers {
-		peerMap.Put(p)
-	}
+	peerMap.PutPeers(peers)
 
 	return peerMap
+}
+
+func (m *PeerMap) PutPeers(peers []*NoForkPeer) {
+	for _, p := range peers {
+		m.Put(p)
+	}
 }
 
 func (m *PeerMap) Put(peer *NoForkPeer) {
@@ -46,7 +52,7 @@ func (m *PeerMap) Remove(peerID string) {
 }
 
 // BestPeer returns the top of heap
-func (m *PeerMap) BestPeer(skipMap map[string]bool) *NoForkPeer {
+func (m *PeerMap) BestPeer(skipMap map[peer.ID]bool) *NoForkPeer {
 	var bestPeer *NoForkPeer
 
 	m.Range(func(key, value interface{}) bool {
