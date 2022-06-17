@@ -527,7 +527,6 @@ func (i *Ibft) runSyncState() {
 			// The snapshot store is currently updated for PoA inside the ProcessHeadersHook
 			callInsertBlockHook(newBlock.Number())
 
-			i.syncer.UpdateLocalLatestBlock(newBlock)
 			i.txpool.ResetWithHeaders(newBlock.Header)
 			isValidator = i.isValidSnapshot()
 
