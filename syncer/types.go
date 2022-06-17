@@ -48,7 +48,6 @@ type Network interface {
 type Syncer interface {
 	Start()
 	GetSyncProgression() *progress.Progression
-	BestPeer() *NoForkPeer
 	HasSyncPeer() bool
 	BulkSync(context.Context, func(*types.Block)) error
 	WatchSync(context.Context, func(*types.Block) bool) error
@@ -66,10 +65,11 @@ type SyncPeerService interface {
 }
 
 type SyncPeerClient interface {
-	Start()
+	Start() error
 	Close()
 	GetConnectedPeerStatuses() []*NoForkPeer
 	GetBlocks(context.Context, string, uint64) (<-chan *types.Block, error)
 	GetBlock(context.Context, string, uint64) (*types.Block, error)
-	GetPeerStatusChangeCh() <-chan *NoForkPeer
+	GetPeerStatusUpdateCh() <-chan *NoForkPeer
+	GetPeerDisconnectCh() <-chan string
 }

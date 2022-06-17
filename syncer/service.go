@@ -11,8 +11,7 @@ import (
 )
 
 var (
-	ErrBlockNotFound    = errors.New("block not found")
-	ErrorHeaderNotFound = errors.New("header not found")
+	ErrBlockNotFound = errors.New("block not found")
 )
 
 type syncPeerService struct {
@@ -95,7 +94,6 @@ func (s *syncPeerService) GetStatus(
 	}
 
 	return &proto.Status{
-		Id:     s.id,
 		Number: number,
 	}, nil
 }

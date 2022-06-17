@@ -28,9 +28,6 @@ message Block {
 }
 
 message Status {
-  // Peer ID
-  string id = 1;
-
   // Latest block height
-  uint64 number = 2;
+  uint64 number = 1;
 }

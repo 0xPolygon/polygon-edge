@@ -8,6 +8,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/network"
+	"github.com/0xPolygon/polygon-edge/network/event"
 	"github.com/0xPolygon/polygon-edge/network/grpc"
 	"github.com/0xPolygon/polygon-edge/syncer/proto"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -29,7 +30,8 @@ type syncPeerClient struct {
 	subscription       blockchain.Subscription
 	topic              *network.Topic
 	id                 string // node ID
-	updatePeerStatusCh chan *NoForkPeer
+	peerStatusUpdateCh chan *NoForkPeer
+	peerDisconnectCh   chan string
 }
 
 func NewSyncPeerClient(
@@ -42,15 +44,20 @@ func NewSyncPeerClient(
 		network:            network,
 		blockchain:         blockchain,
 		id:                 network.AddrInfo().ID.String(),
-		updatePeerStatusCh: make(chan *NoForkPeer, 1),
+		peerStatusUpdateCh: make(chan *NoForkPeer, 1),
+		peerDisconnectCh:   make(chan string, 1),
 	}
 }
 
-func (m *syncPeerClient) Start() {
+func (m *syncPeerClient) Start() error {
 	go m.startNewBlockProcess()
+	go m.startPeerEventProcess()
 
-	// TODO: return error
-	_ = m.startGossip()
+	if err := m.startGossip(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (m *syncPeerClient) Close() {
@@ -60,7 +67,8 @@ func (m *syncPeerClient) Close() {
 		m.subscription = nil
 	}
 
-	close(m.updatePeerStatusCh)
+	close(m.peerStatusUpdateCh)
+	close(m.peerDisconnectCh)
 }
 
 func (m *syncPeerClient) GetConnectedPeerStatuses() []*NoForkPeer {
@@ -85,17 +93,21 @@ func (m *syncPeerClient) GetConnectedPeerStatuses() []*NoForkPeer {
 		}
 
 		syncPeers = append(syncPeers, &NoForkPeer{
-			ID:       status.Id,
+			ID:       p.Info.ID.String(),
 			Number:   status.Number,
-			Distance: m.network.GetPeerDistance(peer.ID(status.Id)),
+			Distance: m.network.GetPeerDistance(peer.ID(p.Info.ID.String())),
 		})
 	}
 
 	return syncPeers
 }
 
-func (m *syncPeerClient) GetPeerStatusChangeCh() <-chan *NoForkPeer {
-	return m.updatePeerStatusCh
+func (m *syncPeerClient) GetPeerStatusUpdateCh() <-chan *NoForkPeer {
+	return m.peerStatusUpdateCh
+}
+
+func (m *syncPeerClient) GetPeerDisconnectCh() <-chan string {
+	return m.peerDisconnectCh
 }
 
 func (m *syncPeerClient) startGossip() error {
@@ -113,7 +125,7 @@ func (m *syncPeerClient) startGossip() error {
 	return nil
 }
 
-func (m *syncPeerClient) handleStatusUpdate(obj interface{}) {
+func (m *syncPeerClient) handleStatusUpdate(obj interface{}, from string) {
 	status, ok := obj.(*proto.Status)
 	if !ok {
 		m.logger.Error("failed to cast gossiped message to txn")
@@ -121,14 +133,14 @@ func (m *syncPeerClient) handleStatusUpdate(obj interface{}) {
 		return
 	}
 
-	if !m.network.IsConnected(peer.ID(status.Id)) {
-		m.logger.Warn("received status from non-connected peer, ignore", "id", status.Id)
+	if !m.network.IsConnected(peer.ID(from)) {
+		m.logger.Warn("received status from non-connected peer, ignore", "id", from)
 
 		return
 	}
 
-	m.updatePeerStatusCh <- &NoForkPeer{
-		ID:     status.Id,
+	m.peerStatusUpdateCh <- &NoForkPeer{
+		ID:     from,
 		Number: status.Number,
 	}
 }
@@ -145,9 +157,23 @@ func (m *syncPeerClient) startNewBlockProcess() {
 
 			// Publish status
 			m.topic.Publish(&proto.Status{
-				Id:     string(m.network.AddrInfo().ID),
 				Number: latest.Number,
 			})
+		}
+	}
+}
+
+func (m *syncPeerClient) startPeerEventProcess() {
+	peerEventCh, err := m.network.SubscribeCh()
+	if err != nil {
+		m.logger.Error("failed to subscribe", "err", err)
+
+		return
+	}
+
+	for e := range peerEventCh {
+		if e.Type == event.PeerDisconnected {
+			m.peerDisconnectCh <- string(e.PeerID)
 		}
 	}
 }

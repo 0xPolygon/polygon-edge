@@ -4,9 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	testproto "github.com/0xPolygon/polygon-edge/network/proto"
 	"testing"
 	"time"
+
+	testproto "github.com/0xPolygon/polygon-edge/network/proto"
 )
 
 func NumSubscribers(srv *Server, topic string) int {
@@ -59,7 +60,7 @@ func TestSimpleGossip(t *testing.T) {
 
 		serverTopics[i] = topic
 
-		if subscribeErr := topic.Subscribe(func(obj interface{}) {
+		if subscribeErr := topic.Subscribe(func(obj interface{}, _ string) {
 			// Everyone should relay they got the message
 			genericMessage, ok := obj.(*testproto.GenericMessage)
 			if !ok {

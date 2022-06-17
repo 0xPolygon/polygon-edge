@@ -659,7 +659,7 @@ func (p *TxPool) handlePromoteRequest(req promoteRequest) {
 
 // addGossipTx handles receiving transactions
 // gossiped by the network.
-func (p *TxPool) addGossipTx(obj interface{}) {
+func (p *TxPool) addGossipTx(obj interface{}, _ string) {
 	if !p.sealing {
 		return
 	}

@@ -42,7 +42,7 @@ func (t *Topic) Publish(obj proto.Message) error {
 	return t.topic.Publish(context.Background(), data)
 }
 
-func (t *Topic) Subscribe(handler func(obj interface{})) error {
+func (t *Topic) Subscribe(handler func(obj interface{}, from string)) error {
 	sub, err := t.topic.Subscribe(pubsub.WithBufferSize(subscribeOutputBufferSize))
 	if err != nil {
 		return err
@@ -53,7 +53,7 @@ func (t *Topic) Subscribe(handler func(obj interface{})) error {
 	return nil
 }
 
-func (t *Topic) readLoop(sub *pubsub.Subscription, handler func(obj interface{})) {
+func (t *Topic) readLoop(sub *pubsub.Subscription, handler func(obj interface{}, from string)) {
 	ctx, cancelFn := context.WithCancel(context.Background())
 
 	go func() {
@@ -77,7 +77,7 @@ func (t *Topic) readLoop(sub *pubsub.Subscription, handler func(obj interface{})
 				return
 			}
 
-			handler(obj)
+			handler(obj, string(msg.GetFrom()))
 		}()
 	}
 }

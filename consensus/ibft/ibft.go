@@ -1,6 +1,7 @@
 package ibft
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
@@ -15,7 +16,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/network"
-	"github.com/0xPolygon/polygon-edge/protocol"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/syncer"
@@ -179,7 +179,7 @@ func Factory(
 	// Istanbul requires a different header hash function
 	types.HeaderHash = istanbulHeaderHash
 
-	p.syncer = protocol.NewSyncer(params.Logger, params.Network, params.Blockchain)
+	p.syncer = syncer.NewSyncer(params.Logger, params.Network, params.Blockchain, p.blockTime*3)
 
 	return p, nil
 }
@@ -314,7 +314,7 @@ func (i *Ibft) setupTransport() error {
 	}
 
 	// Subscribe to the newly created topic
-	err = topic.Subscribe(func(obj interface{}) {
+	err = topic.Subscribe(func(obj interface{}, _ string) {
 		msg, ok := obj.(*proto.MessageReq)
 		if !ok {
 			i.logger.Error("invalid type assertion for message request")
@@ -501,7 +501,7 @@ func (i *Ibft) runSyncState() {
 			continue
 		}
 
-		if err := i.syncer.BulkSyncWithPeer(p, func(newBlock *types.Block) {
+		if err := i.syncer.BulkSync(context.Background(), func(newBlock *types.Block) {
 			callInsertBlockHook(newBlock.Number())
 			i.txpool.ResetWithHeaders(newBlock.Header)
 		}); err != nil {
@@ -522,7 +522,7 @@ func (i *Ibft) runSyncState() {
 		// start watch mode
 		var isValidator bool
 
-		i.syncer.WatchSyncWithPeer(p, func(newBlock *types.Block) bool {
+		i.syncer.WatchSync(context.Background(), func(newBlock *types.Block) bool {
 			// After each written block, update the snapshot store for PoS.
 			// The snapshot store is currently updated for PoA inside the ProcessHeadersHook
 			callInsertBlockHook(newBlock.Number())
@@ -531,7 +531,7 @@ func (i *Ibft) runSyncState() {
 			isValidator = i.isValidSnapshot()
 
 			return isValidator
-		}, i.blockTime)
+		})
 
 		if isValidator {
 			// at this point, we are in sync with the latest chain we know of
@@ -1089,18 +1089,12 @@ func (i *Ibft) runRoundChangeState() {
 
 	checkTimeout := func() {
 		// check if there is any peer that is really advanced and we might need to sync with it first
-		if i.syncer != nil {
-			bestPeer := i.syncer.BestPeer()
-			if bestPeer != nil {
-				lastProposal := i.blockchain.Header()
-				if bestPeer.Number() > lastProposal.Number {
-					i.logger.Debug("it has found a better peer to connect", "local", lastProposal.Number, "remote", bestPeer.Number())
-					// we need to catch up with the last sequence
-					i.setState(SyncState)
+		if i.syncer != nil && i.syncer.HasSyncPeer() {
+			i.logger.Debug("it has found a better peer to connect")
+			// we need to catch up with the last sequence
+			i.setState(SyncState)
 
-					return
-				}
-			}
+			return
 		}
 
 		// otherwise, it seems that we are in sync
