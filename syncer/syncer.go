@@ -77,23 +77,22 @@ func (s *syncer) initializePeerMap() {
 
 func (s *syncer) startPeerDisconnectEventProcess() {
 	for e := range s.syncPeerClient.GetPeerConnectionUpdateEventCh() {
-		e := e
+		peerID := e.PeerID
 
 		switch e.Type {
 		case event.PeerConnected:
 			go func() {
-				status, err := s.syncPeerClient.GetPeerStatus(e.PeerID)
+				status, err := s.syncPeerClient.GetPeerStatus(peerID)
 				if err != nil {
-					s.logger.Warn("failed to get peer status, skip", "id", e.PeerID, "err", err)
+					s.logger.Warn("failed to get peer status, skip", "id", peerID, "err", err)
 
 					return
 				}
 
 				s.peerMap.Put(status)
 			}()
-
 		case event.PeerDisconnected:
-			s.peerMap.Delete(e.PeerID)
+			s.peerMap.Delete(peerID)
 		}
 	}
 }
