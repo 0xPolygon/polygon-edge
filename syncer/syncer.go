@@ -189,13 +189,13 @@ func (s *syncer) bulkSyncWithPeer(peerID string, newBlockCallback func(*types.Bl
 	for {
 		select {
 		case block, ok := <-blockCh:
+			if !ok {
+				return lastReceivedNumber, nil
+			}
+
 			// safe check
 			if block.Number() == 0 {
 				continue
-			}
-
-			if !ok {
-				return lastReceivedNumber, nil
 			}
 
 			if err := s.blockchain.VerifyFinalizedBlock(block); err != nil {
