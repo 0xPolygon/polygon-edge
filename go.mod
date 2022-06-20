@@ -17,7 +17,7 @@ require (
 	github.com/hashicorp/hcl v1.0.0
 	github.com/hashicorp/vault/api v1.7.2
 	github.com/libp2p/go-libp2p v0.20.0
-	github.com/libp2p/go-libp2p-core v0.16.1
+	github.com/libp2p/go-libp2p-core v0.17.0
 	github.com/libp2p/go-libp2p-kbucket v0.4.7
 	github.com/libp2p/go-libp2p-pubsub v0.7.0
 	github.com/miekg/dns v1.1.49 // indirect
