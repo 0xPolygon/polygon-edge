@@ -84,6 +84,9 @@ func (t *Transaction) MarshalRLPWith(arena *fastrlp.Arena) (*fastrlp.Value, erro
 func (t *Transaction) UnmarshalRLP(buf []byte) error {
 	t.Hash = BytesToHash(Keccak256(buf))
 
+	if len(buf) < 1 {
+		return fmt.Errorf("expecting 1 byte but 0 byte provided")
+	}
 	if buf[0] <= 0x7f {
 		// it includes a type byte
 		switch typ := buf[0]; typ {
