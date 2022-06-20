@@ -49,7 +49,7 @@ type Syncer interface {
 	Start() error
 	GetSyncProgression() *progress.Progression
 	HasSyncPeer() bool
-	BulkSync(context.Context, func(*types.Block)) error
+	BulkSync(context.Context, func(*types.Block) bool) error
 	WatchSync(context.Context, func(*types.Block) bool) error
 }
 

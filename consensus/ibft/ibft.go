@@ -502,10 +502,11 @@ func (i *Ibft) runSyncState() {
 
 			continue
 		}
-
-		if err := i.syncer.BulkSync(context.Background(), func(newBlock *types.Block) {
+		if err := i.syncer.BulkSync(context.Background(), func(newBlock *types.Block) bool {
 			callInsertBlockHook(newBlock.Number())
 			i.txpool.ResetWithHeaders(newBlock.Header)
+
+			return false
 		}); err != nil {
 			i.logger.Error("failed to bulk sync", "err", err)
 

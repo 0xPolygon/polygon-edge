@@ -35,6 +35,9 @@ type syncer struct {
 
 	// Timeout for syncing a block
 	blockTimeout time.Duration
+
+	// channel to notify WatchSync that a new status arrived
+	newStatus chan struct{}
 }
 
 func NewSyncer(
@@ -50,6 +53,7 @@ func NewSyncer(
 		syncPeerService: NewSyncPeerService(network, blockchain),
 		syncPeerClient:  NewSyncPeerClient(logger, network, blockchain),
 		blockTimeout:    blockTimeout,
+		newStatus:       make(chan struct{}),
 	}
 }
 
@@ -67,11 +71,20 @@ func (s *syncer) Start() error {
 }
 
 func (s *syncer) initializePeerMap() {
-	peerStatuses := s.syncPeerClient.GetConnectedPeerStatuses()
-	s.peerMap = NewPeerMap(peerStatuses)
 
 	for peerStatus := range s.syncPeerClient.GetPeerStatusUpdateCh() {
+		bestPeer := s.peerMap.BestPeer(nil)
+		peerBlockNum := peerStatus.Number
+		fmt.Println(peerStatus.ID)
 		s.peerMap.Put(peerStatus)
+
+		// send a signal to watchSync if a new block arrives
+		if peerBlockNum > bestPeer.Number {
+			select {
+			case s.newStatus <- struct{}{}:
+			default:
+			}
+		}
 	}
 }
 
@@ -110,9 +123,8 @@ func (s *syncer) HasSyncPeer() bool {
 	return bestPeer != nil && bestPeer.Number > header.Number
 }
 
-func (s *syncer) BulkSync(ctx context.Context, newBlockCallback func(*types.Block)) error {
+func (s *syncer) BulkSync(ctx context.Context, newBlockCallback func(*types.Block) bool) error {
 	localLatest := uint64(0)
-
 	updateLocalLatest := func() {
 		if header := s.blockchain.Header(); header != nil {
 			localLatest = header.Number
@@ -138,7 +150,7 @@ func (s *syncer) BulkSync(ctx context.Context, newBlockCallback func(*types.Bloc
 		// Set the target height
 		s.syncProgression.UpdateHighestProgression(bestPeer.Number)
 
-		lastNumber, err := s.bulkSyncWithPeer(bestPeer.ID, newBlockCallback)
+		lastNumber, _, err := s.bulkSyncWithPeer(bestPeer.ID, newBlockCallback)
 		if err != nil {
 			s.logger.Warn("failed to complete bulk sync with peer, try to next one", "peer ID", bestPeer.ID)
 		}
@@ -157,31 +169,61 @@ func (s *syncer) BulkSync(ctx context.Context, newBlockCallback func(*types.Bloc
 }
 
 func (s *syncer) WatchSync(ctx context.Context, callback func(*types.Block) bool) error {
+	localLatest := s.blockchain.Header().Number
+	skipList := make(map[string]bool)
+
 	// Loop until context is canceled
 	for {
-		// pick one best peer
-		// peer := s.peerHeap.BestPeer()
-
-		// fetch block from the peer
-
-		// verify the block
-
-		// write the block
-
 		select {
-		case <-ctx.Done():
-			// context is canceled
+		case <-s.newStatus:
+		case <-time.After(s.blockTimeout):
+			return errTimeout
+		}
+
+		// fetch local latest block
+		if header := s.blockchain.Header(); header != nil {
+			localLatest = header.Number
+		}
+
+		// pick one best peer
+		bestPeer := s.peerMap.BestPeer(skipList)
+		if bestPeer == nil {
 			break
 		}
+
+		// if the bestPeer does not have a new block continue
+		if bestPeer.Number <= localLatest {
+			continue
+		}
+
+		// fetch block from the peer
+		lastNumber, isValidator, err := s.bulkSyncWithPeer(bestPeer.ID, callback)
+		if err != nil {
+			s.logger.Warn("failed to complete bulk sync with peer, try to next one", "peer ID", bestPeer.ID)
+		}
+
+		if err != nil || lastNumber < bestPeer.Number {
+			skipList[bestPeer.ID] = true
+
+			// continue to next peer
+			continue
+		}
+
+		if isValidator {
+			break
+		}
+
 	}
+	return nil
 }
 
-func (s *syncer) bulkSyncWithPeer(peerID string, newBlockCallback func(*types.Block)) (uint64, error) {
+func (s *syncer) bulkSyncWithPeer(peerID string, newBlockCallback func(*types.Block) bool) (uint64, bool, error) {
 	localLatest := s.blockchain.Header().Number
+	isValidator := false
 
 	blockCh, err := s.syncPeerClient.GetBlocks(context.Background(), peerID, localLatest+1)
 	if err != nil {
-		return 0, err
+		return 0, false, err
 	}
 
 	var lastReceivedNumber uint64
@@ -195,22 +237,22 @@ func (s *syncer) bulkSyncWithPeer(peerID string, newBlockCallback func(*types.Bl
 			}
 
 			if !ok {
-				return lastReceivedNumber, nil
+				return lastReceivedNumber, isValidator, nil
 			}
 
 			if err := s.blockchain.VerifyFinalizedBlock(block); err != nil {
-				return lastReceivedNumber, fmt.Errorf("unable to verify block, %w", err)
+				return lastReceivedNumber, false, fmt.Errorf("unable to verify block, %w", err)
 			}
 
 			if err := s.blockchain.WriteBlock(block); err != nil {
-				return lastReceivedNumber, fmt.Errorf("failed to write block while bulk syncing: %w", err)
+				return lastReceivedNumber, false, fmt.Errorf("failed to write block while bulk syncing: %w", err)
 			}
 
-			newBlockCallback(block)
+			isValidator = newBlockCallback(block)
 
 			lastReceivedNumber = block.Number()
 		case <-time.After(s.blockTimeout):
-			return lastReceivedNumber, errTimeout
+			return lastReceivedNumber, isValidator, errTimeout
 		}
 	}
 }
