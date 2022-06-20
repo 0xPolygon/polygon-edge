@@ -44,7 +44,7 @@ func NewSyncPeerClient(
 		logger:                 logger.Named(SyncPeersManagerLoggerName),
 		network:                network,
 		blockchain:             blockchain,
-		id:                     network.AddrInfo().ID.String(),
+		id:                     string(network.AddrInfo().ID),
 		peerStatusUpdateCh:     make(chan *NoForkPeer, 1),
 		peerConnectionUpdateCh: make(chan *event.PeerEvent, 1),
 	}
@@ -87,7 +87,7 @@ func (m *syncPeerClient) GetPeerStatus(peerID peer.ID) (*NoForkPeer, error) {
 	}
 
 	return &NoForkPeer{
-		ID:       peerID.String(),
+		ID:       peerID,
 		Number:   status.Number,
 		Distance: m.network.GetPeerDistance(peerID),
 	}, nil
@@ -138,7 +138,7 @@ func (m *syncPeerClient) GetPeerConnectionUpdateEventCh() <-chan *event.PeerEven
 }
 
 func (m *syncPeerClient) startGossip() error {
-	topic, err := m.network.NewTopic(statusTopicName, &proto.Status{})
+	topic, err := m.network.NewTopic(statusTopicName, &proto.SyncPeerStatus{})
 	if err != nil {
 		return err
 	}
@@ -152,16 +152,19 @@ func (m *syncPeerClient) startGossip() error {
 	return nil
 }
 
-func (m *syncPeerClient) handleStatusUpdate(obj interface{}, from string) {
-	status, ok := obj.(*proto.Status)
+// TODO: use string from
+func (m *syncPeerClient) handleStatusUpdate(obj interface{}, from peer.ID) {
+	status, ok := obj.(*proto.SyncPeerStatus)
 	if !ok {
 		m.logger.Error("failed to cast gossiped message to txn")
 
 		return
 	}
 
-	if !m.network.IsConnected(peer.ID(from)) {
-		m.logger.Warn("received status from non-connected peer, ignore", "id", from)
+	if !m.network.IsConnected(from) {
+		if m.id != string(from) {
+			m.logger.Warn("received status from non-connected peer, ignore", "id", from)
+		}
 
 		return
 	}
@@ -183,7 +186,7 @@ func (m *syncPeerClient) startNewBlockProcess() {
 			}
 
 			// Publish status
-			if err := m.topic.Publish(&proto.Status{
+			if err := m.topic.Publish(&proto.SyncPeerStatus{
 				Number: latest.Number,
 			}); err != nil {
 				m.logger.Warn("failed to publish status", "err", err)
@@ -207,7 +210,7 @@ func (m *syncPeerClient) startPeerEventProcess() {
 
 func (m *syncPeerClient) GetBlocks(
 	ctx context.Context,
-	peerID string,
+	peerID peer.ID,
 	from uint64,
 ) (<-chan *types.Block, error) {
 	clt, err := m.newSyncPeerClient(peer.ID(peerID))
@@ -249,10 +252,10 @@ func (m *syncPeerClient) GetBlocks(
 
 func (m *syncPeerClient) GetBlock(
 	ctx context.Context,
-	peerID string,
+	peerID peer.ID,
 	number uint64,
 ) (*types.Block, error) {
-	clt, err := m.newSyncPeerClient(peer.ID(peerID))
+	clt, err := m.newSyncPeerClient(peerID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create sync peer client: %w", err)
 	}

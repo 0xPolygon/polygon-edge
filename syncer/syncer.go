@@ -10,6 +10,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/network/event"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
+	"github.com/libp2p/go-libp2p-core/peer"
 )
 
 const (
@@ -54,6 +55,7 @@ func NewSyncer(
 		syncPeerClient:  NewSyncPeerClient(logger, network, blockchain),
 		blockTimeout:    blockTimeout,
 		newStatus:       make(chan struct{}),
+		peerMap:         new(PeerMap),
 	}
 }
 
@@ -71,6 +73,8 @@ func (s *syncer) Start() error {
 }
 
 func (s *syncer) initializePeerMap() {
+	peerStatuses := s.syncPeerClient.GetConnectedPeerStatuses()
+	s.peerMap.PutPeers(peerStatuses)
 
 	for peerStatus := range s.syncPeerClient.GetPeerStatusUpdateCh() {
 		bestPeer := s.peerMap.BestPeer(nil)
@@ -117,6 +121,10 @@ func (s *syncer) GetSyncProgression() *progress.Progression {
 // HasSyncPeer returns whether syncer has the peer to syncs blocks
 // return false if syncer has no peer whose latest block height doesn't exceed local height
 func (s *syncer) HasSyncPeer() bool {
+	if s.peerMap == nil {
+		return false
+	}
+
 	bestPeer := s.peerMap.BestPeer(nil)
 	header := s.blockchain.Header()
 
@@ -139,7 +147,7 @@ func (s *syncer) BulkSync(ctx context.Context, newBlockCallback func(*types.Bloc
 	// Stop monitoring the sync progression upon exit
 	defer s.syncProgression.StopProgression()
 
-	skipList := make(map[string]bool)
+	skipList := make(map[peer.ID]bool)
 
 	for {
 		bestPeer := s.peerMap.BestPeer(skipList)
@@ -170,7 +178,7 @@ func (s *syncer) BulkSync(ctx context.Context, newBlockCallback func(*types.Bloc
 
 func (s *syncer) WatchSync(ctx context.Context, callback func(*types.Block) bool) error {
 	localLatest := s.blockchain.Header().Number
-	skipList := make(map[string]bool)
+	skipList := make(map[peer.ID]bool)
 
 	// Loop until context is canceled
 	for {
@@ -217,7 +225,7 @@ func (s *syncer) WatchSync(ctx context.Context, callback func(*types.Block) bool
 	return nil
 }
 
-func (s *syncer) bulkSyncWithPeer(peerID string, newBlockCallback func(*types.Block) bool) (uint64, bool, error) {
+func (s *syncer) bulkSyncWithPeer(peerID peer.ID, newBlockCallback func(*types.Block) bool) (uint64, bool, error) {
 	localLatest := s.blockchain.Header().Number
 	isValidator := false
 
@@ -231,13 +239,13 @@ func (s *syncer) bulkSyncWithPeer(peerID string, newBlockCallback func(*types.Bl
 	for {
 		select {
 		case block, ok := <-blockCh:
+			if !ok {
+				return lastReceivedNumber,isValidator, nil
+			}
+
 			// safe check
 			if block.Number() == 0 {
 				continue
-			}
-
-			if !ok {
-				return lastReceivedNumber, isValidator, nil
 			}
 
 			if err := s.blockchain.VerifyFinalizedBlock(block); err != nil {
