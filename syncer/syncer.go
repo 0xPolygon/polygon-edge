@@ -79,7 +79,7 @@ func (s *syncer) initializePeerMap() {
 	for peerStatus := range s.syncPeerClient.GetPeerStatusUpdateCh() {
 		bestPeer := s.peerMap.BestPeer(nil)
 		peerBlockNum := peerStatus.Number
-		fmt.Println(peerStatus.ID)
+
 		s.peerMap.Put(peerStatus)
 
 		// send a signal to watchSync if a new block arrives
@@ -220,8 +220,8 @@ func (s *syncer) WatchSync(ctx context.Context, callback func(*types.Block) bool
 		if isValidator {
 			break
 		}
-
 	}
+
 	return nil
 }
 
@@ -240,7 +240,7 @@ func (s *syncer) bulkSyncWithPeer(peerID peer.ID, newBlockCallback func(*types.B
 		select {
 		case block, ok := <-blockCh:
 			if !ok {
-				return lastReceivedNumber,isValidator, nil
+				return lastReceivedNumber, isValidator, nil
 			}
 
 			// safe check
