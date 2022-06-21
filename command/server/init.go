@@ -20,7 +20,6 @@ import (
 
 var (
 	errInvalidBlockTime       = errors.New("invalid block time specified")
-	errInvalidIBFTBaseTimeout = errors.New("invalid IBFT base timeout specified")
 	errWrongIBFTBaseTimeout   = errors.New("IBFT base timeout needs to be higher than block time")
 	errDataDirectoryUndefined = errors.New("data directory not defined")
 )
@@ -84,10 +83,6 @@ func (p *serverParams) initIBFTBaseTimeout() error {
 		p.rawConfig.IBFTBaseTimeout = p.rawConfig.BlockTime * config.BlockTimeMultiplierForTimeout
 
 		return nil
-	}
-
-	if p.rawConfig.IBFTBaseTimeout < 1 {
-		return errInvalidIBFTBaseTimeout
 	}
 
 	if p.rawConfig.IBFTBaseTimeout <= p.rawConfig.BlockTime {

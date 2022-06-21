@@ -389,6 +389,8 @@ func TestAddGossipTx(t *testing.T) {
 }
 
 func TestDropKnownGossipTx(t *testing.T) {
+	t.Parallel()
+
 	pool, err := newTestPool()
 	assert.NoError(t, err)
 	pool.SetSigner(&mockSigner{})
@@ -397,18 +399,18 @@ func TestDropKnownGossipTx(t *testing.T) {
 
 	// send tx as local
 	go func() {
-		err := pool.addTx(local, tx)
-		assert.NoError(t, err)
+		assert.NoError(t, pool.addTx(local, tx))
 	}()
-	pool.handleEnqueueRequest(<-pool.enqueueReqCh)
+	<-pool.enqueueReqCh
 
-	assert.Equal(t, uint64(1), pool.accounts.get(addr1).enqueued.length())
+	_, exists := pool.index.get(tx.Hash)
+	assert.True(t, exists)
 
 	// send tx as gossip (will be discarded)
-	err = pool.addTx(gossip, tx)
-	assert.Nil(t, err)
-
-	assert.Equal(t, uint64(1), pool.accounts.get(addr1).enqueued.length())
+	assert.ErrorIs(t,
+		pool.addTx(gossip, tx),
+		ErrAlreadyKnown,
+	)
 }
 
 func TestAddHandler(t *testing.T) {
