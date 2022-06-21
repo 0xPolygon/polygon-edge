@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/network/common"
 	"github.com/0xPolygon/polygon-edge/server/proto"
@@ -222,7 +223,7 @@ func (s *systemService) Export(req *proto.ExportRequest, stream proto.System_Exp
 }
 
 const (
-	defaultMaxGRPCPayloadSize uint64 = 4 * 1024 * 1024 // 4MB
+	defaultMaxGRPCPayloadSize uint64 = 512 * 1024 // 4MB
 )
 
 type blockStreamWriter struct {
