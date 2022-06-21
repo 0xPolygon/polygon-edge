@@ -170,8 +170,9 @@ func (m *syncPeerClient) handleStatusUpdate(obj interface{}, from peer.ID) {
 	}
 
 	m.peerStatusUpdateCh <- &NoForkPeer{
-		ID:     from,
-		Number: status.Number,
+		ID:       from,
+		Number:   status.Number,
+		Distance: m.network.GetPeerDistance(from),
 	}
 }
 
