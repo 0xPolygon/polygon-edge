@@ -385,7 +385,7 @@ github.com/libp2p/go-libp2p/p2p/transport/websocket
 github.com/libp2p/go-libp2p-asn-util
 # github.com/libp2p/go-libp2p-blankhost v0.4.0
 ## explicit; go 1.17
-# github.com/libp2p/go-libp2p-core v0.16.1
+# github.com/libp2p/go-libp2p-core v0.17.0
 ## explicit; go 1.17
 github.com/libp2p/go-libp2p-core/connmgr
 github.com/libp2p/go-libp2p-core/control
