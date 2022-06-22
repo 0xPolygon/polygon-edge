@@ -78,12 +78,12 @@ func (s *syncer) initializePeerMap() {
 
 	for peerStatus := range s.syncPeerClient.GetPeerStatusUpdateCh() {
 		bestPeer := s.peerMap.BestPeer(nil)
-		peerBlockNum := peerStatus.Number
 
 		s.peerMap.Put(peerStatus)
 
 		// send a signal to watchSync if a new block arrives
-		if peerBlockNum > bestPeer.Number {
+		peerBlockNum := peerStatus.Number
+		if bestPeer != nil && peerBlockNum > bestPeer.Number {
 			select {
 			case s.newStatusCh <- struct{}{}:
 			default:
