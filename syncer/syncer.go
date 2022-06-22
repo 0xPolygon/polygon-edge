@@ -67,7 +67,7 @@ func (s *syncer) Start() error {
 	s.syncPeerService.Start()
 
 	go s.initializePeerMap()
-	go s.startPeerDisconnectEventProcess()
+	go s.startPeerConnectionEventProcess()
 
 	return nil
 }
@@ -92,7 +92,7 @@ func (s *syncer) initializePeerMap() {
 	}
 }
 
-func (s *syncer) startPeerDisconnectEventProcess() {
+func (s *syncer) startPeerConnectionEventProcess() {
 	for e := range s.syncPeerClient.GetPeerConnectionUpdateEventCh() {
 		peerID := e.PeerID
 
@@ -109,7 +109,7 @@ func (s *syncer) startPeerDisconnectEventProcess() {
 				s.peerMap.Put(status)
 			}()
 		case event.PeerDisconnected:
-			s.peerMap.Delete(peerID)
+			s.peerMap.Remove(peerID)
 		}
 	}
 }
