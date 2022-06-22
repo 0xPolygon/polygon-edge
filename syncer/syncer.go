@@ -182,12 +182,6 @@ func (s *syncer) WatchSync(ctx context.Context, callback func(*types.Block) bool
 
 	// Loop until context is canceled
 	for {
-		select {
-		case <-s.newStatusCh:
-		case <-time.After(s.blockTimeout):
-			return errTimeout
-		}
-
 		// fetch local latest block
 		if header := s.blockchain.Header(); header != nil {
 			localLatest = header.Number
@@ -219,6 +213,12 @@ func (s *syncer) WatchSync(ctx context.Context, callback func(*types.Block) bool
 
 		if isValidator {
 			break
+		}
+
+		select {
+		case <-s.newStatusCh:
+		case <-time.After(s.blockTimeout):
+			return errTimeout
 		}
 	}
 
