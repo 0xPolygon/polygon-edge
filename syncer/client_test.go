@@ -3,11 +3,15 @@ package syncer
 import (
 	"sync"
 	"testing"
+	"time"
 
+	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/network/event"
+	"github.com/0xPolygon/polygon-edge/syncer/proto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
+	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -29,22 +33,18 @@ func newTestNetwork(t *testing.T) *network.Server {
 	return srv
 }
 
-func newTestSyncPeerClient(t *testing.T, network Network, blockchain Blockchain) *syncPeerClient {
-	t.Helper()
-
+func newTestSyncPeerClient(network Network, blockchain Blockchain) *syncPeerClient {
 	return &syncPeerClient{
 		logger:                 hclog.NewNullLogger(),
 		network:                network,
 		blockchain:             blockchain,
-		id:                     string(network.AddrInfo().ID),
+		id:                     network.AddrInfo().ID.String(),
 		peerStatusUpdateCh:     make(chan *NoForkPeer, 1),
 		peerConnectionUpdateCh: make(chan *event.PeerEvent, 1),
 	}
 }
 
 func createTestSyncerService(t *testing.T, chain Blockchain) (*syncPeerService, *network.Server) {
-	t.Helper()
-
 	srv := newTestNetwork(t)
 
 	service := &syncPeerService{
@@ -59,15 +59,11 @@ func createTestSyncerService(t *testing.T, chain Blockchain) (*syncPeerService, 
 
 func TestGetPeerStatus(t *testing.T) {
 	clientSrv := newTestNetwork(t)
-	client := newTestSyncPeerClient(t, clientSrv, nil)
+	client := newTestSyncPeerClient(clientSrv, nil)
 
 	peerLatest := uint64(10)
 	_, peerSrv := createTestSyncerService(t, &mockBlockchain{
-		headerHandler: func() *types.Header {
-			return &types.Header{
-				Number: peerLatest,
-			}
-		},
+		headerHandler: newSimpleHeaderHandler(peerLatest),
 	})
 
 	err := network.JoinAndWait(
@@ -93,7 +89,7 @@ func TestGetPeerStatus(t *testing.T) {
 
 func TestGetConnectedPeerStatuses(t *testing.T) {
 	clientSrv := newTestNetwork(t)
-	client := newTestSyncPeerClient(t, clientSrv, nil)
+	client := newTestSyncPeerClient(clientSrv, nil)
 
 	var (
 		peerLatests = []uint64{
@@ -113,11 +109,7 @@ func TestGetConnectedPeerStatuses(t *testing.T) {
 		idx, latest := idx, latest
 
 		_, peerSrv := createTestSyncerService(t, &mockBlockchain{
-			headerHandler: func() *types.Header {
-				return &types.Header{
-					Number: latest,
-				}
-			},
+			headerHandler: newSimpleHeaderHandler(latest),
 		})
 
 		peerID := peerSrv.AddrInfo().ID
@@ -156,9 +148,9 @@ func TestGetConnectedPeerStatuses(t *testing.T) {
 	assert.Equal(t, expected, sortNoForkPeers(statuses))
 }
 
-func TestPeerConnectionUpdateEventCh(t *testing.T) {
+func TestStatusPubSub(t *testing.T) {
 	clientSrv := newTestNetwork(t)
-	client := newTestSyncPeerClient(t, clientSrv, nil)
+	client := newTestSyncPeerClient(clientSrv, nil)
 
 	_, peerSrv := createTestSyncerService(t, &mockBlockchain{})
 	peerID := peerSrv.AddrInfo().ID
@@ -218,6 +210,132 @@ func TestPeerConnectionUpdateEventCh(t *testing.T) {
 	assert.Equal(t, expected, events)
 }
 
-// Gossip
+func TestPeerConnectionUpdateEventCh(t *testing.T) {
+	var (
+		// network layer
+		clientSrv = newTestNetwork(t)
+		peerSrv1  = newTestNetwork(t)
+		peerSrv2  = newTestNetwork(t)
+		peerSrv3  = newTestNetwork(t) // to wait for gossipped message
+
+		// latest block height
+		peerLatest1 = uint64(10)
+		peerLatest2 = uint64(20)
+
+		// blockchain subscription
+		subscription1 = blockchain.NewMockSubscription()
+		subscription2 = blockchain.NewMockSubscription()
+
+		// syncer client
+		client = newTestSyncPeerClient(clientSrv, &mockBlockchain{
+			subscription: &blockchain.MockSubscription{},
+		})
+		peerClient1 = newTestSyncPeerClient(peerSrv1, &mockBlockchain{
+			subscription:  subscription1,
+			headerHandler: newSimpleHeaderHandler(peerLatest1),
+		})
+		peerClient2 = newTestSyncPeerClient(peerSrv2, &mockBlockchain{
+			subscription:  subscription2,
+			headerHandler: newSimpleHeaderHandler(peerLatest2),
+		})
+	)
+
+	t.Cleanup(func() {
+		clientSrv.Close()
+		peerSrv1.Close()
+		peerSrv2.Close()
+		peerSrv3.Close()
+
+		// no need to call Close of Client because test closes it manually
+		peerClient1.Close()
+		peerClient2.Close()
+	})
+
+	// client <-> peer1
+	// peer1  <-> peer2
+	err := network.JoinAndWaitMultiple(
+		network.DefaultJoinTimeout,
+		clientSrv,
+		peerSrv1,
+		peerSrv1,
+		peerSrv2,
+		peerSrv2,
+		peerSrv3,
+	)
+
+	assert.NoError(t, err)
+
+	// start gossip
+	assert.NoError(t, client.startGossip())
+	assert.NoError(t, peerClient1.startGossip())
+	assert.NoError(t, peerClient2.startGossip())
+
+	// create topic
+	topic, err := peerSrv3.NewTopic(statusTopicName, &proto.SyncPeerStatus{})
+	assert.NoError(t, err)
+
+	var wgForGossip sync.WaitGroup
+
+	// 2 messages should be gossipped
+	wgForGossip.Add(2)
+	handler := func(_ interface{}, _ peer.ID) {
+		wgForGossip.Done()
+	}
+
+	assert.NoError(t, topic.Subscribe(handler))
+
+	// need to wait for a few seconds to propagate subscribing
+	time.Sleep(2 * time.Second)
+
+	// start to subscribe blockchain events
+	go peerClient1.startNewBlockProcess()
+	go peerClient2.startNewBlockProcess()
+
+	// collect peer status changes
+	var (
+		wgForConnectingStatus sync.WaitGroup
+		newStatuses           []*NoForkPeer
+	)
+
+	wgForConnectingStatus.Add(1)
+	go func() {
+		defer wgForConnectingStatus.Done()
+
+		for status := range client.GetPeerStatusUpdateCh() {
+			newStatuses = append(newStatuses, status)
+		}
+	}()
+
+	// peer1 and peer2 emit Blockchain event
+	// they should publish their status via gossip
+	blockchainEvent := &blockchain.Event{
+		NewChain: []*types.Header{
+			{},
+		},
+	}
+
+	subscription1.Push(blockchainEvent)
+	subscription2.Push(blockchainEvent)
+
+	// wait until 2 messages are propagated
+	wgForGossip.Wait()
+
+	// close to terminate goroutine
+	close(client.peerStatusUpdateCh)
+
+	// wait until collecting routine is done
+	wgForConnectingStatus.Wait()
+
+	// client connects to only peer1, then expects to have a status from peer1
+	expected := []*NoForkPeer{
+		{
+			ID:       peerSrv1.AddrInfo().ID,
+			Number:   peerLatest1,
+			Distance: clientSrv.GetPeerDistance(peerSrv1.AddrInfo().ID),
+		},
+	}
+
+	assert.Equal(t, expected, newStatuses)
+}
 
 // GetBlocks

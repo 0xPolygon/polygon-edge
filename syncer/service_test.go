@@ -91,11 +91,7 @@ func TestGetBlocks(t *testing.T) {
 
 			service := &syncPeerService{
 				blockchain: &mockBlockchain{
-					headerHandler: func() *types.Header {
-						return &types.Header{
-							Number: test.latest,
-						}
-					},
+					headerHandler: newSimpleHeaderHandler(test.latest),
 					getBlockByNumberHandler: func(u uint64, _ bool) (*types.Block, bool) {
 						block, ok := blockMap[u]
 						if !ok {
@@ -140,11 +136,7 @@ func TestGetStatus(t *testing.T) {
 
 	service := &syncPeerService{
 		blockchain: &mockBlockchain{
-			headerHandler: func() *types.Header {
-				return &types.Header{
-					Number: headerNumber,
-				}
-			},
+			headerHandler: newSimpleHeaderHandler(headerNumber),
 		},
 	}
 

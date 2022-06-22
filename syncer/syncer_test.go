@@ -38,6 +38,7 @@ func (m *mockProgression) GetProgression() *progress.Progression {
 }
 
 type mockBlockchain struct {
+	subscription                blockchain.Subscription
 	headerHandler               func() *types.Header
 	getBlockByNumberHandler     func(uint64, bool) (*types.Block, bool)
 	verifyFinalizedBlockHandler func(*types.Block) error
@@ -45,7 +46,7 @@ type mockBlockchain struct {
 }
 
 func (m *mockBlockchain) SubscribeEvents() blockchain.Subscription {
-	return nil
+	return m.subscription
 }
 
 func (m *mockBlockchain) Header() *types.Header {
@@ -62,6 +63,14 @@ func (m *mockBlockchain) VerifyFinalizedBlock(b *types.Block) error {
 
 func (m *mockBlockchain) WriteBlock(b *types.Block) error {
 	return m.writeBlockHandler(b)
+}
+
+func newSimpleHeaderHandler(num uint64) func() *types.Header {
+	return func() *types.Header {
+		return &types.Header{
+			Number: num,
+		}
+	}
 }
 
 type mockSyncPeerService struct{}
@@ -404,11 +413,7 @@ func TestHasSyncPeer(t *testing.T) {
 			syncer := NewTestSyncer(
 				nil,
 				&mockBlockchain{
-					headerHandler: func() *types.Header {
-						return &types.Header{
-							Number: test.localLatest,
-						}
-					},
+					headerHandler: newSimpleHeaderHandler(test.localLatest),
 				},
 				0,
 				&mockSyncPeerClient{},
@@ -596,11 +601,7 @@ func TestBulkSync(t *testing.T) {
 			syncer := NewTestSyncer(
 				nil,
 				&mockBlockchain{
-					headerHandler: func() *types.Header {
-						return &types.Header{
-							Number: latestBlockNumber,
-						}
-					},
+					headerHandler:               newSimpleHeaderHandler(latestBlockNumber),
 					verifyFinalizedBlockHandler: test.createVerifyFinalizedBlockHandler(),
 					writeBlockHandler: func(b *types.Block) error {
 						syncedBlocks = append(syncedBlocks, b)
@@ -765,11 +766,7 @@ func TestWatchSync(t *testing.T) {
 			syncer := NewTestSyncer(
 				nil,
 				&mockBlockchain{
-					headerHandler: func() *types.Header {
-						return &types.Header{
-							Number: latestBlockNumber,
-						}
-					},
+					headerHandler:               newSimpleHeaderHandler(latestBlockNumber),
 					verifyFinalizedBlockHandler: test.createVerifyFinalizedBlockHandler(),
 					writeBlockHandler: func(b *types.Block) error {
 						syncedBlocks = append(syncedBlocks, b)
@@ -998,11 +995,7 @@ func Test_bulkSyncWithPeer(t *testing.T) {
 			syncer := NewTestSyncer(
 				nil,
 				&mockBlockchain{
-					headerHandler: func() *types.Header {
-						return &types.Header{
-							Number: test.beginningHeight,
-						}
-					},
+					headerHandler:               newSimpleHeaderHandler(test.beginningHeight),
 					verifyFinalizedBlockHandler: test.verifyFinalizedBlockHandler,
 					writeBlockHandler: func(b *types.Block) error {
 						if err := test.writeBlockHandler(b); err != nil {
