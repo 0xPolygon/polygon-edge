@@ -199,7 +199,7 @@ func (s *syncer) WatchSync(ctx context.Context, callback func(*types.Block) bool
 		}
 
 		// fetch block from the peer
-		lastNumber, isValidator, err := s.bulkSyncWithPeer(bestPeer.ID, callback)
+		lastNumber, shouldTerminate, err := s.bulkSyncWithPeer(bestPeer.ID, callback)
 		if err != nil {
 			s.logger.Warn("failed to complete bulk sync with peer, try to next one", "peer ID", bestPeer.ID)
 		}
@@ -211,7 +211,7 @@ func (s *syncer) WatchSync(ctx context.Context, callback func(*types.Block) bool
 			continue
 		}
 
-		if isValidator {
+		if shouldTerminate {
 			break
 		}
 
@@ -227,7 +227,7 @@ func (s *syncer) WatchSync(ctx context.Context, callback func(*types.Block) bool
 
 func (s *syncer) bulkSyncWithPeer(peerID peer.ID, newBlockCallback func(*types.Block) bool) (uint64, bool, error) {
 	localLatest := s.blockchain.Header().Number
-	isValidator := false
+	shouldTerminate := false
 
 	blockCh, err := s.syncPeerClient.GetBlocks(context.Background(), peerID, localLatest+1)
 	if err != nil {
@@ -240,7 +240,7 @@ func (s *syncer) bulkSyncWithPeer(peerID peer.ID, newBlockCallback func(*types.B
 		select {
 		case block, ok := <-blockCh:
 			if !ok {
-				return lastReceivedNumber, isValidator, nil
+				return lastReceivedNumber, shouldTerminate, nil
 			}
 
 			// safe check
@@ -256,11 +256,11 @@ func (s *syncer) bulkSyncWithPeer(peerID peer.ID, newBlockCallback func(*types.B
 				return lastReceivedNumber, false, fmt.Errorf("failed to write block while bulk syncing: %w", err)
 			}
 
-			isValidator = newBlockCallback(block)
+			shouldTerminate = newBlockCallback(block)
 
 			lastReceivedNumber = block.Number()
 		case <-time.After(s.blockTimeout):
-			return lastReceivedNumber, isValidator, errTimeout
+			return lastReceivedNumber, shouldTerminate, errTimeout
 		}
 	}
 }
