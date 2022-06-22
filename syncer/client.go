@@ -152,7 +152,6 @@ func (m *syncPeerClient) startGossip() error {
 	return nil
 }
 
-// TODO: use string from
 func (m *syncPeerClient) handleStatusUpdate(obj interface{}, from peer.ID) {
 	status, ok := obj.(*proto.SyncPeerStatus)
 	if !ok {
@@ -205,7 +204,10 @@ func (m *syncPeerClient) startPeerEventProcess() {
 	}
 
 	for e := range peerEventCh {
-		m.peerConnectionUpdateCh <- e
+		switch e.Type {
+		case event.PeerConnected, event.PeerDisconnected:
+			m.peerConnectionUpdateCh <- e
+		}
 	}
 }
 
