@@ -37,28 +37,30 @@ func (m *mockProgression) GetProgression() *progress.Progression {
 	return nil
 }
 
-type mockBlockchainForSyncer struct {
-	// this doesn't implement GetBlockByNumber because syncer won't call
-	Blockchain
-
+type mockBlockchain struct {
 	headerHandler               func() *types.Header
+	getBlockByNumberHandler     func(uint64, bool) (*types.Block, bool)
 	verifyFinalizedBlockHandler func(*types.Block) error
 	writeBlockHandler           func(*types.Block) error
 }
 
-func (m *mockBlockchainForSyncer) SubscribeEvents() blockchain.Subscription {
+func (m *mockBlockchain) SubscribeEvents() blockchain.Subscription {
 	return nil
 }
 
-func (m *mockBlockchainForSyncer) Header() *types.Header {
+func (m *mockBlockchain) Header() *types.Header {
 	return m.headerHandler()
 }
 
-func (m *mockBlockchainForSyncer) VerifyFinalizedBlock(b *types.Block) error {
+func (m *mockBlockchain) GetBlockByNumber(number uint64, full bool) (*types.Block, bool) {
+	return m.getBlockByNumberHandler(number, full)
+}
+
+func (m *mockBlockchain) VerifyFinalizedBlock(b *types.Block) error {
 	return m.verifyFinalizedBlockHandler(b)
 }
 
-func (m *mockBlockchainForSyncer) WriteBlock(b *types.Block) error {
+func (m *mockBlockchain) WriteBlock(b *types.Block) error {
 	return m.writeBlockHandler(b)
 }
 
@@ -123,7 +125,7 @@ func GetAllElementsFromPeerMap(t *testing.T, p *PeerMap) []*NoForkPeer {
 	return peers
 }
 
-func SortPeerStatuses(peerStatuses []*NoForkPeer) []*NoForkPeer {
+func sortPeerStatuses(peerStatuses []*NoForkPeer) []*NoForkPeer {
 	sort.Slice(peerStatuses, func(p, q int) bool {
 		return peerStatuses[p].Number < peerStatuses[q].Number
 	})
@@ -215,7 +217,7 @@ func Test_initializePeerMap(t *testing.T) {
 
 			syncer.initializePeerMap()
 
-			peerMapStatuses := SortPeerStatuses(
+			peerMapStatuses := sortPeerStatuses(
 				GetAllElementsFromPeerMap(t, syncer.peerMap),
 			)
 
@@ -350,7 +352,7 @@ func Test_startPeerDisconnectEventProcess(t *testing.T) {
 			peerMapStatuses := GetAllElementsFromPeerMap(t, syncer.peerMap)
 
 			// no need to check order
-			peerMapStatuses = SortPeerStatuses(peerMapStatuses)
+			peerMapStatuses = sortPeerStatuses(peerMapStatuses)
 
 			assert.Equal(t, test.expectedPeerMap, peerMapStatuses)
 		})
@@ -401,7 +403,7 @@ func TestHasSyncPeer(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			syncer := NewTestSyncer(
 				nil,
-				&mockBlockchainForSyncer{
+				&mockBlockchain{
 					headerHandler: func() *types.Header {
 						return &types.Header{
 							Number: test.localLatest,
@@ -593,7 +595,7 @@ func TestBulkSync(t *testing.T) {
 			progression := &mockProgression{}
 			syncer := NewTestSyncer(
 				nil,
-				&mockBlockchainForSyncer{
+				&mockBlockchain{
 					headerHandler: func() *types.Header {
 						return &types.Header{
 							Number: latestBlockNumber,
@@ -762,7 +764,7 @@ func TestWatchSync(t *testing.T) {
 			progression := &mockProgression{}
 			syncer := NewTestSyncer(
 				nil,
-				&mockBlockchainForSyncer{
+				&mockBlockchain{
 					headerHandler: func() *types.Header {
 						return &types.Header{
 							Number: latestBlockNumber,
@@ -995,7 +997,7 @@ func Test_bulkSyncWithPeer(t *testing.T) {
 
 			syncer := NewTestSyncer(
 				nil,
-				&mockBlockchainForSyncer{
+				&mockBlockchain{
 					headerHandler: func() *types.Header {
 						return &types.Header{
 							Number: test.beginningHeight,
