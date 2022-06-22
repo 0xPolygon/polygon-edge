@@ -54,6 +54,27 @@ func JoinAndWait(
 	return connectErr
 }
 
+func DisconnectAndWait(
+	source *Server,
+	target peer.ID,
+	leaveTimeout time.Duration,
+) error {
+	if leaveTimeout == 0 {
+		leaveTimeout = DefaultLeaveTimeout
+	}
+
+	// Mark the destination address as ready for dialing
+	source.DisconnectFromPeer(target, "test")
+
+	disconnectCtx, cancelFn := context.WithTimeout(context.Background(), leaveTimeout)
+	defer cancelFn()
+
+	// Wait for the peer to be disconnected
+	_, err := WaitUntilPeerDisconnectsFrom(disconnectCtx, source, target)
+
+	return err
+}
+
 func WaitUntilPeerConnectsTo(ctx context.Context, srv *Server, ids ...peer.ID) (bool, error) {
 	peersConnected := 0
 	targetPeers := len(ids)
