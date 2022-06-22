@@ -70,7 +70,6 @@ type SyncPeerClient interface {
 	GetPeerStatus(id peer.ID) (*NoForkPeer, error)
 	GetConnectedPeerStatuses() []*NoForkPeer
 	GetBlocks(context.Context, peer.ID, uint64) (<-chan *types.Block, error)
-	GetBlock(context.Context, peer.ID, uint64) (*types.Block, error)
 	GetPeerStatusUpdateCh() <-chan *NoForkPeer
 	GetPeerConnectionUpdateEventCh() <-chan *event.PeerEvent
 }
