@@ -251,31 +251,6 @@ func (m *syncPeerClient) GetBlocks(
 	return blockCh, nil
 }
 
-func (m *syncPeerClient) GetBlock(
-	ctx context.Context,
-	peerID peer.ID,
-	number uint64,
-) (*types.Block, error) {
-	clt, err := m.newSyncPeerClient(peerID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create sync peer client: %w", err)
-	}
-
-	protoBlock, err := clt.GetBlock(ctx, &proto.GetBlockRequest{
-		Number: number,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch block from peer: %w", err)
-	}
-
-	block, err := fromProto(protoBlock)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode a block from peer: %w", err)
-	}
-
-	return block, nil
-}
-
 func (m *syncPeerClient) newSyncPeerClient(peerID peer.ID) (proto.SyncPeerClient, error) {
 	stream, err := m.network.NewStream(SyncerProto, peerID)
 	if err != nil {

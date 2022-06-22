@@ -19,8 +19,6 @@ type syncPeerService struct {
 
 	blockchain Blockchain
 	network    Network
-
-	id string // node ID
 }
 
 func NewSyncPeerService(
@@ -30,7 +28,6 @@ func NewSyncPeerService(
 	return &syncPeerService{
 		blockchain: blockchain,
 		network:    network,
-		id:         network.AddrInfo().ID.String(),
 	}
 }
 
@@ -66,21 +63,6 @@ func (s *syncPeerService) GetBlocks(
 	}
 
 	return nil
-}
-
-// GetBlock is a gRPC endpoint to return a block at the specific height
-func (s *syncPeerService) GetBlock(
-	ctx context.Context,
-	req *proto.GetBlockRequest,
-) (*proto.Block, error) {
-	block, ok := s.blockchain.GetBlockByNumber(req.Number, true)
-	if !ok {
-		return nil, ErrBlockNotFound
-	}
-
-	resp := toProtoBlock(block)
-
-	return resp, nil
 }
 
 // GetStatus is a gRPC endpoint to return the latest block number as a node status
