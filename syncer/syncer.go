@@ -77,18 +77,13 @@ func (s *syncer) initializePeerMap() {
 	s.peerMap.PutPeers(peerStatuses)
 
 	for peerStatus := range s.syncPeerClient.GetPeerStatusUpdateCh() {
-		bestPeer := s.peerMap.BestPeer(nil)
-
 		s.peerMap.Put(peerStatus)
 
-		// send a signal to watchSync if a new block arrives
-		peerBlockNum := peerStatus.Number
-		if bestPeer != nil && peerBlockNum > bestPeer.Number {
-			select {
-			case s.newStatusCh <- struct{}{}:
-			default:
-			}
+		select {
+		case s.newStatusCh <- struct{}{}:
+		default:
 		}
+
 	}
 }
 
@@ -107,6 +102,11 @@ func (s *syncer) startPeerDisconnectEventProcess() {
 				}
 
 				s.peerMap.Put(status)
+
+				select {
+				case s.newStatusCh <- struct{}{}:
+				default:
+				}
 			}()
 		case event.PeerDisconnected:
 			s.peerMap.Delete(peerID)
