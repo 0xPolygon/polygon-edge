@@ -37,8 +37,8 @@ type syncer struct {
 	// Timeout for syncing a block
 	blockTimeout time.Duration
 
-	// channel to notify WatchSync that a new status arrived
-	newStatus chan struct{}
+	// Channel to notify WatchSync that a new status arrived
+	newStatusCh chan struct{}
 }
 
 func NewSyncer(
@@ -54,7 +54,7 @@ func NewSyncer(
 		syncPeerService: NewSyncPeerService(network, blockchain),
 		syncPeerClient:  NewSyncPeerClient(logger, network, blockchain),
 		blockTimeout:    blockTimeout,
-		newStatus:       make(chan struct{}),
+		newStatusCh:     make(chan struct{}),
 		peerMap:         new(PeerMap),
 	}
 }
@@ -85,7 +85,7 @@ func (s *syncer) initializePeerMap() {
 		// send a signal to watchSync if a new block arrives
 		if peerBlockNum > bestPeer.Number {
 			select {
-			case s.newStatus <- struct{}{}:
+			case s.newStatusCh <- struct{}{}:
 			default:
 			}
 		}
@@ -183,7 +183,7 @@ func (s *syncer) WatchSync(ctx context.Context, callback func(*types.Block) bool
 	// Loop until context is canceled
 	for {
 		select {
-		case <-s.newStatus:
+		case <-s.newStatusCh:
 		case <-time.After(s.blockTimeout):
 			return errTimeout
 		}
