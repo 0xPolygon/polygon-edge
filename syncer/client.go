@@ -44,7 +44,7 @@ func NewSyncPeerClient(
 		logger:                 logger.Named(SyncPeersManagerLoggerName),
 		network:                network,
 		blockchain:             blockchain,
-		id:                     string(network.AddrInfo().ID),
+		id:                     network.AddrInfo().ID.String(),
 		peerStatusUpdateCh:     make(chan *NoForkPeer, 1),
 		peerConnectionUpdateCh: make(chan *event.PeerEvent, 1),
 	}
@@ -161,7 +161,7 @@ func (m *syncPeerClient) handleStatusUpdate(obj interface{}, from peer.ID) {
 	}
 
 	if !m.network.IsConnected(from) {
-		if m.id != string(from) {
+		if m.id != from.String() {
 			m.logger.Warn("received status from non-connected peer, ignore", "id", from)
 		}
 

@@ -43,12 +43,12 @@ func (m *PeerMap) PutPeers(peers []*NoForkPeer) {
 }
 
 func (m *PeerMap) Put(peer *NoForkPeer) {
-	m.Store(string(peer.ID), peer)
+	m.Store(peer.ID.String(), peer)
 }
 
 // Remove removes a peer from heap if it exists
 func (m *PeerMap) Remove(peerID peer.ID) {
-	m.Delete(string(peerID))
+	m.Delete(peerID.String())
 }
 
 // BestPeer returns the top of heap
