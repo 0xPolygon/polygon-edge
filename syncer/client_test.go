@@ -1,6 +1,7 @@
 package syncer
 
 import (
+	"context"
 	"sync"
 	"testing"
 	"time"
@@ -58,6 +59,8 @@ func createTestSyncerService(t *testing.T, chain Blockchain) (*syncPeerService, 
 }
 
 func TestGetPeerStatus(t *testing.T) {
+	t.Parallel()
+
 	clientSrv := newTestNetwork(t)
 	client := newTestSyncPeerClient(clientSrv, nil)
 
@@ -88,6 +91,8 @@ func TestGetPeerStatus(t *testing.T) {
 }
 
 func TestGetConnectedPeerStatuses(t *testing.T) {
+	t.Parallel()
+
 	clientSrv := newTestNetwork(t)
 	client := newTestSyncPeerClient(clientSrv, nil)
 
@@ -149,6 +154,8 @@ func TestGetConnectedPeerStatuses(t *testing.T) {
 }
 
 func TestStatusPubSub(t *testing.T) {
+	t.Parallel()
+
 	clientSrv := newTestNetwork(t)
 	client := newTestSyncPeerClient(clientSrv, nil)
 
@@ -211,6 +218,8 @@ func TestStatusPubSub(t *testing.T) {
 }
 
 func TestPeerConnectionUpdateEventCh(t *testing.T) {
+	t.Parallel()
+
 	var (
 		// network layer
 		clientSrv = newTestNetwork(t)
@@ -338,4 +347,57 @@ func TestPeerConnectionUpdateEventCh(t *testing.T) {
 	assert.Equal(t, expected, newStatuses)
 }
 
-// GetBlocks
+func Test_syncPeerClient_GetBlocks(t *testing.T) {
+	t.Parallel()
+
+	clientSrv := newTestNetwork(t)
+	client := newTestSyncPeerClient(clientSrv, nil)
+
+	var (
+		peerLatest = uint64(10)
+		syncFrom   = uint64(1)
+	)
+
+	_, peerSrv := createTestSyncerService(t, &mockBlockchain{
+		headerHandler: newSimpleHeaderHandler(peerLatest),
+		getBlockByNumberHandler: func(u uint64, b bool) (*types.Block, bool) {
+			if u <= 10 {
+				return &types.Block{
+					Header: &types.Header{
+						Number: u,
+					},
+				}, true
+			}
+
+			return nil, false
+		},
+	})
+
+	err := network.JoinAndWait(
+		clientSrv,
+		peerSrv,
+		network.DefaultBufferTimeout,
+		network.DefaultJoinTimeout,
+	)
+
+	assert.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	blockStream, err := client.GetBlocks(ctx, peerSrv.AddrInfo().ID, syncFrom)
+	assert.NoError(t, err)
+
+	blocks := make([]*types.Block, 0, peerLatest)
+	for block := range blockStream {
+		blocks = append(blocks, block)
+	}
+
+	// hash is calculated on unmarshlig
+	expected := createMockBlocks(10)
+	for _, b := range expected {
+		b.Header.ComputeHash()
+	}
+
+	assert.Equal(t, expected, blocks)
+}

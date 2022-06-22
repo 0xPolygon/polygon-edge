@@ -52,7 +52,9 @@ func newMockGrpcClient(t *testing.T, service *syncPeerService) proto.SyncPeerCli
 	return proto.NewSyncPeerClient(conn)
 }
 
-func TestGetBlocks(t *testing.T) {
+func Test_syncPeerService_GetBlocks(t *testing.T) {
+	t.Parallel()
+
 	blocks := createMockBlocks(10)
 
 	tests := []struct {
@@ -83,6 +85,8 @@ func TestGetBlocks(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			blockMap := make(map[uint64]*types.Block)
 
 			for _, b := range test.blocks {
@@ -132,6 +136,8 @@ func TestGetBlocks(t *testing.T) {
 }
 
 func TestGetStatus(t *testing.T) {
+	t.Parallel()
+
 	headerNumber := uint64(10)
 
 	service := &syncPeerService{

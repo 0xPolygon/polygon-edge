@@ -73,6 +73,8 @@ func peerMapToPeers(peerMap *PeerMap) []*NoForkPeer {
 }
 
 func TestConstructor(t *testing.T) {
+	t.Parallel()
+
 	peers := peers
 
 	peerMap := NewPeerMap(peers)
@@ -91,6 +93,8 @@ func TestConstructor(t *testing.T) {
 }
 
 func TestPutPeers(t *testing.T) {
+	t.Parallel()
+
 	initialPeers := peers[:1]
 	peers := peers[1:]
 
@@ -112,6 +116,8 @@ func TestPutPeers(t *testing.T) {
 }
 
 func TestPutPeer(t *testing.T) {
+	t.Parallel()
+
 	initialPeers := peers[:1]
 
 	peer := peers[1]
@@ -134,6 +140,8 @@ func TestPutPeer(t *testing.T) {
 }
 
 func TestBestPeer(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		skipList map[peer.ID]bool
@@ -163,7 +171,11 @@ func TestBestPeer(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
+
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			peerMap := NewPeerMap(test.peers)
 
 			bestPeer := peerMap.BestPeer(test.skipList)

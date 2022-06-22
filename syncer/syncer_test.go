@@ -163,6 +163,8 @@ func NewTestSyncer(
 
 // Test whether Syncer calls GetConnectedPeerStatuses and initialize peerMap
 func Test_initializePeerMap(t *testing.T) {
+	t.Parallel()
+
 	peerStatuses := []*NoForkPeer{
 		{
 			ID:       peer.ID("A"),
@@ -199,7 +201,10 @@ func Test_initializePeerMap(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
+
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
 
 			syncer := NewTestSyncer(
 				nil,
@@ -236,6 +241,8 @@ func Test_initializePeerMap(t *testing.T) {
 }
 
 func Test_startPeerDisconnectEventProcess(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name            string
 		events          []*event.PeerEvent
@@ -322,7 +329,11 @@ func Test_startPeerDisconnectEventProcess(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
+
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			syncer := NewTestSyncer(
 				nil,
 				nil,
@@ -369,6 +380,8 @@ func Test_startPeerDisconnectEventProcess(t *testing.T) {
 }
 
 func TestHasSyncPeer(t *testing.T) {
+	t.Parallel()
+
 	peerStatuses := []*NoForkPeer{
 		{
 			ID:       peer.ID("A"),
@@ -409,7 +422,11 @@ func TestHasSyncPeer(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
+
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			syncer := NewTestSyncer(
 				nil,
 				&mockBlockchain{
@@ -457,6 +474,8 @@ func createMockBlocks(num int) []*types.Block {
 }
 
 func TestBulkSync(t *testing.T) {
+	t.Parallel()
+
 	blocks := createMockBlocks(10)
 
 	tests := []struct {
@@ -592,7 +611,11 @@ func TestBulkSync(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
+
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			syncedBlocks := make([]*types.Block, 0, len(test.blocks))
 
 			latestBlockNumber := test.beginningHeight
@@ -613,10 +636,7 @@ func TestBulkSync(t *testing.T) {
 				time.Second,
 				&mockSyncPeerClient{
 					getBlocksHandler: func(ctx context.Context, i peer.ID, u uint64) (<-chan *types.Block, error) {
-						// should not panic
-						peerCh := test.peerBlocksCh[i]
-
-						return peerCh, nil
+						return test.peerBlocksCh[i], nil
 					},
 				},
 				progression,
@@ -635,6 +655,8 @@ func TestBulkSync(t *testing.T) {
 }
 
 func TestWatchSync(t *testing.T) {
+	t.Parallel()
+
 	blocks := createMockBlocks(10)
 
 	tests := []struct {
@@ -757,7 +779,11 @@ func TestWatchSync(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
+
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			syncedBlocks := make([]*types.Block, 0, len(test.blocks))
 
 			latestBlockNumber := test.beginningHeight
@@ -819,6 +845,8 @@ func TestWatchSync(t *testing.T) {
 }
 
 func Test_bulkSyncWithPeer(t *testing.T) {
+	t.Parallel()
+
 	blockNum := 30
 	blocks := make([]*types.Block, blockNum) // 1 to 30
 	for i := 0; i < blockNum; i++ {
@@ -827,22 +855,6 @@ func Test_bulkSyncWithPeer(t *testing.T) {
 				Number: uint64(i + 1),
 			},
 		}
-	}
-
-	blocksToCh := func(blocks []*types.Block, delay time.Duration) <-chan *types.Block {
-		ch := make(chan *types.Block)
-
-		go func() {
-			for _, b := range blocks {
-				time.Sleep(delay)
-
-				ch <- b
-			}
-
-			close(ch)
-		}()
-
-		return ch
 	}
 
 	var (
@@ -989,7 +1001,11 @@ func Test_bulkSyncWithPeer(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
+
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			syncedBlocks := make([]*types.Block, 0, len(test.blocks))
 
 			syncer := NewTestSyncer(
