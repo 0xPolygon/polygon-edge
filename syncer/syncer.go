@@ -128,7 +128,7 @@ func (s *syncer) BulkSync(ctx context.Context, newBlockCallback func(*types.Bloc
 	updateLocalLatest()
 
 	// Create a blockchain subscription for the sync progression and start tracking
-	s.syncProgression.StartProgression(localLatest, s.blockchain.SubscribeEvents())
+	s.syncProgression.StartProgression(localLatest+1, s.blockchain.SubscribeEvents())
 
 	// Stop monitoring the sync progression upon exit
 	defer s.syncProgression.StopProgression()
