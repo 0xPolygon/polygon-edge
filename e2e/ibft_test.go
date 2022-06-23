@@ -181,6 +181,7 @@ func TestIbft_Long_BlockGenerationTime(t *testing.T) {
 			config.SetSeal(true)
 			config.SetBlockTime(blockTime)
 			config.SetIBFTBaseTimeout(ibftTimeout)
+			config.SetShowsLog(true)
 		})
 
 	timeoutForBlockProduction := time.Duration(ibftTimeout+10) * time.Second
