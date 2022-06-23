@@ -21,8 +21,6 @@ import (
 	and verifies it was mined
 **/
 func TestIbft_Transfer(t *testing.T) {
-	t.Parallel()
-
 	var (
 		senderKey, senderAddr = tests.GenerateKeyAndAddr(t)
 		_, receiverAddr       = tests.GenerateKeyAndAddr(t)
@@ -64,8 +62,6 @@ func TestIbft_Transfer(t *testing.T) {
 }
 
 func TestIbft_TransactionFeeRecipient(t *testing.T) {
-	t.Parallel()
-
 	testCases := []struct {
 		name         string
 		contractCall bool
@@ -87,8 +83,6 @@ func TestIbft_TransactionFeeRecipient(t *testing.T) {
 		tc := tc
 
 		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
 			senderKey, senderAddr := tests.GenerateKeyAndAddr(t)
 			_, receiverAddr := tests.GenerateKeyAndAddr(t)
 
@@ -165,8 +159,6 @@ func TestIbft_TransactionFeeRecipient(t *testing.T) {
 }
 
 func TestIbft_Long_BlockGenerationTime(t *testing.T) {
-	t.Parallel()
-
 	// Set the longer value than default timeout into block generation time
 	blockTime := config.DefaultIBFTBaseTimeout + 10
 
@@ -181,7 +173,6 @@ func TestIbft_Long_BlockGenerationTime(t *testing.T) {
 			config.SetSeal(true)
 			config.SetBlockTime(blockTime)
 			config.SetIBFTBaseTimeout(ibftTimeout)
-			config.SetShowsLog(true)
 		})
 
 	timeoutForBlockProduction := time.Duration(ibftTimeout+10) * time.Second
