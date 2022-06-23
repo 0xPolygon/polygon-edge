@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math/big"
 	"sort"
-	"sync"
 	"testing"
 	"time"
 
@@ -156,7 +155,7 @@ func NewTestSyncer(
 		syncPeerService: &mockSyncPeerService{},
 		syncPeerClient:  mockSyncPeerClient,
 		blockTimeout:    blockTimeout,
-		newStatus:       make(chan struct{}),
+		newStatusCh:     make(chan struct{}),
 		peerMap:         new(PeerMap),
 	}
 }
@@ -616,30 +615,31 @@ func TestBulkSync(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			syncedBlocks := make([]*types.Block, 0, len(test.blocks))
+			var (
+				syncedBlocks      = make([]*types.Block, 0, len(test.blocks))
+				latestBlockNumber = test.beginningHeight
+				progression       = &mockProgression{}
 
-			latestBlockNumber := test.beginningHeight
+				syncer = NewTestSyncer(
+					nil,
+					&mockBlockchain{
+						headerHandler:               newSimpleHeaderHandler(latestBlockNumber),
+						verifyFinalizedBlockHandler: test.createVerifyFinalizedBlockHandler(),
+						writeBlockHandler: func(b *types.Block) error {
+							syncedBlocks = append(syncedBlocks, b)
+							latestBlockNumber = b.Number()
 
-			progression := &mockProgression{}
-			syncer := NewTestSyncer(
-				nil,
-				&mockBlockchain{
-					headerHandler:               newSimpleHeaderHandler(latestBlockNumber),
-					verifyFinalizedBlockHandler: test.createVerifyFinalizedBlockHandler(),
-					writeBlockHandler: func(b *types.Block) error {
-						syncedBlocks = append(syncedBlocks, b)
-						latestBlockNumber = b.Number()
-
-						return nil
+							return nil
+						},
 					},
-				},
-				time.Second,
-				&mockSyncPeerClient{
-					getBlocksHandler: func(ctx context.Context, i peer.ID, u uint64) (<-chan *types.Block, error) {
-						return test.peerBlocksCh[i], nil
+					time.Second,
+					&mockSyncPeerClient{
+						getBlocksHandler: func(ctx context.Context, i peer.ID, u uint64) (<-chan *types.Block, error) {
+							return test.peerBlocksCh[i], nil
+						},
 					},
-				},
-				progression,
+					progression,
+				)
 			)
 
 			syncer.peerMap.PutPeers(test.peerStatuses)
@@ -669,7 +669,8 @@ func TestWatchSync(t *testing.T) {
 		// peers
 		peerStatuses []*NoForkPeer
 
-		peerBlocksCh map[peer.ID]<-chan *types.Block
+		peerBlocksCh   map[peer.ID]<-chan *types.Block
+		newStatusDelay time.Duration
 
 		// handlers
 		// a function to return a callback to use closure
@@ -696,6 +697,7 @@ func TestWatchSync(t *testing.T) {
 					Distance: big.NewInt(0),
 				},
 			},
+			newStatusDelay: 0,
 			peerBlocksCh: map[peer.ID]<-chan *types.Block{
 				peer.ID("A"): blocksToCh(blocks[:10], 0),
 			},
@@ -730,6 +732,7 @@ func TestWatchSync(t *testing.T) {
 					Distance: big.NewInt(1),
 				},
 			},
+			newStatusDelay: 0,
 			peerBlocksCh: map[peer.ID]<-chan *types.Block{
 				peer.ID("A"): blocksToCh(blocks[:10], 0),
 				peer.ID("B"): blocksToCh(blocks[4:10], 0),
@@ -760,17 +763,32 @@ func TestWatchSync(t *testing.T) {
 			beginningHeight: 0,
 			createBlockCallback: func() func(*types.Block) bool {
 				return func(b *types.Block) bool {
-					return true
+					return false
 				}
 			},
-			peerStatuses: []*NoForkPeer{},
-			peerBlocksCh: map[peer.ID]<-chan *types.Block{},
+			peerStatuses: []*NoForkPeer{
+				{
+					ID:       peer.ID("A"),
+					Number:   5,
+					Distance: big.NewInt(0),
+				},
+				{
+					ID:       peer.ID("B"),
+					Number:   10,
+					Distance: big.NewInt(0),
+				},
+			},
+			newStatusDelay: 2 * time.Second,
+			peerBlocksCh: map[peer.ID]<-chan *types.Block{
+				peer.ID("A"): blocksToCh(blocks[:5], 0),
+				peer.ID("B"): blocksToCh(blocks[5:10], 0),
+			},
 			createVerifyFinalizedBlockHandler: func() func(*types.Block) error {
 				return func(b *types.Block) error {
 					return nil
 				}
 			},
-			blocks: []*types.Block{},
+			blocks: blocks[:5],
 			// TODO: need to fix implementation?
 			progressionStart:   0,
 			progressionHighest: 0,
@@ -784,57 +802,57 @@ func TestWatchSync(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			syncedBlocks := make([]*types.Block, 0, len(test.blocks))
-
-			latestBlockNumber := test.beginningHeight
-
-			progression := &mockProgression{}
-			syncer := NewTestSyncer(
-				nil,
-				&mockBlockchain{
-					headerHandler:               newSimpleHeaderHandler(latestBlockNumber),
-					verifyFinalizedBlockHandler: test.createVerifyFinalizedBlockHandler(),
-					writeBlockHandler: func(b *types.Block) error {
-						syncedBlocks = append(syncedBlocks, b)
-						latestBlockNumber = b.Number()
-
-						return nil
-					},
-				},
-				time.Second,
-				&mockSyncPeerClient{
-					getBlocksHandler: func(ctx context.Context, i peer.ID, u uint64) (<-chan *types.Block, error) {
-						// should not panic
-						peerCh := test.peerBlocksCh[i]
-
-						return peerCh, nil
-					},
-				},
-				progression,
-			)
-
 			var (
-				wg  sync.WaitGroup
-				err error
+				syncedBlocks      = make([]*types.Block, 0, len(test.blocks))
+				latestBlockNumber = test.beginningHeight
+				progression       = &mockProgression{}
+
+				syncer = NewTestSyncer(
+					nil,
+					&mockBlockchain{
+						headerHandler:               newSimpleHeaderHandler(latestBlockNumber),
+						verifyFinalizedBlockHandler: test.createVerifyFinalizedBlockHandler(),
+						writeBlockHandler: func(b *types.Block) error {
+							syncedBlocks = append(syncedBlocks, b)
+							latestBlockNumber = b.Number()
+
+							return nil
+						},
+					},
+					time.Second,
+					&mockSyncPeerClient{
+						getBlocksHandler: func(ctx context.Context, i peer.ID, u uint64) (<-chan *types.Block, error) {
+							// should not panic
+							peerCh := test.peerBlocksCh[i]
+
+							return peerCh, nil
+						},
+					},
+					progression,
+				)
 			)
 
-			wg.Add(1)
+			if test.newStatusDelay == 0 {
+				for _, p := range test.peerStatuses {
+					syncer.peerMap.Put(p)
+				}
+			} else {
+				if len(test.peerStatuses) > 0 {
+					syncer.peerMap.Put(test.peerStatuses[0])
+				}
 
-			go func() {
-				defer wg.Done()
+				go func() {
+					for _, p := range test.peerStatuses[1:] {
+						time.Sleep(test.newStatusDelay)
 
-				err = syncer.WatchSync(context.Background(), test.createBlockCallback())
-			}()
+						syncer.peerMap.Put(p)
 
-			for _, p := range test.peerStatuses {
-				syncer.peerMap.Put(p)
-
-				syncer.newStatus <- struct{}{}
-
-				time.Sleep(syncer.blockTimeout / 2)
+						syncer.newStatusCh <- struct{}{}
+					}
+				}()
 			}
 
-			wg.Wait()
+			err := syncer.WatchSync(context.Background(), test.createBlockCallback())
 
 			assert.Equal(t, test.blocks, syncedBlocks)
 			assert.Equal(t, test.progressionStart, progression.startingBlock)
@@ -1006,28 +1024,30 @@ func Test_bulkSyncWithPeer(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			syncedBlocks := make([]*types.Block, 0, len(test.blocks))
+			var (
+				syncedBlocks = make([]*types.Block, 0, len(test.blocks))
 
-			syncer := NewTestSyncer(
-				nil,
-				&mockBlockchain{
-					headerHandler:               newSimpleHeaderHandler(test.beginningHeight),
-					verifyFinalizedBlockHandler: test.verifyFinalizedBlockHandler,
-					writeBlockHandler: func(b *types.Block) error {
-						if err := test.writeBlockHandler(b); err != nil {
-							return err
-						}
+				syncer = NewTestSyncer(
+					nil,
+					&mockBlockchain{
+						headerHandler:               newSimpleHeaderHandler(test.beginningHeight),
+						verifyFinalizedBlockHandler: test.verifyFinalizedBlockHandler,
+						writeBlockHandler: func(b *types.Block) error {
+							if err := test.writeBlockHandler(b); err != nil {
+								return err
+							}
 
-						syncedBlocks = append(syncedBlocks, b)
+							syncedBlocks = append(syncedBlocks, b)
 
-						return nil
+							return nil
+						},
 					},
-				},
-				test.blockTimeout,
-				&mockSyncPeerClient{
-					getBlocksHandler: test.getBlocksHandler,
-				},
-				&mockProgression{},
+					test.blockTimeout,
+					&mockSyncPeerClient{
+						getBlocksHandler: test.getBlocksHandler,
+					},
+					&mockProgression{},
+				)
 			)
 
 			lastSynced, shouldTerminate, err := syncer.bulkSyncWithPeer(peer.ID("X"), test.blockCallback)

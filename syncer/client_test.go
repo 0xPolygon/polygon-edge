@@ -393,7 +393,7 @@ func Test_syncPeerClient_GetBlocks(t *testing.T) {
 		blocks = append(blocks, block)
 	}
 
-	// hash is calculated on unmarshlig
+	// hash is calculated on unmarshaling
 	expected := createMockBlocks(10)
 	for _, b := range expected {
 		b.Header.ComputeHash()
