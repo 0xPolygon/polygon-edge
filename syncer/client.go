@@ -216,7 +216,7 @@ func (m *syncPeerClient) GetBlocks(
 	peerID peer.ID,
 	from uint64,
 ) (<-chan *types.Block, error) {
-	clt, err := m.newSyncPeerClient(peer.ID(peerID))
+	clt, err := m.newSyncPeerClient(peerID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create sync peer client: %w", err)
 	}
