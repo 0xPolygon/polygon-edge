@@ -121,6 +121,7 @@ func GetAllElementsFromPeerMap(t *testing.T, p *PeerMap) []*NoForkPeer {
 	t.Helper()
 
 	peers := make([]*NoForkPeer, 0, 3)
+
 	p.Range(func(key, value interface{}) bool {
 		peer, ok := value.(*NoForkPeer)
 		assert.True(t, ok)
@@ -867,6 +868,7 @@ func Test_bulkSyncWithPeer(t *testing.T) {
 
 	blockNum := 30
 	blocks := make([]*types.Block, blockNum) // 1 to 30
+
 	for i := 0; i < blockNum; i++ {
 		blocks[i] = &types.Block{
 			Header: &types.Header{

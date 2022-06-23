@@ -75,6 +75,7 @@ func JoinAndWaitMultiple(
 		s1, s2 := servers[i], servers[i+1]
 
 		wg.Add(1)
+
 		go func() {
 			defer wg.Done()
 

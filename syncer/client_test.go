@@ -46,6 +46,8 @@ func newTestSyncPeerClient(network Network, blockchain Blockchain) *syncPeerClie
 }
 
 func createTestSyncerService(t *testing.T, chain Blockchain) (*syncPeerService, *network.Server) {
+	t.Helper()
+
 	srv := newTestNetwork(t)
 
 	service := &syncPeerService{
@@ -120,6 +122,7 @@ func TestGetConnectedPeerStatuses(t *testing.T) {
 		peerID := peerSrv.AddrInfo().ID
 
 		wg.Add(1)
+
 		go func() {
 			defer wg.Done()
 
@@ -171,6 +174,7 @@ func TestStatusPubSub(t *testing.T) {
 	)
 
 	wg.Add(1)
+
 	go func() {
 		defer wg.Done()
 
@@ -287,6 +291,7 @@ func TestPeerConnectionUpdateEventCh(t *testing.T) {
 
 	// 2 messages should be gossipped
 	wgForGossip.Add(2)
+
 	handler := func(_ interface{}, _ peer.ID) {
 		wgForGossip.Done()
 	}
@@ -307,6 +312,7 @@ func TestPeerConnectionUpdateEventCh(t *testing.T) {
 	)
 
 	wgForConnectingStatus.Add(1)
+
 	go func() {
 		defer wgForConnectingStatus.Done()
 

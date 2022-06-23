@@ -83,7 +83,6 @@ func (s *syncer) initializePeerMap() {
 		case s.newStatusCh <- struct{}{}:
 		default:
 		}
-
 	}
 }
 
