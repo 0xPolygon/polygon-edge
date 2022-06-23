@@ -112,8 +112,8 @@ github.com/aryann/difflib v0.0.0-20170710044230-e206f873d14a/go.mod h1:DAHtR1m6l
 github.com/aws/aws-lambda-go v1.13.3/go.mod h1:4UKl9IzQMoD+QF79YdCuzCwp8VbmG4VAQwij/eHl5CU=
 github.com/aws/aws-sdk-go v1.27.0/go.mod h1:KmX6BPdI08NWTb3/sm4ZGu5ShLoqVDhKgpiN924inxo=
 github.com/aws/aws-sdk-go v1.40.45/go.mod h1:585smgzpB/KqRA+K3y/NL/oYRqQvpNJYvLm+LY1U59Q=
-github.com/aws/aws-sdk-go v1.44.32 h1:x5hBtpY/02sgRL158zzTclcCLwh3dx3YlSl1rAH4Op0=
-github.com/aws/aws-sdk-go v1.44.32/go.mod h1:y4AeaBuwd2Lk+GepC1E9v0qOiTws0MIWAX4oIKwKHZo=
+github.com/aws/aws-sdk-go v1.44.37 h1:KvDxCX6dfJeEDC77U5GPGSP0ErecmNnhDHFxw+NIvlI=
+github.com/aws/aws-sdk-go v1.44.37/go.mod h1:y4AeaBuwd2Lk+GepC1E9v0qOiTws0MIWAX4oIKwKHZo=
 github.com/aws/aws-sdk-go-v2 v0.18.0/go.mod h1:JWVYvqSMppoMJC0x5wdwiImzgXTI9FuZwxzkQq9wy+g=
 github.com/aws/aws-sdk-go-v2 v1.9.1/go.mod h1:cK/D0BBs0b/oWPIcX/Z/obahJK1TT7IPVjy53i/mX/4=
 github.com/aws/aws-sdk-go-v2/service/cloudwatch v1.8.1/go.mod h1:CM+19rL1+4dFWnOQKwDc7H1KwXTz+h61oUSHyhV0b3o=
@@ -684,8 +684,9 @@ github.com/libp2p/go-libp2p-core v0.11.0/go.mod h1:ECdxehoYosLYHgDDFa2N4yE8Y7aQR
 github.com/libp2p/go-libp2p-core v0.12.0/go.mod h1:ECdxehoYosLYHgDDFa2N4yE8Y7aQRAMf0sX9mf2sbGg=
 github.com/libp2p/go-libp2p-core v0.14.0/go.mod h1:tLasfcVdTXnixsLB0QYaT1syJOhsbrhG7q6pGrHtBg8=
 github.com/libp2p/go-libp2p-core v0.15.1/go.mod h1:agSaboYM4hzB1cWekgVReqV5M4g5M+2eNNejV+1EEhs=
-github.com/libp2p/go-libp2p-core v0.16.1 h1:bWoiEBqVkpJ13hbv/f69tHODp86t6mvc4fBN4DkK73M=
 github.com/libp2p/go-libp2p-core v0.16.1/go.mod h1:O3i/7y+LqUb0N+qhzXjBjjpchgptWAVMG1Voegk7b4c=
+github.com/libp2p/go-libp2p-core v0.17.0 h1:QGU8mlxHytwTc4pq/aVQX9VDoAPiCHxfe/oOSwF+YDg=
+github.com/libp2p/go-libp2p-core v0.17.0/go.mod h1:h/iAbFij28ASmI+tvXfjoipg1g2N33O4UN6LIb6QfoU=
 github.com/libp2p/go-libp2p-discovery v0.6.0/go.mod h1:/u1voHt0tKIe5oIA1RHBKQLVCWPna2dXmPNHc2zR9S8=
 github.com/libp2p/go-libp2p-discovery v0.7.0 h1:6Iu3NyningTb/BmUnEhcTwzwbs4zcywwbfTulM9LHuc=
 github.com/libp2p/go-libp2p-discovery v0.7.0/go.mod h1:zPug0Rxib1aQG9iIdwOpRpBf18cAfZgzicO826UQP4I=
