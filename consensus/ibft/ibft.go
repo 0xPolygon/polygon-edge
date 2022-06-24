@@ -503,6 +503,7 @@ func (i *Ibft) runSyncState() {
 
 			continue
 		}
+
 		if err := i.syncer.BulkSync(context.Background(), func(newBlock *types.Block) bool {
 			callInsertBlockHook(newBlock.Number())
 			i.txpool.ResetWithHeaders(newBlock.Header)
@@ -526,7 +527,7 @@ func (i *Ibft) runSyncState() {
 		// start watch mode
 		var isValidator bool
 
-		i.syncer.WatchSync(context.Background(), func(newBlock *types.Block) bool {
+		err := i.syncer.WatchSync(context.Background(), func(newBlock *types.Block) bool {
 			// After each written block, update the snapshot store for PoS.
 			// The snapshot store is currently updated for PoA inside the ProcessHeadersHook
 			callInsertBlockHook(newBlock.Number())
@@ -536,6 +537,10 @@ func (i *Ibft) runSyncState() {
 
 			return isValidator
 		})
+
+		if err != nil {
+			i.logger.Warn("error happened during watch sync", "err", err)
+		}
 
 		if isValidator {
 			// at this point, we are in sync with the latest chain we know of
