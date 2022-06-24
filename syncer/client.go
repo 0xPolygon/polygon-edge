@@ -286,6 +286,7 @@ func (m *syncPeerClient) newSyncPeerClient(peerID peer.ID) (proto.SyncPeerClient
 	}
 
 	m.network.SaveProtocolStream(SyncerProto, conn, peerID)
+
 	return proto.NewSyncPeerClient(conn), nil
 }
 

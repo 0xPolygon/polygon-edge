@@ -83,7 +83,6 @@ func (s *syncer) initializePeerMap() {
 		case s.newStatusCh <- struct{}{}:
 		default:
 		}
-
 	}
 }
 
@@ -182,9 +181,8 @@ func (s *syncer) WatchSync(ctx context.Context, callback func(*types.Block) bool
 
 	// Loop until context is canceled
 	for {
-		select {
-		case <-s.newStatusCh:
-		}
+		//Wait for a new event to arrive
+		<-s.newStatusCh
 
 		// fetch local latest block
 		if header := s.blockchain.Header(); header != nil {
@@ -194,8 +192,9 @@ func (s *syncer) WatchSync(ctx context.Context, callback func(*types.Block) bool
 		// pick one best peer
 		bestPeer := s.peerMap.BestPeer(skipList)
 		if bestPeer == nil {
-			// Empty skipList map
+			// Empty skipList map if there are no best peers
 			skipList = make(map[peer.ID]bool)
+
 			continue
 		}
 
@@ -221,6 +220,7 @@ func (s *syncer) WatchSync(ctx context.Context, callback func(*types.Block) bool
 			break
 		}
 	}
+
 	return nil
 }
 
