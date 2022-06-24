@@ -181,6 +181,9 @@ func (s *syncer) WatchSync(ctx context.Context, callback func(*types.Block) bool
 
 	// Loop until context is canceled
 	for {
+		//Wait for a new event to arrive
+		<-s.newStatusCh
+
 		// fetch local latest block
 		if header := s.blockchain.Header(); header != nil {
 			localLatest = header.Number
@@ -189,7 +192,10 @@ func (s *syncer) WatchSync(ctx context.Context, callback func(*types.Block) bool
 		// pick one best peer
 		bestPeer := s.peerMap.BestPeer(skipList)
 		if bestPeer == nil {
-			break
+			// Empty skipList map if there are no best peers
+			skipList = make(map[peer.ID]bool)
+
+			continue
 		}
 
 		// if the bestPeer does not have a new block continue
@@ -213,12 +219,6 @@ func (s *syncer) WatchSync(ctx context.Context, callback func(*types.Block) bool
 		if shouldTerminate {
 			break
 		}
-
-		select {
-		case <-s.newStatusCh:
-		case <-time.After(s.blockTimeout):
-			return errTimeout
-		}
 	}
 
 	return nil
@@ -232,6 +232,13 @@ func (s *syncer) bulkSyncWithPeer(peerID peer.ID, newBlockCallback func(*types.B
 	if err != nil {
 		return 0, false, err
 	}
+
+	defer func() {
+		err := s.syncPeerClient.CloseStream(peerID)
+		if err != nil {
+			s.logger.Error("Failed to close stream: ", err)
+		}
+	}()
 
 	var lastReceivedNumber uint64
 

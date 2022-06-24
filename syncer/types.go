@@ -2,6 +2,7 @@ package syncer
 
 import (
 	"context"
+	rawGrpc "google.golang.org/grpc"
 	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
@@ -9,7 +10,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/network/event"
 	"github.com/0xPolygon/polygon-edge/types"
-	lp2pNetwork "github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"google.golang.org/protobuf/proto"
 )
@@ -38,11 +38,14 @@ type Network interface {
 	SubscribeCh() (<-chan *event.PeerEvent, error)
 	// Get distance between node and peer
 	GetPeerDistance(peer.ID) *big.Int
-	// NewStream opens a stream to communicate with the peer
-	NewStream(string, peer.ID) (lp2pNetwork.Stream, error)
+	// NewProtoConnection opens up a new stream on the set protocol to the peer,
+	// and returns a reference to the connection
+	NewProtoConnection(protocol string, peerID peer.ID) (*rawGrpc.ClientConn, error)
 	// NewTopic Creates New Topic for gossip
 	NewTopic(protoID string, obj proto.Message) (*network.Topic, error)
 	IsConnected(peerID peer.ID) bool
+	CloseProtocolStream(protocol string, peerID peer.ID) error
+	SaveProtocolStream(protocol string, stream *rawGrpc.ClientConn, peerID peer.ID)
 }
 
 type Syncer interface {
@@ -72,4 +75,5 @@ type SyncPeerClient interface {
 	GetBlocks(context.Context, peer.ID, uint64) (<-chan *types.Block, error)
 	GetPeerStatusUpdateCh() <-chan *NoForkPeer
 	GetPeerConnectionUpdateEventCh() <-chan *event.PeerEvent
+	CloseStream(peerID peer.ID) error
 }

@@ -18,7 +18,7 @@ import (
 // NewIdentityClient returns a new identity service client connection
 func (s *Server) NewIdentityClient(peerID peer.ID) (proto.IdentityClient, error) {
 	// Create a new stream connection and return it
-	protoStream, err := s.newProtoConnection(common.IdentityProto, peerID)
+	protoStream, err := s.NewProtoConnection(common.IdentityProto, peerID)
 	if err != nil {
 		return nil, err
 	}
