@@ -36,6 +36,9 @@ type syncer struct {
 
 	// Timeout for syncing a block
 	blockTimeout time.Duration
+
+	// Channel to notify WatchSync that a new status arrived
+	newStatusCh chan struct{}
 }
 
 func NewSyncer(
@@ -51,6 +54,7 @@ func NewSyncer(
 		syncPeerService: NewSyncPeerService(network, blockchain),
 		syncPeerClient:  NewSyncPeerClient(logger, network, blockchain),
 		blockTimeout:    blockTimeout,
+		newStatusCh:     make(chan struct{}),
 		peerMap:         new(PeerMap),
 	}
 }
@@ -74,6 +78,11 @@ func (s *syncer) initializePeerMap() {
 
 	for peerStatus := range s.syncPeerClient.GetPeerStatusUpdateCh() {
 		s.peerMap.Put(peerStatus)
+
+		select {
+		case s.newStatusCh <- struct{}{}:
+		default:
+		}
 	}
 }
 
@@ -92,6 +101,11 @@ func (s *syncer) startPeerConnectionEventProcess() {
 				}
 
 				s.peerMap.Put(status)
+
+				select {
+				case s.newStatusCh <- struct{}{}:
+				default:
+				}
 			}()
 		case event.PeerDisconnected:
 			s.peerMap.Remove(peerID)
@@ -116,9 +130,8 @@ func (s *syncer) HasSyncPeer() bool {
 	return bestPeer != nil && bestPeer.Number > header.Number
 }
 
-func (s *syncer) BulkSync(ctx context.Context, newBlockCallback func(*types.Block)) error {
+func (s *syncer) BulkSync(ctx context.Context, newBlockCallback func(*types.Block) bool) error {
 	localLatest := uint64(0)
-
 	updateLocalLatest := func() {
 		if header := s.blockchain.Header(); header != nil {
 			localLatest = header.Number
@@ -144,7 +157,7 @@ func (s *syncer) BulkSync(ctx context.Context, newBlockCallback func(*types.Bloc
 		// Set the target height
 		s.syncProgression.UpdateHighestProgression(bestPeer.Number)
 
-		lastNumber, err := s.bulkSyncWithPeer(bestPeer.ID, newBlockCallback)
+		lastNumber, _, err := s.bulkSyncWithPeer(bestPeer.ID, newBlockCallback)
 		if err != nil {
 			s.logger.Warn("failed to complete bulk sync with peer, try to next one", "peer ID", bestPeer.ID)
 		}
@@ -163,32 +176,69 @@ func (s *syncer) BulkSync(ctx context.Context, newBlockCallback func(*types.Bloc
 }
 
 func (s *syncer) WatchSync(ctx context.Context, callback func(*types.Block) bool) error {
+	localLatest := s.blockchain.Header().Number
+	skipList := make(map[peer.ID]bool)
+
 	// Loop until context is canceled
 	for {
+		//Wait for a new event to arrive
+		<-s.newStatusCh
+
+		// fetch local latest block
+		if header := s.blockchain.Header(); header != nil {
+			localLatest = header.Number
+		}
+
 		// pick one best peer
-		// peer := s.peerHeap.BestPeer()
+		bestPeer := s.peerMap.BestPeer(skipList)
+		if bestPeer == nil {
+			// Empty skipList map if there are no best peers
+			skipList = make(map[peer.ID]bool)
+
+			continue
+		}
+
+		// if the bestPeer does not have a new block continue
+		if bestPeer.Number <= localLatest {
+			continue
+		}
 
 		// fetch block from the peer
+		lastNumber, shouldTerminate, err := s.bulkSyncWithPeer(bestPeer.ID, callback)
+		if err != nil {
+			s.logger.Warn("failed to complete bulk sync with peer, try to next one", "peer ID", bestPeer.ID)
+		}
 
-		// verify the block
+		if err != nil || lastNumber < bestPeer.Number {
+			skipList[bestPeer.ID] = true
 
-		// write the block
+			// continue to next peer
+			continue
+		}
 
-		select {
-		case <-ctx.Done():
-			// context is canceled
+		if shouldTerminate {
 			break
 		}
 	}
+
+	return nil
 }
 
-func (s *syncer) bulkSyncWithPeer(peerID peer.ID, newBlockCallback func(*types.Block)) (uint64, error) {
+func (s *syncer) bulkSyncWithPeer(peerID peer.ID, newBlockCallback func(*types.Block) bool) (uint64, bool, error) {
 	localLatest := s.blockchain.Header().Number
+	shouldTerminate := false
 
 	blockCh, err := s.syncPeerClient.GetBlocks(context.Background(), peerID, localLatest+1)
 	if err != nil {
-		return 0, err
+		return 0, false, err
 	}
+
+	defer func() {
+		err := s.syncPeerClient.CloseStream(peerID)
+		if err != nil {
+			s.logger.Error("Failed to close stream: ", err)
+		}
+	}()
 
 	var lastReceivedNumber uint64
 
@@ -196,7 +246,7 @@ func (s *syncer) bulkSyncWithPeer(peerID peer.ID, newBlockCallback func(*types.B
 		select {
 		case block, ok := <-blockCh:
 			if !ok {
-				return lastReceivedNumber, nil
+				return lastReceivedNumber, shouldTerminate, nil
 			}
 
 			// safe check
@@ -205,18 +255,18 @@ func (s *syncer) bulkSyncWithPeer(peerID peer.ID, newBlockCallback func(*types.B
 			}
 
 			if err := s.blockchain.VerifyFinalizedBlock(block); err != nil {
-				return lastReceivedNumber, fmt.Errorf("unable to verify block, %w", err)
+				return lastReceivedNumber, false, fmt.Errorf("unable to verify block, %w", err)
 			}
 
 			if err := s.blockchain.WriteBlock(block); err != nil {
-				return lastReceivedNumber, fmt.Errorf("failed to write block while bulk syncing: %w", err)
+				return lastReceivedNumber, false, fmt.Errorf("failed to write block while bulk syncing: %w", err)
 			}
 
-			newBlockCallback(block)
+			shouldTerminate = newBlockCallback(block)
 
 			lastReceivedNumber = block.Number()
 		case <-time.After(s.blockTimeout):
-			return lastReceivedNumber, errTimeout
+			return lastReceivedNumber, shouldTerminate, errTimeout
 		}
 	}
 }

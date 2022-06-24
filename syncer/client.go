@@ -9,7 +9,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/network/event"
-	"github.com/0xPolygon/polygon-edge/network/grpc"
 	"github.com/0xPolygon/polygon-edge/syncer/proto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
@@ -211,6 +210,10 @@ func (m *syncPeerClient) startPeerEventProcess() {
 	}
 }
 
+func (m *syncPeerClient) CloseStream(peerID peer.ID) error {
+	return m.network.CloseProtocolStream(SyncerProto, peerID)
+}
+
 func (m *syncPeerClient) GetBlocks(
 	ctx context.Context,
 	peerID peer.ID,
@@ -254,12 +257,12 @@ func (m *syncPeerClient) GetBlocks(
 }
 
 func (m *syncPeerClient) newSyncPeerClient(peerID peer.ID) (proto.SyncPeerClient, error) {
-	stream, err := m.network.NewStream(SyncerProto, peerID)
+	conn, err := m.network.NewProtoConnection(SyncerProto, peerID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open a stream, err %w", err)
 	}
 
-	conn := grpc.WrapClient(stream)
+	m.network.SaveProtocolStream(SyncerProto, conn, peerID)
 
 	return proto.NewSyncPeerClient(conn), nil
 }
