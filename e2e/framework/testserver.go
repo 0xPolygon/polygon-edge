@@ -383,14 +383,16 @@ func (t *TestServer) Start(ctx context.Context) error {
 	}
 
 	_, err := tests.RetryUntilTimeout(ctx, func() (interface{}, bool) {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		if _, err := t.Operator().GetStatus(ctx, &empty.Empty{}); err == nil {
-			return nil, false
+		if _, err := t.Operator().GetStatus(ctx, &empty.Empty{}); err != nil {
+			t.t.Logf("failed to get status from server: %+v", err)
+
+			return nil, true
 		}
 
-		return nil, true
+		return nil, false
 	})
 
 	return err
