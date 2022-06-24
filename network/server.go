@@ -584,9 +584,9 @@ func (s *Server) Close() error {
 	return err
 }
 
-// newProtoConnection opens up a new stream on the set protocol to the peer,
+// NewProtoConnection opens up a new stream on the set protocol to the peer,
 // and returns a reference to the connection
-func (s *Server) newProtoConnection(protocol string, peerID peer.ID) (*rawGrpc.ClientConn, error) {
+func (s *Server) NewProtoConnection(protocol string, peerID peer.ID) (*rawGrpc.ClientConn, error) {
 	s.protocolsLock.Lock()
 	defer s.protocolsLock.Unlock()
 
