@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/umbracle/ethgo"
 	"io"
 	"math/big"
 	"os"
@@ -18,6 +17,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/umbracle/ethgo"
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/genesis"
@@ -361,6 +362,10 @@ func (t *TestServer) Start(ctx context.Context) error {
 		args = append(args, "--block-time", strconv.FormatUint(t.Config.BlockTime, 10))
 	}
 
+	if t.Config.IBFTBaseTimeout != 0 {
+		args = append(args, "--ibft-base-timeout", strconv.FormatUint(t.Config.IBFTBaseTimeout, 10))
+	}
+
 	t.ReleaseReservedPorts()
 
 	// Start the server
@@ -378,14 +383,16 @@ func (t *TestServer) Start(ctx context.Context) error {
 	}
 
 	_, err := tests.RetryUntilTimeout(ctx, func() (interface{}, bool) {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		if _, err := t.Operator().GetStatus(ctx, &empty.Empty{}); err == nil {
-			return nil, false
+		if _, err := t.Operator().GetStatus(ctx, &empty.Empty{}); err != nil {
+			t.t.Logf("failed to get status from server: %+v", err)
+
+			return nil, true
 		}
 
-		return nil, true
+		return nil, false
 	})
 
 	return err

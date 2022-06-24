@@ -49,6 +49,7 @@ type TestServerConfig struct {
 	MinValidatorCount       uint64               // Min validator count
 	MaxValidatorCount       uint64               // Max validator count
 	BlockTime               uint64               // Minimum block generation time (in s)
+	IBFTBaseTimeout         uint64               // Base Timeout in seconds for IBFT
 }
 
 // DataDir returns path of data directory server uses
@@ -67,6 +68,10 @@ func (t *TestServerConfig) SetSigner(signer *crypto.EIP155Signer) {
 
 func (t *TestServerConfig) SetBlockTime(blockTime uint64) {
 	t.BlockTime = blockTime
+}
+
+func (t *TestServerConfig) SetIBFTBaseTimeout(baseTimeout uint64) {
+	t.IBFTBaseTimeout = baseTimeout
 }
 
 // PrivateKey returns a private key in data directory

@@ -102,7 +102,8 @@ type Ibft struct {
 
 	mechanisms []ConsensusMechanism // IBFT ConsensusMechanism used (PoA / PoS)
 
-	blockTime time.Duration // Minimum block generation time in seconds
+	blockTime       time.Duration // Minimum block generation time in seconds
+	ibftBaseTimeout time.Duration // Base timeout for IBFT message in seconds
 }
 
 // runHook runs a specified hook if it is present in the hook map
@@ -177,6 +178,7 @@ func Factory(
 		metrics:            params.Metrics,
 		secretsManager:     params.SecretsManager,
 		blockTime:          time.Duration(params.BlockTime) * time.Second,
+		ibftBaseTimeout:    time.Duration(params.IBFTBaseTimeout) * time.Second,
 	}
 
 	// Initialize the mechanism
@@ -830,7 +832,7 @@ func (i *Ibft) runAcceptState() { // start new round
 	// we are NOT a proposer for the block. Then, we have to wait
 	// for a pre-prepare message from the proposer
 
-	timeout := exponentialTimeout(i.state.view.Round)
+	timeout := i.getTimeout()
 	for i.getState() == AcceptState {
 		msg, ok := i.getNextMessage(timeout)
 		if !ok {
@@ -930,7 +932,7 @@ func (i *Ibft) runValidateState() {
 		}
 	}
 
-	timeout := exponentialTimeout(i.state.view.Round)
+	timeout := i.getTimeout()
 	for i.getState() == ValidateState {
 		msg, ok := i.getNextMessage(timeout)
 		if !ok {
@@ -1139,7 +1141,7 @@ func (i *Ibft) runRoundChangeState() {
 	}
 
 	// create a timer for the round change
-	timeout := exponentialTimeout(i.state.view.Round)
+	timeout := i.getTimeout()
 	for i.getState() == RoundChangeState {
 		msg, ok := i.getNextMessage(timeout)
 		if !ok {
@@ -1151,7 +1153,7 @@ func (i *Ibft) runRoundChangeState() {
 			i.logger.Debug("round change timeout")
 			checkTimeout()
 			// update the timeout duration
-			timeout = exponentialTimeout(i.state.view.Round)
+			timeout = i.getTimeout()
 
 			continue
 		}
@@ -1162,7 +1164,8 @@ func (i *Ibft) runRoundChangeState() {
 		if num == i.state.validators.MaxFaultyNodes()+1 && i.state.view.Round < msg.View.Round {
 			// weak certificate, try to catch up if our round number is smaller
 			// update timer
-			timeout = exponentialTimeout(i.state.view.Round)
+			timeout = i.getTimeout()
+
 			sendRoundChange(msg.View.Round)
 		} else if num == i.quorumSize(i.state.view.Sequence)(i.state.validators) {
 			// start a new round immediately
@@ -1427,6 +1430,11 @@ func (i *Ibft) pushMessage(msg *proto.MessageReq) {
 	case i.updateCh <- struct{}{}:
 	default:
 	}
+}
+
+// getTimeout returns the IBFT timeout based on round and config
+func (i *Ibft) getTimeout() time.Duration {
+	return exponentialTimeout(i.state.view.Round, i.ibftBaseTimeout)
 }
 
 // startNewSequence changes the sequence and resets the round in the view of state

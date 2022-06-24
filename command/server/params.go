@@ -2,8 +2,9 @@ package server
 
 import (
 	"errors"
-	"github.com/0xPolygon/polygon-edge/command/server/config"
 	"net"
+
+	"github.com/0xPolygon/polygon-edge/command/server/config"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/network"
@@ -31,6 +32,7 @@ const (
 	secretsConfigFlag     = "secrets-config"
 	restoreFlag           = "restore"
 	blockTimeFlag         = "block-time"
+	ibftBaseTimeoutFlag   = "ibft-base-timeout"
 	devIntervalFlag       = "dev-interval"
 	devFlag               = "dev"
 	corsOriginFlag        = "access-control-allow-origins"
@@ -160,14 +162,15 @@ func (p *serverParams) generateConfig() *server.Config {
 			MaxOutboundPeers: p.rawConfig.Network.MaxOutboundPeers,
 			Chain:            p.genesisConfig,
 		},
-		DataDir:        p.rawConfig.DataDir,
-		Seal:           p.rawConfig.ShouldSeal,
-		PriceLimit:     p.rawConfig.TxPool.PriceLimit,
-		MaxSlots:       p.rawConfig.TxPool.MaxSlots,
-		SecretsManager: p.secretsConfig,
-		RestoreFile:    p.getRestoreFilePath(),
-		BlockTime:      p.rawConfig.BlockTime,
-		LogLevel:       hclog.LevelFromString(p.rawConfig.LogLevel),
-		LogFilePath:    p.logFileLocation,
+		DataDir:         p.rawConfig.DataDir,
+		Seal:            p.rawConfig.ShouldSeal,
+		PriceLimit:      p.rawConfig.TxPool.PriceLimit,
+		MaxSlots:        p.rawConfig.TxPool.MaxSlots,
+		SecretsManager:  p.secretsConfig,
+		RestoreFile:     p.getRestoreFilePath(),
+		BlockTime:       p.rawConfig.BlockTime,
+		IBFTBaseTimeout: p.rawConfig.IBFTBaseTimeout,
+		LogLevel:        hclog.LevelFromString(p.rawConfig.LogLevel),
+		LogFilePath:     p.logFileLocation,
 	}
 }
