@@ -63,7 +63,7 @@ func TestIbft_Transfer(t *testing.T) {
 			)
 
 			var (
-				startTimeout = time.Duration(tc.ibftBaseTimeout+30) * time.Second
+				startTimeout = time.Duration(tc.ibftBaseTimeout+60) * time.Second
 				txTimeout    = time.Duration(tc.ibftBaseTimeout+10) * time.Second
 			)
 
