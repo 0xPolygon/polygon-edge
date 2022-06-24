@@ -9,6 +9,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/network/event"
+	"github.com/0xPolygon/polygon-edge/network/grpc"
 	"github.com/0xPolygon/polygon-edge/syncer/proto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
@@ -35,7 +36,7 @@ func newTestNetwork(t *testing.T) *network.Server {
 }
 
 func newTestSyncPeerClient(network Network, blockchain Blockchain) *syncPeerClient {
-	return &syncPeerClient{
+	client := &syncPeerClient{
 		logger:                 hclog.NewNullLogger(),
 		network:                network,
 		blockchain:             blockchain,
@@ -43,6 +44,11 @@ func newTestSyncPeerClient(network Network, blockchain Blockchain) *syncPeerClie
 		peerStatusUpdateCh:     make(chan *NoForkPeer, 1),
 		peerConnectionUpdateCh: make(chan *event.PeerEvent, 1),
 	}
+
+	// need to register protocol
+	network.RegisterProtocol(SyncerProto, grpc.NewGrpcStream())
+
+	return client
 }
 
 func createTestSyncerService(t *testing.T, chain Blockchain) (*syncPeerService, *network.Server) {

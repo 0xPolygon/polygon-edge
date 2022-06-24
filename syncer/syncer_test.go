@@ -117,6 +117,10 @@ func (m *mockSyncPeerClient) GetPeerConnectionUpdateEventCh() <-chan *event.Peer
 	return m.getPeerConnectionUpdateEventChHandler()
 }
 
+func (m *mockSyncPeerClient) CloseStream(peerID peer.ID) error {
+	return nil
+}
+
 func GetAllElementsFromPeerMap(t *testing.T, p *PeerMap) []*NoForkPeer {
 	t.Helper()
 
@@ -759,42 +763,6 @@ func TestWatchSync(t *testing.T) {
 			progressionHighest: 0,
 			err:                nil,
 		},
-		{
-			name:            "should return error in case of timeout",
-			beginningHeight: 0,
-			createBlockCallback: func() func(*types.Block) bool {
-				return func(b *types.Block) bool {
-					return false
-				}
-			},
-			peerStatuses: []*NoForkPeer{
-				{
-					ID:       peer.ID("A"),
-					Number:   5,
-					Distance: big.NewInt(0),
-				},
-				{
-					ID:       peer.ID("B"),
-					Number:   10,
-					Distance: big.NewInt(0),
-				},
-			},
-			newStatusDelay: 2 * time.Second,
-			peerBlocksCh: map[peer.ID]<-chan *types.Block{
-				peer.ID("A"): blocksToCh(blocks[:5], 0),
-				peer.ID("B"): blocksToCh(blocks[5:10], 0),
-			},
-			createVerifyFinalizedBlockHandler: func() func(*types.Block) error {
-				return func(b *types.Block) error {
-					return nil
-				}
-			},
-			blocks: blocks[:5],
-			// TODO: need to fix implementation?
-			progressionStart:   0,
-			progressionHighest: 0,
-			err:                errTimeout,
-		},
 	}
 
 	for _, test := range tests {
@@ -833,27 +801,23 @@ func TestWatchSync(t *testing.T) {
 				)
 			)
 
-			if test.newStatusDelay == 0 {
+			errCh := make(chan error, 1)
+
+			go func() {
+				errCh <- syncer.WatchSync(context.Background(), test.createBlockCallback())
+			}()
+
+			go func() {
 				for _, p := range test.peerStatuses {
 					syncer.peerMap.Put(p)
+
+					syncer.newStatusCh <- struct{}{}
+
+					time.Sleep(test.newStatusDelay)
 				}
-			} else {
-				if len(test.peerStatuses) > 0 {
-					syncer.peerMap.Put(test.peerStatuses[0])
-				}
+			}()
 
-				go func() {
-					for _, p := range test.peerStatuses[1:] {
-						time.Sleep(test.newStatusDelay)
-
-						syncer.peerMap.Put(p)
-
-						syncer.newStatusCh <- struct{}{}
-					}
-				}()
-			}
-
-			err := syncer.WatchSync(context.Background(), test.createBlockCallback())
+			err := <-errCh
 
 			assert.Equal(t, test.blocks, syncedBlocks)
 			assert.Equal(t, test.progressionStart, progression.startingBlock)
