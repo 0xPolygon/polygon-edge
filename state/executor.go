@@ -740,22 +740,30 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host, op evm.
 		}
 	}
 
-	if t.traceConfig.Debug {
-		if c.Depth == 1 {
-			t.traceConfig.Tracer.CaptureStart(t, c.Caller, c.Address, true, c.Code, c.Gas, c.Value)
-		} else {
-			t.traceConfig.Tracer.CaptureEnter(int(op), c.Caller, c.Address, c.Code, c.Gas, c.Value)
-		}
-	}
-
 	var result *runtime.ExecutionResult
 	start := time.Now()
 
 	result = t.run(c, host)
+	gasCost := uint64(len(result.ReturnValue)) * 200
+
+	if t.traceConfig.Debug {
+		var output []byte
+		copy(output, result.ReturnValue)
+		if c.Depth == 1 {
+			t.traceConfig.Tracer.CaptureStart(t, c.Caller, c.Address, true, c.Code, c.Gas, c.Value)
+			defer func(startTime time.Time) {
+				t.traceConfig.Tracer.CaptureEnd(output, gasCost, time.Since(start), result.Err)
+			}(time.Now())
+		} else {
+			t.traceConfig.Tracer.CaptureEnter(int(op), c.Caller, c.Address, c.Code, c.Gas, c.Value)
+			defer func(startTime time.Time) {
+				t.traceConfig.Tracer.CaptureExit(output, gasCost, result.Err)
+			}(time.Now())
+		}
+	}
 
 	if result.Failed() {
 		t.state.RevertToSnapshot(snapshot)
-
 		return result
 	}
 
@@ -768,8 +776,6 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host, op evm.
 			Err:     runtime.ErrMaxCodeSizeExceeded,
 		}
 	}
-
-	gasCost := uint64(len(result.ReturnValue)) * 200
 
 	if result.GasLeft < gasCost {
 		result.Err = runtime.ErrCodeStoreOutOfGas
@@ -789,13 +795,13 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host, op evm.
 	t.state.SetCode(c.Address, result.ReturnValue)
 
 	// capture trace end
-	if t.traceConfig.Debug {
-		if c.Depth == 1 {
-			t.traceConfig.Tracer.CaptureEnd(result.ReturnValue, gasCost, time.Since(start), result.Err)
-		} else {
-			t.traceConfig.Tracer.CaptureExit(result.ReturnValue, gasCost, result.Err)
-		}
-	}
+	// if t.traceConfig.Debug {
+	// 	if c.Depth == 1 {
+	// 		t.traceConfig.Tracer.CaptureEnd(result.ReturnValue, gasCost, time.Since(start), result.Err)
+	// 	} else {
+	// 		t.traceConfig.Tracer.CaptureExit(result.ReturnValue, gasCost, result.Err)
+	// 	}
+	// }
 
 	return result
 }
