@@ -82,7 +82,6 @@ type mockSyncPeerClient struct {
 	getPeerStatusHandler                  func(peer.ID) (*NoForkPeer, error)
 	getConnectedPeerStatusesHandler       func() []*NoForkPeer
 	getBlocksHandler                      func(context.Context, peer.ID, uint64) (<-chan *types.Block, error)
-	getBlockHandler                       func(context.Context, peer.ID, uint64) (*types.Block, error)
 	getPeerStatusUpdateChHandler          func() <-chan *NoForkPeer
 	getPeerConnectionUpdateEventChHandler func() <-chan *event.PeerEvent
 }
@@ -103,10 +102,6 @@ func (m *mockSyncPeerClient) GetConnectedPeerStatuses() []*NoForkPeer {
 
 func (m *mockSyncPeerClient) GetBlocks(ctx context.Context, id peer.ID, start uint64) (<-chan *types.Block, error) {
 	return m.getBlocksHandler(ctx, id, start)
-}
-
-func (m *mockSyncPeerClient) GetBlock(ctx context.Context, id peer.ID, start uint64) (*types.Block, error) {
-	return m.getBlockHandler(ctx, id, start)
 }
 
 func (m *mockSyncPeerClient) GetPeerStatusUpdateCh() <-chan *NoForkPeer {

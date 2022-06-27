@@ -19,7 +19,6 @@ const _ = grpc.SupportPackageIsVersion7
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type SyncPeerClient interface {
 	GetBlocks(ctx context.Context, in *GetBlocksRequest, opts ...grpc.CallOption) (SyncPeer_GetBlocksClient, error)
-	GetBlock(ctx context.Context, in *GetBlockRequest, opts ...grpc.CallOption) (*Block, error)
 	GetStatus(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*SyncPeerStatus, error)
 }
 
@@ -63,15 +62,6 @@ func (x *syncPeerGetBlocksClient) Recv() (*Block, error) {
 	return m, nil
 }
 
-func (c *syncPeerClient) GetBlock(ctx context.Context, in *GetBlockRequest, opts ...grpc.CallOption) (*Block, error) {
-	out := new(Block)
-	err := c.cc.Invoke(ctx, "/v1.SyncPeer/GetBlock", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *syncPeerClient) GetStatus(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*SyncPeerStatus, error) {
 	out := new(SyncPeerStatus)
 	err := c.cc.Invoke(ctx, "/v1.SyncPeer/GetStatus", in, out, opts...)
@@ -86,7 +76,6 @@ func (c *syncPeerClient) GetStatus(ctx context.Context, in *emptypb.Empty, opts 
 // for forward compatibility
 type SyncPeerServer interface {
 	GetBlocks(*GetBlocksRequest, SyncPeer_GetBlocksServer) error
-	GetBlock(context.Context, *GetBlockRequest) (*Block, error)
 	GetStatus(context.Context, *emptypb.Empty) (*SyncPeerStatus, error)
 	mustEmbedUnimplementedSyncPeerServer()
 }
@@ -97,9 +86,6 @@ type UnimplementedSyncPeerServer struct {
 
 func (UnimplementedSyncPeerServer) GetBlocks(*GetBlocksRequest, SyncPeer_GetBlocksServer) error {
 	return status.Errorf(codes.Unimplemented, "method GetBlocks not implemented")
-}
-func (UnimplementedSyncPeerServer) GetBlock(context.Context, *GetBlockRequest) (*Block, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetBlock not implemented")
 }
 func (UnimplementedSyncPeerServer) GetStatus(context.Context, *emptypb.Empty) (*SyncPeerStatus, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetStatus not implemented")
@@ -138,24 +124,6 @@ func (x *syncPeerGetBlocksServer) Send(m *Block) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-func _SyncPeer_GetBlock_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetBlockRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(SyncPeerServer).GetBlock(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/v1.SyncPeer/GetBlock",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SyncPeerServer).GetBlock(ctx, req.(*GetBlockRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _SyncPeer_GetStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
@@ -178,10 +146,6 @@ var _SyncPeer_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "v1.SyncPeer",
 	HandlerType: (*SyncPeerServer)(nil),
 	Methods: []grpc.MethodDesc{
-		{
-			MethodName: "GetBlock",
-			Handler:    _SyncPeer_GetBlock_Handler,
-		},
 		{
 			MethodName: "GetStatus",
 			Handler:    _SyncPeer_GetStatus_Handler,
