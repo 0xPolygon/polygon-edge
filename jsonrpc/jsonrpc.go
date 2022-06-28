@@ -58,6 +58,7 @@ type Config struct {
 	Addr                     *net.TCPAddr
 	ChainID                  uint64
 	AccessControlAllowOrigin []string
+	PriceLimit               uint64
 }
 
 // NewJSONRPC returns the JSONRPC http server
@@ -65,7 +66,7 @@ func NewJSONRPC(logger hclog.Logger, config *Config) (*JSONRPC, error) {
 	srv := &JSONRPC{
 		logger:     logger.Named("jsonrpc"),
 		config:     config,
-		dispatcher: newDispatcher(logger, config.Store, config.ChainID),
+		dispatcher: newDispatcher(logger, config.Store, config.ChainID, config.PriceLimit),
 	}
 
 	// start http server
@@ -243,15 +244,13 @@ func (j *JSONRPC) handle(w http.ResponseWriter, req *http.Request) {
 	}
 
 	if req.Method == "GET" {
-		//nolint
-		w.Write([]byte("Polygon Edge JSON-RPC"))
+		_, _ = w.Write([]byte("Polygon Edge JSON-RPC"))
 
 		return
 	}
 
 	if req.Method != "POST" {
-		//nolint
-		w.Write([]byte("method " + req.Method + " not allowed"))
+		_, _ = w.Write([]byte("method " + req.Method + " not allowed"))
 
 		return
 	}
@@ -259,8 +258,7 @@ func (j *JSONRPC) handle(w http.ResponseWriter, req *http.Request) {
 	data, err := ioutil.ReadAll(req.Body)
 
 	if err != nil {
-		//nolint
-		w.Write([]byte(err.Error()))
+		_, _ = w.Write([]byte(err.Error()))
 
 		return
 	}
@@ -271,11 +269,9 @@ func (j *JSONRPC) handle(w http.ResponseWriter, req *http.Request) {
 	resp, err := j.dispatcher.Handle(data)
 
 	if err != nil {
-		//nolint
-		w.Write([]byte(err.Error()))
+		_, _ = w.Write([]byte(err.Error()))
 	} else {
-		//nolint
-		w.Write(resp)
+		_, _ = w.Write(resp)
 	}
 
 	j.logger.Debug("handle", "response", string(resp))
