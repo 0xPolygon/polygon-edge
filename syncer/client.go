@@ -3,6 +3,9 @@ package syncer
 import (
 	"context"
 	"fmt"
+	"os"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -13,7 +16,12 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p-core/peer"
+	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"
+
+	// XXX: Experiment Code Begins
+	"google.golang.org/grpc/encoding/gzip"
+	// XXX: Experiment Code Ends
 )
 
 const (
@@ -32,6 +40,11 @@ type syncPeerClient struct {
 	id                     string // node ID
 	peerStatusUpdateCh     chan *NoForkPeer
 	peerConnectionUpdateCh chan *event.PeerEvent
+
+	// XXX: Experiment Code Begins
+	chunkSize  uint64
+	enableGZip bool
+	// XXX: Experiment Code Ends
 }
 
 func NewSyncPeerClient(
@@ -39,6 +52,37 @@ func NewSyncPeerClient(
 	network Network,
 	blockchain Blockchain,
 ) SyncPeerClient {
+	// XXX: Experiment Code Begins
+	var (
+		chunkSize  = uint64(1)
+		enableGZip = false
+	)
+
+	if e := os.Getenv("CHUNK_SIZE"); e != "" {
+		n, err := strconv.ParseInt(e, 10, 64)
+		if err != nil {
+			logger.Error("failed to parse uint64 string", "CHUNK_SIZE", e)
+
+			return nil
+		}
+
+		if n < 0 {
+			logger.Error("CHUNK_SIZE must be positive", "n", n)
+
+			return nil
+		}
+
+		chunkSize = uint64(n)
+	}
+
+	if e := os.Getenv("ENABLE_GZIP"); e != "" {
+		enableGZip = strings.ToLower(e) == "true"
+	}
+
+	fmt.Printf("Chunk Size => %d\n", chunkSize)
+	fmt.Printf("Enable GZip => %t\n", enableGZip)
+	// XXX: Experiment Code Ends
+
 	return &syncPeerClient{
 		logger:                 logger.Named(SyncPeersManagerLoggerName),
 		network:                network,
@@ -46,6 +90,11 @@ func NewSyncPeerClient(
 		id:                     network.AddrInfo().ID.String(),
 		peerStatusUpdateCh:     make(chan *NoForkPeer, 1),
 		peerConnectionUpdateCh: make(chan *event.PeerEvent, 1),
+
+		// XXX: Experiment Code Begins
+		chunkSize:  chunkSize,
+		enableGZip: enableGZip,
+		// XXX: Experiment Code Ends
 	}
 }
 
@@ -224,9 +273,18 @@ func (m *syncPeerClient) GetBlocks(
 		return nil, fmt.Errorf("failed to create sync peer client: %w", err)
 	}
 
+	opts := []grpc.CallOption{}
+	if m.enableGZip {
+		opts = append(opts, grpc.UseCompressor(gzip.Name))
+	}
+
 	stream, err := clt.GetBlocks(ctx, &proto.GetBlocksRequest{
 		From: from,
-	})
+		// XXX: Experiment Code Begins
+		Chunk: m.chunkSize,
+		// XXX: Experiment Code Ends
+	}, opts...)
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to open GetBlocks stream: %w", err)
 	}
@@ -242,14 +300,27 @@ func (m *syncPeerClient) GetBlocks(
 				break
 			}
 
-			block, err := fromProto(protoBlock)
-			if err != nil {
-				m.logger.Warn("failed to decode a block from peer", "peerID", peerID, "err", err)
+			// block, err := fromProto(protoBlock)
+			// if err != nil {
+			// 	m.logger.Warn("failed to decode a block from peer", "peerID", peerID, "err", err)
+
+			// 	break
+			// }
+
+			// blockCh <- block
+
+			// Experiment Code Begins
+			blocks := &types.Blocks{}
+			if err := blocks.UnmarshalRLP(protoBlock.Block); err != nil {
+				m.logger.Error("failed to unmarshal block", "peerID", peerID, "err", err)
 
 				break
 			}
 
-			blockCh <- block
+			for _, b := range *blocks {
+				blockCh <- b
+			}
+			// Experiment Code Ends
 		}
 	}()
 

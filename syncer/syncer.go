@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"strconv"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/helper/progress"
@@ -39,6 +41,10 @@ type syncer struct {
 
 	// Channel to notify WatchSync that a new status arrived
 	newStatusCh chan struct{}
+
+	// XXX: Experiment Code Begins
+	syncTo *uint64
+	// XXX: Experiment Code Ends
 }
 
 func NewSyncer(
@@ -47,6 +53,33 @@ func NewSyncer(
 	blockchain Blockchain,
 	blockTimeout time.Duration,
 ) Syncer {
+	// XXX: Experiment Code Begins
+	var syncTo *uint64
+
+	if e := os.Getenv("SYNC_TO"); e != "" {
+		n, err := strconv.ParseInt(e, 10, 64)
+		if err != nil {
+			logger.Error("failed to parse uint64 string", "SYNC_TO", e)
+
+			return nil
+		}
+
+		if n < 0 {
+			logger.Error("SYNC_TO must be positive", "n", n)
+
+			return nil
+		}
+
+		x := uint64(n)
+
+		syncTo = &x
+
+		fmt.Printf("SyncTo => %d\n", x)
+	} else {
+		fmt.Printf("SyncTo => latest \n")
+	}
+	// XXX: Experiment Code Ends
+
 	return &syncer{
 		logger:          logger.Named(LoggerName),
 		blockchain:      blockchain,
@@ -56,6 +89,10 @@ func NewSyncer(
 		blockTimeout:    blockTimeout,
 		newStatusCh:     make(chan struct{}),
 		peerMap:         new(PeerMap),
+
+		// XXX: Experiment Code Begins
+		syncTo: syncTo,
+		// XXX: Experiment Code Ends
 	}
 }
 
@@ -226,6 +263,29 @@ func (s *syncer) WatchSync(ctx context.Context, callback func(*types.Block) bool
 
 func (s *syncer) bulkSyncWithPeer(peerID peer.ID, newBlockCallback func(*types.Block) bool) (uint64, bool, error) {
 	localLatest := s.blockchain.Header().Number
+
+	// XXX: Experiment Code Begins
+	success := false
+	fmt.Printf("\n\n### Start bulkSyncWithPeer with %s ### \n\n", peerID.String())
+	start := time.Now()
+
+	defer func() {
+		currentLatest := s.blockchain.Header().Number
+		end := time.Now()
+
+		fmt.Printf("\n\n### Experiment Result ###\n")
+		fmt.Printf("From: %d\n", localLatest+1)
+		fmt.Printf("To: %d\n", currentLatest)
+		fmt.Printf("Number: %d\n", currentLatest-localLatest)
+		fmt.Printf("Time: %f [sec]\n", end.Sub(start).Seconds())
+		fmt.Println("")
+
+		if success {
+			os.Exit(0)
+		}
+	}()
+	// XXX: Experiment Code Ends
+
 	shouldTerminate := false
 
 	blockCh, err := s.syncPeerClient.GetBlocks(context.Background(), peerID, localLatest+1)
@@ -246,6 +306,8 @@ func (s *syncer) bulkSyncWithPeer(peerID peer.ID, newBlockCallback func(*types.B
 		select {
 		case block, ok := <-blockCh:
 			if !ok {
+				success = true
+
 				return lastReceivedNumber, shouldTerminate, nil
 			}
 
@@ -265,6 +327,15 @@ func (s *syncer) bulkSyncWithPeer(peerID peer.ID, newBlockCallback func(*types.B
 			shouldTerminate = newBlockCallback(block)
 
 			lastReceivedNumber = block.Number()
+
+			// XXX: Experiment Code Begins
+			if s.syncTo != nil && lastReceivedNumber == *s.syncTo {
+				success = true
+
+				return lastReceivedNumber, shouldTerminate, errTimeout
+			}
+			// XXX: Experiment Code Ends
+
 		case <-time.After(s.blockTimeout):
 			return lastReceivedNumber, shouldTerminate, errTimeout
 		}

@@ -14,6 +14,8 @@ service SyncPeer {
 message GetBlocksRequest {
   // The beginning height
   uint64 from = 1;
+
+  uint64 chunk = 2;
 }
 
 message Block {

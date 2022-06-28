@@ -3,11 +3,16 @@ package syncer
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/0xPolygon/polygon-edge/network/grpc"
 	"github.com/0xPolygon/polygon-edge/syncer/proto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/golang/protobuf/ptypes/empty"
+
+	// XXX: Experiment Code Begins
+	_ "google.golang.org/grpc/encoding/gzip"
+	// XXX: Experiment Code Ends
 )
 
 var (
@@ -48,19 +53,57 @@ func (s *syncPeerService) GetBlocks(
 	req *proto.GetBlocksRequest,
 	stream proto.SyncPeer_GetBlocksServer,
 ) error {
-	// from to latest
-	for i := req.From; i <= s.blockchain.Header().Number; i++ {
+	from, chunkSize := req.From, req.Chunk
+
+	// for i := req.From; i <= s.blockchain.Header().Number; i++ {
+	// 	block, ok := s.blockchain.GetBlockByNumber(i, true)
+	// 	if !ok {
+	// 		return ErrBlockNotFound
+	// 	}
+
+	// 	resp := toProtoBlock(block)
+
+	// 	if err := stream.Send(resp); err != nil {
+	// 		break
+	// 	}
+	// }
+
+	// XXX: Experiment Code Begins
+	blocks := make([]*types.Block, 0, chunkSize)
+
+	sendData := func() error {
+		body := types.Blocks(blocks)
+
+		resp := &proto.Block{
+			Block: body.MarshalRLP(),
+		}
+
+		blocks = blocks[:0]
+
+		return stream.Send(resp)
+	}
+
+	for i := from; i <= s.blockchain.Header().Number; i++ {
 		block, ok := s.blockchain.GetBlockByNumber(i, true)
 		if !ok {
 			return ErrBlockNotFound
 		}
 
-		resp := toProtoBlock(block)
+		blocks = append(blocks, block)
 
-		if err := stream.Send(resp); err != nil {
-			break
+		if index := i - from; (index+1)%chunkSize == 0 {
+			if err := sendData(); err != nil {
+				fmt.Printf("failed to send blocks size=%d, err=%+v\n", len(blocks), err)
+
+				break
+			}
 		}
 	}
+
+	if len(blocks) > 0 {
+		return sendData()
+	}
+	// XXX: Experiment Code Ends
 
 	return nil
 }
