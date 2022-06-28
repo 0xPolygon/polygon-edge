@@ -34,6 +34,31 @@ func UnmarshalRlp(obj unmarshalRLPFunc, input []byte) error {
 	return nil
 }
 
+// XXX: Experiment Code Begins
+func (r *Blocks) UnmarshalRLP(input []byte) error {
+	return UnmarshalRlp(r.UnmarshalRLPFrom, input)
+}
+
+func (r *Blocks) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
+	elems, err := v.GetElems()
+	if err != nil {
+		return err
+	}
+
+	for _, elem := range elems {
+		rr := &Block{}
+		if err := rr.UnmarshalRLPFrom(p, elem); err != nil {
+			return err
+		}
+
+		(*r) = append(*r, rr)
+	}
+
+	return nil
+}
+
+// XXX: Experiment Code Ends
+
 func (b *Block) UnmarshalRLP(input []byte) error {
 	return UnmarshalRlp(b.UnmarshalRLPFrom, input)
 }

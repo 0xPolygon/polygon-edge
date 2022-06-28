@@ -18,6 +18,28 @@ func MarshalRLPTo(obj marshalRLPFunc, dst []byte) []byte {
 	return dst
 }
 
+// XXX: Experiment Code Begins
+type Blocks []*Block
+
+func (b *Blocks) MarshalRLP() []byte {
+	return b.MarshalRLPTo(nil)
+}
+
+func (b Blocks) MarshalRLPTo(dst []byte) []byte {
+	return MarshalRLPTo(b.MarshalRLPWith, dst)
+}
+
+func (b *Blocks) MarshalRLPWith(a *fastrlp.Arena) *fastrlp.Value {
+	vv := a.NewArray()
+	for _, rr := range *b {
+		vv.Set(rr.MarshalRLPWith(a))
+	}
+
+	return vv
+}
+
+// XXX: Experiment Code Ends
+
 func (b *Block) MarshalRLP() []byte {
 	return b.MarshalRLPTo(nil)
 }
