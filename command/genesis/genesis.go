@@ -2,6 +2,7 @@ package genesis
 
 import (
 	"fmt"
+
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft"
@@ -31,30 +32,21 @@ func setFlags(cmd *cobra.Command) {
 		&params.genesisPath,
 		dirFlag,
 		fmt.Sprintf("./%s", command.DefaultGenesisFileName),
-		fmt.Sprintf(
-			"the directory for the Polygon Edge genesis data. Default: %s",
-			fmt.Sprintf("./%s", command.DefaultGenesisFileName),
-		),
+		"the directory for the Polygon Edge genesis data",
 	)
 
 	cmd.Flags().StringVar(
 		&params.name,
 		nameFlag,
 		command.DefaultChainName,
-		fmt.Sprintf(
-			"the name for the chain. Default: %s",
-			command.DefaultChainName,
-		),
+		"the name for the chain",
 	)
 
 	cmd.Flags().StringVar(
 		&params.consensusRaw,
 		command.ConsensusFlag,
 		string(command.DefaultConsensus),
-		fmt.Sprintf(
-			"the consensus protocol to be used. Default: %s",
-			command.DefaultConsensus,
-		),
+		"the consensus protocol to be used",
 	)
 
 	cmd.Flags().StringVar(
@@ -102,30 +94,21 @@ func setFlags(cmd *cobra.Command) {
 		&params.chainID,
 		chainIDFlag,
 		command.DefaultChainID,
-		fmt.Sprintf(
-			"the ID of the chain. Default: %d",
-			command.DefaultChainID,
-		),
+		"the ID of the chain",
 	)
 
 	cmd.Flags().Uint64Var(
 		&params.epochSize,
 		epochSizeFlag,
 		ibft.DefaultEpochSize,
-		fmt.Sprintf(
-			"the epoch size for the chain. Default %d",
-			ibft.DefaultEpochSize,
-		),
+		"the epoch size for the chain",
 	)
 
 	cmd.Flags().Uint64Var(
 		&params.blockGasLimit,
 		blockGasLimitFlag,
 		command.DefaultGenesisGasLimit,
-		fmt.Sprintf(
-			"the maximum amount of gas used by all transactions in a block. Default: %d",
-			command.DefaultGenesisGasLimit,
-		),
+		"the maximum amount of gas used by all transactions in a block",
 	)
 	cmd.Flags().Uint64Var(
 		&params.minNumValidators,
@@ -149,10 +132,7 @@ func setLegacyFlags(cmd *cobra.Command) {
 		&params.chainID,
 		chainIDFlagLEGACY,
 		command.DefaultChainID,
-		fmt.Sprintf(
-			"the ID of the chain. Default: %d",
-			command.DefaultChainID,
-		),
+		"the ID of the chain",
 	)
 
 	_ = cmd.Flags().MarkHidden(chainIDFlagLEGACY)

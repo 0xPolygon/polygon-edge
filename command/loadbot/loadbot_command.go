@@ -105,7 +105,7 @@ func setFlags(cmd *cobra.Command) {
 		&params.detailed,
 		detailedFlag,
 		false,
-		"flag indicating if the error logs should be shown. (default: false)",
+		"flag indicating if the error logs should be shown",
 	)
 
 	cmd.Flags().Uint64Var(

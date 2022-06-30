@@ -2,6 +2,7 @@ package ibftswitch
 
 import (
 	"fmt"
+
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/spf13/cobra"
 )
@@ -25,10 +26,7 @@ func setFlags(cmd *cobra.Command) {
 		&params.genesisPath,
 		chainFlag,
 		fmt.Sprintf("./%s", command.DefaultGenesisFileName),
-		fmt.Sprintf(
-			"the genesis file to update. Default: ./%s",
-			command.DefaultGenesisFileName,
-		),
+		"the genesis file to update",
 	)
 
 	cmd.Flags().StringVar(

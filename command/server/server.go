@@ -130,7 +130,7 @@ func setFlags(cmd *cobra.Command) {
 		&params.rawConfig.Network.NoDiscover,
 		command.NoDiscoverFlag,
 		defaultConfig.Network.NoDiscover,
-		"prevent the client from discovering other peers (default: false)",
+		"prevent the client from discovering other peers",
 	)
 
 	cmd.Flags().Int64Var(
