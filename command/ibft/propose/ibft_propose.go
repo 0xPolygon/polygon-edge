@@ -42,6 +42,8 @@ func setFlags(cmd *cobra.Command) {
 			dropVote,
 		),
 	)
+
+	cmd.MarkFlagsRequiredTogether(addressFlag, voteFlag)
 }
 
 func runPreRun(_ *cobra.Command, _ []string) error {
