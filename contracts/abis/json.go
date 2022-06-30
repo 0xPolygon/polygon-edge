@@ -115,19 +115,6 @@ const StakingJSONABI = `[
 		],
 		"stateMutability": "view",
 		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "getBlockReward",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
 	}
 ]`
 const StressTestJSONABI = `[
@@ -176,3 +163,18 @@ const StressTestJSONABI = `[
       "type": "function"
     }
   ]`
+const CustomJSONABI = `[
+	{
+		"inputs": [],
+		"name": "getBlockReward",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	}
+]`

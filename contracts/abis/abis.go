@@ -6,3 +6,4 @@ import (
 
 var StakingABI = abi.MustNewABI(StakingJSONABI)
 var StressTestABI = abi.MustNewABI(StressTestJSONABI)
+var CustomABI = abi.MustNewABI(CustomJSONABI)
