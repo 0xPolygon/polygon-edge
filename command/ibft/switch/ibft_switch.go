@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/0xPolygon/polygon-edge/command"
+	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/spf13/cobra"
 )
 
@@ -16,7 +17,7 @@ func GetCommand() *cobra.Command {
 	}
 
 	setFlags(ibftSwitchCmd)
-	setRequiredFlags(ibftSwitchCmd)
+	helper.SetRequiredFlags(ibftSwitchCmd, params.getRequiredFlags())
 
 	return ibftSwitchCmd
 }
@@ -61,12 +62,6 @@ func setFlags(cmd *cobra.Command) {
 		"",
 		"the maximum number of validators in the validator set for PoS",
 	)
-}
-
-func setRequiredFlags(cmd *cobra.Command) {
-	for _, requiredFlag := range params.getRequiredFlags() {
-		_ = cmd.MarkFlagRequired(requiredFlag)
-	}
 }
 
 func runPreRun(_ *cobra.Command, _ []string) error {

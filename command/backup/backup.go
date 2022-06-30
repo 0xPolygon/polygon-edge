@@ -18,7 +18,7 @@ func GetCommand() *cobra.Command {
 	helper.RegisterGRPCAddressFlag(backupCmd)
 
 	setFlags(backupCmd)
-	setRequiredFlags(backupCmd)
+	helper.SetRequiredFlags(backupCmd, params.getRequiredFlags())
 
 	return backupCmd
 }
@@ -44,12 +44,6 @@ func setFlags(cmd *cobra.Command) {
 		"",
 		"the end height of the chain in backup",
 	)
-}
-
-func setRequiredFlags(cmd *cobra.Command) {
-	for _, requiredFlag := range params.getRequiredFlags() {
-		_ = cmd.MarkFlagRequired(requiredFlag)
-	}
 }
 
 func runPreRun(_ *cobra.Command, _ []string) error {

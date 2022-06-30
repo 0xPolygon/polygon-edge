@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/0xPolygon/polygon-edge/command"
+	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/spf13/cobra"
 
 	"github.com/0xPolygon/polygon-edge/secrets"
@@ -17,7 +18,7 @@ func GetCommand() *cobra.Command {
 	}
 
 	setFlags(secretsGenerateCmd)
-	setRequiredFlags(secretsGenerateCmd)
+	helper.SetRequiredFlags(secretsGenerateCmd, params.getRequiredFlags())
 
 	return secretsGenerateCmd
 }
@@ -76,12 +77,6 @@ func setFlags(cmd *cobra.Command) {
 		"",
 		"Specifies the extra fields map in string format 'key1=val1,key2=val2'",
 	)
-}
-
-func setRequiredFlags(cmd *cobra.Command) {
-	for _, requiredFlag := range params.getRequiredFlags() {
-		_ = cmd.MarkFlagRequired(requiredFlag)
-	}
 }
 
 func runCommand(cmd *cobra.Command, _ []string) {
