@@ -3,6 +3,7 @@ package snapshot
 import (
 	"bytes"
 	"fmt"
+
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	ibftHelper "github.com/0xPolygon/polygon-edge/command/ibft/helper"
 	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
@@ -15,18 +16,20 @@ type IBFTSnapshotVote struct {
 }
 
 type IBFTSnapshotResult struct {
-	Number     uint64             `json:"number"`
-	Hash       string             `json:"hash"`
-	Votes      []IBFTSnapshotVote `json:"votes"`
-	Validators []string           `json:"validators"`
+	Number      uint64             `json:"number"`
+	Hash        string             `json:"hash"`
+	Votes       []IBFTSnapshotVote `json:"votes"`
+	Validators  []string           `json:"validators"`
+	BlockReward string             `json:"blockReward"`
 }
 
 func newIBFTSnapshotResult(resp *ibftOp.Snapshot) *IBFTSnapshotResult {
 	res := &IBFTSnapshotResult{
-		Number:     resp.Number,
-		Hash:       resp.Hash,
-		Votes:      make([]IBFTSnapshotVote, len(resp.Votes)),
-		Validators: make([]string, len(resp.Validators)),
+		Number:      resp.Number,
+		Hash:        resp.Hash,
+		Votes:       make([]IBFTSnapshotVote, len(resp.Votes)),
+		Validators:  make([]string, len(resp.Validators)),
+		BlockReward: resp.BlockReward,
 	}
 
 	for i, v := range resp.Votes {
@@ -49,6 +52,7 @@ func (r *IBFTSnapshotResult) GetOutput() string {
 	r.writeBlockData(&buffer)
 	r.writeVoteData(&buffer)
 	r.writeValidatorData(&buffer)
+	r.writeBlockRewardData(&buffer)
 
 	return buffer.String()
 }
@@ -100,4 +104,13 @@ func (r *IBFTSnapshotResult) writeValidatorData(buffer *bytes.Buffer) {
 	buffer.WriteString("\n[VALIDATORS]\n")
 	buffer.WriteString(helper.FormatList(validators))
 	buffer.WriteString("\n")
+}
+
+func (r *IBFTSnapshotResult) writeBlockRewardData(buffer *bytes.Buffer) {
+	if r.BlockReward != "" {
+		buffer.WriteString("\n[BLOCK REWARD]\n")
+		buffer.WriteString(r.BlockReward)
+		buffer.WriteString(" wei")
+		buffer.WriteString("\n")
+	}
 }

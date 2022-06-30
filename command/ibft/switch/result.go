@@ -3,18 +3,20 @@ package ibftswitch
 import (
 	"bytes"
 	"fmt"
+
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 )
 
 type IBFTSwitchResult struct {
-	Chain             string             `json:"chain"`
-	Type              ibft.MechanismType `json:"type"`
-	From              common.JSONNumber  `json:"from"`
-	Deployment        *common.JSONNumber `json:"deployment,omitempty"`
-	MaxValidatorCount common.JSONNumber  `json:"maxValidatorCount"`
-	MinValidatorCount common.JSONNumber  `json:"minValidatorCount"`
+	Chain                 string             `json:"chain"`
+	Type                  ibft.MechanismType `json:"type"`
+	From                  common.JSONNumber  `json:"from"`
+	Deployment            *common.JSONNumber `json:"deployment,omitempty"`
+	MaxValidatorCount     common.JSONNumber  `json:"maxValidatorCount"`
+	MinValidatorCount     common.JSONNumber  `json:"minValidatorCount"`
+	CustomContractAddress string             `json:"customContractAddress"`
 }
 
 func (r *IBFTSwitchResult) GetOutput() string {
@@ -33,6 +35,10 @@ func (r *IBFTSwitchResult) GetOutput() string {
 	outputs = append(outputs, fmt.Sprintf("From|%d", r.From.Value))
 	outputs = append(outputs, fmt.Sprintf("MaxValidatorCount|%d", r.MaxValidatorCount.Value))
 	outputs = append(outputs, fmt.Sprintf("MinValidatorCount|%d", r.MinValidatorCount.Value))
+
+	if r.CustomContractAddress != "" {
+		outputs = append(outputs, fmt.Sprint("CustomContractAddress|", r.CustomContractAddress))
+	}
 
 	buffer.WriteString(helper.FormatKV(outputs))
 	buffer.WriteString("\n")

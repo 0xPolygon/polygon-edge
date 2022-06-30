@@ -3,9 +3,10 @@ package ibft
 import (
 	"errors"
 	"fmt"
+	"math/big"
+
 	"github.com/0xPolygon/polygon-edge/contracts/staking"
 	stakingHelper "github.com/0xPolygon/polygon-edge/helper/staking"
-	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -43,8 +44,9 @@ func (pos *PoSMechanism) IsAvailable(hookType HookType, height uint64) bool {
 	case AcceptStateLogHook, VerifyBlockHook, CalculateProposerHook:
 		return pos.IsInRange(height)
 	case PreStateCommitHook:
-		// deploy contract on ContractDeployment
-		return height == pos.ContractDeployment
+		// deploy contract on ContractDeployment or pay out validator block rewards from snapshot
+		return (pos.ContractDeployment != 0 && height == pos.ContractDeployment) ||
+			(pos.CustomContractAddress != types.ZeroAddress && pos.IsInRange(height))
 	case InsertBlockHook:
 		// update validators when the one before the beginning or the end of epoch
 		return height+1 == pos.From || pos.IsInRange(height) && pos.ibft.IsLastOfEpoch(height)
@@ -60,19 +62,21 @@ func (pos *PoSMechanism) initializeParams(params *IBFTFork) error {
 	}
 
 	if pos.From != 0 {
-		if params.Deployment == nil {
-			return errors.New(`"deployment" must be specified in PoS fork`)
-		}
+		if params.CustomContractAddress == "" {
+			if params.Deployment == nil {
+				return errors.New(`"deployment" must be specified in PoS fork`)
+			}
 
-		if params.Deployment.Value > pos.From {
-			return fmt.Errorf(
-				`"deployment" must be less than or equal to "from": deployment=%d, from=%d`,
-				params.Deployment.Value,
-				pos.From,
-			)
-		}
+			if params.Deployment.Value > pos.From {
+				return fmt.Errorf(
+					`"deployment" must be less than or equal to "from": deployment=%d, from=%d`,
+					params.Deployment.Value,
+					pos.From,
+				)
+			}
 
-		pos.ContractDeployment = params.Deployment.Value
+			pos.ContractDeployment = params.Deployment.Value
+		}
 
 		if params.MaxValidatorCount == nil {
 			pos.MaxValidatorCount = stakingHelper.MaxValidatorCount
@@ -145,12 +149,6 @@ func (pos *PoSMechanism) verifyBlockHook(blockParam interface{}) error {
 	return nil
 }
 
-// preStateCommitHookParams are the params passed into the preStateCommitHook
-type preStateCommitHookParams struct {
-	header *types.Header
-	txn    *state.Transition
-}
-
 // verifyBlockHook checks if the block is an epoch block and if it has any transactions
 func (pos *PoSMechanism) preStateCommitHook(rawParams interface{}) error {
 	params, ok := rawParams.(*preStateCommitHookParams)
@@ -159,16 +157,32 @@ func (pos *PoSMechanism) preStateCommitHook(rawParams interface{}) error {
 	}
 
 	// Deploy Staking contract
-	contractState, err := stakingHelper.PredeployStakingSC(nil, stakingHelper.PredeployParams{
-		MinValidatorCount: pos.MinValidatorCount,
-		MaxValidatorCount: pos.MaxValidatorCount,
-	})
-	if err != nil {
-		return err
-	}
+	if pos.ContractDeployment != 0 && params.header.Number == pos.ContractDeployment {
+		contractState, err := stakingHelper.PredeployStakingSC(nil, stakingHelper.PredeployParams{
+			MinValidatorCount: pos.MinValidatorCount,
+			MaxValidatorCount: pos.MaxValidatorCount,
+		})
+		if err != nil {
+			return err
+		}
 
-	if err := params.txn.SetAccountDirectly(staking.AddrStakingContract, contractState); err != nil {
-		return err
+		if err := params.txn.SetAccountDirectly(staking.AddrStakingContract, contractState); err != nil {
+			return err
+		}
+	} else if pos.CustomContractAddress != types.ZeroAddress && pos.IsInRange(params.header.Number) {
+
+		snapshot, err := pos.ibft.getSnapshot(params.header.Number)
+		if err != nil {
+			return err
+		}
+
+		// pay the block proposer the block reward from the current snapshot
+		blockRewardsBonus, ok := new(big.Int).SetString(snapshot.BlockReward, 10)
+		if !ok {
+			return nil
+		}
+
+		params.txn.Txn().AddBalance(params.txn.GetTxContext().Coinbase, blockRewardsBonus)
 	}
 
 	return nil
@@ -210,7 +224,17 @@ func (pos *PoSMechanism) getNextValidators(header *types.Header) (ValidatorSet, 
 		return nil, err
 	}
 
-	return staking.QueryValidators(transition, pos.ibft.validatorKeyAddr)
+	return staking.QueryValidators(transition, pos.CustomContractAddress, pos.ibft.validatorKeyAddr)
+}
+
+// getNextBlockRewards is a helper function for fetching the current blockReward value from the Staking SC
+func (pos *PoSMechanism) getNextBlockRewards(header *types.Header) (string, error) {
+	transition, err := pos.ibft.executor.BeginTxn(header.StateRoot, header, types.ZeroAddress)
+	if err != nil {
+		return "0", err
+	}
+
+	return staking.QueryBlockRewardsPayment(transition, pos.CustomContractAddress, pos.ibft.validatorKeyAddr)
 }
 
 // updateSnapshotValidators updates validators in snapshot at given height
@@ -225,6 +249,11 @@ func (pos *PoSMechanism) updateValidators(num uint64) error {
 		return err
 	}
 
+	blockRewardsPayment, err := pos.getNextBlockRewards(header)
+	if err != nil {
+		return err
+	}
+
 	snap, err := pos.ibft.getSnapshot(header.Number)
 	if err != nil {
 		return err
@@ -234,17 +263,16 @@ func (pos *PoSMechanism) updateValidators(num uint64) error {
 		return fmt.Errorf("cannot find snapshot at %d", header.Number)
 	}
 
-	if !snap.Set.Equal(&validators) {
-		newSnap := snap.Copy()
-		newSnap.Set = validators
-		newSnap.Number = header.Number
-		newSnap.Hash = header.Hash.String()
+	newSnap := snap.Copy()
+	newSnap.Set = validators
+	newSnap.Number = header.Number
+	newSnap.Hash = header.Hash.String()
+	newSnap.BlockReward = blockRewardsPayment
 
-		if snap.Number != header.Number {
-			pos.ibft.store.add(newSnap)
-		} else {
-			pos.ibft.store.replace(newSnap)
-		}
+	if snap.Number != header.Number {
+		pos.ibft.store.add(newSnap)
+	} else {
+		pos.ibft.store.replace(newSnap)
 	}
 
 	return nil

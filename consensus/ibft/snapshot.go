@@ -106,10 +106,11 @@ func (i *Ibft) addHeaderSnap(header *types.Header) error {
 
 	// Create the first snapshot from the genesis
 	snap := &Snapshot{
-		Hash:   header.Hash.String(),
-		Number: header.Number,
-		Votes:  []*Vote{},
-		Set:    extra.Validators,
+		Hash:        header.Hash.String(),
+		Number:      header.Number,
+		Votes:       []*Vote{},
+		Set:         extra.Validators,
+		BlockReward: "0",
 	}
 
 	i.store.add(snap)
@@ -255,6 +256,9 @@ type Snapshot struct {
 
 	// current set of validators
 	Set ValidatorSet
+
+	// blockReward amount
+	BlockReward string
 }
 
 // snapshotMetadata defines the metadata for the snapshot
@@ -322,10 +326,11 @@ func (s *Snapshot) Copy() *Snapshot {
 // ToProto converts the snapshot to a Proto snapshot
 func (s *Snapshot) ToProto() *proto.Snapshot {
 	resp := &proto.Snapshot{
-		Validators: []*proto.Snapshot_Validator{},
-		Votes:      []*proto.Snapshot_Vote{},
-		Number:     s.Number,
-		Hash:       s.Hash,
+		Validators:  []*proto.Snapshot_Validator{},
+		Votes:       []*proto.Snapshot_Vote{},
+		Number:      s.Number,
+		Hash:        s.Hash,
+		BlockReward: s.BlockReward,
 	}
 
 	// add votes

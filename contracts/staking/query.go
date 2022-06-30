@@ -2,8 +2,9 @@ package staking
 
 import (
 	"errors"
-	"github.com/umbracle/ethgo"
 	"math/big"
+
+	"github.com/umbracle/ethgo"
 
 	"github.com/0xPolygon/polygon-edge/contracts/abis"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
@@ -49,16 +50,21 @@ type TxQueryHandler interface {
 	GetNonce(types.Address) uint64
 }
 
-func QueryValidators(t TxQueryHandler, from types.Address) ([]types.Address, error) {
+func QueryValidators(t TxQueryHandler, contract types.Address, from types.Address) ([]types.Address, error) {
 	method, ok := abis.StakingABI.Methods["validators"]
 	if !ok {
 		return nil, errors.New("validators method doesn't exist in Staking contract ABI")
 	}
 
+	stakingContract := AddrStakingContract
+	if contract != types.ZeroAddress {
+		stakingContract = contract
+	}
+
 	selector := method.ID()
 	res, err := t.Apply(&types.Transaction{
 		From:     from,
-		To:       &AddrStakingContract,
+		To:       &stakingContract,
 		Value:    big.NewInt(0),
 		Input:    selector,
 		GasPrice: big.NewInt(0),
@@ -75,4 +81,52 @@ func QueryValidators(t TxQueryHandler, from types.Address) ([]types.Address, err
 	}
 
 	return DecodeValidators(method, res.ReturnValue)
+}
+
+func QueryBlockRewardsPayment(t TxQueryHandler, contract types.Address, from types.Address) (string, error) {
+	method, ok := abis.StakingABI.Methods["getBlockReward"]
+	if !ok {
+		return "0", errors.New("getBlockReward method doesn't exist in Staking contract ABI")
+	}
+
+	stakingContract := AddrStakingContract
+	if contract != types.ZeroAddress {
+		stakingContract = contract
+	}
+
+	selector := method.ID()
+	res, err := t.Apply(&types.Transaction{
+		From:     from,
+		To:       &stakingContract,
+		Value:    big.NewInt(0),
+		Input:    selector,
+		GasPrice: big.NewInt(0),
+		Gas:      queryGasLimit,
+		Nonce:    t.GetNonce(from),
+	})
+
+	if err != nil {
+		return "0", err
+	}
+
+	if res.Failed() {
+		return "0", res.Err
+	}
+
+	result, err := method.Outputs.Decode(res.ReturnValue)
+	if err != nil {
+		return "0", err
+	}
+
+	outputMap, ok := result.(map[string]interface{})
+	if !ok {
+		return "0", errors.New("failed type assertion from getBlockReward returnValue to map")
+	}
+
+	blockReward, ok := outputMap["0"].(*big.Int)
+	if !ok {
+		return "0", errors.New("failed type assertion from outputMap[0] to big.Int")
+	}
+
+	return blockReward.String(), nil
 }

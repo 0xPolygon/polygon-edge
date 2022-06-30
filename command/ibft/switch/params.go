@@ -3,22 +3,24 @@ package ibftswitch
 import (
 	"errors"
 	"fmt"
+	"os"
+
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
-	"os"
 )
 
 const (
-	chainFlag         = "chain"
-	typeFlag          = "type"
-	deploymentFlag    = "deployment"
-	fromFlag          = "from"
-	minValidatorCount = "min-validator-count"
-	maxValidatorCount = "max-validator-count"
+	chainFlag             = "chain"
+	typeFlag              = "type"
+	deploymentFlag        = "deployment"
+	fromFlag              = "from"
+	minValidatorCount     = "min-validator-count"
+	maxValidatorCount     = "max-validator-count"
+	customContractAddress = "custom-contract-address"
 )
 
 var (
@@ -44,6 +46,8 @@ type switchParams struct {
 
 	maxValidatorCount *uint64
 	minValidatorCount *uint64
+
+	customContractAddress string
 }
 
 func (p *switchParams) getRequiredFlags() []string {
@@ -209,6 +213,7 @@ func (p *switchParams) updateGenesisConfig() error {
 		p.deployment,
 		p.maxValidatorCount,
 		p.minValidatorCount,
+		p.customContractAddress,
 	)
 }
 
@@ -252,6 +257,10 @@ func (p *switchParams) getResult() command.CommandResult {
 		result.MaxValidatorCount = common.JSONNumber{Value: common.MaxSafeJSInt}
 	}
 
+	if p.customContractAddress != "" {
+		result.CustomContractAddress = p.customContractAddress
+	}
+
 	return result
 }
 
@@ -262,6 +271,7 @@ func appendIBFTForks(
 	deployment *uint64,
 	maxValidatorCount *uint64,
 	minValidatorCount *uint64,
+	customContractAddress string,
 ) error {
 	ibftConfig, ok := cc.Params.Engine["ibft"].(map[string]interface{})
 	if !ok {
@@ -274,7 +284,7 @@ func appendIBFTForks(
 	}
 
 	lastFork := &ibftForks[len(ibftForks)-1]
-	if mechanismType == lastFork.Type {
+	if mechanismType == lastFork.Type && customContractAddress == lastFork.CustomContractAddress {
 		return errors.New(`cannot specify same IBFT type to the last fork`)
 	}
 
@@ -302,6 +312,8 @@ func appendIBFTForks(
 			newFork.MinValidatorCount = &common.JSONNumber{Value: *minValidatorCount}
 		}
 	}
+
+	newFork.CustomContractAddress = customContractAddress
 
 	ibftForks = append(ibftForks, newFork)
 	ibftConfig["types"] = ibftForks

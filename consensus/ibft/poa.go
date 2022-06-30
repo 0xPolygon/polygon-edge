@@ -3,7 +3,9 @@ package ibft
 import (
 	"errors"
 	"fmt"
+	"math/big"
 
+	"github.com/0xPolygon/polygon-edge/contracts/staking"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -48,6 +50,12 @@ func (poa *PoAMechanism) IsAvailable(hookType HookType, height uint64) bool {
 	switch hookType {
 	case AcceptStateLogHook, VerifyHeadersHook, ProcessHeadersHook, CandidateVoteHook, CalculateProposerHook:
 		return poa.IsInRange(height)
+	case InsertBlockHook:
+		// update block rewards when the one before the beginning or the end of epoch
+		return height+1 == poa.From || poa.IsInRange(height) && poa.ibft.IsLastOfEpoch(height)
+	case PreStateCommitHook:
+		// pay out SC specified block rewards from snapshot if the custom SC address is specified
+		return poa.CustomContractAddress != types.ZeroAddress && poa.IsInRange(height)
 	default:
 		return false
 	}
@@ -243,6 +251,87 @@ func (poa *PoAMechanism) calculateProposerHook(lastProposerParam interface{}) er
 	return nil
 }
 
+// insertBlockHook checks if the block is the last block of the epoch,
+// in order to update the snapshot with the current block reward
+func (poa *PoAMechanism) insertBlockHook(numberParam interface{}) error {
+	headerNumber, ok := numberParam.(uint64)
+	if !ok {
+		return ErrInvalidHookParam
+	}
+
+	header, ok := poa.ibft.blockchain.GetHeaderByNumber(headerNumber)
+	if !ok {
+		return errors.New("header not found")
+	}
+
+	blockRewardsPayment, err := poa.getNextBlockRewards(header)
+	if err != nil {
+		return err
+	}
+
+	snap, err := poa.ibft.getSnapshot(header.Number)
+	if err != nil {
+		return err
+	}
+
+	if snap == nil {
+		return fmt.Errorf("cannot find snapshot at %d", header.Number)
+	}
+
+	if snap.BlockReward != blockRewardsPayment {
+		newSnap := snap.Copy()
+		newSnap.Number = header.Number
+		newSnap.Hash = header.Hash.String()
+		newSnap.BlockReward = blockRewardsPayment
+
+		if snap.Number != header.Number {
+			poa.ibft.store.add(newSnap)
+		} else {
+			poa.ibft.store.replace(newSnap)
+		}
+	}
+
+	return nil
+}
+
+// getNextBlockRewards is a helper function for fetching the current blockReward value from the Staking SC
+func (poa *PoAMechanism) getNextBlockRewards(header *types.Header) (string, error) {
+	transition, err := poa.ibft.executor.BeginTxn(header.StateRoot, header, types.ZeroAddress)
+	if err != nil {
+		return "0", err
+	}
+
+	return staking.QueryBlockRewardsPayment(transition, poa.CustomContractAddress, poa.ibft.validatorKeyAddr)
+}
+
+// verifyBlockHook checks if the block is an epoch block and if it has any transactions
+func (poa *PoAMechanism) preStateCommitHook(rawParams interface{}) error {
+	params, ok := rawParams.(*preStateCommitHookParams)
+	if !ok {
+		return ErrInvalidHookParam
+	}
+
+	return poa.payoutBlockReward(params)
+}
+
+// custom block rewards
+func (poa *PoAMechanism) payoutBlockReward(params *preStateCommitHookParams) error {
+	snapshot, err := poa.ibft.getSnapshot(params.header.Number)
+	if err != nil {
+		return err
+	}
+
+	// pay the block proposer the block reward from the current snapshot
+	blockRewardsBonus, ok := new(big.Int).SetString(snapshot.BlockReward, 10)
+	if !ok {
+		return nil
+	}
+
+	params.txn.Txn().AddBalance(params.txn.GetTxContext().Coinbase, blockRewardsBonus)
+
+	return nil
+}
+
 // initializeHookMap registers the hooks that the PoA mechanism
 // should have
 func (poa *PoAMechanism) initializeHookMap() {
@@ -263,6 +352,12 @@ func (poa *PoAMechanism) initializeHookMap() {
 
 	// Register the CalculateProposerHook
 	poa.hookMap[CalculateProposerHook] = poa.calculateProposerHook
+
+	// Register the InsertBlockHook
+	poa.hookMap[InsertBlockHook] = poa.insertBlockHook
+
+	// Register the PreStateCommitHook
+	poa.hookMap[PreStateCommitHook] = poa.preStateCommitHook
 }
 
 // ShouldWriteTransactions indicates if transactions should be written to a block

@@ -2,6 +2,7 @@ package ibftswitch
 
 import (
 	"fmt"
+
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/spf13/cobra"
 )
@@ -62,6 +63,13 @@ func setFlags(cmd *cobra.Command) {
 		maxValidatorCount,
 		"",
 		"the maximum number of validators in the validator set for PoS",
+	)
+
+	cmd.Flags().StringVar(
+		&params.customContractAddress,
+		customContractAddress,
+		"",
+		"the custom contract address to use for SC interaction",
 	)
 }
 
