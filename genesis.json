@@ -57,6 +57,7 @@
         "blockGasTarget": 0
     },
     "bootnodes": [
-        "/ip4/18.179.34.13/tcp/1478/p2p/16Uiu2HAmAfunbQ7AmLT8tWPyK7dXm52ZKWBMsih8iotc68vNq7BM"
+        "/ip4/52.69.88.246/tcp/8546/p2p/16Uiu2HAmStE6JPMExeGQthDuVSYMsmDGHFHDbUr7vhiViLR6Lt5Q",
+        "/ip4/35.75.126.134/tcp/8546/p2p/16Uiu2HAmF2pSeEvxad3CAt2wPrwaXyDAjKYpBfcwq6w1kUd2YPht"
     ]
 }
