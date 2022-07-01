@@ -17,9 +17,9 @@ import (
 )
 
 const (
-	SyncPeersManagerLoggerName = "sync-peers-manager"
-	statusTopicName            = "syncer/status/0.1"
-	defaultTimeoutForStatus    = 10 * time.Second
+	SyncPeerClientLoggerName = "sync-peer-client"
+	statusTopicName          = "syncer/status/0.1"
+	defaultTimeoutForStatus  = 10 * time.Second
 )
 
 type syncPeerClient struct {
@@ -40,7 +40,7 @@ func NewSyncPeerClient(
 	blockchain Blockchain,
 ) SyncPeerClient {
 	return &syncPeerClient{
-		logger:                 logger.Named(SyncPeersManagerLoggerName),
+		logger:                 logger.Named(SyncPeerClientLoggerName),
 		network:                network,
 		blockchain:             blockchain,
 		id:                     network.AddrInfo().ID.String(),
