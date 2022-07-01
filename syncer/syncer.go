@@ -159,6 +159,7 @@ func (s *syncer) BulkSync(ctx context.Context, newBlockCallback func(*types.Bloc
 
 		lastNumber, _, err := s.bulkSyncWithPeer(bestPeer.ID, newBlockCallback)
 		if err != nil {
+			s.logger.Warn("Error ", err)
 			s.logger.Warn("failed to complete bulk sync with peer, try to next one", "peer ID", bestPeer.ID)
 		}
 
