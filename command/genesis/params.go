@@ -38,7 +38,6 @@ var (
 )
 
 var (
-	errValidatorsNotSpecified    = errors.New("validator information not specified")
 	errValidatorNumberExceedsMax = errors.New("validator number exceeds max validator number")
 	errUnsupportedConsensus      = errors.New("specified consensusRaw not supported")
 	errInvalidEpochSize          = errors.New("epoch size must be greater than 1")
