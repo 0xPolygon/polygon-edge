@@ -22,7 +22,7 @@ require (
 	github.com/libp2p/go-libp2p-pubsub v0.7.0
 	github.com/miekg/dns v1.1.49 // indirect
 	github.com/multiformats/go-base32 v0.0.4 // indirect
-	github.com/multiformats/go-multiaddr v0.5.0
+	github.com/multiformats/go-multiaddr v0.6.0
 	github.com/multiformats/go-multihash v0.1.0 // indirect
 	github.com/onsi/ginkgo v1.16.5 // indirect
 	github.com/prometheus/client_golang v1.12.2
