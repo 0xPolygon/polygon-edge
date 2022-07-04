@@ -2,8 +2,9 @@ package syncer
 
 import (
 	"context"
-	rawGrpc "google.golang.org/grpc"
 	"math/big"
+
+	rawGrpc "google.golang.org/grpc"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
@@ -50,6 +51,7 @@ type Network interface {
 
 type Syncer interface {
 	Start() error
+	Close()
 	GetSyncProgression() *progress.Progression
 	HasSyncPeer() bool
 	BulkSync(context.Context, func(*types.Block) bool) error

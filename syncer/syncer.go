@@ -14,12 +14,12 @@ import (
 )
 
 const (
-	LoggerName  = "syncer"
-	SyncerProto = "/syncer/0.2"
+	syncerLoggerName = "syncer"
+	SyncerProto      = "/syncer/0.2"
 )
 
 var (
-	errTimeout = errors.New("timeout")
+	errTimeout = errors.New("timeout awaiting block from peer")
 )
 
 // XXX: Don't use this syncer for the consensus that may cause fork.
@@ -48,7 +48,7 @@ func NewSyncer(
 	blockTimeout time.Duration,
 ) Syncer {
 	return &syncer{
-		logger:          logger.Named(LoggerName),
+		logger:          logger.Named(syncerLoggerName),
 		blockchain:      blockchain,
 		syncProgression: progress.NewProgressionWrapper(progress.ChainSyncBulk),
 		syncPeerService: NewSyncPeerService(network, blockchain),
@@ -70,6 +70,10 @@ func (s *syncer) Start() error {
 	go s.startPeerConnectionEventProcess()
 
 	return nil
+}
+
+func (s *syncer) Close() {
+	close(s.newStatusCh)
 }
 
 func (s *syncer) initializePeerMap() {

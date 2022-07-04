@@ -204,8 +204,7 @@ func (m *syncPeerClient) startPeerEventProcess() {
 	}
 
 	for e := range peerEventCh {
-		switch e.Type {
-		case event.PeerConnected, event.PeerDisconnected:
+		if e.Type == event.PeerConnected || e.Type == event.PeerDisconnected {
 			m.peerConnectionUpdateCh <- e
 		}
 	}
