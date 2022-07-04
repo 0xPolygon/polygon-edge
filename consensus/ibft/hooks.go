@@ -180,7 +180,7 @@ type IBFTFork struct {
 	To                    *common.JSONNumber `json:"to,omitempty"`
 	MaxValidatorCount     *common.JSONNumber `json:"maxValidatorCount,omitempty"`
 	MinValidatorCount     *common.JSONNumber `json:"minValidatorCount,omitempty"`
-	CustomContractAddress string             `json:"customContractAddress,omitepty"`
+	CustomContractAddress string             `json:"customContractAddress,omitempty"`
 }
 
 // ConsensusMechanismFactory is the factory function to create a consensus mechanism
