@@ -92,11 +92,12 @@ func (m *syncPeerClient) GetPeerStatus(peerID peer.ID) (*NoForkPeer, error) {
 	}, nil
 }
 
+// GetConnectedPeerStatuses returns the statuses of the all connecting nodes
 func (m *syncPeerClient) GetConnectedPeerStatuses() []*NoForkPeer {
 	var (
 		ps            = m.network.Peers()
 		syncPeers     = make([]*NoForkPeer, 0, len(ps))
-		syncPeersLock = sync.Mutex{}
+		syncPeersLock sync.Mutex
 		wg            sync.WaitGroup
 	)
 
