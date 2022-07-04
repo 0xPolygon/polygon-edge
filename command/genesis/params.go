@@ -98,10 +98,6 @@ func (p *genesisParams) validateFlags() error {
 	return nil
 }
 
-func (p *genesisParams) isIBFTConsensus() bool {
-	return server.ConsensusType(p.consensusRaw) == server.IBFTConsensus
-}
-
 func (p *genesisParams) areValidatorsSetByPrefix() bool {
 	return p.validatorPrefixPath != ""
 }
