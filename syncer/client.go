@@ -49,6 +49,7 @@ func NewSyncPeerClient(
 	}
 }
 
+// Start processes for SyncPeerClient
 func (m *syncPeerClient) Start() error {
 	go m.startNewBlockProcess()
 	go m.startPeerEventProcess()
@@ -60,6 +61,7 @@ func (m *syncPeerClient) Start() error {
 	return nil
 }
 
+// Close terminates running processes for SyncPeerClient
 func (m *syncPeerClient) Close() {
 	if m.subscription != nil {
 		m.subscription.Close()
@@ -71,6 +73,7 @@ func (m *syncPeerClient) Close() {
 	close(m.peerConnectionUpdateCh)
 }
 
+// GetPeerStatus fetches peer status
 func (m *syncPeerClient) GetPeerStatus(peerID peer.ID) (*NoForkPeer, error) {
 	clt, err := m.newSyncPeerClient(peerID)
 	if err != nil {
@@ -92,7 +95,7 @@ func (m *syncPeerClient) GetPeerStatus(peerID peer.ID) (*NoForkPeer, error) {
 	}, nil
 }
 
-// GetConnectedPeerStatuses returns the statuses of the all connecting nodes
+// GetConnectedPeerStatuses fetches the statuses of all connecting peers
 func (m *syncPeerClient) GetConnectedPeerStatuses() []*NoForkPeer {
 	var (
 		ps            = m.network.Peers()
@@ -129,14 +132,17 @@ func (m *syncPeerClient) GetConnectedPeerStatuses() []*NoForkPeer {
 	return syncPeers
 }
 
+// GetPeerStatusUpdateCh returns a channel of peer's status update
 func (m *syncPeerClient) GetPeerStatusUpdateCh() <-chan *NoForkPeer {
 	return m.peerStatusUpdateCh
 }
 
+// GetPeerConnectionUpdateEventCh returns peer's connection change event
 func (m *syncPeerClient) GetPeerConnectionUpdateEventCh() <-chan *event.PeerEvent {
 	return m.peerConnectionUpdateCh
 }
 
+// startGossip creates new topic and starts subscribing
 func (m *syncPeerClient) startGossip() error {
 	topic, err := m.network.NewTopic(statusTopicName, &proto.SyncPeerStatus{})
 	if err != nil {
@@ -152,6 +158,7 @@ func (m *syncPeerClient) startGossip() error {
 	return nil
 }
 
+// handleStatusUpdate is a handler of gossip
 func (m *syncPeerClient) handleStatusUpdate(obj interface{}, from peer.ID) {
 	status, ok := obj.(*proto.SyncPeerStatus)
 	if !ok {
@@ -175,15 +182,13 @@ func (m *syncPeerClient) handleStatusUpdate(obj interface{}, from peer.ID) {
 	}
 }
 
+// startNewBlockProcess starts blockchain event subscription
 func (m *syncPeerClient) startNewBlockProcess() {
 	m.subscription = m.blockchain.SubscribeEvents()
 
 	for event := range m.subscription.GetEventCh() {
-		if event.Type == blockchain.EventHead && len(event.NewChain) > 0 {
-			latest := m.blockchain.Header()
-			if latest == nil {
-				return
-			}
+		if l := len(event.NewChain); l > 0 {
+			latest := event.NewChain[l-1]
 
 			// Publish status
 			if err := m.topic.Publish(&proto.SyncPeerStatus{
@@ -195,6 +200,7 @@ func (m *syncPeerClient) startNewBlockProcess() {
 	}
 }
 
+// startPeerEventProcess starts subscribing peer connection change events and process them
 func (m *syncPeerClient) startPeerEventProcess() {
 	peerEventCh, err := m.network.SubscribeCh()
 	if err != nil {
@@ -210,10 +216,12 @@ func (m *syncPeerClient) startPeerEventProcess() {
 	}
 }
 
+// CloseStream closes stream
 func (m *syncPeerClient) CloseStream(peerID peer.ID) error {
 	return m.network.CloseProtocolStream(SyncerProto, peerID)
 }
 
+// GetBlocks returns a stream of blocks from given height to peer's latest
 func (m *syncPeerClient) GetBlocks(
 	ctx context.Context,
 	peerID peer.ID,
@@ -256,6 +264,7 @@ func (m *syncPeerClient) GetBlocks(
 	return blockCh, nil
 }
 
+// newSyncPeerClient creates gRPC client
 func (m *syncPeerClient) newSyncPeerClient(peerID peer.ID) (proto.SyncPeerClient, error) {
 	conn, err := m.network.NewProtoConnection(SyncerProto, peerID)
 	if err != nil {
@@ -267,6 +276,7 @@ func (m *syncPeerClient) newSyncPeerClient(peerID peer.ID) (proto.SyncPeerClient
 	return proto.NewSyncPeerClient(conn), nil
 }
 
+// fromProto gets block from gRPC response data
 func fromProto(protoBlock *proto.Block) (*types.Block, error) {
 	block := &types.Block{}
 	if err := block.UnmarshalRLP(protoBlock.Block); err != nil {

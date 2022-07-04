@@ -16,66 +16,88 @@ import (
 )
 
 type Blockchain interface {
-	// Subscribe new block event
+	// SubscribeEvents subscribes new blockchain event
 	SubscribeEvents() blockchain.Subscription
-	// Get latest header
+	// Header returns get latest header
 	Header() *types.Header
-	// Get Block by number
+	// GetBlockByNumber returns block by number
 	GetBlockByNumber(uint64, bool) (*types.Block, bool)
-	// Verify fetched block
+	// VerifyFinalizedBlock verifies finalized block
 	VerifyFinalizedBlock(*types.Block) error
-	// Write block to chain
+	// WriteBlock writes a given block to chain
 	WriteBlock(*types.Block) error
 }
 
 type Network interface {
 	// AddrInfo returns Network Info
 	AddrInfo() *peer.AddrInfo
-	// Register gRPC service
+	// RegisterProtocol registers gRPC service
 	RegisterProtocol(string, network.Protocol)
-	// Get current connected peers
+	// Peers returns current connected peers
 	Peers() []*network.PeerConnInfo
-	// Subscribe peer added/removed events
+	// SubscribeCh returns a channel of peer event
 	SubscribeCh() (<-chan *event.PeerEvent, error)
-	// Get distance between node and peer
+	// GetPeerDistance returns the distance between the node and given peer
 	GetPeerDistance(peer.ID) *big.Int
 	// NewProtoConnection opens up a new stream on the set protocol to the peer,
 	// and returns a reference to the connection
 	NewProtoConnection(protocol string, peerID peer.ID) (*rawGrpc.ClientConn, error)
 	// NewTopic Creates New Topic for gossip
 	NewTopic(protoID string, obj proto.Message) (*network.Topic, error)
+	// IsConnected returns the node is connecting to the peer associated with the given ID
 	IsConnected(peerID peer.ID) bool
-	CloseProtocolStream(protocol string, peerID peer.ID) error
+	// SaveProtocolStream saves stream
 	SaveProtocolStream(protocol string, stream *rawGrpc.ClientConn, peerID peer.ID)
+	// CloseProtocolStream closes stream
+	CloseProtocolStream(protocol string, peerID peer.ID) error
 }
 
 type Syncer interface {
+	// Start starts syncer processes
 	Start() error
+	// Close terminates syncer process
 	Close()
+	// GetSyncProgression returns sync progression
 	GetSyncProgression() *progress.Progression
+	// HasSyncPeer returns whether syncer has the peer syncer can sync with
 	HasSyncPeer() bool
+	// BulkSync syncs blocks to the peer's latest
 	BulkSync(context.Context, func(*types.Block) bool) error
+	// WatchSync starts routine to sync blocks
 	WatchSync(context.Context, func(*types.Block) bool) error
 }
 
 type Progression interface {
+	// StartProgression starts progression
 	StartProgression(startingBlock uint64, subscription blockchain.Subscription)
+	// UpdateHighestProgression updates highest block number
 	UpdateHighestProgression(highestBlock uint64)
+	// GetProgression returns Progression
 	GetProgression() *progress.Progression
+	// StopProgression finishes progression
 	StopProgression()
 }
 
 type SyncPeerService interface {
+	// Start starts server
 	Start()
 }
 
 type SyncPeerClient interface {
+	// Start processes for SyncPeerClient
 	Start() error
+	// Close terminates running processes for SyncPeerClient
 	Close()
+	// GetPeerStatus fetches peer status
 	GetPeerStatus(id peer.ID) (*NoForkPeer, error)
+	// GetConnectedPeerStatuses fetches the statuses of all connecting peers
 	GetConnectedPeerStatuses() []*NoForkPeer
+	// GetBlocks returns a stream of blocks from given height to peer's latest
 	GetBlocks(context.Context, peer.ID, uint64) (<-chan *types.Block, error)
+	// GetPeerStatusUpdateCh returns a channel of peer's status update
 	GetPeerStatusUpdateCh() <-chan *NoForkPeer
+	// GetPeerConnectionUpdateEventCh returns peer's connection change event
 	GetPeerConnectionUpdateEventCh() <-chan *event.PeerEvent
+	// CloseStream close a stream
 	CloseStream(peerID peer.ID) error
 }
