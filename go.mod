@@ -19,7 +19,7 @@ require (
 	github.com/libp2p/go-libp2p v0.20.0
 	github.com/libp2p/go-libp2p-core v0.17.0
 	github.com/libp2p/go-libp2p-kbucket v0.4.7
-	github.com/libp2p/go-libp2p-pubsub v0.7.0
+	github.com/libp2p/go-libp2p-pubsub v0.7.1
 	github.com/miekg/dns v1.1.49 // indirect
 	github.com/multiformats/go-base32 v0.0.4 // indirect
 	github.com/multiformats/go-multiaddr v0.6.0
