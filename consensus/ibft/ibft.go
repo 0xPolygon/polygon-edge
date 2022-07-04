@@ -1371,6 +1371,10 @@ func (i *Ibft) Close() error {
 		}
 	}
 
+	if i.syncer != nil {
+		i.syncer.Close()
+	}
+
 	return nil
 }
 
