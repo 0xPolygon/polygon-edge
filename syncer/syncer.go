@@ -59,6 +59,7 @@ func NewSyncer(
 	}
 }
 
+// Start starts goroutine processes
 func (s *syncer) Start() error {
 	if err := s.syncPeerClient.Start(); err != nil {
 		return err
@@ -72,10 +73,12 @@ func (s *syncer) Start() error {
 	return nil
 }
 
+// Close terminates goroutine processes
 func (s *syncer) Close() {
 	close(s.newStatusCh)
 }
 
+// initializePeerMap fetches peer statuses and initializes map
 func (s *syncer) initializePeerMap() {
 	peerStatuses := s.syncPeerClient.GetConnectedPeerStatuses()
 	s.peerMap.PutPeers(peerStatuses)
@@ -90,6 +93,7 @@ func (s *syncer) initializePeerMap() {
 	}
 }
 
+// startPeerConnectionEventProcess processes peer connection change events
 func (s *syncer) startPeerConnectionEventProcess() {
 	for e := range s.syncPeerClient.GetPeerConnectionUpdateEventCh() {
 		peerID := e.PeerID
@@ -117,6 +121,7 @@ func (s *syncer) startPeerConnectionEventProcess() {
 	}
 }
 
+// GetSyncProgression returns progression
 func (s *syncer) GetSyncProgression() *progress.Progression {
 	return s.syncProgression.GetProgression()
 }
@@ -180,6 +185,7 @@ func (s *syncer) BulkSync(ctx context.Context, newBlockCallback func(*types.Bloc
 	return nil
 }
 
+// WatchSync syncs block with the best peer until callback returns true
 func (s *syncer) WatchSync(ctx context.Context, callback func(*types.Block) bool) error {
 	localLatest := s.blockchain.Header().Number
 	skipList := make(map[peer.ID]bool)
@@ -230,6 +236,7 @@ func (s *syncer) WatchSync(ctx context.Context, callback func(*types.Block) bool
 	return nil
 }
 
+// bulkSyncWithPeer syncs block with a given peer
 func (s *syncer) bulkSyncWithPeer(peerID peer.ID, newBlockCallback func(*types.Block) bool) (uint64, bool, error) {
 	localLatest := s.blockchain.Header().Number
 	shouldTerminate := false
