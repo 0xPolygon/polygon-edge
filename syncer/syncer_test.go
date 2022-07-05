@@ -81,7 +81,7 @@ func (m *mockProgression) StopProgression() {}
 type mockSyncPeerClient struct {
 	getPeerStatusHandler                  func(peer.ID) (*NoForkPeer, error)
 	getConnectedPeerStatusesHandler       func() []*NoForkPeer
-	getBlocksHandler                      func(context.Context, peer.ID, uint64) (<-chan *types.Block, error)
+	getBlocksHandler                      func(peer.ID, uint64, time.Duration) (<-chan *types.Block, error)
 	getPeerStatusUpdateChHandler          func() <-chan *NoForkPeer
 	getPeerConnectionUpdateEventChHandler func() <-chan *event.PeerEvent
 }
@@ -100,8 +100,12 @@ func (m *mockSyncPeerClient) GetConnectedPeerStatuses() []*NoForkPeer {
 	return m.getConnectedPeerStatusesHandler()
 }
 
-func (m *mockSyncPeerClient) GetBlocks(ctx context.Context, id peer.ID, start uint64) (<-chan *types.Block, error) {
-	return m.getBlocksHandler(ctx, id, start)
+func (m *mockSyncPeerClient) GetBlocks(
+	id peer.ID,
+	start uint64,
+	timeoutPerBlock time.Duration,
+) (<-chan *types.Block, error) {
+	return m.getBlocksHandler(id, start, timeoutPerBlock)
 }
 
 func (m *mockSyncPeerClient) GetPeerStatusUpdateCh() <-chan *NoForkPeer {
@@ -634,7 +638,7 @@ func TestBulkSync(t *testing.T) {
 					},
 					time.Second,
 					&mockSyncPeerClient{
-						getBlocksHandler: func(ctx context.Context, i peer.ID, u uint64) (<-chan *types.Block, error) {
+						getBlocksHandler: func(i peer.ID, u uint64, _ time.Duration) (<-chan *types.Block, error) {
 							return test.peerBlocksCh[i], nil
 						},
 					},
@@ -785,7 +789,7 @@ func TestWatchSync(t *testing.T) {
 					},
 					time.Second,
 					&mockSyncPeerClient{
-						getBlocksHandler: func(ctx context.Context, i peer.ID, u uint64) (<-chan *types.Block, error) {
+						getBlocksHandler: func(i peer.ID, u uint64, _ time.Duration) (<-chan *types.Block, error) {
 							// should not panic
 							peerCh := test.peerBlocksCh[i]
 
@@ -852,7 +856,7 @@ func Test_bulkSyncWithPeer(t *testing.T) {
 		blockCallback   func(*types.Block) bool
 
 		// peers
-		getBlocksHandler func(ctx context.Context, id peer.ID, start uint64) (<-chan *types.Block, error)
+		getBlocksHandler func(id peer.ID, start uint64, timeoutPerBlock time.Duration) (<-chan *types.Block, error)
 
 		// handlers
 		verifyFinalizedBlockHandler func(*types.Block) error
@@ -871,7 +875,7 @@ func Test_bulkSyncWithPeer(t *testing.T) {
 			blockCallback: func(b *types.Block) bool {
 				return false
 			},
-			getBlocksHandler: func(ctx context.Context, id peer.ID, start uint64) (<-chan *types.Block, error) {
+			getBlocksHandler: func(id peer.ID, start uint64, _ time.Duration) (<-chan *types.Block, error) {
 				return blocksToCh(blocks[:10], 0), nil
 			},
 			verifyFinalizedBlockHandler: func(b *types.Block) error {
@@ -892,7 +896,7 @@ func Test_bulkSyncWithPeer(t *testing.T) {
 			blockCallback: func(b *types.Block) bool {
 				return false
 			},
-			getBlocksHandler: func(ctx context.Context, id peer.ID, start uint64) (<-chan *types.Block, error) {
+			getBlocksHandler: func(id peer.ID, start uint64, _ time.Duration) (<-chan *types.Block, error) {
 				return nil, errPeerNoResponse
 			},
 			verifyFinalizedBlockHandler: func(b *types.Block) error {
@@ -913,7 +917,7 @@ func Test_bulkSyncWithPeer(t *testing.T) {
 			blockCallback: func(b *types.Block) bool {
 				return false
 			},
-			getBlocksHandler: func(ctx context.Context, id peer.ID, start uint64) (<-chan *types.Block, error) {
+			getBlocksHandler: func(id peer.ID, start uint64, _ time.Duration) (<-chan *types.Block, error) {
 				return blocksToCh(blocks[:10], 0), nil
 			},
 			verifyFinalizedBlockHandler: func(b *types.Block) error {
@@ -938,7 +942,7 @@ func Test_bulkSyncWithPeer(t *testing.T) {
 			blockCallback: func(b *types.Block) bool {
 				return false
 			},
-			getBlocksHandler: func(ctx context.Context, id peer.ID, start uint64) (<-chan *types.Block, error) {
+			getBlocksHandler: func(id peer.ID, start uint64, _ time.Duration) (<-chan *types.Block, error) {
 				return blocksToCh(blocks[:10], 0), nil
 			},
 			verifyFinalizedBlockHandler: func(b *types.Block) error {
@@ -963,7 +967,7 @@ func Test_bulkSyncWithPeer(t *testing.T) {
 			blockCallback: func(b *types.Block) bool {
 				return false
 			},
-			getBlocksHandler: func(ctx context.Context, id peer.ID, start uint64) (<-chan *types.Block, error) {
+			getBlocksHandler: func(id peer.ID, start uint64, _ time.Duration) (<-chan *types.Block, error) {
 				return blocksToCh(blocks[:10], time.Second*1), nil
 			},
 			verifyFinalizedBlockHandler: func(b *types.Block) error {

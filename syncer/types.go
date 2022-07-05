@@ -3,6 +3,7 @@ package syncer
 import (
 	"context"
 	"math/big"
+	"time"
 
 	rawGrpc "google.golang.org/grpc"
 
@@ -93,7 +94,7 @@ type SyncPeerClient interface {
 	// GetConnectedPeerStatuses fetches the statuses of all connecting peers
 	GetConnectedPeerStatuses() []*NoForkPeer
 	// GetBlocks returns a stream of blocks from given height to peer's latest
-	GetBlocks(context.Context, peer.ID, uint64) (<-chan *types.Block, error)
+	GetBlocks(peer.ID, uint64, time.Duration) (<-chan *types.Block, error)
 	// GetPeerStatusUpdateCh returns a channel of peer's status update
 	GetPeerStatusUpdateCh() <-chan *NoForkPeer
 	// GetPeerConnectionUpdateEventCh returns peer's connection change event

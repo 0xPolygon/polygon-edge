@@ -1,7 +1,6 @@
 package syncer
 
 import (
-	"context"
 	"sync"
 	"testing"
 	"time"
@@ -327,16 +326,21 @@ func TestPeerConnectionUpdateEventCh(t *testing.T) {
 		}
 	}()
 
-	// peer1 and peer2 emit Blockchain event
-	// they should publish their status via gossip
-	blockchainEvent := &blockchain.Event{
-		NewChain: []*types.Header{
-			{},
-		},
+	// push latest block number to blockchain subscription
+	pushSubscription := func(sub *blockchain.MockSubscription, latest uint64) {
+		sub.Push(&blockchain.Event{
+			NewChain: []*types.Header{
+				{
+					Number: peerLatest1,
+				},
+			},
+		})
 	}
 
-	subscription1.Push(blockchainEvent)
-	subscription2.Push(blockchainEvent)
+	// peer1 and peer2 emit Blockchain event
+	// they should publish their status via gossip
+	pushSubscription(subscription1, peerLatest1)
+	pushSubscription(subscription2, peerLatest2)
 
 	// wait until 2 messages are propagated
 	wgForGossip.Wait()
@@ -394,10 +398,7 @@ func Test_syncPeerClient_GetBlocks(t *testing.T) {
 
 	assert.NoError(t, err)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	blockStream, err := client.GetBlocks(ctx, peerSrv.AddrInfo().ID, syncFrom)
+	blockStream, err := client.GetBlocks(peerSrv.AddrInfo().ID, syncFrom, 5*time.Second)
 	assert.NoError(t, err)
 
 	blocks := make([]*types.Block, 0, peerLatest)

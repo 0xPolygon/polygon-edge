@@ -223,41 +223,53 @@ func (m *syncPeerClient) CloseStream(peerID peer.ID) error {
 
 // GetBlocks returns a stream of blocks from given height to peer's latest
 func (m *syncPeerClient) GetBlocks(
-	ctx context.Context,
 	peerID peer.ID,
 	from uint64,
+	timeoutPerBlock time.Duration,
 ) (<-chan *types.Block, error) {
 	clt, err := m.newSyncPeerClient(peerID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create sync peer client: %w", err)
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
+
 	stream, err := clt.GetBlocks(ctx, &proto.GetBlocksRequest{
 		From: from,
 	})
 	if err != nil {
+		cancel()
+
 		return nil, fmt.Errorf("failed to open GetBlocks stream: %w", err)
 	}
 
+	// input channel
+	streamBlockCh, streamErrorCh := blockStreamToChannel(stream)
+
+	// output channel
 	blockCh := make(chan *types.Block, 1)
 
 	go func() {
+		defer cancel()
 		defer close(blockCh)
 
 		for {
-			protoBlock, err := stream.Recv()
-			if err != nil {
-				break
+			select {
+			case block, ok := <-streamBlockCh:
+				if !ok {
+					return
+				}
+
+				blockCh <- block
+			case err := <-streamErrorCh:
+				m.logger.Error("failed to get block from gRPC stream", "peer", peerID, "err", err)
+
+				return
+			case <-time.After(timeoutPerBlock):
+				m.logger.Warn("block doesn't reach within timeout", "timeout", timeoutPerBlock)
+
+				return
 			}
-
-			block, err := fromProto(protoBlock)
-			if err != nil {
-				m.logger.Warn("failed to decode a block from peer", "peerID", peerID, "err", err)
-
-				break
-			}
-
-			blockCh <- block
 		}
 	}()
 
@@ -284,4 +296,33 @@ func fromProto(protoBlock *proto.Block) (*types.Block, error) {
 	}
 
 	return block, nil
+}
+
+func blockStreamToChannel(stream proto.SyncPeer_GetBlocksClient) (<-chan *types.Block, <-chan error) {
+	blockCh := make(chan *types.Block)
+	errorCh := make(chan error, 1)
+
+	go func() {
+		defer close(blockCh)
+
+		for {
+			protoBlock, err := stream.Recv()
+			if err != nil {
+				errorCh <- err
+
+				break
+			}
+
+			block, err := fromProto(protoBlock)
+			if err != nil {
+				errorCh <- err
+
+				break
+			}
+
+			blockCh <- block
+		}
+	}()
+
+	return blockCh, errorCh
 }

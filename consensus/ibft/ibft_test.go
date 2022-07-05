@@ -973,6 +973,8 @@ func (s *mockSyncer) Start() error {
 	return nil
 }
 
+func (s *mockSyncer) Close() {}
+
 func (s *mockSyncer) HasSyncPeer() bool {
 	return true
 }
