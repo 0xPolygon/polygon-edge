@@ -56,7 +56,7 @@ func (m *PeerMap) BestPeer(skipMap map[peer.ID]bool) *NoForkPeer {
 	var bestPeer *NoForkPeer
 
 	m.Range(func(key, value interface{}) bool {
-		peer := value.(*NoForkPeer) //nolint:forcetypeassert
+		peer, _ := value.(*NoForkPeer)
 
 		if skipMap != nil && skipMap[peer.ID] {
 			return true
