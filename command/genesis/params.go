@@ -38,6 +38,7 @@ var (
 )
 
 var (
+	errValidatorsNotSpecified    = errors.New("validator information not specified")
 	errValidatorNumberExceedsMax = errors.New("validator number exceeds max validator number")
 	errUnsupportedConsensus      = errors.New("specified consensusRaw not supported")
 	errInvalidEpochSize          = errors.New("epoch size must be greater than 1")
@@ -76,6 +77,13 @@ func (p *genesisParams) validateFlags() error {
 		return errUnsupportedConsensus
 	}
 
+	// Check if validator information is set at all
+	if p.isIBFTConsensus() &&
+		!p.areValidatorsSetManually() &&
+		!p.areValidatorsSetByPrefix() {
+		return errValidatorsNotSpecified
+	}
+
 	// Check if the genesis file already exists
 	if generateError := verifyGenesisExistence(p.genesisPath); generateError != nil {
 		return errors.New(generateError.GetMessage())
@@ -95,6 +103,14 @@ func (p *genesisParams) validateFlags() error {
 	}
 
 	return nil
+}
+
+func (p *genesisParams) isIBFTConsensus() bool {
+	return server.ConsensusType(p.consensusRaw) == server.IBFTConsensus
+}
+
+func (p *genesisParams) areValidatorsSetManually() bool {
+	return len(p.ibftValidatorsRaw) != 0
 }
 
 func (p *genesisParams) areValidatorsSetByPrefix() bool {
