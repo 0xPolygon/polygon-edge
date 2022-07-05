@@ -200,3 +200,13 @@ addrloop:
 	}
 	return b
 }
+
+// Contains reports whether addr is contained in addrs.
+func Contains(addrs []Multiaddr, addr Multiaddr) bool {
+	for _, a := range addrs {
+		if addr.Equal(a) {
+			return true
+		}
+	}
+	return false
+}
