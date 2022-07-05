@@ -249,11 +249,6 @@ func (pos *PoSMechanism) updateValidators(num uint64) error {
 		return err
 	}
 
-	blockRewardsPayment, err := pos.getNextBlockRewards(header)
-	if err != nil {
-		return err
-	}
-
 	snap, err := pos.ibft.getSnapshot(header.Number)
 	if err != nil {
 		return err
@@ -264,10 +259,18 @@ func (pos *PoSMechanism) updateValidators(num uint64) error {
 	}
 
 	newSnap := snap.Copy()
+
+	if pos.CustomContractAddress != types.ZeroAddress {
+		blockRewardsPayment, err := pos.getNextBlockRewards(header)
+		if err != nil {
+			return err
+		}
+		newSnap.BlockReward = blockRewardsPayment
+	}
+
 	newSnap.Set = validators
 	newSnap.Number = header.Number
 	newSnap.Hash = header.Hash.String()
-	newSnap.BlockReward = blockRewardsPayment
 
 	if snap.Number != header.Number {
 		pos.ibft.store.add(newSnap)
