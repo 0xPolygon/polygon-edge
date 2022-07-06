@@ -2,14 +2,16 @@ package command
 
 import (
 	"errors"
+
 	"github.com/0xPolygon/polygon-edge/helper/common"
 )
 
 const (
-	ConsensusFlag  = "consensus"
-	NoDiscoverFlag = "no-discover"
-	BootnodeFlag   = "bootnode"
-	LogLevelFlag   = "log-level"
+	ConsensusFlag        = "consensus"
+	NoDiscoverFlag       = "no-discover"
+	BootnodeFlag         = "bootnode"
+	BootnodeOnlySyncFlag = "bootnode-only-sync"
+	LogLevelFlag         = "log-level"
 )
 
 var (

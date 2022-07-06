@@ -40,6 +40,7 @@ type Telemetry struct {
 // Network defines the network configuration params
 type Network struct {
 	NoDiscover       bool   `json:"no_discover" yaml:"no_discover"`
+	BootnodeOnlySync bool   `json:"bootnode_only_sync" yaml:"bootnode_only_sync"`
 	Libp2pAddr       string `json:"libp2p_addr" yaml:"libp2p_addr"`
 	NatAddr          string `json:"nat_addr" yaml:"nat_addr"`
 	DNSAddr          string `json:"dns_addr" yaml:"dns_addr"`

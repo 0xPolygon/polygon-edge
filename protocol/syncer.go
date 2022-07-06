@@ -277,9 +277,15 @@ func (s *Syncer) BestPeer() *SyncPeer {
 
 	// Find the peer with the biggest block height available
 	s.peers.Range(func(peerID, peer interface{}) bool {
+
 		syncPeer, ok := peer.(*SyncPeer)
 		if !ok {
 			return false
+		}
+
+		// Check if client should ignore this peer when determining best peer to sync to
+		if s.server.ShouldIgnoreSyncToPeer(syncPeer.peer) {
+			return true
 		}
 
 		peerBlockNumber := syncPeer.Number()
