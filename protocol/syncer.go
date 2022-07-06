@@ -277,7 +277,6 @@ func (s *Syncer) BestPeer() *SyncPeer {
 
 	// Find the peer with the biggest block height available
 	s.peers.Range(func(peerID, peer interface{}) bool {
-
 		syncPeer, ok := peer.(*SyncPeer)
 		if !ok {
 			return false

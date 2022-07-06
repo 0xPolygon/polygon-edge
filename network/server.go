@@ -4,15 +4,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
+	"sync/atomic"
+	"time"
+
 	"github.com/0xPolygon/polygon-edge/network/common"
 	"github.com/0xPolygon/polygon-edge/network/dial"
 	"github.com/0xPolygon/polygon-edge/network/discovery"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/p2p/security/noise"
 	rawGrpc "google.golang.org/grpc"
-	"sync"
-	"sync/atomic"
-	"time"
 
 	peerEvent "github.com/0xPolygon/polygon-edge/network/event"
 	"github.com/0xPolygon/polygon-edge/secrets"
@@ -529,6 +530,7 @@ func (s *Server) ShouldIgnoreSyncToPeer(peerID peer.ID) bool {
 	if ignoreSync {
 		s.logger.Debug("avoid syncing to non-bootnode peer", "id", peerID.String())
 	}
+
 	return ignoreSync
 }
 
