@@ -52,7 +52,8 @@ func (poa *PoAMechanism) IsAvailable(hookType HookType, height uint64) bool {
 		return poa.IsInRange(height)
 	case InsertBlockHook:
 		// update block rewards when the one before the beginning or the end of epoch
-		return poa.CustomContractAddress != types.ZeroAddress && (height+1 == poa.From || poa.IsInRange(height) && poa.ibft.IsLastOfEpoch(height))
+		return poa.CustomContractAddress != types.ZeroAddress &&
+			(height+1 == poa.From || poa.IsInRange(height) && poa.ibft.IsLastOfEpoch(height))
 	case PreStateCommitHook:
 		// pay out SC specified block rewards from snapshot if the custom SC address is specified
 		return poa.CustomContractAddress != types.ZeroAddress && poa.IsInRange(height)

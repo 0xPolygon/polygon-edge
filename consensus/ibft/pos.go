@@ -170,7 +170,6 @@ func (pos *PoSMechanism) preStateCommitHook(rawParams interface{}) error {
 			return err
 		}
 	} else if pos.CustomContractAddress != types.ZeroAddress && pos.IsInRange(params.header.Number) {
-
 		snapshot, err := pos.ibft.getSnapshot(params.header.Number)
 		if err != nil {
 			return err
@@ -265,6 +264,7 @@ func (pos *PoSMechanism) updateValidators(num uint64) error {
 		if err != nil {
 			return err
 		}
+
 		newSnap.BlockReward = blockRewardsPayment
 	}
 
