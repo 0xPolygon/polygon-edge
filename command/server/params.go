@@ -4,9 +4,8 @@ import (
 	"errors"
 	"net"
 
-	"github.com/0xPolygon/polygon-edge/command/server/config"
-
 	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/command/server/config"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/server"
@@ -54,7 +53,6 @@ var (
 )
 
 var (
-	errInvalidPeerParams = errors.New("both max-peers and max-inbound/outbound flags are set")
 	errInvalidNATAddress = errors.New("could not parse NAT IP address")
 )
 
@@ -79,15 +77,6 @@ type serverParams struct {
 	secretsConfig *secrets.SecretsManagerConfig
 
 	logFileLocation string
-}
-
-func (p *serverParams) validateFlags() error {
-	// Validate the max peers configuration
-	if p.isMaxPeersSet() && p.isPeerRangeSet() {
-		return errInvalidPeerParams
-	}
-
-	return nil
 }
 
 func (p *serverParams) isMaxPeersSet() bool {

@@ -130,7 +130,7 @@ func setFlags(cmd *cobra.Command) {
 		&params.rawConfig.Network.NoDiscover,
 		command.NoDiscoverFlag,
 		defaultConfig.Network.NoDiscover,
-		"prevent the client from discovering other peers (default: false)",
+		"prevent the client from discovering other peers",
 	)
 
 	cmd.Flags().Int64Var(
@@ -150,6 +150,7 @@ func setFlags(cmd *cobra.Command) {
 	)
 	// override default usage value
 	cmd.Flag(maxInboundPeersFlag).DefValue = fmt.Sprintf("%d", defaultConfig.Network.MaxInboundPeers)
+	cmd.MarkFlagsMutuallyExclusive(maxPeersFlag, maxInboundPeersFlag)
 
 	cmd.Flags().Int64Var(
 		&params.rawConfig.Network.MaxOutboundPeers,
@@ -159,6 +160,7 @@ func setFlags(cmd *cobra.Command) {
 	)
 	// override default usage value
 	cmd.Flag(maxOutboundPeersFlag).DefValue = fmt.Sprintf("%d", defaultConfig.Network.MaxOutboundPeers)
+	cmd.MarkFlagsMutuallyExclusive(maxPeersFlag, maxOutboundPeersFlag)
 
 	cmd.Flags().Uint64Var(
 		&params.rawConfig.TxPool.PriceLimit,
@@ -244,10 +246,6 @@ func runPreRun(cmd *cobra.Command, _ []string) error {
 		if err := params.initConfigFromFile(); err != nil {
 			return err
 		}
-	}
-
-	if err := params.validateFlags(); err != nil {
-		return err
 	}
 
 	if err := params.initRawParams(); err != nil {
