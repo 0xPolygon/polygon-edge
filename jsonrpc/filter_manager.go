@@ -389,6 +389,7 @@ func (f *FilterManager) removeFilterByID(id string) bool {
 	}
 
 	delete(f.filters, id)
+	delete(f.filterByWsConn, filter.getFilterBase().ws)
 
 	if removed := f.timeouts.removeFilter(filter.getFilterBase()); removed {
 		f.emitSignalToUpdateCh()
