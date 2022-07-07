@@ -59,7 +59,6 @@ func (s *syncPeerService) GetBlocks(
 
 		// if client closes stream, context.Canceled is given
 		if err := stream.Send(resp); err != nil {
-
 			break
 		}
 	}
