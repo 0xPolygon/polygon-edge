@@ -233,19 +233,22 @@ type FilterManager struct {
 
 	updateCh chan struct{}
 	closeCh  chan struct{}
+
+	filterByWsConn map[wsConn]filter
 }
 
 func NewFilterManager(logger hclog.Logger, store filterManagerStore) *FilterManager {
 	m := &FilterManager{
-		logger:      logger.Named("filter"),
-		timeout:     defaultTimeout,
-		store:       store,
-		blockStream: &blockStream{},
-		lock:        sync.RWMutex{},
-		filters:     make(map[string]filter),
-		timeouts:    timeHeapImpl{},
-		updateCh:    make(chan struct{}),
-		closeCh:     make(chan struct{}),
+		logger:         logger.Named("filter"),
+		timeout:        defaultTimeout,
+		store:          store,
+		blockStream:    &blockStream{},
+		lock:           sync.RWMutex{},
+		filters:        make(map[string]filter),
+		timeouts:       timeHeapImpl{},
+		updateCh:       make(chan struct{}),
+		closeCh:        make(chan struct{}),
+		filterByWsConn: make(map[wsConn]filter),
 	}
 
 	// start blockstream with the current header
@@ -319,6 +322,8 @@ func (f *FilterManager) NewBlockFilter(ws wsConn) string {
 		block:      f.blockStream.Head(),
 	}
 
+	f.filterByWsConn[ws] = filter
+
 	return f.addFilter(filter)
 }
 
@@ -328,6 +333,8 @@ func (f *FilterManager) NewLogFilter(logQuery *LogQuery, ws wsConn) string {
 		filterBase: newFilterBase(ws),
 		query:      logQuery,
 	}
+
+	f.filterByWsConn[ws] = filter
 
 	return f.addFilter(filter)
 }
@@ -392,16 +399,16 @@ func (f *FilterManager) removeFilterByID(id string) bool {
 
 // removeFilterByWs removes the filter with given WS, unsafe against race condition
 func (f *FilterManager) RemoveFilterByWs(ws wsConn) {
-	for _, filter := range f.filters {
-		if filter.getFilterBase().ws != ws {
-			continue
-		}
+	filter, ok := f.filterByWsConn[ws]
+	if !ok {
+		return
+	}
 
-		delete(f.filters, filter.getFilterBase().id)
+	delete(f.filters, filter.getFilterBase().id)
+	delete(f.filterByWsConn, ws)
 
-		if removed := f.timeouts.removeFilter(filter.getFilterBase()); removed {
-			f.emitSignalToUpdateCh()
-		}
+	if removed := f.timeouts.removeFilter(filter.getFilterBase()); removed {
+		f.emitSignalToUpdateCh()
 	}
 }
 
