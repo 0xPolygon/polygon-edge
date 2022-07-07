@@ -26,12 +26,13 @@ const (
 // of the legacy proto package is being used.
 const _ = proto.ProtoPackageIsVersion4
 
+// GetBlocksRequest is a request for GetBlocks
 type GetBlocksRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// The beginning height
+	// The height of beginning block to sync
 	From uint64 `protobuf:"varint,1,opt,name=from,proto3" json:"from,omitempty"`
 }
 
@@ -74,6 +75,7 @@ func (x *GetBlocksRequest) GetFrom() uint64 {
 	return 0
 }
 
+// Block contains a block data
 type Block struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -122,6 +124,7 @@ func (x *Block) GetBlock() []byte {
 	return nil
 }
 
+// SyncPeerStatus contains peer status
 type SyncPeerStatus struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache

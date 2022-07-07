@@ -18,7 +18,9 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type SyncPeerClient interface {
+	// Returns stream of blocks beginning specified from
 	GetBlocks(ctx context.Context, in *GetBlocksRequest, opts ...grpc.CallOption) (SyncPeer_GetBlocksClient, error)
+	// Returns server's status
 	GetStatus(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*SyncPeerStatus, error)
 }
 
@@ -75,7 +77,9 @@ func (c *syncPeerClient) GetStatus(ctx context.Context, in *emptypb.Empty, opts 
 // All implementations must embed UnimplementedSyncPeerServer
 // for forward compatibility
 type SyncPeerServer interface {
+	// Returns stream of blocks beginning specified from
 	GetBlocks(*GetBlocksRequest, SyncPeer_GetBlocksServer) error
+	// Returns server's status
 	GetStatus(context.Context, *emptypb.Empty) (*SyncPeerStatus, error)
 	mustEmbedUnimplementedSyncPeerServer()
 }
