@@ -59,6 +59,7 @@ type Config struct {
 	Path string
 }
 
+//	TODO: backend config
 type ConsensusParams struct {
 	Context        context.Context
 	Seal           bool
