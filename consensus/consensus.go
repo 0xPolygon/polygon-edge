@@ -76,6 +76,4 @@ type ConsensusParams struct {
 }
 
 // Factory is the factory function to create a discovery backend
-type Factory func(
-	*ConsensusParams,
-) (Consensus, error)
+type Factory func(*ConsensusParams) (Consensus, error)
