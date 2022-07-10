@@ -1345,6 +1345,7 @@ func (i *Ibft) PreStateCommit(header *types.Header, txn *state.Transition) error
 	return nil
 }
 
+//	TODO: what is this needed for ?
 // GetEpoch returns the current epoch
 func (i *Ibft) GetEpoch(number uint64) uint64 {
 	if number%i.epochSize == 0 {
