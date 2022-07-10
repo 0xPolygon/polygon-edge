@@ -31,6 +31,7 @@ type Consensus interface {
 	// PreStateCommit a hook to be called before finalizing state transition on inserting block
 	PreStateCommit(header *types.Header, txn *state.Transition) error
 
+	//	TODO: this seems to be for eth_syncing only
 	// GetSyncProgression retrieves the current sync progression, if any
 	GetSyncProgression() *progress.Progression
 
