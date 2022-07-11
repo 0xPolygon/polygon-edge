@@ -187,8 +187,7 @@ func (s *syncer) BulkSync(newBlockCallback func(*types.Block) bool) error {
 
 		lastNumber, _, err := s.bulkSyncWithPeer(bestPeer.ID, newBlockCallback)
 		if err != nil {
-			s.logger.Warn("Error ", err)
-			s.logger.Warn("failed to complete bulk sync with peer, try to next one", "peer ID", bestPeer.ID)
+			s.logger.Warn("failed to complete bulk sync with peer, try to next one", "peer ID", "error", bestPeer.ID, err)
 		}
 
 		// if node could sync with the peer fully, then exit loop
@@ -235,11 +234,10 @@ func (s *syncer) WatchSync(callback func(*types.Block) bool) error {
 		// fetch block from the peer
 		lastNumber, shouldTerminate, err := s.bulkSyncWithPeer(bestPeer.ID, callback)
 		if err != nil {
-			s.logger.Warn("Error ", err)
-			s.logger.Warn("failed to complete bulk sync with peer, try to next one", "peer ID", bestPeer.ID)
+			s.logger.Warn("failed to complete bulk sync with peer, try to next one", "peer ID", "error", bestPeer.ID, err)
 		}
 
-		if err != nil || lastNumber < bestPeer.Number {
+		if lastNumber < bestPeer.Number {
 			skipList[bestPeer.ID] = true
 
 			// continue to next peer
