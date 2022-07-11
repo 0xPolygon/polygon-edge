@@ -62,7 +62,7 @@ func TestDispatcher_HandleWebsocketConnection_EthSubscribe(t *testing.T) {
 		t.Parallel()
 
 		store := newMockStore()
-		dispatcher := newDispatcher(hclog.NewNullLogger(), store, 0, 0)
+		dispatcher := newDispatcher(hclog.NewNullLogger(), store, 0, 0, 20, 1000)
 
 		mockConnection := &mockWsConn{
 			msgCh: make(chan []byte, 1),
@@ -96,7 +96,7 @@ func TestDispatcher_HandleWebsocketConnection_EthSubscribe(t *testing.T) {
 
 func TestDispatcher_WebsocketConnection_RequestFormats(t *testing.T) {
 	store := newMockStore()
-	dispatcher := newDispatcher(hclog.NewNullLogger(), store, 0, 0)
+	dispatcher := newDispatcher(hclog.NewNullLogger(), store, 0, 0, 20, 1000)
 
 	mockConnection := &mockWsConn{
 		msgCh: make(chan []byte, 1),
@@ -200,7 +200,7 @@ func (m *mockService) Filter(f LogQuery) (interface{}, error) {
 func TestDispatcherFuncDecode(t *testing.T) {
 	srv := &mockService{msgCh: make(chan interface{}, 10)}
 
-	dispatcher := newDispatcher(hclog.NewNullLogger(), newMockStore(), 0, 0)
+	dispatcher := newDispatcher(hclog.NewNullLogger(), newMockStore(), 0, 0, 20, 1000)
 	dispatcher.registerService("mock", srv)
 
 	handleReq := func(typ string, msg string) interface{} {
@@ -266,25 +266,86 @@ func TestDispatcherFuncDecode(t *testing.T) {
 }
 
 func TestDispatcherBatchRequest(t *testing.T) {
-	dispatcher := newDispatcher(hclog.NewNullLogger(), newMockStore(), 0, 0)
+	handle := func(dispatcher *Dispatcher, reqBody []byte) []byte {
+		res, _ := dispatcher.Handle(reqBody)
 
-	// test with leading whitespace ("  \t\n\n\r")
-	leftBytes := []byte{0x20, 0x20, 0x09, 0x0A, 0x0A, 0x0D}
-	resp, err := dispatcher.Handle(append(leftBytes, []byte(`[
-    {"id":1,"jsonrpc":"2.0","method":"eth_getBalance","params":["0x1", true]},
-    {"id":2,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["0x2", true]},
-    {"id":3,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["0x3", true]},
-	{"id":4,"jsonrpc":"2.0","method": "web3_sha3","params": ["0x68656c6c6f20776f726c64"]}
-]`)...))
-	assert.NoError(t, err)
+		return res
+	}
 
-	var res []SuccessResponse
+	cases := []struct {
+		id          uint8
+		desc        string
+		dispatcher  *Dispatcher
+		reqBody     []byte
+		expectError bool
+	}{
+		{
+			1,
+			"test with leading whitespace (\"  \\t\\n\\n\\r\\)",
+			newDispatcher(hclog.NewNullLogger(), newMockStore(), 0, 0, 20, 1000),
 
-	assert.NoError(t, expectBatchJSONResult(resp, &res))
-	assert.Len(t, res, 4)
+			append([]byte{0x20, 0x20, 0x09, 0x0A, 0x0A, 0x0D}, []byte(`[
+				{"id":1,"jsonrpc":"2.0","method":"eth_getBalance","params":["0x1", true]},
+				{"id":2,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["0x2", true]},
+				{"id":3,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["0x3", true]},
+				{"id":4,"jsonrpc":"2.0","method": "web3_sha3","params": ["0x68656c6c6f20776f726c64"]}]`)...),
+			false,
+		},
+		{
+			2,
+			"test with batch req length within batchRequestLengthLimit",
+			newDispatcher(hclog.NewNullLogger(), newMockStore(), 0, 0, 10, 1000),
+			[]byte(`[
+				{"id":1,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]},
+				{"id":2,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]},
+				{"id":3,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]},
+				{"id":4,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]},
+				{"id":5,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]},
+				{"id":6,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]}]`),
+			false,
+		},
+		{
+			3,
+			"test with batch req length exceeding batchRequestLengthLimit",
+			newDispatcher(hclog.NewNullLogger(), newMockStore(), 0, 0, 3, 1000),
+			[]byte(`[
+				{"id":1,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]},
+				{"id":2,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]},
+				{"id":3,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]},
+				{"id":4,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]},
+				{"id":5,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]},
+				{"id":6,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]}]`),
+			true,
+		},
+	}
 
-	jsonerr := &ObjectError{Code: -32602, Message: "Invalid Params"}
+	for _, c := range cases {
+		res := handle(c.dispatcher, c.reqBody)
 
-	assert.Equal(t, res[0].Error, jsonerr)
-	assert.Nil(t, res[3].Error)
+		if c.expectError {
+			var resp ErrorResponse
+
+			assert.NoError(t, expectBatchJSONResult(res, &resp))
+
+			switch c.id {
+			case 3:
+				jsonerr := &ObjectError{Code: -32600, Message: "Batch request length too long"}
+				assert.Equal(t, resp.Error, jsonerr)
+			}
+		} else {
+			var resp []SuccessResponse
+			assert.NoError(t, expectBatchJSONResult(res, &resp))
+
+			switch c.id {
+			case 1:
+				assert.Len(t, resp, 4)
+				jsonerr := &ObjectError{Code: -32602, Message: "Invalid Params"}
+
+				assert.Equal(t, resp[0].Error, jsonerr)
+				assert.Nil(t, resp[3].Error)
+			case 2:
+				assert.Len(t, resp, 6)
+			}
+		}
+	}
 }

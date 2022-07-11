@@ -22,6 +22,7 @@ var (
 	ErrCastingFilterToLogFilter         = errors.New("casting filter object to logFilter error")
 	ErrBlockNotFound                    = errors.New("block not found")
 	ErrIncorrectBlockRange              = errors.New("incorrect range")
+	ErrBlockRangeTooHigh                = errors.New("block range too high")
 	ErrPendingBlockNumber               = errors.New("pending block number is not supported")
 )
 
@@ -230,9 +231,10 @@ type FilterManager struct {
 
 	timeout time.Duration
 
-	store        filterManagerStore
-	subscription blockchain.Subscription
-	blockStream  *blockStream
+	store           filterManagerStore
+	subscription    blockchain.Subscription
+	blockStream     *blockStream
+	blockRangeLimit uint64
 
 	lock     sync.RWMutex
 	filters  map[string]filter
@@ -242,17 +244,18 @@ type FilterManager struct {
 	closeCh  chan struct{}
 }
 
-func NewFilterManager(logger hclog.Logger, store filterManagerStore) *FilterManager {
+func NewFilterManager(logger hclog.Logger, store filterManagerStore, blockRangeLimit uint64) *FilterManager {
 	m := &FilterManager{
-		logger:      logger.Named("filter"),
-		timeout:     defaultTimeout,
-		store:       store,
-		blockStream: &blockStream{},
-		lock:        sync.RWMutex{},
-		filters:     make(map[string]filter),
-		timeouts:    timeHeapImpl{},
-		updateCh:    make(chan struct{}),
-		closeCh:     make(chan struct{}),
+		logger:          logger.Named("filter"),
+		timeout:         defaultTimeout,
+		store:           store,
+		blockStream:     &blockStream{},
+		blockRangeLimit: blockRangeLimit,
+		lock:            sync.RWMutex{},
+		filters:         make(map[string]filter),
+		timeouts:        timeHeapImpl{},
+		updateCh:        make(chan struct{}),
+		closeCh:         make(chan struct{}),
 	}
 
 	// start blockstream with the current header
@@ -412,6 +415,11 @@ func (f *FilterManager) getLogsFromBlocks(query *LogQuery) ([]*Log, error) {
 	// skip it
 	if from == 0 {
 		from = 1
+	}
+
+	// avoid handling large block ranges
+	if to-from > f.blockRangeLimit {
+		return nil, ErrBlockRangeTooHigh
 	}
 
 	logs := make([]*Log, 0)

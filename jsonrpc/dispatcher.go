@@ -39,23 +39,26 @@ type endpoints struct {
 // Dispatcher handles all json rpc requests by delegating
 // the execution flow to the corresponding service
 type Dispatcher struct {
-	logger        hclog.Logger
-	serviceMap    map[string]*serviceData
-	filterManager *FilterManager
-	endpoints     endpoints
-	chainID       uint64
-	priceLimit    uint64
+	logger           hclog.Logger
+	serviceMap       map[string]*serviceData
+	filterManager    *FilterManager
+	endpoints        endpoints
+	chainID          uint64
+	priceLimit       uint64
+	batchLengthLimit uint64
 }
 
-func newDispatcher(logger hclog.Logger, store JSONRPCStore, chainID uint64, priceLimit uint64) *Dispatcher {
+func newDispatcher(logger hclog.Logger, store JSONRPCStore, chainID uint64, priceLimit uint64,
+	batchLengthLimit uint64, blockRangeLimit uint64) *Dispatcher {
 	d := &Dispatcher{
-		logger:     logger.Named("dispatcher"),
-		chainID:    chainID,
-		priceLimit: priceLimit,
+		logger:           logger.Named("dispatcher"),
+		chainID:          chainID,
+		priceLimit:       priceLimit,
+		batchLengthLimit: batchLengthLimit,
 	}
 
 	if store != nil {
-		d.filterManager = NewFilterManager(logger, store)
+		d.filterManager = NewFilterManager(logger, store, blockRangeLimit)
 		go d.filterManager.Run()
 	}
 
@@ -245,6 +248,11 @@ func (d *Dispatcher) Handle(reqBody []byte) ([]byte, error) {
 	var requests []Request
 	if err := json.Unmarshal(reqBody, &requests); err != nil {
 		return NewRPCResponse(nil, "2.0", nil, NewInvalidRequestError("Invalid json request")).Bytes()
+	}
+
+	// avoid handling long batch requests
+	if len(requests) > int(d.batchLengthLimit) {
+		return NewRPCResponse(nil, "2.0", nil, NewInvalidRequestError("Batch request length too long")).Bytes()
 	}
 
 	responses := make([]Response, 0)

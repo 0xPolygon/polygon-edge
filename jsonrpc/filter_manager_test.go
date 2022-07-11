@@ -80,6 +80,16 @@ func Test_GetLogsForQuery(t *testing.T) {
 			0,
 			ErrIncorrectBlockRange,
 		},
+		{
+			"Block range too high",
+			&LogQuery{
+				fromBlock: 10,
+				toBlock:   1012,
+				Topics:    topics,
+			},
+			0,
+			ErrBlockRangeTooHigh,
+		},
 	}
 
 	// setup test
@@ -112,7 +122,7 @@ func Test_GetLogsForQuery(t *testing.T) {
 
 	store.appendBlocksToStore(blocks)
 
-	f := NewFilterManager(hclog.NewNullLogger(), store)
+	f := NewFilterManager(hclog.NewNullLogger(), store, 1000)
 
 	for _, testCase := range testTable {
 		testCase := testCase
@@ -138,7 +148,7 @@ func Test_GetLogsForQuery(t *testing.T) {
 func Test_GetLogFilterFromID(t *testing.T) {
 	store := newMockStore()
 
-	m := NewFilterManager(hclog.NewNullLogger(), store)
+	m := NewFilterManager(hclog.NewNullLogger(), store, 1000)
 
 	go m.Run()
 
@@ -158,7 +168,7 @@ func Test_GetLogFilterFromID(t *testing.T) {
 func TestFilterLog(t *testing.T) {
 	store := newMockStore()
 
-	m := NewFilterManager(hclog.NewNullLogger(), store)
+	m := NewFilterManager(hclog.NewNullLogger(), store, 1000)
 	go m.Run()
 
 	id := m.NewLogFilter(&LogQuery{
@@ -218,7 +228,7 @@ func TestFilterLog(t *testing.T) {
 func TestFilterBlock(t *testing.T) {
 	store := newMockStore()
 
-	m := NewFilterManager(hclog.NewNullLogger(), store)
+	m := NewFilterManager(hclog.NewNullLogger(), store, 1000)
 	go m.Run()
 
 	// add block filter
@@ -279,7 +289,7 @@ func TestFilterBlock(t *testing.T) {
 func TestFilterTimeout(t *testing.T) {
 	store := newMockStore()
 
-	m := NewFilterManager(hclog.NewNullLogger(), store)
+	m := NewFilterManager(hclog.NewNullLogger(), store, 1000)
 	m.timeout = 2 * time.Second
 
 	go m.Run()
@@ -299,7 +309,7 @@ func TestFilterWebsocket(t *testing.T) {
 		msgCh: make(chan []byte, 1),
 	}
 
-	m := NewFilterManager(hclog.NewNullLogger(), store)
+	m := NewFilterManager(hclog.NewNullLogger(), store, 1000)
 	go m.Run()
 
 	id := m.NewBlockFilter(mock)
@@ -367,7 +377,7 @@ func (m *MockClosedWSConnection) WriteMessage(_messageType int, _data []byte) er
 func TestClosedFilterDeletion(t *testing.T) {
 	store := newMockStore()
 
-	m := NewFilterManager(hclog.NewNullLogger(), store)
+	m := NewFilterManager(hclog.NewNullLogger(), store, 1000)
 
 	go m.Run()
 

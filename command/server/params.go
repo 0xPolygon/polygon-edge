@@ -26,6 +26,8 @@ const (
 	maxInboundPeersFlag   = "max-inbound-peers"
 	maxOutboundPeersFlag  = "max-outbound-peers"
 	priceLimitFlag        = "price-limit"
+	batchRequestLimitFlag = "json-rpc-batch-request-limit"
+	blockRangeLimitFlag   = "json-rpc-block-range-limit"
 	maxSlotsFlag          = "max-slots"
 	blockGasTargetFlag    = "block-gas-target"
 	secretsConfigFlag     = "secrets-config"
@@ -72,6 +74,9 @@ type serverParams struct {
 	isDevMode      bool
 
 	corsAllowedOrigins []string
+
+	batchLengthLimit uint64
+	blockRangeLimit  uint64
 
 	genesisConfig *chain.Chain
 	secretsConfig *secrets.SecretsManagerConfig
@@ -134,6 +139,8 @@ func (p *serverParams) generateConfig() *server.Config {
 		JSONRPC: &server.JSONRPC{
 			JSONRPCAddr:              p.jsonRPCAddress,
 			AccessControlAllowOrigin: p.corsAllowedOrigins,
+			BatchLengthLimit:         p.batchLengthLimit,
+			BlockRangeLimit:          p.blockRangeLimit,
 		},
 		GRPCAddr:   p.grpcAddress,
 		LibP2PAddr: p.libp2pAddress,

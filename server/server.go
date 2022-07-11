@@ -552,6 +552,8 @@ func (s *Server) setupJSONRPC() error {
 		ChainID:                  uint64(s.config.Chain.Params.ChainID),
 		AccessControlAllowOrigin: s.config.JSONRPC.AccessControlAllowOrigin,
 		PriceLimit:               s.config.PriceLimit,
+		BatchLengthLimit:         s.config.JSONRPC.BatchLengthLimit,
+		BlockRangeLimit:          s.config.JSONRPC.BlockRangeLimit,
 	}
 
 	srv, err := jsonrpc.NewJSONRPC(s.logger, conf)
