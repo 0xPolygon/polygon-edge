@@ -66,11 +66,8 @@ func (s *syncer) Start() error {
 
 	s.syncPeerService.Start()
 
-	go func() {
-		s.initializePeerMap()
-		s.startPeerStatusUpdateProcess()
-	}()
-
+	go s.initializePeerMap()
+	go s.startPeerStatusUpdateProcess()
 	go s.startPeerConnectionEventProcess()
 
 	return nil
