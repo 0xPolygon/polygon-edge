@@ -103,7 +103,7 @@ func (pos *PoSMechanism) calculateProposerHook(lastProposerParam interface{}) er
 	return nil
 }
 
-//	TODO: this hook does not seem relevant
+//	TODO: remove
 // acceptStateLogHook logs the current snapshot
 func (pos *PoSMechanism) acceptStateLogHook(snapParam interface{}) error {
 	// Cast the param to a *Snapshot
