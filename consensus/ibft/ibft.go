@@ -848,6 +848,7 @@ func (i *Ibft) runAcceptState() { // start new round
 			continue
 		}
 
+		//	TODO: ~~ IsValidBlock
 		// retrieve the block proposal
 		block := &types.Block{}
 		if err := block.UnmarshalRLP(msg.Proposal.Value); err != nil {
@@ -857,6 +858,7 @@ func (i *Ibft) runAcceptState() { // start new round
 			return
 		}
 
+		//	TODO: ~~ IsValidBlock
 		// Make sure the proposing block height match the current sequence
 		if block.Number() != i.state.view.Sequence {
 			i.logger.Error("sequence not correct", "block", block.Number, "sequence", i.state.view.Sequence)
@@ -876,6 +878,7 @@ func (i *Ibft) runAcceptState() { // start new round
 			}
 		} else {
 			// since it's a new block, we have to verify it first
+			//	TODO: ~~ IsValidBlock
 			if err := i.verifyHeaderImpl(snap, parent, block.Header); err != nil {
 				i.logger.Error("block header verification failed", "err", err)
 				i.handleStateErr(errBlockVerificationFailed)
@@ -884,6 +887,7 @@ func (i *Ibft) runAcceptState() { // start new round
 			}
 
 			// Verify other block params
+			//	TODO: ~~ IsValidBlock
 			if err := i.blockchain.VerifyPotentialBlock(block); err != nil {
 				i.logger.Error("block verification failed", "err", err)
 				i.handleStateErr(errBlockVerificationFailed)
@@ -891,6 +895,7 @@ func (i *Ibft) runAcceptState() { // start new round
 				continue
 			}
 
+			//	TODO: ~~ IsValidBlock
 			if hookErr := i.runHook(VerifyBlockHook, block.Number(), block); hookErr != nil {
 				if errors.As(hookErr, &errBlockVerificationFailed) {
 					i.logger.Error("block verification failed, block at the end of epoch has transactions")
