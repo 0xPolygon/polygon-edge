@@ -896,6 +896,7 @@ func (b *Blockchain) WriteBlock(block *types.Block) error {
 	}
 
 	//	update snapshot
+	//	TODO: this could be part of backend.InsertBlock and not in Blockchain
 	if err := b.consensus.ProcessHeaders([]*types.Header{header}); err != nil {
 		return err
 	}
