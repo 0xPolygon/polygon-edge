@@ -16,6 +16,7 @@ import (
 	"google.golang.org/grpc"
 )
 
+//	TODO: rename to Backend
 // Consensus is the public interface for consensus mechanism
 // Each consensus mechanism must implement this interface in order to be valid
 type Consensus interface {
