@@ -805,6 +805,7 @@ func (i *Ibft) runAcceptState() { // start new round
 				return
 			}
 
+			//	TODO: configurable block time
 			// calculate how much time do we have to wait to mine the block
 			delay := time.Until(time.Unix(int64(i.state.block.Header.Timestamp), 0))
 
