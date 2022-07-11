@@ -95,8 +95,7 @@ func (s *syncer) initializePeerMap() {
 // startPeerStatusUpdateProcess subscribes peer status change event and updates peer map
 func (s *syncer) startPeerStatusUpdateProcess() {
 	for peerStatus := range s.syncPeerClient.GetPeerStatusUpdateCh() {
-		s.peerMap.Put(peerStatus)
-		s.fireNewStatusEvent()
+		s.putToPeerMap(peerStatus)
 	}
 }
 
@@ -107,24 +106,38 @@ func (s *syncer) startPeerConnectionEventProcess() {
 
 		switch e.Type {
 		case event.PeerConnected:
-			go func() {
-				status, err := s.syncPeerClient.GetPeerStatus(peerID)
-				if err != nil {
-					s.logger.Warn("failed to get peer status, skip", "id", peerID, "err", err)
-
-					return
-				}
-
-				s.peerMap.Put(status)
-				s.fireNewStatusEvent()
-			}()
+			go s.getNewPeerStatus(peerID)
 		case event.PeerDisconnected:
-			s.peerMap.Remove(peerID)
+			s.removeFromPeerMap(peerID)
 		}
 	}
 }
 
-func (s *syncer) fireNewStatusEvent() {
+// getNewPeerStatus fetches status of the peer and put to peer map
+func (s *syncer) getNewPeerStatus(peerID peer.ID) {
+	status, err := s.syncPeerClient.GetPeerStatus(peerID)
+	if err != nil {
+		s.logger.Warn("failed to get peer status, skip", "id", peerID, "err", err)
+
+		return
+	}
+
+	s.putToPeerMap(status)
+}
+
+// putToPeerMap puts given status to peer map
+func (s *syncer) putToPeerMap(status *NoForkPeer) {
+	s.peerMap.Put(status)
+	s.notifyNewStatusEvent()
+}
+
+// removeFromPeerMap removes the peer from peer map
+func (s *syncer) removeFromPeerMap(peerID peer.ID) {
+	s.peerMap.Remove(peerID)
+}
+
+// notifyNewStatusEvent emits signal to newStatusCh
+func (s *syncer) notifyNewStatusEvent() {
 	select {
 	case s.newStatusCh <- struct{}{}:
 	default:
