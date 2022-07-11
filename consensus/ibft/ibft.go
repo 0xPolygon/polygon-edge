@@ -751,8 +751,8 @@ func (i *Ibft) runAcceptState() { // start new round
 		return
 	}
 
+	//	TODO: this will affect is the node is even running consensus for some round
 	snap, err := i.getSnapshot(parent.Number)
-
 	if err != nil {
 		i.logger.Error("cannot find snapshot", "num", parent.Number)
 		i.setState(SyncState)
@@ -760,6 +760,7 @@ func (i *Ibft) runAcceptState() { // start new round
 		return
 	}
 
+	//	TODO: this will affect is the node is even running consensus for some round
 	if !snap.Set.Includes(i.validatorKeyAddr) {
 		// we are not a validator anymore, move back to sync state
 		i.logger.Info("we are not a validator anymore")
@@ -789,7 +790,7 @@ func (i *Ibft) runAcceptState() { // start new round
 		i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", CalculateProposerHook, hookErr))
 	}
 
-	//	TODO: 	~~IsValidSender
+	//	TODO: 	~~IsProposer
 	if i.state.proposer == i.validatorKeyAddr {
 		logger.Info("we are the proposer", "block", number)
 
