@@ -90,6 +90,7 @@ func (pos *PoSMechanism) initializeParams(params *IBFTFork) error {
 	return nil
 }
 
+//	TODO: this hook seems like an unnecessary detour
 // calculateProposerHook calculates the next proposer based on the last
 func (pos *PoSMechanism) calculateProposerHook(lastProposerParam interface{}) error {
 	lastProposer, ok := lastProposerParam.(types.Address)
