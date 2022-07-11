@@ -789,6 +789,7 @@ func (i *Ibft) runAcceptState() { // start new round
 		i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", CalculateProposerHook, hookErr))
 	}
 
+	//	TODO: 	~~IsValidSender
 	if i.state.proposer == i.validatorKeyAddr {
 		logger.Info("we are the proposer", "block", number)
 
