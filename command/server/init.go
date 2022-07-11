@@ -3,9 +3,10 @@ package server
 import (
 	"errors"
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/command/server/config"
 	"math"
 	"net"
+
+	"github.com/0xPolygon/polygon-edge/command/server/config"
 
 	"github.com/0xPolygon/polygon-edge/network/common"
 
@@ -19,6 +20,7 @@ import (
 
 var (
 	errInvalidBlockTime       = errors.New("invalid block time specified")
+	errWrongIBFTBaseTimeout   = errors.New("IBFT base timeout needs to be higher than block time")
 	errDataDirectoryUndefined = errors.New("data directory not defined")
 )
 
@@ -53,6 +55,10 @@ func (p *serverParams) initRawParams() error {
 		return err
 	}
 
+	if err := p.initIBFTBaseTimeout(); err != nil {
+		return err
+	}
+
 	if p.isDevMode {
 		p.initDevMode()
 	}
@@ -66,6 +72,21 @@ func (p *serverParams) initRawParams() error {
 func (p *serverParams) initBlockTime() error {
 	if p.rawConfig.BlockTime < 1 {
 		return errInvalidBlockTime
+	}
+
+	return nil
+}
+
+func (p *serverParams) initIBFTBaseTimeout() error {
+	if p.rawConfig.IBFTBaseTimeout == 0 {
+		// Calculate from block time
+		p.rawConfig.IBFTBaseTimeout = p.rawConfig.BlockTime * config.BlockTimeMultiplierForTimeout
+
+		return nil
+	}
+
+	if p.rawConfig.IBFTBaseTimeout <= p.rawConfig.BlockTime {
+		return errWrongIBFTBaseTimeout
 	}
 
 	return nil

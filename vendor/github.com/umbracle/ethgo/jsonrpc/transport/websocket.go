@@ -183,8 +183,9 @@ func (s *stream) setHandler(id uint64, ack chan *ackMessage) {
 func (s *stream) Call(method string, out interface{}, params ...interface{}) error {
 	seq := s.incSeq()
 	request := codec.Request{
-		ID:     seq,
-		Method: method,
+		JsonRPC: "2.0",
+		ID:      seq,
+		Method:  method,
 	}
 	if len(params) > 0 {
 		data, err := json.Marshal(params)

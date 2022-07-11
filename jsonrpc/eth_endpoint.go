@@ -3,9 +3,8 @@ package jsonrpc
 import (
 	"errors"
 	"fmt"
-	"math/big"
-
 	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/state"
@@ -13,6 +12,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/fastrlp"
+	"math/big"
 )
 
 type ethTxPoolStore interface {
@@ -75,11 +75,11 @@ type Eth struct {
 	store         ethStore
 	chainID       uint64
 	filterManager *FilterManager
+	priceLimit    uint64
 }
 
 var (
 	ErrInsufficientFunds = errors.New("insufficient funds for execution")
-	ErrGasCapOverflow    = errors.New("unable to apply transaction for the highest gas limit")
 )
 
 // ChainId returns the chain id of the client
@@ -218,8 +218,8 @@ func (e *Eth) SendRawTransaction(input string) (interface{}, error) {
 	return tx.Hash.String(), nil
 }
 
-// Reject eth_sendTransaction json-rpc call as we don't support wallet management
-func (e *Eth) SendTransaction(arg *txnArgs) (interface{}, error) {
+// SendTransaction rejects eth_sendTransaction json-rpc call as we don't support wallet management
+func (e *Eth) SendTransaction(_ *txnArgs) (interface{}, error) {
 	return nil, fmt.Errorf("request calls to eth_sendTransaction method are not supported," +
 		" use eth_sendRawTransaction insead")
 }
@@ -427,11 +427,13 @@ func (e *Eth) GetStorageAt(
 }
 
 // GasPrice returns the average gas price based on the last x blocks
-func (e *Eth) GasPrice() (interface{}, error) {
-	// Grab the average gas price and convert it to a hex value
-	avgGasPrice := hex.EncodeBig(e.store.GetAvgGasPrice())
+// taking into consideration operator defined price limit
+func (e *Eth) GasPrice() (string, error) {
+	// Fetch average gas price in uint64
+	avgGasPrice := e.store.GetAvgGasPrice().Uint64()
 
-	return avgGasPrice, nil
+	// Return --price-limit flag defined value if it is greater than avgGasPrice
+	return hex.EncodeUint64(common.Max(e.priceLimit, avgGasPrice)), nil
 }
 
 // Call executes a smart contract call using the transaction object data
