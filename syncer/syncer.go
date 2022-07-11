@@ -74,8 +74,16 @@ func (s *syncer) Start() error {
 }
 
 // Close terminates goroutine processes
-func (s *syncer) Close() {
+func (s *syncer) Close() error {
 	close(s.newStatusCh)
+
+	if err := s.syncPeerService.Close(); err != nil {
+		return err
+	}
+
+	s.syncPeerClient.Close()
+
+	return nil
 }
 
 // initializePeerMap fetches peer statuses and initializes map

@@ -76,6 +76,10 @@ type mockSyncPeerService struct{}
 
 func (m *mockSyncPeerService) Start() {}
 
+func (m *mockSyncPeerService) Close() error {
+	return nil
+}
+
 func (m *mockProgression) StopProgression() {}
 
 type mockSyncPeerClient struct {

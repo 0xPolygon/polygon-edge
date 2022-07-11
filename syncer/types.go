@@ -57,7 +57,7 @@ type Syncer interface {
 	// Start starts syncer processes
 	Start() error
 	// Close terminates syncer process
-	Close()
+	Close() error
 	// GetSyncProgression returns sync progression
 	GetSyncProgression() *progress.Progression
 	// HasSyncPeer returns whether syncer has the peer syncer can sync with
@@ -82,6 +82,8 @@ type Progression interface {
 type SyncPeerService interface {
 	// Start starts server
 	Start()
+	// Close terminates running processes for SyncPeerService
+	Close() error
 }
 
 type SyncPeerClient interface {

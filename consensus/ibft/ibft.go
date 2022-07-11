@@ -1372,7 +1372,9 @@ func (i *Ibft) Close() error {
 	}
 
 	if i.syncer != nil {
-		i.syncer.Close()
+		if err := i.syncer.Close(); err != nil {
+			return err
+		}
 	}
 
 	return nil
