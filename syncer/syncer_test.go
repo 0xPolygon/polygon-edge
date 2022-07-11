@@ -167,11 +167,8 @@ func NewTestSyncer(
 	}
 }
 
-// Test whether Syncer calls GetConnectedPeerStatuses and initialize peerMap
-func Test_initializePeerMap(t *testing.T) {
-	t.Parallel()
-
-	peerStatuses := []*NoForkPeer{
+var (
+	peerStatuses = []*NoForkPeer{
 		{
 			ID:       peer.ID("A"),
 			Number:   10,
@@ -188,62 +185,68 @@ func Test_initializePeerMap(t *testing.T) {
 			Distance: big.NewInt(30),
 		},
 	}
+)
 
-	tests := []struct {
-		name                   string
-		initializePeerStatuses []*NoForkPeer
-		newPeerStatuses        []*NoForkPeer
-	}{
-		{
-			name:                   "initialize peerMap by GetConnectedPeerStatuses",
-			initializePeerStatuses: peerStatuses,
-			newPeerStatuses:        nil,
+func Test_initializePeerMap(t *testing.T) {
+	t.Parallel()
+
+	syncer := NewTestSyncer(
+		nil,
+		nil,
+		0,
+		&mockSyncPeerClient{
+			getConnectedPeerStatusesHandler: func() []*NoForkPeer {
+				return peerStatuses
+			},
+			getPeerStatusUpdateChHandler: func() <-chan *NoForkPeer {
+				return nil
+			},
 		},
-		{
-			name:                   "update peerMap by GetPeerStatusUpdateCh",
-			initializePeerStatuses: nil,
-			newPeerStatuses:        peerStatuses,
+		&mockProgression{},
+	)
+
+	syncer.initializePeerMap()
+
+	peerMapStatuses := sortPeerStatuses(
+		GetAllElementsFromPeerMap(t, syncer.peerMap),
+	)
+
+	assert.Equal(t, peerStatuses, peerMapStatuses)
+}
+
+func Test_startPeerStatusUpdateProcess(t *testing.T) {
+	t.Parallel()
+
+	syncer := NewTestSyncer(
+		nil,
+		nil,
+		0,
+		&mockSyncPeerClient{
+			getConnectedPeerStatusesHandler: func() []*NoForkPeer {
+				return nil
+			},
+			getPeerStatusUpdateChHandler: func() <-chan *NoForkPeer {
+				ch := make(chan *NoForkPeer, len(peerStatuses))
+
+				for _, s := range peerStatuses {
+					ch <- s
+				}
+
+				close(ch)
+
+				return ch
+			},
 		},
-	}
+		&mockProgression{},
+	)
 
-	for _, test := range tests {
-		test := test
+	syncer.startPeerStatusUpdateProcess()
 
-		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
+	peerMapStatuses := sortPeerStatuses(
+		GetAllElementsFromPeerMap(t, syncer.peerMap),
+	)
 
-			syncer := NewTestSyncer(
-				nil,
-				nil,
-				0,
-				&mockSyncPeerClient{
-					getConnectedPeerStatusesHandler: func() []*NoForkPeer {
-						return test.initializePeerStatuses
-					},
-					getPeerStatusUpdateChHandler: func() <-chan *NoForkPeer {
-						ch := make(chan *NoForkPeer, len(test.newPeerStatuses))
-
-						for _, s := range test.newPeerStatuses {
-							ch <- s
-						}
-
-						close(ch)
-
-						return ch
-					},
-				},
-				&mockProgression{},
-			)
-
-			syncer.initializePeerMap()
-
-			peerMapStatuses := sortPeerStatuses(
-				GetAllElementsFromPeerMap(t, syncer.peerMap),
-			)
-
-			assert.Equal(t, peerStatuses, peerMapStatuses)
-		})
-	}
+	assert.Equal(t, peerStatuses, peerMapStatuses)
 }
 
 func Test_startPeerDisconnectEventProcess(t *testing.T) {
