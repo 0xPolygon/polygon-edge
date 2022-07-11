@@ -106,15 +106,15 @@ func (s *syncer) startPeerConnectionEventProcess() {
 
 		switch e.Type {
 		case event.PeerConnected:
-			go s.getNewPeerStatus(peerID)
+			go s.initNewPeerStatus(peerID)
 		case event.PeerDisconnected:
 			s.removeFromPeerMap(peerID)
 		}
 	}
 }
 
-// getNewPeerStatus fetches status of the peer and put to peer map
-func (s *syncer) getNewPeerStatus(peerID peer.ID) {
+// initNewPeerStatus fetches status of the peer and put to peer map
+func (s *syncer) initNewPeerStatus(peerID peer.ID) {
 	status, err := s.syncPeerClient.GetPeerStatus(peerID)
 	if err != nil {
 		s.logger.Warn("failed to get peer status, skip", "id", peerID, "err", err)
