@@ -19,6 +19,7 @@ func TestBroadcast(t *testing.T) {
 	// This test is not stable
 	// Opened the ticket to check + fix it
 	t.Skip()
+
 	testCases := []struct {
 		name     string
 		numNodes int
