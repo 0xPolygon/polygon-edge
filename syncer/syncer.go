@@ -137,10 +137,6 @@ func (s *syncer) GetSyncProgression() *progress.Progression {
 // HasSyncPeer returns whether syncer has the peer to syncs blocks
 // return false if syncer has no peer whose latest block height doesn't exceed local height
 func (s *syncer) HasSyncPeer() bool {
-	if s.peerMap == nil {
-		return false
-	}
-
 	bestPeer := s.peerMap.BestPeer(nil)
 	header := s.blockchain.Header()
 
