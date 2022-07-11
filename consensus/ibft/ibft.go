@@ -576,6 +576,7 @@ func (i *Ibft) shouldWriteTransactions(height uint64) bool {
 	return false
 }
 
+//	TODO: ~~BuildProposal
 // buildBlock builds the block, based on the passed in snapshot and parent header
 func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, error) {
 	header := &types.Header{
