@@ -861,6 +861,8 @@ func (b *Blockchain) executeBlockTransactions(block *types.Block) (*BlockResult,
 // WriteBlock writes a single block to the local blockchain.
 // It doesn't do any kind of verification, only commits the block to the DB
 func (b *Blockchain) WriteBlock(block *types.Block) error {
+	//	TODO: lock here
+
 	// Log the information
 	b.logger.Info(
 		"write block",
