@@ -66,7 +66,11 @@ func (s *syncer) Start() error {
 
 	s.syncPeerService.Start()
 
-	go s.initializePeerMap()
+	go func() {
+		s.initializePeerMap()
+		s.startPeerStatusUpdateProcess()
+	}()
+
 	go s.startPeerConnectionEventProcess()
 
 	return nil
@@ -89,14 +93,13 @@ func (s *syncer) Close() error {
 func (s *syncer) initializePeerMap() {
 	peerStatuses := s.syncPeerClient.GetConnectedPeerStatuses()
 	s.peerMap.Put(peerStatuses...)
+}
 
+// startPeerStatusUpdateProcess subscribes peer status change event and updates peer map
+func (s *syncer) startPeerStatusUpdateProcess() {
 	for peerStatus := range s.syncPeerClient.GetPeerStatusUpdateCh() {
 		s.peerMap.Put(peerStatus)
-
-		select {
-		case s.newStatusCh <- struct{}{}:
-		default:
-		}
+		s.fireNewStatusEvent()
 	}
 }
 
@@ -116,15 +119,18 @@ func (s *syncer) startPeerConnectionEventProcess() {
 				}
 
 				s.peerMap.Put(status)
-
-				select {
-				case s.newStatusCh <- struct{}{}:
-				default:
-				}
+				s.fireNewStatusEvent()
 			}()
 		case event.PeerDisconnected:
 			s.peerMap.Remove(peerID)
 		}
+	}
+}
+
+func (s *syncer) fireNewStatusEvent() {
+	select {
+	case s.newStatusCh <- struct{}{}:
+	default:
 	}
 }
 
