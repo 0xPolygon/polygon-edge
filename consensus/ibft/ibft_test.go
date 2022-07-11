@@ -1,7 +1,6 @@
 package ibft
 
 import (
-	"context"
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
@@ -982,7 +981,6 @@ func (s *mockSyncer) HasSyncPeer() bool {
 }
 
 func (s *mockSyncer) BulkSync(
-	_ context.Context,
 	newBlockHandler func(block *types.Block) bool,
 ) error {
 	for _, block := range s.bulkSyncBlocksFromPeer {
@@ -999,7 +997,6 @@ func (s *mockSyncer) BulkSync(
 }
 
 func (s *mockSyncer) WatchSync(
-	ctx context.Context,
 	newBlockHandler func(*types.Block) bool,
 ) error {
 	if s.receivedNewHeadFromPeer != nil {

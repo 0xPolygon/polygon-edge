@@ -1,7 +1,6 @@
 package syncer
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -143,7 +142,7 @@ func (s *syncer) HasSyncPeer() bool {
 	return bestPeer != nil && bestPeer.Number > header.Number
 }
 
-func (s *syncer) BulkSync(ctx context.Context, newBlockCallback func(*types.Block) bool) error {
+func (s *syncer) BulkSync(newBlockCallback func(*types.Block) bool) error {
 	localLatest := uint64(0)
 	updateLocalLatest := func() {
 		if header := s.blockchain.Header(); header != nil {
@@ -190,11 +189,10 @@ func (s *syncer) BulkSync(ctx context.Context, newBlockCallback func(*types.Bloc
 }
 
 // WatchSync syncs block with the best peer until callback returns true
-func (s *syncer) WatchSync(ctx context.Context, callback func(*types.Block) bool) error {
+func (s *syncer) WatchSync(callback func(*types.Block) bool) error {
 	localLatest := s.blockchain.Header().Number
 	skipList := make(map[peer.ID]bool)
 
-	// Loop until context is canceled
 	for {
 		//Wait for a new event to arrive
 		<-s.newStatusCh

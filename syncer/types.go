@@ -1,7 +1,6 @@
 package syncer
 
 import (
-	"context"
 	"math/big"
 	"time"
 
@@ -63,9 +62,9 @@ type Syncer interface {
 	// HasSyncPeer returns whether syncer has the peer syncer can sync with
 	HasSyncPeer() bool
 	// BulkSync syncs blocks to the peer's latest
-	BulkSync(context.Context, func(*types.Block) bool) error
+	BulkSync(func(*types.Block) bool) error
 	// WatchSync starts routine to sync blocks
-	WatchSync(context.Context, func(*types.Block) bool) error
+	WatchSync(func(*types.Block) bool) error
 }
 
 type Progression interface {

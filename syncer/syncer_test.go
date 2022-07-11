@@ -1,7 +1,6 @@
 package syncer
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"math/big"
@@ -652,7 +651,7 @@ func TestBulkSync(t *testing.T) {
 
 			syncer.peerMap.Put(test.peerStatuses...)
 
-			err := syncer.BulkSync(context.Background(), test.blockCallback)
+			err := syncer.BulkSync(test.blockCallback)
 
 			assert.Equal(t, test.blocks, syncedBlocks)
 			assert.Equal(t, test.progressionStart, progression.startingBlock)
@@ -807,7 +806,7 @@ func TestWatchSync(t *testing.T) {
 			errCh := make(chan error, 1)
 
 			go func() {
-				errCh <- syncer.WatchSync(context.Background(), test.createBlockCallback())
+				errCh <- syncer.WatchSync(test.createBlockCallback())
 			}()
 
 			go func() {

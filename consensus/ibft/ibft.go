@@ -1,7 +1,6 @@
 package ibft
 
 import (
-	"context"
 	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
@@ -504,7 +503,7 @@ func (i *Ibft) runSyncState() {
 			continue
 		}
 
-		if err := i.syncer.BulkSync(context.Background(), func(newBlock *types.Block) bool {
+		if err := i.syncer.BulkSync(func(newBlock *types.Block) bool {
 			callInsertBlockHook(newBlock.Number())
 			i.txpool.ResetWithHeaders(newBlock.Header)
 
@@ -527,7 +526,7 @@ func (i *Ibft) runSyncState() {
 		// start watch mode
 		var isValidator bool
 
-		err := i.syncer.WatchSync(context.Background(), func(newBlock *types.Block) bool {
+		err := i.syncer.WatchSync(func(newBlock *types.Block) bool {
 			// After each written block, update the snapshot store for PoS.
 			// The snapshot store is currently updated for PoA inside the ProcessHeadersHook
 			callInsertBlockHook(newBlock.Number())
