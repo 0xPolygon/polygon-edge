@@ -1038,6 +1038,7 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 		committedSeals = append(committedSeals, committedSeal)
 	}
 
+	//	TODO: HEADER header mutated here
 	// Push the committed seals to the header
 	header, err := writeCommittedSeals(block.Header, committedSeals)
 	if err != nil {
