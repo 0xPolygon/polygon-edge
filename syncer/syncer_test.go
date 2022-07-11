@@ -440,7 +440,7 @@ func TestHasSyncPeer(t *testing.T) {
 				&mockProgression{},
 			)
 
-			syncer.peerMap.PutPeers(test.peers)
+			syncer.peerMap.Put(test.peers...)
 
 			assert.Equal(t, test.result, syncer.HasSyncPeer())
 		})
@@ -646,7 +646,7 @@ func TestBulkSync(t *testing.T) {
 				)
 			)
 
-			syncer.peerMap.PutPeers(test.peerStatuses)
+			syncer.peerMap.Put(test.peerStatuses...)
 
 			err := syncer.BulkSync(context.Background(), test.blockCallback)
 

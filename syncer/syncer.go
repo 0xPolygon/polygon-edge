@@ -81,7 +81,7 @@ func (s *syncer) Close() {
 // initializePeerMap fetches peer statuses and initializes map
 func (s *syncer) initializePeerMap() {
 	peerStatuses := s.syncPeerClient.GetConnectedPeerStatuses()
-	s.peerMap.PutPeers(peerStatuses)
+	s.peerMap.Put(peerStatuses...)
 
 	for peerStatus := range s.syncPeerClient.GetPeerStatusUpdateCh() {
 		s.peerMap.Put(peerStatus)
