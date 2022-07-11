@@ -53,6 +53,7 @@ func (poa *PoAMechanism) IsAvailable(hookType HookType, height uint64) bool {
 	}
 }
 
+//	TODO: remove
 // acceptStateLogHook logs the current snapshot with the number of votes
 func (poa *PoAMechanism) acceptStateLogHook(snapParam interface{}) error {
 	// Cast the param to a *Snapshot
