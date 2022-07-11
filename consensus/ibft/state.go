@@ -45,6 +45,7 @@ func (i IbftState) String() string {
 // currentState defines the current state object in IBFT
 type currentState struct {
 	// validators represent the current validator set
+	//	TODO: this will be moved to backend
 	validators ValidatorSet
 
 	// state is the current state
