@@ -41,6 +41,9 @@ func (i *Ibft) BuildProposal(blockNumber uint64) ([]byte, error) {
 }
 
 func (i *Ibft) InsertBlock(proposal []byte, committedSeals [][]byte) error {
+
+	//	TODO: update the currentValidatorSet after block insertion
+
 	return nil
 }
 
