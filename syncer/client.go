@@ -3,6 +3,7 @@ package syncer
 import (
 	"context"
 	"fmt"
+	"io"
 	"sync"
 	"time"
 
@@ -306,6 +307,9 @@ func blockStreamToChannel(stream proto.SyncPeer_GetBlocksClient) (<-chan *types.
 
 		for {
 			protoBlock, err := stream.Recv()
+			if err == io.EOF {
+				break
+			}
 			if err != nil {
 				errorCh <- err
 
