@@ -1200,6 +1200,7 @@ func (i *Ibft) gossip(typ proto.MessageReq_Type) {
 	// add View
 	msg.View = i.state.view.Copy()
 
+	//	TODO: ~~BuildPrePrepare
 	// if we are sending a preprepare message we need to include the proposed block
 	if msg.Type == proto.MessageReq_Preprepare {
 		msg.Proposal = &anypb.Any{
@@ -1207,6 +1208,7 @@ func (i *Ibft) gossip(typ proto.MessageReq_Type) {
 		}
 	}
 
+	//	TODO: ~~BuildCommit
 	// if the message is commit, we need to add the committed seal
 	if msg.Type == proto.MessageReq_Commit {
 		seal, err := writeCommittedSeal(i.validatorKey, i.state.block.Header)
