@@ -190,7 +190,6 @@ func (i *Ibft) runHook(hookName HookType, height uint64, hookParam interface{}) 
 	return nil
 }
 
-// Start starts the IBFT backend
 func (i *Ibft) Initialize() error {
 	// Set up the snapshots
 	if err := i.setupSnapshot(); err != nil {
