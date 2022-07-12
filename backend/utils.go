@@ -12,6 +12,7 @@ type BuildBlockParams struct {
 	Receipts []*types.Receipt
 }
 
+//	TODO: move this to Backend interface
 // BuildBlock is a utility function that builds a block, based on the passed in header, transactions and receipts
 func BuildBlock(params BuildBlockParams) *types.Block {
 	txs := params.Txns
