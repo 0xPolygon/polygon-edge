@@ -45,7 +45,7 @@ func (i *Ibft) InsertBlock(proposal []byte, committedSeals [][]byte) error {
 }
 
 func (i *Ibft) ID() []byte {
-	return nil
+	return i.validatorKeyAddr.Bytes()
 }
 
 func (i *Ibft) MaximumFaultyNodes() uint64 {
