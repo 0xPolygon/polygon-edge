@@ -75,6 +75,9 @@ type Ibft struct {
 	validatorKey     *ecdsa.PrivateKey // Private key for the validator
 	validatorKeyAddr types.Address
 
+	//	TODO: update this field on init
+	currentValidatorSet ValidatorSet
+
 	store     *snapshotStore // Snapshot store that keeps track of all snapshots
 	transport transport      // Reference to the transport protocol
 	state     *currentState  // Reference to the current state
