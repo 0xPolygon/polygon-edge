@@ -15,6 +15,7 @@ import (
 func commitMsg(b []byte) []byte {
 	// message that the nodes need to sign to commit to a block
 	// hash with COMMIT_MSG_CODE which is the same value used in quorum
+	//	TODO: is this enum needed ?
 	return crypto.Keccak256(b, []byte{byte(proto.MessageReq_Commit)})
 }
 
