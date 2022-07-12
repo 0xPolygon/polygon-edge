@@ -30,7 +30,7 @@ func Factory(params *backend.BackendParams) (backend.Backend, error) {
 		closeCh:    make(chan struct{}),
 		blockchain: params.Blockchain,
 		executor:   params.Executor,
-		txpool:     params.Txpool,
+		txpool:     params.TxPool,
 	}
 
 	return d, nil

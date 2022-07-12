@@ -161,7 +161,7 @@ func Factory(
 		blockchain:         params.Blockchain,
 		executor:           params.Executor,
 		closeCh:            make(chan struct{}),
-		txpool:             params.Txpool,
+		txpool:             params.TxPool,
 		state:              &currentState{},
 		network:            params.Network,
 		epochSize:          epochSize,

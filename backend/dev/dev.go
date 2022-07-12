@@ -40,7 +40,7 @@ func Factory(
 		closeCh:    make(chan struct{}),
 		blockchain: params.Blockchain,
 		executor:   params.Executor,
-		txpool:     params.Txpool,
+		txpool:     params.TxPool,
 	}
 
 	rawInterval, ok := params.Config.Config["interval"]

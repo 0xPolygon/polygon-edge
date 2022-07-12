@@ -64,7 +64,7 @@ type BackendParams struct {
 	Context        context.Context
 	Seal           bool
 	Config         *Config
-	Txpool         *txpool.TxPool
+	TxPool         *txpool.TxPool
 	Network        *network.Server
 	Blockchain     *blockchain.Blockchain
 	Executor       *state.Executor

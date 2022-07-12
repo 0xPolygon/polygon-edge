@@ -66,7 +66,7 @@ func (o txOrigin) String() (s string) {
 	return
 }
 
-// store interface defines State helper methods the Txpool should have access to
+// store interface defines State helper methods the TxPool should have access to
 type store interface {
 	Header() *types.Header
 	GetNonce(root types.Hash, addr types.Address) uint64

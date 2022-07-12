@@ -396,7 +396,7 @@ func (s *Server) setupConsensus() error {
 			Context:        context.Background(),
 			Seal:           s.config.Seal,
 			Config:         config,
-			Txpool:         s.txpool,
+			TxPool:         s.txpool,
 			Network:        s.network,
 			Blockchain:     s.blockchain,
 			Executor:       s.executor,
