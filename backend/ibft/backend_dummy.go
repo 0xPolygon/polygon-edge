@@ -48,8 +48,19 @@ func (i *Ibft) ID() []byte {
 	return i.validatorKeyAddr.Bytes()
 }
 
+//	TODO: there needs to be an active ValidatorSet in Ibft
 func (i *Ibft) MaximumFaultyNodes() uint64 {
-	return 0
+	meta, err := i.getSnapshotMetadata()
+	if err != nil {
+		//
+	}
+
+	snap, err := i.getSnapshot(meta.LastBlock)
+	if err != nil {
+
+	}
+
+	return uint64(snap.Set.MaxFaultyNodes())
 }
 
 func (i *Ibft) Quorum(blockNumber uint64) uint64 {
