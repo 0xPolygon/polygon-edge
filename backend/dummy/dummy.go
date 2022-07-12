@@ -20,7 +20,7 @@ type Dummy struct {
 	executor   *state.Executor
 }
 
-func Factory(params *backend.ConsensusParams) (backend.Consensus, error) {
+func Factory(params *backend.ConsensusParams) (backend.Backend, error) {
 	logger := params.Logger.Named("dummy")
 
 	d := &Dummy{

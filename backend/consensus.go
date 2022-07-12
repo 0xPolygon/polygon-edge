@@ -16,10 +16,9 @@ import (
 	"google.golang.org/grpc"
 )
 
-//	TODO: rename to Backend
-// Consensus is the public interface for backend mechanism
+// Backend is the public interface for backend mechanism
 // Each backend mechanism must implement this interface in order to be valid
-type Consensus interface {
+type Backend interface {
 	// VerifyHeader verifies the header is correct
 	VerifyHeader(header *types.Header) error
 
@@ -78,4 +77,4 @@ type ConsensusParams struct {
 }
 
 // Factory is the factory function to create a discovery backend
-type Factory func(*ConsensusParams) (Consensus, error)
+type Factory func(*ConsensusParams) (Backend, error)

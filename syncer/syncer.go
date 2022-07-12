@@ -23,7 +23,7 @@ var (
 )
 
 // XXX: Don't use this syncer for the backend that may cause fork.
-// This syncer doesn't assume fork. Consensus may be broken.
+// This syncer doesn't assume fork. Backend may be broken.
 // TODO: Add extensibility for fork before merge
 type syncer struct {
 	logger          hclog.Logger

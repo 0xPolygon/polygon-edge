@@ -59,7 +59,7 @@ type Ibft struct {
 	sealing bool // Flag indicating if the node is a sealer
 
 	logger hclog.Logger    // Output logger
-	config *backend.Config // Consensus configuration
+	config *backend.Config // Backend configuration
 	Grpc   *grpc.Server    // gRPC configuration
 	state  *currentState   // Reference to the current state
 
@@ -127,7 +127,7 @@ func (i *Ibft) runHook(hookName HookType, height uint64, hookParam interface{}) 
 // Factory implements the base backend Factory method
 func Factory(
 	params *backend.ConsensusParams,
-) (backend.Consensus, error) {
+) (backend.Backend, error) {
 	//	defaults for user set fields in genesis
 	var (
 		epochSize          = uint64(DefaultEpochSize)

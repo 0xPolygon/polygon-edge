@@ -31,7 +31,7 @@ type Dev struct {
 // Factory implements the base factory method
 func Factory(
 	params *backend.ConsensusParams,
-) (backend.Consensus, error) {
+) (backend.Backend, error) {
 	logger := params.Logger.Named("dev")
 
 	d := &Dev{

@@ -42,7 +42,7 @@ type Server struct {
 	state        state.State
 	stateStorage itrie.Storage
 
-	consensus backend.Consensus
+	consensus backend.Backend
 
 	// blockchain stack
 	blockchain *blockchain.Blockchain
@@ -425,7 +425,7 @@ type jsonRPCHub struct {
 	*txpool.TxPool
 	*state.Executor
 	*network.Server
-	backend.Consensus
+	backend.Backend
 }
 
 // HELPER + WRAPPER METHODS //
@@ -524,7 +524,7 @@ func (j *jsonRPCHub) GetSyncProgression() *progress.Progression {
 	}
 
 	// backend sync progression
-	if consensusSyncProg := j.Consensus.GetSyncProgression(); consensusSyncProg != nil {
+	if consensusSyncProg := j.Backend.GetSyncProgression(); consensusSyncProg != nil {
 		return consensusSyncProg
 	}
 
@@ -541,7 +541,7 @@ func (s *Server) setupJSONRPC() error {
 		Blockchain:         s.blockchain,
 		TxPool:             s.txpool,
 		Executor:           s.executor,
-		Consensus:          s.consensus,
+		Backend:            s.consensus,
 		Server:             s.network,
 	}
 
