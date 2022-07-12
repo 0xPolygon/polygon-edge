@@ -89,6 +89,12 @@ type mockSyncPeerClient struct {
 	getPeerConnectionUpdateEventChHandler func() <-chan *event.PeerEvent
 }
 
+func (m *mockSyncPeerClient) StopEmittingBlockEvents() {
+}
+
+func (m *mockSyncPeerClient) StartEmittingBlockEvents() {
+}
+
 func (m *mockSyncPeerClient) Start() error {
 	return nil
 }

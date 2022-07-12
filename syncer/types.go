@@ -102,4 +102,8 @@ type SyncPeerClient interface {
 	GetPeerConnectionUpdateEventCh() <-chan *event.PeerEvent
 	// CloseStream close a stream
 	CloseStream(peerID peer.ID) error
+	// StopEmittingBlockEvents disables emitting blocks in syncer topic
+	StopEmittingBlockEvents()
+	// StartEmittingBlockEvents enables emitting blocks in syncer topic
+	StartEmittingBlockEvents()
 }

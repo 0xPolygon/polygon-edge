@@ -25,15 +25,17 @@ const (
 )
 
 type syncPeerClient struct {
-	logger     hclog.Logger
-	network    Network
-	blockchain Blockchain
+	logger     hclog.Logger // logger used for console logging
+	network    Network      // reference to the network module
+	blockchain Blockchain   // reference to the blockchain module
 
-	subscription           blockchain.Subscription
-	topic                  *network.Topic
-	id                     string // node ID
-	peerStatusUpdateCh     chan *NoForkPeer
-	peerConnectionUpdateCh chan *event.PeerEvent
+	subscription           blockchain.Subscription //reference to the blockchain subscription
+	topic                  *network.Topic          //reference to the network topic
+	id                     string                  //node id
+	peerStatusUpdateCh     chan *NoForkPeer        // peer status update channel
+	peerConnectionUpdateCh chan *event.PeerEvent   // peer connection update channel
+
+	shouldEmitBlocks bool // flag for emitting blocks in the topic
 }
 
 func NewSyncPeerClient(
@@ -48,6 +50,7 @@ func NewSyncPeerClient(
 		id:                     network.AddrInfo().ID.String(),
 		peerStatusUpdateCh:     make(chan *NoForkPeer, 1),
 		peerConnectionUpdateCh: make(chan *event.PeerEvent, 1),
+		shouldEmitBlocks:       true,
 	}
 }
 
@@ -73,6 +76,16 @@ func (m *syncPeerClient) Close() {
 
 	close(m.peerStatusUpdateCh)
 	close(m.peerConnectionUpdateCh)
+}
+
+// StopEmittingBlockEvents disables emitting blocks in syncer topic
+func (m *syncPeerClient) StopEmittingBlockEvents() {
+	m.shouldEmitBlocks = false
+}
+
+// StartEmittingBlockEvents enables emitting blocks in syncer topic
+func (m *syncPeerClient) StartEmittingBlockEvents() {
+	m.shouldEmitBlocks = true
 }
 
 // GetPeerStatus fetches peer status
@@ -191,11 +204,14 @@ func (m *syncPeerClient) startNewBlockProcess() {
 	for event := range m.subscription.GetEventCh() {
 		if l := len(event.NewChain); l > 0 {
 			latest := event.NewChain[l-1]
-			// Publish status
-			if err := m.topic.Publish(&proto.SyncPeerStatus{
-				Number: latest.Number,
-			}); err != nil {
-				m.logger.Warn("failed to publish status", "err", err)
+
+			if m.shouldEmitBlocks {
+				// Publish status
+				if err := m.topic.Publish(&proto.SyncPeerStatus{
+					Number: latest.Number,
+				}); err != nil {
+					m.logger.Warn("failed to publish status", "err", err)
+				}
 			}
 		}
 	}
