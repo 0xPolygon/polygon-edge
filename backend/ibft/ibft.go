@@ -126,7 +126,7 @@ func (i *Ibft) runHook(hookName HookType, height uint64, hookParam interface{}) 
 
 // Factory implements the base backend Factory method
 func Factory(
-	params *backend.ConsensusParams,
+	params *backend.BackendParams,
 ) (backend.Backend, error) {
 	//	defaults for user set fields in genesis
 	var (

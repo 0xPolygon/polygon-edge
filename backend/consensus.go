@@ -61,7 +61,7 @@ type Config struct {
 }
 
 //	TODO: backend config
-type ConsensusParams struct {
+type BackendParams struct {
 	Context        context.Context
 	Seal           bool
 	Config         *Config
@@ -77,4 +77,4 @@ type ConsensusParams struct {
 }
 
 // Factory is the factory function to create a discovery backend
-type Factory func(*ConsensusParams) (Backend, error)
+type Factory func(*BackendParams) (Backend, error)

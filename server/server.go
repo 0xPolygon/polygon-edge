@@ -392,7 +392,7 @@ func (s *Server) setupConsensus() error {
 	}
 
 	consensus, err := engine(
-		&backend.ConsensusParams{
+		&backend.BackendParams{
 			Context:        context.Background(),
 			Seal:           s.config.Seal,
 			Config:         config,
