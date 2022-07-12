@@ -1052,7 +1052,7 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 
 	// The hash needs to be recomputed since the extra data was changed
 	block.Header = header
-	block.Header.ComputeHash()
+	block.Header.ComputeHash() // TODO: this is not needed
 
 	// Verify the header only, since the block body is already verified
 	if err := i.VerifyHeader(block.Header); err != nil {
