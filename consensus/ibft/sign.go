@@ -40,7 +40,7 @@ func ecrecoverFromHeader(h *types.Header) (types.Address, error) {
 		return types.Address{}, err
 	}
 
-	return ecrecoverImpl(extra.Seal, msg)
+	return ecrecoverImpl(extra.ProposerSeal, msg)
 }
 
 func signSealImpl(prv *ecdsa.PrivateKey, h *types.Header, committed bool) ([]byte, error) {
@@ -77,7 +77,7 @@ func writeSeal(prv *ecdsa.PrivateKey, h *types.Header) (*types.Header, error) {
 		return nil, err
 	}
 
-	extra.Seal = seal
+	extra.ProposerSeal = seal
 	if err := PutIbftExtra(h, extra); err != nil {
 		return nil, err
 	}
@@ -129,7 +129,7 @@ func calculateHeaderHash(h *types.Header) ([]byte, error) {
 		return nil, err
 	}
 
-	// This will effectively remove the Seal and Committed Seal fields,
+	// This will effectively remove the ProposerSeal and Committed ProposerSeal fields,
 	// while keeping proposer vanity and validator set
 	// because extra.Validators is what we got from `h` in the first place.
 	putIbftExtraValidators(h, extra.Validators)
