@@ -242,7 +242,7 @@ func validateMsg(msg *proto.MessageReq) error {
 	return nil
 }
 
-//	TODO: proto.Message.Signature
+//	TODO: fill the From field as well
 func signMsg(key *ecdsa.PrivateKey, msg *proto.MessageReq) error {
 	signMsg, err := msg.PayloadNoSig()
 	if err != nil {
