@@ -887,6 +887,7 @@ func (i *Ibft) runAcceptState() { // start new round
 		} else {
 			// since it's a new block, we have to verify it first
 			//	TODO: ~~ IsValidBlock
+			//	TODO: just verify the header, not the sealer (again)
 			if err := i.verifyHeaderImpl(snap, parent, block.Header); err != nil {
 				i.logger.Error("block header verification failed", "err", err)
 				i.handleStateErr(errBlockVerificationFailed)
