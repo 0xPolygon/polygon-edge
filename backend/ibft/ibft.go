@@ -56,46 +56,48 @@ type txPoolInterface interface {
 
 // Ibft represents the IBFT backend mechanism object
 type Ibft struct {
-	sealing bool // Flag indicating if the node is a sealer
+	logger hclog.Logger
 
-	logger hclog.Logger    // Output logger
 	config *backend.Config // Backend configuration
-	Grpc   *grpc.Server    // gRPC configuration
-	state  *currentState   // Reference to the current state
+
+	Grpc *grpc.Server // gRPC configuration
 
 	blockchain blockchainInterface // Interface exposed by the blockchain layer
+	network    *network.Server     // Reference to the networking layer
 	executor   *state.Executor     // Reference to the state executor
-	closeCh    chan struct{}       // Channel for closing
-
-	validatorKey     *ecdsa.PrivateKey // Private key for the validator
-	validatorKeyAddr types.Address
-
-	txpool txPoolInterface // Reference to the transaction pool
-
-	store              *snapshotStore // Snapshot store that keeps track of all snapshots
-	epochSize          uint64
-	quorumSizeBlockNum uint64
-
-	msgQueue *msgQueue     // Structure containing different message queues
-	updateCh chan struct{} // Update channel
-
-	syncer syncer.Syncer // Reference to the sync protocol
-
-	network   *network.Server // Reference to the networking layer
-	transport transport       // Reference to the transport protocol
-
-	operator *operator
-
-	// aux test methods
-	forceTimeoutCh bool
+	txpool     txPoolInterface     // Reference to the transaction pool
+	syncer     syncer.Syncer       // Reference to the sync protocol
 
 	metrics *backend.Metrics
 
 	secretsManager secrets.SecretsManager
 
+	validatorKey     *ecdsa.PrivateKey // Private key for the validator
+	validatorKeyAddr types.Address
+
+	store     *snapshotStore // Snapshot store that keeps track of all snapshots
+	transport transport      // Reference to the transport protocol
+	state     *currentState  // Reference to the current state
+	operator  *operator
+
 	mechanisms []ConsensusMechanism // IBFT ConsensusMechanism used (PoA / PoS)
 
+	epochSize          uint64
+	quorumSizeBlockNum uint64
+
+	sealing bool // Flag indicating if the node is a sealer
+
+	closeCh chan struct{} // Channel for closing
+
+	//	TODO: remove below
+
 	blockTime time.Duration // Minimum block generation time in seconds
+
+	msgQueue *msgQueue // Structure containing different message queues
+
+	updateCh chan struct{} // Update channel
+	// aux test methods
+	forceTimeoutCh bool
 }
 
 // runHook runs a specified hook if it is present in the hook map
