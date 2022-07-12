@@ -115,6 +115,7 @@ func writeCommittedSeals(h *types.Header, seals [][]byte) (*types.Header, error)
 	return h, nil
 }
 
+//	TODO: this mutates the original header
 func calculateHeaderHash(h *types.Header) ([]byte, error) {
 	h = h.Copy() // make a copy since we update the extra field
 
