@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
+	"github.com/0xPolygon/polygon-edge/backend"
+	"github.com/0xPolygon/polygon-edge/backend/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/blockchain"
-	"github.com/0xPolygon/polygon-edge/consensus"
-	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
 )
@@ -80,7 +80,7 @@ func TestOperator_Propose(t *testing.T) {
 
 	ibft := &Ibft{
 		blockchain: blockchain.TestBlockchain(t, pool.genesis()),
-		config:     &consensus.Config{},
+		config:     &backend.Config{},
 		epochSize:  DefaultEpochSize,
 	}
 	assert.NoError(t, ibft.setupSnapshot())

@@ -1,4 +1,4 @@
-package consensus
+package backend
 
 import (
 	"github.com/go-kit/kit/metrics"
@@ -7,7 +7,7 @@ import (
 	stdprometheus "github.com/prometheus/client_golang/prometheus"
 )
 
-// Metrics represents the consensus metrics
+// Metrics represents the backend metrics
 type Metrics struct {
 	// No.of validators
 	Validators metrics.Gauge
@@ -20,7 +20,7 @@ type Metrics struct {
 	BlockInterval metrics.Gauge
 }
 
-// GetPrometheusMetrics return the consensus metrics instance
+// GetPrometheusMetrics return the backend metrics instance
 func GetPrometheusMetrics(namespace string, labelsWithValues ...string) *Metrics {
 	labels := []string{}
 
@@ -31,26 +31,26 @@ func GetPrometheusMetrics(namespace string, labelsWithValues ...string) *Metrics
 	return &Metrics{
 		Validators: prometheus.NewGaugeFrom(stdprometheus.GaugeOpts{
 			Namespace: namespace,
-			Subsystem: "consensus",
+			Subsystem: "backend",
 			Name:      "validators",
 			Help:      "Number of validators.",
 		}, labels).With(labelsWithValues...),
 		Rounds: prometheus.NewGaugeFrom(stdprometheus.GaugeOpts{
 			Namespace: namespace,
-			Subsystem: "consensus",
+			Subsystem: "backend",
 			Name:      "rounds",
 			Help:      "Number of rounds.",
 		}, labels).With(labelsWithValues...),
 		NumTxs: prometheus.NewGaugeFrom(stdprometheus.GaugeOpts{
 			Namespace: namespace,
-			Subsystem: "consensus",
+			Subsystem: "backend",
 			Name:      "num_txs",
 			Help:      "Number of transactions.",
 		}, labels).With(labelsWithValues...),
 
 		BlockInterval: prometheus.NewGaugeFrom(stdprometheus.GaugeOpts{
 			Namespace: namespace,
-			Subsystem: "consensus",
+			Subsystem: "backend",
 			Name:      "block_interval",
 			Help:      "Time between current block and the previous block in seconds.",
 		}, labels).With(labelsWithValues...),

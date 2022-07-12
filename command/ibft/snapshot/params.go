@@ -2,9 +2,9 @@ package snapshot
 
 import (
 	"context"
+	ibftOp "github.com/0xPolygon/polygon-edge/backend/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
-	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 )
 
 const (

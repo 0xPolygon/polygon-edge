@@ -4,7 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
-	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
+	ibftOp "github.com/0xPolygon/polygon-edge/backend/ibft/proto"
 	"github.com/umbracle/ethgo"
 	"math/big"
 	"strconv"

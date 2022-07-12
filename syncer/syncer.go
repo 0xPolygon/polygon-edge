@@ -22,7 +22,7 @@ var (
 	errTimeout = errors.New("timeout awaiting block from peer")
 )
 
-// XXX: Don't use this syncer for the consensus that may cause fork.
+// XXX: Don't use this syncer for the backend that may cause fork.
 // This syncer doesn't assume fork. Consensus may be broken.
 // TODO: Add extensibility for fork before merge
 type syncer struct {

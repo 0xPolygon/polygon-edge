@@ -1,4 +1,4 @@
-package consensus
+package backend
 
 import (
 	"context"
@@ -17,8 +17,8 @@ import (
 )
 
 //	TODO: rename to Backend
-// Consensus is the public interface for consensus mechanism
-// Each consensus mechanism must implement this interface in order to be valid
+// Consensus is the public interface for backend mechanism
+// Each backend mechanism must implement this interface in order to be valid
 type Consensus interface {
 	// VerifyHeader verifies the header is correct
 	VerifyHeader(header *types.Header) error
@@ -36,28 +36,28 @@ type Consensus interface {
 	// GetSyncProgression retrieves the current sync progression, if any
 	GetSyncProgression() *progress.Progression
 
-	// Initialize initializes the consensus (e.g. setup data)
+	// Initialize initializes the backend (e.g. setup data)
 	Initialize() error
 
-	// Start starts the consensus and servers
+	// Start starts the backend and servers
 	Start() error
 
 	// Close closes the connection
 	Close() error
 }
 
-// Config is the configuration for the consensus
+// Config is the configuration for the backend
 type Config struct {
 	// Logger to be used by the backend
 	Logger *log.Logger
 
-	// Params are the params of the chain and the consensus
+	// Params are the params of the chain and the backend
 	Params *chain.Params
 
 	// Config defines specific configuration parameters for the backend
 	Config map[string]interface{}
 
-	// Path is the directory path for the consensus protocol tos tore information
+	// Path is the directory path for the backend protocol tos tore information
 	Path string
 }
 

@@ -9,7 +9,7 @@ import (
 
 var (
 	// IstanbulDigest represents a hash of "Istanbul practical byzantine fault tolerance"
-	// to identify whether the block is from Istanbul consensus engine
+	// to identify whether the block is from Istanbul backend engine
 	IstanbulDigest = types.StringToHash("0x63746963616c2062797a616e74696e65206661756c7420746f6c6572616e6365")
 
 	// IstanbulExtraVanity represents a fixed number of extra-data bytes reserved for proposer vanity

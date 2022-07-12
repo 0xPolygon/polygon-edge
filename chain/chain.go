@@ -371,7 +371,7 @@ func importChain(content []byte) (*Chain, error) {
 	}
 
 	if engines := chain.Params.Engine; len(engines) != 1 {
-		return nil, fmt.Errorf("expected one consensus engine but found %d", len(engines))
+		return nil, fmt.Errorf("expected one backend engine but found %d", len(engines))
 	}
 
 	return chain, nil

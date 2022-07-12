@@ -21,7 +21,7 @@ const (
 type Receipts []*Receipt
 
 type Receipt struct {
-	// consensus fields
+	// backend fields
 	Root              Hash
 	CumulativeGasUsed uint64
 	LogsBloom         Bloom

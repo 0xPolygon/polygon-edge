@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/backend"
 	"github.com/0xPolygon/polygon-edge/blockchain"
-	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/txpool"
@@ -14,7 +14,7 @@ import (
 	"github.com/hashicorp/go-hclog"
 )
 
-// Dev consensus protocol seals any new transaction immediately
+// Dev backend protocol seals any new transaction immediately
 type Dev struct {
 	logger hclog.Logger
 
@@ -30,8 +30,8 @@ type Dev struct {
 
 // Factory implements the base factory method
 func Factory(
-	params *consensus.ConsensusParams,
-) (consensus.Consensus, error) {
+	params *backend.ConsensusParams,
+) (backend.Consensus, error) {
 	logger := params.Logger.Named("dev")
 
 	d := &Dev{
@@ -56,12 +56,12 @@ func Factory(
 	return d, nil
 }
 
-// Initialize initializes the consensus
+// Initialize initializes the backend
 func (d *Dev) Initialize() error {
 	return nil
 }
 
-// Start starts the consensus mechanism
+// Start starts the backend mechanism
 func (d *Dev) Start() error {
 	go d.run()
 
@@ -82,7 +82,7 @@ func (d *Dev) nextNotify() chan struct{} {
 }
 
 func (d *Dev) run() {
-	d.logger.Info("consensus started")
+	d.logger.Info("backend started")
 
 	for {
 		// wait until there is a new txn
@@ -186,7 +186,7 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 
 	// Build the actual block
 	// The header hash is computed inside buildBlock
-	block := consensus.BuildBlock(consensus.BuildBlockParams{
+	block := backend.BuildBlock(backend.BuildBlockParams{
 		Header:   header,
 		Txns:     txns,
 		Receipts: transition.Receipts(),

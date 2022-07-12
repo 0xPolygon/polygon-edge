@@ -1,4 +1,4 @@
-package consensus
+package backend
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-// NoProof is a consensus algorithm that validates everything
+// NoProof is a backend algorithm that validates everything
 type NoProof struct {
 }
 
@@ -16,7 +16,7 @@ func (n *NoProof) VerifyHeader(parent, header *types.Header, uncle, seal bool) e
 	return nil
 }
 
-// Prepare initializes the consensus fields of a block header according to the
+// Prepare initializes the backend fields of a block header according to the
 // rules of a particular engine. The changes are executed inline.
 func (n *NoProof) Prepare(header *types.Header) error {
 	return nil

@@ -14,7 +14,7 @@ import (
 func GetCommand() *cobra.Command {
 	ibftCmd := &cobra.Command{
 		Use:   "ibft",
-		Short: "Top level IBFT command for interacting with the IBFT consensus. Only accepts subcommands.",
+		Short: "Top level IBFT command for interacting with the IBFT backend. Only accepts subcommands.",
 	}
 
 	helper.RegisterGRPCAddressFlag(ibftCmd)

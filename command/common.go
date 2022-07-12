@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	ConsensusFlag  = "consensus"
+	ConsensusFlag  = "backend"
 	NoDiscoverFlag = "no-discover"
 	BootnodeFlag   = "bootnode"
 	LogLevelFlag   = "log-level"

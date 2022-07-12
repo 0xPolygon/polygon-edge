@@ -462,7 +462,7 @@ func NewTestServers(t *testing.T, num int, conf func(*TestServerConfig)) []*Test
 	})
 
 	// It is safe to use a dummy MultiAddr here, since this init method
-	// is called for the Dev consensus mode, and IBFT servers are initialized with NewIBFTServersManager.
+	// is called for the Dev backend mode, and IBFT servers are initialized with NewIBFTServersManager.
 	// This method needs to be standardized in the future
 	bootnodes := []string{tests.GenerateTestMultiAddr(t).String()}
 

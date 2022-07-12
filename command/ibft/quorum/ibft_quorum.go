@@ -9,7 +9,7 @@ import (
 func GetCommand() *cobra.Command {
 	ibftQuorumCmd := &cobra.Command{
 		Use:     "quorum",
-		Short:   "Specify the block number after which quorum optimal will be used for reaching consensus",
+		Short:   "Specify the block number after which quorum optimal will be used for reaching backend",
 		PreRunE: runPreRun,
 		Run:     runCommand,
 	}

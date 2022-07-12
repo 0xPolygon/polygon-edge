@@ -1,8 +1,8 @@
 package dummy
 
 import (
+	"github.com/0xPolygon/polygon-edge/backend"
 	"github.com/0xPolygon/polygon-edge/blockchain"
-	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/txpool"
@@ -20,7 +20,7 @@ type Dummy struct {
 	executor   *state.Executor
 }
 
-func Factory(params *consensus.ConsensusParams) (consensus.Consensus, error) {
+func Factory(params *backend.ConsensusParams) (backend.Consensus, error) {
 	logger := params.Logger.Named("dummy")
 
 	d := &Dummy{
@@ -36,7 +36,7 @@ func Factory(params *consensus.ConsensusParams) (consensus.Consensus, error) {
 	return d, nil
 }
 
-// Initialize initializes the consensus
+// Initialize initializes the backend
 func (d *Dummy) Initialize() error {
 	return nil
 }

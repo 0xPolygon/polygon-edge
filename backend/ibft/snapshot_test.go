@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/0xPolygon/polygon-edge/backend"
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/chain"
-	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -396,7 +396,7 @@ func TestSnapshot_setupSnapshot(t *testing.T) {
 			ibft := &Ibft{
 				epochSize:  epochSize,
 				blockchain: blockchain,
-				config: &consensus.Config{
+				config: &backend.Config{
 					Path: tmpDir,
 				},
 				logger: hclog.NewNullLogger(),
@@ -478,7 +478,7 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 			},
 		},
 		{
-			name:       "two validators, dropping requires consensus",
+			name:       "two validators, dropping requires backend",
 			validators: []string{"A", "B"},
 			headers: []mockHeader{
 				{
@@ -715,7 +715,7 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 			ibft := &Ibft{
 				epochSize:  epochSize,
 				blockchain: blockchain.TestBlockchain(t, genesis),
-				config:     &consensus.Config{},
+				config:     &backend.Config{},
 			}
 			initIbftMechanism(PoA, ibft)
 
@@ -766,7 +766,7 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 			ibft1 := &Ibft{
 				epochSize:  epochSize,
 				blockchain: blockchain.TestBlockchain(t, genesis),
-				config:     &consensus.Config{},
+				config:     &backend.Config{},
 			}
 
 			initIbftMechanism(PoA, ibft1)
@@ -800,7 +800,7 @@ func TestSnapshot_PurgeSnapshots(t *testing.T) {
 	ibft1 := &Ibft{
 		epochSize:  10,
 		blockchain: blockchain.TestBlockchain(t, genesis),
-		config:     &consensus.Config{},
+		config:     &backend.Config{},
 	}
 	assert.NoError(t, ibft1.setupSnapshot())
 	initIbftMechanism(PoA, ibft1)

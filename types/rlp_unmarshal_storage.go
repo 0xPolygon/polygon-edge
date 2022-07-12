@@ -71,7 +71,7 @@ func (t *Transaction) UnmarshalStoreRLPFrom(p *fastrlp.Parser, v *fastrlp.Value)
 		return fmt.Errorf("incorrect number of elements to decode transaction, expected 2 but found %d", len(elems))
 	}
 
-	// consensus part
+	// backend part
 	if err := t.UnmarshalRLPFrom(p, elems[0]); err != nil {
 		return err
 	}

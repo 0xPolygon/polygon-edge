@@ -9,8 +9,8 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/consensus"
-	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
+	"github.com/0xPolygon/polygon-edge/backend"
+	"github.com/0xPolygon/polygon-edge/backend/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
@@ -32,8 +32,8 @@ const (
 
 var (
 	ErrInvalidHookParam     = errors.New("invalid IBFT hook param passed in")
-	ErrInvalidMechanismType = errors.New("invalid consensus mechanism type in params")
-	ErrMissingMechanismType = errors.New("missing consensus mechanism type in params")
+	ErrInvalidMechanismType = errors.New("invalid backend mechanism type in params")
+	ErrMissingMechanismType = errors.New("missing backend mechanism type in params")
 )
 
 type blockchainInterface interface {
@@ -54,14 +54,14 @@ type txPoolInterface interface {
 	ResetWithHeaders(headers ...*types.Header)
 }
 
-// Ibft represents the IBFT consensus mechanism object
+// Ibft represents the IBFT backend mechanism object
 type Ibft struct {
 	sealing bool // Flag indicating if the node is a sealer
 
-	logger hclog.Logger      // Output logger
-	config *consensus.Config // Consensus configuration
-	Grpc   *grpc.Server      // gRPC configuration
-	state  *currentState     // Reference to the current state
+	logger hclog.Logger    // Output logger
+	config *backend.Config // Consensus configuration
+	Grpc   *grpc.Server    // gRPC configuration
+	state  *currentState   // Reference to the current state
 
 	blockchain blockchainInterface // Interface exposed by the blockchain layer
 	executor   *state.Executor     // Reference to the state executor
@@ -89,7 +89,7 @@ type Ibft struct {
 	// aux test methods
 	forceTimeoutCh bool
 
-	metrics *consensus.Metrics
+	metrics *backend.Metrics
 
 	secretsManager secrets.SecretsManager
 
@@ -124,10 +124,10 @@ func (i *Ibft) runHook(hookName HookType, height uint64, hookParam interface{}) 
 	return nil
 }
 
-// Factory implements the base consensus Factory method
+// Factory implements the base backend Factory method
 func Factory(
-	params *consensus.ConsensusParams,
-) (consensus.Consensus, error) {
+	params *backend.ConsensusParams,
+) (backend.Consensus, error) {
 	//	defaults for user set fields in genesis
 	var (
 		epochSize          = uint64(DefaultEpochSize)
@@ -185,7 +185,7 @@ func Factory(
 	return p, nil
 }
 
-// Start starts the IBFT consensus
+// Start starts the IBFT backend
 func (i *Ibft) Initialize() error {
 	// Set up the snapshots
 	if err := i.setupSnapshot(); err != nil {
@@ -195,7 +195,7 @@ func (i *Ibft) Initialize() error {
 	return nil
 }
 
-// Start starts the IBFT consensus
+// Start starts the IBFT backend
 func (i *Ibft) Start() error {
 	// register the grpc operator
 	if i.Grpc != nil {
@@ -284,7 +284,7 @@ func GetIBFTForks(ibftConfig map[string]interface{}) ([]IBFTFork, error) {
 	return nil, errors.New("current IBFT type not found")
 }
 
-//  setupTransport read current mechanism in params and sets up consensus mechanism
+//  setupTransport read current mechanism in params and sets up backend mechanism
 func (i *Ibft) setupMechanism() error {
 	ibftForks, err := GetIBFTForks(i.config.Config)
 	if err != nil {
@@ -296,7 +296,7 @@ func (i *Ibft) setupMechanism() error {
 	for idx, fork := range ibftForks {
 		factory, ok := mechanismBackends[fork.Type]
 		if !ok {
-			return fmt.Errorf("consensus mechanism doesn't define: %s", fork.Type)
+			return fmt.Errorf("backend mechanism doesn't define: %s", fork.Type)
 		}
 
 		fork := fork
@@ -399,9 +399,9 @@ func (i *Ibft) createKey() error {
 
 const IbftKeyName = "validator.key"
 
-// start starts the IBFT consensus state machine
+// start starts the IBFT backend state machine
 func (i *Ibft) start() {
-	// consensus always starts in SyncState mode in case it needs
+	// backend always starts in SyncState mode in case it needs
 	// to sync with other nodes.
 	i.setState(SyncState)
 
@@ -563,7 +563,7 @@ func (i *Ibft) runSyncState() {
 	}
 }
 
-// shouldWriteTransactions checks if each consensus mechanism accepts a block with transactions at given height
+// shouldWriteTransactions checks if each backend mechanism accepts a block with transactions at given height
 // returns true if all mechanisms accept
 // otherwise return false
 func (i *Ibft) shouldWriteTransactions(height uint64) bool {
@@ -640,7 +640,7 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 	header.GasUsed = transition.TotalGas()
 
 	// build the block
-	block := consensus.BuildBlock(consensus.BuildBlockParams{
+	block := backend.BuildBlock(backend.BuildBlockParams{
 		Header:   header,
 		Txns:     txns,
 		Receipts: transition.Receipts(),
@@ -754,7 +754,7 @@ func (i *Ibft) runAcceptState() { // start new round
 		return
 	}
 
-	//	TODO: this will affect is the node is even running consensus for some round
+	//	TODO: this will affect is the node is even running backend for some round
 	snap, err := i.getSnapshot(parent.Number)
 	if err != nil {
 		i.logger.Error("cannot find snapshot", "num", parent.Number)
@@ -763,7 +763,7 @@ func (i *Ibft) runAcceptState() { // start new round
 		return
 	}
 
-	//	TODO: this will affect is the node is even running consensus for some round
+	//	TODO: this will affect is the node is even running backend for some round
 	if !snap.Set.Includes(i.validatorKeyAddr) {
 		// we are not a validator anymore, move back to sync state
 		i.logger.Info("we are not a validator anymore")
@@ -1054,7 +1054,7 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 	block.Header = header
 	block.Header.ComputeHash() // TODO: this is not needed
 
-	//	TODO: this is also not needed, consensus has already verified everything
+	//	TODO: this is also not needed, backend has already verified everything
 	// Verify the header only, since the block body is already verified
 	if err := i.VerifyHeader(block.Header); err != nil {
 		return err
@@ -1378,7 +1378,7 @@ func (i *Ibft) IsLastOfEpoch(number uint64) bool {
 	return number > 0 && number%i.epochSize == 0
 }
 
-// Close closes the IBFT consensus mechanism, and does write back to disk
+// Close closes the IBFT backend mechanism, and does write back to disk
 func (i *Ibft) Close() error {
 	close(i.closeCh)
 

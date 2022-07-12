@@ -6,7 +6,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/helper/common"
 )
 
-// Define the type of the IBFT consensus
+// Define the type of the IBFT backend
 
 type MechanismType string
 
@@ -85,10 +85,10 @@ const (
 )
 
 type ConsensusMechanism interface {
-	// GetType returns the type of IBFT consensus mechanism (PoA / PoS)
+	// GetType returns the type of IBFT backend mechanism (PoA / PoS)
 	GetType() MechanismType
 
-	// GetHookMap returns the hooks registered with the specific consensus mechanism
+	// GetHookMap returns the hooks registered with the specific backend mechanism
 	GetHookMap() map[HookType]func(interface{}) error
 
 	// IsAvailable returns whether the corresponding hook is available
@@ -175,7 +175,7 @@ type IBFTFork struct {
 	MinValidatorCount *common.JSONNumber `json:"minValidatorCount,omitempty"`
 }
 
-// ConsensusMechanismFactory is the factory function to create a consensus mechanism
+// ConsensusMechanismFactory is the factory function to create a backend mechanism
 type ConsensusMechanismFactory func(ibft *Ibft, params *IBFTFork) (ConsensusMechanism, error)
 
 var mechanismBackends = map[MechanismType]ConsensusMechanismFactory{

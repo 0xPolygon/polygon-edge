@@ -11,9 +11,9 @@ import (
 	"path/filepath"
 
 	"github.com/0xPolygon/polygon-edge/archive"
+	"github.com/0xPolygon/polygon-edge/backend"
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/chain"
-	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/keccak"
@@ -42,7 +42,7 @@ type Server struct {
 	state        state.State
 	stateStorage itrie.Storage
 
-	consensus consensus.Consensus
+	consensus backend.Consensus
 
 	// blockchain stack
 	blockchain *blockchain.Blockchain
@@ -223,21 +223,21 @@ func NewServer(config *Config) (*Server, error) {
 	}
 
 	{
-		// Setup consensus
+		// Setup backend
 		if err := m.setupConsensus(); err != nil {
 			return nil, err
 		}
 		m.blockchain.SetConsensus(m.consensus)
 	}
 
-	// after consensus is done, we can mine the genesis block in blockchain
-	// This is done because consensus might use a custom Hash function so we need
-	// to wait for consensus because we do any block hashing like genesis
+	// after backend is done, we can mine the genesis block in blockchain
+	// This is done because backend might use a custom Hash function so we need
+	// to wait for backend because we do any block hashing like genesis
 	if err := m.blockchain.ComputeGenesis(); err != nil {
 		return nil, err
 	}
 
-	// initialize data in consensus layer
+	// initialize data in backend layer
 	if err := m.consensus.Initialize(); err != nil {
 		return nil, err
 	}
@@ -252,7 +252,7 @@ func NewServer(config *Config) (*Server, error) {
 		return nil, err
 	}
 
-	// start consensus
+	// start backend
 	if err := m.consensus.Start(); err != nil {
 		return nil, err
 	}
@@ -377,7 +377,7 @@ func (s *Server) setupConsensus() error {
 	engine, ok := consensusBackends[ConsensusType(engineName)]
 
 	if !ok {
-		return fmt.Errorf("consensus engine '%s' not found", engineName)
+		return fmt.Errorf("backend engine '%s' not found", engineName)
 	}
 
 	engineConfig, ok := s.config.Chain.Params.Engine[engineName].(map[string]interface{})
@@ -385,14 +385,14 @@ func (s *Server) setupConsensus() error {
 		engineConfig = map[string]interface{}{}
 	}
 
-	config := &consensus.Config{
+	config := &backend.Config{
 		Params: s.config.Chain.Params,
 		Config: engineConfig,
-		Path:   filepath.Join(s.config.DataDir, "consensus"),
+		Path:   filepath.Join(s.config.DataDir, "backend"),
 	}
 
 	consensus, err := engine(
-		&consensus.ConsensusParams{
+		&backend.ConsensusParams{
 			Context:        context.Background(),
 			Seal:           s.config.Seal,
 			Config:         config,
@@ -401,7 +401,7 @@ func (s *Server) setupConsensus() error {
 			Blockchain:     s.blockchain,
 			Executor:       s.executor,
 			Grpc:           s.grpcServer,
-			Logger:         s.logger.Named("consensus"),
+			Logger:         s.logger.Named("backend"),
 			Metrics:        s.serverMetrics.consensus,
 			SecretsManager: s.secretsManager,
 			BlockTime:      s.config.BlockTime,
@@ -425,7 +425,7 @@ type jsonRPCHub struct {
 	*txpool.TxPool
 	*state.Executor
 	*network.Server
-	consensus.Consensus
+	backend.Consensus
 }
 
 // HELPER + WRAPPER METHODS //
@@ -523,7 +523,7 @@ func (j *jsonRPCHub) GetSyncProgression() *progress.Progression {
 		return restoreProg
 	}
 
-	// consensus sync progression
+	// backend sync progression
 	if consensusSyncProg := j.Consensus.GetSyncProgression(); consensusSyncProg != nil {
 		return consensusSyncProg
 	}
@@ -592,7 +592,7 @@ func (s *Server) JoinPeer(rawPeerMultiaddr string) error {
 	return s.network.JoinPeer(rawPeerMultiaddr)
 }
 
-// Close closes the Minimal server (blockchain, networking, consensus)
+// Close closes the Minimal server (blockchain, networking, backend)
 func (s *Server) Close() {
 	// Close the blockchain layer
 	if err := s.blockchain.Close(); err != nil {
@@ -604,9 +604,9 @@ func (s *Server) Close() {
 		s.logger.Error("failed to close networking", "err", err.Error())
 	}
 
-	// Close the consensus layer
+	// Close the backend layer
 	if err := s.consensus.Close(); err != nil {
-		s.logger.Error("failed to close consensus", "err", err.Error())
+		s.logger.Error("failed to close backend", "err", err.Error())
 	}
 
 	// Close the state storage

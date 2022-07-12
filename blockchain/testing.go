@@ -333,8 +333,8 @@ func newBlockChain(config *chain.Chain, executor Executor) (*Blockchain, error) 
 	if err != nil {
 		return nil, err
 	}
-	// if we are using mock consensus we can compute right away the genesis since
-	// this consensus does not change the header hash
+	// if we are using mock backend we can compute right away the genesis since
+	// this backend does not change the header hash
 	if err = b.ComputeGenesis(); err != nil {
 		return nil, fmt.Errorf("compute genisis: %w", err)
 	}

@@ -71,7 +71,7 @@ func (l *LocalSecretsManager) Setup() error {
 		return err
 	}
 
-	// baseDir/consensus/validator.key
+	// baseDir/backend/validator.key
 	l.secretPathMap[secrets.ValidatorKey] = filepath.Join(
 		l.path,
 		secrets.ConsensusFolderLocal,

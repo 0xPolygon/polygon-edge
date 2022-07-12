@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.25.0
 // 	protoc        v3.12.0
-// source: consensus/ibft/proto/ibft.proto
+// source: backend/ibft/proto/ibft.proto
 
 package proto
 

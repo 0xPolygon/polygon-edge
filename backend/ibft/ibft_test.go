@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/backend"
+	"github.com/0xPolygon/polygon-edge/backend/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/blockchain"
-	"github.com/0xPolygon/polygon-edge/consensus"
-	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
@@ -1204,7 +1204,7 @@ func newMockIbft(t *testing.T, accounts []string, account string) *mockIbft {
 
 	ibft := &Ibft{
 		logger:           hclog.NewNullLogger(),
-		config:           &consensus.Config{},
+		config:           &backend.Config{},
 		blockchain:       m,
 		validatorKey:     addr.priv,
 		validatorKeyAddr: addr.Address(),
@@ -1213,7 +1213,7 @@ func newMockIbft(t *testing.T, accounts []string, account string) *mockIbft {
 		operator:         &operator{},
 		state:            newState(),
 		epochSize:        DefaultEpochSize,
-		metrics:          consensus.NilMetrics(),
+		metrics:          backend.NilMetrics(),
 	}
 
 	initIbftMechanism(PoA, ibft)
@@ -1262,7 +1262,7 @@ func newMockIBFTWithMockBlockchain(
 
 	ibft := &Ibft{
 		logger:           hclog.NewNullLogger(),
-		config:           &consensus.Config{},
+		config:           &backend.Config{},
 		blockchain:       m,
 		validatorKey:     addr.priv,
 		validatorKeyAddr: addr.Address(),
@@ -1271,7 +1271,7 @@ func newMockIBFTWithMockBlockchain(
 		operator:         &operator{},
 		state:            newState(),
 		epochSize:        DefaultEpochSize,
-		metrics:          consensus.NilMetrics(),
+		metrics:          backend.NilMetrics(),
 	}
 
 	initIbftMechanism(PoA, ibft)

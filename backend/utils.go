@@ -1,4 +1,4 @@
-package consensus
+package backend
 
 import (
 	"github.com/0xPolygon/polygon-edge/types"

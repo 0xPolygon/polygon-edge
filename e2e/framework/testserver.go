@@ -19,13 +19,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/backend/ibft"
+	ibftOp "github.com/0xPolygon/polygon-edge/backend/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/genesis"
 	ibftSwitch "github.com/0xPolygon/polygon-edge/command/ibft/switch"
 	initCmd "github.com/0xPolygon/polygon-edge/command/secrets/init"
 	"github.com/0xPolygon/polygon-edge/command/server"
-	"github.com/0xPolygon/polygon-edge/consensus/ibft"
-	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	stakingHelper "github.com/0xPolygon/polygon-edge/helper/staking"
 	"github.com/0xPolygon/polygon-edge/helper/tests"
@@ -253,10 +253,10 @@ func (t *TestServer) GenerateGenesis() error {
 		args = append(args, "--premine", acct.Addr.String()+":0x"+acct.Balance.Text(16))
 	}
 
-	// add consensus flags
+	// add backend flags
 	switch t.Config.Consensus {
 	case ConsensusIBFT:
-		args = append(args, "--consensus", "ibft")
+		args = append(args, "--backend", "ibft")
 
 		if t.Config.IBFTDirPrefix == "" {
 			return errors.New("prefix of IBFT directory is not set")
@@ -268,14 +268,14 @@ func (t *TestServer) GenerateGenesis() error {
 			args = append(args, "--epoch-size", strconv.FormatUint(t.Config.EpochSize, 10))
 		}
 	case ConsensusDev:
-		args = append(args, "--consensus", "dev")
+		args = append(args, "--backend", "dev")
 
 		// Set up any initial staker addresses for the predeployed Staking SC
 		for _, stakerAddress := range t.Config.DevStakers {
 			args = append(args, "--ibft-validator", stakerAddress.String())
 		}
 	case ConsensusDummy:
-		args = append(args, "--consensus", "dummy")
+		args = append(args, "--backend", "dummy")
 	}
 
 	for _, bootnode := range t.Config.Bootnodes {
