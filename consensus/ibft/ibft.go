@@ -646,6 +646,7 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 		Receipts: transition.Receipts(),
 	})
 
+	//	TODO: this is how the signature is created (?)
 	// write the seal of the block after all the fields are completed
 	header, err = writeSeal(i.validatorKey, block.Header)
 	if err != nil {
