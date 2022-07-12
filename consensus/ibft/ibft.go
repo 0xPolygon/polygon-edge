@@ -657,6 +657,7 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 
 	// compute the hash, this is only a provisional hash since the final one
 	// is sealed after all the committed seals
+	//	TODO: header hash was never generated with ProposerSeal and CommittedSeals
 	block.Header.ComputeHash()
 
 	i.logger.Info("build block", "number", header.Number, "txns", len(txns))
