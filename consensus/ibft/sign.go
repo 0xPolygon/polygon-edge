@@ -220,6 +220,7 @@ func verifyCommittedFields(
 	return nil
 }
 
+//	TODO: validate message sender
 func validateMsg(msg *proto.MessageReq) error {
 	signMsg, err := msg.PayloadNoSig()
 	if err != nil {
