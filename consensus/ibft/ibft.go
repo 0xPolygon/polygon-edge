@@ -1054,6 +1054,7 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 	block.Header = header
 	block.Header.ComputeHash() // TODO: this is not needed
 
+	//	TODO: this is also not needed, consensus has already verified everything
 	// Verify the header only, since the block body is already verified
 	if err := i.VerifyHeader(block.Header); err != nil {
 		return err
