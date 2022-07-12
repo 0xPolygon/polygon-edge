@@ -100,32 +100,6 @@ type Ibft struct {
 	forceTimeoutCh bool
 }
 
-// runHook runs a specified hook if it is present in the hook map
-func (i *Ibft) runHook(hookName HookType, height uint64, hookParam interface{}) error {
-	for _, mechanism := range i.mechanisms {
-		if !mechanism.IsAvailable(hookName, height) {
-			continue
-		}
-
-		// Grab the hook map
-		hookMap := mechanism.GetHookMap()
-
-		// Grab the actual hook if it's present
-		hook, ok := hookMap[hookName]
-		if !ok {
-			// hook not found, continue
-			continue
-		}
-
-		// Run the hook
-		if err := hook(hookParam); err != nil {
-			return fmt.Errorf("error occurred during a call of %s hook in %s: %w", hookName, mechanism.GetType(), err)
-		}
-	}
-
-	return nil
-}
-
 // Factory implements the base backend Factory method
 func Factory(
 	params *backend.BackendParams,
@@ -185,6 +159,32 @@ func Factory(
 	p.syncer = syncer.NewSyncer(params.Logger, params.Network, params.Blockchain, p.blockTime*3)
 
 	return p, nil
+}
+
+// runHook runs a specified hook if it is present in the hook map
+func (i *Ibft) runHook(hookName HookType, height uint64, hookParam interface{}) error {
+	for _, mechanism := range i.mechanisms {
+		if !mechanism.IsAvailable(hookName, height) {
+			continue
+		}
+
+		// Grab the hook map
+		hookMap := mechanism.GetHookMap()
+
+		// Grab the actual hook if it's present
+		hook, ok := hookMap[hookName]
+		if !ok {
+			// hook not found, continue
+			continue
+		}
+
+		// Run the hook
+		if err := hook(hookParam); err != nil {
+			return fmt.Errorf("error occurred during a call of %s hook in %s: %w", hookName, mechanism.GetType(), err)
+		}
+	}
+
+	return nil
 }
 
 // Start starts the IBFT backend
