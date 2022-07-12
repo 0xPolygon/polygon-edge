@@ -60,7 +60,6 @@ type Config struct {
 	Path string
 }
 
-//	TODO: backend config
 type BackendParams struct {
 	Context        context.Context
 	Seal           bool
