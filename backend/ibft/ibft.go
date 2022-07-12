@@ -146,6 +146,11 @@ func Factory(
 		metrics:            params.Metrics,
 		secretsManager:     params.SecretsManager,
 		blockTime:          time.Duration(params.BlockTime) * time.Second,
+		syncer: syncer.NewSyncer(
+			params.Logger,
+			params.Network,
+			params.Blockchain,
+			time.Duration(params.BlockTime)*3*time.Second),
 	}
 
 	// Initialize the mechanism
@@ -155,8 +160,6 @@ func Factory(
 
 	// Istanbul requires a different header hash function
 	types.HeaderHash = istanbulHeaderHash
-
-	p.syncer = syncer.NewSyncer(params.Logger, params.Network, params.Blockchain, p.blockTime*3)
 
 	return p, nil
 }
