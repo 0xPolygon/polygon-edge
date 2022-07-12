@@ -189,7 +189,6 @@ func (m *syncPeerClient) startNewBlockProcess() {
 	for event := range m.subscription.GetEventCh() {
 		if l := len(event.NewChain); l > 0 {
 			latest := event.NewChain[l-1]
-			
 			// Publish status
 			if err := m.topic.Publish(&proto.SyncPeerStatus{
 				Number: latest.Number,
