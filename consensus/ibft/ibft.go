@@ -849,6 +849,7 @@ func (i *Ibft) runAcceptState() { // start new round
 			continue
 		}
 
+		//	TODO: ~~IsProposer()
 		if msg.From != i.state.proposer.String() {
 			i.logger.Error("msg received from wrong proposer")
 
