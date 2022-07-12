@@ -169,7 +169,7 @@ func (m *syncPeerClient) handleStatusUpdate(obj interface{}, from peer.ID) {
 
 	if !m.network.IsConnected(from) {
 		if m.id != from.String() {
-			m.logger.Warn("received status from non-connected peer, ignore", "id", from)
+			m.logger.Debug("received status from non-connected peer, ignore", "id", from)
 		}
 
 		return
@@ -189,7 +189,7 @@ func (m *syncPeerClient) startNewBlockProcess() {
 	for event := range m.subscription.GetEventCh() {
 		if l := len(event.NewChain); l > 0 {
 			latest := event.NewChain[l-1]
-
+			
 			// Publish status
 			if err := m.topic.Publish(&proto.SyncPeerStatus{
 				Number: latest.Number,
