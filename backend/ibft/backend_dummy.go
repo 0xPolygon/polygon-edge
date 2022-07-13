@@ -77,13 +77,14 @@ func (i *Ibft) InsertBlock(proposal []byte, committedSeals [][]byte) error {
 		return hookErr
 	}
 
+	//	TODO: move log to go-ibft
 	i.logger.Info(
 		"block committed",
 		"sequence", i.state.view.Sequence,
 		"hash", newBlock.Hash(),
 		"validators", len(i.state.validators),
 		"rounds", i.state.view.Round+1,
-		"committed", i.state.numCommitted(),
+		"committed", len(committedSeals),
 	)
 
 	// after the block has been written we reset the txpool so that
