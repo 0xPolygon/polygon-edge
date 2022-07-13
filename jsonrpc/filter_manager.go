@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -41,8 +40,8 @@ type filter interface {
 	// getFilterBase returns filterBase that has common fields
 	getFilterBase() *filterBase
 
-	// getUpdates returns stored data in a serialized JSON structure
-	getUpdates() (json.RawMessage, error)
+	// getUpdates returns stored data in a JSON serializable form
+	getUpdates() (interface{}, error)
 
 	// sendUpdates write stored data to web socket stream
 	sendUpdates() error
@@ -120,7 +119,7 @@ func (f *blockFilter) takeBlockUpdates() []*types.Header {
 }
 
 // getUpdates returns updates of blocks in string
-func (f *blockFilter) getUpdates() (json.RawMessage, error) {
+func (f *blockFilter) getUpdates() (interface{}, error) {
 	headers := f.takeBlockUpdates()
 
 	updates := []string{}
@@ -128,7 +127,7 @@ func (f *blockFilter) getUpdates() (json.RawMessage, error) {
 		updates = append(updates, header.Hash.String())
 	}
 
-	return json.RawMessage(fmt.Sprintf("[\"%s\"]", strings.Join(updates, "\",\""))), nil
+	return updates, nil
 }
 
 // sendUpdates writes the updates of blocks to web socket stream
@@ -177,15 +176,10 @@ func (f *logFilter) takeLogUpdates() []*Log {
 }
 
 // getUpdates returns stored logs in string
-func (f *logFilter) getUpdates() (json.RawMessage, error) {
+func (f *logFilter) getUpdates() (interface{}, error) {
 	logs := f.takeLogUpdates()
 
-	res, err := json.Marshal(logs)
-	if err != nil {
-		return nil, err
-	}
-
-	return json.RawMessage(res), nil
+	return logs, nil
 }
 
 // sendUpdates writes stored logs to web socket stream
@@ -479,7 +473,7 @@ func (f *FilterManager) GetLogFilterFromID(filterID string) (*logFilter, error) 
 }
 
 // GetFilterChanges returns the updates of the filter with given ID in string
-func (f *FilterManager) GetFilterChanges(id string) (json.RawMessage, error) {
+func (f *FilterManager) GetFilterChanges(id string) (interface{}, error) {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
 
