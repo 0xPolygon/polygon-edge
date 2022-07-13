@@ -15,11 +15,12 @@ import (
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/network"
-	"github.com/0xPolygon/polygon-edge/protocol"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/state"
+	"github.com/0xPolygon/polygon-edge/syncer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
+	"github.com/libp2p/go-libp2p-core/peer"
 	"google.golang.org/grpc"
 	anypb "google.golang.org/protobuf/types/known/anypb"
 )
@@ -52,15 +53,6 @@ type txPoolInterface interface {
 	ResetWithHeaders(headers ...*types.Header)
 }
 
-type syncerInterface interface {
-	Start()
-	BestPeer() *protocol.SyncPeer
-	BulkSyncWithPeer(p *protocol.SyncPeer, newBlockHandler func(block *types.Block)) error
-	WatchSyncWithPeer(p *protocol.SyncPeer, newBlockHandler func(b *types.Block) bool, blockTimeout time.Duration)
-	GetSyncProgression() *progress.Progression
-	Broadcast(b *types.Block)
-}
-
 // Ibft represents the IBFT consensus mechanism object
 type Ibft struct {
 	sealing bool // Flag indicating if the node is a sealer
@@ -86,7 +78,7 @@ type Ibft struct {
 	msgQueue *msgQueue     // Structure containing different message queues
 	updateCh chan struct{} // Update channel
 
-	syncer syncerInterface // Reference to the sync protocol
+	syncer syncer.Syncer // Reference to the sync protocol
 
 	network   *network.Server // Reference to the networking layer
 	transport transport       // Reference to the transport protocol
@@ -189,7 +181,7 @@ func Factory(
 	// Istanbul requires a different header hash function
 	types.HeaderHash = istanbulHeaderHash
 
-	p.syncer = protocol.NewSyncer(params.Logger, params.Network, params.Blockchain)
+	p.syncer = syncer.NewSyncer(params.Logger, params.Network, params.Blockchain, p.blockTime*3)
 
 	return p, nil
 }
@@ -225,7 +217,9 @@ func (i *Ibft) Start() error {
 	}
 
 	// Start the syncer
-	i.syncer.Start()
+	if err := i.syncer.Start(); err != nil {
+		return err
+	}
 
 	// Start the actual IBFT protocol
 	go i.start()
@@ -324,7 +318,7 @@ func (i *Ibft) setupTransport() error {
 	}
 
 	// Subscribe to the newly created topic
-	err = topic.Subscribe(func(obj interface{}) {
+	err = topic.Subscribe(func(obj interface{}, _ peer.ID) {
 		msg, ok := obj.(*proto.MessageReq)
 		if !ok {
 			i.logger.Error("invalid type assertion for message request")
@@ -492,8 +486,7 @@ func (i *Ibft) runSyncState() {
 
 	for i.isState(SyncState) {
 		// try to sync with the best-suited peer
-		p := i.syncer.BestPeer()
-		if p == nil {
+		if !i.syncer.HasSyncPeer() {
 			// if we do not have any peers, and we have been a validator
 			// we can start now. In case we start on another fork this will be
 			// reverted later
@@ -512,9 +505,11 @@ func (i *Ibft) runSyncState() {
 			continue
 		}
 
-		if err := i.syncer.BulkSyncWithPeer(p, func(newBlock *types.Block) {
+		if err := i.syncer.BulkSync(func(newBlock *types.Block) bool {
 			callInsertBlockHook(newBlock.Number())
 			i.txpool.ResetWithHeaders(newBlock.Header)
+
+			return false
 		}); err != nil {
 			i.logger.Error("failed to bulk sync", "err", err)
 
@@ -533,17 +528,20 @@ func (i *Ibft) runSyncState() {
 		// start watch mode
 		var isValidator bool
 
-		i.syncer.WatchSyncWithPeer(p, func(newBlock *types.Block) bool {
+		err := i.syncer.WatchSync(func(newBlock *types.Block) bool {
 			// After each written block, update the snapshot store for PoS.
 			// The snapshot store is currently updated for PoA inside the ProcessHeadersHook
 			callInsertBlockHook(newBlock.Number())
 
-			i.syncer.Broadcast(newBlock)
 			i.txpool.ResetWithHeaders(newBlock.Header)
 			isValidator = i.isValidSnapshot()
 
 			return isValidator
-		}, i.blockTime)
+		})
+
+		if err != nil {
+			i.logger.Warn("error happened during watch sync", "err", err)
+		}
 
 		if isValidator {
 			// at this point, we are in sync with the latest chain we know of
@@ -1065,9 +1063,6 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 		"committed", i.state.numCommitted(),
 	)
 
-	// broadcast the new block
-	i.syncer.Broadcast(block)
-
 	// after the block has been written we reset the txpool so that
 	// the old transactions are removed
 	i.txpool.ResetWithHeaders(block.Header)
@@ -1104,18 +1099,12 @@ func (i *Ibft) runRoundChangeState() {
 
 	checkTimeout := func() {
 		// check if there is any peer that is really advanced and we might need to sync with it first
-		if i.syncer != nil {
-			bestPeer := i.syncer.BestPeer()
-			if bestPeer != nil {
-				lastProposal := i.blockchain.Header()
-				if bestPeer.Number() > lastProposal.Number {
-					i.logger.Debug("it has found a better peer to connect", "local", lastProposal.Number, "remote", bestPeer.Number())
-					// we need to catch up with the last sequence
-					i.setState(SyncState)
+		if i.syncer != nil && i.syncer.HasSyncPeer() {
+			i.logger.Debug("it has found a better peer to connect")
+			// we need to catch up with the last sequence
+			i.setState(SyncState)
 
-					return
-				}
-			}
+			return
 		}
 
 		// otherwise, it seems that we are in sync
@@ -1380,6 +1369,12 @@ func (i *Ibft) Close() error {
 		err := i.store.saveToPath(i.config.Path)
 
 		if err != nil {
+			return err
+		}
+	}
+
+	if i.syncer != nil {
+		if err := i.syncer.Close(); err != nil {
 			return err
 		}
 	}
