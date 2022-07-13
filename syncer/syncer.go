@@ -166,6 +166,8 @@ func (s *syncer) BulkSync(newBlockCallback func(*types.Block) bool) error {
 		}
 	}
 
+	updateLocalLatest()
+
 	// Stop publishing status in topic while in bulkSync
 	s.syncPeerClient.DisablePublishingPeerStatus()
 
