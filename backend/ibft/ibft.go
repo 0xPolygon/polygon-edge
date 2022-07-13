@@ -1230,7 +1230,7 @@ func (i *Ibft) gossip(typ proto.MessageReq_Type) {
 			return
 		}
 
-		//	TODO: why do we encode to hex ?
+		//	TODO: why do we encode to hex ? (remove)
 		msg.Seal = hex.EncodeToHex(seal)
 	}
 
