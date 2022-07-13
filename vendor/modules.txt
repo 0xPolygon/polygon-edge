@@ -11,6 +11,9 @@ cloud.google.com/go/iam
 ## explicit; go 1.16
 cloud.google.com/go/secretmanager/apiv1
 cloud.google.com/go/secretmanager/internal
+# github.com/Trapesys/go-ibft v0.0.0 => ../Trapesys/go-ibft
+## explicit; go 1.17
+github.com/Trapesys/go-ibft/messages/proto
 # github.com/andybalholm/brotli v1.0.4
 ## explicit; go 1.12
 github.com/andybalholm/brotli
@@ -659,7 +662,7 @@ github.com/spf13/cobra
 # github.com/spf13/pflag v1.0.5
 ## explicit; go 1.12
 github.com/spf13/pflag
-# github.com/stretchr/testify v1.7.2
+# github.com/stretchr/testify v1.8.0
 ## explicit; go 1.13
 github.com/stretchr/testify/assert
 # github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
@@ -985,3 +988,4 @@ gopkg.in/yaml.v3
 # lukechampine.com/blake3 v1.1.7
 ## explicit; go 1.13
 lukechampine.com/blake3
+# github.com/Trapesys/go-ibft => ../Trapesys/go-ibft
