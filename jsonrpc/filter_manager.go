@@ -16,7 +16,7 @@ import (
 )
 
 var (
-	ErrFilterDoesNotExists              = errors.New("filter does not exists")
+	ErrFilterDoesNotExists              = errors.New("filter not found")
 	ErrWSFilterDoesNotSupportGetChanges = errors.New("web socket Filter doesn't support to return a batch of the changes")
 	ErrCastingFilterToLogFilter         = errors.New("casting filter object to logFilter error")
 	ErrBlockNotFound                    = errors.New("block not found")
