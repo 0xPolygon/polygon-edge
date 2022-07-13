@@ -796,7 +796,8 @@ func (i *Ibft) runAcceptState() { // start new round
 		lastProposer, _ = ecrecoverFromHeader(parent)
 	}
 
-	//	TODO: 	~~IsProposer (remove hook)
+	//	TODO: 	~~IsProposer
+	//	TODO: 	edit hook -> (lastProposer, height, round)
 	if hookErr := i.runHook(CalculateProposerHook, i.state.view.Sequence, lastProposer); hookErr != nil {
 		i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", CalculateProposerHook, hookErr))
 	}
