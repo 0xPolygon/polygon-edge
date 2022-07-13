@@ -91,7 +91,19 @@ func (i *Ibft) IsProposer(id []byte, height, round uint64) bool {
 }
 
 func (i *Ibft) IsValidProposalHash(proposal, hash []byte) bool {
-	return false
+	newBlock := &types.Block{}
+	if err := newBlock.UnmarshalRLP(proposal); err != nil {
+		i.logger.Error("unable to unmarshal proposal", "err", err)
+
+		return false
+	}
+
+	blockHash := newBlock.Header.Hash.Bytes()
+	if !bytes.Equal(blockHash, hash) {
+		return false
+	}
+
+	return true
 }
 
 func (i *Ibft) IsValidCommittedSeal(proposal, seal []byte) bool {
