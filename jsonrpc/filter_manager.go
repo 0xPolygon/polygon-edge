@@ -472,28 +472,42 @@ func (f *FilterManager) GetLogFilterFromID(filterID string) (*logFilter, error) 
 	return logFilter, nil
 }
 
-// GetFilterChanges returns the updates of the filter with given ID in string
+// GetFilterChanges returns the updates of the filter with given ID in string, and refreshes the timeout on the filter
 func (f *FilterManager) GetFilterChanges(id string) (interface{}, error) {
+	filter, res, err := f.getFilterAndChanges(id)
+
+	if err == nil && !filter.isWS() {
+		// Refresh the timeout on this filter
+		f.lock.Lock()
+		f.refreshFilterTimeout(filter.getFilterBase())
+		f.lock.Unlock()
+	}
+
+	return res, err
+}
+
+// getFilterAndChanges returns the updates of the filter with given ID in string (read lock only)
+func (f *FilterManager) getFilterAndChanges(id string) (filter, interface{}, error) {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
 
 	filter, ok := f.filters[id]
 
 	if !ok {
-		return nil, ErrFilterDoesNotExists
+		return nil, nil, ErrFilterDoesNotExists
 	}
 
 	// we cannot get updates from a ws filter with getFilterChanges
 	if filter.isWS() {
-		return nil, ErrWSFilterDoesNotSupportGetChanges
+		return nil, nil, ErrWSFilterDoesNotSupportGetChanges
 	}
 
 	res, err := filter.getUpdates()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return res, nil
+	return filter, res, nil
 }
 
 // Uninstall removes the filter with given ID from list
@@ -520,6 +534,19 @@ func (f *FilterManager) removeFilterByID(id string) bool {
 	return true
 }
 
+// refreshFilterTimeout updates the timeout for a filter to the current time
+func (f *FilterManager) refreshFilterTimeout(filter *filterBase) {
+	f.timeouts.removeFilter(filter)
+	f.addFilterTimeout(filter)
+}
+
+// addFilterTimeout set timeout and add to heap
+func (f *FilterManager) addFilterTimeout(filter *filterBase) {
+	filter.expiredAt = time.Now().Add(f.timeout)
+	f.timeouts.addFilter(filter)
+	f.emitSignalToUpdateCh()
+}
+
 // addFilter is an internal method to add given filter to list and heap
 func (f *FilterManager) addFilter(filter filter) string {
 	f.lock.Lock()
@@ -531,9 +558,7 @@ func (f *FilterManager) addFilter(filter filter) string {
 
 	// Set timeout and add to heap if filter doesn't have web socket connection
 	if !filter.isWS() {
-		base.expiredAt = time.Now().Add(f.timeout)
-		f.timeouts.addFilter(base)
-		f.emitSignalToUpdateCh()
+		f.addFilterTimeout(base)
 	}
 
 	return base.id
