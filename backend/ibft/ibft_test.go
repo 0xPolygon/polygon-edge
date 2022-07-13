@@ -1,14 +1,13 @@
 package ibft
 
 import (
-	"context"
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
+	"github.com/0xPolygon/polygon-edge/backend"
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/backend"
 	"github.com/0xPolygon/polygon-edge/backend/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/helper/common"
@@ -973,14 +972,15 @@ func (s *mockSyncer) Start() error {
 	return nil
 }
 
-func (s *mockSyncer) Close() {}
+func (s *mockSyncer) Close() error {
+	return nil
+}
 
 func (s *mockSyncer) HasSyncPeer() bool {
 	return true
 }
 
 func (s *mockSyncer) BulkSync(
-	_ context.Context,
 	newBlockHandler func(block *types.Block) bool,
 ) error {
 	for _, block := range s.bulkSyncBlocksFromPeer {
@@ -997,7 +997,6 @@ func (s *mockSyncer) BulkSync(
 }
 
 func (s *mockSyncer) WatchSync(
-	ctx context.Context,
 	newBlockHandler func(*types.Block) bool,
 ) error {
 	if s.receivedNewHeadFromPeer != nil {

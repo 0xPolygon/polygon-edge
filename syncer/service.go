@@ -17,8 +17,9 @@ var (
 type syncPeerService struct {
 	proto.UnimplementedSyncPeerServer
 
-	blockchain Blockchain
-	network    Network
+	blockchain Blockchain       // reference to the blockchain module
+	network    Network          // reference to the network module
+	stream     *grpc.GrpcStream // reference to the grpc stream
 }
 
 func NewSyncPeerService(
@@ -31,16 +32,23 @@ func NewSyncPeerService(
 	}
 }
 
+// Start starts syncPeerService
 func (s *syncPeerService) Start() {
 	s.setupGRPCServer()
 }
 
-func (s *syncPeerService) setupGRPCServer() {
-	grpcStream := grpc.NewGrpcStream()
+// Close closes syncPeerService
+func (s *syncPeerService) Close() error {
+	return s.stream.Close()
+}
 
-	proto.RegisterSyncPeerServer(grpcStream.GrpcServer(), s)
-	grpcStream.Serve()
-	s.network.RegisterProtocol(SyncerProto, grpcStream)
+// setupGRPCServer setup GRPC server
+func (s *syncPeerService) setupGRPCServer() {
+	s.stream = grpc.NewGrpcStream()
+
+	proto.RegisterSyncPeerServer(s.stream.GrpcServer(), s)
+	s.stream.Serve()
+	s.network.RegisterProtocol(SyncerProto, s.stream)
 }
 
 // GetBlocks is a gRPC endpoint to return blocks from the specific height via stream
@@ -81,6 +89,7 @@ func (s *syncPeerService) GetStatus(
 	}, nil
 }
 
+// toProtoBlock converts type.Block -> proto.Block
 func toProtoBlock(block *types.Block) *proto.Block {
 	return &proto.Block{
 		Block: block.MarshalRLP(),

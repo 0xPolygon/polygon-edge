@@ -27,6 +27,7 @@ type Config struct {
 	LogLevel          string     `json:"log_level" yaml:"log_level"`
 	RestoreFile       string     `json:"restore_file" yaml:"restore_file"`
 	BlockTime         uint64     `json:"block_time_s" yaml:"block_time_s"`
+	IBFTBaseTimeout   uint64     `json:"ibft_base_time_s" yaml:"ibft_base_time_s"`
 	Headers           *Headers   `json:"headers" yaml:"headers"`
 	LogFilePath       string     `json:"log_to" yaml:"log_to"`
 }
@@ -58,8 +59,17 @@ type Headers struct {
 	AccessControlAllowOrigins []string `json:"access_control_allow_origins" yaml:"access_control_allow_origins"`
 }
 
-// minimum block generation time in seconds
-const defaultBlockTime uint64 = 2
+const (
+	// minimum block generation time in seconds
+	DefaultBlockTime uint64 = 2
+
+	// IBFT timeout in seconds
+	DefaultIBFTBaseTimeout uint64 = 10
+
+	// Multiplier to get IBFT timeout from block time
+	// timeout is calculated when IBFT timeout is not specified
+	BlockTimeMultiplierForTimeout uint64 = 5
+)
 
 // DefaultConfig returns the default server configuration
 func DefaultConfig() *Config {
@@ -85,9 +95,10 @@ func DefaultConfig() *Config {
 			PriceLimit: 0,
 			MaxSlots:   4096,
 		},
-		LogLevel:    "INFO",
-		RestoreFile: "",
-		BlockTime:   defaultBlockTime,
+		LogLevel:        "INFO",
+		RestoreFile:     "",
+		BlockTime:       DefaultBlockTime,
+		IBFTBaseTimeout: DefaultIBFTBaseTimeout,
 		Headers: &Headers{
 			AccessControlAllowOrigins: []string{"*"},
 		},

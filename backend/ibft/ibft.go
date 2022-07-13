@@ -1,7 +1,6 @@
 package ibft
 
 import (
-	"context"
 	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
@@ -94,11 +93,13 @@ type Ibft struct {
 
 	//	TODO: remove below
 
-	blockTime time.Duration // Minimum block generation time in seconds
+	blockTime       time.Duration // Minimum block generation time in seconds
+	ibftBaseTimeout time.Duration // Base timeout for IBFT message in seconds
 
 	msgQueue *msgQueue // Structure containing different message queues
 
 	updateCh chan struct{} // Update channel
+
 	// aux test methods
 	forceTimeoutCh bool
 }
@@ -149,6 +150,7 @@ func Factory(
 		metrics:            params.Metrics,
 		secretsManager:     params.SecretsManager,
 		blockTime:          time.Duration(params.BlockTime) * time.Second,
+		ibftBaseTimeout:    time.Duration(params.IBFTBaseTimeout) * time.Second,
 		syncer: syncer.NewSyncer(
 			params.Logger,
 			params.Network,
@@ -511,7 +513,7 @@ func (i *Ibft) runSyncState() {
 			continue
 		}
 
-		if err := i.syncer.BulkSync(context.Background(), func(newBlock *types.Block) bool {
+		if err := i.syncer.BulkSync(func(newBlock *types.Block) bool {
 			callInsertBlockHook(newBlock.Number())
 			i.txpool.ResetWithHeaders(newBlock.Header)
 
@@ -534,7 +536,7 @@ func (i *Ibft) runSyncState() {
 		// start watch mode
 		var isValidator bool
 
-		err := i.syncer.WatchSync(context.Background(), func(newBlock *types.Block) bool {
+		err := i.syncer.WatchSync(func(newBlock *types.Block) bool {
 			// After each written block, update the snapshot store for PoS.
 			// The snapshot store is currently updated for PoA inside the ProcessHeadersHook
 			callInsertBlockHook(newBlock.Number())
@@ -846,7 +848,7 @@ func (i *Ibft) runAcceptState() { // start new round
 	// we are NOT a proposer for the block. Then, we have to wait
 	// for a pre-prepare message from the proposer
 
-	timeout := exponentialTimeout(i.state.view.Round)
+	timeout := i.getTimeout()
 	for i.getState() == AcceptState {
 		msg, ok := i.getNextMessage(timeout)
 		if !ok {
@@ -859,14 +861,12 @@ func (i *Ibft) runAcceptState() { // start new round
 			continue
 		}
 
-		//	TODO: ~~IsProposer()
 		if msg.From != i.state.proposer.String() {
 			i.logger.Error("msg received from wrong proposer")
 
 			continue
 		}
 
-		//	TODO: ~~ IsValidBlock
 		// retrieve the block proposal
 		block := &types.Block{}
 		if err := block.UnmarshalRLP(msg.Proposal.Value); err != nil {
@@ -876,7 +876,6 @@ func (i *Ibft) runAcceptState() { // start new round
 			return
 		}
 
-		//	TODO: ~~ IsValidBlock
 		// Make sure the proposing block height match the current sequence
 		if block.Number() != i.state.view.Sequence {
 			i.logger.Error("sequence not correct", "block", block.Number, "sequence", i.state.view.Sequence)
@@ -896,8 +895,6 @@ func (i *Ibft) runAcceptState() { // start new round
 			}
 		} else {
 			// since it's a new block, we have to verify it first
-			//	TODO: ~~ IsValidBlock
-			//	TODO: just verify the header, not the sealer (again)
 			if err := i.verifyHeaderImpl(snap, parent, block.Header); err != nil {
 				i.logger.Error("block header verification failed", "err", err)
 				i.handleStateErr(errBlockVerificationFailed)
@@ -906,7 +903,6 @@ func (i *Ibft) runAcceptState() { // start new round
 			}
 
 			// Verify other block params
-			//	TODO: ~~ IsValidBlock
 			if err := i.blockchain.VerifyPotentialBlock(block); err != nil {
 				i.logger.Error("block verification failed", "err", err)
 				i.handleStateErr(errBlockVerificationFailed)
@@ -914,7 +910,6 @@ func (i *Ibft) runAcceptState() { // start new round
 				continue
 			}
 
-			//	TODO: ~~ IsValidBlock
 			if hookErr := i.runHook(VerifyBlockHook, block.Number(), block); hookErr != nil {
 				if errors.As(hookErr, &errBlockVerificationFailed) {
 					i.logger.Error("block verification failed, block at the end of epoch has transactions")
@@ -953,7 +948,7 @@ func (i *Ibft) runValidateState() {
 		}
 	}
 
-	timeout := exponentialTimeout(i.state.view.Round)
+	timeout := i.getTimeout()
 	for i.getState() == ValidateState {
 		msg, ok := i.getNextMessage(timeout)
 		if !ok {
@@ -1053,7 +1048,6 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 		committedSeals = append(committedSeals, committedSeal)
 	}
 
-	//	TODO: HEADER header mutated here
 	// Push the committed seals to the header
 	header, err := writeCommittedSeals(block.Header, committedSeals)
 	if err != nil {
@@ -1062,9 +1056,8 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 
 	// The hash needs to be recomputed since the extra data was changed
 	block.Header = header
-	block.Header.ComputeHash() // TODO: this is not needed
+	block.Header.ComputeHash()
 
-	//	TODO: this is also not needed, backend has already verified everything
 	// Verify the header only, since the block body is already verified
 	if err := i.VerifyHeader(block.Header); err != nil {
 		return err
@@ -1155,7 +1148,7 @@ func (i *Ibft) runRoundChangeState() {
 	}
 
 	// create a timer for the round change
-	timeout := exponentialTimeout(i.state.view.Round)
+	timeout := i.getTimeout()
 	for i.getState() == RoundChangeState {
 		msg, ok := i.getNextMessage(timeout)
 		if !ok {
@@ -1167,7 +1160,7 @@ func (i *Ibft) runRoundChangeState() {
 			i.logger.Debug("round change timeout")
 			checkTimeout()
 			// update the timeout duration
-			timeout = exponentialTimeout(i.state.view.Round)
+			timeout = i.getTimeout()
 
 			continue
 		}
@@ -1178,7 +1171,8 @@ func (i *Ibft) runRoundChangeState() {
 		if num == i.state.validators.MaxFaultyNodes()+1 && i.state.view.Round < msg.View.Round {
 			// weak certificate, try to catch up if our round number is smaller
 			// update timer
-			timeout = exponentialTimeout(i.state.view.Round)
+			timeout = i.getTimeout()
+
 			sendRoundChange(msg.View.Round)
 		} else if num == i.quorumSize(i.state.view.Sequence)(i.state.validators) {
 			// start a new round immediately
@@ -1402,7 +1396,9 @@ func (i *Ibft) Close() error {
 	}
 
 	if i.syncer != nil {
-		i.syncer.Close()
+		if err := i.syncer.Close(); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -1451,6 +1447,11 @@ func (i *Ibft) pushMessage(msg *proto.MessageReq) {
 	case i.updateCh <- struct{}{}:
 	default:
 	}
+}
+
+// getTimeout returns the IBFT timeout based on round and config
+func (i *Ibft) getTimeout() time.Duration {
+	return exponentialTimeout(i.state.view.Round, i.ibftBaseTimeout)
 }
 
 // startNewSequence changes the sequence and resets the round in the view of state

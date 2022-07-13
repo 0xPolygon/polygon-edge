@@ -62,7 +62,7 @@ func TestDispatcher_HandleWebsocketConnection_EthSubscribe(t *testing.T) {
 		t.Parallel()
 
 		store := newMockStore()
-		dispatcher := newDispatcher(hclog.NewNullLogger(), store, 0)
+		dispatcher := newDispatcher(hclog.NewNullLogger(), store, 0, 0)
 
 		mockConnection := &mockWsConn{
 			msgCh: make(chan []byte, 1),
@@ -96,7 +96,7 @@ func TestDispatcher_HandleWebsocketConnection_EthSubscribe(t *testing.T) {
 
 func TestDispatcher_WebsocketConnection_RequestFormats(t *testing.T) {
 	store := newMockStore()
-	dispatcher := newDispatcher(hclog.NewNullLogger(), store, 0)
+	dispatcher := newDispatcher(hclog.NewNullLogger(), store, 0, 0)
 
 	mockConnection := &mockWsConn{
 		msgCh: make(chan []byte, 1),
@@ -181,7 +181,7 @@ func (m *mockService) Type(addr types.Address) (interface{}, error) {
 	return nil, nil
 }
 
-func (m *mockService) BlockPtr(a string, f *BlockNumber) (interface{}, error) {
+func (m *mockService) BlockPtr(_ string, f *BlockNumber) (interface{}, error) {
 	if f == nil {
 		m.msgCh <- nil
 	} else {
@@ -200,7 +200,7 @@ func (m *mockService) Filter(f LogQuery) (interface{}, error) {
 func TestDispatcherFuncDecode(t *testing.T) {
 	srv := &mockService{msgCh: make(chan interface{}, 10)}
 
-	dispatcher := newDispatcher(hclog.NewNullLogger(), newMockStore(), 0)
+	dispatcher := newDispatcher(hclog.NewNullLogger(), newMockStore(), 0, 0)
 	dispatcher.registerService("mock", srv)
 
 	handleReq := func(typ string, msg string) interface{} {
@@ -266,7 +266,7 @@ func TestDispatcherFuncDecode(t *testing.T) {
 }
 
 func TestDispatcherBatchRequest(t *testing.T) {
-	dispatcher := newDispatcher(hclog.NewNullLogger(), newMockStore(), 0)
+	dispatcher := newDispatcher(hclog.NewNullLogger(), newMockStore(), 0, 0)
 
 	// test with leading whitespace ("  \t\n\n\r")
 	leftBytes := []byte{0x20, 0x20, 0x09, 0x0A, 0x0A, 0x0D}

@@ -2,7 +2,9 @@ package ibftswitch
 
 import (
 	"fmt"
+
 	"github.com/0xPolygon/polygon-edge/command"
+	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/spf13/cobra"
 )
 
@@ -15,7 +17,7 @@ func GetCommand() *cobra.Command {
 	}
 
 	setFlags(ibftSwitchCmd)
-	setRequiredFlags(ibftSwitchCmd)
+	helper.SetRequiredFlags(ibftSwitchCmd, params.getRequiredFlags())
 
 	return ibftSwitchCmd
 }
@@ -25,10 +27,7 @@ func setFlags(cmd *cobra.Command) {
 		&params.genesisPath,
 		chainFlag,
 		fmt.Sprintf("./%s", command.DefaultGenesisFileName),
-		fmt.Sprintf(
-			"the genesis file to update. Default: ./%s",
-			command.DefaultGenesisFileName,
-		),
+		"the genesis file to update",
 	)
 
 	cmd.Flags().StringVar(
@@ -51,24 +50,20 @@ func setFlags(cmd *cobra.Command) {
 		"",
 		"the height to switch the new type",
 	)
+
 	cmd.Flags().StringVar(
 		&params.minValidatorCountRaw,
 		minValidatorCount,
 		"",
 		"the minimum number of validators in the validator set for PoS",
 	)
+
 	cmd.Flags().StringVar(
 		&params.maxValidatorCountRaw,
 		maxValidatorCount,
 		"",
 		"the maximum number of validators in the validator set for PoS",
 	)
-}
-
-func setRequiredFlags(cmd *cobra.Command) {
-	for _, requiredFlag := range params.getRequiredFlags() {
-		_ = cmd.MarkFlagRequired(requiredFlag)
-	}
 }
 
 func runPreRun(_ *cobra.Command, _ []string) error {

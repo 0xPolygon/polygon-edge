@@ -1,7 +1,6 @@
 package syncer
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -22,8 +21,8 @@ var (
 	errTimeout = errors.New("timeout awaiting block from peer")
 )
 
-// XXX: Don't use this syncer for the backend that may cause fork.
-// This syncer doesn't assume fork. Backend may be broken.
+// XXX: Don't use this syncer for the consensus that may cause fork.
+// This syncer doesn't assume fork. Consensus may be broken.
 // TODO: Add extensibility for fork before merge
 type syncer struct {
 	logger          hclog.Logger
@@ -68,28 +67,35 @@ func (s *syncer) Start() error {
 	s.syncPeerService.Start()
 
 	go s.initializePeerMap()
+	go s.startPeerStatusUpdateProcess()
 	go s.startPeerConnectionEventProcess()
 
 	return nil
 }
 
 // Close terminates goroutine processes
-func (s *syncer) Close() {
+func (s *syncer) Close() error {
 	close(s.newStatusCh)
+
+	if err := s.syncPeerService.Close(); err != nil {
+		return err
+	}
+
+	s.syncPeerClient.Close()
+
+	return nil
 }
 
 // initializePeerMap fetches peer statuses and initializes map
 func (s *syncer) initializePeerMap() {
 	peerStatuses := s.syncPeerClient.GetConnectedPeerStatuses()
-	s.peerMap.PutPeers(peerStatuses)
+	s.peerMap.Put(peerStatuses...)
+}
 
+// startPeerStatusUpdateProcess subscribes peer status change event and updates peer map
+func (s *syncer) startPeerStatusUpdateProcess() {
 	for peerStatus := range s.syncPeerClient.GetPeerStatusUpdateCh() {
-		s.peerMap.Put(peerStatus)
-
-		select {
-		case s.newStatusCh <- struct{}{}:
-		default:
-		}
+		s.putToPeerMap(peerStatus)
 	}
 }
 
@@ -100,24 +106,41 @@ func (s *syncer) startPeerConnectionEventProcess() {
 
 		switch e.Type {
 		case event.PeerConnected:
-			go func() {
-				status, err := s.syncPeerClient.GetPeerStatus(peerID)
-				if err != nil {
-					s.logger.Warn("failed to get peer status, skip", "id", peerID, "err", err)
-
-					return
-				}
-
-				s.peerMap.Put(status)
-
-				select {
-				case s.newStatusCh <- struct{}{}:
-				default:
-				}
-			}()
+			go s.initNewPeerStatus(peerID)
 		case event.PeerDisconnected:
-			s.peerMap.Remove(peerID)
+			s.removeFromPeerMap(peerID)
 		}
+	}
+}
+
+// initNewPeerStatus fetches status of the peer and put to peer map
+func (s *syncer) initNewPeerStatus(peerID peer.ID) {
+	status, err := s.syncPeerClient.GetPeerStatus(peerID)
+	if err != nil {
+		s.logger.Warn("failed to get peer status, skip", "id", peerID, "err", err)
+
+		return
+	}
+
+	s.putToPeerMap(status)
+}
+
+// putToPeerMap puts given status to peer map
+func (s *syncer) putToPeerMap(status *NoForkPeer) {
+	s.peerMap.Put(status)
+	s.notifyNewStatusEvent()
+}
+
+// removeFromPeerMap removes the peer from peer map
+func (s *syncer) removeFromPeerMap(peerID peer.ID) {
+	s.peerMap.Remove(peerID)
+}
+
+// notifyNewStatusEvent emits signal to newStatusCh
+func (s *syncer) notifyNewStatusEvent() {
+	select {
+	case s.newStatusCh <- struct{}{}:
+	default:
 	}
 }
 
@@ -129,17 +152,13 @@ func (s *syncer) GetSyncProgression() *progress.Progression {
 // HasSyncPeer returns whether syncer has the peer to syncs blocks
 // return false if syncer has no peer whose latest block height doesn't exceed local height
 func (s *syncer) HasSyncPeer() bool {
-	if s.peerMap == nil {
-		return false
-	}
-
 	bestPeer := s.peerMap.BestPeer(nil)
 	header := s.blockchain.Header()
 
 	return bestPeer != nil && bestPeer.Number > header.Number
 }
 
-func (s *syncer) BulkSync(ctx context.Context, newBlockCallback func(*types.Block) bool) error {
+func (s *syncer) BulkSync(newBlockCallback func(*types.Block) bool) error {
 	localLatest := uint64(0)
 	updateLocalLatest := func() {
 		if header := s.blockchain.Header(); header != nil {
@@ -149,11 +168,17 @@ func (s *syncer) BulkSync(ctx context.Context, newBlockCallback func(*types.Bloc
 
 	updateLocalLatest()
 
+	// Stop publishing status in topic while in bulkSync
+	s.syncPeerClient.DisablePublishingPeerStatus()
+
 	// Create a blockchain subscription for the sync progression and start tracking
 	s.syncProgression.StartProgression(localLatest+1, s.blockchain.SubscribeEvents())
 
 	// Stop monitoring the sync progression upon exit
-	defer s.syncProgression.StopProgression()
+	defer func() {
+		s.syncProgression.StopProgression()
+		s.syncPeerClient.EnablePublishingPeerStatus()
+	}()
 
 	skipList := make(map[peer.ID]bool)
 
@@ -168,8 +193,7 @@ func (s *syncer) BulkSync(ctx context.Context, newBlockCallback func(*types.Bloc
 
 		lastNumber, _, err := s.bulkSyncWithPeer(bestPeer.ID, newBlockCallback)
 		if err != nil {
-			s.logger.Warn("Error ", err)
-			s.logger.Warn("failed to complete bulk sync with peer, try to next one", "peer ID", bestPeer.ID)
+			s.logger.Warn("failed to complete bulk sync with peer, try to next one", "peer ID", "error", bestPeer.ID, err)
 		}
 
 		// if node could sync with the peer fully, then exit loop
@@ -186,11 +210,10 @@ func (s *syncer) BulkSync(ctx context.Context, newBlockCallback func(*types.Bloc
 }
 
 // WatchSync syncs block with the best peer until callback returns true
-func (s *syncer) WatchSync(ctx context.Context, callback func(*types.Block) bool) error {
+func (s *syncer) WatchSync(callback func(*types.Block) bool) error {
 	localLatest := s.blockchain.Header().Number
 	skipList := make(map[peer.ID]bool)
 
-	// Loop until context is canceled
 	for {
 		//Wait for a new event to arrive
 		<-s.newStatusCh
@@ -217,11 +240,10 @@ func (s *syncer) WatchSync(ctx context.Context, callback func(*types.Block) bool
 		// fetch block from the peer
 		lastNumber, shouldTerminate, err := s.bulkSyncWithPeer(bestPeer.ID, callback)
 		if err != nil {
-			s.logger.Warn("Error ", err)
-			s.logger.Warn("failed to complete bulk sync with peer, try to next one", "peer ID", bestPeer.ID)
+			s.logger.Warn("failed to complete bulk sync with peer, try to next one", "peer ID", "error", bestPeer.ID, err)
 		}
 
-		if err != nil || lastNumber < bestPeer.Number {
+		if lastNumber < bestPeer.Number {
 			skipList[bestPeer.ID] = true
 
 			// continue to next peer

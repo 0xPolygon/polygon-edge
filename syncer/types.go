@@ -1,7 +1,6 @@
 package syncer
 
 import (
-	"context"
 	"math/big"
 	"time"
 
@@ -57,15 +56,15 @@ type Syncer interface {
 	// Start starts syncer processes
 	Start() error
 	// Close terminates syncer process
-	Close()
+	Close() error
 	// GetSyncProgression returns sync progression
 	GetSyncProgression() *progress.Progression
 	// HasSyncPeer returns whether syncer has the peer syncer can sync with
 	HasSyncPeer() bool
 	// BulkSync syncs blocks to the peer's latest
-	BulkSync(context.Context, func(*types.Block) bool) error
+	BulkSync(func(*types.Block) bool) error
 	// WatchSync starts routine to sync blocks
-	WatchSync(context.Context, func(*types.Block) bool) error
+	WatchSync(func(*types.Block) bool) error
 }
 
 type Progression interface {
@@ -82,6 +81,8 @@ type Progression interface {
 type SyncPeerService interface {
 	// Start starts server
 	Start()
+	// Close terminates running processes for SyncPeerService
+	Close() error
 }
 
 type SyncPeerClient interface {
@@ -101,4 +102,8 @@ type SyncPeerClient interface {
 	GetPeerConnectionUpdateEventCh() <-chan *event.PeerEvent
 	// CloseStream close a stream
 	CloseStream(peerID peer.ID) error
+	// DisablePublishingPeerStatus disables publishing status in syncer topic
+	DisablePublishingPeerStatus()
+	// EnablePublishingPeerStatus enables publishing status in syncer topic
+	EnablePublishingPeerStatus()
 }

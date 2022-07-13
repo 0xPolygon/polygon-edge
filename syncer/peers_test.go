@@ -92,7 +92,7 @@ func TestConstructor(t *testing.T) {
 	)
 }
 
-func TestPutPeers(t *testing.T) {
+func TestPutPeer(t *testing.T) {
 	t.Parallel()
 
 	initialPeers := peers[:1]
@@ -100,34 +100,10 @@ func TestPutPeers(t *testing.T) {
 
 	peerMap := NewPeerMap(initialPeers)
 
-	peerMap.PutPeers(peers)
+	peerMap.Put(peers...)
 
 	expected := sortNoForkPeers(
 		cloneNoForkPeers(append(initialPeers, peers...)),
-	)
-
-	actual := peerMapToPeers(peerMap)
-
-	assert.Equal(
-		t,
-		expected,
-		actual,
-	)
-}
-
-func TestPutPeer(t *testing.T) {
-	t.Parallel()
-
-	initialPeers := peers[:1]
-
-	peer := peers[1]
-
-	peerMap := NewPeerMap(initialPeers)
-
-	peerMap.Put(peer)
-
-	expected := sortNoForkPeers(
-		cloneNoForkPeers(append(initialPeers, peer)),
 	)
 
 	actual := peerMapToPeers(peerMap)

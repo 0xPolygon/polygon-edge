@@ -242,3 +242,9 @@ func WriteGenesisConfigToDisk(genesisConfig *chain.Chain, genesisPath string) er
 
 	return nil
 }
+
+func SetRequiredFlags(cmd *cobra.Command, requiredFlags []string) {
+	for _, requiredFlag := range requiredFlags {
+		_ = cmd.MarkFlagRequired(requiredFlag)
+	}
+}

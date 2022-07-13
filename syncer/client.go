@@ -2,7 +2,9 @@ package syncer
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"sync"
 	"time"
 
@@ -23,15 +25,17 @@ const (
 )
 
 type syncPeerClient struct {
-	logger     hclog.Logger
-	network    Network
-	blockchain Blockchain
+	logger     hclog.Logger // logger used for console logging
+	network    Network      // reference to the network module
+	blockchain Blockchain   // reference to the blockchain module
 
-	subscription           blockchain.Subscription
-	topic                  *network.Topic
-	id                     string // node ID
-	peerStatusUpdateCh     chan *NoForkPeer
-	peerConnectionUpdateCh chan *event.PeerEvent
+	subscription           blockchain.Subscription //reference to the blockchain subscription
+	topic                  *network.Topic          //reference to the network topic
+	id                     string                  //node id
+	peerStatusUpdateCh     chan *NoForkPeer        // peer status update channel
+	peerConnectionUpdateCh chan *event.PeerEvent   // peer connection update channel
+
+	shouldEmitBlocks bool // flag for emitting blocks in the topic
 }
 
 func NewSyncPeerClient(
@@ -46,6 +50,7 @@ func NewSyncPeerClient(
 		id:                     network.AddrInfo().ID.String(),
 		peerStatusUpdateCh:     make(chan *NoForkPeer, 1),
 		peerConnectionUpdateCh: make(chan *event.PeerEvent, 1),
+		shouldEmitBlocks:       true,
 	}
 }
 
@@ -71,6 +76,16 @@ func (m *syncPeerClient) Close() {
 
 	close(m.peerStatusUpdateCh)
 	close(m.peerConnectionUpdateCh)
+}
+
+// DisablePublishingPeerStatus disables publishing own status via gossip
+func (m *syncPeerClient) DisablePublishingPeerStatus() {
+	m.shouldEmitBlocks = false
+}
+
+// EnablePublishingPeerStatus enables publishing own status via gossip
+func (m *syncPeerClient) EnablePublishingPeerStatus() {
+	m.shouldEmitBlocks = true
 }
 
 // GetPeerStatus fetches peer status
@@ -169,7 +184,7 @@ func (m *syncPeerClient) handleStatusUpdate(obj interface{}, from peer.ID) {
 
 	if !m.network.IsConnected(from) {
 		if m.id != from.String() {
-			m.logger.Warn("received status from non-connected peer, ignore", "id", from)
+			m.logger.Debug("received status from non-connected peer, ignore", "id", from)
 		}
 
 		return
@@ -187,9 +202,12 @@ func (m *syncPeerClient) startNewBlockProcess() {
 	m.subscription = m.blockchain.SubscribeEvents()
 
 	for event := range m.subscription.GetEventCh() {
+		if !m.shouldEmitBlocks {
+			continue
+		}
+
 		if l := len(event.NewChain); l > 0 {
 			latest := event.NewChain[l-1]
-
 			// Publish status
 			if err := m.topic.Publish(&proto.SyncPeerStatus{
 				Number: latest.Number,
@@ -307,6 +325,10 @@ func blockStreamToChannel(stream proto.SyncPeer_GetBlocksClient) (<-chan *types.
 
 		for {
 			protoBlock, err := stream.Recv()
+			if errors.Is(err, io.EOF) {
+				break
+			}
+
 			if err != nil {
 				errorCh <- err
 

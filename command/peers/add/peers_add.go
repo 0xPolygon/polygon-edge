@@ -15,7 +15,7 @@ func GetCommand() *cobra.Command {
 	}
 
 	setFlags(peersAddCmd)
-	setRequiredFlags(peersAddCmd)
+	helper.SetRequiredFlags(peersAddCmd, params.getRequiredFlags())
 
 	return peersAddCmd
 }
@@ -27,12 +27,6 @@ func setFlags(cmd *cobra.Command) {
 		[]string{},
 		"the libp2p addresses of the peers",
 	)
-}
-
-func setRequiredFlags(cmd *cobra.Command) {
-	for _, requiredFlag := range params.getRequiredFlags() {
-		_ = cmd.MarkFlagRequired(requiredFlag)
-	}
 }
 
 func runPreRun(_ *cobra.Command, _ []string) error {

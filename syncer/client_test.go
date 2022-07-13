@@ -1,6 +1,7 @@
 package syncer
 
 import (
+	"context"
 	"sync"
 	"testing"
 	"time"
@@ -306,6 +307,10 @@ func TestPeerConnectionUpdateEventCh(t *testing.T) {
 	// need to wait for a few seconds to propagate subscribing
 	time.Sleep(2 * time.Second)
 
+	// enable peers to send own status via gossip
+	peerClient1.EnablePublishingPeerStatus()
+	peerClient2.EnablePublishingPeerStatus()
+
 	// start to subscribe blockchain events
 	go peerClient1.startNewBlockProcess()
 	go peerClient2.startNewBlockProcess()
@@ -331,7 +336,7 @@ func TestPeerConnectionUpdateEventCh(t *testing.T) {
 		sub.Push(&blockchain.Event{
 			NewChain: []*types.Header{
 				{
-					Number: peerLatest1,
+					Number: latest,
 				},
 			},
 		})
@@ -361,6 +366,103 @@ func TestPeerConnectionUpdateEventCh(t *testing.T) {
 	}
 
 	assert.Equal(t, expected, newStatuses)
+}
+
+// Make sure the peer shouldn't emit status if the shouldEmitBlocks flag is set
+func Test_shouldEmitBlocks(t *testing.T) {
+	var (
+		// network layer
+		clientSrv = newTestNetwork(t)
+		peerSrv   = newTestNetwork(t)
+
+		clientLatest = uint64(10)
+
+		subscription = blockchain.NewMockSubscription()
+
+		client = newTestSyncPeerClient(clientSrv, &mockBlockchain{
+			subscription:  subscription,
+			headerHandler: newSimpleHeaderHandler(clientLatest),
+		})
+	)
+
+	t.Cleanup(func() {
+		clientSrv.Close()
+		peerSrv.Close()
+		client.Close()
+	})
+
+	err := network.JoinAndWaitMultiple(
+		network.DefaultJoinTimeout,
+		clientSrv,
+		peerSrv,
+	)
+
+	assert.NoError(t, err)
+
+	// start gossip
+	assert.NoError(t, client.startGossip())
+
+	// start to subscribe blockchain events
+	go client.startNewBlockProcess()
+
+	// push latest block number to blockchain subscription
+	pushSubscription := func(sub *blockchain.MockSubscription, latest uint64) {
+		sub.Push(&blockchain.Event{
+			NewChain: []*types.Header{
+				{
+					Number: latest,
+				},
+			},
+		})
+	}
+
+	waitForContext := func(ctx context.Context) bool {
+		select {
+		case <-ctx.Done():
+			return true
+		case <-time.After(5 * time.Second):
+			return false
+		}
+	}
+
+	// create topic & subscribe in peer
+	topic, err := peerSrv.NewTopic(statusTopicName, &proto.SyncPeerStatus{})
+	assert.NoError(t, err)
+
+	testGossip := func(t *testing.T, shouldEmit bool) {
+		t.Helper()
+
+		// context to be canceled when receiving status
+		receiveContext, cancelContext := context.WithCancel(context.Background())
+		defer cancelContext()
+
+		assert.NoError(t, topic.Subscribe(func(_ interface{}, id peer.ID) {
+			cancelContext()
+		}))
+
+		// need to wait for a few seconds to propagate subscribing
+		time.Sleep(2 * time.Second)
+
+		if shouldEmit {
+			client.EnablePublishingPeerStatus()
+		} else {
+			client.DisablePublishingPeerStatus()
+		}
+
+		pushSubscription(subscription, clientLatest)
+
+		canceled := waitForContext(receiveContext)
+
+		assert.Equal(t, shouldEmit, canceled)
+	}
+
+	t.Run("should send own status via gossip if shouldEmitBlocks is set", func(t *testing.T) {
+		testGossip(t, true)
+	})
+
+	t.Run("shouldn't send own status via gossip if shouldEmitBlocks is reset", func(t *testing.T) {
+		testGossip(t, false)
+	})
 }
 
 func Test_syncPeerClient_GetBlocks(t *testing.T) {

@@ -31,19 +31,15 @@ type PeerMap struct {
 func NewPeerMap(peers []*NoForkPeer) *PeerMap {
 	peerMap := new(PeerMap)
 
-	peerMap.PutPeers(peers)
+	peerMap.Put(peers...)
 
 	return peerMap
 }
 
-func (m *PeerMap) PutPeers(peers []*NoForkPeer) {
-	for _, p := range peers {
-		m.Put(p)
+func (m *PeerMap) Put(peers ...*NoForkPeer) {
+	for _, peer := range peers {
+		m.Store(peer.ID.String(), peer)
 	}
-}
-
-func (m *PeerMap) Put(peer *NoForkPeer) {
-	m.Store(peer.ID.String(), peer)
 }
 
 // Remove removes a peer from heap if it exists
