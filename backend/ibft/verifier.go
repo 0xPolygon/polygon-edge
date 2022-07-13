@@ -1,6 +1,7 @@
 package ibft
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -72,7 +73,21 @@ func (i *Ibft) IsValidBlock(proposal []byte) bool {
 //}
 
 func (i *Ibft) IsProposer(id []byte, height, round uint64) bool {
-	return false
+	//	TODO: maybe this should just be i.blockchain.Header()
+	//		to fetch the latest header available, because fetching
+	//		the previousProposer from any earlier block does not make much sense
+	//		and it's also not how things work in the old version
+	previousHeader, _ := i.blockchain.GetHeaderByNumber(height - 1)
+
+	previousProposer := i.getProposer(previousHeader)
+
+	nextProposer := i.currentValidatorSet.CalcProposer(round, previousProposer)
+
+	if !bytes.Equal(nextProposer.Bytes(), id) {
+		return false
+	}
+
+	return true
 }
 
 func (i *Ibft) IsValidProposalHash(proposal, hash []byte) bool {
@@ -81,4 +96,16 @@ func (i *Ibft) IsValidProposalHash(proposal, hash []byte) bool {
 
 func (i *Ibft) IsValidCommittedSeal(proposal, seal []byte) bool {
 	return false
+}
+
+//	helpers
+
+func (i *Ibft) getProposer(header *types.Header) types.Address {
+	if header.Number == 0 {
+		return types.Address{}
+	}
+
+	proposer, _ := ecrecoverFromHeader(header)
+
+	return proposer
 }
