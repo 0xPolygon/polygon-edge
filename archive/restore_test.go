@@ -10,7 +10,6 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
-	"github.com/0xPolygon/polygon-edge/protocol"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
 )
@@ -56,8 +55,12 @@ func (m *mockChain) WriteBlock(block *types.Block) error {
 	return nil
 }
 
+func (m *mockChain) VerifyFinalizedBlock(block *types.Block) error {
+	return nil
+}
+
 func (m *mockChain) SubscribeEvents() blockchain.Subscription {
-	return protocol.NewMockSubscription()
+	return blockchain.NewMockSubscription()
 }
 
 func getLatestBlockFromMockChain(m *mockChain) *types.Block {

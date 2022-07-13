@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"io"
+	"time"
 
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -118,6 +119,15 @@ func (p *PubSub) handleNewPeer(ctx context.Context, pid peer.ID, outgoing <-chan
 	select {
 	case p.newPeerStream <- s:
 	case <-ctx.Done():
+	}
+}
+
+func (p *PubSub) handleNewPeerWithBackoff(ctx context.Context, pid peer.ID, backoff time.Duration, outgoing <-chan *RPC) {
+	select {
+	case <-time.After(backoff):
+		p.handleNewPeer(ctx, pid, outgoing)
+	case <-ctx.Done():
+		return
 	}
 }
 

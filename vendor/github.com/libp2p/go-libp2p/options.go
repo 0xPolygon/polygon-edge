@@ -250,15 +250,10 @@ func EnableRelayService(opts ...relayv2.Option) Option {
 //
 // This subsystem performs automatic address rewriting to advertise relay addresses when it
 // detects that the node is publicly unreachable (e.g. behind a NAT).
-func EnableAutoRelay(opts ...autorelay.StaticRelayOption) Option {
+func EnableAutoRelay(opts ...autorelay.Option) Option {
 	return func(cfg *Config) error {
-		if len(opts) > 0 {
-			if len(opts) > 1 {
-				return errors.New("only expected a single static relay configuration option")
-			}
-			cfg.StaticRelayOpt = opts[0]
-		}
 		cfg.EnableAutoRelay = true
+		cfg.AutoRelayOpts = opts
 		return nil
 	}
 }
@@ -269,7 +264,7 @@ func EnableAutoRelay(opts ...autorelay.StaticRelayOption) Option {
 // Deprecated: pass an autorelay.WithStaticRelays option to EnableAutoRelay.
 func StaticRelays(relays []peer.AddrInfo) Option {
 	return func(cfg *Config) error {
-		cfg.StaticRelayOpt = autorelay.WithStaticRelays(relays)
+		cfg.AutoRelayOpts = append(cfg.AutoRelayOpts, autorelay.WithStaticRelays(relays))
 		return nil
 	}
 }

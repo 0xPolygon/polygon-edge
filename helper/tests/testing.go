@@ -9,6 +9,7 @@ import (
 	libp2pCrypto "github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/multiformats/go-multiaddr"
+	"github.com/umbracle/ethgo"
 	"math/big"
 	"net"
 	"testing"
@@ -18,8 +19,7 @@ import (
 	txpoolOp "github.com/0xPolygon/polygon-edge/txpool/proto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
-	"github.com/umbracle/go-web3"
-	"github.com/umbracle/go-web3/jsonrpc"
+	"github.com/umbracle/ethgo/jsonrpc"
 	empty "google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -130,7 +130,7 @@ func WaitUntilTxPoolEmpty(
 func WaitForNonce(
 	ctx context.Context,
 	ethClient *jsonrpc.Eth,
-	addr web3.Address,
+	addr ethgo.Address,
 	expectedNonce uint64,
 ) (
 	interface{},
@@ -142,7 +142,7 @@ func WaitForNonce(
 	}
 
 	resObj, err := RetryUntilTimeout(ctx, func() (interface{}, bool) {
-		nonce, err := ethClient.GetNonce(addr, web3.Latest)
+		nonce, err := ethClient.GetNonce(addr, ethgo.Latest)
 		if err != nil {
 			//	error -> stop retrying
 			return result{nonce, err}, false
@@ -170,9 +170,9 @@ func WaitForNonce(
 }
 
 // WaitForReceipt waits transaction receipt
-func WaitForReceipt(ctx context.Context, client *jsonrpc.Eth, hash web3.Hash) (*web3.Receipt, error) {
+func WaitForReceipt(ctx context.Context, client *jsonrpc.Eth, hash ethgo.Hash) (*ethgo.Receipt, error) {
 	type result struct {
-		receipt *web3.Receipt
+		receipt *ethgo.Receipt
 		err     error
 	}
 

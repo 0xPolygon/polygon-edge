@@ -20,13 +20,15 @@ import (
 	"github.com/libp2p/go-libp2p-core/protocol"
 
 	logging "github.com/ipfs/go-log"
-	timecache "github.com/whyrusleeping/timecache"
+	"github.com/whyrusleeping/timecache"
 )
 
 // DefaultMaximumMessageSize is 1mb.
 const DefaultMaxMessageSize = 1 << 20
 
 var (
+	// TimeCacheDuration specifies how long a message ID will be remembered as seen.
+	// Use WithSeenMessagesTTL to configure this per pubsub instance, instead of overriding the global default.
 	TimeCacheDuration = 120 * time.Second
 
 	// ErrSubscriptionCancelled may be returned when a subscription Next() is called after the
@@ -110,6 +112,8 @@ type PubSub struct {
 	peerDeadPrioLk sync.RWMutex
 	peerDeadMx     sync.Mutex
 	peerDeadPend   map[peer.ID]struct{}
+	// backoff for retrying new connections to dead peers
+	deadPeerBackoff *backoff
 
 	// The set of topics we are subscribed to
 	mySubs map[string]map[*Subscription]struct{}
@@ -146,9 +150,10 @@ type PubSub struct {
 
 	seenMessagesMx sync.Mutex
 	seenMessages   *timecache.TimeCache
+	seenMsgTTL     time.Duration
 
-	// function used to compute the ID for a message
-	msgID MsgIdFunction
+	// generator used to compute the ID for a message
+	idGen *msgIDGenerator
 
 	// key for signing messages; nil when signing is disabled
 	signKey crypto.PrivKey
@@ -213,6 +218,7 @@ const (
 
 type Message struct {
 	*pb.Message
+	ID            string
 	ReceivedFrom  peer.ID
 	ValidatorData interface{}
 }
@@ -251,6 +257,7 @@ func NewPubSub(ctx context.Context, h host.Host, rt PubSubRouter, opts ...Option
 		newPeerError:          make(chan peer.ID),
 		peerDead:              make(chan struct{}, 1),
 		peerDeadPend:          make(map[peer.ID]struct{}),
+		deadPeerBackoff:       newBackoff(ctx, 1000, BackoffCleanupInterval, MaxBackoffAttempts),
 		cancelCh:              make(chan *Subscription),
 		getPeers:              make(chan *listPeerReq),
 		addSub:                make(chan *addSubReq),
@@ -271,8 +278,8 @@ func NewPubSub(ctx context.Context, h host.Host, rt PubSubRouter, opts ...Option
 		inboundStreams:        make(map[peer.ID]network.Stream),
 		blacklist:             NewMapBlacklist(),
 		blacklistPeer:         make(chan peer.ID),
-		seenMessages:          timecache.NewTimeCache(TimeCacheDuration),
-		msgID:                 DefaultMsgIdFn,
+		seenMsgTTL:            TimeCacheDuration,
+		idGen:                 newMsgIdGenerator(),
 		counter:               uint64(time.Now().UnixNano()),
 	}
 
@@ -292,6 +299,8 @@ func NewPubSub(ctx context.Context, h host.Host, rt PubSubRouter, opts ...Option
 			return nil, fmt.Errorf("can't sign for peer %s: no private key", ps.signID)
 		}
 	}
+
+	ps.seenMessages = timecache.NewTimeCache(ps.seenMsgTTL)
 
 	if err := ps.disc.Start(ps); err != nil {
 		return nil, err
@@ -326,11 +335,7 @@ type MsgIdFunction func(pmsg *pb.Message) string
 // but it can be customized to e.g. the hash of the message.
 func WithMessageIdFn(fn MsgIdFunction) Option {
 	return func(p *PubSub) error {
-		p.msgID = fn
-		// the tracer Option may already be set. Update its message ID function to make options order-independent.
-		if p.tracer != nil {
-			p.tracer.msgID = fn
-		}
+		p.idGen.Default = fn
 		return nil
 	}
 }
@@ -455,7 +460,7 @@ func WithEventTracer(tracer EventTracer) Option {
 		if p.tracer != nil {
 			p.tracer.tracer = tracer
 		} else {
-			p.tracer = &pubsubTracer{tracer: tracer, pid: p.host.ID(), msgID: p.msgID}
+			p.tracer = &pubsubTracer{tracer: tracer, pid: p.host.ID(), idGen: p.idGen}
 		}
 		return nil
 	}
@@ -468,7 +473,7 @@ func WithRawTracer(tracer RawTracer) Option {
 		if p.tracer != nil {
 			p.tracer.raw = append(p.tracer.raw, tracer)
 		} else {
-			p.tracer = &pubsubTracer{raw: []RawTracer{tracer}, pid: p.host.ID(), msgID: p.msgID}
+			p.tracer = &pubsubTracer{raw: []RawTracer{tracer}, pid: p.host.ID(), idGen: p.idGen}
 		}
 		return nil
 	}
@@ -509,6 +514,14 @@ func WithMaxMessageSize(maxMessageSize int) Option {
 func WithProtocolMatchFn(m ProtocolMatchFn) Option {
 	return func(ps *PubSub) error {
 		ps.protoMatchFunc = m
+		return nil
+	}
+}
+
+// WithSeenMessagesTTL configures when a previously seen message ID can be forgotten about
+func WithSeenMessagesTTL(ttl time.Duration) Option {
+	return func(ps *PubSub) error {
+		ps.seenMsgTTL = ttl
 		return nil
 	}
 }
@@ -684,12 +697,18 @@ func (p *PubSub) handleDeadPeers() {
 		close(ch)
 
 		if p.host.Network().Connectedness(pid) == network.Connected {
+			backoffDelay, err := p.deadPeerBackoff.updateAndGet(pid)
+			if err != nil {
+				log.Debug(err)
+				continue
+			}
+
 			// still connected, must be a duplicate connection being closed.
 			// we respawn the writer as we need to ensure there is a stream active
 			log.Debugf("peer declared dead but still connected; respawning writer: %s", pid)
 			messages := make(chan *RPC, p.peerOutboundQueueSize)
 			messages <- p.getHelloPacket()
-			go p.handleNewPeer(p.ctx, pid, messages)
+			go p.handleNewPeerWithBackoff(p.ctx, pid, backoffDelay, messages)
 			p.peers[pid] = messages
 			continue
 		}
@@ -1047,8 +1066,7 @@ func (p *PubSub) handleIncomingRPC(rpc *RPC) {
 				continue
 			}
 
-			msg := &Message{pmsg, rpc.from, nil}
-			p.pushMsg(msg)
+			p.pushMsg(&Message{pmsg, "", rpc.from, nil})
 		}
 	}
 
@@ -1097,7 +1115,7 @@ func (p *PubSub) pushMsg(msg *Message) {
 	}
 
 	// have we already seen and validated this message?
-	id := p.msgID(msg.Message)
+	id := p.idGen.ID(msg)
 	if p.seenMessage(id) {
 		p.tracer.DuplicateMessage(msg)
 		return
@@ -1163,6 +1181,14 @@ type rmTopicReq struct {
 type TopicOptions struct{}
 
 type TopicOpt func(t *Topic) error
+
+// WithTopicMessageIdFn sets custom MsgIdFunction for a Topic, enabling topics to have own msg id generation rules.
+func WithTopicMessageIdFn(msgId MsgIdFunction) TopicOpt {
+	return func(t *Topic) error {
+		t.p.idGen.Set(t.topic, msgId)
+		return nil
+	}
+}
 
 // Join joins the topic and returns a Topic handle. Only one Topic handle should exist per topic, and Join will error if
 // the Topic handle already exists.

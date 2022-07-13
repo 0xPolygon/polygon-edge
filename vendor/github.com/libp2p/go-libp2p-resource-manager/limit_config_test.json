@@ -51,5 +51,10 @@
     },
     "PeerDefault": {
         "Memory": 4096
+    },
+    "Peer": {
+	"12D3KooWPFH2Bx2tPfw6RLxN8k2wh47GRXgkt9yrAHU37zFwHWzS": {
+	    "Memory": 4096
+	}
     }
 }

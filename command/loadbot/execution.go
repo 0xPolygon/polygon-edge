@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
+	"github.com/umbracle/ethgo"
 	"math/big"
 	"sync"
 	"sync/atomic"
@@ -13,10 +14,9 @@ import (
 	"github.com/0xPolygon/polygon-edge/helper/tests"
 	txpoolOp "github.com/0xPolygon/polygon-edge/txpool/proto"
 	"github.com/golang/protobuf/ptypes/any"
-	"github.com/umbracle/go-web3/jsonrpc"
+	"github.com/umbracle/ethgo/jsonrpc"
 
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/umbracle/go-web3"
 )
 
 const (
@@ -92,7 +92,7 @@ func (b *BlockGasMetrics) AddBlockMetric(blockNum uint64, gasMetric GasMetrics) 
 type ContractMetricsData struct {
 	FailedContractTransactionsCount uint64
 	ContractDeploymentDuration      ExecDuration
-	ContractAddress                 web3.Address
+	ContractAddress                 ethgo.Address
 	ContractGasMetrics              *BlockGasMetrics
 }
 
@@ -358,10 +358,10 @@ func (l *Loadbot) Run() error {
 
 func (l *Loadbot) executeTxn(
 	client txpoolOp.TxnPoolOperatorClient,
-) (web3.Hash, error) {
+) (ethgo.Hash, error) {
 	txn, err := l.generator.GenerateTransaction()
 	if err != nil {
-		return web3.Hash{}, err
+		return ethgo.Hash{}, err
 	}
 
 	addReq := &txpoolOp.AddTxnReq{
@@ -373,8 +373,8 @@ func (l *Loadbot) executeTxn(
 
 	addRes, addErr := client.AddTxn(context.Background(), addReq)
 	if addErr != nil {
-		return web3.Hash{}, fmt.Errorf("unable to add transaction, %w", addErr)
+		return ethgo.Hash{}, fmt.Errorf("unable to add transaction, %w", addErr)
 	}
 
-	return web3.Hash(types.StringToHash(addRes.TxHash)), nil
+	return ethgo.Hash(types.StringToHash(addRes.TxHash)), nil
 }

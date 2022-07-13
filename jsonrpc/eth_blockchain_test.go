@@ -4,9 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"strconv"
 	"testing"
 
+	"github.com/0xPolygon/polygon-edge/blockchain"
+	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -97,102 +98,6 @@ func TestEth_Block_GetBlockTransactionCountByNumber(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, res, "expected to return block, but got nil")
 	assert.Equal(t, res, 10)
-}
-
-func TestEth_Block_GetLogs(t *testing.T) {
-	t.Parallel()
-
-	blockHash := types.StringToHash("1")
-
-	// Topics we're searching for
-	topic1 := types.StringToHash("4")
-	topic2 := types.StringToHash("5")
-	topic3 := types.StringToHash("6")
-
-	var topics = [][]types.Hash{{topic1}, {topic2}, {topic3}}
-
-	testTable := []struct {
-		name           string
-		query          *LogQuery
-		shouldFail     bool
-		expectedLength int
-	}{
-		{"Found matching logs, fromBlock < toBlock",
-			&LogQuery{
-				fromBlock: 1,
-				toBlock:   3,
-				Topics:    topics,
-			},
-			false, 3},
-		{"Found matching logs, fromBlock == toBlock",
-			&LogQuery{
-				fromBlock: 2,
-				toBlock:   2,
-				Topics:    topics,
-			},
-			false, 1},
-		{"Found matching logs, BlockHash present",
-			&LogQuery{
-				BlockHash: &blockHash,
-				Topics:    topics,
-			},
-			false, 1},
-		{"No logs found", &LogQuery{
-			fromBlock: 4,
-			toBlock:   5,
-			Topics:    topics,
-		}, false, 0},
-		{"Invalid block range", &LogQuery{
-			fromBlock: 10,
-			toBlock:   5,
-			Topics:    topics,
-		}, true, 0},
-	}
-
-	// setup test
-	store := &mockBlockStore{}
-	store.topics = []types.Hash{topic1, topic2, topic3}
-	store.setupLogs()
-
-	for i := 0; i < 5; i++ {
-		store.add(&types.Block{
-			Header: &types.Header{
-				Number: uint64(i),
-				Hash:   types.StringToHash(strconv.Itoa(i)),
-			},
-			Transactions: []*types.Transaction{
-				{
-					Value: big.NewInt(10),
-				},
-				{
-					Value: big.NewInt(11),
-				},
-				{
-					Value: big.NewInt(12),
-				},
-			},
-		})
-	}
-
-	eth := newTestEthEndpoint(store)
-
-	for _, testCase := range testTable {
-		testCase := testCase
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-
-			foundLogs, logError := eth.GetLogs(testCase.query)
-
-			if logError != nil && !testCase.shouldFail {
-				// If there is an error and test isn't expected to fail
-				t.Fatalf("Error: %v", logError)
-			} else if !testCase.shouldFail {
-				assert.Lenf(t, foundLogs, testCase.expectedLength, "Invalid number of logs found")
-			} else {
-				assert.Nil(t, foundLogs, "Expected first return param to be nil")
-			}
-		})
-	}
 }
 
 func TestEth_GetTransactionByHash(t *testing.T) {
@@ -343,6 +248,32 @@ func TestEth_Syncing(t *testing.T) {
 	})
 }
 
+// if price-limit flag is set its value should be returned if it is higher than avg gas price
+func TestEth_GetPrice_PriceLimitSet(t *testing.T) {
+	priceLimit := uint64(100333)
+	store := newMockBlockStore()
+	// not using newTestEthEndpoint as we need to set priceLimit
+	eth := newTestEthEndpointWithPriceLimit(store, priceLimit)
+
+	t.Run("returns price limit flag value when it is larger than average gas price", func(t *testing.T) {
+		res, err := eth.GasPrice()
+		store.averageGasPrice = 0
+		assert.NoError(t, err)
+		assert.NotNil(t, res)
+
+		assert.Equal(t, hex.EncodeUint64(priceLimit), res)
+	})
+
+	t.Run("returns average gas price when it is larger than set price limit flag", func(t *testing.T) {
+		store.averageGasPrice = 500000
+		res, err := eth.GasPrice()
+		assert.NoError(t, err)
+		assert.NotNil(t, res)
+
+		assert.GreaterOrEqual(t, res, hex.EncodeUint64(priceLimit))
+	})
+}
+
 func TestEth_GasPrice(t *testing.T) {
 	store := newMockBlockStore()
 	store.averageGasPrice = 9999
@@ -352,9 +283,7 @@ func TestEth_GasPrice(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, res)
 
-	// nolint:forcetypeassert
-	response := res.(string)
-	assert.Equal(t, fmt.Sprintf("0x%x", store.averageGasPrice), response)
+	assert.Equal(t, fmt.Sprintf("0x%x", store.averageGasPrice), res)
 }
 
 func TestEth_Call(t *testing.T) {
@@ -432,6 +361,20 @@ func (m *mockBlockStore) add(blocks ...*types.Block) {
 	}
 
 	m.blocks = append(m.blocks, blocks...)
+}
+
+func (m *mockBlockStore) appendBlocksToStore(blocks []*types.Block) {
+	if m.blocks == nil {
+		m.blocks = []*types.Block{}
+	}
+
+	for _, block := range blocks {
+		if block == nil {
+			continue
+		}
+
+		m.blocks = append(m.blocks, block)
+	}
 }
 
 func (m *mockBlockStore) setupLogs() {
@@ -583,6 +526,10 @@ func (m *mockBlockStore) GetAvgGasPrice() *big.Int {
 
 func (m *mockBlockStore) ApplyTxn(header *types.Header, txn *types.Transaction) (*runtime.ExecutionResult, error) {
 	return &runtime.ExecutionResult{Err: m.ethCallError}, nil
+}
+
+func (m *mockBlockStore) SubscribeEvents() blockchain.Subscription {
+	return nil
 }
 
 func newTestBlock(number uint64, hash types.Hash) *types.Block {

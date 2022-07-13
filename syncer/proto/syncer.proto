@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package v1;
+
+option go_package = "/syncer/proto";
+
+import "google/protobuf/empty.proto";
+
+service SyncPeer {
+  // Returns stream of blocks beginning specified from
+  rpc GetBlocks(GetBlocksRequest) returns (stream Block);
+  // Returns server's status
+  rpc GetStatus(google.protobuf.Empty) returns (SyncPeerStatus);
+}
+
+// GetBlocksRequest is a request for GetBlocks
+message GetBlocksRequest {
+  // The height of beginning block to sync
+  uint64 from = 1;
+}
+
+// Block contains a block data
+message Block {
+  // RLP Encoded Block Data
+  bytes block = 1;
+}
+
+// SyncPeerStatus contains peer status
+message SyncPeerStatus {
+  // Latest block height
+  uint64 number = 1;
+}

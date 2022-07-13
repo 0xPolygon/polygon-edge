@@ -52,14 +52,14 @@ func (a *asnStore) AsnForIPv6(ip net.IP) (string, error) {
 func newAsnStore() (*asnStore, error) {
 	cr := cidranger.NewPCTrieRanger()
 
-	for k, v := range ipv6CidrToAsnMap {
-		_, nn, err := net.ParseCIDR(k)
+	for _, v := range ipv6CidrToAsnPairList {
+		_, nn, err := net.ParseCIDR(v.cidr)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse CIDR %s: %w", k, err)
+			return nil, fmt.Errorf("failed to parse CIDR %s: %w", v.cidr, err)
 		}
 
-		if err := cr.Insert(&networkWithAsn{*nn, v}); err != nil {
-			return nil, fmt.Errorf("failed to insert CIDR %s in Trie store: %w", k, err)
+		if err := cr.Insert(&networkWithAsn{*nn, v.asn}); err != nil {
+			return nil, fmt.Errorf("failed to insert CIDR %s in Trie store: %w", v.cidr, err)
 		}
 	}
 

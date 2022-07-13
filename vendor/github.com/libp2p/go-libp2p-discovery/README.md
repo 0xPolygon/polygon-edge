@@ -1,3 +1,8 @@
+# DEPRECATION NOTICE
+
+This package has moved into go-libp2p, split into multiple sub-packages:
+`github.com/libp2p/go-libp2p/p2p/discovery`.
+
 # go-libp2p-discovery
 
 [![](https://img.shields.io/badge/made%20by-Protocol%20Labs-blue.svg?style=flat-square)](https://protocol.ai)

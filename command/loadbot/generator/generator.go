@@ -3,12 +3,12 @@ package generator
 import (
 	"crypto/ecdsa"
 	"encoding/json"
+	"github.com/umbracle/ethgo"
 	"io/ioutil"
 	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/umbracle/go-web3"
-	"github.com/umbracle/go-web3/abi"
+	"github.com/umbracle/ethgo/abi"
 )
 
 type TransactionGenerator interface {
@@ -69,7 +69,7 @@ type GeneratorParams struct {
 	GasPrice         *big.Int
 	ContractArtifact *ContractArtifact
 	ConstructorArgs  []byte // smart contract constructor arguments
-	ContractAddress  web3.Address
+	ContractAddress  ethgo.Address
 }
 
 // ReadContractArtifact reads the contract bytecode from the specified path

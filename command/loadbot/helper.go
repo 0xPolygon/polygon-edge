@@ -2,19 +2,19 @@ package loadbot
 
 import (
 	"fmt"
+	"github.com/umbracle/ethgo"
 	"math/big"
 	"sync"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/umbracle/go-web3"
-	"github.com/umbracle/go-web3/jsonrpc"
+	"github.com/umbracle/ethgo/jsonrpc"
 )
 
 // getInitialSenderNonce queries the sender account nonce before starting the loadbot run.
 // The nonce used for transactions is incremented by the loadbot during runtime
 func getInitialSenderNonce(client *jsonrpc.Client, address types.Address) (uint64, error) {
-	nonce, err := client.Eth().GetNonce(web3.Address(address), web3.Latest)
+	nonce, err := client.Eth().GetNonce(ethgo.Address(address), ethgo.Latest)
 	if err != nil {
 		return 0, fmt.Errorf("failed to query initial sender nonce: %w", err)
 	}
@@ -36,9 +36,9 @@ func getAverageGasPrice(client *jsonrpc.Client) (uint64, error) {
 // estimateGas queries the network node for a gas estimation before starting
 // the loadbot run
 func estimateGas(client *jsonrpc.Client, txn *types.Transaction) (uint64, error) {
-	gasEstimate, err := client.Eth().EstimateGas(&web3.CallMsg{
-		From:     web3.Address(txn.From),
-		To:       (*web3.Address)(txn.To),
+	gasEstimate, err := client.Eth().EstimateGas(&ethgo.CallMsg{
+		From:     ethgo.Address(txn.From),
+		To:       (*ethgo.Address)(txn.To),
 		Data:     txn.Input,
 		GasPrice: txn.GasPrice.Uint64(),
 		Value:    txn.Value,
@@ -99,7 +99,7 @@ func getBlockGasMetrics(
 	) {
 		// Query node for block
 		blockInfo, err := jsonClient.Eth().GetBlockByNumber(
-			web3.BlockNumber(blockNum),
+			ethgo.BlockNumber(blockNum),
 			false,
 		)
 		if err != nil {

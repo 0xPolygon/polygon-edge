@@ -18,6 +18,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/umbracle/ethgo"
+
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/genesis"
 	ibftSwitch "github.com/0xPolygon/polygon-edge/command/ibft/switch"
@@ -36,8 +38,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/umbracle/go-web3"
-	"github.com/umbracle/go-web3/jsonrpc"
+	"github.com/umbracle/ethgo/jsonrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	empty "google.golang.org/protobuf/types/known/emptypb"
@@ -361,6 +362,10 @@ func (t *TestServer) Start(ctx context.Context) error {
 		args = append(args, "--block-time", strconv.FormatUint(t.Config.BlockTime, 10))
 	}
 
+	if t.Config.IBFTBaseTimeout != 0 {
+		args = append(args, "--ibft-base-timeout", strconv.FormatUint(t.Config.IBFTBaseTimeout, 10))
+	}
+
 	t.ReleaseReservedPorts()
 
 	// Start the server
@@ -378,14 +383,14 @@ func (t *TestServer) Start(ctx context.Context) error {
 	}
 
 	_, err := tests.RetryUntilTimeout(ctx, func() (interface{}, bool) {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		if _, err := t.Operator().GetStatus(ctx, &empty.Empty{}); err == nil {
-			return nil, false
+		if _, err := t.Operator().GetStatus(ctx, &empty.Empty{}); err != nil {
+			return nil, true
 		}
 
-		return nil, true
+		return nil, false
 	})
 
 	return err
@@ -441,15 +446,15 @@ func (t *TestServer) DeployContract(
 	ctx context.Context,
 	binary string,
 	privateKey *ecdsa.PrivateKey,
-) (web3.Address, error) {
+) (ethgo.Address, error) {
 	buf, err := hex.DecodeString(binary)
 	if err != nil {
-		return web3.Address{}, err
+		return ethgo.Address{}, err
 	}
 
 	sender, err := crypto.GetAddressFromKey(privateKey)
 	if err != nil {
-		return web3.ZeroAddress, fmt.Errorf("unable to extract key, %w", err)
+		return ethgo.ZeroAddress, fmt.Errorf("unable to extract key, %w", err)
 	}
 
 	receipt, err := t.SendRawTx(ctx, &PreparedTransaction{
@@ -459,7 +464,7 @@ func (t *TestServer) DeployContract(
 		Input:    buf,
 	}, privateKey)
 	if err != nil {
-		return web3.Address{}, err
+		return ethgo.Address{}, err
 	}
 
 	return receipt.ContractAddress, nil
@@ -484,10 +489,10 @@ func (t *TestServer) SendRawTx(
 	ctx context.Context,
 	tx *PreparedTransaction,
 	signerKey *ecdsa.PrivateKey,
-) (*web3.Receipt, error) {
+) (*ethgo.Receipt, error) {
 	client := t.JSONRPC()
 
-	nextNonce, err := client.Eth().GetNonce(web3.Address(tx.From), web3.Latest)
+	nextNonce, err := client.Eth().GetNonce(ethgo.Address(tx.From), ethgo.Latest)
 	if err != nil {
 		return nil, err
 	}
@@ -513,11 +518,11 @@ func (t *TestServer) SendRawTx(
 	return tests.WaitForReceipt(ctx, t.JSONRPC().Eth(), txHash)
 }
 
-func (t *TestServer) WaitForReceipt(ctx context.Context, hash web3.Hash) (*web3.Receipt, error) {
+func (t *TestServer) WaitForReceipt(ctx context.Context, hash ethgo.Hash) (*ethgo.Receipt, error) {
 	client := t.JSONRPC()
 
 	type result struct {
-		receipt *web3.Receipt
+		receipt *ethgo.Receipt
 		err     error
 	}
 
@@ -546,7 +551,7 @@ func (t *TestServer) WaitForReceipt(ctx context.Context, hash web3.Hash) (*web3.
 
 // GetGasTotal waits for the total gas used sum for the passed in
 // transactions
-func (t *TestServer) GetGasTotal(txHashes []web3.Hash) uint64 {
+func (t *TestServer) GetGasTotal(txHashes []ethgo.Hash) uint64 {
 	t.t.Helper()
 
 	var (
@@ -566,7 +571,7 @@ func (t *TestServer) GetGasTotal(txHashes []web3.Hash) uint64 {
 	for _, txHash := range txHashes {
 		wg.Add(1)
 
-		go func(txHash web3.Hash) {
+		go func(txHash ethgo.Hash) {
 			defer wg.Done()
 
 			ctx, cancelFn := context.WithTimeout(context.Background(), DefaultTimeout)
@@ -613,7 +618,7 @@ func (t *TestServer) InvokeMethod(
 	contractAddress types.Address,
 	method string,
 	fromKey *ecdsa.PrivateKey,
-) *web3.Receipt {
+) *ethgo.Receipt {
 	sig := MethodSig(method)
 
 	fromAddress, err := crypto.GetAddressFromKey(fromKey)

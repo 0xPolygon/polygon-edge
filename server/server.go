@@ -35,7 +35,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-// Minimal is the central manager of the blockchain client
+// Server is the central manager of the blockchain client
 type Server struct {
 	logger       hclog.Logger
 	config       *Config
@@ -393,18 +393,19 @@ func (s *Server) setupConsensus() error {
 
 	consensus, err := engine(
 		&consensus.ConsensusParams{
-			Context:        context.Background(),
-			Seal:           s.config.Seal,
-			Config:         config,
-			Txpool:         s.txpool,
-			Network:        s.network,
-			Blockchain:     s.blockchain,
-			Executor:       s.executor,
-			Grpc:           s.grpcServer,
-			Logger:         s.logger.Named("consensus"),
-			Metrics:        s.serverMetrics.consensus,
-			SecretsManager: s.secretsManager,
-			BlockTime:      s.config.BlockTime,
+			Context:         context.Background(),
+			Seal:            s.config.Seal,
+			Config:          config,
+			Txpool:          s.txpool,
+			Network:         s.network,
+			Blockchain:      s.blockchain,
+			Executor:        s.executor,
+			Grpc:            s.grpcServer,
+			Logger:          s.logger.Named("consensus"),
+			Metrics:         s.serverMetrics.consensus,
+			SecretsManager:  s.secretsManager,
+			BlockTime:       s.config.BlockTime,
+			IBFTBaseTimeout: s.config.IBFTBaseTimeout,
 		},
 	)
 
@@ -550,6 +551,7 @@ func (s *Server) setupJSONRPC() error {
 		Addr:                     s.config.JSONRPC.JSONRPCAddr,
 		ChainID:                  uint64(s.config.Chain.Params.ChainID),
 		AccessControlAllowOrigin: s.config.JSONRPC.AccessControlAllowOrigin,
+		PriceLimit:               s.config.PriceLimit,
 	}
 
 	srv, err := jsonrpc.NewJSONRPC(s.logger, conf)
