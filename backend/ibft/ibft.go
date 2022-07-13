@@ -201,6 +201,8 @@ func (i *Ibft) Initialize() error {
 		return err
 	}
 
+	//	TODO: set the current validator set
+
 	return nil
 }
 
