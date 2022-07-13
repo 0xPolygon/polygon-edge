@@ -78,13 +78,13 @@ func (m *syncPeerClient) Close() {
 	close(m.peerConnectionUpdateCh)
 }
 
-// StopEmittingBlockEvents disables emitting blocks in syncer topic
-func (m *syncPeerClient) StopEmittingBlockEvents() {
+// DisablePublishingPeerStatus disables publishing own status via gossip
+func (m *syncPeerClient) DisablePublishingPeerStatus() {
 	m.shouldEmitBlocks = false
 }
 
-// StartEmittingBlockEvents enables emitting blocks in syncer topic
-func (m *syncPeerClient) StartEmittingBlockEvents() {
+// EnablePublishingPeerStatus enables publishing own status via gossip
+func (m *syncPeerClient) EnablePublishingPeerStatus() {
 	m.shouldEmitBlocks = true
 }
 
@@ -202,16 +202,17 @@ func (m *syncPeerClient) startNewBlockProcess() {
 	m.subscription = m.blockchain.SubscribeEvents()
 
 	for event := range m.subscription.GetEventCh() {
+		if !m.shouldEmitBlocks {
+			continue
+		}
+
 		if l := len(event.NewChain); l > 0 {
 			latest := event.NewChain[l-1]
-
-			if m.shouldEmitBlocks {
-				// Publish status
-				if err := m.topic.Publish(&proto.SyncPeerStatus{
-					Number: latest.Number,
-				}); err != nil {
-					m.logger.Warn("failed to publish status", "err", err)
-				}
+			// Publish status
+			if err := m.topic.Publish(&proto.SyncPeerStatus{
+				Number: latest.Number,
+			}); err != nil {
+				m.logger.Warn("failed to publish status", "err", err)
 			}
 		}
 	}

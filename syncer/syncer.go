@@ -166,8 +166,8 @@ func (s *syncer) BulkSync(newBlockCallback func(*types.Block) bool) error {
 		}
 	}
 
-	// Stop emitting blocks in topic while in bulkSync
-	s.syncPeerClient.StopEmittingBlockEvents()
+	// Stop publishing status in topic while in bulkSync
+	s.syncPeerClient.DisablePublishingPeerStatus()
 
 	// Create a blockchain subscription for the sync progression and start tracking
 	s.syncProgression.StartProgression(localLatest+1, s.blockchain.SubscribeEvents())
@@ -175,7 +175,7 @@ func (s *syncer) BulkSync(newBlockCallback func(*types.Block) bool) error {
 	// Stop monitoring the sync progression upon exit
 	defer func() {
 		s.syncProgression.StopProgression()
-		s.syncPeerClient.StartEmittingBlockEvents()
+		s.syncPeerClient.EnablePublishingPeerStatus()
 	}()
 
 	skipList := make(map[peer.ID]bool)
