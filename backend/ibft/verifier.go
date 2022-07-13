@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/0xPolygon/polygon-edge/crypto"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/0xPolygon/polygon-edge/types"
@@ -143,7 +144,7 @@ func (i *Ibft) IsValidCommittedSeal(proposal, seal []byte) bool {
 	var (
 		header        = newBlock.Header
 		headerHash    = header.Hash.Bytes()
-		committedHash = commitMsg(headerHash)
+		committedHash = crypto.Keccak256(headerHash, []byte{byte(protoIBFT.MessageType_COMMIT)})
 	)
 
 	validatorAddress, err := ecrecoverImpl(seal, committedHash)

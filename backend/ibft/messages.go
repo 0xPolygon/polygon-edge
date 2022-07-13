@@ -11,12 +11,12 @@ import (
 func (i *Ibft) signMessage(msg *protoIBFT.Message) *protoIBFT.Message {
 	raw, err := proto.Marshal(msg)
 	if err != nil {
-		return nil
+		panic("signMessage: cannot marshal")
 	}
 
 	sig, err := crypto.Sign(i.validatorKey, crypto.Keccak256(raw))
 	if err != nil {
-		return nil
+		panic("signMessage: cannot sign")
 	}
 
 	msg.Signature = sig
@@ -29,11 +29,9 @@ func (i *Ibft) BuildPrePrepareMessage(proposal []byte, view *protoIBFT.View) *pr
 		View: view,
 		From: i.ID(),
 		Type: protoIBFT.MessageType_PREPREPARE,
-		Payload: &protoIBFT.Message_PreprepareData{
-			PreprepareData: &protoIBFT.PrePrepareMessage{
-				Proposal: proposal,
-			},
-		},
+		Payload: &protoIBFT.Message_PreprepareData{PreprepareData: &protoIBFT.PrePrepareMessage{
+			Proposal: proposal,
+		}},
 	}
 
 	return i.signMessage(msg)
@@ -42,7 +40,7 @@ func (i *Ibft) BuildPrePrepareMessage(proposal []byte, view *protoIBFT.View) *pr
 func (i *Ibft) BuildPrepareMessage(proposal []byte, view *protoIBFT.View) *protoIBFT.Message {
 	block := &types.Block{}
 	if err := block.UnmarshalRLP(proposal); err != nil {
-		//	log err
+		panic("BuildPrepareMessage: cannot unmarshal block")
 		return nil
 	}
 
@@ -63,6 +61,7 @@ func (i *Ibft) BuildPrepareMessage(proposal []byte, view *protoIBFT.View) *proto
 func (i *Ibft) BuildCommitMessage(proposal []byte, view *protoIBFT.View) *protoIBFT.Message {
 	block := &types.Block{}
 	if err := block.UnmarshalRLP(proposal); err != nil {
+		panic("BuildCommitMessage: cannot unmarshal block")
 		//	log err
 		return nil
 	}
@@ -72,6 +71,7 @@ func (i *Ibft) BuildCommitMessage(proposal []byte, view *protoIBFT.View) *protoI
 	seal, err := i.generateCommittedSeal(block.Header)
 	if err != nil {
 		//	log err
+		panic("BuildCommitMessage: cannot generate seal")
 		return nil
 	}
 
@@ -100,6 +100,7 @@ func (i *Ibft) BuildRoundChangeMessage(height, round uint64) *protoIBFT.Message 
 }
 
 func (i *Ibft) generateCommittedSeal(header *types.Header) ([]byte, error) {
+	//	TODO: just grab the hash ?
 	hash, err := calculateHeaderHash(header)
 	if err != nil {
 		return nil, err

@@ -1,6 +1,9 @@
 package ibft
 
-import "errors"
+import (
+	"errors"
+	"github.com/0xPolygon/polygon-edge/types"
+)
 
 //	backend impl for go-ibft
 
@@ -17,6 +20,7 @@ func (i *Ibft) BuildProposal(blockNumber uint64) ([]byte, error) {
 	snap, err := i.getSnapshot(latestBlockNumber)
 	if err != nil {
 		i.logger.Error("cannot find snapshot", "num", latestBlockNumber)
+		panic("BuildProposal: cannot find snapshot")
 
 		return nil, errors.New("snapshot not found")
 	}
@@ -41,8 +45,50 @@ func (i *Ibft) BuildProposal(blockNumber uint64) ([]byte, error) {
 }
 
 func (i *Ibft) InsertBlock(proposal []byte, committedSeals [][]byte) error {
+	newBlock := &types.Block{}
+	if err := newBlock.UnmarshalRLP(proposal); err != nil {
+		panic("InsertBlock: cannot unmarshal block")
+		return err
+	}
 
-	//	TODO: update the currentValidatorSet after block insertion
+	//	TODO: HEADER header mutated here
+	// Push the committed seals to the header
+	header, err := writeCommittedSeals(newBlock.Header, committedSeals)
+	if err != nil {
+		return err
+	}
+
+	// The hash needs to be recomputed since the extra data was changed
+	newBlock.Header = header
+	newBlock.Header.ComputeHash() // TODO: this is not needed
+
+	//	TODO: this is also not needed, backend has already verified everything
+	//// Verify the header only, since the block body is already verified
+	//if err := i.VerifyHeader(newBlock.Header); err != nil {
+	//	return err
+	//}
+
+	// Save the block locally
+	if err := i.blockchain.WriteBlock(newBlock); err != nil {
+		return err
+	}
+
+	if hookErr := i.runHook(InsertBlockHook, header.Number, header.Number); hookErr != nil {
+		return hookErr
+	}
+
+	i.logger.Info(
+		"block committed",
+		"sequence", i.state.view.Sequence,
+		"hash", newBlock.Hash(),
+		"validators", len(i.state.validators),
+		"rounds", i.state.view.Round+1,
+		"committed", i.state.numCommitted(),
+	)
+
+	// after the block has been written we reset the txpool so that
+	// the old transactions are removed
+	i.txpool.ResetWithHeaders(newBlock.Header)
 
 	return nil
 }

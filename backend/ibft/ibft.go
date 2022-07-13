@@ -633,6 +633,8 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 	}
 	// If the mechanism is PoS -> build a regular block if it's not an end-of-epoch block
 	// If the mechanism is PoA -> always build a regular block, regardless of epoch
+
+	//	TODO: block time build
 	txns := []*types.Transaction{}
 	if i.shouldWriteTransactions(header.Number) {
 		txns = i.writeTransactions(gasLimit, transition)
