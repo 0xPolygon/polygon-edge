@@ -4,7 +4,10 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"google.golang.org/protobuf/proto"
+
 	"github.com/0xPolygon/polygon-edge/types"
+	protoIBFT "github.com/Trapesys/go-ibft/messages/proto"
 )
 
 //	Verifier impl for go-ibft
@@ -68,9 +71,32 @@ func (i *Ibft) IsValidBlock(proposal []byte) bool {
 	return true
 }
 
-//func (i *Ibft) IsValidSender(msg *proto.Message) bool {
-//
-//}
+//	TODO: move as helper in go-ibft
+func copyMsg(m *protoIBFT.Message) *protoIBFT.Message {
+	mm, _ := proto.Clone(m).(*protoIBFT.Message)
+	return mm
+}
+
+func (i *Ibft) IsValidSender(msg *protoIBFT.Message) bool {
+	copyMsg := copyMsg(msg)
+	copyMsg.Signature = nil
+
+	raw, err := proto.Marshal(copyMsg)
+	if err != nil {
+		panic("proto marshal")
+	}
+
+	validatorAddress, err := ecrecoverImpl(msg.Signature, raw)
+	if err != nil {
+		panic("ecrecover impl")
+	}
+
+	if !bytes.Equal(msg.From, validatorAddress.Bytes()) {
+		return false
+	}
+
+	return true
+}
 
 func (i *Ibft) IsProposer(id []byte, height, round uint64) bool {
 	//	TODO: maybe this should just be i.blockchain.Header()
