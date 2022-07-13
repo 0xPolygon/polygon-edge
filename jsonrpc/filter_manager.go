@@ -41,8 +41,8 @@ type filter interface {
 	// getFilterBase returns filterBase that has common fields
 	getFilterBase() *filterBase
 
-	// getUpdates returns stored data in string
-	getUpdates() (string, error)
+	// getUpdates returns stored data in a serialized JSON structure
+	getUpdates() (json.RawMessage, error)
 
 	// sendUpdates write stored data to web socket stream
 	sendUpdates() error
@@ -120,7 +120,7 @@ func (f *blockFilter) takeBlockUpdates() []*types.Header {
 }
 
 // getUpdates returns updates of blocks in string
-func (f *blockFilter) getUpdates() (string, error) {
+func (f *blockFilter) getUpdates() (json.RawMessage, error) {
 	headers := f.takeBlockUpdates()
 
 	updates := []string{}
@@ -128,7 +128,7 @@ func (f *blockFilter) getUpdates() (string, error) {
 		updates = append(updates, header.Hash.String())
 	}
 
-	return fmt.Sprintf("[\"%s\"]", strings.Join(updates, "\",\"")), nil
+	return json.RawMessage(fmt.Sprintf("[\"%s\"]", strings.Join(updates, "\",\""))), nil
 }
 
 // sendUpdates writes the updates of blocks to web socket stream
@@ -177,15 +177,15 @@ func (f *logFilter) takeLogUpdates() []*Log {
 }
 
 // getUpdates returns stored logs in string
-func (f *logFilter) getUpdates() (string, error) {
+func (f *logFilter) getUpdates() (json.RawMessage, error) {
 	logs := f.takeLogUpdates()
 
 	res, err := json.Marshal(logs)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return string(res), nil
+	return json.RawMessage(res), nil
 }
 
 // sendUpdates writes stored logs to web socket stream
@@ -479,24 +479,24 @@ func (f *FilterManager) GetLogFilterFromID(filterID string) (*logFilter, error) 
 }
 
 // GetFilterChanges returns the updates of the filter with given ID in string
-func (f *FilterManager) GetFilterChanges(id string) (string, error) {
+func (f *FilterManager) GetFilterChanges(id string) (json.RawMessage, error) {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
 
 	filter, ok := f.filters[id]
 
 	if !ok {
-		return "", ErrFilterDoesNotExists
+		return nil, ErrFilterDoesNotExists
 	}
 
 	// we cannot get updates from a ws filter with getFilterChanges
 	if filter.isWS() {
-		return "", ErrWSFilterDoesNotSupportGetChanges
+		return nil, ErrWSFilterDoesNotSupportGetChanges
 	}
 
 	res, err := filter.getUpdates()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	return res, nil
