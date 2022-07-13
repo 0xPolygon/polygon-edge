@@ -370,8 +370,6 @@ func TestPeerConnectionUpdateEventCh(t *testing.T) {
 
 // Make sure the peer shouldn't emit status if the shouldEmitBlocks flag is set
 func Test_shouldEmitBlocks(t *testing.T) {
-	t.Parallel()
-
 	var (
 		// network layer
 		clientSrv = newTestNetwork(t)
@@ -432,6 +430,8 @@ func Test_shouldEmitBlocks(t *testing.T) {
 	assert.NoError(t, err)
 
 	testGossip := func(t *testing.T, shouldEmit bool) {
+		t.Helper()
+
 		// context to be canceled when receiving status
 		receiveContext, cancelContext := context.WithCancel(context.Background())
 		defer cancelContext()
