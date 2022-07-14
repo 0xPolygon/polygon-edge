@@ -25,6 +25,7 @@ import (
 	anypb "google.golang.org/protobuf/types/known/anypb"
 
 	consensus "github.com/Trapesys/go-ibft/core"
+	protoIBFT "github.com/Trapesys/go-ibft/messages/proto"
 )
 
 const (
@@ -257,7 +258,7 @@ type transport interface {
 }
 
 // Define the IBFT libp2p protocol
-var ibftProto = "/ibft/0.1"
+var ibftProto = "/ibft/0.2"
 
 type gossipTransport struct {
 	topic *network.Topic
@@ -332,14 +333,14 @@ func (i *Ibft) setupMechanism() error {
 // setupTransport sets up the gossip transport protocol
 func (i *Ibft) setupTransport() error {
 	// Define a new topic
-	topic, err := i.network.NewTopic(ibftProto, &proto.MessageReq{})
+	topic, err := i.network.NewTopic(ibftProto, &protoIBFT.Message{})
 	if err != nil {
 		return err
 	}
 
 	// Subscribe to the newly created topic
 	err = topic.Subscribe(func(obj interface{}, _ peer.ID) {
-		msg, ok := obj.(*proto.MessageReq)
+		msg, ok := obj.(*protoIBFT.Message)
 		if !ok {
 			i.logger.Error("invalid type assertion for message request")
 
@@ -352,20 +353,7 @@ func (i *Ibft) setupTransport() error {
 			return
 		}
 
-		// decode sender
-		if err := validateMsg(msg); err != nil {
-			i.logger.Error("failed to validate msg", "err", err)
-
-			return
-		}
-
-		if msg.From == i.validatorKeyAddr.String() {
-			// we are the sender, skip this message since we already
-			// relay our own messages internally.
-			return
-		}
-
-		i.pushMessage(msg)
+		i.consensus.AddMessage(msg)
 	})
 
 	if err != nil {
@@ -682,8 +670,7 @@ func (i *Ibft) executeTransactions(
 			if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok { // nolint:errorlint
 				//	stop processing
 				return nil, false
-			} else if appErr, ok := err.(*state.TransitionApplicationError);
-				ok && appErr.IsRecoverable { // nolint:errorlint
+			} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable { // nolint:errorlint
 				i.txpool.Demote(tx)
 			} else {
 				//failedTxCount++
