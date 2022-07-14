@@ -438,8 +438,33 @@ func (i *Ibft) startt() {
 		break
 	}
 
-	//	bulk sync done, start consensus and watch sync
+	//	bulk sync done
 
+	for {
+		switch i.isActiveValidator() {
+		case true:
+			//	participate in consensus on current height
+			_ = i.blockchain.Header().Number
+		//	TODO: run sequence for latest+1
+		case false:
+			//	run watch sync
+			if err := i.syncer.WatchSync(
+				func(newBlock *types.Block) bool {
+					callInsertBlockHook(newBlock.Number())
+					i.txpool.ResetWithHeaders(newBlock.Header)
+
+					return i.isActiveValidator()
+				},
+			); err != nil {
+				i.logger.Warn("error happened during watch sync", "err", err)
+			}
+		}
+	}
+
+}
+
+func (i *Ibft) isActiveValidator() bool {
+	return i.currentValidatorSet.Includes(i.validatorKeyAddr)
 }
 
 // start starts the IBFT backend state machine
