@@ -254,7 +254,7 @@ func (i *Ibft) GetSyncProgression() *progress.Progression {
 }
 
 type transport interface {
-	Gossip(msg *proto.MessageReq) error
+	Gossip(msg *protoIBFT.Message) error
 }
 
 // Define the IBFT libp2p protocol
@@ -265,7 +265,7 @@ type gossipTransport struct {
 }
 
 // Gossip publishes a new message to the topic
-func (g *gossipTransport) Gossip(msg *proto.MessageReq) error {
+func (g *gossipTransport) Gossip(msg *protoIBFT.Message) error {
 	return g.topic.Publish(msg)
 }
 
@@ -1306,6 +1306,12 @@ func (i *Ibft) runRoundChangeState() {
 
 // --- com wrappers ---
 
+func (i *Ibft) Multicast(msg *protoIBFT.Message) {
+	if err := i.transport.Gossip(msg); err != nil {
+		i.logger.Error("failed to gossip", "err", err)
+	}
+}
+
 func (i *Ibft) sendRoundChange() {
 	i.gossip(proto.MessageReq_RoundChange)
 }
@@ -1365,9 +1371,9 @@ func (i *Ibft) gossip(typ proto.MessageReq_Type) {
 		return
 	}
 
-	if err := i.transport.Gossip(msg); err != nil {
-		i.logger.Error("failed to gossip", "err", err)
-	}
+	//if err := i.transport.Gossip(msg); err != nil {
+	//	i.logger.Error("failed to gossip", "err", err)
+	//}
 }
 
 // getState returns the current IBFT state
