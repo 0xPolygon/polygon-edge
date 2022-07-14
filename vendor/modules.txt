@@ -13,6 +13,8 @@ cloud.google.com/go/secretmanager/apiv1
 cloud.google.com/go/secretmanager/internal
 # github.com/Trapesys/go-ibft v0.0.0 => ../Trapesys/go-ibft
 ## explicit; go 1.17
+github.com/Trapesys/go-ibft/core
+github.com/Trapesys/go-ibft/messages
 github.com/Trapesys/go-ibft/messages/proto
 # github.com/andybalholm/brotli v1.0.4
 ## explicit; go 1.12

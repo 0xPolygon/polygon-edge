@@ -23,6 +23,8 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	"google.golang.org/grpc"
 	anypb "google.golang.org/protobuf/types/known/anypb"
+
+	consensus "github.com/Trapesys/go-ibft/core"
 )
 
 const (
@@ -59,13 +61,15 @@ type Ibft struct {
 
 	config *backend.Config // Backend configuration
 
-	Grpc *grpc.Server // gRPC configuration
+	consensus *consensus.IBFT
 
 	blockchain blockchainInterface // Interface exposed by the blockchain layer
-	network    *network.Server     // Reference to the networking layer
-	executor   *state.Executor     // Reference to the state executor
-	txpool     txPoolInterface     // Reference to the transaction pool
-	syncer     syncer.Syncer       // Reference to the sync protocol
+
+	network  *network.Server // Reference to the networking layer
+	executor *state.Executor // Reference to the state executor
+	txpool   txPoolInterface // Reference to the transaction pool
+	syncer   syncer.Syncer   // Reference to the sync protocol
+	Grpc     *grpc.Server    // gRPC configuration
 
 	metrics *backend.Metrics
 
@@ -409,6 +413,34 @@ func (i *Ibft) createKey() error {
 }
 
 const IbftKeyName = "validator.key"
+
+func (i *Ibft) startt() {
+	//	bulk sync first
+	callInsertBlockHook := func(blockNumber uint64) {
+		if hookErr := i.runHook(InsertBlockHook, blockNumber, blockNumber); hookErr != nil {
+			i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", InsertBlockHook, hookErr))
+		}
+	}
+
+	for {
+		if err := i.syncer.BulkSync(
+			func(newBlock *types.Block) bool {
+				callInsertBlockHook(newBlock.Number())
+				i.txpool.ResetWithHeaders(newBlock.Header)
+
+				return false
+			},
+		); err != nil {
+			//	log err
+			continue
+		}
+
+		break
+	}
+
+	//	bulk sync done, start consensus and watch sync
+
+}
 
 // start starts the IBFT backend state machine
 func (i *Ibft) start() {
