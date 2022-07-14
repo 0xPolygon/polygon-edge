@@ -206,6 +206,12 @@ func (i *Ibft) Initialize() error {
 	}
 
 	//	TODO: set the current validator set
+	snap, err := i.getLatestSnapshot()
+	if err != nil {
+		return err
+	}
+
+	i.currentValidatorSet = snap.Set
 
 	return nil
 }
