@@ -59,6 +59,7 @@ func DecodeUint64(hexStr string) uint64 {
 
 	// base 16 for hexadecimal
 	result, _ := strconv.ParseUint(cleaned, 16, 64)
+
 	return result
 }
 
