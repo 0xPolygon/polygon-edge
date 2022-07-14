@@ -186,8 +186,7 @@ func (i *Ibft) processHeaders(headers []*types.Header) error {
 		if !snap.Equal(parentSnap) {
 			saveSnap(h)
 
-			//	TODO: update currentValdidatorSet here
-
+			i.currentValidatorSet = snap.Set
 		}
 
 	}
