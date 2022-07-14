@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math/big"
 	"sync/atomic"
 
 	"github.com/0xPolygon/polygon-edge/helper/hex"
@@ -35,22 +34,22 @@ type Header struct {
 
 // HeaderJson represents a block header used for json calls
 type HeaderJSON struct {
-	ParentHash   Hash     `json:"parentHash"`
-	Sha3Uncles   Hash     `json:"sha3Uncles"`
-	Miner        Address  `json:"miner"`
-	StateRoot    Hash     `json:"stateRoot"`
-	TxRoot       Hash     `json:"transactionsRoot"`
-	ReceiptsRoot Hash     `json:"receiptsRoot"`
-	LogsBloom    Bloom    `json:"logsBloom"`
-	Difficulty   *big.Int `json:"difficulty"`
-	Number       *big.Int `json:"number"`
-	GasLimit     uint64   `json:"gasLimit"`
-	GasUsed      uint64   `json:"gasUsed"`
-	Timestamp    uint64   `json:"timestamp"`
-	ExtraData    []byte   `json:"extraData"`
-	MixHash      Hash     `json:"mixHash"`
-	Nonce        Nonce    `json:"nonce"`
-	Hash         Hash     `json:"hash"`
+	ParentHash   Hash    `json:"parentHash"`
+	Sha3Uncles   Hash    `json:"sha3Uncles"`
+	Miner        Address `json:"miner"`
+	StateRoot    Hash    `json:"stateRoot"`
+	TxRoot       Hash    `json:"transactionsRoot"`
+	ReceiptsRoot Hash    `json:"receiptsRoot"`
+	LogsBloom    Bloom   `json:"logsBloom"`
+	Difficulty   string  `json:"difficulty"`
+	Number       string  `json:"number"`
+	GasLimit     string  `json:"gasLimit"`
+	GasUsed      string  `json:"gasUsed"`
+	Timestamp    string  `json:"timestamp"`
+	ExtraData    string  `json:"extraData"`
+	MixHash      Hash    `json:"mixHash"`
+	Nonce        Nonce   `json:"nonce"`
+	Hash         Hash    `json:"hash"`
 }
 
 func (h *Header) MarshalJSON() ([]byte, error) {
@@ -63,16 +62,17 @@ func (h *Header) MarshalJSON() ([]byte, error) {
 	header.TxRoot = h.TxRoot
 	header.ReceiptsRoot = h.ReceiptsRoot
 	header.LogsBloom = h.LogsBloom
-	header.GasLimit = h.GasLimit
-	header.GasUsed = h.GasUsed
-	header.Timestamp = h.Timestamp
-	header.ExtraData = h.ExtraData
+
 	header.MixHash = h.MixHash
 	header.Nonce = h.Nonce
 	header.Hash = h.Hash
 
-	header.Difficulty = new(big.Int).SetUint64(h.Difficulty)
-	header.Number = new(big.Int).SetUint64(h.Number)
+	header.Difficulty = hex.EncodeUint64(h.Difficulty)
+	header.Number = hex.EncodeUint64(h.Number)
+	header.GasLimit = hex.EncodeUint64(h.GasLimit)
+	header.GasUsed = hex.EncodeUint64(h.GasUsed)
+	header.Timestamp = hex.EncodeUint64(h.Timestamp)
+	header.ExtraData = hex.EncodeToHex(h.ExtraData)
 
 	return json.Marshal(&header)
 }
@@ -90,16 +90,16 @@ func (h *Header) UnmarshalJSON(input []byte) error {
 	h.TxRoot = header.TxRoot
 	h.ReceiptsRoot = header.ReceiptsRoot
 	h.LogsBloom = header.LogsBloom
-	h.GasLimit = header.GasLimit
-	h.GasUsed = header.GasUsed
-	h.Timestamp = header.Timestamp
-	h.ExtraData = header.ExtraData
 	h.MixHash = header.MixHash
 	h.Nonce = header.Nonce
 	h.Hash = header.Hash
 
-	h.Difficulty = header.Difficulty.Uint64()
-	h.Number = header.Number.Uint64()
+	h.Difficulty = hex.DecodeUint64(header.Difficulty)
+	h.Number = hex.DecodeUint64(header.Number)
+	h.GasLimit = hex.DecodeUint64(header.GasLimit)
+	h.GasUsed = hex.DecodeUint64(header.GasUsed)
+	h.Timestamp = hex.DecodeUint64(header.Timestamp)
+	h.ExtraData = hex.MustDecodeHex(header.ExtraData)
 
 	return nil
 }
