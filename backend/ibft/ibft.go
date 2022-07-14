@@ -444,8 +444,9 @@ func (i *Ibft) startt() {
 		switch i.isActiveValidator() {
 		case true:
 			//	participate in consensus on current height
-			_ = i.blockchain.Header().Number
-		//	TODO: run sequence for latest+1
+			latestHeight := i.blockchain.Header().Number
+
+			i.consensus.RunSequence(latestHeight + 1)
 		case false:
 			//	run watch sync
 			if err := i.syncer.WatchSync(
