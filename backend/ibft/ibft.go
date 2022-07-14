@@ -651,6 +651,79 @@ func (i *Ibft) shouldWriteTransactions(height uint64) bool {
 	return false
 }
 
+func (i *Ibft) executeTransactions(
+	gasLimit,
+	blockNumber uint64,
+	transition transitionInterface,
+) (executed []*types.Transaction) {
+	executed = make([]*types.Transaction, 0)
+
+	if !i.shouldWriteTransactions(blockNumber) {
+		return
+	}
+
+	executeTx := func(tx *types.Transaction) (*types.Transaction, bool) {
+		if tx == nil {
+			return nil, false
+		}
+
+		if tx.ExceedsBlockGasLimit(gasLimit) {
+			i.txpool.Drop(tx)
+
+			if err := transition.WriteFailedReceipt(tx); err != nil {
+				//	log this error
+			}
+
+			//	continue processing
+			return nil, true
+		}
+
+		if err := transition.Write(tx); err != nil {
+			if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok { // nolint:errorlint
+				//	stop processing
+				return nil, false
+			} else if appErr, ok := err.(*state.TransitionApplicationError);
+				ok && appErr.IsRecoverable { // nolint:errorlint
+				i.txpool.Demote(tx)
+			} else {
+				//failedTxCount++
+				i.txpool.Drop(tx)
+			}
+
+			//	continue processing
+			return nil, true
+		}
+
+		i.txpool.Pop(tx)
+
+		return tx, true
+	}
+
+	i.txpool.Prepare()
+
+	stop := false
+	for {
+		select {
+		case <-time.After(i.blockTime):
+			return
+		default:
+			//	execute transactions one by one
+			if stop {
+				continue
+			}
+
+			tx, ok := executeTx(i.txpool.Peek())
+			if !ok {
+				stop = true
+			}
+
+			if tx != nil {
+				executed = append(executed, tx)
+			}
+		}
+	}
+}
+
 //	TODO: ~~BuildProposal
 // buildBlock builds the block, based on the passed in snapshot and parent header
 func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, error) {
@@ -702,11 +775,7 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 	// If the mechanism is PoS -> build a regular block if it's not an end-of-epoch block
 	// If the mechanism is PoA -> always build a regular block, regardless of epoch
 
-	//	TODO: block time build
-	txns := []*types.Transaction{}
-	if i.shouldWriteTransactions(header.Number) {
-		txns = i.writeTransactions(gasLimit, transition)
-	}
+	txs := i.executeTransactions(gasLimit, header.Number, transition)
 
 	if err := i.PreStateCommit(header, transition); err != nil {
 		return nil, err
@@ -719,7 +788,7 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 	// build the block
 	block := backend.BuildBlock(backend.BuildBlockParams{
 		Header:   header,
-		Txns:     txns,
+		Txns:     txs,
 		Receipts: transition.Receipts(),
 	})
 
@@ -737,7 +806,7 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 	//	TODO: header hash was never generated with ProposerSeal and CommittedSeals
 	block.Header.ComputeHash()
 
-	i.logger.Info("build block", "number", header.Number, "txns", len(txns))
+	i.logger.Info("build block", "number", header.Number, "txns", len(txs))
 
 	return block, nil
 }
