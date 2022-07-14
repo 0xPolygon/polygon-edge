@@ -20,12 +20,10 @@ import (
 	"github.com/0xPolygon/polygon-edge/syncer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
-	"github.com/libp2p/go-libp2p-core/peer"
 	"google.golang.org/grpc"
 	anypb "google.golang.org/protobuf/types/known/anypb"
 
 	consensus "github.com/Trapesys/go-ibft/core"
-	protoIBFT "github.com/Trapesys/go-ibft/messages/proto"
 )
 
 const (
@@ -243,7 +241,7 @@ func (i *Ibft) Start() error {
 	}
 
 	// Start the actual IBFT protocol
-	go i.start()
+	go i.startt()
 
 	return nil
 }
@@ -253,21 +251,8 @@ func (i *Ibft) GetSyncProgression() *progress.Progression {
 	return i.syncer.GetSyncProgression()
 }
 
-type transport interface {
-	Gossip(msg *protoIBFT.Message) error
-}
-
 // Define the IBFT libp2p protocol
 var ibftProto = "/ibft/0.2"
-
-type gossipTransport struct {
-	topic *network.Topic
-}
-
-// Gossip publishes a new message to the topic
-func (g *gossipTransport) Gossip(msg *protoIBFT.Message) error {
-	return g.topic.Publish(msg)
-}
 
 // GetIBFTForks returns IBFT fork configurations from chain config
 func GetIBFTForks(ibftConfig map[string]interface{}) ([]IBFTFork, error) {
@@ -330,41 +315,6 @@ func (i *Ibft) setupMechanism() error {
 	return nil
 }
 
-// setupTransport sets up the gossip transport protocol
-func (i *Ibft) setupTransport() error {
-	// Define a new topic
-	topic, err := i.network.NewTopic(ibftProto, &protoIBFT.Message{})
-	if err != nil {
-		return err
-	}
-
-	// Subscribe to the newly created topic
-	err = topic.Subscribe(func(obj interface{}, _ peer.ID) {
-		msg, ok := obj.(*protoIBFT.Message)
-		if !ok {
-			i.logger.Error("invalid type assertion for message request")
-
-			return
-		}
-
-		if !i.isSealing() {
-			// if we are not sealing we do not care about the messages
-			// but we need to subscribe to propagate the messages
-			return
-		}
-
-		i.consensus.AddMessage(msg)
-	})
-
-	if err != nil {
-		return err
-	}
-
-	i.transport = &gossipTransport{topic: topic}
-
-	return nil
-}
-
 // createKey sets the validator's private key from the secrets manager
 func (i *Ibft) createKey() error {
 	i.msgQueue = newMsgQueue()
@@ -409,14 +359,18 @@ func (i *Ibft) createKey() error {
 const IbftKeyName = "validator.key"
 
 func (i *Ibft) startt() {
-	//	bulk sync first
 	callInsertBlockHook := func(blockNumber uint64) {
 		if hookErr := i.runHook(InsertBlockHook, blockNumber, blockNumber); hookErr != nil {
 			i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", InsertBlockHook, hookErr))
 		}
 	}
 
+	//	bulk sync first
 	for {
+		if !i.syncer.HasSyncPeer() {
+			continue
+		}
+
 		if err := i.syncer.BulkSync(
 			func(newBlock *types.Block) bool {
 				callInsertBlockHook(newBlock.Number())
@@ -425,6 +379,7 @@ func (i *Ibft) startt() {
 				return false
 			},
 		); err != nil {
+			i.logger.Error("bulk sync error", "err", err)
 			//	log err
 			continue
 		}
@@ -439,6 +394,7 @@ func (i *Ibft) startt() {
 		case true:
 			//	participate in consensus on current height
 			latestHeight := i.blockchain.Header().Number
+			i.logger.Info("latest height", latestHeight)
 
 			i.consensus.RunSequence(latestHeight + 1)
 		case false:
@@ -689,13 +645,16 @@ func (i *Ibft) executeTransactions(
 	i.txpool.Prepare()
 
 	stop := false
+	blockTimer := time.NewTimer(i.blockTime)
+
 	for {
 		select {
-		case <-time.After(i.blockTime):
+		case <-blockTimer.C:
 			return
 		default:
 			//	execute transactions one by one
 			if stop {
+				//	wait for the timer to expire
 				continue
 			}
 
@@ -742,6 +701,7 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 		i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", CandidateVoteHook, hookErr))
 	}
 
+	//	TODO: fix this (execution of transaction is timed)
 	// set the timestamp
 	parentTime := time.Unix(int64(parent.Timestamp), 0)
 	headerTime := parentTime.Add(i.blockTime)
@@ -1306,12 +1266,6 @@ func (i *Ibft) runRoundChangeState() {
 
 // --- com wrappers ---
 
-func (i *Ibft) Multicast(msg *protoIBFT.Message) {
-	if err := i.transport.Gossip(msg); err != nil {
-		i.logger.Error("failed to gossip", "err", err)
-	}
-}
-
 func (i *Ibft) sendRoundChange() {
 	i.gossip(proto.MessageReq_RoundChange)
 }
@@ -1371,7 +1325,7 @@ func (i *Ibft) gossip(typ proto.MessageReq_Type) {
 		return
 	}
 
-	//if err := i.transport.Gossip(msg); err != nil {
+	//if err := i.transport.Multicast(msg); err != nil {
 	//	i.logger.Error("failed to gossip", "err", err)
 	//}
 }

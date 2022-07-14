@@ -22,7 +22,7 @@ func (i *Ibft) IsValidBlock(proposal []byte) bool {
 
 	// retrieve the newBlock proposal
 	if err := newBlock.UnmarshalRLP(proposal); err != nil {
-		i.logger.Error("failed to unmarshal newBlock", "err", err)
+		i.logger.Error("IsValidBlock: failed to unmarshal newBlock", "err", err)
 
 		return false
 	}
@@ -120,7 +120,7 @@ func (i *Ibft) IsProposer(id []byte, height, round uint64) bool {
 func (i *Ibft) IsValidProposalHash(proposal, hash []byte) bool {
 	newBlock := &types.Block{}
 	if err := newBlock.UnmarshalRLP(proposal); err != nil {
-		i.logger.Error("unable to unmarshal proposal", "err", err)
+		i.logger.Error("IsValidProposalHash: unable to unmarshal proposal", "err", err)
 
 		return false
 	}
@@ -133,21 +133,10 @@ func (i *Ibft) IsValidProposalHash(proposal, hash []byte) bool {
 	return true
 }
 
-func (i *Ibft) IsValidCommittedSeal(proposal, seal []byte) bool {
-	newBlock := &types.Block{}
-	if err := newBlock.UnmarshalRLP(proposal); err != nil {
-		i.logger.Error("unable to unmarshal proposal", "err", err)
+func (i *Ibft) IsValidCommittedSeal(proposalHash, seal []byte) bool {
+	commitHash := crypto.Keccak256(proposalHash, []byte{byte(protoIBFT.MessageType_COMMIT)})
 
-		return false
-	}
-
-	var (
-		header        = newBlock.Header
-		headerHash    = header.Hash.Bytes()
-		committedHash = crypto.Keccak256(headerHash, []byte{byte(protoIBFT.MessageType_COMMIT)})
-	)
-
-	validatorAddress, err := ecrecoverImpl(seal, committedHash)
+	validatorAddress, err := ecrecoverImpl(seal, commitHash)
 	if err != nil {
 		i.logger.Error("unable to recover seal", "err", err)
 

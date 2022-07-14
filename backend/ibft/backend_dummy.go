@@ -8,6 +8,9 @@ import (
 //	backend impl for go-ibft
 
 func (i *Ibft) BuildProposal(blockNumber uint64) ([]byte, error) {
+	i.logger.Debug("building proposal")
+	defer i.logger.Debug("done building")
+
 	var (
 		latestHeader      = i.blockchain.Header()
 		latestBlockNumber = latestHeader.Number
@@ -80,10 +83,9 @@ func (i *Ibft) InsertBlock(proposal []byte, committedSeals [][]byte) error {
 	//	TODO: move log to go-ibft
 	i.logger.Info(
 		"block committed",
-		"sequence", i.state.view.Sequence,
+		"number", newBlock.Number(),
 		"hash", newBlock.Hash(),
-		"validators", len(i.state.validators),
-		"rounds", i.state.view.Round+1,
+		"validators", len(i.currentValidatorSet),
 		"committed", len(committedSeals),
 	)
 
