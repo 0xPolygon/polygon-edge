@@ -94,12 +94,37 @@ func (h *Header) UnmarshalJSON(input []byte) error {
 	h.Nonce = header.Nonce
 	h.Hash = header.Hash
 
-	h.Difficulty = hex.DecodeUint64(header.Difficulty)
-	h.Number = hex.DecodeUint64(header.Number)
-	h.GasLimit = hex.DecodeUint64(header.GasLimit)
-	h.GasUsed = hex.DecodeUint64(header.GasUsed)
-	h.Timestamp = hex.DecodeUint64(header.Timestamp)
-	h.ExtraData = hex.MustDecodeHex(header.ExtraData)
+	var err error
+
+	h.Difficulty, err = hex.DecodeUint64(header.Difficulty)
+	if err != nil {
+		return err
+	}
+
+	h.Number, err = hex.DecodeUint64(header.Number)
+	if err != nil {
+		return err
+	}
+
+	h.GasLimit, err = hex.DecodeUint64(header.GasLimit)
+	if err != nil {
+		return err
+	}
+
+	h.GasUsed, err = hex.DecodeUint64(header.GasUsed)
+	if err != nil {
+		return err
+	}
+
+	h.Timestamp, err = hex.DecodeUint64(header.Timestamp)
+	if err != nil {
+		return err
+	}
+
+	h.ExtraData, err = hex.DecodeHex(header.ExtraData)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }

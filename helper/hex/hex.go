@@ -53,12 +53,30 @@ func EncodeUint64(i uint64) string {
 }
 
 // DecodeUint64 decodes a hex string with 0x prefix to uint64
-func DecodeUint64(hexStr string) uint64 {
+func DecodeUint64(hexStr string) (uint64, error) {
 	// remove 0x suffix if found in the input string
 	cleaned := strings.Replace(hexStr, "0x", "", -1)
 
 	// base 16 for hexadecimal
-	result, _ := strconv.ParseUint(cleaned, 16, 64)
+	result, err := strconv.ParseUint(cleaned, 16, 64)
+	if err != nil {
+		return 0, err
+	}
+
+	return result, nil
+}
+
+// MustDecodeUint64 decodes a hex string with 0x prefix to uint64
+// Returns panic if there is an error
+func MustDecodeUint64(hexStr string) uint64 {
+	// remove 0x suffix if found in the input string
+	cleaned := strings.Replace(hexStr, "0x", "", -1)
+
+	// base 16 for hexadecimal
+	result, err := strconv.ParseUint(cleaned, 16, 64)
+	if err != nil {
+		panic(fmt.Errorf("could not decode hex: %w", err))
+	}
 
 	return result
 }
