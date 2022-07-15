@@ -16,6 +16,11 @@ func TestEncodingUint64(t *testing.T) {
 			245,
 			false,
 		},
+		{
+			"Successfully encode and decode uint64",
+			0,
+			false,
+		},
 	}
 
 	for _, testCase := range testTable {
