@@ -3,6 +3,7 @@ package ibft
 import (
 	"encoding/json"
 	"fmt"
+	lru "github.com/hashicorp/golang-lru"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -185,10 +186,7 @@ func (i *Ibft) processHeaders(headers []*types.Header) error {
 
 		if !snap.Equal(parentSnap) {
 			saveSnap(h)
-
-			i.currentValidatorSet = snap.Set
 		}
-
 	}
 
 	// update the metadata
@@ -208,7 +206,19 @@ func (i *Ibft) getSnapshotMetadata() (*snapshotMetadata, error) {
 
 // getSnapshot returns the snapshot at the specified block height
 func (i *Ibft) getSnapshot(num uint64) (*Snapshot, error) {
+	//	get it from the snapshot first
+	raw, ok := i.store.cache.Get(num)
+	if ok {
+		snap, _ := raw.(*Snapshot)
+
+		return snap, nil
+	}
+
+	//	find it in the store
 	snap := i.store.find(num)
+
+	//	add it to cache for future reference
+	i.store.cache.Add(snap.Number, snap)
 
 	return snap, nil
 }
@@ -360,12 +370,20 @@ type snapshotStore struct {
 
 	// list represents the actual snapshot sorted list
 	list snapshotSortedList
+
+	cache *lru.Cache
 }
 
 // newSnapshotStore returns a new snapshot store
 func newSnapshotStore() *snapshotStore {
+	cache, err := lru.New(100)
+	if err != nil {
+		return nil
+	}
+
 	return &snapshotStore{
-		list: snapshotSortedList{},
+		cache: cache,
+		list:  snapshotSortedList{},
 	}
 }
 
@@ -479,6 +497,8 @@ func (s *snapshotStore) add(snap *Snapshot) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
+	s.cache.Add(snap.Number, snap)
+
 	// append and sort the list
 	s.list = append(s.list, snap)
 	sort.Sort(&s.list)
@@ -491,6 +511,7 @@ func (s *snapshotStore) replace(snap *Snapshot) {
 	for i, sn := range s.list {
 		if sn.Number == snap.Number {
 			s.list[i] = snap
+			s.cache.Add(snap.Number, snap)
 
 			return
 		}

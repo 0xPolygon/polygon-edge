@@ -367,19 +367,6 @@ func (i *Ibft) startt() {
 		}
 	}
 
-	//	TODO: watchSync actually does the sync because best peer is always nil
-	//	bulk sync first
-	if err := i.syncer.BulkSync(
-		func(newBlock *types.Block) bool {
-			callInsertBlockHook(newBlock.Number())
-			i.txpool.ResetWithHeaders(newBlock.Header)
-
-			return false
-		},
-	); err != nil {
-		i.logger.Error("bulk sync error", "err", err)
-	}
-
 	var wg sync.WaitGroup
 
 	runBlockSequence := func(height uint64) <-chan struct{} {
@@ -424,6 +411,13 @@ func (i *Ibft) startt() {
 
 	for {
 		latest := i.blockchain.Header().Number
+		snap, _ := i.getSnapshot(latest)
+
+		i.currentValidatorSet = snap.Set
+		if !i.currentValidatorSet.Includes(i.validatorKeyAddr) {
+			continue
+		}
+
 		done := runBlockSequence(latest + 1)
 
 		select {
@@ -436,36 +430,6 @@ func (i *Ibft) startt() {
 			i.logger.Info("canceled sequence", "sequence", latest+1)
 		}
 	}
-
-	//	bulk sync done
-
-	//for {
-	//	switch i.isActiveValidator() {
-	//	case true:
-	//		//	participate in consensus on current height
-	//		latestHeight := i.blockchain.Header().Number
-	//		i.logger.Info("latest height", latestHeight)
-	//
-	//		i.consensus.RunSequence(latestHeight + 1)
-	//	case false:
-	//		//	run watch sync
-	//		if err := i.syncer.WatchSync(
-	//			func(newBlock *types.Block) bool {
-	//				callInsertBlockHook(newBlock.Number())
-	//				i.txpool.ResetWithHeaders(newBlock.Header)
-	//
-	//				return i.isActiveValidator()
-	//			},
-	//		); err != nil {
-	//			i.logger.Warn("error happened during watch sync", "err", err)
-	//		}
-	//	}
-	//}
-
-}
-
-func (i *Ibft) isActiveValidator() bool {
-	return i.currentValidatorSet.Includes(i.validatorKeyAddr)
 }
 
 // start starts the IBFT backend state machine
