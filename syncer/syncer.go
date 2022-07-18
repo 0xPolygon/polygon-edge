@@ -217,9 +217,7 @@ func (s *syncer) makeSkipList() map[peer.ID]bool {
 
 	s.peerMap.Range(func(key, value interface{}) bool {
 		peer, _ := value.(*NoForkPeer)
-		if s.network.ShouldIgnoreSyncToPeer(peer.ID) {
-			skipList[peer.ID] = true
-		}
+		skipList[peer.ID] = s.network.ShouldIgnoreSyncToPeer(peer.ID)
 
 		return true
 	})
