@@ -59,7 +59,7 @@ func (m *mockBlockchain) VerifyFinalizedBlock(b *types.Block) error {
 	return m.verifyFinalizedBlockHandler(b)
 }
 
-func (m *mockBlockchain) WriteBlock(b *types.Block) error {
+func (m *mockBlockchain) WriteBlock(b *types.Block, s string) error {
 	return m.writeBlockHandler(b)
 }
 

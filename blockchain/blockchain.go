@@ -71,6 +71,8 @@ type Blockchain struct {
 	stream *eventStream // Event subscriptions
 
 	gpAverage *gasPriceAverage // A reference to the average gas price
+
+	writeLock sync.Mutex
 }
 
 // gasPriceAverage keeps track of the average gas price (rolling average)
@@ -860,17 +862,18 @@ func (b *Blockchain) executeBlockTransactions(block *types.Block) (*BlockResult,
 
 // WriteBlock writes a single block to the local blockchain.
 // It doesn't do any kind of verification, only commits the block to the DB
-func (b *Blockchain) WriteBlock(block *types.Block) error {
+func (b *Blockchain) WriteBlock(block *types.Block, s string) error {
 	//	TODO: lock here
+	b.writeLock.Lock()
+	defer b.writeLock.Unlock()
+
+	if block.Number() <= b.Header().Number {
+		b.logger.Info("block already inserted", "block", block.Number(), "source", s)
+		return nil
+	}
 
 	// Log the information
-	b.logger.Info(
-		"write block",
-		"num",
-		block.Number(),
-		"parent",
-		block.ParentHash(),
-	)
+	b.logger.Info("write block", "num", block.Number(), "parent", block.ParentHash())
 
 	header := block.Header
 
@@ -883,6 +886,7 @@ func (b *Blockchain) WriteBlock(block *types.Block) error {
 	if err := b.writeHeaderImpl(evnt, header); err != nil {
 		return err
 	}
+	evnt.Source = s
 
 	// Fetch the block receipts
 	blockReceipts, receiptsErr := b.extractBlockReceipts(block)

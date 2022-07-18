@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/0xPolygon/polygon-edge/blockchain"
 	"reflect"
+	"sync"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/backend"
@@ -62,7 +64,7 @@ type Ibft struct {
 
 	consensus *consensus.IBFT
 
-	blockchain blockchainInterface // Interface exposed by the blockchain layer
+	blockchain *blockchain.Blockchain // Interface exposed by the blockchain layer
 
 	network  *network.Server // Reference to the networking layer
 	executor *state.Executor // Reference to the state executor
@@ -199,24 +201,6 @@ func (i *Ibft) runHook(hookName HookType, height uint64, hookParam interface{}) 
 }
 
 func (i *Ibft) Initialize() error {
-	// Set up the snapshots
-	if err := i.setupSnapshot(); err != nil {
-		return err
-	}
-
-	//	TODO: set the current validator set
-	snap, err := i.getLatestSnapshot()
-	if err != nil {
-		return err
-	}
-
-	i.currentValidatorSet = snap.Set
-
-	return nil
-}
-
-// Start starts the IBFT backend
-func (i *Ibft) Start() error {
 	// register the grpc operator
 	if i.Grpc != nil {
 		i.operator = &operator{ibft: i}
@@ -235,6 +219,24 @@ func (i *Ibft) Start() error {
 		return err
 	}
 
+	// Set up the snapshots
+	if err := i.setupSnapshot(); err != nil {
+		return err
+	}
+
+	//	TODO: set the current validator set
+	snap, err := i.getLatestSnapshot()
+	if err != nil {
+		return err
+	}
+
+	i.currentValidatorSet = snap.Set
+
+	return nil
+}
+
+// Start starts the IBFT backend
+func (i *Ibft) Start() error {
 	// Start the syncer
 	if err := i.syncer.Start(); err != nil {
 		return err
@@ -365,52 +367,100 @@ func (i *Ibft) startt() {
 		}
 	}
 
+	//	TODO: watchSync actually does the sync because best peer is always nil
 	//	bulk sync first
+	if err := i.syncer.BulkSync(
+		func(newBlock *types.Block) bool {
+			callInsertBlockHook(newBlock.Number())
+			i.txpool.ResetWithHeaders(newBlock.Header)
+
+			return false
+		},
+	); err != nil {
+		i.logger.Error("bulk sync error", "err", err)
+	}
+
+	var wg sync.WaitGroup
+
+	runBlockSequence := func(height uint64) <-chan struct{} {
+		wg.Add(1)
+
+		done := make(chan struct{})
+		go func() {
+			defer func() {
+				wg.Done()
+				close(done)
+				i.logger.Info("runBlockSequence done")
+			}()
+
+			i.consensus.RunSequence(height)
+		}()
+
+		return done
+	}
+
+	go func() {
+		if err := i.syncer.WatchSync(func(block *types.Block) bool {
+			callInsertBlockHook(block.Number())
+			i.txpool.ResetWithHeaders(block.Header)
+
+			return false
+		}); err != nil {
+			i.logger.Error("watch sync fail", "err", err)
+		}
+	}()
+
+	newBlockSub := i.blockchain.SubscribeEvents()
+	syncerBlock := make(chan struct{})
+	go func() {
+		for {
+			ev := <-newBlockSub.GetEventCh()
+			if ev.Source == "syncer" {
+				syncerBlock <- struct{}{}
+			}
+		}
+
+	}()
+
 	for {
-		if !i.syncer.HasSyncPeer() {
+		latest := i.blockchain.Header().Number
+		done := runBlockSequence(latest + 1)
+
+		select {
+		case <-done:
+			//	consensus verified block
 			continue
+		case <-syncerBlock:
+			i.consensus.CancelSequence()
+			wg.Wait()
+			i.logger.Info("canceled sequence", "sequence", latest+1)
 		}
-
-		if err := i.syncer.BulkSync(
-			func(newBlock *types.Block) bool {
-				callInsertBlockHook(newBlock.Number())
-				i.txpool.ResetWithHeaders(newBlock.Header)
-
-				return false
-			},
-		); err != nil {
-			i.logger.Error("bulk sync error", "err", err)
-			//	log err
-			continue
-		}
-
-		break
 	}
 
 	//	bulk sync done
 
-	for {
-		switch i.isActiveValidator() {
-		case true:
-			//	participate in consensus on current height
-			latestHeight := i.blockchain.Header().Number
-			i.logger.Info("latest height", latestHeight)
-
-			i.consensus.RunSequence(latestHeight + 1)
-		case false:
-			//	run watch sync
-			if err := i.syncer.WatchSync(
-				func(newBlock *types.Block) bool {
-					callInsertBlockHook(newBlock.Number())
-					i.txpool.ResetWithHeaders(newBlock.Header)
-
-					return i.isActiveValidator()
-				},
-			); err != nil {
-				i.logger.Warn("error happened during watch sync", "err", err)
-			}
-		}
-	}
+	//for {
+	//	switch i.isActiveValidator() {
+	//	case true:
+	//		//	participate in consensus on current height
+	//		latestHeight := i.blockchain.Header().Number
+	//		i.logger.Info("latest height", latestHeight)
+	//
+	//		i.consensus.RunSequence(latestHeight + 1)
+	//	case false:
+	//		//	run watch sync
+	//		if err := i.syncer.WatchSync(
+	//			func(newBlock *types.Block) bool {
+	//				callInsertBlockHook(newBlock.Number())
+	//				i.txpool.ResetWithHeaders(newBlock.Header)
+	//
+	//				return i.isActiveValidator()
+	//			},
+	//		); err != nil {
+	//			i.logger.Warn("error happened during watch sync", "err", err)
+	//		}
+	//	}
+	//}
 
 }
 
@@ -529,7 +579,7 @@ func (i *Ibft) runSyncState() {
 
 			return false
 		}); err != nil {
-			i.logger.Error("failed to bulk sync", "err", err)
+			i.logger.Error("fail to bulk sync", "err", err)
 
 			continue
 		}
@@ -595,6 +645,59 @@ func (i *Ibft) shouldWriteTransactions(height uint64) bool {
 	return false
 }
 
+type status uint8
+
+const (
+	success status = iota
+	fail
+	skip
+)
+
+type txExeResult struct {
+	tx     *types.Transaction
+	status status
+}
+
+func (i *Ibft) writeTransaction(
+	tx *types.Transaction,
+	transition transitionInterface,
+	gasLimit uint64,
+) (*txExeResult, bool) {
+	if tx == nil {
+		return nil, false
+	}
+
+	if tx.ExceedsBlockGasLimit(gasLimit) {
+		i.txpool.Drop(tx)
+
+		if err := transition.WriteFailedReceipt(tx); err != nil {
+			//	log this error
+		}
+
+		//	continue processing
+		return &txExeResult{tx, fail}, true
+	}
+
+	if err := transition.Write(tx); err != nil {
+		if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok { // nolint:errorlint
+			//	stop processing
+			return nil, false
+		} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable { // nolint:errorlint
+			i.txpool.Demote(tx)
+
+			return &txExeResult{tx, skip}, true
+		} else {
+			i.txpool.Drop(tx)
+
+			return &txExeResult{tx, fail}, true
+		}
+	}
+
+	i.txpool.Pop(tx)
+
+	return &txExeResult{tx, success}, true
+}
+
 func (i *Ibft) executeTransactions(
 	gasLimit,
 	blockNumber uint64,
@@ -602,70 +705,56 @@ func (i *Ibft) executeTransactions(
 ) (executed []*types.Transaction) {
 	executed = make([]*types.Transaction, 0)
 
+	var (
+		successful = 0
+		failed     = 0
+		skipped    = 0
+	)
+
 	if !i.shouldWriteTransactions(blockNumber) {
 		return
 	}
 
-	executeTx := func(tx *types.Transaction) (*types.Transaction, bool) {
-		if tx == nil {
-			return nil, false
-		}
-
-		if tx.ExceedsBlockGasLimit(gasLimit) {
-			i.txpool.Drop(tx)
-
-			if err := transition.WriteFailedReceipt(tx); err != nil {
-				//	log this error
-			}
-
-			//	continue processing
-			return nil, true
-		}
-
-		if err := transition.Write(tx); err != nil {
-			if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok { // nolint:errorlint
-				//	stop processing
-				return nil, false
-			} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable { // nolint:errorlint
-				i.txpool.Demote(tx)
-			} else {
-				//failedTxCount++
-				i.txpool.Drop(tx)
-			}
-
-			//	continue processing
-			return nil, true
-		}
-
-		i.txpool.Pop(tx)
-
-		return tx, true
-	}
-
 	i.txpool.Prepare()
 
-	stop := false
-	blockTimer := time.NewTimer(i.blockTime)
+	var (
+		blockTimer    = time.NewTimer(i.blockTime)
+		stopExecution = false
+	)
 
 	for {
 		select {
 		case <-blockTimer.C:
 			return
 		default:
-			//	execute transactions one by one
-			if stop {
+			if stopExecution {
 				//	wait for the timer to expire
 				continue
 			}
 
-			tx, ok := executeTx(i.txpool.Peek())
+			//	execute transactions one by one
+			result, ok := i.writeTransaction(
+				i.txpool.Peek(),
+				transition,
+				gasLimit,
+			)
 			if !ok {
-				stop = true
+				stopExecution = true
+				continue
 			}
 
-			if tx != nil {
+			tx := result.tx
+
+			switch result.status {
+			case success:
 				executed = append(executed, tx)
+				successful++
+			case fail:
+				failed++
+			case skip:
+				skipped++
 			}
+
 		}
 	}
 }
@@ -701,7 +790,6 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 		i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", CandidateVoteHook, hookErr))
 	}
 
-	//	TODO: fix this (execution of transaction is timed)
 	// set the timestamp
 	parentTime := time.Unix(int64(parent.Timestamp), 0)
 	headerTime := parentTime.Add(i.blockTime)
@@ -896,7 +984,7 @@ func (i *Ibft) runAcceptState() { // start new round
 			// since the state is not locked, we need to build a new block
 			i.state.block, err = i.buildBlock(snap, parent)
 			if err != nil {
-				i.logger.Error("failed to build block", "err", err)
+				i.logger.Error("fail to build block", "err", err)
 				i.setState(RoundChangeState)
 
 				return
@@ -952,7 +1040,7 @@ func (i *Ibft) runAcceptState() { // start new round
 		// retrieve the block proposal
 		block := &types.Block{}
 		if err := block.UnmarshalRLP(msg.Proposal.Value); err != nil {
-			i.logger.Error("failed to unmarshal block", "err", err)
+			i.logger.Error("fail to unmarshal block", "err", err)
 			i.setState(RoundChangeState)
 
 			return
@@ -978,7 +1066,7 @@ func (i *Ibft) runAcceptState() { // start new round
 		} else {
 			// since it's a new block, we have to verify it first
 			if err := i.verifyHeaderImpl(snap, parent, block.Header); err != nil {
-				i.logger.Error("block header verification failed", "err", err)
+				i.logger.Error("block header verification fail", "err", err)
 				i.handleStateErr(errBlockVerificationFailed)
 
 				continue
@@ -986,7 +1074,7 @@ func (i *Ibft) runAcceptState() { // start new round
 
 			// Verify other block params
 			if err := i.blockchain.VerifyPotentialBlock(block); err != nil {
-				i.logger.Error("block verification failed", "err", err)
+				i.logger.Error("block verification fail", "err", err)
 				i.handleStateErr(errBlockVerificationFailed)
 
 				continue
@@ -994,7 +1082,7 @@ func (i *Ibft) runAcceptState() { // start new round
 
 			if hookErr := i.runHook(VerifyBlockHook, block.Number(), block); hookErr != nil {
 				if errors.As(hookErr, &errBlockVerificationFailed) {
-					i.logger.Error("block verification failed, block at the end of epoch has transactions")
+					i.logger.Error("block verification fail, block at the end of epoch has transactions")
 					i.handleStateErr(errBlockVerificationFailed)
 				} else {
 					i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", VerifyBlockHook, hookErr))
@@ -1077,7 +1165,7 @@ func (i *Ibft) runValidateState() {
 		if err := i.insertBlock(block); err != nil {
 			// start a new round with the state unlocked since we need to
 			// be able to propose/validate a different block
-			i.logger.Error("failed to insert block", "err", err)
+			i.logger.Error("fail to insert block", "err", err)
 			i.handleStateErr(errFailedToInsertBlock)
 		} else {
 			// update metrics
@@ -1146,7 +1234,7 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 	}
 
 	// Save the block locally
-	if err := i.blockchain.WriteBlock(block); err != nil {
+	if err := i.blockchain.WriteBlock(block, ""); err != nil {
 		return err
 	}
 
@@ -1173,8 +1261,8 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 var (
 	errIncorrectBlockLocked    = errors.New("block locked is incorrect")
 	errIncorrectBlockHeight    = errors.New("proposed block number is incorrect")
-	errBlockVerificationFailed = errors.New("block verification failed")
-	errFailedToInsertBlock     = errors.New("failed to insert block")
+	errBlockVerificationFailed = errors.New("block verification fail")
+	errFailedToInsertBlock     = errors.New("fail to insert block")
 )
 
 func (i *Ibft) handleStateErr(err error) {
@@ -1303,7 +1391,7 @@ func (i *Ibft) gossip(typ proto.MessageReq_Type) {
 	if msg.Type == proto.MessageReq_Commit {
 		seal, err := writeCommittedSeal(i.validatorKey, i.state.block.Header)
 		if err != nil {
-			i.logger.Error("failed to commit seal", "err", err)
+			i.logger.Error("fail to commit seal", "err", err)
 
 			return
 		}
@@ -1320,13 +1408,13 @@ func (i *Ibft) gossip(typ proto.MessageReq_Type) {
 	}
 
 	if err := signMsg(i.validatorKey, msg); err != nil {
-		i.logger.Error("failed to sign message", "err", err)
+		i.logger.Error("fail to sign message", "err", err)
 
 		return
 	}
 
 	//if err := i.transport.Multicast(msg); err != nil {
-	//	i.logger.Error("failed to gossip", "err", err)
+	//	i.logger.Error("fail to gossip", "err", err)
 	//}
 }
 

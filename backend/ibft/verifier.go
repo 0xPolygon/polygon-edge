@@ -22,7 +22,7 @@ func (i *Ibft) IsValidBlock(proposal []byte) bool {
 
 	// retrieve the newBlock proposal
 	if err := newBlock.UnmarshalRLP(proposal); err != nil {
-		i.logger.Error("IsValidBlock: failed to unmarshal newBlock", "err", err)
+		i.logger.Error("IsValidBlock: fail to unmarshal newBlock", "err", err)
 
 		return false
 	}
@@ -47,13 +47,13 @@ func (i *Ibft) IsValidBlock(proposal []byte) bool {
 
 	//	TODO: just verify the header, not the proposer (again)
 	if err := i.verifyHeaderImpl(snap, latestHeader, newBlock.Header); err != nil {
-		i.logger.Error("block header verification failed", "err", err)
+		i.logger.Error("block header verification fail", "err", err)
 
 		return false
 	}
 
 	if err := i.blockchain.VerifyPotentialBlock(newBlock); err != nil {
-		i.logger.Error("newBlock verification failed", "err", err)
+		i.logger.Error("newBlock verification fail", "err", err)
 		i.handleStateErr(errBlockVerificationFailed)
 
 		return false
@@ -61,7 +61,7 @@ func (i *Ibft) IsValidBlock(proposal []byte) bool {
 
 	if hookErr := i.runHook(VerifyBlockHook, newBlock.Number(), newBlock); hookErr != nil {
 		if errors.As(hookErr, &errBlockVerificationFailed) {
-			i.logger.Error("block verification failed, block at the end of epoch has transactions")
+			i.logger.Error("block verification fail, block at the end of epoch has transactions")
 		} else {
 			i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", VerifyBlockHook, hookErr))
 		}

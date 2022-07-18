@@ -41,7 +41,7 @@ func (i *Ibft) BuildProposal(blockNumber uint64) ([]byte, error) {
 
 	block, err := i.buildBlock(snap, latestHeader)
 	if err != nil {
-		return nil, errors.New("build block failed")
+		return nil, errors.New("build block fail")
 	}
 
 	return block.MarshalRLP(), nil
@@ -72,7 +72,7 @@ func (i *Ibft) InsertBlock(proposal []byte, committedSeals [][]byte) error {
 	//}
 
 	// Save the block locally
-	if err := i.blockchain.WriteBlock(newBlock); err != nil {
+	if err := i.blockchain.WriteBlock(newBlock, "consensus"); err != nil {
 		return err
 	}
 

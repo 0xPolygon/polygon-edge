@@ -2,6 +2,7 @@ package ibft
 
 import (
 	"github.com/0xPolygon/polygon-edge/network"
+	"github.com/0xPolygon/polygon-edge/types"
 	consensus "github.com/Trapesys/go-ibft/core"
 	"github.com/Trapesys/go-ibft/messages/proto"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -22,7 +23,7 @@ func (g *gossipTransport) Multicast(msg *proto.Message) error {
 
 func (i *Ibft) Multicast(msg *proto.Message) {
 	if err := i.transport.Multicast(msg); err != nil {
-		i.logger.Error("failed to gossip", "err", err)
+		i.logger.Error("fail to gossip", "err", err)
 	}
 }
 
@@ -50,6 +51,14 @@ func (i *Ibft) setupTransport() error {
 		}
 
 		i.consensus.AddMessage(msg)
+
+		i.logger.Info(
+			"validator message received",
+			"type", msg.Type.String(),
+			"height", msg.GetView().Height,
+			"round", msg.GetView().Round,
+			"addr", types.BytesToAddress(msg.From).String(),
+		)
 	})
 
 	if err != nil {

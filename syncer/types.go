@@ -25,7 +25,7 @@ type Blockchain interface {
 	// VerifyFinalizedBlock verifies finalized block
 	VerifyFinalizedBlock(*types.Block) error
 	// WriteBlock writes a given block to chain
-	WriteBlock(*types.Block) error
+	WriteBlock(*types.Block, string) error
 }
 
 type Network interface {

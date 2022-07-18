@@ -197,7 +197,7 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 	}
 
 	// Write the block to the blockchain
-	if err := d.blockchain.WriteBlock(block); err != nil {
+	if err := d.blockchain.WriteBlock(block, ""); err != nil {
 		return err
 	}
 

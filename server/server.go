@@ -242,6 +242,15 @@ func NewServer(config *Config) (*Server, error) {
 		return nil, err
 	}
 
+	// setup and start grpc server
+	if err := m.setupGRPC(); err != nil {
+		return nil, err
+	}
+
+	if err := m.network.Start(); err != nil {
+		return nil, err
+	}
+
 	// setup and start jsonrpc server
 	if err := m.setupJSONRPC(); err != nil {
 		return nil, err
@@ -254,15 +263,6 @@ func NewServer(config *Config) (*Server, error) {
 
 	// start backend
 	if err := m.consensus.Start(); err != nil {
-		return nil, err
-	}
-
-	// setup and start grpc server
-	if err := m.setupGRPC(); err != nil {
-		return nil, err
-	}
-
-	if err := m.network.Start(); err != nil {
 		return nil, err
 	}
 
@@ -393,20 +393,19 @@ func (s *Server) setupConsensus() error {
 
 	consensus, err := engine(
 		&backend.BackendParams{
-			Context:        context.Background(),
-			Seal:           s.config.Seal,
-			Config:         config,
-			TxPool:         s.txpool,
-			Network:        s.network,
-			Blockchain:     s.blockchain,
-			Executor:       s.executor,
-			Grpc:           s.grpcServer,
-			Logger:         s.logger.Named("backend"),
-			Metrics:        s.serverMetrics.consensus,
-			SecretsManager: s.secretsManager,
-			BlockTime:      s.config.BlockTime,
+			Context:         context.Background(),
+			Seal:            s.config.Seal,
+			Config:          config,
+			TxPool:          s.txpool,
+			Network:         s.network,
+			Blockchain:      s.blockchain,
+			Executor:        s.executor,
+			Grpc:            s.grpcServer,
+			Logger:          s.logger.Named("backend"),
+			Metrics:         s.serverMetrics.consensus,
+			SecretsManager:  s.secretsManager,
+			BlockTime:       s.config.BlockTime,
 			IBFTBaseTimeout: s.config.IBFTBaseTimeout,
-
 		},
 	)
 

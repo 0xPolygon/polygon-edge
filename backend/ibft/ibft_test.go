@@ -111,7 +111,7 @@ func (m *MockBlockchain) SetGenesis(validators []types.Address) *types.Block {
 	}
 
 	if err := m.writeBlock(block); err != nil {
-		m.t.Errorf("failed to insert genesis block: %v", err)
+		m.t.Errorf("fail to insert genesis block: %v", err)
 	}
 
 	return block
@@ -144,7 +144,7 @@ func (m *MockBlockchain) MockBlock(
 
 	header, err = writeSeal(proposer, header)
 	if err != nil {
-		m.t.Errorf("failed to write seal in DummyBlock: %v", err)
+		m.t.Errorf("fail to write seal in DummyBlock: %v", err)
 	}
 
 	return &types.Block{
@@ -1118,7 +1118,7 @@ func (m *mockIbft) DummyBlock() *types.Block {
 
 	num := parent.Number + 1
 	gasLimit, err := m.CalculateGasLimit(num)
-	assert.NoError(m.t, err, "failed to calculate next gas limit")
+	assert.NoError(m.t, err, "fail to calculate next gas limit")
 
 	block := &types.Block{
 		Header: &types.Header{
