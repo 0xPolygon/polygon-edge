@@ -387,8 +387,6 @@ func (t *TestServer) Start(ctx context.Context) error {
 		defer cancel()
 
 		if _, err := t.Operator().GetStatus(ctx, &empty.Empty{}); err != nil {
-			t.t.Logf("failed to get status from server: %+v", err)
-
 			return nil, true
 		}
 

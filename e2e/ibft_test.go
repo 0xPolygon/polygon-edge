@@ -21,8 +21,6 @@ import (
 	and verifies it was mined
 **/
 func TestIbft_Transfer(t *testing.T) {
-	t.Parallel()
-
 	testCases := []struct {
 		name            string
 		blockTime       uint64
@@ -46,11 +44,7 @@ func TestIbft_Transfer(t *testing.T) {
 	)
 
 	for _, tc := range testCases {
-		tc := tc
-
 		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
 			ibftManager := framework.NewIBFTServersManager(t,
 				IBFTMinNodes,
 				IBFTDirPrefix,
@@ -89,15 +83,16 @@ func TestIbft_Transfer(t *testing.T) {
 				SendRawTx(ctxForTx, txn, senderKey)
 
 			assert.NoError(t, err)
-			assert.NotNil(t, receipt)
+			if receipt == nil {
+				t.Fatalf("receipt not received")
+			}
+
 			assert.NotNil(t, receipt.TransactionHash)
 		})
 	}
 }
 
 func TestIbft_TransactionFeeRecipient(t *testing.T) {
-	t.Parallel()
-
 	testCases := []struct {
 		name         string
 		contractCall bool
@@ -116,11 +111,7 @@ func TestIbft_TransactionFeeRecipient(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
-
 		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
 			senderKey, senderAddr := tests.GenerateKeyAndAddr(t)
 			_, receiverAddr := tests.GenerateKeyAndAddr(t)
 
@@ -172,7 +163,10 @@ func TestIbft_TransactionFeeRecipient(t *testing.T) {
 			defer cancel1()
 			receipt, err := srv.SendRawTx(ctx1, txn, senderKey)
 			assert.NoError(t, err)
-			assert.NotNil(t, receipt)
+
+			if receipt == nil {
+				t.Fatalf("receipt not received")
+			}
 
 			// Get the block proposer from the extra data seal
 			assert.NotNil(t, receipt.BlockHash)
