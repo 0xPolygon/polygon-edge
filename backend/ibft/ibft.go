@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"reflect"
-	"sync"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/backend"
@@ -24,8 +23,6 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"google.golang.org/grpc"
 	anypb "google.golang.org/protobuf/types/known/anypb"
-
-	consensus "github.com/Trapesys/go-ibft/core"
 )
 
 const (
@@ -62,7 +59,7 @@ type Ibft struct {
 
 	config *backend.Config // Backend configuration
 
-	consensus *consensus.IBFT
+	consensus *consensus
 
 	blockchain *blockchain.Blockchain // Interface exposed by the blockchain layer
 
@@ -219,12 +216,17 @@ func (i *Ibft) Initialize() error {
 		return err
 	}
 
+	i.consensus = newIBFT(
+		i.logger.Named("consensus"),
+		i,
+		i,
+	)
+
 	// Set up the snapshots
 	if err := i.setupSnapshot(); err != nil {
 		return err
 	}
 
-	//	TODO: set the current validator set
 	snap, err := i.getLatestSnapshot()
 	if err != nil {
 		return err
@@ -367,25 +369,7 @@ func (i *Ibft) startt() {
 		}
 	}
 
-	var wg sync.WaitGroup
-
-	runBlockSequence := func(height uint64) <-chan struct{} {
-		wg.Add(1)
-
-		done := make(chan struct{})
-		go func() {
-			defer func() {
-				wg.Done()
-				close(done)
-				i.logger.Info("runBlockSequence done")
-			}()
-
-			i.consensus.RunSequence(height)
-		}()
-
-		return done
-	}
-
+	//	TODO: refactor into method
 	go func() {
 		if err := i.syncer.WatchSync(func(block *types.Block) bool {
 			callInsertBlockHook(block.Number())
@@ -397,6 +381,7 @@ func (i *Ibft) startt() {
 		}
 	}()
 
+	//	TODO: refactor into method
 	newBlockSub := i.blockchain.SubscribeEvents()
 	syncerBlock := make(chan struct{})
 	go func() {
@@ -418,15 +403,13 @@ func (i *Ibft) startt() {
 			continue
 		}
 
-		done := runBlockSequence(latest + 1)
-
 		select {
-		case <-done:
-			//	consensus verified block
+		case <-i.consensus.runSequence(latest + 1):
+			//	consensus inserted block
 			continue
 		case <-syncerBlock:
-			i.consensus.CancelSequence()
-			wg.Wait()
+			//	syncer inserted block -> stop running consensus
+			i.consensus.cancelSequence()
 			i.logger.Info("canceled sequence", "sequence", latest+1)
 		}
 	}

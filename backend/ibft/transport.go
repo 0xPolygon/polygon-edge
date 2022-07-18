@@ -3,7 +3,6 @@ package ibft
 import (
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/types"
-	consensus "github.com/Trapesys/go-ibft/core"
 	"github.com/Trapesys/go-ibft/messages/proto"
 	"github.com/libp2p/go-libp2p-core/peer"
 )
@@ -66,12 +65,6 @@ func (i *Ibft) setupTransport() error {
 	}
 
 	i.transport = &gossipTransport{topic: topic}
-
-	i.consensus = consensus.NewIBFT(
-		i.logger.Named("consensus"),
-		i,
-		i,
-	)
 
 	return nil
 }
