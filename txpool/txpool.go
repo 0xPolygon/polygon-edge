@@ -150,6 +150,8 @@ type TxPool struct {
 	enqueueReqCh chan enqueueRequest
 	promoteReqCh chan promoteRequest
 
+	overflowCh chan struct{}
+
 	// shutdown channel
 	shutdownCh chan struct{}
 
@@ -214,6 +216,7 @@ func NewTxPool(
 	// initialise channels
 	pool.enqueueReqCh = make(chan enqueueRequest)
 	pool.promoteReqCh = make(chan promoteRequest)
+	pool.overflowCh = make(chan struct{})
 	pool.shutdownCh = make(chan struct{})
 
 	return pool, nil
@@ -226,6 +229,21 @@ func (p *TxPool) Start() {
 	// set default value of txpool pending transactions gauge
 	p.metrics.PendingTxs.Set(0)
 
+	//	overflow reaction
+	go func() {
+		for {
+			//	wait until the signal is emitted
+			<-p.overflowCh
+
+			//	collect a list of most stale accounts
+
+			//	attempt to relieve the gauge
+
+			//	cooldown (time sleep or time after)
+		}
+	}()
+
+	//	transaction flow
 	go func() {
 		for {
 			select {
