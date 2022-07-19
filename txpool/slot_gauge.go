@@ -17,14 +17,16 @@ func (g *slotGauge) read() uint64 {
 	return atomic.LoadUint64(&g.height)
 }
 
-// increase increases the height of the gauge by the specified slots amount.
-func (g *slotGauge) increase(slots uint64) {
-	atomic.AddUint64(&g.height, slots)
+// 	increase increases the height of the gauge by the specified slots amount
+//	and returns the updated value.
+func (g *slotGauge) increase(slots uint64) uint64 {
+	return atomic.AddUint64(&g.height, slots)
 }
 
-// decrease decreases the height of the gauge by the specified slots amount.
-func (g *slotGauge) decrease(slots uint64) {
-	atomic.AddUint64(&g.height, ^(slots - 1))
+// 	decrease decreases the height of the gauge by the specified slots amount
+//	and returns the updates value
+func (g *slotGauge) decrease(slots uint64) uint64 {
+	return atomic.AddUint64(&g.height, ^(slots - 1))
 }
 
 // slotsRequired calculates the number of slots required for given transaction(s).
