@@ -12,22 +12,22 @@ import (
 
 // Header represents a block header in the Ethereum blockchain.
 type Header struct {
-	ParentHash   Hash    `json:"parentHash"`
-	Sha3Uncles   Hash    `json:"sha3Uncles"`
-	Miner        Address `json:"miner"`
-	StateRoot    Hash    `json:"stateRoot"`
-	TxRoot       Hash    `json:"transactionsRoot"`
-	ReceiptsRoot Hash    `json:"receiptsRoot"`
-	LogsBloom    Bloom   `json:"logsBloom"`
-	Difficulty   uint64  `json:"difficulty"`
-	Number       uint64  `json:"number"`
-	GasLimit     uint64  `json:"gasLimit"`
-	GasUsed      uint64  `json:"gasUsed"`
-	Timestamp    uint64  `json:"timestamp"`
-	ExtraData    []byte  `json:"extraData"`
-	MixHash      Hash    `json:"mixHash"`
-	Nonce        Nonce   `json:"nonce"`
-	Hash         Hash    `json:"hash"`
+	ParentHash   Hash   `json:"parentHash"`
+	Sha3Uncles   Hash   `json:"sha3Uncles"`
+	Miner        []byte `json:"miner"`
+	StateRoot    Hash   `json:"stateRoot"`
+	TxRoot       Hash   `json:"transactionsRoot"`
+	ReceiptsRoot Hash   `json:"receiptsRoot"`
+	LogsBloom    Bloom  `json:"logsBloom"`
+	Difficulty   uint64 `json:"difficulty"`
+	Number       uint64 `json:"number"`
+	GasLimit     uint64 `json:"gasLimit"`
+	GasUsed      uint64 `json:"gasUsed"`
+	Timestamp    uint64 `json:"timestamp"`
+	ExtraData    []byte `json:"extraData"`
+	MixHash      Hash   `json:"mixHash"`
+	Nonce        Nonce  `json:"nonce"`
+	Hash         Hash   `json:"hash"`
 }
 
 func (h *Header) Equal(hh *Header) bool {

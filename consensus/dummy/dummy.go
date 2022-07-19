@@ -57,7 +57,7 @@ func (d *Dummy) ProcessHeaders(headers []*types.Header) error {
 }
 
 func (d *Dummy) GetBlockCreator(header *types.Header) (types.Address, error) {
-	return header.Miner, nil
+	return types.BytesToAddress(header.Miner), nil
 }
 
 // PreStateCommit a hook to be called before finalizing state transition on inserting block

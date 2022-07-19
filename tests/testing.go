@@ -138,8 +138,10 @@ func stringToInt64T(t *testing.T, str string) int64 {
 func (e *env) ToHeader(t *testing.T) *types.Header {
 	t.Helper()
 
+	minter := stringToAddressT(t, e.Coinbase)
+
 	return &types.Header{
-		Miner:      stringToAddressT(t, e.Coinbase),
+		Miner:      []byte(minter[:]),
 		Difficulty: stringToUint64T(t, e.Difficulty),
 		GasLimit:   stringToUint64T(t, e.GasLimit),
 		Number:     stringToUint64T(t, e.Number),

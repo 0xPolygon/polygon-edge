@@ -215,7 +215,7 @@ func buildHeaders(
 		h := &types.Header{
 			Number:     uint64(num + 1),
 			ParentHash: parentHash,
-			Miner:      types.ZeroAddress,
+			Miner:      types.ZeroAddress[:],
 			MixHash:    signer.IstanbulDigest,
 			ExtraData:  extraData,
 		}
@@ -224,7 +224,10 @@ func buildHeaders(
 			// if candidate is empty, we are just creating a new block
 			// without votes
 			pool.add(v.candidate)
-			h.Miner = pool.get(v.candidate).Address()
+
+			minter := pool.get(v.candidate).Address()
+
+			h.Miner = minter[:]
 		}
 
 		if v.auth {
@@ -873,12 +876,14 @@ func TestSnapshot_PurgeSnapshots(t *testing.T) {
 		h := &types.Header{
 			Number:     uint64(i),
 			ParentHash: ibft1.blockchain.Header().Hash,
-			Miner:      types.ZeroAddress,
+			Miner:      types.ZeroAddress[:],
 			MixHash:    signer.IstanbulDigest,
 			ExtraData:  genesis.ExtraData,
 		}
 
-		h.Miner = pool.get(id).Address()
+		minter := pool.get(id).Address()
+
+		h.Miner = minter[:]
 		h.Nonce = nonceAuthVote
 
 		err := ibft1.signer.InitIBFTExtra(h, parent, pool.ValidatorSet())

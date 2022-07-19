@@ -543,7 +543,7 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 	header := &types.Header{
 		ParentHash: parent.Hash,
 		Number:     parent.Number + 1,
-		Miner:      types.Address{},
+		Miner:      types.ZeroAddress[:],
 		Nonce:      types.Nonce{},
 		MixHash:    signer.IstanbulDigest,
 		// this is required because blockchain needs difficulty to organize blocks and forks
