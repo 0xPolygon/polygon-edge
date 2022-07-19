@@ -61,20 +61,19 @@ type backendIBFT struct {
 	consensus *consensus
 
 	blockchain *blockchain.Blockchain // Interface exposed by the blockchain layer
-
-	network  *network.Server // Reference to the networking layer
-	executor *state.Executor // Reference to the state executor
-	txpool   txPoolInterface // Reference to the transaction pool
-	syncer   syncer.Syncer   // Reference to the sync protocol
-	Grpc     *grpc.Server    // gRPC configuration
+	network    *network.Server        // Reference to the networking layer
+	executor   *state.Executor        // Reference to the state executor
+	txpool     txPoolInterface        // Reference to the transaction pool
+	syncer     syncer.Syncer          // Reference to the sync protocol
+	Grpc       *grpc.Server           // gRPC configuration
 
 	metrics *backend.Metrics
 
 	secretsManager secrets.SecretsManager
 
-	validatorKey        *ecdsa.PrivateKey // Private key for the validator
-	validatorKeyAddr    types.Address
-	currentValidatorSet ValidatorSet
+	validatorKey       *ecdsa.PrivateKey // Private key for the validator
+	validatorKeyAddr   types.Address
+	activeValidatorSet ValidatorSet
 
 	store     *snapshotStore // Snapshot store that keeps track of all snapshots
 	transport transport      // Reference to the transport protocol
@@ -206,6 +205,9 @@ func (i *backendIBFT) Initialize() error {
 		i,
 	)
 
+	//	Ensure consensus takes into account user configured block production time
+	i.consensus.ExtendRoundTimeout(i.blockTime)
+
 	// Set up the snapshots
 	if err := i.setupSnapshot(); err != nil {
 		return err
@@ -216,9 +218,29 @@ func (i *backendIBFT) Initialize() error {
 		return err
 	}
 
-	i.currentValidatorSet = snap.Set
+	i.activeValidatorSet = snap.Set
 
 	return nil
+}
+
+//	sync runs the syncer in the background to receive blocks from advanced peers
+func (i *backendIBFT) startSyncing() {
+	callInsertBlockHook := func(blockNumber uint64) {
+		if err := i.runHook(InsertBlockHook, blockNumber, blockNumber); err != nil {
+			i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", InsertBlockHook, err))
+		}
+	}
+
+	if err := i.syncer.WatchSync(
+		func(block *types.Block) bool {
+			callInsertBlockHook(block.Number())
+			i.txpool.ResetWithHeaders(block.Header)
+
+			return false
+		},
+	); err != nil {
+		i.logger.Error("watch sync failed", "err", err)
+	}
 }
 
 // Start starts the IBFT backend
@@ -228,8 +250,11 @@ func (i *backendIBFT) Start() error {
 		return err
 	}
 
-	// Start the actual IBFT protocol
-	go i.startt()
+	//	Start syncing blocks from other peers
+	go i.startSyncing()
+
+	// Start the actual consensus protocol
+	go i.startConsensus()
 
 	return nil
 }
@@ -337,66 +362,65 @@ func (i *backendIBFT) createKey() error {
 	return nil
 }
 
-func (i *backendIBFT) startt() {
-	callInsertBlockHook := func(blockNumber uint64) {
-		if hookErr := i.runHook(InsertBlockHook, blockNumber, blockNumber); hookErr != nil {
-			i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", InsertBlockHook, hookErr))
-		}
-	}
+func (i *backendIBFT) startConsensus() {
+	var (
+		newBlockSub   = i.blockchain.SubscribeEvents()
+		syncerBlockCh = make(chan struct{})
+	)
 
-	//	TODO: refactor into method
-	go func() {
-		if err := i.syncer.WatchSync(func(block *types.Block) bool {
-			callInsertBlockHook(block.Number())
-			i.txpool.ResetWithHeaders(block.Header)
-
-			return false
-		}); err != nil {
-			i.logger.Error("watch sync fail", "err", err)
-		}
-	}()
-
-	//	TODO: refactor into method
-	newBlockSub := i.blockchain.SubscribeEvents()
-	syncerBlock := make(chan struct{})
+	//	Receive a notification every time syncer manages
+	//	to insert a valid block. Used for cancelling active consensus
+	//	rounds for a specific height
 	go func() {
 		for {
-			ev := <-newBlockSub.GetEventCh()
-			if ev.Source == "syncer" {
-				syncerBlock <- struct{}{}
+			if ev := <-newBlockSub.GetEventCh(); ev.Source == "syncer" {
+				syncerBlockCh <- struct{}{}
 			}
 		}
-
 	}()
 
 	defer newBlockSub.Close()
 
 	for {
-		latest := i.blockchain.Header().Number
-		snap, _ := i.getSnapshot(latest)
+		var (
+			latest  = i.blockchain.Header().Number
+			pending = latest + 1
+		)
 
-		i.currentValidatorSet = snap.Set
-		//Update the No.of validator metric
-		i.metrics.Validators.Set(float64(len(snap.Set)))
+		i.updateActiveValidatorSet(latest)
 
-		if !i.currentValidatorSet.Includes(i.validatorKeyAddr) {
+		if !i.isActiveValidator() {
+			//	we are not participating in consensus for this height
 			continue
 		}
 
 		select {
-		case <-i.consensus.runSequence(latest + 1):
+		case <-i.consensus.runSequence(pending):
 			//	consensus inserted block
 			continue
-		case <-syncerBlock:
+		case <-syncerBlockCh:
 			//	syncer inserted block -> stop running consensus
 			i.consensus.stopSequence()
-			i.logger.Info("canceled sequence", "sequence", latest+1)
+			i.logger.Info("canceled sequence", "sequence", pending)
 		case <-i.closeCh:
 			//	IBFT backend stopped
 			i.consensus.stopSequence()
 			return
 		}
 	}
+}
+
+func (i *backendIBFT) isActiveValidator() bool {
+	return i.activeValidatorSet.Includes(i.validatorKeyAddr)
+}
+
+func (i *backendIBFT) updateActiveValidatorSet(latestHeight uint64) {
+	snap, _ := i.getSnapshot(latestHeight)
+
+	i.activeValidatorSet = snap.Set
+
+	//Update the No.of validator metric
+	i.metrics.Validators.Set(float64(len(snap.Set)))
 }
 
 // isValidSnapshot checks if the current node is in the validator set for the latest snapshot
@@ -431,269 +455,6 @@ func (i *backendIBFT) shouldWriteTransactions(height uint64) bool {
 	}
 
 	return false
-}
-
-type status uint8
-
-const (
-	success status = iota
-	fail
-	skip
-)
-
-type txExeResult struct {
-	tx     *types.Transaction
-	status status
-}
-
-func (i *backendIBFT) writeTransaction(
-	tx *types.Transaction,
-	transition transitionInterface,
-	gasLimit uint64,
-) (*txExeResult, bool) {
-	if tx == nil {
-		return nil, false
-	}
-
-	if tx.ExceedsBlockGasLimit(gasLimit) {
-		i.txpool.Drop(tx)
-
-		if err := transition.WriteFailedReceipt(tx); err != nil {
-			//	log this error
-		}
-
-		//	continue processing
-		return &txExeResult{tx, fail}, true
-	}
-
-	if err := transition.Write(tx); err != nil {
-		if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok { // nolint:errorlint
-			//	stop processing
-			return nil, false
-		} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable { // nolint:errorlint
-			i.txpool.Demote(tx)
-
-			return &txExeResult{tx, skip}, true
-		} else {
-			i.txpool.Drop(tx)
-
-			return &txExeResult{tx, fail}, true
-		}
-	}
-
-	i.txpool.Pop(tx)
-
-	return &txExeResult{tx, success}, true
-}
-
-func (i *backendIBFT) executeTransactions(
-	gasLimit,
-	blockNumber uint64,
-	transition transitionInterface,
-) (executed []*types.Transaction) {
-	executed = make([]*types.Transaction, 0)
-
-	if !i.shouldWriteTransactions(blockNumber) {
-		return
-	}
-
-	var (
-		blockTimer    = time.NewTimer(i.blockTime)
-		stopExecution = false
-
-		successful = 0
-		failed     = 0
-		skipped    = 0
-	)
-
-	defer blockTimer.Stop()
-
-	i.txpool.Prepare()
-
-	for {
-		select {
-		case <-blockTimer.C:
-			return
-		default:
-			if stopExecution {
-				//	wait for the timer to expire
-				continue
-			}
-
-			//	execute transactions one by one
-			result, ok := i.writeTransaction(
-				i.txpool.Peek(),
-				transition,
-				gasLimit,
-			)
-			if !ok {
-				stopExecution = true
-				continue
-			}
-
-			tx := result.tx
-
-			switch result.status {
-			case success:
-				executed = append(executed, tx)
-				successful++
-			case fail:
-				failed++
-			case skip:
-				skipped++
-			}
-
-		}
-	}
-}
-
-// buildBlock builds the block, based on the passed in snapshot and parent header
-func (i *backendIBFT) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, error) {
-	header := &types.Header{
-		ParentHash: parent.Hash,
-		Number:     parent.Number + 1,
-		Miner:      types.Address{},
-		Nonce:      types.Nonce{},
-		MixHash:    IstanbulDigest,
-		// this is required because blockchain needs difficulty to organize blocks and forks
-		Difficulty: parent.Number + 1,
-		StateRoot:  types.EmptyRootHash, // this avoids needing state for now
-		Sha3Uncles: types.EmptyUncleHash,
-		GasLimit:   parent.GasLimit, // Inherit from parent for now, will need to adjust dynamically later.
-	}
-
-	// calculate gas limit based on parent header
-	gasLimit, err := i.blockchain.CalculateGasLimit(header.Number)
-	if err != nil {
-		return nil, err
-	}
-
-	header.GasLimit = gasLimit
-
-	if hookErr := i.runHook(CandidateVoteHook, header.Number, &candidateVoteHookParams{
-		header: header,
-		snap:   snap,
-	}); hookErr != nil {
-		i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", CandidateVoteHook, hookErr))
-	}
-
-	// set the timestamp
-	parentTime := time.Unix(int64(parent.Timestamp), 0)
-	headerTime := parentTime.Add(i.blockTime)
-
-	if headerTime.Before(time.Now()) {
-		headerTime = time.Now()
-	}
-
-	header.Timestamp = uint64(headerTime.Unix())
-
-	// we need to include in the extra field the current set of validators
-	putIbftExtraValidators(header, snap.Set)
-
-	transition, err := i.executor.BeginTxn(parent.StateRoot, header, i.validatorKeyAddr)
-	if err != nil {
-		return nil, err
-	}
-	// If the mechanism is PoS -> build a regular block if it's not an end-of-epoch block
-	// If the mechanism is PoA -> always build a regular block, regardless of epoch
-
-	txs := i.executeTransactions(gasLimit, header.Number, transition)
-
-	if err := i.PreStateCommit(header, transition); err != nil {
-		return nil, err
-	}
-
-	_, root := transition.Commit()
-	header.StateRoot = root
-	header.GasUsed = transition.TotalGas()
-
-	// build the block
-	block := backend.BuildBlock(backend.BuildBlockParams{
-		Header:   header,
-		Txns:     txs,
-		Receipts: transition.Receipts(),
-	})
-
-	// write the seal of the block after all the fields are completed
-	header, err = writeSeal(i.validatorKey, block.Header)
-	if err != nil {
-		return nil, err
-	}
-
-	block.Header = header
-
-	// compute the hash, this is only a provisional hash since the final one
-	// is sealed after all the committed seals
-	block.Header.ComputeHash()
-
-	i.logger.Info("build block", "number", header.Number, "txs", len(txs))
-
-	return block, nil
-}
-
-type transitionInterface interface {
-	Write(txn *types.Transaction) error
-	WriteFailedReceipt(txn *types.Transaction) error
-}
-
-// writeTransactions writes transactions from the txpool to the transition object
-// and returns transactions that were included in the transition (new block)
-func (i *backendIBFT) writeTransactions(gasLimit uint64, transition transitionInterface) []*types.Transaction {
-	var transactions []*types.Transaction
-
-	successTxCount := 0
-	failedTxCount := 0
-
-	i.txpool.Prepare()
-
-	for {
-		tx := i.txpool.Peek()
-		if tx == nil {
-			break
-		}
-
-		if tx.ExceedsBlockGasLimit(gasLimit) {
-			if err := transition.WriteFailedReceipt(tx); err != nil {
-				failedTxCount++
-
-				i.txpool.Drop(tx)
-
-				continue
-			}
-
-			failedTxCount++
-
-			transactions = append(transactions, tx)
-			i.txpool.Drop(tx)
-
-			continue
-		}
-
-		if err := transition.Write(tx); err != nil {
-			if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok { // nolint:errorlint
-				break
-			} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable { // nolint:errorlint
-				i.txpool.Demote(tx)
-			} else {
-				failedTxCount++
-				i.txpool.Drop(tx)
-			}
-
-			continue
-		}
-
-		// no errors, pop the tx from the pool
-		i.txpool.Pop(tx)
-
-		successTxCount++
-
-		transactions = append(transactions, tx)
-	}
-
-	//nolint:lll
-	i.logger.Info("executed txns", "failed ", failedTxCount, "successful", successTxCount, "remaining in pool", i.txpool.Length())
-
-	return transactions
 }
 
 // updateMetrics will update various metrics based on the given block
@@ -814,8 +575,9 @@ func (i *backendIBFT) PreStateCommit(header *types.Header, txn *state.Transition
 		header: header,
 		txn:    txn,
 	}
-	if hookErr := i.runHook(PreStateCommitHook, header.Number, params); hookErr != nil {
-		return hookErr
+
+	if err := i.runHook(PreStateCommitHook, header.Number, params); err != nil {
+		return err
 	}
 
 	return nil

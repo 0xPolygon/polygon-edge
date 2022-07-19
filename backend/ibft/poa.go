@@ -240,7 +240,7 @@ func (poa *PoAMechanism) calculateProposerHook(lastProposerParam interface{}) er
 	}
 
 	//	TODO: change hook params
-	//poa.ibft.currentValidatorSet.CalcProposer(lastProposer)
+	//poa.ibft.activeValidatorSet.CalcProposer(lastProposer)
 
 	return nil
 }

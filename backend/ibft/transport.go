@@ -51,7 +51,7 @@ func (i *backendIBFT) setupTransport() error {
 
 			i.consensus.AddMessage(msg)
 
-			i.logger.Info(
+			i.logger.Debug(
 				"validator message received",
 				"type", msg.Type.String(),
 				"height", msg.GetView().Height,
