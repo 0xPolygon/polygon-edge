@@ -100,6 +100,8 @@ func (d *Dispatcher) getFnHandler(req Request) (*serviceData, *funcData, Error) 
 
 type wsConn interface {
 	WriteMessage(messageType int, data []byte) error
+	GetFilterID() string
+	SetFilterID(string)
 }
 
 // as per https://www.jsonrpc.org/specification, the `id` in JSON-RPC 2.0

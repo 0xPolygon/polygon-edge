@@ -146,6 +146,15 @@ type wsWrapper struct {
 	ws        *websocket.Conn // the actual WS connection
 	logger    hclog.Logger    // module logger
 	writeLock sync.Mutex      // writer lock
+	filterID  string          // filter ID
+}
+
+func (w *wsWrapper) SetFilterID(filterID string) {
+	w.filterID = filterID
+}
+
+func (w *wsWrapper) GetFilterID() string {
+	return w.filterID
 }
 
 // WriteMessage writes out the message to the WS peer

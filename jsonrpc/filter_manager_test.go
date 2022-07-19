@@ -345,7 +345,16 @@ func TestFilterWebsocket(t *testing.T) {
 }
 
 type mockWsConn struct {
-	msgCh chan []byte
+	msgCh    chan []byte
+	filterID string
+}
+
+func (m *mockWsConn) SetFilterID(filterID string) {
+	m.filterID = filterID
+}
+
+func (m *mockWsConn) GetFilterID() string {
+	return m.filterID
 }
 
 func (m *mockWsConn) WriteMessage(messageType int, b []byte) error {
@@ -377,6 +386,12 @@ func TestHeadStream(t *testing.T) {
 }
 
 type MockClosedWSConnection struct{}
+
+func (m *MockClosedWSConnection) SetFilterID(_filterID string) {}
+
+func (m *MockClosedWSConnection) GetFilterID() string {
+	return ""
+}
 
 func (m *MockClosedWSConnection) WriteMessage(_messageType int, _data []byte) error {
 	return websocket.ErrCloseSent

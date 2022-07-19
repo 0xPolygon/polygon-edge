@@ -240,22 +240,19 @@ type FilterManager struct {
 
 	updateCh chan struct{}
 	closeCh  chan struct{}
-
-	filterByWsConn map[wsConn]filter
 }
 
 func NewFilterManager(logger hclog.Logger, store filterManagerStore) *FilterManager {
 	m := &FilterManager{
-		logger:         logger.Named("filter"),
-		timeout:        defaultTimeout,
-		store:          store,
-		blockStream:    &blockStream{},
-		lock:           sync.RWMutex{},
-		filters:        make(map[string]filter),
-		timeouts:       timeHeapImpl{},
-		updateCh:       make(chan struct{}),
-		closeCh:        make(chan struct{}),
-		filterByWsConn: make(map[wsConn]filter),
+		logger:      logger.Named("filter"),
+		timeout:     defaultTimeout,
+		store:       store,
+		blockStream: &blockStream{},
+		lock:        sync.RWMutex{},
+		filters:     make(map[string]filter),
+		timeouts:    timeHeapImpl{},
+		updateCh:    make(chan struct{}),
+		closeCh:     make(chan struct{}),
 	}
 
 	// start blockstream with the current header
@@ -330,7 +327,7 @@ func (f *FilterManager) NewBlockFilter(ws wsConn) string {
 		block:      f.blockStream.Head(),
 	}
 
-	f.filterByWsConn[ws] = filter
+	ws.SetFilterID(filter.id)
 
 	return f.addFilter(filter)
 }
@@ -341,8 +338,6 @@ func (f *FilterManager) NewLogFilter(logQuery *LogQuery, ws wsConn) string {
 		filterBase: newFilterBase(ws),
 		query:      logQuery,
 	}
-
-	f.filterByWsConn[ws] = filter
 
 	return f.addFilter(filter)
 }
@@ -525,7 +520,6 @@ func (f *FilterManager) removeFilterByID(id string) bool {
 	}
 
 	delete(f.filters, id)
-	delete(f.filterByWsConn, filter.getFilterBase().ws)
 
 	if removed := f.timeouts.removeFilter(filter.getFilterBase()); removed {
 		f.emitSignalToUpdateCh()
@@ -536,13 +530,15 @@ func (f *FilterManager) removeFilterByID(id string) bool {
 
 // removeFilterByWs removes the filter with given WS, unsafe against race condition
 func (f *FilterManager) RemoveFilterByWs(ws wsConn) {
-	filter, ok := f.filterByWsConn[ws]
+	filterID := ws.GetFilterID()
+
+	// Make sure filter exists
+	filter, ok := f.filters[filterID]
 	if !ok {
 		return
 	}
 
-	delete(f.filters, filter.getFilterBase().id)
-	delete(f.filterByWsConn, ws)
+	delete(f.filters, filterID)
 
 	if removed := f.timeouts.removeFilter(filter.getFilterBase()); removed {
 		f.emitSignalToUpdateCh()
