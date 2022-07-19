@@ -42,12 +42,10 @@ var (
 )
 
 var (
-	errValidatorsNotSpecified         = errors.New("validator information not specified")
-	errValidatorsSpecifiedIncorrectly = errors.New("validator information specified through mutually exclusive flags")
-	errValidatorNumberExceedsMax      = errors.New("validator number exceeds max validator number")
-	errUnsupportedConsensus           = errors.New("specified consensusRaw not supported")
-	errMissingBootnode                = errors.New("at least 1 bootnode is required")
-	errInvalidEpochSize               = errors.New("epoch size must be greater than 1")
+	errValidatorsNotSpecified    = errors.New("validator information not specified")
+	errValidatorNumberExceedsMax = errors.New("validator number exceeds max validator number")
+	errUnsupportedConsensus      = errors.New("specified consensusRaw not supported")
+	errInvalidEpochSize          = errors.New("epoch size must be greater than 1")
 )
 
 type genesisParams struct {
@@ -81,11 +79,6 @@ type genesisParams struct {
 }
 
 func (p *genesisParams) validateFlags() error {
-	// Check if the correct number of bootnodes is provided
-	if len(p.bootnodes) < 1 {
-		return errMissingBootnode
-	}
-
 	// Check if the consensusRaw is supported
 	if !server.ConsensusSupported(p.consensusRaw) {
 		return errUnsupportedConsensus
@@ -96,13 +89,6 @@ func (p *genesisParams) validateFlags() error {
 		!p.areValidatorsSetManually() &&
 		!p.areValidatorsSetByPrefix() {
 		return errValidatorsNotSpecified
-	}
-
-	// Check if mutually exclusive flags are set correctly
-	if p.isIBFTConsensus() &&
-		p.areValidatorsSetManually() &&
-		p.areValidatorsSetByPrefix() {
-		return errValidatorsSpecifiedIncorrectly
 	}
 
 	// Check if the genesis file already exists
@@ -183,7 +169,6 @@ func (p *genesisParams) setValidatorSetFromCli() error {
 		if err = p.ibftValidators.Merge(newValidators); err != nil {
 			return err
 		}
-
 	}
 
 	return nil

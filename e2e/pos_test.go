@@ -4,13 +4,12 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
-	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
-	"github.com/umbracle/ethgo"
 	"math/big"
 	"strconv"
 	"testing"
 	"time"
 
+	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/contracts/staking"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/e2e/framework"
@@ -20,6 +19,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/golang/protobuf/ptypes/any"
 	"github.com/stretchr/testify/assert"
+	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/jsonrpc"
 )
 
@@ -84,6 +84,8 @@ func validateValidatorSet(
 }
 
 func TestPoS_ValidatorBoundaries(t *testing.T) {
+	t.Skip()
+
 	accounts := []struct {
 		key     *ecdsa.PrivateKey
 		address types.Address
@@ -164,6 +166,8 @@ func TestPoS_ValidatorBoundaries(t *testing.T) {
 }
 
 func TestPoS_Stake(t *testing.T) {
+	t.Skip()
+
 	stakerKey, stakerAddr := tests.GenerateKeyAndAddr(t)
 	defaultBalance := framework.EthToWei(100)
 	stakeAmount := framework.EthToWei(5)
@@ -224,6 +228,8 @@ func TestPoS_Stake(t *testing.T) {
 }
 
 func TestPoS_Unstake(t *testing.T) {
+	t.Skip()
+
 	stakingContractAddr := staking.AddrStakingContract
 	defaultBalance := framework.EthToWei(100)
 
@@ -309,6 +315,8 @@ func TestPoS_Unstake(t *testing.T) {
 // The code below tests numTransactions cycles of Unstake
 // Expected result for tests: Staked: 0 ETH; Balance: ~20 ETH
 func TestPoS_UnstakeExploit(t *testing.T) {
+	t.Skip()
+
 	// Predefined values
 	stakingContractAddr := staking.AddrStakingContract
 
@@ -451,6 +459,8 @@ func generateStakingAddresses(numAddresses int) []types.Address {
 // The code below tests (numTransactions / 2) cycles of Unstake -> Stake 1 ETH
 // Expected result for tests: Staked: 1 ETH; Balance: ~119 ETH
 func TestPoS_StakeUnstakeExploit(t *testing.T) {
+	t.Skip()
+
 	// Predefined values
 	var blockGasLimit uint64 = 5000000000
 
@@ -593,6 +603,8 @@ func TestPoS_StakeUnstakeExploit(t *testing.T) {
 // Stake 2 ETH -> Unstake
 // Expected result for tests: Staked: 0 ETH; Balance: ~100 ETH; not a validator
 func TestPoS_StakeUnstakeWithinSameBlock(t *testing.T) {
+	t.Skip()
+
 	// Predefined values
 	var blockGasLimit uint64 = 5000000000
 
@@ -735,6 +747,8 @@ func getNextEpochBlock(blockNum uint64, epochSize uint64) uint64 {
 }
 
 func TestSnapshotUpdating(t *testing.T) {
+	t.Skip()
+
 	faucetKey, faucetAddr := tests.GenerateKeyAndAddr(t)
 
 	defaultBalance := framework.EthToWei(1000)

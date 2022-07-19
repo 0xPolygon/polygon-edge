@@ -6,14 +6,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/umbracle/ethgo"
-
+	"github.com/0xPolygon/polygon-edge/command/server/config"
 	ibftSigner "github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/validators"
 	"github.com/0xPolygon/polygon-edge/e2e/framework"
 	"github.com/0xPolygon/polygon-edge/helper/tests"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/umbracle/ethgo"
 )
 
 /**
@@ -21,44 +21,75 @@ import (
 	and verifies it was mined
 **/
 func TestIbft_Transfer(t *testing.T) {
+	testCases := []struct {
+		name            string
+		blockTime       uint64
+		ibftBaseTimeout uint64
+	}{
+		{
+			name:            "default block time",
+			blockTime:       config.DefaultBlockTime,
+			ibftBaseTimeout: 0, // use default value
+		},
+		{
+			name:            "longer block time",
+			blockTime:       10,
+			ibftBaseTimeout: 20,
+		},
+	}
+
 	var (
 		senderKey, senderAddr = tests.GenerateKeyAndAddr(t)
 		_, receiverAddr       = tests.GenerateKeyAndAddr(t)
 	)
 
-	ibftManager := framework.NewIBFTServersManager(t,
-		IBFTMinNodes,
-		IBFTDirPrefix,
-		func(i int, config *framework.TestServerConfig) {
-			config.Premine(senderAddr, framework.EthToWei(10))
-			config.SetSeal(true)
-		},
-	)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ibftManager := framework.NewIBFTServersManager(t,
+				IBFTMinNodes,
+				IBFTDirPrefix,
+				func(i int, config *framework.TestServerConfig) {
+					config.Premine(senderAddr, framework.EthToWei(10))
+					config.SetSeal(true)
+					config.SetBlockTime(tc.blockTime)
+					config.SetIBFTBaseTimeout(tc.ibftBaseTimeout)
+				},
+			)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel()
+			var (
+				startTimeout = time.Duration(tc.ibftBaseTimeout+60) * time.Second
+				txTimeout    = time.Duration(tc.ibftBaseTimeout+10) * time.Second
+			)
 
-	ibftManager.StartServers(ctx)
+			ctxForStart, cancelStart := context.WithTimeout(context.Background(), startTimeout)
+			defer cancelStart()
 
-	txn := &framework.PreparedTransaction{
-		From:     senderAddr,
-		To:       &receiverAddr,
-		GasPrice: big.NewInt(10000),
-		Gas:      1000000,
-		Value:    framework.EthToWei(1),
+			ibftManager.StartServers(ctxForStart)
+
+			txn := &framework.PreparedTransaction{
+				From:     senderAddr,
+				To:       &receiverAddr,
+				GasPrice: big.NewInt(10000),
+				Gas:      1000000,
+				Value:    framework.EthToWei(1),
+			}
+
+			ctxForTx, cancelTx := context.WithTimeout(context.Background(), txTimeout)
+			defer cancelTx()
+
+			//	send tx and wait for receipt
+			receipt, err := ibftManager.
+				GetServer(0).
+				SendRawTx(ctxForTx, txn, senderKey)
+
+			assert.NoError(t, err)
+			if receipt == nil {
+				t.Fatalf("receipt not received")
+			}
+
+			assert.NotNil(t, receipt.TransactionHash)
+		})
 	}
-
-	ctx, cancel = context.WithTimeout(context.Background(), framework.DefaultTimeout)
-	defer cancel()
-
-	//	send tx and wait for receipt
-	receipt, err := ibftManager.
-		GetServer(0).
-		SendRawTx(ctx, txn, senderKey)
-
-	assert.NoError(t, err)
-	assert.NotNil(t, receipt)
-	assert.NotNil(t, receipt.TransactionHash)
 }
 
 func TestIbft_TransactionFeeRecipient(t *testing.T) {
@@ -132,7 +163,10 @@ func TestIbft_TransactionFeeRecipient(t *testing.T) {
 			defer cancel1()
 			receipt, err := srv.SendRawTx(ctx1, txn, senderKey)
 			assert.NoError(t, err)
-			assert.NotNil(t, receipt)
+
+			if receipt == nil {
+				t.Fatalf("receipt not received")
+			}
 
 			// Get the block proposer from the extra data seal
 			assert.NotNil(t, receipt.BlockHash)

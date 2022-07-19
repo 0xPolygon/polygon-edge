@@ -60,19 +60,20 @@ type Config struct {
 }
 
 type ConsensusParams struct {
-	Context        context.Context
-	Seal           bool
-	Config         *Config
-	Txpool         *txpool.TxPool
-	Network        *network.Server
-	Blockchain     *blockchain.Blockchain
-	Executor       *state.Executor
-	Grpc           *grpc.Server
-	Logger         hclog.Logger
-	Metrics        *Metrics
-	SecretsManager secrets.SecretsManager
-	BlockTime      uint64
-	BLS            bool
+	Context         context.Context
+	Seal            bool
+	Config          *Config
+	Txpool          *txpool.TxPool
+	Network         *network.Server
+	Blockchain      *blockchain.Blockchain
+	Executor        *state.Executor
+	Grpc            *grpc.Server
+	Logger          hclog.Logger
+	Metrics         *Metrics
+	SecretsManager  secrets.SecretsManager
+	BlockTime       uint64
+	IBFTBaseTimeout uint64
+	BLS             bool
 }
 
 // Factory is the factory function to create a discovery backend

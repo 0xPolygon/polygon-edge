@@ -22,6 +22,13 @@ func GetCommand() *cobra.Command {
 
 func setFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(
+		&params.rawKeyType,
+		keyTypeFlag,
+		string(crypto.KeySecp256k1),
+		"the type of key to generate",
+	)
+
+	cmd.Flags().StringVar(
 		&params.dataDir,
 		dataDirFlag,
 		"",
@@ -36,12 +43,7 @@ func setFlags(cmd *cobra.Command) {
 			"if omitted, the local FS secrets manager is used",
 	)
 
-	cmd.Flags().StringVar(
-		&params.rawKeyType,
-		keyTypeFlag,
-		string(crypto.KeySecp256k1),
-		"the type of key to generate",
-	)
+	cmd.MarkFlagsMutuallyExclusive(dataDirFlag, configFlag)
 }
 
 func runPreRun(_ *cobra.Command, _ []string) error {

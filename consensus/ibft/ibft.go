@@ -15,11 +15,12 @@ import (
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/network"
-	"github.com/0xPolygon/polygon-edge/protocol"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/state"
+	"github.com/0xPolygon/polygon-edge/syncer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
+	"github.com/libp2p/go-libp2p-core/peer"
 	"google.golang.org/grpc"
 	anypb "google.golang.org/protobuf/types/known/anypb"
 )
@@ -53,15 +54,6 @@ type txPoolInterface interface {
 	ResetWithHeaders(headers ...*types.Header)
 }
 
-type syncerInterface interface {
-	Start()
-	BestPeer() *protocol.SyncPeer
-	BulkSyncWithPeer(p *protocol.SyncPeer, newBlockHandler func(block *types.Block)) error
-	WatchSyncWithPeer(p *protocol.SyncPeer, newBlockHandler func(b *types.Block) bool, blockTimeout time.Duration)
-	GetSyncProgression() *progress.Progression
-	Broadcast(b *types.Block)
-}
-
 // Ibft represents the IBFT consensus mechanism object
 type Ibft struct {
 	sealing bool // Flag indicating if the node is a sealer
@@ -84,7 +76,7 @@ type Ibft struct {
 	msgQueue *msgQueue     // Structure containing different message queues
 	updateCh chan struct{} // Update channel
 
-	syncer syncerInterface // Reference to the sync protocol
+	syncer syncer.Syncer // Reference to the sync protocol
 
 	network   *network.Server // Reference to the networking layer
 	transport transport       // Reference to the transport protocol
@@ -98,9 +90,10 @@ type Ibft struct {
 
 	mechanisms []ConsensusMechanism // IBFT ConsensusMechanism used (PoA / PoS)
 
-	blockTime time.Duration // Minimum block generation time in seconds
-
 	signer signer.Signer
+
+	blockTime       time.Duration // Minimum block generation time in seconds
+	ibftBaseTimeout time.Duration // Base timeout for IBFT message in seconds
 }
 
 // runHook runs a specified hook if it is present in the hook map
@@ -179,6 +172,7 @@ func Factory(
 		sealing:            params.Seal,
 		metrics:            params.Metrics,
 		blockTime:          time.Duration(params.BlockTime) * time.Second,
+		ibftBaseTimeout:    time.Duration(params.IBFTBaseTimeout) * time.Second,
 		signer:             signer,
 	}
 
@@ -190,7 +184,7 @@ func Factory(
 	// Istanbul requires a different header hash function
 	p.SetHeaderHash()
 
-	p.syncer = protocol.NewSyncer(params.Logger, params.Network, params.Blockchain)
+	p.syncer = syncer.NewSyncer(params.Logger, params.Network, params.Blockchain, p.blockTime*3)
 
 	return p, nil
 }
@@ -225,7 +219,9 @@ func (i *Ibft) Start() error {
 	}
 
 	// Start the syncer
-	i.syncer.Start()
+	if err := i.syncer.Start(); err != nil {
+		return err
+	}
 
 	// Start the actual IBFT protocol
 	go i.start()
@@ -324,7 +320,7 @@ func (i *Ibft) setupTransport() error {
 	}
 
 	// Subscribe to the newly created topic
-	err = topic.Subscribe(func(obj interface{}) {
+	err = topic.Subscribe(func(obj interface{}, _ peer.ID) {
 		msg, ok := obj.(*proto.MessageReq)
 		if !ok {
 			i.logger.Error("invalid type assertion for message request")
@@ -425,11 +421,6 @@ func (i *Ibft) isValidSnapshot() bool {
 	}
 
 	if snap.Set.Includes(i.signer.Address()) {
-		i.state.view = &proto.View{
-			Sequence: header.Number + 1,
-			Round:    0,
-		}
-
 		return true
 	}
 
@@ -448,20 +439,22 @@ func (i *Ibft) runSyncState() {
 		}
 	}
 
+	// save current height in order to check new blocks are added or not during sync
+	beginningHeight := uint64(0)
+	if header := i.blockchain.Header(); header != nil {
+		beginningHeight = header.Number
+	}
+
 	for i.isState(SyncState) {
 		// try to sync with the best-suited peer
-		p := i.syncer.BestPeer()
-		if p == nil {
+		if !i.syncer.HasSyncPeer() {
 			// if we do not have any peers, and we have been a validator
 			// we can start now. In case we start on another fork this will be
 			// reverted later
 			if i.isValidSnapshot() {
 				// initialize the round and sequence
-				header := i.blockchain.Header()
-				i.state.view = &proto.View{
-					Round:    0,
-					Sequence: header.Number + 1,
-				}
+				i.startNewSequence()
+
 				//Set the round metric
 				i.metrics.Rounds.Set(float64(i.state.view.Round))
 
@@ -473,9 +466,11 @@ func (i *Ibft) runSyncState() {
 			continue
 		}
 
-		if err := i.syncer.BulkSyncWithPeer(p, func(newBlock *types.Block) {
+		if err := i.syncer.BulkSync(func(newBlock *types.Block) bool {
 			callInsertBlockHook(newBlock.Number())
 			i.txpool.ResetWithHeaders(newBlock.Header)
+
+			return false
 		}); err != nil {
 			i.logger.Error("failed to bulk sync", "err", err)
 
@@ -485,6 +480,7 @@ func (i *Ibft) runSyncState() {
 		// if we are a validator we do not even want to wait here
 		// we can just move ahead
 		if i.isValidSnapshot() {
+			i.startNewSequence()
 			i.setState(AcceptState)
 
 			continue
@@ -493,24 +489,39 @@ func (i *Ibft) runSyncState() {
 		// start watch mode
 		var isValidator bool
 
-		i.syncer.WatchSyncWithPeer(p, func(newBlock *types.Block) bool {
+		err := i.syncer.WatchSync(func(newBlock *types.Block) bool {
 			// After each written block, update the snapshot store for PoS.
 			// The snapshot store is currently updated for PoA inside the ProcessHeadersHook
 			callInsertBlockHook(newBlock.Number())
 
-			i.syncer.Broadcast(newBlock)
 			i.txpool.ResetWithHeaders(newBlock.Header)
 			isValidator = i.isValidSnapshot()
 
 			return isValidator
-		}, i.blockTime)
+		})
+
+		if err != nil {
+			i.logger.Warn("error happened during watch sync", "err", err)
+		}
 
 		if isValidator {
 			// at this point, we are in sync with the latest chain we know of
 			// and we are a validator of that chain so we need to change to AcceptState
 			// so that we can start to do some stuff there
+			i.startNewSequence()
 			i.setState(AcceptState)
 		}
+	}
+
+	// check that new blocks are added during sync
+	endingHeight := uint64(0)
+	if header := i.blockchain.Header(); header != nil {
+		endingHeight = header.Number
+	}
+
+	// if new blocks are added, validator will unlock current block
+	if endingHeight > beginningHeight {
+		i.state.unlock()
 	}
 }
 
@@ -783,7 +794,7 @@ func (i *Ibft) runAcceptState() { // start new round
 	// we are NOT a proposer for the block. Then, we have to wait
 	// for a pre-prepare message from the proposer
 
-	timeout := exponentialTimeout(i.state.view.Round)
+	timeout := i.getTimeout()
 	for i.getState() == AcceptState {
 		msg, ok := i.getNextMessage(timeout)
 		if !ok {
@@ -807,6 +818,14 @@ func (i *Ibft) runAcceptState() { // start new round
 		if err := block.UnmarshalRLP(msg.Proposal.Value); err != nil {
 			i.logger.Error("failed to unmarshal block", "err", err)
 			i.setState(RoundChangeState)
+
+			return
+		}
+
+		// Make sure the proposing block height match the current sequence
+		if block.Number() != i.state.view.Sequence {
+			i.logger.Error("sequence not correct", "block", block.Number, "sequence", i.state.view.Sequence)
+			i.handleStateErr(errIncorrectBlockHeight)
 
 			return
 		}
@@ -875,7 +894,7 @@ func (i *Ibft) runValidateState() {
 		}
 	}
 
-	timeout := exponentialTimeout(i.state.view.Round)
+	timeout := i.getTimeout()
 	for i.getState() == ValidateState {
 		msg, ok := i.getNextMessage(timeout)
 		if !ok {
@@ -927,6 +946,9 @@ func (i *Ibft) runValidateState() {
 		} else {
 			// update metrics
 			i.updateMetrics(block)
+
+			// increase the sequence number and reset the round if any
+			i.startNewSequence()
 
 			// move ahead to the next block
 			i.setState(AcceptState)
@@ -1004,15 +1026,6 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 		"committed", i.state.numCommitted(),
 	)
 
-	// increase the sequence number and reset the round if any
-	i.state.view = &proto.View{
-		Sequence: header.Number + 1,
-		Round:    0,
-	}
-
-	// broadcast the new block
-	i.syncer.Broadcast(block)
-
 	// after the block has been written we reset the txpool so that
 	// the old transactions are removed
 	i.txpool.ResetWithHeaders(block.Header)
@@ -1021,9 +1034,10 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 }
 
 var (
-	errIncorrectBlockLocked    = fmt.Errorf("block locked is incorrect")
-	errBlockVerificationFailed = fmt.Errorf("block verification failed")
-	errFailedToInsertBlock     = fmt.Errorf("failed to insert block")
+	errIncorrectBlockLocked    = errors.New("block locked is incorrect")
+	errIncorrectBlockHeight    = errors.New("proposed block number is incorrect")
+	errBlockVerificationFailed = errors.New("block verification failed")
+	errFailedToInsertBlock     = errors.New("failed to insert block")
 )
 
 func (i *Ibft) handleStateErr(err error) {
@@ -1035,7 +1049,7 @@ func (i *Ibft) runRoundChangeState() {
 	sendRoundChange := func(round uint64) {
 		i.logger.Debug("local round change", "round", round+1)
 		// set the new round and update the round metric
-		i.state.view.Round = round
+		i.startNewRound(round)
 		i.metrics.Rounds.Set(float64(round))
 		// clean the round
 		i.state.cleanRound(round)
@@ -1048,18 +1062,12 @@ func (i *Ibft) runRoundChangeState() {
 
 	checkTimeout := func() {
 		// check if there is any peer that is really advanced and we might need to sync with it first
-		if i.syncer != nil {
-			bestPeer := i.syncer.BestPeer()
-			if bestPeer != nil {
-				lastProposal := i.blockchain.Header()
-				if bestPeer.Number() > lastProposal.Number {
-					i.logger.Debug("it has found a better peer to connect", "local", lastProposal.Number, "remote", bestPeer.Number())
-					// we need to catch up with the last sequence
-					i.setState(SyncState)
+		if i.syncer != nil && i.syncer.HasSyncPeer() {
+			i.logger.Debug("it has found a better peer to connect")
+			// we need to catch up with the last sequence
+			i.setState(SyncState)
 
-					return
-				}
-			}
+			return
 		}
 
 		// otherwise, it seems that we are in sync
@@ -1085,7 +1093,7 @@ func (i *Ibft) runRoundChangeState() {
 	}
 
 	// create a timer for the round change
-	timeout := exponentialTimeout(i.state.view.Round)
+	timeout := i.getTimeout()
 	for i.getState() == RoundChangeState {
 		msg, ok := i.getNextMessage(timeout)
 		if !ok {
@@ -1097,7 +1105,7 @@ func (i *Ibft) runRoundChangeState() {
 			i.logger.Debug("round change timeout")
 			checkTimeout()
 			// update the timeout duration
-			timeout = exponentialTimeout(i.state.view.Round)
+			timeout = i.getTimeout()
 
 			continue
 		}
@@ -1108,11 +1116,12 @@ func (i *Ibft) runRoundChangeState() {
 		if num == i.state.validators.MaxFaultyNodes()+1 && i.state.view.Round < msg.View.Round {
 			// weak certificate, try to catch up if our round number is smaller
 			// update timer
-			timeout = exponentialTimeout(i.state.view.Round)
+			timeout = i.getTimeout()
+
 			sendRoundChange(msg.View.Round)
 		} else if num == i.quorumSize(i.state.view.Sequence)(i.state.validators) {
 			// start a new round immediately
-			i.state.view.Round = msg.View.Round
+			i.startNewRound(msg.View.Round)
 			i.setState(AcceptState)
 		}
 	}
@@ -1244,7 +1253,7 @@ func (i *Ibft) verifyHeaderImpl(snap *Snapshot, parent, header *types.Header) er
 			return err
 		}
 
-		if i.signer.VerifyParentCommittedSeal(
+		if err := i.signer.VerifyParentCommittedSeal(
 			parentSnap.Set,
 			parent,
 			header,
@@ -1345,6 +1354,12 @@ func (i *Ibft) Close() error {
 		}
 	}
 
+	if i.syncer != nil {
+		if err := i.syncer.Close(); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -1435,4 +1450,27 @@ func InitSigner(secretManager secrets.SecretsManager, isBLS bool) (signer.Signer
 	}
 
 	return signer.NewSigner(km), nil
+}
+
+// getTimeout returns the IBFT timeout based on round and config
+func (i *Ibft) getTimeout() time.Duration {
+	return exponentialTimeout(i.state.view.Round, i.ibftBaseTimeout)
+}
+
+// startNewSequence changes the sequence and resets the round in the view of state
+func (i *Ibft) startNewSequence() {
+	header := i.blockchain.Header()
+
+	i.state.view = &proto.View{
+		Sequence: header.Number + 1,
+		Round:    0,
+	}
+}
+
+// startNewRound changes the round in the view of state
+func (i *Ibft) startNewRound(newRound uint64) {
+	i.state.view = &proto.View{
+		Sequence: i.state.view.Sequence,
+		Round:    newRound,
+	}
 }

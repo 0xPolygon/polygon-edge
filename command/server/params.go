@@ -4,9 +4,8 @@ import (
 	"errors"
 	"net"
 
-	"github.com/0xPolygon/polygon-edge/command/server/config"
-
 	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/command/server/config"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/server"
@@ -32,6 +31,7 @@ const (
 	secretsConfigFlag     = "secrets-config"
 	restoreFlag           = "restore"
 	blockTimeFlag         = "block-time"
+	ibftBaseTimeoutFlag   = "ibft-base-timeout"
 	devIntervalFlag       = "dev-interval"
 	devFlag               = "dev"
 	corsOriginFlag        = "access-control-allow-origins"
@@ -54,7 +54,6 @@ var (
 )
 
 var (
-	errInvalidPeerParams = errors.New("both max-peers and max-inbound/outbound flags are set")
 	errInvalidNATAddress = errors.New("could not parse NAT IP address")
 )
 
@@ -81,15 +80,6 @@ type serverParams struct {
 	logFileLocation string
 
 	useBls bool
-}
-
-func (p *serverParams) validateFlags() error {
-	// Validate the max peers configuration
-	if p.isMaxPeersSet() && p.isPeerRangeSet() {
-		return errInvalidPeerParams
-	}
-
-	return nil
 }
 
 func (p *serverParams) isMaxPeersSet() bool {
@@ -164,15 +154,16 @@ func (p *serverParams) generateConfig() *server.Config {
 			MaxOutboundPeers: p.rawConfig.Network.MaxOutboundPeers,
 			Chain:            p.genesisConfig,
 		},
-		DataDir:        p.rawConfig.DataDir,
-		Seal:           p.rawConfig.ShouldSeal,
-		PriceLimit:     p.rawConfig.TxPool.PriceLimit,
-		MaxSlots:       p.rawConfig.TxPool.MaxSlots,
-		SecretsManager: p.secretsConfig,
-		RestoreFile:    p.getRestoreFilePath(),
-		BlockTime:      p.rawConfig.BlockTime,
-		LogLevel:       hclog.LevelFromString(p.rawConfig.LogLevel),
-		LogFilePath:    p.logFileLocation,
-		BLS:            p.useBls,
+		DataDir:         p.rawConfig.DataDir,
+		Seal:            p.rawConfig.ShouldSeal,
+		PriceLimit:      p.rawConfig.TxPool.PriceLimit,
+		MaxSlots:        p.rawConfig.TxPool.MaxSlots,
+		SecretsManager:  p.secretsConfig,
+		RestoreFile:     p.getRestoreFilePath(),
+		BlockTime:       p.rawConfig.BlockTime,
+		IBFTBaseTimeout: p.rawConfig.IBFTBaseTimeout,
+		LogLevel:        hclog.LevelFromString(p.rawConfig.LogLevel),
+		LogFilePath:     p.logFileLocation,
+		BLS:             p.useBls,
 	}
 }
