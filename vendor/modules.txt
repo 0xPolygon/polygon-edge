@@ -424,7 +424,7 @@ github.com/libp2p/go-libp2p-kbucket/peerdiversity
 ## explicit; go 1.17
 github.com/libp2p/go-libp2p-peerstore
 github.com/libp2p/go-libp2p-peerstore/pstoremem
-# github.com/libp2p/go-libp2p-pubsub v0.7.0
+# github.com/libp2p/go-libp2p-pubsub v0.7.1
 ## explicit; go 1.13
 github.com/libp2p/go-libp2p-pubsub
 github.com/libp2p/go-libp2p-pubsub/pb
