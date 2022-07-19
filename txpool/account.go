@@ -1,10 +1,15 @@
 package txpool
 
 import (
+	"errors"
 	"sync"
 	"sync/atomic"
 
 	"github.com/0xPolygon/polygon-edge/types"
+)
+
+const (
+	MaxEnqueuedLimit uint64 = 64
 )
 
 // Thread safe map of all accounts registered by the pool.
@@ -147,10 +152,14 @@ func (m *accountsMap) allTxs(includeEnqueued bool) (
 // indicating the account's enqueued transaction(s)
 // are ready to be moved to the promoted queue.
 type account struct {
-	init               sync.Once
-	enqueued, promoted *accountQueue
-	nextNonce          uint64
-	demotions          uint
+	init sync.Once
+
+	enqueued,
+	promoted *accountQueue
+
+	nextNonce        uint64
+	demotions        uint
+	maxEnqueuedLimit uint
 }
 
 // getNonce returns the next expected nonce for this account.
@@ -213,6 +222,10 @@ func (a *account) reset(nonce uint64, promoteCh chan<- promoteRequest) (
 func (a *account) enqueue(tx *types.Transaction) error {
 	a.enqueued.lock(true)
 	defer a.enqueued.unlock()
+
+	if a.enqueued.length() <= MaxEnqueuedLimit {
+		return errors.New("maximum enqueued limit reached")
+	}
 
 	// reject low nonce tx
 	if tx.Nonce < a.getNonce() {
