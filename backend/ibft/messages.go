@@ -11,12 +11,12 @@ import (
 func (i *backendIBFT) signMessage(msg *protoIBFT.Message) *protoIBFT.Message {
 	raw, err := proto.Marshal(msg)
 	if err != nil {
-		panic("signMessage: cannot marshal")
+		return nil
 	}
 
 	sig, err := crypto.Sign(i.validatorKey, crypto.Keccak256(raw))
 	if err != nil {
-		panic("signMessage: cannot sign")
+		return nil
 	}
 
 	msg.Signature = sig
@@ -40,7 +40,6 @@ func (i *backendIBFT) BuildPrePrepareMessage(proposal []byte, view *protoIBFT.Vi
 func (i *backendIBFT) BuildPrepareMessage(proposal []byte, view *protoIBFT.View) *protoIBFT.Message {
 	block := &types.Block{}
 	if err := block.UnmarshalRLP(proposal); err != nil {
-		panic("BuildPrepareMessage: cannot unmarshal block")
 		return nil
 	}
 
@@ -61,8 +60,6 @@ func (i *backendIBFT) BuildPrepareMessage(proposal []byte, view *protoIBFT.View)
 func (i *backendIBFT) BuildCommitMessage(proposal []byte, view *protoIBFT.View) *protoIBFT.Message {
 	block := &types.Block{}
 	if err := block.UnmarshalRLP(proposal); err != nil {
-		panic("BuildCommitMessage: cannot unmarshal block")
-		//	log err
 		return nil
 	}
 
@@ -70,8 +67,6 @@ func (i *backendIBFT) BuildCommitMessage(proposal []byte, view *protoIBFT.View) 
 
 	seal, err := i.generateCommittedSeal(block.Header)
 	if err != nil {
-		//	log err
-		panic("BuildCommitMessage: cannot generate seal")
 		return nil
 	}
 
@@ -100,13 +95,10 @@ func (i *backendIBFT) BuildRoundChangeMessage(height, round uint64) *protoIBFT.M
 }
 
 func (i *backendIBFT) generateCommittedSeal(header *types.Header) ([]byte, error) {
-	//	TODO: just grab the hash ?
-	hash, err := calculateHeaderHash(header)
-	if err != nil {
-		return nil, err
-	}
-
-	commitHash := crypto.Keccak256(hash, []byte{byte(protoIBFT.MessageType_COMMIT)})
+	commitHash := crypto.Keccak256(
+		header.Hash.Bytes(),
+		[]byte{byte(protoIBFT.MessageType_COMMIT)},
+	)
 
 	seal, err := crypto.Sign(i.validatorKey, crypto.Keccak256(commitHash))
 	if err != nil {
