@@ -33,10 +33,6 @@ func TestEncodingUint64(t *testing.T) {
 			}
 
 			assert.Equal(t, testCase.value, decodedValue)
-
-			decodedValue = MustDecodeUint64(encodedValue)
-
-			assert.Equal(t, testCase.value, decodedValue)
 		})
 	}
 }

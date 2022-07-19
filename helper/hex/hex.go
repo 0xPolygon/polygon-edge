@@ -66,17 +66,6 @@ func DecodeUint64(hexStr string) (uint64, error) {
 	return result, nil
 }
 
-// MustDecodeUint64 decodes a hex string with 0x prefix to uint64
-// Returns panic if there is an error
-func MustDecodeUint64(hexStr string) uint64 {
-	decodedValue, err := DecodeUint64(hexStr)
-	if err != nil {
-		panic(fmt.Errorf("could not decode hex: %w", err))
-	}
-
-	return decodedValue
-}
-
 const BadNibble = ^uint64(0)
 
 // DecodeNibble decodes a byte into a uint64
