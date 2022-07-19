@@ -90,7 +90,6 @@ func writeCommittedSeal(prv *ecdsa.PrivateKey, h *types.Header) ([]byte, error) 
 }
 
 func writeCommittedSeals(h *types.Header, seals [][]byte) (*types.Header, error) {
-	// TODO: ??
 	h = h.Copy()
 
 	if len(seals) == 0 {

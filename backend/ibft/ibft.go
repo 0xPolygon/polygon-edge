@@ -389,11 +389,11 @@ func (i *backendIBFT) startt() {
 			continue
 		case <-syncerBlock:
 			//	syncer inserted block -> stop running consensus
-			i.consensus.cancelSequence()
+			i.consensus.stopSequence()
 			i.logger.Info("canceled sequence", "sequence", latest+1)
 		case <-i.closeCh:
 			//	IBFT backend stopped
-			i.consensus.cancelSequence()
+			i.consensus.stopSequence()
 			return
 		}
 	}
@@ -547,7 +547,6 @@ func (i *backendIBFT) executeTransactions(
 	}
 }
 
-//	TODO: ~~BuildProposal
 // buildBlock builds the block, based on the passed in snapshot and parent header
 func (i *backendIBFT) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, error) {
 	header := &types.Header{
@@ -615,7 +614,6 @@ func (i *backendIBFT) buildBlock(snap *Snapshot, parent *types.Header) (*types.B
 		Receipts: transition.Receipts(),
 	})
 
-	//	TODO: this is how the signature is created (?)
 	// write the seal of the block after all the fields are completed
 	header, err = writeSeal(i.validatorKey, block.Header)
 	if err != nil {
@@ -626,10 +624,9 @@ func (i *backendIBFT) buildBlock(snap *Snapshot, parent *types.Header) (*types.B
 
 	// compute the hash, this is only a provisional hash since the final one
 	// is sealed after all the committed seals
-	//	TODO: header hash was never generated with ProposerSeal and CommittedSeals
 	block.Header.ComputeHash()
 
-	i.logger.Info("build block", "number", header.Number, "txns", len(txs))
+	i.logger.Info("build block", "number", header.Number, "txs", len(txs))
 
 	return block, nil
 }
