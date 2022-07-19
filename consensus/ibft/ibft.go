@@ -10,7 +10,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
-	"github.com/0xPolygon/polygon-edge/consensus/ibft/validators"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
@@ -19,6 +18,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/syncer"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/0xPolygon/polygon-edge/validators"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"google.golang.org/grpc"
@@ -919,12 +919,12 @@ func (i *Ibft) runValidateState() {
 			panic(fmt.Sprintf("BUG: %s", reflect.TypeOf(msg.Type)))
 		}
 
-		if i.state.numPrepared() >= i.quorumSize(i.state.view.Sequence)(i.state.validators) {
+		if i.state.numPrepared() >= i.quorumSize(i.state.view.Sequence, i.state.validators) {
 			// we have received enough pre-prepare messages
 			sendCommit()
 		}
 
-		if i.state.numCommitted() >= i.quorumSize(i.state.view.Sequence)(i.state.validators) {
+		if i.state.numCommitted() >= i.quorumSize(i.state.view.Sequence, i.state.validators) {
 			// we have received enough commit messages
 			sendCommit()
 
@@ -1113,13 +1113,13 @@ func (i *Ibft) runRoundChangeState() {
 		// we only expect RoundChange messages right now
 		num := i.state.AddRoundMessage(msg)
 
-		if num == i.state.validators.MaxFaultyNodes()+1 && i.state.view.Round < msg.View.Round {
+		if num == CalcMaxFaultyNodes(i.state.validators)+1 && i.state.view.Round < msg.View.Round {
 			// weak certificate, try to catch up if our round number is smaller
 			// update timer
 			timeout = i.getTimeout()
 
 			sendRoundChange(msg.View.Round)
-		} else if num == i.quorumSize(i.state.view.Sequence)(i.state.validators) {
+		} else if num == i.quorumSize(i.state.view.Sequence, i.state.validators) {
 			// start a new round immediately
 			i.startNewRound(msg.View.Round)
 			i.setState(AcceptState)
@@ -1257,7 +1257,7 @@ func (i *Ibft) verifyHeaderImpl(snap *Snapshot, parent, header *types.Header) er
 			parentSnap.Set,
 			parent,
 			header,
-			i.quorumSize(header.Number),
+			i.quorumSize(header.Number, parentSnap.Set),
 		); err != nil {
 			return fmt.Errorf("failed to verify ParentCommittedSeal: %w", err)
 		}
@@ -1287,7 +1287,7 @@ func (i *Ibft) VerifyHeader(header *types.Header) error {
 	}
 
 	// verify the committed seals
-	if err := i.signer.VerifyCommittedSeal(snap.Set, header, i.quorumSize(header.Number)); err != nil {
+	if err := i.signer.VerifyCommittedSeal(snap.Set, header, i.quorumSize(header.Number, i.state.validators)); err != nil {
 		return err
 	}
 
@@ -1297,12 +1297,12 @@ func (i *Ibft) VerifyHeader(header *types.Header) error {
 //	quorumSize returns a callback that when executed on a ValidatorSet computes
 //	number of votes required to reach quorum based on the size of the set.
 //	The blockNumber argument indicates which formula was used to calculate the result (see PRs #513, #549)
-func (i *Ibft) quorumSize(blockNumber uint64) validators.QuorumImplementation {
+func (i *Ibft) quorumSize(blockNumber uint64, validatorSet validators.ValidatorSet) int {
 	if blockNumber < i.quorumSizeBlockNum {
-		return validators.LegacyQuorumSize
+		return LegacyQuorumSize(validatorSet)
 	}
 
-	return validators.OptimalQuorumSize
+	return OptimalQuorumSize(validatorSet)
 }
 
 // ProcessHeaders updates the snapshot based on previously verified headers

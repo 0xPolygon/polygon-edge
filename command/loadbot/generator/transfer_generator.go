@@ -42,7 +42,7 @@ func (tg *TransferGenerator) GetExampleTransaction() (*types.Transaction, error)
 }
 
 func (tg *TransferGenerator) generateReceiver() error {
-	key, err := crypto.GenerateKey()
+	key, err := crypto.GenerateECDSAKey()
 	if err != nil {
 		return err
 	}

@@ -2,39 +2,46 @@ package signer
 
 import (
 	"crypto/ecdsa"
-	"fmt"
 
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/helper/keccak"
 	"github.com/0xPolygon/polygon-edge/secrets"
+	"github.com/0xPolygon/polygon-edge/secrets/helper"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/coinbase/kryptology/pkg/signatures/bls/bls_sig"
 	"github.com/umbracle/fastrlp"
 )
 
-func obtainOrCreateECDSAKey(manager secrets.SecretsManager) (*ecdsa.PrivateKey, error) {
-	if manager.HasSecret(secrets.ValidatorKey) {
-		keyBytes, err := manager.GetSecret(secrets.ValidatorKey)
-		if err != nil {
+func getOrCreateECDSAKey(manager secrets.SecretsManager) (*ecdsa.PrivateKey, error) {
+	if !manager.HasSecret(secrets.ValidatorKey) {
+		if _, err := helper.InitECDSAValidatorKey(manager); err != nil {
 			return nil, err
 		}
-
-		return crypto.BytesToPrivateKey(keyBytes)
 	}
 
-	// create new key
-	key, keyBytes, err := crypto.GenerateAndEncodePrivateKey()
+	keyBytes, err := manager.GetSecret(secrets.ValidatorKey)
 	if err != nil {
-		return nil, fmt.Errorf("unable to generate validator key for Secrets Manager, %w", err)
+		return nil, err
 	}
 
-	err = manager.SetSecret(secrets.ValidatorKey, keyBytes)
+	return crypto.BytesToECDSAPrivateKey(keyBytes)
+}
+
+func getOrCreateBLSKey(manager secrets.SecretsManager) (*bls_sig.SecretKey, error) {
+	if !manager.HasSecret(secrets.ValidatorBLSKey) {
+		if _, err := helper.InitBLSValidatorKey(manager); err != nil {
+			return nil, err
+		}
+	}
+
+	keyBytes, err := manager.GetSecret(secrets.ValidatorBLSKey)
 	if err != nil {
-		return nil, fmt.Errorf("unable to save validator key to Secrets Manager, %w", err)
+		return nil, err
 	}
 
-	return key, nil
+	return crypto.BytesToBLSSecretKey(keyBytes)
 }
 
 func calculateHeaderHash(h *types.Header) types.Hash {

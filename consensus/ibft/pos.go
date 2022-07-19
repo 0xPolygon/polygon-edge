@@ -4,11 +4,11 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/0xPolygon/polygon-edge/consensus/ibft/validators"
 	"github.com/0xPolygon/polygon-edge/contracts/staking"
 	stakingHelper "github.com/0xPolygon/polygon-edge/helper/staking"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/0xPolygon/polygon-edge/validators"
 )
 
 // PoSMechanism defines specific hooks for the Proof of Stake IBFT mechanism
@@ -207,20 +207,25 @@ func (pos *PoSMechanism) ShouldWriteTransactions(blockNumber uint64) bool {
 // getNextValidators is a helper function for fetching the validator set
 // from the Staking SC
 func (pos *PoSMechanism) getNextValidators(header *types.Header) (validators.ValidatorSet, error) {
-	transition, err := pos.ibft.executor.BeginTxn(header.StateRoot, header, types.ZeroAddress)
-	if err != nil {
-		return nil, err
-	}
+	// TODO: Add support for PoS in same branch
 
-	valAddrs, err := staking.QueryValidators(transition, pos.ibft.signer.Address())
-	if err != nil {
-		return nil, err
-	}
+	// transition, err := pos.ibft.executor.BeginTxn(header.StateRoot, header, types.ZeroAddress)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
-	// TODO: PoS contract doesn't hold BLS PubKeys
-	valSet := validators.ECDSAValidatorSet(valAddrs)
+	// valAddrs, err := staking.QueryValidators(transition, pos.ibft.signer.Address())
+	// if err != nil {
+	// 	return nil, err
+	// }
 
-	return &valSet, nil
+	// // // TODO: PoS contract doesn't hold BLS PubKeys
+
+	// // valSet := validators.ECDSAValidatorSet(valAddrs)
+
+	// // return &valSet, nil
+
+	return nil, nil
 }
 
 // updateSnapshotValidators updates validators in snapshot at given height

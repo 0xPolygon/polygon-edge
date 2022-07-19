@@ -26,6 +26,9 @@ const (
 	// ValidatorKey is the private key secret of the validator node
 	ValidatorKey = "validator-key"
 
+	// ValidatorBLSKey is the bls secret key of the validator node
+	ValidatorBLSKey = "validator-bls-key"
+
 	// NetworkKey is the libp2p private key secret used for networking
 	NetworkKey = "network-key"
 )

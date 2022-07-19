@@ -4,7 +4,6 @@ import (
 	"errors"
 
 	"github.com/0xPolygon/polygon-edge/command"
-	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/secrets/helper"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -15,7 +14,8 @@ import (
 const (
 	dataDirFlag = "data-dir"
 	configFlag  = "config"
-	keyTypeFlag = "key-type"
+	ecdsaFlag   = "ecdsa"
+	blsFlag     = "bls"
 )
 
 var (
@@ -25,15 +25,14 @@ var (
 var (
 	errInvalidConfig   = errors.New("invalid secrets configuration")
 	errInvalidParams   = errors.New("no config file or data directory passed in")
-	errEmptyKeyType    = errors.New("key type is not specified")
 	errUnsupportedType = errors.New("unsupported secrets manager")
 )
 
 type initParams struct {
-	dataDir    string
-	configPath string
-	rawKeyType string
-	keyType    crypto.KeyType
+	dataDir        string
+	configPath     string
+	generatesECDSA bool
+	generatesBLS   bool
 
 	secretsManager secrets.SecretsManager
 	secretsConfig  *secrets.SecretsManagerConfig
@@ -51,18 +50,10 @@ func (ip *initParams) validateFlags() error {
 		return errInvalidParams
 	}
 
-	if ip.rawKeyType == "" {
-		return errEmptyKeyType
-	}
-
 	return nil
 }
 
 func (ip *initParams) initSecrets() error {
-	if err := ip.initKeyType(); err != nil {
-		return err
-	}
-
 	if err := ip.initSecretsManager(); err != nil {
 		return err
 	}
@@ -72,17 +63,6 @@ func (ip *initParams) initSecrets() error {
 	}
 
 	return ip.initNetworkingKey()
-}
-
-func (ip *initParams) initKeyType() error {
-	key, err := crypto.ToKeyType(ip.rawKeyType)
-	if err != nil {
-		return err
-	}
-
-	ip.keyType = key
-
-	return nil
 }
 
 func (ip *initParams) initSecretsManager() error {
@@ -162,15 +142,16 @@ func (ip *initParams) initLocalSecretsManager() error {
 }
 
 func (ip *initParams) initValidatorKey() error {
-	address, err := helper.InitValidatorKey(ip.secretsManager)
-	if err != nil {
-		return err
+	var err error
+
+	if ip.generatesECDSA {
+		if ip.validatorAddress, err = helper.InitECDSAValidatorKey(ip.secretsManager); err != nil {
+			return err
+		}
 	}
 
-	ip.validatorAddress = address
-
-	if ip.keyType == crypto.KeyBLS {
-		if ip.blsPublicKey, err = crypto.GetBLSPubkeyFromValidatorKey(ip.secretsManager); err != nil {
+	if ip.generatesBLS {
+		if ip.blsPublicKey, err = helper.InitBLSValidatorKey(ip.secretsManager); err != nil {
 			return err
 		}
 	}

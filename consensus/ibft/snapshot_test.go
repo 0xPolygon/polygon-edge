@@ -11,10 +11,10 @@ import (
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
-	"github.com/0xPolygon/polygon-edge/consensus/ibft/validators"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/0xPolygon/polygon-edge/validators"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
 )
@@ -73,7 +73,7 @@ func newTesterAccountPool(t *testing.T, num ...int) *testerAccountPool {
 
 	if len(num) == 1 {
 		for i := 0; i < num[0]; i++ {
-			key, _ := crypto.GenerateKey()
+			key, _ := crypto.GenerateECDSAKey()
 
 			pool.accounts = append(pool.accounts, &testerAccount{
 				alias: strconv.Itoa(i),
@@ -93,7 +93,7 @@ func (ap *testerAccountPool) add(accounts ...string) {
 			continue
 		}
 
-		priv, err := crypto.GenerateKey()
+		priv, err := crypto.GenerateECDSAKey()
 		if err != nil {
 			panic("BUG: Failed to generate crypto key")
 		}
@@ -144,7 +144,9 @@ func (ap *testerAccountPool) ValidatorSet() validators.ValidatorSet {
 
 	v := validators.ECDSAValidatorSet{}
 	for _, i := range ap.accounts {
-		v = append(v, i.Address())
+		v = append(v, &validators.ECDSAValidator{
+			Address: i.Address(),
+		})
 	}
 
 	return &v
@@ -787,7 +789,9 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 					}
 					// check validators
 					for _, i := range result.validators {
-						resSnap.Set.Add(pool.get(i).Address())
+						resSnap.Set.Add(&validators.ECDSAValidator{
+							Address: pool.get(i).Address(),
+						})
 					}
 					// build result votes
 					for _, v := range result.votes {

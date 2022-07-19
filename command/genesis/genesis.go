@@ -6,8 +6,8 @@ import (
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft"
-	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/common"
+	"github.com/0xPolygon/polygon-edge/validators"
 	"github.com/spf13/cobra"
 )
 
@@ -92,10 +92,10 @@ func setFlags(cmd *cobra.Command) {
 	// IBFT Validators
 	{
 		cmd.Flags().StringVar(
-			&params.rawKeyType,
-			keyTypeFlag,
-			string(crypto.KeySecp256k1),
-			"the type of key",
+			&params.rawIBFTValidatorType,
+			ibftValidatorTypeFlag,
+			string(validators.ECDSAValidatorType),
+			"the type of validators in IBFT",
 		)
 
 		cmd.Flags().StringVar(

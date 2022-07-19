@@ -5,8 +5,8 @@ import (
 	"sync/atomic"
 
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
-	"github.com/0xPolygon/polygon-edge/consensus/ibft/validators"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/0xPolygon/polygon-edge/validators"
 )
 
 type IbftState uint32
@@ -106,7 +106,7 @@ func (c *currentState) getErr() error {
 }
 
 func (c *currentState) maxRound() (maxRound uint64, found bool) {
-	num := c.validators.MaxFaultyNodes() + 1
+	num := CalcMaxFaultyNodes(c.validators) + 1
 
 	for k, round := range c.roundMessages {
 		if len(round) < num {
@@ -131,7 +131,9 @@ func (c *currentState) resetRoundMsgs() {
 
 // CalcProposer calculates the proposer and sets it to the state
 func (c *currentState) CalcProposer(lastProposer types.Address) {
-	c.proposer = c.validators.CalcProposer(c.view.Round, lastProposer)
+	proposer := CalcProposer(c.validators, c.view.Round, lastProposer)
+
+	c.proposer = proposer.Addr()
 }
 
 func (c *currentState) lock() {

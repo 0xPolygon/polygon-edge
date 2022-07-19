@@ -5,15 +5,16 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
+	"math/big"
+	"net"
+	"testing"
+	"time"
+
 	"github.com/golang/protobuf/ptypes/any"
 	libp2pCrypto "github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/umbracle/ethgo"
-	"math/big"
-	"net"
-	"testing"
-	"time"
 
 	"github.com/0xPolygon/polygon-edge/crypto"
 	txpoolOp "github.com/0xPolygon/polygon-edge/txpool/proto"
@@ -30,7 +31,7 @@ var (
 func GenerateKeyAndAddr(t *testing.T) (*ecdsa.PrivateKey, types.Address) {
 	t.Helper()
 
-	key, err := crypto.GenerateKey()
+	key, err := crypto.GenerateECDSAKey()
 
 	assert.NoError(t, err)
 

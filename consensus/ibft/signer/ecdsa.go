@@ -5,10 +5,10 @@ import (
 	"fmt"
 
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
-	"github.com/0xPolygon/polygon-edge/consensus/ibft/validators"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/0xPolygon/polygon-edge/validators"
 	"github.com/umbracle/fastrlp"
 )
 
@@ -20,7 +20,7 @@ type ECDSAKeyManager struct {
 type SerializedSeal [][]byte
 
 func NewECDSAKeyManager(manager secrets.SecretsManager) (KeyManager, error) {
-	key, err := obtainOrCreateECDSAKey(manager)
+	key, err := getOrCreateECDSAKey(manager)
 	if err != nil {
 		return nil, err
 	}

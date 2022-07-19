@@ -209,7 +209,7 @@ func (t *TestServer) SecretsInit() (*InitIBFTResult, error) {
 	}
 
 	// Generate the IBFT validator private key
-	validatorKey, validatorKeyEncoded, keyErr := crypto.GenerateAndEncodePrivateKey()
+	validatorKey, validatorKeyEncoded, keyErr := crypto.GenerateAndEncodeECDSAPrivateKey()
 	if keyErr != nil {
 		return nil, keyErr
 	}

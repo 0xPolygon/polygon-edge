@@ -35,17 +35,20 @@ var (
 type KeyType string
 
 const (
-	KeySecp256k1 KeyType = "secp256k1"
-	KeyBLS       KeyType = "bls"
+	KeyECDSA KeyType = "ecdsa"
+	KeyBLS   KeyType = "bls"
 )
 
-func ToKeyType(s string) (KeyType, error) {
+func (t *KeyType) FromString(s string) error {
 	x := KeyType(s)
+
 	switch x {
-	case KeySecp256k1, KeyBLS:
-		return x, nil
+	case KeyECDSA, KeyBLS:
+		*t = x
+
+		return nil
 	default:
-		return x, fmt.Errorf("invalid key type: %s", s)
+		return fmt.Errorf("invalid key type: %s", s)
 	}
 }
 
@@ -116,19 +119,19 @@ func CreateAddress2(addr types.Address, salt [32]byte, inithash []byte) types.Ad
 	return types.BytesToAddress(Keccak256(create2Prefix, addr.Bytes(), salt[:], Keccak256(inithash))[12:])
 }
 
-func ParsePrivateKey(buf []byte) (*ecdsa.PrivateKey, error) {
+func ParseECDSAPrivateKey(buf []byte) (*ecdsa.PrivateKey, error) {
 	prv, _ := btcec.PrivKeyFromBytes(S256, buf)
 
 	return prv.ToECDSA(), nil
 }
 
-// MarshalPrivateKey serializes the private key's D value to a []byte
-func MarshalPrivateKey(priv *ecdsa.PrivateKey) ([]byte, error) {
+// MarshalECDSAPrivateKey serializes the private key's D value to a []byte
+func MarshalECDSAPrivateKey(priv *ecdsa.PrivateKey) ([]byte, error) {
 	return (*btcec.PrivateKey)(priv).Serialize(), nil
 }
 
-// GenerateKey generates a new key based on the secp256k1 elliptic curve.
-func GenerateKey() (*ecdsa.PrivateKey, error) {
+// GenerateECDSAKey generates a new key based on the secp256k1 elliptic curve.
+func GenerateECDSAKey() (*ecdsa.PrivateKey, error) {
 	return ecdsa.GenerateKey(S256, rand.Reader)
 }
 
@@ -238,14 +241,14 @@ func GetAddressFromKey(key goCrypto.PrivateKey) (types.Address, error) {
 	return PubKeyToAddress(&publicKey), nil
 }
 
-// generateKeyAndMarshal generates a new private key and serializes it to a byte array
-func generateKeyAndMarshal() ([]byte, error) {
-	key, err := GenerateKey()
+// generateECDSAKeyAndMarshal generates a new ECDSA private key and serializes it to a byte array
+func generateECDSAKeyAndMarshal() ([]byte, error) {
+	key, err := GenerateECDSAKey()
 	if err != nil {
 		return nil, err
 	}
 
-	buf, err := MarshalPrivateKey(key)
+	buf, err := MarshalECDSAPrivateKey(key)
 	if err != nil {
 		return nil, err
 	}
@@ -253,8 +256,8 @@ func generateKeyAndMarshal() ([]byte, error) {
 	return buf, nil
 }
 
-// BytesToPrivateKey reads the input byte array and constructs a private key if possible
-func BytesToPrivateKey(input []byte) (*ecdsa.PrivateKey, error) {
+// BytesToECDSAPrivateKey reads the input byte array and constructs a private key if possible
+func BytesToECDSAPrivateKey(input []byte) (*ecdsa.PrivateKey, error) {
 	// The key file on disk should be encoded in Base64,
 	// so it must be decoded before it can be parsed by ParsePrivateKey
 	decoded, err := hex.DecodeString(string(input))
@@ -269,7 +272,7 @@ func BytesToPrivateKey(input []byte) (*ecdsa.PrivateKey, error) {
 	}
 
 	// Convert decoded bytes to a private key
-	key, err := ParsePrivateKey(decoded)
+	key, err := ParseECDSAPrivateKey(decoded)
 	if err != nil {
 		return nil, err
 	}
@@ -277,15 +280,73 @@ func BytesToPrivateKey(input []byte) (*ecdsa.PrivateKey, error) {
 	return key, nil
 }
 
-// GenerateOrReadPrivateKey generates a private key at the specified path,
-// or reads it if a key file is present
-func GenerateOrReadPrivateKey(path string) (*ecdsa.PrivateKey, error) {
-	keyBuff, err := keystore.CreateIfNotExists(path, generateKeyAndMarshal)
+// GenerateBLSKey generates a new BLS key
+func GenerateBLSKey() (*bls_sig.SecretKey, error) {
+	blsPop := bls_sig.NewSigPop()
+
+	_, sk, err := blsPop.Keygen()
 	if err != nil {
 		return nil, err
 	}
 
-	privateKey, err := BytesToPrivateKey(keyBuff)
+	return sk, nil
+}
+
+// generateBLSKeyAndMarshal generates a new BLS secret key and serializes it to a byte array
+func generateBLSKeyAndMarshal() ([]byte, error) {
+	key, err := GenerateBLSKey()
+	if err != nil {
+		return nil, err
+	}
+
+	buf, err := key.MarshalBinary()
+	if err != nil {
+		return nil, err
+	}
+
+	return buf, nil
+}
+
+// BytesToECDSAPrivateKey reads the input byte array and constructs a private key if possible
+func BytesToBLSSecretKey(input []byte) (*bls_sig.SecretKey, error) {
+	// The key file on disk should be encoded in Base64,
+	// so it must be decoded before it can be parsed by ParsePrivateKey
+	decoded, err := hex.DecodeString(string(input))
+	if err != nil {
+		return nil, err
+	}
+
+	sk := &bls_sig.SecretKey{}
+	if err := sk.UnmarshalBinary(decoded); err != nil {
+		return nil, err
+	}
+
+	return sk, nil
+}
+
+func BLSSecretKeyToPubkeyBytes(key *bls_sig.SecretKey) ([]byte, error) {
+	pubKey, err := key.GetPublicKey()
+	if err != nil {
+		return nil, err
+	}
+
+	marshalled, err := pubKey.MarshalBinary()
+	if err != nil {
+		return nil, err
+	}
+
+	return marshalled, nil
+}
+
+// GenerateOrReadPrivateKey generates a private key at the specified path,
+// or reads it if a key file is present
+func GenerateOrReadPrivateKey(path string) (*ecdsa.PrivateKey, error) {
+	keyBuff, err := keystore.CreateIfNotExists(path, generateECDSAKeyAndMarshal)
+	if err != nil {
+		return nil, err
+	}
+
+	privateKey, err := BytesToECDSAPrivateKey(keyBuff)
 	if err != nil {
 		return nil, fmt.Errorf("unable to execute byte array -> private key conversion, %w", err)
 	}
@@ -293,19 +354,33 @@ func GenerateOrReadPrivateKey(path string) (*ecdsa.PrivateKey, error) {
 	return privateKey, nil
 }
 
-// GenerateAndEncodePrivateKey returns a newly generated private key and the Base64 encoding of that private key
-func GenerateAndEncodePrivateKey() (*ecdsa.PrivateKey, []byte, error) {
-	keyBuff, err := keystore.CreatePrivateKey(generateKeyAndMarshal)
+// GenerateAndEncodeECDSAPrivateKey returns a newly generated private key and the Base64 encoding of that private key
+func GenerateAndEncodeECDSAPrivateKey() (*ecdsa.PrivateKey, []byte, error) {
+	keyBuff, err := keystore.CreatePrivateKey(generateECDSAKeyAndMarshal)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	privateKey, err := BytesToPrivateKey(keyBuff)
+	privateKey, err := BytesToECDSAPrivateKey(keyBuff)
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to execute byte array -> private key conversion, %w", err)
 	}
 
 	return privateKey, keyBuff, nil
+}
+
+func GenerateAndEncodeBLSSecretKey() (*bls_sig.SecretKey, []byte, error) {
+	keyBuff, err := keystore.CreatePrivateKey(generateECDSAKeyAndMarshal)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	secretKey, err := BytesToBLSSecretKey(keyBuff)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to execute byte array -> private key conversion, %w", err)
+	}
+
+	return secretKey, keyBuff, nil
 }
 
 func ReadConsensusKey(manager secrets.SecretsManager) (*ecdsa.PrivateKey, error) {
@@ -314,45 +389,5 @@ func ReadConsensusKey(manager secrets.SecretsManager) (*ecdsa.PrivateKey, error)
 		return nil, err
 	}
 
-	return BytesToPrivateKey(validatorKey)
-}
-
-func GetBLSPubkeyFromValidatorKey(secretsManager secrets.SecretsManager) ([]byte, error) {
-	ecdsaKey, err := ReadConsensusKey(secretsManager)
-	if err != nil {
-		return nil, err
-	}
-
-	pubkeyBytes, err := ECDSAToMarshalledBLSPubkey(ecdsaKey)
-	if err != nil {
-		return nil, err
-	}
-
-	return pubkeyBytes, nil
-}
-
-func ECDSAToBLS(key *ecdsa.PrivateKey) (*bls_sig.SecretKey, error) {
-	blsPop := bls_sig.NewSigPop()
-	keyBytes := (*btcec.PrivateKey)(key).Serialize()
-
-	_, sk, err := blsPop.KeygenWithSeed(keyBytes)
-	if err != nil {
-		return nil, err
-	}
-
-	return sk, nil
-}
-
-func ECDSAToMarshalledBLSPubkey(ecdsaKey *ecdsa.PrivateKey) ([]byte, error) {
-	secKey, err := ECDSAToBLS(ecdsaKey)
-	if err != nil {
-		return nil, err
-	}
-
-	pubKey, err := secKey.GetPublicKey()
-	if err != nil {
-		return nil, err
-	}
-
-	return pubKey.MarshalBinary()
+	return BytesToECDSAPrivateKey(validatorKey)
 }

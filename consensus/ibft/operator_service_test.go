@@ -8,7 +8,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
-	"github.com/0xPolygon/polygon-edge/consensus/ibft/validators"
+	"github.com/0xPolygon/polygon-edge/validators"
 	"github.com/stretchr/testify/assert"
 )
 

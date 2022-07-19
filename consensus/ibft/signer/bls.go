@@ -6,10 +6,10 @@ import (
 	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
-	"github.com/0xPolygon/polygon-edge/consensus/ibft/validators"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/0xPolygon/polygon-edge/validators"
 	"github.com/coinbase/kryptology/pkg/signatures/bls/bls_sig"
 	"github.com/umbracle/fastrlp"
 )
@@ -21,12 +21,12 @@ type BLSKeyManager struct {
 }
 
 func NewBLSKeyManager(manager secrets.SecretsManager) (KeyManager, error) {
-	ecdsaKey, err := obtainOrCreateECDSAKey(manager)
+	ecdsaKey, err := getOrCreateECDSAKey(manager)
 	if err != nil {
 		return nil, err
 	}
 
-	blsKey, err := crypto.ECDSAToBLS(ecdsaKey)
+	blsKey, err := getOrCreateBLSKey(manager)
 	if err != nil {
 		return nil, err
 	}
@@ -139,7 +139,7 @@ func (s *BLSKeyManager) getBLSSignatures(
 			return nil, nil, err
 		}
 
-		bitMap = bitMap.SetBit(bitMap, index, 1)
+		bitMap = bitMap.SetBit(bitMap, int(index), 1)
 
 		blsSignatures = append(blsSignatures, bsig)
 	}
@@ -192,7 +192,7 @@ func (s *BLSKeyManager) createAggregatedBLSPubKeys(
 		}
 
 		pubKey := &bls_sig.PublicKey{}
-		if err := pubKey.UnmarshalBinary(val.BLSPubKey); err != nil {
+		if err := pubKey.UnmarshalBinary(val.BLSPublicKey); err != nil {
 			return nil, 0, err
 		}
 

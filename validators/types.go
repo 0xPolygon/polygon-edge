@@ -1,0 +1,70 @@
+package validators
+
+import (
+	"errors"
+	"fmt"
+
+	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/umbracle/fastrlp"
+)
+
+var (
+	ErrMismatchValidatorType    = errors.New("mismatch between validator and validator set")
+	ErrMismatchValidatorSetType = errors.New("mismatch between validator sets")
+	ErrValidatorAlreadyExists   = errors.New("validator already exists in validator set")
+	ErrValidatorNotFound        = errors.New("validator not found in validator set")
+)
+
+type ValidatorType string
+
+const (
+	ECDSAValidatorType ValidatorType = "ecdsa"
+	BLSValidatorType   ValidatorType = "bls"
+)
+
+func (t *ValidatorType) FromString(s string) error {
+	x := ValidatorType(s)
+
+	switch x {
+	case ECDSAValidatorType, BLSValidatorType:
+		*t = x
+
+		return nil
+	default:
+		return fmt.Errorf("invalid validator type: %s", s)
+	}
+}
+
+func NewValidatorSetFromType(t ValidatorType) ValidatorSet {
+	switch t {
+	case ECDSAValidatorType:
+		return new(ECDSAValidatorSet)
+	case BLSValidatorType:
+		return new(BLSValidatorSet)
+	}
+
+	return nil
+}
+
+// Validator defines the interface of the methods a validator implements
+type Validator interface {
+	Addr() types.Address
+	Equal(Validator) bool
+	MarshalRLPWith(*fastrlp.Arena) *fastrlp.Value
+	UnmarshalRLPFrom(*fastrlp.Parser, *fastrlp.Value) error
+}
+
+// ValidatorSet defines the interface of the methods validator set implements
+type ValidatorSet interface {
+	Len() int
+	Equal(ValidatorSet) bool
+	Copy() ValidatorSet
+	At(uint64) Validator
+	Index(types.Address) int64
+	Includes(types.Address) bool
+	Add(Validator) error
+	Del(Validator) error
+	Merge(ValidatorSet) error
+	MarshalRLPWith(*fastrlp.Arena) *fastrlp.Value
+	UnmarshalRLPFrom(*fastrlp.Parser, *fastrlp.Value) error
+}

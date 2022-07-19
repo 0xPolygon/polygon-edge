@@ -2,7 +2,6 @@ package init
 
 import (
 	"github.com/0xPolygon/polygon-edge/command"
-	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/spf13/cobra"
 )
 
@@ -22,13 +21,6 @@ func GetCommand() *cobra.Command {
 
 func setFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(
-		&params.rawKeyType,
-		keyTypeFlag,
-		string(crypto.KeySecp256k1),
-		"the type of key to generate",
-	)
-
-	cmd.Flags().StringVar(
 		&params.dataDir,
 		dataDirFlag,
 		"",
@@ -44,6 +36,20 @@ func setFlags(cmd *cobra.Command) {
 	)
 
 	cmd.MarkFlagsMutuallyExclusive(dataDirFlag, configFlag)
+
+	cmd.Flags().BoolVar(
+		&params.generatesECDSA,
+		ecdsaFlag,
+		true,
+		"generates ECDSA key for validator",
+	)
+
+	cmd.Flags().BoolVar(
+		&params.generatesBLS,
+		blsFlag,
+		false,
+		"generates BLS key for validator",
+	)
 }
 
 func runPreRun(_ *cobra.Command, _ []string) error {

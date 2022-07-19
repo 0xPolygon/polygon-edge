@@ -9,12 +9,11 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
-	"github.com/0xPolygon/polygon-edge/consensus/ibft/validators"
 	"github.com/0xPolygon/polygon-edge/contracts/staking"
-	"github.com/0xPolygon/polygon-edge/crypto"
 	stakingHelper "github.com/0xPolygon/polygon-edge/helper/staking"
 	"github.com/0xPolygon/polygon-edge/server"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/0xPolygon/polygon-edge/validators"
 )
 
 const (
@@ -22,6 +21,7 @@ const (
 	nameFlag                = "name"
 	premineFlag             = "premine"
 	chainIDFlag             = "chain-id"
+	ibftValidatorTypeFlag   = "ibft-validator-type"
 	ibftValidatorFlag       = "ibft-validator"
 	ibftValidatorPrefixFlag = "ibft-validators-prefix-path"
 	epochSizeFlag           = "epoch-size"
@@ -29,7 +29,6 @@ const (
 	posFlag                 = "pos"
 	minValidatorCount       = "min-validator-count"
 	maxValidatorCount       = "max-validator-count"
-	keyTypeFlag             = "key-type"
 )
 
 // Legacy flags that need to be preserved for running clients
@@ -67,8 +66,8 @@ type genesisParams struct {
 	minNumValidators uint64
 	maxNumValidators uint64
 
-	rawKeyType string
-	keyType    crypto.KeyType
+	rawIBFTValidatorType string
+	ibftValidatorType    validators.ValidatorType
 
 	extraData []byte
 	consensus server.ConsensusType
@@ -133,7 +132,7 @@ func (p *genesisParams) getRequiredFlags() []string {
 func (p *genesisParams) initRawParams() error {
 	p.consensus = server.ConsensusType(p.consensusRaw)
 
-	if err := p.initKeyType(); err != nil {
+	if err := p.initIBFTValidatorType(); err != nil {
 		return err
 	}
 
@@ -149,26 +148,28 @@ func (p *genesisParams) initRawParams() error {
 
 // setValidatorSetFromCli sets validator set from cli command
 func (p *genesisParams) setValidatorSetFromCli() error {
-	if len(p.ibftValidatorsRaw) != 0 {
-		var (
-			newValidators validators.ValidatorSet
-			err           error
-		)
+	if len(p.ibftValidatorsRaw) == 0 {
+		return nil
+	}
 
-		switch p.keyType {
-		case crypto.KeySecp256k1:
-			newValidators, err = validators.ParseECDSAValidators(p.ibftValidatorsRaw)
-		case crypto.KeyBLS:
-			newValidators, err = validators.ParseBLSValidators(p.ibftValidatorsRaw)
-		}
+	var (
+		newValidators = validators.NewValidatorSetFromType(p.ibftValidatorType)
+		err           error
+	)
 
+	for _, s := range p.ibftValidatorsRaw {
+		validator, err := ParseValidator(p.ibftValidatorType, s)
 		if err != nil {
 			return err
 		}
 
-		if err = p.ibftValidators.Merge(newValidators); err != nil {
+		if err := newValidators.Add(validator); err != nil {
 			return err
 		}
+	}
+
+	if err = p.ibftValidators.Merge(newValidators); err != nil {
+		return err
 	}
 
 	return nil
@@ -182,28 +183,37 @@ func (p *genesisParams) setValidatorSetFromPrefixPath() error {
 		return nil
 	}
 
-	if p.ibftValidators, readErr = getValidatorsFromPrefixPath(
+	validators, err := getValidatorsFromPrefixPath(
 		p.validatorPrefixPath,
-		p.keyType,
-	); readErr != nil {
+		p.ibftValidatorType,
+	)
+
+	if err != nil {
 		return fmt.Errorf("failed to read from prefix: %w", readErr)
+	}
+
+	if err := p.ibftValidators.Merge(validators); err != nil {
+		return err
 	}
 
 	return nil
 }
 
-func (p *genesisParams) initKeyType() error {
-	key, err := crypto.ToKeyType(p.rawKeyType)
-	if err != nil {
-		return err
+func (p *genesisParams) initIBFTValidatorType() error {
+	if !p.isIBFTConsensus() {
+		return nil
 	}
 
-	p.keyType = key
+	if err := p.ibftValidatorType.FromString(p.rawIBFTValidatorType); err != nil {
+		return err
+	}
 
 	return nil
 }
 
 func (p *genesisParams) initValidatorSet() error {
+	p.ibftValidators = validators.NewValidatorSetFromType(p.ibftValidatorType)
+
 	// Set validator set
 	// Priority goes to cli command over prefix path
 	if err := p.setValidatorSetFromPrefixPath(); err != nil {
@@ -233,10 +243,10 @@ func (p *genesisParams) initIBFTExtraData() {
 
 	var committedSeal signer.Sealer
 
-	switch p.keyType {
-	case crypto.KeySecp256k1:
+	switch p.ibftValidatorType {
+	case validators.ECDSAValidatorType:
 		committedSeal = new(signer.SerializedSeal)
-	case crypto.KeyBLS:
+	case validators.BLSValidatorType:
 		committedSeal = new(signer.BLSSeal)
 	}
 
@@ -337,13 +347,14 @@ func (p *genesisParams) shouldPredeployStakingSC() bool {
 }
 
 func (p *genesisParams) predeployStakingSC() (*chain.GenesisAccount, error) {
-	validators, ok := p.ibftValidators.(*validators.ECDSAValidatorSet)
-	if !ok {
-		return nil, fmt.Errorf("%t can't be set in PoS contract", p.ibftValidators)
-	}
+	// validators, ok := p.ibftValidators.(*validators.ECDSAValidatorSet)
+	// if !ok {
+	// 	return nil, fmt.Errorf("%t can't be set in PoS contract", p.ibftValidators)
+	// }
 
+	// TODO: support for PoS
 	stakingAccount, predeployErr := stakingHelper.PredeployStakingSC(
-		[]types.Address(*validators),
+		[]types.Address{},
 		stakingHelper.PredeployParams{
 			MinValidatorCount: p.minNumValidators,
 			MaxValidatorCount: p.maxNumValidators,

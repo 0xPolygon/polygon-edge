@@ -1,24 +1,30 @@
 package genesis
 
 import (
-	"crypto/ecdsa"
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
-	"github.com/0xPolygon/polygon-edge/consensus/ibft"
-	"github.com/0xPolygon/polygon-edge/consensus/ibft/validators"
 	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/0xPolygon/polygon-edge/secrets"
+	"github.com/0xPolygon/polygon-edge/secrets/helper"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/0xPolygon/polygon-edge/validators"
 )
 
 const (
 	StatError   = "StatError"
 	ExistsError = "ExistsError"
+)
+
+var (
+	ErrECDSAKeyNotFound = errors.New("ECDSA key not found in given path")
+	ErrBLSKeyNotFound   = errors.New("BLS key not found in given path")
 )
 
 // GenesisGenError is a specific error type for generating genesis
@@ -90,13 +96,16 @@ func fillPremineMap(
 
 // getValidatorsFromPrefixPath extracts the addresses of the validators based on the directory
 // prefix. It scans the directories for validator private keys and compiles a list of addresses
-func getValidatorsFromPrefixPath(prefix string, keyType crypto.KeyType) (validators.ValidatorSet, error) {
+func getValidatorsFromPrefixPath(
+	prefix string,
+	validatorType validators.ValidatorType,
+) (validators.ValidatorSet, error) {
 	files, err := ioutil.ReadDir(".")
 	if err != nil {
 		return nil, err
 	}
 
-	privateKeys := make([]*ecdsa.PrivateKey, 0)
+	validatorSet := validators.NewValidatorSetFromType(validatorType)
 
 	for _, file := range files {
 		path := file.Name()
@@ -109,28 +118,124 @@ func getValidatorsFromPrefixPath(prefix string, keyType crypto.KeyType) (validat
 			continue
 		}
 
-		// try to read key from the filepath/consensus/<key> path
-		possibleConsensusPath := filepath.Join(path, "consensus", ibft.IbftKeyName)
-
-		// check if path exists
-		if _, err := os.Stat(possibleConsensusPath); os.IsNotExist(err) {
-			continue
-		}
-
-		priv, err := crypto.GenerateOrReadPrivateKey(possibleConsensusPath)
+		localSecretsManager, err := helper.SetupLocalSecretsManager(path)
 		if err != nil {
 			return nil, err
 		}
 
-		privateKeys = append(privateKeys, priv)
+		address, err := getValidatorAddressFromSecretManager(localSecretsManager)
+		if err != nil {
+			return nil, err
+		}
+
+		switch validatorType {
+		case validators.ECDSAValidatorType:
+			validatorSet.Add(&validators.ECDSAValidator{
+				Address: address,
+			})
+		case validators.BLSValidatorType:
+			blsPublicKey, err := getBLSPublicKeyBytesFromSecretManager(localSecretsManager)
+			if err != nil {
+				return nil, err
+			}
+
+			validatorSet.Add(&validators.BLSValidator{
+				Address:      address,
+				BLSPublicKey: blsPublicKey,
+			})
+		}
 	}
 
-	switch keyType {
-	case crypto.KeySecp256k1:
-		return validators.ConvertKeysToECDSAValidatorSet(privateKeys), nil
-	case crypto.KeyBLS:
-		return validators.ConvertKeysToBLSValidatorSet(privateKeys)
-	default:
-		return nil, fmt.Errorf("invalid key type: %s", keyType)
+	return validatorSet, nil
+}
+
+func getValidatorAddressFromSecretManager(manager secrets.SecretsManager) (types.Address, error) {
+	if !manager.HasSecret(secrets.ValidatorKey) {
+		return types.ZeroAddress, ErrECDSAKeyNotFound
 	}
+
+	keyBytes, err := manager.GetSecret(secrets.ValidatorKey)
+	if err != nil {
+		return types.ZeroAddress, err
+	}
+
+	privKey, err := crypto.BytesToECDSAPrivateKey(keyBytes)
+	if err != nil {
+		return types.ZeroAddress, err
+	}
+
+	return crypto.PubKeyToAddress(&privKey.PublicKey), nil
+}
+
+func getBLSPublicKeyBytesFromSecretManager(manager secrets.SecretsManager) ([]byte, error) {
+	if !manager.HasSecret(secrets.ValidatorBLSKey) {
+		return nil, ErrBLSKeyNotFound
+	}
+
+	keyBytes, err := manager.GetSecret(secrets.ValidatorKey)
+	if err != nil {
+		return nil, err
+	}
+
+	secretKey, err := crypto.BytesToBLSSecretKey(keyBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	pubKey, err := secretKey.GetPublicKey()
+	if err != nil {
+		return nil, err
+	}
+
+	pubKeyBytes, err := pubKey.MarshalBinary()
+	if err != nil {
+		return nil, err
+	}
+
+	return pubKeyBytes, nil
+}
+
+func ParseValidator(t validators.ValidatorType, s string) (validators.Validator, error) {
+	switch t {
+	case validators.ECDSAValidatorType:
+		return ParseECDSAValidator(s)
+	case validators.BLSValidatorType:
+		return ParseBLSValidator(s)
+	default:
+		return nil, fmt.Errorf("invalid validator type: %s", t)
+	}
+}
+
+func ParseECDSAValidator(s string) (*validators.ECDSAValidator, error) {
+	bytes, err := hex.DecodeString(strings.TrimPrefix(s, "0x"))
+	if err != nil {
+		return nil, err
+	}
+
+	return &validators.ECDSAValidator{
+		Address: types.BytesToAddress(bytes),
+	}, nil
+}
+
+func ParseBLSValidator(s string) (*validators.BLSValidator, error) {
+	subValues := strings.Split(s, ":")
+
+	if len(subValues) != 2 {
+		return nil, fmt.Errorf("invalid validator format, expected [Validator Address]:[BLS Public Key]")
+	}
+
+	addrBytes, err := hex.DecodeString(strings.TrimPrefix(subValues[0], "0x"))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse address: %w", err)
+	}
+
+	pubKeyBytes, err := hex.DecodeString(strings.TrimPrefix(subValues[1], "0x"))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse BLS Public Key: %w", err)
+	}
+
+	return &validators.BLSValidator{
+		Address:      types.BytesToAddress(addrBytes),
+		BLSPublicKey: pubKeyBytes,
+	}, nil
 }

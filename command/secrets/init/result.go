@@ -20,7 +20,8 @@ func (r *SecretsInitResult) GetOutput() string {
 
 	vals := make([]string, 0, 3)
 
-	vals = append(vals,
+	vals = append(
+		vals,
 		fmt.Sprintf("Public key (address)|%s", r.Address.String()),
 	)
 

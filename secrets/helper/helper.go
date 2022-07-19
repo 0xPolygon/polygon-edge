@@ -79,8 +79,9 @@ func SetupGCPSSM(
 	)
 }
 
-func InitValidatorKey(secretsManager secrets.SecretsManager) (types.Address, error) {
-	validatorKey, validatorKeyEncoded, err := crypto.GenerateAndEncodePrivateKey()
+// InitECDSAValidatorKey creates new ECDSA key and set as a validator key
+func InitECDSAValidatorKey(secretsManager secrets.SecretsManager) (types.Address, error) {
+	validatorKey, validatorKeyEncoded, err := crypto.GenerateAndEncodeECDSAPrivateKey()
 	if err != nil {
 		return types.ZeroAddress, err
 	}
@@ -96,6 +97,28 @@ func InitValidatorKey(secretsManager secrets.SecretsManager) (types.Address, err
 	}
 
 	return address, nil
+}
+
+func InitBLSValidatorKey(secretsManager secrets.SecretsManager) ([]byte, error) {
+	blsSecretKey, blsSecretKeyEncoded, err := crypto.GenerateAndEncodeBLSSecretKey()
+	if err != nil {
+		return []byte{}, err
+	}
+
+	// Write the validator private key to the secrets manager storage
+	if setErr := secretsManager.SetSecret(
+		secrets.ValidatorBLSKey,
+		blsSecretKeyEncoded,
+	); setErr != nil {
+		return []byte{}, setErr
+	}
+
+	pubkeyBytes, err := crypto.BLSSecretKeyToPubkeyBytes(blsSecretKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return pubkeyBytes, nil
 }
 
 func InitNetworkingPrivateKey(secretsManager secrets.SecretsManager) (libp2pCrypto.PrivKey, error) {

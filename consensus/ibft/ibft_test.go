@@ -11,12 +11,12 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
-	"github.com/0xPolygon/polygon-edge/consensus/ibft/validators"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/0xPolygon/polygon-edge/validators"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
 	anypb "google.golang.org/protobuf/types/known/anypb"
@@ -1692,28 +1692,28 @@ func TestQuorumSizeSwitch(t *testing.T) {
 			"use old quorum calculation",
 			10,
 			5,
-			&validators.ECDSAValidatorSet{
+			validators.AddressesToECDSAValidatorSet(
 				types.ZeroAddress,
 				types.ZeroAddress,
 				types.ZeroAddress,
 				types.ZeroAddress,
 				types.ZeroAddress,
 				types.ZeroAddress,
-			},
+			),
 			3,
 		},
 		{
 			"use new quorum calculation",
 			10,
 			15,
-			&validators.ECDSAValidatorSet{
+			validators.AddressesToECDSAValidatorSet(
 				types.ZeroAddress,
 				types.ZeroAddress,
 				types.ZeroAddress,
 				types.ZeroAddress,
 				types.ZeroAddress,
 				types.ZeroAddress,
-			},
+			),
 			4,
 		},
 	}
@@ -1729,7 +1729,7 @@ func TestQuorumSizeSwitch(t *testing.T) {
 
 			assert.Equal(t,
 				test.expectedQuorum,
-				ibft.quorumSize(test.currentBlock)(test.set),
+				ibft.quorumSize(test.currentBlock, test.set),
 			)
 		})
 	}

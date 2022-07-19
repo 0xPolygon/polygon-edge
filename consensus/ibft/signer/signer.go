@@ -5,9 +5,9 @@ import (
 	"fmt"
 
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
-	"github.com/0xPolygon/polygon-edge/consensus/ibft/validators"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/0xPolygon/polygon-edge/validators"
 )
 
 var (
@@ -32,11 +32,11 @@ type Signer interface {
 	EcrecoverFromHeader(*types.Header) (types.Address, error)
 	CreateCommittedSeal(*types.Header) ([]byte, error)
 	WriteCommittedSeals(*types.Header, map[types.Address][]byte) (*types.Header, error)
-	VerifyCommittedSeal(validators.ValidatorSet, *types.Header, validators.QuorumImplementation) error
+	VerifyCommittedSeal(set validators.ValidatorSet, header *types.Header, quorumSize int) error
 	VerifyParentCommittedSeal(
 		set validators.ValidatorSet,
 		parent, header *types.Header,
-		quorumFn validators.QuorumImplementation,
+		quorumSize int,
 	) error
 	SignIBFTMessage(*proto.MessageReq) error
 	ValidateIBFTMessage(*proto.MessageReq) error
@@ -177,7 +177,7 @@ func (s *SignerImpl) WriteCommittedSeals(
 func (s *SignerImpl) VerifyCommittedSeal(
 	validators validators.ValidatorSet,
 	header *types.Header,
-	quorumFn validators.QuorumImplementation,
+	quorumSize int,
 ) error {
 	extra, err := s.GetIBFTExtra(header)
 	if err != nil {
@@ -196,7 +196,7 @@ func (s *SignerImpl) VerifyCommittedSeal(
 		return err
 	}
 
-	if numSeals < quorumFn(validators) {
+	if numSeals < quorumSize {
 		return ErrNotEnoughCommittedSeals
 	}
 
@@ -206,7 +206,7 @@ func (s *SignerImpl) VerifyCommittedSeal(
 func (s *SignerImpl) VerifyParentCommittedSeal(
 	parentValidators validators.ValidatorSet,
 	parent, header *types.Header,
-	quorumFn validators.QuorumImplementation,
+	parentQuorumSize int,
 ) error {
 	extra, err := s.GetIBFTExtra(header)
 	if err != nil {
@@ -225,7 +225,7 @@ func (s *SignerImpl) VerifyParentCommittedSeal(
 		return err
 	}
 
-	if numSeals < quorumFn(parentValidators) {
+	if numSeals < parentQuorumSize {
 		return ErrNotEnoughCommittedSeals
 	}
 

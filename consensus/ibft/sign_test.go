@@ -5,7 +5,6 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
-	"github.com/0xPolygon/polygon-edge/consensus/ibft/validators"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
 )
@@ -77,7 +76,7 @@ func TestSign_CommittedSeals(t *testing.T) {
 
 		assert.NoError(t, err)
 
-		return signerA.VerifyCommittedSeal(snap.Set, sealed, validators.OptimalQuorumSize)
+		return signerA.VerifyCommittedSeal(snap.Set, sealed, OptimalQuorumSize(snap.Set))
 	}
 
 	// Correct

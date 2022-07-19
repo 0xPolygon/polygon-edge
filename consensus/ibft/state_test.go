@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
-	"github.com/0xPolygon/polygon-edge/consensus/ibft/validators"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -26,7 +25,7 @@ func TestState_FaultyNodes(t *testing.T) {
 	for _, c := range cases {
 		pool := newTesterAccountPool(t, int(c.Network))
 		vals := pool.ValidatorSet()
-		assert.Equal(t, vals.MaxFaultyNodes(), int(c.Faulty))
+		assert.Equal(t, CalcMaxFaultyNodes(vals), int(c.Faulty))
 	}
 }
 
@@ -63,7 +62,7 @@ func TestNumValid(t *testing.T) {
 
 		assert.Equal(t,
 			int(c.Quorum),
-			validators.OptimalQuorumSize(pool.ValidatorSet()),
+			OptimalQuorumSize(pool.ValidatorSet()),
 		)
 	}
 }

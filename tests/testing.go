@@ -380,7 +380,7 @@ func (t *stTransaction) UnmarshalJSON(input []byte) error {
 			return err
 		}
 
-		key, err := crypto.ParsePrivateKey(secretKey)
+		key, err := crypto.ParseECDSAPrivateKey(secretKey)
 		if err != nil {
 			return fmt.Errorf("invalid private key: %w", err)
 		}

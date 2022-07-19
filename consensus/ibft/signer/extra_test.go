@@ -5,10 +5,10 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/consensus/ibft/validators"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/tests"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/0xPolygon/polygon-edge/validators"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -41,9 +41,9 @@ func TestExtraEncoding(t *testing.T) {
 	}{
 		{
 			from: &IstanbulExtra{
-				Validators: &validators.ECDSAValidatorSet{
+				Validators: validators.AddressesToECDSAValidatorSet(
 					types.StringToAddress("1"),
-				},
+				),
 				Seal: seal1,
 				CommittedSeal: &SerializedSeal{
 					seal1,
@@ -129,7 +129,7 @@ func TestAppendECDSACommittedSeal(t *testing.T) {
 		signerA = &SignerImpl{
 			NewECDSAKeyManagerFromKey(keys[0]),
 		}
-		validators = validators.ECDSAValidatorSet(addresses)
+		validators = validators.AddressesToECDSAValidatorSet(addresses...)
 
 		err error
 	)
@@ -138,7 +138,7 @@ func TestAppendECDSACommittedSeal(t *testing.T) {
 
 	// create headers by normal validators
 	for i := 0; i < numHeaders; i++ {
-		header := createIBFTHeader(t, signerA, uint64(i+1), parentHeader, &validators)
+		header := createIBFTHeader(t, signerA, uint64(i+1), parentHeader, validators)
 
 		// write seal
 		header, err = signerA.WriteSeal(header)
