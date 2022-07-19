@@ -863,7 +863,6 @@ func (b *Blockchain) executeBlockTransactions(block *types.Block) (*BlockResult,
 // WriteBlock writes a single block to the local blockchain.
 // It doesn't do any kind of verification, only commits the block to the DB
 func (b *Blockchain) WriteBlock(block *types.Block, s string) error {
-	//	TODO: lock here
 	b.writeLock.Lock()
 	defer b.writeLock.Unlock()
 
@@ -912,6 +911,7 @@ func (b *Blockchain) WriteBlock(block *types.Block, s string) error {
 	// Update the average gas price
 	b.updateGasPriceAvgWithBlock(block)
 
+	//	TODO: fix log
 	logArgs := []interface{}{
 		"number", header.Number,
 		"hash", header.Hash,

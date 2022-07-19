@@ -1105,7 +1105,7 @@ func (t *mockTransition) Write(txn *types.Transaction) error {
 
 type mockIbft struct {
 	t *testing.T
-	*Ibft
+	*backendIBFT
 
 	blockchain blockchainInterface
 	pool       *testerAccountPool
@@ -1156,7 +1156,7 @@ func (m *mockIbft) emitMsg(msg *proto.MessageReq) {
 	from := m.pool.get(msg.From).Address()
 	msg.From = from.String()
 
-	m.Ibft.pushMessage(msg)
+	m.backendIBFT.pushMessage(msg)
 }
 
 func (m *mockIbft) addMessage(msg *proto.MessageReq) {
@@ -1201,7 +1201,7 @@ func newMockIbft(t *testing.T, accounts []string, account string) *mockIbft {
 		addr = pool.get(account)
 	}
 
-	ibft := &Ibft{
+	ibft := &backendIBFT{
 		logger:           hclog.NewNullLogger(),
 		config:           &backend.Config{},
 		blockchain:       m,
@@ -1220,7 +1220,7 @@ func newMockIbft(t *testing.T, accounts []string, account string) *mockIbft {
 	// by default set the state to (1, 0)
 	ibft.state.view = proto.ViewMsg(1, 0)
 
-	m.Ibft = ibft
+	m.backendIBFT = ibft
 
 	assert.NoError(t, ibft.setupSnapshot())
 	assert.NoError(t, ibft.createKey())
@@ -1228,7 +1228,7 @@ func newMockIbft(t *testing.T, accounts []string, account string) *mockIbft {
 	// set the initial validators frrom the snapshot
 	ibft.state.validators = pool.ValidatorSet()
 
-	m.Ibft.transport = m
+	m.backendIBFT.transport = m
 
 	return m
 }
@@ -1259,7 +1259,7 @@ func newMockIBFTWithMockBlockchain(
 		addr = pool.get(account)
 	}
 
-	ibft := &Ibft{
+	ibft := &backendIBFT{
 		logger:           hclog.NewNullLogger(),
 		config:           &backend.Config{},
 		blockchain:       m,
@@ -1278,7 +1278,7 @@ func newMockIBFTWithMockBlockchain(
 	// by default set the state to (1, 0)
 	ibft.state.view = proto.ViewMsg(1, 0)
 
-	m.Ibft = ibft
+	m.backendIBFT = ibft
 
 	assert.NoError(t, ibft.setupSnapshot())
 	assert.NoError(t, ibft.createKey())
@@ -1286,7 +1286,7 @@ func newMockIBFTWithMockBlockchain(
 	// set the initial validators frrom the snapshot
 	ibft.state.validators = pool.ValidatorSet()
 
-	m.Ibft.transport = m
+	m.backendIBFT.transport = m
 
 	return m
 }
@@ -1359,7 +1359,7 @@ type mockMechanism struct {
 	shouldWriteTransactions func(uint64) bool
 }
 
-func newMockMechanism(t *testing.T, i *Ibft, params *IBFTFork) *mockMechanism {
+func newMockMechanism(t *testing.T, i *backendIBFT, params *IBFTFork) *mockMechanism {
 	t.Helper()
 
 	m := &mockMechanism{
@@ -1417,7 +1417,7 @@ func (m *mockMechanism) resetFiredCount() {
 
 func Test_runHook(t *testing.T) {
 	i := newMockIbft(t, []string{"A", "B", "C", "D"}, "A")
-	mockMechanism := newMockMechanism(t, i.Ibft, &IBFTFork{
+	mockMechanism := newMockMechanism(t, i.backendIBFT, &IBFTFork{
 		Type: PoA,
 		From: common.JSONNumber{Value: 0},
 	})
@@ -1502,11 +1502,11 @@ func Test_shouldWriteTransactions(t *testing.T) {
 	}
 
 	i := newMockIbft(t, []string{"A", "B", "C", "D"}, "A")
-	mockMechanism1 := newMockMechanism(t, i.Ibft, &IBFTFork{
+	mockMechanism1 := newMockMechanism(t, i.backendIBFT, &IBFTFork{
 		Type: PoA,
 		From: common.JSONNumber{Value: 0},
 	})
-	mockMechanism2 := newMockMechanism(t, i.Ibft, &IBFTFork{
+	mockMechanism2 := newMockMechanism(t, i.backendIBFT, &IBFTFork{
 		Type: PoA,
 		From: common.JSONNumber{Value: 0},
 	})
@@ -1589,7 +1589,7 @@ func TestBaseConsensusMechanismIsInRange(t *testing.T) {
 
 	for _, testcase := range tests {
 		t.Run(testcase.name, func(t *testing.T) {
-			mockMechanism := newMockMechanism(t, i.Ibft, &IBFTFork{
+			mockMechanism := newMockMechanism(t, i.backendIBFT, &IBFTFork{
 				Type: PoA,
 				From: testcase.from,
 				To:   testcase.to,
@@ -1717,7 +1717,7 @@ func TestQuorumSizeSwitch(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			ibft := &Ibft{
+			ibft := &backendIBFT{
 				quorumSizeBlockNum: test.switchBlock,
 			}
 

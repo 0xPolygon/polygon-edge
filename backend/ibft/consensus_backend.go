@@ -7,7 +7,7 @@ import (
 
 //	backend impl for go-ibft
 
-func (i *Ibft) BuildProposal(blockNumber uint64) ([]byte, error) {
+func (i *backendIBFT) BuildProposal(blockNumber uint64) ([]byte, error) {
 	i.logger.Debug("building proposal")
 	defer i.logger.Debug("done building")
 
@@ -47,7 +47,7 @@ func (i *Ibft) BuildProposal(blockNumber uint64) ([]byte, error) {
 	return block.MarshalRLP(), nil
 }
 
-func (i *Ibft) InsertBlock(proposal []byte, committedSeals [][]byte) error {
+func (i *backendIBFT) InsertBlock(proposal []byte, committedSeals [][]byte) error {
 	newBlock := &types.Block{}
 	if err := newBlock.UnmarshalRLP(proposal); err != nil {
 		panic("InsertBlock: cannot unmarshal block")
@@ -65,20 +65,16 @@ func (i *Ibft) InsertBlock(proposal []byte, committedSeals [][]byte) error {
 	newBlock.Header = header
 	newBlock.Header.ComputeHash() // TODO: this is not needed
 
-	//	TODO: this is also not needed, backend has already verified everything
-	//// Verify the header only, since the block body is already verified
-	//if err := i.VerifyHeader(newBlock.Header); err != nil {
-	//	return err
-	//}
-
 	// Save the block locally
 	if err := i.blockchain.WriteBlock(newBlock, "consensus"); err != nil {
 		return err
 	}
 
-	if hookErr := i.runHook(InsertBlockHook, header.Number, header.Number); hookErr != nil {
-		return hookErr
+	if err := i.runHook(InsertBlockHook, header.Number, header.Number); err != nil {
+		return err
 	}
+
+	i.updateMetrics(newBlock)
 
 	//	TODO: move log to go-ibft
 	i.logger.Info(
@@ -96,15 +92,15 @@ func (i *Ibft) InsertBlock(proposal []byte, committedSeals [][]byte) error {
 	return nil
 }
 
-func (i *Ibft) ID() []byte {
+func (i *backendIBFT) ID() []byte {
 	return i.validatorKeyAddr.Bytes()
 }
 
-func (i *Ibft) MaximumFaultyNodes() uint64 {
+func (i *backendIBFT) MaximumFaultyNodes() uint64 {
 	return uint64(i.currentValidatorSet.MaxFaultyNodes())
 }
 
-func (i *Ibft) Quorum(blockNumber uint64) uint64 {
+func (i *backendIBFT) Quorum(blockNumber uint64) uint64 {
 	var (
 		validators = i.currentValidatorSet
 		quorumFn   = i.quorumSize(blockNumber)

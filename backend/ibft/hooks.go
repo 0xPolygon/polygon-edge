@@ -104,7 +104,7 @@ type ConsensusMechanism interface {
 
 type BaseConsensusMechanism struct {
 	// Reference to the main IBFT implementation
-	ibft *Ibft
+	ibft *backendIBFT
 
 	// hookMap is the collection of registered hooks
 	hookMap map[HookType]func(interface{}) error
@@ -176,7 +176,7 @@ type IBFTFork struct {
 }
 
 // ConsensusMechanismFactory is the factory function to create a backend mechanism
-type ConsensusMechanismFactory func(ibft *Ibft, params *IBFTFork) (ConsensusMechanism, error)
+type ConsensusMechanismFactory func(ibft *backendIBFT, params *IBFTFork) (ConsensusMechanism, error)
 
 var mechanismBackends = map[MechanismType]ConsensusMechanismFactory{
 	PoA: PoAFactory,

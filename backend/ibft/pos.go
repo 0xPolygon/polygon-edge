@@ -20,7 +20,7 @@ type PoSMechanism struct {
 
 // PoSFactory initializes the required data
 // for the Proof of Stake mechanism
-func PoSFactory(ibft *Ibft, params *IBFTFork) (ConsensusMechanism, error) {
+func PoSFactory(ibft *backendIBFT, params *IBFTFork) (ConsensusMechanism, error) {
 	pos := &PoSMechanism{
 		BaseConsensusMechanism: BaseConsensusMechanism{
 			mechanismType: PoS,
@@ -93,12 +93,12 @@ func (pos *PoSMechanism) initializeParams(params *IBFTFork) error {
 //	TODO: this hook seems like an unnecessary detour
 // calculateProposerHook calculates the next proposer based on the last
 func (pos *PoSMechanism) calculateProposerHook(lastProposerParam interface{}) error {
-	lastProposer, ok := lastProposerParam.(types.Address)
+	_, ok := lastProposerParam.(types.Address)
 	if !ok {
 		return ErrInvalidHookParam
 	}
 
-	pos.ibft.state.CalcProposer(lastProposer)
+	//pos.ibft.state.CalcProposer(lastProposer)
 
 	return nil
 }

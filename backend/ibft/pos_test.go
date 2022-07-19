@@ -45,7 +45,7 @@ func TestGetEpoch(t *testing.T) {
 	for _, tt := range tests {
 		name := fmt.Sprintf("GetEpoch should return %d for number %d", tt.epoch, tt.num)
 		t.Run(name, func(t *testing.T) {
-			ibft := &Ibft{
+			ibft := &backendIBFT{
 				epochSize: TestEpochSize,
 			}
 			res := ibft.GetEpoch(tt.num)
@@ -88,7 +88,7 @@ func TestIsFirstOfEpoch(t *testing.T) {
 	for _, tt := range tests {
 		name := fmt.Sprintf("IsFirstOfEpoch should return %t for number %d", tt.isFirst, tt.num)
 		t.Run(name, func(t *testing.T) {
-			ibft := &Ibft{
+			ibft := &backendIBFT{
 				epochSize: TestEpochSize,
 			}
 			assert.Equal(t, tt.isFirst, tt.num%ibft.epochSize == 1)
@@ -135,7 +135,7 @@ func TestIsLastOfEpoch(t *testing.T) {
 	for _, tt := range tests {
 		name := fmt.Sprintf("IsLastOfEpoch should return %t for number %d", tt.isLast, tt.num)
 		t.Run(name, func(t *testing.T) {
-			ibft := &Ibft{
+			ibft := &backendIBFT{
 				epochSize: TestEpochSize,
 			}
 			res := ibft.IsLastOfEpoch(tt.num)

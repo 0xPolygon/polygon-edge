@@ -13,7 +13,7 @@ import (
 
 //	Verifier impl for go-ibft
 
-func (i *Ibft) IsValidBlock(proposal []byte) bool {
+func (i *backendIBFT) IsValidBlock(proposal []byte) bool {
 	var (
 		latestHeader      = i.blockchain.Header()
 		latestBlockNumber = latestHeader.Number
@@ -54,7 +54,6 @@ func (i *Ibft) IsValidBlock(proposal []byte) bool {
 
 	if err := i.blockchain.VerifyPotentialBlock(newBlock); err != nil {
 		i.logger.Error("newBlock verification fail", "err", err)
-		i.handleStateErr(errBlockVerificationFailed)
 
 		return false
 	}
@@ -78,7 +77,7 @@ func copyMsg(m *protoIBFT.Message) *protoIBFT.Message {
 	return mm
 }
 
-func (i *Ibft) IsValidSender(msg *protoIBFT.Message) bool {
+func (i *backendIBFT) IsValidSender(msg *protoIBFT.Message) bool {
 	copyMsg := copyMsg(msg)
 	copyMsg.Signature = nil
 
@@ -106,7 +105,7 @@ func (i *Ibft) IsValidSender(msg *protoIBFT.Message) bool {
 	return true
 }
 
-func (i *Ibft) IsProposer(id []byte, height, round uint64) bool {
+func (i *backendIBFT) IsProposer(id []byte, height, round uint64) bool {
 	//	TODO: maybe this should just be i.blockchain.Header()
 	//		to fetch the latest header available, because fetching
 	//		the previousProposer from any earlier block does not make much sense
@@ -115,7 +114,10 @@ func (i *Ibft) IsProposer(id []byte, height, round uint64) bool {
 
 	previousProposer := i.getProposer(previousHeader)
 
+	//	TODO: run hook
 	nextProposer := i.currentValidatorSet.CalcProposer(round, previousProposer)
+
+	i.logger.Info("proposer calculated", "block", height, "proposer", nextProposer)
 
 	if !bytes.Equal(nextProposer.Bytes(), id) {
 		return false
@@ -124,7 +126,7 @@ func (i *Ibft) IsProposer(id []byte, height, round uint64) bool {
 	return true
 }
 
-func (i *Ibft) IsValidProposalHash(proposal, hash []byte) bool {
+func (i *backendIBFT) IsValidProposalHash(proposal, hash []byte) bool {
 	newBlock := &types.Block{}
 	if err := newBlock.UnmarshalRLP(proposal); err != nil {
 		i.logger.Error("IsValidProposalHash: unable to unmarshal proposal", "err", err)
@@ -140,7 +142,7 @@ func (i *Ibft) IsValidProposalHash(proposal, hash []byte) bool {
 	return true
 }
 
-func (i *Ibft) IsValidCommittedSeal(proposalHash, seal []byte) bool {
+func (i *backendIBFT) IsValidCommittedSeal(proposalHash, seal []byte) bool {
 	commitHash := crypto.Keccak256(proposalHash, []byte{byte(protoIBFT.MessageType_COMMIT)})
 
 	_, err := ecrecoverImpl(seal, commitHash)
@@ -155,7 +157,7 @@ func (i *Ibft) IsValidCommittedSeal(proposalHash, seal []byte) bool {
 
 //	helpers
 
-func (i *Ibft) getProposer(header *types.Header) types.Address {
+func (i *backendIBFT) getProposer(header *types.Header) types.Address {
 	if header.Number == 0 {
 		return types.Address{}
 	}

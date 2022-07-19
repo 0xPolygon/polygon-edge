@@ -17,7 +17,7 @@ import (
 )
 
 // setupSnapshot sets up the snapshot store for the IBFT object
-func (i *Ibft) setupSnapshot() error {
+func (i *backendIBFT) setupSnapshot() error {
 	i.store = newSnapshotStore()
 
 	// Read from storage
@@ -97,7 +97,7 @@ func (i *Ibft) setupSnapshot() error {
 }
 
 // addHeaderSnap creates the initial snapshot, and adds it to the snapshot store
-func (i *Ibft) addHeaderSnap(header *types.Header) error {
+func (i *backendIBFT) addHeaderSnap(header *types.Header) error {
 	// Genesis header needs to be set by hand, all the other
 	// snapshots are set as part of processHeaders
 	extra, err := getIbftExtra(header)
@@ -119,7 +119,7 @@ func (i *Ibft) addHeaderSnap(header *types.Header) error {
 }
 
 // getLatestSnapshot returns the latest snapshot object
-func (i *Ibft) getLatestSnapshot() (*Snapshot, error) {
+func (i *backendIBFT) getLatestSnapshot() (*Snapshot, error) {
 	meta, err := i.getSnapshotMetadata()
 	if err != nil {
 		return nil, err
@@ -136,7 +136,7 @@ func (i *Ibft) getLatestSnapshot() (*Snapshot, error) {
 // processHeaders is the powerhouse method in the snapshot module.
 
 // It processes passed in headers, and updates the snapshot / snapshot store
-func (i *Ibft) processHeaders(headers []*types.Header) error {
+func (i *backendIBFT) processHeaders(headers []*types.Header) error {
 	if len(headers) == 0 {
 		return nil
 	}
@@ -196,7 +196,7 @@ func (i *Ibft) processHeaders(headers []*types.Header) error {
 }
 
 // getSnapshotMetadata returns the latest snapshot metadata
-func (i *Ibft) getSnapshotMetadata() (*snapshotMetadata, error) {
+func (i *backendIBFT) getSnapshotMetadata() (*snapshotMetadata, error) {
 	meta := &snapshotMetadata{
 		LastBlock: i.store.getLastBlock(),
 	}
@@ -205,7 +205,7 @@ func (i *Ibft) getSnapshotMetadata() (*snapshotMetadata, error) {
 }
 
 // getSnapshot returns the snapshot at the specified block height
-func (i *Ibft) getSnapshot(num uint64) (*Snapshot, error) {
+func (i *backendIBFT) getSnapshot(num uint64) (*Snapshot, error) {
 	//	get it from the snapshot first
 	raw, ok := i.store.cache.Get(num)
 	if ok {

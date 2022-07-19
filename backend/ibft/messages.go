@@ -8,7 +8,7 @@ import (
 	protoIBFT "github.com/Trapesys/go-ibft/messages/proto"
 )
 
-func (i *Ibft) signMessage(msg *protoIBFT.Message) *protoIBFT.Message {
+func (i *backendIBFT) signMessage(msg *protoIBFT.Message) *protoIBFT.Message {
 	raw, err := proto.Marshal(msg)
 	if err != nil {
 		panic("signMessage: cannot marshal")
@@ -24,7 +24,7 @@ func (i *Ibft) signMessage(msg *protoIBFT.Message) *protoIBFT.Message {
 	return msg
 }
 
-func (i *Ibft) BuildPrePrepareMessage(proposal []byte, view *protoIBFT.View) *protoIBFT.Message {
+func (i *backendIBFT) BuildPrePrepareMessage(proposal []byte, view *protoIBFT.View) *protoIBFT.Message {
 	msg := &protoIBFT.Message{
 		View: view,
 		From: i.ID(),
@@ -37,7 +37,7 @@ func (i *Ibft) BuildPrePrepareMessage(proposal []byte, view *protoIBFT.View) *pr
 	return i.signMessage(msg)
 }
 
-func (i *Ibft) BuildPrepareMessage(proposal []byte, view *protoIBFT.View) *protoIBFT.Message {
+func (i *backendIBFT) BuildPrepareMessage(proposal []byte, view *protoIBFT.View) *protoIBFT.Message {
 	block := &types.Block{}
 	if err := block.UnmarshalRLP(proposal); err != nil {
 		panic("BuildPrepareMessage: cannot unmarshal block")
@@ -58,7 +58,7 @@ func (i *Ibft) BuildPrepareMessage(proposal []byte, view *protoIBFT.View) *proto
 	return i.signMessage(msg)
 }
 
-func (i *Ibft) BuildCommitMessage(proposal []byte, view *protoIBFT.View) *protoIBFT.Message {
+func (i *backendIBFT) BuildCommitMessage(proposal []byte, view *protoIBFT.View) *protoIBFT.Message {
 	block := &types.Block{}
 	if err := block.UnmarshalRLP(proposal); err != nil {
 		panic("BuildCommitMessage: cannot unmarshal block")
@@ -88,7 +88,7 @@ func (i *Ibft) BuildCommitMessage(proposal []byte, view *protoIBFT.View) *protoI
 	return i.signMessage(msg)
 }
 
-func (i *Ibft) BuildRoundChangeMessage(height, round uint64) *protoIBFT.Message {
+func (i *backendIBFT) BuildRoundChangeMessage(height, round uint64) *protoIBFT.Message {
 	msg := &protoIBFT.Message{
 		View:    &protoIBFT.View{Height: height, Round: round},
 		From:    i.ID(),
@@ -99,7 +99,7 @@ func (i *Ibft) BuildRoundChangeMessage(height, round uint64) *protoIBFT.Message 
 	return i.signMessage(msg)
 }
 
-func (i *Ibft) generateCommittedSeal(header *types.Header) ([]byte, error) {
+func (i *backendIBFT) generateCommittedSeal(header *types.Header) ([]byte, error) {
 	//	TODO: just grab the hash ?
 	hash, err := calculateHeaderHash(header)
 	if err != nil {

@@ -18,7 +18,7 @@ import (
 )
 
 // initIbftMechanism initializes the IBFT mechanism for unit tests
-func initIbftMechanism(mechanismType MechanismType, ibft *Ibft) {
+func initIbftMechanism(mechanismType MechanismType, ibft *backendIBFT) {
 	mechanismFactory := mechanismBackends[mechanismType]
 	mechanism, _ := mechanismFactory(ibft, &IBFTFork{
 		Type: mechanismType,
@@ -393,7 +393,7 @@ func TestSnapshot_setupSnapshot(t *testing.T) {
 				assert.NoError(t, err)
 			}
 
-			ibft := &Ibft{
+			ibft := &backendIBFT{
 				epochSize:  epochSize,
 				blockchain: blockchain,
 				config: &backend.Config{
@@ -712,7 +712,7 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 			headers := buildHeaders(pool, genesis, c.headers)
 
 			// process the headers independently
-			ibft := &Ibft{
+			ibft := &backendIBFT{
 				epochSize:  epochSize,
 				blockchain: blockchain.TestBlockchain(t, genesis),
 				config:     &backend.Config{},
@@ -763,7 +763,7 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 			}
 
 			// Process headers all at the same time should have the same result
-			ibft1 := &Ibft{
+			ibft1 := &backendIBFT{
 				epochSize:  epochSize,
 				blockchain: blockchain.TestBlockchain(t, genesis),
 				config:     &backend.Config{},
@@ -797,7 +797,7 @@ func TestSnapshot_PurgeSnapshots(t *testing.T) {
 	pool.add("a", "b", "c")
 
 	genesis := pool.genesis()
-	ibft1 := &Ibft{
+	ibft1 := &backendIBFT{
 		epochSize:  10,
 		blockchain: blockchain.TestBlockchain(t, genesis),
 		config:     &backend.Config{},

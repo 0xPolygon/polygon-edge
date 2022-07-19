@@ -16,7 +16,7 @@ func TestOperator_GetNextCandidate(t *testing.T) {
 	pool := newTesterAccountPool()
 	pool.add("A", "B", "C")
 
-	ibft := &Ibft{
+	ibft := &backendIBFT{
 		validatorKeyAddr: pool.get("A").Address(),
 	}
 
@@ -78,7 +78,7 @@ func TestOperator_Propose(t *testing.T) {
 	pool := newTesterAccountPool()
 	pool.add("A", "B", "C")
 
-	ibft := &Ibft{
+	ibft := &backendIBFT{
 		blockchain: blockchain.TestBlockchain(t, pool.genesis()),
 		config:     &backend.Config{},
 		epochSize:  DefaultEpochSize,
