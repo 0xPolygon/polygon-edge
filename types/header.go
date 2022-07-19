@@ -33,7 +33,7 @@ type Header struct {
 }
 
 // HeaderJson represents a block header used for json calls
-type HeaderJSON struct {
+type headerJSON struct {
 	ParentHash   Hash    `json:"parentHash"`
 	Sha3Uncles   Hash    `json:"sha3Uncles"`
 	Miner        Address `json:"miner"`
@@ -53,7 +53,7 @@ type HeaderJSON struct {
 }
 
 func (h *Header) MarshalJSON() ([]byte, error) {
-	var header HeaderJSON
+	var header headerJSON
 
 	header.ParentHash = h.ParentHash
 	header.Sha3Uncles = h.Sha3Uncles
@@ -78,7 +78,7 @@ func (h *Header) MarshalJSON() ([]byte, error) {
 }
 
 func (h *Header) UnmarshalJSON(input []byte) error {
-	var header HeaderJSON
+	var header headerJSON
 	if err := json.Unmarshal(input, &header); err != nil {
 		return err
 	}
