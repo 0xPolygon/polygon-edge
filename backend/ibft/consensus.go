@@ -1,16 +1,18 @@
 package ibft
 
 import (
-	"sync"
-
+	"context"
 	"github.com/Trapesys/go-ibft/core"
+	"sync"
 )
 
-//	Convenience wrapper for the go-ibft package
+// Convenience wrapper for the go-ibft package
 type consensus struct {
 	*core.IBFT
 
 	wg sync.WaitGroup
+
+	cancelSequence context.CancelFunc
 }
 
 func newIBFT(
@@ -24,23 +26,29 @@ func newIBFT(
 	}
 }
 
-//	runSequence starts the underlying consensus mechanism for the given height.
-//	It may be called by a single thread at any given time
+// runSequence starts the underlying consensus mechanism for the given height.// It may be called by a single thread at any given time
 func (c *consensus) runSequence(height uint64) <-chan struct{} {
 	done := make(chan struct{})
+	ctx, cancel := context.WithCancel(context.Background())
+
+	c.cancelSequence = cancel
 
 	c.wg.Add(1)
 	go func() {
-		defer c.wg.Done()
-		defer close(done)
+		defer func() {
+			cancel()
+			c.wg.Done()
+			close(done)
+		}()
 
-		c.RunSequence(height)
+		c.RunSequence(ctx, height)
 	}()
 
 	return done
 }
 
-func (c *consensus) cancelSequence() {
-	c.CancelSequence()
+//	stopSequence terminates the running IBFT sequence gracefully and waits for it to return
+func (c *consensus) stopSequence() {
+	c.cancelSequence()
 	c.wg.Wait()
 }
