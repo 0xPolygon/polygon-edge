@@ -5,34 +5,24 @@ import (
 	"testing"
 )
 
+const (
+	minUint64 uint64 = 0
+	maxUint64        = 18446744073709551615
+)
+
 func TestEncodingUint64(t *testing.T) {
-	testTable := []struct {
-		name       string
-		value      uint64
-		shouldFail bool
-	}{
-		{
-			"Successfully encode and decode uint64",
-			245,
-			false,
-		},
-		{
-			"Successfully encode and decode uint64",
-			0,
-			false,
-		},
-	}
 
-	for _, testCase := range testTable {
-		t.Run(testCase.name, func(t *testing.T) {
-			encodedValue := EncodeUint64(testCase.value)
+	// random uint64 array, min and max included
+	uint64Array := [10]uint64{minUint64, 30073, 67312, 71762, 11, 80604, 45403, 1, 298, maxUint64}
 
-			decodedValue, err := DecodeUint64(encodedValue)
-			if err != nil && !testCase.shouldFail {
-				t.Fatalf("Unable to decode uint64, %v", err)
-			}
+	for _, value := range uint64Array {
 
-			assert.Equal(t, testCase.value, decodedValue)
-		})
+		encodedValue := EncodeUint64(value)
+
+		decodedValue, err := DecodeUint64(encodedValue)
+		assert.NoError(t, err)
+
+		assert.Equal(t, value, decodedValue)
+
 	}
 }
