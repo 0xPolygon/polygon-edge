@@ -57,13 +57,7 @@ func DecodeUint64(hexStr string) (uint64, error) {
 	// remove 0x suffix if found in the input string
 	cleaned := strings.TrimPrefix(hexStr, "0x")
 
-	// base 16 for hexadecimal
-	result, err := strconv.ParseUint(cleaned, 16, 64)
-	if err != nil {
-		return 0, err
-	}
-
-	return result, nil
+	return strconv.ParseUint(cleaned, 16, 64)
 }
 
 const BadNibble = ^uint64(0)
