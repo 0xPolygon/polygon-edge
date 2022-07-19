@@ -53,7 +53,7 @@ const BloomByteLength = 256
 type Bloom [BloomByteLength]byte
 
 func (b *Bloom) UnmarshalText(input []byte) error {
-	input = input[2:]
+	input = RemoveHexPrefixFromByteArray(input)
 	if _, err := goHex.Decode(b[:], input); err != nil {
 		return err
 	}

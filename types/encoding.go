@@ -80,3 +80,7 @@ func EncodeBigInt(b *big.Int) *string {
 
 	return &res
 }
+
+func RemoveHexPrefixFromByteArray(input []byte) []byte {
+	return input[2:]
+}

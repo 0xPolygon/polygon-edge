@@ -177,7 +177,7 @@ func (n Nonce) MarshalText() ([]byte, error) {
 }
 
 func (n *Nonce) UnmarshalText(input []byte) error {
-	input = input[2:]
+	input = RemoveHexPrefixFromByteArray(input)
 	if _, err := goHex.Decode(n[:], input); err != nil {
 		return err
 	}
