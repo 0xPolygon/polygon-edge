@@ -42,12 +42,9 @@ func TestHeaderType_Encode(t *testing.T) {
 
 func TestUnmarshallFromJSON(t *testing.T) {
 	testCase := struct {
-		name   string
 		input  string
 		output Header
 	}{
-
-		name: "Successfully decode header from json",
 		input: `{
 				"parentHash": "0x0100000000000000000000000000000000000000000000000000000000000000",
 				"sha3Uncles" : "0x0200000000000000000000000000000000000000000000000000000000000000",
