@@ -273,11 +273,12 @@ func TestDispatcherBatchRequest(t *testing.T) {
 	}
 
 	cases := []struct {
-		name       string
-		desc       string
-		dispatcher *Dispatcher
-		reqBody    []byte
-		err        *ObjectError
+		name          string
+		desc          string
+		dispatcher    *Dispatcher
+		reqBody       []byte
+		err           *ObjectError
+		batchResponse []*SuccessResponse
 	}{
 		{
 			"leading-whitespace",
@@ -289,6 +290,11 @@ func TestDispatcherBatchRequest(t *testing.T) {
 				{"id":3,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["0x3", true]},
 				{"id":4,"jsonrpc":"2.0","method": "web3_sha3","params": ["0x68656c6c6f20776f726c64"]}]`)...),
 			nil,
+			[]*SuccessResponse{
+				{Error: &ObjectError{Code: -32602, Message: "Invalid Params"}},
+				{Error: nil},
+				{Error: nil},
+				{Error: nil}},
 		},
 		{
 			"valid-batch-req",
@@ -302,6 +308,13 @@ func TestDispatcherBatchRequest(t *testing.T) {
 				{"id":5,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]},
 				{"id":6,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]}]`),
 			nil,
+			[]*SuccessResponse{
+				{Error: nil},
+				{Error: nil},
+				{Error: nil},
+				{Error: nil},
+				{Error: nil},
+				{Error: nil}},
 		},
 		{
 			"invalid-batch-req",
@@ -315,6 +328,7 @@ func TestDispatcherBatchRequest(t *testing.T) {
 				{"id":5,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]},
 				{"id":6,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]}]`),
 			&ObjectError{Code: -32600, Message: "Batch request length too long"},
+			nil,
 		},
 	}
 
@@ -327,24 +341,19 @@ func TestDispatcherBatchRequest(t *testing.T) {
 			assert.NoError(t, expectBatchJSONResult(res, &resp))
 			assert.Equal(t, resp.Error, c.err)
 		} else {
-			var resp []SuccessResponse
-			assert.NoError(t, expectBatchJSONResult(res, &resp))
+			var batchResp []SuccessResponse
+			assert.NoError(t, expectBatchJSONResult(res, &batchResp))
 
 			if c.name == "leading-whitespace" {
-				assert.Len(t, resp, 4)
-				jsonerr := &ObjectError{Code: -32602, Message: "Invalid Params"}
-				assert.Equal(t, resp[0].Error, jsonerr)
-				assert.Nil(t, resp[1].Error)
-				assert.Nil(t, resp[2].Error)
-				assert.Nil(t, resp[3].Error)
+				assert.Len(t, batchResp, 4)
+				for index, resp := range batchResp {
+					assert.Equal(t, resp.Error, c.batchResponse[index].Error)
+				}
 			} else if c.name == "valid-batch-req" {
-				assert.Len(t, resp, 6)
-				assert.Nil(t, resp[0].Error)
-				assert.Nil(t, resp[1].Error)
-				assert.Nil(t, resp[2].Error)
-				assert.Nil(t, resp[3].Error)
-				assert.Nil(t, resp[4].Error)
-				assert.Nil(t, resp[5].Error)
+				assert.Len(t, batchResp, 6)
+				for index, resp := range batchResp {
+					assert.Equal(t, resp.Error, c.batchResponse[index].Error)
+				}
 			}
 		}
 	}
