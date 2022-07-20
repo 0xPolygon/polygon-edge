@@ -286,7 +286,9 @@ func (s *Snapshot) UnmarshalJSON(data []byte) error {
 					return errors.New("invalid address type")
 				}
 
-				set = append(set, types.StringToAddress(addrString))
+				set.Add(&validators.ECDSAValidator{
+					Address: types.StringToAddress(addrString),
+				})
 			}
 
 			s.Set = &set
@@ -311,9 +313,9 @@ func (s *Snapshot) UnmarshalJSON(data []byte) error {
 					return fmt.Errorf("expected BLSPubKey")
 				}
 
-				set = append(set, validators.BLSValidator{
-					Address:   addr,
-					BLSPubKey: []byte(rawBLSPubkey),
+				set.Add(&validators.BLSValidator{
+					Address:      addr,
+					BLSPublicKey: []byte(rawBLSPubkey),
 				})
 			}
 
@@ -406,7 +408,7 @@ func (s *Snapshot) ToProto() *proto.Snapshot {
 	setSize := s.Set.Len()
 	for index := 0; index < setSize; index++ {
 		resp.Validators[index] = &proto.Snapshot_Validator{
-			Address: s.Set.GetAddress(index).String(),
+			Address: s.Set.At(uint64(index)).Addr().String(),
 		}
 	}
 

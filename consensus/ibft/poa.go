@@ -182,11 +182,13 @@ func (poa *PoAMechanism) processHeadersHook(hookParam interface{}) error {
 	// If more than a half of all validators voted
 	if tally > params.snap.Set.Len()/2 {
 		if authorize {
+			// FIXME: Add support for voting in the next PR
+
 			// add the candidate to the validators list
-			params.snap.Set.Add(params.header.Miner)
+			// params.snap.Set.Add(params.header.Miner)
 		} else {
 			// remove the candidate from the validators list
-			params.snap.Set.Del(params.header.Miner)
+			// params.snap.Set.Del(params.header.Miner)
 
 			// remove any votes casted by the removed validator
 			params.snap.RemoveVotes(func(v *Vote) bool {

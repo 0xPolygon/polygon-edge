@@ -2,7 +2,9 @@ package validators
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
+	"strings"
 
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/fastrlp"
@@ -11,6 +13,29 @@ import (
 type BLSValidator struct {
 	Address      types.Address
 	BLSPublicKey []byte
+}
+
+func ParseBLSValidator(s string) (*BLSValidator, error) {
+	subValues := strings.Split(s, ":")
+
+	if len(subValues) != 2 {
+		return nil, fmt.Errorf("invalid validator format, expected [Validator Address]:[BLS Public Key]")
+	}
+
+	addrBytes, err := hex.DecodeString(strings.TrimPrefix(subValues[0], "0x"))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse address: %w", err)
+	}
+
+	pubKeyBytes, err := hex.DecodeString(strings.TrimPrefix(subValues[1], "0x"))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse BLS Public Key: %w", err)
+	}
+
+	return &BLSValidator{
+		Address:      types.BytesToAddress(addrBytes),
+		BLSPublicKey: pubKeyBytes,
+	}, nil
 }
 
 func (v *BLSValidator) Addr() types.Address {
@@ -54,6 +79,14 @@ func (v *BLSValidator) UnmarshalRLPFrom(p *fastrlp.Parser, val *fastrlp.Value) e
 	}
 
 	return nil
+}
+
+func (v *BLSValidator) Bytes() []byte {
+	return types.MarshalRLPTo(v.MarshalRLPWith, nil)
+}
+
+func (v *BLSValidator) SetFromBytes(input []byte) error {
+	return types.UnmarshalRlp(v.UnmarshalRLPFrom, input)
 }
 
 type BLSValidatorSet []*BLSValidator

@@ -262,7 +262,7 @@ func (m *MockVerifier) GetBlockCreator(header *types.Header) (types.Address, err
 		return m.getBlockCreatorFn(header)
 	}
 
-	return types.BytesToAddress(header.Miner), nil
+	return header.Miner, nil
 }
 
 func (m *MockVerifier) HookGetBlockCreator(fn getBlockCreatorDelegate) {

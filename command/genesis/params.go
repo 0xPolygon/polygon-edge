@@ -158,7 +158,7 @@ func (p *genesisParams) setValidatorSetFromCli() error {
 	)
 
 	for _, s := range p.ibftValidatorsRaw {
-		validator, err := ParseValidator(p.ibftValidatorType, s)
+		validator, err := validators.ParseValidator(p.ibftValidatorType, s)
 		if err != nil {
 			return err
 		}

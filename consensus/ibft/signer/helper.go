@@ -51,7 +51,7 @@ func calculateHeaderHash(h *types.Header) types.Hash {
 	vv := arena.NewArray()
 	vv.Set(arena.NewBytes(h.ParentHash.Bytes()))
 	vv.Set(arena.NewBytes(h.Sha3Uncles.Bytes()))
-	vv.Set(arena.NewBytes(h.Miner))
+	vv.Set(arena.NewBytes(h.Miner[:]))
 	vv.Set(arena.NewBytes(h.StateRoot.Bytes()))
 	vv.Set(arena.NewBytes(h.TxRoot.Bytes()))
 	vv.Set(arena.NewBytes(h.ReceiptsRoot.Bytes()))

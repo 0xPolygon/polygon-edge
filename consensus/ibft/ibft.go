@@ -90,7 +90,8 @@ type Ibft struct {
 
 	mechanisms []ConsensusMechanism // IBFT ConsensusMechanism used (PoA / PoS)
 
-	signer signer.Signer
+	ValidatorType validators.ValidatorType
+	signer        signer.Signer
 
 	blockTime       time.Duration // Minimum block generation time in seconds
 	ibftBaseTimeout time.Duration // Base timeout for IBFT message in seconds
@@ -543,7 +544,7 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 	header := &types.Header{
 		ParentHash: parent.Hash,
 		Number:     parent.Number + 1,
-		Miner:      types.ZeroAddress[:],
+		Miner:      types.ZeroAddress,
 		Nonce:      types.Nonce{},
 		MixHash:    signer.IstanbulDigest,
 		// this is required because blockchain needs difficulty to organize blocks and forks

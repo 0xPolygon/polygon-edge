@@ -1,7 +1,9 @@
 package validators
 
 import (
+	"encoding/hex"
 	"fmt"
+	"strings"
 
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/fastrlp"
@@ -15,6 +17,17 @@ func NewECDSAValidator(addr types.Address) *ECDSAValidator {
 	return &ECDSAValidator{
 		Address: addr,
 	}
+}
+
+func ParseECDSAValidator(s string) (*ECDSAValidator, error) {
+	bytes, err := hex.DecodeString(strings.TrimPrefix(s, "0x"))
+	if err != nil {
+		return nil, err
+	}
+
+	return &ECDSAValidator{
+		Address: types.BytesToAddress(bytes),
+	}, nil
 }
 
 func (v *ECDSAValidator) Addr() types.Address {
@@ -53,6 +66,14 @@ func (v *ECDSAValidator) UnmarshalRLPFrom(p *fastrlp.Parser, val *fastrlp.Value)
 	}
 
 	return nil
+}
+
+func (v *ECDSAValidator) Bytes() []byte {
+	return types.MarshalRLPTo(v.MarshalRLPWith, nil)
+}
+
+func (v *ECDSAValidator) SetFromBytes(input []byte) error {
+	return types.UnmarshalRlp(v.UnmarshalRLPFrom, input)
 }
 
 type ECDSAValidatorSet []*ECDSAValidator

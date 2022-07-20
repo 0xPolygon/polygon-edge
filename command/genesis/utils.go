@@ -1,7 +1,6 @@
 package genesis
 
 import (
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -193,49 +192,4 @@ func getBLSPublicKeyBytesFromSecretManager(manager secrets.SecretsManager) ([]by
 	}
 
 	return pubKeyBytes, nil
-}
-
-func ParseValidator(t validators.ValidatorType, s string) (validators.Validator, error) {
-	switch t {
-	case validators.ECDSAValidatorType:
-		return ParseECDSAValidator(s)
-	case validators.BLSValidatorType:
-		return ParseBLSValidator(s)
-	default:
-		return nil, fmt.Errorf("invalid validator type: %s", t)
-	}
-}
-
-func ParseECDSAValidator(s string) (*validators.ECDSAValidator, error) {
-	bytes, err := hex.DecodeString(strings.TrimPrefix(s, "0x"))
-	if err != nil {
-		return nil, err
-	}
-
-	return &validators.ECDSAValidator{
-		Address: types.BytesToAddress(bytes),
-	}, nil
-}
-
-func ParseBLSValidator(s string) (*validators.BLSValidator, error) {
-	subValues := strings.Split(s, ":")
-
-	if len(subValues) != 2 {
-		return nil, fmt.Errorf("invalid validator format, expected [Validator Address]:[BLS Public Key]")
-	}
-
-	addrBytes, err := hex.DecodeString(strings.TrimPrefix(subValues[0], "0x"))
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse address: %w", err)
-	}
-
-	pubKeyBytes, err := hex.DecodeString(strings.TrimPrefix(subValues[1], "0x"))
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse BLS Public Key: %w", err)
-	}
-
-	return &validators.BLSValidator{
-		Address:      types.BytesToAddress(addrBytes),
-		BLSPublicKey: pubKeyBytes,
-	}, nil
 }

@@ -338,6 +338,22 @@ func BLSSecretKeyToPubkeyBytes(key *bls_sig.SecretKey) ([]byte, error) {
 	return marshalled, nil
 }
 
+func BytesToBLSPublicKey(input string) (*bls_sig.PublicKey, error) {
+	// The key file on disk should be encoded in Base64,
+	// so it must be decoded before it can be parsed by ParsePrivateKey
+	decoded, err := hex.DecodeString(string(input))
+	if err != nil {
+		return nil, err
+	}
+
+	pk := &bls_sig.PublicKey{}
+	if err := pk.UnmarshalBinary(decoded); err != nil {
+		return nil, err
+	}
+
+	return pk, nil
+}
+
 // GenerateOrReadPrivateKey generates a private key at the specified path,
 // or reads it if a key file is present
 func GenerateOrReadPrivateKey(path string) (*ecdsa.PrivateKey, error) {
