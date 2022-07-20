@@ -259,6 +259,34 @@ type Snapshot struct {
 	Set validators.ValidatorSet
 }
 
+func (s *Snapshot) MarshalJSON() ([]byte, error) {
+	var set interface{}
+	switch ts := s.Set.(type) {
+	case *validators.ECDSAValidatorSet:
+		x := make([]types.Address, ts.Len())
+
+		for idx, v := range *ts {
+			x[idx] = v.Address
+		}
+
+		set = x
+	case *validators.BLSValidatorSet:
+		set = ts
+	}
+
+	return json.Marshal(struct {
+		Number uint64
+		Hash   string
+		Votes  []*Vote
+		Set    interface{}
+	}{
+		Number: s.Number,
+		Hash:   s.Hash,
+		Votes:  s.Votes,
+		Set:    set,
+	})
+}
+
 func (s *Snapshot) UnmarshalJSON(data []byte) error {
 	raw := struct {
 		Number uint64
@@ -278,7 +306,7 @@ func (s *Snapshot) UnmarshalJSON(data []byte) error {
 	if len(raw.Set) > 0 {
 		switch raw.Set[0].(type) {
 		case string:
-			set := validators.ECDSAValidatorSet{}
+			set := &validators.ECDSAValidatorSet{}
 
 			for _, x := range raw.Set {
 				addrString, ok := x.(string)
@@ -291,7 +319,7 @@ func (s *Snapshot) UnmarshalJSON(data []byte) error {
 				})
 			}
 
-			s.Set = &set
+			s.Set = set
 		case map[string]interface{}:
 			set := validators.BLSValidatorSet{}
 
