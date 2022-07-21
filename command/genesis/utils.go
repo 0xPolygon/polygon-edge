@@ -11,9 +11,10 @@ import (
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/secrets"
-	"github.com/0xPolygon/polygon-edge/secrets/helper"
+	"github.com/0xPolygon/polygon-edge/secrets/local"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
+	"github.com/hashicorp/go-hclog"
 )
 
 const (
@@ -117,7 +118,15 @@ func getValidatorsFromPrefixPath(
 			continue
 		}
 
-		localSecretsManager, err := helper.SetupLocalSecretsManager(path)
+		localSecretsManager, err := local.SecretsManagerFactory(
+			nil,
+			&secrets.SecretsManagerParams{
+				Logger: hclog.NewNullLogger(),
+				Extra: map[string]interface{}{
+					secrets.Path: path,
+				},
+			},
+		)
 		if err != nil {
 			return nil, err
 		}

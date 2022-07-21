@@ -2,7 +2,6 @@ package ibft
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -259,17 +258,26 @@ type Snapshot struct {
 	Set validators.ValidatorSet
 }
 
+// Redefine JSON Marshalling and Unmarshalling
+type ECDSAValidatorSet validators.ECDSAValidatorSet
+
+func (s *ECDSAValidatorSet) MarshalJSON() ([]byte, error) {
+	addrs := make([]types.Address, len(*s))
+
+	for idx, v := range *s {
+		addrs[idx] = v.Address
+	}
+
+	return json.Marshal(addrs)
+}
+
 func (s *Snapshot) MarshalJSON() ([]byte, error) {
 	var set interface{}
 	switch ts := s.Set.(type) {
 	case *validators.ECDSAValidatorSet:
-		x := make([]types.Address, ts.Len())
+		x := ECDSAValidatorSet(*ts)
 
-		for idx, v := range *ts {
-			x[idx] = v.Address
-		}
-
-		set = x
+		set = &x
 	case *validators.BLSValidatorSet:
 		set = ts
 	}
@@ -303,52 +311,54 @@ func (s *Snapshot) UnmarshalJSON(data []byte) error {
 	s.Hash = raw.Hash
 	s.Votes = raw.Votes
 
-	if len(raw.Set) > 0 {
-		switch raw.Set[0].(type) {
-		case string:
-			set := &validators.ECDSAValidatorSet{}
+	if len(raw.Set) == 0 {
+		return nil
+	}
 
-			for _, x := range raw.Set {
-				addrString, ok := x.(string)
-				if !ok {
-					return errors.New("invalid address type")
-				}
+	switch raw.Set[0].(type) {
+	case string:
+		set := &validators.ECDSAValidatorSet{}
 
-				set.Add(&validators.ECDSAValidator{
-					Address: types.StringToAddress(addrString),
-				})
+		for _, rawVal := range raw.Set {
+			val, ok := rawVal.(string)
+			if !ok {
+				return fmt.Errorf("expected string in a validator but got %T", rawVal)
 			}
 
-			s.Set = set
-		case map[string]interface{}:
-			set := validators.BLSValidatorSet{}
-
-			for _, x := range raw.Set {
-				m, ok := x.(map[string]interface{})
-				if !ok {
-					return fmt.Errorf("expected map")
-				}
-
-				rawAddr, ok := m["Address"].(string)
-				if !ok {
-					return fmt.Errorf("expected Address")
-				}
-
-				addr := types.StringToAddress(rawAddr)
-
-				rawBLSPubkey, ok := m["BLSPubKey"].(string)
-				if !ok {
-					return fmt.Errorf("expected BLSPubKey")
-				}
-
-				set.Add(&validators.BLSValidator{
-					Address:      addr,
-					BLSPublicKey: []byte(rawBLSPubkey),
-				})
-			}
-
-			s.Set = &set
+			set.Add(&validators.ECDSAValidator{
+				Address: types.StringToAddress(val),
+			})
 		}
+
+		s.Set = set
+	case map[string]interface{}:
+		set := validators.BLSValidatorSet{}
+
+		for _, rawVal := range raw.Set {
+			val, ok := rawVal.(map[string]interface{})
+			if !ok {
+				return fmt.Errorf("expected map in a validator but got %T", rawVal)
+			}
+
+			rawAddr, ok := val["Address"].(string)
+			if !ok {
+				return fmt.Errorf("expected Address")
+			}
+
+			addr := types.StringToAddress(rawAddr)
+
+			rawBLSPubkey, ok := val["BLSPublicKey"].(string)
+			if !ok {
+				return fmt.Errorf("expected BLSPubKey")
+			}
+
+			set.Add(&validators.BLSValidator{
+				Address:      addr,
+				BLSPublicKey: []byte(rawBLSPubkey),
+			})
+		}
+
+		s.Set = &set
 	}
 
 	return nil
