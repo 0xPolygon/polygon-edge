@@ -29,6 +29,10 @@ func (g *slotGauge) decrease(slots uint64) uint64 {
 	return atomic.AddUint64(&g.height, ^(slots - 1))
 }
 
+func (g *slotGauge) stable(amount uint64) bool {
+	return amount < uint64(0.8*float64(g.max))
+}
+
 // slotsRequired calculates the number of slots required for given transaction(s).
 func slotsRequired(txs ...*types.Transaction) uint64 {
 	slots := uint64(0)

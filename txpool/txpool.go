@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/golang/protobuf/ptypes/any"
 	"github.com/hashicorp/go-hclog"
@@ -236,10 +237,20 @@ func (p *TxPool) Start() {
 			<-p.overflowCh
 
 			//	collect a list of most stale accounts
+			addrs := p.mostStaleAccounts()
 
 			//	attempt to relieve the gauge
+			for _, addr := range addrs {
+				currentSlots := p.dropStaleEnqueued(addr)
+				if p.gauge.stable(currentSlots) {
+					//	we managed to relieve
+					//	the gauge back to stable
+					break
+				}
+			}
 
 			//	cooldown (time sleep or time after)
+			time.Sleep(5 * time.Second)
 		}
 	}()
 
@@ -256,6 +267,59 @@ func (p *TxPool) Start() {
 			}
 		}
 	}()
+}
+
+func (p *TxPool) dropStaleEnqueued(addr types.Address) uint64 {
+	//	sanity check
+	account := p.accounts.get(addr)
+
+	account.enqueued.lock(true)
+	defer account.enqueued.unlock()
+
+	//	sanity check
+	if time.Since(account.lastPromotion) <= 1*time.Second {
+		return 0
+	}
+
+	dropped := account.enqueued.clear()
+
+	p.index.remove(dropped...)
+	slots := p.gauge.decrease(slotsRequired(dropped...))
+
+	return slots
+}
+
+func (p *TxPool) mostStaleAccounts() []types.Address {
+	//	TODO: this needs to be sorted by timestamp
+	addrs := make([]types.Address, 0)
+
+	p.accounts.Range(
+		func(key, _ interface{}) bool {
+			var (
+				addr, _ = key.(types.Address)
+				account = p.accounts.get(addr)
+			)
+
+			account.promoted.lock(false)
+			account.enqueued.lock(false)
+			defer func() {
+				account.enqueued.unlock()
+				account.promoted.unlock()
+			}()
+
+			if account.enqueued.length() == 0 {
+				return true
+			}
+
+			if time.Since(account.lastPromotion) >= 3*time.Hour {
+				addrs = append(addrs, addr)
+			}
+
+			return true
+		},
+	)
+
+	return addrs
 }
 
 // Close shuts down the pool's main loop.
@@ -657,7 +721,16 @@ func (p *TxPool) handleEnqueueRequest(req enqueueRequest) {
 
 	// update state
 	p.index.add(tx)
-	p.gauge.increase(slotsRequired(tx))
+	currentSlots := p.gauge.increase(slotsRequired(tx))
+
+	if !p.gauge.stable(currentSlots) {
+		select {
+		case p.overflowCh <- struct{}{}:
+		default:
+			//	if we can't send to this channel
+			//	handle overflow service is busy or in cooldown
+		}
+	}
 
 	p.eventManager.signalEvent(proto.EventType_ENQUEUED, tx.Hash)
 
