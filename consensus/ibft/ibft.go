@@ -1288,7 +1288,7 @@ func (i *Ibft) VerifyHeader(header *types.Header) error {
 	}
 
 	// verify the committed seals
-	if err := i.signer.VerifyCommittedSeal(snap.Set, header, i.quorumSize(header.Number, i.state.validators)); err != nil {
+	if err := i.signer.VerifyCommittedSeal(snap.Set, header, i.quorumSize(header.Number, snap.Set)); err != nil {
 		return err
 	}
 
