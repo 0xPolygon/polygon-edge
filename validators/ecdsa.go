@@ -78,6 +78,10 @@ func (v *ECDSAValidator) SetFromBytes(input []byte) error {
 
 type ECDSAValidatorSet []*ECDSAValidator
 
+func (vs *ECDSAValidatorSet) Type() ValidatorType {
+	return ECDSAValidatorType
+}
+
 func (vs *ECDSAValidatorSet) Len() int {
 	return len(*vs)
 }

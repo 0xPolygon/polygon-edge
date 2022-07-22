@@ -1210,6 +1210,8 @@ func newMockIbft(t *testing.T, accounts []string, account string) *mockIbft {
 		addr = pool.get(account)
 	}
 
+	ecdsaType := validators.ECDSAValidatorType
+
 	ibft := &Ibft{
 		logger:     hclog.NewNullLogger(),
 		config:     &consensus.Config{},
@@ -1222,6 +1224,13 @@ func newMockIbft(t *testing.T, accounts []string, account string) *mockIbft {
 		epochSize:  DefaultEpochSize,
 		metrics:    consensus.NilMetrics(),
 		signer:     signer.NewSigner(signer.NewECDSAKeyManagerFromKey(addr.priv)),
+		ibftForks: []IBFTFork{
+			{
+				From:          common.JSONNumber{Value: 0},
+				Type:          PoA,
+				ValidatorType: &ecdsaType,
+			},
+		},
 	}
 
 	initIbftMechanism(PoA, ibft)
@@ -1610,6 +1619,8 @@ func TestBaseConsensusMechanismIsInRange(t *testing.T) {
 }
 
 func TestGetIBFTForks(t *testing.T) {
+	ecdsaTyp := validators.ECDSAValidatorType
+
 	tests := []struct {
 		name       string
 		ibftConfig map[string]interface{}
@@ -1623,8 +1634,9 @@ func TestGetIBFTForks(t *testing.T) {
 			},
 			forks: []IBFTFork{
 				{
-					Type: PoA,
-					From: common.JSONNumber{Value: 0},
+					Type:          PoA,
+					From:          common.JSONNumber{Value: 0},
+					ValidatorType: &ecdsaTyp,
 				},
 			},
 			err: nil,

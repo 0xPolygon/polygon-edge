@@ -38,6 +38,10 @@ func NewBLSKeyManager(manager secrets.SecretsManager) (KeyManager, error) {
 	}, nil
 }
 
+func (s *BLSKeyManager) Type() validators.ValidatorType {
+	return validators.BLSValidatorType
+}
+
 func (s *BLSKeyManager) Address() types.Address {
 	return s.address
 }
@@ -55,11 +59,16 @@ func (s *BLSKeyManager) NewEmptyCommittedSeal() Sealer {
 }
 
 func (s *BLSKeyManager) SignSeal(data []byte) ([]byte, error) {
-	return crypto.Sign(s.ecdsaKey, data)
+	return crypto.Sign(s.ecdsaKey, crypto.Keccak256(data))
 }
 
 func (s *BLSKeyManager) SignCommittedSeal(data []byte) ([]byte, error) {
-	return signByBLS(s.blsKey, data)
+	seal, err := signByBLS(s.blsKey, data)
+	if err != nil {
+		return nil, err
+	}
+
+	return seal, err
 }
 
 func (s *BLSKeyManager) Ecrecover(sig, digest []byte) (types.Address, error) {
@@ -243,7 +252,8 @@ func (s *BLSSeal) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 		return nil
 	}
 
-	if len(vals) != 2 {
+	if len(vals) < 2 {
+		panic(fmt.Errorf("mismatch of RLP type for AggregatedCommittedSeal"))
 		return fmt.Errorf("mismatch of RLP type for AggregatedCommittedSeal")
 	}
 

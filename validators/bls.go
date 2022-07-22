@@ -67,6 +67,7 @@ func (v *BLSValidator) UnmarshalRLPFrom(p *fastrlp.Parser, val *fastrlp.Value) e
 	}
 
 	if len(elems) < 2 {
+		panic(fmt.Errorf("incorrect number of elements to decode BLSValidator, expected 2 but found %d", len(elems)))
 		return fmt.Errorf("incorrect number of elements to decode BLSValidator, expected 2 but found %d", len(elems))
 	}
 
@@ -90,6 +91,10 @@ func (v *BLSValidator) SetFromBytes(input []byte) error {
 }
 
 type BLSValidatorSet []*BLSValidator
+
+func (vs *BLSValidatorSet) Type() ValidatorType {
+	return BLSValidatorType
+}
 
 func (vs *BLSValidatorSet) Len() int {
 	return len(*vs)

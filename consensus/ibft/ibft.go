@@ -88,10 +88,11 @@ type Ibft struct {
 
 	metrics *consensus.Metrics
 
+	ibftForks  []IBFTFork
 	mechanisms []ConsensusMechanism // IBFT ConsensusMechanism used (PoA / PoS)
 
-	ValidatorType validators.ValidatorType
-	signer        signer.Signer
+	secretsManager secrets.SecretsManager
+	signer         signer.Signer
 
 	blockTime       time.Duration // Minimum block generation time in seconds
 	ibftBaseTimeout time.Duration // Base timeout for IBFT message in seconds
@@ -153,11 +154,6 @@ func Factory(
 		quorumSizeBlockNum = uint64(readBlockNum)
 	}
 
-	signer, err := InitSigner(params.SecretsManager, params.BLS)
-	if err != nil {
-		return nil, err
-	}
-
 	p := &Ibft{
 		logger:             params.Logger.Named("ibft"),
 		config:             params.Config,
@@ -174,11 +170,15 @@ func Factory(
 		metrics:            params.Metrics,
 		blockTime:          time.Duration(params.BlockTime) * time.Second,
 		ibftBaseTimeout:    time.Duration(params.IBFTBaseTimeout) * time.Second,
-		signer:             signer,
+		secretsManager:     params.SecretsManager,
 	}
 
 	// Initialize the mechanism
 	if err := p.setupMechanism(); err != nil {
+		return nil, err
+	}
+
+	if err := p.updateSigner(nil, 0); err != nil {
 		return nil, err
 	}
 
@@ -260,12 +260,20 @@ func GetIBFTForks(ibftConfig map[string]interface{}) ([]IBFTFork, error) {
 			return nil, err
 		}
 
+		validatorType := validators.ECDSAValidatorType
+		if rawValType, ok := ibftConfig["validator_type"].(string); ok {
+			if err := validatorType.FromString(rawValType); err != nil {
+				return nil, err
+			}
+		}
+
 		return []IBFTFork{
 			{
-				Type:       typ,
-				Deployment: nil,
-				From:       common.JSONNumber{Value: 0},
-				To:         nil,
+				Type:          typ,
+				Deployment:    nil,
+				ValidatorType: &validatorType,
+				From:          common.JSONNumber{Value: 0},
+				To:            nil,
 			},
 		}, nil
 	}
@@ -290,14 +298,16 @@ func GetIBFTForks(ibftConfig map[string]interface{}) ([]IBFTFork, error) {
 
 //  setupTransport read current mechanism in params and sets up consensus mechanism
 func (i *Ibft) setupMechanism() error {
-	ibftForks, err := GetIBFTForks(i.config.Config)
+	var err error
+
+	i.ibftForks, err = GetIBFTForks(i.config.Config)
 	if err != nil {
 		return err
 	}
 
-	i.mechanisms = make([]ConsensusMechanism, len(ibftForks))
+	i.mechanisms = make([]ConsensusMechanism, len(i.ibftForks))
 
-	for idx, fork := range ibftForks {
+	for idx, fork := range i.ibftForks {
 		factory, ok := mechanismBackends[fork.Type]
 		if !ok {
 			return fmt.Errorf("consensus mechanism doesn't define: %s", fork.Type)
@@ -438,6 +448,16 @@ func (i *Ibft) runSyncState() {
 		if hookErr := i.runHook(InsertBlockHook, blockNumber, blockNumber); hookErr != nil {
 			i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", InsertBlockHook, hookErr))
 		}
+
+		header, ok := i.blockchain.GetHeaderByNumber(blockNumber)
+		if ok {
+			if err := i.updateSigner(header, blockNumber+1); err != nil {
+				i.logger.Error("failed to update signer", "number", blockNumber+1, "err", err)
+			}
+		} else {
+			i.logger.Error("block header not found", "number", blockNumber)
+		}
+
 	}
 
 	// save current height in order to check new blocks are added or not during sync
@@ -579,7 +599,23 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 
 	header.Timestamp = uint64(headerTime.Unix())
 
-	if err := i.signer.InitIBFTExtra(header, parent, snap.Set); err != nil {
+	var parentCommittedSeal signer.Sealer
+
+	if header.Number > 1 {
+		parentSigner, err := i.getSignerAt(parent.Number)
+		if err != nil {
+			return nil, err
+		}
+
+		parentExtra, err := parentSigner.GetIBFTExtra(parent)
+		if err != nil {
+			return nil, err
+		}
+
+		parentCommittedSeal = parentExtra.CommittedSeal
+	}
+
+	if err := i.signer.InitIBFTExtra(header, parentCommittedSeal, snap.Set); err != nil {
 		return nil, err
 	}
 
@@ -716,6 +752,12 @@ func (i *Ibft) runAcceptState() { // start new round
 		return
 	}
 
+	if err := i.updateSigner(parent, number); err != nil {
+		i.logger.Error("cannot update signer", "err", err)
+
+		return
+	}
+
 	snap, err := i.getSnapshot(parent.Number)
 
 	if err != nil {
@@ -748,7 +790,9 @@ func (i *Ibft) runAcceptState() { // start new round
 	// select the proposer of the block
 	var lastProposer types.Address
 	if parent.Number != 0 {
-		lastProposer, _ = i.signer.EcrecoverFromHeader(parent)
+		prevSigner, _ := i.getSignerAt(parent.Number)
+
+		lastProposer, _ = prevSigner.EcrecoverFromHeader(parent)
 	}
 
 	if hookErr := i.runHook(CalculateProposerHook, i.state.view.Sequence, lastProposer); hookErr != nil {
@@ -1254,7 +1298,12 @@ func (i *Ibft) verifyHeaderImpl(snap *Snapshot, parent, header *types.Header) er
 			return err
 		}
 
-		if err := i.signer.VerifyParentCommittedSeal(
+		signer, err := i.getSignerAt(parent.Number)
+		if err != nil {
+			return err
+		}
+
+		if err := signer.VerifyParentCommittedSeal(
 			parentSnap.Set,
 			parent,
 			header,
@@ -1367,7 +1416,12 @@ func (i *Ibft) Close() error {
 // SetHeaderHash updates hash calculation function for IBFT
 func (i *Ibft) SetHeaderHash() {
 	types.HeaderHash = func(h *types.Header) types.Hash {
-		hash, err := i.signer.CalculateHeaderHash(h)
+		signer, err := i.getSignerAt(h.Number)
+		if err != nil {
+			return types.ZeroHash
+		}
+
+		hash, err := signer.CalculateHeaderHash(h)
 		if err != nil {
 			return types.ZeroHash
 		}
@@ -1434,25 +1488,6 @@ func (i *Ibft) verifySigner(snap *Snapshot, header *types.Header) error {
 	return nil
 }
 
-func InitSigner(secretManager secrets.SecretsManager, isBLS bool) (signer.Signer, error) {
-	var (
-		km  signer.KeyManager
-		err error
-	)
-
-	if isBLS {
-		km, err = signer.NewBLSKeyManager(secretManager)
-	} else {
-		km, err = signer.NewECDSAKeyManager(secretManager)
-	}
-
-	if err != nil {
-		return nil, err
-	}
-
-	return signer.NewSigner(km), nil
-}
-
 // getTimeout returns the IBFT timeout based on round and config
 func (i *Ibft) getTimeout() time.Duration {
 	return exponentialTimeout(i.state.view.Round, i.ibftBaseTimeout)
@@ -1474,4 +1509,77 @@ func (i *Ibft) startNewRound(newRound uint64) {
 		Sequence: i.state.view.Sequence,
 		Round:    newRound,
 	}
+}
+
+func (i *Ibft) updateSigner(
+	parentHeader *types.Header,
+	height uint64,
+) error {
+	fork := i.getSignerForkAt(height)
+	if fork == nil {
+		return fmt.Errorf("IBFT fork not found")
+	}
+
+	if i.signer != nil && *fork.ValidatorType == i.signer.Type() {
+		return nil
+	}
+
+	newSigner, err := signer.InitSigner(
+		i.secretsManager,
+		*fork.ValidatorType,
+	)
+
+	if err != nil {
+		return err
+	}
+
+	i.signer = newSigner
+
+	if fork.From.Value == height && fork.Validators != nil {
+		original, err := i.getSnapshot(height)
+		if err != nil {
+			return err
+		}
+
+		newSnap := original.Copy()
+		newSnap.Number = parentHeader.Number
+		newSnap.Hash = parentHeader.Hash.String()
+		newSnap.Set = fork.Validators
+
+		if newSnap.Number == original.Number {
+			i.store.replace(newSnap)
+		} else {
+			i.store.add(newSnap)
+		}
+	}
+
+	return nil
+}
+
+func (i *Ibft) getSignerAt(height uint64) (signer.Signer, error) {
+	fork := i.getSignerForkAt(height)
+	if fork == nil {
+		return nil, fmt.Errorf("IBFT fork not found")
+	}
+
+	return signer.InitSigner(
+		i.secretsManager,
+		*fork.ValidatorType,
+	)
+}
+
+func (i *Ibft) getSignerForkAt(height uint64) *IBFTFork {
+	for idx := len(i.ibftForks) - 1; idx >= 0; idx-- {
+		fork := i.ibftForks[idx]
+
+		if fork.ValidatorType == nil {
+			continue
+		}
+
+		if fork.From.Value <= height && (fork.To == nil || height <= fork.To.Value) {
+			return &fork
+		}
+	}
+
+	return nil
 }

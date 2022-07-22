@@ -211,14 +211,6 @@ func setFlags(cmd *cobra.Command) {
 		"write all logs to the file at specified location instead of writing them to console",
 	)
 
-	cmd.Flags().BoolVar(
-		&params.useBls,
-		blsFlag,
-		false,
-		// TODO
-		"use bls",
-	)
-
 	setDevFlags(cmd)
 }
 

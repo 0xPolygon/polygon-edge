@@ -8,6 +8,7 @@ import (
 
 // KeyManager is a delegated object to sign data
 type KeyManager interface {
+	Type() validators.ValidatorType
 	Address() types.Address
 	NewEmptyIstanbulExtra() *IstanbulExtra
 	NewEmptyCommittedSeal() Sealer

@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
-	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
 )
@@ -25,8 +24,9 @@ var (
 
 // Signer is responsible for signing for blocks and messages in IBFT
 type Signer interface {
+	Type() validators.ValidatorType
 	Address() types.Address
-	InitIBFTExtra(header, parent *types.Header, set validators.ValidatorSet) error
+	InitIBFTExtra(header *types.Header, parentCommittedSeal Sealer, set validators.ValidatorSet) error
 	GetIBFTExtra(*types.Header) (*IstanbulExtra, error)
 	WriteSeal(*types.Header) (*types.Header, error)
 	EcrecoverFromHeader(*types.Header) (types.Address, error)
@@ -53,26 +53,19 @@ func NewSigner(keyManager KeyManager) Signer {
 	}
 }
 
+func (s *SignerImpl) Type() validators.ValidatorType {
+	return s.keyManager.Type()
+}
+
 func (s *SignerImpl) Address() types.Address {
 	return s.keyManager.Address()
 }
 
-func (s *SignerImpl) InitIBFTExtra(header, parent *types.Header, set validators.ValidatorSet) error {
-	var parentCommittedSeal Sealer
-
-	if header.Number > 1 {
-		if parent == nil {
-			return ErrNilParentHeader
-		}
-
-		parentExtra, err := s.GetIBFTExtra(parent)
-		if err != nil {
-			return err
-		}
-
-		parentCommittedSeal = parentExtra.CommittedSeal
-	}
-
+func (s *SignerImpl) InitIBFTExtra(
+	header *types.Header,
+	parentCommittedSeal Sealer,
+	set validators.ValidatorSet,
+) error {
 	putIbftExtra(header, &IstanbulExtra{
 		Validators:          set,
 		Seal:                nil,
@@ -108,7 +101,7 @@ func (s *SignerImpl) WriteSeal(header *types.Header) (*types.Header, error) {
 		return nil, err
 	}
 
-	seal, err := s.keyManager.SignSeal(crypto.Keccak256(hash[:]))
+	seal, err := s.keyManager.SignSeal(hash[:])
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +135,7 @@ func (s *SignerImpl) CreateCommittedSeal(header *types.Header) ([]byte, error) {
 		return nil, err
 	}
 
-	msg := crypto.Keccak256(commitMsg(hash[:]))
+	msg := commitMsg(hash[:])
 
 	return s.keyManager.SignCommittedSeal(msg)
 }

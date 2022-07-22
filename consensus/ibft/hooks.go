@@ -1,6 +1,7 @@
 package ibft
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/0xPolygon/polygon-edge/helper/common"
@@ -178,6 +179,48 @@ type IBFTFork struct {
 	// PoS
 	MaxValidatorCount *common.JSONNumber `json:"maxValidatorCount,omitempty"`
 	MinValidatorCount *common.JSONNumber `json:"minValidatorCount,omitempty"`
+}
+
+func (f *IBFTFork) UnmarshalJSON(data []byte) error {
+	raw := struct {
+		Type              MechanismType             `json:"type"`
+		ValidatorType     *validators.ValidatorType `json:"validator_type"`
+		Deployment        *common.JSONNumber        `json:"deployment,omitempty"`
+		From              common.JSONNumber         `json:"from"`
+		To                *common.JSONNumber        `json:"to,omitempty"`
+		Validators        interface{}               `json:"validators"`
+		MaxValidatorCount *common.JSONNumber        `json:"maxValidatorCount,omitempty"`
+		MinValidatorCount *common.JSONNumber        `json:"minValidatorCount,omitempty"`
+	}{}
+
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	f.Type = raw.Type
+	f.ValidatorType = raw.ValidatorType
+	f.Deployment = raw.Deployment
+	f.From = raw.From
+	f.To = raw.To
+	f.MaxValidatorCount = raw.MaxValidatorCount
+	f.MinValidatorCount = raw.MinValidatorCount
+
+	if raw.ValidatorType == nil || raw.Validators == nil {
+		return nil
+	}
+
+	f.Validators = validators.NewValidatorSetFromType(*raw.ValidatorType)
+
+	validatorsBytes, err := json.Marshal(raw.Validators)
+	if err != nil {
+		return err
+	}
+
+	if err := json.Unmarshal(validatorsBytes, &f.Validators); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // ConsensusMechanismFactory is the factory function to create a consensus mechanism

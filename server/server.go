@@ -406,7 +406,6 @@ func (s *Server) setupConsensus() error {
 			SecretsManager:  s.secretsManager,
 			BlockTime:       s.config.BlockTime,
 			IBFTBaseTimeout: s.config.IBFTBaseTimeout,
-			BLS:             s.config.BLS,
 		},
 	)
 

@@ -41,6 +41,10 @@ func NewMockECDSAKeyManager(addr types.Address) KeyManager {
 	}
 }
 
+func (s *ECDSAKeyManager) Type() validators.ValidatorType {
+	return validators.ECDSAValidatorType
+}
+
 func (s *ECDSAKeyManager) Address() types.Address {
 	return s.address
 }
@@ -58,11 +62,11 @@ func (s *ECDSAKeyManager) NewEmptyCommittedSeal() Sealer {
 }
 
 func (s *ECDSAKeyManager) SignSeal(data []byte) ([]byte, error) {
-	return crypto.Sign(s.key, data)
+	return crypto.Sign(s.key, crypto.Keccak256(data))
 }
 
 func (s *ECDSAKeyManager) SignCommittedSeal(data []byte) ([]byte, error) {
-	return crypto.Sign(s.key, data)
+	return crypto.Sign(s.key, crypto.Keccak256(data))
 }
 
 func (s *ECDSAKeyManager) Ecrecover(sig, digest []byte) (types.Address, error) {

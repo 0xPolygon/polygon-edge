@@ -2,6 +2,7 @@ package signer
 
 import (
 	"crypto/ecdsa"
+	"fmt"
 
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/crypto"
@@ -10,6 +11,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/secrets/helper"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/0xPolygon/polygon-edge/validators"
 	"github.com/coinbase/kryptology/pkg/signatures/bls/bls_sig"
 	"github.com/umbracle/fastrlp"
 )
@@ -118,4 +120,29 @@ func ecrecoverImpl(sig, msg []byte) (types.Address, error) {
 	}
 
 	return crypto.PubKeyToAddress(pub), nil
+}
+
+func InitSigner(
+	secretManager secrets.SecretsManager,
+	validatorType validators.ValidatorType,
+) (Signer, error) {
+	var (
+		km  KeyManager
+		err error
+	)
+
+	switch validatorType {
+	case validators.ECDSAValidatorType:
+		km, err = NewECDSAKeyManager(secretManager)
+	case validators.BLSValidatorType:
+		km, err = NewBLSKeyManager(secretManager)
+	default:
+		err = fmt.Errorf("unsupported validator type: %s", validatorType)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return NewSigner(km), nil
 }

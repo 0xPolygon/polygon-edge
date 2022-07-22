@@ -36,7 +36,6 @@ const (
 	devFlag               = "dev"
 	corsOriginFlag        = "access-control-allow-origins"
 	logFileLocationFlag   = "log-to"
-	blsFlag               = "bls"
 )
 
 const (
@@ -78,8 +77,6 @@ type serverParams struct {
 	secretsConfig *secrets.SecretsManagerConfig
 
 	logFileLocation string
-
-	useBls bool
 }
 
 func (p *serverParams) isMaxPeersSet() bool {
@@ -164,6 +161,5 @@ func (p *serverParams) generateConfig() *server.Config {
 		IBFTBaseTimeout: p.rawConfig.IBFTBaseTimeout,
 		LogLevel:        hclog.LevelFromString(p.rawConfig.LogLevel),
 		LogFilePath:     p.logFileLocation,
-		BLS:             p.useBls,
 	}
 }

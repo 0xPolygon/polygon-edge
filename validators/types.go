@@ -71,6 +71,7 @@ type Validator interface {
 
 // ValidatorSet defines the interface of the methods validator set implements
 type ValidatorSet interface {
+	Type() ValidatorType
 	Len() int
 	Equal(ValidatorSet) bool
 	Copy() ValidatorSet
