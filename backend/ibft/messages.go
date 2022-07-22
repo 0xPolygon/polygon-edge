@@ -50,14 +50,7 @@ func (i *backendIBFT) BuildPrePrepareMessage(
 	return i.signMessage(msg)
 }
 
-func (i *backendIBFT) BuildPrepareMessage(proposal []byte, view *protoIBFT.View) *protoIBFT.Message {
-	block := &types.Block{}
-	if err := block.UnmarshalRLP(proposal); err != nil {
-		return nil
-	}
-
-	proposalHash := block.Header.Hash.Bytes()
-
+func (i *backendIBFT) BuildPrepareMessage(proposalHash []byte, view *protoIBFT.View) *protoIBFT.Message {
 	msg := &protoIBFT.Message{
 		View: view,
 		From: i.ID(),
