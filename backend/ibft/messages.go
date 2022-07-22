@@ -24,13 +24,26 @@ func (i *backendIBFT) signMessage(msg *protoIBFT.Message) *protoIBFT.Message {
 	return msg
 }
 
-func (i *backendIBFT) BuildPrePrepareMessage(proposal []byte, view *protoIBFT.View) *protoIBFT.Message {
+func (i *backendIBFT) BuildPrePrepareMessage(
+	proposal []byte,
+	certificate *protoIBFT.RoundChangeCertificate,
+	view *protoIBFT.View,
+) *protoIBFT.Message {
+	block := &types.Block{}
+	if err := block.UnmarshalRLP(proposal); err != nil {
+		return nil
+	}
+
+	proposalHash := block.Hash().Bytes()
+
 	msg := &protoIBFT.Message{
 		View: view,
 		From: i.ID(),
 		Type: protoIBFT.MessageType_PREPREPARE,
 		Payload: &protoIBFT.Message_PreprepareData{PreprepareData: &protoIBFT.PrePrepareMessage{
-			Proposal: proposal,
+			Proposal:     proposal,
+			ProposalHash: proposalHash,
+			Certificate:  certificate,
 		}},
 	}
 
