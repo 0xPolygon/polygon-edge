@@ -82,12 +82,19 @@ func (i *backendIBFT) BuildCommitMessage(proposalHash []byte, view *protoIBFT.Vi
 	return i.signMessage(msg)
 }
 
-func (i *backendIBFT) BuildRoundChangeMessage(height, round uint64) *protoIBFT.Message {
+func (i *backendIBFT) BuildRoundChangeMessage(
+	proposal []byte,
+	certificate *protoIBFT.PreparedCertificate,
+	view *protoIBFT.View,
+) *protoIBFT.Message {
 	msg := &protoIBFT.Message{
-		View:    &protoIBFT.View{Height: height, Round: round},
-		From:    i.ID(),
-		Type:    protoIBFT.MessageType_ROUND_CHANGE,
-		Payload: nil,
+		View: view,
+		From: i.ID(),
+		Type: protoIBFT.MessageType_ROUND_CHANGE,
+		Payload: &protoIBFT.Message_RoundChangeData{RoundChangeData: &protoIBFT.RoundChangeMessage{
+			LastPreparedProposedBlock: proposal,
+			LatestPreparedCertificate: certificate,
+		}},
 	}
 
 	return i.signMessage(msg)
