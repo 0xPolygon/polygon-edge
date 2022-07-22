@@ -106,8 +106,6 @@ func (i *backendIBFT) IsProposer(id []byte, height, round uint64) bool {
 		return false
 	}
 
-	i.logger.Info("proposer calculated", "block", height, "proposer", nextProposer)
-
 	return true
 }
 
