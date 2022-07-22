@@ -1,7 +1,6 @@
 package ibft
 
 import (
-	"errors"
 	"fmt"
 	"time"
 
@@ -12,52 +11,62 @@ import (
 
 //	backend impl for go-ibft
 
-func (i *backendIBFT) BuildProposal(blockNumber uint64) ([]byte, error) {
+func (i *backendIBFT) BuildProposal(blockNumber uint64) []byte {
 	var (
 		latestHeader      = i.blockchain.Header()
 		latestBlockNumber = latestHeader.Number
 	)
 
 	if latestBlockNumber+1 != blockNumber {
-		return nil, errors.New("invalid block number given")
+		return nil
 	}
 
 	snap, err := i.getSnapshot(latestBlockNumber)
 	if err != nil {
 		i.logger.Error("cannot find snapshot", "num", latestBlockNumber)
 
-		return nil, err
+		return nil
 	}
 
 	block, err := i.buildBlock(snap, latestHeader)
 	if err != nil {
-		return nil, err
+		i.logger.Error("cannot build block", "num", blockNumber, "err", err)
+
+		return nil
 	}
 
-	return block.MarshalRLP(), nil
+	return block.MarshalRLP()
 }
 
-func (i *backendIBFT) InsertBlock(proposal []byte, committedSeals [][]byte) error {
+func (i *backendIBFT) InsertBlock(proposal []byte, committedSeals [][]byte) {
 	newBlock := &types.Block{}
 	if err := newBlock.UnmarshalRLP(proposal); err != nil {
-		return err
+		i.logger.Error("cannot unmarshal proposal", "err", err)
+
+		return
 	}
 
 	// Push the committed seals to the header
 	header, err := writeCommittedSeals(newBlock.Header, committedSeals)
 	if err != nil {
-		return err
+		i.logger.Error("cannot write committed seals", "err", err)
+
+		return
 	}
 
 	newBlock.Header = header
 
 	// Save the block locally
 	if err := i.blockchain.WriteBlock(newBlock, "consensus"); err != nil {
-		return err
+		i.logger.Error("cannot write block", "err", err)
+
+		return
 	}
 
 	if err := i.runHook(InsertBlockHook, header.Number, header.Number); err != nil {
-		return err
+		i.logger.Error("cannot run hook", "name", string(InsertBlockHook), "err", err)
+
+		return
 	}
 
 	i.updateMetrics(newBlock)
@@ -74,7 +83,7 @@ func (i *backendIBFT) InsertBlock(proposal []byte, committedSeals [][]byte) erro
 	// the old transactions are removed
 	i.txpool.ResetWithHeaders(newBlock.Header)
 
-	return nil
+	return
 }
 
 func (i *backendIBFT) ID() []byte {
