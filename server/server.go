@@ -401,7 +401,7 @@ func (s *Server) setupConsensus() error {
 			Blockchain:      s.blockchain,
 			Executor:        s.executor,
 			Grpc:            s.grpcServer,
-			Logger:          s.logger.Named("backend"),
+			Logger:          s.logger,
 			Metrics:         s.serverMetrics.consensus,
 			SecretsManager:  s.secretsManager,
 			BlockTime:       s.config.BlockTime,
