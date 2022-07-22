@@ -676,7 +676,7 @@ github.com/syndtr/goleveldb/leveldb/opt
 github.com/syndtr/goleveldb/leveldb/storage
 github.com/syndtr/goleveldb/leveldb/table
 github.com/syndtr/goleveldb/leveldb/util
-# github.com/umbracle/ethgo v0.1.3
+# github.com/umbracle/ethgo v0.1.4-0.20220722090909-c8ac32939570
 ## explicit; go 1.18
 github.com/umbracle/ethgo
 github.com/umbracle/ethgo/abi
