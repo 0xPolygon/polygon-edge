@@ -93,14 +93,14 @@ func setFlags(cmd *cobra.Command) {
 	{
 		cmd.Flags().StringVar(
 			&params.rawIBFTValidatorType,
-			ibftValidatorTypeFlag,
+			command.IBFTValidatorTypeFlag,
 			string(validators.ECDSAValidatorType),
 			"the type of validators in IBFT",
 		)
 
 		cmd.Flags().StringVar(
 			&params.validatorPrefixPath,
-			ibftValidatorPrefixFlag,
+			command.IBFTValidatorPrefixFlag,
 			"",
 			"prefix path for validator folder directory. "+
 				"Needs to be present if ibft-validator is omitted",
@@ -108,14 +108,14 @@ func setFlags(cmd *cobra.Command) {
 
 		cmd.Flags().StringArrayVar(
 			&params.ibftValidatorsRaw,
-			ibftValidatorFlag,
+			command.IBFTValidatorFlag,
 			[]string{},
 			"addresses to be used as IBFT validators, can be used multiple times. "+
 				"Needs to be present if ibft-validators-prefix-path is omitted",
 		)
 
 		// --ibft-validator-prefix-path & --ibft-validator can't be given at same time
-		cmd.MarkFlagsMutuallyExclusive(ibftValidatorPrefixFlag, ibftValidatorFlag)
+		cmd.MarkFlagsMutuallyExclusive(command.IBFTValidatorPrefixFlag, command.IBFTValidatorFlag)
 	}
 
 	// PoS

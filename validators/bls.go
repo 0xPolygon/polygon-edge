@@ -178,7 +178,7 @@ func (vs *BLSValidatorSet) Del(v Validator) error {
 }
 
 func (vs *BLSValidatorSet) Merge(vts ValidatorSet) error {
-	targetSet, ok := vts.(*ECDSAValidatorSet)
+	targetSet, ok := vts.(*BLSValidatorSet)
 	if !ok {
 		return ErrMismatchValidatorSetType
 	}

@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/0xPolygon/polygon-edge/helper/common"
+	"github.com/0xPolygon/polygon-edge/validators"
 )
 
 // Define the type of the IBFT consensus
@@ -167,10 +168,14 @@ func (base *BaseConsensusMechanism) IsInRange(blockNumber uint64) bool {
 
 // IBFT Fork represents setting in params.engine.ibft of genesis.json
 type IBFTFork struct {
-	Type              MechanismType      `json:"type"`
-	Deployment        *common.JSONNumber `json:"deployment,omitempty"`
-	From              common.JSONNumber  `json:"from"`
-	To                *common.JSONNumber `json:"to,omitempty"`
+	Type          MechanismType             `json:"type"`
+	ValidatorType *validators.ValidatorType `json:"validator_type"`
+	Deployment    *common.JSONNumber        `json:"deployment,omitempty"`
+	From          common.JSONNumber         `json:"from"`
+	To            *common.JSONNumber        `json:"to,omitempty"`
+	// PoA
+	Validators validators.ValidatorSet `json:"validators"`
+	// PoS
 	MaxValidatorCount *common.JSONNumber `json:"maxValidatorCount,omitempty"`
 	MinValidatorCount *common.JSONNumber `json:"minValidatorCount,omitempty"`
 }

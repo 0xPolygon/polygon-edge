@@ -2,10 +2,8 @@ package helper
 
 import (
 	"fmt"
-	"path/filepath"
 
 	"github.com/0xPolygon/polygon-edge/crypto"
-	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/secrets/awsssm"
@@ -19,19 +17,6 @@ import (
 
 // SetupLocalSecretsManager is a helper method for boilerplate local secrets manager setup
 func SetupLocalSecretsManager(dataDir string) (secrets.SecretsManager, error) {
-	subDirectories := []string{secrets.ConsensusFolderLocal, secrets.NetworkFolderLocal}
-
-	// Check if the sub-directories exist / are already populated
-	for _, subDirectory := range subDirectories {
-		if common.DirectoryExists(filepath.Join(dataDir, subDirectory)) {
-			return nil,
-				fmt.Errorf(
-					"directory %s has previously initialized secrets data",
-					dataDir,
-				)
-		}
-	}
-
 	return local.SecretsManagerFactory(
 		nil, // Local secrets manager doesn't require a config
 		&secrets.SecretsManagerParams{
@@ -81,6 +66,10 @@ func SetupGCPSSM(
 
 // InitECDSAValidatorKey creates new ECDSA key and set as a validator key
 func InitECDSAValidatorKey(secretsManager secrets.SecretsManager) (types.Address, error) {
+	if secretsManager.HasSecret(secrets.ValidatorKey) {
+		return types.ZeroAddress, fmt.Errorf(`secrets "%s" has been already initialized`, secrets.ValidatorKey)
+	}
+
 	validatorKey, validatorKeyEncoded, err := crypto.GenerateAndEncodeECDSAPrivateKey()
 	if err != nil {
 		return types.ZeroAddress, err
@@ -100,9 +89,13 @@ func InitECDSAValidatorKey(secretsManager secrets.SecretsManager) (types.Address
 }
 
 func InitBLSValidatorKey(secretsManager secrets.SecretsManager) ([]byte, error) {
+	if secretsManager.HasSecret(secrets.ValidatorBLSKey) {
+		return nil, fmt.Errorf(`secrets "%s" has been already initialized`, secrets.ValidatorKey)
+	}
+
 	blsSecretKey, blsSecretKeyEncoded, err := crypto.GenerateAndEncodeBLSSecretKey()
 	if err != nil {
-		return []byte{}, err
+		return nil, err
 	}
 
 	// Write the validator private key to the secrets manager storage
@@ -110,7 +103,7 @@ func InitBLSValidatorKey(secretsManager secrets.SecretsManager) ([]byte, error) 
 		secrets.ValidatorBLSKey,
 		blsSecretKeyEncoded,
 	); setErr != nil {
-		return []byte{}, setErr
+		return nil, setErr
 	}
 
 	pubkeyBytes, err := crypto.BLSSecretKeyToPubkeyBytes(blsSecretKey)

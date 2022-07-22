@@ -35,8 +35,9 @@ const (
 
 // Define constant file names for the local StorageManager
 const (
-	ValidatorKeyLocal = "validator.key"
-	NetworkKeyLocal   = "libp2p.key"
+	ValidatorKeyLocal    = "validator.key"
+	ValidatorBLSKeyLocal = "validator-bls.key"
+	NetworkKeyLocal      = "libp2p.key"
 )
 
 // Define constant folder names for the local StorageManager

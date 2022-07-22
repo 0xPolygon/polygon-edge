@@ -1,30 +1,18 @@
 package genesis
 
 import (
-	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
-	"github.com/0xPolygon/polygon-edge/crypto"
-	"github.com/0xPolygon/polygon-edge/secrets"
-	"github.com/0xPolygon/polygon-edge/secrets/local"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/0xPolygon/polygon-edge/validators"
-	"github.com/hashicorp/go-hclog"
 )
 
 const (
 	StatError   = "StatError"
 	ExistsError = "ExistsError"
-)
-
-var (
-	ErrECDSAKeyNotFound = errors.New("ECDSA key not found in given path")
-	ErrBLSKeyNotFound   = errors.New("BLS key not found in given path")
 )
 
 // GenesisGenError is a specific error type for generating genesis
@@ -92,113 +80,4 @@ func fillPremineMap(
 	}
 
 	return nil
-}
-
-// getValidatorsFromPrefixPath extracts the addresses of the validators based on the directory
-// prefix. It scans the directories for validator private keys and compiles a list of addresses
-func getValidatorsFromPrefixPath(
-	prefix string,
-	validatorType validators.ValidatorType,
-) (validators.ValidatorSet, error) {
-	files, err := ioutil.ReadDir(".")
-	if err != nil {
-		return nil, err
-	}
-
-	validatorSet := validators.NewValidatorSetFromType(validatorType)
-
-	for _, file := range files {
-		path := file.Name()
-
-		if !file.IsDir() {
-			continue
-		}
-
-		if !strings.HasPrefix(path, prefix) {
-			continue
-		}
-
-		localSecretsManager, err := local.SecretsManagerFactory(
-			nil,
-			&secrets.SecretsManagerParams{
-				Logger: hclog.NewNullLogger(),
-				Extra: map[string]interface{}{
-					secrets.Path: path,
-				},
-			},
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		address, err := getValidatorAddressFromSecretManager(localSecretsManager)
-		if err != nil {
-			return nil, err
-		}
-
-		switch validatorType {
-		case validators.ECDSAValidatorType:
-			validatorSet.Add(&validators.ECDSAValidator{
-				Address: address,
-			})
-		case validators.BLSValidatorType:
-			blsPublicKey, err := getBLSPublicKeyBytesFromSecretManager(localSecretsManager)
-			if err != nil {
-				return nil, err
-			}
-
-			validatorSet.Add(&validators.BLSValidator{
-				Address:      address,
-				BLSPublicKey: blsPublicKey,
-			})
-		}
-	}
-
-	return validatorSet, nil
-}
-
-func getValidatorAddressFromSecretManager(manager secrets.SecretsManager) (types.Address, error) {
-	if !manager.HasSecret(secrets.ValidatorKey) {
-		return types.ZeroAddress, ErrECDSAKeyNotFound
-	}
-
-	keyBytes, err := manager.GetSecret(secrets.ValidatorKey)
-	if err != nil {
-		return types.ZeroAddress, err
-	}
-
-	privKey, err := crypto.BytesToECDSAPrivateKey(keyBytes)
-	if err != nil {
-		return types.ZeroAddress, err
-	}
-
-	return crypto.PubKeyToAddress(&privKey.PublicKey), nil
-}
-
-func getBLSPublicKeyBytesFromSecretManager(manager secrets.SecretsManager) ([]byte, error) {
-	if !manager.HasSecret(secrets.ValidatorBLSKey) {
-		return nil, ErrBLSKeyNotFound
-	}
-
-	keyBytes, err := manager.GetSecret(secrets.ValidatorKey)
-	if err != nil {
-		return nil, err
-	}
-
-	secretKey, err := crypto.BytesToBLSSecretKey(keyBytes)
-	if err != nil {
-		return nil, err
-	}
-
-	pubKey, err := secretKey.GetPublicKey()
-	if err != nil {
-		return nil, err
-	}
-
-	pubKeyBytes, err := pubKey.MarshalBinary()
-	if err != nil {
-		return nil, err
-	}
-
-	return pubKeyBytes, nil
 }

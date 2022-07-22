@@ -386,7 +386,7 @@ func GenerateAndEncodeECDSAPrivateKey() (*ecdsa.PrivateKey, []byte, error) {
 }
 
 func GenerateAndEncodeBLSSecretKey() (*bls_sig.SecretKey, []byte, error) {
-	keyBuff, err := keystore.CreatePrivateKey(generateECDSAKeyAndMarshal)
+	keyBuff, err := keystore.CreatePrivateKey(generateBLSKeyAndMarshal)
 	if err != nil {
 		return nil, nil, err
 	}

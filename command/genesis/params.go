@@ -17,18 +17,15 @@ import (
 )
 
 const (
-	dirFlag                 = "dir"
-	nameFlag                = "name"
-	premineFlag             = "premine"
-	chainIDFlag             = "chain-id"
-	ibftValidatorTypeFlag   = "ibft-validator-type"
-	ibftValidatorFlag       = "ibft-validator"
-	ibftValidatorPrefixFlag = "ibft-validators-prefix-path"
-	epochSizeFlag           = "epoch-size"
-	blockGasLimitFlag       = "block-gas-limit"
-	posFlag                 = "pos"
-	minValidatorCount       = "min-validator-count"
-	maxValidatorCount       = "max-validator-count"
+	dirFlag           = "dir"
+	nameFlag          = "name"
+	premineFlag       = "premine"
+	chainIDFlag       = "chain-id"
+	epochSizeFlag     = "epoch-size"
+	blockGasLimitFlag = "block-gas-limit"
+	posFlag           = "pos"
+	minValidatorCount = "min-validator-count"
+	maxValidatorCount = "max-validator-count"
 )
 
 // Legacy flags that need to be preserved for running clients
@@ -41,10 +38,9 @@ var (
 )
 
 var (
-	errValidatorsNotSpecified    = errors.New("validator information not specified")
-	errValidatorNumberExceedsMax = errors.New("validator number exceeds max validator number")
-	errUnsupportedConsensus      = errors.New("specified consensusRaw not supported")
-	errInvalidEpochSize          = errors.New("epoch size must be greater than 1")
+	errValidatorsNotSpecified = errors.New("validator information not specified")
+	errUnsupportedConsensus   = errors.New("specified consensusRaw not supported")
+	errInvalidEpochSize       = errors.New("epoch size must be greater than 1")
 )
 
 type genesisParams struct {
@@ -152,20 +148,9 @@ func (p *genesisParams) setValidatorSetFromCli() error {
 		return nil
 	}
 
-	var (
-		newValidators = validators.NewValidatorSetFromType(p.ibftValidatorType)
-		err           error
-	)
-
-	for _, s := range p.ibftValidatorsRaw {
-		validator, err := validators.ParseValidator(p.ibftValidatorType, s)
-		if err != nil {
-			return err
-		}
-
-		if err := newValidators.Add(validator); err != nil {
-			return err
-		}
+	newValidators, err := command.ParseValidators(p.ibftValidatorType, p.ibftValidatorsRaw)
+	if err != nil {
+		return err
 	}
 
 	if err = p.ibftValidators.Merge(newValidators); err != nil {
@@ -183,7 +168,7 @@ func (p *genesisParams) setValidatorSetFromPrefixPath() error {
 		return nil
 	}
 
-	validators, err := getValidatorsFromPrefixPath(
+	validators, err := command.GetValidatorsFromPrefixPath(
 		p.validatorPrefixPath,
 		p.ibftValidatorType,
 	)
@@ -226,7 +211,7 @@ func (p *genesisParams) initValidatorSet() error {
 
 	// Validate if validator number exceeds max number
 	if ok := p.isValidatorNumberValid(); !ok {
-		return errValidatorNumberExceedsMax
+		return command.ErrValidatorNumberExceedsMax
 	}
 
 	return nil
@@ -281,8 +266,9 @@ func (p *genesisParams) initConsensusEngineConfig() {
 func (p *genesisParams) initIBFTEngineMap(mechanism ibft.MechanismType) {
 	p.consensusEngineConfig = map[string]interface{}{
 		string(server.IBFTConsensus): map[string]interface{}{
-			"type":      mechanism,
-			"epochSize": p.epochSize,
+			"type":           mechanism,
+			"validator_type": p.ibftValidatorType,
+			"epochSize":      p.epochSize,
 		},
 	}
 }

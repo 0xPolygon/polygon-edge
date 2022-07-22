@@ -3,13 +3,15 @@ package ibftswitch
 import (
 	"errors"
 	"fmt"
+	"os"
+
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
-	"os"
+	"github.com/0xPolygon/polygon-edge/validators"
 )
 
 const (
@@ -30,20 +32,31 @@ var (
 )
 
 type switchParams struct {
-	typeRaw              string
-	fromRaw              string
-	deploymentRaw        string
-	maxValidatorCountRaw string
-	minValidatorCountRaw string
-	genesisPath          string
-
+	genesisPath   string
+	typeRaw       string
 	mechanismType ibft.MechanismType
-	deployment    *uint64
-	from          uint64
-	genesisConfig *chain.Chain
 
-	maxValidatorCount *uint64
-	minValidatorCount *uint64
+	// height
+	deploymentRaw string
+	deployment    *uint64
+	fromRaw       string
+	from          uint64
+
+	rawIBFTValidatorType string
+	ibftValidatorType    validators.ValidatorType
+
+	// PoA
+	ibftValidatorPrefixPath string
+	ibftValidatorsRaw       []string
+	ibftValidators          validators.ValidatorSet
+
+	// PoS
+	maxValidatorCountRaw string
+	maxValidatorCount    *uint64
+	minValidatorCountRaw string
+	minValidatorCount    *uint64
+
+	genesisConfig *chain.Chain
 }
 
 func (p *switchParams) getRequiredFlags() []string {
@@ -58,11 +71,23 @@ func (p *switchParams) initRawParams() error {
 		return err
 	}
 
+	if err := p.initIBFTValidatorType(); err != nil {
+		return err
+	}
+
 	if err := p.initDeployment(); err != nil {
 		return err
 	}
 
 	if err := p.initFrom(); err != nil {
+		return err
+	}
+
+	if err := p.initPoAConfig(); err != nil {
+		return err
+	}
+
+	if err := p.initPoSConfig(); err != nil {
 		return err
 	}
 
@@ -80,6 +105,18 @@ func (p *switchParams) initMechanismType() error {
 	}
 
 	p.mechanismType = mechanismType
+
+	return nil
+}
+
+func (p *switchParams) initIBFTValidatorType() error {
+	if p.rawIBFTValidatorType == "" {
+		return nil
+	}
+
+	if err := p.ibftValidatorType.FromString(p.rawIBFTValidatorType); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -104,14 +141,83 @@ func (p *switchParams) initDeployment() error {
 		p.deployment = &d
 	}
 
-	if p.minValidatorCountRaw != "" {
-		if p.mechanismType != ibft.PoS {
+	return nil
+}
+
+func (p *switchParams) initPoAConfig() error {
+	if p.mechanismType != ibft.PoA {
+		return nil
+	}
+
+	p.ibftValidators = validators.NewValidatorSetFromType(p.ibftValidatorType)
+
+	if err := p.setValidatorSetFromPrefixPath(); err != nil {
+		return err
+	}
+
+	if err := p.setValidatorSetFromCli(); err != nil {
+		return err
+	}
+
+	// Validate if validator number exceeds max number
+	if uint64(p.ibftValidators.Len()) > common.MaxSafeJSInt {
+		return command.ErrValidatorNumberExceedsMax
+	}
+
+	return nil
+}
+
+func (p *switchParams) setValidatorSetFromPrefixPath() error {
+	if p.ibftValidatorPrefixPath == "" {
+		return nil
+	}
+
+	validators, err := command.GetValidatorsFromPrefixPath(
+		p.ibftValidatorPrefixPath,
+		p.ibftValidatorType,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to read from prefix: %w", err)
+	}
+
+	if err := p.ibftValidators.Merge(validators); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// setValidatorSetFromCli sets validator set from cli command
+func (p *switchParams) setValidatorSetFromCli() error {
+	if len(p.ibftValidatorsRaw) == 0 {
+		return nil
+	}
+
+	newSet, err := command.ParseValidators(p.ibftValidatorType, p.ibftValidatorsRaw)
+	if err != nil {
+		return err
+	}
+
+	if err = p.ibftValidators.Merge(newSet); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (p *switchParams) initPoSConfig() error {
+	if p.mechanismType != ibft.PoS {
+		if p.minValidatorCountRaw != "" || p.maxValidatorCountRaw != "" {
 			return fmt.Errorf(
 				"doesn't support min validator count in %s",
 				string(p.mechanismType),
 			)
 		}
 
+		return nil
+	}
+
+	if p.minValidatorCountRaw != "" {
 		value, err := types.ParseUint64orHex(&p.minValidatorCountRaw)
 		if err != nil {
 			return fmt.Errorf(
@@ -124,13 +230,6 @@ func (p *switchParams) initDeployment() error {
 	}
 
 	if p.maxValidatorCountRaw != "" {
-		if p.mechanismType != ibft.PoS {
-			return fmt.Errorf(
-				"doesn't support max validator count in %s",
-				string(p.mechanismType),
-			)
-		}
-
 		value, err := types.ParseUint64orHex(&p.maxValidatorCountRaw)
 		if err != nil {
 			return fmt.Errorf(
@@ -142,11 +241,7 @@ func (p *switchParams) initDeployment() error {
 		p.maxValidatorCount = &value
 	}
 
-	if err := p.validateMinMaxValidatorNumber(); err != nil {
-		return err
-	}
-
-	return nil
+	return p.validateMinMaxValidatorNumber()
 }
 
 func (p *switchParams) validateMinMaxValidatorNumber() error {
@@ -205,8 +300,10 @@ func (p *switchParams) updateGenesisConfig() error {
 	return appendIBFTForks(
 		p.genesisConfig,
 		p.mechanismType,
+		p.ibftValidatorType,
 		p.from,
 		p.deployment,
+		p.ibftValidators,
 		p.maxValidatorCount,
 		p.minValidatorCount,
 	)
@@ -231,9 +328,10 @@ func (p *switchParams) overrideGenesisConfig() error {
 
 func (p *switchParams) getResult() command.CommandResult {
 	result := &IBFTSwitchResult{
-		Chain: p.genesisPath,
-		Type:  p.mechanismType,
-		From:  common.JSONNumber{Value: p.from},
+		Chain:         p.genesisPath,
+		Type:          p.mechanismType,
+		ValidatorType: p.ibftValidatorType,
+		From:          common.JSONNumber{Value: p.from},
 	}
 
 	if p.deployment != nil {
@@ -258,8 +356,12 @@ func (p *switchParams) getResult() command.CommandResult {
 func appendIBFTForks(
 	cc *chain.Chain,
 	mechanismType ibft.MechanismType,
+	validatorType validators.ValidatorType,
 	from uint64,
 	deployment *uint64,
+	// PoA
+	validators validators.ValidatorSet,
+	// PoS
 	maxValidatorCount *uint64,
 	minValidatorCount *uint64,
 ) error {
@@ -274,8 +376,10 @@ func appendIBFTForks(
 	}
 
 	lastFork := &ibftForks[len(ibftForks)-1]
-	if mechanismType == lastFork.Type {
-		return errors.New(`cannot specify same IBFT type to the last fork`)
+
+	if (mechanismType == lastFork.Type) &&
+		(lastFork.ValidatorType != nil && *lastFork.ValidatorType == validatorType) {
+		return errors.New(`cannot specify same IBFT type and validator type as the last fork`)
 	}
 
 	if from <= lastFork.From.Value {
@@ -285,11 +389,15 @@ func appendIBFTForks(
 	lastFork.To = &common.JSONNumber{Value: from - 1}
 
 	newFork := ibft.IBFTFork{
-		Type: mechanismType,
-		From: common.JSONNumber{Value: from},
+		Type:          mechanismType,
+		ValidatorType: &validatorType,
+		From:          common.JSONNumber{Value: from},
 	}
 
-	if mechanismType == ibft.PoS {
+	switch mechanismType {
+	case ibft.PoA:
+		newFork.Validators = validators
+	case ibft.PoS:
 		if deployment != nil {
 			newFork.Deployment = &common.JSONNumber{Value: *deployment}
 		}

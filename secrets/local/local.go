@@ -82,7 +82,7 @@ func (l *LocalSecretsManager) Setup() error {
 	l.secretPathMap[secrets.ValidatorBLSKey] = filepath.Join(
 		l.path,
 		secrets.ConsensusFolderLocal,
-		secrets.ValidatorBLSKey,
+		secrets.ValidatorBLSKeyLocal,
 	)
 
 	// baseDir/libp2p/libp2p.key
