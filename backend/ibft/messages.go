@@ -63,15 +63,8 @@ func (i *backendIBFT) BuildPrepareMessage(proposalHash []byte, view *protoIBFT.V
 	return i.signMessage(msg)
 }
 
-func (i *backendIBFT) BuildCommitMessage(proposal []byte, view *protoIBFT.View) *protoIBFT.Message {
-	block := &types.Block{}
-	if err := block.UnmarshalRLP(proposal); err != nil {
-		return nil
-	}
-
-	proposalHash := block.Header.Hash.Bytes()
-
-	seal, err := i.generateCommittedSeal(block.Header)
+func (i *backendIBFT) BuildCommitMessage(proposalHash []byte, view *protoIBFT.View) *protoIBFT.Message {
+	seal, err := i.generateCommittedSeal(proposalHash)
 	if err != nil {
 		return nil
 	}
@@ -100,9 +93,9 @@ func (i *backendIBFT) BuildRoundChangeMessage(height, round uint64) *protoIBFT.M
 	return i.signMessage(msg)
 }
 
-func (i *backendIBFT) generateCommittedSeal(header *types.Header) ([]byte, error) {
+func (i *backendIBFT) generateCommittedSeal(proposalHash []byte) ([]byte, error) {
 	commitHash := crypto.Keccak256(
-		header.Hash.Bytes(),
+		proposalHash,
 		[]byte{byte(protoIBFT.MessageType_COMMIT)},
 	)
 
