@@ -862,17 +862,14 @@ func (b *Blockchain) executeBlockTransactions(block *types.Block) (*BlockResult,
 
 // WriteBlock writes a single block to the local blockchain.
 // It doesn't do any kind of verification, only commits the block to the DB
-func (b *Blockchain) WriteBlock(block *types.Block, s string) error {
+func (b *Blockchain) WriteBlock(block *types.Block, source string) error {
 	b.writeLock.Lock()
 	defer b.writeLock.Unlock()
 
 	if block.Number() <= b.Header().Number {
-		b.logger.Info("block already inserted", "block", block.Number(), "source", s)
+		b.logger.Info("block already inserted", "block", block.Number(), "source", source)
 		return nil
 	}
-
-	// Log the information
-	b.logger.Info("write block", "num", block.Number(), "parent", block.ParentHash())
 
 	header := block.Header
 
@@ -881,11 +878,10 @@ func (b *Blockchain) WriteBlock(block *types.Block, s string) error {
 	}
 
 	// Write the header to the chain
-	evnt := &Event{}
+	evnt := &Event{Source: source}
 	if err := b.writeHeaderImpl(evnt, header); err != nil {
 		return err
 	}
-	evnt.Source = s
 
 	// Fetch the block receipts
 	blockReceipts, receiptsErr := b.extractBlockReceipts(block)
@@ -901,7 +897,6 @@ func (b *Blockchain) WriteBlock(block *types.Block, s string) error {
 	}
 
 	//	update snapshot
-	//	TODO: this can't be moved because Syncer is counting on it
 	if err := b.consensus.ProcessHeaders([]*types.Header{header}); err != nil {
 		return err
 	}
@@ -911,11 +906,11 @@ func (b *Blockchain) WriteBlock(block *types.Block, s string) error {
 	// Update the average gas price
 	b.updateGasPriceAvgWithBlock(block)
 
-	//	TODO: fix log
 	logArgs := []interface{}{
 		"number", header.Number,
+		"txs", len(block.Transactions),
 		"hash", header.Hash,
-		"txns", len(block.Transactions),
+		"parent", header.ParentHash,
 	}
 
 	if prevHeader, ok := b.GetHeaderByNumber(header.Number - 1); ok {
