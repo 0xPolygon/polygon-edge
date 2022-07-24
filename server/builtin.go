@@ -1,10 +1,10 @@
 package server
 
 import (
-	"github.com/0xPolygon/polygon-edge/backend"
-	consensusDev "github.com/0xPolygon/polygon-edge/backend/dev"
-	consensusDummy "github.com/0xPolygon/polygon-edge/backend/dummy"
-	consensusIBFT "github.com/0xPolygon/polygon-edge/backend/ibft"
+	"github.com/0xPolygon/polygon-edge/consensus"
+	consensusDev "github.com/0xPolygon/polygon-edge/consensus/dev"
+	consensusDummy "github.com/0xPolygon/polygon-edge/consensus/dummy"
+	consensusIBFT "github.com/0xPolygon/polygon-edge/consensus/ibft"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/secrets/awsssm"
 	"github.com/0xPolygon/polygon-edge/secrets/gcpssm"
@@ -20,7 +20,7 @@ const (
 	DummyConsensus ConsensusType = "dummy"
 )
 
-var consensusBackends = map[ConsensusType]backend.Factory{
+var consensusBackends = map[ConsensusType]consensus.Factory{
 	DevConsensus:   consensusDev.Factory,
 	IBFTConsensus:  consensusIBFT.Factory,
 	DummyConsensus: consensusDummy.Factory,

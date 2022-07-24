@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/backend/ibft"
-	ibftOp "github.com/0xPolygon/polygon-edge/backend/ibft/proto"
+	"github.com/0xPolygon/polygon-edge/consensus/ibft"
+	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/e2e/framework"
 	"github.com/0xPolygon/polygon-edge/types"

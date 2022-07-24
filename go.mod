@@ -2,10 +2,6 @@ module github.com/0xPolygon/polygon-edge
 
 go 1.17
 
-require github.com/Trapesys/go-ibft v0.0.0
-
-replace github.com/Trapesys/go-ibft => ../Trapesys/go-ibft
-
 require (
 	github.com/btcsuite/btcd v0.22.1
 	github.com/containerd/cgroups v1.0.4 // indirect
@@ -63,6 +59,8 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 	lukechampine.com/blake3 v1.1.7 // indirect
 )
+
+require github.com/0xPolygon/go-ibft v0.0.0-20220723161511-f0abb68d3324
 
 require (
 	cloud.google.com/go v0.102.0 // indirect

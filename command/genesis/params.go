@@ -4,10 +4,10 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/0xPolygon/polygon-edge/backend/ibft"
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
+	"github.com/0xPolygon/polygon-edge/consensus/ibft"
 	"github.com/0xPolygon/polygon-edge/contracts/staking"
 	stakingHelper "github.com/0xPolygon/polygon-edge/helper/staking"
 	"github.com/0xPolygon/polygon-edge/server"
@@ -282,7 +282,7 @@ func (p *genesisParams) initGenesisConfig() error {
 }
 
 func (p *genesisParams) shouldPredeployStakingSC() bool {
-	// If the backend selected is IBFT / Dev and the mechanism is Proof of Stake,
+	// If the consensus selected is IBFT / Dev and the mechanism is Proof of Stake,
 	// deploy the Staking SC
 	return p.isPos && (p.consensus == server.IBFTConsensus || p.consensus == server.DevConsensus)
 }

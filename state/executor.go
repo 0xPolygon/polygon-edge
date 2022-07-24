@@ -378,7 +378,7 @@ func (t *Transition) nonceCheck(msg *types.Transaction) error {
 	return nil
 }
 
-// errors that can originate in the backend rules checks of the apply method below
+// errors that can originate in the consensus rules checks of the apply method below
 // surfacing of these errors reject the transaction thus not including it in the block
 
 var (
@@ -417,7 +417,7 @@ func NewGasLimitReachedTransitionApplicationError(err error) *GasLimitReachedTra
 }
 
 func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, error) {
-	// First check this message satisfies all backend rules before
+	// First check this message satisfies all consensus rules before
 	// applying the message. The rules include these clauses
 	//
 	// 1. the nonce of the message caller is correct

@@ -2,9 +2,9 @@ package genesis
 
 import (
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/backend/ibft"
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
+	"github.com/0xPolygon/polygon-edge/consensus/ibft"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"io/ioutil"
@@ -106,8 +106,8 @@ func getValidatorsFromPrefixPath(prefix string) ([]types.Address, error) {
 			continue
 		}
 
-		// try to read key from the filepath/backend/<key> path
-		possibleConsensusPath := filepath.Join(path, "backend", ibft.IbftKeyName)
+		// try to read key from the filepath/consensus/<key> path
+		possibleConsensusPath := filepath.Join(path, "consensus", ibft.IbftKeyName)
 
 		// check if path exists
 		if _, err := os.Stat(possibleConsensusPath); os.IsNotExist(err) {

@@ -43,7 +43,7 @@ func (t *Transaction) MarshalStoreRLPTo(dst []byte) []byte {
 
 func (t *Transaction) MarshalStoreRLPWith(a *fastrlp.Arena) *fastrlp.Value {
 	vv := a.NewArray()
-	// backend part
+	// consensus part
 	vv.Set(t.MarshalRLPWith(a))
 	// context part
 	vv.Set(a.NewBytes(t.From.Bytes()))

@@ -67,6 +67,7 @@ func (s *syncer) Start() error {
 	s.syncPeerService.Start()
 
 	s.initializePeerMap()
+
 	go s.startPeerStatusUpdateProcess()
 	go s.startPeerConnectionEventProcess()
 
@@ -187,6 +188,7 @@ func (s *syncer) BulkSync(newBlockCallback func(*types.Block) bool) error {
 		if bestPeer == nil || bestPeer.Number <= localLatest {
 			s.logger.Info("best peer not found ")
 			fmt.Println(bestPeer)
+
 			break
 		}
 

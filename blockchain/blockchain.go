@@ -90,7 +90,7 @@ type Verifier interface {
 	PreStateCommit(header *types.Header, txn *state.Transition) error
 }
 
-// 	TODO: this should be part of Verifier (backend)
+// 	TODO: this should be part of Verifier (consensus)
 type Executor interface {
 	ProcessBlock(parentRoot types.Hash, block *types.Block, blockCreator types.Address) (*state.Transition, error)
 }
@@ -303,7 +303,7 @@ func (b *Blockchain) GetConsensus() Verifier {
 	return b.consensus
 }
 
-// SetConsensus sets the backend
+// SetConsensus sets the consensus
 func (b *Blockchain) SetConsensus(c Verifier) {
 	b.consensus = c
 }
@@ -661,7 +661,7 @@ func (b *Blockchain) WriteHeadersWithBodies(headers []*types.Header) error {
 }
 
 // VerifyPotentialBlock does the minimal block verification without consulting the
-// backend layer. Should only be used if backend checks are done
+// consensus layer. Should only be used if consensus checks are done
 // outside the method call
 func (b *Blockchain) VerifyPotentialBlock(block *types.Block) error {
 	// Do just the initial block verification
@@ -671,7 +671,7 @@ func (b *Blockchain) VerifyPotentialBlock(block *types.Block) error {
 // VerifyFinalizedBlock verifies that the block is valid by performing a series of checks.
 // It is assumed that the block status is sealed (committed)
 func (b *Blockchain) VerifyFinalizedBlock(block *types.Block) error {
-	// Make sure the backend layer verifies this block header
+	// Make sure the consensus layer verifies this block header
 	if err := b.consensus.VerifyHeader(block.Header); err != nil {
 		return fmt.Errorf("failed to verify the header: %w", err)
 	}
@@ -868,6 +868,7 @@ func (b *Blockchain) WriteBlock(block *types.Block, source string) error {
 
 	if block.Number() <= b.Header().Number {
 		b.logger.Info("block already inserted", "block", block.Number(), "source", source)
+
 		return nil
 	}
 

@@ -5,7 +5,7 @@ import (
 	"math/big"
 	"path/filepath"
 
-	"github.com/0xPolygon/polygon-edge/backend/ibft"
+	"github.com/0xPolygon/polygon-edge/consensus/ibft"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -35,11 +35,11 @@ type TestServerConfig struct {
 	IBFTDir                 string               // The name of data directory for IBFT
 	PremineAccts            []*SrvAccount        // Accounts with existing balances (genesis accounts)
 	GenesisValidatorBalance *big.Int             // Genesis the balance for the validators
-	DevStakers              []types.Address      // List of initial staking addresses for the staking SC with dev backend
+	DevStakers              []types.Address      // List of initial staking addresses for the staking SC with dev consensus
 	Consensus               ConsensusType        // Consensus MechanismType
 	Bootnodes               []string             // Bootnode Addresses
 	PriceLimit              *uint64              // Minimum gas price limit to enforce for acceptance into the pool
-	DevInterval             int                  // Dev backend update interval [s]
+	DevInterval             int                  // Dev consensus update interval [s]
 	EpochSize               uint64               // The epoch size in blocks for the IBFT layer
 	BlockGasLimit           uint64               // Block gas limit
 	BlockGasTarget          uint64               // Gas target for new blocks
@@ -76,7 +76,7 @@ func (t *TestServerConfig) SetIBFTBaseTimeout(baseTimeout uint64) {
 
 // PrivateKey returns a private key in data directory
 func (t *TestServerConfig) PrivateKey() (*ecdsa.PrivateKey, error) {
-	return crypto.GenerateOrReadPrivateKey(filepath.Join(t.DataDir(), "backend", ibft.IbftKeyName))
+	return crypto.GenerateOrReadPrivateKey(filepath.Join(t.DataDir(), "consensus", ibft.IbftKeyName))
 }
 
 // CALLBACKS //
@@ -103,19 +103,19 @@ func (t *TestServerConfig) SetBlockGasTarget(target uint64) {
 	t.BlockGasTarget = target
 }
 
-// SetConsensus callback sets backend
+// SetConsensus callback sets consensus
 func (t *TestServerConfig) SetConsensus(c ConsensusType) {
 	t.Consensus = c
 }
 
-// SetDevInterval sets the update interval for the dev backend
+// SetDevInterval sets the update interval for the dev consensus
 func (t *TestServerConfig) SetDevInterval(interval int) {
 	t.DevInterval = interval
 }
 
 // SetDevStakingAddresses sets the Staking smart contract staker addresses for the dev mode.
 // These addresses should be passed into the `ibft-validator` flag in genesis generation.
-// Since invoking the dev backend will not generate the ibft base folders, this is the only way
+// Since invoking the dev consensus will not generate the ibft base folders, this is the only way
 // to signalize to the genesis creation process who the validators are
 func (t *TestServerConfig) SetDevStakingAddresses(stakingAddresses []types.Address) {
 	t.DevStakers = stakingAddresses
@@ -161,7 +161,7 @@ func (t *TestServerConfig) SetShowsLog(f bool) {
 	t.ShowsLog = f
 }
 
-// SetEpochSize sets the epoch size for the backend layer.
+// SetEpochSize sets the epoch size for the consensus layer.
 // It controls the rate at which the validator set is updated
 func (t *TestServerConfig) SetEpochSize(epochSize uint64) {
 	t.EpochSize = epochSize

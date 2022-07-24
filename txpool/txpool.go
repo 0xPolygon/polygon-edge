@@ -117,7 +117,7 @@ type promoteRequest struct {
 // - 2. Promoted	(exit point)
 // 	(both queues are min nonce ordered)
 //
-// When backend needs to process promoted transactions,
+// When consensus needs to process promoted transactions,
 // the pool generates a queue of "executable" transactions. These
 // transactions are the first-in-line of some promoted queue,
 // ready to be written to the state (primaries).

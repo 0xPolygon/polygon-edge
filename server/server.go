@@ -11,9 +11,9 @@ import (
 	"path/filepath"
 
 	"github.com/0xPolygon/polygon-edge/archive"
-	"github.com/0xPolygon/polygon-edge/backend"
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/keccak"
@@ -42,7 +42,7 @@ type Server struct {
 	state        state.State
 	stateStorage itrie.Storage
 
-	consensus backend.Backend
+	consensus consensus.Consensus
 
 	// blockchain stack
 	blockchain *blockchain.Blockchain
@@ -223,21 +223,21 @@ func NewServer(config *Config) (*Server, error) {
 	}
 
 	{
-		// Setup backend
+		// Setup consensus
 		if err := m.setupConsensus(); err != nil {
 			return nil, err
 		}
 		m.blockchain.SetConsensus(m.consensus)
 	}
 
-	// after backend is done, we can mine the genesis block in blockchain
-	// This is done because backend might use a custom Hash function so we need
-	// to wait for backend because we do any block hashing like genesis
+	// after consensus is done, we can mine the genesis block in blockchain
+	// This is done because consensus might use a custom Hash function so we need
+	// to wait for consensus because we do any block hashing like genesis
 	if err := m.blockchain.ComputeGenesis(); err != nil {
 		return nil, err
 	}
 
-	// initialize data in backend layer
+	// initialize data in consensus layer
 	if err := m.consensus.Initialize(); err != nil {
 		return nil, err
 	}
@@ -261,7 +261,7 @@ func NewServer(config *Config) (*Server, error) {
 		return nil, err
 	}
 
-	// start backend
+	// start consensus
 	if err := m.consensus.Start(); err != nil {
 		return nil, err
 	}
@@ -377,7 +377,7 @@ func (s *Server) setupConsensus() error {
 	engine, ok := consensusBackends[ConsensusType(engineName)]
 
 	if !ok {
-		return fmt.Errorf("backend engine '%s' not found", engineName)
+		return fmt.Errorf("consensus engine '%s' not found", engineName)
 	}
 
 	engineConfig, ok := s.config.Chain.Params.Engine[engineName].(map[string]interface{})
@@ -385,14 +385,14 @@ func (s *Server) setupConsensus() error {
 		engineConfig = map[string]interface{}{}
 	}
 
-	config := &backend.Config{
+	config := &consensus.Config{
 		Params: s.config.Chain.Params,
 		Config: engineConfig,
-		Path:   filepath.Join(s.config.DataDir, "backend"),
+		Path:   filepath.Join(s.config.DataDir, "consensus"),
 	}
 
 	consensus, err := engine(
-		&backend.BackendParams{
+		&consensus.Params{
 			Context:         context.Background(),
 			Seal:            s.config.Seal,
 			Config:          config,
@@ -426,7 +426,7 @@ type jsonRPCHub struct {
 	*txpool.TxPool
 	*state.Executor
 	*network.Server
-	backend.Backend
+	consensus.Consensus
 }
 
 // HELPER + WRAPPER METHODS //
@@ -524,8 +524,8 @@ func (j *jsonRPCHub) GetSyncProgression() *progress.Progression {
 		return restoreProg
 	}
 
-	// backend sync progression
-	if consensusSyncProg := j.Backend.GetSyncProgression(); consensusSyncProg != nil {
+	// consensus sync progression
+	if consensusSyncProg := j.Consensus.GetSyncProgression(); consensusSyncProg != nil {
 		return consensusSyncProg
 	}
 
@@ -542,7 +542,7 @@ func (s *Server) setupJSONRPC() error {
 		Blockchain:         s.blockchain,
 		TxPool:             s.txpool,
 		Executor:           s.executor,
-		Backend:            s.consensus,
+		Consensus:          s.consensus,
 		Server:             s.network,
 	}
 
@@ -594,7 +594,7 @@ func (s *Server) JoinPeer(rawPeerMultiaddr string) error {
 	return s.network.JoinPeer(rawPeerMultiaddr)
 }
 
-// Close closes the Minimal server (blockchain, networking, backend)
+// Close closes the Minimal server (blockchain, networking, consensus)
 func (s *Server) Close() {
 	// Close the blockchain layer
 	if err := s.blockchain.Close(); err != nil {
@@ -606,9 +606,9 @@ func (s *Server) Close() {
 		s.logger.Error("failed to close networking", "err", err.Error())
 	}
 
-	// Close the backend layer
+	// Close the consensus layer
 	if err := s.consensus.Close(); err != nil {
-		s.logger.Error("failed to close backend", "err", err.Error())
+		s.logger.Error("failed to close consensus", "err", err.Error())
 	}
 
 	// Close the state storage
@@ -626,7 +626,7 @@ func (s *Server) Close() {
 	s.txpool.Close()
 }
 
-// Entry is a backend configuration entry
+// Entry is a consensus configuration entry
 type Entry struct {
 	Enabled bool
 	Config  map[string]interface{}

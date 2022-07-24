@@ -38,7 +38,7 @@ const (
 
 // Define constant folder names for the local StorageManager
 const (
-	ConsensusFolderLocal = "backend"
+	ConsensusFolderLocal = "consensus"
 	NetworkFolderLocal   = "libp2p"
 )
 
