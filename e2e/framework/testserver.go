@@ -599,15 +599,11 @@ func (t *TestServer) GetGasTotal(txHashes []ethgo.Hash) uint64 {
 
 func (t *TestServer) WaitForReady(ctx context.Context) error {
 	_, err := tests.RetryUntilTimeout(ctx, func() (interface{}, bool) {
-		num, err := t.GetLatestBlockHeight()
-		if err != nil {
-			return nil, true
-		}
-		if num == 0 {
+		if _, err := t.GetLatestBlockHeight(); err != nil {
 			return nil, true
 		}
 
-		return num, false
+		return nil, false
 	})
 
 	return err
