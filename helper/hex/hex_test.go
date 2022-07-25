@@ -10,6 +10,8 @@ import (
 // TestEncodeDecodeUint64 verifies that uint64 values
 // are properly encoded and decoded from hex
 func TestEncodeDecodeUint64(t *testing.T) {
+	t.Parallel()
+
 	generateRandomNumbers := func(count int) []uint64 {
 		numbers := make([]uint64, count)
 
