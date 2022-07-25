@@ -803,16 +803,12 @@ func (e *Eth) GetFilterChanges(id string) (interface{}, error) {
 
 // UninstallFilter uninstalls a filter with given ID
 func (e *Eth) UninstallFilter(id string) (bool, error) {
-	ok := e.filterManager.Uninstall(id)
-
-	return ok, nil
+	return e.filterManager.Uninstall(id), nil
 }
 
 // Unsubscribe uninstalls a filter in a websocket
 func (e *Eth) Unsubscribe(id string) (bool, error) {
-	ok := e.filterManager.Uninstall(id)
-
-	return ok, nil
+	return e.filterManager.Uninstall(id), nil
 }
 
 func (e *Eth) getBlockHeader(number BlockNumber) (*types.Header, error) {

@@ -143,10 +143,11 @@ var wsUpgrader = websocket.Upgrader{
 
 // wsWrapper is a wrapping object for the web socket connection and logger
 type wsWrapper struct {
-	ws        *websocket.Conn // the actual WS connection
-	logger    hclog.Logger    // module logger
-	writeLock sync.Mutex      // writer lock
-	filterID  string          // filter ID
+	sync.Mutex
+
+	ws       *websocket.Conn // the actual WS connection
+	logger   hclog.Logger    // module logger
+	filterID string          // filter ID
 }
 
 func (w *wsWrapper) SetFilterID(filterID string) {
@@ -159,8 +160,8 @@ func (w *wsWrapper) GetFilterID() string {
 
 // WriteMessage writes out the message to the WS peer
 func (w *wsWrapper) WriteMessage(messageType int, data []byte) error {
-	w.writeLock.Lock()
-	defer w.writeLock.Unlock()
+	w.Lock()
+	defer w.Unlock()
 	writeErr := w.ws.WriteMessage(messageType, data)
 
 	if writeErr != nil {
