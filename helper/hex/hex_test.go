@@ -1,20 +1,31 @@
 package hex
 
 import (
+	"crypto/rand"
 	"github.com/stretchr/testify/assert"
+	"math/big"
 	"testing"
 )
 
-const (
-	minUint64 uint64 = 0
-	maxUint64 uint64 = 18446744073709551615
-)
+// TestEncodeDecodeUint64 verifies that uint64 values
+// are properly encoded and decoded from hex
+func TestEncodeDecodeUint64(t *testing.T) {
+	generateRandomNumbers := func(count int) []uint64 {
+		numbers := make([]uint64, count)
 
-func TestEncodingUint64(t *testing.T) {
-	// random uint64 array, min and max included
-	uint64Array := [10]uint64{minUint64, 30073, 67312, 71762, 11, 80604, 45403, 1, 298, maxUint64}
+		for index := 0; index < count; index++ {
+			randNum, _ := rand.Int(
+				rand.Reader,
+				big.NewInt(int64(count)),
+			)
 
-	for _, value := range uint64Array {
+			numbers[index] = randNum.Uint64()
+		}
+
+		return numbers
+	}
+
+	for _, value := range generateRandomNumbers(100) {
 		encodedValue := EncodeUint64(value)
 
 		decodedValue, err := DecodeUint64(encodedValue)

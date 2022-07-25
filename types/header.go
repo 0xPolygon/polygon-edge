@@ -32,7 +32,7 @@ type Header struct {
 	Hash         Hash    `json:"hash"`
 }
 
-// HeaderJson represents a block header used for json calls
+// headerJSON represents a block header used for json calls
 type headerJSON struct {
 	ParentHash   Hash    `json:"parentHash"`
 	Sha3Uncles   Hash    `json:"sha3Uncles"`
@@ -96,33 +96,27 @@ func (h *Header) UnmarshalJSON(input []byte) error {
 
 	var err error
 
-	h.Difficulty, err = hex.DecodeUint64(header.Difficulty)
-	if err != nil {
+	if h.Difficulty, err = hex.DecodeUint64(header.Difficulty); err != nil {
 		return err
 	}
 
-	h.Number, err = hex.DecodeUint64(header.Number)
-	if err != nil {
+	if h.Number, err = hex.DecodeUint64(header.Number); err != nil {
 		return err
 	}
 
-	h.GasLimit, err = hex.DecodeUint64(header.GasLimit)
-	if err != nil {
+	if h.GasLimit, err = hex.DecodeUint64(header.GasLimit); err != nil {
 		return err
 	}
 
-	h.GasUsed, err = hex.DecodeUint64(header.GasUsed)
-	if err != nil {
+	if h.GasUsed, err = hex.DecodeUint64(header.GasUsed); err != nil {
 		return err
 	}
 
-	h.Timestamp, err = hex.DecodeUint64(header.Timestamp)
-	if err != nil {
+	if h.Timestamp, err = hex.DecodeUint64(header.Timestamp); err != nil {
 		return err
 	}
 
-	h.ExtraData, err = hex.DecodeHex(header.ExtraData)
-	if err != nil {
+	if h.ExtraData, err = hex.DecodeHex(header.ExtraData); err != nil {
 		return err
 	}
 
@@ -177,8 +171,10 @@ func (n Nonce) MarshalText() ([]byte, error) {
 }
 
 func (n *Nonce) UnmarshalText(input []byte) error {
-	input = RemoveHexPrefixFromByteArray(input)
-	if _, err := goHex.Decode(n[:], input); err != nil {
+	if _, err := goHex.Decode(
+		n[:],
+		hex.DropHexPrefix(input),
+	); err != nil {
 		return err
 	}
 
