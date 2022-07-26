@@ -1,6 +1,7 @@
 package ibft
 
 import (
+	"github.com/0xPolygon/polygon-edge/crypto"
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/types"
@@ -21,11 +22,11 @@ func TestSign_Sealer(t *testing.T) {
 	// non-validator address
 	pool.add("X")
 
-	badSealedBlock, _ := writeSeal(pool.get("X").priv, h)
+	badSealedBlock, _ := writeProposerSeal(pool.get("X").priv, h)
 	assert.Error(t, verifySigner(snap, badSealedBlock))
 
 	// seal the block with a validator
-	goodSealedBlock, _ := writeSeal(pool.get("A").priv, h)
+	goodSealedBlock, _ := writeProposerSeal(pool.get("A").priv, h)
 	assert.NoError(t, verifySigner(snap, goodSealedBlock))
 }
 
@@ -47,7 +48,7 @@ func TestSign_CommittedSeals(t *testing.T) {
 		seals := [][]byte{}
 
 		for _, accnt := range accnt {
-			seal, err := writeCommittedSeal(pool.get(accnt).priv, h)
+			seal, err := crypto.Sign(pool.get(accnt).priv, crypto.Keccak256(h.Hash.Bytes()))
 
 			assert.NoError(t, err)
 

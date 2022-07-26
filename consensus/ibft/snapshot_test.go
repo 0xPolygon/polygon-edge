@@ -51,7 +51,7 @@ func (t *testerAccount) Address() types.Address {
 }
 
 func (t *testerAccount) sign(h *types.Header) *types.Header {
-	h, _ = writeSeal(t.priv, h)
+	h, _ = writeProposerSeal(t.priv, h)
 
 	return h
 }

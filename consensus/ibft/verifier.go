@@ -69,12 +69,15 @@ func (i *backendIBFT) IsValidBlock(proposal []byte) bool {
 }
 
 func (i *backendIBFT) IsValidSender(msg *protoIBFT.Message) bool {
-	raw, err := msg.PayloadNoSig()
+	msgNoSig, err := msg.PayloadNoSig()
 	if err != nil {
 		return false
 	}
 
-	validatorAddress, err := ecrecoverImpl(msg.Signature, raw)
+	validatorAddress, err := ecrecoverImpl(
+		msg.Signature,
+		crypto.Keccak256(msgNoSig),
+	)
 	if err != nil {
 		return false
 	}
@@ -115,13 +118,8 @@ func (i *backendIBFT) IsValidProposalHash(proposal, hash []byte) bool {
 }
 
 func (i *backendIBFT) IsValidCommittedSeal(proposalHash, seal []byte) bool {
-	//	seal was generated based on the proposal hash and commit message type
-	commitHash := crypto.Keccak256(
-		proposalHash,
-		[]byte{byte(protoIBFT.MessageType_COMMIT)},
-	)
-
-	validator, err := ecrecoverImpl(seal, commitHash)
+	//	seal was generated based on the proposal hash
+	validator, err := ecrecoverImpl(seal, crypto.Keccak256(proposalHash))
 	if err != nil {
 		i.logger.Error("unable to recover seal", "err", err)
 
@@ -144,7 +142,7 @@ func extractProposer(header *types.Header) types.Address {
 		return types.Address{}
 	}
 
-	proposer, _ := ecrecoverFromHeader(header)
+	proposer, _ := ecrecoverProposer(header)
 
 	return proposer
 }

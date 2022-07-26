@@ -11,7 +11,7 @@ import (
 )
 
 func ecrecoverImpl(sig, msg []byte) (types.Address, error) {
-	pub, err := crypto.RecoverPubkey(sig, crypto.Keccak256(msg))
+	pub, err := crypto.RecoverPubkey(sig, msg)
 	if err != nil {
 		return types.Address{}, err
 	}
@@ -19,45 +19,34 @@ func ecrecoverImpl(sig, msg []byte) (types.Address, error) {
 	return crypto.PubKeyToAddress(pub), nil
 }
 
-func ecrecoverFromHeader(h *types.Header) (types.Address, error) {
+func ecrecoverProposer(h *types.Header) (types.Address, error) {
 	// get the extra part that contains the seal
 	extra, err := getIbftExtra(h)
 	if err != nil {
 		return types.Address{}, err
 	}
-	// get the sig
-	msg, err := calculateHeaderHash(h)
+
+	// Calculate the header hash (keccak of RLP)
+	hash, err := calculateHeaderHash(h)
 	if err != nil {
 		return types.Address{}, err
 	}
 
-	return ecrecoverImpl(extra.ProposerSeal, msg)
+	return ecrecoverImpl(extra.ProposerSeal, hash)
 }
 
-func signSealImpl(prv *ecdsa.PrivateKey, h *types.Header, committed bool) ([]byte, error) {
+func signSealImpl(prv *ecdsa.PrivateKey, h *types.Header) ([]byte, error) {
 	hash, err := calculateHeaderHash(h)
 	if err != nil {
 		return nil, err
 	}
 
-	// if we are singing the committed seals we need to do something more
-	msg := hash
-	if committed {
-		msg = crypto.Keccak256(hash)
-	}
-
-	seal, err := crypto.Sign(prv, crypto.Keccak256(msg))
-
-	if err != nil {
-		return nil, err
-	}
-
-	return seal, nil
+	return crypto.Sign(prv, hash)
 }
 
-func writeSeal(prv *ecdsa.PrivateKey, h *types.Header) (*types.Header, error) {
+func writeProposerSeal(prv *ecdsa.PrivateKey, h *types.Header) (*types.Header, error) {
 	h = h.Copy()
-	seal, err := signSealImpl(prv, h, false)
+	seal, err := signSealImpl(prv, h)
 
 	if err != nil {
 		return nil, err
@@ -74,10 +63,6 @@ func writeSeal(prv *ecdsa.PrivateKey, h *types.Header) (*types.Header, error) {
 	}
 
 	return h, nil
-}
-
-func writeCommittedSeal(prv *ecdsa.PrivateKey, h *types.Header) ([]byte, error) {
-	return signSealImpl(prv, h, true)
 }
 
 func writeCommittedSeals(h *types.Header, seals [][]byte) (*types.Header, error) {
@@ -145,7 +130,7 @@ func calculateHeaderHash(h *types.Header) ([]byte, error) {
 }
 
 func verifySigner(snap *Snapshot, header *types.Header) error {
-	signer, err := ecrecoverFromHeader(header)
+	signer, err := ecrecoverProposer(header)
 	if err != nil {
 		return err
 	}
@@ -173,19 +158,12 @@ func verifyCommittedFields(
 		return fmt.Errorf("empty committed seals")
 	}
 
-	// get the message that needs to be signed
-	// this not signing! just removing the fields that should be signed
-	hash, err := calculateHeaderHash(header)
-	if err != nil {
-		return err
-	}
-
-	rawMsg := crypto.Keccak256(hash)
+	headerHash := crypto.Keccak256(header.Hash.Bytes())
 
 	visited := map[types.Address]struct{}{}
 
 	for _, seal := range extra.CommittedSeal {
-		addr, err := ecrecoverImpl(seal, rawMsg)
+		addr, err := ecrecoverImpl(seal, headerHash)
 		if err != nil {
 			return err
 		}

@@ -187,7 +187,6 @@ func (s *syncer) BulkSync(newBlockCallback func(*types.Block) bool) error {
 		bestPeer := s.peerMap.BestPeer(skipList)
 		if bestPeer == nil || bestPeer.Number <= localLatest {
 			s.logger.Info("best peer not found ")
-			fmt.Println(bestPeer)
 
 			break
 		}

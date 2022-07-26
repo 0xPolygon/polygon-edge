@@ -167,7 +167,7 @@ func (i *backendIBFT) buildBlock(snap *Snapshot, parent *types.Header) (*types.B
 	})
 
 	// write the seal of the block after all the fields are completed
-	header, err = writeSeal(i.validatorKey, block.Header)
+	header, err = writeProposerSeal(i.validatorKey, block.Header)
 	if err != nil {
 		return nil, err
 	}

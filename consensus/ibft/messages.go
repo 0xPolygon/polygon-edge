@@ -40,11 +40,13 @@ func (i *backendIBFT) BuildPrePrepareMessage(
 		View: view,
 		From: i.ID(),
 		Type: protoIBFT.MessageType_PREPREPARE,
-		Payload: &protoIBFT.Message_PreprepareData{PreprepareData: &protoIBFT.PrePrepareMessage{
-			Proposal:     proposal,
-			ProposalHash: proposalHash,
-			Certificate:  certificate,
-		}},
+		Payload: &protoIBFT.Message_PreprepareData{
+			PreprepareData: &protoIBFT.PrePrepareMessage{
+				Proposal:     proposal,
+				ProposalHash: proposalHash,
+				Certificate:  certificate,
+			},
+		},
 	}
 
 	return i.signMessage(msg)
@@ -55,9 +57,11 @@ func (i *backendIBFT) BuildPrepareMessage(proposalHash []byte, view *protoIBFT.V
 		View: view,
 		From: i.ID(),
 		Type: protoIBFT.MessageType_PREPARE,
-		Payload: &protoIBFT.Message_PrepareData{PrepareData: &protoIBFT.PrepareMessage{
-			ProposalHash: proposalHash,
-		}},
+		Payload: &protoIBFT.Message_PrepareData{
+			PrepareData: &protoIBFT.PrepareMessage{
+				ProposalHash: proposalHash,
+			},
+		},
 	}
 
 	return i.signMessage(msg)
@@ -73,10 +77,12 @@ func (i *backendIBFT) BuildCommitMessage(proposalHash []byte, view *protoIBFT.Vi
 		View: view,
 		From: i.ID(),
 		Type: protoIBFT.MessageType_COMMIT,
-		Payload: &protoIBFT.Message_CommitData{CommitData: &protoIBFT.CommitMessage{
-			ProposalHash:  proposalHash,
-			CommittedSeal: seal,
-		}},
+		Payload: &protoIBFT.Message_CommitData{
+			CommitData: &protoIBFT.CommitMessage{
+				ProposalHash:  proposalHash,
+				CommittedSeal: seal,
+			},
+		},
 	}
 
 	return i.signMessage(msg)
@@ -101,12 +107,7 @@ func (i *backendIBFT) BuildRoundChangeMessage(
 }
 
 func (i *backendIBFT) generateCommittedSeal(proposalHash []byte) ([]byte, error) {
-	commitHash := crypto.Keccak256(
-		proposalHash,
-		[]byte{byte(protoIBFT.MessageType_COMMIT)},
-	)
-
-	seal, err := crypto.Sign(i.validatorKey, crypto.Keccak256(commitHash))
+	seal, err := crypto.Sign(i.validatorKey, crypto.Keccak256(proposalHash))
 	if err != nil {
 		return nil, err
 	}

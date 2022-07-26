@@ -497,18 +497,18 @@ func (i *backendIBFT) VerifyHeader(header *types.Header) error {
 		)
 	}
 
-	snap := i.getSnapshot(parent.Number)
-	if snap == nil {
+	parentSnap := i.getSnapshot(parent.Number)
+	if parentSnap == nil {
 		return errParentSnapshotNotFound
 	}
 
 	// verify all the header fields + seal
-	if err := i.verifyHeaderImpl(snap, parent, header); err != nil {
+	if err := i.verifyHeaderImpl(parentSnap, parent, header); err != nil {
 		return err
 	}
 
 	// verify the committed seals
-	if err := verifyCommittedFields(snap, header, i.quorumSize(header.Number)); err != nil {
+	if err := verifyCommittedFields(parentSnap, header, i.quorumSize(header.Number)); err != nil {
 		return err
 	}
 
@@ -533,7 +533,7 @@ func (i *backendIBFT) ProcessHeaders(headers []*types.Header) error {
 
 // GetBlockCreator retrieves the block signer from the extra data field
 func (i *backendIBFT) GetBlockCreator(header *types.Header) (types.Address, error) {
-	return ecrecoverFromHeader(header)
+	return ecrecoverProposer(header)
 }
 
 // PreStateCommit a hook to be called before finalizing state transition on inserting block

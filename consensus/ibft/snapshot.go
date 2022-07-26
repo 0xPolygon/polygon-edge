@@ -168,7 +168,7 @@ func (i *backendIBFT) processHeaders(headers []*types.Header) error {
 	}
 
 	for _, h := range headers {
-		proposer, err := ecrecoverFromHeader(h)
+		proposer, err := ecrecoverProposer(h)
 		if err != nil {
 			return err
 		}
