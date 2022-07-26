@@ -113,6 +113,7 @@ func Test_GetLogsForQuery(t *testing.T) {
 	store.appendBlocksToStore(blocks)
 
 	f := NewFilterManager(hclog.NewNullLogger(), store)
+	defer f.Close()
 
 	for _, testCase := range testTable {
 		testCase := testCase
@@ -139,6 +140,7 @@ func Test_GetLogFilterFromID(t *testing.T) {
 	store := newMockStore()
 
 	m := NewFilterManager(hclog.NewNullLogger(), store)
+	defer m.Close()
 
 	go m.Run()
 
@@ -159,6 +161,8 @@ func TestFilterLog(t *testing.T) {
 	store := newMockStore()
 
 	m := NewFilterManager(hclog.NewNullLogger(), store)
+	defer m.Close()
+
 	go m.Run()
 
 	id := m.NewLogFilter(&LogQuery{
@@ -219,6 +223,8 @@ func TestFilterBlock(t *testing.T) {
 	store := newMockStore()
 
 	m := NewFilterManager(hclog.NewNullLogger(), store)
+	defer m.Close()
+
 	go m.Run()
 
 	// add block filter
@@ -280,6 +286,8 @@ func TestFilterTimeout(t *testing.T) {
 	store := newMockStore()
 
 	m := NewFilterManager(hclog.NewNullLogger(), store)
+	defer m.Close()
+
 	m.timeout = 2 * time.Second
 
 	go m.Run()
@@ -300,6 +308,8 @@ func TestRemoveFilterByWebsocket(t *testing.T) {
 	}
 
 	m := NewFilterManager(hclog.NewNullLogger(), store)
+	defer m.Close()
+
 	go m.Run()
 
 	id := m.NewBlockFilter(mock)
@@ -318,6 +328,8 @@ func TestFilterWebsocket(t *testing.T) {
 	}
 
 	m := NewFilterManager(hclog.NewNullLogger(), store)
+	defer m.Close()
+
 	go m.Run()
 
 	id := m.NewBlockFilter(mock)
@@ -401,6 +413,7 @@ func TestClosedFilterDeletion(t *testing.T) {
 	store := newMockStore()
 
 	m := NewFilterManager(hclog.NewNullLogger(), store)
+	defer m.Close()
 
 	go m.Run()
 
