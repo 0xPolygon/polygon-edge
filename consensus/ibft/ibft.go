@@ -117,7 +117,12 @@ func (i *Ibft) runHook(hookName HookType, height uint64, hookParam interface{}) 
 
 		// Run the hook
 		if err := hook(hookParam); err != nil {
-			return fmt.Errorf("error occurred during a call of %s hook in %s: %w", hookName, mechanism.GetType(), err)
+			return fmt.Errorf(
+				"error occurred during a call of %s hook in %s: %w",
+				hookName,
+				mechanism.GetType(),
+				err,
+			)
 		}
 	}
 
@@ -893,6 +898,8 @@ func (i *Ibft) runAcceptState() { // start new round
 			}
 
 			if hookErr := i.runHook(VerifyBlockHook, block.Number(), block); hookErr != nil {
+				// Not linting this as the underlying error is actually wrapped
+				// nolint:govet
 				if errors.As(hookErr, &errBlockVerificationFailed) {
 					i.logger.Error("block verification failed, block at the end of epoch has transactions")
 					i.handleStateErr(errBlockVerificationFailed)
