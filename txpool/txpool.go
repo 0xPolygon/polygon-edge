@@ -456,7 +456,7 @@ func (p *TxPool) processEvent(event *blockchain.Event) {
 		// remove mined txs from the lookup map
 		p.index.remove(block.Transactions...)
 
-		// etract latest nonces
+		// Extract latest nonces
 		for _, tx := range block.Transactions {
 			addr := tx.From
 

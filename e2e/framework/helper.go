@@ -31,7 +31,7 @@ import (
 )
 
 var (
-	DefaultTimeout = time.Second * 10
+	DefaultTimeout = time.Minute
 )
 
 type AtomicErrors struct {
@@ -205,7 +205,7 @@ func GetStakedAmount(from types.Address, rpcClient *jsonrpc.Client) (*big.Int, e
 }
 
 func EcrecoverFromBlockhash(hash types.Hash, signature []byte) (types.Address, error) {
-	pubKey, err := crypto.RecoverPubkey(signature, crypto.Keccak256(hash.Bytes()))
+	pubKey, err := crypto.RecoverPubkey(signature, hash.Bytes())
 	if err != nil {
 		return types.Address{}, err
 	}

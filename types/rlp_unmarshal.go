@@ -292,14 +292,14 @@ func (t *Transaction) UnmarshalRLP(input []byte) error {
 	return UnmarshalRlp(t.UnmarshalRLPFrom, input)
 }
 
-// UnmarshalRLP unmarshals a Transaction in RLP format
+// UnmarshalRLPFrom unmarshals a Transaction in RLP format
 func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	elems, err := v.GetElems()
 	if err != nil {
 		return err
 	}
 
-	if len(elems) < 9 {
+	if len(elems) < 10 {
 		return fmt.Errorf("incorrect number of elements to decode transaction, expected 9 but found %d", len(elems))
 	}
 
@@ -327,30 +327,39 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 		// reset To
 		t.To = nil
 	}
+	// from
+	if vv, _ := v.Get(4).Bytes(); len(vv) == 20 {
+		// address
+		t.From = BytesToAddress(vv)
+	} else {
+		// reset From
+		t.From = ZeroAddress
+	}
+
 	// value
 	t.Value = new(big.Int)
-	if err := elems[4].GetBigInt(t.Value); err != nil {
+	if err := elems[5].GetBigInt(t.Value); err != nil {
 		return err
 	}
 	// input
-	if t.Input, err = elems[5].GetBytes(t.Input[:0]); err != nil {
+	if t.Input, err = elems[6].GetBytes(t.Input[:0]); err != nil {
 		return err
 	}
 
 	// V
 	t.V = new(big.Int)
-	if err = elems[6].GetBigInt(t.V); err != nil {
+	if err = elems[7].GetBigInt(t.V); err != nil {
 		return err
 	}
 
 	// R
 	t.R = new(big.Int)
-	if err = elems[7].GetBigInt(t.R); err != nil {
+	if err = elems[8].GetBigInt(t.R); err != nil {
 		return err
 	}
 	// S
 	t.S = new(big.Int)
-	if err = elems[8].GetBigInt(t.S); err != nil {
+	if err = elems[9].GetBigInt(t.S); err != nil {
 		return err
 	}
 

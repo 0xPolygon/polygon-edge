@@ -177,6 +177,13 @@ func (t *Transaction) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 		vv.Set(arena.NewNull())
 	}
 
+	// Do not lose the from field if it's set
+	if t.From != ZeroAddress {
+		vv.Set(arena.NewBytes(t.From.Bytes()))
+	} else {
+		vv.Set(arena.NewBytes(ZeroAddress.Bytes()))
+	}
+
 	vv.Set(arena.NewBigInt(t.Value))
 	vv.Set(arena.NewCopyBytes(t.Input))
 

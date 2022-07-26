@@ -125,7 +125,7 @@ func Factory(params *consensus.Params) (consensus.Consensus, error) {
 		metrics:            params.Metrics,
 		secretsManager:     params.SecretsManager,
 		blockTime:          time.Duration(params.BlockTime) * time.Second,
-		ibftBaseTimeout:    time.Duration(params.IBFTBaseTimeout) * time.Second, //	TODO: what is this for
+		ibftBaseTimeout:    time.Duration(params.IBFTBaseTimeout) * time.Second, //	TODO: Deprecated
 		syncer: syncer.NewSyncer(
 			params.Logger,
 			params.Network,
