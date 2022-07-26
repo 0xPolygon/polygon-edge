@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/hashicorp/go-hclog"
@@ -94,7 +95,8 @@ func (j *JSONRPC) setupHTTP() error {
 	mux.HandleFunc("/ws", j.handleWs)
 
 	srv := http.Server{
-		Handler: mux,
+		Handler:           mux,
+		ReadHeaderTimeout: 60 * time.Second,
 	}
 
 	go func() {
