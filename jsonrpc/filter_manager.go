@@ -484,13 +484,7 @@ func (f *FilterManager) getFilterByID(filterID string) filter {
 	f.RLock()
 	defer f.RUnlock()
 
-	filter, exists := f.filters[filterID]
-
-	if !exists {
-		return nil
-	}
-
-	return filter
+	return f.filters[filterID]
 }
 
 //GetLogFilterFromID return log filter for given filterID
