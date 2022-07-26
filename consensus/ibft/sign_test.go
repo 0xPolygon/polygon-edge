@@ -18,7 +18,10 @@ func TestSign_Sealer(t *testing.T) {
 	}
 
 	h := &types.Header{}
-	signerA := signer.NewSigner(signer.NewECDSAKeyManagerFromKey(pool.get("A").priv))
+	signerA := signer.NewSigner(
+		signer.NewECDSAKeyManagerFromKey(pool.get("A").priv),
+		signer.NewECDSAKeyManagerFromKey(pool.get("A").priv),
+	)
 
 	err := signerA.InitIBFTExtra(h, &types.Header{}, pool.ValidatorSet())
 	assert.NoError(t, err)
@@ -26,7 +29,10 @@ func TestSign_Sealer(t *testing.T) {
 	// non-validator address
 	pool.add("X")
 
-	signerX := signer.NewSigner(signer.NewECDSAKeyManagerFromKey(pool.get("X").priv))
+	signerX := signer.NewSigner(
+		signer.NewECDSAKeyManagerFromKey(pool.get("X").priv),
+		signer.NewECDSAKeyManagerFromKey(pool.get("X").priv),
+	)
 
 	badSealedHeader, _ := signerX.WriteSeal(h)
 
@@ -52,7 +58,10 @@ func TestSign_CommittedSeals(t *testing.T) {
 
 	h := &types.Header{}
 
-	signerA := signer.NewSigner(signer.NewECDSAKeyManagerFromKey(pool.get("A").priv))
+	signerA := signer.NewSigner(
+		signer.NewECDSAKeyManagerFromKey(pool.get("A").priv),
+		signer.NewECDSAKeyManagerFromKey(pool.get("A").priv),
+	)
 	err := signerA.InitIBFTExtra(h, &types.Header{}, pool.ValidatorSet())
 	assert.NoError(t, err)
 
@@ -64,7 +73,10 @@ func TestSign_CommittedSeals(t *testing.T) {
 
 		for _, name := range names {
 			account := pool.get(name)
-			signer := signer.NewSigner(signer.NewECDSAKeyManagerFromKey(account.priv))
+			signer := signer.NewSigner(
+				signer.NewECDSAKeyManagerFromKey(account.priv),
+				signer.NewECDSAKeyManagerFromKey(account.priv),
+			)
 			seal, err := signer.CreateCommittedSeal(h)
 
 			assert.NoError(t, err)
@@ -76,7 +88,7 @@ func TestSign_CommittedSeals(t *testing.T) {
 
 		assert.NoError(t, err)
 
-		return signerA.VerifyCommittedSeal(snap.Set, sealed, OptimalQuorumSize(snap.Set))
+		return signerA.VerifyCommittedSeals(snap.Set, sealed, OptimalQuorumSize(snap.Set))
 	}
 
 	// Correct

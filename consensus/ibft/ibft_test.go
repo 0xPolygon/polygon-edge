@@ -104,7 +104,10 @@ func (m *MockBlockchain) SetGenesis(validators validators.ValidatorSet, key *ecd
 		GasLimit:   defaultBlockGasLimit,
 	}
 
-	signer := signer.NewSigner(signer.NewECDSAKeyManagerFromKey(key))
+	signer := signer.NewSigner(
+		signer.NewECDSAKeyManagerFromKey(key),
+		signer.NewECDSAKeyManagerFromKey(key),
+	)
 
 	assert.NoError(m.t, signer.InitIBFTExtra(header, nil, validators))
 
@@ -142,7 +145,10 @@ func (m *MockBlockchain) MockBlock(
 		GasLimit:   gasLimit,
 	}
 
-	signer := signer.NewSigner(signer.NewECDSAKeyManagerFromKey(proposer))
+	signer := signer.NewSigner(
+		signer.NewECDSAKeyManagerFromKey(proposer),
+		signer.NewECDSAKeyManagerFromKey(proposer),
+	)
 
 	assert.NoError(m.t, signer.InitIBFTExtra(header, &types.Header{}, vals))
 
@@ -1223,7 +1229,10 @@ func newMockIbft(t *testing.T, accounts []string, account string) *mockIbft {
 		state:      newState(),
 		epochSize:  DefaultEpochSize,
 		metrics:    consensus.NilMetrics(),
-		signer:     signer.NewSigner(signer.NewECDSAKeyManagerFromKey(addr.priv)),
+		signer: signer.NewSigner(
+			signer.NewECDSAKeyManagerFromKey(addr.priv),
+			signer.NewECDSAKeyManagerFromKey(addr.priv),
+		),
 		ibftForks: []IBFTFork{
 			{
 				From:          common.JSONNumber{Value: 0},
@@ -1286,7 +1295,10 @@ func newMockIBFTWithMockBlockchain(
 		state:      newState(),
 		epochSize:  DefaultEpochSize,
 		metrics:    consensus.NilMetrics(),
-		signer:     signer.NewSigner(signer.NewECDSAKeyManagerFromKey(addr.priv)),
+		signer: signer.NewSigner(
+			signer.NewECDSAKeyManagerFromKey(addr.priv),
+			signer.NewECDSAKeyManagerFromKey(addr.priv),
+		),
 	}
 
 	initIbftMechanism(PoA, ibft)

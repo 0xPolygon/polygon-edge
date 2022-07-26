@@ -602,17 +602,17 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 	var parentCommittedSeal signer.Sealer
 
 	if header.Number > 1 {
-		parentSigner, err := i.getSignerAt(parent.Number)
+		signer, err := i.getSignerAt(parent.Number)
 		if err != nil {
 			return nil, err
 		}
 
-		parentExtra, err := parentSigner.GetIBFTExtra(parent)
+		extra, err := signer.GetIBFTExtra(parent)
 		if err != nil {
 			return nil, err
 		}
 
-		parentCommittedSeal = parentExtra.CommittedSeal
+		parentCommittedSeal = extra.CommittedSeal
 	}
 
 	if err := i.signer.InitIBFTExtra(header, parentCommittedSeal, snap.Set); err != nil {
@@ -1298,16 +1298,16 @@ func (i *Ibft) verifyHeaderImpl(snap *Snapshot, parent, header *types.Header) er
 			return err
 		}
 
-		signer, err := i.getSignerAt(parent.Number)
+		signer, err := i.getSignerAt(header.Number)
 		if err != nil {
 			return err
 		}
 
-		if err := signer.VerifyParentCommittedSeal(
+		if err := signer.VerifyParentCommittedSeals(
 			parentSnap.Set,
-			parent,
+			parent.Hash,
 			header,
-			i.quorumSize(header.Number, parentSnap.Set),
+			i.quorumSize(parent.Number, parentSnap.Set),
 		); err != nil {
 			return fmt.Errorf("failed to verify ParentCommittedSeal: %w", err)
 		}
@@ -1337,7 +1337,7 @@ func (i *Ibft) VerifyHeader(header *types.Header) error {
 	}
 
 	// verify the committed seals
-	if err := i.signer.VerifyCommittedSeal(snap.Set, header, i.quorumSize(header.Number, snap.Set)); err != nil {
+	if err := i.signer.VerifyCommittedSeals(snap.Set, header, i.quorumSize(header.Number, snap.Set)); err != nil {
 		return err
 	}
 
@@ -1515,25 +1515,34 @@ func (i *Ibft) updateSigner(
 	parentHeader *types.Header,
 	height uint64,
 ) error {
+	var (
+		keyManager, parentKeyManager signer.KeyManager
+		err                          error
+	)
+
+	if height-1 >= 1 {
+		if i.signer != nil {
+			parentKeyManager = i.signer.KeyManager()
+		} else {
+			if parentKeyManager, err = i.getKeyManagerAt(height - 1); err != nil {
+				return err
+			}
+		}
+	}
+
+	if keyManager, err = i.getKeyManagerAt(height); err != nil {
+		return err
+	}
+
+	i.signer = signer.NewSigner(
+		keyManager,
+		parentKeyManager,
+	)
+
 	fork := i.getSignerForkAt(height)
 	if fork == nil {
 		return fmt.Errorf("IBFT fork not found")
 	}
-
-	if i.signer != nil && *fork.ValidatorType == i.signer.Type() {
-		return nil
-	}
-
-	newSigner, err := signer.InitSigner(
-		i.secretsManager,
-		*fork.ValidatorType,
-	)
-
-	if err != nil {
-		return err
-	}
-
-	i.signer = newSigner
 
 	if fork.From.Value == height && fork.Validators != nil {
 		original, err := i.getSnapshot(height)
@@ -1557,15 +1566,34 @@ func (i *Ibft) updateSigner(
 }
 
 func (i *Ibft) getSignerAt(height uint64) (signer.Signer, error) {
+	var (
+		keyManager, parentKeyManager signer.KeyManager
+		err                          error
+	)
+
+	if keyManager, err = i.getKeyManagerAt(height); err != nil {
+		return nil, err
+	}
+
+	if height-1 > 0 {
+		if parentKeyManager, err = i.getKeyManagerAt(height - 1); err != nil {
+			return nil, err
+		}
+	}
+
+	return signer.NewSigner(
+		keyManager,
+		parentKeyManager,
+	), nil
+}
+
+func (i *Ibft) getKeyManagerAt(height uint64) (signer.KeyManager, error) {
 	fork := i.getSignerForkAt(height)
 	if fork == nil {
 		return nil, fmt.Errorf("IBFT fork not found")
 	}
 
-	return signer.InitSigner(
-		i.secretsManager,
-		*fork.ValidatorType,
-	)
+	return signer.InitKeyManager(i.secretsManager, *fork.ValidatorType)
 }
 
 func (i *Ibft) getSignerForkAt(height uint64) *IBFTFork {

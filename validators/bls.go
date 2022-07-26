@@ -67,7 +67,6 @@ func (v *BLSValidator) UnmarshalRLPFrom(p *fastrlp.Parser, val *fastrlp.Value) e
 	}
 
 	if len(elems) < 2 {
-		panic(fmt.Errorf("incorrect number of elements to decode BLSValidator, expected 2 but found %d", len(elems)))
 		return fmt.Errorf("incorrect number of elements to decode BLSValidator, expected 2 but found %d", len(elems))
 	}
 

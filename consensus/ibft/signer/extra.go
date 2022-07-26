@@ -96,7 +96,7 @@ func (i *IstanbulExtra) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) er
 		return err
 	}
 
-	// LastCommitted
+	// ParentCommitted
 	if len(elems) >= 4 {
 		if err := i.ParentCommittedSeal.UnmarshalRLPFrom(p, elems[3]); err != nil {
 			return err

@@ -46,12 +46,8 @@ func (s *BLSKeyManager) Address() types.Address {
 	return s.address
 }
 
-func (s *BLSKeyManager) NewEmptyIstanbulExtra() *IstanbulExtra {
-	return &IstanbulExtra{
-		Validators:          &validators.BLSValidatorSet{},
-		CommittedSeal:       &BLSSeal{},
-		ParentCommittedSeal: &BLSSeal{},
-	}
+func (s *BLSKeyManager) NewEmptyValidatorSet() validators.ValidatorSet {
+	return &validators.BLSValidatorSet{}
 }
 
 func (s *BLSKeyManager) NewEmptyCommittedSeal() Sealer {
@@ -104,7 +100,7 @@ func (s *BLSKeyManager) GenerateCommittedSeals(sealMap map[types.Address][]byte,
 	}, nil
 }
 
-func (s *BLSKeyManager) VerifyCommittedSeal(
+func (s *BLSKeyManager) VerifyCommittedSeals(
 	rawCommittedSeal Sealer,
 	digest []byte,
 	rawSet validators.ValidatorSet,
@@ -253,7 +249,6 @@ func (s *BLSSeal) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	}
 
 	if len(vals) < 2 {
-		panic(fmt.Errorf("mismatch of RLP type for AggregatedCommittedSeal"))
 		return fmt.Errorf("mismatch of RLP type for AggregatedCommittedSeal")
 	}
 

@@ -49,12 +49,8 @@ func (s *ECDSAKeyManager) Address() types.Address {
 	return s.address
 }
 
-func (s *ECDSAKeyManager) NewEmptyIstanbulExtra() *IstanbulExtra {
-	return &IstanbulExtra{
-		Validators:          &validators.ECDSAValidatorSet{},
-		CommittedSeal:       &SerializedSeal{},
-		ParentCommittedSeal: &SerializedSeal{},
-	}
+func (s *ECDSAKeyManager) NewEmptyValidatorSet() validators.ValidatorSet {
+	return &validators.ECDSAValidatorSet{}
 }
 
 func (s *ECDSAKeyManager) NewEmptyCommittedSeal() Sealer {
@@ -92,7 +88,7 @@ func (s *ECDSAKeyManager) GenerateCommittedSeals(
 	return &serializedSeal, nil
 }
 
-func (s *ECDSAKeyManager) VerifyCommittedSeal(
+func (s *ECDSAKeyManager) VerifyCommittedSeals(
 	rawCommittedSeal Sealer,
 	digest []byte,
 	rawSet validators.ValidatorSet,
@@ -157,6 +153,8 @@ func (s *SerializedSeal) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 
 	committed := ar.NewArray()
 
+	fmt.Printf("\nSerializedSeal MarshalRLPWith size=%d\n", len(*s))
+
 	for _, a := range *s {
 		if len(a) == 0 {
 			committed.Set(ar.NewNull())
@@ -173,6 +171,8 @@ func (s *SerializedSeal) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) e
 	if err != nil {
 		return fmt.Errorf("mismatch of RLP type for CommittedSeal, expected list but found %s", v.Type())
 	}
+
+	fmt.Printf("\nSerializedSeal UnmarshalRLPFrom size=%d\n", len(vals))
 
 	(*s) = make([][]byte, len(vals))
 

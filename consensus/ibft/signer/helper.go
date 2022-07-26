@@ -122,27 +122,16 @@ func ecrecoverImpl(sig, msg []byte) (types.Address, error) {
 	return crypto.PubKeyToAddress(pub), nil
 }
 
-func InitSigner(
+func InitKeyManager(
 	secretManager secrets.SecretsManager,
 	validatorType validators.ValidatorType,
-) (Signer, error) {
-	var (
-		km  KeyManager
-		err error
-	)
-
+) (KeyManager, error) {
 	switch validatorType {
 	case validators.ECDSAValidatorType:
-		km, err = NewECDSAKeyManager(secretManager)
+		return NewECDSAKeyManager(secretManager)
 	case validators.BLSValidatorType:
-		km, err = NewBLSKeyManager(secretManager)
+		return NewBLSKeyManager(secretManager)
 	default:
-		err = fmt.Errorf("unsupported validator type: %s", validatorType)
+		return nil, fmt.Errorf("unsupported validator type: %s", validatorType)
 	}
-
-	if err != nil {
-		return nil, err
-	}
-
-	return NewSigner(km), nil
 }
