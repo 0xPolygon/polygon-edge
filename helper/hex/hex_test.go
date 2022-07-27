@@ -1,38 +1,39 @@
 package hex
 
 import (
-	"crypto/rand"
+	"fmt"
 	"github.com/stretchr/testify/assert"
-	"math/big"
 	"testing"
 )
 
-// TestEncodeDecodeUint64 verifies that uint64 values
-// are properly encoded and decoded from hex
-func TestEncodeDecodeUint64(t *testing.T) {
+// TestDecodeUint64 verifies that uint64 values
+// are properly decoded from hex
+func TestDecodeUint64(t *testing.T) {
 	t.Parallel()
 
-	generateRandomNumbers := func(count int) []uint64 {
-		numbers := make([]uint64, count)
+	uint64Array := []uint64{
+		0,
+		1,
+		11,
+		67312,
+		80604,
+		18446744073709551615, // max uint64
+	}
 
-		for index := 0; index < count; index++ {
-			randNum, _ := rand.Int(
-				rand.Reader,
-				big.NewInt(int64(count)),
-			)
+	toHexArr := func(nums []uint64) []string {
+		numbers := make([]string, len(nums))
 
-			numbers[index] = randNum.Uint64()
+		for index, num := range nums {
+			numbers[index] = fmt.Sprintf("0x%x", num)
 		}
 
 		return numbers
 	}
 
-	for _, value := range generateRandomNumbers(100) {
-		encodedValue := EncodeUint64(value)
-
-		decodedValue, err := DecodeUint64(encodedValue)
+	for index, value := range toHexArr(uint64Array) {
+		decodedValue, err := DecodeUint64(value)
 		assert.NoError(t, err)
 
-		assert.Equal(t, value, decodedValue)
+		assert.Equal(t, uint64Array[index], decodedValue)
 	}
 }
