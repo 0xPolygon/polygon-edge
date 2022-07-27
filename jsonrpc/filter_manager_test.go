@@ -113,7 +113,10 @@ func Test_GetLogsForQuery(t *testing.T) {
 	store.appendBlocksToStore(blocks)
 
 	f := NewFilterManager(hclog.NewNullLogger(), store)
-	defer f.Close()
+
+	t.Cleanup(func() {
+		defer f.Close()
+	})
 
 	for _, testCase := range testTable {
 		testCase := testCase
@@ -137,6 +140,8 @@ func Test_GetLogsForQuery(t *testing.T) {
 }
 
 func Test_GetLogFilterFromID(t *testing.T) {
+	t.Parallel()
+
 	store := newMockStore()
 
 	m := NewFilterManager(hclog.NewNullLogger(), store)
@@ -158,6 +163,8 @@ func Test_GetLogFilterFromID(t *testing.T) {
 }
 
 func TestFilterLog(t *testing.T) {
+	t.Parallel()
+
 	store := newMockStore()
 
 	m := NewFilterManager(hclog.NewNullLogger(), store)
@@ -220,6 +227,8 @@ func TestFilterLog(t *testing.T) {
 }
 
 func TestFilterBlock(t *testing.T) {
+	t.Parallel()
+
 	store := newMockStore()
 
 	m := NewFilterManager(hclog.NewNullLogger(), store)
@@ -283,6 +292,8 @@ func TestFilterBlock(t *testing.T) {
 }
 
 func TestFilterTimeout(t *testing.T) {
+	t.Parallel()
+
 	store := newMockStore()
 
 	m := NewFilterManager(hclog.NewNullLogger(), store)
@@ -301,6 +312,8 @@ func TestFilterTimeout(t *testing.T) {
 }
 
 func TestRemoveFilterByWebsocket(t *testing.T) {
+	t.Parallel()
+
 	store := newMockStore()
 
 	mock := &mockWsConn{
@@ -321,6 +334,8 @@ func TestRemoveFilterByWebsocket(t *testing.T) {
 }
 
 func TestFilterWebsocket(t *testing.T) {
+	t.Parallel()
+
 	store := newMockStore()
 
 	mock := &mockWsConn{
@@ -376,6 +391,8 @@ func (m *mockWsConn) WriteMessage(messageType int, b []byte) error {
 }
 
 func TestHeadStream(t *testing.T) {
+	t.Parallel()
+
 	b := &blockStream{}
 
 	b.push(&types.Header{Hash: types.StringToHash("1")})
@@ -410,6 +427,8 @@ func (m *MockClosedWSConnection) WriteMessage(_messageType int, _data []byte) er
 }
 
 func TestClosedFilterDeletion(t *testing.T) {
+	t.Parallel()
+
 	store := newMockStore()
 
 	m := NewFilterManager(hclog.NewNullLogger(), store)
