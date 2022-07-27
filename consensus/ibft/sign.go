@@ -10,8 +10,19 @@ import (
 	"github.com/umbracle/fastrlp"
 )
 
+const (
+	// legacyCommitCode is the value that is contained in
+	// legacy committed seals, so it needs to be preserved in order
+	// for new clients to read old committed seals
+	legacyCommitCode = 2
+)
+
+func wrapCommitHash(b []byte) []byte {
+	return crypto.Keccak256(b, []byte{byte(legacyCommitCode)})
+}
+
 func ecrecoverImpl(sig, msg []byte) (types.Address, error) {
-	pub, err := crypto.RecoverPubkey(sig, msg)
+	pub, err := crypto.RecoverPubkey(sig, crypto.Keccak256(msg))
 	if err != nil {
 		return types.Address{}, err
 	}
@@ -41,7 +52,7 @@ func signSealImpl(prv *ecdsa.PrivateKey, h *types.Header) ([]byte, error) {
 		return nil, err
 	}
 
-	return crypto.Sign(prv, hash)
+	return crypto.Sign(prv, crypto.Keccak256(hash))
 }
 
 func writeProposerSeal(prv *ecdsa.PrivateKey, h *types.Header) (*types.Header, error) {
@@ -63,6 +74,21 @@ func writeProposerSeal(prv *ecdsa.PrivateKey, h *types.Header) (*types.Header, e
 	}
 
 	return h, nil
+}
+
+// writeCommittedSeal generates the legacy committed seal using the passed in
+// header hash and the private key
+func writeCommittedSeal(prv *ecdsa.PrivateKey, headerHash []byte) ([]byte, error) {
+	return crypto.Sign(
+		prv,
+		// Of course, this keccaking of an extended array is not according to the IBFT 2.0 spec,
+		// but almost nothing in this legacy signing package is. This is kept
+		// in order to preserve the running chains that used these
+		// old (and very, very incorrect) signing schemes
+		crypto.Keccak256(
+			wrapCommitHash(headerHash),
+		),
+	)
 }
 
 func writeCommittedSeals(h *types.Header, seals [][]byte) (*types.Header, error) {
@@ -158,12 +184,17 @@ func verifyCommittedFields(
 		return fmt.Errorf("empty committed seals")
 	}
 
-	headerHash := crypto.Keccak256(header.Hash.Bytes())
+	hash, err := calculateHeaderHash(header)
+	if err != nil {
+		return err
+	}
+
+	rawMsg := wrapCommitHash(hash)
 
 	visited := map[types.Address]struct{}{}
 
 	for _, seal := range extra.CommittedSeal {
-		addr, err := ecrecoverImpl(seal, headerHash)
+		addr, err := ecrecoverImpl(seal, rawMsg)
 		if err != nil {
 			return err
 		}

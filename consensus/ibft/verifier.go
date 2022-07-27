@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	protoIBFT "github.com/0xPolygon/go-ibft/messages/proto"
-	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -76,7 +75,7 @@ func (i *backendIBFT) IsValidSender(msg *protoIBFT.Message) bool {
 
 	validatorAddress, err := ecrecoverImpl(
 		msg.Signature,
-		crypto.Keccak256(msgNoSig),
+		msgNoSig,
 	)
 	if err != nil {
 		return false
@@ -119,7 +118,7 @@ func (i *backendIBFT) IsValidProposalHash(proposal, hash []byte) bool {
 
 func (i *backendIBFT) IsValidCommittedSeal(proposalHash, seal []byte) bool {
 	//	seal was generated based on the proposal hash
-	validator, err := ecrecoverImpl(seal, crypto.Keccak256(proposalHash))
+	validator, err := ecrecoverImpl(seal, wrapCommitHash(proposalHash))
 	if err != nil {
 		i.logger.Error("unable to recover seal", "err", err)
 

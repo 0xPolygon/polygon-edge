@@ -1,7 +1,6 @@
 package ibft
 
 import (
-	"github.com/0xPolygon/polygon-edge/crypto"
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/types"
@@ -9,6 +8,8 @@ import (
 )
 
 func TestSign_Sealer(t *testing.T) {
+	t.Parallel()
+
 	pool := newTesterAccountPool()
 	pool.add("A")
 
@@ -31,6 +32,8 @@ func TestSign_Sealer(t *testing.T) {
 }
 
 func TestSign_CommittedSeals(t *testing.T) {
+	t.Parallel()
+
 	pool := newTesterAccountPool()
 	pool.add("A", "B", "C", "D", "E")
 
@@ -38,8 +41,17 @@ func TestSign_CommittedSeals(t *testing.T) {
 		Set: pool.ValidatorSet(),
 	}
 
-	h := &types.Header{}
+	h := &types.Header{
+		ExtraData: []byte{},
+	}
+
 	putIbftExtraValidators(h, pool.ValidatorSet())
+	hash, err := calculateHeaderHash(h)
+	if err != nil {
+		t.Fatalf("Unable to calculate hash, %v", err)
+	}
+
+	h.Hash = types.BytesToHash(hash)
 
 	// non-validator address
 	pool.add("X")
@@ -48,7 +60,7 @@ func TestSign_CommittedSeals(t *testing.T) {
 		seals := [][]byte{}
 
 		for _, accnt := range accnt {
-			seal, err := crypto.Sign(pool.get(accnt).priv, crypto.Keccak256(h.Hash.Bytes()))
+			seal, err := writeCommittedSeal(pool.get(accnt).priv, h.Hash.Bytes())
 
 			assert.NoError(t, err)
 
