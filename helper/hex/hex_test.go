@@ -17,7 +17,7 @@ func TestDecodeUint64(t *testing.T) {
 		11,
 		67312,
 		80604,
-		18446744073709551615, // max uint64
+		^uint64(0), // max uint64
 	}
 
 	toHexArr := func(nums []uint64) []string {
