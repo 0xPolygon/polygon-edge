@@ -52,6 +52,14 @@ func EncodeUint64(i uint64) string {
 	return string(strconv.AppendUint(enc, i, 16))
 }
 
+// DecodeUint64 decodes a hex string with 0x prefix to uint64
+func DecodeUint64(hexStr string) (uint64, error) {
+	// remove 0x suffix if found in the input string
+	cleaned := strings.TrimPrefix(hexStr, "0x")
+
+	return strconv.ParseUint(cleaned, 16, 64)
+}
+
 const BadNibble = ^uint64(0)
 
 // DecodeNibble decodes a byte into a uint64
@@ -84,4 +92,8 @@ func DecodeHexToBig(hexNum string) *big.Int {
 	createdNum.SetString(hexNum, 16)
 
 	return createdNum
+}
+
+func DropHexPrefix(input []byte) []byte {
+	return input[2:]
 }

@@ -13,7 +13,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
-	"github.com/0xPolygon/polygon-edge/protocol"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
@@ -883,8 +882,6 @@ func TestRunSyncState_NewHeadReceivedFromPeer_CallsTxPoolResetWithHeaders(t *tes
 
 	assert.True(t, mockTxPool.resetWithHeaderCalled)
 	assert.Equal(t, expectedNewBlockToSync.Header, mockTxPool.resetWithHeadersParam[0])
-	assert.True(t, mockSyncer.broadcastCalled)
-	assert.Equal(t, expectedNewBlockToSync, mockSyncer.broadcastedBlock)
 }
 
 func TestRunSyncState_BulkSyncWithPeer_CallsTxPoolResetWithHeaders(t *testing.T) {
@@ -968,18 +965,24 @@ func TestRunSyncState_Unlock_After_Sync(t *testing.T) {
 type mockSyncer struct {
 	bulkSyncBlocksFromPeer  []*types.Block
 	receivedNewHeadFromPeer *types.Block
-	broadcastedBlock        *types.Block
-	broadcastCalled         bool
 	blockchain              blockchainInterface
 }
 
-func (s *mockSyncer) Start() {}
-
-func (s *mockSyncer) BestPeer() *protocol.SyncPeer {
-	return &protocol.SyncPeer{}
+func (s *mockSyncer) Start() error {
+	return nil
 }
 
-func (s *mockSyncer) BulkSyncWithPeer(p *protocol.SyncPeer, handler func(block *types.Block)) error {
+func (s *mockSyncer) Close() error {
+	return nil
+}
+
+func (s *mockSyncer) HasSyncPeer() bool {
+	return true
+}
+
+func (s *mockSyncer) BulkSync(
+	newBlockHandler func(block *types.Block) bool,
+) error {
 	for _, block := range s.bulkSyncBlocksFromPeer {
 		if s.blockchain != nil {
 			if err := s.blockchain.WriteBlock(block); err != nil {
@@ -987,35 +990,30 @@ func (s *mockSyncer) BulkSyncWithPeer(p *protocol.SyncPeer, handler func(block *
 			}
 		}
 
-		handler(block)
+		newBlockHandler(block)
 	}
 
 	return nil
 }
 
-func (s *mockSyncer) WatchSyncWithPeer(
-	p *protocol.SyncPeer,
-	newBlockHandler func(b *types.Block) bool,
-	blockTimeout time.Duration,
-) {
+func (s *mockSyncer) WatchSync(
+	newBlockHandler func(*types.Block) bool,
+) error {
 	if s.receivedNewHeadFromPeer != nil {
 		if s.blockchain != nil {
 			if err := s.blockchain.WriteBlock(s.receivedNewHeadFromPeer); err != nil {
-				return
+				return err
 			}
 		}
 
 		newBlockHandler(s.receivedNewHeadFromPeer)
 	}
+
+	return nil
 }
 
 func (s *mockSyncer) GetSyncProgression() *progress.Progression {
 	return nil
-}
-
-func (s *mockSyncer) Broadcast(b *types.Block) {
-	s.broadcastCalled = true
-	s.broadcastedBlock = b
 }
 
 type mockTxPool struct {

@@ -7,6 +7,7 @@ import (
 
 	"github.com/golang/protobuf/ptypes/any"
 	"github.com/hashicorp/go-hclog"
+	"github.com/libp2p/go-libp2p-core/peer"
 	"google.golang.org/grpc"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
@@ -659,7 +660,7 @@ func (p *TxPool) handlePromoteRequest(req promoteRequest) {
 
 // addGossipTx handles receiving transactions
 // gossiped by the network.
-func (p *TxPool) addGossipTx(obj interface{}) {
+func (p *TxPool) addGossipTx(obj interface{}, _ peer.ID) {
 	if !p.sealing {
 		return
 	}
