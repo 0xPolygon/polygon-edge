@@ -46,6 +46,7 @@ func TestSign_CommittedSeals(t *testing.T) {
 	}
 
 	putIbftExtraValidators(h, pool.ValidatorSet())
+
 	hash, err := calculateHeaderHash(h)
 	if err != nil {
 		t.Fatalf("Unable to calculate hash, %v", err)

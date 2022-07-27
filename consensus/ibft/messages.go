@@ -71,6 +71,7 @@ func (i *backendIBFT) BuildCommitMessage(proposalHash []byte, view *protoIBFT.Vi
 	seal, err := writeCommittedSeal(i.validatorKey, proposalHash)
 	if err != nil {
 		i.logger.Error("Unable to build commit message, %v", err)
+
 		return nil
 	}
 
