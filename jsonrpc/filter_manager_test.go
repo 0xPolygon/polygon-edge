@@ -80,6 +80,16 @@ func Test_GetLogsForQuery(t *testing.T) {
 			0,
 			ErrIncorrectBlockRange,
 		},
+		{
+			"Block range too high",
+			&LogQuery{
+				fromBlock: 10,
+				toBlock:   1012,
+				Topics:    topics,
+			},
+			0,
+			ErrBlockRangeTooHigh,
+		},
 	}
 
 	// setup test
@@ -112,7 +122,7 @@ func Test_GetLogsForQuery(t *testing.T) {
 
 	store.appendBlocksToStore(blocks)
 
-	f := NewFilterManager(hclog.NewNullLogger(), store)
+	f := NewFilterManager(hclog.NewNullLogger(), store, 1000)
 
 	t.Cleanup(func() {
 		defer f.Close()
@@ -144,7 +154,7 @@ func Test_GetLogFilterFromID(t *testing.T) {
 
 	store := newMockStore()
 
-	m := NewFilterManager(hclog.NewNullLogger(), store)
+	m := NewFilterManager(hclog.NewNullLogger(), store, 1000)
 	defer m.Close()
 
 	go m.Run()
@@ -167,7 +177,7 @@ func TestFilterLog(t *testing.T) {
 
 	store := newMockStore()
 
-	m := NewFilterManager(hclog.NewNullLogger(), store)
+	m := NewFilterManager(hclog.NewNullLogger(), store, 1000)
 	defer m.Close()
 
 	go m.Run()
@@ -231,7 +241,7 @@ func TestFilterBlock(t *testing.T) {
 
 	store := newMockStore()
 
-	m := NewFilterManager(hclog.NewNullLogger(), store)
+	m := NewFilterManager(hclog.NewNullLogger(), store, 1000)
 	defer m.Close()
 
 	go m.Run()
@@ -296,7 +306,7 @@ func TestFilterTimeout(t *testing.T) {
 
 	store := newMockStore()
 
-	m := NewFilterManager(hclog.NewNullLogger(), store)
+	m := NewFilterManager(hclog.NewNullLogger(), store, 1000)
 	defer m.Close()
 
 	m.timeout = 2 * time.Second
@@ -320,7 +330,7 @@ func TestRemoveFilterByWebsocket(t *testing.T) {
 		msgCh: make(chan []byte, 1),
 	}
 
-	m := NewFilterManager(hclog.NewNullLogger(), store)
+	m := NewFilterManager(hclog.NewNullLogger(), store, 1000)
 	defer m.Close()
 
 	go m.Run()
@@ -342,7 +352,7 @@ func TestFilterWebsocket(t *testing.T) {
 		msgCh: make(chan []byte, 1),
 	}
 
-	m := NewFilterManager(hclog.NewNullLogger(), store)
+	m := NewFilterManager(hclog.NewNullLogger(), store, 1000)
 	defer m.Close()
 
 	go m.Run()
@@ -431,7 +441,7 @@ func TestClosedFilterDeletion(t *testing.T) {
 
 	store := newMockStore()
 
-	m := NewFilterManager(hclog.NewNullLogger(), store)
+	m := NewFilterManager(hclog.NewNullLogger(), store, 1000)
 	defer m.Close()
 
 	go m.Run()
