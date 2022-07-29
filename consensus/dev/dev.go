@@ -14,6 +14,10 @@ import (
 	"github.com/hashicorp/go-hclog"
 )
 
+const (
+	devConsensus = "dev-consensus"
+)
+
 // Dev consensus protocol seals any new transaction immediately
 type Dev struct {
 	logger hclog.Logger
@@ -197,7 +201,7 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 	}
 
 	// Write the block to the blockchain
-	if err := d.blockchain.WriteBlock(block, ""); err != nil {
+	if err := d.blockchain.WriteBlock(block, devConsensus); err != nil {
 		return err
 	}
 
