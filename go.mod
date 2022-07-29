@@ -60,7 +60,7 @@ require (
 	lukechampine.com/blake3 v1.1.7 // indirect
 )
 
-require github.com/0xPolygon/go-ibft v0.0.0-20220723161511-f0abb68d3324
+require github.com/0xPolygon/go-ibft v0.0.0-20220729102524-0f95a9c3a08c
 
 require (
 	cloud.google.com/go v0.102.0 // indirect

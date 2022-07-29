@@ -44,9 +44,9 @@ type SubscriptionDetails struct {
 	// being subscribed to
 	View *proto.View
 
-	// NumMessages is the threshold of messages
+	// MinNumMessages is the threshold of messages
 	// being subscribed to
-	NumMessages int
+	MinNumMessages int
 
 	// HasMinRound is the flag indicating if the
 	// round number is a lower bound
@@ -108,7 +108,7 @@ func (em *eventManager) signalEvent(
 	view *proto.View,
 	totalMessages int,
 ) {
-	if atomic.LoadInt64(&em.numSubscriptions) < 1 {
+	if atomic.LoadInt64(&em.numSubscriptions) == 0 {
 		// No reason to lock the subscriptions map
 		// if no subscriptions exist
 		return

@@ -69,6 +69,8 @@ dmitri.shuralyov.com/state v0.0.0-20180228185332-28bcc343414c/go.mod h1:0PRwlb0D
 git.apache.org/thrift.git v0.0.0-20180902110319-2566ecd5d999/go.mod h1:fPE2ZNJGynbRyZ4dJvy6G277gSllfV2HJqblrnkyeyg=
 github.com/0xPolygon/go-ibft v0.0.0-20220723161511-f0abb68d3324 h1:yCy8N/Ipb+as5mXqSbzbXKfIuiLptkD21bvE0niLSdk=
 github.com/0xPolygon/go-ibft v0.0.0-20220723161511-f0abb68d3324/go.mod h1:pXhBaK+CcHr3eUAWynKyHGTxgDwpJ3O1tvbGthN+pN4=
+github.com/0xPolygon/go-ibft v0.0.0-20220729102524-0f95a9c3a08c h1:y9Fw+byHhcrV8378z20d2WlyIoHOZiZbPIVAQ9VDuyw=
+github.com/0xPolygon/go-ibft v0.0.0-20220729102524-0f95a9c3a08c/go.mod h1:pXhBaK+CcHr3eUAWynKyHGTxgDwpJ3O1tvbGthN+pN4=
 github.com/AndreasBriese/bbloom v0.0.0-20190306092124-e2d15f34fcf9/go.mod h1:bOvUY6CB00SOBii9/FifXqc0awNKxLFCL/+pkDPuyl8=
 github.com/AndreasBriese/bbloom v0.0.0-20190825152654-46b345b51c96/go.mod h1:bOvUY6CB00SOBii9/FifXqc0awNKxLFCL/+pkDPuyl8=
 github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78 h1:w+iIsaOQNcT7OZ575w+acHgRric5iCyQh+xv+KJ4HB8=

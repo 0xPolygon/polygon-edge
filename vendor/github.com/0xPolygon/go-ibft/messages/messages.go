@@ -30,7 +30,7 @@ func (ms *Messages) Subscribe(details SubscriptionDetails) *Subscription {
 	if numMessages := ms.numMessages(
 		details.View,
 		details.MessageType,
-	); numMessages >= details.NumMessages {
+	); numMessages >= details.MinNumMessages {
 		// Conditions are already met, alert the event manager
 		ms.eventManager.signalEvent(details.MessageType, details.View, numMessages)
 	}

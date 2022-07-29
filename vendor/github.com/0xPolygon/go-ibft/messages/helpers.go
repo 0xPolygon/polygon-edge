@@ -145,6 +145,9 @@ func HaveSameProposalHash(messages []*proto.Message) bool {
 		}
 
 		if hash == nil {
+			// No previous hash for comparison,
+			// set the first one as the reference, as
+			// all of them need to be the same anyway
 			hash = extractedHash
 		}
 
