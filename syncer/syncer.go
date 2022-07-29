@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	syncerLoggerName = "syncer"
-	SyncerProto      = "/syncer/0.2"
+	syncerName  = "syncer"
+	SyncerProto = "/syncer/0.2"
 )
 
 var (
@@ -47,7 +47,7 @@ func NewSyncer(
 	blockTimeout time.Duration,
 ) Syncer {
 	return &syncer{
-		logger:          logger.Named(syncerLoggerName),
+		logger:          logger.Named(syncerName),
 		blockchain:      blockchain,
 		syncProgression: progress.NewProgressionWrapper(progress.ChainSyncBulk),
 		syncPeerService: NewSyncPeerService(network, blockchain),
@@ -296,7 +296,7 @@ func (s *syncer) bulkSyncWithPeer(peerID peer.ID, newBlockCallback func(*types.B
 				return lastReceivedNumber, false, fmt.Errorf("unable to verify block, %w", err)
 			}
 
-			if err := s.blockchain.WriteBlock(block, "syncer"); err != nil {
+			if err := s.blockchain.WriteBlock(block, syncerName); err != nil {
 				return lastReceivedNumber, false, fmt.Errorf("failed to write block while bulk syncing: %w", err)
 			}
 
