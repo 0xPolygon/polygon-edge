@@ -16,6 +16,12 @@ func (i *backendIBFT) BuildProposal(blockNumber uint64) []byte {
 	)
 
 	if latestBlockNumber+1 != blockNumber {
+		i.logger.Error(
+			"unable to build block, due to lack of parent block",
+			"num",
+			latestBlockNumber,
+		)
+
 		return nil
 	}
 
