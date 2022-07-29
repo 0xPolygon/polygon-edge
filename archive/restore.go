@@ -13,6 +13,10 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
+const (
+	restore = "restore"
+)
+
 type blockchainInterface interface {
 	SubscribeEvents() blockchain.Subscription
 	Genesis() types.Hash
@@ -78,7 +82,7 @@ func importBlocks(chain blockchainInterface, blockStream *blockStream, progressi
 			return err
 		}
 
-		if err := chain.WriteBlock(nextBlock, "restore"); err != nil {
+		if err := chain.WriteBlock(nextBlock, restore); err != nil {
 			return err
 		}
 
