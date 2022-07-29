@@ -364,6 +364,12 @@ func (i *backendIBFT) startConsensus() {
 	go func() {
 		for {
 			if ev := <-newBlockSub.GetEventCh(); ev.Source == "syncer" {
+				if ev.NewChain[0].Number < i.blockchain.Header().Number {
+					// The blockchain notification system can eventually deliver
+					// stale block notifications. These should be ignored
+					continue
+				}
+
 				syncerBlockCh <- struct{}{}
 			}
 		}
