@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -17,7 +16,7 @@ import (
 )
 
 var (
-	ErrFilterDoesNotExists              = errors.New("filter does not exists")
+	ErrFilterNotFound                   = errors.New("filter not found")
 	ErrWSFilterDoesNotSupportGetChanges = errors.New("web socket Filter doesn't support to return a batch of the changes")
 	ErrCastingFilterToLogFilter         = errors.New("casting filter object to logFilter error")
 	ErrBlockNotFound                    = errors.New("block not found")
@@ -43,8 +42,8 @@ type filter interface {
 	// getFilterBase returns filterBase that has common fields
 	getFilterBase() *filterBase
 
-	// getUpdates returns stored data in string
-	getUpdates() (string, error)
+	// getUpdates returns stored data in a JSON serializable form
+	getUpdates() (interface{}, error)
 
 	// sendUpdates write stored data to web socket stream
 	sendUpdates() error
@@ -130,7 +129,7 @@ func (f *blockFilter) setHeadElem(head *headElem) {
 }
 
 // getUpdates returns updates of blocks in string
-func (f *blockFilter) getUpdates() (string, error) {
+func (f *blockFilter) getUpdates() (interface{}, error) {
 	headers := f.takeBlockUpdates()
 
 	updates := make([]string, len(headers))
@@ -138,9 +137,7 @@ func (f *blockFilter) getUpdates() (string, error) {
 		updates[index] = header.Hash.String()
 	}
 
-	return fmt.Sprintf(
-		"[\"%s\"]", strings.Join(updates, "\",\""),
-	), nil
+	return updates, nil
 }
 
 // sendUpdates writes the updates of blocks to web socket stream
@@ -190,15 +187,10 @@ func (f *logFilter) takeLogUpdates() []*Log {
 }
 
 // getUpdates returns stored logs in string
-func (f *logFilter) getUpdates() (string, error) {
+func (f *logFilter) getUpdates() (interface{}, error) {
 	logs := f.takeLogUpdates()
 
-	res, err := json.Marshal(logs)
-	if err != nil {
-		return "", err
-	}
-
-	return string(res), nil
+	return logs, nil
 }
 
 // sendUpdates writes stored logs to web socket stream
@@ -500,7 +492,7 @@ func (f *FilterManager) GetLogFilterFromID(filterID string) (*logFilter, error) 
 	filterRaw := f.getFilterByID(filterID)
 
 	if filterRaw == nil {
-		return nil, ErrFilterDoesNotExists
+		return nil, ErrFilterNotFound
 	}
 
 	logFilter, ok := filterRaw.(*logFilter)
@@ -511,28 +503,42 @@ func (f *FilterManager) GetLogFilterFromID(filterID string) (*logFilter, error) 
 	return logFilter, nil
 }
 
-// GetFilterChanges returns the updates of the filter with given ID in string
-func (f *FilterManager) GetFilterChanges(id string) (string, error) {
+// GetFilterChanges returns the updates of the filter with given ID in string, and refreshes the timeout on the filter
+func (f *FilterManager) GetFilterChanges(id string) (interface{}, error) {
+	filter, res, err := f.getFilterAndChanges(id)
+
+	if err == nil && !filter.hasWSConn() {
+		// Refresh the timeout on this filter
+		f.Lock()
+		f.refreshFilterTimeout(filter.getFilterBase())
+		f.Unlock()
+	}
+
+	return res, err
+}
+
+// getFilterAndChanges returns the updates of the filter with given ID in string (read lock only)
+func (f *FilterManager) getFilterAndChanges(id string) (filter, interface{}, error) {
 	f.RLock()
 	defer f.RUnlock()
 
 	filter, ok := f.filters[id]
 
 	if !ok {
-		return "", ErrFilterDoesNotExists
+		return nil, nil, ErrFilterNotFound
 	}
 
 	// we cannot get updates from a ws filter with getFilterChanges
 	if filter.hasWSConn() {
-		return "", ErrWSFilterDoesNotSupportGetChanges
+		return nil, nil, ErrWSFilterDoesNotSupportGetChanges
 	}
 
 	res, err := filter.getUpdates()
 	if err != nil {
-		return "", err
+		return nil, nil, err
 	}
 
-	return res, nil
+	return filter, res, nil
 }
 
 // Uninstall removes the filter with given ID from list
@@ -568,6 +574,19 @@ func (f *FilterManager) RemoveFilterByWs(ws wsConn) {
 	f.removeFilterByID(ws.GetFilterID())
 }
 
+// refreshFilterTimeout updates the timeout for a filter to the current time
+func (f *FilterManager) refreshFilterTimeout(filter *filterBase) {
+	f.timeouts.removeFilter(filter)
+	f.addFilterTimeout(filter)
+}
+
+// addFilterTimeout set timeout and add to heap
+func (f *FilterManager) addFilterTimeout(filter *filterBase) {
+	filter.expiresAt = time.Now().Add(f.timeout)
+	f.timeouts.addFilter(filter)
+	f.emitSignalToUpdateCh()
+}
+
 // addFilter is an internal method to add given filter to list and heap
 func (f *FilterManager) addFilter(filter filter) string {
 	f.Lock()
@@ -579,9 +598,7 @@ func (f *FilterManager) addFilter(filter filter) string {
 
 	// Set timeout and add to heap if filter doesn't have web socket connection
 	if !filter.hasWSConn() {
-		base.expiresAt = time.Now().Add(f.timeout)
-		f.timeouts.addFilter(base)
-		f.emitSignalToUpdateCh()
+		f.addFilterTimeout(base)
 	}
 
 	return base.id
