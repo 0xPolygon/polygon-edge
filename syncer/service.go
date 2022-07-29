@@ -48,7 +48,7 @@ func (s *syncPeerService) setupGRPCServer() {
 
 	proto.RegisterSyncPeerServer(s.stream.GrpcServer(), s)
 	s.stream.Serve()
-	s.network.RegisterProtocol(SyncerProto, s.stream)
+	s.network.RegisterProtocol(syncerProto, s.stream)
 }
 
 // GetBlocks is a gRPC endpoint to return blocks from the specific height via stream

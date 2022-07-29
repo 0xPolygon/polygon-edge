@@ -221,7 +221,7 @@ func (i *backendIBFT) startSyncing() {
 		}
 	}
 
-	if err := i.syncer.WatchSync(
+	if err := i.syncer.Sync(
 		func(block *types.Block) bool {
 			callInsertBlockHook(block.Number())
 			i.txpool.ResetWithHeaders(block.Header)
