@@ -14,28 +14,30 @@ import (
 )
 
 const (
-	configFlag            = "config"
-	genesisPathFlag       = "chain"
-	dataDirFlag           = "data-dir"
-	libp2pAddressFlag     = "libp2p"
-	prometheusAddressFlag = "prometheus"
-	natFlag               = "nat"
-	dnsFlag               = "dns"
-	sealFlag              = "seal"
-	maxPeersFlag          = "max-peers"
-	maxInboundPeersFlag   = "max-inbound-peers"
-	maxOutboundPeersFlag  = "max-outbound-peers"
-	priceLimitFlag        = "price-limit"
-	maxSlotsFlag          = "max-slots"
-	blockGasTargetFlag    = "block-gas-target"
-	secretsConfigFlag     = "secrets-config"
-	restoreFlag           = "restore"
-	blockTimeFlag         = "block-time"
-	ibftBaseTimeoutFlag   = "ibft-base-timeout"
-	devIntervalFlag       = "dev-interval"
-	devFlag               = "dev"
-	corsOriginFlag        = "access-control-allow-origins"
-	logFileLocationFlag   = "log-to"
+	configFlag                   = "config"
+	genesisPathFlag              = "chain"
+	dataDirFlag                  = "data-dir"
+	libp2pAddressFlag            = "libp2p"
+	prometheusAddressFlag        = "prometheus"
+	natFlag                      = "nat"
+	dnsFlag                      = "dns"
+	sealFlag                     = "seal"
+	maxPeersFlag                 = "max-peers"
+	maxInboundPeersFlag          = "max-inbound-peers"
+	maxOutboundPeersFlag         = "max-outbound-peers"
+	priceLimitFlag               = "price-limit"
+	jsonRPCBatchRequestLimitFlag = "json-rpc-batch-request-limit"
+	jsonRPCBlockRangeLimitFlag   = "json-rpc-block-range-limit"
+	maxSlotsFlag                 = "max-slots"
+	blockGasTargetFlag           = "block-gas-target"
+	secretsConfigFlag            = "secrets-config"
+	restoreFlag                  = "restore"
+	blockTimeFlag                = "block-time"
+	ibftBaseTimeoutFlag          = "ibft-base-timeout"
+	devIntervalFlag              = "dev-interval"
+	devFlag                      = "dev"
+	corsOriginFlag               = "access-control-allow-origins"
+	logFileLocationFlag          = "log-to"
 )
 
 const (
@@ -72,6 +74,9 @@ type serverParams struct {
 	isDevMode      bool
 
 	corsAllowedOrigins []string
+
+	jsonRPCBatchLengthLimit uint64
+	jsonRPCBlockRangeLimit  uint64
 
 	genesisConfig *chain.Chain
 	secretsConfig *secrets.SecretsManagerConfig
@@ -134,6 +139,8 @@ func (p *serverParams) generateConfig() *server.Config {
 		JSONRPC: &server.JSONRPC{
 			JSONRPCAddr:              p.jsonRPCAddress,
 			AccessControlAllowOrigin: p.corsAllowedOrigins,
+			BatchLengthLimit:         p.jsonRPCBatchLengthLimit,
+			BlockRangeLimit:          p.jsonRPCBlockRangeLimit,
 		},
 		GRPCAddr:   p.grpcAddress,
 		LibP2PAddr: p.libp2pAddress,

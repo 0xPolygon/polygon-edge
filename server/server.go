@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/0xPolygon/polygon-edge/archive"
 	"github.com/0xPolygon/polygon-edge/blockchain"
@@ -552,6 +553,8 @@ func (s *Server) setupJSONRPC() error {
 		ChainID:                  uint64(s.config.Chain.Params.ChainID),
 		AccessControlAllowOrigin: s.config.JSONRPC.AccessControlAllowOrigin,
 		PriceLimit:               s.config.PriceLimit,
+		BatchLengthLimit:         s.config.JSONRPC.BatchLengthLimit,
+		BlockRangeLimit:          s.config.JSONRPC.BlockRangeLimit,
 	}
 
 	srv, err := jsonrpc.NewJSONRPC(s.logger, conf)
@@ -641,6 +644,7 @@ func (s *Server) startPrometheusServer(listenAddr *net.TCPAddr) *http.Server {
 				promhttp.HandlerOpts{},
 			),
 		),
+		ReadHeaderTimeout: 60 * time.Second,
 	}
 
 	go func() {
