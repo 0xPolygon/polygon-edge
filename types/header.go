@@ -182,13 +182,48 @@ func (n *Nonce) UnmarshalText(input []byte) error {
 }
 
 func (h *Header) Copy() *Header {
-	hh := new(Header)
-	*hh = *h
+	newHeader := &Header{
+		Difficulty: h.Difficulty,
+		Number:     h.Number,
+		GasLimit:   h.GasLimit,
+		GasUsed:    h.GasUsed,
+		Timestamp:  h.Timestamp,
+	}
 
-	hh.ExtraData = make([]byte, len(h.ExtraData))
-	copy(hh.ExtraData[:], h.ExtraData[:])
+	newHeader.ParentHash = Hash{}
+	copy(newHeader.ParentHash[:], h.ParentHash[:])
 
-	return hh
+	newHeader.Sha3Uncles = Hash{}
+	copy(newHeader.Sha3Uncles[:], h.Sha3Uncles[:])
+
+	newHeader.Miner = Address{}
+	copy(newHeader.Miner[:], h.Miner[:])
+
+	newHeader.StateRoot = Hash{}
+	copy(newHeader.StateRoot[:], h.StateRoot[:])
+
+	newHeader.TxRoot = Hash{}
+	copy(newHeader.TxRoot[:], h.TxRoot[:])
+
+	newHeader.ReceiptsRoot = Hash{}
+	copy(newHeader.ReceiptsRoot[:], h.ReceiptsRoot[:])
+
+	newHeader.MixHash = Hash{}
+	copy(newHeader.MixHash[:], h.MixHash[:])
+
+	newHeader.Hash = Hash{}
+	copy(newHeader.Hash[:], h.Hash[:])
+
+	newHeader.LogsBloom = Bloom{}
+	copy(newHeader.LogsBloom[:], h.LogsBloom[:])
+
+	newHeader.Nonce = Nonce{}
+	copy(newHeader.Nonce[:], h.Nonce[:])
+
+	newHeader.ExtraData = make([]byte, len(h.ExtraData))
+	copy(newHeader.ExtraData[:], h.ExtraData[:])
+
+	return newHeader
 }
 
 type Body struct {
