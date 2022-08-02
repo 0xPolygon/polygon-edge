@@ -3,6 +3,7 @@ package genesis
 import (
 	"errors"
 	"fmt"
+	"github.com/0xPolygon/polygon-edge/helper/predeployment"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
@@ -272,7 +273,7 @@ func (p *genesisParams) initGenesisConfig() error {
 	}
 
 	// Premine accounts
-	stakingAccount, err := stakingHelper.GenerateGenesisAccountFromFile(
+	stakingAccount, err := predeployment.GenerateGenesisAccountFromFile(
 		"./Greeter.json",
 		[]interface{}{"yoshiki"},
 	)
