@@ -9,14 +9,12 @@ import (
 	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/state/runtime/evm"
-	"github.com/umbracle/go-web3/abi"
+	"github.com/umbracle/ethgo/abi"
 	"io/ioutil"
 	"math"
 	"math/big"
 	"os"
 	"strings"
-
-	"github.com/0xPolygon/polygon-edge/helper/common"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
@@ -205,7 +203,6 @@ func GenerateGenesisAccountFromFile(
 ) (*chain.GenesisAccount, error) {
 	// Set the code for the staking smart contract
 	// Code retrieved from https://github.com/0xPolygon/staking-contracts
-
 	//	create artifact from json file
 	artifact, err := generateContractArtifact(filepath)
 	if err != nil {
@@ -270,15 +267,16 @@ func GenerateGenesisAccountFromFile(
 
 	//	walk the state and collect
 	storageMap := make(map[types.Hash]types.Hash)
+
 	radix.GetRadix().Root().Walk(func(k []byte, v interface{}) bool {
-		addr := types.BytesToAddress(k)
-		if addr != staking.AddrStakingContract {
+		if types.BytesToAddress(k) != staking.AddrStakingContract {
 			return false
 		}
 
-		obj := v.(*state.StateObject)
+		obj, _ := v.(*state.StateObject)
 		obj.Txn.Root().Walk(func(k []byte, v interface{}) bool {
-			storageMap[types.BytesToHash(k)] = types.BytesToHash(v.([]byte))
+			val, _ := v.([]byte)
+			storageMap[types.BytesToHash(k)] = types.BytesToHash(val)
 
 			return false
 		})
