@@ -3,8 +3,6 @@ package genesis
 import (
 	"errors"
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/helper/predeployment"
-
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
@@ -271,17 +269,6 @@ func (p *genesisParams) initGenesisConfig() error {
 
 		chainConfig.Genesis.Alloc[staking.AddrStakingContract] = stakingAccount
 	}
-
-	// Premine accounts
-	stakingAccount, err := predeployment.GenerateGenesisAccountFromFile(
-		"./Greeter.json",
-		[]interface{}{"yoshiki"},
-	)
-	if err != nil {
-		return err
-	}
-
-	chainConfig.Genesis.Alloc[staking.AddrStakingContract] = stakingAccount
 
 	if err := fillPremineMap(chainConfig.Genesis.Alloc, p.premine); err != nil {
 		return err

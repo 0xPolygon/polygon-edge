@@ -101,7 +101,7 @@ func generateContractArtifact(filepath string) (*contractArtifact, error) {
 // inserted into state
 func GenerateGenesisAccountFromFile(
 	filepath string,
-	constructorParams []interface{},
+	constructorArgs []interface{},
 ) (*chain.GenesisAccount, error) {
 	// Create the artifact from JSON
 	artifact, err := generateContractArtifact(filepath)
@@ -117,7 +117,10 @@ func GenerateGenesisAccountFromFile(
 
 	// Encode the constructor params
 	constructor, err := abi.Encode(
-		constructorParams,
+		// Constructor arguments are passed in as an array of values.
+		// Structs are treated as sub-arrays with their corresponding values laid out
+		// in ABI encoding
+		constructorArgs,
 		contractABI.Constructor.Inputs,
 	)
 	if err != nil {
