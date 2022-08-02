@@ -11,7 +11,7 @@ import (
 	txpoolOp "github.com/0xPolygon/polygon-edge/txpool/proto"
 	"github.com/0xPolygon/polygon-edge/types"
 
-	"github.com/umbracle/go-web3/jsonrpc"
+	"github.com/umbracle/ethgo/jsonrpc"
 )
 
 func (l *Loadbot) deployContract(
@@ -63,8 +63,18 @@ func (l *Loadbot) deployContract(
 	}
 
 	end := time.Now()
-	// initialize gas metrics map with block nuber as index
-	l.metrics.ContractMetrics.ContractGasMetrics.Blocks[receipt.BlockNumber] = GasMetrics{}
+
+	// initialize gas metrics map with block number as index
+	l.metrics.ContractMetrics.ContractGasMetrics, err = getBlockGasMetrics(
+		jsonClient,
+		map[uint64]struct{}{
+			receipt.BlockNumber: {},
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("unable to fetch gas metrics, %w", err)
+	}
+
 	// fetch contract address
 	l.metrics.ContractMetrics.ContractAddress = receipt.ContractAddress
 	// set contract address in order to get new example txn and gas estimate
@@ -88,10 +98,6 @@ func (l *Loadbot) deployContract(
 			blockNumber:    receipt.BlockNumber,
 		},
 	)
-	// calculate contract deployment metrics
-	if err := l.calculateGasMetrics(jsonClient, l.metrics.ContractMetrics.ContractGasMetrics); err != nil {
-		return fmt.Errorf("unable to calculate contract block gas metrics: %w", err)
-	}
 
 	l.metrics.ContractMetrics.ContractDeploymentDuration.calcTurnAroundMetrics()
 	l.metrics.ContractMetrics.ContractDeploymentDuration.TotalExecTime = end.Sub(start)

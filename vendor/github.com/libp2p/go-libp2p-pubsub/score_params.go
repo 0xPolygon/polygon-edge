@@ -93,6 +93,9 @@ type PeerScoreParams struct {
 
 	// time to remember counters for a disconnected peer.
 	RetainScore time.Duration
+
+	// time to remember a message delivery for. Default to global TimeCacheDuration if 0.
+	SeenMsgTTL time.Duration
 }
 
 type TopicScoreParams struct {

@@ -2,6 +2,7 @@ package propose
 
 import (
 	"fmt"
+
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/spf13/cobra"
 
@@ -17,7 +18,8 @@ func GetCommand() *cobra.Command {
 	}
 
 	setFlags(ibftSnapshotCmd)
-	setRequiredFlags(ibftSnapshotCmd)
+
+	helper.SetRequiredFlags(ibftSnapshotCmd, params.getRequiredFlags())
 
 	return ibftSnapshotCmd
 }
@@ -40,12 +42,8 @@ func setFlags(cmd *cobra.Command) {
 			dropVote,
 		),
 	)
-}
 
-func setRequiredFlags(cmd *cobra.Command) {
-	for _, requiredFlag := range params.getRequiredFlags() {
-		_ = cmd.MarkFlagRequired(requiredFlag)
-	}
+	cmd.MarkFlagsRequiredTogether(addressFlag, voteFlag)
 }
 
 func runPreRun(_ *cobra.Command, _ []string) error {

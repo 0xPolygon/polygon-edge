@@ -8,7 +8,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/command/loadbot/generator"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/umbracle/go-web3/abi"
+	"github.com/umbracle/ethgo/abi"
 )
 
 var (
@@ -140,11 +140,23 @@ func (p *loadbotParams) initAddressValues() error {
 		return fmt.Errorf("failed to decode sender address: %w", err)
 	}
 
-	if err := p.receiver.UnmarshalText([]byte(p.receiverRaw)); err != nil {
+	if err := p.initReceiverAddress(); err != nil {
 		return fmt.Errorf("failed to decode receiver address: %w", err)
 	}
 
 	return nil
+}
+
+func (p *loadbotParams) initReceiverAddress() error {
+	if p.receiverRaw == "" {
+		// No receiving address specified,
+		// use the sender address as the receiving address
+		p.receiver = p.sender
+
+		return nil
+	}
+
+	return p.receiver.UnmarshalText([]byte(p.receiverRaw))
 }
 
 func (p *loadbotParams) initTxnValue() error {

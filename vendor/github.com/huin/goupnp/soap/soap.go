@@ -202,5 +202,6 @@ type SOAPFaultError struct {
 }
 
 func (err *SOAPFaultError) Error() string {
-	return fmt.Sprintf("SOAP fault: %s", err.FaultString)
+	return fmt.Sprintf("SOAP fault. Code: %s | Explanation: %s | Detail: %s",
+		err.FaultCode, err.FaultString, string(err.Detail.Raw))
 }

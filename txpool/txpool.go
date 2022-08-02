@@ -7,6 +7,7 @@ import (
 
 	"github.com/golang/protobuf/ptypes/any"
 	"github.com/hashicorp/go-hclog"
+	"github.com/libp2p/go-libp2p-core/peer"
 	"google.golang.org/grpc"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
@@ -21,6 +22,10 @@ const (
 	txSlotSize  = 32 * 1024  // 32kB
 	txMaxSize   = 128 * 1024 //128Kb
 	topicNameV1 = "txpool/0.1"
+
+	//	maximum allowed number of times an account
+	//	was excluded from block building (ibft.writeTransactions)
+	maxAccountDemotions = uint(10)
 )
 
 // errors
@@ -28,7 +33,7 @@ var (
 	ErrIntrinsicGas        = errors.New("intrinsic gas too low")
 	ErrBlockLimitExceeded  = errors.New("exceeds block gas limit")
 	ErrNegativeValue       = errors.New("negative value")
-	ErrNonEncryptedTx      = errors.New("non-encrypted transaction")
+	ErrExtractSignature    = errors.New("cannot extract signature")
 	ErrInvalidSender       = errors.New("invalid sender")
 	ErrTxPoolOverflow      = errors.New("txpool is full")
 	ErrUnderpriced         = errors.New("transaction underpriced")
@@ -317,6 +322,9 @@ func (p *TxPool) Pop(tx *types.Transaction) {
 	// pop the top most promoted tx
 	account.promoted.pop()
 
+	//	successfully popping an account resets its demotions count to 0
+	account.demotions = 0
+
 	// update state
 	p.gauge.decrease(slotsRequired(tx))
 
@@ -378,7 +386,27 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 	)
 }
 
+//	Demote excludes an account from being further processed during block building
+//	due to a recoverable error. If an account has been demoted too many times (maxAccountDemotions),
+//	it is Dropped instead.
 func (p *TxPool) Demote(tx *types.Transaction) {
+	account := p.accounts.get(tx.From)
+	if account.demotions == maxAccountDemotions {
+		p.logger.Debug(
+			"Demote: threshold reached - dropping account",
+			"addr", tx.From.String(),
+		)
+
+		p.Drop(tx)
+
+		//	reset the demotions counter
+		account.demotions = 0
+
+		return
+	}
+
+	account.demotions++
+
 	p.eventManager.signalEvent(proto.EventType_DEMOTED, tx.Hash)
 }
 
@@ -482,7 +510,7 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 	// Extract the sender
 	from, signerErr := p.signer.Sender(tx)
 	if signerErr != nil {
-		return ErrInvalidSender
+		return ErrExtractSignature
 	}
 
 	// If the from field is set, check that
@@ -562,20 +590,9 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 
 	tx.ComputeHash()
 
-	// check if already known
-	if _, ok := p.index.get(tx.Hash); ok {
-		if origin == gossip {
-			// silently drop known tx
-			// that is gossiped back
-			p.logger.Debug(
-				"dropping known gossiped transaction",
-				"hash", tx.Hash.String(),
-			)
-
-			return nil
-		} else {
-			return ErrAlreadyKnown
-		}
+	//	add to index
+	if ok := p.index.add(tx); !ok {
+		return ErrAlreadyKnown
 	}
 
 	// initialize account for this address once
@@ -605,13 +622,13 @@ func (p *TxPool) handleEnqueueRequest(req enqueueRequest) {
 	if err := account.enqueue(tx); err != nil {
 		p.logger.Error("enqueue request", "err", err)
 
+		p.index.remove(tx)
+
 		return
 	}
 
 	p.logger.Debug("enqueue request", "hash", tx.Hash.String())
 
-	// update state
-	p.index.add(tx)
 	p.gauge.increase(slotsRequired(tx))
 
 	p.eventManager.signalEvent(proto.EventType_ENQUEUED, tx.Hash)
@@ -643,24 +660,43 @@ func (p *TxPool) handlePromoteRequest(req promoteRequest) {
 
 // addGossipTx handles receiving transactions
 // gossiped by the network.
-func (p *TxPool) addGossipTx(obj interface{}) {
+func (p *TxPool) addGossipTx(obj interface{}, _ peer.ID) {
 	if !p.sealing {
 		return
 	}
 
-	raw := obj.(*proto.Txn) // nolint:forcetypeassert
+	raw, ok := obj.(*proto.Txn)
+	if !ok {
+		p.logger.Error("failed to cast gossiped message to txn")
+
+		return
+	}
+
+	// Verify that the gossiped transaction message is not empty
+	if raw == nil || raw.Raw == nil {
+		p.logger.Error("malformed gossip transaction message received")
+
+		return
+	}
+
 	tx := new(types.Transaction)
 
 	// decode tx
 	if err := tx.UnmarshalRLP(raw.Raw.Value); err != nil {
-		p.logger.Error("failed to decode broadcasted tx", "err", err)
+		p.logger.Error("failed to decode broadcast tx", "err", err)
 
 		return
 	}
 
 	// add tx
 	if err := p.addTx(gossip, tx); err != nil {
-		p.logger.Error("failed to add broadcasted txn", "err", err)
+		if errors.Is(err, ErrAlreadyKnown) {
+			p.logger.Debug("rejecting known tx (gossip)", "hash", tx.Hash.String())
+
+			return
+		}
+
+		p.logger.Error("failed to add broadcast tx", "err", err, "hash", tx.Hash.String())
 	}
 }
 
@@ -684,6 +720,9 @@ func (p *TxPool) resetAccounts(stateNonces map[types.Address]uint64) {
 		//	append pruned
 		allPrunedPromoted = append(allPrunedPromoted, prunedPromoted...)
 		allPrunedEnqueued = append(allPrunedEnqueued, prunedEnqueued...)
+
+		//	new state for account -> demotions are reset to 0
+		account.demotions = 0
 	}
 
 	//	pool cleanup callback

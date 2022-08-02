@@ -2,7 +2,9 @@ package generate
 
 import (
 	"fmt"
+
 	"github.com/0xPolygon/polygon-edge/command"
+	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/spf13/cobra"
 
 	"github.com/0xPolygon/polygon-edge/secrets"
@@ -11,12 +13,12 @@ import (
 func GetCommand() *cobra.Command {
 	secretsGenerateCmd := &cobra.Command{
 		Use:   "generate",
-		Short: "Initializes the secrets manager configuration in the provided directory. Used for Hashicorp Vault",
+		Short: "Initializes the secrets manager configuration in the provided directory.",
 		Run:   runCommand,
 	}
 
 	setFlags(secretsGenerateCmd)
-	setRequiredFlags(secretsGenerateCmd)
+	helper.SetRequiredFlags(secretsGenerateCmd, params.getRequiredFlags())
 
 	return secretsGenerateCmd
 }
@@ -26,10 +28,7 @@ func setFlags(cmd *cobra.Command) {
 		&params.dir,
 		dirFlag,
 		defaultConfigFileName,
-		fmt.Sprintf(
-			"the directory for the secrets manager configuration file Default: %s",
-			defaultConfigFileName,
-		),
+		"the directory for the secrets manager configuration file",
 	)
 
 	cmd.Flags().StringVar(
@@ -51,8 +50,10 @@ func setFlags(cmd *cobra.Command) {
 		typeFlag,
 		string(secrets.HashicorpVault),
 		fmt.Sprintf(
-			"the type of the secrets manager. Default: %s",
+			"the type of the secrets manager. Available types: %s, %s and %s",
 			secrets.HashicorpVault,
+			secrets.AWSSSM,
+			secrets.GCPSSM,
 		),
 	)
 
@@ -60,20 +61,14 @@ func setFlags(cmd *cobra.Command) {
 		&params.name,
 		nameFlag,
 		defaultNodeName,
-		fmt.Sprintf(
-			"the name of the node for on-service record keeping. Default: %s",
-			defaultNodeName,
-		),
+		"the name of the node for on-service record keeping",
 	)
 
 	cmd.Flags().StringVar(
 		&params.namespace,
 		namespaceFlag,
 		defaultNamespace,
-		fmt.Sprintf(
-			"the namespace for the service. Default %s",
-			defaultNamespace,
-		),
+		"the namespace for the service",
 	)
 
 	cmd.Flags().StringVar(
@@ -82,12 +77,6 @@ func setFlags(cmd *cobra.Command) {
 		"",
 		"Specifies the extra fields map in string format 'key1=val1,key2=val2'",
 	)
-}
-
-func setRequiredFlags(cmd *cobra.Command) {
-	for _, requiredFlag := range params.getRequiredFlags() {
-		_ = cmd.MarkFlagRequired(requiredFlag)
-	}
 }
 
 func runCommand(cmd *cobra.Command, _ []string) {

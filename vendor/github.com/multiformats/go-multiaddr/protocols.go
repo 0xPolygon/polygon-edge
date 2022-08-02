@@ -13,7 +13,10 @@ const (
 	P_DCCP              = 0x0021
 	P_IP6               = 0x0029
 	P_IP6ZONE           = 0x002A
+	P_IPCIDR            = 0x002B
 	P_QUIC              = 0x01CC
+	P_WEBTRANSPORT      = 0x01D1
+	P_CERTHASH          = 0x01D2
 	P_SCTP              = 0x0084
 	P_CIRCUIT           = 0x0122
 	P_UDT               = 0x012D
@@ -103,6 +106,13 @@ var (
 		Size:       128,
 		Transcoder: TranscoderIP6,
 	}
+	protoIPCIDR = Protocol{
+		Name:       "ipcidr",
+		Code:       P_IPCIDR,
+		VCode:      CodeToVarint(P_IPCIDR),
+		Size:       8,
+		Transcoder: TranscoderIPCIDR,
+	}
 	// these require varint
 	protoIP6ZONE = Protocol{
 		Name:       "ip6zone",
@@ -169,6 +179,18 @@ var (
 		Name:  "quic",
 		Code:  P_QUIC,
 		VCode: CodeToVarint(P_QUIC),
+	}
+	protoWEBTRANSPORT = Protocol{
+		Name:  "webtransport",
+		Code:  P_WEBTRANSPORT,
+		VCode: CodeToVarint(P_WEBTRANSPORT),
+	}
+	protoCERTHASH = Protocol{
+		Name:       "certhash",
+		Code:       P_CERTHASH,
+		VCode:      CodeToVarint(P_CERTHASH),
+		Size:       LengthPrefixedVarSize,
+		Transcoder: TranscoderCertHash,
 	}
 	protoHTTP = Protocol{
 		Name:  "http",
@@ -239,6 +261,7 @@ func init() {
 		protoDCCP,
 		protoIP6,
 		protoIP6ZONE,
+		protoIPCIDR,
 		protoSCTP,
 		protoCIRCUIT,
 		protoONION2,
@@ -248,6 +271,8 @@ func init() {
 		protoUTP,
 		protoUDT,
 		protoQUIC,
+		protoWEBTRANSPORT,
+		protoCERTHASH,
 		protoHTTP,
 		protoHTTPS,
 		protoP2P,

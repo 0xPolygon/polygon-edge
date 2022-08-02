@@ -15,11 +15,12 @@ import (
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/network"
-	"github.com/0xPolygon/polygon-edge/protocol"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/state"
+	"github.com/0xPolygon/polygon-edge/syncer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
+	"github.com/libp2p/go-libp2p-core/peer"
 	"google.golang.org/grpc"
 	anypb "google.golang.org/protobuf/types/known/anypb"
 )
@@ -38,6 +39,7 @@ type blockchainInterface interface {
 	Header() *types.Header
 	GetHeaderByNumber(i uint64) (*types.Header, bool)
 	WriteBlock(block *types.Block) error
+	VerifyPotentialBlock(block *types.Block) error
 	CalculateGasLimit(number uint64) (uint64, error)
 }
 
@@ -49,15 +51,6 @@ type txPoolInterface interface {
 	Drop(tx *types.Transaction)
 	Demote(tx *types.Transaction)
 	ResetWithHeaders(headers ...*types.Header)
-}
-
-type syncerInterface interface {
-	Start()
-	BestPeer() *protocol.SyncPeer
-	BulkSyncWithPeer(p *protocol.SyncPeer, newBlockHandler func(block *types.Block)) error
-	WatchSyncWithPeer(p *protocol.SyncPeer, newBlockHandler func(b *types.Block) bool)
-	GetSyncProgression() *progress.Progression
-	Broadcast(b *types.Block)
 }
 
 // Ibft represents the IBFT consensus mechanism object
@@ -78,13 +71,14 @@ type Ibft struct {
 
 	txpool txPoolInterface // Reference to the transaction pool
 
-	store     *snapshotStore // Snapshot store that keeps track of all snapshots
-	epochSize uint64
+	store              *snapshotStore // Snapshot store that keeps track of all snapshots
+	epochSize          uint64
+	quorumSizeBlockNum uint64
 
 	msgQueue *msgQueue     // Structure containing different message queues
 	updateCh chan struct{} // Update channel
 
-	syncer syncerInterface // Reference to the sync protocol
+	syncer syncer.Syncer // Reference to the sync protocol
 
 	network   *network.Server // Reference to the networking layer
 	transport transport       // Reference to the transport protocol
@@ -100,7 +94,8 @@ type Ibft struct {
 
 	mechanisms []ConsensusMechanism // IBFT ConsensusMechanism used (PoA / PoS)
 
-	blockTime time.Duration // Minimum block generation time in seconds
+	blockTime       time.Duration // Minimum block generation time in seconds
+	ibftBaseTimeout time.Duration // Base timeout for IBFT message in seconds
 }
 
 // runHook runs a specified hook if it is present in the hook map
@@ -122,7 +117,12 @@ func (i *Ibft) runHook(hookName HookType, height uint64, hookParam interface{}) 
 
 		// Run the hook
 		if err := hook(hookParam); err != nil {
-			return fmt.Errorf("error occurred during a call of %s hook in %s: %w", hookName, mechanism.GetType(), err)
+			return fmt.Errorf(
+				"error occurred during a call of %s hook in %s: %w",
+				hookName,
+				mechanism.GetType(),
+				err,
+			)
 		}
 	}
 
@@ -133,11 +133,13 @@ func (i *Ibft) runHook(hookName HookType, height uint64, hookParam interface{}) 
 func Factory(
 	params *consensus.ConsensusParams,
 ) (consensus.Consensus, error) {
-	var epochSize uint64
-	if definedEpochSize, ok := params.Config.Config["epochSize"]; !ok {
-		// No epoch size defined, use the default one
-		epochSize = DefaultEpochSize
-	} else {
+	//	defaults for user set fields in genesis
+	var (
+		epochSize          = uint64(DefaultEpochSize)
+		quorumSizeBlockNum = uint64(0)
+	)
+
+	if definedEpochSize, ok := params.Config.Config["epochSize"]; ok {
 		// Epoch size is defined, use the passed in one
 		readSize, ok := definedEpochSize.(float64)
 		if !ok {
@@ -147,21 +149,33 @@ func Factory(
 		epochSize = uint64(readSize)
 	}
 
+	if rawBlockNum, ok := params.Config.Config["quorumSizeBlockNum"]; ok {
+		//	Block number specified for quorum size switch
+		readBlockNum, ok := rawBlockNum.(float64)
+		if !ok {
+			return nil, errors.New("invalid type assertion")
+		}
+
+		quorumSizeBlockNum = uint64(readBlockNum)
+	}
+
 	p := &Ibft{
-		logger:         params.Logger.Named("ibft"),
-		config:         params.Config,
-		Grpc:           params.Grpc,
-		blockchain:     params.Blockchain,
-		executor:       params.Executor,
-		closeCh:        make(chan struct{}),
-		txpool:         params.Txpool,
-		state:          &currentState{},
-		network:        params.Network,
-		epochSize:      epochSize,
-		sealing:        params.Seal,
-		metrics:        params.Metrics,
-		secretsManager: params.SecretsManager,
-		blockTime:      time.Duration(params.BlockTime) * time.Second,
+		logger:             params.Logger.Named("ibft"),
+		config:             params.Config,
+		Grpc:               params.Grpc,
+		blockchain:         params.Blockchain,
+		executor:           params.Executor,
+		closeCh:            make(chan struct{}),
+		txpool:             params.Txpool,
+		state:              &currentState{},
+		network:            params.Network,
+		epochSize:          epochSize,
+		quorumSizeBlockNum: quorumSizeBlockNum,
+		sealing:            params.Seal,
+		metrics:            params.Metrics,
+		secretsManager:     params.SecretsManager,
+		blockTime:          time.Duration(params.BlockTime) * time.Second,
+		ibftBaseTimeout:    time.Duration(params.IBFTBaseTimeout) * time.Second,
 	}
 
 	// Initialize the mechanism
@@ -172,7 +186,7 @@ func Factory(
 	// Istanbul requires a different header hash function
 	types.HeaderHash = istanbulHeaderHash
 
-	p.syncer = protocol.NewSyncer(params.Logger, params.Network, params.Blockchain)
+	p.syncer = syncer.NewSyncer(params.Logger, params.Network, params.Blockchain, p.blockTime*3)
 
 	return p, nil
 }
@@ -208,7 +222,9 @@ func (i *Ibft) Start() error {
 	}
 
 	// Start the syncer
-	i.syncer.Start()
+	if err := i.syncer.Start(); err != nil {
+		return err
+	}
 
 	// Start the actual IBFT protocol
 	go i.start()
@@ -307,7 +323,7 @@ func (i *Ibft) setupTransport() error {
 	}
 
 	// Subscribe to the newly created topic
-	err = topic.Subscribe(func(obj interface{}) {
+	err = topic.Subscribe(func(obj interface{}, _ peer.ID) {
 		msg, ok := obj.(*proto.MessageReq)
 		if !ok {
 			i.logger.Error("invalid type assertion for message request")
@@ -449,11 +465,6 @@ func (i *Ibft) isValidSnapshot() bool {
 	}
 
 	if snap.Set.Includes(i.validatorKeyAddr) {
-		i.state.view = &proto.View{
-			Sequence: header.Number + 1,
-			Round:    0,
-		}
-
 		return true
 	}
 
@@ -472,20 +483,22 @@ func (i *Ibft) runSyncState() {
 		}
 	}
 
+	// save current height in order to check new blocks are added or not during sync
+	beginningHeight := uint64(0)
+	if header := i.blockchain.Header(); header != nil {
+		beginningHeight = header.Number
+	}
+
 	for i.isState(SyncState) {
 		// try to sync with the best-suited peer
-		p := i.syncer.BestPeer()
-		if p == nil {
+		if !i.syncer.HasSyncPeer() {
 			// if we do not have any peers, and we have been a validator
 			// we can start now. In case we start on another fork this will be
 			// reverted later
 			if i.isValidSnapshot() {
 				// initialize the round and sequence
-				header := i.blockchain.Header()
-				i.state.view = &proto.View{
-					Round:    0,
-					Sequence: header.Number + 1,
-				}
+				i.startNewSequence()
+
 				//Set the round metric
 				i.metrics.Rounds.Set(float64(i.state.view.Round))
 
@@ -497,9 +510,11 @@ func (i *Ibft) runSyncState() {
 			continue
 		}
 
-		if err := i.syncer.BulkSyncWithPeer(p, func(newBlock *types.Block) {
+		if err := i.syncer.BulkSync(func(newBlock *types.Block) bool {
 			callInsertBlockHook(newBlock.Number())
 			i.txpool.ResetWithHeaders(newBlock.Header)
+
+			return false
 		}); err != nil {
 			i.logger.Error("failed to bulk sync", "err", err)
 
@@ -509,6 +524,7 @@ func (i *Ibft) runSyncState() {
 		// if we are a validator we do not even want to wait here
 		// we can just move ahead
 		if i.isValidSnapshot() {
+			i.startNewSequence()
 			i.setState(AcceptState)
 
 			continue
@@ -517,24 +533,39 @@ func (i *Ibft) runSyncState() {
 		// start watch mode
 		var isValidator bool
 
-		i.syncer.WatchSyncWithPeer(p, func(newBlock *types.Block) bool {
+		err := i.syncer.WatchSync(func(newBlock *types.Block) bool {
 			// After each written block, update the snapshot store for PoS.
 			// The snapshot store is currently updated for PoA inside the ProcessHeadersHook
 			callInsertBlockHook(newBlock.Number())
 
-			i.syncer.Broadcast(newBlock)
 			i.txpool.ResetWithHeaders(newBlock.Header)
 			isValidator = i.isValidSnapshot()
 
 			return isValidator
 		})
 
+		if err != nil {
+			i.logger.Warn("error happened during watch sync", "err", err)
+		}
+
 		if isValidator {
 			// at this point, we are in sync with the latest chain we know of
 			// and we are a validator of that chain so we need to change to AcceptState
 			// so that we can start to do some stuff there
+			i.startNewSequence()
 			i.setState(AcceptState)
 		}
+	}
+
+	// check that new blocks are added during sync
+	endingHeight := uint64(0)
+	if header := i.blockchain.Header(); header != nil {
+		endingHeight = header.Number
+	}
+
+	// if new blocks are added, validator will unlock current block
+	if endingHeight > beginningHeight {
+		i.state.unlock()
 	}
 }
 
@@ -580,9 +611,6 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 	}); hookErr != nil {
 		i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", CandidateVoteHook, hookErr))
 	}
-
-	// calculate millisecond values from consensus custom functions in utils.go file
-	// to preserve go backward compatibility as time.UnixMili is available as of go 17
 
 	// set the timestamp
 	parentTime := time.Unix(int64(parent.Timestamp), 0)
@@ -807,7 +835,7 @@ func (i *Ibft) runAcceptState() { // start new round
 	// we are NOT a proposer for the block. Then, we have to wait
 	// for a pre-prepare message from the proposer
 
-	timeout := exponentialTimeout(i.state.view.Round)
+	timeout := i.getTimeout()
 	for i.getState() == AcceptState {
 		msg, ok := i.getNextMessage(timeout)
 		if !ok {
@@ -835,6 +863,14 @@ func (i *Ibft) runAcceptState() { // start new round
 			return
 		}
 
+		// Make sure the proposing block height match the current sequence
+		if block.Number() != i.state.view.Sequence {
+			i.logger.Error("sequence not correct", "block", block.Number, "sequence", i.state.view.Sequence)
+			i.handleStateErr(errIncorrectBlockHeight)
+
+			return
+		}
+
 		if i.state.locked {
 			// the state is locked, we need to receive the same block
 			if block.Hash() == i.state.block.Hash() {
@@ -847,6 +883,14 @@ func (i *Ibft) runAcceptState() { // start new round
 		} else {
 			// since it's a new block, we have to verify it first
 			if err := i.verifyHeaderImpl(snap, parent, block.Header); err != nil {
+				i.logger.Error("block header verification failed", "err", err)
+				i.handleStateErr(errBlockVerificationFailed)
+
+				continue
+			}
+
+			// Verify other block params
+			if err := i.blockchain.VerifyPotentialBlock(block); err != nil {
 				i.logger.Error("block verification failed", "err", err)
 				i.handleStateErr(errBlockVerificationFailed)
 
@@ -854,6 +898,8 @@ func (i *Ibft) runAcceptState() { // start new round
 			}
 
 			if hookErr := i.runHook(VerifyBlockHook, block.Number(), block); hookErr != nil {
+				// Not linting this as the underlying error is actually wrapped
+				// nolint:govet
 				if errors.As(hookErr, &errBlockVerificationFailed) {
 					i.logger.Error("block verification failed, block at the end of epoch has transactions")
 					i.handleStateErr(errBlockVerificationFailed)
@@ -891,7 +937,7 @@ func (i *Ibft) runValidateState() {
 		}
 	}
 
-	timeout := exponentialTimeout(i.state.view.Round)
+	timeout := i.getTimeout()
 	for i.getState() == ValidateState {
 		msg, ok := i.getNextMessage(timeout)
 		if !ok {
@@ -916,12 +962,12 @@ func (i *Ibft) runValidateState() {
 			panic(fmt.Sprintf("BUG: %s", reflect.TypeOf(msg.Type)))
 		}
 
-		if i.state.numPrepared() > i.state.NumValid() {
+		if i.state.numPrepared() >= i.quorumSize(i.state.view.Sequence)(i.state.validators) {
 			// we have received enough pre-prepare messages
 			sendCommit()
 		}
 
-		if i.state.numCommitted() > i.state.NumValid() {
+		if i.state.numCommitted() >= i.quorumSize(i.state.view.Sequence)(i.state.validators) {
 			// we have received enough commit messages
 			sendCommit()
 
@@ -943,6 +989,9 @@ func (i *Ibft) runValidateState() {
 		} else {
 			// update metrics
 			i.updateMetrics(block)
+
+			// increase the sequence number and reset the round if any
+			i.startNewSequence()
 
 			// move ahead to the next block
 			i.setState(AcceptState)
@@ -969,21 +1018,41 @@ func (i *Ibft) updateMetrics(block *types.Block) {
 	i.metrics.NumTxs.Set(float64(len(block.Body().Transactions)))
 }
 func (i *Ibft) insertBlock(block *types.Block) error {
-	committedSeals := [][]byte{}
+	committedSeals := make([][]byte, 0)
+
 	for _, commit := range i.state.committed {
 		// no need to check the format of seal here because writeCommittedSeals will check
-		committedSeals = append(committedSeals, hex.MustDecodeHex(commit.Seal))
+		committedSeal, decodeErr := hex.DecodeHex(commit.Seal)
+		if decodeErr != nil {
+			i.logger.Error(
+				fmt.Sprintf(
+					"unable to decode committed seal from %s",
+					commit.From,
+				),
+			)
+
+			continue
+		}
+
+		committedSeals = append(committedSeals, committedSeal)
 	}
 
+	// Push the committed seals to the header
 	header, err := writeCommittedSeals(block.Header, committedSeals)
 	if err != nil {
 		return err
 	}
 
-	// we need to recompute the hash since we have change extra-data
+	// The hash needs to be recomputed since the extra data was changed
 	block.Header = header
 	block.Header.ComputeHash()
 
+	// Verify the header only, since the block body is already verified
+	if err := i.VerifyHeader(block.Header); err != nil {
+		return err
+	}
+
+	// Save the block locally
 	if err := i.blockchain.WriteBlock(block); err != nil {
 		return err
 	}
@@ -1001,15 +1070,6 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 		"committed", i.state.numCommitted(),
 	)
 
-	// increase the sequence number and reset the round if any
-	i.state.view = &proto.View{
-		Sequence: header.Number + 1,
-		Round:    0,
-	}
-
-	// broadcast the new block
-	i.syncer.Broadcast(block)
-
 	// after the block has been written we reset the txpool so that
 	// the old transactions are removed
 	i.txpool.ResetWithHeaders(block.Header)
@@ -1018,9 +1078,10 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 }
 
 var (
-	errIncorrectBlockLocked    = fmt.Errorf("block locked is incorrect")
-	errBlockVerificationFailed = fmt.Errorf("block verification failed")
-	errFailedToInsertBlock     = fmt.Errorf("failed to insert block")
+	errIncorrectBlockLocked    = errors.New("block locked is incorrect")
+	errIncorrectBlockHeight    = errors.New("proposed block number is incorrect")
+	errBlockVerificationFailed = errors.New("block verification failed")
+	errFailedToInsertBlock     = errors.New("failed to insert block")
 )
 
 func (i *Ibft) handleStateErr(err error) {
@@ -1032,7 +1093,7 @@ func (i *Ibft) runRoundChangeState() {
 	sendRoundChange := func(round uint64) {
 		i.logger.Debug("local round change", "round", round+1)
 		// set the new round and update the round metric
-		i.state.view.Round = round
+		i.startNewRound(round)
 		i.metrics.Rounds.Set(float64(round))
 		// clean the round
 		i.state.cleanRound(round)
@@ -1045,18 +1106,12 @@ func (i *Ibft) runRoundChangeState() {
 
 	checkTimeout := func() {
 		// check if there is any peer that is really advanced and we might need to sync with it first
-		if i.syncer != nil {
-			bestPeer := i.syncer.BestPeer()
-			if bestPeer != nil {
-				lastProposal := i.blockchain.Header()
-				if bestPeer.Number() > lastProposal.Number {
-					i.logger.Debug("it has found a better peer to connect", "local", lastProposal.Number, "remote", bestPeer.Number())
-					// we need to catch up with the last sequence
-					i.setState(SyncState)
+		if i.syncer != nil && i.syncer.HasSyncPeer() {
+			i.logger.Debug("it has found a better peer to connect")
+			// we need to catch up with the last sequence
+			i.setState(SyncState)
 
-					return
-				}
-			}
+			return
 		}
 
 		// otherwise, it seems that we are in sync
@@ -1082,7 +1137,7 @@ func (i *Ibft) runRoundChangeState() {
 	}
 
 	// create a timer for the round change
-	timeout := exponentialTimeout(i.state.view.Round)
+	timeout := i.getTimeout()
 	for i.getState() == RoundChangeState {
 		msg, ok := i.getNextMessage(timeout)
 		if !ok {
@@ -1094,7 +1149,7 @@ func (i *Ibft) runRoundChangeState() {
 			i.logger.Debug("round change timeout")
 			checkTimeout()
 			// update the timeout duration
-			timeout = exponentialTimeout(i.state.view.Round)
+			timeout = i.getTimeout()
 
 			continue
 		}
@@ -1102,17 +1157,16 @@ func (i *Ibft) runRoundChangeState() {
 		// we only expect RoundChange messages right now
 		num := i.state.AddRoundMessage(msg)
 
-		if num == i.state.NumValid() {
-			// start a new round immediately
-			i.state.view.Round = msg.View.Round
-			i.setState(AcceptState)
-		} else if num == i.state.validators.MaxFaultyNodes()+1 {
+		if num == i.state.validators.MaxFaultyNodes()+1 && i.state.view.Round < msg.View.Round {
 			// weak certificate, try to catch up if our round number is smaller
-			if i.state.view.Round < msg.View.Round {
-				// update timer
-				timeout = exponentialTimeout(i.state.view.Round)
-				sendRoundChange(msg.View.Round)
-			}
+			// update timer
+			timeout = i.getTimeout()
+
+			sendRoundChange(msg.View.Round)
+		} else if num == i.quorumSize(i.state.view.Sequence)(i.state.validators) {
+			// start a new round immediately
+			i.startNewRound(msg.View.Round)
+			i.setState(AcceptState)
 		}
 	}
 }
@@ -1239,7 +1293,15 @@ func (i *Ibft) verifyHeaderImpl(snap *Snapshot, parent, header *types.Header) er
 }
 
 // VerifyHeader wrapper for verifying headers
-func (i *Ibft) VerifyHeader(parent, header *types.Header) error {
+func (i *Ibft) VerifyHeader(header *types.Header) error {
+	parent, ok := i.blockchain.GetHeaderByNumber(header.Number - 1)
+	if !ok {
+		return fmt.Errorf(
+			"unable to get parent header for block number %d",
+			header.Number,
+		)
+	}
+
 	snap, err := i.getSnapshot(parent.Number)
 	if err != nil {
 		return err
@@ -1251,16 +1313,27 @@ func (i *Ibft) VerifyHeader(parent, header *types.Header) error {
 	}
 
 	// verify the committed seals
-	if err := verifyCommitedFields(snap, header); err != nil {
-		return err
-	}
-
-	// process the new block in order to update the snapshot
-	if err := i.processHeaders([]*types.Header{header}); err != nil {
+	if err := verifyCommittedFields(snap, header, i.quorumSize(header.Number)); err != nil {
 		return err
 	}
 
 	return nil
+}
+
+//	quorumSize returns a callback that when executed on a ValidatorSet computes
+//	number of votes required to reach quorum based on the size of the set.
+//	The blockNumber argument indicates which formula was used to calculate the result (see PRs #513, #549)
+func (i *Ibft) quorumSize(blockNumber uint64) QuorumImplementation {
+	if blockNumber < i.quorumSizeBlockNum {
+		return LegacyQuorumSize
+	}
+
+	return OptimalQuorumSize
+}
+
+// ProcessHeaders updates the snapshot based on previously verified headers
+func (i *Ibft) ProcessHeaders(headers []*types.Header) error {
+	return i.processHeaders(headers)
 }
 
 // GetBlockCreator retrieves the block signer from the extra data field
@@ -1303,6 +1376,12 @@ func (i *Ibft) Close() error {
 		err := i.store.saveToPath(i.config.Path)
 
 		if err != nil {
+			return err
+		}
+	}
+
+	if i.syncer != nil {
+		if err := i.syncer.Close(); err != nil {
 			return err
 		}
 	}
@@ -1352,5 +1431,28 @@ func (i *Ibft) pushMessage(msg *proto.MessageReq) {
 	select {
 	case i.updateCh <- struct{}{}:
 	default:
+	}
+}
+
+// getTimeout returns the IBFT timeout based on round and config
+func (i *Ibft) getTimeout() time.Duration {
+	return exponentialTimeout(i.state.view.Round, i.ibftBaseTimeout)
+}
+
+// startNewSequence changes the sequence and resets the round in the view of state
+func (i *Ibft) startNewSequence() {
+	header := i.blockchain.Header()
+
+	i.state.view = &proto.View{
+		Sequence: header.Number + 1,
+		Round:    0,
+	}
+}
+
+// startNewRound changes the round in the view of state
+func (i *Ibft) startNewRound(newRound uint64) {
+	i.state.view = &proto.View{
+		Sequence: i.state.view.Sequence,
+		Round:    newRound,
 	}
 }

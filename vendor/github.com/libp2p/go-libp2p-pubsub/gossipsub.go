@@ -235,7 +235,7 @@ func DefaultGossipSubParams() GossipSubParams {
 		Dscore:                    GossipSubDscore,
 		Dout:                      GossipSubDout,
 		HistoryLength:             GossipSubHistoryLength,
-		HistoryGossip:             GossipSubHistoryLength,
+		HistoryGossip:             GossipSubHistoryGossip,
 		Dlazy:                     GossipSubDlazy,
 		GossipFactor:              GossipSubGossipFactor,
 		GossipRetransmission:      GossipSubGossipRetransmission,
@@ -295,7 +295,7 @@ func WithPeerScore(params *PeerScoreParams, thresholds *PeerScoreThresholds) Opt
 			ps.tracer = &pubsubTracer{
 				raw:   []RawTracer{gs.score, gs.gossipTracer},
 				pid:   ps.host.ID(),
-				msgID: ps.msgID,
+				idGen: ps.idGen,
 			}
 		}
 
@@ -484,7 +484,7 @@ func (gs *GossipSubRouter) Attach(p *PubSub) {
 	gs.tagTracer.Start(gs)
 
 	// start using the same msg ID function as PubSub for caching messages.
-	gs.mcache.SetMsgIdFn(p.msgID)
+	gs.mcache.SetMsgIdFn(p.idGen.ID)
 
 	// start the heartbeat
 	go gs.heartbeatTimer()
@@ -705,7 +705,7 @@ func (gs *GossipSubRouter) handleIWant(p peer.ID, ctl *pb.ControlMessage) []*pb.
 				continue
 			}
 
-			ihave[mid] = msg
+			ihave[mid] = msg.Message
 		}
 	}
 
@@ -954,7 +954,7 @@ func (gs *GossipSubRouter) connector() {
 }
 
 func (gs *GossipSubRouter) Publish(msg *Message) {
-	gs.mcache.Put(msg.Message)
+	gs.mcache.Put(msg)
 
 	from := msg.ReceivedFrom
 	topic := msg.GetTopic()
@@ -1036,10 +1036,12 @@ func (gs *GossipSubRouter) Join(topic string) {
 
 	gmap, ok = gs.fanout[topic]
 	if ok {
+		backoff := gs.backoff[topic]
 		// these peers have a score above the publish threshold, which may be negative
 		// so drop the ones with a negative score
 		for p := range gmap {
-			if gs.score.Score(p) < 0 {
+			_, doBackOff := backoff[p]
+			if gs.score.Score(p) < 0 || doBackOff {
 				delete(gmap, p)
 			}
 		}
@@ -1047,10 +1049,12 @@ func (gs *GossipSubRouter) Join(topic string) {
 		if len(gmap) < gs.params.D {
 			// we need more peers; eager, as this would get fixed in the next heartbeat
 			more := gs.getPeers(topic, gs.params.D-len(gmap), func(p peer.ID) bool {
-				// filter our current peers, direct peers, and peers with negative scores
+				// filter our current peers, direct peers, peers we are backing off, and
+				// peers with negative scores
 				_, inMesh := gmap[p]
 				_, direct := gs.direct[p]
-				return !inMesh && !direct && gs.score.Score(p) >= 0
+				_, doBackOff := backoff[p]
+				return !inMesh && !direct && !doBackOff && gs.score.Score(p) >= 0
 			})
 			for _, p := range more {
 				gmap[p] = struct{}{}
@@ -1060,10 +1064,12 @@ func (gs *GossipSubRouter) Join(topic string) {
 		delete(gs.fanout, topic)
 		delete(gs.lastpub, topic)
 	} else {
+		backoff := gs.backoff[topic]
 		peers := gs.getPeers(topic, gs.params.D, func(p peer.ID) bool {
-			// filter direct peers and peers with negative score
+			// filter direct peers, peers we are backing off and peers with negative score
 			_, direct := gs.direct[p]
-			return !direct && gs.score.Score(p) >= 0
+			_, doBackOff := backoff[p]
+			return !direct && !doBackOff && gs.score.Score(p) >= 0
 		})
 		gmap = peerListToMap(peers)
 		gs.mesh[topic] = gmap
@@ -1091,6 +1097,10 @@ func (gs *GossipSubRouter) Leave(topic string) {
 		log.Debugf("LEAVE: Remove mesh link to %s in %s", p, topic)
 		gs.tracer.Prune(p, topic)
 		gs.sendPrune(p, topic)
+		// Add a backoff to this peer to prevent us from eagerly
+		// re-grafting this peer into our mesh if we rejoin this
+		// topic before the backoff period ends.
+		gs.addBackoff(p, topic)
 	}
 }
 

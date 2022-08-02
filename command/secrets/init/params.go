@@ -93,6 +93,13 @@ func (ip *initParams) initFromConfig() error {
 		}
 
 		secretsManager = AWSSSM
+	case secrets.GCPSSM:
+		GCPSSM, err := helper.SetupGCPSSM(ip.secretsConfig)
+		if err != nil {
+			return err
+		}
+
+		secretsManager = GCPSSM
 	default:
 		return errUnsupportedType
 	}

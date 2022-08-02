@@ -8,16 +8,6 @@ import (
 	"strings"
 )
 
-// TODO Remove
-var (
-	ErrSyntax        = &DecError{"invalid hex string"}
-	ErrMissingPrefix = &DecError{"hex string without 0x prefix"}
-	ErrEmptyNumber   = &DecError{"hex string \"0x\""}
-	ErrLeadingZero   = &DecError{"hex number with leading zero digits"}
-	ErrUint64Range   = &DecError{"hex number > 64 bits"}
-	ErrBig256Range   = &DecError{"hex number > 256 bits"}
-)
-
 type DecError struct{ msg string }
 
 func (err DecError) Error() string { return err.msg }
@@ -62,6 +52,14 @@ func EncodeUint64(i uint64) string {
 	return string(strconv.AppendUint(enc, i, 16))
 }
 
+// DecodeUint64 decodes a hex string with 0x prefix to uint64
+func DecodeUint64(hexStr string) (uint64, error) {
+	// remove 0x suffix if found in the input string
+	cleaned := strings.TrimPrefix(hexStr, "0x")
+
+	return strconv.ParseUint(cleaned, 16, 64)
+}
+
 const BadNibble = ^uint64(0)
 
 // DecodeNibble decodes a byte into a uint64
@@ -94,4 +92,8 @@ func DecodeHexToBig(hexNum string) *big.Int {
 	createdNum.SetString(hexNum, 16)
 
 	return createdNum
+}
+
+func DropHexPrefix(input []byte) []byte {
+	return input[2:]
 }

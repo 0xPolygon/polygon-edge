@@ -20,7 +20,10 @@ import (
 // Each consensus mechanism must implement this interface in order to be valid
 type Consensus interface {
 	// VerifyHeader verifies the header is correct
-	VerifyHeader(parent, header *types.Header) error
+	VerifyHeader(header *types.Header) error
+
+	// ProcessHeaders updates the snapshot based on the verified headers
+	ProcessHeaders(headers []*types.Header) error
 
 	// GetBlockCreator retrieves the block creator (or signer) given the block header
 	GetBlockCreator(header *types.Header) (types.Address, error)
@@ -57,18 +60,19 @@ type Config struct {
 }
 
 type ConsensusParams struct {
-	Context        context.Context
-	Seal           bool
-	Config         *Config
-	Txpool         *txpool.TxPool
-	Network        *network.Server
-	Blockchain     *blockchain.Blockchain
-	Executor       *state.Executor
-	Grpc           *grpc.Server
-	Logger         hclog.Logger
-	Metrics        *Metrics
-	SecretsManager secrets.SecretsManager
-	BlockTime      uint64
+	Context         context.Context
+	Seal            bool
+	Config          *Config
+	Txpool          *txpool.TxPool
+	Network         *network.Server
+	Blockchain      *blockchain.Blockchain
+	Executor        *state.Executor
+	Grpc            *grpc.Server
+	Logger          hclog.Logger
+	Metrics         *Metrics
+	SecretsManager  secrets.SecretsManager
+	BlockTime       uint64
+	IBFTBaseTimeout uint64
 }
 
 // Factory is the factory function to create a discovery backend

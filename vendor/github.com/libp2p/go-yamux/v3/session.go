@@ -10,6 +10,7 @@ import (
 	"math"
 	"net"
 	"os"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -293,8 +294,13 @@ func (s *Session) Close() error {
 
 	s.streamLock.Lock()
 	defer s.streamLock.Unlock()
+	var memory int
 	for _, stream := range s.streams {
+		memory += stream.memory
 		stream.forceClose()
+	}
+	if memory > 0 {
+		s.memoryManager.ReleaseMemory(memory)
 	}
 	return nil
 }
@@ -483,7 +489,14 @@ func (s *Session) send() {
 	}
 }
 
-func (s *Session) sendLoop() error {
+func (s *Session) sendLoop() (err error) {
+	defer func() {
+		if rerr := recover(); rerr != nil {
+			fmt.Fprintf(os.Stderr, "caught panic: %s\n%s\n", rerr, debug.Stack())
+			err = fmt.Errorf("panic in yamux send loop: %s", rerr)
+		}
+	}()
+
 	defer close(s.sendDoneCh)
 
 	// Extend the write deadline if we've passed the halfway point. This can
@@ -615,7 +628,13 @@ var (
 )
 
 // recvLoop continues to receive data until a fatal error is encountered
-func (s *Session) recvLoop() error {
+func (s *Session) recvLoop() (err error) {
+	defer func() {
+		if rerr := recover(); rerr != nil {
+			fmt.Fprintf(os.Stderr, "caught panic: %s\n%s\n", rerr, debug.Stack())
+			err = fmt.Errorf("panic in yamux receive loop: %s", rerr)
+		}
+	}()
 	defer close(s.recvDoneCh)
 	var hdr header
 	for {
@@ -776,14 +795,14 @@ func (s *Session) incomingStream(id uint32) error {
 		if sendErr := s.sendMsg(s.goAway(goAwayProtoErr), nil, nil); sendErr != nil {
 			s.logger.Printf("[WARN] yamux: failed to send go away: %v", sendErr)
 		}
-		s.memoryManager.ReleaseMemory(initialStreamWindow)
+		s.memoryManager.ReleaseMemory(stream.memory)
 		return ErrDuplicateStream
 	}
 
 	if s.numIncomingStreams >= s.config.MaxIncomingStreams {
 		// too many active streams at the same time
 		s.logger.Printf("[WARN] yamux: MaxIncomingStreams exceeded, forcing stream reset")
-		s.memoryManager.ReleaseMemory(initialStreamWindow)
+		s.memoryManager.ReleaseMemory(stream.memory)
 		hdr := encode(typeWindowUpdate, flagRST, id, 0)
 		return s.sendMsg(hdr, nil, nil)
 	}
@@ -830,7 +849,7 @@ func (s *Session) deleteStream(id uint32) {
 	if !ok {
 		return
 	}
-	s.memoryManager.ReleaseMemory(int(str.recvWindow))
+	s.memoryManager.ReleaseMemory(str.memory)
 	delete(s.streams, id)
 }
 

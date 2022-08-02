@@ -45,7 +45,7 @@ type tagTracer struct {
 	sync.RWMutex
 
 	cmgr     connmgr.ConnManager
-	msgID    MsgIdFunction
+	idGen    *msgIDGenerator
 	decayer  connmgr.Decayer
 	decaying map[string]connmgr.DecayingTag
 	direct   map[peer.ID]struct{}
@@ -62,7 +62,7 @@ func newTagTracer(cmgr connmgr.ConnManager) *tagTracer {
 	}
 	return &tagTracer{
 		cmgr:      cmgr,
-		msgID:     DefaultMsgIdFn,
+		idGen:     newMsgIdGenerator(),
 		decayer:   decayer,
 		decaying:  make(map[string]connmgr.DecayingTag),
 		nearFirst: make(map[string]map[peer.ID]struct{}),
@@ -74,7 +74,7 @@ func (t *tagTracer) Start(gs *GossipSubRouter) {
 		return
 	}
 
-	t.msgID = gs.p.msgID
+	t.idGen = gs.p.idGen
 	t.direct = gs.direct
 }
 
@@ -162,7 +162,7 @@ func (t *tagTracer) bumpTagsForMessage(p peer.ID, msg *Message) {
 func (t *tagTracer) nearFirstPeers(msg *Message) []peer.ID {
 	t.Lock()
 	defer t.Unlock()
-	peersMap, ok := t.nearFirst[t.msgID(msg.Message)]
+	peersMap, ok := t.nearFirst[t.idGen.ID(msg)]
 	if !ok {
 		return nil
 	}
@@ -194,7 +194,7 @@ func (t *tagTracer) DeliverMessage(msg *Message) {
 
 	// delete the delivery state for this message
 	t.Lock()
-	delete(t.nearFirst, t.msgID(msg.Message))
+	delete(t.nearFirst, t.idGen.ID(msg))
 	t.Unlock()
 }
 
@@ -215,7 +215,7 @@ func (t *tagTracer) ValidateMessage(msg *Message) {
 	defer t.Unlock()
 
 	// create map to start tracking the peers who deliver while we're validating
-	id := t.msgID(msg.Message)
+	id := t.idGen.ID(msg)
 	if _, exists := t.nearFirst[id]; exists {
 		return
 	}
@@ -226,7 +226,7 @@ func (t *tagTracer) DuplicateMessage(msg *Message) {
 	t.Lock()
 	defer t.Unlock()
 
-	id := t.msgID(msg.Message)
+	id := t.idGen.ID(msg)
 	peers, ok := t.nearFirst[id]
 	if !ok {
 		return
@@ -247,7 +247,7 @@ func (t *tagTracer) RejectMessage(msg *Message, reason string) {
 	case RejectValidationIgnored:
 		fallthrough
 	case RejectValidationFailed:
-		delete(t.nearFirst, t.msgID(msg.Message))
+		delete(t.nearFirst, t.idGen.ID(msg))
 	}
 }
 

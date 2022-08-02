@@ -1,11 +1,11 @@
 package generate
 
 import (
-	"errors"
 	"fmt"
+	"strings"
+
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/secrets"
-	"strings"
 )
 
 var (
@@ -23,13 +23,15 @@ const (
 )
 
 const (
-	defaultNodeName       = "polygon-edge-node"
+	defaultNodeName       = ""
 	defaultConfigFileName = "./secretsManagerConfig.json"
 	defaultNamespace      = "admin"
 )
 
 var (
-	errUnsupportedType = errors.New("unsupported service manager type")
+	errUnsupportedType = fmt.Errorf(
+		"unsupported service manager type; only %s, %s, %s and %s are supported for now",
+		secrets.Local, secrets.HashicorpVault, secrets.AWSSSM, secrets.GCPSSM)
 )
 
 type generateParams struct {
@@ -44,9 +46,6 @@ type generateParams struct {
 
 func (p *generateParams) getRequiredFlags() []string {
 	return []string{
-		dirFlag,
-		tokenFlag,
-		serverURLFlag,
 		nameFlag,
 	}
 }
@@ -88,7 +87,7 @@ func (p *generateParams) generateSecretsConfig() (*secrets.SecretsManagerConfig,
 		Type:      secrets.SecretsManagerType(p.serviceType),
 		Name:      p.name,
 		Namespace: p.namespace,
-		Extra:     nil,
+		Extra:     extraMap,
 	}, nil
 }
 

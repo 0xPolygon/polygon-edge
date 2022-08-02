@@ -192,6 +192,10 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 		Receipts: transition.Receipts(),
 	})
 
+	if err := d.blockchain.VerifyFinalizedBlock(block); err != nil {
+		return err
+	}
+
 	// Write the block to the blockchain
 	if err := d.blockchain.WriteBlock(block); err != nil {
 		return err
@@ -206,8 +210,12 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 
 // REQUIRED BASE INTERFACE METHODS //
 
-func (d *Dev) VerifyHeader(parent *types.Header, header *types.Header) error {
+func (d *Dev) VerifyHeader(header *types.Header) error {
 	// All blocks are valid
+	return nil
+}
+
+func (d *Dev) ProcessHeaders(headers []*types.Header) error {
 	return nil
 }
 

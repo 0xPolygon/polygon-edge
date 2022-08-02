@@ -2,13 +2,13 @@ package server
 
 import (
 	"fmt"
-	"strconv"
 
 	"github.com/0xPolygon/polygon-edge/command"
+	"github.com/0xPolygon/polygon-edge/command/server/config"
+	"github.com/0xPolygon/polygon-edge/command/server/export"
 	"github.com/spf13/cobra"
 
 	"github.com/0xPolygon/polygon-edge/command/helper"
-	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/server"
 )
 
@@ -24,13 +24,21 @@ func GetCommand() *cobra.Command {
 	helper.RegisterLegacyGRPCAddressFlag(serverCmd)
 	helper.RegisterJSONRPCFlag(serverCmd)
 
+	registerSubcommands(serverCmd)
 	setFlags(serverCmd)
 
 	return serverCmd
 }
 
+func registerSubcommands(baseCmd *cobra.Command) {
+	baseCmd.AddCommand(
+		// server export
+		export.GetCommand(),
+	)
+}
+
 func setFlags(cmd *cobra.Command) {
-	defaultConfig := DefaultConfig()
+	defaultConfig := config.DefaultConfig()
 
 	cmd.Flags().StringVar(
 		&params.rawConfig.LogLevel,
@@ -63,7 +71,7 @@ func setFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(
 		&params.rawConfig.Network.Libp2pAddr,
 		libp2pAddressFlag,
-		fmt.Sprintf("127.0.0.1:%d", network.DefaultLibp2pPort),
+		defaultConfig.Network.Libp2pAddr,
 		"the address and port for the libp2p service",
 	)
 
@@ -92,7 +100,7 @@ func setFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(
 		&params.rawConfig.BlockGasTarget,
 		blockGasTargetFlag,
-		strconv.FormatUint(0, 10),
+		defaultConfig.BlockGasTarget,
 		"the target block gas limit for the chain. If omitted, the value of the parent block is used",
 	)
 
@@ -114,7 +122,7 @@ func setFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVar(
 		&params.rawConfig.ShouldSeal,
 		sealFlag,
-		true,
+		defaultConfig.ShouldSeal,
 		"the flag indicating that the client should seal blocks",
 	)
 
@@ -122,7 +130,7 @@ func setFlags(cmd *cobra.Command) {
 		&params.rawConfig.Network.NoDiscover,
 		command.NoDiscoverFlag,
 		defaultConfig.Network.NoDiscover,
-		"prevent the client from discovering other peers (default: false)",
+		"prevent the client from discovering other peers",
 	)
 
 	cmd.Flags().Int64Var(
@@ -142,6 +150,7 @@ func setFlags(cmd *cobra.Command) {
 	)
 	// override default usage value
 	cmd.Flag(maxInboundPeersFlag).DefValue = fmt.Sprintf("%d", defaultConfig.Network.MaxInboundPeers)
+	cmd.MarkFlagsMutuallyExclusive(maxPeersFlag, maxInboundPeersFlag)
 
 	cmd.Flags().Int64Var(
 		&params.rawConfig.Network.MaxOutboundPeers,
@@ -151,11 +160,12 @@ func setFlags(cmd *cobra.Command) {
 	)
 	// override default usage value
 	cmd.Flag(maxOutboundPeersFlag).DefValue = fmt.Sprintf("%d", defaultConfig.Network.MaxOutboundPeers)
+	cmd.MarkFlagsMutuallyExclusive(maxPeersFlag, maxOutboundPeersFlag)
 
 	cmd.Flags().Uint64Var(
 		&params.rawConfig.TxPool.PriceLimit,
 		priceLimitFlag,
-		0,
+		defaultConfig.TxPool.PriceLimit,
 		fmt.Sprintf(
 			"the minimum gas price limit to enforce for acceptance into the pool (default %d)",
 			defaultConfig.TxPool.PriceLimit,
@@ -165,7 +175,7 @@ func setFlags(cmd *cobra.Command) {
 	cmd.Flags().Uint64Var(
 		&params.rawConfig.TxPool.MaxSlots,
 		maxSlotsFlag,
-		command.DefaultMaxSlots,
+		defaultConfig.TxPool.MaxSlots,
 		"maximum slots in the pool",
 	)
 
@@ -173,7 +183,18 @@ func setFlags(cmd *cobra.Command) {
 		&params.rawConfig.BlockTime,
 		blockTimeFlag,
 		defaultConfig.BlockTime,
-		"minimum block time in seconds",
+		"minimum block time in seconds (at least 1s)",
+	)
+
+	cmd.Flags().Uint64Var(
+		&params.rawConfig.IBFTBaseTimeout,
+		ibftBaseTimeoutFlag,
+		// Calculate from block time if it is not given
+		0,
+		fmt.Sprintf(
+			"base IBFT timeout in seconds, it needs to be larger than block time. (block time * %d) is set if it's zero",
+			config.BlockTimeMultiplierForTimeout,
+		),
 	)
 
 	cmd.Flags().StringArrayVar(
@@ -181,6 +202,28 @@ func setFlags(cmd *cobra.Command) {
 		corsOriginFlag,
 		defaultConfig.Headers.AccessControlAllowOrigins,
 		"the CORS header indicating whether any JSON-RPC response can be shared with the specified origin",
+	)
+
+	cmd.Flags().Uint64Var(
+		&params.jsonRPCBatchLengthLimit,
+		jsonRPCBatchRequestLimitFlag,
+		defaultConfig.JSONRPCBatchRequestLimit,
+		"the max length to be considered when handling json-rpc batch requests",
+	)
+
+	//nolint:lll
+	cmd.Flags().Uint64Var(
+		&params.jsonRPCBlockRangeLimit,
+		jsonRPCBlockRangeLimitFlag,
+		defaultConfig.JSONRPCBlockRangeLimit,
+		"the max block range to be considered when executing json-rpc requests that consider fromBlock/toBlock values (e.g. eth_getLogs)",
+	)
+
+	cmd.Flags().StringVar(
+		&params.rawConfig.LogFilePath,
+		logFileLocationFlag,
+		defaultConfig.LogFilePath,
+		"write all logs to the file at specified location instead of writing them to console",
 	)
 
 	setDevFlags(cmd)
@@ -208,7 +251,7 @@ func setDevFlags(cmd *cobra.Command) {
 
 func runPreRun(cmd *cobra.Command, _ []string) error {
 	// Set the grpc and json ip:port bindings
-	// The config file will have presedence over --flag
+	// The config file will have precedence over --flag
 	params.setRawGRPCAddress(helper.GetGRPCAddress(cmd))
 	params.setRawJSONRPCAddress(helper.GetJSONRPCAddress(cmd))
 
@@ -218,10 +261,6 @@ func runPreRun(cmd *cobra.Command, _ []string) error {
 		if err := params.initConfigFromFile(); err != nil {
 			return err
 		}
-	}
-
-	if err := params.validateFlags(); err != nil {
-		return err
 	}
 
 	if err := params.initRawParams(); err != nil {

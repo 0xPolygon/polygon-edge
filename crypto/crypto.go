@@ -32,6 +32,10 @@ var (
 	one        = []byte{0x01}
 )
 
+var (
+	errInvalidSignature = errors.New("invalid signature")
+)
+
 func trimLeftZeros(b []byte) []byte {
 	i := 0
 	for i = range b {
@@ -140,6 +144,11 @@ func Ecrecover(hash, sig []byte) ([]byte, error) {
 func RecoverPubkey(signature, hash []byte) (*ecdsa.PublicKey, error) {
 	size := len(signature)
 	term := byte(27)
+
+	// Make sure the signature is present
+	if signature == nil || size < 1 {
+		return nil, errInvalidSignature
+	}
 
 	if signature[size-1] == 1 {
 		term = 28

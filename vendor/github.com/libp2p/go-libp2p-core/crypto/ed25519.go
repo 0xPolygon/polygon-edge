@@ -9,6 +9,7 @@ import (
 	"io"
 
 	pb "github.com/libp2p/go-libp2p-core/crypto/pb"
+	"github.com/libp2p/go-libp2p-core/internal/catch"
 )
 
 // Ed25519PrivateKey is an ed25519 private key.
@@ -74,7 +75,9 @@ func (k *Ed25519PrivateKey) GetPublic() PubKey {
 }
 
 // Sign returns a signature from an input message.
-func (k *Ed25519PrivateKey) Sign(msg []byte) ([]byte, error) {
+func (k *Ed25519PrivateKey) Sign(msg []byte) (res []byte, err error) {
+	defer func() { catch.HandlePanic(recover(), &err, "ed15519 signing") }()
+
 	return ed25519.Sign(k.k, msg), nil
 }
 
@@ -99,7 +102,15 @@ func (k *Ed25519PublicKey) Equals(o Key) bool {
 }
 
 // Verify checks a signature agains the input data.
-func (k *Ed25519PublicKey) Verify(data []byte, sig []byte) (bool, error) {
+func (k *Ed25519PublicKey) Verify(data []byte, sig []byte) (success bool, err error) {
+	defer func() {
+		catch.HandlePanic(recover(), &err, "ed15519 signature verification")
+
+		// To be safe.
+		if err != nil {
+			success = false
+		}
+	}()
 	return ed25519.Verify(k.k, data, sig), nil
 }
 

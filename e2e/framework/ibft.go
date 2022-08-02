@@ -83,14 +83,16 @@ func NewIBFTServersManager(
 }
 
 func (m *IBFTServersManager) StartServers(ctx context.Context) {
-	for _, srv := range m.servers {
+	for idx, srv := range m.servers {
 		if err := srv.Start(ctx); err != nil {
+			m.t.Logf("server %d failed to start: %+v", idx, err)
 			m.t.Fatal(err)
 		}
 	}
 
-	for _, srv := range m.servers {
+	for idx, srv := range m.servers {
 		if err := srv.WaitForReady(ctx); err != nil {
+			m.t.Logf("server %d couldn't advance block: %+v", idx, err)
 			m.t.Fatal(err)
 		}
 	}

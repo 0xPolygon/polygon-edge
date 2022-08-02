@@ -4,59 +4,25 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"errors"
-	"fmt"
-	"io"
+	"github.com/0xPolygon/polygon-edge/txpool"
+	"github.com/umbracle/ethgo"
 	"math/big"
-	"sync"
 	"testing"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/e2e/framework"
 	"github.com/0xPolygon/polygon-edge/helper/tests"
-	"github.com/0xPolygon/polygon-edge/txpool"
 	txpoolOp "github.com/0xPolygon/polygon-edge/txpool/proto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/golang/protobuf/ptypes/any"
-	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/stretchr/testify/assert"
-	"github.com/umbracle/go-web3"
 )
 
 var (
 	oneEth = framework.EthToWei(1)
 	signer = crypto.NewEIP155Signer(100)
 )
-
-func waitForBlock(t *testing.T, srv *framework.TestServer, expectedBlocks int, index int) int64 {
-	t.Helper()
-
-	systemClient := srv.Operator()
-	ctx, cancelFn := context.WithCancel(context.Background())
-	stream, err := systemClient.Subscribe(ctx, &empty.Empty{})
-
-	if err != nil {
-		cancelFn()
-		t.Fatalf("Unable to subscribe to blockchain events")
-	}
-
-	evnt, err := stream.Recv()
-	if errors.Is(err, io.EOF) {
-		t.Fatalf("Invalid stream close")
-	}
-
-	if err != nil {
-		t.Fatalf("Unable to read blockchain event")
-	}
-
-	if len(evnt.Added) != expectedBlocks {
-		t.Fatalf("Invalid number of blocks added")
-	}
-
-	cancelFn()
-
-	return evnt.Added[index].Number
-}
 
 type generateTxReqParams struct {
 	nonce         uint64
@@ -172,7 +138,7 @@ func TestTxPool_ErrorCodes(t *testing.T) {
 				defer waitCancelFn()
 
 				convertedHash := types.StringToHash(addResponse.TxHash)
-				_, receiptErr := tests.WaitForReceipt(receiptCtx, srv.JSONRPC().Eth(), web3.Hash(convertedHash))
+				_, receiptErr := tests.WaitForReceipt(receiptCtx, srv.JSONRPC().Eth(), ethgo.Hash(convertedHash))
 				if receiptErr != nil {
 					t.Fatalf("Unable to get receipt, %v", receiptErr)
 				}
@@ -202,16 +168,23 @@ func TestTxPool_TransactionCoalescing(t *testing.T) {
 	referenceKey, referenceAddr := tests.GenerateKeyAndAddr(t)
 	defaultBalance := framework.EthToWei(10)
 
-	devInterval := 5
-
 	// Set up the test server
-	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
-		config.SetConsensus(framework.ConsensusDev)
-		config.SetSeal(true)
-		config.SetDevInterval(devInterval)
-		config.Premine(referenceAddr, defaultBalance)
-	})
-	srv := srvs[0]
+	ibftManager := framework.NewIBFTServersManager(
+		t,
+		1,
+		IBFTDirPrefix,
+		func(i int, config *framework.TestServerConfig) {
+			config.SetSeal(true)
+			config.Premine(referenceAddr, defaultBalance)
+			config.SetBlockTime(1)
+		},
+	)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	ibftManager.StartServers(ctx)
+
+	srv := ibftManager.GetServer(0)
 	client := srv.JSONRPC()
 
 	// Required default values
@@ -251,19 +224,44 @@ func TestTxPool_TransactionCoalescing(t *testing.T) {
 		return msg
 	}
 
+	// testTransaction is a helper structure for
+	// keeping track of test transaction execution
+	type testTransaction struct {
+		txHash ethgo.Hash // the transaction hash
+		block  *uint64    // the block the transaction was included in
+	}
+
+	testTransactions := make([]*testTransaction, 0)
+
 	// Add the transactions with the following nonce order
 	nonces := []uint64{0, 2}
 	for i := 0; i < len(nonces); i++ {
 		addReq := generateReq(nonces[i])
 
-		_, addErr := clt.AddTxn(context.Background(), addReq)
+		addCtx, addCtxCn := context.WithTimeout(context.Background(), framework.DefaultTimeout)
+
+		addResp, addErr := clt.AddTxn(addCtx, addReq)
 		if addErr != nil {
 			t.Fatalf("Unable to add txn, %v", addErr)
 		}
+
+		testTransactions = append(testTransactions, &testTransaction{
+			txHash: ethgo.HexToHash(addResp.TxHash),
+		})
+
+		addCtxCn()
 	}
 
-	// Wait for the state transition to be executed
-	_ = waitForBlock(t, srv, 1, 0)
+	// Wait for the first transaction to go through
+	ctx, cancelFn := context.WithTimeout(context.Background(), framework.DefaultTimeout)
+	defer cancelFn()
+
+	receipt, receiptErr := tests.WaitForReceipt(ctx, client.Eth(), testTransactions[0].txHash)
+	if receiptErr != nil {
+		t.Fatalf("unable to wait for receipt, %v", receiptErr)
+	}
+
+	testTransactions[0].block = &receipt.BlockNumber
 
 	// Get to account balance
 	// Only the first tx should've gone through
@@ -277,13 +275,32 @@ func TestTxPool_TransactionCoalescing(t *testing.T) {
 	// Add the transaction with the gap nonce value
 	addReq := generateReq(1)
 
-	_, addErr := clt.AddTxn(context.Background(), addReq)
+	addCtx, addCtxCn := context.WithTimeout(context.Background(), framework.DefaultTimeout)
+	defer addCtxCn()
+
+	addResp, addErr := clt.AddTxn(addCtx, addReq)
 	if addErr != nil {
 		t.Fatalf("Unable to add txn, %v", addErr)
 	}
 
-	// Wait for the state transition to be executed
-	_ = waitForBlock(t, srv, 1, 0)
+	testTransactions = append(testTransactions, &testTransaction{
+		txHash: ethgo.HexToHash(addResp.TxHash),
+	})
+
+	// Start from 1 since there was previously a txn with nonce 0
+	for i := 1; i < len(testTransactions); i++ {
+		// Wait for the first transaction to go through
+		ctx, cancelFn := context.WithTimeout(context.Background(), framework.DefaultTimeout)
+
+		receipt, receiptErr := tests.WaitForReceipt(ctx, client.Eth(), testTransactions[i].txHash)
+		if receiptErr != nil {
+			t.Fatalf("unable to wait for receipt, %v", receiptErr)
+		}
+
+		testTransactions[i].block = &receipt.BlockNumber
+
+		cancelFn()
+	}
 
 	// Now both the added tx and the shelved tx should've gone through
 	toAccountBalance = framework.GetAccountBalance(t, toAddress, client)
@@ -292,6 +309,9 @@ func TestTxPool_TransactionCoalescing(t *testing.T) {
 		toAccountBalance.String(),
 		"To address balance mismatch after gap transaction",
 	)
+
+	// Make sure the first transaction and the last transaction didn't get included in the same block
+	assert.NotEqual(t, *(testTransactions[0].block), *(testTransactions[2].block))
 }
 
 type testAccount struct {
@@ -312,138 +332,6 @@ func generateTestAccounts(t *testing.T, numAccounts int) []*testAccount {
 	}
 
 	return testAccounts
-}
-
-func TestTxPool_StressAddition(t *testing.T) {
-	// Test scenario:
-	// Add a large number of txns to the txpool concurrently
-	// Predefined values
-	defaultBalance := framework.EthToWei(10000)
-
-	// Each account should add 50 transactions
-	numAccounts := 10
-	numTxPerAccount := 50
-
-	testAccounts := generateTestAccounts(t, numAccounts)
-
-	// Set up the test server
-	srv := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
-		config.SetConsensus(framework.ConsensusDev)
-		config.SetSeal(true)
-		config.SetBlockLimit(20000000)
-		for _, testAccount := range testAccounts {
-			config.Premine(testAccount.address, defaultBalance)
-		}
-	})[0]
-	client := srv.JSONRPC()
-
-	// Required default values
-	signer := crypto.NewEIP155Signer(100)
-
-	// TxPool client
-	toAddress := types.StringToAddress("1")
-	defaultValue := framework.EthToWeiPrecise(1, 15) // 0.001 ETH
-
-	generateTx := func(account *testAccount, nonce uint64) *types.Transaction {
-		signedTx, signErr := signer.SignTx(&types.Transaction{
-			Nonce:    nonce,
-			From:     account.address,
-			To:       &toAddress,
-			GasPrice: big.NewInt(10),
-			Gas:      framework.DefaultGasLimit,
-			Value:    defaultValue,
-			V:        big.NewInt(27), // it is necessary to encode in rlp
-		}, account.key)
-
-		if signErr != nil {
-			t.Fatalf("Unable to sign transaction, %v", signErr)
-		}
-
-		return signedTx
-	}
-
-	// Spawn numAccounts threads to act as sender workers that will send transactions.
-	// The sender worker forwards the transaction hash to the receipt worker.
-	// The numAccounts receipt worker threads wait for tx hashes to arrive and wait for their receipts
-
-	var (
-		wg           sync.WaitGroup
-		errorsLock   sync.Mutex
-		workerErrors = make([]error, 0)
-	)
-
-	wg.Add(numAccounts)
-
-	appendError := func(err error) {
-		errorsLock.Lock()
-		defer errorsLock.Unlock()
-
-		workerErrors = append(workerErrors, err)
-	}
-
-	sendWorker := func(account *testAccount, receiptsChan chan web3.Hash) {
-		defer close(receiptsChan)
-
-		nonce := uint64(0)
-
-		for i := 0; i < numTxPerAccount; i++ {
-			tx := generateTx(account, nonce)
-
-			txHash, err := client.Eth().SendRawTransaction(tx.MarshalRLP())
-			if err != nil {
-				appendError(fmt.Errorf("unable to send txn, %w", err))
-
-				return
-			}
-
-			receiptsChan <- txHash
-
-			nonce++
-		}
-	}
-
-	receiptWorker := func(receiptsChan chan web3.Hash) {
-		defer wg.Done()
-
-		for txHash := range receiptsChan {
-			waitCtx, waitCancel := context.WithTimeout(context.Background(), time.Second*30)
-
-			if _, err := tests.WaitForReceipt(waitCtx, srv.JSONRPC().Eth(), txHash); err != nil {
-				appendError(fmt.Errorf("unable to wait for receipt, %w", err))
-				waitCancel()
-
-				return
-			}
-
-			waitCancel()
-		}
-	}
-
-	for _, testAccount := range testAccounts {
-		receiptsCh := make(chan web3.Hash, numTxPerAccount)
-		go sendWorker(
-			testAccount,
-			receiptsCh,
-		)
-
-		go receiptWorker(receiptsCh)
-	}
-
-	wg.Wait()
-
-	if len(workerErrors) != 0 {
-		t.Fatalf("%v", workerErrors)
-	}
-
-	// Make sure the transactions went through
-	for _, account := range testAccounts {
-		nonce, err := client.Eth().GetNonce(web3.Address(account.address), web3.Latest)
-		if err != nil {
-			t.Fatalf("Unable to fetch block")
-		}
-
-		assert.Equal(t, uint64(numTxPerAccount), nonce)
-	}
 }
 
 func TestTxPool_RecoverableError(t *testing.T) {
@@ -499,7 +387,7 @@ func TestTxPool_RecoverableError(t *testing.T) {
 
 	client := server.JSONRPC()
 	operator := server.TxnPoolOperator()
-	hashes := make([]web3.Hash, 3)
+	hashes := make([]ethgo.Hash, 3)
 
 	for i, tx := range transactions {
 		signedTx, err := signer.SignTx(tx, senderKey)
@@ -513,7 +401,7 @@ func TestTxPool_RecoverableError(t *testing.T) {
 		})
 		assert.NoError(t, err, "Unable to send transaction, %v", err)
 
-		txHash := web3.Hash(types.StringToHash(response.TxHash))
+		txHash := ethgo.Hash(types.StringToHash(response.TxHash))
 
 		// save for later querying
 		hashes[i] = txHash
@@ -528,7 +416,7 @@ func TestTxPool_RecoverableError(t *testing.T) {
 	assert.NotNil(t, receipt)
 
 	// assert balance moved
-	balance, err := client.Eth().GetBalance(web3.Address(receiverAddress), web3.Latest)
+	balance, err := client.Eth().GetBalance(ethgo.Address(receiverAddress), ethgo.Latest)
 	assert.NoError(t, err, "failed to retrieve receiver account balance")
 	assert.Equal(t, framework.EthToWei(3).String(), balance.String())
 
@@ -546,93 +434,6 @@ func TestTxPool_RecoverableError(t *testing.T) {
 
 	// last tx is included in next block
 	assert.NotEqual(t, secondTx.BlockNumber, receipt.BlockNumber)
-}
-
-func TestTxPool_ZeroPriceDev(t *testing.T) {
-	senderKey, senderAddress := tests.GenerateKeyAndAddr(t)
-	_, receiverAddress := tests.GenerateKeyAndAddr(t)
-	// Test scenario:
-	// The sender account should send funds to the receiver account.
-	// Each transaction should have a gas price set do 0 and be treated
-	// as a non-local transaction
-
-	var zeroPriceLimit uint64 = 0
-
-	startingBalance := framework.EthToWei(100)
-
-	servers := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
-		config.SetConsensus(framework.ConsensusDev)
-		config.SetSeal(true)
-		config.SetPriceLimit(&zeroPriceLimit)
-		config.SetBlockLimit(20000000)
-		config.Premine(senderAddress, startingBalance)
-	})
-
-	server := servers[0]
-	client := server.JSONRPC()
-	operator := server.TxnPoolOperator()
-	ctx := context.Background()
-
-	var (
-		nonce    uint64 = 0
-		nonceMux sync.Mutex
-		wg       sync.WaitGroup
-	)
-
-	sendTx := func() {
-		nonceMux.Lock()
-		tx, err := signer.SignTx(&types.Transaction{
-			Nonce:    nonce,
-			GasPrice: big.NewInt(0),
-			Gas:      framework.DefaultGasLimit - 1,
-			To:       &receiverAddress,
-			Value:    oneEth,
-			V:        big.NewInt(27),
-			From:     types.ZeroAddress,
-		}, senderKey)
-		assert.NoError(t, err, "failed to sign transaction")
-
-		_, err = operator.AddTxn(ctx, &txpoolOp.AddTxnReq{
-			Raw: &any.Any{
-				Value: tx.MarshalRLP(),
-			},
-			From: types.ZeroAddress.String(),
-		})
-		assert.NoError(t, err, "failed to add txn using operator")
-
-		nonce++
-		nonceMux.Unlock()
-
-		wg.Done()
-	}
-
-	numIterations := 100
-	numIterationsBig := big.NewInt(int64(numIterations))
-
-	for i := 0; i < numIterations; i++ {
-		wg.Add(1)
-
-		go sendTx()
-	}
-
-	wg.Wait()
-
-	waitCtx, waitCancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer waitCancel()
-
-	_, err := tests.WaitForNonce(waitCtx, client.Eth(), web3.BytesToAddress(senderAddress.Bytes()), nonce)
-	assert.NoError(t, err)
-
-	receiverBalance, err := client.Eth().GetBalance(web3.Address(receiverAddress), web3.Latest)
-	assert.NoError(t, err, "failed to retrieve receiver account balance")
-
-	sentFunds := big.NewInt(0).Mul(numIterationsBig, oneEth)
-	assert.Equal(t, sentFunds.String(), receiverBalance.String())
-
-	senderBalance, err := client.Eth().GetBalance(web3.Address(senderAddress), web3.Latest)
-	assert.NoError(t, err, "failed to retrieve sender account balance")
-
-	assert.Equal(t, big.NewInt(0).Sub(startingBalance, sentFunds).String(), senderBalance.String())
 }
 
 func TestTxPool_GetPendingTx(t *testing.T) {
@@ -676,7 +477,7 @@ func TestTxPool_GetPendingTx(t *testing.T) {
 	})
 	assert.NoError(t, err, "Unable to send transaction, %v", err)
 
-	txHash := web3.Hash(types.StringToHash(response.TxHash))
+	txHash := ethgo.Hash(types.StringToHash(response.TxHash))
 
 	// Grab the pending transaction from the pool
 	tx, err := client.Eth().GetTransactionByHash(txHash)
@@ -686,7 +487,7 @@ func TestTxPool_GetPendingTx(t *testing.T) {
 	// Make sure the specific fields are not filled yet
 	assert.Equal(t, uint64(0), tx.TxnIndex)
 	assert.Equal(t, uint64(0), tx.BlockNumber)
-	assert.Equal(t, web3.ZeroHash, tx.BlockHash)
+	assert.Equal(t, ethgo.ZeroHash, tx.BlockHash)
 
 	// Wait for the transaction to be included into a block
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

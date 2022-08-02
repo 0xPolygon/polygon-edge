@@ -686,9 +686,3 @@ func (nn *cmNotifee) Listen(n network.Network, addr ma.Multiaddr) {}
 
 // ListenClose is no-op in this implementation.
 func (nn *cmNotifee) ListenClose(n network.Network, addr ma.Multiaddr) {}
-
-// OpenedStream is no-op in this implementation.
-func (nn *cmNotifee) OpenedStream(network.Network, network.Stream) {}
-
-// ClosedStream is no-op in this implementation.
-func (nn *cmNotifee) ClosedStream(network.Network, network.Stream) {}

@@ -619,6 +619,8 @@ func getExampleStore() *mockSpecialStore {
 // the latest block gas limit for the upper bound, or the specified
 // gas limit in the transaction
 func TestEth_EstimateGas_GasLimit(t *testing.T) {
+	// TODO Make this test run in parallel when the race
+	// condition is fixed in gas estimation
 	store := getExampleStore()
 	ethEndpoint := newTestEthEndpoint(store)
 

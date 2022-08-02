@@ -3,6 +3,7 @@ package peer
 import (
 	"encoding/json"
 
+	"github.com/libp2p/go-libp2p-core/internal/catch"
 	ma "github.com/multiformats/go-multiaddr"
 )
 
@@ -12,7 +13,9 @@ type addrInfoJson struct {
 	Addrs []string
 }
 
-func (pi AddrInfo) MarshalJSON() ([]byte, error) {
+func (pi AddrInfo) MarshalJSON() (res []byte, err error) {
+	defer func() { catch.HandlePanic(recover(), &err, "libp2p addr info marshal") }()
+
 	addrs := make([]string, len(pi.Addrs))
 	for i, addr := range pi.Addrs {
 		addrs[i] = addr.String()
@@ -23,7 +26,8 @@ func (pi AddrInfo) MarshalJSON() ([]byte, error) {
 	})
 }
 
-func (pi *AddrInfo) UnmarshalJSON(b []byte) error {
+func (pi *AddrInfo) UnmarshalJSON(b []byte) (err error) {
+	defer func() { catch.HandlePanic(recover(), &err, "libp2p addr info unmarshal") }()
 	var data addrInfoJson
 	if err := json.Unmarshal(b, &data); err != nil {
 		return err

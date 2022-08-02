@@ -2,6 +2,7 @@ package ibft
 
 import (
 	"fmt"
+	"math"
 	"sync/atomic"
 
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
@@ -96,15 +97,6 @@ func (c *currentState) setState(s IbftState) {
 	atomic.StoreUint64(stateAddr, uint64(s))
 }
 
-// NumValid returns the number of required messages
-func (c *currentState) NumValid() int {
-	// According to the IBFT spec, the number of valid messages
-	// needs to be 2F + 1
-	// The 1 missing from this equation is accounted for elsewhere
-	// (the current node tallying the messages will include its own message)
-	return 2 * c.validators.MaxFaultyNodes()
-}
-
 // getErr returns the current error, if any, and consumes it
 func (c *currentState) getErr() error {
 	err := c.err
@@ -153,7 +145,12 @@ func (c *currentState) unlock() {
 
 // cleanRound deletes the specific round messages
 func (c *currentState) cleanRound(round uint64) {
-	delete(c.roundMessages, round)
+	//	clear messages from previous round
+	for r := range c.roundMessages {
+		if r < round {
+			delete(c.roundMessages, r)
+		}
+	}
 }
 
 // AddRoundMessage adds a message to the round, and returns the round message size
@@ -305,4 +302,30 @@ func (v *ValidatorSet) MaxFaultyNodes() int {
 	// 7 = 3 * 2 + 1
 	// It should always take the floor of the result
 	return (len(*v) - 1) / 3
+}
+
+type QuorumImplementation func(ValidatorSet) int
+
+//	LegacyQuorumSize returns the legacy quorum size for the given validator set
+func LegacyQuorumSize(set ValidatorSet) int {
+	// According to the IBFT spec, the number of valid messages
+	// needs to be 2F + 1
+	return 2*set.MaxFaultyNodes() + 1
+}
+
+// OptimalQuorumSize returns the optimal quorum size for the given validator set
+func OptimalQuorumSize(set ValidatorSet) int {
+	//	if the number of validators is less than 4,
+	//	then the entire set is required
+	if set.MaxFaultyNodes() == 0 {
+		/*
+			N: 1 -> Q: 1
+			N: 2 -> Q: 2
+			N: 3 -> Q: 3
+		*/
+		return set.Len()
+	}
+
+	// (quorum optimal)	Q = ceil(2/3 * N)
+	return int(math.Ceil(2 * float64(set.Len()) / 3))
 }
