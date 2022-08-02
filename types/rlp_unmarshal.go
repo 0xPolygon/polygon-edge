@@ -327,53 +327,30 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 		// reset To
 		t.To = nil
 	}
-
-	lastIndex := 3
-	if len(elems) == 10 {
-		// This is required for IBFT 2.0, due to the fact that
-		// legacy transactions don't contain this field, and this field
-		// needs to be preserved while transferring a block.
-		// Some transactions don't explicitly set this field (JSONRPC packages)
-		// for example, so we need to support transactions that both have
-		// the From field set, and transactions that don't have it set.
-		// In the future, we should move away from using fragile data encoding formats, such as RLP
-		if vv, _ := v.Get(lastIndex + 1).Bytes(); len(vv) == 20 {
-			// address
-			t.From = BytesToAddress(vv)
-		} else {
-			// reset From
-			t.From = ZeroAddress
-		}
-
-		lastIndex++
-	}
-
 	// value
 	t.Value = new(big.Int)
-	if err := elems[lastIndex+1].GetBigInt(t.Value); err != nil {
+	if err := elems[4].GetBigInt(t.Value); err != nil {
 		return err
 	}
-
 	// input
-	if t.Input, err = elems[lastIndex+2].GetBytes(t.Input[:0]); err != nil {
+	if t.Input, err = elems[5].GetBytes(t.Input[:0]); err != nil {
 		return err
 	}
 
 	// V
 	t.V = new(big.Int)
-	if err = elems[lastIndex+3].GetBigInt(t.V); err != nil {
+	if err = elems[6].GetBigInt(t.V); err != nil {
 		return err
 	}
 
 	// R
 	t.R = new(big.Int)
-	if err = elems[lastIndex+4].GetBigInt(t.R); err != nil {
+	if err = elems[7].GetBigInt(t.R); err != nil {
 		return err
 	}
-
 	// S
 	t.S = new(big.Int)
-	if err = elems[lastIndex+5].GetBigInt(t.S); err != nil {
+	if err = elems[8].GetBigInt(t.S); err != nil {
 		return err
 	}
 

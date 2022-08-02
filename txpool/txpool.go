@@ -458,7 +458,19 @@ func (p *TxPool) processEvent(event *blockchain.Event) {
 
 		// Extract latest nonces
 		for _, tx := range block.Transactions {
+			var err error
+
 			addr := tx.From
+			if addr == types.ZeroAddress {
+				// From field is not set, extract the signer
+				if addr, err = p.signer.Sender(tx); err != nil {
+					p.logger.Error(
+						fmt.Sprintf("unable to extract signer for transaction, %v", err),
+					)
+
+					continue
+				}
+			}
 
 			// skip already processed accounts
 			if _, processed := stateNonces[addr]; processed {
