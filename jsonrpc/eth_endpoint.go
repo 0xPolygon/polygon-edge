@@ -3,6 +3,8 @@ package jsonrpc
 import (
 	"errors"
 	"fmt"
+	"math/big"
+
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
@@ -12,7 +14,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/fastrlp"
-	"math/big"
 )
 
 type ethTxPoolStore interface {

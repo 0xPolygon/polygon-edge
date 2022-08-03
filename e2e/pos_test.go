@@ -861,7 +861,7 @@ func TestSnapshotUpdating(t *testing.T) {
 		ctxCancelFn()
 
 		for _, validator := range snapshot.Validators {
-			if validator.Address == referenceAddr.String() {
+			if types.BytesToAddress(validator.Data) == referenceAddr {
 				return true
 			}
 		}

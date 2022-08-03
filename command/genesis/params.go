@@ -7,7 +7,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
-	"github.com/0xPolygon/polygon-edge/consensus/ibft"
+	"github.com/0xPolygon/polygon-edge/consensus/ibft/fork"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/contracts/staking"
 	stakingHelper "github.com/0xPolygon/polygon-edge/helper/staking"
@@ -50,7 +50,7 @@ type genesisParams struct {
 	validatorPrefixPath string
 	premine             []string
 	bootnodes           []string
-	ibftValidators      validators.ValidatorSet
+	ibftValidators      validators.Validators
 
 	ibftValidatorsRaw []string
 
@@ -255,18 +255,18 @@ func (p *genesisParams) initConsensusEngineConfig() {
 	}
 
 	if p.isPos {
-		p.initIBFTEngineMap(ibft.PoS)
+		p.initIBFTEngineMap(fork.PoS)
 
 		return
 	}
 
-	p.initIBFTEngineMap(ibft.PoA)
+	p.initIBFTEngineMap(fork.PoA)
 }
 
-func (p *genesisParams) initIBFTEngineMap(mechanism ibft.MechanismType) {
+func (p *genesisParams) initIBFTEngineMap(ibftType fork.IBFTType) {
 	p.consensusEngineConfig = map[string]interface{}{
 		string(server.IBFTConsensus): map[string]interface{}{
-			"type":           mechanism,
+			"type":           ibftType,
 			"validator_type": p.ibftValidatorType,
 			"epochSize":      p.epochSize,
 		},
@@ -333,14 +333,8 @@ func (p *genesisParams) shouldPredeployStakingSC() bool {
 }
 
 func (p *genesisParams) predeployStakingSC() (*chain.GenesisAccount, error) {
-	// validators, ok := p.ibftValidators.(*validators.ECDSAValidatorSet)
-	// if !ok {
-	// 	return nil, fmt.Errorf("%t can't be set in PoS contract", p.ibftValidators)
-	// }
-
-	// TODO: support for PoS
 	stakingAccount, predeployErr := stakingHelper.PredeployStakingSC(
-		[]types.Address{},
+		p.ibftValidators,
 		stakingHelper.PredeployParams{
 			MinValidatorCount: p.minNumValidators,
 			MaxValidatorCount: p.maxNumValidators,

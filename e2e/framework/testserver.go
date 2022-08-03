@@ -23,7 +23,7 @@ import (
 	ibftSwitch "github.com/0xPolygon/polygon-edge/command/ibft/switch"
 	initCmd "github.com/0xPolygon/polygon-edge/command/secrets/init"
 	"github.com/0xPolygon/polygon-edge/command/server"
-	"github.com/0xPolygon/polygon-edge/consensus/ibft"
+	"github.com/0xPolygon/polygon-edge/consensus/ibft/fork"
 	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	stakingHelper "github.com/0xPolygon/polygon-edge/helper/staking"
@@ -395,7 +395,7 @@ func (t *TestServer) Start(ctx context.Context) error {
 	return err
 }
 
-func (t *TestServer) SwitchIBFTType(typ ibft.MechanismType, from uint64, to, deployment *uint64) error {
+func (t *TestServer) SwitchIBFTType(typ fork.IBFTType, from uint64, to, deployment *uint64) error {
 	t.t.Helper()
 
 	ibftSwitchCmd := ibftSwitch.GetCommand()
