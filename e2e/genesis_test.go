@@ -65,3 +65,38 @@ func TestGenesisBlockGasLimit(t *testing.T) {
 		})
 	}
 }
+
+//func TestGenesis_Predeployment(t *testing.T) {
+//	var (
+//		firstParam  = "a"
+//		secondParam = "b"
+//		numValue    = "123"
+//	)
+//
+//	senderKey, senderAddr := tests.GenerateKeyAndAddr(t)
+//	addrStr := "0x01110"
+//	predeployAddress := types.StringToAddress(addrStr)
+//
+//	ibftManager := framework.NewIBFTServersManager(
+//		t,
+//		1,
+//		IBFTDirPrefix,
+//		func(i int, config *framework.TestServerConfig) {
+//			config.Premine(senderAddr, framework.EthToWei(10))
+//			config.SetPredeployParams(&framework.PredeployParams{
+//				ArtifactsPath:    "./metadata/predeploySC.json",
+//				PredeployAddress: addrStr,
+//				ConstructorArgs: []string{
+//					fmt.Sprintf("[[%s],[%s]]", firstParam, secondParam), numValue, firstParam},
+//			})
+//		})
+//
+//	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+//	defer cancel()
+//	ibftManager.StartServers(ctx)
+//
+//	srv := ibftManager.GetServer(0)
+//	clt := srv.JSONRPC()
+//
+//
+//}

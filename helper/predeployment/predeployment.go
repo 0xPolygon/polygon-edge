@@ -97,6 +97,56 @@ func generateContractArtifact(filepath string) (*contractArtifact, error) {
 	}, nil
 }
 
+// getArraySubstring fetches the substring of anything
+// that is between [ and ]
+func getArraySubstring(s string) string {
+	// Find the first occurrence of the opening bracket
+	i := strings.Index(s, "[")
+	if i >= 0 {
+		// Find last occurrence of the closing bracket
+		j := strings.LastIndex(s, "]")
+		if j >= 0 {
+			return s[i+1 : j]
+		}
+	}
+
+	return ""
+}
+
+// extractValue recursively extracts the values for subarrays
+// and packs them
+func extractValue(s string) interface{} {
+	if !strings.Contains(s, "[") {
+		return s
+	}
+
+	ret := make([]interface{}, 0)
+	arraySubstring := getArraySubstring(s)
+
+	if arraySubstring != "" {
+		splitValues := strings.Split(arraySubstring, ",")
+
+		for _, str := range splitValues {
+			ret = append(ret, extractValue(str))
+		}
+	}
+
+	return ret
+}
+
+// normalizeConstructorArguments cleans up the constructor arguments so that they
+// can be interpreted by the ABI encoder
+func normalizeConstructorArguments(constructorArgs []interface{}) []interface{} {
+	arguments := make([]interface{}, 0)
+
+	for _, arg := range constructorArgs {
+		argStr, _ := arg.(string)
+		arguments = append(arguments, extractValue(argStr))
+	}
+
+	return arguments
+}
+
 // GenerateGenesisAccountFromFile generates an account that is going to be directly
 // inserted into state
 func GenerateGenesisAccountFromFile(
@@ -120,7 +170,7 @@ func GenerateGenesisAccountFromFile(
 		// Constructor arguments are passed in as an array of values.
 		// Structs are treated as sub-arrays with their corresponding values laid out
 		// in ABI encoding
-		constructorArgs,
+		normalizeConstructorArguments(constructorArgs),
 		contractABI.Constructor.Inputs,
 	)
 	if err != nil {

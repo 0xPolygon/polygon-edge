@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/0xPolygon/polygon-edge/command/genesis/predeploy"
 	"io"
 	"math/big"
 	"os"
@@ -306,6 +307,34 @@ func (t *TestServer) GenerateGenesis() error {
 
 	blockGasLimit := strconv.FormatUint(t.Config.BlockGasLimit, 10)
 	args = append(args, "--block-gas-limit", blockGasLimit)
+
+	cmd := exec.Command(binaryName, args...)
+	cmd.Dir = t.Config.RootDir
+
+	return cmd.Run()
+}
+
+func (t *TestServer) GenesisPredeploy() error {
+	genesisPredeployCmd := predeploy.GetCommand()
+	args := []string{
+		genesisPredeployCmd.Use,
+	}
+
+	// Add the path to the genesis file
+	args = append(args, fmt.Sprintf("%s/genesis.json", t.Config.RootDir))
+
+	// Add predeploy address
+	if t.Config.PredeployParams.PredeployAddress != "" {
+		args = append(args, "--predeploy-address", t.Config.PredeployParams.PredeployAddress)
+	}
+
+	// Add constructor arguments, if any
+	for _, constructorArg := range t.Config.PredeployParams.ConstructorArgs {
+		args = append(args, "--constructor-args", constructorArg)
+	}
+
+	// Add the path to the artifacts file
+	args = append(args, "--artifacts-path", t.Config.PredeployParams.ArtifactsPath)
 
 	cmd := exec.Command(binaryName, args...)
 	cmd.Dir = t.Config.RootDir

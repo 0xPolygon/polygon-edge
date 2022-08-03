@@ -50,6 +50,18 @@ type TestServerConfig struct {
 	MaxValidatorCount       uint64               // Max validator count
 	BlockTime               uint64               // Minimum block generation time (in s)
 	IBFTBaseTimeout         uint64               // Base Timeout in seconds for IBFT
+
+	PredeployParams *PredeployParams
+}
+
+type PredeployParams struct {
+	ArtifactsPath    string
+	PredeployAddress string
+	ConstructorArgs  []string
+}
+
+func (t *TestServerConfig) SetPredeployParams(params *PredeployParams) {
+	t.PredeployParams = params
 }
 
 // DataDir returns path of data directory server uses
