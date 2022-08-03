@@ -74,8 +74,7 @@ type backendIBFT struct {
 	epochSize          uint64
 	quorumSizeBlockNum uint64
 
-	blockTime       time.Duration // Minimum block generation time in seconds
-	ibftBaseTimeout time.Duration // Base timeout for IBFT message in seconds
+	blockTime time.Duration // Minimum block generation time in seconds
 
 	sealing bool // Flag indicating if the node is a sealer
 
@@ -125,7 +124,6 @@ func Factory(params *consensus.Params) (consensus.Consensus, error) {
 		metrics:            params.Metrics,
 		secretsManager:     params.SecretsManager,
 		blockTime:          time.Duration(params.BlockTime) * time.Second,
-		ibftBaseTimeout:    time.Duration(params.IBFTBaseTimeout) * time.Second, //	TODO: Deprecated
 		syncer: syncer.NewSyncer(
 			params.Logger,
 			params.Network,
