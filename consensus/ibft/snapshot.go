@@ -10,6 +10,8 @@ import (
 	"sync"
 	"sync/atomic"
 
+	lru "github.com/hashicorp/golang-lru"
+
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
@@ -110,7 +112,7 @@ func (i *Ibft) addHeaderSnap(header *types.Header) error {
 		Number:      header.Number,
 		Votes:       []*Vote{},
 		Set:         extra.Validators,
-		BlockReward: "",
+		BlockReward: extra.BlockReward,
 	}
 
 	i.store.add(snap)
