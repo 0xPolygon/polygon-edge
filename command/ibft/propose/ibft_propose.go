@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/0xPolygon/polygon-edge/command"
+	"github.com/0xPolygon/polygon-edge/validators"
 	"github.com/spf13/cobra"
 
 	"github.com/0xPolygon/polygon-edge/command/helper"
@@ -26,10 +27,24 @@ func GetCommand() *cobra.Command {
 
 func setFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(
+		&params.rawIBFTValidatorType,
+		command.IBFTValidatorTypeFlag,
+		string(validators.ECDSAValidatorType),
+		"the type of validator in IBFT",
+	)
+
+	cmd.Flags().StringVar(
 		&params.addressRaw,
 		addressFlag,
 		"",
 		"the address of the account to be voted for",
+	)
+
+	cmd.Flags().StringVar(
+		&params.rawBLSPublicKey,
+		blsPublicKeyFlag,
+		"",
+		"the BLS PublicKey of the account to be voted for",
 	)
 
 	cmd.Flags().StringVar(

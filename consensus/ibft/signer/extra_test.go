@@ -41,7 +41,7 @@ func TestExtraEncoding(t *testing.T) {
 	}{
 		{
 			from: &IstanbulExtra{
-				Validators: validators.AddressesToECDSAValidatorSet(
+				Validators: validators.AddressesToECDSAValidators(
 					types.StringToAddress("1"),
 				),
 				Seal: seal1,
@@ -53,7 +53,7 @@ func TestExtraEncoding(t *testing.T) {
 				},
 			},
 			to: &IstanbulExtra{
-				Validators:          &validators.ECDSAValidatorSet{},
+				Validators:          &validators.ECDSAValidators{},
 				Seal:                seal1,
 				CommittedSeal:       &SerializedSeal{},
 				ParentCommittedSeal: &SerializedSeal{},
@@ -94,7 +94,7 @@ func createIBFTHeader(
 	signer Signer,
 	num uint64,
 	parentHeader *types.Header,
-	validators validators.ValidatorSet,
+	validators validators.Validators,
 ) *types.Header {
 	t.Helper()
 
@@ -131,9 +131,8 @@ func TestAppendECDSACommittedSeal(t *testing.T) {
 
 		signerA = &SignerImpl{
 			NewECDSAKeyManagerFromKey(keys[0]),
-			NewECDSAKeyManagerFromKey(keys[0]),
 		}
-		validators = validators.AddressesToECDSAValidatorSet(addresses...)
+		validators = validators.AddressesToECDSAValidators(addresses...)
 
 		err error
 	)
@@ -153,7 +152,6 @@ func TestAppendECDSACommittedSeal(t *testing.T) {
 
 		for _, key := range normalValidatorKeys {
 			signer := NewSigner(
-				NewECDSAKeyManagerFromKey(key),
 				NewECDSAKeyManagerFromKey(key),
 			)
 
@@ -199,7 +197,6 @@ func TestAppendECDSACommittedSeal(t *testing.T) {
 
 		// create new committed seal
 		faultySigner := NewSigner(
-			NewECDSAKeyManagerFromKey(faultyValidatorKey),
 			NewECDSAKeyManagerFromKey(faultyValidatorKey),
 		)
 		fx, err := faultySigner.CreateCommittedSeal(header)

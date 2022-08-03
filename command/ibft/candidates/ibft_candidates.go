@@ -2,6 +2,7 @@ package candidates
 
 import (
 	"context"
+
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
@@ -28,9 +29,14 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	outputter.SetCommandResult(
-		newIBFTCandidatesResult(candidatesResponse),
-	)
+	result, err := newIBFTCandidatesResult(candidatesResponse)
+	if err != nil {
+		outputter.SetError(err)
+
+		return
+	}
+
+	outputter.SetCommandResult(result)
 }
 
 func getIBFTCandidates(grpcAddress string) (*ibftOp.CandidatesResp, error) {

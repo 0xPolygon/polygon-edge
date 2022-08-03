@@ -9,6 +9,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/consensus"
+	"github.com/0xPolygon/polygon-edge/consensus/ibft/fork"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/helper/common"
@@ -92,7 +93,7 @@ func (m *MockBlockchain) CalculateGasLimit(number uint64) (uint64, error) {
 }
 
 // helper method
-func (m *MockBlockchain) SetGenesis(validators validators.ValidatorSet, key *ecdsa.PrivateKey) *types.Block {
+func (m *MockBlockchain) SetGenesis(validators validators.Validators, key *ecdsa.PrivateKey) *types.Block {
 	m.t.Helper()
 
 	header := &types.Header{
@@ -105,7 +106,6 @@ func (m *MockBlockchain) SetGenesis(validators validators.ValidatorSet, key *ecd
 	}
 
 	signer := signer.NewSigner(
-		signer.NewECDSAKeyManagerFromKey(key),
 		signer.NewECDSAKeyManagerFromKey(key),
 	)
 
@@ -128,7 +128,7 @@ func (m *MockBlockchain) MockBlock(
 	height uint64,
 	parentHash types.Hash,
 	proposer *ecdsa.PrivateKey,
-	vals validators.ValidatorSet,
+	vals validators.Validators,
 ) *types.Block {
 	m.t.Helper()
 
@@ -146,7 +146,6 @@ func (m *MockBlockchain) MockBlock(
 	}
 
 	signer := signer.NewSigner(
-		signer.NewECDSAKeyManagerFromKey(proposer),
 		signer.NewECDSAKeyManagerFromKey(proposer),
 	)
 
@@ -401,7 +400,7 @@ func TestTransition_AcceptState_Validator_VerifyFails(t *testing.T) {
 	block := i.DummyBlock()
 	block.Header.MixHash = types.Hash{} // invalidates the block
 
-	header, err := i.signer.WriteSeal(block.Header)
+	header, err := i.currentSigner.WriteSeal(block.Header)
 
 	assert.NoError(t, err)
 
@@ -672,7 +671,7 @@ func TestTransition_RoundChangeState_ErrStartNewRound(t *testing.T) {
 	m := newMockIbft(t, []string{"A", "B"}, "A")
 	m.Close()
 
-	m.state.err = errBlockVerificationFailed
+	m.state.err = ErrBlockVerificationFailed
 
 	m.setState(RoundChangeState)
 	m.runCycle()
@@ -1229,11 +1228,10 @@ func newMockIbft(t *testing.T, accounts []string, account string) *mockIbft {
 		state:      newState(),
 		epochSize:  DefaultEpochSize,
 		metrics:    consensus.NilMetrics(),
-		signer: signer.NewSigner(
-			signer.NewECDSAKeyManagerFromKey(addr.priv),
+		currentSigner: signer.NewSigner(
 			signer.NewECDSAKeyManagerFromKey(addr.priv),
 		),
-		ibftForks: []IBFTFork{
+		ibftForks: []fork.IBFTFork{
 			{
 				From:          common.JSONNumber{Value: 0},
 				Type:          PoA,
@@ -1241,8 +1239,6 @@ func newMockIbft(t *testing.T, accounts []string, account string) *mockIbft {
 			},
 		},
 	}
-
-	initIbftMechanism(PoA, ibft)
 
 	// by default set the state to (1, 0)
 	ibft.state.view = proto.ViewMsg(1, 0)
@@ -1300,8 +1296,6 @@ func newMockIBFTWithMockBlockchain(
 			signer.NewECDSAKeyManagerFromKey(addr.priv),
 		),
 	}
-
-	initIbftMechanism(PoA, ibft)
 
 	// by default set the state to (1, 0)
 	ibft.state.view = proto.ViewMsg(1, 0)
@@ -1375,7 +1369,7 @@ var (
 		CandidateVoteHook,
 		AcceptStateLogHook,
 		VerifyBlockHook,
-		PreStateCommitHook,
+		PreCommitStateHook,
 	}
 )
 
@@ -1709,14 +1703,14 @@ func TestQuorumSizeSwitch(t *testing.T) {
 		name           string
 		switchBlock    uint64
 		currentBlock   uint64
-		set            validators.ValidatorSet
+		set            validators.Validators
 		expectedQuorum int
 	}{
 		{
 			"use old quorum calculation",
 			10,
 			5,
-			validators.AddressesToECDSAValidatorSet(
+			validators.AddressesToECDSAValidators(
 				types.ZeroAddress,
 				types.ZeroAddress,
 				types.ZeroAddress,
@@ -1730,7 +1724,7 @@ func TestQuorumSizeSwitch(t *testing.T) {
 			"use new quorum calculation",
 			10,
 			15,
-			validators.AddressesToECDSAValidatorSet(
+			validators.AddressesToECDSAValidators(
 				types.ZeroAddress,
 				types.ZeroAddress,
 				types.ZeroAddress,

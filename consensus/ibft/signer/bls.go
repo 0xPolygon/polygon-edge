@@ -46,8 +46,8 @@ func (s *BLSKeyManager) Address() types.Address {
 	return s.address
 }
 
-func (s *BLSKeyManager) NewEmptyValidatorSet() validators.ValidatorSet {
-	return &validators.BLSValidatorSet{}
+func (s *BLSKeyManager) NewEmptyValidatorSet() validators.Validators {
+	return &validators.BLSValidators{}
 }
 
 func (s *BLSKeyManager) NewEmptyCommittedSeal() Sealer {
@@ -72,7 +72,7 @@ func (s *BLSKeyManager) Ecrecover(sig, digest []byte) (types.Address, error) {
 }
 
 func (s *BLSKeyManager) GenerateCommittedSeals(sealMap map[types.Address][]byte, extra *IstanbulExtra) (Sealer, error) {
-	validators, ok := extra.Validators.(*validators.BLSValidatorSet)
+	validators, ok := extra.Validators.(*validators.BLSValidators)
 	if !ok {
 		return nil, ErrInvalidValidatorSet
 	}
@@ -103,14 +103,14 @@ func (s *BLSKeyManager) GenerateCommittedSeals(sealMap map[types.Address][]byte,
 func (s *BLSKeyManager) VerifyCommittedSeals(
 	rawCommittedSeal Sealer,
 	digest []byte,
-	rawSet validators.ValidatorSet,
+	rawSet validators.Validators,
 ) (int, error) {
 	committedSeal, ok := rawCommittedSeal.(*BLSSeal)
 	if !ok {
 		return 0, ErrInvalidCommittedSealType
 	}
 
-	validatorSet, ok := rawSet.(*validators.BLSValidatorSet)
+	validatorSet, ok := rawSet.(*validators.BLSValidators)
 	if !ok {
 		return 0, ErrInvalidValidatorSet
 	}
@@ -128,7 +128,7 @@ func (s *BLSKeyManager) ValidateIBFTMessage(msg *proto.MessageReq) error {
 
 func (s *BLSKeyManager) getBLSSignatures(
 	sealMap map[types.Address][]byte,
-	validators *validators.BLSValidatorSet,
+	validators *validators.BLSValidators,
 ) ([]*bls_sig.Signature, *big.Int, error) {
 	blsSignatures := make([]*bls_sig.Signature, 0, len(sealMap))
 	bitMap := new(big.Int)
@@ -155,7 +155,7 @@ func (s *BLSKeyManager) getBLSSignatures(
 func (s *BLSKeyManager) verifyCommittedSealsImpl(
 	committedSeal *BLSSeal,
 	msg []byte,
-	validators validators.BLSValidatorSet,
+	validators validators.BLSValidators,
 ) (int, error) {
 	if len(committedSeal.Signature) == 0 || committedSeal.Bitmap.BitLen() == 0 {
 		return 0, ErrEmptyCommittedSeals
@@ -186,7 +186,7 @@ func (s *BLSKeyManager) verifyCommittedSealsImpl(
 }
 
 func (s *BLSKeyManager) createAggregatedBLSPubKeys(
-	validators validators.BLSValidatorSet,
+	validators validators.BLSValidators,
 	bitMap *big.Int,
 ) (*bls_sig.MultiPublicKey, int, error) {
 	pubkeys := make([]*bls_sig.PublicKey, 0, validators.Len())

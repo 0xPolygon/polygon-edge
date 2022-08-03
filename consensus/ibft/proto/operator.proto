@@ -30,9 +30,10 @@ message Snapshot {
     string hash = 3;
 
     repeated Vote votes = 4;
-    
+
     message Validator {
-        string address = 1;
+        string type = 1;
+        bytes data = 2;
     }
 
     message Vote {
@@ -52,6 +53,7 @@ message CandidatesResp {
 }
 
 message Candidate {
-    string address = 1;
-    bool auth = 2;
+    string type = 1;
+    bytes data = 2;
+    bool auth = 3;
 }

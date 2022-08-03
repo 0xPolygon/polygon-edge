@@ -1,16 +1,16 @@
 package ibft
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/consensus"
+	"github.com/0xPolygon/polygon-edge/consensus/ibft/fork"
+	"github.com/0xPolygon/polygon-edge/consensus/ibft/hook"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
-	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/network"
@@ -30,10 +30,11 @@ const (
 )
 
 var (
-	ErrInvalidHookParam     = errors.New("invalid IBFT hook param passed in")
-	ErrInvalidMechanismType = errors.New("invalid consensus mechanism type in params")
-	ErrMissingMechanismType = errors.New("missing consensus mechanism type in params")
-	ErrSignerNotFound       = errors.New("signer not found in validator set")
+	ErrInvalidHookParam        = errors.New("invalid IBFT hook param passed in")
+	ErrInvalidMechanismType    = errors.New("invalid consensus mechanism type in params")
+	ErrMissingMechanismType    = errors.New("missing consensus mechanism type in params")
+	ErrSignerNotFound          = errors.New("signer not found in validator set")
+	ErrBlockVerificationFailed = errors.New("block verification failed")
 )
 
 type blockchainInterface interface {
@@ -69,7 +70,6 @@ type Ibft struct {
 
 	txpool txPoolInterface // Reference to the transaction pool
 
-	store              *snapshotStore // Snapshot store that keeps track of all snapshots
 	epochSize          uint64
 	quorumSizeBlockNum uint64
 
@@ -83,45 +83,19 @@ type Ibft struct {
 
 	operator *operator
 
+	forkManager   fork.ForkManager
+	currentSigner signer.Signer // signer at current sequence
+	currentHooks  hook.Hooks    // hooks at current sequence
+
 	// aux test methods
 	forceTimeoutCh bool
 
 	metrics *consensus.Metrics
 
-	ibftForks  []IBFTFork
-	mechanisms []ConsensusMechanism // IBFT ConsensusMechanism used (PoA / PoS)
-
 	secretsManager secrets.SecretsManager
-	signer         signer.Signer
 
 	blockTime       time.Duration // Minimum block generation time in seconds
 	ibftBaseTimeout time.Duration // Base timeout for IBFT message in seconds
-}
-
-// runHook runs a specified hook if it is present in the hook map
-func (i *Ibft) runHook(hookName HookType, height uint64, hookParam interface{}) error {
-	for _, mechanism := range i.mechanisms {
-		if !mechanism.IsAvailable(hookName, height) {
-			continue
-		}
-
-		// Grab the hook map
-		hookMap := mechanism.GetHookMap()
-
-		// Grab the actual hook if it's present
-		hook, ok := hookMap[hookName]
-		if !ok {
-			// hook not found, continue
-			continue
-		}
-
-		// Run the hook
-		if err := hook(hookParam); err != nil {
-			return fmt.Errorf("error occurred during a call of %s hook in %s: %w", hookName, mechanism.GetType(), err)
-		}
-	}
-
-	return nil
 }
 
 // Factory implements the base consensus Factory method
@@ -154,8 +128,23 @@ func Factory(
 		quorumSizeBlockNum = uint64(readBlockNum)
 	}
 
+	logger := params.Logger.Named("ibft")
+
+	forkManager, err := fork.NewForkManager(
+		logger,
+		params.Blockchain,
+		params.Executor,
+		params.SecretsManager,
+		params.Config.Path,
+		epochSize,
+		params.Config.Config,
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	p := &Ibft{
-		logger:             params.Logger.Named("ibft"),
+		logger:             logger,
 		config:             params.Config,
 		Grpc:               params.Grpc,
 		blockchain:         params.Blockchain,
@@ -165,21 +154,13 @@ func Factory(
 		state:              &currentState{},
 		network:            params.Network,
 		epochSize:          epochSize,
+		forkManager:        forkManager,
 		quorumSizeBlockNum: quorumSizeBlockNum,
 		sealing:            params.Seal,
 		metrics:            params.Metrics,
 		blockTime:          time.Duration(params.BlockTime) * time.Second,
 		ibftBaseTimeout:    time.Duration(params.IBFTBaseTimeout) * time.Second,
 		secretsManager:     params.SecretsManager,
-	}
-
-	// Initialize the mechanism
-	if err := p.setupMechanism(); err != nil {
-		return nil, err
-	}
-
-	if err := p.updateSigner(nil, 0); err != nil {
-		return nil, err
 	}
 
 	// Istanbul requires a different header hash function
@@ -192,12 +173,7 @@ func Factory(
 
 // Start starts the IBFT consensus
 func (i *Ibft) Initialize() error {
-	// Set up the snapshots
-	if err := i.setupSnapshot(); err != nil {
-		return err
-	}
-
-	return nil
+	return i.forkManager.Initialize()
 }
 
 // Start starts the IBFT consensus
@@ -212,8 +188,6 @@ func (i *Ibft) Start() error {
 	i.closeCh = make(chan struct{})
 	i.updateCh = make(chan struct{})
 
-	i.logger.Info("validator key", "addr", i.signer.Address())
-
 	// start the transport protocol
 	if err := i.setupTransport(); err != nil {
 		return err
@@ -223,6 +197,12 @@ func (i *Ibft) Start() error {
 	if err := i.syncer.Start(); err != nil {
 		return err
 	}
+
+	if err := i.updateCurrentModules(i.blockchain.Header().Number + 1); err != nil {
+		return err
+	}
+
+	i.logger.Info("validator key", "addr", i.currentSigner.Address())
 
 	// Start the actual IBFT protocol
 	go i.start()
@@ -249,77 +229,6 @@ type gossipTransport struct {
 // Gossip publishes a new message to the topic
 func (g *gossipTransport) Gossip(msg *proto.MessageReq) error {
 	return g.topic.Publish(msg)
-}
-
-// GetIBFTForks returns IBFT fork configurations from chain config
-func GetIBFTForks(ibftConfig map[string]interface{}) ([]IBFTFork, error) {
-	// no fork, only specifying IBFT type in chain config
-	if originalType, ok := ibftConfig["type"].(string); ok {
-		typ, err := ParseType(originalType)
-		if err != nil {
-			return nil, err
-		}
-
-		validatorType := validators.ECDSAValidatorType
-		if rawValType, ok := ibftConfig["validator_type"].(string); ok {
-			if err := validatorType.FromString(rawValType); err != nil {
-				return nil, err
-			}
-		}
-
-		return []IBFTFork{
-			{
-				Type:          typ,
-				Deployment:    nil,
-				ValidatorType: &validatorType,
-				From:          common.JSONNumber{Value: 0},
-				To:            nil,
-			},
-		}, nil
-	}
-
-	// with forks
-	if types, ok := ibftConfig["types"].([]interface{}); ok {
-		bytes, err := json.Marshal(types)
-		if err != nil {
-			return nil, err
-		}
-
-		var forks []IBFTFork
-		if err := json.Unmarshal(bytes, &forks); err != nil {
-			return nil, err
-		}
-
-		return forks, nil
-	}
-
-	return nil, errors.New("current IBFT type not found")
-}
-
-//  setupTransport read current mechanism in params and sets up consensus mechanism
-func (i *Ibft) setupMechanism() error {
-	var err error
-
-	i.ibftForks, err = GetIBFTForks(i.config.Config)
-	if err != nil {
-		return err
-	}
-
-	i.mechanisms = make([]ConsensusMechanism, len(i.ibftForks))
-
-	for idx, fork := range i.ibftForks {
-		factory, ok := mechanismBackends[fork.Type]
-		if !ok {
-			return fmt.Errorf("consensus mechanism doesn't define: %s", fork.Type)
-		}
-
-		fork := fork
-		if i.mechanisms[idx], err = factory(i, &fork); err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
 
 // setupTransport sets up the gossip transport protocol
@@ -352,7 +261,7 @@ func (i *Ibft) setupTransport() error {
 			return
 		}
 
-		if msg.From == i.signer.Address().String() {
+		if msg.From == i.currentSigner.Address().String() {
 			// we are the sender, skip this message since we already
 			// relay our own messages internally.
 			return
@@ -419,23 +328,13 @@ func (i *Ibft) runCycle() {
 
 // isValidSnapshot checks if the current node is in the validator set for the latest snapshot
 func (i *Ibft) isValidSnapshot() bool {
+	// check if we are a validator and enabled
+
 	if !i.isSealing() {
 		return false
 	}
 
-	// check if we are a validator and enabled
-	header := i.blockchain.Header()
-	snap, err := i.getSnapshot(header.Number)
-
-	if err != nil {
-		return false
-	}
-
-	if snap.Set.Includes(i.signer.Address()) {
-		return true
-	}
-
-	return false
+	return i.state.validators.Includes(i.currentSigner.Address())
 }
 
 // runSyncState implements the Sync state loop.
@@ -444,20 +343,12 @@ func (i *Ibft) isValidSnapshot() bool {
 func (i *Ibft) runSyncState() {
 	// updateSnapshotCallback keeps the snapshot store in sync with the updated
 	// chain data, by calling the SyncStateHook
-	callInsertBlockHook := func(blockNumber uint64) {
-		if hookErr := i.runHook(InsertBlockHook, blockNumber, blockNumber); hookErr != nil {
-			i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", InsertBlockHook, hookErr))
-		}
+	callInsertBlockHook := func(block *types.Block) {
+		nextHeight := block.Number() + 1
 
-		header, ok := i.blockchain.GetHeaderByNumber(blockNumber)
-		if ok {
-			if err := i.updateSigner(header, blockNumber+1); err != nil {
-				i.logger.Error("failed to update signer", "number", blockNumber+1, "err", err)
-			}
-		} else {
-			i.logger.Error("block header not found", "number", blockNumber)
+		if err := i.updateCurrentModules(nextHeight); err != nil {
+			i.logger.Error("failed to update modules", "height", nextHeight, "error", err)
 		}
-
 	}
 
 	// save current height in order to check new blocks are added or not during sync
@@ -488,7 +379,7 @@ func (i *Ibft) runSyncState() {
 		}
 
 		if err := i.syncer.BulkSync(func(newBlock *types.Block) bool {
-			callInsertBlockHook(newBlock.Number())
+			callInsertBlockHook(newBlock)
 			i.txpool.ResetWithHeaders(newBlock.Header)
 
 			return false
@@ -513,7 +404,7 @@ func (i *Ibft) runSyncState() {
 		err := i.syncer.WatchSync(func(newBlock *types.Block) bool {
 			// After each written block, update the snapshot store for PoS.
 			// The snapshot store is currently updated for PoA inside the ProcessHeadersHook
-			callInsertBlockHook(newBlock.Number())
+			callInsertBlockHook(newBlock)
 
 			i.txpool.ResetWithHeaders(newBlock.Header)
 			isValidator = i.isValidSnapshot()
@@ -546,25 +437,12 @@ func (i *Ibft) runSyncState() {
 	}
 }
 
-// shouldWriteTransactions checks if each consensus mechanism accepts a block with transactions at given height
-// returns true if all mechanisms accept
-// otherwise return false
-func (i *Ibft) shouldWriteTransactions(height uint64) bool {
-	for _, m := range i.mechanisms {
-		if m.ShouldWriteTransactions(height) {
-			return true
-		}
-	}
-
-	return false
-}
-
 // buildBlock builds the block, based on the passed in snapshot and parent header
-func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, error) {
+func (i *Ibft) buildBlock(validators validators.Validators, parent *types.Header) (*types.Block, error) {
 	header := &types.Header{
 		ParentHash: parent.Hash,
 		Number:     parent.Number + 1,
-		Miner:      types.ZeroAddress,
+		Miner:      types.ZeroAddress[:],
 		Nonce:      types.Nonce{},
 		MixHash:    signer.IstanbulDigest,
 		// this is required because blockchain needs difficulty to organize blocks and forks
@@ -582,11 +460,10 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 
 	header.GasLimit = gasLimit
 
-	if hookErr := i.runHook(CandidateVoteHook, header.Number, &candidateVoteHookParams{
-		header: header,
-		snap:   snap,
-	}); hookErr != nil {
-		i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", CandidateVoteHook, hookErr))
+	if err := i.currentHooks.ModifyHeader(header, i.currentSigner.Address()); err != nil {
+		i.logger.Error("failed to build header by validator set", "height", header.Number, "error", err)
+
+		return nil, err
 	}
 
 	// set the timestamp
@@ -602,7 +479,7 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 	var parentCommittedSeal signer.Sealer
 
 	if header.Number > 1 {
-		signer, err := i.getSignerAt(parent.Number)
+		signer, err := i.forkManager.GetSigner(parent.Number)
 		if err != nil {
 			return nil, err
 		}
@@ -615,11 +492,11 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 		parentCommittedSeal = extra.CommittedSeal
 	}
 
-	if err := i.signer.InitIBFTExtra(header, parentCommittedSeal, snap.Set); err != nil {
+	if err := i.currentSigner.InitIBFTExtra(header, parentCommittedSeal, validators); err != nil {
 		return nil, err
 	}
 
-	transition, err := i.executor.BeginTxn(parent.StateRoot, header, i.signer.Address())
+	transition, err := i.executor.BeginTxn(parent.StateRoot, header, i.currentSigner.Address())
 	if err != nil {
 		return nil, err
 	}
@@ -627,11 +504,11 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 	// If the mechanism is PoS -> build a regular block if it's not an end-of-epoch block
 	// If the mechanism is PoA -> always build a regular block, regardless of epoch
 	txns := []*types.Transaction{}
-	if i.shouldWriteTransactions(header.Number) {
+	if i.currentHooks.ShouldWriteTransactions(header.Number) {
 		txns = i.writeTransactions(gasLimit, transition)
 	}
 
-	if err := i.PreStateCommit(header, transition); err != nil {
+	if err := i.PreCommitState(header, transition); err != nil {
 		return nil, err
 	}
 
@@ -647,7 +524,7 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 	})
 
 	// write the seal of the block after all the fields are completed
-	header, err = i.signer.WriteSeal(header)
+	header, err = i.currentSigner.WriteSeal(header)
 	if err != nil {
 		return nil, err
 	}
@@ -752,22 +629,7 @@ func (i *Ibft) runAcceptState() { // start new round
 		return
 	}
 
-	if err := i.updateSigner(parent, number); err != nil {
-		i.logger.Error("cannot update signer", "err", err)
-
-		return
-	}
-
-	snap, err := i.getSnapshot(parent.Number)
-
-	if err != nil {
-		i.logger.Error("cannot find snapshot", "num", parent.Number)
-		i.setState(SyncState)
-
-		return
-	}
-
-	if !snap.Set.Includes(i.signer.Address()) {
+	if !i.state.validators.Includes(i.currentSigner.Address()) {
 		// we are not a validator anymore, move back to sync state
 		i.logger.Info("we are not a validator anymore")
 		i.setState(SyncState)
@@ -775,14 +637,23 @@ func (i *Ibft) runAcceptState() { // start new round
 		return
 	}
 
-	if hookErr := i.runHook(AcceptStateLogHook, i.state.view.Sequence, snap); hookErr != nil {
-		i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", AcceptStateLogHook, hookErr))
-	}
-
-	i.state.validators = snap.Set
+	// TODO
+	// Log the info message
+	// pos.ibft.logger.Info(
+	// 	"current snapshot",
+	// 	"validators",
+	// 	snap.Set.Len(),
+	// )
+	// poa.ibft.logger.Info(
+	// 	"current snapshot",
+	// 	"validators",
+	// 	snap.Set.Len(),
+	// 	"votes",
+	// 	len(snap.Votes),
+	// )
 
 	// Update the No.of validator metric
-	i.metrics.Validators.Set(float64(snap.Set.Len()))
+	i.metrics.Validators.Set(float64(i.state.validators.Len()))
 
 	// reset round messages
 	i.state.resetRoundMsgs()
@@ -790,22 +661,29 @@ func (i *Ibft) runAcceptState() { // start new round
 	// select the proposer of the block
 	var lastProposer types.Address
 	if parent.Number != 0 {
-		prevSigner, _ := i.getSignerAt(parent.Number)
+		parentSigner, err := i.forkManager.GetSigner(parent.Number)
+		if err != nil {
+			i.logger.Error("failed to get signer object at parent block", "height", parent.Number, "error", err)
+			i.setState(SyncState)
+		}
 
-		lastProposer, _ = prevSigner.EcrecoverFromHeader(parent)
+		lastProposer, err = parentSigner.EcrecoverFromHeader(parent)
+		if err != nil {
+			i.logger.Error("failed to recover last proposer", "height", parent.Number, "error", err)
+			i.setState(SyncState)
+		}
 	}
 
-	if hookErr := i.runHook(CalculateProposerHook, i.state.view.Sequence, lastProposer); hookErr != nil {
-		i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", CalculateProposerHook, hookErr))
-	}
+	i.state.CalcProposer(lastProposer)
 
-	if i.state.proposer == i.signer.Address() {
+	if i.state.proposer == i.currentSigner.Address() {
 		logger.Info("we are the proposer", "block", number)
 
 		if !i.state.locked {
+			var err error
+
 			// since the state is not locked, we need to build a new block
-			i.state.block, err = i.buildBlock(snap, parent)
-			if err != nil {
+			if i.state.block, err = i.buildBlock(i.state.validators, parent); err != nil {
 				i.logger.Error("failed to build block", "err", err)
 				i.setState(RoundChangeState)
 
@@ -886,9 +764,9 @@ func (i *Ibft) runAcceptState() { // start new round
 			}
 		} else {
 			// since it's a new block, we have to verify it first
-			if err := i.verifyHeaderImpl(snap, parent, block.Header); err != nil {
+			if err := i.verifyHeaderImpl(parent, block.Header); err != nil {
 				i.logger.Error("block header verification failed", "err", err)
-				i.handleStateErr(errBlockVerificationFailed)
+				i.handleStateErr(ErrBlockVerificationFailed)
 
 				continue
 			}
@@ -896,18 +774,14 @@ func (i *Ibft) runAcceptState() { // start new round
 			// Verify other block params
 			if err := i.blockchain.VerifyPotentialBlock(block); err != nil {
 				i.logger.Error("block verification failed", "err", err)
-				i.handleStateErr(errBlockVerificationFailed)
+				i.handleStateErr(ErrBlockVerificationFailed)
 
 				continue
 			}
 
-			if hookErr := i.runHook(VerifyBlockHook, block.Number(), block); hookErr != nil {
-				if errors.As(hookErr, &errBlockVerificationFailed) {
-					i.logger.Error("block verification failed, block at the end of epoch has transactions")
-					i.handleStateErr(errBlockVerificationFailed)
-				} else {
-					i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", VerifyBlockHook, hookErr))
-				}
+			if err := i.currentHooks.VerifyBlock(block); err != nil {
+				i.logger.Error("block verification failed", "err", err)
+				i.handleStateErr(ErrBlockVerificationFailed)
 
 				continue
 			}
@@ -1039,7 +913,7 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 		committedSeals[addr] = committedSeal
 	}
 
-	header, err := i.signer.WriteCommittedSeals(block.Header, committedSeals)
+	header, err := i.currentSigner.WriteCommittedSeals(block.Header, committedSeals)
 	if err != nil {
 		return err
 	}
@@ -1058,10 +932,6 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 		return err
 	}
 
-	if hookErr := i.runHook(InsertBlockHook, header.Number, header.Number); hookErr != nil {
-		return hookErr
-	}
-
 	i.logger.Info(
 		"block committed",
 		"sequence", i.state.view.Sequence,
@@ -1071,6 +941,8 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 		"committed", i.state.numCommitted(),
 	)
 
+	i.updateCurrentModules(block.Number() + 1)
+
 	// after the block has been written we reset the txpool so that
 	// the old transactions are removed
 	i.txpool.ResetWithHeaders(block.Header)
@@ -1079,10 +951,9 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 }
 
 var (
-	errIncorrectBlockLocked    = errors.New("block locked is incorrect")
-	errIncorrectBlockHeight    = errors.New("proposed block number is incorrect")
-	errBlockVerificationFailed = errors.New("block verification failed")
-	errFailedToInsertBlock     = errors.New("failed to insert block")
+	errIncorrectBlockLocked = errors.New("block locked is incorrect")
+	errIncorrectBlockHeight = errors.New("proposed block number is incorrect")
+	errFailedToInsertBlock  = errors.New("failed to insert block")
 )
 
 func (i *Ibft) handleStateErr(err error) {
@@ -1207,7 +1078,7 @@ func (i *Ibft) gossip(typ proto.MessageReq_Type) {
 
 	// if the message is commit, we need to add the committed seal
 	if msg.Type == proto.MessageReq_Commit {
-		committedSeal, err := i.signer.CreateCommittedSeal(i.state.block.Header)
+		committedSeal, err := i.currentSigner.CreateCommittedSeal(i.state.block.Header)
 		if err != nil {
 			i.logger.Error("failed to commit seal", "err", err)
 
@@ -1220,11 +1091,11 @@ func (i *Ibft) gossip(typ proto.MessageReq_Type) {
 	if msg.Type != proto.MessageReq_Preprepare {
 		// send a copy to ourselves so that we can process this message as well
 		msg2 := msg.Copy()
-		msg2.From = i.signer.Address().String()
+		msg2.From = i.currentSigner.Address().String()
 		i.pushMessage(msg2)
 	}
 
-	if err := i.signer.SignIBFTMessage(msg); err != nil {
+	if err := i.currentSigner.SignIBFTMessage(msg); err != nil {
 		i.logger.Error("failed to sign message", "err", err)
 
 		return
@@ -1262,14 +1133,19 @@ func (i *Ibft) isSealing() bool {
 }
 
 // verifyHeaderImpl implements the actual header verification logic
-func (i *Ibft) verifyHeaderImpl(snap *Snapshot, parent, header *types.Header) error {
-	// ensure the extra data is correctly formatted
-	if _, err := i.signer.GetIBFTExtra(header); err != nil {
+func (i *Ibft) verifyHeaderImpl(parent, header *types.Header) error {
+	headerSigner, validators, hooks, err := i.getModulesFromForkManager(header.Number)
+	if err != nil {
 		return err
 	}
 
-	if hookErr := i.runHook(VerifyHeadersHook, header.Number, header.Nonce); hookErr != nil {
-		return hookErr
+	// ensure the extra data is correctly formatted
+	if _, err := headerSigner.GetIBFTExtra(header); err != nil {
+		return err
+	}
+
+	if err := hooks.VerifyHeader(header); err != nil {
+		return err
 	}
 
 	if header.MixHash != signer.IstanbulDigest {
@@ -1286,28 +1162,27 @@ func (i *Ibft) verifyHeaderImpl(snap *Snapshot, parent, header *types.Header) er
 	}
 
 	// verify the sealer
-	if err := i.verifySigner(snap, header); err != nil {
+	if err := i.verifySigner(header, headerSigner, validators); err != nil {
 		return err
 	}
 
 	// verify last committed seals
 	if parent.Number >= 1 {
-		// find validators who validated last block
-		parentSnap, err := i.getSnapshot(parent.Number - 1)
+		parentSigner, err := i.forkManager.GetSigner(parent.Number)
 		if err != nil {
 			return err
 		}
 
-		signer, err := i.getSignerAt(header.Number)
+		parentValidators, err := i.forkManager.GetValidators(parent.Number)
 		if err != nil {
 			return err
 		}
 
-		if err := signer.VerifyParentCommittedSeals(
-			parentSnap.Set,
+		if err := parentSigner.VerifyParentCommittedSeals(
+			parentValidators,
 			parent.Hash,
 			header,
-			i.quorumSize(parent.Number, parentSnap.Set),
+			i.quorumSize(parent.Number, parentValidators),
 		); err != nil {
 			return fmt.Errorf("failed to verify ParentCommittedSeal: %w", err)
 		}
@@ -1326,18 +1201,23 @@ func (i *Ibft) VerifyHeader(header *types.Header) error {
 		)
 	}
 
-	snap, err := i.getSnapshot(parent.Number)
+	// verify all the header fields + seal
+	if err := i.verifyHeaderImpl(parent, header); err != nil {
+		return err
+	}
+
+	signer, err := i.forkManager.GetSigner(header.Number)
 	if err != nil {
 		return err
 	}
 
-	// verify all the header fields + seal
-	if err := i.verifyHeaderImpl(snap, parent, header); err != nil {
+	validators, err := i.forkManager.GetValidators(header.Number)
+	if err != nil {
 		return err
 	}
 
 	// verify the committed seals
-	if err := i.signer.VerifyCommittedSeals(snap.Set, header, i.quorumSize(header.Number, snap.Set)); err != nil {
+	if err := signer.VerifyCommittedSeals(validators, header, i.quorumSize(header.Number, validators)); err != nil {
 		return err
 	}
 
@@ -1347,7 +1227,7 @@ func (i *Ibft) VerifyHeader(header *types.Header) error {
 //	quorumSize returns a callback that when executed on a ValidatorSet computes
 //	number of votes required to reach quorum based on the size of the set.
 //	The blockNumber argument indicates which formula was used to calculate the result (see PRs #513, #549)
-func (i *Ibft) quorumSize(blockNumber uint64, validatorSet validators.ValidatorSet) int {
+func (i *Ibft) quorumSize(blockNumber uint64, validatorSet validators.Validators) int {
 	if blockNumber < i.quorumSizeBlockNum {
 		return LegacyQuorumSize(validatorSet)
 	}
@@ -1357,25 +1237,38 @@ func (i *Ibft) quorumSize(blockNumber uint64, validatorSet validators.ValidatorS
 
 // ProcessHeaders updates the snapshot based on previously verified headers
 func (i *Ibft) ProcessHeaders(headers []*types.Header) error {
-	return i.processHeaders(headers)
+	for _, header := range headers {
+		hooks, err := i.forkManager.GetHooks(header.Number)
+		if err != nil {
+			return err
+		}
+
+		if err := hooks.ProcessHeader(header); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // GetBlockCreator retrieves the block signer from the extra data field
 func (i *Ibft) GetBlockCreator(header *types.Header) (types.Address, error) {
-	return i.signer.EcrecoverFromHeader(header)
+	signer, err := i.forkManager.GetSigner(header.Number)
+	if err != nil {
+		return types.ZeroAddress, err
+	}
+
+	return signer.EcrecoverFromHeader(header)
 }
 
-// PreStateCommit a hook to be called before finalizing state transition on inserting block
-func (i *Ibft) PreStateCommit(header *types.Header, txn *state.Transition) error {
-	params := &preStateCommitHookParams{
-		header: header,
-		txn:    txn,
-	}
-	if hookErr := i.runHook(PreStateCommitHook, header.Number, params); hookErr != nil {
-		return hookErr
+// PreCommitState a hook to be called before finalizing state transition on inserting block
+func (i *Ibft) PreCommitState(header *types.Header, txn *state.Transition) error {
+	hooks, err := i.forkManager.GetHooks(header.Number)
+	if err != nil {
+		return err
 	}
 
-	return nil
+	return hooks.PreCommitState(header, txn)
 }
 
 // GetEpoch returns the current epoch
@@ -1396,12 +1289,8 @@ func (i *Ibft) IsLastOfEpoch(number uint64) bool {
 func (i *Ibft) Close() error {
 	close(i.closeCh)
 
-	if i.config.Path != "" {
-		err := i.store.saveToPath(i.config.Path)
-
-		if err != nil {
-			return err
-		}
+	if err := i.forkManager.Close(); err != nil {
+		return err
 	}
 
 	if i.syncer != nil {
@@ -1416,7 +1305,7 @@ func (i *Ibft) Close() error {
 // SetHeaderHash updates hash calculation function for IBFT
 func (i *Ibft) SetHeaderHash() {
 	types.HeaderHash = func(h *types.Header) types.Hash {
-		signer, err := i.getSignerAt(h.Number)
+		signer, err := i.forkManager.GetSigner(h.Number)
 		if err != nil {
 			return types.ZeroHash
 		}
@@ -1475,13 +1364,17 @@ func (i *Ibft) pushMessage(msg *proto.MessageReq) {
 	}
 }
 
-func (i *Ibft) verifySigner(snap *Snapshot, header *types.Header) error {
-	signer, err := i.signer.EcrecoverFromHeader(header)
+func (i *Ibft) verifySigner(
+	header *types.Header,
+	signer signer.Signer,
+	validators validators.Validators,
+) error {
+	proposer, err := signer.EcrecoverFromHeader(header)
 	if err != nil {
 		return err
 	}
 
-	if !snap.Set.Includes(signer) {
+	if !validators.Includes(proposer) {
 		return ErrSignerNotFound
 	}
 
@@ -1511,103 +1404,39 @@ func (i *Ibft) startNewRound(newRound uint64) {
 	}
 }
 
-func (i *Ibft) updateSigner(
-	parentHeader *types.Header,
-	height uint64,
-) error {
-	var (
-		keyManager, parentKeyManager signer.KeyManager
-		err                          error
-	)
-
-	if height-1 >= 1 {
-		if i.signer != nil {
-			parentKeyManager = i.signer.KeyManager()
-		} else {
-			if parentKeyManager, err = i.getKeyManagerAt(height - 1); err != nil {
-				return err
-			}
-		}
-	}
-
-	if keyManager, err = i.getKeyManagerAt(height); err != nil {
+func (i *Ibft) updateCurrentModules(height uint64) error {
+	signer, validators, hooks, err := i.getModulesFromForkManager(height)
+	if err != nil {
 		return err
 	}
 
-	i.signer = signer.NewSigner(
-		keyManager,
-		parentKeyManager,
-	)
-
-	fork := i.getSignerForkAt(height)
-	if fork == nil {
-		return fmt.Errorf("IBFT fork not found")
-	}
-
-	if fork.From.Value == height && fork.Validators != nil {
-		original, err := i.getSnapshot(height)
-		if err != nil {
-			return err
-		}
-
-		newSnap := original.Copy()
-		newSnap.Number = parentHeader.Number
-		newSnap.Hash = parentHeader.Hash.String()
-		newSnap.Set = fork.Validators
-
-		if newSnap.Number == original.Number {
-			i.store.replace(newSnap)
-		} else {
-			i.store.add(newSnap)
-		}
-	}
+	i.currentSigner = signer
+	i.currentHooks = hooks
+	i.state.validators = validators
 
 	return nil
 }
 
-func (i *Ibft) getSignerAt(height uint64) (signer.Signer, error) {
-	var (
-		keyManager, parentKeyManager signer.KeyManager
-		err                          error
-	)
-
-	if keyManager, err = i.getKeyManagerAt(height); err != nil {
-		return nil, err
+func (i *Ibft) getModulesFromForkManager(height uint64) (
+	signer.Signer,
+	validators.Validators,
+	hook.Hooks,
+	error,
+) {
+	signer, err := i.forkManager.GetSigner(height)
+	if err != nil {
+		return nil, nil, nil, err
 	}
 
-	if height-1 > 0 {
-		if parentKeyManager, err = i.getKeyManagerAt(height - 1); err != nil {
-			return nil, err
-		}
+	validators, err := i.forkManager.GetValidators(height)
+	if err != nil {
+		return nil, nil, nil, err
 	}
 
-	return signer.NewSigner(
-		keyManager,
-		parentKeyManager,
-	), nil
-}
-
-func (i *Ibft) getKeyManagerAt(height uint64) (signer.KeyManager, error) {
-	fork := i.getSignerForkAt(height)
-	if fork == nil {
-		return nil, fmt.Errorf("IBFT fork not found")
+	hooks, err := i.forkManager.GetHooks(height)
+	if err != nil {
+		return nil, nil, nil, err
 	}
 
-	return signer.InitKeyManager(i.secretsManager, *fork.ValidatorType)
-}
-
-func (i *Ibft) getSignerForkAt(height uint64) *IBFTFork {
-	for idx := len(i.ibftForks) - 1; idx >= 0; idx-- {
-		fork := i.ibftForks[idx]
-
-		if fork.ValidatorType == nil {
-			continue
-		}
-
-		if fork.From.Value <= height && (fork.To == nil || height <= fork.To.Value) {
-			return &fork
-		}
-	}
-
-	return nil
+	return signer, validators, hooks, nil
 }

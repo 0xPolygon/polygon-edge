@@ -27,7 +27,7 @@ type Signer interface {
 	Type() validators.ValidatorType
 	Address() types.Address
 
-	InitIBFTExtra(header *types.Header, parentCommittedSeal Sealer, set validators.ValidatorSet) error
+	InitIBFTExtra(header *types.Header, parentCommittedSeal Sealer, set validators.Validators) error
 	GetIBFTExtra(header *types.Header) (*IstanbulExtra, error)
 
 	WriteSeal(*types.Header) (*types.Header, error)
@@ -35,9 +35,9 @@ type Signer interface {
 
 	CreateCommittedSeal(*types.Header) ([]byte, error)
 	WriteCommittedSeals(*types.Header, map[types.Address][]byte) (*types.Header, error)
-	VerifyCommittedSeals(set validators.ValidatorSet, header *types.Header, quorumSize int) error
+	VerifyCommittedSeals(set validators.Validators, header *types.Header, quorumSize int) error
 	VerifyParentCommittedSeals(
-		set validators.ValidatorSet,
+		set validators.Validators,
 		parentHash types.Hash,
 		header *types.Header,
 		quorumSize int,
@@ -50,17 +50,14 @@ type Signer interface {
 }
 
 type SignerImpl struct {
-	keyManager       KeyManager
-	parentKeyManager KeyManager
+	keyManager KeyManager
 }
 
 func NewSigner(
 	keyManager KeyManager,
-	parentKeyManager KeyManager,
 ) Signer {
 	return &SignerImpl{
-		keyManager:       keyManager,
-		parentKeyManager: parentKeyManager,
+		keyManager: keyManager,
 	}
 }
 
@@ -75,7 +72,7 @@ func (s *SignerImpl) Address() types.Address {
 func (s *SignerImpl) InitIBFTExtra(
 	header *types.Header,
 	parentCommittedSeal Sealer,
-	set validators.ValidatorSet,
+	set validators.Validators,
 ) error {
 	putIbftExtra(header, &IstanbulExtra{
 		Validators:          set,
@@ -104,7 +101,8 @@ func (s *SignerImpl) GetIBFTExtra(h *types.Header) (*IstanbulExtra, error) {
 	}
 
 	if h.Number > 1 {
-		extra.ParentCommittedSeal = s.parentKeyManager.NewEmptyCommittedSeal()
+		// TODO: check
+		extra.ParentCommittedSeal = s.keyManager.NewEmptyCommittedSeal()
 	}
 
 	if err := extra.UnmarshalRLP(data); err != nil {
@@ -187,7 +185,7 @@ func (s *SignerImpl) WriteCommittedSeals(
 }
 
 func (s *SignerImpl) VerifyCommittedSeals(
-	validators validators.ValidatorSet,
+	validators validators.Validators,
 	header *types.Header,
 	quorumSize int,
 ) error {
@@ -216,7 +214,7 @@ func (s *SignerImpl) VerifyCommittedSeals(
 }
 
 func (s *SignerImpl) VerifyParentCommittedSeals(
-	parentValidators validators.ValidatorSet,
+	parentValidators validators.Validators,
 	parentHash types.Hash,
 	header *types.Header,
 	parentQuorumSize int,
@@ -228,7 +226,8 @@ func (s *SignerImpl) VerifyParentCommittedSeals(
 
 	rawMsg := commitMsg(parentHash[:])
 
-	numSeals, err := s.parentKeyManager.VerifyCommittedSeals(extra.ParentCommittedSeal, rawMsg, parentValidators)
+	// TODO: check
+	numSeals, err := s.keyManager.VerifyCommittedSeals(extra.ParentCommittedSeal, rawMsg, parentValidators)
 	if err != nil {
 		return err
 	}
@@ -250,7 +249,7 @@ func (s *SignerImpl) ValidateIBFTMessage(msg *proto.MessageReq) error {
 
 func (s *SignerImpl) initIbftExtra(
 	header *types.Header,
-	validators validators.ValidatorSet,
+	validators validators.Validators,
 	parentCommittedSeal Sealer,
 ) {
 	putIbftExtra(header, &IstanbulExtra{

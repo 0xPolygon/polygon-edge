@@ -49,8 +49,8 @@ func (s *ECDSAKeyManager) Address() types.Address {
 	return s.address
 }
 
-func (s *ECDSAKeyManager) NewEmptyValidatorSet() validators.ValidatorSet {
-	return &validators.ECDSAValidatorSet{}
+func (s *ECDSAKeyManager) NewEmptyValidatorSet() validators.Validators {
+	return &validators.ECDSAValidators{}
 }
 
 func (s *ECDSAKeyManager) NewEmptyCommittedSeal() Sealer {
@@ -91,14 +91,14 @@ func (s *ECDSAKeyManager) GenerateCommittedSeals(
 func (s *ECDSAKeyManager) VerifyCommittedSeals(
 	rawCommittedSeal Sealer,
 	digest []byte,
-	rawSet validators.ValidatorSet,
+	rawSet validators.Validators,
 ) (int, error) {
 	committedSeal, ok := rawCommittedSeal.(*SerializedSeal)
 	if !ok {
 		return 0, ErrInvalidCommittedSealType
 	}
 
-	validatorSet, ok := rawSet.(*validators.ECDSAValidatorSet)
+	validatorSet, ok := rawSet.(*validators.ECDSAValidators)
 	if !ok {
 		return 0, ErrInvalidValidatorSet
 	}
@@ -117,7 +117,7 @@ func (s *ECDSAKeyManager) ValidateIBFTMessage(msg *proto.MessageReq) error {
 func (s *ECDSAKeyManager) verifyCommittedSealsImpl(
 	committedSeal *SerializedSeal,
 	msg []byte,
-	validators validators.ECDSAValidatorSet,
+	validators validators.ECDSAValidators,
 ) (int, error) {
 	numSeals := len(*committedSeal)
 	if numSeals == 0 {
@@ -171,8 +171,6 @@ func (s *SerializedSeal) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) e
 	if err != nil {
 		return fmt.Errorf("mismatch of RLP type for CommittedSeal, expected list but found %s", v.Type())
 	}
-
-	fmt.Printf("\nSerializedSeal UnmarshalRLPFrom size=%d\n", len(vals))
 
 	(*s) = make([][]byte, len(vals))
 

@@ -18,8 +18,7 @@ func TestOperator_GetNextCandidate(t *testing.T) {
 	pool.add("A", "B", "C")
 
 	ibft := &Ibft{
-		signer: signer.NewSigner(
-			signer.NewMockECDSAKeyManager(pool.get("A").Address()),
+		currentSigner: signer.NewSigner(
 			signer.NewMockECDSAKeyManager(pool.get("A").Address()),
 		),
 	}
@@ -52,7 +51,7 @@ func TestOperator_GetNextCandidate(t *testing.T) {
 	// there are no votes so it can vote
 	assert.NotNil(t, o.getNextCandidate(snap))
 
-	snap.Set = &validators.ECDSAValidatorSet{}
+	snap.Set = &validators.ECDSAValidators{}
 
 	// it was a removal and since the candidate is not on the set anymore
 	// is removed from the candidates list

@@ -24,7 +24,7 @@ var (
 
 // IstanbulExtra defines the structure of the extra field for Istanbul
 type IstanbulExtra struct {
-	Validators          validators.ValidatorSet
+	Validators          validators.Validators
 	Seal                []byte
 	CommittedSeal       Sealer
 	ParentCommittedSeal Sealer

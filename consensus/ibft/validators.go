@@ -7,7 +7,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/validators"
 )
 
-func CalcMaxFaultyNodes(s validators.ValidatorSet) int {
+func CalcMaxFaultyNodes(s validators.Validators) int {
 	// N -> number of nodes in IBFT
 	// F -> number of faulty nodes
 	//
@@ -22,17 +22,17 @@ func CalcMaxFaultyNodes(s validators.ValidatorSet) int {
 	return (s.Len() - 1) / 3
 }
 
-type QuorumImplementation func(validators.ValidatorSet) int
+type QuorumImplementation func(validators.Validators) int
 
 //	LegacyQuorumSize returns the legacy quorum size for the given validator set
-func LegacyQuorumSize(set validators.ValidatorSet) int {
+func LegacyQuorumSize(set validators.Validators) int {
 	// According to the IBFT spec, the number of valid messages
 	// needs to be 2F + 1
 	return 2*CalcMaxFaultyNodes(set) + 1
 }
 
 // OptimalQuorumSize returns the optimal quorum size for the given validator set
-func OptimalQuorumSize(set validators.ValidatorSet) int {
+func OptimalQuorumSize(set validators.Validators) int {
 	//	if the number of validators is less than 4,
 	//	then the entire set is required
 	if CalcMaxFaultyNodes(set) == 0 {
@@ -49,7 +49,7 @@ func OptimalQuorumSize(set validators.ValidatorSet) int {
 }
 
 func CalcProposer(
-	validators validators.ValidatorSet,
+	validators validators.Validators,
 	round uint64,
 	lastProposer types.Address,
 ) validators.Validator {

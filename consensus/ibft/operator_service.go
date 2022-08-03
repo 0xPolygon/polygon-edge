@@ -3,159 +3,135 @@ package ibft
 import (
 	"context"
 	"fmt"
-	"sync"
 
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
-	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/0xPolygon/polygon-edge/validators/valset"
 	empty "google.golang.org/protobuf/types/known/emptypb"
 )
 
 type operator struct {
 	ibft *Ibft
-
-	candidatesLock sync.Mutex
-	candidates     []*proto.Candidate
-
 	proto.UnimplementedIbftOperatorServer
 }
 
 // Status returns the status of the IBFT client
 func (o *operator) Status(ctx context.Context, req *empty.Empty) (*proto.IbftStatusResp, error) {
-	resp := &proto.IbftStatusResp{
-		Key: o.ibft.signer.Address().String(),
+	var signerAddr string
+	if o.ibft.currentSigner != nil {
+		signerAddr = o.ibft.currentSigner.Address().String()
 	}
 
-	return resp, nil
-}
-
-// getNextCandidate returns a candidate from the snapshot
-func (o *operator) getNextCandidate(snap *Snapshot) *proto.Candidate {
-	o.candidatesLock.Lock()
-	defer o.candidatesLock.Unlock()
-
-	// first, we need to remove any candidates that have already been
-	// selected as validators
-	for i := 0; i < len(o.candidates); i++ {
-		addr := types.StringToAddress(o.candidates[i].Address)
-
-		// Define the delete callback method
-		deleteFn := func() {
-			o.candidates = append(o.candidates[:i], o.candidates[i+1:]...)
-			i--
-		}
-
-		// Check if the candidate is already in the validator set, and wants to be added
-		if o.candidates[i].Auth && snap.Set.Includes(addr) {
-			deleteFn()
-
-			continue
-		}
-
-		// Check if the candidate is not in the validator set, and wants to be removed
-		if !o.candidates[i].Auth && !snap.Set.Includes(addr) {
-			deleteFn()
-		}
-	}
-
-	var candidate *proto.Candidate
-
-	// now pick the first candidate that has not received a vote yet
-	for _, c := range o.candidates {
-		addr := types.StringToAddress(c.Address)
-
-		count := snap.Count(func(v *Vote) bool {
-			return v.Address == addr && v.Validator == o.ibft.signer.Address()
-		})
-
-		if count == 0 {
-			// Candidate found
-			candidate = c
-
-			break
-		}
-	}
-
-	return candidate
+	return &proto.IbftStatusResp{
+		Key: signerAddr,
+	}, nil
 }
 
 // GetSnapshot returns the snapshot, based on the passed in request
 func (o *operator) GetSnapshot(ctx context.Context, req *proto.SnapshotReq) (*proto.Snapshot, error) {
-	var snap *Snapshot
-
-	var err error
-
+	height := req.Number
 	if req.Latest {
-		snap, err = o.ibft.getLatestSnapshot()
-	} else {
-		snap, err = o.ibft.getSnapshot(req.Number)
+		height = o.ibft.blockchain.Header().Number
 	}
 
+	header, ok := o.ibft.blockchain.GetHeaderByNumber(height)
+	if !ok {
+		return nil, fmt.Errorf("header not found")
+	}
+
+	resp := &proto.Snapshot{
+		Number: height,
+		Hash:   header.Hash.String(),
+	}
+
+	valSet, err := o.ibft.forkManager.GetValidatorSet(height)
 	if err != nil {
 		return nil, err
 	}
 
-	resp := snap.ToProto()
+	vals, err := valSet.GetValidators(height)
+	if err != nil {
+		return nil, err
+	}
+
+	resp.Validators = make([]*proto.Snapshot_Validator, vals.Len())
+	for idx := 0; idx < vals.Len(); idx++ {
+		val := vals.At(uint64(idx))
+
+		resp.Validators[idx] = &proto.Snapshot_Validator{
+			Type: string(vals.Type()),
+			Data: val.Bytes(),
+		}
+	}
+
+	votableValSet, ok := valSet.(valset.Votable)
+	if !ok {
+		return resp, nil
+	}
+
+	votes, err := votableValSet.Votes(height)
+	if err != nil {
+		return nil, err
+	}
+
+	resp.Votes = make([]*proto.Snapshot_Vote, len(votes))
+	for idx := range votes {
+		resp.Votes[idx] = &proto.Snapshot_Vote{
+			Validator: votes[idx].Validator.String(),
+			Proposed:  votes[idx].Candidate.String(),
+			Auth:      votes[idx].Authorize,
+		}
+	}
 
 	return resp, nil
 }
 
 // Propose proposes a new candidate to be added / removed from the validator set
 func (o *operator) Propose(ctx context.Context, req *proto.Candidate) (*empty.Empty, error) {
-	var addr types.Address
-	if err := addr.UnmarshalText([]byte(req.Address)); err != nil {
-		return nil, err
-	}
-
-	// check if the candidate is already there
-	o.candidatesLock.Lock()
-	defer o.candidatesLock.Unlock()
-
-	for _, c := range o.candidates {
-		if c.Address == req.Address {
-			return nil, fmt.Errorf("already a candidate")
-		}
-	}
-
-	snap, err := o.ibft.getLatestSnapshot()
+	valSet, err := o.ibft.forkManager.GetValidatorSet(o.ibft.blockchain.Header().Number)
 	if err != nil {
 		return nil, err
 	}
-	// safe checks
-	if req.Auth {
-		if snap.Set.Includes(addr) {
-			return nil, fmt.Errorf("the candidate is already a validator")
-		}
+
+	votableValSet, ok := valSet.(valset.Votable)
+	if !ok {
+		return nil, fmt.Errorf("voting is not supported")
 	}
 
-	if !req.Auth {
-		if !snap.Set.Includes(addr) {
-			return nil, fmt.Errorf("cannot remove a validator if they're not in the snapshot")
-		}
+	if err := votableValSet.Propose(req.Data, req.Auth, o.ibft.currentSigner.Address()); err != nil {
+		return nil, err
 	}
-
-	// check if we have already voted for this candidate
-	count := snap.Count(func(v *Vote) bool {
-		return v.Address == addr && v.Validator == o.ibft.signer.Address()
-	})
-	if count == 1 {
-		return nil, fmt.Errorf("already voted for this address")
-	}
-
-	o.candidates = append(o.candidates, req)
 
 	return &empty.Empty{}, nil
 }
 
 // Candidates returns the validator candidates list
 func (o *operator) Candidates(ctx context.Context, req *empty.Empty) (*proto.CandidatesResp, error) {
-	o.candidatesLock.Lock()
-	defer o.candidatesLock.Unlock()
-
-	resp := &proto.CandidatesResp{
-		Candidates: []*proto.Candidate{},
+	valSet, err := o.ibft.forkManager.GetValidatorSet(o.ibft.blockchain.Header().Number)
+	if err != nil {
+		return nil, err
 	}
 
-	resp.Candidates = append(resp.Candidates, o.candidates...)
+	votableValSet, ok := valSet.(valset.Votable)
+	if !ok {
+		return nil, fmt.Errorf("voting is not supported")
+	}
+
+	candidates, err := votableValSet.Candidates()
+	if err != nil {
+		return nil, err
+	}
+
+	resp := &proto.CandidatesResp{
+		Candidates: make([]*proto.Candidate, len(candidates)),
+	}
+
+	for idx, candidate := range candidates {
+		resp.Candidates[idx] = &proto.Candidate{
+			Type: string(candidate.Validator.Type()),
+			Data: candidate.Validator.Bytes(),
+			Auth: candidate.Authorize,
+		}
+	}
 
 	return resp, nil
 }
