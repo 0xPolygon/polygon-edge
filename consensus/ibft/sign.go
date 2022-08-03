@@ -39,7 +39,7 @@ func ecrecoverFromHeader(h *types.Header) (types.Address, error) {
 		return types.Address{}, err
 	}
 
-	return ecrecoverImpl(extra.Seal, msg)
+	return ecrecoverImpl(extra.ProposerSeal, msg)
 }
 
 func signSealImpl(prv *ecdsa.PrivateKey, h *types.Header, committed bool) ([]byte, error) {
@@ -76,7 +76,7 @@ func writeSeal(prv *ecdsa.PrivateKey, h *types.Header) (*types.Header, error) {
 		return nil, err
 	}
 
-	extra.Seal = seal
+	extra.ProposerSeal = seal
 	if err := PutIbftExtra(h, extra); err != nil {
 		return nil, err
 	}

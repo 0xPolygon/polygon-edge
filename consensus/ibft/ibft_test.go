@@ -103,7 +103,7 @@ func (m *MockBlockchain) SetGenesis(validators []types.Address) *types.Block {
 		GasLimit:   defaultBlockGasLimit,
 	}
 
-	putIbftExtraValidators(header, validators)
+	putIbftExtraSnapshotData(header, validators, "")
 
 	header = header.ComputeHash()
 
@@ -139,7 +139,7 @@ func (m *MockBlockchain) MockBlock(
 		GasLimit:   gasLimit,
 	}
 
-	putIbftExtraValidators(header, validators)
+	putIbftExtraSnapshotData(header, validators, "")
 
 	header = header.ComputeHash()
 
