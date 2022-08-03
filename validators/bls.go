@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
-	"strings"
 
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/fastrlp"
@@ -15,31 +14,30 @@ type BLSValidator struct {
 	BLSPublicKey []byte
 }
 
-func ParseBLSValidator(s string) (*BLSValidator, error) {
-	subValues := strings.Split(s, ":")
+func (v *BLSValidator) String() string {
+	return fmt.Sprintf(
+		"%s:%s",
+		v.Address.String(),
+		hex.EncodeToString(v.BLSPublicKey),
+	)
+}
 
-	if len(subValues) != 2 {
-		return nil, fmt.Errorf("invalid validator format, expected [Validator Address]:[BLS Public Key]")
-	}
-
-	addrBytes, err := hex.DecodeString(strings.TrimPrefix(subValues[0], "0x"))
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse address: %w", err)
-	}
-
-	pubKeyBytes, err := hex.DecodeString(strings.TrimPrefix(subValues[1], "0x"))
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse BLS Public Key: %w", err)
-	}
-
-	return &BLSValidator{
-		Address:      types.BytesToAddress(addrBytes),
-		BLSPublicKey: pubKeyBytes,
-	}, nil
+func (v *BLSValidator) Type() ValidatorType {
+	return BLSValidatorType
 }
 
 func (v *BLSValidator) Addr() types.Address {
 	return v.Address
+}
+
+func (v *BLSValidator) Copy() Validator {
+	pubkey := make([]byte, len(v.BLSPublicKey))
+	copy(pubkey, v.BLSPublicKey)
+
+	return &BLSValidator{
+		Address:      v.Address,
+		BLSPublicKey: pubkey,
+	}
 }
 
 func (v *BLSValidator) Equal(vr Validator) bool {
@@ -89,18 +87,18 @@ func (v *BLSValidator) SetFromBytes(input []byte) error {
 	return types.UnmarshalRlp(v.UnmarshalRLPFrom, input)
 }
 
-type BLSValidatorSet []*BLSValidator
+type BLSValidators []*BLSValidator
 
-func (vs *BLSValidatorSet) Type() ValidatorType {
+func (vs *BLSValidators) Type() ValidatorType {
 	return BLSValidatorType
 }
 
-func (vs *BLSValidatorSet) Len() int {
+func (vs *BLSValidators) Len() int {
 	return len(*vs)
 }
 
-func (vs *BLSValidatorSet) Equal(ts ValidatorSet) bool {
-	vts, ok := ts.(*BLSValidatorSet)
+func (vs *BLSValidators) Equal(ts Validators) bool {
+	vts, ok := ts.(*BLSValidators)
 	if !ok {
 		return false
 	}
@@ -119,23 +117,21 @@ func (vs *BLSValidatorSet) Equal(ts ValidatorSet) bool {
 	return true
 }
 
-func (vs *BLSValidatorSet) Copy() ValidatorSet {
-	clone := make(BLSValidatorSet, vs.Len())
+func (vs *BLSValidators) Copy() Validators {
+	clone := make(BLSValidators, vs.Len())
 
 	for idx, val := range *vs {
-		copy := *val
-
-		clone[idx] = &copy
+		clone[idx], _ = val.Copy().(*BLSValidator)
 	}
 
 	return &clone
 }
 
-func (vs *BLSValidatorSet) At(index uint64) Validator {
+func (vs *BLSValidators) At(index uint64) Validator {
 	return (*vs)[index]
 }
 
-func (vs *BLSValidatorSet) Index(addr types.Address) int64 {
+func (vs *BLSValidators) Index(addr types.Address) int64 {
 	for i, v := range *vs {
 		if v.Address == addr {
 			return int64(i)
@@ -145,11 +141,11 @@ func (vs *BLSValidatorSet) Index(addr types.Address) int64 {
 	return -1
 }
 
-func (vs *BLSValidatorSet) Includes(addr types.Address) bool {
+func (vs *BLSValidators) Includes(addr types.Address) bool {
 	return vs.Index(addr) != -1
 }
 
-func (vs *BLSValidatorSet) Add(v Validator) error {
+func (vs *BLSValidators) Add(v Validator) error {
 	validator, ok := v.(*BLSValidator)
 	if !ok {
 		return ErrMismatchValidatorType
@@ -164,7 +160,7 @@ func (vs *BLSValidatorSet) Add(v Validator) error {
 	return nil
 }
 
-func (vs *BLSValidatorSet) Del(v Validator) error {
+func (vs *BLSValidators) Del(v Validator) error {
 	validator, ok := v.(*BLSValidator)
 	if !ok {
 		return ErrMismatchValidatorType
@@ -181,8 +177,8 @@ func (vs *BLSValidatorSet) Del(v Validator) error {
 	return nil
 }
 
-func (vs *BLSValidatorSet) Merge(vts ValidatorSet) error {
-	targetSet, ok := vts.(*BLSValidatorSet)
+func (vs *BLSValidators) Merge(vts Validators) error {
+	targetSet, ok := vts.(*BLSValidators)
 	if !ok {
 		return ErrMismatchValidatorSetType
 	}
@@ -200,7 +196,7 @@ func (vs *BLSValidatorSet) Merge(vts ValidatorSet) error {
 	return nil
 }
 
-func (vs *BLSValidatorSet) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
+func (vs *BLSValidators) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 	vv := arena.NewArray()
 
 	for _, v := range *vs {
@@ -210,13 +206,13 @@ func (vs *BLSValidatorSet) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 	return vv
 }
 
-func (vs *BLSValidatorSet) UnmarshalRLPFrom(p *fastrlp.Parser, val *fastrlp.Value) error {
+func (vs *BLSValidators) UnmarshalRLPFrom(p *fastrlp.Parser, val *fastrlp.Value) error {
 	elems, err := val.GetElems()
 	if err != nil {
 		return err
 	}
 
-	*vs = make(BLSValidatorSet, len(elems))
+	*vs = make(BLSValidators, len(elems))
 
 	for idx, e := range elems {
 		val := &BLSValidator{}

@@ -30,8 +30,22 @@ func ParseECDSAValidator(s string) (*ECDSAValidator, error) {
 	}, nil
 }
 
+func (v *ECDSAValidator) Type() ValidatorType {
+	return ECDSAValidatorType
+}
+
+func (v *ECDSAValidator) String() string {
+	return v.Address.String()
+}
+
 func (v *ECDSAValidator) Addr() types.Address {
 	return v.Address
+}
+
+func (v *ECDSAValidator) Copy() Validator {
+	return &ECDSAValidator{
+		Address: v.Address,
+	}
 }
 
 func (v *ECDSAValidator) Equal(vr Validator) bool {
@@ -76,18 +90,18 @@ func (v *ECDSAValidator) SetFromBytes(input []byte) error {
 	return types.UnmarshalRlp(v.UnmarshalRLPFrom, input)
 }
 
-type ECDSAValidatorSet []*ECDSAValidator
+type ECDSAValidators []*ECDSAValidator
 
-func (vs *ECDSAValidatorSet) Type() ValidatorType {
+func (vs *ECDSAValidators) Type() ValidatorType {
 	return ECDSAValidatorType
 }
 
-func (vs *ECDSAValidatorSet) Len() int {
+func (vs *ECDSAValidators) Len() int {
 	return len(*vs)
 }
 
-func (vs *ECDSAValidatorSet) Equal(ts ValidatorSet) bool {
-	vts, ok := ts.(*ECDSAValidatorSet)
+func (vs *ECDSAValidators) Equal(ts Validators) bool {
+	vts, ok := ts.(*ECDSAValidators)
 	if !ok {
 		return false
 	}
@@ -106,23 +120,21 @@ func (vs *ECDSAValidatorSet) Equal(ts ValidatorSet) bool {
 	return true
 }
 
-func (vs *ECDSAValidatorSet) Copy() ValidatorSet {
-	clone := make(ECDSAValidatorSet, vs.Len())
+func (vs *ECDSAValidators) Copy() Validators {
+	clone := make(ECDSAValidators, vs.Len())
 
 	for idx, val := range *vs {
-		copy := *val
-
-		clone[idx] = &copy
+		clone[idx], _ = val.Copy().(*ECDSAValidator)
 	}
 
 	return &clone
 }
 
-func (vs *ECDSAValidatorSet) At(index uint64) Validator {
+func (vs *ECDSAValidators) At(index uint64) Validator {
 	return (*vs)[index]
 }
 
-func (vs *ECDSAValidatorSet) Index(addr types.Address) int64 {
+func (vs *ECDSAValidators) Index(addr types.Address) int64 {
 	for i, v := range *vs {
 		if v.Address == addr {
 			return int64(i)
@@ -132,11 +144,11 @@ func (vs *ECDSAValidatorSet) Index(addr types.Address) int64 {
 	return -1
 }
 
-func (vs *ECDSAValidatorSet) Includes(addr types.Address) bool {
+func (vs *ECDSAValidators) Includes(addr types.Address) bool {
 	return vs.Index(addr) != -1
 }
 
-func (vs *ECDSAValidatorSet) Add(v Validator) error {
+func (vs *ECDSAValidators) Add(v Validator) error {
 	validator, ok := v.(*ECDSAValidator)
 	if !ok {
 		return ErrMismatchValidatorType
@@ -151,7 +163,7 @@ func (vs *ECDSAValidatorSet) Add(v Validator) error {
 	return nil
 }
 
-func (vs *ECDSAValidatorSet) Del(v Validator) error {
+func (vs *ECDSAValidators) Del(v Validator) error {
 	validator, ok := v.(*ECDSAValidator)
 	if !ok {
 		return ErrMismatchValidatorType
@@ -168,8 +180,8 @@ func (vs *ECDSAValidatorSet) Del(v Validator) error {
 	return nil
 }
 
-func (vs *ECDSAValidatorSet) Merge(vts ValidatorSet) error {
-	targetSet, ok := vts.(*ECDSAValidatorSet)
+func (vs *ECDSAValidators) Merge(vts Validators) error {
+	targetSet, ok := vts.(*ECDSAValidators)
 	if !ok {
 		return ErrMismatchValidatorSetType
 	}
@@ -187,7 +199,7 @@ func (vs *ECDSAValidatorSet) Merge(vts ValidatorSet) error {
 	return nil
 }
 
-func (vs *ECDSAValidatorSet) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
+func (vs *ECDSAValidators) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 	vv := arena.NewArray()
 
 	for _, v := range *vs {
@@ -197,13 +209,13 @@ func (vs *ECDSAValidatorSet) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value
 	return vv
 }
 
-func (vs *ECDSAValidatorSet) UnmarshalRLPFrom(p *fastrlp.Parser, val *fastrlp.Value) error {
+func (vs *ECDSAValidators) UnmarshalRLPFrom(p *fastrlp.Parser, val *fastrlp.Value) error {
 	elems, err := val.GetElems()
 	if err != nil {
 		return err
 	}
 
-	*vs = make(ECDSAValidatorSet, len(elems))
+	*vs = make(ECDSAValidators, len(elems))
 
 	for idx, e := range elems {
 		val := &ECDSAValidator{}
