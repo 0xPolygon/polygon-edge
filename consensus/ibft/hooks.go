@@ -65,12 +65,6 @@ const (
 	// when building a block (candidate voting)
 	CandidateVoteHook HookType = "CandidateVoteHook"
 
-	// POA + POS //
-
-	// AcceptStateLogHook defines what should be logged out as the status
-	// from AcceptState
-	AcceptStateLogHook HookType = "AcceptStateLogHook"
-
 	// POS //
 
 	// VerifyBlockHook defines the additional verification steps for the PoS mechanism
@@ -78,10 +72,6 @@ const (
 
 	// PreStateCommitHook defines the additional state transition injection
 	PreStateCommitHook HookType = "PreStateCommitHook"
-
-	// CalculateProposerHook defines what is the next proposer
-	// based on the previous
-	CalculateProposerHook = "CalculateProposerHook"
 )
 
 type ConsensusMechanism interface {

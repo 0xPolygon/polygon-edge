@@ -1,7 +1,6 @@
 package dev
 
 import (
-	"context"
 	"fmt"
 	"time"
 
@@ -234,16 +233,6 @@ func (d *Dev) PreStateCommit(_header *types.Header, _txn *state.Transition) erro
 
 func (d *Dev) GetSyncProgression() *progress.Progression {
 	return nil
-}
-
-func (d *Dev) Prepare(header *types.Header) error {
-	// TODO: Remove
-	return nil
-}
-
-func (d *Dev) Seal(block *types.Block, ctx context.Context) (*types.Block, error) {
-	// TODO: Remove
-	return nil, nil
 }
 
 func (d *Dev) Close() error {

@@ -40,7 +40,7 @@ func PoSFactory(ibft *backendIBFT, params *IBFTFork) (ConsensusMechanism, error)
 // IsAvailable returns indicates if mechanism should be called at given height
 func (pos *PoSMechanism) IsAvailable(hookType HookType, height uint64) bool {
 	switch hookType {
-	case AcceptStateLogHook, VerifyBlockHook, CalculateProposerHook:
+	case VerifyBlockHook:
 		return pos.IsInRange(height)
 	case PreStateCommitHook:
 		// deploy contract on ContractDeployment
@@ -86,38 +86,6 @@ func (pos *PoSMechanism) initializeParams(params *IBFTFork) error {
 			pos.MinValidatorCount = params.MinValidatorCount.Value
 		}
 	}
-
-	return nil
-}
-
-//	TODO: this hook seems like an unnecessary detour
-// calculateProposerHook calculates the next proposer based on the last
-func (pos *PoSMechanism) calculateProposerHook(lastProposerParam interface{}) error {
-	_, ok := lastProposerParam.(types.Address)
-	if !ok {
-		return ErrInvalidHookParam
-	}
-
-	//pos.ibft.state.CalcProposer(lastProposer)
-
-	return nil
-}
-
-//	TODO: remove
-// acceptStateLogHook logs the current snapshot
-func (pos *PoSMechanism) acceptStateLogHook(snapParam interface{}) error {
-	// Cast the param to a *Snapshot
-	snap, ok := snapParam.(*Snapshot)
-	if !ok {
-		return ErrInvalidHookParam
-	}
-
-	// Log the info message
-	pos.ibft.logger.Info(
-		"current snapshot",
-		"validators",
-		len(snap.Set),
-	)
 
 	return nil
 }
@@ -182,9 +150,6 @@ func (pos *PoSMechanism) initializeHookMap() {
 	// Create the hook map
 	pos.hookMap = make(map[HookType]func(interface{}) error)
 
-	// Register the AcceptStateLogHook
-	pos.hookMap[AcceptStateLogHook] = pos.acceptStateLogHook
-
 	// Register the InsertBlockHook
 	pos.hookMap[InsertBlockHook] = pos.insertBlockHook
 
@@ -193,9 +158,6 @@ func (pos *PoSMechanism) initializeHookMap() {
 
 	// Register the PreStateCommitHook
 	pos.hookMap[PreStateCommitHook] = pos.preStateCommitHook
-
-	// Register the CalculateProposerHook
-	pos.hookMap[CalculateProposerHook] = pos.calculateProposerHook
 }
 
 // ShouldWriteTransactions indicates if transactions should be written to a block
