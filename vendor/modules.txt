@@ -11,6 +11,11 @@ cloud.google.com/go/iam
 ## explicit; go 1.16
 cloud.google.com/go/secretmanager/apiv1
 cloud.google.com/go/secretmanager/internal
+# github.com/0xPolygon/go-ibft v0.0.0-20220729102524-0f95a9c3a08c
+## explicit; go 1.17
+github.com/0xPolygon/go-ibft/core
+github.com/0xPolygon/go-ibft/messages
+github.com/0xPolygon/go-ibft/messages/proto
 # github.com/andybalholm/brotli v1.0.4
 ## explicit; go 1.12
 github.com/andybalholm/brotli

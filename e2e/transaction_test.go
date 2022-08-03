@@ -387,7 +387,11 @@ func Test_TransactionIBFTLoop(t *testing.T) {
 		Input:    buf,
 	}
 	receipt, err := srv.SendRawTx(deployCtx, deployTx, senderKey)
-	assert.NoError(t, err)
+
+	if err != nil {
+		t.Fatalf("Unable to send transaction, %v", err)
+	}
+
 	assert.NotNil(t, receipt)
 
 	contractAddr := receipt.ContractAddress

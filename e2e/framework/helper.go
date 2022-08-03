@@ -31,7 +31,7 @@ import (
 )
 
 var (
-	DefaultTimeout = time.Second * 10
+	DefaultTimeout = time.Minute
 )
 
 type AtomicErrors struct {

@@ -19,7 +19,7 @@ func TestExtraEncoding(t *testing.T) {
 				Validators: []types.Address{
 					types.StringToAddress("1"),
 				},
-				Seal: seal1,
+				ProposerSeal: seal1,
 				CommittedSeal: [][]byte{
 					seal1,
 				},

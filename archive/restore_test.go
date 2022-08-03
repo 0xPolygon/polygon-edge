@@ -49,7 +49,7 @@ func (m *mockChain) GetHashByNumber(num uint64) types.Hash {
 	return b.Hash()
 }
 
-func (m *mockChain) WriteBlock(block *types.Block) error {
+func (m *mockChain) WriteBlock(block *types.Block, _ string) error {
 	m.blocks = append(m.blocks, block)
 
 	return nil

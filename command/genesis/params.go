@@ -193,7 +193,7 @@ func (p *genesisParams) initIBFTExtraData() {
 
 	ibftExtra := &ibft.IstanbulExtra{
 		Validators:    p.ibftValidators,
-		Seal:          []byte{},
+		ProposerSeal:  []byte{},
 		CommittedSeal: [][]byte{},
 	}
 

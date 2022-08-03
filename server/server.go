@@ -243,6 +243,15 @@ func NewServer(config *Config) (*Server, error) {
 		return nil, err
 	}
 
+	// setup and start grpc server
+	if err := m.setupGRPC(); err != nil {
+		return nil, err
+	}
+
+	if err := m.network.Start(); err != nil {
+		return nil, err
+	}
+
 	// setup and start jsonrpc server
 	if err := m.setupJSONRPC(); err != nil {
 		return nil, err
@@ -255,15 +264,6 @@ func NewServer(config *Config) (*Server, error) {
 
 	// start consensus
 	if err := m.consensus.Start(); err != nil {
-		return nil, err
-	}
-
-	// setup and start grpc server
-	if err := m.setupGRPC(); err != nil {
-		return nil, err
-	}
-
-	if err := m.network.Start(); err != nil {
 		return nil, err
 	}
 
@@ -393,20 +393,19 @@ func (s *Server) setupConsensus() error {
 	}
 
 	consensus, err := engine(
-		&consensus.ConsensusParams{
-			Context:         context.Background(),
-			Seal:            s.config.Seal,
-			Config:          config,
-			Txpool:          s.txpool,
-			Network:         s.network,
-			Blockchain:      s.blockchain,
-			Executor:        s.executor,
-			Grpc:            s.grpcServer,
-			Logger:          s.logger.Named("consensus"),
-			Metrics:         s.serverMetrics.consensus,
-			SecretsManager:  s.secretsManager,
-			BlockTime:       s.config.BlockTime,
-			IBFTBaseTimeout: s.config.IBFTBaseTimeout,
+		&consensus.Params{
+			Context:        context.Background(),
+			Seal:           s.config.Seal,
+			Config:         config,
+			TxPool:         s.txpool,
+			Network:        s.network,
+			Blockchain:     s.blockchain,
+			Executor:       s.executor,
+			Grpc:           s.grpcServer,
+			Logger:         s.logger,
+			Metrics:        s.serverMetrics.consensus,
+			SecretsManager: s.secretsManager,
+			BlockTime:      s.config.BlockTime,
 		},
 	)
 
@@ -629,7 +628,7 @@ func (s *Server) Close() {
 	s.txpool.Close()
 }
 
-// Entry is a backend configuration entry
+// Entry is a consensus configuration entry
 type Entry struct {
 	Enabled bool
 	Config  map[string]interface{}

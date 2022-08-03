@@ -66,7 +66,7 @@ func (o txOrigin) String() (s string) {
 	return
 }
 
-// store interface defines State helper methods the Txpool should have access to
+// store interface defines State helper methods the TxPool should have access to
 type store interface {
 	Header() *types.Header
 	GetNonce(root types.Hash, addr types.Address) uint64
@@ -456,9 +456,21 @@ func (p *TxPool) processEvent(event *blockchain.Event) {
 		// remove mined txs from the lookup map
 		p.index.remove(block.Transactions...)
 
-		// etract latest nonces
+		// Extract latest nonces
 		for _, tx := range block.Transactions {
+			var err error
+
 			addr := tx.From
+			if addr == types.ZeroAddress {
+				// From field is not set, extract the signer
+				if addr, err = p.signer.Sender(tx); err != nil {
+					p.logger.Error(
+						fmt.Sprintf("unable to extract signer for transaction, %v", err),
+					)
+
+					continue
+				}
+			}
 
 			// skip already processed accounts
 			if _, processed := stateNonces[addr]; processed {
