@@ -21,8 +21,8 @@ var (
 
 var zeroBytes = make([]byte, 32)
 
-// putIbftExtraValidators is a helper method that adds validators to the extra field in the header
-func putIbftExtraValidators(h *types.Header, validators []types.Address) {
+// putIbftExtraSnapshotData is a helper method that adds snapshot data to the extra field in the header
+func putIbftExtraSnapshotData(h *types.Header, validators []types.Address, blockReward string) {
 	// Pad zeros to the right up to istanbul vanity
 	extra := h.ExtraData
 	if len(extra) < IstanbulExtraVanity {
@@ -33,8 +33,9 @@ func putIbftExtraValidators(h *types.Header, validators []types.Address) {
 
 	ibftExtra := &IstanbulExtra{
 		Validators:    validators,
-		Seal:          []byte{},
+		ProposerSeal:  []byte{},
 		CommittedSeal: [][]byte{},
+		BlockReward:   blockReward,
 	}
 
 	extra = ibftExtra.MarshalRLPTo(extra)
@@ -77,8 +78,9 @@ func getIbftExtra(h *types.Header) (*IstanbulExtra, error) {
 // IstanbulExtra defines the structure of the extra field for Istanbul
 type IstanbulExtra struct {
 	Validators    []types.Address
-	Seal          []byte
+	ProposerSeal  []byte
 	CommittedSeal [][]byte
+	BlockReward   string
 }
 
 // MarshalRLPTo defines the marshal function wrapper for IstanbulExtra
@@ -90,6 +92,13 @@ func (i *IstanbulExtra) MarshalRLPTo(dst []byte) []byte {
 func (i *IstanbulExtra) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 	vv := ar.NewArray()
 
+	// BlockReward
+	if i.BlockReward == "" {
+		vv.Set(ar.NewNull())
+	} else {
+		vv.Set(ar.NewString(i.BlockReward))
+	}
+
 	// Validators
 	vals := ar.NewArray()
 	for _, a := range i.Validators {
@@ -98,11 +107,11 @@ func (i *IstanbulExtra) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 
 	vv.Set(vals)
 
-	// Seal
-	if len(i.Seal) == 0 {
+	// ProposerSeal
+	if len(i.ProposerSeal) == 0 {
 		vv.Set(ar.NewNull())
 	} else {
-		vv.Set(ar.NewBytes(i.Seal))
+		vv.Set(ar.NewBytes(i.ProposerSeal))
 	}
 
 	// CommittedSeal
@@ -135,13 +144,22 @@ func (i *IstanbulExtra) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) er
 		return err
 	}
 
-	if len(elems) < 3 {
-		return fmt.Errorf("incorrect number of elements to decode istambul extra, expected 3 but found %d", len(elems))
+	if len(elems) < 4 {
+		return fmt.Errorf("incorrect number of elements to decode istambul extra, expected 4 but found %d", len(elems))
+	}
+
+	// BlockReward
+	{
+		br, err := elems[0].GetString()
+		if err != nil {
+			return fmt.Errorf("string expected for block reward")
+		}
+		i.BlockReward = br
 	}
 
 	// Validators
 	{
-		vals, err := elems[0].GetElems()
+		vals, err := elems[1].GetElems()
 		if err != nil {
 			return fmt.Errorf("list expected for validators")
 		}
@@ -155,14 +173,14 @@ func (i *IstanbulExtra) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) er
 
 	// Seal
 	{
-		if i.Seal, err = elems[1].GetBytes(i.Seal); err != nil {
+		if i.ProposerSeal, err = elems[2].GetBytes(i.ProposerSeal); err != nil {
 			return err
 		}
 	}
 
 	// Committed
 	{
-		vals, err := elems[2].GetElems()
+		vals, err := elems[3].GetElems()
 		if err != nil {
 			return fmt.Errorf("list expected for committed")
 		}

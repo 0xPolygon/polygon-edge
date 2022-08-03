@@ -17,7 +17,7 @@ func TestSign_Sealer(t *testing.T) {
 	}
 
 	h := &types.Header{}
-	putIbftExtraValidators(h, pool.ValidatorSet())
+	putIbftExtraSnapshotData(h, pool.ValidatorSet(), "")
 
 	// non-validator address
 	pool.add("X")
@@ -38,8 +38,10 @@ func TestSign_CommittedSeals(t *testing.T) {
 		Set: pool.ValidatorSet(),
 	}
 
-	h := &types.Header{}
-	putIbftExtraValidators(h, pool.ValidatorSet())
+	h := &types.Header{
+		ExtraData: []byte{},
+	}
+	putIbftExtraSnapshotData(h, pool.ValidatorSet(), "")
 
 	// non-validator address
 	pool.add("X")

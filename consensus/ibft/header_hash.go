@@ -22,7 +22,7 @@ func istanbulHeaderHash(h *types.Header) types.Hash {
 		return types.Hash{}
 	}
 
-	putIbftExtraValidators(h, extra.Validators)
+	putIbftExtraSnapshotData(h, extra.Validators, extra.BlockReward)
 
 	vv := arena.NewArray()
 	vv.Set(arena.NewBytes(h.ParentHash.Bytes()))

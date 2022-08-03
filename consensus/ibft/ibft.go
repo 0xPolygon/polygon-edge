@@ -619,8 +619,8 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 
 	header.Timestamp = uint64(headerTime.Unix())
 
-	// we need to include in the extra field the current set of validators
-	putIbftExtraValidators(header, snap.Set)
+	// we need to include in the extra field the current set of validators and blockreward
+	putIbftExtraSnapshotData(header, snap.Set, snap.BlockReward)
 
 	transition, err := i.executor.BeginTxn(parent.StateRoot, header, i.validatorKeyAddr)
 	if err != nil {
