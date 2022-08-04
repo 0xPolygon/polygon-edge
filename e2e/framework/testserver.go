@@ -315,13 +315,20 @@ func (t *TestServer) GenerateGenesis() error {
 }
 
 func (t *TestServer) GenesisPredeploy() error {
-	genesisPredeployCmd := predeploy.GetCommand()
-	args := []string{
-		genesisPredeployCmd.Use,
+	if t.Config.PredeployParams == nil {
+		// No need to predeploy anything
+		return nil
 	}
 
+	genesisPredeployCmd := predeploy.GetCommand()
+	args := make([]string, 0)
+
+	commandSlice := strings.Split(fmt.Sprintf("genesis %s", genesisPredeployCmd.Use), " ")
+
+	args = append(args, commandSlice...)
+
 	// Add the path to the genesis file
-	args = append(args, fmt.Sprintf("%s/genesis.json", t.Config.RootDir))
+	args = append(args, "--chain", filepath.Join(t.Config.RootDir, "genesis.json"))
 
 	// Add predeploy address
 	if t.Config.PredeployParams.PredeployAddress != "" {

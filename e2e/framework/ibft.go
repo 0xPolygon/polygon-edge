@@ -79,6 +79,10 @@ func NewIBFTServersManager(
 		t.Fatal(err)
 	}
 
+	if err := srv.GenesisPredeploy(); err != nil {
+		t.Fatal(err)
+	}
+
 	return &IBFTServersManager{t, srvs}
 }
 
