@@ -90,7 +90,6 @@ func (p *predeployParams) initPredeployAddress() error {
 
 func (p *predeployParams) convertConstructorArgs() {
 	if len(p.constructorArgsRaw) < 1 {
-		// TODO make sure that it's ok for the array to be this
 		p.constructorArgs = []interface{}{}
 
 		return
