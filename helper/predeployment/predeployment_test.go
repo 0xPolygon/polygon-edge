@@ -45,3 +45,48 @@ func TestExtraction(t *testing.T) {
 		})
 	}
 }
+
+func TestNormalizeArgs(t *testing.T) {
+	t.Parallel()
+
+	testTable := []struct {
+		name           string
+		arguments      []interface{}
+		expectedResult []interface{}
+	}{
+		{
+			"simple type arguments",
+			[]interface{}{"argument"},
+			[]interface{}{"argument"},
+		},
+		{
+			"array of simple type arguments",
+			[]interface{}{"argument 1", "argument 2"},
+			[]interface{}{"argument 1", "argument 2"},
+		},
+		{
+			"structure as argument",
+			[]interface{}{"[argument 1]"},
+			[]interface{}{[]interface{}{"argument 1"}},
+		},
+		{
+			"structure with regular types",
+			[]interface{}{"[argument 1]", "argument 2"},
+			[]interface{}{[]interface{}{"argument 1"}, "argument 2"},
+		},
+	}
+
+	for _, testCase := range testTable {
+		testCase := testCase
+
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(
+				t,
+				testCase.expectedResult,
+				normalizeConstructorArguments(testCase.arguments),
+			)
+		})
+	}
+}
