@@ -2,10 +2,10 @@ package ibft
 
 import (
 	"context"
+	"github.com/0xPolygon/polygon-edge/consensus"
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
-	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
@@ -16,7 +16,7 @@ func TestOperator_GetNextCandidate(t *testing.T) {
 	pool := newTesterAccountPool()
 	pool.add("A", "B", "C")
 
-	ibft := &Ibft{
+	ibft := &backendIBFT{
 		validatorKeyAddr: pool.get("A").Address(),
 	}
 
@@ -78,7 +78,7 @@ func TestOperator_Propose(t *testing.T) {
 	pool := newTesterAccountPool()
 	pool.add("A", "B", "C")
 
-	ibft := &Ibft{
+	ibft := &backendIBFT{
 		blockchain: blockchain.TestBlockchain(t, pool.genesis()),
 		config:     &consensus.Config{},
 		epochSize:  DefaultEpochSize,

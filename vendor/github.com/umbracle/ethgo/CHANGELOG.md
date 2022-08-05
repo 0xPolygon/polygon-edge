@@ -1,5 +1,11 @@
 
-# 0.1.2 (Unreleased)
+# 0.1.3 (13 June, 2022)
+
+- Fix out-of-bounds reading of bytes during ABI decoding [[GH-205](https://github.com/umbracle/ethgo/issues/205)]
+- Update `fastrlp` to `59d5dd3` commit to fix a bug on bytes length check [[GH-204](https://github.com/umbracle/ethgo/issues/204)]
+- Fix out-of-bounds RLP unmarshal of transactions [[GH-203](https://github.com/umbracle/ethgo/issues/203)]
+
+# 0.1.2 (5 May, 2022)
 
 - Update `btcd` library to new `v0.22.1`
 - Add option in `contract` to send transactions with EIP-1559 [[GH-198](https://github.com/umbracle/ethgo/issues/198)]

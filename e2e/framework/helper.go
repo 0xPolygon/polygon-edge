@@ -5,7 +5,6 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
-	"github.com/umbracle/ethgo"
 	"io/ioutil"
 	"math/big"
 	"net"
@@ -14,6 +13,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/umbracle/ethgo"
 
 	"github.com/0xPolygon/polygon-edge/contracts/abis"
 	"github.com/0xPolygon/polygon-edge/contracts/staking"
@@ -30,7 +31,7 @@ import (
 )
 
 var (
-	DefaultTimeout = time.Second * 10
+	DefaultTimeout = time.Minute
 )
 
 type AtomicErrors struct {
@@ -483,9 +484,9 @@ func NewTestServers(t *testing.T, num int, conf func(*TestServerConfig)) []*Test
 	var wg sync.WaitGroup
 
 	for i, srv := range srvs {
-		wg.Add(1)
-
 		i, srv := i, srv
+
+		wg.Add(1)
 
 		go func() {
 			defer wg.Done()
@@ -499,8 +500,7 @@ func NewTestServers(t *testing.T, num int, conf func(*TestServerConfig)) []*Test
 			ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
 			defer cancel()
 
-			err := srv.Start(ctx)
-			if err != nil {
+			if err := srv.Start(ctx); err != nil {
 				errors.Append(fmt.Errorf("server %d failed to start, error=%w", i, err))
 			}
 		}()

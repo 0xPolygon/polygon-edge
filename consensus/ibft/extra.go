@@ -25,7 +25,7 @@ var zeroBytes = make([]byte, 32)
 func initIbftExtra(h *types.Header, validators []types.Address, parentCommittedSeals [][]byte) {
 	putIbftExtra(h, &IstanbulExtra{
 		Validators:          validators,
-		Seal:                []byte{},
+		ProposerSeal:        []byte{},
 		CommittedSeal:       [][]byte{},
 		ParentCommittedSeal: parentCommittedSeals,
 	})
@@ -64,14 +64,14 @@ func getIbftExtra(h *types.Header) (*IstanbulExtra, error) {
 	return extra, nil
 }
 
-// unpackSealFromIbftExtra extracts Seal from the istanbul extra of the given Header
-func unpackSealFromIbftExtra(h *types.Header) ([]byte, error) {
+// unpackProposerSealFromIbftExtra extracts ProposerSeal from the istanbul extra of the given Header
+func unpackProposerSealFromIbftExtra(h *types.Header) ([]byte, error) {
 	extra, err := getIbftExtra(h)
 	if err != nil {
 		return nil, err
 	}
 
-	return extra.Seal, nil
+	return extra.ProposerSeal, nil
 }
 
 // unpackCommittedSealFromIbftExtra extracts CommittedSeal from the istanbul extra of the given Header
@@ -108,10 +108,10 @@ func packFieldIntoIbftExtra(h *types.Header, updateFn func(*IstanbulExtra)) erro
 	return nil
 }
 
-// packSealIntoIbftExtra sets the seal to Seal field in istanbul extra of the given header
-func packSealIntoIbftExtra(h *types.Header, seal []byte) error {
+// packProposerSealIntoIbftExtra sets the seal to ProposerSeal field in istanbul extra of the given header
+func packProposerSealIntoIbftExtra(h *types.Header, seal []byte) error {
 	return packFieldIntoIbftExtra(h, func(extra *IstanbulExtra) {
-		extra.Seal = seal
+		extra.ProposerSeal = seal
 	})
 }
 
@@ -140,7 +140,7 @@ func filterIbftExtraForHash(h *types.Header) error {
 // IstanbulExtra defines the structure of the extra field for Istanbul
 type IstanbulExtra struct {
 	Validators          []types.Address
-	Seal                []byte
+	ProposerSeal        []byte
 	CommittedSeal       [][]byte
 	ParentCommittedSeal [][]byte
 }
@@ -162,11 +162,11 @@ func (i *IstanbulExtra) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 
 	vv.Set(vals)
 
-	// Seal
-	if len(i.Seal) == 0 {
+	// ProposerSeal
+	if len(i.ProposerSeal) == 0 {
 		vv.Set(ar.NewNull())
 	} else {
-		vv.Set(ar.NewBytes(i.Seal))
+		vv.Set(ar.NewBytes(i.ProposerSeal))
 	}
 
 	// CommittedSeal
@@ -234,10 +234,10 @@ func (i *IstanbulExtra) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) er
 		}
 	}
 
-	// Seal
+	// ProposerSeal
 	{
-		if i.Seal, err = elems[1].GetBytes(i.Seal); err != nil {
-			return fmt.Errorf("failed to decode Seal: %w", err)
+		if i.ProposerSeal, err = elems[1].GetBytes(i.ProposerSeal); err != nil {
+			return err
 		}
 	}
 

@@ -5,12 +5,17 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/crypto"
-	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/helper/keccak"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/fastrlp"
+)
+
+const (
+	// legacyCommitCode is the value that is contained in
+	// legacy committed seals, so it needs to be preserved in order
+	// for new clients to read old committed seals
+	legacyCommitCode = 2
 )
 
 var (
@@ -22,10 +27,8 @@ var (
 	ErrSignerNotFound             = errors.New("not found signer in validator set")
 )
 
-func commitMsg(b []byte) []byte {
-	// message that the nodes need to sign to commit to a block
-	// hash with COMMIT_MSG_CODE which is the same value used in quorum
-	return crypto.Keccak256(b, []byte{byte(proto.MessageReq_Commit)})
+func wrapCommitHash(b []byte) []byte {
+	return crypto.Keccak256(b, []byte{byte(legacyCommitCode)})
 }
 
 func ecrecoverImpl(sig, msg []byte) (types.Address, error) {
@@ -37,8 +40,8 @@ func ecrecoverImpl(sig, msg []byte) (types.Address, error) {
 	return crypto.PubKeyToAddress(pub), nil
 }
 
-func ecrecoverFromHeader(h *types.Header) (types.Address, error) {
-	seal, err := unpackSealFromIbftExtra(h)
+func ecrecoverProposer(h *types.Header) (types.Address, error) {
+	seal, err := unpackProposerSealFromIbftExtra(h)
 	if err != nil {
 		return types.Address{}, err
 	}
@@ -52,37 +55,32 @@ func ecrecoverFromHeader(h *types.Header) (types.Address, error) {
 	return ecrecoverImpl(seal, msg)
 }
 
-func signSealImpl(prv *ecdsa.PrivateKey, h *types.Header, committed bool) ([]byte, error) {
+func signSealImpl(prv *ecdsa.PrivateKey, hash []byte, committed bool) ([]byte, error) {
+	// if we are singing the committed seals we need to do something more
+	msg := hash
+	if committed {
+		msg = wrapCommitHash(hash)
+	}
+
+	return crypto.Sign(prv, crypto.Keccak256(msg))
+}
+
+// writeProposerSeal creates and sets a signature to Seal in IBFT Extra
+func writeProposerSeal(prv *ecdsa.PrivateKey, h *types.Header) (*types.Header, error) {
+	h = h.Copy()
+
 	hash, err := calculateHeaderHash(h)
 	if err != nil {
 		return nil, err
 	}
 
-	// if we are singing the committed seals we need to do something more
-	msg := hash
-	if committed {
-		msg = commitMsg(hash)
-	}
-
-	seal, err := crypto.Sign(prv, crypto.Keccak256(msg))
+	seal, err := signSealImpl(prv, hash, false)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return seal, nil
-}
-
-// writeSeal creates and sets a signature to Seal in IBFT Extra
-func writeSeal(prv *ecdsa.PrivateKey, h *types.Header) (*types.Header, error) {
-	h = h.Copy()
-	seal, err := signSealImpl(prv, h, false)
-
-	if err != nil {
-		return nil, err
-	}
-
-	if err := packSealIntoIbftExtra(h, seal); err != nil {
+	if err := packProposerSealIntoIbftExtra(h, seal); err != nil {
 		return nil, err
 	}
 
@@ -90,8 +88,8 @@ func writeSeal(prv *ecdsa.PrivateKey, h *types.Header) (*types.Header, error) {
 }
 
 // createCommittedSeal returns the commit signature
-func createCommittedSeal(prv *ecdsa.PrivateKey, h *types.Header) ([]byte, error) {
-	return signSealImpl(prv, h, true)
+func createCommittedSeal(prv *ecdsa.PrivateKey, proposalHash []byte) ([]byte, error) {
+	return signSealImpl(prv, proposalHash, true)
 }
 
 // writeCommittedSeals sets given commit signatures to CommittedSeal in IBFT Extra
@@ -146,7 +144,7 @@ func calculateHeaderHash(h *types.Header) ([]byte, error) {
 }
 
 func verifySigner(snap *Snapshot, header *types.Header) error {
-	signer, err := ecrecoverFromHeader(header)
+	signer, err := ecrecoverProposer(header)
 	if err != nil {
 		return err
 	}
@@ -169,6 +167,11 @@ func verifyCommittedFields(
 		return err
 	}
 
+	// Committed seals shouldn't be empty
+	if len(extra.CommittedSeal) == 0 {
+		return fmt.Errorf("empty committed seals")
+	}
+
 	// get the message that needs to be signed
 	// this not signing! just removing the fields that should be signed
 	hash, err := calculateHeaderHash(header)
@@ -176,7 +179,7 @@ func verifyCommittedFields(
 		return err
 	}
 
-	rawMsg := commitMsg(hash)
+	rawMsg := wrapCommitHash(hash)
 
 	return verifyCommittedSealsImpl(extra.CommittedSeal, rawMsg, snap.Set, quorumSizeFn)
 }
@@ -197,7 +200,7 @@ func verifyParentCommittedSeal(
 		return err
 	}
 
-	rawMsg := commitMsg(hash)
+	rawMsg := wrapCommitHash(hash)
 
 	return verifyCommittedSealsImpl(parentCommittedSeals, rawMsg, parentSnap.Set, quorumSizeFn)
 }
@@ -240,43 +243,6 @@ func verifyCommittedSealsImpl(
 	if validSeals := len(visited); validSeals < quorumSizeFn(validators) {
 		return fmt.Errorf("not enough seals to seal block")
 	}
-
-	return nil
-}
-
-func validateMsg(msg *proto.MessageReq) error {
-	signMsg, err := msg.PayloadNoSig()
-	if err != nil {
-		return err
-	}
-
-	buf, err := hex.DecodeHex(msg.Signature)
-	if err != nil {
-		return err
-	}
-
-	addr, err := ecrecoverImpl(buf, signMsg)
-	if err != nil {
-		return err
-	}
-
-	msg.From = addr.String()
-
-	return nil
-}
-
-func signMsg(key *ecdsa.PrivateKey, msg *proto.MessageReq) error {
-	signMsg, err := msg.PayloadNoSig()
-	if err != nil {
-		return err
-	}
-
-	sig, err := crypto.Sign(key, crypto.Keccak256(signMsg))
-	if err != nil {
-		return err
-	}
-
-	msg.Signature = hex.EncodeToHex(sig)
 
 	return nil
 }

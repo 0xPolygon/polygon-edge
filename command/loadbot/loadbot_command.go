@@ -20,7 +20,7 @@ func GetCommand() *cobra.Command {
 	helper.RegisterJSONRPCFlag(loadbotCmd)
 
 	setFlags(loadbotCmd)
-	setRequiredFlags(loadbotCmd)
+	helper.SetRequiredFlags(loadbotCmd, params.getRequiredFlags())
 
 	return loadbotCmd
 }
@@ -105,7 +105,7 @@ func setFlags(cmd *cobra.Command) {
 		&params.detailed,
 		detailedFlag,
 		false,
-		"flag indicating if the error logs should be shown. (default: false)",
+		"flag indicating if the error logs should be shown",
 	)
 
 	cmd.Flags().Uint64Var(
@@ -121,12 +121,6 @@ func setFlags(cmd *cobra.Command) {
 		0,
 		"sets the maximum wait time for transactions receipts in minutes.",
 	)
-}
-
-func setRequiredFlags(cmd *cobra.Command) {
-	for _, requiredFlag := range params.getRequiredFlags() {
-		_ = cmd.MarkFlagRequired(requiredFlag)
-	}
 }
 
 func runPreRun(cmd *cobra.Command, _ []string) error {

@@ -2,10 +2,10 @@ package server
 
 import (
 	"errors"
-	"github.com/0xPolygon/polygon-edge/command/server/config"
 	"net"
 
 	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/command/server/config"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/server"
@@ -14,27 +14,35 @@ import (
 )
 
 const (
-	configFlag            = "config"
-	genesisPathFlag       = "chain"
-	dataDirFlag           = "data-dir"
-	libp2pAddressFlag     = "libp2p"
-	prometheusAddressFlag = "prometheus"
-	natFlag               = "nat"
-	dnsFlag               = "dns"
-	sealFlag              = "seal"
-	maxPeersFlag          = "max-peers"
-	maxInboundPeersFlag   = "max-inbound-peers"
-	maxOutboundPeersFlag  = "max-outbound-peers"
-	priceLimitFlag        = "price-limit"
-	maxSlotsFlag          = "max-slots"
-	blockGasTargetFlag    = "block-gas-target"
-	secretsConfigFlag     = "secrets-config"
-	restoreFlag           = "restore"
-	blockTimeFlag         = "block-time"
-	devIntervalFlag       = "dev-interval"
-	devFlag               = "dev"
-	corsOriginFlag        = "access-control-allow-origins"
-	logFileLocationFlag   = "log-to"
+	configFlag                   = "config"
+	genesisPathFlag              = "chain"
+	dataDirFlag                  = "data-dir"
+	libp2pAddressFlag            = "libp2p"
+	prometheusAddressFlag        = "prometheus"
+	natFlag                      = "nat"
+	dnsFlag                      = "dns"
+	sealFlag                     = "seal"
+	maxPeersFlag                 = "max-peers"
+	maxInboundPeersFlag          = "max-inbound-peers"
+	maxOutboundPeersFlag         = "max-outbound-peers"
+	priceLimitFlag               = "price-limit"
+	jsonRPCBatchRequestLimitFlag = "json-rpc-batch-request-limit"
+	jsonRPCBlockRangeLimitFlag   = "json-rpc-block-range-limit"
+	maxSlotsFlag                 = "max-slots"
+	blockGasTargetFlag           = "block-gas-target"
+	secretsConfigFlag            = "secrets-config"
+	restoreFlag                  = "restore"
+	blockTimeFlag                = "block-time"
+	devIntervalFlag              = "dev-interval"
+	devFlag                      = "dev"
+	corsOriginFlag               = "access-control-allow-origins"
+	logFileLocationFlag          = "log-to"
+)
+
+// Flags that are deprecated, but need to be preserved for
+// backwards compatibility with existing scripts
+const (
+	ibftBaseTimeoutFlagLEGACY = "ibft-base-timeout"
 )
 
 const (
@@ -52,7 +60,6 @@ var (
 )
 
 var (
-	errInvalidPeerParams = errors.New("both max-peers and max-inbound/outbound flags are set")
 	errInvalidNATAddress = errors.New("could not parse NAT IP address")
 )
 
@@ -73,19 +80,15 @@ type serverParams struct {
 
 	corsAllowedOrigins []string
 
+	jsonRPCBatchLengthLimit uint64
+	jsonRPCBlockRangeLimit  uint64
+
+	ibftBaseTimeoutLegacy uint64
+
 	genesisConfig *chain.Chain
 	secretsConfig *secrets.SecretsManagerConfig
 
 	logFileLocation string
-}
-
-func (p *serverParams) validateFlags() error {
-	// Validate the max peers configuration
-	if p.isMaxPeersSet() && p.isPeerRangeSet() {
-		return errInvalidPeerParams
-	}
-
-	return nil
 }
 
 func (p *serverParams) isMaxPeersSet() bool {
@@ -143,6 +146,8 @@ func (p *serverParams) generateConfig() *server.Config {
 		JSONRPC: &server.JSONRPC{
 			JSONRPCAddr:              p.jsonRPCAddress,
 			AccessControlAllowOrigin: p.corsAllowedOrigins,
+			BatchLengthLimit:         p.jsonRPCBatchLengthLimit,
+			BlockRangeLimit:          p.jsonRPCBlockRangeLimit,
 		},
 		GRPCAddr:   p.grpcAddress,
 		LibP2PAddr: p.libp2pAddress,

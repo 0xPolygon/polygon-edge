@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/0xPolygon/polygon-edge/archive"
 	"github.com/0xPolygon/polygon-edge/blockchain"
@@ -35,7 +36,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-// Minimal is the central manager of the blockchain client
+// Server is the central manager of the blockchain client
 type Server struct {
 	logger       hclog.Logger
 	config       *Config
@@ -242,6 +243,15 @@ func NewServer(config *Config) (*Server, error) {
 		return nil, err
 	}
 
+	// setup and start grpc server
+	if err := m.setupGRPC(); err != nil {
+		return nil, err
+	}
+
+	if err := m.network.Start(); err != nil {
+		return nil, err
+	}
+
 	// setup and start jsonrpc server
 	if err := m.setupJSONRPC(); err != nil {
 		return nil, err
@@ -254,15 +264,6 @@ func NewServer(config *Config) (*Server, error) {
 
 	// start consensus
 	if err := m.consensus.Start(); err != nil {
-		return nil, err
-	}
-
-	// setup and start grpc server
-	if err := m.setupGRPC(); err != nil {
-		return nil, err
-	}
-
-	if err := m.network.Start(); err != nil {
 		return nil, err
 	}
 
@@ -392,16 +393,16 @@ func (s *Server) setupConsensus() error {
 	}
 
 	consensus, err := engine(
-		&consensus.ConsensusParams{
+		&consensus.Params{
 			Context:        context.Background(),
 			Seal:           s.config.Seal,
 			Config:         config,
-			Txpool:         s.txpool,
+			TxPool:         s.txpool,
 			Network:        s.network,
 			Blockchain:     s.blockchain,
 			Executor:       s.executor,
 			Grpc:           s.grpcServer,
-			Logger:         s.logger.Named("consensus"),
+			Logger:         s.logger,
 			Metrics:        s.serverMetrics.consensus,
 			SecretsManager: s.secretsManager,
 			BlockTime:      s.config.BlockTime,
@@ -550,6 +551,9 @@ func (s *Server) setupJSONRPC() error {
 		Addr:                     s.config.JSONRPC.JSONRPCAddr,
 		ChainID:                  uint64(s.config.Chain.Params.ChainID),
 		AccessControlAllowOrigin: s.config.JSONRPC.AccessControlAllowOrigin,
+		PriceLimit:               s.config.PriceLimit,
+		BatchLengthLimit:         s.config.JSONRPC.BatchLengthLimit,
+		BlockRangeLimit:          s.config.JSONRPC.BlockRangeLimit,
 	}
 
 	srv, err := jsonrpc.NewJSONRPC(s.logger, conf)
@@ -624,7 +628,7 @@ func (s *Server) Close() {
 	s.txpool.Close()
 }
 
-// Entry is a backend configuration entry
+// Entry is a consensus configuration entry
 type Entry struct {
 	Enabled bool
 	Config  map[string]interface{}
@@ -639,6 +643,7 @@ func (s *Server) startPrometheusServer(listenAddr *net.TCPAddr) *http.Server {
 				promhttp.HandlerOpts{},
 			),
 		),
+		ReadHeaderTimeout: 60 * time.Second,
 	}
 
 	go func() {

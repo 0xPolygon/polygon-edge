@@ -14,7 +14,7 @@ func GetCommand() *cobra.Command {
 	}
 
 	setFlags(peersStatusCmd)
-	setRequiredFlags(peersStatusCmd)
+	helper.SetRequiredFlags(peersStatusCmd, params.getRequiredFlags())
 
 	return peersStatusCmd
 }
@@ -26,12 +26,6 @@ func setFlags(cmd *cobra.Command) {
 		"",
 		"libp2p node ID of a specific peer within p2p network",
 	)
-}
-
-func setRequiredFlags(cmd *cobra.Command) {
-	for _, requiredFlag := range params.getRequiredFlags() {
-		_ = cmd.MarkFlagRequired(requiredFlag)
-	}
 }
 
 func runCommand(cmd *cobra.Command, _ []string) {

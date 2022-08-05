@@ -71,6 +71,8 @@ type Blockchain struct {
 	stream *eventStream // Event subscriptions
 
 	gpAverage *gasPriceAverage // A reference to the average gas price
+
+	writeLock sync.Mutex
 }
 
 // gasPriceAverage keeps track of the average gas price (rolling average)
@@ -88,6 +90,7 @@ type Verifier interface {
 	PreStateCommit(header *types.Header, txn *state.Transition) error
 }
 
+// 	TODO: this should be part of Verifier (consensus)
 type Executor interface {
 	ProcessBlock(parentRoot types.Hash, block *types.Block, blockCreator types.Address) (*state.Transition, error)
 }
@@ -859,15 +862,15 @@ func (b *Blockchain) executeBlockTransactions(block *types.Block) (*BlockResult,
 
 // WriteBlock writes a single block to the local blockchain.
 // It doesn't do any kind of verification, only commits the block to the DB
-func (b *Blockchain) WriteBlock(block *types.Block) error {
-	// Log the information
-	b.logger.Info(
-		"write block",
-		"num",
-		block.Number(),
-		"parent",
-		block.ParentHash(),
-	)
+func (b *Blockchain) WriteBlock(block *types.Block, source string) error {
+	b.writeLock.Lock()
+	defer b.writeLock.Unlock()
+
+	if block.Number() <= b.Header().Number {
+		b.logger.Info("block already inserted", "block", block.Number(), "source", source)
+
+		return nil
+	}
 
 	header := block.Header
 
@@ -876,7 +879,7 @@ func (b *Blockchain) WriteBlock(block *types.Block) error {
 	}
 
 	// Write the header to the chain
-	evnt := &Event{}
+	evnt := &Event{Source: source}
 	if err := b.writeHeaderImpl(evnt, header); err != nil {
 		return err
 	}
@@ -906,8 +909,9 @@ func (b *Blockchain) WriteBlock(block *types.Block) error {
 
 	logArgs := []interface{}{
 		"number", header.Number,
+		"txs", len(block.Transactions),
 		"hash", header.Hash,
-		"txns", len(block.Transactions),
+		"parent", header.ParentHash,
 	}
 
 	if prevHeader, ok := b.GetHeaderByNumber(header.Number - 1); ok {

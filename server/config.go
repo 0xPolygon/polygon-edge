@@ -49,4 +49,6 @@ type Telemetry struct {
 type JSONRPC struct {
 	JSONRPCAddr              *net.TCPAddr
 	AccessControlAllowOrigin []string
+	BatchLengthLimit         uint64
+	BlockRangeLimit          uint64
 }

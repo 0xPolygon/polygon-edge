@@ -1,0 +1,101 @@
+syntax = "proto3";
+
+option go_package = "/messages/proto";
+
+// MessageType defines the types of messages
+// circulating in the system
+enum MessageType {
+  PREPREPARE = 0;
+  PREPARE = 1;
+  COMMIT = 2;
+  ROUND_CHANGE = 3;
+}
+
+// View defines the current status
+message View {
+  // height represents the number of the proposal
+  uint64 height = 1;
+
+  // round represents the round number in the specific height
+  uint64 round = 2;
+}
+
+// Message defines the base message structure
+message Message {
+  // view is the current view for the message
+  View view = 1;
+
+  // from defines who is the message sender
+  bytes from = 2;
+
+  // the signature of the sender, if any
+  bytes signature = 3;
+
+  // type defines the message type
+  MessageType type = 4;
+
+  // payload is the specific message payload
+  oneof payload {
+    PrePrepareMessage preprepareData = 5;
+    PrepareMessage prepareData = 6;
+    CommitMessage commitData = 7;
+    RoundChangeMessage roundChangeData = 8;
+  }
+}
+
+// PrePrepareMessage is the message for the PREPREPARE phase
+message PrePrepareMessage {
+  // proposal is the actual data being proposed for consensus
+  bytes proposal = 1;
+
+  // proposalHash is the Keccak hash of the proposal
+  bytes proposalHash = 2;
+
+  // certificate is the RCC that can accompany
+  // a proposal message
+  RoundChangeCertificate certificate = 3;
+}
+
+// PrepareMessage is the message for the PREPARE phase
+message PrepareMessage {
+  // proposalHash is the Keccak hash of the proposal
+  bytes proposalHash = 1;
+}
+
+// CommitMessage is the message for the COMMIT phase
+message CommitMessage {
+  // proposalHash is the Keccak hash of the proposal
+  bytes proposalHash = 1;
+
+  // committedSeal is the seal of the sender
+  bytes committedSeal = 2;
+}
+
+// RoundChangeMessage is the message for the ROUND CHANGE phase
+message RoundChangeMessage {
+  // lastPreparedProposedBlock is the last block
+  // to reach Q(N) - 1 PREPARE messages
+  bytes lastPreparedProposedBlock = 1;
+
+  // latestPreparedCertificate is the PC that accompanies
+  // the last proposal
+  PreparedCertificate latestPreparedCertificate = 2;
+}
+
+// PreparedCertificate is a collection of
+// prepare messages for a certain proposal
+message PreparedCertificate {
+  // proposalMessage is the proposal message to reach
+  // at least Q(N) - 1 PREPARE messages
+  Message proposalMessage = 1;
+
+  // prepareMessages are the PREPARE messages at least Q(N) - 1
+  repeated Message prepareMessages = 2;
+}
+
+// RoundChangeCertificate is a collection of
+// round change messages for a certain round
+message RoundChangeCertificate {
+  // roundChangeMessages are the ROUND CHANGE messages
+  repeated Message roundChangeMessages = 1;
+}

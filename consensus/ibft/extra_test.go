@@ -34,7 +34,7 @@ func TestExtraEncoding(t *testing.T) {
 				Validators: []types.Address{
 					types.StringToAddress("1"),
 				},
-				Seal: seal1,
+				ProposerSeal: seal1,
 				CommittedSeal: [][]byte{
 					seal1,
 				},
@@ -122,13 +122,13 @@ func TestAppendCommittedSeal(t *testing.T) {
 		header := createIBFTHeader(t, uint64(i+1), parentHash, addresses, parentCommittedSeal)
 
 		// write seal
-		header, err = writeSeal(keys[0], header)
+		header, err = writeProposerSeal(keys[0], header)
 		assert.NoError(t, err)
 
 		// write committed seal
 		committedSeal := make([][]byte, len(normalValidatorKeys))
 		for i, key := range normalValidatorKeys {
-			committedSeal[i], err = createCommittedSeal(key, header)
+			committedSeal[i], err = createCommittedSeal(key, header.Hash[:])
 			assert.NoError(t, err)
 		}
 
@@ -165,7 +165,7 @@ func TestAppendCommittedSeal(t *testing.T) {
 		}
 
 		// create new committed seal
-		faultyCommittedSeal, err := createCommittedSeal(faultyValidatorKey, header)
+		faultyCommittedSeal, err := createCommittedSeal(faultyValidatorKey, header.Hash[:])
 		assert.NoError(t, err)
 
 		// append new committed seal

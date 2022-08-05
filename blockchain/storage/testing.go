@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"fmt"
 	"math/big"
 	"reflect"
 	"testing"
@@ -416,11 +415,6 @@ func testWriteCanonicalHeader(t *testing.T, m PlaceholderStorage) {
 	assert.NoError(t, err)
 
 	if !reflect.DeepEqual(h, hh) {
-		fmt.Println("-- valid --")
-		fmt.Println(h)
-		fmt.Println("-- found --")
-		fmt.Println(hh)
-
 		t.Fatal("bad header")
 	}
 

@@ -7,6 +7,7 @@ import (
 
 	"github.com/golang/protobuf/ptypes/any"
 	"github.com/hashicorp/go-hclog"
+	"github.com/libp2p/go-libp2p-core/peer"
 	"google.golang.org/grpc"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
@@ -65,7 +66,7 @@ func (o txOrigin) String() (s string) {
 	return
 }
 
-// store interface defines State helper methods the Txpool should have access to
+// store interface defines State helper methods the TxPool should have access to
 type store interface {
 	Header() *types.Header
 	GetNonce(root types.Hash, addr types.Address) uint64
@@ -455,9 +456,21 @@ func (p *TxPool) processEvent(event *blockchain.Event) {
 		// remove mined txs from the lookup map
 		p.index.remove(block.Transactions...)
 
-		// etract latest nonces
+		// Extract latest nonces
 		for _, tx := range block.Transactions {
+			var err error
+
 			addr := tx.From
+			if addr == types.ZeroAddress {
+				// From field is not set, extract the signer
+				if addr, err = p.signer.Sender(tx); err != nil {
+					p.logger.Error(
+						fmt.Sprintf("unable to extract signer for transaction, %v", err),
+					)
+
+					continue
+				}
+			}
 
 			// skip already processed accounts
 			if _, processed := stateNonces[addr]; processed {
@@ -589,20 +602,9 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 
 	tx.ComputeHash()
 
-	// check if already known
-	if _, ok := p.index.get(tx.Hash); ok {
-		if origin == gossip {
-			// silently drop known tx
-			// that is gossiped back
-			p.logger.Debug(
-				"dropping known gossiped transaction",
-				"hash", tx.Hash.String(),
-			)
-
-			return nil
-		} else {
-			return ErrAlreadyKnown
-		}
+	//	add to index
+	if ok := p.index.add(tx); !ok {
+		return ErrAlreadyKnown
 	}
 
 	// initialize account for this address once
@@ -632,13 +634,13 @@ func (p *TxPool) handleEnqueueRequest(req enqueueRequest) {
 	if err := account.enqueue(tx); err != nil {
 		p.logger.Error("enqueue request", "err", err)
 
+		p.index.remove(tx)
+
 		return
 	}
 
 	p.logger.Debug("enqueue request", "hash", tx.Hash.String())
 
-	// update state
-	p.index.add(tx)
 	p.gauge.increase(slotsRequired(tx))
 
 	p.eventManager.signalEvent(proto.EventType_ENQUEUED, tx.Hash)
@@ -670,7 +672,7 @@ func (p *TxPool) handlePromoteRequest(req promoteRequest) {
 
 // addGossipTx handles receiving transactions
 // gossiped by the network.
-func (p *TxPool) addGossipTx(obj interface{}) {
+func (p *TxPool) addGossipTx(obj interface{}, _ peer.ID) {
 	if !p.sealing {
 		return
 	}
@@ -693,14 +695,20 @@ func (p *TxPool) addGossipTx(obj interface{}) {
 
 	// decode tx
 	if err := tx.UnmarshalRLP(raw.Raw.Value); err != nil {
-		p.logger.Error("failed to decode broadcasted tx", "err", err)
+		p.logger.Error("failed to decode broadcast tx", "err", err)
 
 		return
 	}
 
 	// add tx
 	if err := p.addTx(gossip, tx); err != nil {
-		p.logger.Error("failed to add broadcasted txn", "err", err)
+		if errors.Is(err, ErrAlreadyKnown) {
+			p.logger.Debug("rejecting known tx (gossip)", "hash", tx.Hash.String())
+
+			return
+		}
+
+		p.logger.Error("failed to add broadcast tx", "err", err, "hash", tx.Hash.String())
 	}
 }
 
