@@ -59,6 +59,7 @@ type Config struct {
 	Store                    JSONRPCStore
 	Addr                     *net.TCPAddr
 	ChainID                  uint64
+	ChainName                string
 	AccessControlAllowOrigin []string
 	PriceLimit               uint64
 	BatchLengthLimit         uint64
@@ -70,8 +71,17 @@ func NewJSONRPC(logger hclog.Logger, config *Config) (*JSONRPC, error) {
 	srv := &JSONRPC{
 		logger: logger.Named("jsonrpc"),
 		config: config,
-		dispatcher: newDispatcher(logger, config.Store, config.ChainID, config.PriceLimit,
-			config.BatchLengthLimit, config.BlockRangeLimit),
+		dispatcher: newDispatcher(
+			logger,
+			config.Store,
+			&dispatcherParams{
+				chainID:                 config.ChainID,
+				chainName:               config.ChainName,
+				priceLimit:              config.PriceLimit,
+				jsonRPCBatchLengthLimit: config.BatchLengthLimit,
+				blockRangeLimit:         config.BlockRangeLimit,
+			},
+		),
 	}
 
 	// start http server
@@ -258,12 +268,6 @@ func (j *JSONRPC) handle(w http.ResponseWriter, req *http.Request) {
 	)
 
 	if (*req).Method == "OPTIONS" {
-		return
-	}
-
-	if req.Method == "GET" {
-		_, _ = w.Write([]byte("Polygon Edge JSON-RPC"))
-
 		return
 	}
 
