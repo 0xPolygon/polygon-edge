@@ -1,10 +1,11 @@
 package jsonrpc
 
 import (
-	"github.com/0xPolygon/polygon-edge/types"
 	"math/big"
 	"strconv"
 	"testing"
+
+	"github.com/0xPolygon/polygon-edge/types"
 
 	"github.com/stretchr/testify/assert"
 )

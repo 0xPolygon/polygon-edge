@@ -1,8 +1,9 @@
 package itrie
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestEncoding_HasTermSymbol(t *testing.T) {
