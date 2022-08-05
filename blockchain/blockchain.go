@@ -103,7 +103,7 @@ func (b *Blockchain) updateGasPriceAvg(newValues []*big.Int) {
 	b.gpAverage.Lock()
 	defer b.gpAverage.Unlock()
 
-	//	Sum the values for quick reference
+	// Sum the values for quick reference
 	sum := big.NewInt(0)
 	for _, val := range newValues {
 		sum = sum.Add(sum, val)
@@ -894,7 +894,7 @@ func (b *Blockchain) WriteBlock(block *types.Block) error {
 		return err
 	}
 
-	//	update snapshot
+	// update snapshot
 	if err := b.consensus.ProcessHeaders([]*types.Header{header}); err != nil {
 		return err
 	}

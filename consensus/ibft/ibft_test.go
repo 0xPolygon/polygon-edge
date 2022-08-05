@@ -607,7 +607,7 @@ func TestTransition_RoundChangeState_Timeout(t *testing.T) {
 	// increases to round 1 at the beginning of the round and sends
 	// one RoundChange message.
 	// After the timeout, it increases to round 2 and sends another
-	/// RoundChange message.
+	// / RoundChange message.
 	m.runCycle()
 
 	m.expect(expectResult{

@@ -441,7 +441,7 @@ func (f *FilterManager) getLogsFromBlocks(query *LogQuery) ([]*Log, error) {
 // GetLogsForQuery return array of logs for given query
 func (f *FilterManager) GetLogsForQuery(query *LogQuery) ([]*Log, error) {
 	if query.BlockHash != nil {
-		//	BlockHash is set -> fetch logs from this block only
+		// BlockHash is set -> fetch logs from this block only
 		block, ok := f.store.GetBlockByHash(*query.BlockHash, true)
 		if !ok {
 			return nil, ErrBlockNotFound
@@ -455,11 +455,11 @@ func (f *FilterManager) GetLogsForQuery(query *LogQuery) ([]*Log, error) {
 		return f.getLogsFromBlock(query, block)
 	}
 
-	//	gets logs from a range of blocks
+	// gets logs from a range of blocks
 	return f.getLogsFromBlocks(query)
 }
 
-//GetLogFilterFromID return log filter for given filterID
+// GetLogFilterFromID return log filter for given filterID
 func (f *FilterManager) GetLogFilterFromID(filterID string) (*logFilter, error) {
 	f.lock.RLock()
 

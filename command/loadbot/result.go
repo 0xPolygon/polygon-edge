@@ -3,9 +3,10 @@ package loadbot
 import (
 	"bytes"
 	"fmt"
-	"github.com/umbracle/ethgo"
 	"math"
 	"sort"
+
+	"github.com/umbracle/ethgo"
 
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/command/loadbot/generator"
@@ -139,7 +140,6 @@ func (lr *LoadbotResult) initDetailedErrors(gen generator.TransactionGenerator) 
 }
 
 func (lr *LoadbotResult) writeBlockData(buffer *bytes.Buffer) {
-	//nolint: ifshort
 	blockData := &lr.BlockData
 
 	buffer.WriteString("\n\n[BLOCK DATA]\n")

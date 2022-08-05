@@ -215,7 +215,7 @@ func (s *syncer) WatchSync(callback func(*types.Block) bool) error {
 	skipList := make(map[peer.ID]bool)
 
 	for {
-		//Wait for a new event to arrive
+		// Wait for a new event to arrive
 		<-s.newStatusCh
 
 		// fetch local latest block

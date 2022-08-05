@@ -133,7 +133,7 @@ func (i *Ibft) runHook(hookName HookType, height uint64, hookParam interface{}) 
 func Factory(
 	params *consensus.ConsensusParams,
 ) (consensus.Consensus, error) {
-	//	defaults for user set fields in genesis
+	// defaults for user set fields in genesis
 	var (
 		epochSize          = uint64(DefaultEpochSize)
 		quorumSizeBlockNum = uint64(0)
@@ -150,7 +150,7 @@ func Factory(
 	}
 
 	if rawBlockNum, ok := params.Config.Config["quorumSizeBlockNum"]; ok {
-		//	Block number specified for quorum size switch
+		// Block number specified for quorum size switch
 		readBlockNum, ok := rawBlockNum.(float64)
 		if !ok {
 			return nil, errors.New("invalid type assertion")
@@ -290,7 +290,7 @@ func GetIBFTForks(ibftConfig map[string]interface{}) ([]IBFTFork, error) {
 	return nil, errors.New("current IBFT type not found")
 }
 
-//  setupTransport read current mechanism in params and sets up consensus mechanism
+// setupTransport read current mechanism in params and sets up consensus mechanism
 func (i *Ibft) setupMechanism() error {
 	ibftForks, err := GetIBFTForks(i.config.Config)
 	if err != nil {
@@ -499,7 +499,7 @@ func (i *Ibft) runSyncState() {
 				// initialize the round and sequence
 				i.startNewSequence()
 
-				//Set the round metric
+				// Set the round metric
 				i.metrics.Rounds.Set(float64(i.state.view.Round))
 
 				i.setState(AcceptState)
@@ -707,9 +707,9 @@ func (i *Ibft) writeTransactions(gasLimit uint64, transition transitionInterface
 		}
 
 		if err := transition.Write(tx); err != nil {
-			if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok { // nolint:errorlint
+			if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok { //nolint:errorlint
 				break
-			} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable { // nolint:errorlint
+			} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable { //nolint:errorlint
 				i.txpool.Demote(tx)
 			} else {
 				failedTxCount++
@@ -780,7 +780,7 @@ func (i *Ibft) runAcceptState() { // start new round
 
 	i.state.validators = snap.Set
 
-	//Update the No.of validator metric
+	// Update the No.of validator metric
 	i.metrics.Validators.Set(float64(len(snap.Set)))
 	// reset round messages
 	i.state.resetRoundMsgs()
@@ -899,7 +899,7 @@ func (i *Ibft) runAcceptState() { // start new round
 
 			if hookErr := i.runHook(VerifyBlockHook, block.Number(), block); hookErr != nil {
 				// Not linting this as the underlying error is actually wrapped
-				// nolint:govet
+				//nolint:govet
 				if errors.As(hookErr, &errBlockVerificationFailed) {
 					i.logger.Error("block verification failed, block at the end of epoch has transactions")
 					i.handleStateErr(errBlockVerificationFailed)
@@ -1007,14 +1007,14 @@ func (i *Ibft) updateMetrics(block *types.Block) {
 	parentTime := time.Unix(int64(prvHeader.Timestamp), 0)
 	headerTime := time.Unix(int64(block.Header.Timestamp), 0)
 
-	//Update the block interval metric
+	// Update the block interval metric
 	if block.Number() > 1 {
 		i.metrics.BlockInterval.Set(
 			headerTime.Sub(parentTime).Seconds(),
 		)
 	}
 
-	//Update the Number of transactions in the block metric
+	// Update the Number of transactions in the block metric
 	i.metrics.NumTxs.Set(float64(len(block.Body().Transactions)))
 }
 func (i *Ibft) insertBlock(block *types.Block) error {
@@ -1320,9 +1320,9 @@ func (i *Ibft) VerifyHeader(header *types.Header) error {
 	return nil
 }
 
-//	quorumSize returns a callback that when executed on a ValidatorSet computes
-//	number of votes required to reach quorum based on the size of the set.
-//	The blockNumber argument indicates which formula was used to calculate the result (see PRs #513, #549)
+// quorumSize returns a callback that when executed on a ValidatorSet computes
+// number of votes required to reach quorum based on the size of the set.
+// The blockNumber argument indicates which formula was used to calculate the result (see PRs #513, #549)
 func (i *Ibft) quorumSize(blockNumber uint64) QuorumImplementation {
 	if blockNumber < i.quorumSizeBlockNum {
 		return LegacyQuorumSize

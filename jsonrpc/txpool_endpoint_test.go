@@ -19,7 +19,7 @@ func TestContentEndpoint(t *testing.T) {
 		txPoolEndpoint := &TxPool{mockStore}
 
 		result, _ := txPoolEndpoint.Content()
-		// nolint:forcetypeassert
+		//nolint:forcetypeassert
 		response := result.(ContentResponse)
 
 		assert.True(t, mockStore.includeQueued)
@@ -27,7 +27,7 @@ func TestContentEndpoint(t *testing.T) {
 		assert.Equal(t, 0, len(response.Queued))
 	})
 
-	// nolint:dupl
+	//nolint:dupl
 	t.Run("returns correct data for pending transaction", func(t *testing.T) {
 		t.Parallel()
 
@@ -38,7 +38,7 @@ func TestContentEndpoint(t *testing.T) {
 		txPoolEndpoint := &TxPool{mockStore}
 
 		result, _ := txPoolEndpoint.Content()
-		// nolint:forcetypeassert
+		//nolint:forcetypeassert
 		response := result.(ContentResponse)
 
 		assert.Equal(t, 1, len(response.Pending))
@@ -57,7 +57,7 @@ func TestContentEndpoint(t *testing.T) {
 		assert.Equal(t, nil, txData.TxIndex)
 	})
 
-	// nolint:dupl
+	//nolint:dupl
 	t.Run("returns correct data for queued transaction", func(t *testing.T) {
 		t.Parallel()
 
@@ -68,7 +68,7 @@ func TestContentEndpoint(t *testing.T) {
 		txPoolEndpoint := &TxPool{mockStore}
 
 		result, _ := txPoolEndpoint.Content()
-		// nolint:forcetypeassert
+		//nolint:forcetypeassert
 		response := result.(ContentResponse)
 
 		assert.Equal(t, 0, len(response.Pending))
@@ -105,7 +105,7 @@ func TestContentEndpoint(t *testing.T) {
 		txPoolEndpoint := &TxPool{mockStore}
 
 		result, _ := txPoolEndpoint.Content()
-		// nolint:forcetypeassert
+		//nolint:forcetypeassert
 		response := result.(ContentResponse)
 
 		assert.True(t, mockStore.includeQueued)
@@ -127,7 +127,7 @@ func TestInspectEndpoint(t *testing.T) {
 		txPoolEndpoint := &TxPool{mockStore}
 
 		result, _ := txPoolEndpoint.Inspect()
-		// nolint:forcetypeassert
+		//nolint:forcetypeassert
 		response := result.(InspectResponse)
 
 		assert.True(t, mockStore.includeQueued)
@@ -148,7 +148,7 @@ func TestInspectEndpoint(t *testing.T) {
 		txPoolEndpoint := &TxPool{mockStore}
 
 		result, _ := txPoolEndpoint.Inspect()
-		// nolint:forcetypeassert
+		//nolint:forcetypeassert
 		response := result.(InspectResponse)
 
 		assert.Equal(t, 0, len(response.Pending))
@@ -171,7 +171,7 @@ func TestInspectEndpoint(t *testing.T) {
 		txPoolEndpoint := &TxPool{mockStore}
 
 		result, _ := txPoolEndpoint.Inspect()
-		// nolint:forcetypeassert
+		//nolint:forcetypeassert
 		response := result.(InspectResponse)
 
 		assert.Equal(t, 1, len(response.Pending))
@@ -194,7 +194,7 @@ func TestStatusEndpoint(t *testing.T) {
 		txPoolEndpoint := &TxPool{mockStore}
 
 		result, _ := txPoolEndpoint.Status()
-		// nolint:forcetypeassert
+		//nolint:forcetypeassert
 		response := result.(StatusResponse)
 
 		assert.Equal(t, uint64(0), response.Pending)
@@ -219,7 +219,7 @@ func TestStatusEndpoint(t *testing.T) {
 		txPoolEndpoint := &TxPool{mockStore}
 
 		result, _ := txPoolEndpoint.Status()
-		// nolint:forcetypeassert
+		//nolint:forcetypeassert
 		response := result.(StatusResponse)
 
 		assert.Equal(t, uint64(3), response.Pending)
@@ -242,7 +242,7 @@ func newMockTxPoolStore() *mockTxPoolStore {
 	}
 }
 
-// nolint:lll
+//nolint:lll
 func (s *mockTxPoolStore) GetTxs(inclQueued bool) (map[types.Address][]*types.Transaction, map[types.Address][]*types.Transaction) {
 	s.includeQueued = inclQueued
 
