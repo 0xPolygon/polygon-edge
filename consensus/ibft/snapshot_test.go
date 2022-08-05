@@ -7,9 +7,10 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/0xPolygon/polygon-edge/consensus"
+
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/chain"
-	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -18,7 +19,7 @@ import (
 )
 
 // initIbftMechanism initializes the IBFT mechanism for unit tests
-func initIbftMechanism(mechanismType MechanismType, ibft *Ibft) {
+func initIbftMechanism(mechanismType MechanismType, ibft *backendIBFT) {
 	mechanismFactory := mechanismBackends[mechanismType]
 	mechanism, _ := mechanismFactory(ibft, &IBFTFork{
 		Type: mechanismType,
@@ -51,7 +52,7 @@ func (t *testerAccount) Address() types.Address {
 }
 
 func (t *testerAccount) sign(h *types.Header) *types.Header {
-	h, _ = writeSeal(t.priv, h)
+	h, _ = writeProposerSeal(t.priv, h)
 
 	return h
 }
@@ -393,7 +394,7 @@ func TestSnapshot_setupSnapshot(t *testing.T) {
 				assert.NoError(t, err)
 			}
 
-			ibft := &Ibft{
+			ibft := &backendIBFT{
 				epochSize:  epochSize,
 				blockchain: blockchain,
 				config: &consensus.Config{
@@ -712,7 +713,7 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 			headers := buildHeaders(pool, genesis, c.headers)
 
 			// process the headers independently
-			ibft := &Ibft{
+			ibft := &backendIBFT{
 				epochSize:  epochSize,
 				blockchain: blockchain.TestBlockchain(t, genesis),
 				config:     &consensus.Config{},
@@ -726,8 +727,10 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 				}
 
 				// get latest snapshot
-				snap, err := ibft.getSnapshot(header.Number)
-				assert.NoError(t, err)
+				snap := ibft.getSnapshot(header.Number)
+				if snap == nil {
+					t.Fatalf("Unable to find snapshot")
+				}
 				assert.NotNil(t, snap)
 
 				result := c.headers[indx].snapshot
@@ -755,15 +758,17 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 			}
 
 			// check the metadata
-			meta, err := ibft.getSnapshotMetadata()
-			assert.NoError(t, err)
+			meta := ibft.getSnapshotMetadata()
+			if meta == nil {
+				t.Fatal("Metadata not found")
+			}
 
 			if meta.LastBlock != headers[len(headers)-1].Number {
 				t.Fatal("incorrect meta")
 			}
 
 			// Process headers all at the same time should have the same result
-			ibft1 := &Ibft{
+			ibft1 := &backendIBFT{
 				epochSize:  epochSize,
 				blockchain: blockchain.TestBlockchain(t, genesis),
 				config:     &consensus.Config{},
@@ -778,11 +783,11 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 
 			// from 0 to last header check that all the snapshots match
 			for i := uint64(0); i < headers[len(headers)-1].Number; i++ {
-				snap0, err := ibft.getSnapshot(i)
-				assert.NoError(t, err)
+				snap0 := ibft.getSnapshot(i)
+				assert.NotNil(t, snap0)
 
-				snap1, err := ibft1.getSnapshot(i)
-				assert.NoError(t, err)
+				snap1 := ibft1.getSnapshot(i)
+				assert.NotNil(t, snap1)
 
 				if !snap0.Equal(snap1) {
 					t.Fatal("bad")
@@ -797,7 +802,7 @@ func TestSnapshot_PurgeSnapshots(t *testing.T) {
 	pool.add("a", "b", "c")
 
 	genesis := pool.genesis()
-	ibft1 := &Ibft{
+	ibft1 := &backendIBFT{
 		epochSize:  10,
 		blockchain: blockchain.TestBlockchain(t, genesis),
 		config:     &consensus.Config{},

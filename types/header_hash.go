@@ -7,6 +7,9 @@ import (
 
 var HeaderHash func(h *Header) Hash
 
+// This is the default header hash for the block.
+// In IBFT, this header hash method is substituted
+// for Istanbul Header Hash calculation
 func init() {
 	HeaderHash = defHeaderHash
 }

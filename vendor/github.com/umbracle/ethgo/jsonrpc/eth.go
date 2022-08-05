@@ -73,16 +73,11 @@ func (e *Eth) GetBlockByHash(hash ethgo.Hash, full bool) (*ethgo.Block, error) {
 
 // GetFilterChanges returns the filter changes for log filters
 func (e *Eth) GetFilterChanges(id string) ([]*ethgo.Log, error) {
-	var raw string
-	err := e.c.Call("eth_getFilterChanges", &raw, id)
-	if err != nil {
+	var logs []*ethgo.Log
+	if err := e.c.Call("eth_getFilterChanges", &logs, id); err != nil {
 		return nil, err
 	}
-	var res []*ethgo.Log
-	if err := json.Unmarshal([]byte(raw), &res); err != nil {
-		return nil, err
-	}
-	return res, nil
+	return logs, nil
 }
 
 // GetTransactionByHash returns a transaction by his hash
@@ -94,16 +89,11 @@ func (e *Eth) GetTransactionByHash(hash ethgo.Hash) (*ethgo.Transaction, error) 
 
 // GetFilterChangesBlock returns the filter changes for block filters
 func (e *Eth) GetFilterChangesBlock(id string) ([]ethgo.Hash, error) {
-	var raw string
-	err := e.c.Call("eth_getFilterChanges", &raw, id)
-	if err != nil {
+	var hashes []ethgo.Hash
+	if err := e.c.Call("eth_getFilterChanges", &hashes, id); err != nil {
 		return nil, err
 	}
-	var res []ethgo.Hash
-	if err := json.Unmarshal([]byte(raw), &res); err != nil {
-		return nil, err
-	}
-	return res, nil
+	return hashes, nil
 }
 
 // NewFilter creates a new log filter

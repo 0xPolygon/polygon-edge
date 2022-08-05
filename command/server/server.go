@@ -186,22 +186,26 @@ func setFlags(cmd *cobra.Command) {
 		"minimum block time in seconds (at least 1s)",
 	)
 
-	cmd.Flags().Uint64Var(
-		&params.rawConfig.IBFTBaseTimeout,
-		ibftBaseTimeoutFlag,
-		// Calculate from block time if it is not given
-		0,
-		fmt.Sprintf(
-			"base IBFT timeout in seconds, it needs to be larger than block time. (block time * %d) is set if it's zero",
-			config.BlockTimeMultiplierForTimeout,
-		),
-	)
-
 	cmd.Flags().StringArrayVar(
 		&params.corsAllowedOrigins,
 		corsOriginFlag,
 		defaultConfig.Headers.AccessControlAllowOrigins,
 		"the CORS header indicating whether any JSON-RPC response can be shared with the specified origin",
+	)
+
+	cmd.Flags().Uint64Var(
+		&params.jsonRPCBatchLengthLimit,
+		jsonRPCBatchRequestLimitFlag,
+		defaultConfig.JSONRPCBatchRequestLimit,
+		"the max length to be considered when handling json-rpc batch requests",
+	)
+
+	//nolint:lll
+	cmd.Flags().Uint64Var(
+		&params.jsonRPCBlockRangeLimit,
+		jsonRPCBlockRangeLimitFlag,
+		defaultConfig.JSONRPCBlockRangeLimit,
+		"the max block range to be considered when executing json-rpc requests that consider fromBlock/toBlock values (e.g. eth_getLogs)",
 	)
 
 	cmd.Flags().StringVar(
@@ -211,7 +215,22 @@ func setFlags(cmd *cobra.Command) {
 		"write all logs to the file at specified location instead of writing them to console",
 	)
 
+	setLegacyFlags(cmd)
 	setDevFlags(cmd)
+}
+
+// setLegacyFlags sets the legacy flags to preserve backwards compatibility
+// with running partners
+func setLegacyFlags(cmd *cobra.Command) {
+	// Legacy IBFT base timeout flag
+	cmd.Flags().Uint64Var(
+		&params.ibftBaseTimeoutLegacy,
+		ibftBaseTimeoutFlagLEGACY,
+		0,
+		"",
+	)
+
+	_ = cmd.Flags().MarkHidden(ibftBaseTimeoutFlagLEGACY)
 }
 
 func setDevFlags(cmd *cobra.Command) {
