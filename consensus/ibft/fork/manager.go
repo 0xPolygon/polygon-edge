@@ -2,6 +2,7 @@ package fork
 
 import (
 	"errors"
+	"fmt"
 	"path/filepath"
 
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/hook"
@@ -32,7 +33,7 @@ type ForkManager interface {
 	GetValidatorSet(uint64) (valset.ValidatorSet, error)
 	GetValidators(uint64) (validators.Validators, error)
 	GetHooks(uint64) (hook.Hooks, error)
-	Close() error // to save snapshot to files
+	Close() error
 }
 
 type forkManagerImpl struct {
@@ -64,7 +65,7 @@ func NewForkManager(
 		return nil, err
 	}
 
-	return &forkManagerImpl{
+	fm := &forkManagerImpl{
 		logger:         logger.Named(loggerName),
 		blockchain:     blockchain,
 		executor:       executor,
@@ -74,11 +75,19 @@ func NewForkManager(
 		forks:          forks,
 		signers:        make(map[validators.ValidatorType]signer.Signer),
 		validatorSets:  make(map[valset.SourceType]valset.ValidatorSet),
-	}, nil
+	}
+
+	// Need initialization of signers in the constructor
+	// because hash calculation is called on blockchain initialization
+	if err := fm.initializeSigners(); err != nil {
+		return nil, err
+	}
+
+	return fm, nil
 }
 
 func (m *forkManagerImpl) Initialize() error {
-	if err := m.initializeSignersAndValidatorSets(); err != nil {
+	if err := m.initializeValidatorSets(); err != nil {
 		return err
 	}
 
@@ -149,17 +158,28 @@ func (m *forkManagerImpl) GetHooks(height uint64) (hook.Hooks, error) {
 }
 
 func (m *forkManagerImpl) Close() error {
-	panic("not implement")
+	if err := m.closeSnapshotValidatorSet(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
-func (m *forkManagerImpl) initializeSignersAndValidatorSets() error {
+func (m *forkManagerImpl) initializeSigners() error {
 	for _, fork := range m.forks {
-		valType, sourceType := fork.ValidatorType, ibftTypeToSourceType(fork.Type)
+		valType := fork.ValidatorType
 
 		if err := m.initializeSigner(valType); err != nil {
 			return err
 		}
+	}
 
+	return nil
+}
+
+func (m *forkManagerImpl) initializeValidatorSets() error {
+	for _, fork := range m.forks {
+		sourceType := ibftTypeToSourceType(fork.Type)
 		if err := m.initializeValidatorSet(sourceType); err != nil {
 			return err
 		}
@@ -228,6 +248,29 @@ func (m *forkManagerImpl) initializeSnapshotValidatorSet() (valset.ValidatorSet,
 	}
 
 	return snapshotValset, nil
+}
+
+func (m *forkManagerImpl) closeSnapshotValidatorSet() error {
+	snapshotValset, ok := m.validatorSets[valset.Snapshot].(*snapshot.SnapshotValidatorSet)
+	if !ok {
+		return fmt.Errorf("invalid validator set is stored, expected *snapshot.SnapshotValidatorSet but got %T", m.validatorSets[valset.Snapshot])
+	}
+
+	// save data
+	var (
+		metadata  = snapshotValset.GetSnapshotMetadata()
+		snapshots = snapshotValset.GetSnapshots()
+	)
+
+	if err := writeDataStore(filepath.Join(m.filePath, "metadata"), metadata); err != nil {
+		return err
+	}
+
+	if err := writeDataStore(filepath.Join(m.filePath, "snapshots"), snapshots); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (m *forkManagerImpl) initializeContractValidatorSet() (valset.ValidatorSet, error) {

@@ -73,11 +73,7 @@ func NewSnapshotValidatorSet(
 
 func (s *SnapshotValidatorSet) initialize() error {
 	header := s.blockchain.Header()
-
-	meta, err := s.getSnapshotMetadata()
-	if err != nil {
-		return err
-	}
+	meta := s.GetSnapshotMetadata()
 
 	if header != nil && header.Number == 0 {
 		// Add genesis
@@ -116,9 +112,7 @@ func (s *SnapshotValidatorSet) initialize() error {
 
 		s.store.updateLastBlock(beginHeight)
 
-		if meta, err = s.getSnapshotMetadata(); err != nil {
-			return err
-		}
+		meta = s.GetSnapshotMetadata()
 	}
 
 	// Process headers if we missed some blocks in the current epoch
@@ -155,6 +149,16 @@ func (s *SnapshotValidatorSet) GetValidators(height uint64) (validators.Validato
 	}
 
 	return snapshot.Set, nil
+}
+
+func (s *SnapshotValidatorSet) GetSnapshotMetadata() *SnapshotMetadata {
+	return &SnapshotMetadata{
+		LastBlock: s.store.getLastBlock(),
+	}
+}
+
+func (s *SnapshotValidatorSet) GetSnapshots() []*Snapshot {
+	return s.store.list
 }
 
 func (s *SnapshotValidatorSet) ModifyHeader(header *types.Header, proposer types.Address) (*types.Header, error) {
@@ -392,14 +396,6 @@ func (s *SnapshotValidatorSet) Propose(data []byte, auth bool, proposer types.Ad
 	})
 
 	return nil
-}
-
-func (s *SnapshotValidatorSet) getSnapshotMetadata() (*SnapshotMetadata, error) {
-	meta := &SnapshotMetadata{
-		LastBlock: s.store.getLastBlock(),
-	}
-
-	return meta, nil
 }
 
 // addHeaderSnap creates the initial snapshot, and adds it to the snapshot store

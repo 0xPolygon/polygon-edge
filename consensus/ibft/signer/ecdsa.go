@@ -153,8 +153,6 @@ func (s *SerializedSeal) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 
 	committed := ar.NewArray()
 
-	fmt.Printf("\nSerializedSeal MarshalRLPWith size=%d\n", len(*s))
-
 	for _, a := range *s {
 		if len(a) == 0 {
 			committed.Set(ar.NewNull())

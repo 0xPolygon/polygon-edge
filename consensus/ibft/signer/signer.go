@@ -26,13 +26,10 @@ var (
 type Signer interface {
 	Type() validators.ValidatorType
 	Address() types.Address
-
 	InitIBFTExtra(header *types.Header, parentCommittedSeal Sealer, set validators.Validators) error
 	GetIBFTExtra(header *types.Header) (*IstanbulExtra, error)
-
 	WriteSeal(*types.Header) (*types.Header, error)
 	EcrecoverFromHeader(*types.Header) (types.Address, error)
-
 	CreateCommittedSeal(*types.Header) ([]byte, error)
 	WriteCommittedSeals(*types.Header, map[types.Address][]byte) (*types.Header, error)
 	VerifyCommittedSeals(set validators.Validators, header *types.Header, quorumSize int) error
@@ -42,10 +39,8 @@ type Signer interface {
 		header *types.Header,
 		quorumSize int,
 	) error
-
 	SignIBFTMessage(*proto.MessageReq) error
 	ValidateIBFTMessage(*proto.MessageReq) error
-
 	CalculateHeaderHash(*types.Header) (types.Hash, error)
 }
 
@@ -226,7 +221,6 @@ func (s *SignerImpl) VerifyParentCommittedSeals(
 
 	rawMsg := commitMsg(parentHash[:])
 
-	// TODO: check
 	numSeals, err := s.keyManager.VerifyCommittedSeals(extra.ParentCommittedSeal, rawMsg, parentValidators)
 	if err != nil {
 		return err
