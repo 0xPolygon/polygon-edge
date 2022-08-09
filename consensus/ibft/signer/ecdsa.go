@@ -146,7 +146,7 @@ func (s *ECDSAKeyManager) verifyCommittedSealsImpl(
 		return 0, ErrEmptyCommittedSeals
 	}
 
-	visited := map[types.Address]struct{}{}
+	visited := make(map[types.Address]bool)
 
 	for _, seal := range *committedSeal {
 		addr, err := s.Ecrecover(seal, msg)
@@ -154,7 +154,7 @@ func (s *ECDSAKeyManager) verifyCommittedSealsImpl(
 			return 0, err
 		}
 
-		if _, ok := visited[addr]; ok {
+		if visited[addr] {
 			return 0, ErrRepeatedCommittedSeal
 		}
 
@@ -162,7 +162,7 @@ func (s *ECDSAKeyManager) verifyCommittedSealsImpl(
 			return 0, ErrNonValidatorCommittedSeal
 		}
 
-		visited[addr] = struct{}{}
+		visited[addr] = true
 	}
 
 	return numSeals, nil
