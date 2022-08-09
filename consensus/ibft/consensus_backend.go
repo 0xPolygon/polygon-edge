@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/0xPolygon/go-ibft/messages"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -42,7 +43,10 @@ func (i *backendIBFT) BuildProposal(blockNumber uint64) []byte {
 	return block.MarshalRLP()
 }
 
-func (i *backendIBFT) InsertBlock(proposal []byte, committedSeals [][]byte) {
+func (i *backendIBFT) InsertBlock(
+	proposal []byte,
+	committedSeals []*messages.CommittedSeal,
+) {
 	newBlock := &types.Block{}
 	if err := newBlock.UnmarshalRLP(proposal); err != nil {
 		i.logger.Error("cannot unmarshal proposal", "err", err)
@@ -50,8 +54,13 @@ func (i *backendIBFT) InsertBlock(proposal []byte, committedSeals [][]byte) {
 		return
 	}
 
+	seals := make([][]byte, len(committedSeals))
+	for idx := range committedSeals {
+		seals[idx] = committedSeals[idx].Signature
+	}
+
 	// Push the committed seals to the header
-	header, err := writeCommittedSeals(newBlock.Header, committedSeals)
+	header, err := writeCommittedSeals(newBlock.Header, seals)
 	if err != nil {
 		i.logger.Error("cannot write committed seals", "err", err)
 
