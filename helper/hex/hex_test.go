@@ -2,8 +2,9 @@ package hex
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 // TestDecodeUint64 verifies that uint64 values

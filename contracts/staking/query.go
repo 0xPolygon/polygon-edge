@@ -2,8 +2,9 @@ package staking
 
 import (
 	"errors"
-	"github.com/umbracle/ethgo"
 	"math/big"
+
+	"github.com/umbracle/ethgo"
 
 	"github.com/0xPolygon/polygon-edge/contracts/abis"
 	"github.com/0xPolygon/polygon-edge/state/runtime"

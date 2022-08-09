@@ -2,6 +2,8 @@ package root
 
 import (
 	"fmt"
+	"os"
+
 	"github.com/0xPolygon/polygon-edge/command/backup"
 	"github.com/0xPolygon/polygon-edge/command/genesis"
 	"github.com/0xPolygon/polygon-edge/command/helper"
@@ -16,7 +18,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/txpool"
 	"github.com/0xPolygon/polygon-edge/command/version"
 	"github.com/spf13/cobra"
-	"os"
 )
 
 type RootCommand struct {

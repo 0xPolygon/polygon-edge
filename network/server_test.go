@@ -3,12 +3,13 @@ package network
 import (
 	"context"
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/network/common"
-	peerEvent "github.com/0xPolygon/polygon-edge/network/event"
 	"net"
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/0xPolygon/polygon-edge/network/common"
+	peerEvent "github.com/0xPolygon/polygon-edge/network/event"
 
 	"github.com/0xPolygon/polygon-edge/helper/tests"
 

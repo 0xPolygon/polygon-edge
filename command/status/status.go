@@ -2,6 +2,7 @@ package status
 
 import (
 	"context"
+
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/spf13/cobra"
