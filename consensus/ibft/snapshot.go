@@ -11,14 +11,22 @@ import (
 	"sync"
 	"sync/atomic"
 
+	lru "github.com/hashicorp/golang-lru"
+
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
 	"github.com/hashicorp/go-hclog"
 )
 
+var (
+	errMetadataNotFound       = errors.New("snapshot metadata not found")
+	errSnapshotNotFound       = errors.New("snapshot not found")
+	errParentSnapshotNotFound = errors.New("parent snapshot not found")
+)
+
 // setupSnapshot sets up the snapshot store for the IBFT object
-func (i *Ibft) setupSnapshot() error {
+func (i *backendIBFT) setupSnapshot() error {
 	i.store = newSnapshotStore()
 
 	// Read from storage
@@ -29,10 +37,10 @@ func (i *Ibft) setupSnapshot() error {
 	}
 
 	header := i.blockchain.Header()
-	meta, err := i.getSnapshotMetadata()
+	meta := i.getSnapshotMetadata()
 
-	if err != nil {
-		return err
+	if meta == nil {
+		return errMetadataNotFound
 	}
 
 	if header.Number == 0 {
@@ -50,7 +58,7 @@ func (i *Ibft) setupSnapshot() error {
 	// Get epoch of latest header and saved metadata
 	currentEpoch := header.Number / i.epochSize
 	metaEpoch := meta.LastBlock / i.epochSize
-	snapshot, _ := i.getSnapshot(header.Number)
+	snapshot := i.getSnapshot(header.Number)
 
 	if snapshot == nil || metaEpoch < currentEpoch {
 		// Restore snapshot at the beginning of the current epoch by block header
@@ -69,8 +77,8 @@ func (i *Ibft) setupSnapshot() error {
 
 		i.store.updateLastBlock(beginHeight)
 
-		if meta, err = i.getSnapshotMetadata(); err != nil {
-			return err
+		if meta = i.getSnapshotMetadata(); meta == nil {
+			return errMetadataNotFound
 		}
 	}
 
@@ -98,7 +106,7 @@ func (i *Ibft) setupSnapshot() error {
 }
 
 // addHeaderSnap creates the initial snapshot, and adds it to the snapshot store
-func (i *Ibft) addHeaderSnap(header *types.Header) error {
+func (i *backendIBFT) addHeaderSnap(header *types.Header) error {
 	// Genesis header needs to be set by hand, all the other
 	// snapshots are set as part of processHeaders
 	extra, err := i.signer.GetIBFTExtra(header)
@@ -120,15 +128,15 @@ func (i *Ibft) addHeaderSnap(header *types.Header) error {
 }
 
 // getLatestSnapshot returns the latest snapshot object
-func (i *Ibft) getLatestSnapshot() (*Snapshot, error) {
-	meta, err := i.getSnapshotMetadata()
-	if err != nil {
-		return nil, err
+func (i *backendIBFT) getLatestSnapshot() (*Snapshot, error) {
+	meta := i.getSnapshotMetadata()
+	if meta == nil {
+		return nil, errMetadataNotFound
 	}
 
-	snap, err := i.getSnapshot(meta.LastBlock)
-	if err != nil {
-		return nil, err
+	snap := i.getSnapshot(meta.LastBlock)
+	if snap == nil {
+		return nil, errSnapshotNotFound
 	}
 
 	return snap, nil
@@ -137,14 +145,14 @@ func (i *Ibft) getLatestSnapshot() (*Snapshot, error) {
 // processHeaders is the powerhouse method in the snapshot module.
 
 // It processes passed in headers, and updates the snapshot / snapshot store
-func (i *Ibft) processHeaders(headers []*types.Header) error {
+func (i *backendIBFT) processHeaders(headers []*types.Header) error {
 	if len(headers) == 0 {
 		return nil
 	}
 
-	parentSnap, err := i.getSnapshot(headers[0].Number - 1)
-	if err != nil {
-		return err
+	parentSnap := i.getSnapshot(headers[0].Number - 1)
+	if parentSnap == nil {
+		return errParentSnapshotNotFound
 	}
 
 	snap := parentSnap.Copy()
@@ -197,19 +205,33 @@ func (i *Ibft) processHeaders(headers []*types.Header) error {
 }
 
 // getSnapshotMetadata returns the latest snapshot metadata
-func (i *Ibft) getSnapshotMetadata() (*snapshotMetadata, error) {
+func (i *backendIBFT) getSnapshotMetadata() *snapshotMetadata {
 	meta := &snapshotMetadata{
 		LastBlock: i.store.getLastBlock(),
 	}
 
-	return meta, nil
+	return meta
 }
 
 // getSnapshot returns the snapshot at the specified block height
-func (i *Ibft) getSnapshot(num uint64) (*Snapshot, error) {
+func (i *backendIBFT) getSnapshot(num uint64) *Snapshot {
+	//	get it from the snapshot first
+	raw, ok := i.store.cache.Get(num)
+	if ok {
+		snap, _ := raw.(*Snapshot)
+
+		return snap
+	}
+
+	//	find it in the store
 	snap := i.store.find(num)
 
-	return snap, nil
+	if snap != nil {
+		//	add it to cache for future reference if found
+		i.store.cache.Add(snap.Number, snap)
+	}
+
+	return snap
 }
 
 // Vote defines the vote structure
@@ -257,6 +279,55 @@ type Snapshot struct {
 
 	// current set of validators
 	Set validators.ValidatorSet
+}
+
+func (s *Snapshot) MarshalJSON() ([]byte, error) {
+	var rawSet interface{}
+
+	switch typedSet := s.Set.(type) {
+	case *validators.ECDSAValidatorSet:
+		set := make([]string, typedSet.Len())
+
+		for idx := 0; idx < typedSet.Len(); idx++ {
+			typedVal, ok := typedSet.At(uint64(idx)).(*validators.ECDSAValidator)
+			if !ok {
+				continue
+			}
+
+			set[idx] = typedVal.Address.String()
+		}
+
+		rawSet = set
+
+	case *validators.BLSValidatorSet:
+		set := make([]map[string]interface{}, typedSet.Len())
+		for idx := 0; idx < typedSet.Len(); idx++ {
+			typedVal, ok := typedSet.At(uint64(idx)).(*validators.BLSValidator)
+			if !ok {
+				continue
+			}
+
+			set[idx] = make(map[string]interface{})
+			set[idx]["Address"] = typedVal.Address
+			set[idx]["BLSPubKey"] = typedVal.BLSPublicKey
+		}
+
+		rawSet = set
+	}
+
+	jsonData := struct {
+		Number uint64
+		Hash   string
+		Votes  []*Vote
+		Set    interface{}
+	}{
+		Number: s.Number,
+		Hash:   s.Hash,
+		Votes:  s.Votes,
+		Set:    rawSet,
+	}
+
+	return json.Marshal(jsonData)
 }
 
 func (s *Snapshot) UnmarshalJSON(data []byte) error {
@@ -425,12 +496,20 @@ type snapshotStore struct {
 
 	// list represents the actual snapshot sorted list
 	list snapshotSortedList
+
+	cache *lru.Cache
 }
 
 // newSnapshotStore returns a new snapshot store
 func newSnapshotStore() *snapshotStore {
+	cache, err := lru.New(100)
+	if err != nil {
+		return nil
+	}
+
 	return &snapshotStore{
-		list: snapshotSortedList{},
+		cache: cache,
+		list:  snapshotSortedList{},
 	}
 }
 
@@ -544,6 +623,8 @@ func (s *snapshotStore) add(snap *Snapshot) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
+	s.cache.Add(snap.Number, snap)
+
 	// append and sort the list
 	s.list = append(s.list, snap)
 	sort.Sort(&s.list)
@@ -556,6 +637,7 @@ func (s *snapshotStore) replace(snap *Snapshot) {
 	for i, sn := range s.list {
 		if sn.Number == snap.Number {
 			s.list[i] = snap
+			s.cache.Add(snap.Number, snap)
 
 			return
 		}

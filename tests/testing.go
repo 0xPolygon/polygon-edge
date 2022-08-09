@@ -141,7 +141,7 @@ func (e *env) ToHeader(t *testing.T) *types.Header {
 	minter := stringToAddressT(t, e.Coinbase)
 
 	return &types.Header{
-		Miner:      []byte(minter[:]),
+		Miner:      minter,
 		Difficulty: stringToUint64T(t, e.Difficulty),
 		GasLimit:   stringToUint64T(t, e.GasLimit),
 		Number:     stringToUint64T(t, e.Number),

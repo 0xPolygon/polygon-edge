@@ -1,11 +1,7 @@
 package helper
 
 import (
-	"fmt"
-	"path/filepath"
-
 	"github.com/0xPolygon/polygon-edge/crypto"
-	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/secrets/awsssm"
@@ -19,19 +15,6 @@ import (
 
 // SetupLocalSecretsManager is a helper method for boilerplate local secrets manager setup
 func SetupLocalSecretsManager(dataDir string) (secrets.SecretsManager, error) {
-	subDirectories := []string{secrets.ConsensusFolderLocal, secrets.NetworkFolderLocal}
-
-	// Check if the sub-directories exist / are already populated
-	for _, subDirectory := range subDirectories {
-		if common.DirectoryExists(filepath.Join(dataDir, subDirectory)) {
-			return nil,
-				fmt.Errorf(
-					"directory %s has previously initialized secrets data",
-					dataDir,
-				)
-		}
-	}
-
 	return local.SecretsManagerFactory(
 		nil, // Local secrets manager doesn't require a config
 		&secrets.SecretsManagerParams{

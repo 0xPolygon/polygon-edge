@@ -4,8 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/consensus"
+
+	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/validators"
@@ -17,7 +18,7 @@ func TestOperator_GetNextCandidate(t *testing.T) {
 	pool := newTesterAccountPool(t)
 	pool.add("A", "B", "C")
 
-	ibft := &Ibft{
+	ibft := &backendIBFT{
 		signer: signer.NewSigner(signer.NewMockECDSAKeyManager(pool.get("A").Address())),
 	}
 
@@ -79,7 +80,7 @@ func TestOperator_Propose(t *testing.T) {
 	pool := newTesterAccountPool(t)
 	pool.add("A", "B", "C")
 
-	ibft := &Ibft{
+	ibft := &backendIBFT{
 		blockchain: blockchain.TestBlockchain(t, pool.genesis()),
 		config:     &consensus.Config{},
 		epochSize:  DefaultEpochSize,

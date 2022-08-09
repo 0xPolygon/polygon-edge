@@ -20,7 +20,7 @@ import (
 )
 
 // initIbftMechanism initializes the IBFT mechanism for unit tests
-func initIbftMechanism(mechanismType MechanismType, ibft *Ibft) {
+func initIbftMechanism(mechanismType MechanismType, ibft *backendIBFT) {
 	mechanismFactory := mechanismBackends[mechanismType]
 	mechanism, _ := mechanismFactory(ibft, &IBFTFork{
 		Type: mechanismType,
@@ -55,7 +55,7 @@ func (t *testerAccount) Address() types.Address {
 func (t *testerAccount) sign(h *types.Header) (*types.Header, error) {
 	signer := signer.NewSigner(signer.NewECDSAKeyManagerFromKey(t.priv))
 
-	return signer.WriteSeal(h)
+	return signer.WriteProposerSeal(h)
 }
 
 type testerAccountPool struct {
@@ -215,7 +215,7 @@ func buildHeaders(
 		h := &types.Header{
 			Number:     uint64(num + 1),
 			ParentHash: parentHash,
-			Miner:      types.ZeroAddress[:],
+			Miner:      types.ZeroAddress,
 			MixHash:    signer.IstanbulDigest,
 			ExtraData:  extraData,
 		}
@@ -227,7 +227,7 @@ func buildHeaders(
 
 			minter := pool.get(v.candidate).Address()
 
-			h.Miner = minter[:]
+			h.Miner = minter
 		}
 
 		if v.auth {
@@ -437,7 +437,7 @@ func TestSnapshot_setupSnapshot(t *testing.T) {
 			// Build blockchain with headers
 			blockchain := blockchain.TestBlockchain(t, genesis)
 
-			ibft := &Ibft{
+			ibft := &backendIBFT{
 				epochSize:  epochSize,
 				blockchain: blockchain,
 				config: &consensus.Config{
@@ -761,7 +761,7 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 			genesis := pool.genesis()
 
 			// process the headers independently
-			ibft := &Ibft{
+			ibft := &backendIBFT{
 				epochSize:  epochSize,
 				blockchain: blockchain.TestBlockchain(t, genesis),
 				config:     &consensus.Config{},
@@ -780,8 +780,10 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 				}
 
 				// get latest snapshot
-				snap, err := ibft.getSnapshot(header.Number)
-				assert.NoError(t, err)
+				snap := ibft.getSnapshot(header.Number)
+				if snap == nil {
+					t.Fatalf("Unable to find snapshot")
+				}
 				assert.NotNil(t, snap)
 
 				result := c.headers[indx].snapshot
@@ -804,6 +806,7 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 							Authorize: v.auth,
 						})
 					}
+
 					if !resSnap.Equal(snap) {
 						t.Fatal("bad")
 					}
@@ -811,15 +814,17 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 			}
 
 			// check the metadata
-			meta, err := ibft.getSnapshotMetadata()
-			assert.NoError(t, err)
+			meta := ibft.getSnapshotMetadata()
+			if meta == nil {
+				t.Fatal("Metadata not found")
+			}
 
 			if meta.LastBlock != headers[len(headers)-1].Number {
 				t.Fatal("incorrect meta")
 			}
 
 			// Process headers all at the same time should have the same result
-			ibft1 := &Ibft{
+			ibft1 := &backendIBFT{
 				epochSize:  epochSize,
 				blockchain: blockchain.TestBlockchain(t, genesis),
 				config:     &consensus.Config{},
@@ -835,11 +840,11 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 
 			// from 0 to last header check that all the snapshots match
 			for i := uint64(0); i < headers[len(headers)-1].Number; i++ {
-				snap0, err := ibft.getSnapshot(i)
-				assert.NoError(t, err)
+				snap0 := ibft.getSnapshot(i)
+				assert.NotNil(t, snap0)
 
-				snap1, err := ibft1.getSnapshot(i)
-				assert.NoError(t, err)
+				snap1 := ibft1.getSnapshot(i)
+				assert.NotNil(t, snap1)
 
 				if !snap0.Equal(snap1) {
 					t.Fatal("bad")
@@ -854,7 +859,7 @@ func TestSnapshot_PurgeSnapshots(t *testing.T) {
 	pool.add("A", "B", "C")
 
 	genesis := pool.genesis()
-	ibft1 := &Ibft{
+	ibft1 := &backendIBFT{
 		epochSize:  10,
 		blockchain: blockchain.TestBlockchain(t, genesis),
 		config:     &consensus.Config{},
@@ -876,14 +881,14 @@ func TestSnapshot_PurgeSnapshots(t *testing.T) {
 		h := &types.Header{
 			Number:     uint64(i),
 			ParentHash: ibft1.blockchain.Header().Hash,
-			Miner:      types.ZeroAddress[:],
+			Miner:      types.ZeroAddress,
 			MixHash:    signer.IstanbulDigest,
 			ExtraData:  genesis.ExtraData,
 		}
 
 		minter := pool.get(id).Address()
 
-		h.Miner = minter[:]
+		h.Miner = minter
 		h.Nonce = nonceAuthVote
 
 		err := ibft1.signer.InitIBFTExtra(h, parent, pool.ValidatorSet())

@@ -96,7 +96,7 @@ func TestSimpleGossip(t *testing.T) {
 	for {
 		select {
 		case <-time.After(time.Second * 15):
-			t.Fatalf("Gossip messages not received before timeout")
+			t.Fatalf("Multicast messages not received before timeout")
 		case message := <-messageCh:
 			if message.Message == sentMessage {
 				messagesGossiped++

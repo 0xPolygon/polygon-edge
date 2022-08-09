@@ -182,7 +182,7 @@ func TestIbft_TransactionFeeRecipient(t *testing.T) {
 			err = extraData.UnmarshalRLP(extraDataWithoutVanity)
 			assert.NoError(t, err)
 
-			proposerAddr, err := framework.EcrecoverFromBlockhash(types.Hash(block.Hash), extraData.Seal)
+			proposerAddr, err := framework.EcrecoverFromBlockhash(types.Hash(block.Hash), extraData.ProposerSeal)
 			assert.NoError(t, err)
 
 			// Given that this is the first transaction on the blockchain, proposer's balance should be equal to the tx fee

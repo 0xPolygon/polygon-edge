@@ -11,7 +11,7 @@ import (
 )
 
 type operator struct {
-	ibft *Ibft
+	ibft *backendIBFT
 
 	candidatesLock sync.Mutex
 	candidates     []*proto.Candidate
@@ -87,7 +87,10 @@ func (o *operator) GetSnapshot(ctx context.Context, req *proto.SnapshotReq) (*pr
 	if req.Latest {
 		snap, err = o.ibft.getLatestSnapshot()
 	} else {
-		snap, err = o.ibft.getSnapshot(req.Number)
+		snap = o.ibft.getSnapshot(req.Number)
+		if snap == nil {
+			err = errSnapshotNotFound
+		}
 	}
 
 	if err != nil {

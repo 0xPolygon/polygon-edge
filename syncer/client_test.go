@@ -46,7 +46,7 @@ func newTestSyncPeerClient(network Network, blockchain Blockchain) *syncPeerClie
 	}
 
 	// need to register protocol
-	network.RegisterProtocol(SyncerProto, grpc.NewGrpcStream())
+	network.RegisterProtocol(syncerProto, grpc.NewGrpcStream())
 
 	return client
 }
@@ -368,8 +368,13 @@ func TestPeerConnectionUpdateEventCh(t *testing.T) {
 	assert.Equal(t, expected, newStatuses)
 }
 
-// Make sure the peer shouldn't emit status if the shouldEmitBlocks flag is set
+// Make sure the peer shouldn't emit status if the shouldEmitBlocks flag is set.
+// The subtests cannot contain t.Parallel() due to how
+// the test is organized
+// nolint:tparallel
 func Test_shouldEmitBlocks(t *testing.T) {
+	t.Parallel()
+
 	var (
 		// network layer
 		clientSrv = newTestNetwork(t)

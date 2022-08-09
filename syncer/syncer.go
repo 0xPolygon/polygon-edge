@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	syncerLoggerName = "syncer"
-	SyncerProto      = "/syncer/0.2"
+	syncerName  = "syncer"
+	syncerProto = "/syncer/0.2"
 )
 
 var (
@@ -22,8 +22,7 @@ var (
 )
 
 // XXX: Don't use this syncer for the consensus that may cause fork.
-// This syncer doesn't assume fork. Consensus may be broken.
-// TODO: Add extensibility for fork before merge
+// This syncer doesn't assume forks
 type syncer struct {
 	logger          hclog.Logger
 	blockchain      Blockchain
@@ -36,7 +35,7 @@ type syncer struct {
 	// Timeout for syncing a block
 	blockTimeout time.Duration
 
-	// Channel to notify WatchSync that a new status arrived
+	// Channel to notify Sync that a new status arrived
 	newStatusCh chan struct{}
 }
 
@@ -47,7 +46,7 @@ func NewSyncer(
 	blockTimeout time.Duration,
 ) Syncer {
 	return &syncer{
-		logger:          logger.Named(syncerLoggerName),
+		logger:          logger.Named(syncerName),
 		blockchain:      blockchain,
 		syncProgression: progress.NewProgressionWrapper(progress.ChainSyncBulk),
 		syncPeerService: NewSyncPeerService(network, blockchain),
@@ -66,7 +65,8 @@ func (s *syncer) Start() error {
 
 	s.syncPeerService.Start()
 
-	go s.initializePeerMap()
+	s.initializePeerMap()
+
 	go s.startPeerStatusUpdateProcess()
 	go s.startPeerConnectionEventProcess()
 
@@ -158,59 +158,8 @@ func (s *syncer) HasSyncPeer() bool {
 	return bestPeer != nil && bestPeer.Number > header.Number
 }
 
-func (s *syncer) BulkSync(newBlockCallback func(*types.Block) bool) error {
-	localLatest := uint64(0)
-	updateLocalLatest := func() {
-		if header := s.blockchain.Header(); header != nil {
-			localLatest = header.Number
-		}
-	}
-
-	updateLocalLatest()
-
-	// Stop publishing status in topic while in bulkSync
-	s.syncPeerClient.DisablePublishingPeerStatus()
-
-	// Create a blockchain subscription for the sync progression and start tracking
-	s.syncProgression.StartProgression(localLatest+1, s.blockchain.SubscribeEvents())
-
-	// Stop monitoring the sync progression upon exit
-	defer func() {
-		s.syncProgression.StopProgression()
-		s.syncPeerClient.EnablePublishingPeerStatus()
-	}()
-
-	skipList := make(map[peer.ID]bool)
-
-	for {
-		bestPeer := s.peerMap.BestPeer(skipList)
-		if bestPeer == nil || bestPeer.Number <= localLatest {
-			break
-		}
-
-		// Set the target height
-		s.syncProgression.UpdateHighestProgression(bestPeer.Number)
-
-		lastNumber, _, err := s.bulkSyncWithPeer(bestPeer.ID, newBlockCallback)
-		if err != nil {
-			s.logger.Warn("failed to complete bulk sync with peer, try to next one", "peer ID", "error", bestPeer.ID, err)
-		}
-
-		// if node could sync with the peer fully, then exit loop
-		if err == nil && lastNumber >= bestPeer.Number {
-			break
-		}
-
-		updateLocalLatest()
-
-		skipList[bestPeer.ID] = true
-	}
-
-	return nil
-}
-
-// WatchSync syncs block with the best peer until callback returns true
-func (s *syncer) WatchSync(callback func(*types.Block) bool) error {
+// Sync syncs block with the best peer until callback returns true
+func (s *syncer) Sync(callback func(*types.Block) bool) error {
 	localLatest := s.blockchain.Header().Number
 	skipList := make(map[peer.ID]bool)
 
@@ -293,7 +242,7 @@ func (s *syncer) bulkSyncWithPeer(peerID peer.ID, newBlockCallback func(*types.B
 				return lastReceivedNumber, false, fmt.Errorf("unable to verify block, %w", err)
 			}
 
-			if err := s.blockchain.WriteBlock(block); err != nil {
+			if err := s.blockchain.WriteBlock(block, syncerName); err != nil {
 				return lastReceivedNumber, false, fmt.Errorf("failed to write block while bulk syncing: %w", err)
 			}
 

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -96,6 +95,49 @@ func (s *BLSKeyManager) GenerateCommittedSeals(sealMap map[types.Address][]byte,
 }
 
 func (s *BLSKeyManager) VerifyCommittedSeal(
+	rawSet validators.ValidatorSet,
+	addr types.Address,
+	rawSignature []byte,
+	hash []byte,
+) error {
+	validatorSet, ok := rawSet.(*validators.BLSValidatorSet)
+	if !ok {
+		return ErrInvalidValidatorSet
+	}
+
+	validatorIndex := validatorSet.Index(addr)
+	if validatorIndex == -1 {
+		return ErrValidatorNotFound
+	}
+
+	validator, ok := validatorSet.At(uint64(validatorIndex)).(*validators.BLSValidator)
+	if !ok {
+		return fmt.Errorf("expected BLSValidator in BLSValidators, but got %T", validator)
+	}
+
+	pubkey := &bls_sig.PublicKey{}
+	if err := pubkey.UnmarshalBinary(validator.BLSPublicKey); err != nil {
+		return err
+	}
+
+	signature := &bls_sig.Signature{}
+	if err := signature.UnmarshalBinary(rawSignature); err != nil {
+		return err
+	}
+
+	ok, err := bls_sig.NewSigPop().Verify(pubkey, hash, signature)
+	if err != nil {
+		return err
+	}
+
+	if !ok {
+		return ErrInvalidSignature
+	}
+
+	return nil
+}
+
+func (s *BLSKeyManager) VerifyCommittedSeals(
 	rawCommittedSeal Sealer,
 	digest []byte,
 	rawSet validators.ValidatorSet,
@@ -113,12 +155,8 @@ func (s *BLSKeyManager) VerifyCommittedSeal(
 	return s.verifyCommittedSealsImpl(committedSeal, digest, *validatorSet)
 }
 
-func (s *BLSKeyManager) SignIBFTMessage(msg *proto.MessageReq) error {
-	return signMsg(s.ecdsaKey, msg)
-}
-
-func (s *BLSKeyManager) ValidateIBFTMessage(msg *proto.MessageReq) error {
-	return ValidateMsg(msg)
+func (s *BLSKeyManager) SignIBFTMessage(msg []byte) ([]byte, error) {
+	return crypto.Sign(s.ecdsaKey, crypto.Keccak256(msg))
 }
 
 func (s *BLSKeyManager) getBLSSignatures(
@@ -174,7 +212,7 @@ func (s *BLSKeyManager) verifyCommittedSealsImpl(
 	}
 
 	if !ok {
-		return 0, ErrInvalidBLSSignature
+		return 0, ErrInvalidSignature
 	}
 
 	return numKeys, nil

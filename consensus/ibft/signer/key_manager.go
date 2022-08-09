@@ -1,7 +1,6 @@
 package signer
 
 import (
-	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
 )
@@ -15,7 +14,7 @@ type KeyManager interface {
 	SignCommittedSeal([]byte) ([]byte, error)
 	Ecrecover(sig []byte, digest []byte) (types.Address, error)
 	GenerateCommittedSeals(map[types.Address][]byte, *IstanbulExtra) (Sealer, error)
-	VerifyCommittedSeal(Sealer, []byte, validators.ValidatorSet) (int, error)
-	SignIBFTMessage(msg *proto.MessageReq) error
-	ValidateIBFTMessage(msg *proto.MessageReq) error
+	VerifyCommittedSeal(validators.ValidatorSet, types.Address, []byte, []byte) error
+	VerifyCommittedSeals(Sealer, []byte, validators.ValidatorSet) (int, error)
+	SignIBFTMessage(msg []byte) ([]byte, error)
 }

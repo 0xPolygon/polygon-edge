@@ -76,6 +76,7 @@ func NewIBFTServersManager(
 	}
 
 	if err := srv.GenerateGenesis(); err != nil {
+		fmt.Printf("failed GenerateGenesis\n")
 		t.Fatal(err)
 	}
 

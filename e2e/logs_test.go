@@ -2,10 +2,11 @@ package e2e
 
 import (
 	"context"
-	"github.com/umbracle/ethgo"
 	"math/big"
 	"testing"
 	"time"
+
+	"github.com/umbracle/ethgo"
 
 	"github.com/0xPolygon/polygon-edge/e2e/framework"
 	"github.com/0xPolygon/polygon-edge/helper/hex"

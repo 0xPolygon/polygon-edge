@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
@@ -17,9 +16,10 @@ var (
 	ErrRepeatedCommittedSeal      = errors.New("repeated seal in committed seals")
 	ErrNonValidatorCommittedSeal  = errors.New("found committed seal signed by non validator")
 	ErrNotEnoughCommittedSeals    = errors.New("not enough seals to seal block")
+	ErrSignerMismatch             = errors.New("mismatch address between signer and message sender")
 	ErrValidatorNotFound          = errors.New("not found validator in validator set")
 	ErrInvalidValidatorSet        = errors.New("invalid validator set type")
-	ErrInvalidBLSSignature        = errors.New("invalid BLS signature")
+	ErrInvalidSignature           = errors.New("invalid signature")
 	ErrNilParentHeader            = errors.New("parent header is nil")
 )
 
@@ -28,18 +28,19 @@ type Signer interface {
 	Address() types.Address
 	InitIBFTExtra(header, parent *types.Header, set validators.ValidatorSet) error
 	GetIBFTExtra(*types.Header) (*IstanbulExtra, error)
-	WriteSeal(*types.Header) (*types.Header, error)
+	WriteProposerSeal(*types.Header) (*types.Header, error)
+	Ecrecover(sig, dig []byte) (types.Address, error)
 	EcrecoverFromHeader(*types.Header) (types.Address, error)
-	CreateCommittedSeal(*types.Header) ([]byte, error)
+	CreateCommittedSeal([]byte) ([]byte, error)
+	VerifyCommittedSeal(validators.ValidatorSet, types.Address, []byte, []byte) error
 	WriteCommittedSeals(*types.Header, map[types.Address][]byte) (*types.Header, error)
-	VerifyCommittedSeal(set validators.ValidatorSet, header *types.Header, quorumSize int) error
-	VerifyParentCommittedSeal(
+	VerifyCommittedSeals(validators.ValidatorSet, *types.Header, int) error
+	VerifyParentCommittedSeals(
 		set validators.ValidatorSet,
 		parent, header *types.Header,
 		quorumSize int,
 	) error
-	SignIBFTMessage(*proto.MessageReq) error
-	ValidateIBFTMessage(*proto.MessageReq) error
+	SignIBFTMessage([]byte) ([]byte, error)
 	CalculateHeaderHash(*types.Header) (types.Hash, error)
 }
 
@@ -75,7 +76,7 @@ func (s *SignerImpl) InitIBFTExtra(header, parent *types.Header, set validators.
 
 	putIbftExtra(header, &IstanbulExtra{
 		Validators:          set,
-		Seal:                nil,
+		ProposerSeal:        nil,
 		CommittedSeal:       s.keyManager.NewEmptyCommittedSeal(),
 		ParentCommittedSeal: parentCommittedSeal,
 	})
@@ -102,7 +103,7 @@ func (s *SignerImpl) GetIBFTExtra(h *types.Header) (*IstanbulExtra, error) {
 	return extra, nil
 }
 
-func (s *SignerImpl) WriteSeal(header *types.Header) (*types.Header, error) {
+func (s *SignerImpl) WriteProposerSeal(header *types.Header) (*types.Header, error) {
 	hash, err := s.CalculateHeaderHash(header)
 	if err != nil {
 		return nil, err
@@ -114,12 +115,16 @@ func (s *SignerImpl) WriteSeal(header *types.Header) (*types.Header, error) {
 	}
 
 	if err = s.packFieldIntoIbftExtra(header, func(ie *IstanbulExtra) {
-		ie.Seal = seal
+		ie.ProposerSeal = seal
 	}); err != nil {
 		return nil, err
 	}
 
 	return header, nil
+}
+
+func (s *SignerImpl) Ecrecover(signature, digest []byte) (types.Address, error) {
+	return s.keyManager.Ecrecover(signature, digest)
 }
 
 func (s *SignerImpl) EcrecoverFromHeader(header *types.Header) (types.Address, error) {
@@ -133,18 +138,26 @@ func (s *SignerImpl) EcrecoverFromHeader(header *types.Header) (types.Address, e
 		return types.Address{}, err
 	}
 
-	return s.keyManager.Ecrecover(extra.Seal, hash[:])
+	return s.keyManager.Ecrecover(extra.ProposerSeal, hash[:])
 }
 
-func (s *SignerImpl) CreateCommittedSeal(header *types.Header) ([]byte, error) {
-	hash, err := s.CalculateHeaderHash(header)
-	if err != nil {
-		return nil, err
-	}
+func (s *SignerImpl) CreateCommittedSeal(hash []byte) ([]byte, error) {
+	return s.keyManager.SignCommittedSeal(
+		crypto.Keccak256(commitMsg(hash[:])),
+	)
+}
 
-	msg := crypto.Keccak256(commitMsg(hash[:]))
-
-	return s.keyManager.SignCommittedSeal(msg)
+func (s *SignerImpl) VerifyCommittedSeal(
+	set validators.ValidatorSet,
+	signer types.Address,
+	signature, hash []byte,
+) error {
+	return s.keyManager.VerifyCommittedSeal(
+		set,
+		signer,
+		signature,
+		hash,
+	)
 }
 
 func (s *SignerImpl) WriteCommittedSeals(
@@ -174,7 +187,7 @@ func (s *SignerImpl) WriteCommittedSeals(
 	return header, nil
 }
 
-func (s *SignerImpl) VerifyCommittedSeal(
+func (s *SignerImpl) VerifyCommittedSeals(
 	validators validators.ValidatorSet,
 	header *types.Header,
 	quorumSize int,
@@ -191,7 +204,7 @@ func (s *SignerImpl) VerifyCommittedSeal(
 
 	rawMsg := commitMsg(hash[:])
 
-	numSeals, err := s.keyManager.VerifyCommittedSeal(extra.CommittedSeal, rawMsg, validators)
+	numSeals, err := s.keyManager.VerifyCommittedSeals(extra.CommittedSeal, rawMsg, validators)
 	if err != nil {
 		return err
 	}
@@ -203,7 +216,7 @@ func (s *SignerImpl) VerifyCommittedSeal(
 	return nil
 }
 
-func (s *SignerImpl) VerifyParentCommittedSeal(
+func (s *SignerImpl) VerifyParentCommittedSeals(
 	parentValidators validators.ValidatorSet,
 	parent, header *types.Header,
 	parentQuorumSize int,
@@ -220,7 +233,7 @@ func (s *SignerImpl) VerifyParentCommittedSeal(
 
 	rawMsg := commitMsg(hash[:])
 
-	numSeals, err := s.keyManager.VerifyCommittedSeal(extra.ParentCommittedSeal, rawMsg, parentValidators)
+	numSeals, err := s.keyManager.VerifyCommittedSeals(extra.ParentCommittedSeal, rawMsg, parentValidators)
 	if err != nil {
 		return err
 	}
@@ -232,12 +245,8 @@ func (s *SignerImpl) VerifyParentCommittedSeal(
 	return nil
 }
 
-func (s *SignerImpl) SignIBFTMessage(msg *proto.MessageReq) error {
+func (s *SignerImpl) SignIBFTMessage(msg []byte) ([]byte, error) {
 	return s.keyManager.SignIBFTMessage(msg)
-}
-
-func (s *SignerImpl) ValidateIBFTMessage(msg *proto.MessageReq) error {
-	return s.keyManager.ValidateIBFTMessage(msg)
 }
 
 func (s *SignerImpl) initIbftExtra(
@@ -247,7 +256,7 @@ func (s *SignerImpl) initIbftExtra(
 ) {
 	putIbftExtra(header, &IstanbulExtra{
 		Validators:          validators,
-		Seal:                nil,
+		ProposerSeal:        nil,
 		CommittedSeal:       s.keyManager.NewEmptyCommittedSeal(),
 		ParentCommittedSeal: parentCommittedSeal,
 	})

@@ -4,7 +4,6 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 
-	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -89,6 +88,33 @@ func (s *ECDSAKeyManager) GenerateCommittedSeals(
 }
 
 func (s *ECDSAKeyManager) VerifyCommittedSeal(
+	rawSet validators.ValidatorSet,
+	addr types.Address,
+	signature []byte,
+	hash []byte,
+) error {
+	validatorSet, ok := rawSet.(*validators.ECDSAValidatorSet)
+	if !ok {
+		return ErrInvalidValidatorSet
+	}
+
+	signer, err := s.Ecrecover(signature, hash)
+	if err != nil {
+		return ErrInvalidSignature
+	}
+
+	if addr != signer {
+		return ErrSignerMismatch
+	}
+
+	if !validatorSet.Includes(addr) {
+		return ErrNonValidatorCommittedSeal
+	}
+
+	return nil
+}
+
+func (s *ECDSAKeyManager) VerifyCommittedSeals(
 	rawCommittedSeal Sealer,
 	digest []byte,
 	rawSet validators.ValidatorSet,
@@ -106,12 +132,8 @@ func (s *ECDSAKeyManager) VerifyCommittedSeal(
 	return s.verifyCommittedSealsImpl(committedSeal, digest, *validatorSet)
 }
 
-func (s *ECDSAKeyManager) SignIBFTMessage(msg *proto.MessageReq) error {
-	return signMsg(s.key, msg)
-}
-
-func (s *ECDSAKeyManager) ValidateIBFTMessage(msg *proto.MessageReq) error {
-	return ValidateMsg(msg)
+func (s *ECDSAKeyManager) SignIBFTMessage(msg []byte) ([]byte, error) {
+	return crypto.Sign(s.key, crypto.Keccak256(msg))
 }
 
 func (s *ECDSAKeyManager) verifyCommittedSealsImpl(
