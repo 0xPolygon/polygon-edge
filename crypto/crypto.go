@@ -346,8 +346,12 @@ func BytesToBLSPublicKey(input string) (*bls_sig.PublicKey, error) {
 		return nil, err
 	}
 
+	return ParseBLSPublicKey(decoded)
+}
+
+func ParseBLSPublicKey(input []byte) (*bls_sig.PublicKey, error) {
 	pk := &bls_sig.PublicKey{}
-	if err := pk.UnmarshalBinary(decoded); err != nil {
+	if err := pk.UnmarshalBinary(input); err != nil {
 		return nil, err
 	}
 
