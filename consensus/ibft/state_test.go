@@ -28,8 +28,8 @@ func TestState_FaultyNodes(t *testing.T) {
 	}
 }
 
-//	TestNumValid checks if the quorum size is calculated
-//	correctly based on number of validators (network size).
+// TestNumValid checks if the quorum size is calculated
+// correctly based on number of validators (network size).
 func TestNumValid(t *testing.T) {
 	cases := []struct {
 		Network, Quorum uint64
