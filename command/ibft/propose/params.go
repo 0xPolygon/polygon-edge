@@ -95,6 +95,8 @@ func (p *proposeParams) initBLSPublicKey() error {
 		return err
 	}
 
+	p.blsPublicKey = blsPubkeyBytes
+
 	return nil
 }
 

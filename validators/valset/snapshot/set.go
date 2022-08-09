@@ -244,8 +244,6 @@ func (s *SnapshotValidatorSet) ProcessHeader(
 
 	// Reset votes when new epoch
 	if header.Number%s.epochSize == 0 {
-		fmt.Printf("ProcessHeader reset s.epochSize=%d\n", s.epochSize)
-
 		snap.Votes = nil
 
 		saveSnap()
@@ -363,8 +361,10 @@ func (s *SnapshotValidatorSet) Propose(candidate validators.Validator, auth bool
 	s.candidatesLock.Lock()
 	defer s.candidatesLock.Unlock()
 
+	candidateAddr := candidate.Addr()
+
 	for _, c := range s.candidates {
-		if c.Validator.Equal(candidate) {
+		if c.Validator.Addr() == candidateAddr {
 			return ErrAlreadyCandidate
 		}
 	}
@@ -374,27 +374,41 @@ func (s *SnapshotValidatorSet) Propose(candidate validators.Validator, auth bool
 		return ErrSnapshotNotFound
 	}
 
-	// safe checks
-	if auth && snap.Set.Includes(candidate.Addr()) {
-		return ErrCandidateIsValidator
-	}
+	included := snap.Set.Includes(candidateAddr)
 
-	if !auth && !snap.Set.Includes(candidate.Addr()) {
+	// safe checks
+	if auth && included {
+		return ErrCandidateIsValidator
+	} else if !auth && !included {
 		return ErrCandidateNotExistInSet
 	}
 
 	// check if we have already voted for this candidate
 	count := snap.Count(func(v *valset.Vote) bool {
-		return v.Candidate.Equal(candidate) && v.Validator == proposer
+		return v.Candidate.Addr() == candidateAddr && v.Validator == proposer
 	})
+
 	if count == 1 {
 		return ErrAlreadyVoted
 	}
 
-	s.candidates = append(s.candidates, &valset.Candidate{
-		Validator: candidate,
-		Authorize: auth,
-	})
+	if auth {
+		s.candidates = append(s.candidates, &valset.Candidate{
+			Validator: candidate,
+			Authorize: auth,
+		})
+	} else {
+		// get candidate validator information from set
+		// because don't want user to specify data except for address
+		// in case of removal
+		validatorIndex := snap.Set.Index(candidate.Addr())
+		validatorInSet := snap.Set.At(uint64(validatorIndex))
+
+		s.candidates = append(s.candidates, &valset.Candidate{
+			Validator: validatorInSet,
+			Authorize: auth,
+		})
+	}
 
 	return nil
 }

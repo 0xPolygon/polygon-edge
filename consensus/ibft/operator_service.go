@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
+	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
 	"github.com/0xPolygon/polygon-edge/validators/valset"
@@ -156,7 +157,16 @@ func (o *operator) parseCandidate(req *proto.Candidate) (validators.Validator, e
 		return &validators.ECDSAValidator{
 			Address: types.StringToAddress(req.Address),
 		}, nil
+
 	case validators.BLSValidatorType:
+		// safe check
+		// user doesn't give BLS Public Key in case of removal
+		if req.Auth {
+			if _, err := crypto.ParseBLSPublicKey(req.BlsPubkey); err != nil {
+				return nil, err
+			}
+		}
+
 		return &validators.BLSValidator{
 			Address:      types.StringToAddress(req.Address),
 			BLSPublicKey: req.BlsPubkey,
