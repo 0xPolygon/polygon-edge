@@ -1,9 +1,10 @@
 package jsonrpc
 
 import (
-	"github.com/0xPolygon/polygon-edge/helper/tests"
 	"net"
 	"testing"
+
+	"github.com/0xPolygon/polygon-edge/helper/tests"
 
 	"github.com/hashicorp/go-hclog"
 )

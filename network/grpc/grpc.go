@@ -3,9 +3,10 @@ package grpc
 import (
 	"context"
 	"errors"
-	"google.golang.org/grpc/credentials/insecure"
 	"io"
 	"net"
+
+	"google.golang.org/grpc/credentials/insecure"
 
 	manet "github.com/multiformats/go-multiaddr/net"
 

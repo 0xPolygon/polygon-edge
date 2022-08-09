@@ -2,8 +2,9 @@ package ibft
 
 import (
 	"context"
-	"github.com/0xPolygon/polygon-edge/consensus"
 	"testing"
+
+	"github.com/0xPolygon/polygon-edge/consensus"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"

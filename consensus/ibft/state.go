@@ -97,7 +97,7 @@ func (v *ValidatorSet) MaxFaultyNodes() int {
 
 type QuorumImplementation func(ValidatorSet) int
 
-//	LegacyQuorumSize returns the legacy quorum size for the given validator set
+// LegacyQuorumSize returns the legacy quorum size for the given validator set
 func LegacyQuorumSize(set ValidatorSet) int {
 	// According to the IBFT spec, the number of valid messages
 	// needs to be 2F + 1
@@ -106,8 +106,8 @@ func LegacyQuorumSize(set ValidatorSet) int {
 
 // OptimalQuorumSize returns the optimal quorum size for the given validator set
 func OptimalQuorumSize(set ValidatorSet) int {
-	//	if the number of validators is less than 4,
-	//	then the entire set is required
+	// if the number of validators is less than 4,
+	// then the entire set is required
 	if set.MaxFaultyNodes() == 0 {
 		/*
 			N: 1 -> Q: 1

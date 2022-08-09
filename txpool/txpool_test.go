@@ -1085,12 +1085,12 @@ func TestDemote(t *testing.T) {
 
 	t.Run("Demote increments counter", func(t *testing.T) {
 		t.Parallel()
-		//	create pool
+		// create pool
 		pool, err := newTestPool()
 		assert.NoError(t, err)
 		pool.SetSigner(&mockSigner{})
 
-		//	send tx
+		// send tx
 		go func() {
 			err := pool.addTx(local, newTx(addr1, 0, 1))
 			assert.NoError(t, err)
@@ -1103,7 +1103,7 @@ func TestDemote(t *testing.T) {
 		assert.Equal(t, uint64(1), pool.accounts.get(addr1).promoted.length())
 		assert.Equal(t, uint(0), pool.accounts.get(addr1).demotions)
 
-		//	call demote
+		// call demote
 		pool.Prepare()
 		tx := pool.Peek()
 		pool.Demote(tx)
@@ -1112,19 +1112,19 @@ func TestDemote(t *testing.T) {
 		assert.Equal(t, uint64(1), pool.accounts.get(addr1).getNonce())
 		assert.Equal(t, uint64(1), pool.accounts.get(addr1).promoted.length())
 
-		//	assert counter was incremented
+		// assert counter was incremented
 		assert.Equal(t, uint(1), pool.accounts.get(addr1).demotions)
 	})
 
 	t.Run("Demote calls Drop", func(t *testing.T) {
 		t.Parallel()
 
-		//	create pool
+		// create pool
 		pool, err := newTestPool()
 		assert.NoError(t, err)
 		pool.SetSigner(&mockSigner{})
 
-		//	send tx
+		// send tx
 		go func() {
 			err := pool.addTx(local, newTx(addr1, 0, 1))
 			assert.NoError(t, err)
@@ -1136,20 +1136,20 @@ func TestDemote(t *testing.T) {
 		assert.Equal(t, uint64(1), pool.accounts.get(addr1).getNonce())
 		assert.Equal(t, uint64(1), pool.accounts.get(addr1).promoted.length())
 
-		//	set counter to max allowed demotions
+		// set counter to max allowed demotions
 		pool.accounts.get(addr1).demotions = maxAccountDemotions
 
-		//	call demote
+		// call demote
 		pool.Prepare()
 		tx := pool.Peek()
 		pool.Demote(tx)
 
-		//	account was dropped
+		// account was dropped
 		assert.Equal(t, uint64(0), pool.gauge.read())
 		assert.Equal(t, uint64(0), pool.accounts.get(addr1).getNonce())
 		assert.Equal(t, uint64(0), pool.accounts.get(addr1).promoted.length())
 
-		//	demotions are reset to 0
+		// demotions are reset to 0
 		assert.Equal(t, uint(0), pool.accounts.get(addr1).demotions)
 	})
 }
@@ -1306,7 +1306,7 @@ func TestResetAccounts_Promoted(t *testing.T) {
 			},
 
 			addr4: {
-				//	all txs will be pruned
+				// all txs will be pruned
 				eoa4.signTx(newTx(addr4, 0, 1), signerEIP155), // will be pruned
 				eoa4.signTx(newTx(addr4, 1, 1), signerEIP155), // will be pruned
 				eoa4.signTx(newTx(addr4, 2, 1), signerEIP155), // will be pruned
