@@ -11,12 +11,11 @@ import (
 )
 
 type ContractValidatorSet struct {
-	logger           hclog.Logger
-	blockchain       valset.HeaderGetter
-	executor         Executor
-	getSigner        valset.SignerGetter
-	getValidatorType valset.ValidatorTypeGetter
-	epochSize        uint64
+	logger     hclog.Logger
+	blockchain valset.HeaderGetter
+	executor   Executor
+	getSigner  valset.SignerGetter
+	epochSize  uint64
 }
 
 type Executor interface {
@@ -28,15 +27,13 @@ func NewContractValidatorSet(
 	blockchain valset.HeaderGetter,
 	executor Executor,
 	getSigner valset.SignerGetter,
-	getValidatorType valset.ValidatorTypeGetter,
 	epochSize uint64,
 ) (valset.ValidatorSet, error) {
 	return &ContractValidatorSet{
-		logger:           logger,
-		blockchain:       blockchain,
-		executor:         executor,
-		getSigner:        getSigner,
-		getValidatorType: getValidatorType,
+		logger:     logger,
+		blockchain: blockchain,
+		executor:   executor,
+		getSigner:  getSigner,
 	}, nil
 }
 
@@ -65,10 +62,7 @@ func (s *ContractValidatorSet) GetValidators(height uint64) (validators.Validato
 		return nil, fmt.Errorf("signer not found")
 	}
 
-	validatorType, err := s.getValidatorType(beginningEpoch)
-	if err != nil {
-		return nil, err
-	}
+	validatorType := signer.Type()
 
 	transition, err := s.executor.BeginTxn(beginningHeader.StateRoot, beginningHeader, types.ZeroAddress)
 	if err != nil {

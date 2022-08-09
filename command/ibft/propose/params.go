@@ -10,15 +10,15 @@ import (
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
+	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
-	"github.com/coinbase/kryptology/pkg/signatures/bls/bls_sig"
 )
 
 const (
-	voteFlag         = "vote"
-	addressFlag      = "addr"
-	blsPublicKeyFlag = "bls-pubkey"
+	voteFlag    = "vote"
+	addressFlag = "addr"
+	blsFlag     = "bls"
 )
 
 const (
@@ -36,9 +36,8 @@ var (
 )
 
 type proposeParams struct {
-	rawIBFTValidatorType string
-	addressRaw           string
-	rawBLSPublicKey      string
+	addressRaw      string
+	rawBLSPublicKey string
 
 	vote          string
 	validatorType validators.ValidatorType
@@ -62,12 +61,7 @@ func (p *proposeParams) validateFlags() error {
 }
 
 func (p *proposeParams) initRawParams() error {
-	p.address = types.Address{}
-	if err := p.address.UnmarshalText([]byte(p.addressRaw)); err != nil {
-		return errInvalidAddressFormat
-	}
-
-	if err := p.validatorType.FromString(p.rawIBFTValidatorType); err != nil {
+	if err := p.initAddress(); err != nil {
 		return err
 	}
 
@@ -78,26 +72,27 @@ func (p *proposeParams) initRawParams() error {
 	return nil
 }
 
+func (p *proposeParams) initAddress() error {
+	p.address = types.Address{}
+	if err := p.address.UnmarshalText([]byte(p.addressRaw)); err != nil {
+		return errInvalidAddressFormat
+	}
+
+	return nil
+}
+
 func (p *proposeParams) initBLSPublicKey() error {
-	if p.validatorType == validators.BLSValidatorType {
-		if p.rawBLSPublicKey == "" {
-			return fmt.Errorf("BLS Public Key is required")
-		}
+	if p.rawBLSPublicKey == "" {
+		return nil
+	}
 
-		blsPubkeyBytes, err := hex.DecodeString(strings.TrimPrefix(p.rawBLSPublicKey, "0x"))
-		if err != nil {
-			return fmt.Errorf("failed to parse BLS Public Key: %w", err)
-		}
+	blsPubkeyBytes, err := hex.DecodeString(strings.TrimPrefix(p.rawBLSPublicKey, "0x"))
+	if err != nil {
+		return fmt.Errorf("failed to parse BLS Public Key: %w", err)
+	}
 
-		if err := validateBLSPublicKey(blsPubkeyBytes); err != nil {
-			return err
-		}
-
-		p.blsPublicKey = blsPubkeyBytes
-	} else {
-		if p.rawBLSPublicKey != "" {
-			return fmt.Errorf("BLS Public Key can't be specified")
-		}
+	if _, err := crypto.ParseBLSPublicKey(blsPubkeyBytes); err != nil {
+		return err
 	}
 
 	return nil
@@ -105,15 +100,6 @@ func (p *proposeParams) initBLSPublicKey() error {
 
 func isValidVoteType(vote string) bool {
 	return vote == authVote || vote == dropVote
-}
-
-func validateBLSPublicKey(keyBytes []byte) error {
-	pk := &bls_sig.PublicKey{}
-	if err := pk.UnmarshalBinary(keyBytes); err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func (p *proposeParams) proposeCandidate(grpcAddress string) error {
@@ -124,10 +110,7 @@ func (p *proposeParams) proposeCandidate(grpcAddress string) error {
 
 	if _, err := ibftClient.Propose(
 		context.Background(),
-		&ibftOp.Candidate{
-			Data: p.GenerateCandidateBytes(),
-			Auth: p.vote == authVote,
-		},
+		p.getCandidate(),
 	); err != nil {
 		return err
 	}
@@ -135,24 +118,17 @@ func (p *proposeParams) proposeCandidate(grpcAddress string) error {
 	return nil
 }
 
-func (p *proposeParams) GenerateCandidateBytes() []byte {
-	switch p.validatorType {
-	case validators.ECDSAValidatorType:
-		val := &validators.ECDSAValidator{
-			Address: p.address,
-		}
-
-		return val.Bytes()
-	case validators.BLSValidatorType:
-		val := &validators.BLSValidator{
-			Address:      p.address,
-			BLSPublicKey: p.blsPublicKey,
-		}
-
-		return val.Bytes()
+func (p *proposeParams) getCandidate() *ibftOp.Candidate {
+	res := &ibftOp.Candidate{
+		Address: p.address.String(),
+		Auth:    p.vote == authVote,
 	}
 
-	return nil
+	if p.blsPublicKey != nil {
+		res.BlsPubkey = p.blsPublicKey
+	}
+
+	return res
 }
 
 func (p *proposeParams) getResult() command.CommandResult {
