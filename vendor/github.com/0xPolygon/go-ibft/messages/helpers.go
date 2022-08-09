@@ -2,18 +2,12 @@ package messages
 
 import (
 	"bytes"
-
 	"github.com/0xPolygon/go-ibft/messages/proto"
 )
 
-type CommittedSeal struct {
-	Signer    []byte
-	Signature []byte
-}
-
 // ExtractCommittedSeals extracts the committed seals from the passed in messages
-func ExtractCommittedSeals(commitMessages []*proto.Message) []*CommittedSeal {
-	committedSeals := make([]*CommittedSeal, 0)
+func ExtractCommittedSeals(commitMessages []*proto.Message) [][]byte {
+	committedSeals := make([][]byte, 0)
 
 	for _, commitMessage := range commitMessages {
 		if commitMessage.Type != proto.MessageType_COMMIT {
@@ -27,13 +21,10 @@ func ExtractCommittedSeals(commitMessages []*proto.Message) []*CommittedSeal {
 }
 
 // ExtractCommittedSeal extracts the committed seal from the passed in message
-func ExtractCommittedSeal(commitMessage *proto.Message) *CommittedSeal {
+func ExtractCommittedSeal(commitMessage *proto.Message) []byte {
 	commitData, _ := commitMessage.Payload.(*proto.Message_CommitData)
 
-	return &CommittedSeal{
-		Signer:    commitMessage.From,
-		Signature: commitData.CommitData.CommittedSeal,
-	}
+	return commitData.CommitData.CommittedSeal
 }
 
 // ExtractCommitHash extracts the commit proposal hash from the passed in message

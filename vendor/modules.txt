@@ -15,7 +15,7 @@ cloud.google.com/go/secretmanager/internal
 ## explicit; go 1.17
 filippo.io/edwards25519
 filippo.io/edwards25519/field
-# github.com/0xPolygon/go-ibft v0.0.0-20220729102524-0f95a9c3a08c => /Users/kourin/go/src/github.com/0xPolygon/go-ibft
+# github.com/0xPolygon/go-ibft v0.0.0-20220729102524-0f95a9c3a08c
 ## explicit; go 1.17
 github.com/0xPolygon/go-ibft/core
 github.com/0xPolygon/go-ibft/messages
@@ -1030,4 +1030,3 @@ gopkg.in/yaml.v3
 # lukechampine.com/blake3 v1.1.7
 ## explicit; go 1.13
 lukechampine.com/blake3
-# github.com/0xPolygon/go-ibft => /Users/kourin/go/src/github.com/0xPolygon/go-ibft
