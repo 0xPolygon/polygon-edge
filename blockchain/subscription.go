@@ -43,8 +43,6 @@ func (m *MockSubscription) GetEvent() *Event {
 func (m *MockSubscription) Close() {
 }
 
-/////////////////////////
-
 // subscription is the Blockchain event subscription object
 type subscription struct {
 	updateCh chan void  // Channel for update information

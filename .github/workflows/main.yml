@@ -38,7 +38,6 @@ jobs:
             -E makezero
             -E lll
             -E importas
-            -E ifshort
             -E gosec
             -E gofmt
             -E goconst

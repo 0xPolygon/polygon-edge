@@ -2,10 +2,11 @@ package e2e
 
 import (
 	"context"
-	"github.com/umbracle/ethgo"
 	"math/big"
 	"testing"
 	"time"
+
+	"github.com/umbracle/ethgo"
 
 	"github.com/0xPolygon/polygon-edge/e2e/framework"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
@@ -134,15 +135,15 @@ func TestNewFilter_Block(t *testing.T) {
 func TestFilterValue(t *testing.T) {
 	// Scenario :
 	//
-	//	1.	Deploy a smart contract which is able to emit an event when calling a method.
-	//		The event will contain a data, the number 42.
+	// 1.	Deploy a smart contract which is able to emit an event when calling a method.
+	// The event will contain a data, the number 42.
 	//
-	//		1a. Create a filter which will only register a specific event (
-	//		MyEvent) emitted by the previously deployed contract.
+	// 1a. Create a filter which will only register a specific event (
+	// MyEvent) emitted by the previously deployed contract.
 	//
-	//	2.	Call the smart contract method and wait for the block.
+	// 2.	Call the smart contract method and wait for the block.
 	//
-	//	3.	Query the block's bloom filter to make sure the data has been properly inserted.
+	// 3.	Query the block's bloom filter to make sure the data has been properly inserted.
 	//
 	key, addr := tests.GenerateKeyAndAddr(t)
 

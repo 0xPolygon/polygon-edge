@@ -2,8 +2,9 @@ package precompiled
 
 import (
 	"crypto/sha256"
-	"golang.org/x/crypto/ripemd160" //nolint:staticcheck
 	"math/big"
+
+	"golang.org/x/crypto/ripemd160" //nolint:staticcheck
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/crypto"

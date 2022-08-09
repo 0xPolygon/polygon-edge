@@ -33,7 +33,7 @@ func (s serverType) String() string {
 	}
 }
 
-// JSONRPC is an API backend
+// JSONRPC is an API consensus
 type JSONRPC struct {
 	logger     hclog.Logger
 	config     *Config

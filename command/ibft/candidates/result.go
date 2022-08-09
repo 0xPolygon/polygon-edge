@@ -3,6 +3,7 @@ package candidates
 import (
 	"bytes"
 	"fmt"
+
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	ibftHelper "github.com/0xPolygon/polygon-edge/command/ibft/helper"
 	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"

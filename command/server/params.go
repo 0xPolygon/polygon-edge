@@ -33,11 +33,16 @@ const (
 	secretsConfigFlag            = "secrets-config"
 	restoreFlag                  = "restore"
 	blockTimeFlag                = "block-time"
-	ibftBaseTimeoutFlag          = "ibft-base-timeout"
 	devIntervalFlag              = "dev-interval"
 	devFlag                      = "dev"
 	corsOriginFlag               = "access-control-allow-origins"
 	logFileLocationFlag          = "log-to"
+)
+
+// Flags that are deprecated, but need to be preserved for
+// backwards compatibility with existing scripts
+const (
+	ibftBaseTimeoutFlagLEGACY = "ibft-base-timeout"
 )
 
 const (
@@ -77,6 +82,8 @@ type serverParams struct {
 
 	jsonRPCBatchLengthLimit uint64
 	jsonRPCBlockRangeLimit  uint64
+
+	ibftBaseTimeoutLegacy uint64
 
 	genesisConfig *chain.Chain
 	secretsConfig *secrets.SecretsManagerConfig
@@ -158,15 +165,14 @@ func (p *serverParams) generateConfig() *server.Config {
 			MaxOutboundPeers: p.rawConfig.Network.MaxOutboundPeers,
 			Chain:            p.genesisConfig,
 		},
-		DataDir:         p.rawConfig.DataDir,
-		Seal:            p.rawConfig.ShouldSeal,
-		PriceLimit:      p.rawConfig.TxPool.PriceLimit,
-		MaxSlots:        p.rawConfig.TxPool.MaxSlots,
-		SecretsManager:  p.secretsConfig,
-		RestoreFile:     p.getRestoreFilePath(),
-		BlockTime:       p.rawConfig.BlockTime,
-		IBFTBaseTimeout: p.rawConfig.IBFTBaseTimeout,
-		LogLevel:        hclog.LevelFromString(p.rawConfig.LogLevel),
-		LogFilePath:     p.logFileLocation,
+		DataDir:        p.rawConfig.DataDir,
+		Seal:           p.rawConfig.ShouldSeal,
+		PriceLimit:     p.rawConfig.TxPool.PriceLimit,
+		MaxSlots:       p.rawConfig.TxPool.MaxSlots,
+		SecretsManager: p.secretsConfig,
+		RestoreFile:    p.getRestoreFilePath(),
+		BlockTime:      p.rawConfig.BlockTime,
+		LogLevel:       hclog.LevelFromString(p.rawConfig.LogLevel),
+		LogFilePath:    p.logFileLocation,
 	}
 }

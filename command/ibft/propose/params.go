@@ -4,9 +4,10 @@ import (
 	"context"
 	"errors"
 
+	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
+
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
-	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
