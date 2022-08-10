@@ -53,7 +53,7 @@ message CandidatesResp {
 }
 
 message Candidate {
-    string type = 1;
-    bytes data = 2;
+    string address = 1;
+    bytes bls_pubkey = 2;
     bool auth = 3;
 }

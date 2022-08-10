@@ -2,11 +2,19 @@ package ibft
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
+	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/0xPolygon/polygon-edge/validators"
 	"github.com/0xPolygon/polygon-edge/validators/valset"
 	empty "google.golang.org/protobuf/types/known/emptypb"
+)
+
+var (
+	ErrVotingNotSupported = errors.New("voting is not supported")
 )
 
 type operator struct {
@@ -87,18 +95,18 @@ func (o *operator) GetSnapshot(ctx context.Context, req *proto.SnapshotReq) (*pr
 
 // Propose proposes a new candidate to be added / removed from the validator set
 func (o *operator) Propose(ctx context.Context, req *proto.Candidate) (*empty.Empty, error) {
-	valSet, err := o.ibft.forkManager.GetValidatorSet(o.ibft.blockchain.Header().Number)
+	votableSet, err := o.getVotableValidatorSet()
 	if err != nil {
-		return nil, err
+		return &empty.Empty{}, err
 	}
 
-	votableValSet, ok := valSet.(valset.Votable)
-	if !ok {
-		return nil, fmt.Errorf("voting is not supported")
+	candidate, err := o.parseCandidate(req)
+	if err != nil {
+		return &empty.Empty{}, err
 	}
 
-	if err := votableValSet.Propose(req.Data, req.Auth, o.ibft.currentSigner.Address()); err != nil {
-		return nil, err
+	if err := votableSet.Propose(candidate, req.Auth, o.ibft.currentSigner.Address()); err != nil {
+		return &empty.Empty{}, err
 	}
 
 	return &empty.Empty{}, nil
@@ -116,10 +124,7 @@ func (o *operator) Candidates(ctx context.Context, req *empty.Empty) (*proto.Can
 		return nil, fmt.Errorf("voting is not supported")
 	}
 
-	candidates, err := votableValSet.Candidates()
-	if err != nil {
-		return nil, err
-	}
+	candidates := votableValSet.Candidates()
 
 	resp := &proto.CandidatesResp{
 		Candidates: make([]*proto.Candidate, len(candidates)),
@@ -127,11 +132,61 @@ func (o *operator) Candidates(ctx context.Context, req *empty.Empty) (*proto.Can
 
 	for idx, candidate := range candidates {
 		resp.Candidates[idx] = &proto.Candidate{
-			Type: string(candidate.Validator.Type()),
-			Data: candidate.Validator.Bytes(),
-			Auth: candidate.Authorize,
+			Address:   candidate.Validator.Addr().String(),
+			Auth:      candidate.Authorize,
+			BlsPubkey: []byte{},
+		}
+
+		if blsVal, ok := candidate.Validator.(*validators.BLSValidator); ok {
+			resp.Candidates[idx].BlsPubkey = blsVal.BLSPublicKey
 		}
 	}
 
 	return resp, nil
+}
+
+// parseCandidate parses proto.Candidate and maps to validator
+func (o *operator) parseCandidate(req *proto.Candidate) (validators.Validator, error) {
+	signer, err := o.ibft.forkManager.GetSigner(o.ibft.blockchain.Header().Number)
+	if err != nil {
+		return nil, err
+	}
+
+	switch signer.Type() {
+	case validators.ECDSAValidatorType:
+		return &validators.ECDSAValidator{
+			Address: types.StringToAddress(req.Address),
+		}, nil
+
+	case validators.BLSValidatorType:
+		// safe check
+		// user doesn't give BLS Public Key in case of removal
+		if req.Auth {
+			if _, err := crypto.UnmarshalBLSPublicKey(req.BlsPubkey); err != nil {
+				return nil, err
+			}
+		}
+
+		return &validators.BLSValidator{
+			Address:      types.StringToAddress(req.Address),
+			BLSPublicKey: req.BlsPubkey,
+		}, nil
+	}
+
+	return nil, fmt.Errorf("invalid validator type: %s", signer.Type())
+}
+
+// getVotableValidatorSet gets current validator set and convert its type to Votable
+func (o *operator) getVotableValidatorSet() (valset.Votable, error) {
+	valSet, err := o.ibft.forkManager.GetValidatorSet(o.ibft.blockchain.Header().Number)
+	if err != nil {
+		return nil, err
+	}
+
+	votableValSet, ok := valSet.(valset.Votable)
+	if !ok {
+		return nil, ErrVotingNotSupported
+	}
+
+	return votableValSet, nil
 }

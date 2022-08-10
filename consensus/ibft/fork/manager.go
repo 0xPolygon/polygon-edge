@@ -2,7 +2,6 @@ package fork
 
 import (
 	"errors"
-	"fmt"
 	"path/filepath"
 
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/hook"
@@ -255,7 +254,6 @@ func (m *forkManagerImpl) initializeSnapshotValidatorSet() (valset.ValidatorSet,
 		m.logger,
 		m.blockchain,
 		m.GetSigner,
-		m.getValidatorType,
 		m.epochSize,
 		snapshotMeta,
 		snapshots,
@@ -271,7 +269,8 @@ func (m *forkManagerImpl) initializeSnapshotValidatorSet() (valset.ValidatorSet,
 func (m *forkManagerImpl) closeSnapshotValidatorSet() error {
 	snapshotValset, ok := m.validatorSets[valset.Snapshot].(*snapshot.SnapshotValidatorSet)
 	if !ok {
-		return fmt.Errorf("invalid validator set is stored, expected *snapshot.SnapshotValidatorSet but got %T", m.validatorSets[valset.Snapshot])
+		// no snapshot validator set, skip
+		return nil
 	}
 
 	// save data
@@ -297,7 +296,6 @@ func (m *forkManagerImpl) initializeContractValidatorSet() (valset.ValidatorSet,
 		m.blockchain,
 		m.executor,
 		m.GetSigner,
-		m.getValidatorType,
 		m.epochSize,
 	)
 }

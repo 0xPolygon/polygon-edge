@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/0xPolygon/polygon-edge/contracts/staking"
+	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
@@ -59,6 +60,11 @@ func FetchBLSValidators(
 
 	blsValidators := &validators.BLSValidators{}
 	for idx := range valAddrs {
+		// ignore the validator whose BLS Key is not set
+		if _, err := crypto.UnmarshalBLSPublicKey(blsPublicKeys[idx]); err != nil {
+			continue
+		}
+
 		blsValidators.Add(&validators.BLSValidator{
 			Address:      valAddrs[idx],
 			BLSPublicKey: blsPublicKeys[idx],

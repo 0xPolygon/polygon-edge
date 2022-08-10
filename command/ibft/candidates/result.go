@@ -7,8 +7,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	ibftHelper "github.com/0xPolygon/polygon-edge/command/ibft/helper"
 	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
-	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/0xPolygon/polygon-edge/validators"
+	"github.com/0xPolygon/polygon-edge/helper/hex"
 )
 
 type IBFTCandidate struct {
@@ -27,21 +26,13 @@ func newIBFTCandidatesResult(resp *ibftOp.CandidatesResp) (*IBFTCandidatesResult
 	}
 
 	for i, c := range resp.Candidates {
-		var validatorType validators.ValidatorType
-		if err := validatorType.FromString(c.Type); err != nil {
-			return nil, err
-		}
-
-		validator := validators.NewValidatorFromType(validatorType)
-		if err := validator.SetFromBytes(c.Data); err != nil {
-			return nil, err
-		}
-
-		res.Candidates[i].Address = validator.Addr().String()
+		res.Candidates[i].Address = c.Address
 		res.Candidates[i].Vote = ibftHelper.BoolToVote(c.Auth)
 
-		if blsValidator, ok := validator.(*validators.BLSValidator); ok {
-			res.Candidates[i].BLSPublicKey = types.EncodeBytes(blsValidator.BLSPublicKey)
+		if len(c.BlsPubkey) > 0 {
+			strKey := hex.EncodeToHex(c.BlsPubkey)
+
+			res.Candidates[i].BLSPublicKey = &strKey
 		}
 	}
 

@@ -11,12 +11,11 @@ import (
 )
 
 type ContractValidatorSet struct {
-	logger           hclog.Logger
-	blockchain       valset.HeaderGetter
-	executor         Executor
-	getSigner        valset.SignerGetter
-	getValidatorType valset.ValidatorTypeGetter
-	epochSize        uint64
+	logger     hclog.Logger
+	blockchain valset.HeaderGetter
+	executor   Executor
+	getSigner  valset.SignerGetter
+	epochSize  uint64
 }
 
 type Executor interface {
@@ -28,15 +27,14 @@ func NewContractValidatorSet(
 	blockchain valset.HeaderGetter,
 	executor Executor,
 	getSigner valset.SignerGetter,
-	getValidatorType valset.ValidatorTypeGetter,
 	epochSize uint64,
 ) (valset.ValidatorSet, error) {
 	return &ContractValidatorSet{
-		logger:           logger,
-		blockchain:       blockchain,
-		executor:         executor,
-		getSigner:        getSigner,
-		getValidatorType: getValidatorType,
+		logger:     logger,
+		blockchain: blockchain,
+		executor:   executor,
+		getSigner:  getSigner,
+		epochSize:  epochSize,
 	}, nil
 }
 
@@ -50,13 +48,19 @@ func (s *ContractValidatorSet) Initialize() error {
 
 func (s *ContractValidatorSet) GetValidators(height uint64) (validators.Validators, error) {
 	beginningEpoch := (height / s.epochSize) * s.epochSize
-	beginningHeader, ok := s.blockchain.GetHeaderByNumber(beginningEpoch)
 
-	if !ok {
-		return nil, fmt.Errorf("header not found at %d", beginningEpoch)
+	// Determine the height of the end of the last epoch
+	fetchedHeight := uint64(0)
+	if beginningEpoch > 0 {
+		fetchedHeight = beginningEpoch - 1
 	}
 
-	signer, err := s.getSigner(beginningEpoch)
+	fetchedHeader, ok := s.blockchain.GetHeaderByNumber(fetchedHeight)
+	if !ok {
+		return nil, fmt.Errorf("header not found at %d", fetchedHeight)
+	}
+
+	signer, err := s.getSigner(fetchedHeight)
 	if err != nil {
 		return nil, err
 	}
@@ -65,15 +69,10 @@ func (s *ContractValidatorSet) GetValidators(height uint64) (validators.Validato
 		return nil, fmt.Errorf("signer not found")
 	}
 
-	validatorType, err := s.getValidatorType(beginningEpoch)
+	transition, err := s.executor.BeginTxn(fetchedHeader.StateRoot, fetchedHeader, types.ZeroAddress)
 	if err != nil {
 		return nil, err
 	}
 
-	transition, err := s.executor.BeginTxn(beginningHeader.StateRoot, beginningHeader, types.ZeroAddress)
-	if err != nil {
-		return nil, err
-	}
-
-	return FetchValidators(validatorType, transition, signer.Address())
+	return FetchValidators(signer.Type(), transition, signer.Address())
 }

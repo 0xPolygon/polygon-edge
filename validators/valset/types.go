@@ -64,8 +64,8 @@ type Updatable interface {
 
 type Votable interface {
 	Votes(uint64) ([]*Vote, error)
-	Candidates() ([]*Candidate, error)
-	Propose([]byte, bool, types.Address) error
+	Candidates() []*Candidate
+	Propose(validators.Validator, bool, types.Address) error
 }
 
 type HeaderGetter interface {
