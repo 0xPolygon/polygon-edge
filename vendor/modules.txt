@@ -11,7 +11,7 @@ cloud.google.com/go/iam
 ## explicit; go 1.16
 cloud.google.com/go/secretmanager/apiv1
 cloud.google.com/go/secretmanager/internal
-# github.com/0xPolygon/go-ibft v0.0.0-20220729102524-0f95a9c3a08c
+# github.com/0xPolygon/go-ibft v0.0.0-20220810095021-e43142f8d267
 ## explicit; go 1.17
 github.com/0xPolygon/go-ibft/core
 github.com/0xPolygon/go-ibft/messages
