@@ -61,7 +61,7 @@ func FetchBLSValidators(
 	blsValidators := &validators.BLSValidators{}
 	for idx := range valAddrs {
 		// ignore the validator whose BLS Key is not set
-		if _, err := crypto.ParseBLSPublicKey(blsPublicKeys[idx]); err != nil {
+		if _, err := crypto.UnmarshalBLSPublicKey(blsPublicKeys[idx]); err != nil {
 			continue
 		}
 

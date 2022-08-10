@@ -162,7 +162,7 @@ func (o *operator) parseCandidate(req *proto.Candidate) (validators.Validator, e
 		// safe check
 		// user doesn't give BLS Public Key in case of removal
 		if req.Auth {
-			if _, err := crypto.ParseBLSPublicKey(req.BlsPubkey); err != nil {
+			if _, err := crypto.UnmarshalBLSPublicKey(req.BlsPubkey); err != nil {
 				return nil, err
 			}
 		}

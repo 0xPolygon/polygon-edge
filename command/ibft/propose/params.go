@@ -91,7 +91,7 @@ func (p *proposeParams) initBLSPublicKey() error {
 		return fmt.Errorf("failed to parse BLS Public Key: %w", err)
 	}
 
-	if _, err := crypto.ParseBLSPublicKey(blsPubkeyBytes); err != nil {
+	if _, err := crypto.UnmarshalBLSPublicKey(blsPubkeyBytes); err != nil {
 		return err
 	}
 

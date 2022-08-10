@@ -90,7 +90,7 @@ func InitECDSAValidatorKey(secretsManager secrets.SecretsManager) (types.Address
 
 func InitBLSValidatorKey(secretsManager secrets.SecretsManager) ([]byte, error) {
 	if secretsManager.HasSecret(secrets.ValidatorBLSKey) {
-		return nil, fmt.Errorf(`secrets "%s" has been already initialized`, secrets.ValidatorKey)
+		return nil, fmt.Errorf(`secrets "%s" has been already initialized`, secrets.ValidatorBLSKey)
 	}
 
 	blsSecretKey, blsSecretKeyEncoded, err := crypto.GenerateAndEncodeBLSSecretKey()
@@ -115,6 +115,10 @@ func InitBLSValidatorKey(secretsManager secrets.SecretsManager) ([]byte, error) 
 }
 
 func InitNetworkingPrivateKey(secretsManager secrets.SecretsManager) (libp2pCrypto.PrivKey, error) {
+	if secretsManager.HasSecret(secrets.NetworkKey) {
+		return nil, fmt.Errorf(`secrets "%s" has been already initialized`, secrets.NetworkKey)
+	}
+
 	// Generate the libp2p private key
 	libp2pKey, libp2pKeyEncoded, keyErr := network.GenerateAndEncodeLibp2pKey()
 	if keyErr != nil {
