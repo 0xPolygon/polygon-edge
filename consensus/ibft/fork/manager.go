@@ -139,16 +139,34 @@ func (m *forkManagerImpl) GetHooks(height uint64) (hook.Hooks, error) {
 		return nil, ErrForkNotFound
 	}
 
-	if fork.Type == PoS {
-		registerPoSHook(hooks, m.epochSize)
-	}
-
+	// PoA
 	valSet, err := m.GetValidatorSet(height)
 	if err != nil {
 		return nil, err
 	}
 
 	registerValidatorSetHook(hooks, valSet)
+
+	if fromFork := m.getForkByFrom(height + 1); fromFork != nil {
+		nextValSet, err := m.GetValidatorSet(height + 1)
+		if err != nil {
+			return nil, err
+		}
+
+		if fromFork.Type == PoA && fromFork.Validators != nil {
+			registerUpdateValidatorSetHook(
+				hooks,
+				nextValSet,
+				fromFork.Validators,
+				fromFork.From.Value,
+			)
+		}
+	}
+
+	// PoS
+	if fork.Type == PoS {
+		registerPoSHook(hooks, m.epochSize)
+	}
 
 	if deploymentFork := m.getForkByDeployment(height); deploymentFork != nil {
 		registerContractDeploymentHook(hooks, deploymentFork)
@@ -298,6 +316,16 @@ func (m *forkManagerImpl) getFork(height uint64) *IBFTFork {
 		fork := m.forks[idx]
 
 		if fork.From.Value <= height && (fork.To == nil || height <= fork.To.Value) {
+			return &fork
+		}
+	}
+
+	return nil
+}
+
+func (m *forkManagerImpl) getForkByFrom(height uint64) *IBFTFork {
+	for _, fork := range m.forks {
+		if fork.From.Value == height {
 			return &fork
 		}
 	}

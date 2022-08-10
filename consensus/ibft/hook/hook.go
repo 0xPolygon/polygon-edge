@@ -19,6 +19,8 @@ type ProcessHeaderFunc func(*types.Header) error
 
 type PreCommitStateFunc func(*types.Header, *state.Transition) error
 
+type PostInsertBlockFunc func(*types.Block) error
+
 type Hooks interface {
 	ShouldWriteTransactions(uint64) bool
 	ModifyHeader(*types.Header, types.Address) error
@@ -26,6 +28,7 @@ type Hooks interface {
 	VerifyBlock(*types.Block) error
 	ProcessHeader(*types.Header) error
 	PreCommitState(*types.Header, *state.Transition) error
+	PostInsertBlock(*types.Block) error
 }
 
 type HookManager struct {
@@ -35,6 +38,7 @@ type HookManager struct {
 	VerifyBlockFunc            VerifyBlockFunc
 	ProcessHeaderFunc          ProcessHeaderFunc
 	PreCommitStateFunc         PreCommitStateFunc
+	PostInsertBlockFunc        PostInsertBlockFunc
 }
 
 func (m *HookManager) Clear() {
@@ -44,6 +48,7 @@ func (m *HookManager) Clear() {
 	m.VerifyBlockFunc = nil
 	m.ProcessHeaderFunc = nil
 	m.PreCommitStateFunc = nil
+	m.PostInsertBlockFunc = nil
 }
 
 func (m *HookManager) ShouldWriteTransactions(height uint64) bool {
@@ -89,6 +94,14 @@ func (m *HookManager) ProcessHeader(header *types.Header) error {
 func (m *HookManager) PreCommitState(header *types.Header, txn *state.Transition) error {
 	if m.PreCommitStateFunc != nil {
 		return m.PreCommitStateFunc(header, txn)
+	}
+
+	return nil
+}
+
+func (m *HookManager) PostInsertBlock(block *types.Block) error {
+	if m.PostInsertBlockFunc != nil {
+		return m.PostInsertBlockFunc(block)
 	}
 
 	return nil

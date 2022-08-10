@@ -346,6 +346,10 @@ func (i *Ibft) runSyncState() {
 	callInsertBlockHook := func(block *types.Block) {
 		nextHeight := block.Number() + 1
 
+		if err := i.currentHooks.PostInsertBlock(block); err != nil {
+			i.logger.Error("failed to call PostInsertBlock", "height", block.Header.Number, "error", err)
+		}
+
 		if err := i.updateCurrentModules(nextHeight); err != nil {
 			i.logger.Error("failed to update modules", "height", nextHeight, "error", err)
 		}
@@ -637,21 +641,6 @@ func (i *Ibft) runAcceptState() { // start new round
 		return
 	}
 
-	// TODO
-	// Log the info message
-	// pos.ibft.logger.Info(
-	// 	"current snapshot",
-	// 	"validators",
-	// 	snap.Set.Len(),
-	// )
-	// poa.ibft.logger.Info(
-	// 	"current snapshot",
-	// 	"validators",
-	// 	snap.Set.Len(),
-	// 	"votes",
-	// 	len(snap.Votes),
-	// )
-
 	// Update the No.of validator metric
 	i.metrics.Validators.Set(float64(i.state.validators.Len()))
 
@@ -940,6 +929,10 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 		"rounds", i.state.view.Round+1,
 		"committed", i.state.numCommitted(),
 	)
+
+	if err := i.currentHooks.PostInsertBlock(block); err != nil {
+		return err
+	}
 
 	i.updateCurrentModules(block.Number() + 1)
 

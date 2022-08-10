@@ -161,6 +161,35 @@ func (s *SnapshotValidatorSet) GetSnapshots() []*Snapshot {
 	return s.store.list
 }
 
+func (s *SnapshotValidatorSet) UpdateSet(newValidators validators.Validators, from uint64) error {
+	snapshotHeight := from - 1
+
+	snapshot := s.getSnapshot(snapshotHeight)
+	if snapshot == nil {
+		header, _ := s.blockchain.GetHeaderByNumber(from - 1)
+		if header == nil {
+			return fmt.Errorf("header at %d not found", from-1)
+		}
+
+		snapshot = &Snapshot{
+			Number: from - 1,
+			Hash:   header.Hash.String(),
+		}
+	}
+
+	newSnapshot := snapshot.Copy()
+	newSnapshot.Set = newValidators
+	newSnapshot.Votes = []*valset.Vote{}
+
+	if !newSnapshot.Equal(snapshot) {
+		s.store.add(newSnapshot)
+	}
+
+	fmt.Printf("\n\nSnapshots %+v\n", s.store.list)
+
+	return nil
+}
+
 func (s *SnapshotValidatorSet) ModifyHeader(header *types.Header, proposer types.Address) (*types.Header, error) {
 	snapshot := s.getSnapshot(header.Number)
 	if snapshot == nil {

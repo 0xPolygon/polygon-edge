@@ -8,6 +8,7 @@ import (
 	stakingHelper "github.com/0xPolygon/polygon-edge/helper/staking"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/0xPolygon/polygon-edge/validators"
 	"github.com/0xPolygon/polygon-edge/validators/valset"
 )
 
@@ -43,6 +44,21 @@ func registerValidatorSetHook(
 
 	if ph, ok := set.(valset.HeaderProcessor); ok {
 		hooks.ProcessHeaderFunc = ph.ProcessHeader
+	}
+}
+
+func registerUpdateValidatorSetHook(
+	hooks *hook.HookManager,
+	set valset.ValidatorSet,
+	newValidators validators.Validators,
+	from uint64,
+) {
+	if us, ok := set.(valset.Updatable); ok {
+		hooks.PostInsertBlockFunc = func(b *types.Block) error {
+			fmt.Printf("\n\nUpdate validator set height=%d, set=%+v\n", from, newValidators)
+
+			return us.UpdateSet(newValidators, from)
+		}
 	}
 }
 

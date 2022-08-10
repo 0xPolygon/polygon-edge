@@ -58,6 +58,10 @@ type HeaderProcessor interface {
 	ProcessHeader(*types.Header) error
 }
 
+type Updatable interface {
+	UpdateSet(validators.Validators, uint64) error
+}
+
 type Votable interface {
 	Votes(uint64) ([]*Vote, error)
 	Candidates() ([]*Candidate, error)
