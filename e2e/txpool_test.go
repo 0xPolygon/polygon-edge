@@ -4,11 +4,12 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"errors"
-	"github.com/0xPolygon/polygon-edge/txpool"
-	"github.com/umbracle/ethgo"
 	"math/big"
 	"testing"
 	"time"
+
+	"github.com/0xPolygon/polygon-edge/txpool"
+	"github.com/umbracle/ethgo"
 
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/e2e/framework"

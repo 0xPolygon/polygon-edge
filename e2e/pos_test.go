@@ -4,12 +4,13 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
-	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
-	"github.com/umbracle/ethgo"
 	"math/big"
 	"strconv"
 	"testing"
 	"time"
+
+	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
+	"github.com/umbracle/ethgo"
 
 	"github.com/0xPolygon/polygon-edge/contracts/staking"
 	"github.com/0xPolygon/polygon-edge/crypto"

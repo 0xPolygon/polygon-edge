@@ -4,13 +4,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	lru "github.com/hashicorp/golang-lru"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
 	"sync"
 	"sync/atomic"
+
+	lru "github.com/hashicorp/golang-lru"
 
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -213,7 +214,7 @@ func (i *backendIBFT) getSnapshotMetadata() *snapshotMetadata {
 
 // getSnapshot returns the snapshot at the specified block height
 func (i *backendIBFT) getSnapshot(num uint64) *Snapshot {
-	//	get it from the snapshot first
+	// get it from the snapshot first
 	raw, ok := i.store.cache.Get(num)
 	if ok {
 		snap, _ := raw.(*Snapshot)
@@ -221,11 +222,11 @@ func (i *backendIBFT) getSnapshot(num uint64) *Snapshot {
 		return snap
 	}
 
-	//	find it in the store
+	// find it in the store
 	snap := i.store.find(num)
 
 	if snap != nil {
-		//	add it to cache for future reference if found
+		// add it to cache for future reference if found
 		i.store.cache.Add(snap.Number, snap)
 	}
 

@@ -1,10 +1,11 @@
 package loadbot
 
 import (
-	"github.com/umbracle/ethgo"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/umbracle/ethgo"
 )
 
 type ExecDuration struct {

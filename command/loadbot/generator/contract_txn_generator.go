@@ -19,12 +19,12 @@ type ContractTxnsGenerator struct {
 	failedContractTxnsLock sync.RWMutex
 }
 
-//	Returns contract deployment tx if contractAddress is empty, otherwise returns
-//	a token transfer tx
+// Returns contract deployment tx if contractAddress is empty, otherwise returns
+// a token transfer tx
 func (gen *ContractTxnsGenerator) GetExampleTransaction() (*types.Transaction, error) {
 	if gen.contractAddress == nil {
-		//	contract not deployed yet
-		//	generate contract deployment tx
+		// contract not deployed yet
+		// generate contract deployment tx
 		return gen.signer.SignTx(&types.Transaction{
 			From:     gen.params.SenderAddress,
 			Value:    big.NewInt(0),
@@ -34,7 +34,7 @@ func (gen *ContractTxnsGenerator) GetExampleTransaction() (*types.Transaction, e
 		}, gen.params.SenderKey)
 	}
 
-	//	return token transfer tx
+	// return token transfer tx
 	return gen.signer.SignTx(&types.Transaction{
 		From:     gen.params.SenderAddress,
 		To:       gen.contractAddress,
@@ -49,8 +49,8 @@ func (gen *ContractTxnsGenerator) GenerateTransaction() (*types.Transaction, err
 	newNextNonce := atomic.AddUint64(&gen.params.Nonce, 1)
 
 	if gen.contractAddress == nil {
-		//	contract not deployed yet
-		//	generate contract deployment tx
+		// contract not deployed yet
+		// generate contract deployment tx
 		return gen.signer.SignTx(&types.Transaction{
 			From:     gen.params.SenderAddress,
 			Value:    big.NewInt(0),
@@ -62,7 +62,7 @@ func (gen *ContractTxnsGenerator) GenerateTransaction() (*types.Transaction, err
 		}, gen.params.SenderKey)
 	}
 
-	//	return token transfer tx
+	// return token transfer tx
 	return gen.signer.SignTx(&types.Transaction{
 		From:     gen.params.SenderAddress,
 		To:       gen.contractAddress,

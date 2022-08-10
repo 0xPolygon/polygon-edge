@@ -2,6 +2,8 @@ package identity
 
 import (
 	"context"
+	"testing"
+
 	"github.com/0xPolygon/polygon-edge/network/proto"
 	networkTesting "github.com/0xPolygon/polygon-edge/network/testing"
 	"github.com/hashicorp/go-hclog"
@@ -9,7 +11,6 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
-	"testing"
 )
 
 // newIdentityService creates a new identity service instance

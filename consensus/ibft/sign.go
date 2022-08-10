@@ -238,8 +238,8 @@ func verifyCommittedSealsImpl(
 	}
 
 	// Valid committed seals must be at least 2F+1
-	// 	2F 	is the required number of honest validators who provided the committed seals
-	// 	+1	is the proposer
+	// 2F 	is the required number of honest validators who provided the committed seals
+	// +1	is the proposer
 	if validSeals := len(visited); validSeals < quorumSizeFn(validators) {
 		return fmt.Errorf("not enough seals to seal block")
 	}
