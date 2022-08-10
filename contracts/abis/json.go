@@ -76,6 +76,25 @@ const StakingJSONABI = `[
 				"type": "address"
 			}
 		],
+		"name": "_addressToBLSPublicKey",
+		"outputs": [
+			{
+				"internalType": "bytes",
+				"name": "",
+				"type": "bytes"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
 		"name": "_addressToIsValidator",
 		"outputs": [
 			{
@@ -159,25 +178,6 @@ const StakingJSONABI = `[
 				"internalType": "uint256",
 				"name": "",
 				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"name": "_validatorBLSPublicKeys",
-		"outputs": [
-			{
-				"internalType": "bytes",
-				"name": "",
-				"type": "bytes"
 			}
 		],
 		"stateMutability": "view",
