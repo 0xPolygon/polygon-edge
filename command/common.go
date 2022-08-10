@@ -2,6 +2,7 @@ package command
 
 import (
 	"errors"
+
 	"github.com/0xPolygon/polygon-edge/helper/common"
 )
 

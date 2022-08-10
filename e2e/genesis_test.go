@@ -2,9 +2,10 @@ package e2e
 
 import (
 	"context"
-	"github.com/0xPolygon/polygon-edge/command"
 	"testing"
 	"time"
+
+	"github.com/0xPolygon/polygon-edge/command"
 
 	"github.com/0xPolygon/polygon-edge/e2e/framework"
 	"github.com/0xPolygon/polygon-edge/helper/tests"

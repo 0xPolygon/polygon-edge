@@ -122,8 +122,8 @@ func (v *VaultSecretsManager) GetSecret(name string) ([]byte, error) {
 	// KV-2 (versioned key-value storage) in Vault stores data in the following format:
 	// {
 	// "data": {
-	// 		key: value
-	// 	}
+	// 	key: value
+	// }
 	// }
 	data, ok := secret.Data["data"]
 	if !ok {

@@ -2,8 +2,9 @@ package ibft
 
 import (
 	"context"
-	"github.com/0xPolygon/go-ibft/core"
 	"sync"
+
+	"github.com/0xPolygon/go-ibft/core"
 )
 
 // IBFTConsensus is a convenience wrapper for the go-ibft package
@@ -49,7 +50,7 @@ func (c *IBFTConsensus) runSequence(height uint64) <-chan struct{} {
 	return done
 }
 
-//	stopSequence terminates the running IBFT sequence gracefully and waits for it to return
+// stopSequence terminates the running IBFT sequence gracefully and waits for it to return
 func (c *IBFTConsensus) stopSequence() {
 	c.cancelSequence()
 	c.wg.Wait()

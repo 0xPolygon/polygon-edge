@@ -10,7 +10,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-//	Verifier impl for go-ibft
+// Verifier impl for go-ibft
 
 func (i *backendIBFT) IsValidBlock(proposal []byte) bool {
 	var (
@@ -56,7 +56,7 @@ func (i *backendIBFT) IsValidBlock(proposal []byte) bool {
 	}
 
 	if err := i.runHook(VerifyBlockHook, newBlock.Number(), newBlock); err != nil {
-		// nolint:govet
+		//nolint:govet
 		if errors.As(err, &errBlockVerificationFailed) {
 			i.logger.Error("block verification fail, block at the end of epoch has transactions")
 		} else {
@@ -83,12 +83,12 @@ func (i *backendIBFT) IsValidSender(msg *protoIBFT.Message) bool {
 		return false
 	}
 
-	//	verify the signature came from the sender
+	// verify the signature came from the sender
 	if !bytes.Equal(msg.From, validatorAddress.Bytes()) {
 		return false
 	}
 
-	//	verify the sender is in the active validator set
+	// verify the sender is in the active validator set
 	return i.activeValidatorSet.Includes(validatorAddress)
 }
 
@@ -122,7 +122,7 @@ func (i *backendIBFT) IsValidCommittedSeal(
 	proposalHash []byte,
 	committedSeal *messages.CommittedSeal,
 ) bool {
-	//	seal was generated based on the proposal hash
+	// seal was generated based on the proposal hash
 	validator, err := ecrecoverImpl(committedSeal.Signature, wrapCommitHash(proposalHash))
 	if err != nil {
 		i.logger.Error("unable to recover seal", "err", err)
@@ -139,7 +139,7 @@ func (i *backendIBFT) IsValidCommittedSeal(
 	return true
 }
 
-//	helpers
+// helpers
 
 func extractProposer(header *types.Header) types.Address {
 	if header.Number == 0 {
