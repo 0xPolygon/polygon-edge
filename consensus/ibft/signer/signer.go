@@ -28,16 +28,15 @@ type Signer interface {
 	Address() types.Address
 	InitIBFTExtra(header *types.Header, parentCommittedSeal Sealer, set validators.Validators) error
 	GetIBFTExtra(header *types.Header) (*IstanbulExtra, error)
+	GetParentCommittedSeals(header *types.Header) (Sealer, error)
 	WriteSeal(*types.Header) (*types.Header, error)
 	EcrecoverFromHeader(*types.Header) (types.Address, error)
 	CreateCommittedSeal(*types.Header) ([]byte, error)
 	WriteCommittedSeals(*types.Header, map[types.Address][]byte) (*types.Header, error)
 	VerifyCommittedSeals(set validators.Validators, header *types.Header, quorumSize int) error
 	VerifyParentCommittedSeals(
-		set validators.Validators,
-		parentHash types.Hash,
-		header *types.Header,
-		quorumSize int,
+		header, parentHeader *types.Header,
+		calcQuorum func(validators.Validators) int,
 	) error
 	SignIBFTMessage(*proto.MessageReq) error
 	ValidateIBFTMessage(*proto.MessageReq) error
@@ -67,10 +66,10 @@ func (s *SignerImpl) Address() types.Address {
 func (s *SignerImpl) InitIBFTExtra(
 	header *types.Header,
 	parentCommittedSeal Sealer,
-	set validators.Validators,
+	validators validators.Validators,
 ) error {
 	putIbftExtra(header, &IstanbulExtra{
-		Validators:          set,
+		Validators:          validators,
 		Seal:                nil,
 		CommittedSeal:       s.keyManager.NewEmptyCommittedSeal(),
 		ParentCommittedSeal: parentCommittedSeal,
@@ -80,12 +79,8 @@ func (s *SignerImpl) InitIBFTExtra(
 }
 
 func (s *SignerImpl) GetIBFTExtra(h *types.Header) (*IstanbulExtra, error) {
-	if len(h.ExtraData) < IstanbulExtraVanity {
-		return nil, fmt.Errorf(
-			"wrong extra size, expected greater than or equal to %d but actual %d",
-			IstanbulExtraVanity,
-			len(h.ExtraData),
-		)
+	if err := verifyIBFTExtraSize(h); err != nil {
+		return nil, err
 	}
 
 	data := h.ExtraData[IstanbulExtraVanity:]
@@ -96,7 +91,6 @@ func (s *SignerImpl) GetIBFTExtra(h *types.Header) (*IstanbulExtra, error) {
 	}
 
 	if h.Number > 1 {
-		// TODO: check
 		extra.ParentCommittedSeal = s.keyManager.NewEmptyCommittedSeal()
 	}
 
@@ -118,11 +112,10 @@ func (s *SignerImpl) WriteSeal(header *types.Header) (*types.Header, error) {
 		return nil, err
 	}
 
-	if err = s.packFieldIntoIbftExtra(header, func(ie *IstanbulExtra) {
-		ie.Seal = seal
-	}); err != nil {
-		return nil, err
-	}
+	header.ExtraData = packSealIntoIExtra(
+		header.ExtraData,
+		seal,
+	)
 
 	return header, nil
 }
@@ -170,11 +163,10 @@ func (s *SignerImpl) WriteCommittedSeals(
 		return nil, err
 	}
 
-	if err = s.packFieldIntoIbftExtra(header, func(ie *IstanbulExtra) {
-		ie.CommittedSeal = committedSeal
-	}); err != nil {
-		return nil, err
-	}
+	header.ExtraData = packCommittedSealIntoExtra(
+		header.ExtraData,
+		committedSeal,
+	)
 
 	return header, nil
 }
@@ -209,24 +201,27 @@ func (s *SignerImpl) VerifyCommittedSeals(
 }
 
 func (s *SignerImpl) VerifyParentCommittedSeals(
-	parentValidators validators.Validators,
-	parentHash types.Hash,
-	header *types.Header,
-	parentQuorumSize int,
+	header, parentHeader *types.Header,
+	calcQuorum func(validators.Validators) int,
 ) error {
-	extra, err := s.GetIBFTExtra(header)
+	parentCS, err := s.GetParentCommittedSeals(header)
 	if err != nil {
 		return err
 	}
 
-	rawMsg := commitMsg(parentHash[:])
-
-	numSeals, err := s.keyManager.VerifyCommittedSeals(extra.ParentCommittedSeal, rawMsg, parentValidators)
+	parentValidators, err := s.getValidators(parentHeader)
 	if err != nil {
 		return err
 	}
 
-	if numSeals < parentQuorumSize {
+	rawMsg := commitMsg(parentHeader.Hash[:])
+
+	numSeals, err := s.keyManager.VerifyCommittedSeals(parentCS, rawMsg, parentValidators)
+	if err != nil {
+		return err
+	}
+
+	if numSeals < calcQuorum(parentValidators) {
 		return ErrNotEnoughCommittedSeals
 	}
 
@@ -254,19 +249,6 @@ func (s *SignerImpl) initIbftExtra(
 	})
 }
 
-func (s *SignerImpl) packFieldIntoIbftExtra(h *types.Header, updateFn func(*IstanbulExtra)) error {
-	extra, err := s.GetIBFTExtra(h)
-	if err != nil {
-		return err
-	}
-
-	updateFn(extra)
-
-	putIbftExtra(h, extra)
-
-	return nil
-}
-
 func (s *SignerImpl) CalculateHeaderHash(header *types.Header) (types.Hash, error) {
 	filteredHeader, err := s.filterHeaderForHash(header)
 	if err != nil {
@@ -290,4 +272,44 @@ func (s *SignerImpl) filterHeaderForHash(header *types.Header) (*types.Header, e
 	s.initIbftExtra(clone, extra.Validators, extra.ParentCommittedSeal)
 
 	return clone, nil
+}
+
+// extractValidators extracts Validators from IBFT Extra in Header
+func (s *SignerImpl) getValidators(header *types.Header) (validators.Validators, error) {
+	data := header.ExtraData[IstanbulExtraVanity:]
+	extra := &IstanbulExtra{
+		Validators: s.keyManager.NewEmptyValidatorSet(),
+	}
+
+	if err := extra.unmarshalRLPForValidators(data); err != nil {
+		return nil, err
+	}
+
+	return extra.Validators, nil
+}
+
+// extractParentCommittedSeals extracts Parent Committed Seals from IBFT Extra in Header
+func (s *SignerImpl) GetParentCommittedSeals(header *types.Header) (Sealer, error) {
+	data := header.ExtraData[IstanbulExtraVanity:]
+	extra := &IstanbulExtra{
+		ParentCommittedSeal: s.keyManager.NewEmptyCommittedSeal(),
+	}
+
+	if err := extra.unmarshalRLPForParentCS(data); err != nil {
+		return nil, err
+	}
+
+	return extra.ParentCommittedSeal, nil
+}
+
+func verifyIBFTExtraSize(header *types.Header) error {
+	if len(header.ExtraData) < IstanbulExtraVanity {
+		return fmt.Errorf(
+			"wrong extra size, expected greater than or equal to %d but actual %d",
+			IstanbulExtraVanity,
+			len(header.ExtraData),
+		)
+	}
+
+	return nil
 }

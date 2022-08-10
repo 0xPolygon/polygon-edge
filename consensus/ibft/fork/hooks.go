@@ -55,8 +55,6 @@ func registerUpdateValidatorSetHook(
 ) {
 	if us, ok := set.(valset.Updatable); ok {
 		hooks.PostInsertBlockFunc = func(b *types.Block) error {
-			fmt.Printf("\n\nUpdate validator set height=%d, set=%+v\n", from, newValidators)
-
 			return us.UpdateSet(newValidators, from)
 		}
 	}

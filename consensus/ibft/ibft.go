@@ -618,7 +618,13 @@ func (i *Ibft) writeTransactions(gasLimit uint64, transition transitionInterface
 func (i *Ibft) runAcceptState() { // start new round
 	// set log output
 	logger := i.logger.Named("acceptState")
-	logger.Info("Accept state", "sequence", i.state.view.Sequence, "round", i.state.view.Round+1)
+	logger.Info(
+		"Accept state",
+		"sequence", i.state.view.Sequence,
+		"round", i.state.view.Round+1,
+		"validation_type", i.currentSigner.Type(),
+	)
+
 	// set consensus_rounds metric output
 	i.metrics.Rounds.Set(float64(i.state.view.Round + 1))
 
@@ -1166,16 +1172,10 @@ func (i *Ibft) verifyHeaderImpl(parent, header *types.Header) error {
 			return err
 		}
 
-		parentValidators, err := i.forkManager.GetValidators(parent.Number)
-		if err != nil {
-			return err
-		}
-
 		if err := parentSigner.VerifyParentCommittedSeals(
-			parentValidators,
-			parent.Hash,
 			header,
-			i.quorumSize(parent.Number, parentValidators),
+			parent,
+			i.createQuorumSizeByValidatorsFn(parent.Number),
 		); err != nil {
 			return fmt.Errorf("failed to verify ParentCommittedSeal: %w", err)
 		}
@@ -1226,6 +1226,14 @@ func (i *Ibft) quorumSize(blockNumber uint64, validatorSet validators.Validators
 	}
 
 	return OptimalQuorumSize(validatorSet)
+}
+
+// createQuorumSizeByValidatorsFn creates function
+// that presets block number, takes validators, and returns quorum
+func (i *Ibft) createQuorumSizeByValidatorsFn(blockNumber uint64) func(validatorSet validators.Validators) int {
+	return func(vs validators.Validators) int {
+		return i.quorumSize(blockNumber, vs)
+	}
 }
 
 // ProcessHeaders updates the snapshot based on previously verified headers
