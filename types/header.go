@@ -139,6 +139,10 @@ func (h *Header) SetNonce(i uint64) {
 	binary.BigEndian.PutUint64(h.Nonce[:], i)
 }
 
+func (h *Header) IsGenesis() bool {
+	return h.Hash != ZeroHash && h.Number == 0
+}
+
 type Nonce [8]byte
 
 func (n Nonce) String() string {
