@@ -122,7 +122,10 @@ func (i *backendIBFT) IsValidProposalHash(proposal, hash []byte) bool {
 	return bytes.Equal(blockHash, hash)
 }
 
-func (i *backendIBFT) IsValidCommittedSeal(proposal []byte, committedSeal *messages.CommittedSeal) bool {
+func (i *backendIBFT) IsValidCommittedSeal(
+	proposal []byte,
+	committedSeal *messages.CommittedSeal,
+) bool {
 	err := i.signer.VerifyCommittedSeal(
 		i.activeValidatorSet,
 		types.BytesToAddress(committedSeal.Signer),
@@ -130,7 +133,7 @@ func (i *backendIBFT) IsValidCommittedSeal(proposal []byte, committedSeal *messa
 		proposal,
 	)
 
-	return err != nil
+	return err == nil
 }
 
 func (i *backendIBFT) extractProposer(header *types.Header) types.Address {

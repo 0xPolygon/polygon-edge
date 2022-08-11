@@ -44,7 +44,10 @@ func (i *backendIBFT) BuildProposal(blockNumber uint64) []byte {
 	return block.MarshalRLP()
 }
 
-func (i *backendIBFT) InsertBlock(proposal []byte, committedSeals []*messages.CommittedSeal) {
+func (i *backendIBFT) InsertBlock(
+	proposal []byte,
+	committedSeals []*messages.CommittedSeal,
+) {
 	newBlock := &types.Block{}
 	if err := newBlock.UnmarshalRLP(proposal); err != nil {
 		i.logger.Error("cannot unmarshal proposal", "err", err)
