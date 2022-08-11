@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"github.com/0xPolygon/go-ibft/messages"
-	"github.com/0xPolygon/go-ibft/messages/proto"
 	"math"
 	"sync"
 	"time"
+
+	"github.com/0xPolygon/go-ibft/messages"
+	"github.com/0xPolygon/go-ibft/messages/proto"
 )
 
 type Logger interface {
@@ -109,7 +110,7 @@ func NewIBFT(
 				Height: 0,
 				Round:  0,
 			},
-			seals:        make([][]byte, 0),
+			seals:        make([]*messages.CommittedSeal, 0),
 			roundStarted: false,
 			name:         newRound,
 		},

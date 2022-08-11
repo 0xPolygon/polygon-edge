@@ -182,13 +182,28 @@ func (n *Nonce) UnmarshalText(input []byte) error {
 }
 
 func (h *Header) Copy() *Header {
-	hh := new(Header)
-	*hh = *h
+	newHeader := &Header{
+		ParentHash:   h.ParentHash,
+		Sha3Uncles:   h.Sha3Uncles,
+		Miner:        h.Miner,
+		StateRoot:    h.StateRoot,
+		TxRoot:       h.TxRoot,
+		ReceiptsRoot: h.ReceiptsRoot,
+		MixHash:      h.MixHash,
+		Hash:         h.Hash,
+		LogsBloom:    h.LogsBloom,
+		Nonce:        h.Nonce,
+		Difficulty:   h.Difficulty,
+		Number:       h.Number,
+		GasLimit:     h.GasLimit,
+		GasUsed:      h.GasUsed,
+		Timestamp:    h.Timestamp,
+	}
 
-	hh.ExtraData = make([]byte, len(h.ExtraData))
-	copy(hh.ExtraData[:], h.ExtraData[:])
+	newHeader.ExtraData = make([]byte, len(h.ExtraData))
+	copy(newHeader.ExtraData[:], h.ExtraData[:])
 
-	return hh
+	return newHeader
 }
 
 type Body struct {

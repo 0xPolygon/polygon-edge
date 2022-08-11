@@ -1,6 +1,7 @@
 package core
 
 import (
+	"github.com/0xPolygon/go-ibft/messages"
 	"github.com/0xPolygon/go-ibft/messages/proto"
 )
 
@@ -42,7 +43,7 @@ type Verifier interface {
 	IsValidProposalHash(proposal, hash []byte) bool
 
 	// IsValidCommittedSeal checks if the seal for the proposal is valid
-	IsValidCommittedSeal(proposal, seal []byte) bool
+	IsValidCommittedSeal(proposal []byte, committedSeal *messages.CommittedSeal) bool
 }
 
 // Backend defines an interface all backend implementations
@@ -55,7 +56,7 @@ type Backend interface {
 	BuildProposal(blockNumber uint64) []byte
 
 	// InsertBlock inserts a proposal with the specified committed seals
-	InsertBlock(proposal []byte, committedSeals [][]byte)
+	InsertBlock(proposal []byte, committedSeals []*messages.CommittedSeal)
 
 	// ID returns the validator's ID
 	ID() []byte

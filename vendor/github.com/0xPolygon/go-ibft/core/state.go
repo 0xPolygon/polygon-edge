@@ -1,9 +1,10 @@
 package core
 
 import (
+	"sync"
+
 	"github.com/0xPolygon/go-ibft/messages"
 	"github.com/0xPolygon/go-ibft/messages/proto"
-	"sync"
 )
 
 type stateType uint8
@@ -47,7 +48,7 @@ type state struct {
 	proposalMessage *proto.Message
 
 	//	validated commit seals
-	seals [][]byte
+	seals []*messages.CommittedSeal
 
 	//	flags for different states
 	roundStarted bool
@@ -142,7 +143,7 @@ func (s *state) getProposal() []byte {
 	return nil
 }
 
-func (s *state) getCommittedSeals() [][]byte {
+func (s *state) getCommittedSeals() []*messages.CommittedSeal {
 	s.RLock()
 	defer s.RUnlock()
 
@@ -177,7 +178,7 @@ func (s *state) setView(view *proto.View) {
 	s.view = view
 }
 
-func (s *state) setCommittedSeals(seals [][]byte) {
+func (s *state) setCommittedSeals(seals []*messages.CommittedSeal) {
 	s.Lock()
 	defer s.Unlock()
 
