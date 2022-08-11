@@ -490,7 +490,7 @@ func (i *backendIBFT) verifyHeaderImpl(snap *Snapshot, parent, header *types.Hea
 	}
 
 	// verify last committed seals
-	if parent.Number >= 1 {
+	if !parent.IsGenesis() {
 		// find validators who validated last block
 		parentSnap := i.getSnapshot(parent.Number - 1)
 

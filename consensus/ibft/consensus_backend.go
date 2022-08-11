@@ -140,7 +140,7 @@ func (i *backendIBFT) buildBlock(snap *Snapshot, parent *types.Header) (*types.B
 
 	var parentCommittedSeal [][]byte
 
-	if parent.Number >= 1 {
+	if !parent.IsGenesis() {
 		if parentCommittedSeal, err = unpackCommittedSealFromIbftExtra(parent); err != nil {
 			return nil, err
 		}
