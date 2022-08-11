@@ -60,12 +60,12 @@ func (p *serverParams) initRawParams() error {
 
 	p.initPeerLimits()
 	p.initLogFileLocation()
-	p.initJsonRpcBulkLimits()
+	p.initJSONRPCBulkLimits()
 
 	return p.initAddresses()
 }
 
-func (p *serverParams) initJsonRpcBulkLimits() {
+func (p *serverParams) initJSONRPCBulkLimits() {
 	if p.rawConfig.JSONRPCBatchRequestLimit != config.DefaultJSONRPCBatchRequestLimit {
 		p.jsonRPCBatchLengthLimit = p.rawConfig.JSONRPCBatchRequestLimit
 	}
