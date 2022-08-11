@@ -60,8 +60,19 @@ func (p *serverParams) initRawParams() error {
 
 	p.initPeerLimits()
 	p.initLogFileLocation()
+	p.initJsonRpcBulkLimits()
 
 	return p.initAddresses()
+}
+
+func (p *serverParams) initJsonRpcBulkLimits() {
+	if p.rawConfig.JSONRPCBatchRequestLimit != config.DefaultJSONRPCBatchRequestLimit {
+		p.jsonRPCBatchLengthLimit = p.rawConfig.JSONRPCBatchRequestLimit
+	}
+
+	if p.rawConfig.JSONRPCBlockRangeLimit != config.DefaultJSONRPCBlockRangeLimit {
+		p.jsonRPCBlockRangeLimit = p.rawConfig.JSONRPCBlockRangeLimit
+	}
 }
 
 func (p *serverParams) initBlockTime() error {
