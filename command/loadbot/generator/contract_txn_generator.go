@@ -19,8 +19,8 @@ type ContractTxnsGenerator struct {
 	failedContractTxnsLock sync.RWMutex
 }
 
-//	Returns contract deployment tx if contractAddress is empty, otherwise returns
-//	a token transfer tx
+// Returns contract deployment tx if contractAddress is empty, otherwise returns
+// a token transfer tx
 func (gen *ContractTxnsGenerator) GetExampleTransaction() (*types.Transaction, error) {
 	if gen.contractAddress == nil {
 		//	contract not deployed yet

@@ -12,7 +12,6 @@ import (
 	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/0xPolygon/polygon-edge/validators"
 )
 
 const (
@@ -39,10 +38,9 @@ type proposeParams struct {
 	addressRaw      string
 	rawBLSPublicKey string
 
-	vote          string
-	validatorType validators.ValidatorType
-	address       types.Address
-	blsPublicKey  []byte
+	vote         string
+	address      types.Address
+	blsPublicKey []byte
 }
 
 func (p *proposeParams) getRequiredFlags() []string {

@@ -341,7 +341,7 @@ func BLSSecretKeyToPubkeyBytes(key *bls_sig.SecretKey) ([]byte, error) {
 func BytesToBLSPublicKey(input string) (*bls_sig.PublicKey, error) {
 	// The key file on disk should be encoded in Base64,
 	// so it must be decoded before it can be parsed by ParsePrivateKey
-	decoded, err := hex.DecodeString(string(input))
+	decoded, err := hex.DecodeString(input)
 	if err != nil {
 		return nil, err
 	}

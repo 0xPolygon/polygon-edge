@@ -148,9 +148,7 @@ func (s *SnapshotValidatorSet) SourceType() valset.SourceType {
 
 func (s *SnapshotValidatorSet) GetValidators(height uint64) (validators.Validators, error) {
 	var snapshotHeight uint64 = 0
-	if int64(height)-1 < 0 {
-		snapshotHeight = 0
-	} else {
+	if int64(height) > 0 {
 		snapshotHeight = height - 1
 	}
 

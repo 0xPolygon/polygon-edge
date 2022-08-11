@@ -287,15 +287,6 @@ func (m *forkManagerImpl) initializeContractValidatorSet() (valset.ValidatorSet,
 	)
 }
 
-func (m *forkManagerImpl) getValidatorType(height uint64) (validators.ValidatorType, error) {
-	fork := m.getFork(height)
-	if fork == nil {
-		return "", ErrForkNotFound
-	}
-
-	return fork.ValidatorType, nil
-}
-
 func (m *forkManagerImpl) registerPoAHooks(
 	hooks *hook.HookManager,
 	fork *IBFTFork,
