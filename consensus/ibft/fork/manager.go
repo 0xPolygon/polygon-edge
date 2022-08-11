@@ -138,38 +138,25 @@ func (m *forkManagerImpl) GetHooks(height uint64) (hook.Hooks, error) {
 		return nil, ErrForkNotFound
 	}
 
+	var err error
+
 	// PoA
-	valSet, err := m.GetValidatorSet(height)
+	switch fork.Type {
+	case PoA:
+		err = m.registerPoAHooks(hooks, fork, height)
+	case PoS:
+		m.registerPoSHooks(hooks, fork, height)
+	}
+
 	if err != nil {
 		return nil, err
 	}
 
-	registerValidatorSetHook(hooks, valSet)
-
-	if fromFork := m.getForkByFrom(height + 1); fromFork != nil {
-		nextValSet, err := m.GetValidatorSet(height + 1)
-		if err != nil {
-			return nil, err
-		}
-
-		if fromFork.Type == PoA && fromFork.Validators != nil {
-			registerUpdateValidatorSetHook(
-				hooks,
-				nextValSet,
-				fromFork.Validators,
-				fromFork.From.Value,
-			)
-		}
+	if err := m.registerPoAPrepareHooks(hooks, fork, height); err != nil {
+		return nil, err
 	}
 
-	// PoS
-	if fork.Type == PoS {
-		registerPoSHook(hooks, m.epochSize)
-	}
-
-	if deploymentFork := m.getForkByDeployment(height); deploymentFork != nil {
-		registerContractDeploymentHook(hooks, deploymentFork)
-	}
+	m.registerPoSPrepareHooks(hooks, fork, height)
 
 	return hooks, nil
 }
@@ -307,6 +294,67 @@ func (m *forkManagerImpl) getValidatorType(height uint64) (validators.ValidatorT
 	}
 
 	return fork.ValidatorType, nil
+}
+
+func (m *forkManagerImpl) registerPoAHooks(
+	hooks *hook.HookManager,
+	fork *IBFTFork,
+	height uint64,
+) error {
+	valSet, err := m.GetValidatorSet(height)
+	if err != nil {
+		return err
+	}
+
+	registerValidatorSetHook(hooks, valSet)
+
+	return nil
+}
+
+func (m *forkManagerImpl) registerPoAPrepareHooks(
+	hooks *hook.HookManager,
+	fork *IBFTFork,
+	height uint64,
+) error {
+	fromFork := m.getForkByFrom(height + 1)
+	if fromFork == nil || fromFork.Type != PoA || fromFork.Validators == nil {
+		return nil
+	}
+
+	nextValSet, err := m.GetValidatorSet(height + 1)
+	if err != nil {
+		return err
+	}
+
+	registerUpdateValidatorSetHook(
+		hooks,
+		nextValSet,
+		fromFork.Validators,
+		fromFork.From.Value,
+	)
+
+	return nil
+}
+
+func (m *forkManagerImpl) registerPoSHooks(
+	hooks *hook.HookManager,
+	fork *IBFTFork,
+	height uint64,
+) {
+	registerPoSHook(hooks, m.epochSize)
+}
+
+func (m *forkManagerImpl) registerPoSPrepareHooks(
+	hooks *hook.HookManager,
+	fork *IBFTFork,
+	height uint64,
+) {
+	deploymentFork := m.getForkByDeployment(height + 1)
+	if deploymentFork == nil || deploymentFork.Type != PoS || deploymentFork.Deployment == nil {
+		return
+	}
+
+	registerContractDeploymentHook(hooks, deploymentFork)
 }
 
 func (m *forkManagerImpl) getFork(height uint64) *IBFTFork {

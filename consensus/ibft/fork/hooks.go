@@ -5,6 +5,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/hook"
 	"github.com/0xPolygon/polygon-edge/contracts/staking"
+	"github.com/0xPolygon/polygon-edge/helper/hex"
 	stakingHelper "github.com/0xPolygon/polygon-edge/helper/staking"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -65,15 +66,26 @@ func registerContractDeploymentHook(
 	fork *IBFTFork,
 ) {
 	hooks.PreCommitStateFunc = func(header *types.Header, txn *state.Transition) error {
-		contractState, err := stakingHelper.PredeployStakingSC(fork.Validators, stakingHelper.PredeployParams{
-			MinValidatorCount: fork.MinValidatorCount.Value,
-			MaxValidatorCount: fork.MaxValidatorCount.Value,
-		})
+		if txn.AccountExists(staking.AddrStakingContract) {
+			// update bytecode of deployed contract
+			codeBytes, err := hex.DecodeHex(stakingHelper.StakingSCBytecode)
+			if err != nil {
+				return err
+			}
 
-		if err != nil {
-			return err
+			return txn.SetCodeDirectly(staking.AddrStakingContract, codeBytes)
+		} else {
+			// deploy contract
+			contractState, err := stakingHelper.PredeployStakingSC(fork.Validators, stakingHelper.PredeployParams{
+				MinValidatorCount: fork.MinValidatorCount.Value,
+				MaxValidatorCount: fork.MaxValidatorCount.Value,
+			})
+
+			if err != nil {
+				return err
+			}
+
+			return txn.SetAccountDirectly(staking.AddrStakingContract, contractState)
 		}
-
-		return txn.SetAccountDirectly(staking.AddrStakingContract, contractState)
 	}
 }

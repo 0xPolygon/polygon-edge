@@ -60,7 +60,7 @@ func (s *ContractValidatorSet) GetValidators(height uint64) (validators.Validato
 		return nil, fmt.Errorf("header not found at %d", fetchedHeight)
 	}
 
-	signer, err := s.getSigner(fetchedHeight)
+	signer, err := s.getSigner(height)
 	if err != nil {
 		return nil, err
 	}
