@@ -2,10 +2,11 @@ package loadbot
 
 import (
 	"fmt"
-	"github.com/umbracle/ethgo"
 	"math/big"
 	"sync"
 	"time"
+
+	"github.com/umbracle/ethgo"
 
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo/jsonrpc"

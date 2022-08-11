@@ -144,14 +144,7 @@ func (i *backendIBFT) buildBlock(snap *Snapshot, parent *types.Header) (*types.B
 	}
 
 	// set the timestamp
-	parentTime := time.Unix(int64(parent.Timestamp), 0)
-	headerTime := parentTime.Add(i.blockTime)
-
-	if headerTime.Before(time.Now()) {
-		headerTime = time.Now()
-	}
-
-	header.Timestamp = uint64(headerTime.Unix())
+	header.Timestamp = uint64(time.Now().Unix())
 
 	if err := i.signer.InitIBFTExtra(header, parent, i.activeValidatorSet); err != nil {
 		return nil, err
@@ -256,11 +249,11 @@ func (i *backendIBFT) writeTransactions(
 			return
 		default:
 			if stopExecution {
-				//	wait for the timer to expire
+				// wait for the timer to expire
 				continue
 			}
 
-			//	execute transactions one by one
+			// execute transactions one by one
 			result, ok := i.writeTransaction(
 				i.txpool.Peek(),
 				transition,
@@ -309,15 +302,15 @@ func (i *backendIBFT) writeTransaction(
 			)
 		}
 
-		//	continue processing
+		// continue processing
 		return &txExeResult{tx, fail}, true
 	}
 
 	if err := transition.Write(tx); err != nil {
-		if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok { // nolint:errorlint
-			//	stop processing
+		if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok { //nolint:errorlint
+			// stop processing
 			return nil, false
-		} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable { // nolint:errorlint
+		} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable { //nolint:errorlint
 			i.txpool.Demote(tx)
 
 			return &txExeResult{tx, skip}, true

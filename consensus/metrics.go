@@ -16,7 +16,7 @@ type Metrics struct {
 	// No.of transactions in the block
 	NumTxs metrics.Gauge
 
-	//Time between current block and the previous block in seconds
+	// Time between current block and the previous block in seconds
 	BlockInterval metrics.Gauge
 }
 

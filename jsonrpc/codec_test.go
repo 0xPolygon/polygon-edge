@@ -1,9 +1,10 @@
 package jsonrpc
 
 import (
+	"testing"
+
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestBlockNumberOrHash_UnmarshalJSON(t *testing.T) {

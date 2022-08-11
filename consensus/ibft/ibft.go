@@ -8,8 +8,6 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/consensus"
-	"github.com/0xPolygon/polygon-edge/validators"
-
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/helper/common"
@@ -19,6 +17,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/syncer"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/0xPolygon/polygon-edge/validators"
 	"github.com/hashicorp/go-hclog"
 	"google.golang.org/grpc"
 )
@@ -83,7 +82,7 @@ type backendIBFT struct {
 
 // Factory implements the base consensus Factory method
 func Factory(params *consensus.Params) (consensus.Consensus, error) {
-	//	defaults for user set fields in genesis
+	// defaults for user set fields in genesis
 	var (
 		epochSize          = uint64(DefaultEpochSize)
 		quorumSizeBlockNum = uint64(0)
@@ -100,7 +99,7 @@ func Factory(params *consensus.Params) (consensus.Consensus, error) {
 	}
 
 	if rawBlockNum, ok := params.Config.Config["quorumSizeBlockNum"]; ok {
-		//	Block number specified for quorum size switch
+		// Block number specified for quorum size switch
 		readBlockNum, ok := rawBlockNum.(float64)
 		if !ok {
 			return nil, errors.New("invalid type assertion")
@@ -203,7 +202,7 @@ func (i *backendIBFT) Initialize() error {
 		i,
 	)
 
-	//	Ensure consensus takes into account user configured block production time
+	// Ensure consensus takes into account user configured block production time
 	i.consensus.ExtendRoundTimeout(i.blockTime)
 
 	// Set up the snapshots
@@ -221,7 +220,7 @@ func (i *backendIBFT) Initialize() error {
 	return nil
 }
 
-//	sync runs the syncer in the background to receive blocks from advanced peers
+// sync runs the syncer in the background to receive blocks from advanced peers
 func (i *backendIBFT) startSyncing() {
 	callInsertBlockHook := func(blockNumber uint64) {
 		if err := i.runHook(InsertBlockHook, blockNumber, blockNumber); err != nil {
@@ -248,7 +247,7 @@ func (i *backendIBFT) Start() error {
 		return err
 	}
 
-	//	Start syncing blocks from other peers
+	// Start syncing blocks from other peers
 	go i.startSyncing()
 
 	// Start the actual consensus protocol
@@ -299,7 +298,7 @@ func GetIBFTForks(ibftConfig map[string]interface{}) ([]IBFTFork, error) {
 	return nil, errors.New("current IBFT type not found")
 }
 
-//  setupTransport read current mechanism in params and sets up consensus mechanism
+// setupMechanism reads the current mechanism in params and sets up consensus mechanism
 func (i *backendIBFT) setupMechanism() error {
 	ibftForks, err := GetIBFTForks(i.config.Config)
 	if err != nil {
@@ -329,9 +328,9 @@ func (i *backendIBFT) startConsensus() {
 		syncerBlockCh = make(chan struct{})
 	)
 
-	//	Receive a notification every time syncer manages
-	//	to insert a valid block. Used for cancelling active consensus
-	//	rounds for a specific height
+	// Receive a notification every time syncer manages
+	// to insert a valid block. Used for cancelling active consensus
+	// rounds for a specific height
 	go func() {
 		for {
 			if ev := <-newBlockSub.GetEventCh(); ev.Source == "syncer" {
@@ -357,20 +356,20 @@ func (i *backendIBFT) startConsensus() {
 		i.updateActiveValidatorSet(latest)
 
 		if !i.isActiveValidator() {
-			//	we are not participating in consensus for this height
+			// we are not participating in consensus for this height
 			continue
 		}
 
 		select {
 		case <-i.consensus.runSequence(pending):
-			//	consensus inserted block
+			// consensus inserted block
 			continue
 		case <-syncerBlockCh:
-			//	syncer inserted block -> stop running consensus
+			// syncer inserted block -> stop running consensus
 			i.consensus.stopSequence()
 			i.logger.Info("canceled sequence", "sequence", pending)
 		case <-i.closeCh:
-			//	IBFT consensus stopped
+			// IBFT consensus stopped
 			i.consensus.stopSequence()
 
 			return
@@ -412,14 +411,14 @@ func (i *backendIBFT) updateMetrics(block *types.Block) {
 	parentTime := time.Unix(int64(prvHeader.Timestamp), 0)
 	headerTime := time.Unix(int64(block.Header.Timestamp), 0)
 
-	//Update the block interval metric
+	// Update the block interval metric
 	if block.Number() > 1 {
 		i.metrics.BlockInterval.Set(
 			headerTime.Sub(parentTime).Seconds(),
 		)
 	}
 
-	//Update the Number of transactions in the block metric
+	// Update the Number of transactions in the block metric
 	i.metrics.NumTxs.Set(float64(len(block.Body().Transactions)))
 }
 
@@ -510,9 +509,9 @@ func (i *backendIBFT) VerifyHeader(header *types.Header) error {
 	return nil
 }
 
-//	quorumSize returns a callback that when executed on a ValidatorSet computes
-//	number of votes required to reach quorum based on the size of the set.
-//	The blockNumber argument indicates which formula was used to calculate the result (see PRs #513, #549)
+// quorumSize returns a callback that when executed on a ValidatorSet computes
+// number of votes required to reach quorum based on the size of the set.
+// The blockNumber argument indicates which formula was used to calculate the result (see PRs #513, #549)
 func (i *backendIBFT) quorumSize(blockNumber uint64) QuorumImplementation {
 	if blockNumber < i.quorumSizeBlockNum {
 		return LegacyQuorumSize
