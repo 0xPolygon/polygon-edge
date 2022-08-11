@@ -265,6 +265,7 @@ func (d *Dispatcher) Handle(reqBody []byte) ([]byte, error) {
 	// if not disabled, avoid handling long batch requests
 	if d.jsonRPCBatchLengthLimit != 0 &&
 		len(requests) > int(d.jsonRPCBatchLengthLimit) {
+		d.logger.Info("Entered batch request limit", "batch_request_limit_is", d.jsonRPCBatchLengthLimit)
 		return NewRPCResponse(nil, "2.0", nil, NewInvalidRequestError("Batch request length too long")).Bytes()
 	}
 
