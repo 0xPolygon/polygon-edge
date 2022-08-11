@@ -341,7 +341,7 @@ func TestDispatcherBatchRequest(t *testing.T) {
 				&dispatcherParams{
 					chainID:                 0,
 					priceLimit:              0,
-					jsonRPCBatchLengthLimit: 20,
+					jsonRPCBatchLengthLimit: 10,
 					blockRangeLimit:         1000,
 				},
 			),
@@ -370,7 +370,7 @@ func TestDispatcherBatchRequest(t *testing.T) {
 				&dispatcherParams{
 					chainID:                 0,
 					priceLimit:              0,
-					jsonRPCBatchLengthLimit: 20,
+					jsonRPCBatchLengthLimit: 3,
 					blockRangeLimit:         1000,
 				},
 			),
