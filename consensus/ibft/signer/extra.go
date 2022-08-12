@@ -106,32 +106,6 @@ func (i *IstanbulExtra) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) er
 	return nil
 }
 
-// UnmarshalRLP defines the unmarshal function wrapper for IstanbulExtra
-// that parses only Validators
-func (i *IstanbulExtra) unmarshalRLPForValidators(input []byte) error {
-	return types.UnmarshalRlp(i.unmarshalRLPFromForValidators, input)
-}
-
-// UnmarshalRLPFrom defines the unmarshal implementation for IstanbulExtra
-// that parses only Validators
-func (i *IstanbulExtra) unmarshalRLPFromForValidators(p *fastrlp.Parser, v *fastrlp.Value) error {
-	elems, err := v.GetElems()
-	if err != nil {
-		return err
-	}
-
-	if len(elems) < 1 {
-		return fmt.Errorf("incorrect number of elements to decode istambul extra, expected 1 but found %d", len(elems))
-	}
-
-	// Validators
-	if err := i.Validators.UnmarshalRLPFrom(p, elems[0]); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 // UnmarshalRLPForParentCS defines the unmarshal function wrapper for IstanbulExtra
 // that parses only Parent Committed Seals
 func (i *IstanbulExtra) unmarshalRLPForParentCS(input []byte) error {
@@ -201,6 +175,7 @@ func packFieldsIntoExtra(
 
 			return packFn(ar, elems, vv)
 		}, extraBody)
+
 		return vv
 	}, nil)
 
@@ -265,6 +240,37 @@ func packCommittedSealIntoExtra(
 			// ParentCommittedSeal
 			if len(oldValues) >= 4 {
 				newArrayValue.Set(oldValues[3])
+			}
+
+			return nil
+		},
+	)
+}
+
+// packParentCommittedSealIntoExtra updates only ParentCommittedSeals field in Extra
+func packParentCommittedSealIntoExtra(
+	extraBytes []byte,
+	parentCommittedSeals Sealer,
+) []byte {
+	return packFieldsIntoExtra(
+		extraBytes,
+		func(
+			ar *fastrlp.Arena,
+			oldValues []*fastrlp.Value,
+			newArrayValue *fastrlp.Value,
+		) error {
+			// Validators
+			newArrayValue.Set(oldValues[0])
+
+			// Seal
+			newArrayValue.Set(oldValues[1])
+
+			// CommittedSeal
+			newArrayValue.Set(oldValues[2])
+
+			// ParentCommittedSeal
+			if len(oldValues) >= 4 {
+				newArrayValue.Set(parentCommittedSeals.MarshalRLPWith(ar))
 			}
 
 			return nil

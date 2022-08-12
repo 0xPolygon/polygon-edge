@@ -63,6 +63,7 @@ func (o *operator) GetSnapshot(ctx context.Context, req *proto.SnapshotReq) (*pr
 	}
 
 	resp.Validators = make([]*proto.Snapshot_Validator, vals.Len())
+
 	for idx := 0; idx < vals.Len(); idx++ {
 		val := vals.At(uint64(idx))
 

@@ -186,10 +186,10 @@ func TestAppendECDSACommittedSeal(t *testing.T) {
 			assert.NoError(t, err)
 
 			// update ParentCommittedSeal forcibly
-			err = signerA.packFieldIntoIbftExtra(header, func(extra *IstanbulExtra) {
-				extra.ParentCommittedSeal = e.ParentCommittedSeal
-			})
-			assert.NoError(t, err)
+			header.ExtraData = packParentCommittedSealIntoExtra(
+				header.ExtraData,
+				e.ParentCommittedSeal,
+			)
 		}
 
 		// create new committed seal
@@ -198,17 +198,21 @@ func TestAppendECDSACommittedSeal(t *testing.T) {
 		assert.NoError(t, err)
 
 		// append new committed seal
-		err = signerA.packFieldIntoIbftExtra(header, func(extra *IstanbulExtra) {
-			sseal, _ := extra.CommittedSeal.(*SerializedSeal)
-			ssealSlice := [][]byte(*sseal)
-
-			ssealSlice = append(ssealSlice, fx)
-
-			nsseal := SerializedSeal(ssealSlice)
-
-			extra.CommittedSeal = &nsseal
-		})
+		extra, err := signerA.GetIBFTExtra(parentHeader)
 		assert.NoError(t, err)
+
+		sseal, _ := extra.CommittedSeal.(*SerializedSeal)
+		ssealSlice := [][]byte(*sseal)
+
+		ssealSlice = append(ssealSlice, fx)
+
+		nsseal := SerializedSeal(ssealSlice)
+		newCommittedSeals := &nsseal
+
+		header.ExtraData = packCommittedSealIntoExtra(
+			header.ExtraData,
+			newCommittedSeals,
+		)
 
 		header = header.ComputeHash()
 		faultyHeaders = append(faultyHeaders, header)

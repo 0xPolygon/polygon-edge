@@ -321,10 +321,6 @@ func (i *backendIBFT) updateMetrics(block *types.Block) {
 	i.metrics.NumTxs.Set(float64(len(block.Body().Transactions)))
 }
 
-var (
-	errBlockVerificationFailed = errors.New("block verification fail")
-)
-
 // isSealing checks if the current node is sealing blocks
 func (i *backendIBFT) isSealing() bool {
 	return i.sealing
@@ -383,7 +379,6 @@ func (i *backendIBFT) verifyHeaderImpl(
 }
 
 // VerifyHeader wrapper for verifying headers
-//
 func (i *backendIBFT) VerifyHeader(header *types.Header) error {
 	parent, ok := i.blockchain.GetHeaderByNumber(header.Number - 1)
 	if !ok {

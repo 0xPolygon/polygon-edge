@@ -24,7 +24,7 @@ func CalcMaxFaultyNodes(s validators.Validators) int {
 
 type QuorumImplementation func(validators.Validators) int
 
-//	LegacyQuorumSize returns the legacy quorum size for the given validator set
+// LegacyQuorumSize returns the legacy quorum size for the given validator set
 func LegacyQuorumSize(set validators.Validators) int {
 	// According to the IBFT spec, the number of valid messages
 	// needs to be 2F + 1

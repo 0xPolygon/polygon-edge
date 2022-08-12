@@ -309,20 +309,6 @@ func (s *SignerImpl) filterHeaderForHash(header *types.Header) (*types.Header, e
 	return clone, nil
 }
 
-// extractValidators extracts Validators from IBFT Extra in Header
-func (s *SignerImpl) getValidators(header *types.Header) (validators.Validators, error) {
-	data := header.ExtraData[IstanbulExtraVanity:]
-	extra := &IstanbulExtra{
-		Validators: s.keyManager.NewEmptyValidatorSet(),
-	}
-
-	if err := extra.unmarshalRLPForValidators(data); err != nil {
-		return nil, err
-	}
-
-	return extra.Validators, nil
-}
-
 // extractParentCommittedSeals extracts Parent Committed Seals from IBFT Extra in Header
 func (s *SignerImpl) GetParentCommittedSeals(header *types.Header) (Sealer, error) {
 	data := header.ExtraData[IstanbulExtraVanity:]

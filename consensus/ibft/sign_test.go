@@ -14,15 +14,13 @@ func TestSign_Sealer(t *testing.T) {
 	pool := newTesterAccountPool(t)
 	pool.add("A")
 
-	snap := &Snapshot{
-		Set: pool.ValidatorSet(),
-	}
+	correctValset := pool.ValidatorSet()
 
 	h := &types.Header{}
 
 	signerA := signer.NewSigner(signer.NewECDSAKeyManagerFromKey(pool.get("A").priv))
 
-	err := signerA.InitIBFTExtra(h, &types.Header{}, pool.ValidatorSet())
+	err := signerA.InitIBFTExtra(h, &types.Header{}, correctValset)
 	assert.NoError(t, err)
 
 	// non-validator address
@@ -30,15 +28,14 @@ func TestSign_Sealer(t *testing.T) {
 
 	signerX := signer.NewSigner(
 		signer.NewECDSAKeyManagerFromKey(pool.get("X").priv),
-		signer.NewECDSAKeyManagerFromKey(pool.get("X").priv),
 	)
 
 	badSealedBlock, _ := signerX.WriteProposerSeal(h)
-	assert.Error(t, verifySigner(signerA, snap.Set, badSealedBlock))
+	assert.Error(t, verifyProposerSeal(badSealedBlock, signerA, correctValset))
 
 	// seal the block with a validator
 	goodSealedBlock, _ := signerA.WriteProposerSeal(h)
-	assert.NoError(t, verifySigner(signerA, snap.Set, goodSealedBlock))
+	assert.NoError(t, verifyProposerSeal(goodSealedBlock, signerA, correctValset))
 }
 
 func TestSign_CommittedSeals(t *testing.T) {
@@ -47,17 +44,14 @@ func TestSign_CommittedSeals(t *testing.T) {
 	pool := newTesterAccountPool(t)
 	pool.add("A", "B", "C", "D", "E")
 
-	snap := &Snapshot{
-		Set: pool.ValidatorSet(),
-	}
-
 	h := &types.Header{}
+
+	correctValSet := pool.ValidatorSet()
 
 	signerA := signer.NewSigner(
 		signer.NewECDSAKeyManagerFromKey(pool.get("A").priv),
-		signer.NewECDSAKeyManagerFromKey(pool.get("A").priv),
 	)
-	err := signerA.InitIBFTExtra(h, &types.Header{}, pool.ValidatorSet())
+	err := signerA.InitIBFTExtra(h, &types.Header{}, correctValSet)
 	assert.NoError(t, err)
 
 	h.Hash, err = signerA.CalculateHeaderHash(h)
@@ -90,7 +84,7 @@ func TestSign_CommittedSeals(t *testing.T) {
 
 		assert.NoError(t, err)
 
-		return signerA.VerifyCommittedSeals(snap.Set, sealed, OptimalQuorumSize(snap.Set))
+		return signerA.VerifyCommittedSeals(sealed, correctValSet, OptimalQuorumSize(correctValSet))
 	}
 
 	// Correct

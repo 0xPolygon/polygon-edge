@@ -5,12 +5,9 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/chain"
-	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
-	"github.com/stretchr/testify/assert"
 )
 
 type testerAccount struct {
@@ -22,13 +19,13 @@ func (t *testerAccount) Address() types.Address {
 	return crypto.PubKeyToAddress(&t.priv.PublicKey)
 }
 
-func (t *testerAccount) sign(h *types.Header) (*types.Header, error) {
-	signer := signer.NewSigner(
-		signer.NewECDSAKeyManagerFromKey(t.priv),
-	)
+// func (t *testerAccount) sign(h *types.Header) (*types.Header, error) {
+// 	signer := signer.NewSigner(
+// 		signer.NewECDSAKeyManagerFromKey(t.priv),
+// 	)
 
-	return signer.WriteSeal(h)
-}
+// 	return signer.WriteProposerSeal(h)
+// }
 
 type testerAccountPool struct {
 	t        *testing.T
@@ -77,29 +74,29 @@ func (ap *testerAccountPool) add(accounts ...string) {
 	}
 }
 
-func (ap *testerAccountPool) genesis() *chain.Genesis {
-	ap.t.Helper()
+// func (ap *testerAccountPool) genesis() *chain.Genesis {
+// 	ap.t.Helper()
 
-	genesis := &types.Header{
-		MixHash: signer.IstanbulDigest,
-	}
+// 	genesis := &types.Header{
+// 		MixHash: signer.IstanbulDigest,
+// 	}
 
-	signer := signer.NewSigner(
-		signer.NewECDSAKeyManagerFromKey(ap.get("A").priv),
-	)
+// 	signer := signer.NewSigner(
+// 		signer.NewECDSAKeyManagerFromKey(ap.get("A").priv),
+// 	)
 
-	err := signer.InitIBFTExtra(genesis, nil, ap.ValidatorSet())
-	assert.NoError(ap.t, err)
+// 	err := signer.InitIBFTExtra(genesis, nil, ap.ValidatorSet())
+// 	assert.NoError(ap.t, err)
 
-	genesis.ComputeHash()
+// 	genesis.ComputeHash()
 
-	c := &chain.Genesis{
-		Mixhash:   genesis.MixHash,
-		ExtraData: genesis.ExtraData,
-	}
+// 	c := &chain.Genesis{
+// 		Mixhash:   genesis.MixHash,
+// 		ExtraData: genesis.ExtraData,
+// 	}
 
-	return c
-}
+// 	return c
+// }
 
 func (ap *testerAccountPool) get(name string) *testerAccount {
 	ap.t.Helper()
@@ -118,7 +115,7 @@ func (ap *testerAccountPool) ValidatorSet() validators.Validators {
 
 	v := validators.ECDSAValidators{}
 	for _, i := range ap.accounts {
-		v.Add(&validators.ECDSAValidator{
+		_ = v.Add(&validators.ECDSAValidator{
 			Address: i.Address(),
 		})
 	}
