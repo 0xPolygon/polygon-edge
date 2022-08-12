@@ -61,7 +61,7 @@ func (s *ECDSAKeyManager) SignSeal(data []byte) ([]byte, error) {
 }
 
 func (s *ECDSAKeyManager) SignCommittedSeal(data []byte) ([]byte, error) {
-	return crypto.Sign(s.key, data)
+	return crypto.Sign(s.key, crypto.Keccak256(data))
 }
 
 func (s *ECDSAKeyManager) Ecrecover(sig, digest []byte) (types.Address, error) {

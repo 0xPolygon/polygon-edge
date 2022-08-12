@@ -36,7 +36,7 @@ type Header struct {
 type headerJSON struct {
 	ParentHash   Hash   `json:"parentHash"`
 	Sha3Uncles   Hash   `json:"sha3Uncles"`
-	Miner        []byte `json:"miner"`
+	Miner        string `json:"miner"`
 	StateRoot    Hash   `json:"stateRoot"`
 	TxRoot       Hash   `json:"transactionsRoot"`
 	ReceiptsRoot Hash   `json:"receiptsRoot"`
@@ -57,7 +57,7 @@ func (h *Header) MarshalJSON() ([]byte, error) {
 
 	header.ParentHash = h.ParentHash
 	header.Sha3Uncles = h.Sha3Uncles
-	header.Miner = h.Miner
+	header.Miner = hex.EncodeToHex(h.Miner)
 	header.StateRoot = h.StateRoot
 	header.TxRoot = h.TxRoot
 	header.ReceiptsRoot = h.ReceiptsRoot
@@ -85,7 +85,6 @@ func (h *Header) UnmarshalJSON(input []byte) error {
 
 	h.ParentHash = header.ParentHash
 	h.Sha3Uncles = header.Sha3Uncles
-	h.Miner = header.Miner
 	h.StateRoot = header.StateRoot
 	h.TxRoot = header.TxRoot
 	h.ReceiptsRoot = header.ReceiptsRoot
@@ -95,6 +94,10 @@ func (h *Header) UnmarshalJSON(input []byte) error {
 	h.Hash = header.Hash
 
 	var err error
+
+	if h.Miner, err = hex.DecodeHex(header.Miner); err != nil {
+		return err
+	}
 
 	if h.Difficulty, err = hex.DecodeUint64(header.Difficulty); err != nil {
 		return err

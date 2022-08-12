@@ -20,7 +20,7 @@ func TestSign_Sealer(t *testing.T) {
 
 	signerA := signer.NewSigner(signer.NewECDSAKeyManagerFromKey(pool.get("A").priv))
 
-	err := signerA.InitIBFTExtra(h, &types.Header{}, correctValset)
+	err := signerA.InitIBFTExtra(h, nil, correctValset)
 	assert.NoError(t, err)
 
 	// non-validator address

@@ -139,6 +139,8 @@ func TestAppendECDSACommittedSeal(t *testing.T) {
 
 	useIstanbulHeaderHash(t, signerA)
 
+	assert.NoError(t, signerA.InitIBFTExtra(parentHeader, nil, validators))
+
 	// create headers by normal validators
 	for i := 0; i < numHeaders; i++ {
 		header := createIBFTHeader(t, signerA, uint64(i+1), parentHeader, validators)
@@ -182,13 +184,13 @@ func TestAppendECDSACommittedSeal(t *testing.T) {
 			header.ParentHash = parentHeader.Hash
 
 			// get parent committed seal
-			e, err := signerA.GetIBFTExtra(parentHeader)
+			parentCommittedSeals, err := signerA.GetParentCommittedSeals(parentHeader)
 			assert.NoError(t, err)
 
 			// update ParentCommittedSeal forcibly
 			header.ExtraData = packParentCommittedSealIntoExtra(
 				header.ExtraData,
-				e.ParentCommittedSeal,
+				parentCommittedSeals,
 			)
 		}
 

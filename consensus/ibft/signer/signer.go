@@ -151,7 +151,7 @@ func (s *SignerImpl) EcrecoverFromHeader(header *types.Header) (types.Address, e
 
 func (s *SignerImpl) CreateCommittedSeal(hash []byte) ([]byte, error) {
 	return s.keyManager.SignCommittedSeal(
-		crypto.Keccak256(wrapCommitHash(hash[:])),
+		wrapCommitHash(hash[:]),
 	)
 }
 

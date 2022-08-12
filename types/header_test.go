@@ -33,10 +33,11 @@ func TestHeader_JSON(t *testing.T) {
 				"nonce" : "0x0a00000000000000",
 				"hash" : "0x0800000000000000000000000000000000000000000000000000000000000000"
 			}`
+		minter = Address{0x1}
 		header = Header{
 			ParentHash:   Hash{0x1},
 			Sha3Uncles:   Hash{0x2},
-			Miner:        Address{0x1}.Bytes(),
+			Miner:        minter[:],
 			StateRoot:    Hash{0x4},
 			TxRoot:       Hash{0x5},
 			ReceiptsRoot: Hash{0x6},
