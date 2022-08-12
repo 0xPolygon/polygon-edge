@@ -162,8 +162,6 @@ func (p *genesisParams) setValidatorSetFromCli() error {
 
 // setValidatorSetFromPrefixPath sets validator set from prefix path
 func (p *genesisParams) setValidatorSetFromPrefixPath() error {
-	var readErr error
-
 	if !p.areValidatorsSetByPrefix() {
 		return nil
 	}
@@ -174,7 +172,7 @@ func (p *genesisParams) setValidatorSetFromPrefixPath() error {
 	)
 
 	if err != nil {
-		return fmt.Errorf("failed to read from prefix: %w", readErr)
+		return fmt.Errorf("failed to read from prefix: %w", err)
 	}
 
 	if err := p.ibftValidators.Merge(validators); err != nil {
@@ -237,7 +235,7 @@ func (p *genesisParams) initIBFTExtraData() {
 
 	ibftExtra := &signer.IstanbulExtra{
 		Validators:    p.ibftValidators,
-		Seal:          []byte{},
+		ProposerSeal:  []byte{},
 		CommittedSeal: committedSeal,
 	}
 

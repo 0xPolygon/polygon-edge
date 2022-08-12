@@ -1,4 +1,4 @@
-//nolint:ifshort, forcetypeassert
+//nolint:forcetypeassert
 package evm
 
 import (

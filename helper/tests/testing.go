@@ -145,16 +145,16 @@ func WaitForNonce(
 	resObj, err := RetryUntilTimeout(ctx, func() (interface{}, bool) {
 		nonce, err := ethClient.GetNonce(addr, ethgo.Latest)
 		if err != nil {
-			//	error -> stop retrying
+			// error -> stop retrying
 			return result{nonce, err}, false
 		}
 
 		if nonce >= expectedNonce {
-			//	match -> return result
+			// match -> return result
 			return result{nonce, nil}, false
 		}
 
-		//	continue retrying
+		// continue retrying
 		return nil, true
 	})
 

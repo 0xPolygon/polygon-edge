@@ -18,8 +18,9 @@ var (
 )
 
 type operator struct {
-	ibft *Ibft
 	proto.UnimplementedIbftOperatorServer
+
+	ibft *backendIBFT
 }
 
 // Status returns the status of the IBFT client

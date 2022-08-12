@@ -4,11 +4,12 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
-	"github.com/umbracle/ethgo"
 	"math/big"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/umbracle/ethgo"
 
 	"github.com/0xPolygon/polygon-edge/command/loadbot/generator"
 	"github.com/0xPolygon/polygon-edge/helper/tests"

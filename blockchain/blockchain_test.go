@@ -3,10 +3,11 @@ package blockchain
 import (
 	"errors"
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/state"
 	"math/big"
 	"reflect"
 	"testing"
+
+	"github.com/0xPolygon/polygon-edge/state"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/stretchr/testify/assert"

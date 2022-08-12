@@ -29,9 +29,9 @@ type syncPeerClient struct {
 	network    Network      // reference to the network module
 	blockchain Blockchain   // reference to the blockchain module
 
-	subscription           blockchain.Subscription //reference to the blockchain subscription
-	topic                  *network.Topic          //reference to the network topic
-	id                     string                  //node id
+	subscription           blockchain.Subscription // reference to the blockchain subscription
+	topic                  *network.Topic          // reference to the network topic
+	id                     string                  // node id
 	peerStatusUpdateCh     chan *NoForkPeer        // peer status update channel
 	peerConnectionUpdateCh chan *event.PeerEvent   // peer connection update channel
 
@@ -236,7 +236,7 @@ func (m *syncPeerClient) startPeerEventProcess() {
 
 // CloseStream closes stream
 func (m *syncPeerClient) CloseStream(peerID peer.ID) error {
-	return m.network.CloseProtocolStream(SyncerProto, peerID)
+	return m.network.CloseProtocolStream(syncerProto, peerID)
 }
 
 // GetBlocks returns a stream of blocks from given height to peer's latest
@@ -296,12 +296,12 @@ func (m *syncPeerClient) GetBlocks(
 
 // newSyncPeerClient creates gRPC client
 func (m *syncPeerClient) newSyncPeerClient(peerID peer.ID) (proto.SyncPeerClient, error) {
-	conn, err := m.network.NewProtoConnection(SyncerProto, peerID)
+	conn, err := m.network.NewProtoConnection(syncerProto, peerID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open a stream, err %w", err)
 	}
 
-	m.network.SaveProtocolStream(SyncerProto, conn, peerID)
+	m.network.SaveProtocolStream(syncerProto, conn, peerID)
 
 	return proto.NewSyncPeerClient(conn), nil
 }

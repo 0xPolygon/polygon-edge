@@ -66,7 +66,7 @@ func FetchBLSValidators(
 			continue
 		}
 
-		blsValidators.Add(&validators.BLSValidator{
+		_ = blsValidators.Add(&validators.BLSValidator{
 			Address:      valAddrs[idx],
 			BLSPublicKey: blsPublicKeys[idx],
 		})
