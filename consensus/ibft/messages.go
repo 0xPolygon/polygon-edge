@@ -14,7 +14,8 @@ func (i *backendIBFT) signMessage(msg *protoIBFT.Message) *protoIBFT.Message {
 		return nil
 	}
 
-	sig, err := crypto.Sign(i.validatorKey, crypto.Keccak256(raw))
+	s := sign{ibft: i}
+	sig, err := s.Sign(i.validatorKey, crypto.Keccak256(raw))
 	if err != nil {
 		return nil
 	}
