@@ -117,10 +117,6 @@ var (
 	addr1 = types.StringToAddress("1")
 )
 
-func (m *mockHostForCreate) GetTracerConfig() runtime.TraceConfig {
-	panic("Not implemented in tests")
-}
-
 func TestCreate(t *testing.T) {
 	type state struct {
 		gas    uint64

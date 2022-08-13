@@ -9,6 +9,7 @@ bin/
 test-chain*
 polygon-edge-chain*
 debug-chain*
+etmp
 .idea
 
 # Exclude the build .exe file from version control

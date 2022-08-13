@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	testproto "github.com/0xPolygon/polygon-edge/network/proto"
 	"testing"
 	"time"
+
+	testproto "github.com/0xPolygon/polygon-edge/network/proto"
+	"github.com/libp2p/go-libp2p-core/peer"
 )
 
 func NumSubscribers(srv *Server, topic string) int {
@@ -59,7 +61,7 @@ func TestSimpleGossip(t *testing.T) {
 
 		serverTopics[i] = topic
 
-		if subscribeErr := topic.Subscribe(func(obj interface{}) {
+		if subscribeErr := topic.Subscribe(func(obj interface{}, _ peer.ID) {
 			// Everyone should relay they got the message
 			genericMessage, ok := obj.(*testproto.GenericMessage)
 			if !ok {
@@ -94,7 +96,7 @@ func TestSimpleGossip(t *testing.T) {
 	for {
 		select {
 		case <-time.After(time.Second * 15):
-			t.Fatalf("Gossip messages not received before timeout")
+			t.Fatalf("Multicast messages not received before timeout")
 		case message := <-messageCh:
 			if message.Message == sentMessage {
 				messagesGossiped++

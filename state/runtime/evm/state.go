@@ -49,8 +49,6 @@ var (
 
 // Instructions is the code of instructions
 
-type State state
-
 type state struct {
 	ip   int
 	code []byte
@@ -99,7 +97,6 @@ func (c *state) reset() {
 		c.memory[i] = 0
 	}
 
-	c.stack = c.stack[:0]
 	c.tmp = c.tmp[:0]
 	c.ret = c.ret[:0]
 	c.code = c.code[:0]
@@ -213,61 +210,24 @@ func (c *state) resetReturnData() {
 
 // Run executes the virtual machine
 func (c *state) Run() ([]byte, error) {
-	var (
-		vmerr       error
-		op          OpCode                // current opcode
-		mem         = runtime.NewMemory() // bound memory
-		stack       = runtime.Newstack()  // local stack
-		callContext = &runtime.ScopeContext{
-			Memory:   mem,
-			Stack:    stack,
-			Contract: c.msg,
-		}
-		// For optimisation reason we're using uint64 as the program counter.
-		// It's theoretically possible to go above 2^64. The YP defines the PC
-		// to be uint256. Practically much less so feasible.
-		pc   = uint64(0) // program counter
-		cost uint64
-		// copies used by tracer
-		pcCopy  uint64 // needed for the deferred EVMLogger
-		gasCopy uint64 // for EVMLogger to log gas remaining before execution
-		logged  bool   // deferred EVMLogger should ignore already logged steps
-		// res     []byte // result of the opcode execution function
-	)
-	// get tracer from host
-	tracer := c.host.GetTracerConfig()
-	if tracer.Debug {
-		defer func() {
-			if vmerr != nil {
-				if !logged {
-					tracer.Tracer.CaptureState(pcCopy, int(op), gasCopy, cost, callContext, c.ret, c.msg.Depth, vmerr)
-				} else {
-					tracer.Tracer.CaptureFault(pcCopy, int(op), gasCopy, cost, callContext, c.msg.Depth, vmerr)
-				}
-			}
-		}()
-	}
+	var vmerr error
 
 	codeSize := len(c.code)
 	for !c.stop {
-		if tracer.Debug {
-			logged, pc, gasCopy = false, uint64(c.ip), c.gas
-			pcCopy = pc
-		}
 		if c.ip >= codeSize {
 			c.halt()
 
 			break
 		}
 
-		op = OpCode(c.code[c.ip])
+		op := OpCode(c.code[c.ip])
+
 		inst := dispatchTable[op]
 		if inst.inst == nil {
 			c.exit(errOpCodeNotFound)
 
 			break
 		}
-
 		// check if the depth of the stack is enough for the instruction
 		if c.sp < inst.stack {
 			c.exit(errStackUnderflow)
@@ -281,15 +241,9 @@ func (c *state) Run() ([]byte, error) {
 			break
 		}
 
-		cost = inst.gas
-		// trace
-		if tracer.Debug {
-			tracer.Tracer.CaptureState(pc, int(op), gasCopy, cost, callContext, c.ret, c.msg.Depth, vmerr)
-			logged = true
-		}
-
 		// execute the instruction
 		inst.inst(c)
+
 		// check if stack size exceeds the max size
 		if c.sp > stackSize {
 			c.exit(errStackOverflow)
@@ -316,18 +270,6 @@ func bigToHash(b *big.Int) types.Hash {
 
 func (c *state) Len() int {
 	return len(c.memory)
-}
-
-func (c *state) Memory() []byte {
-	return c.memory
-}
-
-func (c *state) Stack() []*big.Int {
-	return c.stack
-}
-
-func (c *state) Msg() *runtime.Contract {
-	return c.msg
 }
 
 func (c *state) checkMemory(offset, size *big.Int) bool {

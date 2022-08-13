@@ -1,9 +1,10 @@
 package types
 
 import (
-	"github.com/0xPolygon/polygon-edge/helper/keccak"
 	"math/big"
 	"sync/atomic"
+
+	"github.com/0xPolygon/polygon-edge/helper/keccak"
 )
 
 // Config are the configuration options for structured logger the EVM
