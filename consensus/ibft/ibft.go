@@ -5,9 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
+
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/consensus"
-	"time"
 
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/crypto"
@@ -319,32 +320,41 @@ func (i *backendIBFT) createKey() error {
 		// Check if the validator key is initialized
 		var key *ecdsa.PrivateKey
 
-		if i.secretsManager.HasSecret(secrets.ValidatorKey) {
-			// The validator key is present in the secrets manager, load it
-			validatorKey, readErr := crypto.ReadConsensusKey(i.secretsManager)
-			if readErr != nil {
-				return fmt.Errorf("unable to read validator key from Secrets Manager, %w", readErr)
-			}
+		if i.secretsManager.GetSecretsManagerType() != secrets.AwsKms {
 
-			key = validatorKey
+			if i.secretsManager.HasSecret(secrets.ValidatorKey) {
+				// The validator key is present in the secrets manager, load it
+				validatorKey, readErr := crypto.ReadConsensusKey(i.secretsManager)
+				if readErr != nil {
+					return fmt.Errorf("unable to read validator key from Secrets Manager, %w", readErr)
+				}
+
+				key = validatorKey
+			} else {
+				// The validator key is not present in the secrets manager, generate it
+				validatorKey, validatorKeyEncoded, genErr := crypto.GenerateAndEncodePrivateKey()
+				if genErr != nil {
+					return fmt.Errorf("unable to generate validator key for Secrets Manager, %w", genErr)
+				}
+
+				// Save the key to the secrets manager
+				saveErr := i.secretsManager.SetSecret(secrets.ValidatorKey, validatorKeyEncoded)
+				if saveErr != nil {
+					return fmt.Errorf("unable to save validator key to Secrets Manager, %w", saveErr)
+				}
+
+				key = validatorKey
+				i.validatorKey = key
+				i.validatorKeyAddr = crypto.PubKeyToAddress(&key.PublicKey)
+			}
 		} else {
-			// The validator key is not present in the secrets manager, generate it
-			validatorKey, validatorKeyEncoded, genErr := crypto.GenerateAndEncodePrivateKey()
-			if genErr != nil {
-				return fmt.Errorf("unable to generate validator key for Secrets Manager, %w", genErr)
+			i.validatorKey = &ecdsa.PrivateKey{}
+			info, err := i.secretsManager.GetSecretInfo(secrets.ValidatorKey)
+			if err != nil {
+				return err
 			}
-
-			// Save the key to the secrets manager
-			saveErr := i.secretsManager.SetSecret(secrets.ValidatorKey, validatorKeyEncoded)
-			if saveErr != nil {
-				return fmt.Errorf("unable to save validator key to Secrets Manager, %w", saveErr)
-			}
-
-			key = validatorKey
+			i.validatorKeyAddr = types.StringToAddress(info.Address)
 		}
-
-		i.validatorKey = key
-		i.validatorKeyAddr = crypto.PubKeyToAddress(&key.PublicKey)
 	}
 
 	return nil
