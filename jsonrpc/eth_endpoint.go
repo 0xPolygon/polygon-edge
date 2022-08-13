@@ -3,9 +3,8 @@ package jsonrpc
 import (
 	"errors"
 	"fmt"
-	"math/big"
-
 	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/state"
@@ -13,6 +12,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/fastrlp"
+	"math/big"
 )
 
 type ethTxPoolStore interface {
@@ -75,11 +75,11 @@ type Eth struct {
 	store         ethStore
 	chainID       uint64
 	filterManager *FilterManager
+	priceLimit    uint64
 }
 
 var (
 	ErrInsufficientFunds = errors.New("insufficient funds for execution")
-	ErrGasCapOverflow    = errors.New("unable to apply transaction for the highest gas limit")
 )
 
 // ChainId returns the chain id of the client
@@ -218,8 +218,8 @@ func (e *Eth) SendRawTransaction(input string) (interface{}, error) {
 	return tx.Hash.String(), nil
 }
 
-// Reject eth_sendTransaction json-rpc call as we don't support wallet management
-func (e *Eth) SendTransaction(arg *txnArgs) (interface{}, error) {
+// SendTransaction rejects eth_sendTransaction json-rpc call as we don't support wallet management
+func (e *Eth) SendTransaction(_ *txnArgs) (interface{}, error) {
 	return nil, fmt.Errorf("request calls to eth_sendTransaction method are not supported," +
 		" use eth_sendRawTransaction insead")
 }
@@ -403,6 +403,7 @@ func (e *Eth) GetStorageAt(
 	// Get the storage for the passed in location
 	result, err := e.store.GetStorage(header.StateRoot, address, index)
 	if err != nil {
+		// nolint:govet
 		if errors.As(err, &ErrStateNotFound) {
 			return argBytesPtr(types.ZeroHash[:]), nil
 		}
@@ -427,11 +428,13 @@ func (e *Eth) GetStorageAt(
 }
 
 // GasPrice returns the average gas price based on the last x blocks
-func (e *Eth) GasPrice() (interface{}, error) {
-	// Grab the average gas price and convert it to a hex value
-	avgGasPrice := hex.EncodeBig(e.store.GetAvgGasPrice())
+// taking into consideration operator defined price limit
+func (e *Eth) GasPrice() (string, error) {
+	// Fetch average gas price in uint64
+	avgGasPrice := e.store.GetAvgGasPrice().Uint64()
 
-	return avgGasPrice, nil
+	// Return --price-limit flag defined value if it is greater than avgGasPrice
+	return hex.EncodeUint64(common.Max(e.priceLimit, avgGasPrice)), nil
 }
 
 // Call executes a smart contract call using the transaction object data
@@ -533,6 +536,7 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 		accountBalance := big.NewInt(0)
 		acc, err := e.store.GetAccount(header.StateRoot, transaction.From)
 
+		// nolint:govet
 		if err != nil && !errors.As(err, &ErrStateNotFound) {
 			// An unrelated error occurred, return it
 			return nil, err
@@ -575,6 +579,8 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 
 	// Checks if executor level valid gas errors occurred
 	isGasApplyError := func(err error) bool {
+		// Not linting this as the underlying error is actually wrapped
+		// nolint:govet
 		return errors.As(err, &state.ErrNotEnoughIntrinsicGas)
 	}
 
@@ -701,6 +707,7 @@ func (e *Eth) GetBalance(address types.Address, filter BlockNumberOrHash) (inter
 
 	// Extract the account balance
 	acc, err := e.store.GetAccount(header.StateRoot, address)
+	// nolint:govet
 	if errors.As(err, &ErrStateNotFound) {
 		// Account not found, return an empty account
 		return argUintPtr(0), nil
@@ -767,6 +774,7 @@ func (e *Eth) GetCode(address types.Address, filter BlockNumberOrHash) (interfac
 	emptySlice := []byte{}
 	acc, err := e.store.GetAccount(header.StateRoot, address)
 
+	// nolint:govet
 	if errors.As(err, &ErrStateNotFound) {
 		// If the account doesn't exist / is not initialized yet,
 		// return the default value
@@ -801,16 +809,12 @@ func (e *Eth) GetFilterChanges(id string) (interface{}, error) {
 
 // UninstallFilter uninstalls a filter with given ID
 func (e *Eth) UninstallFilter(id string) (bool, error) {
-	ok := e.filterManager.Uninstall(id)
-
-	return ok, nil
+	return e.filterManager.Uninstall(id), nil
 }
 
 // Unsubscribe uninstalls a filter in a websocket
 func (e *Eth) Unsubscribe(id string) (bool, error) {
-	ok := e.filterManager.Uninstall(id)
-
-	return ok, nil
+	return e.filterManager.Uninstall(id), nil
 }
 
 func (e *Eth) getBlockHeader(number BlockNumber) (*types.Header, error) {
@@ -859,6 +863,7 @@ func (e *Eth) getNextNonce(address types.Address, number BlockNumber) (uint64, e
 
 	acc, err := e.store.GetAccount(header.StateRoot, address)
 
+	// nolint:govet
 	if errors.As(err, &ErrStateNotFound) {
 		// If the account doesn't exist / isn't initialized,
 		// return a nonce value of 0

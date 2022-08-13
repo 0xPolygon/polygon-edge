@@ -4,15 +4,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
+	"sync/atomic"
+	"time"
+
 	"github.com/0xPolygon/polygon-edge/network/common"
 	"github.com/0xPolygon/polygon-edge/network/dial"
 	"github.com/0xPolygon/polygon-edge/network/discovery"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/p2p/security/noise"
 	rawGrpc "google.golang.org/grpc"
-	"sync"
-	"sync/atomic"
-	"time"
 
 	peerEvent "github.com/0xPolygon/polygon-edge/network/event"
 	"github.com/0xPolygon/polygon-edge/secrets"
@@ -392,7 +393,7 @@ func (s *Server) runDial() {
 
 			s.logger.Debug(fmt.Sprintf("Dialing peer [%s] as local [%s]", peerInfo.String(), s.host.ID()))
 
-			if !s.isConnected(peerInfo.ID) {
+			if !s.IsConnected(peerInfo.ID) {
 				// the connection process is async because it involves connection (here) +
 				// the handshake done in the identity service.
 				if err := s.host.Connect(context.Background(), *peerInfo); err != nil {
@@ -445,8 +446,8 @@ func (s *Server) hasPeer(peerID peer.ID) bool {
 	return ok
 }
 
-// isConnected checks if the networking server is connected to a peer
-func (s *Server) isConnected(peerID peer.ID) bool {
+// IsConnected checks if the networking server is connected to a peer
+func (s *Server) IsConnected(peerID peer.ID) bool {
 	return s.host.Network().Connectedness(peerID) == network.Connected
 }
 
@@ -583,9 +584,9 @@ func (s *Server) Close() error {
 	return err
 }
 
-// newProtoConnection opens up a new stream on the set protocol to the peer,
+// NewProtoConnection opens up a new stream on the set protocol to the peer,
 // and returns a reference to the connection
-func (s *Server) newProtoConnection(protocol string, peerID peer.ID) (*rawGrpc.ClientConn, error) {
+func (s *Server) NewProtoConnection(protocol string, peerID peer.ID) (*rawGrpc.ClientConn, error) {
 	s.protocolsLock.Lock()
 	defer s.protocolsLock.Unlock()
 

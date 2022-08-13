@@ -34,6 +34,8 @@ func setFlags(cmd *cobra.Command) {
 		"the path to the SecretsManager config file, "+
 			"if omitted, the local FS secrets manager is used",
 	)
+
+	cmd.MarkFlagsMutuallyExclusive(dataDirFlag, configFlag)
 }
 
 func runPreRun(_ *cobra.Command, _ []string) error {

@@ -140,7 +140,7 @@ func (e *Executor) BeginTxn(
 	coinbaseReceiver types.Address,
 ) (*Transition, error) {
 	config := e.config.Forks.At(header.Number)
-	fmt.Printf("parentRoot", parentRoot)
+
 	auxSnap2, err := e.state.NewSnapshotAt(parentRoot)
 	if err != nil {
 		return nil, err
@@ -574,9 +574,8 @@ func (t *Transition) Call2(
 	gas uint64,
 ) *runtime.ExecutionResult {
 	c := runtime.NewContractCall(1, caller, caller, to, value, gas, t.state.GetCode(to), input)
-	ret := t.applyCall(c, runtime.Call, t)
 
-	return ret
+	return t.applyCall(c, runtime.Call, t)
 }
 
 func (t *Transition) run(contract *runtime.Contract, host runtime.Host) *runtime.ExecutionResult {
@@ -764,6 +763,7 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host, op evm.
 
 	if result.Failed() {
 		t.state.RevertToSnapshot(snapshot)
+
 		return result
 	}
 
@@ -793,15 +793,6 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host, op evm.
 
 	result.GasLeft -= gasCost
 	t.state.SetCode(c.Address, result.ReturnValue)
-
-	// capture trace end
-	// if t.traceConfig.Debug {
-	// 	if c.Depth == 1 {
-	// 		t.traceConfig.Tracer.CaptureEnd(result.ReturnValue, gasCost, time.Since(start), result.Err)
-	// 	} else {
-	// 		t.traceConfig.Tracer.CaptureExit(result.ReturnValue, gasCost, result.Err)
-	// 	}
-	// }
 
 	return result
 }

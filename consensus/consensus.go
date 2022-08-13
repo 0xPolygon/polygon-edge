@@ -46,24 +46,24 @@ type Consensus interface {
 
 // Config is the configuration for the consensus
 type Config struct {
-	// Logger to be used by the backend
+	// Logger to be used by the consensus
 	Logger *log.Logger
 
 	// Params are the params of the chain and the consensus
 	Params *chain.Params
 
-	// Config defines specific configuration parameters for the backend
+	// Config defines specific configuration parameters for the consensus
 	Config map[string]interface{}
 
 	// Path is the directory path for the consensus protocol tos tore information
 	Path string
 }
 
-type ConsensusParams struct {
+type Params struct {
 	Context        context.Context
 	Seal           bool
 	Config         *Config
-	Txpool         *txpool.TxPool
+	TxPool         *txpool.TxPool
 	Network        *network.Server
 	Blockchain     *blockchain.Blockchain
 	Executor       *state.Executor
@@ -74,7 +74,5 @@ type ConsensusParams struct {
 	BlockTime      uint64
 }
 
-// Factory is the factory function to create a discovery backend
-type Factory func(
-	*ConsensusParams,
-) (Consensus, error)
+// Factory is the factory function to create a discovery consensus
+type Factory func(*Params) (Consensus, error)

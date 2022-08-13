@@ -33,7 +33,7 @@ func putIbftExtraValidators(h *types.Header, validators []types.Address) {
 
 	ibftExtra := &IstanbulExtra{
 		Validators:    validators,
-		Seal:          []byte{},
+		ProposerSeal:  []byte{},
 		CommittedSeal: [][]byte{},
 	}
 
@@ -77,7 +77,7 @@ func getIbftExtra(h *types.Header) (*IstanbulExtra, error) {
 // IstanbulExtra defines the structure of the extra field for Istanbul
 type IstanbulExtra struct {
 	Validators    []types.Address
-	Seal          []byte
+	ProposerSeal  []byte
 	CommittedSeal [][]byte
 }
 
@@ -98,11 +98,11 @@ func (i *IstanbulExtra) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 
 	vv.Set(vals)
 
-	// Seal
-	if len(i.Seal) == 0 {
+	// ProposerSeal
+	if len(i.ProposerSeal) == 0 {
 		vv.Set(ar.NewNull())
 	} else {
-		vv.Set(ar.NewBytes(i.Seal))
+		vv.Set(ar.NewBytes(i.ProposerSeal))
 	}
 
 	// CommittedSeal
@@ -153,9 +153,9 @@ func (i *IstanbulExtra) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) er
 		}
 	}
 
-	// Seal
+	// ProposerSeal
 	{
-		if i.Seal, err = elems[1].GetBytes(i.Seal); err != nil {
+		if i.ProposerSeal, err = elems[1].GetBytes(i.ProposerSeal); err != nil {
 			return err
 		}
 	}
