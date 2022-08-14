@@ -35,17 +35,6 @@ func (t *ValidatorType) FromString(s string) error {
 	}
 }
 
-func NewValidatorFromType(t ValidatorType) Validator {
-	switch t {
-	case ECDSAValidatorType:
-		return new(ECDSAValidator)
-	case BLSValidatorType:
-		return new(BLSValidator)
-	}
-
-	return nil
-}
-
 func NewValidatorSetFromType(t ValidatorType) ValidatorSet {
 	switch t {
 	case ECDSAValidatorType:
