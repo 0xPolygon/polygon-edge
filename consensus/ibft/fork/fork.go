@@ -8,6 +8,13 @@ import (
 	"github.com/0xPolygon/polygon-edge/validators"
 )
 
+const (
+	// Keys in IBFT Configuration
+	KeyType          = "type"
+	KeyTypes         = "types"
+	KeyValidatorType = "validator_type"
+)
+
 // IBFT Fork represents setting in params.engine.ibft of genesis.json
 type IBFTFork struct {
 	Type          IBFTType                 `json:"type"`
@@ -73,14 +80,14 @@ func (f *IBFTFork) UnmarshalJSON(data []byte) error {
 // GetIBFTForks returns IBFT fork configurations from chain config
 func GetIBFTForks(ibftConfig map[string]interface{}) ([]IBFTFork, error) {
 	// no fork, only specifying IBFT type in chain config
-	if originalType, ok := ibftConfig["type"].(string); ok {
+	if originalType, ok := ibftConfig[KeyType].(string); ok {
 		typ, err := ParseIBFTType(originalType)
 		if err != nil {
 			return nil, err
 		}
 
 		validatorType := validators.ECDSAValidatorType
-		if rawValType, ok := ibftConfig["validator_type"].(string); ok {
+		if rawValType, ok := ibftConfig[KeyValidatorType].(string); ok {
 			if validatorType, err = validators.ParseValidatorType(rawValType); err != nil {
 				return nil, err
 			}
@@ -98,7 +105,7 @@ func GetIBFTForks(ibftConfig map[string]interface{}) ([]IBFTFork, error) {
 	}
 
 	// with forks
-	if types, ok := ibftConfig["types"].([]interface{}); ok {
+	if types, ok := ibftConfig[KeyTypes].([]interface{}); ok {
 		bytes, err := json.Marshal(types)
 		if err != nil {
 			return nil, err

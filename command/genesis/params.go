@@ -7,6 +7,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
+	"github.com/0xPolygon/polygon-edge/consensus/ibft"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/fork"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/contracts/staking"
@@ -265,9 +266,9 @@ func (p *genesisParams) initConsensusEngineConfig() {
 func (p *genesisParams) initIBFTEngineMap(ibftType fork.IBFTType) {
 	p.consensusEngineConfig = map[string]interface{}{
 		string(server.IBFTConsensus): map[string]interface{}{
-			"type":           ibftType,
-			"validator_type": p.ibftValidatorType,
-			"epochSize":      p.epochSize,
+			fork.KeyType:          ibftType,
+			fork.KeyValidatorType: p.ibftValidatorType,
+			ibft.KeyEpochSize:     p.epochSize,
 		},
 	}
 }

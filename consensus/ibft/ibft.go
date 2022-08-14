@@ -25,7 +25,9 @@ import (
 const (
 	DefaultEpochSize = 100000
 	IbftKeyName      = "validator.key"
-	ibftProto        = "/ibft/0.2"
+	KeyEpochSize     = "epochSize"
+
+	ibftProto = "/ibft/0.2"
 )
 
 var (
@@ -89,7 +91,7 @@ func Factory(params *consensus.Params) (consensus.Consensus, error) {
 		quorumSizeBlockNum = uint64(0)
 	)
 
-	if definedEpochSize, ok := params.Config.Config["epochSize"]; ok {
+	if definedEpochSize, ok := params.Config.Config[KeyEpochSize]; ok {
 		// Epoch size is defined, use the passed in one
 		readSize, ok := definedEpochSize.(float64)
 		if !ok {
