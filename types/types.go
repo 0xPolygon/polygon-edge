@@ -150,10 +150,6 @@ func BytesToAddress(b []byte) Address {
 	return a
 }
 
-func AddressToBytes(a Address) []byte {
-	return a[:]
-}
-
 func stringToBytes(str string) []byte {
 	str = strings.TrimPrefix(str, "0x")
 	if len(str)%2 == 1 {
