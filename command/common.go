@@ -64,7 +64,7 @@ func GetValidatorsFromPrefixPath(
 		return nil, err
 	}
 
-	validatorSet := validators.NewValidatorSetFromType(validatorType)
+	validatorSet := validators.NewValidatorsFromType(validatorType)
 
 	for _, file := range files {
 		path := file.Name()
@@ -165,21 +165,4 @@ func getBLSPublicKeyBytesFromSecretManager(manager secrets.SecretsManager) ([]by
 	}
 
 	return pubKeyBytes, nil
-}
-
-func ParseValidators(validatorType validators.ValidatorType, rawValidators []string) (validators.Validators, error) {
-	set := validators.NewValidatorSetFromType(validatorType)
-
-	for _, s := range rawValidators {
-		validator, err := validators.ParseValidator(validatorType, s)
-		if err != nil {
-			return nil, err
-		}
-
-		if err := set.Add(validator); err != nil {
-			return nil, err
-		}
-	}
-
-	return set, nil
 }

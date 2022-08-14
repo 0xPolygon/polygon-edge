@@ -149,7 +149,7 @@ func (p *genesisParams) setValidatorSetFromCli() error {
 		return nil
 	}
 
-	newValidators, err := command.ParseValidators(p.ibftValidatorType, p.ibftValidatorsRaw)
+	newValidators, err := validators.ParseValidators(p.ibftValidatorType, p.ibftValidatorsRaw)
 	if err != nil {
 		return err
 	}
@@ -197,7 +197,7 @@ func (p *genesisParams) initIBFTValidatorType() error {
 }
 
 func (p *genesisParams) initValidatorSet() error {
-	p.ibftValidators = validators.NewValidatorSetFromType(p.ibftValidatorType)
+	p.ibftValidators = validators.NewValidatorsFromType(p.ibftValidatorType)
 
 	// Set validator set
 	// Priority goes to cli command over prefix path

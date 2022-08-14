@@ -12,6 +12,18 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func AddressesToECDSAValidators(addrs ...types.Address) *validators.ECDSAValidators {
+	set := make(validators.ECDSAValidators, len(addrs))
+
+	for idx, addr := range addrs {
+		set[idx] = &validators.ECDSAValidator{
+			Address: addr,
+		}
+	}
+
+	return &set
+}
+
 // useIstanbulHeaderHash is a helper function so that test use istanbulHeaderHash during the test
 func useIstanbulHeaderHash(t *testing.T, signer Signer) {
 	t.Helper()
@@ -41,7 +53,7 @@ func TestExtraEncoding(t *testing.T) {
 	}{
 		{
 			from: &IstanbulExtra{
-				Validators: validators.AddressesToECDSAValidators(
+				Validators: AddressesToECDSAValidators(
 					types.StringToAddress("1"),
 				),
 				ProposerSeal: seal1,
@@ -132,7 +144,7 @@ func TestAppendECDSACommittedSeal(t *testing.T) {
 		signerA = &SignerImpl{
 			NewECDSAKeyManagerFromKey(keys[0]),
 		}
-		validators = validators.AddressesToECDSAValidators(addresses...)
+		validators = AddressesToECDSAValidators(addresses...)
 
 		err error
 	)

@@ -65,7 +65,7 @@ func (s *Snapshot) UnmarshalJSON(data []byte) error {
 	s.Number = raw.Number
 	s.Hash = raw.Hash
 	s.Votes = raw.Votes
-	s.Set = validators.NewValidatorSetFromType(raw.Type)
+	s.Set = validators.NewValidatorsFromType(raw.Type)
 
 	if err := json.Unmarshal(raw.Set, s.Set); err != nil {
 		return err

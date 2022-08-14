@@ -8,6 +8,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
+// NewValidatorFromType instantiates a validator by specified type
 func NewValidatorFromType(t ValidatorType) Validator {
 	switch t {
 	case ECDSAValidatorType:
@@ -19,7 +20,8 @@ func NewValidatorFromType(t ValidatorType) Validator {
 	return nil
 }
 
-func NewValidatorSetFromType(t ValidatorType) Validators {
+// NewValidatorsFromType instantiates a validators by specified type
+func NewValidatorsFromType(t ValidatorType) Validators {
 	switch t {
 	case ECDSAValidatorType:
 		return new(ECDSAValidators)
@@ -30,31 +32,40 @@ func NewValidatorSetFromType(t ValidatorType) Validators {
 	return nil
 }
 
-func ParseValidator(t ValidatorType, s string) (Validator, error) {
-	switch t {
+// ParseValidator parses a validator represented in string
+func ParseValidator(validatorType ValidatorType, validator string) (Validator, error) {
+	switch validatorType {
 	case ECDSAValidatorType:
-		return ParseECDSAValidator(s)
+		return ParseECDSAValidator(validator)
 	case BLSValidatorType:
-		return ParseBLSValidator(s)
+		return ParseBLSValidator(validator)
 	default:
-		return nil, fmt.Errorf("invalid validator type: %s", t)
+		// shouldn't reach here
+		return nil, fmt.Errorf("invalid validator type: %s", validatorType)
 	}
 }
 
-func AddressesToECDSAValidators(addrs ...types.Address) *ECDSAValidators {
-	set := make(ECDSAValidators, len(addrs))
+// ParseValidator parses an array of validator represented in string
+func ParseValidators(validatorType ValidatorType, rawValidators []string) (Validators, error) {
+	set := NewValidatorsFromType(validatorType)
 
-	for idx, addr := range addrs {
-		set[idx] = &ECDSAValidator{
-			Address: addr,
+	for _, s := range rawValidators {
+		validator, err := ParseValidator(validatorType, s)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := set.Add(validator); err != nil {
+			return nil, err
 		}
 	}
 
-	return &set
+	return set, nil
 }
 
-func ParseBLSValidator(s string) (*BLSValidator, error) {
-	subValues := strings.Split(s, ":")
+// ParseBLSValidator parses BLS Validator represented in string
+func ParseBLSValidator(validator string) (*BLSValidator, error) {
+	subValues := strings.Split(validator, ":")
 
 	if len(subValues) != 2 {
 		return nil, fmt.Errorf("invalid validator format, expected [Validator Address]:[BLS Public Key]")

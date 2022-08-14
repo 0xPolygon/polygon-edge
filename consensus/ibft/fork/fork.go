@@ -67,7 +67,7 @@ func (f *IBFTFork) UnmarshalJSON(data []byte) error {
 		return nil
 	}
 
-	f.Validators = validators.NewValidatorSetFromType(f.ValidatorType)
+	f.Validators = validators.NewValidatorsFromType(f.ValidatorType)
 
 	validatorsBytes, err := json.Marshal(raw.Validators)
 	if err != nil {
