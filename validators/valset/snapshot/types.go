@@ -6,6 +6,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
 	"github.com/0xPolygon/polygon-edge/validators/valset"
 )
@@ -103,14 +104,17 @@ func (s *Snapshot) Count(h func(v *valset.Vote) bool) (count int) {
 	return
 }
 
-// RemoveVotes removes votes from the snapshot, based on the passed in callback
-func (s *Snapshot) RemoveVotes(h func(v *valset.Vote) bool) {
-	for i := 0; i < len(s.Votes); i++ {
-		if h(s.Votes[i]) {
-			s.Votes = append(s.Votes[:i], s.Votes[i+1:]...)
-			i--
-		}
-	}
+// AddVote adds a vote to snapshot
+func (s *Snapshot) AddVote(
+	voter types.Address,
+	candidate validators.Validator,
+	authrorize bool,
+) {
+	s.Votes = append(s.Votes, &valset.Vote{
+		Validator: voter,
+		Candidate: candidate,
+		Authorize: authrorize,
+	})
 }
 
 // Copy makes a copy of the snapshot
@@ -126,6 +130,43 @@ func (s *Snapshot) Copy() *Snapshot {
 	}
 
 	return ss
+}
+
+// CountByCandidateAndVoter is a helper method to count votes by voter address and candidate
+func (s *Snapshot) CountByVoterAndCandidate(
+	voter types.Address,
+	candidate validators.Validator,
+) int {
+	return s.Count(func(v *valset.Vote) bool {
+		return v.Validator == voter && v.Candidate.Equal(candidate)
+	})
+}
+
+// CountByCandidateAndVoter is a helper method to count votes by candidate
+func (s *Snapshot) CountByCandidate(
+	candidate validators.Validator,
+) int {
+	return s.Count(func(v *valset.Vote) bool {
+		return v.Candidate.Equal(candidate)
+	})
+}
+
+// RemoveVotesByVoter is a helper method to remove all votes created by specified address
+func (s *Snapshot) RemoveVotesByVoter(
+	address types.Address,
+) int {
+	return s.Count(func(v *valset.Vote) bool {
+		return v.Validator == address
+	})
+}
+
+// RemoveVotesByCandidate is a helper method to remove all votes to specified candidate
+func (s *Snapshot) RemoveVotesByCandidate(
+	candidate validators.Validator,
+) int {
+	return s.Count(func(v *valset.Vote) bool {
+		return v.Candidate.Equal(candidate)
+	})
 }
 
 // snapshotStore defines the structure of the stored snapshots

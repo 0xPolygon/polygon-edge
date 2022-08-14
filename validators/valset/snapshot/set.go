@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
 	"github.com/0xPolygon/polygon-edge/validators/valset"
@@ -25,14 +26,15 @@ var (
 )
 
 var (
-	ErrInvalidNonce           = errors.New("invalid nonce specified")
-	ErrSnapshotNotFound       = errors.New("not found snapshot")
-	ErrUnauthorizedProposer   = errors.New("unauthorized proposer")
-	ErrIncorrectNonce         = errors.New("incorrect vote nonce")
-	ErrAlreadyCandidate       = errors.New("already a candidate")
-	ErrCandidateIsValidator   = errors.New("the candidate is already a validator")
-	ErrCandidateNotExistInSet = errors.New("cannot remove a validator if they're not in the snapshot")
-	ErrAlreadyVoted           = errors.New("already voted for this address")
+	ErrInvalidNonce                 = errors.New("invalid nonce specified")
+	ErrSnapshotNotFound             = errors.New("not found snapshot")
+	ErrUnauthorizedProposer         = errors.New("unauthorized proposer")
+	ErrIncorrectNonce               = errors.New("incorrect vote nonce")
+	ErrAlreadyCandidate             = errors.New("already a candidate")
+	ErrCandidateIsValidator         = errors.New("the candidate is already a validator")
+	ErrCandidateNotExistInSet       = errors.New("cannot remove a validator if they're not in the snapshot")
+	ErrAlreadyVoted                 = errors.New("already voted for this address")
+	ErrMultipleVotesBySameValidator = errors.New("more than one proposal per validator per address found")
 )
 
 type SnapshotValidatorSet struct {
@@ -241,13 +243,12 @@ func (s *SnapshotValidatorSet) ProcessHeader(
 		return err
 	}
 
-	// Check if the recovered proposer is part of the validator set
-	vals, err := s.GetValidators(header.Number)
+	isValidator, err := s.isValidator(proposer, header.Number)
 	if err != nil {
 		return err
 	}
 
-	if !vals.Includes(proposer) {
+	if !isValidator {
 		return ErrUnauthorizedProposer
 	}
 
@@ -258,128 +259,23 @@ func (s *SnapshotValidatorSet) ProcessHeader(
 
 	snap := parentSnap.Copy()
 
-	saveSnap := func() {
-		if !snap.Equal(parentSnap) {
-			snap.Number = header.Number
-			snap.Hash = header.Hash.String()
-
-			s.store.add(snap)
-		}
-	}
-
 	// Reset votes when new epoch
 	if header.Number%s.epochSize == 0 {
-		snap.Votes = nil
-
-		saveSnap()
-
-		// remove in-memory snapshots from two epochs before this one
-		if lowerEpoch := int(header.Number/s.epochSize) - 2; lowerEpoch > 0 {
-			purgeBlock := uint64(lowerEpoch) * s.epochSize
-			s.store.deleteLower(purgeBlock)
-		}
-
-		s.store.updateLastBlock(header.Number)
+		s.resetSnapshot(parentSnap, snap, header)
+		s.removeLowerSnapshots(header.Number)
 
 		return nil
 	}
 
-	// Process votes in the middle of epoch
-	// if we have a miner address, this might be a vote
+	// no vote if miner field is not set
 	if bytes.Equal(header.Miner, types.ZeroAddress[:]) {
 		s.store.updateLastBlock(header.Number)
 
 		return nil
 	}
 
-	// the nonce selects the action
-	var authorize bool
-
-	switch header.Nonce {
-	case nonceAuthVote:
-		authorize = true
-	case nonceDropVote:
-		authorize = false
-	default:
-		return ErrIncorrectNonce
-	}
-
-	validatorType := signer.Type()
-
-	candidate := validators.NewValidatorFromType(validatorType)
-	if err := types.UnmarshalRlp(candidate.UnmarshalRLPFrom, header.Miner); err != nil {
-		return err
-	}
-
-	// validate the vote
-	if authorize {
-		// we can only authorize if they are not on the validators list
-		if snap.Set.Includes(candidate.Addr()) {
-			s.store.updateLastBlock(header.Number)
-
-			return nil
-		}
-	} else {
-		// we can only remove if they are part of the validators list
-		if !snap.Set.Includes(candidate.Addr()) {
-			s.store.updateLastBlock(header.Number)
-
-			return nil
-		}
-	}
-
-	voteCount := snap.Count(func(v *valset.Vote) bool {
-		return v.Validator == proposer && v.Candidate.Equal(candidate)
-	})
-
-	if voteCount > 1 {
-		// there can only be one vote per validator per address
-		return fmt.Errorf("more than one proposal per validator per address found")
-	}
-
-	if voteCount == 0 {
-		// cast the new vote since there is no one yet
-		snap.Votes = append(snap.Votes, &valset.Vote{
-			Validator: proposer,
-			Candidate: candidate,
-			Authorize: authorize,
-		})
-	}
-
-	// check the tally for the proposed validator
-	tally := snap.Count(func(v *valset.Vote) bool {
-		return v.Candidate.Equal(candidate)
-	})
-
-	// If more than a half of all validators voted
-	if tally > snap.Set.Len()/2 {
-		if authorize {
-			// add the candidate to the validators list
-			if err := snap.Set.Add(candidate); err != nil {
-				return err
-			}
-		} else {
-			// remove the candidate from the validators list
-			if err := snap.Set.Del(candidate); err != nil {
-				return err
-			}
-
-			// remove any votes casted by the removed validator
-			snap.RemoveVotes(func(v *valset.Vote) bool {
-				return v.Validator == candidate.Addr()
-			})
-		}
-
-		// remove all the votes that promoted this validator
-		snap.RemoveVotes(func(v *valset.Vote) bool {
-			return v.Candidate.Equal(candidate)
-		})
-	}
-
-	saveSnap()
-	s.store.updateLastBlock(header.Number)
-
-	return nil
+	// Process votes in the middle of epoch
+	return s.processVote(header, signer, proposer, parentSnap, snap)
 }
 
 func (s *SnapshotValidatorSet) Propose(candidate validators.Validator, auth bool, proposer types.Address) error {
@@ -409,33 +305,16 @@ func (s *SnapshotValidatorSet) Propose(candidate validators.Validator, auth bool
 	}
 
 	// check if we have already voted for this candidate
-	count := snap.Count(func(v *valset.Vote) bool {
-		return v.Candidate.Addr() == candidateAddr && v.Validator == proposer
-	})
-
+	count := snap.CountByVoterAndCandidate(proposer, candidate)
 	if count == 1 {
 		return ErrAlreadyVoted
 	}
 
-	if auth {
-		s.candidates = append(s.candidates, &valset.Candidate{
-			Validator: candidate,
-			Authorize: auth,
-		})
-	} else {
-		// get candidate validator information from set
-		// because don't want user to specify data except for address
-		// in case of removal
-		validatorIndex := snap.Set.Index(candidate.Addr())
-		validatorInSet := snap.Set.At(uint64(validatorIndex))
-
-		s.candidates = append(s.candidates, &valset.Candidate{
-			Validator: validatorInSet,
-			Authorize: auth,
-		})
-	}
-
-	return nil
+	return s.addCandidate(
+		snap.Set,
+		candidate,
+		auth,
+	)
 }
 
 // Votes returns the votes in the snapshot at the specified height
@@ -446,6 +325,37 @@ func (s *SnapshotValidatorSet) Votes(height uint64) ([]*valset.Vote, error) {
 	}
 
 	return snapshot.Votes, nil
+}
+
+// AddCandidate adds new candidate to candidate list
+func (s *SnapshotValidatorSet) addCandidate(
+	validators validators.Validators,
+	candidate validators.Validator,
+	authrorize bool,
+) error {
+	if authrorize {
+		s.candidates = append(s.candidates, &valset.Candidate{
+			Validator: candidate,
+			Authorize: authrorize,
+		})
+
+		return nil
+	}
+
+	// get candidate validator information from set
+	// because don't want user to specify data except for address
+	// in case of removal
+	validatorIndex := validators.Index(candidate.Addr())
+	if validatorIndex == -1 {
+		return ErrCandidateNotExistInSet
+	}
+
+	s.candidates = append(s.candidates, &valset.Candidate{
+		Validator: validators.At(uint64(validatorIndex)),
+		Authorize: authrorize,
+	})
+
+	return nil
 }
 
 // Candidates returns the current candidates
@@ -542,6 +452,127 @@ func (s *SnapshotValidatorSet) pickOneCandidate(
 			return c
 		}
 	}
+
+	return nil
+}
+
+// isValidator is a helper function to returns a validator with the given address is
+// a validator in the specified height
+func (s *SnapshotValidatorSet) isValidator(
+	address types.Address,
+	height uint64,
+) (bool, error) {
+	// Check if the recovered proposer is part of the validator set
+	vals, err := s.GetValidators(height)
+	if err != nil {
+		return false, err
+	}
+
+	return vals.Includes(address), nil
+}
+
+// saveSnapshotIfChanged is a helper method to save snapshot updated by the given header
+// only if the snapshot is updated from parent snapshot
+func (s *SnapshotValidatorSet) saveSnapshotIfChanged(
+	parentSnapshot, snapshot *Snapshot,
+	header *types.Header,
+) {
+	if snapshot.Equal(parentSnapshot) {
+		return
+	}
+
+	snapshot.Number = header.Number
+	snapshot.Hash = header.Hash.String()
+
+	s.store.add(snapshot)
+	s.store.updateLastBlock(header.Number)
+}
+
+// resetSnapshot is a helper method to save a snapshot that clears votes
+func (s *SnapshotValidatorSet) resetSnapshot(
+	parentSnapshot, snapshot *Snapshot,
+	header *types.Header,
+) {
+	snapshot.Votes = nil
+
+	s.saveSnapshotIfChanged(parentSnapshot, snapshot, header)
+}
+
+// removeLowerSnapshots is a helper function to removes old snapshots
+func (s *SnapshotValidatorSet) removeLowerSnapshots(
+	currentHeight uint64,
+) {
+	// remove in-memory snapshots from two epochs before this one
+	lowerEpoch := int(currentHeight/s.epochSize) - 2
+	if lowerEpoch > 0 {
+		purgeBlock := uint64(lowerEpoch) * s.epochSize
+		s.store.deleteLower(purgeBlock)
+	}
+}
+
+// processVote processes a vote in header
+func (s *SnapshotValidatorSet) processVote(
+	header *types.Header,
+	signer signer.Signer,
+	proposer types.Address,
+	parentSnapshot, snapshot *Snapshot,
+) error {
+	// the nonce selects the action
+	authorize, err := isAuthorize(header.Nonce)
+	if err != nil {
+		return err
+	}
+
+	validatorType := signer.Type()
+
+	// parse candidate validator set in header.Miner
+	candidate := validators.NewValidatorFromType(validatorType)
+	if err := types.UnmarshalRlp(candidate.UnmarshalRLPFrom, header.Miner); err != nil {
+		return err
+	}
+
+	// if candidate has been processed as expected, just update last block
+	if !shouldProcessVote(snapshot.Set, candidate.Addr(), authorize) {
+		s.store.updateLastBlock(header.Number)
+
+		return nil
+	}
+
+	voteCount := snapshot.CountByVoterAndCandidate(proposer, candidate)
+	if voteCount > 1 {
+		// there can only be one vote per validator per address
+		return ErrMultipleVotesBySameValidator
+	}
+
+	if voteCount == 0 {
+		// cast the new vote since there is no one yet
+		snapshot.AddVote(proposer, candidate, authorize)
+	}
+
+	// check the tally for the proposed validator
+	totalVotes := snapshot.CountByCandidate(candidate)
+
+	// If more than a half of all validators voted
+	if totalVotes > snapshot.Set.Len()/2 {
+		if err := addsOrDelsCandidate(
+			snapshot.Set,
+			candidate,
+			authorize,
+		); err != nil {
+			return err
+		}
+
+		if !authorize {
+			// remove any votes casted by the removed validator
+			snapshot.RemoveVotesByVoter(candidate.Addr())
+		}
+
+		// remove all the votes that promoted this validator
+		snapshot.RemoveVotesByCandidate(candidate)
+	}
+
+	s.saveSnapshotIfChanged(parentSnapshot, snapshot, header)
+	s.store.updateLastBlock(header.Number)
 
 	return nil
 }
