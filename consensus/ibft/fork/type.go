@@ -15,18 +15,18 @@ const (
 	PoS IBFTType = "PoS"
 )
 
-// mechanismTypes is the map used for easy string -> mechanism MechanismType lookups
+// ibftTypes is the map used for easy string -> IBFTType lookups
 var ibftTypes = map[string]IBFTType{
 	"PoA": PoA,
 	"PoS": PoS,
 }
 
-// String is a helper method for casting a MechanismType to a string representation
+// String is a helper method for casting a IBFTType to a string representation
 func (t IBFTType) String() string {
 	return string(t)
 }
 
-// ParseType converts a mechanism string representation to a MechanismType
+// ParseIBFTType converts a ibftType string representation to a IBFTType
 func ParseIBFTType(ibftType string) (IBFTType, error) {
 	// Check if the cast is possible
 	castType, ok := ibftTypes[ibftType]
