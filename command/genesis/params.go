@@ -187,7 +187,8 @@ func (p *genesisParams) initIBFTValidatorType() error {
 		return nil
 	}
 
-	if err := p.ibftValidatorType.FromString(p.rawIBFTValidatorType); err != nil {
+	var err error
+	if p.ibftValidatorType, err = validators.ParseValidatorType(p.rawIBFTValidatorType); err != nil {
 		return err
 	}
 

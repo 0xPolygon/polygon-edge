@@ -81,7 +81,7 @@ func GetIBFTForks(ibftConfig map[string]interface{}) ([]IBFTFork, error) {
 
 		validatorType := validators.ECDSAValidatorType
 		if rawValType, ok := ibftConfig["validator_type"].(string); ok {
-			if err := validatorType.FromString(rawValType); err != nil {
+			if validatorType, err = validators.ParseValidatorType(rawValType); err != nil {
 				return nil, err
 			}
 		}

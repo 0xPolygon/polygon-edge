@@ -37,9 +37,13 @@ func newIBFTSnapshotResult(resp *ibftOp.Snapshot) (*IBFTSnapshotResult, error) {
 		res.Votes[i].Vote = ibftHelper.BoolToVote(v.Auth)
 	}
 
+	var (
+		validatorType validators.ValidatorType
+		err           error
+	)
+
 	for i, v := range resp.Validators {
-		var validatorType validators.ValidatorType
-		if err := validatorType.FromString(v.Type); err != nil {
+		if validatorType, err = validators.ParseValidatorType(v.Type); err != nil {
 			return nil, err
 		}
 
