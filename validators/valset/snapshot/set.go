@@ -501,24 +501,36 @@ func (s *SnapshotValidatorSet) getNextCandidate(
 
 	// first, we need to remove any candidates that have already been
 	// selected as validators
-	for i := 0; i < len(s.candidates); i++ {
-		addr := s.candidates[i].Validator.Addr()
+	s.cleanObsolateCandidates(snap.Set)
 
-		// Define the delete callback method
-		deleteFn := func() {
-			s.candidates = append(s.candidates[:i], s.candidates[i+1:]...)
-			i--
-		}
+	// now pick the first candidate that has not received a vote yet
+	return s.pickOneCandidate(snap, proposer)
+}
 
-		// Delete candidate if the candidate has been processed already
-		if s.candidates[i].Authorize == snap.Set.Includes(addr) {
-			deleteFn()
+// cleanObsolateCandidates removes useless candidates from candidates field
+// Unsafe against concurrent accesses
+func (s *SnapshotValidatorSet) cleanObsolateCandidates(set validators.Validators) {
+	newCandidates := make([]*valset.Candidate, 0, len(s.candidates))
+
+	for _, candidate := range s.candidates {
+		// If Authorize is
+		// true => Candidate needs to be in Set
+		// false => Candiate needs not to be in Set
+		// if the current situetion is not so, it's still a candidate
+		if candidate.Authorize != set.Includes(candidate.Validator.Addr()) {
+			newCandidates = append(newCandidates, candidate)
 		}
 	}
 
-	var candidate *valset.Candidate
+	s.candidates = newCandidates
+}
 
-	// now pick the first candidate that has not received a vote yet
+// pickOneCandidate returns a propser candidate from candidates field
+// Unsafe against concurrent accesses
+func (s *SnapshotValidatorSet) pickOneCandidate(
+	snap *Snapshot,
+	proposer types.Address,
+) *valset.Candidate {
 	for _, c := range s.candidates {
 		addr := c.Validator.Addr()
 
@@ -527,12 +539,9 @@ func (s *SnapshotValidatorSet) getNextCandidate(
 		})
 
 		if count == 0 {
-			// Candidate found
-			candidate = c
-
-			break
+			return c
 		}
 	}
 
-	return candidate
+	return nil
 }
