@@ -5,22 +5,9 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/0xPolygon/polygon-edge/validators/valset"
 	"github.com/0xPolygon/polygon-edge/validators/valset/snapshot"
 	"github.com/hashicorp/go-hclog"
 )
-
-// ibftTypeToSourceType returns source type from IBFT Type
-func ibftTypeToSourceType(ibftType IBFTType) valset.SourceType {
-	switch ibftType {
-	case PoA:
-		return valset.Snapshot
-	case PoS:
-		return valset.Contract
-	default:
-		return valset.Snapshot
-	}
-}
 
 // removeFile is a helper function to remove a file
 // log when error occurs

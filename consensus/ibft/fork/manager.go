@@ -113,7 +113,7 @@ func (m *forkManagerImpl) GetValidatorSet(height uint64) (valset.ValidatorSet, e
 		return nil, ErrForkNotFound
 	}
 
-	set, ok := m.validatorSets[ibftTypeToSourceType(fork.Type)]
+	set, ok := m.validatorSets[ibftTypesToSourceType[fork.Type]]
 	if !ok {
 		return nil, ErrValidatorSetNotFound
 	}
@@ -183,7 +183,7 @@ func (m *forkManagerImpl) initializeSigners() error {
 
 func (m *forkManagerImpl) initializeValidatorSets() error {
 	for _, fork := range m.forks {
-		sourceType := ibftTypeToSourceType(fork.Type)
+		sourceType := ibftTypesToSourceType[fork.Type]
 		if err := m.initializeValidatorSet(sourceType); err != nil {
 			return err
 		}
