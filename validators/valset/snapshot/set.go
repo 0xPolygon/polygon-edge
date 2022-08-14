@@ -82,7 +82,8 @@ func (s *SnapshotValidatorSet) initialize() error {
 	meta := s.GetSnapshotMetadata()
 
 	if header.Number == 0 {
-		// Add genesis
+		// Genesis header needs to be set by hand, all the other
+		// snapshots are set as part of processHeaders
 		if err := s.addHeaderSnap(header); err != nil {
 			return err
 		}
@@ -125,19 +126,8 @@ func (s *SnapshotValidatorSet) initialize() error {
 	if header.Number > meta.LastBlock {
 		s.logger.Info("syncing past snapshots", "from", meta.LastBlock, "to", header.Number)
 
-		for num := meta.LastBlock + 1; num <= header.Number; num++ {
-			if num == 0 {
-				continue
-			}
-
-			header, ok := s.blockchain.GetHeaderByNumber(num)
-			if !ok {
-				return fmt.Errorf("header %d not found", num)
-			}
-
-			if err := s.ProcessHeader(header); err != nil {
-				return err
-			}
+		if err := s.ProcessHeadersInRange(meta.LastBlock+1, header.Number); err != nil {
+			return err
 		}
 	}
 
@@ -221,6 +211,28 @@ func (s *SnapshotValidatorSet) ModifyHeader(header *types.Header, proposer types
 func (s *SnapshotValidatorSet) VerifyHeader(header *types.Header) error {
 	if header.Nonce != nonceAuthVote && header.Nonce != nonceDropVote {
 		return ErrInvalidNonce
+	}
+
+	return nil
+}
+
+// ProcessHeadersInRange is a helper function process headers in the given range
+func (s *SnapshotValidatorSet) ProcessHeadersInRange(
+	from, to uint64,
+) error {
+	for i := from; i <= to; i++ {
+		if i == 0 {
+			continue
+		}
+
+		header, ok := s.blockchain.GetHeaderByNumber(i)
+		if !ok {
+			return fmt.Errorf("header %d not found", i)
+		}
+
+		if err := s.ProcessHeader(header); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -365,8 +377,7 @@ func (s *SnapshotValidatorSet) Candidates() []*valset.Candidate {
 
 // addHeaderSnap creates the initial snapshot, and adds it to the snapshot store
 func (s *SnapshotValidatorSet) addHeaderSnap(header *types.Header) error {
-	// Genesis header needs to be set by hand, all the other
-	// snapshots are set as part of processHeaders
+
 	signer, err := s.getSigner(header.Number)
 	if err != nil {
 		return err
