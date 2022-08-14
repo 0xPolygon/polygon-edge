@@ -75,18 +75,3 @@ func ParseBLSValidator(s string) (*BLSValidator, error) {
 		BLSPublicKey: pubKeyBytes,
 	}, nil
 }
-
-func ParseBLSValidators(ss []string) (*BLSValidators, error) {
-	set := make(BLSValidators, len(ss))
-
-	for idx, s := range ss {
-		val, err := ParseBLSValidator(s)
-		if err != nil {
-			return nil, err
-		}
-
-		set[idx] = val
-	}
-
-	return &set, nil
-}
