@@ -53,21 +53,6 @@ func AddressesToECDSAValidators(addrs ...types.Address) *ECDSAValidators {
 	return &set
 }
 
-func ParseECDSAValidators(ss []string) (*ECDSAValidators, error) {
-	set := make(ECDSAValidators, len(ss))
-
-	for idx, s := range ss {
-		val, err := ParseECDSAValidator(s)
-		if err != nil {
-			return nil, err
-		}
-
-		set[idx] = val
-	}
-
-	return &set, nil
-}
-
 func ParseBLSValidator(s string) (*BLSValidator, error) {
 	subValues := strings.Split(s, ":")
 
