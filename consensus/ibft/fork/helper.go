@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/go-hclog"
 )
 
+// ibftTypeToSourceType returns source type from IBFT Type
 func ibftTypeToSourceType(ibftType IBFTType) valset.SourceType {
 	switch ibftType {
 	case PoA:
@@ -21,16 +22,28 @@ func ibftTypeToSourceType(ibftType IBFTType) valset.SourceType {
 	}
 }
 
+// removeFile is a helper function to remove a file
+// log when error occurs
+func removeFile(
+	logger hclog.Logger,
+	path string,
+) {
+	if err := os.Remove(path); err != nil {
+		logger.Error("failed to remove file", "path", path, "err", err)
+	}
+}
+
+// loadSnapshotMetadata loads Metadata from file
 func loadSnapshotMetadata(
 	logger hclog.Logger,
 	path string,
 ) *snapshot.SnapshotMetadata {
 	var meta *snapshot.SnapshotMetadata
 	if err := readDataStore(path, &meta); err != nil {
-		// if we can't read metadata file delete it
-		// and log the error that we've encountered
 		logger.Error("Could not read metadata snapshot store file", "err", err.Error())
-		os.Remove(path)
+
+		removeFile(logger, path)
+
 		logger.Error("Removed invalid metadata snapshot store file")
 
 		return nil
@@ -39,16 +52,17 @@ func loadSnapshotMetadata(
 	return meta
 }
 
+// loadSnapshots loads Snapshots from file
 func loadSnapshots(
 	logger hclog.Logger,
 	path string,
 ) []*snapshot.Snapshot {
 	snaps := []*snapshot.Snapshot{}
 	if err := readDataStore(path, &snaps); err != nil {
-		// if we can't read snapshot store file delete it
-		// and log the error that we've encountered
 		logger.Error("Could not read snapshot store file", "err", err.Error())
-		os.Remove(path)
+
+		removeFile(logger, path)
+
 		logger.Error("Removed invalid snapshot store file")
 
 		return nil
