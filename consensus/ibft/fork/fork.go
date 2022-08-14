@@ -15,6 +15,10 @@ const (
 	KeyValidatorType = "validator_type"
 )
 
+var (
+	ErrUndefinedIBFTConfig = errors.New("IBFT config is not defined")
+)
+
 // IBFT Fork represents setting in params.engine.ibft of genesis.json
 type IBFTFork struct {
 	Type          IBFTType                 `json:"type"`
@@ -119,5 +123,5 @@ func GetIBFTForks(ibftConfig map[string]interface{}) ([]IBFTFork, error) {
 		return forks, nil
 	}
 
-	return nil, errors.New("current IBFT type not found")
+	return nil, ErrUndefinedIBFTConfig
 }
