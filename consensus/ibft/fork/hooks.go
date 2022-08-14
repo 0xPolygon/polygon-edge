@@ -1,7 +1,7 @@
 package fork
 
 import (
-	"fmt"
+	"errors"
 
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/hook"
 	"github.com/0xPolygon/polygon-edge/contracts/staking"
@@ -13,6 +13,11 @@ import (
 	"github.com/0xPolygon/polygon-edge/validators/valset"
 )
 
+var (
+	ErrTxInLastEpochOfBlock = errors.New("block must not have transactions in the last of epoch")
+)
+
+// registerPoSHook registers additional processes for PoS
 func registerPoSHook(
 	hooks *hook.HookManager,
 	epochSize uint64,
@@ -27,13 +32,15 @@ func registerPoSHook(
 
 	hooks.VerifyBlockFunc = func(block *types.Block) error {
 		if isLastEpoch(block.Number()) && len(block.Transactions) > 0 {
-			return fmt.Errorf("block can't have transactions in the last of epoch")
+			return ErrTxInLastEpochOfBlock
 		}
 
 		return nil
 	}
 }
 
+// registerValidatorSetHook registers additional processes
+// for the ValidatorSet that modifies header
 func registerValidatorSetHook(
 	hooks *hook.HookManager,
 	set valset.ValidatorSet,
@@ -48,19 +55,23 @@ func registerValidatorSetHook(
 	}
 }
 
+// registerUpdateValidatorSetHook registers additional process
+// to update validators at specified height
 func registerUpdateValidatorSetHook(
 	hooks *hook.HookManager,
 	set valset.ValidatorSet,
 	newValidators validators.Validators,
-	from uint64,
+	height uint64,
 ) {
 	if us, ok := set.(valset.Updatable); ok {
 		hooks.PostInsertBlockFunc = func(b *types.Block) error {
-			return us.UpdateSet(newValidators, from)
+			return us.UpdateSet(newValidators, height)
 		}
 	}
 }
 
+// registerContractDeploymentHook registers additional process
+// to deploy contract or update contract byte code
 func registerContractDeploymentHook(
 	hooks *hook.HookManager,
 	fork *IBFTFork,
