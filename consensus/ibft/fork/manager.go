@@ -143,20 +143,20 @@ func (m *forkManagerImpl) GetHooks(height uint64) (hook.Hooks, error) {
 	// PoA
 	switch fork.Type {
 	case PoA:
-		err = m.registerPoAHooks(hooks, fork, height)
+		err = m.registerPoAHooks(hooks, height)
 	case PoS:
-		m.registerPoSHooks(hooks, fork, height)
+		registerPoSHook(hooks, m.epochSize)
 	}
 
 	if err != nil {
 		return nil, err
 	}
 
-	if err := m.registerPoAPrepareHooks(hooks, fork, height); err != nil {
+	if err := m.registerPoAPrepareHooks(hooks, height); err != nil {
 		return nil, err
 	}
 
-	m.registerPoSPrepareHooks(hooks, fork, height)
+	m.registerPoSPrepareHooks(hooks, height)
 
 	return hooks, nil
 }
@@ -296,7 +296,6 @@ func (m *forkManagerImpl) initializeContractValidatorSet() (valset.ValidatorSet,
 
 func (m *forkManagerImpl) registerPoAHooks(
 	hooks *hook.HookManager,
-	fork *IBFTFork,
 	height uint64,
 ) error {
 	valSet, err := m.GetValidatorSet(height)
@@ -311,7 +310,6 @@ func (m *forkManagerImpl) registerPoAHooks(
 
 func (m *forkManagerImpl) registerPoAPrepareHooks(
 	hooks *hook.HookManager,
-	fork *IBFTFork,
 	height uint64,
 ) error {
 	fromFork := m.getForkByFrom(height + 1)
@@ -334,17 +332,8 @@ func (m *forkManagerImpl) registerPoAPrepareHooks(
 	return nil
 }
 
-func (m *forkManagerImpl) registerPoSHooks(
-	hooks *hook.HookManager,
-	fork *IBFTFork,
-	height uint64,
-) {
-	registerPoSHook(hooks, m.epochSize)
-}
-
 func (m *forkManagerImpl) registerPoSPrepareHooks(
 	hooks *hook.HookManager,
-	fork *IBFTFork,
 	height uint64,
 ) {
 	deploymentFork := m.getForkByDeployment(height + 1)
