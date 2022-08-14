@@ -234,8 +234,15 @@ func (m *forkManagerImpl) initializeValidatorSet(setType valset.SourceType) erro
 }
 
 func (m *forkManagerImpl) initializeSnapshotValidatorSet() (valset.ValidatorSet, error) {
-	snapshotMeta := loadSnapshotMetadata(m.logger, filepath.Join(m.filePath, snapshotMetadataFilename))
-	snapshots := loadSnapshots(m.logger, filepath.Join(m.filePath, snapshotSnapshotsFilename))
+	snapshotMeta, err := loadSnapshotMetadata(filepath.Join(m.filePath, snapshotMetadataFilename))
+	if err != nil {
+		return nil, err
+	}
+
+	snapshots, err := loadSnapshots(filepath.Join(m.filePath, snapshotSnapshotsFilename))
+	if err != nil {
+		return nil, err
+	}
 
 	snapshotValset, err := snapshot.NewSnapshotValidatorSet(
 		m.logger,
