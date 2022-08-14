@@ -66,10 +66,12 @@ func FetchBLSValidators(
 			continue
 		}
 
-		_ = blsValidators.Add(&validators.BLSValidator{
+		if err := blsValidators.Add(&validators.BLSValidator{
 			Address:      valAddrs[idx],
 			BLSPublicKey: blsPublicKeys[idx],
-		})
+		}); err != nil {
+			return nil, err
+		}
 	}
 
 	return blsValidators, nil
