@@ -81,10 +81,11 @@ func (v *Vote) Equal(vv *Vote) bool {
 
 // Copy makes a copy of the vote, and returns it
 func (v *Vote) Copy() *Vote {
-	vv := new(Vote)
-	*vv = *v
-
-	return vv
+	return &Vote{
+		Validator: v.Validator,
+		Candidate: v.Candidate.Copy(),
+		Authorize: v.Authorize,
+	}
 }
 
 type Candidate struct {
