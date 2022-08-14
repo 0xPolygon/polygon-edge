@@ -1,8 +1,6 @@
 package valset
 
 import (
-	"fmt"
-
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
@@ -23,25 +21,9 @@ const (
 	Contract SourceType = "Contract"
 )
 
-var sourceTypes = map[string]SourceType{
-	string(Snapshot): Snapshot,
-	string(Contract): Contract,
-}
-
 // String is a helper method for casting a SourceType to a string representation
 func (t SourceType) String() string {
 	return string(t)
-}
-
-// ParseType converts a source string representation to a SourceType
-func ParseSourceType(sourceType string) (SourceType, error) {
-	// Check if the cast is possible
-	castType, ok := sourceTypes[sourceType]
-	if !ok {
-		return castType, fmt.Errorf("invalid Validator Set Source type %s", sourceType)
-	}
-
-	return castType, nil
 }
 
 type ValidatorSet interface {
