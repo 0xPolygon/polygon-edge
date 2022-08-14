@@ -26,6 +26,8 @@ var (
 	ErrValidatorSetNotFound = errors.New("validator set not found")
 )
 
+// ForkManager is an interface of the module that has Fork configuration and multiple version of submodules
+// and returns the proper submodule at specified height
 type ForkManager interface {
 	Initialize() error
 	GetSigner(uint64) (signer.Signer, error)
@@ -35,6 +37,7 @@ type ForkManager interface {
 	Close() error
 }
 
+// forkManagerImpl is a implementation of ForkManager
 type forkManagerImpl struct {
 	logger         hclog.Logger
 	blockchain     valset.HeaderGetter
@@ -50,6 +53,7 @@ type forkManagerImpl struct {
 	validatorSets map[valset.SourceType]valset.ValidatorSet
 }
 
+// NewForkManager is a constructor of forkManagerImpl
 func NewForkManager(
 	logger hclog.Logger,
 	blockchain valset.HeaderGetter,
@@ -77,7 +81,7 @@ func NewForkManager(
 	}
 
 	// Need initialization of signers in the constructor
-	// because hash calculation is called on blockchain initialization
+	// because hash calculation is called from blockchain initialization
 	if err := fm.initializeSigners(); err != nil {
 		return nil, err
 	}
@@ -85,6 +89,7 @@ func NewForkManager(
 	return fm, nil
 }
 
+// Initialize initializes ForkManager on initialization phase
 func (m *forkManagerImpl) Initialize() error {
 	if err := m.initializeValidatorSets(); err != nil {
 		return err
@@ -93,6 +98,7 @@ func (m *forkManagerImpl) Initialize() error {
 	return nil
 }
 
+// GetSigner returns a proper signer at specified height
 func (m *forkManagerImpl) GetSigner(height uint64) (signer.Signer, error) {
 	fork := m.getFork(height)
 	if fork == nil {
@@ -107,6 +113,7 @@ func (m *forkManagerImpl) GetSigner(height uint64) (signer.Signer, error) {
 	return signer, nil
 }
 
+// GetValidatorSet returns a proper validator set at specified height
 func (m *forkManagerImpl) GetValidatorSet(height uint64) (valset.ValidatorSet, error) {
 	fork := m.getFork(height)
 	if fork == nil {
@@ -121,6 +128,7 @@ func (m *forkManagerImpl) GetValidatorSet(height uint64) (valset.ValidatorSet, e
 	return set, nil
 }
 
+// GetValidatorSet returns validators at specified height
 func (m *forkManagerImpl) GetValidators(height uint64) (validators.Validators, error) {
 	set, err := m.GetValidatorSet(height)
 	if err != nil {
@@ -130,6 +138,7 @@ func (m *forkManagerImpl) GetValidators(height uint64) (validators.Validators, e
 	return set.GetValidators(height)
 }
 
+// GetHooks returns a hooks at specified height
 func (m *forkManagerImpl) GetHooks(height uint64) (hook.Hooks, error) {
 	hooks := &hook.HookManager{}
 
@@ -140,7 +149,6 @@ func (m *forkManagerImpl) GetHooks(height uint64) (hook.Hooks, error) {
 
 	var err error
 
-	// PoA
 	switch fork.Type {
 	case PoA:
 		err = m.registerPoAHooks(hooks, height)
@@ -161,6 +169,7 @@ func (m *forkManagerImpl) GetHooks(height uint64) (hook.Hooks, error) {
 	return hooks, nil
 }
 
+// Close calls termination process of submodules
 func (m *forkManagerImpl) Close() error {
 	if err := m.closeSnapshotValidatorSet(); err != nil {
 		return err
@@ -169,6 +178,7 @@ func (m *forkManagerImpl) Close() error {
 	return nil
 }
 
+// initializeSigners initialize all signers based on Fork configuration
 func (m *forkManagerImpl) initializeSigners() error {
 	for _, fork := range m.forks {
 		valType := fork.ValidatorType
@@ -181,6 +191,7 @@ func (m *forkManagerImpl) initializeSigners() error {
 	return nil
 }
 
+// initializeValidatorSets initializes all validator sets based on Fork configuration
 func (m *forkManagerImpl) initializeValidatorSets() error {
 	for _, fork := range m.forks {
 		sourceType := ibftTypesToSourceType[fork.Type]
@@ -192,6 +203,7 @@ func (m *forkManagerImpl) initializeValidatorSets() error {
 	return nil
 }
 
+// initializeSigner initializes the specified signer
 func (m *forkManagerImpl) initializeSigner(valType validators.ValidatorType) error {
 	if _, ok := m.signers[valType]; ok {
 		return nil
@@ -207,6 +219,7 @@ func (m *forkManagerImpl) initializeSigner(valType validators.ValidatorType) err
 	return nil
 }
 
+// initializeSigner initializes the specified validator set
 func (m *forkManagerImpl) initializeValidatorSet(setType valset.SourceType) error {
 	if _, ok := m.validatorSets[setType]; ok {
 		return nil
@@ -221,7 +234,13 @@ func (m *forkManagerImpl) initializeValidatorSet(setType valset.SourceType) erro
 	case valset.Snapshot:
 		valSet, err = m.initializeSnapshotValidatorSet()
 	case valset.Contract:
-		valSet, err = m.initializeContractValidatorSet()
+		valSet, err = contract.NewContractValidatorSet(
+			m.logger,
+			m.blockchain,
+			m.executor,
+			m.GetSigner,
+			m.epochSize,
+		)
 	}
 
 	if err != nil {
@@ -233,6 +252,7 @@ func (m *forkManagerImpl) initializeValidatorSet(setType valset.SourceType) erro
 	return nil
 }
 
+// initializeSnapshotValidatorSet loads data from file and initializes Snapshot validator set
 func (m *forkManagerImpl) initializeSnapshotValidatorSet() (valset.ValidatorSet, error) {
 	snapshotMeta, err := loadSnapshotMetadata(filepath.Join(m.filePath, snapshotMetadataFilename))
 	if err != nil {
@@ -260,6 +280,7 @@ func (m *forkManagerImpl) initializeSnapshotValidatorSet() (valset.ValidatorSet,
 	return snapshotValset, nil
 }
 
+// closeSnapshotValidatorSet gets data from Snapshot validator set and save to files
 func (m *forkManagerImpl) closeSnapshotValidatorSet() error {
 	snapshotValset, ok := m.validatorSets[valset.Snapshot].(*snapshot.SnapshotValidatorSet)
 	if !ok {
@@ -284,16 +305,7 @@ func (m *forkManagerImpl) closeSnapshotValidatorSet() error {
 	return nil
 }
 
-func (m *forkManagerImpl) initializeContractValidatorSet() (valset.ValidatorSet, error) {
-	return contract.NewContractValidatorSet(
-		m.logger,
-		m.blockchain,
-		m.executor,
-		m.GetSigner,
-		m.epochSize,
-	)
-}
-
+// registerPoAHooks register additional processes for PoA
 func (m *forkManagerImpl) registerPoAHooks(
 	hooks *hook.HookManager,
 	height uint64,
@@ -308,6 +320,7 @@ func (m *forkManagerImpl) registerPoAHooks(
 	return nil
 }
 
+// registerPoAHooks register additional processes to start PoA in the middle
 func (m *forkManagerImpl) registerPoAPrepareHooks(
 	hooks *hook.HookManager,
 	height uint64,
@@ -332,6 +345,7 @@ func (m *forkManagerImpl) registerPoAPrepareHooks(
 	return nil
 }
 
+// registerPoAHooks register additional processes to start PoS in the middle
 func (m *forkManagerImpl) registerPoSPrepareHooks(
 	hooks *hook.HookManager,
 	height uint64,
@@ -344,6 +358,7 @@ func (m *forkManagerImpl) registerPoSPrepareHooks(
 	registerContractDeploymentHook(hooks, deploymentFork)
 }
 
+// getFork returns a fork the specified height uses
 func (m *forkManagerImpl) getFork(height uint64) *IBFTFork {
 	for idx := len(m.forks) - 1; idx >= 0; idx-- {
 		fork := m.forks[idx]
@@ -356,6 +371,7 @@ func (m *forkManagerImpl) getFork(height uint64) *IBFTFork {
 	return nil
 }
 
+// getForkByFrom returns a fork whose From matches with the specified height
 func (m *forkManagerImpl) getForkByFrom(height uint64) *IBFTFork {
 	for _, fork := range m.forks {
 		if fork.From.Value == height {
@@ -366,6 +382,7 @@ func (m *forkManagerImpl) getForkByFrom(height uint64) *IBFTFork {
 	return nil
 }
 
+// getForkByFrom returns a fork whose Development matches with the specified height
 func (m *forkManagerImpl) getForkByDeployment(height uint64) *IBFTFork {
 	for _, fork := range m.forks {
 		if fork.Deployment != nil && fork.Deployment.Value == height {
