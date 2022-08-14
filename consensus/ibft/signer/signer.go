@@ -21,7 +21,6 @@ var (
 	ErrValidatorNotFound          = errors.New("not found validator in validator set")
 	ErrInvalidValidatorSet        = errors.New("invalid validator set type")
 	ErrInvalidSignature           = errors.New("invalid signature")
-	ErrNilParentHeader            = errors.New("parent header is nil")
 )
 
 // Signer is responsible for signing for blocks and messages in IBFT
