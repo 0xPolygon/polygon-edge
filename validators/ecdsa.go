@@ -1,53 +1,47 @@
 package validators
 
 import (
-	"encoding/hex"
 	"fmt"
-	"strings"
 
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/fastrlp"
 )
 
+// BLSValidator is a validator using ECDSA signing algorithm
 type ECDSAValidator struct {
 	Address types.Address
 }
 
+// NewECDSAValidator is a constructor of ECDSAValidator
 func NewECDSAValidator(addr types.Address) *ECDSAValidator {
 	return &ECDSAValidator{
 		Address: addr,
 	}
 }
 
-func ParseECDSAValidator(s string) (*ECDSAValidator, error) {
-	bytes, err := hex.DecodeString(strings.TrimPrefix(s, "0x"))
-	if err != nil {
-		return nil, err
-	}
-
-	return &ECDSAValidator{
-		Address: types.BytesToAddress(bytes),
-	}, nil
-}
-
+// Type returns the ValidatorType of ECDSAValidator
 func (v *ECDSAValidator) Type() ValidatorType {
 	return ECDSAValidatorType
 }
 
+// String returns string representation of ECDSAValidator
 func (v *ECDSAValidator) String() string {
 	return v.Address.String()
 }
 
+// Addr returns the validator address
 func (v *ECDSAValidator) Addr() types.Address {
 	return v.Address
 }
 
+// Copy returns copy of ECDSAValidator
 func (v *ECDSAValidator) Copy() Validator {
 	return &ECDSAValidator{
 		Address: v.Address,
 	}
 }
 
+// Equal checks the given validator matches with its data
 func (v *ECDSAValidator) Equal(vr Validator) bool {
 	vv, ok := vr.(*ECDSAValidator)
 	if !ok {
@@ -57,6 +51,7 @@ func (v *ECDSAValidator) Equal(vr Validator) bool {
 	return v.Address == vv.Address
 }
 
+// MarshalRLPWith is a RLP Marshaller
 func (v *ECDSAValidator) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 	vv := arena.NewArray()
 
@@ -65,6 +60,7 @@ func (v *ECDSAValidator) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 	return vv
 }
 
+// UnmarshalRLPFrom is a RLP Unmarshaller
 func (v *ECDSAValidator) UnmarshalRLPFrom(p *fastrlp.Parser, val *fastrlp.Value) error {
 	elems, err := val.GetElems()
 	if err != nil {
@@ -82,24 +78,30 @@ func (v *ECDSAValidator) UnmarshalRLPFrom(p *fastrlp.Parser, val *fastrlp.Value)
 	return nil
 }
 
+// Bytes returns bytes of ECDSAValidator in RLP encode
 func (v *ECDSAValidator) Bytes() []byte {
 	return types.MarshalRLPTo(v.MarshalRLPWith, nil)
 }
 
+// SetFromBytes parses given bytes in RLP encode and map to its fields
 func (v *ECDSAValidator) SetFromBytes(input []byte) error {
 	return types.UnmarshalRlp(v.UnmarshalRLPFrom, input)
 }
 
+// ECDSAValidators is a collection of ECDSAValidator
 type ECDSAValidators []*ECDSAValidator
 
+// Type returns the type of validator
 func (vs *ECDSAValidators) Type() ValidatorType {
 	return ECDSAValidatorType
 }
 
+// Len returns the size of its collection
 func (vs *ECDSAValidators) Len() int {
 	return len(*vs)
 }
 
+// Equal checks the given validators matches with its data
 func (vs *ECDSAValidators) Equal(ts Validators) bool {
 	vts, ok := ts.(*ECDSAValidators)
 	if !ok {
@@ -111,8 +113,7 @@ func (vs *ECDSAValidators) Equal(ts Validators) bool {
 	}
 
 	for idx, vsv := range *vs {
-		tsv := (*vts)[idx]
-		if !vsv.Equal(tsv) {
+		if tsv := (*vts)[idx]; !vsv.Equal(tsv) {
 			return false
 		}
 	}
@@ -120,6 +121,7 @@ func (vs *ECDSAValidators) Equal(ts Validators) bool {
 	return true
 }
 
+// Copy returns a copy of BLSValidators
 func (vs *ECDSAValidators) Copy() Validators {
 	clone := make(ECDSAValidators, vs.Len())
 
@@ -130,10 +132,13 @@ func (vs *ECDSAValidators) Copy() Validators {
 	return &clone
 }
 
+// At returns a validator at specified index in the collection
 func (vs *ECDSAValidators) At(index uint64) Validator {
 	return (*vs)[index]
 }
 
+// Index returns the index of the validator whose address
+// matches with the given address
 func (vs *ECDSAValidators) Index(addr types.Address) int64 {
 	for i, v := range *vs {
 		if v.Address == addr {
@@ -144,10 +149,13 @@ func (vs *ECDSAValidators) Index(addr types.Address) int64 {
 	return -1
 }
 
+// Includes return the bool indicating whether the validator
+// whose address matches with the given address exists or not
 func (vs *ECDSAValidators) Includes(addr types.Address) bool {
 	return vs.Index(addr) != -1
 }
 
+// Add adds a validator into the collection
 func (vs *ECDSAValidators) Add(v Validator) error {
 	validator, ok := v.(*ECDSAValidator)
 	if !ok {
@@ -163,6 +171,7 @@ func (vs *ECDSAValidators) Add(v Validator) error {
 	return nil
 }
 
+// Del removes a validator from the collection
 func (vs *ECDSAValidators) Del(v Validator) error {
 	validator, ok := v.(*ECDSAValidator)
 	if !ok {
@@ -180,6 +189,7 @@ func (vs *ECDSAValidators) Del(v Validator) error {
 	return nil
 }
 
+// Merge introduces the given collection into its collection
 func (vs *ECDSAValidators) Merge(vts Validators) error {
 	targetSet, ok := vts.(*ECDSAValidators)
 	if !ok {
@@ -199,6 +209,7 @@ func (vs *ECDSAValidators) Merge(vts Validators) error {
 	return nil
 }
 
+// MarshalRLPWith is a RLP Marshaller
 func (vs *ECDSAValidators) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 	vv := arena.NewArray()
 
@@ -209,6 +220,7 @@ func (vs *ECDSAValidators) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 	return vv
 }
 
+// UnmarshalRLPFrom is a RLP Unmarshaller
 func (vs *ECDSAValidators) UnmarshalRLPFrom(p *fastrlp.Parser, val *fastrlp.Value) error {
 	elems, err := val.GetElems()
 	if err != nil {

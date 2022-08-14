@@ -36,7 +36,7 @@ func NewValidatorsFromType(t ValidatorType) Validators {
 func ParseValidator(validatorType ValidatorType, validator string) (Validator, error) {
 	switch validatorType {
 	case ECDSAValidatorType:
-		return ParseECDSAValidator(validator)
+		return ParseECDSAValidator(validator), nil
 	case BLSValidatorType:
 		return ParseBLSValidator(validator)
 	default:
@@ -63,7 +63,14 @@ func ParseValidators(validatorType ValidatorType, rawValidators []string) (Valid
 	return set, nil
 }
 
-// ParseBLSValidator parses BLS Validator represented in string
+// ParseBLSValidator parses ECDSAValidator represented in string
+func ParseECDSAValidator(validator string) *ECDSAValidator {
+	return &ECDSAValidator{
+		Address: types.StringToAddress(validator),
+	}
+}
+
+// ParseBLSValidator parses BLSValidator represented in string
 func ParseBLSValidator(validator string) (*BLSValidator, error) {
 	subValues := strings.Split(validator, ":")
 

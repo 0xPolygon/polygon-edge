@@ -59,17 +59,18 @@ func FetchBLSValidators(
 	}
 
 	blsValidators := &validators.BLSValidators{}
-
 	for idx := range valAddrs {
 		// ignore the validator whose BLS Key is not set
+		// because BLS validator needs to have both Address and BLS Public Key set
+		// in the contract
 		if _, err := crypto.UnmarshalBLSPublicKey(blsPublicKeys[idx]); err != nil {
 			continue
 		}
 
-		if err := blsValidators.Add(&validators.BLSValidator{
-			Address:      valAddrs[idx],
-			BLSPublicKey: blsPublicKeys[idx],
-		}); err != nil {
+		if err := blsValidators.Add(validators.NewBLSValidator(
+			valAddrs[idx],
+			blsPublicKeys[idx],
+		)); err != nil {
 			return nil, err
 		}
 	}
