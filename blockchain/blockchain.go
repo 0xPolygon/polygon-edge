@@ -71,6 +71,8 @@ type Blockchain struct {
 	stream *eventStream // Event subscriptions
 
 	gpAverage *gasPriceAverage // A reference to the average gas price
+
+	writeLock sync.Mutex
 }
 
 // gasPriceAverage keeps track of the average gas price (rolling average)
@@ -85,7 +87,7 @@ type Verifier interface {
 	VerifyHeader(header *types.Header) error
 	ProcessHeaders(headers []*types.Header) error
 	GetBlockCreator(header *types.Header) (types.Address, error)
-	PreStateCommit(header *types.Header, txn *state.Transition) error
+	PreCommitState(header *types.Header, txn *state.Transition) error
 }
 
 type Executor interface {
@@ -103,7 +105,7 @@ func (b *Blockchain) updateGasPriceAvg(newValues []*big.Int) {
 	b.gpAverage.Lock()
 	defer b.gpAverage.Unlock()
 
-	//	Sum the values for quick reference
+	// Sum the values for quick reference
 	sum := big.NewInt(0)
 	for _, val := range newValues {
 		sum = sum.Add(sum, val)
@@ -841,7 +843,7 @@ func (b *Blockchain) executeBlockTransactions(block *types.Block) (*BlockResult,
 		return nil, err
 	}
 
-	if err := b.consensus.PreStateCommit(header, txn); err != nil {
+	if err := b.consensus.PreCommitState(header, txn); err != nil {
 		return nil, err
 	}
 
@@ -859,15 +861,15 @@ func (b *Blockchain) executeBlockTransactions(block *types.Block) (*BlockResult,
 
 // WriteBlock writes a single block to the local blockchain.
 // It doesn't do any kind of verification, only commits the block to the DB
-func (b *Blockchain) WriteBlock(block *types.Block) error {
-	// Log the information
-	b.logger.Info(
-		"write block",
-		"num",
-		block.Number(),
-		"parent",
-		block.ParentHash(),
-	)
+func (b *Blockchain) WriteBlock(block *types.Block, source string) error {
+	b.writeLock.Lock()
+	defer b.writeLock.Unlock()
+
+	if block.Number() <= b.Header().Number {
+		b.logger.Info("block already inserted", "block", block.Number(), "source", source)
+
+		return nil
+	}
 
 	header := block.Header
 
@@ -876,7 +878,7 @@ func (b *Blockchain) WriteBlock(block *types.Block) error {
 	}
 
 	// Write the header to the chain
-	evnt := &Event{}
+	evnt := &Event{Source: source}
 	if err := b.writeHeaderImpl(evnt, header); err != nil {
 		return err
 	}
@@ -894,7 +896,7 @@ func (b *Blockchain) WriteBlock(block *types.Block) error {
 		return err
 	}
 
-	//	update snapshot
+	// update snapshot
 	if err := b.consensus.ProcessHeaders([]*types.Header{header}); err != nil {
 		return err
 	}
@@ -906,8 +908,9 @@ func (b *Blockchain) WriteBlock(block *types.Block) error {
 
 	logArgs := []interface{}{
 		"number", header.Number,
+		"txs", len(block.Transactions),
 		"hash", header.Hash,
-		"txns", len(block.Transactions),
+		"parent", header.ParentHash,
 	}
 
 	if prevHeader, ok := b.GetHeaderByNumber(header.Number - 1); ok {

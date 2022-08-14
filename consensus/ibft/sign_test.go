@@ -3,27 +3,24 @@ package ibft
 import (
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestSign_Sealer(t *testing.T) {
+	t.Parallel()
+
 	pool := newTesterAccountPool(t)
 	pool.add("A")
 
-	snap := &Snapshot{
-		Set: pool.ValidatorSet(),
-	}
+	correctValset := pool.ValidatorSet()
 
 	h := &types.Header{}
-	signerA := signer.NewSigner(
-		signer.NewECDSAKeyManagerFromKey(pool.get("A").priv),
-		signer.NewECDSAKeyManagerFromKey(pool.get("A").priv),
-	)
 
-	err := signerA.InitIBFTExtra(h, &types.Header{}, pool.ValidatorSet())
+	signerA := signer.NewSigner(signer.NewECDSAKeyManagerFromKey(pool.get("A").priv))
+
+	err := signerA.InitIBFTExtra(h, nil, correctValset)
 	assert.NoError(t, err)
 
 	// non-validator address
@@ -31,39 +28,36 @@ func TestSign_Sealer(t *testing.T) {
 
 	signerX := signer.NewSigner(
 		signer.NewECDSAKeyManagerFromKey(pool.get("X").priv),
-		signer.NewECDSAKeyManagerFromKey(pool.get("X").priv),
 	)
 
-	badSealedHeader, _ := signerX.WriteSeal(h)
-
-	signerBySeal1, err := signerA.EcrecoverFromHeader(badSealedHeader)
-	assert.NoError(t, err)
-	assert.False(t, snap.Set.Includes(signerBySeal1), "signer shouldn't exist")
+	badSealedBlock, _ := signerX.WriteProposerSeal(h)
+	assert.Error(t, verifyProposerSeal(badSealedBlock, signerA, correctValset))
 
 	// seal the block with a validator
-	goodSealedHeader, _ := signerA.WriteSeal(h)
-
-	signerBySeal2, err := signerA.EcrecoverFromHeader(goodSealedHeader)
-	assert.NoError(t, err)
-	assert.True(t, snap.Set.Includes(signerBySeal2), "signer shouldn't exist")
+	goodSealedBlock, _ := signerA.WriteProposerSeal(h)
+	assert.NoError(t, verifyProposerSeal(goodSealedBlock, signerA, correctValset))
 }
 
 func TestSign_CommittedSeals(t *testing.T) {
+	t.Parallel()
+
 	pool := newTesterAccountPool(t)
 	pool.add("A", "B", "C", "D", "E")
 
-	snap := &Snapshot{
-		Set: pool.ValidatorSet(),
-	}
-
 	h := &types.Header{}
+
+	correctValSet := pool.ValidatorSet()
 
 	signerA := signer.NewSigner(
 		signer.NewECDSAKeyManagerFromKey(pool.get("A").priv),
-		signer.NewECDSAKeyManagerFromKey(pool.get("A").priv),
 	)
-	err := signerA.InitIBFTExtra(h, &types.Header{}, pool.ValidatorSet())
+	err := signerA.InitIBFTExtra(h, &types.Header{}, correctValSet)
 	assert.NoError(t, err)
+
+	h.Hash, err = signerA.CalculateHeaderHash(h)
+	if err != nil {
+		t.Fatalf("Unable to calculate hash, %v", err)
+	}
 
 	// non-validator address
 	pool.add("X")
@@ -72,46 +66,33 @@ func TestSign_CommittedSeals(t *testing.T) {
 		seals := map[types.Address][]byte{}
 
 		for _, name := range names {
-			account := pool.get(name)
+			acc := pool.get(name)
+
 			signer := signer.NewSigner(
-				signer.NewECDSAKeyManagerFromKey(account.priv),
-				signer.NewECDSAKeyManagerFromKey(account.priv),
+				signer.NewECDSAKeyManagerFromKey(
+					acc.priv,
+				),
 			)
-			seal, err := signer.CreateCommittedSeal(h)
+			seal, err := signer.CreateCommittedSeal(h.Hash.Bytes())
 
 			assert.NoError(t, err)
 
-			seals[account.Address()] = seal
+			seals[acc.Address()] = seal
 		}
 
 		sealed, err := signerA.WriteCommittedSeals(h, seals)
 
 		assert.NoError(t, err)
 
-		return signerA.VerifyCommittedSeals(snap.Set, sealed, OptimalQuorumSize(snap.Set))
+		return signerA.VerifyCommittedSeals(sealed, correctValSet, OptimalQuorumSize(correctValSet))
 	}
 
 	// Correct
 	assert.NoError(t, buildCommittedSeal([]string{"A", "B", "C", "D"}))
-
-	// // Failed - Repeated signature
-	assert.Error(t, buildCommittedSeal([]string{"A", "A"}))
 
 	// Failed - Non validator signature
 	assert.Error(t, buildCommittedSeal([]string{"A", "X"}))
 
 	// Failed - Not enough signatures
 	assert.Error(t, buildCommittedSeal([]string{"A"}))
-}
-
-func TestSign_Messages(t *testing.T) {
-	pool := newTesterAccountPool(t)
-	pool.add("A")
-
-	msg := &proto.MessageReq{}
-	signerA := signer.NewECDSAKeyManagerFromKey(pool.get("A").priv)
-	assert.NoError(t, signerA.SignIBFTMessage(msg))
-	assert.NoError(t, signerA.ValidateIBFTMessage(msg))
-
-	assert.Equal(t, msg.From, pool.get("A").Address().String())
 }

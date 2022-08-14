@@ -3,9 +3,11 @@ package snapshot
 import (
 	"bytes"
 	"fmt"
+
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	ibftHelper "github.com/0xPolygon/polygon-edge/command/ibft/helper"
 	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
+	"github.com/0xPolygon/polygon-edge/validators"
 )
 
 type IBFTSnapshotVote struct {
@@ -15,18 +17,18 @@ type IBFTSnapshotVote struct {
 }
 
 type IBFTSnapshotResult struct {
-	Number     uint64             `json:"number"`
-	Hash       string             `json:"hash"`
-	Votes      []IBFTSnapshotVote `json:"votes"`
-	Validators []string           `json:"validators"`
+	Number     uint64                 `json:"number"`
+	Hash       string                 `json:"hash"`
+	Votes      []IBFTSnapshotVote     `json:"votes"`
+	Validators []validators.Validator `json:"validators"`
 }
 
-func newIBFTSnapshotResult(resp *ibftOp.Snapshot) *IBFTSnapshotResult {
+func newIBFTSnapshotResult(resp *ibftOp.Snapshot) (*IBFTSnapshotResult, error) {
 	res := &IBFTSnapshotResult{
 		Number:     resp.Number,
 		Hash:       resp.Hash,
 		Votes:      make([]IBFTSnapshotVote, len(resp.Votes)),
-		Validators: make([]string, len(resp.Validators)),
+		Validators: make([]validators.Validator, len(resp.Validators)),
 	}
 
 	for i, v := range resp.Votes {
@@ -36,10 +38,21 @@ func newIBFTSnapshotResult(resp *ibftOp.Snapshot) *IBFTSnapshotResult {
 	}
 
 	for i, v := range resp.Validators {
-		res.Validators[i] = v.Address
+		var validatorType validators.ValidatorType
+		if err := validatorType.FromString(v.Type); err != nil {
+			return nil, err
+		}
+
+		validator := validators.NewValidatorFromType(validatorType)
+
+		if err := validator.SetFromBytes(v.Data); err != nil {
+			return nil, err
+		}
+
+		res.Validators[i] = validator
 	}
 
-	return res
+	return res, nil
 }
 
 func (r *IBFTSnapshotResult) GetOutput() string {
@@ -93,7 +106,7 @@ func (r *IBFTSnapshotResult) writeValidatorData(buffer *bytes.Buffer) {
 	if numValidators > 0 {
 		validators[0] = "ADDRESS"
 		for i, d := range r.Validators {
-			validators[i+1] = d
+			validators[i+1] = d.String()
 		}
 	}
 

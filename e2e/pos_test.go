@@ -37,6 +37,7 @@ func foundInValidatorSet(validatorSet []types.Address, searchValidator types.Add
 }
 
 // getBigDefaultStakedBalance returns the default staked balance as a *big.Int
+//nolint:unused
 func getBigDefaultStakedBalance(t *testing.T) *big.Int {
 	t.Helper()
 
@@ -738,6 +739,7 @@ func getSnapshot(
 	return snapshot, snapshotErr
 }
 
+//nolint:unused
 func getNextEpochBlock(blockNum uint64, epochSize uint64) uint64 {
 	if epochSize > blockNum {
 		return epochSize
@@ -861,7 +863,7 @@ func TestSnapshotUpdating(t *testing.T) {
 		ctxCancelFn()
 
 		for _, validator := range snapshot.Validators {
-			if validator.Address == referenceAddr.String() {
+			if types.BytesToAddress(validator.Data) == referenceAddr {
 				return true
 			}
 		}

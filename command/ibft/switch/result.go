@@ -5,14 +5,14 @@ import (
 	"fmt"
 
 	"github.com/0xPolygon/polygon-edge/command/helper"
-	"github.com/0xPolygon/polygon-edge/consensus/ibft"
+	"github.com/0xPolygon/polygon-edge/consensus/ibft/fork"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/validators"
 )
 
 type IBFTSwitchResult struct {
 	Chain             string                   `json:"chain"`
-	Type              ibft.MechanismType       `json:"type"`
+	Type              fork.IBFTType            `json:"type"`
 	ValidatorType     validators.ValidatorType `json:"validator_type"`
 	From              common.JSONNumber        `json:"from"`
 	Deployment        *common.JSONNumber       `json:"deployment,omitempty"`
@@ -37,7 +37,7 @@ func (r *IBFTSwitchResult) GetOutput() string {
 
 	outputs = append(outputs, fmt.Sprintf("From|%d", r.From.Value))
 
-	if r.Type == ibft.PoS {
+	if r.Type == fork.PoS {
 		outputs = append(outputs,
 			fmt.Sprintf("MaxValidatorCount|%d", r.MaxValidatorCount.Value),
 			fmt.Sprintf("MinValidatorCount|%d", r.MinValidatorCount.Value),

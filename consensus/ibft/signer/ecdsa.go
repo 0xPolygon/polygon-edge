@@ -4,7 +4,6 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 
-	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -49,8 +48,8 @@ func (s *ECDSAKeyManager) Address() types.Address {
 	return s.address
 }
 
-func (s *ECDSAKeyManager) NewEmptyValidatorSet() validators.ValidatorSet {
-	return &validators.ECDSAValidatorSet{}
+func (s *ECDSAKeyManager) NewEmptyValidatorSet() validators.Validators {
+	return &validators.ECDSAValidators{}
 }
 
 func (s *ECDSAKeyManager) NewEmptyCommittedSeal() Sealer {
@@ -58,7 +57,7 @@ func (s *ECDSAKeyManager) NewEmptyCommittedSeal() Sealer {
 }
 
 func (s *ECDSAKeyManager) SignSeal(data []byte) ([]byte, error) {
-	return crypto.Sign(s.key, crypto.Keccak256(data))
+	return crypto.Sign(s.key, data)
 }
 
 func (s *ECDSAKeyManager) SignCommittedSeal(data []byte) ([]byte, error) {
@@ -88,17 +87,44 @@ func (s *ECDSAKeyManager) GenerateCommittedSeals(
 	return &serializedSeal, nil
 }
 
+func (s *ECDSAKeyManager) VerifyCommittedSeal(
+	rawSet validators.Validators,
+	addr types.Address,
+	signature []byte,
+	hash []byte,
+) error {
+	validatorSet, ok := rawSet.(*validators.ECDSAValidators)
+	if !ok {
+		return ErrInvalidValidatorSet
+	}
+
+	signer, err := s.Ecrecover(signature, hash)
+	if err != nil {
+		return ErrInvalidSignature
+	}
+
+	if addr != signer {
+		return ErrSignerMismatch
+	}
+
+	if !validatorSet.Includes(addr) {
+		return ErrNonValidatorCommittedSeal
+	}
+
+	return nil
+}
+
 func (s *ECDSAKeyManager) VerifyCommittedSeals(
 	rawCommittedSeal Sealer,
 	digest []byte,
-	rawSet validators.ValidatorSet,
+	rawSet validators.Validators,
 ) (int, error) {
 	committedSeal, ok := rawCommittedSeal.(*SerializedSeal)
 	if !ok {
 		return 0, ErrInvalidCommittedSealType
 	}
 
-	validatorSet, ok := rawSet.(*validators.ECDSAValidatorSet)
+	validatorSet, ok := rawSet.(*validators.ECDSAValidators)
 	if !ok {
 		return 0, ErrInvalidValidatorSet
 	}
@@ -106,25 +132,21 @@ func (s *ECDSAKeyManager) VerifyCommittedSeals(
 	return s.verifyCommittedSealsImpl(committedSeal, digest, *validatorSet)
 }
 
-func (s *ECDSAKeyManager) SignIBFTMessage(msg *proto.MessageReq) error {
-	return signMsg(s.key, msg)
-}
-
-func (s *ECDSAKeyManager) ValidateIBFTMessage(msg *proto.MessageReq) error {
-	return ValidateMsg(msg)
+func (s *ECDSAKeyManager) SignIBFTMessage(msg []byte) ([]byte, error) {
+	return crypto.Sign(s.key, crypto.Keccak256(msg))
 }
 
 func (s *ECDSAKeyManager) verifyCommittedSealsImpl(
 	committedSeal *SerializedSeal,
 	msg []byte,
-	validators validators.ECDSAValidatorSet,
+	validators validators.ECDSAValidators,
 ) (int, error) {
 	numSeals := len(*committedSeal)
 	if numSeals == 0 {
 		return 0, ErrEmptyCommittedSeals
 	}
 
-	visited := map[types.Address]struct{}{}
+	visited := make(map[types.Address]bool)
 
 	for _, seal := range *committedSeal {
 		addr, err := s.Ecrecover(seal, msg)
@@ -132,7 +154,7 @@ func (s *ECDSAKeyManager) verifyCommittedSealsImpl(
 			return 0, err
 		}
 
-		if _, ok := visited[addr]; ok {
+		if visited[addr] {
 			return 0, ErrRepeatedCommittedSeal
 		}
 
@@ -140,7 +162,7 @@ func (s *ECDSAKeyManager) verifyCommittedSealsImpl(
 			return 0, ErrNonValidatorCommittedSeal
 		}
 
-		visited[addr] = struct{}{}
+		visited[addr] = true
 	}
 
 	return numSeals, nil
@@ -152,8 +174,6 @@ func (s *SerializedSeal) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 	}
 
 	committed := ar.NewArray()
-
-	fmt.Printf("\nSerializedSeal MarshalRLPWith size=%d\n", len(*s))
 
 	for _, a := range *s {
 		if len(a) == 0 {
@@ -171,8 +191,6 @@ func (s *SerializedSeal) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) e
 	if err != nil {
 		return fmt.Errorf("mismatch of RLP type for CommittedSeal, expected list but found %s", v.Type())
 	}
-
-	fmt.Printf("\nSerializedSeal UnmarshalRLPFrom size=%d\n", len(vals))
 
 	(*s) = make([][]byte, len(vals))
 

@@ -14,28 +14,35 @@ import (
 )
 
 const (
-	configFlag            = "config"
-	genesisPathFlag       = "chain"
-	dataDirFlag           = "data-dir"
-	libp2pAddressFlag     = "libp2p"
-	prometheusAddressFlag = "prometheus"
-	natFlag               = "nat"
-	dnsFlag               = "dns"
-	sealFlag              = "seal"
-	maxPeersFlag          = "max-peers"
-	maxInboundPeersFlag   = "max-inbound-peers"
-	maxOutboundPeersFlag  = "max-outbound-peers"
-	priceLimitFlag        = "price-limit"
-	maxSlotsFlag          = "max-slots"
-	blockGasTargetFlag    = "block-gas-target"
-	secretsConfigFlag     = "secrets-config"
-	restoreFlag           = "restore"
-	blockTimeFlag         = "block-time"
-	ibftBaseTimeoutFlag   = "ibft-base-timeout"
-	devIntervalFlag       = "dev-interval"
-	devFlag               = "dev"
-	corsOriginFlag        = "access-control-allow-origins"
-	logFileLocationFlag   = "log-to"
+	configFlag                   = "config"
+	genesisPathFlag              = "chain"
+	dataDirFlag                  = "data-dir"
+	libp2pAddressFlag            = "libp2p"
+	prometheusAddressFlag        = "prometheus"
+	natFlag                      = "nat"
+	dnsFlag                      = "dns"
+	sealFlag                     = "seal"
+	maxPeersFlag                 = "max-peers"
+	maxInboundPeersFlag          = "max-inbound-peers"
+	maxOutboundPeersFlag         = "max-outbound-peers"
+	priceLimitFlag               = "price-limit"
+	jsonRPCBatchRequestLimitFlag = "json-rpc-batch-request-limit"
+	jsonRPCBlockRangeLimitFlag   = "json-rpc-block-range-limit"
+	maxSlotsFlag                 = "max-slots"
+	blockGasTargetFlag           = "block-gas-target"
+	secretsConfigFlag            = "secrets-config"
+	restoreFlag                  = "restore"
+	blockTimeFlag                = "block-time"
+	devIntervalFlag              = "dev-interval"
+	devFlag                      = "dev"
+	corsOriginFlag               = "access-control-allow-origins"
+	logFileLocationFlag          = "log-to"
+)
+
+// Flags that are deprecated, but need to be preserved for
+// backwards compatibility with existing scripts
+const (
+	ibftBaseTimeoutFlagLEGACY = "ibft-base-timeout"
 )
 
 const (
@@ -72,6 +79,11 @@ type serverParams struct {
 	isDevMode      bool
 
 	corsAllowedOrigins []string
+
+	jsonRPCBatchLengthLimit uint64
+	jsonRPCBlockRangeLimit  uint64
+
+	ibftBaseTimeoutLegacy uint64
 
 	genesisConfig *chain.Chain
 	secretsConfig *secrets.SecretsManagerConfig
@@ -134,6 +146,8 @@ func (p *serverParams) generateConfig() *server.Config {
 		JSONRPC: &server.JSONRPC{
 			JSONRPCAddr:              p.jsonRPCAddress,
 			AccessControlAllowOrigin: p.corsAllowedOrigins,
+			BatchLengthLimit:         p.jsonRPCBatchLengthLimit,
+			BlockRangeLimit:          p.jsonRPCBlockRangeLimit,
 		},
 		GRPCAddr:   p.grpcAddress,
 		LibP2PAddr: p.libp2pAddress,
@@ -151,15 +165,14 @@ func (p *serverParams) generateConfig() *server.Config {
 			MaxOutboundPeers: p.rawConfig.Network.MaxOutboundPeers,
 			Chain:            p.genesisConfig,
 		},
-		DataDir:         p.rawConfig.DataDir,
-		Seal:            p.rawConfig.ShouldSeal,
-		PriceLimit:      p.rawConfig.TxPool.PriceLimit,
-		MaxSlots:        p.rawConfig.TxPool.MaxSlots,
-		SecretsManager:  p.secretsConfig,
-		RestoreFile:     p.getRestoreFilePath(),
-		BlockTime:       p.rawConfig.BlockTime,
-		IBFTBaseTimeout: p.rawConfig.IBFTBaseTimeout,
-		LogLevel:        hclog.LevelFromString(p.rawConfig.LogLevel),
-		LogFilePath:     p.logFileLocation,
+		DataDir:        p.rawConfig.DataDir,
+		Seal:           p.rawConfig.ShouldSeal,
+		PriceLimit:     p.rawConfig.TxPool.PriceLimit,
+		MaxSlots:       p.rawConfig.TxPool.MaxSlots,
+		SecretsManager: p.secretsConfig,
+		RestoreFile:    p.getRestoreFilePath(),
+		BlockTime:      p.rawConfig.BlockTime,
+		LogLevel:       hclog.LevelFromString(p.rawConfig.LogLevel),
+		LogFilePath:    p.logFileLocation,
 	}
 }

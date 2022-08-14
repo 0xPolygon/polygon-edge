@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -46,8 +45,8 @@ func (s *BLSKeyManager) Address() types.Address {
 	return s.address
 }
 
-func (s *BLSKeyManager) NewEmptyValidatorSet() validators.ValidatorSet {
-	return &validators.BLSValidatorSet{}
+func (s *BLSKeyManager) NewEmptyValidatorSet() validators.Validators {
+	return &validators.BLSValidators{}
 }
 
 func (s *BLSKeyManager) NewEmptyCommittedSeal() Sealer {
@@ -55,7 +54,7 @@ func (s *BLSKeyManager) NewEmptyCommittedSeal() Sealer {
 }
 
 func (s *BLSKeyManager) SignSeal(data []byte) ([]byte, error) {
-	return crypto.Sign(s.ecdsaKey, crypto.Keccak256(data))
+	return crypto.Sign(s.ecdsaKey, data)
 }
 
 func (s *BLSKeyManager) SignCommittedSeal(data []byte) ([]byte, error) {
@@ -72,7 +71,7 @@ func (s *BLSKeyManager) Ecrecover(sig, digest []byte) (types.Address, error) {
 }
 
 func (s *BLSKeyManager) GenerateCommittedSeals(sealMap map[types.Address][]byte, extra *IstanbulExtra) (Sealer, error) {
-	validators, ok := extra.Validators.(*validators.BLSValidatorSet)
+	validators, ok := extra.Validators.(*validators.BLSValidators)
 	if !ok {
 		return nil, ErrInvalidValidatorSet
 	}
@@ -100,17 +99,60 @@ func (s *BLSKeyManager) GenerateCommittedSeals(sealMap map[types.Address][]byte,
 	}, nil
 }
 
+func (s *BLSKeyManager) VerifyCommittedSeal(
+	rawSet validators.Validators,
+	addr types.Address,
+	rawSignature []byte,
+	hash []byte,
+) error {
+	validatorSet, ok := rawSet.(*validators.BLSValidators)
+	if !ok {
+		return ErrInvalidValidatorSet
+	}
+
+	validatorIndex := validatorSet.Index(addr)
+	if validatorIndex == -1 {
+		return ErrValidatorNotFound
+	}
+
+	validator, ok := validatorSet.At(uint64(validatorIndex)).(*validators.BLSValidator)
+	if !ok {
+		return fmt.Errorf("expected BLSValidator in BLSValidators, but got %T", validator)
+	}
+
+	pubkey := &bls_sig.PublicKey{}
+	if err := pubkey.UnmarshalBinary(validator.BLSPublicKey); err != nil {
+		return err
+	}
+
+	signature := &bls_sig.Signature{}
+	if err := signature.UnmarshalBinary(rawSignature); err != nil {
+		return err
+	}
+
+	ok, err := bls_sig.NewSigPop().Verify(pubkey, hash, signature)
+	if err != nil {
+		return err
+	}
+
+	if !ok {
+		return ErrInvalidSignature
+	}
+
+	return nil
+}
+
 func (s *BLSKeyManager) VerifyCommittedSeals(
 	rawCommittedSeal Sealer,
 	digest []byte,
-	rawSet validators.ValidatorSet,
+	rawSet validators.Validators,
 ) (int, error) {
 	committedSeal, ok := rawCommittedSeal.(*BLSSeal)
 	if !ok {
 		return 0, ErrInvalidCommittedSealType
 	}
 
-	validatorSet, ok := rawSet.(*validators.BLSValidatorSet)
+	validatorSet, ok := rawSet.(*validators.BLSValidators)
 	if !ok {
 		return 0, ErrInvalidValidatorSet
 	}
@@ -118,17 +160,13 @@ func (s *BLSKeyManager) VerifyCommittedSeals(
 	return s.verifyCommittedSealsImpl(committedSeal, digest, *validatorSet)
 }
 
-func (s *BLSKeyManager) SignIBFTMessage(msg *proto.MessageReq) error {
-	return signMsg(s.ecdsaKey, msg)
-}
-
-func (s *BLSKeyManager) ValidateIBFTMessage(msg *proto.MessageReq) error {
-	return ValidateMsg(msg)
+func (s *BLSKeyManager) SignIBFTMessage(msg []byte) ([]byte, error) {
+	return crypto.Sign(s.ecdsaKey, crypto.Keccak256(msg))
 }
 
 func (s *BLSKeyManager) getBLSSignatures(
 	sealMap map[types.Address][]byte,
-	validators *validators.BLSValidatorSet,
+	validators *validators.BLSValidators,
 ) ([]*bls_sig.Signature, *big.Int, error) {
 	blsSignatures := make([]*bls_sig.Signature, 0, len(sealMap))
 	bitMap := new(big.Int)
@@ -155,7 +193,7 @@ func (s *BLSKeyManager) getBLSSignatures(
 func (s *BLSKeyManager) verifyCommittedSealsImpl(
 	committedSeal *BLSSeal,
 	msg []byte,
-	validators validators.BLSValidatorSet,
+	validators validators.BLSValidators,
 ) (int, error) {
 	if len(committedSeal.Signature) == 0 || committedSeal.Bitmap.BitLen() == 0 {
 		return 0, ErrEmptyCommittedSeals
@@ -179,14 +217,14 @@ func (s *BLSKeyManager) verifyCommittedSealsImpl(
 	}
 
 	if !ok {
-		return 0, ErrInvalidBLSSignature
+		return 0, ErrInvalidSignature
 	}
 
 	return numKeys, nil
 }
 
 func (s *BLSKeyManager) createAggregatedBLSPubKeys(
-	validators validators.BLSValidatorSet,
+	validators validators.BLSValidators,
 	bitMap *big.Int,
 ) (*bls_sig.MultiPublicKey, int, error) {
 	pubkeys := make([]*bls_sig.PublicKey, 0, validators.Len())

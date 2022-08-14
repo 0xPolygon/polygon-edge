@@ -21,3 +21,6 @@ main
 
 # exclude build folder
 artifacts
+
+# Log files
+*.log

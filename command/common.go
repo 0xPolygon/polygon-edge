@@ -58,7 +58,7 @@ func ValidateMinMaxValidatorsNumber(minValidatorCount uint64, maxValidatorCount 
 func GetValidatorsFromPrefixPath(
 	prefix string,
 	validatorType validators.ValidatorType,
-) (validators.ValidatorSet, error) {
+) (validators.Validators, error) {
 	files, err := ioutil.ReadDir(".")
 	if err != nil {
 		return nil, err
@@ -97,19 +97,24 @@ func GetValidatorsFromPrefixPath(
 
 		switch validatorType {
 		case validators.ECDSAValidatorType:
-			validatorSet.Add(&validators.ECDSAValidator{
+			if err := validatorSet.Add(&validators.ECDSAValidator{
 				Address: address,
-			})
+			}); err != nil {
+				return nil, err
+			}
+
 		case validators.BLSValidatorType:
 			blsPublicKey, err := getBLSPublicKeyBytesFromSecretManager(localSecretsManager)
 			if err != nil {
 				return nil, err
 			}
 
-			validatorSet.Add(&validators.BLSValidator{
+			if err := validatorSet.Add(&validators.BLSValidator{
 				Address:      address,
 				BLSPublicKey: blsPublicKey,
-			})
+			}); err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -162,7 +167,7 @@ func getBLSPublicKeyBytesFromSecretManager(manager secrets.SecretsManager) ([]by
 	return pubKeyBytes, nil
 }
 
-func ParseValidators(validatorType validators.ValidatorType, rawValidators []string) (validators.ValidatorSet, error) {
+func ParseValidators(validatorType validators.ValidatorType, rawValidators []string) (validators.Validators, error) {
 	set := validators.NewValidatorSetFromType(validatorType)
 
 	for _, s := range rawValidators {

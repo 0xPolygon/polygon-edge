@@ -695,6 +695,16 @@ func (p *PubSub) handleDeadPeers() {
 		}
 
 		close(ch)
+		delete(p.peers, pid)
+
+		for t, tmap := range p.topics {
+			if _, ok := tmap[pid]; ok {
+				delete(tmap, pid)
+				p.notifyLeave(t, pid)
+			}
+		}
+
+		p.rt.RemovePeer(pid)
 
 		if p.host.Network().Connectedness(pid) == network.Connected {
 			backoffDelay, err := p.deadPeerBackoff.updateAndGet(pid)
@@ -708,20 +718,9 @@ func (p *PubSub) handleDeadPeers() {
 			log.Debugf("peer declared dead but still connected; respawning writer: %s", pid)
 			messages := make(chan *RPC, p.peerOutboundQueueSize)
 			messages <- p.getHelloPacket()
-			go p.handleNewPeerWithBackoff(p.ctx, pid, backoffDelay, messages)
 			p.peers[pid] = messages
-			continue
+			go p.handleNewPeerWithBackoff(p.ctx, pid, backoffDelay, messages)
 		}
-
-		delete(p.peers, pid)
-		for t, tmap := range p.topics {
-			if _, ok := tmap[pid]; ok {
-				delete(tmap, pid)
-				p.notifyLeave(t, pid)
-			}
-		}
-
-		p.rt.RemovePeer(pid)
 	}
 }
 

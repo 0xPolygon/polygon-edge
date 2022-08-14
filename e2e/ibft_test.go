@@ -16,10 +16,8 @@ import (
 	"github.com/umbracle/ethgo"
 )
 
-/**
-	TestIbft_Transfer sends a transfer transaction (EOA -> EOA)
-	and verifies it was mined
-**/
+// TestIbft_Transfer sends a transfer transaction (EOA -> EOA)
+// and verifies it was mined
 func TestIbft_Transfer(t *testing.T) {
 	testCases := []struct {
 		name            string
@@ -77,7 +75,7 @@ func TestIbft_Transfer(t *testing.T) {
 			ctxForTx, cancelTx := context.WithTimeout(context.Background(), txTimeout)
 			defer cancelTx()
 
-			//	send tx and wait for receipt
+			// send tx and wait for receipt
 			receipt, err := ibftManager.
 				GetServer(0).
 				SendRawTx(ctxForTx, txn, senderKey)
@@ -173,7 +171,7 @@ func TestIbft_TransactionFeeRecipient(t *testing.T) {
 			block, err := clt.Eth().GetBlockByHash(receipt.BlockHash, false)
 			assert.NoError(t, err)
 			extraData := &ibftSigner.IstanbulExtra{
-				Validators:          &validators.ECDSAValidatorSet{},
+				Validators:          &validators.ECDSAValidators{},
 				CommittedSeal:       &ibftSigner.SerializedSeal{},
 				ParentCommittedSeal: &ibftSigner.SerializedSeal{},
 			}
@@ -182,7 +180,7 @@ func TestIbft_TransactionFeeRecipient(t *testing.T) {
 			err = extraData.UnmarshalRLP(extraDataWithoutVanity)
 			assert.NoError(t, err)
 
-			proposerAddr, err := framework.EcrecoverFromBlockhash(types.Hash(block.Hash), extraData.Seal)
+			proposerAddr, err := framework.EcrecoverFromBlockhash(types.Hash(block.Hash), extraData.ProposerSeal)
 			assert.NoError(t, err)
 
 			// Given that this is the first transaction on the blockchain, proposer's balance should be equal to the tx fee

@@ -332,7 +332,7 @@ func (t *Transition) GetTxnHash() types.Hash {
 
 // Apply applies a new transaction
 func (t *Transition) Apply(msg *types.Transaction) (*runtime.ExecutionResult, error) {
-	s := t.state.Snapshot() //nolint:ifshort
+	s := t.state.Snapshot()
 	result, err := t.apply(msg)
 
 	if err != nil {
@@ -559,7 +559,6 @@ func (t *Transition) applyCall(
 		}
 	}
 
-	//nolint:ifshort
 	snapshot := t.state.Snapshot()
 	t.state.TouchAccount(c.Address)
 
@@ -761,6 +760,18 @@ func (t *Transition) SetAccountDirectly(addr types.Address, account *chain.Genes
 
 	t.state.SetBalance(addr, account.Balance)
 	t.state.SetNonce(addr, account.Nonce)
+
+	return nil
+}
+
+// SetCodeDirectly sets new code into the account with the specified address
+// NOTE: SetCodeDirectly changes the world state without a transaction
+func (t *Transition) SetCodeDirectly(addr types.Address, code []byte) error {
+	if !t.AccountExists(addr) {
+		return fmt.Errorf("account doesn't exist at %s", addr)
+	}
+
+	t.state.SetCode(addr, code)
 
 	return nil
 }

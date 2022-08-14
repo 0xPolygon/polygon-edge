@@ -24,8 +24,8 @@ var (
 
 // IstanbulExtra defines the structure of the extra field for Istanbul
 type IstanbulExtra struct {
-	Validators          validators.ValidatorSet
-	Seal                []byte
+	Validators          validators.Validators
+	ProposerSeal        []byte
 	CommittedSeal       Sealer
 	ParentCommittedSeal Sealer
 }
@@ -47,11 +47,11 @@ func (i *IstanbulExtra) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 	// Validators
 	vv.Set(i.Validators.MarshalRLPWith(ar))
 
-	// Seal
-	if len(i.Seal) == 0 {
+	// ProposerSeal
+	if len(i.ProposerSeal) == 0 {
 		vv.Set(ar.NewNull())
 	} else {
-		vv.Set(ar.NewBytes(i.Seal))
+		vv.Set(ar.NewBytes(i.ProposerSeal))
 	}
 
 	// CommittedSeal
@@ -86,13 +86,37 @@ func (i *IstanbulExtra) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) er
 		return err
 	}
 
-	// Seal
-	if i.Seal, err = elems[1].GetBytes(i.Seal); err != nil {
+	// ProposerSeal
+	if i.ProposerSeal, err = elems[1].GetBytes(i.ProposerSeal); err != nil {
 		return fmt.Errorf("failed to decode Seal: %w", err)
 	}
 
-	// Committed
+	// CommittedSeal
 	if err := i.CommittedSeal.UnmarshalRLPFrom(p, elems[2]); err != nil {
+		return err
+	}
+
+	// ParentCommitted
+	if len(elems) >= 4 && i.ParentCommittedSeal != nil {
+		if err := i.ParentCommittedSeal.UnmarshalRLPFrom(p, elems[3]); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// UnmarshalRLPForParentCS defines the unmarshal function wrapper for IstanbulExtra
+// that parses only Parent Committed Seals
+func (i *IstanbulExtra) unmarshalRLPForParentCS(input []byte) error {
+	return types.UnmarshalRlp(i.unmarshalRLPFromForParentCS, input)
+}
+
+// UnmarshalRLPFrom defines the unmarshal implementation for IstanbulExtra
+// that parses only Parent Committed Seals
+func (i *IstanbulExtra) unmarshalRLPFromForParentCS(p *fastrlp.Parser, v *fastrlp.Value) error {
+	elems, err := v.GetElems()
+	if err != nil {
 		return err
 	}
 
@@ -117,4 +141,139 @@ func putIbftExtra(h *types.Header, istanbulExtra *IstanbulExtra) {
 	}
 
 	h.ExtraData = istanbulExtra.MarshalRLPTo(extra)
+}
+
+// packFieldsIntoExtra is a helper function
+// that injects a few fields into IBFT Extra
+// without modifying other fields
+// Validators, CommittedSeals, and ParentCommittedSeals have a few types
+// and extra must have these instances before unmarshalling usually
+// This function doesn't require the field instances that don't update
+func packFieldsIntoExtra(
+	extraBytes []byte,
+	packFn func(
+		ar *fastrlp.Arena,
+		oldValues []*fastrlp.Value,
+		newArrayValue *fastrlp.Value,
+	) error,
+) []byte {
+	extraHeader := extraBytes[:IstanbulExtraVanity]
+	extraBody := extraBytes[IstanbulExtraVanity:]
+
+	newExtraBody := types.MarshalRLPTo(func(ar *fastrlp.Arena) *fastrlp.Value {
+		vv := ar.NewArray()
+
+		_ = types.UnmarshalRlp(func(p *fastrlp.Parser, v *fastrlp.Value) error {
+			elems, err := v.GetElems()
+			if err != nil {
+				return err
+			}
+
+			if len(elems) < 3 {
+				return fmt.Errorf("incorrect number of elements to decode istambul extra, expected 3 but found %d", len(elems))
+			}
+
+			return packFn(ar, elems, vv)
+		}, extraBody)
+
+		return vv
+	}, nil)
+
+	return append(
+		extraHeader,
+		newExtraBody...,
+	)
+}
+
+// packSealIntoIExtra updates only Seal field in Extra
+func packSealIntoIExtra(
+	extraBytes []byte,
+	seal []byte,
+) []byte {
+	return packFieldsIntoExtra(
+		extraBytes,
+		func(
+			ar *fastrlp.Arena,
+			oldValues []*fastrlp.Value,
+			newArrayValue *fastrlp.Value,
+		) error {
+			// Validators
+			newArrayValue.Set(oldValues[0])
+
+			// Seal
+			newArrayValue.Set(ar.NewBytes(seal))
+
+			// CommittedSeal
+			newArrayValue.Set(oldValues[2])
+
+			// ParentCommittedSeal
+			if len(oldValues) >= 4 {
+				newArrayValue.Set(oldValues[3])
+			}
+
+			return nil
+		},
+	)
+}
+
+// packSealIntoIExtra updates only CommittedSeal field in Extra
+func packCommittedSealIntoExtra(
+	extraBytes []byte,
+	committedSeal Sealer,
+) []byte {
+	return packFieldsIntoExtra(
+		extraBytes,
+		func(
+			ar *fastrlp.Arena,
+			oldValues []*fastrlp.Value,
+			newArrayValue *fastrlp.Value,
+		) error {
+			// Validators
+			newArrayValue.Set(oldValues[0])
+
+			// Seal
+			newArrayValue.Set(oldValues[1])
+
+			// CommittedSeal
+			newArrayValue.Set(committedSeal.MarshalRLPWith(ar))
+
+			// ParentCommittedSeal
+			if len(oldValues) >= 4 {
+				newArrayValue.Set(oldValues[3])
+			}
+
+			return nil
+		},
+	)
+}
+
+// packParentCommittedSealIntoExtra updates only ParentCommittedSeals field in Extra
+func packParentCommittedSealIntoExtra(
+	extraBytes []byte,
+	parentCommittedSeals Sealer,
+) []byte {
+	return packFieldsIntoExtra(
+		extraBytes,
+		func(
+			ar *fastrlp.Arena,
+			oldValues []*fastrlp.Value,
+			newArrayValue *fastrlp.Value,
+		) error {
+			// Validators
+			newArrayValue.Set(oldValues[0])
+
+			// Seal
+			newArrayValue.Set(oldValues[1])
+
+			// CommittedSeal
+			newArrayValue.Set(oldValues[2])
+
+			// ParentCommittedSeal
+			if len(oldValues) >= 4 {
+				newArrayValue.Set(parentCommittedSeals.MarshalRLPWith(ar))
+			}
+
+			return nil
+		},
+	)
 }

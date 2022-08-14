@@ -1,7 +1,6 @@
 package dev
 
 import (
-	"context"
 	"fmt"
 	"time"
 
@@ -12,6 +11,10 @@ import (
 	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
+)
+
+const (
+	devConsensus = "dev-consensus"
 )
 
 // Dev consensus protocol seals any new transaction immediately
@@ -30,7 +33,7 @@ type Dev struct {
 
 // Factory implements the base factory method
 func Factory(
-	params *consensus.ConsensusParams,
+	params *consensus.Params,
 ) (consensus.Consensus, error) {
 	logger := params.Logger.Named("dev")
 
@@ -40,7 +43,7 @@ func Factory(
 		closeCh:    make(chan struct{}),
 		blockchain: params.Blockchain,
 		executor:   params.Executor,
-		txpool:     params.Txpool,
+		txpool:     params.TxPool,
 	}
 
 	rawInterval, ok := params.Config.Config["interval"]
@@ -122,9 +125,9 @@ func (d *Dev) writeTransactions(gasLimit uint64, transition transitionInterface)
 		}
 
 		if err := transition.Write(tx); err != nil {
-			if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok { // nolint:errorlint
+			if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok { //nolint:errorlint
 				break
-			} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable { // nolint:errorlint
+			} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable { //nolint:errorlint
 				d.txpool.Demote(tx)
 			} else {
 				d.txpool.Drop(tx)
@@ -197,7 +200,7 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 	}
 
 	// Write the block to the blockchain
-	if err := d.blockchain.WriteBlock(block); err != nil {
+	if err := d.blockchain.WriteBlock(block, devConsensus); err != nil {
 		return err
 	}
 
@@ -220,26 +223,16 @@ func (d *Dev) ProcessHeaders(headers []*types.Header) error {
 }
 
 func (d *Dev) GetBlockCreator(header *types.Header) (types.Address, error) {
-	return header.Miner, nil
+	return types.BytesToAddress(header.Miner), nil
 }
 
-// PreStateCommit a hook to be called before finalizing state transition on inserting block
-func (d *Dev) PreStateCommit(_header *types.Header, _txn *state.Transition) error {
+// PreCommitState a hook to be called before finalizing state transition on inserting block
+func (d *Dev) PreCommitState(_header *types.Header, _txn *state.Transition) error {
 	return nil
 }
 
 func (d *Dev) GetSyncProgression() *progress.Progression {
 	return nil
-}
-
-func (d *Dev) Prepare(header *types.Header) error {
-	// TODO: Remove
-	return nil
-}
-
-func (d *Dev) Seal(block *types.Block, ctx context.Context) (*types.Block, error) {
-	// TODO: Remove
-	return nil, nil
 }
 
 func (d *Dev) Close() error {

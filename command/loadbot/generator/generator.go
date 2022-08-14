@@ -3,9 +3,10 @@ package generator
 import (
 	"crypto/ecdsa"
 	"encoding/json"
-	"github.com/umbracle/ethgo"
 	"io/ioutil"
 	"math/big"
+
+	"github.com/umbracle/ethgo"
 
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo/abi"

@@ -35,52 +35,31 @@ func (t *ValidatorType) FromString(s string) error {
 	}
 }
 
-func NewValidatorSetFromType(t ValidatorType) ValidatorSet {
-	switch t {
-	case ECDSAValidatorType:
-		return new(ECDSAValidatorSet)
-	case BLSValidatorType:
-		return new(BLSValidatorSet)
-	}
-
-	return nil
-}
-
 // Validator defines the interface of the methods a validator implements
 type Validator interface {
+	Type() ValidatorType
+	String() string
 	Addr() types.Address
+	Copy() Validator
 	Equal(Validator) bool
-	// TODO: check they're used
 	MarshalRLPWith(*fastrlp.Arena) *fastrlp.Value
 	UnmarshalRLPFrom(*fastrlp.Parser, *fastrlp.Value) error
-
 	Bytes() []byte
 	SetFromBytes([]byte) error
 }
 
 // ValidatorSet defines the interface of the methods validator set implements
-type ValidatorSet interface {
+type Validators interface {
 	Type() ValidatorType
 	Len() int
-	Equal(ValidatorSet) bool
-	Copy() ValidatorSet
+	Equal(Validators) bool
+	Copy() Validators
 	At(uint64) Validator
 	Index(types.Address) int64
 	Includes(types.Address) bool
 	Add(Validator) error
 	Del(Validator) error
-	Merge(ValidatorSet) error
+	Merge(Validators) error
 	MarshalRLPWith(*fastrlp.Arena) *fastrlp.Value
 	UnmarshalRLPFrom(*fastrlp.Parser, *fastrlp.Value) error
-}
-
-func ParseValidator(t ValidatorType, s string) (Validator, error) {
-	switch t {
-	case ECDSAValidatorType:
-		return ParseECDSAValidator(s)
-	case BLSValidatorType:
-		return ParseBLSValidator(s)
-	default:
-		return nil, fmt.Errorf("invalid validator type: %s", t)
-	}
 }

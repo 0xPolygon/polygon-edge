@@ -41,10 +41,10 @@ func TestExtraEncoding(t *testing.T) {
 	}{
 		{
 			from: &IstanbulExtra{
-				Validators: validators.AddressesToECDSAValidatorSet(
+				Validators: validators.AddressesToECDSAValidators(
 					types.StringToAddress("1"),
 				),
-				Seal: seal1,
+				ProposerSeal: seal1,
 				CommittedSeal: &SerializedSeal{
 					seal1,
 				},
@@ -53,8 +53,8 @@ func TestExtraEncoding(t *testing.T) {
 				},
 			},
 			to: &IstanbulExtra{
-				Validators:          &validators.ECDSAValidatorSet{},
-				Seal:                seal1,
+				Validators:          &validators.ECDSAValidators{},
+				ProposerSeal:        seal1,
 				CommittedSeal:       &SerializedSeal{},
 				ParentCommittedSeal: &SerializedSeal{},
 			},
@@ -94,7 +94,7 @@ func createIBFTHeader(
 	signer Signer,
 	num uint64,
 	parentHeader *types.Header,
-	validators validators.ValidatorSet,
+	validators validators.Validators,
 ) *types.Header {
 	t.Helper()
 
@@ -131,33 +131,30 @@ func TestAppendECDSACommittedSeal(t *testing.T) {
 
 		signerA = &SignerImpl{
 			NewECDSAKeyManagerFromKey(keys[0]),
-			NewECDSAKeyManagerFromKey(keys[0]),
 		}
-		validators = validators.AddressesToECDSAValidatorSet(addresses...)
+		validators = validators.AddressesToECDSAValidators(addresses...)
 
 		err error
 	)
 
 	useIstanbulHeaderHash(t, signerA)
 
+	assert.NoError(t, signerA.InitIBFTExtra(parentHeader, nil, validators))
+
 	// create headers by normal validators
 	for i := 0; i < numHeaders; i++ {
 		header := createIBFTHeader(t, signerA, uint64(i+1), parentHeader, validators)
 
 		// write seal
-		header, err = signerA.WriteSeal(header)
+		header, err = signerA.WriteProposerSeal(header)
 		assert.NoError(t, err)
 
 		// write committed seal
 		committedSeal := make(map[types.Address][]byte, len(normalValidatorKeys))
 
 		for _, key := range normalValidatorKeys {
-			signer := NewSigner(
-				NewECDSAKeyManagerFromKey(key),
-				NewECDSAKeyManagerFromKey(key),
-			)
-
-			seal, err := signer.CreateCommittedSeal(header)
+			signer := NewSigner(NewECDSAKeyManagerFromKey(key))
+			seal, err := signer.CreateCommittedSeal(header.Hash[:])
 
 			assert.NoError(t, err)
 
@@ -187,36 +184,37 @@ func TestAppendECDSACommittedSeal(t *testing.T) {
 			header.ParentHash = parentHeader.Hash
 
 			// get parent committed seal
-			e, err := signerA.GetIBFTExtra(parentHeader)
+			parentCommittedSeals, err := signerA.GetParentCommittedSeals(parentHeader)
 			assert.NoError(t, err)
 
 			// update ParentCommittedSeal forcibly
-			err = signerA.packFieldIntoIbftExtra(header, func(extra *IstanbulExtra) {
-				extra.ParentCommittedSeal = e.ParentCommittedSeal
-			})
-			assert.NoError(t, err)
+			header.ExtraData = packParentCommittedSealIntoExtra(
+				header.ExtraData,
+				parentCommittedSeals,
+			)
 		}
 
 		// create new committed seal
-		faultySigner := NewSigner(
-			NewECDSAKeyManagerFromKey(faultyValidatorKey),
-			NewECDSAKeyManagerFromKey(faultyValidatorKey),
-		)
-		fx, err := faultySigner.CreateCommittedSeal(header)
+		faultySigner := NewSigner(NewECDSAKeyManagerFromKey(faultyValidatorKey))
+		fx, err := faultySigner.CreateCommittedSeal(header.Hash[:])
 		assert.NoError(t, err)
 
 		// append new committed seal
-		err = signerA.packFieldIntoIbftExtra(header, func(extra *IstanbulExtra) {
-			sseal, _ := extra.CommittedSeal.(*SerializedSeal)
-			ssealSlice := [][]byte(*sseal)
-
-			ssealSlice = append(ssealSlice, fx)
-
-			nsseal := SerializedSeal(ssealSlice)
-
-			extra.CommittedSeal = &nsseal
-		})
+		extra, err := signerA.GetIBFTExtra(parentHeader)
 		assert.NoError(t, err)
+
+		sseal, _ := extra.CommittedSeal.(*SerializedSeal)
+		ssealSlice := [][]byte(*sseal)
+
+		ssealSlice = append(ssealSlice, fx)
+
+		nsseal := SerializedSeal(ssealSlice)
+		newCommittedSeals := &nsseal
+
+		header.ExtraData = packCommittedSealIntoExtra(
+			header.ExtraData,
+			newCommittedSeals,
+		)
 
 		header = header.ComputeHash()
 		faultyHeaders = append(faultyHeaders, header)

@@ -20,7 +20,7 @@ type Dummy struct {
 	executor   *state.Executor
 }
 
-func Factory(params *consensus.ConsensusParams) (consensus.Consensus, error) {
+func Factory(params *consensus.Params) (consensus.Consensus, error) {
 	logger := params.Logger.Named("dummy")
 
 	d := &Dummy{
@@ -30,7 +30,7 @@ func Factory(params *consensus.ConsensusParams) (consensus.Consensus, error) {
 		closeCh:    make(chan struct{}),
 		blockchain: params.Blockchain,
 		executor:   params.Executor,
-		txpool:     params.Txpool,
+		txpool:     params.TxPool,
 	}
 
 	return d, nil
@@ -57,11 +57,11 @@ func (d *Dummy) ProcessHeaders(headers []*types.Header) error {
 }
 
 func (d *Dummy) GetBlockCreator(header *types.Header) (types.Address, error) {
-	return header.Miner, nil
+	return types.BytesToAddress(header.Miner), nil
 }
 
-// PreStateCommit a hook to be called before finalizing state transition on inserting block
-func (d *Dummy) PreStateCommit(_header *types.Header, _txn *state.Transition) error {
+// PreCommitState a hook to be called before finalizing state transition on inserting block
+func (d *Dummy) PreCommitState(_header *types.Header, _txn *state.Transition) error {
 	return nil
 }
 

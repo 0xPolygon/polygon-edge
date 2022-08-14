@@ -4,9 +4,7 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 
-	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/crypto"
-	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/helper/keccak"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/secrets/helper"
@@ -15,6 +13,17 @@ import (
 	"github.com/coinbase/kryptology/pkg/signatures/bls/bls_sig"
 	"github.com/umbracle/fastrlp"
 )
+
+const (
+	// legacyCommitCode is the value that is contained in
+	// legacy committed seals, so it needs to be preserved in order
+	// for new clients to read old committed seals
+	legacyCommitCode = 2
+)
+
+func wrapCommitHash(b []byte) []byte {
+	return crypto.Keccak256(b, []byte{byte(legacyCommitCode)})
+}
 
 func getOrCreateECDSAKey(manager secrets.SecretsManager) (*ecdsa.PrivateKey, error) {
 	if !manager.HasSecret(secrets.ValidatorKey) {
@@ -70,49 +79,6 @@ func calculateHeaderHash(h *types.Header) types.Hash {
 	return types.BytesToHash(buf)
 }
 
-func commitMsg(b []byte) []byte {
-	// message that the nodes need to sign to commit to a block
-	// hash with COMMIT_MSG_CODE which is the same value used in quorum
-	return crypto.Keccak256(b, []byte{byte(proto.MessageReq_Commit)})
-}
-
-func signMsg(key *ecdsa.PrivateKey, msg *proto.MessageReq) error {
-	signMsg, err := msg.PayloadNoSig()
-	if err != nil {
-		return err
-	}
-
-	sig, err := crypto.Sign(key, crypto.Keccak256(signMsg))
-	if err != nil {
-		return err
-	}
-
-	msg.Signature = hex.EncodeToHex(sig)
-
-	return nil
-}
-
-func ValidateMsg(msg *proto.MessageReq) error {
-	signMsg, err := msg.PayloadNoSig()
-	if err != nil {
-		return err
-	}
-
-	buf, err := hex.DecodeHex(msg.Signature)
-	if err != nil {
-		return err
-	}
-
-	addr, err := ecrecoverImpl(buf, signMsg)
-	if err != nil {
-		return err
-	}
-
-	msg.From = addr.String()
-
-	return nil
-}
-
 func ecrecoverImpl(sig, msg []byte) (types.Address, error) {
 	pub, err := crypto.RecoverPubkey(sig, crypto.Keccak256(msg))
 	if err != nil {
@@ -122,7 +88,7 @@ func ecrecoverImpl(sig, msg []byte) (types.Address, error) {
 	return crypto.PubKeyToAddress(pub), nil
 }
 
-func InitKeyManager(
+func newKeyManagerFromType(
 	secretManager secrets.SecretsManager,
 	validatorType validators.ValidatorType,
 ) (KeyManager, error) {
@@ -134,4 +100,16 @@ func InitKeyManager(
 	default:
 		return nil, fmt.Errorf("unsupported validator type: %s", validatorType)
 	}
+}
+
+func NewSignerFromType(
+	secretManager secrets.SecretsManager,
+	validatorType validators.ValidatorType,
+) (Signer, error) {
+	km, err := newKeyManagerFromType(secretManager, validatorType)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewSigner(km), nil
 }

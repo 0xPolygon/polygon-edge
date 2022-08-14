@@ -329,7 +329,7 @@ func (s *Server) checkPeerConnections() {
 
 		if s.numPeers() < MinimumPeerConnections {
 			if s.config.NoDiscover || !s.bootnodes.hasBootnodes() {
-				//TODO: dial peers from the peerstore
+				// TODO: dial peers from the peerstore
 			} else {
 				randomNode := s.GetRandomBootnode()
 				s.addToDialQueue(randomNode, common.PriorityRandomDial)

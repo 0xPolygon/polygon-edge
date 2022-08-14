@@ -2,11 +2,12 @@ package jsonrpc
 
 import (
 	"errors"
+	"math/big"
+	"sync"
+
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
-	"math/big"
-	"sync"
 )
 
 type mockAccount struct {

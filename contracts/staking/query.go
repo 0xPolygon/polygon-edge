@@ -2,8 +2,9 @@ package staking
 
 import (
 	"errors"
-	"github.com/umbracle/ethgo"
 	"math/big"
+
+	"github.com/umbracle/ethgo"
 
 	"github.com/0xPolygon/polygon-edge/contracts/abis"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
@@ -55,12 +56,11 @@ func QueryValidators(t TxQueryHandler, from types.Address) ([]types.Address, err
 		return nil, errors.New("validators method doesn't exist in Staking contract ABI")
 	}
 
-	selector := method.ID()
 	res, err := t.Apply(&types.Transaction{
 		From:     from,
 		To:       &AddrStakingContract,
 		Value:    big.NewInt(0),
-		Input:    selector,
+		Input:    method.ID(),
 		GasPrice: big.NewInt(0),
 		Gas:      queryGasLimit,
 		Nonce:    t.GetNonce(from),
@@ -75,4 +75,60 @@ func QueryValidators(t TxQueryHandler, from types.Address) ([]types.Address, err
 	}
 
 	return DecodeValidators(method, res.ReturnValue)
+}
+
+func DecodeBLSPublicKeys(
+	method *abi.Method,
+	returnValue []byte,
+) ([][]byte, error) {
+	decodedResults, err := method.Outputs.Decode(returnValue)
+	if err != nil {
+		return nil, err
+	}
+
+	results, ok := decodedResults.(map[string]interface{})
+	if !ok {
+		return nil, errors.New("failed type assertion from decodedResults to map")
+	}
+
+	bytesArray, ok := results["0"].([][]uint8)
+	if !ok {
+		return nil, errors.New("failed type assertion from results[0] to [][]uint8")
+	}
+
+	blsPublicKeys := make([][]byte, len(bytesArray))
+	for idx, bytes := range bytesArray {
+		blsPublicKeys[idx] = make([]byte, len(bytes))
+
+		copy(blsPublicKeys[idx], bytes)
+	}
+
+	return blsPublicKeys, nil
+}
+
+func QueryBLSPublicKeys(t TxQueryHandler, from types.Address) ([][]byte, error) {
+	method, ok := abis.StakingABI.Methods["validatorBLSPublicKeys"]
+	if !ok {
+		return nil, errors.New("validators method doesn't exist in Staking contract ABI")
+	}
+
+	res, err := t.Apply(&types.Transaction{
+		From:     from,
+		To:       &AddrStakingContract,
+		Value:    big.NewInt(0),
+		Input:    method.ID(),
+		GasPrice: big.NewInt(0),
+		Gas:      queryGasLimit,
+		Nonce:    t.GetNonce(from),
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	if res.Failed() {
+		return nil, res.Err
+	}
+
+	return DecodeBLSPublicKeys(method, res.ReturnValue)
 }

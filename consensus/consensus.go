@@ -28,8 +28,8 @@ type Consensus interface {
 	// GetBlockCreator retrieves the block creator (or signer) given the block header
 	GetBlockCreator(header *types.Header) (types.Address, error)
 
-	// PreStateCommit a hook to be called before finalizing state transition on inserting block
-	PreStateCommit(header *types.Header, txn *state.Transition) error
+	// PreCommitState a hook to be called before finalizing state transition on inserting block
+	PreCommitState(header *types.Header, txn *state.Transition) error
 
 	// GetSyncProgression retrieves the current sync progression, if any
 	GetSyncProgression() *progress.Progression
@@ -46,37 +46,33 @@ type Consensus interface {
 
 // Config is the configuration for the consensus
 type Config struct {
-	// Logger to be used by the backend
+	// Logger to be used by the consensus
 	Logger *log.Logger
 
 	// Params are the params of the chain and the consensus
 	Params *chain.Params
 
-	// Config defines specific configuration parameters for the backend
+	// Config defines specific configuration parameters for the consensus
 	Config map[string]interface{}
 
 	// Path is the directory path for the consensus protocol tos tore information
 	Path string
 }
 
-type ConsensusParams struct {
-	Context         context.Context
-	Seal            bool
-	Config          *Config
-	Txpool          *txpool.TxPool
-	Network         *network.Server
-	Blockchain      *blockchain.Blockchain
-	Executor        *state.Executor
-	Grpc            *grpc.Server
-	Logger          hclog.Logger
-	Metrics         *Metrics
-	SecretsManager  secrets.SecretsManager
-	BlockTime       uint64
-	IBFTBaseTimeout uint64
-	BLS             bool
+type Params struct {
+	Context        context.Context
+	Seal           bool
+	Config         *Config
+	TxPool         *txpool.TxPool
+	Network        *network.Server
+	Blockchain     *blockchain.Blockchain
+	Executor       *state.Executor
+	Grpc           *grpc.Server
+	Logger         hclog.Logger
+	Metrics        *Metrics
+	SecretsManager secrets.SecretsManager
+	BlockTime      uint64
 }
 
-// Factory is the factory function to create a discovery backend
-type Factory func(
-	*ConsensusParams,
-) (Consensus, error)
+// Factory is the factory function to create a discovery consensus
+type Factory func(*Params) (Consensus, error)
