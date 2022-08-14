@@ -377,7 +377,6 @@ func (s *SnapshotValidatorSet) Candidates() []*valset.Candidate {
 
 // addHeaderSnap creates the initial snapshot, and adds it to the snapshot store
 func (s *SnapshotValidatorSet) addHeaderSnap(header *types.Header) error {
-
 	signer, err := s.getSigner(header.Number)
 	if err != nil {
 		return err
@@ -392,15 +391,12 @@ func (s *SnapshotValidatorSet) addHeaderSnap(header *types.Header) error {
 		return err
 	}
 
-	// Create the first snapshot from the genesis
-	snap := &Snapshot{
+	s.store.add(&Snapshot{
 		Hash:   header.Hash.String(),
 		Number: header.Number,
 		Votes:  []*valset.Vote{},
 		Set:    extra.Validators,
-	}
-
-	s.store.add(snap)
+	})
 
 	return nil
 }
