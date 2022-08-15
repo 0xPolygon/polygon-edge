@@ -236,9 +236,9 @@ func (p *genesisParams) initIBFTExtraData() {
 	}
 
 	ibftExtra := &signer.IstanbulExtra{
-		Validators:    p.ibftValidators,
-		ProposerSeal:  []byte{},
-		CommittedSeal: committedSeal,
+		Validators:     p.ibftValidators,
+		ProposerSeal:   []byte{},
+		CommittedSeals: committedSeal,
 	}
 
 	p.extraData = make([]byte, signer.IstanbulExtraVanity)

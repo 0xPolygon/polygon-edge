@@ -24,10 +24,10 @@ var (
 
 // IstanbulExtra defines the structure of the extra field for Istanbul
 type IstanbulExtra struct {
-	Validators          validators.Validators
-	ProposerSeal        []byte
-	CommittedSeal       Sealer
-	ParentCommittedSeal Sealer
+	Validators           validators.Validators
+	ProposerSeal         []byte
+	CommittedSeals       Sealer
+	ParentCommittedSeals Sealer
 }
 
 type Sealer interface {
@@ -55,11 +55,11 @@ func (i *IstanbulExtra) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 	}
 
 	// CommittedSeal
-	vv.Set(i.CommittedSeal.MarshalRLPWith(ar))
+	vv.Set(i.CommittedSeals.MarshalRLPWith(ar))
 
 	// ParentCommittedSeal
-	if i.ParentCommittedSeal != nil {
-		vv.Set(i.ParentCommittedSeal.MarshalRLPWith(ar))
+	if i.ParentCommittedSeals != nil {
+		vv.Set(i.ParentCommittedSeals.MarshalRLPWith(ar))
 	}
 
 	return vv
@@ -92,13 +92,13 @@ func (i *IstanbulExtra) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) er
 	}
 
 	// CommittedSeal
-	if err := i.CommittedSeal.UnmarshalRLPFrom(p, elems[2]); err != nil {
+	if err := i.CommittedSeals.UnmarshalRLPFrom(p, elems[2]); err != nil {
 		return err
 	}
 
 	// ParentCommitted
-	if len(elems) >= 4 && i.ParentCommittedSeal != nil {
-		if err := i.ParentCommittedSeal.UnmarshalRLPFrom(p, elems[3]); err != nil {
+	if len(elems) >= 4 && i.ParentCommittedSeals != nil {
+		if err := i.ParentCommittedSeals.UnmarshalRLPFrom(p, elems[3]); err != nil {
 			return err
 		}
 	}
@@ -122,7 +122,7 @@ func (i *IstanbulExtra) unmarshalRLPFromForParentCS(p *fastrlp.Parser, v *fastrl
 
 	// ParentCommitted
 	if len(elems) >= 4 {
-		if err := i.ParentCommittedSeal.UnmarshalRLPFrom(p, elems[3]); err != nil {
+		if err := i.ParentCommittedSeals.UnmarshalRLPFrom(p, elems[3]); err != nil {
 			return err
 		}
 	}

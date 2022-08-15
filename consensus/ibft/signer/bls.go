@@ -49,7 +49,7 @@ func (s *BLSKeyManager) NewEmptyValidatorSet() validators.Validators {
 	return &validators.BLSValidators{}
 }
 
-func (s *BLSKeyManager) NewEmptyCommittedSeal() Sealer {
+func (s *BLSKeyManager) NewEmptyCommittedSeals() Sealer {
 	return &BLSSeal{}
 }
 

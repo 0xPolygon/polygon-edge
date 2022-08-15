@@ -69,7 +69,7 @@ func (i *backendIBFT) IsValidSender(msg *protoIBFT.Message) bool {
 		return false
 	}
 
-	signerAddress, err := i.currentSigner.Ecrecover(
+	signerAddress, err := i.currentSigner.EcrecoverFromIBFTMessage(
 		msg.Signature,
 		msgNoSig,
 	)

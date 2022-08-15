@@ -135,17 +135,15 @@ func (i *backendIBFT) buildBlock(parent *types.Header) (*types.Block, error) {
 	// set the timestamp
 	header.Timestamp = uint64(time.Now().Unix())
 
-	var parentCommittedSeal signer.Sealer
+	var parentCommittedSeals signer.Sealer
 
 	if header.Number > 1 {
-		if parentCommittedSeal, err = i.extractCommittedSeals(parent); err != nil {
+		if parentCommittedSeals, err = i.extractCommittedSeals(parent); err != nil {
 			return nil, err
 		}
 	}
 
-	if err := i.currentSigner.InitIBFTExtra(header, parentCommittedSeal, i.currentValidators); err != nil {
-		return nil, err
-	}
+	i.currentSigner.InitIBFTExtra(header, i.currentValidators, parentCommittedSeals)
 
 	transition, err := i.executor.BeginTxn(parent.StateRoot, header, i.currentSigner.Address())
 	if err != nil {
@@ -336,5 +334,5 @@ func (i *backendIBFT) extractCommittedSeals(
 		return nil, err
 	}
 
-	return extra.CommittedSeal, nil
+	return extra.CommittedSeals, nil
 }

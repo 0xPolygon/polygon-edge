@@ -52,7 +52,7 @@ func (s *ECDSAKeyManager) NewEmptyValidatorSet() validators.Validators {
 	return &validators.ECDSAValidators{}
 }
 
-func (s *ECDSAKeyManager) NewEmptyCommittedSeal() Sealer {
+func (s *ECDSAKeyManager) NewEmptyCommittedSeals() Sealer {
 	return &SerializedSeal{}
 }
 

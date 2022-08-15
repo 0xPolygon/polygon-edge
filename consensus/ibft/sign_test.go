@@ -20,8 +20,7 @@ func TestSign_Sealer(t *testing.T) {
 
 	signerA := signer.NewSigner(signer.NewECDSAKeyManagerFromKey(pool.get("A").priv))
 
-	err := signerA.InitIBFTExtra(h, nil, correctValset)
-	assert.NoError(t, err)
+	signerA.InitIBFTExtra(h, correctValset, nil)
 
 	// non-validator address
 	pool.add("X")
@@ -44,15 +43,18 @@ func TestSign_CommittedSeals(t *testing.T) {
 	pool := newTesterAccountPool(t)
 	pool.add("A", "B", "C", "D", "E")
 
-	h := &types.Header{}
+	var (
+		h   = &types.Header{}
+		err error
+	)
 
 	correctValSet := pool.ValidatorSet()
 
 	signerA := signer.NewSigner(
 		signer.NewECDSAKeyManagerFromKey(pool.get("A").priv),
 	)
-	err := signerA.InitIBFTExtra(h, &types.Header{}, correctValSet)
-	assert.NoError(t, err)
+
+	signerA.InitIBFTExtra(h, correctValSet, nil)
 
 	h.Hash, err = signerA.CalculateHeaderHash(h)
 	if err != nil {
