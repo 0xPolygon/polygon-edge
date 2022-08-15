@@ -3,14 +3,13 @@ package predeploy
 import (
 	"errors"
 	"fmt"
-	"math/big"
 	"os"
-	"strings"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/contracts/staking"
+	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/helper/predeployment"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -102,18 +101,10 @@ func isReservedAddress(address types.Address) bool {
 }
 
 func (p *predeployParams) verifyMinAddress() error {
-	address, ok := big.NewInt(0).SetString(strings.TrimPrefix(p.address.String(), "0x"), 16)
-	if !ok {
-		return errors.New("unable to convert hex number")
-	}
-
-	addressMin, ok := big.NewInt(0).SetString(
-		strings.TrimPrefix(predeployAddressMin.String(), "0x"),
-		16,
+	var (
+		address    = hex.DecodeHexToBig(p.address.String())
+		addressMin = hex.DecodeHexToBig(predeployAddressMin.String())
 	)
-	if !ok {
-		return errors.New("unable to convert hex number")
-	}
 
 	if address.Cmp(addressMin) < 0 {
 		return errInvalidAddress
