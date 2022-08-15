@@ -49,13 +49,13 @@ func generateContractArtifact(filepath string) (*contractArtifact, error) {
 
 	jsonRaw, err := ioutil.ReadAll(jsonFile)
 	if err != nil {
-		return artifact, err
+		return nil, err
 	}
 
 	// Fill out the fields in the JSON file
 	var jsonResult map[string]interface{}
 	if err = json.Unmarshal(jsonRaw, &jsonResult); err != nil {
-		return artifact, err
+		return nil, err
 	}
 
 	// Parse the ABI
