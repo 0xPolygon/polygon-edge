@@ -77,7 +77,7 @@ func (p *predeployParams) initRawParams() error {
 }
 
 func (p *predeployParams) initPredeployAddress() error {
-	if len(p.addressRaw) < 1 {
+	if p.addressRaw == "" {
 		return errInvalidPredeployAddress
 	}
 
