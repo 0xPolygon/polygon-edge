@@ -27,6 +27,12 @@ var (
 	errDeployedBytecodeNotFound = errors.New("deployed bytecode field not found in specified JSON")
 )
 
+const (
+	abiValue              = "abi"
+	deployedBytecodeValue = "deployedBytecode"
+	bytecodeValue         = "bytecode"
+)
+
 type contractArtifact struct {
 	ABI              []byte // the ABI of the Smart Contract
 	Bytecode         []byte // the raw bytecode of the Smart Contract
@@ -59,7 +65,7 @@ func generateContractArtifact(filepath string) (*contractArtifact, error) {
 	}
 
 	// Parse the ABI
-	abiRaw, ok := jsonResult["abi"]
+	abiRaw, ok := jsonResult[abiValue]
 	if !ok {
 		return nil, errABINotFound
 	}
@@ -70,7 +76,7 @@ func generateContractArtifact(filepath string) (*contractArtifact, error) {
 	}
 
 	// Parse the bytecode
-	bytecode, ok := jsonResult["bytecode"].(string)
+	bytecode, ok := jsonResult[bytecodeValue].(string)
 	if !ok {
 		return nil, errBytecodeNotFound
 	}
@@ -81,7 +87,7 @@ func generateContractArtifact(filepath string) (*contractArtifact, error) {
 	}
 
 	// Parse deployed bytecode
-	deployedBytecode, ok := jsonResult["deployedBytecode"].(string)
+	deployedBytecode, ok := jsonResult[deployedBytecodeValue].(string)
 	if !ok {
 		return nil, errDeployedBytecodeNotFound
 	}
