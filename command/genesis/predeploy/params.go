@@ -33,6 +33,9 @@ var (
 
 var (
 	predeployAddressMin = types.StringToAddress("01100")
+	reservedAddresses   = []types.Address{
+		staking.AddrStakingContract,
+	}
 )
 
 var (
@@ -82,13 +85,23 @@ func (p *predeployParams) initPredeployAddress() error {
 	}
 
 	address := types.StringToAddress(p.addressRaw)
-	if address == staking.AddrStakingContract {
+	if isReservedAddress(address) {
 		return errReservedPredeployAddress
 	}
 
 	p.address = address
 
 	return nil
+}
+
+func isReservedAddress(address types.Address) bool {
+	for _, reservedAddress := range reservedAddresses {
+		if address == reservedAddress {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (p *predeployParams) convertConstructorArgs() {
