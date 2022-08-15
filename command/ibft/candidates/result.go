@@ -20,7 +20,7 @@ type IBFTCandidatesResult struct {
 	Candidates []IBFTCandidate `json:"candidates"`
 }
 
-func newIBFTCandidatesResult(resp *ibftOp.CandidatesResp) (*IBFTCandidatesResult, error) {
+func newIBFTCandidatesResult(resp *ibftOp.CandidatesResp) *IBFTCandidatesResult {
 	res := &IBFTCandidatesResult{
 		Candidates: make([]IBFTCandidate, len(resp.Candidates)),
 	}
@@ -36,7 +36,7 @@ func newIBFTCandidatesResult(resp *ibftOp.CandidatesResp) (*IBFTCandidatesResult
 		}
 	}
 
-	return res, nil
+	return res
 }
 
 func (r *IBFTCandidatesResult) GetOutput() string {

@@ -29,14 +29,9 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	result, err := newIBFTCandidatesResult(candidatesResponse)
-	if err != nil {
-		outputter.SetError(err)
-
-		return
-	}
-
-	outputter.SetCommandResult(result)
+	outputter.SetCommandResult(
+		newIBFTCandidatesResult(candidatesResponse),
+	)
 }
 
 func getIBFTCandidates(grpcAddress string) (*ibftOp.CandidatesResp, error) {
