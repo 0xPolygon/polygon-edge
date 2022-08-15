@@ -413,7 +413,7 @@ func TestDropKnownGossipTx(t *testing.T) {
 	)
 }
 
-func TestAddHandler(t *testing.T) {
+func TestEnqueueHandler(t *testing.T) {
 	t.Parallel()
 
 	t.Run("enqueue new tx with higher nonce", func(t *testing.T) {
