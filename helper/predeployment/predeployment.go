@@ -195,16 +195,7 @@ func GenerateGenesisAccountFromFile(
 	)
 
 	// Enable all forks
-	config := chain.ForksInTime{
-		Homestead:      true,
-		Byzantium:      true,
-		Constantinople: true,
-		Petersburg:     true,
-		Istanbul:       true,
-		EIP150:         true,
-		EIP158:         true,
-		EIP155:         true,
-	}
+	config := chain.AllForksEnabled.At(0)
 
 	// Create a transition
 	transition := state.NewTransition(config, radix)
