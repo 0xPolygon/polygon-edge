@@ -2,7 +2,6 @@ package signer
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -321,6 +320,20 @@ func (s *SignerImpl) CalculateHeaderHash(header *types.Header) (types.Hash, erro
 	return calculateHeaderHash(filteredHeader), nil
 }
 
+// GetParentCommittedSeals extracts Parent Committed Seals from IBFT Extra in Header
+func (s *SignerImpl) GetParentCommittedSeals(header *types.Header) (Sealer, error) {
+	data := header.ExtraData[IstanbulExtraVanity:]
+	extra := &IstanbulExtra{
+		ParentCommittedSeals: s.keyManager.NewEmptyCommittedSeals(),
+	}
+
+	if err := extra.unmarshalRLPForParentCS(data); err != nil {
+		return nil, err
+	}
+
+	return extra.ParentCommittedSeals, nil
+}
+
 // filterHeaderForHash removes unnecessary fields from IBFT Extra of the header
 // for hash calculation
 func (s *SignerImpl) filterHeaderForHash(header *types.Header) (*types.Header, error) {
@@ -336,31 +349,4 @@ func (s *SignerImpl) filterHeaderForHash(header *types.Header) (*types.Header, e
 	s.initIbftExtra(clone, extra.Validators, extra.ParentCommittedSeals)
 
 	return clone, nil
-}
-
-// extractParentCommittedSeals extracts Parent Committed Seals from IBFT Extra in Header
-func (s *SignerImpl) GetParentCommittedSeals(header *types.Header) (Sealer, error) {
-	data := header.ExtraData[IstanbulExtraVanity:]
-	extra := &IstanbulExtra{
-		ParentCommittedSeals: s.keyManager.NewEmptyCommittedSeals(),
-	}
-
-	if err := extra.unmarshalRLPForParentCS(data); err != nil {
-		return nil, err
-	}
-
-	return extra.ParentCommittedSeals, nil
-}
-
-// verifyIBFTExtraSize checks whether header.ExtraData has enough size for IBFT Extra
-func verifyIBFTExtraSize(header *types.Header) error {
-	if len(header.ExtraData) < IstanbulExtraVanity {
-		return fmt.Errorf(
-			"wrong extra size, expected greater than or equal to %d but actual %d",
-			IstanbulExtraVanity,
-			len(header.ExtraData),
-		)
-	}
-
-	return nil
 }

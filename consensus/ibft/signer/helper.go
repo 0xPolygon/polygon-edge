@@ -120,3 +120,16 @@ func NewSignerFromType(
 
 	return NewSigner(km), nil
 }
+
+// verifyIBFTExtraSize checks whether header.ExtraData has enough size for IBFT Extra
+func verifyIBFTExtraSize(header *types.Header) error {
+	if len(header.ExtraData) < IstanbulExtraVanity {
+		return fmt.Errorf(
+			"wrong extra size, expected greater than or equal to %d but actual %d",
+			IstanbulExtraVanity,
+			len(header.ExtraData),
+		)
+	}
+
+	return nil
+}
