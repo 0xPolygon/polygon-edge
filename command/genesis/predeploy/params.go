@@ -105,12 +105,6 @@ func isReservedAddress(address types.Address) bool {
 }
 
 func (p *predeployParams) convertConstructorArgs() {
-	if len(p.constructorArgsRaw) < 1 {
-		p.constructorArgs = []interface{}{}
-
-		return
-	}
-
 	constructorArgs := make([]interface{}, len(p.constructorArgsRaw))
 	for i, v := range p.constructorArgsRaw {
 		constructorArgs[i] = v
