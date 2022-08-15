@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/0xPolygon/polygon-edge/chain"
-	"github.com/0xPolygon/polygon-edge/contracts/staking"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state"
 	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
@@ -147,6 +146,7 @@ func normalizeConstructorArguments(constructorArgs []string) []interface{} {
 func GenerateGenesisAccountFromFile(
 	filepath string,
 	constructorArgs []string,
+	predeployAddress types.Address,
 ) (*chain.GenesisAccount, error) {
 	// Create the artifact from JSON
 	artifact, err := generateContractArtifact(filepath)
@@ -188,7 +188,7 @@ func GenerateGenesisAccountFromFile(
 		1,
 		types.ZeroAddress,
 		types.ZeroAddress,
-		staking.AddrStakingContract,
+		predeployAddress,
 		big.NewInt(0),
 		math.MaxInt64,
 		finalBytecode,
@@ -212,7 +212,7 @@ func GenerateGenesisAccountFromFile(
 	storageMap := make(map[types.Hash]types.Hash)
 
 	radix.GetRadix().Root().Walk(func(k []byte, v interface{}) bool {
-		if types.BytesToAddress(k) != staking.AddrStakingContract {
+		if types.BytesToAddress(k) != predeployAddress {
 			// Ignore all addresses that are not the one the predeployment
 			// is meant to run for
 			return false
@@ -232,8 +232,8 @@ func GenerateGenesisAccountFromFile(
 	transition.Commit()
 
 	return &chain.GenesisAccount{
-		Balance: transition.GetBalance(staking.AddrStakingContract),
-		Nonce:   transition.GetNonce(staking.AddrStakingContract),
+		Balance: transition.GetBalance(predeployAddress),
+		Nonce:   transition.GetNonce(predeployAddress),
 		Code:    artifact.DeployedBytecode,
 		Storage: storageMap,
 	}, nil

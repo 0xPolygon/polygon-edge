@@ -136,6 +136,7 @@ func (p *predeployParams) updateGenesisConfig() error {
 	predeployAccount, err := predeployment.GenerateGenesisAccountFromFile(
 		p.artifactsPath,
 		p.constructorArgs,
+		p.address,
 	)
 	if err != nil {
 		return err
