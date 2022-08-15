@@ -141,6 +141,31 @@ func normalizeConstructorArguments(constructorArgs []string) []interface{} {
 	return arguments
 }
 
+// getModifiedStorageMap fetches the modified storage map for the specified address
+func getModifiedStorageMap(radix *state.Txn, address types.Address) map[types.Hash]types.Hash {
+	storageMap := make(map[types.Hash]types.Hash)
+
+	radix.GetRadix().Root().Walk(func(k []byte, v interface{}) bool {
+		if types.BytesToAddress(k) != address {
+			// Ignore all addresses that are not the one the predeployment
+			// is meant to run for
+			return false
+		}
+
+		obj, _ := v.(*state.StateObject)
+		obj.Txn.Root().Walk(func(k []byte, v interface{}) bool {
+			val, _ := v.([]byte)
+			storageMap[types.BytesToHash(k)] = types.BytesToHash(val)
+
+			return false
+		})
+
+		return true
+	})
+
+	return storageMap
+}
+
 // GenerateGenesisAccountFromFile generates an account that is going to be directly
 // inserted into state
 func GenerateGenesisAccountFromFile(
@@ -207,27 +232,8 @@ func GenerateGenesisAccountFromFile(
 	}
 
 	// After the execution finishes,
-	// the state needs to be walked to collect all touched
-	// storage slots
-	storageMap := make(map[types.Hash]types.Hash)
-
-	radix.GetRadix().Root().Walk(func(k []byte, v interface{}) bool {
-		if types.BytesToAddress(k) != predeployAddress {
-			// Ignore all addresses that are not the one the predeployment
-			// is meant to run for
-			return false
-		}
-
-		obj, _ := v.(*state.StateObject)
-		obj.Txn.Root().Walk(func(k []byte, v interface{}) bool {
-			val, _ := v.([]byte)
-			storageMap[types.BytesToHash(k)] = types.BytesToHash(val)
-
-			return false
-		})
-
-		return true
-	})
+	// the state needs to be walked to collect all touched all storage slots
+	storageMap := getModifiedStorageMap(radix, predeployAddress)
 
 	transition.Commit()
 
