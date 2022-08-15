@@ -67,7 +67,7 @@ func (s *BLSKeyManager) SignCommittedSeal(data []byte) ([]byte, error) {
 }
 
 func (s *BLSKeyManager) Ecrecover(sig, digest []byte) (types.Address, error) {
-	return ecrecoverImpl(sig, digest)
+	return ecrecover(sig, digest)
 }
 
 func (s *BLSKeyManager) GenerateCommittedSeals(sealMap map[types.Address][]byte, extra *IstanbulExtra) (Sealer, error) {

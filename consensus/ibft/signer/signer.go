@@ -65,10 +65,12 @@ type Signer interface {
 	CalculateHeaderHash(*types.Header) (types.Hash, error)
 }
 
+// SignerImpl is an implementation that meets Signer
 type SignerImpl struct {
 	keyManager KeyManager
 }
 
+// NewSigner is a constructor of SignerImpl
 func NewSigner(
 	keyManager KeyManager,
 ) Signer {
@@ -77,40 +79,44 @@ func NewSigner(
 	}
 }
 
+// Type returns that validator type the signer expects
 func (s *SignerImpl) Type() validators.ValidatorType {
 	return s.keyManager.Type()
 }
 
+// Address returns the signer's address
 func (s *SignerImpl) Address() types.Address {
 	return s.keyManager.Address()
 }
 
+// InitIBFTExtra initializes the extra field in the given header
+// based on given validators and parent committed seals
 func (s *SignerImpl) InitIBFTExtra(
 	header *types.Header,
 	validators validators.Validators,
 	parentCommittedSeals Sealer,
 ) {
-	putIbftExtra(header, &IstanbulExtra{
-		Validators:           validators,
-		ProposerSeal:         nil,
-		CommittedSeals:       s.keyManager.NewEmptyCommittedSeals(),
-		ParentCommittedSeals: parentCommittedSeals,
-	})
+	s.initIbftExtra(
+		header,
+		validators,
+		parentCommittedSeals,
+	)
 }
 
-func (s *SignerImpl) GetIBFTExtra(h *types.Header) (*IstanbulExtra, error) {
-	if err := verifyIBFTExtraSize(h); err != nil {
+// GetIBFTExtra extracts IBFT Extra from the given header
+func (s *SignerImpl) GetIBFTExtra(header *types.Header) (*IstanbulExtra, error) {
+	if err := verifyIBFTExtraSize(header); err != nil {
 		return nil, err
 	}
 
-	data := h.ExtraData[IstanbulExtraVanity:]
+	data := header.ExtraData[IstanbulExtraVanity:]
 	extra := &IstanbulExtra{
 		Validators:     s.keyManager.NewEmptyValidatorSet(),
 		ProposerSeal:   nil,
 		CommittedSeals: s.keyManager.NewEmptyCommittedSeals(),
 	}
 
-	if h.Number > 1 {
+	if header.Number > 1 {
 		extra.ParentCommittedSeals = s.keyManager.NewEmptyCommittedSeals()
 	}
 
@@ -121,6 +127,7 @@ func (s *SignerImpl) GetIBFTExtra(h *types.Header) (*IstanbulExtra, error) {
 	return extra, nil
 }
 
+// WriteProposerSeal signs and set ProposerSeal into IBFT Extra of the header
 func (s *SignerImpl) WriteProposerSeal(header *types.Header) (*types.Header, error) {
 	hash, err := s.CalculateHeaderHash(header)
 	if err != nil {
@@ -142,10 +149,12 @@ func (s *SignerImpl) WriteProposerSeal(header *types.Header) (*types.Header, err
 	return header, nil
 }
 
+// EcrecoverFromIBFTMessage recovers signer address from given signature and digest
 func (s *SignerImpl) EcrecoverFromIBFTMessage(signature, digest []byte) (types.Address, error) {
 	return s.keyManager.Ecrecover(signature, digest)
 }
 
+// EcrecoverFromIBFTMessage recovers signer address from given signature and header hash
 func (s *SignerImpl) EcrecoverFromHeader(header *types.Header) (types.Address, error) {
 	extra, err := s.GetIBFTExtra(header)
 	if err != nil {
@@ -160,12 +169,14 @@ func (s *SignerImpl) EcrecoverFromHeader(header *types.Header) (types.Address, e
 	return s.keyManager.Ecrecover(extra.ProposerSeal, hash[:])
 }
 
+// CreateCommittedSeal returns CommittedSeal from given hash
 func (s *SignerImpl) CreateCommittedSeal(hash []byte) ([]byte, error) {
 	return s.keyManager.SignCommittedSeal(
 		wrapCommitHash(hash[:]),
 	)
 }
 
+// CreateCommittedSeal verifies a CommittedSeal
 func (s *SignerImpl) VerifyCommittedSeal(
 	validators validators.Validators,
 	signer types.Address,
@@ -179,6 +190,7 @@ func (s *SignerImpl) VerifyCommittedSeal(
 	)
 }
 
+// WriteCommittedSeals builds and writes CommittedSeals into IBFT Extra of the header
 func (s *SignerImpl) WriteCommittedSeals(
 	header *types.Header,
 	sealMap map[types.Address][]byte,
@@ -205,6 +217,7 @@ func (s *SignerImpl) WriteCommittedSeals(
 	return header, nil
 }
 
+// VerifyCommittedSeals verifies CommittedSeals in IBFT Extra of the header
 func (s *SignerImpl) VerifyCommittedSeals(
 	header *types.Header,
 	validators validators.Validators,
@@ -238,6 +251,7 @@ func (s *SignerImpl) VerifyCommittedSeals(
 	return nil
 }
 
+// VerifyParentCommittedSeals verifies ParentCommittedSeals in IBFT Extra of the header
 func (s *SignerImpl) VerifyParentCommittedSeals(
 	parent, header *types.Header,
 	parentValidators validators.Validators,
@@ -278,10 +292,12 @@ func (s *SignerImpl) VerifyParentCommittedSeals(
 	return nil
 }
 
+// SignIBFTMessage signs arbitrary message
 func (s *SignerImpl) SignIBFTMessage(msg []byte) ([]byte, error) {
 	return s.keyManager.SignIBFTMessage(msg)
 }
 
+// InitIBFTExtra initializes the extra field
 func (s *SignerImpl) initIbftExtra(
 	header *types.Header,
 	validators validators.Validators,
@@ -295,6 +311,7 @@ func (s *SignerImpl) initIbftExtra(
 	})
 }
 
+// CalculateHeaderHash calculates header hash for IBFT Extra
 func (s *SignerImpl) CalculateHeaderHash(header *types.Header) (types.Hash, error) {
 	filteredHeader, err := s.filterHeaderForHash(header)
 	if err != nil {
@@ -304,6 +321,8 @@ func (s *SignerImpl) CalculateHeaderHash(header *types.Header) (types.Hash, erro
 	return calculateHeaderHash(filteredHeader), nil
 }
 
+// filterHeaderForHash removes unnecessary fields from IBFT Extra of the header
+// for hash calculation
 func (s *SignerImpl) filterHeaderForHash(header *types.Header) (*types.Header, error) {
 	clone := header.Copy()
 
@@ -333,6 +352,7 @@ func (s *SignerImpl) GetParentCommittedSeals(header *types.Header) (Sealer, erro
 	return extra.ParentCommittedSeals, nil
 }
 
+// verifyIBFTExtraSize checks whether header.ExtraData has enough size for IBFT Extra
 func verifyIBFTExtraSize(header *types.Header) error {
 	if len(header.ExtraData) < IstanbulExtraVanity {
 		return fmt.Errorf(

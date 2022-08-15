@@ -21,10 +21,12 @@ const (
 	legacyCommitCode = 2
 )
 
+// wrapCommitHash calculates digest for CommittedSeal
 func wrapCommitHash(b []byte) []byte {
 	return crypto.Keccak256(b, []byte{byte(legacyCommitCode)})
 }
 
+// getOrCreateECDSAKey loads ECDSA key or creates a new key
 func getOrCreateECDSAKey(manager secrets.SecretsManager) (*ecdsa.PrivateKey, error) {
 	if !manager.HasSecret(secrets.ValidatorKey) {
 		if _, err := helper.InitECDSAValidatorKey(manager); err != nil {
@@ -40,6 +42,7 @@ func getOrCreateECDSAKey(manager secrets.SecretsManager) (*ecdsa.PrivateKey, err
 	return crypto.BytesToECDSAPrivateKey(keyBytes)
 }
 
+// getOrCreateECDSAKey loads BLS key or creates a new key
 func getOrCreateBLSKey(manager secrets.SecretsManager) (*bls_sig.SecretKey, error) {
 	if !manager.HasSecret(secrets.ValidatorBLSKey) {
 		if _, err := helper.InitBLSValidatorKey(manager); err != nil {
@@ -55,6 +58,7 @@ func getOrCreateBLSKey(manager secrets.SecretsManager) (*bls_sig.SecretKey, erro
 	return crypto.BytesToBLSSecretKey(keyBytes)
 }
 
+// calculateHeaderHash is hash calculation of header for IBFT
 func calculateHeaderHash(h *types.Header) types.Hash {
 	arena := fastrlp.DefaultArenaPool.Get()
 	defer fastrlp.DefaultArenaPool.Put(arena)
@@ -79,7 +83,8 @@ func calculateHeaderHash(h *types.Header) types.Hash {
 	return types.BytesToHash(buf)
 }
 
-func ecrecoverImpl(sig, msg []byte) (types.Address, error) {
+// ecrecover recovers signer address from the given digest and signature
+func ecrecover(sig, msg []byte) (types.Address, error) {
 	pub, err := crypto.RecoverPubkey(sig, crypto.Keccak256(msg))
 	if err != nil {
 		return types.Address{}, err
@@ -88,6 +93,7 @@ func ecrecoverImpl(sig, msg []byte) (types.Address, error) {
 	return crypto.PubKeyToAddress(pub), nil
 }
 
+// newKeyManagerFromType creates KeyManager based on the given type
 func newKeyManagerFromType(
 	secretManager secrets.SecretsManager,
 	validatorType validators.ValidatorType,
@@ -102,6 +108,7 @@ func newKeyManagerFromType(
 	}
 }
 
+// NewSignerFromType creates signer from the given type
 func NewSignerFromType(
 	secretManager secrets.SecretsManager,
 	validatorType validators.ValidatorType,

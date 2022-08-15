@@ -65,7 +65,7 @@ func (s *ECDSAKeyManager) SignCommittedSeal(data []byte) ([]byte, error) {
 }
 
 func (s *ECDSAKeyManager) Ecrecover(sig, digest []byte) (types.Address, error) {
-	return ecrecoverImpl(sig, digest)
+	return ecrecover(sig, digest)
 }
 
 func (s *ECDSAKeyManager) GenerateCommittedSeals(
