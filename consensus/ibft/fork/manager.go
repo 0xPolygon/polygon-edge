@@ -234,7 +234,7 @@ func (m *forkManagerImpl) initializeValidatorSet(setType valset.SourceType) erro
 	case valset.Snapshot:
 		valSet, err = m.initializeSnapshotValidatorSet()
 	case valset.Contract:
-		valSet, err = contract.NewContractValidatorSet(
+		valSet = contract.NewContractValidatorSet(
 			m.logger,
 			m.blockchain,
 			m.executor,

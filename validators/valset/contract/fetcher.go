@@ -10,26 +10,26 @@ import (
 	"github.com/0xPolygon/polygon-edge/validators"
 )
 
+// FetchValidators fetches validators from a contract switched by validator type
 func FetchValidators(
 	validatorType validators.ValidatorType,
 	transition *state.Transition,
-	from types.Address,
 ) (validators.Validators, error) {
 	switch validatorType {
 	case validators.ECDSAValidatorType:
-		return FetchECDSAValidators(transition, from)
+		return FetchECDSAValidators(transition)
 	case validators.BLSValidatorType:
-		return FetchBLSValidators(transition, from)
+		return FetchBLSValidators(transition)
 	}
 
 	return nil, fmt.Errorf("unsupported validator type: %s", validatorType)
 }
 
+// FetchECDSAValidators queries a contract for validator addresses and returns ECDSAValidators
 func FetchECDSAValidators(
 	transition *state.Transition,
-	from types.Address,
 ) (*validators.ECDSAValidators, error) {
-	valAddrs, err := staking.QueryValidators(transition, from)
+	valAddrs, err := staking.QueryValidators(transition, types.ZeroAddress)
 	if err != nil {
 		return nil, err
 	}
@@ -44,16 +44,16 @@ func FetchECDSAValidators(
 	return ecdsaValidators, nil
 }
 
+// FetchBLSValidators queries a contract for validator addresses & BLS Public Keys and returns ECDSAValidators
 func FetchBLSValidators(
 	transition *state.Transition,
-	from types.Address,
 ) (*validators.BLSValidators, error) {
-	valAddrs, err := staking.QueryValidators(transition, from)
+	valAddrs, err := staking.QueryValidators(transition, types.ZeroAddress)
 	if err != nil {
 		return nil, err
 	}
 
-	blsPublicKeys, err := staking.QueryBLSPublicKeys(transition, from)
+	blsPublicKeys, err := staking.QueryBLSPublicKeys(transition, types.ZeroAddress)
 	if err != nil {
 		return nil, err
 	}

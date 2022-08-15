@@ -391,6 +391,7 @@ func (s *SnapshotValidatorSet) addHeaderSnap(header *types.Header) error {
 		return err
 	}
 
+	// Create the first snapshot from the genesis
 	s.store.add(&Snapshot{
 		Hash:   header.Hash.String(),
 		Number: header.Number,

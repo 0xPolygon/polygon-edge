@@ -46,13 +46,17 @@ func TestBLSValidatorAddr(t *testing.T) {
 }
 
 func TestBLSValidatorCopy(t *testing.T) {
-	v := NewBLSValidator(addr1, testBLSPubKey1)
+	v1 := NewBLSValidator(addr1, testBLSPubKey1)
+	v2 := v1.Copy()
 
-	assert.Equal(
-		t,
-		v,
-		v.Copy(),
-	)
+	assert.Equal(t, v1, v2)
+
+	// check the addresses are different
+	typedV2, ok := v2.(*BLSValidator)
+
+	assert.True(t, ok)
+	assert.NotSame(t, v1.Address, typedV2.Address)
+	assert.NotSame(t, v1.BLSPublicKey, typedV2.BLSPublicKey)
 }
 
 func TestBLSValidatorEqual(t *testing.T) {
@@ -202,11 +206,18 @@ func TestBLSValidatorsCopy(t *testing.T) {
 		NewBLSValidator(addr2, testBLSPubKey2),
 	}
 
-	assert.Equal(
-		t,
-		vals1,
-		vals1.Copy(),
-	)
+	vals2 := vals1.Copy()
+
+	assert.Equal(t, vals1, vals2)
+
+	// check the addresses are different
+	for i := 0; i < vals1.Len(); i++ {
+		assert.NotSame(
+			t,
+			vals1.At(uint64(i)),
+			vals2.At(uint64(i)),
+		)
+	}
 }
 
 func TestBLSValidatorsAt(t *testing.T) {

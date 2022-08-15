@@ -1,6 +1,7 @@
 package contract
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/0xPolygon/polygon-edge/state"
@@ -8,6 +9,10 @@ import (
 	"github.com/0xPolygon/polygon-edge/validators"
 	"github.com/0xPolygon/polygon-edge/validators/valset"
 	"github.com/hashicorp/go-hclog"
+)
+
+var (
+	ErrSignerNotFound = errors.New("signer not found")
 )
 
 type ContractValidatorSet struct {
@@ -28,14 +33,14 @@ func NewContractValidatorSet(
 	executor Executor,
 	getSigner valset.SignerGetter,
 	epochSize uint64,
-) (valset.ValidatorSet, error) {
+) valset.ValidatorSet {
 	return &ContractValidatorSet{
 		logger:     logger,
 		blockchain: blockchain,
 		executor:   executor,
 		getSigner:  getSigner,
 		epochSize:  epochSize,
-	}, nil
+	}
 }
 
 func (s *ContractValidatorSet) SourceType() valset.SourceType {
@@ -47,17 +52,11 @@ func (s *ContractValidatorSet) Initialize() error {
 }
 
 func (s *ContractValidatorSet) GetValidators(height uint64) (validators.Validators, error) {
-	beginningEpoch := (height / s.epochSize) * s.epochSize
+	fetchingHeight := calculateFetchingHeight(height, s.epochSize)
 
-	// Determine the height of the end of the last epoch
-	fetchedHeight := uint64(0)
-	if beginningEpoch > 0 {
-		fetchedHeight = beginningEpoch - 1
-	}
-
-	fetchedHeader, ok := s.blockchain.GetHeaderByNumber(fetchedHeight)
+	fetchedHeader, ok := s.blockchain.GetHeaderByNumber(fetchingHeight)
 	if !ok {
-		return nil, fmt.Errorf("header not found at %d", fetchedHeight)
+		return nil, fmt.Errorf("header not found at %d", fetchingHeight)
 	}
 
 	signer, err := s.getSigner(height)
@@ -66,7 +65,7 @@ func (s *ContractValidatorSet) GetValidators(height uint64) (validators.Validato
 	}
 
 	if signer == nil {
-		return nil, fmt.Errorf("signer not found")
+		return nil, ErrSignerNotFound
 	}
 
 	transition, err := s.executor.BeginTxn(fetchedHeader.StateRoot, fetchedHeader, types.ZeroAddress)
@@ -74,5 +73,17 @@ func (s *ContractValidatorSet) GetValidators(height uint64) (validators.Validato
 		return nil, err
 	}
 
-	return FetchValidators(signer.Type(), transition, signer.Address())
+	return FetchValidators(signer.Type(), transition)
+}
+
+func calculateFetchingHeight(usingHeight, epochSize uint64) uint64 {
+	beginningEpoch := (usingHeight / epochSize) * epochSize
+
+	// Determine the height of the end of the last epoch
+	if beginningEpoch == 0 {
+		return 0
+	}
+
+	// the end of the last epoch
+	return beginningEpoch - 1
 }

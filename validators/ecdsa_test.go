@@ -40,13 +40,17 @@ func TestECDSAValidatorAddr(t *testing.T) {
 }
 
 func TestECDSAValidatorCopy(t *testing.T) {
-	v := NewECDSAValidator(addr1)
+	v1 := NewECDSAValidator(addr1)
 
-	assert.Equal(
-		t,
-		v,
-		v.Copy(),
-	)
+	v2 := v1.Copy()
+
+	assert.Equal(t, v1, v2)
+
+	// check the addresses are different
+	typedV2, ok := v2.(*ECDSAValidator)
+
+	assert.True(t, ok)
+	assert.NotSame(t, v1.Address, typedV2.Address)
 }
 
 func TestECDSAValidatorEqual(t *testing.T) {
@@ -190,11 +194,18 @@ func TestECDSAValidatorsCopy(t *testing.T) {
 		NewECDSAValidator(addr2),
 	}
 
-	assert.Equal(
-		t,
-		vals1,
-		vals1.Copy(),
-	)
+	vals2 := vals1.Copy()
+
+	assert.Equal(t, vals1, vals2)
+
+	// check the addresses are different
+	for i := 0; i < vals1.Len(); i++ {
+		assert.NotSame(
+			t,
+			vals1.At(uint64(i)),
+			vals2.At(uint64(i)),
+		)
+	}
 }
 
 func TestECDSAValidatorsAt(t *testing.T) {
