@@ -312,9 +312,8 @@ func (s *SignerImpl) filterHeaderForHash(header *types.Header) (*types.Header, e
 		return nil, err
 	}
 
-	// This will effectively remove the Seal and Committed Seal fields,
-	// while keeping proposer vanity and validator set
-	// because extra.Validators, extra.ParentCommittedSeal is what we got from `h` in the first place.
+	// This will effectively remove the Seal and CommittedSeals from the IBFT Extra of header,
+	// while keeping proposer vanity, validator set, and ParentCommittedSeals
 	s.initIbftExtra(clone, extra.Validators, extra.ParentCommittedSeals)
 
 	return clone, nil
