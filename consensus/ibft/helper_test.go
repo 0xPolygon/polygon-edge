@@ -19,14 +19,6 @@ func (t *testerAccount) Address() types.Address {
 	return crypto.PubKeyToAddress(&t.priv.PublicKey)
 }
 
-// func (t *testerAccount) sign(h *types.Header) (*types.Header, error) {
-// 	signer := signer.NewSigner(
-// 		signer.NewECDSAKeyManagerFromKey(t.priv),
-// 	)
-
-// 	return signer.WriteProposerSeal(h)
-// }
-
 type testerAccountPool struct {
 	t        *testing.T
 	accounts []*testerAccount
@@ -73,30 +65,6 @@ func (ap *testerAccountPool) add(accounts ...string) {
 		})
 	}
 }
-
-// func (ap *testerAccountPool) genesis() *chain.Genesis {
-// 	ap.t.Helper()
-
-// 	genesis := &types.Header{
-// 		MixHash: signer.IstanbulDigest,
-// 	}
-
-// 	signer := signer.NewSigner(
-// 		signer.NewECDSAKeyManagerFromKey(ap.get("A").priv),
-// 	)
-
-// 	err := signer.InitIBFTExtra(genesis, nil, ap.ValidatorSet())
-// 	assert.NoError(ap.t, err)
-
-// 	genesis.ComputeHash()
-
-// 	c := &chain.Genesis{
-// 		Mixhash:   genesis.MixHash,
-// 		ExtraData: genesis.ExtraData,
-// 	}
-
-// 	return c
-// }
 
 func (ap *testerAccountPool) get(name string) *testerAccount {
 	ap.t.Helper()
