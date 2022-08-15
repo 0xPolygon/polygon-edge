@@ -145,12 +145,9 @@ func (i *backendIBFT) buildBlock(parent *types.Header) (*types.Block, error) {
 	// set the timestamp
 	header.Timestamp = uint64(time.Now().Unix())
 
-	var parentCommittedSeals signer.Sealer
-
-	if header.Number > 1 {
-		if parentCommittedSeals, err = i.extractCommittedSeals(parent); err != nil {
-			return nil, err
-		}
+	parentCommittedSeals, err := i.extractParentCommittedSeals(parent)
+	if err != nil {
+		return nil, err
 	}
 
 	i.currentSigner.InitIBFTExtra(header, i.currentValidators, parentCommittedSeals)
@@ -329,6 +326,7 @@ func (i *backendIBFT) writeTransaction(
 	return &txExeResult{tx, success}, true
 }
 
+// extractCommittedSeals extracts CommittedSeals from header
 func (i *backendIBFT) extractCommittedSeals(
 	header *types.Header,
 ) (signer.Sealer, error) {
@@ -343,4 +341,15 @@ func (i *backendIBFT) extractCommittedSeals(
 	}
 
 	return extra.CommittedSeals, nil
+}
+
+// extractParentCommittedSeals extracts ParentCommittedSeals from header
+func (i *backendIBFT) extractParentCommittedSeals(
+	header *types.Header,
+) (signer.Sealer, error) {
+	if header.Number == 0 {
+		return nil, nil
+	}
+
+	return i.extractCommittedSeals(header)
 }
