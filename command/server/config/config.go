@@ -61,17 +61,18 @@ type Headers struct {
 }
 
 const (
-	// minimum block generation time in seconds
+	// DefaultBlockTime minimum block generation time in seconds
 	DefaultBlockTime uint64 = 2
 
-	// Multiplier to get IBFT timeout from block time
+	// BlockTimeMultiplierForTimeout Multiplier to get IBFT timeout from block time
 	// timeout is calculated when IBFT timeout is not specified
 	BlockTimeMultiplierForTimeout uint64 = 5
 
-	// maximum length allowed for json_rpc batch requests
+	// DefaultJSONRPCBatchRequestLimit maximum length allowed for json_rpc batch requests
 	DefaultJSONRPCBatchRequestLimit uint64 = 20
 
-	// maximum block range allowed for json_rpc requests with fromBlock/toBlock values (e.g. eth_getLogs)
+	// DefaultJSONRPCBlockRangeLimit maximum block range allowed for json_rpc
+	// requests with fromBlock/toBlock values (e.g. eth_getLogs)
 	DefaultJSONRPCBlockRangeLimit uint64 = 1000
 )
 
