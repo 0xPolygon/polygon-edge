@@ -4,6 +4,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"math"
+	"math/big"
+	"os"
+	"strings"
+
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/contracts/staking"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
@@ -13,11 +19,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/state/runtime/evm"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo/abi"
-	"io/ioutil"
-	"math"
-	"math/big"
-	"os"
-	"strings"
 )
 
 var (
@@ -136,12 +137,11 @@ func extractValue(s string) interface{} {
 
 // normalizeConstructorArguments cleans up the constructor arguments so that they
 // can be interpreted by the ABI encoder
-func normalizeConstructorArguments(constructorArgs []interface{}) []interface{} {
+func normalizeConstructorArguments(constructorArgs []string) []interface{} {
 	arguments := make([]interface{}, 0)
 
 	for _, arg := range constructorArgs {
-		argStr, _ := arg.(string)
-		arguments = append(arguments, extractValue(argStr))
+		arguments = append(arguments, extractValue(arg))
 	}
 
 	return arguments
@@ -151,7 +151,7 @@ func normalizeConstructorArguments(constructorArgs []interface{}) []interface{} 
 // inserted into state
 func GenerateGenesisAccountFromFile(
 	filepath string,
-	constructorArgs []interface{},
+	constructorArgs []string,
 ) (*chain.GenesisAccount, error) {
 	// Create the artifact from JSON
 	artifact, err := generateContractArtifact(filepath)

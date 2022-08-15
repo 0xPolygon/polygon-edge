@@ -45,7 +45,7 @@ func setFlags(cmd *cobra.Command) {
 	)
 
 	cmd.Flags().StringArrayVar(
-		&params.constructorArgsRaw,
+		&params.constructorArgs,
 		constructorArgsPath,
 		[]string{},
 		"the constructor arguments, if any",

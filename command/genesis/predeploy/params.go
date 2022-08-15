@@ -43,13 +43,12 @@ var (
 )
 
 type predeployParams struct {
-	addressRaw         string
-	constructorArgsRaw []string
-	genesisPath        string
+	addressRaw  string
+	genesisPath string
 
 	address         types.Address
 	artifactsPath   string
-	constructorArgs []interface{}
+	constructorArgs []string
 
 	genesisConfig *chain.Chain
 }
@@ -73,8 +72,6 @@ func (p *predeployParams) initRawParams() error {
 	if err := p.initChain(); err != nil {
 		return err
 	}
-
-	p.convertConstructorArgs()
 
 	return nil
 }
@@ -102,15 +99,6 @@ func isReservedAddress(address types.Address) bool {
 	}
 
 	return false
-}
-
-func (p *predeployParams) convertConstructorArgs() {
-	constructorArgs := make([]interface{}, len(p.constructorArgsRaw))
-	for i, v := range p.constructorArgsRaw {
-		constructorArgs[i] = v
-	}
-
-	p.constructorArgs = constructorArgs
 }
 
 func (p *predeployParams) verifyMinAddress() error {
