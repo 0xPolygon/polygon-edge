@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"math"
 	"math/big"
 	"os"
@@ -42,18 +41,8 @@ type contractArtifact struct {
 // generateContractArtifact generates contract artifacts based on the
 // passed in Smart Contract JSON ABI
 func generateContractArtifact(filepath string) (*contractArtifact, error) {
-	var (
-		artifact *contractArtifact
-		err      error
-	)
-
 	// Read from the ABI from the JSON file
-	jsonFile, err := os.Open(filepath)
-	if err != nil {
-		return artifact, err
-	}
-
-	jsonRaw, err := ioutil.ReadAll(jsonFile)
+	jsonRaw, err := os.ReadFile(filepath)
 	if err != nil {
 		return nil, err
 	}
