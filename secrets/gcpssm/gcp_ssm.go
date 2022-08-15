@@ -3,9 +3,10 @@ package gcpssm
 import (
 	"context"
 	"fmt"
+	"os"
+
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/hashicorp/go-hclog"
-	"os"
 
 	sm "cloud.google.com/go/secretmanager/apiv1"
 	smpb "google.golang.org/genproto/googleapis/cloud/secretmanager/v1"

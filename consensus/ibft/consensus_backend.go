@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/0xPolygon/go-ibft/messages"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -42,7 +43,10 @@ func (i *backendIBFT) BuildProposal(blockNumber uint64) []byte {
 	return block.MarshalRLP()
 }
 
-func (i *backendIBFT) InsertBlock(proposal []byte, committedSeals [][]byte) {
+func (i *backendIBFT) InsertBlock(
+	proposal []byte,
+	committedSeals []*messages.CommittedSeal,
+) {
 	newBlock := &types.Block{}
 	if err := newBlock.UnmarshalRLP(proposal); err != nil {
 		i.logger.Error("cannot unmarshal proposal", "err", err)
@@ -50,8 +54,13 @@ func (i *backendIBFT) InsertBlock(proposal []byte, committedSeals [][]byte) {
 		return
 	}
 
+	seals := make([][]byte, len(committedSeals))
+	for idx := range committedSeals {
+		seals[idx] = committedSeals[idx].Signature
+	}
+
 	// Push the committed seals to the header
-	header, err := writeCommittedSeals(newBlock.Header, committedSeals)
+	header, err := writeCommittedSeals(newBlock.Header, seals)
 	if err != nil {
 		i.logger.Error("cannot write committed seals", "err", err)
 
@@ -136,14 +145,7 @@ func (i *backendIBFT) buildBlock(snap *Snapshot, parent *types.Header) (*types.B
 	}
 
 	// set the timestamp
-	parentTime := time.Unix(int64(parent.Timestamp), 0)
-	headerTime := parentTime.Add(i.blockTime)
-
-	if headerTime.Before(time.Now()) {
-		headerTime = time.Now()
-	}
-
-	header.Timestamp = uint64(headerTime.Unix())
+	header.Timestamp = uint64(time.Now().Unix())
 
 	// we need to include in the extra field the current set of validators
 	putIbftExtraValidators(header, snap.Set)
@@ -247,11 +249,11 @@ func (i *backendIBFT) writeTransactions(
 			return
 		default:
 			if stopExecution {
-				//	wait for the timer to expire
+				// wait for the timer to expire
 				continue
 			}
 
-			//	execute transactions one by one
+			// execute transactions one by one
 			result, ok := i.writeTransaction(
 				i.txpool.Peek(),
 				transition,
@@ -300,15 +302,15 @@ func (i *backendIBFT) writeTransaction(
 			)
 		}
 
-		//	continue processing
+		// continue processing
 		return &txExeResult{tx, fail}, true
 	}
 
 	if err := transition.Write(tx); err != nil {
-		if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok { // nolint:errorlint
-			//	stop processing
+		if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok { //nolint:errorlint
+			// stop processing
 			return nil, false
-		} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable { // nolint:errorlint
+		} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable { //nolint:errorlint
 			i.txpool.Demote(tx)
 
 			return &txExeResult{tx, skip}, true

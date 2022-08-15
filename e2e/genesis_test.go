@@ -3,11 +3,6 @@ package e2e
 import (
 	"context"
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/command"
-	"github.com/0xPolygon/polygon-edge/helper/hex"
-	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/umbracle/ethgo"
-	"github.com/umbracle/ethgo/abi"
 	"io/ioutil"
 	"math/big"
 	"path/filepath"
@@ -17,6 +12,12 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/0xPolygon/polygon-edge/command"
+	"github.com/0xPolygon/polygon-edge/helper/hex"
+	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/umbracle/ethgo"
+	"github.com/umbracle/ethgo/abi"
 
 	"github.com/0xPolygon/polygon-edge/e2e/framework"
 	"github.com/0xPolygon/polygon-edge/helper/tests"

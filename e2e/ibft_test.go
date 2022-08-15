@@ -16,10 +16,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-/**
-	TestIbft_Transfer sends a transfer transaction (EOA -> EOA)
-	and verifies it was mined
-**/
+// TestIbft_Transfer sends a transfer transaction (EOA -> EOA)
+// and verifies it was mined
 func TestIbft_Transfer(t *testing.T) {
 	testCases := []struct {
 		name            string
@@ -77,7 +75,7 @@ func TestIbft_Transfer(t *testing.T) {
 			ctxForTx, cancelTx := context.WithTimeout(context.Background(), txTimeout)
 			defer cancelTx()
 
-			//	send tx and wait for receipt
+			// send tx and wait for receipt
 			receipt, err := ibftManager.
 				GetServer(0).
 				SendRawTx(ctxForTx, txn, senderKey)
