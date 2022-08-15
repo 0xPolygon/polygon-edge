@@ -2,6 +2,7 @@ package predeploy
 
 import (
 	"fmt"
+
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/spf13/cobra"
@@ -32,8 +33,8 @@ func setFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(
 		&params.addressRaw,
 		predeployAddressFlag,
-		predeployAddressMin,
-		"the address to predeploy to. Must be >= 0x0000000000000000000000000000000000001100",
+		predeployAddressMin.String(),
+		fmt.Sprintf("the address to predeploy to. Must be >= %s", predeployAddressMin.String()),
 	)
 
 	cmd.Flags().StringVar(

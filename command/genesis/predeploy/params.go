@@ -3,15 +3,16 @@ package predeploy
 import (
 	"errors"
 	"fmt"
+	"math/big"
+	"os"
+	"strings"
+
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/contracts/staking"
 	"github.com/0xPolygon/polygon-edge/helper/predeployment"
 	"github.com/0xPolygon/polygon-edge/types"
-	"math/big"
-	"os"
-	"strings"
 )
 
 const (
@@ -25,11 +26,13 @@ var (
 	errInvalidPredeployAddress  = errors.New("invalid predeploy address provided")
 	errAddressTaken             = errors.New("the provided predeploy address is taken")
 	errReservedPredeployAddress = errors.New("the provided predeploy address is reserved")
-	errInvalidAddress           = errors.New("the provided predeploy address must be >= 0x01100")
+	errInvalidAddress           = errors.New(
+		fmt.Sprintf("the provided predeploy address must be >= %s", predeployAddressMin.String()),
+	)
 )
 
 var (
-	predeployAddressMin = "0x0000000000000000000000000000000000001100"
+	predeployAddressMin = types.StringToAddress("01100")
 )
 
 var (
@@ -109,7 +112,10 @@ func (p *predeployParams) verifyMinAddress() error {
 		return errors.New("unable to convert hex number")
 	}
 
-	addressMin, ok := big.NewInt(0).SetString(strings.TrimPrefix(predeployAddressMin, "0x"), 16)
+	addressMin, ok := big.NewInt(0).SetString(
+		strings.TrimPrefix(predeployAddressMin.String(), "0x"),
+		16,
+	)
 	if !ok {
 		return errors.New("unable to convert hex number")
 	}
