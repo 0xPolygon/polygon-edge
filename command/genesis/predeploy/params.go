@@ -25,8 +25,8 @@ var (
 	errInvalidPredeployAddress  = errors.New("invalid predeploy address provided")
 	errAddressTaken             = errors.New("the provided predeploy address is taken")
 	errReservedPredeployAddress = errors.New("the provided predeploy address is reserved")
-	errInvalidAddress           = errors.New(
-		fmt.Sprintf("the provided predeploy address must be >= %s", predeployAddressMin.String()),
+	errInvalidAddress           = fmt.Errorf(
+		"the provided predeploy address must be >= %s", predeployAddressMin.String(),
 	)
 )
 

@@ -2,8 +2,9 @@ package predeployment
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestExtraction(t *testing.T) {
@@ -51,27 +52,27 @@ func TestNormalizeArgs(t *testing.T) {
 
 	testTable := []struct {
 		name           string
-		arguments      []interface{}
+		arguments      []string
 		expectedResult []interface{}
 	}{
 		{
 			"simple type arguments",
-			[]interface{}{"argument"},
+			[]string{"argument"},
 			[]interface{}{"argument"},
 		},
 		{
 			"array of simple type arguments",
-			[]interface{}{"argument 1", "argument 2"},
+			[]string{"argument 1", "argument 2"},
 			[]interface{}{"argument 1", "argument 2"},
 		},
 		{
 			"structure as argument",
-			[]interface{}{"[argument 1]"},
+			[]string{"[argument 1]"},
 			[]interface{}{[]interface{}{"argument 1"}},
 		},
 		{
 			"structure with regular types",
-			[]interface{}{"[argument 1]", "argument 2"},
+			[]string{"[argument 1]", "argument 2"},
 			[]interface{}{[]interface{}{"argument 1"}, "argument 2"},
 		},
 	}

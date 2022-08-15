@@ -75,7 +75,7 @@ func generateContractArtifact(filepath string) (*contractArtifact, error) {
 		return nil, errBytecodeNotFound
 	}
 
-	hexBytecode, err := hex.DecodeString(strings.TrimPrefix(bytecode, "0x"))
+	hexBytecode, err := hex.DecodeHex(bytecode)
 	if err != nil {
 		return nil, fmt.Errorf("unable to decode bytecode, %w", err)
 	}
@@ -86,7 +86,7 @@ func generateContractArtifact(filepath string) (*contractArtifact, error) {
 		return nil, errDeployedBytecodeNotFound
 	}
 
-	hexDeployedBytecode, err := hex.DecodeString(strings.TrimPrefix(deployedBytecode, "0x"))
+	hexDeployedBytecode, err := hex.DecodeHex(deployedBytecode)
 	if err != nil {
 		return nil, fmt.Errorf("unable to decode deployed bytecode, %w", err)
 	}
