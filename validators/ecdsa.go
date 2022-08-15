@@ -220,7 +220,7 @@ func (vs *ECDSAValidators) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 	return vv
 }
 
-// UnmarshalRLPFrom is a RLP Unmarshaller
+// UnmarshalRLPFrom is a RLP Unmarshaler
 func (vs *ECDSAValidators) UnmarshalRLPFrom(p *fastrlp.Parser, val *fastrlp.Value) error {
 	elems, err := val.GetElems()
 	if err != nil {

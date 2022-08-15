@@ -25,9 +25,7 @@ func (vs *ECDSAValidators) UnmarshalJSON(data []byte) error {
 
 	*vs = ECDSAValidators{}
 	for _, addr := range addrs {
-		if err := vs.Add(&ECDSAValidator{
-			Address: addr,
-		}); err != nil {
+		if err := vs.Add(NewECDSAValidator(addr)); err != nil {
 			return err
 		}
 	}

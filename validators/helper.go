@@ -2,10 +2,15 @@ package validators
 
 import (
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/0xPolygon/polygon-edge/types"
+)
+
+var (
+	ErrInvalidBLSValidatorFormat = errors.New("invalid validator format, expected [Validator Address]:[BLS Public Key]")
 )
 
 // NewValidatorFromType instantiates a validator by specified type
@@ -48,6 +53,9 @@ func ParseValidator(validatorType ValidatorType, validator string) (Validator, e
 // ParseValidator parses an array of validator represented in string
 func ParseValidators(validatorType ValidatorType, rawValidators []string) (Validators, error) {
 	set := NewValidatorsFromType(validatorType)
+	if set == nil {
+		return nil, fmt.Errorf("invalid validator type: %s", validatorType)
+	}
 
 	for _, s := range rawValidators {
 		validator, err := ParseValidator(validatorType, s)
@@ -75,7 +83,7 @@ func ParseBLSValidator(validator string) (*BLSValidator, error) {
 	subValues := strings.Split(validator, ":")
 
 	if len(subValues) != 2 {
-		return nil, fmt.Errorf("invalid validator format, expected [Validator Address]:[BLS Public Key]")
+		return nil, ErrInvalidBLSValidatorFormat
 	}
 
 	addrBytes, err := hex.DecodeString(strings.TrimPrefix(subValues[0], "0x"))

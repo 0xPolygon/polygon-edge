@@ -32,7 +32,7 @@ func (v *BLSValidator) Type() ValidatorType {
 // Format => [Address]:[BLSPublicKey]
 func (v *BLSValidator) String() string {
 	return fmt.Sprintf(
-		"%s:%s",
+		"%s:0x%s",
 		v.Address.String(),
 		hex.EncodeToString(v.BLSPublicKey),
 	)
