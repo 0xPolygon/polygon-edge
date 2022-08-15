@@ -99,7 +99,17 @@ func (i *backendIBFT) MaximumFaultyNodes() uint64 {
 }
 
 func (i *backendIBFT) Quorum(blockNumber uint64) uint64 {
-	validators, _ := i.forkManager.GetValidators(blockNumber)
+	validators, err := i.forkManager.GetValidators(blockNumber)
+	if err != nil {
+		i.logger.Error(
+			"failed to get validators when calculation quorum",
+			"height", blockNumber,
+			"err", err,
+		)
+
+		return 0
+	}
+
 	quorumFn := i.quorumSize(blockNumber)
 
 	return uint64(quorumFn(validators))
@@ -149,8 +159,6 @@ func (i *backendIBFT) buildBlock(parent *types.Header) (*types.Block, error) {
 	if err != nil {
 		return nil, err
 	}
-	// If the mechanism is PoS -> build a regular block if it's not an end-of-epoch block
-	// If the mechanism is PoA -> always build a regular block, regardless of epoch
 
 	txs := i.writeTransactions(gasLimit, header.Number, transition)
 
