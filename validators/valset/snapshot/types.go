@@ -54,9 +54,9 @@ func (s *Snapshot) UnmarshalJSON(data []byte) error {
 	raw := struct {
 		Number uint64
 		Hash   string
-		Votes  []*valset.Vote
 		Type   validators.ValidatorType
-		Set    []byte
+		Votes  []json.RawMessage
+		Set    json.RawMessage
 	}{}
 
 	if err := json.Unmarshal(data, &raw); err != nil {
@@ -65,9 +65,23 @@ func (s *Snapshot) UnmarshalJSON(data []byte) error {
 
 	s.Number = raw.Number
 	s.Hash = raw.Hash
-	s.Votes = raw.Votes
 	s.Set = validators.NewValidatorsFromType(raw.Type)
 
+	// Votes
+	votes := make([]*valset.Vote, len(raw.Votes))
+	for idx := range votes {
+		votes[idx] = &valset.Vote{
+			Candidate: validators.NewValidatorFromType(raw.Type),
+		}
+
+		if err := json.Unmarshal(raw.Votes[idx], votes[idx]); err != nil {
+			return err
+		}
+	}
+
+	s.Votes = votes
+
+	// Set
 	if err := json.Unmarshal(raw.Set, s.Set); err != nil {
 		return err
 	}
@@ -108,12 +122,12 @@ func (s *Snapshot) Count(h func(v *valset.Vote) bool) (count int) {
 func (s *Snapshot) AddVote(
 	voter types.Address,
 	candidate validators.Validator,
-	authrorize bool,
+	authorize bool,
 ) {
 	s.Votes = append(s.Votes, &valset.Vote{
 		Validator: voter,
 		Candidate: candidate,
-		Authorize: authrorize,
+		Authorize: authorize,
 	})
 }
 
@@ -151,11 +165,27 @@ func (s *Snapshot) CountByCandidate(
 	})
 }
 
+// RemoveVotes removes the Votes that meet condition defined in the given function
+func (s *Snapshot) RemoveVotes(shouldRemoveFn func(v *valset.Vote) bool) {
+	newVotes := make([]*valset.Vote, 0, len(s.Votes))
+
+	for _, vote := range s.Votes {
+		if shouldRemoveFn(vote) {
+			continue
+		}
+
+		newVotes = append(newVotes, vote)
+	}
+
+	// match capacity with size in order to shrink array
+	s.Votes = newVotes[:len(newVotes):len(newVotes)]
+}
+
 // RemoveVotesByVoter is a helper method to remove all votes created by specified address
 func (s *Snapshot) RemoveVotesByVoter(
 	address types.Address,
-) int {
-	return s.Count(func(v *valset.Vote) bool {
+) {
+	s.RemoveVotes(func(v *valset.Vote) bool {
 		return v.Validator == address
 	})
 }
@@ -163,8 +193,8 @@ func (s *Snapshot) RemoveVotesByVoter(
 // RemoveVotesByCandidate is a helper method to remove all votes to specified candidate
 func (s *Snapshot) RemoveVotesByCandidate(
 	candidate validators.Validator,
-) int {
-	return s.Count(func(v *valset.Vote) bool {
+) {
+	s.RemoveVotes(func(v *valset.Vote) bool {
 		return v.Candidate.Equal(candidate)
 	})
 }

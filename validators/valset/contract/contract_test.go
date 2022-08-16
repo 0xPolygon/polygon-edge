@@ -35,7 +35,7 @@ var (
 	testBlockGasLimit uint64 = 10000000
 )
 
-func newTestBLSKeyBytes() []byte {
+func newTestBLSKeyBytes() validators.BLSValidatorPublicKey {
 	key, err := crypto.GenerateBLSKey()
 	if err != nil {
 		return nil

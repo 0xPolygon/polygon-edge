@@ -58,7 +58,7 @@ type HeaderGetter interface {
 // Vote defines the vote structure
 type Vote struct {
 	Validator types.Address        // Voter
-	Candidate validators.Validator // Candidate of Validator
+	Candidate validators.Validator // Candidate
 	Authorize bool                 // Add or Remove
 }
 

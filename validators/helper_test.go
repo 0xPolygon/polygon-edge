@@ -12,8 +12,13 @@ import (
 var (
 	addr1          = types.StringToAddress("1")
 	addr2          = types.StringToAddress("2")
-	testBLSPubKey1 = []byte("bls_pubkey1")
-	testBLSPubKey2 = []byte("bls_pubkey2")
+	testBLSPubKey1 = BLSValidatorPublicKey([]byte("bls_pubkey1"))
+	testBLSPubKey2 = BLSValidatorPublicKey([]byte("bls_pubkey2"))
+
+	ecdsaValidator1 = NewECDSAValidator(addr1)
+	ecdsaValidator2 = NewECDSAValidator(addr2)
+	blsValidator1   = NewBLSValidator(addr1, testBLSPubKey1)
+	blsValidator2   = NewBLSValidator(addr2, testBLSPubKey2)
 
 	fakeValidatorType = ValidatorType("fake")
 )
@@ -111,14 +116,14 @@ func TestParseValidator(t *testing.T) {
 			name:              "ECDSAValidator",
 			validatorType:     ECDSAValidatorType,
 			validatorStr:      addr1.String(),
-			expectedValidator: &ECDSAValidator{addr1},
+			expectedValidator: ecdsaValidator1,
 			expectedErr:       nil,
 		},
 		{
 			name:              "BLSValidator",
 			validatorType:     BLSValidatorType,
 			validatorStr:      createTestBLSValidatorString(addr1, testBLSPubKey1),
-			expectedValidator: &BLSValidator{addr1, testBLSPubKey1},
+			expectedValidator: blsValidator1,
 			expectedErr:       nil,
 		},
 		{
@@ -162,8 +167,8 @@ func TestParseValidators(t *testing.T) {
 				addr2.String(),
 			},
 			expectedValidators: &ECDSAValidators{
-				&ECDSAValidator{addr1},
-				&ECDSAValidator{addr2},
+				ecdsaValidator1,
+				ecdsaValidator2,
 			},
 			expectedErr: nil,
 		},
@@ -175,8 +180,8 @@ func TestParseValidators(t *testing.T) {
 				createTestBLSValidatorString(addr2, testBLSPubKey2),
 			},
 			expectedValidators: &BLSValidators{
-				&BLSValidator{addr1, testBLSPubKey1},
-				&BLSValidator{addr2, testBLSPubKey2},
+				blsValidator1,
+				blsValidator2,
 			},
 			expectedErr: nil,
 		},
@@ -209,7 +214,7 @@ func TestParseValidators(t *testing.T) {
 func TestParseECDSAValidator(t *testing.T) {
 	assert.Equal(
 		t,
-		&ECDSAValidator{addr1},
+		ecdsaValidator1,
 		ParseECDSAValidator(addr1.String()),
 	)
 }
@@ -226,7 +231,7 @@ func TestParseBLSValidator(t *testing.T) {
 		{
 			name:              "should parse correctly",
 			validatorStr:      createTestBLSValidatorString(addr1, testBLSPubKey1),
-			expectedValidator: &BLSValidator{addr1, testBLSPubKey1},
+			expectedValidator: blsValidator1,
 			expectedErr:       nil,
 		},
 		{

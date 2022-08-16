@@ -2,24 +2,53 @@ package validators
 
 import (
 	"bytes"
-	"encoding/hex"
+	"errors"
 	"fmt"
 
+	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/fastrlp"
 )
 
+var (
+	ErrInvalidTypeAssert = errors.New("invalid type assert")
+)
+
+type BLSValidatorPublicKey []byte
+
+// String returns a public key in hex
+func (k BLSValidatorPublicKey) String() string {
+	return hex.EncodeToHex(k[:])
+}
+
+// MarshalText implements encoding.TextMarshaler
+func (k BLSValidatorPublicKey) MarshalText() ([]byte, error) {
+	return []byte(k.String()), nil
+}
+
+// UnmarshalText parses an BLS Public Key in hex
+func (k *BLSValidatorPublicKey) UnmarshalText(input []byte) error {
+	kk, err := hex.DecodeHex(string(input))
+	if err != nil {
+		return err
+	}
+
+	*k = kk
+
+	return nil
+}
+
 // BLSValidator is a validator using BLS signing algorithm
 type BLSValidator struct {
 	Address      types.Address
-	BLSPublicKey []byte
+	BLSPublicKey BLSValidatorPublicKey
 }
 
 // NewBLSValidator is a constructor of BLSValidator
 func NewBLSValidator(addr types.Address, blsPubkey []byte) *BLSValidator {
 	return &BLSValidator{
 		Address:      addr,
-		BLSPublicKey: blsPubkey,
+		BLSPublicKey: BLSValidatorPublicKey(blsPubkey),
 	}
 }
 
@@ -32,9 +61,9 @@ func (v *BLSValidator) Type() ValidatorType {
 // Format => [Address]:[BLSPublicKey]
 func (v *BLSValidator) String() string {
 	return fmt.Sprintf(
-		"%s:0x%s",
+		"%s:%s",
 		v.Address.String(),
-		hex.EncodeToString(v.BLSPublicKey),
+		hex.EncodeToHex(v.BLSPublicKey),
 	)
 }
 

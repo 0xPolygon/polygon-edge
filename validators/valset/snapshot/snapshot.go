@@ -138,6 +138,16 @@ func (s *SnapshotValidatorSet) SourceType() valset.SourceType {
 	return valset.Snapshot
 }
 
+func (s *SnapshotValidatorSet) GetSnapshotMetadata() *SnapshotMetadata {
+	return &SnapshotMetadata{
+		LastBlock: s.store.getLastBlock(),
+	}
+}
+
+func (s *SnapshotValidatorSet) GetSnapshots() []*Snapshot {
+	return s.store.list
+}
+
 func (s *SnapshotValidatorSet) GetValidators(height uint64) (validators.Validators, error) {
 	var snapshotHeight uint64 = 0
 	if int64(height) > 0 {
@@ -152,14 +162,19 @@ func (s *SnapshotValidatorSet) GetValidators(height uint64) (validators.Validato
 	return snapshot.Set, nil
 }
 
-func (s *SnapshotValidatorSet) GetSnapshotMetadata() *SnapshotMetadata {
-	return &SnapshotMetadata{
-		LastBlock: s.store.getLastBlock(),
+// Votes returns the votes in the snapshot at the specified height
+func (s *SnapshotValidatorSet) Votes(height uint64) ([]*valset.Vote, error) {
+	snapshot := s.getSnapshot(height)
+	if snapshot == nil {
+		return nil, ErrSnapshotNotFound
 	}
+
+	return snapshot.Votes, nil
 }
 
-func (s *SnapshotValidatorSet) GetSnapshots() []*Snapshot {
-	return s.store.list
+// Candidates returns the current candidates
+func (s *SnapshotValidatorSet) Candidates() []*valset.Candidate {
+	return s.candidates
 }
 
 func (s *SnapshotValidatorSet) UpdateSet(newValidators validators.Validators, from uint64) error {
@@ -209,6 +224,10 @@ func (s *SnapshotValidatorSet) ModifyHeader(header *types.Header, proposer types
 }
 
 func (s *SnapshotValidatorSet) VerifyHeader(header *types.Header) error {
+	// Check the nonce format.
+	// The nonce field must have either an AUTH or DROP vote value.
+	// Block nonce values are not taken into account when the Miner field is set to zeroes, indicating
+	// no vote casting is taking place within a block
 	if header.Nonce != nonceAuthVote && header.Nonce != nonceDropVote {
 		return ErrInvalidNonce
 	}
@@ -275,6 +294,8 @@ func (s *SnapshotValidatorSet) ProcessHeader(
 	if header.Number%s.epochSize == 0 {
 		s.resetSnapshot(parentSnap, snap, header)
 		s.removeLowerSnapshots(header.Number)
+		s.store.updateLastBlock(header.Number)
+		fmt.Printf("\nReset Snapshot, %d\n", s.store.getLastBlock())
 
 		return nil
 	}
@@ -282,6 +303,7 @@ func (s *SnapshotValidatorSet) ProcessHeader(
 	// no vote if miner field is not set
 	if bytes.Equal(header.Miner, types.ZeroAddress[:]) {
 		s.store.updateLastBlock(header.Number)
+		fmt.Printf("\nNo Vote, Update LastBlock, %d\n", s.store.getLastBlock())
 
 		return nil
 	}
@@ -329,16 +351,6 @@ func (s *SnapshotValidatorSet) Propose(candidate validators.Validator, auth bool
 	)
 }
 
-// Votes returns the votes in the snapshot at the specified height
-func (s *SnapshotValidatorSet) Votes(height uint64) ([]*valset.Vote, error) {
-	snapshot := s.getSnapshot(height)
-	if snapshot == nil {
-		return nil, ErrSnapshotNotFound
-	}
-
-	return snapshot.Votes, nil
-}
-
 // AddCandidate adds new candidate to candidate list
 func (s *SnapshotValidatorSet) addCandidate(
 	validators validators.Validators,
@@ -368,11 +380,6 @@ func (s *SnapshotValidatorSet) addCandidate(
 	})
 
 	return nil
-}
-
-// Candidates returns the current candidates
-func (s *SnapshotValidatorSet) Candidates() []*valset.Candidate {
-	return s.candidates
 }
 
 // addHeaderSnap creates the initial snapshot, and adds it to the snapshot store
@@ -419,7 +426,7 @@ func (s *SnapshotValidatorSet) getNextCandidate(
 
 	// first, we need to remove any candidates that have already been
 	// selected as validators
-	s.cleanObsolateCandidates(snap.Set)
+	s.cleanObsoleteCandidates(snap.Set)
 
 	// now pick the first candidate that has not received a vote yet
 	return s.pickOneCandidate(snap, proposer)
@@ -427,7 +434,7 @@ func (s *SnapshotValidatorSet) getNextCandidate(
 
 // cleanObsolateCandidates removes useless candidates from candidates field
 // Unsafe against concurrent accesses
-func (s *SnapshotValidatorSet) cleanObsolateCandidates(set validators.Validators) {
+func (s *SnapshotValidatorSet) cleanObsoleteCandidates(set validators.Validators) {
 	newCandidates := make([]*valset.Candidate, 0, len(s.candidates))
 
 	for _, candidate := range s.candidates {
@@ -485,6 +492,7 @@ func (s *SnapshotValidatorSet) saveSnapshotIfChanged(
 	parentSnapshot, snapshot *Snapshot,
 	header *types.Header,
 ) {
+	fmt.Printf("saveSnapshotIfChanged %t\n", snapshot.Equal(parentSnapshot))
 	if snapshot.Equal(parentSnapshot) {
 		return
 	}
@@ -493,7 +501,11 @@ func (s *SnapshotValidatorSet) saveSnapshotIfChanged(
 	snapshot.Hash = header.Hash.String()
 
 	s.store.add(snapshot)
-	s.store.updateLastBlock(header.Number)
+	fmt.Printf("added %#v\n", snapshot)
+	for idx, s := range s.store.list {
+		fmt.Printf("[%d] => %#v, hash=%s, number=%d, vals=%d, votes=%#v\n", idx, s, s.Hash, s.Number, s.Set.Len(), s.Votes)
+	}
+	fmt.Println("")
 }
 
 // resetSnapshot is a helper method to save a snapshot that clears votes
@@ -539,14 +551,18 @@ func (s *SnapshotValidatorSet) processVote(
 		return err
 	}
 
+	fmt.Printf("\n\ncandidate %#v\n", candidate)
+
 	// if candidate has been processed as expected, just update last block
 	if !shouldProcessVote(snapshot.Set, candidate.Addr(), authorize) {
 		s.store.updateLastBlock(header.Number)
+		fmt.Printf("shouldn't process %#v\n", candidate)
 
 		return nil
 	}
 
 	voteCount := snapshot.CountByVoterAndCandidate(proposer, candidate)
+	fmt.Printf("vote count %d\n", voteCount)
 	if voteCount > 1 {
 		// there can only be one vote per validator per address
 		return ErrMultipleVotesBySameValidator
@@ -560,6 +576,8 @@ func (s *SnapshotValidatorSet) processVote(
 	// check the tally for the proposed validator
 	totalVotes := snapshot.CountByCandidate(candidate)
 
+	fmt.Printf("total votes %d\n", totalVotes)
+
 	// If more than a half of all validators voted
 	if totalVotes > snapshot.Set.Len()/2 {
 		if err := addsOrDelsCandidate(
@@ -567,6 +585,8 @@ func (s *SnapshotValidatorSet) processVote(
 			candidate,
 			authorize,
 		); err != nil {
+			fmt.Printf("failed to add %v\n", err)
+
 			return err
 		}
 

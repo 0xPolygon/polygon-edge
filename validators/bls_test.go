@@ -1,13 +1,56 @@
 package validators
 
 import (
-	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 
+	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestBLSValidatorPublicKeyString(t *testing.T) {
+	assert.Equal(
+		t,
+		hex.EncodeToHex([]byte(testBLSPubKey1)),
+		testBLSPubKey1.String(),
+	)
+}
+
+func TestBLSValidatorPublicKeyMarshal(t *testing.T) {
+	res, err := json.Marshal(testBLSPubKey1)
+
+	assert.NoError(t, err)
+	assert.Equal(
+		t,
+		hex.EncodeToHex([]byte(testBLSPubKey1)),
+		strings.Trim(
+			// remove double quotes in json
+			string(res),
+			"\"",
+		),
+	)
+}
+
+func TestBLSValidatorPublicKeyUnmarshal(t *testing.T) {
+	key := BLSValidatorPublicKey{}
+
+	err := json.Unmarshal(
+		[]byte(
+			fmt.Sprintf("\"%s\"", hex.EncodeToHex(testBLSPubKey2)),
+		),
+		&key,
+	)
+
+	assert.NoError(t, err)
+	assert.Equal(
+		t,
+		testBLSPubKey2,
+		key,
+	)
+}
 
 func TestNewBLSValidator(t *testing.T) {
 	assert.Equal(
