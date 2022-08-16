@@ -92,7 +92,16 @@ func (i *backendIBFT) IsValidSender(msg *protoIBFT.Message) bool {
 	}
 
 	// verify the sender is in the active validator set
-	return i.currentValidators.Includes(signerAddress)
+	if !i.currentValidators.Includes(signerAddress) {
+		i.logger.Error(
+			"signer address doesn't included in validators",
+			"signer", signerAddress,
+		)
+
+		return false
+	}
+
+	return true
 }
 
 func (i *backendIBFT) IsProposer(id []byte, height, round uint64) bool {
