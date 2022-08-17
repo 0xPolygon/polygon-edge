@@ -604,8 +604,7 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 func (p *TxPool) signalPruning() {
 	select {
 	case p.pruneCh <- struct{}{}:
-	default:
-		//	pruning handler is active or in cooldown
+	default: //	pruning handler is active or in cooldown
 	}
 }
 

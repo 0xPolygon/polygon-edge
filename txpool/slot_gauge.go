@@ -31,8 +31,8 @@ func (g *slotGauge) decrease(slots uint64) {
 	atomic.AddUint64(&g.height, ^(slots - 1))
 }
 
-//	highPressure checks if the gauge level
-//	is higher than the highPressureMark (0.8 * max)
+// highPressure checks if the gauge level
+// is higher than the highPressureMark (0.8 * max)
 func (g *slotGauge) highPressure() bool {
 	return g.read() > uint64(highPressureMark*float64(g.max))
 }

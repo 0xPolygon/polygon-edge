@@ -461,7 +461,6 @@ func TestAddTxHighPressure(t *testing.T) {
 			assert.False(t, open)
 		},
 	)
-
 }
 
 func TestAddGossipTx(t *testing.T) {
