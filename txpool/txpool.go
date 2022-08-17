@@ -153,6 +153,7 @@ type TxPool struct {
 	// does dispatching/handling requests.
 	enqueueReqCh chan enqueueRequest
 	promoteReqCh chan promoteRequest
+	pruneCh      chan struct{}
 
 	// shutdown channel
 	shutdownCh chan struct{}
@@ -195,6 +196,12 @@ func NewTxPool(
 		gauge:       slotGauge{height: 0, max: config.MaxSlots},
 		priceLimit:  config.PriceLimit,
 		sealing:     config.Sealing,
+
+		//	main loop channels
+		enqueueReqCh: make(chan enqueueRequest),
+		promoteReqCh: make(chan promoteRequest),
+		pruneCh:      make(chan struct{}),
+		shutdownCh:   make(chan struct{}),
 	}
 
 	// Attach the event manager
@@ -218,11 +225,6 @@ func NewTxPool(
 		proto.RegisterTxnPoolOperatorServer(grpcServer, pool)
 	}
 
-	// initialise channels
-	pool.enqueueReqCh = make(chan enqueueRequest)
-	pool.promoteReqCh = make(chan promoteRequest)
-	pool.shutdownCh = make(chan struct{})
-
 	return pool, nil
 }
 
@@ -233,6 +235,19 @@ func (p *TxPool) Start() {
 	// set default value of txpool pending transactions gauge
 	p.metrics.PendingTxs.Set(0)
 
+	//	run the handler for high gauge level pruning
+	go func() {
+		for {
+			select {
+			case <-p.shutdownCh:
+				return
+			case <-p.pruneCh:
+
+			}
+		}
+	}()
+
+	//	run the handler for the tx pipeline
 	go func() {
 		for {
 			select {
