@@ -461,6 +461,30 @@ func TestAddTxHighPressure(t *testing.T) {
 			assert.False(t, open)
 		},
 	)
+
+	t.Run(
+		"reject tx with nonce not matching expected",
+		func(t *testing.T) {
+			t.Parallel()
+
+			pool, err := newTestPool()
+			assert.NoError(t, err)
+			pool.SetSigner(&mockSigner{})
+
+			pool.createAccountOnce(addr1)
+			pool.accounts.get(addr1).nextNonce = 5
+
+			//	mock high pressure
+			slots := 1 + uint64(highPressureMark*float64(pool.gauge.max))
+			pool.gauge.increase(slots)
+
+			assert.ErrorIs(t,
+				ErrRejectFutureTx,
+				pool.addTx(local, newTx(addr1, 8, 1)),
+			)
+
+		},
+	)
 }
 
 func TestAddGossipTx(t *testing.T) {
