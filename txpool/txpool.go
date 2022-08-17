@@ -609,6 +609,34 @@ func (p *TxPool) signalPruning() {
 	}
 }
 
+func (p *TxPool) pruneAccountsWithNonceHoles() {
+	p.accounts.Range(
+		func(_, value interface{}) bool {
+			account, _ := value.(*account)
+
+			account.enqueued.lock(true)
+			defer account.enqueued.unlock()
+
+			firstTx := account.enqueued.peek()
+
+			if firstTx == nil {
+				return true
+			}
+
+			if firstTx.Nonce == account.getNonce() {
+				return true
+			}
+
+			removed := account.enqueued.clear()
+
+			p.index.remove(removed...)
+			p.gauge.decrease(slotsRequired(removed...))
+
+			return true
+		},
+	)
+}
+
 // addTx is the main entry point to the pool
 // for all new transactions. If the call is
 // successful, an account is created for this address
