@@ -80,9 +80,6 @@ type serverParams struct {
 
 	corsAllowedOrigins []string
 
-	jsonRPCBatchLengthLimit uint64
-	jsonRPCBlockRangeLimit  uint64
-
 	ibftBaseTimeoutLegacy uint64
 
 	genesisConfig *chain.Chain
@@ -146,8 +143,8 @@ func (p *serverParams) generateConfig() *server.Config {
 		JSONRPC: &server.JSONRPC{
 			JSONRPCAddr:              p.jsonRPCAddress,
 			AccessControlAllowOrigin: p.corsAllowedOrigins,
-			BatchLengthLimit:         p.jsonRPCBatchLengthLimit,
-			BlockRangeLimit:          p.jsonRPCBlockRangeLimit,
+			BatchLengthLimit:         p.rawConfig.JSONRPCBatchRequestLimit,
+			BlockRangeLimit:          p.rawConfig.JSONRPCBlockRangeLimit,
 		},
 		GRPCAddr:   p.grpcAddress,
 		LibP2PAddr: p.libp2pAddress,

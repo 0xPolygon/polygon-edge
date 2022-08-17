@@ -330,6 +330,40 @@ func TestDispatcherBatchRequest(t *testing.T) {
 			&ObjectError{Code: -32600, Message: "Batch request length too long"},
 			nil,
 		},
+		{
+			"no-limits",
+			"test when limits are not set",
+			newDispatcher(hclog.NewNullLogger(), newMockStore(), 0, 0, 0, 0),
+			[]byte(`[
+				{"id":1,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]},
+				{"id":2,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]},
+				{"id":3,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]},
+				{"id":4,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]},
+				{"id":5,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]},
+				{"id":6,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]},
+				{"id":7,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]},
+				{"id":8,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]},
+				{"id":9,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]},
+				{"id":10,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]},
+				{"id":11,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]},
+				{"id":12,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]}]`,
+			),
+			nil,
+			[]*SuccessResponse{
+				{Error: nil},
+				{Error: nil},
+				{Error: nil},
+				{Error: nil},
+				{Error: nil},
+				{Error: nil},
+				{Error: nil},
+				{Error: nil},
+				{Error: nil},
+				{Error: nil},
+				{Error: nil},
+				{Error: nil},
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -351,6 +385,11 @@ func TestDispatcherBatchRequest(t *testing.T) {
 				}
 			} else if c.name == "valid-batch-req" {
 				assert.Len(t, batchResp, 6)
+				for index, resp := range batchResp {
+					assert.Equal(t, resp.Error, c.batchResponse[index].Error)
+				}
+			} else if c.name == "no-limits" {
+				assert.Len(t, batchResp, 12)
 				for index, resp := range batchResp {
 					assert.Equal(t, resp.Error, c.batchResponse[index].Error)
 				}
