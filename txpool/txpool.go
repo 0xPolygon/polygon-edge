@@ -601,6 +601,14 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 	return nil
 }
 
+func (p *TxPool) signalPruning() {
+	select {
+	case p.pruneCh <- struct{}{}:
+	default:
+		//	pruning handler is active or in cooldown
+	}
+}
+
 // addTx is the main entry point to the pool
 // for all new transactions. If the call is
 // successful, an account is created for this address
@@ -614,6 +622,10 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 	// validate incoming tx
 	if err := p.validateTx(tx); err != nil {
 		return err
+	}
+
+	if p.gauge.highPressure() {
+		p.signalPruning()
 	}
 
 	// check for overflow
