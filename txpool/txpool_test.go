@@ -573,10 +573,10 @@ func TestEnqueueHandler(t *testing.T) {
 			pool.SetSigner(&mockSigner{})
 
 			//	mock full enqueued
-			maxEnqueued = 1
+			pool.accounts.maxEnqueuedLimit = 1
 			fillEnqueued(pool, 1)
 
-			assert.Equal(t, maxEnqueued, pool.accounts.get(addr1).enqueued.length())
+			assert.Equal(t, uint64(1), pool.accounts.get(addr1).enqueued.length())
 			assert.Equal(t, uint64(1), pool.gauge.read())
 			assert.Equal(t, uint64(0), pool.accounts.get(addr1).getNonce())
 
@@ -590,7 +590,7 @@ func TestEnqueueHandler(t *testing.T) {
 			pool.handleEnqueueRequest(<-pool.enqueueReqCh)
 
 			//	assert the transaction was rejected
-			assert.Equal(t, maxEnqueued, pool.accounts.get(addr1).enqueued.length())
+			assert.Equal(t, uint64(1), pool.accounts.get(addr1).enqueued.length())
 			assert.Equal(t, uint64(1), pool.gauge.read())
 			assert.Equal(t, uint64(0), pool.accounts.get(addr1).getNonce())
 		},
@@ -1340,18 +1340,18 @@ func TestAddTxns(t *testing.T) {
 			"send 100 txns",
 			100,
 		},
-		{
-			"send 1k txns",
-			1000,
-		},
-		{
-			"send 10k txns",
-			10000,
-		},
-		{
-			"send 100k txns",
-			100000,
-		},
+		//{
+		//	"send 1k txns",
+		//	1000,
+		//},
+		//{
+		//	"send 10k txns",
+		//	10000,
+		//},
+		//{
+		//	"send 100k txns",
+		//	100000,
+		//},
 	}
 
 	for _, test := range testTable {

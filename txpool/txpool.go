@@ -182,11 +182,14 @@ func NewTxPool(
 	config *Config,
 ) (*TxPool, error) {
 	pool := &TxPool{
-		logger:      logger.Named("txpool"),
-		forks:       forks,
-		store:       store,
-		metrics:     metrics,
-		accounts:    accountsMap{},
+		logger:  logger.Named("txpool"),
+		forks:   forks,
+		store:   store,
+		metrics: metrics,
+		accounts: accountsMap{
+			//	TODO: make this configurable
+			maxEnqueuedLimit: defaultMaxEnqueuedLimit,
+		},
 		executables: newPricedQueue(),
 		index:       lookupMap{all: make(map[types.Hash]*types.Transaction)},
 		gauge:       slotGauge{height: 0, max: config.MaxSlots},
