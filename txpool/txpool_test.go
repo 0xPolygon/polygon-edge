@@ -371,13 +371,6 @@ func TestAddTxHighPressure(t *testing.T) {
 		},
 	)
 
-	t.Run(
-		"pruning handler is not signaled",
-		func(t *testing.T) {
-
-		},
-	)
-
 }
 
 func TestAddGossipTx(t *testing.T) {
