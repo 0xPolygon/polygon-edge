@@ -331,7 +331,6 @@ func TestAddTxHighPressure(t *testing.T) {
 	t.Run(
 		"pruning handler is signaled",
 		func(t *testing.T) {
-			t.SkipNow()
 			t.Parallel()
 
 			pool, err := newTestPool()
@@ -339,7 +338,7 @@ func TestAddTxHighPressure(t *testing.T) {
 			pool.SetSigner(&mockSigner{})
 
 			//	mock high pressure
-			slots := uint64(highPressureMark * float64(pool.gauge.max))
+			slots := 1 + uint64(highPressureMark*float64(pool.gauge.max))
 			pool.gauge.increase(slots)
 
 			catchSignal := func() <-chan struct{} {
@@ -355,7 +354,6 @@ func TestAddTxHighPressure(t *testing.T) {
 
 			//	expect signal
 			done := catchSignal()
-
 			//	enqueue tx
 			go func() {
 				assert.NoError(t,
@@ -1323,7 +1321,8 @@ func (e *eoa) signTx(tx *types.Transaction, signer crypto.TxSigner) *types.Trans
 var signerEIP155 = crypto.NewEIP155Signer(100)
 
 func TestAddTxs(t *testing.T) {
-	t.SkipNow() // TODO: this test needs to be reconsidered due to maxEnqueuedLimit
+	// TODO: this test needs to be reconsidered due to maxEnqueuedLimit
+	t.SkipNow()
 	t.Parallel()
 
 	slotSize := uint64(1)
