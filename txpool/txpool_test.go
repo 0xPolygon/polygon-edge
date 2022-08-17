@@ -485,6 +485,34 @@ func TestAddTxHighPressure(t *testing.T) {
 
 		},
 	)
+
+	t.Run(
+		"accept tx with expected nonce during high gauge level",
+		func(t *testing.T) {
+			t.Parallel()
+
+			pool, err := newTestPool()
+			assert.NoError(t, err)
+			pool.SetSigner(&mockSigner{})
+
+			pool.createAccountOnce(addr1)
+			pool.accounts.get(addr1).nextNonce = 5
+
+			//	mock high pressure
+			slots := 1 + uint64(highPressureMark*float64(pool.gauge.max))
+			pool.gauge.increase(slots)
+
+			go func() {
+				assert.NoError(t,
+					pool.addTx(local, newTx(addr1, 5, 1)),
+				)
+			}()
+			enq := <-pool.enqueueReqCh
+
+			_, exists := pool.index.get(enq.tx.Hash)
+			assert.True(t, exists)
+		},
+	)
 }
 
 func TestAddGossipTx(t *testing.T) {
