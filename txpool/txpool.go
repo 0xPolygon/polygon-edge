@@ -48,6 +48,7 @@ var (
 	ErrAlreadyKnown            = errors.New("already known")
 	ErrOversizedData           = errors.New("oversized data")
 	ErrMaxEnqueuedLimitReached = errors.New("maximum number of enqueued transactions reached")
+	ErrRejectFutureTx          = errors.New("rejected future tx due to low memory")
 )
 
 // indicates origin of a transaction
@@ -660,6 +661,12 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 
 	if p.gauge.highPressure() {
 		p.signalPruning()
+
+		//	only accept transactions with expected nonce
+		if account := p.accounts.get(tx.From); account != nil &&
+			tx.Nonce > account.getNonce() {
+			return ErrRejectFutureTx
+		}
 	}
 
 	// check for overflow
