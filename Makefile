@@ -19,8 +19,13 @@ protoc:
 .PHONY: build
 build:
 	$(eval LATEST_VERSION = $(shell git describe --tags --abbrev=0))
-	$(eval COMMIT_HASH = $(shell git rev-parse --short HEAD))
-	go build -ldflags="-X 'github.com/0xPolygon/polygon-edge/versioning.Version=$(LATEST_VERSION)+$(COMMIT_HASH)'" main.go
+	$(eval COMMIT_HASH = $(shell git rev-parse HEAD))
+	$(eval TIME = $(shell date))
+	go build -o polygon-edge -ldflags="\
+    	-X 'github.com/0xPolygon/polygon-edge/versioning.Version=$(LATEST_VERSION)' \
+		-X 'github.com/0xPolygon/polygon-edge/versioning.Commit=$(COMMIT_HASH)'\
+		-X 'github.com/0xPolygon/polygon-edge/versioning.BuildTime=$(TIME)'" \
+	main.go
 
 .PHONY: lint
 lint:
