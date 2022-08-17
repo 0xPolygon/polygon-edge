@@ -7,18 +7,14 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-var (
-	//	TODO: make this cofigurable
-	//	maximum number of enqueued transactions any account can have
-	maxEnqueued = defaultMaxEnqueuedLimit
-)
-
 // Thread safe map of all accounts registered by the pool.
 // Each account (value) is bound to one address (key).
 type accountsMap struct {
 	sync.Map
 
 	count uint64
+
+	maxEnqueuedLimit uint64
 }
 
 // Intializes an account for the given address.
@@ -30,6 +26,9 @@ func (m *accountsMap) initOnce(addr types.Address, nonce uint64) *account {
 		// create queues
 		newAccount.enqueued = newAccountQueue()
 		newAccount.promoted = newAccountQueue()
+
+		//	set the limit for enqueued txs
+		newAccount.maxEnqueued = m.maxEnqueuedLimit
 
 		// set the nonce
 		newAccount.setNonce(nonce)
@@ -158,6 +157,9 @@ type account struct {
 	enqueued, promoted *accountQueue
 	nextNonce          uint64
 	demotions          uint
+
+	//	maximum number of enqueued transactions
+	maxEnqueued uint64
 }
 
 // getNonce returns the next expected nonce for this account.
@@ -221,7 +223,7 @@ func (a *account) enqueue(tx *types.Transaction) error {
 	a.enqueued.lock(true)
 	defer a.enqueued.unlock()
 
-	if a.enqueued.length() == maxEnqueued {
+	if a.enqueued.length() == a.maxEnqueued {
 		return ErrMaxEnqueuedLimitReached
 	}
 
