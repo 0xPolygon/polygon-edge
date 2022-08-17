@@ -7,10 +7,17 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
+var (
+	//	TODO: make this cofigurable
+	//	maximum number of enqueued transactions any account can have
+	maxEnqueued = defaultMaxEnqueuedLimit
+)
+
 // Thread safe map of all accounts registered by the pool.
 // Each account (value) is bound to one address (key).
 type accountsMap struct {
 	sync.Map
+
 	count uint64
 }
 
@@ -214,7 +221,7 @@ func (a *account) enqueue(tx *types.Transaction) error {
 	a.enqueued.lock(true)
 	defer a.enqueued.unlock()
 
-	if a.enqueued.length() == maxEnqueuedLimit {
+	if a.enqueued.length() == maxEnqueued {
 		return ErrMaxEnqueuedLimitReached
 	}
 
