@@ -325,6 +325,59 @@ func TestAddTxErrors(t *testing.T) {
 	})
 }
 
+func TestAddTxHighPressure(t *testing.T) {
+	t.Parallel()
+
+	t.Run(
+		"pruning handler is signaled",
+		func(t *testing.T) {
+			t.Parallel()
+
+			pool, err := newTestPool()
+			assert.NoError(t, err)
+			pool.SetSigner(&mockSigner{})
+
+			//	mock high pressure
+			slots := uint64(highPressureMark * float64(pool.gauge.max))
+			pool.gauge.increase(slots)
+
+			catchSignal := func() <-chan struct{} {
+				done := make(chan struct{})
+				go func() {
+					defer close(done)
+
+					<-pool.pruneCh
+				}()
+
+				return done
+			}
+
+			//	expect signal
+			done := catchSignal()
+
+			//	enqueue tx
+			go func() {
+				assert.NoError(t,
+					pool.addTx(local, newTx(addr1, 0, 1)),
+				)
+			}()
+
+			<-pool.enqueueReqCh
+
+			_, open := <-done
+			assert.False(t, open)
+		},
+	)
+
+	t.Run(
+		"pruning handler is not signaled",
+		func(t *testing.T) {
+
+		},
+	)
+
+}
+
 func TestAddGossipTx(t *testing.T) {
 	t.Parallel()
 
