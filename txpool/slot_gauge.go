@@ -6,6 +6,10 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
+const (
+	highPressureMark = 0.8
+)
+
 // Gauge for measuring pool capacity in slots
 type slotGauge struct {
 	height uint64 // amount of slots currently occupying the pool
@@ -25,6 +29,12 @@ func (g *slotGauge) increase(slots uint64) {
 // decrease decreases the height of the gauge by the specified slots amount.
 func (g *slotGauge) decrease(slots uint64) {
 	atomic.AddUint64(&g.height, ^(slots - 1))
+}
+
+//	highPressure checks if the gauge level
+//	is higher than the highPressureMark (0.8 * max)
+func (g *slotGauge) highPressure() bool {
+	return g.read() > uint64(highPressureMark*float64(g.max))
 }
 
 // slotsRequired calculates the number of slots required for given transaction(s).
