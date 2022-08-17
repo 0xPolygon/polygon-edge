@@ -14,15 +14,15 @@ var (
 )
 
 // NewValidatorFromType instantiates a validator by specified type
-func NewValidatorFromType(t ValidatorType) Validator {
+func NewValidatorFromType(t ValidatorType) (Validator, error) {
 	switch t {
 	case ECDSAValidatorType:
-		return new(ECDSAValidator)
+		return new(ECDSAValidator), nil
 	case BLSValidatorType:
-		return new(BLSValidator)
+		return new(BLSValidator), nil
 	}
 
-	return nil
+	return nil, ErrInvalidValidatorType
 }
 
 // NewValidatorsFromType instantiates a validators by specified type

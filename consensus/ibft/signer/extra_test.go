@@ -24,25 +24,6 @@ func AddressesToECDSAValidators(addrs ...types.Address) *validators.ECDSAValidat
 	return &set
 }
 
-// useIstanbulHeaderHash is a helper function so that test use istanbulHeaderHash during the test
-func useIstanbulHeaderHash(t *testing.T, signer Signer) {
-	t.Helper()
-
-	originalHashCalc := types.HeaderHash
-	types.HeaderHash = func(h *types.Header) types.Hash {
-		hash, err := signer.CalculateHeaderHash(h)
-		if err != nil {
-			return types.ZeroHash
-		}
-
-		return hash
-	}
-
-	t.Cleanup(func() {
-		types.HeaderHash = originalHashCalc
-	})
-}
-
 func TestExtraEncoding(t *testing.T) {
 	seal1 := types.StringToHash("1").Bytes()
 	seal2 := types.StringToHash("2").Bytes()
@@ -149,7 +130,7 @@ func TestAppendECDSACommittedSeal(t *testing.T) {
 		err error
 	)
 
-	useIstanbulHeaderHash(t, signerA)
+	UseIstanbulHeaderHash(t, signerA)
 
 	signerA.InitIBFTExtra(parentHeader, validators, nil)
 

@@ -87,10 +87,10 @@ func registerContractDeploymentHook(
 			return txn.SetCodeDirectly(staking.AddrStakingContract, codeBytes)
 		} else {
 			// deploy contract
-			contractState, err := stakingHelper.PredeployStakingSC(fork.Validators, stakingHelper.PredeployParams{
-				MinValidatorCount: fork.MinValidatorCount.Value,
-				MaxValidatorCount: fork.MaxValidatorCount.Value,
-			})
+			contractState, err := stakingHelper.PredeployStakingSC(
+				fork.Validators,
+				getPreDeployParams(fork),
+			)
 
 			if err != nil {
 				return err
@@ -99,4 +99,21 @@ func registerContractDeploymentHook(
 			return txn.SetAccountDirectly(staking.AddrStakingContract, contractState)
 		}
 	}
+}
+
+func getPreDeployParams(fork *IBFTFork) stakingHelper.PredeployParams {
+	params := stakingHelper.PredeployParams{
+		MinValidatorCount: stakingHelper.MinValidatorCount,
+		MaxValidatorCount: stakingHelper.MaxValidatorCount,
+	}
+
+	if fork.MinValidatorCount != nil {
+		params.MinValidatorCount = fork.MinValidatorCount.Value
+	}
+
+	if fork.MaxValidatorCount != nil {
+		params.MaxValidatorCount = fork.MaxValidatorCount.Value
+	}
+
+	return params
 }

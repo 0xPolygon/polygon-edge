@@ -3,6 +3,7 @@ package signer
 import (
 	"crypto/ecdsa"
 	"fmt"
+	"testing"
 
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/keccak"
@@ -132,4 +133,23 @@ func verifyIBFTExtraSize(header *types.Header) error {
 	}
 
 	return nil
+}
+
+// UseIstanbulHeaderHash is a helper function so that test use istanbulHeaderHash during the test
+func UseIstanbulHeaderHash(t *testing.T, signer Signer) {
+	t.Helper()
+
+	originalHashCalc := types.HeaderHash
+	types.HeaderHash = func(h *types.Header) types.Hash {
+		hash, err := signer.CalculateHeaderHash(h)
+		if err != nil {
+			return types.ZeroHash
+		}
+
+		return hash
+	}
+
+	t.Cleanup(func() {
+		types.HeaderHash = originalHashCalc
+	})
 }

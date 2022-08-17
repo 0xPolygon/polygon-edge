@@ -39,30 +39,42 @@ func TestNewValidatorFromType(t *testing.T) {
 		name          string
 		validatorType ValidatorType
 		expected      Validator
+		err           error
 	}{
 		{
 			name:          "ECDSAValidator",
 			validatorType: ECDSAValidatorType,
 			expected:      new(ECDSAValidator),
+			err:           nil,
 		},
 		{
 			name:          "BLSValidator",
 			validatorType: BLSValidatorType,
 			expected:      new(BLSValidator),
+			err:           nil,
 		},
 		{
 			name:          "undefined type",
 			validatorType: fakeValidatorType,
 			expected:      nil,
+			err:           ErrInvalidValidatorType,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			res, err := NewValidatorFromType(test.validatorType)
+
 			assert.Equal(
 				t,
 				test.expected,
-				NewValidatorFromType(test.validatorType),
+				res,
+			)
+
+			assert.ErrorIs(
+				t,
+				test.err,
+				err,
 			)
 		})
 	}

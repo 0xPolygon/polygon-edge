@@ -91,6 +91,7 @@ func GetIBFTForks(ibftConfig map[string]interface{}) ([]IBFTFork, error) {
 		}
 
 		validatorType := validators.ECDSAValidatorType
+
 		if rawValType, ok := ibftConfig[KeyValidatorType].(string); ok {
 			if validatorType, err = validators.ParseValidatorType(rawValType); err != nil {
 				return nil, err

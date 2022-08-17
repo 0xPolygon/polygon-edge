@@ -22,8 +22,6 @@ import (
 // PoS [30, ]
 // - Check validator set in each validator has only 3 validators
 func TestPoAPoSSwitch(t *testing.T) {
-	t.Skip()
-
 	var (
 		// switch configuration
 		posDeployContractAt = uint64(10)

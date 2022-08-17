@@ -57,7 +57,7 @@ func (o *operator) GetSnapshot(ctx context.Context, req *proto.SnapshotReq) (*pr
 		return nil, err
 	}
 
-	vals, err := valSet.GetValidators(height)
+	vals, err := o.ibft.forkManager.GetValidators(height)
 	if err != nil {
 		return nil, err
 	}

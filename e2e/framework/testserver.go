@@ -309,6 +309,12 @@ func (t *TestServer) GenerateGenesis() error {
 	cmd := exec.Command(binaryName, args...)
 	cmd.Dir = t.Config.RootDir
 
+	if t.Config.ShowsLog {
+		stdout := io.Writer(os.Stdout)
+		cmd.Stdout = stdout
+		cmd.Stderr = stdout
+	}
+
 	return cmd.Run()
 }
 

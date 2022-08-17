@@ -148,7 +148,7 @@ func (s *SnapshotValidatorSet) GetSnapshots() []*Snapshot {
 	return s.store.list
 }
 
-func (s *SnapshotValidatorSet) GetValidators(height uint64) (validators.Validators, error) {
+func (s *SnapshotValidatorSet) GetValidators(height uint64, _ uint64) (validators.Validators, error) {
 	var snapshotHeight uint64 = 0
 	if int64(height) > 0 {
 		snapshotHeight = height - 1
@@ -211,7 +211,12 @@ func (s *SnapshotValidatorSet) ModifyHeader(header *types.Header, proposer types
 	}
 
 	if candidate := s.getNextCandidate(snapshot, proposer); candidate != nil {
-		header.Miner = types.MarshalRLPTo(candidate.Validator.MarshalRLPWith, nil)
+		var err error
+
+		header.Miner, err = validatorToMiner(candidate.Validator)
+		if err != nil {
+			return err
+		}
 
 		if candidate.Authorize {
 			header.Nonce = nonceAuthVote
@@ -295,7 +300,6 @@ func (s *SnapshotValidatorSet) ProcessHeader(
 		s.resetSnapshot(parentSnap, snap, header)
 		s.removeLowerSnapshots(header.Number)
 		s.store.updateLastBlock(header.Number)
-		fmt.Printf("\nReset Snapshot, %d\n", s.store.getLastBlock())
 
 		return nil
 	}
@@ -303,7 +307,6 @@ func (s *SnapshotValidatorSet) ProcessHeader(
 	// no vote if miner field is not set
 	if bytes.Equal(header.Miner, types.ZeroAddress[:]) {
 		s.store.updateLastBlock(header.Number)
-		fmt.Printf("\nNo Vote, Update LastBlock, %d\n", s.store.getLastBlock())
 
 		return nil
 	}
@@ -440,7 +443,7 @@ func (s *SnapshotValidatorSet) cleanObsoleteCandidates(set validators.Validators
 	for _, candidate := range s.candidates {
 		// If Authorize is
 		// true => Candidate needs to be in Set
-		// false => Candiate needs not to be in Set
+		// false => Candidate needs not to be in Set
 		// if the current situetion is not so, it's still a candidate
 		if candidate.Authorize != set.Includes(candidate.Validator.Addr()) {
 			newCandidates = append(newCandidates, candidate)
@@ -478,7 +481,7 @@ func (s *SnapshotValidatorSet) isValidator(
 	height uint64,
 ) (bool, error) {
 	// Check if the recovered proposer is part of the validator set
-	vals, err := s.GetValidators(height)
+	vals, err := s.GetValidators(height, 0)
 	if err != nil {
 		return false, err
 	}
@@ -492,7 +495,6 @@ func (s *SnapshotValidatorSet) saveSnapshotIfChanged(
 	parentSnapshot, snapshot *Snapshot,
 	header *types.Header,
 ) {
-	fmt.Printf("saveSnapshotIfChanged %t\n", snapshot.Equal(parentSnapshot))
 	if snapshot.Equal(parentSnapshot) {
 		return
 	}
@@ -501,11 +503,6 @@ func (s *SnapshotValidatorSet) saveSnapshotIfChanged(
 	snapshot.Hash = header.Hash.String()
 
 	s.store.add(snapshot)
-	fmt.Printf("added %#v\n", snapshot)
-	for idx, s := range s.store.list {
-		fmt.Printf("[%d] => %#v, hash=%s, number=%d, vals=%d, votes=%#v\n", idx, s, s.Hash, s.Number, s.Set.Len(), s.Votes)
-	}
-	fmt.Println("")
 }
 
 // resetSnapshot is a helper method to save a snapshot that clears votes
@@ -545,24 +542,20 @@ func (s *SnapshotValidatorSet) processVote(
 
 	validatorType := signer.Type()
 
-	// parse candidate validator set in header.Miner
-	candidate := validators.NewValidatorFromType(validatorType)
-	if err := types.UnmarshalRlp(candidate.UnmarshalRLPFrom, header.Miner); err != nil {
+	// parse candidate validator set from header.Miner
+	candidate, err := minerToValidator(validatorType, header.Miner)
+	if err != nil {
 		return err
 	}
-
-	fmt.Printf("\n\ncandidate %#v\n", candidate)
 
 	// if candidate has been processed as expected, just update last block
 	if !shouldProcessVote(snapshot.Set, candidate.Addr(), authorize) {
 		s.store.updateLastBlock(header.Number)
-		fmt.Printf("shouldn't process %#v\n", candidate)
 
 		return nil
 	}
 
 	voteCount := snapshot.CountByVoterAndCandidate(proposer, candidate)
-	fmt.Printf("vote count %d\n", voteCount)
 	if voteCount > 1 {
 		// there can only be one vote per validator per address
 		return ErrMultipleVotesBySameValidator
@@ -576,8 +569,6 @@ func (s *SnapshotValidatorSet) processVote(
 	// check the tally for the proposed validator
 	totalVotes := snapshot.CountByCandidate(candidate)
 
-	fmt.Printf("total votes %d\n", totalVotes)
-
 	// If more than a half of all validators voted
 	if totalVotes > snapshot.Set.Len()/2 {
 		if err := addsOrDelsCandidate(
@@ -585,8 +576,6 @@ func (s *SnapshotValidatorSet) processVote(
 			candidate,
 			authorize,
 		); err != nil {
-			fmt.Printf("failed to add %v\n", err)
-
 			return err
 		}
 
@@ -603,4 +592,43 @@ func (s *SnapshotValidatorSet) processVote(
 	s.store.updateLastBlock(header.Number)
 
 	return nil
+}
+
+// validatorToMiner converts validator to bytes for miner field in header
+func validatorToMiner(validator validators.Validator) ([]byte, error) {
+	switch validator.(type) {
+	case *validators.ECDSAValidator:
+		// Return Address directly
+		// to support backward compatibility
+		return validator.Addr().Bytes(), nil
+	case *validators.BLSValidator:
+		return validator.Bytes(), nil
+	default:
+		return nil, validators.ErrInvalidValidatorType
+	}
+}
+
+// minerToValidator converts bytes to validator for miner field in header
+func minerToValidator(
+	validatorType validators.ValidatorType,
+	miner []byte,
+) (validators.Validator, error) {
+	validator, err := validators.NewValidatorFromType(validatorType)
+	if err != nil {
+		return nil, err
+	}
+
+	switch typedVal := validator.(type) {
+	case *validators.ECDSAValidator:
+		typedVal.Address = types.BytesToAddress(miner)
+	case *validators.BLSValidator:
+		if err := typedVal.SetFromBytes(miner); err != nil {
+			return nil, err
+		}
+	default:
+		// shouldn't reach here
+		return nil, validators.ErrInvalidValidatorType
+	}
+
+	return validator, nil
 }

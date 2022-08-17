@@ -4,17 +4,18 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestFetchValidators(t *testing.T) {
 	// only check error handling because of the duplicated tests below
-
 	fakeValidatorType := validators.ValidatorType("fake")
 	res, err := FetchValidators(
 		fakeValidatorType,
 		nil,
+		types.ZeroAddress,
 	)
 
 	assert.Nil(t, res)
@@ -35,6 +36,7 @@ func TestFetchECDSAValidators(t *testing.T) {
 	res, err := FetchValidators(
 		validators.ECDSAValidatorType,
 		transition,
+		types.ZeroAddress,
 	)
 
 	assert.Equal(t, vals, res)
@@ -55,6 +57,7 @@ func TestFetchBLSValidators(t *testing.T) {
 	res, err := FetchValidators(
 		validators.BLSValidatorType,
 		transition,
+		types.ZeroAddress,
 	)
 
 	// only validator 1

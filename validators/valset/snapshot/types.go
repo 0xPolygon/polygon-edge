@@ -70,8 +70,13 @@ func (s *Snapshot) UnmarshalJSON(data []byte) error {
 	// Votes
 	votes := make([]*valset.Vote, len(raw.Votes))
 	for idx := range votes {
+		candidate, err := validators.NewValidatorFromType(raw.Type)
+		if err != nil {
+			return err
+		}
+
 		votes[idx] = &valset.Vote{
-			Candidate: validators.NewValidatorFromType(raw.Type),
+			Candidate: candidate,
 		}
 
 		if err := json.Unmarshal(raw.Votes[idx], votes[idx]); err != nil {

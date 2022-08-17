@@ -2,13 +2,13 @@ package validators
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/fastrlp"
 )
 
 var (
+	ErrInvalidValidatorType     = errors.New("invalid validator type")
 	ErrMismatchValidatorType    = errors.New("mismatch between validator and validator set")
 	ErrMismatchValidatorSetType = errors.New("mismatch between validator sets")
 	ErrValidatorAlreadyExists   = errors.New("validator already exists in validator set")
@@ -33,7 +33,7 @@ func ParseValidatorType(validatorType string) (ValidatorType, error) {
 	// Check if the cast is possible
 	castType, ok := validatorTypes[validatorType]
 	if !ok {
-		return castType, fmt.Errorf("invalid ValidatorType type %s", validatorType)
+		return castType, ErrInvalidValidatorType
 	}
 
 	return castType, nil
@@ -41,29 +41,50 @@ func ParseValidatorType(validatorType string) (ValidatorType, error) {
 
 // Validator defines the interface of the methods a validator implements
 type Validator interface {
-	Type() ValidatorType                                    // Return the validator type
-	String() string                                         // Return the string representation
-	Addr() types.Address                                    // Return the address of the validator
-	Copy() Validator                                        // Return of copy of the validator
-	Equal(Validator) bool                                   // Check the same validator or not
-	MarshalRLPWith(*fastrlp.Arena) *fastrlp.Value           // RLP Marshaller to encode to bytes
-	UnmarshalRLPFrom(*fastrlp.Parser, *fastrlp.Value) error // RLP Unmarshaller to encode from bytes
-	Bytes() []byte                                          // Reeturn bytes in RLP encode
-	SetFromBytes([]byte) error                              // Decode bytes in RLP encode and map to the fields
+	// Return the validator type
+	Type() ValidatorType
+	// Return the string representation
+	String() string
+	// Return the address of the validator
+	Addr() types.Address
+	// Return of copy of the validator
+	Copy() Validator
+	// Check the same validator or not
+	Equal(Validator) bool
+	// RLP Marshaller to encode to bytes
+	MarshalRLPWith(*fastrlp.Arena) *fastrlp.Value
+	// RLP Unmarshaller to encode from bytes
+	UnmarshalRLPFrom(*fastrlp.Parser, *fastrlp.Value) error
+	// Reeturn bytes in RLP encode
+	Bytes() []byte
+	// Decode bytes in RLP encode and map to the fields
+	SetFromBytes([]byte) error
 }
 
 // Validators defines the interface of the methods validator collection implements
 type Validators interface {
-	Type() ValidatorType                                    // Return the type of the validators
-	Len() int                                               // Return the size of collection
-	Equal(Validators) bool                                  // Check equality of each element
-	Copy() Validators                                       // Return of the whole collection
-	At(uint64) Validator                                    // Get validator at specified height
-	Index(types.Address) int64                              // Find the index of the validator that has specified address
-	Includes(types.Address) bool                            // Check the validator that has specified address exists in the collection
-	Add(Validator) error                                    // Add a validator into collection
-	Del(Validator) error                                    // Remove a validator from collection
-	Merge(Validators) error                                 // Merge 2 collections into one collection
-	MarshalRLPWith(*fastrlp.Arena) *fastrlp.Value           // RLP Marshaller to encode to bytes
-	UnmarshalRLPFrom(*fastrlp.Parser, *fastrlp.Value) error // Decode bytes in RLP encode and map to the elements
+	// Return the type of the validators
+	Type() ValidatorType
+	// Return the size of collection
+	Len() int
+	// Check equality of each element
+	Equal(Validators) bool
+	// Return of the whole collection
+	Copy() Validators
+	// Get validator at specified height
+	At(uint64) Validator
+	// Find the index of the validator that has specified address
+	Index(types.Address) int64
+	// Check the validator that has specified address exists in the collection
+	Includes(types.Address) bool
+	// Add a validator into collection
+	Add(Validator) error
+	// Remove a validator from collection
+	Del(Validator) error
+	// Merge 2 collections into one collection
+	Merge(Validators) error
+	// RLP Marshaller to encode to bytes
+	MarshalRLPWith(*fastrlp.Arena) *fastrlp.Value
+	// Decode bytes in RLP encode and map to the elements
+	UnmarshalRLPFrom(*fastrlp.Parser, *fastrlp.Value) error
 }

@@ -192,7 +192,6 @@ func (h *Header) Copy() *Header {
 	newHeader := &Header{
 		ParentHash:   h.ParentHash,
 		Sha3Uncles:   h.Sha3Uncles,
-		Miner:        h.Miner,
 		StateRoot:    h.StateRoot,
 		TxRoot:       h.TxRoot,
 		ReceiptsRoot: h.ReceiptsRoot,
@@ -206,6 +205,9 @@ func (h *Header) Copy() *Header {
 		GasUsed:      h.GasUsed,
 		Timestamp:    h.Timestamp,
 	}
+
+	newHeader.Miner = make([]byte, len(h.Miner))
+	copy(newHeader.Miner[:], h.Miner[:])
 
 	newHeader.ExtraData = make([]byte, len(h.ExtraData))
 	copy(newHeader.ExtraData[:], h.ExtraData[:])

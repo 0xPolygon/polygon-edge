@@ -14,12 +14,13 @@ import (
 func FetchValidators(
 	validatorType validators.ValidatorType,
 	transition *state.Transition,
+	from types.Address,
 ) (validators.Validators, error) {
 	switch validatorType {
 	case validators.ECDSAValidatorType:
-		return FetchECDSAValidators(transition)
+		return FetchECDSAValidators(transition, from)
 	case validators.BLSValidatorType:
-		return FetchBLSValidators(transition)
+		return FetchBLSValidators(transition, from)
 	}
 
 	return nil, fmt.Errorf("unsupported validator type: %s", validatorType)
@@ -28,8 +29,9 @@ func FetchValidators(
 // FetchECDSAValidators queries a contract for validator addresses and returns ECDSAValidators
 func FetchECDSAValidators(
 	transition *state.Transition,
+	from types.Address,
 ) (*validators.ECDSAValidators, error) {
-	valAddrs, err := staking.QueryValidators(transition, types.ZeroAddress)
+	valAddrs, err := staking.QueryValidators(transition, from)
 	if err != nil {
 		return nil, err
 	}
@@ -47,18 +49,20 @@ func FetchECDSAValidators(
 // FetchBLSValidators queries a contract for validator addresses & BLS Public Keys and returns ECDSAValidators
 func FetchBLSValidators(
 	transition *state.Transition,
+	from types.Address,
 ) (*validators.BLSValidators, error) {
-	valAddrs, err := staking.QueryValidators(transition, types.ZeroAddress)
+	valAddrs, err := staking.QueryValidators(transition, from)
 	if err != nil {
 		return nil, err
 	}
 
-	blsPublicKeys, err := staking.QueryBLSPublicKeys(transition, types.ZeroAddress)
+	blsPublicKeys, err := staking.QueryBLSPublicKeys(transition, from)
 	if err != nil {
 		return nil, err
 	}
 
 	blsValidators := &validators.BLSValidators{}
+
 	for idx := range valAddrs {
 		// ignore the validator whose BLS Key is not set
 		// because BLS validator needs to have both Address and BLS Public Key set

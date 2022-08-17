@@ -189,41 +189,46 @@ func PredeployStakingSC(
 	stakedAmount := big.NewInt(0)
 	bigMinNumValidators := big.NewInt(int64(params.MinValidatorCount))
 	bigMaxNumValidators := big.NewInt(int64(params.MaxValidatorCount))
+	valsLen := big.NewInt(0)
 
-	for idx := 0; idx < vals.Len(); idx++ {
-		validator := vals.At(uint64(idx))
+	if vals != nil {
+		valsLen = big.NewInt(int64(vals.Len()))
 
-		// Update the total staked amount
-		stakedAmount = stakedAmount.Add(stakedAmount, bigDefaultStakedBalance)
+		for idx := 0; idx < vals.Len(); idx++ {
+			validator := vals.At(uint64(idx))
 
-		// Get the storage indexes
-		storageIndexes := getStorageIndexes(validator, idx)
+			// Update the total staked amount
+			stakedAmount = stakedAmount.Add(stakedAmount, bigDefaultStakedBalance)
 
-		// Set the value for the validators array
-		storageMap[types.BytesToHash(storageIndexes.ValidatorsIndex)] =
-			types.BytesToHash(
-				validator.Addr().Bytes(),
-			)
+			// Get the storage indexes
+			storageIndexes := getStorageIndexes(validator, idx)
 
-		if blsValidator, ok := validator.(*validators.BLSValidator); ok {
-			setBytesToStorage(
-				storageMap,
-				storageIndexes.ValidatorBLSPublicKeyIndex,
-				blsValidator.BLSPublicKey,
-			)
+			// Set the value for the validators array
+			storageMap[types.BytesToHash(storageIndexes.ValidatorsIndex)] =
+				types.BytesToHash(
+					validator.Addr().Bytes(),
+				)
+
+			if blsValidator, ok := validator.(*validators.BLSValidator); ok {
+				setBytesToStorage(
+					storageMap,
+					storageIndexes.ValidatorBLSPublicKeyIndex,
+					blsValidator.BLSPublicKey,
+				)
+			}
+
+			// Set the value for the address -> validator array index mapping
+			storageMap[types.BytesToHash(storageIndexes.AddressToIsValidatorIndex)] =
+				types.BytesToHash(bigTrueValue.Bytes())
+
+			// Set the value for the address -> staked amount mapping
+			storageMap[types.BytesToHash(storageIndexes.AddressToStakedAmountIndex)] =
+				types.StringToHash(hex.EncodeBig(bigDefaultStakedBalance))
+
+			// Set the value for the address -> validator index mapping
+			storageMap[types.BytesToHash(storageIndexes.AddressToValidatorIndexIndex)] =
+				types.StringToHash(hex.EncodeUint64(uint64(idx)))
 		}
-
-		// Set the value for the address -> validator array index mapping
-		storageMap[types.BytesToHash(storageIndexes.AddressToIsValidatorIndex)] =
-			types.BytesToHash(bigTrueValue.Bytes())
-
-		// Set the value for the address -> staked amount mapping
-		storageMap[types.BytesToHash(storageIndexes.AddressToStakedAmountIndex)] =
-			types.StringToHash(hex.EncodeBig(bigDefaultStakedBalance))
-
-		// Set the value for the address -> validator index mapping
-		storageMap[types.BytesToHash(storageIndexes.AddressToValidatorIndexIndex)] =
-			types.StringToHash(hex.EncodeUint64(uint64(idx)))
 	}
 
 	// Set the value for the total staked amount
@@ -232,7 +237,7 @@ func PredeployStakingSC(
 
 	// Set the value for the size of the validators array
 	storageMap[types.BytesToHash(big.NewInt(validatorsSlot).Bytes())] =
-		types.BytesToHash(big.NewInt(int64(vals.Len())).Bytes())
+		types.BytesToHash(valsLen.Bytes())
 
 	// Set the value for the minimum number of validators
 	storageMap[types.BytesToHash(big.NewInt(minNumValidatorSlot).Bytes())] =

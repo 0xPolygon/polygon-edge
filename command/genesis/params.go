@@ -184,10 +184,6 @@ func (p *genesisParams) setValidatorSetFromPrefixPath() error {
 }
 
 func (p *genesisParams) initIBFTValidatorType() error {
-	if !p.isIBFTConsensus() {
-		return nil
-	}
-
 	var err error
 	if p.ibftValidatorType, err = validators.ParseValidatorType(p.rawIBFTValidatorType); err != nil {
 		return err

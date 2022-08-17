@@ -130,12 +130,17 @@ func (m *forkManagerImpl) GetValidatorSet(height uint64) (valset.ValidatorSet, e
 
 // GetValidatorSet returns validators at specified height
 func (m *forkManagerImpl) GetValidators(height uint64) (validators.Validators, error) {
+	fork := m.getFork(height)
+	if fork == nil {
+		return nil, ErrForkNotFound
+	}
+
 	set, err := m.GetValidatorSet(height)
 	if err != nil {
 		return nil, err
 	}
 
-	return set.GetValidators(height)
+	return set.GetValidators(height, fork.From.Value)
 }
 
 // GetHooks returns a hooks at specified height

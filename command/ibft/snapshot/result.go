@@ -47,7 +47,10 @@ func newIBFTSnapshotResult(resp *ibftOp.Snapshot) (*IBFTSnapshotResult, error) {
 			return nil, err
 		}
 
-		validator := validators.NewValidatorFromType(validatorType)
+		validator, err := validators.NewValidatorFromType(validatorType)
+		if err != nil {
+			return nil, err
+		}
 
 		if err := validator.SetFromBytes(v.Data); err != nil {
 			return nil, err

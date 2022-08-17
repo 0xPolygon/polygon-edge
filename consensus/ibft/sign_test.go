@@ -18,9 +18,15 @@ func TestSign_Sealer(t *testing.T) {
 
 	h := &types.Header{}
 
-	signerA := signer.NewSigner(signer.NewECDSAKeyManagerFromKey(pool.get("A").priv))
+	signerA := signer.NewSigner(
+		signer.NewECDSAKeyManagerFromKey(pool.get("A").priv),
+	)
+
+	signer.UseIstanbulHeaderHash(t, signerA)
 
 	signerA.InitIBFTExtra(h, correctValset, nil)
+
+	h = h.ComputeHash()
 
 	// non-validator address
 	pool.add("X")

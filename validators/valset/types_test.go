@@ -17,12 +17,10 @@ var (
 	addr3 = types.StringToAddress("3")
 
 	testBLSPubKey1 = validators.BLSValidatorPublicKey([]byte("bls_pubkey1"))
-	testBLSPubKey2 = validators.BLSValidatorPublicKey([]byte("bls_pubkey2"))
 
 	ecdsaValidator1 = validators.NewECDSAValidator(addr1)
 	ecdsaValidator2 = validators.NewECDSAValidator(addr2)
 	blsValidator1   = validators.NewBLSValidator(addr1, testBLSPubKey1)
-	blsValidator2   = validators.NewBLSValidator(addr2, testBLSPubKey2)
 )
 
 func TestSourceTypeString(t *testing.T) {

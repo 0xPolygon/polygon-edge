@@ -111,7 +111,7 @@ func (s *SignerImpl) GetIBFTExtra(header *types.Header) (*IstanbulExtra, error) 
 	data := header.ExtraData[IstanbulExtraVanity:]
 	extra := &IstanbulExtra{
 		Validators:     s.keyManager.NewEmptyValidatorSet(),
-		ProposerSeal:   nil,
+		ProposerSeal:   []byte{},
 		CommittedSeals: s.keyManager.NewEmptyCommittedSeals(),
 	}
 
@@ -160,12 +160,7 @@ func (s *SignerImpl) EcrecoverFromHeader(header *types.Header) (types.Address, e
 		return types.Address{}, err
 	}
 
-	hash, err := s.CalculateHeaderHash(header)
-	if err != nil {
-		return types.Address{}, err
-	}
-
-	return s.keyManager.Ecrecover(extra.ProposerSeal, hash[:])
+	return s.keyManager.Ecrecover(extra.ProposerSeal, header.Hash[:])
 }
 
 // CreateCommittedSeal returns CommittedSeal from given hash
@@ -304,7 +299,7 @@ func (s *SignerImpl) initIbftExtra(
 ) {
 	putIbftExtra(header, &IstanbulExtra{
 		Validators:           validators,
-		ProposerSeal:         nil,
+		ProposerSeal:         []byte{},
 		CommittedSeals:       s.keyManager.NewEmptyCommittedSeals(),
 		ParentCommittedSeals: parentCommittedSeal,
 	})
@@ -339,7 +334,7 @@ func (s *SignerImpl) GetParentCommittedSeals(header *types.Header) (Sealer, erro
 func (s *SignerImpl) filterHeaderForHash(header *types.Header) (*types.Header, error) {
 	clone := header.Copy()
 
-	extra, err := s.GetIBFTExtra(clone)
+	extra, err := s.GetIBFTExtra(header)
 	if err != nil {
 		return nil, err
 	}

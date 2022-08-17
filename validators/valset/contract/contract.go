@@ -51,14 +51,7 @@ func (s *ContractValidatorSet) Initialize() error {
 	return nil
 }
 
-func (s *ContractValidatorSet) GetValidators(height uint64) (validators.Validators, error) {
-	fetchingHeight := calculateFetchingHeight(height, s.epochSize)
-
-	fetchedHeader, ok := s.blockchain.GetHeaderByNumber(fetchingHeight)
-	if !ok {
-		return nil, fmt.Errorf("header not found at %d", fetchingHeight)
-	}
-
+func (s *ContractValidatorSet) GetValidators(height, from uint64) (validators.Validators, error) {
 	signer, err := s.getSigner(height)
 	if err != nil {
 		return nil, err
@@ -68,22 +61,41 @@ func (s *ContractValidatorSet) GetValidators(height uint64) (validators.Validato
 		return nil, ErrSignerNotFound
 	}
 
-	transition, err := s.executor.BeginTxn(fetchedHeader.StateRoot, fetchedHeader, types.ZeroAddress)
+	transition, err := s.getTransitionForQuery(height, from)
 	if err != nil {
 		return nil, err
 	}
 
-	return FetchValidators(signer.Type(), transition)
+	return FetchValidators(signer.Type(), transition, signer.Address())
 }
 
-func calculateFetchingHeight(usingHeight, epochSize uint64) uint64 {
-	beginningEpoch := (usingHeight / epochSize) * epochSize
+func (s *ContractValidatorSet) getTransitionForQuery(height uint64, from uint64) (*state.Transition, error) {
+	fetchingHeight := calculateFetchingHeight(height, s.epochSize, from)
 
-	// Determine the height of the end of the last epoch
-	if beginningEpoch == 0 {
-		return 0
+	header, ok := s.blockchain.GetHeaderByNumber(fetchingHeight)
+	if !ok {
+		return nil, fmt.Errorf("header not found at %d", fetchingHeight)
 	}
 
-	// the end of the last epoch
-	return beginningEpoch - 1
+	return s.executor.BeginTxn(header.StateRoot, header, types.ZeroAddress)
+}
+
+func calculateFetchingHeight(usingHeight, epochSize, from uint64) uint64 {
+	beginningEpoch := (usingHeight / epochSize) * epochSize
+
+	height := uint64(0)
+	if beginningEpoch > 0 {
+		// the end of the last epoch
+		height = beginningEpoch - 1
+	}
+
+	if height <= from {
+		if from == 0 {
+			return from
+		}
+
+		return from - 1
+	}
+
+	return height
 }

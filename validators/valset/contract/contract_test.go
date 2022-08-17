@@ -162,10 +162,12 @@ func TestContractValidatorSetGetValidators(t *testing.T) {
 				},
 			},
 			nil,
-			nil,
+			func(x uint64) (signer.Signer, error) {
+				return signer.NewSigner(nil), nil
+			},
 		)
 
-		res, err := s.GetValidators(0)
+		res, err := s.GetValidators(0, 0)
 
 		assert.Nil(t, res)
 		assert.Error(t, err)
@@ -184,7 +186,7 @@ func TestContractValidatorSetGetValidators(t *testing.T) {
 			},
 		)
 
-		res, err := s.GetValidators(0)
+		res, err := s.GetValidators(0, 0)
 
 		assert.Nil(t, res)
 		assert.ErrorIs(t, errTest, err)
@@ -203,7 +205,7 @@ func TestContractValidatorSetGetValidators(t *testing.T) {
 			},
 		)
 
-		res, err := s.GetValidators(0)
+		res, err := s.GetValidators(0, 0)
 
 		assert.Nil(t, res)
 		assert.ErrorIs(t, ErrSignerNotFound, err)
@@ -226,7 +228,7 @@ func TestContractValidatorSetGetValidators(t *testing.T) {
 			},
 		)
 
-		res, err := s.GetValidators(0)
+		res, err := s.GetValidators(0, 0)
 
 		assert.Nil(t, res)
 		assert.ErrorIs(t, errTest, err)
@@ -278,7 +280,7 @@ func TestContractValidatorSetGetValidators(t *testing.T) {
 			},
 		)
 
-		res, err := s.GetValidators(0)
+		res, err := s.GetValidators(0, 0)
 
 		assert.Equal(t, vals, res)
 		assert.NoError(t, err)
@@ -330,7 +332,7 @@ func TestContractValidatorSetGetValidators(t *testing.T) {
 			},
 		)
 
-		res, err := s.GetValidators(0)
+		res, err := s.GetValidators(0, 0)
 
 		assert.Equal(t, vals, res)
 		assert.NoError(t, err)
@@ -393,7 +395,7 @@ func Test_calculateFetchingHeight(t *testing.T) {
 			assert.Equal(
 				t,
 				test.expected,
-				calculateFetchingHeight(test.height, test.epochSize),
+				calculateFetchingHeight(test.height, test.epochSize, 0),
 			)
 		})
 	}

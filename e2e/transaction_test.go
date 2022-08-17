@@ -453,7 +453,6 @@ func Test_TransactionIBFTLoop(t *testing.T) {
 	defer statusCancel()
 
 	resp, err := tests.WaitUntilTxPoolEmpty(statusCtx, srv.TxnPoolOperator())
-
 	if err != nil {
 		t.Fatalf("Unable to get txpool status, %v", err)
 	}
