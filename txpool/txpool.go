@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/golang/protobuf/ptypes/any"
 	"github.com/hashicorp/go-hclog"
@@ -28,6 +29,8 @@ const (
 	maxAccountDemotions = uint(10)
 
 	defaultMaxEnqueuedLimit = uint64(16)
+
+	pruningCooldown = 5000 * time.Millisecond
 )
 
 // errors
@@ -242,8 +245,12 @@ func (p *TxPool) Start() {
 			case <-p.shutdownCh:
 				return
 			case <-p.pruneCh:
-
+				p.pruneAccountsWithNonceHoles()
 			}
+
+			//	handler is in cooldown to avoid successive calls
+			//	which could be just no-ops
+			time.Sleep(pruningCooldown)
 		}
 	}()
 
