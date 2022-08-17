@@ -325,6 +325,100 @@ func TestAddTxErrors(t *testing.T) {
 	})
 }
 
+func TestPruneAccountsWithNonceHoles(t *testing.T) {
+	t.Parallel()
+
+	t.Run(
+		"no enqueued to prune",
+		func(t *testing.T) {
+			t.Parallel()
+
+			pool, err := newTestPool()
+			assert.NoError(t, err)
+			pool.SetSigner(&mockSigner{})
+
+			pool.createAccountOnce(addr1)
+
+			assert.Equal(t, uint64(0), pool.gauge.read())
+			assert.Equal(t, uint64(0), pool.accounts.get(addr1).getNonce())
+			assert.Equal(t, uint64(0), pool.accounts.get(addr1).enqueued.length())
+
+			pool.pruneAccountsWithNonceHoles()
+
+			assert.Equal(t, uint64(0), pool.gauge.read())
+			assert.Equal(t, uint64(0), pool.accounts.get(addr1).getNonce())
+			assert.Equal(t, uint64(0), pool.accounts.get(addr1).enqueued.length())
+		},
+	)
+
+	t.Run(
+		"skip valid account",
+		func(t *testing.T) {
+			t.Parallel()
+
+			pool, err := newTestPool()
+			assert.NoError(t, err)
+			pool.SetSigner(&mockSigner{})
+
+			//	enqueue tx
+			go func() {
+				assert.NoError(t,
+					pool.addTx(local, newTx(addr1, 0, 1)),
+				)
+			}()
+			go pool.handleEnqueueRequest(<-pool.enqueueReqCh)
+			<-pool.promoteReqCh
+
+			assert.Equal(t, uint64(1), pool.gauge.read())
+			assert.Equal(t, uint64(1), pool.accounts.get(addr1).enqueued.length())
+
+			//	assert no nonce hole
+			assert.Equal(t,
+				pool.accounts.get(addr1).getNonce(),
+				pool.accounts.get(addr1).enqueued.peek().Nonce,
+			)
+
+			pool.pruneAccountsWithNonceHoles()
+
+			assert.Equal(t, uint64(1), pool.gauge.read())
+			assert.Equal(t, uint64(1), pool.accounts.get(addr1).enqueued.length())
+		},
+	)
+
+	t.Run(
+		"prune nonce hole account",
+		func(t *testing.T) {
+			t.Parallel()
+
+			pool, err := newTestPool()
+			assert.NoError(t, err)
+			pool.SetSigner(&mockSigner{})
+
+			//	enqueue tx
+			go func() {
+				assert.NoError(t,
+					pool.addTx(local, newTx(addr1, 5, 1)),
+				)
+			}()
+			pool.handleEnqueueRequest(<-pool.enqueueReqCh)
+
+			assert.Equal(t, uint64(1), pool.gauge.read())
+			assert.Equal(t, uint64(1), pool.accounts.get(addr1).enqueued.length())
+
+			//	assert nonce hole
+			assert.NotEqual(t,
+				pool.accounts.get(addr1).getNonce(),
+				pool.accounts.get(addr1).enqueued.peek().Nonce,
+			)
+
+			pool.pruneAccountsWithNonceHoles()
+
+			assert.Equal(t, uint64(0), pool.gauge.read())
+			assert.Equal(t, uint64(0), pool.accounts.get(addr1).enqueued.length())
+		},
+	)
+}
+
 func TestAddTxHighPressure(t *testing.T) {
 	t.Parallel()
 
@@ -345,7 +439,6 @@ func TestAddTxHighPressure(t *testing.T) {
 				done := make(chan struct{})
 				go func() {
 					defer close(done)
-
 					<-pool.pruneCh
 				}()
 
