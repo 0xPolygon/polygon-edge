@@ -365,7 +365,7 @@ func TestAddTxHighPressure(t *testing.T) {
 
 			<-pool.enqueueReqCh
 
-			println("aaaa")
+			//	assert that catchSignal is done (closed ch)
 			_, open := <-done
 			assert.False(t, open)
 		},
