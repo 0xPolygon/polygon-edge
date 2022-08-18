@@ -1096,6 +1096,8 @@ func TestResetAccount(t *testing.T) {
 }
 
 func TestPop(t *testing.T) {
+	t.Parallel()
+
 	pool, err := newTestPool()
 	assert.NoError(t, err)
 	pool.SetSigner(&mockSigner{})
@@ -1121,6 +1123,8 @@ func TestPop(t *testing.T) {
 }
 
 func TestDrop(t *testing.T) {
+	t.Parallel()
+
 	pool, err := newTestPool()
 	assert.NoError(t, err)
 	pool.SetSigner(&mockSigner{})
