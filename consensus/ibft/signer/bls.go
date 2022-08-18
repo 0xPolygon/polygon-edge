@@ -273,7 +273,7 @@ func (s *BLSSeal) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 	if s.Signature == nil {
 		x.Set(ar.NewNull())
 	} else {
-		x.Set(ar.NewBytes(s.Signature))
+		x.Set(ar.NewCopyBytes(s.Signature))
 	}
 
 	return x

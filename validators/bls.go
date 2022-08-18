@@ -97,8 +97,8 @@ func (v *BLSValidator) Equal(vr Validator) bool {
 func (v *BLSValidator) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 	vv := arena.NewArray()
 
-	vv.Set(arena.NewBytes(v.Address[:]))
-	vv.Set(arena.NewBytes(v.BLSPublicKey))
+	vv.Set(arena.NewBytes(v.Address.Bytes()))
+	vv.Set(arena.NewCopyBytes(v.BLSPublicKey))
 
 	return vv
 }

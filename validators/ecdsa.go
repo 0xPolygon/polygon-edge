@@ -51,7 +51,7 @@ func (v *ECDSAValidator) Equal(vr Validator) bool {
 
 // MarshalRLPWith is a RLP Marshaller
 func (v *ECDSAValidator) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
-	return arena.NewBytes(v.Address[:])
+	return arena.NewBytes(v.Address.Bytes())
 }
 
 // UnmarshalRLPFrom is a RLP Unmarshaller

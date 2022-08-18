@@ -134,7 +134,7 @@ func (s *SignerImpl) WriteProposerSeal(header *types.Header) (*types.Header, err
 	}
 
 	seal, err := s.keyManager.SignSeal(
-		crypto.Keccak256(hash[:]),
+		crypto.Keccak256(hash.Bytes()),
 	)
 	if err != nil {
 		return nil, err

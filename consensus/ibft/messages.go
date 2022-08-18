@@ -13,12 +13,9 @@ func (i *backendIBFT) signMessage(msg *protoIBFT.Message) *protoIBFT.Message {
 		return nil
 	}
 
-	sig, err := i.currentSigner.SignIBFTMessage(raw)
-	if err != nil {
+	if msg.Signature, err = i.currentSigner.SignIBFTMessage(raw); err != nil {
 		return nil
 	}
-
-	msg.Signature = sig
 
 	return msg
 }

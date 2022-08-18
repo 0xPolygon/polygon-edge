@@ -53,7 +53,7 @@ func (i *IstanbulExtra) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 	if len(i.ProposerSeal) == 0 {
 		vv.Set(ar.NewNull())
 	} else {
-		vv.Set(ar.NewBytes(i.ProposerSeal))
+		vv.Set(ar.NewCopyBytes(i.ProposerSeal))
 	}
 
 	// CommittedSeal

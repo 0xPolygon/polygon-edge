@@ -73,6 +73,7 @@ func (i *backendIBFT) IsValidSender(msg *protoIBFT.Message) bool {
 		msg.Signature,
 		msgNoSig,
 	)
+
 	if err != nil {
 		i.logger.Error("failed to ecrecover message", "err", err)
 
