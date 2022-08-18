@@ -409,26 +409,6 @@ func (i *backendIBFT) startConsensus() {
 
 			return
 		}
-
-		//if !i.isActiveValidator() {
-		//	// we are not participating in consensus for this height
-		//	continue
-		//}
-		//
-		//select {
-		//case <-i.consensus.runSequence(pending):
-		//	// consensus inserted block
-		//	continue
-		//case <-syncerBlockCh:
-		//	// syncer inserted block -> stop running consensus
-		//	i.consensus.stopSequence()
-		//	i.logger.Info("canceled sequence", "sequence", pending)
-		//case <-i.closeCh:
-		//	// IBFT consensus stopped
-		//	i.consensus.stopSequence()
-		//
-		//	return
-		//}
 	}
 }
 
