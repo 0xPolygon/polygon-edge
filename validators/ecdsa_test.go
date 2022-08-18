@@ -106,7 +106,7 @@ func TestECDSAValidatorBytes(t *testing.T) {
 	// result of Bytes() equals the data encoded in RLP
 	assert.Equal(
 		t,
-		types.MarshalRLPTo(val.MarshalRLPWith, nil),
+		val.Address.Bytes(),
 		val.Bytes(),
 	)
 }

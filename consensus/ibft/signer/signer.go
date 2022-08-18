@@ -160,7 +160,7 @@ func (s *SignerImpl) EcrecoverFromHeader(header *types.Header) (types.Address, e
 		return types.Address{}, err
 	}
 
-	return s.keyManager.Ecrecover(extra.ProposerSeal, header.Hash[:])
+	return s.keyManager.Ecrecover(extra.ProposerSeal, header.Hash.Bytes())
 }
 
 // CreateCommittedSeal returns CommittedSeal from given hash
@@ -268,7 +268,7 @@ func (s *SignerImpl) VerifyParentCommittedSeals(
 		return nil
 	}
 
-	rawMsg := wrapCommitHash(parent.Hash[:])
+	rawMsg := wrapCommitHash(parent.Hash.Bytes())
 
 	numSeals, err := s.keyManager.VerifyCommittedSeals(
 		parentCommittedSeals,
@@ -339,9 +339,16 @@ func (s *SignerImpl) filterHeaderForHash(header *types.Header) (*types.Header, e
 		return nil, err
 	}
 
+	parentCommittedSeals := extra.ParentCommittedSeals
+	if parentCommittedSeals != nil && parentCommittedSeals.Num() == 0 {
+		// avoid to set ParentCommittedSeals in extra for hash calculation
+		// in case of empty ParentCommittedSeals for backward compatibility
+		parentCommittedSeals = nil
+	}
+
 	// This will effectively remove the Seal and CommittedSeals from the IBFT Extra of header,
 	// while keeping proposer vanity, validator set, and ParentCommittedSeals
-	s.initIbftExtra(clone, extra.Validators, extra.ParentCommittedSeals)
+	s.initIbftExtra(clone, extra.Validators, parentCommittedSeals)
 
 	return clone, nil
 }

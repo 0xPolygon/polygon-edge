@@ -54,23 +54,33 @@ func (s *Snapshot) UnmarshalJSON(data []byte) error {
 	raw := struct {
 		Number uint64
 		Hash   string
-		Type   validators.ValidatorType
+		Type   string
 		Votes  []json.RawMessage
 		Set    json.RawMessage
 	}{}
 
-	if err := json.Unmarshal(data, &raw); err != nil {
+	var err error
+
+	if err = json.Unmarshal(data, &raw); err != nil {
 		return err
 	}
 
 	s.Number = raw.Number
 	s.Hash = raw.Hash
-	s.Set = validators.NewValidatorsFromType(raw.Type)
+
+	valType := validators.ECDSAValidatorType
+	if len(raw.Type) > 0 {
+		if valType, err = validators.ParseValidatorType(raw.Type); err != nil {
+			return err
+		}
+	}
+
+	s.Set = validators.NewValidatorsFromType(valType)
 
 	// Votes
 	votes := make([]*valset.Vote, len(raw.Votes))
 	for idx := range votes {
-		candidate, err := validators.NewValidatorFromType(raw.Type)
+		candidate, err := validators.NewValidatorFromType(valType)
 		if err != nil {
 			return err
 		}

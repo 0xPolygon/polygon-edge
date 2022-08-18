@@ -168,6 +168,10 @@ func (s *ECDSAKeyManager) verifyCommittedSealsImpl(
 	return numSeals, nil
 }
 
+func (s *SerializedSeal) Num() int {
+	return len(*s)
+}
+
 func (s *SerializedSeal) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 	if len(*s) == 0 {
 		return ar.NewNullArray()
@@ -179,7 +183,7 @@ func (s *SerializedSeal) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 		if len(a) == 0 {
 			committed.Set(ar.NewNull())
 		} else {
-			committed.Set(ar.NewBytes(a))
+			committed.Set(ar.NewCopyBytes(a))
 		}
 	}
 

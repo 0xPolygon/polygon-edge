@@ -1,8 +1,6 @@
 package validators
 
 import (
-	"fmt"
-
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/fastrlp"
 )
@@ -53,39 +51,24 @@ func (v *ECDSAValidator) Equal(vr Validator) bool {
 
 // MarshalRLPWith is a RLP Marshaller
 func (v *ECDSAValidator) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
-	vv := arena.NewArray()
-
-	vv.Set(arena.NewBytes(v.Address[:]))
-
-	return vv
+	return arena.NewBytes(v.Address[:])
 }
 
 // UnmarshalRLPFrom is a RLP Unmarshaller
 func (v *ECDSAValidator) UnmarshalRLPFrom(p *fastrlp.Parser, val *fastrlp.Value) error {
-	elems, err := val.GetElems()
-	if err != nil {
-		return err
-	}
-
-	if len(elems) < 1 {
-		return fmt.Errorf("incorrect number of elements to decode ECDSAValidator, expected 1 but found %d", len(elems))
-	}
-
-	if err := elems[0].GetAddr(v.Address[:]); err != nil {
-		return fmt.Errorf("failed to decode Address: %w", err)
-	}
-
-	return nil
+	return val.GetAddr(v.Address[:])
 }
 
 // Bytes returns bytes of ECDSAValidator in RLP encode
 func (v *ECDSAValidator) Bytes() []byte {
-	return types.MarshalRLPTo(v.MarshalRLPWith, nil)
+	return v.Address.Bytes()
 }
 
 // SetFromBytes parses given bytes in RLP encode and map to its fields
 func (v *ECDSAValidator) SetFromBytes(input []byte) error {
-	return types.UnmarshalRlp(v.UnmarshalRLPFrom, input)
+	v.Address = types.BytesToAddress(input)
+
+	return nil
 }
 
 // ECDSAValidators is a collection of ECDSAValidator

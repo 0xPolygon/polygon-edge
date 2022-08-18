@@ -257,6 +257,10 @@ type BLSSeal struct {
 	Signature []byte
 }
 
+func (s *BLSSeal) Num() int {
+	return s.Bitmap.BitLen()
+}
+
 func (s *BLSSeal) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 	x := ar.NewArray()
 

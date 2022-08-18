@@ -91,8 +91,13 @@ func (i *backendIBFT) IsValidSender(msg *protoIBFT.Message) bool {
 		return false
 	}
 
+	validators, err := i.forkManager.GetValidators(msg.View.Height)
+	if err != nil {
+		return false
+	}
+
 	// verify the sender is in the active validator set
-	if !i.currentValidators.Includes(signerAddress) {
+	if !validators.Includes(signerAddress) {
 		i.logger.Error(
 			"signer address doesn't included in validators",
 			"signer", signerAddress,

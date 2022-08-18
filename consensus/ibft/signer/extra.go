@@ -31,6 +31,8 @@ type IstanbulExtra struct {
 }
 
 type Sealer interface {
+	// Number of committed seals
+	Num() int
 	MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value
 	UnmarshalRLPFrom(*fastrlp.Parser, *fastrlp.Value) error
 }
