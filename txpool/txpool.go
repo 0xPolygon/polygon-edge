@@ -27,7 +27,7 @@ const (
 	// was excluded from block building (ibft.writeTransactions)
 	maxAccountDemotions = uint(10)
 
-	defaultMaxEnqueuedLimit = uint64(16)
+	defaultMaxEnqueuedLimit = uint64(64)
 )
 
 // errors
