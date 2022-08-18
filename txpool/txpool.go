@@ -26,8 +26,6 @@ const (
 	// maximum allowed number of times an account
 	// was excluded from block building (ibft.writeTransactions)
 	maxAccountDemotions = uint(10)
-
-	defaultMaxEnqueuedLimit = uint64(64)
 )
 
 // errors
