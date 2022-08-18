@@ -69,6 +69,7 @@ func (s *Snapshot) UnmarshalJSON(data []byte) error {
 	s.Hash = raw.Hash
 
 	valType := validators.ECDSAValidatorType
+
 	if len(raw.Type) > 0 {
 		if valType, err = validators.ParseValidatorType(raw.Type); err != nil {
 			return err
