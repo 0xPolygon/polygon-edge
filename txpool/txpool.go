@@ -82,9 +82,10 @@ type signer interface {
 }
 
 type Config struct {
-	PriceLimit uint64
-	MaxSlots   uint64
-	Sealing    bool
+	PriceLimit         uint64
+	MaxSlots           uint64
+	MaxAccountEnqueued uint64
+	Sealing            bool
 }
 
 /* All requests are passed to the main loop
@@ -182,15 +183,12 @@ func NewTxPool(
 	config *Config,
 ) (*TxPool, error) {
 	pool := &TxPool{
-		logger:  logger.Named("txpool"),
-		forks:   forks,
-		store:   store,
-		metrics: metrics,
-		accounts: accountsMap{
-			//	TODO: make this configurable
-			maxEnqueuedLimit: defaultMaxEnqueuedLimit,
-		},
+		logger:      logger.Named("txpool"),
+		forks:       forks,
+		store:       store,
+		metrics:     metrics,
 		executables: newPricedQueue(),
+		accounts:    accountsMap{maxEnqueuedLimit: config.MaxAccountEnqueued},
 		index:       lookupMap{all: make(map[types.Hash]*types.Transaction)},
 		gauge:       slotGauge{height: 0, max: config.MaxSlots},
 		priceLimit:  config.PriceLimit,
