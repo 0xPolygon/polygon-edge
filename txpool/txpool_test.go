@@ -470,7 +470,6 @@ func TestAddTxHighPressure(t *testing.T) {
 				ErrRejectFutureTx,
 				pool.addTx(local, newTx(addr1, 8, 1)),
 			)
-
 		},
 	)
 
