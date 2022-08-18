@@ -378,7 +378,7 @@ func (i *backendIBFT) startConsensus() {
 
 	var (
 		sequenceCh  = make(<-chan struct{})
-		isValidator = false
+		isValidator bool
 	)
 
 	for {
