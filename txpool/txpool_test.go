@@ -19,9 +19,10 @@ import (
 )
 
 const (
-	defaultPriceLimit uint64 = 1
-	defaultMaxSlots   uint64 = 4096
-	validGasLimit     uint64 = 4712350
+	defaultPriceLimit         uint64 = 1
+	defaultMaxSlots           uint64 = 4096
+	defaultMaxAccountEnqueued uint64 = 128
+	validGasLimit             uint64 = 4712350
 )
 
 var (
@@ -88,9 +89,10 @@ func newTestPoolWithSlots(maxSlots uint64, mockStore ...store) (*TxPool, error) 
 		nil,
 		nilMetrics,
 		&Config{
-			PriceLimit: defaultPriceLimit,
-			MaxSlots:   maxSlots,
-			Sealing:    false,
+			PriceLimit:         defaultPriceLimit,
+			MaxSlots:           maxSlots,
+			Sealing:            false,
+			MaxAccountEnqueued: defaultMaxAccountEnqueued,
 		},
 	)
 }
