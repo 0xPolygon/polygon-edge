@@ -1281,6 +1281,7 @@ func (e *eoa) signTx(tx *types.Transaction, signer crypto.TxSigner) *types.Trans
 var signerEIP155 = crypto.NewEIP155Signer(100)
 
 func TestAddTxs(t *testing.T) {
+	t.SkipNow()
 	t.Parallel()
 
 	slotSize := uint64(1)
