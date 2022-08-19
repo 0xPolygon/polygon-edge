@@ -290,7 +290,7 @@ func GetIBFTForks(ibftConfig map[string]interface{}) ([]IBFTFork, error) {
 	return nil, errors.New("current IBFT type not found")
 }
 
-//  setupTransport read current mechanism in params and sets up consensus mechanism
+// setupMechanism reads the current mechanism in params and sets up consensus mechanism
 func (i *backendIBFT) setupMechanism() error {
 	ibftForks, err := GetIBFTForks(i.config.Config)
 	if err != nil {
@@ -366,9 +366,9 @@ func (i *backendIBFT) startConsensus() {
 		syncerBlockCh = make(chan struct{})
 	)
 
-	//	Receive a notification every time syncer manages
-	//	to insert a valid block. Used for cancelling active consensus
-	//	rounds for a specific height
+	// Receive a notification every time syncer manages
+	// to insert a valid block. Used for cancelling active consensus
+	// rounds for a specific height
 	go func() {
 		for {
 			if ev := <-newBlockSub.GetEventCh(); ev.Source == "syncer" {
@@ -385,6 +385,11 @@ func (i *backendIBFT) startConsensus() {
 
 	defer newBlockSub.Close()
 
+	var (
+		sequenceCh  = make(<-chan struct{})
+		isValidator bool
+	)
+
 	for {
 		var (
 			latest  = i.blockchain.Header().Number
@@ -393,22 +398,23 @@ func (i *backendIBFT) startConsensus() {
 
 		i.updateActiveValidatorSet(latest)
 
-		if !i.isActiveValidator() {
-			//	we are not participating in consensus for this height
-			continue
+		isValidator = i.isActiveValidator()
+
+		if isValidator {
+			sequenceCh = i.consensus.runSequence(pending)
 		}
 
 		select {
-		case <-i.consensus.runSequence(pending):
-			//	consensus inserted block
-			continue
 		case <-syncerBlockCh:
-			//	syncer inserted block -> stop running consensus
-			i.consensus.stopSequence()
-			i.logger.Info("canceled sequence", "sequence", pending)
+			if isValidator {
+				i.consensus.stopSequence()
+				i.logger.Info("canceled sequence", "sequence", pending)
+			}
+		case <-sequenceCh:
 		case <-i.closeCh:
-			//	IBFT consensus stopped
-			i.consensus.stopSequence()
+			if isValidator {
+				i.consensus.stopSequence()
+			}
 
 			return
 		}
@@ -424,7 +430,7 @@ func (i *backendIBFT) updateActiveValidatorSet(latestHeight uint64) {
 
 	i.activeValidatorSet = snap.Set
 
-	//Update the No.of validator metric
+	// Update the No.of validator metric
 	i.metrics.Validators.Set(float64(len(snap.Set)))
 }
 
@@ -449,14 +455,14 @@ func (i *backendIBFT) updateMetrics(block *types.Block) {
 	parentTime := time.Unix(int64(prvHeader.Timestamp), 0)
 	headerTime := time.Unix(int64(block.Header.Timestamp), 0)
 
-	//Update the block interval metric
+	// Update the block interval metric
 	if block.Number() > 1 {
 		i.metrics.BlockInterval.Set(
 			headerTime.Sub(parentTime).Seconds(),
 		)
 	}
 
-	//Update the Number of transactions in the block metric
+	// Update the Number of transactions in the block metric
 	i.metrics.NumTxs.Set(float64(len(block.Body().Transactions)))
 }
 
@@ -529,9 +535,9 @@ func (i *backendIBFT) VerifyHeader(header *types.Header) error {
 	return nil
 }
 
-//	quorumSize returns a callback that when executed on a ValidatorSet computes
-//	number of votes required to reach quorum based on the size of the set.
-//	The blockNumber argument indicates which formula was used to calculate the result (see PRs #513, #549)
+// quorumSize returns a callback that when executed on a ValidatorSet computes
+// number of votes required to reach quorum based on the size of the set.
+// The blockNumber argument indicates which formula was used to calculate the result (see PRs #513, #549)
 func (i *backendIBFT) quorumSize(blockNumber uint64) QuorumImplementation {
 	if blockNumber < i.quorumSizeBlockNum {
 		return LegacyQuorumSize
