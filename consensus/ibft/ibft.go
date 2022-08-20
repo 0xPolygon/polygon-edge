@@ -344,9 +344,11 @@ func (i *backendIBFT) createKey() error {
 				}
 
 				key = validatorKey
-				i.validatorKey = key
-				i.validatorKeyAddr = crypto.PubKeyToAddress(&key.PublicKey)
+
 			}
+			i.validatorKey = key
+			i.validatorKeyAddr = crypto.PubKeyToAddress(&key.PublicKey)
+
 		} else {
 			i.validatorKey = &ecdsa.PrivateKey{}
 			info, err := i.secretsManager.GetSecretInfo(secrets.ValidatorKey)
