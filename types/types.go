@@ -107,6 +107,16 @@ func (a Address) Bytes() []byte {
 	return a[:]
 }
 
+func (a Address) ExistsIn(addresses []Address) bool {
+	for _, address := range addresses {
+		if a == address {
+			return true
+		}
+	}
+
+	return false
+}
+
 func (a Address) Value() (driver.Value, error) {
 	return a.String(), nil
 }
