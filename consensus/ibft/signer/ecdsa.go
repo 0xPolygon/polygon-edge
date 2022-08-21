@@ -48,7 +48,7 @@ func (s *ECDSAKeyManager) Address() types.Address {
 	return s.address
 }
 
-func (s *ECDSAKeyManager) NewEmptyValidatorSet() validators.Validators {
+func (s *ECDSAKeyManager) NewEmptyValidators() validators.Validators {
 	return &validators.ECDSAValidators{}
 }
 
@@ -95,7 +95,7 @@ func (s *ECDSAKeyManager) VerifyCommittedSeal(
 ) error {
 	validatorSet, ok := rawSet.(*validators.ECDSAValidators)
 	if !ok {
-		return ErrInvalidValidatorSet
+		return ErrInvalidValidators
 	}
 
 	signer, err := s.Ecrecover(signature, hash)
@@ -126,7 +126,7 @@ func (s *ECDSAKeyManager) VerifyCommittedSeals(
 
 	validatorSet, ok := rawSet.(*validators.ECDSAValidators)
 	if !ok {
-		return 0, ErrInvalidValidatorSet
+		return 0, ErrInvalidValidators
 	}
 
 	return s.verifyCommittedSealsImpl(committedSeal, digest, *validatorSet)

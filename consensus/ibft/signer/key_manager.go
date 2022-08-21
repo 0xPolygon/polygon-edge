@@ -11,7 +11,7 @@ type KeyManager interface {
 	Address() types.Address
 
 	// initializer of modules related to KeyManager
-	NewEmptyValidatorSet() validators.Validators
+	NewEmptyValidators() validators.Validators
 	NewEmptyCommittedSeals() Sealer
 
 	// Seal

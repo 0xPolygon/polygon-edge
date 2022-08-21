@@ -166,7 +166,7 @@ func TestBLSValidatorBytes(t *testing.T) {
 	)
 }
 
-func TestBLSValidatorSetFromBytes(t *testing.T) {
+func TestBLSValidatorFromBytes(t *testing.T) {
 	val1 := NewBLSValidator(addr1, testBLSPubKey1)
 	marshalledData := types.MarshalRLPTo(val1.MarshalRLPWith, nil)
 
@@ -484,7 +484,7 @@ func TestBLSValidatorsMerge(t *testing.T) {
 
 		assert.ErrorIs(
 			t,
-			ErrMismatchValidatorSetType,
+			ErrMismatchValidatorsType,
 			vals1.Merge(vals2),
 		)
 	})

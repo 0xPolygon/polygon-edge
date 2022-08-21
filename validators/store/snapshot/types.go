@@ -8,7 +8,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
-	"github.com/0xPolygon/polygon-edge/validators/valset"
+	"github.com/0xPolygon/polygon-edge/validators/store"
 )
 
 // snapshotMetadata defines the metadata for the snapshot
@@ -26,7 +26,7 @@ type Snapshot struct {
 	Hash string
 
 	// votes casted in chronological order
-	Votes []*valset.Vote
+	Votes []*store.Vote
 
 	// current set of validators
 	Set validators.Validators
@@ -36,7 +36,7 @@ func (s *Snapshot) MarshalJSON() ([]byte, error) {
 	jsonData := struct {
 		Number uint64
 		Hash   string
-		Votes  []*valset.Vote
+		Votes  []*store.Vote
 		Type   validators.ValidatorType
 		Set    validators.Validators
 	}{
@@ -79,14 +79,14 @@ func (s *Snapshot) UnmarshalJSON(data []byte) error {
 	s.Set = validators.NewValidatorsFromType(valType)
 
 	// Votes
-	votes := make([]*valset.Vote, len(raw.Votes))
+	votes := make([]*store.Vote, len(raw.Votes))
 	for idx := range votes {
 		candidate, err := validators.NewValidatorFromType(valType)
 		if err != nil {
 			return err
 		}
 
-		votes[idx] = &valset.Vote{
+		votes[idx] = &store.Vote{
 			Candidate: candidate,
 		}
 
@@ -124,7 +124,7 @@ func (s *Snapshot) Equal(ss *Snapshot) bool {
 
 // Count returns the vote tally.
 // The count increases if the callback function returns true
-func (s *Snapshot) Count(h func(v *valset.Vote) bool) (count int) {
+func (s *Snapshot) Count(h func(v *store.Vote) bool) (count int) {
 	for _, v := range s.Votes {
 		if h(v) {
 			count++
@@ -140,7 +140,7 @@ func (s *Snapshot) AddVote(
 	candidate validators.Validator,
 	authorize bool,
 ) {
-	s.Votes = append(s.Votes, &valset.Vote{
+	s.Votes = append(s.Votes, &store.Vote{
 		Validator: voter,
 		Candidate: candidate,
 		Authorize: authorize,
@@ -151,7 +151,7 @@ func (s *Snapshot) AddVote(
 func (s *Snapshot) Copy() *Snapshot {
 	// Do not need to copy Number and Hash
 	ss := &Snapshot{
-		Votes: make([]*valset.Vote, len(s.Votes)),
+		Votes: make([]*store.Vote, len(s.Votes)),
 		Set:   s.Set.Copy(),
 	}
 
@@ -167,7 +167,7 @@ func (s *Snapshot) CountByVoterAndCandidate(
 	voter types.Address,
 	candidate validators.Validator,
 ) int {
-	return s.Count(func(v *valset.Vote) bool {
+	return s.Count(func(v *store.Vote) bool {
 		return v.Validator == voter && v.Candidate.Equal(candidate)
 	})
 }
@@ -176,14 +176,14 @@ func (s *Snapshot) CountByVoterAndCandidate(
 func (s *Snapshot) CountByCandidate(
 	candidate validators.Validator,
 ) int {
-	return s.Count(func(v *valset.Vote) bool {
+	return s.Count(func(v *store.Vote) bool {
 		return v.Candidate.Equal(candidate)
 	})
 }
 
 // RemoveVotes removes the Votes that meet condition defined in the given function
-func (s *Snapshot) RemoveVotes(shouldRemoveFn func(v *valset.Vote) bool) {
-	newVotes := make([]*valset.Vote, 0, len(s.Votes))
+func (s *Snapshot) RemoveVotes(shouldRemoveFn func(v *store.Vote) bool) {
+	newVotes := make([]*store.Vote, 0, len(s.Votes))
 
 	for _, vote := range s.Votes {
 		if shouldRemoveFn(vote) {
@@ -201,7 +201,7 @@ func (s *Snapshot) RemoveVotes(shouldRemoveFn func(v *valset.Vote) bool) {
 func (s *Snapshot) RemoveVotesByVoter(
 	address types.Address,
 ) {
-	s.RemoveVotes(func(v *valset.Vote) bool {
+	s.RemoveVotes(func(v *store.Vote) bool {
 		return v.Validator == address
 	})
 }
@@ -210,7 +210,7 @@ func (s *Snapshot) RemoveVotesByVoter(
 func (s *Snapshot) RemoveVotesByCandidate(
 	candidate validators.Validator,
 ) {
-	s.RemoveVotes(func(v *valset.Vote) bool {
+	s.RemoveVotes(func(v *store.Vote) bool {
 		return v.Candidate.Equal(candidate)
 	})
 }

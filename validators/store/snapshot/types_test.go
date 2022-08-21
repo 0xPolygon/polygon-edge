@@ -9,7 +9,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
-	"github.com/0xPolygon/polygon-edge/validators/valset"
+	"github.com/0xPolygon/polygon-edge/validators/store"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -94,8 +94,8 @@ func newTestVote(
 	candidate validators.Validator,
 	validator types.Address,
 	authorize bool,
-) *valset.Vote {
-	return &valset.Vote{
+) *store.Vote {
+	return &store.Vote{
 		Validator: validator,
 		Candidate: candidate,
 		Authorize: authorize,
@@ -128,7 +128,7 @@ func TestSnapshotMarshalJSON(t *testing.T) {
 			&Snapshot{
 				Number: testNumber,
 				Hash:   testHash.String(),
-				Votes: []*valset.Vote{
+				Votes: []*store.Vote{
 					vote,
 				},
 				Set: &validators.ECDSAValidators{
@@ -154,7 +154,7 @@ func TestSnapshotMarshalJSON(t *testing.T) {
 			&Snapshot{
 				Number: testNumber,
 				Hash:   testHash.String(),
-				Votes: []*valset.Vote{
+				Votes: []*store.Vote{
 					vote,
 				},
 				Set: &validators.BLSValidators{
@@ -203,7 +203,7 @@ func TestSnapshotUnmarshalJSON(t *testing.T) {
 			&Snapshot{
 				Number: testNumber,
 				Hash:   testHash.String(),
-				Votes: []*valset.Vote{
+				Votes: []*store.Vote{
 					newTestVote(ecdsaValidator1, ecdsaValidator2.Addr(), true),
 				},
 				Set: &validators.ECDSAValidators{
@@ -228,7 +228,7 @@ func TestSnapshotUnmarshalJSON(t *testing.T) {
 			&Snapshot{
 				Number: testNumber,
 				Hash:   testHash.String(),
-				Votes: []*valset.Vote{
+				Votes: []*store.Vote{
 					newTestVote(blsValidator1, blsValidator2.Addr(), false),
 				},
 				Set: &validators.BLSValidators{
@@ -249,7 +249,7 @@ func TestSnapshotEqual(t *testing.T) {
 		{
 			name: "should return true if they're equal",
 			s1: &Snapshot{
-				Votes: []*valset.Vote{
+				Votes: []*store.Vote{
 					newTestVote(ecdsaValidator2, ecdsaValidator1.Addr(), true),
 				},
 				Set: &validators.ECDSAValidators{
@@ -257,7 +257,7 @@ func TestSnapshotEqual(t *testing.T) {
 				},
 			},
 			s2: &Snapshot{
-				Votes: []*valset.Vote{
+				Votes: []*store.Vote{
 					newTestVote(ecdsaValidator2, ecdsaValidator1.Addr(), true),
 				},
 				Set: &validators.ECDSAValidators{
@@ -269,7 +269,7 @@ func TestSnapshotEqual(t *testing.T) {
 		{
 			name: "should return false if the sizes of Votes doesn't match with each other",
 			s1: &Snapshot{
-				Votes: []*valset.Vote{
+				Votes: []*store.Vote{
 					newTestVote(ecdsaValidator2, ecdsaValidator1.Addr(), true),
 				},
 				Set: &validators.ECDSAValidators{
@@ -277,7 +277,7 @@ func TestSnapshotEqual(t *testing.T) {
 				},
 			},
 			s2: &Snapshot{
-				Votes: []*valset.Vote{},
+				Votes: []*store.Vote{},
 				Set: &validators.ECDSAValidators{
 					ecdsaValidator1,
 				},
@@ -287,7 +287,7 @@ func TestSnapshotEqual(t *testing.T) {
 		{
 			name: "should return false if Votes don't match with each other",
 			s1: &Snapshot{
-				Votes: []*valset.Vote{
+				Votes: []*store.Vote{
 					newTestVote(ecdsaValidator2, ecdsaValidator1.Addr(), true),
 				},
 				Set: &validators.ECDSAValidators{
@@ -295,7 +295,7 @@ func TestSnapshotEqual(t *testing.T) {
 				},
 			},
 			s2: &Snapshot{
-				Votes: []*valset.Vote{
+				Votes: []*store.Vote{
 					newTestVote(ecdsaValidator3, ecdsaValidator1.Addr(), true),
 				},
 				Set: &validators.ECDSAValidators{
@@ -307,7 +307,7 @@ func TestSnapshotEqual(t *testing.T) {
 		{
 			name: "should return true if Sets doesn't match with each other",
 			s1: &Snapshot{
-				Votes: []*valset.Vote{
+				Votes: []*store.Vote{
 					newTestVote(ecdsaValidator3, ecdsaValidator1.Addr(), true),
 				},
 				Set: &validators.ECDSAValidators{
@@ -315,7 +315,7 @@ func TestSnapshotEqual(t *testing.T) {
 				},
 			},
 			s2: &Snapshot{
-				Votes: []*valset.Vote{
+				Votes: []*store.Vote{
 					newTestVote(ecdsaValidator3, ecdsaValidator1.Addr(), true),
 				},
 				Set: &validators.ECDSAValidators{
@@ -341,25 +341,25 @@ func TestSnapshotCount(t *testing.T) {
 	tests := []struct {
 		name     string
 		snapshot *Snapshot
-		fn       func(v *valset.Vote) bool
+		fn       func(v *store.Vote) bool
 		expected int
-		visited  []*valset.Vote
+		visited  []*store.Vote
 	}{
 		{
 			name: "should return true if they're equal",
 			snapshot: &Snapshot{
-				Votes: []*valset.Vote{
+				Votes: []*store.Vote{
 					newTestVote(ecdsaValidator1, ecdsaValidator1.Addr(), true),
 					newTestVote(ecdsaValidator2, ecdsaValidator2.Addr(), false),
 					newTestVote(ecdsaValidator3, ecdsaValidator3.Addr(), true),
 				},
 			},
-			fn: func(v *valset.Vote) bool {
+			fn: func(v *store.Vote) bool {
 				// count all
 				return true
 			},
 			expected: 3,
-			visited: []*valset.Vote{
+			visited: []*store.Vote{
 				newTestVote(ecdsaValidator1, ecdsaValidator1.Addr(), true),
 				newTestVote(ecdsaValidator2, ecdsaValidator2.Addr(), false),
 				newTestVote(ecdsaValidator3, ecdsaValidator3.Addr(), true),
@@ -368,17 +368,17 @@ func TestSnapshotCount(t *testing.T) {
 		{
 			name: "shouldn't count but visit all",
 			snapshot: &Snapshot{
-				Votes: []*valset.Vote{
+				Votes: []*store.Vote{
 					newTestVote(blsValidator1, ecdsaValidator1.Addr(), true),
 					newTestVote(blsValidator2, ecdsaValidator2.Addr(), false),
 				},
 			},
-			fn: func(v *valset.Vote) bool {
+			fn: func(v *store.Vote) bool {
 				// don't count
 				return false
 			},
 			expected: 0,
-			visited: []*valset.Vote{
+			visited: []*store.Vote{
 				newTestVote(blsValidator1, ecdsaValidator1.Addr(), true),
 				newTestVote(blsValidator2, ecdsaValidator2.Addr(), false),
 			},
@@ -387,9 +387,9 @@ func TestSnapshotCount(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			visited := make([]*valset.Vote, 0, len(test.snapshot.Votes))
+			visited := make([]*store.Vote, 0, len(test.snapshot.Votes))
 
-			res := test.snapshot.Count(func(v *valset.Vote) bool {
+			res := test.snapshot.Count(func(v *store.Vote) bool {
 				visited = append(visited, v)
 
 				return test.fn(v)
@@ -405,18 +405,18 @@ func TestSnapshotAddVote(t *testing.T) {
 	tests := []struct {
 		name     string
 		snapshot *Snapshot
-		vote     *valset.Vote
-		expected []*valset.Vote
+		vote     *store.Vote
+		expected []*store.Vote
 	}{
 		{
 			name: "should add ECDSA Validator Vote",
 			snapshot: &Snapshot{
-				Votes: []*valset.Vote{
+				Votes: []*store.Vote{
 					newTestVote(ecdsaValidator1, ecdsaValidator1.Addr(), true),
 				},
 			},
 			vote: newTestVote(ecdsaValidator2, ecdsaValidator1.Addr(), false),
-			expected: []*valset.Vote{
+			expected: []*store.Vote{
 				newTestVote(ecdsaValidator1, ecdsaValidator1.Addr(), true),
 				newTestVote(ecdsaValidator2, ecdsaValidator1.Addr(), false),
 			},
@@ -424,12 +424,12 @@ func TestSnapshotAddVote(t *testing.T) {
 		{
 			name: "should add BLS Validator Vote",
 			snapshot: &Snapshot{
-				Votes: []*valset.Vote{
+				Votes: []*store.Vote{
 					newTestVote(blsValidator1, ecdsaValidator1.Addr(), true),
 				},
 			},
 			vote: newTestVote(blsValidator2, ecdsaValidator2.Addr(), false),
-			expected: []*valset.Vote{
+			expected: []*store.Vote{
 				newTestVote(blsValidator1, ecdsaValidator1.Addr(), true),
 				newTestVote(blsValidator2, ecdsaValidator2.Addr(), false),
 			},
@@ -457,7 +457,7 @@ func TestSnapshotCopy(t *testing.T) {
 		{
 			name: "should copy ECDSA Snapshot",
 			snapshot: &Snapshot{
-				Votes: []*valset.Vote{
+				Votes: []*store.Vote{
 					newTestVote(ecdsaValidator1, ecdsaValidator1.Addr(), true),
 				},
 				Set: &validators.ECDSAValidators{
@@ -469,7 +469,7 @@ func TestSnapshotCopy(t *testing.T) {
 		{
 			name: "should copy BLS Snapshot",
 			snapshot: &Snapshot{
-				Votes: []*valset.Vote{
+				Votes: []*store.Vote{
 					newTestVote(blsValidator1, ecdsaValidator1.Addr(), true),
 				},
 				Set: &validators.BLSValidators{
@@ -510,7 +510,7 @@ func TestSnapshotCountByVoterAndCandidate(t *testing.T) {
 		{
 			name: "should return count of the votes whose Validator and Candidate equal to the given fields",
 			snapshot: &Snapshot{
-				Votes: []*valset.Vote{
+				Votes: []*store.Vote{
 					newTestVote(ecdsaValidator1, ecdsaValidator1.Addr(), true), // not match
 					newTestVote(ecdsaValidator2, ecdsaValidator2.Addr(), true), // not match
 					newTestVote(ecdsaValidator2, ecdsaValidator1.Addr(), true), // match
@@ -546,7 +546,7 @@ func TestSnapshotCountByCandidate(t *testing.T) {
 		{
 			name: "should return count of the votes whose Candidate equal to the given field",
 			snapshot: &Snapshot{
-				Votes: []*valset.Vote{
+				Votes: []*store.Vote{
 					newTestVote(ecdsaValidator1, ecdsaValidator1.Addr(), true), // match
 					newTestVote(ecdsaValidator2, ecdsaValidator1.Addr(), true), // not match
 					newTestVote(ecdsaValidator3, ecdsaValidator2.Addr(), true), // not match
@@ -574,36 +574,36 @@ func TestSnapshotRemoveVotes(t *testing.T) {
 	tests := []struct {
 		name     string
 		snapshot *Snapshot
-		fn       func(v *valset.Vote) bool
-		expected []*valset.Vote
+		fn       func(v *store.Vote) bool
+		expected []*store.Vote
 	}{
 		{
 			name: "should remove all Votes from Votes",
 			snapshot: &Snapshot{
-				Votes: []*valset.Vote{
+				Votes: []*store.Vote{
 					newTestVote(ecdsaValidator1, ecdsaValidator1.Addr(), true),
 					newTestVote(ecdsaValidator2, ecdsaValidator1.Addr(), true),
 					newTestVote(ecdsaValidator3, ecdsaValidator2.Addr(), true),
 				},
 			},
-			fn: func(v *valset.Vote) bool {
+			fn: func(v *store.Vote) bool {
 				// remove all
 				return true
 			},
-			expected: []*valset.Vote{},
+			expected: []*store.Vote{},
 		},
 		{
 			name: "should removes only Votes created by Validator 1",
 			snapshot: &Snapshot{
-				Votes: []*valset.Vote{
+				Votes: []*store.Vote{
 					newTestVote(blsValidator1, ecdsaValidator1.Addr(), true),
 					newTestVote(blsValidator2, ecdsaValidator2.Addr(), true),
 				},
 			},
-			fn: func(v *valset.Vote) bool {
+			fn: func(v *store.Vote) bool {
 				return v.Validator == ecdsaValidator1.Address
 			},
-			expected: []*valset.Vote{
+			expected: []*store.Vote{
 				newTestVote(blsValidator2, ecdsaValidator2.Addr(), true),
 			},
 		},
@@ -627,30 +627,30 @@ func TestSnapshotRemoveVotesByVoter(t *testing.T) {
 		name     string
 		snapshot *Snapshot
 		voter    types.Address
-		expected []*valset.Vote
+		expected []*store.Vote
 	}{
 		{
 			name: "should remove all Votes",
 			snapshot: &Snapshot{
-				Votes: []*valset.Vote{
+				Votes: []*store.Vote{
 					newTestVote(blsValidator1, ecdsaValidator1.Addr(), true),
 					newTestVote(blsValidator2, ecdsaValidator1.Addr(), false),
 				},
 			},
 			voter:    ecdsaValidator1.Address,
-			expected: []*valset.Vote{},
+			expected: []*store.Vote{},
 		},
 		{
 			name: "should removes only Votes created by Validator 1",
 			snapshot: &Snapshot{
-				Votes: []*valset.Vote{
+				Votes: []*store.Vote{
 					newTestVote(ecdsaValidator1, ecdsaValidator1.Addr(), true),
 					newTestVote(ecdsaValidator2, ecdsaValidator1.Addr(), false),
 					newTestVote(ecdsaValidator3, ecdsaValidator2.Addr(), false),
 				},
 			},
 			voter: ecdsaValidator1.Address,
-			expected: []*valset.Vote{
+			expected: []*store.Vote{
 				newTestVote(ecdsaValidator3, ecdsaValidator2.Addr(), false),
 			},
 		},
@@ -674,30 +674,30 @@ func TestSnapshotRemoveVotesByCandidate(t *testing.T) {
 		name      string
 		snapshot  *Snapshot
 		candidate validators.Validator
-		expected  []*valset.Vote
+		expected  []*store.Vote
 	}{
 		{
 			name: "should remove all Votes",
 			snapshot: &Snapshot{
-				Votes: []*valset.Vote{
+				Votes: []*store.Vote{
 					newTestVote(blsValidator1, ecdsaValidator1.Addr(), true),
 					newTestVote(blsValidator1, ecdsaValidator2.Addr(), false),
 				},
 			},
 			candidate: blsValidator1,
-			expected:  []*valset.Vote{},
+			expected:  []*store.Vote{},
 		},
 		{
 			name: "should removes only Votes for Validator 1",
 			snapshot: &Snapshot{
-				Votes: []*valset.Vote{
+				Votes: []*store.Vote{
 					newTestVote(ecdsaValidator1, ecdsaValidator1.Addr(), true),
 					newTestVote(ecdsaValidator2, ecdsaValidator1.Addr(), false),
 					newTestVote(ecdsaValidator3, ecdsaValidator2.Addr(), false),
 				},
 			},
 			candidate: ecdsaValidator1,
-			expected: []*valset.Vote{
+			expected: []*store.Vote{
 				newTestVote(ecdsaValidator2, ecdsaValidator1.Addr(), false),
 				newTestVote(ecdsaValidator3, ecdsaValidator2.Addr(), false),
 			},

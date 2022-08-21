@@ -1,4 +1,4 @@
-package valset
+package store
 
 import (
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
@@ -26,7 +26,7 @@ func (t SourceType) String() string {
 	return string(t)
 }
 
-type ValidatorSet interface {
+type ValidatorStore interface {
 	SourceType() SourceType
 	GetValidators(height, from uint64) (validators.Validators, error)
 }

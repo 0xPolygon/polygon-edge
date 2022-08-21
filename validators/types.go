@@ -8,11 +8,11 @@ import (
 )
 
 var (
-	ErrInvalidValidatorType     = errors.New("invalid validator type")
-	ErrMismatchValidatorType    = errors.New("mismatch between validator and validator set")
-	ErrMismatchValidatorSetType = errors.New("mismatch between validator sets")
-	ErrValidatorAlreadyExists   = errors.New("validator already exists in validator set")
-	ErrValidatorNotFound        = errors.New("validator not found in validator set")
+	ErrInvalidValidatorType   = errors.New("invalid validator type")
+	ErrMismatchValidatorType  = errors.New("mismatch between validator and validators")
+	ErrMismatchValidatorsType = errors.New("mismatch between two validators")
+	ErrValidatorAlreadyExists = errors.New("validator already exists in validators")
+	ErrValidatorNotFound      = errors.New("validator not found in validators")
 )
 
 type ValidatorType string

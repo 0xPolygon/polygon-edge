@@ -14,7 +14,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/state/runtime/evm"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
-	"github.com/0xPolygon/polygon-edge/validators/valset"
+	"github.com/0xPolygon/polygon-edge/validators/store"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
 )
@@ -128,35 +128,35 @@ func newTestTransitionWithPredeployedStakingContract(
 }
 
 func NewTestContractSet(
-	blockchain valset.HeaderGetter,
+	blockchain store.HeaderGetter,
 	executor Executor,
-	getSigner valset.SignerGetter,
-) *ContractValidatorSet {
-	return &ContractValidatorSet{
+	getSigner store.SignerGetter,
+) *ContractValidatorStore {
+	return &ContractValidatorStore{
 		logger:     hclog.NewNullLogger(),
-		epochSize:  valset.TestEpochSize,
+		epochSize:  store.TestEpochSize,
 		blockchain: blockchain,
 		executor:   executor,
 		getSigner:  getSigner,
 	}
 }
 
-func TestContractValidatorSetSourceType(t *testing.T) {
+func TestContractValidatorStoreSourceType(t *testing.T) {
 	s := NewTestContractSet(nil, nil, nil)
 
-	assert.Equal(t, valset.Contract, s.SourceType())
+	assert.Equal(t, store.Contract, s.SourceType())
 }
 
-func TestContractValidatorSetInitialize(t *testing.T) {
+func TestContractValidatorStoreInitialize(t *testing.T) {
 	s := NewTestContractSet(nil, nil, nil)
 
 	assert.NoError(t, s.Initialize())
 }
 
-func TestContractValidatorSetGetValidators(t *testing.T) {
+func TestContractValidatorStoreGetValidators(t *testing.T) {
 	t.Run("should throw error when header not found", func(t *testing.T) {
 		s := NewTestContractSet(
-			&valset.MockBlockchain{
+			&store.MockBlockchain{
 				GetHeaderByNumberFn: func(u uint64) (*types.Header, bool) {
 					return nil, false
 				},
@@ -175,7 +175,7 @@ func TestContractValidatorSetGetValidators(t *testing.T) {
 
 	t.Run("should throw error getSigner throws error", func(t *testing.T) {
 		s := NewTestContractSet(
-			&valset.MockBlockchain{
+			&store.MockBlockchain{
 				GetHeaderByNumberFn: func(u uint64) (*types.Header, bool) {
 					return &types.Header{}, true
 				},
@@ -194,7 +194,7 @@ func TestContractValidatorSetGetValidators(t *testing.T) {
 
 	t.Run("should throw error when getSigner throws ErrSignerNotFound", func(t *testing.T) {
 		s := NewTestContractSet(
-			&valset.MockBlockchain{
+			&store.MockBlockchain{
 				GetHeaderByNumberFn: func(u uint64) (*types.Header, bool) {
 					return &types.Header{}, true
 				},
@@ -213,7 +213,7 @@ func TestContractValidatorSetGetValidators(t *testing.T) {
 
 	t.Run("should throw error when executor throws error", func(t *testing.T) {
 		s := NewTestContractSet(
-			&valset.MockBlockchain{
+			&store.MockBlockchain{
 				GetHeaderByNumberFn: func(u uint64) (*types.Header, bool) {
 					return &types.Header{}, true
 				},
@@ -256,7 +256,7 @@ func TestContractValidatorSetGetValidators(t *testing.T) {
 		)
 
 		s := NewTestContractSet(
-			&valset.MockBlockchain{
+			&store.MockBlockchain{
 				GetHeaderByNumberFn: func(u uint64) (*types.Header, bool) {
 					return header, true
 				},
@@ -308,7 +308,7 @@ func TestContractValidatorSetGetValidators(t *testing.T) {
 		)
 
 		s := NewTestContractSet(
-			&valset.MockBlockchain{
+			&store.MockBlockchain{
 				GetHeaderByNumberFn: func(u uint64) (*types.Header, bool) {
 					return header, true
 				},

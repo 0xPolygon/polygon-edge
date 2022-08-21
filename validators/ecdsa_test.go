@@ -111,7 +111,7 @@ func TestECDSAValidatorBytes(t *testing.T) {
 	)
 }
 
-func TestECDSAValidatorSetFromBytes(t *testing.T) {
+func TestECDSAValidatorFromBytes(t *testing.T) {
 	val1 := NewECDSAValidator(addr1)
 	marshalledData := types.MarshalRLPTo(val1.MarshalRLPWith, nil)
 
@@ -426,7 +426,7 @@ func TestECDSAValidatorsMerge(t *testing.T) {
 
 		assert.ErrorIs(
 			t,
-			ErrMismatchValidatorSetType,
+			ErrMismatchValidatorsType,
 			vals1.Merge(vals2),
 		)
 	})

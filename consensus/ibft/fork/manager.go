@@ -8,9 +8,9 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/validators"
-	"github.com/0xPolygon/polygon-edge/validators/valset"
-	"github.com/0xPolygon/polygon-edge/validators/valset/contract"
-	"github.com/0xPolygon/polygon-edge/validators/valset/snapshot"
+	"github.com/0xPolygon/polygon-edge/validators/store"
+	"github.com/0xPolygon/polygon-edge/validators/store/contract"
+	"github.com/0xPolygon/polygon-edge/validators/store/snapshot"
 	"github.com/hashicorp/go-hclog"
 )
 
@@ -21,9 +21,9 @@ const (
 )
 
 var (
-	ErrForkNotFound         = errors.New("fork not found")
-	ErrSignerNotFound       = errors.New("signer not found")
-	ErrValidatorSetNotFound = errors.New("validator set not found")
+	ErrForkNotFound           = errors.New("fork not found")
+	ErrSignerNotFound         = errors.New("signer not found")
+	ErrValidatorStoreNotFound = errors.New("validator set not found")
 )
 
 // ForkManager is an interface of the module that has Fork configuration and multiple version of submodules
@@ -31,7 +31,7 @@ var (
 type ForkManager interface {
 	Initialize() error
 	GetSigner(uint64) (signer.Signer, error)
-	GetValidatorSet(uint64) (valset.ValidatorSet, error)
+	GetValidatorStore(uint64) (store.ValidatorStore, error)
 	GetValidators(uint64) (validators.Validators, error)
 	GetHooks(uint64) (hook.Hooks, error)
 	Close() error
@@ -40,7 +40,7 @@ type ForkManager interface {
 // forkManagerImpl is a implementation of ForkManager
 type forkManagerImpl struct {
 	logger         hclog.Logger
-	blockchain     valset.HeaderGetter
+	blockchain     store.HeaderGetter
 	executor       contract.Executor
 	secretsManager secrets.SecretsManager
 
@@ -50,13 +50,13 @@ type forkManagerImpl struct {
 	epochSize uint64
 
 	signers       map[validators.ValidatorType]signer.Signer
-	validatorSets map[valset.SourceType]valset.ValidatorSet
+	validatorSets map[store.SourceType]store.ValidatorStore
 }
 
 // NewForkManager is a constructor of forkManagerImpl
 func NewForkManager(
 	logger hclog.Logger,
-	blockchain valset.HeaderGetter,
+	blockchain store.HeaderGetter,
 	executor contract.Executor,
 	secretManager secrets.SecretsManager,
 	filePath string,
@@ -77,7 +77,7 @@ func NewForkManager(
 		epochSize:      epochSize,
 		forks:          forks,
 		signers:        make(map[validators.ValidatorType]signer.Signer),
-		validatorSets:  make(map[valset.SourceType]valset.ValidatorSet),
+		validatorSets:  make(map[store.SourceType]store.ValidatorStore),
 	}
 
 	// Need initialization of signers in the constructor
@@ -91,7 +91,7 @@ func NewForkManager(
 
 // Initialize initializes ForkManager on initialization phase
 func (m *forkManagerImpl) Initialize() error {
-	if err := m.initializeValidatorSets(); err != nil {
+	if err := m.initializeValidatorStores(); err != nil {
 		return err
 	}
 
@@ -113,8 +113,8 @@ func (m *forkManagerImpl) GetSigner(height uint64) (signer.Signer, error) {
 	return signer, nil
 }
 
-// GetValidatorSet returns a proper validator set at specified height
-func (m *forkManagerImpl) GetValidatorSet(height uint64) (valset.ValidatorSet, error) {
+// GetValidatorStore returns a proper validator set at specified height
+func (m *forkManagerImpl) GetValidatorStore(height uint64) (store.ValidatorStore, error) {
 	fork := m.getFork(height)
 	if fork == nil {
 		return nil, ErrForkNotFound
@@ -122,20 +122,20 @@ func (m *forkManagerImpl) GetValidatorSet(height uint64) (valset.ValidatorSet, e
 
 	set, ok := m.validatorSets[ibftTypesToSourceType[fork.Type]]
 	if !ok {
-		return nil, ErrValidatorSetNotFound
+		return nil, ErrValidatorStoreNotFound
 	}
 
 	return set, nil
 }
 
-// GetValidatorSet returns validators at specified height
+// GetValidators returns validators at specified height
 func (m *forkManagerImpl) GetValidators(height uint64) (validators.Validators, error) {
 	fork := m.getFork(height)
 	if fork == nil {
 		return nil, ErrForkNotFound
 	}
 
-	set, err := m.GetValidatorSet(height)
+	set, err := m.GetValidatorStore(height)
 	if err != nil {
 		return nil, err
 	}
@@ -176,7 +176,7 @@ func (m *forkManagerImpl) GetHooks(height uint64) (hook.Hooks, error) {
 
 // Close calls termination process of submodules
 func (m *forkManagerImpl) Close() error {
-	if err := m.closeSnapshotValidatorSet(); err != nil {
+	if err := m.closeSnapshotValidatorStore(); err != nil {
 		return err
 	}
 
@@ -196,11 +196,11 @@ func (m *forkManagerImpl) initializeSigners() error {
 	return nil
 }
 
-// initializeValidatorSets initializes all validator sets based on Fork configuration
-func (m *forkManagerImpl) initializeValidatorSets() error {
+// initializeValidatorStores initializes all validator sets based on Fork configuration
+func (m *forkManagerImpl) initializeValidatorStores() error {
 	for _, fork := range m.forks {
 		sourceType := ibftTypesToSourceType[fork.Type]
-		if err := m.initializeValidatorSet(sourceType); err != nil {
+		if err := m.initializeValidatorStore(sourceType); err != nil {
 			return err
 		}
 	}
@@ -224,22 +224,22 @@ func (m *forkManagerImpl) initializeSigner(valType validators.ValidatorType) err
 	return nil
 }
 
-// initializeSigner initializes the specified validator set
-func (m *forkManagerImpl) initializeValidatorSet(setType valset.SourceType) error {
+// initializeValidatorStore initializes the specified validator set
+func (m *forkManagerImpl) initializeValidatorStore(setType store.SourceType) error {
 	if _, ok := m.validatorSets[setType]; ok {
 		return nil
 	}
 
 	var (
-		valSet valset.ValidatorSet
+		valSet store.ValidatorStore
 		err    error
 	)
 
 	switch setType {
-	case valset.Snapshot:
-		valSet, err = m.initializeSnapshotValidatorSet()
-	case valset.Contract:
-		valSet = contract.NewContractValidatorSet(
+	case store.Snapshot:
+		valSet, err = m.initializeSnapshotValidatorStore()
+	case store.Contract:
+		valSet = contract.NewContractValidatorStore(
 			m.logger,
 			m.blockchain,
 			m.executor,
@@ -257,8 +257,8 @@ func (m *forkManagerImpl) initializeValidatorSet(setType valset.SourceType) erro
 	return nil
 }
 
-// initializeSnapshotValidatorSet loads data from file and initializes Snapshot validator set
-func (m *forkManagerImpl) initializeSnapshotValidatorSet() (valset.ValidatorSet, error) {
+// initializeSnapshotValidatorStore loads data from file and initializes Snapshot validator set
+func (m *forkManagerImpl) initializeSnapshotValidatorStore() (store.ValidatorStore, error) {
 	snapshotMeta, err := loadSnapshotMetadata(filepath.Join(m.filePath, snapshotMetadataFilename))
 	if err != nil {
 		return nil, err
@@ -269,7 +269,7 @@ func (m *forkManagerImpl) initializeSnapshotValidatorSet() (valset.ValidatorSet,
 		return nil, err
 	}
 
-	snapshotValset, err := snapshot.NewSnapshotValidatorSet(
+	snapshotValset, err := snapshot.NewSnapshotValidatorStore(
 		m.logger,
 		m.blockchain,
 		m.GetSigner,
@@ -285,9 +285,9 @@ func (m *forkManagerImpl) initializeSnapshotValidatorSet() (valset.ValidatorSet,
 	return snapshotValset, nil
 }
 
-// closeSnapshotValidatorSet gets data from Snapshot validator set and save to files
-func (m *forkManagerImpl) closeSnapshotValidatorSet() error {
-	snapshotValset, ok := m.validatorSets[valset.Snapshot].(*snapshot.SnapshotValidatorSet)
+// closeSnapshotValidatorStore gets data from Snapshot validator set and save to files
+func (m *forkManagerImpl) closeSnapshotValidatorStore() error {
+	snapshotValset, ok := m.validatorSets[store.Snapshot].(*snapshot.SnapshotValidatorStore)
 	if !ok {
 		// no snapshot validator set, skip
 		return nil
@@ -315,12 +315,12 @@ func (m *forkManagerImpl) registerPoAHooks(
 	hooks *hook.HookManager,
 	height uint64,
 ) error {
-	valSet, err := m.GetValidatorSet(height)
+	valSet, err := m.GetValidatorStore(height)
 	if err != nil {
 		return err
 	}
 
-	registerValidatorSetHook(hooks, valSet)
+	registerValidatorStoreHook(hooks, valSet)
 
 	return nil
 }
@@ -335,12 +335,12 @@ func (m *forkManagerImpl) registerPoAPrepareHooks(
 		return nil
 	}
 
-	nextValSet, err := m.GetValidatorSet(height + 1)
+	nextValSet, err := m.GetValidatorStore(height + 1)
 	if err != nil {
 		return err
 	}
 
-	registerUpdateValidatorSetHook(
+	registerUpdateValidatorStoreHook(
 		hooks,
 		nextValSet,
 		fromFork.Validators,

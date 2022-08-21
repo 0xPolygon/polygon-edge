@@ -1,4 +1,4 @@
-package valset
+package store
 
 import (
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"

@@ -7,7 +7,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
-	"github.com/0xPolygon/polygon-edge/validators/valset"
+	"github.com/0xPolygon/polygon-edge/validators/store"
 	"github.com/hashicorp/go-hclog"
 )
 
@@ -15,11 +15,11 @@ var (
 	ErrSignerNotFound = errors.New("signer not found")
 )
 
-type ContractValidatorSet struct {
+type ContractValidatorStore struct {
 	logger     hclog.Logger
-	blockchain valset.HeaderGetter
+	blockchain store.HeaderGetter
 	executor   Executor
-	getSigner  valset.SignerGetter
+	getSigner  store.SignerGetter
 	epochSize  uint64
 }
 
@@ -27,14 +27,14 @@ type Executor interface {
 	BeginTxn(types.Hash, *types.Header, types.Address) (*state.Transition, error)
 }
 
-func NewContractValidatorSet(
+func NewContractValidatorStore(
 	logger hclog.Logger,
-	blockchain valset.HeaderGetter,
+	blockchain store.HeaderGetter,
 	executor Executor,
-	getSigner valset.SignerGetter,
+	getSigner store.SignerGetter,
 	epochSize uint64,
-) valset.ValidatorSet {
-	return &ContractValidatorSet{
+) store.ValidatorStore {
+	return &ContractValidatorStore{
 		logger:     logger,
 		blockchain: blockchain,
 		executor:   executor,
@@ -43,15 +43,15 @@ func NewContractValidatorSet(
 	}
 }
 
-func (s *ContractValidatorSet) SourceType() valset.SourceType {
-	return valset.Contract
+func (s *ContractValidatorStore) SourceType() store.SourceType {
+	return store.Contract
 }
 
-func (s *ContractValidatorSet) Initialize() error {
+func (s *ContractValidatorStore) Initialize() error {
 	return nil
 }
 
-func (s *ContractValidatorSet) GetValidators(height, from uint64) (validators.Validators, error) {
+func (s *ContractValidatorStore) GetValidators(height, from uint64) (validators.Validators, error) {
 	signer, err := s.getSigner(height)
 	if err != nil {
 		return nil, err
@@ -69,7 +69,7 @@ func (s *ContractValidatorSet) GetValidators(height, from uint64) (validators.Va
 	return FetchValidators(signer.Type(), transition, signer.Address())
 }
 
-func (s *ContractValidatorSet) getTransitionForQuery(height uint64, from uint64) (*state.Transition, error) {
+func (s *ContractValidatorStore) getTransitionForQuery(height uint64, from uint64) (*state.Transition, error) {
 	fetchingHeight := calculateFetchingHeight(height, s.epochSize, from)
 
 	header, ok := s.blockchain.GetHeaderByNumber(fetchingHeight)

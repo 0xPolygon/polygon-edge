@@ -10,7 +10,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
-	"github.com/0xPolygon/polygon-edge/validators/valset"
+	"github.com/0xPolygon/polygon-edge/validators/store"
 )
 
 var (
@@ -39,31 +39,31 @@ func registerPoSHook(
 	}
 }
 
-// registerValidatorSetHook registers additional processes
-// for the ValidatorSet that modifies header
-func registerValidatorSetHook(
+// registerValidatorStoreHook registers additional processes
+// for the ValidatorStore that modifies header
+func registerValidatorStoreHook(
 	hooks *hook.HookManager,
-	set valset.ValidatorSet,
+	set store.ValidatorStore,
 ) {
-	if hm, ok := set.(valset.HeaderModifier); ok {
+	if hm, ok := set.(store.HeaderModifier); ok {
 		hooks.ModifyHeaderFunc = hm.ModifyHeader
 		hooks.VerifyHeaderFunc = hm.VerifyHeader
 	}
 
-	if ph, ok := set.(valset.HeaderProcessor); ok {
+	if ph, ok := set.(store.HeaderProcessor); ok {
 		hooks.ProcessHeaderFunc = ph.ProcessHeader
 	}
 }
 
-// registerUpdateValidatorSetHook registers additional process
+// registerUpdateValidatorStoreHook registers additional process
 // to update validators at specified height
-func registerUpdateValidatorSetHook(
+func registerUpdateValidatorStoreHook(
 	hooks *hook.HookManager,
-	set valset.ValidatorSet,
+	set store.ValidatorStore,
 	newValidators validators.Validators,
 	height uint64,
 ) {
-	if us, ok := set.(valset.Updatable); ok {
+	if us, ok := set.(store.Updatable); ok {
 		hooks.PostInsertBlockFunc = func(b *types.Block) error {
 			return us.UpdateSet(newValidators, height)
 		}

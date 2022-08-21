@@ -9,7 +9,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
-	"github.com/0xPolygon/polygon-edge/validators/valset"
+	"github.com/0xPolygon/polygon-edge/validators/store"
 	empty "google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -52,7 +52,7 @@ func (o *operator) GetSnapshot(ctx context.Context, req *proto.SnapshotReq) (*pr
 		Hash:   header.Hash.String(),
 	}
 
-	valSet, err := o.ibft.forkManager.GetValidatorSet(height)
+	valSet, err := o.ibft.forkManager.GetValidatorStore(height)
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +73,7 @@ func (o *operator) GetSnapshot(ctx context.Context, req *proto.SnapshotReq) (*pr
 		}
 	}
 
-	votableValSet, ok := valSet.(valset.Votable)
+	votableValSet, ok := valSet.(store.Votable)
 	if !ok {
 		return resp, nil
 	}
@@ -97,7 +97,7 @@ func (o *operator) GetSnapshot(ctx context.Context, req *proto.SnapshotReq) (*pr
 
 // Propose proposes a new candidate to be added / removed from the validator set
 func (o *operator) Propose(ctx context.Context, req *proto.Candidate) (*empty.Empty, error) {
-	votableSet, err := o.getVotableValidatorSet()
+	votableSet, err := o.getVotableValidatorStore()
 	if err != nil {
 		return &empty.Empty{}, err
 	}
@@ -116,12 +116,12 @@ func (o *operator) Propose(ctx context.Context, req *proto.Candidate) (*empty.Em
 
 // Candidates returns the validator candidates list
 func (o *operator) Candidates(ctx context.Context, req *empty.Empty) (*proto.CandidatesResp, error) {
-	valSet, err := o.ibft.forkManager.GetValidatorSet(o.ibft.blockchain.Header().Number)
+	valSet, err := o.ibft.forkManager.GetValidatorStore(o.ibft.blockchain.Header().Number)
 	if err != nil {
 		return nil, err
 	}
 
-	votableValSet, ok := valSet.(valset.Votable)
+	votableValSet, ok := valSet.(store.Votable)
 	if !ok {
 		return nil, fmt.Errorf("voting is not supported")
 	}
@@ -178,14 +178,14 @@ func (o *operator) parseCandidate(req *proto.Candidate) (validators.Validator, e
 	return nil, fmt.Errorf("invalid validator type: %s", signer.Type())
 }
 
-// getVotableValidatorSet gets current validator set and convert its type to Votable
-func (o *operator) getVotableValidatorSet() (valset.Votable, error) {
-	valSet, err := o.ibft.forkManager.GetValidatorSet(o.ibft.blockchain.Header().Number)
+// getVotableValidatorStore gets current validator set and convert its type to Votable
+func (o *operator) getVotableValidatorStore() (store.Votable, error) {
+	valSet, err := o.ibft.forkManager.GetValidatorStore(o.ibft.blockchain.Header().Number)
 	if err != nil {
 		return nil, err
 	}
 
-	votableValSet, ok := valSet.(valset.Votable)
+	votableValSet, ok := valSet.(store.Votable)
 	if !ok {
 		return nil, ErrVotingNotSupported
 	}

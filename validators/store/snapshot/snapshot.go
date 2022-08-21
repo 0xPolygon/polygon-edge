@@ -9,7 +9,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
-	"github.com/0xPolygon/polygon-edge/validators/valset"
+	"github.com/0xPolygon/polygon-edge/validators/store"
 	"github.com/hashicorp/go-hclog"
 )
 
@@ -37,35 +37,35 @@ var (
 	ErrMultipleVotesBySameValidator = errors.New("more than one proposal per validator per address found")
 )
 
-type SnapshotValidatorSet struct {
+type SnapshotValidatorStore struct {
 	// interface
 	logger     hclog.Logger
-	blockchain valset.HeaderGetter
-	getSigner  valset.SignerGetter
+	blockchain store.HeaderGetter
+	getSigner  store.SignerGetter
 
 	// configuration
 	epochSize uint64
 
 	// data
 	store          *snapshotStore
-	candidates     []*valset.Candidate
+	candidates     []*store.Candidate
 	candidatesLock sync.RWMutex
 }
 
-func NewSnapshotValidatorSet(
+func NewSnapshotValidatorStore(
 	logger hclog.Logger,
-	blockchain valset.HeaderGetter,
-	getSigner valset.SignerGetter,
+	blockchain store.HeaderGetter,
+	getSigner store.SignerGetter,
 	epochSize uint64,
 	metadata *SnapshotMetadata,
 	snapshots []*Snapshot,
-) (valset.ValidatorSet, error) {
-	set := &SnapshotValidatorSet{
+) (store.ValidatorStore, error) {
+	set := &SnapshotValidatorStore{
 		logger:         logger.Named(loggerName),
 		store:          newSnapshotStore(metadata, snapshots),
 		blockchain:     blockchain,
 		getSigner:      getSigner,
-		candidates:     make([]*valset.Candidate, 0),
+		candidates:     make([]*store.Candidate, 0),
 		candidatesLock: sync.RWMutex{},
 		epochSize:      epochSize,
 	}
@@ -77,7 +77,7 @@ func NewSnapshotValidatorSet(
 	return set, nil
 }
 
-func (s *SnapshotValidatorSet) initialize() error {
+func (s *SnapshotValidatorStore) initialize() error {
 	header := s.blockchain.Header()
 	meta := s.GetSnapshotMetadata()
 
@@ -134,21 +134,21 @@ func (s *SnapshotValidatorSet) initialize() error {
 	return nil
 }
 
-func (s *SnapshotValidatorSet) SourceType() valset.SourceType {
-	return valset.Snapshot
+func (s *SnapshotValidatorStore) SourceType() store.SourceType {
+	return store.Snapshot
 }
 
-func (s *SnapshotValidatorSet) GetSnapshotMetadata() *SnapshotMetadata {
+func (s *SnapshotValidatorStore) GetSnapshotMetadata() *SnapshotMetadata {
 	return &SnapshotMetadata{
 		LastBlock: s.store.getLastBlock(),
 	}
 }
 
-func (s *SnapshotValidatorSet) GetSnapshots() []*Snapshot {
+func (s *SnapshotValidatorStore) GetSnapshots() []*Snapshot {
 	return s.store.list
 }
 
-func (s *SnapshotValidatorSet) GetValidators(height uint64, _ uint64) (validators.Validators, error) {
+func (s *SnapshotValidatorStore) GetValidators(height uint64, _ uint64) (validators.Validators, error) {
 	var snapshotHeight uint64 = 0
 	if int64(height) > 0 {
 		snapshotHeight = height - 1
@@ -163,7 +163,7 @@ func (s *SnapshotValidatorSet) GetValidators(height uint64, _ uint64) (validator
 }
 
 // Votes returns the votes in the snapshot at the specified height
-func (s *SnapshotValidatorSet) Votes(height uint64) ([]*valset.Vote, error) {
+func (s *SnapshotValidatorStore) Votes(height uint64) ([]*store.Vote, error) {
 	snapshot := s.getSnapshot(height)
 	if snapshot == nil {
 		return nil, ErrSnapshotNotFound
@@ -173,11 +173,11 @@ func (s *SnapshotValidatorSet) Votes(height uint64) ([]*valset.Vote, error) {
 }
 
 // Candidates returns the current candidates
-func (s *SnapshotValidatorSet) Candidates() []*valset.Candidate {
+func (s *SnapshotValidatorStore) Candidates() []*store.Candidate {
 	return s.candidates
 }
 
-func (s *SnapshotValidatorSet) UpdateSet(newValidators validators.Validators, from uint64) error {
+func (s *SnapshotValidatorStore) UpdateSet(newValidators validators.Validators, from uint64) error {
 	snapshotHeight := from - 1
 
 	snapshot := s.getSnapshot(snapshotHeight)
@@ -195,7 +195,7 @@ func (s *SnapshotValidatorSet) UpdateSet(newValidators validators.Validators, fr
 	newSnapshot.Number = snapshotHeight
 	newSnapshot.Hash = header.Hash.String()
 	newSnapshot.Set = newValidators
-	newSnapshot.Votes = []*valset.Vote{}
+	newSnapshot.Votes = []*store.Vote{}
 
 	if !newSnapshot.Equal(snapshot) {
 		s.store.add(newSnapshot)
@@ -204,7 +204,7 @@ func (s *SnapshotValidatorSet) UpdateSet(newValidators validators.Validators, fr
 	return nil
 }
 
-func (s *SnapshotValidatorSet) ModifyHeader(header *types.Header, proposer types.Address) error {
+func (s *SnapshotValidatorStore) ModifyHeader(header *types.Header, proposer types.Address) error {
 	snapshot := s.getSnapshot(header.Number)
 	if snapshot == nil {
 		return ErrSnapshotNotFound
@@ -228,7 +228,7 @@ func (s *SnapshotValidatorSet) ModifyHeader(header *types.Header, proposer types
 	return nil
 }
 
-func (s *SnapshotValidatorSet) VerifyHeader(header *types.Header) error {
+func (s *SnapshotValidatorStore) VerifyHeader(header *types.Header) error {
 	// Check the nonce format.
 	// The nonce field must have either an AUTH or DROP vote value.
 	// Block nonce values are not taken into account when the Miner field is set to zeroes, indicating
@@ -241,7 +241,7 @@ func (s *SnapshotValidatorSet) VerifyHeader(header *types.Header) error {
 }
 
 // ProcessHeadersInRange is a helper function process headers in the given range
-func (s *SnapshotValidatorSet) ProcessHeadersInRange(
+func (s *SnapshotValidatorStore) ProcessHeadersInRange(
 	from, to uint64,
 ) error {
 	for i := from; i <= to; i++ {
@@ -262,7 +262,7 @@ func (s *SnapshotValidatorSet) ProcessHeadersInRange(
 	return nil
 }
 
-func (s *SnapshotValidatorSet) ProcessHeader(
+func (s *SnapshotValidatorStore) ProcessHeader(
 	header *types.Header,
 ) error {
 	signer, err := s.getSigner(header.Number)
@@ -315,7 +315,7 @@ func (s *SnapshotValidatorSet) ProcessHeader(
 	return s.processVote(header, signer, proposer, parentSnap, snap)
 }
 
-func (s *SnapshotValidatorSet) Propose(candidate validators.Validator, auth bool, proposer types.Address) error {
+func (s *SnapshotValidatorStore) Propose(candidate validators.Validator, auth bool, proposer types.Address) error {
 	s.candidatesLock.Lock()
 	defer s.candidatesLock.Unlock()
 
@@ -355,13 +355,13 @@ func (s *SnapshotValidatorSet) Propose(candidate validators.Validator, auth bool
 }
 
 // AddCandidate adds new candidate to candidate list
-func (s *SnapshotValidatorSet) addCandidate(
+func (s *SnapshotValidatorStore) addCandidate(
 	validators validators.Validators,
 	candidate validators.Validator,
 	authrorize bool,
 ) error {
 	if authrorize {
-		s.candidates = append(s.candidates, &valset.Candidate{
+		s.candidates = append(s.candidates, &store.Candidate{
 			Validator: candidate,
 			Authorize: authrorize,
 		})
@@ -377,7 +377,7 @@ func (s *SnapshotValidatorSet) addCandidate(
 		return ErrCandidateNotExistInSet
 	}
 
-	s.candidates = append(s.candidates, &valset.Candidate{
+	s.candidates = append(s.candidates, &store.Candidate{
 		Validator: validators.At(uint64(validatorIndex)),
 		Authorize: authrorize,
 	})
@@ -386,7 +386,7 @@ func (s *SnapshotValidatorSet) addCandidate(
 }
 
 // addHeaderSnap creates the initial snapshot, and adds it to the snapshot store
-func (s *SnapshotValidatorSet) addHeaderSnap(header *types.Header) error {
+func (s *SnapshotValidatorStore) addHeaderSnap(header *types.Header) error {
 	signer, err := s.getSigner(header.Number)
 	if err != nil {
 		return err
@@ -405,25 +405,25 @@ func (s *SnapshotValidatorSet) addHeaderSnap(header *types.Header) error {
 	s.store.add(&Snapshot{
 		Hash:   header.Hash.String(),
 		Number: header.Number,
-		Votes:  []*valset.Vote{},
+		Votes:  []*store.Vote{},
 		Set:    extra.Validators,
 	})
 
 	return nil
 }
 
-func (s *SnapshotValidatorSet) getSnapshot(height uint64) *Snapshot {
+func (s *SnapshotValidatorStore) getSnapshot(height uint64) *Snapshot {
 	return s.store.find(height)
 }
 
-func (s *SnapshotValidatorSet) getLatestSnapshot() *Snapshot {
+func (s *SnapshotValidatorStore) getLatestSnapshot() *Snapshot {
 	return s.getSnapshot(s.store.lastNumber)
 }
 
-func (s *SnapshotValidatorSet) getNextCandidate(
+func (s *SnapshotValidatorStore) getNextCandidate(
 	snap *Snapshot,
 	proposer types.Address,
-) *valset.Candidate {
+) *store.Candidate {
 	s.candidatesLock.Lock()
 	defer s.candidatesLock.Unlock()
 
@@ -437,8 +437,8 @@ func (s *SnapshotValidatorSet) getNextCandidate(
 
 // cleanObsolateCandidates removes useless candidates from candidates field
 // Unsafe against concurrent accesses
-func (s *SnapshotValidatorSet) cleanObsoleteCandidates(set validators.Validators) {
-	newCandidates := make([]*valset.Candidate, 0, len(s.candidates))
+func (s *SnapshotValidatorStore) cleanObsoleteCandidates(set validators.Validators) {
+	newCandidates := make([]*store.Candidate, 0, len(s.candidates))
 
 	for _, candidate := range s.candidates {
 		// If Authorize is
@@ -455,14 +455,14 @@ func (s *SnapshotValidatorSet) cleanObsoleteCandidates(set validators.Validators
 
 // pickOneCandidate returns a propser candidate from candidates field
 // Unsafe against concurrent accesses
-func (s *SnapshotValidatorSet) pickOneCandidate(
+func (s *SnapshotValidatorStore) pickOneCandidate(
 	snap *Snapshot,
 	proposer types.Address,
-) *valset.Candidate {
+) *store.Candidate {
 	for _, c := range s.candidates {
 		addr := c.Validator.Addr()
 
-		count := snap.Count(func(v *valset.Vote) bool {
+		count := snap.Count(func(v *store.Vote) bool {
 			return v.Candidate.Addr() == addr && v.Validator == proposer
 		})
 
@@ -476,7 +476,7 @@ func (s *SnapshotValidatorSet) pickOneCandidate(
 
 // isValidator is a helper function to returns a validator with the given address is
 // a validator in the specified height
-func (s *SnapshotValidatorSet) isValidator(
+func (s *SnapshotValidatorStore) isValidator(
 	address types.Address,
 	height uint64,
 ) (bool, error) {
@@ -491,7 +491,7 @@ func (s *SnapshotValidatorSet) isValidator(
 
 // saveSnapshotIfChanged is a helper method to save snapshot updated by the given header
 // only if the snapshot is updated from parent snapshot
-func (s *SnapshotValidatorSet) saveSnapshotIfChanged(
+func (s *SnapshotValidatorStore) saveSnapshotIfChanged(
 	parentSnapshot, snapshot *Snapshot,
 	header *types.Header,
 ) {
@@ -506,7 +506,7 @@ func (s *SnapshotValidatorSet) saveSnapshotIfChanged(
 }
 
 // resetSnapshot is a helper method to save a snapshot that clears votes
-func (s *SnapshotValidatorSet) resetSnapshot(
+func (s *SnapshotValidatorStore) resetSnapshot(
 	parentSnapshot, snapshot *Snapshot,
 	header *types.Header,
 ) {
@@ -516,7 +516,7 @@ func (s *SnapshotValidatorSet) resetSnapshot(
 }
 
 // removeLowerSnapshots is a helper function to removes old snapshots
-func (s *SnapshotValidatorSet) removeLowerSnapshots(
+func (s *SnapshotValidatorStore) removeLowerSnapshots(
 	currentHeight uint64,
 ) {
 	// remove in-memory snapshots from two epochs before this one
@@ -528,7 +528,7 @@ func (s *SnapshotValidatorSet) removeLowerSnapshots(
 }
 
 // processVote processes a vote in header
-func (s *SnapshotValidatorSet) processVote(
+func (s *SnapshotValidatorStore) processVote(
 	header *types.Header,
 	signer signer.Signer,
 	proposer types.Address,

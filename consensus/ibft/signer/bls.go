@@ -45,7 +45,7 @@ func (s *BLSKeyManager) Address() types.Address {
 	return s.address
 }
 
-func (s *BLSKeyManager) NewEmptyValidatorSet() validators.Validators {
+func (s *BLSKeyManager) NewEmptyValidators() validators.Validators {
 	return &validators.BLSValidators{}
 }
 
@@ -73,7 +73,7 @@ func (s *BLSKeyManager) Ecrecover(sig, digest []byte) (types.Address, error) {
 func (s *BLSKeyManager) GenerateCommittedSeals(sealMap map[types.Address][]byte, extra *IstanbulExtra) (Sealer, error) {
 	validators, ok := extra.Validators.(*validators.BLSValidators)
 	if !ok {
-		return nil, ErrInvalidValidatorSet
+		return nil, ErrInvalidValidators
 	}
 
 	blsSignatures, bitMap, err := s.getBLSSignatures(sealMap, validators)
@@ -107,7 +107,7 @@ func (s *BLSKeyManager) VerifyCommittedSeal(
 ) error {
 	validatorSet, ok := rawSet.(*validators.BLSValidators)
 	if !ok {
-		return ErrInvalidValidatorSet
+		return ErrInvalidValidators
 	}
 
 	validatorIndex := validatorSet.Index(addr)
@@ -154,7 +154,7 @@ func (s *BLSKeyManager) VerifyCommittedSeals(
 
 	validatorSet, ok := rawSet.(*validators.BLSValidators)
 	if !ok {
-		return 0, ErrInvalidValidatorSet
+		return 0, ErrInvalidValidators
 	}
 
 	return s.verifyCommittedSealsImpl(committedSeal, digest, *validatorSet)

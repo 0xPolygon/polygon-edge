@@ -3,7 +3,7 @@ package fork
 import (
 	"fmt"
 
-	"github.com/0xPolygon/polygon-edge/validators/valset"
+	"github.com/0xPolygon/polygon-edge/validators/store"
 )
 
 // Define the type of the IBFT consensus
@@ -26,9 +26,9 @@ var ibftTypes = map[string]IBFTType{
 }
 
 // ibftTypesToSourceType defines validator set type used under each IBFT Type
-var ibftTypesToSourceType = map[IBFTType]valset.SourceType{
-	PoA: valset.Snapshot,
-	PoS: valset.Contract,
+var ibftTypesToSourceType = map[IBFTType]store.SourceType{
+	PoA: store.Snapshot,
+	PoS: store.Contract,
 }
 
 // String is a helper method for casting a IBFTType to a string representation

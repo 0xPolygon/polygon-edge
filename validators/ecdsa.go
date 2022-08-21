@@ -176,7 +176,7 @@ func (vs *ECDSAValidators) Del(v Validator) error {
 func (vs *ECDSAValidators) Merge(vts Validators) error {
 	targetSet, ok := vts.(*ECDSAValidators)
 	if !ok {
-		return ErrMismatchValidatorSetType
+		return ErrMismatchValidatorsType
 	}
 
 	for _, tsv := range *targetSet {

@@ -1,4 +1,4 @@
-package valset
+package store
 
 import (
 	"encoding/json"

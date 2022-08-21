@@ -239,7 +239,7 @@ func (vs *BLSValidators) Del(v Validator) error {
 func (vs *BLSValidators) Merge(vts Validators) error {
 	targetSet, ok := vts.(*BLSValidators)
 	if !ok {
-		return ErrMismatchValidatorSetType
+		return ErrMismatchValidatorsType
 	}
 
 	for _, tsv := range *targetSet {

@@ -5,7 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/0xPolygon/polygon-edge/validators/valset/snapshot"
+	"github.com/0xPolygon/polygon-edge/validators/store/snapshot"
 )
 
 // loadSnapshotMetadata loads Metadata from file

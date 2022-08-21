@@ -18,7 +18,7 @@ var (
 	ErrNotEnoughCommittedSeals    = errors.New("not enough seals to seal block")
 	ErrSignerMismatch             = errors.New("mismatch address between signer and message sender")
 	ErrValidatorNotFound          = errors.New("validator not found in validator set")
-	ErrInvalidValidatorSet        = errors.New("invalid validator set type")
+	ErrInvalidValidators          = errors.New("invalid validators type")
 	ErrInvalidSignature           = errors.New("invalid signature")
 )
 
@@ -110,7 +110,7 @@ func (s *SignerImpl) GetIBFTExtra(header *types.Header) (*IstanbulExtra, error) 
 
 	data := header.ExtraData[IstanbulExtraVanity:]
 	extra := &IstanbulExtra{
-		Validators:     s.keyManager.NewEmptyValidatorSet(),
+		Validators:     s.keyManager.NewEmptyValidators(),
 		ProposerSeal:   []byte{},
 		CommittedSeals: s.keyManager.NewEmptyCommittedSeals(),
 	}
