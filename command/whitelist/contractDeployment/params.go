@@ -8,6 +8,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -19,7 +20,6 @@ const (
 
 var (
 	errInvalidAddressFormat = errors.New("one or more addresses are invalid format")
-	errTypeConversion       = errors.New("invalid conversion")
 )
 
 var (
@@ -96,33 +96,9 @@ func (p *contractDeploymentParams) initChain() error {
 }
 
 func (p *contractDeploymentParams) updateGenesisConfig() error {
-	// Fetch whitelist config if exists, if not init
-	whitelistConfig := p.genesisConfig.Params.Whitelists
-	if len(whitelistConfig) == 0 {
-		whitelistConfig = make(map[string]interface{})
-	}
-
-	// Extract contract deployment whitelist if exists, if not init
-	var contractDeploymentWhitelistRaw []interface{}
-
-	if whitelistConfig["contractDeployment"] != nil {
-		var ok bool
-
-		contractDeploymentWhitelistRaw, ok = whitelistConfig["contractDeployment"].([]interface{})
-		if !ok {
-			return errTypeConversion
-		}
-	}
-
-	contractDeploymentWhitelist := make([]types.Address, 0)
-
-	for i := range contractDeploymentWhitelistRaw {
-		address, ok := contractDeploymentWhitelistRaw[i].(string)
-		if !ok {
-			return errTypeConversion
-		}
-		fmt.Println(contractDeploymentWhitelist)
-		contractDeploymentWhitelist = append(contractDeploymentWhitelist, types.StringToAddress(address))
+	contractDeploymentWhitelist, err := common.FetchContractDeploymentWhitelist(p.genesisConfig)
+	if err != nil {
+		return err
 	}
 
 	// Add addresses if not exists
@@ -142,6 +118,8 @@ func (p *contractDeploymentParams) updateGenesisConfig() error {
 	}
 
 	p.whitelist = newContractDeploymentWhitelist
+
+	whitelistConfig := common.FetchWhitelistFromConfig(p.genesisConfig)
 
 	whitelistConfig["contractDeployment"] = newContractDeploymentWhitelist
 	p.genesisConfig.Params.Whitelists = whitelistConfig

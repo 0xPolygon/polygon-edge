@@ -10,8 +10,13 @@ import (
 	"path/filepath"
 	"syscall"
 
+	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/types"
+)
+
+var (
+	errTypeConversion = errors.New("invalid conversion")
 )
 
 var (
@@ -173,4 +178,50 @@ func PadLeftOrTrim(bb []byte, size int) []byte {
 	copy(tmp[size-l:], bb)
 
 	return tmp
+}
+
+// FetchWhitelistFromConfig fetches whitelist object from the config
+// if not exists returns empty map
+func FetchWhitelistFromConfig(genesisConfig *chain.Chain) map[string]interface{} {
+	// Fetch whitelist config if exists, if not init
+	whitelistConfig := genesisConfig.Params.Whitelists
+	if len(whitelistConfig) == 0 {
+		whitelistConfig = make(map[string]interface{})
+	}
+
+	return whitelistConfig
+}
+
+// FetchContractDeploymentWhitelist fetches contract deployment whitelist from the config
+// if not exists returns empty array
+func FetchContractDeploymentWhitelist(genesisConfig *chain.Chain) ([]types.Address, error) {
+	// Fetch whitelist config if exists, if not init
+	whitelistConfig := FetchWhitelistFromConfig(genesisConfig)
+
+	// Extract contract deployment whitelist if exists, if not init
+	var contractDeploymentWhitelistRaw []interface{}
+
+	if whitelistConfig["contractDeployment"] != nil {
+		var ok bool
+
+		contractDeploymentWhitelistRaw, ok = whitelistConfig["contractDeployment"].([]interface{})
+		if !ok {
+			//TODO more descriptive errror
+			return nil, errTypeConversion
+		}
+	}
+
+	contractDeploymentWhitelist := make([]types.Address, 0)
+
+	for i := range contractDeploymentWhitelistRaw {
+		address, ok := contractDeploymentWhitelistRaw[i].(string)
+		if !ok {
+			//TODO more descriptive errror
+			return nil, errTypeConversion
+		}
+
+		contractDeploymentWhitelist = append(contractDeploymentWhitelist, types.StringToAddress(address))
+	}
+
+	return contractDeploymentWhitelist, nil
 }

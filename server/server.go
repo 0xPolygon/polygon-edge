@@ -200,6 +200,12 @@ func NewServer(config *Config) (*Server, error) {
 			state:      m.state,
 			Blockchain: m.blockchain,
 		}
+
+		contractDeploymentWhitelist, err := common.FetchContractDeploymentWhitelist(config.Chain)
+		if err != nil {
+			return nil, err
+		}
+
 		// start transaction pool
 		m.txpool, err = txpool.NewTxPool(
 			logger,
@@ -213,6 +219,7 @@ func NewServer(config *Config) (*Server, error) {
 				MaxSlots:   m.config.MaxSlots,
 				PriceLimit: m.config.PriceLimit,
 			},
+			contractDeploymentWhitelist,
 		)
 		if err != nil {
 			return nil, err

@@ -92,6 +92,7 @@ func newTestPoolWithSlots(maxSlots uint64, mockStore ...store) (*TxPool, error) 
 			MaxSlots:   maxSlots,
 			Sealing:    false,
 		},
+		[]types.Address{},
 	)
 }
 

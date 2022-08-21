@@ -30,18 +30,19 @@ const (
 
 // errors
 var (
-	ErrIntrinsicGas        = errors.New("intrinsic gas too low")
-	ErrBlockLimitExceeded  = errors.New("exceeds block gas limit")
-	ErrNegativeValue       = errors.New("negative value")
-	ErrExtractSignature    = errors.New("cannot extract signature")
-	ErrInvalidSender       = errors.New("invalid sender")
-	ErrTxPoolOverflow      = errors.New("txpool is full")
-	ErrUnderpriced         = errors.New("transaction underpriced")
-	ErrNonceTooLow         = errors.New("nonce too low")
-	ErrInsufficientFunds   = errors.New("insufficient funds for gas * price + value")
-	ErrInvalidAccountState = errors.New("invalid account state")
-	ErrAlreadyKnown        = errors.New("already known")
-	ErrOversizedData       = errors.New("oversized data")
+	ErrIntrinsicGas            = errors.New("intrinsic gas too low")
+	ErrBlockLimitExceeded      = errors.New("exceeds block gas limit")
+	ErrNegativeValue           = errors.New("negative value")
+	ErrExtractSignature        = errors.New("cannot extract signature")
+	ErrInvalidSender           = errors.New("invalid sender")
+	ErrTxPoolOverflow          = errors.New("txpool is full")
+	ErrUnderpriced             = errors.New("transaction underpriced")
+	ErrNonceTooLow             = errors.New("nonce too low")
+	ErrInsufficientFunds       = errors.New("insufficient funds for gas * price + value")
+	ErrInvalidAccountState     = errors.New("invalid account state")
+	ErrAlreadyKnown            = errors.New("already known")
+	ErrOversizedData           = errors.New("oversized data")
+	ErrSmartContractRestricted = errors.New("deploying smart contract from this address is restricted")
 )
 
 // indicates origin of a transaction
@@ -164,6 +165,9 @@ type TxPool struct {
 	// Event manager for txpool events
 	eventManager *eventManager
 
+	// Contract deployment whitelist
+	contractDeploymentWhitelist []types.Address
+
 	// indicates which txpool operator commands should be implemented
 	proto.UnimplementedTxnPoolOperatorServer
 }
@@ -177,18 +181,20 @@ func NewTxPool(
 	network *network.Server,
 	metrics *Metrics,
 	config *Config,
+	contractDeploymentWhitelist []types.Address,
 ) (*TxPool, error) {
 	pool := &TxPool{
-		logger:      logger.Named("txpool"),
-		forks:       forks,
-		store:       store,
-		metrics:     metrics,
-		accounts:    accountsMap{},
-		executables: newPricedQueue(),
-		index:       lookupMap{all: make(map[types.Hash]*types.Transaction)},
-		gauge:       slotGauge{height: 0, max: config.MaxSlots},
-		priceLimit:  config.PriceLimit,
-		sealing:     config.Sealing,
+		logger:                      logger.Named("txpool"),
+		forks:                       forks,
+		store:                       store,
+		metrics:                     metrics,
+		accounts:                    accountsMap{},
+		executables:                 newPricedQueue(),
+		index:                       lookupMap{all: make(map[types.Hash]*types.Transaction)},
+		gauge:                       slotGauge{height: 0, max: config.MaxSlots},
+		priceLimit:                  config.PriceLimit,
+		sealing:                     config.Sealing,
+		contractDeploymentWhitelist: contractDeploymentWhitelist,
 	}
 
 	// Attach the event manager
@@ -535,6 +541,11 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 	// If no address was set, update it
 	if tx.From == types.ZeroAddress {
 		tx.From = from
+	}
+
+	// Check if transaction can deploy smart contract
+	if tx.IsContractCreation() && !tx.CanDeployContract(p.contractDeploymentWhitelist) {
+		return ErrSmartContractRestricted
 	}
 
 	// Reject underpriced transactions
