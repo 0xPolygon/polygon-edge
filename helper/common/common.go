@@ -23,6 +23,11 @@ var (
 	MaxSafeJSInt = uint64(math.Pow(2, 53) - 2)
 )
 
+var (
+	ErrAddressTypeAssertion   = errors.New("invalid type assertion for address")
+	ErrWhitelistTypeAssertion = errors.New("invalid type assertion for deployment whitelist")
+)
+
 // Min returns the strictly lower number
 func Min(a, b uint64) uint64 {
 	if a < b {
@@ -203,7 +208,7 @@ func FetchDeploymentWhitelist(genesisConfig *chain.Chain) ([]types.Address, erro
 
 		deploymentWhitelistRaw, ok = whitelistConfig["deployment"].([]interface{})
 		if !ok {
-			return nil, errors.New("invalid type assertion for deployment whitelist")
+			return nil, ErrAddressTypeAssertion
 		}
 	}
 
@@ -212,7 +217,7 @@ func FetchDeploymentWhitelist(genesisConfig *chain.Chain) ([]types.Address, erro
 	for i := range deploymentWhitelistRaw {
 		address, ok := deploymentWhitelistRaw[i].(string)
 		if !ok {
-			return nil, errors.New("invalid type assertion for address")
+			return nil, ErrWhitelistTypeAssertion
 		}
 
 		deploymentWhitelist = append(deploymentWhitelist, types.StringToAddress(address))
