@@ -129,7 +129,7 @@ func (p *deploymentParams) updateGenesisConfig() error {
 
 	// Set whitelist in genesis configuration
 	whitelistConfig := common.FetchWhitelistFromConfig(p.genesisConfig)
-	whitelistConfig["deployment"] = newDeploymentWhitelist
+	whitelistConfig[common.DeploymentWhitelistKey] = newDeploymentWhitelist
 	p.genesisConfig.Params.Whitelists = whitelistConfig
 
 	// Save whitelist for result

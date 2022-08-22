@@ -23,6 +23,11 @@ var (
 	MaxSafeJSInt = uint64(math.Pow(2, 53) - 2)
 )
 
+const (
+	// DeploymentWhitelistKey is the key used for the deployment whitelist
+	DeploymentWhitelistKey = "deployment"
+)
+
 var (
 	ErrAddressTypeAssertion   = errors.New("invalid type assertion for address")
 	ErrWhitelistTypeAssertion = errors.New("invalid type assertion for deployment whitelist")
@@ -203,10 +208,10 @@ func FetchDeploymentWhitelist(genesisConfig *chain.Chain) ([]types.Address, erro
 
 	var deploymentWhitelistRaw []interface{}
 
-	if whitelistConfig["deployment"] != nil {
+	if whitelistConfig[DeploymentWhitelistKey] != nil {
 		var ok bool
 
-		deploymentWhitelistRaw, ok = whitelistConfig["deployment"].([]interface{})
+		deploymentWhitelistRaw, ok = whitelistConfig[DeploymentWhitelistKey].([]interface{})
 		if !ok {
 			return nil, ErrAddressTypeAssertion
 		}
