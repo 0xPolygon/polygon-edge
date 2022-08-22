@@ -42,7 +42,7 @@ var (
 	ErrInvalidAccountState     = errors.New("invalid account state")
 	ErrAlreadyKnown            = errors.New("already known")
 	ErrOversizedData           = errors.New("oversized data")
-	ErrSmartContractRestricted = errors.New("deploying smart contract from this address is restricted")
+	ErrSmartContractRestricted = errors.New("smart contract deployment restricted")
 )
 
 // indicates origin of a transaction
