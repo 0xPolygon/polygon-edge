@@ -33,7 +33,8 @@ message Snapshot {
 
     message Validator {
         string type = 1;
-        bytes data = 2;
+        string address = 2;
+        bytes data = 3;
     }
 
     message Vote {

@@ -51,7 +51,7 @@ func (s *ContractValidatorStore) Initialize() error {
 	return nil
 }
 
-func (s *ContractValidatorStore) GetValidators(height, from uint64) (validators.Validators, error) {
+func (s *ContractValidatorStore) GetValidators(height uint64) (validators.Validators, error) {
 	signer, err := s.getSigner(height)
 	if err != nil {
 		return nil, err
@@ -61,7 +61,7 @@ func (s *ContractValidatorStore) GetValidators(height, from uint64) (validators.
 		return nil, ErrSignerNotFound
 	}
 
-	transition, err := s.getTransitionForQuery(height, from)
+	transition, err := s.getTransitionForQuery(height)
 	if err != nil {
 		return nil, err
 	}
@@ -69,33 +69,11 @@ func (s *ContractValidatorStore) GetValidators(height, from uint64) (validators.
 	return FetchValidators(signer.Type(), transition, signer.Address())
 }
 
-func (s *ContractValidatorStore) getTransitionForQuery(height uint64, from uint64) (*state.Transition, error) {
-	fetchingHeight := calculateFetchingHeight(height, s.epochSize, from)
-
-	header, ok := s.blockchain.GetHeaderByNumber(fetchingHeight)
+func (s *ContractValidatorStore) getTransitionForQuery(height uint64) (*state.Transition, error) {
+	header, ok := s.blockchain.GetHeaderByNumber(height)
 	if !ok {
-		return nil, fmt.Errorf("header not found at %d", fetchingHeight)
+		return nil, fmt.Errorf("header not found at %d", height)
 	}
 
 	return s.executor.BeginTxn(header.StateRoot, header, types.ZeroAddress)
-}
-
-func calculateFetchingHeight(usingHeight, epochSize, from uint64) uint64 {
-	beginningEpoch := (usingHeight / epochSize) * epochSize
-
-	height := uint64(0)
-	if beginningEpoch > 0 {
-		// the end of the last epoch
-		height = beginningEpoch - 1
-	}
-
-	if height <= from {
-		if from == 0 {
-			return from
-		}
-
-		return from - 1
-	}
-
-	return height
 }

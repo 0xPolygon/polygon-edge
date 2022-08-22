@@ -30,11 +30,15 @@ func NewBLSKeyManager(manager secrets.SecretsManager) (KeyManager, error) {
 		return nil, err
 	}
 
+	return NewECDSAKeyManagerFromKeys(ecdsaKey, blsKey), nil
+}
+
+func NewECDSAKeyManagerFromKeys(ecdsaKey *ecdsa.PrivateKey, blsKey *bls_sig.SecretKey) KeyManager {
 	return &BLSKeyManager{
 		ecdsaKey: ecdsaKey,
 		blsKey:   blsKey,
 		address:  crypto.PubKeyToAddress(&ecdsaKey.PublicKey),
-	}, nil
+	}
 }
 
 func (s *BLSKeyManager) Type() validators.ValidatorType {

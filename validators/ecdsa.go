@@ -59,12 +59,12 @@ func (v *ECDSAValidator) UnmarshalRLPFrom(p *fastrlp.Parser, val *fastrlp.Value)
 	return val.GetAddr(v.Address[:])
 }
 
-// Bytes returns bytes of ECDSAValidator in RLP encode
+// Bytes returns bytes of ECDSAValidator
 func (v *ECDSAValidator) Bytes() []byte {
 	return v.Address.Bytes()
 }
 
-// SetFromBytes parses given bytes in RLP encode and map to its fields
+// SetFromBytes parses given bytes
 func (v *ECDSAValidator) SetFromBytes(input []byte) error {
 	v.Address = types.BytesToAddress(input)
 

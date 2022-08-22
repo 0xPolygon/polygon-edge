@@ -1,227 +1,381 @@
 package signer
 
 import (
-	"crypto/ecdsa"
-	"reflect"
+	"encoding/json"
+	"math/big"
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/crypto"
-	"github.com/0xPolygon/polygon-edge/helper/tests"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
 	"github.com/stretchr/testify/assert"
 )
 
-func AddressesToECDSAValidators(addrs ...types.Address) *validators.ECDSAValidators {
-	set := make(validators.ECDSAValidators, len(addrs))
+var (
+	validatorAddr1         = types.StringToAddress("1")
+	validatorBLSPublicKey1 = validators.BLSValidatorPublicKey([]byte{0x1})
 
-	for idx, addr := range addrs {
-		set[idx] = &validators.ECDSAValidator{
-			Address: addr,
-		}
-	}
+	testProposerSeal = []byte{0x1}
+)
 
-	return &set
+func JsonMarshalHelper(t *testing.T, extra *IstanbulExtra) string {
+	t.Helper()
+
+	res, err := json.Marshal(extra)
+
+	assert.NoError(t, err)
+
+	return string(res)
 }
 
-func TestExtraEncoding(t *testing.T) {
-	seal1 := types.StringToHash("1").Bytes()
-	seal2 := types.StringToHash("2").Bytes()
-
-	cases := []struct {
-		from *IstanbulExtra
-		to   *IstanbulExtra
+func TestIstanbulExtraMarshalAndUnmarshal(t *testing.T) {
+	tests := []struct {
+		name  string
+		extra *IstanbulExtra
 	}{
 		{
-			from: &IstanbulExtra{
-				Validators: AddressesToECDSAValidators(
-					types.StringToAddress("1"),
-				),
-				ProposerSeal: seal1,
+			name: "ECDSAExtra",
+			extra: &IstanbulExtra{
+				Validators: &validators.ECDSAValidators{
+					&validators.ECDSAValidator{
+						Address: validatorAddr1,
+					},
+				},
+				ProposerSeal: testProposerSeal,
 				CommittedSeals: &SerializedSeal{
-					seal1,
+					[]byte{0x1},
+					[]byte{0x2},
 				},
 				ParentCommittedSeals: &SerializedSeal{
-					seal2,
+					[]byte{0x3},
+					[]byte{0x4},
 				},
 			},
-			to: &IstanbulExtra{
-				Validators:           &validators.ECDSAValidators{},
-				ProposerSeal:         seal1,
-				CommittedSeals:       &SerializedSeal{},
-				ParentCommittedSeals: &SerializedSeal{},
+		},
+		{
+			name: "ECDSAExtra without ParentCommittedSeals",
+			extra: &IstanbulExtra{
+				Validators: &validators.ECDSAValidators{
+					&validators.ECDSAValidator{
+						Address: validatorAddr1,
+					},
+				},
+				ProposerSeal: testProposerSeal,
+				CommittedSeals: &SerializedSeal{
+					[]byte{0x1},
+					[]byte{0x2},
+				},
+			},
+		},
+		{
+			name: "BLSExtra",
+			extra: &IstanbulExtra{
+				Validators: &validators.BLSValidators{
+					&validators.BLSValidator{
+						Address:      validatorAddr1,
+						BLSPublicKey: validatorBLSPublicKey1,
+					},
+				},
+				ProposerSeal: testProposerSeal,
+				CommittedSeals: &BLSSeal{
+					Bitmap:    new(big.Int).SetBytes([]byte{0x8}),
+					Signature: []byte{0x1},
+				},
+				ParentCommittedSeals: &BLSSeal{
+					Bitmap:    new(big.Int).SetBytes([]byte{0x9}),
+					Signature: []byte{0x2},
+				},
+			},
+		},
+		{
+			name: "BLSExtra without ParentCommittedSeals",
+			extra: &IstanbulExtra{
+				Validators: &validators.BLSValidators{
+					&validators.BLSValidator{
+						Address:      validatorAddr1,
+						BLSPublicKey: validatorBLSPublicKey1,
+					},
+				},
+				ProposerSeal: testProposerSeal,
+				CommittedSeals: &BLSSeal{
+					Bitmap:    new(big.Int).SetBytes([]byte{0x8}),
+					Signature: []byte{0x1},
+				},
+				ParentCommittedSeals: &BLSSeal{
+					Bitmap:    new(big.Int).SetBytes([]byte{0x9}),
+					Signature: []byte{0x2},
+				},
 			},
 		},
 	}
 
-	for _, c := range cases {
-		data := c.from.MarshalRLPTo(nil)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// create original data
+			originalExtraJson := JsonMarshalHelper(t, test.extra)
 
-		if err := c.to.UnmarshalRLP(data); err != nil {
-			t.Fatal(err)
-		}
-
-		if !reflect.DeepEqual(c.from, c.to) {
-			t.Fatal("bad")
-		}
-	}
-}
-
-func generateKeysAndAddresses(t *testing.T, num int) ([]*ecdsa.PrivateKey, []types.Address) {
-	t.Helper()
-
-	keys := make([]*ecdsa.PrivateKey, num)
-	addrs := make([]types.Address, num)
-
-	for i := range keys {
-		pk, addr := tests.GenerateKeyAndAddr(t)
-		keys[i] = pk
-		addrs[i] = addr
-	}
-
-	return keys, addrs
-}
-
-func createIBFTHeader(
-	t *testing.T,
-	signer Signer,
-	num uint64,
-	parentHeader *types.Header,
-	validators validators.Validators,
-) *types.Header {
-	t.Helper()
-
-	header := &types.Header{
-		Number:     num,
-		ParentHash: parentHeader.Hash,
-	}
-
-	parentExtra, err := signer.GetIBFTExtra(parentHeader)
-	assert.NoError(t, err)
-
-	signer.InitIBFTExtra(header, validators, parentExtra.CommittedSeals)
-
-	return header
-}
-
-// Test Scenario
-// 1. 4 IBFT Validators create headers
-// 2. A faulty node scans the past headers and appends new committed seal
-// 3. Check if each hash of the headers is wrong
-func TestAppendECDSACommittedSeal(t *testing.T) {
-	var (
-		numHeaders          = 5
-		numNormalValidators = 4
-		numFaultyValidators = 1
-
-		headers       = make([]*types.Header, 0, numHeaders)
-		faultyHeaders = make([]*types.Header, 0, numHeaders)
-		parentHeader  = &types.Header{}
-
-		keys, addresses     = generateKeysAndAddresses(t, numNormalValidators+numFaultyValidators)
-		normalValidatorKeys = keys[:numNormalValidators]
-		faultyValidatorKey  = keys[numNormalValidators]
-
-		signerA = &SignerImpl{
-			NewECDSAKeyManagerFromKey(keys[0]),
-		}
-		validators = AddressesToECDSAValidators(addresses...)
-
-		err error
-	)
-
-	UseIstanbulHeaderHash(t, signerA)
-
-	signerA.InitIBFTExtra(parentHeader, validators, nil)
-
-	// create headers by normal validators
-	for i := 0; i < numHeaders; i++ {
-		header := createIBFTHeader(t, signerA, uint64(i+1), parentHeader, validators)
-
-		// write seal
-		header, err = signerA.WriteProposerSeal(header)
-		assert.NoError(t, err)
-
-		// write committed seal
-		committedSeal := make(map[types.Address][]byte, len(normalValidatorKeys))
-
-		for _, key := range normalValidatorKeys {
-			signer := NewSigner(NewECDSAKeyManagerFromKey(key))
-			seal, err := signer.CreateCommittedSeal(header.Hash[:])
-
+			bytesData := test.extra.MarshalRLPTo(nil)
+			err := test.extra.UnmarshalRLP(bytesData)
 			assert.NoError(t, err)
 
-			committedSeal[crypto.PubKeyToAddress(&key.PublicKey)] = seal
-		}
-
-		header, err = signerA.WriteCommittedSeals(header, committedSeal)
-
-		assert.NoError(t, err)
-
-		header = header.ComputeHash()
-
-		headers = append(headers, header)
-
-		parentHeader = header
-	}
-
-	// faulty node scans the past headers and try to inject new committed seal
-	for i, h := range headers {
-		header := h.Copy()
-
-		// update parent hash & committed seal
-		if i > 0 {
-			parentHeader := faultyHeaders[i-1]
-
-			// update parent hash
-			header.ParentHash = parentHeader.Hash
-
-			// get parent committed seal
-			parentCommittedSeals, err := signerA.GetParentCommittedSeals(parentHeader)
-			assert.NoError(t, err)
-
-			// update ParentCommittedSeal forcibly
-			header.ExtraData = packParentCommittedSealIntoExtra(
-				header.ExtraData,
-				parentCommittedSeals,
+			// make sure all data is recovered
+			assert.Equal(
+				t,
+				originalExtraJson,
+				JsonMarshalHelper(t, test.extra),
 			)
-		}
+		})
+	}
+}
 
-		// create new committed seal
-		faultySigner := NewSigner(NewECDSAKeyManagerFromKey(faultyValidatorKey))
-		fx, err := faultySigner.CreateCommittedSeal(header.Hash[:])
-		assert.NoError(t, err)
+func Test_packProposerSealIntoExtra(t *testing.T) {
+	newProposerSeal := []byte("new proposer seal")
 
-		// append new committed seal
-		extra, err := signerA.GetIBFTExtra(parentHeader)
-		assert.NoError(t, err)
-
-		sseal, _ := extra.CommittedSeals.(*SerializedSeal)
-		ssealSlice := [][]byte(*sseal)
-
-		ssealSlice = append(ssealSlice, fx)
-
-		nsseal := SerializedSeal(ssealSlice)
-		newCommittedSeals := &nsseal
-
-		header.ExtraData = packCommittedSealIntoExtra(
-			header.ExtraData,
-			newCommittedSeals,
-		)
-
-		header = header.ComputeHash()
-		faultyHeaders = append(faultyHeaders, header)
+	tests := []struct {
+		name  string
+		extra *IstanbulExtra
+	}{
+		{
+			name: "ECDSAExtra",
+			extra: &IstanbulExtra{
+				Validators: &validators.ECDSAValidators{
+					&validators.ECDSAValidator{
+						Address: validatorAddr1,
+					},
+				},
+				ProposerSeal: testProposerSeal,
+				CommittedSeals: &SerializedSeal{
+					[]byte{0x1},
+					[]byte{0x2},
+				},
+				ParentCommittedSeals: &SerializedSeal{
+					[]byte{0x3},
+					[]byte{0x4},
+				},
+			},
+		},
+		{
+			name: "ECDSAExtra without ParentCommittedSeals",
+			extra: &IstanbulExtra{
+				Validators: &validators.ECDSAValidators{
+					&validators.ECDSAValidator{
+						Address: validatorAddr1,
+					},
+				},
+				ProposerSeal: testProposerSeal,
+				CommittedSeals: &SerializedSeal{
+					[]byte{0x1},
+					[]byte{0x2},
+				},
+			},
+		},
+		{
+			name: "BLSExtra",
+			extra: &IstanbulExtra{
+				Validators: &validators.BLSValidators{
+					&validators.BLSValidator{
+						Address:      validatorAddr1,
+						BLSPublicKey: validatorBLSPublicKey1,
+					},
+				},
+				ProposerSeal: testProposerSeal,
+				CommittedSeals: &BLSSeal{
+					Bitmap:    new(big.Int).SetBytes([]byte{0x8}),
+					Signature: []byte{0x1},
+				},
+				ParentCommittedSeals: &BLSSeal{
+					Bitmap:    new(big.Int).SetBytes([]byte{0x9}),
+					Signature: []byte{0x2},
+				},
+			},
+		},
+		{
+			name: "BLSExtra without ParentCommittedSeals",
+			extra: &IstanbulExtra{
+				Validators: &validators.BLSValidators{
+					&validators.BLSValidator{
+						Address:      validatorAddr1,
+						BLSPublicKey: validatorBLSPublicKey1,
+					},
+				},
+				ProposerSeal: testProposerSeal,
+				CommittedSeals: &BLSSeal{
+					Bitmap:    new(big.Int).SetBytes([]byte{0x8}),
+					Signature: []byte{0x1},
+				},
+				ParentCommittedSeals: &BLSSeal{
+					Bitmap:    new(big.Int).SetBytes([]byte{0x9}),
+					Signature: []byte{0x2},
+				},
+			},
+		},
 	}
 
-	// Check hashes are different
-	for i := range headers {
-		header, faultyHeader := headers[i], faultyHeaders[i]
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			originalProposerSeal := test.extra.ProposerSeal
 
-		if i == 0 {
-			// hashes should be same because first header doesn't have parent committed seal
-			assert.Equal(t, header.Hash, faultyHeader.Hash)
-		} else {
-			assert.NotEqual(t, header.Hash, faultyHeader.Hash)
-		}
+			// create expected data
+			test.extra.ProposerSeal = newProposerSeal
+			expectedJSON := JsonMarshalHelper(t, test.extra)
+			test.extra.ProposerSeal = originalProposerSeal
+
+			newExtraBytes := packProposerSealIntoExtra(
+				// prepend IstanbulExtraHeader to parse
+				append(
+					make([]byte, IstanbulExtraVanity),
+					test.extra.MarshalRLPTo(nil)...,
+				),
+				newProposerSeal,
+			)
+
+			assert.NoError(
+				t,
+				test.extra.UnmarshalRLP(newExtraBytes[IstanbulExtraVanity:]),
+			)
+
+			// check json of decoded data matches with the original data
+			jsonData := JsonMarshalHelper(t, test.extra)
+
+			assert.Equal(
+				t,
+				expectedJSON,
+				jsonData,
+			)
+		})
+	}
+}
+
+func Test_packCommittedSealsIntoExtra(t *testing.T) {
+	tests := []struct {
+		name              string
+		extra             *IstanbulExtra
+		newCommittedSeals Sealer
+	}{
+		{
+			name: "ECDSAExtra",
+			extra: &IstanbulExtra{
+				Validators: &validators.ECDSAValidators{
+					&validators.ECDSAValidator{
+						Address: validatorAddr1,
+					},
+				},
+				ProposerSeal: testProposerSeal,
+				CommittedSeals: &SerializedSeal{
+					[]byte{0x1},
+					[]byte{0x2},
+				},
+				ParentCommittedSeals: &SerializedSeal{
+					[]byte{0x3},
+					[]byte{0x4},
+				},
+			},
+			newCommittedSeals: &SerializedSeal{
+				[]byte{0x3},
+				[]byte{0x4},
+			},
+		},
+		{
+			name: "ECDSAExtra without ParentCommittedSeals",
+			extra: &IstanbulExtra{
+				Validators: &validators.ECDSAValidators{
+					&validators.ECDSAValidator{
+						Address: validatorAddr1,
+					},
+				},
+				ProposerSeal: testProposerSeal,
+				CommittedSeals: &SerializedSeal{
+					[]byte{0x1},
+					[]byte{0x2},
+				},
+			},
+			newCommittedSeals: &SerializedSeal{
+				[]byte{0x3},
+				[]byte{0x4},
+			},
+		},
+		{
+			name: "BLSExtra",
+			extra: &IstanbulExtra{
+				Validators: &validators.BLSValidators{
+					&validators.BLSValidator{
+						Address:      validatorAddr1,
+						BLSPublicKey: validatorBLSPublicKey1,
+					},
+				},
+				ProposerSeal: testProposerSeal,
+				CommittedSeals: &BLSSeal{
+					Bitmap:    new(big.Int).SetBytes([]byte{0x8}),
+					Signature: []byte{0x1},
+				},
+				ParentCommittedSeals: &BLSSeal{
+					Bitmap:    new(big.Int).SetBytes([]byte{0x9}),
+					Signature: []byte{0x2},
+				},
+			},
+			newCommittedSeals: &BLSSeal{
+				Bitmap:    new(big.Int).SetBytes([]byte{0xa}),
+				Signature: []byte{0x2},
+			},
+		},
+		{
+			name: "BLSExtra without ParentCommittedSeals",
+			extra: &IstanbulExtra{
+				Validators: &validators.BLSValidators{
+					&validators.BLSValidator{
+						Address:      validatorAddr1,
+						BLSPublicKey: validatorBLSPublicKey1,
+					},
+				},
+				ProposerSeal: testProposerSeal,
+				CommittedSeals: &BLSSeal{
+					Bitmap:    new(big.Int).SetBytes([]byte{0x8}),
+					Signature: []byte{0x1},
+				},
+				ParentCommittedSeals: &BLSSeal{
+					Bitmap:    new(big.Int).SetBytes([]byte{0x9}),
+					Signature: []byte{0x2},
+				},
+			},
+			newCommittedSeals: &BLSSeal{
+				Bitmap:    new(big.Int).SetBytes([]byte{0xa}),
+				Signature: []byte{0x2},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			originalCommittedSeals := test.extra.CommittedSeals
+
+			// create expected data
+			test.extra.CommittedSeals = test.newCommittedSeals
+			expectedJSON := JsonMarshalHelper(t, test.extra)
+			test.extra.CommittedSeals = originalCommittedSeals
+
+			// update committed seals
+			newExtraBytes := packCommittedSealsIntoExtra(
+				// prepend IstanbulExtraHeader
+				append(
+					make([]byte, IstanbulExtraVanity),
+					test.extra.MarshalRLPTo(nil)...,
+				),
+				test.newCommittedSeals,
+			)
+
+			// decode RLP data
+			assert.NoError(
+				t,
+				test.extra.UnmarshalRLP(newExtraBytes[IstanbulExtraVanity:]),
+			)
+
+			// check json of decoded data matches with the original data
+			jsonData := JsonMarshalHelper(t, test.extra)
+
+			assert.Equal(
+				t,
+				expectedJSON,
+				jsonData,
+			)
+		})
 	}
 }

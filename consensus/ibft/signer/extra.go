@@ -187,10 +187,10 @@ func packFieldsIntoExtra(
 	)
 }
 
-// packSealIntoIExtra updates only Seal field in Extra
-func packSealIntoIExtra(
+// packProposerSealIntoExtra updates only Seal field in Extra
+func packProposerSealIntoExtra(
 	extraBytes []byte,
-	seal []byte,
+	proposerSeal []byte,
 ) []byte {
 	return packFieldsIntoExtra(
 		extraBytes,
@@ -203,7 +203,7 @@ func packSealIntoIExtra(
 			newArrayValue.Set(oldValues[0])
 
 			// Seal
-			newArrayValue.Set(ar.NewBytes(seal))
+			newArrayValue.Set(ar.NewBytes(proposerSeal))
 
 			// CommittedSeal
 			newArrayValue.Set(oldValues[2])
@@ -218,8 +218,8 @@ func packSealIntoIExtra(
 	)
 }
 
-// packSealIntoIExtra updates only CommittedSeal field in Extra
-func packCommittedSealIntoExtra(
+// packCommittedSealsIntoExtra updates only CommittedSeal field in Extra
+func packCommittedSealsIntoExtra(
 	extraBytes []byte,
 	committedSeal Sealer,
 ) []byte {
@@ -242,37 +242,6 @@ func packCommittedSealIntoExtra(
 			// ParentCommittedSeal
 			if len(oldValues) >= 4 {
 				newArrayValue.Set(oldValues[3])
-			}
-
-			return nil
-		},
-	)
-}
-
-// packParentCommittedSealIntoExtra updates only ParentCommittedSeals field in Extra
-func packParentCommittedSealIntoExtra(
-	extraBytes []byte,
-	parentCommittedSeals Sealer,
-) []byte {
-	return packFieldsIntoExtra(
-		extraBytes,
-		func(
-			ar *fastrlp.Arena,
-			oldValues []*fastrlp.Value,
-			newArrayValue *fastrlp.Value,
-		) error {
-			// Validators
-			newArrayValue.Set(oldValues[0])
-
-			// Seal
-			newArrayValue.Set(oldValues[1])
-
-			// CommittedSeal
-			newArrayValue.Set(oldValues[2])
-
-			// ParentCommittedSeal
-			if len(oldValues) >= 4 {
-				newArrayValue.Set(parentCommittedSeals.MarshalRLPWith(ar))
 			}
 
 			return nil

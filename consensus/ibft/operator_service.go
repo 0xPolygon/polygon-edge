@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
+	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
@@ -15,6 +16,7 @@ import (
 
 var (
 	ErrVotingNotSupported = errors.New("voting is not supported")
+	ErrHeaderNotFound     = errors.New("header not found")
 )
 
 type operator struct {
@@ -25,13 +27,13 @@ type operator struct {
 
 // Status returns the status of the IBFT client
 func (o *operator) Status(ctx context.Context, req *empty.Empty) (*proto.IbftStatusResp, error) {
-	var signerAddr string
-	if o.ibft.currentSigner != nil {
-		signerAddr = o.ibft.currentSigner.Address().String()
+	signer, err := o.getLatestSigner()
+	if err != nil {
+		return nil, err
 	}
 
 	return &proto.IbftStatusResp{
-		Key: signerAddr,
+		Key: signer.Address().String(),
 	}, nil
 }
 
@@ -44,53 +46,36 @@ func (o *operator) GetSnapshot(ctx context.Context, req *proto.SnapshotReq) (*pr
 
 	header, ok := o.ibft.blockchain.GetHeaderByNumber(height)
 	if !ok {
-		return nil, fmt.Errorf("header not found")
+		return nil, ErrHeaderNotFound
+	}
+
+	validatorsStore, err := o.ibft.forkManager.GetValidatorStore(height)
+	if err != nil {
+		return nil, err
+	}
+
+	validators, err := o.ibft.forkManager.GetValidators(height)
+	if err != nil {
+		return nil, err
 	}
 
 	resp := &proto.Snapshot{
-		Number: height,
-		Hash:   header.Hash.String(),
+		Number:     height,
+		Hash:       header.Hash.String(),
+		Validators: validatorsToProtoValidators(validators),
 	}
 
-	valSet, err := o.ibft.forkManager.GetValidatorStore(height)
+	votes, err := getVotes(validatorsStore, height)
 	if err != nil {
 		return nil, err
 	}
 
-	vals, err := o.ibft.forkManager.GetValidators(height)
-	if err != nil {
-		return nil, err
-	}
-
-	resp.Validators = make([]*proto.Snapshot_Validator, vals.Len())
-
-	for idx := 0; idx < vals.Len(); idx++ {
-		val := vals.At(uint64(idx))
-
-		resp.Validators[idx] = &proto.Snapshot_Validator{
-			Type: string(vals.Type()),
-			Data: val.Bytes(),
-		}
-	}
-
-	votableValSet, ok := valSet.(store.Votable)
-	if !ok {
+	if votes == nil {
+		// current ValidatorStore doesn't have voting function
 		return resp, nil
 	}
 
-	votes, err := votableValSet.Votes(height)
-	if err != nil {
-		return nil, err
-	}
-
-	resp.Votes = make([]*proto.Snapshot_Vote, len(votes))
-	for idx := range votes {
-		resp.Votes[idx] = &proto.Snapshot_Vote{
-			Validator: votes[idx].Validator.String(),
-			Proposed:  votes[idx].Candidate.String(),
-			Auth:      votes[idx].Authorize,
-		}
-	}
+	resp.Votes = votesToProtoVotes(votes)
 
 	return resp, nil
 }
@@ -99,16 +84,16 @@ func (o *operator) GetSnapshot(ctx context.Context, req *proto.SnapshotReq) (*pr
 func (o *operator) Propose(ctx context.Context, req *proto.Candidate) (*empty.Empty, error) {
 	votableSet, err := o.getVotableValidatorStore()
 	if err != nil {
-		return &empty.Empty{}, err
+		return nil, err
 	}
 
 	candidate, err := o.parseCandidate(req)
 	if err != nil {
-		return &empty.Empty{}, err
+		return nil, err
 	}
 
 	if err := votableSet.Propose(candidate, req.Auth, o.ibft.currentSigner.Address()); err != nil {
-		return &empty.Empty{}, err
+		return nil, err
 	}
 
 	return &empty.Empty{}, nil
@@ -116,40 +101,21 @@ func (o *operator) Propose(ctx context.Context, req *proto.Candidate) (*empty.Em
 
 // Candidates returns the validator candidates list
 func (o *operator) Candidates(ctx context.Context, req *empty.Empty) (*proto.CandidatesResp, error) {
-	valSet, err := o.ibft.forkManager.GetValidatorStore(o.ibft.blockchain.Header().Number)
+	votableValSet, err := o.getVotableValidatorStore()
 	if err != nil {
 		return nil, err
 	}
 
-	votableValSet, ok := valSet.(store.Votable)
-	if !ok {
-		return nil, fmt.Errorf("voting is not supported")
-	}
-
 	candidates := votableValSet.Candidates()
 
-	resp := &proto.CandidatesResp{
-		Candidates: make([]*proto.Candidate, len(candidates)),
-	}
-
-	for idx, candidate := range candidates {
-		resp.Candidates[idx] = &proto.Candidate{
-			Address:   candidate.Validator.Addr().String(),
-			Auth:      candidate.Authorize,
-			BlsPubkey: []byte{},
-		}
-
-		if blsVal, ok := candidate.Validator.(*validators.BLSValidator); ok {
-			resp.Candidates[idx].BlsPubkey = blsVal.BLSPublicKey
-		}
-	}
-
-	return resp, nil
+	return &proto.CandidatesResp{
+		Candidates: candidatesToProtoCandidates(candidates),
+	}, nil
 }
 
 // parseCandidate parses proto.Candidate and maps to validator
 func (o *operator) parseCandidate(req *proto.Candidate) (validators.Validator, error) {
-	signer, err := o.ibft.forkManager.GetSigner(o.ibft.blockchain.Header().Number)
+	signer, err := o.getLatestSigner()
 	if err != nil {
 		return nil, err
 	}
@@ -162,13 +128,13 @@ func (o *operator) parseCandidate(req *proto.Candidate) (validators.Validator, e
 
 	case validators.BLSValidatorType:
 		// safe check
-		// user doesn't give BLS Public Key in case of removal
 		if req.Auth {
 			if _, err := crypto.UnmarshalBLSPublicKey(req.BlsPubkey); err != nil {
 				return nil, err
 			}
 		}
 
+		// BLS Public Key doesn't have to be given in case of removal
 		return &validators.BLSValidator{
 			Address:      types.StringToAddress(req.Address),
 			BLSPublicKey: req.BlsPubkey,
@@ -191,4 +157,72 @@ func (o *operator) getVotableValidatorStore() (store.Votable, error) {
 	}
 
 	return votableValSet, nil
+}
+
+// getLatestSigner gets the latest signer IBFT uses
+func (o *operator) getLatestSigner() (signer.Signer, error) {
+	if o.ibft.currentSigner != nil {
+		return o.ibft.currentSigner, nil
+	}
+
+	return o.ibft.forkManager.GetSigner(o.ibft.blockchain.Header().Number)
+}
+
+// validatorsToProtoValidators converts validators to response of validators
+func validatorsToProtoValidators(validators validators.Validators) []*proto.Snapshot_Validator {
+	protoValidators := make([]*proto.Snapshot_Validator, validators.Len())
+
+	for idx := 0; idx < validators.Len(); idx++ {
+		validator := validators.At(uint64(idx))
+
+		protoValidators[idx] = &proto.Snapshot_Validator{
+			Type:    string(validator.Type()),
+			Address: validator.Addr().String(),
+			Data:    validator.Bytes(),
+		}
+	}
+
+	return protoValidators
+}
+
+// votesToProtoVotes converts votes to response of votes
+func votesToProtoVotes(votes []*store.Vote) []*proto.Snapshot_Vote {
+	protoVotes := make([]*proto.Snapshot_Vote, len(votes))
+
+	for idx := range votes {
+		protoVotes[idx] = &proto.Snapshot_Vote{
+			Validator: votes[idx].Validator.String(),
+			Proposed:  votes[idx].Candidate.String(),
+			Auth:      votes[idx].Authorize,
+		}
+	}
+
+	return protoVotes
+}
+
+func candidatesToProtoCandidates(candidates []*store.Candidate) []*proto.Candidate {
+	protoCandidates := make([]*proto.Candidate, len(candidates))
+
+	for idx, candidate := range candidates {
+		protoCandidates[idx] = &proto.Candidate{
+			Address: candidate.Validator.Addr().String(),
+			Auth:    candidate.Authorize,
+		}
+
+		if blsVal, ok := candidate.Validator.(*validators.BLSValidator); ok {
+			protoCandidates[idx].BlsPubkey = blsVal.BLSPublicKey
+		}
+	}
+
+	return protoCandidates
+}
+
+// getVotes gets votes from validator store only if store supports voting
+func getVotes(validatorStore store.ValidatorStore, height uint64) ([]*store.Vote, error) {
+	votableStore, ok := validatorStore.(store.Votable)
+	if !ok {
+		return nil, nil
+	}
+
+	return votableStore.Votes(height)
 }

@@ -140,7 +140,9 @@ func (m *forkManagerImpl) GetValidators(height uint64) (validators.Validators, e
 		return nil, err
 	}
 
-	return set.GetValidators(height, fork.From.Value)
+	return set.GetValidators(
+		calculateFetchingValidatorsHeight(height, m.epochSize, fork),
+	)
 }
 
 // GetHooks returns a hooks at specified height
@@ -396,4 +398,37 @@ func (m *forkManagerImpl) getForkByDeployment(height uint64) *IBFTFork {
 	}
 
 	return nil
+}
+
+func calculateFetchingValidatorsHeight(height, epochSize uint64, fork *IBFTFork) uint64 {
+	switch ibftTypesToSourceType[fork.Type] {
+	case store.Snapshot:
+		// the biggest height of blocks that have been processed before the given height
+		return height - 1
+	case store.Contract:
+		// calculates the beginning of the epoch the given height is in
+		beginningEpoch := (height / epochSize) * epochSize
+
+		// calculates the end of the previous epoch
+		// to determine the height to fetch validators
+		fetchingHeight := uint64(0)
+		if beginningEpoch > 0 {
+			fetchingHeight = beginningEpoch - 1
+		}
+
+		from := fork.From.Value
+
+		// use the calculated height if it's bigger than or equal to from
+		if fetchingHeight >= from {
+			return fetchingHeight
+		}
+
+		if from > 0 {
+			return from - 1
+		}
+
+		return from
+	}
+
+	return 0
 }

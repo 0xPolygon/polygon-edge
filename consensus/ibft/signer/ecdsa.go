@@ -34,12 +34,6 @@ func NewECDSAKeyManagerFromKey(key *ecdsa.PrivateKey) KeyManager {
 	}
 }
 
-func NewMockECDSAKeyManager(addr types.Address) KeyManager {
-	return &ECDSAKeyManager{
-		address: addr,
-	}
-}
-
 func (s *ECDSAKeyManager) Type() validators.ValidatorType {
 	return validators.ECDSAValidatorType
 }

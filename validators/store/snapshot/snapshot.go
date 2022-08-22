@@ -148,13 +148,8 @@ func (s *SnapshotValidatorStore) GetSnapshots() []*Snapshot {
 	return s.store.list
 }
 
-func (s *SnapshotValidatorStore) GetValidators(height uint64, _ uint64) (validators.Validators, error) {
-	var snapshotHeight uint64 = 0
-	if int64(height) > 0 {
-		snapshotHeight = height - 1
-	}
-
-	snapshot := s.getSnapshot(snapshotHeight)
+func (s *SnapshotValidatorStore) GetValidators(height uint64) (validators.Validators, error) {
+	snapshot := s.getSnapshot(height)
 	if snapshot == nil {
 		return nil, ErrSnapshotNotFound
 	}
@@ -481,7 +476,7 @@ func (s *SnapshotValidatorStore) isValidator(
 	height uint64,
 ) (bool, error) {
 	// Check if the recovered proposer is part of the validator set
-	vals, err := s.GetValidators(height, 0)
+	vals, err := s.GetValidators(height - 1)
 	if err != nil {
 		return false, err
 	}

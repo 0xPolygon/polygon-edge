@@ -140,7 +140,7 @@ func (s *SignerImpl) WriteProposerSeal(header *types.Header) (*types.Header, err
 		return nil, err
 	}
 
-	header.ExtraData = packSealIntoIExtra(
+	header.ExtraData = packProposerSealIntoExtra(
 		header.ExtraData,
 		seal,
 	)
@@ -203,7 +203,7 @@ func (s *SignerImpl) WriteCommittedSeals(
 		return nil, err
 	}
 
-	header.ExtraData = packCommittedSealIntoExtra(
+	header.ExtraData = packCommittedSealsIntoExtra(
 		header.ExtraData,
 		committedSeal,
 	)

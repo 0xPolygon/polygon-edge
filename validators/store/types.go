@@ -28,7 +28,7 @@ func (t SourceType) String() string {
 
 type ValidatorStore interface {
 	SourceType() SourceType
-	GetValidators(height, from uint64) (validators.Validators, error)
+	GetValidators(height uint64) (validators.Validators, error)
 }
 
 type HeaderModifier interface {

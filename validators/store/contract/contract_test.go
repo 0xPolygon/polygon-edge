@@ -167,7 +167,7 @@ func TestContractValidatorStoreGetValidators(t *testing.T) {
 			},
 		)
 
-		res, err := s.GetValidators(0, 0)
+		res, err := s.GetValidators(0)
 
 		assert.Nil(t, res)
 		assert.Error(t, err)
@@ -186,7 +186,7 @@ func TestContractValidatorStoreGetValidators(t *testing.T) {
 			},
 		)
 
-		res, err := s.GetValidators(0, 0)
+		res, err := s.GetValidators(0)
 
 		assert.Nil(t, res)
 		assert.ErrorIs(t, errTest, err)
@@ -205,7 +205,7 @@ func TestContractValidatorStoreGetValidators(t *testing.T) {
 			},
 		)
 
-		res, err := s.GetValidators(0, 0)
+		res, err := s.GetValidators(0)
 
 		assert.Nil(t, res)
 		assert.ErrorIs(t, ErrSignerNotFound, err)
@@ -228,7 +228,7 @@ func TestContractValidatorStoreGetValidators(t *testing.T) {
 			},
 		)
 
-		res, err := s.GetValidators(0, 0)
+		res, err := s.GetValidators(0)
 
 		assert.Nil(t, res)
 		assert.ErrorIs(t, errTest, err)
@@ -280,7 +280,7 @@ func TestContractValidatorStoreGetValidators(t *testing.T) {
 			},
 		)
 
-		res, err := s.GetValidators(0, 0)
+		res, err := s.GetValidators(0)
 
 		assert.Equal(t, vals, res)
 		assert.NoError(t, err)
@@ -332,71 +332,9 @@ func TestContractValidatorStoreGetValidators(t *testing.T) {
 			},
 		)
 
-		res, err := s.GetValidators(0, 0)
+		res, err := s.GetValidators(0)
 
 		assert.Equal(t, vals, res)
 		assert.NoError(t, err)
 	})
-}
-
-func Test_calculateFetchingHeight(t *testing.T) {
-	tests := []struct {
-		name      string
-		height    uint64
-		epochSize uint64
-		expected  uint64
-	}{
-		{
-			name:      "height is 0",
-			height:    0,
-			epochSize: 10,
-			expected:  0,
-		},
-		{
-			name:      "height is 1",
-			height:    1,
-			epochSize: 10,
-			expected:  0,
-		},
-		{
-			name:      "height is the end of the first epoch",
-			height:    9,
-			epochSize: 10,
-			expected:  0,
-		},
-		{
-			name:      "height is the beginning of the second epoch",
-			height:    10,
-			epochSize: 10,
-			expected:  9, // the end of the first epoch
-		},
-		{
-			name:      "height is the next of beginning of the second epoch",
-			height:    11,
-			epochSize: 10,
-			expected:  9, // the end of the first epoch
-		},
-		{
-			name:      "height is the end of the second epoch",
-			height:    19,
-			epochSize: 10,
-			expected:  9, // the end of the first epoch
-		},
-		{
-			name:      "height is the beginning of the third epoch",
-			height:    20,
-			epochSize: 10,
-			expected:  19, // the end of the first epoch
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			assert.Equal(
-				t,
-				test.expected,
-				calculateFetchingHeight(test.height, test.epochSize, 0),
-			)
-		})
-	}
 }

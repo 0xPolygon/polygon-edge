@@ -22,7 +22,7 @@ func TestSign_Sealer(t *testing.T) {
 		signer.NewECDSAKeyManagerFromKey(pool.get("A").priv),
 	)
 
-	signer.UseIstanbulHeaderHash(t, signerA)
+	signer.UseIstanbulHeaderHashInTest(t, signerA)
 
 	signerA.InitIBFTExtra(h, correctValset, nil)
 

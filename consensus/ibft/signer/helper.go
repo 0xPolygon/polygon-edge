@@ -23,8 +23,8 @@ const (
 )
 
 // wrapCommitHash calculates digest for CommittedSeal
-func wrapCommitHash(b []byte) []byte {
-	return crypto.Keccak256(b, []byte{byte(legacyCommitCode)})
+func wrapCommitHash(data []byte) []byte {
+	return crypto.Keccak256(data, []byte{byte(legacyCommitCode)})
 }
 
 // getOrCreateECDSAKey loads ECDSA key or creates a new key
@@ -135,8 +135,8 @@ func verifyIBFTExtraSize(header *types.Header) error {
 	return nil
 }
 
-// UseIstanbulHeaderHash is a helper function so that test use istanbulHeaderHash during the test
-func UseIstanbulHeaderHash(t *testing.T, signer Signer) {
+// UseIstanbulHeaderHash is a helper function for the test
+func UseIstanbulHeaderHashInTest(t *testing.T, signer Signer) {
 	t.Helper()
 
 	originalHashCalc := types.HeaderHash
