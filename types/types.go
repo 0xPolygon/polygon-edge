@@ -107,6 +107,7 @@ func (a Address) Bytes() []byte {
 	return a[:]
 }
 
+// ExistsIn check if address exists in address list
 func (a Address) ExistsIn(addresses []Address) bool {
 	for _, address := range addresses {
 		if a == address {

@@ -1,4 +1,4 @@
-package contractdeployment
+package deployment
 
 import (
 	"fmt"
@@ -8,16 +8,16 @@ import (
 )
 
 func GetCommand() *cobra.Command {
-	contractDeploymentCmd := &cobra.Command{
-		Use:     "contractDeployment",
-		Short:   "Updates smart contract deployment whitelist",
+	deploymentCmd := &cobra.Command{
+		Use:     "deployment",
+		Short:   "Top level command for updating smart contract deployment whitelist, Only accepts subcommands",
 		PreRunE: runPreRun,
 		Run:     runCommand,
 	}
 
-	setFlags(contractDeploymentCmd)
+	setFlags(deploymentCmd)
 
-	return contractDeploymentCmd
+	return deploymentCmd
 }
 
 func setFlags(cmd *cobra.Command) {

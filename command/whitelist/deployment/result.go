@@ -1,4 +1,4 @@
-package contractdeployment
+package deployment
 
 import (
 	"bytes"
@@ -7,16 +7,16 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-type ContractDeploymentResult struct {
+type DeploymentResult struct {
 	AddAddress    []types.Address `json:"addAddress"`
 	RemoveAddress []types.Address `json:"removeAddress"`
 	Whitelist     []types.Address `json:"whitelist"`
 }
 
-func (r *ContractDeploymentResult) GetOutput() string {
+func (r *DeploymentResult) GetOutput() string {
 	var buffer bytes.Buffer
 
-	buffer.WriteString("\n[CONTRACT DEPLOYMENT WHITELIST CHANGES]\n\n")
+	buffer.WriteString("\n[CONTRACT DEPLOYMENT WHITELIST]\n\n")
 
 	if len(r.AddAddress) != 0 {
 		buffer.WriteString(fmt.Sprintf("Added addresses: %s,\n", r.AddAddress))

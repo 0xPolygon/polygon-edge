@@ -165,11 +165,16 @@ type TxPool struct {
 	// Event manager for txpool events
 	eventManager *eventManager
 
-	// Contract deployment whitelist
-	contractDeploymentWhitelist []types.Address
+	// struct which contains all whitelists
+	whitelists Whitelists
 
 	// indicates which txpool operator commands should be implemented
 	proto.UnimplementedTxnPoolOperatorServer
+}
+
+type Whitelists struct {
+	// Contract deployment whitelist
+	Deployment []types.Address
 }
 
 // NewTxPool returns a new pool for processing incoming transactions.
@@ -181,20 +186,20 @@ func NewTxPool(
 	network *network.Server,
 	metrics *Metrics,
 	config *Config,
-	contractDeploymentWhitelist []types.Address,
+	whitelists Whitelists,
 ) (*TxPool, error) {
 	pool := &TxPool{
-		logger:                      logger.Named("txpool"),
-		forks:                       forks,
-		store:                       store,
-		metrics:                     metrics,
-		accounts:                    accountsMap{},
-		executables:                 newPricedQueue(),
-		index:                       lookupMap{all: make(map[types.Hash]*types.Transaction)},
-		gauge:                       slotGauge{height: 0, max: config.MaxSlots},
-		priceLimit:                  config.PriceLimit,
-		sealing:                     config.Sealing,
-		contractDeploymentWhitelist: contractDeploymentWhitelist,
+		logger:      logger.Named("txpool"),
+		forks:       forks,
+		store:       store,
+		metrics:     metrics,
+		accounts:    accountsMap{},
+		executables: newPricedQueue(),
+		index:       lookupMap{all: make(map[types.Hash]*types.Transaction)},
+		gauge:       slotGauge{height: 0, max: config.MaxSlots},
+		priceLimit:  config.PriceLimit,
+		sealing:     config.Sealing,
+		whitelists:  whitelists,
 	}
 
 	// Attach the event manager
@@ -544,7 +549,7 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 	}
 
 	// Check if transaction can deploy smart contract
-	if tx.IsContractCreation() && !tx.CanDeployContract(p.contractDeploymentWhitelist) {
+	if tx.IsContractCreation() && !tx.CanDeployContract(p.whitelists.Deployment) {
 		return ErrSmartContractRestricted
 	}
 

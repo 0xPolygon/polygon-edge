@@ -201,7 +201,7 @@ func NewServer(config *Config) (*Server, error) {
 			Blockchain: m.blockchain,
 		}
 
-		contractDeploymentWhitelist, err := common.FetchContractDeploymentWhitelist(config.Chain)
+		deploymentWhitelist, err := common.FetchDeploymentWhitelist(config.Chain)
 		if err != nil {
 			return nil, err
 		}
@@ -219,7 +219,9 @@ func NewServer(config *Config) (*Server, error) {
 				MaxSlots:   m.config.MaxSlots,
 				PriceLimit: m.config.PriceLimit,
 			},
-			contractDeploymentWhitelist,
+			txpool.Whitelists{
+				Deployment: deploymentWhitelist,
+			},
 		)
 		if err != nil {
 			return nil, err

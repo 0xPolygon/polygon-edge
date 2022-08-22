@@ -1,4 +1,4 @@
-package contractdeployment
+package deployment
 
 import (
 	"errors"
@@ -19,31 +19,37 @@ const (
 )
 
 var (
-	errInvalidAddressFormat = errors.New("one or more addresses are invalid format")
+	errInvalidAddressFormat = errors.New("one or more addresses are of invalid format")
 )
 
 var (
-	params = &contractDeploymentParams{}
+	params = &deploymentParams{}
 )
 
-type contractDeploymentParams struct {
+type deploymentParams struct {
+	// raw addresses, entered by CLI commands
 	addAddressRaw    []string
 	removeAddressRaw []string
 
+	// addresses, converted from raw addresses
 	addAddress    []types.Address
 	removeAddress []types.Address
 
+	// genesis file
 	genesisPath   string
 	genesisConfig *chain.Chain
 
+	// deployment whitelist from genesis configuration
 	whitelist []types.Address
 }
 
-func (p *contractDeploymentParams) initRawParams() error {
+func (p *deploymentParams) initRawParams() error {
+	// convert raw addresses to appropriate format
 	if err := p.initRawAddresses(); err != nil {
 		return err
 	}
 
+	// init genesis configuration
 	if err := p.initChain(); err != nil {
 		return err
 	}
@@ -51,26 +57,27 @@ func (p *contractDeploymentParams) initRawParams() error {
 	return nil
 }
 
-func (p *contractDeploymentParams) initRawAddresses() error {
+func (p *deploymentParams) initRawAddresses() error {
+	// init slices for addresses to be added and removed
 	p.addAddress = []types.Address{}
 	p.removeAddress = []types.Address{}
 
+	// convert addresses to be added from string to type.Address
 	for _, address := range p.addAddressRaw {
 		newAddress := types.Address{}
 
 		if err := newAddress.UnmarshalText([]byte(address)); err != nil {
-			//TODO add more descriptive error
 			return errInvalidAddressFormat
 		}
 
 		p.addAddress = append(p.addAddress, newAddress)
 	}
 
+	// convert addresses to be removed from string to type.Address
 	for _, address := range p.removeAddressRaw {
 		newAddress := types.Address{}
 
 		if err := newAddress.UnmarshalText([]byte(address)); err != nil {
-			//TODO add more descriptive error
 			return errInvalidAddressFormat
 		}
 
@@ -80,7 +87,8 @@ func (p *contractDeploymentParams) initRawAddresses() error {
 	return nil
 }
 
-func (p *contractDeploymentParams) initChain() error {
+func (p *deploymentParams) initChain() error {
+	// import genesis configuration
 	cc, err := chain.Import(p.genesisPath)
 	if err != nil {
 		return fmt.Errorf(
@@ -90,45 +98,48 @@ func (p *contractDeploymentParams) initChain() error {
 		)
 	}
 
+	// set genesis configuration
 	p.genesisConfig = cc
 
 	return nil
 }
 
-func (p *contractDeploymentParams) updateGenesisConfig() error {
-	contractDeploymentWhitelist, err := common.FetchContractDeploymentWhitelist(p.genesisConfig)
+func (p *deploymentParams) updateGenesisConfig() error {
+	// Fetch contract deployment whitelist from genesis config
+	deploymentWhitelist, err := common.FetchDeploymentWhitelist(p.genesisConfig)
 	if err != nil {
 		return err
 	}
 
 	// Add addresses if not exists
 	for _, address := range p.addAddress {
-		if !address.ExistsIn(contractDeploymentWhitelist) {
-			contractDeploymentWhitelist = append(contractDeploymentWhitelist, address)
+		if !address.ExistsIn(deploymentWhitelist) {
+			deploymentWhitelist = append(deploymentWhitelist, address)
 		}
 	}
 
-	newContractDeploymentWhitelist := make([]types.Address, 0)
+	newDeploymentWhitelist := make([]types.Address, 0)
 
 	// Remove addresses if exists
-	for _, address := range contractDeploymentWhitelist {
+	for _, address := range deploymentWhitelist {
 		if !address.ExistsIn(p.removeAddress) {
-			newContractDeploymentWhitelist = append(newContractDeploymentWhitelist, address)
+			newDeploymentWhitelist = append(newDeploymentWhitelist, address)
 		}
 	}
 
-	p.whitelist = newContractDeploymentWhitelist
-
+	// Set whitelist in genesis configuration
 	whitelistConfig := common.FetchWhitelistFromConfig(p.genesisConfig)
-
-	whitelistConfig["contractDeployment"] = newContractDeploymentWhitelist
+	whitelistConfig["deployment"] = newDeploymentWhitelist
 	p.genesisConfig.Params.Whitelists = whitelistConfig
+
+	// Save whitelist for result
+	p.whitelist = newDeploymentWhitelist
 
 	return nil
 }
 
-func (p *contractDeploymentParams) overrideGenesisConfig() error {
-	// Remove the current genesis configuration from disk
+func (p *deploymentParams) overrideGenesisConfig() error {
+	// Remove the current genesis configuration from the disk
 	if err := os.Remove(p.genesisPath); err != nil {
 		return err
 	}
@@ -144,8 +155,8 @@ func (p *contractDeploymentParams) overrideGenesisConfig() error {
 	return nil
 }
 
-func (p *contractDeploymentParams) getResult() command.CommandResult {
-	result := &ContractDeploymentResult{
+func (p *deploymentParams) getResult() command.CommandResult {
+	result := &DeploymentResult{
 		AddAddress:    p.addAddress,
 		RemoveAddress: p.removeAddress,
 		Whitelist:     p.whitelist,

@@ -181,9 +181,9 @@ func PadLeftOrTrim(bb []byte, size int) []byte {
 }
 
 // FetchWhitelistFromConfig fetches whitelist object from the config
-// if not exists returns empty map
+// if doesn't exist returns empty map
 func FetchWhitelistFromConfig(genesisConfig *chain.Chain) map[string]interface{} {
-	// Fetch whitelist config if exists, if not init
+	// Fetch whitelist if exists, if not init
 	whitelistConfig := genesisConfig.Params.Whitelists
 	if len(whitelistConfig) == 0 {
 		whitelistConfig = make(map[string]interface{})
@@ -192,36 +192,35 @@ func FetchWhitelistFromConfig(genesisConfig *chain.Chain) map[string]interface{}
 	return whitelistConfig
 }
 
-// FetchContractDeploymentWhitelist fetches contract deployment whitelist from the config
-// if not exists returns empty array
-func FetchContractDeploymentWhitelist(genesisConfig *chain.Chain) ([]types.Address, error) {
+// FetchDeploymentWhitelist fetches deployment whitelist from the genesis config
+// if doesn't exist returns empty list
+func FetchDeploymentWhitelist(genesisConfig *chain.Chain) ([]types.Address, error) {
 	// Fetch whitelist config if exists, if not init
 	whitelistConfig := FetchWhitelistFromConfig(genesisConfig)
 
-	// Extract contract deployment whitelist if exists, if not init
-	var contractDeploymentWhitelistRaw []interface{}
+	// Extract deployment whitelist if exists, if not init
 
-	if whitelistConfig["contractDeployment"] != nil {
+	var deploymentWhitelistRaw []interface{}
+
+	if whitelistConfig["deployment"] != nil {
 		var ok bool
 
-		contractDeploymentWhitelistRaw, ok = whitelistConfig["contractDeployment"].([]interface{})
+		deploymentWhitelistRaw, ok = whitelistConfig["deployment"].([]interface{})
 		if !ok {
-			//TODO more descriptive errror
-			return nil, errTypeConversion
+			return nil, errors.New("invalid type assertion for deployment whitelist")
 		}
 	}
 
-	contractDeploymentWhitelist := make([]types.Address, 0)
+	deploymentWhitelist := make([]types.Address, 0)
 
-	for i := range contractDeploymentWhitelistRaw {
-		address, ok := contractDeploymentWhitelistRaw[i].(string)
+	for i := range deploymentWhitelistRaw {
+		address, ok := deploymentWhitelistRaw[i].(string)
 		if !ok {
-			//TODO more descriptive errror
-			return nil, errTypeConversion
+			return nil, errors.New("invalid type assertion for address")
 		}
 
-		contractDeploymentWhitelist = append(contractDeploymentWhitelist, types.StringToAddress(address))
+		deploymentWhitelist = append(deploymentWhitelist, types.StringToAddress(address))
 	}
 
-	return contractDeploymentWhitelist, nil
+	return deploymentWhitelist, nil
 }
