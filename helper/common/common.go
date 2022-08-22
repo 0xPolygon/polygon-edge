@@ -16,10 +16,6 @@ import (
 )
 
 var (
-	errTypeConversion = errors.New("invalid conversion")
-)
-
-var (
 	// MaxSafeJSInt represents max value which JS support
 	// It is used for smartContract fields
 	// Our staking repo is written in JS, as are many other clients
