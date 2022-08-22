@@ -2,6 +2,7 @@ package whitelist
 
 import (
 	"github.com/0xPolygon/polygon-edge/command/whitelist/deployment"
+	"github.com/0xPolygon/polygon-edge/command/whitelist/show"
 	"github.com/spf13/cobra"
 )
 
@@ -19,5 +20,6 @@ func GetCommand() *cobra.Command {
 func registerSubcommands(baseCmd *cobra.Command) {
 	baseCmd.AddCommand(
 		deployment.GetCommand(),
+		show.GetCommand(),
 	)
 }
