@@ -9,7 +9,7 @@ import (
 func GetCommand() *cobra.Command {
 	whitelistCmd := &cobra.Command{
 		Use:   "whitelist",
-		Short: "Top level command for modifying the Polygon Edge whitelists within config file. Only accepts subcommands.",
+		Short: "Top level command for modifying the Polygon Edge whitelists within the config file. Only accepts subcommands.",
 	}
 
 	registerSubcommands(whitelistCmd)
