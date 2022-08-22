@@ -46,6 +46,8 @@ func newTestECDSAKey(t *testing.T) (*ecdsa.PrivateKey, []byte) {
 }
 
 func newTestBLSKey(t *testing.T) (*bls_sig.SecretKey, []byte) {
+	t.Helper()
+
 	testKey, testKeyEncoded, err := crypto.GenerateAndEncodeBLSSecretKey()
 
 	assert.NoError(t, err, "failed to initialize test ECDSA key")
@@ -70,6 +72,7 @@ func Test_wrapCommitHash(t *testing.T) {
 	assert.Equal(t, expectedOutput, output)
 }
 
+//nolint
 func Test_getOrCreateECDSAKey(t *testing.T) {
 	testKey, testKeyEncoded := newTestECDSAKey(t)
 
@@ -80,6 +83,7 @@ func Test_getOrCreateECDSAKey(t *testing.T) {
 		assert.Equal(t, secrets.ValidatorKey, name)
 	}
 
+	//lint:ignore dupl
 	tests := []struct {
 		name              string
 		mockSecretManager *MockSecretManager
@@ -173,6 +177,7 @@ func Test_getOrCreateECDSAKey(t *testing.T) {
 	}
 }
 
+//nolint
 func Test_getOrCreateBLSKey(t *testing.T) {
 	testKey, testKeyEncoded := newTestBLSKey(t)
 

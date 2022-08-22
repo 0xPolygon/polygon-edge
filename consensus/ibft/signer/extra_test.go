@@ -17,7 +17,7 @@ var (
 	testProposerSeal = []byte{0x1}
 )
 
-func JsonMarshalHelper(t *testing.T, extra *IstanbulExtra) string {
+func JSONMarshalHelper(t *testing.T, extra *IstanbulExtra) string {
 	t.Helper()
 
 	res, err := json.Marshal(extra)
@@ -28,6 +28,7 @@ func JsonMarshalHelper(t *testing.T, extra *IstanbulExtra) string {
 }
 
 func TestIstanbulExtraMarshalAndUnmarshal(t *testing.T) {
+	//nolint:dupl
 	tests := []struct {
 		name  string
 		extra *IstanbulExtra
@@ -111,7 +112,7 @@ func TestIstanbulExtraMarshalAndUnmarshal(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			// create original data
-			originalExtraJson := JsonMarshalHelper(t, test.extra)
+			originalExtraJSON := JSONMarshalHelper(t, test.extra)
 
 			bytesData := test.extra.MarshalRLPTo(nil)
 			err := test.extra.UnmarshalRLP(bytesData)
@@ -120,8 +121,8 @@ func TestIstanbulExtraMarshalAndUnmarshal(t *testing.T) {
 			// make sure all data is recovered
 			assert.Equal(
 				t,
-				originalExtraJson,
-				JsonMarshalHelper(t, test.extra),
+				originalExtraJSON,
+				JSONMarshalHelper(t, test.extra),
 			)
 		})
 	}
@@ -130,6 +131,7 @@ func TestIstanbulExtraMarshalAndUnmarshal(t *testing.T) {
 func Test_packProposerSealIntoExtra(t *testing.T) {
 	newProposerSeal := []byte("new proposer seal")
 
+	//nolint:dupl
 	tests := []struct {
 		name  string
 		extra *IstanbulExtra
@@ -216,7 +218,7 @@ func Test_packProposerSealIntoExtra(t *testing.T) {
 
 			// create expected data
 			test.extra.ProposerSeal = newProposerSeal
-			expectedJSON := JsonMarshalHelper(t, test.extra)
+			expectedJSON := JSONMarshalHelper(t, test.extra)
 			test.extra.ProposerSeal = originalProposerSeal
 
 			newExtraBytes := packProposerSealIntoExtra(
@@ -234,7 +236,7 @@ func Test_packProposerSealIntoExtra(t *testing.T) {
 			)
 
 			// check json of decoded data matches with the original data
-			jsonData := JsonMarshalHelper(t, test.extra)
+			jsonData := JSONMarshalHelper(t, test.extra)
 
 			assert.Equal(
 				t,
@@ -349,7 +351,7 @@ func Test_packCommittedSealsIntoExtra(t *testing.T) {
 
 			// create expected data
 			test.extra.CommittedSeals = test.newCommittedSeals
-			expectedJSON := JsonMarshalHelper(t, test.extra)
+			expectedJSON := JSONMarshalHelper(t, test.extra)
 			test.extra.CommittedSeals = originalCommittedSeals
 
 			// update committed seals
@@ -369,7 +371,7 @@ func Test_packCommittedSealsIntoExtra(t *testing.T) {
 			)
 
 			// check json of decoded data matches with the original data
-			jsonData := JsonMarshalHelper(t, test.extra)
+			jsonData := JSONMarshalHelper(t, test.extra)
 
 			assert.Equal(
 				t,
