@@ -111,7 +111,7 @@ func (p *deploymentParams) updateGenesisConfig() error {
 		return err
 	}
 
-	// Add addresses if not exists
+	// Add addresses if it doesn't exist
 	for _, address := range p.addAddress {
 		if !address.ExistsIn(deploymentWhitelist) {
 			deploymentWhitelist = append(deploymentWhitelist, address)
