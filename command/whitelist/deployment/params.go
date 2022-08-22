@@ -59,8 +59,8 @@ func (p *deploymentParams) initRawParams() error {
 
 func (p *deploymentParams) initRawAddresses() error {
 	// init slices for addresses to be added and removed
-	p.addAddress = []types.Address{}
-	p.removeAddress = []types.Address{}
+	p.addAddress = make([]types.Address, len(p.addAddressRaw))
+	p.removeAddress = make([]types.Address, len(p.removeAddressRaw))
 
 	// convert addresses to be added from string to type.Address
 	for _, address := range p.addAddressRaw {
