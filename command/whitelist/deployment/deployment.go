@@ -10,7 +10,7 @@ import (
 func GetCommand() *cobra.Command {
 	deploymentCmd := &cobra.Command{
 		Use:     "deployment",
-		Short:   "Top level command for updating smart contract deployment whitelist, Only accepts subcommands",
+		Short:   "Top level command for updating smart contract deployment whitelist. Only accepts subcommands",
 		PreRunE: runPreRun,
 		Run:     runCommand,
 	}
