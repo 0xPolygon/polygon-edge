@@ -8,12 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var (
-	addr1 = Address{0x1}
-	addr2 = Address{0x2}
-	addr3 = Address{0x3}
-)
-
 func TestEIP55(t *testing.T) {
 	t.Parallel()
 
@@ -93,6 +87,10 @@ func TestTransactionCopy(t *testing.T) {
 
 func TestAddress_ExistsIn(t *testing.T) {
 	t.Parallel()
+
+	addr1 := Address{0x1}
+	addr2 := Address{0x2}
+	addr3 := Address{0x3}
 
 	testCases := []struct {
 		name      string
