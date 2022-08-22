@@ -3,13 +3,10 @@ package show
 import (
 	"bytes"
 	"fmt"
-
-	"github.com/0xPolygon/polygon-edge/chain"
-	"github.com/0xPolygon/polygon-edge/helper/common"
 )
 
 type ShowResult struct {
-	GenesisConfig *chain.Chain
+	Whitelists Whitelists
 }
 
 func (r *ShowResult) GetOutput() string {
@@ -17,12 +14,7 @@ func (r *ShowResult) GetOutput() string {
 
 	buffer.WriteString("\n[WHITELISTS]\n\n")
 
-	deploymentWhitelist, err := common.FetchDeploymentWhitelist(r.GenesisConfig)
-	if err != nil {
-		return err.Error()
-	}
-
-	buffer.WriteString(fmt.Sprintf("Contract deployment whitelist : %s,\n", deploymentWhitelist))
+	buffer.WriteString(fmt.Sprintf("Contract deployment whitelist : %s,\n", r.Whitelists.deployment))
 
 	return buffer.String()
 }

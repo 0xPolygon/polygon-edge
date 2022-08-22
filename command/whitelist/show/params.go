@@ -5,6 +5,8 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
+	"github.com/0xPolygon/polygon-edge/helper/common"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 const (
@@ -16,23 +18,29 @@ var (
 )
 
 type showParams struct {
-	// genesis file
-	genesisPath   string
-	genesisConfig *chain.Chain
+	// genesis file path
+	genesisPath string
+
+	// deployment whitelist
+	whitelists Whitelists
+}
+
+type Whitelists struct {
+	deployment []types.Address
 }
 
 func (p *showParams) initRawParams() error {
 	// init genesis configuration
-	if err := p.initChain(); err != nil {
+	if err := p.initWhitelists(); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (p *showParams) initChain() error {
+func (p *showParams) initWhitelists() error {
 	// import genesis configuration
-	cc, err := chain.Import(p.genesisPath)
+	genesisConfig, err := chain.Import(p.genesisPath)
 	if err != nil {
 		return fmt.Errorf(
 			"failed to load chain config from %s: %w",
@@ -41,15 +49,23 @@ func (p *showParams) initChain() error {
 		)
 	}
 
-	// set genesis configuration
-	p.genesisConfig = cc
+	// fetch whitelists
+	deploymentWhitelist, err := common.FetchDeploymentWhitelist(genesisConfig)
+	if err != nil {
+		return err
+	}
+
+	// set whitelists
+	p.whitelists = Whitelists{
+		deployment: deploymentWhitelist,
+	}
 
 	return nil
 }
 
 func (p *showParams) getResult() command.CommandResult {
 	result := &ShowResult{
-		GenesisConfig: p.genesisConfig,
+		Whitelists: p.whitelists,
 	}
 
 	return result
