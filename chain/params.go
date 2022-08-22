@@ -9,7 +9,7 @@ type Params struct {
 	Forks          *Forks                 `json:"forks"`
 	ChainID        int                    `json:"chainID"`
 	Engine         map[string]interface{} `json:"engine"`
-	Whitelists     map[string]interface{} `json:"whitelists"`
+	Whitelists     map[string]interface{} `json:"whitelists,omitempty"`
 	BlockGasTarget uint64                 `json:"blockGasTarget"`
 }
 
