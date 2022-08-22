@@ -10,7 +10,7 @@ import (
 func GetCommand() *cobra.Command {
 	showCmd := &cobra.Command{
 		Use:     "show",
-		Short:   "Command for listing all whitelists",
+		Short:   "Displays whitelist information",
 		PreRunE: runPreRun,
 		Run:     runCommand,
 	}
