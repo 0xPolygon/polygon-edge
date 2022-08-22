@@ -8,6 +8,12 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+var (
+	addr1 = Address{0x1}
+	addr2 = Address{0x2}
+	addr3 = Address{0x3}
+)
+
 func TestEIP55(t *testing.T) {
 	t.Parallel()
 
@@ -82,5 +88,37 @@ func TestTransactionCopy(t *testing.T) {
 
 	if !reflect.DeepEqual(txn, newTxn) {
 		t.Fatal("[ERROR] Copied transaction not equal base transaction")
+	}
+}
+
+func TestAddress_ExistsIn(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name      string
+		address   Address
+		addresses []Address
+		exists    bool
+	}{
+		{
+			name:      "Address exists",
+			address:   addr1,
+			addresses: []Address{addr2, addr1},
+			exists:    true,
+		},
+		{
+			name:      "Address doesn't exists",
+			address:   addr3,
+			addresses: []Address{addr2, addr1},
+			exists:    false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			exists := tc.address.ExistsIn(tc.addresses)
+			assert.Equal(t, exists, tc.exists)
+		})
 	}
 }
