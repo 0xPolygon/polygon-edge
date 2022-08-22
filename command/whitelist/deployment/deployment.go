@@ -31,7 +31,7 @@ func setFlags(cmd *cobra.Command) {
 		&params.addAddressRaw,
 		addAddressFlag,
 		[]string{},
-		"adds a new address in the contract deployment whitelist",
+		"adds a new address to the contract deployment whitelist",
 	)
 
 	cmd.Flags().StringArrayVar(
