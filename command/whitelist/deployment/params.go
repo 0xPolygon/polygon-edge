@@ -58,30 +58,18 @@ func (p *deploymentParams) initRawParams() error {
 }
 
 func (p *deploymentParams) initRawAddresses() error {
-	// init slices for addresses to be added and removed
-	p.addAddress = make([]types.Address, len(p.addAddressRaw))
-	p.removeAddress = make([]types.Address, len(p.removeAddressRaw))
+	var err error
 
 	// convert addresses to be added from string to type.Address
-	for _, address := range p.addAddressRaw {
-		newAddress := types.Address{}
-
-		if err := newAddress.UnmarshalText([]byte(address)); err != nil {
-			return errInvalidAddressFormat
-		}
-
-		p.addAddress = append(p.addAddress, newAddress)
+	p.addAddress, err = unmarshallRawAddresses(p.addAddressRaw)
+	if err != nil {
+		return err
 	}
 
 	// convert addresses to be removed from string to type.Address
-	for _, address := range p.removeAddressRaw {
-		newAddress := types.Address{}
-
-		if err := newAddress.UnmarshalText([]byte(address)); err != nil {
-			return errInvalidAddressFormat
-		}
-
-		p.removeAddress = append(p.removeAddress, newAddress)
+	p.removeAddress, err = unmarshallRawAddresses(p.removeAddressRaw)
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -163,4 +151,20 @@ func (p *deploymentParams) getResult() command.CommandResult {
 	}
 
 	return result
+}
+
+func unmarshallRawAddresses(addresses []string) ([]types.Address, error) {
+	marshalledAddresses := []types.Address{}
+
+	for _, address := range addresses {
+		newAddress := types.Address{}
+
+		if err := newAddress.UnmarshalText([]byte(address)); err != nil {
+			return nil, errInvalidAddressFormat
+		}
+
+		marshalledAddresses = append(marshalledAddresses, newAddress)
+	}
+
+	return marshalledAddresses, nil
 }
