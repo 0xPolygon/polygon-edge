@@ -72,6 +72,7 @@ func (s *Snapshot) UnmarshalJSON(data []byte) error {
 
 	// determine validators type
 	valType := validators.ECDSAValidatorType
+
 	if !isLegacyFormat {
 		if valType, err = validators.ParseValidatorType(raw.Type); err != nil {
 			return err
