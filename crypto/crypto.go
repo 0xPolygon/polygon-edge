@@ -41,19 +41,6 @@ const (
 	KeyBLS   KeyType = "bls"
 )
 
-func (t *KeyType) FromString(s string) error {
-	x := KeyType(s)
-
-	switch x {
-	case KeyECDSA, KeyBLS:
-		*t = x
-
-		return nil
-	default:
-		return fmt.Errorf("invalid key type: %s", s)
-	}
-}
-
 var (
 	errInvalidSignature = errors.New("invalid signature")
 )
