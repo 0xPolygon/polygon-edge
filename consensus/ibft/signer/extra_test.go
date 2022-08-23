@@ -77,11 +77,11 @@ func TestIstanbulExtraMarshalAndUnmarshal(t *testing.T) {
 					},
 				},
 				ProposerSeal: testProposerSeal,
-				CommittedSeals: &BLSSeal{
+				CommittedSeals: &AggregatedSeal{
 					Bitmap:    new(big.Int).SetBytes([]byte{0x8}),
 					Signature: []byte{0x1},
 				},
-				ParentCommittedSeals: &BLSSeal{
+				ParentCommittedSeals: &AggregatedSeal{
 					Bitmap:    new(big.Int).SetBytes([]byte{0x9}),
 					Signature: []byte{0x2},
 				},
@@ -97,11 +97,11 @@ func TestIstanbulExtraMarshalAndUnmarshal(t *testing.T) {
 					},
 				},
 				ProposerSeal: testProposerSeal,
-				CommittedSeals: &BLSSeal{
+				CommittedSeals: &AggregatedSeal{
 					Bitmap:    new(big.Int).SetBytes([]byte{0x8}),
 					Signature: []byte{0x1},
 				},
-				ParentCommittedSeals: &BLSSeal{
+				ParentCommittedSeals: &AggregatedSeal{
 					Bitmap:    new(big.Int).SetBytes([]byte{0x9}),
 					Signature: []byte{0x2},
 				},
@@ -180,11 +180,11 @@ func Test_packProposerSealIntoExtra(t *testing.T) {
 					},
 				},
 				ProposerSeal: testProposerSeal,
-				CommittedSeals: &BLSSeal{
+				CommittedSeals: &AggregatedSeal{
 					Bitmap:    new(big.Int).SetBytes([]byte{0x8}),
 					Signature: []byte{0x1},
 				},
-				ParentCommittedSeals: &BLSSeal{
+				ParentCommittedSeals: &AggregatedSeal{
 					Bitmap:    new(big.Int).SetBytes([]byte{0x9}),
 					Signature: []byte{0x2},
 				},
@@ -200,11 +200,11 @@ func Test_packProposerSealIntoExtra(t *testing.T) {
 					},
 				},
 				ProposerSeal: testProposerSeal,
-				CommittedSeals: &BLSSeal{
+				CommittedSeals: &AggregatedSeal{
 					Bitmap:    new(big.Int).SetBytes([]byte{0x8}),
 					Signature: []byte{0x1},
 				},
-				ParentCommittedSeals: &BLSSeal{
+				ParentCommittedSeals: &AggregatedSeal{
 					Bitmap:    new(big.Int).SetBytes([]byte{0x9}),
 					Signature: []byte{0x2},
 				},
@@ -305,16 +305,16 @@ func Test_packCommittedSealsIntoExtra(t *testing.T) {
 					},
 				},
 				ProposerSeal: testProposerSeal,
-				CommittedSeals: &BLSSeal{
+				CommittedSeals: &AggregatedSeal{
 					Bitmap:    new(big.Int).SetBytes([]byte{0x8}),
 					Signature: []byte{0x1},
 				},
-				ParentCommittedSeals: &BLSSeal{
+				ParentCommittedSeals: &AggregatedSeal{
 					Bitmap:    new(big.Int).SetBytes([]byte{0x9}),
 					Signature: []byte{0x2},
 				},
 			},
-			newCommittedSeals: &BLSSeal{
+			newCommittedSeals: &AggregatedSeal{
 				Bitmap:    new(big.Int).SetBytes([]byte{0xa}),
 				Signature: []byte{0x2},
 			},
@@ -329,16 +329,16 @@ func Test_packCommittedSealsIntoExtra(t *testing.T) {
 					},
 				},
 				ProposerSeal: testProposerSeal,
-				CommittedSeals: &BLSSeal{
+				CommittedSeals: &AggregatedSeal{
 					Bitmap:    new(big.Int).SetBytes([]byte{0x8}),
 					Signature: []byte{0x1},
 				},
-				ParentCommittedSeals: &BLSSeal{
+				ParentCommittedSeals: &AggregatedSeal{
 					Bitmap:    new(big.Int).SetBytes([]byte{0x9}),
 					Signature: []byte{0x2},
 				},
 			},
-			newCommittedSeals: &BLSSeal{
+			newCommittedSeals: &AggregatedSeal{
 				Bitmap:    new(big.Int).SetBytes([]byte{0xa}),
 				Signature: []byte{0x2},
 			},

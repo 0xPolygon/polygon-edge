@@ -62,7 +62,7 @@ func (s *BLSKeyManager) NewEmptyValidators() validators.Validators {
 
 // NewEmptyCommittedSeals returns empty CommittedSeals BLSKeyManager uses
 func (s *BLSKeyManager) NewEmptyCommittedSeals() Seals {
-	return &BLSSeal{}
+	return &AggregatedSeal{}
 }
 
 func (s *BLSKeyManager) SignProposerSeal(data []byte) ([]byte, error) {
@@ -126,7 +126,7 @@ func (s *BLSKeyManager) GenerateCommittedSeals(
 		return nil, err
 	}
 
-	return &BLSSeal{
+	return &AggregatedSeal{
 		Bitmap:    bitMap,
 		Signature: multiSignatureBytes,
 	}, nil
@@ -137,7 +137,7 @@ func (s *BLSKeyManager) VerifyCommittedSeals(
 	message []byte,
 	rawValidators validators.Validators,
 ) (int, error) {
-	committedSeal, ok := rawCommittedSeal.(*BLSSeal)
+	committedSeal, ok := rawCommittedSeal.(*AggregatedSeal)
 	if !ok {
 		return 0, ErrInvalidCommittedSealType
 	}
@@ -158,16 +158,16 @@ func (s *BLSKeyManager) Ecrecover(sig, digest []byte) (types.Address, error) {
 	return ecrecover(sig, digest)
 }
 
-type BLSSeal struct {
+type AggregatedSeal struct {
 	Bitmap    *big.Int
 	Signature []byte
 }
 
-func (s *BLSSeal) Num() int {
+func (s *AggregatedSeal) Num() int {
 	return s.Bitmap.BitLen()
 }
 
-func (s *BLSSeal) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
+func (s *AggregatedSeal) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 	x := ar.NewArray()
 
 	if s.Bitmap == nil {
@@ -185,7 +185,7 @@ func (s *BLSSeal) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 	return x
 }
 
-func (s *BLSSeal) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
+func (s *AggregatedSeal) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	vals, err := v.GetElems()
 
 	if err != nil {
@@ -270,7 +270,7 @@ func createAggregatedBLSPubKeys(
 }
 
 func verifyBLSCommittedSealsImpl(
-	committedSeal *BLSSeal,
+	committedSeal *AggregatedSeal,
 	msg []byte,
 	validators validators.BLSValidators,
 ) (int, error) {

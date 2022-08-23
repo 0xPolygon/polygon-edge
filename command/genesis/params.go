@@ -228,7 +228,7 @@ func (p *genesisParams) initIBFTExtraData() {
 	case validators.ECDSAValidatorType:
 		committedSeal = new(signer.SerializedSeal)
 	case validators.BLSValidatorType:
-		committedSeal = new(signer.BLSSeal)
+		committedSeal = new(signer.AggregatedSeal)
 	}
 
 	ibftExtra := &signer.IstanbulExtra{

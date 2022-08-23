@@ -239,7 +239,7 @@ func TestBLSKeyManagerNewEmptyCommittedSeals(t *testing.T) {
 
 	assert.Equal(
 		t,
-		&BLSSeal{},
+		&AggregatedSeal{},
 		blsKeyManager.NewEmptyCommittedSeals(),
 	)
 }
@@ -433,7 +433,7 @@ func TestBLSKeyManagerGenerateCommittedSeals(t *testing.T) {
 			expectedErr:   errors.New("at least one signature is required"),
 		},
 		{
-			name: "should return BLSSeal if it's successful",
+			name: "should return AggregatedSeal if it's successful",
 			sealMap: map[types.Address][]byte{
 				blsKeyManager1.Address(): correctCommittedSeal,
 			},
@@ -443,7 +443,7 @@ func TestBLSKeyManagerGenerateCommittedSeals(t *testing.T) {
 					blsKeyManager1,
 				),
 			},
-			expectedRes: &BLSSeal{
+			expectedRes: &AggregatedSeal{
 				Bitmap:    big.NewInt(0).SetBit(new(big.Int), 0, 1),
 				Signature: aggregatedBLSSigBytes,
 			},
@@ -493,7 +493,7 @@ func TestBLSKeyManagerVerifyCommittedSeals(t *testing.T) {
 		expectedErr       error
 	}{
 		{
-			name:              "should return ErrInvalidCommittedSealType if rawCommittedSeal is not *BLSSeal",
+			name:              "should return ErrInvalidCommittedSealType if rawCommittedSeal is not *AggregatedSeal",
 			rawCommittedSeals: &SerializedSeal{},
 			hash:              nil,
 			rawValidators:     nil,
@@ -502,7 +502,7 @@ func TestBLSKeyManagerVerifyCommittedSeals(t *testing.T) {
 		},
 		{
 			name: "should return ErrInvalidValidators if rawValidators is not *BLSValidators",
-			rawCommittedSeals: &BLSSeal{
+			rawCommittedSeals: &AggregatedSeal{
 				Bitmap:    big.NewInt(0).SetBit(new(big.Int), 0, 1),
 				Signature: aggregatedBLSSigBytes,
 			},
@@ -511,8 +511,8 @@ func TestBLSKeyManagerVerifyCommittedSeals(t *testing.T) {
 			expectedErr:   ErrInvalidValidators,
 		},
 		{
-			name: "should return size of BLSSeal if it's successful",
-			rawCommittedSeals: &BLSSeal{
+			name: "should return size of AggregatedSeal if it's successful",
+			rawCommittedSeals: &AggregatedSeal{
 				Bitmap:    big.NewInt(0).SetBit(new(big.Int), 0, 1),
 				Signature: aggregatedBLSSigBytes,
 			},
@@ -853,7 +853,7 @@ func Test_verifyBLSCommittedSealsImpl(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		committedSeal *BLSSeal
+		committedSeal *AggregatedSeal
 		msg           []byte
 		validators    validators.BLSValidators
 		expectedRes   int
@@ -861,7 +861,7 @@ func Test_verifyBLSCommittedSealsImpl(t *testing.T) {
 	}{
 		{
 			name: "should return ErrEmptyCommittedSeals if committedSeal.Signature is empty",
-			committedSeal: &BLSSeal{
+			committedSeal: &AggregatedSeal{
 				Signature: []byte{},
 				Bitmap:    new(big.Int).SetBit(new(big.Int), 0, 1),
 			},
@@ -870,7 +870,7 @@ func Test_verifyBLSCommittedSealsImpl(t *testing.T) {
 		},
 		{
 			name: "should return ErrEmptyCommittedSeals if committedSeal.BitMap is nil",
-			committedSeal: &BLSSeal{
+			committedSeal: &AggregatedSeal{
 				Signature: []byte("test"),
 				Bitmap:    nil,
 			},
@@ -879,7 +879,7 @@ func Test_verifyBLSCommittedSealsImpl(t *testing.T) {
 		},
 		{
 			name: "should return ErrEmptyCommittedSeals if committedSeal.BitMap is zero",
-			committedSeal: &BLSSeal{
+			committedSeal: &AggregatedSeal{
 				Signature: []byte("test"),
 				Bitmap:    new(big.Int),
 			},
@@ -888,7 +888,7 @@ func Test_verifyBLSCommittedSealsImpl(t *testing.T) {
 		},
 		{
 			name: "should return error if failed to aggregate public keys",
-			committedSeal: &BLSSeal{
+			committedSeal: &AggregatedSeal{
 				Signature: []byte("test"),
 				Bitmap:    new(big.Int).SetBit(new(big.Int), 0, 1),
 			},
@@ -902,7 +902,7 @@ func Test_verifyBLSCommittedSealsImpl(t *testing.T) {
 		},
 		{
 			name: "should return error if failed to unmarshal aggregated signature",
-			committedSeal: &BLSSeal{
+			committedSeal: &AggregatedSeal{
 				Signature: []byte("test"),
 				Bitmap:    new(big.Int).SetBit(new(big.Int), 0, 1),
 			},
@@ -915,7 +915,7 @@ func Test_verifyBLSCommittedSealsImpl(t *testing.T) {
 		},
 		{
 			name: "should return error if message is nil",
-			committedSeal: &BLSSeal{
+			committedSeal: &AggregatedSeal{
 				Signature: correctAggregatedSig,
 				Bitmap:    new(big.Int).SetBit(new(big.Int), 0, 1),
 			},
@@ -929,7 +929,7 @@ func Test_verifyBLSCommittedSealsImpl(t *testing.T) {
 		},
 		{
 			name: "should return ErrInvalidSignature if verification failed (different message)",
-			committedSeal: &BLSSeal{
+			committedSeal: &AggregatedSeal{
 				Signature: wrongAggregatedSig,
 				Bitmap:    new(big.Int).SetBytes([]byte{0x3}), // validator1 & validator2
 			},
@@ -943,7 +943,7 @@ func Test_verifyBLSCommittedSealsImpl(t *testing.T) {
 		},
 		{
 			name: "should return ErrInvalidSignature if verification failed (wrong validator set)",
-			committedSeal: &BLSSeal{
+			committedSeal: &AggregatedSeal{
 				Signature: correctAggregatedSig,
 				Bitmap:    new(big.Int).SetBytes([]byte{0x3}), // validator1 & validator 2
 			},
@@ -957,7 +957,7 @@ func Test_verifyBLSCommittedSealsImpl(t *testing.T) {
 		},
 		{
 			name: "should return ErrInvalidSignature if verification failed (smaller validator set)",
-			committedSeal: &BLSSeal{
+			committedSeal: &AggregatedSeal{
 				Signature: correctAggregatedSig,
 				Bitmap:    new(big.Int).SetBytes([]byte{0x1}), // validator1
 			},
@@ -970,7 +970,7 @@ func Test_verifyBLSCommittedSealsImpl(t *testing.T) {
 		},
 		{
 			name: "should return ErrInvalidSignature if verification failed (bigger validator set)",
-			committedSeal: &BLSSeal{
+			committedSeal: &AggregatedSeal{
 				Signature: correctAggregatedSig,
 				Bitmap:    new(big.Int).SetBytes([]byte{0x7}), // validator1 & validator 2 & validator 3
 			},
@@ -985,7 +985,7 @@ func Test_verifyBLSCommittedSealsImpl(t *testing.T) {
 		},
 		{
 			name: "should succeed",
-			committedSeal: &BLSSeal{
+			committedSeal: &AggregatedSeal{
 				Signature: correctAggregatedSig,
 				Bitmap:    new(big.Int).SetBytes([]byte{0x3}), // validator1 & validator 2
 			},

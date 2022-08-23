@@ -341,7 +341,7 @@ func TestECDSAKeyManagerVerifyCommittedSeals(t *testing.T) {
 	}{
 		{
 			name:           "should return ErrInvalidCommittedSealType if the Seals is not *SerializedSeal",
-			committedSeals: &BLSSeal{},
+			committedSeals: &AggregatedSeal{},
 			digest:         msg,
 			rawSet:         nil,
 			expectedRes:    0,
