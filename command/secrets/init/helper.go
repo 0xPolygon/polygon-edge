@@ -2,6 +2,7 @@ package init
 
 import (
 	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -28,22 +29,27 @@ func loadValidatorAddress(secretsManager secrets.SecretsManager) (types.Address,
 }
 
 // loadValidatorAddress loads BLS key by SecretsManager and returns BLS Public Key
-func loadBLSPublicKey(secretsManager secrets.SecretsManager) ([]byte, error) {
+func loadBLSPublicKey(secretsManager secrets.SecretsManager) (string, error) {
 	if !secretsManager.HasSecret(secrets.ValidatorBLSKey) {
-		return nil, nil
+		return "", nil
 	}
 
 	encodedKey, err := secretsManager.GetSecret(secrets.ValidatorBLSKey)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	secretKey, err := crypto.BytesToBLSSecretKey(encodedKey)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	return crypto.BLSSecretKeyToPubkeyBytes(secretKey)
+	pubkeyBytes, err := crypto.BLSSecretKeyToPubkeyBytes(secretKey)
+	if err != nil {
+		return "", err
+	}
+
+	return hex.EncodeToHex(pubkeyBytes), nil
 }
 
 // loadNodeID loads Libp2p key by SecretsManager and returns Node ID

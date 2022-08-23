@@ -5,13 +5,12 @@ import (
 	"fmt"
 
 	"github.com/0xPolygon/polygon-edge/command/helper"
-	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
 type SecretsInitResult struct {
 	Address   types.Address `json:"address"`
-	BLSPubkey []byte        `json:"bls_pubkey"`
+	BLSPubkey string        `json:"bls_pubkey"`
 	NodeID    string        `json:"node_id"`
 }
 
@@ -25,10 +24,10 @@ func (r *SecretsInitResult) GetOutput() string {
 		fmt.Sprintf("Public key (address)|%s", r.Address.String()),
 	)
 
-	if r.BLSPubkey != nil {
+	if r.BLSPubkey != "" {
 		vals = append(
 			vals,
-			fmt.Sprintf("BLS Public key|%s", hex.EncodeToHex(r.BLSPubkey)),
+			fmt.Sprintf("BLS Public key|%s", r.BLSPubkey),
 		)
 	}
 
