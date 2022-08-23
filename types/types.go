@@ -107,17 +107,6 @@ func (a Address) Bytes() []byte {
 	return a[:]
 }
 
-// ExistsIn check if address exists in address list
-func (a Address) ExistsIn(addresses []Address) bool {
-	for _, address := range addresses {
-		if a == address {
-			return true
-		}
-	}
-
-	return false
-}
-
 func (a Address) Value() (driver.Value, error) {
 	return a.String(), nil
 }
@@ -197,6 +186,17 @@ func (h Hash) MarshalText() ([]byte, error) {
 
 func (a Address) MarshalText() ([]byte, error) {
 	return []byte(a.String()), nil
+}
+
+// AddressExists check if address exists in address list
+func AddressExists(address Address, addresses []Address) bool {
+	for _, item := range addresses {
+		if address == item {
+			return true
+		}
+	}
+
+	return false
 }
 
 var (

@@ -37,7 +37,7 @@ func (t *Transaction) CanDeployContract(whitelist []Address) bool {
 	}
 
 	// Only addresses which exists in whitelist can deploy
-	if t.From.ExistsIn(whitelist) {
+	if AddressExists(t.From, whitelist) {
 		return true
 	}
 
