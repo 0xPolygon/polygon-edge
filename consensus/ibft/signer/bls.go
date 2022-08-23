@@ -253,17 +253,15 @@ func createAggregatedBLSPubKeys(
 			continue
 		}
 
-		pubKey := &bls_sig.PublicKey{}
-		if err := pubKey.UnmarshalBinary(val.BLSPublicKey); err != nil {
+		pubKey, err := crypto.UnmarshalBLSPublicKey(val.BLSPublicKey)
+		if err != nil {
 			return nil, 0, err
 		}
 
 		pubkeys = append(pubkeys, pubKey)
 	}
 
-	blsPop := bls_sig.NewSigPop()
-
-	key, err := blsPop.AggregatePublicKeys(pubkeys...)
+	key, err := bls_sig.NewSigPop().AggregatePublicKeys(pubkeys...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -276,7 +274,9 @@ func verifyBLSCommittedSealsImpl(
 	msg []byte,
 	validators validators.BLSValidators,
 ) (int, error) {
-	if len(committedSeal.Signature) == 0 || committedSeal.Bitmap.BitLen() == 0 {
+	if len(committedSeal.Signature) == 0 ||
+		committedSeal.Bitmap == nil ||
+		committedSeal.Bitmap.BitLen() == 0 {
 		return 0, ErrEmptyCommittedSeals
 	}
 

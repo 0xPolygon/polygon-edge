@@ -59,7 +59,7 @@ func TestNewECDSAKeyManager(t *testing.T) {
 			expectedErr: nil,
 		},
 		{
-			name: "should return error when getOrCreateECDSAKey returns error",
+			name: "should return error if getOrCreateECDSAKey returns error",
 			mockSecretManager: &MockSecretManager{
 				HasSecretFn: func(name string) bool {
 					testSecretName(name)
@@ -392,7 +392,7 @@ func TestECDSAKeyManagerSignIBFTMessageAndEcrecover(t *testing.T) {
 	proposerSeal, err := ecdsaKeyManager.SignIBFTMessage(msg)
 	assert.NoError(t, err)
 
-	recoveredAddress, err := ecrecover(proposerSeal, msg)
+	recoveredAddress, err := ecdsaKeyManager.Ecrecover(proposerSeal, msg)
 	assert.NoError(t, err)
 
 	assert.Equal(
@@ -447,7 +447,7 @@ func TestECDSAKeyManager_verifyCommittedSealsImpl(t *testing.T) {
 			expectedErr: errors.New("invalid compact signature size"),
 		},
 		{
-			name: "should return error ErrRepeatedCommittedSeal when CommittedSeal",
+			name: "should return error ErrRepeatedCommittedSeal if CommittedSeal",
 			committedSeals: &SerializedSeal{
 				correctCommittedSeal,
 				correctCommittedSeal,
@@ -462,7 +462,7 @@ func TestECDSAKeyManager_verifyCommittedSealsImpl(t *testing.T) {
 			expectedErr: ErrRepeatedCommittedSeal,
 		},
 		{
-			name: "should return error ErrNonValidatorCommittedSeal when CommittedSeals has the signature by non-validator",
+			name: "should return error ErrNonValidatorCommittedSeal if CommittedSeals has the signature by non-validator",
 			committedSeals: &SerializedSeal{
 				correctCommittedSeal,
 				nonValidatorsCommittedSeal,
@@ -477,7 +477,7 @@ func TestECDSAKeyManager_verifyCommittedSealsImpl(t *testing.T) {
 			expectedErr: ErrNonValidatorCommittedSeal,
 		},
 		{
-			name: "should return the size of CommittedSeals when verification is successful",
+			name: "should return the size of CommittedSeals if verification is successful",
 			committedSeals: &SerializedSeal{
 				correctCommittedSeal,
 			},

@@ -204,19 +204,12 @@ func Sign(priv *ecdsa.PrivateKey, hash []byte) ([]byte, error) {
 
 // SignByBLS signs the given data by BLS
 func SignByBLS(prv *bls_sig.SecretKey, msg []byte) ([]byte, error) {
-	blsPop := bls_sig.NewSigPop()
-	seal, err := blsPop.Sign(prv, msg)
-
+	signature, err := bls_sig.NewSigPop().Sign(prv, msg)
 	if err != nil {
 		return nil, err
 	}
 
-	sealBytes, err := seal.MarshalBinary()
-	if err != nil {
-		return nil, err
-	}
-
-	return sealBytes, nil
+	return signature.MarshalBinary()
 }
 
 // VerifyBLSSignature verifies the given signature from Public Key and original message
@@ -372,6 +365,7 @@ func BytesToBLSSecretKey(input []byte) (*bls_sig.SecretKey, error) {
 	return sk, nil
 }
 
+// BLSSecretKeyToPubkeyBytes returns bytes of BLS Public Key corresponding to the given secret key
 func BLSSecretKeyToPubkeyBytes(key *bls_sig.SecretKey) ([]byte, error) {
 	pubKey, err := key.GetPublicKey()
 	if err != nil {
@@ -386,6 +380,7 @@ func BLSSecretKeyToPubkeyBytes(key *bls_sig.SecretKey) ([]byte, error) {
 	return marshalled, nil
 }
 
+// BytesToBLSPublicKey decodes given hex string and returns BLS Public Key
 func BytesToBLSPublicKey(input string) (*bls_sig.PublicKey, error) {
 	// The key file on disk should be encoded in Base64,
 	// so it must be decoded before it can be parsed by ParsePrivateKey
