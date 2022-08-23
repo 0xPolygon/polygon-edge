@@ -8,6 +8,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/fork"
+	"github.com/0xPolygon/polygon-edge/consensus/ibft/hook"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
@@ -17,6 +18,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/syncer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
+	"github.com/0xPolygon/polygon-edge/validators/store"
 	"github.com/hashicorp/go-hclog"
 	"google.golang.org/grpc"
 )
@@ -58,6 +60,15 @@ type hooksInterface interface {
 	PostInsertBlock(*types.Block) error
 }
 
+type forkManagerInterface interface {
+	Initialize() error
+	Close() error
+	GetSigner(uint64) (signer.Signer, error)
+	GetValidatorStore(uint64) (store.ValidatorStore, error)
+	GetValidators(uint64) (validators.Validators, error)
+	GetHooks(uint64) (*hook.Hooks, error)
+}
+
 // backendIBFT represents the IBFT consensus mechanism object
 type backendIBFT struct {
 	consensus *IBFTConsensus
@@ -76,7 +87,7 @@ type backendIBFT struct {
 	metrics        *consensus.Metrics     // Reference to the metrics service
 
 	// Dynamic References
-	forkManager       fork.ForkManager      // Manager to hold IBFT Forks
+	forkManager       forkManagerInterface  // Manager to hold IBFT Forks
 	currentSigner     signer.Signer         // Signer at current sequence
 	currentValidators validators.Validators // signer at current sequence
 	currentHooks      hooksInterface        // Hooks at current sequence
@@ -574,7 +585,7 @@ func (i *backendIBFT) verifyParentCommittedSeals(
 }
 
 // getModulesFromForkManager is a helper function to get all modules from ForkManager
-func getModulesFromForkManager(forkManager fork.ForkManager, height uint64) (
+func getModulesFromForkManager(forkManager forkManagerInterface, height uint64) (
 	signer.Signer,
 	validators.Validators,
 	hooksInterface,

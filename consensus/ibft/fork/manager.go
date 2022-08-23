@@ -26,19 +26,9 @@ var (
 	ErrValidatorStoreNotFound = errors.New("validator set not found")
 )
 
-// ForkManager is an interface of the module that has Fork configuration and multiple version of submodules
+// ForkManager is the module that has Fork configuration and multiple version of submodules
 // and returns the proper submodule at specified height
-type ForkManager interface {
-	Initialize() error
-	GetSigner(uint64) (signer.Signer, error)
-	GetValidatorStore(uint64) (store.ValidatorStore, error)
-	GetValidators(uint64) (validators.Validators, error)
-	GetHooks(uint64) (*hook.Hooks, error)
-	Close() error
-}
-
-// forkManagerImpl is a implementation of ForkManager
-type forkManagerImpl struct {
+type ForkManager struct {
 	logger         hclog.Logger
 	blockchain     store.HeaderGetter
 	executor       contract.Executor
@@ -53,7 +43,7 @@ type forkManagerImpl struct {
 	validatorSets map[store.SourceType]store.ValidatorStore
 }
 
-// NewForkManager is a constructor of forkManagerImpl
+// NewForkManager is a constructor of ForkManager
 func NewForkManager(
 	logger hclog.Logger,
 	blockchain store.HeaderGetter,
@@ -62,13 +52,13 @@ func NewForkManager(
 	filePath string,
 	epochSize uint64,
 	ibftConfig map[string]interface{},
-) (ForkManager, error) {
+) (*ForkManager, error) {
 	forks, err := GetIBFTForks(ibftConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	fm := &forkManagerImpl{
+	fm := &ForkManager{
 		logger:         logger.Named(loggerName),
 		blockchain:     blockchain,
 		executor:       executor,
@@ -90,7 +80,7 @@ func NewForkManager(
 }
 
 // Initialize initializes ForkManager on initialization phase
-func (m *forkManagerImpl) Initialize() error {
+func (m *ForkManager) Initialize() error {
 	if err := m.initializeValidatorStores(); err != nil {
 		return err
 	}
@@ -99,7 +89,7 @@ func (m *forkManagerImpl) Initialize() error {
 }
 
 // GetSigner returns a proper signer at specified height
-func (m *forkManagerImpl) GetSigner(height uint64) (signer.Signer, error) {
+func (m *ForkManager) GetSigner(height uint64) (signer.Signer, error) {
 	fork := m.getFork(height)
 	if fork == nil {
 		return nil, ErrForkNotFound
@@ -114,7 +104,7 @@ func (m *forkManagerImpl) GetSigner(height uint64) (signer.Signer, error) {
 }
 
 // GetValidatorStore returns a proper validator set at specified height
-func (m *forkManagerImpl) GetValidatorStore(height uint64) (store.ValidatorStore, error) {
+func (m *ForkManager) GetValidatorStore(height uint64) (store.ValidatorStore, error) {
 	fork := m.getFork(height)
 	if fork == nil {
 		return nil, ErrForkNotFound
@@ -129,7 +119,7 @@ func (m *forkManagerImpl) GetValidatorStore(height uint64) (store.ValidatorStore
 }
 
 // GetValidators returns validators at specified height
-func (m *forkManagerImpl) GetValidators(height uint64) (validators.Validators, error) {
+func (m *ForkManager) GetValidators(height uint64) (validators.Validators, error) {
 	fork := m.getFork(height)
 	if fork == nil {
 		return nil, ErrForkNotFound
@@ -146,7 +136,7 @@ func (m *forkManagerImpl) GetValidators(height uint64) (validators.Validators, e
 }
 
 // GetHooks returns a hooks at specified height
-func (m *forkManagerImpl) GetHooks(height uint64) (*hook.Hooks, error) {
+func (m *ForkManager) GetHooks(height uint64) (*hook.Hooks, error) {
 	hooks := &hook.Hooks{}
 
 	fork := m.getFork(height)
@@ -177,7 +167,7 @@ func (m *forkManagerImpl) GetHooks(height uint64) (*hook.Hooks, error) {
 }
 
 // Close calls termination process of submodules
-func (m *forkManagerImpl) Close() error {
+func (m *ForkManager) Close() error {
 	if err := m.closeSnapshotValidatorStore(); err != nil {
 		return err
 	}
@@ -186,7 +176,7 @@ func (m *forkManagerImpl) Close() error {
 }
 
 // initializeSigners initialize all signers based on Fork configuration
-func (m *forkManagerImpl) initializeSigners() error {
+func (m *ForkManager) initializeSigners() error {
 	for _, fork := range m.forks {
 		valType := fork.ValidatorType
 
@@ -199,7 +189,7 @@ func (m *forkManagerImpl) initializeSigners() error {
 }
 
 // initializeValidatorStores initializes all validator sets based on Fork configuration
-func (m *forkManagerImpl) initializeValidatorStores() error {
+func (m *ForkManager) initializeValidatorStores() error {
 	for _, fork := range m.forks {
 		sourceType := ibftTypesToSourceType[fork.Type]
 		if err := m.initializeValidatorStore(sourceType); err != nil {
@@ -211,7 +201,7 @@ func (m *forkManagerImpl) initializeValidatorStores() error {
 }
 
 // initializeSigner initializes the specified signer
-func (m *forkManagerImpl) initializeSigner(valType validators.ValidatorType) error {
+func (m *ForkManager) initializeSigner(valType validators.ValidatorType) error {
 	if _, ok := m.signers[valType]; ok {
 		return nil
 	}
@@ -227,7 +217,7 @@ func (m *forkManagerImpl) initializeSigner(valType validators.ValidatorType) err
 }
 
 // initializeValidatorStore initializes the specified validator set
-func (m *forkManagerImpl) initializeValidatorStore(setType store.SourceType) error {
+func (m *ForkManager) initializeValidatorStore(setType store.SourceType) error {
 	if _, ok := m.validatorSets[setType]; ok {
 		return nil
 	}
@@ -260,7 +250,7 @@ func (m *forkManagerImpl) initializeValidatorStore(setType store.SourceType) err
 }
 
 // initializeSnapshotValidatorStore loads data from file and initializes Snapshot validator set
-func (m *forkManagerImpl) initializeSnapshotValidatorStore() (store.ValidatorStore, error) {
+func (m *ForkManager) initializeSnapshotValidatorStore() (store.ValidatorStore, error) {
 	snapshotMeta, err := loadSnapshotMetadata(filepath.Join(m.filePath, snapshotMetadataFilename))
 	if err != nil {
 		return nil, err
@@ -288,7 +278,7 @@ func (m *forkManagerImpl) initializeSnapshotValidatorStore() (store.ValidatorSto
 }
 
 // closeSnapshotValidatorStore gets data from Snapshot validator set and save to files
-func (m *forkManagerImpl) closeSnapshotValidatorStore() error {
+func (m *ForkManager) closeSnapshotValidatorStore() error {
 	snapshotValset, ok := m.validatorSets[store.Snapshot].(*snapshot.SnapshotValidatorStore)
 	if !ok {
 		// no snapshot validator set, skip
@@ -313,7 +303,7 @@ func (m *forkManagerImpl) closeSnapshotValidatorStore() error {
 }
 
 // registerPoAHooks register additional processes for PoA
-func (m *forkManagerImpl) registerPoAHooks(
+func (m *ForkManager) registerPoAHooks(
 	hooks *hook.Hooks,
 	height uint64,
 ) error {
@@ -328,7 +318,7 @@ func (m *forkManagerImpl) registerPoAHooks(
 }
 
 // registerPoAHooks register additional processes to start PoA in the middle
-func (m *forkManagerImpl) registerPoAPrepareHooks(
+func (m *ForkManager) registerPoAPrepareHooks(
 	hooks *hook.Hooks,
 	height uint64,
 ) error {
@@ -353,7 +343,7 @@ func (m *forkManagerImpl) registerPoAPrepareHooks(
 }
 
 // registerPoAHooks register additional processes to start PoS in the middle
-func (m *forkManagerImpl) registerPoSPrepareHooks(
+func (m *ForkManager) registerPoSPrepareHooks(
 	hooks *hook.Hooks,
 	height uint64,
 ) {
@@ -366,7 +356,7 @@ func (m *forkManagerImpl) registerPoSPrepareHooks(
 }
 
 // getFork returns a fork the specified height uses
-func (m *forkManagerImpl) getFork(height uint64) *IBFTFork {
+func (m *ForkManager) getFork(height uint64) *IBFTFork {
 	for idx := len(m.forks) - 1; idx >= 0; idx-- {
 		fork := m.forks[idx]
 
@@ -379,7 +369,7 @@ func (m *forkManagerImpl) getFork(height uint64) *IBFTFork {
 }
 
 // getForkByFrom returns a fork whose From matches with the specified height
-func (m *forkManagerImpl) getForkByFrom(height uint64) *IBFTFork {
+func (m *ForkManager) getForkByFrom(height uint64) *IBFTFork {
 	for _, fork := range m.forks {
 		if fork.From.Value == height {
 			return &fork
@@ -390,7 +380,7 @@ func (m *forkManagerImpl) getForkByFrom(height uint64) *IBFTFork {
 }
 
 // getForkByFrom returns a fork whose Development matches with the specified height
-func (m *forkManagerImpl) getForkByDeployment(height uint64) *IBFTFork {
+func (m *ForkManager) getForkByDeployment(height uint64) *IBFTFork {
 	for _, fork := range m.forks {
 		if fork.Deployment != nil && fork.Deployment.Value == height {
 			return &fork
