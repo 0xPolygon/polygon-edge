@@ -33,7 +33,7 @@ type ForkManager interface {
 	GetSigner(uint64) (signer.Signer, error)
 	GetValidatorStore(uint64) (store.ValidatorStore, error)
 	GetValidators(uint64) (validators.Validators, error)
-	GetHooks(uint64) (hook.Hooks, error)
+	GetHooks(uint64) (*hook.Hooks, error)
 	Close() error
 }
 
@@ -146,8 +146,8 @@ func (m *forkManagerImpl) GetValidators(height uint64) (validators.Validators, e
 }
 
 // GetHooks returns a hooks at specified height
-func (m *forkManagerImpl) GetHooks(height uint64) (hook.Hooks, error) {
-	hooks := &hook.HookManager{}
+func (m *forkManagerImpl) GetHooks(height uint64) (*hook.Hooks, error) {
+	hooks := &hook.Hooks{}
 
 	fork := m.getFork(height)
 	if fork == nil {
@@ -314,7 +314,7 @@ func (m *forkManagerImpl) closeSnapshotValidatorStore() error {
 
 // registerPoAHooks register additional processes for PoA
 func (m *forkManagerImpl) registerPoAHooks(
-	hooks *hook.HookManager,
+	hooks *hook.Hooks,
 	height uint64,
 ) error {
 	valSet, err := m.GetValidatorStore(height)
@@ -329,7 +329,7 @@ func (m *forkManagerImpl) registerPoAHooks(
 
 // registerPoAHooks register additional processes to start PoA in the middle
 func (m *forkManagerImpl) registerPoAPrepareHooks(
-	hooks *hook.HookManager,
+	hooks *hook.Hooks,
 	height uint64,
 ) error {
 	fromFork := m.getForkByFrom(height + 1)
@@ -354,7 +354,7 @@ func (m *forkManagerImpl) registerPoAPrepareHooks(
 
 // registerPoAHooks register additional processes to start PoS in the middle
 func (m *forkManagerImpl) registerPoSPrepareHooks(
-	hooks *hook.HookManager,
+	hooks *hook.Hooks,
 	height uint64,
 ) {
 	deploymentFork := m.getForkByDeployment(height + 1)

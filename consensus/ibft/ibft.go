@@ -8,7 +8,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/fork"
-	"github.com/0xPolygon/polygon-edge/consensus/ibft/hook"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
@@ -49,6 +48,16 @@ type txPoolInterface interface {
 	ResetWithHeaders(headers ...*types.Header)
 }
 
+type hooksInterface interface {
+	ShouldWriteTransactions(uint64) bool
+	ModifyHeader(*types.Header, types.Address) error
+	VerifyHeader(*types.Header) error
+	VerifyBlock(*types.Block) error
+	ProcessHeader(*types.Header) error
+	PreCommitState(*types.Header, *state.Transition) error
+	PostInsertBlock(*types.Block) error
+}
+
 // backendIBFT represents the IBFT consensus mechanism object
 type backendIBFT struct {
 	consensus *IBFTConsensus
@@ -70,7 +79,7 @@ type backendIBFT struct {
 	forkManager       fork.ForkManager      // Manager to hold IBFT Forks
 	currentSigner     signer.Signer         // Signer at current sequence
 	currentValidators validators.Validators // signer at current sequence
-	currentHooks      hook.Hooks            // Hooks at current sequence
+	currentHooks      hooksInterface        // Hooks at current sequence
 
 	// Configurations
 	config             *consensus.Config // Consensus configuration
@@ -334,7 +343,7 @@ func (i *backendIBFT) verifyHeaderImpl(
 	parent, header *types.Header,
 	headerSigner signer.Signer,
 	validators validators.Validators,
-	hooks hook.Hooks,
+	hooks hooksInterface,
 	shouldVerifyParentCommittedSeals bool,
 ) error {
 	if header.MixHash != signer.IstanbulDigest {
@@ -568,7 +577,7 @@ func (i *backendIBFT) verifyParentCommittedSeals(
 func getModulesFromForkManager(forkManager fork.ForkManager, height uint64) (
 	signer.Signer,
 	validators.Validators,
-	hook.Hooks,
+	hooksInterface,
 	error,
 ) {
 	signer, err := forkManager.GetSigner(height)

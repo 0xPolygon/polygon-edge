@@ -19,7 +19,7 @@ var (
 
 // registerPoSHook registers additional processes for PoS
 func registerPoSHook(
-	hooks *hook.HookManager,
+	hooks *hook.Hooks,
 	epochSize uint64,
 ) {
 	isLastEpoch := func(height uint64) bool {
@@ -42,7 +42,7 @@ func registerPoSHook(
 // registerValidatorStoreHook registers additional processes
 // for the ValidatorStore that modifies header
 func registerValidatorStoreHook(
-	hooks *hook.HookManager,
+	hooks *hook.Hooks,
 	set store.ValidatorStore,
 ) {
 	if hm, ok := set.(store.HeaderModifier); ok {
@@ -58,7 +58,7 @@ func registerValidatorStoreHook(
 // registerUpdateValidatorStoreHook registers additional process
 // to update validators at specified height
 func registerUpdateValidatorStoreHook(
-	hooks *hook.HookManager,
+	hooks *hook.Hooks,
 	set store.ValidatorStore,
 	newValidators validators.Validators,
 	height uint64,
@@ -73,7 +73,7 @@ func registerUpdateValidatorStoreHook(
 // registerContractDeploymentHook registers additional process
 // to deploy contract or update contract byte code
 func registerContractDeploymentHook(
-	hooks *hook.HookManager,
+	hooks *hook.Hooks,
 	fork *IBFTFork,
 ) {
 	hooks.PreCommitStateFunc = func(header *types.Header, txn *state.Transition) error {

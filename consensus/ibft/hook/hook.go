@@ -21,17 +21,7 @@ type PreCommitStateFunc func(*types.Header, *state.Transition) error
 
 type PostInsertBlockFunc func(*types.Block) error
 
-type Hooks interface {
-	ShouldWriteTransactions(uint64) bool
-	ModifyHeader(*types.Header, types.Address) error
-	VerifyHeader(*types.Header) error
-	VerifyBlock(*types.Block) error
-	ProcessHeader(*types.Header) error
-	PreCommitState(*types.Header, *state.Transition) error
-	PostInsertBlock(*types.Block) error
-}
-
-type HookManager struct {
+type Hooks struct {
 	ShouldWriteTransactionFunc ShouldWriteTransactionsFunc
 	ModifyHeaderFunc           ModifyHeaderFunc
 	VerifyHeaderFunc           VerifyHeaderFunc
@@ -41,7 +31,7 @@ type HookManager struct {
 	PostInsertBlockFunc        PostInsertBlockFunc
 }
 
-func (m *HookManager) Clear() {
+func (m *Hooks) Clear() {
 	m.ShouldWriteTransactionFunc = nil
 	m.ModifyHeaderFunc = nil
 	m.VerifyHeaderFunc = nil
@@ -51,7 +41,7 @@ func (m *HookManager) Clear() {
 	m.PostInsertBlockFunc = nil
 }
 
-func (m *HookManager) ShouldWriteTransactions(height uint64) bool {
+func (m *Hooks) ShouldWriteTransactions(height uint64) bool {
 	if m.ShouldWriteTransactionFunc != nil {
 		return m.ShouldWriteTransactionFunc(height)
 	}
@@ -59,7 +49,7 @@ func (m *HookManager) ShouldWriteTransactions(height uint64) bool {
 	return true
 }
 
-func (m *HookManager) ModifyHeader(header *types.Header, proposer types.Address) error {
+func (m *Hooks) ModifyHeader(header *types.Header, proposer types.Address) error {
 	if m.ModifyHeaderFunc != nil {
 		return m.ModifyHeaderFunc(header, proposer)
 	}
@@ -67,7 +57,7 @@ func (m *HookManager) ModifyHeader(header *types.Header, proposer types.Address)
 	return nil
 }
 
-func (m *HookManager) VerifyHeader(header *types.Header) error {
+func (m *Hooks) VerifyHeader(header *types.Header) error {
 	if m.VerifyHeaderFunc != nil {
 		return m.VerifyHeaderFunc(header)
 	}
@@ -75,7 +65,7 @@ func (m *HookManager) VerifyHeader(header *types.Header) error {
 	return nil
 }
 
-func (m *HookManager) VerifyBlock(block *types.Block) error {
+func (m *Hooks) VerifyBlock(block *types.Block) error {
 	if m.VerifyBlockFunc != nil {
 		return m.VerifyBlockFunc(block)
 	}
@@ -83,7 +73,7 @@ func (m *HookManager) VerifyBlock(block *types.Block) error {
 	return nil
 }
 
-func (m *HookManager) ProcessHeader(header *types.Header) error {
+func (m *Hooks) ProcessHeader(header *types.Header) error {
 	if m.ProcessHeaderFunc != nil {
 		return m.ProcessHeaderFunc(header)
 	}
@@ -91,7 +81,7 @@ func (m *HookManager) ProcessHeader(header *types.Header) error {
 	return nil
 }
 
-func (m *HookManager) PreCommitState(header *types.Header, txn *state.Transition) error {
+func (m *Hooks) PreCommitState(header *types.Header, txn *state.Transition) error {
 	if m.PreCommitStateFunc != nil {
 		return m.PreCommitStateFunc(header, txn)
 	}
@@ -99,7 +89,7 @@ func (m *HookManager) PreCommitState(header *types.Header, txn *state.Transition
 	return nil
 }
 
-func (m *HookManager) PostInsertBlock(block *types.Block) error {
+func (m *Hooks) PostInsertBlock(block *types.Block) error {
 	if m.PostInsertBlockFunc != nil {
 		return m.PostInsertBlockFunc(block)
 	}
