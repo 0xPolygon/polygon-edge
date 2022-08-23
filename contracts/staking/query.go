@@ -121,8 +121,8 @@ func QueryValidators(t TxQueryHandler, from types.Address) ([]types.Address, err
 	return DecodeValidators(method, res.ReturnValue)
 }
 
-// DecodeBLSPublicKeys parses contract call result and returns arraty of bytes
-func DecodeBLSPublicKeys(
+// decodeBLSPublicKeys parses contract call result and returns arraty of bytes
+func decodeBLSPublicKeys(
 	method *abi.Method,
 	returnValue []byte,
 ) ([][]byte, error) {
@@ -161,5 +161,5 @@ func QueryBLSPublicKeys(t TxQueryHandler, from types.Address) ([][]byte, error) 
 		return nil, res.Err
 	}
 
-	return DecodeBLSPublicKeys(method, res.ReturnValue)
+	return decodeBLSPublicKeys(method, res.ReturnValue)
 }
