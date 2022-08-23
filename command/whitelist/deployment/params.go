@@ -1,7 +1,6 @@
 package deployment
 
 import (
-	"errors"
 	"fmt"
 	"os"
 
@@ -16,10 +15,6 @@ const (
 	chainFlag         = "chain"
 	addAddressFlag    = "add-address"
 	removeAddressFlag = "remove-address"
-)
-
-var (
-	errInvalidAddressFormat = errors.New("one or more addresses are of invalid format")
 )
 
 var (
@@ -58,8 +53,6 @@ func (p *deploymentParams) initRawParams() error {
 }
 
 func (p *deploymentParams) initRawAddresses() error {
-	var err error
-
 	// convert addresses to be added from string to type.Address
 	p.addAddress = unmarshallRawAddresses(p.addAddressRaw)
 
