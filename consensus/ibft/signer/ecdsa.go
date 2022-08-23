@@ -52,7 +52,7 @@ func (s *ECDSAKeyManager) NewEmptyValidators() validators.Validators {
 }
 
 // NewEmptyCommittedSeals returns empty CommittedSeals ECDSAKeyManager uses
-func (s *ECDSAKeyManager) NewEmptyCommittedSeals() Sealer {
+func (s *ECDSAKeyManager) NewEmptyCommittedSeals() Seals {
 	return &SerializedSeal{}
 }
 
@@ -97,7 +97,7 @@ func (s *ECDSAKeyManager) VerifyCommittedSeal(
 func (s *ECDSAKeyManager) GenerateCommittedSeals(
 	sealMap map[types.Address][]byte,
 	_ validators.Validators,
-) (Sealer, error) {
+) (Seals, error) {
 	seals := [][]byte{}
 
 	for _, seal := range sealMap {
@@ -114,7 +114,7 @@ func (s *ECDSAKeyManager) GenerateCommittedSeals(
 }
 
 func (s *ECDSAKeyManager) VerifyCommittedSeals(
-	rawCommittedSeal Sealer,
+	rawCommittedSeal Seals,
 	digest []byte,
 	rawSet validators.Validators,
 ) (int, error) {

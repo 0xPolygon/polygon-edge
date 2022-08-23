@@ -222,7 +222,7 @@ func (p *genesisParams) initIBFTExtraData() {
 		return
 	}
 
-	var committedSeal signer.Sealer
+	var committedSeal signer.Seals
 
 	switch p.ibftValidatorType {
 	case validators.ECDSAValidatorType:

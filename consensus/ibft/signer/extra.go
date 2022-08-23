@@ -26,11 +26,11 @@ var (
 type IstanbulExtra struct {
 	Validators           validators.Validators
 	ProposerSeal         []byte
-	CommittedSeals       Sealer
-	ParentCommittedSeals Sealer
+	CommittedSeals       Seals
+	ParentCommittedSeals Seals
 }
 
-type Sealer interface {
+type Seals interface {
 	// Number of committed seals
 	Num() int
 	MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value
@@ -221,7 +221,7 @@ func packProposerSealIntoExtra(
 // packCommittedSealsIntoExtra updates only CommittedSeal field in Extra
 func packCommittedSealsIntoExtra(
 	extraBytes []byte,
-	committedSeal Sealer,
+	committedSeal Seals,
 ) []byte {
 	return packFieldsIntoExtra(
 		extraBytes,

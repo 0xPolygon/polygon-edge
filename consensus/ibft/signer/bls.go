@@ -61,7 +61,7 @@ func (s *BLSKeyManager) NewEmptyValidators() validators.Validators {
 }
 
 // NewEmptyCommittedSeals returns empty CommittedSeals BLSKeyManager uses
-func (s *BLSKeyManager) NewEmptyCommittedSeals() Sealer {
+func (s *BLSKeyManager) NewEmptyCommittedSeals() Seals {
 	return &BLSSeal{}
 }
 
@@ -105,7 +105,7 @@ func (s *BLSKeyManager) VerifyCommittedSeal(
 func (s *BLSKeyManager) GenerateCommittedSeals(
 	sealMap map[types.Address][]byte,
 	rawValidators validators.Validators,
-) (Sealer, error) {
+) (Seals, error) {
 	validators, ok := rawValidators.(*validators.BLSValidators)
 	if !ok {
 		return nil, ErrInvalidValidators
@@ -133,7 +133,7 @@ func (s *BLSKeyManager) GenerateCommittedSeals(
 }
 
 func (s *BLSKeyManager) VerifyCommittedSeals(
-	rawCommittedSeal Sealer,
+	rawCommittedSeal Seals,
 	message []byte,
 	rawValidators validators.Validators,
 ) (int, error) {

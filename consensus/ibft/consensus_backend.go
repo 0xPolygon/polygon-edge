@@ -346,7 +346,7 @@ func (i *backendIBFT) writeTransaction(
 // extractCommittedSeals extracts CommittedSeals from header
 func (i *backendIBFT) extractCommittedSeals(
 	header *types.Header,
-) (signer.Sealer, error) {
+) (signer.Seals, error) {
 	signer, err := i.forkManager.GetSigner(header.Number)
 	if err != nil {
 		return nil, err
@@ -363,7 +363,7 @@ func (i *backendIBFT) extractCommittedSeals(
 // extractParentCommittedSeals extracts ParentCommittedSeals from header
 func (i *backendIBFT) extractParentCommittedSeals(
 	header *types.Header,
-) (signer.Sealer, error) {
+) (signer.Seals, error) {
 	if header.Number == 0 {
 		return nil, nil
 	}

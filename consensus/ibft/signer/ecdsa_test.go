@@ -283,7 +283,7 @@ func TestECDSAKeyManagerGenerateCommittedSeals(t *testing.T) {
 	tests := []struct {
 		name        string
 		sealMap     map[types.Address][]byte
-		expectedRes Sealer
+		expectedRes Seals
 		expectedErr error
 	}{
 		{
@@ -333,14 +333,14 @@ func TestECDSAKeyManagerVerifyCommittedSeals(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		committedSeals Sealer
+		committedSeals Seals
 		digest         []byte
 		rawSet         validators.Validators
 		expectedRes    int
 		expectedErr    error
 	}{
 		{
-			name:           "should return ErrInvalidCommittedSealType if the Sealer is not *SerializedSeal",
+			name:           "should return ErrInvalidCommittedSealType if the Seals is not *SerializedSeal",
 			committedSeals: &BLSSeal{},
 			digest:         msg,
 			rawSet:         nil,
@@ -429,7 +429,7 @@ func TestECDSAKeyManager_verifyCommittedSealsImpl(t *testing.T) {
 		expectedErr    error
 	}{
 		{
-			name:           "should return ErrInvalidCommittedSealType if the Sealer is not *SerializedSeal",
+			name:           "should return ErrInvalidCommittedSealType if the Seals is not *SerializedSeal",
 			committedSeals: &SerializedSeal{},
 			msg:            msg,
 			validators:     validators.ECDSAValidators{},

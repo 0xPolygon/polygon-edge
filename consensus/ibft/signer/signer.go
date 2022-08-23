@@ -29,7 +29,7 @@ type Signer interface {
 	Address() types.Address
 
 	// IBFT Extra
-	InitIBFTExtra(*types.Header, validators.Validators, Sealer)
+	InitIBFTExtra(*types.Header, validators.Validators, Seals)
 	GetIBFTExtra(header *types.Header) (*IstanbulExtra, error)
 
 	// ProposerSeal
@@ -49,7 +49,7 @@ type Signer interface {
 	) error
 
 	// ParentCommittedSeals
-	GetParentCommittedSeals(header *types.Header) (Sealer, error)
+	GetParentCommittedSeals(header *types.Header) (Seals, error)
 	VerifyParentCommittedSeals(
 		parent, header *types.Header,
 		parentValidators validators.Validators,
@@ -94,7 +94,7 @@ func (s *SignerImpl) Address() types.Address {
 func (s *SignerImpl) InitIBFTExtra(
 	header *types.Header,
 	validators validators.Validators,
-	parentCommittedSeals Sealer,
+	parentCommittedSeals Seals,
 ) {
 	s.initIbftExtra(
 		header,
@@ -310,7 +310,7 @@ func (s *SignerImpl) SignIBFTMessage(msg []byte) ([]byte, error) {
 func (s *SignerImpl) initIbftExtra(
 	header *types.Header,
 	validators validators.Validators,
-	parentCommittedSeal Sealer,
+	parentCommittedSeal Seals,
 ) {
 	putIbftExtra(header, &IstanbulExtra{
 		Validators:           validators,
@@ -331,7 +331,7 @@ func (s *SignerImpl) CalculateHeaderHash(header *types.Header) (types.Hash, erro
 }
 
 // GetParentCommittedSeals extracts Parent Committed Seals from IBFT Extra in Header
-func (s *SignerImpl) GetParentCommittedSeals(header *types.Header) (Sealer, error) {
+func (s *SignerImpl) GetParentCommittedSeals(header *types.Header) (Seals, error) {
 	data := header.ExtraData[IstanbulExtraVanity:]
 	extra := &IstanbulExtra{
 		ParentCommittedSeals: s.keyManager.NewEmptyCommittedSeals(),

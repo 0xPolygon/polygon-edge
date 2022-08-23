@@ -251,7 +251,7 @@ func Test_packCommittedSealsIntoExtra(t *testing.T) {
 	tests := []struct {
 		name              string
 		extra             *IstanbulExtra
-		newCommittedSeals Sealer
+		newCommittedSeals Seals
 	}{
 		{
 			name: "ECDSAExtra",

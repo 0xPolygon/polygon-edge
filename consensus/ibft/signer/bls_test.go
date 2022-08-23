@@ -406,7 +406,7 @@ func TestBLSKeyManagerGenerateCommittedSeals(t *testing.T) {
 		name          string
 		sealMap       map[types.Address][]byte
 		rawValidators validators.Validators
-		expectedRes   Sealer
+		expectedRes   Seals
 		expectedErr   error
 	}{
 		{
@@ -486,7 +486,7 @@ func TestBLSKeyManagerVerifyCommittedSeals(t *testing.T) {
 
 	tests := []struct {
 		name              string
-		rawCommittedSeals Sealer
+		rawCommittedSeals Seals
 		hash              []byte
 		rawValidators     validators.Validators
 		expectedRes       int

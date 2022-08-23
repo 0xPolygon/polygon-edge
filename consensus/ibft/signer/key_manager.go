@@ -14,7 +14,7 @@ type KeyManager interface {
 	// NewEmptyValidators creates empty validator collection the Signer expects
 	NewEmptyValidators() validators.Validators
 	// NewEmptyCommittedSeals creates empty committed seals the Signer expects
-	NewEmptyCommittedSeals() Sealer
+	NewEmptyCommittedSeals() Seals
 	// SignProposerSeal creates a signature for ProposerSeal
 	SignProposerSeal(hash []byte) ([]byte, error)
 	// SignCommittedSeal creates a signature for committed seal
@@ -22,9 +22,9 @@ type KeyManager interface {
 	// VerifyCommittedSeal verifies a committed seal
 	VerifyCommittedSeal(vals validators.Validators, signer types.Address, sig, hash []byte) error
 	// GenerateCommittedSeals creates CommittedSeals from committed seals
-	GenerateCommittedSeals(sealsByValidator map[types.Address][]byte, vals validators.Validators) (Sealer, error)
+	GenerateCommittedSeals(sealsByValidator map[types.Address][]byte, vals validators.Validators) (Seals, error)
 	// VerifyCommittedSeals verifies CommittedSeals
-	VerifyCommittedSeals(seals Sealer, hash []byte, vals validators.Validators) (int, error)
+	VerifyCommittedSeals(seals Seals, hash []byte, vals validators.Validators) (int, error)
 	// SignIBFTMessage signs for arbitrary bytes message
 	SignIBFTMessage(msg []byte) ([]byte, error)
 	// Ecrecover recovers address from signature and message
