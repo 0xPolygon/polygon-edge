@@ -549,7 +549,7 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 	}
 
 	// Check if transaction can deploy smart contract
-	if tx.IsContractCreation() && !tx.CanDeployContract(p.whitelists.Deployment) {
+	if tx.IsContractCreation() && !canDeployContract(tx.From, p.whitelists.Deployment) {
 		return ErrSmartContractRestricted
 	}
 
@@ -804,4 +804,11 @@ func toHash(txs ...*types.Transaction) (hashes []types.Hash) {
 	}
 
 	return
+}
+
+// CanDeployContract checks if address can deploy smart contract
+func canDeployContract(from types.Address, whitelist []types.Address) bool {
+	// If whitelist is empty anyone can deploy
+	// If not only addresses which exists in whitelist can deploy
+	return len(whitelist) == 0 || types.AddressExists(from, whitelist)
 }

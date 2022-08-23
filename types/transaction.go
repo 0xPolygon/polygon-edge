@@ -29,21 +29,6 @@ func (t *Transaction) IsContractCreation() bool {
 	return t.To == nil
 }
 
-// CanDeployContract checks if address can deploy smart contract
-func (t *Transaction) CanDeployContract(whitelist []Address) bool {
-	// If whitelist is empty anyone can deploy
-	if len(whitelist) == 0 {
-		return true
-	}
-
-	// Only addresses which exists in whitelist can deploy
-	if AddressExists(t.From, whitelist) {
-		return true
-	}
-
-	return false
-}
-
 // ComputeHash computes the hash of the transaction
 func (t *Transaction) ComputeHash() *Transaction {
 	ar := marshalArenaPool.Get()
