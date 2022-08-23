@@ -13,6 +13,7 @@ var (
 	ErrMismatchValidatorsType = errors.New("mismatch between two validators")
 	ErrValidatorAlreadyExists = errors.New("validator already exists in validators")
 	ErrValidatorNotFound      = errors.New("validator not found in validators")
+	ErrInvalidValidators      = errors.New("container is not ")
 )
 
 type ValidatorType string
@@ -55,7 +56,7 @@ type Validator interface {
 	MarshalRLPWith(*fastrlp.Arena) *fastrlp.Value
 	// RLP Unmarshaller to encode from bytes
 	UnmarshalRLPFrom(*fastrlp.Parser, *fastrlp.Value) error
-	// Reeturn bytes in RLP encode
+	// Return bytes in RLP encode
 	Bytes() []byte
 	// Decode bytes in RLP encode and map to the fields
 	SetFromBytes([]byte) error

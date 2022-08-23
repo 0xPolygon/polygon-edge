@@ -125,7 +125,7 @@ func TestECDSAKeyManagerNewEmptyValidators(t *testing.T) {
 
 	assert.Equal(
 		t,
-		&validators.ECDSAValidators{},
+		validators.NewECDSAValidatorSet(),
 		ecdsaKeyManager.NewEmptyValidators(),
 	)
 }
@@ -206,7 +206,7 @@ func TestECDSAKeyManagerVerifyCommittedSeal(t *testing.T) {
 	}{
 		{
 			name:        "should return ErrInvalidValidators if validators is wrong type",
-			validators:  &validators.BLSValidators{},
+			validators:  validators.NewBLSValidatorSet(),
 			address:     ecdsaKeyManager1.Address(),
 			signature:   []byte{},
 			message:     []byte{},
@@ -214,7 +214,7 @@ func TestECDSAKeyManagerVerifyCommittedSeal(t *testing.T) {
 		},
 		{
 			name:        "should return ErrInvalidSignature if ecrecover failed",
-			validators:  &validators.ECDSAValidators{},
+			validators:  validators.NewECDSAValidatorSet(),
 			address:     ecdsaKeyManager1.Address(),
 			signature:   []byte{},
 			message:     []byte{},
@@ -222,7 +222,7 @@ func TestECDSAKeyManagerVerifyCommittedSeal(t *testing.T) {
 		},
 		{
 			name:        "should return ErrSignerMismatch if the signature is signed by different signer",
-			validators:  &validators.ECDSAValidators{},
+			validators:  validators.NewECDSAValidatorSet(),
 			address:     ecdsaKeyManager1.Address(),
 			signature:   wrongSignature,
 			message:     msg,
@@ -230,7 +230,7 @@ func TestECDSAKeyManagerVerifyCommittedSeal(t *testing.T) {
 		},
 		{
 			name:        "should return ErrNonValidatorCommittedSeal if the signer is not in the validators",
-			validators:  &validators.ECDSAValidators{},
+			validators:  validators.NewECDSAValidatorSet(),
 			address:     ecdsaKeyManager1.Address(),
 			signature:   correctSignature,
 			message:     msg,
@@ -238,11 +238,11 @@ func TestECDSAKeyManagerVerifyCommittedSeal(t *testing.T) {
 		},
 		{
 			name: "should return nil if it's verified",
-			validators: &validators.ECDSAValidators{
-				{
-					Address: ecdsaKeyManager1.Address(),
-				},
-			},
+			validators: validators.NewECDSAValidatorSet(
+				validators.NewECDSAValidator(
+					ecdsaKeyManager1.Address(),
+				),
+			),
 			address:     ecdsaKeyManager1.Address(),
 			signature:   correctSignature,
 			message:     msg,
@@ -351,7 +351,7 @@ func TestECDSAKeyManagerVerifyCommittedSeals(t *testing.T) {
 			name:           "should return ErrInvalidValidators if the rawSet is not *validators.ECDSAValidators",
 			committedSeals: &SerializedSeal{},
 			digest:         msg,
-			rawSet:         &validators.BLSValidators{},
+			rawSet:         validators.NewBLSValidatorSet(),
 			expectedRes:    0,
 			expectedErr:    ErrInvalidValidators,
 		},
@@ -361,11 +361,11 @@ func TestECDSAKeyManagerVerifyCommittedSeals(t *testing.T) {
 				correctCommittedSeal,
 			},
 			digest: msg,
-			rawSet: &validators.ECDSAValidators{
+			rawSet: validators.NewECDSAValidatorSet(
 				validators.NewECDSAValidator(
 					ecdsaKeyManager1.Address(),
 				),
-			},
+			),
 			expectedRes: 1,
 			expectedErr: nil,
 		},
@@ -424,7 +424,7 @@ func TestECDSAKeyManager_verifyCommittedSealsImpl(t *testing.T) {
 		name           string
 		committedSeals *SerializedSeal
 		msg            []byte
-		validators     validators.ECDSAValidators
+		validators     validators.Validators
 		expectedRes    int
 		expectedErr    error
 	}{
@@ -432,7 +432,7 @@ func TestECDSAKeyManager_verifyCommittedSealsImpl(t *testing.T) {
 			name:           "should return ErrInvalidCommittedSealType if the Seals is not *SerializedSeal",
 			committedSeals: &SerializedSeal{},
 			msg:            msg,
-			validators:     validators.ECDSAValidators{},
+			validators:     validators.NewECDSAValidatorSet(),
 			expectedRes:    0,
 			expectedErr:    ErrEmptyCommittedSeals,
 		},
@@ -442,7 +442,7 @@ func TestECDSAKeyManager_verifyCommittedSealsImpl(t *testing.T) {
 				wrongSignature,
 			},
 			msg:         msg,
-			validators:  validators.ECDSAValidators{},
+			validators:  validators.NewECDSAValidatorSet(),
 			expectedRes: 0,
 			expectedErr: errors.New("invalid compact signature size"),
 		},
@@ -453,11 +453,11 @@ func TestECDSAKeyManager_verifyCommittedSealsImpl(t *testing.T) {
 				correctCommittedSeal,
 			},
 			msg: msg,
-			validators: validators.ECDSAValidators{
+			validators: validators.NewECDSAValidatorSet(
 				validators.NewECDSAValidator(
 					ecdsaKeyManager1.Address(),
 				),
-			},
+			),
 			expectedRes: 0,
 			expectedErr: ErrRepeatedCommittedSeal,
 		},
@@ -468,11 +468,11 @@ func TestECDSAKeyManager_verifyCommittedSealsImpl(t *testing.T) {
 				nonValidatorsCommittedSeal,
 			},
 			msg: msg,
-			validators: validators.ECDSAValidators{
+			validators: validators.NewECDSAValidatorSet(
 				validators.NewECDSAValidator(
 					ecdsaKeyManager1.Address(),
 				),
-			},
+			),
 			expectedRes: 0,
 			expectedErr: ErrNonValidatorCommittedSeal,
 		},
@@ -482,11 +482,11 @@ func TestECDSAKeyManager_verifyCommittedSealsImpl(t *testing.T) {
 				correctCommittedSeal,
 			},
 			msg: msg,
-			validators: validators.ECDSAValidators{
+			validators: validators.NewECDSAValidatorSet(
 				validators.NewECDSAValidator(
 					ecdsaKeyManager1.Address(),
 				),
-			},
+			),
 			expectedRes: 1,
 			expectedErr: nil,
 		},

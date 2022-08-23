@@ -40,7 +40,9 @@ func createExampleECDSASnapshotJSON(
 			}
 		],
 		"Set": [
-			"%s"
+			{
+				"Address": "%s"
+			}
 		]
 	}`,
 		hash,
@@ -76,7 +78,10 @@ func createExampleBLSSnapshotJSON(
 			}
 		],
 		"Set": [
-			"%s"
+			{
+				"Address": "%s",
+				"BLSPublicKey": "%s"
+			}
 		]
 	}`,
 		hash,
@@ -86,7 +91,8 @@ func createExampleBLSSnapshotJSON(
 		voteCandidate.Address,
 		voteCandidate.BLSPublicKey,
 		voteValidator,
-		setValidator.String(),
+		setValidator.Address,
+		setValidator.BLSPublicKey,
 	)
 }
 
@@ -131,9 +137,9 @@ func TestSnapshotMarshalJSON(t *testing.T) {
 				Votes: []*store.Vote{
 					vote,
 				},
-				Set: &validators.ECDSAValidators{
+				Set: validators.NewECDSAValidatorSet(
 					ecdsaValidator1,
-				},
+				),
 			},
 			createExampleECDSASnapshotJSON(
 				testHash,
@@ -157,9 +163,9 @@ func TestSnapshotMarshalJSON(t *testing.T) {
 				Votes: []*store.Vote{
 					vote,
 				},
-				Set: &validators.BLSValidators{
+				Set: validators.NewBLSValidatorSet(
 					blsValidator1,
-				},
+				),
 			},
 			createExampleBLSSnapshotJSON(
 				testHash,
@@ -206,9 +212,49 @@ func TestSnapshotUnmarshalJSON(t *testing.T) {
 				Votes: []*store.Vote{
 					newTestVote(ecdsaValidator1, ecdsaValidator2.Addr(), true),
 				},
-				Set: &validators.ECDSAValidators{
+				Set: validators.NewECDSAValidatorSet(
 					ecdsaValidator2,
+				),
+			},
+		)
+	})
+
+	t.Run("ECDSAValidators (Legacy format)", func(t *testing.T) {
+		testUnmarshalJSON(
+			t,
+			fmt.Sprintf(`
+			{
+				"Number": %d,
+				"Hash": "%s",
+				"Votes": [
+					{
+						"Validator": "%s",
+						"Address": "%s",
+						"Authorize": %t
+					}
+				],
+				"Set": [
+					"%s"
+				]
+			}
+			`,
+				testNumber,
+				testHash,
+				ecdsaValidator2.Addr(),
+				ecdsaValidator1.Addr(),
+				true,
+				ecdsaValidator2.Addr(),
+			),
+			&Snapshot{},
+			&Snapshot{
+				Number: testNumber,
+				Hash:   testHash.String(),
+				Votes: []*store.Vote{
+					newTestVote(ecdsaValidator1, ecdsaValidator2.Addr(), true),
 				},
+				Set: validators.NewECDSAValidatorSet(
+					ecdsaValidator2,
+				),
 			},
 		)
 	})
@@ -231,9 +277,9 @@ func TestSnapshotUnmarshalJSON(t *testing.T) {
 				Votes: []*store.Vote{
 					newTestVote(blsValidator1, blsValidator2.Addr(), false),
 				},
-				Set: &validators.BLSValidators{
+				Set: validators.NewBLSValidatorSet(
 					blsValidator2,
-				},
+				),
 			},
 		)
 	})
@@ -252,17 +298,17 @@ func TestSnapshotEqual(t *testing.T) {
 				Votes: []*store.Vote{
 					newTestVote(ecdsaValidator2, ecdsaValidator1.Addr(), true),
 				},
-				Set: &validators.ECDSAValidators{
+				Set: validators.NewECDSAValidatorSet(
 					ecdsaValidator1,
-				},
+				),
 			},
 			s2: &Snapshot{
 				Votes: []*store.Vote{
 					newTestVote(ecdsaValidator2, ecdsaValidator1.Addr(), true),
 				},
-				Set: &validators.ECDSAValidators{
+				Set: validators.NewECDSAValidatorSet(
 					ecdsaValidator1,
-				},
+				),
 			},
 			expected: true,
 		},
@@ -272,15 +318,15 @@ func TestSnapshotEqual(t *testing.T) {
 				Votes: []*store.Vote{
 					newTestVote(ecdsaValidator2, ecdsaValidator1.Addr(), true),
 				},
-				Set: &validators.ECDSAValidators{
+				Set: validators.NewECDSAValidatorSet(
 					ecdsaValidator1,
-				},
+				),
 			},
 			s2: &Snapshot{
 				Votes: []*store.Vote{},
-				Set: &validators.ECDSAValidators{
+				Set: validators.NewECDSAValidatorSet(
 					ecdsaValidator1,
-				},
+				),
 			},
 			expected: false,
 		},
@@ -290,17 +336,17 @@ func TestSnapshotEqual(t *testing.T) {
 				Votes: []*store.Vote{
 					newTestVote(ecdsaValidator2, ecdsaValidator1.Addr(), true),
 				},
-				Set: &validators.ECDSAValidators{
+				Set: validators.NewECDSAValidatorSet(
 					ecdsaValidator1,
-				},
+				),
 			},
 			s2: &Snapshot{
 				Votes: []*store.Vote{
 					newTestVote(ecdsaValidator3, ecdsaValidator1.Addr(), true),
 				},
-				Set: &validators.ECDSAValidators{
+				Set: validators.NewECDSAValidatorSet(
 					ecdsaValidator1,
-				},
+				),
 			},
 			expected: false,
 		},
@@ -310,17 +356,17 @@ func TestSnapshotEqual(t *testing.T) {
 				Votes: []*store.Vote{
 					newTestVote(ecdsaValidator3, ecdsaValidator1.Addr(), true),
 				},
-				Set: &validators.ECDSAValidators{
+				Set: validators.NewECDSAValidatorSet(
 					ecdsaValidator1,
-				},
+				),
 			},
 			s2: &Snapshot{
 				Votes: []*store.Vote{
 					newTestVote(ecdsaValidator3, ecdsaValidator1.Addr(), true),
 				},
-				Set: &validators.ECDSAValidators{
+				Set: validators.NewECDSAValidatorSet(
 					ecdsaValidator2,
-				},
+				),
 			},
 			expected: false,
 		},
@@ -460,10 +506,10 @@ func TestSnapshotCopy(t *testing.T) {
 				Votes: []*store.Vote{
 					newTestVote(ecdsaValidator1, ecdsaValidator1.Addr(), true),
 				},
-				Set: &validators.ECDSAValidators{
+				Set: validators.NewECDSAValidatorSet(
 					ecdsaValidator1,
 					ecdsaValidator2,
-				},
+				),
 			},
 		},
 		{
@@ -472,10 +518,10 @@ func TestSnapshotCopy(t *testing.T) {
 				Votes: []*store.Vote{
 					newTestVote(blsValidator1, ecdsaValidator1.Addr(), true),
 				},
-				Set: &validators.BLSValidators{
+				Set: validators.NewBLSValidatorSet(
 					blsValidator1,
 					blsValidator2,
-				},
+				),
 			},
 		},
 	}

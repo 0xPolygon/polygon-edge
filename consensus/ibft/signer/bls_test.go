@@ -229,7 +229,7 @@ func TestBLSKeyManagerNewEmptyValidators(t *testing.T) {
 
 	assert.Equal(
 		t,
-		&validators.BLSValidators{},
+		validators.NewBLSValidatorSet(),
 		blsKeyManager.NewEmptyValidators(),
 	)
 }
@@ -322,7 +322,7 @@ func TestBLSKeyManagerVerifyCommittedSeal(t *testing.T) {
 	}{
 		{
 			name:        "should return ErrInvalidValidators if validators is wrong type",
-			validators:  &validators.ECDSAValidators{},
+			validators:  validators.NewECDSAValidatorSet(),
 			address:     blsKeyManager1.Address(),
 			signature:   []byte{},
 			message:     []byte{},
@@ -330,11 +330,9 @@ func TestBLSKeyManagerVerifyCommittedSeal(t *testing.T) {
 		},
 		{
 			name: "should return ErrInvalidSignature if the address is not in the validators",
-			validators: &validators.BLSValidators{
-				&validators.BLSValidator{
-					Address: blsKeyManager2.Address(),
-				},
-			},
+			validators: validators.NewBLSValidatorSet(
+				testBLSKeyManagerToBLSValidator(t, blsKeyManager2),
+			),
 			address:     blsKeyManager1.Address(),
 			signature:   []byte{},
 			message:     []byte{},
@@ -342,12 +340,12 @@ func TestBLSKeyManagerVerifyCommittedSeal(t *testing.T) {
 		},
 		{
 			name: "should return crypto.ErrInvalidBLSSignature if it's wrong signature",
-			validators: &validators.BLSValidators{
-				&validators.BLSValidator{
-					Address:      blsKeyManager1.Address(),
-					BLSPublicKey: blsPublicKeyBytes,
-				},
-			},
+			validators: validators.NewBLSValidatorSet(
+				validators.NewBLSValidator(
+					blsKeyManager1.Address(),
+					blsPublicKeyBytes,
+				),
+			),
 			address:     blsKeyManager1.Address(),
 			signature:   wrongSignature,
 			message:     msg,
@@ -355,12 +353,12 @@ func TestBLSKeyManagerVerifyCommittedSeal(t *testing.T) {
 		},
 		{
 			name: "should return nil if it's correct signature",
-			validators: &validators.BLSValidators{
-				&validators.BLSValidator{
-					Address:      blsKeyManager1.Address(),
-					BLSPublicKey: blsPublicKeyBytes,
-				},
-			},
+			validators: validators.NewBLSValidatorSet(
+				validators.NewBLSValidator(
+					blsKeyManager1.Address(),
+					blsPublicKeyBytes,
+				),
+			),
 			address:     blsKeyManager1.Address(),
 			signature:   correctSignature,
 			message:     msg,
@@ -403,46 +401,46 @@ func TestBLSKeyManagerGenerateCommittedSeals(t *testing.T) {
 	)
 
 	tests := []struct {
-		name          string
-		sealMap       map[types.Address][]byte
-		rawValidators validators.Validators
-		expectedRes   Seals
-		expectedErr   error
+		name        string
+		sealMap     map[types.Address][]byte
+		validators  validators.Validators
+		expectedRes Seals
+		expectedErr error
 	}{
 		{
-			name:          "should return ErrInvalidValidators if rawValidators is not *BLSValidators",
-			sealMap:       nil,
-			rawValidators: &validators.ECDSAValidators{},
-			expectedRes:   nil,
-			expectedErr:   ErrInvalidValidators,
+			name:        "should return ErrInvalidValidators if rawValidators is not *BLSValidators",
+			sealMap:     nil,
+			validators:  validators.NewECDSAValidatorSet(),
+			expectedRes: nil,
+			expectedErr: ErrInvalidValidators,
 		},
 		{
 			name: "should return error if getBLSSignatures returns error",
 			sealMap: map[types.Address][]byte{
 				blsKeyManager1.Address(): correctCommittedSeal,
 			},
-			rawValidators: &validators.BLSValidators{},
-			expectedRes:   nil,
-			expectedErr:   ErrNonValidatorCommittedSeal,
+			validators:  validators.NewBLSValidatorSet(),
+			expectedRes: nil,
+			expectedErr: ErrNonValidatorCommittedSeal,
 		},
 		{
-			name:          "should return error if sealMap is empty",
-			sealMap:       map[types.Address][]byte{},
-			rawValidators: &validators.BLSValidators{},
-			expectedRes:   nil,
-			expectedErr:   errors.New("at least one signature is required"),
+			name:        "should return error if sealMap is empty",
+			sealMap:     map[types.Address][]byte{},
+			validators:  validators.NewBLSValidatorSet(),
+			expectedRes: nil,
+			expectedErr: errors.New("at least one signature is required"),
 		},
 		{
 			name: "should return AggregatedSeal if it's successful",
 			sealMap: map[types.Address][]byte{
 				blsKeyManager1.Address(): correctCommittedSeal,
 			},
-			rawValidators: &validators.BLSValidators{
+			validators: validators.NewBLSValidatorSet(
 				testBLSKeyManagerToBLSValidator(
 					t,
 					blsKeyManager1,
 				),
-			},
+			),
 			expectedRes: &AggregatedSeal{
 				Bitmap:    big.NewInt(0).SetBit(new(big.Int), 0, 1),
 				Signature: aggregatedBLSSigBytes,
@@ -455,7 +453,7 @@ func TestBLSKeyManagerGenerateCommittedSeals(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			res, err := blsKeyManager1.GenerateCommittedSeals(
 				test.sealMap,
-				test.rawValidators,
+				test.validators,
 			)
 
 			assert.Equal(t, test.expectedRes, res)
@@ -488,7 +486,7 @@ func TestBLSKeyManagerVerifyCommittedSeals(t *testing.T) {
 		name              string
 		rawCommittedSeals Seals
 		hash              []byte
-		rawValidators     validators.Validators
+		validators        validators.Validators
 		expectedRes       int
 		expectedErr       error
 	}{
@@ -496,7 +494,7 @@ func TestBLSKeyManagerVerifyCommittedSeals(t *testing.T) {
 			name:              "should return ErrInvalidCommittedSealType if rawCommittedSeal is not *AggregatedSeal",
 			rawCommittedSeals: &SerializedSeal{},
 			hash:              nil,
-			rawValidators:     nil,
+			validators:        nil,
 			expectedRes:       0,
 			expectedErr:       ErrInvalidCommittedSealType,
 		},
@@ -506,9 +504,9 @@ func TestBLSKeyManagerVerifyCommittedSeals(t *testing.T) {
 				Bitmap:    big.NewInt(0).SetBit(new(big.Int), 0, 1),
 				Signature: aggregatedBLSSigBytes,
 			},
-			rawValidators: &validators.ECDSAValidators{},
-			expectedRes:   0,
-			expectedErr:   ErrInvalidValidators,
+			validators:  validators.NewECDSAValidatorSet(),
+			expectedRes: 0,
+			expectedErr: ErrInvalidValidators,
 		},
 		{
 			name: "should return size of AggregatedSeal if it's successful",
@@ -516,12 +514,12 @@ func TestBLSKeyManagerVerifyCommittedSeals(t *testing.T) {
 				Bitmap:    big.NewInt(0).SetBit(new(big.Int), 0, 1),
 				Signature: aggregatedBLSSigBytes,
 			},
-			rawValidators: &validators.BLSValidators{
+			validators: validators.NewBLSValidatorSet(
 				testBLSKeyManagerToBLSValidator(
 					t,
 					blsKeyManager1,
 				),
-			},
+			),
 			expectedRes: 1,
 			expectedErr: nil,
 		},
@@ -532,7 +530,7 @@ func TestBLSKeyManagerVerifyCommittedSeals(t *testing.T) {
 			res, err := blsKeyManager1.VerifyCommittedSeals(
 				test.rawCommittedSeals,
 				msg,
-				test.rawValidators,
+				test.validators,
 			)
 
 			assert.Equal(t, test.expectedRes, res)
@@ -564,11 +562,8 @@ func TestBLSKeyManagerSignIBFTMessageAndEcrecover(t *testing.T) {
 }
 
 func Test_getBLSSignatures(t *testing.T) {
-	validatorKeyManager, _, validatorBLSSecretKey := newTestBLSKeyManager(t)
+	validatorKeyManager, _, _ := newTestBLSKeyManager(t)
 	nonValidatorKeyManager, _, _ := newTestBLSKeyManager(t)
-
-	validatorBLSPublicKey, err := crypto.BLSSecretKeyToPubkeyBytes(validatorBLSSecretKey)
-	assert.NoError(t, err)
 
 	msg := crypto.Keccak256(
 		wrapCommitHash(
@@ -590,7 +585,7 @@ func Test_getBLSSignatures(t *testing.T) {
 	tests := []struct {
 		name               string
 		sealMap            map[types.Address][]byte
-		validators         *validators.BLSValidators
+		validators         validators.Validators
 		expectedSignatures []*bls_sig.Signature
 		expectedBitMap     *big.Int
 		expectedErr        error
@@ -600,12 +595,12 @@ func Test_getBLSSignatures(t *testing.T) {
 			sealMap: map[types.Address][]byte{
 				nonValidatorKeyManager.Address(): nonValidatorCommittedSeal,
 			},
-			validators: &validators.BLSValidators{
+			validators: validators.NewBLSValidatorSet(
 				testBLSKeyManagerToBLSValidator(
 					t,
 					validatorKeyManager,
 				),
-			},
+			),
 			expectedSignatures: nil,
 			expectedBitMap:     nil,
 			expectedErr:        ErrNonValidatorCommittedSeal,
@@ -615,12 +610,12 @@ func Test_getBLSSignatures(t *testing.T) {
 			sealMap: map[types.Address][]byte{
 				validatorKeyManager.Address(): wrongCommittedSeal,
 			},
-			validators: &validators.BLSValidators{
+			validators: validators.NewBLSValidatorSet(
 				testBLSKeyManagerToBLSValidator(
 					t,
 					validatorKeyManager,
 				),
-			},
+			),
 			expectedSignatures: nil,
 			expectedBitMap:     nil,
 			expectedErr:        errors.New("signature must be 96 bytes"),
@@ -630,12 +625,12 @@ func Test_getBLSSignatures(t *testing.T) {
 			sealMap: map[types.Address][]byte{
 				validatorKeyManager.Address(): validatorCommittedSeal,
 			},
-			validators: &validators.BLSValidators{
-				validators.NewBLSValidator(
-					validatorKeyManager.Address(),
-					validatorBLSPublicKey,
+			validators: validators.NewBLSValidatorSet(
+				testBLSKeyManagerToBLSValidator(
+					t,
+					validatorKeyManager,
 				),
-			},
+			),
 			expectedSignatures: []*bls_sig.Signature{
 				validatorSignature,
 			},
@@ -679,7 +674,7 @@ func Test_getBLSSignatures(t *testing.T) {
 		)
 
 		sealMap := make(map[types.Address][]byte)
-		validators := &validators.BLSValidators{}
+		validators := validators.NewBLSValidatorSet()
 
 		expectedSignatures := make([]*bls_sig.Signature, 0, len(signerFlags))
 		expectedBitMap := new(big.Int)
@@ -740,7 +735,7 @@ func Test_createAggregatedBLSPubKeys(t *testing.T) {
 			true,
 		}
 
-		validators := validators.BLSValidators{}
+		validators := validators.NewBLSValidatorSet()
 		bitMap := new(big.Int)
 
 		expectedBLSPublicKeys := []*bls_sig.PublicKey{}
@@ -799,7 +794,7 @@ func Test_createAggregatedBLSPubKeys(t *testing.T) {
 
 	t.Run("should return error if bitMap is empty", func(t *testing.T) {
 		aggrecatedPubKeys, num, err := createAggregatedBLSPubKeys(
-			validators.BLSValidators{},
+			validators.NewBLSValidatorSet(),
 			new(big.Int),
 		)
 
@@ -810,12 +805,12 @@ func Test_createAggregatedBLSPubKeys(t *testing.T) {
 
 	t.Run("should return error if public key is wrong", func(t *testing.T) {
 		aggrecatedPubKeys, num, err := createAggregatedBLSPubKeys(
-			validators.BLSValidators{
+			validators.NewBLSValidatorSet(
 				validators.NewBLSValidator(
 					types.StringToAddress("0"),
 					[]byte("fake"),
 				),
-			},
+			),
 			new(big.Int).SetBit(new(big.Int), 0, 1),
 		)
 
@@ -855,7 +850,7 @@ func Test_verifyBLSCommittedSealsImpl(t *testing.T) {
 		name          string
 		committedSeal *AggregatedSeal
 		msg           []byte
-		validators    validators.BLSValidators
+		validators    validators.Validators
 		expectedRes   int
 		expectedErr   error
 	}{
@@ -892,11 +887,11 @@ func Test_verifyBLSCommittedSealsImpl(t *testing.T) {
 				Signature: []byte("test"),
 				Bitmap:    new(big.Int).SetBit(new(big.Int), 0, 1),
 			},
-			validators: validators.BLSValidators{
+			validators: validators.NewBLSValidatorSet(
 				&validators.BLSValidator{
 					BLSPublicKey: []byte("test"),
 				},
-			},
+			),
 			expectedRes: 0,
 			expectedErr: errors.New("failed to aggregate BLS Public Keys: public key must be 48 bytes"),
 		},
@@ -906,10 +901,10 @@ func Test_verifyBLSCommittedSealsImpl(t *testing.T) {
 				Signature: []byte("test"),
 				Bitmap:    new(big.Int).SetBit(new(big.Int), 0, 1),
 			},
-			validators: validators.BLSValidators{
+			validators: validators.NewBLSValidatorSet(
 				testBLSKeyManagerToBLSValidator(t, validatorKeyManager1),
 				testBLSKeyManagerToBLSValidator(t, validatorKeyManager2),
-			},
+			),
 			expectedRes: 0,
 			expectedErr: errors.New("multi signature must be 96 bytes"),
 		},
@@ -919,10 +914,10 @@ func Test_verifyBLSCommittedSealsImpl(t *testing.T) {
 				Signature: correctAggregatedSig,
 				Bitmap:    new(big.Int).SetBit(new(big.Int), 0, 1),
 			},
-			validators: validators.BLSValidators{
+			validators: validators.NewBLSValidatorSet(
 				testBLSKeyManagerToBLSValidator(t, validatorKeyManager1),
 				testBLSKeyManagerToBLSValidator(t, validatorKeyManager2),
-			},
+			),
 			msg:         nil,
 			expectedRes: 0,
 			expectedErr: errors.New("signature and message and public key cannot be nil or zero"),
@@ -933,10 +928,10 @@ func Test_verifyBLSCommittedSealsImpl(t *testing.T) {
 				Signature: wrongAggregatedSig,
 				Bitmap:    new(big.Int).SetBytes([]byte{0x3}), // validator1 & validator2
 			},
-			validators: validators.BLSValidators{
+			validators: validators.NewBLSValidatorSet(
 				testBLSKeyManagerToBLSValidator(t, validatorKeyManager1),
 				testBLSKeyManagerToBLSValidator(t, validatorKeyManager2),
-			},
+			),
 			msg:         msg,
 			expectedRes: 0,
 			expectedErr: ErrInvalidSignature,
@@ -947,10 +942,10 @@ func Test_verifyBLSCommittedSealsImpl(t *testing.T) {
 				Signature: correctAggregatedSig,
 				Bitmap:    new(big.Int).SetBytes([]byte{0x3}), // validator1 & validator 2
 			},
-			validators: validators.BLSValidators{
+			validators: validators.NewBLSValidatorSet(
 				testBLSKeyManagerToBLSValidator(t, validatorKeyManager3),
 				testBLSKeyManagerToBLSValidator(t, validatorKeyManager4),
-			},
+			),
 			msg:         msg,
 			expectedRes: 0,
 			expectedErr: ErrInvalidSignature,
@@ -961,9 +956,9 @@ func Test_verifyBLSCommittedSealsImpl(t *testing.T) {
 				Signature: correctAggregatedSig,
 				Bitmap:    new(big.Int).SetBytes([]byte{0x1}), // validator1
 			},
-			validators: validators.BLSValidators{
+			validators: validators.NewBLSValidatorSet(
 				testBLSKeyManagerToBLSValidator(t, validatorKeyManager1),
-			},
+			),
 			msg:         msg,
 			expectedRes: 0,
 			expectedErr: ErrInvalidSignature,
@@ -974,11 +969,11 @@ func Test_verifyBLSCommittedSealsImpl(t *testing.T) {
 				Signature: correctAggregatedSig,
 				Bitmap:    new(big.Int).SetBytes([]byte{0x7}), // validator1 & validator 2 & validator 3
 			},
-			validators: validators.BLSValidators{
+			validators: validators.NewBLSValidatorSet(
 				testBLSKeyManagerToBLSValidator(t, validatorKeyManager1),
 				testBLSKeyManagerToBLSValidator(t, validatorKeyManager2),
 				testBLSKeyManagerToBLSValidator(t, validatorKeyManager3),
-			},
+			),
 			msg:         msg,
 			expectedRes: 0,
 			expectedErr: ErrInvalidSignature,
@@ -989,10 +984,10 @@ func Test_verifyBLSCommittedSealsImpl(t *testing.T) {
 				Signature: correctAggregatedSig,
 				Bitmap:    new(big.Int).SetBytes([]byte{0x3}), // validator1 & validator 2
 			},
-			validators: validators.BLSValidators{
+			validators: validators.NewBLSValidatorSet(
 				testBLSKeyManagerToBLSValidator(t, validatorKeyManager1),
 				testBLSKeyManagerToBLSValidator(t, validatorKeyManager2),
-			},
+			),
 			msg:         msg,
 			expectedRes: 2,
 			expectedErr: nil,

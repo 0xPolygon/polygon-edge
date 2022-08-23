@@ -151,7 +151,7 @@ func (p *switchParams) initPoAConfig() error {
 		return nil
 	}
 
-	p.ibftValidators = validators.NewValidatorsFromType(p.ibftValidatorType)
+	p.ibftValidators = validators.NewValidatorSetFromType(p.ibftValidatorType)
 
 	if err := p.setValidatorSetFromPrefixPath(); err != nil {
 		return err

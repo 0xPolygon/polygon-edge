@@ -80,7 +80,7 @@ func TestNewValidatorFromType(t *testing.T) {
 	}
 }
 
-func TestNewValidatorsFromType(t *testing.T) {
+func TestNewValidatorSetFromType(t *testing.T) {
 	tests := []struct {
 		name          string
 		validatorType ValidatorType
@@ -89,12 +89,18 @@ func TestNewValidatorsFromType(t *testing.T) {
 		{
 			name:          "ECDSAValidators",
 			validatorType: ECDSAValidatorType,
-			expected:      new(ECDSAValidators),
+			expected: &Set{
+				ValidatorType: ECDSAValidatorType,
+				Validators:    []Validator{},
+			},
 		},
 		{
 			name:          "BLSValidators",
 			validatorType: BLSValidatorType,
-			expected:      new(BLSValidators),
+			expected: &Set{
+				ValidatorType: BLSValidatorType,
+				Validators:    []Validator{},
+			},
 		},
 		{
 			name:          "undefined type",
@@ -108,7 +114,7 @@ func TestNewValidatorsFromType(t *testing.T) {
 			assert.Equal(
 				t,
 				test.expected,
-				NewValidatorsFromType(test.validatorType),
+				NewValidatorSetFromType(test.validatorType),
 			)
 		})
 	}
@@ -178,10 +184,10 @@ func TestParseValidators(t *testing.T) {
 				addr1.String(),
 				addr2.String(),
 			},
-			expectedValidators: &ECDSAValidators{
+			expectedValidators: NewECDSAValidatorSet(
 				ecdsaValidator1,
 				ecdsaValidator2,
-			},
+			),
 			expectedErr: nil,
 		},
 		{
@@ -191,10 +197,10 @@ func TestParseValidators(t *testing.T) {
 				createTestBLSValidatorString(addr1, testBLSPubKey1),
 				createTestBLSValidatorString(addr2, testBLSPubKey2),
 			},
-			expectedValidators: &BLSValidators{
+			expectedValidators: NewBLSValidatorSet(
 				blsValidator1,
 				blsValidator2,
-			},
+			),
 			expectedErr: nil,
 		},
 		{

@@ -25,16 +25,44 @@ func NewValidatorFromType(t ValidatorType) (Validator, error) {
 	return nil, ErrInvalidValidatorType
 }
 
-// NewValidatorsFromType instantiates a validators by specified type
-func NewValidatorsFromType(t ValidatorType) Validators {
+// NewValidatorSetFromType instantiates a validators by specified type
+func NewValidatorSetFromType(t ValidatorType) Validators {
 	switch t {
 	case ECDSAValidatorType:
-		return new(ECDSAValidators)
+		return NewECDSAValidatorSet()
 	case BLSValidatorType:
-		return new(BLSValidators)
+		return NewBLSValidatorSet()
 	}
 
 	return nil
+}
+
+// NewECDSAValidatorSet creates Validator Set for ECDSAValidator with initialized validators
+func NewECDSAValidatorSet(ecdsaValidators ...*ECDSAValidator) Validators {
+	validators := make([]Validator, len(ecdsaValidators))
+
+	for idx, val := range ecdsaValidators {
+		validators[idx] = Validator(val)
+	}
+
+	return &Set{
+		ValidatorType: ECDSAValidatorType,
+		Validators:    validators,
+	}
+}
+
+// NewBLSValidatorSet creates Validator Set for BLSValidator with initialized validators
+func NewBLSValidatorSet(blsValidators ...*BLSValidator) Validators {
+	validators := make([]Validator, len(blsValidators))
+
+	for idx, val := range blsValidators {
+		validators[idx] = Validator(val)
+	}
+
+	return &Set{
+		ValidatorType: BLSValidatorType,
+		Validators:    validators,
+	}
 }
 
 // ParseValidator parses a validator represented in string
@@ -52,7 +80,7 @@ func ParseValidator(validatorType ValidatorType, validator string) (Validator, e
 
 // ParseValidator parses an array of validator represented in string
 func ParseValidators(validatorType ValidatorType, rawValidators []string) (Validators, error) {
-	set := NewValidatorsFromType(validatorType)
+	set := NewValidatorSetFromType(validatorType)
 	if set == nil {
 		return nil, fmt.Errorf("invalid validator type: %s", validatorType)
 	}

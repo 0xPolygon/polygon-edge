@@ -9,19 +9,29 @@ import (
 )
 
 func TestECDSAValidatorsMarshalJSON(t *testing.T) {
-	validators := &ECDSAValidators{
-		&ECDSAValidator{addr1},
-		&ECDSAValidator{addr2},
+	validators := &Set{
+		ValidatorType: ECDSAValidatorType,
+		Validators: []Validator{
+			&ECDSAValidator{addr1},
+			&ECDSAValidator{addr2},
+		},
 	}
 
 	res, err := json.Marshal(validators)
 
 	assert.NoError(t, err)
 
-	assert.Equal(
+	assert.JSONEq(
 		t,
 		fmt.Sprintf(
-			`["%s","%s"]`,
+			`[
+				{
+					"Address": "%s"
+				},
+				{
+					"Address": "%s"
+				}
+			]`,
 			addr1.String(),
 			addr2.String(),
 		),
@@ -31,12 +41,19 @@ func TestECDSAValidatorsMarshalJSON(t *testing.T) {
 
 func TestECDSAValidatorsUnmarshalJSON(t *testing.T) {
 	inputStr := fmt.Sprintf(
-		`["%s","%s"]`,
+		`[
+			{
+				"Address": "%s"
+			},
+			{
+				"Address": "%s"
+			}
+		]`,
 		addr1.String(),
 		addr2.String(),
 	)
 
-	validators := new(ECDSAValidators)
+	validators := NewECDSAValidatorSet()
 
 	assert.NoError(
 		t,
@@ -45,30 +62,47 @@ func TestECDSAValidatorsUnmarshalJSON(t *testing.T) {
 
 	assert.Equal(
 		t,
-		&ECDSAValidators{
-			&ECDSAValidator{addr1},
-			&ECDSAValidator{addr2},
+		&Set{
+			ValidatorType: ECDSAValidatorType,
+			Validators: []Validator{
+				&ECDSAValidator{addr1},
+				&ECDSAValidator{addr2},
+			},
 		},
 		validators,
 	)
 }
 
 func TestBLSValidatorsMarshalJSON(t *testing.T) {
-	validators := &BLSValidators{
-		&BLSValidator{addr1, testBLSPubKey1},
-		&BLSValidator{addr2, testBLSPubKey2},
+	validators := &Set{
+		ValidatorType: BLSValidatorType,
+		Validators: []Validator{
+			&BLSValidator{addr1, testBLSPubKey1},
+			&BLSValidator{addr2, testBLSPubKey2},
+		},
 	}
 
 	res, err := json.Marshal(validators)
 
 	assert.NoError(t, err)
 
-	assert.Equal(
+	assert.JSONEq(
 		t,
 		fmt.Sprintf(
-			`["%s","%s"]`,
-			createTestBLSValidatorString(addr1, testBLSPubKey1),
-			createTestBLSValidatorString(addr2, testBLSPubKey2),
+			`[
+				{
+					"Address": "%s",
+					"BLSPublicKey": "%s"
+				},
+				{
+					"Address": "%s",
+					"BLSPublicKey": "%s"
+				}
+			]`,
+			addr1,
+			testBLSPubKey1,
+			addr2,
+			testBLSPubKey2,
 		),
 		string(res),
 	)
@@ -76,12 +110,23 @@ func TestBLSValidatorsMarshalJSON(t *testing.T) {
 
 func TestBLSValidatorsUnmarshalJSON(t *testing.T) {
 	inputStr := fmt.Sprintf(
-		`["%s","%s"]`,
-		createTestBLSValidatorString(addr1, testBLSPubKey1),
-		createTestBLSValidatorString(addr2, testBLSPubKey2),
+		`[
+			{
+				"Address": "%s",
+				"BLSPublicKey": "%s"
+			},
+			{
+				"Address": "%s",
+				"BLSPublicKey": "%s"
+			}
+		]`,
+		addr1,
+		testBLSPubKey1,
+		addr2,
+		testBLSPubKey2,
 	)
 
-	validators := new(BLSValidators)
+	validators := NewBLSValidatorSet()
 
 	assert.NoError(
 		t,
@@ -90,9 +135,12 @@ func TestBLSValidatorsUnmarshalJSON(t *testing.T) {
 
 	assert.Equal(
 		t,
-		&BLSValidators{
-			&BLSValidator{addr1, testBLSPubKey1},
-			&BLSValidator{addr2, testBLSPubKey2},
+		&Set{
+			ValidatorType: BLSValidatorType,
+			Validators: []Validator{
+				&BLSValidator{addr1, testBLSPubKey1},
+				&BLSValidator{addr2, testBLSPubKey2},
+			},
 		},
 		validators,
 	)

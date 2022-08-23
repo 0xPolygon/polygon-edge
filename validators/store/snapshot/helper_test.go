@@ -70,38 +70,38 @@ func Test_shouldProcessVote(t *testing.T) {
 		// ECDSA
 		{
 			name: "ECDSA: vote for addition when the candidate isn't in validators",
-			validators: &validators.ECDSAValidators{
+			validators: validators.NewECDSAValidatorSet(
 				ecdsaValidator1,
-			},
+			),
 			candidate:  ecdsaValidator2.Addr(),
 			voteAction: true,
 			expected:   true,
 		},
 		{
 			name: "ECDSA: vote for addition when the candidate is already in validators",
-			validators: &validators.ECDSAValidators{
+			validators: validators.NewECDSAValidatorSet(
 				ecdsaValidator1,
 				ecdsaValidator2,
-			},
+			),
 			candidate:  ecdsaValidator2.Addr(),
 			voteAction: true,
 			expected:   false,
 		},
 		{
 			name: "ECDSA: vote for deletion when the candidate is in validators",
-			validators: &validators.ECDSAValidators{
+			validators: validators.NewECDSAValidatorSet(
 				ecdsaValidator1,
 				ecdsaValidator2,
-			},
+			),
 			candidate:  ecdsaValidator2.Addr(),
 			voteAction: false,
 			expected:   true,
 		},
 		{
 			name: "ECDSA: vote for deletion when the candidate isn't in validators",
-			validators: &validators.ECDSAValidators{
+			validators: validators.NewECDSAValidatorSet(
 				ecdsaValidator1,
-			},
+			),
 			candidate:  ecdsaValidator2.Addr(),
 			voteAction: false,
 			expected:   false,
@@ -109,38 +109,38 @@ func Test_shouldProcessVote(t *testing.T) {
 		// BLS
 		{
 			name: "BLS: vote for addition when the candidate isn't in validators",
-			validators: &validators.BLSValidators{
+			validators: validators.NewBLSValidatorSet(
 				blsValidator1,
-			},
+			),
 			candidate:  blsValidator2.Addr(),
 			voteAction: true,
 			expected:   true,
 		},
 		{
 			name: "BLS: vote for addition when the candidate is already in validators",
-			validators: &validators.BLSValidators{
+			validators: validators.NewBLSValidatorSet(
 				blsValidator1,
 				blsValidator2,
-			},
+			),
 			candidate:  blsValidator2.Addr(),
 			voteAction: true,
 			expected:   false,
 		},
 		{
 			name: "BLS: vote for deletion when the candidate is in validators",
-			validators: &validators.BLSValidators{
+			validators: validators.NewBLSValidatorSet(
 				blsValidator1,
 				blsValidator2,
-			},
+			),
 			candidate:  blsValidator1.Addr(),
 			voteAction: false,
 			expected:   true,
 		},
 		{
 			name: "BLS: vote for deletion when the candidate isn't in validators",
-			validators: &validators.BLSValidators{
+			validators: validators.NewBLSValidatorSet(
 				blsValidator1,
-			},
+			),
 			candidate:  blsValidator2.Addr(),
 			voteAction: false,
 			expected:   false,
@@ -172,108 +172,108 @@ func Test_addsOrDelsCandidate(t *testing.T) {
 		// ECDSA
 		{
 			name: "ECDSA: addition when the candidate isn't in validators",
-			validators: &validators.ECDSAValidators{
+			validators: validators.NewECDSAValidatorSet(
 				ecdsaValidator1,
-			},
+			),
 			candidate:    ecdsaValidator2,
 			updateAction: true,
 			expectedErr:  nil,
-			newValidators: &validators.ECDSAValidators{
+			newValidators: validators.NewECDSAValidatorSet(
 				ecdsaValidator1,
 				ecdsaValidator2,
-			},
+			),
 		},
 		{
 			name: "ECDSA: addition when the candidate is already in validators",
-			validators: &validators.ECDSAValidators{
+			validators: validators.NewECDSAValidatorSet(
 				ecdsaValidator1,
 				ecdsaValidator2,
-			},
+			),
 			candidate:    ecdsaValidator2,
 			updateAction: true,
 			expectedErr:  validators.ErrValidatorAlreadyExists,
-			newValidators: &validators.ECDSAValidators{
+			newValidators: validators.NewECDSAValidatorSet(
 				ecdsaValidator1,
 				ecdsaValidator2,
-			},
+			),
 		},
 		{
 			name: "ECDSA: deletion when the candidate is in validators",
-			validators: &validators.ECDSAValidators{
+			validators: validators.NewECDSAValidatorSet(
 				ecdsaValidator1,
 				ecdsaValidator2,
-			},
+			),
 			candidate:    ecdsaValidator1,
 			updateAction: false,
 			expectedErr:  nil,
-			newValidators: &validators.ECDSAValidators{
+			newValidators: validators.NewECDSAValidatorSet(
 				ecdsaValidator2,
-			},
+			),
 		},
 		{
 			name: "ECDSA: deletion when the candidate isn't in validators",
-			validators: &validators.ECDSAValidators{
+			validators: validators.NewECDSAValidatorSet(
 				ecdsaValidator2,
-			},
+			),
 			candidate:    ecdsaValidator1,
 			updateAction: false,
 			expectedErr:  validators.ErrValidatorNotFound,
-			newValidators: &validators.ECDSAValidators{
+			newValidators: validators.NewECDSAValidatorSet(
 				ecdsaValidator2,
-			},
+			),
 		},
 		// BLS
 		{
 			name: "BLS: addition when the candidate isn't in validators",
-			validators: &validators.BLSValidators{
+			validators: validators.NewBLSValidatorSet(
 				blsValidator1,
-			},
+			),
 			candidate:    blsValidator2,
 			updateAction: true,
 			expectedErr:  nil,
-			newValidators: &validators.BLSValidators{
+			newValidators: validators.NewBLSValidatorSet(
 				blsValidator1,
 				blsValidator2,
-			},
+			),
 		},
 		{
 			name: "BLS: addition when the candidate is already in validators",
-			validators: &validators.BLSValidators{
+			validators: validators.NewBLSValidatorSet(
 				blsValidator1,
 				blsValidator2,
-			},
+			),
 			candidate:    blsValidator2,
 			updateAction: true,
 			expectedErr:  validators.ErrValidatorAlreadyExists,
-			newValidators: &validators.BLSValidators{
+			newValidators: validators.NewBLSValidatorSet(
 				blsValidator1,
 				blsValidator2,
-			},
+			),
 		},
 		{
 			name: "BLS: deletion when the candidate is in validators",
-			validators: &validators.BLSValidators{
+			validators: validators.NewBLSValidatorSet(
 				blsValidator1,
 				blsValidator2,
-			},
+			),
 			candidate:    blsValidator1,
 			updateAction: false,
 			expectedErr:  nil,
-			newValidators: &validators.BLSValidators{
+			newValidators: validators.NewBLSValidatorSet(
 				blsValidator2,
-			},
+			),
 		},
 		{
 			name: "BLS: deletion when the candidate is in validators",
-			validators: &validators.BLSValidators{
+			validators: validators.NewBLSValidatorSet(
 				blsValidator2,
-			},
+			),
 			candidate:    blsValidator1,
 			updateAction: false,
 			expectedErr:  validators.ErrValidatorNotFound,
-			newValidators: &validators.BLSValidators{
+			newValidators: validators.NewBLSValidatorSet(
 				blsValidator2,
-			},
+			),
 		},
 	}
 

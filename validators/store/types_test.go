@@ -3,7 +3,6 @@ package store
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/types"
@@ -63,6 +62,22 @@ func createExampleECDSAVoteJSON(
 	)
 }
 
+func createExampleLegacyECDSAVoteJSON(
+	authorize bool,
+	candidate *validators.ECDSAValidator,
+	validator types.Address,
+) string {
+	return fmt.Sprintf(`{
+		"Authorize": %t,
+		"Address": "%s",
+		"Validator": "%s"
+	}`,
+		authorize,
+		candidate.Addr(),
+		validator,
+	)
+}
+
 func createExampleBLSVoteJSON(
 	authorize bool,
 	candidate *validators.BLSValidator,
@@ -97,7 +112,7 @@ func TestVoteJSONMarshal(t *testing.T) {
 		assert.NoError(t, err)
 		assert.JSONEq(
 			t,
-			strings.TrimSpace(expectedJSON),
+			expectedJSON,
 			string(res),
 		)
 	}
@@ -160,6 +175,25 @@ func TestVoteJSONUnmarshal(t *testing.T) {
 			),
 			&Vote{
 				// need to initialize Candidate before unmarshalling
+				Candidate: new(validators.ECDSAValidator),
+			},
+			&Vote{
+				Authorize: false,
+				Candidate: ecdsaValidator1,
+				Validator: addr2,
+			},
+		)
+	})
+
+	t.Run("ECDSAValidator (legacy format)", func(t *testing.T) {
+		testUnmarshalJSON(
+			t,
+			createExampleLegacyECDSAVoteJSON(
+				false,
+				ecdsaValidator1,
+				addr2,
+			),
+			&Vote{
 				Candidate: new(validators.ECDSAValidator),
 			},
 			&Vote{

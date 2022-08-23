@@ -171,7 +171,7 @@ func TestIbft_TransactionFeeRecipient(t *testing.T) {
 			block, err := clt.Eth().GetBlockByHash(receipt.BlockHash, false)
 			assert.NoError(t, err)
 			extraData := &ibftSigner.IstanbulExtra{
-				Validators:           &validators.ECDSAValidators{},
+				Validators:           validators.NewECDSAValidatorSet(),
 				CommittedSeals:       &ibftSigner.SerializedSeal{},
 				ParentCommittedSeals: &ibftSigner.SerializedSeal{},
 			}

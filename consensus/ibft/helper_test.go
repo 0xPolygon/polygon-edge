@@ -81,12 +81,12 @@ func (ap *testerAccountPool) get(name string) *testerAccount {
 func (ap *testerAccountPool) ValidatorSet() validators.Validators {
 	ap.t.Helper()
 
-	v := validators.ECDSAValidators{}
+	v := validators.NewECDSAValidatorSet()
 	for _, i := range ap.accounts {
 		_ = v.Add(&validators.ECDSAValidator{
 			Address: i.Address(),
 		})
 	}
 
-	return &v
+	return v
 }

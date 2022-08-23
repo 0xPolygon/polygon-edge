@@ -36,11 +36,11 @@ func TestIstanbulExtraMarshalAndUnmarshal(t *testing.T) {
 		{
 			name: "ECDSAExtra",
 			extra: &IstanbulExtra{
-				Validators: &validators.ECDSAValidators{
-					&validators.ECDSAValidator{
-						Address: validatorAddr1,
-					},
-				},
+				Validators: validators.NewECDSAValidatorSet(
+					validators.NewECDSAValidator(
+						validatorAddr1,
+					),
+				),
 				ProposerSeal: testProposerSeal,
 				CommittedSeals: &SerializedSeal{
 					[]byte{0x1},
@@ -55,11 +55,11 @@ func TestIstanbulExtraMarshalAndUnmarshal(t *testing.T) {
 		{
 			name: "ECDSAExtra without ParentCommittedSeals",
 			extra: &IstanbulExtra{
-				Validators: &validators.ECDSAValidators{
-					&validators.ECDSAValidator{
-						Address: validatorAddr1,
-					},
-				},
+				Validators: validators.NewECDSAValidatorSet(
+					validators.NewECDSAValidator(
+						validatorAddr1,
+					),
+				),
 				ProposerSeal: testProposerSeal,
 				CommittedSeals: &SerializedSeal{
 					[]byte{0x1},
@@ -70,12 +70,12 @@ func TestIstanbulExtraMarshalAndUnmarshal(t *testing.T) {
 		{
 			name: "BLSExtra",
 			extra: &IstanbulExtra{
-				Validators: &validators.BLSValidators{
-					&validators.BLSValidator{
-						Address:      validatorAddr1,
-						BLSPublicKey: validatorBLSPublicKey1,
-					},
-				},
+				Validators: validators.NewBLSValidatorSet(
+					validators.NewBLSValidator(
+						validatorAddr1,
+						validatorBLSPublicKey1,
+					),
+				),
 				ProposerSeal: testProposerSeal,
 				CommittedSeals: &AggregatedSeal{
 					Bitmap:    new(big.Int).SetBytes([]byte{0x8}),
@@ -90,12 +90,12 @@ func TestIstanbulExtraMarshalAndUnmarshal(t *testing.T) {
 		{
 			name: "BLSExtra without ParentCommittedSeals",
 			extra: &IstanbulExtra{
-				Validators: &validators.BLSValidators{
-					&validators.BLSValidator{
-						Address:      validatorAddr1,
-						BLSPublicKey: validatorBLSPublicKey1,
-					},
-				},
+				Validators: validators.NewBLSValidatorSet(
+					validators.NewBLSValidator(
+						validatorAddr1,
+						validatorBLSPublicKey1,
+					),
+				),
 				ProposerSeal: testProposerSeal,
 				CommittedSeals: &AggregatedSeal{
 					Bitmap:    new(big.Int).SetBytes([]byte{0x8}),
@@ -139,11 +139,11 @@ func Test_packProposerSealIntoExtra(t *testing.T) {
 		{
 			name: "ECDSAExtra",
 			extra: &IstanbulExtra{
-				Validators: &validators.ECDSAValidators{
-					&validators.ECDSAValidator{
-						Address: validatorAddr1,
-					},
-				},
+				Validators: validators.NewECDSAValidatorSet(
+					validators.NewECDSAValidator(
+						validatorAddr1,
+					),
+				),
 				ProposerSeal: testProposerSeal,
 				CommittedSeals: &SerializedSeal{
 					[]byte{0x1},
@@ -158,11 +158,11 @@ func Test_packProposerSealIntoExtra(t *testing.T) {
 		{
 			name: "ECDSAExtra without ParentCommittedSeals",
 			extra: &IstanbulExtra{
-				Validators: &validators.ECDSAValidators{
-					&validators.ECDSAValidator{
-						Address: validatorAddr1,
-					},
-				},
+				Validators: validators.NewECDSAValidatorSet(
+					validators.NewECDSAValidator(
+						validatorAddr1,
+					),
+				),
 				ProposerSeal: testProposerSeal,
 				CommittedSeals: &SerializedSeal{
 					[]byte{0x1},
@@ -173,12 +173,12 @@ func Test_packProposerSealIntoExtra(t *testing.T) {
 		{
 			name: "BLSExtra",
 			extra: &IstanbulExtra{
-				Validators: &validators.BLSValidators{
-					&validators.BLSValidator{
-						Address:      validatorAddr1,
-						BLSPublicKey: validatorBLSPublicKey1,
-					},
-				},
+				Validators: validators.NewBLSValidatorSet(
+					validators.NewBLSValidator(
+						validatorAddr1,
+						validatorBLSPublicKey1,
+					),
+				),
 				ProposerSeal: testProposerSeal,
 				CommittedSeals: &AggregatedSeal{
 					Bitmap:    new(big.Int).SetBytes([]byte{0x8}),
@@ -193,12 +193,12 @@ func Test_packProposerSealIntoExtra(t *testing.T) {
 		{
 			name: "BLSExtra without ParentCommittedSeals",
 			extra: &IstanbulExtra{
-				Validators: &validators.BLSValidators{
-					&validators.BLSValidator{
-						Address:      validatorAddr1,
-						BLSPublicKey: validatorBLSPublicKey1,
-					},
-				},
+				Validators: validators.NewBLSValidatorSet(
+					validators.NewBLSValidator(
+						validatorAddr1,
+						validatorBLSPublicKey1,
+					),
+				),
 				ProposerSeal: testProposerSeal,
 				CommittedSeals: &AggregatedSeal{
 					Bitmap:    new(big.Int).SetBytes([]byte{0x8}),
@@ -256,11 +256,11 @@ func Test_packCommittedSealsIntoExtra(t *testing.T) {
 		{
 			name: "ECDSAExtra",
 			extra: &IstanbulExtra{
-				Validators: &validators.ECDSAValidators{
-					&validators.ECDSAValidator{
-						Address: validatorAddr1,
-					},
-				},
+				Validators: validators.NewECDSAValidatorSet(
+					validators.NewECDSAValidator(
+						validatorAddr1,
+					),
+				),
 				ProposerSeal: testProposerSeal,
 				CommittedSeals: &SerializedSeal{
 					[]byte{0x1},
@@ -279,11 +279,11 @@ func Test_packCommittedSealsIntoExtra(t *testing.T) {
 		{
 			name: "ECDSAExtra without ParentCommittedSeals",
 			extra: &IstanbulExtra{
-				Validators: &validators.ECDSAValidators{
-					&validators.ECDSAValidator{
-						Address: validatorAddr1,
-					},
-				},
+				Validators: validators.NewECDSAValidatorSet(
+					validators.NewECDSAValidator(
+						validatorAddr1,
+					),
+				),
 				ProposerSeal: testProposerSeal,
 				CommittedSeals: &SerializedSeal{
 					[]byte{0x1},
@@ -298,12 +298,12 @@ func Test_packCommittedSealsIntoExtra(t *testing.T) {
 		{
 			name: "BLSExtra",
 			extra: &IstanbulExtra{
-				Validators: &validators.BLSValidators{
-					&validators.BLSValidator{
-						Address:      validatorAddr1,
-						BLSPublicKey: validatorBLSPublicKey1,
-					},
-				},
+				Validators: validators.NewBLSValidatorSet(
+					validators.NewBLSValidator(
+						validatorAddr1,
+						validatorBLSPublicKey1,
+					),
+				),
 				ProposerSeal: testProposerSeal,
 				CommittedSeals: &AggregatedSeal{
 					Bitmap:    new(big.Int).SetBytes([]byte{0x8}),
@@ -322,12 +322,12 @@ func Test_packCommittedSealsIntoExtra(t *testing.T) {
 		{
 			name: "BLSExtra without ParentCommittedSeals",
 			extra: &IstanbulExtra{
-				Validators: &validators.BLSValidators{
-					&validators.BLSValidator{
-						Address:      validatorAddr1,
-						BLSPublicKey: validatorBLSPublicKey1,
-					},
-				},
+				Validators: validators.NewBLSValidatorSet(
+					validators.NewBLSValidator(
+						validatorAddr1,
+						validatorBLSPublicKey1,
+					),
+				),
 				ProposerSeal: testProposerSeal,
 				CommittedSeals: &AggregatedSeal{
 					Bitmap:    new(big.Int).SetBytes([]byte{0x8}),

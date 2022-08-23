@@ -23,10 +23,10 @@ func TestFetchValidators(t *testing.T) {
 }
 
 func TestFetchECDSAValidators(t *testing.T) {
-	vals := &validators.ECDSAValidators{
+	vals := validators.NewECDSAValidatorSet(
 		validators.NewECDSAValidator(addr1),
 		validators.NewECDSAValidator(addr2),
-	}
+	)
 
 	transition := newTestTransitionWithPredeployedStakingContract(
 		t,
@@ -44,10 +44,10 @@ func TestFetchECDSAValidators(t *testing.T) {
 }
 
 func TestFetchBLSValidators(t *testing.T) {
-	vals := &validators.BLSValidators{
+	vals := validators.NewBLSValidatorSet(
 		validators.NewBLSValidator(addr1, testBLSPubKey1),
 		validators.NewBLSValidator(addr2, []byte{}), // validator 2 has not set BLS Public Key
-	}
+	)
 
 	transition := newTestTransitionWithPredeployedStakingContract(
 		t,
@@ -61,9 +61,9 @@ func TestFetchBLSValidators(t *testing.T) {
 	)
 
 	// only validator 1
-	expected := &validators.BLSValidators{
+	expected := validators.NewBLSValidatorSet(
 		validators.NewBLSValidator(addr1, testBLSPubKey1),
-	}
+	)
 
 	assert.Equal(t, expected, res)
 	assert.NoError(t, err)

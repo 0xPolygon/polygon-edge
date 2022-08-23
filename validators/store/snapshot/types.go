@@ -68,18 +68,34 @@ func (s *Snapshot) UnmarshalJSON(data []byte) error {
 	s.Number = raw.Number
 	s.Hash = raw.Hash
 
-	valType := validators.ECDSAValidatorType
+	isLegacyFormat := raw.Type == ""
 
-	if len(raw.Type) > 0 {
+	// determine validators type
+	valType := validators.ECDSAValidatorType
+	if !isLegacyFormat {
 		if valType, err = validators.ParseValidatorType(raw.Type); err != nil {
 			return err
 		}
 	}
 
-	s.Set = validators.NewValidatorsFromType(valType)
-
 	// Votes
-	votes := make([]*store.Vote, len(raw.Votes))
+	if err := s.unmarshalVotesJSON(valType, raw.Votes); err != nil {
+		return err
+	}
+
+	if err := s.unmarshalSetJSON(valType, raw.Set, isLegacyFormat); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// unmarshalVotesJSON is a helper function to unmarshal for Votes field
+func (s *Snapshot) unmarshalVotesJSON(
+	valType validators.ValidatorType,
+	rawVotes []json.RawMessage,
+) error {
+	votes := make([]*store.Vote, len(rawVotes))
 	for idx := range votes {
 		candidate, err := validators.NewValidatorFromType(valType)
 		if err != nil {
@@ -90,19 +106,42 @@ func (s *Snapshot) UnmarshalJSON(data []byte) error {
 			Candidate: candidate,
 		}
 
-		if err := json.Unmarshal(raw.Votes[idx], votes[idx]); err != nil {
+		if err := json.Unmarshal(rawVotes[idx], votes[idx]); err != nil {
 			return err
 		}
 	}
 
 	s.Votes = votes
 
+	return nil
+}
+
+// unmarshalSetJSON is a helper function to unmarshal for Set field
+func (s *Snapshot) unmarshalSetJSON(
+	valType validators.ValidatorType,
+	rawSet json.RawMessage,
+	isLegacyFormat bool,
+) error {
 	// Set
-	if err := json.Unmarshal(raw.Set, s.Set); err != nil {
-		return err
+	if isLegacyFormat {
+		addrs := []types.Address{}
+		if err := json.Unmarshal(rawSet, &addrs); err != nil {
+			return err
+		}
+
+		vals := make([]*validators.ECDSAValidator, len(addrs))
+		for idx, addr := range addrs {
+			vals[idx] = validators.NewECDSAValidator(addr)
+		}
+
+		s.Set = validators.NewECDSAValidatorSet(vals...)
+
+		return nil
 	}
 
-	return nil
+	s.Set = validators.NewValidatorSetFromType(valType)
+
+	return json.Unmarshal(rawSet, s.Set)
 }
 
 // Equal checks if two snapshots are equal

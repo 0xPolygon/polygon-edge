@@ -30,13 +30,13 @@ func FetchValidators(
 func FetchECDSAValidators(
 	transition *state.Transition,
 	from types.Address,
-) (*validators.ECDSAValidators, error) {
+) (validators.Validators, error) {
 	valAddrs, err := staking.QueryValidators(transition, from)
 	if err != nil {
 		return nil, err
 	}
 
-	ecdsaValidators := &validators.ECDSAValidators{}
+	ecdsaValidators := validators.NewECDSAValidatorSet()
 	for _, addr := range valAddrs {
 		if err := ecdsaValidators.Add(validators.NewECDSAValidator(addr)); err != nil {
 			return nil, err
@@ -50,7 +50,7 @@ func FetchECDSAValidators(
 func FetchBLSValidators(
 	transition *state.Transition,
 	from types.Address,
-) (*validators.BLSValidators, error) {
+) (validators.Validators, error) {
 	valAddrs, err := staking.QueryValidators(transition, from)
 	if err != nil {
 		return nil, err
@@ -61,7 +61,7 @@ func FetchBLSValidators(
 		return nil, err
 	}
 
-	blsValidators := &validators.BLSValidators{}
+	blsValidators := validators.NewBLSValidatorSet()
 
 	for idx := range valAddrs {
 		// ignore the validator whose BLS Key is not set

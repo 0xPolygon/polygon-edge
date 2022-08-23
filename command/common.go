@@ -64,7 +64,7 @@ func GetValidatorsFromPrefixPath(
 		return nil, err
 	}
 
-	validatorSet := validators.NewValidatorsFromType(validatorType)
+	validatorSet := validators.NewValidatorSetFromType(validatorType)
 
 	for _, file := range files {
 		path := file.Name()

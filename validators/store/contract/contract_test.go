@@ -244,9 +244,12 @@ func TestContractValidatorStoreGetValidators(t *testing.T) {
 			signerAddr = types.StringToAddress("2")
 			signerType = validators.ECDSAValidatorType
 
-			vals = &validators.ECDSAValidators{
-				validators.NewECDSAValidator(addr1),
-				validators.NewECDSAValidator(addr2),
+			vals = &validators.Set{
+				ValidatorType: validators.ECDSAValidatorType,
+				Validators: []validators.Validator{
+					validators.NewECDSAValidator(addr1),
+					validators.NewECDSAValidator(addr2),
+				},
 			}
 
 			transition = newTestTransitionWithPredeployedStakingContract(
@@ -296,9 +299,12 @@ func TestContractValidatorStoreGetValidators(t *testing.T) {
 			signerAddr = types.StringToAddress("2")
 			signerType = validators.BLSValidatorType
 
-			vals = &validators.BLSValidators{
-				validators.NewBLSValidator(addr1, testBLSPubKey1),
-				validators.NewBLSValidator(addr2, testBLSPubKey2),
+			vals = &validators.Set{
+				ValidatorType: validators.BLSValidatorType,
+				Validators: []validators.Validator{
+					validators.NewBLSValidator(addr1, testBLSPubKey1),
+					validators.NewBLSValidator(addr2, testBLSPubKey2),
+				},
 			}
 
 			transition = newTestTransitionWithPredeployedStakingContract(

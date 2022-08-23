@@ -48,7 +48,7 @@ func (s *ECDSAKeyManager) Address() types.Address {
 
 // NewEmptyValidators returns empty validator collection ECDSAKeyManager uses
 func (s *ECDSAKeyManager) NewEmptyValidators() validators.Validators {
-	return &validators.ECDSAValidators{}
+	return validators.NewECDSAValidatorSet()
 }
 
 // NewEmptyCommittedSeals returns empty CommittedSeals ECDSAKeyManager uses
@@ -68,13 +68,12 @@ func (s *ECDSAKeyManager) SignCommittedSeal(message []byte) ([]byte, error) {
 
 // VerifyCommittedSeal verifies a committed seal
 func (s *ECDSAKeyManager) VerifyCommittedSeal(
-	rawValidators validators.Validators,
+	vals validators.Validators,
 	address types.Address,
 	signature []byte,
 	message []byte,
 ) error {
-	validators, ok := rawValidators.(*validators.ECDSAValidators)
-	if !ok {
+	if vals.Type() != s.Type() {
 		return ErrInvalidValidators
 	}
 
@@ -87,7 +86,7 @@ func (s *ECDSAKeyManager) VerifyCommittedSeal(
 		return ErrSignerMismatch
 	}
 
-	if !validators.Includes(address) {
+	if !vals.Includes(address) {
 		return ErrNonValidatorCommittedSeal
 	}
 
@@ -116,19 +115,18 @@ func (s *ECDSAKeyManager) GenerateCommittedSeals(
 func (s *ECDSAKeyManager) VerifyCommittedSeals(
 	rawCommittedSeal Seals,
 	digest []byte,
-	rawSet validators.Validators,
+	vals validators.Validators,
 ) (int, error) {
 	committedSeal, ok := rawCommittedSeal.(*SerializedSeal)
 	if !ok {
 		return 0, ErrInvalidCommittedSealType
 	}
 
-	validatorSet, ok := rawSet.(*validators.ECDSAValidators)
-	if !ok {
+	if vals.Type() != s.Type() {
 		return 0, ErrInvalidValidators
 	}
 
-	return s.verifyCommittedSealsImpl(committedSeal, digest, *validatorSet)
+	return s.verifyCommittedSealsImpl(committedSeal, digest, vals)
 }
 
 func (s *ECDSAKeyManager) SignIBFTMessage(msg []byte) ([]byte, error) {
@@ -142,7 +140,7 @@ func (s *ECDSAKeyManager) Ecrecover(sig, digest []byte) (types.Address, error) {
 func (s *ECDSAKeyManager) verifyCommittedSealsImpl(
 	committedSeal *SerializedSeal,
 	msg []byte,
-	validators validators.ECDSAValidators,
+	validators validators.Validators,
 ) (int, error) {
 	numSeals := committedSeal.Num()
 	if numSeals == 0 {
