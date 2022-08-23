@@ -7,24 +7,26 @@ import (
 
 // KeyManager is a delegated module that signs data
 type KeyManager interface {
+	// Type returns Validator type signer supports
 	Type() validators.ValidatorType
+	// Address returns an address of signer
 	Address() types.Address
-
-	// initializer of modules related to KeyManager
+	// NewEmptyValidators creates empty validator collection the Signer expects
 	NewEmptyValidators() validators.Validators
+	// NewEmptyCommittedSeals creates empty committed seals the Signer expects
 	NewEmptyCommittedSeals() Sealer
-
-	// Seal
-	SignSeal(hash []byte) ([]byte, error)
-
-	// CommittedSeal
+	// SignProposerSeal creates a signature for ProposerSeal
+	SignProposerSeal(hash []byte) ([]byte, error)
+	// SignCommittedSeal creates a signature for committed seal
 	SignCommittedSeal(hash []byte) ([]byte, error)
+	// VerifyCommittedSeal verifies a committed seal
 	VerifyCommittedSeal(vals validators.Validators, signer types.Address, sig, hash []byte) error
-
-	// CommittedSeals
-	GenerateCommittedSeals(sealsByValidator map[types.Address][]byte, extra *IstanbulExtra) (Sealer, error)
+	// GenerateCommittedSeals creates CommittedSeals from committed seals
+	GenerateCommittedSeals(sealsByValidator map[types.Address][]byte, vals validators.Validators) (Sealer, error)
+	// VerifyCommittedSeals verifies CommittedSeals
 	VerifyCommittedSeals(seals Sealer, hash []byte, vals validators.Validators) (int, error)
-
+	// SignIBFTMessage signs for arbitrary bytes message
 	SignIBFTMessage(msg []byte) ([]byte, error)
+	// Ecrecover recovers address from signature and message
 	Ecrecover(sig []byte, msg []byte) (types.Address, error)
 }

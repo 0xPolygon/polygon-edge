@@ -30,6 +30,8 @@ var S256 = btcec.S256()
 var (
 	secp256k1N = hex.MustDecodeHex("0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141")
 	one        = []byte{0x01}
+
+	ErrInvalidBLSSignature = errors.New("invalid BLS Signature")
 )
 
 type KeyType string
@@ -200,6 +202,52 @@ func Sign(priv *ecdsa.PrivateKey, hash []byte) ([]byte, error) {
 	return append(sig, term)[1:], nil
 }
 
+// SignByBLS signs the given data by BLS
+func SignByBLS(prv *bls_sig.SecretKey, msg []byte) ([]byte, error) {
+	blsPop := bls_sig.NewSigPop()
+	seal, err := blsPop.Sign(prv, msg)
+
+	if err != nil {
+		return nil, err
+	}
+
+	sealBytes, err := seal.MarshalBinary()
+	if err != nil {
+		return nil, err
+	}
+
+	return sealBytes, nil
+}
+
+// VerifyBLSSignature verifies the given signature from Public Key and original message
+func VerifyBLSSignature(pubkey *bls_sig.PublicKey, sig *bls_sig.Signature, message []byte) error {
+	ok, err := bls_sig.NewSigPop().Verify(pubkey, message, sig)
+	if err != nil {
+		return err
+	}
+
+	if !ok {
+		return ErrInvalidBLSSignature
+	}
+
+	return nil
+}
+
+// VerifyBLSSignatureFromBytes verifies BLS Signature from BLS PublicKey, signature, and original message in bytes
+func VerifyBLSSignatureFromBytes(rawPubkey, rawSig, message []byte) error {
+	pubkey, err := UnmarshalBLSPublicKey(rawPubkey)
+	if err != nil {
+		return err
+	}
+
+	signature, err := UnmarshalBLSSignature(rawSig)
+	if err != nil {
+		return err
+	}
+
+	return VerifyBLSSignature(pubkey, signature, message)
+}
+
 // SigToPub returns the public key that created the given signature.
 func SigToPub(hash, sig []byte) (*ecdsa.PublicKey, error) {
 	s, err := Ecrecover(hash, sig)
@@ -349,6 +397,7 @@ func BytesToBLSPublicKey(input string) (*bls_sig.PublicKey, error) {
 	return UnmarshalBLSPublicKey(decoded)
 }
 
+// UnmarshalBLSPublicKey unmarshal bytes data into BLS Public Key
 func UnmarshalBLSPublicKey(input []byte) (*bls_sig.PublicKey, error) {
 	pk := &bls_sig.PublicKey{}
 	if err := pk.UnmarshalBinary(input); err != nil {
@@ -356,6 +405,16 @@ func UnmarshalBLSPublicKey(input []byte) (*bls_sig.PublicKey, error) {
 	}
 
 	return pk, nil
+}
+
+// UnmarshalBLSSignature unmarshal bytes data into BLS Signature
+func UnmarshalBLSSignature(input []byte) (*bls_sig.Signature, error) {
+	sig := &bls_sig.Signature{}
+	if err := sig.UnmarshalBinary(input); err != nil {
+		return nil, err
+	}
+
+	return sig, nil
 }
 
 // GenerateOrReadPrivateKey generates a private key at the specified path,

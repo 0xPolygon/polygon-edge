@@ -19,6 +19,7 @@ var (
 	ErrSignerMismatch             = errors.New("mismatch address between signer and message sender")
 	ErrValidatorNotFound          = errors.New("validator not found in validator set")
 	ErrInvalidValidators          = errors.New("invalid validators type")
+	ErrInvalidValidator           = errors.New("invalid validator type")
 	ErrInvalidSignature           = errors.New("invalid signature")
 )
 
@@ -133,7 +134,7 @@ func (s *SignerImpl) WriteProposerSeal(header *types.Header) (*types.Header, err
 		return nil, err
 	}
 
-	seal, err := s.keyManager.SignSeal(
+	seal, err := s.keyManager.SignProposerSeal(
 		crypto.Keccak256(hash.Bytes()),
 	)
 	if err != nil {
@@ -150,7 +151,7 @@ func (s *SignerImpl) WriteProposerSeal(header *types.Header) (*types.Header, err
 
 // EcrecoverFromIBFTMessage recovers signer address from given signature and digest
 func (s *SignerImpl) EcrecoverFromIBFTMessage(signature, digest []byte) (types.Address, error) {
-	return s.keyManager.Ecrecover(signature, digest)
+	return s.keyManager.Ecrecover(signature, crypto.Keccak256(digest))
 }
 
 // EcrecoverFromIBFTMessage recovers signer address from given signature and header hash
@@ -160,13 +161,19 @@ func (s *SignerImpl) EcrecoverFromHeader(header *types.Header) (types.Address, e
 		return types.Address{}, err
 	}
 
-	return s.keyManager.Ecrecover(extra.ProposerSeal, header.Hash.Bytes())
+	return s.keyManager.Ecrecover(extra.ProposerSeal, crypto.Keccak256(header.Hash.Bytes()))
 }
 
 // CreateCommittedSeal returns CommittedSeal from given hash
 func (s *SignerImpl) CreateCommittedSeal(hash []byte) ([]byte, error) {
 	return s.keyManager.SignCommittedSeal(
-		wrapCommitHash(hash[:]),
+		// Of course, this keccaking of an extended array is not according to the IBFT 2.0 spec,
+		// but almost nothing in this legacy signing package is. This is kept
+		// in order to preserve the running chains that used these
+		// old (and very, very incorrect) signing schemes
+		crypto.Keccak256(
+			wrapCommitHash(hash[:]),
+		),
 	)
 }
 
@@ -176,12 +183,16 @@ func (s *SignerImpl) VerifyCommittedSeal(
 	signer types.Address,
 	signature, hash []byte,
 ) error {
-	return s.keyManager.VerifyCommittedSeal(
+	err := s.keyManager.VerifyCommittedSeal(
 		validators,
 		signer,
 		signature,
-		wrapCommitHash(hash),
+		crypto.Keccak256(
+			wrapCommitHash(hash[:]),
+		),
 	)
+
+	return err
 }
 
 // WriteCommittedSeals builds and writes CommittedSeals into IBFT Extra of the header
@@ -198,7 +209,7 @@ func (s *SignerImpl) WriteCommittedSeals(
 		return nil, err
 	}
 
-	committedSeal, err := s.keyManager.GenerateCommittedSeals(sealMap, extra)
+	committedSeal, err := s.keyManager.GenerateCommittedSeals(sealMap, extra.Validators)
 	if err != nil {
 		return nil, err
 	}
@@ -227,7 +238,9 @@ func (s *SignerImpl) VerifyCommittedSeals(
 		return err
 	}
 
-	rawMsg := wrapCommitHash(hash[:])
+	rawMsg := crypto.Keccak256(
+		wrapCommitHash(hash[:]),
+	)
 
 	numSeals, err := s.keyManager.VerifyCommittedSeals(
 		extra.CommittedSeals,
@@ -268,7 +281,9 @@ func (s *SignerImpl) VerifyParentCommittedSeals(
 		return nil
 	}
 
-	rawMsg := wrapCommitHash(parent.Hash.Bytes())
+	rawMsg := crypto.Keccak256(
+		wrapCommitHash(parent.Hash.Bytes()),
+	)
 
 	numSeals, err := s.keyManager.VerifyCommittedSeals(
 		parentCommittedSeals,
@@ -288,7 +303,7 @@ func (s *SignerImpl) VerifyParentCommittedSeals(
 
 // SignIBFTMessage signs arbitrary message
 func (s *SignerImpl) SignIBFTMessage(msg []byte) ([]byte, error) {
-	return s.keyManager.SignIBFTMessage(msg)
+	return s.keyManager.SignIBFTMessage(crypto.Keccak256(msg))
 }
 
 // InitIBFTExtra initializes the extra field

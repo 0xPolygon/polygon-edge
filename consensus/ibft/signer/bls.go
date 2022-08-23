@@ -13,12 +13,15 @@ import (
 	"github.com/umbracle/fastrlp"
 )
 
+// BLSKeyManager is a module that holds ECDSA and BLS keys
+// and implements methods of signing by these keys
 type BLSKeyManager struct {
 	ecdsaKey *ecdsa.PrivateKey
 	blsKey   *bls_sig.SecretKey
 	address  types.Address
 }
 
+// NewBLSKeyManager initializes BLSKeyManager by the ECDSA key and BLS key which are loaded from SecretsManager
 func NewBLSKeyManager(manager secrets.SecretsManager) (KeyManager, error) {
 	ecdsaKey, err := getOrCreateECDSAKey(manager)
 	if err != nil {
@@ -30,10 +33,11 @@ func NewBLSKeyManager(manager secrets.SecretsManager) (KeyManager, error) {
 		return nil, err
 	}
 
-	return NewECDSAKeyManagerFromKeys(ecdsaKey, blsKey), nil
+	return NewBLSKeyManagerFromKeys(ecdsaKey, blsKey), nil
 }
 
-func NewECDSAKeyManagerFromKeys(ecdsaKey *ecdsa.PrivateKey, blsKey *bls_sig.SecretKey) KeyManager {
+// NewBLSKeyManagerFromKeys initializes BLSKeyManager from the given ECDSA and BLS keys
+func NewBLSKeyManagerFromKeys(ecdsaKey *ecdsa.PrivateKey, blsKey *bls_sig.SecretKey) KeyManager {
 	return &BLSKeyManager{
 		ecdsaKey: ecdsaKey,
 		blsKey:   blsKey,
@@ -41,66 +45,32 @@ func NewECDSAKeyManagerFromKeys(ecdsaKey *ecdsa.PrivateKey, blsKey *bls_sig.Secr
 	}
 }
 
+// Type returns the validator type KeyManager supports
 func (s *BLSKeyManager) Type() validators.ValidatorType {
 	return validators.BLSValidatorType
 }
 
+// Address returns the address of KeyManager
 func (s *BLSKeyManager) Address() types.Address {
 	return s.address
 }
 
+// NewEmptyValidators returns empty validator collection BLSKeyManager uses
 func (s *BLSKeyManager) NewEmptyValidators() validators.Validators {
 	return &validators.BLSValidators{}
 }
 
+// NewEmptyCommittedSeals returns empty CommittedSeals BLSKeyManager uses
 func (s *BLSKeyManager) NewEmptyCommittedSeals() Sealer {
 	return &BLSSeal{}
 }
 
-func (s *BLSKeyManager) SignSeal(data []byte) ([]byte, error) {
+func (s *BLSKeyManager) SignProposerSeal(data []byte) ([]byte, error) {
 	return crypto.Sign(s.ecdsaKey, data)
 }
 
 func (s *BLSKeyManager) SignCommittedSeal(data []byte) ([]byte, error) {
-	seal, err := signByBLS(s.blsKey, data)
-	if err != nil {
-		return nil, err
-	}
-
-	return seal, err
-}
-
-func (s *BLSKeyManager) Ecrecover(sig, digest []byte) (types.Address, error) {
-	return ecrecover(sig, digest)
-}
-
-func (s *BLSKeyManager) GenerateCommittedSeals(sealMap map[types.Address][]byte, extra *IstanbulExtra) (Sealer, error) {
-	validators, ok := extra.Validators.(*validators.BLSValidators)
-	if !ok {
-		return nil, ErrInvalidValidators
-	}
-
-	blsSignatures, bitMap, err := s.getBLSSignatures(sealMap, validators)
-	if err != nil {
-		return nil, err
-	}
-
-	blsPop := bls_sig.NewSigPop()
-
-	multiSignature, err := blsPop.AggregateSignatures(blsSignatures...)
-	if err != nil {
-		return nil, err
-	}
-
-	multiSignatureBytes, err := multiSignature.MarshalBinary()
-	if err != nil {
-		return nil, err
-	}
-
-	return &BLSSeal{
-		Bitmap:    bitMap,
-		Signature: multiSignatureBytes,
-	}, nil
+	return crypto.SignByBLS(s.blsKey, data)
 }
 
 func (s *BLSKeyManager) VerifyCommittedSeal(
@@ -119,141 +89,73 @@ func (s *BLSKeyManager) VerifyCommittedSeal(
 		return ErrValidatorNotFound
 	}
 
-	validator, ok := validatorSet.At(uint64(validatorIndex)).(*validators.BLSValidator)
-	if !ok {
-		return fmt.Errorf("expected BLSValidator in BLSValidators, but got %T", validator)
-	}
+	validator, _ := validatorSet.At(uint64(validatorIndex)).(*validators.BLSValidator)
 
-	pubkey := &bls_sig.PublicKey{}
-	if err := pubkey.UnmarshalBinary(validator.BLSPublicKey); err != nil {
+	if err := crypto.VerifyBLSSignatureFromBytes(
+		validator.BLSPublicKey,
+		rawSignature,
+		hash,
+	); err != nil {
 		return err
-	}
-
-	signature := &bls_sig.Signature{}
-	if err := signature.UnmarshalBinary(rawSignature); err != nil {
-		return err
-	}
-
-	ok, err := bls_sig.NewSigPop().Verify(pubkey, hash, signature)
-	if err != nil {
-		return err
-	}
-
-	if !ok {
-		return ErrInvalidSignature
 	}
 
 	return nil
 }
 
+func (s *BLSKeyManager) GenerateCommittedSeals(
+	sealMap map[types.Address][]byte,
+	rawValidators validators.Validators,
+) (Sealer, error) {
+	validators, ok := rawValidators.(*validators.BLSValidators)
+	if !ok {
+		return nil, ErrInvalidValidators
+	}
+
+	blsSignatures, bitMap, err := getBLSSignatures(sealMap, validators)
+	if err != nil {
+		return nil, err
+	}
+
+	multiSignature, err := bls_sig.NewSigPop().AggregateSignatures(blsSignatures...)
+	if err != nil {
+		return nil, err
+	}
+
+	multiSignatureBytes, err := multiSignature.MarshalBinary()
+	if err != nil {
+		return nil, err
+	}
+
+	return &BLSSeal{
+		Bitmap:    bitMap,
+		Signature: multiSignatureBytes,
+	}, nil
+}
+
 func (s *BLSKeyManager) VerifyCommittedSeals(
 	rawCommittedSeal Sealer,
-	digest []byte,
-	rawSet validators.Validators,
+	message []byte,
+	rawValidators validators.Validators,
 ) (int, error) {
 	committedSeal, ok := rawCommittedSeal.(*BLSSeal)
 	if !ok {
 		return 0, ErrInvalidCommittedSealType
 	}
 
-	validatorSet, ok := rawSet.(*validators.BLSValidators)
+	validatorSet, ok := rawValidators.(*validators.BLSValidators)
 	if !ok {
 		return 0, ErrInvalidValidators
 	}
 
-	return s.verifyCommittedSealsImpl(committedSeal, digest, *validatorSet)
+	return verifyBLSCommittedSealsImpl(committedSeal, message, *validatorSet)
 }
 
 func (s *BLSKeyManager) SignIBFTMessage(msg []byte) ([]byte, error) {
-	return crypto.Sign(s.ecdsaKey, crypto.Keccak256(msg))
+	return crypto.Sign(s.ecdsaKey, msg)
 }
 
-func (s *BLSKeyManager) getBLSSignatures(
-	sealMap map[types.Address][]byte,
-	validators *validators.BLSValidators,
-) ([]*bls_sig.Signature, *big.Int, error) {
-	blsSignatures := make([]*bls_sig.Signature, 0, len(sealMap))
-	bitMap := new(big.Int)
-
-	for addr, seal := range sealMap {
-		index := validators.Index(addr)
-		if index == -1 {
-			return nil, nil, ErrNonValidatorCommittedSeal
-		}
-
-		bsig := &bls_sig.Signature{}
-		if err := bsig.UnmarshalBinary(seal); err != nil {
-			return nil, nil, err
-		}
-
-		bitMap = bitMap.SetBit(bitMap, int(index), 1)
-
-		blsSignatures = append(blsSignatures, bsig)
-	}
-
-	return blsSignatures, bitMap, nil
-}
-
-func (s *BLSKeyManager) verifyCommittedSealsImpl(
-	committedSeal *BLSSeal,
-	msg []byte,
-	validators validators.BLSValidators,
-) (int, error) {
-	if len(committedSeal.Signature) == 0 || committedSeal.Bitmap.BitLen() == 0 {
-		return 0, ErrEmptyCommittedSeals
-	}
-
-	aggregatedPubKey, numKeys, err := s.createAggregatedBLSPubKeys(validators, committedSeal.Bitmap)
-	if err != nil {
-		return 0, fmt.Errorf("failed to aggregate BLS Public Keys: %w", err)
-	}
-
-	signature := &bls_sig.MultiSignature{}
-	if err := signature.UnmarshalBinary(committedSeal.Signature); err != nil {
-		return 0, err
-	}
-
-	blsPop := bls_sig.NewSigPop()
-
-	ok, err := blsPop.VerifyMultiSignature(aggregatedPubKey, msg, signature)
-	if err != nil {
-		return 0, err
-	}
-
-	if !ok {
-		return 0, ErrInvalidSignature
-	}
-
-	return numKeys, nil
-}
-
-func (s *BLSKeyManager) createAggregatedBLSPubKeys(
-	validators validators.BLSValidators,
-	bitMap *big.Int,
-) (*bls_sig.MultiPublicKey, int, error) {
-	pubkeys := make([]*bls_sig.PublicKey, 0, validators.Len())
-
-	for idx, val := range validators {
-		if bitMap.Bit(idx) == 0 {
-			continue
-		}
-
-		pubKey := &bls_sig.PublicKey{}
-		if err := pubKey.UnmarshalBinary(val.BLSPublicKey); err != nil {
-			return nil, 0, err
-		}
-
-		pubkeys = append(pubkeys, pubKey)
-	}
-
-	blsPop := bls_sig.NewSigPop()
-
-	key, err := blsPop.AggregatePublicKeys(pubkeys...)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	return key, len(pubkeys), nil
+func (s *BLSKeyManager) Ecrecover(sig, digest []byte) (types.Address, error) {
+	return ecrecover(sig, digest)
 }
 
 type BLSSeal struct {
@@ -314,18 +216,88 @@ func (s *BLSSeal) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	return nil
 }
 
-func signByBLS(prv *bls_sig.SecretKey, msg []byte) ([]byte, error) {
+func getBLSSignatures(
+	sealMap map[types.Address][]byte,
+	validators *validators.BLSValidators,
+) ([]*bls_sig.Signature, *big.Int, error) {
+	blsSignatures := make([]*bls_sig.Signature, 0, len(sealMap))
+	bitMap := new(big.Int)
+
+	for addr, seal := range sealMap {
+		index := validators.Index(addr)
+		if index == -1 {
+			return nil, nil, ErrNonValidatorCommittedSeal
+		}
+
+		bsig := &bls_sig.Signature{}
+		if err := bsig.UnmarshalBinary(seal); err != nil {
+			return nil, nil, err
+		}
+
+		bitMap = bitMap.SetBit(bitMap, int(index), 1)
+
+		blsSignatures = append(blsSignatures, bsig)
+	}
+
+	return blsSignatures, bitMap, nil
+}
+
+func createAggregatedBLSPubKeys(
+	validators validators.BLSValidators,
+	bitMap *big.Int,
+) (*bls_sig.MultiPublicKey, int, error) {
+	pubkeys := make([]*bls_sig.PublicKey, 0, validators.Len())
+
+	for idx, val := range validators {
+		if bitMap.Bit(idx) == 0 {
+			continue
+		}
+
+		pubKey := &bls_sig.PublicKey{}
+		if err := pubKey.UnmarshalBinary(val.BLSPublicKey); err != nil {
+			return nil, 0, err
+		}
+
+		pubkeys = append(pubkeys, pubKey)
+	}
+
 	blsPop := bls_sig.NewSigPop()
-	seal, err := blsPop.Sign(prv, msg)
 
+	key, err := blsPop.AggregatePublicKeys(pubkeys...)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
-	sealBytes, err := seal.MarshalBinary()
-	if err != nil {
-		return nil, err
+	return key, len(pubkeys), nil
+}
+
+func verifyBLSCommittedSealsImpl(
+	committedSeal *BLSSeal,
+	msg []byte,
+	validators validators.BLSValidators,
+) (int, error) {
+	if len(committedSeal.Signature) == 0 || committedSeal.Bitmap.BitLen() == 0 {
+		return 0, ErrEmptyCommittedSeals
 	}
 
-	return sealBytes, nil
+	aggregatedPubKey, numKeys, err := createAggregatedBLSPubKeys(validators, committedSeal.Bitmap)
+	if err != nil {
+		return 0, fmt.Errorf("failed to aggregate BLS Public Keys: %w", err)
+	}
+
+	signature := &bls_sig.MultiSignature{}
+	if err := signature.UnmarshalBinary(committedSeal.Signature); err != nil {
+		return 0, err
+	}
+
+	ok, err := bls_sig.NewSigPop().VerifyMultiSignature(aggregatedPubKey, msg, signature)
+	if err != nil {
+		return 0, err
+	}
+
+	if !ok {
+		return 0, ErrInvalidSignature
+	}
+
+	return numKeys, nil
 }

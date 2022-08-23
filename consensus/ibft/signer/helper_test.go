@@ -298,7 +298,7 @@ func Test_ecrecover(t *testing.T) {
 
 	signature, err := crypto.Sign(
 		testKey,
-		crypto.Keccak256(rawMessage),
+		rawMessage,
 	)
 	assert.NoError(t, err)
 
@@ -355,7 +355,7 @@ func Test_newKeyManagerFromType(t *testing.T) {
 					return nil, fmt.Errorf("unexpected key name: %s", name)
 				},
 			},
-			expectedRes: NewECDSAKeyManagerFromKeys(testECDSAKey, testBLSKey),
+			expectedRes: NewBLSKeyManagerFromKeys(testECDSAKey, testBLSKey),
 		},
 		{
 			name:          "unsupported type",
@@ -427,7 +427,7 @@ func TestNewSignerFromType(t *testing.T) {
 				},
 			},
 			expectedRes: NewSigner(
-				NewECDSAKeyManagerFromKeys(testECDSAKey, testBLSKey),
+				NewBLSKeyManagerFromKeys(testECDSAKey, testBLSKey),
 			),
 		},
 		{

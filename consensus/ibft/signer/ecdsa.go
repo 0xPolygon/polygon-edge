@@ -11,13 +11,14 @@ import (
 	"github.com/umbracle/fastrlp"
 )
 
+// ECDSAKeyManager is a module that holds ECDSA key
+// and implements methods of signing by this key
 type ECDSAKeyManager struct {
 	key     *ecdsa.PrivateKey
 	address types.Address
 }
 
-type SerializedSeal [][]byte
-
+// NewECDSAKeyManager initializes ECDSAKeyManager by the ECDSA key loaded from SecretsManager
 func NewECDSAKeyManager(manager secrets.SecretsManager) (KeyManager, error) {
 	key, err := getOrCreateECDSAKey(manager)
 	if err != nil {
@@ -27,6 +28,7 @@ func NewECDSAKeyManager(manager secrets.SecretsManager) (KeyManager, error) {
 	return NewECDSAKeyManagerFromKey(key), nil
 }
 
+// NewECDSAKeyManagerFromKey initializes ECDSAKeyManager from the given ECDSA key
 func NewECDSAKeyManagerFromKey(key *ecdsa.PrivateKey) KeyManager {
 	return &ECDSAKeyManager{
 		key:     key,
@@ -34,37 +36,67 @@ func NewECDSAKeyManagerFromKey(key *ecdsa.PrivateKey) KeyManager {
 	}
 }
 
+// Type returns the validator type KeyManager supports
 func (s *ECDSAKeyManager) Type() validators.ValidatorType {
 	return validators.ECDSAValidatorType
 }
 
+// Address returns the address of KeyManager
 func (s *ECDSAKeyManager) Address() types.Address {
 	return s.address
 }
 
+// NewEmptyValidators returns empty validator collection ECDSAKeyManager uses
 func (s *ECDSAKeyManager) NewEmptyValidators() validators.Validators {
 	return &validators.ECDSAValidators{}
 }
 
+// NewEmptyCommittedSeals returns empty CommittedSeals ECDSAKeyManager uses
 func (s *ECDSAKeyManager) NewEmptyCommittedSeals() Sealer {
 	return &SerializedSeal{}
 }
 
-func (s *ECDSAKeyManager) SignSeal(data []byte) ([]byte, error) {
-	return crypto.Sign(s.key, data)
+// SignProposerSeal signs the given message by ECDSA key the ECDSAKeyManager holds for ProposerSeal
+func (s *ECDSAKeyManager) SignProposerSeal(message []byte) ([]byte, error) {
+	return crypto.Sign(s.key, message)
 }
 
-func (s *ECDSAKeyManager) SignCommittedSeal(data []byte) ([]byte, error) {
-	return crypto.Sign(s.key, crypto.Keccak256(data))
+// SignProposerSeal signs the given message by ECDSA key the ECDSAKeyManager holds for committed seal
+func (s *ECDSAKeyManager) SignCommittedSeal(message []byte) ([]byte, error) {
+	return crypto.Sign(s.key, message)
 }
 
-func (s *ECDSAKeyManager) Ecrecover(sig, digest []byte) (types.Address, error) {
-	return ecrecover(sig, digest)
+// VerifyCommittedSeal verifies a committed seal
+func (s *ECDSAKeyManager) VerifyCommittedSeal(
+	rawValidators validators.Validators,
+	address types.Address,
+	signature []byte,
+	message []byte,
+) error {
+	validators, ok := rawValidators.(*validators.ECDSAValidators)
+	if !ok {
+		return ErrInvalidValidators
+	}
+
+	signer, err := s.Ecrecover(signature, message)
+	if err != nil {
+		return ErrInvalidSignature
+	}
+
+	if address != signer {
+		return ErrSignerMismatch
+	}
+
+	if !validators.Includes(address) {
+		return ErrNonValidatorCommittedSeal
+	}
+
+	return nil
 }
 
 func (s *ECDSAKeyManager) GenerateCommittedSeals(
 	sealMap map[types.Address][]byte,
-	extra *IstanbulExtra,
+	_ validators.Validators,
 ) (Sealer, error) {
 	seals := [][]byte{}
 
@@ -79,33 +111,6 @@ func (s *ECDSAKeyManager) GenerateCommittedSeals(
 	serializedSeal := SerializedSeal(seals)
 
 	return &serializedSeal, nil
-}
-
-func (s *ECDSAKeyManager) VerifyCommittedSeal(
-	rawSet validators.Validators,
-	addr types.Address,
-	signature []byte,
-	hash []byte,
-) error {
-	validatorSet, ok := rawSet.(*validators.ECDSAValidators)
-	if !ok {
-		return ErrInvalidValidators
-	}
-
-	signer, err := s.Ecrecover(signature, hash)
-	if err != nil {
-		return ErrInvalidSignature
-	}
-
-	if addr != signer {
-		return ErrSignerMismatch
-	}
-
-	if !validatorSet.Includes(addr) {
-		return ErrNonValidatorCommittedSeal
-	}
-
-	return nil
 }
 
 func (s *ECDSAKeyManager) VerifyCommittedSeals(
@@ -127,7 +132,11 @@ func (s *ECDSAKeyManager) VerifyCommittedSeals(
 }
 
 func (s *ECDSAKeyManager) SignIBFTMessage(msg []byte) ([]byte, error) {
-	return crypto.Sign(s.key, crypto.Keccak256(msg))
+	return crypto.Sign(s.key, msg)
+}
+
+func (s *ECDSAKeyManager) Ecrecover(sig, digest []byte) (types.Address, error) {
+	return ecrecover(sig, digest)
 }
 
 func (s *ECDSAKeyManager) verifyCommittedSealsImpl(
@@ -135,7 +144,7 @@ func (s *ECDSAKeyManager) verifyCommittedSealsImpl(
 	msg []byte,
 	validators validators.ECDSAValidators,
 ) (int, error) {
-	numSeals := len(*committedSeal)
+	numSeals := committedSeal.Num()
 	if numSeals == 0 {
 		return 0, ErrEmptyCommittedSeals
 	}
@@ -161,6 +170,8 @@ func (s *ECDSAKeyManager) verifyCommittedSealsImpl(
 
 	return numSeals, nil
 }
+
+type SerializedSeal [][]byte
 
 func (s *SerializedSeal) Num() int {
 	return len(*s)

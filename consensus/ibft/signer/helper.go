@@ -86,7 +86,7 @@ func calculateHeaderHash(h *types.Header) types.Hash {
 
 // ecrecover recovers signer address from the given digest and signature
 func ecrecover(sig, msg []byte) (types.Address, error) {
-	pub, err := crypto.RecoverPubkey(sig, crypto.Keccak256(msg))
+	pub, err := crypto.RecoverPubkey(sig, msg)
 	if err != nil {
 		return types.Address{}, err
 	}
