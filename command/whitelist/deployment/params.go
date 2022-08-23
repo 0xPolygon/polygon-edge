@@ -14,8 +14,8 @@ import (
 
 const (
 	chainFlag         = "chain"
-	addAddressFlag    = "addAddress"
-	removeAddressFlag = "removeAddress"
+	addAddressFlag    = "add-address"
+	removeAddressFlag = "remove-address"
 )
 
 var (

@@ -8,8 +8,8 @@ import (
 )
 
 type DeploymentResult struct {
-	AddAddress    []types.Address `json:"add_address,omitempty"`
-	RemoveAddress []types.Address `json:"remove_address,omitempty"`
+	AddAddress    []types.Address `json:"addAddress,omitempty"`
+	RemoveAddress []types.Address `json:"removeAddress,omitempty"`
 	Whitelist     []types.Address `json:"whitelist"`
 }
 
