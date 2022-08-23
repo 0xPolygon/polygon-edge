@@ -172,6 +172,7 @@ func (s *SnapshotValidatorStore) Candidates() []*store.Candidate {
 	return s.candidates
 }
 
+// UpdateSet resets Snapshot with given validators at specified height
 func (s *SnapshotValidatorStore) UpdateSet(newValidators validators.Validators, from uint64) error {
 	snapshotHeight := from - 1
 
@@ -199,6 +200,7 @@ func (s *SnapshotValidatorStore) UpdateSet(newValidators validators.Validators, 
 	return nil
 }
 
+// ModifyHeader updates Header to vote
 func (s *SnapshotValidatorStore) ModifyHeader(header *types.Header, proposer types.Address) error {
 	snapshot := s.getSnapshot(header.Number)
 	if snapshot == nil {
@@ -223,6 +225,7 @@ func (s *SnapshotValidatorStore) ModifyHeader(header *types.Header, proposer typ
 	return nil
 }
 
+// VerifyHeader verifies the fields of Header which are modified in ModifyHeader
 func (s *SnapshotValidatorStore) VerifyHeader(header *types.Header) error {
 	// Check the nonce format.
 	// The nonce field must have either an AUTH or DROP vote value.
@@ -257,6 +260,7 @@ func (s *SnapshotValidatorStore) ProcessHeadersInRange(
 	return nil
 }
 
+// ProcessHeader processes the header and updates snapshots
 func (s *SnapshotValidatorStore) ProcessHeader(
 	header *types.Header,
 ) error {
@@ -310,6 +314,7 @@ func (s *SnapshotValidatorStore) ProcessHeader(
 	return s.processVote(header, signer, proposer, parentSnap, snap)
 }
 
+// Propose adds new candidate for vote
 func (s *SnapshotValidatorStore) Propose(candidate validators.Validator, auth bool, proposer types.Address) error {
 	s.candidatesLock.Lock()
 	defer s.candidatesLock.Unlock()
@@ -407,14 +412,17 @@ func (s *SnapshotValidatorStore) addHeaderSnap(header *types.Header) error {
 	return nil
 }
 
+// getSnapshot returns a snapshot for specified height
 func (s *SnapshotValidatorStore) getSnapshot(height uint64) *Snapshot {
 	return s.store.find(height)
 }
 
+// getLatestSnapshot returns a snapshot for latest height
 func (s *SnapshotValidatorStore) getLatestSnapshot() *Snapshot {
 	return s.getSnapshot(s.store.lastNumber)
 }
 
+// getNextCandidate returns a possible candidate from candidates list
 func (s *SnapshotValidatorStore) getNextCandidate(
 	snap *Snapshot,
 	proposer types.Address,
