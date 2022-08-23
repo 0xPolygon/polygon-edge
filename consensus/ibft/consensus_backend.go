@@ -82,6 +82,13 @@ func (i *backendIBFT) InsertBlock(
 	)
 
 	if err := i.currentHooks.PostInsertBlock(newBlock); err != nil {
+		i.logger.Error(
+			"failed to call PostInsertBlock hook",
+			"height", newBlock.Number(),
+			"hash", newBlock.Hash(),
+			"err", err,
+		)
+
 		return
 	}
 
