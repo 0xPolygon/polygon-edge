@@ -29,7 +29,7 @@ var validatorTypes = map[string]ValidatorType{
 	string(BLSValidatorType):   BLSValidatorType,
 }
 
-// ParseValidatorType converts a ibftType string representation to a IBFTType
+// ParseValidatorType converts a validatorType string representation to a ValidatorType
 func ParseValidatorType(validatorType string) (ValidatorType, error) {
 	// Check if the cast is possible
 	castType, ok := validatorTypes[validatorType]
