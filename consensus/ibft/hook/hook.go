@@ -5,8 +5,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-// register multiple
-
 type ShouldWriteTransactionsFunc func(uint64) bool
 
 type ModifyHeaderFunc func(*types.Header, types.Address) error
@@ -29,16 +27,6 @@ type Hooks struct {
 	ProcessHeaderFunc          ProcessHeaderFunc
 	PreCommitStateFunc         PreCommitStateFunc
 	PostInsertBlockFunc        PostInsertBlockFunc
-}
-
-func (m *Hooks) Clear() {
-	m.ShouldWriteTransactionFunc = nil
-	m.ModifyHeaderFunc = nil
-	m.VerifyHeaderFunc = nil
-	m.VerifyBlockFunc = nil
-	m.ProcessHeaderFunc = nil
-	m.PreCommitStateFunc = nil
-	m.PostInsertBlockFunc = nil
 }
 
 func (m *Hooks) ShouldWriteTransactions(height uint64) bool {
