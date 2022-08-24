@@ -44,7 +44,7 @@ type HeaderProcessor interface {
 }
 
 type Updatable interface {
-	UpdateSet(validators.Validators, uint64) error
+	UpdateValidatorSet(validators.Validators, uint64) error
 }
 
 type Votable interface {

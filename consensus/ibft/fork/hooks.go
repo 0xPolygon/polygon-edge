@@ -61,11 +61,16 @@ func registerUpdateValidatorStoreHook(
 	hooks *hook.Hooks,
 	set store.ValidatorStore,
 	newValidators validators.Validators,
-	height uint64,
+	beginningHeight uint64,
 ) {
 	if us, ok := set.(store.Updatable); ok {
 		hooks.PostInsertBlockFunc = func(b *types.Block) error {
-			return us.UpdateSet(newValidators, height)
+			if beginningHeight != b.Number()-1 {
+				return nil
+			}
+
+			// call if the previous block has been inserted
+			return us.UpdateValidatorSet(newValidators, b.Number())
 		}
 	}
 }
