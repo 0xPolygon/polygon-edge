@@ -125,7 +125,7 @@ func (i *backendIBFT) Quorum(blockNumber uint64) uint64 {
 			"err", err,
 		)
 
-		// return Math.MaxInt32 to prevent overflow when casting to int go-ibft package
+		// return Math.MaxInt32 to prevent overflow when casting to int in go-ibft package
 		return math.MaxInt32
 	}
 
