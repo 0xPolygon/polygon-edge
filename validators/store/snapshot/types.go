@@ -329,6 +329,8 @@ func (s *snapshotStore) find(num uint64) *Snapshot {
 		return last
 	}
 
+	// find the index of the element
+	// whose Number is bigger than or equals to num, and smallest
 	i := sort.Search(len(s.list), func(i int) bool {
 		return s.list[i].Number >= num
 	})
@@ -345,6 +347,7 @@ func (s *snapshotStore) find(num uint64) *Snapshot {
 		return s.list[i-1]
 	}
 
+	// should not reach here
 	return nil
 }
 
@@ -354,6 +357,28 @@ func (s *snapshotStore) add(snap *Snapshot) {
 	defer s.Unlock()
 
 	// append and sort the list
+	s.list = append(s.list, snap)
+	sort.Sort(&s.list)
+}
+
+// putByNumber replaces snapshot if the snapshot whose Number matches with the given snapshot's Number
+// otherwise adds the given snapshot to the list
+func (s *snapshotStore) putByNumber(snap *Snapshot) {
+	s.Lock()
+	defer s.Unlock()
+
+	i := sort.Search(len(s.list), func(i int) bool {
+		return s.list[i].Number == snap.Number
+	})
+
+	if i < len(s.list) {
+		// replace if found
+		s.list[i] = snap
+
+		return
+	}
+
+	// append if not found
 	s.list = append(s.list, snap)
 	sort.Sort(&s.list)
 }
