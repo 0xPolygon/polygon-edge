@@ -231,12 +231,12 @@ func (m *ForkManager) initializeValidatorStore(setType store.SourceType) error {
 	case store.Snapshot:
 		valSet, err = m.initializeSnapshotValidatorStore()
 	case store.Contract:
-		valSet = contract.NewContractValidatorStore(
+		valSet, err = contract.NewContractValidatorStore(
 			m.logger,
 			m.blockchain,
 			m.executor,
 			m.GetSigner,
-			m.epochSize,
+			contract.DefaultValidatorSetCacheSize,
 		)
 	}
 

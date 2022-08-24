@@ -1,9 +1,11 @@
 package contract
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 
+	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
 	"github.com/stretchr/testify/assert"
@@ -23,48 +25,113 @@ func TestFetchValidators(t *testing.T) {
 }
 
 func TestFetchECDSAValidators(t *testing.T) {
-	vals := validators.NewECDSAValidatorSet(
-		validators.NewECDSAValidator(addr1),
-		validators.NewECDSAValidator(addr2),
+	var (
+		ecdsaValidators = validators.NewECDSAValidatorSet(
+			validators.NewECDSAValidator(addr1),
+			validators.NewECDSAValidator(addr2),
+		)
 	)
 
-	transition := newTestTransitionWithPredeployedStakingContract(
-		t,
-		vals,
-	)
+	tests := []struct {
+		name        string
+		transition  *state.Transition
+		from        types.Address
+		expectedRes validators.Validators
+		expectedErr error
+	}{
+		{
+			name: "should return error if QueryValidators failed",
+			transition: newTestTransition(
+				t,
+			),
+			from:        types.ZeroAddress,
+			expectedRes: nil,
+			expectedErr: errors.New("empty input"),
+		},
+		{
+			name: "should return ECDSA Validators",
+			transition: newTestTransitionWithPredeployedStakingContract(
+				t,
+				ecdsaValidators,
+			),
+			from:        types.ZeroAddress,
+			expectedRes: ecdsaValidators,
+			expectedErr: nil,
+		},
+	}
 
-	res, err := FetchValidators(
-		validators.ECDSAValidatorType,
-		transition,
-		types.ZeroAddress,
-	)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			res, err := FetchValidators(
+				validators.ECDSAValidatorType,
+				test.transition,
+				test.from,
+			)
 
-	assert.Equal(t, vals, res)
-	assert.NoError(t, err)
+			assert.Equal(t, test.expectedRes, res)
+
+			if test.expectedErr != nil {
+				assert.ErrorContains(t, err, test.expectedErr.Error())
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
 }
 
 func TestFetchBLSValidators(t *testing.T) {
-	vals := validators.NewBLSValidatorSet(
-		validators.NewBLSValidator(addr1, testBLSPubKey1),
-		validators.NewBLSValidator(addr2, []byte{}), // validator 2 has not set BLS Public Key
+	var (
+		blsValidators = validators.NewBLSValidatorSet(
+			validators.NewBLSValidator(addr1, testBLSPubKey1),
+			validators.NewBLSValidator(addr2, []byte{}), // validator 2 has not set BLS Public Key
+		)
 	)
 
-	transition := newTestTransitionWithPredeployedStakingContract(
-		t,
-		vals,
-	)
+	tests := []struct {
+		name        string
+		transition  *state.Transition
+		from        types.Address
+		expectedRes validators.Validators
+		expectedErr error
+	}{
+		{
+			name: "should return error if QueryValidators failed",
+			transition: newTestTransition(
+				t,
+			),
+			from:        types.ZeroAddress,
+			expectedRes: nil,
+			expectedErr: errors.New("empty input"),
+		},
+		{
+			name: "should return ECDSA Validators",
+			transition: newTestTransitionWithPredeployedStakingContract(
+				t,
+				blsValidators,
+			),
+			from: types.ZeroAddress,
+			expectedRes: validators.NewBLSValidatorSet(
+				validators.NewBLSValidator(addr1, testBLSPubKey1),
+			),
+			expectedErr: nil,
+		},
+	}
 
-	res, err := FetchValidators(
-		validators.BLSValidatorType,
-		transition,
-		types.ZeroAddress,
-	)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			res, err := FetchValidators(
+				validators.BLSValidatorType,
+				test.transition,
+				test.from,
+			)
 
-	// only validator 1
-	expected := validators.NewBLSValidatorSet(
-		validators.NewBLSValidator(addr1, testBLSPubKey1),
-	)
+			assert.Equal(t, test.expectedRes, res)
 
-	assert.Equal(t, expected, res)
-	assert.NoError(t, err)
+			if test.expectedErr != nil {
+				assert.ErrorContains(t, err, test.expectedErr.Error())
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
 }

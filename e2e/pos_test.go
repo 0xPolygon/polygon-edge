@@ -241,7 +241,7 @@ func TestPoS_Unstake(t *testing.T) {
 		t,
 		numGenesisValidators,
 		IBFTDirPrefix,
-		func(i int, config *framework.TestServerConfig) {
+		func(_ int, config *framework.TestServerConfig) {
 			// Premine to send unstake transaction
 			config.SetSeal(true)
 			config.SetEpochSize(2) // Need to leave room for the endblock
