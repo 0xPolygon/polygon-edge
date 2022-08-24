@@ -427,6 +427,7 @@ func TestContractValidatorStoreGetValidators(t *testing.T) {
 			expectedErr:   errors.New("unsupported validator type: fake"),
 			finalCaches:   map[uint64]interface{}{},
 		},
+		//nolint:dupl
 		{
 			name: "should return fetched ECDSA validators",
 			blockchain: &store.MockBlockchain{
@@ -462,6 +463,7 @@ func TestContractValidatorStoreGetValidators(t *testing.T) {
 				1: ecdsaValidators,
 			},
 		},
+		//nolint:dupl
 		{
 			name: "should return fetched BLS validators",
 			blockchain: &store.MockBlockchain{
