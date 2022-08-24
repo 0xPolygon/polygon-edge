@@ -75,6 +75,20 @@ func testCreateAggregatedSignature(t *testing.T, msg []byte, keyManagers ...KeyM
 	return testAggregateBLSSignatureBytes(t, signatures...)
 }
 
+// assert equality of marshalled aggregated BLS Public Keys
+// because the field values in MultiPublicKey may be different for the same keys
+func assertEqualAggregatedBLSPublicKeys(t *testing.T, apk1, apk2 *bls_sig.MultiPublicKey) {
+	t.Helper()
+
+	apkBytes1, err := apk1.MarshalBinary()
+	assert.NoError(t, err)
+
+	apkBytes2, err := apk2.MarshalBinary()
+	assert.NoError(t, err)
+
+	assert.Equal(t, apkBytes1, apkBytes2)
+}
+
 func TestNewBLSKeyManager(t *testing.T) {
 	testECDSAKey, testECDSAKeyEncoded := newTestECDSAKey(t)
 	testBLSKey, testBLSKeyEncoded := newTestBLSKey(t)
@@ -646,7 +660,11 @@ func Test_getBLSSignatures(t *testing.T) {
 				test.validators,
 			)
 
-			assert.Equal(t, test.expectedSignatures, sigs)
+			assert.ElementsMatch(
+				t,
+				test.expectedSignatures,
+				sigs,
+			)
 			assert.Equal(t, test.expectedBitMap, bitmap)
 
 			if test.expectedErr != nil {
@@ -718,7 +736,12 @@ func Test_getBLSSignatures(t *testing.T) {
 			validators,
 		)
 
-		assert.Equal(t, expectedSignatures, signatures)
+		// the order might be different due to scanning sealMap
+		assert.ElementsMatch(
+			t,
+			expectedSignatures,
+			signatures,
+		)
 		assert.Equal(t, expectedBitMap, bitmap)
 		assert.NoError(t, err)
 	})
@@ -782,14 +805,7 @@ func Test_createAggregatedBLSPubKeys(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, expectedNumSigners, num)
 
-		// compared with marshalled bytes because some fields are different every time
-		expectedAggregatedBLSKeyBytes, err := expectedAggregatedBLSPublicKeys.MarshalBinary()
-		assert.NoError(t, err)
-
-		aggregatedPubKeyBytes, err := aggregatedPubKey.MarshalBinary()
-		assert.NoError(t, err)
-
-		assert.Equal(t, expectedAggregatedBLSKeyBytes, aggregatedPubKeyBytes)
+		assertEqualAggregatedBLSPublicKeys(t, expectedAggregatedBLSPublicKeys, aggregatedPubKey)
 	})
 
 	t.Run("should return error if bitMap is empty", func(t *testing.T) {
