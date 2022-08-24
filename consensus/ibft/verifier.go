@@ -148,14 +148,14 @@ func (i *backendIBFT) IsValidProposalHash(proposal, hash []byte) bool {
 }
 
 func (i *backendIBFT) IsValidCommittedSeal(
-	proposal []byte,
+	proposalHash []byte,
 	committedSeal *messages.CommittedSeal,
 ) bool {
 	err := i.currentSigner.VerifyCommittedSeal(
 		i.currentValidators,
 		types.BytesToAddress(committedSeal.Signer),
 		committedSeal.Signature,
-		proposal,
+		proposalHash,
 	)
 
 	if err != nil {
