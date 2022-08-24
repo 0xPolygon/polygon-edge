@@ -2,6 +2,7 @@ package ibft
 
 import (
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/0xPolygon/go-ibft/messages"
@@ -124,7 +125,8 @@ func (i *backendIBFT) Quorum(blockNumber uint64) uint64 {
 			"err", err,
 		)
 
-		return 0
+		// return Math.MaxInt32 to prevent overflow when casting to int go-ibft package
+		return math.MaxInt32
 	}
 
 	quorumFn := i.quorumSize(blockNumber)
