@@ -46,7 +46,7 @@ var (
 	ErrAlreadyKnown            = errors.New("already known")
 	ErrOversizedData           = errors.New("oversized data")
 	ErrMaxEnqueuedLimitReached = errors.New("maximum number of enqueued transactions reached")
-	ErrRejectFutureTx          = errors.New("rejected future tx due to low memory")
+	ErrRejectFutureTx          = errors.New("rejected future tx due to low slots")
 )
 
 // indicates origin of a transaction
