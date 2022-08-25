@@ -88,11 +88,11 @@ func newTestPoolWithSlots(maxSlots uint64, mockStore ...store) (*TxPool, error) 
 		nil,
 		nilMetrics,
 		&Config{
-			PriceLimit: defaultPriceLimit,
-			MaxSlots:   maxSlots,
-			Sealing:    false,
+			PriceLimit:          defaultPriceLimit,
+			MaxSlots:            maxSlots,
+			Sealing:             false,
+			DeploymentWhitelist: []types.Address{},
 		},
-		Whitelists{},
 	)
 }
 
@@ -1198,9 +1198,8 @@ func TestPermissionSmartContractDeployment(t *testing.T) {
 	t.Run("Addresses inside whitelist can deploy smart contract", func(t *testing.T) {
 		t.Parallel()
 		pool := setupPool()
-		pool.whitelists = Whitelists{
-			Deployment: []types.Address{addr1, defaultAddr},
-		}
+		pool.deploymentWhitelist.add(addr1)
+		pool.deploymentWhitelist.add(defaultAddr)
 
 		tx := newTx(defaultAddr, 0, 1)
 		tx.To = nil
@@ -1210,9 +1209,8 @@ func TestPermissionSmartContractDeployment(t *testing.T) {
 	t.Run("Addresses outside whitelist can not deploy smart contract", func(t *testing.T) {
 		t.Parallel()
 		pool := setupPool()
-		pool.whitelists = Whitelists{
-			Deployment: []types.Address{addr1, addr2},
-		}
+		pool.deploymentWhitelist.add(addr1)
+		pool.deploymentWhitelist.add(addr2)
 
 		tx := newTx(defaultAddr, 0, 1)
 		tx.To = nil

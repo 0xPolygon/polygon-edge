@@ -216,12 +216,10 @@ func NewServer(config *Config) (*Server, error) {
 			m.network,
 			m.serverMetrics.txpool,
 			&txpool.Config{
-				Sealing:    m.config.Seal,
-				MaxSlots:   m.config.MaxSlots,
-				PriceLimit: m.config.PriceLimit,
-			},
-			txpool.Whitelists{
-				Deployment: deploymentWhitelist,
+				Sealing:             m.config.Seal,
+				MaxSlots:            m.config.MaxSlots,
+				PriceLimit:          m.config.PriceLimit,
+				DeploymentWhitelist: deploymentWhitelist,
 			},
 		)
 		if err != nil {
