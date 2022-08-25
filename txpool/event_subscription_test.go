@@ -4,8 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"math/big"
-
-	//nolint:gosec
 	mathRand "math/rand"
 	"sync"
 	"sync/atomic"
@@ -72,10 +70,10 @@ func shuffleTxPoolEvents(
 	}
 
 	// Shuffle the events
-	mathRand.Seed(time.Now().UnixNano())
+	mathRand.Seed(time.Now().UnixNano()) //nolint
 	mathRand.Shuffle(len(events), func(i, j int) {
 		events[i], events[j] = events[j], events[i]
-	})
+	}) //nolint
 
 	return events
 }
