@@ -188,9 +188,9 @@ func PadLeftOrTrim(bb []byte, size int) []byte {
 
 // FetchWhitelistFromConfig fetches whitelist object from the config
 // if doesn't exist returns empty map
-func FetchWhitelistFromConfig(genesisConfig *chain.Chain) map[string]interface{} {
+func FetchWhitelistFromConfig(config *chain.Chain) map[string]interface{} {
 	// Fetch whitelist if exists, if not init
-	whitelistConfig := genesisConfig.Params.Whitelists
+	whitelistConfig := config.Params.Whitelists
 	if len(whitelistConfig) == 0 {
 		whitelistConfig = make(map[string]interface{})
 	}
