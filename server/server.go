@@ -202,7 +202,7 @@ func NewServer(config *Config) (*Server, error) {
 			Blockchain: m.blockchain,
 		}
 
-		deploymentWhitelist, err := configHelper.FetchDeploymentWhitelist(config.Chain)
+		deploymentWhitelist, err := configHelper.GetDeploymentWhitelist(config.Chain)
 		if err != nil {
 			return nil, err
 		}

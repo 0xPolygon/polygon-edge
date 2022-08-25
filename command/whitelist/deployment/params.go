@@ -81,7 +81,7 @@ func (p *deploymentParams) initChain() error {
 
 func (p *deploymentParams) updateGenesisConfig() error {
 	// Fetch contract deployment whitelist from genesis config
-	deploymentWhitelist, err := config.FetchDeploymentWhitelist(p.genesisConfig)
+	deploymentWhitelist, err := config.GetDeploymentWhitelist(p.genesisConfig)
 	if err != nil {
 		return err
 	}
@@ -103,7 +103,7 @@ func (p *deploymentParams) updateGenesisConfig() error {
 	}
 
 	// Set whitelist in genesis configuration
-	whitelistConfig := config.FetchWhitelist(p.genesisConfig)
+	whitelistConfig := config.GetWhitelist(p.genesisConfig)
 	whitelistConfig[config.DeploymentWhitelistKey] = newDeploymentWhitelist
 	p.genesisConfig.Params.Whitelists = whitelistConfig
 

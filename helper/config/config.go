@@ -17,9 +17,9 @@ var (
 	ErrWhitelistTypeAssertion = errors.New("invalid type assertion for deployment whitelist")
 )
 
-// FetchWhitelist fetches whitelist object from the config
+// GetWhitelist fetches whitelist object from the config
 // if doesn't exist returns empty map
-func FetchWhitelist(config *chain.Chain) map[string]interface{} {
+func GetWhitelist(config *chain.Chain) map[string]interface{} {
 	// Fetch whitelist if exists, if not init
 	whitelistConfig := config.Params.Whitelists
 	if len(whitelistConfig) == 0 {
@@ -29,11 +29,11 @@ func FetchWhitelist(config *chain.Chain) map[string]interface{} {
 	return whitelistConfig
 }
 
-// FetchDeploymentWhitelist fetches deployment whitelist from the genesis config
+// GetDeploymentWhitelist fetches deployment whitelist from the genesis config
 // if doesn't exist returns empty list
-func FetchDeploymentWhitelist(genesisConfig *chain.Chain) ([]types.Address, error) {
+func GetDeploymentWhitelist(genesisConfig *chain.Chain) ([]types.Address, error) {
 	// Fetch whitelist config if exists, if not init
-	whitelistConfig := FetchWhitelist(genesisConfig)
+	whitelistConfig := GetWhitelist(genesisConfig)
 
 	// Extract deployment whitelist if exists, if not init
 

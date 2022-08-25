@@ -50,7 +50,7 @@ func (p *showParams) initWhitelists() error {
 	}
 
 	// fetch whitelists
-	deploymentWhitelist, err := config.FetchDeploymentWhitelist(genesisConfig)
+	deploymentWhitelist, err := config.GetDeploymentWhitelist(genesisConfig)
 	if err != nil {
 		return err
 	}
