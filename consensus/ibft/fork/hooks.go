@@ -59,6 +59,11 @@ func registerValidatorStoreHook(
 	}
 }
 
+// Updatable is an interface for the ValidatorStore that updates validators in the middle for fork
+type Updatable interface {
+	UpdateValidatorSet(validators.Validators, uint64) error
+}
+
 // registerUpdateValidatorStoreHook registers additional process
 // to update validators at specified height
 func registerUpdateValidatorStoreHook(
@@ -67,7 +72,7 @@ func registerUpdateValidatorStoreHook(
 	newValidators validators.Validators,
 	beginningHeight uint64,
 ) {
-	if us, ok := set.(store.Updatable); ok {
+	if us, ok := set.(Updatable); ok {
 		hooks.PostInsertBlockFunc = func(b *types.Block) error {
 			if beginningHeight != b.Number()-1 {
 				return nil

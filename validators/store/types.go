@@ -34,10 +34,6 @@ type ValidatorStore interface {
 	GetValidators(height uint64) (validators.Validators, error)
 }
 
-type Updatable interface {
-	UpdateValidatorSet(validators.Validators, uint64) error
-}
-
 type Votable interface {
 	Votes(uint64) ([]*Vote, error)
 	Candidates() []*Candidate
