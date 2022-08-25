@@ -34,12 +34,6 @@ type ValidatorStore interface {
 	GetValidators(height uint64) (validators.Validators, error)
 }
 
-type Votable interface {
-	Votes(uint64) ([]*Vote, error)
-	Candidates() []*Candidate
-	Propose(validators.Validator, bool, types.Address) error
-}
-
 type HeaderGetter interface {
 	Header() *types.Header
 	GetHeaderByNumber(uint64) (*types.Header, bool)

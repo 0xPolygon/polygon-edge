@@ -25,6 +25,13 @@ type operator struct {
 	ibft *backendIBFT
 }
 
+// Votable is an interface of the ValidatorStore with vote function
+type Votable interface {
+	Votes(uint64) ([]*store.Vote, error)
+	Candidates() []*store.Candidate
+	Propose(validators.Validator, bool, types.Address) error
+}
+
 // Status returns the status of the IBFT client
 func (o *operator) Status(ctx context.Context, req *empty.Empty) (*proto.IbftStatusResp, error) {
 	signer, err := o.getLatestSigner()
@@ -145,13 +152,13 @@ func (o *operator) parseCandidate(req *proto.Candidate) (validators.Validator, e
 }
 
 // getVotableValidatorStore gets current validator set and convert its type to Votable
-func (o *operator) getVotableValidatorStore() (store.Votable, error) {
+func (o *operator) getVotableValidatorStore() (Votable, error) {
 	valSet, err := o.ibft.forkManager.GetValidatorStore(o.ibft.blockchain.Header().Number)
 	if err != nil {
 		return nil, err
 	}
 
-	votableValSet, ok := valSet.(store.Votable)
+	votableValSet, ok := valSet.(Votable)
 	if !ok {
 		return nil, ErrVotingNotSupported
 	}
@@ -219,7 +226,7 @@ func candidatesToProtoCandidates(candidates []*store.Candidate) []*proto.Candida
 
 // getVotes gets votes from validator store only if store supports voting
 func getVotes(validatorStore store.ValidatorStore, height uint64) ([]*store.Vote, error) {
-	votableStore, ok := validatorStore.(store.Votable)
+	votableStore, ok := validatorStore.(Votable)
 	if !ok {
 		return nil, nil
 	}
