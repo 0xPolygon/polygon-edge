@@ -18,15 +18,8 @@ var (
 )
 
 // GetWhitelist fetches whitelist object from the config
-// if doesn't exist returns empty map
-func GetWhitelist(config *chain.Chain) map[string]interface{} {
-	// Fetch whitelist if exists, if not init
-	whitelistConfig := config.Params.Whitelists
-	if len(whitelistConfig) == 0 {
-		whitelistConfig = make(map[string]interface{})
-	}
-
-	return whitelistConfig
+func GetWhitelist(config *chain.Chain) *chain.Whitelists {
+	return config.Params.Whitelists
 }
 
 // GetDeploymentWhitelist fetches deployment whitelist from the genesis config
@@ -36,28 +29,9 @@ func GetDeploymentWhitelist(genesisConfig *chain.Chain) ([]types.Address, error)
 	whitelistConfig := GetWhitelist(genesisConfig)
 
 	// Extract deployment whitelist if exists, if not init
-
-	var deploymentWhitelistRaw []interface{}
-
-	if whitelistConfig[DeploymentWhitelistKey] != nil {
-		var ok bool
-
-		deploymentWhitelistRaw, ok = whitelistConfig[DeploymentWhitelistKey].([]interface{})
-		if !ok {
-			return nil, ErrAddressTypeAssertion
-		}
+	if whitelistConfig == nil {
+		return make([]types.Address, 0), nil
 	}
 
-	deploymentWhitelist := make([]types.Address, 0, len(deploymentWhitelistRaw))
-
-	for i := range deploymentWhitelistRaw {
-		address, ok := deploymentWhitelistRaw[i].(string)
-		if !ok {
-			return nil, ErrWhitelistTypeAssertion
-		}
-
-		deploymentWhitelist = append(deploymentWhitelist, types.StringToAddress(address))
-	}
-
-	return deploymentWhitelist, nil
+	return whitelistConfig.Deployed, nil
 }

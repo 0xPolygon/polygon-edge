@@ -87,7 +87,7 @@ func (p *deploymentParams) updateGenesisConfig() error {
 	}
 
 	isExist := map[types.Address]bool{}
-	
+
 	for _, a := range deploymentWhitelist {
 		isExist[a] = true
 	}
@@ -110,7 +110,12 @@ func (p *deploymentParams) updateGenesisConfig() error {
 
 	// Set whitelist in genesis configuration
 	whitelistConfig := config.GetWhitelist(p.genesisConfig)
-	whitelistConfig[config.DeploymentWhitelistKey] = newDeploymentWhitelist
+
+	if whitelistConfig == nil {
+		whitelistConfig = &chain.Whitelists{}
+	}
+
+	whitelistConfig.Deployed = newDeploymentWhitelist
 	p.genesisConfig.Params.Whitelists = whitelistConfig
 
 	// Save whitelist for result
