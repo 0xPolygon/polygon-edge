@@ -129,6 +129,18 @@ func (i *backendIBFT) buildBlock(snap *Snapshot, parent *types.Header) (*types.B
 		GasLimit:   parent.GasLimit, // Inherit from parent for now, will need to adjust dynamically later.
 	}
 
+	// Update the timestamp
+	parentTime := time.Unix(int64(parent.Timestamp), 0)
+
+	headerTime := parentTime.Add(i.blockTime)
+	if headerTime.Before(time.Now()) {
+		// The block header time is out of sync with the
+		// expected block time, realign it from this block forward
+		headerTime = time.Now().Add(i.blockTime)
+	}
+
+	header.Timestamp = uint64(headerTime.Unix())
+
 	// calculate gas limit based on parent header
 	gasLimit, err := i.blockchain.CalculateGasLimit(header.Number)
 	if err != nil {
@@ -144,9 +156,6 @@ func (i *backendIBFT) buildBlock(snap *Snapshot, parent *types.Header) (*types.B
 		i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", CandidateVoteHook, hookErr))
 	}
 
-	// set the timestamp
-	header.Timestamp = uint64(time.Now().Unix())
-
 	// we need to include in the extra field the current set of validators
 	putIbftExtraValidators(header, snap.Set)
 
@@ -157,7 +166,12 @@ func (i *backendIBFT) buildBlock(snap *Snapshot, parent *types.Header) (*types.B
 	// If the mechanism is PoS -> build a regular block if it's not an end-of-epoch block
 	// If the mechanism is PoA -> always build a regular block, regardless of epoch
 
-	txs := i.writeTransactions(gasLimit, header.Number, transition)
+	txs := i.writeTransactions(
+		gasLimit,
+		header.Number,
+		transition,
+		headerTime,
+	)
 
 	if err := i.PreStateCommit(header, transition); err != nil {
 		return nil, err
@@ -213,6 +227,7 @@ func (i *backendIBFT) writeTransactions(
 	gasLimit,
 	blockNumber uint64,
 	transition transitionInterface,
+	headerTime time.Time,
 ) (executed []*types.Transaction) {
 	executed = make([]*types.Transaction, 0)
 
@@ -221,7 +236,7 @@ func (i *backendIBFT) writeTransactions(
 	}
 
 	var (
-		blockTimer = time.NewTimer(i.blockTime)
+		blockTimer = time.After(time.Until(headerTime))
 
 		successful = 0
 		failed     = 0
@@ -243,7 +258,7 @@ func (i *backendIBFT) writeTransactions(
 write:
 	for {
 		select {
-		case <-blockTimer.C:
+		case <-blockTimer:
 			return
 		default:
 			// execute transactions one by one
@@ -272,7 +287,7 @@ write:
 	}
 
 	//	wait for the timer to expire
-	<-blockTimer.C
+	<-blockTimer
 
 	return
 }
