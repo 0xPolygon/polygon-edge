@@ -86,19 +86,25 @@ func (p *deploymentParams) updateGenesisConfig() error {
 		return err
 	}
 
-	// Add addresses if it doesn't exist
-	for _, address := range p.addAddresses {
-		if !types.AddressExists(address, deploymentWhitelist) {
-			deploymentWhitelist = append(deploymentWhitelist, address)
-		}
+	isExist := map[types.Address]bool{}
+	
+	for _, a := range deploymentWhitelist {
+		isExist[a] = true
+	}
+
+	for _, a := range p.addAddresses {
+		isExist[a] = true
+	}
+
+	for _, a := range p.removeAddresses {
+		isExist[a] = false
 	}
 
 	newDeploymentWhitelist := make([]types.Address, 0)
 
-	// Remove addresses if exists
-	for _, address := range deploymentWhitelist {
-		if !types.AddressExists(address, p.removeAddresses) {
-			newDeploymentWhitelist = append(newDeploymentWhitelist, address)
+	for addr, exists := range isExist {
+		if exists {
+			newDeploymentWhitelist = append(newDeploymentWhitelist, addr)
 		}
 	}
 
