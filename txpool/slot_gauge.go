@@ -32,7 +32,7 @@ func (g *slotGauge) decrease(slots uint64) {
 }
 
 // highPressure checks if the gauge level
-// is higher than the highPressureMark (0.8 * max)
+// is higher than the 0.8*max threshold
 func (g *slotGauge) highPressure() bool {
 	return g.read() > uint64(highPressureMark*float64(g.max))
 }
