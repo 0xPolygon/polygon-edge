@@ -10,16 +10,6 @@ import (
 	"github.com/hashicorp/go-hclog"
 )
 
-// Closer is an interface for termination process
-type Closer interface {
-	Close() error
-}
-
-// ValidatorsGetter is an interface of the method to returns validators at the given height
-type ValidatorsGetter interface {
-	GetValidators(height, epochSize, forkFrom uint64) (validators.Validators, error)
-}
-
 // SnapshotValidatorStoreWrapper is a wrapper of store.SnapshotValidatorStore
 // in order to add initialization and closer process with side effect
 type SnapshotValidatorStoreWrapper struct {

@@ -82,7 +82,7 @@ func (f *IBFTFork) UnmarshalJSON(data []byte) error {
 }
 
 // GetIBFTForks returns IBFT fork configurations from chain config
-func GetIBFTForks(ibftConfig map[string]interface{}) ([]IBFTFork, error) {
+func GetIBFTForks(ibftConfig map[string]interface{}) (IBFTForks, error) {
 	// no fork, only specifying IBFT type in chain config
 	if originalType, ok := ibftConfig[KeyType].(string); ok {
 		typ, err := ParseIBFTType(originalType)
@@ -98,7 +98,7 @@ func GetIBFTForks(ibftConfig map[string]interface{}) ([]IBFTFork, error) {
 			}
 		}
 
-		return []IBFTFork{
+		return IBFTForks{
 			{
 				Type:          typ,
 				Deployment:    nil,
@@ -116,7 +116,7 @@ func GetIBFTForks(ibftConfig map[string]interface{}) ([]IBFTFork, error) {
 			return nil, err
 		}
 
-		var forks []IBFTFork
+		var forks IBFTForks
 		if err := json.Unmarshal(bytes, &forks); err != nil {
 			return nil, err
 		}
@@ -125,4 +125,33 @@ func GetIBFTForks(ibftConfig map[string]interface{}) ([]IBFTFork, error) {
 	}
 
 	return nil, ErrUndefinedIBFTConfig
+}
+
+type IBFTForks []*IBFTFork
+
+// getByFork returns the fork in which the given height is
+// it doesn't use binary search for now because number of IBFTFork is not so many
+func (fs *IBFTForks) getFork(height uint64) *IBFTFork {
+	for idx := len(*fs) - 1; idx >= 0; idx-- {
+		fork := (*fs)[idx]
+
+		if fork.From.Value <= height && (fork.To == nil || height <= fork.To.Value) {
+			return fork
+		}
+	}
+
+	return nil
+}
+
+// filterByType returns new list of IBFTFork whose type matches with the given type
+func (fs *IBFTForks) filterByType(ibftType IBFTType) IBFTForks {
+	filteredForks := make(IBFTForks, 0)
+
+	for _, fork := range *fs {
+		if fork.Type == ibftType {
+			filteredForks = append(filteredForks, fork)
+		}
+	}
+
+	return filteredForks
 }

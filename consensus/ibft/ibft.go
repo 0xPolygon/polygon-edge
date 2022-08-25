@@ -8,7 +8,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/fork"
-	"github.com/0xPolygon/polygon-edge/consensus/ibft/hook"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
@@ -49,23 +48,13 @@ type txPoolInterface interface {
 	ResetWithHeaders(headers ...*types.Header)
 }
 
-type hooksInterface interface {
-	ShouldWriteTransactions(uint64) bool
-	ModifyHeader(*types.Header, types.Address) error
-	VerifyHeader(*types.Header) error
-	VerifyBlock(*types.Block) error
-	ProcessHeader(*types.Header) error
-	PreCommitState(*types.Header, *state.Transition) error
-	PostInsertBlock(*types.Block) error
-}
-
 type forkManagerInterface interface {
 	Initialize() error
 	Close() error
 	GetSigner(uint64) (signer.Signer, error)
 	GetValidatorStore(uint64) (fork.ValidatorStore, error)
 	GetValidators(uint64) (validators.Validators, error)
-	GetHooks(uint64) (*hook.Hooks, error)
+	GetHooks(uint64) fork.HooksInterface
 }
 
 // backendIBFT represents the IBFT consensus mechanism object
@@ -89,7 +78,7 @@ type backendIBFT struct {
 	forkManager       forkManagerInterface  // Manager to hold IBFT Forks
 	currentSigner     signer.Signer         // Signer at current sequence
 	currentValidators validators.Validators // signer at current sequence
-	currentHooks      hooksInterface        // Hooks at current sequence
+	currentHooks      fork.HooksInterface   // Hooks at current sequence
 
 	// Configurations
 	config             *consensus.Config // Consensus configuration
@@ -353,7 +342,7 @@ func (i *backendIBFT) verifyHeaderImpl(
 	parent, header *types.Header,
 	headerSigner signer.Signer,
 	validators validators.Validators,
-	hooks hooksInterface,
+	hooks fork.HooksInterface,
 	shouldVerifyParentCommittedSeals bool,
 ) error {
 	if header.MixHash != signer.IstanbulDigest {
@@ -456,10 +445,7 @@ func (i *backendIBFT) quorumSize(blockNumber uint64) QuorumImplementation {
 // ProcessHeaders updates the snapshot based on previously verified headers
 func (i *backendIBFT) ProcessHeaders(headers []*types.Header) error {
 	for _, header := range headers {
-		hooks, err := i.forkManager.GetHooks(header.Number)
-		if err != nil {
-			return err
-		}
+		hooks := i.forkManager.GetHooks(header.Number)
 
 		if err := hooks.ProcessHeader(header); err != nil {
 			return err
@@ -481,10 +467,7 @@ func (i *backendIBFT) GetBlockCreator(header *types.Header) (types.Address, erro
 
 // PreCommitState a hook to be called before finalizing state transition on inserting block
 func (i *backendIBFT) PreCommitState(header *types.Header, txn *state.Transition) error {
-	hooks, err := i.forkManager.GetHooks(header.Number)
-	if err != nil {
-		return err
-	}
+	hooks := i.forkManager.GetHooks(header.Number)
 
 	return hooks.PreCommitState(header, txn)
 }
@@ -587,7 +570,7 @@ func (i *backendIBFT) verifyParentCommittedSeals(
 func getModulesFromForkManager(forkManager forkManagerInterface, height uint64) (
 	signer.Signer,
 	validators.Validators,
-	hooksInterface,
+	fork.HooksInterface,
 	error,
 ) {
 	signer, err := forkManager.GetSigner(height)
@@ -600,10 +583,7 @@ func getModulesFromForkManager(forkManager forkManagerInterface, height uint64) 
 		return nil, nil, nil, err
 	}
 
-	hooks, err := forkManager.GetHooks(height)
-	if err != nil {
-		return nil, nil, nil, err
-	}
+	hooks := forkManager.GetHooks(height)
 
 	return signer, validators, hooks, nil
 }

@@ -15,7 +15,7 @@ const (
 	PoA IBFTType = "PoA"
 
 	// PoS defines the Proof of Stake IBFT type,
-	// where the validator set it changed through staking on the Staking SC
+	// where the validator set it changed through staking on the Staking Smart Contract
 	PoS IBFTType = "PoS"
 )
 
@@ -26,6 +26,9 @@ var ibftTypes = map[string]IBFTType{
 }
 
 // ibftTypesToSourceType defines validator set type used under each IBFT Type
+// Right now each IBFT Type is correspond one-to-one with ValidatorStore
+// In other words, PoA always uses SnapshotValidatorStore while PoS uses ContractValidatorStore
+// By definition, PoA can fetch validators from ContractValidatorStore
 var ibftTypesToSourceType = map[IBFTType]store.SourceType{
 	PoA: store.Snapshot,
 	PoS: store.Contract,

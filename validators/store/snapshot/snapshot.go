@@ -175,14 +175,21 @@ func (s *SnapshotValidatorStore) Votes(height uint64) ([]*store.Vote, error) {
 }
 
 // UpdateValidatorSet resets Snapshot with given validators at specified height
-func (s *SnapshotValidatorStore) UpdateValidatorSet(newValidators validators.Validators, height uint64) error {
-	header, _ := s.blockchain.GetHeaderByNumber(height)
-	if header == nil {
-		return fmt.Errorf("header at %d not found", height)
+func (s *SnapshotValidatorStore) UpdateValidatorSet(
+	// new validators to be overwritten
+	newValidators validators.Validators,
+	// the height from which new validators are used
+	fromHeight uint64,
+) error {
+	snapshotHeight := fromHeight - 1
+
+	header, ok := s.blockchain.GetHeaderByNumber(snapshotHeight)
+	if !ok {
+		return fmt.Errorf("header at %d not found", snapshotHeight)
 	}
 
 	s.store.putByNumber(&Snapshot{
-		Number: height,
+		Number: header.Number,
 		Hash:   header.Hash.String(),
 		// reset validators & votes
 		Set:   newValidators,

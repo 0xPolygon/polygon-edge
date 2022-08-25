@@ -17,11 +17,53 @@ var (
 	ErrTxInLastEpochOfBlock = errors.New("block must not have transactions in the last of epoch")
 )
 
-// registerPoSHook registers additional processes for PoS
-func registerPoSHook(
+// HeaderModifier is an interface for the struct that modifies block header for additional process
+type HeaderModifier interface {
+	ModifyHeader(*types.Header, types.Address) error
+	VerifyHeader(*types.Header) error
+	ProcessHeader(*types.Header) error
+}
+
+// registerHeaderModifierHooks registers hooks to modify header by validator store
+func registerHeaderModifierHooks(
 	hooks *hook.Hooks,
-	epochSize uint64,
+	validatorStore store.ValidatorStore,
 ) {
+	if modifier, ok := validatorStore.(HeaderModifier); ok {
+		hooks.ModifyHeaderFunc = modifier.ModifyHeader
+		hooks.VerifyHeaderFunc = modifier.VerifyHeader
+		hooks.ProcessHeaderFunc = modifier.ProcessHeader
+	}
+}
+
+// Updatable is an interface for the struct that updates validators in the middle
+type Updatable interface {
+	// UpdateValidatorSet updates validators forcibly
+	// in order that new validators are available from the given height
+	UpdateValidatorSet(validators.Validators, uint64) error
+}
+
+// registerUpdateValidatorsHooks registers hooks to update validators in the middle
+func registerUpdateValidatorsHooks(
+	hooks *hook.Hooks,
+	validatorStore store.ValidatorStore,
+	validators validators.Validators,
+	fromHeight uint64,
+) {
+	if us, ok := validatorStore.(Updatable); ok {
+		hooks.PostInsertBlockFunc = func(b *types.Block) error {
+			if fromHeight != b.Number()+1 {
+				return nil
+			}
+
+			// update validators if the block height is the one before beginning height
+			return us.UpdateValidatorSet(validators, fromHeight)
+		}
+	}
+}
+
+// registerPoSVerificationHooks registers that hooks to prevent the last epoch block from having transactions
+func registerTxInclusionGuardHooks(hooks *hook.Hooks, epochSize uint64) {
 	isLastEpoch := func(height uint64) bool {
 		return height > 0 && height%epochSize == 0
 	}
@@ -39,58 +81,18 @@ func registerPoSHook(
 	}
 }
 
-// HeaderModifier is an interface for the module that modifies block header for additional process
-type HeaderModifier interface {
-	ModifyHeader(*types.Header, types.Address) error
-	VerifyHeader(*types.Header) error
-	ProcessHeader(*types.Header) error
-}
-
-// registerValidatorStoreHook registers additional processes
-// for the ValidatorStore that modifies header
-func registerValidatorStoreHook(
-	hooks *hook.Hooks,
-	set store.ValidatorStore,
-) {
-	if hm, ok := set.(HeaderModifier); ok {
-		hooks.ModifyHeaderFunc = hm.ModifyHeader
-		hooks.VerifyHeaderFunc = hm.VerifyHeader
-		hooks.ProcessHeaderFunc = hm.ProcessHeader
-	}
-}
-
-// Updatable is an interface for the ValidatorStore that updates validators in the middle for fork
-type Updatable interface {
-	UpdateValidatorSet(validators.Validators, uint64) error
-}
-
-// registerUpdateValidatorStoreHook registers additional process
-// to update validators at specified height
-func registerUpdateValidatorStoreHook(
-	hooks *hook.Hooks,
-	set store.ValidatorStore,
-	newValidators validators.Validators,
-	beginningHeight uint64,
-) {
-	if us, ok := set.(Updatable); ok {
-		hooks.PostInsertBlockFunc = func(b *types.Block) error {
-			if beginningHeight != b.Number()-1 {
-				return nil
-			}
-
-			// call if the previous block has been inserted
-			return us.UpdateValidatorSet(newValidators, b.Number())
-		}
-	}
-}
-
-// registerContractDeploymentHook registers additional process
-// to deploy contract or update contract byte code
-func registerContractDeploymentHook(
+// registerStakingContractDeploymentHooks registers hooks
+// to deploy or update staking contract
+func registerStakingContractDeploymentHooks(
 	hooks *hook.Hooks,
 	fork *IBFTFork,
 ) {
 	hooks.PreCommitStateFunc = func(header *types.Header, txn *state.Transition) error {
+		// safe check
+		if header.Number != fork.Deployment.Value {
+			return nil
+		}
+
 		if txn.AccountExists(staking.AddrStakingContract) {
 			// update bytecode of deployed contract
 			codeBytes, err := hex.DecodeHex(stakingHelper.StakingSCBytecode)
@@ -115,6 +117,7 @@ func registerContractDeploymentHook(
 	}
 }
 
+// getPreDeployParams returns PredeployParams for Staking Contract from IBFTFork
 func getPreDeployParams(fork *IBFTFork) stakingHelper.PredeployParams {
 	params := stakingHelper.PredeployParams{
 		MinValidatorCount: stakingHelper.MinValidatorCount,

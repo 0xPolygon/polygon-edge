@@ -24,7 +24,11 @@ const (
 )
 
 var (
-	ErrFromPositive = errors.New(`"from" must be positive number`)
+	ErrFromPositive                  = errors.New(`"from" must be positive number`)
+	ErrIBFTConfigNotFound            = errors.New(`"ibft" config doesn't exist in "engine" of genesis.json'`)
+	ErrSameIBFTAndValidatorType      = errors.New("cannot specify same IBFT type and validator type as the last fork")
+	ErrLessFromThanLastFrom          = errors.New(`"from" must be greater than the beginning height of last fork`)
+	ErrInvalidValidatorsUpdateHeight = errors.New(`cannot specify a less height than 2 for validators update`)
 )
 
 var (
@@ -369,7 +373,7 @@ func appendIBFTForks(
 ) error {
 	ibftConfig, ok := cc.Params.Engine["ibft"].(map[string]interface{})
 	if !ok {
-		return errors.New(`"ibft" setting doesn't exist in "engine" of genesis.json'`)
+		return ErrIBFTConfigNotFound
 	}
 
 	ibftForks, err := fork.GetIBFTForks(ibftConfig)
@@ -377,15 +381,20 @@ func appendIBFTForks(
 		return err
 	}
 
-	lastFork := &ibftForks[len(ibftForks)-1]
+	lastFork := ibftForks[len(ibftForks)-1]
 
 	if (ibftType == lastFork.Type) &&
-		(lastFork.ValidatorType == validatorType) {
-		return errors.New(`cannot specify same IBFT type and validator type as the last fork`)
+		(validatorType == lastFork.ValidatorType) {
+		return ErrSameIBFTAndValidatorType
 	}
 
 	if from <= lastFork.From.Value {
-		return errors.New(`"from" must be greater than the beginning height of last fork`)
+		return ErrLessFromThanLastFrom
+	}
+
+	if ibftType == fork.PoA && validators != nil && from <= 1 {
+		// can't update validators at block 0
+		return ErrInvalidValidatorsUpdateHeight
 	}
 
 	lastFork.To = &common.JSONNumber{Value: from - 1}
@@ -413,7 +422,7 @@ func appendIBFTForks(
 		}
 	}
 
-	ibftForks = append(ibftForks, newFork)
+	ibftForks = append(ibftForks, &newFork)
 	ibftConfig["types"] = ibftForks
 
 	// remove leftover config

@@ -6,6 +6,8 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/hook"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/secrets"
+	"github.com/0xPolygon/polygon-edge/state"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
 	"github.com/0xPolygon/polygon-edge/validators/store"
 	"github.com/0xPolygon/polygon-edge/validators/store/contract"
@@ -24,11 +26,31 @@ var (
 	ErrValidatorStoreNotFound = errors.New("validator set not found")
 )
 
-// ValidatorStore is an interface that HookManager calls for Validator Store
+// ValidatorStore is an interface that ForkManager calls for Validator Store
 type ValidatorStore interface {
 	store.ValidatorStore
-	Closer
-	ValidatorsGetter
+	// Close defines termination process
+	Close() error
+	// GetValidators is a method to return validators at the given height
+	GetValidators(height, epochSize, forkFrom uint64) (validators.Validators, error)
+}
+
+// HookRegister is an interface that ForkManager calls for hook registrations
+type HooksRegister interface {
+	// RegisterHooks register hooks for the given block height
+	RegisterHooks(hooks *hook.Hooks, height uint64)
+}
+
+// HooksInterface is an interface of hooks to be called by IBFT
+// This interface is referred from fork and ibft package
+type HooksInterface interface {
+	ShouldWriteTransactions(uint64) bool
+	ModifyHeader(*types.Header, types.Address) error
+	VerifyHeader(*types.Header) error
+	VerifyBlock(*types.Block) error
+	ProcessHeader(*types.Header) error
+	PreCommitState(*types.Header, *state.Transition) error
+	PostInsertBlock(*types.Block) error
 }
 
 // ForkManager is the module that has Fork configuration and multiple version of submodules
@@ -40,14 +62,14 @@ type ForkManager struct {
 	secretsManager secrets.SecretsManager
 
 	// configuration
-	forks     []IBFTFork
+	forks     IBFTForks
 	filePath  string
 	epochSize uint64
 
-	signers map[validators.ValidatorType]signer.Signer
-
-	// validator sets
-	validatorSets map[store.SourceType]ValidatorStore
+	// submodule lookup
+	signers         map[validators.ValidatorType]signer.Signer
+	validatorStores map[store.SourceType]ValidatorStore
+	hooksRegisters  map[IBFTType]HooksRegister
 }
 
 // NewForkManager is a constructor of ForkManager
@@ -66,15 +88,16 @@ func NewForkManager(
 	}
 
 	fm := &ForkManager{
-		logger:         logger.Named(loggerName),
-		blockchain:     blockchain,
-		executor:       executor,
-		secretsManager: secretManager,
-		filePath:       filePath,
-		epochSize:      epochSize,
-		forks:          forks,
-		signers:        make(map[validators.ValidatorType]signer.Signer),
-		validatorSets:  make(map[store.SourceType]ValidatorStore),
+		logger:          logger.Named(loggerName),
+		blockchain:      blockchain,
+		executor:        executor,
+		secretsManager:  secretManager,
+		filePath:        filePath,
+		epochSize:       epochSize,
+		forks:           forks,
+		signers:         make(map[validators.ValidatorType]signer.Signer),
+		validatorStores: make(map[store.SourceType]ValidatorStore),
+		hooksRegisters:  make(map[IBFTType]HooksRegister),
 	}
 
 	// Need initialization of signers in the constructor
@@ -92,12 +115,25 @@ func (m *ForkManager) Initialize() error {
 		return err
 	}
 
+	m.initializeHooksRegisters()
+
+	return nil
+}
+
+// Close calls termination process of submodules
+func (m *ForkManager) Close() error {
+	for _, store := range m.validatorStores {
+		if err := store.Close(); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
 // GetSigner returns a proper signer at specified height
 func (m *ForkManager) GetSigner(height uint64) (signer.Signer, error) {
-	fork := m.getFork(height)
+	fork := m.forks.getFork(height)
 	if fork == nil {
 		return nil, ErrForkNotFound
 	}
@@ -112,13 +148,13 @@ func (m *ForkManager) GetSigner(height uint64) (signer.Signer, error) {
 
 // GetValidatorStore returns a proper validator set at specified height
 func (m *ForkManager) GetValidatorStore(height uint64) (ValidatorStore, error) {
-	fork := m.getFork(height)
+	fork := m.forks.getFork(height)
 	if fork == nil {
 		return nil, ErrForkNotFound
 	}
 
-	set, ok := m.validatorSets[ibftTypesToSourceType[fork.Type]]
-	if !ok {
+	set := m.getValidatorStoreByIBFTFork(fork)
+	if set == nil {
 		return nil, ErrValidatorStoreNotFound
 	}
 
@@ -127,14 +163,14 @@ func (m *ForkManager) GetValidatorStore(height uint64) (ValidatorStore, error) {
 
 // GetValidators returns validators at specified height
 func (m *ForkManager) GetValidators(height uint64) (validators.Validators, error) {
-	fork := m.getFork(height)
+	fork := m.forks.getFork(height)
 	if fork == nil {
 		return nil, ErrForkNotFound
 	}
 
-	set, err := m.GetValidatorStore(height)
-	if err != nil {
-		return nil, err
+	set := m.getValidatorStoreByIBFTFork(fork)
+	if set == nil {
+		return nil, ErrValidatorStoreNotFound
 	}
 
 	return set.GetValidators(
@@ -144,46 +180,24 @@ func (m *ForkManager) GetValidators(height uint64) (validators.Validators, error
 	)
 }
 
-// GetHooks returns a hooks at specified height
-func (m *ForkManager) GetHooks(height uint64) (*hook.Hooks, error) {
-	hooks := &hook.Hooks{}
-
-	fork := m.getFork(height)
-	if fork == nil {
-		return nil, ErrForkNotFound
+func (m *ForkManager) getValidatorStoreByIBFTFork(fork *IBFTFork) ValidatorStore {
+	set, ok := m.validatorStores[ibftTypesToSourceType[fork.Type]]
+	if !ok {
+		return nil
 	}
 
-	var err error
-
-	switch fork.Type {
-	case PoA:
-		err = m.registerPoAHooks(hooks, height)
-	case PoS:
-		registerPoSHook(hooks, m.epochSize)
-	}
-
-	if err != nil {
-		return nil, err
-	}
-
-	if err := m.registerPoAPrepareHooks(hooks, height); err != nil {
-		return nil, err
-	}
-
-	m.registerPoSPrepareHooks(hooks, height)
-
-	return hooks, nil
+	return set
 }
 
-// Close calls termination process of submodules
-func (m *ForkManager) Close() error {
-	for _, store := range m.validatorSets {
-		if err := store.Close(); err != nil {
-			return err
-		}
+// GetHooks returns a hooks at specified height
+func (m *ForkManager) GetHooks(height uint64) HooksInterface {
+	hooks := &hook.Hooks{}
+
+	for _, r := range m.hooksRegisters {
+		r.RegisterHooks(hooks, height)
 	}
 
-	return nil
+	return hooks
 }
 
 // initializeSigners initialize all signers based on Fork configuration
@@ -192,18 +206,6 @@ func (m *ForkManager) initializeSigners() error {
 		valType := fork.ValidatorType
 
 		if err := m.initializeSigner(valType); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// initializeValidatorStores initializes all validator sets based on Fork configuration
-func (m *ForkManager) initializeValidatorStores() error {
-	for _, fork := range m.forks {
-		sourceType := ibftTypesToSourceType[fork.Type]
-		if err := m.initializeValidatorStore(sourceType); err != nil {
 			return err
 		}
 	}
@@ -227,9 +229,21 @@ func (m *ForkManager) initializeSigner(valType validators.ValidatorType) error {
 	return nil
 }
 
+// initializeValidatorStores initializes all validator sets based on Fork configuration
+func (m *ForkManager) initializeValidatorStores() error {
+	for _, fork := range m.forks {
+		sourceType := ibftTypesToSourceType[fork.Type]
+		if err := m.initializeValidatorStore(sourceType); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // initializeValidatorStore initializes the specified validator set
 func (m *ForkManager) initializeValidatorStore(setType store.SourceType) error {
-	if _, ok := m.validatorSets[setType]; ok {
+	if _, ok := m.validatorStores[setType]; ok {
 		return nil
 	}
 
@@ -260,95 +274,34 @@ func (m *ForkManager) initializeValidatorStore(setType store.SourceType) error {
 		return err
 	}
 
-	m.validatorSets[setType] = valStore
+	m.validatorStores[setType] = valStore
 
 	return nil
 }
 
-// registerPoAHooks register additional processes for PoA
-func (m *ForkManager) registerPoAHooks(
-	hooks *hook.Hooks,
-	height uint64,
-) error {
-	valSet, err := m.GetValidatorStore(height)
-	if err != nil {
-		return err
+// initializeHooksRegisters initialize all HookRegisters to be used
+func (m *ForkManager) initializeHooksRegisters() {
+	for _, fork := range m.forks {
+		m.initializeHooksRegister(fork.Type)
 	}
-
-	registerValidatorStoreHook(hooks, valSet)
-
-	return nil
 }
 
-// registerPoAHooks register additional processes to start PoA in the middle
-func (m *ForkManager) registerPoAPrepareHooks(
-	hooks *hook.Hooks,
-	height uint64,
-) error {
-	fromFork := m.getForkByFrom(height + 1)
-	if fromFork == nil || fromFork.Type != PoA || fromFork.Validators == nil {
-		return nil
-	}
-
-	nextValSet, err := m.GetValidatorStore(height + 1)
-	if err != nil {
-		return err
-	}
-
-	registerUpdateValidatorStoreHook(
-		hooks,
-		nextValSet,
-		fromFork.Validators,
-		fromFork.From.Value,
-	)
-
-	return nil
-}
-
-// registerPoAHooks register additional processes to start PoS in the middle
-func (m *ForkManager) registerPoSPrepareHooks(
-	hooks *hook.Hooks,
-	height uint64,
-) {
-	deploymentFork := m.getForkByDeployment(height + 1)
-	if deploymentFork == nil || deploymentFork.Type != PoS || deploymentFork.Deployment == nil {
+// initializeHooksRegister initialize HookRegister by IBFTType
+func (m *ForkManager) initializeHooksRegister(ibftType IBFTType) {
+	if _, ok := m.hooksRegisters[ibftType]; ok {
 		return
 	}
 
-	registerContractDeploymentHook(hooks, deploymentFork)
-}
-
-// getFork returns a fork the specified height uses
-func (m *ForkManager) getFork(height uint64) *IBFTFork {
-	for idx := len(m.forks) - 1; idx >= 0; idx-- {
-		fork := m.forks[idx]
-
-		if fork.From.Value <= height && (fork.To == nil || height <= fork.To.Value) {
-			return &fork
-		}
+	switch ibftType {
+	case PoA:
+		m.hooksRegisters[PoA] = NewPoAHookRegisterer(
+			m.getValidatorStoreByIBFTFork,
+			m.forks,
+		)
+	case PoS:
+		m.hooksRegisters[PoS] = NewPoSHookRegister(
+			m.forks,
+			m.epochSize,
+		)
 	}
-
-	return nil
-}
-
-// getForkByFrom returns a fork whose From matches with the specified height
-func (m *ForkManager) getForkByFrom(height uint64) *IBFTFork {
-	for _, fork := range m.forks {
-		if fork.From.Value == height {
-			return &fork
-		}
-	}
-
-	return nil
-}
-
-// getForkByFrom returns a fork whose Development matches with the specified height
-func (m *ForkManager) getForkByDeployment(height uint64) *IBFTFork {
-	for _, fork := range m.forks {
-		if fork.Deployment != nil && fork.Deployment.Value == height {
-			return &fork
-		}
-	}
-
-	return nil
 }
