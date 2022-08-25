@@ -34,15 +34,6 @@ type ValidatorStore interface {
 	GetValidators(height uint64) (validators.Validators, error)
 }
 
-type HeaderModifier interface {
-	ModifyHeader(*types.Header, types.Address) error
-	VerifyHeader(*types.Header) error
-}
-
-type HeaderProcessor interface {
-	ProcessHeader(*types.Header) error
-}
-
 type Updatable interface {
 	UpdateValidatorSet(validators.Validators, uint64) error
 }

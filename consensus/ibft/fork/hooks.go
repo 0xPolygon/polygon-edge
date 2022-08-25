@@ -39,19 +39,23 @@ func registerPoSHook(
 	}
 }
 
+// HeaderModifier is an interface for the module that modifies block header for additional process
+type HeaderModifier interface {
+	ModifyHeader(*types.Header, types.Address) error
+	VerifyHeader(*types.Header) error
+	ProcessHeader(*types.Header) error
+}
+
 // registerValidatorStoreHook registers additional processes
 // for the ValidatorStore that modifies header
 func registerValidatorStoreHook(
 	hooks *hook.Hooks,
 	set store.ValidatorStore,
 ) {
-	if hm, ok := set.(store.HeaderModifier); ok {
+	if hm, ok := set.(HeaderModifier); ok {
 		hooks.ModifyHeaderFunc = hm.ModifyHeader
 		hooks.VerifyHeaderFunc = hm.VerifyHeader
-	}
-
-	if ph, ok := set.(store.HeaderProcessor); ok {
-		hooks.ProcessHeaderFunc = ph.ProcessHeader
+		hooks.ProcessHeaderFunc = hm.ProcessHeader
 	}
 }
 
