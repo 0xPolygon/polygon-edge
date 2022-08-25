@@ -8,9 +8,9 @@ import (
 )
 
 type DeploymentResult struct {
-	AddAddress    []types.Address `json:"addAddress,omitempty"`
-	RemoveAddress []types.Address `json:"removeAddress,omitempty"`
-	Whitelist     []types.Address `json:"whitelist"`
+	AddAddresses    []types.Address `json:"addAddress,omitempty"`
+	RemoveAddresses []types.Address `json:"removeAddress,omitempty"`
+	Whitelist       []types.Address `json:"whitelist"`
 }
 
 func (r *DeploymentResult) GetOutput() string {
@@ -18,12 +18,12 @@ func (r *DeploymentResult) GetOutput() string {
 
 	buffer.WriteString("\n[CONTRACT DEPLOYMENT WHITELIST]\n\n")
 
-	if len(r.AddAddress) != 0 {
-		buffer.WriteString(fmt.Sprintf("Added addresses: %s,\n", r.AddAddress))
+	if len(r.AddAddresses) != 0 {
+		buffer.WriteString(fmt.Sprintf("Added addresses: %s,\n", r.AddAddresses))
 	}
 
-	if len(r.RemoveAddress) != 0 {
-		buffer.WriteString(fmt.Sprintf("Removed addresses: %s,\n", r.RemoveAddress))
+	if len(r.RemoveAddresses) != 0 {
+		buffer.WriteString(fmt.Sprintf("Removed addresses: %s,\n", r.RemoveAddresses))
 	}
 
 	buffer.WriteString(fmt.Sprintf("Contract deployment whitelist : %s,\n", r.Whitelist))

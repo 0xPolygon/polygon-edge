@@ -27,8 +27,8 @@ type deploymentParams struct {
 	removeAddressRaw []string
 
 	// addresses, converted from raw addresses
-	addAddress    []types.Address
-	removeAddress []types.Address
+	addAddresses    []types.Address
+	removeAddresses []types.Address
 
 	// genesis file
 	genesisPath   string
@@ -54,10 +54,10 @@ func (p *deploymentParams) initRawParams() error {
 
 func (p *deploymentParams) initRawAddresses() error {
 	// convert addresses to be added from string to type.Address
-	p.addAddress = unmarshallRawAddresses(p.addAddressRaw)
+	p.addAddresses = unmarshallRawAddresses(p.addAddressRaw)
 
 	// convert addresses to be removed from string to type.Address
-	p.removeAddress = unmarshallRawAddresses(p.removeAddressRaw)
+	p.removeAddresses = unmarshallRawAddresses(p.removeAddressRaw)
 
 	return nil
 }
@@ -87,7 +87,7 @@ func (p *deploymentParams) updateGenesisConfig() error {
 	}
 
 	// Add addresses if it doesn't exist
-	for _, address := range p.addAddress {
+	for _, address := range p.addAddresses {
 		if !types.AddressExists(address, deploymentWhitelist) {
 			deploymentWhitelist = append(deploymentWhitelist, address)
 		}
@@ -97,7 +97,7 @@ func (p *deploymentParams) updateGenesisConfig() error {
 
 	// Remove addresses if exists
 	for _, address := range deploymentWhitelist {
-		if !types.AddressExists(address, p.removeAddress) {
+		if !types.AddressExists(address, p.removeAddresses) {
 			newDeploymentWhitelist = append(newDeploymentWhitelist, address)
 		}
 	}
@@ -132,9 +132,9 @@ func (p *deploymentParams) overrideGenesisConfig() error {
 
 func (p *deploymentParams) getResult() command.CommandResult {
 	result := &DeploymentResult{
-		AddAddress:    p.addAddress,
-		RemoveAddress: p.removeAddress,
-		Whitelist:     p.whitelist,
+		AddAddresses:    p.addAddresses,
+		RemoveAddresses: p.removeAddresses,
+		Whitelist:       p.whitelist,
 	}
 
 	return result
