@@ -17,6 +17,7 @@
 package runtime
 
 import (
+	"math/big"
 	"sync"
 
 	"github.com/holiman/uint256"
@@ -35,8 +36,16 @@ type Stack struct {
 	data []uint256.Int
 }
 
-func Newstack() *Stack {
+func NewStack() *Stack {
 	return stackPool.Get().(*Stack)
+}
+
+func (st *Stack) UpdateStack(data []*big.Int, sp int) {
+	st.data = make([]uint256.Int, 0, 16)
+	for i := 0; i < sp; i++ {
+		tmpData, _ := uint256.FromBig(data[i])
+		st.push(tmpData)
+	}
 }
 
 func returnStack(s *Stack) {

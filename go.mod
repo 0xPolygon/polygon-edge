@@ -62,8 +62,8 @@ require (
 
 require (
 	github.com/0xPolygon/go-ibft v0.0.0-20220810095021-e43142f8d267
+	github.com/dop251/goja v0.0.0-20220815083517-0c74f9139fd6
 	github.com/holiman/uint256 v1.2.0
-	gopkg.in/olebedev/go-duktape.v3 v3.0.0-20210326210528-650f7c854440
 )
 
 require (
@@ -82,9 +82,11 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/davidlazar/go-crypto v0.0.0-20200604182044-b73af7476f6c // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.1 // indirect
+	github.com/dlclark/regexp2 v1.7.0 // indirect
 	github.com/docker/go-units v0.4.0 // indirect
 	github.com/flynn/noise v1.0.0 // indirect
 	github.com/francoispqt/gojay v1.2.13 // indirect
+	github.com/go-sourcemap/sourcemap v2.1.3+incompatible // indirect
 	github.com/go-task/slim-sprig v0.0.0-20210107165309-348f09dbbbc0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect

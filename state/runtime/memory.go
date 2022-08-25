@@ -27,6 +27,18 @@ func NewMemory() *Memory {
 	return &Memory{}
 }
 
+func NewMemoryII(store []byte, lastGasCost uint64) *Memory {
+	return &Memory{
+		store:       store,
+		lastGasCost: lastGasCost,
+	}
+}
+
+func (m *Memory) UpdateMemory(store []byte, lastGasCost uint64) {
+	m.store = store
+	m.lastGasCost = lastGasCost
+}
+
 // Set sets offset + size to value
 func (m *Memory) Set(offset, size uint64, value []byte) {
 	// It's possible the offset is greater than 0 and size equals 0. This is because

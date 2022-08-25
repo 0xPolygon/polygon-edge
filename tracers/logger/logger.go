@@ -1,4 +1,4 @@
-// Copyright 2015 The go-ethereum Authors
+// Copyright 2021 The go-ethereum Authors
 // This file is part of the go-ethereum library.
 //
 // The go-ethereum library is free software: you can redistribute it and/or modify
@@ -19,7 +19,6 @@ package logger
 import (
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"math/big"
@@ -109,15 +108,15 @@ func (s *StructLog) ErrorString() string {
 // contract their storage.
 type StructLogger struct {
 	cfg Config
-	// env *evm.EVM
+	// env *vm.EVM
 
 	storage  map[types.Address]Storage
 	logs     []StructLog
 	output   []byte
-	txn      *state.Transition // as env
 	err      error
 	gasLimit uint64
 	usedGas  uint64
+	txn      *state.Transition
 
 	interrupt uint32 // Atomic flag to signal execution interruption
 	reason    error  // Textual reason for the interruption
@@ -187,21 +186,21 @@ func (l *StructLogger) CaptureState(pc uint64, op int, gas, cost uint64, scope *
 	stackLen := len(stackData)
 	// Copy a snapshot of the current storage to a new container
 	var storage Storage
-	if !l.cfg.DisableStorage && (op == evm.SLOAD || op == evm.SSTORE) {
+	if !l.cfg.DisableStorage && (evm.OpCode(op) == evm.SLOAD || evm.OpCode(op) == evm.SSTORE) {
 		// initialise new changed values storage container for this contract
 		// if not present.
 		if l.storage[contract.Address] == nil {
 			l.storage[contract.Address] = make(Storage)
 		}
 		// capture SLOAD opcodes and record the read entry in the local storage
-		if op == evm.SLOAD && stackLen >= 1 {
+		if evm.OpCode(op) == evm.SLOAD && stackLen >= 1 {
 			var (
 				address = types.Hash(stackData[stackLen-1].Bytes32())
 				value   = l.txn.GetTxn().GetState(contract.Address, address)
 			)
 			l.storage[contract.Address][address] = value
 			storage = l.storage[contract.Address].Copy()
-		} else if op == evm.SSTORE && stackLen >= 2 {
+		} else if evm.OpCode(op) == evm.SSTORE && stackLen >= 2 {
 			// capture SSTORE opcodes and record the written entry in the local storage.
 			var (
 				value   = types.Hash(stackData[stackLen-2].Bytes32())
@@ -217,7 +216,6 @@ func (l *StructLogger) CaptureState(pc uint64, op int, gas, cost uint64, scope *
 		copy(rdata, rData)
 	}
 	// create a new snapshot of the EVM.
-	// l.txn is nil ??  因为start的时候没有赋值！
 	log := StructLog{pc, op, gas, cost, mem, memory.Len(), stck, rdata, storage, depth, l.txn.GetTxn().GetRefund(), err}
 	l.logs = append(l.logs, log)
 }
@@ -254,12 +252,9 @@ func (l *StructLogger) GetResult() (json.RawMessage, error) {
 	returnData := types.CopyBytes(l.output)
 	// Return data when successful and revert reason when reverted, otherwise empty.
 	returnVal := fmt.Sprintf("%x", returnData)
-	if failed && l.err != errors.New("execution reverted") {
-		returnVal = ""
-	}
-	if failed {
-		returnVal = ""
-	}
+	// if failed && l.err != vm.ErrExecutionReverted {
+	// 	returnVal = ""
+	// }
 	return json.Marshal(&ExecutionResult{
 		Gas:         l.usedGas,
 		Failed:      failed,
@@ -294,7 +289,7 @@ func (l *StructLogger) Output() []byte { return l.output }
 // WriteTrace writes a formatted trace to the given writer
 func WriteTrace(writer io.Writer, logs []StructLog) {
 	for _, log := range logs {
-		fmt.Fprintf(writer, "%-16dpc=%08d gas=%v cost=%v", log.Op, log.Pc, log.Gas, log.GasCost)
+		fmt.Fprintf(writer, "%-16spc=%08d gas=%v cost=%v", log.Op, log.Pc, log.Gas, log.GasCost)
 		if log.Err != nil {
 			fmt.Fprintf(writer, " ERROR: %v", log.Err)
 		}

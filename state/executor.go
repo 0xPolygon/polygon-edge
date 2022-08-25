@@ -742,24 +742,26 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host, op evm.
 	var result *runtime.ExecutionResult
 	start := time.Now()
 
-	result = t.run(c, host)
-	gasCost := uint64(len(result.ReturnValue)) * 200
+	var gasCost uint64
 
 	if t.traceConfig.Debug {
-		var output []byte
-		copy(output, result.ReturnValue)
+		// var output []byte
+		// copy(output, result.ReturnValue)
 		if c.Depth == 1 {
 			t.traceConfig.Tracer.CaptureStart(t, c.Caller, c.Address, true, c.Code, c.Gas, c.Value)
-			defer func(startTime time.Time) {
-				t.traceConfig.Tracer.CaptureEnd(output, gasCost, time.Since(start), result.Err)
-			}(time.Now())
+			defer func(gas uint64) {
+				t.traceConfig.Tracer.CaptureEnd(result.ReturnValue, gas, time.Since(start), result.Err)
+			}(gasCost)
 		} else {
 			t.traceConfig.Tracer.CaptureEnter(int(op), c.Caller, c.Address, c.Code, c.Gas, c.Value)
-			defer func(startTime time.Time) {
-				t.traceConfig.Tracer.CaptureExit(output, gasCost, result.Err)
-			}(time.Now())
+			defer func(gas uint64) {
+				t.traceConfig.Tracer.CaptureExit(result.ReturnValue, gas, result.Err)
+			}(gasCost)
 		}
 	}
+
+	result = t.run(c, host)
+	gasCost = uint64(len(result.ReturnValue)) * 200
 
 	if result.Failed() {
 		t.state.RevertToSnapshot(snapshot)
