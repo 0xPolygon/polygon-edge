@@ -217,7 +217,7 @@ func FetchDeploymentWhitelist(genesisConfig *chain.Chain) ([]types.Address, erro
 		}
 	}
 
-	deploymentWhitelist := make([]types.Address, 0)
+	deploymentWhitelist := make([]types.Address, 0, len(deploymentWhitelistRaw))
 
 	for i := range deploymentWhitelistRaw {
 		address, ok := deploymentWhitelistRaw[i].(string)
