@@ -7,7 +7,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
-	"github.com/0xPolygon/polygon-edge/helper/common"
+	"github.com/0xPolygon/polygon-edge/helper/config"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -81,7 +81,7 @@ func (p *deploymentParams) initChain() error {
 
 func (p *deploymentParams) updateGenesisConfig() error {
 	// Fetch contract deployment whitelist from genesis config
-	deploymentWhitelist, err := common.FetchDeploymentWhitelist(p.genesisConfig)
+	deploymentWhitelist, err := config.FetchDeploymentWhitelist(p.genesisConfig)
 	if err != nil {
 		return err
 	}
@@ -103,8 +103,8 @@ func (p *deploymentParams) updateGenesisConfig() error {
 	}
 
 	// Set whitelist in genesis configuration
-	whitelistConfig := common.FetchWhitelistFromConfig(p.genesisConfig)
-	whitelistConfig[common.DeploymentWhitelistKey] = newDeploymentWhitelist
+	whitelistConfig := config.FetchWhitelist(p.genesisConfig)
+	whitelistConfig[config.DeploymentWhitelistKey] = newDeploymentWhitelist
 	p.genesisConfig.Params.Whitelists = whitelistConfig
 
 	// Save whitelist for result

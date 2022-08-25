@@ -5,7 +5,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
-	"github.com/0xPolygon/polygon-edge/helper/common"
+	"github.com/0xPolygon/polygon-edge/helper/config"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -50,7 +50,7 @@ func (p *showParams) initWhitelists() error {
 	}
 
 	// fetch whitelists
-	deploymentWhitelist, err := common.FetchDeploymentWhitelist(genesisConfig)
+	deploymentWhitelist, err := config.FetchDeploymentWhitelist(genesisConfig)
 	if err != nil {
 		return err
 	}
