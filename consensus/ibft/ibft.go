@@ -18,7 +18,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/syncer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
-	"github.com/0xPolygon/polygon-edge/validators/store"
 	"github.com/hashicorp/go-hclog"
 	"google.golang.org/grpc"
 )
@@ -64,7 +63,7 @@ type forkManagerInterface interface {
 	Initialize() error
 	Close() error
 	GetSigner(uint64) (signer.Signer, error)
-	GetValidatorStore(uint64) (store.ValidatorStore, error)
+	GetValidatorStore(uint64) (fork.ValidatorStore, error)
 	GetValidators(uint64) (validators.Validators, error)
 	GetHooks(uint64) (*hook.Hooks, error)
 }

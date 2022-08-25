@@ -515,7 +515,7 @@ func TestContractValidatorStoreGetValidators(t *testing.T) {
 				store.validatorSetCache.Add(height, data)
 			}
 
-			res, err := store.GetValidators(test.height)
+			res, err := store.GetValidatorsByHeight(test.height)
 
 			assert.Equal(t, test.expectedRes, res)
 			if test.expectedErr != nil {

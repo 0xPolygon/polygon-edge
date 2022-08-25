@@ -32,7 +32,7 @@ func (t SourceType) String() string {
 // ValidatorStore is an interface that ValidatorStore needs to implement
 type ValidatorStore interface {
 	SourceType() SourceType
-	GetValidators(height uint64) (validators.Validators, error)
+	GetValidatorsByHeight(height uint64) (validators.Validators, error)
 }
 
 // HeaderGetter is an interface in order each ValidatorStore gets latest header and header by number

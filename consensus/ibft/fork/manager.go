@@ -2,7 +2,6 @@ package fork
 
 import (
 	"errors"
-	"path/filepath"
 
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/hook"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
@@ -10,7 +9,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/validators"
 	"github.com/0xPolygon/polygon-edge/validators/store"
 	"github.com/0xPolygon/polygon-edge/validators/store/contract"
-	"github.com/0xPolygon/polygon-edge/validators/store/snapshot"
 	"github.com/hashicorp/go-hclog"
 )
 
@@ -26,6 +24,13 @@ var (
 	ErrValidatorStoreNotFound = errors.New("validator set not found")
 )
 
+// ValidatorStore is an interface that HookManager calls for Validator Store
+type ValidatorStore interface {
+	store.ValidatorStore
+	Closer
+	ValidatorsGetter
+}
+
 // ForkManager is the module that has Fork configuration and multiple version of submodules
 // and returns the proper submodule at specified height
 type ForkManager struct {
@@ -39,8 +44,10 @@ type ForkManager struct {
 	filePath  string
 	epochSize uint64
 
-	signers       map[validators.ValidatorType]signer.Signer
-	validatorSets map[store.SourceType]store.ValidatorStore
+	signers map[validators.ValidatorType]signer.Signer
+
+	// validator sets
+	validatorSets map[store.SourceType]ValidatorStore
 }
 
 // NewForkManager is a constructor of ForkManager
@@ -67,7 +74,7 @@ func NewForkManager(
 		epochSize:      epochSize,
 		forks:          forks,
 		signers:        make(map[validators.ValidatorType]signer.Signer),
-		validatorSets:  make(map[store.SourceType]store.ValidatorStore),
+		validatorSets:  make(map[store.SourceType]ValidatorStore),
 	}
 
 	// Need initialization of signers in the constructor
@@ -104,7 +111,7 @@ func (m *ForkManager) GetSigner(height uint64) (signer.Signer, error) {
 }
 
 // GetValidatorStore returns a proper validator set at specified height
-func (m *ForkManager) GetValidatorStore(height uint64) (store.ValidatorStore, error) {
+func (m *ForkManager) GetValidatorStore(height uint64) (ValidatorStore, error) {
 	fork := m.getFork(height)
 	if fork == nil {
 		return nil, ErrForkNotFound
@@ -131,7 +138,9 @@ func (m *ForkManager) GetValidators(height uint64) (validators.Validators, error
 	}
 
 	return set.GetValidators(
-		calculateFetchingValidatorsHeight(height, m.epochSize, fork),
+		height,
+		m.epochSize,
+		fork.From.Value,
 	)
 }
 
@@ -168,8 +177,10 @@ func (m *ForkManager) GetHooks(height uint64) (*hook.Hooks, error) {
 
 // Close calls termination process of submodules
 func (m *ForkManager) Close() error {
-	if err := m.closeSnapshotValidatorStore(); err != nil {
-		return err
+	for _, store := range m.validatorSets {
+		if err := store.Close(); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -223,20 +234,25 @@ func (m *ForkManager) initializeValidatorStore(setType store.SourceType) error {
 	}
 
 	var (
-		valSet store.ValidatorStore
-		err    error
+		valStore ValidatorStore
+		err      error
 	)
 
 	switch setType {
 	case store.Snapshot:
-		valSet, err = m.initializeSnapshotValidatorStore()
+		valStore, err = NewSnapshotValidatorStoreWrapper(
+			m.logger,
+			m.blockchain,
+			m.GetSigner,
+			m.filePath,
+			m.epochSize,
+		)
 	case store.Contract:
-		valSet, err = contract.NewContractValidatorStore(
+		valStore, err = NewContractValidatorStoreWrapper(
 			m.logger,
 			m.blockchain,
 			m.executor,
 			m.GetSigner,
-			contract.DefaultValidatorSetCacheSize,
 		)
 	}
 
@@ -244,60 +260,7 @@ func (m *ForkManager) initializeValidatorStore(setType store.SourceType) error {
 		return err
 	}
 
-	m.validatorSets[setType] = valSet
-
-	return nil
-}
-
-// initializeSnapshotValidatorStore loads data from file and initializes Snapshot validator set
-func (m *ForkManager) initializeSnapshotValidatorStore() (store.ValidatorStore, error) {
-	snapshotMeta, err := loadSnapshotMetadata(filepath.Join(m.filePath, snapshotMetadataFilename))
-	if err != nil {
-		return nil, err
-	}
-
-	snapshots, err := loadSnapshots(filepath.Join(m.filePath, snapshotSnapshotsFilename))
-	if err != nil {
-		return nil, err
-	}
-
-	snapshotValset, err := snapshot.NewSnapshotValidatorStore(
-		m.logger,
-		m.blockchain,
-		m.GetSigner,
-		m.epochSize,
-		snapshotMeta,
-		snapshots,
-	)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return snapshotValset, nil
-}
-
-// closeSnapshotValidatorStore gets data from Snapshot validator set and save to files
-func (m *ForkManager) closeSnapshotValidatorStore() error {
-	snapshotValset, ok := m.validatorSets[store.Snapshot].(*snapshot.SnapshotValidatorStore)
-	if !ok {
-		// no snapshot validator set, skip
-		return nil
-	}
-
-	// save data
-	var (
-		metadata  = snapshotValset.GetSnapshotMetadata()
-		snapshots = snapshotValset.GetSnapshots()
-	)
-
-	if err := writeDataStore(filepath.Join(m.filePath, "metadata"), metadata); err != nil {
-		return err
-	}
-
-	if err := writeDataStore(filepath.Join(m.filePath, "snapshots"), snapshots); err != nil {
-		return err
-	}
+	m.validatorSets[setType] = valStore
 
 	return nil
 }
@@ -388,37 +351,4 @@ func (m *ForkManager) getForkByDeployment(height uint64) *IBFTFork {
 	}
 
 	return nil
-}
-
-func calculateFetchingValidatorsHeight(height, epochSize uint64, fork *IBFTFork) uint64 {
-	switch ibftTypesToSourceType[fork.Type] {
-	case store.Snapshot:
-		// the biggest height of blocks that have been processed before the given height
-		return height - 1
-	case store.Contract:
-		// calculates the beginning of the epoch the given height is in
-		beginningEpoch := (height / epochSize) * epochSize
-
-		// calculates the end of the previous epoch
-		// to determine the height to fetch validators
-		fetchingHeight := uint64(0)
-		if beginningEpoch > 0 {
-			fetchingHeight = beginningEpoch - 1
-		}
-
-		from := fork.From.Value
-
-		// use the calculated height if it's bigger than or equal to from
-		if fetchingHeight >= from {
-			return fetchingHeight
-		}
-
-		if from > 0 {
-			return from - 1
-		}
-
-		return from
-	}
-
-	return 0
 }

@@ -43,7 +43,7 @@ func NewContractValidatorStore(
 	executor Executor,
 	getSigner store.SignerGetter,
 	validatorSetCacheSize int,
-) (store.ValidatorStore, error) {
+) (*ContractValidatorStore, error) {
 	var (
 		validatorsCache *lru.Cache
 		err             error
@@ -68,7 +68,7 @@ func (s *ContractValidatorStore) SourceType() store.SourceType {
 	return store.Contract
 }
 
-func (s *ContractValidatorStore) GetValidators(height uint64) (validators.Validators, error) {
+func (s *ContractValidatorStore) GetValidatorsByHeight(height uint64) (validators.Validators, error) {
 	cachedValidators, err := s.loadCachedValidatorSet(height)
 	if err != nil {
 		return nil, err

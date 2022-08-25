@@ -59,7 +59,7 @@ func NewSnapshotValidatorStore(
 	epochSize uint64,
 	metadata *SnapshotMetadata,
 	snapshots []*Snapshot,
-) (store.ValidatorStore, error) {
+) (*SnapshotValidatorStore, error) {
 	set := &SnapshotValidatorStore{
 		logger:         logger.Named(loggerName),
 		store:          newSnapshotStore(metadata, snapshots),
@@ -155,7 +155,7 @@ func (s *SnapshotValidatorStore) Candidates() []*store.Candidate {
 }
 
 // GetValidators returns the validator set in the Snapshot for the given height
-func (s *SnapshotValidatorStore) GetValidators(height uint64) (validators.Validators, error) {
+func (s *SnapshotValidatorStore) GetValidatorsByHeight(height uint64) (validators.Validators, error) {
 	snapshot := s.getSnapshot(height)
 	if snapshot == nil {
 		return nil, ErrSnapshotNotFound
@@ -476,7 +476,7 @@ func (s *SnapshotValidatorStore) isValidator(
 	height uint64,
 ) (bool, error) {
 	// Check if the recovered proposer is part of the validator set
-	vals, err := s.GetValidators(height - 1)
+	vals, err := s.GetValidatorsByHeight(height - 1)
 	if err != nil {
 		return false, err
 	}
