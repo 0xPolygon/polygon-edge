@@ -1,20 +1,8 @@
 package config
 
 import (
-	"errors"
-
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/types"
-)
-
-const (
-	// DeploymentWhitelistKey is the key used for the deployment whitelist
-	DeploymentWhitelistKey = "deployment"
-)
-
-var (
-	ErrAddressTypeAssertion   = errors.New("invalid type assertion for address")
-	ErrWhitelistTypeAssertion = errors.New("invalid type assertion for deployment whitelist")
 )
 
 // GetWhitelist fetches whitelist object from the config
@@ -33,5 +21,5 @@ func GetDeploymentWhitelist(genesisConfig *chain.Chain) ([]types.Address, error)
 		return make([]types.Address, 0), nil
 	}
 
-	return whitelistConfig.Deployed, nil
+	return whitelistConfig.Deployment, nil
 }

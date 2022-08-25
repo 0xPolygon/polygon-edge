@@ -115,7 +115,7 @@ func (p *deploymentParams) updateGenesisConfig() error {
 		whitelistConfig = &chain.Whitelists{}
 	}
 
-	whitelistConfig.Deployed = newDeploymentWhitelist
+	whitelistConfig.Deployment = newDeploymentWhitelist
 	p.genesisConfig.Params.Whitelists = whitelistConfig
 
 	// Save whitelist for result

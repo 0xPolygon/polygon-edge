@@ -26,7 +26,7 @@ func (p *Params) GetEngine() string {
 
 // Whitelists specifies supported whitelists
 type Whitelists struct {
-	Deployed []types.Address `json:"deployed,omitempty"`
+	Deployment []types.Address `json:"deployment,omitempty"`
 }
 
 // Forks specifies when each fork is activated
