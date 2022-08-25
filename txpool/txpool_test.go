@@ -2078,7 +2078,6 @@ func TestRecovery(t *testing.T) {
 }
 
 func TestGetTxs(t *testing.T) {
-	t.SkipNow()
 	t.Parallel()
 
 	var (
