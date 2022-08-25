@@ -15,6 +15,7 @@ type Closer interface {
 	Close() error
 }
 
+// ValidatorsGetter is an interface of the method to returns validators at the given height
 type ValidatorsGetter interface {
 	GetValidators(height, epochSize, forkFrom uint64) (validators.Validators, error)
 }
