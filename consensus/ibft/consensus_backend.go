@@ -240,8 +240,7 @@ func (i *backendIBFT) writeTransactions(
 	}
 
 	var (
-		blockTimer    = time.NewTimer(i.blockTime)
-		stopExecution = false
+		blockTimer = time.NewTimer(i.blockTime)
 
 		successful = 0
 		failed     = 0
@@ -249,8 +248,6 @@ func (i *backendIBFT) writeTransactions(
 	)
 
 	defer func() {
-		blockTimer.Stop()
-
 		i.logger.Info(
 			"executed txs",
 			"successful", successful,
@@ -262,16 +259,12 @@ func (i *backendIBFT) writeTransactions(
 
 	i.txpool.Prepare()
 
+write:
 	for {
 		select {
 		case <-blockTimer.C:
 			return
 		default:
-			if stopExecution {
-				// wait for the timer to expire
-				continue
-			}
-
 			// execute transactions one by one
 			result, ok := i.writeTransaction(
 				i.txpool.Peek(),
@@ -280,9 +273,7 @@ func (i *backendIBFT) writeTransactions(
 			)
 
 			if !ok {
-				stopExecution = true
-
-				continue
+				break write
 			}
 
 			tx := result.tx
@@ -298,6 +289,11 @@ func (i *backendIBFT) writeTransactions(
 			}
 		}
 	}
+
+	//	wait for the timer to expire
+	<-blockTimer.C
+
+	return
 }
 
 func (i *backendIBFT) writeTransaction(
