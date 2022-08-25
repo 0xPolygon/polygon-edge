@@ -4,6 +4,8 @@ import (
 	"context"
 	"crypto/rand"
 	"math/big"
+
+	//nolint:gosec
 	mathRand "math/rand"
 	"sync"
 	"sync/atomic"
