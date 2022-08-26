@@ -188,17 +188,6 @@ func (a Address) MarshalText() ([]byte, error) {
 	return []byte(a.String()), nil
 }
 
-// AddressExists check if address exists in address list
-func AddressExists(address Address, addresses []Address) bool {
-	for _, item := range addresses {
-		if address == item {
-			return true
-		}
-	}
-
-	return false
-}
-
 var (
 	// EmptyRootHash is the root when there are no transactions
 	EmptyRootHash = StringToHash("0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
