@@ -136,7 +136,7 @@ func (i *backendIBFT) buildBlock(snap *Snapshot, parent *types.Header) (*types.B
 	if headerTime.Before(time.Now()) {
 		// The block header time is out of sync with the
 		// expected block time, realign it from this block forward
-		headerTime = time.Now()
+		headerTime = time.Now().Add(i.blockTime)
 	}
 
 	header.Timestamp = uint64(headerTime.Unix())
