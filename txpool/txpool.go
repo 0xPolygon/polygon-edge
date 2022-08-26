@@ -185,8 +185,12 @@ func (w *deploymentWhitelist) add(addr types.Address) {
 	w.addresses[addr.String()] = true
 }
 
-// allowed checks if address is inside of whitelist
+// allowed checks if address can deploy smart contract
 func (w *deploymentWhitelist) allowed(addr types.Address) bool {
+	if len(w.addresses) == 0 {
+		return true
+	}
+
 	_, ok := w.addresses[addr.String()]
 
 	return ok
@@ -577,7 +581,7 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 	}
 
 	// Check if transaction can deploy smart contract
-	if tx.IsContractCreation() && !canDeployContract(tx.From, p.deploymentWhitelist) {
+	if tx.IsContractCreation() && !p.deploymentWhitelist.allowed(tx.From) {
 		return ErrSmartContractRestricted
 	}
 
@@ -832,11 +836,4 @@ func toHash(txs ...*types.Transaction) (hashes []types.Hash) {
 	}
 
 	return
-}
-
-// canDeployContract checks if address can deploy smart contract
-func canDeployContract(from types.Address, whitelist deploymentWhitelist) bool {
-	// If whitelist is empty anyone can deploy
-	// If not only addresses which exists in whitelist can deploy
-	return len(whitelist.addresses) == 0 || whitelist.allowed(from)
 }
