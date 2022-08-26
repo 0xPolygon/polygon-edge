@@ -170,7 +170,6 @@ func (i *backendIBFT) buildBlock(snap *Snapshot, parent *types.Header) (*types.B
 		gasLimit,
 		header.Number,
 		transition,
-		headerTime,
 	)
 
 	if err := i.PreStateCommit(header, transition); err != nil {
@@ -202,6 +201,9 @@ func (i *backendIBFT) buildBlock(snap *Snapshot, parent *types.Header) (*types.B
 
 	i.logger.Info("build block", "number", header.Number, "txs", len(txs))
 
+	// wait for the future
+	<-time.After(time.Until(headerTime))
+
 	return block, nil
 }
 
@@ -227,7 +229,6 @@ func (i *backendIBFT) writeTransactions(
 	gasLimit,
 	blockNumber uint64,
 	transition transitionInterface,
-	headerTime time.Time,
 ) (executed []*types.Transaction) {
 	executed = make([]*types.Transaction, 0)
 
@@ -236,8 +237,6 @@ func (i *backendIBFT) writeTransactions(
 	}
 
 	var (
-		blockTimer = time.After(time.Until(headerTime))
-
 		successful = 0
 		failed     = 0
 		skipped    = 0
@@ -257,37 +256,29 @@ func (i *backendIBFT) writeTransactions(
 
 write:
 	for {
-		select {
-		case <-blockTimer:
-			return
-		default:
-			// execute transactions one by one
-			result, ok := i.writeTransaction(
-				i.txpool.Peek(),
-				transition,
-				gasLimit,
-			)
+		// execute transactions one by one
+		result, ok := i.writeTransaction(
+			i.txpool.Peek(),
+			transition,
+			gasLimit,
+		)
 
-			if !ok {
-				break write
-			}
+		if !ok {
+			break write
+		}
 
-			tx := result.tx
+		tx := result.tx
 
-			switch result.status {
-			case success:
-				executed = append(executed, tx)
-				successful++
-			case fail:
-				failed++
-			case skip:
-				skipped++
-			}
+		switch result.status {
+		case success:
+			executed = append(executed, tx)
+			successful++
+		case fail:
+			failed++
+		case skip:
+			skipped++
 		}
 	}
-
-	//	wait for the timer to expire
-	<-blockTimer
 
 	return
 }
