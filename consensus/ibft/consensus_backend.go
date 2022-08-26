@@ -202,7 +202,7 @@ func (i *backendIBFT) buildBlock(snap *Snapshot, parent *types.Header) (*types.B
 	i.logger.Info("build block", "number", header.Number, "txs", len(txs))
 
 	// wait for the future
-	<-time.After(time.Until(headerTime))
+	<-time.After(time.Until(time.Unix(int64(block.Header.Timestamp), 0)))
 
 	return block, nil
 }
