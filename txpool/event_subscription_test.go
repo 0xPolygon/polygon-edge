@@ -2,7 +2,7 @@ package txpool
 
 import (
 	"context"
-	"crypto/rand"
+	cryptoRand "crypto/rand"
 	"math/big"
 	mathRand "math/rand"
 	"sync"
@@ -42,7 +42,7 @@ func shuffleTxPoolEvents(
 
 	randomEventType := func(supported bool) proto.EventType {
 		for {
-			randNum, _ := rand.Int(rand.Reader, big.NewInt(int64(len(supportedTypes))))
+			randNum, _ := cryptoRand.Int(cryptoRand.Reader, big.NewInt(int64(len(supportedTypes))))
 
 			randType := allEvents[randNum.Int64()]
 			if tempSubscription.eventSupported(randType) == supported {
