@@ -192,6 +192,18 @@ func (w *deploymentWhitelist) allowed(addr types.Address) bool {
 	return ok
 }
 
+func newDeploymentWhitelist(deploymentWhitelistRaw []types.Address) deploymentWhitelist {
+	deploymentWhitelist := deploymentWhitelist{
+		addresses: map[string]bool{},
+	}
+
+	for _, addr := range deploymentWhitelistRaw {
+		deploymentWhitelist.add(addr)
+	}
+
+	return deploymentWhitelist
+}
+
 // NewTxPool returns a new pool for processing incoming transactions.
 func NewTxPool(
 	logger hclog.Logger,
@@ -232,16 +244,8 @@ func NewTxPool(
 		pool.topic = topic
 	}
 
-	// initialize and populate deployment whitelist
-	pool.deploymentWhitelist = deploymentWhitelist{
-		addresses: map[string]bool{},
-	}
-
-	if config.DeploymentWhitelist != nil {
-		for _, addr := range config.DeploymentWhitelist {
-			pool.deploymentWhitelist.add(addr)
-		}
-	}
+	// initialize deployment whitelist
+	pool.deploymentWhitelist = newDeploymentWhitelist(config.DeploymentWhitelist)
 
 	if grpcServer != nil {
 		proto.RegisterTxnPoolOperatorServer(grpcServer, pool)
