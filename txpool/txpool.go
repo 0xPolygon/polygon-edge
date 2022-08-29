@@ -30,18 +30,19 @@ const (
 
 // errors
 var (
-	ErrIntrinsicGas        = errors.New("intrinsic gas too low")
-	ErrBlockLimitExceeded  = errors.New("exceeds block gas limit")
-	ErrNegativeValue       = errors.New("negative value")
-	ErrExtractSignature    = errors.New("cannot extract signature")
-	ErrInvalidSender       = errors.New("invalid sender")
-	ErrTxPoolOverflow      = errors.New("txpool is full")
-	ErrUnderpriced         = errors.New("transaction underpriced")
-	ErrNonceTooLow         = errors.New("nonce too low")
-	ErrInsufficientFunds   = errors.New("insufficient funds for gas * price + value")
-	ErrInvalidAccountState = errors.New("invalid account state")
-	ErrAlreadyKnown        = errors.New("already known")
-	ErrOversizedData       = errors.New("oversized data")
+	ErrIntrinsicGas            = errors.New("intrinsic gas too low")
+	ErrBlockLimitExceeded      = errors.New("exceeds block gas limit")
+	ErrNegativeValue           = errors.New("negative value")
+	ErrExtractSignature        = errors.New("cannot extract signature")
+	ErrInvalidSender           = errors.New("invalid sender")
+	ErrTxPoolOverflow          = errors.New("txpool is full")
+	ErrUnderpriced             = errors.New("transaction underpriced")
+	ErrNonceTooLow             = errors.New("nonce too low")
+	ErrInsufficientFunds       = errors.New("insufficient funds for gas * price + value")
+	ErrInvalidAccountState     = errors.New("invalid account state")
+	ErrAlreadyKnown            = errors.New("already known")
+	ErrOversizedData           = errors.New("oversized data")
+	ErrMaxEnqueuedLimitReached = errors.New("maximum number of enqueued transactions reached")
 )
 
 // indicates origin of a transaction
@@ -79,9 +80,10 @@ type signer interface {
 }
 
 type Config struct {
-	PriceLimit uint64
-	MaxSlots   uint64
-	Sealing    bool
+	PriceLimit         uint64
+	MaxSlots           uint64
+	MaxAccountEnqueued uint64
+	Sealing            bool
 }
 
 /* All requests are passed to the main loop
@@ -183,8 +185,8 @@ func NewTxPool(
 		forks:       forks,
 		store:       store,
 		metrics:     metrics,
-		accounts:    accountsMap{},
 		executables: newPricedQueue(),
+		accounts:    accountsMap{maxEnqueuedLimit: config.MaxAccountEnqueued},
 		index:       lookupMap{all: make(map[types.Hash]*types.Transaction)},
 		gauge:       slotGauge{height: 0, max: config.MaxSlots},
 		priceLimit:  config.PriceLimit,

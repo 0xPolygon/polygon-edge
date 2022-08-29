@@ -180,6 +180,13 @@ func setFlags(cmd *cobra.Command) {
 	)
 
 	cmd.Flags().Uint64Var(
+		&params.rawConfig.TxPool.MaxAccountEnqueued,
+		maxEnqueuedFlag,
+		defaultConfig.TxPool.MaxAccountEnqueued,
+		"maximum number of enqueued transactions per account",
+	)
+
+	cmd.Flags().Uint64Var(
 		&params.rawConfig.BlockTime,
 		blockTimeFlag,
 		defaultConfig.BlockTime,
