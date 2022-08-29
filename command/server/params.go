@@ -29,6 +29,7 @@ const (
 	jsonRPCBatchRequestLimitFlag = "json-rpc-batch-request-limit"
 	jsonRPCBlockRangeLimitFlag   = "json-rpc-block-range-limit"
 	maxSlotsFlag                 = "max-slots"
+	maxEnqueuedFlag              = "max-enqueued"
 	blockGasTargetFlag           = "block-gas-target"
 	secretsConfigFlag            = "secrets-config"
 	restoreFlag                  = "restore"
@@ -162,14 +163,15 @@ func (p *serverParams) generateConfig() *server.Config {
 			MaxOutboundPeers: p.rawConfig.Network.MaxOutboundPeers,
 			Chain:            p.genesisConfig,
 		},
-		DataDir:        p.rawConfig.DataDir,
-		Seal:           p.rawConfig.ShouldSeal,
-		PriceLimit:     p.rawConfig.TxPool.PriceLimit,
-		MaxSlots:       p.rawConfig.TxPool.MaxSlots,
-		SecretsManager: p.secretsConfig,
-		RestoreFile:    p.getRestoreFilePath(),
-		BlockTime:      p.rawConfig.BlockTime,
-		LogLevel:       hclog.LevelFromString(p.rawConfig.LogLevel),
-		LogFilePath:    p.logFileLocation,
+		DataDir:            p.rawConfig.DataDir,
+		Seal:               p.rawConfig.ShouldSeal,
+		PriceLimit:         p.rawConfig.TxPool.PriceLimit,
+		MaxSlots:           p.rawConfig.TxPool.MaxSlots,
+		MaxAccountEnqueued: p.rawConfig.TxPool.MaxAccountEnqueued,
+		SecretsManager:     p.secretsConfig,
+		RestoreFile:        p.getRestoreFilePath(),
+		BlockTime:          p.rawConfig.BlockTime,
+		LogLevel:           hclog.LevelFromString(p.rawConfig.LogLevel),
+		LogFilePath:        p.logFileLocation,
 	}
 }
