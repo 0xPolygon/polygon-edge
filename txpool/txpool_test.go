@@ -438,18 +438,18 @@ func TestAddTxHighPressure(t *testing.T) {
 			pool.gauge.increase(slots)
 
 			//	enqueue tx
-			go func(t *testing.T) {
+			go func() {
 				assert.NoError(t,
 					pool.addTx(local, newTx(addr1, 0, 1)),
 				)
-			}(t)
+			}()
 
 			//	pick up signal
 			_, ok := <-pool.pruneCh
 			assert.True(t, ok)
 
 			//	unblock the handler (handler would block entire test run)
-			_ = <-pool.enqueueReqCh
+			<-pool.enqueueReqCh
 		},
 	)
 
