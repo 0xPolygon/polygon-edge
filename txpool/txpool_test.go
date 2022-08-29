@@ -447,6 +447,61 @@ func TestAddTxHighPressure(t *testing.T) {
 			//	pick up signal
 			_, ok := <-pool.pruneCh
 			assert.True(t, ok)
+
+			//	unblock the handler (handler would block entire test run)
+			<-pool.enqueueReqCh
+		},
+	)
+
+	t.Run(
+		"reject tx with nonce not matching expected",
+		func(t *testing.T) {
+			t.Parallel()
+
+			pool, err := newTestPool()
+			assert.NoError(t, err)
+			pool.SetSigner(&mockSigner{})
+
+			pool.createAccountOnce(addr1)
+			pool.accounts.get(addr1).nextNonce = 5
+
+			//	mock high pressure
+			slots := 1 + (highPressureMark*pool.gauge.max)/100
+			pool.gauge.increase(slots)
+
+			assert.ErrorIs(t,
+				ErrRejectFutureTx,
+				pool.addTx(local, newTx(addr1, 8, 1)),
+			)
+		},
+	)
+
+	t.Run(
+		"accept tx with expected nonce during high gauge level",
+		func(t *testing.T) {
+			t.Parallel()
+
+			pool, err := newTestPool()
+			assert.NoError(t, err)
+			pool.SetSigner(&mockSigner{})
+
+			pool.createAccountOnce(addr1)
+			pool.accounts.get(addr1).nextNonce = 5
+
+			//	mock high pressure
+			slots := 1 + (highPressureMark*pool.gauge.max)/100
+			println("slots", slots, "max", pool.gauge.max)
+			pool.gauge.increase(slots)
+
+			go func() {
+				assert.NoError(t,
+					pool.addTx(local, newTx(addr1, 5, 1)),
+				)
+			}()
+			enq := <-pool.enqueueReqCh
+
+			_, exists := pool.index.get(enq.tx.Hash)
+			assert.True(t, exists)
 		},
 	)
 }
