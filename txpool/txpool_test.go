@@ -434,7 +434,7 @@ func TestAddTxHighPressure(t *testing.T) {
 			pool.SetSigner(&mockSigner{})
 
 			//	mock high pressure
-			slots := 1 + uint64(highPressureMark*float64(pool.gauge.max))
+			slots := 1 + (highPressureMark*pool.gauge.max)/100
 			pool.gauge.increase(slots)
 
 			//	enqueue tx

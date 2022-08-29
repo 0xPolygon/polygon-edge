@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	highPressureMark = 0.8
+	highPressureMark = 80 // 80%
 )
 
 // Gauge for measuring pool capacity in slots
@@ -34,7 +34,7 @@ func (g *slotGauge) decrease(slots uint64) {
 // highPressure checks if the gauge level
 // is higher than the 0.8*max threshold
 func (g *slotGauge) highPressure() bool {
-	return g.read() > uint64(highPressureMark*float64(g.max))
+	return g.read() > (highPressureMark*g.max)/100
 }
 
 // slotsRequired calculates the number of slots required for given transaction(s).
