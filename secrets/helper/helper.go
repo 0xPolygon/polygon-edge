@@ -3,10 +3,8 @@ package helper
 import (
 	"crypto/ecdsa"
 	"fmt"
-	"path/filepath"
 
 	"github.com/0xPolygon/polygon-edge/crypto"
-	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/secrets/awsssm"
@@ -19,19 +17,6 @@ import (
 
 // SetupLocalSecretsManager is a helper method for boilerplate local secrets manager setup
 func SetupLocalSecretsManager(dataDir string) (secrets.SecretsManager, error) {
-	subDirectories := []string{secrets.ConsensusFolderLocal, secrets.NetworkFolderLocal}
-
-	// Check if the sub-directories exist / are already populated
-	for _, subDirectory := range subDirectories {
-		if common.DirectoryExists(filepath.Join(dataDir, subDirectory)) {
-			return nil,
-				fmt.Errorf(
-					"directory %s has previously initialized secrets data",
-					dataDir,
-				)
-		}
-	}
-
 	return local.SecretsManagerFactory(
 		nil, // Local secrets manager doesn't require a config
 		&secrets.SecretsManagerParams{
@@ -113,4 +98,24 @@ func InitNetworkingPrivateKey(secretsManager secrets.SecretsManager) (libp2pCryp
 	}
 
 	return libp2pKey, keyErr
+}
+
+func GetValidatorKey(secretsManager secrets.SecretsManager) (*ecdsa.PrivateKey, error) {
+	// Get the validator private key from the secrets manager storage
+	validatorKey, readErr := crypto.ReadConsensusKey(secretsManager)
+	if readErr != nil {
+		return nil, fmt.Errorf("unable to read validator key from Secrets Manager, %w", readErr)
+	}
+
+	return validatorKey, nil
+}
+
+func GetNetworkingPrivateKey(secretsManager secrets.SecretsManager) (libp2pCrypto.PrivKey, error) {
+	// Get the libp2p private key from the secrets manager store
+	libp2pKey, readErr := network.ReadLibp2pKey(secretsManager)
+	if readErr != nil {
+		return nil, fmt.Errorf("unable to read networking private key from Secrets Manager, %w", readErr)
+	}
+
+	return libp2pKey, readErr
 }

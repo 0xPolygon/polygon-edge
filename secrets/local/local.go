@@ -3,7 +3,6 @@ package local
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sync"
@@ -99,7 +98,7 @@ func (l *LocalSecretsManager) GetSecret(name string) ([]byte, error) {
 	}
 
 	// Read the secret from disk
-	secret, err := ioutil.ReadFile(secretPath)
+	secret, err := os.ReadFile(secretPath)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"unable to read secret from disk (%s), %w",
@@ -126,8 +125,15 @@ func (l *LocalSecretsManager) SetSecret(name string, value []byte) error {
 		return secrets.ErrSecretNotFound
 	}
 
+	// Checks for existing secret
+	if _, err := os.Stat(secretPath); err == nil {
+		return fmt.Errorf(
+			"%s has previously initialized secret.",
+			secretPath,
+		)
+	}
 	// Write the secret to disk
-	if err := ioutil.WriteFile(secretPath, value, 0600); err != nil {
+	if err := os.WriteFile(secretPath, value, 0600); err != nil {
 		return fmt.Errorf(
 			"unable to write secret to disk (%s), %w",
 			secretPath,

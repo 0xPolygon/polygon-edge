@@ -4,6 +4,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/command/secrets/generate"
 	initCmd "github.com/0xPolygon/polygon-edge/command/secrets/init"
+	printCmd "github.com/0xPolygon/polygon-edge/command/secrets/print"
 	"github.com/spf13/cobra"
 )
 
@@ -26,5 +27,7 @@ func registerSubcommands(baseCmd *cobra.Command) {
 		initCmd.GetCommand(),
 		// secrets generate
 		generate.GetCommand(),
+		// secrets print public data
+		printCmd.GetCommand(),
 	)
 }
