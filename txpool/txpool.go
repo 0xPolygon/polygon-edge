@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/golang/protobuf/ptypes/any"
 	"github.com/hashicorp/go-hclog"
@@ -26,6 +27,8 @@ const (
 	// maximum allowed number of times an account
 	// was excluded from block building (ibft.writeTransactions)
 	maxAccountDemotions = uint(10)
+
+	pruningCooldown = 5000 * time.Millisecond
 )
 
 // errors
@@ -152,6 +155,7 @@ type TxPool struct {
 	// does dispatching/handling requests.
 	enqueueReqCh chan enqueueRequest
 	promoteReqCh chan promoteRequest
+	pruneCh      chan struct{}
 
 	// shutdown channel
 	shutdownCh chan struct{}
@@ -191,6 +195,12 @@ func NewTxPool(
 		gauge:       slotGauge{height: 0, max: config.MaxSlots},
 		priceLimit:  config.PriceLimit,
 		sealing:     config.Sealing,
+
+		//	main loop channels
+		enqueueReqCh: make(chan enqueueRequest),
+		promoteReqCh: make(chan promoteRequest),
+		pruneCh:      make(chan struct{}),
+		shutdownCh:   make(chan struct{}),
 	}
 
 	// Attach the event manager
@@ -214,11 +224,6 @@ func NewTxPool(
 		proto.RegisterTxnPoolOperatorServer(grpcServer, pool)
 	}
 
-	// initialise channels
-	pool.enqueueReqCh = make(chan enqueueRequest)
-	pool.promoteReqCh = make(chan promoteRequest)
-	pool.shutdownCh = make(chan struct{})
-
 	return pool, nil
 }
 
@@ -229,6 +234,23 @@ func (p *TxPool) Start() {
 	// set default value of txpool pending transactions gauge
 	p.metrics.PendingTxs.Set(0)
 
+	//	run the handler for high gauge level pruning
+	go func() {
+		for {
+			select {
+			case <-p.shutdownCh:
+				return
+			case <-p.pruneCh:
+				p.pruneAccountsWithNonceHoles()
+			}
+
+			//	handler is in cooldown to avoid successive calls
+			//	which could be just no-ops
+			time.Sleep(pruningCooldown)
+		}
+	}()
+
+	//	run the handler for the tx pipeline
 	go func() {
 		for {
 			select {
@@ -582,6 +604,41 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 	return nil
 }
 
+func (p *TxPool) signalPruning() {
+	select {
+	case p.pruneCh <- struct{}{}:
+	default: //	pruning handler is active or in cooldown
+	}
+}
+
+func (p *TxPool) pruneAccountsWithNonceHoles() {
+	p.accounts.Range(
+		func(_, value interface{}) bool {
+			account, _ := value.(*account)
+
+			account.enqueued.lock(true)
+			defer account.enqueued.unlock()
+
+			firstTx := account.enqueued.peek()
+
+			if firstTx == nil {
+				return true
+			}
+
+			if firstTx.Nonce == account.getNonce() {
+				return true
+			}
+
+			removed := account.enqueued.clear()
+
+			p.index.remove(removed...)
+			p.gauge.decrease(slotsRequired(removed...))
+
+			return true
+		},
+	)
+}
+
 // addTx is the main entry point to the pool
 // for all new transactions. If the call is
 // successful, an account is created for this address
@@ -595,6 +652,10 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 	// validate incoming tx
 	if err := p.validateTx(tx); err != nil {
 		return err
+	}
+
+	if p.gauge.highPressure() {
+		p.signalPruning()
 	}
 
 	// check for overflow
