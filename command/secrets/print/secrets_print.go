@@ -34,7 +34,24 @@ func setFlags(cmd *cobra.Command) {
 			"if omitted, the local FS secrets manager is used",
 	)
 
+	cmd.Flags().BoolVar(
+		&params.printNodeID,
+		nodeIDFlag,
+		false,
+		"output only the node id "+
+			"from the provided secrets manager",
+	)
+
+	cmd.Flags().BoolVar(
+		&params.printValidator,
+		validatorFlag,
+		false,
+		"output only the validator key address "+
+			"from the provided secrets manager",
+	)
+
 	cmd.MarkFlagsMutuallyExclusive(dataDirFlag, configFlag)
+	cmd.MarkFlagsMutuallyExclusive(nodeIDFlag, validatorFlag)
 }
 
 func runPreRun(_ *cobra.Command, _ []string) error {

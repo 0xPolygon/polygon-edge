@@ -13,8 +13,10 @@ import (
 )
 
 const (
-	dataDirFlag = "data-dir"
-	configFlag  = "config"
+	dataDirFlag   = "data-dir"
+	configFlag    = "config"
+	validatorFlag = "validator"
+	nodeIDFlag    = "node-id"
 )
 
 var (
@@ -30,6 +32,9 @@ var (
 type printParams struct {
 	dataDir    string
 	configPath string
+
+	printNodeID    bool
+	printValidator bool
 
 	secretsManager secrets.SecretsManager
 	secretsConfig  *secrets.SecretsManagerConfig
@@ -173,5 +178,8 @@ func (ip *printParams) getResult() command.CommandResult {
 	return &SecretsPrintResult{
 		Address: crypto.PubKeyToAddress(&ip.validatorPrivateKey.PublicKey),
 		NodeID:  ip.nodeID.String(),
+
+		PrintNodeID:    ip.printNodeID,
+		PrintValidator: ip.printValidator,
 	}
 }

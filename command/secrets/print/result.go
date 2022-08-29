@@ -11,11 +11,22 @@ import (
 type SecretsPrintResult struct {
 	Address types.Address `json:"address"`
 	NodeID  string        `json:"node_id"`
+
+	PrintNodeID    bool `json:"print_node_id"`
+	PrintValidator bool `json:"print_validator"`
 }
 
 func (r *SecretsPrintResult) GetOutput() string {
 	var buffer bytes.Buffer
 
+	if r.PrintNodeID {
+		buffer.WriteString(fmt.Sprintf("%s", r.NodeID))
+		return buffer.String()
+	}
+	if r.PrintValidator {
+		buffer.WriteString(fmt.Sprintf("%s", r.Address))
+		return buffer.String()
+	}
 	buffer.WriteString("\n[SECRETS PUBLIC DATA]\n")
 	buffer.WriteString(helper.FormatKV([]string{
 		fmt.Sprintf("Public key (address)|%s", r.Address),
