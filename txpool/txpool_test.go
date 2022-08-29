@@ -438,15 +438,18 @@ func TestAddTxHighPressure(t *testing.T) {
 			pool.gauge.increase(slots)
 
 			//	enqueue tx
-			go func() {
+			go func(t *testing.T) {
 				assert.NoError(t,
 					pool.addTx(local, newTx(addr1, 0, 1)),
 				)
-			}()
+			}(t)
 
 			//	pick up signal
 			_, ok := <-pool.pruneCh
 			assert.True(t, ok)
+
+			//	unblock the handler (handler would block entire test run)
+			_ = <-pool.enqueueReqCh
 		},
 	)
 
@@ -463,7 +466,7 @@ func TestAddTxHighPressure(t *testing.T) {
 			pool.accounts.get(addr1).nextNonce = 5
 
 			//	mock high pressure
-			slots := 1 + uint64(highPressureMark*float64(pool.gauge.max))
+			slots := 1 + (highPressureMark*pool.gauge.max)/100
 			pool.gauge.increase(slots)
 
 			assert.ErrorIs(t,
@@ -486,7 +489,8 @@ func TestAddTxHighPressure(t *testing.T) {
 			pool.accounts.get(addr1).nextNonce = 5
 
 			//	mock high pressure
-			slots := 1 + uint64(highPressureMark*float64(pool.gauge.max))
+			slots := 1 + (highPressureMark*pool.gauge.max)/100
+			println("slots", slots, "max", pool.gauge.max)
 			pool.gauge.increase(slots)
 
 			go func() {
