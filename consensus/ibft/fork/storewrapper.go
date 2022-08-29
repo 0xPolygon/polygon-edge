@@ -3,6 +3,7 @@ package fork
 import (
 	"path/filepath"
 
+	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/validators"
 	"github.com/0xPolygon/polygon-edge/validators/store"
 	"github.com/0xPolygon/polygon-edge/validators/store/contract"
@@ -46,7 +47,7 @@ func (w *SnapshotValidatorStoreWrapper) GetValidators(height, _, _ uint64) (vali
 func NewSnapshotValidatorStoreWrapper(
 	logger hclog.Logger,
 	blockchain store.HeaderGetter,
-	getSigner store.SignerGetter,
+	getSigner func(uint64) (signer.Signer, error),
 	dirPath string,
 	epochSize uint64,
 ) (*SnapshotValidatorStoreWrapper, error) {
@@ -63,7 +64,14 @@ func NewSnapshotValidatorStoreWrapper(
 	snapshotStore, err := snapshot.NewSnapshotValidatorStore(
 		logger,
 		blockchain,
-		getSigner,
+		func(height uint64) (snapshot.SignerInterface, error) {
+			rawSigner, err := getSigner(height)
+			if err != nil {
+				return nil, err
+			}
+
+			return snapshot.SignerInterface(rawSigner), nil
+		},
 		epochSize,
 		snapshotMeta,
 		snapshots,
@@ -83,6 +91,7 @@ func NewSnapshotValidatorStoreWrapper(
 // in order to add Close and GetValidators
 type ContractValidatorStoreWrapper struct {
 	*contract.ContractValidatorStore
+	getSigner func(uint64) (signer.Signer, error)
 }
 
 // NewContractValidatorStoreWrapper creates *ContractValidatorStoreWrapper
@@ -90,13 +99,12 @@ func NewContractValidatorStoreWrapper(
 	logger hclog.Logger,
 	blockchain store.HeaderGetter,
 	executor contract.Executor,
-	getSigner store.SignerGetter,
+	getSigner func(uint64) (signer.Signer, error),
 ) (*ContractValidatorStoreWrapper, error) {
 	contractStore, err := contract.NewContractValidatorStore(
 		logger,
 		blockchain,
 		executor,
-		getSigner,
 		contract.DefaultValidatorSetCacheSize,
 	)
 
@@ -105,7 +113,8 @@ func NewContractValidatorStoreWrapper(
 	}
 
 	return &ContractValidatorStoreWrapper{
-		contractStore,
+		ContractValidatorStore: contractStore,
+		getSigner:              getSigner,
 	}, nil
 }
 
@@ -118,7 +127,13 @@ func (w *ContractValidatorStoreWrapper) Close() error {
 func (w *ContractValidatorStoreWrapper) GetValidators(
 	height, epochSize, forkFrom uint64,
 ) (validators.Validators, error) {
+	signer, err := w.getSigner(height)
+	if err != nil {
+		return nil, err
+	}
+
 	return w.GetValidatorsByHeight(
+		signer.Type(),
 		calculateContractStoreFetchingHeight(
 			height,
 			epochSize,

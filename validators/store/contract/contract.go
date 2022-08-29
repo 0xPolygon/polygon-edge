@@ -27,7 +27,6 @@ type ContractValidatorStore struct {
 	logger     hclog.Logger
 	blockchain store.HeaderGetter
 	executor   Executor
-	getSigner  store.SignerGetter
 
 	// LRU cache for the validators
 	validatorSetCache *lru.Cache
@@ -41,7 +40,6 @@ func NewContractValidatorStore(
 	logger hclog.Logger,
 	blockchain store.HeaderGetter,
 	executor Executor,
-	getSigner store.SignerGetter,
 	validatorSetCacheSize int,
 ) (*ContractValidatorStore, error) {
 	var (
@@ -59,7 +57,6 @@ func NewContractValidatorStore(
 		logger:            logger,
 		blockchain:        blockchain,
 		executor:          executor,
-		getSigner:         getSigner,
 		validatorSetCache: validatorsCache,
 	}, nil
 }
@@ -68,7 +65,10 @@ func (s *ContractValidatorStore) SourceType() store.SourceType {
 	return store.Contract
 }
 
-func (s *ContractValidatorStore) GetValidatorsByHeight(height uint64) (validators.Validators, error) {
+func (s *ContractValidatorStore) GetValidatorsByHeight(
+	validatorType validators.ValidatorType,
+	height uint64,
+) (validators.Validators, error) {
 	cachedValidators, err := s.loadCachedValidatorSet(height)
 	if err != nil {
 		return nil, err
@@ -78,21 +78,12 @@ func (s *ContractValidatorStore) GetValidatorsByHeight(height uint64) (validator
 		return cachedValidators, nil
 	}
 
-	signer, err := s.getSigner(height)
-	if err != nil {
-		return nil, err
-	}
-
-	if signer == nil {
-		return nil, ErrSignerNotFound
-	}
-
 	transition, err := s.getTransitionForQuery(height)
 	if err != nil {
 		return nil, err
 	}
 
-	fetchedValidators, err := FetchValidators(signer.Type(), transition, signer.Address())
+	fetchedValidators, err := FetchValidators(validatorType, transition, types.ZeroAddress)
 	if err != nil {
 		return nil, err
 	}

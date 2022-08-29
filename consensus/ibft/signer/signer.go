@@ -30,7 +30,8 @@ type Signer interface {
 
 	// IBFT Extra
 	InitIBFTExtra(*types.Header, validators.Validators, Seals)
-	GetIBFTExtra(header *types.Header) (*IstanbulExtra, error)
+	GetIBFTExtra(*types.Header) (*IstanbulExtra, error)
+	GetValidators(*types.Header) (validators.Validators, error)
 
 	// ProposerSeal
 	WriteProposerSeal(*types.Header) (*types.Header, error)
@@ -328,6 +329,15 @@ func (s *SignerImpl) CalculateHeaderHash(header *types.Header) (types.Hash, erro
 	}
 
 	return calculateHeaderHash(filteredHeader), nil
+}
+
+func (s *SignerImpl) GetValidators(header *types.Header) (validators.Validators, error) {
+	extra, err := s.GetIBFTExtra(header)
+	if err != nil {
+		return nil, err
+	}
+
+	return extra.Validators, nil
 }
 
 // GetParentCommittedSeals extracts Parent Committed Seals from IBFT Extra in Header

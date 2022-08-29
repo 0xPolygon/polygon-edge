@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	testHelper "github.com/0xPolygon/polygon-edge/helper/tests"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
@@ -69,12 +70,7 @@ func TestFetchECDSAValidators(t *testing.T) {
 			)
 
 			assert.Equal(t, test.expectedRes, res)
-
-			if test.expectedErr != nil {
-				assert.ErrorContains(t, err, test.expectedErr.Error())
-			} else {
-				assert.NoError(t, err)
-			}
+			testHelper.AssertErrorMessageContains(t, test.expectedErr, err)
 		})
 	}
 }
@@ -126,12 +122,7 @@ func TestFetchBLSValidators(t *testing.T) {
 			)
 
 			assert.Equal(t, test.expectedRes, res)
-
-			if test.expectedErr != nil {
-				assert.ErrorContains(t, err, test.expectedErr.Error())
-			} else {
-				assert.NoError(t, err)
-			}
+			testHelper.AssertErrorMessageContains(t, test.expectedErr, err)
 		})
 	}
 }

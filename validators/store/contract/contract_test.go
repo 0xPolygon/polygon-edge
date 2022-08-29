@@ -5,10 +5,10 @@ import (
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/chain"
-	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/contracts/staking"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	stakingHelper "github.com/0xPolygon/polygon-edge/helper/staking"
+	testHelper "github.com/0xPolygon/polygon-edge/helper/tests"
 	"github.com/0xPolygon/polygon-edge/state"
 	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
 	"github.com/0xPolygon/polygon-edge/state/runtime/evm"
@@ -21,8 +21,6 @@ import (
 )
 
 var (
-	errTest = errors.New("error by test")
-
 	addr1 = types.StringToAddress("1")
 	addr2 = types.StringToAddress("2")
 
@@ -77,8 +75,6 @@ func (m *mockExecutor) BeginTxn(
 }
 
 type mockSigner struct {
-	signer.Signer
-
 	TypeVal    validators.ValidatorType
 	AddressVal types.Address
 }
@@ -151,7 +147,6 @@ func NewTestContractValidatorStore(
 	t *testing.T,
 	blockchain store.HeaderGetter,
 	executor Executor,
-	getSigner store.SignerGetter,
 	cacheSize int,
 ) *ContractValidatorStore {
 	t.Helper()
@@ -165,7 +160,6 @@ func NewTestContractValidatorStore(
 		logger:            hclog.NewNullLogger(),
 		blockchain:        blockchain,
 		executor:          executor,
-		getSigner:         getSigner,
 		validatorSetCache: cache,
 	}
 }
@@ -226,26 +220,11 @@ func TestNewContractValidatorStore(t *testing.T) {
 				logger,
 				blockchain,
 				executor,
-				// skip because function object cannot be compared by assert.Equal
-				nil,
 				test.cacheSize,
 			)
 
-			assert.Equal(
-				t,
-				test.expectedRes,
-				res,
-			)
-
-			if test.expectedErr != nil {
-				assert.ErrorContains(
-					t,
-					err,
-					test.expectedErr.Error(),
-				)
-			} else {
-				assert.NoError(t, err)
-			}
+			assert.Equal(t, test.expectedRes, res)
+			testHelper.AssertErrorMessageContains(t, test.expectedErr, err)
 		})
 	}
 }
@@ -262,8 +241,6 @@ func TestContractValidatorStoreGetValidators(t *testing.T) {
 		header    = &types.Header{
 			StateRoot: stateRoot,
 		}
-
-		signerAddr = types.StringToAddress("2")
 
 		ecdsaValidators = validators.NewECDSAValidatorSet(
 			validators.NewECDSAValidator(addr1),
@@ -290,12 +267,12 @@ func TestContractValidatorStoreGetValidators(t *testing.T) {
 		name          string
 		blockchain    store.HeaderGetter
 		executor      Executor
-		getSigner     store.SignerGetter
 		cacheSize     int
 		initialCaches map[uint64]interface{}
 
 		// input
-		height uint64
+		validatorType validators.ValidatorType
+		height        uint64
 
 		// output
 		expectedRes validators.Validators
@@ -307,7 +284,6 @@ func TestContractValidatorStoreGetValidators(t *testing.T) {
 			name:       "should return error when loadCachedValidatorSet failed",
 			blockchain: nil,
 			executor:   nil,
-			getSigner:  nil,
 			cacheSize:  1,
 			initialCaches: map[uint64]interface{}{
 				0: string("fake"),
@@ -323,7 +299,6 @@ func TestContractValidatorStoreGetValidators(t *testing.T) {
 			name:       "should return validators if cache exists",
 			blockchain: nil,
 			executor:   nil,
-			getSigner:  nil,
 			cacheSize:  1,
 			initialCaches: map[uint64]interface{}{
 				0: validators.NewECDSAValidatorSet(
@@ -342,38 +317,6 @@ func TestContractValidatorStoreGetValidators(t *testing.T) {
 			},
 		},
 		{
-			name:       "should return error if getSigner returns error",
-			blockchain: nil,
-			executor:   nil,
-			getSigner: func(height uint64) (signer.Signer, error) {
-				assert.Equal(t, uint64(0), height)
-
-				return nil, errTest
-			},
-			cacheSize:     1,
-			initialCaches: map[uint64]interface{}{},
-			height:        0,
-			expectedRes:   nil,
-			expectedErr:   errTest,
-			finalCaches:   map[uint64]interface{}{},
-		},
-		{
-			name:       "should return error if getSigner returns nil",
-			blockchain: nil,
-			executor:   nil,
-			getSigner: func(height uint64) (signer.Signer, error) {
-				assert.Equal(t, uint64(0), height)
-
-				return nil, nil
-			},
-			cacheSize:     1,
-			initialCaches: map[uint64]interface{}{},
-			height:        0,
-			expectedRes:   nil,
-			expectedErr:   ErrSignerNotFound,
-			finalCaches:   map[uint64]interface{}{},
-		},
-		{
 			name: "should return error if header not found",
 			blockchain: &store.MockBlockchain{
 				GetHeaderByNumberFn: func(height uint64) (*types.Header, bool) {
@@ -382,12 +325,7 @@ func TestContractValidatorStoreGetValidators(t *testing.T) {
 					return nil, false
 				},
 			},
-			executor: nil,
-			getSigner: func(height uint64) (signer.Signer, error) {
-				assert.Equal(t, uint64(1), height)
-
-				return &mockSigner{}, nil
-			},
+			executor:      nil,
 			cacheSize:     1,
 			initialCaches: map[uint64]interface{}{},
 			height:        1,
@@ -413,15 +351,9 @@ func TestContractValidatorStoreGetValidators(t *testing.T) {
 					return transitionForECDSAValidators, nil
 				},
 			},
-			getSigner: func(height uint64) (signer.Signer, error) {
-				assert.Equal(t, uint64(1), height)
-
-				return &mockSigner{
-					TypeVal: validators.ValidatorType("fake"),
-				}, nil
-			},
 			cacheSize:     1,
 			initialCaches: map[uint64]interface{}{},
+			validatorType: validators.ValidatorType("fake"),
 			height:        1,
 			expectedRes:   nil,
 			expectedErr:   errors.New("unsupported validator type: fake"),
@@ -446,16 +378,9 @@ func TestContractValidatorStoreGetValidators(t *testing.T) {
 					return transitionForECDSAValidators, nil
 				},
 			},
-			getSigner: func(height uint64) (signer.Signer, error) {
-				assert.Equal(t, uint64(1), height)
-
-				return &mockSigner{
-					TypeVal:    validators.ECDSAValidatorType,
-					AddressVal: signerAddr,
-				}, nil
-			},
 			cacheSize:     1,
 			initialCaches: map[uint64]interface{}{},
+			validatorType: validators.ECDSAValidatorType,
 			height:        1,
 			expectedRes:   ecdsaValidators,
 			expectedErr:   nil,
@@ -482,16 +407,9 @@ func TestContractValidatorStoreGetValidators(t *testing.T) {
 					return transitionForBLSValidators, nil
 				},
 			},
-			getSigner: func(height uint64) (signer.Signer, error) {
-				assert.Equal(t, uint64(1), height)
-
-				return &mockSigner{
-					TypeVal:    validators.BLSValidatorType,
-					AddressVal: signerAddr,
-				}, nil
-			},
 			cacheSize:     1,
 			initialCaches: map[uint64]interface{}{},
+			validatorType: validators.BLSValidatorType,
 			height:        1,
 			expectedRes:   blsValidators,
 			expectedErr:   nil,
@@ -507,7 +425,6 @@ func TestContractValidatorStoreGetValidators(t *testing.T) {
 				t,
 				test.blockchain,
 				test.executor,
-				test.getSigner,
 				test.cacheSize,
 			)
 
@@ -515,14 +432,10 @@ func TestContractValidatorStoreGetValidators(t *testing.T) {
 				store.validatorSetCache.Add(height, data)
 			}
 
-			res, err := store.GetValidatorsByHeight(test.height)
+			res, err := store.GetValidatorsByHeight(test.validatorType, test.height)
 
 			assert.Equal(t, test.expectedRes, res)
-			if test.expectedErr != nil {
-				assert.ErrorContains(t, err, test.expectedErr.Error())
-			} else {
-				assert.NoError(t, err)
-			}
+			testHelper.AssertErrorMessageContains(t, test.expectedErr, err)
 
 			// check cache
 			assert.Equal(t, len(test.finalCaches), store.validatorSetCache.Len())
@@ -543,7 +456,6 @@ func TestContractValidatorStore_CacheChange(t *testing.T) {
 
 		store = NewTestContractValidatorStore(
 			t,
-			nil,
 			nil,
 			nil,
 			cacheSize,
@@ -619,7 +531,6 @@ func TestContractValidatorStore_NoCache(t *testing.T) {
 	var (
 		store = NewTestContractValidatorStore(
 			t,
-			nil,
 			nil,
 			nil,
 			0,

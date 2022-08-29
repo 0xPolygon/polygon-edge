@@ -4,12 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
 )
-
-type SignerGetter func(uint64) (signer.Signer, error)
 
 type ValidatorTypeGetter func(uint64) (validators.ValidatorType, error)
 
@@ -32,7 +29,6 @@ func (t SourceType) String() string {
 // ValidatorStore is an interface that ValidatorStore needs to implement
 type ValidatorStore interface {
 	SourceType() SourceType
-	GetValidatorsByHeight(height uint64) (validators.Validators, error)
 }
 
 // HeaderGetter is an interface in order each ValidatorStore gets latest header and header by number

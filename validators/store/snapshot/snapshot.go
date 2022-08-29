@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
 	"github.com/0xPolygon/polygon-edge/validators/store"
@@ -16,6 +15,13 @@ import (
 const (
 	loggerName = "snapshot_validator_set"
 )
+
+// SignerInterface is an interface of the Signer SnapshotValidatorStore calls
+type SignerInterface interface {
+	Type() validators.ValidatorType
+	EcrecoverFromHeader(*types.Header) (types.Address, error)
+	GetValidators(*types.Header) (validators.Validators, error)
+}
 
 var (
 	// Magic nonce number to vote on adding a new validator
@@ -41,7 +47,7 @@ type SnapshotValidatorStore struct {
 	// interface
 	logger     hclog.Logger
 	blockchain store.HeaderGetter
-	getSigner  store.SignerGetter
+	getSigner  func(uint64) (SignerInterface, error)
 
 	// configuration
 	epochSize uint64
@@ -55,7 +61,7 @@ type SnapshotValidatorStore struct {
 func NewSnapshotValidatorStore(
 	logger hclog.Logger,
 	blockchain store.HeaderGetter,
-	getSigner store.SignerGetter,
+	getSigner func(uint64) (SignerInterface, error),
 	epochSize uint64,
 	metadata *SnapshotMetadata,
 	snapshots []*Snapshot,
@@ -354,6 +360,7 @@ func (s *SnapshotValidatorStore) Propose(candidate validators.Validator, auth bo
 }
 
 // AddCandidate adds new candidate to candidate list
+// unsafe against concurrent access
 func (s *SnapshotValidatorStore) addCandidate(
 	validators validators.Validators,
 	candidate validators.Validator,
@@ -368,7 +375,7 @@ func (s *SnapshotValidatorStore) addCandidate(
 		return nil
 	}
 
-	// get candidate validator information from set
+	// Get candidate validator information from set
 	// because don't want user to specify data except for address
 	// in case of removal
 	validatorIndex := validators.Index(candidate.Addr())
@@ -395,7 +402,7 @@ func (s *SnapshotValidatorStore) addHeaderSnap(header *types.Header) error {
 		return fmt.Errorf("signer not found %d", header.Number)
 	}
 
-	extra, err := signer.GetIBFTExtra(header)
+	validators, err := signer.GetValidators(header)
 	if err != nil {
 		return err
 	}
@@ -405,7 +412,7 @@ func (s *SnapshotValidatorStore) addHeaderSnap(header *types.Header) error {
 		Hash:   header.Hash.String(),
 		Number: header.Number,
 		Votes:  []*store.Vote{},
-		Set:    extra.Validators,
+		Set:    validators,
 	})
 
 	return nil
@@ -455,7 +462,7 @@ func (s *SnapshotValidatorStore) cleanObsoleteCandidates(set validators.Validato
 	s.candidates = newCandidates
 }
 
-// pickOneCandidate returns a propser candidate from candidates field
+// pickOneCandidate returns a proposer candidate from candidates field
 // Unsafe against concurrent accesses
 func (s *SnapshotValidatorStore) pickOneCandidate(
 	snap *Snapshot,
@@ -532,7 +539,7 @@ func (s *SnapshotValidatorStore) removeLowerSnapshots(
 // processVote processes a vote in header
 func (s *SnapshotValidatorStore) processVote(
 	header *types.Header,
-	signer signer.Signer,
+	signer SignerInterface,
 	proposer types.Address,
 	parentSnapshot, snapshot *Snapshot,
 ) error {
