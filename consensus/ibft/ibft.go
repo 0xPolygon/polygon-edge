@@ -376,6 +376,11 @@ func (i *backendIBFT) startConsensus() {
 
 	defer newBlockSub.Close()
 
+	var (
+		sequenceCh  = make(<-chan struct{})
+		isValidator bool
+	)
+
 	for {
 		var (
 			latest  = i.blockchain.Header().Number
@@ -384,22 +389,23 @@ func (i *backendIBFT) startConsensus() {
 
 		i.updateActiveValidatorSet(latest)
 
-		if !i.isActiveValidator() {
-			// we are not participating in consensus for this height
-			continue
+		isValidator = i.isActiveValidator()
+
+		if isValidator {
+			sequenceCh = i.consensus.runSequence(pending)
 		}
 
 		select {
-		case <-i.consensus.runSequence(pending):
-			// consensus inserted block
-			continue
 		case <-syncerBlockCh:
-			// syncer inserted block -> stop running consensus
-			i.consensus.stopSequence()
-			i.logger.Info("canceled sequence", "sequence", pending)
+			if isValidator {
+				i.consensus.stopSequence()
+				i.logger.Info("canceled sequence", "sequence", pending)
+			}
+		case <-sequenceCh:
 		case <-i.closeCh:
-			// IBFT consensus stopped
-			i.consensus.stopSequence()
+			if isValidator {
+				i.consensus.stopSequence()
+			}
 
 			return
 		}
