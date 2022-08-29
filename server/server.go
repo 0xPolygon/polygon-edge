@@ -151,6 +151,8 @@ func NewServer(config *Config) (*Server, error) {
 	// Set up datadog profiler
 	if err := m.enableDataDogMetrics(); err != nil {
 		m.logger.Error("could not setup DataDog profiler: %w", err)
+	} else {
+		m.logger.Info("datadog profiler started")
 	}
 
 	// Set up the secrets manager
