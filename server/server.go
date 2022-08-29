@@ -148,6 +148,11 @@ func NewServer(config *Config) (*Server, error) {
 		m.serverMetrics = metricProvider("polygon", config.Chain.Name, false)
 	}
 
+	// Set up datadog profiler
+	if err := m.enableDataDogMetrics(); err != nil {
+		m.logger.Error("could not setup DataDog profiler: %w", err)
+	}
+
 	// Set up the secrets manager
 	if err := m.setupSecretsManager(); err != nil {
 		return nil, fmt.Errorf("failed to set up the secrets manager: %w", err)
