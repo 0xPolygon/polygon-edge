@@ -20,6 +20,7 @@ func TestSign_Sealer(t *testing.T) {
 
 	signerA := signer.NewSigner(
 		signer.NewECDSAKeyManagerFromKey(pool.get("A").priv),
+		signer.NewECDSAKeyManagerFromKey(pool.get("A").priv),
 	)
 
 	signer.UseIstanbulHeaderHashInTest(t, signerA)
@@ -33,6 +34,7 @@ func TestSign_Sealer(t *testing.T) {
 
 	signerX := signer.NewSigner(
 		signer.NewECDSAKeyManagerFromKey(pool.get("X").priv),
+		signer.NewECDSAKeyManagerFromKey(pool.get("A").priv),
 	)
 
 	badSealedBlock, _ := signerX.WriteProposerSeal(h)
@@ -58,6 +60,7 @@ func TestSign_CommittedSeals(t *testing.T) {
 
 	signerA := signer.NewSigner(
 		signer.NewECDSAKeyManagerFromKey(pool.get("A").priv),
+		signer.NewECDSAKeyManagerFromKey(pool.get("A").priv),
 	)
 
 	signerA.InitIBFTExtra(h, correctValSet, nil)
@@ -80,7 +83,11 @@ func TestSign_CommittedSeals(t *testing.T) {
 				signer.NewECDSAKeyManagerFromKey(
 					acc.priv,
 				),
+				signer.NewECDSAKeyManagerFromKey(
+					acc.priv,
+				),
 			)
+
 			seal, err := signer.CreateCommittedSeal(h.Hash.Bytes())
 
 			assert.NoError(t, err)

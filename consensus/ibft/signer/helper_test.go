@@ -33,6 +33,7 @@ var (
 		Timestamp:    12,
 		ExtraData:    crypto.Keccak256([]byte{0x13}),
 	}
+
 	testHeaderHashHex = "0xd6701b3d601fd78734ce2f2542dc3d9cc1c75b1ed980c61c8d69cd2cb638f89c"
 )
 
@@ -312,7 +313,7 @@ func Test_ecrecover(t *testing.T) {
 	)
 }
 
-func Test_newKeyManagerFromType(t *testing.T) {
+func TestNewKeyManagerFromType(t *testing.T) {
 	testECDSAKey, testECDSAKeyEncoded := newTestECDSAKey(t)
 	testBLSKey, testBLSKeyEncoded := newTestBLSKey(t)
 
@@ -367,80 +368,7 @@ func Test_newKeyManagerFromType(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			res, err := newKeyManagerFromType(test.mockSecretManager, test.validatorType)
-
-			assert.Equal(t, test.expectedRes, res)
-
-			if test.expectedErr == nil {
-				assert.NoError(t, err)
-			} else {
-				assert.Error(t, err)
-				assert.ErrorContains(t, err, test.expectedErr.Error())
-			}
-		})
-	}
-}
-
-func TestNewSignerFromType(t *testing.T) {
-	testECDSAKey, testECDSAKeyEncoded := newTestECDSAKey(t)
-	testBLSKey, testBLSKeyEncoded := newTestBLSKey(t)
-
-	tests := []struct {
-		name              string
-		validatorType     validators.ValidatorType
-		mockSecretManager *MockSecretManager
-		expectedRes       Signer
-		expectedErr       error
-	}{
-		{
-			name:          "ECDSAValidatorType",
-			validatorType: validators.ECDSAValidatorType,
-			mockSecretManager: &MockSecretManager{
-				HasSecretFn: func(name string) bool {
-					return true
-				},
-				GetSecretFn: func(name string) ([]byte, error) {
-					return testECDSAKeyEncoded, nil
-				},
-			},
-			expectedRes: NewSigner(
-				NewECDSAKeyManagerFromKey(testECDSAKey),
-			),
-			expectedErr: nil,
-		},
-		{
-			name:          "BLSValidatorType",
-			validatorType: validators.BLSValidatorType,
-			mockSecretManager: &MockSecretManager{
-				HasSecretFn: func(name string) bool {
-					return true
-				},
-				GetSecretFn: func(name string) ([]byte, error) {
-					switch name {
-					case secrets.ValidatorKey:
-						return testECDSAKeyEncoded, nil
-					case secrets.ValidatorBLSKey:
-						return testBLSKeyEncoded, nil
-					}
-
-					return nil, fmt.Errorf("unexpected key name: %s", name)
-				},
-			},
-			expectedRes: NewSigner(
-				NewBLSKeyManagerFromKeys(testECDSAKey, testBLSKey),
-			),
-		},
-		{
-			name:          "unsupported type",
-			validatorType: validators.ValidatorType("fake"),
-			expectedRes:   nil,
-			expectedErr:   errors.New("unsupported validator type: fake"),
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			res, err := NewSignerFromType(test.mockSecretManager, test.validatorType)
+			res, err := NewKeyManagerFromType(test.mockSecretManager, test.validatorType)
 
 			assert.Equal(t, test.expectedRes, res)
 

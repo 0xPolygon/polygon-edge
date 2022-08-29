@@ -24,6 +24,7 @@ var (
 	ErrForkNotFound           = errors.New("fork not found")
 	ErrSignerNotFound         = errors.New("signer not found")
 	ErrValidatorStoreNotFound = errors.New("validator set not found")
+	ErrKeyManagerNotFound     = errors.New("key manager not found")
 )
 
 // ValidatorStore is an interface that ForkManager calls for Validator Store
@@ -67,7 +68,7 @@ type ForkManager struct {
 	epochSize uint64
 
 	// submodule lookup
-	signers         map[validators.ValidatorType]signer.Signer
+	keyManagers     map[validators.ValidatorType]signer.KeyManager
 	validatorStores map[store.SourceType]ValidatorStore
 	hooksRegisters  map[IBFTType]HooksRegister
 }
@@ -95,14 +96,14 @@ func NewForkManager(
 		filePath:        filePath,
 		epochSize:       epochSize,
 		forks:           forks,
-		signers:         make(map[validators.ValidatorType]signer.Signer),
+		keyManagers:     make(map[validators.ValidatorType]signer.KeyManager),
 		validatorStores: make(map[store.SourceType]ValidatorStore),
 		hooksRegisters:  make(map[IBFTType]HooksRegister),
 	}
 
 	// Need initialization of signers in the constructor
 	// because hash calculation is called from blockchain initialization
-	if err := fm.initializeSigners(); err != nil {
+	if err := fm.initializeKeyManagers(); err != nil {
 		return nil, err
 	}
 
@@ -133,17 +134,22 @@ func (m *ForkManager) Close() error {
 
 // GetSigner returns a proper signer at specified height
 func (m *ForkManager) GetSigner(height uint64) (signer.Signer, error) {
-	fork := m.forks.getFork(height)
-	if fork == nil {
-		return nil, ErrForkNotFound
+	keyManager, err := m.getKeyManager(height)
+	if err != nil {
+		return nil, err
 	}
 
-	signer, ok := m.signers[fork.ValidatorType]
-	if !ok {
-		return nil, ErrSignerNotFound
+	var parentKeyManager signer.KeyManager
+	if height > 1 {
+		if parentKeyManager, err = m.getKeyManager(height - 1); err != nil {
+			return nil, err
+		}
 	}
 
-	return signer, nil
+	return signer.NewSigner(
+		keyManager,
+		parentKeyManager,
+	), nil
 }
 
 // GetValidatorStore returns a proper validator set at specified height
@@ -180,15 +186,6 @@ func (m *ForkManager) GetValidators(height uint64) (validators.Validators, error
 	)
 }
 
-func (m *ForkManager) getValidatorStoreByIBFTFork(fork *IBFTFork) ValidatorStore {
-	set, ok := m.validatorStores[ibftTypesToSourceType[fork.Type]]
-	if !ok {
-		return nil
-	}
-
-	return set
-}
-
 // GetHooks returns a hooks at specified height
 func (m *ForkManager) GetHooks(height uint64) HooksInterface {
 	hooks := &hook.Hooks{}
@@ -200,12 +197,33 @@ func (m *ForkManager) GetHooks(height uint64) HooksInterface {
 	return hooks
 }
 
-// initializeSigners initialize all signers based on Fork configuration
-func (m *ForkManager) initializeSigners() error {
-	for _, fork := range m.forks {
-		valType := fork.ValidatorType
+func (m *ForkManager) getValidatorStoreByIBFTFork(fork *IBFTFork) ValidatorStore {
+	set, ok := m.validatorStores[ibftTypesToSourceType[fork.Type]]
+	if !ok {
+		return nil
+	}
 
-		if err := m.initializeSigner(valType); err != nil {
+	return set
+}
+
+func (m *ForkManager) getKeyManager(height uint64) (signer.KeyManager, error) {
+	fork := m.forks.getFork(height)
+	if fork == nil {
+		return nil, ErrForkNotFound
+	}
+
+	keyManager, ok := m.keyManagers[fork.ValidatorType]
+	if !ok {
+		return nil, ErrKeyManagerNotFound
+	}
+
+	return keyManager, nil
+}
+
+// initializeKeyManagers initialize all key managers based on Fork configuration
+func (m *ForkManager) initializeKeyManagers() error {
+	for _, fork := range m.forks {
+		if err := m.initializeKeyManager(fork.ValidatorType); err != nil {
 			return err
 		}
 	}
@@ -213,18 +231,18 @@ func (m *ForkManager) initializeSigners() error {
 	return nil
 }
 
-// initializeSigner initializes the specified signer
-func (m *ForkManager) initializeSigner(valType validators.ValidatorType) error {
-	if _, ok := m.signers[valType]; ok {
+// initializeKeyManager initializes the sp
+func (m *ForkManager) initializeKeyManager(valType validators.ValidatorType) error {
+	if _, ok := m.keyManagers[valType]; ok {
 		return nil
 	}
 
-	signer, err := signer.NewSignerFromType(m.secretsManager, valType)
+	keyManager, err := signer.NewKeyManagerFromType(m.secretsManager, valType)
 	if err != nil {
 		return err
 	}
 
-	m.signers[valType] = signer
+	m.keyManagers[valType] = keyManager
 
 	return nil
 }

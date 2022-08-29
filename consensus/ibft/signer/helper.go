@@ -94,8 +94,8 @@ func ecrecover(sig, msg []byte) (types.Address, error) {
 	return crypto.PubKeyToAddress(pub), nil
 }
 
-// newKeyManagerFromType creates KeyManager based on the given type
-func newKeyManagerFromType(
+// NewKeyManagerFromType creates KeyManager based on the given type
+func NewKeyManagerFromType(
 	secretManager secrets.SecretsManager,
 	validatorType validators.ValidatorType,
 ) (KeyManager, error) {
@@ -107,19 +107,6 @@ func newKeyManagerFromType(
 	default:
 		return nil, fmt.Errorf("unsupported validator type: %s", validatorType)
 	}
-}
-
-// NewSignerFromType creates signer from the given type
-func NewSignerFromType(
-	secretManager secrets.SecretsManager,
-	validatorType validators.ValidatorType,
-) (Signer, error) {
-	km, err := newKeyManagerFromType(secretManager, validatorType)
-	if err != nil {
-		return nil, err
-	}
-
-	return NewSigner(km), nil
 }
 
 // verifyIBFTExtraSize checks whether header.ExtraData has enough size for IBFT Extra

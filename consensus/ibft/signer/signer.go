@@ -68,15 +68,18 @@ type Signer interface {
 
 // SignerImpl is an implementation that meets Signer
 type SignerImpl struct {
-	keyManager KeyManager
+	keyManager       KeyManager
+	parentKeyManager KeyManager
 }
 
 // NewSigner is a constructor of SignerImpl
 func NewSigner(
 	keyManager KeyManager,
+	parentKeyManager KeyManager,
 ) Signer {
 	return &SignerImpl{
-		keyManager: keyManager,
+		keyManager:       keyManager,
+		parentKeyManager: parentKeyManager,
 	}
 }
 
@@ -118,7 +121,7 @@ func (s *SignerImpl) GetIBFTExtra(header *types.Header) (*IstanbulExtra, error) 
 	}
 
 	if header.Number > 1 {
-		extra.ParentCommittedSeals = s.keyManager.NewEmptyCommittedSeals()
+		extra.ParentCommittedSeals = s.parentKeyManager.NewEmptyCommittedSeals()
 	}
 
 	if err := extra.UnmarshalRLP(data); err != nil {
