@@ -3,7 +3,6 @@ FROM alpine:3.14
 RUN set -x \
     && apk add --update --no-cache \
        ca-certificates \
-       libc6-compat \
     && rm -rf /var/cache/apk/*
 COPY polygon-edge /usr/local/bin/
 
