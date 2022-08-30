@@ -128,7 +128,7 @@ func (l *LocalSecretsManager) SetSecret(name string, value []byte) error {
 	// Checks for existing secret
 	if _, err := os.Stat(secretPath); err == nil {
 		return fmt.Errorf(
-			"%s already initalized",
+			"%s already initialized",
 			secretPath,
 		)
 	}

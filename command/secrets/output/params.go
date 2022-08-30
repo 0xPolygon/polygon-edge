@@ -1,4 +1,4 @@
-package print
+package output
 
 import (
 	"crypto/ecdsa"
@@ -20,7 +20,7 @@ const (
 )
 
 var (
-	params = &printParams{}
+	params = &outputParams{}
 )
 
 var (
@@ -29,12 +29,12 @@ var (
 	errUnsupportedType = errors.New("unsupported secrets manager")
 )
 
-type printParams struct {
+type outputParams struct {
 	dataDir    string
 	configPath string
 
-	printNodeID    bool
-	printValidator bool
+	outputNodeID    bool
+	outputValidator bool
 
 	secretsManager secrets.SecretsManager
 	secretsConfig  *secrets.SecretsManagerConfig
@@ -45,7 +45,7 @@ type printParams struct {
 	nodeID peer.ID
 }
 
-func (ip *printParams) validateFlags() error {
+func (ip *outputParams) validateFlags() error {
 	if ip.dataDir == "" && ip.configPath == "" {
 		return errInvalidParams
 	}
@@ -53,7 +53,7 @@ func (ip *printParams) validateFlags() error {
 	return nil
 }
 
-func (ip *printParams) printSecrets() error {
+func (ip *outputParams) outputSecrets() error {
 	if err := ip.initSecretsManager(); err != nil {
 		return err
 	}
@@ -65,7 +65,7 @@ func (ip *printParams) printSecrets() error {
 	return ip.getNetworkingKey()
 }
 
-func (ip *printParams) initSecretsManager() error {
+func (ip *outputParams) initSecretsManager() error {
 	if ip.hasConfigPath() {
 		return ip.initFromConfig()
 	}
@@ -73,11 +73,11 @@ func (ip *printParams) initSecretsManager() error {
 	return ip.initLocalSecretsManager()
 }
 
-func (ip *printParams) hasConfigPath() bool {
+func (ip *outputParams) hasConfigPath() bool {
 	return ip.configPath != ""
 }
 
-func (ip *printParams) initFromConfig() error {
+func (ip *outputParams) initFromConfig() error {
 	if err := ip.parseConfig(); err != nil {
 		return err
 	}
@@ -115,7 +115,7 @@ func (ip *printParams) initFromConfig() error {
 	return nil
 }
 
-func (ip *printParams) parseConfig() error {
+func (ip *outputParams) parseConfig() error {
 	secretsConfig, readErr := secrets.ReadConfig(ip.configPath)
 	if readErr != nil {
 		return errInvalidConfig
@@ -130,7 +130,7 @@ func (ip *printParams) parseConfig() error {
 	return nil
 }
 
-func (ip *printParams) initLocalSecretsManager() error {
+func (ip *outputParams) initLocalSecretsManager() error {
 	local, err := helper.SetupLocalSecretsManager(ip.dataDir)
 	if err != nil {
 		return err
@@ -141,7 +141,7 @@ func (ip *printParams) initLocalSecretsManager() error {
 	return nil
 }
 
-func (ip *printParams) getValidatorKey() error {
+func (ip *outputParams) getValidatorKey() error {
 	validatorKey, err := helper.GetValidatorKey(ip.secretsManager)
 	if err != nil {
 		return err
@@ -152,7 +152,7 @@ func (ip *printParams) getValidatorKey() error {
 	return nil
 }
 
-func (ip *printParams) getNetworkingKey() error {
+func (ip *outputParams) getNetworkingKey() error {
 	networkingKey, err := helper.GetNetworkingPrivateKey(ip.secretsManager)
 	if err != nil {
 		return err
@@ -163,7 +163,7 @@ func (ip *printParams) getNetworkingKey() error {
 	return ip.initNodeID()
 }
 
-func (ip *printParams) initNodeID() error {
+func (ip *outputParams) initNodeID() error {
 	nodeID, err := peer.IDFromPrivateKey(ip.networkingPrivateKey)
 	if err != nil {
 		return err
@@ -174,28 +174,28 @@ func (ip *printParams) initNodeID() error {
 	return nil
 }
 
-func (ip *printParams) getResult() command.CommandResult {
-	if ip.printNodeID {
-		return &SecretsPrintResult{
+func (ip *outputParams) getResult() command.CommandResult {
+	if ip.outputNodeID {
+		return &SecretsOutputResult{
 			NodeID: ip.nodeID.String(),
 
-			printValidator: ip.printValidator,
-			printNodeID:    ip.printNodeID,
+			outputValidator: ip.outputValidator,
+			outputNodeID:    ip.outputNodeID,
 		}
 	}
-	if ip.printValidator {
-		return &SecretsPrintResult{
+	if ip.outputValidator {
+		return &SecretsOutputResult{
 			Address: crypto.PubKeyToAddress(&ip.validatorPrivateKey.PublicKey).String(),
 
-			printValidator: ip.printValidator,
-			printNodeID:    ip.printNodeID,
+			outputValidator: ip.outputValidator,
+			outputNodeID:    ip.outputNodeID,
 		}
 	}
-	return &SecretsPrintResult{
+	return &SecretsOutputResult{
 		Address: crypto.PubKeyToAddress(&ip.validatorPrivateKey.PublicKey).String(),
 		NodeID:  ip.nodeID.String(),
 
-		printValidator: ip.printValidator,
-		printNodeID:    ip.printNodeID,
+		outputValidator: ip.outputValidator,
+		outputNodeID:    ip.outputNodeID,
 	}
 }

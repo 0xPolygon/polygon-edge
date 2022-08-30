@@ -1,4 +1,4 @@
-package print
+package output
 
 import (
 	"github.com/0xPolygon/polygon-edge/command"
@@ -6,16 +6,16 @@ import (
 )
 
 func GetCommand() *cobra.Command {
-	secretsPrintCmd := &cobra.Command{
-		Use:     "print",
-		Short:   "Prints validator key address and public network key from the provided Secrets Manager",
+	secretsOutputCmd := &cobra.Command{
+		Use:     "output",
+		Short:   "Outputs validator key address and public network key from the provided Secrets Manager",
 		PreRunE: runPreRun,
 		Run:     runCommand,
 	}
 
-	setFlags(secretsPrintCmd)
+	setFlags(secretsOutputCmd)
 
-	return secretsPrintCmd
+	return secretsOutputCmd
 }
 
 func setFlags(cmd *cobra.Command) {
@@ -35,7 +35,7 @@ func setFlags(cmd *cobra.Command) {
 	)
 
 	cmd.Flags().BoolVar(
-		&params.printNodeID,
+		&params.outputNodeID,
 		nodeIDFlag,
 		false,
 		"output only the node id "+
@@ -43,7 +43,7 @@ func setFlags(cmd *cobra.Command) {
 	)
 
 	cmd.Flags().BoolVar(
-		&params.printValidator,
+		&params.outputValidator,
 		validatorFlag,
 		false,
 		"output only the validator key address "+
@@ -62,7 +62,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
-	if err := params.printSecrets(); err != nil {
+	if err := params.outputSecrets(); err != nil {
 		outputter.SetError(err)
 
 		return

@@ -1,4 +1,4 @@
-package print
+package output
 
 import (
 	"bytes"
@@ -7,23 +7,23 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/helper"
 )
 
-type SecretsPrintResult struct {
+type SecretsOutputResult struct {
 	Address string `json:"address,omitempty"`
 	NodeID  string `json:"node_id,omitempty"`
 
-	printNodeID    bool `json:"-"`
-	printValidator bool `json:"-"`
+	outputNodeID    bool `json:"-"`
+	outputValidator bool `json:"-"`
 }
 
-func (r *SecretsPrintResult) GetOutput() string {
+func (r *SecretsOutputResult) GetOutput() string {
 	var buffer bytes.Buffer
 
-	if r.printNodeID {
-		buffer.WriteString(fmt.Sprintf("%s", r.NodeID))
+	if r.outputNodeID {
+		buffer.WriteString(r.NodeID)
 		return buffer.String()
 	}
-	if r.printValidator {
-		buffer.WriteString(fmt.Sprintf("%s", r.Address))
+	if r.outputValidator {
+		buffer.WriteString(r.Address)
 		return buffer.String()
 	}
 
