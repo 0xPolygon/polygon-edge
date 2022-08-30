@@ -127,7 +127,7 @@ func NewServer(config *Config) (*Server, error) {
 	}
 
 	m := &Server{
-		logger:             logger,
+		logger:             logger.Named("server"),
 		config:             config,
 		chain:              config.Chain,
 		grpcServer:         grpc.NewServer(),
@@ -149,7 +149,7 @@ func NewServer(config *Config) (*Server, error) {
 	}
 
 	// Set up datadog profiler
-	if err := m.enableDataDogMetrics(); err != nil {
+	if err := m.enableDataDogProfiler(); err != nil {
 		m.logger.Error("could not setup DataDog profiler: %w", err)
 	} else {
 		m.logger.Info("datadog profiler started")
@@ -634,6 +634,9 @@ func (s *Server) Close() {
 
 	// close the txpool's main loop
 	s.txpool.Close()
+
+	// close DataDog profiler
+	s.CloseDataDogProfiler()
 }
 
 // Entry is a consensus configuration entry

@@ -6,6 +6,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/txpool"
+	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 	"gopkg.in/DataDog/dd-trace-go.v1/profiler"
 	"os"
 )
@@ -37,9 +38,9 @@ func metricProvider(nameSpace string, chainID string, metricsRequired bool) *ser
 	}
 }
 
-// enableDataDogMetrics enables DataDog profiler. Enable it by setting DD_ENABLE env var.
+// enableDataDogProfiler enables DataDog profiler. Enable it by setting DD_ENABLE env var.
 // Additional parameters can be set with env vars (DD_) - https://docs.datadoghq.com/profiler/enabling/go/
-func (s *Server) enableDataDogMetrics() error {
+func (s *Server) enableDataDogProfiler() error {
 	if os.Getenv("DD_ENABLE") == "" {
 		return errors.New(ErrDataDogEnabled)
 	}
@@ -57,7 +58,21 @@ func (s *Server) enableDataDogMetrics() error {
 	); err != nil {
 		return fmt.Errorf("could not start datadog profiler: %w", err)
 	}
-	defer profiler.Stop()
+
+	// start the tracer
+	tracer.Start()
 
 	return nil
+}
+
+func (s *Server) CloseDataDogProfiler() {
+	defer func() {
+		s.logger.Debug("closing DataDog profiler")
+		profiler.Stop()
+	}()
+
+	defer func() {
+		s.logger.Debug("closing DataDog tracer")
+		tracer.Stop()
+	}()
 }
