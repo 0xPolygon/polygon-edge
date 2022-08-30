@@ -171,7 +171,7 @@ func (ip *initParams) initNodeID() error {
 
 func (ip *initParams) getResult() command.CommandResult {
 	return &SecretsInitResult{
-		Address: crypto.PubKeyToAddress(&ip.validatorPrivateKey.PublicKey),
+		Address: crypto.PubKeyToAddress(&ip.validatorPrivateKey.PublicKey).String(),
 		NodeID:  ip.nodeID.String(),
 	}
 }

@@ -5,12 +5,11 @@ import (
 	"fmt"
 
 	"github.com/0xPolygon/polygon-edge/command/helper"
-	"github.com/0xPolygon/polygon-edge/types"
 )
 
 type SecretsInitResult struct {
-	Address types.Address `json:"address"`
-	NodeID  string        `json:"node_id"`
+	Address string `json:"address"`
+	NodeID  string `json:"node_id"`
 }
 
 func (r *SecretsInitResult) GetOutput() string {

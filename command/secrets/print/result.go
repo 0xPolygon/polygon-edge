@@ -5,28 +5,28 @@ import (
 	"fmt"
 
 	"github.com/0xPolygon/polygon-edge/command/helper"
-	"github.com/0xPolygon/polygon-edge/types"
 )
 
 type SecretsPrintResult struct {
-	Address types.Address `json:"address"`
-	NodeID  string        `json:"node_id"`
+	Address string `json:"address,omitempty"`
+	NodeID  string `json:"node_id,omitempty"`
 
-	PrintNodeID    bool `json:"print_node_id"`
-	PrintValidator bool `json:"print_validator"`
+	printNodeID    bool `json:"-"`
+	printValidator bool `json:"-"`
 }
 
 func (r *SecretsPrintResult) GetOutput() string {
 	var buffer bytes.Buffer
 
-	if r.PrintNodeID {
+	if r.printNodeID {
 		buffer.WriteString(fmt.Sprintf("%s", r.NodeID))
 		return buffer.String()
 	}
-	if r.PrintValidator {
+	if r.printValidator {
 		buffer.WriteString(fmt.Sprintf("%s", r.Address))
 		return buffer.String()
 	}
+
 	buffer.WriteString("\n[SECRETS PUBLIC DATA]\n")
 	buffer.WriteString(helper.FormatKV([]string{
 		fmt.Sprintf("Public key (address)|%s", r.Address),

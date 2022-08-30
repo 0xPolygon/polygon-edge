@@ -175,11 +175,27 @@ func (ip *printParams) initNodeID() error {
 }
 
 func (ip *printParams) getResult() command.CommandResult {
+	if ip.printNodeID {
+		return &SecretsPrintResult{
+			NodeID: ip.nodeID.String(),
+
+			printValidator: ip.printValidator,
+			printNodeID:    ip.printNodeID,
+		}
+	}
+	if ip.printValidator {
+		return &SecretsPrintResult{
+			Address: crypto.PubKeyToAddress(&ip.validatorPrivateKey.PublicKey).String(),
+
+			printValidator: ip.printValidator,
+			printNodeID:    ip.printNodeID,
+		}
+	}
 	return &SecretsPrintResult{
-		Address: crypto.PubKeyToAddress(&ip.validatorPrivateKey.PublicKey),
+		Address: crypto.PubKeyToAddress(&ip.validatorPrivateKey.PublicKey).String(),
 		NodeID:  ip.nodeID.String(),
 
-		PrintNodeID:    ip.printNodeID,
-		PrintValidator: ip.printValidator,
+		printValidator: ip.printValidator,
+		printNodeID:    ip.printNodeID,
 	}
 }
