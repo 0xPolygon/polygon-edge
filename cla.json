@@ -119,6 +119,14 @@
       "created_at": "2022-07-22T16:50:30Z",
       "repoId": 287542207,
       "pullRequestNo": 641
+    },
+    {
+      "name": "epikichi",
+      "id": 78609649,
+      "comment_id": 1231861828,
+      "created_at": "2022-08-30T15:56:57Z",
+      "repoId": 287542207,
+      "pullRequestNo": 705
     }
   ]
 }
