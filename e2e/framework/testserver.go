@@ -34,6 +34,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/server/proto"
 	txpoolProto "github.com/0xPolygon/polygon-edge/txpool/proto"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/0xPolygon/polygon-edge/validators"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/umbracle/ethgo"
@@ -306,6 +307,9 @@ func (t *TestServer) GenerateGenesis() error {
 	blockGasLimit := strconv.FormatUint(t.Config.BlockGasLimit, 10)
 	args = append(args, "--block-gas-limit", blockGasLimit)
 
+	// Default ibft validator type for e2e tests is ECDSA
+	args = append(args, "--ibft-validator-type", string(validators.ECDSAValidatorType))
+
 	cmd := exec.Command(binaryName, args...)
 	cmd.Dir = t.Config.RootDir
 
@@ -416,6 +420,9 @@ func (t *TestServer) SwitchIBFTType(typ fork.IBFTType, from uint64, to, deployme
 		"--type", string(typ),
 		"--from", strconv.FormatUint(from, 10),
 	)
+
+	// Default ibft validator type for e2e tests is ECDSA
+	args = append(args, "--ibft-validator-type", string(validators.ECDSAValidatorType))
 
 	if to != nil {
 		args = append(args, "--to", strconv.FormatUint(*to, 10))
