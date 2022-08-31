@@ -262,8 +262,9 @@ func (d *Dispatcher) Handle(reqBody []byte) ([]byte, error) {
 		return NewRPCResponse(nil, "2.0", nil, NewInvalidRequestError("Invalid json request")).Bytes()
 	}
 
-	// avoid handling long batch requests
-	if len(requests) > int(d.jsonRPCBatchLengthLimit) {
+	// if not disabled, avoid handling long batch requests
+	if d.jsonRPCBatchLengthLimit != 0 &&
+		len(requests) > int(d.jsonRPCBatchLengthLimit) {
 		return NewRPCResponse(nil, "2.0", nil, NewInvalidRequestError("Batch request length too long")).Bytes()
 	}
 
