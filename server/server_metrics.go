@@ -1,7 +1,6 @@
 package server
 
 import (
-	"errors"
 	"fmt"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/network"
@@ -17,9 +16,6 @@ type serverMetrics struct {
 	network   *network.Metrics
 	txpool    *txpool.Metrics
 }
-
-const ErrDataDogEnabled = "DD_ENABLED environment variable not found." +
-	"DataDog profiler will not be started"
 
 // metricProvider serverMetric instance for the given ChainID and nameSpace
 func metricProvider(nameSpace string, chainID string, metricsRequired bool) *serverMetrics {
@@ -42,7 +38,9 @@ func metricProvider(nameSpace string, chainID string, metricsRequired bool) *ser
 // Additional parameters can be set with env vars (DD_) - https://docs.datadoghq.com/profiler/enabling/go/
 func (s *Server) enableDataDogProfiler() error {
 	if os.Getenv("DD_ENABLE") == "" {
-		return errors.New(ErrDataDogEnabled)
+		s.logger.Debug("DataDog profiler disabled, set DD_ENABLE env var to enable it.")
+
+		return nil
 	}
 
 	if err := profiler.Start(
@@ -61,6 +59,7 @@ func (s *Server) enableDataDogProfiler() error {
 
 	// start the tracer
 	tracer.Start()
+	s.logger.Info("DataDog profiler started")
 
 	return nil
 }
