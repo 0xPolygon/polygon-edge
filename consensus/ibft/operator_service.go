@@ -136,6 +136,11 @@ func (o *operator) parseCandidate(req *proto.Candidate) (validators.Validator, e
 	case validators.BLSValidatorType:
 		// safe check
 		if req.Auth {
+			// BLS public key is necessary but the command is not required
+			if req.BlsPubkey == nil {
+				return nil, errors.New("BLS public key is required")
+			}
+
 			if _, err := crypto.UnmarshalBLSPublicKey(req.BlsPubkey); err != nil {
 				return nil, err
 			}
