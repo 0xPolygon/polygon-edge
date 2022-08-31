@@ -23,6 +23,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		&VersionResult{
 			Version:   versioning.Version,
 			Commit:    versioning.Commit,
+			Branch:    versioning.Branch,
 			BuildTime: versioning.BuildTime,
 		},
 	)

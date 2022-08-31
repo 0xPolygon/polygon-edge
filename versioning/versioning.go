@@ -8,6 +8,7 @@ var (
 	// Versioning should follow the SemVer guidelines
 	// https://semver.org/
 	Version   string
+	Branch    string
 	Commit    string
 	BuildTime string
 )
