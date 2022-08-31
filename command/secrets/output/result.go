@@ -20,10 +20,13 @@ func (r *SecretsOutputResult) GetOutput() string {
 
 	if r.outputNodeID {
 		buffer.WriteString(r.NodeID)
+
 		return buffer.String()
 	}
+
 	if r.outputValidator {
 		buffer.WriteString(r.Address)
+
 		return buffer.String()
 	}
 
