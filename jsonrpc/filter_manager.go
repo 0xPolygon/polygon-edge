@@ -429,8 +429,8 @@ func (f *FilterManager) getLogsFromBlocks(query *LogQuery) ([]*Log, error) {
 		from = 1
 	}
 
-	// avoid handling large block ranges
-	if to-from > f.blockRangeLimit {
+	// if not disabled, avoid handling large block ranges
+	if f.blockRangeLimit != 0 && to-from > f.blockRangeLimit {
 		return nil, ErrBlockRangeTooHigh
 	}
 
