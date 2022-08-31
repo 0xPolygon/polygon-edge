@@ -183,6 +183,7 @@ func (ip *outputParams) getResult() command.CommandResult {
 			outputNodeID:    ip.outputNodeID,
 		}
 	}
+
 	if ip.outputValidator {
 		return &SecretsOutputResult{
 			Address: crypto.PubKeyToAddress(&ip.validatorPrivateKey.PublicKey).String(),
@@ -191,6 +192,7 @@ func (ip *outputParams) getResult() command.CommandResult {
 			outputNodeID:    ip.outputNodeID,
 		}
 	}
+
 	return &SecretsOutputResult{
 		Address: crypto.PubKeyToAddress(&ip.validatorPrivateKey.PublicKey).String(),
 		NodeID:  ip.nodeID.String(),
