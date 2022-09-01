@@ -130,7 +130,7 @@ func newTestTransitionWithPredeployedStakingContract(
 	return transition
 }
 
-func NewTestContractValidatorStore(
+func newTestContractValidatorStore(
 	t *testing.T,
 	blockchain store.HeaderGetter,
 	executor Executor,
@@ -152,6 +152,8 @@ func NewTestContractValidatorStore(
 }
 
 func TestNewContractValidatorStore(t *testing.T) {
+	t.Parallel()
+
 	var (
 		logger     = hclog.NewNullLogger()
 		blockchain = store.HeaderGetter(
@@ -202,7 +204,11 @@ func TestNewContractValidatorStore(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
+
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			res, err := NewContractValidatorStore(
 				logger,
 				blockchain,
@@ -217,12 +223,16 @@ func TestNewContractValidatorStore(t *testing.T) {
 }
 
 func TestContractValidatorStoreSourceType(t *testing.T) {
+	t.Parallel()
+
 	s := &ContractValidatorStore{}
 
 	assert.Equal(t, store.Contract, s.SourceType())
 }
 
 func TestContractValidatorStoreGetValidators(t *testing.T) {
+	t.Parallel()
+
 	var (
 		stateRoot = types.StringToHash("1")
 		header    = &types.Header{
@@ -405,8 +415,12 @@ func TestContractValidatorStoreGetValidators(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
+
 		t.Run(test.name, func(t *testing.T) {
-			store := NewTestContractValidatorStore(
+			t.Parallel()
+
+			store := newTestContractValidatorStore(
 				t,
 				test.blockchain,
 				test.executor,
@@ -436,10 +450,12 @@ func TestContractValidatorStoreGetValidators(t *testing.T) {
 }
 
 func TestContractValidatorStore_CacheChange(t *testing.T) {
+	t.Parallel()
+
 	var (
 		cacheSize = 2
 
-		store = NewTestContractValidatorStore(
+		store = newTestContractValidatorStore(
 			t,
 			nil,
 			nil,
@@ -513,8 +529,10 @@ func TestContractValidatorStore_CacheChange(t *testing.T) {
 }
 
 func TestContractValidatorStore_NoCache(t *testing.T) {
+	t.Parallel()
+
 	var (
-		store = NewTestContractValidatorStore(
+		store = newTestContractValidatorStore(
 			t,
 			nil,
 			nil,

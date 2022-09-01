@@ -109,6 +109,8 @@ func newTestVote(
 }
 
 func TestSnapshotMarshalJSON(t *testing.T) {
+	t.Parallel()
+
 	testMarshalJSON := func(
 		t *testing.T,
 		data interface{},
@@ -127,6 +129,8 @@ func TestSnapshotMarshalJSON(t *testing.T) {
 	}
 
 	t.Run("ECDSAValidators", func(t *testing.T) {
+		t.Parallel()
+
 		vote := newTestVote(ecdsaValidator2, addr1, true)
 
 		testMarshalJSON(
@@ -153,6 +157,8 @@ func TestSnapshotMarshalJSON(t *testing.T) {
 	})
 
 	t.Run("BLSValidators", func(t *testing.T) {
+		t.Parallel()
+
 		vote := newTestVote(blsValidator2, addr1, false)
 
 		testMarshalJSON(
@@ -180,6 +186,8 @@ func TestSnapshotMarshalJSON(t *testing.T) {
 }
 
 func TestSnapshotUnmarshalJSON(t *testing.T) {
+	t.Parallel()
+
 	testUnmarshalJSON := func(
 		t *testing.T,
 		jsonStr string,
@@ -195,6 +203,8 @@ func TestSnapshotUnmarshalJSON(t *testing.T) {
 	}
 
 	t.Run("ECDSAValidators", func(t *testing.T) {
+		t.Parallel()
+
 		testUnmarshalJSON(
 			t,
 			createExampleECDSASnapshotJSON(
@@ -220,6 +230,8 @@ func TestSnapshotUnmarshalJSON(t *testing.T) {
 	})
 
 	t.Run("ECDSAValidators (Legacy format)", func(t *testing.T) {
+		t.Parallel()
+
 		testUnmarshalJSON(
 			t,
 			fmt.Sprintf(`
@@ -260,6 +272,8 @@ func TestSnapshotUnmarshalJSON(t *testing.T) {
 	})
 
 	t.Run("BLSValidators", func(t *testing.T) {
+		t.Parallel()
+
 		testUnmarshalJSON(
 			t,
 			createExampleBLSSnapshotJSON(
@@ -283,9 +297,72 @@ func TestSnapshotUnmarshalJSON(t *testing.T) {
 			},
 		)
 	})
+
+	t.Run("error handling", func(t *testing.T) {
+		t.Parallel()
+
+		tests := []struct {
+			name    string
+			jsonStr string
+		}{
+			{
+				name:    "should return error if UnmarshalJSON for raw failed",
+				jsonStr: "[]",
+			},
+			{
+				name: "should error if parsing Type is failed",
+				jsonStr: `{
+					"Number": 0,
+					"Hash": "0x1",
+					"Type": "fake",
+					"Votes": [],
+					"Set": []
+				}`,
+			},
+			{
+				name: "should error if unmarshal Votes is failed",
+				jsonStr: `{
+					"Number": 0,
+					"Hash": "0x1",
+					"Type": "ecdsa",
+					"Votes": [
+						1
+					],
+					"Set": []
+				}`,
+			},
+			{
+				name: "should return error if unmarshal Set is failed",
+				jsonStr: `{
+					"Number": 0,
+					"Hash": "0x1",
+					"Type": "ecdsa",
+					"Votes": [],
+					"Set": [
+						1
+					]
+				}`,
+			},
+		}
+
+		for _, test := range tests {
+			test := test
+
+			t.Run(test.name, func(t *testing.T) {
+				t.Parallel()
+
+				assert.Error(
+					t,
+					json.Unmarshal([]byte(test.jsonStr), &Snapshot{}),
+				)
+			})
+		}
+	})
 }
 
 func TestSnapshotEqual(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		s1       *Snapshot
@@ -373,7 +450,11 @@ func TestSnapshotEqual(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
+
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			assert.Equal(
 				t,
 				test.expected,
@@ -384,6 +465,8 @@ func TestSnapshotEqual(t *testing.T) {
 }
 
 func TestSnapshotCount(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		snapshot *Snapshot
@@ -432,7 +515,11 @@ func TestSnapshotCount(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
+
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			visited := make([]*store.Vote, 0, len(test.snapshot.Votes))
 
 			res := test.snapshot.Count(func(v *store.Vote) bool {
@@ -448,6 +535,8 @@ func TestSnapshotCount(t *testing.T) {
 }
 
 func TestSnapshotAddVote(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		snapshot *Snapshot
@@ -483,7 +572,11 @@ func TestSnapshotAddVote(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
+
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			test.snapshot.AddVote(
 				test.vote.Validator,
 				test.vote.Candidate,
@@ -496,6 +589,8 @@ func TestSnapshotAddVote(t *testing.T) {
 }
 
 func TestSnapshotCopy(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		snapshot *Snapshot
@@ -527,7 +622,11 @@ func TestSnapshotCopy(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
+
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			copied := test.snapshot.Copy()
 
 			// check fields
@@ -546,6 +645,8 @@ func TestSnapshotCopy(t *testing.T) {
 }
 
 func TestSnapshotCountByVoterAndCandidate(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name      string
 		snapshot  *Snapshot
@@ -569,7 +670,11 @@ func TestSnapshotCountByVoterAndCandidate(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
+
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			assert.Equal(
 				t,
 				test.expected,
@@ -583,6 +688,8 @@ func TestSnapshotCountByVoterAndCandidate(t *testing.T) {
 }
 
 func TestSnapshotCountByCandidate(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name      string
 		snapshot  *Snapshot
@@ -604,7 +711,11 @@ func TestSnapshotCountByCandidate(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
+
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			assert.Equal(
 				t,
 				test.expected,
@@ -617,6 +728,8 @@ func TestSnapshotCountByCandidate(t *testing.T) {
 }
 
 func TestSnapshotRemoveVotes(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		snapshot *Snapshot
@@ -656,7 +769,11 @@ func TestSnapshotRemoveVotes(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
+
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			test.snapshot.RemoveVotes(
 				test.fn,
 			)
@@ -669,6 +786,8 @@ func TestSnapshotRemoveVotes(t *testing.T) {
 }
 
 func TestSnapshotRemoveVotesByVoter(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		snapshot *Snapshot
@@ -703,7 +822,11 @@ func TestSnapshotRemoveVotesByVoter(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
+
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			test.snapshot.RemoveVotesByVoter(
 				test.voter,
 			)
@@ -716,6 +839,8 @@ func TestSnapshotRemoveVotesByVoter(t *testing.T) {
 }
 
 func TestSnapshotRemoveVotesByCandidate(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name      string
 		snapshot  *Snapshot
@@ -751,7 +876,11 @@ func TestSnapshotRemoveVotesByCandidate(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
+
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			test.snapshot.RemoveVotesByCandidate(
 				test.candidate,
 			)
@@ -763,11 +892,9 @@ func TestSnapshotRemoveVotesByCandidate(t *testing.T) {
 	}
 }
 
-func Test_snapshotStore_newSnapshotStore(t *testing.T) {
-
-}
-
 func Test_snapshotSortedListLen(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		list     *snapshotSortedList
@@ -784,7 +911,11 @@ func Test_snapshotSortedListLen(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
+
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			assert.Equal(
 				t,
 				test.expected,
@@ -795,6 +926,8 @@ func Test_snapshotSortedListLen(t *testing.T) {
 }
 
 func Test_snapshotSortedListSwap(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		list     *snapshotSortedList
@@ -819,7 +952,11 @@ func Test_snapshotSortedListSwap(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
+
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			test.list.Swap(test.i, test.j)
 
 			assert.Equal(
@@ -832,6 +969,8 @@ func Test_snapshotSortedListSwap(t *testing.T) {
 }
 
 func Test_snapshotSortedListLess(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		list     *snapshotSortedList
@@ -865,11 +1004,326 @@ func Test_snapshotSortedListLess(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
+
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			assert.Equal(
 				t,
 				test.expected,
 				test.list.Less(0, 1),
+			)
+		})
+	}
+}
+
+func Test_newSnapshotStore(t *testing.T) {
+	t.Parallel()
+
+	var (
+		metadata = &SnapshotMetadata{
+			LastBlock: 10,
+		}
+
+		snapshots = []*Snapshot{
+			{Number: 1},
+			{Number: 3},
+		}
+	)
+
+	assert.Equal(
+		t,
+		&snapshotStore{
+			lastNumber: metadata.LastBlock,
+			list: snapshotSortedList(
+				snapshots,
+			),
+		},
+		newSnapshotStore(
+			metadata,
+			snapshots,
+		),
+	)
+}
+
+func Test_snapshotStore_getLastBlock(t *testing.T) {
+	t.Parallel()
+
+	var (
+		metadata = &SnapshotMetadata{
+			LastBlock: 10,
+		}
+	)
+
+	store := newSnapshotStore(
+		metadata,
+		nil,
+	)
+
+	assert.Equal(
+		t,
+		metadata.LastBlock,
+		store.getLastBlock(),
+	)
+}
+
+func Test_snapshotStore_updateLastBlock(t *testing.T) {
+	t.Parallel()
+
+	var (
+		metadata = &SnapshotMetadata{
+			LastBlock: 10,
+		}
+
+		newLastBlock = uint64(20)
+	)
+
+	store := newSnapshotStore(
+		metadata,
+		nil,
+	)
+
+	store.updateLastBlock(newLastBlock)
+
+	assert.Equal(
+		t,
+		newLastBlock,
+		store.getLastBlock(),
+	)
+}
+
+func Test_snapshotStore_deleteLower(t *testing.T) {
+	t.Parallel()
+
+	var (
+		metadata = &SnapshotMetadata{
+			LastBlock: 10,
+		}
+
+		snapshots = []*Snapshot{
+			{Number: 10},
+			{Number: 19},
+			{Number: 20},
+			{Number: 21},
+			{Number: 30},
+		}
+
+		boundary = uint64(20)
+	)
+
+	store := newSnapshotStore(
+		metadata,
+		snapshots,
+	)
+
+	store.deleteLower(boundary)
+
+	assert.Equal(
+		t,
+		&snapshotStore{
+			lastNumber: metadata.LastBlock,
+			list: []*Snapshot{
+				{Number: 20},
+				{Number: 21},
+				{Number: 30},
+			},
+		},
+		store,
+	)
+}
+
+func Test_snapshotStore_find(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		snapshots []*Snapshot
+		input     uint64
+		expected  *Snapshot
+	}{
+		{
+			name:      "should return nil if the list is empty",
+			snapshots: nil,
+			input:     1,
+			expected:  nil,
+		},
+		{
+			name: "should return the last element if it's lower than given number",
+			snapshots: []*Snapshot{
+				{Number: 10},
+				{Number: 20},
+				{Number: 30},
+			},
+			input: 40,
+			expected: &Snapshot{
+				Number: 30,
+			},
+		},
+		{
+			name: "should return the first element if the given value is less than any snapshot",
+			snapshots: []*Snapshot{
+				{Number: 10},
+				{Number: 20},
+				{Number: 30},
+			},
+			input: 5,
+			expected: &Snapshot{
+				Number: 10,
+			},
+		},
+		{
+			name: "should return the element whose Number matches with the given number",
+			snapshots: []*Snapshot{
+				{Number: 10},
+				{Number: 20},
+				{Number: 30},
+			},
+			input: 20,
+			expected: &Snapshot{
+				Number: 20,
+			},
+		},
+		{
+			name: "should return the one before the element whose Number is bigger than the given value",
+			snapshots: []*Snapshot{
+				{Number: 10},
+				{Number: 20},
+				{Number: 30},
+			},
+			input: 29,
+			expected: &Snapshot{
+				Number: 20,
+			},
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			store := newSnapshotStore(
+				&SnapshotMetadata{},
+				test.snapshots,
+			)
+
+			assert.Equal(
+				t,
+				test.expected,
+				store.find(test.input),
+			)
+		})
+	}
+}
+
+func Test_snapshotStore_add(t *testing.T) {
+	t.Parallel()
+
+	var (
+		snapshots = []*Snapshot{
+			{Number: 30},
+			{Number: 25},
+			{Number: 20},
+			{Number: 15},
+			{Number: 10},
+		}
+
+		newSnapshot = &Snapshot{Number: 12}
+
+		expected = []*Snapshot{
+			// should be sorted in asc
+			{Number: 10},
+			{Number: 12},
+			{Number: 15},
+			{Number: 20},
+			{Number: 25},
+			{Number: 30},
+		}
+	)
+
+	store := newSnapshotStore(
+		&SnapshotMetadata{},
+		snapshots,
+	)
+
+	store.add(newSnapshot)
+
+	assert.Equal(
+		t,
+		&snapshotStore{
+			list: snapshotSortedList(
+				expected,
+			),
+		},
+		store,
+	)
+}
+
+func Test_snapshotStore_putByNumber(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name             string
+		initialSnapshots []*Snapshot
+		newSnapshot      *Snapshot
+		finalSnapshots   []*Snapshot
+	}{
+		{
+			name: "should replace if the same Number snapshot exists in the list",
+			initialSnapshots: []*Snapshot{
+				{Number: 10, Hash: "10"},
+				{Number: 20, Hash: "20"},
+				{Number: 30, Hash: "30"},
+			},
+			newSnapshot: &Snapshot{
+				Number: 20,
+				Hash:   "xxx",
+			},
+			finalSnapshots: []*Snapshot{
+				{Number: 10, Hash: "10"},
+				{Number: 20, Hash: "xxx"},
+				{Number: 30, Hash: "30"},
+			},
+		},
+		{
+			name: "should add if the same Number snapshot doesn't exist in the list",
+			initialSnapshots: []*Snapshot{
+				{Number: 10, Hash: "10"},
+				{Number: 20, Hash: "20"},
+				{Number: 30, Hash: "30"},
+			},
+			newSnapshot: &Snapshot{
+				Number: 25,
+				Hash:   "25",
+			},
+			finalSnapshots: []*Snapshot{
+				{Number: 10, Hash: "10"},
+				{Number: 20, Hash: "20"},
+				{Number: 25, Hash: "25"},
+				{Number: 30, Hash: "30"},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			store := newSnapshotStore(
+				&SnapshotMetadata{},
+				test.initialSnapshots,
+			)
+
+			store.putByNumber(test.newSnapshot)
+
+			assert.Equal(
+				t,
+				test.finalSnapshots,
+				[]*Snapshot(store.list),
 			)
 		})
 	}

@@ -29,6 +29,7 @@ func loadSnapshots(path string) ([]*snapshot.Snapshot, error) {
 }
 
 // readDataStore attempts to read the specific file from file storage
+// return nil if the file doesn't exist
 func readDataStore(path string, obj interface{}) error {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		return nil

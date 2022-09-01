@@ -58,6 +58,7 @@ type SnapshotValidatorStore struct {
 	candidatesLock sync.RWMutex
 }
 
+// NewSnapshotValidatorStore creates and initializes *SnapshotValidatorStore
 func NewSnapshotValidatorStore(
 	logger hclog.Logger,
 	blockchain store.HeaderGetter,
@@ -83,6 +84,7 @@ func NewSnapshotValidatorStore(
 	return set, nil
 }
 
+// initialize setup the snapshots to catch up latest header in blockchain
 func (s *SnapshotValidatorStore) initialize() error {
 	header := s.blockchain.Header()
 	meta := s.GetSnapshotMetadata()
@@ -113,8 +115,8 @@ func (s *SnapshotValidatorStore) initialize() error {
 		// if list doesn't have any snapshots to calculate snapshot for the next header
 		s.logger.Info("snapshot was not found, restore snapshot at beginning of current epoch", "current epoch", currentEpoch)
 		beginHeight := currentEpoch * s.epochSize
-		beginHeader, ok := s.blockchain.GetHeaderByNumber(beginHeight)
 
+		beginHeader, ok := s.blockchain.GetHeaderByNumber(beginHeight)
 		if !ok {
 			return fmt.Errorf("header at %d not found", beginHeight)
 		}
@@ -140,10 +142,12 @@ func (s *SnapshotValidatorStore) initialize() error {
 	return nil
 }
 
+// SourceType returns validator store type
 func (s *SnapshotValidatorStore) SourceType() store.SourceType {
 	return store.Snapshot
 }
 
+// GetSnapshotMetadata returns metadata
 func (s *SnapshotValidatorStore) GetSnapshotMetadata() *SnapshotMetadata {
 	return &SnapshotMetadata{
 		LastBlock: s.store.getLastBlock(),
@@ -283,18 +287,13 @@ func (s *SnapshotValidatorStore) ProcessHeader(
 		return err
 	}
 
-	isValidator, err := s.isValidator(proposer, header.Number)
-	if err != nil {
-		return err
-	}
-
-	if !isValidator {
-		return ErrUnauthorizedProposer
-	}
-
 	parentSnap := s.getSnapshot(header.Number - 1)
 	if parentSnap == nil {
 		return ErrSnapshotNotFound
+	}
+
+	if !parentSnap.Set.Includes(proposer) {
+		return ErrUnauthorizedProposer
 	}
 
 	snap := parentSnap.Copy()
@@ -316,7 +315,14 @@ func (s *SnapshotValidatorStore) ProcessHeader(
 	}
 
 	// Process votes in the middle of epoch
-	return s.processVote(header, signer, proposer, parentSnap, snap)
+	if err := processVote(snap, header, signer.Type(), proposer); err != nil {
+		return err
+	}
+
+	s.store.updateLastBlock(header.Number)
+	s.saveSnapshotIfChanged(parentSnap, snap, header)
+
+	return nil
 }
 
 // Propose adds new candidate for vote
@@ -483,21 +489,6 @@ func (s *SnapshotValidatorStore) pickOneCandidate(
 	return nil
 }
 
-// isValidator is a helper function to returns a validator with the given address is
-// a validator in the specified height
-func (s *SnapshotValidatorStore) isValidator(
-	address types.Address,
-	height uint64,
-) (bool, error) {
-	// Check if the recovered proposer is part of the validator set
-	vals, err := s.GetValidatorsByHeight(height - 1)
-	if err != nil {
-		return false, err
-	}
-
-	return vals.Includes(address), nil
-}
-
 // saveSnapshotIfChanged is a helper method to save snapshot updated by the given header
 // only if the snapshot is updated from parent snapshot
 func (s *SnapshotValidatorStore) saveSnapshotIfChanged(
@@ -536,12 +527,12 @@ func (s *SnapshotValidatorStore) removeLowerSnapshots(
 	}
 }
 
-// processVote processes a vote in header
-func (s *SnapshotValidatorStore) processVote(
+// processVote processes vote in the given header and update snapshot
+func processVote(
+	snapshot *Snapshot,
 	header *types.Header,
-	signer SignerInterface,
+	candidateType validators.ValidatorType,
 	proposer types.Address,
-	parentSnapshot, snapshot *Snapshot,
 ) error {
 	// the nonce selects the action
 	authorize, err := isAuthorize(header.Nonce)
@@ -549,18 +540,14 @@ func (s *SnapshotValidatorStore) processVote(
 		return err
 	}
 
-	validatorType := signer.Type()
-
 	// parse candidate validator set from header.Miner
-	candidate, err := minerToValidator(validatorType, header.Miner)
+	candidate, err := minerToValidator(candidateType, header.Miner)
 	if err != nil {
 		return err
 	}
 
 	// if candidate has been processed as expected, just update last block
 	if !shouldProcessVote(snapshot.Set, candidate.Addr(), authorize) {
-		s.store.updateLastBlock(header.Number)
-
 		return nil
 	}
 
@@ -596,9 +583,6 @@ func (s *SnapshotValidatorStore) processVote(
 		// remove all the votes that promoted this validator
 		snapshot.RemoveVotesByCandidate(candidate)
 	}
-
-	s.saveSnapshotIfChanged(parentSnapshot, snapshot, header)
-	s.store.updateLastBlock(header.Number)
 
 	return nil
 }

@@ -2,9 +2,11 @@ package validators
 
 import (
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"testing"
 
+	testHelper "github.com/0xPolygon/polygon-edge/helper/tests"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
 )
@@ -35,6 +37,8 @@ func createTestBLSValidatorString(
 }
 
 func TestNewValidatorFromType(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name          string
 		validatorType ValidatorType
@@ -62,7 +66,11 @@ func TestNewValidatorFromType(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
+
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			res, err := NewValidatorFromType(test.validatorType)
 
 			assert.Equal(
@@ -81,6 +89,8 @@ func TestNewValidatorFromType(t *testing.T) {
 }
 
 func TestNewValidatorSetFromType(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name          string
 		validatorType ValidatorType
@@ -110,7 +120,11 @@ func TestNewValidatorSetFromType(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
+
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			assert.Equal(
 				t,
 				test.expected,
@@ -121,6 +135,8 @@ func TestNewValidatorSetFromType(t *testing.T) {
 }
 
 func TestParseValidator(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name string
 		// inputs
@@ -154,7 +170,11 @@ func TestParseValidator(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
+
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			val, err := ParseValidator(
 				test.validatorType,
 				test.validatorStr,
@@ -168,6 +188,8 @@ func TestParseValidator(t *testing.T) {
 }
 
 func TestParseValidators(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name string
 		// inputs
@@ -216,7 +238,11 @@ func TestParseValidators(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
+
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			vals, err := ParseValidators(
 				test.validatorType,
 				test.validatorStrs,
@@ -230,6 +256,8 @@ func TestParseValidators(t *testing.T) {
 }
 
 func TestParseECDSAValidator(t *testing.T) {
+	t.Parallel()
+
 	assert.Equal(
 		t,
 		ecdsaValidator1,
@@ -238,6 +266,8 @@ func TestParseECDSAValidator(t *testing.T) {
 }
 
 func TestParseBLSValidator(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name string
 		// inputs
@@ -253,22 +283,37 @@ func TestParseBLSValidator(t *testing.T) {
 			expectedErr:       nil,
 		},
 		{
-			name:              "incorrect format",
+			name:              "should return error for incorrect format",
 			validatorStr:      addr1.String(),
 			expectedValidator: nil,
 			expectedErr:       ErrInvalidBLSValidatorFormat,
 		},
+		{
+			name:              "should return error for incorrect Address format",
+			validatorStr:      fmt.Sprintf("%s:%s", "aaaaa", testBLSPubKey1.String()),
+			expectedValidator: nil,
+			expectedErr:       errors.New("failed to parse address:"),
+		},
+		{
+			name:              "should return for incorrect BLS Public Key format",
+			validatorStr:      fmt.Sprintf("%s:%s", addr1.String(), "bbbbb"),
+			expectedValidator: nil,
+			expectedErr:       errors.New("failed to parse BLS Public Key:"),
+		},
 	}
 
 	for _, test := range tests {
+		test := test
+
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			val, err := ParseBLSValidator(
 				test.validatorStr,
 			)
 
 			assert.Equal(t, test.expectedValidator, val)
-
-			assert.Equal(t, test.expectedErr, err)
+			testHelper.AssertErrorMessageContains(t, test.expectedErr, err)
 		})
 	}
 }

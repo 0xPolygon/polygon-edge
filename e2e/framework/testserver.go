@@ -76,6 +76,7 @@ func NewTestServer(t *testing.T, rootDir string, callback TestServerConfigCallba
 		JSONRPCPort:   ports[2].Port(),
 		RootDir:       rootDir,
 		Signer:        crypto.NewEIP155Signer(100),
+		ValidatorType: validators.ECDSAValidatorType,
 	}
 
 	if callback != nil {
@@ -231,6 +232,19 @@ func (t *TestServer) SecretsInit() (*InitIBFTResult, error) {
 		return nil, setErr
 	}
 
+	if t.Config.ValidatorType == validators.BLSValidatorType {
+		// Generate the BLS Key
+		_, bksKeyEncoded, keyErr := crypto.GenerateAndEncodeBLSSecretKey()
+		if keyErr != nil {
+			return nil, keyErr
+		}
+
+		// Write the networking private key to the secrets manager storage
+		if setErr := localSecretsManager.SetSecret(secrets.ValidatorBLSKey, bksKeyEncoded); setErr != nil {
+			return nil, setErr
+		}
+	}
+
 	// Get the node ID from the private key
 	nodeID, err := peer.IDFromPrivateKey(libp2pKey)
 	if err != nil {
@@ -257,7 +271,11 @@ func (t *TestServer) GenerateGenesis() error {
 	// add consensus flags
 	switch t.Config.Consensus {
 	case ConsensusIBFT:
-		args = append(args, "--consensus", "ibft")
+		args = append(
+			args,
+			"--consensus", "ibft",
+			"--ibft-validator-type", string(t.Config.ValidatorType),
+		)
 
 		if t.Config.IBFTDirPrefix == "" {
 			return errors.New("prefix of IBFT directory is not set")
@@ -268,8 +286,13 @@ func (t *TestServer) GenerateGenesis() error {
 		if t.Config.EpochSize != 0 {
 			args = append(args, "--epoch-size", strconv.FormatUint(t.Config.EpochSize, 10))
 		}
+
 	case ConsensusDev:
-		args = append(args, "--consensus", "dev")
+		args = append(
+			args,
+			"--consensus", "dev",
+			"--ibft-validator-type", string(t.Config.ValidatorType),
+		)
 
 		// Set up any initial staker addresses for the predeployed Staking SC
 		for _, stakerAddress := range t.Config.DevStakers {
@@ -306,9 +329,6 @@ func (t *TestServer) GenerateGenesis() error {
 
 	blockGasLimit := strconv.FormatUint(t.Config.BlockGasLimit, 10)
 	args = append(args, "--block-gas-limit", blockGasLimit)
-
-	// Default ibft validator type for e2e tests is ECDSA
-	args = append(args, "--ibft-validator-type", string(validators.ECDSAValidatorType))
 
 	cmd := exec.Command(binaryName, args...)
 	cmd.Dir = t.Config.RootDir

@@ -50,7 +50,6 @@ type Signer interface {
 	) error
 
 	// ParentCommittedSeals
-	GetParentCommittedSeals(header *types.Header) (Seals, error)
 	VerifyParentCommittedSeals(
 		parent, header *types.Header,
 		parentValidators validators.Validators,
@@ -76,7 +75,7 @@ type SignerImpl struct {
 func NewSigner(
 	keyManager KeyManager,
 	parentKeyManager KeyManager,
-) Signer {
+) *SignerImpl {
 	return &SignerImpl{
 		keyManager:       keyManager,
 		parentKeyManager: parentKeyManager,
@@ -153,11 +152,6 @@ func (s *SignerImpl) WriteProposerSeal(header *types.Header) (*types.Header, err
 	return header, nil
 }
 
-// EcrecoverFromIBFTMessage recovers signer address from given signature and digest
-func (s *SignerImpl) EcrecoverFromIBFTMessage(signature, digest []byte) (types.Address, error) {
-	return s.keyManager.Ecrecover(signature, crypto.Keccak256(digest))
-}
-
 // EcrecoverFromIBFTMessage recovers signer address from given signature and header hash
 func (s *SignerImpl) EcrecoverFromHeader(header *types.Header) (types.Address, error) {
 	extra, err := s.GetIBFTExtra(header)
@@ -187,7 +181,7 @@ func (s *SignerImpl) VerifyCommittedSeal(
 	signer types.Address,
 	signature, hash []byte,
 ) error {
-	err := s.keyManager.VerifyCommittedSeal(
+	return s.keyManager.VerifyCommittedSeal(
 		validators,
 		signer,
 		signature,
@@ -195,8 +189,6 @@ func (s *SignerImpl) VerifyCommittedSeal(
 			wrapCommitHash(hash[:]),
 		),
 	)
-
-	return err
 }
 
 // WriteCommittedSeals builds and writes CommittedSeals into IBFT Extra of the header
@@ -208,12 +200,12 @@ func (s *SignerImpl) WriteCommittedSeals(
 		return nil, ErrEmptyCommittedSeals
 	}
 
-	extra, err := s.GetIBFTExtra(header)
+	validators, err := s.GetValidators(header)
 	if err != nil {
 		return nil, err
 	}
 
-	committedSeal, err := s.keyManager.GenerateCommittedSeals(sealMap, extra.Validators)
+	committedSeal, err := s.keyManager.GenerateCommittedSeals(sealMap, validators)
 	if err != nil {
 		return nil, err
 	}
@@ -310,6 +302,11 @@ func (s *SignerImpl) SignIBFTMessage(msg []byte) ([]byte, error) {
 	return s.keyManager.SignIBFTMessage(crypto.Keccak256(msg))
 }
 
+// EcrecoverFromIBFTMessage recovers signer address from given signature and digest
+func (s *SignerImpl) EcrecoverFromIBFTMessage(signature, digest []byte) (types.Address, error) {
+	return s.keyManager.Ecrecover(signature, crypto.Keccak256(digest))
+}
+
 // InitIBFTExtra initializes the extra field
 func (s *SignerImpl) initIbftExtra(
 	header *types.Header,
@@ -345,6 +342,10 @@ func (s *SignerImpl) GetValidators(header *types.Header) (validators.Validators,
 
 // GetParentCommittedSeals extracts Parent Committed Seals from IBFT Extra in Header
 func (s *SignerImpl) GetParentCommittedSeals(header *types.Header) (Seals, error) {
+	if err := verifyIBFTExtraSize(header); err != nil {
+		return nil, err
+	}
+
 	data := header.ExtraData[IstanbulExtraVanity:]
 	extra := &IstanbulExtra{
 		ParentCommittedSeals: s.keyManager.NewEmptyCommittedSeals(),

@@ -12,6 +12,8 @@ import (
 )
 
 func TestBLSValidatorPublicKeyString(t *testing.T) {
+	t.Parallel()
+
 	assert.Equal(
 		t,
 		hex.EncodeToHex([]byte(testBLSPubKey1)),
@@ -20,6 +22,8 @@ func TestBLSValidatorPublicKeyString(t *testing.T) {
 }
 
 func TestBLSValidatorPublicKeyMarshal(t *testing.T) {
+	t.Parallel()
+
 	res, err := json.Marshal(testBLSPubKey1)
 
 	assert.NoError(t, err)
@@ -35,6 +39,8 @@ func TestBLSValidatorPublicKeyMarshal(t *testing.T) {
 }
 
 func TestBLSValidatorPublicKeyUnmarshal(t *testing.T) {
+	t.Parallel()
+
 	key := BLSValidatorPublicKey{}
 
 	err := json.Unmarshal(
@@ -53,6 +59,8 @@ func TestBLSValidatorPublicKeyUnmarshal(t *testing.T) {
 }
 
 func TestNewBLSValidator(t *testing.T) {
+	t.Parallel()
+
 	assert.Equal(
 		t,
 		&BLSValidator{addr1, testBLSPubKey1},
@@ -61,6 +69,8 @@ func TestNewBLSValidator(t *testing.T) {
 }
 
 func TestBLSValidatorType(t *testing.T) {
+	t.Parallel()
+
 	assert.Equal(
 		t,
 		BLSValidatorType,
@@ -69,6 +79,8 @@ func TestBLSValidatorType(t *testing.T) {
 }
 
 func TestBLSValidatorString(t *testing.T) {
+	t.Parallel()
+
 	assert.Equal(
 		t,
 		fmt.Sprintf(
@@ -81,6 +93,8 @@ func TestBLSValidatorString(t *testing.T) {
 }
 
 func TestBLSValidatorAddr(t *testing.T) {
+	t.Parallel()
+
 	assert.Equal(
 		t,
 		addr1,
@@ -89,6 +103,8 @@ func TestBLSValidatorAddr(t *testing.T) {
 }
 
 func TestBLSValidatorCopy(t *testing.T) {
+	t.Parallel()
+
 	v1 := NewBLSValidator(addr1, testBLSPubKey1)
 	v2 := v1.Copy()
 
@@ -103,6 +119,8 @@ func TestBLSValidatorCopy(t *testing.T) {
 }
 
 func TestBLSValidatorEqual(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		val1     *BLSValidator
@@ -130,7 +148,11 @@ func TestBLSValidatorEqual(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
+
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			assert.Equal(
 				t,
 				test.expected,
@@ -141,6 +163,8 @@ func TestBLSValidatorEqual(t *testing.T) {
 }
 
 func TestBLSValidatorMarshalAndUnmarshal(t *testing.T) {
+	t.Parallel()
+
 	val1 := NewBLSValidator(addr1, testBLSPubKey1)
 
 	marshalRes := types.MarshalRLPTo(val1.MarshalRLPWith, nil)
@@ -156,6 +180,8 @@ func TestBLSValidatorMarshalAndUnmarshal(t *testing.T) {
 }
 
 func TestBLSValidatorBytes(t *testing.T) {
+	t.Parallel()
+
 	val := NewBLSValidator(addr1, testBLSPubKey1)
 
 	// result of Bytes() equals the data encoded in RLP
@@ -167,6 +193,8 @@ func TestBLSValidatorBytes(t *testing.T) {
 }
 
 func TestBLSValidatorFromBytes(t *testing.T) {
+	t.Parallel()
+
 	val1 := NewBLSValidator(addr1, testBLSPubKey1)
 	marshalledData := types.MarshalRLPTo(val1.MarshalRLPWith, nil)
 

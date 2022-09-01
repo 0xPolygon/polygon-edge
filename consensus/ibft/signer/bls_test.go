@@ -8,6 +8,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
+	testHelper "github.com/0xPolygon/polygon-edge/helper/tests"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
@@ -90,6 +91,8 @@ func assertEqualAggregatedBLSPublicKeys(t *testing.T, apk1, apk2 *bls_sig.MultiP
 }
 
 func TestNewBLSKeyManager(t *testing.T) {
+	t.Parallel()
+
 	testECDSAKey, testECDSAKeyEncoded := newTestECDSAKey(t)
 	testBLSKey, testBLSKeyEncoded := newTestBLSKey(t)
 
@@ -153,7 +156,7 @@ func TestNewBLSKeyManager(t *testing.T) {
 					switch name {
 					case secrets.ValidatorKey:
 						// return error instead of key
-						return nil, errFake
+						return nil, errTest
 					case secrets.ValidatorBLSKey:
 						return testBLSKeyEncoded, nil
 					}
@@ -162,7 +165,7 @@ func TestNewBLSKeyManager(t *testing.T) {
 				},
 			},
 			expectedResult: nil,
-			expectedErr:    errFake,
+			expectedErr:    errTest,
 		},
 		{
 			name: "should return error if getOrCreateBLSKey returns error",
@@ -180,19 +183,23 @@ func TestNewBLSKeyManager(t *testing.T) {
 						return testECDSAKeyEncoded, nil
 					case secrets.ValidatorBLSKey:
 						// return error instead of key
-						return nil, errFake
+						return nil, errTest
 					}
 
 					return nil, nil
 				},
 			},
 			expectedResult: nil,
-			expectedErr:    errFake,
+			expectedErr:    errTest,
 		},
 	}
 
 	for _, test := range tests {
+		test := test
+
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			res, err := NewBLSKeyManager(test.mockSecretManager)
 
 			assert.Equal(t, test.expectedResult, res)
@@ -202,6 +209,8 @@ func TestNewBLSKeyManager(t *testing.T) {
 }
 
 func TestNewECDSAKeyManagerFromKeys(t *testing.T) {
+	t.Parallel()
+
 	testKey, _ := newTestECDSAKey(t)
 	testBLSKey, _ := newTestBLSKey(t)
 
@@ -217,6 +226,8 @@ func TestNewECDSAKeyManagerFromKeys(t *testing.T) {
 }
 
 func TestBLSKeyManagerType(t *testing.T) {
+	t.Parallel()
+
 	blsKeyManager, _, _ := newTestBLSKeyManager(t)
 
 	assert.Equal(
@@ -227,6 +238,8 @@ func TestBLSKeyManagerType(t *testing.T) {
 }
 
 func TestBLSKeyManagerAddress(t *testing.T) {
+	t.Parallel()
+
 	ecdsaKey, _ := newTestECDSAKey(t)
 	blsKey, _ := newTestBLSKey(t)
 	blsKeyManager := NewBLSKeyManagerFromKeys(ecdsaKey, blsKey)
@@ -239,6 +252,8 @@ func TestBLSKeyManagerAddress(t *testing.T) {
 }
 
 func TestBLSKeyManagerNewEmptyValidators(t *testing.T) {
+	t.Parallel()
+
 	blsKeyManager, _, _ := newTestBLSKeyManager(t)
 
 	assert.Equal(
@@ -249,6 +264,8 @@ func TestBLSKeyManagerNewEmptyValidators(t *testing.T) {
 }
 
 func TestBLSKeyManagerNewEmptyCommittedSeals(t *testing.T) {
+	t.Parallel()
+
 	blsKeyManager, _, _ := newTestBLSKeyManager(t)
 
 	assert.Equal(
@@ -259,6 +276,8 @@ func TestBLSKeyManagerNewEmptyCommittedSeals(t *testing.T) {
 }
 
 func TestBLSKeyManagerSignProposerSeal(t *testing.T) {
+	t.Parallel()
+
 	blsKeyManager, _, _ := newTestBLSKeyManager(t)
 	msg := crypto.Keccak256(
 		hex.MustDecodeHex(testHeaderHashHex),
@@ -278,6 +297,8 @@ func TestBLSKeyManagerSignProposerSeal(t *testing.T) {
 }
 
 func TestBLSKeyManagerSignCommittedSeal(t *testing.T) {
+	t.Parallel()
+
 	ecdsaKeyManager, _, blsKey := newTestBLSKeyManager(t)
 	blsPubKey, err := blsKey.GetPublicKey()
 	assert.NoError(t, err)
@@ -305,6 +326,8 @@ func TestBLSKeyManagerSignCommittedSeal(t *testing.T) {
 }
 
 func TestBLSKeyManagerVerifyCommittedSeal(t *testing.T) {
+	t.Parallel()
+
 	blsKeyManager1, _, blsSecretKey1 := newTestBLSKeyManager(t)
 	blsKeyManager2, _, _ := newTestBLSKeyManager(t)
 
@@ -381,7 +404,11 @@ func TestBLSKeyManagerVerifyCommittedSeal(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
+
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			assert.ErrorIs(
 				t,
 				test.expectedErr,
@@ -397,6 +424,8 @@ func TestBLSKeyManagerVerifyCommittedSeal(t *testing.T) {
 }
 
 func TestBLSKeyManagerGenerateCommittedSeals(t *testing.T) {
+	t.Parallel()
+
 	blsKeyManager1, _, _ := newTestBLSKeyManager(t)
 
 	msg := crypto.Keccak256(
@@ -464,24 +493,25 @@ func TestBLSKeyManagerGenerateCommittedSeals(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
+
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			res, err := blsKeyManager1.GenerateCommittedSeals(
 				test.sealMap,
 				test.validators,
 			)
 
 			assert.Equal(t, test.expectedRes, res)
-
-			if test.expectedErr != nil {
-				assert.ErrorContains(t, err, test.expectedErr.Error())
-			} else {
-				assert.NoError(t, err)
-			}
+			testHelper.AssertErrorMessageContains(t, test.expectedErr, err)
 		})
 	}
 }
 
 func TestBLSKeyManagerVerifyCommittedSeals(t *testing.T) {
+	t.Parallel()
+
 	blsKeyManager1, _, _ := newTestBLSKeyManager(t)
 
 	msg := crypto.Keccak256(
@@ -540,7 +570,11 @@ func TestBLSKeyManagerVerifyCommittedSeals(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
+
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			res, err := blsKeyManager1.VerifyCommittedSeals(
 				test.rawCommittedSeals,
 				msg,
@@ -548,17 +582,14 @@ func TestBLSKeyManagerVerifyCommittedSeals(t *testing.T) {
 			)
 
 			assert.Equal(t, test.expectedRes, res)
-
-			if test.expectedErr != nil {
-				assert.ErrorContains(t, err, test.expectedErr.Error())
-			} else {
-				assert.NoError(t, err)
-			}
+			testHelper.AssertErrorMessageContains(t, test.expectedErr, err)
 		})
 	}
 }
 
 func TestBLSKeyManagerSignIBFTMessageAndEcrecover(t *testing.T) {
+	t.Parallel()
+
 	blsKeyManager, _, _ := newTestBLSKeyManager(t)
 	msg := crypto.Keccak256([]byte("message"))
 
@@ -576,6 +607,8 @@ func TestBLSKeyManagerSignIBFTMessageAndEcrecover(t *testing.T) {
 }
 
 func Test_getBLSSignatures(t *testing.T) {
+	t.Parallel()
+
 	validatorKeyManager, _, _ := newTestBLSKeyManager(t)
 	nonValidatorKeyManager, _, _ := newTestBLSKeyManager(t)
 
@@ -654,7 +687,11 @@ func Test_getBLSSignatures(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
+
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			sigs, bitmap, err := getBLSSignatures(
 				test.sealMap,
 				test.validators,
@@ -666,16 +703,13 @@ func Test_getBLSSignatures(t *testing.T) {
 				sigs,
 			)
 			assert.Equal(t, test.expectedBitMap, bitmap)
-
-			if test.expectedErr != nil {
-				assert.ErrorContains(t, err, test.expectedErr.Error())
-			} else {
-				assert.NoError(t, err)
-			}
+			testHelper.AssertErrorMessageContains(t, test.expectedErr, err)
 		})
 	}
 
 	t.Run("multiple committed seals by validators", func(t *testing.T) {
+		t.Parallel()
+
 		// which validator signed committed seals
 		signerFlags := []bool{
 			false,
@@ -748,7 +782,11 @@ func Test_getBLSSignatures(t *testing.T) {
 }
 
 func Test_createAggregatedBLSPubKeys(t *testing.T) {
+	t.Parallel()
+
 	t.Run("multiple validators", func(t *testing.T) {
+		t.Parallel()
+
 		// which validator signed committed seals
 		signerFlags := []bool{
 			false,
@@ -809,6 +847,8 @@ func Test_createAggregatedBLSPubKeys(t *testing.T) {
 	})
 
 	t.Run("should return error if bitMap is empty", func(t *testing.T) {
+		t.Parallel()
+
 		aggrecatedPubKeys, num, err := createAggregatedBLSPubKeys(
 			validators.NewBLSValidatorSet(),
 			new(big.Int),
@@ -820,6 +860,8 @@ func Test_createAggregatedBLSPubKeys(t *testing.T) {
 	})
 
 	t.Run("should return error if public key is wrong", func(t *testing.T) {
+		t.Parallel()
+
 		aggrecatedPubKeys, num, err := createAggregatedBLSPubKeys(
 			validators.NewBLSValidatorSet(
 				validators.NewBLSValidator(
@@ -837,6 +879,8 @@ func Test_createAggregatedBLSPubKeys(t *testing.T) {
 }
 
 func Test_verifyBLSCommittedSealsImpl(t *testing.T) {
+	t.Parallel()
+
 	validatorKeyManager1, _, _ := newTestBLSKeyManager(t)
 	validatorKeyManager2, _, _ := newTestBLSKeyManager(t)
 	validatorKeyManager3, _, _ := newTestBLSKeyManager(t)
@@ -1011,18 +1055,19 @@ func Test_verifyBLSCommittedSealsImpl(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		res, err := verifyBLSCommittedSealsImpl(
-			test.committedSeal,
-			test.msg,
-			test.validators,
-		)
+		test := test
 
-		assert.Equal(t, test.expectedRes, res)
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
 
-		if test.expectedErr != nil {
-			assert.ErrorContains(t, err, test.expectedErr.Error())
-		} else {
-			assert.NoError(t, err)
-		}
+			res, err := verifyBLSCommittedSealsImpl(
+				test.committedSeal,
+				test.msg,
+				test.validators,
+			)
+
+			assert.Equal(t, test.expectedRes, res)
+			testHelper.AssertErrorMessageContains(t, test.expectedErr, err)
+		})
 	}
 }

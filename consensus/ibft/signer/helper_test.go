@@ -16,8 +16,6 @@ import (
 )
 
 var (
-	errFake = errors.New("fake error")
-
 	testHeader = &types.Header{
 		ParentHash:   types.BytesToHash(crypto.Keccak256([]byte{0x1})),
 		Sha3Uncles:   types.BytesToHash(crypto.Keccak256([]byte{0x2})),
@@ -58,6 +56,8 @@ func newTestBLSKey(t *testing.T) (*bls_sig.SecretKey, []byte) {
 
 // Make sure the target function always returns the same result
 func Test_wrapCommitHash(t *testing.T) {
+	t.Parallel()
+
 	var (
 		input             = crypto.Keccak256([]byte{0x1})
 		expectedOutputHex = "0x8a319084d2e52be9c9192645aa98900413ee2a7c93c2916ef99d62218207d1da"
@@ -75,6 +75,8 @@ func Test_wrapCommitHash(t *testing.T) {
 
 //nolint
 func Test_getOrCreateECDSAKey(t *testing.T) {
+	t.Parallel()
+
 	testKey, testKeyEncoded := newTestECDSAKey(t)
 
 	testSecretName := func(name string) {
@@ -143,11 +145,11 @@ func Test_getOrCreateECDSAKey(t *testing.T) {
 				GetSecretFn: func(name string) ([]byte, error) {
 					testSecretName(name)
 
-					return nil, errFake
+					return nil, errTest
 				},
 			},
 			expectedResult: nil,
-			expectedErr:    errFake,
+			expectedErr:    errTest,
 		},
 		{
 			name: "should return error if the key manager fails to generate new ECDSA key",
@@ -160,16 +162,20 @@ func Test_getOrCreateECDSAKey(t *testing.T) {
 				SetSecretFn: func(name string, key []byte) error {
 					testSecretName(name)
 
-					return errFake
+					return errTest
 				},
 			},
 			expectedResult: nil,
-			expectedErr:    errFake,
+			expectedErr:    errTest,
 		},
 	}
 
 	for _, test := range tests {
+		test := test
+
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			res, err := getOrCreateECDSAKey(test.mockSecretManager)
 
 			assert.Equal(t, test.expectedResult, res)
@@ -180,6 +186,8 @@ func Test_getOrCreateECDSAKey(t *testing.T) {
 
 //nolint
 func Test_getOrCreateBLSKey(t *testing.T) {
+	t.Parallel()
+
 	testKey, testKeyEncoded := newTestBLSKey(t)
 
 	testSecretName := func(name string) {
@@ -247,11 +255,11 @@ func Test_getOrCreateBLSKey(t *testing.T) {
 				GetSecretFn: func(name string) ([]byte, error) {
 					testSecretName(name)
 
-					return nil, errFake
+					return nil, errTest
 				},
 			},
 			expectedResult: nil,
-			expectedErr:    errFake,
+			expectedErr:    errTest,
 		},
 		{
 			name: "should return error if the key manager fails to generate new BLS key",
@@ -264,16 +272,20 @@ func Test_getOrCreateBLSKey(t *testing.T) {
 				SetSecretFn: func(name string, key []byte) error {
 					testSecretName(name)
 
-					return errFake
+					return errTest
 				},
 			},
 			expectedResult: nil,
-			expectedErr:    errFake,
+			expectedErr:    errTest,
 		},
 	}
 
 	for _, test := range tests {
+		test := test
+
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			res, err := getOrCreateBLSKey(test.mockSecretManager)
 
 			assert.Equal(t, test.expectedResult, res)
@@ -284,6 +296,8 @@ func Test_getOrCreateBLSKey(t *testing.T) {
 
 // make sure that header hash calculation returns the same hash
 func Test_calculateHeaderHash(t *testing.T) {
+	t.Parallel()
+
 	assert.Equal(
 		t,
 		types.StringToHash(testHeaderHashHex),
@@ -292,6 +306,8 @@ func Test_calculateHeaderHash(t *testing.T) {
 }
 
 func Test_ecrecover(t *testing.T) {
+	t.Parallel()
+
 	testKey, _ := newTestECDSAKey(t)
 	signerAddress := crypto.PubKeyToAddress(&testKey.PublicKey)
 
@@ -314,6 +330,8 @@ func Test_ecrecover(t *testing.T) {
 }
 
 func TestNewKeyManagerFromType(t *testing.T) {
+	t.Parallel()
+
 	testECDSAKey, testECDSAKeyEncoded := newTestECDSAKey(t)
 	testBLSKey, testBLSKeyEncoded := newTestBLSKey(t)
 
@@ -367,7 +385,11 @@ func TestNewKeyManagerFromType(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
+
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			res, err := NewKeyManagerFromType(test.mockSecretManager, test.validatorType)
 
 			assert.Equal(t, test.expectedRes, res)
@@ -383,6 +405,8 @@ func TestNewKeyManagerFromType(t *testing.T) {
 }
 
 func Test_verifyIBFTExtraSize(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name      string
 		extraData []byte
@@ -411,7 +435,11 @@ func Test_verifyIBFTExtraSize(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
+
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			header := &types.Header{
 				ExtraData: test.extraData,
 			}

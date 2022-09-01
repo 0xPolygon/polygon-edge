@@ -8,6 +8,8 @@ import (
 )
 
 func TestNewECDSAValidator(t *testing.T) {
+	t.Parallel()
+
 	assert.Equal(
 		t,
 		&ECDSAValidator{addr1},
@@ -16,6 +18,8 @@ func TestNewECDSAValidator(t *testing.T) {
 }
 
 func TestECDSAValidatorType(t *testing.T) {
+	t.Parallel()
+
 	assert.Equal(
 		t,
 		ECDSAValidatorType,
@@ -24,6 +28,8 @@ func TestECDSAValidatorType(t *testing.T) {
 }
 
 func TestECDSAValidatorString(t *testing.T) {
+	t.Parallel()
+
 	assert.Equal(
 		t,
 		addr1.String(),
@@ -32,6 +38,8 @@ func TestECDSAValidatorString(t *testing.T) {
 }
 
 func TestECDSAValidatorAddr(t *testing.T) {
+	t.Parallel()
+
 	assert.Equal(
 		t,
 		addr1,
@@ -40,6 +48,8 @@ func TestECDSAValidatorAddr(t *testing.T) {
 }
 
 func TestECDSAValidatorCopy(t *testing.T) {
+	t.Parallel()
+
 	v1 := NewECDSAValidator(addr1)
 
 	v2 := v1.Copy()
@@ -54,6 +64,8 @@ func TestECDSAValidatorCopy(t *testing.T) {
 }
 
 func TestECDSAValidatorEqual(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		val1     *ECDSAValidator
@@ -75,7 +87,11 @@ func TestECDSAValidatorEqual(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
+
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			assert.Equal(
 				t,
 				test.expected,
@@ -86,6 +102,8 @@ func TestECDSAValidatorEqual(t *testing.T) {
 }
 
 func TestECDSAValidatorMarshalAndUnmarshal(t *testing.T) {
+	t.Parallel()
+
 	val1 := NewECDSAValidator(addr1)
 
 	marshalRes := types.MarshalRLPTo(val1.MarshalRLPWith, nil)
@@ -101,6 +119,8 @@ func TestECDSAValidatorMarshalAndUnmarshal(t *testing.T) {
 }
 
 func TestECDSAValidatorBytes(t *testing.T) {
+	t.Parallel()
+
 	val := NewECDSAValidator(addr1)
 
 	// result of Bytes() equals the data encoded in RLP
@@ -112,6 +132,8 @@ func TestECDSAValidatorBytes(t *testing.T) {
 }
 
 func TestECDSAValidatorFromBytes(t *testing.T) {
+	t.Parallel()
+
 	val1 := NewECDSAValidator(addr1)
 	marshalledData := types.MarshalRLPTo(val1.MarshalRLPWith, nil)
 

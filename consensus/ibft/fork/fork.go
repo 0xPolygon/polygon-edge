@@ -74,7 +74,7 @@ func (f *IBFTFork) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	if err := json.Unmarshal(validatorsBytes, &f.Validators); err != nil {
+	if err := json.Unmarshal(validatorsBytes, f.Validators); err != nil {
 		return err
 	}
 

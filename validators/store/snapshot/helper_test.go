@@ -14,15 +14,19 @@ var (
 	addr3          = types.StringToAddress("3")
 	testBLSPubKey1 = validators.BLSValidatorPublicKey([]byte("bls_pubkey1"))
 	testBLSPubKey2 = validators.BLSValidatorPublicKey([]byte("bls_pubkey2"))
+	testBLSPubKey3 = validators.BLSValidatorPublicKey([]byte("bls_pubkey3"))
 
 	ecdsaValidator1 = validators.NewECDSAValidator(addr1)
 	ecdsaValidator2 = validators.NewECDSAValidator(addr2)
 	ecdsaValidator3 = validators.NewECDSAValidator(addr3)
 	blsValidator1   = validators.NewBLSValidator(addr1, testBLSPubKey1)
 	blsValidator2   = validators.NewBLSValidator(addr2, testBLSPubKey2)
+	blsValidator3   = validators.NewBLSValidator(addr3, testBLSPubKey3)
 )
 
 func Test_isAuthorize(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name         string
 		nonce        types.Nonce
@@ -51,6 +55,8 @@ func Test_isAuthorize(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			res, err := isAuthorize(test.nonce)
 
 			assert.Equal(t, test.expectedFlag, res)
@@ -60,6 +66,8 @@ func Test_isAuthorize(t *testing.T) {
 }
 
 func Test_shouldProcessVote(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name       string
 		validators validators.Validators
@@ -149,6 +157,8 @@ func Test_shouldProcessVote(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			assert.Equal(
 				t,
 				test.expected,
@@ -159,6 +169,8 @@ func Test_shouldProcessVote(t *testing.T) {
 }
 
 func Test_addsOrDelsCandidate(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name string
 		// inputs
@@ -279,6 +291,8 @@ func Test_addsOrDelsCandidate(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			err := addsOrDelsCandidate(
 				test.validators,
 				test.candidate,

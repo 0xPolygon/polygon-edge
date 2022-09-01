@@ -7,6 +7,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
+	testHelper "github.com/0xPolygon/polygon-edge/helper/tests"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
@@ -22,6 +23,8 @@ func newTestECDSAKeyManager(t *testing.T) (KeyManager, *ecdsa.PrivateKey) {
 }
 
 func TestNewECDSAKeyManager(t *testing.T) {
+	t.Parallel()
+
 	testKey, testKeyEncoded := newTestECDSAKey(t)
 
 	testSecretName := func(name string) {
@@ -69,16 +72,20 @@ func TestNewECDSAKeyManager(t *testing.T) {
 				GetSecretFn: func(name string) ([]byte, error) {
 					testSecretName(name)
 
-					return nil, errFake
+					return nil, errTest
 				},
 			},
 			expectedResult: nil,
-			expectedErr:    errFake,
+			expectedErr:    errTest,
 		},
 	}
 
 	for _, test := range tests {
+		test := test
+
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			res, err := NewECDSAKeyManager(test.mockSecretManager)
 
 			assert.Equal(t, test.expectedResult, res)
@@ -87,6 +94,8 @@ func TestNewECDSAKeyManager(t *testing.T) {
 	}
 }
 func TestNewECDSAKeyManagerFromKey(t *testing.T) {
+	t.Parallel()
+
 	testKey, _ := newTestECDSAKey(t)
 
 	assert.Equal(
@@ -100,6 +109,8 @@ func TestNewECDSAKeyManagerFromKey(t *testing.T) {
 }
 
 func TestECDSAKeyManagerType(t *testing.T) {
+	t.Parallel()
+
 	ecdsaKeyManager, _ := newTestECDSAKeyManager(t)
 
 	assert.Equal(
@@ -110,6 +121,8 @@ func TestECDSAKeyManagerType(t *testing.T) {
 }
 
 func TestECDSAKeyManagerAddress(t *testing.T) {
+	t.Parallel()
+
 	ecdsaKey, _ := newTestECDSAKey(t)
 	ecdsaKeyManager := NewECDSAKeyManagerFromKey(ecdsaKey)
 
@@ -121,6 +134,8 @@ func TestECDSAKeyManagerAddress(t *testing.T) {
 }
 
 func TestECDSAKeyManagerNewEmptyValidators(t *testing.T) {
+	t.Parallel()
+
 	ecdsaKeyManager, _ := newTestECDSAKeyManager(t)
 
 	assert.Equal(
@@ -131,6 +146,8 @@ func TestECDSAKeyManagerNewEmptyValidators(t *testing.T) {
 }
 
 func TestECDSAKeyManagerNewEmptyCommittedSeals(t *testing.T) {
+	t.Parallel()
+
 	ecdsaKeyManager, _ := newTestECDSAKeyManager(t)
 
 	assert.Equal(
@@ -141,6 +158,8 @@ func TestECDSAKeyManagerNewEmptyCommittedSeals(t *testing.T) {
 }
 
 func TestECDSAKeyManagerSignProposerSeal(t *testing.T) {
+	t.Parallel()
+
 	ecdsaKeyManager, _ := newTestECDSAKeyManager(t)
 	msg := crypto.Keccak256(
 		hex.MustDecodeHex(testHeaderHashHex),
@@ -160,6 +179,8 @@ func TestECDSAKeyManagerSignProposerSeal(t *testing.T) {
 }
 
 func TestECDSAKeyManagerSignCommittedSeal(t *testing.T) {
+	t.Parallel()
+
 	ecdsaKeyManager, _ := newTestECDSAKeyManager(t)
 	msg := crypto.Keccak256(
 		wrapCommitHash(
@@ -181,6 +202,8 @@ func TestECDSAKeyManagerSignCommittedSeal(t *testing.T) {
 }
 
 func TestECDSAKeyManagerVerifyCommittedSeal(t *testing.T) {
+	t.Parallel()
+
 	ecdsaKeyManager1, _ := newTestECDSAKeyManager(t)
 	ecdsaKeyManager2, _ := newTestECDSAKeyManager(t)
 
@@ -251,7 +274,11 @@ func TestECDSAKeyManagerVerifyCommittedSeal(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
+
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			assert.ErrorIs(
 				t,
 				test.expectedErr,
@@ -267,6 +294,8 @@ func TestECDSAKeyManagerVerifyCommittedSeal(t *testing.T) {
 }
 
 func TestECDSAKeyManagerGenerateCommittedSeals(t *testing.T) {
+	t.Parallel()
+
 	ecdsaKeyManager1, _ := newTestECDSAKeyManager(t)
 
 	msg := crypto.Keccak256(
@@ -307,7 +336,11 @@ func TestECDSAKeyManagerGenerateCommittedSeals(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
+
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			res, err := ecdsaKeyManager1.GenerateCommittedSeals(
 				test.sealMap,
 				nil,
@@ -320,6 +353,8 @@ func TestECDSAKeyManagerGenerateCommittedSeals(t *testing.T) {
 }
 
 func TestECDSAKeyManagerVerifyCommittedSeals(t *testing.T) {
+	t.Parallel()
+
 	ecdsaKeyManager1, _ := newTestECDSAKeyManager(t)
 
 	msg := crypto.Keccak256(
@@ -372,7 +407,11 @@ func TestECDSAKeyManagerVerifyCommittedSeals(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
+
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			res, err := ecdsaKeyManager1.VerifyCommittedSeals(
 				test.committedSeals,
 				test.digest,
@@ -386,6 +425,8 @@ func TestECDSAKeyManagerVerifyCommittedSeals(t *testing.T) {
 }
 
 func TestECDSAKeyManagerSignIBFTMessageAndEcrecover(t *testing.T) {
+	t.Parallel()
+
 	ecdsaKeyManager, _ := newTestECDSAKeyManager(t)
 	msg := crypto.Keccak256([]byte("message"))
 
@@ -403,6 +444,8 @@ func TestECDSAKeyManagerSignIBFTMessageAndEcrecover(t *testing.T) {
 }
 
 func TestECDSAKeyManager_verifyCommittedSealsImpl(t *testing.T) {
+	t.Parallel()
+
 	ecdsaKeyManager1, _ := newTestECDSAKeyManager(t)
 	ecdsaKeyManager2, _ := newTestECDSAKeyManager(t)
 
@@ -493,7 +536,11 @@ func TestECDSAKeyManager_verifyCommittedSealsImpl(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
+
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			res, err := ecdsaKeyManager1.(*ECDSAKeyManager).verifyCommittedSealsImpl(
 				test.committedSeals,
 				test.msg,
@@ -501,12 +548,7 @@ func TestECDSAKeyManager_verifyCommittedSealsImpl(t *testing.T) {
 			)
 
 			assert.Equal(t, test.expectedRes, res)
-
-			if test.expectedErr != nil {
-				assert.ErrorContains(t, err, test.expectedErr.Error())
-			} else {
-				assert.NoError(t, err)
-			}
+			testHelper.AssertErrorMessageContains(t, test.expectedErr, err)
 		})
 	}
 }

@@ -13,6 +13,8 @@ import (
 )
 
 func TestFetchValidators(t *testing.T) {
+	t.Parallel()
+
 	// only check error handling because of the duplicated tests below
 	fakeValidatorType := validators.ValidatorType("fake")
 	res, err := FetchValidators(
@@ -26,6 +28,8 @@ func TestFetchValidators(t *testing.T) {
 }
 
 func TestFetchECDSAValidators(t *testing.T) {
+	t.Parallel()
+
 	var (
 		ecdsaValidators = validators.NewECDSAValidatorSet(
 			validators.NewECDSAValidator(addr1),
@@ -62,7 +66,11 @@ func TestFetchECDSAValidators(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
+
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			res, err := FetchValidators(
 				validators.ECDSAValidatorType,
 				test.transition,
@@ -76,6 +84,8 @@ func TestFetchECDSAValidators(t *testing.T) {
 }
 
 func TestFetchBLSValidators(t *testing.T) {
+	t.Parallel()
+
 	var (
 		blsValidators = validators.NewBLSValidatorSet(
 			validators.NewBLSValidator(addr1, testBLSPubKey1),
@@ -114,7 +124,11 @@ func TestFetchBLSValidators(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
+
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			res, err := FetchValidators(
 				validators.BLSValidatorType,
 				test.transition,

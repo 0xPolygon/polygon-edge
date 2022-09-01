@@ -22,28 +22,6 @@ var (
 	blsValidator1   = validators.NewBLSValidator(addr1, testBLSPubKey1)
 )
 
-func TestSourceTypeString(t *testing.T) {
-	tests := []struct {
-		sourceType SourceType
-		expected   string
-	}{
-		{
-			sourceType: Snapshot,
-			expected:   "Snapshot",
-		},
-		{
-			sourceType: Contract,
-			expected:   "Contract",
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.expected, func(t *testing.T) {
-			assert.Equal(t, test.expected, test.sourceType.String())
-		})
-	}
-}
-
 func createExampleECDSAVoteJSON(
 	authorize bool,
 	candidate *validators.ECDSAValidator,
@@ -99,7 +77,37 @@ func createExampleBLSVoteJSON(
 	)
 }
 
+func TestSourceTypeString(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		sourceType SourceType
+		expected   string
+	}{
+		{
+			sourceType: Snapshot,
+			expected:   "Snapshot",
+		},
+		{
+			sourceType: Contract,
+			expected:   "Contract",
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+
+		t.Run(test.expected, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, test.expected, test.sourceType.String())
+		})
+	}
+}
+
 func TestVoteJSONMarshal(t *testing.T) {
+	t.Parallel()
+
 	testMarshalJSON := func(
 		t *testing.T,
 		data interface{},
@@ -118,6 +126,8 @@ func TestVoteJSONMarshal(t *testing.T) {
 	}
 
 	t.Run("ECDSAValidator", func(t *testing.T) {
+		t.Parallel()
+
 		testMarshalJSON(
 			t,
 			&Vote{
@@ -134,6 +144,8 @@ func TestVoteJSONMarshal(t *testing.T) {
 	})
 
 	t.Run("BLSValidator", func(t *testing.T) {
+		t.Parallel()
+
 		testMarshalJSON(
 			t,
 			&Vote{
@@ -151,6 +163,8 @@ func TestVoteJSONMarshal(t *testing.T) {
 }
 
 func TestVoteJSONUnmarshal(t *testing.T) {
+	t.Parallel()
+
 	testUnmarshalJSON := func(
 		t *testing.T,
 		jsonStr string,
@@ -166,6 +180,8 @@ func TestVoteJSONUnmarshal(t *testing.T) {
 	}
 
 	t.Run("ECDSAValidator", func(t *testing.T) {
+		t.Parallel()
+
 		testUnmarshalJSON(
 			t,
 			createExampleECDSAVoteJSON(
@@ -186,6 +202,8 @@ func TestVoteJSONUnmarshal(t *testing.T) {
 	})
 
 	t.Run("ECDSAValidator (legacy format)", func(t *testing.T) {
+		t.Parallel()
+
 		testUnmarshalJSON(
 			t,
 			createExampleLegacyECDSAVoteJSON(
@@ -205,6 +223,8 @@ func TestVoteJSONUnmarshal(t *testing.T) {
 	})
 
 	t.Run("BLSValidator", func(t *testing.T) {
+		t.Parallel()
+
 		testUnmarshalJSON(
 			t,
 			createExampleBLSVoteJSON(
@@ -226,6 +246,8 @@ func TestVoteJSONUnmarshal(t *testing.T) {
 }
 
 func TestVoteEqual(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		v1       *Vote
@@ -291,7 +313,11 @@ func TestVoteEqual(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
+
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			assert.Equal(
 				t,
 				test.expected,
@@ -302,6 +328,8 @@ func TestVoteEqual(t *testing.T) {
 }
 
 func TestVoteCopy(t *testing.T) {
+	t.Parallel()
+
 	v1 := &Vote{
 		Validator: addr1,
 		Candidate: validators.NewECDSAValidator(addr2),

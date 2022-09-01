@@ -9,6 +9,8 @@ import (
 )
 
 func TestECDSAValidatorsMarshalJSON(t *testing.T) {
+	t.Parallel()
+
 	validators := &Set{
 		ValidatorType: ECDSAValidatorType,
 		Validators: []Validator{
@@ -40,6 +42,8 @@ func TestECDSAValidatorsMarshalJSON(t *testing.T) {
 }
 
 func TestECDSAValidatorsUnmarshalJSON(t *testing.T) {
+	t.Parallel()
+
 	inputStr := fmt.Sprintf(
 		`[
 			{
@@ -74,6 +78,8 @@ func TestECDSAValidatorsUnmarshalJSON(t *testing.T) {
 }
 
 func TestBLSValidatorsMarshalJSON(t *testing.T) {
+	t.Parallel()
+
 	validators := &Set{
 		ValidatorType: BLSValidatorType,
 		Validators: []Validator{
@@ -109,6 +115,8 @@ func TestBLSValidatorsMarshalJSON(t *testing.T) {
 }
 
 func TestBLSValidatorsUnmarshalJSON(t *testing.T) {
+	t.Parallel()
+
 	inputStr := fmt.Sprintf(
 		`[
 			{

@@ -23,16 +23,25 @@ func TestIbft_Transfer(t *testing.T) {
 		name            string
 		blockTime       uint64
 		ibftBaseTimeout uint64
+		validatorType   validators.ValidatorType
 	}{
 		{
 			name:            "default block time",
 			blockTime:       config.DefaultBlockTime,
 			ibftBaseTimeout: 0, // use default value
+			validatorType:   validators.ECDSAValidatorType,
 		},
 		{
 			name:            "longer block time",
 			blockTime:       10,
 			ibftBaseTimeout: 20,
+			validatorType:   validators.ECDSAValidatorType,
+		},
+		{
+			name:            "with BLS",
+			blockTime:       config.DefaultBlockTime,
+			ibftBaseTimeout: 0, // use default value
+			validatorType:   validators.BLSValidatorType,
 		},
 	}
 
@@ -51,6 +60,7 @@ func TestIbft_Transfer(t *testing.T) {
 					config.SetSeal(true)
 					config.SetBlockTime(tc.blockTime)
 					config.SetIBFTBaseTimeout(tc.ibftBaseTimeout)
+					config.SetValidatorType(tc.validatorType)
 				},
 			)
 

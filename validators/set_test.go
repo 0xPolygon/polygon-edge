@@ -8,7 +8,11 @@ import (
 )
 
 func TestSetType(t *testing.T) {
+	t.Parallel()
+
 	t.Run("ECDSAValidators", func(t *testing.T) {
+		t.Parallel()
+
 		assert.Equal(
 			t,
 			ECDSAValidatorType,
@@ -17,6 +21,8 @@ func TestSetType(t *testing.T) {
 	})
 
 	t.Run("BLSValidators", func(t *testing.T) {
+		t.Parallel()
+
 		assert.Equal(
 			t,
 			BLSValidatorType,
@@ -26,6 +32,8 @@ func TestSetType(t *testing.T) {
 }
 
 func TestSetLen(t *testing.T) {
+	t.Parallel()
+
 	assert.Equal(
 		t,
 		2,
@@ -37,6 +45,8 @@ func TestSetLen(t *testing.T) {
 }
 
 func TestSetEqual(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		vals1    Validators
@@ -117,7 +127,11 @@ func TestSetEqual(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
+
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			assert.Equal(
 				t,
 				test.expected,
@@ -128,6 +142,8 @@ func TestSetEqual(t *testing.T) {
 }
 
 func TestSetCopy(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name       string
 		validators Validators
@@ -149,7 +165,11 @@ func TestSetCopy(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
+
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			copied := test.validators.Copy()
 
 			assert.Equal(t, test.validators, copied)
@@ -167,6 +187,8 @@ func TestSetCopy(t *testing.T) {
 }
 
 func TestSetAt(t *testing.T) {
+	t.Parallel()
+
 	validators := NewECDSAValidatorSet(
 		NewECDSAValidator(addr1),
 		NewECDSAValidator(addr2),
@@ -192,6 +214,8 @@ func TestSetAt(t *testing.T) {
 }
 
 func TestSetIndex(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name       string
 		validators Validators
@@ -228,7 +252,11 @@ func TestSetIndex(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
+
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			assert.Equal(
 				t,
 				test.expected,
@@ -239,6 +267,8 @@ func TestSetIndex(t *testing.T) {
 }
 
 func TestSetIncludes(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name       string
 		validators Validators
@@ -275,7 +305,11 @@ func TestSetIncludes(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
+
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			assert.Equal(
 				t,
 				test.expected,
@@ -286,6 +320,8 @@ func TestSetIncludes(t *testing.T) {
 }
 
 func TestSetAdd(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name               string
 		validators         Validators
@@ -342,7 +378,11 @@ func TestSetAdd(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
+
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			assert.ErrorIs(
 				t,
 				test.expectedErr,
@@ -359,6 +399,8 @@ func TestSetAdd(t *testing.T) {
 }
 
 func TestSetDel(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name               string
 		validators         Validators
@@ -415,7 +457,11 @@ func TestSetDel(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
+
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			assert.ErrorIs(
 				t,
 				test.expectedErr,
@@ -432,6 +478,8 @@ func TestSetDel(t *testing.T) {
 }
 
 func TestSetMerge(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name               string
 		validators1        Validators
@@ -498,7 +546,11 @@ func TestSetMerge(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
+
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			assert.ErrorIs(
 				t,
 				test.expectedErr,
@@ -515,6 +567,8 @@ func TestSetMerge(t *testing.T) {
 }
 
 func TestSetMarshalAndUnmarshal(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name       string
 		validators Validators
@@ -536,7 +590,11 @@ func TestSetMarshalAndUnmarshal(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
+
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			encoded := types.MarshalRLPTo(test.validators.MarshalRLPWith, nil)
 
 			validator2 := &Set{
