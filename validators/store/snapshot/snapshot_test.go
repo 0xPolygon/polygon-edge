@@ -2453,8 +2453,6 @@ func TestSnapshotValidatorStore_removeLowerSnapshots(t *testing.T) {
 }
 
 func TestSnapshotValidatorStore_processVote(t *testing.T) {
-	t.Parallel()
-
 	var (
 		headerNumber uint64 = 21
 
@@ -2674,11 +2672,7 @@ func TestSnapshotValidatorStore_processVote(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test := test
-
 		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
-
 			testHelper.AssertErrorMessageContains(
 				t,
 				test.expectedErr,
