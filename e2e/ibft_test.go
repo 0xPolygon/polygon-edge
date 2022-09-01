@@ -61,14 +61,12 @@ func TestIbft_Transfer(t *testing.T) {
 					config.SetBlockTime(tc.blockTime)
 					config.SetIBFTBaseTimeout(tc.ibftBaseTimeout)
 					config.SetValidatorType(tc.validatorType)
-
-					config.SetShowsLog(tc.validatorType == validators.BLSValidatorType)
 				},
 			)
 
 			var (
 				startTimeout = time.Duration(tc.ibftBaseTimeout+60) * time.Second
-				txTimeout    = time.Duration(tc.ibftBaseTimeout+10) * time.Second
+				txTimeout    = time.Duration(tc.ibftBaseTimeout+20) * time.Second
 			)
 
 			ctxForStart, cancelStart := context.WithTimeout(context.Background(), startTimeout)
