@@ -7,13 +7,11 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	ibftHelper "github.com/0xPolygon/polygon-edge/command/ibft/helper"
 	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
-	"github.com/0xPolygon/polygon-edge/helper/hex"
 )
 
 type IBFTCandidate struct {
-	Address      string          `json:"address"`
-	BLSPublicKey *string         `json:"bls_pubkey"`
-	Vote         ibftHelper.Vote `json:"vote"`
+	Address string          `json:"address"`
+	Vote    ibftHelper.Vote `json:"vote"`
 }
 
 type IBFTCandidatesResult struct {
@@ -28,12 +26,6 @@ func newIBFTCandidatesResult(resp *ibftOp.CandidatesResp) *IBFTCandidatesResult 
 	for i, c := range resp.Candidates {
 		res.Candidates[i].Address = c.Address
 		res.Candidates[i].Vote = ibftHelper.BoolToVote(c.Auth)
-
-		if len(c.BlsPubkey) > 0 {
-			strKey := hex.EncodeToHex(c.BlsPubkey)
-
-			res.Candidates[i].BLSPublicKey = &strKey
-		}
 	}
 
 	return res
