@@ -94,16 +94,6 @@ func (i *backendIBFT) InsertBlock(
 		return
 	}
 
-	if err := i.updateCurrentModules(newBlock.Number() + 1); err != nil {
-		i.logger.Error(
-			"failed to update submodules",
-			"height", newBlock.Number()+1,
-			"err", err,
-		)
-
-		return
-	}
-
 	// after the block has been written we reset the txpool so that
 	// the old transactions are removed
 	i.txpool.ResetWithHeaders(newBlock.Header)

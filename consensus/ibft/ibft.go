@@ -208,14 +208,12 @@ func (i *backendIBFT) Initialize() error {
 // sync runs the syncer in the background to receive blocks from advanced peers
 func (i *backendIBFT) startSyncing() {
 	callInsertBlockHook := func(block *types.Block) bool {
-		nextHeight := block.Number() + 1
-
 		if err := i.currentHooks.PostInsertBlock(block); err != nil {
 			i.logger.Error("failed to call PostInsertBlock", "height", block.Header.Number, "error", err)
 		}
 
-		if err := i.updateCurrentModules(nextHeight); err != nil {
-			i.logger.Error("failed to update modules", "height", nextHeight, "error", err)
+		if err := i.updateCurrentModules(block.Number() + 1); err != nil {
+			i.logger.Error("failed to update sub modules", "height", block.Number()+1, "err", err)
 		}
 
 		i.txpool.ResetWithHeaders(block.Header)
@@ -286,6 +284,14 @@ func (i *backendIBFT) startConsensus() {
 			latest  = i.blockchain.Header().Number
 			pending = latest + 1
 		)
+
+		if err := i.updateCurrentModules(pending); err != nil {
+			i.logger.Error(
+				"failed to update submodules",
+				"height", pending,
+				"err", err,
+			)
+		}
 
 		// Update the No.of validator metric
 		i.metrics.Validators.Set(float64(i.currentValidators.Len()))
