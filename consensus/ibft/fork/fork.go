@@ -28,7 +28,7 @@ type IBFTFork struct {
 	To            *common.JSONNumber       `json:"to,omitempty"`
 
 	// PoA
-	Validators validators.Validators `json:"validators"`
+	Validators validators.Validators `json:"validators,omitempty"`
 
 	// PoS
 	MaxValidatorCount *common.JSONNumber `json:"maxValidatorCount,omitempty"`
@@ -38,11 +38,11 @@ type IBFTFork struct {
 func (f *IBFTFork) UnmarshalJSON(data []byte) error {
 	raw := struct {
 		Type              IBFTType                  `json:"type"`
-		ValidatorType     *validators.ValidatorType `json:"validator_type"`
+		ValidatorType     *validators.ValidatorType `json:"validator_type,omitempty"`
 		Deployment        *common.JSONNumber        `json:"deployment,omitempty"`
 		From              common.JSONNumber         `json:"from"`
 		To                *common.JSONNumber        `json:"to,omitempty"`
-		Validators        interface{}               `json:"validators"`
+		Validators        interface{}               `json:"validators,omitempty"`
 		MaxValidatorCount *common.JSONNumber        `json:"maxValidatorCount,omitempty"`
 		MinValidatorCount *common.JSONNumber        `json:"minValidatorCount,omitempty"`
 	}{}
