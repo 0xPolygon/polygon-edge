@@ -226,8 +226,6 @@ func TestSignerInitIBFTExtra(t *testing.T) {
 }
 
 func TestSignerGetIBFTExtra(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		name          string
 		header        *types.Header
@@ -447,11 +445,7 @@ func TestSignerGetIBFTExtra(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test := test
-
 		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
-
 			extra, err := test.signer.GetIBFTExtra(test.header)
 
 			assert.Equal(
