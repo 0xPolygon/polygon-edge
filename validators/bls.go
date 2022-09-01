@@ -48,7 +48,7 @@ type BLSValidator struct {
 func NewBLSValidator(addr types.Address, blsPubkey []byte) *BLSValidator {
 	return &BLSValidator{
 		Address:      addr,
-		BLSPublicKey: BLSValidatorPublicKey(blsPubkey),
+		BLSPublicKey: blsPubkey,
 	}
 }
 
