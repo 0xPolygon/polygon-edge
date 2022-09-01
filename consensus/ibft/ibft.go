@@ -532,6 +532,8 @@ func (i *backendIBFT) SetHeaderHash() {
 // that are used at specified height
 // by fetching from ForkManager
 func (i *backendIBFT) updateCurrentModules(height uint64) error {
+	lastSigner := i.currentSigner
+
 	signer, validators, hooks, err := getModulesFromForkManager(i.forkManager, height)
 	if err != nil {
 		return err
@@ -541,7 +543,18 @@ func (i *backendIBFT) updateCurrentModules(height uint64) error {
 	i.currentValidators = validators
 	i.currentHooks = hooks
 
+	i.logFork(lastSigner, signer)
+
 	return nil
+}
+
+// logFork logs validation type switch
+func (i *backendIBFT) logFork(
+	lastSigner, signer signer.Signer,
+) {
+	if lastSigner != nil && signer != nil && lastSigner.Type() != signer.Type() {
+		i.logger.Info("IBFT validation type switched", "old", lastSigner.Type(), "new", signer.Type())
+	}
 }
 
 func (i *backendIBFT) verifyParentCommittedSeals(
