@@ -140,6 +140,7 @@ func (m *ForkManager) GetSigner(height uint64) (signer.Signer, error) {
 	}
 
 	var parentKeyManager signer.KeyManager
+
 	if height > 1 {
 		if parentKeyManager, err = m.getKeyManager(height - 1); err != nil {
 			return nil, err

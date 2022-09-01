@@ -54,7 +54,7 @@ func setFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVar(
 		&params.generatesBLS,
 		blsFlag,
-		false,
+		true,
 		"the flag indicating whether new BLS key is created",
 	)
 }

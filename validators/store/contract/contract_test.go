@@ -74,19 +74,6 @@ func (m *mockExecutor) BeginTxn(
 	return m.BeginTxnFn(hash, header, address)
 }
 
-type mockSigner struct {
-	TypeVal    validators.ValidatorType
-	AddressVal types.Address
-}
-
-func (m *mockSigner) Type() validators.ValidatorType {
-	return m.TypeVal
-}
-
-func (m *mockSigner) Address() types.Address {
-	return m.AddressVal
-}
-
 func newTestTransition(
 	t *testing.T,
 ) *state.Transition {
@@ -359,7 +346,6 @@ func TestContractValidatorStoreGetValidators(t *testing.T) {
 			expectedErr:   errors.New("unsupported validator type: fake"),
 			finalCaches:   map[uint64]interface{}{},
 		},
-		//nolint:dupl
 		{
 			name: "should return fetched ECDSA validators",
 			blockchain: &store.MockBlockchain{
@@ -388,7 +374,6 @@ func TestContractValidatorStoreGetValidators(t *testing.T) {
 				1: ecdsaValidators,
 			},
 		},
-		//nolint:dupl
 		{
 			name: "should return fetched BLS validators",
 			blockchain: &store.MockBlockchain{
