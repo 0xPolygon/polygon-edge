@@ -61,6 +61,8 @@ func TestIbft_Transfer(t *testing.T) {
 					config.SetBlockTime(tc.blockTime)
 					config.SetIBFTBaseTimeout(tc.ibftBaseTimeout)
 					config.SetValidatorType(tc.validatorType)
+
+					config.SetShowsLog(tc.validatorType == validators.BLSValidatorType)
 				},
 			)
 
