@@ -69,11 +69,7 @@ func GetValidatorsFromPrefixPath(
 	for _, file := range files {
 		path := file.Name()
 
-		if !file.IsDir() {
-			continue
-		}
-
-		if !strings.HasPrefix(path, prefix) {
+		if !file.IsDir() || !strings.HasPrefix(path, prefix) {
 			continue
 		}
 
