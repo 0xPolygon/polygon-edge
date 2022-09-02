@@ -64,7 +64,7 @@ func (s *Server) enableDataDogProfiler() error {
 	return nil
 }
 
-func (s *Server) CloseDataDogProfiler() {
+func (s *Server) closeDataDogProfiler() {
 	defer func() {
 		s.logger.Debug("closing DataDog profiler")
 		profiler.Stop()

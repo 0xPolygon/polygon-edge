@@ -634,7 +634,7 @@ func (s *Server) Close() {
 	s.txpool.Close()
 
 	// close DataDog profiler
-	s.CloseDataDogProfiler()
+	s.closeDataDogProfiler()
 }
 
 // Entry is a consensus configuration entry
