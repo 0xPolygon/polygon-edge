@@ -1,6 +1,10 @@
 package version
 
-import "fmt"
+import (
+	"bytes"
+	"fmt"
+	"github.com/0xPolygon/polygon-edge/command/helper"
+)
 
 type VersionResult struct {
 	Version   string `json:"version"`
@@ -10,9 +14,15 @@ type VersionResult struct {
 }
 
 func (r *VersionResult) GetOutput() string {
-	return fmt.Sprintf("\n[VERSION INFO]\n"+
-		"Release version: %s \n"+
-		"Git branch: %s\n"+
-		"Commit hash: %s\n"+
-		"Build time: %s", r.Version, r.Branch, r.Commit, r.BuildTime)
+	var buffer bytes.Buffer
+
+	buffer.WriteString("\n[VERSION INFO]\n")
+	buffer.WriteString(helper.FormatKV([]string{
+		fmt.Sprintf("Release version|%s", r.Version),
+		fmt.Sprintf("Git branch|%s", r.Branch),
+		fmt.Sprintf("Commit hash|%s", r.Commit),
+		fmt.Sprintf("Build time|%s", r.BuildTime),
+	}))
+
+	return buffer.String()
 }
