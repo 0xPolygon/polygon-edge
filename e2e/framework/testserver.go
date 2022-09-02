@@ -194,6 +194,7 @@ func (t *TestServer) SecretsInit() (*InitIBFTResult, error) {
 	if _, err := cmd.Output(); err != nil {
 		return nil, err
 	}
+	_ = os.RemoveAll(filepath.Join(cmd.Dir, t.Config.IBFTDir))
 
 	res := &InitIBFTResult{}
 
