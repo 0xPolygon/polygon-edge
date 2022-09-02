@@ -186,7 +186,7 @@ func (t *TestServer) SecretsInit() (*InitIBFTResult, error) {
 
 	commandSlice := strings.Split(fmt.Sprintf("secrets %s", secretsInitCmd.Use), " ")
 	args = append(args, commandSlice...)
-	args = append(args, "--data-dir", t.Config.IBFTDir)
+	args = append(args, "--data-dir", filepath.Join(t.Config.IBFTDir, "tmp"))
 
 	cmd := exec.Command(binaryName, args...)
 	cmd.Dir = t.Config.RootDir
@@ -194,8 +194,6 @@ func (t *TestServer) SecretsInit() (*InitIBFTResult, error) {
 	if _, err := cmd.Output(); err != nil {
 		return nil, err
 	}
-
-	_ = os.RemoveAll(filepath.Join(cmd.Dir, t.Config.IBFTDir))
 
 	res := &InitIBFTResult{}
 
