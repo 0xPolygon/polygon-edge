@@ -11,6 +11,9 @@ jobs:
           wget https://github.com/Trapesys/aws-commander/releases/download/v0.2.0/aws-commander_0.2.0_Linux_x86_64.tar.gz
           tar -xf aws-commander_0.2.0_Linux_x86_64.tar.gz
           sudo mv aws-commander /usr/local/bin
+          
+      - name: Checkout code
+        uses: actions/checkout@v3
 
       - name: Run deployment Ansible
         env:
