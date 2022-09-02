@@ -1,6 +1,6 @@
 ---
 -
-  name: Install Polygon Edge
+  name: Update Polygon Edge binary
   hosts:
     - all
   become: yes
