@@ -1,5 +1,7 @@
 on:
-  workflow_dispatch:
+  release:
+    types: 
+      - published
 
 jobs:
   deploy_to_edge_net:
