@@ -1,6 +1,7 @@
 package rootchain
 
-//	TODO: define iota types
+// TODO: define iota types
+
 type PayloadType uint8
 
 type Payload interface {
