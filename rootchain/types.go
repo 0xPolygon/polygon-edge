@@ -2,18 +2,14 @@ package rootchain
 
 import "github.com/0xPolygon/polygon-edge/types"
 
-// TODO: define iota types
 type PayloadType uint8
+
+const (
+	ValidatorSetPayload PayloadType = iota
+)
 
 type Payload interface {
 	Get() (PayloadType, []byte)
-}
-
-type Event struct {
-	Number      uint64 // index of the event emitted from the rootchain contract
-	BlockNumber uint64 // number of the block the event was contained in
-
-	Payload // event specific data
 }
 
 type SAM struct {
