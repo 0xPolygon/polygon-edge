@@ -7,51 +7,54 @@ option go_package = "/consensus/ibft/proto";
 import "google/protobuf/empty.proto";
 
 service IbftOperator {
-  rpc GetSnapshot(SnapshotReq) returns (Snapshot);
-  rpc Propose(Candidate) returns (google.protobuf.Empty);
-  rpc Candidates(google.protobuf.Empty) returns (CandidatesResp);
-  rpc Status(google.protobuf.Empty) returns (IbftStatusResp);
+    rpc GetSnapshot(SnapshotReq) returns (Snapshot);
+    rpc Propose(Candidate) returns (google.protobuf.Empty);
+    rpc Candidates(google.protobuf.Empty) returns (CandidatesResp);
+    rpc Status(google.protobuf.Empty) returns (IbftStatusResp);
 }
 
 message IbftStatusResp {
-  string key = 1;
+    string key = 1;
 }
 
 message SnapshotReq {
-  bool latest = 1;
-  uint64 number = 2;
+    bool latest = 1;
+    uint64 number = 2;
 }
 
 message Snapshot {
-  repeated Validator validators = 1;
+    repeated Validator validators = 1;
 
-  uint64 number = 2;
+    uint64 number = 2;
 
-  string hash = 3;
+    string hash = 3;
 
-  repeated Vote votes = 4;
+    repeated Vote votes = 4;
 
-  message Validator {
-    string address = 1;
-  }
+    message Validator {
+        string type = 1;
+        string address = 2;
+        bytes data = 3;
+    }
 
-  message Vote {
-    string validator = 1;
-    string proposed = 2;
-    bool auth = 3;
-  }
+    message Vote {
+        string validator = 1;
+        string proposed = 2;
+        bool auth = 3;
+    }
 }
 
 message ProposeReq {
-  string address = 1;
-  bool auth = 2;
+    string address = 1;
+    bool auth = 2;
 }
 
 message CandidatesResp {
-  repeated Candidate candidates = 1;
+    repeated Candidate candidates = 1;
 }
 
 message Candidate {
-  string address = 1;
-  bool auth = 2;
+    string address = 1;
+    bytes bls_pubkey = 2;
+    bool auth = 3;
 }

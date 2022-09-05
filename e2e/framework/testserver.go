@@ -18,14 +18,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/umbracle/ethgo"
-
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/genesis"
 	ibftSwitch "github.com/0xPolygon/polygon-edge/command/ibft/switch"
 	initCmd "github.com/0xPolygon/polygon-edge/command/secrets/init"
 	"github.com/0xPolygon/polygon-edge/command/server"
-	"github.com/0xPolygon/polygon-edge/consensus/ibft"
+	"github.com/0xPolygon/polygon-edge/consensus/ibft/fork"
 	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	stakingHelper "github.com/0xPolygon/polygon-edge/helper/staking"
@@ -36,8 +34,10 @@ import (
 	"github.com/0xPolygon/polygon-edge/server/proto"
 	txpoolProto "github.com/0xPolygon/polygon-edge/txpool/proto"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/0xPolygon/polygon-edge/validators"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/jsonrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -76,6 +76,7 @@ func NewTestServer(t *testing.T, rootDir string, callback TestServerConfigCallba
 		JSONRPCPort:   ports[2].Port(),
 		RootDir:       rootDir,
 		Signer:        crypto.NewEIP155Signer(100),
+		ValidatorType: validators.ECDSAValidatorType,
 	}
 
 	if callback != nil {
@@ -210,7 +211,7 @@ func (t *TestServer) SecretsInit() (*InitIBFTResult, error) {
 	}
 
 	// Generate the IBFT validator private key
-	validatorKey, validatorKeyEncoded, keyErr := crypto.GenerateAndEncodePrivateKey()
+	validatorKey, validatorKeyEncoded, keyErr := crypto.GenerateAndEncodeECDSAPrivateKey()
 	if keyErr != nil {
 		return nil, keyErr
 	}
@@ -229,6 +230,19 @@ func (t *TestServer) SecretsInit() (*InitIBFTResult, error) {
 	// Write the networking private key to the secrets manager storage
 	if setErr := localSecretsManager.SetSecret(secrets.NetworkKey, libp2pKeyEncoded); setErr != nil {
 		return nil, setErr
+	}
+
+	if t.Config.ValidatorType == validators.BLSValidatorType {
+		// Generate the BLS Key
+		_, bksKeyEncoded, keyErr := crypto.GenerateAndEncodeBLSSecretKey()
+		if keyErr != nil {
+			return nil, keyErr
+		}
+
+		// Write the networking private key to the secrets manager storage
+		if setErr := localSecretsManager.SetSecret(secrets.ValidatorBLSKey, bksKeyEncoded); setErr != nil {
+			return nil, setErr
+		}
 	}
 
 	// Get the node ID from the private key
@@ -257,7 +271,11 @@ func (t *TestServer) GenerateGenesis() error {
 	// add consensus flags
 	switch t.Config.Consensus {
 	case ConsensusIBFT:
-		args = append(args, "--consensus", "ibft")
+		args = append(
+			args,
+			"--consensus", "ibft",
+			"--ibft-validator-type", string(t.Config.ValidatorType),
+		)
 
 		if t.Config.IBFTDirPrefix == "" {
 			return errors.New("prefix of IBFT directory is not set")
@@ -268,8 +286,13 @@ func (t *TestServer) GenerateGenesis() error {
 		if t.Config.EpochSize != 0 {
 			args = append(args, "--epoch-size", strconv.FormatUint(t.Config.EpochSize, 10))
 		}
+
 	case ConsensusDev:
-		args = append(args, "--consensus", "dev")
+		args = append(
+			args,
+			"--consensus", "dev",
+			"--ibft-validator-type", string(t.Config.ValidatorType),
+		)
 
 		// Set up any initial staker addresses for the predeployed Staking SC
 		for _, stakerAddress := range t.Config.DevStakers {
@@ -309,6 +332,12 @@ func (t *TestServer) GenerateGenesis() error {
 
 	cmd := exec.Command(binaryName, args...)
 	cmd.Dir = t.Config.RootDir
+
+	if t.Config.ShowsLog {
+		stdout := io.Writer(os.Stdout)
+		cmd.Stdout = stdout
+		cmd.Stderr = stdout
+	}
 
 	return cmd.Run()
 }
@@ -396,7 +425,7 @@ func (t *TestServer) Start(ctx context.Context) error {
 	return err
 }
 
-func (t *TestServer) SwitchIBFTType(typ ibft.MechanismType, from uint64, to, deployment *uint64) error {
+func (t *TestServer) SwitchIBFTType(typ fork.IBFTType, from uint64, to, deployment *uint64) error {
 	t.t.Helper()
 
 	ibftSwitchCmd := ibftSwitch.GetCommand()
@@ -411,6 +440,9 @@ func (t *TestServer) SwitchIBFTType(typ ibft.MechanismType, from uint64, to, dep
 		"--type", string(typ),
 		"--from", strconv.FormatUint(from, 10),
 	)
+
+	// Default ibft validator type for e2e tests is ECDSA
+	args = append(args, "--ibft-validator-type", string(validators.ECDSAValidatorType))
 
 	if to != nil {
 		args = append(args, "--to", strconv.FormatUint(*to, 10))

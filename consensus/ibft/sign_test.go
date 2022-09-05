@@ -3,6 +3,7 @@ package ibft
 import (
 	"testing"
 
+	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
 )
@@ -10,76 +11,99 @@ import (
 func TestSign_Sealer(t *testing.T) {
 	t.Parallel()
 
-	pool := newTesterAccountPool()
+	pool := newTesterAccountPool(t)
 	pool.add("A")
 
-	snap := &Snapshot{
-		Set: pool.ValidatorSet(),
-	}
+	correctValset := pool.ValidatorSet()
 
 	h := &types.Header{}
-	putIbftExtraValidators(h, pool.ValidatorSet())
+
+	signerA := signer.NewSigner(
+		signer.NewECDSAKeyManagerFromKey(pool.get("A").priv),
+		signer.NewECDSAKeyManagerFromKey(pool.get("A").priv),
+	)
+
+	signer.UseIstanbulHeaderHashInTest(t, signerA)
+
+	signerA.InitIBFTExtra(h, correctValset, nil)
+
+	h = h.ComputeHash()
 
 	// non-validator address
 	pool.add("X")
 
-	badSealedBlock, _ := writeProposerSeal(pool.get("X").priv, h)
-	assert.Error(t, verifySigner(snap, badSealedBlock))
+	signerX := signer.NewSigner(
+		signer.NewECDSAKeyManagerFromKey(pool.get("X").priv),
+		signer.NewECDSAKeyManagerFromKey(pool.get("A").priv),
+	)
+
+	badSealedBlock, _ := signerX.WriteProposerSeal(h)
+	assert.Error(t, verifyProposerSeal(badSealedBlock, signerA, correctValset))
 
 	// seal the block with a validator
-	goodSealedBlock, _ := writeProposerSeal(pool.get("A").priv, h)
-	assert.NoError(t, verifySigner(snap, goodSealedBlock))
+	goodSealedBlock, _ := signerA.WriteProposerSeal(h)
+	assert.NoError(t, verifyProposerSeal(goodSealedBlock, signerA, correctValset))
 }
 
 func TestSign_CommittedSeals(t *testing.T) {
 	t.Parallel()
 
-	pool := newTesterAccountPool()
+	pool := newTesterAccountPool(t)
 	pool.add("A", "B", "C", "D", "E")
 
-	snap := &Snapshot{
-		Set: pool.ValidatorSet(),
-	}
+	var (
+		h   = &types.Header{}
+		err error
+	)
 
-	h := &types.Header{
-		ExtraData: []byte{},
-	}
+	correctValSet := pool.ValidatorSet()
 
-	putIbftExtraValidators(h, pool.ValidatorSet())
+	signerA := signer.NewSigner(
+		signer.NewECDSAKeyManagerFromKey(pool.get("A").priv),
+		signer.NewECDSAKeyManagerFromKey(pool.get("A").priv),
+	)
 
-	hash, err := calculateHeaderHash(h)
+	signerA.InitIBFTExtra(h, correctValSet, nil)
+
+	h.Hash, err = signerA.CalculateHeaderHash(h)
 	if err != nil {
 		t.Fatalf("Unable to calculate hash, %v", err)
 	}
 
-	h.Hash = types.BytesToHash(hash)
-
 	// non-validator address
 	pool.add("X")
 
-	buildCommittedSeal := func(accnt []string) error {
-		seals := [][]byte{}
+	buildCommittedSeal := func(names []string) error {
+		seals := map[types.Address][]byte{}
 
-		for _, accnt := range accnt {
-			seal, err := writeCommittedSeal(pool.get(accnt).priv, h.Hash.Bytes())
+		for _, name := range names {
+			acc := pool.get(name)
+
+			signer := signer.NewSigner(
+				signer.NewECDSAKeyManagerFromKey(
+					acc.priv,
+				),
+				signer.NewECDSAKeyManagerFromKey(
+					acc.priv,
+				),
+			)
+
+			seal, err := signer.CreateCommittedSeal(h.Hash.Bytes())
 
 			assert.NoError(t, err)
 
-			seals = append(seals, seal)
+			seals[acc.Address()] = seal
 		}
 
-		sealed, err := writeCommittedSeals(h, seals)
+		sealed, err := signerA.WriteCommittedSeals(h, seals)
 
 		assert.NoError(t, err)
 
-		return verifyCommittedFields(snap, sealed, OptimalQuorumSize)
+		return signerA.VerifyCommittedSeals(sealed, correctValSet, OptimalQuorumSize(correctValSet))
 	}
 
 	// Correct
 	assert.NoError(t, buildCommittedSeal([]string{"A", "B", "C", "D"}))
-
-	// Failed - Repeated signature
-	assert.Error(t, buildCommittedSeal([]string{"A", "A"}))
 
 	// Failed - Non validator signature
 	assert.Error(t, buildCommittedSeal([]string{"A", "X"}))

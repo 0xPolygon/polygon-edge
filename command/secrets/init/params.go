@@ -1,20 +1,19 @@
 package init
 
 import (
-	"crypto/ecdsa"
 	"errors"
 
 	"github.com/0xPolygon/polygon-edge/command"
-	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/secrets/helper"
-	libp2pCrypto "github.com/libp2p/go-libp2p-core/crypto"
-	"github.com/libp2p/go-libp2p-core/peer"
 )
 
 const (
 	dataDirFlag = "data-dir"
 	configFlag  = "config"
+	ecdsaFlag   = "ecdsa"
+	blsFlag     = "bls"
+	networkFlag = "network"
 )
 
 var (
@@ -28,16 +27,14 @@ var (
 )
 
 type initParams struct {
-	dataDir    string
-	configPath string
+	dataDir          string
+	configPath       string
+	generatesECDSA   bool
+	generatesBLS     bool
+	generatesNetwork bool
 
 	secretsManager secrets.SecretsManager
 	secretsConfig  *secrets.SecretsManagerConfig
-
-	validatorPrivateKey  *ecdsa.PrivateKey
-	networkingPrivateKey libp2pCrypto.PrivKey
-
-	nodeID peer.ID
 }
 
 func (ip *initParams) validateFlags() error {
@@ -137,41 +134,51 @@ func (ip *initParams) initLocalSecretsManager() error {
 }
 
 func (ip *initParams) initValidatorKey() error {
-	validatorKey, err := helper.InitValidatorKey(ip.secretsManager)
-	if err != nil {
-		return err
+	var err error
+
+	if ip.generatesECDSA {
+		if _, err = helper.InitECDSAValidatorKey(ip.secretsManager); err != nil {
+			return err
+		}
 	}
 
-	ip.validatorPrivateKey = validatorKey
+	if ip.generatesBLS {
+		if _, err = helper.InitBLSValidatorKey(ip.secretsManager); err != nil {
+			return err
+		}
+	}
 
 	return nil
 }
 
 func (ip *initParams) initNetworkingKey() error {
-	networkingKey, err := helper.InitNetworkingPrivateKey(ip.secretsManager)
-	if err != nil {
-		return err
+	if ip.generatesNetwork {
+		if _, err := helper.InitNetworkingPrivateKey(ip.secretsManager); err != nil {
+			return err
+		}
 	}
-
-	ip.networkingPrivateKey = networkingKey
-
-	return ip.initNodeID()
-}
-
-func (ip *initParams) initNodeID() error {
-	nodeID, err := peer.IDFromPrivateKey(ip.networkingPrivateKey)
-	if err != nil {
-		return err
-	}
-
-	ip.nodeID = nodeID
 
 	return nil
 }
 
-func (ip *initParams) getResult() command.CommandResult {
-	return &SecretsInitResult{
-		Address: crypto.PubKeyToAddress(&ip.validatorPrivateKey.PublicKey),
-		NodeID:  ip.nodeID.String(),
+// getResult gets keys from secret manager and return result to display
+func (ip *initParams) getResult() (command.CommandResult, error) {
+	var (
+		res = &SecretsInitResult{}
+		err error
+	)
+
+	if res.Address, err = loadValidatorAddress(ip.secretsManager); err != nil {
+		return nil, err
 	}
+
+	if res.BLSPubkey, err = loadBLSPublicKey(ip.secretsManager); err != nil {
+		return nil, err
+	}
+
+	if res.NodeID, err = loadNodeID(ip.secretsManager); err != nil {
+		return nil, err
+	}
+
+	return res, nil
 }

@@ -22,9 +22,9 @@ func TestState_FaultyNodes(t *testing.T) {
 		{9, 2},
 	}
 	for _, c := range cases {
-		pool := newTesterAccountPool(int(c.Network))
+		pool := newTesterAccountPool(t, int(c.Network))
 		vals := pool.ValidatorSet()
-		assert.Equal(t, vals.MaxFaultyNodes(), int(c.Faulty))
+		assert.Equal(t, CalcMaxFaultyNodes(vals), int(c.Faulty))
 	}
 }
 
@@ -56,7 +56,7 @@ func TestNumValid(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		pool := newTesterAccountPool(int(c.Network))
+		pool := newTesterAccountPool(t, int(c.Network))
 		addAccounts(pool, int(c.Network))
 
 		assert.Equal(t,

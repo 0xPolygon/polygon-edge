@@ -7,6 +7,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft"
 	"github.com/0xPolygon/polygon-edge/helper/common"
+	"github.com/0xPolygon/polygon-edge/validators"
 	"github.com/spf13/cobra"
 )
 
@@ -91,8 +92,15 @@ func setFlags(cmd *cobra.Command) {
 	// IBFT Validators
 	{
 		cmd.Flags().StringVar(
+			&params.rawIBFTValidatorType,
+			command.IBFTValidatorTypeFlag,
+			string(validators.BLSValidatorType),
+			"the type of validators in IBFT",
+		)
+
+		cmd.Flags().StringVar(
 			&params.validatorPrefixPath,
-			ibftValidatorPrefixFlag,
+			command.IBFTValidatorPrefixFlag,
 			"",
 			"prefix path for validator folder directory. "+
 				"Needs to be present if ibft-validator is omitted",
@@ -100,14 +108,14 @@ func setFlags(cmd *cobra.Command) {
 
 		cmd.Flags().StringArrayVar(
 			&params.ibftValidatorsRaw,
-			ibftValidatorFlag,
+			command.IBFTValidatorFlag,
 			[]string{},
 			"addresses to be used as IBFT validators, can be used multiple times. "+
 				"Needs to be present if ibft-validators-prefix-path is omitted",
 		)
 
 		// --ibft-validator-prefix-path & --ibft-validator can't be given at same time
-		cmd.MarkFlagsMutuallyExclusive(ibftValidatorPrefixFlag, ibftValidatorFlag)
+		cmd.MarkFlagsMutuallyExclusive(command.IBFTValidatorPrefixFlag, command.IBFTValidatorFlag)
 	}
 
 	// PoS
