@@ -2,7 +2,7 @@ package rootchain
 
 import "github.com/0xPolygon/polygon-edge/types"
 
-//	TODO: define iota types
+// TODO: define iota types
 type PayloadType uint8
 
 type Payload interface {
