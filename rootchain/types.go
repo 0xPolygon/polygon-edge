@@ -1,5 +1,7 @@
 package rootchain
 
+import "github.com/0xPolygon/polygon-edge/types"
+
 //	TODO: define iota types
 type PayloadType uint8
 
@@ -15,8 +17,8 @@ type Event struct {
 }
 
 type SAM struct {
-	Hash      []byte // unique hash of the event
-	Signature []byte // validator signature
+	Hash      types.Hash // unique hash of the event
+	Signature []byte     // validator signature
 
 	Event
 }
