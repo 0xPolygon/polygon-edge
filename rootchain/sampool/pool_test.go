@@ -76,8 +76,7 @@ func TestSAMPool_AddMessage(t *testing.T) {
 			}
 
 			pool := New(verfier)
-
-			pool.lastProcessedEvent = 10
+			pool.lastProcessedMessage = 10
 
 			msg := rootchain.SAM{
 				Event: rootchain.Event{
@@ -87,7 +86,7 @@ func TestSAMPool_AddMessage(t *testing.T) {
 
 			err := pool.AddMessage(msg)
 
-			assert.Error(t, err)
+			assert.ErrorIs(t, err, ErrStaleMessage)
 		},
 	)
 }

@@ -1,6 +1,14 @@
 package sampool
 
-import "github.com/0xPolygon/polygon-edge/rootchain"
+import (
+	"errors"
+	"fmt"
+	"github.com/0xPolygon/polygon-edge/rootchain"
+)
+
+var (
+	ErrStaleMessage = errors.New("stale message received")
+)
 
 //	Verifies hash and signature of a SAM
 type Verifier interface {
@@ -12,6 +20,8 @@ type Verifier interface {
 
 type SAMPool struct {
 	verifier Verifier
+
+	lastProcessedMessage uint64
 }
 
 func New(verifier Verifier) *SAMPool {
@@ -29,6 +39,11 @@ func (s *SAMPool) AddMessage(msg rootchain.SAM) error {
 	//	verify message signature
 	if err := s.verifier.VerifySignature(msg); err != nil {
 		return err
+	}
+
+	//	reject old message
+	if msgNumber := msg.Event.Number; msgNumber <= s.lastProcessedMessage {
+		return fmt.Errorf("%w: message number %d", ErrStaleMessage, msgNumber)
 	}
 
 	//	add message
