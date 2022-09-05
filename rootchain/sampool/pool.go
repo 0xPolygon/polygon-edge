@@ -27,6 +27,9 @@ func (s *SAMPool) AddMessage(msg rootchain.SAM) error {
 	}
 
 	//	verify message signature
+	if err := s.verifier.VerifySignature(msg); err != nil {
+		return err
+	}
 
 	//	add message
 
