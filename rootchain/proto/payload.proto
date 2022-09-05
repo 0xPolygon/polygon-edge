@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package v1;
+
+option go_package = "/rootchain/proto";
+
+// ValidatorSetPayload is used for rootchain events
+// that emit a validator set change (whole set snapshot),
+// containing
+message ValidatorSetPayload {
+  repeated ValidatorInfoBLS validatorsInfo = 1;
+}
+
+// ValidatorInfo is a tuple containing the
+// validator address and the associated BLS key
+message ValidatorInfoBLS {
+  bytes address = 1;
+  bytes blsPubKey = 2;
+}
