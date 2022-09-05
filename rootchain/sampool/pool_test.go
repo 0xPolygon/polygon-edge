@@ -1,1 +1,35 @@
 package sampool
+
+import (
+	"errors"
+	"github.com/0xPolygon/polygon-edge/rootchain"
+	"github.com/stretchr/testify/assert"
+	"testing"
+)
+
+func TestSAMPool_AddMessage(t *testing.T) {
+	t.Parallel()
+
+	t.Run(
+		"bad hash",
+		func(t *testing.T) {
+			t.Parallel()
+
+			verifier := mockVerifier{
+				verifyHash: func(msg rootchain.SAM) error {
+					return errors.New("asdasd")
+				},
+			}
+
+			pool := New(verifier)
+
+			msg := rootchain.SAM{
+				Hash: []byte("some really bad hash"),
+			}
+
+			err := pool.AddMessage(msg)
+
+			assert.Error(t, err)
+		},
+	)
+}
