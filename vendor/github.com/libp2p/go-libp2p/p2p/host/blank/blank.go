@@ -6,16 +6,15 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/libp2p/go-libp2p-core/connmgr"
-	"github.com/libp2p/go-libp2p-core/event"
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/peerstore"
-	"github.com/libp2p/go-libp2p-core/protocol"
-	"github.com/libp2p/go-libp2p-core/record"
-
-	"github.com/libp2p/go-eventbus"
+	"github.com/libp2p/go-libp2p/core/connmgr"
+	"github.com/libp2p/go-libp2p/core/event"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/peerstore"
+	"github.com/libp2p/go-libp2p/core/protocol"
+	"github.com/libp2p/go-libp2p/core/record"
+	"github.com/libp2p/go-libp2p/p2p/host/eventbus"
 
 	logging "github.com/ipfs/go-log/v2"
 
@@ -159,9 +158,9 @@ func (bh *BlankHost) NewStream(ctx context.Context, p peer.ID, protos ...protoco
 		return nil, err
 	}
 
-	var protoStrs []string
-	for _, pid := range protos {
-		protoStrs = append(protoStrs, string(pid))
+	protoStrs := make([]string, len(protos))
+	for i, pid := range protos {
+		protoStrs[i] = string(pid)
 	}
 
 	selected, err := mstream.SelectOneOf(protoStrs, s)

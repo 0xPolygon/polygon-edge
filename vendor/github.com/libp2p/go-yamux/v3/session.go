@@ -295,9 +295,10 @@ func (s *Session) Close() error {
 	s.streamLock.Lock()
 	defer s.streamLock.Unlock()
 	var memory int
-	for _, stream := range s.streams {
+	for id, stream := range s.streams {
 		memory += stream.memory
 		stream.forceClose()
+		delete(s.streams, id)
 	}
 	if memory > 0 {
 		s.memoryManager.ReleaseMemory(memory)
@@ -829,6 +830,7 @@ func (s *Session) incomingStream(id uint32) error {
 // was not yet established, then this will give the credit back.
 func (s *Session) closeStream(id uint32) {
 	s.streamLock.Lock()
+	defer s.streamLock.Unlock()
 	if _, ok := s.inflight[id]; ok {
 		select {
 		case <-s.synCh:
@@ -837,17 +839,22 @@ func (s *Session) closeStream(id uint32) {
 		}
 		delete(s.inflight, id)
 	}
-	if s.client == (id%2 == 0) {
-		s.numIncomingStreams--
-	}
 	s.deleteStream(id)
-	s.streamLock.Unlock()
 }
 
 func (s *Session) deleteStream(id uint32) {
 	str, ok := s.streams[id]
 	if !ok {
 		return
+	}
+	if s.client == (id%2 == 0) {
+		if s.numIncomingStreams == 0 {
+			s.logger.Printf("[ERR] yamux: numIncomingStreams underflow")
+			// prevent the creation of any new streams
+			s.numIncomingStreams = math.MaxUint32
+		} else {
+			s.numIncomingStreams--
+		}
 	}
 	s.memoryManager.ReleaseMemory(str.memory)
 	delete(s.streams, id)

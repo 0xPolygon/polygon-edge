@@ -1,4 +1,4 @@
-// Copyright (c) 2020 The Decred developers
+// Copyright (c) 2020-2022 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -100,7 +100,7 @@ var (
 // arithmetic over the secp256k1 group order. This means all arithmetic is
 // performed modulo:
 //
-//   0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141
+//	0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141
 //
 // It only implements the arithmetic needed for elliptic curve operations,
 // however, the operations that are not implemented can typically be worked
@@ -172,6 +172,19 @@ func (s *ModNScalar) Zero() {
 	s.n[5] = 0
 	s.n[6] = 0
 	s.n[7] = 0
+}
+
+// IsZeroBit returns 1 when the scalar is equal to zero or 0 otherwise in
+// constant time.
+//
+// Note that a bool is not used here because it is not possible in Go to convert
+// from a bool to numeric value in constant time and many constant-time
+// operations require a numeric value.  See IsZero for the version that returns
+// a bool.
+func (s *ModNScalar) IsZeroBit() uint32 {
+	// The scalar can only be zero if no bits are set in any of the words.
+	bits := s.n[0] | s.n[1] | s.n[2] | s.n[3] | s.n[4] | s.n[5] | s.n[6] | s.n[7]
+	return constantTimeEq(bits, 0)
 }
 
 // IsZero returns whether or not the scalar is equal to zero in constant time.

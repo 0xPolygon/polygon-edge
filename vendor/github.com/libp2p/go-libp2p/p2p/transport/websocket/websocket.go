@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/transport"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/transport"
 
 	ma "github.com/multiformats/go-multiaddr"
 	mafmt "github.com/multiformats/go-multiaddr-fmt"
@@ -23,7 +23,7 @@ var WsFmt = mafmt.And(mafmt.TCP, mafmt.Base(ma.P_WS))
 
 // This is _not_ WsFmt because we want the transport to stick to dialing fully
 // resolved addresses.
-var dialMatcher = mafmt.And(mafmt.IP, mafmt.Base(ma.P_TCP), mafmt.Or(mafmt.Base(ma.P_WS), mafmt.Base(ma.P_WSS)))
+var dialMatcher = mafmt.And(mafmt.Or(mafmt.IP, mafmt.DNS), mafmt.Base(ma.P_TCP), mafmt.Or(mafmt.Base(ma.P_WS), mafmt.Base(ma.P_WSS)))
 
 func init() {
 	manet.RegisterFromNetAddr(ParseWebsocketNetAddr, "websocket")
@@ -101,7 +101,7 @@ func (t *WebsocketTransport) Proxy() bool {
 }
 
 func (t *WebsocketTransport) Dial(ctx context.Context, raddr ma.Multiaddr, p peer.ID) (transport.CapableConn, error) {
-	connScope, err := t.rcmgr.OpenConnection(network.DirOutbound, true)
+	connScope, err := t.rcmgr.OpenConnection(network.DirOutbound, true, raddr)
 	if err != nil {
 		return nil, err
 	}

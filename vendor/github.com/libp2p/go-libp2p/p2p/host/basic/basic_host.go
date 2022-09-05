@@ -9,7 +9,17 @@ import (
 	"sync"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/connmgr"
+	"github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/event"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/peerstore"
+	"github.com/libp2p/go-libp2p/core/protocol"
+	"github.com/libp2p/go-libp2p/core/record"
 	"github.com/libp2p/go-libp2p/p2p/host/autonat"
+	"github.com/libp2p/go-libp2p/p2p/host/eventbus"
 	"github.com/libp2p/go-libp2p/p2p/host/pstoremanager"
 	"github.com/libp2p/go-libp2p/p2p/host/relaysvc"
 	inat "github.com/libp2p/go-libp2p/p2p/net/nat"
@@ -18,17 +28,6 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/protocol/identify"
 	"github.com/libp2p/go-libp2p/p2p/protocol/ping"
 
-	"github.com/libp2p/go-libp2p-core/connmgr"
-	"github.com/libp2p/go-libp2p-core/crypto"
-	"github.com/libp2p/go-libp2p-core/event"
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/peerstore"
-	"github.com/libp2p/go-libp2p-core/protocol"
-	"github.com/libp2p/go-libp2p-core/record"
-
-	"github.com/libp2p/go-eventbus"
 	"github.com/libp2p/go-netroute"
 
 	logging "github.com/ipfs/go-log/v2"
@@ -62,9 +61,9 @@ type AddrsFactory func([]ma.Multiaddr) []ma.Multiaddr
 
 // BasicHost is the basic implementation of the host.Host interface. This
 // particular host implementation:
-//  * uses a protocol muxer to mux per-protocol streams
-//  * uses an identity service to send + receive node information
-//  * uses a nat service to establish NAT port mappings
+//   - uses a protocol muxer to mux per-protocol streams
+//   - uses an identity service to send + receive node information
+//   - uses a nat service to establish NAT port mappings
 type BasicHost struct {
 	ctx       context.Context
 	ctxCancel context.CancelFunc
@@ -559,7 +558,9 @@ func (h *BasicHost) EventBus() event.Bus {
 
 // SetStreamHandler sets the protocol handler on the Host's Mux.
 // This is equivalent to:
-//   host.Mux().SetHandler(proto, handler)
+//
+//	host.Mux().SetHandler(proto, handler)
+//
 // (Threadsafe)
 func (h *BasicHost) SetStreamHandler(pid protocol.ID, handler network.StreamHandler) {
 	h.Mux().AddHandler(string(pid), func(p string, rwc io.ReadWriteCloser) error {

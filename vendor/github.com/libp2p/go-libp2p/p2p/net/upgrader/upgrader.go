@@ -7,14 +7,13 @@ import (
 	"net"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/connmgr"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
+	ipnet "github.com/libp2p/go-libp2p/core/pnet"
+	"github.com/libp2p/go-libp2p/core/sec"
+	"github.com/libp2p/go-libp2p/core/transport"
 	"github.com/libp2p/go-libp2p/p2p/net/pnet"
-
-	"github.com/libp2p/go-libp2p-core/connmgr"
-	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
-	ipnet "github.com/libp2p/go-libp2p-core/pnet"
-	"github.com/libp2p/go-libp2p-core/sec"
-	"github.com/libp2p/go-libp2p-core/transport"
 
 	manet "github.com/multiformats/go-multiaddr/net"
 )
