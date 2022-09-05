@@ -24,7 +24,7 @@ func TestSAMPool_AddMessage(t *testing.T) {
 			pool := New(verifier)
 
 			msg := rootchain.SAM{
-				Hash: []byte("some really bad hash"),
+				//Hash: [32]byte("some really bad hash"),
 			}
 
 			err := pool.AddMessage(msg)
@@ -65,7 +65,7 @@ func TestSAMPool_AddMessage(t *testing.T) {
 		func(t *testing.T) {
 			t.Parallel()
 
-			verfier := mockVerifier{
+			verifier := mockVerifier{
 				verifyHash: func(sam rootchain.SAM) error {
 					return nil
 				},
@@ -75,7 +75,7 @@ func TestSAMPool_AddMessage(t *testing.T) {
 				quorumFunc: nil,
 			}
 
-			pool := New(verfier)
+			pool := New(verifier)
 			pool.lastProcessedMessage = 10
 
 			msg := rootchain.SAM{
