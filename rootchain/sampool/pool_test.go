@@ -32,4 +32,30 @@ func TestSAMPool_AddMessage(t *testing.T) {
 			assert.Error(t, err)
 		},
 	)
+
+	t.Run(
+		"bad signature",
+		func(t *testing.T) {
+			t.Parallel()
+
+			verifier := mockVerifier{
+				verifyHash: func(sam rootchain.SAM) error {
+					return nil
+				},
+				verifySignature: func(sam rootchain.SAM) error {
+					return errors.New("some really bad signature")
+				},
+			}
+
+			pool := New(verifier)
+
+			msg := rootchain.SAM{
+				Signature: []byte("some really bad signature"),
+			}
+
+			err := pool.AddMessage(msg)
+
+			assert.Error(t, err)
+		},
+	)
 }
