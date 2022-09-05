@@ -20,19 +20,43 @@ func TestExtraction(t *testing.T) {
 		},
 		{
 			"[a]",
-			[]interface{}{"a"},
+			[]interface{}{
+				"a",
+			},
 		},
 		{
 			"[[a]]",
-			[]interface{}{[]interface{}{"a"}},
+			[]interface{}{
+				[]interface{}{"a"},
+			},
 		},
 		{
 			"[[a],[b]]",
-			[]interface{}{[]interface{}{"a"}, []interface{}{"b"}},
+			[]interface{}{
+				[]interface{}{"a"},
+				[]interface{}{"b"},
+			},
 		},
 		{
 			"[[[a]]]",
-			[]interface{}{[]interface{}{[]interface{}{"a"}}},
+			[]interface{}{
+				[]interface{}{
+					[]interface{}{"a"},
+				},
+			},
+		},
+		{
+			"[[a,b],[c,d]]",
+			[]interface{}{
+				[]interface{}{
+					"a",
+					"b",
+				},
+				[]interface{}{
+					"c",
+					"d",
+				},
+			},
 		},
 	}
 
@@ -57,23 +81,70 @@ func TestNormalizeArgs(t *testing.T) {
 	}{
 		{
 			"simple type arguments",
-			[]string{"argument"},
-			[]interface{}{"argument"},
+			[]string{
+				"argument",
+			},
+			[]interface{}{
+				"argument",
+			},
 		},
 		{
 			"array of simple type arguments",
-			[]string{"argument 1", "argument 2"},
-			[]interface{}{"argument 1", "argument 2"},
+			[]string{
+				"argument 1",
+				"argument 2",
+			},
+			[]interface{}{
+				"argument 1",
+				"argument 2",
+			},
 		},
 		{
 			"structure as argument",
-			[]string{"[argument 1]"},
-			[]interface{}{[]interface{}{"argument 1"}},
+			[]string{
+				"[argument 1]",
+			},
+			[]interface{}{
+				[]interface{}{
+					"argument 1",
+				},
+			},
 		},
 		{
 			"structure with regular types",
-			[]string{"[argument 1]", "argument 2"},
-			[]interface{}{[]interface{}{"argument 1"}, "argument 2"},
+			[]string{
+				"[argument 1]",
+				"argument 2",
+			},
+			[]interface{}{
+				[]interface{}{
+					"argument 1",
+				},
+				"argument 2",
+			},
+		},
+		{
+			"structure with arrays with nested object",
+			[]string{
+				"[[struct1-1, struct1-2], [struct-2-1, struct-2-2]]", // array of struct
+				"[string1, string2]", // array of string
+			},
+			[]interface{}{
+				[]interface{}{
+					[]interface{}{
+						"struct1-1",
+						"struct1-2",
+					},
+					[]interface{}{
+						"struct2-1",
+						"struct2-2",
+					},
+				},
+				[]interface{}{
+					"string1",
+					"string2",
+				},
+			},
 		},
 	}
 
