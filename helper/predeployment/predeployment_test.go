@@ -100,9 +100,9 @@ func TestNormalizeArgs(t *testing.T) {
 			},
 		},
 		{
-			"structure as argument",
+			"structure as argument with double quotes",
 			[]string{
-				"[argument 1]",
+				`["argument 1"]`,
 			},
 			[]interface{}{
 				[]interface{}{
@@ -113,7 +113,7 @@ func TestNormalizeArgs(t *testing.T) {
 		{
 			"structure with regular types",
 			[]string{
-				"[argument 1]",
+				`["argument 1"]`,
 				"argument 2",
 			},
 			[]interface{}{
@@ -126,8 +126,8 @@ func TestNormalizeArgs(t *testing.T) {
 		{
 			"structure with arrays with nested object",
 			[]string{
-				"[[struct1-1, struct1-2], [struct-2-1, struct-2-2]]", // array of struct
-				"[string1, string2]", // array of string
+				`[["struct1-1", "struct1-2"], ["struct-2-1", "struct-2-2"]]`, // array of struct
+				`["string1", "string2"]`,                                     // array of string
 			},
 			[]interface{}{
 				[]interface{}{
@@ -143,6 +143,34 @@ func TestNormalizeArgs(t *testing.T) {
 				[]interface{}{
 					"string1",
 					"string2",
+				},
+			},
+		},
+		{
+			"structure with the values containing special characters",
+			[]string{
+				// outermost bracket is for array
+				`["opening square bracket is \["]`,
+				`["closing square bracket is \]"]`,
+				`["comma is \,"]`,
+				`["double quote is \""]`,
+				`["multiple spaces are  "]`,
+			},
+			[]interface{}{
+				[]interface{}{
+					`opening square bracket is [`,
+				},
+				[]interface{}{
+					`closing square bracket is ]`,
+				},
+				[]interface{}{
+					`comma is \,`,
+				},
+				[]interface{}{
+					`double quote is \"`,
+				},
+				[]interface{}{
+					`multiple spaces are  `,
 				},
 			},
 		},
