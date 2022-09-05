@@ -22,8 +22,10 @@ type SAM struct {
 type VerifiedSAM []SAM
 
 func (v VerifiedSAM) Signatures() (signatures [][]byte) {
-	for _, m := range v {
-		signatures = append(signatures, m.Signature)
+	signatures = make([][]byte, len(v))
+
+	for index, m := range v {
+		signatures[index] = m.Signature
 	}
 
 	return
