@@ -1,27 +1,20 @@
+// Deprecated: This package has moved into go-libp2p as a sub-package: github.com/libp2p/go-libp2p/core/discovery.
+//
 // Package discovery provides service advertisement and peer discovery interfaces for libp2p.
 package discovery
 
 import (
-	"context"
-	"time"
-
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/discovery"
 )
 
 // Advertiser is an interface for advertising services
-type Advertiser interface {
-	// Advertise advertises a service
-	Advertise(ctx context.Context, ns string, opts ...Option) (time.Duration, error)
-}
+// Deprecated: use github.com/libp2p/go-libp2p/core/discovery.Advertiser instead
+type Advertiser = discovery.Advertiser
 
 // Discoverer is an interface for peer discovery
-type Discoverer interface {
-	// FindPeers discovers peers providing a service
-	FindPeers(ctx context.Context, ns string, opts ...Option) (<-chan peer.AddrInfo, error)
-}
+// Deprecated: use github.com/libp2p/go-libp2p/core/discovery.Discoverer instead
+type Discoverer = discovery.Discoverer
 
 // Discovery is an interface that combines service advertisement and peer discovery
-type Discovery interface {
-	Advertiser
-	Discoverer
-}
+// Deprecated: use github.com/libp2p/go-libp2p/core/discovery.Discovery instead
+type Discovery = discovery.Discovery

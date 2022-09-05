@@ -1,67 +1,52 @@
 package connmgr
 
 import (
-	"math"
 	"time"
+
+	"github.com/libp2p/go-libp2p/core/connmgr"
 )
 
 // DecayNone applies no decay.
+// Deprecated: use github.com/libp2p/go-libp2p/core/connmgr.DecayNone instead
 func DecayNone() DecayFn {
-	return func(value DecayingValue) (_ int, rm bool) {
-		return value.Value, false
-	}
+	return connmgr.DecayNone()
 }
 
 // DecayFixed subtracts from by the provided minuend, and deletes the tag when
 // first reaching 0 or negative.
+// Deprecated: use github.com/libp2p/go-libp2p/core/connmgr.DecayFixed instead
 func DecayFixed(minuend int) DecayFn {
-	return func(value DecayingValue) (_ int, rm bool) {
-		v := value.Value - minuend
-		return v, v <= 0
-	}
+	return connmgr.DecayFixed(minuend)
 }
 
 // DecayLinear applies a fractional coefficient to the value of the current tag,
 // rounding down via math.Floor. It erases the tag when the result is zero.
+// Deprecated: use github.com/libp2p/go-libp2p/core/connmgr.DecayLinear instead
 func DecayLinear(coef float64) DecayFn {
-	return func(value DecayingValue) (after int, rm bool) {
-		v := math.Floor(float64(value.Value) * coef)
-		return int(v), v <= 0
-	}
+	return connmgr.DecayLinear(coef)
 }
 
 // DecayExpireWhenInactive expires a tag after a certain period of no bumps.
+// Deprecated: use github.com/libp2p/go-libp2p/core/connmgr.DecayExpireWhenInactive instead
 func DecayExpireWhenInactive(after time.Duration) DecayFn {
-	return func(value DecayingValue) (_ int, rm bool) {
-		rm = time.Until(value.LastVisit) >= after
-		return 0, rm
-	}
+	return connmgr.DecayExpireWhenInactive(after)
 }
 
 // BumpSumUnbounded adds the incoming value to the peer's score.
+// Deprecated: use github.com/libp2p/go-libp2p/core/connmgr.BumpSumUnbounded instead
 func BumpSumUnbounded() BumpFn {
-	return func(value DecayingValue, delta int) (after int) {
-		return value.Value + delta
-	}
+	return connmgr.BumpSumUnbounded()
 }
 
 // BumpSumBounded keeps summing the incoming score, keeping it within a
 // [min, max] range.
+// Deprecated: use github.com/libp2p/go-libp2p/core/connmgr.BumpSumBounded instead
 func BumpSumBounded(min, max int) BumpFn {
-	return func(value DecayingValue, delta int) (after int) {
-		v := value.Value + delta
-		if v >= max {
-			return max
-		} else if v <= min {
-			return min
-		}
-		return v
-	}
+	return connmgr.BumpSumBounded(min, max)
 }
 
 // BumpOverwrite replaces the current value of the tag with the incoming one.
+// Deprecated: use github.com/libp2p/go-libp2p/core/connmgr.BumpOverwrite instead
 func BumpOverwrite() BumpFn {
-	return func(value DecayingValue, delta int) (after int) {
-		return delta
-	}
+	return connmgr.BumpOverwrite()
 }

@@ -3,16 +3,18 @@ package ping
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/binary"
 	"errors"
 	"io"
+	mrand "math/rand"
 	"time"
 
-	u "github.com/ipfs/go-ipfs-util"
 	logging "github.com/ipfs/go-log/v2"
 	pool "github.com/libp2p/go-buffer-pool"
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 var log = logging.Logger("ping")
@@ -120,6 +122,14 @@ func Ping(ctx context.Context, h host.Host, p peer.ID) <-chan Result {
 		return pingError(err)
 	}
 
+	b := make([]byte, 8)
+	if _, err := rand.Read(b); err != nil {
+		log.Errorf("failed to get cryptographic random: %s", err)
+		s.Reset()
+		return pingError(err)
+	}
+	ra := mrand.New(mrand.NewSource(int64(binary.BigEndian.Uint64(b))))
+
 	ctx, cancel := context.WithCancel(ctx)
 
 	out := make(chan Result)
@@ -129,7 +139,7 @@ func Ping(ctx context.Context, h host.Host, p peer.ID) <-chan Result {
 
 		for ctx.Err() == nil {
 			var res Result
-			res.RTT, res.Error = ping(s)
+			res.RTT, res.Error = ping(s, ra)
 
 			// canceled, ignore everything.
 			if ctx.Err() != nil {
@@ -157,7 +167,7 @@ func Ping(ctx context.Context, h host.Host, p peer.ID) <-chan Result {
 	return out
 }
 
-func ping(s network.Stream) (time.Duration, error) {
+func ping(s network.Stream, randReader io.Reader) (time.Duration, error) {
 	if err := s.Scope().ReserveMemory(2*PingSize, network.ReservationPriorityAlways); err != nil {
 		log.Debugf("error reserving memory for ping stream: %s", err)
 		s.Reset()
@@ -168,19 +178,19 @@ func ping(s network.Stream) (time.Duration, error) {
 	buf := pool.Get(PingSize)
 	defer pool.Put(buf)
 
-	u.NewTimeSeededRand().Read(buf)
+	if _, err := io.ReadFull(randReader, buf); err != nil {
+		return 0, err
+	}
 
 	before := time.Now()
-	_, err := s.Write(buf)
-	if err != nil {
+	if _, err := s.Write(buf); err != nil {
 		return 0, err
 	}
 
 	rbuf := pool.Get(PingSize)
 	defer pool.Put(rbuf)
 
-	_, err = io.ReadFull(s, rbuf)
-	if err != nil {
+	if _, err := io.ReadFull(s, rbuf); err != nil {
 		return 0, err
 	}
 

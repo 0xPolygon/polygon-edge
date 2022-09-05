@@ -1,3 +1,5 @@
+// Deprecated: This package has moved into go-libp2p as a sub-package: github.com/libp2p/go-libp2p/core/network.
+//
 // Package network provides core networking abstractions for libp2p.
 //
 // The network package provides the high-level Network interface for interacting
@@ -6,181 +8,100 @@
 package network
 
 import (
-	"context"
-	"io"
-	"time"
-
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/peerstore"
-
-	ma "github.com/multiformats/go-multiaddr"
+	"github.com/libp2p/go-libp2p/core/network"
 )
 
 // MessageSizeMax is a soft (recommended) maximum for network messages.
 // One can write more, as the interface is a stream. But it is useful
 // to bunch it up into multiple read/writes when the whole message is
 // a single, large serialized object.
-const MessageSizeMax = 1 << 22 // 4 MB
+// Deprecated: use github.com/libp2p/go-libp2p/core/network.MessageSizeMax instead
+const MessageSizeMax = network.MessageSizeMax
 
 // Direction represents which peer in a stream initiated a connection.
-type Direction int
+// Deprecated: use github.com/libp2p/go-libp2p/core/network.Direction instead
+type Direction = network.Direction
 
 const (
 	// DirUnknown is the default direction.
-	DirUnknown Direction = iota
+	// Deprecated: use github.com/libp2p/go-libp2p/core/network.DirUnknown instead
+	DirUnknown = network.DirUnknown
 	// DirInbound is for when the remote peer initiated a connection.
-	DirInbound
+	// Deprecated: use github.com/libp2p/go-libp2p/core/network.DirInbound instead
+	DirInbound = network.DirInbound
 	// DirOutbound is for when the local peer initiated a connection.
-	DirOutbound
+	// Deprecated: use github.com/libp2p/go-libp2p/core/network.DirOutbound instead
+	DirOutbound = network.DirOutbound
 )
-
-func (d Direction) String() string {
-	str := [...]string{"Unknown", "Inbound", "Outbound"}
-	if d < 0 || int(d) >= len(str) {
-		return "(unrecognized)"
-	}
-	return str[d]
-}
 
 // Connectedness signals the capacity for a connection with a given node.
 // It is used to signal to services and other peers whether a node is reachable.
-type Connectedness int
+type Connectedness = network.Connectedness
 
 const (
 	// NotConnected means no connection to peer, and no extra information (default)
-	NotConnected Connectedness = iota
+	// Deprecated: use github.com/libp2p/go-libp2p/core/network.NotConnected instead
+	NotConnected = network.NotConnected
 
 	// Connected means has an open, live connection to peer
-	Connected
+	// Deprecated: use github.com/libp2p/go-libp2p/core/network.Connected instead
+	Connected = network.Connected
 
 	// CanConnect means recently connected to peer, terminated gracefully
-	CanConnect
+	// Deprecated: use github.com/libp2p/go-libp2p/core/network.CanConnect instead
+	CanConnect = network.CanConnect
 
 	// CannotConnect means recently attempted connecting but failed to connect.
 	// (should signal "made effort, failed")
-	CannotConnect
+	// Deprecated: use github.com/libp2p/go-libp2p/core/network.CannotConnect instead
+	CannotConnect = network.CannotConnect
 )
 
-func (c Connectedness) String() string {
-	str := [...]string{"NotConnected", "Connected", "CanConnect", "CannotConnect"}
-	if c < 0 || int(c) >= len(str) {
-		return "(unrecognized)"
-	}
-	return str[c]
-}
-
 // Reachability indicates how reachable a node is.
-type Reachability int
+// Deprecated: use github.com/libp2p/go-libp2p/core/network.Reachability instead
+type Reachability = network.Reachability
 
 const (
 	// ReachabilityUnknown indicates that the reachability status of the
 	// node is unknown.
-	ReachabilityUnknown Reachability = iota
+	// Deprecated: use github.com/libp2p/go-libp2p/core/network.ReachabilityUnknown instead
+	ReachabilityUnknown = network.ReachabilityUnknown
 
 	// ReachabilityPublic indicates that the node is reachable from the
 	// public internet.
-	ReachabilityPublic
+	// Deprecated: use github.com/libp2p/go-libp2p/core/network.ReachabilityPubic instead
+	ReachabilityPublic = network.ReachabilityPublic
 
 	// ReachabilityPrivate indicates that the node is not reachable from the
 	// public internet.
 	//
 	// NOTE: This node may _still_ be reachable via relays.
-	ReachabilityPrivate
+	// Deprecated: use github.com/libp2p/go-libp2p/core/network.ReachabilityPrivate instead
+	ReachabilityPrivate = network.ReachabilityPrivate
 )
 
-func (r Reachability) String() string {
-	str := [...]string{"Unknown", "Public", "Private"}
-	if r < 0 || int(r) >= len(str) {
-		return "(unrecognized)"
-	}
-	return str[r]
-}
-
 // ConnStats stores metadata pertaining to a given Conn.
-type ConnStats struct {
-	Stats
-	// NumStreams is the number of streams on the connection.
-	NumStreams int
-}
+// Deprecated: use github.com/libp2p/go-libp2p/core/network.ConnStats instead
+type ConnStats = network.ConnStats
 
 // Stats stores metadata pertaining to a given Stream / Conn.
-type Stats struct {
-	// Direction specifies whether this is an inbound or an outbound connection.
-	Direction Direction
-	// Opened is the timestamp when this connection was opened.
-	Opened time.Time
-	// Transient indicates that this connection is transient and may be closed soon.
-	Transient bool
-	// Extra stores additional metadata about this connection.
-	Extra map[interface{}]interface{}
-}
+// Deprecated: use github.com/libp2p/go-libp2p/core/network.Stats instead
+type Stats = network.Stats
 
 // StreamHandler is the type of function used to listen for
 // streams opened by the remote side.
-type StreamHandler func(Stream)
+// Deprecated: use github.com/libp2p/go-libp2p/core/network.StreamHandler instead
+type StreamHandler = network.StreamHandler
 
 // Network is the interface used to connect to the outside world.
 // It dials and listens for connections. it uses a Swarm to pool
 // connections (see swarm pkg, and peerstream.Swarm). Connections
 // are encrypted with a TLS-like protocol.
-type Network interface {
-	Dialer
-	io.Closer
-
-	// SetStreamHandler sets the handler for new streams opened by the
-	// remote side. This operation is threadsafe.
-	SetStreamHandler(StreamHandler)
-
-	// NewStream returns a new stream to given peer p.
-	// If there is no connection to p, attempts to create one.
-	NewStream(context.Context, peer.ID) (Stream, error)
-
-	// Listen tells the network to start listening on given multiaddrs.
-	Listen(...ma.Multiaddr) error
-
-	// ListenAddresses returns a list of addresses at which this network listens.
-	ListenAddresses() []ma.Multiaddr
-
-	// InterfaceListenAddresses returns a list of addresses at which this network
-	// listens. It expands "any interface" addresses (/ip4/0.0.0.0, /ip6/::) to
-	// use the known local interfaces.
-	InterfaceListenAddresses() ([]ma.Multiaddr, error)
-
-	// ResourceManager returns the ResourceManager associated with this network
-	ResourceManager() ResourceManager
-}
+// Deprecated: use github.com/libp2p/go-libp2p/core/network.Network instead
+type Network = network.Network
 
 // Dialer represents a service that can dial out to peers
 // (this is usually just a Network, but other services may not need the whole
 // stack, and thus it becomes easier to mock)
-type Dialer interface {
-	// Peerstore returns the internal peerstore
-	// This is useful to tell the dialer about a new address for a peer.
-	// Or use one of the public keys found out over the network.
-	Peerstore() peerstore.Peerstore
-
-	// LocalPeer returns the local peer associated with this network
-	LocalPeer() peer.ID
-
-	// DialPeer establishes a connection to a given peer
-	DialPeer(context.Context, peer.ID) (Conn, error)
-
-	// ClosePeer closes the connection to a given peer
-	ClosePeer(peer.ID) error
-
-	// Connectedness returns a state signaling connection capabilities
-	Connectedness(peer.ID) Connectedness
-
-	// Peers returns the peers connected
-	Peers() []peer.ID
-
-	// Conns returns the connections in this Netowrk
-	Conns() []Conn
-
-	// ConnsToPeer returns the connections in this Netowrk for given peer.
-	ConnsToPeer(p peer.ID) []Conn
-
-	// Notify/StopNotify register and unregister a notifiee for signals
-	Notify(Notifiee)
-	StopNotify(Notifiee)
-}
+// Deprecated: use github.com/libp2p/go-libp2p/core/network.Dialer instead
+type Dialer = network.Dialer

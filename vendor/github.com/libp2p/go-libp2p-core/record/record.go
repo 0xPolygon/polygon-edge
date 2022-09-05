@@ -1,18 +1,15 @@
+// Deprecated: This package has moved into go-libp2p as a sub-package: github.com/libp2p/go-libp2p/core/record.
 package record
 
 import (
-	"errors"
-	"reflect"
-
-	"github.com/libp2p/go-libp2p-core/internal/catch"
+	"github.com/libp2p/go-libp2p/core/record"
 )
 
 var (
 	// ErrPayloadTypeNotRegistered is returned from ConsumeEnvelope when the Envelope's
 	// PayloadType does not match any registered Record types.
-	ErrPayloadTypeNotRegistered = errors.New("payload type is not registered")
-
-	payloadTypeRegistry = make(map[string]reflect.Type)
+	// Deprecated: use github.com/libp2p/go-libp2p/core/record.ErrPayloadTypeNotRegistered instead
+	ErrPayloadTypeNotRegistered = record.ErrPayloadTypeNotRegistered
 )
 
 // Record represents a data type that can be used as the payload of an Envelope.
@@ -28,27 +25,8 @@ var (
 // To use an unregistered Record type instead, use ConsumeTypedEnvelope and pass in
 // an instance of the Record type that you'd like the Envelope's payload to be
 // unmarshaled into.
-type Record interface {
-
-	// Domain is the "signature domain" used when signing and verifying a particular
-	// Record type. The Domain string should be unique to your Record type, and all
-	// instances of the Record type must have the same Domain string.
-	Domain() string
-
-	// Codec is a binary identifier for this type of record, ideally a registered multicodec
-	// (see https://github.com/multiformats/multicodec).
-	// When a Record is put into an Envelope (see record.Seal), the Codec value will be used
-	// as the Envelope's PayloadType. When the Envelope is later unsealed, the PayloadType
-	// will be used to lookup the correct Record type to unmarshal the Envelope payload into.
-	Codec() []byte
-
-	// MarshalRecord converts a Record instance to a []byte, so that it can be used as an
-	// Envelope payload.
-	MarshalRecord() ([]byte, error)
-
-	// UnmarshalRecord unmarshals a []byte payload into an instance of a particular Record type.
-	UnmarshalRecord([]byte) error
-}
+// Deprecated: use github.com/libp2p/go-libp2p/core/record.Record instead
+type Record = record.Record
 
 // RegisterType associates a binary payload type identifier with a concrete
 // Record type. This is used to automatically unmarshal Record payloads from Envelopes
@@ -59,48 +37,16 @@ type Record interface {
 // a pointer type. Registration should be done in the init function of the package
 // where the Record type is defined:
 //
-//    package hello_record
-//    import record "github.com/libp2p/go-libp2p-core/record"
+//	package hello_record
+//	import record "github.com/libp2p/go-libp2p-core/record"
 //
-//    func init() {
-//        record.RegisterType(&HelloRecord{})
-//    }
+//	func init() {
+//	    record.RegisterType(&HelloRecord{})
+//	}
 //
-//    type HelloRecord struct { } // etc..
+//	type HelloRecord struct { } // etc..
 //
+// Deprecated: use github.com/libp2p/go-libp2p/core/record.RegisterType instead
 func RegisterType(prototype Record) {
-	payloadTypeRegistry[string(prototype.Codec())] = getValueType(prototype)
-}
-
-func unmarshalRecordPayload(payloadType []byte, payloadBytes []byte) (_rec Record, err error) {
-	defer func() { catch.HandlePanic(recover(), &err, "libp2p envelope record unmarshal") }()
-
-	rec, err := blankRecordForPayloadType(payloadType)
-	if err != nil {
-		return nil, err
-	}
-	err = rec.UnmarshalRecord(payloadBytes)
-	if err != nil {
-		return nil, err
-	}
-	return rec, nil
-}
-
-func blankRecordForPayloadType(payloadType []byte) (Record, error) {
-	valueType, ok := payloadTypeRegistry[string(payloadType)]
-	if !ok {
-		return nil, ErrPayloadTypeNotRegistered
-	}
-
-	val := reflect.New(valueType)
-	asRecord := val.Interface().(Record)
-	return asRecord, nil
-}
-
-func getValueType(i interface{}) reflect.Type {
-	valueType := reflect.TypeOf(i)
-	if valueType.Kind() == reflect.Ptr {
-		valueType = valueType.Elem()
-	}
-	return valueType
+	record.RegisterType(prototype)
 }

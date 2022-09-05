@@ -4,66 +4,33 @@
 package crypto
 
 import (
-	"errors"
 	"io"
 
-	openssl "github.com/libp2p/go-openssl"
+	"github.com/libp2p/go-libp2p/core/crypto"
 )
 
 // RsaPrivateKey is an rsa private key
-type RsaPrivateKey struct {
-	opensslPrivateKey
-}
+// Deprecated: use github.com/libp2p/go-libp2p/core/crypto.RsaPrivateKey instead
+type RsaPrivateKey = crypto.RsaPrivateKey
 
 // RsaPublicKey is an rsa public key
-type RsaPublicKey struct {
-	opensslPublicKey
-}
+// Deprecated: use github.com/libp2p/go-libp2p/core/crypto.RsaPublicKey instead
+type RsaPublicKey = crypto.RsaPublicKey
 
 // GenerateRSAKeyPair generates a new rsa private and public key
-func GenerateRSAKeyPair(bits int, _ io.Reader) (PrivKey, PubKey, error) {
-	if bits < MinRsaKeyBits {
-		return nil, nil, ErrRsaKeyTooSmall
-	}
-
-	key, err := openssl.GenerateRSAKey(bits)
-	if err != nil {
-		return nil, nil, err
-	}
-	return &RsaPrivateKey{opensslPrivateKey{key}}, &RsaPublicKey{opensslPublicKey{key: key}}, nil
-}
-
-// GetPublic returns a public key
-func (sk *RsaPrivateKey) GetPublic() PubKey {
-	return &RsaPublicKey{opensslPublicKey{key: sk.opensslPrivateKey.key}}
+// Deprecated: use github.com/libp2p/go-libp2p/core/crypto.GenerateRSAKeyPair instead
+func GenerateRSAKeyPair(bits int, r io.Reader) (PrivKey, PubKey, error) {
+	return crypto.GenerateRSAKeyPair(bits, r)
 }
 
 // UnmarshalRsaPrivateKey returns a private key from the input x509 bytes
+// Deprecated: use github.com/libp2p/go-libp2p/core/crypto.UnmarshalRsaPrivateKey instead
 func UnmarshalRsaPrivateKey(b []byte) (PrivKey, error) {
-	key, err := unmarshalOpensslPrivateKey(b)
-	if err != nil {
-		return nil, err
-	}
-	if 8*key.key.Size() < MinRsaKeyBits {
-		return nil, ErrRsaKeyTooSmall
-	}
-	if key.Type() != RSA {
-		return nil, errors.New("not actually an rsa public key")
-	}
-	return &RsaPrivateKey{key}, nil
+	return crypto.UnmarshalRsaPrivateKey(b)
 }
 
 // UnmarshalRsaPublicKey returns a public key from the input x509 bytes
+// Deprecated: use github.com/libp2p/go-libp2p/core/crypto.UnmarshalRsaPublicKey instead
 func UnmarshalRsaPublicKey(b []byte) (PubKey, error) {
-	key, err := unmarshalOpensslPublicKey(b)
-	if err != nil {
-		return nil, err
-	}
-	if 8*key.key.Size() < MinRsaKeyBits {
-		return nil, ErrRsaKeyTooSmall
-	}
-	if key.Type() != RSA {
-		return nil, errors.New("not actually an rsa public key")
-	}
-	return &RsaPublicKey{key}, nil
+	return crypto.UnmarshalRsaPublicKey(b)
 }

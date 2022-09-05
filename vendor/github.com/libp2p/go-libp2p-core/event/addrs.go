@@ -1,40 +1,38 @@
 package event
 
 import (
-	"github.com/libp2p/go-libp2p-core/record"
-	ma "github.com/multiformats/go-multiaddr"
+	"github.com/libp2p/go-libp2p/core/event"
 )
 
 // AddrAction represents an action taken on one of a Host's listen addresses.
 // It is used to add context to address change events in EvtLocalAddressesUpdated.
-type AddrAction int
+// Deprecated: use github.com/libp2p/go-libp2p/core/event.AddrAction instead
+type AddrAction = event.AddrAction
 
 const (
 	// Unknown means that the event producer was unable to determine why the address
 	// is in the current state.
-	Unknown AddrAction = iota
+	// Deprecated: use github.com/libp2p/go-libp2p/core/event.Unknown instead
+	Unknown = event.Unknown
 
 	// Added means that the address is new and was not present prior to the event.
-	Added
+	// Deprecated: use github.com/libp2p/go-libp2p/core/event.Added instead
+	Added = event.Added
 
 	// Maintained means that the address was not altered between the current and
 	// previous states.
-	Maintained
+	// Deprecated: use github.com/libp2p/go-libp2p/core/event.Maintained instead
+	Maintained = event.Maintained
 
 	// Removed means that the address was removed from the Host.
-	Removed
+	// Deprecated: use github.com/libp2p/go-libp2p/core/event.Removed instead
+	Removed = event.Removed
 )
 
 // UpdatedAddress is used in the EvtLocalAddressesUpdated event to convey
 // address change information.
-type UpdatedAddress struct {
-	// Address contains the address that was updated.
-	Address ma.Multiaddr
-
-	// Action indicates what action was taken on the address during the
-	// event. May be Unknown if the event producer cannot produce diffs.
-	Action AddrAction
-}
+// Deprecated: use github.com/libp2p/go-libp2p/core/event.UpdatedAddress instead
+type UpdatedAddress = event.UpdatedAddress
 
 // EvtLocalAddressesUpdated should be emitted when the set of listen addresses for
 // the local host changes. This may happen for a number of reasons. For example,
@@ -60,23 +58,5 @@ type UpdatedAddress struct {
 // for the Current set of listen addresses, wrapped in a record.Envelope and signed by the Host's private key.
 // This record can be shared with other peers to inform them of what we believe are our  diallable addresses
 // a secure and authenticated way.
-type EvtLocalAddressesUpdated struct {
-
-	// Diffs indicates whether this event contains a diff of the Host's previous
-	// address set.
-	Diffs bool
-
-	// Current contains all current listen addresses for the Host.
-	// If Diffs == true, the Action field of each UpdatedAddress will tell
-	// you whether an address was Added, or was Maintained from the previous
-	// state.
-	Current []UpdatedAddress
-
-	// Removed contains addresses that were removed from the Host.
-	// This field is only set when Diffs == true.
-	Removed []UpdatedAddress
-
-	// SignedPeerRecord contains our own updated peer.PeerRecord, listing the addresses enumerated in Current.
-	// wrapped in a record.Envelope and signed by the Host's private key.
-	SignedPeerRecord *record.Envelope
-}
+// Deprecated: use github.com/libp2p/go-libp2p/core/event.EvtLocalAddressesUpdated instead
+type EvtLocalAddressesUpdated = event.EvtLocalAddressesUpdated

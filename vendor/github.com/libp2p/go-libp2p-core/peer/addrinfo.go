@@ -1,117 +1,54 @@
 package peer
 
 import (
-	"fmt"
+	"github.com/libp2p/go-libp2p/core/peer"
 
 	ma "github.com/multiformats/go-multiaddr"
 )
 
 // AddrInfo is a small struct used to pass around a peer with
 // a set of addresses (and later, keys?).
-type AddrInfo struct {
-	ID    ID
-	Addrs []ma.Multiaddr
-}
+// Deprecated: use github.com/libp2p/go-libp2p/core/peer.AddrInfo instead
+type AddrInfo = peer.AddrInfo
 
-var _ fmt.Stringer = AddrInfo{}
-
-func (pi AddrInfo) String() string {
-	return fmt.Sprintf("{%v: %v}", pi.ID, pi.Addrs)
-}
-
-var ErrInvalidAddr = fmt.Errorf("invalid p2p multiaddr")
+// Deprecated: use github.com/libp2p/go-libp2p/core/peer.ErrInvalidAddr instead
+var ErrInvalidAddr = peer.ErrInvalidAddr
 
 // AddrInfosFromP2pAddrs converts a set of Multiaddrs to a set of AddrInfos.
+// Deprecated: use github.com/libp2p/go-libp2p/core/peer.AddrInfosFromP2pAddrs instead
 func AddrInfosFromP2pAddrs(maddrs ...ma.Multiaddr) ([]AddrInfo, error) {
-	m := make(map[ID][]ma.Multiaddr)
-	for _, maddr := range maddrs {
-		transport, id := SplitAddr(maddr)
-		if id == "" {
-			return nil, ErrInvalidAddr
-		}
-		if transport == nil {
-			if _, ok := m[id]; !ok {
-				m[id] = nil
-			}
-		} else {
-			m[id] = append(m[id], transport)
-		}
-	}
-	ais := make([]AddrInfo, 0, len(m))
-	for id, maddrs := range m {
-		ais = append(ais, AddrInfo{ID: id, Addrs: maddrs})
-	}
-	return ais, nil
+	return peer.AddrInfosFromP2pAddrs(maddrs...)
 }
 
 // SplitAddr splits a p2p Multiaddr into a transport multiaddr and a peer ID.
 //
 // * Returns a nil transport if the address only contains a /p2p part.
 // * Returns a empty peer ID if the address doesn't contain a /p2p part.
+// Deprecated: use github.com/libp2p/go-libp2p/core/peer.SplitAddr instead
 func SplitAddr(m ma.Multiaddr) (transport ma.Multiaddr, id ID) {
-	if m == nil {
-		return nil, ""
-	}
-
-	transport, p2ppart := ma.SplitLast(m)
-	if p2ppart == nil || p2ppart.Protocol().Code != ma.P_P2P {
-		return m, ""
-	}
-	id = ID(p2ppart.RawValue()) // already validated by the multiaddr library.
-	return transport, id
+	return peer.SplitAddr(m)
 }
 
 // AddrInfoFromString builds an AddrInfo from the string representation of a Multiaddr
+// Deprecated: use github.com/libp2p/go-libp2p/core/peer.AddrInfoFromString instead
 func AddrInfoFromString(s string) (*AddrInfo, error) {
-	a, err := ma.NewMultiaddr(s)
-	if err != nil {
-		return nil, err
-	}
-
-	return AddrInfoFromP2pAddr(a)
+	return peer.AddrInfoFromString(s)
 }
 
 // AddrInfoFromP2pAddr converts a Multiaddr to an AddrInfo.
+// Deprecated: use github.com/libp2p/go-libp2p/core/peer.AddrInfoFromP2pAddr instead
 func AddrInfoFromP2pAddr(m ma.Multiaddr) (*AddrInfo, error) {
-	transport, id := SplitAddr(m)
-	if id == "" {
-		return nil, ErrInvalidAddr
-	}
-	info := &AddrInfo{ID: id}
-	if transport != nil {
-		info.Addrs = []ma.Multiaddr{transport}
-	}
-	return info, nil
+	return peer.AddrInfoFromP2pAddr(m)
 }
 
 // AddrInfoToP2pAddrs converts an AddrInfo to a list of Multiaddrs.
+// Deprecated: use github.com/libp2p/go-libp2p/core/peer.AddrInfoToP2pAddrs instead
 func AddrInfoToP2pAddrs(pi *AddrInfo) ([]ma.Multiaddr, error) {
-	var addrs []ma.Multiaddr
-	p2ppart, err := ma.NewComponent("p2p", Encode(pi.ID))
-	if err != nil {
-		return nil, err
-	}
-	if len(pi.Addrs) == 0 {
-		return []ma.Multiaddr{p2ppart}, nil
-	}
-	for _, addr := range pi.Addrs {
-		addrs = append(addrs, addr.Encapsulate(p2ppart))
-	}
-	return addrs, nil
-}
-
-func (pi *AddrInfo) Loggable() map[string]interface{} {
-	return map[string]interface{}{
-		"peerID": pi.ID.Pretty(),
-		"addrs":  pi.Addrs,
-	}
+	return peer.AddrInfoToP2pAddrs(pi)
 }
 
 // AddrInfosToIDs extracts the peer IDs from the passed AddrInfos and returns them in-order.
+// Deprecated: use github.com/libp2p/go-libp2p/core/peer.AddrInfosToIDs instead
 func AddrInfosToIDs(pis []AddrInfo) []ID {
-	ps := make([]ID, len(pis))
-	for i, pi := range pis {
-		ps[i] = pi.ID
-	}
-	return ps
+	return peer.AddrInfosToIDs(pis)
 }

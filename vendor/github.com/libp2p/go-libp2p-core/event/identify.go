@@ -1,17 +1,13 @@
 package event
 
-import "github.com/libp2p/go-libp2p-core/peer"
+import (
+	"github.com/libp2p/go-libp2p/core/event"
+)
 
 // EvtPeerIdentificationCompleted is emitted when the initial identification round for a peer is completed.
-type EvtPeerIdentificationCompleted struct {
-	// Peer is the ID of the peer whose identification succeeded.
-	Peer peer.ID
-}
+// Deprecated: use github.com/libp2p/go-libp2p/core/event.EvtPeerIdentificationCompleted instead
+type EvtPeerIdentificationCompleted = event.EvtPeerIdentificationCompleted
 
 // EvtPeerIdentificationFailed is emitted when the initial identification round for a peer failed.
-type EvtPeerIdentificationFailed struct {
-	// Peer is the ID of the peer whose identification failed.
-	Peer peer.ID
-	// Reason is the reason why identification failed.
-	Reason error
-}
+// Deprecated: use github.com/libp2p/go-libp2p/core/event.EvtPeerIdentificationFailed instead
+type EvtPeerIdentificationFailed = event.EvtPeerIdentificationFailed

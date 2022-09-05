@@ -5,11 +5,16 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
+
+	"github.com/benbjohnson/clock"
 )
 
 type config struct {
-	peerChan     <-chan peer.AddrInfo
+	clock      clock.Clock
+	peerSource func(num int) <-chan peer.AddrInfo
+	// minimum interval used to call the peerSource callback
+	minInterval  time.Duration
 	staticRelays []peer.AddrInfo
 	// see WithMinCandidates
 	minCandidates int
@@ -20,24 +25,28 @@ type config struct {
 	bootDelay time.Duration
 	// backoff is the time we wait after failing to obtain a reservation with a candidate
 	backoff time.Duration
-	// If we fail to obtain a reservation more than maxAttempts, we stop trying.
-	maxAttempts int
 	// Number of relays we strive to obtain a reservation with.
-	desiredRelays    int
+	desiredRelays int
+	// see WithMaxCandidateAge
+	maxCandidateAge  time.Duration
 	setMinCandidates bool
 	enableCircuitV1  bool
 }
 
 var defaultConfig = config{
-	minCandidates: 4,
-	maxCandidates: 20,
-	bootDelay:     3 * time.Minute,
-	backoff:       time.Hour,
-	maxAttempts:   3,
-	desiredRelays: 2,
+	clock:           clock.New(),
+	minCandidates:   4,
+	maxCandidates:   20,
+	bootDelay:       3 * time.Minute,
+	backoff:         time.Hour,
+	desiredRelays:   2,
+	maxCandidateAge: 30 * time.Minute,
 }
 
-var errStaticRelaysMinCandidates = errors.New("cannot use WithMinCandidates and WithStaticRelays")
+var (
+	errStaticRelaysMinCandidates = errors.New("cannot use WithMinCandidates and WithStaticRelays")
+	errStaticRelaysPeerSource    = errors.New("cannot use WithPeerSource and WithStaticRelays")
+)
 
 // DefaultRelays are the known PL-operated v1 relays; will be decommissioned in 2022.
 var DefaultRelays = []string{
@@ -68,6 +77,9 @@ func WithStaticRelays(static []peer.AddrInfo) Option {
 		if c.setMinCandidates {
 			return errStaticRelaysMinCandidates
 		}
+		if c.peerSource != nil {
+			return errStaticRelaysPeerSource
+		}
 		if len(c.staticRelays) > 0 {
 			return errors.New("can't set static relays, static relays already configured")
 		}
@@ -81,9 +93,22 @@ func WithDefaultStaticRelays() Option {
 	return WithStaticRelays(defaultStaticRelays)
 }
 
-func WithPeerSource(peerChan <-chan peer.AddrInfo) Option {
+// WithPeerSource defines a callback for AutoRelay to query for more relay candidates.
+// AutoRelay will call this function when it needs new candidates is connected to the desired number of
+// relays, and it has enough candidates (in case we get disconnected from one of the relays).
+// Implementations must send *at most* numPeers, and close the channel when they don't intend to provide
+// any more peers.
+// AutoRelay will not call the callback again until the channel is closed.
+// Implementations should send new peers, but may send peers they sent before. AutoRelay implements
+// a per-peer backoff (see WithBackoff).
+// minInterval is the minimum interval this callback is called with, even if AutoRelay needs new candidates.
+func WithPeerSource(f func(numPeers int) <-chan peer.AddrInfo, minInterval time.Duration) Option {
 	return func(c *config) error {
-		c.peerChan = peerChan
+		if len(c.staticRelays) > 0 {
+			return errStaticRelaysPeerSource
+		}
+		c.peerSource = f
+		c.minInterval = minInterval
 		return nil
 	}
 }
@@ -100,6 +125,9 @@ func WithNumRelays(n int) Option {
 func WithMaxCandidates(n int) Option {
 	return func(c *config) error {
 		c.maxCandidates = n
+		if c.minCandidates > n {
+			c.minCandidates = n
+		}
 		return nil
 	}
 }
@@ -111,6 +139,9 @@ func WithMinCandidates(n int) Option {
 	return func(c *config) error {
 		if len(c.staticRelays) > 0 {
 			return errStaticRelaysMinCandidates
+		}
+		if n > c.maxCandidates {
+			n = c.maxCandidates
 		}
 		c.minCandidates = n
 		c.setMinCandidates = true
@@ -137,19 +168,29 @@ func WithBackoff(d time.Duration) Option {
 	}
 }
 
-// WithMaxAttempts sets the number of times we attempt to obtain a reservation with a candidate.
-// If we still fail to obtain a reservation, this candidate is dropped.
-func WithMaxAttempts(n int) Option {
-	return func(c *config) error {
-		c.maxAttempts = n
-		return nil
-	}
-}
-
 // WithCircuitV1Support enables support for circuit v1 relays.
 func WithCircuitV1Support() Option {
 	return func(c *config) error {
 		c.enableCircuitV1 = true
+		return nil
+	}
+}
+
+// WithMaxCandidateAge sets the maximum age of a candidate.
+// When we are connected to the desired number of relays, we don't ask the peer source for new candidates.
+// This can lead to AutoRelay's candidate list becoming outdated, and means we won't be able
+// to quickly establish a new relay connection if our existing connection breaks, if all the candidates
+// have become stale.
+func WithMaxCandidateAge(d time.Duration) Option {
+	return func(c *config) error {
+		c.maxCandidateAge = d
+		return nil
+	}
+}
+
+func WithClock(cl clock.Clock) Option {
+	return func(c *config) error {
+		c.clock = cl
 		return nil
 	}
 }

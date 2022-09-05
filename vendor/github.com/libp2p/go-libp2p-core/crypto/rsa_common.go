@@ -1,25 +1,19 @@
 package crypto
 
 import (
-	"fmt"
-	"os"
+	"github.com/libp2p/go-libp2p/core/crypto"
 )
 
 // WeakRsaKeyEnv is an environment variable which, when set, lowers the
 // minimum required bits of RSA keys to 512. This should be used exclusively in
 // test situations.
-const WeakRsaKeyEnv = "LIBP2P_ALLOW_WEAK_RSA_KEYS"
+// Deprecated: use github.com/libp2p/go-libp2p/core/crypto.WeakRsaKeyEnv instead
+const WeakRsaKeyEnv = crypto.WeakRsaKeyEnv
 
-var MinRsaKeyBits = 2048
+// Deprecated: use github.com/libp2p/go-libp2p/core/crypto.MinRsaKeyBits instead
+var MinRsaKeyBits = crypto.MinRsaKeyBits
 
 // ErrRsaKeyTooSmall is returned when trying to generate or parse an RSA key
 // that's smaller than MinRsaKeyBits bits. In test
+// Deprecated: use github.com/libp2p/go-libp2p/core/crypto.ErrRsaKeyTooSmall instead
 var ErrRsaKeyTooSmall error
-
-func init() {
-	if _, ok := os.LookupEnv(WeakRsaKeyEnv); ok {
-		MinRsaKeyBits = 512
-	}
-
-	ErrRsaKeyTooSmall = fmt.Errorf("rsa keys must be >= %d bits to be useful", MinRsaKeyBits)
-}
