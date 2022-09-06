@@ -10,8 +10,9 @@ import (
 
 func GetCommand() *cobra.Command {
 	rootchainCmd := &cobra.Command{
-		Use:     "rootchain",
-		Short:   "Generates the rootchain configuration file with the passed in parameters. Appends to the config if it is already present.",
+		Use: "rootchain",
+		Short: "Generates the rootchain configuration file with the passed in parameters. " +
+			"Appends to the config if it is already present.",
 		PreRunE: runPreRun,
 		Run:     runCommand,
 	}
