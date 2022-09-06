@@ -42,7 +42,7 @@ type TestServerConfig struct {
 	IBFTDir                 string                   // The name of data directory for IBFT
 	PremineAccts            []*SrvAccount            // Accounts with existing balances (genesis accounts)
 	GenesisValidatorBalance *big.Int                 // Genesis the balance for the validators
-	DevStakers              []types.Address          // List of initial staking addresses for the staking SC with dev consensus
+	DevStakers              []types.Address          // List of initial staking addresses for the staking SC
 	Consensus               ConsensusType            // Consensus MechanismType
 	ValidatorType           validators.ValidatorType // Validator Type
 	Bootnodes               []string                 // Bootnode Addresses

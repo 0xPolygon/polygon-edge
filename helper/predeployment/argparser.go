@@ -164,7 +164,9 @@ func (p *ArgParser) parseArray() ([]interface{}, error) {
 
 		switch next {
 		case ' ':
-			p.consumeSpaces()
+			if err := p.consumeSpaces(); err != nil {
+				return nil, err
+			}
 
 		case ']':
 			if _, _, err := p.ReadRune(); err != nil {
@@ -202,8 +204,12 @@ func (p *ArgParser) parseLiteral() (string, error) {
 
 	for {
 		next, err := p.PeekRune()
-		if err == io.EOF {
-			return string(chars), nil
+		if err != nil {
+			if errors.Is(io.EOF, err) {
+				return string(chars), nil
+			}
+
+			return "", err
 		}
 
 		switch next {
