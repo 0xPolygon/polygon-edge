@@ -21,12 +21,15 @@ type Verifier interface {
 type SAMPool struct {
 	verifier Verifier
 
+	messagesByNumber map[uint64]samBucket
+
 	lastProcessedMessage uint64
 }
 
 func New(verifier Verifier) *SAMPool {
 	return &SAMPool{
-		verifier: verifier,
+		verifier:         verifier,
+		messagesByNumber: make(map[uint64]samBucket),
 	}
 }
 
@@ -42,11 +45,21 @@ func (s *SAMPool) AddMessage(msg rootchain.SAM) error {
 	}
 
 	//	reject old message
-	if msgNumber := msg.Event.Number; msgNumber <= s.lastProcessedMessage {
+	msgNumber := msg.Event.Number
+	if msgNumber <= s.lastProcessedMessage {
 		return fmt.Errorf("%w: message number %d", ErrStaleMessage, msgNumber)
 	}
 
 	//	add message
+
+	//	TODO: lock/unlock here
+	bucket := s.messagesByNumber[msgNumber]
+	if bucket == nil {
+		bucket = newBucket()
+		s.messagesByNumber[msgNumber] = bucket
+	}
+
+	bucket.add(msg)
 
 	return nil
 }
