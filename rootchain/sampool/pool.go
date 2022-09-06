@@ -80,7 +80,17 @@ func (p *SAMPool) Prune(index uint64) {
 //	TODO: Peek or Pop might be redundant
 
 func (p *SAMPool) Peek() rootchain.VerifiedSAM {
-	return nil
+	//	TODO: lock/unlock
+
+	expectedMessageNumber := p.lastProcessedMessage + 1
+
+	bucket := p.messagesByNumber[expectedMessageNumber]
+	if bucket == nil {
+		return nil
+	}
+
+	return bucket.getReadyMessages(p.verifier.Quorum)
+
 }
 
 func (p *SAMPool) Pop() rootchain.VerifiedSAM {

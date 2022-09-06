@@ -29,3 +29,15 @@ func (b samBucket) exists(msg rootchain.SAM) bool {
 
 	return ok
 }
+
+type countFunc func(uint64) bool
+
+func (b samBucket) getReadyMessages(count countFunc) []rootchain.SAM {
+	for _, messages := range b {
+		if count(uint64(len(messages))) {
+			return messages
+		}
+	}
+
+	return nil
+}
