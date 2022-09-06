@@ -58,7 +58,6 @@ func (op *outputParams) validateFlags() error {
 
 func (op *outputParams) outputSecrets() error {
 	if err := op.initSecretsManager(); err != nil {
-
 		return err
 	}
 
