@@ -52,8 +52,7 @@ func (p *ArgParser) PeekRune() (rune, error) {
 // consumeSpaces read all consecutive spaces from the current position
 func (p *ArgParser) consumeSpaces() error {
 	for {
-		// read with consuming
-		next, nextSize, err := p.ReadRune()
+		next, err := p.PeekRune()
 		if err != nil {
 			if errors.Is(io.EOF, err) {
 				return nil
@@ -62,17 +61,14 @@ func (p *ArgParser) consumeSpaces() error {
 			return err
 		}
 
-		// if the next is space, continue loop
-		if next == ' ' {
-			continue
+		if next != ' ' {
+			return nil
 		}
 
-		// otherwise move backward consumed size and return
-		if _, err := p.Seek(-1*int64(nextSize), 1); err != nil {
+		// consume and continue loop
+		if _, _, err := p.ReadRune(); err != nil {
 			return err
 		}
-
-		return nil
 	}
 }
 
