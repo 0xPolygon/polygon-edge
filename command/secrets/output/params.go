@@ -197,6 +197,7 @@ func (op *outputParams) getResult() command.CommandResult {
 			outputNodeID:    op.outputNodeID,
 		}
 	}
+
 	if op.outputBLS {
 		return &SecretsOutputResult{
 			BLSPubkey: op.blsPubkey,
