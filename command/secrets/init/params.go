@@ -161,21 +161,22 @@ func (ip *initParams) initNetworkingKey() error {
 	return nil
 }
 
+// getResult gets keys from secret manager and return result to display
 func (ip *initParams) getResult() (command.CommandResult, error) {
 	var (
 		res = &SecretsInitResult{}
 		err error
 	)
 
-	if res.Address, err = loadValidatorAddress(ip.secretsManager); err != nil {
+	if res.Address, err = helper.LoadValidatorAddress(ip.secretsManager); err != nil {
 		return nil, err
 	}
 
-	if res.BLSPubkey, err = loadBLSPublicKey(ip.secretsManager); err != nil {
+	if res.BLSPubkey, err = helper.LoadBLSPublicKey(ip.secretsManager); err != nil {
 		return nil, err
 	}
 
-	if res.NodeID, err = loadNodeID(ip.secretsManager); err != nil {
+	if res.NodeID, err = helper.LoadNodeID(ip.secretsManager); err != nil {
 		return nil, err
 	}
 

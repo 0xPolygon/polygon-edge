@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/0xPolygon/polygon-edge/command/helper"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 type SecretsInitResult struct {

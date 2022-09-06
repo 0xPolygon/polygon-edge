@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/secrets/awsssm"
@@ -13,6 +14,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	libp2pCrypto "github.com/libp2p/go-libp2p-core/crypto"
+	"github.com/libp2p/go-libp2p-core/peer"
 )
 
 // SetupLocalSecretsManager is a helper method for boilerplate local secrets manager setup
@@ -136,22 +138,69 @@ func InitNetworkingPrivateKey(secretsManager secrets.SecretsManager) (libp2pCryp
 	return libp2pKey, keyErr
 }
 
-func GetValidatorKey(secretsManager secrets.SecretsManager) (*ecdsa.PrivateKey, error) {
-	// Get the validator private key from the secrets manager storage
-	validatorKey, readErr := crypto.ReadConsensusKey(secretsManager)
-	if readErr != nil {
-		return nil, fmt.Errorf("unable to read validator key from Secrets Manager, %w", readErr)
+// LoadValidatorAddress loads ECDSA key by SecretsManager and returns validator address
+func LoadValidatorAddress(secretsManager secrets.SecretsManager) (types.Address, error) {
+	if !secretsManager.HasSecret(secrets.ValidatorKey) {
+		return types.ZeroAddress, nil
 	}
 
-	return validatorKey, nil
+	encodedKey, err := secretsManager.GetSecret(secrets.ValidatorKey)
+	if err != nil {
+		return types.ZeroAddress, err
+	}
+
+	privateKey, err := crypto.BytesToECDSAPrivateKey(encodedKey)
+	if err != nil {
+		return types.ZeroAddress, err
+	}
+
+	return crypto.PubKeyToAddress(&privateKey.PublicKey), nil
 }
 
-func GetNetworkingPrivateKey(secretsManager secrets.SecretsManager) (libp2pCrypto.PrivKey, error) {
-	// Get the libp2p private key from the secrets manager store
-	libp2pKey, readErr := network.ReadLibp2pKey(secretsManager)
-	if readErr != nil {
-		return nil, fmt.Errorf("unable to read networking private key from Secrets Manager, %w", readErr)
+// LoadValidatorAddress loads BLS key by SecretsManager and returns BLS Public Key
+func LoadBLSPublicKey(secretsManager secrets.SecretsManager) (string, error) {
+	if !secretsManager.HasSecret(secrets.ValidatorBLSKey) {
+		return "", nil
 	}
 
-	return libp2pKey, readErr
+	encodedKey, err := secretsManager.GetSecret(secrets.ValidatorBLSKey)
+	if err != nil {
+		return "", err
+	}
+
+	secretKey, err := crypto.BytesToBLSSecretKey(encodedKey)
+	if err != nil {
+		return "", err
+	}
+
+	pubkeyBytes, err := crypto.BLSSecretKeyToPubkeyBytes(secretKey)
+	if err != nil {
+		return "", err
+	}
+
+	return hex.EncodeToHex(pubkeyBytes), nil
+}
+
+// LoadNodeID loads Libp2p key by SecretsManager and returns Node ID
+func LoadNodeID(secretsManager secrets.SecretsManager) (string, error) {
+	if !secretsManager.HasSecret(secrets.NetworkKey) {
+		return "", nil
+	}
+
+	encodedKey, err := secretsManager.GetSecret(secrets.NetworkKey)
+	if err != nil {
+		return "", err
+	}
+
+	parsedKey, err := network.ParseLibp2pKey(encodedKey)
+	if err != nil {
+		return "", err
+	}
+
+	nodeID, err := peer.IDFromPrivateKey(parsedKey)
+	if err != nil {
+		return "", err
+	}
+
+	return nodeID.String(), nil
 }

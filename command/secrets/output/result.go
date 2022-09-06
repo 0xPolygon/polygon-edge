@@ -8,10 +8,12 @@ import (
 )
 
 type SecretsOutputResult struct {
-	Address string `json:"address,omitempty"`
-	NodeID  string `json:"node_id,omitempty"`
+	Address   string `json:"address,omitempty"`
+	BLSPubkey string `json:"bls,omitempty"`
+	NodeID    string `json:"node_id,omitempty"`
 
 	outputNodeID    bool `json:"-"`
+	outputBLS       bool `json:"-"`
 	outputValidator bool `json:"-"`
 }
 
@@ -30,11 +32,30 @@ func (r *SecretsOutputResult) GetOutput() string {
 		return buffer.String()
 	}
 
-	buffer.WriteString("\n[SECRETS PUBLIC DATA]\n")
-	buffer.WriteString(helper.FormatKV([]string{
+	if r.outputBLS {
+		buffer.WriteString(r.BLSPubkey)
+
+		return buffer.String()
+	}
+
+	vals := make([]string, 0, 3)
+
+	vals = append(
+		vals,
 		fmt.Sprintf("Public key (address)|%s", r.Address),
-		fmt.Sprintf("Node ID|%s", r.NodeID),
-	}))
+	)
+
+	if r.BLSPubkey != "" {
+		vals = append(
+			vals,
+			fmt.Sprintf("BLS Public key|%s", r.BLSPubkey),
+		)
+	}
+
+	vals = append(vals, fmt.Sprintf("Node ID|%s", r.NodeID))
+
+	buffer.WriteString("\n[SECRETS OUTPUT]\n")
+	buffer.WriteString(helper.FormatKV(vals))
 	buffer.WriteString("\n")
 
 	return buffer.String()
