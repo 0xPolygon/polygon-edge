@@ -33,6 +33,13 @@ func setFlags(cmd *cobra.Command) {
 	)
 
 	cmd.Flags().StringVar(
+		&params.rawBLSPublicKey,
+		blsFlag,
+		"",
+		"the BLS Public Key of the account to be voted for",
+	)
+
+	cmd.Flags().StringVar(
 		&params.vote,
 		voteFlag,
 		"",

@@ -4,7 +4,6 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	protoIBFT "github.com/0xPolygon/go-ibft/messages/proto"
-	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -14,12 +13,9 @@ func (i *backendIBFT) signMessage(msg *protoIBFT.Message) *protoIBFT.Message {
 		return nil
 	}
 
-	sig, err := crypto.Sign(i.validatorKey, crypto.Keccak256(raw))
-	if err != nil {
+	if msg.Signature, err = i.currentSigner.SignIBFTMessage(raw); err != nil {
 		return nil
 	}
-
-	msg.Signature = sig
 
 	return msg
 }
@@ -68,7 +64,7 @@ func (i *backendIBFT) BuildPrepareMessage(proposalHash []byte, view *protoIBFT.V
 }
 
 func (i *backendIBFT) BuildCommitMessage(proposalHash []byte, view *protoIBFT.View) *protoIBFT.Message {
-	seal, err := writeCommittedSeal(i.validatorKey, proposalHash)
+	committedSeal, err := i.currentSigner.CreateCommittedSeal(proposalHash)
 	if err != nil {
 		i.logger.Error("Unable to build commit message, %v", err)
 
@@ -82,7 +78,7 @@ func (i *backendIBFT) BuildCommitMessage(proposalHash []byte, view *protoIBFT.Vi
 		Payload: &protoIBFT.Message_CommitData{
 			CommitData: &protoIBFT.CommitMessage{
 				ProposalHash:  proposalHash,
-				CommittedSeal: seal,
+				CommittedSeal: committedSeal,
 			},
 		},
 	}

@@ -68,7 +68,7 @@ func (g *Genesis) GenesisHeader() *types.Header {
 		GasUsed:      g.GasUsed,
 		Difficulty:   g.Difficulty,
 		MixHash:      g.Mixhash,
-		Miner:        g.Coinbase,
+		Miner:        g.Coinbase.Bytes(),
 		StateRoot:    stateRoot,
 		Sha3Uncles:   types.EmptyUncleHash,
 		ReceiptsRoot: types.EmptyRootHash,

@@ -26,14 +26,18 @@ const (
 	// ValidatorKey is the private key secret of the validator node
 	ValidatorKey = "validator-key"
 
+	// ValidatorBLSKey is the bls secret key of the validator node
+	ValidatorBLSKey = "validator-bls-key"
+
 	// NetworkKey is the libp2p private key secret used for networking
 	NetworkKey = "network-key"
 )
 
 // Define constant file names for the local StorageManager
 const (
-	ValidatorKeyLocal = "validator.key"
-	NetworkKeyLocal   = "libp2p.key"
+	ValidatorKeyLocal    = "validator.key"
+	ValidatorBLSKeyLocal = "validator-bls.key"
+	NetworkKeyLocal      = "libp2p.key"
 )
 
 // Define constant folder names for the local StorageManager

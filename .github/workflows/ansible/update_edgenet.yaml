@@ -1,0 +1,68 @@
+---
+-
+  name: Update Polygon Edge binary
+  hosts:
+    - all
+  become: yes
+  tasks:
+    ## update & upgrade system
+    - name: Update & upgrade system
+      apt:
+        upgrade: yes
+        update_cache: yes
+
+    ## stop polygon-edge service
+    - name: Stop polygon edge service
+      systemd:
+        state: stopped
+        name: polygon-edge
+
+    ## get the latest release
+    - name: Get latest release link
+      uri:
+        url: https://api.github.com/repos/0xPolygon/polygon-edge/releases/latest
+        return_content: true
+      register: edge_release
+
+    ## download the latest release
+    - name: Download latest Polygon Edge release
+      get_url:
+        url: "{{ edge_release.json.assets[3].browser_download_url }}"
+        dest: /tmp/polygon-edge.tar.gz
+        force: yes
+
+    ## create temp dir for release
+    - name: Create temp dir for Polygon Edge release
+      file:
+        path: /tmp/polygon-edge
+        state: directory
+
+    ## unpack release tar
+    - name: Unpack Polygon Edge release
+      unarchive:
+        remote_src: yes
+        src: /tmp/polygon-edge.tar.gz
+        dest: /tmp/polygon-edge
+
+    ## set polygon-edge to PATH
+    - name: Place Polygon Edge binary to PATH
+      copy:
+        remote_src: yes
+        src: /tmp/polygon-edge/polygon-edge
+        dest: /usr/local/bin/
+        mode: a+x
+        force: yes
+
+    ## remove release temp dir
+    - name: Remove temp Polygon Edge release dir
+      file:
+        state: absent
+        path: /tmp/polygon-edge
+
+    ## start polygon edge service
+    - name: Start polygon-edge service
+      systemd:
+        state: restarted
+        name: polygon-edge
+        daemon_reload: yes
+        enabled: yes

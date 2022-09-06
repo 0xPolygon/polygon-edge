@@ -29,6 +29,7 @@ const (
 	jsonRPCBatchRequestLimitFlag = "json-rpc-batch-request-limit"
 	jsonRPCBlockRangeLimitFlag   = "json-rpc-block-range-limit"
 	maxSlotsFlag                 = "max-slots"
+	maxEnqueuedFlag              = "max-enqueued"
 	blockGasTargetFlag           = "block-gas-target"
 	secretsConfigFlag            = "secrets-config"
 	restoreFlag                  = "restore"
@@ -79,9 +80,6 @@ type serverParams struct {
 	isDevMode      bool
 
 	corsAllowedOrigins []string
-
-	jsonRPCBatchLengthLimit uint64
-	jsonRPCBlockRangeLimit  uint64
 
 	ibftBaseTimeoutLegacy uint64
 
@@ -146,8 +144,8 @@ func (p *serverParams) generateConfig() *server.Config {
 		JSONRPC: &server.JSONRPC{
 			JSONRPCAddr:              p.jsonRPCAddress,
 			AccessControlAllowOrigin: p.corsAllowedOrigins,
-			BatchLengthLimit:         p.jsonRPCBatchLengthLimit,
-			BlockRangeLimit:          p.jsonRPCBlockRangeLimit,
+			BatchLengthLimit:         p.rawConfig.JSONRPCBatchRequestLimit,
+			BlockRangeLimit:          p.rawConfig.JSONRPCBlockRangeLimit,
 		},
 		GRPCAddr:   p.grpcAddress,
 		LibP2PAddr: p.libp2pAddress,
@@ -165,14 +163,15 @@ func (p *serverParams) generateConfig() *server.Config {
 			MaxOutboundPeers: p.rawConfig.Network.MaxOutboundPeers,
 			Chain:            p.genesisConfig,
 		},
-		DataDir:        p.rawConfig.DataDir,
-		Seal:           p.rawConfig.ShouldSeal,
-		PriceLimit:     p.rawConfig.TxPool.PriceLimit,
-		MaxSlots:       p.rawConfig.TxPool.MaxSlots,
-		SecretsManager: p.secretsConfig,
-		RestoreFile:    p.getRestoreFilePath(),
-		BlockTime:      p.rawConfig.BlockTime,
-		LogLevel:       hclog.LevelFromString(p.rawConfig.LogLevel),
-		LogFilePath:    p.logFileLocation,
+		DataDir:            p.rawConfig.DataDir,
+		Seal:               p.rawConfig.ShouldSeal,
+		PriceLimit:         p.rawConfig.TxPool.PriceLimit,
+		MaxSlots:           p.rawConfig.TxPool.MaxSlots,
+		MaxAccountEnqueued: p.rawConfig.TxPool.MaxAccountEnqueued,
+		SecretsManager:     p.secretsConfig,
+		RestoreFile:        p.getRestoreFilePath(),
+		BlockTime:          p.rawConfig.BlockTime,
+		LogLevel:           hclog.LevelFromString(p.rawConfig.LogLevel),
+		LogFilePath:        p.logFileLocation,
 	}
 }
