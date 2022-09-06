@@ -89,10 +89,11 @@ func newTestPoolWithSlots(maxSlots uint64, mockStore ...store) (*TxPool, error) 
 		nil,
 		nilMetrics,
 		&Config{
-			PriceLimit:         defaultPriceLimit,
-			MaxSlots:           maxSlots,
-			Sealing:            false,
-			MaxAccountEnqueued: defaultMaxAccountEnqueued,
+			PriceLimit:          defaultPriceLimit,
+			MaxSlots:            maxSlots,
+			MaxAccountEnqueued:  defaultMaxAccountEnqueued,
+			Sealing:             false,
+			DeploymentWhitelist: []types.Address{},
 		},
 	)
 }
@@ -1401,6 +1402,73 @@ func TestDemote(t *testing.T) {
 
 		// demotions are reset to 0
 		assert.Equal(t, uint(0), pool.accounts.get(addr1).demotions)
+	})
+}
+
+// TestPermissionSmartContractDeployment tests sending deployment tx with deployment whitelist
+func TestPermissionSmartContractDeployment(t *testing.T) {
+	t.Parallel()
+
+	signer := crypto.NewEIP155Signer(uint64(100))
+
+	poolSigner := crypto.NewEIP155Signer(100)
+
+	// Generate a private key and address
+	defaultKey, defaultAddr := tests.GenerateKeyAndAddr(t)
+
+	setupPool := func() *TxPool {
+		pool, err := newTestPool()
+		if err != nil {
+			t.Fatalf("cannot create txpool - err: %v\n", err)
+		}
+
+		pool.SetSigner(signer)
+
+		return pool
+	}
+
+	signTx := func(transaction *types.Transaction) *types.Transaction {
+		signedTx, signErr := poolSigner.SignTx(transaction, defaultKey)
+		if signErr != nil {
+			t.Fatalf("Unable to sign transaction, %v", signErr)
+		}
+
+		return signedTx
+	}
+
+	t.Run("contract deployment whitelist empty, anyone can deploy", func(t *testing.T) {
+		t.Parallel()
+		pool := setupPool()
+
+		tx := newTx(defaultAddr, 0, 1)
+		tx.To = nil
+
+		assert.NoError(t, pool.validateTx(signTx(tx)))
+	})
+	t.Run("Addresses inside whitelist can deploy smart contract", func(t *testing.T) {
+		t.Parallel()
+		pool := setupPool()
+		pool.deploymentWhitelist.add(addr1)
+		pool.deploymentWhitelist.add(defaultAddr)
+
+		tx := newTx(defaultAddr, 0, 1)
+		tx.To = nil
+
+		assert.NoError(t, pool.validateTx(signTx(tx)))
+	})
+	t.Run("Addresses outside whitelist can not deploy smart contract", func(t *testing.T) {
+		t.Parallel()
+		pool := setupPool()
+		pool.deploymentWhitelist.add(addr1)
+		pool.deploymentWhitelist.add(addr2)
+
+		tx := newTx(defaultAddr, 0, 1)
+		tx.To = nil
+
+		assert.ErrorIs(t,
+			pool.validateTx(signTx(tx)),
+			ErrSmartContractRestricted,
+		)
 	})
 }
 

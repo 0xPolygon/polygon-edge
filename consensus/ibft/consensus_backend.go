@@ -2,10 +2,12 @@ package ibft
 
 import (
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/0xPolygon/go-ibft/messages"
 	"github.com/0xPolygon/polygon-edge/consensus"
+	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -26,14 +28,7 @@ func (i *backendIBFT) BuildProposal(blockNumber uint64) []byte {
 		return nil
 	}
 
-	snap := i.getSnapshot(latestBlockNumber)
-	if snap == nil {
-		i.logger.Error("cannot find snapshot", "num", latestBlockNumber)
-
-		return nil
-	}
-
-	block, err := i.buildBlock(snap, latestHeader)
+	block, err := i.buildBlock(latestHeader)
 	if err != nil {
 		i.logger.Error("cannot build block", "num", blockNumber, "err", err)
 
@@ -54,13 +49,14 @@ func (i *backendIBFT) InsertBlock(
 		return
 	}
 
-	seals := make([][]byte, len(committedSeals))
-	for idx := range committedSeals {
-		seals[idx] = committedSeals[idx].Signature
+	committedSealsMap := make(map[types.Address][]byte, len(committedSeals))
+
+	for _, cm := range committedSeals {
+		committedSealsMap[types.BytesToAddress(cm.Signer)] = cm.Signature
 	}
 
 	// Push the committed seals to the header
-	header, err := writeCommittedSeals(newBlock.Header, seals)
+	header, err := i.currentSigner.WriteCommittedSeals(newBlock.Header, committedSealsMap)
 	if err != nil {
 		i.logger.Error("cannot write committed seals", "err", err)
 
@@ -76,21 +72,27 @@ func (i *backendIBFT) InsertBlock(
 		return
 	}
 
-	if err := i.runHook(InsertBlockHook, header.Number, header.Number); err != nil {
-		i.logger.Error("cannot run hook", "name", string(InsertBlockHook), "err", err)
-
-		return
-	}
-
 	i.updateMetrics(newBlock)
 
 	i.logger.Info(
 		"block committed",
 		"number", newBlock.Number(),
 		"hash", newBlock.Hash(),
-		"validators", len(i.activeValidatorSet),
+		"validation_type", i.currentSigner.Type(),
+		"validators", i.currentValidators.Len(),
 		"committed", len(committedSeals),
 	)
+
+	if err := i.currentHooks.PostInsertBlock(newBlock); err != nil {
+		i.logger.Error(
+			"failed to call PostInsertBlock hook",
+			"height", newBlock.Number(),
+			"hash", newBlock.Hash(),
+			"err", err,
+		)
+
+		return
+	}
 
 	// after the block has been written we reset the txpool so that
 	// the old transactions are removed
@@ -98,30 +100,39 @@ func (i *backendIBFT) InsertBlock(
 }
 
 func (i *backendIBFT) ID() []byte {
-	return i.validatorKeyAddr.Bytes()
+	return i.currentSigner.Address().Bytes()
 }
 
 func (i *backendIBFT) MaximumFaultyNodes() uint64 {
-	return uint64(i.activeValidatorSet.MaxFaultyNodes())
+	return uint64(CalcMaxFaultyNodes(i.currentValidators))
 }
 
 func (i *backendIBFT) Quorum(blockNumber uint64) uint64 {
-	var (
-		validators = i.activeValidatorSet
-		quorumFn   = i.quorumSize(blockNumber)
-	)
+	validators, err := i.forkManager.GetValidators(blockNumber)
+	if err != nil {
+		i.logger.Error(
+			"failed to get validators when calculation quorum",
+			"height", blockNumber,
+			"err", err,
+		)
+
+		// return Math.MaxInt32 to prevent overflow when casting to int in go-ibft package
+		return math.MaxInt32
+	}
+
+	quorumFn := i.quorumSize(blockNumber)
 
 	return uint64(quorumFn(validators))
 }
 
 // buildBlock builds the block, based on the passed in snapshot and parent header
-func (i *backendIBFT) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, error) {
+func (i *backendIBFT) buildBlock(parent *types.Header) (*types.Block, error) {
 	header := &types.Header{
 		ParentHash: parent.Hash,
 		Number:     parent.Number + 1,
-		Miner:      types.Address{},
+		Miner:      types.ZeroAddress.Bytes(),
 		Nonce:      types.Nonce{},
-		MixHash:    IstanbulDigest,
+		MixHash:    signer.IstanbulDigest,
 		// this is required because blockchain needs difficulty to organize blocks and forks
 		Difficulty: parent.Number + 1,
 		StateRoot:  types.EmptyRootHash, // this avoids needing state for now
@@ -137,29 +148,28 @@ func (i *backendIBFT) buildBlock(snap *Snapshot, parent *types.Header) (*types.B
 
 	header.GasLimit = gasLimit
 
-	if hookErr := i.runHook(CandidateVoteHook, header.Number, &candidateVoteHookParams{
-		header: header,
-		snap:   snap,
-	}); hookErr != nil {
-		i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", CandidateVoteHook, hookErr))
+	if err := i.currentHooks.ModifyHeader(header, i.currentSigner.Address()); err != nil {
+		return nil, err
 	}
 
 	// set the timestamp
 	header.Timestamp = uint64(time.Now().Unix())
 
-	// we need to include in the extra field the current set of validators
-	putIbftExtraValidators(header, snap.Set)
-
-	transition, err := i.executor.BeginTxn(parent.StateRoot, header, i.validatorKeyAddr)
+	parentCommittedSeals, err := i.extractParentCommittedSeals(parent)
 	if err != nil {
 		return nil, err
 	}
-	// If the mechanism is PoS -> build a regular block if it's not an end-of-epoch block
-	// If the mechanism is PoA -> always build a regular block, regardless of epoch
+
+	i.currentSigner.InitIBFTExtra(header, i.currentValidators, parentCommittedSeals)
+
+	transition, err := i.executor.BeginTxn(parent.StateRoot, header, i.currentSigner.Address())
+	if err != nil {
+		return nil, err
+	}
 
 	txs := i.writeTransactions(gasLimit, header.Number, transition)
 
-	if err := i.PreStateCommit(header, transition); err != nil {
+	if err := i.PreCommitState(header, transition); err != nil {
 		return nil, err
 	}
 
@@ -175,7 +185,7 @@ func (i *backendIBFT) buildBlock(snap *Snapshot, parent *types.Header) (*types.B
 	})
 
 	// write the seal of the block after all the fields are completed
-	header, err = writeProposerSeal(i.validatorKey, block.Header)
+	header, err = i.currentSigner.WriteProposerSeal(header)
 	if err != nil {
 		return nil, err
 	}
@@ -216,7 +226,7 @@ func (i *backendIBFT) writeTransactions(
 ) (executed []*types.Transaction) {
 	executed = make([]*types.Transaction, 0)
 
-	if !i.shouldWriteTransactions(blockNumber) {
+	if !i.currentHooks.ShouldWriteTransactions(blockNumber) {
 		return
 	}
 
@@ -320,4 +330,32 @@ func (i *backendIBFT) writeTransaction(
 	i.txpool.Pop(tx)
 
 	return &txExeResult{tx, success}, true
+}
+
+// extractCommittedSeals extracts CommittedSeals from header
+func (i *backendIBFT) extractCommittedSeals(
+	header *types.Header,
+) (signer.Seals, error) {
+	signer, err := i.forkManager.GetSigner(header.Number)
+	if err != nil {
+		return nil, err
+	}
+
+	extra, err := signer.GetIBFTExtra(header)
+	if err != nil {
+		return nil, err
+	}
+
+	return extra.CommittedSeals, nil
+}
+
+// extractParentCommittedSeals extracts ParentCommittedSeals from header
+func (i *backendIBFT) extractParentCommittedSeals(
+	header *types.Header,
+) (signer.Seals, error) {
+	if header.Number == 0 {
+		return nil, nil
+	}
+
+	return i.extractCommittedSeals(header)
 }

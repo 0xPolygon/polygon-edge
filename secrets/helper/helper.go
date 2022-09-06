@@ -1,7 +1,6 @@
 package helper
 
 import (
-	"crypto/ecdsa"
 	"fmt"
 
 	"github.com/0xPolygon/polygon-edge/crypto"
@@ -11,6 +10,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/secrets/gcpssm"
 	"github.com/0xPolygon/polygon-edge/secrets/hashicorpvault"
 	"github.com/0xPolygon/polygon-edge/secrets/local"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	libp2pCrypto "github.com/libp2p/go-libp2p-core/crypto"
 )
@@ -64,25 +64,61 @@ func SetupGCPSSM(
 	)
 }
 
-func InitValidatorKey(secretsManager secrets.SecretsManager) (*ecdsa.PrivateKey, error) {
-	// Generate the IBFT validator private key
-	validatorKey, validatorKeyEncoded, keyErr := crypto.GenerateAndEncodePrivateKey()
-	if keyErr != nil {
-		return nil, keyErr
+// InitECDSAValidatorKey creates new ECDSA key and set as a validator key
+func InitECDSAValidatorKey(secretsManager secrets.SecretsManager) (types.Address, error) {
+	if secretsManager.HasSecret(secrets.ValidatorKey) {
+		return types.ZeroAddress, fmt.Errorf(`secrets "%s" has been already initialized`, secrets.ValidatorKey)
 	}
+
+	validatorKey, validatorKeyEncoded, err := crypto.GenerateAndEncodeECDSAPrivateKey()
+	if err != nil {
+		return types.ZeroAddress, err
+	}
+
+	address := crypto.PubKeyToAddress(&validatorKey.PublicKey)
 
 	// Write the validator private key to the secrets manager storage
 	if setErr := secretsManager.SetSecret(
 		secrets.ValidatorKey,
 		validatorKeyEncoded,
 	); setErr != nil {
+		return types.ZeroAddress, setErr
+	}
+
+	return address, nil
+}
+
+func InitBLSValidatorKey(secretsManager secrets.SecretsManager) ([]byte, error) {
+	if secretsManager.HasSecret(secrets.ValidatorBLSKey) {
+		return nil, fmt.Errorf(`secrets "%s" has been already initialized`, secrets.ValidatorBLSKey)
+	}
+
+	blsSecretKey, blsSecretKeyEncoded, err := crypto.GenerateAndEncodeBLSSecretKey()
+	if err != nil {
+		return nil, err
+	}
+
+	// Write the validator private key to the secrets manager storage
+	if setErr := secretsManager.SetSecret(
+		secrets.ValidatorBLSKey,
+		blsSecretKeyEncoded,
+	); setErr != nil {
 		return nil, setErr
 	}
 
-	return validatorKey, nil
+	pubkeyBytes, err := crypto.BLSSecretKeyToPubkeyBytes(blsSecretKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return pubkeyBytes, nil
 }
 
 func InitNetworkingPrivateKey(secretsManager secrets.SecretsManager) (libp2pCrypto.PrivKey, error) {
+	if secretsManager.HasSecret(secrets.NetworkKey) {
+		return nil, fmt.Errorf(`secrets "%s" has been already initialized`, secrets.NetworkKey)
+	}
+
 	// Generate the libp2p private key
 	libp2pKey, libp2pKeyEncoded, keyErr := network.GenerateAndEncodeLibp2pKey()
 	if keyErr != nil {
