@@ -1,85 +1,86 @@
 package predeployment
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestParseArguments_validInput(t *testing.T) {
+	t.Parallel()
+
 	testTable := []struct {
 		name           string
 		arguments      []string
 		expectedResult []interface{}
 	}{
-		// {
-		// 	"simple type arguments",
-		// 	[]string{
-		// 		"argument",
-		// 	},
-		// 	[]interface{}{
-		// 		"argument",
-		// 	},
-		// },
-		// {
-		// 	"array of simple type arguments",
-		// 	[]string{
-		// 		"argument 1",
-		// 		"argument 2",
-		// 	},
-		// 	[]interface{}{
-		// 		"argument 1",
-		// 		"argument 2",
-		// 	},
-		// },
-		// {
-		// 	"structure as argument with double quotes",
-		// 	[]string{
-		// 		`["argument 1"]`,
-		// 	},
-		// 	[]interface{}{
-		// 		[]interface{}{
-		// 			"argument 1",
-		// 		},
-		// 	},
-		// },
-		// {
-		// 	"structure with regular types",
-		// 	[]string{
-		// 		`["argument 1"]`,
-		// 		"argument 2",
-		// 	},
-		// 	[]interface{}{
-		// 		[]interface{}{
-		// 			"argument 1",
-		// 		},
-		// 		"argument 2",
-		// 	},
-		// },
-		// {
-		// 	"structure with arrays with nested object",
-		// 	[]string{
-		// 		`[["struct1-1", "struct1-2"], ["struct2-1", "struct2-2"]]`, // array of struct
-		// 		`["string1", "string2"]`,                                   // array of string
-		// 	},
-		// 	[]interface{}{
-		// 		[]interface{}{
-		// 			[]interface{}{
-		// 				"struct1-1",
-		// 				"struct1-2",
-		// 			},
-		// 			[]interface{}{
-		// 				"struct2-1",
-		// 				"struct2-2",
-		// 			},
-		// 		},
-		// 		[]interface{}{
-		// 			"string1",
-		// 			"string2",
-		// 		},
-		// 	},
-		// },
+		{
+			"simple type arguments",
+			[]string{
+				"argument",
+			},
+			[]interface{}{
+				"argument",
+			},
+		},
+		{
+			"array of simple type arguments",
+			[]string{
+				"argument 1",
+				"argument 2",
+			},
+			[]interface{}{
+				"argument 1",
+				"argument 2",
+			},
+		},
+		{
+			"structure as argument with double quotes",
+			[]string{
+				`["argument 1"]`,
+			},
+			[]interface{}{
+				[]interface{}{
+					"argument 1",
+				},
+			},
+		},
+		{
+			"structure with regular types",
+			[]string{
+				`["argument 1"]`,
+				"argument 2",
+			},
+			[]interface{}{
+				[]interface{}{
+					"argument 1",
+				},
+				"argument 2",
+			},
+		},
+		{
+			"structure with arrays with nested object",
+			[]string{
+				`[["struct1-1", "struct1-2"], ["struct2-1", "struct2-2"]]`, // array of struct
+				`["string1", "string2"]`,                                   // array of string
+			},
+			[]interface{}{
+				[]interface{}{
+					[]interface{}{
+						"struct1-1",
+						"struct1-2",
+					},
+					[]interface{}{
+						"struct2-1",
+						"struct2-2",
+					},
+				},
+				[]interface{}{
+					"string1",
+					"string2",
+				},
+			},
+		},
 		{
 			"structure with the values containing special characters",
 			[]string{
@@ -119,8 +120,6 @@ func TestParseArguments_validInput(t *testing.T) {
 
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
-
-			fmt.Printf("arguments => %+v\n", testCase.arguments)
 
 			res, err := ParseArguments(testCase.arguments)
 
