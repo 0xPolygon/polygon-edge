@@ -119,3 +119,72 @@ func TestSAMPool_AddMessage(t *testing.T) {
 		},
 	)
 }
+
+func TestSAMPool_Prune(t *testing.T) {
+	t.Parallel()
+
+	t.Run(
+		"prune removes message",
+		func(t *testing.T) {
+			t.Parallel()
+
+			verifier := mockVerifier{
+				verifyHash:      func(rootchain.SAM) error { return nil },
+				verifySignature: func(rootchain.SAM) error { return nil },
+			}
+
+			pool := New(verifier)
+
+			msg := rootchain.SAM{
+				Hash: types.Hash{1, 2, 3},
+				Event: rootchain.Event{
+					Number: 3,
+				},
+			}
+
+			err := pool.AddMessage(msg)
+			assert.NoError(t, err)
+
+			bucket := pool.messagesByNumber[msg.Number]
+			assert.True(t, bucket.exists(msg))
+
+			pool.Prune(5)
+
+			bucket = pool.messagesByNumber[msg.Number]
+			assert.False(t, bucket.exists(msg))
+		},
+	)
+
+	t.Run(
+		"prune removes no message",
+		func(t *testing.T) {
+			t.Parallel()
+
+			verifier := mockVerifier{
+				verifyHash:      func(rootchain.SAM) error { return nil },
+				verifySignature: func(rootchain.SAM) error { return nil },
+			}
+
+			pool := New(verifier)
+
+			msg := rootchain.SAM{
+				Hash: types.Hash{1, 2, 3},
+				Event: rootchain.Event{
+					Number: 10,
+				},
+			}
+
+			err := pool.AddMessage(msg)
+			assert.NoError(t, err)
+
+			bucket := pool.messagesByNumber[msg.Number]
+			assert.True(t, bucket.exists(msg))
+
+			pool.Prune(5)
+
+			bucket = pool.messagesByNumber[msg.Number]
+			assert.True(t, bucket.exists(msg))
+		},
+	)
+
+}
