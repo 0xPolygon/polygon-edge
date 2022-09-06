@@ -81,7 +81,7 @@ func (p *rootchainParams) validateFlags() error {
 }
 
 func validatePayloadType(payloadType uint64) error {
-	if rootchain.PayloadType(payloadType) != rootchain.ValidatorSetPayload {
+	if rootchain.PayloadType(payloadType) != rootchain.ValidatorSetPayloadType {
 		return errInvalidPayloadType
 	}
 

@@ -3,7 +3,7 @@ package rootchain
 type PayloadType uint8
 
 const (
-	ValidatorSetPayload PayloadType = iota
+	ValidatorSetPayloadType PayloadType = iota
 )
 
 type Payload interface {

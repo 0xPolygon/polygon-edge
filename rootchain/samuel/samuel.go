@@ -1,15 +1,18 @@
 package samuel
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/0xPolygon/polygon-edge/blockchain/storage"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/rootchain"
+	"github.com/0xPolygon/polygon-edge/rootchain/payload"
 	"github.com/0xPolygon/polygon-edge/rootchain/proto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo/abi"
+	googleProto "google.golang.org/protobuf/proto"
 )
 
 // eventTracker defines the event tracker interface for SAMUEL
@@ -131,7 +134,14 @@ func (s *SAMUEL) Start() error {
 func (s *SAMUEL) registerGossipHandler() error {
 	return s.transport.Subscribe(func(sam *proto.SAM) {
 		// Extract the event data
-		// TODO
+		eventPayload, err := s.getEventPayload(sam.Event.Payload, sam.Event.PayloadType)
+		if err != nil {
+			s.logger.Warn(
+				fmt.Sprintf("unable to get event payload with hash %s, %v", sam.Hash, err),
+			)
+
+			return
+		}
 
 		// Convert the proto event to a local SAM
 		localSAM := rootchain.SAM{
@@ -140,6 +150,7 @@ func (s *SAMUEL) registerGossipHandler() error {
 			Event: rootchain.Event{
 				Index:       sam.Event.Index,
 				BlockNumber: sam.Event.BlockNumber,
+				Payload:     eventPayload,
 			},
 		}
 
@@ -149,6 +160,31 @@ func (s *SAMUEL) registerGossipHandler() error {
 			)
 		}
 	})
+}
+
+func (s *SAMUEL) getEventPayload(
+	eventPayload []byte,
+	payloadType uint64,
+) (rootchain.Payload, error) {
+	switch rootchain.PayloadType(payloadType) {
+	case rootchain.ValidatorSetPayloadType:
+		vsProto := &proto.ValidatorSetPayload{}
+		if err := googleProto.Unmarshal(eventPayload, vsProto); err != nil {
+			return nil, fmt.Errorf("unable to unmarshal proto payload, %v", err)
+		}
+		setInfo := make([]payload.ValidatorSetInfo, len(vsProto.ValidatorsInfo))
+
+		for index, info := range vsProto.ValidatorsInfo {
+			setInfo[index] = payload.ValidatorSetInfo{
+				Address:      info.Address,
+				BLSPublicKey: info.BlsPubKey,
+			}
+		}
+
+		return payload.NewValidatorSetPayload(setInfo), nil
+	default:
+		return nil, errors.New("unknown payload type")
+	}
 }
 
 func (s *SAMUEL) startEventLoop() {

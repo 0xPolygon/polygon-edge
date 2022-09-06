@@ -14,7 +14,7 @@ func TestRootchainConfig(t *testing.T) {
 		eventABI           = "event ABI"
 		methodABI          = "method ABI"
 		localAddress       = "0x123123"
-		payloadType        = ValidatorSetPayload
+		payloadType        = ValidatorSetPayloadType
 		blockConfirmations = uint64(10)
 	)
 

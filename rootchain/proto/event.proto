@@ -13,8 +13,11 @@ message Event {
   // with the event
   uint64 blockNumber = 2;
 
+  // The type of the payload
+  uint64 payloadType = 3;
+
   // The underlying payload
-  bytes payload = 3;
+  bytes payload = 4;
 }
 
 // SAM defines the gossiped Signed Arbitrary Message
