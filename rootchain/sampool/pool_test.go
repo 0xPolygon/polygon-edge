@@ -188,3 +188,90 @@ func TestSAMPool_Prune(t *testing.T) {
 	)
 
 }
+
+func TestSAMPool_Peek(t *testing.T) {
+	t.Parallel()
+
+	t.Run(
+		"Peek returns nil (no expected message)",
+		func(t *testing.T) {
+			t.Parallel()
+
+			verifier := mockVerifier{
+				verifyHash:      func(rootchain.SAM) error { return nil },
+				verifySignature: func(rootchain.SAM) error { return nil },
+			}
+
+			pool := New(verifier)
+			pool.lastProcessedMessage = 3
+
+			verifiedMsg := pool.Peek()
+			assert.Nil(t, verifiedMsg)
+		},
+	)
+
+	t.Run(
+		"Peek returns nil (no quorum)",
+		func(t *testing.T) {
+			t.Parallel()
+
+			verifier := mockVerifier{
+				verifyHash:      func(rootchain.SAM) error { return nil },
+				verifySignature: func(rootchain.SAM) error { return nil },
+				quorumFunc:      func(uint64) bool { return false },
+			}
+
+			pool := New(verifier)
+
+			msg := rootchain.SAM{
+				Hash: types.Hash{1, 2, 3},
+				Event: rootchain.Event{
+					Number: 10,
+				},
+			}
+
+			pool.lastProcessedMessage = 9
+
+			err := pool.AddMessage(msg)
+
+			assert.NoError(t, err)
+
+			verifiedMsg := pool.Peek()
+
+			assert.Nil(t, verifiedMsg)
+		},
+	)
+
+	t.Run(
+		"Peek returns verified SAM",
+		func(t *testing.T) {
+			t.Parallel()
+
+			verifier := mockVerifier{
+				verifyHash:      func(rootchain.SAM) error { return nil },
+				verifySignature: func(rootchain.SAM) error { return nil },
+				quorumFunc:      func(uint64) bool { return true },
+			}
+
+			pool := New(verifier)
+
+			msg := rootchain.SAM{
+				Hash: types.Hash{1, 2, 3},
+				Event: rootchain.Event{
+					Number: 10,
+				},
+			}
+
+			pool.lastProcessedMessage = 9
+
+			err := pool.AddMessage(msg)
+
+			assert.NoError(t, err)
+
+			verifiedMsg := pool.Peek()
+
+			assert.NotNil(t, verifiedMsg)
+		},
+	)
+
+}
