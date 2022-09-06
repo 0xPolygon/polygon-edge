@@ -170,8 +170,9 @@ func (s *SAMUEL) getEventPayload(
 	case rootchain.ValidatorSetPayloadType:
 		vsProto := &proto.ValidatorSetPayload{}
 		if err := googleProto.Unmarshal(eventPayload, vsProto); err != nil {
-			return nil, fmt.Errorf("unable to unmarshal proto payload, %v", err)
+			return nil, fmt.Errorf("unable to unmarshal proto payload, %w", err)
 		}
+
 		setInfo := make([]payload.ValidatorSetInfo, len(vsProto.ValidatorsInfo))
 
 		for index, info := range vsProto.ValidatorsInfo {
