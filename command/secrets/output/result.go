@@ -57,7 +57,7 @@ func (r *SecretsOutputResult) GetOutput() string {
 	if r.NodeID != "" {
 		vals = append(
 			vals,
-			fmt.Sprintf("Node ID|%s", r.BLSPubkey),
+			fmt.Sprintf("Node ID|%s", r.NodeID),
 		)
 	}
 

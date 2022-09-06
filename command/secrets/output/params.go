@@ -2,6 +2,10 @@ package output
 
 import (
 	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/secrets"
@@ -54,6 +58,7 @@ func (op *outputParams) validateFlags() error {
 
 func (op *outputParams) outputSecrets() error {
 	if err := op.initSecretsManager(); err != nil {
+
 		return err
 	}
 
@@ -134,6 +139,27 @@ func (op *outputParams) parseConfig() error {
 }
 
 func (op *outputParams) initLocalSecretsManager() error {
+	validatorPathPrefix := filepath.Join(op.dataDir, secrets.ConsensusFolderLocal)
+	networkPathPrefix := filepath.Join(op.dataDir, secrets.NetworkFolderLocal)
+	dataDirAbs, _ := filepath.Abs(op.dataDir)
+
+	if _, err := os.Stat(op.dataDir); os.IsNotExist(err) {
+		return fmt.Errorf("the data directory provided does not exist: %s", dataDirAbs)
+	}
+
+	errs := make([]string, 0, 2)
+	if _, err := os.Stat(validatorPathPrefix); os.IsNotExist(err) {
+		errs = append(errs, fmt.Sprintf("no validator keys found in the data directory provided: %s", dataDirAbs))
+	}
+
+	if _, err := os.Stat(networkPathPrefix); os.IsNotExist(err) {
+		errs = append(errs, fmt.Sprintf("no network key found in the data directory provided: %s", dataDirAbs))
+	}
+
+	if len(errs) > 0 {
+		return fmt.Errorf(strings.Join(errs, "\n"))
+	}
+
 	local, err := helper.SetupLocalSecretsManager(op.dataDir)
 	if err != nil {
 		return err
