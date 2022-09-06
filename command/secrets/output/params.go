@@ -38,7 +38,7 @@ type outputParams struct {
 	secretsManager secrets.SecretsManager
 	secretsConfig  *secrets.SecretsManagerConfig
 
-	validatorAddress types.Address
+	validatorAddress string
 	blsPubkey        string
 
 	nodeID string
@@ -150,7 +150,11 @@ func (op *outputParams) initValidatorAddress() error {
 		return err
 	}
 
-	op.validatorAddress = validatorAddress
+	if validatorAddress == types.ZeroAddress {
+		op.validatorAddress = ""
+	} else {
+		op.validatorAddress = validatorAddress.String()
+	}
 
 	return nil
 }
@@ -190,7 +194,7 @@ func (op *outputParams) getResult() command.CommandResult {
 
 	if op.outputValidator {
 		return &SecretsOutputResult{
-			Address: op.validatorAddress.String(),
+			Address: op.validatorAddress,
 
 			outputValidator: op.outputValidator,
 			outputBLS:       op.outputBLS,
@@ -209,7 +213,7 @@ func (op *outputParams) getResult() command.CommandResult {
 	}
 
 	return &SecretsOutputResult{
-		Address:   op.validatorAddress.String(),
+		Address:   op.validatorAddress,
 		BLSPubkey: op.blsPubkey,
 		NodeID:    op.nodeID,
 

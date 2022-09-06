@@ -40,10 +40,12 @@ func (r *SecretsOutputResult) GetOutput() string {
 
 	vals := make([]string, 0, 3)
 
-	vals = append(
-		vals,
-		fmt.Sprintf("Public key (address)|%s", r.Address),
-	)
+	if r.Address != "" {
+		vals = append(
+			vals,
+			fmt.Sprintf("Public key (address)|%s", r.Address),
+		)
+	}
 
 	if r.BLSPubkey != "" {
 		vals = append(
@@ -52,10 +54,16 @@ func (r *SecretsOutputResult) GetOutput() string {
 		)
 	}
 
-	vals = append(vals, fmt.Sprintf("Node ID|%s", r.NodeID))
+	if r.NodeID != "" {
+		vals = append(
+			vals,
+			fmt.Sprintf("Node ID|%s", r.BLSPubkey),
+		)
+	}
 
 	buffer.WriteString("\n[SECRETS OUTPUT]\n")
 	buffer.WriteString(helper.FormatKV(vals))
+
 	buffer.WriteString("\n")
 
 	return buffer.String()
