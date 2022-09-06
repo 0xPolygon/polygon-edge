@@ -3,6 +3,7 @@ package sampool
 import (
 	"errors"
 	"github.com/0xPolygon/polygon-edge/rootchain"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -87,6 +88,34 @@ func TestSAMPool_AddMessage(t *testing.T) {
 			err := pool.AddMessage(msg)
 
 			assert.ErrorIs(t, err, ErrStaleMessage)
+		},
+	)
+
+	t.Run(
+		"message accepted",
+		func(t *testing.T) {
+			t.Parallel()
+
+			verifier := mockVerifier{
+				verifyHash:      func(rootchain.SAM) error { return nil },
+				verifySignature: func(rootchain.SAM) error { return nil },
+			}
+
+			pool := New(verifier)
+
+			msg := rootchain.SAM{
+				Hash: types.Hash{1, 2, 3},
+				Event: rootchain.Event{
+					Number: 3,
+				},
+			}
+
+			err := pool.AddMessage(msg)
+
+			assert.NoError(t, err)
+
+			bucket := pool.messagesByNumber[msg.Number]
+			assert.True(t, bucket.exists(msg))
 		},
 	)
 }
