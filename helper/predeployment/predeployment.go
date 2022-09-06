@@ -7,7 +7,6 @@ import (
 	"math"
 	"math/big"
 	"os"
-	"strings"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
@@ -37,9 +36,9 @@ type contractArtifact struct {
 	DeployedBytecode []byte // the deployed bytecode of the Smart Contract
 }
 
-// generateContractArtifact generates contract artifacts based on the
-// passed in Smart Contract JSON ABI
-func generateContractArtifact(filepath string) (*contractArtifact, error) {
+// loadContractArtifact loads contract artifacts based on the
+// passed in Smart Contract JSON ABI from json file
+func loadContractArtifact(filepath string) (*contractArtifact, error) {
 	// Read from the ABI from the JSON file
 	jsonRaw, err := os.ReadFile(filepath)
 	if err != nil {
@@ -92,55 +91,6 @@ func generateContractArtifact(filepath string) (*contractArtifact, error) {
 	}, nil
 }
 
-// getArraySubstring fetches the substring of anything
-// that is between [ and ]
-func getArraySubstring(s string) string {
-	// Find the first occurrence of the opening bracket
-	i := strings.Index(s, "[")
-	if i >= 0 {
-		// Find last occurrence of the closing bracket
-		j := strings.LastIndex(s, "]")
-		if j >= 0 {
-			return s[i+1 : j]
-		}
-	}
-
-	return ""
-}
-
-// extractValue recursively extracts the values for subarrays
-// and packs them
-func extractValue(s string) interface{} {
-	if !strings.Contains(s, "[") {
-		return s
-	}
-
-	ret := make([]interface{}, 0)
-	arraySubstring := getArraySubstring(s)
-
-	if arraySubstring != "" {
-		splitValues := strings.Split(arraySubstring, ",")
-
-		for _, str := range splitValues {
-			ret = append(ret, extractValue(str))
-		}
-	}
-
-	return ret
-}
-
-// normalizeConstructorArguments cleans up the constructor arguments so that they
-// can be interpreted by the ABI encoder
-func normalizeConstructorArguments(constructorArgs []string) []interface{} {
-	arguments := make([]interface{}, 0)
-
-	for _, arg := range constructorArgs {
-		arguments = append(arguments, extractValue(arg))
-	}
-
-	return arguments
-}
-
 // getModifiedStorageMap fetches the modified storage map for the specified address
 func getModifiedStorageMap(radix *state.Txn, address types.Address) map[types.Hash]types.Hash {
 	storageMap := make(map[types.Hash]types.Hash)
@@ -174,7 +124,7 @@ func GenerateGenesisAccountFromFile(
 	predeployAddress types.Address,
 ) (*chain.GenesisAccount, error) {
 	// Create the artifact from JSON
-	artifact, err := generateContractArtifact(filepath)
+	artifact, err := loadContractArtifact(filepath)
 	if err != nil {
 		return nil, err
 	}
@@ -185,12 +135,17 @@ func GenerateGenesisAccountFromFile(
 		return nil, fmt.Errorf("unable to create contract ABI, %w", err)
 	}
 
+	// Constructor arguments are passed in as an array of values.
+	// Structs are treated as sub-arrays with their corresponding values laid out
+	// in ABI encoding
+	parsedArguments, err := ParseArguments(constructorArgs)
+	if err != nil {
+		return nil, err
+	}
+
 	// Encode the constructor params
 	constructor, err := abi.Encode(
-		// Constructor arguments are passed in as an array of values.
-		// Structs are treated as sub-arrays with their corresponding values laid out
-		// in ABI encoding
-		normalizeConstructorArguments(constructorArgs),
+		parsedArguments,
 		contractABI.Constructor.Inputs,
 	)
 	if err != nil {
