@@ -14,12 +14,13 @@ import (
 )
 
 const (
-	dirFlag           = "dir"
-	rootchainAddrFlag = "rootchain-addr"
-	eventABIFlag      = "event-abi"
-	methodABIFlag     = "method-abi"
-	localAddrFlag     = "local-addr"
-	payloadTypeFlag   = "payload-type"
+	dirFlag                = "dir"
+	rootchainAddrFlag      = "rootchain-addr"
+	eventABIFlag           = "event-abi"
+	methodABIFlag          = "method-abi"
+	localAddrFlag          = "local-addr"
+	payloadTypeFlag        = "payload-type"
+	blockConfirmationsFlag = "block-confirmations"
 )
 
 var (
@@ -39,12 +40,13 @@ var (
 )
 
 type rootchainParams struct {
-	configPath    string
-	rootchainAddr string
-	eventABI      string
-	methodABI     string
-	localAddr     string
-	payloadType   uint64
+	configPath         string
+	rootchainAddr      string
+	eventABI           string
+	methodABI          string
+	localAddr          string
+	payloadType        uint64
+	blockConfirmations uint64
 
 	config *rootchain.Config
 }
@@ -154,10 +156,11 @@ func (p *rootchainParams) generateConfig() error {
 	existingEvents = append(
 		existingEvents,
 		rootchain.ConfigEvent{
-			EventABI:     p.eventABI,
-			MethodABI:    p.methodABI,
-			LocalAddress: p.localAddr,
-			PayloadType:  rootchain.PayloadType(p.payloadType),
+			EventABI:           p.eventABI,
+			MethodABI:          p.methodABI,
+			LocalAddress:       p.localAddr,
+			PayloadType:        rootchain.PayloadType(p.payloadType),
+			BlockConfirmations: p.blockConfirmations,
 		},
 	)
 

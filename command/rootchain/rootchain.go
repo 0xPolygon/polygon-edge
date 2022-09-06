@@ -66,6 +66,13 @@ func setFlags(cmd *cobra.Command) {
 		0,
 		"the payload type for the rootchain event. Possible types: [0 - ValidatorSetPayload]",
 	)
+
+	cmd.Flags().Uint64Var(
+		&params.blockConfirmations,
+		blockConfirmationsFlag,
+		0,
+		"the number of blocks required for making sure the event is sealed",
+	)
 }
 
 func runPreRun(_ *cobra.Command, _ []string) error {

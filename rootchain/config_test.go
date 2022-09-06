@@ -10,21 +10,23 @@ import (
 
 func TestRootchainConfig(t *testing.T) {
 	const (
-		rootchainAddress = "0x123456"
-		eventABI         = "event ABI"
-		methodABI        = "method ABI"
-		localAddress     = "0x123123"
-		payloadType      = ValidatorSetPayload
+		rootchainAddress   = "0x123456"
+		eventABI           = "event ABI"
+		methodABI          = "method ABI"
+		localAddress       = "0x123123"
+		payloadType        = ValidatorSetPayload
+		blockConfirmations = uint64(10)
 	)
 
 	config := Config{
 		RootchainAddresses: map[string][]ConfigEvent{
 			rootchainAddress: {
 				{
-					EventABI:     eventABI,
-					MethodABI:    methodABI,
-					LocalAddress: localAddress,
-					PayloadType:  payloadType,
+					EventABI:           eventABI,
+					MethodABI:          methodABI,
+					LocalAddress:       localAddress,
+					PayloadType:        payloadType,
+					BlockConfirmations: blockConfirmations,
 				},
 			},
 		},
