@@ -33,30 +33,30 @@ func New(verifier Verifier) *SAMPool {
 	}
 }
 
-func (s *SAMPool) AddMessage(msg rootchain.SAM) error {
+func (p *SAMPool) AddMessage(msg rootchain.SAM) error {
 	//	verify message hash
-	if err := s.verifier.VerifyHash(msg); err != nil {
+	if err := p.verifier.VerifyHash(msg); err != nil {
 		return err
 	}
 
 	//	verify message signature
-	if err := s.verifier.VerifySignature(msg); err != nil {
+	if err := p.verifier.VerifySignature(msg); err != nil {
 		return err
 	}
 
 	//	reject old message
 	msgNumber := msg.Event.Number
-	if msgNumber <= s.lastProcessedMessage {
+	if msgNumber <= p.lastProcessedMessage {
 		return fmt.Errorf("%w: message number %d", ErrStaleMessage, msgNumber)
 	}
 
 	//	add message
 
 	//	TODO: lock/unlock here
-	bucket := s.messagesByNumber[msgNumber]
+	bucket := p.messagesByNumber[msgNumber]
 	if bucket == nil {
 		bucket = newBucket()
-		s.messagesByNumber[msgNumber] = bucket
+		p.messagesByNumber[msgNumber] = bucket
 	}
 
 	bucket.add(msg)
@@ -64,16 +64,25 @@ func (s *SAMPool) AddMessage(msg rootchain.SAM) error {
 	return nil
 }
 
-func (s *SAMPool) Prune(index uint64) {
+func (p *SAMPool) Prune(index uint64) {
+	//	TODO: lock/unlock
+
+	for idx := range p.messagesByNumber {
+		if idx <= index {
+			delete(p.messagesByNumber, idx)
+		}
+	}
+
+	p.lastProcessedMessage = index
 
 }
 
 //	TODO: Peek or Pop might be redundant
 
-func (s *SAMPool) Peek() rootchain.VerifiedSAM {
+func (p *SAMPool) Peek() rootchain.VerifiedSAM {
 	return nil
 }
 
-func (s *SAMPool) Pop() rootchain.VerifiedSAM {
+func (p *SAMPool) Pop() rootchain.VerifiedSAM {
 	return nil
 }
