@@ -2,7 +2,6 @@ package predeployment
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"strings"
 )
@@ -17,8 +16,6 @@ func ParseArguments(raws []string) ([]interface{}, error) {
 
 	for idx, raw := range raws {
 		if args[idx], err = parser.Parse(raw); err != nil {
-			fmt.Printf("failed idx=%d, arg=%s\n", idx, raw)
-
 			return nil, err
 		}
 	}
