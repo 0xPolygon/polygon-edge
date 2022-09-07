@@ -73,7 +73,15 @@ func (p *SAMPool) Peek() rootchain.VerifiedSAM {
 		return nil
 	}
 
-	return bucket.getQuorumMessages(p.verifier.Quorum)
+	messages := bucket.getQuorumMessages(p.verifier.Quorum)
+	if len(messages) == 0 {
+		return nil
+	}
+
+	result := make([]rootchain.SAM, len(messages))
+	copy(result, messages)
+
+	return result
 }
 
 func (p *SAMPool) Pop() rootchain.VerifiedSAM {
