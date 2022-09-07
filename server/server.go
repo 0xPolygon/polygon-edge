@@ -62,6 +62,9 @@ type Server struct {
 	// libp2p network
 	network *network.Server
 
+	// signer
+	signer crypto.TxSigner
+
 	// transaction pool
 	txpool *txpool.TxPool
 
@@ -188,8 +191,11 @@ func NewServer(config *Config) (*Server, error) {
 	genesisRoot := m.executor.WriteGenesis(config.Chain.Genesis.Alloc)
 	config.Chain.Genesis.StateRoot = genesisRoot
 
+	// use the eip155 signer
+	m.signer = crypto.NewEIP155Signer(uint64(m.config.Chain.Params.ChainID))
+
 	// blockchain object
-	m.blockchain, err = blockchain.NewBlockchain(logger, m.config.DataDir, config.Chain, nil, m.executor)
+	m.blockchain, err = blockchain.NewBlockchain(logger, m.config.DataDir, config.Chain, nil, m.executor, m.signer)
 	if err != nil {
 		return nil, err
 	}
@@ -227,9 +233,7 @@ func NewServer(config *Config) (*Server, error) {
 			return nil, err
 		}
 
-		// use the eip155 signer
-		signer := crypto.NewEIP155Signer(uint64(m.config.Chain.Params.ChainID))
-		m.txpool.SetSigner(signer)
+		m.txpool.SetSigner(m.signer)
 	}
 
 	{

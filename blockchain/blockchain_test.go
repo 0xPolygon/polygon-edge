@@ -546,24 +546,37 @@ func TestBlockchainWriteBody(t *testing.T) {
 	storage, err := memory.NewMemoryStorage(nil)
 	assert.NoError(t, err)
 
+	txFromByTxHash := make(map[types.Hash]types.Address)
+	addr := types.StringToAddress("1")
+
 	b := &Blockchain{
 		db: storage,
+		txSigner: &mockSigner{
+			txFromByTxHash: txFromByTxHash,
+		},
 	}
+
+	tx := &types.Transaction{
+		Value: big.NewInt(10),
+		V:     big.NewInt(1),
+	}
+
+	txFromByTxHash[tx.Hash] = addr
 
 	block := &types.Block{
 		Header: &types.Header{},
 		Transactions: []*types.Transaction{
-			{
-				Value: big.NewInt(10),
-				V:     big.NewInt(1),
-			},
+			tx,
 		},
 	}
+
 	block.Header.ComputeHash()
 
 	if err := b.writeBody(block); err != nil {
 		t.Fatal(err)
 	}
+
+	assert.Equal(t, addr, tx.From)
 }
 
 func TestCalculateGasLimit(t *testing.T) {

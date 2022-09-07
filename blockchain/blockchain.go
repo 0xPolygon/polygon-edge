@@ -47,6 +47,7 @@ type Blockchain struct {
 	db        storage.Storage // The Storage object (database)
 	consensus Verifier
 	executor  Executor
+	txSigner  TxSigner
 
 	config  *chain.Chain // Config containing chain information
 	genesis types.Hash   // The hash of the genesis block
@@ -92,6 +93,11 @@ type Verifier interface {
 
 type Executor interface {
 	ProcessBlock(parentRoot types.Hash, block *types.Block, blockCreator types.Address) (*state.Transition, error)
+}
+
+type TxSigner interface {
+	// Sender returns the sender of the transaction
+	Sender(tx *types.Transaction) (types.Address, error)
 }
 
 type BlockResult struct {
@@ -185,12 +191,14 @@ func NewBlockchain(
 	config *chain.Chain,
 	consensus Verifier,
 	executor Executor,
+	txSigner TxSigner,
 ) (*Blockchain, error) {
 	b := &Blockchain{
 		logger:    logger.Named("blockchain"),
 		config:    config,
 		consensus: consensus,
 		executor:  executor,
+		txSigner:  txSigner,
 		stream:    &eventStream{},
 		gpAverage: &gasPriceAverage{
 			price: big.NewInt(0),
@@ -966,10 +974,13 @@ func (b *Blockchain) updateGasPriceAvgWithBlock(block *types.Block) {
 // writeBody writes the block body to the DB.
 // Additionally, it also updates the txn lookup, for txnHash -> block lookups
 func (b *Blockchain) writeBody(block *types.Block) error {
-	body := block.Body()
+	// Recover 'from' field in tx before saving
+	if err := b.recoverTxFromFieldInBlock(block); err != nil {
+		return err
+	}
 
 	// Write the full body (txns + receipts)
-	if err := b.db.WriteBody(block.Header.Hash, body); err != nil {
+	if err := b.db.WriteBody(block.Header.Hash, block.Body()); err != nil {
 		return err
 	}
 
@@ -988,6 +999,23 @@ func (b *Blockchain) ReadTxLookup(hash types.Hash) (types.Hash, bool) {
 	v, ok := b.db.ReadTxLookup(hash)
 
 	return v, ok
+}
+
+// recoverTxFromFieldInBlock recovers 'from' fields in transactions of the given block
+func (b *Blockchain) recoverTxFromFieldInBlock(block *types.Block) error {
+	var err error
+
+	for _, tx := range block.Transactions {
+		if tx.From != types.ZeroAddress {
+			continue
+		}
+
+		if tx.From, err = b.txSigner.Sender(tx); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // verifyGasLimit is a helper function for validating a gas limit in a header
