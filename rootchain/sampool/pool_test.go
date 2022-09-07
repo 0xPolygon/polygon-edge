@@ -67,16 +67,18 @@ func TestSAMPool_AddMessage(t *testing.T) {
 			pool.lastProcessedMessage = 10
 
 			assert.ErrorIs(t,
-				pool.AddMessage(rootchain.SAM{
-					Event: rootchain.Event{Index: 3},
-				}),
+				pool.AddMessage(
+					rootchain.SAM{
+						Event: rootchain.Event{Index: 3},
+					},
+				),
 				ErrStaleMessage,
 			)
 		},
 	)
 
 	t.Run(
-		"message accepted",
+		"message added",
 		func(t *testing.T) {
 			t.Parallel()
 
@@ -111,7 +113,7 @@ func TestSAMPool_AddMessage(t *testing.T) {
 	)
 
 	t.Run(
-		"no double message",
+		"no duplicate message added",
 		func(t *testing.T) {
 			t.Parallel()
 
@@ -123,7 +125,7 @@ func TestSAMPool_AddMessage(t *testing.T) {
 			pool := New(verifier)
 
 			msg := rootchain.SAM{
-				Hash:      types.Hash{1, 2, 3},
+				Hash:      types.Hash{111},
 				Signature: []byte("signature"),
 				Event: rootchain.Event{
 					Index: 3,
@@ -149,9 +151,7 @@ func TestSAMPool_AddMessage(t *testing.T) {
 
 			//	num of messages is still 1
 			set = pool.messages[msg.Index][msg.Hash]
-			messages = set.get()
-
-			assert.Len(t, messages, 1)
+			assert.Len(t, set.get(), 1)
 		},
 	)
 }
@@ -160,7 +160,7 @@ func TestSAMPool_Prune(t *testing.T) {
 	t.Parallel()
 
 	t.Run(
-		"prune removes message",
+		"Prune removes message",
 		func(t *testing.T) {
 			t.Parallel()
 
@@ -191,7 +191,7 @@ func TestSAMPool_Prune(t *testing.T) {
 	)
 
 	t.Run(
-		"prune removes no message",
+		"Prune removes no message",
 		func(t *testing.T) {
 			t.Parallel()
 
@@ -203,7 +203,7 @@ func TestSAMPool_Prune(t *testing.T) {
 			pool := New(verifier)
 
 			msg := rootchain.SAM{
-				Hash: types.Hash{1, 2, 3},
+				Hash: types.Hash{111},
 				Event: rootchain.Event{
 					Index: 10,
 				},
@@ -257,7 +257,7 @@ func TestSAMPool_Peek(t *testing.T) {
 			pool.lastProcessedMessage = 9
 
 			msg := rootchain.SAM{
-				Hash: types.Hash{1, 2, 3},
+				Hash: types.Hash{111},
 				Event: rootchain.Event{
 					Index: 10,
 				},
@@ -283,7 +283,7 @@ func TestSAMPool_Peek(t *testing.T) {
 			pool.lastProcessedMessage = 9
 
 			msg := rootchain.SAM{
-				Hash: types.Hash{1, 2, 3},
+				Hash: types.Hash{111},
 				Event: rootchain.Event{
 					Index: 10,
 				},
@@ -310,7 +310,7 @@ func TestSAMPool_Pop(t *testing.T) {
 	)
 
 	t.Run(
-		"Pop returns nil (no quoum)",
+		"Pop returns nil (no quorum)",
 		func(t *testing.T) {
 			t.Parallel()
 
@@ -346,7 +346,6 @@ func TestSAMPool_Pop(t *testing.T) {
 			}
 
 			assert.NoError(t, pool.AddMessage(msg))
-
 			assert.NotNil(t, pool.Pop())
 
 			_, ok := pool.messages[msg.Index]
