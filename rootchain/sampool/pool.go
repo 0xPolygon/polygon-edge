@@ -23,15 +23,15 @@ type Verifier interface {
 type SAMPool struct {
 	verifier Verifier
 
-	messagesByNumber map[uint64]samBucket
+	messages map[uint64]samBucket
 
 	lastProcessedMessage uint64
 }
 
 func New(verifier Verifier) *SAMPool {
 	return &SAMPool{
-		verifier:         verifier,
-		messagesByNumber: make(map[uint64]samBucket),
+		verifier: verifier,
+		messages: make(map[uint64]samBucket),
 	}
 }
 
@@ -55,10 +55,10 @@ func (p *SAMPool) AddMessage(msg rootchain.SAM) error {
 	//	add message
 
 	//	TODO: lock/unlock here
-	bucket := p.messagesByNumber[msgNumber]
+	bucket := p.messages[msgNumber]
 	if bucket == nil {
 		bucket = newBucket()
-		p.messagesByNumber[msgNumber] = bucket
+		p.messages[msgNumber] = bucket
 	}
 
 	bucket.add(msg)
@@ -69,9 +69,9 @@ func (p *SAMPool) AddMessage(msg rootchain.SAM) error {
 func (p *SAMPool) Prune(index uint64) {
 	//	TODO: lock/unlock
 
-	for idx := range p.messagesByNumber {
+	for idx := range p.messages {
 		if idx <= index {
-			delete(p.messagesByNumber, idx)
+			delete(p.messages, idx)
 		}
 	}
 
@@ -86,7 +86,7 @@ func (p *SAMPool) Peek() rootchain.VerifiedSAM {
 
 	expectedMessageNumber := p.lastProcessedMessage + 1
 
-	bucket := p.messagesByNumber[expectedMessageNumber]
+	bucket := p.messages[expectedMessageNumber]
 	if bucket == nil {
 		return nil
 	}

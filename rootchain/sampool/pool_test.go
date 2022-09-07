@@ -96,7 +96,7 @@ func TestSAMPool_AddMessage(t *testing.T) {
 
 			assert.NoError(t, pool.AddMessage(msg))
 
-			bucket, ok := pool.messagesByNumber[msg.Number]
+			bucket, ok := pool.messages[msg.Number]
 			assert.True(t, ok)
 			assert.NotNil(t, bucket)
 
@@ -132,7 +132,7 @@ func TestSAMPool_AddMessage(t *testing.T) {
 
 			assert.NoError(t, pool.AddMessage(msg))
 
-			bucket, ok := pool.messagesByNumber[msg.Number]
+			bucket, ok := pool.messages[msg.Number]
 			assert.True(t, ok)
 			assert.NotNil(t, bucket)
 
@@ -148,7 +148,7 @@ func TestSAMPool_AddMessage(t *testing.T) {
 			assert.NoError(t, pool.AddMessage(msg))
 
 			//	num of messages is still 1
-			set = pool.messagesByNumber[msg.Number][msg.Hash]
+			set = pool.messages[msg.Number][msg.Hash]
 			messages = set.get()
 
 			assert.Len(t, messages, 1)
@@ -180,12 +180,12 @@ func TestSAMPool_Prune(t *testing.T) {
 
 			assert.NoError(t, pool.AddMessage(msg))
 
-			_, ok := pool.messagesByNumber[msg.Number]
+			_, ok := pool.messages[msg.Number]
 			assert.True(t, ok)
 
 			pool.Prune(5)
 
-			_, ok = pool.messagesByNumber[msg.Number]
+			_, ok = pool.messages[msg.Number]
 			assert.False(t, ok)
 		},
 	)
@@ -211,12 +211,12 @@ func TestSAMPool_Prune(t *testing.T) {
 
 			assert.NoError(t, pool.AddMessage(msg))
 
-			_, ok := pool.messagesByNumber[msg.Number]
+			_, ok := pool.messages[msg.Number]
 			assert.True(t, ok)
 
 			pool.Prune(5)
 
-			_, ok = pool.messagesByNumber[msg.Number]
+			_, ok = pool.messages[msg.Number]
 			assert.True(t, ok)
 		},
 	)
