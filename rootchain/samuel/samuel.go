@@ -124,13 +124,17 @@ func initEventLookupMap(
 	return lookupMap
 }
 
+// Start starts the SAMUEL module
 func (s *SAMUEL) Start() error {
 	// Start the event loop for the tracker
 	s.startEventLoop()
 
+	// Register the gossip message handler
 	return s.registerGossipHandler()
 }
 
+// registerGossipHandler registers a listener for incoming SAM messages
+// from other peers
 func (s *SAMUEL) registerGossipHandler() error {
 	return s.transport.Subscribe(func(sam *proto.SAM) {
 		// Extract the event data
@@ -162,12 +166,15 @@ func (s *SAMUEL) registerGossipHandler() error {
 	})
 }
 
+// getEventPayload retrieves a concrete payload implementation
+// based on the passed in byte array and payload type
 func (s *SAMUEL) getEventPayload(
 	eventPayload []byte,
 	payloadType uint64,
 ) (rootchain.Payload, error) {
 	switch rootchain.PayloadType(payloadType) {
 	case rootchain.ValidatorSetPayloadType:
+		// Unmarshal the data
 		vsProto := &proto.ValidatorSetPayload{}
 		if err := googleProto.Unmarshal(eventPayload, vsProto); err != nil {
 			return nil, fmt.Errorf("unable to unmarshal proto payload, %w", err)
@@ -175,6 +182,7 @@ func (s *SAMUEL) getEventPayload(
 
 		setInfo := make([]payload.ValidatorSetInfo, len(vsProto.ValidatorsInfo))
 
+		// Extract the specific info
 		for index, info := range vsProto.ValidatorsInfo {
 			setInfo[index] = payload.ValidatorSetInfo{
 				Address:      info.Address,
@@ -182,12 +190,15 @@ func (s *SAMUEL) getEventPayload(
 			}
 		}
 
+		// Return the specific Payload implementation
 		return payload.NewValidatorSetPayload(setInfo), nil
 	default:
 		return nil, errors.New("unknown payload type")
 	}
 }
 
+// startEventLoop starts the SAMUEL event monitoring loop, which retrieves
+// events from the Event Tracker, bundles them, and sends them off to other nodes
 func (s *SAMUEL) startEventLoop() {
 	subscription := s.eventTracker.Subscribe()
 
@@ -236,14 +247,23 @@ func (s *SAMUEL) startEventLoop() {
 	}()
 }
 
+// Stop stops the SAMUEL module and any underlying modules
 func (s *SAMUEL) Stop() {
-
+	// TODO
 }
 
-func (s *SAMUEL) SaveProgress(contractAddr types.Address, input []byte) {
-
+// SaveProgress notifies the SAMUEL module of which events
+// are committed to the blockchain
+func (s *SAMUEL) SaveProgress(
+	contractAddr types.Address, // local Smart Contract address
+	input []byte, // method with argument data
+) {
+	// TODO
 }
 
+// GetReadyTransactions retrieves the ready transactions which have
+// enough valid signatures
 func (s *SAMUEL) GetReadyTransactions() []types.Transaction {
+	// TODO
 	return nil
 }
