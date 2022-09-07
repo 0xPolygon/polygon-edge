@@ -62,9 +62,6 @@ type Server struct {
 	// libp2p network
 	network *network.Server
 
-	// signer
-	signer crypto.TxSigner
-
 	// transaction pool
 	txpool *txpool.TxPool
 
@@ -192,10 +189,10 @@ func NewServer(config *Config) (*Server, error) {
 	config.Chain.Genesis.StateRoot = genesisRoot
 
 	// use the eip155 signer
-	m.signer = crypto.NewEIP155Signer(uint64(m.config.Chain.Params.ChainID))
+	signer := crypto.NewEIP155Signer(uint64(m.config.Chain.Params.ChainID))
 
 	// blockchain object
-	m.blockchain, err = blockchain.NewBlockchain(logger, m.config.DataDir, config.Chain, nil, m.executor, m.signer)
+	m.blockchain, err = blockchain.NewBlockchain(logger, m.config.DataDir, config.Chain, nil, m.executor, signer)
 	if err != nil {
 		return nil, err
 	}
@@ -233,7 +230,7 @@ func NewServer(config *Config) (*Server, error) {
 			return nil, err
 		}
 
-		m.txpool.SetSigner(m.signer)
+		m.txpool.SetSigner(signer)
 	}
 
 	{
@@ -432,7 +429,6 @@ func (s *Server) setupConsensus() error {
 }
 
 type jsonRPCHub struct {
-	logger             hclog.Logger
 	state              state.State
 	restoreProgression *progress.ProgressionWrapper
 
@@ -441,7 +437,6 @@ type jsonRPCHub struct {
 	*state.Executor
 	*network.Server
 	consensus.Consensus
-	crypto.TxSigner
 }
 
 // HELPER + WRAPPER METHODS //
@@ -552,7 +547,6 @@ func (j *jsonRPCHub) GetSyncProgression() *progress.Progression {
 // setupJSONRCP sets up the JSONRPC server, using the set configuration
 func (s *Server) setupJSONRPC() error {
 	hub := &jsonRPCHub{
-		logger:             s.logger.Named("JSONRPCHub"),
 		state:              s.state,
 		restoreProgression: s.restoreProgression,
 		Blockchain:         s.blockchain,
@@ -560,7 +554,6 @@ func (s *Server) setupJSONRPC() error {
 		Executor:           s.executor,
 		Consensus:          s.consensus,
 		Server:             s.network,
-		TxSigner:           s.signer,
 	}
 
 	conf := &jsonrpc.Config{

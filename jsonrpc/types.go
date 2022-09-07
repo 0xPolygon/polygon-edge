@@ -104,10 +104,7 @@ type block struct {
 	Uncles          []types.Hash        `json:"uncles"`
 }
 
-func toBlock(
-	b *types.Block,
-	fullTx bool,
-) *block {
+func toBlock(b *types.Block, fullTx bool) *block {
 	h := b.Header
 	res := &block{
 		ParentHash:      h.ParentHash,
