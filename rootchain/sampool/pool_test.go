@@ -64,7 +64,7 @@ func TestSAMPool_AddMessage(t *testing.T) {
 			}
 
 			pool := New(verifier)
-			pool.lastProcessedMessage = 10
+			pool.lastProcessedIndex = 10
 
 			assert.ErrorIs(t,
 				pool.AddMessage(
@@ -236,7 +236,7 @@ func TestSAMPool_Peek(t *testing.T) {
 			}
 
 			pool := New(verifier)
-			pool.lastProcessedMessage = 3
+			pool.lastProcessedIndex = 3
 
 			assert.Nil(t, pool.Peek())
 		},
@@ -254,7 +254,7 @@ func TestSAMPool_Peek(t *testing.T) {
 			}
 
 			pool := New(verifier)
-			pool.lastProcessedMessage = 9
+			pool.lastProcessedIndex = 9
 
 			msg := rootchain.SAM{
 				Hash: types.Hash{111},
@@ -280,7 +280,7 @@ func TestSAMPool_Peek(t *testing.T) {
 			}
 
 			pool := New(verifier)
-			pool.lastProcessedMessage = 9
+			pool.lastProcessedIndex = 9
 
 			msg := rootchain.SAM{
 				Hash: types.Hash{111},
@@ -336,7 +336,7 @@ func TestSAMPool_Pop(t *testing.T) {
 			}
 
 			pool := New(verifier)
-			pool.lastProcessedMessage = 4
+			pool.lastProcessedIndex = 4
 
 			msg := rootchain.SAM{
 				Hash: types.Hash{1, 2, 3},
@@ -350,7 +350,7 @@ func TestSAMPool_Pop(t *testing.T) {
 
 			_, ok := pool.messages[msg.Index]
 			assert.False(t, ok)
-			assert.Equal(t, uint64(5), pool.lastProcessedMessage)
+			assert.Equal(t, uint64(5), pool.lastProcessedIndex)
 		},
 	)
 }

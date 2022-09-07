@@ -27,7 +27,7 @@ type SAMPool struct {
 	mux      sync.Mutex
 	messages map[uint64]samBucket
 
-	lastProcessedMessage uint64
+	lastProcessedIndex uint64
 }
 
 func New(verifier Verifier) *SAMPool {
@@ -58,7 +58,7 @@ func (p *SAMPool) Prune(index uint64) {
 		}
 	}
 
-	p.lastProcessedMessage = index
+	p.lastProcessedIndex = index
 }
 
 // TODO: Peek or Pop might be redundant
@@ -66,9 +66,9 @@ func (p *SAMPool) Peek() rootchain.VerifiedSAM {
 	p.mux.Lock()
 	defer p.mux.Unlock()
 
-	expectedMessageNumber := p.lastProcessedMessage + 1
+	expectedIndex := p.lastProcessedIndex + 1
 
-	bucket := p.messages[expectedMessageNumber]
+	bucket := p.messages[expectedIndex]
 	if bucket == nil {
 		return nil
 	}
@@ -88,9 +88,9 @@ func (p *SAMPool) Pop() rootchain.VerifiedSAM {
 	p.mux.Lock()
 	defer p.mux.Unlock()
 
-	expectedMessageNumber := p.lastProcessedMessage + 1
+	expectedIndex := p.lastProcessedIndex + 1
 
-	bucket := p.messages[expectedMessageNumber]
+	bucket := p.messages[expectedIndex]
 	if bucket == nil {
 		return nil
 	}
@@ -101,10 +101,10 @@ func (p *SAMPool) Pop() rootchain.VerifiedSAM {
 	}
 
 	//	remove associated bucket
-	delete(p.messages, expectedMessageNumber)
+	delete(p.messages, expectedIndex)
 
 	//	update index for next call
-	p.lastProcessedMessage = expectedMessageNumber
+	p.lastProcessedIndex = expectedIndex
 
 	return messages
 }
@@ -121,8 +121,8 @@ func (p *SAMPool) verifySAM(msg rootchain.SAM) error {
 	}
 
 	//	reject old message
-	if msgNumber := msg.Event.Index; msgNumber <= p.lastProcessedMessage {
-		return fmt.Errorf("%w: message number %d", ErrStaleMessage, msgNumber)
+	if index := msg.Index; index <= p.lastProcessedIndex {
+		return fmt.Errorf("%w: message number %d", ErrStaleMessage, index)
 	}
 
 	return nil
@@ -133,13 +133,13 @@ func (p *SAMPool) addSAM(msg rootchain.SAM) {
 	defer p.mux.Unlock()
 
 	var (
-		msgNumber = msg.Index
-		bucket    = p.messages[msgNumber]
+		index  = msg.Index
+		bucket = p.messages[index]
 	)
 
 	if bucket == nil {
 		bucket = newBucket()
-		p.messages[msgNumber] = bucket
+		p.messages[index] = bucket
 	}
 
 	bucket.add(msg)
