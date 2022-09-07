@@ -294,3 +294,64 @@ func TestSAMPool_Peek(t *testing.T) {
 		},
 	)
 }
+
+func TestSAMPool_Pop(t *testing.T) {
+	t.Parallel()
+
+	t.Run(
+		"Pop returns nil (no message)",
+		func(t *testing.T) {
+			t.Parallel()
+
+			pool := New(mockVerifier{})
+
+			assert.Nil(t, pool.Pop())
+		},
+	)
+
+	t.Run(
+		"Pop returns nil (no quoum)",
+		func(t *testing.T) {
+			t.Parallel()
+
+			verifier := mockVerifier{
+				quorumFunc: func(uint64) bool { return false },
+			}
+
+			pool := New(verifier)
+
+			assert.Nil(t, pool.Pop())
+		},
+	)
+
+	t.Run(
+		"Pop returns VerifiedSAM",
+		func(t *testing.T) {
+			t.Parallel()
+
+			verifier := mockVerifier{
+				verifyHash:      func(rootchain.SAM) error { return nil },
+				verifySignature: func(rootchain.SAM) error { return nil },
+				quorumFunc:      func(uint64) bool { return true },
+			}
+
+			pool := New(verifier)
+			pool.lastProcessedMessage = 4
+
+			msg := rootchain.SAM{
+				Hash: types.Hash{1, 2, 3},
+				Event: rootchain.Event{
+					Index: 5,
+				},
+			}
+
+			assert.NoError(t, pool.AddMessage(msg))
+
+			assert.NotNil(t, pool.Pop())
+
+			_, ok := pool.messages[msg.Index]
+			assert.False(t, ok)
+			assert.Equal(t, uint64(5), pool.lastProcessedMessage)
+		},
+	)
+}
