@@ -650,6 +650,7 @@ func (t *TestServer) CallJSONRPC(req map[string]interface{}) map[string]interfac
 		return nil
 	}
 
+	//nolint:gosec
 	url := fmt.Sprintf("http://%s", t.JSONRPCAddr())
 
 	response, err := http.Post(url, "application/json", bytes.NewReader(reqJSON))
