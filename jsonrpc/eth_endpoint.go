@@ -34,6 +34,11 @@ type ethStateStore interface {
 	GetCode(hash types.Hash) ([]byte, error)
 }
 
+type ethSignerStore interface {
+	// RecoverAddress recover 'from' field if from is empty and signatures are set
+	RecoverTxFrom(tx *types.Transaction) error
+}
+
 type ethBlockchainStore interface {
 	// Header returns the current header of the chain (genesis if empty)
 	Header() *types.Header
@@ -68,6 +73,7 @@ type ethStore interface {
 	ethTxPoolStore
 	ethStateStore
 	ethBlockchainStore
+	ethSignerStore
 }
 
 // Eth is the eth jsonrpc endpoint
@@ -160,7 +166,7 @@ func (e *Eth) GetBlockByNumber(number BlockNumber, fullTx bool) (interface{}, er
 		return nil, nil
 	}
 
-	return toBlock(block, fullTx), nil
+	return toBlock(block, fullTx, e.store, e.logger), nil
 }
 
 // GetBlockByHash returns information about a block by hash
@@ -170,7 +176,7 @@ func (e *Eth) GetBlockByHash(hash types.Hash, fullTx bool) (interface{}, error) 
 		return nil, nil
 	}
 
-	return toBlock(block, fullTx), nil
+	return toBlock(block, fullTx, e.store, e.logger), nil
 }
 
 func (e *Eth) GetBlockTransactionCountByNumber(number BlockNumber) (interface{}, error) {
@@ -249,6 +255,10 @@ func (e *Eth) GetTransactionByHash(hash types.Hash) (interface{}, error) {
 		// Find the transaction within the block
 		for idx, txn := range block.Transactions {
 			if txn.Hash == hash {
+				if err := e.store.RecoverTxFrom(txn); err != nil {
+					e.logger.Warn("failed to recover transaction's from field", "hash", txn.Hash, "err", err)
+				}
+
 				return toTransaction(
 					txn,
 					argUintPtr(block.Number()),
@@ -266,6 +276,10 @@ func (e *Eth) GetTransactionByHash(hash types.Hash) (interface{}, error) {
 	findPendingTx := func() *transaction {
 		// Check the TxPool for the transaction if it's pending
 		if pendingTx, pendingFound := e.store.GetPendingTx(hash); pendingFound {
+			if err := e.store.RecoverTxFrom(pendingTx); err != nil {
+				e.logger.Warn("failed to recover transaction's from field", "hash", pendingTx.Hash, "err", err)
+			}
+
 			return toPendingTransaction(pendingTx)
 		}
 
