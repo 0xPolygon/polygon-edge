@@ -3,6 +3,8 @@ package sampool
 import (
 	"errors"
 	"fmt"
+	"sync"
+
 	"github.com/0xPolygon/polygon-edge/rootchain"
 )
 
@@ -23,6 +25,7 @@ type Verifier interface {
 type SAMPool struct {
 	verifier Verifier
 
+	mux      sync.Mutex
 	messages map[uint64]samBucket
 
 	lastProcessedMessage uint64
@@ -31,6 +34,7 @@ type SAMPool struct {
 func New(verifier Verifier) *SAMPool {
 	return &SAMPool{
 		verifier: verifier,
+		mux:      sync.Mutex{},
 		messages: make(map[uint64]samBucket),
 	}
 }
@@ -54,7 +58,8 @@ func (p *SAMPool) AddMessage(msg rootchain.SAM) error {
 
 	//	add message
 
-	//	TODO: lock/unlock here
+	p.mux.Lock()
+
 	bucket := p.messages[msgNumber]
 	if bucket == nil {
 		bucket = newBucket()
@@ -63,11 +68,14 @@ func (p *SAMPool) AddMessage(msg rootchain.SAM) error {
 
 	bucket.add(msg)
 
+	p.mux.Unlock()
+
 	return nil
 }
 
 func (p *SAMPool) Prune(index uint64) {
-	//	TODO: lock/unlock
+	p.mux.Lock()
+	defer p.mux.Unlock()
 
 	for idx := range p.messages {
 		if idx <= index {
@@ -82,7 +90,8 @@ func (p *SAMPool) Prune(index uint64) {
 //	TODO: Peek or Pop might be redundant
 
 func (p *SAMPool) Peek() rootchain.VerifiedSAM {
-	//	TODO: lock/unlock
+	p.mux.Lock()
+	defer p.mux.Unlock()
 
 	expectedMessageNumber := p.lastProcessedMessage + 1
 
