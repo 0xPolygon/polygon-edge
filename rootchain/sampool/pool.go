@@ -59,11 +59,9 @@ func (p *SAMPool) Prune(index uint64) {
 	}
 
 	p.lastProcessedMessage = index
-
 }
 
-//	TODO: Peek or Pop might be redundant
-
+// TODO: Peek or Pop might be redundant
 func (p *SAMPool) Peek() rootchain.VerifiedSAM {
 	p.mux.Lock()
 	defer p.mux.Unlock()
@@ -76,7 +74,6 @@ func (p *SAMPool) Peek() rootchain.VerifiedSAM {
 	}
 
 	return bucket.getQuorumMessages(p.verifier.Quorum)
-
 }
 
 func (p *SAMPool) Pop() rootchain.VerifiedSAM {

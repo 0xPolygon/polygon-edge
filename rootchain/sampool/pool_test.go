@@ -68,7 +68,7 @@ func TestSAMPool_AddMessage(t *testing.T) {
 
 			assert.ErrorIs(t,
 				pool.AddMessage(rootchain.SAM{
-					Event: rootchain.Event{Number: 3},
+					Event: rootchain.Event{Index: 3},
 				}),
 				ErrStaleMessage,
 			)
@@ -90,13 +90,13 @@ func TestSAMPool_AddMessage(t *testing.T) {
 			msg := rootchain.SAM{
 				Hash: types.Hash{111},
 				Event: rootchain.Event{
-					Number: 3,
+					Index: 3,
 				},
 			}
 
 			assert.NoError(t, pool.AddMessage(msg))
 
-			bucket, ok := pool.messages[msg.Number]
+			bucket, ok := pool.messages[msg.Index]
 			assert.True(t, ok)
 			assert.NotNil(t, bucket)
 
@@ -126,13 +126,13 @@ func TestSAMPool_AddMessage(t *testing.T) {
 				Hash:      types.Hash{1, 2, 3},
 				Signature: []byte("signature"),
 				Event: rootchain.Event{
-					Number: 3,
+					Index: 3,
 				},
 			}
 
 			assert.NoError(t, pool.AddMessage(msg))
 
-			bucket, ok := pool.messages[msg.Number]
+			bucket, ok := pool.messages[msg.Index]
 			assert.True(t, ok)
 			assert.NotNil(t, bucket)
 
@@ -148,7 +148,7 @@ func TestSAMPool_AddMessage(t *testing.T) {
 			assert.NoError(t, pool.AddMessage(msg))
 
 			//	num of messages is still 1
-			set = pool.messages[msg.Number][msg.Hash]
+			set = pool.messages[msg.Index][msg.Hash]
 			messages = set.get()
 
 			assert.Len(t, messages, 1)
@@ -174,18 +174,18 @@ func TestSAMPool_Prune(t *testing.T) {
 			msg := rootchain.SAM{
 				Hash: types.Hash{111},
 				Event: rootchain.Event{
-					Number: 3,
+					Index: 3,
 				},
 			}
 
 			assert.NoError(t, pool.AddMessage(msg))
 
-			_, ok := pool.messages[msg.Number]
+			_, ok := pool.messages[msg.Index]
 			assert.True(t, ok)
 
 			pool.Prune(5)
 
-			_, ok = pool.messages[msg.Number]
+			_, ok = pool.messages[msg.Index]
 			assert.False(t, ok)
 		},
 	)
@@ -205,22 +205,21 @@ func TestSAMPool_Prune(t *testing.T) {
 			msg := rootchain.SAM{
 				Hash: types.Hash{1, 2, 3},
 				Event: rootchain.Event{
-					Number: 10,
+					Index: 10,
 				},
 			}
 
 			assert.NoError(t, pool.AddMessage(msg))
 
-			_, ok := pool.messages[msg.Number]
+			_, ok := pool.messages[msg.Index]
 			assert.True(t, ok)
 
 			pool.Prune(5)
 
-			_, ok = pool.messages[msg.Number]
+			_, ok = pool.messages[msg.Index]
 			assert.True(t, ok)
 		},
 	)
-
 }
 
 func TestSAMPool_Peek(t *testing.T) {
@@ -260,7 +259,7 @@ func TestSAMPool_Peek(t *testing.T) {
 			msg := rootchain.SAM{
 				Hash: types.Hash{1, 2, 3},
 				Event: rootchain.Event{
-					Number: 10,
+					Index: 10,
 				},
 			}
 
@@ -286,7 +285,7 @@ func TestSAMPool_Peek(t *testing.T) {
 			msg := rootchain.SAM{
 				Hash: types.Hash{1, 2, 3},
 				Event: rootchain.Event{
-					Number: 10,
+					Index: 10,
 				},
 			}
 
@@ -294,5 +293,4 @@ func TestSAMPool_Peek(t *testing.T) {
 			assert.NotNil(t, pool.Peek())
 		},
 	)
-
 }
