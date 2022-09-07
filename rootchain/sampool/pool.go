@@ -95,7 +95,7 @@ func (p *SAMPool) verifySAM(msg rootchain.SAM) error {
 	}
 
 	//	reject old message
-	if msgNumber := msg.Event.Number; msgNumber <= p.lastProcessedMessage {
+	if msgNumber := msg.Event.Index; msgNumber <= p.lastProcessedMessage {
 		return fmt.Errorf("%w: message number %d", ErrStaleMessage, msgNumber)
 	}
 
@@ -107,7 +107,7 @@ func (p *SAMPool) addSAM(msg rootchain.SAM) {
 	defer p.mux.Unlock()
 
 	var (
-		msgNumber = msg.Number
+		msgNumber = msg.Index
 		bucket    = p.messages[msgNumber]
 	)
 
