@@ -156,37 +156,6 @@ func TestEth_GetTransactionByHash(t *testing.T) {
 		assert.Nil(t, foundTxn.TxIndex)
 	})
 
-	t.Run("returns transaction with recovered address if the transaction doesn't have from field", func(t *testing.T) {
-		t.Parallel()
-
-		txFromByTxHash := make(map[types.Hash]types.Address)
-		store := &mockBlockStore{
-			txFromByTxHash: txFromByTxHash,
-		}
-		eth := newTestEthEndpoint(store)
-		block := newTestBlock(1, hash1)
-		store.add(block)
-
-		for i := 0; i < 10; i++ {
-			txn := newTestTransaction(uint64(i), types.ZeroAddress)
-			txFromByTxHash[txn.Hash] = addr2
-			block.Transactions = append(block.Transactions, txn)
-		}
-
-		testTxnIndex := 5
-		testTxn := block.Transactions[testTxnIndex]
-
-		assert.Equal(t, types.ZeroAddress, testTxn.From)
-
-		res, err := eth.GetTransactionByHash(testTxn.Hash)
-		assert.NoError(t, err)
-		assert.NotNil(t, res)
-
-		foundTxn, ok := res.(*transaction)
-		assert.True(t, ok)
-		assert.Equal(t, addr2, foundTxn.From)
-	})
-
 	t.Run("returns nil if transaction is nowhere to be found", func(t *testing.T) {
 		t.Parallel()
 
@@ -377,7 +346,6 @@ type mockBlockStore struct {
 	isSyncing       bool
 	averageGasPrice int64
 	ethCallError    error
-	txFromByTxHash  map[types.Hash]types.Address
 }
 
 func newMockBlockStore() *mockBlockStore {
@@ -561,14 +529,6 @@ func (m *mockBlockStore) ApplyTxn(header *types.Header, txn *types.Transaction) 
 }
 
 func (m *mockBlockStore) SubscribeEvents() blockchain.Subscription {
-	return nil
-}
-
-func (m *mockBlockStore) RecoverTxFrom(tx *types.Transaction) error {
-	if sender, ok := m.txFromByTxHash[tx.Hash]; ok {
-		tx.From = sender
-	}
-
 	return nil
 }
 

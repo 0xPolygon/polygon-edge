@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/state"
+	"github.com/hashicorp/go-hclog"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/stretchr/testify/assert"
@@ -577,6 +578,51 @@ func TestBlockchainWriteBody(t *testing.T) {
 	}
 
 	assert.Equal(t, addr, tx.From)
+}
+
+func TestBlockchainReadBody(t *testing.T) {
+	storage, err := memory.NewMemoryStorage(nil)
+	assert.NoError(t, err)
+
+	txFromByTxHash := make(map[types.Hash]types.Address)
+	addr := types.StringToAddress("1")
+
+	b := &Blockchain{
+		logger: hclog.NewNullLogger(),
+		db:     storage,
+		txSigner: &mockSigner{
+			txFromByTxHash: txFromByTxHash,
+		},
+	}
+
+	tx := &types.Transaction{
+		Value: big.NewInt(10),
+		V:     big.NewInt(1),
+	}
+
+	tx.ComputeHash()
+
+	block := &types.Block{
+		Header: &types.Header{},
+		Transactions: []*types.Transaction{
+			tx,
+		},
+	}
+
+	block.Header.ComputeHash()
+
+	txFromByTxHash[tx.Hash] = types.ZeroAddress
+
+	if err := b.writeBody(block); err != nil {
+		t.Fatal(err)
+	}
+
+	txFromByTxHash[tx.Hash] = addr
+
+	readBody, found := b.readBody(block.Hash())
+
+	assert.True(t, found)
+	assert.Equal(t, addr, readBody.Transactions[0].From)
 }
 
 func TestCalculateGasLimit(t *testing.T) {

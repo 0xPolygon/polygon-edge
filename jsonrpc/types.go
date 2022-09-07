@@ -7,7 +7,6 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/hashicorp/go-hclog"
 )
 
 // For union type of transaction and types.Hash
@@ -108,8 +107,6 @@ type block struct {
 func toBlock(
 	b *types.Block,
 	fullTx bool,
-	signer ethSignerStore,
-	logger hclog.Logger,
 ) *block {
 	h := b.Header
 	res := &block{
@@ -137,10 +134,6 @@ func toBlock(
 
 	for idx, txn := range b.Transactions {
 		if fullTx {
-			if err := signer.RecoverTxFrom(txn); err != nil {
-				logger.Warn("failed to recover transaction's from field", "hash", txn.Hash, "err", err)
-			}
-
 			res.Transactions = append(
 				res.Transactions,
 				toTransaction(

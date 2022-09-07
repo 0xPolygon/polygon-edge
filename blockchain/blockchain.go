@@ -579,6 +579,13 @@ func (b *Blockchain) readBody(hash types.Hash) (*types.Body, bool) {
 		return nil, false
 	}
 
+	// To return from field in the transactions of the past blocks
+	if updated := b.recoverAllFromFieldsInTransactions(bb.Transactions); updated {
+		if err := b.db.WriteBody(hash, bb); err != nil {
+			b.logger.Warn("failed to write body into storage", "hash", hash, "err", err)
+		}
+	}
+
 	return bb, true
 }
 
@@ -975,7 +982,9 @@ func (b *Blockchain) updateGasPriceAvgWithBlock(block *types.Block) {
 // Additionally, it also updates the txn lookup, for txnHash -> block lookups
 func (b *Blockchain) writeBody(block *types.Block) error {
 	// Recover 'from' field in tx before saving
-	if err := b.recoverTxFromFieldInBlock(block); err != nil {
+	// Because the block passed from the consensus layer doesn't have from field in tx,
+	// due to missing encoding in RLP
+	if err := b.recoverFromFieldsInBlock(block); err != nil {
 		return err
 	}
 
@@ -1001,21 +1010,47 @@ func (b *Blockchain) ReadTxLookup(hash types.Hash) (types.Hash, bool) {
 	return v, ok
 }
 
-// recoverTxFromFieldInBlock recovers 'from' fields in transactions of the given block
-func (b *Blockchain) recoverTxFromFieldInBlock(block *types.Block) error {
-	var err error
-
+// recoverFromFields recovers 'from' fields in the transactions of the given block
+// return error if the invalid signature found
+func (b *Blockchain) recoverFromFieldsInBlock(block *types.Block) error {
 	for _, tx := range block.Transactions {
 		if tx.From != types.ZeroAddress {
 			continue
 		}
 
-		if tx.From, err = b.txSigner.Sender(tx); err != nil {
+		sender, err := b.txSigner.Sender(tx)
+		if err != nil {
 			return err
 		}
+
+		tx.From = sender
 	}
 
 	return nil
+}
+
+// recoverFromFieldsInTransactions recovers 'from' fields in the transactions
+// log as warning if failing to recover one address
+func (b *Blockchain) recoverAllFromFieldsInTransactions(transactions []*types.Transaction) bool {
+	updated := false
+
+	for _, tx := range transactions {
+		if tx.From != types.ZeroAddress {
+			continue
+		}
+
+		sender, err := b.txSigner.Sender(tx)
+		if err != nil {
+			b.logger.Warn("failed to recover from address in Tx", "hash", tx.Hash, "err", err)
+
+			continue
+		}
+
+		tx.From = sender
+		updated = true
+	}
+
+	return updated
 }
 
 // verifyGasLimit is a helper function for validating a gas limit in a header

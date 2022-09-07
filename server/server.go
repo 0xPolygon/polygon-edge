@@ -432,6 +432,7 @@ func (s *Server) setupConsensus() error {
 }
 
 type jsonRPCHub struct {
+	logger             hclog.Logger
 	state              state.State
 	restoreProgression *progress.ProgressionWrapper
 
@@ -546,27 +547,12 @@ func (j *jsonRPCHub) GetSyncProgression() *progress.Progression {
 	return nil
 }
 
-// RecoverTxFrom recovers sender address from the signatures and set it to From field
-func (j *jsonRPCHub) RecoverTxFrom(tx *types.Transaction) error {
-	if tx.From != types.ZeroAddress || tx.R == nil && tx.S == nil && tx.V == nil {
-		return nil
-	}
-
-	sender, err := j.TxSigner.Sender(tx)
-	if err != nil {
-		return err
-	}
-
-	tx.From = sender
-
-	return nil
-}
-
 // SETUP //
 
 // setupJSONRCP sets up the JSONRPC server, using the set configuration
 func (s *Server) setupJSONRPC() error {
 	hub := &jsonRPCHub{
+		logger:             s.logger.Named("JSONRPCHub"),
 		state:              s.state,
 		restoreProgression: s.restoreProgression,
 		Blockchain:         s.blockchain,
