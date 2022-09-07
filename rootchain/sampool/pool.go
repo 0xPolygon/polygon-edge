@@ -11,10 +11,9 @@ import (
 var (
 	ErrInvalidHash      = errors.New("invalid SAM hash")
 	ErrInvalidSignature = errors.New("invalid SAM signature")
-	ErrStaleMessage     = errors.New("stale message received")
+	ErrStaleMessage     = errors.New("stale SAM received")
 )
 
-//	Verifies hash and signature of a SAM
 type Verifier interface {
 	VerifyHash(rootchain.SAM) error
 	VerifySignature(rootchain.SAM) error
@@ -40,35 +39,11 @@ func New(verifier Verifier) *SAMPool {
 }
 
 func (p *SAMPool) AddMessage(msg rootchain.SAM) error {
-	//	verify message hash
-	if err := p.verifier.VerifyHash(msg); err != nil {
-		return fmt.Errorf("%w: %v", ErrInvalidHash, err)
+	if err := p.verifySAM(msg); err != nil {
+		return err
 	}
 
-	//	verify message signature
-	if err := p.verifier.VerifySignature(msg); err != nil {
-		return fmt.Errorf("%w: %v", ErrInvalidSignature, err)
-	}
-
-	//	reject old message
-	msgNumber := msg.Event.Number
-	if msgNumber <= p.lastProcessedMessage {
-		return fmt.Errorf("%w: message number %d", ErrStaleMessage, msgNumber)
-	}
-
-	//	add message
-
-	p.mux.Lock()
-
-	bucket := p.messages[msgNumber]
-	if bucket == nil {
-		bucket = newBucket()
-		p.messages[msgNumber] = bucket
-	}
-
-	bucket.add(msg)
-
-	p.mux.Unlock()
+	p.addSAM(msg)
 
 	return nil
 }
@@ -106,4 +81,40 @@ func (p *SAMPool) Peek() rootchain.VerifiedSAM {
 
 func (p *SAMPool) Pop() rootchain.VerifiedSAM {
 	return nil
+}
+
+func (p *SAMPool) verifySAM(msg rootchain.SAM) error {
+	//	verify message hash
+	if err := p.verifier.VerifyHash(msg); err != nil {
+		return fmt.Errorf("%w: %v", ErrInvalidHash, err)
+	}
+
+	//	verify message signature
+	if err := p.verifier.VerifySignature(msg); err != nil {
+		return fmt.Errorf("%w: %v", ErrInvalidSignature, err)
+	}
+
+	//	reject old message
+	if msgNumber := msg.Event.Number; msgNumber <= p.lastProcessedMessage {
+		return fmt.Errorf("%w: message number %d", ErrStaleMessage, msgNumber)
+	}
+
+	return nil
+}
+
+func (p *SAMPool) addSAM(msg rootchain.SAM) {
+	p.mux.Lock()
+	defer p.mux.Unlock()
+
+	var (
+		msgNumber = msg.Number
+		bucket    = p.messages[msgNumber]
+	)
+
+	if bucket == nil {
+		bucket = newBucket()
+		p.messages[msgNumber] = bucket
+	}
+
+	bucket.add(msg)
 }
