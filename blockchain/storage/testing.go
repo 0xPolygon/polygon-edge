@@ -469,31 +469,36 @@ type writeReceiptsDelegate func(types.Hash, []*types.Receipt) error
 type readReceiptsDelegate func(types.Hash) ([]*types.Receipt, error)
 type writeTxLookupDelegate func(types.Hash, types.Hash) error
 type readTxLookupDelegate func(types.Hash) (types.Hash, bool)
+type writeLastProcessedEvent func(string, string) error
+type readLastProcessedEvent func(string) (string, bool)
 type closeDelegate func() error
 
 type MockStorage struct {
-	readCanonicalHashFn    readCanonicalHashDelegate
-	writeCanonicalHashFn   writeCanonicalHashDelegate
-	readHeadHashFn         readHeadHashDelegate
-	readHeadNumberFn       readHeadNumberDelegate
-	writeHeadHashFn        writeHeadHashDelegate
-	writeHeadNumberFn      writeHeadNumberDelegate
-	writeForksFn           writeForksDelegate
-	readForksFn            readForksDelegate
-	writeTotalDifficultyFn writeTotalDifficultyDelegate
-	readTotalDifficultyFn  readTotalDifficultyDelegate
-	writeHeaderFn          writeHeaderDelegate
-	readHeaderFn           readHeaderDelegate
-	writeCanonicalHeaderFn writeCanonicalHeaderDelegate
-	writeBodyFn            writeBodyDelegate
-	readBodyFn             readBodyDelegate
-	writeSnapshotFn        writeSnapshotDelegate
-	readSnapshotFn         readSnapshotDelegate
-	writeReceiptsFn        writeReceiptsDelegate
-	readReceiptsFn         readReceiptsDelegate
-	writeTxLookupFn        writeTxLookupDelegate
-	readTxLookupFn         readTxLookupDelegate
-	closeFn                closeDelegate
+	readCanonicalHashFn       readCanonicalHashDelegate
+	writeCanonicalHashFn      writeCanonicalHashDelegate
+	readHeadHashFn            readHeadHashDelegate
+	readHeadNumberFn          readHeadNumberDelegate
+	writeHeadHashFn           writeHeadHashDelegate
+	writeHeadNumberFn         writeHeadNumberDelegate
+	writeForksFn              writeForksDelegate
+	readForksFn               readForksDelegate
+	writeTotalDifficultyFn    writeTotalDifficultyDelegate
+	readTotalDifficultyFn     readTotalDifficultyDelegate
+	writeHeaderFn             writeHeaderDelegate
+	readHeaderFn              readHeaderDelegate
+	writeCanonicalHeaderFn    writeCanonicalHeaderDelegate
+	writeBodyFn               writeBodyDelegate
+	readBodyFn                readBodyDelegate
+	writeSnapshotFn           writeSnapshotDelegate
+	readSnapshotFn            readSnapshotDelegate
+	writeReceiptsFn           writeReceiptsDelegate
+	readReceiptsFn            readReceiptsDelegate
+	writeTxLookupFn           writeTxLookupDelegate
+	readTxLookupFn            readTxLookupDelegate
+	writeLastProcessedEventFn writeLastProcessedEvent
+	readLastProcessedEventFn  readLastProcessedEvent
+
+	closeFn closeDelegate
 }
 
 func NewMockStorage() *MockStorage {
@@ -762,4 +767,20 @@ func (m *MockStorage) Close() error {
 
 func (m *MockStorage) HookClose(fn closeDelegate) {
 	m.closeFn = fn
+}
+
+func (m *MockStorage) ReadLastProcessedEvent(contractAddr string) (string, bool) {
+	if m.readLastProcessedEventFn != nil {
+		return m.readLastProcessedEventFn(contractAddr)
+	}
+
+	return "", false
+}
+
+func (m *MockStorage) WriteLastProcessedEvent(data string, contractAddr string) error {
+	if m.writeLastProcessedEventFn != nil {
+		return m.writeLastProcessedEventFn(data, contractAddr)
+	}
+
+	return nil
 }

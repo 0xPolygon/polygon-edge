@@ -39,6 +39,9 @@ var (
 
 	// TX_LOOKUP_PREFIX is the prefix for transaction lookups
 	TX_LOOKUP_PREFIX = []byte("l")
+
+	// LAST_PROCESSED_EVENT is the prefix for the last processed event lookups
+	LAST_PROCESSED_EVENT = []byte("last_processed_event")
 )
 
 // Sub-prefixes
@@ -282,6 +285,21 @@ func (s *KeyValueStorage) ReadTxLookup(hash types.Hash) (types.Hash, bool) {
 	}
 
 	return types.BytesToHash(blockHash), true
+}
+
+// ReadLastProcessedEvent reads the last processed event info
+func (s *KeyValueStorage) ReadLastProcessedEvent(contractAddr string) (string, bool) {
+	data, ok := s.get(LAST_PROCESSED_EVENT, []byte(contractAddr))
+	if !ok {
+		return "", false
+	}
+
+	return string(data), true
+}
+
+// WriteLastProcessedEvent writes the last processed event info
+func (s *KeyValueStorage) WriteLastProcessedEvent(data string, contractAddr string) error {
+	return s.set(LAST_PROCESSED_EVENT, []byte(contractAddr), []byte(data))
 }
 
 // WRITE OPERATIONS //

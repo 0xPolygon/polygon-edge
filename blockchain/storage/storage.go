@@ -40,6 +40,9 @@ type Storage interface {
 	WriteTxLookup(hash types.Hash, blockHash types.Hash) error
 	ReadTxLookup(hash types.Hash) (types.Hash, bool)
 
+	ReadLastProcessedEvent(contractAddr string) (string, bool)
+	WriteLastProcessedEvent(data string, contractAddr string) error
+
 	Close() error
 }
 

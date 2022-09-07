@@ -7,7 +7,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 )
 
-var transportProto = "/rootchain/0.1"
+const transportProto = "/rootchain/0.1"
 
 type libp2pGossipTransport struct {
 	logger  hclog.Logger

@@ -3,6 +3,8 @@ package samuel
 import (
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 
 	"github.com/0xPolygon/polygon-edge/blockchain/storage"
 	"github.com/0xPolygon/polygon-edge/crypto"
@@ -61,16 +63,16 @@ type transport interface {
 
 // eventData holds information on event data mapping
 type eventData struct {
-	payloadType rootchain.PayloadType
-	eventABI    *abi.Event
-	methodABI   *abi.ABI
+	payloadType  rootchain.PayloadType
+	eventABI     *abi.Event
+	methodABI    *abi.Method
+	localAddress string
 }
 
 // SAMUEL is the module that coordinates activities with the SAMP and Event Tracker
 type SAMUEL struct {
-	// eventLookup maps the local Smart Contract address to the event data
-	eventLookup map[types.Address]eventData
-	logger      hclog.Logger
+	eventData eventData
+	logger    hclog.Logger
 
 	eventTracker eventTracker
 	samp         samp
@@ -81,7 +83,7 @@ type SAMUEL struct {
 
 // NewSamuel creates a new SAMUEL instance
 func NewSamuel(
-	config *rootchain.Config,
+	configEvent *rootchain.ConfigEvent,
 	logger hclog.Logger,
 	eventTracker eventTracker,
 	samp samp,
@@ -91,7 +93,7 @@ func NewSamuel(
 ) *SAMUEL {
 	return &SAMUEL{
 		logger:       logger.Named("SAMUEL"),
-		eventLookup:  initEventLookupMap(config),
+		eventData:    initEventData(configEvent),
 		eventTracker: eventTracker,
 		samp:         samp,
 		signer:       signer,
@@ -102,26 +104,14 @@ func NewSamuel(
 
 // initEventLookupMap generates the SAMUEL event data lookup map from the
 // passed in rootchain configuration
-func initEventLookupMap(
-	config *rootchain.Config,
-) map[types.Address]eventData {
-	lookupMap := make(map[types.Address]eventData)
-
-	for rootchainAddr := range config.RootchainAddresses {
-		// Grab the config events for the specific rootchain WS address
-		configEvents := config.RootchainAddresses[rootchainAddr]
-
-		// Initialize the lookup map with these events
-		for _, chainEvent := range configEvents {
-			lookupMap[types.StringToAddress(chainEvent.LocalAddress)] = eventData{
-				payloadType: chainEvent.PayloadType,
-				eventABI:    abi.MustNewEvent(chainEvent.EventABI),
-				methodABI:   abi.MustNewABI(chainEvent.MethodABI),
-			}
-		}
+func initEventData(
+	configEvent *rootchain.ConfigEvent,
+) eventData {
+	return eventData{
+		payloadType: configEvent.PayloadType,
+		eventABI:    abi.MustNewEvent(configEvent.EventABI),
+		methodABI:   abi.MustNewABI(configEvent.MethodABI).GetMethod(configEvent.MethodName),
 	}
-
-	return lookupMap
 }
 
 // Start starts the SAMUEL module
@@ -130,7 +120,43 @@ func (s *SAMUEL) Start() error {
 	s.startEventLoop()
 
 	// Register the gossip message handler
-	return s.registerGossipHandler()
+	if err := s.registerGossipHandler(); err != nil {
+		return fmt.Errorf("unable to register gossip handler, %w", err)
+	}
+
+	// Fetch the latest event data
+	startBlock, err := s.getStartBlockNumber()
+	if err != nil {
+		return fmt.Errorf("unable to get start block number, %w", err)
+	}
+
+	// Start the Event Tracker
+	s.eventTracker.Start(startBlock)
+
+	return nil
+}
+
+// getStartBlockNumber determines the starting block for the Event Tracker
+func (s *SAMUEL) getStartBlockNumber() (uint64, error) {
+	startBlock := rootchain.LatestRootchainBlockNumber
+
+	data, exists := s.storage.ReadLastProcessedEvent(s.eventData.localAddress)
+	if exists && data != "" {
+		// index:blockNumber
+		values := strings.Split(data, ":")
+		if len(values) < 2 {
+			return 0, fmt.Errorf("invalid last processed event in DB: %v", values)
+		}
+
+		blockNumber, err := strconv.ParseUint(values[1], 10, 64)
+		if err != nil {
+			return 0, fmt.Errorf("unable to parse last processed block number in DB: %w", err)
+		}
+
+		startBlock = blockNumber
+	}
+
+	return startBlock, nil
 }
 
 // registerGossipHandler registers a listener for incoming SAM messages
@@ -249,7 +275,8 @@ func (s *SAMUEL) startEventLoop() {
 
 // Stop stops the SAMUEL module and any underlying modules
 func (s *SAMUEL) Stop() {
-	// TODO
+	// Stop the Event Tracker
+	s.eventTracker.Stop()
 }
 
 // SaveProgress notifies the SAMUEL module of which events
@@ -258,7 +285,53 @@ func (s *SAMUEL) SaveProgress(
 	contractAddr types.Address, // local Smart Contract address
 	input []byte, // method with argument data
 ) {
-	// TODO
+	if contractAddr != types.StringToAddress(s.eventData.localAddress) {
+		s.logger.Warn(
+			fmt.Sprintf("Attempted to save progress for unknown contract %s", contractAddr),
+		)
+
+		return
+	}
+
+	params, err := s.eventData.methodABI.Decode(input)
+	if err != nil {
+		s.logger.Error(
+			fmt.Sprintf("Unable to decode event params for contract %s, %v", contractAddr, err),
+		)
+
+		return
+	}
+
+	switch s.eventData.payloadType {
+	case rootchain.ValidatorSetPayloadType:
+		// The method needs to contain
+		// (validatorSet[], index, blockNumber)
+		index, _ := params["index"].(uint64)
+		blockNumber, _ := params["blockNumber"].(uint64)
+
+		// Save to the local database
+		if err := s.storage.WriteLastProcessedEvent(
+			fmt.Sprintf("%d:%d", index, blockNumber),
+			contractAddr.String(),
+		); err != nil {
+			s.logger.Error(
+				fmt.Sprintf(
+					"Unable to save last processed event for contract %s, %v",
+					contractAddr,
+					err,
+				),
+			)
+
+			return
+		}
+
+		// Realign the local SAMP
+		s.samp.Prune(index)
+	default:
+		s.logger.Error("Unknown payload type")
+
+		return
+	}
 }
 
 // GetReadyTransactions retrieves the ready transactions which have
