@@ -176,6 +176,9 @@ func (s *SAMUEL) registerGossipHandler() error {
 			return
 		}
 
+		// TODO add hash verification
+		// TODO add signature verification
+
 		// Convert the proto event to a local SAM
 		localSAM := rootchain.SAM{
 			Hash:      types.BytesToHash(sam.Hash),
