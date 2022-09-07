@@ -70,7 +70,7 @@ func setFlags(cmd *cobra.Command) {
 	cmd.Flags().Uint64Var(
 		&params.blockConfirmations,
 		blockConfirmationsFlag,
-		0,
+		6,
 		"the number of blocks required for making sure the event is sealed",
 	)
 }
