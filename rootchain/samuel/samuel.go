@@ -337,16 +337,14 @@ func (s *SAMUEL) SaveProgress(
 	}
 }
 
-// GetReadyTransactions retrieves the ready transactions which have
+// GetReadyTransaction retrieves the ready SAMP transaction which has
 // enough valid signatures
-func (s *SAMUEL) GetReadyTransactions() *types.Transaction {
-	// Check if there are any
-	if len(s.samp.Peek()) == 0 {
+func (s *SAMUEL) GetReadyTransaction() *types.Transaction {
+	// Get the latest verified SAM
+	verifiedSAM := s.samp.Peek()
+	if verifiedSAM == nil {
 		return nil
 	}
-
-	// Get the latest verified SAM
-	verifiedSAM := s.samp.Pop()
 
 	// Extract the required data
 	SAM := []rootchain.SAM(verifiedSAM)[0]
@@ -358,6 +356,7 @@ func (s *SAMUEL) GetReadyTransactions() *types.Transaction {
 	// Extract the payload info
 	payloadType, payloadData := SAM.Payload.Get()
 	rawPayload, err := getEventPayload(payloadData, uint64(payloadType))
+
 	if err != nil {
 		s.logger.Error(
 			fmt.Sprintf(
@@ -370,7 +369,7 @@ func (s *SAMUEL) GetReadyTransactions() *types.Transaction {
 
 	switch payloadType {
 	case rootchain.ValidatorSetPayloadType:
-		vs := rawPayload.(*payload.ValidatorSetPayload)
+		vs, _ := rawPayload.(*payload.ValidatorSetPayload)
 
 		// The method should have the signature
 		// methodName(validatorSet tuple[], index uint64, blockNumber uint64, signatures [][]byte)
@@ -386,7 +385,7 @@ func (s *SAMUEL) GetReadyTransactions() *types.Transaction {
 		if err != nil {
 			s.logger.Error(
 				fmt.Sprintf(
-					"Unable to encode method arguements for SAM %s, %v",
+					"Unable to encode method arguments for SAM %s, %v",
 					SAM.Hash.String(),
 					err,
 				),
@@ -411,4 +410,9 @@ func (s *SAMUEL) GetReadyTransactions() *types.Transaction {
 	}
 
 	return nil
+}
+
+// PopReadyTransaction removes the latest ready transaction from the SAMP
+func (s *SAMUEL) PopReadyTransaction() {
+	s.samp.Pop()
 }
