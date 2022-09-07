@@ -5,19 +5,19 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-type uniqueSAMs struct {
+type samSet struct {
 	messages   []rootchain.SAM
 	signatures map[string]bool
 }
 
-func newUniqueSAMs() uniqueSAMs {
-	return uniqueSAMs{
+func newUniqueSAMs() samSet {
+	return samSet{
 		messages:   make([]rootchain.SAM, 0),
 		signatures: make(map[string]bool),
 	}
 }
 
-func (s *uniqueSAMs) add(msg rootchain.SAM) {
+func (s *samSet) add(msg rootchain.SAM) {
 	strSignature := string(msg.Signature)
 
 	if s.signatures[strSignature] {
@@ -28,14 +28,14 @@ func (s *uniqueSAMs) add(msg rootchain.SAM) {
 	s.signatures[strSignature] = true
 }
 
-func (s *uniqueSAMs) get() []rootchain.SAM {
+func (s *samSet) get() []rootchain.SAM {
 	return s.messages
 }
 
-type samBucket map[types.Hash]uniqueSAMs
+type samBucket map[types.Hash]samSet
 
 func newBucket() samBucket {
-	return make(map[types.Hash]uniqueSAMs)
+	return make(map[types.Hash]samSet)
 }
 
 func (b samBucket) add(msg rootchain.SAM) {
