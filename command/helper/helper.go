@@ -12,6 +12,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
 	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
+	"github.com/0xPolygon/polygon-edge/rootchain"
 	"github.com/0xPolygon/polygon-edge/server"
 	"github.com/0xPolygon/polygon-edge/server/proto"
 	txpoolOp "github.com/0xPolygon/polygon-edge/txpool/proto"
@@ -247,4 +248,19 @@ func SetRequiredFlags(cmd *cobra.Command, requiredFlags []string) {
 	for _, requiredFlag := range requiredFlags {
 		_ = cmd.MarkFlagRequired(requiredFlag)
 	}
+}
+
+// WriteRootchainConfigToDisk writes the passed in rootchain config to the specified path
+func WriteRootchainConfigToDisk(rootchainConfig *rootchain.Config, configPath string) error {
+	data, err := json.MarshalIndent(rootchainConfig, "", "    ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal rootchain config: %w", err)
+	}
+
+	//nolint:gosec
+	if err := ioutil.WriteFile(configPath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write rootchain config: %w", err)
+	}
+
+	return nil
 }

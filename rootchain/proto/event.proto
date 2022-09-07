@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package v1;
+
+option go_package = "/rootchain/proto";
+
+// Event describes an ordered rootchain event
+message Event {
+  // The unique, ordered index of the event
+  uint64 index = 1;
+
+  // The block number on the rootchain associated
+  // with the event
+  uint64 blockNumber = 2;
+
+  // The underlying payload
+  bytes payload = 3;
+}
