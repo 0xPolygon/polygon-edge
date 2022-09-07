@@ -85,7 +85,28 @@ func (p *SAMPool) Peek() rootchain.VerifiedSAM {
 }
 
 func (p *SAMPool) Pop() rootchain.VerifiedSAM {
-	return nil
+	p.mux.Lock()
+	defer p.mux.Unlock()
+
+	expectedMessageNumber := p.lastProcessedMessage + 1
+
+	bucket := p.messages[expectedMessageNumber]
+	if bucket == nil {
+		return nil
+	}
+
+	messages := bucket.getQuorumMessages(p.verifier.Quorum)
+	if len(messages) == 0 {
+		return nil
+	}
+
+	//	remove associated bucket
+	delete(p.messages, expectedMessageNumber)
+
+	//	update index for next call
+	p.lastProcessedMessage = expectedMessageNumber
+
+	return messages
 }
 
 func (p *SAMPool) verifySAM(msg rootchain.SAM) error {
