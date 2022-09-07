@@ -54,13 +54,13 @@ func (b samBucket) exists(msg rootchain.SAM) bool {
 	return ok
 }
 
-type countFunc func(uint64) bool
+type quorumFunc func(uint64) bool
 
-func (b samBucket) getReadyMessages(count countFunc) []rootchain.SAM {
+func (b samBucket) getReadyMessages(quorum quorumFunc) []rootchain.SAM {
 	for _, messages := range b {
 		unique := messages.get()
 
-		if count(uint64(len(unique))) {
+		if quorum(uint64(len(unique))) {
 			return unique
 		}
 	}
