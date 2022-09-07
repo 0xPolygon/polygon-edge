@@ -650,8 +650,9 @@ func (t *TestServer) CallJSONRPC(req map[string]interface{}) map[string]interfac
 		return nil
 	}
 
-	url := fmt.Sprintf("http://%s", t.JSONRPCAddr()) //nolint:gosec // this is not used because it can't be defined as a global variable
+	url := fmt.Sprintf("http://%s", t.JSONRPCAddr())
 
+	//nolint:gosec // this is not used because it can't be defined as a global variable
 	response, err := http.Post(url, "application/json", bytes.NewReader(reqJSON))
 	if err != nil {
 		t.t.Fatalf("failed to send request to JSON-RPC server: %v", err)
