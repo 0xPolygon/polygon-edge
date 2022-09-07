@@ -12,82 +12,66 @@ func TestSAMPool_AddMessage(t *testing.T) {
 	t.Parallel()
 
 	t.Run(
-		"bad hash",
+		"ErrInvalidHash",
 		func(t *testing.T) {
 			t.Parallel()
 
 			verifier := mockVerifier{
 				verifyHash: func(msg rootchain.SAM) error {
-					return errors.New("asdasd")
+					return errors.New("a really bad hash")
 				},
 			}
 
 			pool := New(verifier)
 
-			msg := rootchain.SAM{
-				//Hash: [32]byte("some really bad hash"),
-			}
-
-			err := pool.AddMessage(msg)
-
-			assert.Error(t, err)
+			assert.ErrorIs(t,
+				pool.AddMessage(rootchain.SAM{}),
+				ErrInvalidHash,
+			)
 		},
 	)
 
 	t.Run(
-		"bad signature",
+		"ErrInvalidSignature",
 		func(t *testing.T) {
 			t.Parallel()
 
 			verifier := mockVerifier{
-				verifyHash: func(sam rootchain.SAM) error {
-					return nil
-				},
+				verifyHash: func(sam rootchain.SAM) error { return nil },
 
 				verifySignature: func(sam rootchain.SAM) error {
-					return errors.New("some really bad signature")
+					return errors.New("a really bad signature")
 				},
 			}
 
 			pool := New(verifier)
 
-			msg := rootchain.SAM{
-				Signature: []byte("some really bad signature"),
-			}
-
-			err := pool.AddMessage(msg)
-
-			assert.Error(t, err)
+			assert.ErrorIs(t,
+				pool.AddMessage(rootchain.SAM{}),
+				ErrInvalidSignature,
+			)
 		},
 	)
 
 	t.Run(
-		"reject stale message",
+		"ErrStaleMessage",
 		func(t *testing.T) {
 			t.Parallel()
 
 			verifier := mockVerifier{
-				verifyHash: func(sam rootchain.SAM) error {
-					return nil
-				},
-				verifySignature: func(sam rootchain.SAM) error {
-					return nil
-				},
-				quorumFunc: nil,
+				verifyHash:      func(sam rootchain.SAM) error { return nil },
+				verifySignature: func(sam rootchain.SAM) error { return nil },
 			}
 
 			pool := New(verifier)
 			pool.lastProcessedMessage = 10
 
-			msg := rootchain.SAM{
-				Event: rootchain.Event{
-					Number: 5,
-				},
-			}
-
-			err := pool.AddMessage(msg)
-
-			assert.ErrorIs(t, err, ErrStaleMessage)
+			assert.ErrorIs(t,
+				pool.AddMessage(rootchain.SAM{
+					Event: rootchain.Event{Number: 3},
+				}),
+				ErrStaleMessage,
+			)
 		},
 	)
 
@@ -104,18 +88,25 @@ func TestSAMPool_AddMessage(t *testing.T) {
 			pool := New(verifier)
 
 			msg := rootchain.SAM{
-				Hash: types.Hash{1, 2, 3},
+				Hash: types.Hash{111},
 				Event: rootchain.Event{
 					Number: 3,
 				},
 			}
 
-			err := pool.AddMessage(msg)
+			assert.NoError(t, pool.AddMessage(msg))
 
-			assert.NoError(t, err)
+			bucket, ok := pool.messagesByNumber[msg.Number]
+			assert.True(t, ok)
+			assert.NotNil(t, bucket)
 
-			bucket := pool.messagesByNumber[msg.Number]
-			assert.True(t, bucket.exists(msg))
+			set, ok := bucket[msg.Hash]
+			assert.True(t, ok)
+			assert.NotNil(t, set)
+
+			messages := set.get()
+			assert.NotNil(t, messages)
+			assert.Len(t, messages, 1)
 		},
 	)
 
@@ -145,14 +136,22 @@ func TestSAMPool_AddMessage(t *testing.T) {
 			assert.True(t, ok)
 			assert.NotNil(t, bucket)
 
-			messages, ok := bucket[msg.Hash]
+			set, ok := bucket[msg.Hash]
 			assert.True(t, ok)
-			assert.Len(t, messages.get(), 1)
+			assert.NotNil(t, set)
 
+			messages := set.get()
+			assert.NotNil(t, messages)
+			assert.Len(t, messages, 1)
+
+			//	add the message again
 			assert.NoError(t, pool.AddMessage(msg))
 
-			messages = pool.messagesByNumber[msg.Number][msg.Hash]
-			assert.Len(t, messages.get(), 1)
+			//	num of messages is still 1
+			set = pool.messagesByNumber[msg.Number][msg.Hash]
+			messages = set.get()
+
+			assert.Len(t, messages, 1)
 		},
 	)
 }
@@ -173,22 +172,21 @@ func TestSAMPool_Prune(t *testing.T) {
 			pool := New(verifier)
 
 			msg := rootchain.SAM{
-				Hash: types.Hash{1, 2, 3},
+				Hash: types.Hash{111},
 				Event: rootchain.Event{
 					Number: 3,
 				},
 			}
 
-			err := pool.AddMessage(msg)
-			assert.NoError(t, err)
+			assert.NoError(t, pool.AddMessage(msg))
 
-			bucket := pool.messagesByNumber[msg.Number]
-			assert.True(t, bucket.exists(msg))
+			_, ok := pool.messagesByNumber[msg.Number]
+			assert.True(t, ok)
 
 			pool.Prune(5)
 
-			bucket = pool.messagesByNumber[msg.Number]
-			assert.False(t, bucket.exists(msg))
+			_, ok = pool.messagesByNumber[msg.Number]
+			assert.False(t, ok)
 		},
 	)
 
@@ -211,16 +209,15 @@ func TestSAMPool_Prune(t *testing.T) {
 				},
 			}
 
-			err := pool.AddMessage(msg)
-			assert.NoError(t, err)
+			assert.NoError(t, pool.AddMessage(msg))
 
-			bucket := pool.messagesByNumber[msg.Number]
-			assert.True(t, bucket.exists(msg))
+			_, ok := pool.messagesByNumber[msg.Number]
+			assert.True(t, ok)
 
 			pool.Prune(5)
 
-			bucket = pool.messagesByNumber[msg.Number]
-			assert.True(t, bucket.exists(msg))
+			_, ok = pool.messagesByNumber[msg.Number]
+			assert.True(t, ok)
 		},
 	)
 
@@ -230,7 +227,7 @@ func TestSAMPool_Peek(t *testing.T) {
 	t.Parallel()
 
 	t.Run(
-		"Peek returns nil (no expected message)",
+		"Peek returns nil (no message)",
 		func(t *testing.T) {
 			t.Parallel()
 
@@ -242,8 +239,7 @@ func TestSAMPool_Peek(t *testing.T) {
 			pool := New(verifier)
 			pool.lastProcessedMessage = 3
 
-			verifiedMsg := pool.Peek()
-			assert.Nil(t, verifiedMsg)
+			assert.Nil(t, pool.Peek())
 		},
 	)
 
@@ -259,6 +255,7 @@ func TestSAMPool_Peek(t *testing.T) {
 			}
 
 			pool := New(verifier)
+			pool.lastProcessedMessage = 9
 
 			msg := rootchain.SAM{
 				Hash: types.Hash{1, 2, 3},
@@ -267,15 +264,8 @@ func TestSAMPool_Peek(t *testing.T) {
 				},
 			}
 
-			pool.lastProcessedMessage = 9
-
-			err := pool.AddMessage(msg)
-
-			assert.NoError(t, err)
-
-			verifiedMsg := pool.Peek()
-
-			assert.Nil(t, verifiedMsg)
+			assert.NoError(t, pool.AddMessage(msg))
+			assert.Nil(t, pool.Peek())
 		},
 	)
 
@@ -291,6 +281,7 @@ func TestSAMPool_Peek(t *testing.T) {
 			}
 
 			pool := New(verifier)
+			pool.lastProcessedMessage = 9
 
 			msg := rootchain.SAM{
 				Hash: types.Hash{1, 2, 3},
@@ -299,15 +290,8 @@ func TestSAMPool_Peek(t *testing.T) {
 				},
 			}
 
-			pool.lastProcessedMessage = 9
-
-			err := pool.AddMessage(msg)
-
-			assert.NoError(t, err)
-
-			verifiedMsg := pool.Peek()
-
-			assert.NotNil(t, verifiedMsg)
+			assert.NoError(t, pool.AddMessage(msg))
+			assert.NotNil(t, pool.Peek())
 		},
 	)
 

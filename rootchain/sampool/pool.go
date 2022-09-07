@@ -7,7 +7,9 @@ import (
 )
 
 var (
-	ErrStaleMessage = errors.New("stale message received")
+	ErrInvalidHash      = errors.New("invalid SAM hash")
+	ErrInvalidSignature = errors.New("invalid SAM signature")
+	ErrStaleMessage     = errors.New("stale message received")
 )
 
 //	Verifies hash and signature of a SAM
@@ -36,12 +38,12 @@ func New(verifier Verifier) *SAMPool {
 func (p *SAMPool) AddMessage(msg rootchain.SAM) error {
 	//	verify message hash
 	if err := p.verifier.VerifyHash(msg); err != nil {
-		return err
+		return fmt.Errorf("%w: %v", ErrInvalidHash, err)
 	}
 
 	//	verify message signature
 	if err := p.verifier.VerifySignature(msg); err != nil {
-		return err
+		return fmt.Errorf("%w: %v", ErrInvalidSignature, err)
 	}
 
 	//	reject old message
