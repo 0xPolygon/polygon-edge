@@ -75,7 +75,7 @@ func (p *SAMPool) Peek() rootchain.VerifiedSAM {
 		return nil
 	}
 
-	return bucket.getReadyMessages(p.verifier.Quorum)
+	return bucket.getQuorumMessages(p.verifier.Quorum)
 
 }
 

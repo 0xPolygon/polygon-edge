@@ -48,20 +48,14 @@ func (b samBucket) add(msg rootchain.SAM) {
 	b[msg.Hash] = messages
 }
 
-func (b samBucket) exists(msg rootchain.SAM) bool {
-	_, ok := b[msg.Hash]
-
-	return ok
-}
-
 type quorumFunc func(uint64) bool
 
-func (b samBucket) getReadyMessages(quorum quorumFunc) []rootchain.SAM {
-	for _, messages := range b {
-		unique := messages.get()
+func (b samBucket) getQuorumMessages(quorum quorumFunc) []rootchain.SAM {
+	for _, set := range b {
+		messages := set.get()
 
-		if quorum(uint64(len(unique))) {
-			return unique
+		if quorum(uint64(len(messages))) {
+			return messages
 		}
 	}
 
