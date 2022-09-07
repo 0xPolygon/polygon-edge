@@ -118,6 +118,43 @@ func TestSAMPool_AddMessage(t *testing.T) {
 			assert.True(t, bucket.exists(msg))
 		},
 	)
+
+	t.Run(
+		"no double message",
+		func(t *testing.T) {
+			t.Parallel()
+
+			verifier := mockVerifier{
+				verifyHash:      func(rootchain.SAM) error { return nil },
+				verifySignature: func(rootchain.SAM) error { return nil },
+			}
+
+			pool := New(verifier)
+
+			msg := rootchain.SAM{
+				Hash:      types.Hash{1, 2, 3},
+				Signature: []byte("signature"),
+				Event: rootchain.Event{
+					Number: 3,
+				},
+			}
+
+			assert.NoError(t, pool.AddMessage(msg))
+
+			bucket, ok := pool.messagesByNumber[msg.Number]
+			assert.True(t, ok)
+			assert.NotNil(t, bucket)
+
+			messages, ok := bucket[msg.Hash]
+			assert.True(t, ok)
+			assert.Len(t, messages.get(), 1)
+
+			assert.NoError(t, pool.AddMessage(msg))
+
+			messages = pool.messagesByNumber[msg.Number][msg.Hash]
+			assert.Len(t, messages.get(), 1)
+		},
+	)
 }
 
 func TestSAMPool_Prune(t *testing.T) {
