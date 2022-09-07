@@ -30,6 +30,10 @@ func (v *ValidatorSetPayload) Get() (rootchain.PayloadType, []byte) {
 	return rootchain.ValidatorSetPayloadType, payload
 }
 
+func (v *ValidatorSetPayload) GetSetInfo() []ValidatorSetInfo {
+	return v.setInfo
+}
+
 func (v *ValidatorSetPayload) toProto() *rootProto.ValidatorSetPayload {
 	validatorsInfo := make([]*rootProto.ValidatorInfoBLS, len(v.setInfo))
 

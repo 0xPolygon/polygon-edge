@@ -3,11 +3,13 @@ package samuel
 import (
 	"errors"
 	"fmt"
+	"math/big"
 	"strconv"
 	"strings"
 
 	"github.com/0xPolygon/polygon-edge/blockchain/storage"
 	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/0xPolygon/polygon-edge/e2e/framework"
 	"github.com/0xPolygon/polygon-edge/rootchain"
 	"github.com/0xPolygon/polygon-edge/rootchain/payload"
 	"github.com/0xPolygon/polygon-edge/rootchain/proto"
@@ -66,7 +68,7 @@ type eventData struct {
 	payloadType  rootchain.PayloadType
 	eventABI     *abi.Event
 	methodABI    *abi.Method
-	localAddress string
+	localAddress types.Address
 }
 
 // SAMUEL is the module that coordinates activities with the SAMP and Event Tracker
@@ -108,9 +110,10 @@ func initEventData(
 	configEvent *rootchain.ConfigEvent,
 ) eventData {
 	return eventData{
-		payloadType: configEvent.PayloadType,
-		eventABI:    abi.MustNewEvent(configEvent.EventABI),
-		methodABI:   abi.MustNewABI(configEvent.MethodABI).GetMethod(configEvent.MethodName),
+		payloadType:  configEvent.PayloadType,
+		eventABI:     abi.MustNewEvent(configEvent.EventABI),
+		methodABI:    abi.MustNewABI(configEvent.MethodABI).GetMethod(configEvent.MethodName),
+		localAddress: types.StringToAddress(configEvent.LocalAddress),
 	}
 }
 
@@ -140,7 +143,7 @@ func (s *SAMUEL) Start() error {
 func (s *SAMUEL) getStartBlockNumber() (uint64, error) {
 	startBlock := rootchain.LatestRootchainBlockNumber
 
-	data, exists := s.storage.ReadLastProcessedEvent(s.eventData.localAddress)
+	data, exists := s.storage.ReadLastProcessedEvent(s.eventData.localAddress.String())
 	if exists && data != "" {
 		// index:blockNumber
 		values := strings.Split(data, ":")
@@ -164,7 +167,7 @@ func (s *SAMUEL) getStartBlockNumber() (uint64, error) {
 func (s *SAMUEL) registerGossipHandler() error {
 	return s.transport.Subscribe(func(sam *proto.SAM) {
 		// Extract the event data
-		eventPayload, err := s.getEventPayload(sam.Event.Payload, sam.Event.PayloadType)
+		eventPayload, err := getEventPayload(sam.Event.Payload, sam.Event.PayloadType)
 		if err != nil {
 			s.logger.Warn(
 				fmt.Sprintf("unable to get event payload with hash %s, %v", sam.Hash, err),
@@ -194,7 +197,7 @@ func (s *SAMUEL) registerGossipHandler() error {
 
 // getEventPayload retrieves a concrete payload implementation
 // based on the passed in byte array and payload type
-func (s *SAMUEL) getEventPayload(
+func getEventPayload(
 	eventPayload []byte,
 	payloadType uint64,
 ) (rootchain.Payload, error) {
@@ -285,7 +288,7 @@ func (s *SAMUEL) SaveProgress(
 	contractAddr types.Address, // local Smart Contract address
 	input []byte, // method with argument data
 ) {
-	if contractAddr != types.StringToAddress(s.eventData.localAddress) {
+	if contractAddr != types.StringToAddress(s.eventData.localAddress.String()) {
 		s.logger.Warn(
 			fmt.Sprintf("Attempted to save progress for unknown contract %s", contractAddr),
 		)
@@ -336,7 +339,76 @@ func (s *SAMUEL) SaveProgress(
 
 // GetReadyTransactions retrieves the ready transactions which have
 // enough valid signatures
-func (s *SAMUEL) GetReadyTransactions() []types.Transaction {
-	// TODO
+func (s *SAMUEL) GetReadyTransactions() *types.Transaction {
+	// Check if there are any
+	if len(s.samp.Peek()) == 0 {
+		return nil
+	}
+
+	// Get the latest verified SAM
+	verifiedSAM := s.samp.Pop()
+
+	// Extract the required data
+	SAM := []rootchain.SAM(verifiedSAM)[0]
+
+	blockNumber := SAM.BlockNumber
+	index := SAM.Index
+	signatures := verifiedSAM.Signatures()
+
+	// Extract the payload info
+	payloadType, payloadData := SAM.Payload.Get()
+	rawPayload, err := getEventPayload(payloadData, uint64(payloadType))
+	if err != nil {
+		s.logger.Error(
+			fmt.Sprintf(
+				"Unable to extract event payload for SAM %s, %v",
+				SAM.Hash.String(),
+				err,
+			),
+		)
+	}
+
+	switch payloadType {
+	case rootchain.ValidatorSetPayloadType:
+		vs := rawPayload.(*payload.ValidatorSetPayload)
+
+		// The method should have the signature
+		// methodName(validatorSet tuple[], index uint64, blockNumber uint64, signatures [][]byte)
+		encodedArgs, err := s.eventData.methodABI.Encode(
+			map[string]interface{}{
+				"validatorSet": vs.GetSetInfo(),
+				"index":        index,
+				"blockNumber":  blockNumber,
+				"signatures":   signatures,
+			},
+		)
+
+		if err != nil {
+			s.logger.Error(
+				fmt.Sprintf(
+					"Unable to encode method arguements for SAM %s, %v",
+					SAM.Hash.String(),
+					err,
+				),
+			)
+
+			return nil
+		}
+
+		// TODO This transaction needs to be signed later on? @dbrajovic
+		return &types.Transaction{
+			Nonce:    0,
+			From:     types.ZeroAddress,
+			To:       &s.eventData.localAddress,
+			GasPrice: big.NewInt(0),
+			Gas:      framework.DefaultGasLimit,
+			Value:    big.NewInt(0),
+			V:        big.NewInt(1), // it is necessary to encode in rlp,
+			Input:    append(s.eventData.methodABI.ID(), encodedArgs...),
+		}
+	default:
+		s.logger.Error("Unknown payload type")
+	}
+
 	return nil
 }
