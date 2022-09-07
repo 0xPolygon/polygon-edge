@@ -22,7 +22,8 @@ var (
 )
 
 var (
-	errInvalidTypeAssertion = errors.New("invalid type assertion")
+	errInvalidTypeAssertion  = errors.New("invalid type assertion")
+	errRecoveryAddressFailed = errors.New("failed to recover from field")
 )
 
 // NewTestHeadersWithSeed creates a new chain with a seed factor
@@ -314,7 +315,7 @@ func (m *mockSigner) Sender(tx *types.Transaction) (types.Address, error) {
 		return from, nil
 	}
 
-	return types.ZeroAddress, errors.New("failed to recover from field")
+	return types.ZeroAddress, errRecoveryAddressFailed
 }
 
 func TestBlockchain(t *testing.T, genesis *chain.Genesis) *Blockchain {
