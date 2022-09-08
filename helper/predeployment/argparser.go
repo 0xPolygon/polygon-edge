@@ -2,6 +2,7 @@ package predeployment
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"strings"
 )
@@ -91,7 +92,7 @@ func (p *ArgParser) parseArgument() (interface{}, error) {
 	case '[':
 		return p.parseArray()
 	case ',', ']':
-		return nil, errors.New("invalid grammar")
+		return nil, fmt.Errorf("reached unexpected character: '%c'", fst)
 	default:
 		return p.parseLiteral()
 	}
@@ -128,8 +129,7 @@ func (p *ArgParser) parseString() (string, error) {
 
 		case next == '"' || next == '\'':
 			if next != opening {
-				// TODO
-				return "", errors.New("bracket mismatch")
+				return "", fmt.Errorf("bracket mismatch happened, opening=%c, closing=%c", opening, next)
 			}
 
 			return string(chars), nil
@@ -151,7 +151,6 @@ func (p *ArgParser) parseArray() ([]interface{}, error) {
 	for {
 		next, err := p.PeekRune()
 		if err != nil {
-			// TODO: more detail
 			return nil, err
 		}
 
@@ -170,7 +169,7 @@ func (p *ArgParser) parseArray() ([]interface{}, error) {
 
 		case ',':
 			if len(elems) == 0 {
-				return nil, errors.New("invalid grammar")
+				return nil, fmt.Errorf("invalid grammar, comma can't be as the first character in array")
 			}
 
 			if _, _, err := p.ReadRune(); err != nil {
@@ -217,7 +216,7 @@ func (p *ArgParser) parseLiteral() (interface{}, error) {
 			return res, nil
 
 		case '[':
-			return "", errors.New("invalid grammar")
+			return "", fmt.Errorf("invalid grammar, reached opening bracket in literal")
 
 		default:
 			next, _, err := p.ReadRune()
