@@ -7,9 +7,7 @@ import (
 	"math/big"
 	"path/filepath"
 	"regexp"
-	"strconv"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -87,18 +85,116 @@ func extractABIFromJSONBody(body string) string {
 	return match[strings.Index(match, "["):]
 }
 
+// ArgGroup is the type of the third argument of HRM contract
+type ArgGroup struct {
+	name   string
+	number uint
+	flag   bool
+	people ArgHumans
+}
+
+// String returns text for predeploy flag
+func (g *ArgGroup) String() string {
+	return fmt.Sprintf(
+		"[%s, %d, %t, %s]",
+		g.name,
+		g.number,
+		g.flag,
+		g.people.String(),
+	)
+}
+
+// ArgGroups is a collection of ArgGroup
+type ArgGroups []ArgGroup
+
+// String returns the text for predeploy flag
+func (gs *ArgGroups) String() string {
+	groupStrs := make([]string, len(*gs))
+
+	for i, group := range *gs {
+		groupStrs[i] = group.String()
+	}
+
+	return fmt.Sprintf("[%s]", strings.Join(groupStrs, ","))
+}
+
+// ArgGroup is the type of the third argument of HRM contract
+type ArgHuman struct {
+	addr   string
+	name   string
+	number int
+}
+
+// String returns the text for predeploy flag
+func (h *ArgHuman) String() string {
+	return fmt.Sprintf("[%s, %s, %d]", h.addr, h.name, h.number)
+}
+
+// ArgHumans is a collection of ArgHuman
+type ArgHumans []ArgHuman
+
+// String returns the text for predeploy flag
+func (hs *ArgHumans) String() string {
+	humanStrs := make([]string, len(*hs))
+
+	for i, human := range *hs {
+		humanStrs[i] = human.String()
+	}
+
+	return fmt.Sprintf("[%s]", strings.Join(humanStrs, ","))
+}
+
 func TestGenesis_Predeployment(t *testing.T) {
+	t.Parallel()
+
 	var (
-		firstParam  = "a"
-		secondParam = "b"
-		numValue    = "123"
+		artifactPath = "./metadata/predeploy_abi.json"
+
+		_, senderAddr = tests.GenerateKeyAndAddr(t)
+		contractAddr  = types.StringToAddress("1200")
+
+		// predeploy arguments
+		id     = 1000000
+		name   = "TestContract"
+		groups = ArgGroups{
+			{
+				name:   "group1",
+				number: 1,
+				flag:   true,
+				people: ArgHumans{
+					{
+						addr:   types.StringToAddress("1").String(),
+						name:   "A",
+						number: 11,
+					},
+					{
+						addr:   types.StringToAddress("2").String(),
+						name:   "B",
+						number: 12,
+					},
+				},
+			},
+			{
+				name:   "group2",
+				number: 2,
+				flag:   false,
+				people: ArgHumans{
+					{
+						addr:   types.StringToAddress("3").String(),
+						name:   "C",
+						number: 21,
+					},
+					{
+						addr:   types.StringToAddress("4").String(),
+						name:   "D",
+						number: 22,
+					},
+				},
+			},
+		}
 	)
 
-	_, senderAddr := tests.GenerateKeyAndAddr(t)
-	addrStr := "0x01110"
-	predeployAddress := types.StringToAddress(addrStr)
-
-	artifactsPath, err := filepath.Abs("./metadata/predeploySC.json")
+	artifactsPath, err := filepath.Abs(artifactPath)
 	if err != nil {
 		t.Fatalf("unable to get working directory, %v", err)
 	}
@@ -111,11 +207,15 @@ func TestGenesis_Predeployment(t *testing.T) {
 			config.Premine(senderAddr, framework.EthToWei(10))
 			config.SetPredeployParams(&framework.PredeployParams{
 				ArtifactsPath:    artifactsPath,
-				PredeployAddress: addrStr,
+				PredeployAddress: contractAddr.String(),
 				ConstructorArgs: []string{
-					fmt.Sprintf("[[%s],[%s]]", firstParam, secondParam), numValue, firstParam},
+					fmt.Sprintf("%d", id),
+					name,
+					groups.String(),
+				},
 			})
-		})
+		},
+	)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
@@ -125,7 +225,7 @@ func TestGenesis_Predeployment(t *testing.T) {
 	clt := srv.JSONRPC()
 
 	// Extract the contract ABI from the metadata test file
-	content, err := ioutil.ReadFile("./metadata/predeploySC.json")
+	content, err := ioutil.ReadFile(artifactPath)
 	if err != nil {
 		t.Fatalf("unable to open JSON file, %v", err)
 	}
@@ -134,47 +234,43 @@ func TestGenesis_Predeployment(t *testing.T) {
 		extractABIFromJSONBody(string(content)),
 	)
 
-	greetMethod, ok := predeployABI.Methods["greet"]
-	if !ok {
-		t.Fatalf("greet method not present in SC")
-	}
+	callSCMethod := func(t *testing.T, methodName string, args ...interface{}) interface{} {
+		t.Helper()
 
-	greetNumMethod, ok := predeployABI.Methods["greetNum"]
-	if !ok {
-		t.Fatalf("greetNum method not present in SC")
-	}
+		method, ok := predeployABI.Methods[methodName]
+		assert.Truef(t, ok, "%s method not present in SC", methodName)
 
-	greetSecondMethod, ok := predeployABI.Methods["greetSecond"]
-	if !ok {
-		t.Fatalf("greet method not present in SC")
-	}
+		data := method.ID()
 
-	contractMethods := []*abi.Method{greetMethod, greetNumMethod, greetSecondMethod}
+		if len(args) > 0 {
+			input, err := method.Inputs.Encode(args)
+			assert.NoError(t, err)
 
-	toAddress := ethgo.Address(predeployAddress)
+			data = append(data, input...)
+		}
 
-	executeSCCall := func(methodABI *abi.Method) interface{} {
+		toAddress := ethgo.Address(contractAddr)
+
 		response, err := clt.Eth().Call(
 			&ethgo.CallMsg{
 				From:     ethgo.Address(senderAddr),
 				To:       &toAddress,
-				Data:     methodABI.ID(),
 				GasPrice: 100000000,
 				Value:    big.NewInt(0),
+				Data:     data,
 			},
 			ethgo.BlockNumber(1),
 		)
-
-		if err != nil {
-			t.Fatalf("unable to execute SC call, %v", err)
-		}
+		assert.NoError(t, err, "failed to call SC method")
 
 		byteResponse, decodeError := hex.DecodeHex(response)
 		if decodeError != nil {
 			t.Fatalf("unable to decode hex response, %v", decodeError)
 		}
 
-		decodedResults, err := methodABI.Outputs.Decode(byteResponse)
+		fmt.Printf("byteResponse %+v\n", byteResponse)
+
+		decodedResults, err := method.Outputs.Decode(byteResponse)
 		if err != nil {
 			t.Fatalf("unable to decode response, %v", err)
 		}
@@ -187,51 +283,138 @@ func TestGenesis_Predeployment(t *testing.T) {
 		return results["0"]
 	}
 
-	var (
-		resultsLock sync.Mutex
-		wg          sync.WaitGroup
-	)
+	t.Run("id is set correctly", func(t *testing.T) {
+		t.Parallel()
 
-	callResults := make([]interface{}, 3)
+		rawResID := callSCMethod(t, "getID")
+		resID, ok := rawResID.(*big.Int)
 
-	addCallResults := func(index int, result interface{}) {
-		resultsLock.Lock()
-		defer resultsLock.Unlock()
+		assert.Truef(t, ok, "failed to cast the result to *big.Int, actual %T", rawResID)
+		assert.Zero(
+			t,
+			big.NewInt(int64(id)).Cmp(resID),
+		)
+	})
 
-		callResults[index] = result
+	t.Run("name is set correctly", func(t *testing.T) {
+		t.Parallel()
+
+		rawResName := callSCMethod(t, "getName")
+		resName, ok := rawResName.(string)
+
+		assert.Truef(t, ok, "failed to cast the result to string, actual %T", rawResName)
+		assert.Equal(
+			t,
+			name,
+			resName,
+		)
+	})
+
+	testHuman := func(t *testing.T, groupIndex int, humanIndex int) {
+		human := groups[groupIndex].people[humanIndex]
+
+		t.Run("human addr is set correctly", func(t *testing.T) {
+			t.Parallel()
+
+			rawResAddr := callSCMethod(t, "getHumanAddr", groupIndex, humanIndex)
+			resAddr, ok := rawResAddr.(ethgo.Address)
+
+			assert.Truef(t, ok, "failed to cast the result to ethgo.Address, actual %T", rawResAddr)
+			assert.Equal(
+				t,
+				human.addr,
+				resAddr.String(),
+			)
+		})
+
+		t.Run("human name is set correctly", func(t *testing.T) {
+			t.Parallel()
+
+			rawResName := callSCMethod(t, "getHumanName", groupIndex, humanIndex)
+			resName, ok := rawResName.(string)
+
+			assert.Truef(t, ok, "failed to cast the result to string, actual %T", rawResName)
+			assert.Equal(
+				t,
+				human.name,
+				resName,
+			)
+		})
+
+		t.Run("human number is set correctly", func(t *testing.T) {
+			t.Parallel()
+
+			rawResNumber := callSCMethod(t, "getHumanNumber", groupIndex, humanIndex)
+			resNumber, ok := rawResNumber.(*big.Int)
+
+			assert.Truef(t, ok, "failed to cast the result to *big.Int, actual %T", resNumber)
+			assert.Zero(
+				t,
+				big.NewInt(int64(human.number)).Cmp(resNumber),
+			)
+		})
 	}
 
-	for i, contractMethod := range contractMethods {
-		wg.Add(1)
+	testGroup := func(t *testing.T, groupIndex int) {
+		t.Helper()
 
-		go func(i int, method *abi.Method) {
-			defer wg.Done()
+		group := groups[groupIndex]
 
-			addCallResults(i, executeSCCall(method))
-		}(i, contractMethod)
+		t.Run("group name is set correctly", func(t *testing.T) {
+			t.Parallel()
+
+			rawResName := callSCMethod(t, "getGroupName", groupIndex)
+			resName, ok := rawResName.(string)
+
+			assert.Truef(t, ok, "failed to cast the result to string, actual %T", rawResName)
+			assert.Equal(
+				t,
+				group.name,
+				resName,
+			)
+		})
+
+		t.Run("group number is set correctly", func(t *testing.T) {
+			t.Parallel()
+
+			rawResNumber := callSCMethod(t, "getGroupNumber", groupIndex)
+			resNumber, ok := rawResNumber.(*big.Int)
+
+			assert.Truef(t, ok, "failed to cast the result to int, actual %T", rawResNumber)
+			assert.Zero(
+				t,
+				big.NewInt(int64(group.number)).Cmp(resNumber),
+			)
+		})
+
+		t.Run("group flag is set correctly", func(t *testing.T) {
+			t.Parallel()
+
+			rawResFlag := callSCMethod(t, "getGroupFlag", groupIndex)
+			resFlag, ok := rawResFlag.(bool)
+
+			assert.Truef(t, ok, "failed to cast the result to bool, actual %T", rawResFlag)
+			assert.Equal(
+				t,
+				group.flag,
+				resFlag,
+			)
+		})
+
+		for humanIndex, _ := range group.people {
+			t.Run(fmt.Sprintf("groups[%d].people[%d] is set correctly", groupIndex, humanIndex), func(t *testing.T) {
+				t.Parallel()
+
+				testHuman(t, groupIndex, humanIndex)
+			})
+		}
 	}
 
-	wg.Wait()
+	for idx, _ := range groups {
+		t.Run(fmt.Sprintf("groups[%d] is set correctly", idx), func(t *testing.T) {
+			t.Parallel()
 
-	greeting, ok := callResults[0].(string)
-	if !ok {
-		t.Fatal("failed type assertion to string")
+			testGroup(t, idx)
+		})
 	}
-
-	assert.Equal(t, secondParam, greeting)
-
-	num, ok := callResults[1].(*big.Int)
-	if !ok {
-		t.Fatal("failed type assertion to big.Int")
-	}
-
-	convNumValue, _ := strconv.ParseUint(numValue, 10, 64)
-	assert.Equal(t, convNumValue, num.Uint64())
-
-	secondGreeting, ok := callResults[2].(string)
-	if !ok {
-		t.Fatal("failed type assertion to string")
-	}
-
-	assert.Equal(t, firstParam, secondGreeting)
 }

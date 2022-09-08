@@ -116,6 +116,53 @@ func getModifiedStorageMap(radix *state.Txn, address types.Address) map[types.Ha
 	return storageMap
 }
 
+func getPredeployAccount(address types.Address, input, deployedBytecode []byte) (*chain.GenesisAccount, error) {
+	// Create an instance of the state
+	st := itrie.NewState(itrie.NewMemoryStorage())
+
+	// Create a snapshot
+	snapshot := st.NewSnapshot()
+
+	// Create a radix
+	radix := state.NewTxn(st, snapshot)
+
+	// Create the contract object for the EVM
+	contract := runtime.NewContractCreation(
+		1,
+		types.ZeroAddress,
+		types.ZeroAddress,
+		address,
+		big.NewInt(0),
+		math.MaxInt64,
+		input,
+	)
+
+	// Enable all forks
+	config := chain.AllForksEnabled.At(0)
+
+	// Create a transition
+	transition := state.NewTransition(config, radix)
+
+	// Run the transition through the EVM
+	res := evm.NewEVM().Run(contract, transition, &config)
+	if res.Err != nil {
+		return nil, fmt.Errorf("EVM predeployment failed, %w", res.Err)
+	}
+
+	// After the execution finishes,
+	// the state needs to be walked to collect all touched all storage slots
+	storageMap := getModifiedStorageMap(radix, address)
+
+	transition.Commit()
+
+	return &chain.GenesisAccount{
+		Balance: transition.GetBalance(address),
+		Nonce:   transition.GetNonce(address),
+		Code:    deployedBytecode,
+		Storage: storageMap,
+	}, nil
+}
+
 // GenerateGenesisAccountFromFile generates an account that is going to be directly
 // inserted into state
 func GenerateGenesisAccountFromFile(
@@ -154,48 +201,5 @@ func GenerateGenesisAccountFromFile(
 
 	finalBytecode := append(artifact.Bytecode, constructor...)
 
-	// Create an instance of the state
-	st := itrie.NewState(itrie.NewMemoryStorage())
-
-	// Create a snapshot
-	snapshot := st.NewSnapshot()
-
-	// Create a radix
-	radix := state.NewTxn(st, snapshot)
-
-	// Create the contract object for the EVM
-	contract := runtime.NewContractCreation(
-		1,
-		types.ZeroAddress,
-		types.ZeroAddress,
-		predeployAddress,
-		big.NewInt(0),
-		math.MaxInt64,
-		finalBytecode,
-	)
-
-	// Enable all forks
-	config := chain.AllForksEnabled.At(0)
-
-	// Create a transition
-	transition := state.NewTransition(config, radix)
-
-	// Run the transition through the EVM
-	res := evm.NewEVM().Run(contract, transition, &config)
-	if res.Err != nil {
-		return nil, fmt.Errorf("EVM predeployment failed, %w", res.Err)
-	}
-
-	// After the execution finishes,
-	// the state needs to be walked to collect all touched all storage slots
-	storageMap := getModifiedStorageMap(radix, predeployAddress)
-
-	transition.Commit()
-
-	return &chain.GenesisAccount{
-		Balance: transition.GetBalance(predeployAddress),
-		Nonce:   transition.GetNonce(predeployAddress),
-		Code:    artifact.DeployedBytecode,
-		Storage: storageMap,
-	}, nil
+	return getPredeployAccount(predeployAddress, finalBytecode, artifact.DeployedBytecode)
 }

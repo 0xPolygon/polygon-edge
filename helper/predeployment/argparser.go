@@ -170,7 +170,6 @@ func (p *ArgParser) parseArray() ([]interface{}, error) {
 
 		case ',':
 			if len(elems) == 0 {
-				// TODO: more detail
 				return nil, errors.New("invalid grammar")
 			}
 
@@ -192,7 +191,7 @@ func (p *ArgParser) parseArray() ([]interface{}, error) {
 }
 
 // parseLiteral parses the single value except for string like number 123, 0xA0
-func (p *ArgParser) parseLiteral() (string, error) {
+func (p *ArgParser) parseLiteral() (interface{}, error) {
 	chars := []rune{}
 
 	for {
@@ -207,7 +206,15 @@ func (p *ArgParser) parseLiteral() (string, error) {
 
 		switch next {
 		case ',', ']':
-			return string(chars), nil
+			res := string(chars)
+
+			if res == "true" {
+				return true, nil
+			} else if res == "false" {
+				return false, nil
+			}
+
+			return res, nil
 
 		case '[':
 			return "", errors.New("invalid grammar")
