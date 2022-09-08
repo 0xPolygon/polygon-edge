@@ -20,22 +20,17 @@ type SecretsOutputResult struct {
 func (r *SecretsOutputResult) GetOutput() string {
 	var buffer bytes.Buffer
 
+	// returns the raw output if flag matches
 	if r.outputNodeID {
-		buffer.WriteString(r.NodeID)
-
-		return buffer.String()
+		return r.NodeID
 	}
 
 	if r.outputValidator {
-		buffer.WriteString(r.Address)
-
-		return buffer.String()
+		return r.Address
 	}
 
 	if r.outputBLS {
-		buffer.WriteString(r.BLSPubkey)
-
-		return buffer.String()
+		return r.BLSPubkey
 	}
 
 	vals := make([]string, 0, 3)

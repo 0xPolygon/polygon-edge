@@ -3,11 +3,11 @@ package output
 import (
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/0xPolygon/polygon-edge/command"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/secrets/helper"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -56,7 +56,7 @@ func (op *outputParams) validateFlags() error {
 	return nil
 }
 
-func (op *outputParams) outputSecrets() error {
+func (op *outputParams) initSecrets() error {
 	if err := op.initSecretsManager(); err != nil {
 		return err
 	}
@@ -142,16 +142,16 @@ func (op *outputParams) initLocalSecretsManager() error {
 	networkPathPrefix := filepath.Join(op.dataDir, secrets.NetworkFolderLocal)
 	dataDirAbs, _ := filepath.Abs(op.dataDir)
 
-	if _, err := os.Stat(op.dataDir); os.IsNotExist(err) {
+	if !common.DirectoryExists(op.dataDir) {
 		return fmt.Errorf("the data directory provided does not exist: %s", dataDirAbs)
 	}
 
 	errs := make([]string, 0, 2)
-	if _, err := os.Stat(validatorPathPrefix); os.IsNotExist(err) {
+	if !common.DirectoryExists(validatorPathPrefix) {
 		errs = append(errs, fmt.Sprintf("no validator keys found in the data directory provided: %s", dataDirAbs))
 	}
 
-	if _, err := os.Stat(networkPathPrefix); os.IsNotExist(err) {
+	if !common.DirectoryExists(networkPathPrefix) {
 		errs = append(errs, fmt.Sprintf("no network key found in the data directory provided: %s", dataDirAbs))
 	}
 
@@ -207,42 +207,33 @@ func (op *outputParams) initNodeID() error {
 }
 
 func (op *outputParams) getResult() command.CommandResult {
-	if op.outputNodeID {
-		return &SecretsOutputResult{
-			NodeID: op.nodeID,
+	outputResults := &SecretsOutputResult{
+		outputValidator: op.outputValidator,
+		outputBLS:       op.outputBLS,
+		outputNodeID:    op.outputNodeID,
+	}
 
-			outputValidator: op.outputValidator,
-			outputBLS:       op.outputBLS,
-			outputNodeID:    op.outputNodeID,
-		}
+	if op.outputNodeID {
+		outputResults.NodeID = op.nodeID
+
+		return outputResults
 	}
 
 	if op.outputValidator {
-		return &SecretsOutputResult{
-			Address: op.validatorAddress,
+		outputResults.Address = op.validatorAddress
 
-			outputValidator: op.outputValidator,
-			outputBLS:       op.outputBLS,
-			outputNodeID:    op.outputNodeID,
-		}
+		return outputResults
 	}
 
 	if op.outputBLS {
-		return &SecretsOutputResult{
-			BLSPubkey: op.blsPubkey,
+		outputResults.BLSPubkey = op.blsPubkey
 
-			outputValidator: op.outputValidator,
-			outputBLS:       op.outputBLS,
-			outputNodeID:    op.outputNodeID,
-		}
+		return outputResults
 	}
 
-	return &SecretsOutputResult{
-		Address:   op.validatorAddress,
-		BLSPubkey: op.blsPubkey,
-		NodeID:    op.nodeID,
+	outputResults.NodeID = op.nodeID
+	outputResults.BLSPubkey = op.blsPubkey
+	outputResults.Address = op.validatorAddress
 
-		outputValidator: op.outputValidator,
-		outputNodeID:    op.outputNodeID,
-	}
+	return outputResults
 }

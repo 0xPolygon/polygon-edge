@@ -70,7 +70,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
-	if err := params.outputSecrets(); err != nil {
+	if err := params.initSecrets(); err != nil {
 		outputter.SetError(err)
 
 		return
