@@ -272,8 +272,6 @@ func TestGenesis_Predeployment(t *testing.T) {
 			t.Fatalf("unable to decode hex response, %v", decodeError)
 		}
 
-		fmt.Printf("byteResponse %+v\n", byteResponse)
-
 		decodedResults, err := method.Outputs.Decode(byteResponse)
 		if err != nil {
 			t.Fatalf("unable to decode response, %v", err)
