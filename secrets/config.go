@@ -20,7 +20,7 @@ type SecretsManagerConfig struct {
 func (c *SecretsManagerConfig) WriteConfig(path string) error {
 	jsonBytes, _ := json.MarshalIndent(c, "", " ")
 
-	return os.WriteFile(path, jsonBytes, 0600)
+	return os.WriteFile(path, jsonBytes, os.ModePerm)
 }
 
 // ReadConfig reads the SecretsManagerConfig from the specified path

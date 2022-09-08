@@ -53,7 +53,7 @@ func writeDataStore(path string, obj interface{}) error {
 		return err
 	}
 
-	if err := os.WriteFile(path, data, 0644); err != nil {
+	if err := os.WriteFile(path, data, os.ModePerm); err != nil {
 		return err
 	}
 
