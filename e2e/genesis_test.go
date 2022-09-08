@@ -203,7 +203,7 @@ func TestGenesis_Predeployment(t *testing.T) {
 		t,
 		1,
 		IBFTDirPrefix,
-		func(i int, config *framework.TestServerConfig) {
+		func(_i int, config *framework.TestServerConfig) {
 			config.Premine(senderAddr, framework.EthToWei(10))
 			config.SetPredeployParams(&framework.PredeployParams{
 				ArtifactsPath:    artifactsPath,
@@ -218,7 +218,11 @@ func TestGenesis_Predeployment(t *testing.T) {
 	)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel()
+
+	t.Cleanup(func() {
+		cancel()
+	})
+
 	ibftManager.StartServers(ctx)
 
 	srv := ibftManager.GetServer(0)
@@ -311,6 +315,8 @@ func TestGenesis_Predeployment(t *testing.T) {
 	})
 
 	testHuman := func(t *testing.T, groupIndex int, humanIndex int) {
+		t.Helper()
+
 		human := groups[groupIndex].people[humanIndex]
 
 		t.Run("human addr is set correctly", func(t *testing.T) {
@@ -401,7 +407,7 @@ func TestGenesis_Predeployment(t *testing.T) {
 			)
 		})
 
-		for humanIndex, _ := range group.people {
+		for humanIndex := range group.people {
 			t.Run(fmt.Sprintf("groups[%d].people[%d] is set correctly", groupIndex, humanIndex), func(t *testing.T) {
 				t.Parallel()
 
@@ -410,7 +416,7 @@ func TestGenesis_Predeployment(t *testing.T) {
 		}
 	}
 
-	for idx, _ := range groups {
+	for idx := range groups {
 		t.Run(fmt.Sprintf("groups[%d] is set correctly", idx), func(t *testing.T) {
 			t.Parallel()
 
