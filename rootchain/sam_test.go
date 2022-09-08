@@ -11,6 +11,7 @@ func TestSAMToProto(t *testing.T) {
 	var (
 		hash      = types.BytesToHash([]byte("Unique hash"))
 		signature = []byte("Unique signature")
+		blockNum  = uint64(1)
 		event     = Event{
 			Index:       1,
 			BlockNumber: 10,
@@ -22,15 +23,17 @@ func TestSAMToProto(t *testing.T) {
 	)
 
 	sam := &SAM{
-		Hash:      hash,
-		Signature: signature,
-		Event:     event,
+		Hash:          hash,
+		Signature:     signature,
+		ChildBlockNum: blockNum,
+		Event:         event,
 	}
 
 	proto := sam.ToProto()
 
 	assert.Equal(t, hash.Bytes(), proto.Hash)
 	assert.Equal(t, signature, proto.Signature)
+	assert.Equal(t, blockNum, proto.ChildchainBlockNumber)
 
 	_, eventPayload := event.Get()
 	assert.Equal(t, event.Index, proto.Event.Index)

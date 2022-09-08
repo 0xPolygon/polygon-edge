@@ -1,6 +1,7 @@
 package samuel
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"math/big"
@@ -49,8 +50,14 @@ type samp interface {
 // signer defines the signer interface used for
 // generating signatures
 type signer interface {
-	// Sign signs the specified data
-	Sign([]byte) ([]byte, error)
+	// Sign signs the specified data,
+	// and returns the signature and the block number at which
+	// the signature was generated
+	Sign([]byte) ([]byte, uint64, error)
+
+	// VerifySignature verifies the signature for the passed in
+	// raw data
+	VerifySignature([]byte, []byte) error
 }
 
 // transport defines the transport interface used for
@@ -171,15 +178,12 @@ func (s *SAMUEL) registerGossipHandler() error {
 		// Extract the event data
 		eventPayload, err := getEventPayload(sam.Event.Payload, sam.Event.PayloadType)
 		if err != nil {
-			s.logger.Warn(
+			s.logger.Error(
 				fmt.Sprintf("unable to get event payload with hash %s, %v", sam.Hash, err),
 			)
 
 			return
 		}
-
-		// TODO add hash verification
-		// TODO add signature verification
 
 		// Convert the proto event to a local SAM
 		localSAM := rootchain.SAM{
@@ -192,8 +196,34 @@ func (s *SAMUEL) registerGossipHandler() error {
 			},
 		}
 
+		// Verify that the hash is correct
+		marshalledEvent, err := localSAM.Event.Marshal()
+		if err != nil {
+			s.logger.Error(
+				fmt.Sprintf("unable to marshal event, %v", err),
+			)
+
+			return
+		}
+
+		hash := crypto.Keccak256(marshalledEvent)
+		if !bytes.Equal(sam.Hash, hash) {
+			s.logger.Error("invalid hash for incoming event")
+
+			return
+		}
+
+		// Verify that the signature is correct
+		if err := s.signer.VerifySignature(hash, sam.Signature); err != nil {
+			s.logger.Error(
+				fmt.Sprintf("invalid signature for event with hash %s, %v", sam.Hash, err),
+			)
+
+			return
+		}
+
 		if err := s.samp.AddMessage(localSAM); err != nil {
-			s.logger.Warn(
+			s.logger.Error(
 				fmt.Sprintf("unable to add event with hash %s to SAMP, %v", sam.Hash, err),
 			)
 		}
@@ -248,7 +278,7 @@ func (s *SAMUEL) startEventLoop() {
 
 			// Get the hash and the signature of the event
 			hash := crypto.Keccak256(data)
-			signature, err := s.signer.Sign(hash)
+			signature, blockNum, err := s.signer.Sign(hash)
 
 			if err != nil {
 				s.logger.Warn(fmt.Sprintf("unable to sign Event Tracker event, %v", err))
@@ -258,9 +288,10 @@ func (s *SAMUEL) startEventLoop() {
 
 			// Push the SAM to the local SAMP
 			sam := rootchain.SAM{
-				Hash:      types.BytesToHash(hash),
-				Signature: signature,
-				Event:     ev,
+				Hash:          types.BytesToHash(hash),
+				Signature:     signature,
+				ChildBlockNum: blockNum,
+				Event:         ev,
 			}
 
 			if err := s.samp.AddMessage(sam); err != nil {

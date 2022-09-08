@@ -7,8 +7,9 @@ import (
 )
 
 type SAM struct {
-	Hash      types.Hash // unique hash of the event (keccak 256)
-	Signature []byte     // validator signature
+	Hash          types.Hash // unique hash of the event (keccak 256)
+	Signature     []byte     // validator signature
+	ChildBlockNum uint64     // the childchain block number when the SAM was generated
 
 	Event
 }
@@ -17,9 +18,10 @@ type SAM struct {
 func (s *SAM) ToProto() *rootProto.SAM {
 	// Fetch the payload
 	return &rootProto.SAM{
-		Hash:      s.Hash.Bytes(),
-		Signature: s.Signature,
-		Event:     s.Event.toProto(),
+		Hash:                  s.Hash.Bytes(),
+		Signature:             s.Signature,
+		ChildchainBlockNumber: s.ChildBlockNum,
+		Event:                 s.Event.toProto(),
 	}
 }
 

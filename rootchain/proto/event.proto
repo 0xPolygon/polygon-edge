@@ -28,6 +28,9 @@ message SAM {
   // The signature of the event
   bytes signature = 2;
 
+  // The childchain block number when the SAM was generated
+  uint64 childchainBlockNumber = 3;
+
   // The actual event contained in the SAM
-  Event event = 3;
+  Event event = 4;
 }
