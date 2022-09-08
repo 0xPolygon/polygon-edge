@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/0xPolygon/polygon-edge/blockchain/storage"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/e2e/framework"
 	"github.com/0xPolygon/polygon-edge/rootchain"
@@ -70,6 +69,16 @@ type transport interface {
 	Subscribe(func(*proto.SAM)) error
 }
 
+// storage defines the required storage interface for SAMUEL
+// and its modules
+type storage interface {
+	// ReadLastProcessedEvent reads the last processed event data
+	ReadLastProcessedEvent(string) (string, bool)
+
+	// WriteLastProcessedEvent writes the last processed event data
+	WriteLastProcessedEvent(data string, contractAddr string) error
+}
+
 // eventData holds information on event data mapping
 type eventData struct {
 	payloadType  rootchain.PayloadType
@@ -85,7 +94,7 @@ type SAMUEL struct {
 
 	eventTracker eventTracker
 	samp         samp
-	storage      storage.Storage
+	storage      storage
 	signer       signer
 	transport    transport
 }
@@ -97,7 +106,7 @@ func NewSamuel(
 	eventTracker eventTracker,
 	samp samp,
 	signer signer,
-	storage storage.Storage,
+	storage storage,
 	transport transport,
 ) *SAMUEL {
 	return &SAMUEL{

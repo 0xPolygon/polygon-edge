@@ -1,138 +1,97 @@
 package samuel
 
 import (
+	"fmt"
+	"testing"
+
 	"github.com/0xPolygon/polygon-edge/rootchain"
 	"github.com/0xPolygon/polygon-edge/rootchain/proto"
+	"github.com/stretchr/testify/assert"
 )
 
-type startDelegate func(uint64) error
-type stopDelegate func() error
-type subscribeDelegate func() <-chan rootchain.Event
+func TestSAMUEL_Start(t *testing.T) {
+	var (
+		hasSubscribed        = false
+		hasRegistered        = false
+		startedBlock  uint64 = 0
+		eventTracker         = mockEventTracker{
+			subscribeFn: func() <-chan rootchain.Event {
+				hasSubscribed = true
 
-type mockEventTracker struct {
-	startFn     startDelegate
-	stopFn      stopDelegate
-	subscribeFn subscribeDelegate
-}
+				ch := make(chan rootchain.Event)
+				close(ch)
 
-func (m *mockEventTracker) Start(startBlock uint64) error {
-	if m.startFn != nil {
-		return m.startFn(startBlock)
+				return ch
+			},
+			startFn: func(blockNum uint64) error {
+				startedBlock = blockNum
+				return nil
+			},
+		}
+		transport = mockTransport{
+			subscribeFn: func(f func(sam *proto.SAM)) error {
+				hasRegistered = true
+
+				return nil
+			},
+		}
+		storage = mockStorage{}
+	)
+
+	// Create the SAMUEL instance
+	s := &SAMUEL{
+		transport:    transport,
+		storage:      storage,
+		eventTracker: eventTracker,
 	}
 
-	return nil
+	// Make sure there were no errors in starting
+	assert.NoError(t, s.Start())
+
+	// Make sure the event subscription is active
+	assert.True(t, hasSubscribed)
+
+	// Make sure the gossip handler is registered
+	assert.True(t, hasRegistered)
+
+	// Make sure the start block is the latest block
+	assert.Equal(t, rootchain.LatestRootchainBlockNumber, startedBlock)
 }
 
-func (m *mockEventTracker) Stop() error {
-	if m.stopFn != nil {
-		return m.stopFn()
+func TestSAMUEL_GetStartBlockNumber_Predefined(t *testing.T) {
+	var (
+		storedBlockNumber uint64 = 100
+		storedEventIndex  uint64 = 1
+		storage                  = mockStorage{
+			readFn: func(_ string) (string, bool) {
+				return fmt.Sprintf(
+					"%d:%d",
+					storedEventIndex,
+					storedBlockNumber,
+				), true
+			},
+		}
+	)
+
+	s := &SAMUEL{
+		storage: storage,
 	}
 
-	return nil
+	// Get the start block number
+	startBlock, err := s.getStartBlockNumber()
+
+	assert.NoError(t, err)
+	assert.Equal(t, storedBlockNumber, startBlock)
 }
 
-func (m *mockEventTracker) Subscribe() <-chan rootchain.Event {
-	if m.subscribeFn != nil {
-		return m.subscribeFn()
+func TestSAMUEL_GetLatestStartBlock(t *testing.T) {
+	s := &SAMUEL{
+		storage: mockStorage{},
 	}
 
-	return nil
-}
+	// Get the start block number
+	startBlock, err := s.getStartBlockNumber()
 
-type addMessageDelegate func(rootchain.SAM) error
-type pruneDelegate func(uint64)
-type peekDelegate func() rootchain.VerifiedSAM
-type popDelegate func() rootchain.VerifiedSAM
-
-type mockSAMP struct {
-	addMessageFn addMessageDelegate
-	pruneFn      pruneDelegate
-	peekFn       peekDelegate
-	popFn        popDelegate
-}
-
-func (m *mockSAMP) AddMessage(sam rootchain.SAM) error {
-	if m.addMessageFn != nil {
-		return m.addMessageFn(sam)
-	}
-
-	return nil
-}
-
-func (m *mockSAMP) Prune(index uint64) {
-	if m.pruneFn != nil {
-		m.pruneFn(index)
-	}
-}
-
-func (m *mockSAMP) Peek() rootchain.VerifiedSAM {
-	if m.peekFn != nil {
-		return m.peekFn()
-	}
-
-	return nil
-}
-
-func (m *mockSAMP) Pop() rootchain.VerifiedSAM {
-	if m.popFn != nil {
-		return m.popFn()
-	}
-
-	return nil
-}
-
-type signDelegate func([]byte) ([]byte, uint64, error)
-type verifySignatureDelegate func([]byte, []byte, uint64) error
-
-type mockSigner struct {
-	signFn            signDelegate
-	verifySignatureFn verifySignatureDelegate
-}
-
-func (m *mockSigner) Sign(data []byte) ([]byte, uint64, error) {
-	if m.signFn != nil {
-		return m.signFn(data)
-	}
-
-	return nil, 0, nil
-}
-
-func (m *mockSigner) VerifySignature(
-	rawData []byte,
-	signature []byte,
-	signedBlock uint64,
-) error {
-	if m.verifySignatureFn != nil {
-		return m.verifySignatureFn(
-			rawData,
-			signature,
-			signedBlock,
-		)
-	}
-
-	return nil
-}
-
-type publishDelegate func(*proto.SAM) error
-type subscribeTransportDelegate func(func(sam *proto.SAM)) error
-
-type mockTransport struct {
-	publishFn   publishDelegate
-	subscribeFn subscribeTransportDelegate
-}
-
-func (m *mockTransport) Publish(sam *proto.SAM) error {
-	if m.publishFn != nil {
-		return m.publishFn(sam)
-	}
-
-	return nil
-}
-
-func (m *mockTransport) Subscribe(fn func(sam *proto.SAM)) error {
-	if m.subscribeFn != nil {
-		return m.subscribeFn(fn)
-	}
-
-	return nil
+	assert.NoError(t, err)
+	assert.Equal(t, rootchain.LatestRootchainBlockNumber, startBlock)
 }
