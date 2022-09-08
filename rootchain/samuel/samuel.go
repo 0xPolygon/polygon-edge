@@ -22,10 +22,10 @@ import (
 // eventTracker defines the event tracker interface for SAMUEL
 type eventTracker interface {
 	// Start starts the event tracker from the specified block number
-	Start(uint64)
+	Start(uint64) error
 
 	// Stop stops the event tracker
-	Stop()
+	Stop() error
 
 	// Subscribe creates a rootchain event subscription
 	Subscribe() <-chan rootchain.Event
@@ -134,7 +134,9 @@ func (s *SAMUEL) Start() error {
 	}
 
 	// Start the Event Tracker
-	s.eventTracker.Start(startBlock)
+	if err := s.eventTracker.Start(startBlock); err != nil {
+		return fmt.Errorf("unable to start event tracker, %w", err)
+	}
 
 	return nil
 }
@@ -280,9 +282,16 @@ func (s *SAMUEL) startEventLoop() {
 }
 
 // Stop stops the SAMUEL module and any underlying modules
-func (s *SAMUEL) Stop() {
+func (s *SAMUEL) Stop() error {
 	// Stop the Event Tracker
-	s.eventTracker.Stop()
+	if err := s.eventTracker.Stop(); err != nil {
+		return fmt.Errorf(
+			"unable to gracefully stop event tracker, %w",
+			err,
+		)
+	}
+
+	return nil
 }
 
 // SaveProgress notifies the SAMUEL module of which events
