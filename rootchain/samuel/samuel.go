@@ -56,8 +56,8 @@ type signer interface {
 	Sign([]byte) ([]byte, uint64, error)
 
 	// VerifySignature verifies the signature for the passed in
-	// raw data
-	VerifySignature([]byte, []byte) error
+	// raw data, and at the specified block number
+	VerifySignature([]byte, []byte, uint64) error
 }
 
 // transport defines the transport interface used for
@@ -214,7 +214,11 @@ func (s *SAMUEL) registerGossipHandler() error {
 		}
 
 		// Verify that the signature is correct
-		if err := s.signer.VerifySignature(hash, sam.Signature); err != nil {
+		if err := s.signer.VerifySignature(
+			hash,
+			sam.Signature,
+			sam.ChildchainBlockNumber,
+		); err != nil {
 			s.logger.Error(
 				fmt.Sprintf("invalid signature for event with hash %s, %v", sam.Hash, err),
 			)
