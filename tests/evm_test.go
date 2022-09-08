@@ -2,23 +2,21 @@ package tests
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"math/big"
+	"os"
 	"strings"
 	"testing"
 
-	"github.com/hashicorp/go-hclog"
-	"github.com/umbracle/fastrlp"
-
 	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/helper/keccak"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/state/runtime/evm"
 	"github.com/0xPolygon/polygon-edge/types"
-
-	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/hashicorp/go-hclog"
+	"github.com/umbracle/fastrlp"
 )
 
 var mainnetChainConfig = chain.Params{
@@ -167,7 +165,7 @@ func TestEVM(t *testing.T) {
 					return
 				}
 
-				data, err := ioutil.ReadFile(file)
+				data, err := os.ReadFile(file)
 				if err != nil {
 					t.Fatal(err)
 				}

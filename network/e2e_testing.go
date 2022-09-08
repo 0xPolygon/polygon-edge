@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"sync"
 	"testing"
@@ -371,7 +370,7 @@ func MeshJoin(servers ...*Server) []error {
 func GenerateTestLibp2pKey(t *testing.T) (crypto.PrivKey, string) {
 	t.Helper()
 
-	dir, err := ioutil.TempDir(os.TempDir(), "")
+	dir, err := os.MkdirTemp(os.TempDir(), "")
 	assert.NoError(t, err)
 
 	// Instantiate the correct folder structure

@@ -4,8 +4,8 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"math/big"
+	"os"
 
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -355,7 +355,7 @@ func ImportFromName(chain string) (*Chain, error) {
 
 // ImportFromFile imports a chain from a filepath
 func ImportFromFile(filename string) (*Chain, error) {
-	data, err := ioutil.ReadFile(filename)
+	data, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}

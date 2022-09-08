@@ -3,12 +3,11 @@ package generator
 import (
 	"crypto/ecdsa"
 	"encoding/json"
-	"io/ioutil"
 	"math/big"
-
-	"github.com/umbracle/ethgo"
+	"os"
 
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
 )
 
@@ -75,7 +74,7 @@ type GeneratorParams struct {
 
 // ReadContractArtifact reads the contract bytecode from the specified path
 func ReadContractArtifact(configPath string) (*ContractArtifact, error) {
-	rawData, readErr := ioutil.ReadFile(configPath)
+	rawData, readErr := os.ReadFile(configPath)
 	if readErr != nil {
 		return nil, readErr
 	}
