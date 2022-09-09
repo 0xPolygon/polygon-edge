@@ -387,7 +387,15 @@ func TestDispatcherBatchRequest(t *testing.T) {
 		{
 			"no-limits",
 			"test when limits are not set",
-			newDispatcher(hclog.NewNullLogger(), newMockStore(), 0, 0, 0, 0),
+			newDispatcher(
+				hclog.NewNullLogger(),
+				newMockStore(),
+				&dispatcherParams{
+					chainID:                 0,
+					priceLimit:              0,
+					jsonRPCBatchLengthLimit: 0,
+					blockRangeLimit:         0,
+				}),
 			[]byte(`[
 				{"id":1,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]},
 				{"id":2,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]},

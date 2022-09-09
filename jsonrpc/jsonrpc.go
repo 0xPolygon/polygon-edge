@@ -1,13 +1,16 @@
 package jsonrpc
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"sync"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/versioning"
 	"github.com/gorilla/websocket"
 	"github.com/hashicorp/go-hclog"
 )
@@ -267,16 +270,19 @@ func (j *JSONRPC) handle(w http.ResponseWriter, req *http.Request) {
 		"Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization",
 	)
 
-	if (*req).Method == "OPTIONS" {
-		return
-	}
-
-	if req.Method != "POST" {
+	switch req.Method {
+	case "POST":
+		j.handleJSONRPCRequest(w, req)
+	case "GET":
+		j.handleGetRequest(w)
+	case "OPTIONS":
+		// nothing to return
+	default:
 		_, _ = w.Write([]byte("method " + req.Method + " not allowed"))
-
-		return
 	}
+}
 
+func (j *JSONRPC) handleJSONRPCRequest(w http.ResponseWriter, req *http.Request) {
 	data, err := ioutil.ReadAll(req.Body)
 
 	if err != nil {
@@ -297,4 +303,27 @@ func (j *JSONRPC) handle(w http.ResponseWriter, req *http.Request) {
 	}
 
 	j.logger.Debug("handle", "response", string(resp))
+}
+
+type GetResponse struct {
+	Name    string `json:"name"`
+	ChainID uint64 `json:"chain_id"`
+	Version string `json:"version"`
+}
+
+func (j *JSONRPC) handleGetRequest(writer io.Writer) {
+	data := &GetResponse{
+		Name:    j.config.ChainName,
+		ChainID: j.config.ChainID,
+		Version: versioning.Version,
+	}
+
+	resp, err := json.Marshal(data)
+	if err != nil {
+		_, _ = writer.Write([]byte(err.Error()))
+	}
+
+	if _, err = writer.Write(resp); err != nil {
+		_, _ = writer.Write([]byte(err.Error()))
+	}
 }
