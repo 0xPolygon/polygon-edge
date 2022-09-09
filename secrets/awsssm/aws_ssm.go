@@ -110,10 +110,12 @@ func (a *AwsSsmManager) SetSecret(name string, value []byte) error {
 }
 
 // HasSecret checks if the secret is present on AWS SSM ParameterStore
-func (a *AwsSsmManager) HasSecret(name string) bool {
-	_, err := a.GetSecret(name)
+func (a *AwsSsmManager) HasSecret(name string) (bool, error) {
+	if _, err := a.GetSecret(name); err != nil {
+		return false, fmt.Errorf("unable to fetch secret (%s), %w", name, err);
+	}
 
-	return err == nil
+	return true, nil
 }
 
 // RemoveSecret removes a secret from AWS SSM ParameterStore

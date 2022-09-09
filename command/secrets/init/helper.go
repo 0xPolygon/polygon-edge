@@ -11,7 +11,11 @@ import (
 
 // loadValidatorAddress loads ECDSA key by SecretsManager and returns validator address
 func loadValidatorAddress(secretsManager secrets.SecretsManager) (types.Address, error) {
-	if !secretsManager.HasSecret(secrets.ValidatorKey) {
+	hasSecret, err := secretsManager.HasSecret(secrets.ValidatorKey)
+	if err != nil {
+		return types.ZeroAddress, nil
+	}
+	if !hasSecret {
 		return types.ZeroAddress, nil
 	}
 
@@ -30,7 +34,11 @@ func loadValidatorAddress(secretsManager secrets.SecretsManager) (types.Address,
 
 // loadValidatorAddress loads BLS key by SecretsManager and returns BLS Public Key
 func loadBLSPublicKey(secretsManager secrets.SecretsManager) (string, error) {
-	if !secretsManager.HasSecret(secrets.ValidatorBLSKey) {
+	hasSecret, err := secretsManager.HasSecret(secrets.ValidatorBLSKey)
+	if err != nil {
+		return "", nil
+	}
+	if !hasSecret {
 		return "", nil
 	}
 
@@ -54,7 +62,11 @@ func loadBLSPublicKey(secretsManager secrets.SecretsManager) (string, error) {
 
 // loadNodeID loads Libp2p key by SecretsManager and returns Node ID
 func loadNodeID(secretsManager secrets.SecretsManager) (string, error) {
-	if !secretsManager.HasSecret(secrets.NetworkKey) {
+	hasSecret, err := secretsManager.HasSecret(secrets.NetworkKey)
+	if err != nil {
+		return "", err
+	}
+	if !hasSecret {
 		return "", nil
 	}
 

@@ -214,7 +214,11 @@ func (pci *PeerConnInfo) getProtocolStream(protocol string) *rawGrpc.ClientConn 
 func setupLibp2pKey(secretsManager secrets.SecretsManager) (crypto.PrivKey, error) {
 	var key crypto.PrivKey
 
-	if secretsManager.HasSecret(secrets.NetworkKey) {
+	hasSecret, err := secretsManager.HasSecret(secrets.NetworkKey)
+	if err != nil {
+		return nil, err
+	}
+	if hasSecret {
 		// The key is present in the secrets manager, read it
 		networkingKey, readErr := ReadLibp2pKey(secretsManager)
 		if readErr != nil {

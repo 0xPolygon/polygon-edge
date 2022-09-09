@@ -118,7 +118,11 @@ func GetValidatorsFromPrefixPath(
 }
 
 func getValidatorAddressFromSecretManager(manager secrets.SecretsManager) (types.Address, error) {
-	if !manager.HasSecret(secrets.ValidatorKey) {
+	hasSecret, err := manager.HasSecret(secrets.ValidatorKey)
+	if err != nil {
+		return types.ZeroAddress, err
+	}
+	if !hasSecret {
 		return types.ZeroAddress, ErrECDSAKeyNotFound
 	}
 
@@ -136,7 +140,11 @@ func getValidatorAddressFromSecretManager(manager secrets.SecretsManager) (types
 }
 
 func getBLSPublicKeyBytesFromSecretManager(manager secrets.SecretsManager) ([]byte, error) {
-	if !manager.HasSecret(secrets.ValidatorBLSKey) {
+	hasSecret, err := manager.HasSecret(secrets.ValidatorBLSKey)
+	if err != nil {
+		return nil, err
+	}
+	if !hasSecret {
 		return nil, ErrBLSKeyNotFound
 	}
 

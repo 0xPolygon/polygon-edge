@@ -181,10 +181,12 @@ func (v *VaultSecretsManager) SetSecret(name string, value []byte) error {
 }
 
 // HasSecret checks if the secret is present on the Hashicorp Vault server
-func (v *VaultSecretsManager) HasSecret(name string) bool {
-	_, err := v.GetSecret(name)
+func (v *VaultSecretsManager) HasSecret(name string) (bool, error) {
+	if _, err := v.GetSecret(name); err != nil {
+		return false, fmt.Errorf("unable to fetch secret (%s), %w", name, err);
+	}
 
-	return err == nil
+	return true, nil
 }
 
 // RemoveSecret removes a secret from the Hashicorp Vault server

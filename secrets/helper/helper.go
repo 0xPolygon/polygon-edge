@@ -66,7 +66,11 @@ func SetupGCPSSM(
 
 // InitECDSAValidatorKey creates new ECDSA key and set as a validator key
 func InitECDSAValidatorKey(secretsManager secrets.SecretsManager) (types.Address, error) {
-	if secretsManager.HasSecret(secrets.ValidatorKey) {
+	hasSecret, err := secretsManager.HasSecret(secrets.ValidatorKey)
+	if err != nil {
+		return types.ZeroAddress, err
+	}
+	if hasSecret {
 		return types.ZeroAddress, fmt.Errorf(`secrets "%s" has been already initialized`, secrets.ValidatorKey)
 	}
 
@@ -89,7 +93,12 @@ func InitECDSAValidatorKey(secretsManager secrets.SecretsManager) (types.Address
 }
 
 func InitBLSValidatorKey(secretsManager secrets.SecretsManager) ([]byte, error) {
-	if secretsManager.HasSecret(secrets.ValidatorBLSKey) {
+	hasSecret, err := secretsManager.HasSecret(secrets.ValidatorBLSKey)
+	if err != nil {
+		return nil, err
+	}
+
+	if hasSecret {
 		return nil, fmt.Errorf(`secrets "%s" has been already initialized`, secrets.ValidatorBLSKey)
 	}
 
@@ -115,7 +124,11 @@ func InitBLSValidatorKey(secretsManager secrets.SecretsManager) ([]byte, error) 
 }
 
 func InitNetworkingPrivateKey(secretsManager secrets.SecretsManager) (libp2pCrypto.PrivKey, error) {
-	if secretsManager.HasSecret(secrets.NetworkKey) {
+	hasSecret, err := secretsManager.HasSecret(secrets.NetworkKey)
+	if err != nil {
+		return nil, err
+	}
+	if hasSecret {
 		return nil, fmt.Errorf(`secrets "%s" has been already initialized`, secrets.NetworkKey)
 	}
 

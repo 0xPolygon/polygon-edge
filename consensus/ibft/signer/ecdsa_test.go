@@ -44,10 +44,10 @@ func TestNewECDSAKeyManager(t *testing.T) {
 		{
 			name: "should initialize ECDSAKeyManager from the loaded ECDSA key",
 			mockSecretManager: &MockSecretManager{
-				HasSecretFn: func(name string) bool {
+				HasSecretFn: func(name string) (bool, error) {
 					testSecretName(name)
 
-					return true
+					return true, nil
 				},
 				GetSecretFn: func(name string) ([]byte, error) {
 					testSecretName(name)
@@ -64,10 +64,10 @@ func TestNewECDSAKeyManager(t *testing.T) {
 		{
 			name: "should return error if getOrCreateECDSAKey returns error",
 			mockSecretManager: &MockSecretManager{
-				HasSecretFn: func(name string) bool {
+				HasSecretFn: func(name string) (bool, error) {
 					testSecretName(name)
 
-					return true
+					return true, nil
 				},
 				GetSecretFn: func(name string) ([]byte, error) {
 					testSecretName(name)

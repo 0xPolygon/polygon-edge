@@ -80,7 +80,7 @@ type SecretsManager interface {
 	SetSecret(name string, value []byte) error
 
 	// HasSecret checks if the secret is present
-	HasSecret(name string) bool
+	HasSecret(name string) (bool, error)
 
 	// RemoveSecret removes the secret from storage
 	RemoveSecret(name string) error
