@@ -233,10 +233,6 @@ func setupLibp2pKey(secretsManager secrets.SecretsManager) (crypto.PrivKey, erro
 			return nil, fmt.Errorf("unable to generate networking private key for Secrets Manager, %w", keyErr)
 		}
 
-		if deleteErr := secretsManager.RemoveSecret(secrets.NetworkKey); deleteErr != nil {
-			return nil, fmt.Errorf("unable to delete pre-existing networking private key in Secrets Manager, %w", deleteErr)
-		}
-
 		// Write the networking private key to disk
 		if setErr := secretsManager.SetSecret(secrets.NetworkKey, libp2pKeyEncoded); setErr != nil {
 			return nil, fmt.Errorf("unable to store networking private key to Secrets Manager, %w", setErr)

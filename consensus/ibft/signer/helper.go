@@ -49,7 +49,7 @@ func getOrCreateECDSAKey(manager secrets.SecretsManager) (*ecdsa.PrivateKey, err
 
 // getOrCreateECDSAKey loads BLS key or creates a new key
 func getOrCreateBLSKey(manager secrets.SecretsManager) (*bls_sig.SecretKey, error) {
-	hasSecret, err := manager.HasSecret(secrets.ValidatorKey)
+	hasSecret, err := manager.HasSecret(secrets.ValidatorBLSKey)
 	if err != nil {
 		return nil, err
 	}
