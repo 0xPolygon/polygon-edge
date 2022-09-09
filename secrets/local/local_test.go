@@ -124,7 +124,7 @@ func TestLocalSecretsManager_GetSetSecret(
 	t *testing.T,
 ) {
 	// Set up the values used in the test table
-	validatorKey, validatorKeyEncoded, genErr := crypto.GenerateAndEncodePrivateKey()
+	validatorKey, validatorKeyEncoded, genErr := crypto.GenerateAndEncodeECDSAPrivateKey()
 	if genErr != nil {
 		t.Fatalf("Unable to generate validator private key, %v", genErr)
 	}
@@ -226,7 +226,7 @@ func TestLocalSecretsManager_GetSetSecret(
 
 func TestLocalSecretsManager_RemoveSecret(t *testing.T) {
 	// Set up the values used in the test table
-	_, validatorKeyEncoded, genErr := crypto.GenerateAndEncodePrivateKey()
+	_, validatorKeyEncoded, genErr := crypto.GenerateAndEncodeECDSAPrivateKey()
 	if genErr != nil {
 		t.Fatalf("Unable to generate validator private key, %v", genErr)
 	}

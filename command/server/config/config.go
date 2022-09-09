@@ -51,8 +51,9 @@ type Network struct {
 
 // TxPool defines the TxPool configuration params
 type TxPool struct {
-	PriceLimit uint64 `json:"price_limit" yaml:"price_limit"`
-	MaxSlots   uint64 `json:"max_slots" yaml:"max_slots"`
+	PriceLimit         uint64 `json:"price_limit" yaml:"price_limit"`
+	MaxSlots           uint64 `json:"max_slots" yaml:"max_slots"`
+	MaxAccountEnqueued uint64 `json:"max_account_enqueued" yaml:"max_account_enqueued"`
 }
 
 // Headers defines the HTTP response headers required to enable CORS.
@@ -61,17 +62,18 @@ type Headers struct {
 }
 
 const (
-	// minimum block generation time in seconds
+	// DefaultBlockTime minimum block generation time in seconds
 	DefaultBlockTime uint64 = 2
 
-	// Multiplier to get IBFT timeout from block time
+	// BlockTimeMultiplierForTimeout Multiplier to get IBFT timeout from block time
 	// timeout is calculated when IBFT timeout is not specified
 	BlockTimeMultiplierForTimeout uint64 = 5
 
-	// maximum length allowed for json_rpc batch requests
+	// DefaultJSONRPCBatchRequestLimit maximum length allowed for json_rpc batch requests
 	DefaultJSONRPCBatchRequestLimit uint64 = 20
 
-	// maximum block range allowed for json_rpc requests with fromBlock/toBlock values (e.g. eth_getLogs)
+	// DefaultJSONRPCBlockRangeLimit maximum block range allowed for json_rpc
+	// requests with fromBlock/toBlock values (e.g. eth_getLogs)
 	DefaultJSONRPCBlockRangeLimit uint64 = 1000
 )
 
@@ -96,8 +98,9 @@ func DefaultConfig() *Config {
 		Telemetry:  &Telemetry{},
 		ShouldSeal: true,
 		TxPool: &TxPool{
-			PriceLimit: 0,
-			MaxSlots:   4096,
+			PriceLimit:         0,
+			MaxSlots:           4096,
+			MaxAccountEnqueued: 128,
 		},
 		LogLevel:    "INFO",
 		RestoreFile: "",

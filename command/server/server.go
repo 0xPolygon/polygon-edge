@@ -4,12 +4,11 @@ import (
 	"fmt"
 
 	"github.com/0xPolygon/polygon-edge/command"
+	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/command/server/config"
 	"github.com/0xPolygon/polygon-edge/command/server/export"
-	"github.com/spf13/cobra"
-
-	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/server"
+	"github.com/spf13/cobra"
 )
 
 func GetCommand() *cobra.Command {
@@ -180,6 +179,13 @@ func setFlags(cmd *cobra.Command) {
 	)
 
 	cmd.Flags().Uint64Var(
+		&params.rawConfig.TxPool.MaxAccountEnqueued,
+		maxEnqueuedFlag,
+		defaultConfig.TxPool.MaxAccountEnqueued,
+		"maximum number of enqueued transactions per account",
+	)
+
+	cmd.Flags().Uint64Var(
 		&params.rawConfig.BlockTime,
 		blockTimeFlag,
 		defaultConfig.BlockTime,
@@ -194,18 +200,18 @@ func setFlags(cmd *cobra.Command) {
 	)
 
 	cmd.Flags().Uint64Var(
-		&params.jsonRPCBatchLengthLimit,
+		&params.rawConfig.JSONRPCBatchRequestLimit,
 		jsonRPCBatchRequestLimitFlag,
 		defaultConfig.JSONRPCBatchRequestLimit,
-		"the max length to be considered when handling json-rpc batch requests",
+		"max length to be considered when handling json-rpc batch requests, value of 0 disables it",
 	)
 
-	//nolint:lll
 	cmd.Flags().Uint64Var(
-		&params.jsonRPCBlockRangeLimit,
+		&params.rawConfig.JSONRPCBlockRangeLimit,
 		jsonRPCBlockRangeLimitFlag,
 		defaultConfig.JSONRPCBlockRangeLimit,
-		"the max block range to be considered when executing json-rpc requests that consider fromBlock/toBlock values (e.g. eth_getLogs)",
+		"max block range to be considered when executing json-rpc requests "+
+			"that consider fromBlock/toBlock values (e.g. eth_getLogs), value of 0 disables it",
 	)
 
 	cmd.Flags().StringVar(
@@ -216,6 +222,7 @@ func setFlags(cmd *cobra.Command) {
 	)
 
 	setLegacyFlags(cmd)
+
 	setDevFlags(cmd)
 }
 

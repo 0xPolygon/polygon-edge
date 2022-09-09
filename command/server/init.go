@@ -123,6 +123,11 @@ func (p *serverParams) initGenesisConfig() error {
 		return parseErr
 	}
 
+	// if block-gas-target flag is set override genesis.json value
+	if p.blockGasTarget != 0 {
+		p.genesisConfig.Params.BlockGasTarget = p.blockGasTarget
+	}
+
 	return nil
 }
 
