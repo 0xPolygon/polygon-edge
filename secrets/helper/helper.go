@@ -67,7 +67,7 @@ func setupGCPSSM(
 	)
 }
 
-// InitValidatorKey creates new ECDSA key and set as a validator key
+// InitECDSAValidatorKey creates new ECDSA key and set as a validator key
 func InitECDSAValidatorKey(secretsManager secrets.SecretsManager) (types.Address, error) {
 	if secretsManager.HasSecret(secrets.ValidatorKey) {
 		return types.ZeroAddress, fmt.Errorf(`secrets "%s" has been already initialized`, secrets.ValidatorKey)
