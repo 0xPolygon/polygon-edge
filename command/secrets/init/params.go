@@ -58,8 +58,13 @@ func (ip *initParams) initSecrets() error {
 }
 
 func (ip *initParams) initSecretsManager() error {
+	var err error
 	if ip.hasConfigPath() {
-		return ip.initFromConfig()
+		if err = ip.parseConfig(); err != nil {
+			return err
+		}
+		ip.secretsManager, err = helper.InitCloudSecretsManager(ip.secretsConfig)
+		return err
 	}
 
 	return ip.initLocalSecretsManager()
@@ -67,44 +72,6 @@ func (ip *initParams) initSecretsManager() error {
 
 func (ip *initParams) hasConfigPath() bool {
 	return ip.configPath != ""
-}
-
-func (ip *initParams) initFromConfig() error {
-	if err := ip.parseConfig(); err != nil {
-		return err
-	}
-
-	var secretsManager secrets.SecretsManager
-
-	switch ip.secretsConfig.Type {
-	case secrets.HashicorpVault:
-		vault, err := helper.SetupHashicorpVault(ip.secretsConfig)
-		if err != nil {
-			return err
-		}
-
-		secretsManager = vault
-	case secrets.AWSSSM:
-		AWSSSM, err := helper.SetupAWSSSM(ip.secretsConfig)
-		if err != nil {
-			return err
-		}
-
-		secretsManager = AWSSSM
-	case secrets.GCPSSM:
-		GCPSSM, err := helper.SetupGCPSSM(ip.secretsConfig)
-		if err != nil {
-			return err
-		}
-
-		secretsManager = GCPSSM
-	default:
-		return errUnsupportedType
-	}
-
-	ip.secretsManager = secretsManager
-
-	return nil
 }
 
 func (ip *initParams) parseConfig() error {

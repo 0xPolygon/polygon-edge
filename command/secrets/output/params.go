@@ -73,8 +73,13 @@ func (op *outputParams) initSecrets() error {
 }
 
 func (op *outputParams) initSecretsManager() error {
+	var err error
 	if op.hasConfigPath() {
-		return op.initFromConfig()
+		if err = op.parseConfig(); err != nil {
+			return err
+		}
+		op.secretsManager, err = helper.InitCloudSecretsManager(op.secretsConfig)
+		return err
 	}
 
 	return op.initLocalSecretsManager()
@@ -82,44 +87,6 @@ func (op *outputParams) initSecretsManager() error {
 
 func (op *outputParams) hasConfigPath() bool {
 	return op.configPath != ""
-}
-
-func (op *outputParams) initFromConfig() error {
-	if err := op.parseConfig(); err != nil {
-		return err
-	}
-
-	var secretsManager secrets.SecretsManager
-
-	switch op.secretsConfig.Type {
-	case secrets.HashicorpVault:
-		vault, err := helper.SetupHashicorpVault(op.secretsConfig)
-		if err != nil {
-			return err
-		}
-
-		secretsManager = vault
-	case secrets.AWSSSM:
-		AWSSSM, err := helper.SetupAWSSSM(op.secretsConfig)
-		if err != nil {
-			return err
-		}
-
-		secretsManager = AWSSSM
-	case secrets.GCPSSM:
-		GCPSSM, err := helper.SetupGCPSSM(op.secretsConfig)
-		if err != nil {
-			return err
-		}
-
-		secretsManager = GCPSSM
-	default:
-		return errUnsupportedType
-	}
-
-	op.secretsManager = secretsManager
-
-	return nil
 }
 
 func (op *outputParams) parseConfig() error {
