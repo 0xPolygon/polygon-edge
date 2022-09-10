@@ -63,7 +63,9 @@ func (ip *initParams) initSecretsManager() error {
 		if err = ip.parseConfig(); err != nil {
 			return err
 		}
+
 		ip.secretsManager, err = helper.InitCloudSecretsManager(ip.secretsConfig)
+
 		return err
 	}
 

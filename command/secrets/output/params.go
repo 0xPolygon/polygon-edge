@@ -78,7 +78,9 @@ func (op *outputParams) initSecretsManager() error {
 		if err = op.parseConfig(); err != nil {
 			return err
 		}
+
 		op.secretsManager, err = helper.InitCloudSecretsManager(op.secretsConfig)
+
 		return err
 	}
 
