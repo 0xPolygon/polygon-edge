@@ -6,26 +6,26 @@ import (
 )
 
 type samSet struct {
-	messages   []rootchain.SAM
-	signatures map[string]bool
+	messages []rootchain.SAM
+	isAdded  map[string]bool
 }
 
 func newSet() samSet {
 	return samSet{
-		messages:   make([]rootchain.SAM, 0),
-		signatures: make(map[string]bool),
+		messages: make([]rootchain.SAM, 0),
+		isAdded:  make(map[string]bool),
 	}
 }
 
 func (s *samSet) add(msg rootchain.SAM) {
 	strSignature := string(msg.Signature)
 
-	if s.signatures[strSignature] {
+	if s.isAdded[strSignature] {
 		return
 	}
 
 	s.messages = append(s.messages, msg)
-	s.signatures[strSignature] = true
+	s.isAdded[strSignature] = true
 }
 
 func (s *samSet) getMessages() []rootchain.SAM {
