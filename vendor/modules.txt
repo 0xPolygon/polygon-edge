@@ -401,8 +401,6 @@ github.com/libp2p/go-libp2p/core/sec/insecure
 github.com/libp2p/go-libp2p/core/sec/insecure/pb
 github.com/libp2p/go-libp2p/core/transport
 github.com/libp2p/go-libp2p/p2p/discovery/backoff
-github.com/libp2p/go-libp2p/p2p/discovery/routing
-github.com/libp2p/go-libp2p/p2p/discovery/util
 github.com/libp2p/go-libp2p/p2p/host/autonat
 github.com/libp2p/go-libp2p/p2p/host/autonat/pb
 github.com/libp2p/go-libp2p/p2p/host/autorelay
@@ -445,24 +443,15 @@ github.com/libp2p/go-libp2p/p2p/transport/websocket
 # github.com/libp2p/go-libp2p-asn-util v0.2.0
 ## explicit; go 1.17
 github.com/libp2p/go-libp2p-asn-util
-# github.com/libp2p/go-libp2p-blankhost v0.4.0
-## explicit; go 1.17
 # github.com/libp2p/go-libp2p-core v0.20.1
 ## explicit; go 1.17
-github.com/libp2p/go-libp2p-core/connmgr
 github.com/libp2p/go-libp2p-core/crypto
-github.com/libp2p/go-libp2p-core/discovery
 github.com/libp2p/go-libp2p-core/event
 github.com/libp2p/go-libp2p-core/host
 github.com/libp2p/go-libp2p-core/network
 github.com/libp2p/go-libp2p-core/peer
 github.com/libp2p/go-libp2p-core/peerstore
 github.com/libp2p/go-libp2p-core/protocol
-github.com/libp2p/go-libp2p-core/record
-github.com/libp2p/go-libp2p-core/routing
-# github.com/libp2p/go-libp2p-discovery v0.7.0
-## explicit; go 1.16
-github.com/libp2p/go-libp2p-discovery
 # github.com/libp2p/go-libp2p-kbucket v0.5.0
 ## explicit; go 1.18
 github.com/libp2p/go-libp2p-kbucket
@@ -470,8 +459,8 @@ github.com/libp2p/go-libp2p-kbucket/keyspace
 github.com/libp2p/go-libp2p-kbucket/peerdiversity
 # github.com/libp2p/go-libp2p-peerstore v0.7.0
 ## explicit; go 1.17
-# github.com/libp2p/go-libp2p-pubsub v0.7.1
-## explicit; go 1.13
+# github.com/libp2p/go-libp2p-pubsub v0.8.0
+## explicit; go 1.17
 github.com/libp2p/go-libp2p-pubsub
 github.com/libp2p/go-libp2p-pubsub/pb
 # github.com/libp2p/go-libp2p-swarm v0.11.0

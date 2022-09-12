@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/protocol"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/protocol"
 
 	manet "github.com/multiformats/go-multiaddr/net"
 )
@@ -143,10 +143,11 @@ type TopicScoreSnapshot struct {
 // When this option is enabled, the supplied function will be invoked periodically to allow
 // the application to inspect or dump the scores for connected peers.
 // The supplied function can have one of two signatures:
-//  - PeerScoreInspectFn, which takes a map of peer IDs to score.
-//  - ExtendedPeerScoreInspectFn, which takes a map of peer IDs to
-//    PeerScoreSnapshots and allows inspection of individual score
-//    components for debugging peer scoring.
+//   - PeerScoreInspectFn, which takes a map of peer IDs to score.
+//   - ExtendedPeerScoreInspectFn, which takes a map of peer IDs to
+//     PeerScoreSnapshots and allows inspection of individual score
+//     components for debugging peer scoring.
+//
 // This option must be passed _after_ the WithPeerScore option.
 func WithPeerScoreInspect(inspect interface{}, period time.Duration) Option {
 	return func(ps *PubSub) error {
