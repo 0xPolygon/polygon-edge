@@ -356,10 +356,21 @@ func (s *SAMUEL) SaveProgress(
 		return
 	}
 
-	params, err := s.eventData.methodABI.Decode(input)
+	// Decode the inputs
+	params, err := s.eventData.methodABI.Inputs.Decode(input)
 	if err != nil {
 		s.logger.Error(
 			fmt.Sprintf("Unable to decode event params for contract %s, %v", contractAddr, err),
+		)
+
+		return
+	}
+
+	// Make sure it's of a correct type
+	castParams, castErr := params.(map[string]interface{})
+	if err != nil {
+		s.logger.Error(
+			fmt.Sprintf("Unable to properly cast input params, %v", castErr),
 		)
 
 		return
@@ -369,8 +380,8 @@ func (s *SAMUEL) SaveProgress(
 	case rootchain.ValidatorSetPayloadType:
 		// The method needs to contain
 		// (validatorSet[], index, blockNumber)
-		index, _ := params["index"].(uint64)
-		blockNumber, _ := params["blockNumber"].(uint64)
+		index, _ := castParams["index"].(uint64)
+		blockNumber, _ := castParams["blockNumber"].(uint64)
 
 		// Save to the local database
 		if err := s.storage.WriteLastProcessedEvent(
@@ -433,7 +444,7 @@ func (s *SAMUEL) GetReadyTransaction() *types.Transaction {
 
 		// The method should have the signature
 		// methodName(validatorSet tuple[], index uint64, blockNumber uint64, signatures [][]byte)
-		encodedArgs, err := s.eventData.methodABI.Encode(
+		encodedArgs, err := s.eventData.methodABI.Inputs.Encode(
 			map[string]interface{}{
 				"validatorSet": vs.GetSetInfo(),
 				"index":        index,

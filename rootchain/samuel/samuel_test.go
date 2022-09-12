@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strings"
 	"sync"
 	"testing"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
+	"github.com/umbracle/ethgo/abi"
 )
 
 func TestSAMUEL_Start(t *testing.T) {
@@ -390,7 +392,120 @@ func TestSAMUEL_startEventLoop(t *testing.T) {
 }
 
 func TestSAMUEL_SaveProgress(t *testing.T) {
-	// TODO
+	t.Parallel()
+
+	var (
+		pruneIndex                 = uint64(0)
+		lastProcessedEvent         = ""
+		lastProcessedEventContract = ""
+		localContractAddr          = types.StringToAddress("123")
+		methodABIStr               = `
+									[
+									{
+									  "inputs": [
+										{
+										  "internalType": "uint64",
+										  "name": "index",
+										  "type": "uint64"
+										},
+										{
+										  "internalType": "uint64",
+										  "name": "blockNumber",
+										  "type": "uint64"
+										}
+									  ],
+									  "name": "exampleMethod",
+									  "outputs": [],
+									  "stateMutability": "nonpayable",
+									  "type": "function"
+									}
+									]
+									`
+		methodName       = "exampleMethod"
+		eventIndex       = uint64(1)
+		eventBlockNumber = uint64(100)
+
+		configEvent = &rootchain.ConfigEvent{
+			EventABI:     "event ExampleEvent()",
+			MethodABI:    methodABIStr,
+			MethodName:   methodName,
+			LocalAddress: localContractAddr.String(),
+			PayloadType:  rootchain.ValidatorSetPayloadType,
+		}
+
+		storage = mockStorage{
+			writeFn: func(bundle string, contractAddr string) error {
+				lastProcessedEvent = bundle
+				lastProcessedEventContract = contractAddr
+
+				return nil
+			},
+		}
+		samp = mockSAMP{
+			pruneFn: func(index uint64) {
+				pruneIndex = index
+			},
+		}
+	)
+
+	// Create a method ABI
+	methodABI, err := abi.NewABI(methodABIStr)
+	if err != nil {
+		t.Fatalf("unable to set method ABI, %v", err)
+	}
+
+	method := methodABI.GetMethod(methodName)
+	if method == nil {
+		t.Fatalf("unable to get method from ABI")
+	}
+
+	// Encode the parameters
+	encodedArgs, err := method.Inputs.Encode(
+		map[string]interface{}{
+			"index":       eventIndex,
+			"blockNumber": eventBlockNumber,
+		},
+	)
+	if err != nil {
+		t.Fatalf("unable to encode method parameters, %v", err)
+	}
+
+	// Create a new SAMUEL instance
+	s := NewSamuel(
+		configEvent,
+		hclog.NewNullLogger(),
+		mockEventTracker{},
+		samp,
+		mockSigner{},
+		storage,
+		mockTransport{},
+	)
+
+	// Save the progress with the encoded params
+	s.SaveProgress(localContractAddr, encodedArgs)
+
+	// Make sure the prune index is correct
+	assert.Equal(t, eventIndex, pruneIndex)
+
+	// Make sure the last processed event contract is correct
+	assert.Equal(t, localContractAddr.String(), lastProcessedEventContract)
+
+	// Make sure the saved last processed event information is correct
+	resArr := strings.Split(lastProcessedEvent, ":")
+	if len(resArr) != 2 {
+		t.Fatalf("invalid size of the last processed event")
+	}
+
+	assert.Equal(
+		t,
+		fmt.Sprintf("%d", eventIndex),
+		resArr[0],
+	)
+	assert.Equal(
+		t,
+		fmt.Sprintf("%d", eventBlockNumber),
+		resArr[1],
+	)
 }
 
 func TestSAMUEL_GetReadyTransaction(t *testing.T) {
