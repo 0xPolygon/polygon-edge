@@ -180,7 +180,7 @@ func (r *Receipt) UnmarshalStoreRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) err
 		return err
 	}
 
-	if len(elems) <= 4 {
+	if len(elems) < 4 {
 		return errors.New("expected at least 4 elements")
 	}
 
