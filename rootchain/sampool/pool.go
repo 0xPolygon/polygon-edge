@@ -13,9 +13,9 @@ var (
 )
 
 type SAMPool struct {
-	mux      sync.Mutex
-	messages map[uint64]samBucket
+	mux sync.Mutex
 
+	messages           map[uint64]samBucket
 	lastProcessedIndex uint64
 }
 
@@ -34,6 +34,13 @@ func (p *SAMPool) AddMessage(msg rootchain.SAM) error {
 	p.addSAM(msg)
 
 	return nil
+}
+
+func (p *SAMPool) SetLastProcessedEvent(index uint64) {
+	p.mux.Lock()
+	defer p.mux.Unlock()
+
+	p.lastProcessedIndex = index
 }
 
 func (p *SAMPool) Prune(index uint64) {
