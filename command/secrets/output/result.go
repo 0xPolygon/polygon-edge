@@ -7,20 +7,24 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/helper"
 )
 
+//SecretsOutputAllResults for default output case
 type SecretsOutputAllResult struct {
 	Address   string `json:"address"`
 	BLSPubkey string `json:"bls"`
 	NodeID    string `json:"node_id"`
 }
 
+//SecretsOutputNodeIDResults for `--node` output case
 type SecretsOutputNodeIDResult struct {
 	NodeID string `json:"node_id"`
 }
 
+//SecretsOutputBLSResults for `--bls` output case
 type SecretsOutputBLSResult struct {
 	BLSPubkey string `json:"bls"`
 }
 
+//SecretsOutputValidatorResult for `--validator` output case
 type SecretsOutputValidatorResult struct {
 	Address string `json:"address"`
 }
