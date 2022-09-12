@@ -28,7 +28,7 @@ func (s *samSet) add(msg rootchain.SAM) {
 	s.signatures[strSignature] = true
 }
 
-func (s *samSet) get() []rootchain.SAM {
+func (s *samSet) getMessages() []rootchain.SAM {
 	return s.messages
 }
 
@@ -52,7 +52,7 @@ type quorumFunc func(uint64) bool
 
 func (b samBucket) getQuorumMessages(quorum quorumFunc) []rootchain.SAM {
 	for _, set := range b {
-		messages := set.get()
+		messages := set.getMessages()
 
 		if quorum(uint64(len(messages))) {
 			return messages

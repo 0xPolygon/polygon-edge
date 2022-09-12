@@ -106,7 +106,7 @@ func TestSAMPool_AddMessage(t *testing.T) {
 			assert.True(t, ok)
 			assert.NotNil(t, set)
 
-			messages := set.get()
+			messages := set.getMessages()
 			assert.NotNil(t, messages)
 			assert.Len(t, messages, 1)
 		},
@@ -142,7 +142,7 @@ func TestSAMPool_AddMessage(t *testing.T) {
 			assert.True(t, ok)
 			assert.NotNil(t, set)
 
-			messages := set.get()
+			messages := set.getMessages()
 			assert.NotNil(t, messages)
 			assert.Len(t, messages, 1)
 
@@ -151,7 +151,7 @@ func TestSAMPool_AddMessage(t *testing.T) {
 
 			//	num of messages is still 1
 			set = pool.messages[msg.Index][msg.Hash]
-			assert.Len(t, set.get(), 1)
+			assert.Len(t, set.getMessages(), 1)
 		},
 	)
 }
