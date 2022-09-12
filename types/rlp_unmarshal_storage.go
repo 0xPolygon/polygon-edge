@@ -180,12 +180,12 @@ func (r *Receipt) UnmarshalStoreRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) err
 		return err
 	}
 
-	// come TransactionType first if exist
-	if len(elems) != 3 && len(elems) != 4 {
-		return errors.New("expected 3 or 4 elements")
+	if len(elems) <= 4 {
+		return errors.New("expected at least 4 elements")
 	}
 
-	if len(elems) == 4 {
+	// come TransactionType first if exist
+	if len(elems) == 5 {
 		if err := r.TransactionType.UnmarshalRLPFrom(p, elems[0]); err != nil {
 			return err
 		}
