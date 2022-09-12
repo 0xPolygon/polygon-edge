@@ -22,6 +22,7 @@ type Verifier interface {
 }
 
 type SAMPool struct {
+	// TODO: remove once milos moves verification to SAMUEL
 	verifier Verifier
 
 	mux      sync.Mutex
