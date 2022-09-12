@@ -176,33 +176,27 @@ func (op *outputParams) initNodeID() error {
 }
 
 func (op *outputParams) getResult() command.CommandResult {
-	outputResults := &SecretsOutputResult{
-		outputValidator: op.outputValidator,
-		outputBLS:       op.outputBLS,
-		outputNodeID:    op.outputNodeID,
-	}
-
 	if op.outputNodeID {
-		outputResults.NodeID = op.nodeID
-
-		return outputResults
+		return &SecretsOutputNodeIDResult{
+			NodeID: op.nodeID,
+		}
 	}
 
 	if op.outputValidator {
-		outputResults.Address = op.validatorAddress
-
-		return outputResults
+		return &SecretsOutputValidatorResult{
+			Address: op.validatorAddress,
+		}
 	}
 
 	if op.outputBLS {
-		outputResults.BLSPubkey = op.blsPubkey
-
-		return outputResults
+		return &SecretsOutputBLSResult{
+			BLSPubkey: op.blsPubkey,
+		}
 	}
 
-	outputResults.NodeID = op.nodeID
-	outputResults.BLSPubkey = op.blsPubkey
-	outputResults.Address = op.validatorAddress
-
-	return outputResults
+	return &SecretsOutputAllResult{
+		BLSPubkey: op.blsPubkey,
+		NodeID:    op.nodeID,
+		Address:   op.validatorAddress,
+	}
 }
