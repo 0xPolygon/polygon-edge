@@ -463,8 +463,8 @@ github.com/libp2p/go-libp2p-core/routing
 # github.com/libp2p/go-libp2p-discovery v0.7.0
 ## explicit; go 1.16
 github.com/libp2p/go-libp2p-discovery
-# github.com/libp2p/go-libp2p-kbucket v0.4.7
-## explicit; go 1.13
+# github.com/libp2p/go-libp2p-kbucket v0.5.0
+## explicit; go 1.18
 github.com/libp2p/go-libp2p-kbucket
 github.com/libp2p/go-libp2p-kbucket/keyspace
 github.com/libp2p/go-libp2p-kbucket/peerdiversity
