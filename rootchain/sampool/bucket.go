@@ -10,7 +10,7 @@ type samSet struct {
 	signatures map[string]bool
 }
 
-func newUniqueSAMs() samSet {
+func newSet() samSet {
 	return samSet{
 		messages:   make([]rootchain.SAM, 0),
 		signatures: make(map[string]bool),
@@ -41,7 +41,7 @@ func newBucket() samBucket {
 func (b samBucket) add(msg rootchain.SAM) {
 	messages, ok := b[msg.Hash]
 	if !ok {
-		messages = newUniqueSAMs()
+		messages = newSet()
 	}
 
 	messages.add(msg)
