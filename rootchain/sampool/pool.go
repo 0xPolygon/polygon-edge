@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/hashicorp/go-hclog"
+
 	"github.com/0xPolygon/polygon-edge/rootchain"
 )
 
@@ -15,14 +17,15 @@ var (
 // SAMPool is a storage for Signed Arbitrary Messages. Its main purpose is
 // to aggregate signatures of received SAMs and preserve their ordering (SAM.Index)
 type SAMPool struct {
-	mux sync.Mutex
+	mux    sync.Mutex
+	logger hclog.Logger
 
 	messages           map[uint64]samBucket
 	lastProcessedIndex uint64
 }
 
 // New returns a new SAMPool instance
-func New() *SAMPool {
+func New(logger hclog.Logger) *SAMPool {
 	return &SAMPool{
 		mux:      sync.Mutex{},
 		messages: make(map[uint64]samBucket),
@@ -32,10 +35,14 @@ func New() *SAMPool {
 // AddMessage adds the given message to the pool
 func (p *SAMPool) AddMessage(msg rootchain.SAM) error {
 	if err := p.verifySAM(msg); err != nil {
+		p.logger.Error("add SAM failed", "err", err)
+
 		return err
 	}
 
 	p.addSAM(msg)
+
+	p.logger.Debug("added SAM", "index", msg.Index, "hash", msg.Hash.String())
 
 	return nil
 }
@@ -62,6 +69,8 @@ func (p *SAMPool) Prune(index uint64) {
 	}
 
 	p.lastProcessedIndex = index
+
+	p.logger.Debug("pruned stale SAMs", "last_processed_index", index)
 }
 
 // Peek returns all SAMs whose index matches the expected event.
@@ -74,6 +83,8 @@ func (p *SAMPool) Peek() rootchain.VerifiedSAM {
 
 	bucket := p.messages[expectedIndex]
 	if bucket == nil {
+		p.logger.Debug("no SAMs for expected index", "index", expectedIndex)
+
 		return nil
 	}
 

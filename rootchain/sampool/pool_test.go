@@ -3,6 +3,7 @@ package sampool
 import (
 	"github.com/0xPolygon/polygon-edge/rootchain"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -15,7 +16,7 @@ func TestSAMPool_AddMessage(t *testing.T) {
 		func(t *testing.T) {
 			t.Parallel()
 
-			pool := New()
+			pool := New(hclog.NewNullLogger())
 			pool.lastProcessedIndex = 10
 
 			assert.ErrorIs(t,
@@ -34,7 +35,7 @@ func TestSAMPool_AddMessage(t *testing.T) {
 		func(t *testing.T) {
 			t.Parallel()
 
-			pool := New()
+			pool := New(hclog.NewNullLogger())
 
 			msg := rootchain.SAM{
 				Hash: types.Hash{111},
@@ -64,7 +65,7 @@ func TestSAMPool_AddMessage(t *testing.T) {
 		func(t *testing.T) {
 			t.Parallel()
 
-			pool := New()
+			pool := New(hclog.NewNullLogger())
 
 			msg := rootchain.SAM{
 				Hash:      types.Hash{111},
@@ -106,7 +107,7 @@ func TestSAMPool_Prune(t *testing.T) {
 		func(t *testing.T) {
 			t.Parallel()
 
-			pool := New()
+			pool := New(hclog.NewNullLogger())
 
 			msg := rootchain.SAM{
 				Hash: types.Hash{111},
@@ -132,7 +133,7 @@ func TestSAMPool_Prune(t *testing.T) {
 		func(t *testing.T) {
 			t.Parallel()
 
-			pool := New()
+			pool := New(hclog.NewNullLogger())
 
 			msg := rootchain.SAM{
 				Hash: types.Hash{111},
@@ -162,7 +163,7 @@ func TestSAMPool_Peek(t *testing.T) {
 		func(t *testing.T) {
 			t.Parallel()
 
-			pool := New()
+			pool := New(hclog.NewNullLogger())
 			pool.lastProcessedIndex = 3
 
 			assert.Nil(t, pool.Peek())
@@ -174,7 +175,7 @@ func TestSAMPool_Peek(t *testing.T) {
 		func(t *testing.T) {
 			t.Parallel()
 
-			pool := New()
+			pool := New(hclog.NewNullLogger())
 			pool.lastProcessedIndex = 9
 
 			msg := rootchain.SAM{
@@ -198,7 +199,7 @@ func TestSAMPool_Pop(t *testing.T) {
 		func(t *testing.T) {
 			t.Parallel()
 
-			pool := New()
+			pool := New(hclog.NewNullLogger())
 
 			assert.Nil(t, pool.Pop())
 		},
@@ -209,7 +210,7 @@ func TestSAMPool_Pop(t *testing.T) {
 		func(t *testing.T) {
 			t.Parallel()
 
-			pool := New()
+			pool := New(hclog.NewNullLogger())
 			pool.lastProcessedIndex = 4
 
 			msg := rootchain.SAM{
