@@ -12,6 +12,8 @@ var (
 	ErrStaleMessage = errors.New("stale SAM received")
 )
 
+// SAMPool is a storage for Signed Arbitrary Messages. Its main purpose is
+// to aggregate signatures of received SAMs and preserve their ordering (SAM.Index)
 type SAMPool struct {
 	mux sync.Mutex
 
@@ -19,6 +21,7 @@ type SAMPool struct {
 	lastProcessedIndex uint64
 }
 
+// New returns a new SAMPool instance
 func New() *SAMPool {
 	return &SAMPool{
 		mux:      sync.Mutex{},
@@ -26,6 +29,7 @@ func New() *SAMPool {
 	}
 }
 
+// AddMessage adds the given message to the pool
 func (p *SAMPool) AddMessage(msg rootchain.SAM) error {
 	if err := p.verifySAM(msg); err != nil {
 		return err
@@ -36,6 +40,8 @@ func (p *SAMPool) AddMessage(msg rootchain.SAM) error {
 	return nil
 }
 
+// SetLastProcessedEvent updates the SAMPool's internal index
+// for keeping track of SAM ordering
 func (p *SAMPool) SetLastProcessedEvent(index uint64) {
 	p.mux.Lock()
 	defer p.mux.Unlock()
@@ -43,6 +49,8 @@ func (p *SAMPool) SetLastProcessedEvent(index uint64) {
 	p.lastProcessedIndex = index
 }
 
+// Prune removes all messages whose index is less (or equal)
+// to the given argument
 func (p *SAMPool) Prune(index uint64) {
 	p.mux.Lock()
 	defer p.mux.Unlock()
@@ -56,6 +64,8 @@ func (p *SAMPool) Prune(index uint64) {
 	p.lastProcessedIndex = index
 }
 
+// Peek returns all SAMs whose index matches the expected event.
+// Messages are not removed from the pool.
 func (p *SAMPool) Peek() rootchain.VerifiedSAM {
 	p.mux.Lock()
 	defer p.mux.Unlock()
@@ -78,6 +88,8 @@ func (p *SAMPool) Peek() rootchain.VerifiedSAM {
 	return result
 }
 
+// Pop returns all the SAMs whose index matches the expected event.
+// Messages are removed from the pool
 func (p *SAMPool) Pop() rootchain.VerifiedSAM {
 	p.mux.Lock()
 	defer p.mux.Unlock()

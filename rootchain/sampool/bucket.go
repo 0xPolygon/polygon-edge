@@ -5,6 +5,9 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
+// samSet represents a unique set of signed SAMs.
+// Every signature contained in the set is guaranteed
+// to be unique
 type samSet struct {
 	messages []rootchain.SAM
 	isAdded  map[string]bool
@@ -32,6 +35,8 @@ func (s *samSet) getMessages() []rootchain.SAM {
 	return s.messages
 }
 
+// samBucket is a collection of different samSets.
+// The sets are indexed by the hash of the event they represent
 type samBucket map[types.Hash]samSet
 
 func newBucket() samBucket {
