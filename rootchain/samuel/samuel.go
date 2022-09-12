@@ -19,6 +19,10 @@ import (
 	googleProto "google.golang.org/protobuf/proto"
 )
 
+var (
+	errUnknownPayloadType = errors.New("unknown payload type")
+)
+
 // eventTracker defines the event tracker interface for SAMUEL
 type eventTracker interface {
 	// Start starts the event tracker from the specified block number
@@ -270,7 +274,7 @@ func getEventPayload(
 		// Return the specific Payload implementation
 		return payload.NewValidatorSetPayload(setInfo), nil
 	default:
-		return nil, errors.New("unknown payload type")
+		return nil, errUnknownPayloadType
 	}
 }
 
