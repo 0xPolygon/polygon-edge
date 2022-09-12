@@ -296,7 +296,7 @@ func (t *Transition) writeStateTx(tx *types.Transaction) error {
 	msg := tx.Copy()
 
 	s := t.state.Snapshot() //nolint:ifshort
-	result, err := t.apply(msg)
+	result, err := t.applyStateTx(msg)
 
 	if err != nil {
 		t.state.RevertToSnapshot(s)
@@ -353,6 +353,10 @@ func (t *Transition) writeStateTx(tx *types.Transaction) error {
 
 // Write writes another transaction to the executor
 func (t *Transition) Write(txn *types.Transaction) error {
+	if txn.Type == types.StateTx {
+		return t.writeStateTx(txn)
+	}
+
 	signer := crypto.NewSigner(t.config, uint64(t.r.config.ChainID))
 
 	var err error
