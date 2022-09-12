@@ -1,11 +1,15 @@
 package network
 
+import "github.com/libp2p/go-libp2p/core/network"
+
 // NATDeviceType indicates the type of the NAT device.
-type NATDeviceType int
+// Deprecated: use github.com/libp2p/go-libp2p/core/network.NATDeviceType instead
+type NATDeviceType = network.NATDeviceType
 
 const (
 	// NATDeviceTypeUnknown indicates that the type of the NAT device is unknown.
-	NATDeviceTypeUnknown NATDeviceType = iota
+	// Deprecated: use github.com/libp2p/go-libp2p/core/network.NATDeviceTypeUnknown instead
+	NATDeviceTypeUnknown = network.NATDeviceTypeUnknown
 
 	// NATDeviceTypeCone indicates that the NAT device is a Cone NAT.
 	// A Cone NAT is a NAT where all outgoing connections from the same source IP address and port are mapped by the NAT device
@@ -14,45 +18,26 @@ const (
 	// Port Restricted Cone NAT. However, we do NOT differentiate between them here and simply classify all such NATs as a Cone NAT.
 	// NAT traversal with hole punching is possible with a Cone NAT ONLY if the remote peer is ALSO behind a Cone NAT.
 	// If the remote peer is behind a Symmetric NAT, hole punching will fail.
-	NATDeviceTypeCone
+	// Deprecated: use github.com/libp2p/go-libp2p/core/network.NATDeviceTypeConn instead
+	NATDeviceTypeCone = network.NATDeviceTypeCone
 
 	// NATDeviceTypeSymmetric indicates that the NAT device is a Symmetric NAT.
 	// A Symmetric NAT maps outgoing connections with different destination addresses to different IP addresses and ports,
 	// even if they originate from the same source IP address and port.
 	// NAT traversal with hole-punching is currently NOT possible in libp2p with Symmetric NATs irrespective of the remote peer's NAT type.
-	NATDeviceTypeSymmetric
+	// Deprecated: use github.com/libp2p/go-libp2p/core/network.NATDeviceTypeSymmetric instead
+	NATDeviceTypeSymmetric = network.NATDeviceTypeSymmetric
 )
 
-func (r NATDeviceType) String() string {
-	switch r {
-	case 0:
-		return "Unknown"
-	case 1:
-		return "Cone"
-	case 2:
-		return "Symmetric"
-	default:
-		return "unrecognized"
-	}
-}
-
 // NATTransportProtocol is the transport protocol for which the NAT Device Type has been determined.
-type NATTransportProtocol int
+// Deprecated: use github.com/libp2p/go-libp2p/core/network.NATTransportProtocol instead
+type NATTransportProtocol = network.NATTransportProtocol
 
 const (
 	// NATTransportUDP means that the NAT Device Type has been determined for the UDP Protocol.
-	NATTransportUDP NATTransportProtocol = iota
+	// Deprecated: use github.com/libp2p/go-libp2p/core/network.NATTransportUDP instead
+	NATTransportUDP = network.NATTransportUDP
 	// NATTransportTCP means that the NAT Device Type has been determined for the TCP Protocol.
-	NATTransportTCP
+	// Deprecated: use github.com/libp2p/go-libp2p/core/network.NATTransportTCP instead
+	NATTransportTCP = network.NATTransportTCP
 )
-
-func (n NATTransportProtocol) String() string {
-	switch n {
-	case 0:
-		return "UDP"
-	case 1:
-		return "TCP"
-	default:
-		return "unrecognized"
-	}
-}

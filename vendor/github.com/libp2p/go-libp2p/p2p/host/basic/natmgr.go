@@ -8,9 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/network"
 	inat "github.com/libp2p/go-libp2p/p2p/net/nat"
-
-	"github.com/libp2p/go-libp2p-core/network"
 
 	ma "github.com/multiformats/go-multiaddr"
 )
@@ -34,12 +33,12 @@ func NewNATManager(net network.Network) NATManager {
 // natManager takes care of adding + removing port mappings to the nat.
 // Initialized with the host if it has a NATPortMap option enabled.
 // natManager receives signals from the network, and check on nat mappings:
-//  * natManager listens to the network and adds or closes port mappings
-//    as the network signals Listen() or ListenClose().
-//  * closing the natManager closes the nat and its mappings.
+//   - natManager listens to the network and adds or closes port mappings
+//     as the network signals Listen() or ListenClose().
+//   - closing the natManager closes the nat and its mappings.
 type natManager struct {
 	net   network.Network
-	natmu sync.RWMutex
+	natMx sync.RWMutex
 	nat   *inat.NAT
 
 	ready    chan struct{} // closed once the nat is ready to process port mappings
@@ -79,6 +78,14 @@ func (nmgr *natManager) Ready() <-chan struct{} {
 func (nmgr *natManager) background(ctx context.Context) {
 	defer nmgr.refCount.Done()
 
+	defer func() {
+		nmgr.natMx.Lock()
+		if nmgr.nat != nil {
+			nmgr.nat.Close()
+		}
+		nmgr.natMx.Unlock()
+	}()
+
 	discoverCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	natInstance, err := inat.DiscoverNAT(discoverCtx)
@@ -88,9 +95,9 @@ func (nmgr *natManager) background(ctx context.Context) {
 		return
 	}
 
-	nmgr.natmu.Lock()
+	nmgr.natMx.Lock()
 	nmgr.nat = natInstance
-	nmgr.natmu.Unlock()
+	nmgr.natMx.Unlock()
 	close(nmgr.ready)
 
 	// sign natManager up for network notifications
@@ -209,8 +216,8 @@ func (nmgr *natManager) doSync() {
 // (a) the search process is still ongoing, or (b) the search process
 // found no nat. Clients must check whether the return value is nil.
 func (nmgr *natManager) NAT() *inat.NAT {
-	nmgr.natmu.Lock()
-	defer nmgr.natmu.Unlock()
+	nmgr.natMx.Lock()
+	defer nmgr.natMx.Unlock()
 	return nmgr.nat
 }
 

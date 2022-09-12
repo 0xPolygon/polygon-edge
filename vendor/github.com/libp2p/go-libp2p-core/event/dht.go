@@ -1,7 +1,10 @@
 package event
 
+import "github.com/libp2p/go-libp2p/core/event"
+
 // RawJSON is a type that contains a raw JSON string.
-type RawJSON string
+// Deprecated: use github.com/libp2p/go-libp2p/core/event.RawJSON instead
+type RawJSON = event.RawJSON
 
 // GenericDHTEvent is a type that encapsulates an actual DHT event by carrying
 // its raw JSON.
@@ -12,10 +15,5 @@ type RawJSON string
 //
 // EXPERIMENTAL: this will likely be removed if/when the DHT event types are
 // hoisted to core, and the DHT event system is reconciled with the eventbus.
-type GenericDHTEvent struct {
-	// Type is the type of the DHT event that occured.
-	Type string
-
-	// Raw is the raw JSON representation of the event payload.
-	Raw RawJSON
-}
+// Deprecated: use github.com/libp2p/go-libp2p/core/event.GenericDHTEvent instead
+type GenericDHTEvent = event.GenericDHTEvent

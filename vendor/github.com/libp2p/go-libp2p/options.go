@@ -8,15 +8,14 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/connmgr"
-	"github.com/libp2p/go-libp2p-core/crypto"
-	"github.com/libp2p/go-libp2p-core/metrics"
-	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/peerstore"
-	"github.com/libp2p/go-libp2p-core/pnet"
-
 	"github.com/libp2p/go-libp2p/config"
+	"github.com/libp2p/go-libp2p/core/connmgr"
+	"github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/metrics"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/peerstore"
+	"github.com/libp2p/go-libp2p/core/pnet"
 	"github.com/libp2p/go-libp2p/p2p/host/autorelay"
 	bhost "github.com/libp2p/go-libp2p/p2p/host/basic"
 	relayv2 "github.com/libp2p/go-libp2p/p2p/protocol/circuitv2/relay"
@@ -245,8 +244,8 @@ func EnableRelayService(opts ...relayv2.Option) Option {
 // EnableAutoRelay configures libp2p to enable the AutoRelay subsystem.
 //
 // Dependencies:
-//  * Relay (enabled by default)
-//  * Routing (to find relays), or StaticRelays/DefaultStaticRelays.
+//   - Relay (enabled by default)
+//   - Routing (to find relays), or StaticRelays/DefaultStaticRelays.
 //
 // This subsystem performs automatic address rewriting to advertise relay addresses when it
 // detects that the node is publicly unreachable (e.g. behind a NAT).
@@ -330,7 +329,7 @@ func AutoNATServiceRateLimit(global, perPeer int, interval time.Duration) Option
 // to actively reject inbound/outbound connections based on the lifecycle stage
 // of the connection.
 //
-// For more information, refer to go-libp2p-core.ConnectionGater.
+// For more information, refer to go-libp2p/core.ConnectionGater.
 func ConnectionGater(cg connmgr.ConnectionGater) Option {
 	return func(cfg *Config) error {
 		if cfg.ConnectionGater != nil {
@@ -342,6 +341,8 @@ func ConnectionGater(cg connmgr.ConnectionGater) Option {
 }
 
 // ResourceManager configures libp2p to use the given ResourceManager.
+// When using the p2p/host/resource-manager implementation of the ResourceManager interface,
+// it is recommended to set limits for libp2p protocol by calling SetDefaultServiceLimits.
 func ResourceManager(rcmgr network.ResourceManager) Option {
 	return func(cfg *Config) error {
 		if cfg.ResourceManager != nil {
@@ -434,14 +435,14 @@ func MultiaddrResolver(rslv *madns.Resolver) Option {
 // to create direct/NAT-traversed connections with other peers. (default: disabled)
 //
 // Dependencies:
-//  * Relay (enabled by default)
+//   - Relay (enabled by default)
 //
 // This subsystem performs two functions:
 //
-// 1. On receiving an inbound Relay connection, it attempts to create a direct connection with the remote peer
-//    by initiating and co-ordinating a hole punch over the Relayed connection.
-// 2. If a peer sees a request to co-ordinate a hole punch on an outbound Relay connection,
-//    it will participate in the hole-punch to create a direct connection with the remote peer.
+//  1. On receiving an inbound Relay connection, it attempts to create a direct connection with the remote peer
+//     by initiating and co-ordinating a hole punch over the Relayed connection.
+//  2. If a peer sees a request to co-ordinate a hole punch on an outbound Relay connection,
+//     it will participate in the hole-punch to create a direct connection with the remote peer.
 //
 // If the hole punch is successful, all new streams will thereafter be created on the hole-punched connection.
 // The Relayed connection will eventually be closed after a grace period.
