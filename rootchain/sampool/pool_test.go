@@ -170,26 +170,6 @@ func TestSAMPool_Peek(t *testing.T) {
 	)
 
 	t.Run(
-		"Peek returns nil (no quorum)",
-		func(t *testing.T) {
-			t.Parallel()
-
-			pool := New()
-			pool.lastProcessedIndex = 9
-
-			msg := rootchain.SAM{
-				Hash: types.Hash{111},
-				Event: rootchain.Event{
-					Index: 10,
-				},
-			}
-
-			assert.NoError(t, pool.AddMessage(msg))
-			assert.Nil(t, pool.Peek())
-		},
-	)
-
-	t.Run(
 		"Peek returns verified SAM",
 		func(t *testing.T) {
 			t.Parallel()
