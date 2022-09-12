@@ -1,7 +1,6 @@
 package sampool
 
 import (
-	"errors"
 	"github.com/0xPolygon/polygon-edge/rootchain"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
@@ -12,58 +11,11 @@ func TestSAMPool_AddMessage(t *testing.T) {
 	t.Parallel()
 
 	t.Run(
-		"ErrInvalidHash",
-		func(t *testing.T) {
-			t.Parallel()
-
-			verifier := mockVerifier{
-				verifyHash: func(msg rootchain.SAM) error {
-					return errors.New("a really bad hash")
-				},
-			}
-
-			pool := New(verifier)
-
-			assert.ErrorIs(t,
-				pool.AddMessage(rootchain.SAM{}),
-				ErrInvalidHash,
-			)
-		},
-	)
-
-	t.Run(
-		"ErrInvalidSignature",
-		func(t *testing.T) {
-			t.Parallel()
-
-			verifier := mockVerifier{
-				verifyHash: func(sam rootchain.SAM) error { return nil },
-
-				verifySignature: func(sam rootchain.SAM) error {
-					return errors.New("a really bad signature")
-				},
-			}
-
-			pool := New(verifier)
-
-			assert.ErrorIs(t,
-				pool.AddMessage(rootchain.SAM{}),
-				ErrInvalidSignature,
-			)
-		},
-	)
-
-	t.Run(
 		"ErrStaleMessage",
 		func(t *testing.T) {
 			t.Parallel()
 
-			verifier := mockVerifier{
-				verifyHash:      func(sam rootchain.SAM) error { return nil },
-				verifySignature: func(sam rootchain.SAM) error { return nil },
-			}
-
-			pool := New(verifier)
+			pool := New()
 			pool.lastProcessedIndex = 10
 
 			assert.ErrorIs(t,
@@ -82,12 +34,7 @@ func TestSAMPool_AddMessage(t *testing.T) {
 		func(t *testing.T) {
 			t.Parallel()
 
-			verifier := mockVerifier{
-				verifyHash:      func(rootchain.SAM) error { return nil },
-				verifySignature: func(rootchain.SAM) error { return nil },
-			}
-
-			pool := New(verifier)
+			pool := New()
 
 			msg := rootchain.SAM{
 				Hash: types.Hash{111},
@@ -117,12 +64,7 @@ func TestSAMPool_AddMessage(t *testing.T) {
 		func(t *testing.T) {
 			t.Parallel()
 
-			verifier := mockVerifier{
-				verifyHash:      func(rootchain.SAM) error { return nil },
-				verifySignature: func(rootchain.SAM) error { return nil },
-			}
-
-			pool := New(verifier)
+			pool := New()
 
 			msg := rootchain.SAM{
 				Hash:      types.Hash{111},
@@ -164,12 +106,7 @@ func TestSAMPool_Prune(t *testing.T) {
 		func(t *testing.T) {
 			t.Parallel()
 
-			verifier := mockVerifier{
-				verifyHash:      func(rootchain.SAM) error { return nil },
-				verifySignature: func(rootchain.SAM) error { return nil },
-			}
-
-			pool := New(verifier)
+			pool := New()
 
 			msg := rootchain.SAM{
 				Hash: types.Hash{111},
@@ -195,12 +132,7 @@ func TestSAMPool_Prune(t *testing.T) {
 		func(t *testing.T) {
 			t.Parallel()
 
-			verifier := mockVerifier{
-				verifyHash:      func(rootchain.SAM) error { return nil },
-				verifySignature: func(rootchain.SAM) error { return nil },
-			}
-
-			pool := New(verifier)
+			pool := New()
 
 			msg := rootchain.SAM{
 				Hash: types.Hash{111},
@@ -230,12 +162,7 @@ func TestSAMPool_Peek(t *testing.T) {
 		func(t *testing.T) {
 			t.Parallel()
 
-			verifier := mockVerifier{
-				verifyHash:      func(rootchain.SAM) error { return nil },
-				verifySignature: func(rootchain.SAM) error { return nil },
-			}
-
-			pool := New(verifier)
+			pool := New()
 			pool.lastProcessedIndex = 3
 
 			assert.Nil(t, pool.Peek())
@@ -247,13 +174,7 @@ func TestSAMPool_Peek(t *testing.T) {
 		func(t *testing.T) {
 			t.Parallel()
 
-			verifier := mockVerifier{
-				verifyHash:      func(rootchain.SAM) error { return nil },
-				verifySignature: func(rootchain.SAM) error { return nil },
-				quorumFunc:      func(uint64) bool { return false },
-			}
-
-			pool := New(verifier)
+			pool := New()
 			pool.lastProcessedIndex = 9
 
 			msg := rootchain.SAM{
@@ -273,13 +194,7 @@ func TestSAMPool_Peek(t *testing.T) {
 		func(t *testing.T) {
 			t.Parallel()
 
-			verifier := mockVerifier{
-				verifyHash:      func(rootchain.SAM) error { return nil },
-				verifySignature: func(rootchain.SAM) error { return nil },
-				quorumFunc:      func(uint64) bool { return true },
-			}
-
-			pool := New(verifier)
+			pool := New()
 			pool.lastProcessedIndex = 9
 
 			msg := rootchain.SAM{
@@ -303,22 +218,7 @@ func TestSAMPool_Pop(t *testing.T) {
 		func(t *testing.T) {
 			t.Parallel()
 
-			pool := New(mockVerifier{})
-
-			assert.Nil(t, pool.Pop())
-		},
-	)
-
-	t.Run(
-		"Pop returns nil (no quorum)",
-		func(t *testing.T) {
-			t.Parallel()
-
-			verifier := mockVerifier{
-				quorumFunc: func(uint64) bool { return false },
-			}
-
-			pool := New(verifier)
+			pool := New()
 
 			assert.Nil(t, pool.Pop())
 		},
@@ -329,17 +229,11 @@ func TestSAMPool_Pop(t *testing.T) {
 		func(t *testing.T) {
 			t.Parallel()
 
-			verifier := mockVerifier{
-				verifyHash:      func(rootchain.SAM) error { return nil },
-				verifySignature: func(rootchain.SAM) error { return nil },
-				quorumFunc:      func(uint64) bool { return true },
-			}
-
-			pool := New(verifier)
+			pool := New()
 			pool.lastProcessedIndex = 4
 
 			msg := rootchain.SAM{
-				Hash: types.Hash{1, 2, 3},
+				Hash: types.Hash{111},
 				Event: rootchain.Event{
 					Index: 5,
 				},

@@ -9,31 +9,18 @@ import (
 )
 
 var (
-	ErrInvalidHash      = errors.New("invalid SAM hash")
-	ErrInvalidSignature = errors.New("invalid SAM signature")
-	ErrStaleMessage     = errors.New("stale SAM received")
+	ErrStaleMessage = errors.New("stale SAM received")
 )
 
-type Verifier interface {
-	VerifyHash(rootchain.SAM) error
-	VerifySignature(rootchain.SAM) error
-
-	Quorum(uint64) bool
-}
-
 type SAMPool struct {
-	// TODO: remove once milos moves verification to SAMUEL
-	verifier Verifier
-
 	mux      sync.Mutex
 	messages map[uint64]samBucket
 
 	lastProcessedIndex uint64
 }
 
-func New(verifier Verifier) *SAMPool {
+func New() *SAMPool {
 	return &SAMPool{
-		verifier: verifier,
 		mux:      sync.Mutex{},
 		messages: make(map[uint64]samBucket),
 	}
@@ -62,7 +49,6 @@ func (p *SAMPool) Prune(index uint64) {
 	p.lastProcessedIndex = index
 }
 
-// TODO: Peek or Pop might be redundant
 func (p *SAMPool) Peek() rootchain.VerifiedSAM {
 	p.mux.Lock()
 	defer p.mux.Unlock()
@@ -74,7 +60,7 @@ func (p *SAMPool) Peek() rootchain.VerifiedSAM {
 		return nil
 	}
 
-	messages := bucket.getQuorumMessages(p.verifier.Quorum)
+	messages := bucket.getMessagesWithMostSignatures()
 	if len(messages) == 0 {
 		return nil
 	}
@@ -96,7 +82,7 @@ func (p *SAMPool) Pop() rootchain.VerifiedSAM {
 		return nil
 	}
 
-	messages := bucket.getQuorumMessages(p.verifier.Quorum)
+	messages := bucket.getMessagesWithMostSignatures()
 	if len(messages) == 0 {
 		return nil
 	}
@@ -111,16 +97,6 @@ func (p *SAMPool) Pop() rootchain.VerifiedSAM {
 }
 
 func (p *SAMPool) verifySAM(msg rootchain.SAM) error {
-	//	verify message hash
-	if err := p.verifier.VerifyHash(msg); err != nil {
-		return fmt.Errorf("%w: %v", ErrInvalidHash, err)
-	}
-
-	//	verify message signature
-	if err := p.verifier.VerifySignature(msg); err != nil {
-		return fmt.Errorf("%w: %v", ErrInvalidSignature, err)
-	}
-
 	//	reject old message
 	if index := msg.Index; index <= p.lastProcessedIndex {
 		return fmt.Errorf("%w: message number %d", ErrStaleMessage, index)

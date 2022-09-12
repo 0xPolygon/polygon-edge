@@ -48,16 +48,24 @@ func (b samBucket) add(msg rootchain.SAM) {
 	b[msg.Hash] = messages
 }
 
-type quorumFunc func(uint64) bool
+func (b samBucket) getMessagesWithMostSignatures() []rootchain.SAM {
+	var (
+		max  = 0
+		hash = types.Hash{}
+	)
 
-func (b samBucket) getQuorumMessages(quorum quorumFunc) []rootchain.SAM {
-	for _, set := range b {
-		messages := set.getMessages()
-
-		if quorum(uint64(len(messages))) {
-			return messages
+	for h, set := range b {
+		if msgCount := len(set.getMessages()); msgCount > max {
+			hash = h
+			max = msgCount
 		}
 	}
 
-	return nil
+	if max == 0 {
+		return nil
+	}
+
+	maxSet := b[hash]
+
+	return maxSet.getMessages()
 }
