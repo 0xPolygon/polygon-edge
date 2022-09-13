@@ -225,6 +225,27 @@ func (i *backendIBFT) writeStateTransaction(transition transitionInterface) (*ty
 		return nil, false
 	}
 
+	// sanity check
+	if tx.Type != types.StateTx {
+		i.logger.Error(
+			"writeStateTransaction: invalid tx type",
+			"expected", types.StateTx.String(),
+			"actual", tx.Type.String(),
+		)
+
+		return nil, false
+	}
+
+	// write state transaction
+	if err := transition.Write(tx); err != nil {
+		i.logger.Error("failed to write state tx", "err", err)
+
+		return nil, false
+	}
+
+	// safe to remove
+	i.samuel.PopReadyTransaction()
+
 	return tx, true
 }
 
