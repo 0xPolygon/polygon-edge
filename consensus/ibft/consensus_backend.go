@@ -65,6 +65,7 @@ func (i *backendIBFT) InsertBlock(
 
 	newBlock.Header = header
 
+	//	TODO: not sure how state txs are saved
 	// Save the block locally
 	if err := i.blockchain.WriteBlock(newBlock, "consensus"); err != nil {
 		i.logger.Error("cannot write block", "err", err)
@@ -97,6 +98,8 @@ func (i *backendIBFT) InsertBlock(
 	// after the block has been written we reset the txpool so that
 	// the old transactions are removed
 	i.txpool.ResetWithHeaders(newBlock.Header)
+
+	//	TODO: reset samuel with the last processed event index
 }
 
 func (i *backendIBFT) ID() []byte {
