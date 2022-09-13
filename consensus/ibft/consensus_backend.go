@@ -219,6 +219,15 @@ type transitionInterface interface {
 	WriteFailedReceipt(txn *types.Transaction) error
 }
 
+func (i *backendIBFT) writeStateTransaction(transition transitionInterface) (*types.Transaction, bool) {
+	tx := i.samuel.GetReadyTransaction()
+	if tx == nil {
+		return nil, false
+	}
+
+	return tx, true
+}
+
 func (i *backendIBFT) writeTransactions(
 	gasLimit,
 	blockNumber uint64,
@@ -236,6 +245,8 @@ func (i *backendIBFT) writeTransactions(
 		successful = 0
 		failed     = 0
 		skipped    = 0
+
+		shouldWriteStateTx = true
 	)
 
 	defer func() {
@@ -256,7 +267,22 @@ write:
 		case <-blockTimer.C:
 			return
 		default:
-			// execute transactions one by one
+			// execute state transactions first
+			if shouldWriteStateTx {
+				tx, ok := i.writeStateTransaction(transition)
+
+				if !ok {
+					shouldWriteStateTx = false
+					continue
+				}
+
+				executed = append(executed, tx)
+
+				//	continue processing state txs before legacy txs
+				continue
+			}
+
+			// execute legacy transactions one by one
 			result, ok := i.writeTransaction(
 				i.txpool.Peek(),
 				transition,

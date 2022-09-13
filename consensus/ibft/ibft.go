@@ -57,6 +57,11 @@ type forkManagerInterface interface {
 	GetHooks(uint64) fork.HooksInterface
 }
 
+type Samuel interface {
+	GetReadyTransaction() *types.Transaction
+	PopReadyTransaction()
+}
+
 // backendIBFT represents the IBFT consensus mechanism object
 type backendIBFT struct {
 	consensus *IBFTConsensus
@@ -73,6 +78,7 @@ type backendIBFT struct {
 	operator       *operator              // Reference to the gRPC service of IBFT
 	transport      transport              // Reference to the transport protocol
 	metrics        *consensus.Metrics     // Reference to the metrics service
+	samuel         Samuel
 
 	// Dynamic References
 	forkManager       forkManagerInterface  // Manager to hold IBFT Forks
