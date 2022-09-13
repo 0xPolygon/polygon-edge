@@ -252,6 +252,9 @@ func NewServer(config *Config) (*Server, error) {
 		return nil, err
 	}
 
+	// TODO: init rootnet staking modules here
+	// 	and set Samuel as a field in consensus
+
 	// setup and start grpc server
 	if err := m.setupGRPC(); err != nil {
 		return nil, err
