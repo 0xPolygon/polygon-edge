@@ -27,6 +27,7 @@ type SAMPool struct {
 // New returns a new SAMPool instance
 func New(logger hclog.Logger) *SAMPool {
 	return &SAMPool{
+		logger:   logger,
 		mux:      sync.Mutex{},
 		messages: make(map[uint64]samBucket),
 	}
