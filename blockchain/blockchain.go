@@ -772,6 +772,7 @@ func (b *Blockchain) verifyBlockBody(block *types.Block) error {
 	}
 
 	// Make sure the transactions root matches up
+	//	TODO: what about state txs?
 	if hash := buildroot.CalculateTransactionsRoot(block.Transactions); hash != block.Header.TxRoot {
 		b.logger.Error(fmt.Sprintf(
 			"transaction root hash mismatch: have %s, want %s",
@@ -957,6 +958,7 @@ func (b *Blockchain) updateGasPriceAvgWithBlock(block *types.Block) {
 
 	gasPrices := make([]*big.Int, len(block.Transactions))
 	for i, transaction := range block.Transactions {
+		//	TODO: what about state txs ?
 		gasPrices[i] = transaction.GasPrice
 	}
 
@@ -975,6 +977,7 @@ func (b *Blockchain) writeBody(block *types.Block) error {
 
 	// Write txn lookups (txHash -> block)
 	for _, txn := range block.Transactions {
+		//	TODO: what about state txs ?
 		if err := b.db.WriteTxLookup(txn.Hash, block.Hash()); err != nil {
 			return err
 		}
