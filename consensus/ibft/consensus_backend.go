@@ -100,6 +100,7 @@ func (i *backendIBFT) InsertBlock(
 	i.txpool.ResetWithHeaders(newBlock.Header)
 
 	//	TODO: reset samuel with the last processed event index
+	i.samuel.ResetWithTransactions(i.extractStateTransactions(newBlock)...)
 }
 
 func (i *backendIBFT) ID() []byte {
@@ -408,4 +409,17 @@ func (i *backendIBFT) extractParentCommittedSeals(
 	}
 
 	return i.extractCommittedSeals(header)
+}
+
+func (i *backendIBFT) extractStateTransactions(block *types.Block) []*types.Transaction {
+	stateTxs := make([]*types.Transaction, 0)
+	for _, tx := range block.Transactions {
+		if tx.Type != types.StateTx {
+			continue
+		}
+
+		stateTxs = append(stateTxs, tx)
+	}
+
+	return stateTxs
 }

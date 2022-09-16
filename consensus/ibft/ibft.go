@@ -225,6 +225,8 @@ func (i *backendIBFT) startSyncing() {
 
 		i.txpool.ResetWithHeaders(block.Header)
 
+		i.samuel.ResetWithTransactions(i.extractStateTransactions(block)...)
+
 		return false
 	}
 
