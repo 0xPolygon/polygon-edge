@@ -5,11 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"math/big"
 	"strings"
 	"sync"
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/0xPolygon/polygon-edge/e2e/framework"
 	"github.com/0xPolygon/polygon-edge/rootchain"
 	"github.com/0xPolygon/polygon-edge/rootchain/payload"
 	"github.com/0xPolygon/polygon-edge/rootchain/proto"
@@ -37,6 +39,7 @@ func TestSAMUEL_Start(t *testing.T) {
 			},
 			startFn: func(blockNum uint64) error {
 				startedBlock = blockNum
+
 				return nil
 			},
 		}
@@ -123,7 +126,8 @@ func TestSAMUEL_NewSamuel(t *testing.T) {
 		transport    = mockTransport{}
 		logger       = hclog.NewNullLogger()
 		event        = &rootchain.ConfigEvent{
-			EventABI:     "event GreetEmit()",
+			EventABI: "event GreetEmit()",
+			//nolint:lll
 			MethodABI:    "[ { \"anonymous\": false, \"inputs\": [ { \"indexed\": false, \"internalType\": \"bytes\", \"name\": \"data\", \"type\": \"bytes\" } ], \"name\": \"StateReceived\", \"type\": \"event\" }, { \"inputs\": [ { \"internalType\": \"bytes\", \"name\": \"data\", \"type\": \"bytes\" } ], \"name\": \"onStateReceived\", \"outputs\": [], \"stateMutability\": \"nonpayable\", \"type\": \"function\" } ]",
 			MethodName:   "setGreeting",
 			LocalAddress: types.StringToAddress("123").String(),
@@ -156,6 +160,7 @@ func TestSAMUEL_GetEventPayload(t *testing.T) {
 			BLSPublicKey: []byte("BLS public key"),
 		},
 	})
+
 	vsPayloadMarshalled, err := vsPayload.Marshal()
 	if err != nil {
 		t.Fatalf("unable to marshal standard event type, %v", err)
@@ -216,6 +221,7 @@ func TestSAMUEL_RegisterGossipHandler(t *testing.T) {
 			BLSPublicKey: []byte("BLS public key"),
 		},
 	})
+
 	vsPayloadMarshalled, err := vsPayload.Marshal()
 	if err != nil {
 		t.Fatalf("unable to marshal standard event type, %v", err)
@@ -482,7 +488,7 @@ func TestSAMUEL_SaveProgress(t *testing.T) {
 	)
 
 	// Save the progress with the encoded params
-	s.SaveProgress(localContractAddr, encodedArgs)
+	s.SaveProgress(localContractAddr, append(method.ID(), encodedArgs...))
 
 	// Make sure the prune index is correct
 	assert.Equal(t, eventIndex, pruneIndex)
@@ -509,7 +515,187 @@ func TestSAMUEL_SaveProgress(t *testing.T) {
 }
 
 func TestSAMUEL_GetReadyTransaction(t *testing.T) {
-	// TODO
+	t.Parallel()
+
+	var (
+		childBlockNum uint64 = 100
+		signature            = []byte("signature")
+		eventIndex    uint64 = 1
+		rootBlockNum  uint64 = 200
+
+		localContractAddr = types.StringToAddress("123")
+		methodABIStr      = `
+									[
+									{
+									  "inputs": [
+										{
+										  "internalType": "uint64",
+										  "name": "index",
+										  "type": "uint64"
+										},
+										{
+										  "internalType": "uint64",
+										  "name": "blockNumber",
+										  "type": "uint64"
+										},
+										{
+										  "internalType": "uint64",
+										  "name": "signatureBlockNumber",
+										  "type": "uint64"
+										},
+										{
+										  "internalType": "bytes[]",
+										  "name": "signatures",
+										  "type": "bytes[]"
+										},
+										{
+										  "components": [
+											{
+											  "internalType": "bytes",
+											  "name": "Address",
+											  "type": "bytes"
+											},
+											{
+											  "internalType": "bytes",
+											  "name": "BLSPublicKey",
+											  "type": "bytes"
+											}
+										  ],
+										  "internalType": "struct Example.ValidatorSetInfo[]",
+										  "name": "validatorSet",
+										  "type": "tuple[]"
+										}
+									  ],
+									  "name": "exampleMethod",
+									  "outputs": [],
+									  "stateMutability": "nonpayable",
+									  "type": "function"
+									}
+								  	]
+									`
+		methodName  = "exampleMethod"
+		configEvent = &rootchain.ConfigEvent{
+			EventABI:     "event ExampleEvent()",
+			MethodABI:    methodABIStr,
+			MethodName:   methodName,
+			LocalAddress: localContractAddr.String(),
+			PayloadType:  rootchain.ValidatorSetPayloadType,
+		}
+		samAddress   = []byte("random address")
+		blsPublicKey = []byte("random pub key")
+
+		verifiedSAMs = rootchain.VerifiedSAM{
+			{
+				ChildBlockNum: childBlockNum,
+				Signature:     signature,
+				Event: rootchain.Event{
+					Index:       eventIndex,
+					BlockNumber: rootBlockNum,
+					Payload: payload.NewValidatorSetPayload(
+						[]payload.ValidatorSetInfo{
+							{
+								Address:      samAddress,
+								BLSPublicKey: blsPublicKey,
+							},
+						},
+					),
+				},
+			},
+		}
+		signer = mockSigner{
+			quorumFn: func(_ uint64) uint64 {
+				return uint64(len(verifiedSAMs))
+			},
+		}
+		samp = mockSAMP{
+			peekFn: func() rootchain.VerifiedSAM {
+				return verifiedSAMs
+			},
+		}
+	)
+
+	// Create a method ABI
+	methodABI, err := abi.NewABI(methodABIStr)
+	if err != nil {
+		t.Fatalf("unable to set method ABI, %v", err)
+	}
+
+	method := methodABI.GetMethod(methodName)
+	if method == nil {
+		t.Fatalf("unable to get method from ABI")
+	}
+
+	// Create a new SAMUEL instance
+	s := NewSamuel(
+		configEvent,
+		hclog.NewNullLogger(),
+		mockEventTracker{},
+		samp,
+		signer,
+		mockStorage{},
+		mockTransport{},
+	)
+
+	transaction := s.GetReadyTransaction()
+
+	if transaction == nil {
+		t.Fatalf("Unable to get ready transaction")
+	}
+
+	// Make sure the transaction params match up
+	assert.Equal(t, uint64(0), transaction.Nonce)
+	assert.Equal(t, types.ZeroAddress, transaction.From)
+	assert.Equal(t, &localContractAddr, transaction.To)
+	assert.Equal(
+		t,
+		big.NewInt(0).String(),
+		transaction.GasPrice.String(),
+	)
+	assert.Equal(
+		t,
+		fmt.Sprintf("%x", framework.DefaultGasLimit),
+		fmt.Sprintf("%x", transaction.Gas),
+	)
+	assert.Equal(t, big.NewInt(0).String(), transaction.Value.String())
+	assert.Equal(t, big.NewInt(1).String(), transaction.V.String())
+
+	if transaction.Input == nil {
+		t.Fatalf("Invalid transaction input")
+	}
+
+	args, err := method.Inputs.Decode(
+		transaction.Input[len(method.ID()):],
+	)
+	if err != nil {
+		t.Fatalf("Unable to decode arguments")
+	}
+
+	argsMap, ok := args.(map[string]interface{})
+	if !ok {
+		t.Fatalf("unable to correctly cast")
+	}
+
+	argIndex, _ := argsMap["index"].(uint64)
+	assert.Equal(t, eventIndex, argIndex)
+
+	argBlockNumber, _ := argsMap["blockNumber"].(uint64)
+	assert.Equal(t, rootBlockNum, argBlockNumber)
+
+	argSigNumber, _ := argsMap["signatureBlockNumber"].(uint64)
+	assert.Equal(t, childBlockNum, argSigNumber)
+
+	argSignatures, _ := argsMap["signatures"].([][]byte)
+	assert.Len(t, argSignatures, 1)
+	assert.True(t, bytes.Equal(argSignatures[0], signature))
+
+	argValidatorSet, _ := argsMap["validatorSet"].([]map[string]interface{})
+	assert.Len(t, argValidatorSet, 1)
+
+	argAddress, _ := argValidatorSet[0]["Address"].([]byte)
+	assert.True(t, bytes.Equal(argAddress, samAddress))
+
+	argBLS, _ := argValidatorSet[0]["BLSPublicKey"].([]byte)
+	assert.True(t, bytes.Equal(argBLS, blsPublicKey))
 }
 
 func TestSAMUEL_PopReadyTransaction(t *testing.T) {
@@ -539,6 +725,8 @@ func TestSAMUEL_PopReadyTransaction(t *testing.T) {
 }
 
 func TestGetVerifiedSAMBucketEmpty(t *testing.T) {
+	t.Parallel()
+
 	var (
 		quorum uint64 = 10
 		signer        = mockSigner{
@@ -565,6 +753,8 @@ func TestGetVerifiedSAMBucketEmpty(t *testing.T) {
 }
 
 func TestGetVerifiedSAMBucketSingleCandidate(t *testing.T) {
+	t.Parallel()
+
 	var (
 		childBlockNum uint64 = 100
 
@@ -597,6 +787,8 @@ func TestGetVerifiedSAMBucketSingleCandidate(t *testing.T) {
 }
 
 func TestGetVerifiedSAMBucketMultipleCandidates(t *testing.T) {
+	t.Parallel()
+
 	var (
 		firstCandidateBlockNum  uint64 = 100
 		secondCandidateBlockNum        = firstCandidateBlockNum + 1

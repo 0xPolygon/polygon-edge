@@ -361,7 +361,11 @@ func (s *SAMUEL) SaveProgress(
 	}
 
 	// Decode the inputs
-	params, err := s.eventData.methodABI.Inputs.Decode(input)
+	methodID := s.eventData.methodABI.ID()
+	params, err := s.eventData.methodABI.Inputs.Decode(
+		input[len(methodID):],
+	)
+
 	if err != nil {
 		s.logger.Error(
 			fmt.Sprintf("Unable to decode event params for contract %s, %v", contractAddr, err),
@@ -451,13 +455,23 @@ func (s *SAMUEL) GetReadyTransaction() *types.Transaction {
 
 	switch payloadType {
 	case rootchain.ValidatorSetPayloadType:
+		// Get the validator set info
 		vs, _ := rawPayload.(*payload.ValidatorSetPayload)
+		setInfo := vs.GetSetInfo()
+		validatorSetMap := make([]map[string][]byte, len(setInfo))
+
+		for index, info := range setInfo {
+			validatorSetMap[index] = map[string][]byte{
+				"Address":      info.Address,
+				"BLSPublicKey": info.BLSPublicKey,
+			}
+		}
 
 		// The method should have the signature
 		// methodName(validatorSet tuple[], index uint64, blockNumber uint64, signatures [][]byte)
 		encodedArgs, err := s.eventData.methodABI.Inputs.Encode(
 			map[string]interface{}{
-				"validatorSet":         vs.GetSetInfo(),
+				"validatorSet":         validatorSetMap,
 				"index":                index,
 				"blockNumber":          blockNumber,
 				"signatures":           signatures,
@@ -477,7 +491,6 @@ func (s *SAMUEL) GetReadyTransaction() *types.Transaction {
 			return nil
 		}
 
-		// TODO This transaction needs to be signed later on? @dbrajovic
 		return &types.Transaction{
 			Nonce:    0,
 			From:     types.ZeroAddress,
