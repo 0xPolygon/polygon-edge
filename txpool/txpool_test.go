@@ -861,6 +861,90 @@ func TestPromoteHandler(t *testing.T) {
 		assert.Equal(t, uint64(0), pool.accounts.get(addr1).enqueued.length())
 		assert.Equal(t, uint64(20), pool.accounts.get(addr1).promoted.length())
 	})
+
+	t.Run(
+		"promote handler discards cheaper tx",
+		func(t *testing.T) {
+			t.Parallel()
+
+			// helper
+			newPricedTx := func(
+				addr types.Address,
+				nonce,
+				gasPrice uint64,
+			) *types.Transaction {
+				tx := newTx(addr, nonce, 1)
+				tx.GasPrice.SetUint64(gasPrice)
+
+				return tx
+			}
+
+			pool, err := newTestPool()
+			assert.NoError(t, err)
+			pool.SetSigner(&mockSigner{})
+
+			tx := newPricedTx(addr1, 0, 100)
+			txx := newPricedTx(addr1, 0, 200)
+
+			tx.ComputeHash()
+			txx.ComputeHash()
+
+			// send the first
+			go func() {
+				assert.NoError(t,
+					pool.addTx(local, tx),
+				)
+			}()
+
+			//	grab the enqueue signal
+			enqTx := <-pool.enqueueReqCh
+
+			// send the second
+			go func() {
+				assert.NoError(t,
+					pool.addTx(local, txx),
+				)
+			}()
+
+			//	grab the enqueue signal
+			enqTxx := <-pool.enqueueReqCh
+
+			assert.Equal(t, uint64(0), pool.accounts.get(addr1).getNonce())
+
+			//	execute the enqueue handlers
+			go func() {
+				pool.handleEnqueueRequest(enqTx)
+			}()
+
+			//	grab the promotion signal
+			promTx := <-pool.promoteReqCh
+
+			go func() {
+				pool.handleEnqueueRequest(enqTxx)
+			}()
+
+			//	grab the promotion signal
+			promTxx := <-pool.promoteReqCh
+
+			assert.Equal(t, uint64(0), pool.accounts.get(addr1).getNonce())
+			assert.Equal(t, uint64(2), pool.accounts.get(addr1).enqueued.length())
+
+			pool.handlePromoteRequest(promTx)
+
+			assert.Equal(t, uint64(1), pool.accounts.get(addr1).getNonce())
+			assert.Equal(t, uint64(1), pool.accounts.get(addr1).promoted.length())
+
+			//	TODO: this will be true after the fix
+			assert.Equal(t, uint64(0), pool.accounts.get(addr1).enqueued.length())
+
+			//	TODO: this will be true after the fix
+			_, exists := pool.index.get(tx.Hash)
+			assert.False(t, exists)
+
+			//	TODO: this becomes a no-op after the fix
+			pool.handlePromoteRequest(promTxx)
+		},
+	)
 }
 
 func TestResetAccount(t *testing.T) {
