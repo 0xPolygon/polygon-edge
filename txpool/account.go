@@ -287,7 +287,7 @@ func (a *account) promote() (promoted []*types.Transaction, pruned []*types.Tran
 		nextNonce = tx.Nonce + 1
 
 		// prune the transactions with lower nonce
-		pruned = a.enqueued.prune(nextNonce)
+		pruned = append(pruned, a.enqueued.prune(nextNonce)...)
 
 		// update return result
 		promoted = append(promoted, tx)
