@@ -60,6 +60,7 @@ type forkManagerInterface interface {
 type Samuel interface {
 	GetReadyTransaction() *types.Transaction
 	PopReadyTransaction()
+	ResetWithTransactions(txs ...*types.Transaction)
 }
 
 // backendIBFT represents the IBFT consensus mechanism object
