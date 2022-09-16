@@ -871,9 +871,10 @@ func TestPromoteHandler(t *testing.T) {
 			newPricedTx := func(
 				addr types.Address,
 				nonce,
-				gasPrice uint64,
+				gasPrice,
+				slots uint64,
 			) *types.Transaction {
-				tx := newTx(addr, nonce, 1)
+				tx := newTx(addr, nonce, slots)
 				tx.GasPrice.SetUint64(gasPrice)
 
 				return tx
@@ -883,66 +884,87 @@ func TestPromoteHandler(t *testing.T) {
 			assert.NoError(t, err)
 			pool.SetSigner(&mockSigner{})
 
-			tx := newPricedTx(addr1, 0, 100)
-			txx := newPricedTx(addr1, 0, 200)
+			addTx := func(tx *types.Transaction) enqueueRequest {
+				tx.ComputeHash()
 
-			tx.ComputeHash()
-			txx.ComputeHash()
+				go func() {
+					assert.NoError(t,
+						pool.addTx(local, tx),
+					)
+				}()
 
-			// send the first
-			go func() {
-				assert.NoError(t,
-					pool.addTx(local, tx),
-				)
-			}()
+				//	grab the enqueue signal
+				return <-pool.enqueueReqCh
+			}
 
-			//	grab the enqueue signal
-			enqTx := <-pool.enqueueReqCh
+			handleEnqueueRequest := func(req enqueueRequest) promoteRequest {
+				go func() {
+					pool.handleEnqueueRequest(req)
+				}()
 
-			// send the second
-			go func() {
-				assert.NoError(t,
-					pool.addTx(local, txx),
-				)
-			}()
+				return <-pool.promoteReqCh
+			}
 
-			//	grab the enqueue signal
-			enqTxx := <-pool.enqueueReqCh
+			assertTxExists := func(t *testing.T, tx *types.Transaction, shouldExists bool) {
+				t.Helper()
 
+				_, exists := pool.index.get(tx.Hash)
+				assert.Equal(t, shouldExists, exists)
+			}
+
+			tx1 := newPricedTx(addr1, 0, 10, 2)
+			tx2 := newPricedTx(addr1, 0, 20, 3)
+
+			// add the transactions
+			enqTx1 := addTx(tx1)
+			enqTx2 := addTx(tx2)
+
+			assertTxExists(t, tx1, true)
+			assertTxExists(t, tx2, true)
+
+			// check the account nonce before promoting
 			assert.Equal(t, uint64(0), pool.accounts.get(addr1).getNonce())
 
 			//	execute the enqueue handlers
-			go func() {
-				pool.handleEnqueueRequest(enqTx)
-			}()
-
-			//	grab the promotion signal
-			promTx := <-pool.promoteReqCh
-
-			go func() {
-				pool.handleEnqueueRequest(enqTxx)
-			}()
-
-			//	grab the promotion signal
-			promTxx := <-pool.promoteReqCh
+			promReq1 := handleEnqueueRequest(enqTx1)
+			promReq2 := handleEnqueueRequest(enqTx2)
 
 			assert.Equal(t, uint64(0), pool.accounts.get(addr1).getNonce())
 			assert.Equal(t, uint64(2), pool.accounts.get(addr1).enqueued.length())
+			assert.Equal(t, uint64(0), pool.accounts.get(addr1).promoted.length())
+			assert.Equal(
+				t,
+				slotsRequired(tx1)+slotsRequired(tx2),
+				pool.gauge.read(),
+			)
 
-			pool.handlePromoteRequest(promTx)
+			// promote the second Tx and remove the first Tx
+			pool.handlePromoteRequest(promReq1)
 
 			assert.Equal(t, uint64(1), pool.accounts.get(addr1).getNonce())
+			assert.Equal(t, uint64(0), pool.accounts.get(addr1).enqueued.length()) // should be empty
 			assert.Equal(t, uint64(1), pool.accounts.get(addr1).promoted.length())
+			assertTxExists(t, tx1, false)
+			assertTxExists(t, tx2, true)
+			assert.Equal(
+				t,
+				slotsRequired(tx2),
+				pool.gauge.read(),
+			)
 
-			//	TODO: this will be true after the fix
+			// should do nothing in the 2nd promotion
+			pool.handlePromoteRequest(promReq2)
+
+			assert.Equal(t, uint64(1), pool.accounts.get(addr1).getNonce())
 			assert.Equal(t, uint64(0), pool.accounts.get(addr1).enqueued.length())
-
-			//	TODO: this will be true after the fix
-			_, exists := pool.index.get(tx.Hash)
-			assert.False(t, exists)
-
-			//	TODO: this becomes a no-op after the fix
-			pool.handlePromoteRequest(promTxx)
+			assert.Equal(t, uint64(1), pool.accounts.get(addr1).promoted.length())
+			assertTxExists(t, tx1, false)
+			assertTxExists(t, tx2, true)
+			assert.Equal(
+				t,
+				slotsRequired(tx2),
+				pool.gauge.read(),
+			)
 		},
 	)
 }
