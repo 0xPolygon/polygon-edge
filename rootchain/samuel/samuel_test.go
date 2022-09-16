@@ -537,3 +537,116 @@ func TestSAMUEL_PopReadyTransaction(t *testing.T) {
 	// Make sure the SAMP has been popped
 	assert.True(t, sampPopped)
 }
+
+func TestGetVerifiedSAMBucketEmpty(t *testing.T) {
+	var (
+		quorum uint64 = 10
+		signer        = mockSigner{
+			quorumFn: func(_ uint64) uint64 {
+				return quorum
+			},
+		}
+		verifiedSAMs = rootchain.VerifiedSAM{
+			{
+				ChildBlockNum: 0,
+			},
+		}
+	)
+
+	s := &SAMUEL{
+		signer: signer,
+	}
+
+	// Get the quorum verified SAMs
+	quorumSAMs := s.getVerifiedSAMBucket(verifiedSAMs)
+
+	// Make sure there are no candidates found
+	assert.Nil(t, quorumSAMs)
+}
+
+func TestGetVerifiedSAMBucketSingleCandidate(t *testing.T) {
+	var (
+		childBlockNum uint64 = 100
+
+		verifiedSAMs = rootchain.VerifiedSAM{
+			{
+				ChildBlockNum: childBlockNum,
+			},
+		}
+		signer = mockSigner{
+			quorumFn: func(_ uint64) uint64 {
+				return uint64(len(verifiedSAMs))
+			},
+		}
+	)
+
+	s := &SAMUEL{
+		signer: signer,
+	}
+
+	// Get the quorum verified SAMs
+	quorumSAMs := s.getVerifiedSAMBucket(verifiedSAMs)
+
+	// Make sure there are is a single candidate found
+	if len(quorumSAMs) == 0 {
+		t.Fatalf("Invalid number of verified SAMs")
+	}
+
+	assert.Len(t, quorumSAMs, len(verifiedSAMs))
+	assert.Equal(t, quorumSAMs[0].ChildBlockNum, childBlockNum)
+}
+
+func TestGetVerifiedSAMBucketMultipleCandidates(t *testing.T) {
+	var (
+		firstCandidateBlockNum  uint64 = 100
+		secondCandidateBlockNum        = firstCandidateBlockNum + 1
+
+		verifiedSAMs = rootchain.VerifiedSAM{
+			{
+				ChildBlockNum: firstCandidateBlockNum,
+			},
+			{
+				ChildBlockNum: firstCandidateBlockNum,
+			},
+			{
+				ChildBlockNum: firstCandidateBlockNum,
+			},
+			{
+				ChildBlockNum: secondCandidateBlockNum,
+			},
+			{
+				ChildBlockNum: secondCandidateBlockNum,
+			},
+			{
+				ChildBlockNum: secondCandidateBlockNum,
+			},
+			{
+				ChildBlockNum: secondCandidateBlockNum,
+			},
+		}
+		signer = mockSigner{
+			quorumFn: func(blockNum uint64) uint64 {
+				if blockNum == firstCandidateBlockNum {
+					return 3
+				}
+
+				return 4
+			},
+		}
+	)
+
+	s := &SAMUEL{
+		signer: signer,
+	}
+
+	// Get the quorum verified SAMs
+	quorumSAMs := s.getVerifiedSAMBucket(verifiedSAMs)
+
+	// Make sure there are is a single candidate found
+	if len(quorumSAMs) == 0 {
+		t.Fatalf("Invalid number of verified SAMs")
+	}
+
+	assert.Len(t, quorumSAMs, 3)
+	assert.Equal(t, quorumSAMs[0].ChildBlockNum, firstCandidateBlockNum)
+}

@@ -61,6 +61,10 @@ type signer interface {
 	// VerifySignature verifies the signature for the passed in
 	// raw data, and at the specified block number
 	VerifySignature([]byte, []byte, uint64) error
+
+	// Quorum returns the number of quorum validators
+	// for the given block number
+	Quorum(uint64) uint64
 }
 
 // transport defines the transport interface used for
@@ -417,10 +421,17 @@ func (s *SAMUEL) GetReadyTransaction() *types.Transaction {
 		return nil
 	}
 
+	// Find the verified SAM that has the least quorum signatures
+	verifiedSAM = s.getVerifiedSAMBucket(verifiedSAM)
+	if verifiedSAM == nil {
+		return nil
+	}
+
 	// Extract the required data
 	SAM := []rootchain.SAM(verifiedSAM)[0]
 
 	blockNumber := SAM.BlockNumber
+	childBlockNumber := SAM.ChildBlockNum
 	index := SAM.Index
 	signatures := verifiedSAM.Signatures()
 
@@ -446,10 +457,11 @@ func (s *SAMUEL) GetReadyTransaction() *types.Transaction {
 		// methodName(validatorSet tuple[], index uint64, blockNumber uint64, signatures [][]byte)
 		encodedArgs, err := s.eventData.methodABI.Inputs.Encode(
 			map[string]interface{}{
-				"validatorSet": vs.GetSetInfo(),
-				"index":        index,
-				"blockNumber":  blockNumber,
-				"signatures":   signatures,
+				"validatorSet":         vs.GetSetInfo(),
+				"index":                index,
+				"blockNumber":          blockNumber,
+				"signatures":           signatures,
+				"signatureBlockNumber": childBlockNumber,
 			},
 		)
 
@@ -486,4 +498,70 @@ func (s *SAMUEL) GetReadyTransaction() *types.Transaction {
 // PopReadyTransaction removes the latest ready transaction from the SAMP
 func (s *SAMUEL) PopReadyTransaction() {
 	s.samp.Pop()
+}
+
+// getVerifiedSAMBucket returns the verified SAM bucket that
+// has Quorum verified signatures
+func (s *SAMUEL) getVerifiedSAMBucket(
+	verifiedSAMs rootchain.VerifiedSAM,
+) rootchain.VerifiedSAM {
+	// Create the bucket map
+	// childchainBlockNum -> verifiedSAMs
+	samBuckets := make(map[uint64]rootchain.VerifiedSAM)
+
+	// Sort the SAM messages into buckets
+	for _, verifiedSAM := range verifiedSAMs {
+		childBlockNum := verifiedSAM.ChildBlockNum
+
+		// Check if there is already an aggregated array
+		samArr, present := samBuckets[childBlockNum]
+		if !present {
+			samArr = make(rootchain.VerifiedSAM, 0)
+		}
+
+		samArr = append(samArr, verifiedSAM)
+		samBuckets[childBlockNum] = samArr
+	}
+
+	var (
+		chosenBucket     uint64 = 0
+		candidateBuckets        = make([]uint64, 0)
+	)
+
+	// Get buckets that have Quorum signatures
+	for blockNum, sams := range samBuckets {
+		if uint64(len(sams)) >= s.signer.Quorum(blockNum) {
+			candidateBuckets = append(candidateBuckets, blockNum)
+		}
+	}
+
+	if len(candidateBuckets) == 0 {
+		// No candidate SAMs
+		return nil
+	}
+
+	// Out of all the candidate buckets, pick the one with the
+	// lowest quorum threshold
+	for _, bucketNumber := range candidateBuckets {
+		if chosenBucket == 0 {
+			// No bucket is chosen yet, assign it
+			chosenBucket = bucketNumber
+
+			continue
+		}
+
+		// Check if the current bucket has a lower quorum
+		// threshold, and if so accept it
+		if s.signer.Quorum(bucketNumber) <= s.signer.Quorum(chosenBucket) {
+			chosenBucket = bucketNumber
+		}
+	}
+
+	// Check if there is no Quorum
+	// verified SAM array
+	if chosenBucket == 0 {
+		return nil
+	}
+
+	return samBuckets[chosenBucket]
 }

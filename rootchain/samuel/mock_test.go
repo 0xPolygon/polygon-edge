@@ -83,10 +83,12 @@ func (m mockSAMP) Pop() rootchain.VerifiedSAM {
 
 type signDelegate func([]byte) ([]byte, uint64, error)
 type verifySignatureDelegate func([]byte, []byte, uint64) error
+type quorumDelegate func(uint64) uint64
 
 type mockSigner struct {
 	signFn            signDelegate
 	verifySignatureFn verifySignatureDelegate
+	quorumFn          quorumDelegate
 }
 
 func (m mockSigner) Sign(data []byte) ([]byte, uint64, error) {
@@ -111,6 +113,14 @@ func (m mockSigner) VerifySignature(
 	}
 
 	return nil
+}
+
+func (m mockSigner) Quorum(blockNumber uint64) uint64 {
+	if m.quorumFn != nil {
+		return m.quorumFn(blockNumber)
+	}
+
+	return 0
 }
 
 type publishDelegate func(*proto.SAM) error
