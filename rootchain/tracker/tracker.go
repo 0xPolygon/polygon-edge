@@ -20,11 +20,6 @@ var (
 	ErrInvalidValidatorsMap = errors.New("validators map is not in event or wrong type")
 )
 
-type Validator struct {
-	EcdsaAddress types.Address
-	BlsPublicKey []byte
-}
-
 // cancellable context for tracker's listening mechanism
 type contextSubscription struct {
 	context context.Context
