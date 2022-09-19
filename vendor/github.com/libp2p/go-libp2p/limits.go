@@ -1,157 +1,126 @@
 package libp2p
 
 import (
-	"github.com/libp2p/go-libp2p-core/protocol"
-
+	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/p2p/host/autonat"
+	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
 	relayv1 "github.com/libp2p/go-libp2p/p2p/protocol/circuitv1/relay"
 	circuit "github.com/libp2p/go-libp2p/p2p/protocol/circuitv2/proto"
 	relayv2 "github.com/libp2p/go-libp2p/p2p/protocol/circuitv2/relay"
 	"github.com/libp2p/go-libp2p/p2p/protocol/holepunch"
 	"github.com/libp2p/go-libp2p/p2p/protocol/identify"
 	"github.com/libp2p/go-libp2p/p2p/protocol/ping"
-
-	rcmgr "github.com/libp2p/go-libp2p-resource-manager"
 )
 
 // SetDefaultServiceLimits sets the default limits for bundled libp2p services
-//
-// More specifically this sets the following limits:
-// - identify:
-//   128 streams in, 128 streams out, 256 streams total, 4MB min, 64MB max svc memory
-//   16/16/32 streams per peer
-// - ping:
-//   128 streams in, 128 sreams out, 256 streasms total, 4MB min, 64MB max svc memory
-//   2/3/4 streams per peer
-// - autonat
-//   128 streams in, 128 streams out, 128 streams total, 4MB min, 64MB max svc memory
-//   2/2/2 streams per peer
-// - holepunch
-//   128 streams in, 128 streams out, 128 streams total, 4MB min, 64MB max svc memory
-//   2/2/2 streams per peer
-// - relay v1 and v2 (separate services)
-//   1024 streams in, 1024 streams out, 1024 streams total, 4MB min, 64MB max svc memory
-//   64/64/64 streams per peer
-func SetDefaultServiceLimits(limiter *rcmgr.BasicLimiter) {
-	if limiter.ServiceLimits == nil {
-		limiter.ServiceLimits = make(map[string]rcmgr.Limit)
-	}
-	if limiter.ServicePeerLimits == nil {
-		limiter.ServicePeerLimits = make(map[string]rcmgr.Limit)
-	}
-	if limiter.ProtocolLimits == nil {
-		limiter.ProtocolLimits = make(map[protocol.ID]rcmgr.Limit)
-	}
-	if limiter.ProtocolPeerLimits == nil {
-		limiter.ProtocolPeerLimits = make(map[protocol.ID]rcmgr.Limit)
-	}
-
+func SetDefaultServiceLimits(config *rcmgr.ScalingLimitConfig) {
 	// identify
-	setServiceLimits(limiter, identify.ServiceName,
-		limiter.DefaultServiceLimits.
-			WithMemoryLimit(1, 4<<20, 64<<20). // max 64MB service memory
-			WithStreamLimit(128, 128, 256),    // max 256 streams -- symmetric
-		peerLimit(16, 16, 32))
+	config.AddServiceLimit(
+		identify.ServiceName,
+		rcmgr.BaseLimit{StreamsInbound: 64, StreamsOutbound: 64, Streams: 128, Memory: 4 << 20},
+		rcmgr.BaseLimitIncrease{StreamsInbound: 64, StreamsOutbound: 64, Streams: 128, Memory: 4 << 20},
+	)
+	config.AddServicePeerLimit(
+		identify.ServiceName,
+		rcmgr.BaseLimit{StreamsInbound: 16, StreamsOutbound: 16, Streams: 32, Memory: 1 << 20},
+		rcmgr.BaseLimitIncrease{},
+	)
+	for _, id := range [...]protocol.ID{identify.ID, identify.IDDelta, identify.IDPush} {
+		config.AddProtocolLimit(
+			id,
+			rcmgr.BaseLimit{StreamsInbound: 64, StreamsOutbound: 64, Streams: 128, Memory: 4 << 20},
+			rcmgr.BaseLimitIncrease{StreamsInbound: 64, StreamsOutbound: 64, Streams: 128, Memory: 4 << 20},
+		)
+		config.AddProtocolPeerLimit(
+			id,
+			rcmgr.BaseLimit{StreamsInbound: 16, StreamsOutbound: 16, Streams: 32, Memory: 32 * (256<<20 + 16<<10)},
+			rcmgr.BaseLimitIncrease{},
+		)
+	}
 
-	setProtocolLimits(limiter, identify.ID,
-		limiter.DefaultProtocolLimits.WithMemoryLimit(1, 4<<20, 32<<20),
-		peerLimit(16, 16, 32))
-	setProtocolLimits(limiter, identify.IDPush,
-		limiter.DefaultProtocolLimits.WithMemoryLimit(1, 4<<20, 32<<20),
-		peerLimit(16, 16, 32))
-	setProtocolLimits(limiter, identify.IDDelta,
-		limiter.DefaultProtocolLimits.WithMemoryLimit(1, 4<<20, 32<<20),
-		peerLimit(16, 16, 32))
-
-	// ping
-	setServiceLimits(limiter, ping.ServiceName,
-		limiter.DefaultServiceLimits.
-			WithMemoryLimit(1, 4<<20, 64<<20). // max 64MB service memory
-			WithStreamLimit(128, 128, 128),    // max 128 streams - asymmetric
-		peerLimit(2, 3, 4))
-	setProtocolLimits(limiter, ping.ID,
-		limiter.DefaultProtocolLimits.WithMemoryLimit(1, 4<<20, 64<<20),
-		peerLimit(2, 3, 4))
+	//  ping
+	addServiceAndProtocolLimit(config,
+		ping.ServiceName, ping.ID,
+		rcmgr.BaseLimit{StreamsInbound: 64, StreamsOutbound: 64, Streams: 64, Memory: 4 << 20},
+		rcmgr.BaseLimitIncrease{StreamsInbound: 64, StreamsOutbound: 64, Streams: 64, Memory: 4 << 20},
+	)
+	addServicePeerAndProtocolPeerLimit(
+		config,
+		ping.ServiceName, ping.ID,
+		rcmgr.BaseLimit{StreamsInbound: 2, StreamsOutbound: 3, Streams: 4, Memory: 32 * (256<<20 + 16<<10)},
+		rcmgr.BaseLimitIncrease{},
+	)
 
 	// autonat
-	setServiceLimits(limiter, autonat.ServiceName,
-		limiter.DefaultServiceLimits.
-			WithMemoryLimit(1, 4<<20, 64<<20). // max 64MB service memory
-			WithStreamLimit(128, 128, 128),    // max 128 streams - asymmetric
-		peerLimit(2, 2, 2))
-	setProtocolLimits(limiter, autonat.AutoNATProto,
-		limiter.DefaultProtocolLimits.WithMemoryLimit(1, 4<<20, 64<<20),
-		peerLimit(2, 2, 2))
+	addServiceAndProtocolLimit(config,
+		autonat.ServiceName, autonat.AutoNATProto,
+		rcmgr.BaseLimit{StreamsInbound: 64, StreamsOutbound: 64, Streams: 64, Memory: 4 << 20},
+		rcmgr.BaseLimitIncrease{StreamsInbound: 4, StreamsOutbound: 4, Streams: 4, Memory: 2 << 20},
+	)
+	addServicePeerAndProtocolPeerLimit(
+		config,
+		autonat.ServiceName, autonat.AutoNATProto,
+		rcmgr.BaseLimit{StreamsInbound: 2, StreamsOutbound: 2, Streams: 2, Memory: 1 << 20},
+		rcmgr.BaseLimitIncrease{},
+	)
 
 	// holepunch
-	setServiceLimits(limiter, holepunch.ServiceName,
-		limiter.DefaultServiceLimits.
-			WithMemoryLimit(1, 4<<20, 64<<20). // max 64MB service memory
-			WithStreamLimit(128, 128, 256),    // max 256 streams - symmetric
-		peerLimit(2, 2, 2))
-	setProtocolLimits(limiter, holepunch.Protocol,
-		limiter.DefaultProtocolLimits.WithMemoryLimit(1, 4<<20, 64<<20),
-		peerLimit(2, 2, 2))
+	addServiceAndProtocolLimit(config,
+		holepunch.ServiceName, holepunch.Protocol,
+		rcmgr.BaseLimit{StreamsInbound: 32, StreamsOutbound: 32, Streams: 64, Memory: 4 << 20},
+		rcmgr.BaseLimitIncrease{StreamsInbound: 8, StreamsOutbound: 8, Streams: 16, Memory: 4 << 20},
+	)
+	addServicePeerAndProtocolPeerLimit(config,
+		holepunch.ServiceName, holepunch.Protocol,
+		rcmgr.BaseLimit{StreamsInbound: 2, StreamsOutbound: 2, Streams: 2, Memory: 1 << 20},
+		rcmgr.BaseLimitIncrease{},
+	)
 
 	// relay/v1
-	setServiceLimits(limiter, relayv1.ServiceName,
-		limiter.DefaultServiceLimits.
-			WithMemoryLimit(1, 4<<20, 64<<20). // max 64MB service memory
-			WithStreamLimit(1024, 1024, 1024), // max 1024 streams - asymmetric
-		peerLimit(64, 64, 64))
+	config.AddServiceLimit(
+		relayv1.ServiceName,
+		rcmgr.BaseLimit{StreamsInbound: 256, StreamsOutbound: 256, Streams: 256, Memory: 16 << 20},
+		rcmgr.BaseLimitIncrease{StreamsInbound: 256, StreamsOutbound: 256, Streams: 256, Memory: 16 << 20},
+	)
+	config.AddServicePeerLimit(
+		relayv1.ServiceName,
+		rcmgr.BaseLimit{StreamsInbound: 64, StreamsOutbound: 64, Streams: 64, Memory: 1 << 20},
+		rcmgr.BaseLimitIncrease{},
+	)
 
 	// relay/v2
-	setServiceLimits(limiter, relayv2.ServiceName,
-		limiter.DefaultServiceLimits.
-			WithMemoryLimit(1, 4<<20, 64<<20). // max 64MB service memory
-			WithStreamLimit(1024, 1024, 1024), // max 1024 streams - asymmetric
-		peerLimit(64, 64, 64))
+	config.AddServiceLimit(
+		relayv2.ServiceName,
+		rcmgr.BaseLimit{StreamsInbound: 256, StreamsOutbound: 256, Streams: 256, Memory: 16 << 20},
+		rcmgr.BaseLimitIncrease{StreamsInbound: 256, StreamsOutbound: 256, Streams: 256, Memory: 16 << 20},
+	)
+	config.AddServicePeerLimit(
+		relayv2.ServiceName,
+		rcmgr.BaseLimit{StreamsInbound: 64, StreamsOutbound: 64, Streams: 64, Memory: 1 << 20},
+		rcmgr.BaseLimitIncrease{},
+	)
 
 	// circuit protocols, both client and service
-	setProtocolLimits(limiter, circuit.ProtoIDv1,
-		limiter.DefaultProtocolLimits.
-			WithMemoryLimit(1, 4<<20, 64<<20).
-			WithStreamLimit(1280, 1280, 1280),
-		peerLimit(128, 128, 128))
-	setProtocolLimits(limiter, circuit.ProtoIDv2Hop,
-		limiter.DefaultProtocolLimits.
-			WithMemoryLimit(1, 4<<20, 64<<20).
-			WithStreamLimit(1280, 1280, 1280),
-		peerLimit(128, 128, 128))
-	setProtocolLimits(limiter, circuit.ProtoIDv2Stop,
-		limiter.DefaultProtocolLimits.
-			WithMemoryLimit(1, 4<<20, 64<<20).
-			WithStreamLimit(1280, 1280, 1280),
-		peerLimit(128, 128, 128))
-
-}
-
-func setServiceLimits(limiter *rcmgr.BasicLimiter, svc string, limit rcmgr.Limit, peerLimit rcmgr.Limit) {
-	if _, ok := limiter.ServiceLimits[svc]; !ok {
-		limiter.ServiceLimits[svc] = limit
-	}
-	if _, ok := limiter.ServicePeerLimits[svc]; !ok {
-		limiter.ServicePeerLimits[svc] = peerLimit
+	for _, proto := range [...]protocol.ID{circuit.ProtoIDv1, circuit.ProtoIDv2Hop, circuit.ProtoIDv2Stop} {
+		config.AddProtocolLimit(
+			proto,
+			rcmgr.BaseLimit{StreamsInbound: 640, StreamsOutbound: 640, Streams: 640, Memory: 16 << 20},
+			rcmgr.BaseLimitIncrease{StreamsInbound: 640, StreamsOutbound: 640, Streams: 640, Memory: 16 << 20},
+		)
+		config.AddProtocolPeerLimit(
+			proto,
+			rcmgr.BaseLimit{StreamsInbound: 128, StreamsOutbound: 128, Streams: 128, Memory: 32 << 20},
+			rcmgr.BaseLimitIncrease{},
+		)
 	}
 }
 
-func setProtocolLimits(limiter *rcmgr.BasicLimiter, proto protocol.ID, limit rcmgr.Limit, peerLimit rcmgr.Limit) {
-	if _, ok := limiter.ProtocolLimits[proto]; !ok {
-		limiter.ProtocolLimits[proto] = limit
-	}
-	if _, ok := limiter.ProtocolPeerLimits[proto]; !ok {
-		limiter.ProtocolPeerLimits[proto] = peerLimit
-	}
+func addServiceAndProtocolLimit(config *rcmgr.ScalingLimitConfig, service string, proto protocol.ID, limit rcmgr.BaseLimit, increase rcmgr.BaseLimitIncrease) {
+	config.AddServiceLimit(service, limit, increase)
+	config.AddProtocolLimit(proto, limit, increase)
 }
 
-func peerLimit(numStreamsIn, numStreamsOut, numStreamsTotal int) rcmgr.Limit {
-	return &rcmgr.StaticLimit{
-		// memory: 256kb for window buffers plus some change for message buffers per stream
-		Memory: int64(numStreamsTotal * (256<<10 + 16384)),
-		BaseLimit: rcmgr.BaseLimit{
-			StreamsInbound:  numStreamsIn,
-			StreamsOutbound: numStreamsOut,
-			Streams:         numStreamsTotal,
-		},
-	}
+func addServicePeerAndProtocolPeerLimit(config *rcmgr.ScalingLimitConfig, service string, proto protocol.ID, limit rcmgr.BaseLimit, increase rcmgr.BaseLimitIncrease) {
+	config.AddServicePeerLimit(service, limit, increase)
+	config.AddProtocolPeerLimit(proto, limit, increase)
 }
