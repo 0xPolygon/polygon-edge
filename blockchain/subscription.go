@@ -1,7 +1,6 @@
 package blockchain
 
 import (
-	"fmt"
 	"math/big"
 	"sync"
 
@@ -194,7 +193,6 @@ func (e *eventStream) push(event *Event) {
 		select {
 		case update <- event:
 		default:
-			fmt.Println("defaulting")
 		}
 	}
 }
