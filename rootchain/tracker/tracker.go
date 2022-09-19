@@ -16,8 +16,19 @@ import (
 )
 
 var (
-	ErrInvalidID            = errors.New("id isn't in event or wrong type")
-	ErrInvalidValidatorsMap = errors.New("validators map is not in event or wrong type")
+	ErrNoEventConfigProvided   = errors.New("no event config provided")
+	ErrEventParseNoPayloadType = errors.New("cannot parse event, no payloadType defined")
+	ErrInvalidIndex            = errors.New("index isn't in event or wrong type")
+	ErrInvalidValidatorsMap    = errors.New("validators map isn't in event or wrong type")
+	ErrInvalidBlsPublicKey     = errors.New("blsPublicKey isn't in event or wrong type")
+	ErrInvalidEcdsaAddress     = errors.New("ecdsaAddress isn't in event or wrong type")
+)
+
+const (
+	IndexAttribute        = ("index")
+	ValidatorMapAttribute = ("Validator")
+	BlsPublicKeyAttribute = ("blsPublicKey")
+	EcdsaAddressAttribute = ("ecdsaAddress")
 )
 
 // cancellable context for tracker's listening mechanism
@@ -69,7 +80,7 @@ func NewEventTracker(
 	rootchainWS string,
 ) (*EventTracker, error) {
 	if eventConfig == nil {
-		return nil, errors.New("no event config provided")
+		return nil, ErrNoEventConfigProvided
 	}
 
 	// create tracker
@@ -164,19 +175,19 @@ func (t *EventTracker) startEventTracking() {
 		// handle sub error
 		case err := <-t.sub.err():
 			t.ctxSubscription.cancel()
-			t.logger.Error("subscription cancelled", err)
+			t.logger.Error("rootchain subscription cancelled", err)
 
 			return
 
 		// stop tracker's sub
 		case <-t.ctxSubscription.done():
 			if err := t.sub.unsubscribe(); err != nil {
-				t.logger.Error("cannot unsubscribe", "err", err)
+				t.logger.Error("cannot unsubscribe from the rootchain", "err", err)
 
 				return
 			}
 
-			t.logger.Debug("subscription stopped")
+			t.logger.Debug("rootchain subscription stopped")
 
 			return
 		}
@@ -194,13 +205,16 @@ func (t *EventTracker) setFromBlock(fromBlock uint64) {
 // it is sent to eventCh.
 func (t *EventTracker) trackHeader(header *types.Header) {
 	// determine range of blocks to query
-	fromBlock, toBlock := t.calculateRange(header)
-	if toBlock == 0 && fromBlock == 0 {
+	fromBlockPtr, toBlockPtr := t.calculateRange(header)
+	if toBlockPtr == nil || fromBlockPtr == nil {
 		// we are returning here because the calculated
 		// range was already queried or the chain is not
 		// at the desired depth.
 		return
 	}
+
+	fromBlock := *fromBlockPtr
+	toBlock := *toBlockPtr
 
 	t.logger.Info("querying events within block range", "from", fromBlock, "to", toBlock)
 
@@ -217,7 +231,7 @@ func (t *EventTracker) trackHeader(header *types.Header) {
 
 // calculateRange determines the next range of blocks
 // to query for events.
-func (t *EventTracker) calculateRange(header *types.Header) (from, to uint64) {
+func (t *EventTracker) calculateRange(header *types.Header) (from, to *uint64) {
 	// check if block number is at required depth
 	if header.Number < t.confirmations {
 		// block height less than required
@@ -226,7 +240,7 @@ func (t *EventTracker) calculateRange(header *types.Header) (from, to uint64) {
 			"current", header.Number,
 			"required", t.confirmations)
 
-		return 0, 0
+		return nil, nil
 	}
 
 	// right bound
@@ -241,7 +255,7 @@ func (t *EventTracker) calculateRange(header *types.Header) (from, to uint64) {
 		fromBlock = toBlock
 	}
 
-	return fromBlock, toBlock
+	return &fromBlock, &toBlock
 }
 
 // queryEvents collects all events on the rootchain that occurred
@@ -276,17 +290,19 @@ func (t *EventTracker) notify(logs ...*ethgo.Log) {
 
 // encodeEventFromLog encodes event from log
 func (t *EventTracker) encodeEventFromLog(log *ethgo.Log) (rootchain.Event, error) {
+	// Parse event data from log
 	eventData, err := t.contract.event.ParseLog(log)
 	if err != nil {
 		return rootchain.Event{}, errors.New(fmt.Sprint("cannot parse event log", "err", err))
 	}
 
+	// encode event for specific payload
 	switch t.payloadType {
 	case rootchain.ValidatorSetPayloadType:
 		return t.encodeValidatorSetPayloadEvent(eventData, log.BlockNumber)
 	}
 
-	return rootchain.Event{}, errors.New("cannot parse event, no payloadType defined")
+	return rootchain.Event{}, ErrEventParseNoPayloadType
 }
 
 // encodeEventFromLog encodes event for specific payload
@@ -295,44 +311,51 @@ func (t *EventTracker) encodeValidatorSetPayloadEvent(
 	blockNumber uint64,
 ) (rootchain.Event, error) {
 	var (
-		index *big.Int
-		ok    bool
-
-		validators []map[string]interface{}
+		index        *big.Int
+		ok           bool
+		validatorMap []map[string]interface{}
 	)
 
-	index, ok = eventData["index"].(*big.Int)
+	// extract index from event data
+	index, ok = eventData[IndexAttribute].(*big.Int)
 	if !ok {
-		return rootchain.Event{}, errors.New(fmt.Sprint("failed to parse StateSyncEvent: %w", "err", ErrInvalidID))
+		return rootchain.Event{}, errors.New(fmt.Sprint("failed to parse StateSyncEvent: %w", "err", ErrInvalidIndex))
 	}
 
-	validators, ok = eventData["Validator"].([]map[string]interface{})
+	// extract validator map from event data
+	validatorMap, ok = eventData[ValidatorMapAttribute].([]map[string]interface{})
 	if !ok {
 		return rootchain.Event{}, errors.New(fmt.Sprint("failed to parse StateSyncEvent: %w", "err", ErrInvalidValidatorsMap))
 	}
 
-	validatorSetInfo := make([]payload.ValidatorSetInfo, len(validators))
+	validatorSetInfo := make([]payload.ValidatorSetInfo, len(validatorMap))
 
-	for index, validatorInfo := range validators {
-		blsKey, ok := validatorInfo["blsPublicKey"].([]byte)
+	// populate validator set info from validator map
+	for index, validatorInfo := range validatorMap {
+		// extract blsKey from validatorMap entry
+		blsKey, ok := validatorInfo[BlsPublicKeyAttribute].([]byte)
 		if !ok {
-			return rootchain.Event{}, errors.New("failed to parse blsPublicKey from validator info")
+			return rootchain.Event{}, errors.New(fmt.Sprint("failed to parse StateSyncEvent: %w", "err", ErrInvalidBlsPublicKey))
 		}
 
-		ecdsaAddress, ok := validatorInfo["ecdsaAddress"].(ethgo.Address)
+		// extract ecdsaAddress from validatorMap entry
+		ecdsaAddress, ok := validatorInfo[EcdsaAddressAttribute].(ethgo.Address)
 		if !ok {
-			return rootchain.Event{}, errors.New("failed to parse ecdsaAddress from validator info")
+			return rootchain.Event{}, errors.New(fmt.Sprint("failed to parse StateSyncEvent: %w", "err", ErrInvalidEcdsaAddress))
 		}
 
+		// create validator set info from blsKey and ecdsaAddress
 		newValidatorSetInfo := payload.ValidatorSetInfo{
 			Address:      ecdsaAddress.Bytes(),
 			BLSPublicKey: blsKey}
 
+		// update validatorSetInfo
 		validatorSetInfo[index] = newValidatorSetInfo
 	}
 
 	validatorSetPayload := payload.NewValidatorSetPayload(validatorSetInfo)
 
+	// create event
 	event := rootchain.Event{
 		Index:       index.Uint64(),
 		BlockNumber: blockNumber,
