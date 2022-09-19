@@ -174,17 +174,17 @@ func (a *account) setNonce(nonce uint64) {
 
 // Demotions returns the current value of demotions
 func (a *account) Demotions() uint64 {
-	return atomic.LoadUint64(&a.demotions)
+	return a.demotions
 }
 
 // resetDemotions sets 0 to demotions to clear count
 func (a *account) resetDemotions() {
-	atomic.StoreUint64(&a.demotions, 0)
+	a.demotions = 0
 }
 
 // incrementDemotions increments demotions
 func (a *account) incrementDemotions() {
-	atomic.AddUint64(&a.demotions, 1)
+	a.demotions++
 }
 
 // reset aligns the account with the new nonce

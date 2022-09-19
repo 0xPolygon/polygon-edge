@@ -1458,7 +1458,7 @@ func TestDemote(t *testing.T) {
 		assert.Equal(t, uint64(1), pool.gauge.read())
 		assert.Equal(t, uint64(1), pool.accounts.get(addr1).getNonce())
 		assert.Equal(t, uint64(1), pool.accounts.get(addr1).promoted.length())
-		assert.Equal(t, uint(0), pool.accounts.get(addr1).demotions)
+		assert.Equal(t, uint64(0), pool.accounts.get(addr1).Demotions())
 
 		// call demote
 		pool.Prepare()
@@ -1470,7 +1470,7 @@ func TestDemote(t *testing.T) {
 		assert.Equal(t, uint64(1), pool.accounts.get(addr1).promoted.length())
 
 		// assert counter was incremented
-		assert.Equal(t, uint(1), pool.accounts.get(addr1).demotions)
+		assert.Equal(t, uint64(1), pool.accounts.get(addr1).Demotions())
 	})
 
 	t.Run("Demote calls Drop", func(t *testing.T) {
@@ -1507,7 +1507,7 @@ func TestDemote(t *testing.T) {
 		assert.Equal(t, uint64(0), pool.accounts.get(addr1).promoted.length())
 
 		// demotions are reset to 0
-		assert.Equal(t, uint(0), pool.accounts.get(addr1).demotions)
+		assert.Equal(t, uint64(0), pool.accounts.get(addr1).Demotions())
 	})
 }
 
