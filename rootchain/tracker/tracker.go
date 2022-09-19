@@ -103,7 +103,7 @@ func NewEventTracker(
 // Start initializes context for the tracking mechanism
 // and starts listening for events on the rootchain.
 func (t *EventTracker) Start(fromBlock uint64) error {
-	//	subscribe for new headers
+	// subscribe for new headers
 	if err := t.subscribeToRootchain(); err != nil {
 		t.logger.Error("cannot subscribe to rootchain", "err", err)
 
@@ -121,7 +121,7 @@ func (t *EventTracker) Start(fromBlock uint64) error {
 
 // Stop stops the tracker's listening mechanism.
 func (t *EventTracker) Stop() error {
-	//	stop subscription
+	// stop subscription
 	t.ctxSubscription.cancel()
 
 	// close rootchain client
@@ -201,9 +201,9 @@ func (t *EventTracker) trackHeader(header *types.Header) {
 	// determine range of blocks to query
 	fromBlock, toBlock := t.calculateRange(header)
 	if toBlock == 0 && fromBlock == 0 {
-		//	we are returning here because the calculated
-		//	range was already queried or the chain is not
-		//	at the desired depth.
+		// we are returning here because the calculated
+		// range was already queried or the chain is not
+		// at the desired depth.
 		return
 	}
 
