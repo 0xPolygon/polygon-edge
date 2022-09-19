@@ -450,7 +450,7 @@ github.com/libp2p/go-libp2p-kbucket/keyspace
 github.com/libp2p/go-libp2p-kbucket/peerdiversity
 # github.com/libp2p/go-libp2p-peerstore v0.7.0
 ## explicit; go 1.17
-# github.com/libp2p/go-libp2p-pubsub v0.8.0
+# github.com/libp2p/go-libp2p-pubsub v0.8.1
 ## explicit; go 1.17
 github.com/libp2p/go-libp2p-pubsub
 github.com/libp2p/go-libp2p-pubsub/pb
