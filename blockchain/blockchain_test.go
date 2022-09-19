@@ -745,7 +745,7 @@ func Test_recoverFromFieldsInBlock(t *testing.T) {
 	})
 }
 
-func Test_recoverAllFromFieldsInTransactions(t *testing.T) {
+func Test_recoverFromFieldsInTransactions(t *testing.T) {
 	t.Parallel()
 
 	var (
@@ -785,7 +785,7 @@ func Test_recoverAllFromFieldsInTransactions(t *testing.T) {
 
 		assert.True(
 			t,
-			chain.recoverAllFromFieldsInTransactions(transactions),
+			chain.recoverFromFieldsInTransactions(transactions),
 		)
 	})
 
@@ -816,7 +816,7 @@ func Test_recoverAllFromFieldsInTransactions(t *testing.T) {
 			tx3,
 		}
 
-		assert.True(t, chain.recoverAllFromFieldsInTransactions(transactions))
+		assert.True(t, chain.recoverFromFieldsInTransactions(transactions))
 
 		assert.Equal(t, addr1, tx1.From)
 		assert.Equal(t, types.ZeroAddress, tx2.From)
@@ -848,7 +848,7 @@ func Test_recoverAllFromFieldsInTransactions(t *testing.T) {
 
 		assert.False(
 			t,
-			chain.recoverAllFromFieldsInTransactions(transactions),
+			chain.recoverFromFieldsInTransactions(transactions),
 		)
 	})
 }

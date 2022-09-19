@@ -580,7 +580,7 @@ func (b *Blockchain) readBody(hash types.Hash) (*types.Body, bool) {
 	}
 
 	// To return from field in the transactions of the past blocks
-	if updated := b.recoverAllFromFieldsInTransactions(bb.Transactions); updated {
+	if updated := b.recoverFromFieldsInTransactions(bb.Transactions); updated {
 		if err := b.db.WriteBody(hash, bb); err != nil {
 			b.logger.Warn("failed to write body into storage", "hash", hash, "err", err)
 		}
@@ -1010,7 +1010,7 @@ func (b *Blockchain) ReadTxLookup(hash types.Hash) (types.Hash, bool) {
 	return v, ok
 }
 
-// recoverFromFields recovers 'from' fields in the transactions of the given block
+// recoverFromFieldsInBlock recovers 'from' fields in the transactions of the given block
 // return error if the invalid signature found
 func (b *Blockchain) recoverFromFieldsInBlock(block *types.Block) error {
 	for _, tx := range block.Transactions {
@@ -1031,7 +1031,7 @@ func (b *Blockchain) recoverFromFieldsInBlock(block *types.Block) error {
 
 // recoverFromFieldsInTransactions recovers 'from' fields in the transactions
 // log as warning if failing to recover one address
-func (b *Blockchain) recoverAllFromFieldsInTransactions(transactions []*types.Transaction) bool {
+func (b *Blockchain) recoverFromFieldsInTransactions(transactions []*types.Transaction) bool {
 	updated := false
 
 	for _, tx := range transactions {
