@@ -77,6 +77,11 @@ func (m *monitor) PopTransaction() {
 }
 
 func (m *monitor) SaveProgress(block *types.Block) {
+	stateTxs := block.ExtractStateTransactions()
+	if len(stateTxs) == 0 {
+		return
+	}
+
 	// todo: milos
 	//m.samuel.SaveProgress()
 }
