@@ -37,7 +37,7 @@ func Factory(params *consensus.Params) (consensus.Consensus, error) {
 // Initialize initializes the consensus
 func (d *Dummy) Initialize() error {
 	d.txpool.SetSealing(true)
-	
+
 	return nil
 }
 
