@@ -9,6 +9,7 @@ import (
 	"github.com/golang/protobuf/ptypes/any"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p-core/peer"
+	"go.uber.org/atomic"
 	"google.golang.org/grpc"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
@@ -27,6 +28,9 @@ const (
 	// maximum allowed number of times an account
 	// was excluded from block building (ibft.writeTransactions)
 	maxAccountDemotions = uint(10)
+
+	// maximum allowed number of consecutive blocks that don't have the account's transaction
+	maxAccountUnadopted = uint64(10)
 
 	pruningCooldown = 5000 * time.Millisecond
 )
@@ -88,7 +92,6 @@ type Config struct {
 	PriceLimit          uint64
 	MaxSlots            uint64
 	MaxAccountEnqueued  uint64
-	Sealing             bool
 	DeploymentWhitelist []types.Address
 }
 
@@ -165,7 +168,7 @@ type TxPool struct {
 
 	// flag indicating if the current node is a sealer,
 	// and should therefore gossip transactions
-	sealing bool
+	sealing atomic.Bool
 
 	// prometheus API
 	metrics *Metrics
@@ -235,7 +238,6 @@ func NewTxPool(
 		index:       lookupMap{all: make(map[types.Hash]*types.Transaction)},
 		gauge:       slotGauge{height: 0, max: config.MaxSlots},
 		priceLimit:  config.PriceLimit,
-		sealing:     config.Sealing,
 
 		//	main loop channels
 		enqueueReqCh: make(chan enqueueRequest),
@@ -319,6 +321,16 @@ func (p *TxPool) Close() {
 // to validate a transaction's signature.
 func (p *TxPool) SetSigner(s signer) {
 	p.signer = s
+}
+
+// SetSealing sets the sealing flag
+func (p *TxPool) SetSealing(sealing bool) {
+	p.sealing.Store(sealing)
+}
+
+// Sealing returns the current set sealing flag
+func (p *TxPool) Sealing() bool {
+	return p.sealing.Load()
 }
 
 // AddTx adds a new transaction to the pool (sent from json-RPC/gRPC endpoints)
@@ -564,12 +576,13 @@ func (p *TxPool) processEvent(event *blockchain.Event) {
 		}
 	}
 
-	if len(stateNonces) == 0 {
-		return
-	}
-
 	// reset accounts with the new state
 	p.resetAccounts(stateNonces)
+
+	if !p.Sealing() {
+		// only non-validator cleanup inactive accounts
+		p.updateUnadoptedCounts(stateNonces)
+	}
 }
 
 // validateTx ensures the transaction conforms to specific
@@ -791,7 +804,7 @@ func (p *TxPool) handlePromoteRequest(req promoteRequest) {
 // addGossipTx handles receiving transactions
 // gossiped by the network.
 func (p *TxPool) addGossipTx(obj interface{}, _ peer.ID) {
-	if !p.sealing {
+	if !p.Sealing() {
 		return
 	}
 
@@ -832,6 +845,10 @@ func (p *TxPool) addGossipTx(obj interface{}, _ peer.ID) {
 
 // resetAccounts updates existing accounts with the new nonce and prunes stale transactions.
 func (p *TxPool) resetAccounts(stateNonces map[types.Address]uint64) {
+	if len(stateNonces) == 0 {
+		return
+	}
+
 	var (
 		allPrunedPromoted []*types.Transaction
 		allPrunedEnqueued []*types.Transaction
@@ -879,6 +896,49 @@ func (p *TxPool) resetAccounts(stateNonces map[types.Address]uint64) {
 			toHash(allPrunedEnqueued...)...,
 		)
 	}
+}
+
+// updateUnadoptedCounts update the accounts' unadopted counts, 
+// the number of the consecutive blocks that doesn't have the account's transactions
+func (p *TxPool) updateUnadoptedCounts(latestActiveAccounts map[types.Address]uint64) {
+	p.accounts.Range(
+		func(key, value interface{}) bool {
+			address, _ := key.(types.Address)
+			account, _ := value.(*account)
+
+			if _, ok := latestActiveAccounts[address]; ok {
+				account.unadopted = 0
+			} else {
+				account.unadopted++
+			}
+
+			if account.unadopted < maxAccountUnadopted {
+				return true
+			}
+
+			account.promoted.lock(true)
+			defer account.promoted.unlock()
+
+			firstTx := account.promoted.pop()
+			if firstTx != nil {
+				p.index.remove(firstTx)
+				p.gauge.decrease(slotsRequired(firstTx))
+				account.unadopted = 0
+			}
+
+			account.enqueued.lock(true)
+			defer account.enqueued.unlock()
+
+			firstTx = account.enqueued.pop()
+			if firstTx != nil {
+				p.index.remove(firstTx)
+				p.gauge.decrease(slotsRequired(firstTx))
+				account.unadopted = 0
+			}
+
+			return true
+		},
+	)
 }
 
 // createAccountOnce creates an account and

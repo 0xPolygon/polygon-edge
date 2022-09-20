@@ -92,7 +92,6 @@ func newTestPoolWithSlots(maxSlots uint64, mockStore ...store) (*TxPool, error) 
 			PriceLimit:          defaultPriceLimit,
 			MaxSlots:            maxSlots,
 			MaxAccountEnqueued:  defaultMaxAccountEnqueued,
-			Sealing:             false,
 			DeploymentWhitelist: []types.Address{},
 		},
 	)
@@ -521,7 +520,7 @@ func TestAddGossipTx(t *testing.T) {
 		assert.NoError(t, err)
 		pool.SetSigner(signer)
 
-		pool.sealing = true
+		pool.SetSealing(true)
 
 		signedTx, err := signer.SignTx(tx, key)
 		if err != nil {
@@ -549,7 +548,7 @@ func TestAddGossipTx(t *testing.T) {
 		assert.NoError(t, err)
 		pool.SetSigner(signer)
 
-		pool.sealing = false
+		pool.SetSealing(false)
 
 		pool.createAccountOnce(sender)
 
@@ -1402,6 +1401,144 @@ func TestDemote(t *testing.T) {
 
 		// demotions are reset to 0
 		assert.Equal(t, uint(0), pool.accounts.get(addr1).demotions)
+	})
+}
+
+func Test_updateUnadoptedCounts(t *testing.T) {
+	t.Parallel()
+
+	sendTx := func(
+		t *testing.T,
+		pool *TxPool,
+		tx *types.Transaction,
+		shouldPromote bool,	
+	) {
+		t.Helper()
+
+		go func() {
+			err := pool.addTx(local, tx)
+			assert.NoError(t, err)
+		}()
+
+		if shouldPromote {
+			go pool.handleEnqueueRequest(<-pool.enqueueReqCh)
+			pool.handlePromoteRequest(<-pool.promoteReqCh)
+		} else {
+			pool.handleEnqueueRequest(<-pool.enqueueReqCh)
+		}
+	}
+
+	checkTxExistence := func(t *testing.T, pool *TxPool, txHash types.Hash, shouldExist bool) {
+		t.Helper()
+
+		_, ok := pool.index.get(txHash)
+
+		assert.Equal(t, shouldExist, ok)
+	}
+
+	t.Run("should drop the first transaction from promoted queue", func(t *testing.T) {
+		t.Parallel()
+		// create pool
+		pool, err := newTestPool()
+		assert.NoError(t, err)
+
+		pool.SetSigner(&mockSigner{})
+
+		tx :=  newTx(addr1, 0, 1)
+		sendTx(t, pool, tx, true)
+
+		accountMap := pool.accounts.get(addr1)
+
+		// make sure the transaction is promoted and unadopted count is zero
+		assert.Zero(t, accountMap.enqueued.length())
+		assert.Equal(t, uint64(1), accountMap.promoted.length())
+		assert.Zero(t, accountMap.unadopted)
+		assert.Equal(t, slotsRequired(tx), pool.gauge.read())
+		checkTxExistence(t, pool, tx.Hash, true)
+
+		// set 9 to unadopted in order to drop transaction next
+		accountMap.unadopted = 9
+
+		pool.updateUnadoptedCounts(map[types.Address]uint64{
+			// empty
+		})
+
+		// make sure the account queue is empty and unadopted is reset
+		assert.Zero(t, accountMap.enqueued.length())
+		assert.Zero(t, accountMap.promoted.length())
+		assert.Zero(t, accountMap.unadopted)
+		assert.Zero(t, pool.gauge.read())
+		checkTxExistence(t, pool, tx.Hash, false)
+	})
+
+	t.Run("should drop the first transaction from enqueued queue", func(t *testing.T) {
+		t.Parallel()
+		// create pool
+		pool, err := newTestPool()
+		assert.NoError(t, err)
+
+		pool.SetSigner(&mockSigner{})
+
+		tx :=  newTx(addr1, 1, 1) // set non-zero nonce to prevent the tx from being added
+		sendTx(t, pool, tx, false)
+
+		accountMap := pool.accounts.get(addr1)
+
+		// make sure the transaction is promoted and unadopted count is zero
+		assert.NotZero(t, accountMap.enqueued.length())
+		assert.Zero(t, accountMap.promoted.length())
+		assert.Zero(t, accountMap.unadopted)
+		assert.Equal(t, slotsRequired(tx), pool.gauge.read())
+		checkTxExistence(t, pool, tx.Hash, true)
+
+		// set 9 to unadopted in order to drop transaction next
+		accountMap.unadopted = 9
+
+		pool.updateUnadoptedCounts(map[types.Address]uint64{
+			// empty
+		})
+
+		// make sure the account queue is empty and unadopted is reset
+		assert.Zero(t, accountMap.enqueued.length())
+		assert.Zero(t, accountMap.promoted.length())
+		assert.Zero(t, accountMap.unadopted)
+		assert.Zero(t, pool.gauge.read())
+		checkTxExistence(t, pool, tx.Hash, false)
+	})
+
+	t.Run("should not drop a transaction", func(t *testing.T) {
+		t.Parallel()
+		// create pool
+		pool, err := newTestPool()
+		assert.NoError(t, err)
+
+		pool.SetSigner(&mockSigner{})
+
+		tx :=  newTx(addr1, 0, 1)
+		sendTx(t, pool, tx, true)
+
+		accountMap := pool.accounts.get(addr1)
+
+		// make sure the transaction is promoted and unadopted count is zero
+		assert.Zero(t, accountMap.enqueued.length())
+		assert.Equal(t, uint64(1), accountMap.promoted.length())
+		assert.Zero(t, accountMap.unadopted)
+		assert.Equal(t, slotsRequired(tx), pool.gauge.read())
+		checkTxExistence(t, pool, tx.Hash, true)
+
+		// set 9 to unadopted in order to drop transaction next
+		accountMap.unadopted = 5
+
+		pool.updateUnadoptedCounts(map[types.Address]uint64{
+			addr1: 1,
+		})
+
+		// make sure the account queue is empty and unadopted is reset
+		assert.Zero(t, accountMap.enqueued.length())
+		assert.Equal(t, uint64(1), accountMap.promoted.length())
+		assert.Equal(t, uint64(0) ,accountMap.unadopted)
+		assert.Equal(t, slotsRequired(tx), pool.gauge.read())
+		checkTxExistence(t, pool, tx.Hash, true)
 	})
 }
 

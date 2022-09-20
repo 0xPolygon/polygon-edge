@@ -157,6 +157,7 @@ type account struct {
 	enqueued, promoted *accountQueue
 	nextNonce          uint64
 	demotions          uint
+	unadopted          uint64
 
 	//	maximum number of enqueued transactions
 	maxEnqueued uint64
