@@ -259,8 +259,10 @@ func (i *backendIBFT) startConsensus() {
 	// to insert a valid block. Used for cancelling active consensus
 	// rounds for a specific height
 	go func() {
+		eventCh := newBlockSub.GetEventCh()
+
 		for {
-			if ev := <-newBlockSub.GetEventCh(); ev.Source == "syncer" {
+			if ev := <-eventCh; ev.Source == "syncer" {
 				if ev.NewChain[0].Number < i.blockchain.Header().Number {
 					// The blockchain notification system can eventually deliver
 					// stale block notifications. These should be ignored
