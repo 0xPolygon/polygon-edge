@@ -61,12 +61,18 @@ func (op *outputParams) initSecrets() error {
 		return err
 	}
 
-	if err := op.initValidatorAddress(); err != nil || op.outputValidator {
-		return err
+	outputAll := !(op.outputBLS || op.outputValidator || op.outputNodeID)
+
+	if op.outputValidator || outputAll {
+		if err := op.initValidatorAddress(); err != nil || op.outputValidator {
+			return err
+		}
 	}
 
-	if err := op.initBLSPublicKey(); err != nil || op.outputBLS {
-		return err
+	if op.outputBLS || outputAll {
+		if err := op.initBLSPublicKey(); err != nil || op.outputBLS {
+			return err
+		}
 	}
 
 	return op.initNodeID()
