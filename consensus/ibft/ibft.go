@@ -177,7 +177,9 @@ func Factory(params *consensus.Params) (consensus.Consensus, error) {
 		closeCh: make(chan struct{}),
 	}
 
-	p.initRootnet(params.RootchainConfig)
+	if err := p.initRootnet(params.RootchainConfig); err != nil {
+		return nil, err
+	}
 
 	// Istanbul requires a different header hash function
 	p.SetHeaderHash()
@@ -185,12 +187,20 @@ func Factory(params *consensus.Params) (consensus.Consensus, error) {
 	return p, nil
 }
 
-func (i *backendIBFT) initRootnet(config *rootchain.Config) rootnet.Monitor {
+func (i *backendIBFT) initRootnet(config *rootchain.Config) error {
 	if config == nil {
-		return nilMonitor{}
+		i.rootMonitor = nilMonitor{}
+
+		return nil
 	}
 
-	//	todo
+	monitor, err := rootnet.NewMonitor(i.logger, config, nil) // todo
+	if err != nil {
+		return fmt.Errorf("failed to initialize monitor: %w", err)
+	}
+
+	i.rootMonitor = monitor
+
 	return nil
 }
 
