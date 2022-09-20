@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/0xPolygon/polygon-edge/crypto"
-	"github.com/0xPolygon/polygon-edge/e2e/framework"
 	"github.com/0xPolygon/polygon-edge/rootchain"
 	"github.com/0xPolygon/polygon-edge/rootchain/payload"
 	"github.com/0xPolygon/polygon-edge/rootchain/proto"
@@ -350,7 +349,7 @@ func (s *SAMUEL) Stop() error {
 // are committed to the blockchain
 func (s *SAMUEL) SaveProgress(
 	contractAddr types.Address, // local Smart Contract address
-	input []byte, // method with argument data
+	input []byte,               // method with argument data
 ) {
 	if contractAddr != types.StringToAddress(s.eventData.localAddress.String()) {
 		s.logger.Warn(
@@ -496,7 +495,7 @@ func (s *SAMUEL) GetReadyTransaction() *types.Transaction {
 			From:     types.ZeroAddress,
 			To:       &s.eventData.localAddress,
 			GasPrice: big.NewInt(0),
-			Gas:      framework.DefaultGasLimit,
+			Gas:      5242880,
 			Value:    big.NewInt(0),
 			V:        big.NewInt(1), // it is necessary to encode in rlp,
 			Input:    append(s.eventData.methodABI.ID(), encodedArgs...),
