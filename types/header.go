@@ -283,3 +283,19 @@ func (b *Block) WithSeal(header *Header) *Block {
 		Uncles:       b.Uncles,
 	}
 }
+
+// ExtractStateTransactions collects all state transactions
+// contained inside the block
+func (b *Block) ExtractStateTransactions() []*Transaction {
+	var stateTxs []*Transaction
+
+	for _, tx := range b.Transactions {
+		if tx.Type != StateTx {
+			continue
+		}
+
+		stateTxs = append(stateTxs, tx)
+	}
+
+	return stateTxs
+}
