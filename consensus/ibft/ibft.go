@@ -3,6 +3,8 @@ package ibft
 import (
 	"errors"
 	"fmt"
+	"github.com/0xPolygon/polygon-edge/consensus/ibft/rootnet"
+	"github.com/0xPolygon/polygon-edge/rootchain"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
@@ -80,6 +82,9 @@ type backendIBFT struct {
 	currentValidators validators.Validators // signer at current sequence
 	currentHooks      fork.HooksInterface   // Hooks at current sequence
 
+	// Rootnet service
+	rootMonitor rootnet.Monitor
+
 	// Configurations
 	config             *consensus.Config // Consensus configuration
 	epochSize          uint64
@@ -90,6 +95,14 @@ type backendIBFT struct {
 	// Channels
 	closeCh chan struct{} // Channel for closing
 }
+
+type nilMonitor struct{}
+
+func (m nilMonitor) PeekTransaction() *types.Transaction { return nil }
+
+func (m nilMonitor) PopTransaction() {}
+
+func (m nilMonitor) SaveProgress(block *types.Block) {}
 
 // Factory implements the base consensus Factory method
 func Factory(params *consensus.Params) (consensus.Consensus, error) {
@@ -164,10 +177,21 @@ func Factory(params *consensus.Params) (consensus.Consensus, error) {
 		closeCh: make(chan struct{}),
 	}
 
+	p.initRootnet(params.RootchainConfig)
+
 	// Istanbul requires a different header hash function
 	p.SetHeaderHash()
 
 	return p, nil
+}
+
+func (i *backendIBFT) initRootnet(config *rootchain.Config) rootnet.Monitor {
+	if config == nil {
+		return nilMonitor{}
+	}
+
+	//	todo
+	return nil
 }
 
 func (i *backendIBFT) Initialize() error {

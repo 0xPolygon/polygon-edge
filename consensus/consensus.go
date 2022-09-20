@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"context"
+	"github.com/0xPolygon/polygon-edge/rootchain"
 	"log"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
@@ -60,18 +61,19 @@ type Config struct {
 }
 
 type Params struct {
-	Context        context.Context
-	Seal           bool
-	Config         *Config
-	TxPool         *txpool.TxPool
-	Network        *network.Server
-	Blockchain     *blockchain.Blockchain
-	Executor       *state.Executor
-	Grpc           *grpc.Server
-	Logger         hclog.Logger
-	Metrics        *Metrics
-	SecretsManager secrets.SecretsManager
-	BlockTime      uint64
+	Context         context.Context
+	Seal            bool
+	Config          *Config
+	TxPool          *txpool.TxPool
+	Network         *network.Server
+	Blockchain      *blockchain.Blockchain
+	Executor        *state.Executor
+	Grpc            *grpc.Server
+	Logger          hclog.Logger
+	Metrics         *Metrics
+	SecretsManager  secrets.SecretsManager
+	BlockTime       uint64
+	RootchainConfig *rootchain.Config
 }
 
 // Factory is the factory function to create a discovery consensus
