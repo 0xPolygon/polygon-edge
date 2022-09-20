@@ -244,6 +244,8 @@ func (i *backendIBFT) startSyncing() {
 
 		i.txpool.ResetWithHeaders(block.Header)
 
+		i.rootMonitor.SaveProgress(block)
+
 		return false
 	}
 

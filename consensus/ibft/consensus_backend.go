@@ -97,6 +97,9 @@ func (i *backendIBFT) InsertBlock(
 	// after the block has been written we reset the txpool so that
 	// the old transactions are removed
 	i.txpool.ResetWithHeaders(newBlock.Header)
+
+	// update monitor based on processed events
+	i.rootMonitor.SaveProgress(newBlock)
 }
 
 func (i *backendIBFT) ID() []byte {
