@@ -2,7 +2,9 @@ package rootnet
 
 import (
 	"github.com/0xPolygon/polygon-edge/rootchain"
+	"github.com/0xPolygon/polygon-edge/rootchain/sampool"
 	"github.com/0xPolygon/polygon-edge/rootchain/samuel"
+	"github.com/0xPolygon/polygon-edge/rootchain/tracker"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 )
@@ -36,14 +38,34 @@ func NewMonitor(
 	signer signer,
 ) (Monitor, error) {
 	//	init tracker
-	//	init sampool
-	//	init samuel
+	tracker, err := tracker.NewEventTracker(
+		logger,
+		&rootchain.ConfigEvent{},
+		"todo",
+	) // todo
+	if err != nil {
+		return nil, err
+	}
 
-	return &monitor{}, nil
+	//	init sampool
+	pool := sampool.New(logger) // todo
+
+	//	init samuel
+	samuel := samuel.NewSamuel(
+		&rootchain.ConfigEvent{},
+		logger,
+		tracker,
+		pool,
+		signer,
+		nil,
+		nil,
+	) // todo
+
+	return &monitor{samuel}, nil
 }
 
 type monitor struct {
-	samuel samuel.SAMUEL
+	samuel *samuel.SAMUEL
 }
 
 func (m *monitor) PeekTransaction() *types.Transaction {
