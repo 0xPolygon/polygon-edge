@@ -359,7 +359,6 @@ func Test_TransactionIBFTLoop(t *testing.T) {
 		IBFTDirPrefix,
 		func(i int, config *framework.TestServerConfig) {
 			config.Premine(sender, defaultBalance)
-			config.SetSeal(true)
 			config.SetBlockLimit(20000000)
 		},
 	)
