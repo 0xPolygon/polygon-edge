@@ -236,6 +236,8 @@ func (i *backendIBFT) writeTransactions(
 		successful = 0
 		failed     = 0
 		skipped    = 0
+
+		writeStateTx = true
 	)
 
 	defer func() {
@@ -256,6 +258,22 @@ write:
 		case <-blockTimer.C:
 			return
 		default:
+			if writeStateTx {
+				tx, ok := i.writeStateTransaction(
+					i.rootMonitor.PeekTransaction(),
+					transition,
+				)
+
+				if !ok {
+					writeStateTx = false
+					continue
+				}
+
+				executed = append(executed, tx)
+
+				continue
+			}
+
 			// execute transactions one by one
 			result, ok := i.writeTransaction(
 				i.txpool.Peek(),
@@ -330,6 +348,25 @@ func (i *backendIBFT) writeTransaction(
 	i.txpool.Pop(tx)
 
 	return &txExeResult{tx, success}, true
+}
+
+func (i *backendIBFT) writeStateTransaction(
+	tx *types.Transaction,
+	transition transitionInterface,
+) (*types.Transaction, bool) {
+	if tx == nil {
+		return nil, false
+	}
+
+	if err := transition.Write(tx); err != nil {
+		i.logger.Error("failed to apply state tx", "err", err)
+
+		return nil, false
+	}
+
+	i.rootMonitor.PopTransaction()
+
+	return tx, true
 }
 
 // extractCommittedSeals extracts CommittedSeals from header
