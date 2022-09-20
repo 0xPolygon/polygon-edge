@@ -9,6 +9,10 @@ import (
 	"github.com/hashicorp/go-hclog"
 )
 
+var (
+	NilMonitor = nilMonitor{}
+)
+
 // signer defines the signer interface used for
 // generating signatures
 type signer interface {
@@ -85,3 +89,11 @@ func (m *monitor) SaveProgress(block *types.Block) {
 	// todo: milos
 	//m.samuel.SaveProgress()
 }
+
+type nilMonitor struct{}
+
+func (m nilMonitor) PeekTransaction() *types.Transaction { return nil }
+
+func (m nilMonitor) PopTransaction() {}
+
+func (m nilMonitor) SaveProgress(block *types.Block) {}

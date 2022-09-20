@@ -96,14 +96,6 @@ type backendIBFT struct {
 	closeCh chan struct{} // Channel for closing
 }
 
-type nilMonitor struct{}
-
-func (m nilMonitor) PeekTransaction() *types.Transaction { return nil }
-
-func (m nilMonitor) PopTransaction() {}
-
-func (m nilMonitor) SaveProgress(block *types.Block) {}
-
 // Factory implements the base consensus Factory method
 func Factory(params *consensus.Params) (consensus.Consensus, error) {
 	// defaults for user set fields in genesis
@@ -189,7 +181,7 @@ func Factory(params *consensus.Params) (consensus.Consensus, error) {
 
 func (i *backendIBFT) initRootnet(config *rootchain.Config) error {
 	if config == nil {
-		i.rootMonitor = nilMonitor{}
+		i.rootMonitor = rootnet.NilMonitor
 
 		return nil
 	}
