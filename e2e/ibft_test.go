@@ -48,7 +48,6 @@ func TestIbft_Transfer(t *testing.T) {
 				IBFTDirPrefix,
 				func(i int, config *framework.TestServerConfig) {
 					config.Premine(senderAddr, framework.EthToWei(10))
-					config.SetSeal(true)
 					config.SetBlockTime(tc.blockTime)
 					config.SetIBFTBaseTimeout(tc.ibftBaseTimeout)
 				},
@@ -119,7 +118,6 @@ func TestIbft_TransactionFeeRecipient(t *testing.T) {
 				IBFTDirPrefix,
 				func(i int, config *framework.TestServerConfig) {
 					config.Premine(senderAddr, framework.EthToWei(10))
-					config.SetSeal(true)
 				})
 
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)

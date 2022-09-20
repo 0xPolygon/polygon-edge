@@ -216,7 +216,6 @@ func NewServer(config *Config) (*Server, error) {
 			m.network,
 			m.serverMetrics.txpool,
 			&txpool.Config{
-				Sealing:             m.config.Seal,
 				MaxSlots:            m.config.MaxSlots,
 				PriceLimit:          m.config.PriceLimit,
 				MaxAccountEnqueued:  m.config.MaxAccountEnqueued,
@@ -404,7 +403,6 @@ func (s *Server) setupConsensus() error {
 	consensus, err := engine(
 		&consensus.Params{
 			Context:        context.Background(),
-			Seal:           s.config.Seal,
 			Config:         config,
 			TxPool:         s.txpool,
 			Network:        s.network,

@@ -41,6 +41,7 @@ type txPoolInterface interface {
 	Drop(tx *types.Transaction)
 	Demote(tx *types.Transaction)
 	ResetWithHeaders(headers ...*types.Header)
+	SetSealing(bool)
 }
 
 // backendIBFT represents the IBFT consensus mechanism object
@@ -392,6 +393,8 @@ func (i *backendIBFT) startConsensus() {
 		i.updateActiveValidatorSet(latest)
 
 		isValidator = i.isActiveValidator()
+
+		i.txpool.SetSealing(isValidator)
 
 		if isValidator {
 			sequenceCh = i.consensus.runSequence(pending)
