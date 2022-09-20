@@ -25,10 +25,10 @@ var (
 )
 
 const (
-	IndexAttribute        = ("index")
-	ValidatorMapAttribute = ("Validator")
-	BlsPublicKeyAttribute = ("blsPublicKey")
-	EcdsaAddressAttribute = ("ecdsaAddress")
+	indexAttribute        = ("index")
+	validatorMapAttribute = ("Validator")
+	blsPublicKeyAttribute = ("blsPublicKey")
+	ecdsaAddressAttribute = ("ecdsaAddress")
 )
 
 // cancellable context for tracker's listening mechanism
@@ -317,15 +317,15 @@ func (t *EventTracker) encodeValidatorSetPayloadEvent(
 	)
 
 	// extract index from event data
-	index, ok = eventData[IndexAttribute].(*big.Int)
+	index, ok = eventData[indexAttribute].(*big.Int)
 	if !ok {
-		return rootchain.Event{}, errors.New(fmt.Sprint("failed to parse StateSyncEvent: %w", "err", ErrInvalidIndex))
+		return rootchain.Event{}, fmt.Errorf("failed to parse StateSyncEvent: %w", ErrInvalidIndex)
 	}
 
 	// extract validator map from event data
-	validatorMap, ok = eventData[ValidatorMapAttribute].([]map[string]interface{})
+	validatorMap, ok = eventData[validatorMapAttribute].([]map[string]interface{})
 	if !ok {
-		return rootchain.Event{}, errors.New(fmt.Sprint("failed to parse StateSyncEvent: %w", "err", ErrInvalidValidatorsMap))
+		return rootchain.Event{}, fmt.Errorf("failed to parse StateSyncEvent: %w", ErrInvalidValidatorsMap)
 	}
 
 	validatorSetInfo := make([]payload.ValidatorSetInfo, len(validatorMap))
@@ -333,15 +333,15 @@ func (t *EventTracker) encodeValidatorSetPayloadEvent(
 	// populate validator set info from validator map
 	for index, validatorInfo := range validatorMap {
 		// extract blsKey from validatorMap entry
-		blsKey, ok := validatorInfo[BlsPublicKeyAttribute].([]byte)
+		blsKey, ok := validatorInfo[blsPublicKeyAttribute].([]byte)
 		if !ok {
-			return rootchain.Event{}, errors.New(fmt.Sprint("failed to parse StateSyncEvent: %w", "err", ErrInvalidBlsPublicKey))
+			return rootchain.Event{}, fmt.Errorf("failed to parse StateSyncEvent: %w", ErrInvalidBlsPublicKey)
 		}
 
 		// extract ecdsaAddress from validatorMap entry
-		ecdsaAddress, ok := validatorInfo[EcdsaAddressAttribute].(ethgo.Address)
+		ecdsaAddress, ok := validatorInfo[ecdsaAddressAttribute].(ethgo.Address)
 		if !ok {
-			return rootchain.Event{}, errors.New(fmt.Sprint("failed to parse StateSyncEvent: %w", "err", ErrInvalidEcdsaAddress))
+			return rootchain.Event{}, fmt.Errorf("failed to parse StateSyncEvent: %w", ErrInvalidEcdsaAddress)
 		}
 
 		// create validator set info from blsKey and ecdsaAddress
