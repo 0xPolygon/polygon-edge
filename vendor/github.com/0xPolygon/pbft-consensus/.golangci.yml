@@ -1,0 +1,55 @@
+run:
+  timeout: 10m
+
+linters-settings:
+  dupl:
+    threshold: 100
+  goconst:
+    min-len: 3
+    min-occurrences: 3
+  govet:
+    check-shadowing: true
+  lll:
+    line-length: 300
+
+  misspell:
+    locale: US
+
+service:
+  golangci-lint-version: 1.45.0
+
+linters:
+  disable-all: true
+  enable:
+    - govet # Suspicious constructs
+    - errcheck # Unchecked errors
+    - staticcheck # Static analysis checks
+    - gosimple # Simplify a code
+    - structcheck # Unused struct fields
+    - varcheck # Unused global variables and constants
+    - ineffassign # Unused assignments to existing variables
+    - deadcode # Unused code
+    - typecheck # Parses and type-checks Go code
+    - rowserrcheck # database/sql.Rows.Err() checked
+    - unconvert # Unnecessary type conversions
+    - goconst # Repeated strings that could be replaced by a constant
+    - gofmt # Whether the code was gofmt-ed
+    - goimports # Unused imports
+    - misspell # Misspelled English words in comments
+    - lll # Long lines
+    - unparam # Unused function parameters
+    - nakedret # Naked returns in functions greater than a specified function length (?)
+    - exportloopref # Unpinned variables in go programs
+    - nolintlint # Ill-formed or insufficient nolint directives
+    - depguard # Package imports are in a list of acceptable packages
+    - gosec # Security problems
+    - unused # Unused constants, variables, functions
+    - goprintffuncname # Printf-like functions are named with f at the end
+    - exportloopref # Exporting pointers for loop variables
+    - dupl # Code clone detection
+
+issues:
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - gosec

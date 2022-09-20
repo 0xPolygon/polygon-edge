@@ -97,5 +97,5 @@ var Identity_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "identity.proto",
+	Metadata: "network/proto/identity.proto",
 }

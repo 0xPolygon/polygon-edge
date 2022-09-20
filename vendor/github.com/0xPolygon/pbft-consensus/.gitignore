@@ -1,0 +1,11 @@
+.DS_Store
+*/**/.DS_Store
+SavedState/
+**/launch.json
+**/*.flow
+**/*.log
+**/*.txt
+log*/
+e2e/*.fail
+*.fail
+coverage.out
