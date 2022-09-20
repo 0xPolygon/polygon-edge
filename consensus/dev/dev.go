@@ -62,7 +62,7 @@ func Factory(
 // Initialize initializes the consensus
 func (d *Dev) Initialize() error {
 	d.txpool.SetSealing(true)
-	
+
 	return nil
 }
 

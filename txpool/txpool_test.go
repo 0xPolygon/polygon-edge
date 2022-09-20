@@ -1411,7 +1411,7 @@ func Test_updateUnadoptedCounts(t *testing.T) {
 		t *testing.T,
 		pool *TxPool,
 		tx *types.Transaction,
-		shouldPromote bool,	
+		shouldPromote bool,
 	) {
 		t.Helper()
 
@@ -1444,7 +1444,7 @@ func Test_updateUnadoptedCounts(t *testing.T) {
 
 		pool.SetSigner(&mockSigner{})
 
-		tx :=  newTx(addr1, 0, 1)
+		tx := newTx(addr1, 0, 1)
 		sendTx(t, pool, tx, true)
 
 		accountMap := pool.accounts.get(addr1)
@@ -1479,7 +1479,7 @@ func Test_updateUnadoptedCounts(t *testing.T) {
 
 		pool.SetSigner(&mockSigner{})
 
-		tx :=  newTx(addr1, 1, 1) // set non-zero nonce to prevent the tx from being added
+		tx := newTx(addr1, 1, 1) // set non-zero nonce to prevent the tx from being added
 		sendTx(t, pool, tx, false)
 
 		accountMap := pool.accounts.get(addr1)
@@ -1514,7 +1514,7 @@ func Test_updateUnadoptedCounts(t *testing.T) {
 
 		pool.SetSigner(&mockSigner{})
 
-		tx :=  newTx(addr1, 0, 1)
+		tx := newTx(addr1, 0, 1)
 		sendTx(t, pool, tx, true)
 
 		accountMap := pool.accounts.get(addr1)
@@ -1536,7 +1536,7 @@ func Test_updateUnadoptedCounts(t *testing.T) {
 		// make sure the account queue is empty and unadopted is reset
 		assert.Zero(t, accountMap.enqueued.length())
 		assert.Equal(t, uint64(1), accountMap.promoted.length())
-		assert.Equal(t, uint64(0) ,accountMap.unadopted)
+		assert.Equal(t, uint64(0), accountMap.unadopted)
 		assert.Equal(t, slotsRequired(tx), pool.gauge.read())
 		checkTxExistence(t, pool, tx.Hash, true)
 	})

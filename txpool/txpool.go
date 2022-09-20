@@ -898,7 +898,7 @@ func (p *TxPool) resetAccounts(stateNonces map[types.Address]uint64) {
 	}
 }
 
-// updateUnadoptedCounts update the accounts' unadopted counts, 
+// updateUnadoptedCounts update the accounts' unadopted counts,
 // the number of the consecutive blocks that doesn't have the account's transactions
 func (p *TxPool) updateUnadoptedCounts(latestActiveAccounts map[types.Address]uint64) {
 	p.accounts.Range(
