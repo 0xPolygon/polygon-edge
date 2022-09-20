@@ -141,7 +141,7 @@ func (t *EventTracker) Stop() error {
 }
 
 // getEventChannel returns the tracker's event channel.
-func (t *EventTracker) GetEventChannel() <-chan rootchain.Event {
+func (t *EventTracker) Subscribe() <-chan rootchain.Event {
 	return t.eventCh
 }
 
