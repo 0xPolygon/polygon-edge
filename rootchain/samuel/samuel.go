@@ -128,7 +128,7 @@ func NewSamuel(
 	}
 }
 
-// initEventLookupMap generates the SAMUEL event data lookup map from the
+// initEventData generates the SAMUEL event data lookup map from the
 // passed in rootchain configuration
 func initEventData(
 	configEvent *rootchain.ConfigEvent,
