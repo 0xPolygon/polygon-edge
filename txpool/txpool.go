@@ -912,8 +912,8 @@ func (p *TxPool) updateAccountSkipsCounts(latestActiveAccounts map[types.Address
 				return true
 			}
 
-			firstPromoted := account.getLowestTx()
-			if firstPromoted == nil {
+			firstTx := account.getLowestTx()
+			if firstTx == nil {
 				// no need to increment anything,
 				// account has no txs
 				return true
@@ -926,7 +926,7 @@ func (p *TxPool) updateAccountSkipsCounts(latestActiveAccounts map[types.Address
 			}
 
 			// account has been skipped too many times
-			p.Drop(firstPromoted)
+			p.Drop(firstTx)
 
 			account.resetSkips()
 
