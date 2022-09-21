@@ -170,7 +170,11 @@ func Factory(params *consensus.Params) (consensus.Consensus, error) {
 		closeCh: make(chan struct{}),
 	}
 
-	if err := p.initRootnet(params.RootchainConfig, params.Config.RootDir); err != nil {
+	if err := p.initRootnet(
+		params.Logger.Named("rootnet"),
+		params.RootchainConfig,
+		params.Config.RootDir,
+	); err != nil {
 		return nil, err
 	}
 
@@ -180,7 +184,11 @@ func Factory(params *consensus.Params) (consensus.Consensus, error) {
 	return p, nil
 }
 
-func (i *backendIBFT) initRootnet(config *rootchain.Config, rootDir string) error {
+func (i *backendIBFT) initRootnet(
+	logger hclog.Logger,
+	config *rootchain.Config,
+	rootDir string,
+) error {
 	if config == nil || len(config.RootchainAddresses) == 0 {
 		i.rootMonitor = rootnet.NilMonitor
 
@@ -190,7 +198,7 @@ func (i *backendIBFT) initRootnet(config *rootchain.Config, rootDir string) erro
 	//	single monitor for now
 	cfg := config.RootchainAddresses[0]
 
-	monitor, err := rootnet.NewMonitor(i.logger, cfg, i, i.network, rootDir)
+	monitor, err := rootnet.NewMonitor(logger, cfg, i, i.network, rootDir)
 	if err != nil {
 		return fmt.Errorf("failed to initialize monitor: %w", err)
 	}

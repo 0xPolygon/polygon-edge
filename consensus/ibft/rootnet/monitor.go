@@ -55,7 +55,7 @@ func NewMonitor(
 	}
 
 	//	init sampool
-	pool := sampool.New(logger) // todo
+	pool := sampool.New(logger)
 
 	storage, err := leveldb.NewLevelDBStorage(
 		filepath.Join(rootDir, "rootnet"),
