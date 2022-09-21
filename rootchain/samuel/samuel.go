@@ -151,29 +151,35 @@ func (s *SAMUEL) Start() error {
 
 // getStartBlockNumber determines the starting block for the Event Tracker
 func (s *SAMUEL) getStartBlockNumber() (uint64, uint64, error) {
-	startBlock := rootchain.LatestRootchainBlockNumber
-	startIndex := uint64(0)
+	var (
+		startBlock = rootchain.LatestRootchainBlockNumber
+		startIndex = uint64(0)
 
+		err error
+	)
+
+	// Grab the last processed event info from the DB
 	data, exists := s.storage.ReadLastProcessedEvent(s.eventData.getLocalAddress())
-	if exists && data != "" {
-		// index:blockNumber
-		values := strings.Split(data, ":")
-		if len(values) < 2 {
-			return 0, 0, fmt.Errorf("invalid last processed event in DB: %v", values)
-		}
+	if !exists || data == "" {
+		// The last processed event information is not saved in the DB,
+		// return the default values
+		return startBlock, startIndex, nil
+	}
 
-		eventIndex, err := strconv.ParseUint(values[0], 10, 64)
-		if err != nil {
-			return 0, 0, fmt.Errorf("unable to parse last processed index in DB: %w", err)
-		}
+	// index:blockNumber
+	values := strings.Split(data, ":")
+	if len(values) < 2 {
+		return 0, 0, fmt.Errorf("invalid last processed event in DB: %v", values)
+	}
 
-		blockNumber, err := strconv.ParseUint(values[1], 10, 64)
-		if err != nil {
-			return 0, 0, fmt.Errorf("unable to parse last processed block number in DB: %w", err)
-		}
+	startIndex, err = strconv.ParseUint(values[0], 10, 64)
+	if err != nil {
+		return 0, 0, fmt.Errorf("unable to parse last processed index in DB: %w", err)
+	}
 
-		startBlock = blockNumber
-		startIndex = eventIndex
+	startBlock, err = strconv.ParseUint(values[1], 10, 64)
+	if err != nil {
+		return 0, 0, fmt.Errorf("unable to parse last processed block number in DB: %w", err)
 	}
 
 	return startBlock, startIndex, nil
