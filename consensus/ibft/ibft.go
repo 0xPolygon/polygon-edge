@@ -186,7 +186,7 @@ func (i *backendIBFT) initRootnet(config *rootchain.Config) error {
 		return nil
 	}
 
-	monitor, err := rootnet.NewMonitor(i.logger, config, i)
+	monitor, err := rootnet.NewMonitor(i.logger, config, i, i.network)
 	if err != nil {
 		return fmt.Errorf("failed to initialize monitor: %w", err)
 	}

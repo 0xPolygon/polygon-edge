@@ -1,10 +1,12 @@
 package rootnet
 
 import (
+	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/rootchain"
 	"github.com/0xPolygon/polygon-edge/rootchain/sampool"
 	"github.com/0xPolygon/polygon-edge/rootchain/samuel"
 	"github.com/0xPolygon/polygon-edge/rootchain/tracker"
+	"github.com/0xPolygon/polygon-edge/rootchain/transport"
 	"github.com/0xPolygon/polygon-edge/types"
 
 	"github.com/hashicorp/go-hclog"
@@ -41,6 +43,7 @@ func NewMonitor(
 	logger hclog.Logger,
 	config *rootchain.Config,
 	signer signer,
+	network *network.Server,
 ) (Monitor, error) {
 	//	init tracker
 	tracker, err := tracker.NewEventTracker(
@@ -62,9 +65,12 @@ func NewMonitor(
 		tracker,
 		pool,
 		signer,
-		nil,
-		nil,
-	) // todo
+		nil, // todo
+		transport.NewLibp2pGossipTransport(
+			logger,
+			network,
+		),
+	)
 
 	return &monitor{samuel}, nil
 }
