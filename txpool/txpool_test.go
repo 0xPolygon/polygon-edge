@@ -1404,7 +1404,7 @@ func TestDemote(t *testing.T) {
 	})
 }
 
-func Test_updateUnadoptedCounts(t *testing.T) {
+func Test_updateAccountSkipsCounts(t *testing.T) {
 	t.Parallel()
 
 	sendTx := func(
@@ -1459,7 +1459,7 @@ func Test_updateUnadoptedCounts(t *testing.T) {
 		// set 9 to skips in order to drop transaction next
 		accountMap.skips = 9
 
-		pool.updateUnadoptedCounts(map[types.Address]uint64{
+		pool.updateAccountSkipsCounts(map[types.Address]uint64{
 			// empty
 		})
 
@@ -1494,7 +1494,7 @@ func Test_updateUnadoptedCounts(t *testing.T) {
 		// set 9 to skips in order to drop transaction next
 		accountMap.skips = 9
 
-		pool.updateUnadoptedCounts(map[types.Address]uint64{
+		pool.updateAccountSkipsCounts(map[types.Address]uint64{
 			// empty
 		})
 
@@ -1529,7 +1529,7 @@ func Test_updateUnadoptedCounts(t *testing.T) {
 		// set 9 to skips in order to drop transaction next
 		accountMap.skips = 5
 
-		pool.updateUnadoptedCounts(map[types.Address]uint64{
+		pool.updateAccountSkipsCounts(map[types.Address]uint64{
 			addr1: 1,
 		})
 

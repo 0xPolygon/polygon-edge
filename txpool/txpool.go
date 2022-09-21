@@ -30,7 +30,7 @@ const (
 	maxAccountDemotions = uint(10)
 
 	// maximum allowed number of consecutive blocks that don't have the account's transaction
-	maxAccountUnadopted = uint64(10)
+	maxAccountSkips = uint64(10)
 
 	pruningCooldown = 5000 * time.Millisecond
 )
@@ -581,7 +581,7 @@ func (p *TxPool) processEvent(event *blockchain.Event) {
 
 	if !p.getSealing() {
 		// only non-validator cleanup inactive accounts
-		p.updateUnadoptedCounts(stateNonces)
+		p.updateAccountSkipsCounts(stateNonces)
 	}
 }
 
@@ -898,9 +898,9 @@ func (p *TxPool) resetAccounts(stateNonces map[types.Address]uint64) {
 	}
 }
 
-// updateUnadoptedCounts update the accounts' skips counts,
+// updateAccountSkipsCounts update the accounts' skips,
 // the number of the consecutive blocks that doesn't have the account's transactions
-func (p *TxPool) updateUnadoptedCounts(latestActiveAccounts map[types.Address]uint64) {
+func (p *TxPool) updateAccountSkipsCounts(latestActiveAccounts map[types.Address]uint64) {
 	p.accounts.Range(
 		func(key, value interface{}) bool {
 			address, _ := key.(types.Address)
@@ -912,27 +912,12 @@ func (p *TxPool) updateUnadoptedCounts(latestActiveAccounts map[types.Address]ui
 				account.incrementSkips()
 			}
 
-			if account.skips < maxAccountUnadopted {
+			if account.skips < maxAccountSkips {
 				return true
 			}
 
-			account.promoted.lock(true)
-			defer account.promoted.unlock()
-
-			firstTx := account.promoted.pop()
-			if firstTx != nil {
-				p.index.remove(firstTx)
-				p.gauge.decrease(slotsRequired(firstTx))
-				account.resetSkips()
-			}
-
-			account.enqueued.lock(true)
-			defer account.enqueued.unlock()
-
-			firstTx = account.enqueued.pop()
-			if firstTx != nil {
-				p.index.remove(firstTx)
-				p.gauge.decrease(slotsRequired(firstTx))
+			if lowestTx := account.getLowestTx(); lowestTx != nil {
+				p.Drop(lowestTx)
 				account.resetSkips()
 			}
 

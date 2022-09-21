@@ -305,3 +305,23 @@ func (a *account) resetSkips()  {
 func (a *account) incrementSkips()  {
 	a.skips++
 }
+
+// getLowestTx returns the transaction with lowest nonce, which might be popped next
+// this method don't pop a transaction from both queues
+func (a *account) getLowestTx() *types.Transaction {
+	a.promoted.lock(true)
+	defer a.promoted.unlock()
+
+	if firstPromoted := a.promoted.peek(); firstPromoted != nil {
+		return firstPromoted
+	}
+
+	a.enqueued.lock(true)
+	defer a.enqueued.unlock()
+
+	if firstEnqueued := a.enqueued.peek(); firstEnqueued != nil {
+		return firstEnqueued
+	}
+
+	return nil
+}
