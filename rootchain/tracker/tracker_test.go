@@ -27,7 +27,7 @@ func initEventTracker(rootchainWS string, evenABI string, PayloadType rootchain.
 		BlockConfirmations: blockConfirmation,
 	}
 
-	return NewEventTracker(hclog.NewNullLogger(), &trackerConfig, rootchainWS)
+	return NewEventTracker(hclog.NewNullLogger(), trackerConfig)
 }
 
 func TestEventTracker_calculateRange(t *testing.T) {
