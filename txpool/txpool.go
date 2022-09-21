@@ -907,9 +907,9 @@ func (p *TxPool) updateUnadoptedCounts(latestActiveAccounts map[types.Address]ui
 			account, _ := value.(*account)
 
 			if _, ok := latestActiveAccounts[address]; ok {
-				account.skips = 0
+				account.resetSkips()
 			} else {
-				account.skips++
+				account.incrementSkips()
 			}
 
 			if account.skips < maxAccountUnadopted {
@@ -923,7 +923,7 @@ func (p *TxPool) updateUnadoptedCounts(latestActiveAccounts map[types.Address]ui
 			if firstTx != nil {
 				p.index.remove(firstTx)
 				p.gauge.decrease(slotsRequired(firstTx))
-				account.skips = 0
+				account.resetSkips()
 			}
 
 			account.enqueued.lock(true)
@@ -933,7 +933,7 @@ func (p *TxPool) updateUnadoptedCounts(latestActiveAccounts map[types.Address]ui
 			if firstTx != nil {
 				p.index.remove(firstTx)
 				p.gauge.decrease(slotsRequired(firstTx))
-				account.skips = 0
+				account.resetSkips()
 			}
 
 			return true

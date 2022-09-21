@@ -295,3 +295,13 @@ func (a *account) promote() []*types.Transaction {
 
 	return promoted
 }
+
+// resetSkips sets 0 to skips
+func (a *account) resetSkips()  {
+	a.skips = 0
+}
+
+// incrementSkips increments skips
+func (a *account) incrementSkips()  {
+	a.skips++
+}
