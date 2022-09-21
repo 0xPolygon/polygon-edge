@@ -15,7 +15,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/rootchain/proto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
-	"github.com/umbracle/ethgo/abi"
 	googleProto "google.golang.org/protobuf/proto"
 )
 
@@ -90,14 +89,6 @@ type storage interface {
 	WriteLastProcessedEvent(data string, contractAddr string) error
 }
 
-// eventData holds information on event data mapping
-type eventData struct {
-	payloadType  rootchain.PayloadType
-	eventABI     *abi.Event
-	methodABI    *abi.Method
-	localAddress types.Address
-}
-
 // SAMUEL is the module that coordinates activities with the SAMP and Event Tracker
 type SAMUEL struct {
 	eventData eventData
@@ -122,25 +113,12 @@ func NewSamuel(
 ) *SAMUEL {
 	return &SAMUEL{
 		logger:       logger.Named("SAMUEL"),
-		eventData:    initEventData(configEvent),
+		eventData:    newEventData(configEvent),
 		eventTracker: eventTracker,
 		samp:         samp,
 		signer:       signer,
 		storage:      storage,
 		transport:    transport,
-	}
-}
-
-// initEventData generates the SAMUEL event data lookup map from the
-// passed in rootchain configuration
-func initEventData(
-	configEvent *rootchain.ConfigEvent,
-) eventData {
-	return eventData{
-		payloadType:  configEvent.PayloadType,
-		eventABI:     abi.MustNewEvent(configEvent.EventABI),
-		methodABI:    abi.MustNewABI(configEvent.MethodABI).GetMethod(configEvent.MethodName),
-		localAddress: types.StringToAddress(configEvent.LocalAddress),
 	}
 }
 
@@ -176,7 +154,7 @@ func (s *SAMUEL) getStartBlockNumber() (uint64, uint64, error) {
 	startBlock := rootchain.LatestRootchainBlockNumber
 	startIndex := uint64(0)
 
-	data, exists := s.storage.ReadLastProcessedEvent(s.eventData.localAddress.String())
+	data, exists := s.storage.ReadLastProcessedEvent(s.eventData.getLocalAddress())
 	if exists && data != "" {
 		// index:blockNumber
 		values := strings.Split(data, ":")
@@ -365,7 +343,7 @@ func (s *SAMUEL) SaveProgress(
 	contractAddr types.Address, // local Smart Contract address
 	input []byte, // method with argument data
 ) {
-	if contractAddr != types.StringToAddress(s.eventData.localAddress.String()) {
+	if contractAddr != types.StringToAddress(s.eventData.getLocalAddress()) {
 		s.logger.Warn(
 			fmt.Sprintf("Attempted to save progress for unknown contract %s", contractAddr),
 		)
@@ -374,11 +352,7 @@ func (s *SAMUEL) SaveProgress(
 	}
 
 	// Decode the inputs
-	methodID := s.eventData.methodABI.ID()
-	params, err := s.eventData.methodABI.Inputs.Decode(
-		input[len(methodID):],
-	)
-
+	params, err := s.eventData.decodeInputs(input)
 	if err != nil {
 		s.logger.Error(
 			fmt.Sprintf("Unable to decode event params for contract %s, %v", contractAddr, err),
@@ -482,7 +456,7 @@ func (s *SAMUEL) GetReadyTransaction() *types.Transaction {
 
 		// The method should have the signature
 		// methodName(validatorSet tuple[], index uint64, blockNumber uint64, signatures [][]byte)
-		encodedArgs, err := s.eventData.methodABI.Inputs.Encode(
+		encodedArgs, err := s.eventData.encodeInputs(
 			map[string]interface{}{
 				"validatorSet":         validatorSetMap,
 				"index":                index,
@@ -512,7 +486,7 @@ func (s *SAMUEL) GetReadyTransaction() *types.Transaction {
 			Gas:      framework.DefaultGasLimit,
 			Value:    big.NewInt(0),
 			V:        big.NewInt(1), // it is necessary to encode in rlp,
-			Input:    append(s.eventData.methodABI.ID(), encodedArgs...),
+			Input:    append(s.eventData.getMethodID(), encodedArgs...),
 		}
 	default:
 		s.logger.Error("Unknown payload type")
