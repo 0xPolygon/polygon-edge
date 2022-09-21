@@ -180,13 +180,16 @@ func Factory(params *consensus.Params) (consensus.Consensus, error) {
 }
 
 func (i *backendIBFT) initRootnet(config *rootchain.Config) error {
-	if config == nil {
+	if config == nil || len(config.RootchainAddresses) == 0 {
 		i.rootMonitor = rootnet.NilMonitor
 
 		return nil
 	}
 
-	monitor, err := rootnet.NewMonitor(i.logger, config, i, i.network)
+	//	single monitor for now
+	cfg := config.RootchainAddresses[0]
+
+	monitor, err := rootnet.NewMonitor(i.logger, cfg, i, i.network)
 	if err != nil {
 		return fmt.Errorf("failed to initialize monitor: %w", err)
 	}

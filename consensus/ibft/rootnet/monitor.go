@@ -41,16 +41,12 @@ type Monitor interface {
 
 func NewMonitor(
 	logger hclog.Logger,
-	config *rootchain.Config,
+	config rootchain.EventConfig,
 	signer signer,
 	network *network.Server,
 ) (Monitor, error) {
 	//	init tracker
-	tracker, err := tracker.NewEventTracker(
-		logger,
-		&rootchain.EventConfig{},
-		"todo",
-	) // todo
+	tracker, err := tracker.NewEventTracker(logger, config)
 	if err != nil {
 		return nil, err
 	}
@@ -60,7 +56,7 @@ func NewMonitor(
 
 	//	init samuel
 	samuel := samuel.NewSamuel(
-		&rootchain.EventConfig{},
+		config,
 		logger,
 		tracker,
 		pool,

@@ -76,13 +76,8 @@ type EventTracker struct {
 // NewEventTracker returns a new tracker object.
 func NewEventTracker(
 	logger hclog.Logger,
-	eventConfig *rootchain.EventConfig,
-	rootchainWS string,
+	eventConfig rootchain.EventConfig,
 ) (*EventTracker, error) {
-	if eventConfig == nil {
-		return nil, ErrNoEventConfigProvided
-	}
-
 	// create tracker
 	tracker := &EventTracker{
 		logger:        logger.Named("event_tracker"),
@@ -97,7 +92,7 @@ func NewEventTracker(
 	var err error
 
 	// create rootchain client
-	if tracker.client, err = newRootchainClient(rootchainWS); err != nil {
+	if tracker.client, err = newRootchainClient(eventConfig.RootchainURL); err != nil {
 		logger.Error("cannot connect to rootchain", "err", err)
 
 		return nil, err

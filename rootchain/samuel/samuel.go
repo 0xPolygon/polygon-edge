@@ -108,7 +108,7 @@ type SAMUEL struct {
 
 // NewSamuel creates a new SAMUEL instance
 func NewSamuel(
-	configEvent *rootchain.EventConfig,
+	configEvent rootchain.EventConfig,
 	logger hclog.Logger,
 	eventTracker eventTracker,
 	samp samp,
@@ -130,7 +130,7 @@ func NewSamuel(
 // initEventLookupMap generates the SAMUEL event data lookup map from the
 // passed in rootchain configuration
 func initEventData(
-	configEvent *rootchain.EventConfig,
+	configEvent rootchain.EventConfig,
 ) eventData {
 	return eventData{
 		payloadType:  configEvent.PayloadType,
