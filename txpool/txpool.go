@@ -898,7 +898,7 @@ func (p *TxPool) resetAccounts(stateNonces map[types.Address]uint64) {
 	}
 }
 
-// updateUnadoptedCounts update the accounts' unadopted counts,
+// updateUnadoptedCounts update the accounts' skips counts,
 // the number of the consecutive blocks that doesn't have the account's transactions
 func (p *TxPool) updateUnadoptedCounts(latestActiveAccounts map[types.Address]uint64) {
 	p.accounts.Range(
@@ -907,12 +907,12 @@ func (p *TxPool) updateUnadoptedCounts(latestActiveAccounts map[types.Address]ui
 			account, _ := value.(*account)
 
 			if _, ok := latestActiveAccounts[address]; ok {
-				account.unadopted = 0
+				account.skips = 0
 			} else {
-				account.unadopted++
+				account.skips++
 			}
 
-			if account.unadopted < maxAccountUnadopted {
+			if account.skips < maxAccountUnadopted {
 				return true
 			}
 
@@ -923,7 +923,7 @@ func (p *TxPool) updateUnadoptedCounts(latestActiveAccounts map[types.Address]ui
 			if firstTx != nil {
 				p.index.remove(firstTx)
 				p.gauge.decrease(slotsRequired(firstTx))
-				account.unadopted = 0
+				account.skips = 0
 			}
 
 			account.enqueued.lock(true)
@@ -933,7 +933,7 @@ func (p *TxPool) updateUnadoptedCounts(latestActiveAccounts map[types.Address]ui
 			if firstTx != nil {
 				p.index.remove(firstTx)
 				p.gauge.decrease(slotsRequired(firstTx))
-				account.unadopted = 0
+				account.skips = 0
 			}
 
 			return true

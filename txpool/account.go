@@ -157,7 +157,8 @@ type account struct {
 	enqueued, promoted *accountQueue
 	nextNonce          uint64
 	demotions          uint
-	unadopted          uint64
+	// the number of consecutive blocks that don't contain account's transaction
+	skips              uint64
 
 	//	maximum number of enqueued transactions
 	maxEnqueued uint64

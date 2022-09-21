@@ -1449,24 +1449,24 @@ func Test_updateUnadoptedCounts(t *testing.T) {
 
 		accountMap := pool.accounts.get(addr1)
 
-		// make sure the transaction is promoted and unadopted count is zero
+		// make sure the transaction is promoted and skips count is zero
 		assert.Zero(t, accountMap.enqueued.length())
 		assert.Equal(t, uint64(1), accountMap.promoted.length())
-		assert.Zero(t, accountMap.unadopted)
+		assert.Zero(t, accountMap.skips)
 		assert.Equal(t, slotsRequired(tx), pool.gauge.read())
 		checkTxExistence(t, pool, tx.Hash, true)
 
-		// set 9 to unadopted in order to drop transaction next
-		accountMap.unadopted = 9
+		// set 9 to skips in order to drop transaction next
+		accountMap.skips = 9
 
 		pool.updateUnadoptedCounts(map[types.Address]uint64{
 			// empty
 		})
 
-		// make sure the account queue is empty and unadopted is reset
+		// make sure the account queue is empty and skips is reset
 		assert.Zero(t, accountMap.enqueued.length())
 		assert.Zero(t, accountMap.promoted.length())
-		assert.Zero(t, accountMap.unadopted)
+		assert.Zero(t, accountMap.skips)
 		assert.Zero(t, pool.gauge.read())
 		checkTxExistence(t, pool, tx.Hash, false)
 	})
@@ -1484,24 +1484,24 @@ func Test_updateUnadoptedCounts(t *testing.T) {
 
 		accountMap := pool.accounts.get(addr1)
 
-		// make sure the transaction is promoted and unadopted count is zero
+		// make sure the transaction is promoted and skips count is zero
 		assert.NotZero(t, accountMap.enqueued.length())
 		assert.Zero(t, accountMap.promoted.length())
-		assert.Zero(t, accountMap.unadopted)
+		assert.Zero(t, accountMap.skips)
 		assert.Equal(t, slotsRequired(tx), pool.gauge.read())
 		checkTxExistence(t, pool, tx.Hash, true)
 
-		// set 9 to unadopted in order to drop transaction next
-		accountMap.unadopted = 9
+		// set 9 to skips in order to drop transaction next
+		accountMap.skips = 9
 
 		pool.updateUnadoptedCounts(map[types.Address]uint64{
 			// empty
 		})
 
-		// make sure the account queue is empty and unadopted is reset
+		// make sure the account queue is empty and skips is reset
 		assert.Zero(t, accountMap.enqueued.length())
 		assert.Zero(t, accountMap.promoted.length())
-		assert.Zero(t, accountMap.unadopted)
+		assert.Zero(t, accountMap.skips)
 		assert.Zero(t, pool.gauge.read())
 		checkTxExistence(t, pool, tx.Hash, false)
 	})
@@ -1519,24 +1519,24 @@ func Test_updateUnadoptedCounts(t *testing.T) {
 
 		accountMap := pool.accounts.get(addr1)
 
-		// make sure the transaction is promoted and unadopted count is zero
+		// make sure the transaction is promoted and skips count is zero
 		assert.Zero(t, accountMap.enqueued.length())
 		assert.Equal(t, uint64(1), accountMap.promoted.length())
-		assert.Zero(t, accountMap.unadopted)
+		assert.Zero(t, accountMap.skips)
 		assert.Equal(t, slotsRequired(tx), pool.gauge.read())
 		checkTxExistence(t, pool, tx.Hash, true)
 
-		// set 9 to unadopted in order to drop transaction next
-		accountMap.unadopted = 5
+		// set 9 to skips in order to drop transaction next
+		accountMap.skips = 5
 
 		pool.updateUnadoptedCounts(map[types.Address]uint64{
 			addr1: 1,
 		})
 
-		// make sure the account queue is empty and unadopted is reset
+		// make sure the account queue is empty and skips is reset
 		assert.Zero(t, accountMap.enqueued.length())
 		assert.Equal(t, uint64(1), accountMap.promoted.length())
-		assert.Equal(t, uint64(0), accountMap.unadopted)
+		assert.Equal(t, uint64(0), accountMap.skips)
 		assert.Equal(t, slotsRequired(tx), pool.gauge.read())
 		checkTxExistence(t, pool, tx.Hash, true)
 	})
