@@ -48,6 +48,9 @@ type samp interface {
 
 	// Pop returns a ready set of SAM messages, with removal
 	Pop() rootchain.VerifiedSAM
+
+	// SetLastProcessedEvent updates the last processed event index for the SAMP
+	SetLastProcessedEvent(uint64)
 }
 
 // signer defines the signer interface used for
@@ -149,7 +152,7 @@ func (s *SAMUEL) Start() error {
 	}
 
 	// Fetch the latest event data
-	startBlock, err := s.getStartBlockNumber()
+	startBlock, startIndex, err := s.getStartBlockNumber()
 	if err != nil {
 		return fmt.Errorf("unable to get start block number, %w", err)
 	}
@@ -162,30 +165,40 @@ func (s *SAMUEL) Start() error {
 	// Start the event loop for the tracker
 	s.startEventLoop()
 
+	// Set the start index for the SAMP
+	s.samp.SetLastProcessedEvent(startIndex)
+
 	return nil
 }
 
 // getStartBlockNumber determines the starting block for the Event Tracker
-func (s *SAMUEL) getStartBlockNumber() (uint64, error) {
+func (s *SAMUEL) getStartBlockNumber() (uint64, uint64, error) {
 	startBlock := rootchain.LatestRootchainBlockNumber
+	startIndex := uint64(0)
 
 	data, exists := s.storage.ReadLastProcessedEvent(s.eventData.localAddress.String())
 	if exists && data != "" {
 		// index:blockNumber
 		values := strings.Split(data, ":")
 		if len(values) < 2 {
-			return 0, fmt.Errorf("invalid last processed event in DB: %v", values)
+			return 0, 0, fmt.Errorf("invalid last processed event in DB: %v", values)
+		}
+
+		eventIndex, err := strconv.ParseUint(values[0], 10, 64)
+		if err != nil {
+			return 0, 0, fmt.Errorf("unable to parse last processed index in DB: %w", err)
 		}
 
 		blockNumber, err := strconv.ParseUint(values[1], 10, 64)
 		if err != nil {
-			return 0, fmt.Errorf("unable to parse last processed block number in DB: %w", err)
+			return 0, 0, fmt.Errorf("unable to parse last processed block number in DB: %w", err)
 		}
 
 		startBlock = blockNumber
+		startIndex = eventIndex
 	}
 
-	return startBlock, nil
+	return startBlock, startIndex, nil
 }
 
 // registerGossipHandler registers a listener for incoming SAM messages

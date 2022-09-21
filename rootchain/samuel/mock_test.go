@@ -43,12 +43,14 @@ type addMessageDelegate func(rootchain.SAM) error
 type pruneDelegate func(uint64)
 type peekDelegate func() rootchain.VerifiedSAM
 type popDelegate func() rootchain.VerifiedSAM
+type setLastProcessedEventDelegate func(uint64)
 
 type mockSAMP struct {
-	addMessageFn addMessageDelegate
-	pruneFn      pruneDelegate
-	peekFn       peekDelegate
-	popFn        popDelegate
+	addMessageFn            addMessageDelegate
+	pruneFn                 pruneDelegate
+	peekFn                  peekDelegate
+	popFn                   popDelegate
+	setLastProcessedEventFn setLastProcessedEventDelegate
 }
 
 func (m mockSAMP) AddMessage(sam rootchain.SAM) error {
@@ -79,6 +81,12 @@ func (m mockSAMP) Pop() rootchain.VerifiedSAM {
 	}
 
 	return nil
+}
+
+func (m mockSAMP) SetLastProcessedEvent(index uint64) {
+	if m.setLastProcessedEventFn != nil {
+		m.setLastProcessedEventFn(index)
+	}
 }
 
 type signDelegate func([]byte) ([]byte, uint64, error)

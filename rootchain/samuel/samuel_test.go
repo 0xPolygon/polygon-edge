@@ -58,6 +58,7 @@ func TestSAMUEL_Start(t *testing.T) {
 		transport:    transport,
 		storage:      storage,
 		eventTracker: eventTracker,
+		samp:         mockSAMP{},
 	}
 
 	// Make sure there were no errors in starting
@@ -95,10 +96,11 @@ func TestSAMUEL_GetStartBlockNumber_Predefined(t *testing.T) {
 	}
 
 	// Get the start block number
-	startBlock, err := s.getStartBlockNumber()
+	startBlock, startIndex, err := s.getStartBlockNumber()
 
 	assert.NoError(t, err)
 	assert.Equal(t, storedBlockNumber, startBlock)
+	assert.Equal(t, storedEventIndex, startIndex)
 }
 
 func TestSAMUEL_GetLatestStartBlock(t *testing.T) {
@@ -109,10 +111,11 @@ func TestSAMUEL_GetLatestStartBlock(t *testing.T) {
 	}
 
 	// Get the start block number
-	startBlock, err := s.getStartBlockNumber()
+	startBlock, startIndex, err := s.getStartBlockNumber()
 
 	assert.NoError(t, err)
 	assert.Equal(t, rootchain.LatestRootchainBlockNumber, startBlock)
+	assert.Equal(t, uint64(0), startIndex)
 }
 
 func TestSAMUEL_NewSamuel(t *testing.T) {
