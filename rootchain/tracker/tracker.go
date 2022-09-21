@@ -16,12 +16,12 @@ import (
 )
 
 var (
-	ErrNoEventConfigProvided   = errors.New("no event config provided")
-	ErrEventParseNoPayloadType = errors.New("cannot parse event, no payloadType defined")
-	ErrInvalidIndex            = errors.New("index isn't in event or wrong type")
-	ErrInvalidValidatorsMap    = errors.New("validators map isn't in event or wrong type")
-	ErrInvalidBlsPublicKey     = errors.New("blsPublicKey isn't in event or wrong type")
-	ErrInvalidEcdsaAddress     = errors.New("ecdsaAddress isn't in event or wrong type")
+	errNoEventConfigProvided   = errors.New("no event config provided")
+	errEventParseNoPayloadType = errors.New("cannot parse event, no payloadType defined")
+	errInvalidIndex            = errors.New("index isn't in event or wrong type")
+	errInvalidValidatorsMap    = errors.New("validators map isn't in event or wrong type")
+	errInvalidBlsPublicKey     = errors.New("blsPublicKey isn't in event or wrong type")
+	errInvalidEcdsaAddress     = errors.New("ecdsaAddress isn't in event or wrong type")
 )
 
 const (
@@ -80,7 +80,7 @@ func NewEventTracker(
 	rootchainWS string,
 ) (*EventTracker, error) {
 	if eventConfig == nil {
-		return nil, ErrNoEventConfigProvided
+		return nil, errNoEventConfigProvided
 	}
 
 	// create tracker
@@ -302,7 +302,7 @@ func (t *EventTracker) encodeEventFromLog(log *ethgo.Log) (rootchain.Event, erro
 		return t.encodeValidatorSetPayloadEvent(eventData, log.BlockNumber)
 	}
 
-	return rootchain.Event{}, ErrEventParseNoPayloadType
+	return rootchain.Event{}, errEventParseNoPayloadType
 }
 
 // encodeEventFromLog encodes event for specific payload
@@ -319,13 +319,13 @@ func (t *EventTracker) encodeValidatorSetPayloadEvent(
 	// extract index from event data
 	index, ok = eventData[indexAttribute].(*big.Int)
 	if !ok {
-		return rootchain.Event{}, fmt.Errorf("failed to parse StateSyncEvent: %w", ErrInvalidIndex)
+		return rootchain.Event{}, fmt.Errorf("failed to parse StateSyncEvent: %w", errInvalidIndex)
 	}
 
 	// extract validator map from event data
 	validatorMap, ok = eventData[validatorMapAttribute].([]map[string]interface{})
 	if !ok {
-		return rootchain.Event{}, fmt.Errorf("failed to parse StateSyncEvent: %w", ErrInvalidValidatorsMap)
+		return rootchain.Event{}, fmt.Errorf("failed to parse StateSyncEvent: %w", errInvalidValidatorsMap)
 	}
 
 	validatorSetInfo := make([]payload.ValidatorSetInfo, len(validatorMap))
@@ -335,13 +335,13 @@ func (t *EventTracker) encodeValidatorSetPayloadEvent(
 		// extract blsKey from validatorMap entry
 		blsKey, ok := validatorInfo[blsPublicKeyAttribute].([]byte)
 		if !ok {
-			return rootchain.Event{}, fmt.Errorf("failed to parse StateSyncEvent: %w", ErrInvalidBlsPublicKey)
+			return rootchain.Event{}, fmt.Errorf("failed to parse StateSyncEvent: %w", errInvalidBlsPublicKey)
 		}
 
 		// extract ecdsaAddress from validatorMap entry
 		ecdsaAddress, ok := validatorInfo[ecdsaAddressAttribute].(ethgo.Address)
 		if !ok {
-			return rootchain.Event{}, fmt.Errorf("failed to parse StateSyncEvent: %w", ErrInvalidEcdsaAddress)
+			return rootchain.Event{}, fmt.Errorf("failed to parse StateSyncEvent: %w", errInvalidEcdsaAddress)
 		}
 
 		// create validator set info from blsKey and ecdsaAddress
