@@ -35,7 +35,7 @@ type eventTracker interface {
 	Subscribe() <-chan rootchain.Event
 }
 
-// samp defines the SAMP interface for SAMUEL
+// samp defines the Signed Arbitrary Message Pool interface for SAMUEL
 type samp interface {
 	// AddMessage pushes a Signed Arbitrary Message into the SAMP
 	AddMessage(rootchain.SAM) error
