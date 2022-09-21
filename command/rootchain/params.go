@@ -154,12 +154,12 @@ func (p *rootchainParams) generateConfig() error {
 		config = p.config
 	} else {
 		config = &rootchain.Config{
-			RootchainAddresses: make(map[string][]rootchain.ConfigEvent),
+			RootchainAddresses: make([]rootchain.ConfigEvent, 0),
 		}
 	}
 
-	if len(config.RootchainAddresses[p.rootchainAddr]) > 0 {
-		existingEvents = config.RootchainAddresses[p.rootchainAddr]
+	if len(config.RootchainAddresses) > 0 {
+		existingEvents = config.RootchainAddresses
 	}
 
 	// Append the event
@@ -175,7 +175,7 @@ func (p *rootchainParams) generateConfig() error {
 		},
 	)
 
-	config.RootchainAddresses[p.rootchainAddr] = existingEvents
+	config.RootchainAddresses = existingEvents
 
 	p.config = config
 

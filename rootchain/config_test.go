@@ -18,19 +18,16 @@ func TestRootchainConfig(t *testing.T) {
 		blockConfirmations = uint64(10)
 	)
 
-	config := Config{
-		RootchainAddresses: map[string][]ConfigEvent{
-			rootchainAddress: {
-				{
-					EventABI:           eventABI,
-					MethodABI:          methodABI,
-					LocalAddress:       localAddress,
-					PayloadType:        payloadType,
-					BlockConfirmations: blockConfirmations,
-				},
-			},
+	config := Config{RootchainAddresses: []ConfigEvent{
+		{
+			RootchainURL:       rootchainAddress,
+			EventABI:           eventABI,
+			MethodABI:          methodABI,
+			LocalAddress:       localAddress,
+			PayloadType:        payloadType,
+			BlockConfirmations: blockConfirmations,
 		},
-	}
+	}}
 
 	// Marshal the data into JSON
 	marshalledData, err := json.Marshal(config)
