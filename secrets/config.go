@@ -2,7 +2,7 @@ package secrets
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"os"
 )
 
 // SecretsManagerConfig is the configuration that gets
@@ -20,12 +20,12 @@ type SecretsManagerConfig struct {
 func (c *SecretsManagerConfig) WriteConfig(path string) error {
 	jsonBytes, _ := json.MarshalIndent(c, "", " ")
 
-	return ioutil.WriteFile(path, jsonBytes, 0600)
+	return os.WriteFile(path, jsonBytes, os.ModePerm)
 }
 
 // ReadConfig reads the SecretsManagerConfig from the specified path
 func ReadConfig(path string) (*SecretsManagerConfig, error) {
-	configFile, readErr := ioutil.ReadFile(path)
+	configFile, readErr := os.ReadFile(path)
 	if readErr != nil {
 		return nil, readErr
 	}

@@ -3,7 +3,6 @@ package keystore
 import (
 	"encoding/hex"
 	"fmt"
-	"io/ioutil"
 	"os"
 )
 
@@ -20,7 +19,7 @@ func CreateIfNotExists(path string, create createFn) ([]byte, error) {
 	var keyBuff []byte
 	if !os.IsNotExist(err) {
 		// Key exists
-		keyBuff, err = ioutil.ReadFile(path)
+		keyBuff, err = os.ReadFile(path)
 		if err != nil {
 			return nil, fmt.Errorf("unable to read private key from disk (%s), %w", path, err)
 		}
@@ -36,7 +35,7 @@ func CreateIfNotExists(path string, create createFn) ([]byte, error) {
 
 	// Encode it to a readable format (Base64) and write to disk
 	keyBuff = []byte(hex.EncodeToString(keyBuff))
-	if err = ioutil.WriteFile(path, keyBuff, 0600); err != nil {
+	if err = os.WriteFile(path, keyBuff, os.ModePerm); err != nil {
 		return nil, fmt.Errorf("unable to write private key to disk (%s), %w", path, err)
 	}
 

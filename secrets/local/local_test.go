@@ -2,7 +2,6 @@ package local
 
 import (
 	"encoding/hex"
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -16,7 +15,7 @@ import (
 
 func TestLocalSecretsManagerFactory(t *testing.T) {
 	// Set up the expected folder structure
-	workingDirectory, tempErr := ioutil.TempDir("/tmp", "local-secrets-manager")
+	workingDirectory, tempErr := os.MkdirTemp("/tmp", "local-secrets-manager")
 	if tempErr != nil {
 		t.Fatalf("Unable to instantiate local secrets manager directories, %v", tempErr)
 	}
@@ -73,7 +72,7 @@ func getLocalSecretsManager(t *testing.T) secrets.SecretsManager {
 	t.Helper()
 
 	// Set up the expected folder structure
-	workingDirectory, tempErr := ioutil.TempDir("/tmp", "local-secrets-manager")
+	workingDirectory, tempErr := os.MkdirTemp("/tmp", "local-secrets-manager")
 	if tempErr != nil {
 		t.Fatalf("Unable to instantiate local secrets manager directories, %v", tempErr)
 	}

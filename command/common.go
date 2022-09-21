@@ -2,7 +2,7 @@ package command
 
 import (
 	"errors"
-	"io/ioutil"
+	"os"
 	"strings"
 
 	"github.com/0xPolygon/polygon-edge/crypto"
@@ -59,7 +59,7 @@ func GetValidatorsFromPrefixPath(
 	prefix string,
 	validatorType validators.ValidatorType,
 ) (validators.Validators, error) {
-	files, err := ioutil.ReadDir(".")
+	files, err := os.ReadDir(".")
 	if err != nil {
 		return nil, err
 	}

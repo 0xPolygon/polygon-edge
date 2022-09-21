@@ -3,7 +3,6 @@ package tests
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -488,7 +487,7 @@ func listFolders(paths ...string) ([]string, error) {
 	for _, p := range paths {
 		path := filepath.Join(TESTS, p)
 
-		files, err := ioutil.ReadDir(path)
+		files, err := os.ReadDir(path)
 		if err != nil {
 			return nil, err
 		}
