@@ -147,14 +147,14 @@ func (p *rootchainParams) loadExistingConfig() error {
 func (p *rootchainParams) generateConfig() error {
 	var (
 		config         *rootchain.Config
-		existingEvents = make([]rootchain.ConfigEvent, 0)
+		existingEvents = make([]rootchain.EventConfig, 0)
 	)
 
 	if p.config != nil {
 		config = p.config
 	} else {
 		config = &rootchain.Config{
-			RootchainAddresses: make([]rootchain.ConfigEvent, 0),
+			RootchainAddresses: make([]rootchain.EventConfig, 0),
 		}
 	}
 
@@ -165,7 +165,7 @@ func (p *rootchainParams) generateConfig() error {
 	// Append the event
 	existingEvents = append(
 		existingEvents,
-		rootchain.ConfigEvent{
+		rootchain.EventConfig{
 			EventABI:           p.eventABI,
 			MethodABI:          p.methodABI,
 			LocalAddress:       p.localAddr,

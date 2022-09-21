@@ -1,13 +1,13 @@
 package rootchain
 
-// Config defines the rootchain config mapping "0xa... (rootchain address)" => []ConfigEvent
+// Config defines the rootchain config mapping "0xa... (rootchain address)" => []EventConfig
 type Config struct {
-	RootchainAddresses []ConfigEvent `json:"rootchainAddresses"`
+	RootchainAddresses []EventConfig `json:"rootchainAddresses"`
 }
 
-// ConfigEvent defines a single event that needs to be listened for on the rootchain,
+// EventConfig defines a single event that needs to be listened for on the rootchain,
 // and corresponding local metadata
-type ConfigEvent struct {
+type EventConfig struct {
 	RootchainURL       string      `json:"rootchainURL"`
 	EventABI           string      `json:"eventABI"`
 	MethodABI          string      `json:"methodABI"`

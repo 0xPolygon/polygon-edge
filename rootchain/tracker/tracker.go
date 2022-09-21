@@ -76,7 +76,7 @@ type EventTracker struct {
 // NewEventTracker returns a new tracker object.
 func NewEventTracker(
 	logger hclog.Logger,
-	eventConfig *rootchain.ConfigEvent,
+	eventConfig *rootchain.EventConfig,
 	rootchainWS string,
 ) (*EventTracker, error) {
 	if eventConfig == nil {

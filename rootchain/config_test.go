@@ -18,7 +18,7 @@ func TestRootchainConfig(t *testing.T) {
 		blockConfirmations = uint64(10)
 	)
 
-	config := Config{RootchainAddresses: []ConfigEvent{
+	config := Config{RootchainAddresses: []EventConfig{
 		{
 			RootchainURL:       rootchainAddress,
 			EventABI:           eventABI,

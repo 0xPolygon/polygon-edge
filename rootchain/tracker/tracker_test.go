@@ -19,7 +19,7 @@ const (
 //nolint
 func initEventTracker(rootchainWS string, evenABI string, PayloadType rootchain.PayloadType, blockConfirmation uint64) (*EventTracker, error) {
 	// Tracer
-	trackerConfig := rootchain.ConfigEvent{
+	trackerConfig := rootchain.EventConfig{
 		EventABI:           evenABI,
 		MethodABI:          "",
 		LocalAddress:       "0x56B572e4eD62e421bA66EB14cB21e9BE04821D77",

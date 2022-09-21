@@ -48,7 +48,7 @@ func NewMonitor(
 	//	init tracker
 	tracker, err := tracker.NewEventTracker(
 		logger,
-		&rootchain.ConfigEvent{},
+		&rootchain.EventConfig{},
 		"todo",
 	) // todo
 	if err != nil {
@@ -60,7 +60,7 @@ func NewMonitor(
 
 	//	init samuel
 	samuel := samuel.NewSamuel(
-		&rootchain.ConfigEvent{},
+		&rootchain.EventConfig{},
 		logger,
 		tracker,
 		pool,

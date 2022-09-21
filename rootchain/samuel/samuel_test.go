@@ -125,7 +125,7 @@ func TestSAMUEL_NewSamuel(t *testing.T) {
 		storage      = mockStorage{}
 		transport    = mockTransport{}
 		logger       = hclog.NewNullLogger()
-		event        = &rootchain.ConfigEvent{
+		event        = &rootchain.EventConfig{
 			EventABI: "event GreetEmit()",
 			//nolint:lll
 			MethodABI:    "[ { \"anonymous\": false, \"inputs\": [ { \"indexed\": false, \"internalType\": \"bytes\", \"name\": \"data\", \"type\": \"bytes\" } ], \"name\": \"StateReceived\", \"type\": \"event\" }, { \"inputs\": [ { \"internalType\": \"bytes\", \"name\": \"data\", \"type\": \"bytes\" } ], \"name\": \"onStateReceived\", \"outputs\": [], \"stateMutability\": \"nonpayable\", \"type\": \"function\" } ]",
@@ -431,7 +431,7 @@ func TestSAMUEL_SaveProgress(t *testing.T) {
 		eventIndex       = uint64(1)
 		eventBlockNumber = uint64(100)
 
-		configEvent = &rootchain.ConfigEvent{
+		configEvent = &rootchain.EventConfig{
 			EventABI:     "event ExampleEvent()",
 			MethodABI:    methodABIStr,
 			MethodName:   methodName,
@@ -574,7 +574,7 @@ func TestSAMUEL_GetReadyTransaction(t *testing.T) {
 								  	]
 									`
 		methodName  = "exampleMethod"
-		configEvent = &rootchain.ConfigEvent{
+		configEvent = &rootchain.EventConfig{
 			EventABI:     "event ExampleEvent()",
 			MethodABI:    methodABIStr,
 			MethodName:   methodName,

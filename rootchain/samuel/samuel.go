@@ -108,7 +108,7 @@ type SAMUEL struct {
 
 // NewSamuel creates a new SAMUEL instance
 func NewSamuel(
-	configEvent *rootchain.ConfigEvent,
+	configEvent *rootchain.EventConfig,
 	logger hclog.Logger,
 	eventTracker eventTracker,
 	samp samp,
@@ -130,7 +130,7 @@ func NewSamuel(
 // initEventLookupMap generates the SAMUEL event data lookup map from the
 // passed in rootchain configuration
 func initEventData(
-	configEvent *rootchain.ConfigEvent,
+	configEvent *rootchain.EventConfig,
 ) eventData {
 	return eventData{
 		payloadType:  configEvent.PayloadType,
@@ -349,7 +349,7 @@ func (s *SAMUEL) Stop() error {
 // are committed to the blockchain
 func (s *SAMUEL) SaveProgress(
 	contractAddr types.Address, // local Smart Contract address
-	input []byte,               // method with argument data
+	input []byte, // method with argument data
 ) {
 	if contractAddr != types.StringToAddress(s.eventData.localAddress.String()) {
 		s.logger.Warn(
