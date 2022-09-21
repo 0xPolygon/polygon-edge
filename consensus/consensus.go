@@ -56,8 +56,8 @@ type Config struct {
 	// Config defines specific configuration parameters for the consensus
 	Config map[string]interface{}
 
-	// Path is the directory path for the consensus protocol tos tore information
-	Path string
+	// RootDir is the directory path for the consensus protocol tos tore information
+	RootDir string
 }
 
 type Params struct {

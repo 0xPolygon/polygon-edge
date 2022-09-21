@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/rootnet"
 	"github.com/0xPolygon/polygon-edge/rootchain"
+	"path/filepath"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
@@ -131,7 +132,7 @@ func Factory(params *consensus.Params) (consensus.Consensus, error) {
 		params.Blockchain,
 		params.Executor,
 		params.SecretsManager,
-		params.Config.Path,
+		filepath.Join(params.Config.RootDir, "consensus"),
 		epochSize,
 		params.Config.Config,
 	)
@@ -169,7 +170,7 @@ func Factory(params *consensus.Params) (consensus.Consensus, error) {
 		closeCh: make(chan struct{}),
 	}
 
-	if err := p.initRootnet(params.RootchainConfig); err != nil {
+	if err := p.initRootnet(params.RootchainConfig, params.Config.RootDir); err != nil {
 		return nil, err
 	}
 
@@ -179,7 +180,7 @@ func Factory(params *consensus.Params) (consensus.Consensus, error) {
 	return p, nil
 }
 
-func (i *backendIBFT) initRootnet(config *rootchain.Config) error {
+func (i *backendIBFT) initRootnet(config *rootchain.Config, rootDir string) error {
 	if config == nil || len(config.RootchainAddresses) == 0 {
 		i.rootMonitor = rootnet.NilMonitor
 
@@ -189,7 +190,7 @@ func (i *backendIBFT) initRootnet(config *rootchain.Config) error {
 	//	single monitor for now
 	cfg := config.RootchainAddresses[0]
 
-	monitor, err := rootnet.NewMonitor(i.logger, cfg, i, i.network)
+	monitor, err := rootnet.NewMonitor(i.logger, cfg, i, i.network, rootDir)
 	if err != nil {
 		return fmt.Errorf("failed to initialize monitor: %w", err)
 	}

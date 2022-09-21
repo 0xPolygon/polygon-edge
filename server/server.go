@@ -396,9 +396,9 @@ func (s *Server) setupConsensus() error {
 	}
 
 	config := &consensus.Config{
-		Params: s.config.Chain.Params,
-		Config: engineConfig,
-		Path:   filepath.Join(s.config.DataDir, "consensus"),
+		Params:  s.config.Chain.Params,
+		Config:  engineConfig,
+		RootDir: s.config.DataDir,
 	}
 
 	consensus, err := engine(

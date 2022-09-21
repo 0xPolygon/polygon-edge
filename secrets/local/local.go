@@ -19,7 +19,7 @@ type LocalSecretsManager struct {
 	// Logger object
 	logger hclog.Logger
 
-	// Path to the base working directory
+	// RootDir to the base working directory
 	path string
 
 	// Map of known secrets and their paths

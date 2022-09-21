@@ -1,6 +1,7 @@
 package rootnet
 
 import (
+	"github.com/0xPolygon/polygon-edge/blockchain/storage/leveldb"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/rootchain"
 	"github.com/0xPolygon/polygon-edge/rootchain/sampool"
@@ -8,6 +9,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/rootchain/tracker"
 	"github.com/0xPolygon/polygon-edge/rootchain/transport"
 	"github.com/0xPolygon/polygon-edge/types"
+	"path/filepath"
 
 	"github.com/hashicorp/go-hclog"
 )
@@ -44,6 +46,7 @@ func NewMonitor(
 	config rootchain.EventConfig,
 	signer signer,
 	network *network.Server,
+	rootDir string,
 ) (Monitor, error) {
 	//	init tracker
 	tracker, err := tracker.NewEventTracker(logger, config)
@@ -54,6 +57,14 @@ func NewMonitor(
 	//	init sampool
 	pool := sampool.New(logger) // todo
 
+	storage, err := leveldb.NewLevelDBStorage(
+		filepath.Join(rootDir, "rootnet"),
+		logger,
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	//	init samuel
 	samuel := samuel.NewSamuel(
 		config,
@@ -61,7 +72,7 @@ func NewMonitor(
 		tracker,
 		pool,
 		signer,
-		nil, // todo
+		storage,
 		transport.NewLibp2pGossipTransport(
 			logger,
 			network,
