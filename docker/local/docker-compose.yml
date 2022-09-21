@@ -1,0 +1,77 @@
+version: '3.5'
+
+services:
+  ## INITIALIZE GENESIS AND SECRETS
+  init:
+    build:
+      context: ../../
+      dockerfile: docker/local/Dockerfile
+    command: ["init"]
+    volumes:
+      - node-1:/data1
+      - node-2:/data2
+      - node-3:/data3
+      - node-4:/data4
+      - genesis:/genesis
+    network_mode: host
+  
+  ## RUN NODES
+  ## Nodes must have the same names as folders in genesis-legde
+  node-1:
+    build:
+      context: ../../
+      dockerfile: docker/local/Dockerfile
+    command: ["server", "--data-dir", "/data", "--chain", "/genesis/genesis.json", "--grpc-address", ":10000", "--libp2p", ":10001", "--jsonrpc", ":10002", "--seal"]
+    depends_on:
+      - init
+    volumes:
+      - node-1:/data
+      - genesis:/genesis
+    network_mode: host
+    restart: on-failure
+    
+  node-2:
+    build:
+      context: ../../
+      dockerfile: docker/local/Dockerfile
+    command: ["server", "--data-dir", "/data", "--chain", "/genesis/genesis.json", "--grpc-address", ":20000", "--libp2p", ":20001", "--jsonrpc", ":20002", "--seal"]
+    depends_on:
+      - init
+    volumes:
+      - node-2:/data
+      - genesis:/genesis
+    network_mode: host
+    restart: on-failure
+    
+  node-3:
+    build:
+      context: ../../
+      dockerfile: docker/local/Dockerfile
+    command: ["server", "--data-dir", "/data", "--chain", "/genesis/genesis.json", "--grpc-address", ":30000", "--libp2p", ":30001", "--jsonrpc", ":30002", "--seal"]
+    depends_on:
+      - init
+    volumes:
+      - node-3:/data
+      - genesis:/genesis
+    network_mode: host
+    restart: on-failure
+    
+  node-4:
+    build:
+      context: ../../
+      dockerfile: docker/local/Dockerfile
+    command: ["server", "--data-dir", "/data", "--chain", "/genesis/genesis.json", "--grpc-address", ":40000", "--libp2p", ":40001", "--jsonrpc", ":40002", "--seal"]
+    depends_on:
+      - init
+    volumes:
+      - node-4:/data
+      - genesis:/genesis
+    network_mode: host
+    restart: on-failure
+
+volumes:
+  node-1:
+  node-2:
+  node-3:
+  node-4:
+  genesis:
