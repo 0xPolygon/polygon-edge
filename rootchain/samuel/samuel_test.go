@@ -181,7 +181,7 @@ func TestSAMUEL_GetEventPayload(t *testing.T) {
 			[]byte{},
 			math.MaxUint64,
 			nil,
-			errUnknownPayloadType,
+			payload.ErrUnknownPayloadType,
 		},
 		{
 			"Validator Set Payload type",
@@ -198,13 +198,13 @@ func TestSAMUEL_GetEventPayload(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			resPayload, payloadErr := getEventPayload(
+			resPayload, payloadErr := payload.GetEventPayload(
 				testCase.eventPayload,
 				testCase.payloadType,
 			)
 
 			if testCase.expectedErr != nil {
-				assert.ErrorIs(t, payloadErr, errUnknownPayloadType)
+				assert.ErrorIs(t, payloadErr, payload.ErrUnknownPayloadType)
 				assert.Nil(t, resPayload)
 			} else {
 				assert.NoError(t, payloadErr)

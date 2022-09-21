@@ -2,7 +2,6 @@ package samuel
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"math/big"
 	"strconv"
@@ -15,11 +14,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/rootchain/proto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
-	googleProto "google.golang.org/protobuf/proto"
-)
-
-var (
-	errUnknownPayloadType = errors.New("unknown payload type")
 )
 
 // eventTracker defines the event tracker interface for SAMUEL
@@ -190,7 +184,7 @@ func (s *SAMUEL) getStartBlockNumber() (uint64, uint64, error) {
 func (s *SAMUEL) registerGossipHandler() error {
 	return s.transport.Subscribe(func(sam *proto.SAM) {
 		// Extract the event data
-		eventPayload, err := getEventPayload(sam.Event.Payload, sam.Event.PayloadType)
+		eventPayload, err := payload.GetEventPayload(sam.Event.Payload, sam.Event.PayloadType)
 		if err != nil {
 			s.logger.Error(
 				fmt.Sprintf("unable to get event payload with hash %s, %v", sam.Hash, err),
@@ -246,37 +240,6 @@ func (s *SAMUEL) registerGossipHandler() error {
 			)
 		}
 	})
-}
-
-// getEventPayload retrieves a concrete payload implementation
-// based on the passed in byte array and payload type
-func getEventPayload(
-	eventPayload []byte,
-	payloadType uint64,
-) (rootchain.Payload, error) {
-	switch rootchain.PayloadType(payloadType) {
-	case rootchain.ValidatorSetPayloadType:
-		// Unmarshal the data
-		vsProto := &proto.ValidatorSetPayload{}
-		if err := googleProto.Unmarshal(eventPayload, vsProto); err != nil {
-			return nil, fmt.Errorf("unable to unmarshal proto payload, %w", err)
-		}
-
-		setInfo := make([]payload.ValidatorSetInfo, len(vsProto.ValidatorsInfo))
-
-		// Extract the specific info
-		for index, info := range vsProto.ValidatorsInfo {
-			setInfo[index] = payload.ValidatorSetInfo{
-				Address:      info.Address,
-				BLSPublicKey: info.BlsPubKey,
-			}
-		}
-
-		// Return the specific Payload implementation
-		return payload.NewValidatorSetPayload(setInfo), nil
-	default:
-		return nil, errUnknownPayloadType
-	}
 }
 
 // startEventLoop starts the SAMUEL event monitoring loop, which retrieves
@@ -434,7 +397,7 @@ func (s *SAMUEL) GetReadyTransaction() *types.Transaction {
 
 	// Extract the payload info
 	payloadType, payloadData := SAM.Payload.Get()
-	rawPayload, err := getEventPayload(payloadData, uint64(payloadType))
+	rawPayload, err := payload.GetEventPayload(payloadData, uint64(payloadType))
 
 	if err != nil {
 		s.logger.Error(
