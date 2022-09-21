@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 const (
@@ -478,7 +478,7 @@ func (val *topicVal) validateMsg(ctx context.Context, src peer.ID, msg *Message)
 	}
 }
 
-/// Options
+// / Options
 
 // WithValidateQueueSize sets the buffer of validate queue. Defaults to 32.
 // When queue is full, validation is throttled and new messages are dropped.

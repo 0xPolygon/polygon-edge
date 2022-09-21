@@ -3,13 +3,12 @@ package upgrader
 import (
 	"fmt"
 
-	"github.com/libp2p/go-libp2p-core/mux"
-	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/transport"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/transport"
 )
 
 type transportConn struct {
-	mux.MuxedConn
+	network.MuxedConn
 	network.ConnMultiaddrs
 	network.ConnSecurity
 	transport transport.Transport
