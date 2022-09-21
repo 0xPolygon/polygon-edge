@@ -328,8 +328,8 @@ func (p *TxPool) SetSealing(sealing bool) {
 	p.sealing.Store(sealing)
 }
 
-// Sealing returns the current set sealing flag
-func (p *TxPool) Sealing() bool {
+// sealing returns the current set sealing flag
+func (p *TxPool) getSealing() bool {
 	return p.sealing.Load()
 }
 
@@ -579,7 +579,7 @@ func (p *TxPool) processEvent(event *blockchain.Event) {
 	// reset accounts with the new state
 	p.resetAccounts(stateNonces)
 
-	if !p.Sealing() {
+	if !p.getSealing() {
 		// only non-validator cleanup inactive accounts
 		p.updateUnadoptedCounts(stateNonces)
 	}
@@ -804,7 +804,7 @@ func (p *TxPool) handlePromoteRequest(req promoteRequest) {
 // addGossipTx handles receiving transactions
 // gossiped by the network.
 func (p *TxPool) addGossipTx(obj interface{}, _ peer.ID) {
-	if !p.Sealing() {
+	if !p.getSealing() {
 		return
 	}
 
