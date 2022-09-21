@@ -235,7 +235,6 @@ func TestFromFieldInTx(t *testing.T) {
 		IBFTDirPrefix,
 		func(i int, config *framework.TestServerConfig) {
 			config.Premine(senderAddr, framework.EthToWei(10))
-			config.SetSeal(true)
 		},
 	)
 
