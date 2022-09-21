@@ -143,9 +143,6 @@ func initEventData(
 
 // Start starts the SAMUEL module
 func (s *SAMUEL) Start() error {
-	// Start the event loop for the tracker
-	s.startEventLoop()
-
 	// Register the gossip message handler
 	if err := s.registerGossipHandler(); err != nil {
 		return fmt.Errorf("unable to register gossip handler, %w", err)
@@ -161,6 +158,9 @@ func (s *SAMUEL) Start() error {
 	if err := s.eventTracker.Start(startBlock); err != nil {
 		return fmt.Errorf("unable to start event tracker, %w", err)
 	}
+
+	// Start the event loop for the tracker
+	s.startEventLoop()
 
 	return nil
 }
