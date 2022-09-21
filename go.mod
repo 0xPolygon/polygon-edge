@@ -38,7 +38,7 @@ require (
 )
 
 require (
-	cloud.google.com/go/secretmanager v1.5.0
+	cloud.google.com/go/secretmanager v1.6.0
 	github.com/armon/go-metrics v0.4.0 // indirect
 	github.com/aws/aws-sdk-go v1.44.61
 	github.com/benbjohnson/clock v1.3.0 // indirect
@@ -55,7 +55,7 @@ require (
 	go.uber.org/zap v1.22.0 // indirect
 	golang.org/x/sys v0.0.0-20220811171246-fbc7d0a398ab // indirect
 	golang.org/x/tools v0.1.12 // indirect
-	google.golang.org/genproto v0.0.0-20220617124728-180714bec0ad
+	google.golang.org/genproto v0.0.0-20220624142145-8cd45d7dbd1f
 	gopkg.in/yaml.v3 v3.0.1
 	lukechampine.com/blake3 v1.1.7 // indirect
 )
@@ -118,8 +118,6 @@ require (
 	github.com/libp2p/go-cidranger v1.1.0 // indirect
 	github.com/libp2p/go-flow-metrics v0.1.0 // indirect
 	github.com/libp2p/go-libp2p-asn-util v0.2.0 // indirect
-	github.com/libp2p/go-libp2p-peerstore v0.7.0 // indirect
-	github.com/libp2p/go-libp2p-swarm v0.11.0 // indirect
 	github.com/libp2p/go-msgio v0.2.0 // indirect
 	github.com/libp2p/go-nat v0.1.0 // indirect
 	github.com/libp2p/go-netroute v0.2.0 // indirect
@@ -174,11 +172,11 @@ require (
 	go.uber.org/multierr v1.8.0 // indirect
 	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4 // indirect
 	golang.org/x/net v0.0.0-20220812174116-3211cb980234 // indirect
-	golang.org/x/oauth2 v0.0.0-20220608161450-d0670ef3b1eb // indirect
+	golang.org/x/oauth2 v0.0.0-20220909003341-f21342109be1 // indirect
 	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/time v0.0.0-20220411224347-583f2d630306 // indirect
-	google.golang.org/api v0.85.0 // indirect
+	google.golang.org/api v0.95.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	gopkg.in/square/go-jose.v2 v2.6.0 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect

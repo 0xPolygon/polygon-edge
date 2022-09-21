@@ -7,8 +7,8 @@ cloud.google.com/go/compute/metadata
 # cloud.google.com/go/iam v0.3.0
 ## explicit; go 1.15
 cloud.google.com/go/iam
-# cloud.google.com/go/secretmanager v1.5.0
-## explicit; go 1.16
+# cloud.google.com/go/secretmanager v1.6.0
+## explicit; go 1.17
 cloud.google.com/go/secretmanager/apiv1
 cloud.google.com/go/secretmanager/internal
 # filippo.io/edwards25519 v1.0.0-rc.1
@@ -448,14 +448,10 @@ github.com/libp2p/go-libp2p-asn-util
 github.com/libp2p/go-libp2p-kbucket
 github.com/libp2p/go-libp2p-kbucket/keyspace
 github.com/libp2p/go-libp2p-kbucket/peerdiversity
-# github.com/libp2p/go-libp2p-peerstore v0.7.0
-## explicit; go 1.17
 # github.com/libp2p/go-libp2p-pubsub v0.8.1
 ## explicit; go 1.17
 github.com/libp2p/go-libp2p-pubsub
 github.com/libp2p/go-libp2p-pubsub/pb
-# github.com/libp2p/go-libp2p-swarm v0.11.0
-## explicit; go 1.17
 # github.com/libp2p/go-msgio v0.2.0
 ## explicit; go 1.17
 github.com/libp2p/go-msgio
@@ -797,8 +793,8 @@ golang.org/x/net/ipv4
 golang.org/x/net/ipv6
 golang.org/x/net/route
 golang.org/x/net/trace
-# golang.org/x/oauth2 v0.0.0-20220608161450-d0670ef3b1eb
-## explicit; go 1.15
+# golang.org/x/oauth2 v0.0.0-20220909003341-f21342109be1
+## explicit; go 1.17
 golang.org/x/oauth2
 golang.org/x/oauth2/authhandler
 golang.org/x/oauth2/google
@@ -846,7 +842,7 @@ golang.org/x/tools/internal/imports
 golang.org/x/tools/internal/packagesinternal
 golang.org/x/tools/internal/typeparams
 golang.org/x/tools/internal/typesinternal
-# google.golang.org/api v0.85.0
+# google.golang.org/api v0.95.0
 ## explicit; go 1.15
 google.golang.org/api/googleapi
 google.golang.org/api/internal
@@ -872,7 +868,7 @@ google.golang.org/appengine/internal/socket
 google.golang.org/appengine/internal/urlfetch
 google.golang.org/appengine/socket
 google.golang.org/appengine/urlfetch
-# google.golang.org/genproto v0.0.0-20220617124728-180714bec0ad
+# google.golang.org/genproto v0.0.0-20220624142145-8cd45d7dbd1f
 ## explicit; go 1.15
 google.golang.org/genproto/googleapis/api/annotations
 google.golang.org/genproto/googleapis/cloud/secretmanager/v1
