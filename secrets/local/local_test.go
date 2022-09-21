@@ -2,7 +2,6 @@ package local
 
 import (
 	"encoding/hex"
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -10,13 +9,13 @@ import (
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/hashicorp/go-hclog"
-	libp2pCrypto "github.com/libp2p/go-libp2p-core/crypto"
+	libp2pCrypto "github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestLocalSecretsManagerFactory(t *testing.T) {
 	// Set up the expected folder structure
-	workingDirectory, tempErr := ioutil.TempDir("/tmp", "local-secrets-manager")
+	workingDirectory, tempErr := os.MkdirTemp("/tmp", "local-secrets-manager")
 	if tempErr != nil {
 		t.Fatalf("Unable to instantiate local secrets manager directories, %v", tempErr)
 	}
@@ -73,7 +72,7 @@ func getLocalSecretsManager(t *testing.T) secrets.SecretsManager {
 	t.Helper()
 
 	// Set up the expected folder structure
-	workingDirectory, tempErr := ioutil.TempDir("/tmp", "local-secrets-manager")
+	workingDirectory, tempErr := os.MkdirTemp("/tmp", "local-secrets-manager")
 	if tempErr != nil {
 		t.Fatalf("Unable to instantiate local secrets manager directories, %v", tempErr)
 	}

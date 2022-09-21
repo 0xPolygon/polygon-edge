@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"sync"
@@ -283,8 +282,7 @@ func (j *JSONRPC) handle(w http.ResponseWriter, req *http.Request) {
 }
 
 func (j *JSONRPC) handleJSONRPCRequest(w http.ResponseWriter, req *http.Request) {
-	data, err := ioutil.ReadAll(req.Body)
-
+	data, err := io.ReadAll(req.Body)
 	if err != nil {
 		_, _ = w.Write([]byte(err.Error()))
 

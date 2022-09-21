@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"sync"
 	"testing"
@@ -16,8 +15,8 @@ import (
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/secrets/local"
 	"github.com/hashicorp/go-hclog"
-	"github.com/libp2p/go-libp2p-core/crypto"
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/stretchr/testify/assert"
 )
@@ -371,7 +370,7 @@ func MeshJoin(servers ...*Server) []error {
 func GenerateTestLibp2pKey(t *testing.T) (crypto.PrivKey, string) {
 	t.Helper()
 
-	dir, err := ioutil.TempDir(os.TempDir(), "")
+	dir, err := os.MkdirTemp(os.TempDir(), "")
 	assert.NoError(t, err)
 
 	// Instantiate the correct folder structure

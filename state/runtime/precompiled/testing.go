@@ -3,7 +3,7 @@ package precompiled
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -33,7 +33,7 @@ func ReadTestCase(t *testing.T, path string, f func(t *testing.T, c *TestCase)) 
 	t.Helper()
 	t.Parallel()
 
-	data, err := ioutil.ReadFile(filepath.Join("./fixtures", path))
+	data, err := os.ReadFile(filepath.Join("./fixtures", path))
 	if err != nil {
 		t.Fatal(err)
 	}

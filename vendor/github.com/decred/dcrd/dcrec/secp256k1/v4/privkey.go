@@ -1,13 +1,12 @@
 // Copyright (c) 2013-2014 The btcsuite developers
-// Copyright (c) 2015-2020 The Decred developers
+// Copyright (c) 2015-2022 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
 package secp256k1
 
 import (
-	"crypto/ecdsa"
-	"crypto/rand"
+	csprng "crypto/rand"
 )
 
 // PrivateKey provides facilities for working with secp256k1 private keys within
@@ -40,14 +39,27 @@ func PrivKeyFromBytes(privKeyBytes []byte) *PrivateKey {
 	return &privKey
 }
 
-// GeneratePrivateKey returns a private key that is suitable for use with
-// secp256k1.
+// GeneratePrivateKey generates and returns a new cryptographically secure
+// private key that is suitable for use with secp256k1.
 func GeneratePrivateKey() (*PrivateKey, error) {
-	key, err := ecdsa.GenerateKey(S256(), rand.Reader)
-	if err != nil {
-		return nil, err
+	// The group order is close enough to 2^256 that there is only roughly a 1
+	// in 2^128 chance of generating an invalid private key, so this loop will
+	// virtually never run more than a single iteration in practice.
+	var key PrivateKey
+	var b32 [32]byte
+	for valid := false; !valid; {
+		if _, err := csprng.Read(b32[:]); err != nil {
+			return nil, err
+		}
+
+		// The private key is only valid when it is in the range [1, N-1], where
+		// N is the order of the curve.
+		overflow := key.Key.SetBytes(&b32)
+		valid = (key.Key.IsZeroBit() | overflow) == 0
 	}
-	return PrivKeyFromBytes(key.D.Bytes()), nil
+	zeroArray32(&b32)
+
+	return &key, nil
 }
 
 // PubKey computes and returns the public key corresponding to this private key.
