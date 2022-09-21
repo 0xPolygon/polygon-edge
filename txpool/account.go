@@ -158,7 +158,7 @@ type account struct {
 	nextNonce          uint64
 	demotions          uint
 	// the number of consecutive blocks that don't contain account's transaction
-	skips              uint64
+	skips uint64
 
 	//	maximum number of enqueued transactions
 	maxEnqueued uint64
@@ -297,12 +297,12 @@ func (a *account) promote() []*types.Transaction {
 }
 
 // resetSkips sets 0 to skips
-func (a *account) resetSkips()  {
+func (a *account) resetSkips() {
 	a.skips = 0
 }
 
 // incrementSkips increments skips
-func (a *account) incrementSkips()  {
+func (a *account) incrementSkips() {
 	a.skips++
 }
 

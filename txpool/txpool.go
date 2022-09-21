@@ -927,7 +927,7 @@ func (p *TxPool) updateAccountSkipsCounts(latestActiveAccounts map[types.Address
 
 			// account has been skipped too many times
 			p.Drop(firstPromoted)
-			
+
 			account.resetSkips()
 
 			return true
