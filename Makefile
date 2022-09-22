@@ -40,7 +40,7 @@ test:
 
 .PHONY: run-local
 run-local:
-	docker-compose -f ./docker/local/docker-compose.yml up -d
+	docker-compose -f ./docker/local/docker-compose.yml up -d --build
 
 .PHONY: stop-local
 stop-local:
