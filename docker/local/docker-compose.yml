@@ -8,10 +8,10 @@ services:
       dockerfile: docker/local/Dockerfile
     command: ["init"]
     volumes:
-      - node-1:/data1
-      - node-2:/data2
-      - node-3:/data3
-      - node-4:/data4
+      - node-1:/polygon-edge/data-1
+      - node-2:/polygon-edge/data-2
+      - node-3:/polygon-edge/data-3
+      - node-4:/polygon-edge/data-4
       - genesis:/genesis
     network_mode: host
   
