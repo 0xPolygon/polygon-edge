@@ -127,7 +127,7 @@ func testDeleteCommonStateRoot(t *testing.T, buildPreState buildPreState) {
 	txn2.SetState(addr1, hash1, hash0)
 
 	objs = txn.Commit(false)
-	snap3, _ := snap.Commit(objs)
+	snap3, _ := snap2.Commit(objs)
 
 	txn3 := newTxn(state, snap3)
 	assert.Equal(t, hash1, txn3.GetState(addr1, hash2))
