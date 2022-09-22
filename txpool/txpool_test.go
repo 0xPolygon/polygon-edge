@@ -860,6 +860,112 @@ func TestPromoteHandler(t *testing.T) {
 		assert.Equal(t, uint64(0), pool.accounts.get(addr1).enqueued.length())
 		assert.Equal(t, uint64(20), pool.accounts.get(addr1).promoted.length())
 	})
+
+	t.Run(
+		"promote handler discards cheaper tx",
+		func(t *testing.T) {
+			t.Parallel()
+
+			// helper
+			newPricedTx := func(
+				addr types.Address,
+				nonce,
+				gasPrice,
+				slots uint64,
+			) *types.Transaction {
+				tx := newTx(addr, nonce, slots)
+				tx.GasPrice.SetUint64(gasPrice)
+
+				return tx
+			}
+
+			pool, err := newTestPool()
+			assert.NoError(t, err)
+			pool.SetSigner(&mockSigner{})
+
+			addTx := func(tx *types.Transaction) enqueueRequest {
+				tx.ComputeHash()
+
+				go func() {
+					assert.NoError(t,
+						pool.addTx(local, tx),
+					)
+				}()
+
+				//	grab the enqueue signal
+				return <-pool.enqueueReqCh
+			}
+
+			handleEnqueueRequest := func(req enqueueRequest) promoteRequest {
+				go func() {
+					pool.handleEnqueueRequest(req)
+				}()
+
+				return <-pool.promoteReqCh
+			}
+
+			assertTxExists := func(t *testing.T, tx *types.Transaction, shouldExists bool) {
+				t.Helper()
+
+				_, exists := pool.index.get(tx.Hash)
+				assert.Equal(t, shouldExists, exists)
+			}
+
+			tx1 := newPricedTx(addr1, 0, 10, 2)
+			tx2 := newPricedTx(addr1, 0, 20, 3)
+
+			// add the transactions
+			enqTx1 := addTx(tx1)
+			enqTx2 := addTx(tx2)
+
+			assertTxExists(t, tx1, true)
+			assertTxExists(t, tx2, true)
+
+			// check the account nonce before promoting
+			assert.Equal(t, uint64(0), pool.accounts.get(addr1).getNonce())
+
+			//	execute the enqueue handlers
+			promReq1 := handleEnqueueRequest(enqTx1)
+			promReq2 := handleEnqueueRequest(enqTx2)
+
+			assert.Equal(t, uint64(0), pool.accounts.get(addr1).getNonce())
+			assert.Equal(t, uint64(2), pool.accounts.get(addr1).enqueued.length())
+			assert.Equal(t, uint64(0), pool.accounts.get(addr1).promoted.length())
+			assert.Equal(
+				t,
+				slotsRequired(tx1)+slotsRequired(tx2),
+				pool.gauge.read(),
+			)
+
+			// promote the second Tx and remove the first Tx
+			pool.handlePromoteRequest(promReq1)
+
+			assert.Equal(t, uint64(1), pool.accounts.get(addr1).getNonce())
+			assert.Equal(t, uint64(0), pool.accounts.get(addr1).enqueued.length()) // should be empty
+			assert.Equal(t, uint64(1), pool.accounts.get(addr1).promoted.length())
+			assertTxExists(t, tx1, false)
+			assertTxExists(t, tx2, true)
+			assert.Equal(
+				t,
+				slotsRequired(tx2),
+				pool.gauge.read(),
+			)
+
+			// should do nothing in the 2nd promotion
+			pool.handlePromoteRequest(promReq2)
+
+			assert.Equal(t, uint64(1), pool.accounts.get(addr1).getNonce())
+			assert.Equal(t, uint64(0), pool.accounts.get(addr1).enqueued.length())
+			assert.Equal(t, uint64(1), pool.accounts.get(addr1).promoted.length())
+			assertTxExists(t, tx1, false)
+			assertTxExists(t, tx2, true)
+			assert.Equal(
+				t,
+				slotsRequired(tx2),
+				pool.gauge.read(),
+			)
+		},
+	)
 }
 
 func TestResetAccount(t *testing.T) {
@@ -1351,7 +1457,7 @@ func TestDemote(t *testing.T) {
 		assert.Equal(t, uint64(1), pool.gauge.read())
 		assert.Equal(t, uint64(1), pool.accounts.get(addr1).getNonce())
 		assert.Equal(t, uint64(1), pool.accounts.get(addr1).promoted.length())
-		assert.Equal(t, uint(0), pool.accounts.get(addr1).demotions)
+		assert.Equal(t, uint64(0), pool.accounts.get(addr1).Demotions())
 
 		// call demote
 		pool.Prepare()
@@ -1363,7 +1469,7 @@ func TestDemote(t *testing.T) {
 		assert.Equal(t, uint64(1), pool.accounts.get(addr1).promoted.length())
 
 		// assert counter was incremented
-		assert.Equal(t, uint(1), pool.accounts.get(addr1).demotions)
+		assert.Equal(t, uint64(1), pool.accounts.get(addr1).Demotions())
 	})
 
 	t.Run("Demote calls Drop", func(t *testing.T) {
@@ -1400,7 +1506,7 @@ func TestDemote(t *testing.T) {
 		assert.Equal(t, uint64(0), pool.accounts.get(addr1).promoted.length())
 
 		// demotions are reset to 0
-		assert.Equal(t, uint(0), pool.accounts.get(addr1).demotions)
+		assert.Equal(t, uint64(0), pool.accounts.get(addr1).Demotions())
 	})
 }
 

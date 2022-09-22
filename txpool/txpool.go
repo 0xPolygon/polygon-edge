@@ -27,7 +27,7 @@ const (
 
 	// maximum allowed number of times an account
 	// was excluded from block building (ibft.writeTransactions)
-	maxAccountDemotions = uint(10)
+	maxAccountDemotions uint64 = 10
 
 	// maximum allowed number of consecutive blocks that don't have the account's transaction
 	maxAccountSkips = uint64(10)
@@ -403,7 +403,7 @@ func (p *TxPool) Pop(tx *types.Transaction) {
 	account.promoted.pop()
 
 	// successfully popping an account resets its demotions count to 0
-	account.demotions = 0
+	account.resetDemotions()
 
 	// update state
 	p.gauge.decrease(slotsRequired(tx))
@@ -471,7 +471,7 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 // it is Dropped instead.
 func (p *TxPool) Demote(tx *types.Transaction) {
 	account := p.accounts.get(tx.From)
-	if account.demotions == maxAccountDemotions {
+	if account.Demotions() >= maxAccountDemotions {
 		p.logger.Debug(
 			"Demote: threshold reached - dropping account",
 			"addr", tx.From.String(),
@@ -480,12 +480,12 @@ func (p *TxPool) Demote(tx *types.Transaction) {
 		p.Drop(tx)
 
 		// reset the demotions counter
-		account.demotions = 0
+		account.resetDemotions()
 
 		return
 	}
 
-	account.demotions++
+	account.incrementDemotions()
 
 	p.eventManager.signalEvent(proto.EventType_DEMOTED, tx.Hash)
 }
@@ -739,9 +739,7 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 	}
 
 	// initialize account for this address once
-	if !p.accounts.exists(tx.From) {
-		p.createAccountOnce(tx.From)
-	}
+	p.createAccountOnce(tx.From)
 
 	// send request [BLOCKING]
 	p.enqueueReqCh <- enqueueRequest{tx: tx}
@@ -793,8 +791,11 @@ func (p *TxPool) handlePromoteRequest(req promoteRequest) {
 	account := p.accounts.get(addr)
 
 	// promote enqueued txs
-	promoted := account.promote()
+	promoted, pruned := account.promote()
 	p.logger.Debug("promote request", "promoted", promoted, "addr", addr.String())
+
+	p.index.remove(pruned...)
+	p.gauge.decrease(slotsRequired(pruned...))
 
 	// update metrics
 	p.metrics.PendingTxs.Add(float64(len(promoted)))
@@ -856,12 +857,13 @@ func (p *TxPool) resetAccounts(stateNonces map[types.Address]uint64) {
 
 	// clear all accounts of stale txs
 	for addr, newNonce := range stateNonces {
-		if !p.accounts.exists(addr) {
+		account := p.accounts.get(addr)
+
+		if account == nil {
 			// no updates for this account
 			continue
 		}
 
-		account := p.accounts.get(addr)
 		prunedPromoted, prunedEnqueued := account.reset(newNonce, p.promoteReqCh)
 
 		// append pruned
@@ -869,18 +871,19 @@ func (p *TxPool) resetAccounts(stateNonces map[types.Address]uint64) {
 		allPrunedEnqueued = append(allPrunedEnqueued, prunedEnqueued...)
 
 		// new state for account -> demotions are reset to 0
-		account.demotions = 0
+		account.resetDemotions()
 	}
 
 	// pool cleanup callback
-	cleanup := func(stale ...*types.Transaction) {
+	cleanup := func(stale []*types.Transaction) {
 		p.index.remove(stale...)
 		p.gauge.decrease(slotsRequired(stale...))
 	}
 
 	// prune pool state
 	if len(allPrunedPromoted) > 0 {
-		cleanup(allPrunedPromoted...)
+		cleanup(allPrunedPromoted)
+
 		p.eventManager.signalEvent(
 			proto.EventType_PRUNED_PROMOTED,
 			toHash(allPrunedPromoted...)...,
@@ -890,7 +893,8 @@ func (p *TxPool) resetAccounts(stateNonces map[types.Address]uint64) {
 	}
 
 	if len(allPrunedEnqueued) > 0 {
-		cleanup(allPrunedEnqueued...)
+		cleanup(allPrunedEnqueued)
+
 		p.eventManager.signalEvent(
 			proto.EventType_PRUNED_ENQUEUED,
 			toHash(allPrunedEnqueued...)...,
@@ -938,14 +942,16 @@ func (p *TxPool) updateAccountSkipsCounts(latestActiveAccounts map[types.Address
 // createAccountOnce creates an account and
 // ensures it is only initialized once.
 func (p *TxPool) createAccountOnce(newAddr types.Address) *account {
+	if p.accounts.exists(newAddr) {
+		return nil
+	}
+
 	// fetch nonce from state
 	stateRoot := p.store.Header().StateRoot
 	stateNonce := p.store.GetNonce(stateRoot, newAddr)
 
 	// initialize the account
-	account := p.accounts.initOnce(newAddr, stateNonce)
-
-	return account
+	return p.accounts.initOnce(newAddr, stateNonce)
 }
 
 // Length returns the total number of all promoted transactions.
