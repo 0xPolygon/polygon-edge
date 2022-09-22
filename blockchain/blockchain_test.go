@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/state"
+	"github.com/hashicorp/go-hclog"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/stretchr/testify/assert"
@@ -543,27 +544,358 @@ func TestForkUnknownParents(t *testing.T) {
 }
 
 func TestBlockchainWriteBody(t *testing.T) {
+	t.Parallel()
+
+	var (
+		addr = types.StringToAddress("1")
+	)
+
+	newChain := func(
+		t *testing.T,
+		txFromByTxHash map[types.Hash]types.Address,
+	) *Blockchain {
+		t.Helper()
+
+		storage, err := memory.NewMemoryStorage(nil)
+		assert.NoError(t, err)
+
+		chain := &Blockchain{
+			db: storage,
+			txSigner: &mockSigner{
+				txFromByTxHash: txFromByTxHash,
+			},
+		}
+
+		return chain
+	}
+
+	t.Run("should succeed if tx has from field", func(t *testing.T) {
+		t.Parallel()
+
+		tx := &types.Transaction{
+			Value: big.NewInt(10),
+			V:     big.NewInt(1),
+			From:  addr,
+		}
+
+		block := &types.Block{
+			Header: &types.Header{},
+			Transactions: []*types.Transaction{
+				tx,
+			},
+		}
+
+		tx.ComputeHash()
+		block.Header.ComputeHash()
+
+		txFromByTxHash := map[types.Hash]types.Address{}
+
+		chain := newChain(t, txFromByTxHash)
+
+		assert.NoError(
+			t,
+			chain.writeBody(block),
+		)
+	})
+
+	t.Run("should return error if tx doesn't have from and recovering address fails", func(t *testing.T) {
+		t.Parallel()
+
+		tx := &types.Transaction{
+			Value: big.NewInt(10),
+			V:     big.NewInt(1),
+		}
+
+		block := &types.Block{
+			Header: &types.Header{},
+			Transactions: []*types.Transaction{
+				tx,
+			},
+		}
+
+		tx.ComputeHash()
+		block.Header.ComputeHash()
+
+		txFromByTxHash := map[types.Hash]types.Address{}
+
+		chain := newChain(t, txFromByTxHash)
+
+		assert.ErrorIs(
+			t,
+			errRecoveryAddressFailed,
+			chain.writeBody(block),
+		)
+	})
+
+	t.Run("should recover from address and store to storage", func(t *testing.T) {
+		t.Parallel()
+
+		tx := &types.Transaction{
+			Value: big.NewInt(10),
+			V:     big.NewInt(1),
+		}
+
+		block := &types.Block{
+			Header: &types.Header{},
+			Transactions: []*types.Transaction{
+				tx,
+			},
+		}
+
+		tx.ComputeHash()
+		block.Header.ComputeHash()
+
+		txFromByTxHash := map[types.Hash]types.Address{
+			tx.Hash: addr,
+		}
+
+		chain := newChain(t, txFromByTxHash)
+
+		assert.NoError(t, chain.writeBody(block))
+
+		readBody, ok := chain.readBody(block.Hash())
+		assert.True(t, ok)
+
+		assert.Equal(t, addr, readBody.Transactions[0].From)
+	})
+}
+
+func Test_recoverFromFieldsInBlock(t *testing.T) {
+	t.Parallel()
+
+	var (
+		addr1 = types.StringToAddress("1")
+		addr2 = types.StringToAddress("1")
+		addr3 = types.StringToAddress("1")
+	)
+
+	computeTxHashes := func(txs ...*types.Transaction) {
+		for _, tx := range txs {
+			tx.ComputeHash()
+		}
+	}
+
+	t.Run("should succeed", func(t *testing.T) {
+		t.Parallel()
+
+		txFromByTxHash := map[types.Hash]types.Address{}
+		chain := &Blockchain{
+			txSigner: &mockSigner{
+				txFromByTxHash: txFromByTxHash,
+			},
+		}
+
+		tx1 := &types.Transaction{Nonce: 0, From: addr1}
+		tx2 := &types.Transaction{Nonce: 1, From: types.ZeroAddress}
+
+		computeTxHashes(tx1, tx2)
+
+		txFromByTxHash[tx2.Hash] = addr2
+
+		block := &types.Block{
+			Transactions: []*types.Transaction{
+				tx1,
+				tx2,
+			},
+		}
+
+		assert.NoError(
+			t,
+			chain.recoverFromFieldsInBlock(block),
+		)
+	})
+
+	t.Run("should stop and return error if recovery fails", func(t *testing.T) {
+		t.Parallel()
+
+		txFromByTxHash := map[types.Hash]types.Address{}
+		chain := &Blockchain{
+			txSigner: &mockSigner{
+				txFromByTxHash: txFromByTxHash,
+			},
+		}
+
+		tx1 := &types.Transaction{Nonce: 0, From: types.ZeroAddress}
+		tx2 := &types.Transaction{Nonce: 1, From: types.ZeroAddress}
+		tx3 := &types.Transaction{Nonce: 2, From: types.ZeroAddress}
+
+		computeTxHashes(tx1, tx2, tx3)
+
+		// returns only addresses for tx1 and tx3
+		txFromByTxHash[tx1.Hash] = addr1
+		txFromByTxHash[tx3.Hash] = addr3
+
+		block := &types.Block{
+			Transactions: []*types.Transaction{
+				tx1,
+				tx2,
+				tx3,
+			},
+		}
+
+		assert.ErrorIs(
+			t,
+			chain.recoverFromFieldsInBlock(block),
+			errRecoveryAddressFailed,
+		)
+
+		assert.Equal(t, addr1, tx1.From)
+		assert.Equal(t, types.ZeroAddress, tx2.From)
+		assert.Equal(t, types.ZeroAddress, tx3.From)
+	})
+}
+
+func Test_recoverFromFieldsInTransactions(t *testing.T) {
+	t.Parallel()
+
+	var (
+		addr1 = types.StringToAddress("1")
+		addr2 = types.StringToAddress("1")
+		addr3 = types.StringToAddress("1")
+	)
+
+	computeTxHashes := func(txs ...*types.Transaction) {
+		for _, tx := range txs {
+			tx.ComputeHash()
+		}
+	}
+
+	t.Run("should succeed", func(t *testing.T) {
+		t.Parallel()
+
+		txFromByTxHash := map[types.Hash]types.Address{}
+		chain := &Blockchain{
+			logger: hclog.NewNullLogger(),
+			txSigner: &mockSigner{
+				txFromByTxHash: txFromByTxHash,
+			},
+		}
+
+		tx1 := &types.Transaction{Nonce: 0, From: addr1}
+		tx2 := &types.Transaction{Nonce: 1, From: types.ZeroAddress}
+
+		computeTxHashes(tx1, tx2)
+
+		txFromByTxHash[tx2.Hash] = addr2
+
+		transactions := []*types.Transaction{
+			tx1,
+			tx2,
+		}
+
+		assert.True(
+			t,
+			chain.recoverFromFieldsInTransactions(transactions),
+		)
+	})
+
+	t.Run("should succeed even though recovery fails for some transactions", func(t *testing.T) {
+		t.Parallel()
+
+		txFromByTxHash := map[types.Hash]types.Address{}
+		chain := &Blockchain{
+			logger: hclog.NewNullLogger(),
+			txSigner: &mockSigner{
+				txFromByTxHash: txFromByTxHash,
+			},
+		}
+
+		tx1 := &types.Transaction{Nonce: 0, From: types.ZeroAddress}
+		tx2 := &types.Transaction{Nonce: 1, From: types.ZeroAddress}
+		tx3 := &types.Transaction{Nonce: 2, From: types.ZeroAddress}
+
+		computeTxHashes(tx1, tx2, tx3)
+
+		// returns only addresses for tx1 and tx3
+		txFromByTxHash[tx1.Hash] = addr1
+		txFromByTxHash[tx3.Hash] = addr3
+
+		transactions := []*types.Transaction{
+			tx1,
+			tx2,
+			tx3,
+		}
+
+		assert.True(t, chain.recoverFromFieldsInTransactions(transactions))
+
+		assert.Equal(t, addr1, tx1.From)
+		assert.Equal(t, types.ZeroAddress, tx2.From)
+		assert.Equal(t, addr3, tx3.From)
+	})
+
+	t.Run("should return false if all transactions has from field", func(t *testing.T) {
+		t.Parallel()
+
+		txFromByTxHash := map[types.Hash]types.Address{}
+		chain := &Blockchain{
+			logger: hclog.NewNullLogger(),
+			txSigner: &mockSigner{
+				txFromByTxHash: txFromByTxHash,
+			},
+		}
+
+		tx1 := &types.Transaction{Nonce: 0, From: addr1}
+		tx2 := &types.Transaction{Nonce: 1, From: addr2}
+
+		computeTxHashes(tx1, tx2)
+
+		txFromByTxHash[tx2.Hash] = addr2
+
+		transactions := []*types.Transaction{
+			tx1,
+			tx2,
+		}
+
+		assert.False(
+			t,
+			chain.recoverFromFieldsInTransactions(transactions),
+		)
+	})
+}
+
+func TestBlockchainReadBody(t *testing.T) {
 	storage, err := memory.NewMemoryStorage(nil)
 	assert.NoError(t, err)
 
+	txFromByTxHash := make(map[types.Hash]types.Address)
+	addr := types.StringToAddress("1")
+
 	b := &Blockchain{
-		db: storage,
+		logger: hclog.NewNullLogger(),
+		db:     storage,
+		txSigner: &mockSigner{
+			txFromByTxHash: txFromByTxHash,
+		},
 	}
+
+	tx := &types.Transaction{
+		Value: big.NewInt(10),
+		V:     big.NewInt(1),
+	}
+
+	tx.ComputeHash()
 
 	block := &types.Block{
 		Header: &types.Header{},
 		Transactions: []*types.Transaction{
-			{
-				Value: big.NewInt(10),
-				V:     big.NewInt(1),
-			},
+			tx,
 		},
 	}
+
 	block.Header.ComputeHash()
+
+	txFromByTxHash[tx.Hash] = types.ZeroAddress
 
 	if err := b.writeBody(block); err != nil {
 		t.Fatal(err)
 	}
+
+	txFromByTxHash[tx.Hash] = addr
+
+	readBody, found := b.readBody(block.Hash())
+
+	assert.True(t, found)
+	assert.Equal(t, addr, readBody.Transactions[0].From)
 }
 
 func TestCalculateGasLimit(t *testing.T) {

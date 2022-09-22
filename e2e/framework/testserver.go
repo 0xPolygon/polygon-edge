@@ -1,13 +1,16 @@
 package framework
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"math/big"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -341,10 +344,6 @@ func (t *TestServer) Start(ctx context.Context) error {
 		args = append(args, "--data-dir", t.Config.RootDir)
 	}
 
-	if t.Config.Seal {
-		args = append(args, "--seal")
-	}
-
 	if t.Config.PriceLimit != nil {
 		args = append(args, "--price-limit", strconv.FormatUint(*t.Config.PriceLimit, 10))
 	}
@@ -637,4 +636,47 @@ func (t *TestServer) InvokeMethod(
 	}
 
 	return receipt
+}
+
+func (t *TestServer) CallJSONRPC(req map[string]interface{}) map[string]interface{} {
+	reqJSON, err := json.Marshal(req)
+	if err != nil {
+		t.t.Fatal(err)
+
+		return nil
+	}
+
+	url := fmt.Sprintf("http://%s", t.JSONRPCAddr())
+
+	//nolint:gosec // this is not used because it can't be defined as a global variable
+	response, err := http.Post(url, "application/json", bytes.NewReader(reqJSON))
+	if err != nil {
+		t.t.Fatalf("failed to send request to JSON-RPC server: %v", err)
+
+		return nil
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		t.t.Fatalf("JSON-RPC doesn't return ok: %s", response.Status)
+
+		return nil
+	}
+
+	bodyBytes, err := io.ReadAll(response.Body)
+	if err != nil {
+		t.t.Fatalf("failed to read HTTP body: %s", err)
+
+		return nil
+	}
+
+	result := map[string]interface{}{}
+
+	if err := json.Unmarshal(bodyBytes, &result); err != nil {
+		t.t.Fatalf("failed to convert json to object: %s", err)
+
+		return nil
+	}
+
+	return result
 }

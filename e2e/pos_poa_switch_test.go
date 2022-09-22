@@ -36,7 +36,6 @@ func TestPoAPoSSwitch(t *testing.T) {
 		IBFTMinNodes,
 		IBFTDirPrefix,
 		func(i int, config *framework.TestServerConfig) {
-			config.SetSeal(true)
 			config.PremineValidatorBalance(defaultBalance)
 		})
 

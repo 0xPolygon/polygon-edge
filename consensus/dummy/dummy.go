@@ -11,7 +11,6 @@ import (
 )
 
 type Dummy struct {
-	sealing    bool
 	logger     hclog.Logger
 	notifyCh   chan struct{}
 	closeCh    chan struct{}
@@ -24,7 +23,6 @@ func Factory(params *consensus.Params) (consensus.Consensus, error) {
 	logger := params.Logger.Named("dummy")
 
 	d := &Dummy{
-		sealing:    params.Seal,
 		logger:     logger,
 		notifyCh:   make(chan struct{}),
 		closeCh:    make(chan struct{}),
@@ -38,6 +36,8 @@ func Factory(params *consensus.Params) (consensus.Consensus, error) {
 
 // Initialize initializes the consensus
 func (d *Dummy) Initialize() error {
+	d.txpool.SetSealing(true)
+
 	return nil
 }
 

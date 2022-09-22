@@ -157,6 +157,8 @@ type account struct {
 	enqueued, promoted *accountQueue
 	nextNonce          uint64
 	demotions          uint64
+	// the number of consecutive blocks that don't contain account's transaction
+	skips uint64
 
 	//	maximum number of enqueued transactions
 	maxEnqueued uint64
@@ -300,4 +302,34 @@ func (a *account) promote() (promoted []*types.Transaction, pruned []*types.Tran
 	}
 
 	return
+}
+
+// resetSkips sets 0 to skips
+func (a *account) resetSkips() {
+	a.skips = 0
+}
+
+// incrementSkips increments skips
+func (a *account) incrementSkips() {
+	a.skips++
+}
+
+// getLowestTx returns the transaction with lowest nonce, which might be popped next
+// this method don't pop a transaction from both queues
+func (a *account) getLowestTx() *types.Transaction {
+	a.promoted.lock(true)
+	defer a.promoted.unlock()
+
+	if firstPromoted := a.promoted.peek(); firstPromoted != nil {
+		return firstPromoted
+	}
+
+	a.enqueued.lock(true)
+	defer a.enqueued.unlock()
+
+	if firstEnqueued := a.enqueued.peek(); firstEnqueued != nil {
+		return firstEnqueued
+	}
+
+	return nil
 }

@@ -41,6 +41,7 @@ type txPoolInterface interface {
 	Drop(tx *types.Transaction)
 	Demote(tx *types.Transaction)
 	ResetWithHeaders(headers ...*types.Header)
+	SetSealing(bool)
 }
 
 // backendIBFT represents the IBFT consensus mechanism object
@@ -76,8 +77,6 @@ type backendIBFT struct {
 	quorumSizeBlockNum uint64
 
 	blockTime time.Duration // Minimum block generation time in seconds
-
-	sealing bool // Flag indicating if the node is a sealer
 
 	closeCh chan struct{} // Channel for closing
 }
@@ -121,7 +120,6 @@ func Factory(params *consensus.Params) (consensus.Consensus, error) {
 		network:            params.Network,
 		epochSize:          epochSize,
 		quorumSizeBlockNum: quorumSizeBlockNum,
-		sealing:            params.Seal,
 		metrics:            params.Metrics,
 		secretsManager:     params.SecretsManager,
 		blockTime:          time.Duration(params.BlockTime) * time.Second,
@@ -393,6 +391,8 @@ func (i *backendIBFT) startConsensus() {
 
 		isValidator = i.isActiveValidator()
 
+		i.txpool.SetSealing(isValidator)
+
 		if isValidator {
 			sequenceCh = i.consensus.runSequence(pending)
 		}
@@ -462,11 +462,6 @@ func (i *backendIBFT) updateMetrics(block *types.Block) {
 var (
 	errBlockVerificationFailed = errors.New("block verification fail")
 )
-
-// isSealing checks if the current node is sealing blocks
-func (i *backendIBFT) isSealing() bool {
-	return i.sealing
-}
 
 // verifyHeaderImpl implements the actual header verification logic
 func (i *backendIBFT) verifyHeaderImpl(snap *Snapshot, parent, header *types.Header) error {

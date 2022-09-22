@@ -1,76 +1,53 @@
 package blockchain
 
 import (
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/stretchr/testify/assert"
 )
 
-func TestSubscriptionLinear(t *testing.T) {
-	e := &eventStream{}
+func TestSubscription(t *testing.T) {
+	t.Parallel()
 
-	// add a genesis block to eventstream
-	e.push(&Event{
-		NewChain: []*types.Header{
-			{Number: 0},
-		},
-	})
+	var (
+		e              = &eventStream{}
+		sub            = e.subscribe()
+		caughtEventNum = uint64(0)
+		event          = &Event{
+			NewChain: []*types.Header{
+				{
+					Number: 100,
+				},
+			},
+		}
 
-	sub := e.subscribe()
+		wg sync.WaitGroup
+	)
 
-	eventCh := make(chan *Event)
+	defer sub.Close()
+
+	updateCh := sub.GetEventCh()
+
+	wg.Add(1)
 
 	go func() {
-		for {
-			task := sub.GetEvent()
-			eventCh <- task
+		defer wg.Done()
+
+		select {
+		case ev := <-updateCh:
+			caughtEventNum = ev.NewChain[0].Number
+		case <-time.After(5 * time.Second):
 		}
 	}()
 
-	for i := 1; i < 10; i++ {
-		evnt := &Event{}
+	// Send the event to the channel
+	e.push(event)
 
-		evnt.AddNewHeader(&types.Header{Number: uint64(i)})
-		e.push(evnt)
+	// Wait for the event to be parsed
+	wg.Wait()
 
-		// it should fire updateCh
-		select {
-		case evnt := <-eventCh:
-			if evnt.NewChain[0].Number != uint64(i) {
-				t.Fatal("bad")
-			}
-		case <-time.After(1 * time.Second):
-			t.Fatal("timeout")
-		}
-	}
-}
-
-func TestSubscriptionSlowConsumer(t *testing.T) {
-	e := &eventStream{}
-
-	e.push(&Event{
-		NewChain: []*types.Header{
-			{Number: 0},
-		},
-	})
-
-	sub := e.subscribe()
-
-	// send multiple events
-	for i := 1; i < 10; i++ {
-		e.push(&Event{
-			NewChain: []*types.Header{
-				{Number: uint64(i)},
-			},
-		})
-	}
-
-	// consume events now
-	for i := 1; i < 10; i++ {
-		evnt := sub.GetEvent()
-		if evnt.NewChain[0].Number != uint64(i) {
-			t.Fatal("bad")
-		}
-	}
+	assert.Equal(t, event.NewChain[0].Number, caughtEventNum)
 }
