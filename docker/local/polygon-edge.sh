@@ -19,8 +19,8 @@ case "$1" in
         --dir /genesis/genesis.json \
         --consensus ibft \
         --ibft-validators-prefix-path data- \
-        --bootnode /dns4/node-1/tcp/10001/p2p/"$node1id" \
-        --bootnode /dns4/node-2/tcp/10001/p2p/"$node2id"
+        --bootnode /dns4/node-1/tcp/1478/p2p/"$node1id" \
+        --bootnode /dns4/node-2/tcp/1478/p2p/"$node2id"
       echo "Genesis file has been successfully generated"
       ;;
 
