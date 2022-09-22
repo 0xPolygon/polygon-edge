@@ -117,14 +117,11 @@ func TestSAMPool_Prune(t *testing.T) {
 			}
 
 			assert.NoError(t, pool.AddMessage(msg))
-
-			_, ok := pool.messages[msg.Index]
-			assert.True(t, ok)
+			assert.Contains(t, pool.messages, msg.Index)
 
 			pool.Prune(5)
 
-			_, ok = pool.messages[msg.Index]
-			assert.False(t, ok)
+			assert.NotContains(t, pool.messages, msg.Index)
 		},
 	)
 
@@ -143,14 +140,11 @@ func TestSAMPool_Prune(t *testing.T) {
 			}
 
 			assert.NoError(t, pool.AddMessage(msg))
-
-			_, ok := pool.messages[msg.Index]
-			assert.True(t, ok)
+			assert.Contains(t, pool.messages, msg.Index)
 
 			pool.Prune(5)
 
-			_, ok = pool.messages[msg.Index]
-			assert.True(t, ok)
+			assert.Contains(t, pool.messages, msg.Index)
 		},
 	)
 }
@@ -223,8 +217,7 @@ func TestSAMPool_Pop(t *testing.T) {
 			assert.NoError(t, pool.AddMessage(msg))
 			assert.NotNil(t, pool.Pop())
 
-			_, ok := pool.messages[msg.Index]
-			assert.False(t, ok)
+			assert.NotContains(t, pool.messages, msg.Index)
 			assert.Equal(t, uint64(5), pool.lastProcessedIndex)
 		},
 	)
