@@ -135,6 +135,14 @@
       "created_at": "2022-09-21T13:48:55Z",
       "repoId": 287542207,
       "pullRequestNo": 747
+    },
+    {
+      "name": "igorcrevar",
+      "id": 729576,
+      "comment_id": 1254781322,
+      "created_at": "2022-09-22T09:42:02Z",
+      "repoId": 287542207,
+      "pullRequestNo": 753
     }
   ]
 }
