@@ -3,6 +3,7 @@ package sampool
 import (
 	"errors"
 	"fmt"
+	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"sync"
 
 	"github.com/hashicorp/go-hclog"
@@ -151,4 +152,11 @@ func (p *SAMPool) addSAM(msg rootchain.SAM) {
 	}
 
 	bucket.add(msg)
+
+	p.logger.Debug(
+		"added SAM",
+		"index", msg.Index,
+		"hash", msg.Hash.String(),
+		"signature", hex.EncodeToHex(msg.Signature),
+	)
 }
