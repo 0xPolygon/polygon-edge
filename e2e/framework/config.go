@@ -29,7 +29,6 @@ type TestServerConfig struct {
 	JSONRPCPort             int                  // The JSON RPC endpoint port
 	GRPCPort                int                  // The GRPC endpoint port
 	LibP2PPort              int                  // The Libp2p endpoint port
-	Seal                    bool                 // Flag indicating if blocks should be sealed
 	RootDir                 string               // The root directory for test environment
 	IBFTDirPrefix           string               // The prefix of data directory for IBFT
 	IBFTDir                 string               // The name of data directory for IBFT
@@ -134,11 +133,6 @@ func (t *TestServerConfig) SetIBFTDirPrefix(ibftDirPrefix string) {
 // SetIBFTDir callback sets the name of data directory for IBFT
 func (t *TestServerConfig) SetIBFTDir(ibftDir string) {
 	t.IBFTDir = ibftDir
-}
-
-// SetSeal callback toggles the seal mode
-func (t *TestServerConfig) SetSeal(state bool) {
-	t.Seal = state
 }
 
 // SetBootnodes sets bootnodes

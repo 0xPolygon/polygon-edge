@@ -131,7 +131,6 @@ func TestEthTransfer(t *testing.T) {
 
 	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDev)
-		config.SetSeal(true)
 		for _, acc := range validAccounts {
 			config.Premine(acc.address, acc.balance)
 		}
@@ -236,7 +235,6 @@ func TestFromFieldInTx(t *testing.T) {
 		IBFTDirPrefix,
 		func(i int, config *framework.TestServerConfig) {
 			config.Premine(senderAddr, framework.EthToWei(10))
-			config.SetSeal(true)
 		},
 	)
 
@@ -415,9 +413,9 @@ func Test_TransactionIBFTLoop(t *testing.T) {
 		IBFTDirPrefix,
 		func(i int, config *framework.TestServerConfig) {
 			config.Premine(sender, defaultBalance)
-			config.SetSeal(true)
 			config.SetBlockLimit(20000000)
-		})
+		},
+	)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()

@@ -344,10 +344,6 @@ func (t *TestServer) Start(ctx context.Context) error {
 		args = append(args, "--data-dir", t.Config.RootDir)
 	}
 
-	if t.Config.Seal {
-		args = append(args, "--seal")
-	}
-
 	if t.Config.PriceLimit != nil {
 		args = append(args, "--price-limit", strconv.FormatUint(*t.Config.PriceLimit, 10))
 	}
