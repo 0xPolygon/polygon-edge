@@ -72,7 +72,7 @@ func (e *Executor) WriteGenesis(alloc map[types.Address]*chain.GenesisAccount) t
 	}
 
 	objs := txn.Commit(false)
-	_, root := txn.snapshot.Commit(objs)
+	_, root := snap.Commit(objs)
 
 	return types.BytesToHash(root)
 }

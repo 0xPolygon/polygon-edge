@@ -340,5 +340,6 @@ func testChangeAccountBalanceToZero(t *testing.T, buildPreState buildPreState) {
 
 func buildNewSnapshot(txn *Txn, snapshot Snapshot, deleteEmptyObjects bool) (Snapshot, []byte) {
 	objs := txn.Commit(deleteEmptyObjects)
+
 	return txn.snapshot.Commit(objs)
 }
