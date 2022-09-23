@@ -1,0 +1,99 @@
+version: '3.5'
+
+services:
+  ## INITIALIZE GENESIS AND SECRETS
+  init:
+    build:
+      context: ../../
+      dockerfile: docker/local/Dockerfile
+    command: ["init"]
+    volumes:
+      - node-1:/polygon-edge/data-1
+      - node-2:/polygon-edge/data-2
+      - node-3:/polygon-edge/data-3
+      - node-4:/polygon-edge/data-4
+      - genesis:/genesis
+    networks:
+      - polygon-edge-docker
+  
+  ## RUN NODES
+  ## Nodes must have the same names as folders in genesis-legde
+  node-1:
+    build:
+      context: ../../
+      dockerfile: docker/local/Dockerfile
+    command: ["server", "--data-dir", "/data", "--chain", "/genesis/genesis.json", "--grpc-address", "0.0.0.0:9632", "--libp2p", "0.0.0.0:1478", "--jsonrpc", "0.0.0.0:8545", "--seal"]
+    depends_on:
+      - init
+    ports:
+      - '10000:9632'
+      - '10002:8545'
+    volumes:
+      - node-1:/data
+      - genesis:/genesis
+    networks:
+      - polygon-edge-docker
+    restart: on-failure
+    
+  node-2:
+    build:
+      context: ../../
+      dockerfile: docker/local/Dockerfile
+    command: ["server", "--data-dir", "/data", "--chain", "/genesis/genesis.json", "--grpc-address", "0.0.0.0:9632", "--libp2p", "0.0.0.0:1478", "--jsonrpc", "0.0.0.0:8545", "--seal"]
+    depends_on:
+      - init
+    ports:
+      - '20000:9632'
+      - '20002:8545'
+    volumes:
+      - node-2:/data
+      - genesis:/genesis
+    networks:
+      - polygon-edge-docker
+    restart: on-failure
+    
+  node-3:
+    build:
+      context: ../../
+      dockerfile: docker/local/Dockerfile
+    command: ["server", "--data-dir", "/data", "--chain", "/genesis/genesis.json", "--grpc-address", "0.0.0.0:9632", "--libp2p", "0.0.0.0:1478", "--jsonrpc", "0.0.0.0:8545", "--seal"]
+    depends_on:
+      - init
+    ports:
+      - '30000:9632'
+      - '30002:8545'
+    volumes:
+      - node-3:/data
+      - genesis:/genesis
+    networks:
+      - polygon-edge-docker
+    restart: on-failure
+    
+  node-4:
+    build:
+      context: ../../
+      dockerfile: docker/local/Dockerfile
+    command: ["server", "--data-dir", "/data", "--chain", "/genesis/genesis.json", "--grpc-address", "0.0.0.0:9632", "--libp2p", "0.0.0.0:1478", "--jsonrpc", "0.0.0.0:8545", "--seal"]
+    depends_on:
+      - init
+    ports:
+      - '40000:9632'
+      - '40002:8545'
+    volumes:
+      - node-4:/data
+      - genesis:/genesis
+    networks:
+      - polygon-edge-docker
+    restart: on-failure
+
+networks:
+  polygon-edge-docker:
+    driver: bridge
+    name: polygon-edge-docker
+
+volumes:
+  node-1:
+  node-2:
+  node-3:
+  node-4:
+  genesis:

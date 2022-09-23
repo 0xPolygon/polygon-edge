@@ -44,3 +44,12 @@ test:
 	go build -o artifacts/polygon-edge .
 	$(eval export PATH=$(shell pwd)/artifacts:$(PATH))
 	go test -timeout 28m ./...
+
+.PHONY: run-local
+run-local:
+	docker-compose -f ./docker/local/docker-compose.yml up -d --build
+
+.PHONY: stop-local
+stop-local:
+	docker-compose -f ./docker/local/docker-compose.yml stop
+
