@@ -1,4 +1,4 @@
-FROM golang:1.18-alpine AS builder
+FROM golang:1.17-alpine AS builder
 
 WORKDIR /polygon-edge
 
@@ -11,7 +11,7 @@ RUN go build -o polygon-edge main.go
 
 FROM alpine:latest AS runner
 
-RUN apk --no-cache add ca-certificates
+RUN apk --no-cache add ca-certificates jq
 
 WORKDIR /polygon-edge
 

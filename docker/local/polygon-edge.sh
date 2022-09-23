@@ -8,8 +8,8 @@ case "$1" in
 
    "init")
       echo "Generating secrets..."
-      node1id=$("$POLYGON_EDGE_BIN" secrets init --data-dir data-1 | grep Node | awk -F ' ' '{print $4}')
-      node2id=$("$POLYGON_EDGE_BIN" secrets init --data-dir data-2 | grep Node | awk -F ' ' '{print $4}')
+      node1id=$("$POLYGON_EDGE_BIN" secrets init --data-dir data-1 | jq -r '.node_id')
+      node2id=$("$POLYGON_EDGE_BIN" secrets init --data-dir data-2 | jq -r '.node_id')
       "$POLYGON_EDGE_BIN" secrets init --data-dir data-3
       "$POLYGON_EDGE_BIN" secrets init --data-dir data-4
       echo "Secrets have been successfully generated"
