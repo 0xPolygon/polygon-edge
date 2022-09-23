@@ -6,8 +6,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/connmgr"
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/connmgr"
+	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/benbjohnson/clock"
 )
@@ -62,9 +62,9 @@ type DecayerCfg struct {
 // WithDefaults writes the default values on this DecayerConfig instance,
 // and returns itself for chainability.
 //
-//  cfg := (&DecayerCfg{}).WithDefaults()
-//  cfg.Resolution = 30 * time.Second
-//  t := NewDecayer(cfg, cm)
+//	cfg := (&DecayerCfg{}).WithDefaults()
+//	cfg.Resolution = 30 * time.Second
+//	t := NewDecayer(cfg, cm)
 func (cfg *DecayerCfg) WithDefaults() *DecayerCfg {
 	cfg.Resolution = DefaultResolution
 	return cfg

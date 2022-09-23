@@ -3,7 +3,7 @@ package yamux
 import (
 	"context"
 
-	"github.com/libp2p/go-libp2p-core/network"
+	"github.com/libp2p/go-libp2p/core/network"
 
 	"github.com/libp2p/go-yamux/v3"
 )
@@ -12,6 +12,11 @@ import (
 type conn yamux.Session
 
 var _ network.MuxedConn = &conn{}
+
+// NewMuxedConn constructs a new MuxedConn from a yamux.Session.
+func NewMuxedConn(m *yamux.Session) network.MuxedConn {
+	return (*conn)(m)
+}
 
 // Close closes underlying yamux
 func (c *conn) Close() error {

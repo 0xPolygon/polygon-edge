@@ -1,17 +1,16 @@
 package kbucket
 
 import (
-	"bytes"
 	"errors"
+	"github.com/minio/sha256-simd"
 
-	"github.com/libp2p/go-libp2p-core/peer"
 	ks "github.com/libp2p/go-libp2p-kbucket/keyspace"
+	"github.com/libp2p/go-libp2p/core/peer"
 
 	u "github.com/ipfs/go-ipfs-util"
-	"github.com/minio/sha256-simd"
 )
 
-// Returned if a routing table query returns no results. This is NOT expected
+// ErrLookupFailure is returned if a routing table query returns no results. This is NOT expected
 // behaviour
 var ErrLookupFailure = errors.New("failed to find any peer in table")
 
@@ -20,10 +19,6 @@ var ErrLookupFailure = errors.New("failed to find any peer in table")
 // The type dht.ID signifies that its contents have been hashed from either a
 // peer.ID or a util.Key. This unifies the keyspace
 type ID []byte
-
-func (id ID) equal(other ID) bool {
-	return bytes.Equal(id, other)
-}
 
 func (id ID) less(other ID) bool {
 	a := ks.Key{Space: ks.XORKeySpace, Bytes: id}

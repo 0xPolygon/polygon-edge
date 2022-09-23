@@ -5,10 +5,10 @@ import (
 	"sync"
 	"time"
 
-	lru "github.com/hashicorp/golang-lru"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/peer"
 
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/peer"
+	lru "github.com/hashicorp/golang-lru"
 )
 
 // BackoffConnector is a utility to connect to peers, but only if we have not recently tried connecting to them already

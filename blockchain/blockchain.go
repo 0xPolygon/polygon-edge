@@ -87,7 +87,7 @@ type Verifier interface {
 	VerifyHeader(header *types.Header) error
 	ProcessHeaders(headers []*types.Header) error
 	GetBlockCreator(header *types.Header) (types.Address, error)
-	PreStateCommit(header *types.Header, txn *state.Transition) error
+	PreCommitState(header *types.Header, txn *state.Transition) error
 }
 
 type Executor interface {
@@ -843,7 +843,7 @@ func (b *Blockchain) executeBlockTransactions(block *types.Block) (*BlockResult,
 		return nil, err
 	}
 
-	if err := b.consensus.PreStateCommit(header, txn); err != nil {
+	if err := b.consensus.PreCommitState(header, txn); err != nil {
 		return nil, err
 	}
 

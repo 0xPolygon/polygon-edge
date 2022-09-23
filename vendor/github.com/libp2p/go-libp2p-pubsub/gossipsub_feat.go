@@ -3,7 +3,7 @@ package pubsub
 import (
 	"fmt"
 
-	"github.com/libp2p/go-libp2p-core/protocol"
+	"github.com/libp2p/go-libp2p/core/protocol"
 )
 
 // GossipSubFeatureTest is a feature test function; it takes a feature and a protocol ID and

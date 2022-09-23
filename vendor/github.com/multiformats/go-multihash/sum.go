@@ -1,7 +1,6 @@
 package multihash
 
 import (
-	"errors"
 	"fmt"
 	"hash"
 	"io"
@@ -12,14 +11,14 @@ import (
 // ErrSumNotSupported is returned when the Sum function code is not implemented
 var ErrSumNotSupported = mhreg.ErrSumNotSupported
 
-var ErrLenTooLarge = errors.New("requested length was too large for digest")
+var ErrLenTooLarge = mhreg.ErrLenTooLarge
 
 // Sum obtains the cryptographic sum of a given buffer. The length parameter
 // indicates the length of the resulting digest. Passing a negative value uses
 // default length values for the selected hash function.
 func Sum(data []byte, code uint64, length int) (Multihash, error) {
 	// Get the algorithm.
-	hasher, err := GetHasher(code)
+	hasher, err := mhreg.GetVariableHasher(code, length)
 	if err != nil {
 		return nil, err
 	}
@@ -35,7 +34,7 @@ func Sum(data []byte, code uint64, length int) (Multihash, error) {
 // value uses default length values for the selected hash function.
 func SumStream(r io.Reader, code uint64, length int) (Multihash, error) {
 	// Get the algorithm.
-	hasher, err := GetHasher(code)
+	hasher, err := mhreg.GetVariableHasher(code, length)
 	if err != nil {
 		return nil, err
 	}

@@ -15,13 +15,13 @@ import (
 
 func TestKeyEncoding(t *testing.T) {
 	for i := 0; i < 10; i++ {
-		priv, _ := GenerateKey()
+		priv, _ := GenerateECDSAKey()
 
 		// marshall private key
-		buf, err := MarshalPrivateKey(priv)
+		buf, err := MarshalECDSAPrivateKey(priv)
 		assert.NoError(t, err)
 
-		priv0, err := ParsePrivateKey(buf)
+		priv0, err := ParseECDSAPrivateKey(buf)
 		assert.NoError(t, err)
 
 		assert.Equal(t, priv, priv0)
@@ -204,7 +204,7 @@ func TestPrivateKeyRead(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			privateKey, err := BytesToPrivateKey([]byte(testCase.privateKeyHex))
+			privateKey, err := BytesToECDSAPrivateKey([]byte(testCase.privateKeyHex))
 			if err != nil && !testCase.shouldFail {
 				t.Fatalf("Unable to parse private key, %v", err)
 			}

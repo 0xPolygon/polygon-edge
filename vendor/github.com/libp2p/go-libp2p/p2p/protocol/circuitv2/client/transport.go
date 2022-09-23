@@ -5,11 +5,10 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/libp2p/go-libp2p-core/network"
-
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/transport"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/transport"
 
 	ma "github.com/multiformats/go-multiaddr"
 )
@@ -50,7 +49,7 @@ var _ transport.Transport = (*Client)(nil)
 var _ io.Closer = (*Client)(nil)
 
 func (c *Client) Dial(ctx context.Context, a ma.Multiaddr, p peer.ID) (transport.CapableConn, error) {
-	connScope, err := c.host.Network().ResourceManager().OpenConnection(network.DirOutbound, false)
+	connScope, err := c.host.Network().ResourceManager().OpenConnection(network.DirOutbound, false, a)
 	if err != nil {
 		return nil, err
 	}

@@ -1,6 +1,6 @@
 package event
 
-import "github.com/libp2p/go-libp2p-core/peer"
+import "github.com/libp2p/go-libp2p/core/peer"
 
 type PeerEventType uint
 

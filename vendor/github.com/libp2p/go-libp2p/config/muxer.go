@@ -3,11 +3,9 @@ package config
 import (
 	"fmt"
 
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/network"
 	msmux "github.com/libp2p/go-libp2p/p2p/muxer/muxer-multistream"
-
-	"github.com/libp2p/go-libp2p-core/network"
-
-	"github.com/libp2p/go-libp2p-core/host"
 )
 
 // MuxC is a stream multiplex transport constructor.

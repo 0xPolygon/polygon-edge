@@ -27,11 +27,12 @@ var (
 
 // ErrInconsistentLen is returned when a decoded multihash has an inconsistent length
 type ErrInconsistentLen struct {
-	dm *DecodedMultihash
+	dm          *DecodedMultihash
+	lengthFound int
 }
 
 func (e ErrInconsistentLen) Error() string {
-	return fmt.Sprintf("multihash length inconsistent: expected %d, got %d", e.dm.Length, len(e.dm.Digest))
+	return fmt.Sprintf("multihash length inconsistent: expected %d; got %d", e.dm.Length, e.lengthFound)
 }
 
 // constants
@@ -143,6 +144,7 @@ var Codes = map[uint64]string{
 	MD5:                       "md5",
 }
 
+// reads a varint from buf and returns bytes read.
 func uvarint(buf []byte) (uint64, []byte, error) {
 	n, c, err := varint.FromUvarint(buf)
 	if err != nil {
@@ -233,7 +235,7 @@ func Decode(buf []byte) (*DecodedMultihash, error) {
 	}
 
 	if len(buf) != rlen {
-		return nil, ErrInconsistentLen{dm}
+		return nil, ErrInconsistentLen{dm, rlen}
 	}
 
 	return dm, nil
@@ -264,8 +266,8 @@ func EncodeName(buf []byte, name string) ([]byte, error) {
 // Note: the returned digest is a slice over the passed in data and should be
 // copied if the buffer will be reused
 func readMultihashFromBuf(buf []byte) (int, uint64, []byte, error) {
-	bufl := len(buf)
-	if bufl < 2 {
+	initBufLength := len(buf)
+	if initBufLength < 2 {
 		return 0, 0, nil, ErrTooShort
 	}
 
@@ -289,7 +291,8 @@ func readMultihashFromBuf(buf []byte) (int, uint64, []byte, error) {
 		return 0, 0, nil, errors.New("length greater than remaining number of bytes in buffer")
 	}
 
-	rlen := (bufl - len(buf)) + int(length)
+	// rlen is the advertised size of the CID
+	rlen := (initBufLength - len(buf)) + int(length)
 	return rlen, code, buf[:length], nil
 }
 

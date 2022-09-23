@@ -8,24 +8,25 @@ import (
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft"
+	"github.com/0xPolygon/polygon-edge/consensus/ibft/fork"
+	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/contracts/staking"
 	stakingHelper "github.com/0xPolygon/polygon-edge/helper/staking"
 	"github.com/0xPolygon/polygon-edge/server"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/0xPolygon/polygon-edge/validators"
 )
 
 const (
-	dirFlag                 = "dir"
-	nameFlag                = "name"
-	premineFlag             = "premine"
-	chainIDFlag             = "chain-id"
-	ibftValidatorFlag       = "ibft-validator"
-	ibftValidatorPrefixFlag = "ibft-validators-prefix-path"
-	epochSizeFlag           = "epoch-size"
-	blockGasLimitFlag       = "block-gas-limit"
-	posFlag                 = "pos"
-	minValidatorCount       = "min-validator-count"
-	maxValidatorCount       = "max-validator-count"
+	dirFlag           = "dir"
+	nameFlag          = "name"
+	premineFlag       = "premine"
+	chainIDFlag       = "chain-id"
+	epochSizeFlag     = "epoch-size"
+	blockGasLimitFlag = "block-gas-limit"
+	posFlag           = "pos"
+	minValidatorCount = "min-validator-count"
+	maxValidatorCount = "max-validator-count"
 )
 
 // Legacy flags that need to be preserved for running clients
@@ -38,10 +39,9 @@ var (
 )
 
 var (
-	errValidatorsNotSpecified    = errors.New("validator information not specified")
-	errValidatorNumberExceedsMax = errors.New("validator number exceeds max validator number")
-	errUnsupportedConsensus      = errors.New("specified consensusRaw not supported")
-	errInvalidEpochSize          = errors.New("epoch size must be greater than 1")
+	errValidatorsNotSpecified = errors.New("validator information not specified")
+	errUnsupportedConsensus   = errors.New("specified consensusRaw not supported")
+	errInvalidEpochSize       = errors.New("epoch size must be greater than 1")
 )
 
 type genesisParams struct {
@@ -51,7 +51,7 @@ type genesisParams struct {
 	validatorPrefixPath string
 	premine             []string
 	bootnodes           []string
-	ibftValidators      []types.Address
+	ibftValidators      validators.Validators
 
 	ibftValidatorsRaw []string
 
@@ -62,6 +62,9 @@ type genesisParams struct {
 
 	minNumValidators uint64
 	maxNumValidators uint64
+
+	rawIBFTValidatorType string
+	ibftValidatorType    validators.ValidatorType
 
 	extraData []byte
 	consensus server.ConsensusType
@@ -126,6 +129,10 @@ func (p *genesisParams) getRequiredFlags() []string {
 func (p *genesisParams) initRawParams() error {
 	p.consensus = server.ConsensusType(p.consensusRaw)
 
+	if err := p.initIBFTValidatorType(); err != nil {
+		return err
+	}
+
 	if err := p.initValidatorSet(); err != nil {
 		return err
 	}
@@ -137,53 +144,77 @@ func (p *genesisParams) initRawParams() error {
 }
 
 // setValidatorSetFromCli sets validator set from cli command
-func (p *genesisParams) setValidatorSetFromCli() {
-	if len(p.ibftValidatorsRaw) != 0 {
-		for _, val := range p.ibftValidatorsRaw {
-			p.ibftValidators = append(
-				p.ibftValidators,
-				types.StringToAddress(val),
-			)
-		}
+func (p *genesisParams) setValidatorSetFromCli() error {
+	if len(p.ibftValidatorsRaw) == 0 {
+		return nil
 	}
+
+	newValidators, err := validators.ParseValidators(p.ibftValidatorType, p.ibftValidatorsRaw)
+	if err != nil {
+		return err
+	}
+
+	if err = p.ibftValidators.Merge(newValidators); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // setValidatorSetFromPrefixPath sets validator set from prefix path
 func (p *genesisParams) setValidatorSetFromPrefixPath() error {
-	var readErr error
-
 	if !p.areValidatorsSetByPrefix() {
 		return nil
 	}
 
-	if p.ibftValidators, readErr = getValidatorsFromPrefixPath(
+	validators, err := command.GetValidatorsFromPrefixPath(
 		p.validatorPrefixPath,
-	); readErr != nil {
-		return fmt.Errorf("failed to read from prefix: %w", readErr)
+		p.ibftValidatorType,
+	)
+
+	if err != nil {
+		return fmt.Errorf("failed to read from prefix: %w", err)
+	}
+
+	if err := p.ibftValidators.Merge(validators); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (p *genesisParams) initIBFTValidatorType() error {
+	var err error
+	if p.ibftValidatorType, err = validators.ParseValidatorType(p.rawIBFTValidatorType); err != nil {
+		return err
 	}
 
 	return nil
 }
 
 func (p *genesisParams) initValidatorSet() error {
+	p.ibftValidators = validators.NewValidatorSetFromType(p.ibftValidatorType)
+
 	// Set validator set
 	// Priority goes to cli command over prefix path
 	if err := p.setValidatorSetFromPrefixPath(); err != nil {
 		return err
 	}
 
-	p.setValidatorSetFromCli()
+	if err := p.setValidatorSetFromCli(); err != nil {
+		return err
+	}
 
 	// Validate if validator number exceeds max number
 	if ok := p.isValidatorNumberValid(); !ok {
-		return errValidatorNumberExceedsMax
+		return command.ErrValidatorNumberExceedsMax
 	}
 
 	return nil
 }
 
 func (p *genesisParams) isValidatorNumberValid() bool {
-	return uint64(len(p.ibftValidators)) <= p.maxNumValidators
+	return p.ibftValidators == nil || uint64(p.ibftValidators.Len()) <= p.maxNumValidators
 }
 
 func (p *genesisParams) initIBFTExtraData() {
@@ -191,13 +222,22 @@ func (p *genesisParams) initIBFTExtraData() {
 		return
 	}
 
-	ibftExtra := &ibft.IstanbulExtra{
-		Validators:    p.ibftValidators,
-		ProposerSeal:  []byte{},
-		CommittedSeal: [][]byte{},
+	var committedSeal signer.Seals
+
+	switch p.ibftValidatorType {
+	case validators.ECDSAValidatorType:
+		committedSeal = new(signer.SerializedSeal)
+	case validators.BLSValidatorType:
+		committedSeal = new(signer.AggregatedSeal)
 	}
 
-	p.extraData = make([]byte, ibft.IstanbulExtraVanity)
+	ibftExtra := &signer.IstanbulExtra{
+		Validators:     p.ibftValidators,
+		ProposerSeal:   []byte{},
+		CommittedSeals: committedSeal,
+	}
+
+	p.extraData = make([]byte, signer.IstanbulExtraVanity)
 	p.extraData = ibftExtra.MarshalRLPTo(p.extraData)
 }
 
@@ -211,19 +251,20 @@ func (p *genesisParams) initConsensusEngineConfig() {
 	}
 
 	if p.isPos {
-		p.initIBFTEngineMap(ibft.PoS)
+		p.initIBFTEngineMap(fork.PoS)
 
 		return
 	}
 
-	p.initIBFTEngineMap(ibft.PoA)
+	p.initIBFTEngineMap(fork.PoA)
 }
 
-func (p *genesisParams) initIBFTEngineMap(mechanism ibft.MechanismType) {
+func (p *genesisParams) initIBFTEngineMap(ibftType fork.IBFTType) {
 	p.consensusEngineConfig = map[string]interface{}{
 		string(server.IBFTConsensus): map[string]interface{}{
-			"type":      mechanism,
-			"epochSize": p.epochSize,
+			fork.KeyType:          ibftType,
+			fork.KeyValidatorType: p.ibftValidatorType,
+			ibft.KeyEpochSize:     p.epochSize,
 		},
 	}
 }
@@ -288,7 +329,8 @@ func (p *genesisParams) shouldPredeployStakingSC() bool {
 }
 
 func (p *genesisParams) predeployStakingSC() (*chain.GenesisAccount, error) {
-	stakingAccount, predeployErr := stakingHelper.PredeployStakingSC(p.ibftValidators,
+	stakingAccount, predeployErr := stakingHelper.PredeployStakingSC(
+		p.ibftValidators,
 		stakingHelper.PredeployParams{
 			MinValidatorCount: p.minNumValidators,
 			MaxValidatorCount: p.maxNumValidators,

@@ -4,8 +4,8 @@ import (
 	"context"
 	"sync"
 
-	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
 
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
@@ -89,9 +89,9 @@ loop:
 				return
 			}
 
-			c := w.s.bestAcceptableConnToPeer(req.ctx, w.peer)
-			if c != nil {
-				req.resch <- dialResponse{conn: c}
+			c, err := w.s.bestAcceptableConnToPeer(req.ctx, w.peer)
+			if c != nil || err != nil {
+				req.resch <- dialResponse{conn: c, err: err}
 				continue loop
 			}
 
@@ -255,7 +255,7 @@ func (w *dialWorker) dispatchError(ad *addrDial, err error) {
 			// all addrs have erred, dispatch dial error
 			// but first do a last one check in case an acceptable connection has landed from
 			// a simultaneous dial that started later and added new acceptable addrs
-			c := w.s.bestAcceptableConnToPeer(pr.req.ctx, w.peer)
+			c, _ := w.s.bestAcceptableConnToPeer(pr.req.ctx, w.peer)
 			if c != nil {
 				pr.req.resch <- dialResponse{conn: c}
 			} else {

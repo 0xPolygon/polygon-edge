@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/elastic/gosigar"
-	"github.com/raulk/clock"
+	"github.com/benbjohnson/clock"
 )
 
 // ErrNotSupported is returned when the watchdog does not support the requested
@@ -191,7 +191,8 @@ func HeapDriven(limit uint64, minGOGC int, policyCtor PolicyCtor) (err error, st
 		// get the initial effective GOGC; guess it's 100 (default), and restore
 		// it to whatever it actually was. This works because SetGCPercent
 		// returns the previous value.
-		originalGOGC := debug.SetGCPercent(debug.SetGCPercent(100))
+		originalGOGC := debug.SetGCPercent(100)
+		debug.SetGCPercent(originalGOGC)
 		currGOGC := originalGOGC
 
 		var memstats runtime.MemStats

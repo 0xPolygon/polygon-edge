@@ -17,7 +17,17 @@ import (
 	"github.com/multiformats/go-multihash/core"
 )
 
-func init() {
-	multihash.Register(multihash.BLAKE3, func() hash.Hash { h := blake3.New(32, nil); return h })
+const DefaultSize = 32
+const MaxSize = 128
 
+func init() {
+	multihash.RegisterVariableSize(multihash.BLAKE3, func(size int) (hash.Hash, bool) {
+		if size == -1 {
+			size = DefaultSize
+		} else if size > MaxSize || size <= 0 {
+			return nil, false
+		}
+		h := blake3.New(size, nil)
+		return h, true
+	})
 }

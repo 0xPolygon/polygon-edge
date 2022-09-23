@@ -21,7 +21,7 @@ hash combination.
 
 A comprehensive suite of tests is provided to ensure proper functionality.
 
-ECDSA use in Decred
+# ECDSA use in Decred
 
 At the time of this writing, ECDSA signatures are heavily used for proving coin
 ownership in Decred as the vast majority of transactions consist of what is
@@ -30,7 +30,7 @@ private key only known to the recipient of the coins along with an encumbrance
 that requires an ECDSA signature that proves the new owner possesses the private
 key without actually revealing it.
 
-Errors
+# Errors
 
 Errors returned by this package are of type ecdsa.Error and fully support the
 standard library errors.Is and errors.As functions.  This allows the caller to

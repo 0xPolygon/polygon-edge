@@ -204,10 +204,11 @@ func (msm *MultistreamMuxer) Negotiate(rwc io.ReadWriteCloser) (proto string, ha
 		}
 	}()
 
-	// Send our protocol ID
-	if err := delimWriteBuffered(rwc, []byte(ProtocolID)); err != nil {
-		return "", nil, err
-	}
+	// Send the multistream protocol ID
+	// Ignore the error here.  We want the handshake to finish, even if the
+	// other side has closed this rwc for writing. They may have sent us a
+	// message and closed. Future writers will get an error anyways.
+	_ = delimWriteBuffered(rwc, []byte(ProtocolID))
 
 	line, err := ReadNextToken(rwc)
 	if err != nil {
@@ -235,9 +236,10 @@ loop:
 			continue loop
 		}
 
-		if err := delimWriteBuffered(rwc, []byte(tok)); err != nil {
-			return "", nil, err
-		}
+		// Ignore the error here.  We want the handshake to finish, even if the
+		// other side has closed this rwc for writing. They may have sent us a
+		// message and closed. Future writers will get an error anyways.
+		_ = delimWriteBuffered(rwc, []byte(tok))
 
 		// hand off processing to the sub-protocol handler
 		return tok, h.Handle, nil
