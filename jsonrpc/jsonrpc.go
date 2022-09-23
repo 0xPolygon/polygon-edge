@@ -2,7 +2,7 @@ package jsonrpc
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"sync"
@@ -273,7 +273,7 @@ func (j *JSONRPC) handle(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	data, err := ioutil.ReadAll(req.Body)
+	data, err := io.ReadAll(req.Body)
 
 	if err != nil {
 		_, _ = w.Write([]byte(err.Error()))

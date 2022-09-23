@@ -7,11 +7,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/libp2p/go-eventbus"
-	"github.com/libp2p/go-libp2p-core/event"
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peerstore"
+	"github.com/libp2p/go-libp2p/core/event"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peerstore"
+	"github.com/libp2p/go-libp2p/p2p/host/eventbus"
 
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
@@ -51,9 +51,9 @@ type observation struct {
 
 // observedAddr is an entry for an address reported by our peers.
 // We only use addresses that:
-// - have been observed at least 4 times in last 40 minutes. (counter symmetric nats)
-// - have been observed at least once recently (10 minutes), because our position in the
-//   network, or network port mapppings, may have changed.
+//   - have been observed at least 4 times in last 40 minutes. (counter symmetric nats)
+//   - have been observed at least once recently (10 minutes), because our position in the
+//     network, or network port mapppings, may have changed.
 type observedAddr struct {
 	addr       ma.Multiaddr
 	seenBy     map[string]observation // peer(observer) address -> observation info
@@ -376,7 +376,7 @@ func (oas *ObservedAddrManager) maybeRecordObservation(conn network.Conn, observ
 	}
 
 	local := conn.LocalMultiaddr()
-	if !addrInAddrs(local, ifaceaddrs) && !addrInAddrs(local, oas.host.Network().ListenAddresses()) {
+	if !ma.Contains(ifaceaddrs, local) && !ma.Contains(oas.host.Network().ListenAddresses(), local) {
 		// not in our list
 		return
 	}

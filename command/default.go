@@ -6,7 +6,7 @@ const (
 	DefaultGenesisFileName = "genesis.json"
 	DefaultChainName       = "polygon-edge"
 	DefaultChainID         = 100
-	DefaultPremineBalance  = "0x3635C9ADC5DEA00000" // 1000 ETH
+	DefaultPremineBalance  = "0xD3C21BCECCEDA1000000" // 1 million units of native network currency
 	DefaultConsensus       = server.IBFTConsensus
 	DefaultGenesisGasUsed  = 458752  // 0x70000
 	DefaultGenesisGasLimit = 5242880 // 0x500000

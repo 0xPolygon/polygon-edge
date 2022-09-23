@@ -39,7 +39,7 @@ To learn more, check out the following resources:
 
 ## Usage
 
-This repository (`go-libp2p`) serves as the entrypoint to the universe of modules that compose the Go implementation of the libp2p stack.
+This repository (`go-libp2p`) serves as the entrypoint to the universe of packages that compose the Go implementation of the libp2p stack.
 
 You can start using go-libp2p in your Go application simply by adding imports from our repos, e.g.:
 
@@ -53,88 +53,9 @@ Examples can be found in the [examples folder](examples).
 
 ## Development
 
-### Using the go-libp2p Workspace
-
-While developing, you may need to make changes to several modules at once, or you may want changes made locally in one module to be available for import by another.
-
-The [go-libp2p workspace](https://github.com/libp2p/workspace-go-libp2p) provides a developer-oriented view of the modules that comprise go-libp2p.
-
-Using the tooling in the workspace repository, you can checkout all of go-libp2p's module repos and enter "local mode", which adds [replace directives](https://github.com/golang/go/wiki/Modules#gomod) to the go.mod files in each local working copy. When you build locally, the libp2p depdendencies will be resolved from your local working copies.
-
-Once you've committed your changes, you can switch back to "remote mode", which removes the replace directives and pulls imports from the main go module cache.
-
-See the [workspace repo](https://github.com/libp2p/workspace-go-libp2p) for more information.
-
 ### Tests
 
 `go test ./...` will run all tests in the repo.
-
-### Packages
-
-> This table is generated using the module [`package-table`](https://github.com/ipfs-shipyard/package-table) with `package-table --data=package-list.json`.
-
-List of packages currently in existence for libp2p:
-
-| Name | CI/Travis | Coverage | Description |
-| ---------|---------|---------|--------- |
-| **Libp2p** |
-| [`go-libp2p`](//github.com/libp2p/go-libp2p) | [![Travis CI](https://travis-ci.com/libp2p/go-libp2p.svg?branch=master)](https://travis-ci.com/libp2p/go-libp2p) | [![codecov](https://codecov.io/gh/libp2p/go-libp2p/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-libp2p) | go-libp2p entry point |
-| [`go-libp2p-core`](//github.com/libp2p/go-libp2p-core) | [![Travis CI](https://travis-ci.com/libp2p/go-libp2p-core.svg?branch=master)](https://travis-ci.com/libp2p/go-libp2p-core) | [![codecov](https://codecov.io/gh/libp2p/go-libp2p-core/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-libp2p-core) | core interfaces, types, and abstractions |
-| [`go-libp2p-blankhost`](//github.com/libp2p/go-libp2p-blankhost) | [![Travis CI](https://travis-ci.com/libp2p/go-libp2p-blankhost.svg?branch=master)](https://travis-ci.com/libp2p/go-libp2p-blankhost) | [![codecov](https://codecov.io/gh/libp2p/go-libp2p-blankhost/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-libp2p-blankhost) | minimal implementation of the "host" interface |
-| **Network** |
-| [`go-libp2p-swarm`](//github.com/libp2p/go-libp2p-swarm) | [![Travis CI](https://travis-ci.com/libp2p/go-libp2p-swarm.svg?branch=master)](https://travis-ci.com/libp2p/go-libp2p-swarm) | [![codecov](https://codecov.io/gh/libp2p/go-libp2p-swarm/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-libp2p-swarm) | reference implementation of network state machine |
-| **Transport** |
-| [`go-ws-transport`](//github.com/libp2p/go-ws-transport) | [![Travis CI](https://travis-ci.com/libp2p/go-ws-transport.svg?branch=master)](https://travis-ci.com/libp2p/go-ws-transport) | [![codecov](https://codecov.io/gh/libp2p/go-ws-transport/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-ws-transport) | WebSocket transport |
-| [`go-tcp-transport`](//github.com/libp2p/go-tcp-transport) | [![Travis CI](https://travis-ci.com/libp2p/go-tcp-transport.svg?branch=master)](https://travis-ci.com/libp2p/go-tcp-transport) | [![codecov](https://codecov.io/gh/libp2p/go-tcp-transport/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-tcp-transport) | TCP transport |
-| [`go-libp2p-quic-transport`](//github.com/libp2p/go-libp2p-quic-transport) | [![Travis CI](https://travis-ci.com/libp2p/go-libp2p-quic-transport.svg?branch=master)](https://travis-ci.com/libp2p/go-libp2p-quic-transport) | [![codecov](https://codecov.io/gh/libp2p/go-libp2p-quic-transport/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-libp2p-quic-transport) | QUIC transport |
-| [`go-udp-transport`](//github.com/libp2p/go-udp-transport) | [![Travis CI](https://travis-ci.com/libp2p/go-udp-transport.svg?branch=master)](https://travis-ci.com/libp2p/go-udp-transport) | [![codecov](https://codecov.io/gh/libp2p/go-udp-transport/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-udp-transport) | UDP transport |
-| [`go-utp-transport`](//github.com/libp2p/go-utp-transport) | [![Travis CI](https://travis-ci.com/libp2p/go-utp-transport.svg?branch=master)](https://travis-ci.com/libp2p/go-utp-transport) | [![codecov](https://codecov.io/gh/libp2p/go-utp-transport/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-utp-transport) | uTorrent transport (UTP) |
-| [`go-libp2p-circuit`](//github.com/libp2p/go-libp2p-circuit) | [![Travis CI](https://travis-ci.com/libp2p/go-libp2p-circuit.svg?branch=master)](https://travis-ci.com/libp2p/go-libp2p-circuit) | [![codecov](https://codecov.io/gh/libp2p/go-libp2p-circuit/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-libp2p-circuit) | relay transport |
-| [`go-libp2p-transport-upgrader`](//github.com/libp2p/go-libp2p-transport-upgrader) | [![Travis CI](https://travis-ci.com/libp2p/go-libp2p-transport-upgrader.svg?branch=master)](https://travis-ci.com/libp2p/go-libp2p-transport-upgrader) | [![codecov](https://codecov.io/gh/libp2p/go-libp2p-transport-upgrader/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-libp2p-transport-upgrader) | upgrades multiaddr-net connections into full libp2p transports |
-| [`go-libp2p-reuseport-transport`](//github.com/libp2p/go-libp2p-reuseport-transport) | [![Travis CI](https://travis-ci.com/libp2p/go-libp2p-reuseport-transport.svg?branch=master)](https://travis-ci.com/libp2p/go-libp2p-reuseport-transport) | [![codecov](https://codecov.io/gh/libp2p/go-libp2p-reuseport-transport/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-libp2p-reuseport-transport) | partial transport for building transports that reuse ports |
-| **Encrypted Channels** |
-| [`go-libp2p-noise`](//github.com/libp2p/go-libp2p-noise) | [![Travis CI](https://travis-ci.com/libp2p/go-libp2p-noise.svg?branch=master)](https://travis-ci.com/libp2p/go-libp2p-noise) | [![codecov](https://codecov.io/gh/libp2p/go-libp2p-noise/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-libp2p-noise) | Noise crypto channel |
-| [`go-libp2p-tls`](//github.com/libp2p/go-libp2p-tls) | [![Travis CI](https://travis-ci.com/libp2p/go-libp2p-tls.svg?branch=master)](https://travis-ci.com/libp2p/go-libp2p-tls) | [![codecov](https://codecov.io/gh/libp2p/go-libp2p-tls/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-libp2p-tls) | TLS 1.3+ crypto channel |
-| [`go-conn-security-multistream`](//github.com/libp2p/go-conn-security-multistream) | [![Travis CI](https://travis-ci.com/libp2p/go-conn-security-multistream.svg?branch=master)](https://travis-ci.com/libp2p/go-conn-security-multistream) | [![codecov](https://codecov.io/gh/libp2p/go-conn-security-multistream/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-conn-security-multistream) | multistream multiplexed meta crypto channel |
-| **Private Network** |
-| [`go-libp2p-pnet`](//github.com/libp2p/go-libp2p-pnet) | [![Travis CI](https://travis-ci.com/libp2p/go-libp2p-pnet.svg?branch=master)](https://travis-ci.com/libp2p/go-libp2p-pnet) | [![codecov](https://codecov.io/gh/libp2p/go-libp2p-pnet/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-libp2p-pnet) | reference private networking implementation |
-| **Stream Muxers** |
-| [`go-libp2p-yamux`](//github.com/libp2p/go-libp2p-yamux) | [![Travis CI](https://travis-ci.com/libp2p/go-libp2p-yamux.svg?branch=master)](https://travis-ci.com/libp2p/go-libp2p-yamux) | [![codecov](https://codecov.io/gh/libp2p/go-libp2p-yamux/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-libp2p-yamux) | YAMUX stream multiplexer |
-| [`go-libp2p-mplex`](//github.com/libp2p/go-libp2p-mplex) | [![Travis CI](https://travis-ci.com/libp2p/go-libp2p-mplex.svg?branch=master)](https://travis-ci.com/libp2p/go-libp2p-mplex) | [![codecov](https://codecov.io/gh/libp2p/go-libp2p-mplex/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-libp2p-mplex) | MPLEX stream multiplexer |
-| **NAT Traversal** |
-| [`go-libp2p-nat`](//github.com/libp2p/go-libp2p-nat) | [![Travis CI](https://travis-ci.com/libp2p/go-libp2p-nat.svg?branch=master)](https://travis-ci.com/libp2p/go-libp2p-nat) | [![codecov](https://codecov.io/gh/libp2p/go-libp2p-nat/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-libp2p-nat) |  |
-| **Peerstore** |
-| [`go-libp2p-peerstore`](//github.com/libp2p/go-libp2p-peerstore) | [![Travis CI](https://travis-ci.com/libp2p/go-libp2p-peerstore.svg?branch=master)](https://travis-ci.com/libp2p/go-libp2p-peerstore) | [![codecov](https://codecov.io/gh/libp2p/go-libp2p-peerstore/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-libp2p-peerstore) | reference implementation of peer metadata storage component |
-| **Connection Manager** |
-| [`go-libp2p-connmgr`](//github.com/libp2p/go-libp2p-connmgr) | [![Travis CI](https://travis-ci.com/libp2p/go-libp2p-connmgr.svg?branch=master)](https://travis-ci.com/libp2p/go-libp2p-connmgr) | [![codecov](https://codecov.io/gh/libp2p/go-libp2p-connmgr/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-libp2p-connmgr) | reference implementation of connection manager |
-| **Routing** |
-| [`go-libp2p-record`](//github.com/libp2p/go-libp2p-record) | [![Travis CI](https://travis-ci.com/libp2p/go-libp2p-record.svg?branch=master)](https://travis-ci.com/libp2p/go-libp2p-record) | [![codecov](https://codecov.io/gh/libp2p/go-libp2p-record/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-libp2p-record) | record type and validator logic |
-| [`go-libp2p-kad-dht`](//github.com/libp2p/go-libp2p-kad-dht) | [![Travis CI](https://travis-ci.com/libp2p/go-libp2p-kad-dht.svg?branch=master)](https://travis-ci.com/libp2p/go-libp2p-kad-dht) | [![codecov](https://codecov.io/gh/libp2p/go-libp2p-kad-dht/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-libp2p-kad-dht) | Kademlia-like router |
-| [`go-libp2p-kbucket`](//github.com/libp2p/go-libp2p-kbucket) | [![Travis CI](https://travis-ci.com/libp2p/go-libp2p-kbucket.svg?branch=master)](https://travis-ci.com/libp2p/go-libp2p-kbucket) | [![codecov](https://codecov.io/gh/libp2p/go-libp2p-kbucket/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-libp2p-kbucket) | Kademlia routing table helper types |
-| [`go-libp2p-coral-dht`](//github.com/libp2p/go-libp2p-coral-dht) | [![Travis CI](https://travis-ci.com/libp2p/go-libp2p-coral-dht.svg?branch=master)](https://travis-ci.com/libp2p/go-libp2p-coral-dht) | [![codecov](https://codecov.io/gh/libp2p/go-libp2p-coral-dht/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-libp2p-coral-dht) | Router based on Coral DHT |
-| [`go-libp2p-pubsub-router`](//github.com/libp2p/go-libp2p-pubsub-router) | [![Travis CI](https://travis-ci.com/libp2p/go-libp2p-pubsub-router.svg?branch=master)](https://travis-ci.com/libp2p/go-libp2p-pubsub-router) | [![codecov](https://codecov.io/gh/libp2p/go-libp2p-pubsub-router/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-libp2p-pubsub-router) | record-store over pubsub adapter |
-| **Consensus** |
-| [`go-libp2p-consensus`](//github.com/libp2p/go-libp2p-consensus) | [![Travis CI](https://travis-ci.com/libp2p/go-libp2p-consensus.svg?branch=master)](https://travis-ci.com/libp2p/go-libp2p-consensus) | [![codecov](https://codecov.io/gh/libp2p/go-libp2p-consensus/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-libp2p-consensus) | consensus protocols interfaces |
-| [`go-libp2p-raft`](//github.com/libp2p/go-libp2p-raft) | [![Travis CI](https://travis-ci.com/libp2p/go-libp2p-raft.svg?branch=master)](https://travis-ci.com/libp2p/go-libp2p-raft) | [![codecov](https://codecov.io/gh/libp2p/go-libp2p-raft/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-libp2p-raft) | consensus implementation over raft |
-| **Pubsub** |
-| [`go-libp2p-pubsub`](//github.com/libp2p/go-libp2p-pubsub) | [![Travis CI](https://travis-ci.com/libp2p/go-libp2p-pubsub.svg?branch=master)](https://travis-ci.com/libp2p/go-libp2p-pubsub) | [![codecov](https://codecov.io/gh/libp2p/go-libp2p-pubsub/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-libp2p-pubsub) | multiple pubsub over libp2p implementations |
-| **RPC** |
-| [`go-libp2p-gorpc`](//github.com/libp2p/go-libp2p-gorpc) | [![Travis CI](https://travis-ci.com/libp2p/go-libp2p-gorpc.svg?branch=master)](https://travis-ci.com/libp2p/go-libp2p-gorpc) | [![codecov](https://codecov.io/gh/libp2p/go-libp2p-gorpc/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-libp2p-gorpc) | a simple RPC library for libp2p |
-| **Utilities/miscellaneous** |
-| [`go-libp2p-loggables`](//github.com/libp2p/go-libp2p-loggables) | [![Travis CI](https://travis-ci.com/libp2p/go-libp2p-loggables.svg?branch=master)](https://travis-ci.com/libp2p/go-libp2p-loggables) | [![codecov](https://codecov.io/gh/libp2p/go-libp2p-loggables/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-libp2p-loggables) | logging helpers |
-| [`go-maddr-filter`](//github.com/libp2p/go-maddr-filter) | [![Travis CI](https://travis-ci.com/libp2p/go-maddr-filter.svg?branch=master)](https://travis-ci.com/libp2p/go-maddr-filter) | [![codecov](https://codecov.io/gh/libp2p/go-maddr-filter/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-maddr-filter) | multiaddr filtering helpers |
-| [`go-libp2p-netutil`](//github.com/libp2p/go-libp2p-netutil) | [![Travis CI](https://travis-ci.com/libp2p/go-libp2p-netutil.svg?branch=master)](https://travis-ci.com/libp2p/go-libp2p-netutil) | [![codecov](https://codecov.io/gh/libp2p/go-libp2p-netutil/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-libp2p-netutil) | misc utilities |
-| [`go-msgio`](//github.com/libp2p/go-msgio) | [![Travis CI](https://travis-ci.com/libp2p/go-msgio.svg?branch=master)](https://travis-ci.com/libp2p/go-msgio) | [![codecov](https://codecov.io/gh/libp2p/go-msgio/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-msgio) | length prefixed data channel |
-| [`go-addr-util`](//github.com/libp2p/go-addr-util) | [![Travis CI](https://travis-ci.com/libp2p/go-addr-util.svg?branch=master)](https://travis-ci.com/libp2p/go-addr-util) | [![codecov](https://codecov.io/gh/libp2p/go-addr-util/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-addr-util) | address utilities for libp2p swarm |
-| [`go-buffer-pool`](//github.com/libp2p/go-buffer-pool) | [![Travis CI](https://travis-ci.com/libp2p/go-buffer-pool.svg?branch=master)](https://travis-ci.com/libp2p/go-buffer-pool) | [![codecov](https://codecov.io/gh/libp2p/go-buffer-pool/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-buffer-pool) | a variable size buffer pool for go |
-| [`go-libp2p-routing-helpers`](//github.com/libp2p/go-libp2p-routing-helpers) | [![Travis CI](https://travis-ci.com/libp2p/go-libp2p-routing-helpers.svg?branch=master)](https://travis-ci.com/libp2p/go-libp2p-routing-helpers) | [![codecov](https://codecov.io/gh/libp2p/go-libp2p-routing-helpers/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-libp2p-routing-helpers) | routing helpers |
-| [`go-reuseport`](//github.com/libp2p/go-reuseport) | [![Travis CI](https://travis-ci.com/libp2p/go-reuseport.svg?branch=master)](https://travis-ci.com/libp2p/go-reuseport) | [![codecov](https://codecov.io/gh/libp2p/go-reuseport/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-reuseport) | enables reuse of addresses |
-| [`go-sockaddr`](//github.com/libp2p/go-sockaddr) | [![Travis CI](https://travis-ci.com/libp2p/go-sockaddr.svg?branch=master)](https://travis-ci.com/libp2p/go-sockaddr) | [![codecov](https://codecov.io/gh/libp2p/go-sockaddr/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-sockaddr) | utils for sockaddr conversions |
-| [`go-flow-metrics`](//github.com/libp2p/go-flow-metrics) | [![Travis CI](https://travis-ci.com/libp2p/go-flow-metrics.svg?branch=master)](https://travis-ci.com/libp2p/go-flow-metrics) | [![codecov](https://codecov.io/gh/libp2p/go-flow-metrics/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-flow-metrics) | metrics library |
-| [`go-libp2p-gostream`](//github.com/libp2p/go-libp2p-gostream) | [![Travis CI](https://travis-ci.com/libp2p/go-libp2p-gostream.svg?branch=master)](https://travis-ci.com/libp2p/go-libp2p-gostream) | [![codecov](https://codecov.io/gh/libp2p/go-libp2p-gostream/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-libp2p-gostream) | Go 'net' wrappers for libp2p |
-| [`go-libp2p-http`](//github.com/libp2p/go-libp2p-http) | [![Travis CI](https://travis-ci.com/libp2p/go-libp2p-http.svg?branch=master)](https://travis-ci.com/libp2p/go-libp2p-http) | [![codecov](https://codecov.io/gh/libp2p/go-libp2p-http/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-libp2p-http) | HTTP on top of libp2p streams |
-| **Testing and examples** |
-| [`go-libp2p-testing`](//github.com/libp2p/go-libp2p-testing) | [![Travis CI](https://travis-ci.com/libp2p/go-libp2p-testing.svg?branch=master)](https://travis-ci.com/libp2p/go-libp2p-testing) | [![codecov](https://codecov.io/gh/libp2p/go-libp2p-testing/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-libp2p-testing) | a collection of testing utilities for libp2p |
 
 # Contribute
 

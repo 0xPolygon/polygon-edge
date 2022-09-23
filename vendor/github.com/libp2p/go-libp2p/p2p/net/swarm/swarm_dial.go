@@ -7,9 +7,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/transport"
+	"github.com/libp2p/go-libp2p/core/canonicallog"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/transport"
 
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
@@ -65,7 +66,7 @@ const ConcurrentFdDials = 160
 
 // DefaultPerPeerRateLimit is the number of concurrent outbound dials to make
 // per peer
-const DefaultPerPeerRateLimit = 8
+var DefaultPerPeerRateLimit = 8
 
 // dialbackoff is a struct used to avoid over-dialing the same, dead peers.
 // Whenever we totally time out on a peer (all three attempts), we add them
@@ -154,7 +155,7 @@ var BackoffMax = time.Minute * 5
 // Backoff is not exponential, it's quadratic and computed according to the
 // following formula:
 //
-//     BackoffBase + BakoffCoef * PriorBackoffs^2
+//	BackoffBase + BakoffCoef * PriorBackoffs^2
 //
 // Where PriorBackoffs is the number of previous backoffs.
 func (db *DialBackoff) AddBackoff(p peer.ID, addr ma.Multiaddr) {
@@ -220,11 +221,6 @@ func (db *DialBackoff) cleanup() {
 // This allows us to use various transport protocols, do NAT traversal/relay,
 // etc. to achieve connection.
 func (s *Swarm) DialPeer(ctx context.Context, p peer.ID) (network.Conn, error) {
-	if s.gater != nil && !s.gater.InterceptPeerDial(p) {
-		log.Debugf("gater disallowed outbound connection to peer %s", p.Pretty())
-		return nil, &DialError{Peer: p, Cause: ErrGaterDisallowedConnection}
-	}
-
 	// Avoid typed nil issues.
 	c, err := s.dialPeer(ctx, p)
 	if err != nil {
@@ -248,10 +244,16 @@ func (s *Swarm) dialPeer(ctx context.Context, p peer.ID) (*Conn, error) {
 		return nil, ErrDialToSelf
 	}
 
-	// check if we already have an open (usable) connection first
-	conn := s.bestAcceptableConnToPeer(ctx, p)
-	if conn != nil {
-		return conn, nil
+	// check if we already have an open (usable) connection first, or can't have a usable
+	// connection.
+	conn, err := s.bestAcceptableConnToPeer(ctx, p)
+	if conn != nil || err != nil {
+		return conn, err
+	}
+
+	if s.gater != nil && !s.gater.InterceptPeerDial(p) {
+		log.Debugf("gater disallowed outbound connection to peer %s", p.Pretty())
+		return nil, &DialError{Peer: p, Cause: ErrGaterDisallowedConnection}
 	}
 
 	// apply the DialPeer timeout
@@ -343,14 +345,7 @@ func (s *Swarm) filterKnownUndialables(p peer.ID, addrs []ma.Multiaddr) []ma.Mul
 	}
 
 	return ma.FilterAddrs(addrs,
-		func(addr ma.Multiaddr) bool {
-			for _, a := range ourAddrs {
-				if a.Equal(addr) {
-					return false
-				}
-			}
-			return true
-		},
+		func(addr ma.Multiaddr) bool { return !ma.Contains(ourAddrs, addr) },
 		s.canDial,
 		// TODO: Consider allowing link-local addresses
 		func(addr ma.Multiaddr) bool { return !manet.IsIP6LinkLocal(addr) },
@@ -394,6 +389,7 @@ func (s *Swarm) dialAddr(ctx context.Context, p peer.ID, addr ma.Multiaddr) (tra
 	if err != nil {
 		return nil, err
 	}
+	canonicallog.LogPeerStatus(100, connC.RemotePeer(), connC.RemoteMultiaddr(), "connection_status", "established", "dir", "outbound")
 
 	// Trust the transport? Yeah... right.
 	if connC.RemotePeer() != p {
@@ -407,7 +403,7 @@ func (s *Swarm) dialAddr(ctx context.Context, p peer.ID, addr ma.Multiaddr) (tra
 	return connC, nil
 }
 
-// TODO We should have a `IsFdConsuming() bool` method on the `Transport` interface in go-libp2p-core/transport.
+// TODO We should have a `IsFdConsuming() bool` method on the `Transport` interface in go-libp2p/core/transport.
 // This function checks if any of the transport protocols in the address requires a file descriptor.
 // For now:
 // A Non-circuit address which has the TCP/UNIX protocol is deemed FD consuming.
@@ -429,9 +425,10 @@ func isFdConsumingAddr(addr ma.Multiaddr) bool {
 }
 
 func isExpensiveAddr(addr ma.Multiaddr) bool {
-	_, err1 := addr.ValueForProtocol(ma.P_WS)
-	_, err2 := addr.ValueForProtocol(ma.P_WSS)
-	return err1 == nil || err2 == nil
+	_, wsErr := addr.ValueForProtocol(ma.P_WS)
+	_, wssErr := addr.ValueForProtocol(ma.P_WSS)
+	_, wtErr := addr.ValueForProtocol(ma.P_WEBTRANSPORT)
+	return wsErr == nil || wssErr == nil || wtErr == nil
 }
 
 func isRelayAddr(addr ma.Multiaddr) bool {

@@ -11,9 +11,9 @@ import (
 	"github.com/0xPolygon/polygon-edge/network/discovery"
 	"github.com/0xPolygon/polygon-edge/network/grpc"
 	"github.com/0xPolygon/polygon-edge/network/proto"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/peerstore"
 	kb "github.com/libp2p/go-libp2p-kbucket"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/peerstore"
 	rawGrpc "google.golang.org/grpc"
 )
 

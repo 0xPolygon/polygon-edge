@@ -2,7 +2,6 @@ package fork
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"os"
 
 	"github.com/0xPolygon/polygon-edge/validators/store/snapshot"
@@ -35,7 +34,7 @@ func readDataStore(path string, obj interface{}) error {
 		return nil
 	}
 
-	data, err := ioutil.ReadFile(path)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return err
 	}
@@ -54,8 +53,7 @@ func writeDataStore(path string, obj interface{}) error {
 		return err
 	}
 
-	//nolint: gosec
-	if err := ioutil.WriteFile(path, data, 0755); err != nil {
+	if err := os.WriteFile(path, data, os.ModePerm); err != nil {
 		return err
 	}
 
