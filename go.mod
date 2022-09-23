@@ -60,10 +60,7 @@ require (
 	lukechampine.com/blake3 v1.1.7 // indirect
 )
 
-require (
-	github.com/0xPolygon/go-ibft v0.0.0-20220810095021-e43142f8d267
-	github.com/libp2p/go-libp2p-core v0.16.1
-)
+require github.com/0xPolygon/go-ibft v0.0.0-20220810095021-e43142f8d267
 
 require (
 	cloud.google.com/go v0.102.0 // indirect
@@ -123,6 +120,7 @@ require (
 	github.com/libp2p/go-cidranger v1.1.0 // indirect
 	github.com/libp2p/go-flow-metrics v0.1.0 // indirect
 	github.com/libp2p/go-libp2p-asn-util v0.2.0 // indirect
+	github.com/libp2p/go-libp2p-core v0.16.1 // indirect
 	github.com/libp2p/go-libp2p-peerstore v0.7.0 // indirect
 	github.com/libp2p/go-libp2p-swarm v0.11.0 // indirect
 	github.com/libp2p/go-msgio v0.2.0 // indirect
