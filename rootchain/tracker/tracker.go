@@ -347,7 +347,8 @@ func (t *EventTracker) encodeValidatorSetPayloadEvent(
 		// create validator set info from blsKey and ecdsaAddress
 		newValidatorSetInfo := payload.ValidatorSetInfo{
 			Address:      ecdsaAddress.Bytes(),
-			BLSPublicKey: blsKey}
+			BLSPublicKey: blsKey,
+		}
 
 		// update validatorSetInfo
 		validatorSetInfo[index] = newValidatorSetInfo

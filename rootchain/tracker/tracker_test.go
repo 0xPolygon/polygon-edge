@@ -16,8 +16,12 @@ const (
 	ValidatorSetChangeEventABI = `event ValidatorSetChange(uint256 indexed index,tuple(address ecdsaAddress, bytes blsPublicKey)[] Validator,int8 indexed changeType)`
 )
 
-//nolint
-func initEventTracker(rootchainWS string, evenABI string, PayloadType rootchain.PayloadType, blockConfirmation uint64) (*EventTracker, error) {
+func initEventTracker(
+	rootchainWS string,
+	evenABI string,
+	PayloadType rootchain.PayloadType,
+	blockConfirmation uint64,
+) (*EventTracker, error) {
 	// Tracer
 	trackerConfig := rootchain.ConfigEvent{
 		EventABI:           evenABI,
@@ -127,7 +131,6 @@ func TestEventTracker_encodeEventFromLog(t *testing.T) {
 	t.Run(
 		"cannot parse event, no payloadType defined",
 		func(t *testing.T) {
-			t.Parallel()
 
 			// set payloadType
 			evenTracker.payloadType = 1
@@ -144,14 +147,13 @@ func TestEventTracker_encodeEventFromLog(t *testing.T) {
 
 			// try to encode log, should parse but no payloadType
 			_, err := evenTracker.encodeEventFromLog(&log)
-			assert.ErrorIs(t, err, ErrEventParseNoPayloadType)
+			assert.ErrorIs(t, err, errEventParseNoPayloadType)
 
 		})
 
 	t.Run(
 		"successfully encode validatorSetChange event from log",
 		func(t *testing.T) {
-			t.Parallel()
 
 			// set payloadType
 			evenTracker.payloadType = 0
