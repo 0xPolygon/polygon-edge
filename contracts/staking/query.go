@@ -3,13 +3,12 @@ package staking
 import (
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"math/big"
 
-	"github.com/umbracle/ethgo"
 	"github.com/0xPolygon/polygon-edge/contracts/abis"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
 )
 
@@ -90,13 +89,11 @@ func QueryValidators(t TxQueryHandler, from types.Address, store BlockChainStore
 	}
 
 	if len(addrs) == 0 {
-		fmt.Println("addrs is empty: ", len(addrs))
 		return []types.Address{}, nil
 	}
 
 	u := NewUpHash(len(addrs))
 	headHash := store.Header().Hash //get latest block from the chain
-	fmt.Println(" head hash ", headHash)
 	factor := int64(binary.BigEndian.Uint64(headHash.Bytes()))
 	resultSeqs, err := u.GenHash(factor)
 	if err != nil {

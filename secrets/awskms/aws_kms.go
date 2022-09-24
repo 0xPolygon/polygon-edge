@@ -222,7 +222,6 @@ func (k *KmsSecretManager) SignBySecretOnce(key string, chainId int, data []byte
 
 	dataHash := types.BytesToHash(data)
 
-	// fmt.Println("intarray: ", intArray)
 	req := &Req{
 		Operation: "signBytes1559",
 		SignRaw: SignRaw{
@@ -231,13 +230,11 @@ func (k *KmsSecretManager) SignBySecretOnce(key string, chainId int, data []byte
 			ChainId:  strconv.FormatInt(int64(chainId), 16),
 		},
 	}
-	//fmt.Println(" hash ------ ", data)
 
 	bs, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
 	}
-	//fmt.Println("reqData: ", string(bs))
 
 	beginTime := time.Now().UnixNano()
 	resp, err := k.client.Post(k.serverURL, "application/json", bytes.NewBuffer(bs))
@@ -288,8 +285,6 @@ func (k *KmsSecretManager) SignBySecretOnce(key string, chainId int, data []byte
 		return nil, fmt.Errorf("get info json data err %s ", signResp.Msg)
 	}
 
-	//fmt.Println("map: ", signResp)
-
 	R, ok := (&big.Int{}).SetString(signResp.Data.R[2:], 16)
 	if !ok {
 		return nil, errors.New("r to big int error")
@@ -308,8 +303,6 @@ func (k *KmsSecretManager) SignBySecretOnce(key string, chainId int, data []byte
 	big35 := big.NewInt(35)
 	bigV.Sub(bigV, big35)
 
-	//fmt.Println(" v ", byte(bigV.Int64()))
-
 	return crypto.EncodeSignature(R, S, byte(bigV.Int64()))
 }
 
@@ -325,7 +318,6 @@ func (k *KmsSecretManager) GetSecretInfo(name string) (*secrets.SecretInfo, erro
 	type Req struct {
 		Operation string  `json:"operation"`
 		Info      InfoReq `json:"info"`
-		//   string `json:"kms_key_id"`
 	}
 	req := &Req{
 		Operation: "info",
@@ -338,7 +330,6 @@ func (k *KmsSecretManager) GetSecretInfo(name string) (*secrets.SecretInfo, erro
 	if err != nil {
 		return nil, err
 	}
-	//fmt.Println("reqData: ", string(bs))
 
 	resp, err := k.client.Post(k.serverURL, "application/json", bytes.NewBuffer(bs))
 	if err != nil {
@@ -370,9 +361,6 @@ func (k *KmsSecretManager) GetSecretInfo(name string) (*secrets.SecretInfo, erro
 		return nil, err
 	}
 
-	//fmt.Println("respData: ", string(respData))
-
-	// var respMap map[string]interface{}
 	var infoResp Resp
 
 	err = json.Unmarshal(respData, &infoResp)
@@ -383,8 +371,6 @@ func (k *KmsSecretManager) GetSecretInfo(name string) (*secrets.SecretInfo, erro
 	if infoResp.Code != 0 {
 		return nil, fmt.Errorf("get info json data err %s ", infoResp.Msg)
 	}
-
-	//fmt.Println("map: ", infoResp)
 
 	secretInfo := &secrets.SecretInfo{
 		Pubkey:  infoResp.Data.PubKey,

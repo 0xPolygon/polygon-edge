@@ -275,7 +275,6 @@ func verifyCommittedFields(
 func (s *sign) Sign(priv *ecdsa.PrivateKey, hash []byte) ([]byte, error) {
 	k, ok := s.ibft.secretsManager.(*awskms.KmsSecretManager)
 	if ok {
-		//fmt.Println(" By Kms sign approach")
 		return k.SignBySecret(secrets.ValidatorKey, s.ibft.config.Params.ChainID, hash)
 	}
 
