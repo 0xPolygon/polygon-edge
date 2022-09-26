@@ -1,4 +1,4 @@
-// nolint:lll,gofmt
+//nolint:lll,gofmt
 package precompiled
 
 import (

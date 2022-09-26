@@ -372,6 +372,8 @@ func TestPeerConnectionUpdateEventCh(t *testing.T) {
 // Make sure the peer shouldn't emit status if the shouldEmitBlocks flag is set.
 // The subtests cannot contain t.Parallel() due to how
 // the test is organized
+//
+//nolint:tparallel
 func Test_shouldEmitBlocks(t *testing.T) {
 	t.Parallel()
 
