@@ -3,13 +3,12 @@ package config
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"strings"
 
 	"github.com/0xPolygon/polygon-edge/network"
-	"gopkg.in/yaml.v3"
-
 	"github.com/hashicorp/hcl"
+	"gopkg.in/yaml.v3"
 )
 
 // Config defines the server configuration params
@@ -119,7 +118,7 @@ func DefaultConfig() *Config {
 //
 // Supported file types: .json, .hcl, .yaml, .yml
 func ReadConfigFile(path string) (*Config, error) {
-	data, err := ioutil.ReadFile(path)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}

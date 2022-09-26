@@ -10,8 +10,6 @@ import (
 	"time"
 
 	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
-	"github.com/umbracle/ethgo"
-
 	"github.com/0xPolygon/polygon-edge/contracts/staking"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/e2e/framework"
@@ -21,6 +19,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/golang/protobuf/ptypes/any"
 	"github.com/stretchr/testify/assert"
+	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/jsonrpc"
 )
 
@@ -123,6 +122,10 @@ func TestPoS_ValidatorBoundaries(t *testing.T) {
 			config.SetMaxValidatorCount(maxValidatorCount)
 		})
 
+	t.Cleanup(func() {
+		ibftManager.StopServers()
+	})
+
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	ibftManager.StartServers(ctx)
@@ -180,6 +183,10 @@ func TestPoS_Stake(t *testing.T) {
 			config.SetIBFTPoS(true)
 		})
 
+	t.Cleanup(func() {
+		ibftManager.StopServers()
+	})
+
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	ibftManager.StartServers(ctx)
@@ -232,12 +239,16 @@ func TestPoS_Unstake(t *testing.T) {
 		t,
 		numGenesisValidators,
 		IBFTDirPrefix,
-		func(i int, config *framework.TestServerConfig) {
+		func(_ int, config *framework.TestServerConfig) {
 			// Premine to send unstake transaction
 			config.SetEpochSize(2) // Need to leave room for the endblock
 			config.PremineValidatorBalance(defaultBalance)
 			config.SetIBFTPoS(true)
 		})
+
+	t.Cleanup(func() {
+		ibftManager.StopServers()
+	})
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
@@ -812,7 +823,7 @@ func TestSnapshotUpdating(t *testing.T) {
 	}
 
 	// Wait for all the nodes to reach the epoch block
-	waitErrors := framework.WaitForServersToSeal(servers, nextEpoch)
+	waitErrors := framework.WaitForServersToSeal(servers, nextEpoch+1)
 
 	if len(waitErrors) != 0 {
 		t.Fatalf("Unable to wait for all nodes to seal blocks, %v", waitErrors)
@@ -841,7 +852,7 @@ func TestSnapshotUpdating(t *testing.T) {
 		ctxCancelFn()
 
 		for _, validator := range snapshot.Validators {
-			if validator.Address == referenceAddr.String() {
+			if types.BytesToAddress(validator.Data) == referenceAddr {
 				return true
 			}
 		}

@@ -41,7 +41,7 @@ func extractSenderAccount(address types.Address) (*Account, error) {
 
 	privateKeyRaw := os.Getenv("LOADBOT_" + address.String())
 	privateKeyRaw = strings.TrimPrefix(privateKeyRaw, "0x")
-	privateKey, err := crypto.BytesToPrivateKey([]byte(privateKeyRaw))
+	privateKey, err := crypto.BytesToECDSAPrivateKey([]byte(privateKeyRaw))
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract ECDSA private key from bytes: %w", err)

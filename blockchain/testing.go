@@ -263,14 +263,14 @@ func (m *MockVerifier) GetBlockCreator(header *types.Header) (types.Address, err
 		return m.getBlockCreatorFn(header)
 	}
 
-	return header.Miner, nil
+	return types.BytesToAddress(header.Miner), nil
 }
 
 func (m *MockVerifier) HookGetBlockCreator(fn getBlockCreatorDelegate) {
 	m.getBlockCreatorFn = fn
 }
 
-func (m *MockVerifier) PreStateCommit(header *types.Header, txn *state.Transition) error {
+func (m *MockVerifier) PreCommitState(header *types.Header, txn *state.Transition) error {
 	if m.preStateCommitFn != nil {
 		return m.preStateCommitFn(header, txn)
 	}
@@ -278,7 +278,7 @@ func (m *MockVerifier) PreStateCommit(header *types.Header, txn *state.Transitio
 	return nil
 }
 
-func (m *MockVerifier) HookPreStateCommit(fn preStateCommitDelegate) {
+func (m *MockVerifier) HookPreCommitState(fn preStateCommitDelegate) {
 	m.preStateCommitFn = fn
 }
 

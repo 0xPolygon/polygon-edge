@@ -6,14 +6,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/umbracle/ethgo"
-
 	"github.com/0xPolygon/polygon-edge/command/server/config"
-	"github.com/0xPolygon/polygon-edge/consensus/ibft"
+	ibftSigner "github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/e2e/framework"
 	"github.com/0xPolygon/polygon-edge/helper/tests"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/0xPolygon/polygon-edge/validators"
 	"github.com/stretchr/testify/assert"
+	"github.com/umbracle/ethgo"
 )
 
 // TestIbft_Transfer sends a transfer transaction (EOA -> EOA)
@@ -23,16 +23,25 @@ func TestIbft_Transfer(t *testing.T) {
 		name            string
 		blockTime       uint64
 		ibftBaseTimeout uint64
+		validatorType   validators.ValidatorType
 	}{
 		{
 			name:            "default block time",
 			blockTime:       config.DefaultBlockTime,
 			ibftBaseTimeout: 0, // use default value
+			validatorType:   validators.ECDSAValidatorType,
 		},
 		{
 			name:            "longer block time",
 			blockTime:       10,
 			ibftBaseTimeout: 20,
+			validatorType:   validators.ECDSAValidatorType,
+		},
+		{
+			name:            "with BLS",
+			blockTime:       config.DefaultBlockTime,
+			ibftBaseTimeout: 0, // use default value
+			validatorType:   validators.BLSValidatorType,
 		},
 	}
 
@@ -50,12 +59,13 @@ func TestIbft_Transfer(t *testing.T) {
 					config.Premine(senderAddr, framework.EthToWei(10))
 					config.SetBlockTime(tc.blockTime)
 					config.SetIBFTBaseTimeout(tc.ibftBaseTimeout)
+					config.SetValidatorType(tc.validatorType)
 				},
 			)
 
 			var (
 				startTimeout = time.Duration(tc.ibftBaseTimeout+60) * time.Second
-				txTimeout    = time.Duration(tc.ibftBaseTimeout+10) * time.Second
+				txTimeout    = time.Duration(tc.ibftBaseTimeout+20) * time.Second
 			)
 
 			ctxForStart, cancelStart := context.WithTimeout(context.Background(), startTimeout)
@@ -139,7 +149,7 @@ func TestIbft_TransactionFeeRecipient(t *testing.T) {
 				// Deploy contract
 				deployTx := &framework.PreparedTransaction{
 					From:     senderAddr,
-					GasPrice: big.NewInt(10),
+					GasPrice: big.NewInt(0), // don't want gas fee to paid to a proposer
 					Gas:      1000000,
 					Value:    big.NewInt(0),
 					Input:    framework.MethodSig("setA1"),
@@ -168,8 +178,13 @@ func TestIbft_TransactionFeeRecipient(t *testing.T) {
 			assert.NotNil(t, receipt.BlockHash)
 			block, err := clt.Eth().GetBlockByHash(receipt.BlockHash, false)
 			assert.NoError(t, err)
-			extraData := &ibft.IstanbulExtra{}
-			extraDataWithoutVanity := block.ExtraData[ibft.IstanbulExtraVanity:]
+			extraData := &ibftSigner.IstanbulExtra{
+				Validators:           validators.NewECDSAValidatorSet(),
+				CommittedSeals:       &ibftSigner.SerializedSeal{},
+				ParentCommittedSeals: &ibftSigner.SerializedSeal{},
+			}
+			extraDataWithoutVanity := block.ExtraData[ibftSigner.IstanbulExtraVanity:]
+
 			err = extraData.UnmarshalRLP(extraDataWithoutVanity)
 			assert.NoError(t, err)
 

@@ -14,42 +14,42 @@ import (
 
 // Header represents a block header in the Ethereum blockchain.
 type Header struct {
-	ParentHash   Hash    `json:"parentHash"`
-	Sha3Uncles   Hash    `json:"sha3Uncles"`
-	Miner        Address `json:"miner"`
-	StateRoot    Hash    `json:"stateRoot"`
-	TxRoot       Hash    `json:"transactionsRoot"`
-	ReceiptsRoot Hash    `json:"receiptsRoot"`
-	LogsBloom    Bloom   `json:"logsBloom"`
-	Difficulty   uint64  `json:"difficulty"`
-	Number       uint64  `json:"number"`
-	GasLimit     uint64  `json:"gasLimit"`
-	GasUsed      uint64  `json:"gasUsed"`
-	Timestamp    uint64  `json:"timestamp"`
-	ExtraData    []byte  `json:"extraData"`
-	MixHash      Hash    `json:"mixHash"`
-	Nonce        Nonce   `json:"nonce"`
-	Hash         Hash    `json:"hash"`
+	ParentHash   Hash   `json:"parentHash"`
+	Sha3Uncles   Hash   `json:"sha3Uncles"`
+	Miner        []byte `json:"miner"`
+	StateRoot    Hash   `json:"stateRoot"`
+	TxRoot       Hash   `json:"transactionsRoot"`
+	ReceiptsRoot Hash   `json:"receiptsRoot"`
+	LogsBloom    Bloom  `json:"logsBloom"`
+	Difficulty   uint64 `json:"difficulty"`
+	Number       uint64 `json:"number"`
+	GasLimit     uint64 `json:"gasLimit"`
+	GasUsed      uint64 `json:"gasUsed"`
+	Timestamp    uint64 `json:"timestamp"`
+	ExtraData    []byte `json:"extraData"`
+	MixHash      Hash   `json:"mixHash"`
+	Nonce        Nonce  `json:"nonce"`
+	Hash         Hash   `json:"hash"`
 }
 
 // headerJSON represents a block header used for json calls
 type headerJSON struct {
-	ParentHash   Hash    `json:"parentHash"`
-	Sha3Uncles   Hash    `json:"sha3Uncles"`
-	Miner        Address `json:"miner"`
-	StateRoot    Hash    `json:"stateRoot"`
-	TxRoot       Hash    `json:"transactionsRoot"`
-	ReceiptsRoot Hash    `json:"receiptsRoot"`
-	LogsBloom    Bloom   `json:"logsBloom"`
-	Difficulty   string  `json:"difficulty"`
-	Number       string  `json:"number"`
-	GasLimit     string  `json:"gasLimit"`
-	GasUsed      string  `json:"gasUsed"`
-	Timestamp    string  `json:"timestamp"`
-	ExtraData    string  `json:"extraData"`
-	MixHash      Hash    `json:"mixHash"`
-	Nonce        Nonce   `json:"nonce"`
-	Hash         Hash    `json:"hash"`
+	ParentHash   Hash   `json:"parentHash"`
+	Sha3Uncles   Hash   `json:"sha3Uncles"`
+	Miner        string `json:"miner"`
+	StateRoot    Hash   `json:"stateRoot"`
+	TxRoot       Hash   `json:"transactionsRoot"`
+	ReceiptsRoot Hash   `json:"receiptsRoot"`
+	LogsBloom    Bloom  `json:"logsBloom"`
+	Difficulty   string `json:"difficulty"`
+	Number       string `json:"number"`
+	GasLimit     string `json:"gasLimit"`
+	GasUsed      string `json:"gasUsed"`
+	Timestamp    string `json:"timestamp"`
+	ExtraData    string `json:"extraData"`
+	MixHash      Hash   `json:"mixHash"`
+	Nonce        Nonce  `json:"nonce"`
+	Hash         Hash   `json:"hash"`
 }
 
 func (h *Header) MarshalJSON() ([]byte, error) {
@@ -57,7 +57,7 @@ func (h *Header) MarshalJSON() ([]byte, error) {
 
 	header.ParentHash = h.ParentHash
 	header.Sha3Uncles = h.Sha3Uncles
-	header.Miner = h.Miner
+	header.Miner = hex.EncodeToHex(h.Miner)
 	header.StateRoot = h.StateRoot
 	header.TxRoot = h.TxRoot
 	header.ReceiptsRoot = h.ReceiptsRoot
@@ -85,7 +85,6 @@ func (h *Header) UnmarshalJSON(input []byte) error {
 
 	h.ParentHash = header.ParentHash
 	h.Sha3Uncles = header.Sha3Uncles
-	h.Miner = header.Miner
 	h.StateRoot = header.StateRoot
 	h.TxRoot = header.TxRoot
 	h.ReceiptsRoot = header.ReceiptsRoot
@@ -95,6 +94,10 @@ func (h *Header) UnmarshalJSON(input []byte) error {
 	h.Hash = header.Hash
 
 	var err error
+
+	if h.Miner, err = hex.DecodeHex(header.Miner); err != nil {
+		return err
+	}
 
 	if h.Difficulty, err = hex.DecodeUint64(header.Difficulty); err != nil {
 		return err
@@ -137,6 +140,10 @@ func (h *Header) HasReceipts() bool {
 
 func (h *Header) SetNonce(i uint64) {
 	binary.BigEndian.PutUint64(h.Nonce[:], i)
+}
+
+func (h *Header) IsGenesis() bool {
+	return h.Hash != ZeroHash && h.Number == 0
 }
 
 type Nonce [8]byte
@@ -185,7 +192,6 @@ func (h *Header) Copy() *Header {
 	newHeader := &Header{
 		ParentHash:   h.ParentHash,
 		Sha3Uncles:   h.Sha3Uncles,
-		Miner:        h.Miner,
 		StateRoot:    h.StateRoot,
 		TxRoot:       h.TxRoot,
 		ReceiptsRoot: h.ReceiptsRoot,
@@ -199,6 +205,9 @@ func (h *Header) Copy() *Header {
 		GasUsed:      h.GasUsed,
 		Timestamp:    h.Timestamp,
 	}
+
+	newHeader.Miner = make([]byte, len(h.Miner))
+	copy(newHeader.Miner[:], h.Miner[:])
 
 	newHeader.ExtraData = make([]byte, len(h.ExtraData))
 	copy(newHeader.ExtraData[:], h.ExtraData[:])

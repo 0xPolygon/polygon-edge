@@ -2,8 +2,8 @@ package chain
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"math/big"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -155,7 +155,7 @@ func TestGenesisX(t *testing.T) {
 
 func TestChainFolder(t *testing.T) {
 	// it should be able to parse all the chains in the ./chains folder
-	files, err := ioutil.ReadDir("./chains")
+	files, err := os.ReadDir("./chains")
 	if err != nil {
 		t.Fatal(err)
 	}

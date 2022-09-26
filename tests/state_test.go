@@ -3,12 +3,10 @@ package tests
 import (
 	"bytes"
 	"encoding/json"
-	"io/ioutil"
 	"math/big"
+	"os"
 	"strings"
 	"testing"
-
-	"github.com/hashicorp/go-hclog"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
@@ -16,6 +14,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/state/runtime/evm"
 	"github.com/0xPolygon/polygon-edge/state/runtime/precompiled"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/hashicorp/go-hclog"
 )
 
 var (
@@ -149,7 +148,7 @@ func TestState(t *testing.T) {
 					continue
 				}
 
-				data, err := ioutil.ReadFile(file)
+				data, err := os.ReadFile(file)
 				if err != nil {
 					t.Fatal(err)
 				}
