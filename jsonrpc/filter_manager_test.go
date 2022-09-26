@@ -350,7 +350,7 @@ func Test_flushWsFilters(t *testing.T) {
 	store := newMockStore()
 
 	m := NewFilterManager(hclog.NewNullLogger(), store, 1000)
-	
+
 	t.Cleanup(func() {
 		m.Close()
 	})
