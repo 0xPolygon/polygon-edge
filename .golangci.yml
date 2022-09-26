@@ -46,7 +46,7 @@ linters-settings:
     min-occurrences: 3
 
 issues:
-  new-from-rev: origin/master # report only new issues with reference to master branch
+  new-from-rev: origin/develop # report only new issues with reference to develop branch
   exclude-rules:
     - path: _test\.go
       linters:
