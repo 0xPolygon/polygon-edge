@@ -19,33 +19,6 @@ jobs:
 
       - name: Lint
         uses: golangci/golangci-lint-action@v3
-        with:
-          version: v1.49.0
-          args:
-            --timeout=3m
-            -E whitespace
-            -E wsl
-            -E wastedassign
-            -E unconvert
-            -E tparallel
-            -E thelper
-            -E stylecheck
-            -E prealloc
-            -E predeclared
-            -E nolintlint
-            -E nlreturn
-            -E misspell
-            -E makezero
-            -E lll
-            -E importas
-            -E gosec
-            -E gofmt
-            -E goconst
-            -E forcetypeassert
-            -E dogsled
-            -E dupl
-            -E errname
-            -E errorlint
 
   test:
     runs-on: ubuntu-latest
