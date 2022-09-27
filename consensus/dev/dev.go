@@ -106,7 +106,7 @@ func (d *Dev) run() {
 }
 
 type transitionInterface interface {
-	Write(txn *types.Transaction) error
+	Write(txn *types.Transaction) (*types.Receipt, error)
 }
 
 func (d *Dev) writeTransactions(gasLimit uint64, transition transitionInterface) []*types.Transaction {
@@ -126,7 +126,7 @@ func (d *Dev) writeTransactions(gasLimit uint64, transition transitionInterface)
 			continue
 		}
 
-		if err := transition.Write(tx); err != nil {
+		if _, err := transition.Write(tx); err != nil {
 			if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok { //nolint:errorlint
 				break
 			} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable { //nolint:errorlint

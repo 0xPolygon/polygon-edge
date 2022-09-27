@@ -215,8 +215,8 @@ type txExeResult struct {
 }
 
 type transitionInterface interface {
-	Write(txn *types.Transaction) error
-	WriteFailedReceipt(txn *types.Transaction) error
+	Write(txn *types.Transaction) (*types.Receipt, error)
+	WriteFailedReceipt(txn *types.Transaction) (*types.Receipt, error)
 }
 
 func (i *backendIBFT) writeTransactions(
@@ -299,7 +299,7 @@ func (i *backendIBFT) writeTransaction(
 	if tx.ExceedsBlockGasLimit(gasLimit) {
 		i.txpool.Drop(tx)
 
-		if err := transition.WriteFailedReceipt(tx); err != nil {
+		if _, err := transition.WriteFailedReceipt(tx); err != nil {
 			i.logger.Error(
 				fmt.Sprintf(
 					"unable to write failed receipt for transaction %s",
@@ -312,7 +312,7 @@ func (i *backendIBFT) writeTransaction(
 		return &txExeResult{tx, fail}, true
 	}
 
-	if err := transition.Write(tx); err != nil {
+	if _, err := transition.Write(tx); err != nil {
 		if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok { //nolint:errorlint
 			// stop processing
 			return nil, false
