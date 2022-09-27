@@ -53,3 +53,7 @@ run-local:
 stop-local:
 	docker-compose -f ./docker/local/docker-compose.yml stop
 
+.PHONY: test-e2e
+test-e2e:
+	$(MAKE) build
+	env EDGE_BINARY=${PWD}/polygon-edge go test -v ./e2e/... -timeout=30m
