@@ -144,7 +144,7 @@ func (e *Executor) BeginTxn(
 		ChainID:    int64(e.config.ChainID),
 	}
 
-	txn := &Transition{
+	txn := &Transition1{
 		logger:   e.logger,
 		r:        e,
 		ctx:      env2,
@@ -158,10 +158,14 @@ func (e *Executor) BeginTxn(
 		totalGas: 0,
 	}
 
-	return txn, nil
+	return &Transition{txn}, nil
 }
 
 type Transition struct {
+	*Transition1
+}
+
+type Transition1 struct {
 	logger hclog.Logger
 
 	// dummy
@@ -179,17 +183,17 @@ type Transition struct {
 	totalGas uint64
 }
 
-func (t *Transition) TotalGas() uint64 {
+func (t *Transition1) TotalGas() uint64 {
 	return t.totalGas
 }
 
-func (t *Transition) Receipts() []*types.Receipt {
+func (t *Transition1) Receipts() []*types.Receipt {
 	return t.receipts
 }
 
 var emptyFrom = types.Address{}
 
-func (t *Transition) WriteFailedReceipt(txn *types.Transaction) error {
+func (t *Transition1) WriteFailedReceipt(txn *types.Transaction) error {
 	signer := crypto.NewSigner(t.config, uint64(t.r.config.ChainID))
 
 	if txn.From == emptyFrom {
@@ -220,7 +224,7 @@ func (t *Transition) WriteFailedReceipt(txn *types.Transaction) error {
 }
 
 // Write writes another transaction to the executor
-func (t *Transition) Write(txn *types.Transaction) error {
+func (t *Transition1) Write(txn *types.Transaction) error {
 	signer := crypto.NewSigner(t.config, uint64(t.r.config.ChainID))
 
 	var err error
@@ -285,14 +289,14 @@ func (t *Transition) Write(txn *types.Transaction) error {
 }
 
 // Commit commits the final result
-func (t *Transition) Commit() (Snapshot, types.Hash) {
+func (t *Transition1) Commit() (Snapshot, types.Hash) {
 	objs := t.state.Commit(t.config.EIP155)
 	s2, root := t.state.snapshot.Commit(objs)
 
 	return s2, types.BytesToHash(root)
 }
 
-func (t *Transition) subGasPool(amount uint64) error {
+func (t *Transition1) subGasPool(amount uint64) error {
 	if t.gasPool < amount {
 		return ErrBlockLimitReached
 	}
@@ -302,20 +306,20 @@ func (t *Transition) subGasPool(amount uint64) error {
 	return nil
 }
 
-func (t *Transition) addGasPool(amount uint64) {
+func (t *Transition1) addGasPool(amount uint64) {
 	t.gasPool += amount
 }
 
-func (t *Transition) SetTxn(txn *Txn) {
+func (t *Transition1) SetTxn(txn *Txn) {
 	t.state = txn
 }
 
-func (t *Transition) Txn() *Txn {
+func (t *Transition1) Txn() *Txn {
 	return t.state
 }
 
 // Apply applies a new transaction
-func (t *Transition) Apply(msg *types.Transaction) (*runtime.ExecutionResult, error) {
+func (t *Transition1) Apply(msg *types.Transaction) (*runtime.ExecutionResult, error) {
 	s := t.state.Snapshot()
 	result, err := t.apply(msg)
 
@@ -324,7 +328,7 @@ func (t *Transition) Apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 	}
 
 	if t.r.PostHook != nil {
-		t.r.PostHook(t)
+		t.r.PostHook(&Transition{t})
 	}
 
 	return result, err
@@ -332,11 +336,11 @@ func (t *Transition) Apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 
 // ContextPtr returns reference of context
 // This method is called only by test
-func (t *Transition) ContextPtr() *runtime.TxContext {
+func (t *Transition1) ContextPtr() *runtime.TxContext {
 	return &t.ctx
 }
 
-func (t *Transition) subGasLimitPrice(msg *types.Transaction) error {
+func (t *Transition1) subGasLimitPrice(msg *types.Transaction) error {
 	// deduct the upfront max gas cost
 	upfrontGasCost := new(big.Int).Set(msg.GasPrice)
 	upfrontGasCost.Mul(upfrontGasCost, new(big.Int).SetUint64(msg.Gas))
@@ -352,7 +356,7 @@ func (t *Transition) subGasLimitPrice(msg *types.Transaction) error {
 	return nil
 }
 
-func (t *Transition) nonceCheck(msg *types.Transaction) error {
+func (t *Transition1) nonceCheck(msg *types.Transaction) error {
 	nonce := t.state.GetNonce(msg.From)
 
 	if nonce != msg.Nonce {
@@ -400,7 +404,7 @@ func NewGasLimitReachedTransitionApplicationError(err error) *GasLimitReachedTra
 	}
 }
 
-func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, error) {
+func (t *Transition1) apply(msg *types.Transaction) (*runtime.ExecutionResult, error) {
 	// First check this message satisfies all consensus rules before
 	// applying the message. The rules include these clauses
 	//
@@ -477,7 +481,7 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 	return result, nil
 }
 
-func (t *Transition) Create2(
+func (t *Transition1) Create2(
 	caller types.Address,
 	code []byte,
 	value *big.Int,
@@ -489,7 +493,7 @@ func (t *Transition) Create2(
 	return t.applyCreate(contract, t)
 }
 
-func (t *Transition) Call2(
+func (t *Transition1) Call2(
 	caller types.Address,
 	to types.Address,
 	input []byte,
@@ -501,7 +505,7 @@ func (t *Transition) Call2(
 	return t.applyCall(c, runtime.Call, t)
 }
 
-func (t *Transition) run(contract *runtime.Contract, host runtime.Host) *runtime.ExecutionResult {
+func (t *Transition1) run(contract *runtime.Contract, host runtime.Host) *runtime.ExecutionResult {
 	for _, r := range t.r.runtimes {
 		if r.CanRun(contract, host, &t.config) {
 			return r.Run(contract, host, &t.config)
@@ -513,7 +517,7 @@ func (t *Transition) run(contract *runtime.Contract, host runtime.Host) *runtime
 	}
 }
 
-func (t *Transition) transfer(from, to types.Address, amount *big.Int) error {
+func (t *Transition1) transfer(from, to types.Address, amount *big.Int) error {
 	if amount == nil {
 		return nil
 	}
@@ -531,7 +535,7 @@ func (t *Transition) transfer(from, to types.Address, amount *big.Int) error {
 	return nil
 }
 
-func (t *Transition) applyCall(
+func (t *Transition1) applyCall(
 	c *runtime.Contract,
 	callType runtime.CallType,
 	host runtime.Host,
@@ -566,7 +570,7 @@ func (t *Transition) applyCall(
 
 var emptyHash types.Hash
 
-func (t *Transition) hasCodeOrNonce(addr types.Address) bool {
+func (t *Transition1) hasCodeOrNonce(addr types.Address) bool {
 	nonce := t.state.GetNonce(addr)
 	if nonce != 0 {
 		return true
@@ -581,7 +585,7 @@ func (t *Transition) hasCodeOrNonce(addr types.Address) bool {
 	return false
 }
 
-func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtime.ExecutionResult {
+func (t *Transition1) applyCreate(c *runtime.Contract, host runtime.Host) *runtime.ExecutionResult {
 	gasLimit := c.Gas
 
 	if c.Depth > int(1024)+1 {
@@ -659,7 +663,7 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 	return result
 }
 
-func (t *Transition) SetStorage(
+func (t *Transition1) SetStorage(
 	addr types.Address,
 	key types.Hash,
 	value types.Hash,
@@ -668,51 +672,51 @@ func (t *Transition) SetStorage(
 	return t.state.SetStorage(addr, key, value, config)
 }
 
-func (t *Transition) GetTxContext() runtime.TxContext {
+func (t *Transition1) GetTxContext() runtime.TxContext {
 	return t.ctx
 }
 
-func (t *Transition) GetBlockHash(number int64) (res types.Hash) {
+func (t *Transition1) GetBlockHash(number int64) (res types.Hash) {
 	return t.getHash(uint64(number))
 }
 
-func (t *Transition) EmitLog(addr types.Address, topics []types.Hash, data []byte) {
+func (t *Transition1) EmitLog(addr types.Address, topics []types.Hash, data []byte) {
 	t.state.EmitLog(addr, topics, data)
 }
 
-func (t *Transition) GetCodeSize(addr types.Address) int {
+func (t *Transition1) GetCodeSize(addr types.Address) int {
 	return t.state.GetCodeSize(addr)
 }
 
-func (t *Transition) GetCodeHash(addr types.Address) (res types.Hash) {
+func (t *Transition1) GetCodeHash(addr types.Address) (res types.Hash) {
 	return t.state.GetCodeHash(addr)
 }
 
-func (t *Transition) GetCode(addr types.Address) []byte {
+func (t *Transition1) GetCode(addr types.Address) []byte {
 	return t.state.GetCode(addr)
 }
 
-func (t *Transition) GetBalance(addr types.Address) *big.Int {
+func (t *Transition1) GetBalance(addr types.Address) *big.Int {
 	return t.state.GetBalance(addr)
 }
 
-func (t *Transition) GetStorage(addr types.Address, key types.Hash) types.Hash {
+func (t *Transition1) GetStorage(addr types.Address, key types.Hash) types.Hash {
 	return t.state.GetState(addr, key)
 }
 
-func (t *Transition) AccountExists(addr types.Address) bool {
+func (t *Transition1) AccountExists(addr types.Address) bool {
 	return t.state.Exist(addr)
 }
 
-func (t *Transition) Empty(addr types.Address) bool {
+func (t *Transition1) Empty(addr types.Address) bool {
 	return t.state.Empty(addr)
 }
 
-func (t *Transition) GetNonce(addr types.Address) uint64 {
+func (t *Transition1) GetNonce(addr types.Address) uint64 {
 	return t.state.GetNonce(addr)
 }
 
-func (t *Transition) Selfdestruct(addr types.Address, beneficiary types.Address) {
+func (t *Transition1) Selfdestruct(addr types.Address, beneficiary types.Address) {
 	if !t.state.HasSuicided(addr) {
 		t.state.AddRefund(24000)
 	}
@@ -721,7 +725,7 @@ func (t *Transition) Selfdestruct(addr types.Address, beneficiary types.Address)
 	t.state.Suicide(addr)
 }
 
-func (t *Transition) Callx(c *runtime.Contract, h runtime.Host) *runtime.ExecutionResult {
+func (t *Transition1) Callx(c *runtime.Contract, h runtime.Host) *runtime.ExecutionResult {
 	if c.Type == runtime.Create {
 		return t.applyCreate(c, h)
 	}
@@ -731,7 +735,7 @@ func (t *Transition) Callx(c *runtime.Contract, h runtime.Host) *runtime.Executi
 
 // SetAccountDirectly sets an account to the given address
 // NOTE: SetAccountDirectly changes the world state without a transaction
-func (t *Transition) SetAccountDirectly(addr types.Address, account *chain.GenesisAccount) error {
+func (t *Transition1) SetAccountDirectly(addr types.Address, account *chain.GenesisAccount) error {
 	if t.AccountExists(addr) {
 		return fmt.Errorf("can't add account to %+v because an account exists already", addr)
 	}
@@ -750,7 +754,7 @@ func (t *Transition) SetAccountDirectly(addr types.Address, account *chain.Genes
 
 // SetCodeDirectly sets new code into the account with the specified address
 // NOTE: SetCodeDirectly changes the world state without a transaction
-func (t *Transition) SetCodeDirectly(addr types.Address, code []byte) error {
+func (t *Transition1) SetCodeDirectly(addr types.Address, code []byte) error {
 	if !t.AccountExists(addr) {
 		return fmt.Errorf("account doesn't exist at %s", addr)
 	}
