@@ -111,7 +111,6 @@ func CreateBloom(receipts []*Receipt) (b Bloom) {
 
 func (b *Bloom) setEncode(hasher *keccak.Keccak, h []byte) {
 	hasher.Reset()
-	//nolint
 	hasher.Write(h[:])
 	buf := hasher.Read()
 
@@ -153,7 +152,6 @@ func (b *Bloom) IsLogInBloom(log *Log) bool {
 // isByteArrPresent checks if the byte array is possibly present in the Bloom filter
 func (b *Bloom) isByteArrPresent(hasher *keccak.Keccak, data []byte) bool {
 	hasher.Reset()
-	//nolint
 	hasher.Write(data[:])
 	buf := hasher.Read()
 
