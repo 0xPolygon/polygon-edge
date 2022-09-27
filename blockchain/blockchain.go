@@ -47,6 +47,7 @@ type Blockchain struct {
 	db        storage.Storage // The Storage object (database)
 	consensus Verifier
 	executor  Executor
+	txSigner  TxSigner
 
 	config  *chain.Chain // Config containing chain information
 	genesis types.Hash   // The hash of the genesis block
@@ -92,6 +93,11 @@ type Verifier interface {
 
 type Executor interface {
 	ProcessBlock(parentRoot types.Hash, block *types.Block, blockCreator types.Address) (*state.Transition, error)
+}
+
+type TxSigner interface {
+	// Sender returns the sender of the transaction
+	Sender(tx *types.Transaction) (types.Address, error)
 }
 
 type BlockResult struct {
@@ -185,12 +191,14 @@ func NewBlockchain(
 	config *chain.Chain,
 	consensus Verifier,
 	executor Executor,
+	txSigner TxSigner,
 ) (*Blockchain, error) {
 	b := &Blockchain{
 		logger:    logger.Named("blockchain"),
 		config:    config,
 		consensus: consensus,
 		executor:  executor,
+		txSigner:  txSigner,
 		stream:    &eventStream{},
 		gpAverage: &gasPriceAverage{
 			price: big.NewInt(0),
@@ -569,6 +577,13 @@ func (b *Blockchain) readBody(hash types.Hash) (*types.Body, bool) {
 		b.logger.Error("failed to read body", "err", err)
 
 		return nil, false
+	}
+
+	// To return from field in the transactions of the past blocks
+	if updated := b.recoverFromFieldsInTransactions(bb.Transactions); updated {
+		if err := b.db.WriteBody(hash, bb); err != nil {
+			b.logger.Warn("failed to write body into storage", "hash", hash, "err", err)
+		}
 	}
 
 	return bb, true
@@ -966,10 +981,15 @@ func (b *Blockchain) updateGasPriceAvgWithBlock(block *types.Block) {
 // writeBody writes the block body to the DB.
 // Additionally, it also updates the txn lookup, for txnHash -> block lookups
 func (b *Blockchain) writeBody(block *types.Block) error {
-	body := block.Body()
+	// Recover 'from' field in tx before saving
+	// Because the block passed from the consensus layer doesn't have from field in tx,
+	// due to missing encoding in RLP
+	if err := b.recoverFromFieldsInBlock(block); err != nil {
+		return err
+	}
 
 	// Write the full body (txns + receipts)
-	if err := b.db.WriteBody(block.Header.Hash, body); err != nil {
+	if err := b.db.WriteBody(block.Header.Hash, block.Body()); err != nil {
 		return err
 	}
 
@@ -988,6 +1008,49 @@ func (b *Blockchain) ReadTxLookup(hash types.Hash) (types.Hash, bool) {
 	v, ok := b.db.ReadTxLookup(hash)
 
 	return v, ok
+}
+
+// recoverFromFieldsInBlock recovers 'from' fields in the transactions of the given block
+// return error if the invalid signature found
+func (b *Blockchain) recoverFromFieldsInBlock(block *types.Block) error {
+	for _, tx := range block.Transactions {
+		if tx.From != types.ZeroAddress {
+			continue
+		}
+
+		sender, err := b.txSigner.Sender(tx)
+		if err != nil {
+			return err
+		}
+
+		tx.From = sender
+	}
+
+	return nil
+}
+
+// recoverFromFieldsInTransactions recovers 'from' fields in the transactions
+// log as warning if failing to recover one address
+func (b *Blockchain) recoverFromFieldsInTransactions(transactions []*types.Transaction) bool {
+	updated := false
+
+	for _, tx := range transactions {
+		if tx.From != types.ZeroAddress {
+			continue
+		}
+
+		sender, err := b.txSigner.Sender(tx)
+		if err != nil {
+			b.logger.Warn("failed to recover from address in Tx", "hash", tx.Hash, "err", err)
+
+			continue
+		}
+
+		tx.From = sender
+		updated = true
+	}
+
+	return updated
 }
 
 // verifyGasLimit is a helper function for validating a gas limit in a header

@@ -46,6 +46,7 @@ type txPoolInterface interface {
 	Drop(tx *types.Transaction)
 	Demote(tx *types.Transaction)
 	ResetWithHeaders(headers ...*types.Header)
+	SetSealing(bool)
 }
 
 type forkManagerInterface interface {
@@ -85,7 +86,6 @@ type backendIBFT struct {
 	epochSize          uint64
 	quorumSizeBlockNum uint64
 	blockTime          time.Duration // Minimum block generation time in seconds
-	sealing            bool          // Flag indicating if the node is a sealer
 
 	// Channels
 	closeCh chan struct{} // Channel for closing
@@ -158,7 +158,6 @@ func Factory(params *consensus.Params) (consensus.Consensus, error) {
 		epochSize:          epochSize,
 		quorumSizeBlockNum: quorumSizeBlockNum,
 		blockTime:          time.Duration(params.BlockTime) * time.Second,
-		sealing:            params.Seal,
 
 		// Channels
 		closeCh: make(chan struct{}),
@@ -259,8 +258,10 @@ func (i *backendIBFT) startConsensus() {
 	// to insert a valid block. Used for cancelling active consensus
 	// rounds for a specific height
 	go func() {
+		eventCh := newBlockSub.GetEventCh()
+
 		for {
-			if ev := <-newBlockSub.GetEventCh(); ev.Source == "syncer" {
+			if ev := <-eventCh; ev.Source == "syncer" {
 				if ev.NewChain[0].Number < i.blockchain.Header().Number {
 					// The blockchain notification system can eventually deliver
 					// stale block notifications. These should be ignored
@@ -297,6 +298,8 @@ func (i *backendIBFT) startConsensus() {
 		i.metrics.Validators.Set(float64(i.currentValidators.Len()))
 
 		isValidator = i.isActiveValidator()
+
+		i.txpool.SetSealing(isValidator)
 
 		if isValidator {
 			sequenceCh = i.consensus.runSequence(pending)
@@ -341,11 +344,6 @@ func (i *backendIBFT) updateMetrics(block *types.Block) {
 
 	// Update the Number of transactions in the block metric
 	i.metrics.NumTxs.Set(float64(len(block.Body().Transactions)))
-}
-
-// isSealing checks if the current node is sealing blocks
-func (i *backendIBFT) isSealing() bool {
-	return i.sealing
 }
 
 // verifyHeaderImpl verifies fields including Extra

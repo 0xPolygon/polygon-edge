@@ -45,7 +45,6 @@ func TestBroadcast(t *testing.T) {
 	conf := func(config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDummy)
 		config.Premine(senderAddr, framework.EthToWei(10))
-		config.SetSeal(true)
 	}
 
 	for _, tt := range testCases {
