@@ -16,11 +16,11 @@ on:  # yamllint disable-line rule:truthy
         required: false
         type: environment
       transaction_count:
-        default: '2000'
+        default: '10000'
         description: The number of transactions to send
         type: string
       transaction_batch:
-        default: '20'
+        default: '100'
         description: The transaction batch size
         type: string
   workflow_call:

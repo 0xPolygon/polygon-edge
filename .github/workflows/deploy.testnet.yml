@@ -164,8 +164,8 @@ jobs:
     with:
       runner: testnet
       environment: testnet
-      transaction_batch: '20'
-      transaction_count: '2000'
+      transaction_batch: '200'
+      transaction_count: '10000'
 
   loadbot:
     uses: 0xpolygon/polygon-edge/.github/workflows/loadbot.yml@develop
@@ -182,5 +182,5 @@ jobs:
       environment: testnet
       chain_id: '750'
       transaction_amount: '100'
-      transaction_count: '2000'
+      transaction_count: '10000'
       transactions_per_second: '100'

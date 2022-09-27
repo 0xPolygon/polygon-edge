@@ -30,19 +30,3 @@ jobs:
         uses: securego/gosec@master
         with:
           args: ./...
-
-  notify-deployer:
-    needs: test
-    runs-on: ubuntu-latest
-    if: github.event_name != 'pull_request'
-    steps:
-      - name: Extract branch name
-        shell: bash
-        run: echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/heads/})"
-        id: extract_branch
-      - name: Notify Deployer
-        env:
-          ARTIFACT_NAME: polygon-edge_${{ github.sha }}_${{ steps.extract_branch.outputs.branch }}
-          COMMITER: ${{ github.actor }}
-        run: |
-          curl -X POST ${{ secrets.DEPLOYER_API }} -H 'Accept: application/vnd.github.everest-preview+json' -u ${{ secrets.DEPLOYER_ACCESS_TOKEN }} --data '{"event_type": "new_artefact", "client_payload": { "commiter":"'"$COMMITER"'","commit":"'"$GITHUB_SHA"'","branch":"'"$GITHUB_REF"'","repository": "'"$GITHUB_REPOSITORY"'","artefact_name":"'"$ARTIFACT_NAME"'" }}'

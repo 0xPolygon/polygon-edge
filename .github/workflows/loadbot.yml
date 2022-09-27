@@ -21,7 +21,7 @@ on:  # yamllint disable-line rule:truthy
         description: The chain ID of the network to test
         type: string
       transaction_count:
-        default: '1000'
+        default: '10000'
         description: The number of transactions to send
         type: string
       transactions_per_second:
