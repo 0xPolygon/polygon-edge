@@ -9,11 +9,12 @@ import (
 	"github.com/umbracle/fastrlp"
 
 	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/evm"
+	"github.com/0xPolygon/polygon-edge/evm/runtime"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/state"
-	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -507,9 +508,9 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 
 	var standardGas uint64
 	if transaction.IsContractCreation() && forksInTime.Homestead {
-		standardGas = state.TxGasContractCreation
+		standardGas = evm.TxGasContractCreation
 	} else {
-		standardGas = state.TxGas
+		standardGas = evm.TxGas
 	}
 
 	var (
@@ -584,7 +585,7 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 	isGasApplyError := func(err error) bool {
 		// Not linting this as the underlying error is actually wrapped
 		//nolint:govet
-		return errors.As(err, &state.ErrNotEnoughIntrinsicGas)
+		return errors.As(err, &evm.ErrNotEnoughIntrinsicGas)
 	}
 
 	// Checks if EVM level valid gas errors occurred

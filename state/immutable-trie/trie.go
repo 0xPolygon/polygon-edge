@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/0xPolygon/polygon-edge/state"
+	"github.com/0xPolygon/polygon-edge/evm"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/fastrlp"
 	"golang.org/x/crypto/sha3"
@@ -118,7 +118,7 @@ var accountArenaPool fastrlp.ArenaPool
 
 var stateArenaPool fastrlp.ArenaPool // TODO, Remove once we do update in fastrlp
 
-func (t *Trie) Commit(objs []*state.Object) (state.Snapshot, []byte) {
+func (t *Trie) Commit(objs []*evm.Object) (evm.Snapshot, []byte) {
 	// Create an insertion batch for all the entries
 	batch := t.storage.Batch()
 
@@ -135,7 +135,7 @@ func (t *Trie) Commit(objs []*state.Object) (state.Snapshot, []byte) {
 		if obj.Deleted {
 			tt.Delete(hashit(obj.Address.Bytes()))
 		} else {
-			account := state.Account{
+			account := evm.Account{
 				Balance:  obj.Balance,
 				Nonce:    obj.Nonce,
 				CodeHash: obj.CodeHash.Bytes(),

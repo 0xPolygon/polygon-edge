@@ -10,7 +10,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/state"
-	itrie "github.com/0xPolygon/polygon-edge/state2/immutable-trie"
+	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
 	"github.com/hashicorp/go-hclog"
 
 	"github.com/0xPolygon/polygon-edge/types"

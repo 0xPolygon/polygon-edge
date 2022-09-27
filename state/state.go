@@ -1,191 +1,178 @@
 package state
 
 import (
-	"bytes"
-	"fmt"
 	"math/big"
 
-	iradix "github.com/hashicorp/go-immutable-radix"
-	"github.com/umbracle/fastrlp"
-
-	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/evm"
+	"github.com/0xPolygon/polygon-edge/evm/runtime"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/hashicorp/go-hclog"
 )
 
-type State interface {
-	NewSnapshotAt(types.Hash) (Snapshot, error)
-	NewSnapshot() Snapshot
-	GetCode(hash types.Hash) ([]byte, bool)
+type State = evm.State
+
+type Snapshot = evm.Snapshot
+
+type Account = evm.Account
+
+type GetHashByNumber = evm.GetHashByNumber
+
+// Executor is the main entity
+type Executor struct {
+	logger  hclog.Logger
+	config  *chain.Params
+	state   evm.State
+	GetHash evm.GetHashByNumberHelper
+
+	PostHook PostHook
 }
 
-type Snapshot interface {
-	Get(k []byte) ([]byte, bool)
-	Commit(objs []*Object) (Snapshot, []byte)
+type PostHook func(txn *Transition)
+
+// NewExecutor creates a new executor
+func NewExecutor(config *chain.Params, s evm.State, logger hclog.Logger) *Executor {
+	return &Executor{
+		logger: logger,
+		config: config,
+		state:  s,
+	}
 }
 
-// account trie
-type accountTrie interface {
-	Get(k []byte) ([]byte, bool)
+func (e *Executor) SetRuntime(r runtime.Runtime) {
+
 }
 
-// Account is the account reference in the ethereum state
-type Account struct {
-	Nonce    uint64
-	Balance  *big.Int
+func (e *Executor) WriteGenesis(alloc map[types.Address]*chain.GenesisAccount) types.Hash {
+	snap := e.state.NewSnapshot()
+	txn := evm.NewTxn(e.state, snap)
+
+	for addr, account := range alloc {
+		if account.Balance != nil {
+			txn.AddBalance(addr, account.Balance)
+		}
+
+		if account.Nonce != 0 {
+			txn.SetNonce(addr, account.Nonce)
+		}
+
+		if len(account.Code) != 0 {
+			txn.SetCode(addr, account.Code)
+		}
+
+		for key, value := range account.Storage {
+			txn.SetState(addr, key, value)
+		}
+	}
+
+	objs := txn.Commit(false)
+	_, root := snap.Commit(objs)
+
+	return types.BytesToHash(root)
+}
+
+type BlockResult struct {
 	Root     types.Hash
-	CodeHash []byte
-	Trie     accountTrie
+	Receipts []*types.Receipt
+	TotalGas uint64
 }
 
-func (a *Account) MarshalWith(ar *fastrlp.Arena) *fastrlp.Value {
-	v := ar.NewArray()
-	v.Set(ar.NewUint(a.Nonce))
-	v.Set(ar.NewBigInt(a.Balance))
-	v.Set(ar.NewBytes(a.Root.Bytes()))
-	v.Set(ar.NewBytes(a.CodeHash))
-
-	return v
-}
-
-var accountParserPool fastrlp.ParserPool
-
-func (a *Account) UnmarshalRlp(b []byte) error {
-	p := accountParserPool.Get()
-	defer accountParserPool.Put(p)
-
-	v, err := p.Parse(b)
+// ProcessBlock already does all the handling of the whole process
+func (e *Executor) ProcessBlock(
+	parentRoot types.Hash,
+	block *types.Block,
+	blockCreator types.Address,
+) (*Transition, error) {
+	txn, err := e.BeginTxn(parentRoot, block.Header, blockCreator)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	elems, err := v.GetElems()
+	for _, t := range block.Transactions {
+		var receipt *types.Receipt
 
+		if t.ExceedsBlockGasLimit(block.Header.GasLimit) {
+			receipt, err = txn.WriteFailedReceipt(t)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			receipt, err = txn.Write(t)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		txn.receipts = append(txn.receipts, receipt)
+	}
+
+	return txn, nil
+}
+
+// GetForksInTime returns the active forks at the given block height
+func (e *Executor) GetForksInTime(blockNumber uint64) chain.ForksInTime {
+	return e.config.Forks.At(blockNumber)
+}
+
+func (e *Executor) BeginTxn(
+	parentRoot types.Hash,
+	header *types.Header,
+	coinbaseReceiver types.Address,
+) (*Transition, error) {
+	config := e.config.Forks.At(header.Number)
+
+	auxSnap2, err := e.state.NewSnapshotAt(parentRoot)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	if len(elems) < 4 {
-		return fmt.Errorf("incorrect number of elements to decode account, expected 4 but found %d", len(elems))
+	newTxn := evm.NewTxn(e.state, auxSnap2)
+
+	env2 := runtime.TxContext{
+		Coinbase:   coinbaseReceiver,
+		Timestamp:  int64(header.Timestamp),
+		Number:     int64(header.Number),
+		Difficulty: types.BytesToHash(new(big.Int).SetUint64(header.Difficulty).Bytes()),
+		GasLimit:   int64(header.GasLimit),
+		ChainID:    int64(e.config.ChainID),
 	}
 
-	// nonce
-	if a.Nonce, err = elems[0].GetUint64(); err != nil {
-		return err
-	}
-	// balance
-	if a.Balance == nil {
-		a.Balance = new(big.Int)
-	}
+	txn := evm.NewTransition1()
+	txn.Ctx = env2
+	txn.Config = config
+	txn.State = newTxn
+	txn.GetHash = e.GetHash(header)
+	txn.GasPool = uint64(env2.GasLimit)
 
-	if err = elems[1].GetBigInt(a.Balance); err != nil {
-		return err
-	}
-	// root
-	if err = elems[2].GetHash(a.Root[:]); err != nil {
-		return err
-	}
-	// codeHash
-	if a.CodeHash, err = elems[3].GetBytes(a.CodeHash[:0]); err != nil {
-		return err
-	}
-
-	return nil
+	return &Transition{receipts: []*types.Receipt{}, writeSnapshot: auxSnap2, hook: e.PostHook, Transition1: txn}, nil
 }
 
-func (a *Account) String() string {
-	return fmt.Sprintf("%d %s", a.Nonce, a.Balance.String())
+type Transition struct {
+	*evm.Transition1
+
+	writeSnapshot evm.Snapshot
+
+	hook PostHook
+
+	receipts []*types.Receipt
 }
 
-func (a *Account) Copy() *Account {
-	aa := new(Account)
+// Apply applies a new transaction
+func (t *Transition) Apply(msg *types.Transaction) (*runtime.ExecutionResult, error) {
+	result, err := t.Transition1.Apply(msg)
 
-	aa.Balance = big.NewInt(1).SetBytes(a.Balance.Bytes())
-	aa.Nonce = a.Nonce
-	aa.CodeHash = a.CodeHash
-	aa.Root = a.Root
-	aa.Trie = a.Trie
-
-	return aa
-}
-
-var emptyCodeHash = crypto.Keccak256(nil)
-
-// StateObject is the internal representation of the account
-type StateObject struct {
-	Account   *Account
-	Code      []byte
-	Suicide   bool
-	Deleted   bool
-	DirtyCode bool
-	Txn       *iradix.Txn
-}
-
-func (s *StateObject) Empty() bool {
-	return s.Account.Nonce == 0 && s.Account.Balance.Sign() == 0 && bytes.Equal(s.Account.CodeHash, emptyCodeHash)
-}
-
-var stateStateParserPool fastrlp.ParserPool
-
-func (s *StateObject) GetCommitedState(key types.Hash) types.Hash {
-	val, ok := s.Account.Trie.Get(key.Bytes())
-	if !ok {
-		return types.Hash{}
+	if t.hook != nil {
+		t.hook(t)
 	}
 
-	p := stateStateParserPool.Get()
-	defer stateStateParserPool.Put(p)
-
-	v, err := p.Parse(val)
-	if err != nil {
-		return types.Hash{}
-	}
-
-	res := []byte{}
-	if res, err = v.GetBytes(res[:0]); err != nil {
-		return types.Hash{}
-	}
-
-	return types.BytesToHash(res)
+	return result, err
 }
 
-// Copy makes a copy of the state object
-func (s *StateObject) Copy() *StateObject {
-	ss := new(StateObject)
-
-	// copy account
-	ss.Account = s.Account.Copy()
-
-	ss.Suicide = s.Suicide
-	ss.Deleted = s.Deleted
-	ss.DirtyCode = s.DirtyCode
-	ss.Code = s.Code
-
-	if s.Txn != nil {
-		ss.Txn = s.Txn.CommitOnly().Txn()
-	}
-
-	return ss
+func (t *Transition) Commit() (evm.Snapshot, types.Hash) {
+	s2, root := t.writeSnapshot.Commit(t.Transition1.Commit2())
+	return s2, types.BytesToHash(root)
 }
 
-// Object is the serialization of the radix object (can be merged to StateObject?).
-type Object struct {
-	Address  types.Address
-	CodeHash types.Hash
-	Balance  *big.Int
-	Root     types.Hash
-	Nonce    uint64
-	Deleted  bool
-
-	// TODO: Move this to executor
-	DirtyCode bool
-	Code      []byte
-
-	Storage []*StorageObject
-}
-
-// StorageObject is an entry in the storage
-type StorageObject struct {
-	Deleted bool
-	Key     []byte
-	Val     []byte
+func (t *Transition) Receipts() []*types.Receipt {
+	return t.receipts
 }

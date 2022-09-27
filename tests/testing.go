@@ -11,10 +11,11 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/0xPolygon/polygon-edge/evm"
+	"github.com/0xPolygon/polygon-edge/evm/runtime"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state"
-	"github.com/0xPolygon/polygon-edge/state/runtime"
-	itrie "github.com/0xPolygon/polygon-edge/state2/immutable-trie"
+	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -228,7 +229,7 @@ func buildState(
 	s := itrie.NewState(itrie.NewMemoryStorage())
 	snap := s.NewSnapshot()
 
-	txn := state.NewTxn(s, snap)
+	txn := evm.NewTxn(s, snap)
 
 	for addr, alloc := range allocs {
 		txn.CreateAccount(addr)

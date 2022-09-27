@@ -6,7 +6,7 @@ import (
 
 	lru "github.com/hashicorp/golang-lru"
 
-	"github.com/0xPolygon/polygon-edge/state"
+	"github.com/0xPolygon/polygon-edge/evm"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -26,7 +26,7 @@ func NewState(storage Storage) *State {
 	return s
 }
 
-func (s *State) NewSnapshot() state.Snapshot {
+func (s *State) NewSnapshot() evm.Snapshot {
 	t := NewTrie()
 	t.state = s
 	t.storage = s.storage
@@ -42,7 +42,7 @@ func (s *State) GetCode(hash types.Hash) ([]byte, bool) {
 	return s.storage.GetCode(hash)
 }
 
-func (s *State) NewSnapshotAt(root types.Hash) (state.Snapshot, error) {
+func (s *State) NewSnapshotAt(root types.Hash) (evm.Snapshot, error) {
 	if root == types.EmptyRootHash {
 		// empty state
 		return s.NewSnapshot(), nil

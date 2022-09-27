@@ -4,7 +4,7 @@ import (
 	"errors"
 
 	"github.com/0xPolygon/polygon-edge/chain"
-	"github.com/0xPolygon/polygon-edge/state/runtime"
+	"github.com/0xPolygon/polygon-edge/evm/runtime"
 )
 
 var _ runtime.Runtime = &EVM{}

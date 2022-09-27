@@ -14,8 +14,8 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/evm"
 	"github.com/0xPolygon/polygon-edge/network"
-	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/txpool/proto"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -647,7 +647,7 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 	}
 
 	// Make sure the transaction has more gas than the basic transaction fee
-	intrinsicGas, err := state.TransactionGasCost(tx, p.forks.Homestead, p.forks.Istanbul)
+	intrinsicGas, err := evm.TransactionGasCost(tx, p.forks.Homestead, p.forks.Istanbul)
 	if err != nil {
 		return err
 	}

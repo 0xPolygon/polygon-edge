@@ -1,25 +1,23 @@
-package state
+package evm
 
 import (
 	"math/big"
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/state/runtime"
+	"github.com/0xPolygon/polygon-edge/evm/runtime"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
 )
 
-func newTestTransition(preState map[types.Address]*PreState) *Transition {
+func newTestTransition(preState map[types.Address]*PreState) *Transition1 {
 	if preState == nil {
 		preState = defaultPreState
 	}
 
-	return &Transition{
-		Transition1: &Transition1{
-			logger: hclog.NewNullLogger(),
-			State:  newTestTxn(preState),
-		},
+	return &Transition1{
+		logger: hclog.NewNullLogger(),
+		State:  newTestTxn(preState),
 	}
 }
 

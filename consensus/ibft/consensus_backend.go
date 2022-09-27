@@ -8,7 +8,7 @@ import (
 	"github.com/0xPolygon/go-ibft/messages"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
-	"github.com/0xPolygon/polygon-edge/state"
+	"github.com/0xPolygon/polygon-edge/evm"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -313,10 +313,10 @@ func (i *backendIBFT) writeTransaction(
 	}
 
 	if _, err := transition.Write(tx); err != nil {
-		if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok { //nolint:errorlint
+		if _, ok := err.(*evm.GasLimitReachedTransitionApplicationError); ok { //nolint:errorlint
 			// stop processing
 			return nil, false
-		} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable { //nolint:errorlint
+		} else if appErr, ok := err.(*evm.TransitionApplicationError); ok && appErr.IsRecoverable { //nolint:errorlint
 			i.txpool.Demote(tx)
 
 			return &txExeResult{tx, skip}, true

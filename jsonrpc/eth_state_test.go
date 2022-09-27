@@ -8,9 +8,10 @@ import (
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/evm"
+	"github.com/0xPolygon/polygon-edge/evm/runtime"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state"
-	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/umbracle/fastrlp"
@@ -632,40 +633,40 @@ func TestEth_EstimateGas_GasLimit(t *testing.T) {
 	}{
 		{
 			"valid gas limit from the latest block",
-			state.TxGas,
+			evm.TxGas,
 			nil,
 			constructMockTx(nil, nil),
 		},
 		{
 			"valid gas limit from the latest block for contract interaction",
-			state.TxGasContractCreation,
+			evm.TxGasContractCreation,
 			nil,
 			constructMockTx(nil, argBytesPtr([]byte{0x12})),
 		},
 		{
 			"valid gas limit from the transaction",
-			state.TxGas,
+			evm.TxGas,
 			nil,
 			constructMockTx(argUintPtr(30000), nil),
 		},
 		{
 			"insufficient gas limit from the transaction",
-			state.TxGas,
-			state.ErrNotEnoughIntrinsicGas,
-			constructMockTx(argUintPtr(state.TxGas/2), nil),
+			evm.TxGas,
+			evm.ErrNotEnoughIntrinsicGas,
+			constructMockTx(argUintPtr(evm.TxGas/2), nil),
 		},
 	}
 
 	for _, testCase := range testTable {
 		t.Run(testCase.name, func(t *testing.T) {
 			// Set up the apply hook
-			if errors.Is(testCase.expectedError, state.ErrNotEnoughIntrinsicGas) {
+			if errors.Is(testCase.expectedError, evm.ErrNotEnoughIntrinsicGas) {
 				// We want to trigger a situation where no value in the gas range is correct
 				store.applyTxnHook = func(
 					header *types.Header,
 					txn *types.Transaction,
 				) (*runtime.ExecutionResult, error) {
-					return &runtime.ExecutionResult{}, state.ErrNotEnoughIntrinsicGas
+					return &runtime.ExecutionResult{}, evm.ErrNotEnoughIntrinsicGas
 				}
 			} else {
 				// We want to trigger a situation where only values that cover the intrinsic gas costs
@@ -675,7 +676,7 @@ func TestEth_EstimateGas_GasLimit(t *testing.T) {
 					txn *types.Transaction,
 				) (*runtime.ExecutionResult, error) {
 					if txn.Gas < testCase.intrinsicGasCost {
-						return &runtime.ExecutionResult{}, state.ErrNotEnoughIntrinsicGas
+						return &runtime.ExecutionResult{}, evm.ErrNotEnoughIntrinsicGas
 					}
 
 					return &runtime.ExecutionResult{}, nil
