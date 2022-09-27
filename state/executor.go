@@ -36,8 +36,10 @@ type Executor struct {
 	state    State
 	GetHash  GetHashByNumberHelper
 
-	PostHook func(txn *Transition)
+	PostHook PostHook
 }
+
+type PostHook func(txn *Transition)
 
 // NewExecutor creates a new executor
 func NewExecutor(config *chain.Params, s State, logger hclog.Logger) *Executor {
@@ -158,11 +160,31 @@ func (e *Executor) BeginTxn(
 		totalGas: 0,
 	}
 
-	return &Transition{txn}, nil
+	return &Transition{writeSnapshot: auxSnap2, hook: e.PostHook, Transition1: txn}, nil
 }
 
 type Transition struct {
 	*Transition1
+
+	writeSnapshot Snapshot
+
+	hook PostHook
+}
+
+// Apply applies a new transaction
+func (t *Transition) Apply(msg *types.Transaction) (*runtime.ExecutionResult, error) {
+	result, err := t.Transition1.Apply(msg)
+
+	if t.hook != nil {
+		t.hook(t)
+	}
+
+	return result, err
+}
+
+func (t *Transition) Commit() (Snapshot, types.Hash) {
+	s2, root := t.writeSnapshot.Commit(t.Transition1.Commit2())
+	return s2, types.BytesToHash(root)
 }
 
 type Transition1 struct {
@@ -288,6 +310,10 @@ func (t *Transition1) Write(txn *types.Transaction) error {
 	return nil
 }
 
+func (t *Transition1) Commit2() []*Object {
+	return t.state.Commit(t.config.EIP155)
+}
+
 // Commit commits the final result
 func (t *Transition1) Commit() (Snapshot, types.Hash) {
 	objs := t.state.Commit(t.config.EIP155)
@@ -325,10 +351,6 @@ func (t *Transition1) Apply(msg *types.Transaction) (*runtime.ExecutionResult, e
 
 	if err != nil {
 		t.state.RevertToSnapshot(s)
-	}
-
-	if t.r.PostHook != nil {
-		t.r.PostHook(&Transition{t})
 	}
 
 	return result, err
