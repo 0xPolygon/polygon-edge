@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/e2e/framework"
 	"github.com/0xPolygon/polygon-edge/rootchain"
 	"github.com/0xPolygon/polygon-edge/rootchain/payload"
@@ -205,16 +204,15 @@ func (s *SAMUEL) registerGossipHandler() error {
 		}
 
 		// Verify that the hash is correct
-		marshalledEvent, err := localSAM.Event.Marshal()
+		hash, err := localSAM.Event.GetHash()
 		if err != nil {
 			s.logger.Error(
-				fmt.Sprintf("unable to marshal event, %v", err),
+				fmt.Sprintf("unable to marshal and hash event, %v", err),
 			)
 
 			return
 		}
 
-		hash := crypto.Keccak256(marshalledEvent)
 		if !bytes.Equal(sam.Hash, hash) {
 			s.logger.Error("invalid hash for incoming event")
 
@@ -250,15 +248,19 @@ func (s *SAMUEL) startEventLoop() {
 	go func() {
 		for ev := range subscription {
 			// Get the raw event data as bytes
-			data, err := ev.Marshal()
+			hash, err := ev.GetHash()
 			if err != nil {
-				s.logger.Warn(fmt.Sprintf("unable to marshal Event Tracker event, %v", err))
+				s.logger.Warn(
+					fmt.Sprintf(
+						"unable to marshal and hash Event Tracker event, %v",
+						err,
+					),
+				)
 
 				continue
 			}
 
 			// Get the hash and the signature of the event
-			hash := crypto.Keccak256(data)
 			signature, blockNum, err := s.signer.Sign(hash)
 
 			if err != nil {

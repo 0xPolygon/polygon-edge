@@ -10,7 +10,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/e2e/framework"
 	"github.com/0xPolygon/polygon-edge/rootchain"
 	"github.com/0xPolygon/polygon-edge/rootchain/payload"
@@ -242,7 +241,7 @@ func TestSAMUEL_RegisterGossipHandler(t *testing.T) {
 		Index:       event.Index,
 		BlockNumber: event.BlockNumber,
 		Payload:     vsPayload,
-	}).Marshal()
+	}).GetHash()
 	if err != nil {
 		t.Fatalf("unable to hash rootchain event, %v", err)
 	}
@@ -252,7 +251,7 @@ func TestSAMUEL_RegisterGossipHandler(t *testing.T) {
 		childchainBlockNumber uint64         = 10
 		addedSAM              *rootchain.SAM = nil
 		sam                                  = &proto.SAM{
-			Hash:                  crypto.Keccak256(eventHash),
+			Hash:                  eventHash,
 			Signature:             signature,
 			ChildchainBlockNumber: childchainBlockNumber,
 			Event:                 event,
