@@ -13,6 +13,24 @@ message Event {
   // with the event
   uint64 blockNumber = 2;
 
+  // The type of the payload
+  uint64 payloadType = 3;
+
   // The underlying payload
-  bytes payload = 3;
+  bytes payload = 4;
+}
+
+// SAM defines the gossiped Signed Arbitrary Message
+message SAM {
+  // The hash of the event
+  bytes hash = 1;
+
+  // The signature of the event
+  bytes signature = 2;
+
+  // The childchain block number when the SAM was generated
+  uint64 childchainBlockNumber = 3;
+
+  // The actual event contained in the SAM
+  Event event = 4;
 }

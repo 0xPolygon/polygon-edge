@@ -10,6 +10,7 @@ type Config struct {
 type ConfigEvent struct {
 	EventABI           string      `json:"eventABI"`
 	MethodABI          string      `json:"methodABI"`
+	MethodName         string      `json:"methodName"`
 	LocalAddress       string      `json:"localAddress"`
 	PayloadType        PayloadType `json:"payloadType"`
 	BlockConfirmations uint64      `json:"blockConfirmations"`

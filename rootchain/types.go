@@ -1,22 +1,19 @@
 package rootchain
 
-import "github.com/0xPolygon/polygon-edge/types"
+import "math"
 
 type PayloadType uint8
 
 const (
-	ValidatorSetPayload PayloadType = iota
+	ValidatorSetPayloadType PayloadType = iota
+)
+
+const (
+	LatestRootchainBlockNumber uint64 = math.MaxUint64 // Special value, meaning the latest block on the rootchain
 )
 
 type Payload interface {
 	Get() (PayloadType, []byte)
-}
-
-type SAM struct {
-	Hash      types.Hash // unique hash of the event
-	Signature []byte     // validator signature
-
-	Event
 }
 
 type VerifiedSAM []SAM

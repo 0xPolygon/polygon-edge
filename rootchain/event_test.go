@@ -38,8 +38,8 @@ func TestEventMarshal(t *testing.T) {
 		Payload: &testPayload{},
 	}
 
-	marshalled, err := event.Marshal()
+	eventHash, err := event.GetHash()
 
 	assert.NoError(t, err)
-	assert.NotNil(t, marshalled)
+	assert.NotNil(t, eventHash)
 }

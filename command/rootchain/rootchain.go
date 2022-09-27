@@ -60,6 +60,13 @@ func setFlags(cmd *cobra.Command) {
 		"the Ethereum address of the local Smart Contract to call",
 	)
 
+	cmd.Flags().StringVar(
+		&params.methodName,
+		methodNameFlag,
+		"",
+		"the name of the method being called on the local Smart Contract",
+	)
+
 	cmd.Flags().Uint64Var(
 		&params.payloadType,
 		payloadTypeFlag,

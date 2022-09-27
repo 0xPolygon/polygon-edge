@@ -21,6 +21,7 @@ const (
 	localAddrFlag          = "local-addr"
 	payloadTypeFlag        = "payload-type"
 	blockConfirmationsFlag = "block-confirmations"
+	methodNameFlag         = "method-name"
 )
 
 var (
@@ -36,6 +37,7 @@ var (
 	errInvalidPayloadType = errors.New("invalid payload type")
 	errInvalidEventABI    = errors.New("invalid event ABI")
 	errInvalidMethodABI   = errors.New("invalid method ABI")
+	errInvalidMethodName  = errors.New("invalid method name")
 	errUnableToReadConfig = errors.New("unable to read rootchain config")
 )
 
@@ -44,6 +46,7 @@ type rootchainParams struct {
 	rootchainAddr      string
 	eventABI           string
 	methodABI          string
+	methodName         string
 	localAddr          string
 	payloadType        uint64
 	blockConfirmations uint64
@@ -57,6 +60,7 @@ func (p *rootchainParams) getRequiredFlags() []string {
 		eventABIFlag,
 		methodABIFlag,
 		localAddrFlag,
+		methodNameFlag,
 	}
 }
 
@@ -81,7 +85,7 @@ func (p *rootchainParams) validateFlags() error {
 }
 
 func validatePayloadType(payloadType uint64) error {
-	if rootchain.PayloadType(payloadType) != rootchain.ValidatorSetPayload {
+	if rootchain.PayloadType(payloadType) != rootchain.ValidatorSetPayloadType {
 		return errInvalidPayloadType
 	}
 
@@ -99,9 +103,15 @@ func (p *rootchainParams) validateEventABI() error {
 }
 
 func (p *rootchainParams) validateMethodABI() error {
-	_, err := abi.NewABI(p.methodABI)
+	// Make sure the ABI is correct
+	methodABI, err := abi.NewABI(p.methodABI)
 	if err != nil {
 		return errInvalidMethodABI
+	}
+
+	// Make sure the method is present in the ABI
+	if methodABI.GetMethod(p.methodName) == nil {
+		return errInvalidMethodName
 	}
 
 	return nil
@@ -161,6 +171,7 @@ func (p *rootchainParams) generateConfig() error {
 			LocalAddress:       p.localAddr,
 			PayloadType:        rootchain.PayloadType(p.payloadType),
 			BlockConfirmations: p.blockConfirmations,
+			MethodName:         p.methodName,
 		},
 	)
 
