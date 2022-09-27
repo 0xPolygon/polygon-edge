@@ -26,25 +26,19 @@ var (
 // Txn is a reference of the state
 type Txn struct {
 	snapshot  Snapshot
-	state     State
 	snapshots []*iradix.Tree
 	txn       *iradix.Txn
 	codeCache *lru.Cache
 	hash      *keccak.Keccak
 }
 
-func NewTxn(state State, snapshot Snapshot) *Txn {
-	return newTxn(state, snapshot)
-}
-
-func newTxn(state State, snapshot Snapshot) *Txn {
+func NewTxn(snapshot Snapshot) *Txn {
 	i := iradix.New()
 
 	codeCache, _ := lru.New(20)
 
 	return &Txn{
 		snapshot:  snapshot,
-		state:     state,
 		snapshots: []*iradix.Tree{},
 		txn:       i.Txn(),
 		codeCache: codeCache,
@@ -102,26 +96,9 @@ func (txn *Txn) getStateObject(addr types.Address) (*StateObject, bool) {
 		return obj.Copy(), true
 	}
 
-	data, ok := txn.snapshot.Get(txn.hashit(addr.Bytes()))
-	if !ok {
+	account, err := txn.snapshot.GetAccount(addr)
+	if err != nil {
 		return nil, false
-	}
-
-	var err error
-
-	var account Account
-	if err = account.UnmarshalRlp(data); err != nil {
-		return nil, false
-	}
-
-	// Load trie from memory if there is some state
-	if account.Root == emptyStateHash {
-		account.Trie = txn.state.NewSnapshot()
-	} else {
-		account.Trie, err = txn.state.NewSnapshotAt(account.Root)
-		if err != nil {
-			return nil, false
-		}
 	}
 
 	obj := &StateObject{
@@ -136,8 +113,8 @@ func (txn *Txn) upsertAccount(addr types.Address, create bool, f func(object *St
 	if !exists && create {
 		object = &StateObject{
 			Account: &Account{
-				Balance:  big.NewInt(0),
-				Trie:     txn.state.NewSnapshot(),
+				Balance: big.NewInt(0),
+				// Trie:     txn.state.NewSnapshot(),
 				CodeHash: emptyCodeHash,
 				Root:     emptyStateHash,
 			},
@@ -337,6 +314,7 @@ func (txn *Txn) SetState(
 }
 
 // GetState returns the state of the address at a given key
+// GetStorage(addr types.Address, root types.Hash, key types.Hash) types.Hash
 func (txn *Txn) GetState(addr types.Address, key types.Hash) types.Hash {
 	object, exists := txn.getStateObject(addr)
 	if !exists {
@@ -416,7 +394,7 @@ func (txn *Txn) GetCode(addr types.Address) []byte {
 		return v.([]byte)
 	}
 
-	code, _ := txn.state.GetCode(types.BytesToHash(object.Account.CodeHash))
+	code, _ := txn.snapshot.GetCode(types.BytesToHash(object.Account.CodeHash))
 	txn.codeCache.Add(addr, code)
 
 	return code
@@ -529,8 +507,8 @@ func (txn *Txn) Empty(addr types.Address) bool {
 func newStateObject(txn *Txn) *StateObject {
 	return &StateObject{
 		Account: &Account{
-			Balance:  big.NewInt(0),
-			Trie:     txn.state.NewSnapshot(),
+			Balance: big.NewInt(0),
+			// Trie:     txn.state.NewSnapshot(),
 			CodeHash: emptyCodeHash,
 			Root:     emptyStateHash,
 		},
@@ -540,8 +518,8 @@ func newStateObject(txn *Txn) *StateObject {
 func (txn *Txn) CreateAccount(addr types.Address) {
 	obj := &StateObject{
 		Account: &Account{
-			Balance:  big.NewInt(0),
-			Trie:     txn.state.NewSnapshot(),
+			Balance: big.NewInt(0),
+			// Trie:     txn.state.NewSnapshot(),
 			CodeHash: emptyCodeHash,
 			Root:     emptyStateHash,
 		},

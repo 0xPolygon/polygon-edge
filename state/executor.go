@@ -49,9 +49,9 @@ func NewExecutor(config *chain.Params, s State, logger hclog.Logger) *Executor {
 	}
 }
 
-func (e *Executor) WriteGenesis(alloc map[types.Address]*chain.GenesisAccount) types.Hash {
+func (e *Executor) WriteGenesis(alloc map[types.Address]*chain.GenesisAccount) []*Object {
 	snap := e.state.NewSnapshot()
-	txn := NewTxn(e.state, snap)
+	txn := NewTxn(snap)
 
 	for addr, account := range alloc {
 		if account.Balance != nil {
@@ -71,10 +71,7 @@ func (e *Executor) WriteGenesis(alloc map[types.Address]*chain.GenesisAccount) t
 		}
 	}
 
-	objs := txn.Commit(false)
-	_, root := snap.Commit(objs)
-
-	return types.BytesToHash(root)
+	return txn.Commit(false)
 }
 
 // SetRuntime adds a runtime to the runtime set
@@ -145,7 +142,7 @@ func (e *Executor) BeginTxn(
 		return nil, err
 	}
 
-	newTxn := NewTxn(e.state, auxSnap2)
+	newTxn := NewTxn(auxSnap2)
 
 	env2 := runtime.TxContext{
 		Coinbase:   coinbaseReceiver,
@@ -261,29 +258,19 @@ func (t *Transition) Write(txn *types.Transaction) error {
 
 	logs := t.state.Logs()
 
-	var root []byte
-
 	receipt := &types.Receipt{
 		CumulativeGasUsed: t.totalGas,
 		TxHash:            txn.Hash,
 		GasUsed:           result.GasUsed,
 	}
 
-	if t.config.Byzantium {
-		// The suicided accounts are set as deleted for the next iteration
-		t.state.CleanDeleteObjects(true)
+	// The suicided accounts are set as deleted for the next iteration
+	t.state.CleanDeleteObjects(true)
 
-		if result.Failed() {
-			receipt.SetStatus(types.ReceiptFailed)
-		} else {
-			receipt.SetStatus(types.ReceiptSuccess)
-		}
+	if result.Failed() {
+		receipt.SetStatus(types.ReceiptFailed)
 	} else {
-		objs := t.state.Commit(t.config.EIP155)
-		ss, aux := t.state.snapshot.Commit(objs)
-		t.state = NewTxn(t.auxState, ss)
-		root = aux
-		receipt.Root = types.BytesToHash(root)
+		receipt.SetStatus(types.ReceiptSuccess)
 	}
 
 	// if the transaction created a contract, store the creation address in the receipt.
@@ -300,11 +287,8 @@ func (t *Transition) Write(txn *types.Transaction) error {
 }
 
 // Commit commits the final result
-func (t *Transition) Commit() (Snapshot, types.Hash) {
-	objs := t.state.Commit(t.config.EIP155)
-	s2, root := t.state.snapshot.Commit(objs)
-
-	return s2, types.BytesToHash(root)
+func (t *Transition) Commit() []*Object {
+	return t.state.Commit(t.config.EIP155)
 }
 
 func (t *Transition) subGasPool(amount uint64) error {

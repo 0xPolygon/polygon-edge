@@ -15,12 +15,16 @@ import (
 type State interface {
 	NewSnapshotAt(types.Hash) (Snapshot, error)
 	NewSnapshot() Snapshot
-	GetCode(hash types.Hash) ([]byte, bool)
+	// GetCode(hash types.Hash) ([]byte, bool)
 }
 
+// Get(k []byte) ([]byte, bool)
+// Commit(objs []*Object) (snapshotTrie, []byte)
+
 type Snapshot interface {
-	Get(k []byte) ([]byte, bool)
-	Commit(objs []*Object) (Snapshot, []byte)
+	GetCode(hash types.Hash) ([]byte, bool)
+	GetStorage(root types.Hash, key types.Hash) types.Hash
+	GetAccount(addr types.Address) (*Account, error)
 }
 
 // account trie
