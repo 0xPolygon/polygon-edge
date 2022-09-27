@@ -15,6 +15,7 @@ import (
 type State interface {
 	NewSnapshotAt(types.Hash) (Snapshot, error)
 	NewSnapshot() Snapshot
+	Commit([]*Object) (Snapshot, []byte)
 	// GetCode(hash types.Hash) ([]byte, bool)
 }
 

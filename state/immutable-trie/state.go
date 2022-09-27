@@ -100,6 +100,20 @@ func (s *State) NewSnapshot() state.Snapshot {
 	return snap
 }
 
+func (s *State) Commit(objs []*state.Object) (state.Snapshot, []byte) {
+	trie, err := s.NewTrieAt(types.EmptyRootHash)
+	if err != nil {
+		panic(err)
+	}
+
+	accountTrie, root := trie.Commit(objs)
+	snap := &Snapshot{
+		accountTrie: accountTrie,
+		state:       s,
+	}
+	return snap, root
+}
+
 type Snapshot struct {
 	accountTrie *Trie
 	state       *State
