@@ -38,23 +38,23 @@ func metricProvider(nameSpace string, chainID string, metricsRequired bool) *ser
 // enableDataDogProfiler enables DataDog profiler. Enable it by setting DD_ENABLE env var.
 // Additional parameters can be set with env vars (DD_) - https://docs.datadoghq.com/profiler/enabling/go/
 func (s *Server) enableDataDogProfiler() error {
-	if os.Getenv("DD_ENABLE") == "" {
-		s.logger.Debug("DataDog profiler disabled, set DD_ENABLE env var to enable it.")
+	if os.Getenv("DD_PROFILING_ENABLED") == "" {
+		s.logger.Debug("DataDog profiler disabled, set DD_PROFILING_ENABLED env var to enable it.")
 
 		return nil
 	}
 	// For containerized solutions, we want to be able to set the ip and port that the agent will bind to
-	// by defining DD_PROF_IP and DD_PROF_PORT env vars.
+	// by defining DD_AGENT_HOST and DD_TRACE_AGENT_PORT env vars.
 	// If these env vars are not defined, the agent will bind to default ip:port ( localhost:8126 )
 	ddIP := "localhost"
 	ddPort := "8126"
 
-	if os.Getenv("DD_PROF_IP") != "" {
-		ddIP = os.Getenv("DD_PROF_IP")
+	if os.Getenv("DD_AGENT_HOST") != "" {
+		ddIP = os.Getenv("DD_AGENT_HOST")
 	}
 
-	if os.Getenv("DD_PROF_PORT") != "" {
-		ddPort = os.Getenv("DD_PROF_PORT")
+	if os.Getenv("DD_TRACE_AGENT_PORT") != "" {
+		ddPort = os.Getenv("DD_TRACE_AGENT_PORT")
 	}
 
 	if err := profiler.Start(
