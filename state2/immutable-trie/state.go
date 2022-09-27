@@ -66,11 +66,9 @@ func (s *State) NewSnapshotAt(root types.Hash) (state.Snapshot, error) {
 	}
 
 	n, ok, err := GetNode(root.Bytes(), s.storage)
-
 	if err != nil {
 		return nil, err
 	}
-
 	if !ok {
 		return nil, fmt.Errorf("state not found at hash %s", root)
 	}
