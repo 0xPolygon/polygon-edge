@@ -152,11 +152,10 @@ func (e *Executor) BeginTxn(
 
 	txn := &Transition1{
 		logger:   e.logger,
-		r:        e,
+		runtimes: e.runtimes,
 		ctx:      env2,
 		state:    newTxn,
 		getHash:  e.GetHash(header),
-		auxState: e.state,
 		config:   config,
 		gasPool:  uint64(env2.GasLimit),
 		totalGas: 0,
@@ -198,15 +197,12 @@ func (t *Transition) Receipts() []*types.Receipt {
 type Transition1 struct {
 	logger hclog.Logger
 
-	// dummy
-	auxState State
-
-	r       *Executor
-	config  chain.ForksInTime
-	state   *Txn
-	getHash GetHashByNumber
-	ctx     runtime.TxContext
-	gasPool uint64
+	runtimes []runtime.Runtime
+	config   chain.ForksInTime
+	state    *Txn
+	getHash  GetHashByNumber
+	ctx      runtime.TxContext
+	gasPool  uint64
 
 	// result
 	totalGas uint64
@@ -219,7 +215,7 @@ func (t *Transition1) TotalGas() uint64 {
 var emptyFrom = types.Address{}
 
 func (t *Transition1) WriteFailedReceipt(txn *types.Transaction) (*types.Receipt, error) {
-	signer := crypto.NewSigner(t.config, uint64(t.r.config.ChainID))
+	signer := crypto.NewSigner(t.config, uint64(t.ctx.ChainID))
 
 	if txn.From == emptyFrom {
 		// Decrypt the from address
@@ -250,7 +246,7 @@ func (t *Transition1) WriteFailedReceipt(txn *types.Transaction) (*types.Receipt
 
 // Write writes another transaction to the executor
 func (t *Transition1) Write(txn *types.Transaction) (*types.Receipt, error) {
-	signer := crypto.NewSigner(t.config, uint64(t.r.config.ChainID))
+	signer := crypto.NewSigner(t.config, uint64(t.ctx.ChainID))
 
 	var err error
 	if txn.From == emptyFrom {
@@ -275,29 +271,20 @@ func (t *Transition1) Write(txn *types.Transaction) (*types.Receipt, error) {
 
 	logs := t.state.Logs()
 
-	var root []byte
-
 	receipt := &types.Receipt{
 		CumulativeGasUsed: t.totalGas,
 		TxHash:            txn.Hash,
 		GasUsed:           result.GasUsed,
 	}
 
-	if t.config.Byzantium {
-		// The suicided accounts are set as deleted for the next iteration
-		t.state.CleanDeleteObjects(true)
+	// The suicided accounts are set as deleted for the next iteration
+	t.state.CleanDeleteObjects(true)
 
-		if result.Failed() {
-			receipt.SetStatus(types.ReceiptFailed)
-		} else {
-			receipt.SetStatus(types.ReceiptSuccess)
-		}
+	// TODO: Remove for now the pre-byzantium hard fork
+	if result.Failed() {
+		receipt.SetStatus(types.ReceiptFailed)
 	} else {
-		objs := t.state.Commit(t.config.EIP155)
-		ss, aux := t.state.snapshot.Commit(objs)
-		t.state = NewTxn(t.auxState, ss)
-		root = aux
-		receipt.Root = types.BytesToHash(root)
+		receipt.SetStatus(types.ReceiptSuccess)
 	}
 
 	// if the transaction created a contract, store the creation address in the receipt.
@@ -531,7 +518,7 @@ func (t *Transition1) Call2(
 }
 
 func (t *Transition1) run(contract *runtime.Contract, host runtime.Host) *runtime.ExecutionResult {
-	for _, r := range t.r.runtimes {
+	for _, r := range t.runtimes {
 		if r.CanRun(contract, host, &t.config) {
 			return r.Run(contract, host, &t.config)
 		}
