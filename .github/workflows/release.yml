@@ -1,6 +1,6 @@
+---
 name: Release
-
-on:
+on:  # yamllint disable-line rule:truthy
   push:
     branches-ignore:
       - '**'

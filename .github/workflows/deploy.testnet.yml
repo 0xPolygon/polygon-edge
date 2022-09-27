@@ -1,0 +1,186 @@
+---
+name: TestNet Workflow
+on:  # yamllint disable-line rule:truthy
+  workflow_dispatch:
+  push:
+    branches:
+      - 'release/**'
+
+permissions:
+  id-token: write
+  contents: read
+  security-events: write
+
+jobs:
+  gosec:
+    name: Gosec and Publish
+    uses: 0xpolygon/polygon-edge/.github/workflows/security.yml@develop
+
+  build:
+    uses: 0xpolygon/polygon-edge/.github/workflows/build.yml@develop
+    name: Build
+
+  test:
+    uses: 0xpolygon/polygon-edge/.github/workflows/test.yml@develop
+    name: Test
+    needs: build
+
+  deploy_testnet:
+    name: Update TestNet
+    needs: build
+    concurrency: deploy_testnet
+    environment:
+      name: testnet
+      url: https://rpc.us-east-1.tn.testing.psdk.io/
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Polygon Edge Artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: polygon-edge
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Notify Slack
+        uses: slackapi/slack-github-action@v1.22.0
+        continue-on-error: true
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_DEPLOYMENT_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+        with:
+          payload: |
+            {
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "Testnet Deployment - Started"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "Testnet Deployment Status: ${{ job.status }}\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|Job Status>"
+                  }
+                }
+              ]
+            }
+
+      - name: Publish Binary package to S3
+        run: |
+          aws s3 cp ./polygon-edge.tar.gz s3://${{ secrets.POLYGON_EDGE_ARTIFACT_BUCKET }} --metadata "{\"commit_sha\":\"${GITHUB_SHA}\"}"
+      - name: Deploy to Testnet
+        continue-on-error: true
+        env:
+          VALIDATOR_ASGS: ${{ secrets.VALIDATOR_ASGS }}
+        run: |
+          echo "Deploying new TestNet..."
+          for vasg in ${VALIDATOR_ASGS//,/ }
+          do
+              instance_id=$(aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names  $vasg --query 'AutoScalingGroups[0].Instances[0].InstanceId' --output text)
+
+              echo "Draining $instance_id in $vasg"
+              irid=$(aws autoscaling start-instance-refresh --auto-scaling-group-name $vasg --query InstanceRefreshId --output text)
+
+              echo "Waiting for instance to clear health check..."
+              refresh_status=Pending
+              until [ $refresh_status != "InProgress" ] && [ $refresh_status != "Pending" ]
+              do
+                  sleep 10
+                  refresh_status=$(aws autoscaling describe-instance-refreshes --instance-refresh-ids $irid --auto-scaling-group-name $vasg --query 'InstanceRefreshes[0].Status' --output text)
+
+                  echo "ASG: $vasg"
+                  echo "Status: $refresh_status"
+              done
+
+              if [ "$refresh_status" != "Successful" ]
+              then
+                  echo "instance refresh failed."
+                  echo "autoscaling group: $vasg"
+                  echo "instance refresh id: $irid"
+                  exit 1
+              fi
+
+              instance_id=$(aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names $vasg --query 'AutoScalingGroups[0].Instances[0].InstanceId' --output text)
+              echo "-------------------------------------------------"
+              echo "New validator: $instance_id successfully deployed"
+              echo "-------------------------------------------------"
+
+          done
+          echo "Testnet Deployment Complete"
+
+      - name: Notify Slack
+        uses: slackapi/slack-github-action@v1.22.0
+        continue-on-error: true
+        if: ${{ job.status != 'success' }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_DEPLOYMENT_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+        with:
+          payload: |
+            {
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "Testnet Deployment - Failed"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|Job Status>"
+                  }
+                },
+                {
+                  "type": "divider"
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "Commit SHA: <${{ github.server_url }}/${{ github.repository }}/tree/${{ github.sha }}|${{ github.sha }}>\nPre-release: <${{ github.server_url }}/${{ github.repository }}/tree/${{ github.ref_name }}|${{ github.ref_name}}>"
+                  }
+                }
+              ]
+            }
+
+  pandoras_box:
+    uses: 0xpolygon/polygon-edge/.github/workflows/pandoras_box.yml@develop
+    name: Pandora's Box
+    needs: deploy_testnet
+    secrets:
+      SLACK_PERFORMANCE_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
+      PANDORAS_TARGET: ${{ secrets.PANDORAS_TARGET }}
+      PANDORAS_MNEMONIC: ${{ secrets.PANDORAS_MNEMONIC }}
+    with:
+      runner: testnet
+      environment: testnet
+      transaction_batch: '20'
+      transaction_count: '2000'
+
+  loadbot:
+    uses: 0xpolygon/polygon-edge/.github/workflows/loadbot.yml@develop
+    name: Loadbot
+    needs: deploy_testnet
+    secrets:
+      SLACK_PERFORMANCE_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
+      LOADBOT_JSONRPC_URL: ${{ secrets.LOADBOT_JSONRPC_URL }}
+      LOADBOT_SENDER_ADDRESS: ${{ secrets.LOADBOT_SENDER_ADDRESS }}
+      LOADBOT_GRPC_ADDRESS: ${{ secrets.LOADBOT_GRPC_ADDRESS }}
+      LOADBOT_0x1AB8C3df809b85012a009c0264eb92dB04eD6EFa: ${{ secrets.LOADBOT_0x1AB8C3df809b85012a009c0264eb92dB04eD6EFa }}
+    with:
+      runner: testnet
+      environment: testnet
+      chain_id: '750'
+      transaction_amount: '100'
+      transaction_count: '2000'
+      transactions_per_second: '100'

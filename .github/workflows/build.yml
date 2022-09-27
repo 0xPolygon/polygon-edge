@@ -1,0 +1,32 @@
+---
+name: Build
+on:  # yamllint disable-line rule:truthy
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  go_build:
+    name: Polygon Edge
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Setup Go environment
+        uses: actions/setup-go@v3.3.0
+        with:
+          go-version: 1.17.x
+
+      - name: Build Polygon Edge
+        run: go build -ldflags="-s -w -linkmode external -extldflags "-static" -X \"github.com/0xPolygon/polygon-edge/versioning.Version=${GITHUB_REF_NAME}@${GITHUB_SHA}\"" && tar -czvf polygon-edge.tar.gz polygon-edge
+        env:
+          CC: gcc
+          CXX: g++
+          GOARC: amd64
+          GOOS: linux
+
+      - name: 'Upload Artifact'
+        uses: actions/upload-artifact@v3
+        with:
+          name: polygon-edge
+          path: polygon-edge.tar.gz
+          retention-days: 3
