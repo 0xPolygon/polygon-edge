@@ -18,7 +18,7 @@ func newTestTransition(preState map[types.Address]*PreState) *Transition {
 	return &Transition{
 		Transition1: &Transition1{
 			logger: hclog.NewNullLogger(),
-			state:  newTestTxn(preState),
+			State:  newTestTxn(preState),
 		},
 	}
 }
