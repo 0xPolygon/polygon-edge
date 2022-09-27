@@ -43,6 +43,19 @@ func (s *Server) enableDataDogProfiler() error {
 
 		return nil
 	}
+	// For containerized solutions, we want to be able to set the ip and port that the agent will bind to
+	// by defining DD_PROF_IP and DD_PROF_PORT env vars.
+	// If these env vars are not defined, the agent will bind to default ip:port ( localhost:8126 )
+	ddIP := "localhost"
+	ddPort := "8126"
+
+	if os.Getenv("DD_PROF_IP") != "" {
+		ddIP = os.Getenv("DD_PROF_IP")
+	}
+
+	if os.Getenv("DD_PROF_PORT") != "" {
+		ddPort = os.Getenv("DD_PROF_PORT")
+	}
 
 	if err := profiler.Start(
 		// enable all profiles
@@ -54,6 +67,7 @@ func (s *Server) enableDataDogProfiler() error {
 			profiler.GoroutineProfile,
 			profiler.MetricsProfile,
 		),
+		profiler.WithAgentAddr(ddIP+":"+ddPort),
 	); err != nil {
 		return fmt.Errorf("could not start datadog profiler: %w", err)
 	}
@@ -66,13 +80,9 @@ func (s *Server) enableDataDogProfiler() error {
 }
 
 func (s *Server) closeDataDogProfiler() {
-	defer func() {
-		s.logger.Debug("closing DataDog profiler")
-		profiler.Stop()
-	}()
+	s.logger.Debug("closing DataDog profiler")
+	profiler.Stop()
 
-	defer func() {
-		s.logger.Debug("closing DataDog tracer")
-		tracer.Stop()
-	}()
+	s.logger.Debug("closing DataDog tracer")
+	tracer.Stop()
 }
