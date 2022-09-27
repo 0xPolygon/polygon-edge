@@ -24,7 +24,6 @@ func NewValidatorSetPayload(setInfo []ValidatorSetInfo) *ValidatorSetPayload {
 }
 
 func (v *ValidatorSetPayload) Get() (rootchain.PayloadType, []byte) {
-	// TODO @dbrajovic, do we even need to handle this error?
 	payload, _ := v.Marshal()
 
 	return rootchain.ValidatorSetPayloadType, payload
