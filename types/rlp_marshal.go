@@ -67,7 +67,7 @@ func (h *Header) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 
 	vv.Set(arena.NewBytes(h.ParentHash.Bytes()))
 	vv.Set(arena.NewBytes(h.Sha3Uncles.Bytes()))
-	vv.Set(arena.NewBytes(h.Miner.Bytes()))
+	vv.Set(arena.NewCopyBytes(h.Miner[:]))
 	vv.Set(arena.NewBytes(h.StateRoot.Bytes()))
 	vv.Set(arena.NewBytes(h.TxRoot.Bytes()))
 	vv.Set(arena.NewBytes(h.ReceiptsRoot.Bytes()))
@@ -110,6 +110,7 @@ func (r *Receipt) MarshalRLPTo(dst []byte) []byte {
 // MarshalRLPWith marshals a receipt with a specific fastrlp.Arena
 func (r *Receipt) MarshalRLPWith(a *fastrlp.Arena) *fastrlp.Value {
 	vv := a.NewArray()
+
 	if r.Status != nil {
 		vv.Set(a.NewUint(uint64(*r.Status)))
 	} else {

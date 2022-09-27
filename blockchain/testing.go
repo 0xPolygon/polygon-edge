@@ -22,7 +22,8 @@ var (
 )
 
 var (
-	errInvalidTypeAssertion = errors.New("invalid type assertion")
+	errInvalidTypeAssertion  = errors.New("invalid type assertion")
+	errRecoveryAddressFailed = errors.New("failed to recover from field")
 )
 
 // NewTestHeadersWithSeed creates a new chain with a seed factor
@@ -262,14 +263,14 @@ func (m *MockVerifier) GetBlockCreator(header *types.Header) (types.Address, err
 		return m.getBlockCreatorFn(header)
 	}
 
-	return header.Miner, nil
+	return types.BytesToAddress(header.Miner), nil
 }
 
 func (m *MockVerifier) HookGetBlockCreator(fn getBlockCreatorDelegate) {
 	m.getBlockCreatorFn = fn
 }
 
-func (m *MockVerifier) PreStateCommit(header *types.Header, txn *state.Transition) error {
+func (m *MockVerifier) PreCommitState(header *types.Header, txn *state.Transition) error {
 	if m.preStateCommitFn != nil {
 		return m.preStateCommitFn(header, txn)
 	}
@@ -277,7 +278,7 @@ func (m *MockVerifier) PreStateCommit(header *types.Header, txn *state.Transitio
 	return nil
 }
 
-func (m *MockVerifier) HookPreStateCommit(fn preStateCommitDelegate) {
+func (m *MockVerifier) HookPreCommitState(fn preStateCommitDelegate) {
 	m.preStateCommitFn = fn
 }
 
@@ -305,6 +306,18 @@ func (m *mockExecutor) HookProcessBlock(fn processBlockDelegate) {
 	m.processBlockFn = fn
 }
 
+type mockSigner struct {
+	txFromByTxHash map[types.Hash]types.Address
+}
+
+func (m *mockSigner) Sender(tx *types.Transaction) (types.Address, error) {
+	if from, ok := m.txFromByTxHash[tx.Hash]; ok {
+		return from, nil
+	}
+
+	return types.ZeroAddress, errRecoveryAddressFailed
+}
+
 func TestBlockchain(t *testing.T, genesis *chain.Genesis) *Blockchain {
 	if genesis == nil {
 		genesis = &chain.Genesis{}
@@ -330,7 +343,7 @@ func newBlockChain(config *chain.Chain, executor Executor) (*Blockchain, error) 
 		executor = &mockExecutor{}
 	}
 
-	b, err := NewBlockchain(hclog.NewNullLogger(), "", config, &MockVerifier{}, executor)
+	b, err := NewBlockchain(hclog.NewNullLogger(), "", config, &MockVerifier{}, executor, &mockSigner{})
 	if err != nil {
 		return nil, err
 	}

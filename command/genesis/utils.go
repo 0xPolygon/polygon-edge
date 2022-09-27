@@ -2,15 +2,11 @@ package genesis
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
-	"github.com/0xPolygon/polygon-edge/consensus/ibft"
-	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -84,44 +80,4 @@ func fillPremineMap(
 	}
 
 	return nil
-}
-
-// getValidatorsFromPrefixPath extracts the addresses of the validators based on the directory
-// prefix. It scans the directories for validator private keys and compiles a list of addresses
-func getValidatorsFromPrefixPath(prefix string) ([]types.Address, error) {
-	validators := make([]types.Address, 0)
-
-	files, err := ioutil.ReadDir(".")
-	if err != nil {
-		return nil, err
-	}
-
-	for _, file := range files {
-		path := file.Name()
-
-		if !file.IsDir() {
-			continue
-		}
-
-		if !strings.HasPrefix(path, prefix) {
-			continue
-		}
-
-		// try to read key from the filepath/consensus/<key> path
-		possibleConsensusPath := filepath.Join(path, "consensus", ibft.IbftKeyName)
-
-		// check if path exists
-		if _, err := os.Stat(possibleConsensusPath); os.IsNotExist(err) {
-			continue
-		}
-
-		priv, err := crypto.GenerateOrReadPrivateKey(possibleConsensusPath)
-		if err != nil {
-			return nil, err
-		}
-
-		validators = append(validators, crypto.PubKeyToAddress(&priv.PublicKey))
-	}
-
-	return validators, nil
 }

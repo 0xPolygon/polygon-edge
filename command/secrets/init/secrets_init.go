@@ -36,6 +36,27 @@ func setFlags(cmd *cobra.Command) {
 	)
 
 	cmd.MarkFlagsMutuallyExclusive(dataDirFlag, configFlag)
+
+	cmd.Flags().BoolVar(
+		&params.generatesECDSA,
+		ecdsaFlag,
+		true,
+		"the flag indicating whether new ECDSA key is created",
+	)
+
+	cmd.Flags().BoolVar(
+		&params.generatesNetwork,
+		networkFlag,
+		true,
+		"the flag indicating whether new Network key is created",
+	)
+
+	cmd.Flags().BoolVar(
+		&params.generatesBLS,
+		blsFlag,
+		true,
+		"the flag indicating whether new BLS key is created",
+	)
 }
 
 func runPreRun(_ *cobra.Command, _ []string) error {
@@ -52,5 +73,12 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	outputter.SetCommandResult(params.getResult())
+	res, err := params.getResult()
+	if err != nil {
+		outputter.SetError(err)
+
+		return
+	}
+
+	outputter.SetCommandResult(res)
 }

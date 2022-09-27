@@ -110,7 +110,7 @@ func (h *Header) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 		return err
 	}
 	// miner
-	if err = elems[2].GetAddr(h.Miner[:]); err != nil {
+	if h.Miner, err = elems[2].GetBytes(h.Miner[:]); err != nil {
 		return err
 	}
 	// stateroot

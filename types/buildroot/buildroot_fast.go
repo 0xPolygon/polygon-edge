@@ -144,7 +144,7 @@ func (f *FastHasher) Hash(num int, cb func(i int) []byte) ([]byte, bool) {
 }
 
 func (f *FastHasher) hash(dst, b []byte) []byte {
-	f.k.Write(b) //nolint
+	f.k.Write(b)
 	dst = f.k.Sum(dst)
 	f.k.Reset()
 

@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/hashicorp/go-hclog"
+	"github.com/umbracle/fastrlp"
+
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
@@ -12,8 +15,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/hashicorp/go-hclog"
-	"github.com/umbracle/fastrlp"
 )
 
 type ethTxPoolStore interface {
@@ -84,7 +85,8 @@ var (
 )
 
 // ChainId returns the chain id of the client
-//nolint:stylecheck, gofmt
+//
+//nolint:stylecheck
 func (e *Eth) ChainId() (interface{}, error) {
 	return argUintPtr(e.chainID), nil
 }

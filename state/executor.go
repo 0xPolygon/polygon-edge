@@ -764,6 +764,18 @@ func (t *Transition) SetAccountDirectly(addr types.Address, account *chain.Genes
 	return nil
 }
 
+// SetCodeDirectly sets new code into the account with the specified address
+// NOTE: SetCodeDirectly changes the world state without a transaction
+func (t *Transition) SetCodeDirectly(addr types.Address, code []byte) error {
+	if !t.AccountExists(addr) {
+		return fmt.Errorf("account doesn't exist at %s", addr)
+	}
+
+	t.state.SetCode(addr, code)
+
+	return nil
+}
+
 func TransactionGasCost(msg *types.Transaction, isHomestead, isIstanbul bool) (uint64, error) {
 	cost := uint64(0)
 

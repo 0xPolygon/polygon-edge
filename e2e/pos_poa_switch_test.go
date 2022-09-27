@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/consensus/ibft"
+	"github.com/0xPolygon/polygon-edge/consensus/ibft/fork"
 	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/e2e/framework"
@@ -36,12 +36,11 @@ func TestPoAPoSSwitch(t *testing.T) {
 		IBFTMinNodes,
 		IBFTDirPrefix,
 		func(i int, config *framework.TestServerConfig) {
-			config.SetSeal(true)
 			config.PremineValidatorBalance(defaultBalance)
 		})
 
 	// Set switch configuration into genesis.json
-	err := ibftManager.GetServer(0).SwitchIBFTType(ibft.PoS, posStartAt, nil, &posDeployContractAt)
+	err := ibftManager.GetServer(0).SwitchIBFTType(fork.PoS, posStartAt, nil, &posDeployContractAt)
 	assert.NoError(t, err)
 
 	// Get server slice
@@ -82,7 +81,7 @@ func TestPoAPoSSwitch(t *testing.T) {
 
 		snapshotValidators := make([]types.Address, len(res.Validators))
 		for idx, v := range res.Validators {
-			snapshotValidators[idx] = types.StringToAddress(v.Address)
+			snapshotValidators[idx] = types.BytesToAddress(v.Data)
 		}
 
 		assert.ElementsMatch(t, expectedValidators, snapshotValidators)

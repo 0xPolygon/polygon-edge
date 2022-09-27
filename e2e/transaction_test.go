@@ -19,6 +19,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/e2e/framework"
 	"github.com/0xPolygon/polygon-edge/helper/tests"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/0xPolygon/polygon-edge/validators"
 	"github.com/stretchr/testify/assert"
 	"github.com/umbracle/ethgo/jsonrpc"
 )
@@ -78,7 +79,6 @@ func TestEthTransfer(t *testing.T) {
 		framework.EthToWei(50), // 50 ETH
 		big.NewInt(0),
 		framework.EthToWei(10), // 10 ETH
-
 	}
 
 	validAccounts := make([]testAccount, len(accountBalances))
@@ -132,7 +132,6 @@ func TestEthTransfer(t *testing.T) {
 
 	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDev)
-		config.SetSeal(true)
 		for _, acc := range validAccounts {
 			config.Premine(acc.address, acc.balance)
 		}
@@ -225,6 +224,61 @@ func TestEthTransfer(t *testing.T) {
 				"Receiver balance incorrect")
 		})
 	}
+}
+
+// Check whether the mined tx has from field
+func TestFromFieldInTx(t *testing.T) {
+	senderKey, senderAddr := tests.GenerateKeyAndAddr(t)
+	_, receiverAddr := tests.GenerateKeyAndAddr(t)
+
+	ibftManager := framework.NewIBFTServersManager(t,
+		1,
+		IBFTDirPrefix,
+		func(i int, config *framework.TestServerConfig) {
+			config.Premine(senderAddr, framework.EthToWei(10))
+		},
+	)
+
+	ctxForStart, cancelStart := context.WithTimeout(context.Background(), framework.DefaultTimeout)
+	defer cancelStart()
+
+	ibftManager.StartServers(ctxForStart)
+
+	srv := ibftManager.GetServer(0)
+
+	// Do the transfer
+	ctx, cancel := context.WithTimeout(context.Background(), framework.DefaultTimeout)
+	defer cancel()
+
+	txn := &framework.PreparedTransaction{
+		From:     senderAddr,
+		To:       &receiverAddr,
+		GasPrice: big.NewInt(1048576),
+		Gas:      1000000,
+		Value:    framework.EthToWei(1),
+	}
+
+	receipt, err := srv.SendRawTx(ctx, txn, senderKey)
+	assert.NoError(t, err)
+	assert.NotNil(t, receipt)
+
+	// json-rpc client in framework recovers from field, so call json-rpc directly
+	response := srv.CallJSONRPC(map[string]interface{}{
+		"id":      1,
+		"jsonrpc": "2.0",
+		"method":  "eth_getTransactionByHash",
+		"params": []interface{}{
+			receipt.TransactionHash,
+		},
+	})
+
+	result, ok := response["result"].(map[string]interface{})
+	assert.True(t, ok)
+
+	from, ok := result["from"].(string)
+	assert.True(t, ok)
+
+	assert.Equal(t, senderAddr.String(), from)
 }
 
 // getCount is a helper function for the stress test SC
@@ -350,121 +404,132 @@ func addStressTxnsWithHashes(
 // that modify it's state, and make sure that all
 // transactions were correctly executed
 func Test_TransactionIBFTLoop(t *testing.T) {
-	senderKey, sender := tests.GenerateKeyAndAddr(t)
-	defaultBalance := framework.EthToWei(100)
+	runTest := func(t *testing.T, validatorType validators.ValidatorType) {
+		t.Helper()
 
-	// Set up the test server
-	ibftManager := framework.NewIBFTServersManager(
-		t,
-		IBFTMinNodes,
-		IBFTDirPrefix,
-		func(i int, config *framework.TestServerConfig) {
-			config.Premine(sender, defaultBalance)
-			config.SetSeal(true)
-			config.SetBlockLimit(20000000)
-		})
+		senderKey, sender := tests.GenerateKeyAndAddr(t)
+		defaultBalance := framework.EthToWei(100)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel()
-	ibftManager.StartServers(ctx)
+		// Set up the test server
+		ibftManager := framework.NewIBFTServersManager(
+			t,
+			IBFTMinNodes,
+			IBFTDirPrefix,
+			func(i int, config *framework.TestServerConfig) {
+				config.SetValidatorType(validatorType)
+				config.Premine(sender, defaultBalance)
+				config.SetBlockLimit(20000000)
+			})
 
-	srv := ibftManager.GetServer(0)
-	client := srv.JSONRPC()
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		defer cancel()
+		ibftManager.StartServers(ctx)
 
-	// Deploy the stress test contract
-	deployCtx, deployCancel := context.WithTimeout(context.Background(), framework.DefaultTimeout)
-	defer deployCancel()
+		srv := ibftManager.GetServer(0)
+		client := srv.JSONRPC()
 
-	buf, err := hex.DecodeString(stressTestBytecode)
-	if err != nil {
-		t.Fatalf("Unable to decode bytecode, %v", err)
-	}
+		// Deploy the stress test contract
+		deployCtx, deployCancel := context.WithTimeout(context.Background(), framework.DefaultTimeout)
+		defer deployCancel()
 
-	deployTx := &framework.PreparedTransaction{
-		From:     sender,
-		GasPrice: big.NewInt(framework.DefaultGasPrice),
-		Gas:      framework.DefaultGasLimit,
-		Value:    big.NewInt(0),
-		Input:    buf,
-	}
-	receipt, err := srv.SendRawTx(deployCtx, deployTx, senderKey)
-
-	if err != nil {
-		t.Fatalf("Unable to send transaction, %v", err)
-	}
-
-	assert.NotNil(t, receipt)
-
-	contractAddr := receipt.ContractAddress
-
-	if err != nil {
-		t.Fatalf("Unable to send transaction, %v", err)
-	}
-
-	count, countErr := getCount(sender, contractAddr, client)
-	if countErr != nil {
-		t.Fatalf("Unable to call count method, %v", countErr)
-	}
-
-	// Check that the count is 0 before running the test
-	assert.Equalf(t, "0", count.String(), "Count doesn't match")
-
-	// Send ~50 transactions
-	numTransactions := 50
-
-	var wg sync.WaitGroup
-
-	wg.Add(numTransactions)
-
-	// Add stress test transactions
-	txHashes := addStressTxnsWithHashes(
-		t,
-		srv,
-		numTransactions,
-		types.StringToAddress(contractAddr.String()),
-		senderKey,
-	)
-	if len(txHashes) != numTransactions {
-		t.Fatalf(
-			"Invalid number of txns sent [sent %d, expected %d]",
-			len(txHashes),
-			numTransactions,
-		)
-	}
-
-	// For each transaction hash, wait for it to get included into a block
-	for index, txHash := range txHashes {
-		waitCtx, waitCancel := context.WithTimeout(context.Background(), time.Minute*3)
-
-		receipt, receiptErr := tests.WaitForReceipt(waitCtx, client.Eth(), txHash)
-		if receipt == nil {
-			t.Fatalf("Unable to get receipt for hash index [%d]", index)
-		} else if receiptErr != nil {
-			t.Fatalf("Unable to get receipt for hash index [%d], %v", index, receiptErr)
+		buf, err := hex.DecodeString(stressTestBytecode)
+		if err != nil {
+			t.Fatalf("Unable to decode bytecode, %v", err)
 		}
 
-		waitCancel()
-		wg.Done()
+		deployTx := &framework.PreparedTransaction{
+			From:     sender,
+			GasPrice: big.NewInt(framework.DefaultGasPrice),
+			Gas:      framework.DefaultGasLimit,
+			Value:    big.NewInt(0),
+			Input:    buf,
+		}
+		receipt, err := srv.SendRawTx(deployCtx, deployTx, senderKey)
+
+		if err != nil {
+			t.Fatalf("Unable to send transaction, %v", err)
+		}
+
+		assert.NotNil(t, receipt)
+
+		contractAddr := receipt.ContractAddress
+
+		if err != nil {
+			t.Fatalf("Unable to send transaction, %v", err)
+		}
+
+		count, countErr := getCount(sender, contractAddr, client)
+		if countErr != nil {
+			t.Fatalf("Unable to call count method, %v", countErr)
+		}
+
+		// Check that the count is 0 before running the test
+		assert.Equalf(t, "0", count.String(), "Count doesn't match")
+
+		// Send ~50 transactions
+		numTransactions := 50
+
+		var wg sync.WaitGroup
+
+		wg.Add(numTransactions)
+
+		// Add stress test transactions
+		txHashes := addStressTxnsWithHashes(
+			t,
+			srv,
+			numTransactions,
+			types.StringToAddress(contractAddr.String()),
+			senderKey,
+		)
+		if len(txHashes) != numTransactions {
+			t.Fatalf(
+				"Invalid number of txns sent [sent %d, expected %d]",
+				len(txHashes),
+				numTransactions,
+			)
+		}
+
+		// For each transaction hash, wait for it to get included into a block
+		for index, txHash := range txHashes {
+			waitCtx, waitCancel := context.WithTimeout(context.Background(), time.Minute*3)
+
+			receipt, receiptErr := tests.WaitForReceipt(waitCtx, client.Eth(), txHash)
+			if receipt == nil {
+				t.Fatalf("Unable to get receipt for hash index [%d]", index)
+			} else if receiptErr != nil {
+				t.Fatalf("Unable to get receipt for hash index [%d], %v", index, receiptErr)
+			}
+
+			waitCancel()
+			wg.Done()
+		}
+
+		wg.Wait()
+
+		statusCtx, statusCancel := context.WithTimeout(context.Background(), time.Second*30)
+		defer statusCancel()
+
+		resp, err := tests.WaitUntilTxPoolEmpty(statusCtx, srv.TxnPoolOperator())
+		if err != nil {
+			t.Fatalf("Unable to get txpool status, %v", err)
+		}
+
+		assert.Equal(t, 0, int(resp.Length))
+
+		count, countErr = getCount(sender, contractAddr, client)
+		if countErr != nil {
+			t.Fatalf("Unable to call count method, %v", countErr)
+		}
+
+		// Check that the count is correct
+		assert.Equalf(t, strconv.Itoa(numTransactions), count.String(), "Count doesn't match")
 	}
 
-	wg.Wait()
+	t.Run("ECDSA", func(t *testing.T) {
+		runTest(t, validators.ECDSAValidatorType)
+	})
 
-	statusCtx, statusCancel := context.WithTimeout(context.Background(), time.Second*30)
-	defer statusCancel()
-
-	resp, err := tests.WaitUntilTxPoolEmpty(statusCtx, srv.TxnPoolOperator())
-
-	if err != nil {
-		t.Fatalf("Unable to get txpool status, %v", err)
-	}
-
-	assert.Equal(t, 0, int(resp.Length))
-
-	count, countErr = getCount(sender, contractAddr, client)
-	if countErr != nil {
-		t.Fatalf("Unable to call count method, %v", countErr)
-	}
-
-	// Check that the count is correct
-	assert.Equalf(t, strconv.Itoa(numTransactions), count.String(), "Count doesn't match")
+	t.Run("BLS", func(t *testing.T) {
+		runTest(t, validators.BLSValidatorType)
+	})
 }
