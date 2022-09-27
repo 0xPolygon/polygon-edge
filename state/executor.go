@@ -102,17 +102,21 @@ func (e *Executor) ProcessBlock(
 	}
 
 	for _, t := range block.Transactions {
+		var receipt *types.Receipt
+
 		if t.ExceedsBlockGasLimit(block.Header.GasLimit) {
-			if err := txn.WriteFailedReceipt(t); err != nil {
+			receipt, err = txn.WriteFailedReceipt(t)
+			if err != nil {
 				return nil, err
 			}
-
-			continue
+		} else {
+			receipt, err = txn.Write(t)
+			if err != nil {
+				return nil, err
+			}
 		}
 
-		if err := txn.Write(t); err != nil {
-			return nil, err
-		}
+		txn.receipts = append(txn.receipts, receipt)
 	}
 
 	return txn, nil
@@ -155,12 +159,10 @@ func (e *Executor) BeginTxn(
 		auxState: e.state,
 		config:   config,
 		gasPool:  uint64(env2.GasLimit),
-
-		receipts: []*types.Receipt{},
 		totalGas: 0,
 	}
 
-	return &Transition{writeSnapshot: auxSnap2, hook: e.PostHook, Transition1: txn}, nil
+	return &Transition{receipts: []*types.Receipt{}, writeSnapshot: auxSnap2, hook: e.PostHook, Transition1: txn}, nil
 }
 
 type Transition struct {
@@ -169,6 +171,8 @@ type Transition struct {
 	writeSnapshot Snapshot
 
 	hook PostHook
+
+	receipts []*types.Receipt
 }
 
 // Apply applies a new transaction
@@ -187,6 +191,10 @@ func (t *Transition) Commit() (Snapshot, types.Hash) {
 	return s2, types.BytesToHash(root)
 }
 
+func (t *Transition) Receipts() []*types.Receipt {
+	return t.receipts
+}
+
 type Transition1 struct {
 	logger hclog.Logger
 
@@ -201,7 +209,6 @@ type Transition1 struct {
 	gasPool uint64
 
 	// result
-	receipts []*types.Receipt
 	totalGas uint64
 }
 
@@ -209,20 +216,16 @@ func (t *Transition1) TotalGas() uint64 {
 	return t.totalGas
 }
 
-func (t *Transition1) Receipts() []*types.Receipt {
-	return t.receipts
-}
-
 var emptyFrom = types.Address{}
 
-func (t *Transition1) WriteFailedReceipt(txn *types.Transaction) error {
+func (t *Transition1) WriteFailedReceipt(txn *types.Transaction) (*types.Receipt, error) {
 	signer := crypto.NewSigner(t.config, uint64(t.r.config.ChainID))
 
 	if txn.From == emptyFrom {
 		// Decrypt the from address
 		from, err := signer.Sender(txn)
 		if err != nil {
-			return NewTransitionApplicationError(err, false)
+			return nil, NewTransitionApplicationError(err, false)
 		}
 
 		txn.From = from
@@ -236,17 +239,17 @@ func (t *Transition1) WriteFailedReceipt(txn *types.Transaction) error {
 
 	receipt.LogsBloom = types.CreateBloom([]*types.Receipt{receipt})
 	receipt.SetStatus(types.ReceiptFailed)
-	t.receipts = append(t.receipts, receipt)
+	//t.receipts = append(t.receipts, receipt)
 
 	if txn.To == nil {
 		receipt.ContractAddress = crypto.CreateAddress(txn.From, txn.Nonce).Ptr()
 	}
 
-	return nil
+	return receipt, nil
 }
 
 // Write writes another transaction to the executor
-func (t *Transition1) Write(txn *types.Transaction) error {
+func (t *Transition1) Write(txn *types.Transaction) (*types.Receipt, error) {
 	signer := crypto.NewSigner(t.config, uint64(t.r.config.ChainID))
 
 	var err error
@@ -254,18 +257,18 @@ func (t *Transition1) Write(txn *types.Transaction) error {
 		// Decrypt the from address
 		txn.From, err = signer.Sender(txn)
 		if err != nil {
-			return NewTransitionApplicationError(err, false)
+			return nil, NewTransitionApplicationError(err, false)
 		}
 	}
 
 	// Make a local copy and apply the transaction
 	msg := txn.Copy()
 
-	result, e := t.Apply(msg)
-	if e != nil {
-		t.logger.Error("failed to apply tx", "err", e)
+	result, err := t.Apply(msg)
+	if err != nil {
+		t.logger.Error("failed to apply tx", "err", err)
 
-		return e
+		return nil, err
 	}
 
 	t.totalGas += result.GasUsed
@@ -305,9 +308,9 @@ func (t *Transition1) Write(txn *types.Transaction) error {
 	// Set the receipt logs and create a bloom for filtering
 	receipt.Logs = logs
 	receipt.LogsBloom = types.CreateBloom([]*types.Receipt{receipt})
-	t.receipts = append(t.receipts, receipt)
+	//t.receipts = append(t.receipts, receipt)
 
-	return nil
+	return receipt, nil
 }
 
 func (t *Transition1) Commit2() []*Object {
