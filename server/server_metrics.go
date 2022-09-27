@@ -2,12 +2,13 @@ package server
 
 import (
 	"fmt"
+	"os"
+
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/txpool"
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 	"gopkg.in/DataDog/dd-trace-go.v1/profiler"
-	"os"
 )
 
 // serverMetrics holds the metric instances of all sub systems
