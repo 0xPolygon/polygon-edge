@@ -14,14 +14,14 @@ linters:
   disable-all: true
   enable:
     - whitespace # Tool for detection of leading and trailing whitespace
-    - wsl # Whitespace Linter - Forces you to use empty lines!
-    - wastedassign # Finds wasted assignment statements.
+    - wsl # Forces you to use empty lines
+    - wastedassign # Finds wasted assignment statements
     - unconvert # Unnecessary type conversions
     - tparallel # detects inappropriate usage of t.Parallel() method in your Go test codes
     - thelper # Detects golang test helpers without t.Helper() call and checks the consistency of test helpers
     - stylecheck # Stylecheck is a replacement for golint
     - prealloc # Finds slice declarations that could potentially be pre-allocated
-    - predeclared # Find code that shadows one of Go's predeclared identifiers
+    - predeclared # Finds code that shadows one of Go's predeclared identifiers
     - nolintlint # Ill-formed or insufficient nolint directives
     - nlreturn # Checks for a new line before return and branch statements to increase code clarity
     - misspell # Misspelled English words in comments
@@ -35,8 +35,8 @@ linters:
     - forcetypeassert # Finds forced type assertions
     - dogsled # Checks assignments with too many blank identifiers (e.g. x, , , _, := f())
     - dupl # Code clone detection
-    - errname # Checks that sentinel errors are prefixed with the Err and error types are suffixed with the Error.
-    - errorlint # errorlint is a linter for that can be used to find code that will cause problems with the error wrapping scheme introduced in Go 1.13.
+    - errname # Checks that sentinel errors are prefixed with the Err and error types are suffixed with the Error
+    - errorlint # errorlint is a linter for that can be used to find code that will cause problems with the error wrapping scheme introduced in Go 1.13
 
 linters-settings:
   gofmt:
@@ -54,7 +54,7 @@ issues:
         - unparam
         - lll
   include:
-    - EXC0012 # EXC0012 revive: Annoying issue about not having a comment. The rare codebase has such comments
-    - EXC0013 # EXC0013 revive: Annoying issue about not having a comment. The rare codebase has such comments
-    - EXC0014 # EXC0014 revive: Annoying issue about not having a comment. The rare codebase has such comments
-    - EXC0015 # EXC0015 revive: Annoying issue about not having a comment. The rare codebase has such comments
+    - EXC0012 # Exported (.+) should have comment( \(or a comment on this block\))? or be unexported
+    - EXC0013 # Package comment should be of the form "(.+)...
+    - EXC0014 # Comment on exported (.+) should be of the form "(.+)..."
+    - EXC0015 # Should have a package comment
