@@ -71,7 +71,8 @@ func (e *Executor) WriteGenesis(alloc map[types.Address]*chain.GenesisAccount) t
 		}
 	}
 
-	_, root := txn.Commit(false)
+	objs := txn.Commit(false)
+	_, root := snap.Commit(objs)
 
 	return types.BytesToHash(root)
 }
@@ -278,7 +279,8 @@ func (t *Transition) Write(txn *types.Transaction) error {
 			receipt.SetStatus(types.ReceiptSuccess)
 		}
 	} else {
-		ss, aux := t.state.Commit(t.config.EIP155)
+		objs := t.state.Commit(t.config.EIP155)
+		ss, aux := t.state.snapshot.Commit(objs)
 		t.state = NewTxn(t.auxState, ss)
 		root = aux
 		receipt.Root = types.BytesToHash(root)
@@ -299,7 +301,8 @@ func (t *Transition) Write(txn *types.Transaction) error {
 
 // Commit commits the final result
 func (t *Transition) Commit() (Snapshot, types.Hash) {
-	s2, root := t.state.Commit(t.config.EIP155)
+	objs := t.state.Commit(t.config.EIP155)
+	s2, root := t.state.snapshot.Commit(objs)
 
 	return s2, types.BytesToHash(root)
 }
