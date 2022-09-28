@@ -8,7 +8,6 @@ import (
 )
 
 const (
-
 	// maxInitNum is the maximum value for "num" flag
 	maxInitNum = 1000
 )
@@ -116,6 +115,8 @@ func setFlags(cmd *cobra.Command, params *initParams, num *int) {
 	)
 }
 
+// newParamsList creates a list of initParams with num elements.
+// This function basically copies the given initParams but updating dataDir by applying an index.
 func newParamsList(params initParams, num int) []initParams {
 	if num == 1 {
 		return []initParams{params}
