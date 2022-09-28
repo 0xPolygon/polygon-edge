@@ -23,8 +23,8 @@ var (
 	refundIndex = types.BytesToHash([]byte{3}).Bytes()
 )
 
-// Txn is a reference of the state
-type Txn struct {
+// execTxn is a reference of the state
+type execTxn struct {
 	snapshot  Snapshot
 	state     State
 	snapshots []*iradix.Tree
@@ -33,16 +33,16 @@ type Txn struct {
 	hash      *keccak.Keccak
 }
 
-func NewTxn(state State, snapshot Snapshot) *Txn {
+func newExecTxn(state State, snapshot Snapshot) *execTxn {
 	return newTxn(state, snapshot)
 }
 
-func newTxn(state State, snapshot Snapshot) *Txn {
+func newTxn(state State, snapshot Snapshot) *execTxn {
 	i := iradix.New()
 
 	codeCache, _ := lru.New(20)
 
-	return &Txn{
+	return &execTxn{
 		snapshot:  snapshot,
 		state:     state,
 		snapshots: []*iradix.Tree{},
@@ -52,7 +52,7 @@ func newTxn(state State, snapshot Snapshot) *Txn {
 	}
 }
 
-func (txn *Txn) hashit(src []byte) []byte {
+func (txn *execTxn) hashit(src []byte) []byte {
 	txn.hash.Reset()
 	txn.hash.Write(src)
 	// hashit is used to make queries so we do not need to
@@ -61,7 +61,7 @@ func (txn *Txn) hashit(src []byte) []byte {
 }
 
 // Snapshot takes a snapshot at this point in time
-func (txn *Txn) Snapshot() int {
+func (txn *execTxn) Snapshot() int {
 	t := txn.txn.CommitOnly()
 
 	id := len(txn.snapshots)
@@ -71,7 +71,7 @@ func (txn *Txn) Snapshot() int {
 }
 
 // RevertToSnapshot reverts to a given snapshot
-func (txn *Txn) RevertToSnapshot(id int) {
+func (txn *execTxn) RevertToSnapshot(id int) {
 	if id > len(txn.snapshots) {
 		panic("")
 	}
@@ -81,7 +81,7 @@ func (txn *Txn) RevertToSnapshot(id int) {
 }
 
 // GetAccount returns an account
-func (txn *Txn) GetAccount(addr types.Address) (*Account, bool) {
+func (txn *execTxn) GetAccount(addr types.Address) (*Account, bool) {
 	object, exists := txn.getStateObject(addr)
 	if !exists {
 		return nil, false
@@ -90,7 +90,7 @@ func (txn *Txn) GetAccount(addr types.Address) (*Account, bool) {
 	return object.Account, true
 }
 
-func (txn *Txn) getStateObject(addr types.Address) (*StateObject, bool) {
+func (txn *execTxn) getStateObject(addr types.Address) (*StateObject, bool) {
 	// Try to get state from radix tree which holds transient states during block processing first
 	val, exists := txn.txn.Get(addr.Bytes())
 	if exists {
@@ -131,7 +131,7 @@ func (txn *Txn) getStateObject(addr types.Address) (*StateObject, bool) {
 	return obj, true
 }
 
-func (txn *Txn) upsertAccount(addr types.Address, create bool, f func(object *StateObject)) {
+func (txn *execTxn) upsertAccount(addr types.Address, create bool, f func(object *StateObject)) {
 	object, exists := txn.getStateObject(addr)
 	if !exists && create {
 		object = &StateObject{
@@ -152,7 +152,7 @@ func (txn *Txn) upsertAccount(addr types.Address, create bool, f func(object *St
 	}
 }
 
-func (txn *Txn) AddSealingReward(addr types.Address, balance *big.Int) {
+func (txn *execTxn) AddSealingReward(addr types.Address, balance *big.Int) {
 	txn.upsertAccount(addr, true, func(object *StateObject) {
 		if object.Suicide {
 			*object = *newStateObject(txn)
@@ -164,14 +164,14 @@ func (txn *Txn) AddSealingReward(addr types.Address, balance *big.Int) {
 }
 
 // AddBalance adds balance
-func (txn *Txn) AddBalance(addr types.Address, balance *big.Int) {
+func (txn *execTxn) AddBalance(addr types.Address, balance *big.Int) {
 	txn.upsertAccount(addr, true, func(object *StateObject) {
 		object.Account.Balance.Add(object.Account.Balance, balance)
 	})
 }
 
 // SubBalance reduces the balance at address addr by amount
-func (txn *Txn) SubBalance(addr types.Address, amount *big.Int) error {
+func (txn *execTxn) SubBalance(addr types.Address, amount *big.Int) error {
 	// If we try to reduce balance by 0, then it's a noop
 	if amount.Sign() == 0 {
 		return nil
@@ -190,14 +190,14 @@ func (txn *Txn) SubBalance(addr types.Address, amount *big.Int) error {
 }
 
 // SetBalance sets the balance
-func (txn *Txn) SetBalance(addr types.Address, balance *big.Int) {
+func (txn *execTxn) SetBalance(addr types.Address, balance *big.Int) {
 	txn.upsertAccount(addr, true, func(object *StateObject) {
 		object.Account.Balance.SetBytes(balance.Bytes())
 	})
 }
 
 // GetBalance returns the balance of an address
-func (txn *Txn) GetBalance(addr types.Address) *big.Int {
+func (txn *execTxn) GetBalance(addr types.Address) *big.Int {
 	object, exists := txn.getStateObject(addr)
 	if !exists {
 		return big.NewInt(0)
@@ -206,7 +206,7 @@ func (txn *Txn) GetBalance(addr types.Address) *big.Int {
 	return object.Account.Balance
 }
 
-func (txn *Txn) EmitLog(addr types.Address, topics []types.Hash, data []byte) {
+func (txn *execTxn) EmitLog(addr types.Address, topics []types.Hash, data []byte) {
 	log := &types.Log{
 		Address: addr,
 		Topics:  topics,
@@ -227,7 +227,7 @@ func (txn *Txn) EmitLog(addr types.Address, topics []types.Hash, data []byte) {
 }
 
 // AddLog adds a new log
-func (txn *Txn) AddLog(log *types.Log) {
+func (txn *execTxn) AddLog(log *types.Log) {
 	var logs []*types.Log
 
 	data, exists := txn.txn.Get(logIndex)
@@ -245,7 +245,7 @@ func (txn *Txn) AddLog(log *types.Log) {
 
 var zeroHash types.Hash
 
-func (txn *Txn) SetStorage(
+func (txn *execTxn) SetStorage(
 	addr types.Address,
 	key types.Hash,
 	value types.Hash,
@@ -318,7 +318,7 @@ func (txn *Txn) SetStorage(
 }
 
 // SetState change the state of an address
-func (txn *Txn) SetState(
+func (txn *execTxn) SetState(
 	addr types.Address,
 	key,
 	value types.Hash,
@@ -337,7 +337,7 @@ func (txn *Txn) SetState(
 }
 
 // GetState returns the state of the address at a given key
-func (txn *Txn) GetState(addr types.Address, key types.Hash) types.Hash {
+func (txn *execTxn) GetState(addr types.Address, key types.Hash) types.Hash {
 	object, exists := txn.getStateObject(addr)
 	if !exists {
 		return types.Hash{}
@@ -365,21 +365,21 @@ func (txn *Txn) GetState(addr types.Address, key types.Hash) types.Hash {
 // Nonce
 
 // IncrNonce increases the nonce of the address
-func (txn *Txn) IncrNonce(addr types.Address) {
+func (txn *execTxn) IncrNonce(addr types.Address) {
 	txn.upsertAccount(addr, true, func(object *StateObject) {
 		object.Account.Nonce++
 	})
 }
 
 // SetNonce reduces the balance
-func (txn *Txn) SetNonce(addr types.Address, nonce uint64) {
+func (txn *execTxn) SetNonce(addr types.Address, nonce uint64) {
 	txn.upsertAccount(addr, true, func(object *StateObject) {
 		object.Account.Nonce = nonce
 	})
 }
 
 // GetNonce returns the nonce of an addr
-func (txn *Txn) GetNonce(addr types.Address) uint64 {
+func (txn *execTxn) GetNonce(addr types.Address) uint64 {
 	object, exists := txn.getStateObject(addr)
 	if !exists {
 		return 0
@@ -391,7 +391,7 @@ func (txn *Txn) GetNonce(addr types.Address) uint64 {
 // Code
 
 // SetCode sets the code for an address
-func (txn *Txn) SetCode(addr types.Address, code []byte) {
+func (txn *execTxn) SetCode(addr types.Address, code []byte) {
 	txn.upsertAccount(addr, true, func(object *StateObject) {
 		object.Account.CodeHash = crypto.Keccak256(code)
 		object.DirtyCode = true
@@ -399,7 +399,7 @@ func (txn *Txn) SetCode(addr types.Address, code []byte) {
 	})
 }
 
-func (txn *Txn) GetCode(addr types.Address) []byte {
+func (txn *execTxn) GetCode(addr types.Address) []byte {
 	object, exists := txn.getStateObject(addr)
 	if !exists {
 		return nil
@@ -422,11 +422,11 @@ func (txn *Txn) GetCode(addr types.Address) []byte {
 	return code
 }
 
-func (txn *Txn) GetCodeSize(addr types.Address) int {
+func (txn *execTxn) GetCodeSize(addr types.Address) int {
 	return len(txn.GetCode(addr))
 }
 
-func (txn *Txn) GetCodeHash(addr types.Address) types.Hash {
+func (txn *execTxn) GetCodeHash(addr types.Address) types.Hash {
 	object, exists := txn.getStateObject(addr)
 	if !exists {
 		return types.Hash{}
@@ -436,7 +436,7 @@ func (txn *Txn) GetCodeHash(addr types.Address) types.Hash {
 }
 
 // Suicide marks the given account as suicided
-func (txn *Txn) Suicide(addr types.Address) bool {
+func (txn *execTxn) Suicide(addr types.Address) bool {
 	var suicided bool
 
 	txn.upsertAccount(addr, false, func(object *StateObject) {
@@ -455,24 +455,24 @@ func (txn *Txn) Suicide(addr types.Address) bool {
 }
 
 // HasSuicided returns true if the account suicided
-func (txn *Txn) HasSuicided(addr types.Address) bool {
+func (txn *execTxn) HasSuicided(addr types.Address) bool {
 	object, exists := txn.getStateObject(addr)
 
 	return exists && object.Suicide
 }
 
 // Refund
-func (txn *Txn) AddRefund(gas uint64) {
+func (txn *execTxn) AddRefund(gas uint64) {
 	refund := txn.GetRefund() + gas
 	txn.txn.Insert(refundIndex, refund)
 }
 
-func (txn *Txn) SubRefund(gas uint64) {
+func (txn *execTxn) SubRefund(gas uint64) {
 	refund := txn.GetRefund() - gas
 	txn.txn.Insert(refundIndex, refund)
 }
 
-func (txn *Txn) Logs() []*types.Log {
+func (txn *execTxn) Logs() []*types.Log {
 	data, exists := txn.txn.Get(logIndex)
 	if !exists {
 		return nil
@@ -483,7 +483,7 @@ func (txn *Txn) Logs() []*types.Log {
 	return data.([]*types.Log)
 }
 
-func (txn *Txn) GetRefund() uint64 {
+func (txn *execTxn) GetRefund() uint64 {
 	data, exists := txn.txn.Get(refundIndex)
 	if !exists {
 		return 0
@@ -494,7 +494,7 @@ func (txn *Txn) GetRefund() uint64 {
 }
 
 // GetCommittedState returns the state of the address in the trie
-func (txn *Txn) GetCommittedState(addr types.Address, key types.Hash) types.Hash {
+func (txn *execTxn) GetCommittedState(addr types.Address, key types.Hash) types.Hash {
 	obj, ok := txn.getStateObject(addr)
 	if !ok {
 		return types.Hash{}
@@ -503,7 +503,7 @@ func (txn *Txn) GetCommittedState(addr types.Address, key types.Hash) types.Hash
 	return obj.GetCommitedState(types.BytesToHash(txn.hashit(key.Bytes())))
 }
 
-func (txn *Txn) TouchAccount(addr types.Address) {
+func (txn *execTxn) TouchAccount(addr types.Address) {
 	txn.upsertAccount(addr, true, func(obj *StateObject) {
 
 	})
@@ -511,13 +511,13 @@ func (txn *Txn) TouchAccount(addr types.Address) {
 
 // TODO, check panics with this ones
 
-func (txn *Txn) Exist(addr types.Address) bool {
+func (txn *execTxn) Exist(addr types.Address) bool {
 	_, exists := txn.getStateObject(addr)
 
 	return exists
 }
 
-func (txn *Txn) Empty(addr types.Address) bool {
+func (txn *execTxn) Empty(addr types.Address) bool {
 	obj, exists := txn.getStateObject(addr)
 	if !exists {
 		return true
@@ -526,7 +526,7 @@ func (txn *Txn) Empty(addr types.Address) bool {
 	return obj.Empty()
 }
 
-func newStateObject(txn *Txn) *StateObject {
+func newStateObject(txn *execTxn) *StateObject {
 	return &StateObject{
 		Account: &Account{
 			Balance:  big.NewInt(0),
@@ -537,7 +537,7 @@ func newStateObject(txn *Txn) *StateObject {
 	}
 }
 
-func (txn *Txn) CreateAccount(addr types.Address) {
+func (txn *execTxn) CreateAccount(addr types.Address) {
 	obj := &StateObject{
 		Account: &Account{
 			Balance:  big.NewInt(0),
@@ -555,7 +555,7 @@ func (txn *Txn) CreateAccount(addr types.Address) {
 	txn.txn.Insert(addr.Bytes(), obj)
 }
 
-func (txn *Txn) CleanDeleteObjects(deleteEmptyObjects bool) {
+func (txn *execTxn) CleanDeleteObjects(deleteEmptyObjects bool) {
 	remove := [][]byte{}
 
 	txn.txn.Root().Walk(func(k []byte, v interface{}) bool {
@@ -591,7 +591,7 @@ func (txn *Txn) CleanDeleteObjects(deleteEmptyObjects bool) {
 	txn.txn.Delete(refundIndex)
 }
 
-func (txn *Txn) Commit(deleteEmptyObjects bool) []*Object {
+func (txn *execTxn) Commit(deleteEmptyObjects bool) []*Object {
 	txn.CleanDeleteObjects(deleteEmptyObjects)
 
 	x := txn.txn.Commit()

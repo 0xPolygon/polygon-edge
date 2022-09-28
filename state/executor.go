@@ -48,7 +48,7 @@ func NewExecutor(config *chain.Params, s State, logger hclog.Logger) *Executor {
 
 func (e *Executor) WriteGenesis(alloc map[types.Address]*chain.GenesisAccount) types.Hash {
 	snap := e.state.NewSnapshot()
-	txn := NewTxn(e.state, snap)
+	txn := newExecTxn(e.state, snap)
 
 	for addr, account := range alloc {
 		if account.Balance != nil {
@@ -142,7 +142,7 @@ func (e *Executor) BeginTxn(
 		return nil, err
 	}
 
-	newTxn := NewTxn(e.state, auxSnap2)
+	newTxn := newExecTxn(e.state, auxSnap2)
 
 	env2 := runtime.TxContext{
 		Coinbase:   coinbaseReceiver,

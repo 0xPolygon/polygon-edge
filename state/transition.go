@@ -24,7 +24,7 @@ type Transition struct {
 
 	r       *Executor
 	config  chain.ForksInTime
-	state   *Txn
+	state   *execTxn
 	getHash GetHashByNumber
 	ctx     runtime.TxContext
 	gasPool uint64
@@ -121,7 +121,7 @@ func (t *Transition) Write(txn *types.Transaction) error {
 	} else {
 		objs := t.state.Commit(t.config.EIP155)
 		ss, aux := t.state.snapshot.Commit(objs)
-		t.state = NewTxn(t.auxState, ss)
+		t.state = newExecTxn(t.auxState, ss)
 		root = aux
 		receipt.Root = types.BytesToHash(root)
 	}
@@ -161,11 +161,11 @@ func (t *Transition) addGasPool(amount uint64) {
 	t.gasPool += amount
 }
 
-func (t *Transition) SetTxn(txn *Txn) {
+func (t *Transition) SetTxn(txn *execTxn) {
 	t.state = txn
 }
 
-func (t *Transition) Txn() *Txn {
+func (t *Transition) Txn() *execTxn {
 	return t.state
 }
 

@@ -79,7 +79,7 @@ func newStateWithPreState(preState map[types.Address]*PreState) (*mockState, *mo
 	return state, snapshot
 }
 
-func newTestTxn(p map[types.Address]*PreState) *Txn {
+func newTestTxn(p map[types.Address]*PreState) *execTxn {
 	return newTxn(newStateWithPreState(p))
 }
 
