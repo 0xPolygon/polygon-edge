@@ -14,10 +14,7 @@ const (
 	ecdsaFlag   = "ecdsa"
 	blsFlag     = "bls"
 	networkFlag = "network"
-)
-
-var (
-	params = &initParams{}
+	numFlag     = "num"
 )
 
 var (
