@@ -27,6 +27,7 @@ var (
 type execTxn struct {
 	snapshot  Snapshot
 	state     State
+	snapshot2 ReadSnapshot
 	snapshots []*iradix.Tree
 	txn       *iradix.Txn
 	codeCache *lru.Cache
@@ -102,6 +103,20 @@ func (txn *execTxn) getStateObject(addr types.Address) (*StateObject, bool) {
 		return obj.Copy(), true
 	}
 
+	if txn.snapshot2 != nil {
+		account, err := txn.snapshot2.GetAccount2(addr)
+		if err != nil {
+			return nil, false
+		}
+		if account == nil {
+			return nil, false
+		}
+		obj := &StateObject{
+			Account: account.Copy(),
+		}
+		return obj, true
+	}
+
 	data, ok := txn.snapshot.Get(txn.hashit(addr.Bytes()))
 	if !ok {
 		return nil, false
@@ -123,7 +138,6 @@ func (txn *execTxn) getStateObject(addr types.Address) (*StateObject, bool) {
 			return nil, false
 		}
 	}
-
 	obj := &StateObject{
 		Account: account.Copy(),
 	}
@@ -356,6 +370,10 @@ func (txn *execTxn) GetState(addr types.Address, key types.Hash) types.Hash {
 		}
 	}
 
+	if txn.snapshot2 != nil {
+		return txn.snapshot2.GetStorage2(addr, object.Account.Root, key)
+	}
+
 	// If the object was not found in the radix trie due to no state update, we fetch it from the trie tre
 	k := txn.hashit(key.Bytes())
 
@@ -499,7 +517,9 @@ func (txn *execTxn) GetCommittedState(addr types.Address, key types.Hash) types.
 	if !ok {
 		return types.Hash{}
 	}
-
+	if txn.snapshot2 != nil {
+		return txn.snapshot2.GetStorage2(addr, obj.Account.Root, key)
+	}
 	return obj.GetCommitedState(types.BytesToHash(txn.hashit(key.Bytes())))
 }
 

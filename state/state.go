@@ -18,6 +18,11 @@ type State interface {
 	GetCode(hash types.Hash) ([]byte, bool)
 }
 
+type ReadSnapshot interface {
+	GetStorage2(addr types.Address, root types.Hash, key types.Hash) types.Hash
+	GetAccount2(addr types.Address) (*Account, error)
+}
+
 type Snapshot interface {
 	Get(k []byte) ([]byte, bool)
 	Commit(objs []*Object) (Snapshot, []byte)

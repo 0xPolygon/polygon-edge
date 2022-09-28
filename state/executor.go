@@ -33,7 +33,7 @@ type Executor struct {
 	state    State
 	GetHash  GetHashByNumberHelper
 
-	PostHook func(txn *Transition)
+	PostHook func(txn *Transition1) // TODO
 }
 
 // NewExecutor creates a new executor
@@ -153,7 +153,7 @@ func (e *Executor) BeginTxn(
 		ChainID:    int64(e.config.ChainID),
 	}
 
-	txn := &Transition{
+	txn := &Transition1{
 		logger:   e.logger,
 		r:        e,
 		ctx:      env2,
@@ -167,5 +167,65 @@ func (e *Executor) BeginTxn(
 		totalGas: 0,
 	}
 
-	return txn, nil
+	tt := &Transition{Transition1: txn, state: e.state, snap: auxSnap2}
+	newTxn.snapshot2 = tt
+
+	return tt, nil
+}
+
+type Transition struct {
+	*Transition1
+
+	state State
+	snap  Snapshot
+}
+
+func (t *Transition) GetStorage2(addr types.Address, root types.Hash, rawkey types.Hash) types.Hash {
+	var err error
+	var trie Snapshot
+
+	if root == emptyStateHash {
+		trie = t.state.NewSnapshot()
+	} else {
+		trie, err = t.state.NewSnapshotAt(root)
+		if err != nil {
+			return types.Hash{}
+		}
+	}
+
+	key := crypto.Keccak256(rawkey.Bytes())
+
+	val, ok := trie.Get(key)
+	if !ok {
+		return types.Hash{}
+	}
+
+	p := stateStateParserPool.Get()
+	defer stateStateParserPool.Put(p)
+
+	v, err := p.Parse(val)
+	if err != nil {
+		return types.Hash{}
+	}
+
+	res := []byte{}
+	if res, err = v.GetBytes(res[:0]); err != nil {
+		return types.Hash{}
+	}
+
+	return types.BytesToHash(res)
+}
+
+func (t *Transition) GetAccount2(addr types.Address) (*Account, error) {
+	key := crypto.Keccak256(addr.Bytes())
+
+	data, ok := t.snap.Get(key)
+	if !ok {
+		return nil, nil
+	}
+	var account Account
+	if err := account.UnmarshalRlp(data); err != nil {
+		return nil, err
+	}
+	return &account, nil
 }
