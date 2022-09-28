@@ -69,6 +69,10 @@ func (s *Snapshot) Commit(objs []*state.Object) (state.Snapshot, []byte) {
 	return &Snapshot{trie: trie, state: s.state}, root
 }
 
+func (s *Snapshot) GetCode(hash types.Hash) ([]byte, bool) {
+	return s.state.GetCode(hash)
+}
+
 func (s *Snapshot) Get(k []byte) ([]byte, bool) {
 	panic("BAD")
 }

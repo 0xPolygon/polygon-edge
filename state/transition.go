@@ -16,9 +16,6 @@ import (
 type Transition1 struct {
 	logger hclog.Logger
 
-	// dummy
-	auxState State
-
 	// the current block being processed
 	block *types.Block
 
@@ -101,29 +98,19 @@ func (t *Transition1) Write(txn *types.Transaction) error {
 
 	logs := t.state.Logs()
 
-	var root []byte
-
 	receipt := &types.Receipt{
 		CumulativeGasUsed: t.totalGas,
 		TxHash:            txn.Hash,
 		GasUsed:           result.GasUsed,
 	}
 
-	if t.config.Byzantium {
-		// The suicided accounts are set as deleted for the next iteration
-		t.state.CleanDeleteObjects(true)
+	// The suicided accounts are set as deleted for the next iteration
+	t.state.CleanDeleteObjects(true)
 
-		if result.Failed() {
-			receipt.SetStatus(types.ReceiptFailed)
-		} else {
-			receipt.SetStatus(types.ReceiptSuccess)
-		}
+	if result.Failed() {
+		receipt.SetStatus(types.ReceiptFailed)
 	} else {
-		objs := t.state.Commit(t.config.EIP155)
-		ss, aux := t.state.snapshot.Commit(objs)
-		t.state = newExecTxn(t.auxState, ss)
-		root = aux
-		receipt.Root = types.BytesToHash(root)
+		receipt.SetStatus(types.ReceiptSuccess)
 	}
 
 	// if the transaction created a contract, store the creation address in the receipt.
@@ -140,11 +127,8 @@ func (t *Transition1) Write(txn *types.Transaction) error {
 }
 
 // Commit commits the final result
-func (t *Transition1) Commit() (Snapshot, types.Hash) {
-	objs := t.state.Commit(t.config.EIP155)
-	s2, root := t.state.snapshot.Commit(objs)
-
-	return s2, types.BytesToHash(root)
+func (t *Transition1) Commit1() []*Object {
+	return t.state.Commit(t.config.EIP155)
 }
 
 func (t *Transition1) subGasPool(amount uint64) error {

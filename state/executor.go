@@ -48,7 +48,7 @@ func NewExecutor(config *chain.Params, s State, logger hclog.Logger) *Executor {
 
 func (e *Executor) WriteGenesis(alloc map[types.Address]*chain.GenesisAccount) types.Hash {
 	snap := e.state.NewSnapshot()
-	txn := newExecTxn(e.state, snap)
+	txn := newExecTxn(snap)
 
 	for addr, account := range alloc {
 		if account.Balance != nil {
@@ -142,7 +142,7 @@ func (e *Executor) BeginTxn(
 		return nil, err
 	}
 
-	newTxn := newExecTxn(e.state, auxSnap2)
+	newTxn := newExecTxn(auxSnap2)
 
 	env2 := runtime.TxContext{
 		Coinbase:   coinbaseReceiver,
@@ -154,21 +154,19 @@ func (e *Executor) BeginTxn(
 	}
 
 	txn := &Transition1{
-		logger:   e.logger,
-		r:        e,
-		ctx:      env2,
-		state:    newTxn,
-		getHash:  e.GetHash(header),
-		auxState: e.state,
-		config:   config,
-		gasPool:  uint64(env2.GasLimit),
+		logger:  e.logger,
+		r:       e,
+		ctx:     env2,
+		state:   newTxn,
+		getHash: e.GetHash(header),
+		config:  config,
+		gasPool: uint64(env2.GasLimit),
 
 		receipts: []*types.Receipt{},
 		totalGas: 0,
 	}
 
 	tt := &Transition{Transition1: txn, state: e.state, snap: auxSnap2}
-	newTxn.snapshot2 = auxSnap2
 
 	return tt, nil
 }
@@ -180,54 +178,10 @@ type Transition struct {
 	snap  Snapshot
 }
 
-/*
-func (t *Transition) GetStorage2(addr types.Address, root types.Hash, rawkey types.Hash) types.Hash {
-	var err error
-	var trie Snapshot
+// Commit commits the final result
+func (t *Transition) Commit() (Snapshot, types.Hash) {
+	objs := t.Transition1.Commit1()
+	s2, root := t.snap.Commit(objs)
 
-	if root == emptyStateHash {
-		trie = t.state.NewSnapshot()
-	} else {
-		trie, err = t.state.NewSnapshotAt(root)
-		if err != nil {
-			return types.Hash{}
-		}
-	}
-
-	key := crypto.Keccak256(rawkey.Bytes())
-
-	val, ok := trie.Get(key)
-	if !ok {
-		return types.Hash{}
-	}
-
-	p := stateStateParserPool.Get()
-	defer stateStateParserPool.Put(p)
-
-	v, err := p.Parse(val)
-	if err != nil {
-		return types.Hash{}
-	}
-
-	res := []byte{}
-	if res, err = v.GetBytes(res[:0]); err != nil {
-		return types.Hash{}
-	}
-
-	return types.BytesToHash(res)
+	return s2, types.BytesToHash(root)
 }
-
-func (t *Transition) GetAccount2(addr types.Address) (*Account, error) {
-	key := crypto.Keccak256(addr.Bytes())
-
-	data, ok := t.snap.Get(key)
-	if !ok {
-		return nil, nil
-	}
-	var account Account
-	if err := account.UnmarshalRlp(data); err != nil {
-		return nil, err
-	}
-	return &account, nil
-}
-*/

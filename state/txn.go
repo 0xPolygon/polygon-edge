@@ -13,6 +13,12 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
+type readSnapshot interface {
+	GetStorage2(addr types.Address, root types.Hash, key types.Hash) types.Hash
+	GetAccount2(addr types.Address) (*Account, error)
+	GetCode(hash types.Hash) ([]byte, bool)
+}
+
 var emptyStateHash = types.StringToHash("0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
 
 var (
@@ -25,45 +31,30 @@ var (
 
 // execTxn is a reference of the state
 type execTxn struct {
-	snapshot  Snapshot
-	state     State
-	snapshot2 ReadSnapshot
+	snapshot  readSnapshot
 	snapshots []*iradix.Tree
 	txn       *iradix.Txn
 	codeCache *lru.Cache
 	hash      *keccak.Keccak
 }
 
-func newExecTxn(state State, snapshot Snapshot) *execTxn {
-	return NewTxn(state, snapshot)
+func newExecTxn(snapshot readSnapshot) *execTxn {
+	return NewTxn(snapshot)
 }
 
-func NewTxn(state State, snapshot Snapshot) *execTxn {
+func NewTxn(snapshot readSnapshot) *execTxn {
 	i := iradix.New()
 
 	codeCache, _ := lru.New(20)
 
 	tt := &execTxn{
 		snapshot:  snapshot,
-		state:     state,
 		snapshots: []*iradix.Tree{},
 		txn:       i.Txn(),
 		codeCache: codeCache,
 		hash:      keccak.NewKeccak256(),
 	}
-
-	if x, ok := snapshot.(ReadSnapshot); ok {
-		tt.snapshot2 = x
-	}
 	return tt
-}
-
-func (txn *execTxn) hashit(src []byte) []byte {
-	txn.hash.Reset()
-	txn.hash.Write(src)
-	// hashit is used to make queries so we do not need to
-	// make copies of the result
-	return txn.hash.Read()
 }
 
 // Snapshot takes a snapshot at this point in time
@@ -108,45 +99,16 @@ func (txn *execTxn) getStateObject(addr types.Address) (*StateObject, bool) {
 		return obj.Copy(), true
 	}
 
-	if txn.snapshot2 != nil {
-		account, err := txn.snapshot2.GetAccount2(addr)
-		if err != nil {
-			return nil, false
-		}
-		if account == nil {
-			return nil, false
-		}
-		obj := &StateObject{
-			Account: account.Copy(),
-		}
-		return obj, true
-	}
-
-	data, ok := txn.snapshot.Get(txn.hashit(addr.Bytes()))
-	if !ok {
+	account, err := txn.snapshot.GetAccount2(addr)
+	if err != nil {
 		return nil, false
 	}
-
-	var err error
-
-	var account Account
-	if err = account.UnmarshalRlp(data); err != nil {
+	if account == nil {
 		return nil, false
-	}
-
-	// Load trie from memory if there is some state
-	if account.Root == emptyStateHash {
-		account.Trie = txn.state.NewSnapshot()
-	} else {
-		account.Trie, err = txn.state.NewSnapshotAt(account.Root)
-		if err != nil {
-			return nil, false
-		}
 	}
 	obj := &StateObject{
 		Account: account.Copy(),
 	}
-
 	return obj, true
 }
 
@@ -156,7 +118,6 @@ func (txn *execTxn) upsertAccount(addr types.Address, create bool, f func(object
 		object = &StateObject{
 			Account: &Account{
 				Balance:  big.NewInt(0),
-				Trie:     txn.state.NewSnapshot(),
 				CodeHash: emptyCodeHash,
 				Root:     emptyStateHash,
 			},
@@ -375,14 +336,7 @@ func (txn *execTxn) GetState(addr types.Address, key types.Hash) types.Hash {
 		}
 	}
 
-	if txn.snapshot2 != nil {
-		return txn.snapshot2.GetStorage2(addr, object.Account.Root, key)
-	}
-
-	// If the object was not found in the radix trie due to no state update, we fetch it from the trie tre
-	k := txn.hashit(key.Bytes())
-
-	return object.GetCommitedState(types.BytesToHash(k))
+	return txn.snapshot.GetStorage2(addr, object.Account.Root, key)
 }
 
 // Nonce
@@ -439,7 +393,7 @@ func (txn *execTxn) GetCode(addr types.Address) []byte {
 		return v.([]byte)
 	}
 
-	code, _ := txn.state.GetCode(types.BytesToHash(object.Account.CodeHash))
+	code, _ := txn.snapshot.GetCode(types.BytesToHash(object.Account.CodeHash))
 	txn.codeCache.Add(addr, code)
 
 	return code
@@ -522,10 +476,7 @@ func (txn *execTxn) GetCommittedState(addr types.Address, key types.Hash) types.
 	if !ok {
 		return types.Hash{}
 	}
-	if txn.snapshot2 != nil {
-		return txn.snapshot2.GetStorage2(addr, obj.Account.Root, key)
-	}
-	return obj.GetCommitedState(types.BytesToHash(txn.hashit(key.Bytes())))
+	return txn.snapshot.GetStorage2(addr, obj.Account.Root, key)
 }
 
 func (txn *execTxn) TouchAccount(addr types.Address) {
@@ -555,7 +506,6 @@ func newStateObject(txn *execTxn) *StateObject {
 	return &StateObject{
 		Account: &Account{
 			Balance:  big.NewInt(0),
-			Trie:     txn.state.NewSnapshot(),
 			CodeHash: emptyCodeHash,
 			Root:     emptyStateHash,
 		},
@@ -566,7 +516,6 @@ func (txn *execTxn) CreateAccount(addr types.Address) {
 	obj := &StateObject{
 		Account: &Account{
 			Balance:  big.NewInt(0),
-			Trie:     txn.state.NewSnapshot(),
 			CodeHash: emptyCodeHash,
 			Root:     emptyStateHash,
 		},
