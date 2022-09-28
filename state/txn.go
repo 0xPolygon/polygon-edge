@@ -43,7 +43,7 @@ func NewTxn(state State, snapshot Snapshot) *execTxn {
 
 	codeCache, _ := lru.New(20)
 
-	return &execTxn{
+	tt := &execTxn{
 		snapshot:  snapshot,
 		state:     state,
 		snapshots: []*iradix.Tree{},
@@ -51,6 +51,11 @@ func NewTxn(state State, snapshot Snapshot) *execTxn {
 		codeCache: codeCache,
 		hash:      keccak.NewKeccak256(),
 	}
+
+	if x, ok := snapshot.(ReadSnapshot); ok {
+		tt.snapshot2 = x
+	}
+	return tt
 }
 
 func (txn *execTxn) hashit(src []byte) []byte {

@@ -26,7 +26,7 @@ func NewState(storage Storage) *State {
 	return s
 }
 
-func (s *State) NewSnapshot() state.Snapshot {
+func (s *State) newTrie() *Trie {
 	t := NewTrie()
 	t.state = s
 	t.storage = s.storage
@@ -42,10 +42,23 @@ func (s *State) GetCode(hash types.Hash) ([]byte, bool) {
 	return s.storage.GetCode(hash)
 }
 
+func (s *State) NewSnapshot() state.Snapshot {
+	t := s.newTrie()
+	return &Snapshot{state: s, trie: t}
+}
+
 func (s *State) NewSnapshotAt(root types.Hash) (state.Snapshot, error) {
+	t, err := s.newTrieAt(root)
+	if err != nil {
+		return nil, err
+	}
+	return &Snapshot{state: s, trie: t}, nil
+}
+
+func (s *State) newTrieAt(root types.Hash) (*Trie, error) {
 	if root == types.EmptyRootHash {
 		// empty state
-		return s.NewSnapshot(), nil
+		return s.newTrie(), nil
 	}
 
 	tt, ok := s.cache.Get(root)

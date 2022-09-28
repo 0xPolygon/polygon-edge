@@ -168,7 +168,7 @@ func (e *Executor) BeginTxn(
 	}
 
 	tt := &Transition{Transition1: txn, state: e.state, snap: auxSnap2}
-	newTxn.snapshot2 = tt
+	newTxn.snapshot2 = auxSnap2
 
 	return tt, nil
 }
@@ -180,6 +180,7 @@ type Transition struct {
 	snap  Snapshot
 }
 
+/*
 func (t *Transition) GetStorage2(addr types.Address, root types.Hash, rawkey types.Hash) types.Hash {
 	var err error
 	var trie Snapshot
@@ -229,3 +230,4 @@ func (t *Transition) GetAccount2(addr types.Address) (*Account, error) {
 	}
 	return &account, nil
 }
+*/

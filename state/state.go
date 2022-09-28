@@ -24,6 +24,8 @@ type ReadSnapshot interface {
 }
 
 type Snapshot interface {
+	ReadSnapshot
+
 	Get(k []byte) ([]byte, bool)
 	Commit(objs []*Object) (Snapshot, []byte)
 }

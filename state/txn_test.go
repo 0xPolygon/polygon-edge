@@ -1,5 +1,6 @@
 package state
 
+/*
 import (
 	"bytes"
 	"crypto/rand"
@@ -28,7 +29,8 @@ func (m *mockState) NewSnapshotAt(root types.Hash) (Snapshot, error) {
 }
 
 func (m *mockState) NewSnapshot() Snapshot {
-	return &mockSnapshot{data: map[string][]byte{}}
+	panic("BAD")
+	// return &mockSnapshot{data: map[string][]byte{}}
 }
 
 func (m *mockState) GetCode(hash types.Hash) ([]byte, bool) {
@@ -67,12 +69,6 @@ func newStateWithPreState(preState map[types.Address]*PreState) (*mockState, *mo
 
 		v := account.MarshalWith(ar)
 		accountRlp := v.MarshalTo(nil)
-		/*
-			accountRlp, err := rlp.EncodeToBytes(account)
-			if err != nil {
-				panic(err)
-			}
-		*/
 		snapshot.data[hex.EncodeToHex(hashit(addr.Bytes()))] = accountRlp
 	}
 
@@ -145,3 +141,4 @@ func hashit(k []byte) []byte {
 
 	return h.Sum(nil)
 }
+*/
