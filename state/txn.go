@@ -34,10 +34,10 @@ type execTxn struct {
 }
 
 func newExecTxn(state State, snapshot Snapshot) *execTxn {
-	return newTxn(state, snapshot)
+	return NewTxn(state, snapshot)
 }
 
-func newTxn(state State, snapshot Snapshot) *execTxn {
+func NewTxn(state State, snapshot Snapshot) *execTxn {
 	i := iradix.New()
 
 	codeCache, _ := lru.New(20)

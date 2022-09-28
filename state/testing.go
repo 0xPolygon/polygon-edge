@@ -107,7 +107,7 @@ func testDeleteCommonStateRoot(t *testing.T, buildPreState buildPreState) {
 	t.Helper()
 
 	state, snap := buildPreState(nil)
-	txn := newTxn(state, snap)
+	txn := NewTxn(state, snap)
 
 	txn.SetNonce(addr1, 1)
 	txn.SetState(addr1, hash0, hash1)
@@ -120,14 +120,14 @@ func testDeleteCommonStateRoot(t *testing.T, buildPreState buildPreState) {
 	txn.SetState(addr2, hash2, hash1)
 
 	snap2, _ := snap.Commit(txn.Commit(false))
-	txn2 := newTxn(state, snap2)
+	txn2 := NewTxn(state, snap2)
 
 	txn2.SetState(addr1, hash0, hash0)
 	txn2.SetState(addr1, hash1, hash0)
 
 	snap3, _ := snap2.Commit(txn2.Commit(false))
 
-	txn3 := newTxn(state, snap3)
+	txn3 := NewTxn(state, snap3)
 	assert.Equal(t, hash1, txn3.GetState(addr1, hash2))
 	assert.Equal(t, hash1, txn3.GetState(addr2, hash0))
 	assert.Equal(t, hash1, txn3.GetState(addr2, hash1))
@@ -138,7 +138,7 @@ func testWriteState(t *testing.T, buildPreState buildPreState) {
 	t.Helper()
 
 	state, snap := buildPreState(nil)
-	txn := newTxn(state, snap)
+	txn := NewTxn(state, snap)
 
 	txn.SetState(addr1, hash1, hash1)
 	txn.SetState(addr1, hash2, hash2)
@@ -148,7 +148,7 @@ func testWriteState(t *testing.T, buildPreState buildPreState) {
 
 	snap, _ = snap.Commit(txn.Commit(false))
 
-	txn = newTxn(state, snap)
+	txn = NewTxn(state, snap)
 	assert.Equal(t, hash1, txn.GetState(addr1, hash1))
 	assert.Equal(t, hash2, txn.GetState(addr1, hash2))
 }
@@ -157,23 +157,23 @@ func testWriteEmptyState(t *testing.T, buildPreState buildPreState) {
 	t.Helper()
 	// Create account and write empty state
 	state, snap := buildPreState(nil)
-	txn := newTxn(state, snap)
+	txn := NewTxn(state, snap)
 
 	// Without EIP150 the data is added
 	txn.SetState(addr1, hash1, hash0)
 	snap, _ = snap.Commit(txn.Commit(false))
 
-	txn = newTxn(state, snap)
+	txn = NewTxn(state, snap)
 	assert.True(t, txn.Exist(addr1))
 
 	_, snap = buildPreState(nil)
-	txn = newTxn(state, snap)
+	txn = NewTxn(state, snap)
 
 	// With EIP150 the empty data is removed
 	txn.SetState(addr1, hash1, hash0)
 	snap, _ = snap.Commit(txn.Commit(true))
 
-	txn = newTxn(state, snap)
+	txn = NewTxn(state, snap)
 	assert.False(t, txn.Exist(addr1))
 }
 
@@ -183,14 +183,14 @@ func testUpdateStateWithEmpty(t *testing.T, buildPreState buildPreState) {
 	// If the state (in prestate) is updated to empty it should be removed
 	state, snap := buildPreState(defaultPreState)
 
-	txn := newTxn(state, snap)
+	txn := NewTxn(state, snap)
 	txn.SetState(addr1, hash1, hash0)
 
 	// TODO, test with false (should not be deleted)
 	// TODO, test with balance on the account and nonce
 	snap, _ = snap.Commit(txn.Commit(true))
 
-	txn = newTxn(state, snap)
+	txn = NewTxn(state, snap)
 	assert.False(t, txn.Exist(addr1))
 }
 
@@ -200,11 +200,11 @@ func testSuicideAccountInPreState(t *testing.T, buildPreState buildPreState) {
 	// Suicide an account created in the prestate
 	state, snap := buildPreState(defaultPreState)
 
-	txn := newTxn(state, snap)
+	txn := NewTxn(state, snap)
 	txn.Suicide(addr1)
 	snap, _ = snap.Commit(txn.Commit(true))
 
-	txn = newTxn(state, snap)
+	txn = NewTxn(state, snap)
 	assert.False(t, txn.Exist(addr1))
 }
 
@@ -213,7 +213,7 @@ func testSuicideAccount(t *testing.T, buildPreState buildPreState) {
 	// Create a new account and suicide it
 	state, snap := buildPreState(nil)
 
-	txn := newTxn(state, snap)
+	txn := NewTxn(state, snap)
 	txn.SetState(addr1, hash1, hash1)
 	txn.Suicide(addr1)
 
@@ -222,7 +222,7 @@ func testSuicideAccount(t *testing.T, buildPreState buildPreState) {
 
 	snap, _ = snap.Commit(txn.Commit(true))
 
-	txn = newTxn(state, snap)
+	txn = NewTxn(state, snap)
 	assert.False(t, txn.Exist(addr1))
 }
 
@@ -231,7 +231,7 @@ func testSuicideAccountWithData(t *testing.T, buildPreState buildPreState) {
 	// Data (nonce, balance, code) from a suicided account should be empty
 	state, snap := buildPreState(nil)
 
-	txn := newTxn(state, snap)
+	txn := NewTxn(state, snap)
 
 	code := []byte{0x1, 0x2, 0x3}
 
@@ -243,7 +243,7 @@ func testSuicideAccountWithData(t *testing.T, buildPreState buildPreState) {
 	txn.Suicide(addr1)
 	snap, _ = snap.Commit(txn.Commit(true))
 
-	txn = newTxn(state, snap)
+	txn = NewTxn(state, snap)
 
 	assert.Equal(t, big.NewInt(0), txn.GetBalance(addr1))
 	assert.Equal(t, uint64(0), txn.GetNonce(addr1))
@@ -261,12 +261,12 @@ func testSuicideCoinbase(t *testing.T, buildPreState buildPreState) {
 	// Suicide the coinbase of the block
 	state, snap := buildPreState(defaultPreState)
 
-	txn := newTxn(state, snap)
+	txn := NewTxn(state, snap)
 	txn.Suicide(addr1)
 	txn.AddSealingReward(addr1, big.NewInt(10))
 	snap, _ = snap.Commit(txn.Commit(true))
 
-	txn = newTxn(state, snap)
+	txn = NewTxn(state, snap)
 	assert.Equal(t, big.NewInt(10), txn.GetBalance(addr1))
 }
 
@@ -275,7 +275,7 @@ func testSuicideWithIntermediateCommit(t *testing.T, buildPreState buildPreState
 
 	state, snap := buildPreState(defaultPreState)
 
-	txn := newTxn(state, snap)
+	txn := NewTxn(state, snap)
 	txn.SetNonce(addr1, 10)
 	txn.Suicide(addr1)
 
@@ -294,7 +294,7 @@ func testRestartRefunds(t *testing.T, buildPreState buildPreState) {
 	// intermediateCommit they have to be restarted
 	state, snap := buildPreState(nil)
 
-	txn := newTxn(state, snap)
+	txn := NewTxn(state, snap)
 
 	txn.AddRefund(1000)
 	assert.Equal(t, uint64(1000), txn.GetRefund())
@@ -316,11 +316,11 @@ func testChangePrestateAccountBalanceToZero(t *testing.T, buildPreState buildPre
 
 	state, snap := buildPreState(preState)
 
-	txn := newTxn(state, snap)
+	txn := NewTxn(state, snap)
 	txn.SetBalance(addr1, big.NewInt(0))
 	snap, _ = snap.Commit(txn.Commit(true))
 
-	txn = newTxn(state, snap)
+	txn = NewTxn(state, snap)
 	assert.False(t, txn.Exist(addr1))
 }
 
@@ -329,12 +329,12 @@ func testChangeAccountBalanceToZero(t *testing.T, buildPreState buildPreState) {
 	// If the balance of the account changes to zero the account is deleted
 	state, snap := buildPreState(nil)
 
-	txn := newTxn(state, snap)
+	txn := NewTxn(state, snap)
 	txn.SetBalance(addr1, big.NewInt(10))
 	txn.SetBalance(addr1, big.NewInt(0))
 
 	snap, _ = snap.Commit(txn.Commit(true))
 
-	txn = newTxn(state, snap)
+	txn = NewTxn(state, snap)
 	assert.False(t, txn.Exist(addr1))
 }
