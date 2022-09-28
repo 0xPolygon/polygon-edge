@@ -55,5 +55,5 @@ stop-local:
 
 .PHONY: test-e2e
 test-e2e:
-	$(MAKE) build
+	go build -o polygon-edge
 	env EDGE_BINARY=${PWD}/polygon-edge go test -v ./e2e/... -timeout=30m
