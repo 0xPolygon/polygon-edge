@@ -189,7 +189,7 @@ func (t *TestServer) SecretsInit() (*InitIBFTResult, error) {
 	args = append(args, commandSlice...)
 	args = append(args, "--data-dir", t.Config.IBFTDir)
 
-	cmd := exec.Command(binaryName, args...)
+	cmd := exec.Command(resolveBinary(), args...)
 	cmd.Dir = t.Config.RootDir
 
 	if _, err := cmd.Output(); err != nil {
