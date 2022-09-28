@@ -4,7 +4,6 @@ import (
 	"crypto/ecdsa"
 	"math/big"
 	"path/filepath"
-	"testing"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/consensus/ibft"
@@ -28,8 +27,6 @@ type SrvAccount struct {
 
 // TestServerConfig for the test server
 type TestServerConfig struct {
-	t *testing.T
-
 	ReservedPorts           []ReservedPort
 	JSONRPCPort             int                      // The JSON RPC endpoint port
 	GRPCPort                int                      // The GRPC endpoint port
