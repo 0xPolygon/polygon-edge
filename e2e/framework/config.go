@@ -4,7 +4,6 @@ import (
 	"crypto/ecdsa"
 	"math/big"
 	"path/filepath"
-	"time"
 
 	"github.com/0xPolygon/polygon-edge/consensus/ibft"
 	"github.com/0xPolygon/polygon-edge/crypto"
@@ -55,12 +54,6 @@ type TestServerConfig struct {
 	MaxValidatorCount       uint64                   // Max validator count
 	BlockTime               uint64                   // Minimum block generation time (in s)
 	IBFTBaseTimeout         uint64                   // Base Timeout in seconds for IBFT
-}
-
-var startTime int64
-
-func init() {
-	startTime = time.Now().UnixMilli()
 }
 
 // DataDir returns path of data directory server uses

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -15,6 +16,12 @@ type IBFTServersManager struct {
 }
 
 type IBFTServerConfigCallback func(index int, config *TestServerConfig)
+
+var startTime int64
+
+func init() {
+	startTime = time.Now().UnixMilli()
+}
 
 func NewIBFTServersManager(
 	t *testing.T,
