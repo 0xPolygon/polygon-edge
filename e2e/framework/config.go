@@ -2,12 +2,8 @@ package framework
 
 import (
 	"crypto/ecdsa"
-	"fmt"
-	"io"
 	"math/big"
-	"os"
 	"path/filepath"
-	"sync"
 	"testing"
 	"time"
 
@@ -53,6 +49,7 @@ type TestServerConfig struct {
 	BlockGasLimit           uint64                   // Block gas limit
 	BlockGasTarget          uint64                   // Gas target for new blocks
 	ShowsLog                bool                     // Flag specifying if logs are shown
+	Name                    string                   // Name of the server
 	SaveLogs                bool                     // Flag specifying if logs are saved
 	LogsDir                 string                   // Directory where logs are saved
 	IsPos                   bool                     // Specifies the mechanism used for IBFT (PoA / PoS)
@@ -61,8 +58,6 @@ type TestServerConfig struct {
 	MaxValidatorCount       uint64                   // Max validator count
 	BlockTime               uint64                   // Minimum block generation time (in s)
 	IBFTBaseTimeout         uint64                   // Base Timeout in seconds for IBFT
-
-	logsDirOnce sync.Once
 }
 
 var startTime int64
@@ -196,42 +191,17 @@ func (t *TestServerConfig) SetMaxValidatorCount(val uint64) {
 	t.MaxValidatorCount = val
 }
 
-// GetStdout returns the combined stdout writers of the server
-func (c *TestServerConfig) GetStdout(name string) io.Writer {
-	writers := []io.Writer{}
-
-	if c.SaveLogs {
-		c.logsDirOnce.Do(func() {
-			c.initLogsDir()
-		})
-
-		f, err := os.OpenFile(filepath.Join(c.LogsDir, name+".log"), os.O_RDWR|os.O_APPEND|os.O_CREATE, 0660)
-		if err != nil {
-			c.t.Fatal(err)
-		}
-		writers = append(writers, f)
-
-		c.t.Cleanup(func() {
-			err = f.Close()
-			if err != nil {
-				c.t.Logf("Failed to close file. Error: %s", err)
-			}
-		})
-	}
-	if c.ShowsLog {
-		writers = append(writers, os.Stdout)
-	}
-	if len(writers) == 0 {
-		return io.Discard
-	}
-	return io.MultiWriter(writers...)
+// SetSaveLogs sets flag for saving logs
+func (t *TestServerConfig) SetSaveLogs(f bool) {
+	t.SaveLogs = f
 }
 
-func (c *TestServerConfig) initLogsDir() {
-	logsDir := fmt.Sprintf("../e2e-logs-%d", startTime)
-	if err := os.MkdirAll(logsDir, 0755); err != nil {
-		c.t.Fatal(err)
-	}
-	c.t.Logf("logs enabled for e2e test: %s", logsDir)
-	c.LogsDir = logsDir
+// SetLogsDir sets the directory where logs are saved
+func (t *TestServerConfig) SetLogsDir(dir string) {
+	t.LogsDir = dir
+}
+
+// SetName sets the name of the server
+func (t *TestServerConfig) SetName(name string) {
+	t.Name = name
 }

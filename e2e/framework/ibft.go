@@ -43,11 +43,19 @@ func NewIBFTServersManager(
 	bootnodes := make([]string, 0, numNodes)
 	genesisValidators := make([]string, 0, numNodes)
 
+	logsDir, err := initLogsDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	for i := 0; i < numNodes; i++ {
 		srv := NewTestServer(t, dataDir, func(config *TestServerConfig) {
 			config.SetConsensus(ConsensusIBFT)
 			config.SetIBFTDirPrefix(ibftDirPrefix)
 			config.SetIBFTDir(fmt.Sprintf("%s%d", ibftDirPrefix, i))
+			config.SetLogsDir(logsDir)
+			config.SetSaveLogs(true)
+			config.SetName(fmt.Sprintf("server-%d", i))
 			callback(i, config)
 		})
 		res, err := srv.SecretsInit()
@@ -110,4 +118,13 @@ func (m *IBFTServersManager) GetServer(i int) *TestServer {
 	}
 
 	return m.servers[i]
+}
+
+func initLogsDir() (string, error) {
+	logsDir := fmt.Sprintf("../e2e-logs-%d", startTime)
+	if err := os.MkdirAll(logsDir, 0755); err != nil {
+		return "", err
+	}
+
+	return logsDir, nil
 }
