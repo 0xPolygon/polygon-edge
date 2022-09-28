@@ -73,6 +73,7 @@ func NewTestServer(t *testing.T, rootDir string, callback TestServerConfigCallba
 
 	// Sets the services to start on open ports
 	config := &TestServerConfig{
+		t:             t,
 		ReservedPorts: ports,
 		GRPCPort:      ports[0].Port(),
 		LibP2PPort:    ports[1].Port(),
