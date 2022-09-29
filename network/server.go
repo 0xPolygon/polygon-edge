@@ -332,7 +332,9 @@ func (s *Server) checkPeerConnections() {
 				// TODO: dial peers from the peerstore
 			} else {
 				randomNode := s.GetRandomBootnode()
-				s.addToDialQueue(randomNode, common.PriorityRandomDial)
+				if randomNode != nil {
+					s.addToDialQueue(randomNode, common.PriorityRandomDial)
+				}
 			}
 		}
 	}
