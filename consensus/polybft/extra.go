@@ -301,12 +301,6 @@ func (s *Signature) UnmarshalRLPWith(v *fastrlp.Value) error {
 	return nil
 }
 
-// getQuorumSize returns result of division of given number by two,
-// but rounded to next integer value (similar to math.Ceil function).
-func getQuorumSize(validatorsCount int) int {
-	return (validatorsCount + 1) / 2
-}
-
 // VerifyCommittedFields is checking for consensus proof in the header
 func (s *Signature) VerifyCommittedFields(validatorSet AccountSet, hash types.Hash) error {
 	filtered, err := validatorSet.GetFilteredValidators(s.Bitmap)
