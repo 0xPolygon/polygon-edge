@@ -51,7 +51,7 @@ func NewIBFTServersManager(
 	bootnodes := make([]string, 0, numNodes)
 	genesisValidators := make([]string, 0, numNodes)
 
-	logsDir, err := helperInitLogsDir(t)
+	logsDir, err := initLogsDir(t)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -128,8 +128,10 @@ func (m *IBFTServersManager) GetServer(i int) *TestServer {
 	return m.servers[i]
 }
 
-func helperInitLogsDir(t *testing.T) (string, error) {
+func initLogsDir(t *testing.T) (string, error) {
+	t.Helper()
 	logsDir := path.Join("..", "e2e-logs", fmt.Sprintf("e2e-logs-%d-%s", startTime, t.Name()))
+
 	if err := os.MkdirAll(logsDir, 0755); err != nil {
 		return "", err
 	}
