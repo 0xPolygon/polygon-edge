@@ -105,10 +105,12 @@ func (b *BlockBuilder) Reset() {
 	b.header = &types.Header{
 		ParentHash: b.params.Parent.Hash,
 		Number:     b.params.Parent.Number + 1,
-		//Coinbase:   b.params.Coinbase, // TODO: what is Coinbase?
-		GasLimit:   b.params.GasLimit,
+		Miner:      types.ZeroAddress.Bytes(), //Coinbase:   b.params.Coinbase, // TODO: what is Coinbase?
 		Difficulty: 1,
 		ExtraData:  b.params.Extra,
+		StateRoot:  types.EmptyRootHash, // this avoids needing state for now
+		Sha3Uncles: types.EmptyUncleHash,
+		// GasLimit:   parent.GasLimit, // Inherit from parent for now, will need to adjust dynamically later.
 		// BaseFee:    big.NewInt(100), // TODO: what is base fee
 	}
 
@@ -133,6 +135,14 @@ func (b *BlockBuilder) Build(handler func(h *types.Header)) *StateBlock {
 	// b.header.Root = b.state.IntermediateRoot(true)
 	b.header.StateRoot = types.Hash{} // set somehow state root with executor or something else after Ferran's changes
 	// b.block = NewFinalBlock(b.header, b.txns, b.receipts)
+	// calculate gas limit based on parent header
+
+	// gasLimit, err := i.blockchain.CalculateGasLimit(header.Number)
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	// header.GasLimit = gasLimit
 
 	return &StateBlock{
 		Block:    b.block,
