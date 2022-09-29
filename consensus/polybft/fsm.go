@@ -4,12 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/big"
 	"time"
 
 	"github.com/0xPolygon/pbft-consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
+	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/umbracle/ethgo"
 )
 
 var _ pbft.Backend = &fsm{}
@@ -84,6 +85,8 @@ type fsm struct {
 
 	// stateSyncExecutionIndex is the next state sync execution index in smart contract
 	stateSyncExecutionIndex uint64
+
+	logger hcf.Logger // The logger object
 }
 
 func (f *fsm) Init(info *pbft.RoundInfo) {
@@ -116,7 +119,7 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 			return nil, err
 		}
 		extra.Validators = validatorsDelta
-		log.Trace("[FSM Build Proposal]", "Validators Delta", validatorsDelta)
+		f.logger.Trace("[FSM Build Proposal]", "Validators Delta", validatorsDelta)
 	}
 
 	if f.config.IsBridgeEnabled() {
@@ -140,12 +143,13 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 	if err := f.blockBuilder.Fill(context.Background()); err != nil {
 		return nil, err
 	}
-	log.Debug("Fill block", "time", time.Since(now))
+
+	f.logger.Debug("Fill block", "time", time.Since(now))
 
 	buildBlock := f.blockBuilder.Build(func(h *types.Header) {
-		h.Time = uint64(headerTime.Unix())
-		h.Extra = append(make([]byte, 32), extra.MarshalRLPTo(nil)...)
-		h.MixDigest = PolyMixDigest
+		h.Timestamp = uint64(headerTime.Unix())
+		h.ExtraData = append(make([]byte, 32), extra.MarshalRLPTo(nil)...)
+		h.MixHash = PolyMixDigest
 	})
 
 	f.block = buildBlock
@@ -161,7 +165,7 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 		Hash: f.block.Block.Hash().Bytes(),
 	}
 	f.proposal = proposal
-	log.Debug("[FSM Build Proposal]", "Proposal hash", hexutil.Encode(proposal.Hash))
+	f.logger.Debug("[FSM Build Proposal]", "Proposal hash", hex.EncodeToHex(proposal.Hash))
 	return proposal, nil
 }
 
@@ -173,7 +177,7 @@ func (f *fsm) stateTransactions() []*types.Transaction {
 			// add register commitment transaction
 			inputData, err := f.proposerCommitmentToRegister.EncodeAbi()
 			if err != nil {
-				log.Error("StateTransactions failed to encode input data for state sync commitment registration", "Error", err)
+				f.logger.Error("StateTransactions failed to encode input data for state sync commitment registration", "Error", err)
 				return nil
 			}
 			txns = append(txns,
@@ -189,7 +193,7 @@ func (f *fsm) stateTransactions() []*types.Transaction {
 		for _, bundle := range f.bundleProofs {
 			inputData, err := bundle.EncodeAbi()
 			if err != nil {
-				log.Error("stateTransactions failed to encode input data for state sync execution", "Error", err)
+				f.logger.Error("stateTransactions failed to encode input data for state sync execution", "Error", err)
 				return nil
 			}
 			txns = append(txns,
@@ -197,7 +201,7 @@ func (f *fsm) stateTransactions() []*types.Transaction {
 		}
 	}
 
-	log.Debug("Apply state transaction", "num", len(txns))
+	f.logger.Debug("Apply state transaction", "num", len(txns))
 	return txns
 }
 
@@ -217,7 +221,7 @@ func (f *fsm) ValidateCommit(from pbft.NodeID, seal []byte) error {
 		return fmt.Errorf("incorrect commit from %s. proposal unavailable", from)
 	}
 
-	fromAddress := types.HexToAddress(string(from))
+	fromAddress := types.Address(ethgo.HexToAddress(string(from)))
 	validator := f.validators.Accounts().GetValidatorAccount(fromAddress)
 
 	if validator == nil {
@@ -237,7 +241,7 @@ func (f *fsm) ValidateCommit(from pbft.NodeID, seal []byte) error {
 
 // Validate validates a raw proposal (used if non-proposer)
 func (f *fsm) Validate(proposal *pbft.Proposal) error {
-	log.Debug("[FSM Validate]", "Proposal hash", hexutil.Encode(proposal.Hash))
+	f.logger.Debug("[FSM Validate]", "Proposal hash", hex.EncodeToHex(proposal.Hash))
 
 	var block types.Block
 	if err := rlp.DecodeBytes(proposal.Data, &block); err != nil {
@@ -246,23 +250,23 @@ func (f *fsm) Validate(proposal *pbft.Proposal) error {
 
 	// validate proposal
 	if block.Hash() != types.BytesToHash(proposal.Hash) {
-		return fmt.Errorf("incorrect sign hash (current header#%d)", block.NumberU64())
+		return fmt.Errorf("incorrect sign hash (current header#%d)", block.Number())
 	}
 
 	// validate header fields
-	if err := validateHeaderFields(f.parent, block.Header()); err != nil {
+	if err := validateHeaderFields(f.parent, block.Header); err != nil {
 		return fmt.Errorf("failed to validate header (parent header#%d, current header#%d): %v",
-			f.parent.Number.Uint64(), block.NumberU64(), err)
+			f.parent.Number, block.Number, err)
 	}
 
-	blockExtra, err := GetIbftExtra(block.Extra())
+	blockExtra, err := GetIbftExtra(block.Header.ExtraData)
 	if err != nil {
 		return err
 	}
 
 	// TODO: Validate validator set delta?
 
-	blockNumber := block.NumberU64()
+	blockNumber := block.Number()
 	if blockNumber > 1 {
 		// verify parent signature
 		// We skip block 0 (genesis) and block 1 (parent is genesis)
@@ -271,19 +275,19 @@ func (f *fsm) Validate(proposal *pbft.Proposal) error {
 		if err != nil {
 			return err
 		}
-		log.Trace("[FSM Validate]", "Block", blockNumber, "parent validators", validators)
-		parentHash := f.parent.Hash()
+		f.logger.Trace("[FSM Validate]", "Block", blockNumber, "parent validators", validators)
+		parentHash := f.parent.Hash
 		if err := blockExtra.Parent.VerifyCommittedFields(validators, parentHash); err != nil {
 			return fmt.Errorf(
 				"failed to verify signatures for (parent) block#%d. Block hash: %v, block#%d",
-				f.parent.Number.Uint64(),
+				f.parent.Number,
 				parentHash,
 				blockNumber,
 			)
 		}
 	}
 
-	if err := f.VerifyStateTransactions(block.Transactions()); err != nil {
+	if err := f.VerifyStateTransactions(block.Transactions); err != nil {
 		return err
 	}
 
@@ -296,7 +300,7 @@ func (f *fsm) Validate(proposal *pbft.Proposal) error {
 	return nil
 }
 
-func (f *fsm) VerifyStateTransactions(transactions types.Transactions) error {
+func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 	if f.isEndOfEpoch {
 		err := f.verifyValidatorsUptimeTx(transactions)
 		if err != nil {
@@ -311,43 +315,43 @@ func (f *fsm) VerifyStateTransactions(transactions types.Transactions) error {
 	nextStateSyncBundleIndex := f.stateSyncExecutionIndex
 	for _, tx := range transactions {
 		// skip if transaction is not of types.StateTransactionType type
-		if tx.Type() != types.StateTransactionType {
+		if tx.Type != types.StateTransactionType {
 			continue
 		}
 
 		if !f.isEndOfSprint {
-			return fmt.Errorf("state transaction in block which should not contain it: tx = %v", tx.Hash())
+			return fmt.Errorf("state transaction in block which should not contain it: tx = %v", tx.Hash)
 		}
 
-		decodedStateTx, err := decodeStateTransaction(tx.Data())
+		decodedStateTx, err := decodeStateTransaction(tx.Input) // used to be Data
 		if err != nil {
-			return fmt.Errorf("state transaction error while decoding: tx = %v, err = %v", tx.Hash(), err)
+			return fmt.Errorf("state transaction error while decoding: tx = %v, err = %v", tx.Hash, err)
 		}
 
 		switch stateTxData := decodedStateTx.(type) {
 		case *CommitmentMessageSigned:
 			if commitmentMessageSignedExists {
-				return fmt.Errorf("only one commitment is allowed per block: %v", tx.Hash())
+				return fmt.Errorf("only one commitment is allowed per block: %v", tx.Hash)
 			}
 
 			commitmentMessageSignedExists = true
 			signers, err := f.validators.Accounts().GetFilteredValidators(stateTxData.AggSignature.Bitmap)
 			if err != nil {
-				return fmt.Errorf("error for state transaction while retrieving signers: tx = %v, error = %v", tx.Hash(), err)
+				return fmt.Errorf("error for state transaction while retrieving signers: tx = %v, error = %v", tx.Hash, err)
 			}
 
 			if len(signers) < getQuorumSize(f.validators.Len()) {
-				return fmt.Errorf("quorum size not reached for state tx: %v", tx.Hash())
+				return fmt.Errorf("quorum size not reached for state tx: %v", tx.Hash)
 			}
 
 			aggs, err := bls.UnmarshalSignature(stateTxData.AggSignature.AggregatedSignature)
 			if err != nil {
-				return fmt.Errorf("error for state transaction while unmarshaling signature: tx = %v, error = %v", tx.Hash(), err)
+				return fmt.Errorf("error for state transaction while unmarshaling signature: tx = %v, error = %v", tx.Hash, err)
 			}
 
 			verified := aggs.VerifyAggregated(signers.GetBlsKeys(), stateTxData.Message.Hash().Bytes())
 			if !verified {
-				return fmt.Errorf("invalid signature for tx = %v", tx.Hash())
+				return fmt.Errorf("invalid signature for tx = %v", tx.Hash)
 			}
 
 			f.commitmentToSaveOnRegister = stateTxData
@@ -366,7 +370,7 @@ func (f *fsm) VerifyStateTransactions(transactions types.Transactions) error {
 					isVerified = true
 					if err := commitment.Message.VerifyProof(stateTxData); err != nil {
 						return fmt.Errorf("state transaction error while validating proof: tx = %v, err = %v",
-							tx.Hash(), err)
+							tx.Hash, err)
 					}
 					break
 				}
@@ -374,7 +378,7 @@ func (f *fsm) VerifyStateTransactions(transactions types.Transactions) error {
 
 			if !isVerified {
 				return fmt.Errorf("state transaction error while validating proof. "+
-					"No appropriate commitment found to verify proof. tx = %v", tx.Hash())
+					"No appropriate commitment found to verify proof. tx = %v", tx.Hash)
 			}
 		}
 	}
@@ -439,7 +443,7 @@ func (f *fsm) Insert(p *pbft.SealedProposal) error {
 
 // Height returns the height for the current round
 func (f *fsm) Height() uint64 {
-	return f.parent.Number.Uint64() + 1
+	return f.parent.Number + 1
 }
 
 // ValidatorSet returns the validator set for the current round
@@ -464,7 +468,7 @@ func (f *fsm) getValidatorSetDelta(pendingBlockState vm.StateDB) (*ValidatorSetD
 }
 
 // verifyValidatorsUptimeTx creates uptime transaction and compares its hash with the one extracted from the block.
-func (f *fsm) verifyValidatorsUptimeTx(transactions types.Transactions) error {
+func (f *fsm) verifyValidatorsUptimeTx(transactions []*types.Transaction) error {
 	var blockUptimeTx *types.Transaction
 	if len(transactions) > 0 {
 		blockUptimeTx = transactions[0]
@@ -479,15 +483,15 @@ func (f *fsm) verifyValidatorsUptimeTx(transactions types.Transactions) error {
 		if blockUptimeTx == nil {
 			return errors.New("uptime transaction is not found in the epoch ending block")
 		}
-		if blockUptimeTx.Hash() != createdUptimeTx.Hash() {
+		if blockUptimeTx.Hash != createdUptimeTx.Hash {
 			return fmt.Errorf(
 				"invalid uptime transaction. Expected '%s', but got '%s' uptime transaction hash",
-				blockUptimeTx.Hash(),
-				createdUptimeTx.Hash(),
+				blockUptimeTx.Hash,
+				createdUptimeTx.Hash,
 			)
 		}
 	} else {
-		if blockUptimeTx != nil && blockUptimeTx.Hash() == createdUptimeTx.Hash() {
+		if blockUptimeTx != nil && blockUptimeTx.Hash == createdUptimeTx.Hash {
 			return errors.New("didn't expect uptime transaction in the middle of an epoch")
 		}
 	}
@@ -496,23 +500,23 @@ func (f *fsm) verifyValidatorsUptimeTx(transactions types.Transactions) error {
 
 func validateHeaderFields(parent *types.Header, header *types.Header) error {
 	// verify parent hash
-	if parent.Hash() != header.ParentHash {
-		return fmt.Errorf("incorrect header parent hash (parent=%s, header parent=%s)", parent.Hash(), header.ParentHash)
+	if parent.Hash != header.ParentHash {
+		return fmt.Errorf("incorrect header parent hash (parent=%s, header parent=%s)", parent.Hash, header.ParentHash)
 	}
 	// verify parent number
-	if diff := new(big.Int).Sub(header.Number, parent.Number); diff.Cmp(big.NewInt(1)) != 0 {
+	if header.Number != parent.Number+1 {
 		return fmt.Errorf("invalid number")
 	}
 	// verify time has passed
-	if header.Time <= parent.Time {
+	if header.Timestamp <= parent.Timestamp {
 		return fmt.Errorf("timestamp older than parent")
 	}
 	// verify mix digest
-	if header.MixDigest != PolyMixDigest {
+	if header.MixHash != PolyMixDigest {
 		return fmt.Errorf("mix digest is not correct")
 	}
 	// difficulty must be > 0
-	if header.Difficulty == nil || header.Difficulty.Cmp(big.NewInt(0)) <= 0 {
+	if header.Difficulty <= 0 {
 		return fmt.Errorf("difficulty should be greater than zero")
 	}
 	return nil

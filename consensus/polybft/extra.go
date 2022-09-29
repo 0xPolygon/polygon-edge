@@ -19,10 +19,10 @@ const (
 
 var (
 	// PolyMixDigest represents a hash of "PolyBFT Mix" to identify whether the block is from PolyBFT consensus engine
-	PolyMixDigest = ethgo.HexToHash("adce6e5230abe012342a44e4e9b6d05997d6f015387ae0e59be924afc7ec70c1")
+	PolyMixDigest = types.Hash(ethgo.HexToHash("adce6e5230abe012342a44e4e9b6d05997d6f015387ae0e59be924afc7ec70c1"))
 
 	// PolyBFTDigest represents a hash of "PolyBFT" to identify whether the block is from PolyBFT consensus engine
-	PolyBFTDigest = ethgo.HexToHash("3ceb7974985f530ac20a5ddf2e9e9bd54d1674e810e06bbcca9015105aa6b6f9")
+	PolyBFTDigest = types.Hash(ethgo.HexToHash("3ceb7974985f530ac20a5ddf2e9e9bd54d1674e810e06bbcca9015105aa6b6f9"))
 )
 
 // Extra defines the structure of the extra field for Istanbul

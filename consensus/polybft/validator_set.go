@@ -30,7 +30,7 @@ func (v validatorSet) Accounts() AccountSet {
 
 func (v validatorSet) CalcProposer(round uint64) pbft.NodeID {
 	seed := uint64(0)
-	if v.last == (common.Address{}) {
+	if v.last == (types.Address{}) {
 		seed = round
 	} else {
 		offset := 0
