@@ -33,17 +33,8 @@ jobs:
         with:
           submodules: recursive
 
-      # We need to build the binary with the race flag enabled
-      # because it will get picked up and run during e2e tests
-      # and the e2e tests should error out if any kind of race is found
-      - name: Go build with race
-        run: CGO_ENABLED=1 GOOS=linux go build -race -a -o artifacts/polygon-edge .
-
-      - name: Add artifacts directory to the path
-        run: echo "$(pwd)/artifacts" >> $GITHUB_PATH
-
       - name: Go test
-        run: go test -coverprofile coverage.out -timeout 28m ./...
+        run: go test -coverprofile coverage.out -timeout 10m `go list ./... | grep -v e2e`
 
       - name: Upload coverage file to Codecov
         uses: codecov/codecov-action@v3
