@@ -10,6 +10,9 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/ethereum/go-ethereum/core/vm"
+	"github.com/ethereum/go-ethereum/rlp"
+	hcf "github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
 )
 
@@ -45,7 +48,7 @@ type fsm struct {
 	validators ValidatorSet
 
 	// blockBuilder is the block builder for proposers
-	//blockBuilder blockBuilder
+	blockBuilder blockBuilder
 
 	// block is the current block being process in this round.
 	// It should be populated after the Accept state in pbft-consensus.
