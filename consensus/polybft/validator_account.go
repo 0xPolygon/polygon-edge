@@ -185,36 +185,35 @@ func (as AccountSet) GetFilteredValidators(bitmap bitmap.Bitmap) (AccountSet, er
 // ApplyDelta receives ValidatorSetDelta and applies it to the values from the current AccountSet
 // (removes the ones marked for deletion and adds the one which are being added by delta)
 // Function returns new AccountSet with old and new data merged. AccountSet is immutable!
+// TODO Nemanja
+func (as AccountSet) ApplyDelta(validatorsDelta *ValidatorSetDelta) (AccountSet, error) {
+	if validatorsDelta == nil || validatorsDelta.IsEmpty() {
+		return as.Copy(), nil
+	}
 
-// TO DO Nemanja
-// func (as AccountSet) ApplyDelta(validatorsDelta *ValidatorSetDelta) (AccountSet, error) {
-// 	if validatorsDelta == nil || validatorsDelta.IsEmpty() {
-// 		return as.Copy(), nil
-// 	}
+	// Figure out which validators from the existing set are not marked for deletion.
+	// Those should be kept in the snapshot.
+	var validators AccountSet
+	for i, validator := range as {
+		// If a validator is not in the Removed set, or it is in the Removed set
+		// but it exists in the Added set as well (which should never happen),
+		// the validator should remain in the validator set.
+		if !validatorsDelta.Removed.IsSet(uint64(i)) ||
+			validatorsDelta.Added.ContainsAddress(validator.Address) {
+			validators = append(validators, validator)
+		}
+	}
 
-// 	// Figure out which validators from the existing set are not marked for deletion.
-// 	// Those should be kept in the snapshot.
-// 	var validators AccountSet
-// 	for i, validator := range as {
-// 		// If a validator is not in the Removed set, or it is in the Removed set
-// 		// but it exists in the Added set as well (which should never happen),
-// 		// the validator should remain in the validator set.
-// 		if !validatorsDelta.Removed.IsSet(uint64(i)) ||
-// 			validatorsDelta.Added.ContainsAddress(validator.Address) {
-// 			validators = append(validators, validator)
-// 		}
-// 	}
-
-// 	// Append added validators
-// 	for _, addedValidator := range validatorsDelta.Added {
-// 		if validators.ContainsAddress(addedValidator.Address) {
-// 			return nil, fmt.Errorf("validator %v is already present in the validators snapshot", addedValidator.Address.Hex())
-// 		}
-// 		validators = append(validators, addedValidator)
-// 	}
-// 	log.Trace("[ApplyDelta]", "Validators Snapshot", validators)
-// 	return validators, nil
-// }
+	// Append added validators
+	for _, addedValidator := range validatorsDelta.Added {
+		if validators.ContainsAddress(addedValidator.Address) {
+			return nil, fmt.Errorf("validator %v is already present in the validators snapshot", addedValidator.Address.String())
+		}
+		validators = append(validators, addedValidator)
+	}
+	// log.Trace("[ApplyDelta]", "Validators Snapshot", validators)
+	return validators, nil
+}
 
 // Marshal marshals AccountSet to JSON
 func (as AccountSet) Marshal() ([]byte, error) {
