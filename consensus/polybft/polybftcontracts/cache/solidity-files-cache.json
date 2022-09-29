@@ -1,8 +1,8 @@
 {
   "_format": "hh-sol-cache-2",
   "files": {
-    "/home/stefan/go/src/polygon-edge/consensus/polybft/polybftcontracts/contracts/rootchain/Checkpoint.sol": {
-      "lastModificationDate": 1664798141094,
+    "/usr/src/app/contracts/rootchain/Checkpoint.sol": {
+      "lastModificationDate": 1664459255348,
       "contentHash": "f37bad9549898f2a66eae802c8857eb7",
       "sourceName": "contracts/rootchain/Checkpoint.sol",
       "solcConfig": {
@@ -38,8 +38,8 @@
         "Checkpoint"
       ]
     },
-    "/home/stefan/go/src/polygon-edge/consensus/polybft/polybftcontracts/contracts/rootchain/RootchainBridge.sol": {
-      "lastModificationDate": 1664798141094,
+    "/usr/src/app/contracts/rootchain/RootchainBridge.sol": {
+      "lastModificationDate": 1664459255348,
       "contentHash": "7e3cc2e8ba02308f589faad9f50bf92b",
       "sourceName": "contracts/rootchain/RootchainBridge.sol",
       "solcConfig": {
@@ -73,8 +73,8 @@
         "RootchainBridge"
       ]
     },
-    "/home/stefan/go/src/polygon-edge/consensus/polybft/polybftcontracts/contracts/sidechain/ERC20Bridge.sol": {
-      "lastModificationDate": 1664798141094,
+    "/usr/src/app/contracts/sidechain/ERC20Bridge.sol": {
+      "lastModificationDate": 1664459255348,
       "contentHash": "9e095848fe2cbbde827a49186c77f7fd",
       "sourceName": "contracts/sidechain/ERC20Bridge.sol",
       "solcConfig": {
@@ -111,8 +111,8 @@
         "ERC20BridgeToken"
       ]
     },
-    "/home/stefan/go/src/polygon-edge/consensus/polybft/polybftcontracts/contracts/sidechain/SidechainBridge.sol": {
-      "lastModificationDate": 1664798141094,
+    "/usr/src/app/contracts/sidechain/SidechainBridge.sol": {
+      "lastModificationDate": 1664459255352,
       "contentHash": "e775c7f953a4747fadf64f90bcadc112",
       "sourceName": "contracts/sidechain/SidechainBridge.sol",
       "solcConfig": {
@@ -147,9 +147,9 @@
         "SidechainBridge"
       ]
     },
-    "/home/stefan/go/src/polygon-edge/consensus/polybft/polybftcontracts/contracts/sidechain/Validator.sol": {
-      "lastModificationDate": 1665118977460,
-      "contentHash": "1a90ffb3cf4925bb3f5439b2da5bd4a2",
+    "/usr/src/app/contracts/sidechain/Validator.sol": {
+      "lastModificationDate": 1664459255352,
+      "contentHash": "ad6aa45efc2cd309b98b0cf93a3d74d2",
       "sourceName": "contracts/sidechain/Validator.sol",
       "solcConfig": {
         "version": "0.8.4",
@@ -184,8 +184,8 @@
         "Validator"
       ]
     },
-    "/home/stefan/go/src/polygon-edge/consensus/polybft/polybftcontracts/contracts/sidechain/GasUsageBenchmark.sol": {
-      "lastModificationDate": 1664798141094,
+    "/usr/src/app/contracts/sidechain/GasUsageBenchmark.sol": {
+      "lastModificationDate": 1664459255352,
       "contentHash": "722e6d8de152e47b782e0fb5e89e8398",
       "sourceName": "contracts/sidechain/GasUsageBenchmark.sol",
       "solcConfig": {
@@ -221,8 +221,8 @@
         "GasUsageBenchmark"
       ]
     },
-    "/home/stefan/go/src/polygon-edge/consensus/polybft/polybftcontracts/contracts/sidechain/MintERC20.sol": {
-      "lastModificationDate": 1664798141094,
+    "/usr/src/app/contracts/sidechain/MintERC20.sol": {
+      "lastModificationDate": 1664459255352,
       "contentHash": "55ca16deecef2a2ddad768f6901a6f2b",
       "sourceName": "contracts/sidechain/MintERC20.sol",
       "solcConfig": {
@@ -258,8 +258,8 @@
         "MintERC20"
       ]
     },
-    "/home/stefan/go/src/polygon-edge/consensus/polybft/polybftcontracts/node_modules/@openzeppelin/contracts/token/ERC20/ERC20.sol": {
-      "lastModificationDate": 1664950897109,
+    "/usr/src/app/node_modules/@openzeppelin/contracts/token/ERC20/ERC20.sol": {
+      "lastModificationDate": 1660825023031,
       "contentHash": "f48de0eaae9544072b8766e2eac528a7",
       "sourceName": "@openzeppelin/contracts/token/ERC20/ERC20.sol",
       "solcConfig": {
@@ -297,8 +297,8 @@
         "ERC20"
       ]
     },
-    "/home/stefan/go/src/polygon-edge/consensus/polybft/polybftcontracts/node_modules/@openzeppelin/contracts/token/ERC20/IERC20.sol": {
-      "lastModificationDate": 1664950897269,
+    "/usr/src/app/node_modules/@openzeppelin/contracts/token/ERC20/IERC20.sol": {
+      "lastModificationDate": 1660825023035,
       "contentHash": "302d9755e46bc69d7058b0cbe7185e37",
       "sourceName": "@openzeppelin/contracts/token/ERC20/IERC20.sol",
       "solcConfig": {
@@ -332,8 +332,8 @@
         "IERC20"
       ]
     },
-    "/home/stefan/go/src/polygon-edge/consensus/polybft/polybftcontracts/node_modules/@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol": {
-      "lastModificationDate": 1664950897269,
+    "/usr/src/app/node_modules/@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol": {
+      "lastModificationDate": 1660825023035,
       "contentHash": "909ab67fc5c25033fe6cd364f8c056f9",
       "sourceName": "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol",
       "solcConfig": {
@@ -369,8 +369,8 @@
         "IERC20Metadata"
       ]
     },
-    "/home/stefan/go/src/polygon-edge/consensus/polybft/polybftcontracts/node_modules/@openzeppelin/contracts/utils/Context.sol": {
-      "lastModificationDate": 1664950897009,
+    "/usr/src/app/node_modules/@openzeppelin/contracts/utils/Context.sol": {
+      "lastModificationDate": 1660825023043,
       "contentHash": "5f2c5c4b6af2dd4551027144797bc8be",
       "sourceName": "@openzeppelin/contracts/utils/Context.sol",
       "solcConfig": {

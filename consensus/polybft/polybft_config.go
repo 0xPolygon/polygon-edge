@@ -11,6 +11,8 @@ type PolyBFTConfig struct {
 	Genesis []*Validator  `json:"genesis"`
 	Bridge  *BridgeConfig `json:"bridge"`
 
+	ValidatorSetSize int `json:"validatorSetSize"`
+
 	// Address of the system contracts, as of now (testing) this is populated automatically during genesis
 	ValidatorSetAddr    types.Address `json:"validatorSetAddr"`
 	SidechainBridgeAddr types.Address `json:"sidechainBridgeAddr"`

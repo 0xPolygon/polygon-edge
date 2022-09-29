@@ -15,6 +15,8 @@ import (
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/polybftcontracts"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	configHelper "github.com/0xPolygon/polygon-edge/helper/config"
@@ -190,7 +192,18 @@ func NewServer(config *Config) (*Server, error) {
 	m.executor.SetRuntime(evm.NewEVM())
 
 	// compute the genesis root state
-	genesisRoot := m.executor.WriteGenesis(config.Chain.Genesis.Alloc)
+	// TODO: make this generic!!!!!!!!
+	// TODO: pass some config ass
+	alloc, err := polybftcontracts.PopulateGenesis(
+		&polybft.PolyBFTConfig{
+			ValidatorSetSize: 100,
+		},
+		config.Chain.Genesis.Alloc)
+	if err != nil {
+		return nil, err
+	}
+
+	genesisRoot := m.executor.WriteGenesis(alloc)
 	config.Chain.Genesis.StateRoot = genesisRoot
 
 	// use the eip155 signer
