@@ -34,7 +34,7 @@ jobs:
           submodules: recursive
 
       - name: Go test
-        run: go test -coverprofile coverage.out -timeout 10m `go list ./... | grep -v e2e`
+        run: go test -coverprofile coverage.out -timeout 20m `go list ./... | grep -v e2e`
 
       - name: Upload coverage file to Codecov
         uses: codecov/codecov-action@v3

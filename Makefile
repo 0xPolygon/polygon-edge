@@ -39,7 +39,7 @@ generate-bsd-licenses:
 
 .PHONY: test
 test:
-	go test -timeout=10m `go list ./... | grep -v e2e`
+	go test -timeout=20m `go list ./... | grep -v e2e`
 
 .PHONY: test-e2e
 test-e2e:
