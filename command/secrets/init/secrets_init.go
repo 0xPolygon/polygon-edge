@@ -17,8 +17,10 @@ var (
 )
 
 func GetCommand() *cobra.Command {
-	var basicParams initParams
-	var number int
+	var (
+		basicParams initParams
+		number      int
+	)
 
 	secretsInitCmd := &cobra.Command{
 		Use: "init",
