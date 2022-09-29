@@ -1,0 +1,8 @@
+SavedState/
+**/launch.json
+**/*.flow
+**/*.log
+**/*.txt
+log*/
+e2e/*.fail
+*.fail
