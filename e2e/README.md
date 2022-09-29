@@ -11,10 +11,7 @@ Use the make file to launch the tests `make test-e2e`
 ### Check if the polygon-edge process is running
 
 If you've stopped the tests abruptly, chances are the polygon-edge process is still running on your machine. <br/ >
-In order for the tests to function normally, please kill the process.
-
-Note the process id: `ps aux | grep polygon-edge`
-Kill the process `kill -9 [pid]`
+In order for the tests to function normally, please kill the possible remaining processes using `killall polygon-edge`
 
 ### Clean the golang test cache
 
