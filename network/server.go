@@ -46,7 +46,7 @@ const (
 
 	DefaultLibp2pPort int = 1478
 
-	MinimumPeerConnections int64 = 1
+	MinimumPeerConnections int64 = 10
 	MinimumBootNodes       int   = 1
 )
 
