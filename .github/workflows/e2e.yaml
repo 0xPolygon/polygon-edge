@@ -21,3 +21,4 @@ jobs:
         with:
           name: e2e-logs
           path: e2e-logs-*/
+          retention-days: 30
