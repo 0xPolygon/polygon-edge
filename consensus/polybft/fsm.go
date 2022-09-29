@@ -9,22 +9,21 @@ import (
 	"github.com/0xPolygon/pbft-consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
+	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/ethereum/go-ethereum/core/vm"
-	"github.com/ethereum/go-ethereum/rlp"
 	hcf "github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
 )
 
 var _ pbft.Backend = &fsm{}
 
-// type blockBuilder interface {
-// 	Reset()
-// 	CommitTransaction(tx *types.Transaction) error
-// 	Fill(ctx context.Context) error
-// 	Build(func(h *types.Header)) *blockbuilder.StateBlock
-// 	GetState() vm.StateDB
-// }
+type blockBuilder interface {
+	Reset()
+	CommitTransaction(tx *types.Transaction) error
+	Fill(ctx context.Context) error
+	Build(func(h *types.Header)) *StateBlock
+	GetState() state.Snapshot
+}
 
 const (
 	stateTransactionsGasLimit = 1000000 // some arbitrary default gas limit for state transactions
@@ -52,7 +51,7 @@ type fsm struct {
 
 	// block is the current block being process in this round.
 	// It should be populated after the Accept state in pbft-consensus.
-	block *blockbuilder.StateBlock
+	block *StateBlock
 
 	// proposal is the current proposal being processed
 	proposal *pbft.Proposal
@@ -394,7 +393,7 @@ func (f *fsm) Insert(p *pbft.SealedProposal) error {
 	// at this point everything we have to do is just commit something that
 	// we should have already computed beforehand.
 
-	extra, _ := GetIbftExtra(f.block.Block.Extra())
+	extra, _ := GetIbftExtra(f.block.Block.Header.ExtraData)
 
 	// create map for faster access to indexes
 	nodeIDIndexMap := make(map[pbft.NodeID]int, f.validators.Len())
@@ -431,7 +430,9 @@ func (f *fsm) Insert(p *pbft.SealedProposal) error {
 		AggregatedSignature: aggregatedSignature,
 		Bitmap:              bitmap,
 	}
-	f.block.Block.SetExtra(append(make([]byte, 32), extra.MarshalRLPTo(nil)...))
+
+	// Write extar data to header
+	f.block.Block.Header.ExtraData = append(make([]byte, 32), extra.MarshalRLPTo(nil)...)
 
 	if err := f.backend.CommitBlock(f.block); err != nil {
 		return err

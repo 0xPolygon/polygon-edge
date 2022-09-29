@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/state"
-	trie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
 	"github.com/0xPolygon/polygon-edge/types"
 	hcf "github.com/hashicorp/go-hclog"
 )
@@ -97,6 +96,8 @@ type BlockBuilder struct {
 
 	// block is a reference to the already built block
 	block *types.Block
+
+	state state.Snapshot
 }
 
 // Reset is used to indicate that the current block building has been interrupted
@@ -105,7 +106,7 @@ func (b *BlockBuilder) Reset() {
 	b.header = &types.Header{
 		ParentHash: b.params.Parent.Hash,
 		Number:     b.params.Parent.Number + 1,
-		Miner:      types.ZeroAddress.Bytes(), //Coinbase:   b.params.Coinbase, // TODO: what is Coinbase?
+		Miner:      b.params.Coinbase[:],
 		Difficulty: 1,
 		ExtraData:  b.params.Extra,
 		StateRoot:  types.EmptyRootHash, // this avoids needing state for now
@@ -119,6 +120,8 @@ func (b *BlockBuilder) Reset() {
 	// b.state = b.params.StateDB.Copy()
 	b.txns = []*types.Transaction{}
 	b.receipts = []*types.Receipt{}
+
+	b.state = nil // TODO: build snapshot somehow from  b.params (by using state.NewSnapshotAt?)
 }
 
 // Block returns the built block if nil, it is not built yet
@@ -243,16 +246,16 @@ func (b *BlockBuilder) writeTransaction(
 	return success, true
 }
 
-// // GetState returns StateDB reference
-// func (b *BlockBuilder) GetState() vm.StateDB {
-// 	return b.state
-// }
+// GetState returns StateDB reference
+func (b *BlockBuilder) GetState() state.Snapshot {
+	return b.state
+}
 
 // StateBlock is a block with the full state it modifies
 type StateBlock struct {
 	Block    *types.Block
 	Receipts []*types.Receipt
-	State    *trie.Trie
+	State    state.Snapshot
 }
 
 // func (b *StateBlock) EncodeRlpBlock() ([]byte, error) {
