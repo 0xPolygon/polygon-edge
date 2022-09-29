@@ -2,6 +2,7 @@ package polybft
 
 import (
 	"fmt"
+	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -319,21 +320,21 @@ func (s *Signature) VerifyCommittedFields(validatorSet AccountSet, hash types.Ha
 
 	// TO DO Nemanja - what to do with signatures
 	// log.Trace("VerifyCommittedFields", "Filtered validators", filtered, "Bitmap", s.Bitmap)
-	// rawMsg := hash[:]
-	// var blsPublicKeys []*bls.PublicKey
-	// for _, validator := range filtered {
-	// 	blsPublicKeys = append(blsPublicKeys, validator.BlsKey)
-	// }
+	rawMsg := hash[:]
+	var blsPublicKeys []*bls.PublicKey
+	for _, validator := range filtered {
+		blsPublicKeys = append(blsPublicKeys, validator.BlsKey)
+	}
 
-	// // TODO: refactor AggregatedSignature
-	// aggs, err := bls.UnmarshalSignature(s.AggregatedSignature)
-	// if err != nil {
-	// 	return err
-	// }
-	// isOk := aggs.VerifyAggregated(blsPublicKeys, rawMsg)
-	// if !isOk {
-	// 	return fmt.Errorf("could not verify signature")
-	// }
+	// TODO: refactor AggregatedSignature
+	aggs, err := bls.UnmarshalSignature(s.AggregatedSignature)
+	if err != nil {
+		return err
+	}
+	isOk := aggs.VerifyAggregated(blsPublicKeys, rawMsg)
+	if !isOk {
+		return fmt.Errorf("could not verify signature")
+	}
 
 	return nil
 }

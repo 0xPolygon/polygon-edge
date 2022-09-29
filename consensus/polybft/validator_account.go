@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
+	"reflect"
 
 	"github.com/0xPolygon/pbft-consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
@@ -14,7 +16,7 @@ import (
 // ValidatorAccount represents a validator from the validator set
 type ValidatorAccount struct {
 	Address types.Address
-	//BlsKey  *bls.PublicKey
+	BlsKey  *bls.PublicKey
 }
 
 // Equals compares ValidatorAccount equality
@@ -22,17 +24,17 @@ func (a ValidatorAccount) Equals(b *ValidatorAccount) bool {
 	if b == nil {
 		return false
 	}
-	return a.Address == b.Address //&& reflect.DeepEqual(a.BlsKey, b.BlsKey)
+	return a.Address == b.Address && reflect.DeepEqual(a.BlsKey, b.BlsKey)
 }
 
 // Copy returns a deep copy of ValidatorAccount
 func (a ValidatorAccount) Copy() *ValidatorAccount {
-	//copiedBlsKey := a.BlsKey.Marshal()
-	//blsk, _ := bls.UnmarshalPublicKey(copiedBlsKey)
+	copiedBlsKey := a.BlsKey.Marshal()
+	blsk, _ := bls.UnmarshalPublicKey(copiedBlsKey)
 
 	newAccount := &ValidatorAccount{
 		Address: types.BytesToAddress(a.Address[:]),
-		//BlsKey:  blsk,
+		BlsKey:  blsk,
 	}
 	return newAccount
 }
@@ -43,7 +45,7 @@ func (a ValidatorAccount) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 	// Address
 	vv.Set(ar.NewBytes(a.Address.Bytes()))
 	// BlsKey
-	//vv.Set(ar.NewCopyBytes(a.BlsKey.Marshal()))
+	vv.Set(ar.NewCopyBytes(a.BlsKey.Marshal()))
 	return vv
 }
 
@@ -65,23 +67,22 @@ func (a *ValidatorAccount) UnmarshalRLPWith(v *fastrlp.Value) error {
 		a.Address = types.BytesToAddress(addressRaw)
 	}
 
-	// BlsKey	TO DO Nemanja
-	// {
-	// 	blsKeyRaw, err := elems[1].GetBytes(nil)
-	// 	if err != nil {
-	// 		return fmt.Errorf("expected 'BlsKey' encoded as bytes. Error: %v", err)
-	// 	}
-	// 	a.BlsKey, err = bls.UnmarshalPublicKey(blsKeyRaw)
-	// 	if err != nil {
-	// 		return fmt.Errorf("failed to unmarshal BLS public key. Error: %v", err)
-	// 	}
-	// }
+	{
+		blsKeyRaw, err := elems[1].GetBytes(nil)
+		if err != nil {
+			return fmt.Errorf("expected 'BlsKey' encoded as bytes. Error: %v", err)
+		}
+		a.BlsKey, err = bls.UnmarshalPublicKey(blsKeyRaw)
+		if err != nil {
+			return fmt.Errorf("failed to unmarshal BLS public key. Error: %v", err)
+		}
+	}
 	return nil
 }
 
 // fmt.Stringer implementation
 func (a ValidatorAccount) String() string {
-	//return fmt.Sprintf("Address=%v; Bls Key=%v", a.Address.Hex(), hexutil.Encode(a.BlsKey.Marshal()))
+	// return fmt.Sprintf("Address=%v; Bls Key=%v", a.Address.Hex(), hexutil.Encode(a.BlsKey.Marshal()))
 	return fmt.Sprintf("Address=%v", a.Address.String()) // TO DO Nemanja check this
 }
 
@@ -98,13 +99,13 @@ func (as AccountSet) GetAddresses() []types.Address {
 }
 
 // GetBlsKeys aggregates public BLS keys for given AccountSet
-// func (as AccountSet) GetBlsKeys() []*bls.PublicKey {
-// 	res := make([]*bls.PublicKey, 0, len(as))
-// 	for _, account := range as {
-// 		res = append(res, account.BlsKey)
-// 	}
-// 	return res
-// }
+func (as AccountSet) GetBlsKeys() []*bls.PublicKey {
+	res := make([]*bls.PublicKey, 0, len(as))
+	for _, account := range as {
+		res = append(res, account.BlsKey)
+	}
+	return res
+}
 
 // Len returns length of AccountSet
 func (as AccountSet) Len() int {
