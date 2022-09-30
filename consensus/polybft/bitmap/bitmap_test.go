@@ -11,8 +11,10 @@ func TestBitmap_Set(t *testing.T) {
 	unique := map[int]struct{}{}
 
 	b := Bitmap{}
+
 	for _, v := range data {
 		unique[v] = struct{}{}
+
 		b.Set(uint64(v))
 	}
 
@@ -22,6 +24,7 @@ func TestBitmap_Set(t *testing.T) {
 	}
 
 	cntSet := 0
+
 	for i := uint64(0); i < b.Len(); i++ {
 		if _, exists := unique[int(i)]; exists {
 			cntSet++
@@ -44,6 +47,7 @@ func TestBitmap_Extend(t *testing.T) {
 		{8, 35},
 	}
 	b := Bitmap{}
+
 	for _, dt := range data {
 		b.Set(uint64(dt[0]))
 		assert.True(t, b.Len() == uint64(dt[1])*8, dt[0])

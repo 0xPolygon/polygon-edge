@@ -19,7 +19,9 @@ func (b *Bitmap) IsSet(idx uint64) bool {
 	if length := b.Len(); length <= idx {
 		return false
 	}
+
 	bit := uint8(1 << (idx % 8))
+
 	return (*b)[idx/8]&bit == bit
 }
 
@@ -30,5 +32,6 @@ func extendByteSlice(b []byte, needLen int) []byte {
 	if n := needLen - len(b); n > 0 {
 		b = append(b, make([]byte, n)...)
 	}
+
 	return b
 }
