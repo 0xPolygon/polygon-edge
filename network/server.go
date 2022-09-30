@@ -262,7 +262,7 @@ func (s *Server) Start() error {
 	}
 
 	go s.runDial()
-	go s.keepAlivePeerConnections()
+	go s.keepAliveMinimumPeerConnections()
 
 	// watch for disconnected peers
 	s.host.Network().Notify(&network.NotifyBundle{
@@ -318,8 +318,9 @@ func (s *Server) setupBootnodes() error {
 	return nil
 }
 
-// keepAlivePeerConnections will attempt to make new connections if the active peer count is lesser than the specified limit.
-func (s *Server) keepAlivePeerConnections() {
+// keepAliveMinimumPeerConnections will attempt to make new connections
+// if the active peer count is lesser than the specified limit.
+func (s *Server) keepAliveMinimumPeerConnections() {
 	for {
 		select {
 		case <-time.After(10 * time.Second):
