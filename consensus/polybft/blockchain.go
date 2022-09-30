@@ -5,10 +5,9 @@ import (
 	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
+	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/core/vm"
-	"github.com/ethereum/go-ethereum/event"
+	"github.com/maticnetwork/bor/core"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/contract"
 )
@@ -40,13 +39,13 @@ type blockchainBackend interface {
 	NewBlockBuilder(parent *types.Header) (blockBuilder, error)
 
 	// ProcessBlock builds a final block from given 'block' on top of 'parent'.
-	ProcessBlock(parent *types.Header, block *types.Block) (*blockbuilder.StateBlock, error)
+	ProcessBlock(parent *types.Header, block *types.Block) (*StateBlock, error)
 
 	// GetStateProviderForBlock returns a reference to make queries to the state at 'block'.
 	GetStateProviderForBlock(block *types.Header) (contract.Provider, error)
 
 	// GetStateProviderForDB returns a reference to make queries to the provided state.
-	GetStateProviderForDB(state vm.StateDB) contract.Provider
+	GetStateProviderForDB(transition *state.Transition) contract.Provider
 
 	// GetHeaderByNumber returns a reference to block header for the given block number.
 	GetHeaderByNumber(number uint64) (*types.Header, bool)
@@ -55,7 +54,7 @@ type blockchainBackend interface {
 	GetHeaderByHash(hash types.Hash) (*types.Header, bool)
 
 	// SubscribeChainHeadEvent subscribes to block insert event on chain.
-	SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription
+	// SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription
 
 	// GetSystemState creates a new instance of SystemState interface
 	GetSystemState(config *PolyBFTConfig, provider contract.Provider) SystemState
@@ -81,7 +80,7 @@ func (p *blockchainWrapper) CurrentHeader() *types.Header {
 }
 
 // CommitBlock commits a block to the chain
-func (p *blockchainWrapper) CommitBlock(stateBlock *blockbuilder.StateBlock) error {
+func (p *blockchainWrapper) CommitBlock(stateBlock *StateBlock) error {
 	logs := buildLogsFromReceipts(stateBlock.Receipts, stateBlock.Block.GetHeader())
 	status, err := p.blockchain.WriteBlockAndSetHead(stateBlock.Block, stateBlock.Receipts, logs, stateBlock.State, true)
 	if err != nil {
@@ -143,7 +142,6 @@ func (p *blockchainWrapper) ProcessBlock(parent *types.Header, block *types.Bloc
 		return nil, fmt.Errorf("incorrect state root: (%s, %s)", root, block.Root())
 	}
 
-
 	// build the final block: Nemanja it is the same as propsal since there is no transactions
 	found := NewFinalBlock(header, block.Transactions, receipts)
 	if found.Hash() != block.Hash() {
@@ -159,23 +157,25 @@ func (p *blockchainWrapper) ProcessBlock(parent *types.Header, block *types.Bloc
 }
 
 // SubscribeChainHeadEvent is an implementation of blockchain interface
-func (p *blockchainWrapper) SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription {
-	return p.blockchain.SubscribeChainHeadEvent(ch)
-}
+// func (p *blockchainWrapper) SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription {
+// 	return p.blockchain.SubscribeChainHeadEvent(ch)
+// }
 
 // StateAt is an implementation of blockchain interface
 func (p *blockchainWrapper) GetStateProviderForBlock(block *types.Header) (contract.Provider, error) {
+	// TODO: executor.BeginTxn(block.StateRoot,...)
+	// this returns transition object for given StateRoot
 	state, err := p.blockchain.StateAt(block.StateRoot)
 	if err != nil {
 		return nil, fmt.Errorf("state not found") // this is critical
 	}
 
-	return NewStateProvider(state, p.blockchain.Config()), nil
+	return NewStateProvider(transition), nil
 }
 
 // GetStateProviderForDB returns a reference to make queries to the provided state
-func (p *blockchainWrapper) GetStateProviderForDB(state vm.StateDB) contract.Provider {
-	return NewStateProvider(state, p.blockchain.Config())
+func (p *blockchainWrapper) GetStateProviderForDB(transition *state.Transition) contract.Provider {
+	return NewStateProvider(transition)
 }
 
 // GetHeaderByNumber is an implementation of blockchain interface
@@ -196,13 +196,13 @@ func (p *blockchainWrapper) NewBlockBuilder(parent *types.Header) (blockBuilder,
 	}
 
 	return NewBlockBuilder(&BlockBuilderParams{
-		Parent:        parent,
-		Coinbase:      p.coinbase,
-		ChainConfig:   p.blockchain.Config(),
+		Parent:      parent,
+		Coinbase:    p.coinbase,
+		ChainConfig: p.blockchain.Config(),
 		//ChainContext:  p.blockchain,
 		//TxPoolFactory: blockbuilder.NewEthTxPool(p.eth.TxPool()),
-		StateDB:       stt,
-		GasLimit:      100000000000 // TO DO Nemanja - see what to do with this (p.eth.GenesisGasLimit(),)
+		StateDB:  stt,
+		GasLimit: 100000000000, // TO DO Nemanja - see what to do with this (p.eth.GenesisGasLimit(),)
 	}), nil
 }
 
@@ -217,29 +217,29 @@ func (p *blockchainWrapper) OnNewBlockInserted(block *types.Block) {
 	//p.eth.BroadcastBlock(block, true)
 }
 
+var _ contract.Provider = &stateProvider{}
+
 type stateProvider struct {
-	vm *vm.EVM
+	transition *state.Transition
 }
 
 // NewStateProvider initializes EVM against given state and chain config and returns stateProvider instance
 // which is an abstraction for smart contract calls
-func NewStateProvider(state vm.StateDB, config *params.ChainConfig) contract.Provider {
-	ctx := core.NewEVMBlockContext(&types.Header{Number: big.NewInt(0), Difficulty: big.NewInt(0)}, nil, &types.Address{})
-	evm := vm.NewEVM(ctx, vm.TxContext{}, state, config, vm.Config{NoBaseFee: true})
-	return &stateProvider{vm: evm}
+func NewStateProvider(transition *state.Transition) contract.Provider {
+	return &stateProvider{transition: transition}
 }
 
 // Call implements the contract.Provider interface to make contract calls directly to the state
 func (s *stateProvider) Call(addr ethgo.Address, input []byte, opts *contract.CallOpts) ([]byte, error) {
-	retVal, _, err := s.vm.Call(vm.AccountRef(types.Address{}), types.Address(addr), input, 10000000, big.NewInt(0))
-	if err != nil {
-		return nil, err
+	result := s.transition.Call2(types.ZeroAddress, types.Address(addr), input, big.NewInt(0), 10000000)
+	if result.Err != nil {
+		return nil, result.Err
 	}
-	return retVal, nil
+	return result.ReturnValue, nil
 }
 
 // Txn is part of the contract.Provider interface to make Ethereum transactions. We disable this function
 // since the system state does not make any transaction
-func (s *stateProvider) Txn(ethgo.Address, ethgo.Key, []byte, *contract.TxnOpts) (contract.Txn, error) {
+func (s *stateProvider) Txn(ethgo.Address, ethgo.Key, []byte) (contract.Txn, error) {
 	panic("we do not make transaction in system state")
 }

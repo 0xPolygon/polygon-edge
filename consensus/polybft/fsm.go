@@ -11,8 +11,9 @@ import (
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/ethereum/go-ethereum/core/vm"	
+	"github.com/ethereum/go-ethereum/core/vm"
 	hcf "github.com/hashicorp/go-hclog"
+	"github.com/maticnetwork/bor/rlp"
 	"github.com/umbracle/ethgo"
 )
 
@@ -157,11 +158,11 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 		h.MixHash = PolyMixDigest
 	})
 
-	f.block = stateBlock	
+	f.block = stateBlock
 
 	proposal := &pbft.Proposal{
 		Time: headerTime,
-		Data: stateBlock.Block.MarshalRLP(),,
+		Data: stateBlock.Block.MarshalRLP(),
 		Hash: f.block.Block.Hash().Bytes(),
 	}
 	f.proposal = proposal

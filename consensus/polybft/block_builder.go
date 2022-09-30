@@ -35,7 +35,7 @@ import (
 // 	WriteFailedReceipt(txn *types.Transaction) error
 // }
 
-// Params are fields for the block that cannot be changed
+// BlockBuilderParams are fields for the block that cannot be changed
 type BlockBuilderParams struct {
 	// Parent block
 	Parent *types.Header
@@ -111,16 +111,16 @@ type BlockBuilder struct {
 // and it has to clean any data
 func (b *BlockBuilder) Reset() {
 	b.header = &types.Header{
-		ParentHash:    b.params.Parent.Hash,
-		Number:        b.params.Parent.Number + 1,
-		Miner:         b.params.Coinbase[:],
-		Difficulty:    1,
-		ExtraData:     b.params.Extra,
-		StateRoot:     types.EmptyRootHash, // this avoids needing state for now
-		TxRoot:        types.EmptyRootHash,
-		ReceiptsRoots: types.EmptyRootHash, // this avoids needing state for now
-		Sha3Uncles:    types.EmptyUncleHash,
-		GasLimit:      b.params.GasLimit, //will need to adjust dynamically later.
+		ParentHash:   b.params.Parent.Hash,
+		Number:       b.params.Parent.Number + 1,
+		Miner:        b.params.Coinbase[:],
+		Difficulty:   1,
+		ExtraData:    b.params.Extra,
+		StateRoot:    types.EmptyRootHash, // this avoids needing state for now
+		TxRoot:       types.EmptyRootHash,
+		ReceiptsRoot: types.EmptyRootHash, // this avoids needing state for now
+		Sha3Uncles:   types.EmptyUncleHash,
+		GasLimit:     b.params.GasLimit, //will need to adjust dynamically later.
 		//BaseFee:    big.NewInt(100), // TODO: what is base fee
 	}
 
@@ -272,9 +272,9 @@ type StateBlock struct {
 }
 
 func NewFinalBlock(header *types.Header, txs []*types.Transaction, receipts []*types.Receipt) *types.Block {
-	b := &types.Block{header: header.Copy()}
+	b := &types.Block{Header: header.Copy()}
 	if len(txs) != len(receipts) {
-		panci("cannot create block: number of receipts and txs is not the same")
+		panic("cannot create block: number of receipts and txs is not the same")
 	}
 
 	// TO DO Nemanja - there are no thx and receipts, so leve everithing as default
