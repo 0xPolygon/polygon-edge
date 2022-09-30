@@ -13,16 +13,17 @@ import (
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/proto"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/network"
-	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/syncer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/umbracle/ethgo"
 )
 
 const (
@@ -31,24 +32,32 @@ const (
 )
 
 type signKey struct {
-	key  *ecdsa.PrivateKey
-	addr pbft.NodeID
+	raw *wallet.Account
 }
 
-func newSignKey(key *ecdsa.PrivateKey) *signKey {
-	addr, err := crypto.GetAddressFromKey(key)
+func newSignKey(raw *wallet.Account) *signKey {
+	return &signKey{raw}
+}
+
+func (k signKey) String() string {
+	return k.raw.Ecdsa.Address().String()
+}
+
+func (k signKey) Address() ethgo.Address {
+	return k.raw.Ecdsa.Address()
+}
+
+func (k signKey) NodeID() pbft.NodeID {
+	return pbft.NodeID(k.String())
+}
+
+func (k signKey) Sign(b []byte) ([]byte, error) {
+	s, err := k.raw.Bls.Sign(b)
 	if err != nil {
-		panic(fmt.Errorf("BUG: %v", err))
+		return nil, err
 	}
-	return &signKey{key: key, addr: pbft.NodeID(addr.String())}
-}
 
-func (s *signKey) NodeID() pbft.NodeID {
-	return s.addr
-}
-
-func (s *signKey) Sign(b []byte) ([]byte, error) {
-	return crypto.Sign(s.key, b)
+	return s.Marshal()
 }
 
 type validator struct {
@@ -97,16 +106,12 @@ func Factory(params *consensus.Params) (consensus.Consensus, error) {
 
 	// panic("x")
 
-	keyBytes, err := params.SecretsManager.GetSecret(secrets.ValidatorKey)
-	if err != nil {
-		return nil, err
-	}
-	ecdsaKey, err := crypto.BytesToECDSAPrivateKey(keyBytes)
+	account, err := wallet.GenerateAccountFromSecrets(params.SecretsManager)
 	if err != nil {
 		return nil, err
 	}
 
-	key := newSignKey(ecdsaKey)
+	key := newSignKey(account)
 	engine := pbft.New(key,
 		&pbftTransport{topic: topic},
 		pbft.WithLogger(params.Logger.Named("engine").StandardLogger(&hclog.StandardLoggerOptions{})),
@@ -140,7 +145,7 @@ func Factory(params *consensus.Params) (consensus.Consensus, error) {
 		blockTime:  time.Duration(params.BlockTime),
 		syncer:     sync,
 		pbft:       engine,
-		ecdsaKey:   ecdsaKey,
+		account:    account,
 	}
 	return polybft, nil
 }
@@ -172,8 +177,8 @@ type Polybft struct {
 	// topic for pbft consensus
 	pbftTopic *network.Topic
 
-	// signing key
-	ecdsaKey *ecdsa.PrivateKey
+	// ecdsa and bls signing keys
+	account *wallet.Account
 
 	// validatorSet is fixed
 	validatorSet *validatorSet
