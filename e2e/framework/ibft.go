@@ -130,7 +130,7 @@ func (m *IBFTServersManager) GetServer(i int) *TestServer {
 
 func initLogsDir(t *testing.T) (string, error) {
 	t.Helper()
-	logsDir := path.Join("..", "e2e-logs", fmt.Sprintf("e2e-logs-%d-%s", startTime, t.Name()))
+	logsDir := path.Join("..", "e2e-logs", fmt.Sprintf("e2e-logs-%d", startTime), t.Name())
 
 	if err := os.MkdirAll(logsDir, 0755); err != nil {
 		return "", err
