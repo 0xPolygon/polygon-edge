@@ -7,7 +7,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/maticnetwork/bor/core"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/contract"
 )
@@ -26,9 +25,6 @@ import (
 
 // blockchain is an interface that wraps the methods called on blockchain
 type blockchainBackend interface {
-	// OnNewBlockInserted is invoked when new block is finalized by consensus protocol.
-	OnNewBlockInserted(block *types.Block)
-
 	// CurrentHeader returns the header of blockchain block head
 	CurrentHeader() *types.Header
 
@@ -44,17 +40,14 @@ type blockchainBackend interface {
 	// GetStateProviderForBlock returns a reference to make queries to the state at 'block'.
 	GetStateProviderForBlock(block *types.Header) (contract.Provider, error)
 
-	// GetStateProviderForDB returns a reference to make queries to the provided state.
-	GetStateProviderForDB(transition *state.Transition) contract.Provider
+	// GetStateProvider returns a reference to make queries to the provided state.
+	GetStateProvider(transition *state.Transition) contract.Provider
 
 	// GetHeaderByNumber returns a reference to block header for the given block number.
 	GetHeaderByNumber(number uint64) (*types.Header, bool)
 
 	// GetHeaderByHash returns a reference to block header for the given block hash
 	GetHeaderByHash(hash types.Hash) (*types.Header, bool)
-
-	// SubscribeChainHeadEvent subscribes to block insert event on chain.
-	// SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription
 
 	// GetSystemState creates a new instance of SystemState interface
 	GetSystemState(config *PolyBFTConfig, provider contract.Provider) SystemState
@@ -70,8 +63,7 @@ var _ blockchainBackend = &blockchainWrapper{}
 
 type blockchainWrapper struct {
 	blockchain *blockchain.Blockchain
-	//eth        ethereumBackend
-	coinbase types.Address
+	coinbase   types.Address
 }
 
 // CurrentHeader returns the header of blockchain block head
@@ -81,13 +73,19 @@ func (p *blockchainWrapper) CurrentHeader() *types.Header {
 
 // CommitBlock commits a block to the chain
 func (p *blockchainWrapper) CommitBlock(stateBlock *StateBlock) error {
-	logs := buildLogsFromReceipts(stateBlock.Receipts, stateBlock.Block.GetHeader())
-	status, err := p.blockchain.WriteBlockAndSetHead(stateBlock.Block, stateBlock.Receipts, logs, stateBlock.State, true)
-	if err != nil {
+
+	if err := p.blockchain.WriteBlock(stateBlock.Block, "consensus"); err != nil {
 		return err
-	} else if status != core.CanonStatTy {
-		return fmt.Errorf("non canonical change")
 	}
+
+	// logs := buildLogsFromReceipts(stateBlock.Receipts, stateBlock.Block.GetHeader())
+	// status, err := p.blockchain.WriteBlockAndSetHead(stateBlock.Block, stateBlock.Receipts, logs, stateBlock.State, true)
+	// if err != nil {
+	// 	return err
+	// } else if status != core.CanonStatTy {
+	// 	return fmt.Errorf("non canonical change")
+	// }
+
 	return nil
 }
 
@@ -102,20 +100,20 @@ func (p *blockchainWrapper) SetCoinbase(coinbase types.Address) {
 }
 
 // ProcessBlock builds a final block from given 'block' on top of 'parent'
-func (p *blockchainWrapper) ProcessBlock(parent *types.Header, block *types.Block) (*blockbuilder.StateBlock, error) {
+func (p *blockchainWrapper) ProcessBlock(parent *types.Header, block *types.Block) (*StateBlock, error) {
 	// TODO: Call validate block in polybft
 
-	state, err := p.blockchain.StateAt(parent.Root)
-	if err != nil {
-		return nil, err
-	}
+	// state, err := p.blockchain.StateAt(parent.Root)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
 	// TO DO Nemanja - no transactions for now, leave empty receipts
 	var receipts []*types.Receipt
 
 	// var usedGas uint64
 	// gasPool := core.GasPool(block.GasLimit)
-	// header := block.Header()
+	header := block.Header
 
 	// for index, txn := range block.Transactions() {
 	// 	state.Prepare(txn.Hash(), index)
@@ -137,10 +135,10 @@ func (p *blockchainWrapper) ProcessBlock(parent *types.Header, block *types.Bloc
 	// }
 
 	// build the state
-	root := state.IntermediateRoot(true)
-	if root != block.Header.StateRoot {
-		return nil, fmt.Errorf("incorrect state root: (%s, %s)", root, block.Root())
-	}
+	// root := state.IntermediateRoot(true)
+	// if root != block.Header.StateRoot {
+	// 	return nil, fmt.Errorf("incorrect state root: (%s, %s)", root, block.Root())
+	// }
 
 	// build the final block: Nemanja it is the same as propsal since there is no transactions
 	found := NewFinalBlock(header, block.Transactions, receipts)
@@ -148,24 +146,20 @@ func (p *blockchainWrapper) ProcessBlock(parent *types.Header, block *types.Bloc
 		return nil, fmt.Errorf("incorrect block hash: (%s, %s)", found.Hash(), block.Hash())
 	}
 
-	builtBlock := &blockbuilder.StateBlock{
+	builtBlock := &StateBlock{
 		Block:    found,
 		Receipts: receipts,
-		State:    state,
+		State:    nil,
 	}
+
 	return builtBlock, nil
 }
-
-// SubscribeChainHeadEvent is an implementation of blockchain interface
-// func (p *blockchainWrapper) SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription {
-// 	return p.blockchain.SubscribeChainHeadEvent(ch)
-// }
 
 // StateAt is an implementation of blockchain interface
 func (p *blockchainWrapper) GetStateProviderForBlock(block *types.Header) (contract.Provider, error) {
 	// TODO: executor.BeginTxn(block.StateRoot,...)
 	// this returns transition object for given StateRoot
-	state, err := p.blockchain.StateAt(block.StateRoot)
+	state, err := p.blockchain.Transition(block.StateRoot)
 	if err != nil {
 		return nil, fmt.Errorf("state not found") // this is critical
 	}
@@ -173,8 +167,8 @@ func (p *blockchainWrapper) GetStateProviderForBlock(block *types.Header) (contr
 	return NewStateProvider(transition), nil
 }
 
-// GetStateProviderForDB returns a reference to make queries to the provided state
-func (p *blockchainWrapper) GetStateProviderForDB(transition *state.Transition) contract.Provider {
+// GetStateProvider returns a reference to make queries to the provided state
+func (p *blockchainWrapper) GetStateProvider(transition *state.Transition) contract.Provider {
 	return NewStateProvider(transition)
 }
 
@@ -190,7 +184,7 @@ func (p *blockchainWrapper) GetHeaderByHash(hash types.Hash) (*types.Header, boo
 
 // NewBlockBuilder is an implementation of blockchain interface
 func (p *blockchainWrapper) NewBlockBuilder(parent *types.Header) (blockBuilder, error) {
-	stt, err := p.blockchain.StateAt(parent.Root)
+	transition, err := p.blockchain.StateAt(parent.StateRoot)
 	if err != nil {
 		return nil, fmt.Errorf("state not found") // this is critical
 	}
@@ -201,20 +195,14 @@ func (p *blockchainWrapper) NewBlockBuilder(parent *types.Header) (blockBuilder,
 		ChainConfig: p.blockchain.Config(),
 		//ChainContext:  p.blockchain,
 		//TxPoolFactory: blockbuilder.NewEthTxPool(p.eth.TxPool()),
-		StateDB:  stt,
-		GasLimit: 100000000000, // TO DO Nemanja - see what to do with this (p.eth.GenesisGasLimit(),)
+		State:    transition,
+		GasLimit: 10000000, // TO DO Nemanja - see what to do with this (p.eth.GenesisGasLimit(),)
 	}), nil
 }
 
 // GetSystemState is an implementation of blockchain interface
-func (p *blockchainWrapper) GetSystemState(config *params.PolyBFTConfig, provider contract.Provider) SystemState {
+func (p *blockchainWrapper) GetSystemState(config *PolyBFTConfig, provider contract.Provider) SystemState {
 	return NewSystemState(config, provider)
-}
-
-// OnNewBlockInserted is an implementation of blockchain interface
-func (p *blockchainWrapper) OnNewBlockInserted(block *types.Block) {
-	// TO DO Nemanja - probably we do not need this method
-	//p.eth.BroadcastBlock(block, true)
 }
 
 var _ contract.Provider = &stateProvider{}
@@ -231,7 +219,9 @@ func NewStateProvider(transition *state.Transition) contract.Provider {
 
 // Call implements the contract.Provider interface to make contract calls directly to the state
 func (s *stateProvider) Call(addr ethgo.Address, input []byte, opts *contract.CallOpts) ([]byte, error) {
+
 	result := s.transition.Call2(types.ZeroAddress, types.Address(addr), input, big.NewInt(0), 10000000)
+
 	if result.Err != nil {
 		return nil, result.Err
 	}

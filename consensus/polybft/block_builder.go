@@ -40,6 +40,8 @@ type BlockBuilderParams struct {
 	// Parent block
 	Parent *types.Header
 
+	State *state.Transition
+
 	// Coinbase that is signing the block
 	Coinbase types.Address
 
@@ -104,7 +106,7 @@ type BlockBuilder struct {
 	// block is a reference to the already built block
 	block *types.Block
 
-	state state.Snapshot
+	state *state.Transition
 }
 
 // Reset is used to indicate that the current block building has been interrupted
@@ -129,9 +131,11 @@ func (b *BlockBuilder) Reset() {
 	b.receipts = []*types.Receipt{}
 
 	// b.signer = types.MakeSigner(b.params.ChainConfig, b.header.Number)
-	// b.state = b.params.StateDB.Copy()
 
-	b.state = nil // TODO: build snapshot somehow from  b.params (by using state.NewSnapshotAt?)
+	// should this be copied? probably not
+	b.state = b.params.State
+
+	b.state = &state.Transition{} // TODO: build snapshot somehow from  b.params (by using state.NewSnapshotAt?)
 }
 
 // Block returns the built block if nil, it is not built yet
@@ -161,7 +165,7 @@ func (b *BlockBuilder) Build(handler func(h *types.Header)) *StateBlock {
 	return &StateBlock{
 		Block:    b.block,
 		Receipts: b.receipts,
-		State:    nil, // b.state, // TODO: somehow pass the trie
+		State:    nil, // TO DO Nemanja - fix this somehow
 	}
 }
 
@@ -260,7 +264,7 @@ func (b *BlockBuilder) writeTransaction(
 */
 
 // GetState returns StateDB reference
-func (b *BlockBuilder) GetState() state.Snapshot {
+func (b *BlockBuilder) GetState() *state.Transition {
 	return b.state
 }
 
@@ -268,7 +272,7 @@ func (b *BlockBuilder) GetState() state.Snapshot {
 type StateBlock struct {
 	Block    *types.Block
 	Receipts []*types.Receipt
-	State    state.Snapshot
+	State    *state.Transition
 }
 
 func NewFinalBlock(header *types.Header, txs []*types.Transaction, receipts []*types.Receipt) *types.Block {

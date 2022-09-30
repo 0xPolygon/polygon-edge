@@ -7,6 +7,8 @@ import (
 	"crypto/ecdsa"
 	"encoding/json"
 	"fmt"
+	"time"
+
 	"github.com/0xPolygon/pbft-consensus"
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/consensus"
@@ -21,7 +23,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"time"
 )
 
 const (

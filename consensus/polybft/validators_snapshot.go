@@ -2,22 +2,23 @@ package polybft
 
 import (
 	"fmt"
+	"sync"
+
 	"github.com/0xPolygon/polygon-edge/types"
 	hcf "github.com/hashicorp/go-hclog"
-	"sync"
 )
 
 type validatorsSnapshotCache struct {
 	snapshots  map[uint64]AccountSet
 	state      *State
 	epochSize  uint64
-	blockchain blockchain
+	blockchain blockchainBackend
 	lock       sync.Mutex
 	logger     hcf.Logger
 }
 
 // newValidatorsSnapshotCache initializes a new instance of validatorsSnapshotCache
-func newValidatorsSnapshotCache(state *State, epochSize uint64, blockchain blockchain) *validatorsSnapshotCache {
+func newValidatorsSnapshotCache(state *State, epochSize uint64, blockchain blockchainBackend) *validatorsSnapshotCache {
 	return &validatorsSnapshotCache{
 		snapshots:  map[uint64]AccountSet{},
 		state:      state,
@@ -153,12 +154,12 @@ func (v *validatorsSnapshotCache) computeSnapshot(
 		}
 	}
 	if header == nil {
-		header = v.blockchain.GetHeaderByNumber(epochEndBlockNumber)
+		if _, ok := v.blockchain.GetHeaderByNumber(epochEndBlockNumber); ok {
+			return nil, fmt.Errorf("unknown block. Block number=%v", epochEndBlockNumber)
+		}
 	}
-	if header == nil {
-		return nil, fmt.Errorf("unknown block. Block number=%v", epochEndBlockNumber)
-	}
-	extra, err := GetIbftExtra(header.Extra)
+
+	extra, err := GetIbftExtra(header.ExtraData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode extra from the block#%d: %v", header.Number, err)
 	}

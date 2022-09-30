@@ -17,7 +17,7 @@ type eventSubscription interface {
 
 type eventTracker struct {
 	dataDir    string
-	config     *params.PolyBFTConfig
+	config     *PolyBFTConfig
 	subscriber eventSubscription
 	logger     hcf.Logger
 }

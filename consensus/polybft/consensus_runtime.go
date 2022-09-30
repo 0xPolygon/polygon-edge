@@ -9,6 +9,7 @@ import (
 
 	"github.com/0xPolygon/pbft-consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
+	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/types"
 	hcf "github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
@@ -60,12 +61,12 @@ type epochMetadata struct {
 
 // runtimeConfig is a struct that holds configuration data for given consensus runtime
 type runtimeConfig struct {
-	PolyBFTConfig  *params.PolyBFTConfig
+	PolyBFTConfig  *PolyBFTConfig
 	DataDir        string
 	Transport      Transport
 	Key            *key
 	State          *State
-	blockchain     blockchain
+	blockchain     blockchainBackend
 	polybftBackend polybftBackend
 }
 
@@ -150,9 +151,9 @@ func (c *consensusRuntime) AddLog(eventLog *ethgo.Log) {
 }
 
 // NotifyProposalInserted is an implementation of fsmNotify interface
-func (c *consensusRuntime) NotifyProposalInserted(b *blockbuilder.StateBlock) {
-	lastHeader := b.Block.GetHeader()
-	if c.isEndOfEpoch(lastHeader.Number.Uint64()) {
+func (c *consensusRuntime) NotifyProposalInserted(b *StateBlock) {
+	lastHeader := b.Block.Header
+	if c.isEndOfEpoch(lastHeader.Number) {
 		// reset the epoch. Internally it updates the parent block header.
 		if err := c.restartEpoch(lastHeader); err != nil {
 			c.logger.Error("failed to restart epoch after block inserted", "err", err)
@@ -162,7 +163,8 @@ func (c *consensusRuntime) NotifyProposalInserted(b *blockbuilder.StateBlock) {
 		c.lastBuiltBlock = lastHeader
 	}
 
-	c.config.blockchain.OnNewBlockInserted(b.Block)
+	// TO DO Nemanja - probably no need for this
+	//c.config.blockchain.OnNewBlockInserted(b.Block)
 }
 
 // FSM creates a new instance of fsm
@@ -191,7 +193,7 @@ func (c *consensusRuntime) FSM() (*fsm, error) {
 		backend:        c.config.blockchain,
 		polybftBackend: c.config.polybftBackend,
 		blockBuilder:   blockBuilder,
-		validators:     newValidatorSet(parent.Coinbase, epoch.Validators),
+		validators:     newValidatorSet(types.BytesToAddress(parent.Miner), epoch.Validators), // TO DO Nemanja - check this
 		isEndOfEpoch:   isEndOfEpoch,
 		isEndOfSprint:  isEndOfSprint,
 		epoch:          epoch.Number,
@@ -332,7 +334,7 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) error {
 		}
 	*/
 
-	validatorSet, err := c.config.polybftBackend.GetValidators(c.lastBuiltBlock.Number.Uint64(), nil)
+	validatorSet, err := c.config.polybftBackend.GetValidators(c.lastBuiltBlock.Number, nil)
 	if err != nil {
 		return err
 	}
@@ -438,25 +440,28 @@ func (c *consensusRuntime) buildBundles(epoch *epochMetadata, commitmentMsg *Com
 	}
 
 	bundleProofs := []*BundleProof{}
-	startBundleIdx := commitmentMsg.GetBundleIdxFromStateSyncEventIdx(stateSyncExecutionIndex)
-	for idx := startBundleIdx; idx < commitmentMsg.BundlesCount(); idx++ {
-		p, err := epoch.Commitment.MerkleTrie.GenerateProof(uint(idx))
-		if err != nil {
-			return err
-		}
 
-		events, err := c.getStateSyncEventsForBundle(commitmentMsg.GetFirstStateSyncIndexFromBundleIndex(idx),
-			commitmentMsg.BundleSize)
-		if err != nil {
-			return err
-		}
+	// TO DO Nemanja - fix this with new merkle trie
 
-		bundleProofs = append(bundleProofs,
-			&BundleProof{
-				Proof:      p,
-				StateSyncs: events,
-			})
-	}
+	//startBundleIdx := commitmentMsg.GetBundleIdxFromStateSyncEventIdx(stateSyncExecutionIndex)
+	// for idx := startBundleIdx; idx < commitmentMsg.BundlesCount(); idx++ {
+	// 	p, err := epoch.Commitment.MerkleTrie.GenerateProof(uint(idx))
+	// 	if err != nil {
+	// 		return err
+	// 	}
+
+	// 	events, err := c.getStateSyncEventsForBundle(commitmentMsg.GetFirstStateSyncIndexFromBundleIndex(idx),
+	// 		commitmentMsg.BundleSize)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+
+	// 	bundleProofs = append(bundleProofs,
+	// 		&BundleProof{
+	// 			Proof:      p,
+	// 			StateSyncs: events,
+	// 		})
+	// }
 
 	return c.state.insertBundles(bundleProofs)
 }
@@ -584,7 +589,7 @@ func (c *consensusRuntime) runCheckpoint(epoch *epochMetadata) error {
 
 // getLatestSprintBlockNumber returns latest sprint block number
 func (c *consensusRuntime) getLatestSprintBlockNumber() uint64 {
-	lastBuiltBlockNumber := c.lastBuiltBlock.Number.Uint64()
+	lastBuiltBlockNumber := c.lastBuiltBlock.Number
 	sprintSizeMod := lastBuiltBlockNumber % c.config.PolyBFTConfig.SprintSize
 	if sprintSizeMod == 0 {
 		return lastBuiltBlockNumber
@@ -607,7 +612,7 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header) (*UptimeC
 	}
 
 	calculateUptimeForBlock := func(header *types.Header, validators AccountSet) error {
-		blockExtra, err := GetIbftExtra(header.Extra)
+		blockExtra, err := GetIbftExtra(header.ExtraData)
 		if err != nil {
 			return err
 		}
@@ -623,17 +628,18 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header) (*UptimeC
 		return nil
 	}
 
-	firstBlockInEpoch := calculateFirstBlockOfPeriod(currentBlock.Number.Uint64(), c.config.PolyBFTConfig.EpochSize)
+	firstBlockInEpoch := calculateFirstBlockOfPeriod(currentBlock.Number, c.config.PolyBFTConfig.EpochSize)
 	lastBlockInPreviousEpoch := firstBlockInEpoch - 1
 
 	blockHeader := currentBlock
 	validators := epoch.Validators
-	for blockHeader.Number.Uint64() > firstBlockInEpoch {
+	for blockHeader.Number > firstBlockInEpoch {
 		if err := calculateUptimeForBlock(blockHeader, validators); err != nil {
 			return nil, err
 		}
 
-		blockHeader = c.config.blockchain.GetHeaderByNumber(blockHeader.Number.Uint64() - 1)
+		// blockHeader, ok := c.config.blockchain.GetHeaderByNumber(blockHeader.Number - 1)
+		_, _ = c.config.blockchain.GetHeaderByNumber(blockHeader.Number - 1)
 	}
 
 	// since we need to calculate uptime for the last block of the previous epoch,
@@ -641,7 +647,7 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header) (*UptimeC
 	// this is something that should probably be optimized
 	if lastBlockInPreviousEpoch > 0 { // do not calculate anything for genesis block
 		for i := 0; i < uptimeLookbackSize; i++ {
-			validators, err := c.config.polybftBackend.GetValidators(blockHeader.Number.Uint64()-2, nil)
+			validators, err := c.config.polybftBackend.GetValidators(blockHeader.Number-2, nil)
 			if err != nil {
 				return nil, err
 			}
@@ -649,7 +655,9 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header) (*UptimeC
 			if err := calculateUptimeForBlock(blockHeader, validators); err != nil {
 				return nil, err
 			}
-			blockHeader = c.config.blockchain.GetHeaderByNumber(blockHeader.Number.Uint64() - 1)
+
+			//blockHeader, ok := c.config.blockchain.GetHeaderByNumber(blockHeader.Number - 1)
+			_, _ = c.config.blockchain.GetHeaderByNumber(blockHeader.Number - 1)
 		}
 	}
 
@@ -658,7 +666,12 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header) (*UptimeC
 
 // setIsValidator updates the isValidator field
 func (c *consensusRuntime) setIsValidator(isValidator bool) {
-	atomic.StoreUint32(&c.isValidator, uint32(math.BoolToInteger(isValidator)))
+
+	if isValidator {
+		atomic.StoreUint32(&c.isValidator, 1)
+	} else {
+		atomic.StoreUint32(&c.isValidator, 0)
+	}
 }
 
 // isValidatorNode indicates if node is in validator set or not
@@ -668,7 +681,7 @@ func (c *consensusRuntime) isValidatorNode() bool {
 
 // getPendingBlockNumber returns block number currently being built (last built block number + 1)
 func (c *consensusRuntime) getPendingBlockNumber() uint64 {
-	return c.lastBuiltBlock.Number.Uint64() + 1
+	return c.lastBuiltBlock.Number + 1
 }
 
 // isEndOfEpoch checks if an end of an epoch is reached with the current block
@@ -743,7 +756,8 @@ func (c *consensusRuntime) getCommitmentToRegister(epoch *epochMetadata,
 	}
 
 	commitmentMessage := NewCommitmentMessage(
-		epoch.Commitment.MerkleTrie.Trie.Hash(),
+		//epoch.Commitment.MerkleTrie.Trie.Hash(),
+		types.EmptyRootHash, // TO DO Nemanja - fix this with bridge
 		registerCommitmentIndex,
 		registerCommitmentIndex+stateSyncMainBundleSize-1,
 		epoch.Number,
@@ -777,17 +791,19 @@ func createStateTransaction(
 // createStateTransactionWithData creates a state transaction
 // with provided target address and inputData parameter which is ABI encoded byte array.
 func createStateTransactionWithData(target types.Address, inputData []byte, gasLimit uint64) *types.Transaction {
-	return types.NewTx(
-		&types.StateTransaction{
-			To:    target,
-			Input: inputData,
-			Gas:   gasLimit,
-		})
+	// return types.NewTx(
+	// 	&types.StateTransaction{
+	// 		To:    target,
+	// 		Input: inputData,
+	// 		Gas:   gasLimit,
+	// 	})
+	// TO DO Nemanja - fix this with bridge
+	return nil
 }
 
 func validateVote(vote *MessageSignature, epoch *epochMetadata) error {
 	// get senders address
-	senderAddress := types.HexToAddress(string(vote.From))
+	senderAddress := types.StringToAddress(string(vote.From))
 	if !epoch.Validators.ContainsAddress(senderAddress) {
 		return fmt.Errorf(
 			"message is received from sender %s, which is not in current validator set",

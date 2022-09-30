@@ -1,19 +1,17 @@
 package polybft
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"time"
 
 	"github.com/0xPolygon/pbft-consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
+	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/ethereum/go-ethereum/core/vm"
 	hcf "github.com/hashicorp/go-hclog"
-	"github.com/maticnetwork/bor/rlp"
 	"github.com/umbracle/ethgo"
 )
 
@@ -24,7 +22,7 @@ type blockBuilder interface {
 	// CommitTransaction(tx *types.Transaction) error
 	// Fill(ctx context.Context) error
 	Build(func(h *types.Header)) *StateBlock
-	GetState() state.Snapshot
+	GetState() *state.Transition
 }
 
 const (
@@ -40,7 +38,7 @@ type fsm struct {
 	parent *types.Header
 
 	// backend implements methods for retrieving data from block chain
-	backend blockchain
+	backend blockchainBackend
 
 	// polybftBackend implements methods needed from the polybft
 	polybftBackend polybftBackend
@@ -146,9 +144,11 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 
 	// fill the block with transactions
 	now := time.Now()
-	if err := f.blockBuilder.Fill(context.Background()); err != nil {
-		return nil, err
-	}
+
+	// TO DO Nemanja - skip transactions
+	// if err := f.blockBuilder.Fill(context.Background()); err != nil {
+	// 	return nil, err
+	// }
 
 	f.logger.Debug("Fill block", "time", time.Since(now))
 
@@ -245,7 +245,7 @@ func (f *fsm) Validate(proposal *pbft.Proposal) error {
 	f.logger.Debug("[FSM Validate]", "Proposal hash", hex.EncodeToHex(proposal.Hash))
 
 	var block types.Block
-	if err := rlp.DecodeBytes(proposal.Data, &block); err != nil {
+	if err := block.UnmarshalRLP(proposal.Data); err != nil {
 		return fmt.Errorf("failed to decode block data. Error: %v", err)
 	}
 
@@ -316,10 +316,11 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 	commitmentMessageSignedExists := false
 	nextStateSyncBundleIndex := f.stateSyncExecutionIndex
 	for _, tx := range transactions {
+		// TO DO Nemanja - fix this with transactions
 		// skip if transaction is not of types.StateTransactionType type
-		if tx.Type != types.StateTransactionType {
-			continue
-		}
+		// if tx.Type != types.StateTransactionType {
+		// 	continue
+		// }
 
 		if !f.isEndOfSprint {
 			return fmt.Errorf("state transaction in block which should not contain it: tx = %v", tx.Hash)
@@ -461,8 +462,8 @@ func (f *fsm) IsStuck(num uint64) (uint64, bool) {
 }
 
 // getValidatorSetDelta calculates validator set delta based on parent and current header
-func (f *fsm) getValidatorSetDelta(pendingBlockState vm.StateDB) (*ValidatorSetDelta, error) {
-	provider := f.backend.GetStateProviderForDB(pendingBlockState)
+func (f *fsm) getValidatorSetDelta(pendingBlockState *state.Transition) (*ValidatorSetDelta, error) {
+	provider := f.backend.GetStateProvider(pendingBlockState)
 	systemState := f.backend.GetSystemState(f.config, provider)
 	newValidators, err := systemState.GetValidatorSet()
 	if err != nil {
