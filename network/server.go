@@ -332,7 +332,7 @@ func (s *Server) keepAliveMinimumPeerConnections() {
 			if s.config.NoDiscover || !s.bootnodes.hasBootnodes() {
 				// dial unconnected peer
 				randPeer := s.GetRandomPeer()
-				if !s.IsConnected(*randPeer) && randPeer != nil {
+				if randPeer != nil && !s.IsConnected(*randPeer) {
 					s.addToDialQueue(s.GetPeerInfo(*randPeer), common.PriorityRandomDial)
 				}
 			} else {
