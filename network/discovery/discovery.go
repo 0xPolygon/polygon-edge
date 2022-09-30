@@ -237,12 +237,6 @@ func (d *DiscoveryService) findPeersCall(
 	peerID peer.ID,
 	shouldCloseConn bool,
 ) ([]string, error) {
-	// If this is a temporary connection, make sure we're connected to the peer
-	if shouldCloseConn {
-		d.logger.Debug("creating new temporary dial to peer", "peer", peerID)
-		d.baseServer.TemporaryDialPeer(d.baseServer.GetPeerInfo(peerID))
-	}
-
 	clt, clientErr := d.baseServer.NewDiscoveryClient(peerID)
 	if clientErr != nil {
 		return nil, fmt.Errorf("unable to create new discovery client connection, %w", clientErr)
@@ -372,10 +366,16 @@ func (d *DiscoveryService) bootnodePeerDiscovery() {
 		}
 	}()
 
+	// Make sure we are peered with a bootnode
+	d.baseServer.TemporaryDialPeer(bootnode)
+
 	// Find peers from the referenced bootnode
 	foundNodes, err := d.findPeersCall(bootnode.ID, true)
 	if err != nil {
-		d.logger.Error("Unable to execute bootnode peer discovery, %w", err)
+		d.logger.Error("Unable to execute bootnode peer discovery",
+			"bootnode", bootnode.ID.String(),
+			"err", err.Error(),
+		)
 
 		return
 	}
