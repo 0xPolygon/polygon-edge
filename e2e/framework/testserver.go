@@ -192,7 +192,7 @@ func (t *TestServer) SecretsInit() (*InitIBFTResult, error) {
 	args = append(args, commandSlice...)
 	args = append(args, "--data-dir", filepath.Join(t.Config.IBFTDir, "tmp"))
 
-	cmd := exec.Command(binaryName, args...)
+	cmd := exec.Command(resolveBinary(), args...) //nolint:gosec
 	cmd.Dir = t.Config.RootDir
 
 	if _, err := cmd.Output(); err != nil {
@@ -333,7 +333,7 @@ func (t *TestServer) GenerateGenesis() error {
 	blockGasLimit := strconv.FormatUint(t.Config.BlockGasLimit, 10)
 	args = append(args, "--block-gas-limit", blockGasLimit)
 
-	cmd := exec.Command(binaryName, args...)
+	cmd := exec.Command(resolveBinary(), args...) //nolint:gosec
 	cmd.Dir = t.Config.RootDir
 
 	if t.Config.ShowsLog {
@@ -397,7 +397,7 @@ func (t *TestServer) Start(ctx context.Context) error {
 	t.ReleaseReservedPorts()
 
 	// Start the server
-	t.cmd = exec.Command(binaryName, args...)
+	t.cmd = exec.Command(resolveBinary(), args...) //nolint:gosec
 	t.cmd.Dir = t.Config.RootDir
 
 	if t.Config.ShowsLog {
@@ -452,7 +452,7 @@ func (t *TestServer) SwitchIBFTType(typ fork.IBFTType, from uint64, to, deployme
 	}
 
 	// Start the server
-	t.cmd = exec.Command(binaryName, args...)
+	t.cmd = exec.Command(resolveBinary(), args...) //nolint:gosec
 	t.cmd.Dir = t.Config.RootDir
 
 	if t.Config.ShowsLog {
@@ -711,4 +711,13 @@ func (t *TestServer) CallJSONRPC(req map[string]interface{}) map[string]interfac
 	}
 
 	return result
+}
+
+func resolveBinary() string {
+	bin := os.Getenv("EDGE_BINARY")
+	if bin != "" {
+		return bin
+	}
+	// fallback
+	return binaryName
 }

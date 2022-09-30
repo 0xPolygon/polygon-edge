@@ -536,7 +536,7 @@ func (s *Server) DisconnectFromPeer(peer peer.ID, reason string) {
 
 var (
 	// Anything below 35s is prone to false timeouts, as seen from empirical test data
-	DefaultJoinTimeout   = 40 * time.Second
+	DefaultJoinTimeout   = 100 * time.Second
 	DefaultBufferTimeout = DefaultJoinTimeout + time.Second*5
 )
 
