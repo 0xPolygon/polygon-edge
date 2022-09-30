@@ -3,8 +3,9 @@ package init
 import (
 	"fmt"
 
-	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/spf13/cobra"
+
+	"github.com/0xPolygon/polygon-edge/command"
 )
 
 const (
@@ -99,6 +100,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 	paramsList := newParamsList(basicParams, initNumber)
 	results := make(Results, len(paramsList))
+
 	for i, params := range paramsList {
 		if err := params.initSecrets(); err != nil {
 			outputter.SetError(err)
