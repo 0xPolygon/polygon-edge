@@ -16,7 +16,7 @@ func (b *Bitmap) Len() uint64 {
 }
 
 func (b *Bitmap) IsSet(idx uint64) bool {
-	if len := b.Len(); len <= idx {
+	if length := b.Len(); length <= idx {
 		return false
 	}
 	bit := uint8(1 << (idx % 8))

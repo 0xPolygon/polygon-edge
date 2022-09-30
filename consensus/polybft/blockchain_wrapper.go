@@ -29,7 +29,7 @@ type blockchainBackend interface {
 	CurrentHeader() *types.Header
 
 	// CommitBlock commits a block to the chain.
-	CommitBlock(stateBlock *StateBlock) error
+	CommitBlock(stateBlock *types.Block) error
 
 	// NewBlockBuilder is a factory method that returns a block builder on top of 'parent'.
 	NewBlockBuilder(parent *types.Header) (blockBuilder, error)
@@ -62,8 +62,9 @@ type blockchainBackend interface {
 var _ blockchainBackend = &blockchainWrapper{}
 
 type blockchainWrapper struct {
+	executor   *state.Executor
 	blockchain *blockchain.Blockchain
-	coinbase   types.Address
+	coinbase   types.Address // TODO: This is suspicious (shouldn't we use coinbase as Header.Miner field)?
 }
 
 // CurrentHeader returns the header of blockchain block head
@@ -72,21 +73,8 @@ func (p *blockchainWrapper) CurrentHeader() *types.Header {
 }
 
 // CommitBlock commits a block to the chain
-func (p *blockchainWrapper) CommitBlock(stateBlock *StateBlock) error {
-
-	if err := p.blockchain.WriteBlock(stateBlock.Block, "consensus"); err != nil {
-		return err
-	}
-
-	// logs := buildLogsFromReceipts(stateBlock.Receipts, stateBlock.Block.GetHeader())
-	// status, err := p.blockchain.WriteBlockAndSetHead(stateBlock.Block, stateBlock.Receipts, logs, stateBlock.State, true)
-	// if err != nil {
-	// 	return err
-	// } else if status != core.CanonStatTy {
-	// 	return fmt.Errorf("non canonical change")
-	// }
-
-	return nil
+func (p *blockchainWrapper) CommitBlock(block *types.Block) error {
+	return p.blockchain.WriteBlock(block, "consensus")
 }
 
 // PeersLen returns the number of peers the node is connected to
@@ -108,7 +96,7 @@ func (p *blockchainWrapper) ProcessBlock(parent *types.Header, block *types.Bloc
 	// 	return nil, err
 	// }
 
-	// TO DO Nemanja - no transactions for now, leave empty receipts
+	// TODO: Nemanja: no transactions for now, leave empty receipts
 	var receipts []*types.Receipt
 
 	// var usedGas uint64
@@ -155,15 +143,16 @@ func (p *blockchainWrapper) ProcessBlock(parent *types.Header, block *types.Bloc
 	return builtBlock, nil
 }
 
-// StateAt is an implementation of blockchain interface
-func (p *blockchainWrapper) GetStateProviderForBlock(block *types.Header) (contract.Provider, error) {
-	// TODO: executor.BeginTxn(block.StateRoot,...)
-	// this returns transition object for given StateRoot
-	state, err := p.blockchain.Transition(block.StateRoot)
-	if err != nil {
-		return nil, fmt.Errorf("state not found") // this is critical
+// GetStateProviderForBlock is an implementation of blockchainBackend interface
+func (p *blockchainWrapper) GetStateProviderForBlock(header *types.Header) (contract.Provider, error) {
+	parentHeader, found := p.GetHeaderByHash(header.ParentHash)
+	if !found {
+		return nil, fmt.Errorf("failed to retrieve parent header for hash %s", header.ParentHash.String())
 	}
-
+	transition, err := p.executor.BeginTxn(parentHeader.StateRoot, header, types.BytesToAddress(header.Miner))
+	if err != nil {
+		return nil, err
+	}
 	return NewStateProvider(transition), nil
 }
 
@@ -172,23 +161,26 @@ func (p *blockchainWrapper) GetStateProvider(transition *state.Transition) contr
 	return NewStateProvider(transition)
 }
 
-// GetHeaderByNumber is an implementation of blockchain interface
+// GetHeaderByNumber is an implementation of blockchainBackend interface
 func (p *blockchainWrapper) GetHeaderByNumber(number uint64) (*types.Header, bool) {
 	return p.blockchain.GetHeaderByNumber(number)
 }
 
-// GetHeaderByHash is an implementation of blockchain interface
+// GetHeaderByHash is an implementation of blockchainBackend interface
 func (p *blockchainWrapper) GetHeaderByHash(hash types.Hash) (*types.Header, bool) {
 	return p.blockchain.GetHeaderByHash(hash)
 }
 
-// NewBlockBuilder is an implementation of blockchain interface
+// NewBlockBuilder is an implementation of blockchainBackend interface
 func (p *blockchainWrapper) NewBlockBuilder(parent *types.Header) (blockBuilder, error) {
-	transition, err := p.blockchain.StateAt(parent.StateRoot)
-	if err != nil {
-		return nil, fmt.Errorf("state not found") // this is critical
+	parentHeader, found := p.GetHeaderByHash(parent.ParentHash)
+	if !found {
+		return nil, fmt.Errorf("failed to retrieve parent header for hash %s", parent.ParentHash.String())
 	}
-
+	transition, err := p.executor.BeginTxn(parentHeader.StateRoot, parent, types.BytesToAddress(parent.Miner))
+	if err != nil {
+		return nil, err
+	}
 	return NewBlockBuilder(&BlockBuilderParams{
 		Parent:      parent,
 		Coinbase:    p.coinbase,
@@ -196,11 +188,11 @@ func (p *blockchainWrapper) NewBlockBuilder(parent *types.Header) (blockBuilder,
 		//ChainContext:  p.blockchain,
 		//TxPoolFactory: blockbuilder.NewEthTxPool(p.eth.TxPool()),
 		State:    transition,
-		GasLimit: 10000000, // TO DO Nemanja - see what to do with this (p.eth.GenesisGasLimit(),)
+		GasLimit: 10000000, // TODO: Nemanja - see what to do with this (p.eth.GenesisGasLimit(),)
 	}), nil
 }
 
-// GetSystemState is an implementation of blockchain interface
+// GetSystemState is an implementation of blockchainBackend interface
 func (p *blockchainWrapper) GetSystemState(config *PolyBFTConfig, provider contract.Provider) SystemState {
 	return NewSystemState(config, provider)
 }
@@ -219,9 +211,7 @@ func NewStateProvider(transition *state.Transition) contract.Provider {
 
 // Call implements the contract.Provider interface to make contract calls directly to the state
 func (s *stateProvider) Call(addr ethgo.Address, input []byte, opts *contract.CallOpts) ([]byte, error) {
-
 	result := s.transition.Call2(types.ZeroAddress, types.Address(addr), input, big.NewInt(0), 10000000)
-
 	if result.Err != nil {
 		return nil, result.Err
 	}

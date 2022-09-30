@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -73,14 +74,14 @@ func NewBlockBuilder(params *BlockBuilderParams) *BlockBuilder {
 	// extra can only be 32 size max. it is better to trim that to return
 	// an error that we have to propagate. It should be up to higher level
 	// code to error if the extra supplied by the user is too big.
-	if len(params.Extra) > 32 {
-		params.Extra = params.Extra[:32]
+	if len(params.Extra) > signer.IstanbulExtraVanity {
+		params.Extra = params.Extra[:signer.IstanbulExtraVanity]
 	}
 	if params.Extra == nil {
 		params.Extra = make([]byte, 0)
 	}
 	if params.BlockTime == 0 {
-		params.BlockTime = time.Second * 30 // TODO: is this ok?
+		params.BlockTime = time.Second * 2 // TODO: is this ok?
 	}
 
 	builder := &BlockBuilder{
@@ -153,7 +154,7 @@ func (b *BlockBuilder) Build(handler func(h *types.Header)) *StateBlock {
 	b.header.StateRoot = types.Hash{} // set somehow state root with executor or something else after Ferran's changes
 	b.block = NewFinalBlock(b.header, b.txns, b.receipts)
 
-	// TO DO Nemanja - see what to do with gas later
+	// TODO: Nemanja - see what to do with gas later
 	// calculate gas limit based on parent header
 	// gasLimit, err := b.blockchain.CalculateGasLimit(header.Number)
 	// if err != nil {
@@ -281,7 +282,7 @@ func NewFinalBlock(header *types.Header, txs []*types.Transaction, receipts []*t
 		panic("cannot create block: number of receipts and txs is not the same")
 	}
 
-	// TO DO Nemanja - there are no thx and receipts, so leve everithing as default
+	// TODO: Nemanja - there are no thx and receipts, so leve everithing as default
 
 	return b
 }

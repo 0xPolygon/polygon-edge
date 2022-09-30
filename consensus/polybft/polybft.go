@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/0xPolygon/pbft-consensus"
-	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/proto"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
@@ -140,12 +139,15 @@ func Factory(params *consensus.Params) (consensus.Consensus, error) {
 	)
 
 	polybft := &Polybft{
-		pbftTopic:  topic,
-		blockchain: params.Blockchain,
-		blockTime:  time.Duration(params.BlockTime),
-		syncer:     sync,
-		pbft:       engine,
-		account:    account,
+		pbftTopic: topic,
+		blockchain: &blockchainWrapper{
+			blockchain: params.Blockchain,
+			executor:   params.Executor,
+		},
+		blockTime: time.Duration(params.BlockTime),
+		syncer:    sync,
+		pbft:      engine,
+		account:   account,
 	}
 	return polybft, nil
 }
@@ -158,7 +160,7 @@ type polybftBackend interface {
 	// GetValidators retrieves validator set for the given block
 	GetValidators(blockNumber uint64, parents []*types.Header) (AccountSet, error)
 
-	// InsertBlock(b *types.Block)
+	InsertBlock(b *types.Block)
 }
 
 type Polybft struct {
@@ -168,8 +170,8 @@ type Polybft struct {
 	// block time duration
 	blockTime time.Duration
 
-	// refernece to the blockchain
-	blockchain *blockchain.Blockchain
+	// reference to the blockchain
+	blockchain blockchainBackend
 
 	// reference to the syncer
 	syncer syncer.Syncer
@@ -228,7 +230,7 @@ func (p *Polybft) Initialize() error {
 }
 
 func (p *Polybft) InsertBlock(block *types.Block) {
-	if err := p.blockchain.WriteBlock(block, "consensus"); err != nil {
+	if err := p.blockchain.CommitBlock(block); err != nil {
 		panic(err)
 	}
 }
@@ -250,7 +252,7 @@ func (p *Polybft) Start() error {
 
 	// start consensus
 	for {
-		sequence := p.blockchain.Header().Number + 1
+		sequence := p.blockchain.CurrentHeader().Number + 1
 
 		// setup consensus
 		b := &backend{
@@ -313,7 +315,7 @@ func (b *backend) Init(*pbft.RoundInfo) {
 
 // Insert inserts the sealed proposal
 func (b *backend) Insert(proposal *pbft.SealedProposal) error {
-	block := types.Block{}
+	block := &types.Block{}
 	if err := block.UnmarshalRLP(proposal.Proposal.Data); err != nil {
 		return err
 	}
@@ -325,8 +327,7 @@ func (b *backend) Insert(proposal *pbft.SealedProposal) error {
 	b.hash = hash[:]
 
 	// TODO: merge sealed keys in extra block data
-	// TODO insert block
-	// b.consensus.InsertBlock(&block)
+	b.consensus.InsertBlock(block)
 	return nil
 }
 
