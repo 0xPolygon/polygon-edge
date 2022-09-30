@@ -76,6 +76,9 @@ type networkingServer interface {
 	// RemoveTemporaryDial removes a peer from the temporary dial map
 	RemoveTemporaryDial(peerID peer.ID)
 
+	// TemporaryDialPeer dials the peer temporarily
+	TemporaryDialPeer(peerAddrInfo *peer.AddrInfo)
+
 	// CONNECTION INFORMATION //
 
 	// HasFreeConnectionSlot checks if there is an available connection slot for the set direction [Thread safe]
@@ -312,7 +315,7 @@ func (d *DiscoveryService) regularPeerDiscovery() {
 	}
 }
 
-// bootnodeDiscovery queries a random (unconnected) bootnode for new peers
+// bootnodePeerDiscovery queries a random (unconnected) bootnode for new peers
 // and adds them to the routing table
 func (d *DiscoveryService) bootnodePeerDiscovery() {
 	if !d.baseServer.HasFreeConnectionSlot(network.DirOutbound) {
@@ -360,6 +363,9 @@ func (d *DiscoveryService) bootnodePeerDiscovery() {
 			d.baseServer.DisconnectFromPeer(bootnode.ID, "Thank you")
 		}
 	}()
+
+	// Temporarily dial the bootnode
+	d.baseServer.TemporaryDialPeer(bootnode)
 
 	// Find peers from the referenced bootnode
 	foundNodes, err := d.findPeersCall(bootnode.ID, true)

@@ -46,8 +46,8 @@ const (
 
 	DefaultLibp2pPort int = 1478
 
-	MinimumPeerConnections int64 = 10
 	MinimumBootNodes       int   = 1
+	MinimumPeerConnections int64 = 1
 )
 
 var (
@@ -262,7 +262,7 @@ func (s *Server) Start() error {
 	}
 
 	go s.runDial()
-	go s.checkPeerConnections()
+	go s.keepAlivePeerConnections()
 
 	// watch for disconnected peers
 	s.host.Network().Notify(&network.NotifyBundle{
@@ -318,8 +318,8 @@ func (s *Server) setupBootnodes() error {
 	return nil
 }
 
-// checkPeerCount will attempt to make new connections if the active peer count is lesser than the specified limit.
-func (s *Server) checkPeerConnections() {
+// keepAlivePeerConnections will attempt to make new connections if the active peer count is lesser than the specified limit.
+func (s *Server) keepAlivePeerConnections() {
 	for {
 		select {
 		case <-time.After(10 * time.Second):
@@ -329,8 +329,13 @@ func (s *Server) checkPeerConnections() {
 
 		if s.numPeers() < MinimumPeerConnections {
 			if s.config.NoDiscover || !s.bootnodes.hasBootnodes() {
-				// TODO: dial peers from the peerstore
+				// dial unconnected peer
+				randPeer := s.GetRandomPeer()
+				if !s.IsConnected(*randPeer) && randPeer != nil {
+					s.addToDialQueue(s.GetPeerInfo(*randPeer), common.PriorityRandomDial)
+				}
 			} else {
+				// dial random unconnected bootnode
 				randomNode := s.GetRandomBootnode()
 				if randomNode != nil {
 					s.addToDialQueue(randomNode, common.PriorityRandomDial)
