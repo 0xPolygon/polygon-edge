@@ -11,6 +11,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/ethereum/go-ethereum/core/vm"	
 	hcf "github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
 )
@@ -19,8 +20,8 @@ var _ pbft.Backend = &fsm{}
 
 type blockBuilder interface {
 	Reset()
-	CommitTransaction(tx *types.Transaction) error
-	Fill(ctx context.Context) error
+	// CommitTransaction(tx *types.Transaction) error
+	// Fill(ctx context.Context) error
 	Build(func(h *types.Header)) *StateBlock
 	GetState() state.Snapshot
 }
@@ -108,13 +109,14 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 	// TODO: we will need to revisit once slashing is implemented
 	extra := &Extra{Parent: extraParent.Committed}
 	if f.isEndOfEpoch {
-		tx, err := f.createValidatorsUptimeTx()
-		if err != nil {
-			return nil, err
-		}
-		if err := f.blockBuilder.CommitTransaction(tx); err != nil {
-			return nil, fmt.Errorf("failed to commit validators uptime transaction: %v", err)
-		}
+		// TO DO Nemanja - no transactions for now
+		// tx, err := f.createValidatorsUptimeTx()
+		// if err != nil {
+		// 	return nil, err
+		// }
+		// if err := f.blockBuilder.CommitTransaction(tx); err != nil {
+		// 	return nil, fmt.Errorf("failed to commit validators uptime transaction: %v", err)
+		// }
 
 		validatorsDelta, err := f.getValidatorSetDelta(f.blockBuilder.GetState())
 		if err != nil {
@@ -125,11 +127,12 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 	}
 
 	if f.config.IsBridgeEnabled() {
-		for _, tx := range f.stateTransactions() {
-			if err := f.blockBuilder.CommitTransaction(tx); err != nil {
-				return nil, fmt.Errorf("failed to commit state transaction. Error: %v", err)
-			}
-		}
+		// TO DO Nemanja - no transactions for now
+		// for _, tx := range f.stateTransactions() {
+		// 	if err := f.blockBuilder.CommitTransaction(tx); err != nil {
+		// 		return nil, fmt.Errorf("failed to commit state transaction. Error: %v", err)
+		// 	}
+		// }
 	}
 
 	// set the timestamp
@@ -148,22 +151,17 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 
 	f.logger.Debug("Fill block", "time", time.Since(now))
 
-	buildBlock := f.blockBuilder.Build(func(h *types.Header) {
+	stateBlock := f.blockBuilder.Build(func(h *types.Header) {
 		h.Timestamp = uint64(headerTime.Unix())
 		h.ExtraData = append(make([]byte, 32), extra.MarshalRLPTo(nil)...)
 		h.MixHash = PolyMixDigest
 	})
 
-	f.block = buildBlock
-
-	rlpBlock, err := buildBlock.EncodeRlpBlock()
-	if err != nil {
-		return nil, fmt.Errorf("failed to encode rlp block: %v", err)
-	}
+	f.block = stateBlock	
 
 	proposal := &pbft.Proposal{
 		Time: headerTime,
-		Data: rlpBlock,
+		Data: stateBlock.Block.MarshalRLP(),,
 		Hash: f.block.Block.Hash().Bytes(),
 	}
 	f.proposal = proposal
@@ -289,9 +287,10 @@ func (f *fsm) Validate(proposal *pbft.Proposal) error {
 		}
 	}
 
-	if err := f.VerifyStateTransactions(block.Transactions); err != nil {
-		return err
-	}
+	// TO DO Nemanja - do not validate state transaction because there isn't any
+	// if err := f.VerifyStateTransactions(block.Transactions); err != nil {
+	// 	return err
+	// }
 
 	builtBlock, err := f.backend.ProcessBlock(f.parent, &block)
 	if err != nil {

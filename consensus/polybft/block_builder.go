@@ -1,40 +1,39 @@
 package polybft
 
 import (
-	"fmt"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
-	hcf "github.com/hashicorp/go-hclog"
 )
 
 // TODO: Add opentracing
 
-type txStatus uint8
+// type txStatus uint8
 
-const (
-	success txStatus = iota
-	fail
-	skip
-	nothing
-)
+// const (
+// 	success txStatus = iota
+// 	fail
+// 	skip
+// 	nothing
+// )
 
-type txPoolInterface interface {
-	Prepare()
-	Length() uint64
-	Peek() *types.Transaction
-	Pop(tx *types.Transaction)
-	Drop(tx *types.Transaction)
-	Demote(tx *types.Transaction)
-	ResetWithHeaders(headers ...*types.Header)
-	SetSealing(bool)
-}
+// type txPoolInterface interface {
+// 	Prepare()
+// 	Length() uint64
+// 	Peek() *types.Transaction
+// 	Pop(tx *types.Transaction)
+// 	Drop(tx *types.Transaction)
+// 	Demote(tx *types.Transaction)
+// 	ResetWithHeaders(headers ...*types.Header)
+// 	SetSealing(bool)
+// }
 
-type txEvmTransition interface {
-	Write(txn *types.Transaction) error
-	WriteFailedReceipt(txn *types.Transaction) error
-}
+// type txEvmTransition interface {
+// 	Write(txn *types.Transaction) error
+// 	WriteFailedReceipt(txn *types.Transaction) error
+// }
 
 // Params are fields for the block that cannot be changed
 type BlockBuilderParams struct {
@@ -44,11 +43,17 @@ type BlockBuilderParams struct {
 	// Coinbase that is signing the block
 	Coinbase types.Address
 
+	// ChainConfig is the configurtion of the chain
+	ChainConfig *chain.Params
+
+	// ChainContext interface is used during EVM execution
+	//ChainContext core.ChainContext
+
 	// Vanity extra for the block
 	Extra []byte
 
 	// Executor for EVM execution
-	Transition txEvmTransition
+	//Transition txEvmTransition
 
 	// GasLimit is the gas limit for the block
 	GasLimit uint64
@@ -57,9 +62,9 @@ type BlockBuilderParams struct {
 	BlockTime time.Duration
 
 	// Logger
-	Logger hcf.Logger
+	//Logger hcf.Logger
 
-	TxPool txPoolInterface // Reference to the transaction pool
+	// TxPool txPoolInterface // Reference to the transaction pool
 }
 
 func NewBlockBuilder(params *BlockBuilderParams) *BlockBuilder {
@@ -83,6 +88,8 @@ func NewBlockBuilder(params *BlockBuilderParams) *BlockBuilder {
 	return builder
 }
 
+var _ blockBuilder = &BlockBuilder{}
+
 type BlockBuilder struct {
 	// input params for the block
 	params *BlockBuilderParams
@@ -104,22 +111,25 @@ type BlockBuilder struct {
 // and it has to clean any data
 func (b *BlockBuilder) Reset() {
 	b.header = &types.Header{
-		ParentHash: b.params.Parent.Hash,
-		Number:     b.params.Parent.Number + 1,
-		Miner:      b.params.Coinbase[:],
-		Difficulty: 1,
-		ExtraData:  b.params.Extra,
-		StateRoot:  types.EmptyRootHash, // this avoids needing state for now
-		Sha3Uncles: types.EmptyUncleHash,
-		// GasLimit:   parent.GasLimit, // Inherit from parent for now, will need to adjust dynamically later.
-		// BaseFee:    big.NewInt(100), // TODO: what is base fee
+		ParentHash:    b.params.Parent.Hash,
+		Number:        b.params.Parent.Number + 1,
+		Miner:         b.params.Coinbase[:],
+		Difficulty:    1,
+		ExtraData:     b.params.Extra,
+		StateRoot:     types.EmptyRootHash, // this avoids needing state for now
+		TxRoot:        types.EmptyRootHash,
+		ReceiptsRoots: types.EmptyRootHash, // this avoids needing state for now
+		Sha3Uncles:    types.EmptyUncleHash,
+		GasLimit:      b.params.GasLimit, //will need to adjust dynamically later.
+		//BaseFee:    big.NewInt(100), // TODO: what is base fee
 	}
 
 	b.block = nil
-	// b.signer = types.MakeSigner(b.params.ChainConfig, b.header.Number)
-	// b.state = b.params.StateDB.Copy()
 	b.txns = []*types.Transaction{}
 	b.receipts = []*types.Receipt{}
+
+	// b.signer = types.MakeSigner(b.params.ChainConfig, b.header.Number)
+	// b.state = b.params.StateDB.Copy()
 
 	b.state = nil // TODO: build snapshot somehow from  b.params (by using state.NewSnapshotAt?)
 }
@@ -137,10 +147,11 @@ func (b *BlockBuilder) Build(handler func(h *types.Header)) *StateBlock {
 	// build the block and write the state
 	// b.header.Root = b.state.IntermediateRoot(true)
 	b.header.StateRoot = types.Hash{} // set somehow state root with executor or something else after Ferran's changes
-	// b.block = NewFinalBlock(b.header, b.txns, b.receipts)
-	// calculate gas limit based on parent header
+	b.block = NewFinalBlock(b.header, b.txns, b.receipts)
 
-	// gasLimit, err := i.blockchain.CalculateGasLimit(header.Number)
+	// TO DO Nemanja - see what to do with gas later
+	// calculate gas limit based on parent header
+	// gasLimit, err := b.blockchain.CalculateGasLimit(header.Number)
 	// if err != nil {
 	// 	return nil, err
 	// }
@@ -154,6 +165,7 @@ func (b *BlockBuilder) Build(handler func(h *types.Header)) *StateBlock {
 	}
 }
 
+/*
 // Fill fills the block with transactions from the txpool
 func (b *BlockBuilder) Fill() (successful int, failed int, skipped int, timeout bool) {
 	executed := make([]*types.Transaction, 0)
@@ -245,6 +257,7 @@ func (b *BlockBuilder) writeTransaction(
 
 	return success, true
 }
+*/
 
 // GetState returns StateDB reference
 func (b *BlockBuilder) GetState() state.Snapshot {
@@ -258,10 +271,13 @@ type StateBlock struct {
 	State    state.Snapshot
 }
 
-// func (b *StateBlock) EncodeRlpBlock() ([]byte, error) {
-// 	return rlp.EncodeToBytes(b.Block)
-// }
+func NewFinalBlock(header *types.Header, txs []*types.Transaction, receipts []*types.Receipt) *types.Block {
+	b := &types.Block{header: header.Copy()}
+	if len(txs) != len(receipts) {
+		panci("cannot create block: number of receipts and txs is not the same")
+	}
 
-// func NewFinalBlock(header *types.Header, txs []*types.Transaction, receipts []*types.Receipt) *types.Block {
-// 	return types.NewBlock(header, txs, nil, receipts, trie.NewStackTrie(nil))
-// }
+	// TO DO Nemanja - there are no thx and receipts, so leve everithing as default
+
+	return b
+}

@@ -1,37 +1,32 @@
 package polybft
 
-/*
 import (
 	"fmt"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/0xPolygon/polygon-edge/blockchain"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/event"
-	blockbuilder "github.com/ethereum/go-ethereum/internal/block-builder"
-	"github.com/ethereum/go-ethereum/internal/bls"
-	"github.com/ethereum/go-ethereum/params"
 	"github.com/umbracle/ethgo"
-	"github.com/umbracle/ethgo/abi"
 	"github.com/umbracle/ethgo/contract"
 )
 
-// ethereumBackend is an interface that wraps the methods called on ethereum backend protocol
-type ethereumBackend interface {
-	// PeersLen returns the number of peers the node is connected to
-	PeersLen() int
-	// TxPool returns the current transaction pool
-	TxPool() *core.TxPool
-	// Broadcast block broadcasts the newly inserted block to the rest of the peers
-	BroadcastBlock(block *types.Block, propagate bool)
-	// GenesisGasLimit returns the initial gas limit for a block
-	GenesisGasLimit() uint64
-}
+// // ethereumBackend is an interface that wraps the methods called on ethereum backend protocol
+// type ethereumBackend interface {
+// 	// PeersLen returns the number of peers the node is connected to
+// 	PeersLen() int
+// 	// TxPool returns the current transaction pool
+// 	TxPool() *core.TxPool
+// 	// Broadcast block broadcasts the newly inserted block to the rest of the peers
+// 	BroadcastBlock(block *types.Block, propagate bool)
+// 	// GenesisGasLimit returns the initial gas limit for a block
+// 	GenesisGasLimit() uint64
+// }
 
 // blockchain is an interface that wraps the methods called on blockchain
-type blockchain interface {
+type blockchainBackend interface {
 	// OnNewBlockInserted is invoked when new block is finalized by consensus protocol.
 	OnNewBlockInserted(block *types.Block)
 
@@ -39,7 +34,7 @@ type blockchain interface {
 	CurrentHeader() *types.Header
 
 	// CommitBlock commits a block to the chain.
-	CommitBlock(stateBlock *blockbuilder.StateBlock) error
+	CommitBlock(stateBlock *StateBlock) error
 
 	// NewBlockBuilder is a factory method that returns a block builder on top of 'parent'.
 	NewBlockBuilder(parent *types.Header) (blockBuilder, error)
@@ -54,35 +49,35 @@ type blockchain interface {
 	GetStateProviderForDB(state vm.StateDB) contract.Provider
 
 	// GetHeaderByNumber returns a reference to block header for the given block number.
-	GetHeaderByNumber(number uint64) *types.Header
+	GetHeaderByNumber(number uint64) (*types.Header, bool)
 
 	// GetHeaderByHash returns a reference to block header for the given block hash
-	GetHeaderByHash(hash common.Hash) *types.Header
+	GetHeaderByHash(hash types.Hash) (*types.Header, bool)
 
 	// SubscribeChainHeadEvent subscribes to block insert event on chain.
 	SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription
 
 	// GetSystemState creates a new instance of SystemState interface
-	GetSystemState(config *params.PolyBFTConfig, provider contract.Provider) SystemState
+	GetSystemState(config *PolyBFTConfig, provider contract.Provider) SystemState
 
 	// PeersLen returns the number of peers the node is connected to
-	PeersLen() int
+	//PeersLen() int
 
 	// SetCoinbase sets the coinbase data
-	SetCoinbase(coinbase common.Address)
+	SetCoinbase(coinbase types.Address)
 }
 
-var _ blockchain = &blockchainWrapper{}
+var _ blockchainBackend = &blockchainWrapper{}
 
 type blockchainWrapper struct {
-	blockchain *core.BlockChain
-	eth        ethereumBackend
-	coinbase   common.Address
+	blockchain *blockchain.Blockchain
+	//eth        ethereumBackend
+	coinbase types.Address
 }
 
 // CurrentHeader returns the header of blockchain block head
 func (p *blockchainWrapper) CurrentHeader() *types.Header {
-	return p.blockchain.CurrentHeader()
+	return p.blockchain.Header()
 }
 
 // CommitBlock commits a block to the chain
@@ -98,12 +93,12 @@ func (p *blockchainWrapper) CommitBlock(stateBlock *blockbuilder.StateBlock) err
 }
 
 // PeersLen returns the number of peers the node is connected to
-func (p *blockchainWrapper) PeersLen() int {
-	return p.eth.PeersLen()
-}
+// func (p *blockchainWrapper) PeersLen() int {
+// 	return p.eth.PeersLen()
+// }
 
 // SetCoinbase sets the coinbase data
-func (p *blockchainWrapper) SetCoinbase(coinbase common.Address) {
+func (p *blockchainWrapper) SetCoinbase(coinbase types.Address) {
 	p.coinbase = coinbase
 }
 
@@ -116,39 +111,41 @@ func (p *blockchainWrapper) ProcessBlock(parent *types.Header, block *types.Bloc
 		return nil, err
 	}
 
-	header := block.Header()
-
-	var usedGas uint64
-	gasPool := core.GasPool(block.GasLimit())
-
+	// TO DO Nemanja - no transactions for now, leave empty receipts
 	var receipts []*types.Receipt
-	for index, txn := range block.Transactions() {
-		state.Prepare(txn.Hash(), index)
-		receipt, err := core.ApplyTransaction(
-			p.blockchain.Config(),
-			p.blockchain,
-			&header.Coinbase,
-			&gasPool,
-			state,
-			header,
-			txn,
-			&usedGas,
-			vm.Config{},
-		)
-		if err != nil {
-			return nil, err
-		}
-		receipts = append(receipts, receipt)
-	}
+
+	// var usedGas uint64
+	// gasPool := core.GasPool(block.GasLimit)
+	// header := block.Header()
+
+	// for index, txn := range block.Transactions() {
+	// 	state.Prepare(txn.Hash(), index)
+	// 	receipt, err := core.ApplyTransaction(
+	// 		p.blockchain.Config(),
+	// 		p.blockchain,
+	// 		&header.Coinbase,
+	// 		&gasPool,
+	// 		state,
+	// 		header,
+	// 		txn,
+	// 		&usedGas,
+	// 		vm.Config{},
+	// 	)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// 	receipts = append(receipts, receipt)
+	// }
 
 	// build the state
 	root := state.IntermediateRoot(true)
-	if root != block.Root() {
+	if root != block.Header.StateRoot {
 		return nil, fmt.Errorf("incorrect state root: (%s, %s)", root, block.Root())
 	}
 
-	// build the final block
-	found := blockbuilder.NewFinalBlock(header, block.Transactions(), receipts)
+
+	// build the final block: Nemanja it is the same as propsal since there is no transactions
+	found := NewFinalBlock(header, block.Transactions, receipts)
 	if found.Hash() != block.Hash() {
 		return nil, fmt.Errorf("incorrect block hash: (%s, %s)", found.Hash(), block.Hash())
 	}
@@ -168,7 +165,7 @@ func (p *blockchainWrapper) SubscribeChainHeadEvent(ch chan<- core.ChainHeadEven
 
 // StateAt is an implementation of blockchain interface
 func (p *blockchainWrapper) GetStateProviderForBlock(block *types.Header) (contract.Provider, error) {
-	state, err := p.blockchain.StateAt(block.Root)
+	state, err := p.blockchain.StateAt(block.StateRoot)
 	if err != nil {
 		return nil, fmt.Errorf("state not found") // this is critical
 	}
@@ -182,12 +179,12 @@ func (p *blockchainWrapper) GetStateProviderForDB(state vm.StateDB) contract.Pro
 }
 
 // GetHeaderByNumber is an implementation of blockchain interface
-func (p *blockchainWrapper) GetHeaderByNumber(number uint64) *types.Header {
+func (p *blockchainWrapper) GetHeaderByNumber(number uint64) (*types.Header, bool) {
 	return p.blockchain.GetHeaderByNumber(number)
 }
 
 // GetHeaderByHash is an implementation of blockchain interface
-func (p *blockchainWrapper) GetHeaderByHash(hash common.Hash) *types.Header {
+func (p *blockchainWrapper) GetHeaderByHash(hash types.Hash) (*types.Header, bool) {
 	return p.blockchain.GetHeaderByHash(hash)
 }
 
@@ -198,14 +195,14 @@ func (p *blockchainWrapper) NewBlockBuilder(parent *types.Header) (blockBuilder,
 		return nil, fmt.Errorf("state not found") // this is critical
 	}
 
-	return blockbuilder.NewBlockBuilder(&blockbuilder.Params{
+	return NewBlockBuilder(&BlockBuilderParams{
 		Parent:        parent,
 		Coinbase:      p.coinbase,
 		ChainConfig:   p.blockchain.Config(),
-		ChainContext:  p.blockchain,
-		TxPoolFactory: blockbuilder.NewEthTxPool(p.eth.TxPool()),
+		//ChainContext:  p.blockchain,
+		//TxPoolFactory: blockbuilder.NewEthTxPool(p.eth.TxPool()),
 		StateDB:       stt,
-		GasLimit:      p.eth.GenesisGasLimit(),
+		GasLimit:      100000000000 // TO DO Nemanja - see what to do with this (p.eth.GenesisGasLimit(),)
 	}), nil
 }
 
@@ -216,7 +213,8 @@ func (p *blockchainWrapper) GetSystemState(config *params.PolyBFTConfig, provide
 
 // OnNewBlockInserted is an implementation of blockchain interface
 func (p *blockchainWrapper) OnNewBlockInserted(block *types.Block) {
-	p.eth.BroadcastBlock(block, true)
+	// TO DO Nemanja - probably we do not need this method
+	//p.eth.BroadcastBlock(block, true)
 }
 
 type stateProvider struct {
@@ -226,14 +224,14 @@ type stateProvider struct {
 // NewStateProvider initializes EVM against given state and chain config and returns stateProvider instance
 // which is an abstraction for smart contract calls
 func NewStateProvider(state vm.StateDB, config *params.ChainConfig) contract.Provider {
-	ctx := core.NewEVMBlockContext(&types.Header{Number: big.NewInt(0), Difficulty: big.NewInt(0)}, nil, &common.Address{})
+	ctx := core.NewEVMBlockContext(&types.Header{Number: big.NewInt(0), Difficulty: big.NewInt(0)}, nil, &types.Address{})
 	evm := vm.NewEVM(ctx, vm.TxContext{}, state, config, vm.Config{NoBaseFee: true})
 	return &stateProvider{vm: evm}
 }
 
 // Call implements the contract.Provider interface to make contract calls directly to the state
 func (s *stateProvider) Call(addr ethgo.Address, input []byte, opts *contract.CallOpts) ([]byte, error) {
-	retVal, _, err := s.vm.Call(vm.AccountRef(common.Address{}), common.Address(addr), input, 10000000, big.NewInt(0))
+	retVal, _, err := s.vm.Call(vm.AccountRef(types.Address{}), types.Address(addr), input, 10000000, big.NewInt(0))
 	if err != nil {
 		return nil, err
 	}
@@ -245,4 +243,3 @@ func (s *stateProvider) Call(addr ethgo.Address, input []byte, opts *contract.Ca
 func (s *stateProvider) Txn(ethgo.Address, ethgo.Key, []byte, *contract.TxnOpts) (contract.Txn, error) {
 	panic("we do not make transaction in system state")
 }
-*/
