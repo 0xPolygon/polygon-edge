@@ -335,8 +335,6 @@ func (d *DiscoveryService) bootnodePeerDiscovery() {
 		// Get a random unconnected bootnode from the bootnode set
 		bootnode = d.baseServer.GetRandomBootnode()
 		if bootnode == nil {
-			// No bootnodes available
-			d.logger.Debug("no bootnodes available for peer discovery")
 			return
 		}
 

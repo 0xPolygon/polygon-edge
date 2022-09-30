@@ -405,7 +405,7 @@ func (s *Server) runDial() {
 				// the connection process is async because it involves connection (here) +
 				// the handshake done in the identity service.
 				if err := s.host.Connect(context.Background(), *peerInfo); err != nil {
-					s.logger.Debug("failed to dial", "addr", peerInfo.String(), "err", err)
+					s.logger.Debug("failed to dial", "addr", peerInfo.String(), "err", err.Error())
 
 					s.emitEvent(peerInfo.ID, peerEvent.PeerFailedToConnect)
 				}
