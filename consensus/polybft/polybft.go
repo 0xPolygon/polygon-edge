@@ -80,7 +80,7 @@ func Factory(params *consensus.Params) (consensus.Consensus, error) {
 		return nil, err
 	}
 
-	key := wallet.newKey(account)
+	key := wallet.NewKey(account)
 	engine := pbft.New(key,
 		&pbftTransport{topic: topic},
 		pbft.WithLogger(params.Logger.Named("engine").StandardLogger(&hclog.StandardLoggerOptions{})),
@@ -119,6 +119,7 @@ func Factory(params *consensus.Params) (consensus.Consensus, error) {
 		pbft:      engine,
 		account:   account,
 	}
+
 	return polybft, nil
 }
 

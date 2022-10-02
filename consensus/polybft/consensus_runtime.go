@@ -65,7 +65,7 @@ type runtimeConfig struct {
 	PolyBFTConfig  *PolyBFTConfig
 	DataDir        string
 	Transport      Transport
-	Key            *wallet.key
+	Key            *wallet.Key
 	State          *State
 	blockchain     blockchainBackend
 	polybftBackend polybftBackend

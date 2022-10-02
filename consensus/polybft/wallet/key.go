@@ -5,29 +5,29 @@ import (
 	"github.com/umbracle/ethgo"
 )
 
-type key struct {
+type Key struct {
 	raw *Account
 }
 
-func newKey(raw *Account) *key {
-	return &key{
+func NewKey(raw *Account) *Key {
+	return &Key{
 		raw: raw,
 	}
 }
 
-func (k *key) String() string {
+func (k *Key) String() string {
 	return k.raw.Ecdsa.Address().String()
 }
 
-func (k *key) Address() ethgo.Address {
+func (k *Key) Address() ethgo.Address {
 	return k.raw.Ecdsa.Address()
 }
 
-func (k *key) NodeID() pbft.NodeID {
+func (k *Key) NodeID() pbft.NodeID {
 	return pbft.NodeID(k.String())
 }
 
-func (k *key) Sign(b []byte) ([]byte, error) {
+func (k *Key) Sign(b []byte) ([]byte, error) {
 	s, err := k.raw.Bls.Sign(b)
 	if err != nil {
 		return nil, err
