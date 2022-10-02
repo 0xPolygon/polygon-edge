@@ -435,7 +435,7 @@ func (f *fsm) Insert(p *pbft.SealedProposal) error {
 	// Write extar data to header
 	f.block.Block.Header.ExtraData = append(make([]byte, 32), extra.MarshalRLPTo(nil)...)
 
-	if err := f.backend.CommitBlock(f.block.Block); err != nil {
+	if err := f.backend.CommitBlock(f.block); err != nil {
 		return err
 	}
 

@@ -29,7 +29,7 @@ type blockchainBackend interface {
 	CurrentHeader() *types.Header
 
 	// CommitBlock commits a block to the chain.
-	CommitBlock(stateBlock *types.Block) error
+	CommitBlock(stateBlock *StateBlock) error
 
 	// NewBlockBuilder is a factory method that returns a block builder on top of 'parent'.
 	NewBlockBuilder(parent *types.Header) (blockBuilder, error)
@@ -76,8 +76,8 @@ func (p *blockchainWrapper) CurrentHeader() *types.Header {
 }
 
 // CommitBlock commits a block to the chain
-func (p *blockchainWrapper) CommitBlock(block *types.Block) error {
-	return p.blockchain.WriteBlock(block, "consensus")
+func (p *blockchainWrapper) CommitBlock(stateBlock *StateBlock) error {
+	return p.blockchain.WriteBlock(stateBlock.Block, "consensus")
 
 	// logs := buildLogsFromReceipts(stateBlock.Receipts, stateBlock.Block.GetHeader())
 	// status, err := p.blockchain.WriteBlockAndSetHead(stateBlock.Block, stateBlock.Receipts, logs, stateBlock.State, true)

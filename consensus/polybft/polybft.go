@@ -38,8 +38,6 @@ type polybftBackend interface {
 
 	// GetValidators retrieves validator set for the given block
 	GetValidators(blockNumber uint64, parents []*types.Header) (AccountSet, error)
-
-	InsertBlock(b *types.Block)
 }
 
 // Factory is the factory function to create a discovery consensus
@@ -543,12 +541,6 @@ func (p *Polybft) GetBlockCreator(_ *types.Header) (types.Address, error) {
 func (p *Polybft) PreCommitState(_ *types.Header, _ *state.Transition) error {
 	// Not required
 	return nil
-}
-
-func (p *Polybft) InsertBlock(block *types.Block) {
-	if err := p.blockchain.CommitBlock(block); err != nil {
-		panic(err)
-	}
 }
 
 type pbftTransportWrapper struct {
