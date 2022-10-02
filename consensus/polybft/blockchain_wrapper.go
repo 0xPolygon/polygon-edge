@@ -49,6 +49,9 @@ type blockchainBackend interface {
 	// GetHeaderByHash returns a reference to block header for the given block hash
 	GetHeaderByHash(hash types.Hash) (*types.Header, bool)
 
+	// GetHeaderByHash returns a reference to block header for the given block hash
+	GetHeader(hash types.Hash, number uint64) (*types.Header, bool)
+
 	// GetSystemState creates a new instance of SystemState interface
 	GetSystemState(config *PolyBFTConfig, provider contract.Provider) SystemState
 
@@ -75,6 +78,14 @@ func (p *blockchainWrapper) CurrentHeader() *types.Header {
 // CommitBlock commits a block to the chain
 func (p *blockchainWrapper) CommitBlock(block *types.Block) error {
 	return p.blockchain.WriteBlock(block, "consensus")
+
+	// logs := buildLogsFromReceipts(stateBlock.Receipts, stateBlock.Block.GetHeader())
+	// status, err := p.blockchain.WriteBlockAndSetHead(stateBlock.Block, stateBlock.Receipts, logs, stateBlock.State, true)
+	// if err != nil {
+	// 	return err
+	// } else if status != core.CanonStatTy {
+	// 	return fmt.Errorf("non canonical change")
+	// }
 }
 
 // PeersLen returns the number of peers the node is connected to
@@ -169,6 +180,11 @@ func (p *blockchainWrapper) GetHeaderByNumber(number uint64) (*types.Header, boo
 // GetHeaderByHash is an implementation of blockchainBackend interface
 func (p *blockchainWrapper) GetHeaderByHash(hash types.Hash) (*types.Header, bool) {
 	return p.blockchain.GetHeaderByHash(hash)
+}
+
+// GetHeaderByHash returns a reference to block header for the given block hash
+func (p *blockchainWrapper) GetHeader(hash types.Hash, number uint64) (*types.Header, bool) {
+	return p.blockchain.GetHeader(hash, number)
 }
 
 // NewBlockBuilder is an implementation of blockchainBackend interface
