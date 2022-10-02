@@ -10,6 +10,7 @@ import (
 	"github.com/0xPolygon/pbft-consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/types"
 	hcf "github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
@@ -64,7 +65,7 @@ type runtimeConfig struct {
 	PolyBFTConfig  *PolyBFTConfig
 	DataDir        string
 	Transport      Transport
-	Key            *key
+	Key            *wallet.key
 	State          *State
 	blockchain     blockchainBackend
 	polybftBackend polybftBackend

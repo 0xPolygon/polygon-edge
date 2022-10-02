@@ -22,42 +22,12 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/umbracle/ethgo"
 )
 
 const (
 	minSyncPeers = 2
 	pbftProto    = "/pbft/0.2"
 )
-
-type signKey struct {
-	raw *wallet.Account
-}
-
-func newSignKey(raw *wallet.Account) *signKey {
-	return &signKey{raw}
-}
-
-func (k signKey) String() string {
-	return k.raw.Ecdsa.Address().String()
-}
-
-func (k signKey) Address() ethgo.Address {
-	return k.raw.Ecdsa.Address()
-}
-
-func (k signKey) NodeID() pbft.NodeID {
-	return pbft.NodeID(k.String())
-}
-
-func (k signKey) Sign(b []byte) ([]byte, error) {
-	s, err := k.raw.Bls.Sign(b)
-	if err != nil {
-		return nil, err
-	}
-
-	return s.Marshal()
-}
 
 type validator struct {
 	PubKey *ecdsa.PublicKey
@@ -110,7 +80,7 @@ func Factory(params *consensus.Params) (consensus.Consensus, error) {
 		return nil, err
 	}
 
-	key := newSignKey(account)
+	key := wallet.newKey(account)
 	engine := pbft.New(key,
 		&pbftTransport{topic: topic},
 		pbft.WithLogger(params.Logger.Named("engine").StandardLogger(&hclog.StandardLoggerOptions{})),
