@@ -148,7 +148,7 @@ func (p *blockchainWrapper) GetStateProviderForBlock(header *types.Header) (cont
 	if !found {
 		return nil, fmt.Errorf("failed to retrieve parent header for hash %s", header.ParentHash.String())
 	}
-	transition, err := p.executor.BeginTxn(parentHeader.StateRoot, header, types.BytesToAddress(header.Miner))
+	transition, err := p.executor.BeginTxn(parentHeader.StateRoot, header, types.ZeroAddress)
 	if err != nil {
 		return nil, err
 	}
@@ -176,7 +176,7 @@ func (p *blockchainWrapper) NewBlockBuilder(parent *types.Header, coinbase types
 	if !found {
 		return nil, fmt.Errorf("failed to retrieve parent header for hash %s", parent.ParentHash.String())
 	}
-	transition, err := p.executor.BeginTxn(parentHeader.StateRoot, parent, types.BytesToAddress(parent.Miner))
+	transition, err := p.executor.BeginTxn(parentHeader.StateRoot, parent, coinbase)
 	if err != nil {
 		return nil, err
 	}
