@@ -1,7 +1,6 @@
 package emit
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -80,10 +79,12 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	g, ctx := errgroup.WithContext(context.Background())
+	g, ctx := errgroup.WithContext(cmd.Context())
+
 	for i := range params.wallets {
 		wallet := params.wallets[i]
 		amount := params.amounts[i]
+
 		g.Go(func() error {
 			select {
 			case <-ctx.Done():

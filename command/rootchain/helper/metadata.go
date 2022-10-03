@@ -22,8 +22,7 @@ func GetRootchainID() string {
 		panic(err)
 	}
 
-	ctx := context.Background()
-	containers, err := cli.ContainerList(ctx, dockertypes.ContainerListOptions{})
+	containers, err := cli.ContainerList(context.Background(), dockertypes.ContainerListOptions{})
 	if err != nil {
 		panic(err)
 	}

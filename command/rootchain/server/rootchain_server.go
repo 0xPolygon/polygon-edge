@@ -97,6 +97,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 	// gather the logs
 	var glr *gatherLogsResult
+
 	go func() {
 		if glr, err = gatherLogs(ctx); err != nil {
 			outputter.SetError(fmt.Errorf("failed to gether logs: %w", err))
@@ -106,6 +107,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 	// perform any initial deploy on parallel
 	var idr []initialDeployResult
+
 	go func() {
 		if idr, err = initialDeploy(); err != nil {
 			outputter.SetError(fmt.Errorf("failed to deploy: %w", err))
@@ -172,8 +174,9 @@ func runRootchain(ctx context.Context, closeCh chan struct{}) (*runResult, error
 		},
 	}
 
-	// we need to use the full path
 	mountDir := params.dataDir
+
+	// we need to use the full path
 	if !strings.HasPrefix(params.dataDir, "/") {
 		// if the path is not absolute, assume we want to create it locally
 		// in current folder
@@ -306,6 +309,7 @@ func initialDeploy() ([]initialDeployResult, error) {
 	}
 
 	var results []initialDeployResult
+
 	for name, address := range deployContracts {
 		artifact := smartcontracts.MustReadArtifact("rootchain", name)
 

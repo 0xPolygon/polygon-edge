@@ -153,6 +153,7 @@ func FundAccount(account types.Address) (types.Hash, error) {
 
 func waitForReceipt(client *jsonrpc.Eth, hash ethgo.Hash) (*ethgo.Receipt, error) {
 	var count uint64
+
 	for {
 		receipt, err := client.GetTransactionReceipt(hash)
 		if err != nil {
