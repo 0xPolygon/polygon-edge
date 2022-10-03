@@ -8,13 +8,13 @@ import (
 )
 
 const (
-	MESSAGE_SIZE        = 5000
-	PARTICIPANTS_NUMBER = 64
+	MessageSize        = 5000
+	ParticipantsNumber = 64
 )
 
 var (
-	validTestMsg   = genRandomBytes(MESSAGE_SIZE)
-	invalidTestMsg = genRandomBytes(MESSAGE_SIZE)
+	validTestMsg   = genRandomBytes(MessageSize)
+	invalidTestMsg = genRandomBytes(MessageSize)
 )
 
 func Test_VerifySignature(t *testing.T) {
@@ -49,13 +49,15 @@ func Test_AggregatedSignatureSimple(t *testing.T) {
 }
 
 func Test_AggregatedSignature(t *testing.T) {
-	blsKeys, err := CreateRandomBlsKeys(PARTICIPANTS_NUMBER)
+	blsKeys, err := CreateRandomBlsKeys(ParticipantsNumber)
 	require.NoError(t, err)
+
 	allPubs := collectPublicKeys(blsKeys)
 	aggPubs := aggregatePublicKeys(allPubs)
 	allSignatures := Signatures{}
 
 	var manuallyAggSignature *Signature
+
 	for i, key := range blsKeys {
 		signature, err := key.Sign(validTestMsg)
 		require.NoError(t, err)
@@ -71,6 +73,7 @@ func Test_AggregatedSignature(t *testing.T) {
 	aggSignature := allSignatures.Aggregate()
 
 	var manuallyAggPubs *PublicKey
+
 	for i, pubKey := range allPubs {
 		if i == 0 {
 			manuallyAggPubs = pubKey

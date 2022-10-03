@@ -3,8 +3,9 @@ package bls
 import (
 	"encoding/json"
 	"errors"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"math/big"
+
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 
 	bn256 "github.com/umbracle/go-eth-bn256"
 )
@@ -21,7 +22,9 @@ func (p *PublicKey) aggregate(onemore *PublicKey) *PublicKey {
 	} else {
 		g2 = new(bn256.G2).Set(p.p)
 	}
+
 	g2.Add(g2, onemore.p)
+
 	return &PublicKey{p: g2}
 }
 
@@ -38,12 +41,15 @@ func (p *PublicKey) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON implements the json.Marshaler interface.
 func (p *PublicKey) UnmarshalJSON(b []byte) error {
 	var d []byte
+
 	err := json.Unmarshal(b, &d)
 	if err != nil {
 		return err
 	}
+
 	pk, err := UnmarshalPublicKey(d)
 	p.p = pk.p
+
 	return err
 }
 
@@ -52,8 +58,10 @@ func UnmarshalPublicKey(raw []byte) (*PublicKey, error) {
 	if len(raw) == 0 {
 		return nil, errors.New("cannot unmarshal public key from empty slice")
 	}
+
 	p := new(bn256.G2)
 	_, err := p.Unmarshal(raw)
+
 	return &PublicKey{p: p}, err
 }
 
@@ -66,17 +74,19 @@ func (p PublicKey) ToBigInt() ([4]*big.Int, error) {
 		new(big.Int).SetBytes(blsKey[96:128]),
 		new(big.Int).SetBytes(blsKey[64:96]),
 	}
+
 	return res, nil
 }
 
 // UnmarshalPublicKeyFromBigInt unmarshals public key from 4 big ints
 // Order of coordinates is [A.Y, A.X, B.Y, B.X]
 func UnmarshalPublicKeyFromBigInt(b [4]*big.Int) (*PublicKey, error) {
-	pubKeyBuf := []byte{}
+	var pubKeyBuf []byte
 	pubKeyBuf = append(pubKeyBuf, common.LeftPadBytes(b[1].Bytes(), 32)...)
 	pubKeyBuf = append(pubKeyBuf, common.LeftPadBytes(b[0].Bytes(), 32)...)
 	pubKeyBuf = append(pubKeyBuf, common.LeftPadBytes(b[3].Bytes(), 32)...)
 	pubKeyBuf = append(pubKeyBuf, common.LeftPadBytes(b[2].Bytes(), 32)...)
+
 	return UnmarshalPublicKey(pubKeyBuf)
 }
 
@@ -86,5 +96,6 @@ func aggregatePublicKeys(pubs []*PublicKey) *PublicKey {
 	for i := 0; i < len(pubs); i++ {
 		res.Add(&res, pubs[i].p)
 	}
+
 	return &PublicKey{p: &res}
 }

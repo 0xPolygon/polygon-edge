@@ -25,10 +25,12 @@ var (
 // genRandomBytes generates byte array with random data
 func genRandomBytes(size int) (blk []byte) {
 	blk = make([]byte, size)
+
 	_, err := rand.Reader.Read(blk)
 	if err != nil {
 		panic("Cannot generate message for tests. This should never happen")
 	}
+
 	return
 }
 
@@ -37,13 +39,12 @@ func leftPadTo32Bytes(bytes []byte) ([]byte, error) {
 	expectedByteLen := 32
 	if len(bytes) > expectedByteLen {
 		return nil, fmt.Errorf("cannot pad %v byte array to %v bytes", len(bytes), expectedByteLen)
+	} else if len(bytes) == expectedByteLen {
+		return bytes, nil
 	}
 
-	result := make([]byte, 0)
-	if len(bytes) < expectedByteLen {
-		result = make([]byte, expectedByteLen-len(bytes))
-	}
-	result = append(result, bytes...)
+	result := make([]byte, expectedByteLen)
+	copy(result[expectedByteLen-len(bytes):], bytes)
 
 	return result, nil
 }
@@ -53,6 +54,7 @@ func sum(ints ...*big.Int) *big.Int {
 	for _, num := range ints {
 		acc.Add(acc, num)
 	}
+
 	return acc
 }
 
@@ -61,6 +63,7 @@ func product(ints ...*big.Int) *big.Int {
 	for _, num := range ints {
 		acc.Mul(acc, num)
 	}
+
 	return acc
 }
 
@@ -126,10 +129,11 @@ func g1HashToPoint(m []byte) (*bn256.G1, error) {
 
 // colects public keys from the BlsKeys
 func collectPublicKeys(keys []*PrivateKey) []*PublicKey {
-	total := len(keys)
-	pubKeys := make([]*PublicKey, total)
+	pubKeys := make([]*PublicKey, len(keys))
+
 	for i, key := range keys {
 		pubKeys[i] = key.PublicKey()
 	}
+
 	return pubKeys
 }

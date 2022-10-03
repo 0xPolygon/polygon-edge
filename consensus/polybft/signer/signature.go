@@ -20,6 +20,7 @@ func (s *Signature) Verify(publicKey *PublicKey, message []byte) bool {
 
 	a := []*bn256.G1{new(bn256.G1).Neg(s.p), hashPoint}
 	b := []*bn256.G2{&g2, publicKey.p}
+
 	return bn256.PairingCheck(a, b)
 }
 
@@ -38,7 +39,9 @@ func (s *Signature) Aggregate(onemore *Signature) *Signature {
 	} else {
 		p = new(bn256.G1).Set(s.p)
 	}
+
 	p.Add(p, onemore.p)
+
 	return &Signature{p: p}
 }
 
@@ -47,6 +50,7 @@ func (s *Signature) Marshal() ([]byte, error) {
 	if s.p == nil {
 		return nil, errors.New("cannot marshal empty signature")
 	}
+
 	return s.p.Marshal(), nil
 }
 
@@ -55,8 +59,10 @@ func UnmarshalSignature(raw []byte) (*Signature, error) {
 	if len(raw) == 0 {
 		return nil, errors.New("cannot unmarshal signature from empty slice")
 	}
+
 	p := new(bn256.G1)
 	_, err := p.Unmarshal(raw)
+
 	return &Signature{p: p}, err
 }
 
@@ -70,5 +76,6 @@ func (s Signatures) Aggregate() *Signature {
 		point := new(bn256.G1).Set(sig.p)
 		p.Add(&p, point)
 	}
+
 	return &Signature{p: &p}
 }

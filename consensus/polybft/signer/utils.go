@@ -21,12 +21,15 @@ func GenerateBlsKey() (*PrivateKey, error) {
 // CreateRandomBlsKeys creates an array of random private and their corresponding public keys
 func CreateRandomBlsKeys(total int) ([]*PrivateKey, error) {
 	blsKeys := make([]*PrivateKey, total)
+
 	for i := 0; i < total; i++ {
 		blsKey, err := GenerateBlsKey()
 		if err != nil {
 			return nil, err
 		}
+
 		blsKeys[i] = blsKey
 	}
+
 	return blsKeys, nil
 }

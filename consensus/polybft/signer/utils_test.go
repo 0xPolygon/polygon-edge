@@ -25,14 +25,15 @@ func Test_SingleSign(t *testing.T) {
 }
 
 func Test_AggregatedSign(t *testing.T) {
-	keys, err := CreateRandomBlsKeys(PARTICIPANTS_NUMBER) // create keys for validators
+	keys, err := CreateRandomBlsKeys(ParticipantsNumber) // create keys for validators
 	require.NoError(t, err)
 
 	pubKeys := collectPublicKeys(keys)
 
+	var isOk bool
+
 	signatures := Signatures{}
 	aggSignature := new(Signature)
-	isOk := false
 
 	// test all signatures at once
 	for i := 0; i < len(keys); i++ {

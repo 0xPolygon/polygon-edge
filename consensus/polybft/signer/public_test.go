@@ -10,6 +10,7 @@ import (
 func Test_PublicMarshal(t *testing.T) {
 	blsKey, err := GenerateBlsKey() // structure which holds private/public key pair
 	require.NoError(t, err)
+
 	pubKey := blsKey.PublicKey() // structure which holds public key
 
 	// marshal public key

@@ -23,6 +23,7 @@ func (p *PrivateKey) Sign(message []byte) (*Signature, error) {
 	if err != nil {
 		return &Signature{}, err
 	}
+
 	return &Signature{p: new(bn256.G1).ScalarMult(hashPoint, p.p)}, nil
 }
 
@@ -31,6 +32,7 @@ func (p *PrivateKey) MarshalJSON() ([]byte, error) {
 	if p.p == nil {
 		return nil, errors.New("cannot marshal empty private key")
 	}
+
 	return p.p.MarshalJSON()
 }
 
@@ -38,5 +40,6 @@ func (p *PrivateKey) MarshalJSON() ([]byte, error) {
 func UnmarshalPrivateKey(data []byte) (*PrivateKey, error) {
 	p := new(big.Int)
 	err := p.UnmarshalJSON(data)
+
 	return &PrivateKey{p: p}, err
 }
