@@ -9,24 +9,24 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-type Results []command.CommandResult
+type results []command.CommandResult
 
-func (r Results) GetOutput() string {
+func (r results) GetOutput() string {
 	var buffer bytes.Buffer
 
-	for _, result := range r {
-		buffer.WriteString(result.GetOutput())
+	for _, res := range r {
+		buffer.WriteString(res.GetOutput())
 	}
 
 	return buffer.String()
 }
 
-type Result struct {
+type result struct {
 	ValidatorAddr types.Address `json:"address"`
 	TxHash        types.Hash    `json:"tx_hash"`
 }
 
-func (r *Result) GetOutput() string {
+func (r *result) GetOutput() string {
 	var buffer bytes.Buffer
 
 	vals := make([]string, 0, 3)

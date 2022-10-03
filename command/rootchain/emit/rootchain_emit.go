@@ -104,7 +104,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	outputter.SetCommandResult(&Result{
+	outputter.SetCommandResult(&result{
 		ContractAddr: params.contractAddrRaw,
 		Wallets:      params.wallets,
 		Amounts:      params.amounts,

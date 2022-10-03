@@ -68,7 +68,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	defer outputter.WriteOutput()
 
 	paramsList := getParamsList()
-	results := make(Results, len(paramsList))
+	resList := make(results, len(paramsList))
 
 	for i, params := range paramsList {
 		if err := params.initSecretsManager(); err != nil {
@@ -88,13 +88,13 @@ func runCommand(cmd *cobra.Command, _ []string) {
 			return
 		}
 
-		results[i] = &Result{
+		resList[i] = &result{
 			ValidatorAddr: validatorAcc,
 			TxHash:        txHash,
 		}
 	}
 
-	outputter.SetCommandResult(results)
+	outputter.SetCommandResult(resList)
 }
 
 // getParamsList creates a list of initParams with num elements.

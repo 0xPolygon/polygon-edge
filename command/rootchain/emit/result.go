@@ -8,13 +8,13 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/helper"
 )
 
-type Result struct {
+type result struct {
 	ContractAddr string   `json:"address"`
 	Wallets      []string `json:"wallets"`
 	Amounts      []string `json:"amounts"`
 }
 
-func (r *Result) GetOutput() string {
+func (r *result) GetOutput() string {
 	var buffer bytes.Buffer
 
 	vals := make([]string, 0, 3)

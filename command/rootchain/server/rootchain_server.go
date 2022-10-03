@@ -1,7 +1,6 @@
 package server
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -69,11 +68,12 @@ func runPreRun(_ *cobra.Command, _ []string) error {
 }
 
 func runCommand(cmd *cobra.Command, _ []string) {
+	ctx := cmd.Context()
+
 	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
 	closeCh := make(chan struct{})
-	c.logger = log.New(os.Stdout, "", 0)
 
 	// check if the client is already running
 	if containerId := helper.GetRootchainID(); containerId != "" {
@@ -82,61 +82,68 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	}
 
 	// start the client
-	if err := runRootchain(closeCh); err != nil {
+	rr, err := runRootchain(ctx, closeCh)
+	if err != nil {
 		outputter.SetError(fmt.Errorf("failed to run rootchain: %s", err))
 		return
 	}
 
-	if err := pingServer(closeCh); err != nil {
+	if err = pingServer(closeCh); err != nil {
 		close(closeCh)
-		outputter.SetError(fmt.Errorf("Failed to ping rootchain server at address %s", helper.ReadRootchainIP()))
+		outputter.SetError(fmt.Errorf("failed to ping rootchain server at address %s: %s", helper.ReadRootchainIP(), err))
 
 		return
 	}
 
 	// gather the logs
-	var logsOut, logsErr bytes.Buffer
+	var glr *gatherLogsResult
 	go func() {
-		if err := gatherLogs(&logsOut, &logsErr); err != nil {
+		if glr, err = gatherLogs(ctx); err != nil {
 			outputter.SetError(fmt.Errorf("failed to gether logs: %v", err))
 			return
 		}
 	}()
 
 	// perform any initial deploy on parallel
+	var idr []initialDeployResult
 	go func() {
-		if err := initialDeploy(); err != nil {
+		if idr, err = initialDeploy(); err != nil {
 			outputter.SetError(fmt.Errorf("failed to deploy: %v", err))
 			return
 		}
 	}()
 
-	if err := handleSignals(closeCh); err != nil {
+	if err = handleSignals(ctx, closeCh); err != nil {
 		outputter.SetError(fmt.Errorf("failed to handle signals: %v", err))
+		return
 	}
+
+	fmt.Println("rr", rr)
+	fmt.Println("glr", glr)
+	fmt.Println("idr", idr)
 }
 
-func runRootchain(closeCh chan struct{}) error {
-	ctx := context.Background()
+func runRootchain(ctx context.Context, closeCh chan struct{}) (*runResult, error) {
+	var res runResult
 
 	var err error
 	if dockerClient, err = dockerclient.NewClientWithOpts(dockerclient.FromEnv); err != nil {
-		return err
+		return nil, err
 	}
 
 	// target directory for the chain
 	if err = os.MkdirAll(params.dataDir, 0700); err != nil {
-		return err
+		return nil, err
 	}
 
 	// try to pull the image
 	reader, err := dockerClient.ImagePull(ctx, "docker.io/"+imageName+":"+imageTag, dockertypes.ImagePullOptions{})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	if _, err = io.Copy(c.logger.Writer(), reader); err != nil {
-		return fmt.Errorf("cannot copy:%w", err)
+	if _, err = io.Copy(&res.imgPullOut, reader); err != nil {
+		return nil, fmt.Errorf("cannot copy: %w", err)
 	}
 
 	// create the client
@@ -161,7 +168,7 @@ func runRootchain(closeCh chan struct{}) error {
 		Image: imageName + ":" + imageTag,
 		Cmd:   args,
 		Labels: map[string]string{
-			"v3-type": "rootchain",
+			"edge-type": "rootchain",
 		},
 	}
 
@@ -196,33 +203,31 @@ func runRootchain(closeCh chan struct{}) error {
 
 	resp, err := dockerClient.ContainerCreate(ctx, config, hostConfig, nil, nil, "")
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// start the client
 	if err = dockerClient.ContainerStart(ctx, resp.ID, dockertypes.ContainerStartOptions{}); err != nil {
-		return err
+		return nil, err
 	}
 
 	dockerContainerID = resp.ID
-	c.logger.Printf("Container started: id, %s", resp.ID)
 
 	// wait for it to finish
 	go func() {
-		statusCh, errCh := dockerClient.ContainerWait(context.Background(), dockerContainerID, container.WaitConditionNotRunning)
+		statusCh, errCh := dockerClient.ContainerWait(ctx, dockerContainerID, container.WaitConditionNotRunning)
 		select {
-		case err = <-errCh:
-			c.UI.Error(fmt.Sprintf("failed to wait for container: %s", err))
+		case res.stopErr = <-errCh:
 		case status := <-statusCh:
-			c.UI.Output(fmt.Sprintf("Done with status %d", status.StatusCode))
+			res.stopStatus = status.StatusCode
 		}
 		close(closeCh)
 	}()
 
-	return nil
+	return &res, nil
 }
 
-func handleSignals(closeCh <-chan struct{}) error {
+func handleSignals(ctx context.Context, closeCh <-chan struct{}) error {
 	signalCh := make(chan os.Signal, 4)
 	signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
 
@@ -235,8 +240,6 @@ func handleSignals(closeCh <-chan struct{}) error {
 
 	// close the container if possible
 	if stop {
-		ctx := context.Background()
-
 		if err := dockerClient.ContainerStop(ctx, dockerContainerID, nil); err != nil {
 			return fmt.Errorf("failed to stop container: %v", err)
 		}
@@ -245,9 +248,7 @@ func handleSignals(closeCh <-chan struct{}) error {
 	return nil
 }
 
-func gatherLogs(stdOut, stdErr io.Writer) error {
-	ctx := context.Background()
-
+func gatherLogs(ctx context.Context) (*gatherLogsResult, error) {
 	opts := dockertypes.ContainerLogsOptions{
 		ShowStderr: true,
 		ShowStdout: true,
@@ -256,14 +257,15 @@ func gatherLogs(stdOut, stdErr io.Writer) error {
 
 	out, err := dockerClient.ContainerLogs(ctx, dockerContainerID, opts)
 	if err != nil {
-		return fmt.Errorf("failed to retrieve container logs: %v", err)
+		return nil, fmt.Errorf("failed to retrieve container logs: %v", err)
 	}
 
-	if _, err = stdcopy.StdCopy(stdOut, stdErr, out); err != nil {
-		return fmt.Errorf("failed to write container logs to the stdout: %v", err)
+	var res gatherLogsResult
+	if _, err = stdcopy.StdCopy(&res.stdOut, &res.stdErr, out); err != nil {
+		return nil, fmt.Errorf("failed to write container logs to the stdout: %v", err)
 	}
 
-	return nil
+	return &res, nil
 }
 
 func pingServer(closeCh <-chan struct{}) error {
@@ -287,37 +289,29 @@ func pingServer(closeCh <-chan struct{}) error {
 	}
 }
 
-func initialDeploy() error {
+func initialDeploy() ([]initialDeployResult, error) {
 	// if the bridge contract is not created, we have to deploy all the contracts
 	if helper.ExistsCode(helper.RootchainBridgeAddress) {
-		return nil
+		return nil, nil
 	}
 
 	// fund account
 	if _, err := helper.FundAccount(helper.GetDefAccount()); err != nil {
-		return err
+		return nil, err
 	}
 
-	deployContracts := []struct {
-		name     string
-		expected types.Address
-	}{
-		{
-			name:     "RootchainBridge",
-			expected: helper.RootchainBridgeAddress,
-		},
-		{
-			name:     "Checkpoint",
-			expected: helper.CheckpointManagerAddress,
-		},
+	var results []initialDeployResult
+	deployContracts := map[string]types.Address{
+		"RootchainBridge": helper.RootchainBridgeAddress,
+		"Checkpoint":      helper.CheckpointManagerAddress,
 	}
 
-	for _, contract := range deployContracts {
-		artifact := smartcontracts.MustReadArtifact("rootchain", contract.name)
+	for name, address := range deployContracts {
+		artifact := smartcontracts.MustReadArtifact("rootchain", name)
 
 		input, err := artifact.DeployInput(nil)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		txn := &ethgo.Transaction{
@@ -327,20 +321,24 @@ func initialDeploy() error {
 
 		pendingNonce, err := helper.GetPendingNonce(helper.GetDefAccount())
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		receipt, err := helper.SendTxn(pendingNonce, txn)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
-		if types.Address(receipt.ContractAddress) != contract.expected {
-			panic(fmt.Sprintf("wrong deployed address: expected %s but found %s", contract.expected, receipt.ContractAddress))
+		if types.Address(receipt.ContractAddress) != address {
+			return nil, fmt.Errorf("wrong deployed address: expected %s but found %s", address, receipt.ContractAddress)
 		}
 
-		c.UI.Output(fmt.Sprintf("Contract created: name=%s, address=%s", contract.name, contract.expected))
+		results = append(results, initialDeployResult{
+			name:    name,
+			address: address,
+			hash:    types.BytesToHash(receipt.TransactionHash.Bytes()),
+		})
 	}
 
-	return nil
+	return results, nil
 }
