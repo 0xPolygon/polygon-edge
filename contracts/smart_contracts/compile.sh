@@ -11,5 +11,5 @@ docker run \
   -v $PWD/contracts/smart_contracts/contracts:/usr/src/app/contracts \
   -v $PWD/contracts/smart_contracts/artifacts:/usr/src/app/artifacts \
   -v $PWD/contracts/smart_contracts/cache:/usr/src/app/cache \
-  v3_contracts_builder
+  edge_contracts_builder
 docker rm -f edge_build_contracts
