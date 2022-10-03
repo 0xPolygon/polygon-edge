@@ -66,7 +66,6 @@ require (
 	github.com/boltdb/bolt v1.3.1
 	github.com/docker/docker v20.10.18+incompatible
 	github.com/docker/go-connections v0.4.0
-	github.com/ethereum/go-ethereum v1.10.25
 	go.opentelemetry.io/otel v1.1.0
 	go.uber.org/atomic v1.10.0
 	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4

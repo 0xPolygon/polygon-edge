@@ -5,8 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/umbracle/ethgo/abi"
+
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 //go:embed artifacts/*
@@ -44,8 +45,8 @@ func ReadArtifact(chain string, name string) (*Artifact, error) {
 
 	return &Artifact{
 		Abi:              hexRes.Abi,
-		Bytecode:         hexutil.MustDecode(hexRes.Bytecode),
-		DeployedBytecode: hexutil.MustDecode(hexRes.DeployedBytecode),
+		Bytecode:         types.StringToBytes(hexRes.Bytecode),
+		DeployedBytecode: types.StringToBytes(hexRes.DeployedBytecode),
 	}, nil
 }
 
