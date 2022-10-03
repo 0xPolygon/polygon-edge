@@ -25,38 +25,42 @@ func InitGenesis(Chain *chain.Chain, initial map[types.Address]*chain.GenesisAcc
 		ValidatorSetSize: 100,
 	}
 
-	return deployContracts(config, initial)
-}
-
-func deployContracts(
-	config *PolyBFTConfig, initial map[types.Address]*chain.GenesisAccount) (
-	map[types.Address]*chain.GenesisAccount, error) {
 	acc := map[types.Address]*chain.GenesisAccount{}
 	for k, v := range initial {
 		acc[k] = v
 	}
 
+	err := deployContracts(config, &acc)
+	if err != nil {
+		return nil, err
+	}
+
+	return acc, nil
+}
+
+func deployContracts(
+	config *PolyBFTConfig, acc *map[types.Address]*chain.GenesisAccount) error {
 	// build validator constructor input
 	validatorCons := []interface{}{}
 	for _, validator := range config.Genesis {
 		blsKey, err := hex.DecodeString(validator.BlsKey)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		pubKey, err := bls.UnmarshalPublicKey(blsKey)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		int4, err := pubKey.ToBigInt()
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		enc, err := abi.Encode(int4, abi.MustNewType("uint[4]"))
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		validatorCons = append(validatorCons, map[string]interface{}{
@@ -106,19 +110,20 @@ func deployContracts(
 	for _, contract := range predefinedContracts {
 		artifact, err := polybftcontracts.ReadArtifact(contract.chain, contract.name)
 		if err != nil {
-			return nil, err
+			return err
 		}
+
 		input, err := artifact.DeployInput(contract.input)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		// it is important to keep the same sender so we will always have a deterministic validator address
 		// note again that this is only done for testing purposes.
-		acc[types.Address(contract.expected)] = &chain.GenesisAccount{
+		(*acc)[types.Address(contract.expected)] = &chain.GenesisAccount{
 			Code: input,
 		}
 	}
 
-	return acc, nil
+	return nil
 }
