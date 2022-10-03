@@ -76,7 +76,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 	pendingNonce, err := helper.GetPendingNonce(helper.GetDefAccount())
 	if err != nil {
-		outputter.SetError(fmt.Errorf("could not get pending nonce: %s", err))
+		outputter.SetError(fmt.Errorf("could not get pending nonce: %w", err))
 		return
 	}
 
@@ -91,7 +91,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 			default:
 				txn, err := createTxInput(paramsType, wallet, amount)
 				if err != nil {
-					return fmt.Errorf("failed to create tx input: %v", err)
+					return fmt.Errorf("failed to create tx input: %w", err)
 				}
 
 				if _, err = helper.SendTxn(pendingNonce+uint64(i), txn); err != nil {
@@ -104,7 +104,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	}
 
 	if err = g.Wait(); err != nil {
-		outputter.SetError(fmt.Errorf("sending transactions to rootchain failed: %s", err))
+		outputter.SetError(fmt.Errorf("sending transactions to rootchain failed: %w", err))
 		return
 	}
 
@@ -121,7 +121,7 @@ func createTxInput(paramsType string, parameters ...interface{}) (*ethgo.Transac
 
 	wrapperInput, err := abi.MustNewType(paramsType).Encode(prms)
 	if err != nil {
-		return nil, fmt.Errorf("failed to encode parsed parameters: %v", err)
+		return nil, fmt.Errorf("failed to encode parsed parameters: %w", err)
 	}
 
 	artifact := smartcontracts.MustReadArtifact("rootchain", "RootchainBridge")
@@ -129,7 +129,7 @@ func createTxInput(paramsType string, parameters ...interface{}) (*ethgo.Transac
 
 	input, err := method.Encode([]interface{}{types.StringToAddress(params.address), wrapperInput})
 	if err != nil {
-		return nil, fmt.Errorf("failed to encode provided parameters: %v", err)
+		return nil, fmt.Errorf("failed to encode provided parameters: %w", err)
 	}
 
 	return &ethgo.Transaction{

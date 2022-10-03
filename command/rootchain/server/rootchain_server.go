@@ -84,13 +84,13 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	// start the client
 	rr, err := runRootchain(ctx, closeCh)
 	if err != nil {
-		outputter.SetError(fmt.Errorf("failed to run rootchain: %s", err))
+		outputter.SetError(fmt.Errorf("failed to run rootchain: %w", err))
 		return
 	}
 
 	if err = pingServer(closeCh); err != nil {
 		close(closeCh)
-		outputter.SetError(fmt.Errorf("failed to ping rootchain server at address %s: %s", helper.ReadRootchainIP(), err))
+		outputter.SetError(fmt.Errorf("failed to ping rootchain server at address %s: %w", helper.ReadRootchainIP(), err))
 
 		return
 	}
@@ -99,7 +99,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	var glr *gatherLogsResult
 	go func() {
 		if glr, err = gatherLogs(ctx); err != nil {
-			outputter.SetError(fmt.Errorf("failed to gether logs: %v", err))
+			outputter.SetError(fmt.Errorf("failed to gether logs: %w", err))
 			return
 		}
 	}()
@@ -108,13 +108,13 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	var idr []initialDeployResult
 	go func() {
 		if idr, err = initialDeploy(); err != nil {
-			outputter.SetError(fmt.Errorf("failed to deploy: %v", err))
+			outputter.SetError(fmt.Errorf("failed to deploy: %w", err))
 			return
 		}
 	}()
 
 	if err = handleSignals(ctx, closeCh); err != nil {
-		outputter.SetError(fmt.Errorf("failed to handle signals: %v", err))
+		outputter.SetError(fmt.Errorf("failed to handle signals: %w", err))
 		return
 	}
 
@@ -241,7 +241,7 @@ func handleSignals(ctx context.Context, closeCh <-chan struct{}) error {
 	// close the container if possible
 	if stop {
 		if err := dockerClient.ContainerStop(ctx, dockerContainerID, nil); err != nil {
-			return fmt.Errorf("failed to stop container: %v", err)
+			return fmt.Errorf("failed to stop container: %w", err)
 		}
 	}
 
@@ -257,12 +257,12 @@ func gatherLogs(ctx context.Context) (*gatherLogsResult, error) {
 
 	out, err := dockerClient.ContainerLogs(ctx, dockerContainerID, opts)
 	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve container logs: %v", err)
+		return nil, fmt.Errorf("failed to retrieve container logs: %w", err)
 	}
 
 	var res gatherLogsResult
 	if _, err = stdcopy.StdCopy(&res.stdOut, &res.stdErr, out); err != nil {
-		return nil, fmt.Errorf("failed to write container logs to the stdout: %v", err)
+		return nil, fmt.Errorf("failed to write container logs to the stdout: %w", err)
 	}
 
 	return &res, nil
