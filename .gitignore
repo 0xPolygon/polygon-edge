@@ -21,6 +21,7 @@ main
 
 # exclude build folder
 artifacts
+consensus/polybft/polybftcontracts/cache
 
 # Log files
 *.log
