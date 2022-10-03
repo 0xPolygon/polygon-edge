@@ -32,6 +32,7 @@ func GetRootchainID() string {
 	for _, c := range containers {
 		if c.Labels["edge-type"] == "rootchain" {
 			contID = c.ID
+
 			break
 		}
 	}
