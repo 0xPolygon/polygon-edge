@@ -39,6 +39,7 @@ func ReadArtifact(chain string, name string) (*Artifact, error) {
 		Bytecode         string
 		DeployedBytecode string
 	}
+
 	if err = json.Unmarshal(data, &hexRes); err != nil {
 		return nil, fmt.Errorf("artifact found but no correct format: %v", err)
 	}

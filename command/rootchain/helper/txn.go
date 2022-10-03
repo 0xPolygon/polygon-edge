@@ -22,6 +22,7 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
+
 	defKey, err = wallet.NewWalletFromPrivKey(dec)
 	if err != nil {
 		panic(err)
@@ -57,8 +58,7 @@ func SendTxn(nonce uint64, txn *ethgo.Transaction) (*ethgo.Receipt, error) {
 	}
 
 	signer := wallet.NewEIP155Signer(chainID.Uint64())
-	txn, err = signer.SignTx(txn, defKey)
-	if err != nil {
+	if txn, err = signer.SignTx(txn, defKey); err != nil {
 		return nil, err
 	}
 
@@ -160,12 +160,15 @@ func waitForReceipt(client *jsonrpc.Eth, hash ethgo.Hash) (*ethgo.Receipt, error
 				return nil, err
 			}
 		}
+
 		if receipt != nil {
 			return receipt, nil
 		}
+
 		if count > 100 {
 			return nil, fmt.Errorf("timeout")
 		}
+
 		time.Sleep(50 * time.Millisecond)
 		count++
 	}

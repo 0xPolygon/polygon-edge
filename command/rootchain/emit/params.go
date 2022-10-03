@@ -15,9 +15,9 @@ var (
 )
 
 type emitParams struct {
-	contractAddrRaw string
-	wallets         []string
-	amounts         []string
+	address string
+	wallets []string
+	amounts []string
 }
 
 func (ep *emitParams) validateFlags() error {

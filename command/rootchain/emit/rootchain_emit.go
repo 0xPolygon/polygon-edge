@@ -39,7 +39,7 @@ func GetCommand() *cobra.Command {
 
 func setFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(
-		&params.contractAddrRaw,
+		&params.address,
 		contractFlag,
 		helper.SidechainBridgeAddr.String(),
 		"ERC20 bridge contract address",
@@ -68,9 +68,9 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
-	paramsType, exists := contractsToParamTypes[params.contractAddrRaw]
+	paramsType, exists := contractsToParamTypes[params.address]
 	if !exists {
-		outputter.SetError(fmt.Errorf("there are no parameter types registered for given contract address: %v", params.contractAddrRaw))
+		outputter.SetError(fmt.Errorf("no parameter types for given contract address: %v", params.address))
 		return
 	}
 
@@ -89,11 +89,15 @@ func runCommand(cmd *cobra.Command, _ []string) {
 			case <-ctx.Done():
 				return ctx.Err()
 			default:
-				nonce := pendingNonce + uint64(i)
-				txn := createTxInput(paramsType, wallet, amount)
-				if _, err = helper.SendTxn(nonce, txn); err != nil {
+				txn, err := createTxInput(paramsType, wallet, amount)
+				if err != nil {
+					return fmt.Errorf("failed to create tx input: %v", err)
+				}
+
+				if _, err = helper.SendTxn(pendingNonce+uint64(i), txn); err != nil {
 					return fmt.Errorf("sending transaction to wallet: %s with amount: %s, failed with error: %w", wallet, amount, err)
 				}
+
 				return nil
 			}
 		})
@@ -105,30 +109,31 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	}
 
 	outputter.SetCommandResult(&result{
-		ContractAddr: params.contractAddrRaw,
-		Wallets:      params.wallets,
-		Amounts:      params.amounts,
+		Address: params.address,
+		Wallets: params.wallets,
+		Amounts: params.amounts,
 	})
 }
 
-func createTxInput(paramsType string, parameters ...interface{}) *ethgo.Transaction {
+func createTxInput(paramsType string, parameters ...interface{}) (*ethgo.Transaction, error) {
 	var prms []interface{}
 	prms = append(prms, parameters...)
 
 	wrapperInput, err := abi.MustNewType(paramsType).Encode(prms)
 	if err != nil {
-		panic(fmt.Sprintf("Failed to encode parsed parameters. Error: %v", err))
+		return nil, fmt.Errorf("failed to encode parsed parameters: %v", err)
 	}
 
 	artifact := smartcontracts.MustReadArtifact("rootchain", "RootchainBridge")
 	method := artifact.Abi.Methods["emitEvent"]
-	input, err := method.Encode([]interface{}{types.StringToAddress(params.contractAddrRaw), wrapperInput})
+
+	input, err := method.Encode([]interface{}{types.StringToAddress(params.address), wrapperInput})
 	if err != nil {
-		panic(fmt.Sprintf("Failed to encode provided parameters. Error: %v", err))
+		return nil, fmt.Errorf("failed to encode provided parameters: %v", err)
 	}
 
 	return &ethgo.Transaction{
 		To:    (*ethgo.Address)(&helper.RootchainBridgeAddress),
 		Input: input,
-	}
+	}, nil
 }

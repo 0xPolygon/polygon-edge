@@ -9,16 +9,16 @@ import (
 )
 
 type result struct {
-	ContractAddr string   `json:"address"`
-	Wallets      []string `json:"wallets"`
-	Amounts      []string `json:"amounts"`
+	Address string   `json:"address"`
+	Wallets []string `json:"wallets"`
+	Amounts []string `json:"amounts"`
 }
 
 func (r *result) GetOutput() string {
 	var buffer bytes.Buffer
 
 	vals := make([]string, 0, 3)
-	vals = append(vals, fmt.Sprintf("Contract (address)|%s", r.ContractAddr))
+	vals = append(vals, fmt.Sprintf("Contract (address)|%s", r.Address))
 	vals = append(vals, fmt.Sprintf("Wallets|%s", strings.Join(r.Wallets, ", ")))
 	vals = append(vals, fmt.Sprintf("Amounts|%s", strings.Join(r.Amounts, ", ")))
 

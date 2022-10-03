@@ -300,12 +300,12 @@ func initialDeploy() ([]initialDeployResult, error) {
 		return nil, err
 	}
 
-	var results []initialDeployResult
 	deployContracts := map[string]types.Address{
 		"RootchainBridge": helper.RootchainBridgeAddress,
 		"Checkpoint":      helper.CheckpointManagerAddress,
 	}
 
+	var results []initialDeployResult
 	for name, address := range deployContracts {
 		artifact := smartcontracts.MustReadArtifact("rootchain", name)
 
