@@ -111,22 +111,6 @@ func (p *Polybft) Initialize() error {
 	// set key
 	p.key = wallet.NewKey(account)
 
-	// create pbft topic
-	pbftTopic, err := p.config.Network.NewTopic(pbftProto, &proto.GossipMessage{})
-	if err != nil {
-		return fmt.Errorf("failed to create pbft topic. Error: %v", err)
-	}
-	// set pbft topic
-	p.pbftTopic = pbftTopic
-
-	// create bridge topic
-	bridgeTopic, err := p.config.Network.NewTopic(bridgeProto, &proto.TransportMessage{})
-	if err != nil {
-		return fmt.Errorf("failed to create bridge topic. Error: %v", err)
-	}
-	// set pbft topic
-	p.bridgeTopic = bridgeTopic
-
 	// create and set syncer
 	p.syncer = syncer.NewSyncer(
 		p.config.Logger,
@@ -140,6 +124,46 @@ func (p *Polybft) Initialize() error {
 		blockchain: p.config.Blockchain,
 		executor:   p.config.Executor,
 	}
+
+	// initialize pbft engine
+	opts := []pbft.ConfigOption{
+		pbft.WithLogger(p.logger.Named("Pbft").StandardLogger(&hclog.StandardLoggerOptions{})),
+		pbft.WithTracer(otel.Tracer("Pbft")),
+	}
+	p.pbft = pbft.New(p.key, &pbftTransportWrapper{topic: p.pbftTopic}, opts...)
+
+	// create pbft topic
+	pbftTopic, err := p.config.Network.NewTopic(pbftProto, &proto.GossipMessage{})
+	if err != nil {
+		return fmt.Errorf("failed to create pbft topic. Error: %v", err)
+	}
+
+	// check pbft topic - listen for transport messages and relay them to pbft
+	err = p.pbftTopic.Subscribe(func(obj interface{}, from peer.ID) {
+		gossipMsg := obj.(*proto.GossipMessage)
+
+		var msg *pbft.MessageReq
+		if err := json.Unmarshal(gossipMsg.Data, &msg); err != nil {
+			panic(err)
+		}
+
+		p.pbft.PushMessage(msg)
+	})
+
+	if err != nil {
+		return fmt.Errorf("Topic subscription failed: %v", err)
+	}
+
+	// set pbft topic
+	p.pbftTopic = pbftTopic
+
+	// create bridge topic
+	bridgeTopic, err := p.config.Network.NewTopic(bridgeProto, &proto.TransportMessage{})
+	if err != nil {
+		return fmt.Errorf("failed to create bridge topic. Error: %v", err)
+	}
+	// set pbft topic, it will be check if/when the bridge is enabled
+	p.bridgeTopic = bridgeTopic
 
 	// set block time  Nemanja - not sure if I am going to need it
 	p.blockTime = time.Duration(p.config.BlockTime)
@@ -166,50 +190,61 @@ func (p *Polybft) Initialize() error {
 func (p *Polybft) Start() error {
 	p.logger.Info("starting consenzus")
 
-	// Start the syncer
+	// start syncer
+	if err := p.startSyncing(); err != nil {
+		return err
+	}
+
+	// start consensus
+	return p.startSealing()
+}
+
+// startSyncing starts the synchroniser
+func (p *Polybft) startSyncing() error {
+
 	if err := p.syncer.Start(); err != nil {
 		return fmt.Errorf("failed to start syncer. Error: %v", err)
 	}
+
 	go func() {
 		nullHandler := func(b *types.Block) bool {
 			return false
 		}
+
 		if err := p.syncer.Sync(nullHandler); err != nil {
 			panic(fmt.Errorf("failed to sync blocks. Error: %v", err))
+			// TO DO Nemanja - should we only log here as ibft, it seems to me that we should panic
+			// p.logger.Error("watch sync failed", "err", err)
 		}
 	}()
 
-	// start consensus
-	return p.StartSealing()
+	return nil
 }
 
-// StartSealing is executed if the PolyBFT protocol is running in sealing mode.
-func (p *Polybft) StartSealing() error {
+// startSealing is executed if the PolyBFT protocol is running in sealing mode.
+func (p *Polybft) startSealing() error {
 	p.logger.Info("Using signer", "address", p.key.String())
 
-	// at this point the p2p server is running
-	// p.transport = p.node.P2P()
-
 	// run routine until close ch is notified
-	go func() {
-		// Nemanja - probably we do not need this
-		// p.logger.Debug("Subscribing to chain head event...")
-		// defer p.logger.Debug("Ending subscription to chain head event.")
-		// chainHeadEventCh := make(chan core.ChainHeadEvent)
-		// sub := p.blockchain.SubscribeChainHeadEvent(chainHeadEventCh)
-		// defer sub.Unsubscribe()
-		for {
-			select {
-			// case msg := <-chainHeadEventCh:
-			// 	err := p.Publish(msg)
-			// 	if err != nil {
-			// 		p.logger.Warn("Error posting chain head event message", "error", err)
-			// 	}
-			case <-p.closeCh:
-				return
-			}
-		}
-	}()
+	// Nemanja - we are not subscribed to chain events
+	// go func() {
+	// 	p.logger.Debug("Subscribing to chain head event...")
+	// 	defer p.logger.Debug("Ending subscription to chain head event.")
+	// 	chainHeadEventCh := make(chan core.ChainHeadEvent)
+	// 	sub := p.blockchain.SubscribeChainHeadEvent(chainHeadEventCh)
+	// 	defer sub.Unsubscribe()
+	// 	for {
+	// 		select {
+	// 		case msg := <-chainHeadEventCh:
+	// 			err := p.Publish(msg)
+	// 			if err != nil {
+	// 				p.logger.Warn("Error posting chain head event message", "error", err)
+	// 			}
+	// 		case <-p.closeCh:
+	// 			return
+	// 		}
+	// 	}
+	// }()
 
 	// Nemanja - no old sync tracker
 	// start the sync tracker and let it run
@@ -228,34 +263,8 @@ func (p *Polybft) StartSealing() error {
 	// }
 	// p.syncTracker.init()
 
-	// create pbft at this point because we need to have the seal key
-	// which is set in the command line
-	opts := []pbft.ConfigOption{
-		pbft.WithLogger(p.logger.Named("Pbft").StandardLogger(&hclog.StandardLoggerOptions{})),
-		pbft.WithTracer(otel.Tracer("Pbft")),
-	}
-	pbftEngine := pbft.New(p.key, &pbftTransportWrapper{topic: p.pbftTopic}, opts...)
-
-	// listen for transport messages and relay them to pbft
-	err := p.pbftTopic.Subscribe(func(obj interface{}, from peer.ID) {
-		gossipMsg := obj.(*proto.GossipMessage)
-
-		var msg *pbft.MessageReq
-		if err := json.Unmarshal(gossipMsg.Data, &msg); err != nil {
-			panic(err)
-		}
-
-		pbftEngine.PushMessage(msg)
-	})
-
-	if err != nil {
-		return fmt.Errorf("Topic subscription failed: %v", err)
-	}
-
-	p.pbft = pbftEngine
-
 	if err := p.startRuntime(); err != nil {
-		return fmt.Errorf("Runtime startup  failed: %v", err)
+		return fmt.Errorf("Runtime startup failed: %v", err)
 	}
 
 	// Nemanja - do we need this?
