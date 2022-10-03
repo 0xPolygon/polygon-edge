@@ -7,7 +7,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
-	"github.com/umbracle/ethgo/jsonrpc"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/0xPolygon/polygon-edge/command"
@@ -75,14 +74,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	ipAddr := helper.ReadRootchainIP()
-	rpcClient, err := jsonrpc.NewClient(ipAddr)
-	if err != nil {
-		outputter.SetError(fmt.Errorf("could not establish new json rpc client: %s", err))
-		return
-	}
-
-	pendingNonce, err := rpcClient.Eth().GetNonce(helper.GetDefAccount(), ethgo.Pending)
+	pendingNonce, err := helper.GetPendingNonce(helper.GetDefAccount())
 	if err != nil {
 		outputter.SetError(fmt.Errorf("could not get pending nonce: %s", err))
 		return
@@ -90,7 +82,6 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 	g, ctx := errgroup.WithContext(context.Background())
 	for i := range params.wallets {
-		i := i // goroutine closure
 		wallet := params.wallets[i]
 		amount := params.amounts[i]
 		g.Go(func() error {
@@ -100,7 +91,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 			default:
 				nonce := pendingNonce + uint64(i)
 				txn := createTxInput(paramsType, wallet, amount)
-				if _, err = helper.SendTxn(rpcClient, nonce, txn); err != nil {
+				if _, err = helper.SendTxn(nonce, txn); err != nil {
 					return fmt.Errorf("sending transaction to wallet: %s with amount: %s, failed with error: %w", wallet, amount, err)
 				}
 				return nil
@@ -113,7 +104,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	outputter.SetCommandResult(&RootchainEmitResult{
+	outputter.SetCommandResult(&Result{
 		ContractAddr: params.contractAddrRaw,
 		Wallets:      params.wallets,
 		Amounts:      params.amounts,

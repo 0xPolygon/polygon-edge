@@ -20,7 +20,6 @@ import (
 	"github.com/docker/go-connections/nat"
 	"github.com/spf13/cobra"
 	"github.com/umbracle/ethgo"
-	"github.com/umbracle/ethgo/jsonrpc"
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
@@ -289,12 +288,12 @@ func PingServer(closeCh <-chan struct{}) error {
 
 func initialDeploy() error {
 	// if the bridge contract is not created, we have to deploy all the contracts
-	if helper.ExistsCode(ethgo.Address(helper.RootchainBridgeAddress)) {
+	if helper.ExistsCode(helper.RootchainBridgeAddress) {
 		return nil
 	}
 
 	// fund account
-	if err := helper.FundAccount(helper.GetDefAccount()); err != nil {
+	if _, err := helper.FundAccount(helper.GetDefAccount()); err != nil {
 		return err
 	}
 
@@ -313,10 +312,6 @@ func initialDeploy() error {
 	}
 
 	ipAddr := helper.ReadRootchainIP()
-	rpcClient, err := jsonrpc.NewClient(ipAddr)
-	if err != nil {
-		return err
-	}
 
 	for _, contract := range deployContracts {
 		artifact := smartcontracts.MustReadArtifact("rootchain", contract.name)
@@ -331,12 +326,12 @@ func initialDeploy() error {
 			Input: input,
 		}
 
-		pendingNonce, err := rpcClient.Eth().GetNonce(helper.GetDefAccount(), ethgo.Pending)
+		pendingNonce, err := helper.GetPendingNonce(helper.GetDefAccount())
 		if err != nil {
 			return err
 		}
 
-		receipt, err := helper.SendTxn(rpcClient, pendingNonce, txn)
+		receipt, err := helper.SendTxn(pendingNonce, txn)
 		if err != nil {
 			return err
 		}

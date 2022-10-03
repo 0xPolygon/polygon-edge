@@ -2,7 +2,6 @@ package fund
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/spf13/cobra"
 
@@ -11,7 +10,8 @@ import (
 )
 
 var (
-	params fundParams
+	basicParams fundParams
+	fundNumber  int
 )
 
 // GetCommand returns the rootchain fund command
@@ -30,46 +30,87 @@ func GetCommand() *cobra.Command {
 
 func setFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(
-		&params.password,
-		passwordFlag,
+		&basicParams.dataDir,
+		dataDirFlag,
 		"",
-		"password file to use for non-interactive password input",
+		"the directory for the Polygon Edge data if the local FS is used",
 	)
+
+	cmd.Flags().StringVar(
+		&basicParams.configPath,
+		configFlag,
+		"",
+		"the path to the SecretsManager config file, "+
+			"if omitted, the local FS secrets manager is used",
+	)
+
+	cmd.Flags().IntVar(
+		&fundNumber,
+		numFlag,
+		1,
+		"the flag indicating the number of accounts to be funded",
+	)
+
+	// Don't accept data-dir and config flags because they are related to different secrets managers.
+	// data-dir is about the local FS as secrets storage, config is about remote secrets manager.
+	cmd.MarkFlagsMutuallyExclusive(dataDirFlag, configFlag)
+
+	// num flag should be used with data-dir flag only so it should not be used with config flag.
+	cmd.MarkFlagsMutuallyExclusive(numFlag, configFlag)
 }
 
 func runPreRun(_ *cobra.Command, _ []string) error {
-	return nil
+	return basicParams.validateFlags()
 }
 
 func runCommand(cmd *cobra.Command, _ []string) {
 	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
-	var pwd string
-	if params.password != "" {
-		pwdRaw, err := os.ReadFile(params.password)
+	paramsList := getParamsList()
+	results := make(Results, len(paramsList))
+
+	for i, params := range paramsList {
+		if err := params.initSecretsManager(); err != nil {
+			outputter.SetError(err)
+			return
+		}
+
+		validatorAcc, err := params.getValidatorAccount()
 		if err != nil {
 			outputter.SetError(err)
-
 			return
 		}
-		pwd = string(pwdRaw)
-	}
 
-	// Read accounts from genesis
-	targets, err := utils.ReadValidatorsByRegexp("", "test-dir", pwd)
-	if err != nil {
-		outputter.SetError(err)
-
-		return
-	}
-
-	for _, target := range targets {
-		c.UI.Output(fmt.Sprintf("fund account %s", target.Account.Ecdsa.Address()))
-		if err = helper.FundAccount(target.Account.Ecdsa.Address()); err != nil {
+		txHash, err := helper.FundAccount(validatorAcc)
+		if err != nil {
 			outputter.SetError(err)
-
 			return
 		}
+
+		results[i] = &Result{
+			ValidatorAddr: validatorAcc,
+			TxHash:        txHash,
+		}
 	}
+
+	outputter.SetCommandResult(results)
+}
+
+// getParamsList creates a list of initParams with num elements.
+// This function basically copies the given initParams but updating dataDir by applying an index.
+func getParamsList() []fundParams {
+	if fundNumber == 1 {
+		return []fundParams{basicParams}
+	}
+
+	paramsList := make([]fundParams, fundNumber)
+	for i := 1; i <= fundNumber; i++ {
+		paramsList[i-1] = fundParams{
+			dataDir:    fmt.Sprintf("%s%d", basicParams.dataDir, i),
+			configPath: basicParams.configPath,
+		}
+	}
+
+	return paramsList
 }

@@ -9,6 +9,8 @@ import (
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/jsonrpc"
 	"github.com/umbracle/ethgo/wallet"
+
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 // use a deterministic wallet/private key so that the address of the deployed contracts
@@ -31,13 +33,20 @@ const (
 	defaultGasLimit = 5242880    // 0x500000
 )
 
-func GetDefAccount() ethgo.Address {
-	return defKey.Address()
+func GetDefAccount() types.Address {
+	return types.BytesToAddress(defKey.Address().Bytes())
 }
 
 // SendTxn function sends transaction to the rootchain
 // blocks until receipt hash is returned
-func SendTxn(client *jsonrpc.Client, nonce uint64, txn *ethgo.Transaction) (*ethgo.Receipt, error) {
+func SendTxn(nonce uint64, txn *ethgo.Transaction) (*ethgo.Receipt, error) {
+	ipAddr := ReadRootchainIP()
+
+	client, err := jsonrpc.NewClient(ipAddr)
+	if err != nil {
+		return nil, err
+	}
+
 	txn.GasPrice = defaultGasPrice
 	txn.Gas = defaultGasLimit
 	txn.Nonce = nonce
@@ -46,15 +55,18 @@ func SendTxn(client *jsonrpc.Client, nonce uint64, txn *ethgo.Transaction) (*eth
 	if err != nil {
 		return nil, err
 	}
+
 	signer := wallet.NewEIP155Signer(chainID.Uint64())
 	txn, err = signer.SignTx(txn, defKey)
 	if err != nil {
 		return nil, err
 	}
+
 	data, err := txn.MarshalRLPTo(nil)
 	if err != nil {
 		return nil, err
 	}
+
 	txnHash, err := client.Eth().SendRawTransaction(data)
 	if err != nil {
 		return nil, err
@@ -64,10 +76,11 @@ func SendTxn(client *jsonrpc.Client, nonce uint64, txn *ethgo.Transaction) (*eth
 	if err != nil {
 		return nil, err
 	}
+
 	return receipt, nil
 }
 
-func ExistsCode(addr ethgo.Address) bool {
+func ExistsCode(addr types.Address) bool {
 	ipAddr := ReadRootchainIP()
 
 	provider, err := jsonrpc.NewClient(ipAddr)
@@ -75,32 +88,51 @@ func ExistsCode(addr ethgo.Address) bool {
 		panic(err)
 	}
 
-	code, err := provider.Eth().GetCode(addr, ethgo.Latest)
+	code, err := provider.Eth().GetCode(ethgo.HexToAddress(addr.String()), ethgo.Latest)
 	if err != nil {
 		panic(err)
 	}
+
 	if code == "0x" {
 		return false
 	}
+
 	return true
 }
 
-func FundAccount(account ethgo.Address) error {
+func GetPendingNonce(addr types.Address) (uint64, error) {
 	ipAddr := ReadRootchainIP()
 
 	provider, err := jsonrpc.NewClient(ipAddr)
 	if err != nil {
-		return err
+		return 0, err
+	}
+
+	nonce, err := provider.Eth().GetNonce(ethgo.HexToAddress(addr.String()), ethgo.Pending)
+	if err != nil {
+		return 0, err
+	}
+
+	return nonce, nil
+}
+
+func FundAccount(account types.Address) (types.Hash, error) {
+	ipAddr := ReadRootchainIP()
+
+	provider, err := jsonrpc.NewClient(ipAddr)
+	if err != nil {
+		return types.Hash{}, err
 	}
 
 	accounts, err := provider.Eth().Accounts()
 	if err != nil {
-		return err
+		return types.Hash{}, err
 	}
 
+	acc := ethgo.HexToAddress(account.String())
 	txn := &ethgo.Transaction{
 		From:     accounts[0],
-		To:       &account,
+		To:       &acc,
 		GasPrice: defaultGasPrice,
 		Gas:      defaultGasLimit,
 		Value:    big.NewInt(1000000000000000000),
@@ -108,14 +140,15 @@ func FundAccount(account ethgo.Address) error {
 
 	txnHash, err := provider.Eth().SendTransaction(txn)
 	if err != nil {
-		return err
+		return types.Hash{}, err
 	}
+
 	receipt, err := waitForReceipt(provider.Eth(), txnHash)
 	if err != nil {
-		return err
+		return types.Hash{}, err
 	}
-	fmt.Printf("Txn Receipt: %v\n", receipt)
-	return nil
+
+	return types.BytesToHash(receipt.TransactionHash.Bytes()), nil
 }
 
 func waitForReceipt(client *jsonrpc.Eth, hash ethgo.Hash) (*ethgo.Receipt, error) {

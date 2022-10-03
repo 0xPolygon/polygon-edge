@@ -8,13 +8,13 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/helper"
 )
 
-type RootchainEmitResult struct {
+type Result struct {
 	ContractAddr string   `json:"address"`
 	Wallets      []string `json:"wallets"`
 	Amounts      []string `json:"amounts"`
 }
 
-func (r *RootchainEmitResult) GetOutput() string {
+func (r *Result) GetOutput() string {
 	var buffer bytes.Buffer
 
 	vals := make([]string, 0, 3)

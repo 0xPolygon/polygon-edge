@@ -9,7 +9,9 @@ import (
 )
 
 const (
-	passwordFlag = "password"
+	dataDirFlag = "data-dir"
+	configFlag  = "config"
+	numFlag     = "num"
 )
 
 var (
@@ -21,7 +23,6 @@ var (
 type fundParams struct {
 	dataDir    string
 	configPath string
-	password   string
 
 	secretsManager secrets.SecretsManager
 	secretsConfig  *secrets.SecretsManagerConfig
