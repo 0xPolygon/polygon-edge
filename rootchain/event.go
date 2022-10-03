@@ -1,6 +1,7 @@
 package rootchain
 
 import (
+	"github.com/0xPolygon/polygon-edge/crypto"
 	"google.golang.org/protobuf/proto"
 
 	rootProto "github.com/0xPolygon/polygon-edge/rootchain/proto"
@@ -26,7 +27,17 @@ func (e *Event) toProto() *rootProto.Event {
 	}
 }
 
-// Marshal marshals the Event into bytes
-func (e *Event) Marshal() ([]byte, error) {
+// marshal encodes the Event into bytes
+func (e *Event) marshal() ([]byte, error) {
 	return proto.Marshal(e.toProto())
+}
+
+// GetHash returns the Keccak256 hash of the event
+func (e *Event) GetHash() ([]byte, error) {
+	evData, err := e.marshal()
+	if err != nil {
+		return nil, err
+	}
+
+	return crypto.Keccak256(evData), nil
 }

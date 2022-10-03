@@ -233,8 +233,130 @@ func (t *Transition) WriteFailedReceipt(txn *types.Transaction) error {
 	return nil
 }
 
+func (t *Transition) checkAndPreProcessStateTransaction(msg *types.Transaction) (uint64, error) {
+	if msg.GasPrice.Cmp(big.NewInt(0)) != 0 {
+		return 0, NewTransitionApplicationError(
+			errors.New("gasPrice of state transaction must be zero"),
+			true,
+		)
+	}
+
+	if msg.Gas != 0 {
+		return 0, NewTransitionApplicationError(
+			errors.New("gas of state transaction must be zero"),
+			true,
+		)
+	}
+
+	if msg.From != types.ZeroAddress {
+		return 0, NewTransitionApplicationError(
+			errors.New("from of state transaction must be zero"),
+			true,
+		)
+	}
+
+	if msg.To == nil || *msg.To == types.ZeroAddress {
+		return 0, NewTransitionApplicationError(
+			errors.New("to of state transaction must be specified"),
+			true,
+		)
+	}
+
+	// FIXME: unbounded gas limit for now because it's hard to estimate how much the gas is used
+	// and not decided in spec yet
+	return math.MaxInt64, nil
+}
+
+func (t *Transition) applyStateTx(msg *types.Transaction) (*runtime.ExecutionResult, error) {
+	//availableGas, err := t.checkAndPreProcessTransaction(txn, msg)
+	availableGas, err := t.checkAndPreProcessStateTransaction(msg)
+	if err != nil {
+		return nil, err
+	}
+
+	gasPrice := new(big.Int).Set(msg.GasPrice)
+	value := new(big.Int).Set(msg.Value)
+
+	// Set the specific transaction fields in the context
+	t.ctx.GasPrice = types.BytesToHash(gasPrice.Bytes())
+	t.ctx.Origin = msg.From
+
+	var result *runtime.ExecutionResult
+	if msg.IsContractCreation() {
+		result = t.Create2(msg.From, msg.Input, value, availableGas)
+	} else {
+		result = t.Call2(msg.From, *msg.To, msg.Input, value, availableGas)
+	}
+
+	return result, nil
+}
+
+func (t *Transition) writeStateTx(tx *types.Transaction) error {
+	// Make a local copy and apply the transaction
+	msg := tx.Copy()
+
+	s := t.state.Snapshot() //nolint:ifshort
+	result, err := t.applyStateTx(msg)
+
+	if err != nil {
+		t.state.RevertToSnapshot(s)
+	}
+
+	if t.r.PostHook != nil {
+		t.r.PostHook(t)
+	}
+
+	if err != nil {
+		t.logger.Error("failed to apply tx", "err", err)
+
+		return err
+	}
+
+	logs := t.state.Logs()
+
+	var root []byte
+
+	receipt := &types.Receipt{
+		CumulativeGasUsed: t.totalGas,
+		TxHash:            tx.Hash,
+		GasUsed:           result.GasUsed,
+	}
+
+	if t.config.Byzantium {
+		// The suicided accounts are set as deleted for the next iteration
+		t.state.CleanDeleteObjects(true)
+
+		if result.Failed() {
+			receipt.SetStatus(types.ReceiptFailed)
+		} else {
+			receipt.SetStatus(types.ReceiptSuccess)
+		}
+	} else {
+		ss, aux := t.state.Commit(t.config.EIP155)
+		t.state = NewTxn(t.auxState, ss)
+		root = aux
+		receipt.Root = types.BytesToHash(root)
+	}
+
+	// if the transaction created a contract, store the creation address in the receipt.
+	if msg.To == nil {
+		receipt.ContractAddress = crypto.CreateAddress(msg.From, tx.Nonce).Ptr()
+	}
+
+	// Set the receipt logs and create a bloom for filtering
+	receipt.Logs = logs
+	receipt.LogsBloom = types.CreateBloom([]*types.Receipt{receipt})
+	t.receipts = append(t.receipts, receipt)
+
+	return nil
+}
+
 // Write writes another transaction to the executor
 func (t *Transition) Write(txn *types.Transaction) error {
+	if txn.Type == types.StateTx {
+		return t.writeStateTx(txn)
+	}
+
 	signer := crypto.NewSigner(t.config, uint64(t.r.config.ChainID))
 
 	var err error

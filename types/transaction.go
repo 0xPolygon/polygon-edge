@@ -1,11 +1,41 @@
 package types
 
 import (
+	"fmt"
 	"math/big"
 	"sync/atomic"
 
 	"github.com/0xPolygon/polygon-edge/helper/keccak"
 )
+
+type TxType byte
+
+const (
+	LegacyTx TxType = 0x0
+	StateTx  TxType = 0x7f
+)
+
+func TxTypeFromByte(b byte) (TxType, error) {
+	tt := TxType(b)
+
+	switch tt {
+	case LegacyTx, StateTx:
+		return tt, nil
+	default:
+		return tt, fmt.Errorf("unknown transaction type: %d", b)
+	}
+}
+
+func (t TxType) String() (s string) {
+	switch t {
+	case LegacyTx:
+		return "LegacyTx"
+	case StateTx:
+		return "StateTx"
+	}
+
+	return
+}
 
 type Transaction struct {
 	Nonce    uint64
@@ -20,8 +50,14 @@ type Transaction struct {
 	Hash     Hash
 	From     Address
 
+	Type TxType
+
 	// Cache
 	size atomic.Value
+}
+
+func (t *Transaction) IsLegacyTx() bool {
+	return t.Type == LegacyTx
 }
 
 // IsContractCreation checks if tx is contract creation
@@ -31,14 +67,11 @@ func (t *Transaction) IsContractCreation() bool {
 
 // ComputeHash computes the hash of the transaction
 func (t *Transaction) ComputeHash() *Transaction {
-	ar := marshalArenaPool.Get()
 	hash := keccak.DefaultKeccakPool.Get()
-
-	v := t.MarshalRLPWith(ar)
-	hash.WriteRlp(t.Hash[:0], v)
-
-	marshalArenaPool.Put(ar)
-	keccak.DefaultKeccakPool.Put(hash)
+	if _, err := hash.Write(t.MarshalRLP()); err == nil {
+		hash.Sum(t.Hash[:0])
+		keccak.DefaultKeccakPool.Put(hash)
+	}
 
 	return t
 }

@@ -10,7 +10,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/e2e/framework"
 	"github.com/0xPolygon/polygon-edge/rootchain"
 	"github.com/0xPolygon/polygon-edge/rootchain/payload"
@@ -58,6 +57,7 @@ func TestSAMUEL_Start(t *testing.T) {
 		transport:    transport,
 		storage:      storage,
 		eventTracker: eventTracker,
+		samp:         mockSAMP{},
 	}
 
 	// Make sure there were no errors in starting
@@ -95,10 +95,11 @@ func TestSAMUEL_GetStartBlockNumber_Predefined(t *testing.T) {
 	}
 
 	// Get the start block number
-	startBlock, err := s.getStartBlockNumber()
+	startBlock, startIndex, err := s.getStartBlockNumber()
 
 	assert.NoError(t, err)
 	assert.Equal(t, storedBlockNumber, startBlock)
+	assert.Equal(t, storedEventIndex, startIndex)
 }
 
 func TestSAMUEL_GetLatestStartBlock(t *testing.T) {
@@ -109,10 +110,11 @@ func TestSAMUEL_GetLatestStartBlock(t *testing.T) {
 	}
 
 	// Get the start block number
-	startBlock, err := s.getStartBlockNumber()
+	startBlock, startIndex, err := s.getStartBlockNumber()
 
 	assert.NoError(t, err)
 	assert.Equal(t, rootchain.LatestRootchainBlockNumber, startBlock)
+	assert.Equal(t, uint64(0), startIndex)
 }
 
 func TestSAMUEL_NewSamuel(t *testing.T) {
@@ -178,7 +180,7 @@ func TestSAMUEL_GetEventPayload(t *testing.T) {
 			[]byte{},
 			math.MaxUint64,
 			nil,
-			errUnknownPayloadType,
+			payload.ErrUnknownPayloadType,
 		},
 		{
 			"Validator Set Payload type",
@@ -195,13 +197,13 @@ func TestSAMUEL_GetEventPayload(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			resPayload, payloadErr := getEventPayload(
+			resPayload, payloadErr := payload.GetEventPayload(
 				testCase.eventPayload,
 				testCase.payloadType,
 			)
 
 			if testCase.expectedErr != nil {
-				assert.ErrorIs(t, payloadErr, errUnknownPayloadType)
+				assert.ErrorIs(t, payloadErr, payload.ErrUnknownPayloadType)
 				assert.Nil(t, resPayload)
 			} else {
 				assert.NoError(t, payloadErr)
@@ -239,7 +241,7 @@ func TestSAMUEL_RegisterGossipHandler(t *testing.T) {
 		Index:       event.Index,
 		BlockNumber: event.BlockNumber,
 		Payload:     vsPayload,
-	}).Marshal()
+	}).GetHash()
 	if err != nil {
 		t.Fatalf("unable to hash rootchain event, %v", err)
 	}
@@ -249,7 +251,7 @@ func TestSAMUEL_RegisterGossipHandler(t *testing.T) {
 		childchainBlockNumber uint64         = 10
 		addedSAM              *rootchain.SAM = nil
 		sam                                  = &proto.SAM{
-			Hash:                  crypto.Keccak256(eventHash),
+			Hash:                  eventHash,
 			Signature:             signature,
 			ChildchainBlockNumber: childchainBlockNumber,
 			Event:                 event,
