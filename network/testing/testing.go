@@ -86,6 +86,8 @@ type getRandomPeerDelegate func() *peer.ID
 type fetchAndSetTemporaryDialDelegate func(peer.ID, bool) bool
 type removeTemporaryDialDelegate func(peer.ID)
 
+func (m *MockNetworkingServer) TemporaryDialPeer(peerAddrInfo *peer.AddrInfo) {}
+
 func (m *MockNetworkingServer) NewIdentityClient(peerID peer.ID) (proto.IdentityClient, error) {
 	if m.newIdentityClientFn != nil {
 		return m.newIdentityClientFn(peerID)
