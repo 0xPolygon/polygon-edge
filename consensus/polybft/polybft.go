@@ -120,7 +120,7 @@ func (p *Polybft) Initialize() error {
 	p.pbftTopic = pbftTopic
 
 	// create bridge topic
-	bridgeTopic, err := p.config.Network.NewTopic(bridgeProto, &proto.GossipMessage{})
+	bridgeTopic, err := p.config.Network.NewTopic(bridgeProto, &proto.TransportMessage{})
 	if err != nil {
 		return fmt.Errorf("failed to create bridge topic. Error: %v", err)
 	}
@@ -144,7 +144,7 @@ func (p *Polybft) Initialize() error {
 	// set block time  Nemanja - not sure if I am going to need it
 	p.blockTime = time.Duration(p.config.BlockTime)
 
-	//p.dataDir = node.ResolvePath("polybft")  Nemanja - what to do with this
+	// p.dataDir = node.ResolvePath("polybft")  Nemanja - what to do with this
 	p.dataDir = "./polybft" // Nemanja - check this
 	// create the data dir if not exists
 	if err := os.MkdirAll(p.dataDir, 0755); err != nil {
@@ -188,7 +188,7 @@ func (p *Polybft) StartSealing() error {
 	p.logger.Info("Using signer", "address", p.key.String())
 
 	// at this point the p2p server is running
-	//p.transport = p.node.P2P()
+	// p.transport = p.node.P2P()
 
 	// run routine until close ch is notified
 	go func() {
@@ -260,7 +260,7 @@ func (p *Polybft) StartSealing() error {
 
 	// Nemanja - do we need this?
 	// Indicate that we are ready to accept transactions
-	//p.eth.SetSynced()
+	// p.eth.SetSynced()
 
 	go func() {
 		// start the pbft process
@@ -333,8 +333,12 @@ func (p *Polybft) startRuntime() error {
 
 	if runtime.IsBridgeEnabled() {
 		err := p.bridgeTopic.Subscribe(func(obj interface{}, from peer.ID) {
-			msg := obj.(*TransportMessage)
-			if _, err := p.runtime.deliverMessage(msg); err != nil {
+			msg := obj.(*proto.TransportMessage)
+			var transportMsg *TransportMessage
+			if err := json.Unmarshal(msg.Data, &transportMsg); err != nil {
+				panic(err)
+			}
+			if _, err := p.runtime.deliverMessage(transportMsg); err != nil {
 				p.logger.Warn(fmt.Sprintf("Failed to deliver message. Error: %s", err))
 			}
 		})
