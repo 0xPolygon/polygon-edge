@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -41,7 +42,7 @@ type BlockBuilderParams struct {
 	// Parent block
 	Parent *types.Header
 
-	State *state.Transition
+	Executor *state.Executor
 
 	// Coinbase that is signing the block
 	Coinbase types.Address
@@ -54,9 +55,6 @@ type BlockBuilderParams struct {
 
 	// Vanity extra for the block
 	Extra []byte
-
-	// Executor for EVM execution
-	//Transition txEvmTransition
 
 	// GasLimit is the gas limit for the block
 	GasLimit uint64
@@ -130,13 +128,6 @@ func (b *BlockBuilder) Reset() {
 	b.block = nil
 	b.txns = []*types.Transaction{}
 	b.receipts = []*types.Receipt{}
-
-	// b.signer = types.MakeSigner(b.params.ChainConfig, b.header.Number)
-
-	// should this be copied? probably not
-	b.state = b.params.State
-
-	b.state = &state.Transition{} // TODO: build snapshot somehow from  b.params (by using state.NewSnapshotAt?)
 }
 
 // Block returns the built block if nil, it is not built yet
@@ -145,29 +136,49 @@ func (b *BlockBuilder) Block() *types.Block {
 }
 
 // Build creates the state and the final block
-func (b *BlockBuilder) Build(handler func(h *types.Header)) *StateBlock {
+func (b *BlockBuilder) Build(handler func(h *types.Header)) (*StateBlock, error) {
 	if handler != nil {
 		handler(b.header)
 	}
-	// build the block and write the state
-	// b.header.Root = b.state.IntermediateRoot(true)
-	b.header.StateRoot = types.Hash{} // set somehow state root with executor or something else after Ferran's changes
-	b.block = NewFinalBlock(b.header, b.txns, b.receipts)
 
-	// TODO: Nemanja - see what to do with gas later
+	// TODO: Nemanja - see what to do with gas
 	// calculate gas limit based on parent header
-	// gasLimit, err := b.blockchain.CalculateGasLimit(header.Number)
+	//gasLimit, err := b.blockchain.CalculateGasLimit(header.Number)
 	// if err != nil {
 	// 	return nil, err
 	// }
-
 	// header.GasLimit = gasLimit
+
+	transition, err := b.params.Executor.BeginTxn(b.header.ParentHash, b.header, b.params.Coinbase)
+	if err != nil {
+		return nil, err
+	}
+
+	// Nemanja - fill transactions
+	// txs := i.writeTransactions(gasLimit, header.Number, transition)
+
+	// if err := i.PreCommitState(header, transition); err != nil {
+	// 	return nil, err
+	// }
+
+	_, root := transition.Commit()
+	b.header.StateRoot = root
+	b.header.GasUsed = transition.TotalGas()
+
+	// build the block
+	b.block = consensus.BuildBlock(consensus.BuildBlockParams{
+		Header:   b.header,
+		Txns:     b.txns,
+		Receipts: transition.Receipts(),
+	})
+
+	b.block.Header.ComputeHash()
 
 	return &StateBlock{
 		Block:    b.block,
-		Receipts: b.receipts,
-		State:    nil, // TO DO Nemanja - fix this somehow
-	}
+		Receipts: transition.Receipts(),
+		State:    transition,
+	}, nil
 }
 
 /*
@@ -274,15 +285,4 @@ type StateBlock struct {
 	Block    *types.Block
 	Receipts []*types.Receipt
 	State    *state.Transition
-}
-
-func NewFinalBlock(header *types.Header, txs []*types.Transaction, receipts []*types.Receipt) *types.Block {
-	b := &types.Block{Header: header.Copy()}
-	if len(txs) != len(receipts) {
-		panic("cannot create block: number of receipts and txs is not the same")
-	}
-
-	// TODO: Nemanja - there are no thx and receipts, so leve everithing as default
-
-	return b
 }

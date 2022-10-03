@@ -21,7 +21,7 @@ type blockBuilder interface {
 	Reset()
 	// CommitTransaction(tx *types.Transaction) error
 	// Fill(ctx context.Context) error
-	Build(func(h *types.Header)) *StateBlock
+	Build(func(h *types.Header)) (*StateBlock, error)
 	GetState() *state.Transition
 }
 
@@ -152,7 +152,7 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 
 	f.logger.Debug("Fill block", "time", time.Since(now))
 
-	stateBlock := f.blockBuilder.Build(func(h *types.Header) {
+	stateBlock, err := f.blockBuilder.Build(func(h *types.Header) {
 		h.Timestamp = uint64(headerTime.Unix())
 		h.ExtraData = append(make([]byte, 32), extra.MarshalRLPTo(nil)...)
 		h.MixHash = PolyMixDigest

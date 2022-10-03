@@ -5,6 +5,7 @@ import (
 	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
+	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo"
@@ -51,9 +52,6 @@ type blockchainBackend interface {
 
 	// GetSystemState creates a new instance of SystemState interface
 	GetSystemState(config *PolyBFTConfig, provider contract.Provider) SystemState
-
-	// PeersLen returns the number of peers the node is connected to
-	//PeersLen() int
 }
 
 var _ blockchainBackend = &blockchainWrapper{}
@@ -81,65 +79,38 @@ func (p *blockchainWrapper) CommitBlock(stateBlock *StateBlock) error {
 	// }
 }
 
-// PeersLen returns the number of peers the node is connected to
-// func (p *blockchainWrapper) PeersLen() int {
-// 	return p.eth.PeersLen()
-// }
-
 // ProcessBlock builds a final block from given 'block' on top of 'parent'
 func (p *blockchainWrapper) ProcessBlock(parent *types.Header, block *types.Block) (*StateBlock, error) {
 	// TODO: Call validate block in polybft
 
-	// state, err := p.blockchain.StateAt(parent.Root)
-	// if err != nil {
-	// 	return nil, err
-	// }
+	header := block.Header.Copy()
 
-	// TODO: Nemanja: no transactions for now, leave empty receipts
-	var receipts []*types.Receipt
-
-	// var usedGas uint64
-	// gasPool := core.GasPool(block.GasLimit)
-	header := block.Header
-
-	// for index, txn := range block.Transactions() {
-	// 	state.Prepare(txn.Hash(), index)
-	// 	receipt, err := core.ApplyTransaction(
-	// 		p.blockchain.Config(),
-	// 		p.blockchain,
-	// 		&header.Coinbase,
-	// 		&gasPool,
-	// 		state,
-	// 		header,
-	// 		txn,
-	// 		&usedGas,
-	// 		vm.Config{},
-	// 	)
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
-	// 	receipts = append(receipts, receipt)
-	// }
-
-	// build the state
-	// root := state.IntermediateRoot(true)
-	// if root != block.Header.StateRoot {
-	// 	return nil, fmt.Errorf("incorrect state root: (%s, %s)", root, block.Root())
-	// }
-
-	// build the final block: Nemanja it is the same as propsal since there is no transactions
-	found := NewFinalBlock(header, block.Transactions, receipts)
-	if found.Hash() != block.Hash() {
-		return nil, fmt.Errorf("incorrect block hash: (%s, %s)", found.Hash(), block.Hash())
+	//transition, err := p.executor.BeginTxn(parent.Hash, header, b.params.Coinbase)
+	transition, err := p.executor.BeginTxn(parent.Hash, header, types.Address{})
+	if err != nil {
+		return nil, err
 	}
 
-	builtBlock := &StateBlock{
+	// Nemanja - apply transactions from block
+
+	_, root := transition.Commit()
+
+	if root != block.Header.StateRoot {
+		return nil, fmt.Errorf("incorrect state root: (%s, %s)", root, block.Header.StateRoot)
+	}
+
+	// build the block
+	found := consensus.BuildBlock(consensus.BuildBlockParams{
+		Header:   header,
+		Txns:     block.Transactions,
+		Receipts: transition.Receipts(),
+	})
+
+	return &StateBlock{
 		Block:    found,
-		Receipts: receipts,
-		State:    nil,
-	}
-
-	return builtBlock, nil
+		Receipts: transition.Receipts(),
+		State:    transition,
+	}, nil
 }
 
 // GetStateProviderForBlock is an implementation of blockchainBackend interface
@@ -152,6 +123,7 @@ func (p *blockchainWrapper) GetStateProviderForBlock(header *types.Header) (cont
 	if err != nil {
 		return nil, err
 	}
+
 	return NewStateProvider(transition), nil
 }
 
@@ -172,21 +144,14 @@ func (p *blockchainWrapper) GetHeaderByHash(hash types.Hash) (*types.Header, boo
 
 // NewBlockBuilder is an implementation of blockchainBackend interface
 func (p *blockchainWrapper) NewBlockBuilder(parent *types.Header, coinbase types.Address) (blockBuilder, error) {
-	parentHeader, found := p.GetHeaderByHash(parent.ParentHash)
-	if !found {
-		return nil, fmt.Errorf("failed to retrieve parent header for hash %s", parent.ParentHash.String())
-	}
-	transition, err := p.executor.BeginTxn(parentHeader.StateRoot, parent, coinbase)
-	if err != nil {
-		return nil, err
-	}
+
 	return NewBlockBuilder(&BlockBuilderParams{
 		Parent:      parent,
 		Coinbase:    coinbase,
 		ChainConfig: p.blockchain.Config(),
 		//ChainContext:  p.blockchain,
 		//TxPoolFactory: blockbuilder.NewEthTxPool(p.eth.TxPool()),
-		State:    transition,
+		Executor: p.executor,
 		GasLimit: 10000000, // TODO: Nemanja - see what to do with this (p.eth.GenesisGasLimit(),)
 	}), nil
 }
