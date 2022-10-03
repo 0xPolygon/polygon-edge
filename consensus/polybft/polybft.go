@@ -225,92 +225,14 @@ func (p *Polybft) startSyncing() error {
 func (p *Polybft) startSealing() error {
 	p.logger.Info("Using signer", "address", p.key.String())
 
-	// run routine until close ch is notified
-	// Nemanja - we are not subscribed to chain events
-	// go func() {
-	// 	p.logger.Debug("Subscribing to chain head event...")
-	// 	defer p.logger.Debug("Ending subscription to chain head event.")
-	// 	chainHeadEventCh := make(chan core.ChainHeadEvent)
-	// 	sub := p.blockchain.SubscribeChainHeadEvent(chainHeadEventCh)
-	// 	defer sub.Unsubscribe()
-	// 	for {
-	// 		select {
-	// 		case msg := <-chainHeadEventCh:
-	// 			err := p.Publish(msg)
-	// 			if err != nil {
-	// 				p.logger.Warn("Error posting chain head event message", "error", err)
-	// 			}
-	// 		case <-p.closeCh:
-	// 			return
-	// 		}
-	// 	}
-	// }()
-
-	// Nemanja - no old sync tracker
-	// start the sync tracker and let it run
-	// p.syncTracker = &syncTracker{
-	// 	closeCh:   p.closeCh,
-	// 	lastBlock: p.blockchain.CurrentHeader(),
-	// 	pubSub:    p,
-	// 	isValidatorCallback: func(header *types.Header) bool {
-	// 		snapshot, err := p.GetValidators(header.Number.Uint64(), nil)
-	// 		if err != nil {
-	// 			return false
-	// 		}
-	// 		return snapshot.ContainsNodeID(p.key.NodeID())
-	// 	},
-	// 	logger: p.logger.New("module", "sync-tracker"),
-	// }
-	// p.syncTracker.init()
-
 	if err := p.startRuntime(); err != nil {
 		return fmt.Errorf("Runtime startup failed: %v", err)
 	}
-
-	// Nemanja - do we need this?
-	// Indicate that we are ready to accept transactions
-	// p.eth.SetSynced()
 
 	go func() {
 		// start the pbft process
 		p.startPbftProcess()
 	}()
-
-	// Nemanja - no dev logs for now
-	// if p.DevPort != 0 {
-	// 	go func() {
-	// 		p.logger.Error("Debug toolkit started")
-	// 		mux := http.NewServeMux()
-	// 		mux.HandleFunc("/consensus", func(writer http.ResponseWriter, request *http.Request) {
-	// 			writer.Header().Set("X-Content-Type-Options", "nosniff")
-	// 			writer.Header().Set("Content-Type", "; charset=utf-8")
-
-	// 			r := struct {
-	// 				Locked   bool
-	// 				State    string
-	// 				Round    uint64
-	// 				Proposal *pbft.Proposal
-	// 			}{
-	// 				Locked:   p.pbft.IsLocked(),
-	// 				State:    p.pbft.GetState().String(),
-	// 				Round:    p.pbft.Round(),
-	// 				Proposal: p.pbft.GetProposal(),
-	// 			}
-	// 			err := json.NewEncoder(writer).Encode(r)
-	// 			if err != nil {
-	// 				p.logger.Warn("dump handler err", "err", err)
-	// 			}
-	// 		})
-	// 		mux.HandleFunc("/consensus/state", pbft.ConsensusStateHandler(p.pbft))
-	// 		mux.HandleFunc("/debug/pprof/", pprof.Index)
-	// 		mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
-	// 		mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
-	// 		mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-	// 		mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
-
-	// 		p.logger.Error("Server", "err", http.ListenAndServe(":"+strconv.FormatUint(p.DevPort, 10), mux))
-	// 	}()
-	// }
 
 	return nil
 }
@@ -369,7 +291,10 @@ func (p *Polybft) startPbftProcess() {
 SYNC:
 	p.runtime.setIsValidator(false)
 
-	lastBlock := p.syncer.waitToStartValidating()
+	//for (syncer.GetSyncProgression())
+
+	lastBlock := p.getLatestAfterSync()
+
 	if lastBlock == nil {
 		// channel closed
 		return
@@ -404,6 +329,10 @@ SYNC:
 			return
 		}
 	}
+}
+
+func (p *Polybft) getLatestAfterSync() *types.Header {
+	return nil
 }
 
 // runCycle runs a single cycle of the state machine and indicates if node should exit the consensus or keep on running

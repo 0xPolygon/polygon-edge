@@ -256,8 +256,8 @@ func (f *fsm) Validate(proposal *pbft.Proposal) error {
 
 	// validate header fields
 	if err := validateHeaderFields(f.parent, block.Header); err != nil {
-		return fmt.Errorf("failed to validate header (parent header#%d, current header#%d): %v",
-			f.parent.Number, block.Number, err)
+		return fmt.Errorf("failed to validate header (parent header# %d, current header#%d): %v",
+			f.parent.Number, block.Number(), err)
 	}
 
 	blockExtra, err := GetIbftExtra(block.Header.ExtraData)
