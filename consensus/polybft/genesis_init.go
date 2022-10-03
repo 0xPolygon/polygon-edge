@@ -1,10 +1,10 @@
-package polybftcontracts
+package polybft
 
 import (
 	"encoding/hex"
 
 	"github.com/0xPolygon/polygon-edge/chain"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/polybftcontracts"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo"
@@ -19,8 +19,17 @@ var (
 	SidechainERC20BridgeAddr = ethgo.HexToAddress("0x8Be503bcdEd90ED42Eff31f56199399B2b0154CA")
 )
 
-func PopulateGenesis(
-	config *polybft.PolyBFTConfig, initial map[types.Address]*chain.GenesisAccount) (
+func InitGenesis(Chain *chain.Chain, initial map[types.Address]*chain.GenesisAccount) (
+	map[types.Address]*chain.GenesisAccount, error) {
+	config := &PolyBFTConfig{
+		ValidatorSetSize: 100,
+	}
+
+	return deployContracts(config, initial)
+}
+
+func deployContracts(
+	config *PolyBFTConfig, initial map[types.Address]*chain.GenesisAccount) (
 	map[types.Address]*chain.GenesisAccount, error) {
 	acc := map[types.Address]*chain.GenesisAccount{}
 	for k, v := range initial {
@@ -95,7 +104,7 @@ func PopulateGenesis(
 	// to call the init in validator smart contract we do not need much more context in the evm object
 	// that is why many fields are set as default (as of now).
 	for _, contract := range predefinedContracts {
-		artifact, err := ReadArtifact(contract.chain, contract.name)
+		artifact, err := polybftcontracts.ReadArtifact(contract.chain, contract.name)
 		if err != nil {
 			return nil, err
 		}
