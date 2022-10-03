@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -15,7 +16,7 @@ import (
 
 	dockertypes "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/client"
+	dockerclient "github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/go-connections/nat"
 	"github.com/spf13/cobra"
@@ -35,7 +36,9 @@ const (
 )
 
 var (
-	params serverParams
+	params            serverParams
+	dockerClient      *dockerclient.Client
+	dockerContainerID string
 )
 
 // GetCommand returns the rootchain server command
@@ -69,100 +72,57 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
+	closeCh := make(chan struct{})
 	c.logger = log.New(os.Stdout, "", 0)
 
 	// check if the client is already running
 	if containerId := helper.GetRootchainID(); containerId != "" {
 		outputter.SetError(fmt.Errorf("rootchain already running: %s", containerId))
-
 		return
 	}
 
 	// start the client
-	if err := runRootchain(); err != nil {
+	if err := runRootchain(closeCh); err != nil {
 		outputter.SetError(fmt.Errorf("failed to run rootchain: %s", err))
-
 		return
 	}
 
-	if err := PingServer(c.closeCh); err != nil {
-		close(c.closeCh)
+	if err := pingServer(closeCh); err != nil {
+		close(closeCh)
 		outputter.SetError(fmt.Errorf("Failed to ping rootchain server at address %s", helper.ReadRootchainIP()))
 
 		return
 	}
 
 	// gather the logs
-	go gatherLogs()
+	var logsOut, logsErr bytes.Buffer
+	go func() {
+		if err := gatherLogs(&logsOut, &logsErr); err != nil {
+			outputter.SetError(fmt.Errorf("failed to gether logs: %v", err))
+			return
+		}
+	}()
 
 	// perform any initial deploy on parallel
 	go func() {
 		if err := initialDeploy(); err != nil {
 			outputter.SetError(fmt.Errorf("failed to deploy: %v", err))
-
 			return
 		}
 	}()
 
-	return handleSignals()
+	if err := handleSignals(closeCh); err != nil {
+		outputter.SetError(fmt.Errorf("failed to handle signals: %v", err))
+	}
 }
 
-func handleSignals() int {
-	signalCh := make(chan os.Signal, 4)
-	signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
-
-	stop := true
-	select {
-	case sig := <-signalCh:
-		c.UI.Output(fmt.Sprintf("Caught signal: %v", sig))
-		c.UI.Output("Gracefully shutting down rootchain server...")
-	case <-c.closeCh:
-		stop = false
-	}
-
-	// close the container if possible
-	if stop {
-		ctx := context.Background()
-
-		if err := c.client.ContainerStop(ctx, c.id, nil); err != nil {
-			c.UI.Error(fmt.Sprintf("Failed to stop container: %v", err))
-		}
-	}
-
-	return 0
-}
-
-func gatherLogs() {
+func runRootchain(closeCh chan struct{}) error {
 	ctx := context.Background()
 
-	opts := dockertypes.ContainerLogsOptions{
-		ShowStderr: true,
-		ShowStdout: true,
-		Follow:     true,
-	}
-	out, err := c.client.ContainerLogs(ctx, c.id, opts)
-	if err != nil {
-		panic(fmt.Errorf("Failed to retrieve container logs. Error: %v", err))
-	}
-
-	_, err = stdcopy.StdCopy(os.Stdout, os.Stderr, out)
-	if err != nil {
-		panic(fmt.Errorf("Failed to write container logs to the stdout. Error: %v", err))
-	}
-
-	fmt.Println("Docker container logs retrieval done")
-}
-
-func runRootchain() error {
-	c.closeCh = make(chan struct{})
-
-	ctx := context.Background()
-
-	cli, err := client.NewClientWithOpts(client.FromEnv)
-	if err != nil {
+	var err error
+	if dockerClient, err = dockerclient.NewClientWithOpts(dockerclient.FromEnv); err != nil {
 		return err
 	}
-	c.client = cli
 
 	// target directory for the chain
 	if err = os.MkdirAll(params.dataDir, 0700); err != nil {
@@ -170,13 +130,12 @@ func runRootchain() error {
 	}
 
 	// try to pull the image
-	reader, err := cli.ImagePull(ctx, "docker.io/"+imageName+":"+imageTag, dockertypes.ImagePullOptions{})
+	reader, err := dockerClient.ImagePull(ctx, "docker.io/"+imageName+":"+imageTag, dockertypes.ImagePullOptions{})
 	if err != nil {
 		return err
 	}
 
-	_, err = io.Copy(c.logger.Writer(), reader)
-	if err != nil {
+	if _, err = io.Copy(c.logger.Writer(), reader); err != nil {
 		return fmt.Errorf("cannot copy:%w", err)
 	}
 
@@ -234,37 +193,80 @@ func runRootchain() error {
 		},
 		AutoRemove: true,
 	}
-	resp, err := cli.ContainerCreate(ctx, config, hostConfig, nil, nil, "")
+
+	resp, err := dockerClient.ContainerCreate(ctx, config, hostConfig, nil, nil, "")
 	if err != nil {
 		return err
 	}
 
 	// start the client
-	if err = cli.ContainerStart(ctx, resp.ID, dockertypes.ContainerStartOptions{}); err != nil {
+	if err = dockerClient.ContainerStart(ctx, resp.ID, dockertypes.ContainerStartOptions{}); err != nil {
 		return err
 	}
-	c.id = resp.ID
+
+	dockerContainerID = resp.ID
 	c.logger.Printf("Container started: id, %s", resp.ID)
 
 	// wait for it to finish
 	go func() {
-		statusCh, errCh := c.client.ContainerWait(context.Background(), c.id, container.WaitConditionNotRunning)
+		statusCh, errCh := dockerClient.ContainerWait(context.Background(), dockerContainerID, container.WaitConditionNotRunning)
 		select {
 		case err = <-errCh:
 			c.UI.Error(fmt.Sprintf("failed to wait for container: %s", err))
 		case status := <-statusCh:
 			c.UI.Output(fmt.Sprintf("Done with status %d", status.StatusCode))
 		}
-		close(c.closeCh)
+		close(closeCh)
 	}()
 
 	return nil
 }
 
-func PingServer(closeCh <-chan struct{}) error {
-	if closeCh == nil {
-		closeCh = make(chan struct{})
+func handleSignals(closeCh <-chan struct{}) error {
+	signalCh := make(chan os.Signal, 4)
+	signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
+
+	stop := true
+	select {
+	case <-signalCh:
+	case <-closeCh:
+		stop = false
 	}
+
+	// close the container if possible
+	if stop {
+		ctx := context.Background()
+
+		if err := dockerClient.ContainerStop(ctx, dockerContainerID, nil); err != nil {
+			return fmt.Errorf("failed to stop container: %v", err)
+		}
+	}
+
+	return nil
+}
+
+func gatherLogs(stdOut, stdErr io.Writer) error {
+	ctx := context.Background()
+
+	opts := dockertypes.ContainerLogsOptions{
+		ShowStderr: true,
+		ShowStdout: true,
+		Follow:     true,
+	}
+
+	out, err := dockerClient.ContainerLogs(ctx, dockerContainerID, opts)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve container logs: %v", err)
+	}
+
+	if _, err = stdcopy.StdCopy(stdOut, stdErr, out); err != nil {
+		return fmt.Errorf("failed to write container logs to the stdout: %v", err)
+	}
+
+	return nil
+}
+
+func pingServer(closeCh <-chan struct{}) error {
 	httpTimer := time.NewTimer(30 * time.Second)
 	httpClient := http.Client{
 		Timeout: 5 * time.Second,
@@ -275,8 +277,7 @@ func PingServer(closeCh <-chan struct{}) error {
 		case <-time.After(500 * time.Millisecond):
 			resp, err := httpClient.Post(fmt.Sprintf("http://%s:%s", defaultHostIP, defaultHostPort), "application/json", nil)
 			if err == nil {
-				resp.Body.Close()
-				return nil
+				return resp.Body.Close()
 			}
 		case <-httpTimer.C:
 			return fmt.Errorf("timeout to start http")
@@ -311,8 +312,6 @@ func initialDeploy() error {
 		},
 	}
 
-	ipAddr := helper.ReadRootchainIP()
-
 	for _, contract := range deployContracts {
 		artifact := smartcontracts.MustReadArtifact("rootchain", contract.name)
 
@@ -339,7 +338,9 @@ func initialDeploy() error {
 		if types.Address(receipt.ContractAddress) != contract.expected {
 			panic(fmt.Sprintf("wrong deployed address: expected %s but found %s", contract.expected, receipt.ContractAddress))
 		}
+
 		c.UI.Output(fmt.Sprintf("Contract created: name=%s, address=%s", contract.name, contract.expected))
 	}
+
 	return nil
 }
