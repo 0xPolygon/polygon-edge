@@ -32,7 +32,7 @@ type blockchainBackend interface {
 	CommitBlock(stateBlock *StateBlock) error
 
 	// NewBlockBuilder is a factory method that returns a block builder on top of 'parent'.
-	NewBlockBuilder(parent *types.Header) (blockBuilder, error)
+	NewBlockBuilder(parent *types.Header, coinbase types.Address) (blockBuilder, error)
 
 	// ProcessBlock builds a final block from given 'block' on top of 'parent'.
 	ProcessBlock(parent *types.Header, block *types.Block) (*StateBlock, error)
@@ -49,17 +49,11 @@ type blockchainBackend interface {
 	// GetHeaderByHash returns a reference to block header for the given block hash
 	GetHeaderByHash(hash types.Hash) (*types.Header, bool)
 
-	// GetHeaderByHash returns a reference to block header for the given block hash
-	GetHeader(hash types.Hash, number uint64) (*types.Header, bool)
-
 	// GetSystemState creates a new instance of SystemState interface
 	GetSystemState(config *PolyBFTConfig, provider contract.Provider) SystemState
 
 	// PeersLen returns the number of peers the node is connected to
 	//PeersLen() int
-
-	// SetCoinbase sets the coinbase data
-	SetCoinbase(coinbase types.Address)
 }
 
 var _ blockchainBackend = &blockchainWrapper{}
@@ -67,7 +61,6 @@ var _ blockchainBackend = &blockchainWrapper{}
 type blockchainWrapper struct {
 	executor   *state.Executor
 	blockchain *blockchain.Blockchain
-	coinbase   types.Address // TODO: This is suspicious (shouldn't we use coinbase as Header.Miner field)?
 }
 
 // CurrentHeader returns the header of blockchain block head
@@ -92,11 +85,6 @@ func (p *blockchainWrapper) CommitBlock(stateBlock *StateBlock) error {
 // func (p *blockchainWrapper) PeersLen() int {
 // 	return p.eth.PeersLen()
 // }
-
-// SetCoinbase sets the coinbase data
-func (p *blockchainWrapper) SetCoinbase(coinbase types.Address) {
-	p.coinbase = coinbase
-}
 
 // ProcessBlock builds a final block from given 'block' on top of 'parent'
 func (p *blockchainWrapper) ProcessBlock(parent *types.Header, block *types.Block) (*StateBlock, error) {
@@ -182,13 +170,8 @@ func (p *blockchainWrapper) GetHeaderByHash(hash types.Hash) (*types.Header, boo
 	return p.blockchain.GetHeaderByHash(hash)
 }
 
-// GetHeaderByHash returns a reference to block header for the given block hash
-func (p *blockchainWrapper) GetHeader(hash types.Hash, number uint64) (*types.Header, bool) {
-	return p.blockchain.GetHeader(hash, number)
-}
-
 // NewBlockBuilder is an implementation of blockchainBackend interface
-func (p *blockchainWrapper) NewBlockBuilder(parent *types.Header) (blockBuilder, error) {
+func (p *blockchainWrapper) NewBlockBuilder(parent *types.Header, coinbase types.Address) (blockBuilder, error) {
 	parentHeader, found := p.GetHeaderByHash(parent.ParentHash)
 	if !found {
 		return nil, fmt.Errorf("failed to retrieve parent header for hash %s", parent.ParentHash.String())
@@ -199,7 +182,7 @@ func (p *blockchainWrapper) NewBlockBuilder(parent *types.Header) (blockBuilder,
 	}
 	return NewBlockBuilder(&BlockBuilderParams{
 		Parent:      parent,
-		Coinbase:    p.coinbase,
+		Coinbase:    coinbase,
 		ChainConfig: p.blockchain.Config(),
 		//ChainContext:  p.blockchain,
 		//TxPoolFactory: blockbuilder.NewEthTxPool(p.eth.TxPool()),

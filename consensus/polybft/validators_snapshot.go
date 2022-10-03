@@ -5,30 +5,27 @@ import (
 	"sync"
 
 	"github.com/0xPolygon/polygon-edge/types"
-	hcf "github.com/hashicorp/go-hclog"
+	"github.com/hashicorp/go-hclog"
 )
 
+// TODO: Should we switch validators snapshot to Edge implementation? (validators/store/snapshot/snapshot.go)
 type validatorsSnapshotCache struct {
 	snapshots  map[uint64]AccountSet
 	state      *State
 	epochSize  uint64
 	blockchain blockchainBackend
 	lock       sync.Mutex
-	logger     hcf.Logger
+	logger     hclog.Logger
 }
 
 // newValidatorsSnapshotCache initializes a new instance of validatorsSnapshotCache
-func newValidatorsSnapshotCache(state *State, epochSize uint64, blockchain blockchainBackend) *validatorsSnapshotCache {
+func newValidatorsSnapshotCache(logger hclog.Logger, state *State, epochSize uint64, blockchain blockchainBackend) *validatorsSnapshotCache {
 	return &validatorsSnapshotCache{
 		snapshots:  map[uint64]AccountSet{},
 		state:      state,
 		epochSize:  epochSize,
 		blockchain: blockchain,
-		// todo pass logger from the caller?
-		logger: hcf.New(&hcf.LoggerOptions{
-			Name:  "validator-snapshot",
-			Level: hcf.LevelFromString("INFO"),
-		}),
+		logger:     logger.Named("validators_snapshot"),
 	}
 }
 
@@ -141,13 +138,13 @@ func (v *validatorsSnapshotCache) computeSnapshot(
 	epochEndBlockNumber uint64,
 	parents []*types.Header,
 ) (AccountSet, error) {
-	// log.Trace("Compute snapshot started...", "BlockNumber", epochEndBlockNumber)
+	v.logger.Trace("Compute snapshot started...", "BlockNumber", epochEndBlockNumber)
 	var header *types.Header
 	if len(parents) > 0 {
 		for i := len(parents) - 1; i >= 0; i-- {
 			parentHeader := parents[i]
 			if parentHeader.Number == epochEndBlockNumber {
-				// log.Trace("Compute snapshot. Found header in parents", "Header", parentHeader.Number.Uint64())
+				v.logger.Trace("Compute snapshot. Found header in parents", "Header", parentHeader.Number)
 				header = parentHeader
 				break
 			}

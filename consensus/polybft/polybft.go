@@ -25,10 +25,9 @@ import (
 )
 
 const (
-	DefaultEpochSize = 10
-	minSyncPeers     = 2
-	pbftProto        = "/pbft/0.2"
-	bridgeProto      = "/bridge/0.2"
+	minSyncPeers = 2
+	pbftProto    = "/pbft/0.2"
+	bridgeProto  = "/bridge/0.2"
 )
 
 // polybftBackend is an interface defining polybft methods needed by fsm and sync tracker
@@ -49,7 +48,7 @@ func Factory(params *consensus.Params) (consensus.Consensus, error) {
 		closeCh: make(chan struct{}),
 		logger:  params.Logger,
 	}
-
+	polybft.initializeCustomConfig()
 	return polybft, nil
 }
 
@@ -65,6 +64,9 @@ type Polybft struct {
 
 	// consensus parametres
 	config *consensus.Params
+
+	// customConfig is genesis configuration for polybft consensus protocol
+	customConfig *PolyBFTConfig
 
 	// blockchain is a reference to the blockchain object
 	blockchain blockchainBackend
@@ -155,7 +157,7 @@ func (p *Polybft) Initialize() error {
 	}
 
 	p.state = stt
-	p.validatorsCache = newValidatorsSnapshotCache(stt, DefaultEpochSize, p.blockchain)
+	p.validatorsCache = newValidatorsSnapshotCache(p.config.Logger, stt, p.customConfig.EpochSize, p.blockchain)
 
 	return nil
 }
@@ -184,9 +186,6 @@ func (p *Polybft) Start() error {
 // StartSealing is executed if the PolyBFT protocol is running in sealing mode.
 func (p *Polybft) StartSealing() error {
 	p.logger.Info("Using signer", "address", p.key.String())
-
-	// set miner
-	p.blockchain.SetCoinbase(types.Address(p.key.Address()))
 
 	// at this point the p2p server is running
 	//p.transport = p.node.P2P()
@@ -307,10 +306,16 @@ func (p *Polybft) StartSealing() error {
 	return nil
 }
 
+func (p *Polybft) initializeCustomConfig() {
+	// TODO: deserialize custom configuration
+	// customConfigGeneric := p.config.Config.Config
+	p.customConfig = nil
+}
+
 // startRuntime starts consensus runtime
 func (p *Polybft) startRuntime() error {
 	runtimeConfig := &runtimeConfig{
-		PolyBFTConfig:  p.config.PolyBFT,
+		PolyBFTConfig:  p.customConfig,
 		Key:            p.key,
 		DataDir:        p.dataDir,
 		Transport:      &bridgeTransportWrapper{topic: p.bridgeTopic},
@@ -419,8 +424,8 @@ func (p *Polybft) waitForNPeers() bool {
 		case <-time.After(2 * time.Second):
 		}
 
-		num := p.config.Network.numPeers()
-		if num >= minSyncPeers {
+		numPeers := len(p.config.Network.Peers())
+		if numPeers >= minSyncPeers {
 			break
 		}
 	}
@@ -440,13 +445,13 @@ func (p *Polybft) GetSyncProgression() *progress.Progression {
 
 // VerifyHeader implements consensus.Engine and checks whether a header conforms to the consensus rules
 func (p *Polybft) VerifyHeader(header *types.Header) error {
-	// Short circuit if the header is known, or its parent not
-	header, ok := p.blockchain.GetHeader(header.Hash, header.Number)
-	if !ok {
+	// Short circuit if the header is known
+	header, ok := p.blockchain.GetHeaderByHash(header.Hash)
+	if ok {
 		return nil
 	}
 
-	parent, ok := p.blockchain.GetHeaderByNumber(header.Number - 1)
+	parent, ok := p.blockchain.GetHeaderByHash(header.ParentHash)
 	if !ok {
 		return fmt.Errorf(
 			"unable to get parent header for block number %d",

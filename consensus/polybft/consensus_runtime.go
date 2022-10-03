@@ -179,7 +179,7 @@ func (c *consensusRuntime) FSM() (*fsm, error) {
 		return nil, errNotAValidator
 	}
 
-	blockBuilder, err := c.config.blockchain.NewBlockBuilder(parent)
+	blockBuilder, err := c.config.blockchain.NewBlockBuilder(parent, types.Address(c.config.Key.Address()))
 	if err != nil {
 		return nil, err
 	}
