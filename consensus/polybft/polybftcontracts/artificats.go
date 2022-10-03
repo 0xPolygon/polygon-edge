@@ -17,6 +17,7 @@ func MustReadArtifact(chain string, name string) *Artifact {
 	if err != nil {
 		panic(err)
 	}
+
 	return artifact
 }
 
@@ -42,8 +43,9 @@ func ReadArtifact(chain string, name string) (*Artifact, error) {
 		Bytecode         string
 		DeployedBytecode string
 	}
+
 	if err := json.Unmarshal(data, &hexRes); err != nil {
-		return nil, fmt.Errorf("artifact found but no correct format: %v", err)
+		return nil, fmt.Errorf("artifact found but no correct format: %w", err)
 	}
 
 	res := &Artifact{
@@ -51,6 +53,7 @@ func ReadArtifact(chain string, name string) (*Artifact, error) {
 		Bytecode:         hex.MustDecodeHex(hexRes.Bytecode),
 		DeployedBytecode: hex.MustDecodeHex(hexRes.DeployedBytecode),
 	}
+
 	return res, nil
 }
 
@@ -69,7 +72,9 @@ func (a *Artifact) DeployInput(args []interface{}) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		input = append(input, argsInput...)
 	}
+
 	return input, nil
 }
