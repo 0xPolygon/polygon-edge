@@ -38,6 +38,10 @@ lint:
 generate-bsd-licenses:
 	./generate_dependency_licenses.sh BSD-3-Clause,BSD-2-Clause > ./licenses/bsd_licenses.json
 
+.PHONY: compile-smart-contracts
+compile-smart-contracts:
+	./contracts/smart_contracts/compile.sh
+
 .PHONY: test
 test:
 	go test -timeout=20m `go list ./... | grep -v e2e`
