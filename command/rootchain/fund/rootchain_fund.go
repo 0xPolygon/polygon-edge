@@ -73,18 +73,21 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	for i, params := range paramsList {
 		if err := params.initSecretsManager(); err != nil {
 			outputter.SetError(err)
+
 			return
 		}
 
 		validatorAcc, err := params.getValidatorAccount()
 		if err != nil {
 			outputter.SetError(err)
+
 			return
 		}
 
 		txHash, err := helper.FundAccount(validatorAcc)
 		if err != nil {
 			outputter.SetError(err)
+
 			return
 		}
 

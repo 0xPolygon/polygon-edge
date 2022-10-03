@@ -76,8 +76,9 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	closeCh := make(chan struct{})
 
 	// check if the client is already running
-	if containerId := helper.GetRootchainID(); containerId != "" {
-		outputter.SetError(fmt.Errorf("rootchain already running: %s", containerId))
+	if containerID := helper.GetRootchainID(); containerID != "" {
+		outputter.SetError(fmt.Errorf("rootchain already running: %s", containerID))
+
 		return
 	}
 
@@ -85,6 +86,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	rr, err := runRootchain(ctx, closeCh)
 	if err != nil {
 		outputter.SetError(fmt.Errorf("failed to run rootchain: %w", err))
+
 		return
 	}
 
@@ -101,6 +103,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	go func() {
 		if glr, err = gatherLogs(ctx); err != nil {
 			outputter.SetError(fmt.Errorf("failed to gether logs: %w", err))
+
 			return
 		}
 	}()
@@ -111,12 +114,14 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	go func() {
 		if idr, err = initialDeploy(); err != nil {
 			outputter.SetError(fmt.Errorf("failed to deploy: %w", err))
+
 			return
 		}
 	}()
 
 	if err = handleSignals(ctx, closeCh); err != nil {
 		outputter.SetError(fmt.Errorf("failed to handle signals: %w", err))
+
 		return
 	}
 
@@ -307,8 +312,7 @@ func initialDeploy() ([]initialDeployResult, error) {
 		"RootchainBridge": helper.RootchainBridgeAddress,
 		"Checkpoint":      helper.CheckpointManagerAddress,
 	}
-
-	var results []initialDeployResult
+	results := make([]initialDeployResult, 0, len(deployContracts))
 
 	for name, address := range deployContracts {
 		artifact := smartcontracts.MustReadArtifact("rootchain", name)

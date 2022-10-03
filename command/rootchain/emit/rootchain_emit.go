@@ -70,12 +70,14 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	paramsType, exists := contractsToParamTypes[params.address]
 	if !exists {
 		outputter.SetError(fmt.Errorf("no parameter types for given contract address: %v", params.address))
+
 		return
 	}
 
 	pendingNonce, err := helper.GetPendingNonce(helper.GetDefAccount())
 	if err != nil {
 		outputter.SetError(fmt.Errorf("could not get pending nonce: %w", err))
+
 		return
 	}
 
@@ -106,6 +108,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 	if err = g.Wait(); err != nil {
 		outputter.SetError(fmt.Errorf("sending transactions to rootchain failed: %w", err))
+
 		return
 	}
 
