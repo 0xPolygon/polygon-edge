@@ -2,6 +2,7 @@ package polybft
 
 import (
 	"encoding/hex"
+	"time"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/polybftcontracts"
@@ -17,12 +18,24 @@ var (
 	SidechainBridgeAddr      = ethgo.HexToAddress("0x5a443704dd4B594B382c22a083e2BD3090A6feF3")
 	sidechainERC20Addr       = ethgo.HexToAddress("0x47e9Fbef8C83A1714F1951F142132E6e90F5fa5D")
 	SidechainERC20BridgeAddr = ethgo.HexToAddress("0x8Be503bcdEd90ED42Eff31f56199399B2b0154CA")
+
+	defaultEpochSize  = uint64(10)
+	defaultSprintSize = uint64(5)
+	validatorSetSize  = 100
+	defaultBlockTime  = 2 * time.Second
 )
 
-func InitGenesis(Chain *chain.Chain, initial map[types.Address]*chain.GenesisAccount) (
+func InitGenesis(_ *chain.Chain, initial map[types.Address]*chain.GenesisAccount) (
 	map[types.Address]*chain.GenesisAccount, error) {
 	config := &PolyBFTConfig{
-		ValidatorSetSize: 100,
+		// TODO: Figure out how to persist and load PolyBFTConfig fields
+		// TODO: Genesis, Bridge
+		BlockTime:           defaultBlockTime,
+		EpochSize:           defaultEpochSize,
+		SprintSize:          defaultSprintSize,
+		ValidatorSetSize:    validatorSetSize,
+		ValidatorSetAddr:    types.Address(ValidatorSetAddr),
+		SidechainBridgeAddr: types.Address(SidechainBridgeAddr),
 	}
 
 	acc := map[types.Address]*chain.GenesisAccount{}
@@ -30,7 +43,7 @@ func InitGenesis(Chain *chain.Chain, initial map[types.Address]*chain.GenesisAcc
 		acc[k] = v
 	}
 
-	err := deployContracts(config, &acc)
+	err := deployContracts(config, acc)
 	if err != nil {
 		return nil, err
 	}
@@ -39,7 +52,7 @@ func InitGenesis(Chain *chain.Chain, initial map[types.Address]*chain.GenesisAcc
 }
 
 func deployContracts(
-	config *PolyBFTConfig, acc *map[types.Address]*chain.GenesisAccount) error {
+	config *PolyBFTConfig, acc map[types.Address]*chain.GenesisAccount) error {
 	// build validator constructor input
 	validatorCons := []interface{}{}
 	for _, validator := range config.Genesis {
@@ -120,7 +133,7 @@ func deployContracts(
 
 		// it is important to keep the same sender so we will always have a deterministic validator address
 		// note again that this is only done for testing purposes.
-		(*acc)[types.Address(contract.expected)] = &chain.GenesisAccount{
+		acc[types.Address(contract.expected)] = &chain.GenesisAccount{
 			Code: input,
 		}
 	}
