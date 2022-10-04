@@ -52,6 +52,8 @@ type blockchainBackend interface {
 
 	// GetSystemState creates a new instance of SystemState interface
 	GetSystemState(config *PolyBFTConfig, provider contract.Provider) SystemState
+
+	SubscribeEvents() blockchain.Subscription
 }
 
 var _ blockchainBackend = &blockchainWrapper{}
@@ -159,6 +161,10 @@ func (p *blockchainWrapper) NewBlockBuilder(parent *types.Header, coinbase types
 // GetSystemState is an implementation of blockchainBackend interface
 func (p *blockchainWrapper) GetSystemState(config *PolyBFTConfig, provider contract.Provider) SystemState {
 	return NewSystemState(config, provider)
+}
+
+func (p *blockchainWrapper) SubscribeEvents() blockchain.Subscription {
+	return p.blockchain.SubscribeEvents()
 }
 
 var _ contract.Provider = &stateProvider{}
