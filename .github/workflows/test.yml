@@ -19,14 +19,6 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install Polygon Edge
-        run: go install -race -a .
-        env:
-          GO111MODULE: on  # yamllint disable-line rule:truthy
-          CGO_ENABLED: '1'
-          GOARC: amd64
-          GOOS: linux
-
       - name: Run Go Test
         run: go test -coverprofile coverage.out -timeout 20m `go list ./... | grep -v e2e`
 
