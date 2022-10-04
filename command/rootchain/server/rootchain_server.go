@@ -75,82 +75,70 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 	closeCh := make(chan struct{})
 
-	// check if the client is already running
+	// Check if the client is already running
 	if containerID := helper.GetRootchainID(); containerID != "" {
 		outputter.SetError(fmt.Errorf("rootchain already running: %s", containerID))
 
 		return
 	}
 
-	// start the client
-	rr, err := runRootchain(ctx, closeCh)
-	if err != nil {
+	// Start the client
+	if err := runRootchain(ctx, outputter, closeCh); err != nil {
 		outputter.SetError(fmt.Errorf("failed to run rootchain: %w", err))
 
 		return
 	}
 
-	if err = pingServer(closeCh); err != nil {
+	// Ping geth server to make sure everything is up and running
+	if err := pingServer(closeCh); err != nil {
 		close(closeCh)
 		outputter.SetError(fmt.Errorf("failed to ping rootchain server at address %s: %w", helper.ReadRootchainIP(), err))
 
 		return
 	}
 
-	// gather the logs
-	var glr *gatherLogsResult
+	// perform any initial deploy  of contracts
+	if err := initialDeploy(outputter); err != nil {
+		close(closeCh)
+		outputter.SetError(fmt.Errorf("failed to deploy: %w", err))
 
+		return
+	}
+
+	// Gather the logs
 	go func() {
-		if glr, err = gatherLogs(ctx); err != nil {
+		if err := gatherLogs(ctx, outputter); err != nil {
 			outputter.SetError(fmt.Errorf("failed to gether logs: %w", err))
 
 			return
 		}
 	}()
 
-	// perform any initial deploy on parallel
-	var idr []initialDeployResult
-
-	go func() {
-		if idr, err = initialDeploy(); err != nil {
-			outputter.SetError(fmt.Errorf("failed to deploy: %w", err))
-
-			return
-		}
-	}()
-
-	if err = handleSignals(ctx, closeCh); err != nil {
+	if err := handleSignals(ctx, closeCh); err != nil {
 		outputter.SetError(fmt.Errorf("failed to handle signals: %w", err))
-
-		return
 	}
-
-	fmt.Println("rr", rr)
-	fmt.Println("glr", glr)
-	fmt.Println("idr", idr)
 }
 
-func runRootchain(ctx context.Context, closeCh chan struct{}) (*runResult, error) {
-	var res runResult
-
+func runRootchain(ctx context.Context, outputter command.OutputFormatter, closeCh chan struct{}) error {
 	var err error
 	if dockerClient, err = dockerclient.NewClientWithOpts(dockerclient.FromEnv); err != nil {
-		return nil, err
+		return err
 	}
 
 	// target directory for the chain
 	if err = os.MkdirAll(params.dataDir, 0700); err != nil {
-		return nil, err
+		return err
 	}
 
 	// try to pull the image
 	reader, err := dockerClient.ImagePull(ctx, "docker.io/"+imageName+":"+imageTag, dockertypes.ImagePullOptions{})
 	if err != nil {
-		return nil, err
+		return err
 	}
+	defer reader.Close()
 
-	if _, err = io.Copy(&res.imgPullOut, reader); err != nil {
-		return nil, fmt.Errorf("cannot copy: %w", err)
+	if _, err = io.Copy(outputter, reader); err != nil {
+		return fmt.Errorf("cannot copy: %w", err)
 	}
 
 	// create the client
@@ -211,12 +199,12 @@ func runRootchain(ctx context.Context, closeCh chan struct{}) (*runResult, error
 
 	resp, err := dockerClient.ContainerCreate(ctx, config, hostConfig, nil, nil, "")
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// start the client
 	if err = dockerClient.ContainerStart(ctx, resp.ID, dockertypes.ContainerStartOptions{}); err != nil {
-		return nil, err
+		return err
 	}
 
 	dockerContainerID = resp.ID
@@ -225,38 +213,74 @@ func runRootchain(ctx context.Context, closeCh chan struct{}) (*runResult, error
 	go func() {
 		statusCh, errCh := dockerClient.ContainerWait(ctx, dockerContainerID, container.WaitConditionNotRunning)
 		select {
-		case res.stopErr = <-errCh:
+		case err = <-errCh:
+			outputter.SetError(err)
 		case status := <-statusCh:
-			res.stopStatus = status.StatusCode
+			outputter.SetCommandResult(containerStopResult{
+				Status: status.StatusCode,
+				Err:    status.Error.Message,
+			})
 		}
 		close(closeCh)
 	}()
 
-	return &res, nil
+	return nil
 }
 
-func handleSignals(ctx context.Context, closeCh <-chan struct{}) error {
-	signalCh := make(chan os.Signal, 4)
-	signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
-
-	stop := true
-	select {
-	case <-signalCh:
-	case <-closeCh:
-		stop = false
+func initialDeploy(outputter command.OutputFormatter) error {
+	// if the bridge contract is not created, we have to deploy all the contracts
+	if helper.ExistsCode(helper.RootchainBridgeAddress) {
+		return nil
 	}
 
-	// close the container if possible
-	if stop {
-		if err := dockerClient.ContainerStop(ctx, dockerContainerID, nil); err != nil {
-			return fmt.Errorf("failed to stop container: %w", err)
+	// fund account
+	if _, err := helper.FundAccount(helper.GetDefAccount()); err != nil {
+		return err
+	}
+
+	deployContracts := map[string]types.Address{
+		"RootchainBridge": helper.RootchainBridgeAddress,
+		"Checkpoint":      helper.CheckpointManagerAddress,
+	}
+
+	for name, address := range deployContracts {
+		artifact := smartcontracts.MustReadArtifact("rootchain", name)
+
+		input, err := artifact.DeployInput(nil)
+		if err != nil {
+			return err
 		}
+
+		txn := &ethgo.Transaction{
+			To:    nil, // contract deployment
+			Input: input,
+		}
+
+		pendingNonce, err := helper.GetPendingNonce(helper.GetDefAccount())
+		if err != nil {
+			return err
+		}
+
+		receipt, err := helper.SendTxn(pendingNonce, txn)
+		if err != nil {
+			return err
+		}
+
+		if types.Address(receipt.ContractAddress) != address {
+			return fmt.Errorf("wrong deployed address for %s: expected %s but found %s", name, address, receipt.ContractAddress)
+		}
+
+		outputter.WriteCommandResult(initialDeployResult{
+			Name:    name,
+			Address: address,
+			Hash:    types.BytesToHash(receipt.TransactionHash.Bytes()),
+		})
 	}
 
 	return nil
 }
 
-func gatherLogs(ctx context.Context) (*gatherLogsResult, error) {
+func gatherLogs(ctx context.Context, outputter command.OutputFormatter) error {
 	opts := dockertypes.ContainerLogsOptions{
 		ShowStderr: true,
 		ShowStdout: true,
@@ -265,15 +289,14 @@ func gatherLogs(ctx context.Context) (*gatherLogsResult, error) {
 
 	out, err := dockerClient.ContainerLogs(ctx, dockerContainerID, opts)
 	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve container logs: %w", err)
+		return fmt.Errorf("failed to retrieve container logs: %w", err)
 	}
 
-	var res gatherLogsResult
-	if _, err = stdcopy.StdCopy(&res.stdOut, &res.stdErr, out); err != nil {
-		return nil, fmt.Errorf("failed to write container logs to the stdout: %w", err)
+	if _, err = stdcopy.StdCopy(outputter, outputter, out); err != nil {
+		return fmt.Errorf("failed to write container logs to the stdout: %w", err)
 	}
 
-	return &res, nil
+	return nil
 }
 
 func pingServer(closeCh <-chan struct{}) error {
@@ -297,56 +320,23 @@ func pingServer(closeCh <-chan struct{}) error {
 	}
 }
 
-func initialDeploy() ([]initialDeployResult, error) {
-	// if the bridge contract is not created, we have to deploy all the contracts
-	if helper.ExistsCode(helper.RootchainBridgeAddress) {
-		return nil, nil
+func handleSignals(ctx context.Context, closeCh <-chan struct{}) error {
+	signalCh := make(chan os.Signal, 4)
+	signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
+
+	stop := true
+	select {
+	case <-signalCh:
+	case <-closeCh:
+		stop = false
 	}
 
-	// fund account
-	if _, err := helper.FundAccount(helper.GetDefAccount()); err != nil {
-		return nil, err
+	// close the container if possible
+	if stop {
+		if err := dockerClient.ContainerStop(ctx, dockerContainerID, nil); err != nil {
+			return fmt.Errorf("failed to stop container: %w", err)
+		}
 	}
 
-	deployContracts := map[string]types.Address{
-		"RootchainBridge": helper.RootchainBridgeAddress,
-		"Checkpoint":      helper.CheckpointManagerAddress,
-	}
-	results := make([]initialDeployResult, 0, len(deployContracts))
-
-	for name, address := range deployContracts {
-		artifact := smartcontracts.MustReadArtifact("rootchain", name)
-
-		input, err := artifact.DeployInput(nil)
-		if err != nil {
-			return nil, err
-		}
-
-		txn := &ethgo.Transaction{
-			To:    nil, // contract deployment
-			Input: input,
-		}
-
-		pendingNonce, err := helper.GetPendingNonce(helper.GetDefAccount())
-		if err != nil {
-			return nil, err
-		}
-
-		receipt, err := helper.SendTxn(pendingNonce, txn)
-		if err != nil {
-			return nil, err
-		}
-
-		if types.Address(receipt.ContractAddress) != address {
-			return nil, fmt.Errorf("wrong deployed address: expected %s but found %s", address, receipt.ContractAddress)
-		}
-
-		results = append(results, initialDeployResult{
-			name:    name,
-			address: address,
-			hash:    types.BytesToHash(receipt.TransactionHash.Bytes()),
-		})
-	}
-
-	return results, nil
+	return nil
 }

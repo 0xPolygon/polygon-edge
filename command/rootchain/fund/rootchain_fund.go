@@ -68,7 +68,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	defer outputter.WriteOutput()
 
 	paramsList := getParamsList()
-	resList := make(results, len(paramsList))
+	resList := make(command.Results, len(paramsList))
 
 	for i, params := range paramsList {
 		if err := params.initSecretsManager(); err != nil {
