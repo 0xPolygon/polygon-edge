@@ -319,12 +319,10 @@ func (p *Polybft) startPbftProcess() {
 				currentBlockNum := p.blockchain.CurrentHeader().Number
 				if ev.Source == "syncer" {
 					if ev.NewChain[0].Number < currentBlockNum {
-						// The blockchain notification system can eventually deliver
-						// stale block notifications. These should be ignored
 						continue
 					}
 				}
-				if p.syncer.GetSyncProgression().HighestBlock == currentBlockNum {
+				if p.isSynced() {
 					syncerBlockCh <- currentBlockNum
 				}
 
@@ -332,7 +330,6 @@ func (p *Polybft) startPbftProcess() {
 				return
 			}
 		}
-
 	}()
 
 	defer newBlockSub.Close()
@@ -340,12 +337,10 @@ func (p *Polybft) startPbftProcess() {
 SYNC:
 	p.runtime.setIsValidator(false)
 
-	lastBlock := p.getLatestAfterSync()
-
-	if lastBlock == nil {
-		// channel closed
-		return
+	if !p.isSynced() {
+		<-syncerBlockCh
 	}
+	lastBlock := p.blockchain.CurrentHeader()
 
 	p.runtime.setIsValidator(true)
 
@@ -378,9 +373,9 @@ SYNC:
 	}
 }
 
-func (p *Polybft) getLatestAfterSync() *types.Header {
-	return nil
-
+// isSynced return true if the current header from the local storage corresponds to the highest block of syncer
+func (p *Polybft) isSynced() bool {
+	return p.syncer.GetSyncProgression().HighestBlock == p.blockchain.CurrentHeader().Number
 }
 
 // runCycle runs a single cycle of the state machine and indicates if node should exit the consensus or keep on running
