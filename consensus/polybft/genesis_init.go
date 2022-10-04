@@ -19,31 +19,37 @@ var (
 	sidechainERC20Addr       = ethgo.HexToAddress("0x47e9Fbef8C83A1714F1951F142132E6e90F5fa5D")
 	SidechainERC20BridgeAddr = ethgo.HexToAddress("0x8Be503bcdEd90ED42Eff31f56199399B2b0154CA")
 
+	blockTimeKey           = "blockTime"
+	epochSizeKey           = "epochSize"
+	sprintSizeKey          = "sprintSize"
+	validatorSetSizeKey    = "validatorSetSize"
+	sidechainBridgeAddrKey = "sidechainBridgeAddr"
+	validatorSetAddrKey    = "validatorSetAddr"
+
 	defaultEpochSize  = uint64(10)
 	defaultSprintSize = uint64(5)
 	validatorSetSize  = 100
 	defaultBlockTime  = 2 * time.Second
 )
 
-func InitGenesis(_ *chain.Chain, initial map[types.Address]*chain.GenesisAccount) (
+func InitGenesis(c *chain.Chain, initial map[types.Address]*chain.GenesisAccount) (
 	map[types.Address]*chain.GenesisAccount, error) {
-	config := &PolyBFTConfig{
-		// TODO: Figure out how to persist and load PolyBFTConfig fields
-		// TODO: Genesis, Bridge
-		BlockTime:           defaultBlockTime,
-		EpochSize:           defaultEpochSize,
-		SprintSize:          defaultSprintSize,
-		ValidatorSetSize:    validatorSetSize,
-		ValidatorSetAddr:    types.Address(ValidatorSetAddr),
-		SidechainBridgeAddr: types.Address(SidechainBridgeAddr),
-	}
+	// TODO: Genesis, Bridge configuration
+	// TODO: This should be part of the new CLI command
+	polybftConfig := c.Params.Engine["polybft"].(map[string]interface{})
+	polybftConfig[blockTimeKey] = defaultBlockTime
+	polybftConfig[epochSizeKey] = defaultEpochSize
+	polybftConfig[sprintSizeKey] = defaultSprintSize
+	polybftConfig[validatorSetSizeKey] = validatorSetSize
+	polybftConfig[sidechainBridgeAddrKey] = types.Address(SidechainBridgeAddr)
+	polybftConfig[validatorSetAddrKey] = types.Address(ValidatorSetAddr)
 
 	acc := map[types.Address]*chain.GenesisAccount{}
 	for k, v := range initial {
 		acc[k] = v
 	}
 
-	err := deployContracts(config, acc)
+	err := deployContracts([]*Validator{}, validatorSetSize, acc)
 	if err != nil {
 		return nil, err
 	}
@@ -51,11 +57,12 @@ func InitGenesis(_ *chain.Chain, initial map[types.Address]*chain.GenesisAccount
 	return acc, nil
 }
 
-func deployContracts(
-	config *PolyBFTConfig, acc map[types.Address]*chain.GenesisAccount) error {
+func deployContracts(validators []*Validator,
+	activeValidatorsSize int,
+	allocations map[types.Address]*chain.GenesisAccount) error {
 	// build validator constructor input
 	validatorCons := []interface{}{}
-	for _, validator := range config.Genesis {
+	for _, validator := range validators {
 		blsKey, err := hex.DecodeString(validator.BlsKey)
 		if err != nil {
 			return err
@@ -91,7 +98,7 @@ func deployContracts(
 		{
 			// Validator smart contract
 			name:     "Validator",
-			input:    []interface{}{validatorCons, config.ValidatorSetSize},
+			input:    []interface{}{validatorCons, activeValidatorsSize},
 			expected: ValidatorSetAddr,
 			chain:    "child",
 		},
@@ -133,7 +140,7 @@ func deployContracts(
 
 		// it is important to keep the same sender so we will always have a deterministic validator address
 		// note again that this is only done for testing purposes.
-		acc[types.Address(contract.expected)] = &chain.GenesisAccount{
+		allocations[types.Address(contract.expected)] = &chain.GenesisAccount{
 			Code: input,
 		}
 	}

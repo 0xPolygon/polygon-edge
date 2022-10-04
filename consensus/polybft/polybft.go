@@ -41,14 +41,15 @@ type polybftBackend interface {
 
 // Factory is the factory function to create a discovery consensus
 func Factory(params *consensus.Params) (consensus.Consensus, error) {
-	params.Logger.Info("polybft factory", "params", params.Config.Params, "specific consensus params", params.Config)
+	logger := params.Logger.Named("polybft")
+	logger.Info("polybft factory", "params", params.Config.Params, "specific consensus params", params.Config)
 
 	polybft := &Polybft{
 		config:  params,
 		closeCh: make(chan struct{}),
-		logger:  params.Logger,
+		logger:  logger,
 	}
-	polybft.initializeCustomConfig()
+	polybft.initializeConsensusConfig()
 	return polybft, nil
 }
 
@@ -65,8 +66,8 @@ type Polybft struct {
 	// consensus parametres
 	config *consensus.Params
 
-	// customConfig is genesis configuration for polybft consensus protocol
-	customConfig *PolyBFTConfig
+	// consensusConfig is genesis configuration for polybft consensus protocol
+	consensusConfig *PolyBFTConfig
 
 	// blockchain is a reference to the blockchain object
 	blockchain blockchainBackend
@@ -181,7 +182,7 @@ func (p *Polybft) Initialize() error {
 	}
 
 	p.state = stt
-	p.validatorsCache = newValidatorsSnapshotCache(p.config.Logger, stt, p.customConfig.EpochSize, p.blockchain)
+	p.validatorsCache = newValidatorsSnapshotCache(p.config.Logger, stt, p.consensusConfig.EpochSize, p.blockchain)
 
 	return nil
 }
@@ -237,16 +238,30 @@ func (p *Polybft) startSealing() error {
 	return nil
 }
 
-func (p *Polybft) initializeCustomConfig() {
-	// TODO: deserialize custom configuration
-	// customConfigGeneric := p.config.Config.Config
-	p.customConfig = nil
+// initializeConsensusConfig populates consensus configuration
+func (p *Polybft) initializeConsensusConfig() {
+	customConfigGeneric := p.config.Config.Config
+	blockTime := customConfigGeneric[blockTimeKey].(time.Duration)
+	epochSize := customConfigGeneric[epochSizeKey].(uint64)
+	sprintSize := customConfigGeneric[sprintSizeKey].(uint64)
+	sidechainBridgeAddr := customConfigGeneric[sidechainBridgeAddrKey].(types.Address)
+	validatorSetAddr := customConfigGeneric[validatorSetAddrKey].(types.Address)
+	activeValidatorsSize := customConfigGeneric[validatorSetSizeKey].(int)
+	// TODO: Bridge, validators configuration
+	p.consensusConfig = &PolyBFTConfig{
+		BlockTime:           blockTime,
+		EpochSize:           epochSize,
+		SprintSize:          sprintSize,
+		SidechainBridgeAddr: sidechainBridgeAddr,
+		ValidatorSetAddr:    validatorSetAddr,
+		ValidatorSetSize:    activeValidatorsSize,
+	}
 }
 
 // startRuntime starts consensus runtime
 func (p *Polybft) startRuntime() error {
 	runtimeConfig := &runtimeConfig{
-		PolyBFTConfig:  p.customConfig,
+		PolyBFTConfig:  p.consensusConfig,
 		Key:            p.key,
 		DataDir:        p.dataDir,
 		Transport:      &bridgeTransportWrapper{topic: p.bridgeTopic},

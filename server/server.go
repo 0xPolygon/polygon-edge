@@ -189,12 +189,12 @@ func NewServer(config *Config) (*Server, error) {
 	m.executor.SetRuntime(precompiled.NewPrecompiled())
 	m.executor.SetRuntime(evm.NewEVM())
 
-	// compute the genesis root state
 	alloc, err := InitGenesis(config.Chain)
 	if err != nil {
 		return nil, err
 	}
 
+	// compute the genesis root state
 	genesisRoot := m.executor.WriteGenesis(alloc)
 	config.Chain.Genesis.StateRoot = genesisRoot
 
