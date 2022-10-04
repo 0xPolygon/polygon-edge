@@ -189,13 +189,8 @@ func NewServer(config *Config) (*Server, error) {
 	m.executor.SetRuntime(precompiled.NewPrecompiled())
 	m.executor.SetRuntime(evm.NewEVM())
 
-	alloc, err := InitGenesis(config.Chain)
-	if err != nil {
-		return nil, err
-	}
-
 	// compute the genesis root state
-	genesisRoot := m.executor.WriteGenesis(alloc)
+	genesisRoot := m.executor.WriteGenesis(config.Chain.Genesis.Alloc)
 	config.Chain.Genesis.StateRoot = genesisRoot
 
 	// use the eip155 signer

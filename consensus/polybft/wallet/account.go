@@ -1,6 +1,7 @@
 package wallet
 
 import (
+	"crypto/ecdsa"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -53,7 +54,7 @@ func GenerateAccountFromSecrets(secretsManager secrets.SecretsManager) (*Account
 		return nil, err
 	}
 
-	blsPrivateKey, err := bls.UnmarshalPrivateKey(blsBytes)
+	blsPrivateKey, err := bls.UnmarshalPrivateKeyBinary(blsBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -146,4 +147,13 @@ func (a *Account) SaveAccount(path string, password string) error {
 	}
 
 	return nil
+}
+
+func (a *Account) GetEcdsaPrivateKey() (*ecdsa.PrivateKey, error) {
+	ecdsaRaw, err := a.Ecdsa.MarshallPrivateKey()
+	if err != nil {
+		return nil, err
+	}
+
+	return wallet.ParsePrivateKey(ecdsaRaw)
 }

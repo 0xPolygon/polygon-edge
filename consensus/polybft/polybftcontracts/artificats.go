@@ -31,7 +31,7 @@ func ReadArtifact(chain string, name string) (*Artifact, error) {
 		return nil, fmt.Errorf("chain has to be either 'rootchain' or 'sidechain'")
 	}
 
-	fileName := directory + "/" + name + ".sol/" + name + ".json"
+	fileName := fmt.Sprintf("artifacts/contracts/%s/%s.sol/%s.json", directory, name, name)
 
 	data, err := artifactsDir.ReadFile(fileName)
 	if err != nil {

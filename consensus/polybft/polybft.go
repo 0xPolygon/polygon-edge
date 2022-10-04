@@ -28,6 +28,13 @@ const (
 	minSyncPeers = 2
 	pbftProto    = "/pbft/0.2"
 	bridgeProto  = "/bridge/0.2"
+
+	blockTimeKey           = "blockTime"
+	epochSizeKey           = "epochSize"
+	sprintSizeKey          = "sprintSize"
+	validatorSetSizeKey    = "validatorSetSize"
+	sidechainBridgeAddrKey = "sidechainBridgeAddr"
+	validatorSetAddrKey    = "validatorSetAddr"
 )
 
 // polybftBackend is an interface defining polybft methods needed by fsm and sync tracker
@@ -143,7 +150,7 @@ func (p *Polybft) Initialize() error {
 
 	// check pbft topic - listen for transport messages and relay them to pbft
 	err = p.pbftTopic.Subscribe(func(obj interface{}, from peer.ID) {
-		gossipMsg := obj.(*proto.GossipMessage)
+		gossipMsg, _ := obj.(*proto.GossipMessage)
 
 		var msg *pbft.MessageReq
 		if err := json.Unmarshal(gossipMsg.Data, &msg); err != nil {
@@ -204,7 +211,6 @@ func (p *Polybft) Start() error {
 
 // startSyncing starts the synchroniser
 func (p *Polybft) startSyncing() error {
-
 	if err := p.syncer.Start(); err != nil {
 		return fmt.Errorf("failed to start syncer. Error: %v", err)
 	}
@@ -243,12 +249,13 @@ func (p *Polybft) startSealing() error {
 // initializeConsensusConfig populates consensus configuration
 func (p *Polybft) initializeConsensusConfig() {
 	customConfigGeneric := p.config.Config.Config
-	blockTime := customConfigGeneric[blockTimeKey].(time.Duration)
-	epochSize := customConfigGeneric[epochSizeKey].(uint64)
-	sprintSize := customConfigGeneric[sprintSizeKey].(uint64)
-	sidechainBridgeAddr := customConfigGeneric[sidechainBridgeAddrKey].(types.Address)
-	validatorSetAddr := customConfigGeneric[validatorSetAddrKey].(types.Address)
-	activeValidatorsSize := customConfigGeneric[validatorSetSizeKey].(int)
+	blockTime, _ := customConfigGeneric[blockTimeKey].(time.Duration)
+	epochSize, _ := customConfigGeneric[epochSizeKey].(uint64)
+	sprintSize, _ := customConfigGeneric[sprintSizeKey].(uint64)
+	sidechainBridgeAddr, _ := customConfigGeneric[sidechainBridgeAddrKey].(types.Address)
+	validatorSetAddr, _ := customConfigGeneric[validatorSetAddrKey].(types.Address)
+	activeValidatorsSize, _ := customConfigGeneric[validatorSetSizeKey].(int)
+
 	// TODO: Bridge, validators configuration
 	p.consensusConfig = &PolyBFTConfig{
 		BlockTime:           blockTime,
@@ -284,7 +291,7 @@ func (p *Polybft) startRuntime() error {
 
 	if runtime.IsBridgeEnabled() {
 		err := p.bridgeTopic.Subscribe(func(obj interface{}, from peer.ID) {
-			msg := obj.(*proto.TransportMessage)
+			msg, _ := obj.(*proto.TransportMessage)
 			var transportMsg *TransportMessage
 			if err := json.Unmarshal(msg.Data, &transportMsg); err != nil {
 				panic(err)
@@ -318,6 +325,7 @@ func (p *Polybft) startPbftProcess() {
 	// to insert a valid block.
 	go func() {
 		eventCh := newBlockSub.GetEventCh()
+
 		for {
 			select {
 			case ev := <-eventCh:
@@ -349,6 +357,7 @@ SYNC:
 	if err != nil {
 		p.logger.Error("failed to query current validator set", "block number", lastBlock.Number, "error", err)
 	}
+
 	p.runtime.setIsActiveValidator(currentValidators.ContainsNodeID(p.key.NodeID()))
 	if !p.runtime.isActiveValidator() {
 		// inactive validator is not part of the consensus protocol and it should just perform syncing
@@ -358,6 +367,7 @@ SYNC:
 	// we have to start the bridge snapshot when we have finished syncing
 	if err := p.runtime.restartEpoch(lastBlock); err != nil {
 		p.logger.Error("failed to restart epoch", "error", err)
+
 		goto SYNC
 	}
 
@@ -368,6 +378,7 @@ SYNC:
 			} else {
 				p.logger.Error("an error occurred while running a state machine cycle.", "error", err)
 			}
+
 			goto SYNC
 		}
 
@@ -404,6 +415,7 @@ func (p *Polybft) runCycle() error {
 
 	// this cancel is not sexy
 	ctx, cancelFn := context.WithCancel(context.Background())
+
 	go func() {
 		<-p.closeCh
 		cancelFn()
