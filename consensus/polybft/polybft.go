@@ -113,7 +113,6 @@ func (p *Polybft) Initialize() error {
 	p.logger.Info("initializing polybft...")
 
 	// read account
-	// read account
 	account, err := wallet.GenerateNewAccountFromSecret(
 		p.config.SecretsManager, secrets.ValidatorBLSKey)
 	if err != nil {
@@ -153,7 +152,7 @@ func (p *Polybft) Initialize() error {
 	}
 
 	// check pbft topic - listen for transport messages and relay them to pbft
-	err = p.pbftTopic.Subscribe(func(obj interface{}, from peer.ID) {
+	err = pbftTopic.Subscribe(func(obj interface{}, from peer.ID) {
 		gossipMsg, _ := obj.(*proto.GossipMessage)
 
 		var msg *pbft.MessageReq

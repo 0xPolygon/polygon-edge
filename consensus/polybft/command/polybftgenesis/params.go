@@ -260,7 +260,7 @@ func (p *genesisParams) GetChainConfig() (*chain.Chain, error) {
 	if len(p.bootnodes) == 0 {
 		for i, validator := range validators {
 			// /ip4/127.0.0.1/tcp/10001/p2p/16Uiu2HAm9r5oP8Dmfsqbp1w2LdPU4YSFggKvwEmT6aTpWU8c8R13
-			bnode := fmt.Sprintf("/ip/%s/tpc/%d/p2p/%s", "127.0.0.1", bootnodePortStart+i, validator.NodeID)
+			bnode := fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", "127.0.0.1", bootnodePortStart+i, validator.NodeID)
 			chainConfig.Bootnodes = append(chainConfig.Bootnodes, bnode)
 		}
 	}
