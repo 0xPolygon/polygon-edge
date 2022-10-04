@@ -17,9 +17,7 @@ func Test_PrivateMarshal(t *testing.T) {
 	// require.NoError(t, err)
 	//
 	// assert.Equal(t, blsKey, blsKeyUnmarshalled)
-
 	var b []byte
 
 	fmt.Println(len(b))
-
 }
