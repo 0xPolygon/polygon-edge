@@ -190,9 +190,9 @@ func (t *TestServer) SecretsInit() (*InitIBFTResult, error) {
 
 	commandSlice := strings.Split(fmt.Sprintf("secrets %s", secretsInitCmd.Use), " ")
 	args = append(args, commandSlice...)
-	args = append(args, "--data-dir", t.Config.IBFTDir)
+	args = append(args, "--data-dir", filepath.Join(t.Config.IBFTDir, "tmp"))
 
-	cmd := exec.Command(binaryName, args...)
+	cmd := exec.Command(resolveBinary(), args...) //nolint:gosec
 	cmd.Dir = t.Config.RootDir
 
 	if _, err := cmd.Output(); err != nil {
@@ -333,14 +333,12 @@ func (t *TestServer) GenerateGenesis() error {
 	blockGasLimit := strconv.FormatUint(t.Config.BlockGasLimit, 10)
 	args = append(args, "--block-gas-limit", blockGasLimit)
 
-	cmd := exec.Command(binaryName, args...)
+	cmd := exec.Command(resolveBinary(), args...) //nolint:gosec
 	cmd.Dir = t.Config.RootDir
 
-	if t.Config.ShowsLog {
-		stdout := io.Writer(os.Stdout)
-		cmd.Stdout = stdout
-		cmd.Stderr = stdout
-	}
+	stdout := t.GetStdout()
+	cmd.Stdout = stdout
+	cmd.Stderr = stdout
 
 	return cmd.Run()
 }
@@ -377,7 +375,7 @@ func (t *TestServer) Start(ctx context.Context) error {
 		args = append(args, "--price-limit", strconv.FormatUint(*t.Config.PriceLimit, 10))
 	}
 
-	if t.Config.ShowsLog {
+	if t.Config.ShowsLog || t.Config.SaveLogs {
 		args = append(args, "--log-level", "debug")
 	}
 
@@ -397,14 +395,12 @@ func (t *TestServer) Start(ctx context.Context) error {
 	t.ReleaseReservedPorts()
 
 	// Start the server
-	t.cmd = exec.Command(binaryName, args...)
+	t.cmd = exec.Command(resolveBinary(), args...) //nolint:gosec
 	t.cmd.Dir = t.Config.RootDir
 
-	if t.Config.ShowsLog {
-		stdout := io.Writer(os.Stdout)
-		t.cmd.Stdout = stdout
-		t.cmd.Stderr = stdout
-	}
+	stdout := t.GetStdout()
+	t.cmd.Stdout = stdout
+	t.cmd.Stderr = stdout
 
 	if err := t.cmd.Start(); err != nil {
 		return err
@@ -452,14 +448,12 @@ func (t *TestServer) SwitchIBFTType(typ fork.IBFTType, from uint64, to, deployme
 	}
 
 	// Start the server
-	t.cmd = exec.Command(binaryName, args...)
+	t.cmd = exec.Command(resolveBinary(), args...) //nolint:gosec
 	t.cmd.Dir = t.Config.RootDir
 
-	if t.Config.ShowsLog {
-		stdout := io.Writer(os.Stdout)
-		t.cmd.Stdout = stdout
-		t.cmd.Stderr = stdout
-	}
+	stdout := t.GetStdout()
+	t.cmd.Stdout = stdout
+	t.cmd.Stderr = stdout
 
 	return t.cmd.Run()
 }
@@ -711,4 +705,44 @@ func (t *TestServer) CallJSONRPC(req map[string]interface{}) map[string]interfac
 	}
 
 	return result
+}
+
+// GetStdout returns the combined stdout writers of the server
+func (t *TestServer) GetStdout() io.Writer {
+	writers := []io.Writer{}
+
+	if t.Config.SaveLogs {
+		f, err := os.OpenFile(filepath.Join(t.Config.LogsDir, t.Config.Name+".log"), os.O_RDWR|os.O_APPEND|os.O_CREATE, 0660)
+		if err != nil {
+			t.t.Fatal(err)
+		}
+
+		writers = append(writers, f)
+
+		t.t.Cleanup(func() {
+			err = f.Close()
+			if err != nil {
+				t.t.Logf("Failed to close file. Error: %s", err)
+			}
+		})
+	}
+
+	if t.Config.ShowsLog {
+		writers = append(writers, os.Stdout)
+	}
+
+	if len(writers) == 0 {
+		return io.Discard
+	}
+
+	return io.MultiWriter(writers...)
+}
+
+func resolveBinary() string {
+	bin := os.Getenv("EDGE_BINARY")
+	if bin != "" {
+		return bin
+	}
+	// fallback
+	return binaryName
 }

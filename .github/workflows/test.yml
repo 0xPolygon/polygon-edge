@@ -28,7 +28,7 @@ jobs:
           GOOS: linux
 
       - name: Run Go Test
-        run: go test -coverprofile coverage.out -timeout 28m ./...
+        run: go test -coverprofile coverage.out -timeout 20m `go list ./... | grep -v e2e`
 
       - name: Upload coverage file to Codecov
         uses: codecov/codecov-action@v3
