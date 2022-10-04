@@ -1,22 +1,25 @@
 package bls
 
 import (
+	"fmt"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func Test_PrivateMarshal(t *testing.T) {
-	blsKey, err := GenerateBlsKey() // structure which holds private/public key pair
-	require.NoError(t, err)
+	// blsKey, err := GenerateBlsKey() // structure which holds private/public key pair
+	// require.NoError(t, err)
+	//
+	// // marshal public key
+	// privateKeyMarshalled, err := blsKey.MarshalJSON()
+	// require.NoError(t, err)
+	// // recover private and public key
+	// blsKeyUnmarshalled, err := UnmarshalPrivateKey(privateKeyMarshalled)
+	// require.NoError(t, err)
+	//
+	// assert.Equal(t, blsKey, blsKeyUnmarshalled)
 
-	// marshal public key
-	privateKeyMarshalled, err := blsKey.MarshalJSON()
-	require.NoError(t, err)
-	// recover private and public key
-	blsKeyUnmarshalled, err := UnmarshalPrivateKey(privateKeyMarshalled)
-	require.NoError(t, err)
+	var b []byte
 
-	assert.Equal(t, blsKey, blsKeyUnmarshalled)
+	fmt.Println(len(b))
+
 }

@@ -5,8 +5,6 @@ import (
 	"errors"
 	"math/big"
 
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/common"
-
 	bn256 "github.com/umbracle/go-eth-bn256"
 )
 
@@ -82,10 +80,28 @@ func (p PublicKey) ToBigInt() ([4]*big.Int, error) {
 // Order of coordinates is [A.Y, A.X, B.Y, B.X]
 func UnmarshalPublicKeyFromBigInt(b [4]*big.Int) (*PublicKey, error) {
 	var pubKeyBuf []byte
-	pubKeyBuf = append(pubKeyBuf, common.LeftPadBytes(b[1].Bytes(), 32)...)
-	pubKeyBuf = append(pubKeyBuf, common.LeftPadBytes(b[0].Bytes(), 32)...)
-	pubKeyBuf = append(pubKeyBuf, common.LeftPadBytes(b[3].Bytes(), 32)...)
-	pubKeyBuf = append(pubKeyBuf, common.LeftPadBytes(b[2].Bytes(), 32)...)
+
+	pt1, err := leftPadTo32Bytes(b[1].Bytes())
+	if err != nil {
+		return nil, err
+	}
+	pt2, err := leftPadTo32Bytes(b[0].Bytes())
+	if err != nil {
+		return nil, err
+	}
+	pt3, err := leftPadTo32Bytes(b[3].Bytes())
+	if err != nil {
+		return nil, err
+	}
+	pt4, err := leftPadTo32Bytes(b[2].Bytes())
+	if err != nil {
+		return nil, err
+	}
+
+	pubKeyBuf = append(pubKeyBuf, pt1...)
+	pubKeyBuf = append(pubKeyBuf, pt2...)
+	pubKeyBuf = append(pubKeyBuf, pt3...)
+	pubKeyBuf = append(pubKeyBuf, pt4...)
 
 	return UnmarshalPublicKey(pubKeyBuf)
 }
