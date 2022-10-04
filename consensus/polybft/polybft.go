@@ -340,14 +340,16 @@ func (p *Polybft) startPbftProcess() {
 	defer newBlockSub.Close()
 
 SYNC:
-	p.runtime.setIsValidator(false)
-
 	if !p.isSynced() {
 		<-syncerBlockCh
 	}
 	lastBlock := p.blockchain.CurrentHeader()
 
-	p.runtime.setIsValidator(true)
+	currentValidators, err := p.GetValidators(lastBlock.Number, nil)
+	if err != nil {
+		p.logger.Error("failed to query current validator set", "block number", lastBlock.Number, "error", err)
+	}
+	p.runtime.setIsActiveValidator(currentValidators.ContainsNodeID(p.key.NodeID()))
 
 	// we have to start the bridge snapshot when we have finished syncing
 	if err := p.runtime.restartEpoch(lastBlock); err != nil {

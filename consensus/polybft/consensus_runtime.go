@@ -91,8 +91,8 @@ type consensusRuntime struct {
 	// lastBuiltBlock is the header of the last processed block
 	lastBuiltBlock *types.Header
 
-	// isValidator indicates whether the given node is amongst current validator set
-	isValidator uint32
+	// activeValidatorFlag indicates whether the given node is amongst currently active validator set
+	activeValidatorFlag uint32
 
 	logger hcf.Logger
 }
@@ -104,7 +104,6 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 		config: config,
 		logger: log.Named("consensus_runtime"),
 	}
-	runtime.setIsValidator(true)
 
 	if runtime.IsBridgeEnabled() {
 		err := runtime.startEventTracker()
@@ -553,13 +552,13 @@ func (c *consensusRuntime) deliverMessage(msg *TransportMessage) (bool, error) {
 		return false, nil
 	}
 
-	if !c.isValidatorNode() {
-		return false, fmt.Errorf("not among the current validator set")
+	if !c.isActiveValidator() {
+		return false, fmt.Errorf("validator is not among the active validator set")
 	}
 
 	// check just in case
 	if epoch.Validators == nil {
-		return false, fmt.Errorf("internal server error: validators are not set for the current epoch")
+		return false, fmt.Errorf("validators are not set for the current epoch")
 	}
 
 	msgVote := &MessageSignature{
@@ -668,19 +667,18 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header) (*UptimeC
 	return uptimeCounter, nil
 }
 
-// setIsValidator updates the isValidator field
-func (c *consensusRuntime) setIsValidator(isValidator bool) {
-
-	if isValidator {
-		atomic.StoreUint32(&c.isValidator, 1)
+// setIsActiveValidator updates the activeValidatorFlag field
+func (c *consensusRuntime) setIsActiveValidator(isActiveValidator bool) {
+	if isActiveValidator {
+		atomic.StoreUint32(&c.activeValidatorFlag, 1)
 	} else {
-		atomic.StoreUint32(&c.isValidator, 0)
+		atomic.StoreUint32(&c.activeValidatorFlag, 0)
 	}
 }
 
-// isValidatorNode indicates if node is in validator set or not
-func (c *consensusRuntime) isValidatorNode() bool {
-	return atomic.LoadUint32(&c.isValidator) == 1
+// isActiveValidator indicates if node is in validator set or not
+func (c *consensusRuntime) isActiveValidator() bool {
+	return atomic.LoadUint32(&c.activeValidatorFlag) == 1
 }
 
 // getPendingBlockNumber returns block number currently being built (last built block number + 1)
