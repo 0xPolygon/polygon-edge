@@ -122,7 +122,6 @@ func (b *BlockBuilder) Reset() {
 		ReceiptsRoot: types.EmptyRootHash, // this avoids needing state for now
 		Sha3Uncles:   types.EmptyUncleHash,
 		GasLimit:     b.params.GasLimit, //will need to adjust dynamically later.
-		//BaseFee:    big.NewInt(100), // TODO: what is base fee
 	}
 
 	b.block = nil

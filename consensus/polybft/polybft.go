@@ -350,6 +350,10 @@ SYNC:
 		p.logger.Error("failed to query current validator set", "block number", lastBlock.Number, "error", err)
 	}
 	p.runtime.setIsActiveValidator(currentValidators.ContainsNodeID(p.key.NodeID()))
+	if !p.runtime.isActiveValidator() {
+		// inactive validator is not part of the consensus protocol and it should just perform syncing
+		goto SYNC
+	}
 
 	// we have to start the bridge snapshot when we have finished syncing
 	if err := p.runtime.restartEpoch(lastBlock); err != nil {
