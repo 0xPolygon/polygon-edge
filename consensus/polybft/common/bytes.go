@@ -1,6 +1,7 @@
 package common
 
 // LeftPadBytes zero-pads slice to the left up to length l.
+// TODO fix this
 func LeftPadBytes(slice []byte, l int) []byte {
 	if l <= len(slice) {
 		return slice

@@ -1,6 +1,6 @@
 package bitmap
 
-// Index 0 is LSB from the first bitmap byte
+// Bitmap Index 0 is LSB from the first bitmap byte
 type Bitmap []byte
 
 func (b *Bitmap) Set(idx uint64) {

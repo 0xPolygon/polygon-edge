@@ -114,7 +114,7 @@ func (p *Polybft) Initialize() error {
 
 	// create and set syncer
 	p.syncer = syncer.NewSyncer(
-		p.config.Logger,
+		p.config.Logger.Named("syncer"),
 		p.config.Network,
 		p.config.Blockchain,
 		time.Duration(p.config.BlockTime)*3*time.Second,
@@ -128,7 +128,9 @@ func (p *Polybft) Initialize() error {
 
 	// initialize pbft engine
 	opts := []pbft.ConfigOption{
-		pbft.WithLogger(p.logger.Named("Pbft").StandardLogger(&hclog.StandardLoggerOptions{})),
+		pbft.WithLogger(p.logger.Named("Pbft").
+			StandardLogger(&hclog.StandardLoggerOptions{}),
+		),
 		pbft.WithTracer(otel.Tracer("Pbft")),
 	}
 	p.pbft = pbft.New(p.key, &pbftTransportWrapper{topic: p.pbftTopic}, opts...)
@@ -136,7 +138,7 @@ func (p *Polybft) Initialize() error {
 	// create pbft topic
 	pbftTopic, err := p.config.Network.NewTopic(pbftProto, &proto.GossipMessage{})
 	if err != nil {
-		return fmt.Errorf("failed to create pbft topic. Error: %v", err)
+		return fmt.Errorf("failed to create pbft topic. Error: %w", err)
 	}
 
 	// check pbft topic - listen for transport messages and relay them to pbft
@@ -189,7 +191,7 @@ func (p *Polybft) Initialize() error {
 
 // Start starts the consensus and servers
 func (p *Polybft) Start() error {
-	p.logger.Info("starting consenzus")
+	p.logger.Info("starting polybft consensus")
 
 	// start syncer
 	if err := p.startSyncing(); err != nil {
@@ -261,16 +263,19 @@ func (p *Polybft) initializeConsensusConfig() {
 // startRuntime starts consensus runtime
 func (p *Polybft) startRuntime() error {
 	runtimeConfig := &runtimeConfig{
-		PolyBFTConfig:  p.consensusConfig,
-		Key:            p.key,
-		DataDir:        p.dataDir,
-		Transport:      &bridgeTransportWrapper{topic: p.bridgeTopic},
+		PolyBFTConfig: p.consensusConfig,
+		Key:           p.key,
+		DataDir:       p.dataDir,
+		Transport: &bridgeTransportWrapper{
+			topic:  p.bridgeTopic,
+			logger: p.logger.Named("bridge_transport"),
+		},
 		State:          p.state,
 		blockchain:     p.blockchain,
 		polybftBackend: p,
 	}
 
-	runtime, err := newConsensusRuntime(runtimeConfig)
+	runtime, err := newConsensusRuntime(p.logger, runtimeConfig)
 	if err != nil {
 		return err
 	}

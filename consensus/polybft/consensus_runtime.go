@@ -20,13 +20,13 @@ import (
 const (
 	eventsBufferSize   = 10
 	stateFileName      = "consensusState.db"
-	uptimeLookbackSize = 2 //number of blocks to calculate uptime from the previous epoch
+	uptimeLookbackSize = 2 // number of blocks to calculate uptime from the previous epoch
 )
 
 var (
 	// state sync metrics
 	// TO DO Nemanja- what to do with metrics
-	//totalStateSyncsMeter = metrics.NewRegisteredMeter("consensus/bridge/stateSyncsTotal", nil)
+	// totalStateSyncsMeter = metrics.NewRegisteredMeter("consensus/bridge/stateSyncsTotal", nil)
 
 	// errNotAValidator represents "node is not a validator" error message
 	errNotAValidator = errors.New("node is not a validator")
@@ -94,14 +94,15 @@ type consensusRuntime struct {
 	// isValidator indicates whether the given node is amongst current validator set
 	isValidator uint32
 
-	logger hcf.Logger // The logger object
+	logger hcf.Logger
 }
 
 // newConsensusRuntime creates and starts a new consensus runtime instance with event tracking
-func newConsensusRuntime(config *runtimeConfig) (*consensusRuntime, error) {
+func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRuntime, error) {
 	runtime := &consensusRuntime{
 		state:  config.State,
 		config: config,
+		logger: log.Named("consensus_runtime"),
 	}
 	runtime.setIsValidator(true)
 
@@ -148,7 +149,7 @@ func (c *consensusRuntime) AddLog(eventLog *ethgo.Log) {
 	}
 
 	// update metrics
-	//totalStateSyncsMeter.Mark(1)
+	// totalStateSyncsMeter.Mark(1)
 }
 
 // NotifyProposalInserted is an implementation of fsmNotify interface
@@ -165,7 +166,7 @@ func (c *consensusRuntime) NotifyProposalInserted(b *StateBlock) {
 	}
 
 	// TO DO Nemanja - probably no need for this
-	//c.config.blockchain.OnNewBlockInserted(b.Block)
+	// c.config.blockchain.OnNewBlockInserted(b.Block)
 }
 
 // FSM creates a new instance of fsm
@@ -198,6 +199,7 @@ func (c *consensusRuntime) FSM() (*fsm, error) {
 		isEndOfEpoch:   isEndOfEpoch,
 		isEndOfSprint:  isEndOfSprint,
 		epoch:          epoch.Number,
+		logger:         c.logger.Named("fsm"),
 	}
 
 	var systemState SystemState
@@ -444,7 +446,7 @@ func (c *consensusRuntime) buildBundles(epoch *epochMetadata, commitmentMsg *Com
 
 	// TO DO Nemanja - fix this with new merkle trie
 
-	//startBundleIdx := commitmentMsg.GetBundleIdxFromStateSyncEventIdx(stateSyncExecutionIndex)
+	// startBundleIdx := commitmentMsg.GetBundleIdxFromStateSyncEventIdx(stateSyncExecutionIndex)
 	// for idx := startBundleIdx; idx < commitmentMsg.BundlesCount(); idx++ {
 	// 	p, err := epoch.Commitment.MerkleTrie.GenerateProof(uint(idx))
 	// 	if err != nil {
@@ -532,6 +534,7 @@ func (c *consensusRuntime) startEventTracker() error {
 		config:     c.config.PolyBFTConfig,
 		subscriber: c,
 		dataDir:    c.config.DataDir,
+		logger:     c.logger.Named("event_tracker"),
 	}
 
 	if err := c.eventTracker.start(); err != nil {
@@ -657,7 +660,7 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header) (*UptimeC
 				return nil, err
 			}
 
-			//blockHeader, ok := c.config.blockchain.GetHeaderByNumber(blockHeader.Number - 1)
+			// blockHeader, ok := c.config.blockchain.GetHeaderByNumber(blockHeader.Number - 1)
 			_, _ = c.config.blockchain.GetHeaderByNumber(blockHeader.Number - 1)
 		}
 	}
@@ -757,7 +760,7 @@ func (c *consensusRuntime) getCommitmentToRegister(epoch *epochMetadata,
 	}
 
 	commitmentMessage := NewCommitmentMessage(
-		//epoch.Commitment.MerkleTrie.Trie.Hash(),
+		// epoch.Commitment.MerkleTrie.Trie.Hash(),
 		types.EmptyRootHash, // TO DO Nemanja - fix this with bridge
 		registerCommitmentIndex,
 		registerCommitmentIndex+stateSyncMainBundleSize-1,
