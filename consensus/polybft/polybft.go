@@ -469,8 +469,7 @@ func (p *Polybft) CheckIfStuck(num uint64) (uint64, bool) {
 }
 
 func (p *Polybft) GetValidators(blockNumber uint64, parents []*types.Header) (AccountSet, error) {
-	// TODO implement me
-	panic("implement me")
+	return p.validatorsCache.GetSnapshot(blockNumber, parents)
 }
 
 // ProcessHeaders updates the snapshot based on the verified headers
