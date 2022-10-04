@@ -4,14 +4,27 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/0xPolygon/polygon-edge/command/helper"
+	"github.com/docker/docker/api/types/container"
 
+	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
 type containerStopResult struct {
 	Status int64  `json:"status"`
 	Err    string `json:"err"`
+}
+
+func newContainerStopResult(status container.ContainerWaitOKBody) *containerStopResult {
+	var errMsg string
+	if status.Error != nil {
+		errMsg = status.Error.Message
+	}
+
+	return &containerStopResult{
+		Status: status.StatusCode,
+		Err:    errMsg,
+	}
 }
 
 func (r containerStopResult) GetOutput() string {
@@ -32,6 +45,14 @@ type initialDeployResult struct {
 	Name    string        `json:"name"`
 	Address types.Address `json:"address"`
 	Hash    types.Hash    `json:"hash"`
+}
+
+func newInitialDeployResult(name string, address types.Address, hash types.Hash) *initialDeployResult {
+	return &initialDeployResult{
+		Name:    name,
+		Address: address,
+		Hash:    hash,
+	}
 }
 
 func (r initialDeployResult) GetOutput() string {

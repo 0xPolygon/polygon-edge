@@ -17,6 +17,9 @@ func newCLIOutput() *cliOutput {
 
 // WriteOutput implements OutputFormatter interface
 func (cli *cliOutput) WriteOutput() {
+	cli.Lock()
+	defer cli.Unlock()
+
 	if cli.errorOutput != nil {
 		_, _ = fmt.Fprintln(os.Stderr, cli.getErrorOutput())
 

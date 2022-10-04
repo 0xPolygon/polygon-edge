@@ -216,10 +216,7 @@ func runRootchain(ctx context.Context, outputter command.OutputFormatter, closeC
 		case err = <-errCh:
 			outputter.SetError(err)
 		case status := <-statusCh:
-			outputter.SetCommandResult(containerStopResult{
-				Status: status.StatusCode,
-				Err:    status.Error.Message,
-			})
+			outputter.SetCommandResult(newContainerStopResult(status))
 		}
 		close(closeCh)
 	}()
@@ -270,11 +267,7 @@ func initialDeploy(outputter command.OutputFormatter) error {
 			return fmt.Errorf("wrong deployed address for %s: expected %s but found %s", name, address, receipt.ContractAddress)
 		}
 
-		outputter.WriteCommandResult(initialDeployResult{
-			Name:    name,
-			Address: address,
-			Hash:    types.BytesToHash(receipt.TransactionHash.Bytes()),
-		})
+		outputter.WriteCommandResult(newInitialDeployResult(name, address, types.BytesToHash(receipt.TransactionHash.Bytes())))
 	}
 
 	return nil

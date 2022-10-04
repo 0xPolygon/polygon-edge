@@ -18,6 +18,9 @@ func newJSONOutput() *jsonOutput {
 
 // WriteOutput implements OutputFormatter interface
 func (jo *jsonOutput) WriteOutput() {
+	jo.Lock()
+	defer jo.Unlock()
+
 	if jo.errorOutput != nil {
 		_, _ = fmt.Fprintln(os.Stderr, jo.getErrorOutput())
 
