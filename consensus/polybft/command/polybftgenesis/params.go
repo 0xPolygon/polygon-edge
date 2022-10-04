@@ -38,6 +38,8 @@ const (
 	defaultSprintSize       = uint64(5)
 	defaultValidatorSetSize = 100
 	defaultBlockTime        = 2 * time.Second
+
+	bootnodePortStart = 30301
 )
 
 var (
@@ -135,25 +137,25 @@ func (p *genesisParams) setFlags(cmd *cobra.Command) {
 		&p.validatorSetSize,
 		validatorSetSizeFlag,
 		defaultValidatorSetSize,
-		"validator set size for polybft",
+		"validator set size",
 	)
 	flags.Uint64Var(
 		&p.epochSize,
 		epochSizeFlag,
 		defaultEpochSize,
-		"epoch size for polybft",
+		"epoch size",
 	)
 	flags.Uint64Var(
 		&p.sprintSize,
 		sprintSizeFlag,
 		defaultSprintSize,
-		"sprint size for polybft",
+		"sprint size",
 	)
 	flags.DurationVar(
 		&p.blockTime,
 		blockTimeFlag,
 		defaultBlockTime,
-		"duration time for polybft",
+		"block time",
 	)
 	flags.StringArrayVar(
 		&p.validators,
@@ -258,7 +260,7 @@ func (p *genesisParams) GetChainConfig() (*chain.Chain, error) {
 	if len(p.bootnodes) == 0 {
 		for i, validator := range validators {
 			// /ip4/127.0.0.1/tcp/10001/p2p/16Uiu2HAm9r5oP8Dmfsqbp1w2LdPU4YSFggKvwEmT6aTpWU8c8R13
-			bnode := fmt.Sprintf("/ip/%s/tpc/%d/p2p/%s", "127.0.0.1", 30301+i, validator.NodeID)
+			bnode := fmt.Sprintf("/ip/%s/tpc/%d/p2p/%s", "127.0.0.1", bootnodePortStart+i, validator.NodeID)
 			chainConfig.Bootnodes = append(chainConfig.Bootnodes, bnode)
 		}
 	}

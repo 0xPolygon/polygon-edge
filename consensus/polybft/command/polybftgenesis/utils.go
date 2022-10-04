@@ -162,7 +162,8 @@ func getSecrets(directory string) (*wallet.Account, string, error) {
 		return nil, "", err
 	}
 
-	account, err := wallet.GenerateAccountFromSecrets(localManager)
+	account, err := wallet.GenerateNewAccountFromSecret(
+		localManager, secrets.ValidatorBLSKey)
 	if err != nil {
 		return nil, "", err
 	}

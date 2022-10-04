@@ -5,12 +5,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
-	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/secrets"
-	"github.com/umbracle/ethgo/keystore"
 	"github.com/umbracle/ethgo/wallet"
 )
 
@@ -38,49 +35,20 @@ func GenerateAccount() *Account {
 	}
 }
 
-func GenerateAccountFromSecrets(secretsManager secrets.SecretsManager) (*Account, error) {
-	validatorBytes, err := secretsManager.GetSecret(secrets.ValidatorKey)
+func GenerateNewAccountFromSecret(secretManager secrets.SecretsManager, key string) (*Account, error) {
+	// read account
+	accountBytes, err := secretManager.GetSecret(key)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read account data. Error: %v", err)
 	}
 
-	blsBytes, err := secretsManager.GetSecret(secrets.ValidatorBLSKey)
-	if err != nil {
-		return nil, err
-	}
-
-	ecdsaPrivateKey, err := crypto.BytesToECDSAPrivateKey(validatorBytes)
-	if err != nil {
-		return nil, err
-	}
-
-	blsPrivateKey, err := bls.UnmarshalPrivateKeyBinary(blsBytes)
-	if err != nil {
-		return nil, err
-	}
-
-	return &Account{wallet.NewKey(ecdsaPrivateKey), blsPrivateKey}, nil
-}
-
-// NewAccount creates a new Account from a file
-func NewAccount(path string, password string) (*Account, error) {
-	data, err := ioutil.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-
-	return newAccountFromBytes(data, password)
+	return newAccountFromBytes(accountBytes)
 }
 
 // NewAccountFromBytes creates a new Account from bytes
-func newAccountFromBytes(content []byte, password string) (*Account, error) {
-	dst, err := keystore.DecryptV3(content, password)
-	if err != nil {
-		return nil, err
-	}
-
+func newAccountFromBytes(content []byte) (*Account, error) {
 	var stored *keystoreAccount
-	if err := json.Unmarshal(dst, &stored); err != nil {
+	if err := json.Unmarshal(content, &stored); err != nil {
 		return nil, err
 	}
 
@@ -113,17 +81,17 @@ type keystoreAccount struct {
 }
 
 // SaveAccount saves an account to the given path
-func (a *Account) SaveAccount(path string, password string) error {
+func (a *Account) ToBytes() ([]byte, error) {
 	// get serialized ecdsa private key
 	ecdsaRaw, err := a.Ecdsa.MarshallPrivateKey()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// get serialized bls private key
 	blsRaw, err := a.Bls.MarshalJSON()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	stored := &keystoreAccount{
@@ -131,22 +99,7 @@ func (a *Account) SaveAccount(path string, password string) error {
 		BlsPrivKey:   hex.EncodeToString(blsRaw),
 	}
 
-	raw, err := json.Marshal(stored)
-	if err != nil {
-		return err
-	}
-
-	keystoreRaw, err := keystore.EncryptV3(raw, password)
-	if err != nil {
-		return err
-	}
-
-	const fileMode = 0600
-	if err := ioutil.WriteFile(path, keystoreRaw, fileMode); err != nil {
-		return err
-	}
-
-	return nil
+	return json.Marshal(stored)
 }
 
 func (a *Account) GetEcdsaPrivateKey() (*ecdsa.PrivateKey, error) {
