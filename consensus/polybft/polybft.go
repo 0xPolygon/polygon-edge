@@ -398,8 +398,8 @@ SYNC:
 // isSynced return true if the current header from the local storage corresponds to the highest block of syncer
 func (p *Polybft) isSynced() bool {
 	// TODO: Check could we change following condition to this:
-	// p.syncer.GetSyncProgression().HighestBlock == p.syncer.GetSyncProgression().CurrentBlock
-	return p.syncer.GetSyncProgression().HighestBlock == p.blockchain.CurrentHeader().Number
+	// p.syncer.GetSyncProgression().CurrentBlock >= p.syncer.GetSyncProgression().HighestBlock
+	return p.blockchain.CurrentHeader().Number >= p.syncer.GetSyncProgression().HighestBlock
 }
 
 // runCycle runs a single cycle of the state machine and indicates if node should exit the consensus or keep on running
