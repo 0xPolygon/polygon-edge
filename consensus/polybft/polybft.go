@@ -303,10 +303,42 @@ func (p *Polybft) startPbftProcess() {
 		return
 	}
 
+	// subscribe to new block events
+	var (
+		newBlockSub   = p.blockchain.SubscribeEvents()
+		syncerBlockCh = make(chan uint64)
+	)
+
+	// Receive a notification every time syncer manages
+	// to insert a valid block.
+	go func() {
+		eventCh := newBlockSub.GetEventCh()
+		for {
+			select {
+			case ev := <-eventCh:
+				currentBlockNum := p.blockchain.CurrentHeader().Number
+				if ev.Source == "syncer" {
+					if ev.NewChain[0].Number < currentBlockNum {
+						// The blockchain notification system can eventually deliver
+						// stale block notifications. These should be ignored
+						continue
+					}
+				}
+				if p.syncer.GetSyncProgression().HighestBlock == currentBlockNum {
+					syncerBlockCh <- currentBlockNum
+				}
+
+			case <-p.closeCh:
+				return
+			}
+		}
+
+	}()
+
+	defer newBlockSub.Close()
+
 SYNC:
 	p.runtime.setIsValidator(false)
-
-	//for (syncer.GetSyncProgression())
 
 	lastBlock := p.getLatestAfterSync()
 
@@ -348,6 +380,7 @@ SYNC:
 
 func (p *Polybft) getLatestAfterSync() *types.Header {
 	return nil
+
 }
 
 // runCycle runs a single cycle of the state machine and indicates if node should exit the consensus or keep on running
@@ -391,6 +424,12 @@ func (p *Polybft) waitForNPeers() bool {
 
 // Close closes the connection
 func (p *Polybft) Close() error {
+	if p.syncer != nil {
+		if err := p.syncer.Close(); err != nil {
+			return err
+		}
+	}
+
 	close(p.closeCh)
 	return nil
 }
