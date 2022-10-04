@@ -102,7 +102,7 @@ type Polybft struct {
 
 // Initialize initializes the consensus (e.g. setup data)
 func (p *Polybft) Initialize() error {
-	p.logger.Info("initializing polybft")
+	p.logger.Info("initializing polybft...")
 
 	// read account
 	account, err := wallet.GenerateAccountFromSecrets(p.config.SecretsManager)
@@ -169,8 +169,8 @@ func (p *Polybft) Initialize() error {
 	// set block time  Nemanja - not sure if I am going to need it
 	p.blockTime = time.Duration(p.config.BlockTime)
 
-	// p.dataDir = node.ResolvePath("polybft")  Nemanja - what to do with this
-	p.dataDir = "./polybft" // Nemanja - check this
+	// initialize polybft consensus data directory
+	p.dataDir = filepath.Join(p.config.Config.Path, "polybft")
 	// create the data dir if not exists
 	if err := os.MkdirAll(p.dataDir, 0755); err != nil {
 		return fmt.Errorf("failed to create data directory. Error: %v", err)
@@ -375,6 +375,8 @@ SYNC:
 
 // isSynced return true if the current header from the local storage corresponds to the highest block of syncer
 func (p *Polybft) isSynced() bool {
+	// TODO: Check could we change following condition to this:
+	// p.syncer.GetSyncProgression().HighestBlock == p.syncer.GetSyncProgression().CurrentBlock
 	return p.syncer.GetSyncProgression().HighestBlock == p.blockchain.CurrentHeader().Number
 }
 
@@ -513,8 +515,22 @@ func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, parents []*type
 }
 
 func (p *Polybft) CheckIfStuck(num uint64) (uint64, bool) {
-	// TODO implement me
-	panic("implement me")
+	if !p.isSynced() {
+		// we are currently syncing new data, for sure we are stuck.
+		// We can return 0 here at least for now since that value is only used
+		// for the open telemetry tracing.
+		return 0, true
+	}
+
+	// Now, we have to check if the current value of the round 'num' is lower
+	// than our currently synced block.
+	currentHeader := p.blockchain.CurrentHeader().Number
+	if currentHeader > num {
+		// at this point, it will exit the sync process and start the fsm round again
+		// (or sync a small number of blocks) to start from the correct position.
+		return currentHeader, true
+	}
+	return 0, false
 }
 
 func (p *Polybft) GetValidators(blockNumber uint64, parents []*types.Header) (AccountSet, error) {
@@ -529,7 +545,7 @@ func (p *Polybft) ProcessHeaders(_ []*types.Header) error {
 
 // GetBlockCreator retrieves the block creator (or signer) given the block header
 func (p *Polybft) GetBlockCreator(_ *types.Header) (types.Address, error) {
-	panic("TODO")
+	panic("GetBlockCreator not implemented")
 }
 
 // PreCommitState a hook to be called before finalizing state transition on inserting block
