@@ -12,8 +12,8 @@ import (
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
 	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
-	"github.com/0xPolygon/polygon-edge/rootchain"
 	"github.com/0xPolygon/polygon-edge/helper/common"
+	"github.com/0xPolygon/polygon-edge/rootchain"
 	"github.com/0xPolygon/polygon-edge/server"
 	"github.com/0xPolygon/polygon-edge/server/proto"
 	txpoolOp "github.com/0xPolygon/polygon-edge/txpool/proto"
@@ -256,7 +256,7 @@ func WriteRootchainConfigToDisk(rootchainConfig *rootchain.Config, configPath st
 	}
 
 	//nolint:gosec
-	if err := ioutil.WriteFile(configPath, data, 0644); err != nil {
+	if err := os.WriteFile(configPath, data, 0644); err != nil {
 		return fmt.Errorf("failed to write rootchain config: %w", err)
 	}
 

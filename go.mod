@@ -62,6 +62,7 @@ require (
 
 require (
 	github.com/0xPolygon/go-ibft v0.0.0-20220810095021-e43142f8d267
+	github.com/libp2p/go-libp2p-core v0.20.1
 	go.uber.org/atomic v1.10.0
 )
 

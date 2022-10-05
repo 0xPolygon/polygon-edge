@@ -333,7 +333,8 @@ func (t *Transition) writeStateTx(tx *types.Transaction) error {
 			receipt.SetStatus(types.ReceiptSuccess)
 		}
 	} else {
-		ss, aux := t.state.Commit(t.config.EIP155)
+		objs := t.state.Commit(t.config.EIP155)
+		ss, aux := t.state.snapshot.Commit(objs)
 		t.state = NewTxn(t.auxState, ss)
 		root = aux
 		receipt.Root = types.BytesToHash(root)
