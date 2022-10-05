@@ -132,6 +132,13 @@ func (l *LocalSecretsManager) SetSecret(name string, value []byte) error {
 		return secrets.ErrSecretNotFound
 	}
 
+	// Checks for existing secret
+	if _, err := os.Stat(secretPath); err == nil {
+		return fmt.Errorf(
+			"%s already initialized",
+			secretPath,
+		)
+	}
 	// Write the secret to disk
 	if err := os.WriteFile(secretPath, value, os.ModePerm); err != nil {
 		return fmt.Errorf(

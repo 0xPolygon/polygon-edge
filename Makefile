@@ -39,9 +39,15 @@ generate-bsd-licenses:
 
 .PHONY: test
 test:
-	go build -o artifacts/polygon-edge .
-	$(eval export PATH=$(shell pwd)/artifacts:$(PATH))
-	go test -timeout 28m ./...
+	go test -timeout=20m `go list ./... | grep -v e2e`
+
+.PHONY: test-e2e
+test-e2e:
+    # We need to build the binary with the race flag enabled
+    # because it will get picked up and run during e2e tests
+    # and the e2e tests should error out if any kind of race is found
+	go build -race -o artifacts/polygon-edge .
+	env EDGE_BINARY=${PWD}/artifacts/polygon-edge go test -v -timeout=30m ./e2e/...
 
 .PHONY: run-local
 run-local:
