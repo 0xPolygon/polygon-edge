@@ -3,7 +3,6 @@ package tests
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -245,7 +244,8 @@ func buildState(
 		}
 	}
 
-	snap, root := txn.Commit(false)
+	objs := txn.Commit(false)
+	snap, root := snap.Commit(objs)
 
 	return s, snap, types.BytesToHash(root)
 }
@@ -488,7 +488,7 @@ func listFolders(paths ...string) ([]string, error) {
 	for _, p := range paths {
 		path := filepath.Join(TESTS, p)
 
-		files, err := ioutil.ReadDir(path)
+		files, err := os.ReadDir(path)
 		if err != nil {
 			return nil, err
 		}

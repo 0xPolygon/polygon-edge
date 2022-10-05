@@ -22,7 +22,8 @@ var (
 )
 
 var (
-	errInvalidTypeAssertion = errors.New("invalid type assertion")
+	errInvalidTypeAssertion  = errors.New("invalid type assertion")
+	errRecoveryAddressFailed = errors.New("failed to recover from field")
 )
 
 // NewTestHeadersWithSeed creates a new chain with a seed factor
@@ -305,6 +306,18 @@ func (m *mockExecutor) HookProcessBlock(fn processBlockDelegate) {
 	m.processBlockFn = fn
 }
 
+type mockSigner struct {
+	txFromByTxHash map[types.Hash]types.Address
+}
+
+func (m *mockSigner) Sender(tx *types.Transaction) (types.Address, error) {
+	if from, ok := m.txFromByTxHash[tx.Hash]; ok {
+		return from, nil
+	}
+
+	return types.ZeroAddress, errRecoveryAddressFailed
+}
+
 func TestBlockchain(t *testing.T, genesis *chain.Genesis) *Blockchain {
 	if genesis == nil {
 		genesis = &chain.Genesis{}
@@ -330,7 +343,7 @@ func newBlockChain(config *chain.Chain, executor Executor) (*Blockchain, error) 
 		executor = &mockExecutor{}
 	}
 
-	b, err := NewBlockchain(hclog.NewNullLogger(), "", config, &MockVerifier{}, executor)
+	b, err := NewBlockchain(hclog.NewNullLogger(), "", config, &MockVerifier{}, executor, &mockSigner{})
 	if err != nil {
 		return nil, err
 	}

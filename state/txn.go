@@ -54,7 +54,7 @@ func newTxn(state State, snapshot Snapshot) *Txn {
 
 func (txn *Txn) hashit(src []byte) []byte {
 	txn.hash.Reset()
-	txn.hash.Write(src) //nolint
+	txn.hash.Write(src)
 	// hashit is used to make queries so we do not need to
 	// make copies of the result
 	return txn.hash.Read()
@@ -591,7 +591,7 @@ func (txn *Txn) CleanDeleteObjects(deleteEmptyObjects bool) {
 	txn.txn.Delete(refundIndex)
 }
 
-func (txn *Txn) Commit(deleteEmptyObjects bool) (Snapshot, []byte) {
+func (txn *Txn) Commit(deleteEmptyObjects bool) []*Object {
 	txn.CleanDeleteObjects(deleteEmptyObjects)
 
 	x := txn.txn.Commit()
@@ -638,7 +638,5 @@ func (txn *Txn) Commit(deleteEmptyObjects bool) (Snapshot, []byte) {
 		return false
 	})
 
-	t, hash := txn.snapshot.Commit(objs)
-
-	return t, hash
+	return objs
 }

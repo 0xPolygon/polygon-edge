@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"sync"
 	"time"
 
@@ -718,7 +719,7 @@ func (f *FilterManager) flushWsFilters() error {
 
 		if flushErr := filter.sendUpdates(); flushErr != nil {
 			// mark as closed if the connection is closed
-			if errors.Is(flushErr, websocket.ErrCloseSent) {
+			if errors.Is(flushErr, websocket.ErrCloseSent) || errors.Is(flushErr, net.ErrClosed) {
 				closedFilterIDs = append(closedFilterIDs, id)
 
 				f.logger.Warn(fmt.Sprintf("Subscription %s has been closed", id))

@@ -3,12 +3,10 @@ package tests
 import (
 	"bytes"
 	"encoding/json"
-	"io/ioutil"
 	"math/big"
+	"os"
 	"strings"
 	"testing"
-
-	"github.com/hashicorp/go-hclog"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
@@ -16,6 +14,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/state/runtime/evm"
 	"github.com/0xPolygon/polygon-edge/state/runtime/precompiled"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/hashicorp/go-hclog"
 )
 
 var (
@@ -48,7 +47,7 @@ func RunSpecificTest(t *testing.T, file string, c stateCase, name, fork string, 
 		t.Fatal(err)
 	}
 
-	s, _, pastRoot := buildState(c.Pre)
+	s, snapshot, pastRoot := buildState(c.Pre)
 	forks := config.At(uint64(env.Number))
 
 	xxx := state.NewExecutor(&chain.Params{Forks: config, ChainID: 1}, s, hclog.NewNullLogger())
@@ -75,7 +74,9 @@ func RunSpecificTest(t *testing.T, file string, c stateCase, name, fork string, 
 	// mining rewards
 	txn.AddSealingReward(env.Coinbase, big.NewInt(0))
 
-	_, root := txn.Commit(forks.EIP158)
+	objs := txn.Commit(forks.EIP155)
+	_, root := snapshot.Commit(objs)
+
 	if !bytes.Equal(root, p.Root.Bytes()) {
 		t.Fatalf(
 			"root mismatch (%s %s %s %d): expected %s but found %s",
@@ -149,7 +150,7 @@ func TestState(t *testing.T) {
 					continue
 				}
 
-				data, err := ioutil.ReadFile(file)
+				data, err := os.ReadFile(file)
 				if err != nil {
 					t.Fatal(err)
 				}

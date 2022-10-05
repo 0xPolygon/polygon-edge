@@ -30,7 +30,6 @@ type TestServerConfig struct {
 	JSONRPCPort             int                      // The JSON RPC endpoint port
 	GRPCPort                int                      // The GRPC endpoint port
 	LibP2PPort              int                      // The Libp2p endpoint port
-	Seal                    bool                     // Flag indicating if blocks should be sealed
 	RootDir                 string                   // The root directory for test environment
 	IBFTDirPrefix           string                   // The prefix of data directory for IBFT
 	IBFTDir                 string                   // The name of data directory for IBFT
@@ -46,6 +45,9 @@ type TestServerConfig struct {
 	BlockGasLimit           uint64                   // Block gas limit
 	BlockGasTarget          uint64                   // Gas target for new blocks
 	ShowsLog                bool                     // Flag specifying if logs are shown
+	Name                    string                   // Name of the server
+	SaveLogs                bool                     // Flag specifying if logs are saved
+	LogsDir                 string                   // Directory where logs are saved
 	IsPos                   bool                     // Specifies the mechanism used for IBFT (PoA / PoS)
 	Signer                  *crypto.EIP155Signer     // Signer used for transactions
 	MinValidatorCount       uint64                   // Min validator count
@@ -143,11 +145,6 @@ func (t *TestServerConfig) SetIBFTDir(ibftDir string) {
 	t.IBFTDir = ibftDir
 }
 
-// SetSeal callback toggles the seal mode
-func (t *TestServerConfig) SetSeal(state bool) {
-	t.Seal = state
-}
-
 // SetBootnodes sets bootnodes
 func (t *TestServerConfig) SetBootnodes(bootnodes []string) {
 	t.Bootnodes = bootnodes
@@ -182,4 +179,19 @@ func (t *TestServerConfig) SetMinValidatorCount(val uint64) {
 // SetMaxValidatorCount sets the max validator count
 func (t *TestServerConfig) SetMaxValidatorCount(val uint64) {
 	t.MaxValidatorCount = val
+}
+
+// SetSaveLogs sets flag for saving logs
+func (t *TestServerConfig) SetSaveLogs(f bool) {
+	t.SaveLogs = f
+}
+
+// SetLogsDir sets the directory where logs are saved
+func (t *TestServerConfig) SetLogsDir(dir string) {
+	t.LogsDir = dir
+}
+
+// SetName sets the name of the server
+func (t *TestServerConfig) SetName(name string) {
+	t.Name = name
 }

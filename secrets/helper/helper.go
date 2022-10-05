@@ -1,9 +1,11 @@
 package helper
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/secrets/awsssm"
@@ -12,7 +14,8 @@ import (
 	"github.com/0xPolygon/polygon-edge/secrets/local"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
-	libp2pCrypto "github.com/libp2p/go-libp2p-core/crypto"
+	libp2pCrypto "github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 // SetupLocalSecretsManager is a helper method for boilerplate local secrets manager setup
@@ -28,8 +31,8 @@ func SetupLocalSecretsManager(dataDir string) (secrets.SecretsManager, error) {
 	)
 }
 
-// SetupHashicorpVault is a helper method for boilerplate hashicorp vault secrets manager setup
-func SetupHashicorpVault(
+// setupHashicorpVault is a helper method for boilerplate hashicorp vault secrets manager setup
+func setupHashicorpVault(
 	secretsConfig *secrets.SecretsManagerConfig,
 ) (secrets.SecretsManager, error) {
 	return hashicorpvault.SecretsManagerFactory(
@@ -40,8 +43,8 @@ func SetupHashicorpVault(
 	)
 }
 
-// SetupAWSSSM is a helper method for boilerplate aws ssm secrets manager setup
-func SetupAWSSSM(
+// setupAWSSSM is a helper method for boilerplate aws ssm secrets manager setup
+func setupAWSSSM(
 	secretsConfig *secrets.SecretsManagerConfig,
 ) (secrets.SecretsManager, error) {
 	return awsssm.SecretsManagerFactory(
@@ -52,8 +55,8 @@ func SetupAWSSSM(
 	)
 }
 
-// SetupGCPSSM is a helper method for boilerplate Google Cloud Computing secrets manager setup
-func SetupGCPSSM(
+// setupGCPSSM is a helper method for boilerplate Google Cloud Computing secrets manager setup
+func setupGCPSSM(
 	secretsConfig *secrets.SecretsManagerConfig,
 ) (secrets.SecretsManager, error) {
 	return gcpssm.SecretsManagerFactory(
@@ -134,4 +137,104 @@ func InitNetworkingPrivateKey(secretsManager secrets.SecretsManager) (libp2pCryp
 	}
 
 	return libp2pKey, keyErr
+}
+
+// LoadValidatorAddress loads ECDSA key by SecretsManager and returns validator address
+func LoadValidatorAddress(secretsManager secrets.SecretsManager) (types.Address, error) {
+	if !secretsManager.HasSecret(secrets.ValidatorKey) {
+		return types.ZeroAddress, nil
+	}
+
+	encodedKey, err := secretsManager.GetSecret(secrets.ValidatorKey)
+	if err != nil {
+		return types.ZeroAddress, err
+	}
+
+	privateKey, err := crypto.BytesToECDSAPrivateKey(encodedKey)
+	if err != nil {
+		return types.ZeroAddress, err
+	}
+
+	return crypto.PubKeyToAddress(&privateKey.PublicKey), nil
+}
+
+// LoadValidatorAddress loads BLS key by SecretsManager and returns BLS Public Key
+func LoadBLSPublicKey(secretsManager secrets.SecretsManager) (string, error) {
+	if !secretsManager.HasSecret(secrets.ValidatorBLSKey) {
+		return "", nil
+	}
+
+	encodedKey, err := secretsManager.GetSecret(secrets.ValidatorBLSKey)
+	if err != nil {
+		return "", err
+	}
+
+	secretKey, err := crypto.BytesToBLSSecretKey(encodedKey)
+	if err != nil {
+		return "", err
+	}
+
+	pubkeyBytes, err := crypto.BLSSecretKeyToPubkeyBytes(secretKey)
+	if err != nil {
+		return "", err
+	}
+
+	return hex.EncodeToHex(pubkeyBytes), nil
+}
+
+// LoadNodeID loads Libp2p key by SecretsManager and returns Node ID
+func LoadNodeID(secretsManager secrets.SecretsManager) (string, error) {
+	if !secretsManager.HasSecret(secrets.NetworkKey) {
+		return "", nil
+	}
+
+	encodedKey, err := secretsManager.GetSecret(secrets.NetworkKey)
+	if err != nil {
+		return "", err
+	}
+
+	parsedKey, err := network.ParseLibp2pKey(encodedKey)
+	if err != nil {
+		return "", err
+	}
+
+	nodeID, err := peer.IDFromPrivateKey(parsedKey)
+	if err != nil {
+		return "", err
+	}
+
+	return nodeID.String(), nil
+}
+
+// GetCloudSecretsManager returns the cloud secrets manager from the provided config
+func InitCloudSecretsManager(secretsConfig *secrets.SecretsManagerConfig) (secrets.SecretsManager, error) {
+	var secretsManager secrets.SecretsManager
+
+	switch secretsConfig.Type {
+	case secrets.HashicorpVault:
+		vault, err := setupHashicorpVault(secretsConfig)
+		if err != nil {
+			return secretsManager, err
+		}
+
+		secretsManager = vault
+	case secrets.AWSSSM:
+		AWSSSM, err := setupAWSSSM(secretsConfig)
+		if err != nil {
+			return secretsManager, err
+		}
+
+		secretsManager = AWSSSM
+	case secrets.GCPSSM:
+		GCPSSM, err := setupGCPSSM(secretsConfig)
+		if err != nil {
+			return secretsManager, err
+		}
+
+		secretsManager = GCPSSM
+	default:
+		return secretsManager, errors.New("unsupported secrets manager")
+	}
+
+	return secretsManager, nil
 }

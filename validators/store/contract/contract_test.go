@@ -450,8 +450,6 @@ func TestContractValidatorStoreGetValidators(t *testing.T) {
 }
 
 func TestContractValidatorStore_CacheChange(t *testing.T) {
-	t.Parallel()
-
 	var (
 		cacheSize = 2
 
