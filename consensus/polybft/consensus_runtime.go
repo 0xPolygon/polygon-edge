@@ -120,6 +120,7 @@ func (c *consensusRuntime) getEpoch() *epochMetadata {
 	c.lock.Lock()
 	epoch := c.epoch
 	c.lock.Unlock()
+
 	return epoch
 }
 
@@ -140,10 +141,13 @@ func (c *consensusRuntime) AddLog(eventLog *ethgo.Log) {
 	event, err := decodeEvent(eventLog)
 	if err != nil {
 		c.logger.Error("failed to decode state sync event", "hash", eventLog.TransactionHash, "err", err)
+
 		return
 	}
+
 	if err := c.state.insertStateSyncEvent(event); err != nil {
 		c.logger.Error("failed to insert state sync event", "hash", eventLog.TransactionHash, "err", err)
+
 		return
 	}
 
@@ -202,7 +206,9 @@ func (c *consensusRuntime) FSM() (*fsm, error) {
 	}
 
 	var systemState SystemState
+
 	var nextStateSyncExecutionIdx uint64
+
 	if c.IsBridgeEnabled() {
 		systemState, err = c.getSystemState(c.lastBuiltBlock)
 		if err != nil {
@@ -223,13 +229,16 @@ func (c *consensusRuntime) FSM() (*fsm, error) {
 				if err := c.state.insertCommitmentMessage(ff.commitmentToSaveOnRegister); err != nil {
 					return err
 				}
-				if err := c.buildBundles(epoch, ff.commitmentToSaveOnRegister.Message, nextStateSyncExecutionIdx); err != nil {
+
+				if err := c.buildBundles(
+					epoch, ff.commitmentToSaveOnRegister.Message, nextStateSyncExecutionIdx); err != nil {
 					return err
 				}
 			}
 		}
 
 		c.NotifyProposalInserted(ff.block)
+
 		return nil
 	}
 
@@ -260,6 +269,7 @@ func (c *consensusRuntime) FSM() (*fsm, error) {
 			if err != nil {
 				return nil, err
 			}
+
 			if err := c.state.cleanCommitments(nextStateSyncExecutionIdx); err != nil {
 				return nil, err
 			}
@@ -274,6 +284,7 @@ func (c *consensusRuntime) FSM() (*fsm, error) {
 				if err != nil {
 					return nil, err
 				}
+
 				ff.commitmentsToVerifyBundles = nonExecutedCommitments
 				ff.bundleProofs = bundlesToExecute
 			}
@@ -285,6 +296,7 @@ func (c *consensusRuntime) FSM() (*fsm, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		ff.uptimeCounter = uptimeCounter
 	}
 
@@ -293,12 +305,14 @@ func (c *consensusRuntime) FSM() (*fsm, error) {
 		"endOfEpoch", isEndOfEpoch,
 		"endOfSprint", isEndOfSprint,
 	)
+
 	return ff, nil
 }
 
 // restartEpoch resets the previously run epoch and moves to the next one
 func (c *consensusRuntime) restartEpoch(header *types.Header) error {
 	c.lastBuiltBlock = header
+
 	systemState, err := c.getSystemState(c.lastBuiltBlock)
 	if err != nil {
 		return err
@@ -353,7 +367,7 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) error {
 	}
 
 	if err := c.state.insertEpoch(epoch.Number); err != nil {
-		return fmt.Errorf("an error occurred while inserting new epoch in db. Reason: %v", err)
+		return fmt.Errorf("an error occurred while inserting new epoch in db. Reason: %w", err)
 	}
 
 	// create commitment for state sync events
@@ -395,6 +409,7 @@ func (c *consensusRuntime) buildCommitment(epoch, fromIndex uint64) (*Commitment
 			// this is a valid case, there is not enough state syncs
 			return nil, nil
 		}
+
 		return nil, err
 	}
 
@@ -404,17 +419,18 @@ func (c *consensusRuntime) buildCommitment(epoch, fromIndex uint64) (*Commitment
 	}
 
 	hash := commitment.Hash().Bytes()
+
 	signature, err := c.config.Key.Sign(hash)
 	if err != nil {
-		return nil, fmt.Errorf("failed to sign commitment message. Error: %v", err)
+		return nil, fmt.Errorf("failed to sign commitment message. Error: %w", err)
 	}
 
-	_, err = c.state.insertMessageVote(epoch, hash,
-		&MessageSignature{
-			From:      c.config.Key.NodeID(),
-			Signature: signature,
-		})
-	if err != nil {
+	sig := &MessageSignature{
+		From:      c.config.Key.NodeID(),
+		Signature: signature,
+	}
+
+	if _, err = c.state.insertMessageVote(epoch, hash, sig); err != nil {
 		return nil, fmt.Errorf("failed to insert signature for hash=%v to the state."+
 			"Error: %v", hex.EncodeToString(hash), err)
 	}
@@ -427,6 +443,7 @@ func (c *consensusRuntime) buildCommitment(epoch, fromIndex uint64) (*Commitment
 		EpochNumber: epoch,
 	}
 	c.config.Transport.Gossip(msg)
+
 	return commitment, nil
 }
 
@@ -438,6 +455,7 @@ func (c *consensusRuntime) buildBundles(epoch *epochMetadata, commitmentMsg *Com
 		// we will be able to validate them though, since we have CommitmentMessageSigned taken from
 		// register commitment state transaction when its block was inserted
 		c.logger.Info("[buildProofs] No commitment built.")
+
 		return nil
 	}
 
@@ -486,7 +504,9 @@ func (c *consensusRuntime) getAggSignatureForCommitmentMessage(epoch *epochMetad
 	}
 
 	var signatures bls.Signatures
+
 	bitmap := bitmap.Bitmap{}
+
 	for _, vote := range votes {
 		index, exists := nodeIDIndexMap[vote.From]
 		if !exists {
@@ -497,8 +517,10 @@ func (c *consensusRuntime) getAggSignatureForCommitmentMessage(epoch *epochMetad
 		if err != nil {
 			return Signature{}, err
 		}
-		signatures = append(signatures, signature)
+
 		bitmap.Set(uint64(index))
+
+		signatures = append(signatures, signature)
 	}
 
 	if len(signatures) < getQuorumSize(validators.Len()) {
@@ -514,12 +536,14 @@ func (c *consensusRuntime) getAggSignatureForCommitmentMessage(epoch *epochMetad
 		AggregatedSignature: aggregatedSignature,
 		Bitmap:              bitmap,
 	}
+
 	return result, nil
 }
 
 // getStateSyncEventsForBundle gets state sync events from database for the appropriate bundle
 func (c *consensusRuntime) getStateSyncEventsForBundle(from, bundleSize uint64) ([]*StateSyncEvent, error) {
 	until := bundleSize + from
+
 	return c.state.getStateSyncEventsForCommitment(from, until)
 }
 
@@ -539,6 +563,7 @@ func (c *consensusRuntime) startEventTracker() error {
 	if err := c.eventTracker.start(); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -572,7 +597,7 @@ func (c *consensusRuntime) deliverMessage(msg *TransportMessage) (bool, error) {
 
 	numSignatures, err := c.state.insertMessageVote(msg.EpochNumber, msg.Hash, msgVote)
 	if err != nil {
-		return false, fmt.Errorf("error inserting message vote:%w", err)
+		return false, fmt.Errorf("error inserting message vote: %w", err)
 	}
 
 	c.logger.Info(
@@ -582,6 +607,7 @@ func (c *consensusRuntime) deliverMessage(msg *TransportMessage) (bool, error) {
 		"signatures", numSignatures,
 		"quorum", getQuorumSize(len(epoch.Validators)),
 	)
+
 	return true, nil
 }
 
@@ -593,11 +619,14 @@ func (c *consensusRuntime) runCheckpoint(epoch *epochMetadata) error {
 // getLatestSprintBlockNumber returns latest sprint block number
 func (c *consensusRuntime) getLatestSprintBlockNumber() uint64 {
 	lastBuiltBlockNumber := c.lastBuiltBlock.Number
+
 	sprintSizeMod := lastBuiltBlockNumber % c.config.PolyBFTConfig.SprintSize
 	if sprintSizeMod == 0 {
 		return lastBuiltBlockNumber
 	}
+
 	sprintBlockNumber := lastBuiltBlockNumber - sprintSizeMod
+
 	return sprintBlockNumber
 }
 
@@ -628,6 +657,7 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header) (*UptimeC
 		for _, a := range signers.GetAddresses() {
 			uptimeCounter.AddUptime(ethgo.Address(a))
 		}
+
 		return nil
 	}
 
@@ -636,6 +666,7 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header) (*UptimeC
 
 	blockHeader := currentBlock
 	validators := epoch.Validators
+
 	for blockHeader.Number > firstBlockInEpoch {
 		if err := calculateUptimeForBlock(blockHeader, validators); err != nil {
 			return nil, err
@@ -702,6 +733,7 @@ func (c *consensusRuntime) getSystemState(header *types.Header) (SystemState, er
 	if err != nil {
 		return nil, err
 	}
+
 	return c.config.blockchain.GetSystemState(c.config.PolyBFTConfig, provider), nil
 }
 
@@ -722,12 +754,13 @@ func calculateFirstBlockOfPeriod(currentBlockNumber, periodSize uint64) uint64 {
 	if currentBlockNumber <= periodSize {
 		return 1 // it's the first epoch
 	}
-	mod := currentBlockNumber % periodSize
-	if mod == 1 {
+
+	switch currentBlockNumber % periodSize {
+	case 1:
 		return currentBlockNumber
-	} else if mod == 0 {
+	case 0:
 		return currentBlockNumber - periodSize + 1
-	} else {
+	default:
 		return currentBlockNumber - (currentBlockNumber % periodSize) + 1
 	}
 }
@@ -740,6 +773,7 @@ func getEpochNumber(blockNumber, epochSize uint64) uint64 {
 	if isEndOfPeriod(blockNumber, epochSize) {
 		return blockNumber / epochSize
 	}
+
 	return blockNumber/epochSize + 1
 }
 
@@ -787,6 +821,7 @@ func createStateTransaction(
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode arguments:%w", err)
 	}
+
 	return createStateTransactionWithData(target, abiEncodedArgs, stateTransactionsGasLimit), nil
 }
 
@@ -812,5 +847,6 @@ func validateVote(vote *MessageSignature, epoch *epochMetadata) error {
 			vote.From,
 		)
 	}
+
 	return nil
 }

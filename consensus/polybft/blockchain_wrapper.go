@@ -70,8 +70,6 @@ func (p *blockchainWrapper) CurrentHeader() *types.Header {
 
 // CommitBlock commits a block to the chain
 func (p *blockchainWrapper) CommitBlock(stateBlock *StateBlock) error {
-	return p.blockchain.WriteBlock(stateBlock.Block, "consensus")
-
 	// logs := buildLogsFromReceipts(stateBlock.Receipts, stateBlock.Block.GetHeader())
 	// status, err := p.blockchain.WriteBlockAndSetHead(stateBlock.Block, stateBlock.Receipts, logs, stateBlock.State, true)
 	// if err != nil {
@@ -79,12 +77,12 @@ func (p *blockchainWrapper) CommitBlock(stateBlock *StateBlock) error {
 	// } else if status != core.CanonStatTy {
 	// 	return fmt.Errorf("non canonical change")
 	// }
+	return p.blockchain.WriteBlock(stateBlock.Block, "consensus")
 }
 
 // ProcessBlock builds a final block from given 'block' on top of 'parent'
 func (p *blockchainWrapper) ProcessBlock(parent *types.Header, block *types.Block) (*StateBlock, error) {
 	// TODO: Call validate block in polybft
-
 	header := block.Header.Copy()
 
 	//transition, err := p.executor.BeginTxn(parent.Hash, header, b.params.Coinbase)
@@ -121,6 +119,7 @@ func (p *blockchainWrapper) GetStateProviderForBlock(header *types.Header) (cont
 	if !found {
 		return nil, fmt.Errorf("failed to retrieve parent header for hash %s", header.ParentHash.String())
 	}
+
 	transition, err := p.executor.BeginTxn(parentHeader.StateRoot, header, types.ZeroAddress)
 	if err != nil {
 		return nil, err
@@ -145,8 +144,8 @@ func (p *blockchainWrapper) GetHeaderByHash(hash types.Hash) (*types.Header, boo
 }
 
 // NewBlockBuilder is an implementation of blockchainBackend interface
-func (p *blockchainWrapper) NewBlockBuilder(parent *types.Header, coinbase types.Address) (blockBuilder, error) {
-
+func (p *blockchainWrapper) NewBlockBuilder(
+	parent *types.Header, coinbase types.Address) (blockBuilder, error) {
 	return NewBlockBuilder(&BlockBuilderParams{
 		Parent:      parent,
 		Coinbase:    coinbase,
@@ -185,6 +184,7 @@ func (s *stateProvider) Call(addr ethgo.Address, input []byte, opts *contract.Ca
 	if result.Err != nil {
 		return nil, result.Err
 	}
+
 	return result.ReturnValue, nil
 }
 

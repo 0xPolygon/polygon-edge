@@ -52,13 +52,15 @@ func Factory(params *consensus.Params) (consensus.Consensus, error) {
 	logger := params.Logger.Named("polybft")
 	logger.Info("polybft factory", "params", params.Config.Params, "specific consensus params", params.Config)
 
+	setupHeaderHashFunc()
+
 	polybft := &Polybft{
 		config:  params,
 		closeCh: make(chan struct{}),
 		logger:  logger,
 	}
 	polybft.initializeConsensusConfig()
-	types.HeaderHash = polyBFTHeaderHash
+
 	return polybft, nil
 }
 

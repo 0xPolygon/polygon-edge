@@ -156,8 +156,10 @@ func (v *validatorsSnapshotCache) computeSnapshot(
 	epochEndBlockNumber uint64,
 	parents []*types.Header,
 ) (AccountSet, error) {
-	v.logger.Trace("Compute snapshot started...", "BlockNumber", epochEndBlockNumber)
 	var header *types.Header
+
+	v.logger.Trace("Compute snapshot started...", "BlockNumber", epochEndBlockNumber)
+
 	if len(parents) > 0 {
 		for i := len(parents) - 1; i >= 0; i-- {
 			parentHeader := parents[i]
