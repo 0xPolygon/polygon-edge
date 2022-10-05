@@ -350,6 +350,7 @@ SYNC:
 	}
 
 	lastBlock := p.blockchain.CurrentHeader()
+	p.logger.Info("startPbftProcess", "header hash", lastBlock.Hash, "computed hash", lastBlock.HashF(), "header number", lastBlock.Number)
 
 	currentValidators, err := p.GetValidators(lastBlock.Number, nil)
 	if err != nil {

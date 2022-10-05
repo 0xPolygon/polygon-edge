@@ -2,6 +2,7 @@ package polybft
 
 import (
 	"fmt"
+
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
@@ -130,8 +131,8 @@ func (i *Extra) UnmarshalRLPWith(v *fastrlp.Value) error {
 	return nil
 }
 
-// createValidatorSetDelta calculates ValidatorSetDelta based on the provided old and new validator sets
-func createValidatorSetDelta(oldValidatorSet, newValidatorSet AccountSet) *ValidatorSetDelta {
+// CreateValidatorSetDelta calculates ValidatorSetDelta based on the provided old and new validator sets
+func CreateValidatorSetDelta(oldValidatorSet, newValidatorSet AccountSet) *ValidatorSetDelta {
 	var addedValidators AccountSet
 	removedValidators := make(map[types.Address]int)
 	oldValidatorSetMap := make(map[types.Address]*ValidatorAccount)
@@ -366,36 +367,3 @@ func GetIbftExtra(extraB []byte) (*Extra, error) {
 	}
 	return extra, nil
 }
-
-/*
-TO DO Nemanja - see what happens with this after figuring out genesis
-// InitGenesisValidatorsDelta extracts initial account set from the genesis block and
-// populates validator set delta to its extra data
-func InitGenesisValidatorsDelta(genesis *core.Genesis) error {
-	validators := genesis.Config.PolyBFT.Genesis
-	initialValidatorSet := make([]*ValidatorAccount, len(validators))
-	for i, validator := range validators {
-		blsKey, err := hexutil.Decode(validator.BlsKey)
-		if err != nil {
-			return fmt.Errorf("failed to decode validator BLS key: %w", err)
-		}
-		blsPubKey, err := bls.UnmarshalPublicKey(blsKey)
-		if err != nil {
-			return fmt.Errorf("failed to unmarshal validator BLS key: %w", err)
-		}
-		initialValidatorSet[i] = &ValidatorAccount{
-			Address: validator.Ecdsa,
-			BlsKey:  blsPubKey,
-		}
-	}
-
-	validatorSetDelta := createValidatorSetDelta(nil, initialValidatorSet)
-	extra, err := GetIbftExtra(genesis.ExtraData)
-	if err != nil {
-		return err
-	}
-	extra.Validators = validatorSetDelta
-	genesis.ExtraData = append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...)
-	return nil
-}
-*/
