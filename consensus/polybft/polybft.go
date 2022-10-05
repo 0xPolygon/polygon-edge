@@ -354,6 +354,7 @@ SYNC:
 	if !p.isSynced() {
 		<-syncerBlockCh
 	}
+
 	lastBlock := p.blockchain.CurrentHeader()
 
 	currentValidators, err := p.GetValidators(lastBlock.Number, nil)
@@ -402,7 +403,9 @@ SYNC:
 func (p *Polybft) isSynced() bool {
 	// TODO: Check could we change following condition to this:
 	// p.syncer.GetSyncProgression().CurrentBlock >= p.syncer.GetSyncProgression().HighestBlock
-	return p.blockchain.CurrentHeader().Number >= p.syncer.GetSyncProgression().HighestBlock
+	syncProgression := p.syncer.GetSyncProgression()
+	return syncProgression == nil ||
+		p.blockchain.CurrentHeader().Number >= syncProgression.HighestBlock
 }
 
 // runCycle runs a single cycle of the state machine and indicates if node should exit the consensus or keep on running
