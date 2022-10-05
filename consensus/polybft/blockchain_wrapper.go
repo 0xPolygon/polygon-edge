@@ -1,12 +1,14 @@
 package polybft
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/state"
+	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/contract"
@@ -182,26 +184,12 @@ func NewStateProvider(transition *state.Transition) contract.Provider {
 
 // Call implements the contract.Provider interface to make contract calls directly to the state
 func (s *stateProvider) Call(addr ethgo.Address, input []byte, opts *contract.CallOpts) ([]byte, error) {
-	// result := s.transition.Call2(types.ZeroAddress, types.Address(addr), input, big.NewInt(0), 10000000)
-	from, to := types.ZeroAddress, types.Address(addr)
-	tx := &types.Transaction{
-		From:     from,
-		To:       &to,
-		Input:    input,
-		Nonce:    s.transition.GetNonce(from),
-		Gas:      100000,
-		Value:    big.NewInt(0),
-		GasPrice: big.NewInt(0),
-	}
-
-	result, err := s.transition.Apply(tx)
-
-	if err != nil {
-		return nil, err
-	}
-
+	result := s.transition.Call2(types.ZeroAddress, types.Address(addr), input, big.NewInt(0), 10000000)
 	if result.Failed() {
-		return nil, result.Err
+		// do not treat execution reverted
+		if !errors.Is(result.Err, runtime.ErrExecutionReverted) {
+			return nil, result.Err
+		}
 	}
 
 	return result.ReturnValue, nil
