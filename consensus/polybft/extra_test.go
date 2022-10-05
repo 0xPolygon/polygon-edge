@@ -2,6 +2,7 @@ package polybft
 
 import (
 	"crypto/rand"
+	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
@@ -332,55 +333,58 @@ func TestExtra_CreateValidatorSetDelta_BlsDiffer(t *testing.T) {
 
 }
 
-// TODO fix tests
-// func TestExtra_InitGenesisValidatorsDelta(t *testing.T) {
-// 	t.Run("Happy path", func(t *testing.T) {
-// 		const validatorsCount = 7
-// 		vals := newTestValidators(validatorsCount)
-//
-// 		extra := Extra{}
-// 		genesis := &core.Genesis{
-// 			Config:    &params.ChainConfig{PolyBFT: &params.PolyBFTConfig{Genesis: vals.getParamValidators()}},
-// 			ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...),
-// 		}
-// 		err := InitGenesisValidatorsDelta(genesis)
-// 		assert.NoError(t, err)
-//
-// 		genesisExtra, err := GetIbftExtra(genesis.ExtraData)
-// 		assert.NoError(t, err)
-// 		assert.Len(t, genesisExtra.Validators.Added, validatorsCount)
-// 		assert.Empty(t, genesisExtra.Validators.Removed)
-// 	})
-//
-// 	t.Run("Invalid validator BLS key", func(t *testing.T) {
-// 		key := newTestValidator("A").paramsValidator()
-// 		key.BlsKey = string("xx")
-//
-// 		validators := []*params.Validator{
-// 			key,
-// 		}
-//
-// 		genesis := &core.Genesis{
-// 			Config: &params.ChainConfig{
-// 				PolyBFT: &params.PolyBFTConfig{Genesis: validators},
-// 			},
-// 		}
-// 		err := InitGenesisValidatorsDelta(genesis)
-// 		require.Error(t, err, "failed to decode validator BLS key: hex string without 0x prefix")
-// 	})
-//
-// 	t.Run("Invalid Extra data", func(t *testing.T) {
-// 		validators := newTestValidators(5).getParamValidators()
-//
-// 		genesis := &core.Genesis{
-// 			Config: &params.ChainConfig{
-// 				PolyBFT: &params.PolyBFTConfig{Genesis: validators},
-// 			},
-// 			ExtraData: []byte{0x2, 0x3},
-// 		}
-// 		require.Error(t, InitGenesisValidatorsDelta(genesis))
-// 	})
-// }
+func TestExtra_InitGenesisValidatorsDelta(t *testing.T) {
+	t.Run("Happy path", func(t *testing.T) {
+		const validatorsCount = 7
+		vals := newTestValidators(validatorsCount)
+
+		polyBftConfig := PolyBFTConfig{Genesis: vals.getParamValidators()}
+
+		delta := &ValidatorSetDelta{
+			Added:   make(AccountSet, validatorsCount),
+			Removed: bitmap.Bitmap{},
+		}
+
+		var i int
+		for _, validator := range vals.validators {
+			delta.Added[i] = &ValidatorAccount{
+				Address: types.Address(validator.account.Ecdsa.Address()),
+				BlsKey:  validator.account.Bls.PublicKey(),
+			}
+			i++
+		}
+
+		extra := Extra{Validators: delta}
+
+		genesis := &chain.Genesis{
+			Config: &chain.Params{Engine: map[string]interface{}{
+				"polybft": polyBftConfig,
+			}},
+			ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...),
+		}
+
+		genesisExtra, err := GetIbftExtra(genesis.ExtraData)
+		assert.NoError(t, err)
+		assert.Len(t, genesisExtra.Validators.Added, validatorsCount)
+		assert.Empty(t, genesisExtra.Validators.Removed)
+	})
+
+	t.Run("Invalid Extra data", func(t *testing.T) {
+		validators := newTestValidators(5)
+		polyBftConfig := PolyBFTConfig{Genesis: validators.getParamValidators()}
+
+		genesis := &chain.Genesis{
+			Config: &chain.Params{Engine: map[string]interface{}{
+				"polybft": polyBftConfig,
+			}},
+			ExtraData: append(make([]byte, ExtraVanity), []byte{0x2, 0x3}...),
+		}
+
+		_, err := GetIbftExtra(genesis.ExtraData)
+
+		require.Error(t, err)
+	})
+}
 
 func TestValidatorSetDelta_Copy(t *testing.T) {
 	const (
