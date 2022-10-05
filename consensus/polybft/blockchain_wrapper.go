@@ -115,12 +115,14 @@ func (p *blockchainWrapper) ProcessBlock(parent *types.Header, block *types.Bloc
 
 // GetStateProviderForBlock is an implementation of blockchainBackend interface
 func (p *blockchainWrapper) GetStateProviderForBlock(header *types.Header) (contract.Provider, error) {
-	parentHeader, found := p.GetHeaderByHash(header.ParentHash)
-	if !found {
-		return nil, fmt.Errorf("failed to retrieve parent header for hash %s", header.ParentHash.String())
+	newHeader := &types.Header{
+		Timestamp:  header.Timestamp + 1,
+		Number:     header.Number + 1,
+		Difficulty: 1,
+		GasLimit:   header.GasLimit,
 	}
 
-	transition, err := p.executor.BeginTxn(parentHeader.StateRoot, header, types.ZeroAddress)
+	transition, err := p.executor.BeginTxn(header.StateRoot, newHeader, types.ZeroAddress)
 	if err != nil {
 		return nil, err
 	}
@@ -180,8 +182,25 @@ func NewStateProvider(transition *state.Transition) contract.Provider {
 
 // Call implements the contract.Provider interface to make contract calls directly to the state
 func (s *stateProvider) Call(addr ethgo.Address, input []byte, opts *contract.CallOpts) ([]byte, error) {
-	result := s.transition.Call2(types.ZeroAddress, types.Address(addr), input, big.NewInt(0), 10000000)
-	if result.Err != nil {
+	// result := s.transition.Call2(types.ZeroAddress, types.Address(addr), input, big.NewInt(0), 10000000)
+	from, to := types.ZeroAddress, types.Address(addr)
+	tx := &types.Transaction{
+		From:     from,
+		To:       &to,
+		Input:    input,
+		Nonce:    s.transition.GetNonce(from),
+		Gas:      100000,
+		Value:    big.NewInt(0),
+		GasPrice: big.NewInt(0),
+	}
+
+	result, err := s.transition.Apply(tx)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if result.Failed() {
 		return nil, result.Err
 	}
 
