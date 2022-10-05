@@ -252,22 +252,16 @@ func (p *Polybft) startSealing() error {
 // initializeConsensusConfig populates consensus configuration
 func (p *Polybft) initializeConsensusConfig() {
 	customConfigGeneric := p.config.Config.Config
-	blockTime, _ := customConfigGeneric[blockTimeKey].(time.Duration)
-	epochSize, _ := customConfigGeneric[epochSizeKey].(uint64)
-	sprintSize, _ := customConfigGeneric[sprintSizeKey].(uint64)
-	sidechainBridgeAddr, _ := customConfigGeneric[sidechainBridgeAddrKey].(types.Address)
-	validatorSetAddr, _ := customConfigGeneric[validatorSetAddrKey].(types.Address)
-	activeValidatorsSize, _ := customConfigGeneric[validatorSetSizeKey].(int)
+
+	var polyBftConfig PolyBFTConfig
+
+	customConfigJSON, _ := json.Marshal(customConfigGeneric)
+	json.Unmarshal(customConfigJSON, &polyBftConfig)
+
+	p.logger.Info(fmt.Sprintf("Polybft config %+v", polyBftConfig))
 
 	// TODO: Bridge, validators configuration
-	p.consensusConfig = &PolyBFTConfig{
-		BlockTime:           blockTime,
-		EpochSize:           epochSize,
-		SprintSize:          sprintSize,
-		SidechainBridgeAddr: sidechainBridgeAddr,
-		ValidatorSetAddr:    validatorSetAddr,
-		ValidatorSetSize:    activeValidatorsSize,
-	}
+	p.consensusConfig = &polyBftConfig
 }
 
 // startRuntime starts consensus runtime
