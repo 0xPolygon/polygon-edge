@@ -146,16 +146,6 @@ func (h *Header) IsGenesis() bool {
 	return h.Hash != ZeroHash && h.Number == 0
 }
 
-// HashF returns the block hash of the header, which is simply the keccak256 hash of its
-// RLP encoding.
-func (h *Header) HashF() Hash {
-	// (v3). We need to perform specific hashing of the block
-	if fn, ok := mixHashHash[h.MixHash]; ok {
-		return fn(h)
-	}
-	return defHeaderHash(h)
-}
-
 type Nonce [8]byte
 
 func (n Nonce) String() string {

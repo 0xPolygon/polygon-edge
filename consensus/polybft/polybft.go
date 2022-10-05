@@ -58,7 +58,7 @@ func Factory(params *consensus.Params) (consensus.Consensus, error) {
 		logger:  logger,
 	}
 	polybft.initializeConsensusConfig()
-
+	types.HeaderHash = polyBFTHeaderHash
 	return polybft, nil
 }
 
@@ -144,7 +144,6 @@ func (p *Polybft) Initialize() error {
 		),
 		pbft.WithTracer(otel.Tracer("Pbft")),
 	}
-
 	p.pbft = pbft.New(p.key, &pbftTransportWrapper{topic: p.pbftTopic}, opts...)
 
 	// create pbft topic
@@ -156,8 +155,8 @@ func (p *Polybft) Initialize() error {
 	// check pbft topic - listen for transport messages and relay them to pbft
 	err = pbftTopic.Subscribe(func(obj interface{}, from peer.ID) {
 		gossipMsg, _ := obj.(*proto.GossipMessage)
-		var msg *pbft.MessageReq
 
+		var msg *pbft.MessageReq
 		if err := json.Unmarshal(gossipMsg.Data, &msg); err != nil {
 			panic(err)
 		}
@@ -177,7 +176,6 @@ func (p *Polybft) Initialize() error {
 	if err != nil {
 		return fmt.Errorf("failed to create bridge topic. Error: %v", err)
 	}
-
 	// set pbft topic, it will be check if/when the bridge is enabled
 	p.bridgeTopic = bridgeTopic
 
@@ -186,7 +184,6 @@ func (p *Polybft) Initialize() error {
 
 	// initialize polybft consensus data directory
 	p.dataDir = filepath.Join(p.config.Config.Path, "polybft")
-
 	// create the data dir if not exists
 	if err := os.MkdirAll(p.dataDir, 0755); err != nil {
 		return fmt.Errorf("failed to create data directory. Error: %v", err)
@@ -262,6 +259,8 @@ func (p *Polybft) initializeConsensusConfig() {
 	customConfigJSON, _ := json.Marshal(customConfigGeneric)
 	json.Unmarshal(customConfigJSON, &polyBftConfig)
 
+	p.logger.Info(fmt.Sprintf("Polybft config %+v", polyBftConfig))
+
 	// TODO: Bridge, validators configuration
 	p.consensusConfig = &polyBftConfig
 }
@@ -292,16 +291,13 @@ func (p *Polybft) startRuntime() error {
 		err := p.bridgeTopic.Subscribe(func(obj interface{}, from peer.ID) {
 			msg, _ := obj.(*proto.TransportMessage)
 			var transportMsg *TransportMessage
-
 			if err := json.Unmarshal(msg.Data, &transportMsg); err != nil {
 				panic(err)
 			}
-
 			if _, err := p.runtime.deliverMessage(transportMsg); err != nil {
 				p.logger.Warn(fmt.Sprintf("Failed to deliver message. Error: %s", err))
 			}
 		})
-
 		if err != nil {
 			return fmt.Errorf("topic subscription failed:%w", err)
 		}
@@ -337,7 +333,6 @@ func (p *Polybft) startPbftProcess() {
 						continue
 					}
 				}
-
 				if p.isSynced() {
 					syncerBlockCh <- currentBlockNum
 				}
@@ -356,10 +351,7 @@ SYNC:
 	}
 
 	lastBlock := p.blockchain.CurrentHeader()
-	p.logger.Info("startPbftProcess",
-		"header hash", lastBlock.Hash,
-		"computed hash", lastBlock.HashF(),
-		"header number", lastBlock.Number)
+	p.logger.Info("startPbftProcess", "header hash", lastBlock.Hash, "computed hash", lastBlock.Hash, "header number", lastBlock.Number)
 
 	currentValidators, err := p.GetValidators(lastBlock.Number, nil)
 	if err != nil {
@@ -408,7 +400,6 @@ func (p *Polybft) isSynced() bool {
 	// TODO: Check could we change following condition to this:
 	// p.syncer.GetSyncProgression().CurrentBlock >= p.syncer.GetSyncProgression().HighestBlock
 	syncProgression := p.syncer.GetSyncProgression()
-
 	return syncProgression == nil ||
 		p.blockchain.CurrentHeader().Number >= syncProgression.HighestBlock
 }
@@ -473,7 +464,7 @@ func (p *Polybft) GetSyncProgression() *progress.Progression {
 // VerifyHeader implements consensus.Engine and checks whether a header conforms to the consensus rules
 func (p *Polybft) VerifyHeader(header *types.Header) error {
 	// Short circuit if the header is known
-	header, ok := p.blockchain.GetHeaderByHash(header.HashF())
+	header, ok := p.blockchain.GetHeaderByHash(header.Hash)
 	if ok {
 		return nil
 	}
@@ -516,11 +507,11 @@ func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, parents []*type
 		return fmt.Errorf(
 			"failed to verify signatures for block %d because signatures are nil. Block hash: %v",
 			blockNumber,
-			header.HashF(),
+			header.Hash,
 		)
 	}
-	if err := extra.Committed.VerifyCommittedFields(validators, header.HashF()); err != nil {
-		return fmt.Errorf("failed to verify signatures for block %d. Block hash: %v", blockNumber, header.HashF())
+	if err := extra.Committed.VerifyCommittedFields(validators, header.Hash); err != nil {
+		return fmt.Errorf("failed to verify signatures for block %d. Block hash: %v", blockNumber, header.Hash)
 	}
 
 	// validate the signatures for parent (skip block 1 because genesis does not have committed)
@@ -529,10 +520,9 @@ func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, parents []*type
 			return fmt.Errorf(
 				"failed to verify signatures for parent of block %d because signatures are nil. Parent hash: %v",
 				blockNumber,
-				parent.HashF(),
+				parent.Hash,
 			)
 		}
-
 		parentValidators, err := p.GetValidators(blockNumber-2, parents)
 		if err != nil {
 			return fmt.Errorf(
@@ -541,9 +531,8 @@ func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, parents []*type
 				err,
 			)
 		}
-
-		if err := extra.Parent.VerifyCommittedFields(parentValidators, parent.HashF()); err != nil {
-			return fmt.Errorf("failed to verify signatures for parent of block %d. Parent hash: %v", blockNumber, parent.HashF())
+		if err := extra.Parent.VerifyCommittedFields(parentValidators, parent.Hash); err != nil {
+			return fmt.Errorf("failed to verify signatures for parent of block %d. Parent hash: %v", blockNumber, parent.Hash)
 		}
 	}
 
