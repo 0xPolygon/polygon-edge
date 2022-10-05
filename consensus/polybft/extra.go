@@ -2,6 +2,7 @@ package polybft
 
 import (
 	"fmt"
+	"github.com/hashicorp/go-hclog"
 
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 
@@ -133,7 +134,7 @@ func (i *Extra) UnmarshalRLPWith(v *fastrlp.Value) error {
 }
 
 // CreateValidatorSetDelta calculates ValidatorSetDelta based on the provided old and new validator sets
-func CreateValidatorSetDelta(oldValidatorSet, newValidatorSet AccountSet) *ValidatorSetDelta {
+func CreateValidatorSetDelta(log hclog.Logger, oldValidatorSet, newValidatorSet AccountSet) *ValidatorSetDelta {
 	var addedValidators AccountSet
 
 	oldValidatorSetMap := make(map[types.Address]*ValidatorAccount)
@@ -151,12 +152,12 @@ func CreateValidatorSetDelta(oldValidatorSet, newValidatorSet AccountSet) *Valid
 		oldValidator, ok := oldValidatorSetMap[newValidator.Address]
 		if ok {
 			if !oldValidator.Equals(newValidator) {
-				// log.Error(
-				// 	fmt.Sprintf(
-				// 		"validator '%s' found in both old and new validator set, but its BLS keys differ",
-				// 		newValidator.Address.String(),
-				// 	),
-				// )
+				log.Error(
+					fmt.Sprintf(
+						"validator '%s' found in both old and new validator set, but its BLS keys differ",
+						newValidator.Address.String(),
+					),
+				)
 			}
 
 			// If it is, then discard it from removed validators...
@@ -387,4 +388,47 @@ func GetIbftExtra(extraB []byte) (*Extra, error) {
 	}
 
 	return extra, nil
+}
+
+// createValidatorSetDelta calculates ValidatorSetDelta based on the provided old and new validator sets
+func createValidatorSetDelta(log hclog.Logger, oldValidatorSet, newValidatorSet AccountSet) *ValidatorSetDelta {
+	var addedValidators AccountSet
+	removedValidators := make(map[types.Address]int)
+	oldValidatorSetMap := make(map[types.Address]*ValidatorAccount)
+
+	for i, validator := range oldValidatorSet {
+		if (validator.Address != types.Address{}) {
+			removedValidators[validator.Address] = i
+			oldValidatorSetMap[validator.Address] = validator
+		}
+	}
+	for _, newValidator := range newValidatorSet {
+		// Check if the validator is among both old and new validator set
+		oldValidator, ok := oldValidatorSetMap[newValidator.Address]
+		if ok {
+			if !oldValidator.Equals(newValidator) {
+				log.Error(
+					fmt.Sprintf(
+						"validator '%s' found in both old and new validator set, but its BLS keys differ",
+						newValidator.Address.String(),
+					),
+				)
+			}
+			// If it is, then discard it from removed validators...
+			delete(removedValidators, newValidator.Address)
+		} else {
+			// ...otherwise it is added
+			addedValidators = append(addedValidators, newValidator)
+		}
+	}
+
+	removedValsBitmap := bitmap.Bitmap{}
+	for _, i := range removedValidators {
+		removedValsBitmap.Set(uint64(i))
+	}
+
+	return &ValidatorSetDelta{
+		Added:   addedValidators,
+		Removed: removedValsBitmap,
+	}
 }

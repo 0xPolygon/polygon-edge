@@ -235,7 +235,7 @@ func (p *genesisParams) GetChainConfig() (*chain.Chain, error) {
 		return nil, err
 	}
 
-	extra := polybft.Extra{Validators: getInitialValidatorsDelta(validators)}
+	extra := polybft.Extra{Validators: GetInitialValidatorsDelta(validators)}
 
 	chainConfig := &chain.Chain{
 		Name: p.name,
@@ -369,9 +369,9 @@ func deployContracts(config *polybft.PolyBFTConfig, acc map[types.Address]*chain
 	return nil
 }
 
-// getInitialValidatorsDelta extracts initial account set from the genesis block and
+// GetInitialValidatorsDelta extracts initial account set from the genesis block and
 // populates validator set delta to its extra data
-func getInitialValidatorsDelta(validators []GenesisTarget) *polybft.ValidatorSetDelta {
+func GetInitialValidatorsDelta(validators []GenesisTarget) *polybft.ValidatorSetDelta {
 	delta := &polybft.ValidatorSetDelta{
 		Added:   make(polybft.AccountSet, len(validators)),
 		Removed: bitmap.Bitmap{},

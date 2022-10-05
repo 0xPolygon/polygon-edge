@@ -469,7 +469,7 @@ func (f *fsm) getValidatorSetDelta(pendingBlockState *state.Transition) (*Valida
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve validator set for current block %v", err)
 	}
-	return CreateValidatorSetDelta(f.validators.Accounts(), newValidators), nil
+	return CreateValidatorSetDelta(f.logger, f.validators.Accounts(), newValidators), nil
 }
 
 // verifyValidatorsUptimeTx creates uptime transaction and compares its hash with the one extracted from the block.
