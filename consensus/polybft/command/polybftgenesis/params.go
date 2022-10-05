@@ -11,6 +11,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/polybftcontracts"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/server"
@@ -371,13 +372,17 @@ func deployContracts(config *polybft.PolyBFTConfig, acc map[types.Address]*chain
 // getInitialValidatorsDelta extracts initial account set from the genesis block and
 // populates validator set delta to its extra data
 func getInitialValidatorsDelta(validators []GenesisTarget) *polybft.ValidatorSetDelta {
-	initialValidatorSet := make([]*polybft.ValidatorAccount, len(validators))
+	delta := &polybft.ValidatorSetDelta{
+		Added:   make(polybft.AccountSet, len(validators)),
+		Removed: bitmap.Bitmap{},
+	}
+
 	for i, validator := range validators {
-		initialValidatorSet[i] = &polybft.ValidatorAccount{
+		delta.Added[i] = &polybft.ValidatorAccount{
 			Address: types.Address(validator.Account.Ecdsa.Address()),
 			BlsKey:  validator.Account.Bls.PublicKey(),
 		}
 	}
 
-	return polybft.CreateValidatorSetDelta(nil, initialValidatorSet)
+	return delta
 }

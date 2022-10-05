@@ -38,6 +38,7 @@ type Extra struct {
 // MarshalRLPTo defines the marshal function wrapper for Extra
 func (i *Extra) MarshalRLPTo(dst []byte) []byte {
 	ar := &fastrlp.Arena{}
+
 	return i.MarshalRLPWith(ar).MarshalTo(dst)
 }
 
@@ -86,8 +87,7 @@ func (i *Extra) UnmarshalRLPWith(v *fastrlp.Value) error {
 	elems, err := v.GetElems()
 	if err != nil {
 		return err
-	}
-	if num := len(elems); num != 4 {
+	} else if num := len(elems); num != 4 {
 		return fmt.Errorf("not enough elements to decode extra, expected 4 but found %d", num)
 	}
 
@@ -95,6 +95,7 @@ func (i *Extra) UnmarshalRLPWith(v *fastrlp.Value) error {
 	{
 		if elems[0].Elems() > 0 {
 			i.Validators = &ValidatorSetDelta{}
+
 			if err := i.Validators.UnmarshalRLPWith(elems[0]); err != nil {
 				return err
 			}
@@ -103,8 +104,10 @@ func (i *Extra) UnmarshalRLPWith(v *fastrlp.Value) error {
 
 	// Seal
 	{
-		if i.Seal, err = elems[1].GetBytes(i.Seal); err != nil {
-			return err
+		if elems[1].Len() > 0 {
+			if i.Seal, err = elems[1].GetBytes(i.Seal); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -112,6 +115,7 @@ func (i *Extra) UnmarshalRLPWith(v *fastrlp.Value) error {
 	{
 		if elems[2].Elems() > 0 {
 			i.Parent = &Signature{}
+
 			if err := i.Parent.UnmarshalRLPWith(elems[2]); err != nil {
 				return err
 			}
@@ -122,6 +126,7 @@ func (i *Extra) UnmarshalRLPWith(v *fastrlp.Value) error {
 	{
 		if elems[3].Elems() > 0 {
 			i.Committed = &Signature{}
+
 			if err := i.Committed.UnmarshalRLPWith(elems[3]); err != nil {
 				return err
 			}
@@ -143,6 +148,7 @@ func CreateValidatorSetDelta(oldValidatorSet, newValidatorSet AccountSet) *Valid
 			oldValidatorSetMap[validator.Address] = validator
 		}
 	}
+
 	for _, newValidator := range newValidatorSet {
 		// Check if the validator is among both old and new validator set
 		oldValidator, ok := oldValidatorSetMap[newValidator.Address]
@@ -155,6 +161,7 @@ func CreateValidatorSetDelta(oldValidatorSet, newValidatorSet AccountSet) *Valid
 				// 	),
 				// )
 			}
+
 			// If it is, then discard it from removed validators...
 			delete(removedValidators, newValidator.Address)
 		} else {
@@ -185,15 +192,15 @@ type ValidatorSetDelta struct {
 // MarshalRLPWith marshals ValidatorSetDelta to RLP format
 func (d *ValidatorSetDelta) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 	vv := ar.NewArray()
-	// added validators
 	validatorsRaw := ar.NewArray()
+
 	for _, validatorAccount := range d.Added {
 		validatorsRaw.Set(validatorAccount.MarshalRLPWith(ar))
 	}
-	vv.Set(validatorsRaw)
 
-	// bitmap
-	vv.Set(ar.NewCopyBytes(d.Removed))
+	vv.Set(validatorsRaw)              // Added
+	vv.Set(ar.NewCopyBytes(d.Removed)) // Removed bitmap
+
 	return vv
 }
 
@@ -203,6 +210,7 @@ func (d *ValidatorSetDelta) UnmarshalRLPWith(v *fastrlp.Value) error {
 	if err != nil {
 		return err
 	}
+
 	if len(elems) == 0 {
 		return nil
 	} else if num := len(elems); num != 2 {
@@ -215,13 +223,17 @@ func (d *ValidatorSetDelta) UnmarshalRLPWith(v *fastrlp.Value) error {
 		if err != nil {
 			return fmt.Errorf("array expected for added validators")
 		}
+
 		if len(validatorsRaw) != 0 {
 			d.Added = make(AccountSet, len(validatorsRaw))
+
 			for i, validatorRaw := range validatorsRaw {
 				acc := &ValidatorAccount{}
+
 				if err = acc.UnmarshalRLPWith(validatorRaw); err != nil {
 					return err
 				}
+
 				d.Added[i] = acc
 			}
 		}
@@ -233,6 +245,7 @@ func (d *ValidatorSetDelta) UnmarshalRLPWith(v *fastrlp.Value) error {
 		if err != nil {
 			return err
 		}
+
 		d.Removed = bitmap.Bitmap(dst)
 	}
 
@@ -249,6 +262,7 @@ func (d *ValidatorSetDelta) Copy() *ValidatorSetDelta {
 	added := d.Added.Copy()
 	removed := make([]byte, len(d.Removed))
 	copy(removed, d.Removed)
+
 	return &ValidatorSetDelta{Added: added, Removed: removed}
 }
 
@@ -267,16 +281,19 @@ type Signature struct {
 // MarshalRLPWith marshals Signature object into RLP format
 func (s *Signature) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 	committed := ar.NewArray()
+
 	if s.AggregatedSignature == nil {
 		committed.Set(ar.NewNull())
 	} else {
 		committed.Set(ar.NewBytes(s.AggregatedSignature))
 	}
+
 	if s.Bitmap == nil {
 		committed.Set(ar.NewNull())
 	} else {
 		committed.Set(ar.NewBytes(s.Bitmap))
 	}
+
 	return committed
 }
 
@@ -286,6 +303,7 @@ func (s *Signature) UnmarshalRLPWith(v *fastrlp.Value) error {
 	if err != nil {
 		return fmt.Errorf("array type expected for signature struct")
 	}
+
 	// there should be exactly two elements (aggregated signature and bitmap)
 	if len(vals) != 2 {
 		return fmt.Errorf("invalid rlp values")
@@ -295,10 +313,12 @@ func (s *Signature) UnmarshalRLPWith(v *fastrlp.Value) error {
 	if err != nil {
 		return err
 	}
+
 	s.Bitmap, err = vals[1].GetBytes(nil)
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -316,9 +336,10 @@ func (s *Signature) VerifyCommittedFields(validatorSet AccountSet, hash types.Ha
 	// TO DO Nemanja - what to do with signatures
 	// log.Trace("VerifyCommittedFields", "Filtered validators", filtered, "Bitmap", s.Bitmap)
 	rawMsg := hash[:]
-	var blsPublicKeys []*bls.PublicKey
-	for _, validator := range filtered {
-		blsPublicKeys = append(blsPublicKeys, validator.BlsKey)
+	blsPublicKeys := make([]*bls.PublicKey, len(filtered))
+
+	for i, validator := range filtered {
+		blsPublicKeys[i] = validator.BlsKey
 	}
 
 	// TODO: refactor AggregatedSignature
@@ -326,6 +347,7 @@ func (s *Signature) VerifyCommittedFields(validatorSet AccountSet, hash types.Ha
 	if err != nil {
 		return err
 	}
+
 	isOk := aggs.VerifyAggregated(blsPublicKeys, rawMsg)
 	if !isOk {
 		return fmt.Errorf("could not verify signature")
@@ -348,6 +370,7 @@ func GetIbftExtraClean(extraB []byte) ([]byte, error) {
 		Seal:       []byte{},
 		Committed:  &Signature{},
 	}
+
 	return ibftExtra.MarshalRLPTo(nil), nil
 }
 
@@ -359,11 +382,14 @@ func GetIbftExtra(extraB []byte) (*Extra, error) {
 
 	data := extraB[ExtraVanity:]
 	extra := &Extra{}
+
 	if err := extra.UnmarshalRLP(data); err != nil {
 		return nil, err
 	}
+
 	if extra.Validators == nil {
 		extra.Validators = &ValidatorSetDelta{}
 	}
+
 	return extra, nil
 }
