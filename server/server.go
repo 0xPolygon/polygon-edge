@@ -15,6 +15,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	configHelper "github.com/0xPolygon/polygon-edge/helper/config"
@@ -203,6 +204,11 @@ func NewServer(config *Config) (*Server, error) {
 	}
 
 	m.executor.GetHash = m.blockchain.GetHashHelper
+
+	engineName := m.config.Chain.Params.GetEngine()
+	if ConsensusType(engineName) == PolyBFTConsensus { // dirty fix for polybft consensus
+		m.executor.GenesisPostHook = polybft.GenesisPostHook
+	}
 
 	{
 		hub := &txpoolHub{

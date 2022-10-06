@@ -111,6 +111,10 @@ type Polybft struct {
 	logger hclog.Logger
 }
 
+func GenesisPostHook(txn *state.Transition) {
+	//
+}
+
 // Initialize initializes the consensus (e.g. setup data)
 func (p *Polybft) Initialize() error {
 	p.logger.Info("initializing polybft...")
