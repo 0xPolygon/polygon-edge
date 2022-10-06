@@ -273,14 +273,14 @@ func (c *state) Len() int {
 }
 
 func (c *state) checkMemory(offset, size *big.Int) bool {
-	if size.Sign() == 0 {
-		return true
-	}
-
 	if !offset.IsUint64() || !size.IsUint64() {
 		c.exit(errGasUintOverflow)
 
 		return false
+	}
+
+	if size.Sign() == 0 {
+		return true
 	}
 
 	o := offset.Uint64()

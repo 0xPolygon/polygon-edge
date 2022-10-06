@@ -817,6 +817,12 @@ func opReturnDataCopy(c *state) {
 		return
 	}
 
+	if !dataOffset.IsUint64() {
+		c.exit(errGasUintOverflow)
+
+		return
+	}
+
 	size := length.Uint64()
 	if !c.consumeGas(((size + 31) / 32) * copyGas) {
 		return
