@@ -36,6 +36,7 @@ on:  # yamllint disable-line rule:truthy
       environment:
         description: 'The environment to run against'
         type: string
+        required: true
       runner:
         required: true
         type: string
@@ -51,9 +52,9 @@ on:  # yamllint disable-line rule:truthy
 jobs:
   open_pandoras_box:
     name: Open Pandora's Box
-    concurrency: ${{ github.event.inputs.environment }}_performance
-    environment: ${{ github.event.inputs.environment }}
-    runs-on: ${{ github.event.inputs.runner }}
+    concurrency: ${{ inputs.environment }}_performance
+    environment: ${{ inputs.environment }}
+    runs-on: ${{ inputs.runner }}
     steps:
       - name: Checkout Pandora's Box Repository
         uses: actions/checkout@v3
@@ -102,7 +103,7 @@ jobs:
       - id: pandora
         name: Open Pandora's Box
         run: |
-          pandoras-box -url ${{ secrets.PANDORAS_TARGET }} -m "${{ secrets.PANDORAS_MNEMONIC }}" -b ${{ github.event.inputs.transaction_batch }} -t ${{ github.event.inputs.transaction_count }} -o pandorasConsequences.json
+          pandoras-box -url ${{ secrets.PANDORAS_TARGET }} -m "${{ secrets.PANDORAS_MNEMONIC }}" -b ${{ inputs.transaction_batch }} -t ${{ inputs.transaction_count }} -o pandorasConsequences.json
           echo "::set-output name=tps::$(cat pandorasConsequences.json | jq -r '.averageTPS')"
       - name: Archive Pandora's Consequences
         continue-on-error: true
@@ -141,7 +142,7 @@ jobs:
                   "elements": [
                       {
                         "type": "mrkdwn",
-                        "text": "Environment: `${{ github.event.inputs.environment }}`"
+                        "text": "Environment: `${{ inputs.environment }}`"
                       },
                       {
                         "type": "mrkdwn",

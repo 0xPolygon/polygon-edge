@@ -181,6 +181,6 @@ jobs:
       runner: testnet
       environment: testnet
       chain_id: '750'
-      transaction_amount: '100'
+      transaction_value: '100'
       transaction_count: '10000'
       transactions_per_second: '100'

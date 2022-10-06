@@ -43,14 +43,15 @@ on:  # yamllint disable-line rule:truthy
       transactions_per_second:
         description: The amount of transactions per second to send
         type: string
-      transaction_amount:
-        description: The amount per transactions  to send
+      transaction_value:
+        description: The value per transactions to send
         type: string
       runner:
         required: true
         type: string
         description: The runner label to use
       environment:
+        required: true
         description: 'The environment to run against'
         type: string
     secrets:
@@ -67,9 +68,9 @@ on:  # yamllint disable-line rule:truthy
 jobs:
   run_loadbot:
     name: Run Loadbot
-    concurrency: ${{ github.event.inputs.environment }}_performance
-    environment: ${{ github.event.inputs.environment }}
-    runs-on: ${{ github.event.inputs.runner }}
+    concurrency: ${{ inputs.environment }}_performance
+    environment: ${{ inputs.environment }}
+    runs-on: ${{ inputs.runner  }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -86,7 +87,7 @@ jobs:
         name: Run Loadbot
         continue-on-error: true
         run: |
-          go run . loadbot --jsonrpc ${{ secrets.LOADBOT_JSONRPC_URL }} --grpc-address ${{ secrets.LOADBOT_GRPC_ADDRESS }} --sender ${{ secrets.LOADBOT_SENDER_ADDRESS }}  --count ${{ github.event.inputs.transaction_count}} --value ${{ github.event.inputs.transaction_value }} --tps ${{ github.event.inputs.transactions_per_second }} --chain-id ${{ github.event.inputs.chain_id }} --detailed --json > loadbotOutput.json
+          go run . loadbot --jsonrpc ${{ secrets.LOADBOT_JSONRPC_URL }} --grpc-address ${{ secrets.LOADBOT_GRPC_ADDRESS }} --sender ${{ secrets.LOADBOT_SENDER_ADDRESS }}  --count ${{ inputs.transaction_count}} --value ${{ inputs.transaction_value }} --tps ${{ inputs.transactions_per_second }} --chain-id ${{ inputs.chain_id }} --detailed --json > loadbotOutput.json
           cat loadbotOutput.json
           echo "::set-output name=tps::$(cat loadbotOutput.json | jq -r '.approx_tps')"
           echo "::set-output name=totalTx::$(cat loadbotOutput.json | jq -r '.count_data.total')"
@@ -138,7 +139,7 @@ jobs:
                   "elements": [
                       {
                         "type": "mrkdwn",
-                        "text": "Environment: `${{ github.event.inputs.environment }}`"
+                        "text": "Environment: `${{ inputs.environment }}`"
                       },
                       {
                         "type": "mrkdwn",
