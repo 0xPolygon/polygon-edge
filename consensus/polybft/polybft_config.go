@@ -44,8 +44,8 @@ func (p *PolyBFTConfig) IsBridgeEnabled() bool {
 }
 
 type Validator struct {
-	Ecdsa  types.Address
-	BlsKey string
+	Address types.Address
+	BlsKey  string
 }
 
 // DebugConfig is a struct used for test configuration in init genesis

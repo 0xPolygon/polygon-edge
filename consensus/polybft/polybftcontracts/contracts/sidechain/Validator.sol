@@ -8,8 +8,8 @@ contract Validator is BridgeImpl {
     // bridge and validators
     // list of current validators
     struct ValidatorAccount {
-        address ecdsa;
-        bytes bls;
+        address    ecdsa;
+        uint256[4] bls;
     }
     ValidatorAccount[] allValidators;
     ValidatorAccount[] currentValidators;
@@ -57,7 +57,7 @@ contract Validator is BridgeImpl {
     }
 
     function getEpoch() public view returns (uint64) {
-        return 77;
+        return epoch;
     }
 
     // --- checkpoint manager on sidechain ---

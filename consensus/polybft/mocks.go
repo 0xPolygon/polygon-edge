@@ -2,11 +2,12 @@ package polybft
 
 import (
 	"fmt"
+	"sort"
+	"strconv"
+
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/types"
-	"sort"
-	"strconv"
 )
 
 type testValidator struct {
@@ -84,8 +85,8 @@ func (v *testValidator) paramsValidator() *Validator {
 	bls := v.account.Bls.PublicKey().Marshal()
 
 	return &Validator{
-		Ecdsa:  v.Address(),
-		BlsKey: hex.EncodeToHex(bls),
+		Address: v.Address(),
+		BlsKey:  hex.EncodeToHex(bls),
 	}
 }
 

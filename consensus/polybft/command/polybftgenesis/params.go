@@ -13,12 +13,10 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/polybftcontracts"
-	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/server"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/spf13/cobra"
 	"github.com/umbracle/ethgo"
-	"github.com/umbracle/ethgo/abi"
 )
 
 const (
@@ -188,7 +186,7 @@ func (p *genesisParams) getRequiredFlags() []string {
 }
 
 func (p *genesisParams) getPolyBftConfig(validators []*polybft.Validator) (*polybft.PolyBFTConfig, error) {
-	smartContracts, err := deployContracts(validators, p.validatorSetSize)
+	smartContracts, err := deployContracts()
 	if err != nil {
 		return nil, err
 	}
@@ -270,8 +268,8 @@ func (p *genesisParams) getGenesisValidators(validators []GenesisTarget) (result
 			}
 
 			result = append(result, &polybft.Validator{
-				Ecdsa:  types.Address(ethgo.HexToAddress(parts[0])),
-				BlsKey: parts[1],
+				Address: types.Address(ethgo.HexToAddress(parts[0])),
+				BlsKey:  parts[1],
 			})
 		}
 	} else {
@@ -279,8 +277,8 @@ func (p *genesisParams) getGenesisValidators(validators []GenesisTarget) (result
 			pubKeyMarshalled := validator.Account.Bls.PublicKey().Marshal()
 
 			result = append(result, &polybft.Validator{
-				Ecdsa:  types.Address(validator.Account.Ecdsa.Address()),
-				BlsKey: hex.EncodeToString(pubKeyMarshalled),
+				Address: types.Address(validator.Account.Ecdsa.Address()),
+				BlsKey:  hex.EncodeToString(pubKeyMarshalled),
 			})
 		}
 	}
@@ -288,37 +286,7 @@ func (p *genesisParams) getGenesisValidators(validators []GenesisTarget) (result
 	return result
 }
 
-func deployContracts(validators []*polybft.Validator, validatorSetSize int) ([]polybft.SmartContract, error) {
-	// build validator constructor input
-	validatorCons := []interface{}{}
-
-	for _, validator := range validators {
-		blsKey, err := hex.DecodeString(validator.BlsKey)
-		if err != nil {
-			return nil, err
-		}
-
-		pubKey, err := bls.UnmarshalPublicKey(blsKey)
-		if err != nil {
-			return nil, err
-		}
-
-		int4, err := pubKey.ToBigInt()
-		if err != nil {
-			return nil, err
-		}
-
-		enc, err := abi.Encode(int4, abi.MustNewType("uint[4]"))
-		if err != nil {
-			return nil, err
-		}
-
-		validatorCons = append(validatorCons, map[string]interface{}{
-			"ecdsa": validator.Ecdsa,
-			"bls":   enc,
-		})
-	}
-
+func deployContracts() ([]polybft.SmartContract, error) {
 	predefinedContracts := []struct {
 		name     string
 		input    []interface{}
@@ -327,8 +295,7 @@ func deployContracts(validators []*polybft.Validator, validatorSetSize int) ([]p
 	}{
 		{
 			// Validator smart contract
-			name: "Validator",
-			// input:    []interface{}{validatorCons, validatorSetSize},
+			name:     "Validator",
 			expected: ValidatorSetAddr,
 			chain:    "child",
 		},

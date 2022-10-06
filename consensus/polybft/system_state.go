@@ -1,6 +1,7 @@
 package polybft
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"math/big"
 
@@ -14,6 +15,7 @@ import (
 var stateFunctions, _ = abi.NewABIFromList([]string{
 	"function getValidators() returns (tuple(address,bytes)[])",
 	"function getEpoch() returns (uint64)",
+	"function init(tuple(address, uint256[4])[], uint64)",
 })
 
 var sidechainBridgeFunctions, _ = abi.NewABIFromList([]string{
@@ -56,6 +58,47 @@ func NewSystemState(config *PolyBFTConfig, provider contract.Provider) *SystemSt
 	return s
 }
 
+func (s *SystemStateImpl) InitValidatorSet(validators []*Validator, validatorSetSize int) error {
+	validatorCons := make([][]byte, 0, len(validators))
+
+	validatorType := abi.MustNewType("tuple(address ecdsa, uint256[4] bls)")
+	for _, validator := range validators {
+		blsKey, err := hex.DecodeString(validator.BlsKey)
+		if err != nil {
+			return err
+		}
+
+		pubKey, err := bls.UnmarshalPublicKey(blsKey)
+		if err != nil {
+			return err
+		}
+
+		blsBigInts, err := pubKey.ToBigInt()
+		if err != nil {
+			return err
+		}
+
+		// blsKey, err = abi.Encode(blsBigInts, abi.MustNewType("uint256[4]"))
+		// if err != nil {
+		// 	return err
+		// }
+
+		encoded, err := validatorType.Encode(map[string]interface{}{
+			"ecdsa": validator.Address,
+			"bls":   blsBigInts,
+		})
+		if err != nil {
+			return err
+		}
+
+		validatorCons = append(validatorCons, encoded)
+	}
+
+	_, err := s.validatorContract.Call("init", ethgo.Latest, [2]interface{}{validatorCons, uint64(validatorSetSize)})
+
+	return err
+}
+
 // GetValidatorSet retrieves current validator set from the smart contract
 func (s *SystemStateImpl) GetValidatorSet() (AccountSet, error) {
 	ret, err := s.validatorContract.Call("getValidators", ethgo.Latest)
@@ -65,7 +108,8 @@ func (s *SystemStateImpl) GetValidatorSet() (AccountSet, error) {
 
 	res := []*ValidatorAccount{}
 	for _, i := range ret["0"].([]map[string]interface{}) {
-		keyParts, err := abi.Decode(abi.MustNewType("uint[4]"), i["1"].([]byte))
+		tmp := i["1"].([]byte)
+		keyParts, err := abi.Decode(abi.MustNewType("uint256[]"), tmp)
 		if err != nil {
 			return nil, err
 		}

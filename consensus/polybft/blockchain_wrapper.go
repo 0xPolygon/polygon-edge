@@ -1,14 +1,12 @@
 package polybft
 
 import (
-	"errors"
 	"fmt"
 	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/state"
-	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/contract"
@@ -186,10 +184,7 @@ func NewStateProvider(transition *state.Transition) contract.Provider {
 func (s *stateProvider) Call(addr ethgo.Address, input []byte, opts *contract.CallOpts) ([]byte, error) {
 	result := s.transition.Call2(types.ZeroAddress, types.Address(addr), input, big.NewInt(0), 10000000)
 	if result.Failed() {
-		// do not treat execution reverted
-		if !errors.Is(result.Err, runtime.ErrExecutionReverted) {
-			return nil, result.Err
-		}
+		return nil, result.Err
 	}
 
 	return result.ReturnValue, nil
