@@ -146,16 +146,17 @@ func (p *Polybft) Initialize() error {
 		),
 		pbft.WithTracer(otel.Tracer("Pbft")),
 	}
-	p.pbft = pbft.New(p.key, &pbftTransportWrapper{topic: p.pbftTopic}, opts...)
 
 	// create pbft topic
-	pbftTopic, err := p.config.Network.NewTopic(pbftProto, &proto.GossipMessage{})
+	p.pbftTopic, err = p.config.Network.NewTopic(pbftProto, &proto.GossipMessage{})
 	if err != nil {
 		return fmt.Errorf("failed to create pbft topic. Error: %w", err)
 	}
 
+	p.pbft = pbft.New(p.key, &pbftTransportWrapper{topic: p.pbftTopic}, opts...)
+
 	// check pbft topic - listen for transport messages and relay them to pbft
-	err = pbftTopic.Subscribe(func(obj interface{}, from peer.ID) {
+	err = p.pbftTopic.Subscribe(func(obj interface{}, from peer.ID) {
 		gossipMsg, _ := obj.(*proto.GossipMessage)
 
 		var msg *pbft.MessageReq
@@ -169,9 +170,6 @@ func (p *Polybft) Initialize() error {
 	if err != nil {
 		return fmt.Errorf("Topic subscription failed: %v", err)
 	}
-
-	// set pbft topic
-	p.pbftTopic = pbftTopic
 
 	// create bridge topic
 	bridgeTopic, err := p.config.Network.NewTopic(bridgeProto, &proto.TransportMessage{})
