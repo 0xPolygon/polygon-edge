@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"fmt"
 
+	"github.com/umbracle/ethgo"
+
 	"github.com/docker/docker/api/types/container"
 
 	"github.com/0xPolygon/polygon-edge/command/helper"
@@ -47,11 +49,11 @@ type initialDeployResult struct {
 	Hash    types.Hash    `json:"hash"`
 }
 
-func newInitialDeployResult(name string, address types.Address, hash types.Hash) *initialDeployResult {
+func newInitialDeployResult(name string, address types.Address, hash ethgo.Hash) *initialDeployResult {
 	return &initialDeployResult{
 		Name:    name,
 		Address: address,
-		Hash:    hash,
+		Hash:    types.BytesToHash(hash.Bytes()),
 	}
 }
 

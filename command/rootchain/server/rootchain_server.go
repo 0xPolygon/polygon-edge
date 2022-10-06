@@ -267,7 +267,7 @@ func initialDeploy(outputter command.OutputFormatter) error {
 			return fmt.Errorf("wrong deployed address for %s: expected %s but found %s", name, address, receipt.ContractAddress)
 		}
 
-		outputter.WriteCommandResult(newInitialDeployResult(name, address, types.BytesToHash(receipt.TransactionHash.Bytes())))
+		outputter.WriteCommandResult(newInitialDeployResult(name, address, receipt.TransactionHash))
 	}
 
 	return nil
