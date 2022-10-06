@@ -382,6 +382,8 @@ func TestCreate(t *testing.T) {
 }
 
 func Test_opReturnDataCopy(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name        string
 		config      *chain.ForksInTime
@@ -509,6 +511,8 @@ func Test_opReturnDataCopy(t *testing.T) {
 		test := test
 
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			state, closeFn := getState()
 			defer closeFn()
 
@@ -518,6 +522,11 @@ func Test_opReturnDataCopy(t *testing.T) {
 			state.memory = test.initState.memory
 			state.returnData = test.initState.returnData
 			state.config = test.config
+
+			// assign nil to some fields in cached state object
+			state.code = nil
+			state.host = nil
+			state.msg = nil
 
 			opReturnDataCopy(state)
 
