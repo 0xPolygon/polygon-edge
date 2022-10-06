@@ -2,14 +2,15 @@ package polybft
 
 import (
 	"crypto/rand"
+	mrand "math/rand"
+	"testing"
+
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
-	mrand "math/rand"
-	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -338,7 +339,7 @@ func TestExtra_InitGenesisValidatorsDelta(t *testing.T) {
 		const validatorsCount = 7
 		vals := newTestValidators(validatorsCount)
 
-		polyBftConfig := PolyBFTConfig{Genesis: vals.getParamValidators()}
+		polyBftConfig := PolyBFTConfig{InitialValidatorSet: vals.getParamValidators()}
 
 		delta := &ValidatorSetDelta{
 			Added:   make(AccountSet, validatorsCount),
@@ -371,7 +372,7 @@ func TestExtra_InitGenesisValidatorsDelta(t *testing.T) {
 
 	t.Run("Invalid Extra data", func(t *testing.T) {
 		validators := newTestValidators(5)
-		polyBftConfig := PolyBFTConfig{Genesis: validators.getParamValidators()}
+		polyBftConfig := PolyBFTConfig{InitialValidatorSet: validators.getParamValidators()}
 
 		genesis := &chain.Genesis{
 			Config: &chain.Params{Engine: map[string]interface{}{

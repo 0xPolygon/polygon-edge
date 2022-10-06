@@ -187,55 +187,42 @@ func (p *genesisParams) getRequiredFlags() []string {
 	return []string{} // command.BootnodeFlag,
 }
 
-func (p *genesisParams) getPolyBftConfig(validators []GenesisTarget) (*polybft.PolyBFTConfig, error) {
+func (p *genesisParams) getPolyBftConfig(validators []*polybft.Validator) (*polybft.PolyBFTConfig, error) {
+	smartContracts, err := deployContracts(validators, p.validatorSetSize)
+	if err != nil {
+		return nil, err
+	}
+
 	config := &polybft.PolyBFTConfig{
-		// TODO: Genesis, Bridge
+		// TODO: Bridge
+		InitialValidatorSet: validators,
 		BlockTime:           p.blockTime,
 		EpochSize:           p.epochSize,
 		SprintSize:          p.sprintSize,
 		ValidatorSetSize:    p.validatorSetSize,
 		ValidatorSetAddr:    types.Address(ValidatorSetAddr),
 		SidechainBridgeAddr: types.Address(SidechainBridgeAddr),
-	}
-
-	if len(p.validators) > 0 {
-		for _, validator := range p.validators {
-			parts := strings.Split(validator, ":")
-			if len(parts) != 2 || len(parts[0]) != 32 || len(parts[1]) < 2 {
-				continue
-			}
-
-			config.Genesis = append(config.Genesis, &polybft.Validator{
-				Ecdsa:  types.Address(ethgo.HexToAddress(parts[0])),
-				BlsKey: parts[1],
-			})
-		}
-	} else {
-		for _, validator := range validators {
-			pubKeyMarshalled := validator.Account.Bls.PublicKey().Marshal()
-
-			config.Genesis = append(config.Genesis, &polybft.Validator{
-				Ecdsa:  types.Address(validator.Account.Ecdsa.Address()),
-				BlsKey: hex.EncodeToString(pubKeyMarshalled),
-			})
-		}
+		SmartContracts:      smartContracts,
 	}
 
 	return config, nil
 }
 
 func (p *genesisParams) GetChainConfig() (*chain.Chain, error) {
-	validators, err := ReadValidatorsByRegexp(path.Dir(p.genesisPath), p.validatorPrefixPath)
+	validatorsInfo, err := ReadValidatorsByRegexp(path.Dir(p.genesisPath), p.validatorPrefixPath)
 	if err != nil {
 		return nil, err
 	}
 
-	polyBftConfig, err := p.getPolyBftConfig(validators)
+	// Predeploy staking smart contracts
+	genesisValidators := p.getGenesisValidators(validatorsInfo)
+
+	polyBftConfig, err := p.getPolyBftConfig(genesisValidators)
 	if err != nil {
 		return nil, err
 	}
 
-	extra := polybft.Extra{Validators: GetInitialValidatorsDelta(validators)}
+	extra := polybft.Extra{Validators: GetInitialValidatorsDelta(validatorsInfo)}
 
 	chainConfig := &chain.Chain{
 		Name: p.name,
@@ -259,16 +246,11 @@ func (p *genesisParams) GetChainConfig() (*chain.Chain, error) {
 
 	// set generic validators as bootnodes if needed
 	if len(p.bootnodes) == 0 {
-		for i, validator := range validators {
+		for i, validator := range validatorsInfo {
 			// /ip4/127.0.0.1/tcp/10001/p2p/16Uiu2HAm9r5oP8Dmfsqbp1w2LdPU4YSFggKvwEmT6aTpWU8c8R13
 			bnode := fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", "127.0.0.1", bootnodePortStart+i, validator.NodeID)
 			chainConfig.Bootnodes = append(chainConfig.Bootnodes, bnode)
 		}
-	}
-
-	// Predeploy staking smart contracts
-	if err := deployContracts(polyBftConfig, chainConfig.Genesis.Alloc); err != nil {
-		return nil, err
 	}
 
 	// Premine accounts
@@ -279,29 +261,56 @@ func (p *genesisParams) GetChainConfig() (*chain.Chain, error) {
 	return chainConfig, nil
 }
 
-func deployContracts(config *polybft.PolyBFTConfig, acc map[types.Address]*chain.GenesisAccount) error {
+func (p *genesisParams) getGenesisValidators(validators []GenesisTarget) (result []*polybft.Validator) {
+	if len(p.validators) > 0 {
+		for _, validator := range p.validators {
+			parts := strings.Split(validator, ":")
+			if len(parts) != 2 || len(parts[0]) != 32 || len(parts[1]) < 2 {
+				continue
+			}
+
+			result = append(result, &polybft.Validator{
+				Ecdsa:  types.Address(ethgo.HexToAddress(parts[0])),
+				BlsKey: parts[1],
+			})
+		}
+	} else {
+		for _, validator := range validators {
+			pubKeyMarshalled := validator.Account.Bls.PublicKey().Marshal()
+
+			result = append(result, &polybft.Validator{
+				Ecdsa:  types.Address(validator.Account.Ecdsa.Address()),
+				BlsKey: hex.EncodeToString(pubKeyMarshalled),
+			})
+		}
+	}
+
+	return result
+}
+
+func deployContracts(validators []*polybft.Validator, validatorSetSize int) ([]polybft.SmartContract, error) {
 	// build validator constructor input
 	validatorCons := []interface{}{}
 
-	for _, validator := range config.Genesis {
+	for _, validator := range validators {
 		blsKey, err := hex.DecodeString(validator.BlsKey)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		pubKey, err := bls.UnmarshalPublicKey(blsKey)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		int4, err := pubKey.ToBigInt()
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		enc, err := abi.Encode(int4, abi.MustNewType("uint[4]"))
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		validatorCons = append(validatorCons, map[string]interface{}{
@@ -318,8 +327,8 @@ func deployContracts(config *polybft.PolyBFTConfig, acc map[types.Address]*chain
 	}{
 		{
 			// Validator smart contract
-			name:     "Validator",
-			input:    []interface{}{validatorCons, config.ValidatorSetSize},
+			name: "Validator",
+			// input:    []interface{}{validatorCons, validatorSetSize},
 			expected: ValidatorSetAddr,
 			chain:    "child",
 		},
@@ -346,27 +355,31 @@ func deployContracts(config *polybft.PolyBFTConfig, acc map[types.Address]*chain
 		},
 	}
 
+	result := make([]polybft.SmartContract, 0, len(predefinedContracts))
+
 	// to call the init in validator smart contract we do not need much more context in the evm object
 	// that is why many fields are set as default (as of now).
 	for _, contract := range predefinedContracts {
 		artifact, err := polybftcontracts.ReadArtifact(contract.chain, contract.name)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		input, err := artifact.DeployInput(contract.input)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
-		// it is important to keep the same sender so we will always have a deterministic validator address
-		// note again that this is only done for testing purposes.
-		acc[types.Address(contract.expected)] = &chain.GenesisAccount{
-			Code: input,
+		smartContract := polybft.SmartContract{
+			Address: types.Address(contract.expected),
+			Code:    input,
+			Name:    fmt.Sprintf("%s/%s", contract.chain, contract.name),
 		}
+
+		result = append(result, smartContract)
 	}
 
-	return nil
+	return result, nil
 }
 
 // GetInitialValidatorsDelta extracts initial account set from the genesis block and

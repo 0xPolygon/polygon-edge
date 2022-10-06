@@ -8,8 +8,8 @@ import (
 
 // PolyBFTConfig is the configuration file for the Polybft consensus protocol.
 type PolyBFTConfig struct {
-	Genesis []*Validator  `json:"genesis"`
-	Bridge  *BridgeConfig `json:"bridge"`
+	InitialValidatorSet []*Validator  `json:"initialValidatorSet"`
+	Bridge              *BridgeConfig `json:"bridge"`
 
 	ValidatorSetSize int `json:"validatorSetSize"`
 
@@ -22,13 +22,21 @@ type PolyBFTConfig struct {
 	SprintSize uint64 `json:"sprintSize"`
 
 	BlockTime time.Duration `json:"blockTime"`
+
+	SmartContracts []SmartContract `json:"smartContracts"`
+}
+
+type SmartContract struct {
+	Address types.Address `json:"address"`
+	Code    []byte        `json:"code"`
+	Name    string        `json:"name"`
 }
 
 // BridgeConfig is the configuration for the bridge
 type BridgeConfig struct {
 	BridgeAddr      types.Address `json:"bridgeAddr"`
 	CheckpointAddr  types.Address `json:"checkpointAddr"`
-	JsonRPCEndpoint string        `json:"jsonRPCEndpoint"`
+	JSONRPCEndpoint string        `json:"jsonRPCEndpoint"`
 }
 
 func (p *PolyBFTConfig) IsBridgeEnabled() bool {

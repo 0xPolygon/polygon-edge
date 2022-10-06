@@ -17,7 +17,14 @@ contract Validator is BridgeImpl {
     uint64 validatorSetSize;
     uint256 indexToStart = 1;
 
-    constructor(ValidatorAccount[] memory _validators, uint64 _validatorSetSize) {
+    // constructor(ValidatorAccount[] memory _validators, uint64 _validatorSetSize) {
+    //     init(_validators, _validatorSetSize);
+    // }
+
+    constructor() {
+    }
+
+    function init(ValidatorAccount[] memory _validators, uint64 _validatorSetSize) public {
         require(_validators.length >= _validatorSetSize, "Validator snapshot size can not be bigger than length of validators array");
         for (uint256 i = 0; i < _validators.length; i++) {
             allValidators.push(_validators[i]);
@@ -50,7 +57,7 @@ contract Validator is BridgeImpl {
     }
 
     function getEpoch() public view returns (uint64) {
-        return epoch;
+        return 77;
     }
 
     // --- checkpoint manager on sidechain ---

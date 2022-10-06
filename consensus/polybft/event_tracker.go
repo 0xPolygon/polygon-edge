@@ -23,7 +23,7 @@ type eventTracker struct {
 }
 
 func (e *eventTracker) start() error {
-	provider, err := jsonrpc.NewClient(e.config.Bridge.JsonRPCEndpoint)
+	provider, err := jsonrpc.NewClient(e.config.Bridge.JSONRPCEndpoint)
 	if err != nil {
 		return err
 	}

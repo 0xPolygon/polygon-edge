@@ -39,7 +39,7 @@ type Executor struct {
 	GetHash  GetHashByNumberHelper
 
 	PostHook        func(txn *Transition)
-	GenesisPostHook func(txn *Transition)
+	GenesisPostHook func(*Transition) error
 }
 
 // NewExecutor creates a new executor
@@ -55,6 +55,7 @@ func NewExecutor(config *chain.Params, s State, logger hclog.Logger) *Executor {
 func (e *Executor) WriteGenesis(alloc map[types.Address]*chain.GenesisAccount) types.Hash {
 	snap := e.state.NewSnapshot()
 	txn := NewTxn(e.state, snap)
+	config := e.config.Forks.At(0)
 
 	env := runtime.TxContext{
 		ChainID: int64(e.config.ChainID),
@@ -67,6 +68,7 @@ func (e *Executor) WriteGenesis(alloc map[types.Address]*chain.GenesisAccount) t
 		state:    txn,
 		auxState: e.state,
 		gasPool:  uint64(env.GasLimit),
+		config:   config,
 	}
 
 	for addr, account := range alloc {
@@ -88,7 +90,9 @@ func (e *Executor) WriteGenesis(alloc map[types.Address]*chain.GenesisAccount) t
 	}
 
 	if e.GenesisPostHook != nil {
-		e.GenesisPostHook(transition)
+		if err := e.GenesisPostHook(transition); err != nil {
+			panic(fmt.Errorf("Error writing genesis block: %w", err))
+		}
 	}
 
 	objs := txn.Commit(false)

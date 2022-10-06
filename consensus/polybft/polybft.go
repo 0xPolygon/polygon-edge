@@ -6,11 +6,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/big"
 	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/0xPolygon/pbft-consensus"
+	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/proto"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
@@ -18,6 +20,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/state"
+	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/syncer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
@@ -111,8 +114,28 @@ type Polybft struct {
 	logger hclog.Logger
 }
 
-func GenesisPostHook(txn *state.Transition) {
-	//
+func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *state.Transition) error {
+	customConfigGeneric := config.Params.Engine[engineName]
+
+	var polyBftConfig PolyBFTConfig
+
+	customConfigJSON, _ := json.Marshal(customConfigGeneric)
+	json.Unmarshal(customConfigJSON, &polyBftConfig)
+
+	return func(transition *state.Transition) error {
+		for _, sc := range polyBftConfig.SmartContracts {
+			result := transition.Create2(types.ZeroAddress, sc.Code, big.NewInt(0), 10000000)
+			if result.Failed() {
+				// do not treat execution reverted
+				if !errors.Is(result.Err, runtime.ErrExecutionReverted) {
+					// return result.Err
+					continue
+				}
+			}
+		}
+
+		return nil
+	}
 }
 
 // Initialize initializes the consensus (e.g. setup data)
