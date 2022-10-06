@@ -69,9 +69,8 @@ require (
 	go.opentelemetry.io/otel v1.1.0
 	go.uber.org/atomic v1.10.0
 	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
+	gopkg.in/DataDog/dd-trace-go.v1 v1.42.1
 )
-
-require gopkg.in/DataDog/dd-trace-go.v1 v1.42.1
 
 require (
 	cloud.google.com/go v0.104.0 // indirect
