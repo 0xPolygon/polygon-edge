@@ -203,7 +203,7 @@ func TestGenesis_Predeployment(t *testing.T) {
 		t,
 		1,
 		IBFTDirPrefix,
-		func(_i int, config *framework.TestServerConfig) {
+		func(_ int, config *framework.TestServerConfig) {
 			config.Premine(senderAddr, framework.EthToWei(10))
 			config.SetPredeployParams(&framework.PredeployParams{
 				ArtifactsPath:    artifactsPath,

@@ -374,8 +374,12 @@ func (t *TestServer) GenesisPredeploy() error {
 	// Add the path to the artifacts file
 	args = append(args, "--artifacts-path", t.Config.PredeployParams.ArtifactsPath)
 
-	cmd := exec.Command(binaryName, args...)
+	cmd := exec.Command(resolveBinary(), args...) //nolint:gosec
 	cmd.Dir = t.Config.RootDir
+
+	stdout := t.GetStdout()
+	cmd.Stdout = stdout
+	cmd.Stderr = stdout
 
 	return cmd.Run()
 }
