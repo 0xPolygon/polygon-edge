@@ -13,7 +13,7 @@ import (
 )
 
 var stateFunctions, _ = abi.NewABIFromList([]string{
-	"function getValidators() returns (tuple(address,bytes)[])",
+	"function getValidators() returns (tuple(address,uint256[4])[])",
 	"function getEpoch() returns (uint64)",
 	"function init(tuple(address ecdsa, uint256[4] bls)[] _validators, uint64 _validatorSetSize)",
 })
@@ -96,12 +96,7 @@ func (s *SystemStateImpl) GetValidatorSet() (AccountSet, error) {
 
 	res := []*ValidatorAccount{}
 	for _, i := range ret["0"].([]map[string]interface{}) {
-		tmp := i["1"].([]byte)
-		keyParts, err := abi.Decode(abi.MustNewType("uint256[]"), tmp)
-		if err != nil {
-			return nil, err
-		}
-		bigKey := keyParts.([4]*big.Int)
+		bigKey := i["1"].([4]*big.Int)
 		blsKey, err := bls.UnmarshalPublicKeyFromBigInt(bigKey)
 		if err != nil {
 			return nil, err

@@ -227,14 +227,6 @@ func (p *Polybft) Initialize() error {
 	p.state = stt
 	p.validatorsCache = newValidatorsSnapshotCache(p.config.Logger, stt, p.consensusConfig.EpochSize, p.blockchain)
 
-	provider, _ := p.blockchain.GetStateProviderForBlock(p.blockchain.CurrentHeader())
-	systemState := p.blockchain.GetSystemState(p.consensusConfig, provider)
-	epoch, err := systemState.GetEpoch()
-	fmt.Println(epoch, err)
-
-	validator, err := systemState.GetValidatorSet()
-	fmt.Println(validator, err)
-
 	return nil
 }
 
