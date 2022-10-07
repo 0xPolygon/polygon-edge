@@ -506,7 +506,7 @@ func (p *Polybft) GetSyncProgression() *progress.Progression {
 // VerifyHeader implements consensus.Engine and checks whether a header conforms to the consensus rules
 func (p *Polybft) VerifyHeader(header *types.Header) error {
 	// Short circuit if the header is known
-	header, ok := p.blockchain.GetHeaderByHash(header.Hash)
+	_, ok := p.blockchain.GetHeaderByHash(header.Hash)
 	if ok {
 		return nil
 	}
