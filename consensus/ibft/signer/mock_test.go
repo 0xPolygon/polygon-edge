@@ -10,12 +10,12 @@ type MockSecretManager struct {
 	// skip implementing the methods not to be used
 	secrets.SecretsManager
 
-	HasSecretFn func(string) bool
+	HasSecretFn func(string) (bool, error)
 	GetSecretFn func(string) ([]byte, error)
 	SetSecretFn func(string, []byte) error
 }
 
-func (m *MockSecretManager) HasSecret(name string) bool {
+func (m *MockSecretManager) HasSecret(name string) (bool, error) {
 	return m.HasSecretFn(name)
 }
 

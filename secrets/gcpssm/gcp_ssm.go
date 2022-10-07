@@ -155,11 +155,12 @@ func (gm *GCPSecretsManager) SetSecret(name string, value []byte) error {
 }
 
 // HasSecret checks if the secret is present
-func (gm *GCPSecretsManager) HasSecret(name string) bool {
-	_, err := gm.GetSecret(name)
+func (gm *GCPSecretsManager) HasSecret(name string) (bool, error) {
+	if _, err := gm.GetSecret(name); err != nil {
+		return false, fmt.Errorf("unable to fetch secret (%s), %w", name, err);
+	}
 
-	// if there is no error fetching secret return true
-	return err == nil
+	return true, nil
 }
 
 // RemoveSecret removes the secret from storage used only for tests

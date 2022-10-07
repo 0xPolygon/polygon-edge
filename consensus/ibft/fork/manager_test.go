@@ -45,11 +45,11 @@ func (m *mockHooksRegister) RegisterHooks(hooks *hook.Hooks, height uint64) {
 type mockSecretManager struct {
 	secrets.SecretsManager
 
-	HasSecretFunc func(name string) bool
+	HasSecretFunc func(name string) (bool, error)
 	GetSecretFunc func(name string) ([]byte, error)
 }
 
-func (m *mockSecretManager) HasSecret(name string) bool {
+func (m *mockSecretManager) HasSecret(name string) (bool, error) {
 	return m.HasSecretFunc(name)
 }
 
@@ -91,8 +91,8 @@ func TestNewForkManager(t *testing.T) {
 			epochSize uint64 = 10
 
 			secretManager = &mockSecretManager{
-				HasSecretFunc: func(name string) bool {
-					return true
+				HasSecretFunc: func(name string) (bool, error) {
+					return true, errTest
 				},
 				GetSecretFunc: func(name string) ([]byte, error) {
 					return nil, errTest
@@ -133,10 +133,10 @@ func TestNewForkManager(t *testing.T) {
 			}
 
 			secretManager = &mockSecretManager{
-				HasSecretFunc: func(name string) bool {
+				HasSecretFunc: func(name string) (bool, error) {
 					assert.Equal(t, secrets.ValidatorKey, name)
 
-					return true
+					return true, nil
 				},
 				GetSecretFunc: func(name string) ([]byte, error) {
 					assert.Equal(t, secrets.ValidatorKey, name)
@@ -204,10 +204,10 @@ func TestNewForkManager(t *testing.T) {
 			}
 
 			secretManager = &mockSecretManager{
-				HasSecretFunc: func(name string) bool {
+				HasSecretFunc: func(name string) (bool, error) {
 					assert.Equal(t, secrets.ValidatorKey, name)
 
-					return true
+					return true, nil
 				},
 				GetSecretFunc: func(name string) ([]byte, error) {
 					assert.Equal(t, secrets.ValidatorKey, name)
@@ -257,10 +257,10 @@ func TestNewForkManager(t *testing.T) {
 			epochSize uint64 = 10
 
 			secretManager = &mockSecretManager{
-				HasSecretFunc: func(name string) bool {
+				HasSecretFunc: func(name string) (bool, error) {
 					assert.True(t, name == secrets.ValidatorKey || name == secrets.ValidatorBLSKey)
 
-					return true
+					return true, nil
 				},
 				GetSecretFunc: func(name string) ([]byte, error) {
 					assert.True(t, name == secrets.ValidatorKey || name == secrets.ValidatorBLSKey)
@@ -793,10 +793,10 @@ func TestForkManager_initializeKeyManagers(t *testing.T) {
 				},
 			},
 			secretManager: &mockSecretManager{
-				HasSecretFunc: func(name string) bool {
+				HasSecretFunc: func(name string) (bool, error) {
 					assert.Equal(t, secrets.ValidatorKey, name)
 
-					return true
+					return true, nil
 				},
 				GetSecretFunc: func(name string) ([]byte, error) {
 					assert.Equal(t, secrets.ValidatorKey, name)

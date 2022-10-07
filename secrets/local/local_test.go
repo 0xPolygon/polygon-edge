@@ -267,8 +267,10 @@ func TestLocalSecretsManager_RemoveSecret(t *testing.T) {
 				assert.Error(t, removeErr)
 			}
 
+			hasSecret, _ := manager.HasSecret(testCase.secretName)
+
 			// Check that the value is not present
-			assert.False(t, manager.HasSecret(testCase.secretName))
+			assert.False(t, hasSecret)
 		})
 	}
 }
