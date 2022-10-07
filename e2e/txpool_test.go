@@ -103,7 +103,6 @@ func TestTxPool_ErrorCodes(t *testing.T) {
 			// Set up the test server
 			srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
 				config.SetConsensus(framework.ConsensusDev)
-				config.SetSeal(true)
 				config.SetDevInterval(devInterval)
 				config.Premine(referenceAddr, testCase.defaultBalance)
 			})
@@ -175,7 +174,6 @@ func TestTxPool_TransactionCoalescing(t *testing.T) {
 		1,
 		IBFTDirPrefix,
 		func(i int, config *framework.TestServerConfig) {
-			config.SetSeal(true)
 			config.Premine(referenceAddr, defaultBalance)
 			config.SetBlockTime(1)
 		},
@@ -380,7 +378,6 @@ func TestTxPool_RecoverableError(t *testing.T) {
 
 	server := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDev)
-		config.SetSeal(true)
 		config.SetBlockLimit(2.5 * 21000)
 		config.SetDevInterval(2)
 		config.Premine(senderAddress, framework.EthToWei(100))
@@ -448,7 +445,6 @@ func TestTxPool_GetPendingTx(t *testing.T) {
 
 	server := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDev)
-		config.SetSeal(true)
 		config.SetDevInterval(3)
 		config.SetBlockLimit(20000000)
 		config.Premine(senderAddress, startingBalance)

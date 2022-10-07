@@ -73,9 +73,7 @@ func TestDispatcher_HandleWebsocketConnection_EthSubscribe(t *testing.T) {
 			},
 		)
 
-		mockConnection := &mockWsConn{
-			msgCh: make(chan []byte, 1),
-		}
+		mockConnection, msgCh := newMockWsConnWithMsgCh()
 
 		req := []byte(`{
 		"method": "eth_subscribe",
@@ -96,7 +94,7 @@ func TestDispatcher_HandleWebsocketConnection_EthSubscribe(t *testing.T) {
 		})
 
 		select {
-		case <-mockConnection.msgCh:
+		case <-msgCh:
 		case <-time.After(2 * time.Second):
 			t.Fatal("\"newHeads\" event not received in 2 seconds")
 		}
@@ -116,9 +114,7 @@ func TestDispatcher_WebsocketConnection_RequestFormats(t *testing.T) {
 		},
 	)
 
-	mockConnection := &mockWsConn{
-		msgCh: make(chan []byte, 1),
-	}
+	mockConnection, _ := newMockWsConnWithMsgCh()
 
 	cases := []struct {
 		msg         []byte

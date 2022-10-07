@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/0xPolygon/polygon-edge/command"
+	"github.com/0xPolygon/polygon-edge/command/genesis/predeploy"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft"
 	"github.com/0xPolygon/polygon-edge/helper/common"
@@ -25,6 +26,11 @@ func GetCommand() *cobra.Command {
 	setLegacyFlags(genesisCmd)
 
 	helper.SetRequiredFlags(genesisCmd, params.getRequiredFlags())
+
+	genesisCmd.AddCommand(
+		// genesis predeploy
+		predeploy.GetCommand(),
+	)
 
 	return genesisCmd
 }
