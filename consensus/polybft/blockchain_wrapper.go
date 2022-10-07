@@ -71,7 +71,8 @@ func (p *blockchainWrapper) CurrentHeader() *types.Header {
 // CommitBlock commits a block to the chain
 func (p *blockchainWrapper) CommitBlock(stateBlock *StateBlock) error {
 	// logs := buildLogsFromReceipts(stateBlock.Receipts, stateBlock.Block.GetHeader())
-	// status, err := p.blockchain.WriteBlockAndSetHead(stateBlock.Block, stateBlock.Receipts, logs, stateBlock.State, true)
+	// status, err := p.blockchain.WriteBlockAndSetHead(stateBlock.Block,
+	// stateBlock.Receipts, logs, stateBlock.State, true)
 	// if err != nil {
 	// 	return err
 	// } else if status != core.CanonStatTy {
@@ -86,7 +87,7 @@ func (p *blockchainWrapper) ProcessBlock(parent *types.Header, block *types.Bloc
 	header := block.Header.Copy()
 
 	//transition, err := p.executor.BeginTxn(parent.Hash, header, b.params.Coinbase)
-	transition, err := p.executor.BeginTxn(parent.Hash, header, types.Address{})
+	transition, err := p.executor.BeginTxn(parent.StateRoot, header, types.Address{})
 	if err != nil {
 		return nil, err
 	}
@@ -115,14 +116,7 @@ func (p *blockchainWrapper) ProcessBlock(parent *types.Header, block *types.Bloc
 
 // GetStateProviderForBlock is an implementation of blockchainBackend interface
 func (p *blockchainWrapper) GetStateProviderForBlock(header *types.Header) (contract.Provider, error) {
-	newHeader := &types.Header{
-		Timestamp:  header.Timestamp + 1,
-		Number:     header.Number + 1,
-		Difficulty: 1,
-		GasLimit:   header.GasLimit,
-	}
-
-	transition, err := p.executor.BeginTxn(header.StateRoot, newHeader, types.ZeroAddress)
+	transition, err := p.executor.BeginTxn(header.StateRoot, header, types.ZeroAddress)
 	if err != nil {
 		return nil, err
 	}

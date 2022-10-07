@@ -148,7 +148,7 @@ func (b *BlockBuilder) Build(handler func(h *types.Header)) (*StateBlock, error)
 	// }
 	// header.GasLimit = gasLimit
 
-	transition, err := b.params.Executor.BeginTxn(b.header.ParentHash, b.header, b.params.Coinbase)
+	transition, err := b.params.Executor.BeginTxn(b.params.Parent.StateRoot, b.header, b.params.Coinbase)
 	if err != nil {
 		return nil, err
 	}

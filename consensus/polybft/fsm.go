@@ -107,6 +107,7 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 
 	// TODO: we will need to revisit once slashing is implemented
 	extra := &Extra{Parent: extraParent.Committed}
+
 	if f.isEndOfEpoch {
 		// TO DO Nemanja - no transactions for now
 		// tx, err := f.createValidatorsUptimeTx()
@@ -116,11 +117,11 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 		// if err := f.blockBuilder.CommitTransaction(tx); err != nil {
 		// 	return nil, fmt.Errorf("failed to commit validators uptime transaction: %v", err)
 		// }
-
 		validatorsDelta, err := f.getValidatorSetDelta(f.blockBuilder.GetState())
 		if err != nil {
 			return nil, err
 		}
+
 		extra.Validators = validatorsDelta
 		f.logger.Trace("[FSM Build Proposal]", "Validators Delta", validatorsDelta)
 	}
@@ -158,6 +159,10 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 		h.MixHash = PolyMixDigest
 	})
 
+	if err != nil {
+		return nil, err
+	}
+
 	f.block = stateBlock
 
 	proposal := &pbft.Proposal{
@@ -167,6 +172,7 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 	}
 	f.proposal = proposal
 	f.logger.Debug("[FSM Build Proposal]", "Proposal hash", hex.EncodeToHex(proposal.Hash))
+
 	return proposal, nil
 }
 
@@ -231,8 +237,9 @@ func (f *fsm) ValidateCommit(from pbft.NodeID, seal []byte) error {
 
 	signature, err := bls.UnmarshalSignature(seal)
 	if err != nil {
-		return fmt.Errorf("failed to unmarshall signature: %v", err)
+		return fmt.Errorf("failed to unmarshall signature: %w", err)
 	}
+
 	if !signature.Verify(validator.BlsKey, f.proposal.Hash) {
 		return fmt.Errorf("incorrect commit signature from %s", from)
 	}
@@ -246,7 +253,7 @@ func (f *fsm) Validate(proposal *pbft.Proposal) error {
 
 	var block types.Block
 	if err := block.UnmarshalRLP(proposal.Data); err != nil {
-		return fmt.Errorf("failed to decode block data. Error: %v", err)
+		return fmt.Errorf("failed to decode block data. Error: %w", err)
 	}
 
 	// validate proposal
@@ -256,7 +263,7 @@ func (f *fsm) Validate(proposal *pbft.Proposal) error {
 
 	// validate header fields
 	if err := validateHeaderFields(f.parent, block.Header); err != nil {
-		return fmt.Errorf("failed to validate header (parent header# %d, current header#%d): %v",
+		return fmt.Errorf("failed to validate header (parent header# %d, current header#%d): %w",
 			f.parent.Number, block.Number(), err)
 	}
 
@@ -276,8 +283,10 @@ func (f *fsm) Validate(proposal *pbft.Proposal) error {
 		if err != nil {
 			return err
 		}
+
 		f.logger.Trace("[FSM Validate]", "Block", blockNumber, "parent validators", validators)
 		parentHash := f.parent.Hash
+
 		if err := blockExtra.Parent.VerifyCommittedFields(validators, parentHash); err != nil {
 			return fmt.Errorf(
 				"failed to verify signatures for (parent) block#%d. Block hash: %v, block#%d",
@@ -288,7 +297,7 @@ func (f *fsm) Validate(proposal *pbft.Proposal) error {
 		}
 	}
 
-	// TO DO Nemanja - do not validate state transaction because there isn't any
+	// TODO: Nemanja - do not validate state transaction because there isn't any
 	// if err := f.VerifyStateTransactions(block.Transactions); err != nil {
 	// 	return err
 	// }
@@ -297,6 +306,7 @@ func (f *fsm) Validate(proposal *pbft.Proposal) error {
 	if err != nil {
 		return err
 	}
+
 	f.block = builtBlock
 	f.proposal = proposal
 	return nil
