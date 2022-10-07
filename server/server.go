@@ -563,6 +563,7 @@ func (s *Server) setupJSONRPC() error {
 		Store:                    hub,
 		Addr:                     s.config.JSONRPC.JSONRPCAddr,
 		ChainID:                  uint64(s.config.Chain.Params.ChainID),
+		ChainName:                s.chain.Name,
 		AccessControlAllowOrigin: s.config.JSONRPC.AccessControlAllowOrigin,
 		PriceLimit:               s.config.PriceLimit,
 		BatchLengthLimit:         s.config.JSONRPC.BatchLengthLimit,
