@@ -3,9 +3,10 @@ package state
 import (
 	"errors"
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/state/runtime/evm"
 	"math"
 	"math/big"
+
+	"github.com/0xPolygon/polygon-edge/state/runtime/evm"
 
 	"github.com/hashicorp/go-hclog"
 

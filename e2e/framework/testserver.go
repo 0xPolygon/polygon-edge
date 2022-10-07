@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/command/genesis/predeploy"
 	"io"
 	"math/big"
 	"net/http"
@@ -21,6 +20,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/0xPolygon/polygon-edge/command/genesis/predeploy"
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/genesis"
