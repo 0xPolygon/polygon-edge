@@ -291,14 +291,15 @@ func (c *consensusRuntime) FSM() (*fsm, error) {
 		}
 	}
 
-	if isEndOfEpoch {
-		uptimeCounter, err := c.calculateUptime(parent)
-		if err != nil {
-			return nil, err
-		}
+	// TODO: Nemanja
+	// if isEndOfEpoch {
+	// 	uptimeCounter, err := c.calculateUptime(parent)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
 
-		ff.uptimeCounter = uptimeCounter
-	}
+	// 	ff.uptimeCounter = uptimeCounter
+	// }
 
 	c.logger.Info("[FSM built]",
 		"epoch", epoch.Number,
@@ -332,6 +333,8 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) error {
 		}
 	}
 
+	c.logger.Info("restartEpoch", "EpochNumber", epochNumber)
+
 	/*
 		// We will uncomment this once we have the clear PoC for the checkpoint
 		lastCheckpoint := uint64(0)
@@ -354,6 +357,7 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) error {
 	if err != nil {
 		return err
 	}
+	c.logger.Info("restartEpoch", "validators", validatorSet)
 
 	epoch := &epochMetadata{
 		Number:         epochNumber,

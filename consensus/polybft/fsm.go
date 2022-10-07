@@ -109,7 +109,7 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 	extra := &Extra{Parent: extraParent.Committed}
 
 	if f.isEndOfEpoch {
-		// TO DO Nemanja - no transactions for now
+		// TODO: Nemanja - no transactions for now
 		// tx, err := f.createValidatorsUptimeTx()
 		// if err != nil {
 		// 	return nil, err
@@ -119,6 +119,7 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 		// }
 		validatorsDelta, err := f.getValidatorSetDelta(f.blockBuilder.GetState())
 		if err != nil {
+			f.logger.Error("BuildProposal", "Error", err)
 			return nil, err
 		}
 
@@ -474,10 +475,14 @@ func (f *fsm) IsStuck(num uint64) (uint64, bool) {
 // getValidatorSetDelta calculates validator set delta based on parent and current header
 func (f *fsm) getValidatorSetDelta(pendingBlockState *state.Transition) (*ValidatorSetDelta, error) {
 	provider := f.backend.GetStateProvider(pendingBlockState)
+	f.logger.Info("getValidatorSetDelta 1")
 	systemState := f.backend.GetSystemState(f.config, provider)
+	f.logger.Info("getValidatorSetDelta 2")
 	newValidators, err := systemState.GetValidatorSet()
+	f.logger.Info("getValidatorSetDelta 3", "Validators", newValidators)
+
 	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve validator set for current block %v", err)
+		return nil, fmt.Errorf("failed to retrieve validator set for current block %w", err)
 	}
 	return CreateValidatorSetDelta(f.logger, f.validators.Accounts(), newValidators), nil
 }

@@ -86,6 +86,7 @@ func NewBlockBuilder(params *BlockBuilderParams) *BlockBuilder {
 		params: params,
 	}
 	builder.Reset()
+
 	return builder
 }
 
@@ -127,6 +128,13 @@ func (b *BlockBuilder) Reset() {
 	b.block = nil
 	b.txns = []*types.Transaction{}
 	b.receipts = []*types.Receipt{}
+
+	transition, err := b.params.Executor.BeginTxn(b.params.Parent.StateRoot, b.header, b.params.Coinbase)
+	if err != nil {
+		panic(err)
+	}
+
+	b.state = transition
 }
 
 // Block returns the built block if nil, it is not built yet
@@ -148,11 +156,6 @@ func (b *BlockBuilder) Build(handler func(h *types.Header)) (*StateBlock, error)
 	// }
 	// header.GasLimit = gasLimit
 
-	transition, err := b.params.Executor.BeginTxn(b.params.Parent.StateRoot, b.header, b.params.Coinbase)
-	if err != nil {
-		return nil, err
-	}
-
 	// Nemanja - fill transactions
 	// txs := i.writeTransactions(gasLimit, header.Number, transition)
 
@@ -160,23 +163,23 @@ func (b *BlockBuilder) Build(handler func(h *types.Header)) (*StateBlock, error)
 	// 	return nil, err
 	// }
 
-	_, root := transition.Commit()
+	_, root := b.state.Commit()
 	b.header.StateRoot = root
-	b.header.GasUsed = transition.TotalGas()
+	b.header.GasUsed = b.state.TotalGas()
 
 	// build the block
 	b.block = consensus.BuildBlock(consensus.BuildBlockParams{
 		Header:   b.header,
 		Txns:     b.txns,
-		Receipts: transition.Receipts(),
+		Receipts: b.state.Receipts(),
 	})
 
 	b.block.Header.ComputeHash()
 
 	return &StateBlock{
 		Block:    b.block,
-		Receipts: transition.Receipts(),
-		State:    transition,
+		Receipts: b.state.Receipts(),
+		State:    b.state,
 	}, nil
 }
 
