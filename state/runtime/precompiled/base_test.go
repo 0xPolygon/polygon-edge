@@ -1,11 +1,11 @@
-//nolint: lll,gofmt
 package precompiled
 
 import (
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/0xPolygon/polygon-edge/helper/hex"
 )
 
 type precompiledTest struct {

@@ -32,7 +32,6 @@ func TestClusterBlockSync(t *testing.T) {
 					config.SetIBFTDirPrefix(dirPrefix)
 					config.SetIBFTDir(fmt.Sprintf("%s%d", dirPrefix, i))
 				}
-				config.SetSeal(i < IBFTMinNodes)
 			})
 
 		startContext, startCancelFn := context.WithTimeout(context.Background(), time.Minute)

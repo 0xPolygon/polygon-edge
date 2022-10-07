@@ -2,7 +2,7 @@ package jsonrpc
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"sync"
@@ -90,7 +90,10 @@ func (j *JSONRPC) setupHTTP() error {
 		return err
 	}
 
-	mux := http.DefaultServeMux
+	// NewServeMux must be used, as it disables all debug features.
+	// For some strange reason, with DefaultServeMux debug/vars is always enabled (but not debug/pprof).
+	// If pprof need to be enabled, this should be DefaultServeMux
+	mux := http.NewServeMux()
 
 	// The middleware factory returns a handler, so we need to wrap the handler function properly.
 	jsonRPCHandler := http.HandlerFunc(j.handle)
@@ -273,7 +276,7 @@ func (j *JSONRPC) handle(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	data, err := ioutil.ReadAll(req.Body)
+	data, err := io.ReadAll(req.Body)
 
 	if err != nil {
 		_, _ = w.Write([]byte(err.Error()))

@@ -1,7 +1,10 @@
 package jsonrpc
 
 import (
+	"context"
+	"errors"
 	"math/big"
+	"net"
 	"strconv"
 	"testing"
 	"time"
@@ -326,9 +329,7 @@ func TestRemoveFilterByWebsocket(t *testing.T) {
 
 	store := newMockStore()
 
-	mock := &mockWsConn{
-		msgCh: make(chan []byte, 1),
-	}
+	mock, _ := newMockWsConnWithMsgCh()
 
 	m := NewFilterManager(hclog.NewNullLogger(), store, 1000)
 	defer m.Close()
@@ -343,14 +344,99 @@ func TestRemoveFilterByWebsocket(t *testing.T) {
 	assert.False(t, m.Exists(id))
 }
 
+func Test_flushWsFilters(t *testing.T) {
+	t.Parallel()
+
+	store := newMockStore()
+
+	m := NewFilterManager(hclog.NewNullLogger(), store, 1000)
+
+	t.Cleanup(func() {
+		m.Close()
+	})
+
+	go m.Run()
+
+	runTest := func(t *testing.T, flushErr error, shouldExist bool) {
+		t.Helper()
+
+		var (
+			filterID string
+		)
+
+		mock := &mockWsConn{
+			SetFilterIDFn: func(s string) {
+				filterID = s
+			},
+			GetFilterIDFn: func() string {
+				return filterID
+			},
+			WriteMessageFn: func(i int, b []byte) error {
+				return flushErr
+			},
+		}
+
+		id := m.NewBlockFilter(mock)
+
+		// emit event
+		store.emitEvent(&mockEvent{
+			NewChain: []*mockHeader{
+				{
+					header: &types.Header{
+						Hash: types.StringToHash("1"),
+					},
+				},
+			},
+		})
+
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+
+		for {
+			select {
+			case <-ctx.Done():
+				t.Errorf("timeout for filter existence check, expected=%t, actual=%t", shouldExist, m.Exists(id))
+
+				return
+			default:
+				if shouldExist == m.Exists(id) {
+					return
+				}
+			}
+		}
+	}
+
+	t.Run("should remove if sendUpdates returns websocket.ErrCloseSent", func(t *testing.T) {
+		t.Parallel()
+
+		runTest(t, websocket.ErrCloseSent, false)
+	})
+
+	t.Run("should remove if sendUpdates returns net.ErrClosed", func(t *testing.T) {
+		t.Parallel()
+
+		runTest(t, net.ErrClosed, false)
+	})
+
+	t.Run("should keep if sendUpdates returns unknown error", func(t *testing.T) {
+		t.Parallel()
+
+		runTest(t, errors.New("hoge"), true)
+	})
+
+	t.Run("should keep if sendUpdates doesn't return error", func(t *testing.T) {
+		t.Parallel()
+
+		runTest(t, nil, true)
+	})
+}
+
 func TestFilterWebsocket(t *testing.T) {
 	t.Parallel()
 
 	store := newMockStore()
 
-	mock := &mockWsConn{
-		msgCh: make(chan []byte, 1),
-	}
+	mock, msgCh := newMockWsConnWithMsgCh()
 
 	m := NewFilterManager(hclog.NewNullLogger(), store, 1000)
 	defer m.Close()
@@ -375,29 +461,51 @@ func TestFilterWebsocket(t *testing.T) {
 	})
 
 	select {
-	case <-mock.msgCh:
+	case <-msgCh:
 	case <-time.After(2 * time.Second):
 		t.Fatal("bad")
 	}
 }
 
 type mockWsConn struct {
-	msgCh    chan []byte
-	filterID string
+	SetFilterIDFn  func(string)
+	GetFilterIDFn  func() string
+	WriteMessageFn func(int, []byte) error
 }
 
 func (m *mockWsConn) SetFilterID(filterID string) {
-	m.filterID = filterID
+	m.SetFilterIDFn(filterID)
 }
 
 func (m *mockWsConn) GetFilterID() string {
-	return m.filterID
+	return m.GetFilterIDFn()
 }
 
 func (m *mockWsConn) WriteMessage(messageType int, b []byte) error {
-	m.msgCh <- b
+	return m.WriteMessageFn(messageType, b)
+}
 
-	return nil
+func newMockWsConnWithMsgCh() (*mockWsConn, <-chan []byte) {
+	var (
+		filterID string
+		msgCh    = make(chan []byte, 1)
+	)
+
+	mock := &mockWsConn{
+		SetFilterIDFn: func(s string) {
+			filterID = s
+		},
+		GetFilterIDFn: func() string {
+			return filterID
+		},
+		WriteMessageFn: func(i int, b []byte) error {
+			msgCh <- b
+
+			return nil
+		},
+	}
+
+	return mock, msgCh
 }
 
 func TestHeadStream(t *testing.T) {

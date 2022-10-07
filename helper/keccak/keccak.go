@@ -22,7 +22,6 @@ type Keccak struct {
 // WriteRlp writes an RLP value
 func (k *Keccak) WriteRlp(dst []byte, v *fastrlp.Value) []byte {
 	k.buf = v.MarshalTo(k.buf[:0])
-	//nolint
 	k.Write(k.buf)
 
 	return k.Sum(dst)
@@ -41,7 +40,6 @@ func (k *Keccak) Reset() {
 
 // Read hashes the content and returns the intermediate buffer.
 func (k *Keccak) Read() []byte {
-	//nolint
 	k.hash.Read(k.tmp)
 
 	return k.tmp
@@ -49,7 +47,6 @@ func (k *Keccak) Read() []byte {
 
 // Sum implements the hash interface
 func (k *Keccak) Sum(dst []byte) []byte {
-	//nolint
 	k.hash.Read(k.tmp)
 	dst = append(dst, k.tmp[:]...)
 

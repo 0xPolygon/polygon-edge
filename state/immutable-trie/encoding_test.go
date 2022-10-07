@@ -122,7 +122,6 @@ func TestEncoding_KeyBytesToHexNibbles(t *testing.T) {
 
 func TestEncoding_HexCompact(t *testing.T) {
 	// As per the official spec:
-	//nolint:lll
 	// https://eth.wiki/en/fundamentals/patricia-tree#specification-compact-encoding-of-hex-sequence-with-optional-terminator
 	// hex char    bits    |    node type partial     path length
 	// ----------------------------------------------------------
