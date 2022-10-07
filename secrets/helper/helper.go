@@ -154,7 +154,11 @@ func InitNetworkingPrivateKey(secretsManager secrets.SecretsManager) (libp2pCryp
 
 // LoadValidatorAddress loads ECDSA key by SecretsManager and returns validator address
 func LoadValidatorAddress(secretsManager secrets.SecretsManager) (types.Address, error) {
-	if !secretsManager.HasSecret(secrets.ValidatorKey) {
+	hasSecret, err := secretsManager.HasSecret(secrets.ValidatorKey)
+	if err != nil {
+		return types.ZeroAddress, nil
+	}
+	if !hasSecret {
 		return types.ZeroAddress, nil
 	}
 
@@ -173,7 +177,11 @@ func LoadValidatorAddress(secretsManager secrets.SecretsManager) (types.Address,
 
 // LoadValidatorAddress loads BLS key by SecretsManager and returns BLS Public Key
 func LoadBLSPublicKey(secretsManager secrets.SecretsManager) (string, error) {
-	if !secretsManager.HasSecret(secrets.ValidatorBLSKey) {
+	hasSecret, err := secretsManager.HasSecret(secrets.ValidatorBLSKey)
+	if err != nil {
+		return "", nil
+	}
+	if !hasSecret {
 		return "", nil
 	}
 
@@ -197,7 +205,11 @@ func LoadBLSPublicKey(secretsManager secrets.SecretsManager) (string, error) {
 
 // LoadNodeID loads Libp2p key by SecretsManager and returns Node ID
 func LoadNodeID(secretsManager secrets.SecretsManager) (string, error) {
-	if !secretsManager.HasSecret(secrets.NetworkKey) {
+	hasSecret, err := secretsManager.HasSecret(secrets.NetworkKey)
+	if err != nil {
+		return "", err
+	}
+	if !hasSecret {
 		return "", nil
 	}
 
