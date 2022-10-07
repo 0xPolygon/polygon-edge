@@ -505,6 +505,40 @@ func Test_opReturnDataCopy(t *testing.T) {
 				err:         nil,
 			},
 		},
+		{
+			name:   "should expand memory and copy data returnData",
+			config: &allEnabledForks,
+			initState: &state{
+				stack: []*big.Int{
+					big.NewInt(5), // length
+					big.NewInt(1), // dataOffset
+					big.NewInt(2), // memOffset
+				},
+				sp:         3,
+				returnData: []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06},
+				memory:     []byte{0x11, 0x22},
+				gas:        20,
+			},
+			resultState: &state{
+				config: &allEnabledForks,
+				stack: []*big.Int{
+					big.NewInt(6), // updated for end index
+					big.NewInt(1),
+					big.NewInt(2),
+				},
+				sp:         0,
+				returnData: []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06},
+				memory: append(
+					// 1 word (32 bytes)
+					[]byte{0x11, 0x22, 0x02, 0x03, 0x04, 0x05, 0x06},
+					make([]byte, 25)...,
+				),
+				gas:         14,
+				lastGasCost: 3,
+				stop:        false,
+				err:         nil,
+			},
+		},
 	}
 
 	for _, test := range tests {
