@@ -292,7 +292,7 @@ func (c *state) checkMemory(offset, size *big.Int) bool {
 		return false
 	}
 
-	if newSize, m := o+s, uint64(len(c.memory)); m < newSize {
+	if newSize, currentSize := o+s, uint64(len(c.memory)); currentSize < newSize {
 		w := (newSize + 31) / 32
 		newCost := 3*w + w*w/512
 		cost := newCost - c.lastGasCost
