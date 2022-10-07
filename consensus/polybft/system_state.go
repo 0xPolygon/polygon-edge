@@ -15,7 +15,7 @@ import (
 var stateFunctions, _ = abi.NewABIFromList([]string{
 	"function getValidators() returns (tuple(address,bytes)[])",
 	"function getEpoch() returns (uint64)",
-	"function init(tuple(address, uint256[4])[], uint64)",
+	"function init(tuple(address ecdsa, uint256[4] bls)[] _validators, uint64 _validatorSetSize)",
 })
 
 var sidechainBridgeFunctions, _ = abi.NewABIFromList([]string{
@@ -59,10 +59,8 @@ func NewSystemState(config *PolyBFTConfig, provider contract.Provider) *SystemSt
 }
 
 func (s *SystemStateImpl) InitValidatorSet(validators []*Validator, validatorSetSize int) error {
-	validatorCons := make([][]byte, 0, len(validators))
-
-	validatorType := abi.MustNewType("tuple(address ecdsa, uint256[4] bls)")
-	for _, validator := range validators {
+	validatorCons := make([]map[string]interface{}, len(validators))
+	for i, validator := range validators {
 		blsKey, err := hex.DecodeString(validator.BlsKey)
 		if err != nil {
 			return err
@@ -78,23 +76,13 @@ func (s *SystemStateImpl) InitValidatorSet(validators []*Validator, validatorSet
 			return err
 		}
 
-		// blsKey, err = abi.Encode(blsBigInts, abi.MustNewType("uint256[4]"))
-		// if err != nil {
-		// 	return err
-		// }
-
-		encoded, err := validatorType.Encode(map[string]interface{}{
+		validatorCons[i] = map[string]interface{}{
 			"ecdsa": validator.Address,
 			"bls":   blsBigInts,
-		})
-		if err != nil {
-			return err
 		}
-
-		validatorCons = append(validatorCons, encoded)
 	}
 
-	_, err := s.validatorContract.Call("init", ethgo.Latest, [2]interface{}{validatorCons, uint64(validatorSetSize)})
+	_, err := s.validatorContract.Call("init", ethgo.Latest, validatorCons, validatorSetSize)
 
 	return err
 }
