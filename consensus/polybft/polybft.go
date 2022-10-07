@@ -20,7 +20,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/state"
-	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/syncer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
@@ -117,27 +116,24 @@ type Polybft struct {
 func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *state.Transition) error {
 	customConfigGeneric := config.Params.Engine[engineName]
 
-	var polyBftConfig PolyBFTConfig
+	var pbftConfig PolyBFTConfig
 
 	customConfigJSON, _ := json.Marshal(customConfigGeneric)
-	json.Unmarshal(customConfigJSON, &polyBftConfig)
+	json.Unmarshal(customConfigJSON, &pbftConfig)
 
 	return func(transition *state.Transition) error {
-		for _, sc := range polyBftConfig.SmartContracts {
+		provider := NewStateProvider(transition)
+		systemState := NewSystemState(&pbftConfig, provider)
+
+		for _, sc := range pbftConfig.SmartContracts {
 			result := transition.Create2(types.ZeroAddress, sc.Code, big.NewInt(0), 10000000)
 			if result.Failed() {
-				// do not treat execution reverted
-				if !errors.Is(result.Err, runtime.ErrExecutionReverted) {
-					// return result.Err
-					continue
-				}
+				return result.Err
 			}
 
 			// init validators
-			if sc.Address == polyBftConfig.ValidatorSetAddr {
-				provider := NewStateProvider(transition)
-				systemState := NewSystemState(&polyBftConfig, provider)
-				systemState.InitValidatorSet(polyBftConfig.InitialValidatorSet, polyBftConfig.ValidatorSetSize)
+			if sc.Address == pbftConfig.ValidatorSetAddr {
+				systemState.InitValidatorSet(pbftConfig.InitialValidatorSet, pbftConfig.ValidatorSetSize)
 			}
 		}
 
@@ -393,7 +389,10 @@ SYNC:
 	}
 
 	lastBlock := p.blockchain.CurrentHeader()
-	p.logger.Info("startPbftProcess", "header hash", lastBlock.Hash, "computed hash", lastBlock.Hash, "header number", lastBlock.Number)
+	p.logger.Info("startPbftProcess",
+		"header hash", lastBlock.Hash,
+		"computed hash", lastBlock.Hash,
+		"header number", lastBlock.Number)
 
 	currentValidators, err := p.GetValidators(lastBlock.Number, nil)
 	if err != nil {
@@ -442,6 +441,7 @@ func (p *Polybft) isSynced() bool {
 	// TODO: Check could we change following condition to this:
 	// p.syncer.GetSyncProgression().CurrentBlock >= p.syncer.GetSyncProgression().HighestBlock
 	syncProgression := p.syncer.GetSyncProgression()
+
 	return syncProgression == nil ||
 		p.blockchain.CurrentHeader().Number >= syncProgression.HighestBlock
 }
@@ -565,6 +565,7 @@ func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, parents []*type
 				parent.Hash,
 			)
 		}
+
 		parentValidators, err := p.GetValidators(blockNumber-2, parents)
 		if err != nil {
 			return fmt.Errorf(
@@ -573,6 +574,7 @@ func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, parents []*type
 				err,
 			)
 		}
+
 		if err := extra.Parent.VerifyCommittedFields(parentValidators, parent.Hash); err != nil {
 			return fmt.Errorf("failed to verify signatures for parent of block %d. Parent hash: %v", blockNumber, parent.Hash)
 		}
@@ -630,6 +632,7 @@ func (p *pbftTransportWrapper) Gossip(msg *pbft.MessageReq) error {
 	if err != nil {
 		return err
 	}
+
 	protoMsg := &proto.GossipMessage{
 		Data: data,
 	}
@@ -644,16 +647,18 @@ type bridgeTransportWrapper struct {
 func (b *bridgeTransportWrapper) Gossip(msg interface{}) {
 	data, err := json.Marshal(msg)
 	if err != nil {
-		b.logger.Warn(fmt.Sprintf("Failed to marshal bridge message:%s", err))
+		b.logger.Warn("Failed to marshal bridge message", "err", err)
+
 		return
 	}
+
 	protoMsg := &proto.GossipMessage{
 		Data: data,
 	}
 
 	err = b.topic.Publish(protoMsg)
 	if err != nil {
-		b.logger.Warn(fmt.Sprintf("Failed to gossip bridge message:%s", err))
+		b.logger.Warn("Failed to gossip bridge message", "err", err)
 	}
 }
 
