@@ -152,10 +152,12 @@ func (l *LocalSecretsManager) SetSecret(name string, value []byte) error {
 }
 
 // HasSecret checks if the secret is present on disk
-func (l *LocalSecretsManager) HasSecret(name string) bool {
-	_, err := l.GetSecret(name)
+func (l *LocalSecretsManager) HasSecret(name string) (bool, error) {
+	if _, err := l.GetSecret(name); err != nil {
+		return false, fmt.Errorf("unable to fetch secret (%s), %w", name, err);
+	}
 
-	return err == nil
+	return true, nil
 }
 
 // RemoveSecret removes the local SecretsManager's secret from disk

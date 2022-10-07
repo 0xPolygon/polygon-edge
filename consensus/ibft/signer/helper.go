@@ -29,7 +29,11 @@ func wrapCommitHash(data []byte) []byte {
 
 // getOrCreateECDSAKey loads ECDSA key or creates a new key
 func getOrCreateECDSAKey(manager secrets.SecretsManager) (*ecdsa.PrivateKey, error) {
-	if !manager.HasSecret(secrets.ValidatorKey) {
+	hasSecret, err := manager.HasSecret(secrets.ValidatorKey)
+	if err != nil {
+		return nil, err
+	}
+	if !hasSecret {
 		if _, err := helper.InitECDSAValidatorKey(manager); err != nil {
 			return nil, err
 		}
@@ -45,7 +49,11 @@ func getOrCreateECDSAKey(manager secrets.SecretsManager) (*ecdsa.PrivateKey, err
 
 // getOrCreateECDSAKey loads BLS key or creates a new key
 func getOrCreateBLSKey(manager secrets.SecretsManager) (*bls_sig.SecretKey, error) {
-	if !manager.HasSecret(secrets.ValidatorBLSKey) {
+	hasSecret, err := manager.HasSecret(secrets.ValidatorBLSKey)
+	if err != nil {
+		return nil, err
+	}
+	if !hasSecret {
 		if _, err := helper.InitBLSValidatorKey(manager); err != nil {
 			return nil, err
 		}

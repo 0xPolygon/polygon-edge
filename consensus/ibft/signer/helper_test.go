@@ -96,10 +96,10 @@ func Test_getOrCreateECDSAKey(t *testing.T) {
 		{
 			name: "should load ECDSA key from secret manager if the key exists",
 			mockSecretManager: &MockSecretManager{
-				HasSecretFn: func(name string) bool {
+				HasSecretFn: func(name string) (bool, error) {
 					testSecretName(name)
 
-					return true
+					return true, nil
 				},
 				GetSecretFn: func(name string) ([]byte, error) {
 					testSecretName(name)
@@ -113,10 +113,10 @@ func Test_getOrCreateECDSAKey(t *testing.T) {
 		{
 			name: "should create new ECDSA key if the key doesn't exist",
 			mockSecretManager: &MockSecretManager{
-				HasSecretFn: func(name string) bool {
+				HasSecretFn: func(name string) (bool, error) {
 					testSecretName(name)
 
-					return false
+					return false, nil
 				},
 				SetSecretFn: func(name string, key []byte) error {
 					testSecretName(name)
@@ -137,10 +137,10 @@ func Test_getOrCreateECDSAKey(t *testing.T) {
 		{
 			name: "should return error if secret manager returns error",
 			mockSecretManager: &MockSecretManager{
-				HasSecretFn: func(name string) bool {
+				HasSecretFn: func(name string) (bool, error) {
 					testSecretName(name)
 
-					return true
+					return true, nil
 				},
 				GetSecretFn: func(name string) ([]byte, error) {
 					testSecretName(name)
@@ -154,10 +154,10 @@ func Test_getOrCreateECDSAKey(t *testing.T) {
 		{
 			name: "should return error if the key manager fails to generate new ECDSA key",
 			mockSecretManager: &MockSecretManager{
-				HasSecretFn: func(name string) bool {
+				HasSecretFn: func(name string) (bool, error) {
 					testSecretName(name)
 
-					return false
+					return false, nil
 				},
 				SetSecretFn: func(name string, key []byte) error {
 					testSecretName(name)
@@ -206,10 +206,10 @@ func Test_getOrCreateBLSKey(t *testing.T) {
 		{
 			name: "should load BLS key from secret manager if the key exists",
 			mockSecretManager: &MockSecretManager{
-				HasSecretFn: func(name string) bool {
+				HasSecretFn: func(name string) (bool, error) {
 					testSecretName(name)
 
-					return true
+					return true, nil
 				},
 				GetSecretFn: func(name string) ([]byte, error) {
 					testSecretName(name)
@@ -223,10 +223,10 @@ func Test_getOrCreateBLSKey(t *testing.T) {
 		{
 			name: "should create new BLS key if the key doesn't exist",
 			mockSecretManager: &MockSecretManager{
-				HasSecretFn: func(name string) bool {
+				HasSecretFn: func(name string) (bool, error) {
 					testSecretName(name)
 
-					return false
+					return false, nil
 				},
 				SetSecretFn: func(name string, key []byte) error {
 					testSecretName(name)
@@ -247,10 +247,10 @@ func Test_getOrCreateBLSKey(t *testing.T) {
 		{
 			name: "should return error if secret manager returns error",
 			mockSecretManager: &MockSecretManager{
-				HasSecretFn: func(name string) bool {
+				HasSecretFn: func(name string) (bool, error) {
 					testSecretName(name)
 
-					return true
+					return true, nil
 				},
 				GetSecretFn: func(name string) ([]byte, error) {
 					testSecretName(name)
@@ -264,10 +264,10 @@ func Test_getOrCreateBLSKey(t *testing.T) {
 		{
 			name: "should return error if the key manager fails to generate new BLS key",
 			mockSecretManager: &MockSecretManager{
-				HasSecretFn: func(name string) bool {
+				HasSecretFn: func(name string) (bool, error) {
 					testSecretName(name)
 
-					return false
+					return false, nil
 				},
 				SetSecretFn: func(name string, key []byte) error {
 					testSecretName(name)
@@ -346,8 +346,8 @@ func TestNewKeyManagerFromType(t *testing.T) {
 			name:          "ECDSAValidatorType",
 			validatorType: validators.ECDSAValidatorType,
 			mockSecretManager: &MockSecretManager{
-				HasSecretFn: func(name string) bool {
-					return true
+				HasSecretFn: func(name string) (bool, error) {
+					return true, nil
 				},
 				GetSecretFn: func(name string) ([]byte, error) {
 					return testECDSAKeyEncoded, nil
@@ -360,8 +360,8 @@ func TestNewKeyManagerFromType(t *testing.T) {
 			name:          "BLSValidatorType",
 			validatorType: validators.BLSValidatorType,
 			mockSecretManager: &MockSecretManager{
-				HasSecretFn: func(name string) bool {
-					return true
+				HasSecretFn: func(name string) (bool, error) {
+					return true, nil
 				},
 				GetSecretFn: func(name string) ([]byte, error) {
 					switch name {
