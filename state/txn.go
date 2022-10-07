@@ -37,6 +37,10 @@ func NewTxn(state State, snapshot Snapshot) *Txn {
 	return newTxn(state, snapshot)
 }
 
+func (txn *Txn) GetRadix() *iradix.Txn {
+	return txn.txn
+}
+
 func newTxn(state State, snapshot Snapshot) *Txn {
 	i := iradix.New()
 

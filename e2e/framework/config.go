@@ -24,6 +24,12 @@ type SrvAccount struct {
 	Balance *big.Int
 }
 
+type PredeployParams struct {
+	ArtifactsPath    string
+	PredeployAddress string
+	ConstructorArgs  []string
+}
+
 // TestServerConfig for the test server
 type TestServerConfig struct {
 	ReservedPorts           []ReservedPort
@@ -35,7 +41,7 @@ type TestServerConfig struct {
 	IBFTDir                 string                   // The name of data directory for IBFT
 	PremineAccts            []*SrvAccount            // Accounts with existing balances (genesis accounts)
 	GenesisValidatorBalance *big.Int                 // Genesis the balance for the validators
-	DevStakers              []types.Address          // List of initial staking addresses for the staking SC with dev
+	DevStakers              []types.Address          // List of initial staking addresses for the staking SC
 	Consensus               ConsensusType            // Consensus MechanismType
 	ValidatorType           validators.ValidatorType // Validator Type
 	Bootnodes               []string                 // Bootnode Addresses
@@ -54,6 +60,11 @@ type TestServerConfig struct {
 	MaxValidatorCount       uint64                   // Max validator count
 	BlockTime               uint64                   // Minimum block generation time (in s)
 	IBFTBaseTimeout         uint64                   // Base Timeout in seconds for IBFT
+	PredeployParams         *PredeployParams
+}
+
+func (t *TestServerConfig) SetPredeployParams(params *PredeployParams) {
+	t.PredeployParams = params
 }
 
 // DataDir returns path of data directory server uses

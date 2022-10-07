@@ -21,6 +21,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/command/genesis/predeploy"
+
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/genesis"
 	ibftSwitch "github.com/0xPolygon/polygon-edge/command/ibft/switch"
@@ -332,6 +334,45 @@ func (t *TestServer) GenerateGenesis() error {
 
 	blockGasLimit := strconv.FormatUint(t.Config.BlockGasLimit, 10)
 	args = append(args, "--block-gas-limit", blockGasLimit)
+
+	cmd := exec.Command(resolveBinary(), args...) //nolint:gosec
+	cmd.Dir = t.Config.RootDir
+
+	stdout := t.GetStdout()
+	cmd.Stdout = stdout
+	cmd.Stderr = stdout
+
+	return cmd.Run()
+}
+
+func (t *TestServer) GenesisPredeploy() error {
+	if t.Config.PredeployParams == nil {
+		// No need to predeploy anything
+		return nil
+	}
+
+	genesisPredeployCmd := predeploy.GetCommand()
+	args := make([]string, 0)
+
+	commandSlice := strings.Split(fmt.Sprintf("genesis %s", genesisPredeployCmd.Use), " ")
+
+	args = append(args, commandSlice...)
+
+	// Add the path to the genesis file
+	args = append(args, "--chain", filepath.Join(t.Config.RootDir, "genesis.json"))
+
+	// Add predeploy address
+	if t.Config.PredeployParams.PredeployAddress != "" {
+		args = append(args, "--predeploy-address", t.Config.PredeployParams.PredeployAddress)
+	}
+
+	// Add constructor arguments, if any
+	for _, constructorArg := range t.Config.PredeployParams.ConstructorArgs {
+		args = append(args, "--constructor-args", constructorArg)
+	}
+
+	// Add the path to the artifacts file
+	args = append(args, "--artifacts-path", t.Config.PredeployParams.ArtifactsPath)
 
 	cmd := exec.Command(resolveBinary(), args...) //nolint:gosec
 	cmd.Dir = t.Config.RootDir
