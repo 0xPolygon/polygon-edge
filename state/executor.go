@@ -6,6 +6,8 @@ import (
 	"math"
 	"math/big"
 
+	"github.com/0xPolygon/polygon-edge/state/runtime/evm"
+
 	"github.com/hashicorp/go-hclog"
 
 	"github.com/0xPolygon/polygon-edge/chain"
@@ -71,7 +73,8 @@ func (e *Executor) WriteGenesis(alloc map[types.Address]*chain.GenesisAccount) t
 		}
 	}
 
-	_, root := txn.Commit(false)
+	objs := txn.Commit(false)
+	_, root := snap.Commit(objs)
 
 	return types.BytesToHash(root)
 }
@@ -193,6 +196,18 @@ type Transition struct {
 	totalGas uint64
 }
 
+func NewTransition(config chain.ForksInTime, radix *Txn) *Transition {
+	return &Transition{
+		config: config,
+		state:  radix,
+		r: &Executor{
+			runtimes: []runtime.Runtime{
+				evm.NewEVM(),
+			},
+		},
+	}
+}
+
 func (t *Transition) TotalGas() uint64 {
 	return t.totalGas
 }
@@ -278,7 +293,8 @@ func (t *Transition) Write(txn *types.Transaction) error {
 			receipt.SetStatus(types.ReceiptSuccess)
 		}
 	} else {
-		ss, aux := t.state.Commit(t.config.EIP155)
+		objs := t.state.Commit(t.config.EIP155)
+		ss, aux := t.state.snapshot.Commit(objs)
 		t.state = NewTxn(t.auxState, ss)
 		root = aux
 		receipt.Root = types.BytesToHash(root)
@@ -299,7 +315,8 @@ func (t *Transition) Write(txn *types.Transaction) error {
 
 // Commit commits the final result
 func (t *Transition) Commit() (Snapshot, types.Hash) {
-	s2, root := t.state.Commit(t.config.EIP155)
+	objs := t.state.Commit(t.config.EIP155)
+	s2, root := t.state.snapshot.Commit(objs)
 
 	return s2, types.BytesToHash(root)
 }

@@ -36,16 +36,14 @@ func (i *backendIBFT) setupTransport() error {
 	// Subscribe to the newly created topic
 	if err := topic.Subscribe(
 		func(obj interface{}, _ peer.ID) {
+			if !i.isActiveValidator() {
+				return
+			}
+
 			msg, ok := obj.(*proto.Message)
 			if !ok {
 				i.logger.Error("invalid type assertion for message request")
 
-				return
-			}
-
-			if !i.isSealing() {
-				// if we are not sealing we do not care about the messages
-				// but we need to subscribe to propagate the messages
 				return
 			}
 

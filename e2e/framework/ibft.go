@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path"
 	"testing"
+	"time"
 
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -15,6 +17,12 @@ type IBFTServersManager struct {
 }
 
 type IBFTServerConfigCallback func(index int, config *TestServerConfig)
+
+var startTime int64
+
+func init() {
+	startTime = time.Now().UnixMilli()
+}
 
 func NewIBFTServersManager(
 	t *testing.T,
@@ -43,11 +51,19 @@ func NewIBFTServersManager(
 	bootnodes := make([]string, 0, numNodes)
 	genesisValidators := make([]string, 0, numNodes)
 
+	logsDir, err := initLogsDir(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	for i := 0; i < numNodes; i++ {
 		srv := NewTestServer(t, dataDir, func(config *TestServerConfig) {
 			config.SetConsensus(ConsensusIBFT)
 			config.SetIBFTDirPrefix(ibftDirPrefix)
 			config.SetIBFTDir(fmt.Sprintf("%s%d", ibftDirPrefix, i))
+			config.SetLogsDir(logsDir)
+			config.SetSaveLogs(true)
+			config.SetName(fmt.Sprintf("node-%d", i))
 			callback(i, config)
 		})
 		res, err := srv.SecretsInit()
@@ -76,6 +92,10 @@ func NewIBFTServersManager(
 	}
 
 	if err := srv.GenerateGenesis(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := srv.GenesisPredeploy(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -110,4 +130,15 @@ func (m *IBFTServersManager) GetServer(i int) *TestServer {
 	}
 
 	return m.servers[i]
+}
+
+func initLogsDir(t *testing.T) (string, error) {
+	t.Helper()
+	logsDir := path.Join("..", "e2e-logs", fmt.Sprintf("e2e-logs-%d", startTime), t.Name())
+
+	if err := os.MkdirAll(logsDir, 0755); err != nil {
+		return "", err
+	}
+
+	return logsDir, nil
 }

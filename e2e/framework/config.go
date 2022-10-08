@@ -24,19 +24,24 @@ type SrvAccount struct {
 	Balance *big.Int
 }
 
+type PredeployParams struct {
+	ArtifactsPath    string
+	PredeployAddress string
+	ConstructorArgs  []string
+}
+
 // TestServerConfig for the test server
 type TestServerConfig struct {
 	ReservedPorts           []ReservedPort
 	JSONRPCPort             int                      // The JSON RPC endpoint port
 	GRPCPort                int                      // The GRPC endpoint port
 	LibP2PPort              int                      // The Libp2p endpoint port
-	Seal                    bool                     // Flag indicating if blocks should be sealed
 	RootDir                 string                   // The root directory for test environment
 	IBFTDirPrefix           string                   // The prefix of data directory for IBFT
 	IBFTDir                 string                   // The name of data directory for IBFT
 	PremineAccts            []*SrvAccount            // Accounts with existing balances (genesis accounts)
 	GenesisValidatorBalance *big.Int                 // Genesis the balance for the validators
-	DevStakers              []types.Address          // List of initial staking addresses for the staking SC with dev
+	DevStakers              []types.Address          // List of initial staking addresses for the staking SC
 	Consensus               ConsensusType            // Consensus MechanismType
 	ValidatorType           validators.ValidatorType // Validator Type
 	Bootnodes               []string                 // Bootnode Addresses
@@ -46,12 +51,20 @@ type TestServerConfig struct {
 	BlockGasLimit           uint64                   // Block gas limit
 	BlockGasTarget          uint64                   // Gas target for new blocks
 	ShowsLog                bool                     // Flag specifying if logs are shown
+	Name                    string                   // Name of the server
+	SaveLogs                bool                     // Flag specifying if logs are saved
+	LogsDir                 string                   // Directory where logs are saved
 	IsPos                   bool                     // Specifies the mechanism used for IBFT (PoA / PoS)
 	Signer                  *crypto.EIP155Signer     // Signer used for transactions
 	MinValidatorCount       uint64                   // Min validator count
 	MaxValidatorCount       uint64                   // Max validator count
 	BlockTime               uint64                   // Minimum block generation time (in s)
 	IBFTBaseTimeout         uint64                   // Base Timeout in seconds for IBFT
+	PredeployParams         *PredeployParams
+}
+
+func (t *TestServerConfig) SetPredeployParams(params *PredeployParams) {
+	t.PredeployParams = params
 }
 
 // DataDir returns path of data directory server uses
@@ -143,11 +156,6 @@ func (t *TestServerConfig) SetIBFTDir(ibftDir string) {
 	t.IBFTDir = ibftDir
 }
 
-// SetSeal callback toggles the seal mode
-func (t *TestServerConfig) SetSeal(state bool) {
-	t.Seal = state
-}
-
 // SetBootnodes sets bootnodes
 func (t *TestServerConfig) SetBootnodes(bootnodes []string) {
 	t.Bootnodes = bootnodes
@@ -182,4 +190,19 @@ func (t *TestServerConfig) SetMinValidatorCount(val uint64) {
 // SetMaxValidatorCount sets the max validator count
 func (t *TestServerConfig) SetMaxValidatorCount(val uint64) {
 	t.MaxValidatorCount = val
+}
+
+// SetSaveLogs sets flag for saving logs
+func (t *TestServerConfig) SetSaveLogs(f bool) {
+	t.SaveLogs = f
+}
+
+// SetLogsDir sets the directory where logs are saved
+func (t *TestServerConfig) SetLogsDir(dir string) {
+	t.LogsDir = dir
+}
+
+// SetName sets the name of the server
+func (t *TestServerConfig) SetName(name string) {
+	t.Name = name
 }

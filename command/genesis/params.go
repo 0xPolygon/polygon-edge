@@ -312,7 +312,6 @@ func (p *genesisParams) initGenesisConfig() error {
 		chainConfig.Genesis.Alloc[staking.AddrStakingContract] = stakingAccount
 	}
 
-	// Premine accounts
 	if err := fillPremineMap(chainConfig.Genesis.Alloc, p.premine); err != nil {
 		return err
 	}

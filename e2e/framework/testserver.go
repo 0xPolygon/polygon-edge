@@ -1,13 +1,16 @@
 package framework
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"math/big"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -17,6 +20,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/0xPolygon/polygon-edge/command/genesis/predeploy"
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/genesis"
@@ -187,9 +192,9 @@ func (t *TestServer) SecretsInit() (*InitIBFTResult, error) {
 
 	commandSlice := strings.Split(fmt.Sprintf("secrets %s", secretsInitCmd.Use), " ")
 	args = append(args, commandSlice...)
-	args = append(args, "--data-dir", t.Config.IBFTDir)
+	args = append(args, "--data-dir", filepath.Join(t.Config.IBFTDir, "tmp"))
 
-	cmd := exec.Command(binaryName, args...)
+	cmd := exec.Command(resolveBinary(), args...) //nolint:gosec
 	cmd.Dir = t.Config.RootDir
 
 	if _, err := cmd.Output(); err != nil {
@@ -330,14 +335,51 @@ func (t *TestServer) GenerateGenesis() error {
 	blockGasLimit := strconv.FormatUint(t.Config.BlockGasLimit, 10)
 	args = append(args, "--block-gas-limit", blockGasLimit)
 
-	cmd := exec.Command(binaryName, args...)
+	cmd := exec.Command(resolveBinary(), args...) //nolint:gosec
 	cmd.Dir = t.Config.RootDir
 
-	if t.Config.ShowsLog {
-		stdout := io.Writer(os.Stdout)
-		cmd.Stdout = stdout
-		cmd.Stderr = stdout
+	stdout := t.GetStdout()
+	cmd.Stdout = stdout
+	cmd.Stderr = stdout
+
+	return cmd.Run()
+}
+
+func (t *TestServer) GenesisPredeploy() error {
+	if t.Config.PredeployParams == nil {
+		// No need to predeploy anything
+		return nil
 	}
+
+	genesisPredeployCmd := predeploy.GetCommand()
+	args := make([]string, 0)
+
+	commandSlice := strings.Split(fmt.Sprintf("genesis %s", genesisPredeployCmd.Use), " ")
+
+	args = append(args, commandSlice...)
+
+	// Add the path to the genesis file
+	args = append(args, "--chain", filepath.Join(t.Config.RootDir, "genesis.json"))
+
+	// Add predeploy address
+	if t.Config.PredeployParams.PredeployAddress != "" {
+		args = append(args, "--predeploy-address", t.Config.PredeployParams.PredeployAddress)
+	}
+
+	// Add constructor arguments, if any
+	for _, constructorArg := range t.Config.PredeployParams.ConstructorArgs {
+		args = append(args, "--constructor-args", constructorArg)
+	}
+
+	// Add the path to the artifacts file
+	args = append(args, "--artifacts-path", t.Config.PredeployParams.ArtifactsPath)
+
+	cmd := exec.Command(resolveBinary(), args...) //nolint:gosec
+	cmd.Dir = t.Config.RootDir
+
+	stdout := t.GetStdout()
+	cmd.Stdout = stdout
+	cmd.Stderr = stdout
 
 	return cmd.Run()
 }
@@ -370,15 +412,11 @@ func (t *TestServer) Start(ctx context.Context) error {
 		args = append(args, "--data-dir", t.Config.RootDir)
 	}
 
-	if t.Config.Seal {
-		args = append(args, "--seal")
-	}
-
 	if t.Config.PriceLimit != nil {
 		args = append(args, "--price-limit", strconv.FormatUint(*t.Config.PriceLimit, 10))
 	}
 
-	if t.Config.ShowsLog {
+	if t.Config.ShowsLog || t.Config.SaveLogs {
 		args = append(args, "--log-level", "debug")
 	}
 
@@ -398,14 +436,12 @@ func (t *TestServer) Start(ctx context.Context) error {
 	t.ReleaseReservedPorts()
 
 	// Start the server
-	t.cmd = exec.Command(binaryName, args...)
+	t.cmd = exec.Command(resolveBinary(), args...) //nolint:gosec
 	t.cmd.Dir = t.Config.RootDir
 
-	if t.Config.ShowsLog {
-		stdout := io.Writer(os.Stdout)
-		t.cmd.Stdout = stdout
-		t.cmd.Stderr = stdout
-	}
+	stdout := t.GetStdout()
+	t.cmd.Stdout = stdout
+	t.cmd.Stderr = stdout
 
 	if err := t.cmd.Start(); err != nil {
 		return err
@@ -453,14 +489,12 @@ func (t *TestServer) SwitchIBFTType(typ fork.IBFTType, from uint64, to, deployme
 	}
 
 	// Start the server
-	t.cmd = exec.Command(binaryName, args...)
+	t.cmd = exec.Command(resolveBinary(), args...) //nolint:gosec
 	t.cmd.Dir = t.Config.RootDir
 
-	if t.Config.ShowsLog {
-		stdout := io.Writer(os.Stdout)
-		t.cmd.Stdout = stdout
-		t.cmd.Stderr = stdout
-	}
+	stdout := t.GetStdout()
+	t.cmd.Stdout = stdout
+	t.cmd.Stderr = stdout
 
 	return t.cmd.Run()
 }
@@ -669,4 +703,87 @@ func (t *TestServer) InvokeMethod(
 	}
 
 	return receipt
+}
+
+func (t *TestServer) CallJSONRPC(req map[string]interface{}) map[string]interface{} {
+	reqJSON, err := json.Marshal(req)
+	if err != nil {
+		t.t.Fatal(err)
+
+		return nil
+	}
+
+	url := fmt.Sprintf("http://%s", t.JSONRPCAddr())
+
+	//nolint:gosec // this is not used because it can't be defined as a global variable
+	response, err := http.Post(url, "application/json", bytes.NewReader(reqJSON))
+	if err != nil {
+		t.t.Fatalf("failed to send request to JSON-RPC server: %v", err)
+
+		return nil
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		t.t.Fatalf("JSON-RPC doesn't return ok: %s", response.Status)
+
+		return nil
+	}
+
+	bodyBytes, err := io.ReadAll(response.Body)
+	if err != nil {
+		t.t.Fatalf("failed to read HTTP body: %s", err)
+
+		return nil
+	}
+
+	result := map[string]interface{}{}
+
+	if err := json.Unmarshal(bodyBytes, &result); err != nil {
+		t.t.Fatalf("failed to convert json to object: %s", err)
+
+		return nil
+	}
+
+	return result
+}
+
+// GetStdout returns the combined stdout writers of the server
+func (t *TestServer) GetStdout() io.Writer {
+	writers := []io.Writer{}
+
+	if t.Config.SaveLogs {
+		f, err := os.OpenFile(filepath.Join(t.Config.LogsDir, t.Config.Name+".log"), os.O_RDWR|os.O_APPEND|os.O_CREATE, 0660)
+		if err != nil {
+			t.t.Fatal(err)
+		}
+
+		writers = append(writers, f)
+
+		t.t.Cleanup(func() {
+			err = f.Close()
+			if err != nil {
+				t.t.Logf("Failed to close file. Error: %s", err)
+			}
+		})
+	}
+
+	if t.Config.ShowsLog {
+		writers = append(writers, os.Stdout)
+	}
+
+	if len(writers) == 0 {
+		return io.Discard
+	}
+
+	return io.MultiWriter(writers...)
+}
+
+func resolveBinary() string {
+	bin := os.Getenv("EDGE_BINARY")
+	if bin != "" {
+		return bin
+	}
+	// fallback
+	return binaryName
 }

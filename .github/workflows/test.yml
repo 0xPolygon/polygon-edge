@@ -1,0 +1,28 @@
+---
+name: Test
+on:  # yamllint disable-line rule:truthy
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  go_test:
+    name: Polygon Edge
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.18.x
+
+      - name: Checkout Code
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      - name: Run Go Test
+        run: go test -coverprofile coverage.out -timeout 20m `go list ./... | grep -v e2e`
+
+      - name: Upload coverage file to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: coverage.out

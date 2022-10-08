@@ -1,0 +1,31 @@
+---
+name: E2E tests
+on:  # yamllint disable-line rule:truthy
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      E2E_TESTS: true
+      E2E_LOGS: true
+      CI_VERBOSE: true
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.18.x
+      - name: Run tests
+        run: make test-e2e
+      - name: Archive test logs
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: e2e-logs
+          path: e2e-logs-*/
+          retention-days: 30

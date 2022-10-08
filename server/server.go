@@ -128,7 +128,7 @@ func NewServer(config *Config) (*Server, error) {
 	}
 
 	m := &Server{
-		logger:             logger,
+		logger:             logger.Named("server"),
 		config:             config,
 		chain:              config.Chain,
 		grpcServer:         grpc.NewServer(),
@@ -147,6 +147,11 @@ func NewServer(config *Config) (*Server, error) {
 		m.prometheusServer = m.startPrometheusServer(config.Telemetry.PrometheusAddr)
 	} else {
 		m.serverMetrics = metricProvider("polygon", config.Chain.Name, false)
+	}
+
+	// Set up datadog profiler
+	if ddErr := m.enableDataDogProfiler(); err != nil {
+		m.logger.Error("DataDog profiler setup failed", "err", ddErr.Error())
 	}
 
 	// Set up the secrets manager
@@ -188,8 +193,11 @@ func NewServer(config *Config) (*Server, error) {
 	genesisRoot := m.executor.WriteGenesis(config.Chain.Genesis.Alloc)
 	config.Chain.Genesis.StateRoot = genesisRoot
 
+	// use the eip155 signer
+	signer := crypto.NewEIP155Signer(uint64(m.config.Chain.Params.ChainID))
+
 	// blockchain object
-	m.blockchain, err = blockchain.NewBlockchain(logger, m.config.DataDir, config.Chain, nil, m.executor)
+	m.blockchain, err = blockchain.NewBlockchain(logger, m.config.DataDir, config.Chain, nil, m.executor, signer)
 	if err != nil {
 		return nil, err
 	}
@@ -216,7 +224,6 @@ func NewServer(config *Config) (*Server, error) {
 			m.network,
 			m.serverMetrics.txpool,
 			&txpool.Config{
-				Sealing:             m.config.Seal,
 				MaxSlots:            m.config.MaxSlots,
 				PriceLimit:          m.config.PriceLimit,
 				MaxAccountEnqueued:  m.config.MaxAccountEnqueued,
@@ -227,8 +234,6 @@ func NewServer(config *Config) (*Server, error) {
 			return nil, err
 		}
 
-		// use the eip155 signer
-		signer := crypto.NewEIP155Signer(uint64(m.config.Chain.Params.ChainID))
 		m.txpool.SetSigner(signer)
 	}
 
@@ -404,7 +409,6 @@ func (s *Server) setupConsensus() error {
 	consensus, err := engine(
 		&consensus.Params{
 			Context:        context.Background(),
-			Seal:           s.config.Seal,
 			Config:         config,
 			TxPool:         s.txpool,
 			Network:        s.network,
@@ -559,6 +563,7 @@ func (s *Server) setupJSONRPC() error {
 		Store:                    hub,
 		Addr:                     s.config.JSONRPC.JSONRPCAddr,
 		ChainID:                  uint64(s.config.Chain.Params.ChainID),
+		ChainName:                s.chain.Name,
 		AccessControlAllowOrigin: s.config.JSONRPC.AccessControlAllowOrigin,
 		PriceLimit:               s.config.PriceLimit,
 		BatchLengthLimit:         s.config.JSONRPC.BatchLengthLimit,
@@ -635,6 +640,9 @@ func (s *Server) Close() {
 
 	// close the txpool's main loop
 	s.txpool.Close()
+
+	// close DataDog profiler
+	s.closeDataDogProfiler()
 }
 
 // Entry is a consensus configuration entry

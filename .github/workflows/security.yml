@@ -1,0 +1,26 @@
+---
+name: Security Scan
+on:  # yamllint disable-line rule:truthy
+  workflow_call: {}
+  workflow_dispatch: {}
+  schedule:
+    - cron: '0 0 * * 0'
+
+jobs:
+  gosec:
+    name: Gosec and Publish
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    env:
+      GO111MODULE: on  # yamllint disable-line rule:truthy
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@v2
+      - name: Run Gosec Security Scanner
+        uses: securego/gosec@master
+        with:
+          args: '-no-fail -fmt sarif -out results.sarif ./...'
+      - name: Upload SARIF file
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: results.sarif
