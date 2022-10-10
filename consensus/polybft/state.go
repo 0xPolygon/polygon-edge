@@ -10,6 +10,7 @@ import (
 
 	"github.com/0xPolygon/pbft-consensus"
 	"github.com/boltdb/bolt"
+	"github.com/hashicorp/go-hclog"
 
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
@@ -48,7 +49,7 @@ const (
 	// numberOfSnapshotsToLeaveInMemory defines a number of validator snapshots to leave in memory
 	numberOfSnapshotsToLeaveInMemory = 2
 	// numberOfSnapshotsToLeaveInMemory defines a number of validator snapshots to leave in db
-	numberOfSnapshotsToLeaveInDb = 10
+	numberOfSnapshotsToLeaveInDB = 10
 	// number of stateSyncEvents to be processed before a commitment message can be created and gossiped
 	stateSyncMainBundleSize = 5
 	// number of stateSyncEvents to be grouped into one StateTransaction
@@ -91,13 +92,27 @@ func decodeEvent(log *ethgo.Log) (*StateSyncEvent, error) {
 		return nil, err
 	}
 
-	id := raw["id"].(*big.Int).Uint64()
-	sender := raw["sender"].(ethgo.Address)
-	target := raw["target"].(ethgo.Address)
-	data := raw["data"].([]byte)
+	id, ok := raw["id"].(*big.Int)
+	if !ok {
+		return nil, fmt.Errorf("failed to decode id field of log: %+v", log)
+	}
 
-	stateSyncEvent := newStateSyncEvent(id, sender, target, data, log)
-	return stateSyncEvent, nil
+	sender, ok := raw["sender"].(ethgo.Address)
+	if !ok {
+		return nil, fmt.Errorf("failed to decode sender field of log: %+v", log)
+	}
+
+	target, ok := raw["target"].(ethgo.Address)
+	if !ok {
+		return nil, fmt.Errorf("failed to decode target field of log: %+v", log)
+	}
+
+	data, ok := raw["data"].([]byte)
+	if !ok {
+		return nil, fmt.Errorf("failed to decode data field of log: %+v", log)
+	}
+
+	return newStateSyncEvent(id.Uint64(), sender, target, data, log), nil
 }
 
 func (s *StateSyncEvent) String() string {
@@ -148,28 +163,31 @@ var (
 
 // State represents a persistence layer which persists consensus data off-chain
 type State struct {
-	db *bolt.DB
+	db     *bolt.DB
+	logger hclog.Logger
 }
 
-func newState(path string) (*State, error) {
+func newState(path string, logger hclog.Logger) (*State, error) {
 	db, err := bolt.Open(path, 0666, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	err = initMainDbBuckets(db)
+	err = initMainDBBuckets(db)
 	if err != nil {
 		return nil, err
 	}
 
 	state := &State{
-		db: db,
+		db:     db,
+		logger: logger.Named("state"),
 	}
+
 	return state, nil
 }
 
-// initMainDbBuckets creates predefined buckets in bolt database if they don't exist already.
-func initMainDbBuckets(db *bolt.DB) error {
+// initMainDBBuckets creates predefined buckets in bolt database if they don't exist already.
+func initMainDBBuckets(db *bolt.DB) error {
 	// init the buckets
 	err := db.Update(func(tx *bolt.Tx) error {
 		for _, bucket := range parentBuckets {
@@ -177,8 +195,10 @@ func initMainDbBuckets(db *bolt.DB) error {
 				return err
 			}
 		}
+
 		return nil
 	})
+
 	return err
 }
 
@@ -191,6 +211,7 @@ func (s *State) insertValidatorSnapshot(epoch uint64, validatorSnapshot AccountS
 		}
 
 		bucket := tx.Bucket(validatorSnapshotsBucket)
+
 		return bucket.Put(itob(epoch), raw)
 	})
 }
@@ -198,12 +219,14 @@ func (s *State) insertValidatorSnapshot(epoch uint64, validatorSnapshot AccountS
 // getValidatorSnapshot queries the validator snapshot for given epoch from db
 func (s *State) getValidatorSnapshot(epoch uint64) (AccountSet, error) {
 	var validatorSnapshot AccountSet
+
 	err := s.db.View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(validatorSnapshotsBucket)
 		v := bucket.Get(itob(epoch))
 		if v != nil {
 			return validatorSnapshot.Unmarshal(v)
 		}
+
 		return nil
 	})
 
@@ -221,12 +244,14 @@ func (s *State) list() ([]*StateSyncEvent, error) {
 				return err
 			}
 			events = append(events, event)
+
 			return nil
 		})
 	})
 	if err != nil {
 		return nil, err
 	}
+
 	return events, nil
 }
 
@@ -239,6 +264,7 @@ func (s *State) insertStateSyncEvent(event *StateSyncEvent) error {
 		}
 
 		bucket := tx.Bucket(syncStateEventsBucket)
+
 		return bucket.Put(itob(event.ID), raw)
 	})
 }
@@ -247,6 +273,7 @@ func (s *State) insertStateSyncEvent(event *StateSyncEvent) error {
 // if there is an event with index that can not be found in db in given range, an error is returned
 func (s *State) getStateSyncEventsForCommitment(fromIndex, toIndex uint64) ([]*StateSyncEvent, error) {
 	var events []*StateSyncEvent
+
 	err := s.db.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(syncStateEventsBucket)
 		for i := fromIndex; i < toIndex; i++ {
@@ -262,8 +289,10 @@ func (s *State) getStateSyncEventsForCommitment(fromIndex, toIndex uint64) ([]*S
 
 			events = append(events, event)
 		}
+
 		return nil
 	})
+
 	return events, err
 }
 
@@ -275,6 +304,7 @@ func (s *State) insertEpoch(epoch uint64) error {
 			return err
 		}
 		_, err = epochBucket.CreateBucketIfNotExists(messageVotesBucket)
+
 		return err
 	})
 }
@@ -283,6 +313,7 @@ func (s *State) insertEpoch(epoch uint64) error {
 func (s *State) isEpochInserted(epoch uint64) bool {
 	return s.db.View(func(tx *bolt.Tx) error {
 		_, err := getEpochBucket(tx, epoch)
+
 		return err
 	}) == nil
 }
@@ -306,13 +337,16 @@ func (s *State) insertCommitmentMessage(commitment *CommitmentMessageSigned) err
 // getCommitmentMessage queries the signed commitment from the db
 func (s *State) getCommitmentMessage(toIndex uint64) (*CommitmentMessageSigned, error) {
 	var commitment *CommitmentMessageSigned
+
 	err := s.db.View(func(tx *bolt.Tx) error {
 		raw := tx.Bucket(commitmentsBucket).Get(itob(toIndex))
 		if raw == nil {
 			return nil
 		}
+
 		return json.Unmarshal(raw, &commitment)
 	})
+
 	return commitment, err
 }
 
@@ -320,6 +354,7 @@ func (s *State) getCommitmentMessage(toIndex uint64) (*CommitmentMessageSigned, 
 // (commitments whose toIndex is greater than or equal to startIndex)
 func (s *State) getNonExecutedCommitments(startIndex uint64) ([]*CommitmentMessageSigned, error) {
 	var commitments []*CommitmentMessageSigned
+
 	err := s.db.View(func(tx *bolt.Tx) error {
 		c := tx.Bucket(commitmentsBucket).Cursor()
 
@@ -402,6 +437,7 @@ func (s *State) insertBundles(bundles []*BundleProof) error {
 // getBundles gets bundles that are not executed
 func (s *State) getBundles(stateSyncExecutionIndex, maxNumberOfBundles uint64) ([]*BundleProof, error) {
 	var bundles []*BundleProof
+
 	err := s.db.View(func(tx *bolt.Tx) error {
 		c := tx.Bucket(bundlesBucket).Cursor()
 		processed := uint64(0)
@@ -426,6 +462,7 @@ func (s *State) getBundles(stateSyncExecutionIndex, maxNumberOfBundles uint64) (
 // insertMessageVote inserts given vote to signatures bucket of given epoch
 func (s *State) insertMessageVote(epoch uint64, key []byte, vote *MessageSignature) (int, error) {
 	var numSignatures int
+
 	err := s.db.Update(func(tx *bolt.Tx) error {
 		signatures, err := s.getMessageVotesLocked(tx, epoch, key)
 		if err != nil {
@@ -436,6 +473,7 @@ func (s *State) insertMessageVote(epoch uint64, key []byte, vote *MessageSignatu
 		for _, sigs := range signatures {
 			if sigs.From == vote.From {
 				numSignatures = len(signatures)
+
 				return nil
 			}
 		}
@@ -460,28 +498,35 @@ func (s *State) insertMessageVote(epoch uint64, key []byte, vote *MessageSignatu
 		if err := bucket.Put(key, raw); err != nil {
 			return err
 		}
+
 		return nil
 	})
+
 	if err != nil {
 		return 0, err
 	}
+
 	return numSignatures, nil
 }
 
 // getMessageVotes gets all signatures from db associated with given epoch and hash
 func (s *State) getMessageVotes(epoch uint64, hash []byte) ([]*MessageSignature, error) {
 	var signatures []*MessageSignature
+
 	err := s.db.View(func(tx *bolt.Tx) error {
 		res, err := s.getMessageVotesLocked(tx, epoch, hash)
 		if err != nil {
 			return err
 		}
 		signatures = res
+
 		return nil
 	})
+
 	if err != nil {
 		return nil, err
 	}
+
 	return signatures, nil
 }
 
@@ -491,14 +536,17 @@ func (s *State) getMessageVotesLocked(tx *bolt.Tx, epoch uint64, hash []byte) ([
 	if err != nil {
 		return nil, err
 	}
+
 	v := bucket.Get(hash)
 	if v == nil {
 		return nil, nil
 	}
+
 	var signatures []*MessageSignature
 	if err := json.Unmarshal(v, &signatures); err != nil {
 		return nil, err
 	}
+
 	return signatures, nil
 }
 
@@ -510,6 +558,7 @@ func getNestedBucketInEpoch(tx *bolt.Tx, epoch uint64, bucketKey []byte) (*bolt.
 	}
 
 	bucket := epochBucket.Bucket(bucketKey)
+
 	if epochBucket == nil {
 		return nil, fmt.Errorf("could not find %v bucket for epoch: %v", string(bucketKey), epoch)
 	}
@@ -523,31 +572,33 @@ func getEpochBucket(tx *bolt.Tx, epoch uint64) (*bolt.Bucket, error) {
 	if epochBucket == nil {
 		return nil, fmt.Errorf("could not find bucket for epoch: %v", epoch)
 	}
+
 	return epochBucket, nil
 }
 
-// cleanEpochsFromDb cleans epoch buckets from db
-func (s *State) cleanEpochsFromDb() error {
+// cleanEpochsFromDB cleans epoch buckets from db
+func (s *State) cleanEpochsFromDB() error {
 	return s.db.Update(func(tx *bolt.Tx) error {
 		if err := tx.DeleteBucket(epochsBucket); err != nil {
 			return err
 		}
 		_, err := tx.CreateBucket(epochsBucket)
+
 		return err
 	})
 }
 
-// cleanValidatorSnapshotsFromDb cleans the validator snapshots bucket if a limit is reached,
+// cleanValidatorSnapshotsFromDB cleans the validator snapshots bucket if a limit is reached,
 // but it leaves the latest (n) number of snapshots
-func (s *State) cleanValidatorSnapshotsFromDb(epoch uint64) error {
+func (s *State) cleanValidatorSnapshotsFromDB(epoch uint64) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(validatorSnapshotsBucket)
 
 		// paired list
 		keys := make([][]byte, 0)
 		values := make([][]byte, 0)
-		if numberOfSnapshotsToLeaveInDb > 0 { // TODO this is always true?!
-			for i := 0; i < numberOfSnapshotsToLeaveInDb; i++ { // exclude the last inserted we already appended
+		if numberOfSnapshotsToLeaveInDB > 0 { // TODO this is always true?!
+			for i := 0; i < numberOfSnapshotsToLeaveInDB; i++ { // exclude the last inserted we already appended
 				key := itob(epoch)
 				value := bucket.Get(key)
 				if value == nil {
@@ -596,31 +647,34 @@ func (s *State) removeAllValidatorSnapshots() error {
 		if err != nil {
 			return err
 		}
+
 		return nil
 	})
 }
 
-// epochsDbStats returns stats of epochs bucket in db
-func (s *State) epochsDbStats() *bolt.BucketStats {
+// epochsDBStats returns stats of epochs bucket in db
+func (s *State) epochsDBStats() *bolt.BucketStats {
 	return s.bucketStats(epochsBucket)
 }
 
-// validatorSnapshotsDbStats returns stats of validators snapshot bucket in db
-func (s *State) validatorSnapshotsDbStats() *bolt.BucketStats {
+// validatorSnapshotsDBStats returns stats of validators snapshot bucket in db
+func (s *State) validatorSnapshotsDBStats() *bolt.BucketStats {
 	return s.bucketStats(validatorSnapshotsBucket)
 }
 
 // bucketStats returns stats for the given bucket in db
 func (s *State) bucketStats(bucketName []byte) *bolt.BucketStats {
 	var stats *bolt.BucketStats
+
 	err := s.db.View(func(tx *bolt.Tx) error {
 		s := tx.Bucket(bucketName).Stats()
 		stats = &s
+
 		return nil
 	})
+
 	if err != nil {
-		// TO DO Nemanja - fix this
-		// log.Error(fmt.Sprintf("Cannot check bucket stats. Error: %s", err))
+		s.logger.Error("Cannot check bucket stats", "Bucket name", string(bucketName), "Error", err)
 	}
 
 	return stats
@@ -629,6 +683,7 @@ func (s *State) bucketStats(bucketName []byte) *bolt.BucketStats {
 func itob(v uint64) []byte {
 	b := make([]byte, 8)
 	binary.BigEndian.PutUint64(b, v)
+
 	return b
 }
 

@@ -246,6 +246,7 @@ func TestExtra_VerifyCommittedFieldsRandom(t *testing.T) {
 	msgHash := types.Hash{0x1}
 
 	var signature bls.Signatures
+
 	bitmap := bitmap.Bitmap{}
 	valIndxsRnd := mrand.Perm(numValidators)[:numValidators*2/3+1]
 
@@ -262,6 +263,7 @@ func TestExtra_VerifyCommittedFieldsRandom(t *testing.T) {
 
 	aggs, err := signature.Aggregate().Marshal()
 	require.NoError(t, err)
+
 	s := &Signature{
 		AggregatedSignature: aggs,
 		Bitmap:              bitmap,
@@ -325,13 +327,13 @@ func TestExtra_CreateValidatorSetDelta_BlsDiffer(t *testing.T) {
 
 	// change the public bls key of 'B'
 	newValidatorSet := vals.getPublicIdentities("B", "E", "F")
-	privk, err := bls.GenerateBlsKey()
+	privateKey, err := bls.GenerateBlsKey()
 	require.NoError(t, err)
-	newValidatorSet[0].BlsKey = privk.PublicKey()
+
+	newValidatorSet[0].BlsKey = privateKey.PublicKey()
 
 	delta := createValidatorSetDelta(hclog.NewNullLogger(), oldValidatorSet, newValidatorSet)
 	assert.Len(t, delta.Added, 2)
-
 }
 
 func TestExtra_InitGenesisValidatorsDelta(t *testing.T) {
@@ -392,6 +394,7 @@ func TestValidatorSetDelta_Copy(t *testing.T) {
 		originalValidatorsCount = 10
 		addedValidatorsCount    = 2
 	)
+
 	oldValidatorSet := newTestValidators(originalValidatorsCount).getPublicIdentities()
 	newValidatorSet := oldValidatorSet[:len(oldValidatorSet)-2]
 	originalDelta := createValidatorSetDelta(hclog.NewNullLogger(), oldValidatorSet, newValidatorSet)

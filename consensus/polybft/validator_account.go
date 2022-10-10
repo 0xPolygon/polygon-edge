@@ -4,8 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"reflect"
+
+	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 
 	"github.com/0xPolygon/pbft-consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
@@ -24,19 +25,19 @@ func (a ValidatorAccount) Equals(b *ValidatorAccount) bool {
 	if b == nil {
 		return false
 	}
+
 	return a.Address == b.Address && reflect.DeepEqual(a.BlsKey, b.BlsKey)
 }
 
 // Copy returns a deep copy of ValidatorAccount
 func (a ValidatorAccount) Copy() *ValidatorAccount {
 	copiedBlsKey := a.BlsKey.Marshal()
-	blsk, _ := bls.UnmarshalPublicKey(copiedBlsKey)
+	blsKey, _ := bls.UnmarshalPublicKey(copiedBlsKey)
 
-	newAccount := &ValidatorAccount{
+	return &ValidatorAccount{
 		Address: types.BytesToAddress(a.Address[:]),
-		BlsKey:  blsk,
+		BlsKey:  blsKey,
 	}
-	return newAccount
 }
 
 // MarshalRLPWith marshals ValidatorAccount to the RLP format
@@ -46,6 +47,7 @@ func (a ValidatorAccount) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 	vv.Set(ar.NewBytes(a.Address.Bytes()))
 	// BlsKey
 	vv.Set(ar.NewCopyBytes(a.BlsKey.Marshal()))
+
 	return vv
 }
 
@@ -55,6 +57,7 @@ func (a *ValidatorAccount) UnmarshalRLPWith(v *fastrlp.Value) error {
 	if err != nil {
 		return err
 	}
+
 	if num := len(elems); num != 2 {
 		return fmt.Errorf("not enough elements to decode validator account, expected 2 but found %d", num)
 	}
@@ -62,7 +65,7 @@ func (a *ValidatorAccount) UnmarshalRLPWith(v *fastrlp.Value) error {
 	{
 		addressRaw, err := elems[0].GetBytes(nil)
 		if err != nil {
-			return fmt.Errorf("expected 'Address' field encoded as bytes. Error: %v", err)
+			return fmt.Errorf("expected 'Address' field encoded as bytes. Error: %w", err)
 		}
 		a.Address = types.BytesToAddress(addressRaw)
 	}
@@ -70,13 +73,14 @@ func (a *ValidatorAccount) UnmarshalRLPWith(v *fastrlp.Value) error {
 	{
 		blsKeyRaw, err := elems[1].GetBytes(nil)
 		if err != nil {
-			return fmt.Errorf("expected 'BlsKey' encoded as bytes. Error: %v", err)
+			return fmt.Errorf("expected 'BlsKey' encoded as bytes. Error: %w", err)
 		}
 		a.BlsKey, err = bls.UnmarshalPublicKey(blsKeyRaw)
 		if err != nil {
-			return fmt.Errorf("failed to unmarshal BLS public key. Error: %v", err)
+			return fmt.Errorf("failed to unmarshal BLS public key. Error: %w", err)
 		}
 	}
+
 	return nil
 }
 
@@ -95,6 +99,7 @@ func (as AccountSet) GetAddresses() []types.Address {
 	for _, account := range as {
 		res = append(res, account.Address)
 	}
+
 	return res
 }
 
@@ -104,6 +109,7 @@ func (as AccountSet) GetBlsKeys() []*bls.PublicKey {
 	for _, account := range as {
 		res = append(res, account.BlsKey)
 	}
+
 	return res
 }
 
@@ -119,6 +125,7 @@ func (as AccountSet) ContainsNodeID(nodeID pbft.NodeID) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -135,6 +142,7 @@ func (as AccountSet) Index(addr types.Address) int {
 			return indx
 		}
 	}
+
 	return -1
 }
 
@@ -144,6 +152,7 @@ func (as AccountSet) Copy() AccountSet {
 	for i, acc := range as {
 		copiedAccs[i] = acc.Copy()
 	}
+
 	return AccountSet(copiedAccs)
 }
 
@@ -154,6 +163,7 @@ func (as AccountSet) GetValidatorAccount(address types.Address) *ValidatorAccoun
 	if i == -1 {
 		return nil
 	}
+
 	return as[i]
 }
 
@@ -179,13 +189,13 @@ func (as AccountSet) GetFilteredValidators(bitmap bitmap.Bitmap) (AccountSet, er
 			filteredValidators = append(filteredValidators, validator)
 		}
 	}
+
 	return filteredValidators, nil
 }
 
 // ApplyDelta receives ValidatorSetDelta and applies it to the values from the current AccountSet
 // (removes the ones marked for deletion and adds the one which are being added by delta)
 // Function returns new AccountSet with old and new data merged. AccountSet is immutable!
-// TODO Nemanja
 func (as AccountSet) ApplyDelta(validatorsDelta *ValidatorSetDelta) (AccountSet, error) {
 	if validatorsDelta == nil || validatorsDelta.IsEmpty() {
 		return as.Copy(), nil
@@ -193,7 +203,8 @@ func (as AccountSet) ApplyDelta(validatorsDelta *ValidatorSetDelta) (AccountSet,
 
 	// Figure out which validators from the existing set are not marked for deletion.
 	// Those should be kept in the snapshot.
-	var validators AccountSet
+	validators := make(AccountSet, 0)
+
 	for i, validator := range as {
 		// If a validator is not in the Removed set, or it is in the Removed set
 		// but it exists in the Added set as well (which should never happen),
@@ -209,9 +220,10 @@ func (as AccountSet) ApplyDelta(validatorsDelta *ValidatorSetDelta) (AccountSet,
 		if validators.ContainsAddress(addedValidator.Address) {
 			return nil, fmt.Errorf("validator %v is already present in the validators snapshot", addedValidator.Address.String())
 		}
+
 		validators = append(validators, addedValidator)
 	}
-	// log.Trace("[ApplyDelta]", "Validators Snapshot", validators)
+
 	return validators, nil
 }
 

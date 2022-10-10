@@ -2,6 +2,7 @@ package polybft
 
 import (
 	"fmt"
+
 	"github.com/hashicorp/go-hclog"
 
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
@@ -393,6 +394,7 @@ func GetIbftExtra(extraB []byte) (*Extra, error) {
 // createValidatorSetDelta calculates ValidatorSetDelta based on the provided old and new validator sets
 func createValidatorSetDelta(log hclog.Logger, oldValidatorSet, newValidatorSet AccountSet) *ValidatorSetDelta {
 	var addedValidators AccountSet
+
 	removedValidators := make(map[types.Address]int)
 	oldValidatorSetMap := make(map[types.Address]*ValidatorAccount)
 
@@ -402,6 +404,7 @@ func createValidatorSetDelta(log hclog.Logger, oldValidatorSet, newValidatorSet 
 			oldValidatorSetMap[validator.Address] = validator
 		}
 	}
+
 	for _, newValidator := range newValidatorSet {
 		// Check if the validator is among both old and new validator set
 		oldValidator, ok := oldValidatorSetMap[newValidator.Address]

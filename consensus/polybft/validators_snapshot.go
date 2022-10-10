@@ -48,6 +48,7 @@ func (v *validatorsSnapshotCache) GetSnapshot(blockNumber uint64, parents []*typ
 	v.logger.Trace("Retrieving snapshot started...", "Block", blockNumber, "Epoch", epochNumber)
 
 	var snapshot AccountSet
+
 	currentEpochNumber := epochNumber
 
 	for ; ; currentEpochNumber-- {
@@ -91,7 +92,7 @@ func (v *validatorsSnapshotCache) GetSnapshot(blockNumber uint64, parents []*typ
 		// log.Trace("Building validators snapshot from scratch...")
 		initialSnapshot, err := v.computeSnapshot(nil, 0, parents)
 		if err != nil {
-			return nil, fmt.Errorf("failed to compute snapshot for epoch 0: %v", err)
+			return nil, fmt.Errorf("failed to compute snapshot for epoch 0: %w", err)
 		}
 
 		snapshot = initialSnapshot
@@ -99,7 +100,7 @@ func (v *validatorsSnapshotCache) GetSnapshot(blockNumber uint64, parents []*typ
 		// (and there might be use case to require snapshot for the genesis block, i.e. epoch 0)
 		err = v.storeSnapshot(0, initialSnapshot)
 		if err != nil {
-			return nil, fmt.Errorf("failed to store validators snapshot for epoch 0: %v", err)
+			return nil, fmt.Errorf("failed to store validators snapshot for epoch 0: %w", err)
 		}
 
 		v.logger.Trace("Built validators snapshot")
@@ -122,7 +123,7 @@ func (v *validatorsSnapshotCache) GetSnapshot(blockNumber uint64, parents []*typ
 
 		intermediateSnapshot, err := v.computeSnapshot(snapshot, endEpochBlockNumber, parents)
 		if err != nil {
-			return nil, fmt.Errorf("failed to compute snapshot for epoch %d: %v", currentEpochNumber, err)
+			return nil, fmt.Errorf("failed to compute snapshot for epoch %d: %w", currentEpochNumber, err)
 		}
 
 		snapshot = intermediateSnapshot
@@ -132,7 +133,7 @@ func (v *validatorsSnapshotCache) GetSnapshot(blockNumber uint64, parents []*typ
 	if deltasCount > 0 {
 		err := v.storeSnapshot(currentEpochNumber, snapshot)
 		if err != nil {
-			return nil, fmt.Errorf("failed to store validators snapshot for epoch %d: %v", currentEpochNumber, err)
+			return nil, fmt.Errorf("failed to store validators snapshot for epoch %d: %w", currentEpochNumber, err)
 		}
 	}
 
@@ -183,7 +184,7 @@ func (v *validatorsSnapshotCache) computeSnapshot(
 
 	extra, err := GetIbftExtra(header.ExtraData)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode extra from the block#%d: %v", header.Number, err)
+		return nil, fmt.Errorf("failed to decode extra from the block#%d: %w", header.Number, err)
 	}
 
 	snapshot := existingSnapshot
@@ -193,7 +194,7 @@ func (v *validatorsSnapshotCache) computeSnapshot(
 
 	snapshot, err = snapshot.ApplyDelta(extra.Validators)
 	if err != nil {
-		return nil, fmt.Errorf("failed to apply delta to the validators snapshot, block#%d: %v", header.Number, err)
+		return nil, fmt.Errorf("failed to apply delta to the validators snapshot, block#%d: %w", header.Number, err)
 	}
 
 	v.logger.Trace("Computed snapshot",
@@ -208,8 +209,9 @@ func (v *validatorsSnapshotCache) computeSnapshot(
 func (v *validatorsSnapshotCache) storeSnapshot(epoch uint64, snapshot AccountSet) error {
 	copySnap := snapshot.Copy()
 	v.snapshots[epoch] = copySnap
+
 	if err := v.state.insertValidatorSnapshot(epoch, copySnap); err != nil {
-		return fmt.Errorf("failed to insert validator snapshot for epoch %d to the database: %v", epoch, err)
+		return fmt.Errorf("failed to insert validator snapshot for epoch %d to the database: %w", epoch, err)
 	}
 
 	v.logger.Trace("Store snapshot", "Snapshots", v.snapshots)
@@ -241,7 +243,7 @@ func (v *validatorsSnapshotCache) cleanup() error {
 
 		v.snapshots = cache
 
-		return v.state.cleanValidatorSnapshotsFromDb(latestEpoch)
+		return v.state.cleanValidatorSnapshotsFromDB(latestEpoch)
 	}
 
 	return nil

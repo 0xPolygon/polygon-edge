@@ -27,7 +27,9 @@ func (e *eventTracker) start() error {
 	if err != nil {
 		return err
 	}
+
 	store, err := boltdbStore.New(filepath.Join(e.dataDir, "/deposit.db"))
+
 	if err != nil {
 		return err
 	}
@@ -62,6 +64,7 @@ func (e *eventTracker) start() error {
 					if len(evnt.Removed) != 0 {
 						panic("this will not happen anymore after tracker v2")
 					}
+
 					for _, log := range evnt.Added {
 						e.subscriber.AddLog(log)
 					}

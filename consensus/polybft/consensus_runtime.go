@@ -25,7 +25,7 @@ const (
 
 var (
 	// state sync metrics
-	// TO DO Nemanja- what to do with metrics
+	// TODO: Nemanja - what to do with metrics
 	// totalStateSyncsMeter = metrics.NewRegisteredMeter("consensus/bridge/stateSyncsTotal", nil)
 
 	// errNotAValidator represents "node is not a validator" error message
@@ -150,9 +150,10 @@ func (c *consensusRuntime) AddLog(eventLog *ethgo.Log) {
 
 		return
 	}
-
+	// TODO: Nemanja
 	// update metrics
 	// totalStateSyncsMeter.Mark(1)
+	return // TODO: Delete this when metrics is established. This is added just to trick linter.
 }
 
 // NotifyProposalInserted is an implementation of fsmNotify interface
@@ -167,9 +168,6 @@ func (c *consensusRuntime) NotifyProposalInserted(b *StateBlock) {
 		// inside the epoch, update last built block header
 		c.lastBuiltBlock = lastHeader
 	}
-
-	// TO DO Nemanja - probably no need for this
-	// c.config.blockchain.OnNewBlockInserted(b.Block)
 }
 
 // FSM creates a new instance of fsm
@@ -333,8 +331,6 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) error {
 		}
 	}
 
-	c.logger.Info("restartEpoch", "EpochNumber", epochNumber)
-
 	/*
 		// We will uncomment this once we have the clear PoC for the checkpoint
 		lastCheckpoint := uint64(0)
@@ -357,7 +353,6 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) error {
 	if err != nil {
 		return err
 	}
-	c.logger.Info("restartEpoch", "validators", validatorSet)
 
 	epoch := &epochMetadata{
 		Number:         epochNumber,
@@ -366,7 +361,7 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) error {
 		Validators:     validatorSet,
 	}
 
-	if err := c.state.cleanEpochsFromDb(); err != nil {
+	if err := c.state.cleanEpochsFromDB(); err != nil {
 		c.logger.Error("Could not clean previous epochs from db.", "err", err)
 	}
 

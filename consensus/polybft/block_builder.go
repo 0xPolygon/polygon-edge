@@ -75,9 +75,11 @@ func NewBlockBuilder(params *BlockBuilderParams) *BlockBuilder {
 	if len(params.Extra) > signer.IstanbulExtraVanity {
 		params.Extra = params.Extra[:signer.IstanbulExtraVanity]
 	}
+
 	if params.Extra == nil {
 		params.Extra = make([]byte, 0)
 	}
+
 	if params.BlockTime == 0 {
 		params.BlockTime = time.Second * 2 // TODO: is this ok?
 	}

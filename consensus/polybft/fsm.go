@@ -119,7 +119,6 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 		// }
 		validatorsDelta, err := f.getValidatorSetDelta(f.blockBuilder.GetState())
 		if err != nil {
-			f.logger.Error("BuildProposal", "Error", err)
 			return nil, err
 		}
 
@@ -128,7 +127,7 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 	}
 
 	if f.config.IsBridgeEnabled() {
-		// TO DO Nemanja - no transactions for now
+		// TODO: Nemanja - no transactions for now
 		// for _, tx := range f.stateTransactions() {
 		// 	if err := f.blockBuilder.CommitTransaction(tx); err != nil {
 		// 		return nil, fmt.Errorf("failed to commit state transaction. Error: %v", err)
@@ -186,8 +185,10 @@ func (f *fsm) stateTransactions() []*types.Transaction {
 			inputData, err := f.proposerCommitmentToRegister.EncodeAbi()
 			if err != nil {
 				f.logger.Error("StateTransactions failed to encode input data for state sync commitment registration", "Error", err)
+
 				return nil
 			}
+
 			txns = append(txns,
 				createStateTransactionWithData(f.config.SidechainBridgeAddr, inputData, stateTransactionsGasLimit))
 
@@ -202,14 +203,17 @@ func (f *fsm) stateTransactions() []*types.Transaction {
 			inputData, err := bundle.EncodeAbi()
 			if err != nil {
 				f.logger.Error("stateTransactions failed to encode input data for state sync execution", "Error", err)
+
 				return nil
 			}
+
 			txns = append(txns,
 				createStateTransactionWithData(f.config.SidechainBridgeAddr, inputData, stateTransactionsGasLimit))
 		}
 	}
 
 	f.logger.Debug("Apply state transaction", "num", len(txns))
+
 	return txns
 }
 
@@ -220,6 +224,7 @@ func (f *fsm) createValidatorsUptimeTx() (*types.Transaction, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return createStateTransactionWithData(f.config.ValidatorSetAddr, input, stateTransactionsGasLimit), nil
 }
 
@@ -310,6 +315,7 @@ func (f *fsm) Validate(proposal *pbft.Proposal) error {
 
 	f.block = builtBlock
 	f.proposal = proposal
+
 	return nil
 }
 
@@ -319,6 +325,7 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 		if err != nil {
 			return err
 		}
+
 		if len(transactions) > 0 {
 			transactions = transactions[1:]
 		}
@@ -326,20 +333,20 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 
 	commitmentMessageSignedExists := false
 	nextStateSyncBundleIndex := f.stateSyncExecutionIndex
+
 	for _, tx := range transactions {
 		// TO DO Nemanja - fix this with transactions
 		// skip if transaction is not of types.StateTransactionType type
 		// if tx.Type != types.StateTransactionType {
 		// 	continue
 		// }
-
 		if !f.isEndOfSprint {
 			return fmt.Errorf("state transaction in block which should not contain it: tx = %v", tx.Hash)
 		}
 
 		decodedStateTx, err := decodeStateTransaction(tx.Input) // used to be Data
 		if err != nil {
-			return fmt.Errorf("state transaction error while decoding: tx = %v, err = %v", tx.Hash, err)
+			return fmt.Errorf("state transaction error while decoding: tx = %v, err = %w", tx.Hash, err)
 		}
 
 		switch stateTxData := decodedStateTx.(type) {
@@ -350,8 +357,9 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 
 			commitmentMessageSignedExists = true
 			signers, err := f.validators.Accounts().GetFilteredValidators(stateTxData.AggSignature.Bitmap)
+
 			if err != nil {
-				return fmt.Errorf("error for state transaction while retrieving signers: tx = %v, error = %v", tx.Hash, err)
+				return fmt.Errorf("error for state transaction while retrieving signers: tx = %v, error = %w", tx.Hash, err)
 			}
 
 			if len(signers) < getQuorumSize(f.validators.Len()) {
@@ -360,7 +368,7 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 
 			aggs, err := bls.UnmarshalSignature(stateTxData.AggSignature.AggregatedSignature)
 			if err != nil {
-				return fmt.Errorf("error for state transaction while unmarshaling signature: tx = %v, error = %v", tx.Hash, err)
+				return fmt.Errorf("error for state transaction while unmarshaling signature: tx = %v, error = %w", tx.Hash, err)
 			}
 
 			verified := aggs.VerifyAggregated(signers.GetBlsKeys(), stateTxData.Message.Hash().Bytes())
@@ -379,13 +387,16 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 			nextStateSyncBundleIndex = stateTxData.StateSyncs[len(stateTxData.StateSyncs)-1].ID + 1
 
 			isVerified := false
+
 			for _, commitment := range f.commitmentsToVerifyBundles {
 				if commitment.Message.ContainsStateSync(stateTxData.ID()) {
 					isVerified = true
+
 					if err := commitment.Message.VerifyProof(stateTxData); err != nil {
-						return fmt.Errorf("state transaction error while validating proof: tx = %v, err = %v",
+						return fmt.Errorf("state transaction error while validating proof: tx = %v, err = %w",
 							tx.Hash, err)
 					}
+
 					break
 				}
 			}
@@ -396,6 +407,7 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 			}
 		}
 	}
+
 	return nil
 }
 
@@ -404,7 +416,6 @@ func (f *fsm) Insert(p *pbft.SealedProposal) error {
 	// In this function we should try to return little to no errors since
 	// at this point everything we have to do is just commit something that
 	// we should have already computed beforehand.
-
 	extra, _ := GetIbftExtra(f.block.Block.Header.ExtraData)
 
 	// create map for faster access to indexes
@@ -417,6 +428,7 @@ func (f *fsm) Insert(p *pbft.SealedProposal) error {
 	// also populate slice of signatures
 	bitmap := bitmap.Bitmap{}
 	signatures := make(bls.Signatures, 0, len(p.CommittedSeals))
+
 	for _, commSeal := range p.CommittedSeals {
 		index, exists := nodeIDIndexMap[commSeal.NodeID]
 		if !exists {
@@ -427,13 +439,15 @@ func (f *fsm) Insert(p *pbft.SealedProposal) error {
 		if err != nil {
 			return fmt.Errorf("invalid signature = %s", commSeal.Signature)
 		}
+
 		signatures = append(signatures, s)
+
 		bitmap.Set(uint64(index))
 	}
 
 	aggregatedSignature, err := signatures.Aggregate().Marshal()
 	if err != nil {
-		return fmt.Errorf("could not aggregate seals: %v", err.Error())
+		return fmt.Errorf("could not aggregate seals: %w", err)
 	}
 
 	// include aggregated signature of all committed seals
@@ -475,15 +489,13 @@ func (f *fsm) IsStuck(num uint64) (uint64, bool) {
 // getValidatorSetDelta calculates validator set delta based on parent and current header
 func (f *fsm) getValidatorSetDelta(pendingBlockState *state.Transition) (*ValidatorSetDelta, error) {
 	provider := f.backend.GetStateProvider(pendingBlockState)
-	f.logger.Info("getValidatorSetDelta 1")
 	systemState := f.backend.GetSystemState(f.config, provider)
-	f.logger.Info("getValidatorSetDelta 2")
 	newValidators, err := systemState.GetValidatorSet()
-	f.logger.Info("getValidatorSetDelta 3", "Validators", newValidators)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve validator set for current block %w", err)
 	}
+
 	return CreateValidatorSetDelta(f.logger, f.validators.Accounts(), newValidators), nil
 }
 
@@ -503,6 +515,7 @@ func (f *fsm) verifyValidatorsUptimeTx(transactions []*types.Transaction) error 
 		if blockUptimeTx == nil {
 			return errors.New("uptime transaction is not found in the epoch ending block")
 		}
+
 		if blockUptimeTx.Hash != createdUptimeTx.Hash {
 			return fmt.Errorf(
 				"invalid uptime transaction. Expected '%s', but got '%s' uptime transaction hash",
@@ -515,6 +528,7 @@ func (f *fsm) verifyValidatorsUptimeTx(transactions []*types.Transaction) error 
 			return errors.New("didn't expect uptime transaction in the middle of an epoch")
 		}
 	}
+
 	return nil
 }
 
@@ -539,5 +553,6 @@ func validateHeaderFields(parent *types.Header, header *types.Header) error {
 	if header.Difficulty <= 0 {
 		return fmt.Errorf("difficulty should be greater than zero")
 	}
+
 	return nil
 }

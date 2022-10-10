@@ -6,7 +6,6 @@ import (
 	consensusDev "github.com/0xPolygon/polygon-edge/consensus/dev"
 	consensusDummy "github.com/0xPolygon/polygon-edge/consensus/dummy"
 	consensusIBFT "github.com/0xPolygon/polygon-edge/consensus/ibft"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	consensusPolyBFT "github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/secrets/awsssm"
@@ -44,7 +43,7 @@ var secretsManagerBackends = map[secrets.SecretsManagerType]secrets.SecretsManag
 }
 
 var genesisCreationFactory = map[ConsensusType]GenesisFactoryHook{
-	PolyBFTConsensus: polybft.GenesisPostHookFactory,
+	PolyBFTConsensus: consensusPolyBFT.GenesisPostHookFactory,
 }
 
 func ConsensusSupported(value string) bool {

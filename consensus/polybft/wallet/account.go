@@ -39,7 +39,7 @@ func GenerateNewAccountFromSecret(secretManager secrets.SecretsManager, key stri
 	// read account
 	accountBytes, err := secretManager.GetSecret(key)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read account data. Error: %v", err)
+		return nil, fmt.Errorf("failed to read account data: %w", err)
 	}
 
 	return newAccountFromBytes(accountBytes)

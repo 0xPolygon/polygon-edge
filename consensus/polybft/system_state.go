@@ -3,6 +3,7 @@ package polybft
 import (
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"math/big"
 
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
@@ -55,11 +56,13 @@ func NewSystemState(config *PolyBFTConfig, provider contract.Provider) *SystemSt
 		sidechainBridgeFunctions,
 		contract.WithProvider(provider),
 	)
+
 	return s
 }
 
 func (s *SystemStateImpl) InitValidatorSet(validators []*Validator, validatorSetSize int) error {
 	validatorCons := make([]map[string]interface{}, len(validators))
+
 	for i, validator := range validators {
 		blsKey, err := hex.DecodeString(validator.BlsKey)
 		if err != nil {
@@ -95,18 +98,35 @@ func (s *SystemStateImpl) GetValidatorSet() (AccountSet, error) {
 	}
 
 	res := []*ValidatorAccount{}
-	for _, i := range ret["0"].([]map[string]interface{}) {
-		bigKey := i["1"].([4]*big.Int)
+
+	validatorsMap, isOk := ret["0"].([]map[string]interface{})
+	if !isOk {
+		return nil, fmt.Errorf("failed to decode validator set data")
+	}
+
+	for _, i := range validatorsMap {
+		address, isOk := i["0"].(ethgo.Address)
+		if !isOk {
+			return nil, fmt.Errorf("failed to decode validator address")
+		}
+
+		bigKey, isOk := i["1"].([4]*big.Int)
+		if !isOk {
+			return nil, fmt.Errorf("failed to decode validator bls key")
+		}
+
 		blsKey, err := bls.UnmarshalPublicKeyFromBigInt(bigKey)
+
 		if err != nil {
 			return nil, err
 		}
 
 		res = append(res, &ValidatorAccount{
-			Address: types.Address(i["0"].(ethgo.Address)),
+			Address: types.Address(address),
 			BlsKey:  blsKey,
 		})
 	}
+
 	return AccountSet(res), nil
 }
 
@@ -117,7 +137,12 @@ func (s *SystemStateImpl) GetEpoch() (uint64, error) {
 		return 0, err
 	}
 
-	return rawResult["0"].(uint64), nil
+	epochNumber, isOk := rawResult["0"].(uint64)
+	if !isOk {
+		return 0, fmt.Errorf("failed to decode epoch")
+	}
+
+	return epochNumber, nil
 }
 
 // GetNextExecutionIndex retrieves next bridge state sync index
@@ -126,7 +151,13 @@ func (s *SystemStateImpl) GetNextExecutionIndex() (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return rawResult["0"].(uint64), nil
+
+	nextExecutionIndex, isOk := rawResult["0"].(uint64)
+	if !isOk {
+		return 0, fmt.Errorf("failed to decode next execution index")
+	}
+
+	return nextExecutionIndex, nil
 }
 
 // GetNextCommittedIndex retrieves next committed bridge state sync index
@@ -135,11 +166,18 @@ func (s *SystemStateImpl) GetNextCommittedIndex() (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return rawResult["0"].(uint64), nil
+
+	nextCommittedIndex, isOk := rawResult["0"].(uint64)
+	if !isOk {
+		return 0, fmt.Errorf("failed to decode next committed index")
+	}
+
+	return nextCommittedIndex, nil
 }
 
 func buildLogsFromReceipts(entry []*types.Receipt, header *types.Header) []*types.Log {
 	var logs []*types.Log
+
 	for _, taskReceipt := range entry {
 		for _, taskLog := range taskReceipt.Logs {
 			log := new(types.Log)
@@ -153,5 +191,6 @@ func buildLogsFromReceipts(entry []*types.Receipt, header *types.Header) []*type
 			logs = append(logs, log)
 		}
 	}
+
 	return logs
 }

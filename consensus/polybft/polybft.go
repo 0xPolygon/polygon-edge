@@ -149,7 +149,7 @@ func (p *Polybft) Initialize() error {
 	account, err := wallet.GenerateNewAccountFromSecret(
 		p.config.SecretsManager, secrets.ValidatorBLSKey)
 	if err != nil {
-		return fmt.Errorf("failed to read account data. Error: %v", err)
+		return fmt.Errorf("failed to read account data. Error: %w", err)
 	}
 
 	// set key
@@ -198,13 +198,13 @@ func (p *Polybft) Initialize() error {
 	})
 
 	if err != nil {
-		return fmt.Errorf("Topic subscription failed: %v", err)
+		return fmt.Errorf("topic subscription failed: %w", err)
 	}
 
 	// create bridge topic
 	bridgeTopic, err := p.config.Network.NewTopic(bridgeProto, &proto.TransportMessage{})
 	if err != nil {
-		return fmt.Errorf("failed to create bridge topic. Error: %v", err)
+		return fmt.Errorf("failed to create bridge topic. Error: %w", err)
 	}
 	// set pbft topic, it will be check if/when the bridge is enabled
 	p.bridgeTopic = bridgeTopic
@@ -216,12 +216,12 @@ func (p *Polybft) Initialize() error {
 	p.dataDir = filepath.Join(p.config.Config.Path, "polybft")
 	// create the data dir if not exists
 	if err := os.MkdirAll(p.dataDir, 0755); err != nil {
-		return fmt.Errorf("failed to create data directory. Error: %v", err)
+		return fmt.Errorf("failed to create data directory. Error: %w", err)
 	}
 
-	stt, err := newState(filepath.Join(p.dataDir, stateFileName))
+	stt, err := newState(filepath.Join(p.dataDir, stateFileName), p.logger)
 	if err != nil {
-		return fmt.Errorf("failed to create state instance. Error: %v", err)
+		return fmt.Errorf("failed to create state instance. Error: %w", err)
 	}
 
 	p.state = stt
@@ -246,7 +246,7 @@ func (p *Polybft) Start() error {
 // startSyncing starts the synchroniser
 func (p *Polybft) startSyncing() error {
 	if err := p.syncer.Start(); err != nil {
-		return fmt.Errorf("failed to start syncer. Error: %v", err)
+		return fmt.Errorf("failed to start syncer. Error: %w", err)
 	}
 
 	go func() {
@@ -255,9 +255,9 @@ func (p *Polybft) startSyncing() error {
 		}
 
 		if err := p.syncer.Sync(nullHandler); err != nil {
-			panic(fmt.Errorf("failed to sync blocks. Error: %v", err))
-			// TO DO Nemanja - should we only log here as ibft, it seems to me that we should panic
+			// TODO: Nemanja - should we only log here as ibft, it seems to me that we should panic
 			// p.logger.Error("watch sync failed", "err", err)
+			panic(fmt.Errorf("failed to sync blocks. Error: %w", err))
 		}
 	}()
 
@@ -269,7 +269,7 @@ func (p *Polybft) startSealing() error {
 	p.logger.Info("Using signer", "address", p.key.String())
 
 	if err := p.startRuntime(); err != nil {
-		return fmt.Errorf("Runtime startup failed: %v", err)
+		return fmt.Errorf("consensus runtime start failed: %w", err)
 	}
 
 	go func() {
@@ -363,6 +363,7 @@ func (p *Polybft) startPbftProcess() {
 						continue
 					}
 				}
+
 				if p.isSynced() {
 					syncerBlockCh <- currentBlockNum
 				}
@@ -392,6 +393,7 @@ SYNC:
 	}
 
 	p.runtime.setIsActiveValidator(currentValidators.ContainsNodeID(p.key.NodeID()))
+
 	if !p.runtime.isActiveValidator() {
 		// inactive validator is not part of the consensus protocol and it should just perform syncing
 		goto SYNC
@@ -475,6 +477,7 @@ func (p *Polybft) waitForNPeers() bool {
 			break
 		}
 	}
+
 	return true
 }
 
@@ -487,6 +490,7 @@ func (p *Polybft) Close() error {
 	}
 
 	close(p.closeCh)
+
 	return nil
 }
 
@@ -524,7 +528,7 @@ func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, parents []*type
 
 	// validate header fields
 	if err := validateHeaderFields(parent, header); err != nil {
-		return fmt.Errorf("failed to validate header for block %d. error = %v", blockNumber, err)
+		return fmt.Errorf("failed to validate header for block %d. error = %w", blockNumber, err)
 	}
 
 	validators, err := p.GetValidators(blockNumber-1, parents)
@@ -535,8 +539,9 @@ func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, parents []*type
 	// decode the extra field and validate the signatures
 	extra, err := GetIbftExtra(header.ExtraData)
 	if err != nil {
-		return fmt.Errorf("failed to verify header for block %d. get extra error = %v", blockNumber, err)
+		return fmt.Errorf("failed to verify header for block %d. get extra error = %w", blockNumber, err)
 	}
+
 	if extra.Committed == nil {
 		return fmt.Errorf(
 			"failed to verify signatures for block %d because signatures are nil. Block hash: %v",
@@ -544,6 +549,7 @@ func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, parents []*type
 			header.Hash,
 		)
 	}
+
 	if err := extra.Committed.VerifyCommittedFields(validators, header.Hash); err != nil {
 		return fmt.Errorf("failed to verify signatures for block %d. Block hash: %v", blockNumber, header.Hash)
 	}
@@ -591,6 +597,7 @@ func (p *Polybft) CheckIfStuck(num uint64) (uint64, bool) {
 		// (or sync a small number of blocks) to start from the correct position.
 		return currentHeader, true
 	}
+
 	return 0, false
 }
 
@@ -625,10 +632,10 @@ func (p *pbftTransportWrapper) Gossip(msg *pbft.MessageReq) error {
 		return err
 	}
 
-	protoMsg := &proto.GossipMessage{
-		Data: data,
-	}
-	return p.topic.Publish(protoMsg)
+	return p.topic.Publish(
+		&proto.GossipMessage{
+			Data: data,
+		})
 }
 
 type bridgeTransportWrapper struct {

@@ -28,6 +28,7 @@ func newTestValidators(validatorsCount int) *testValidators {
 	for i := 0; i < validatorsCount; i++ {
 		aliases[i] = strconv.Itoa(i)
 	}
+
 	return newTestValidatorsWithAliases(aliases)
 }
 
@@ -35,6 +36,7 @@ func (v *testValidators) getPublicIdentities(aliases ...string) (res AccountSet)
 	v.iterAcct(aliases, func(t *testValidator) {
 		res = append(res, t.ValidatorAccount())
 	})
+
 	return
 }
 
@@ -42,6 +44,7 @@ func (v *testValidators) getValidators(aliases ...string) (res []*testValidator)
 	v.iterAcct(aliases, func(t *testValidator) {
 		res = append(res, t)
 	})
+
 	return
 }
 
@@ -61,6 +64,7 @@ func (v *testValidators) iterAcct(aliases []string, handle func(t *testValidator
 		// sort the names since they get queried randomly
 		sort.Strings(aliases)
 	}
+
 	for _, alias := range aliases {
 		handle(v.getValidator(alias))
 	}
@@ -71,6 +75,7 @@ func (v *testValidators) getValidator(alias string) *testValidator {
 	if !ok {
 		panic(fmt.Sprintf("BUG: validator %s does not exist", alias))
 	}
+
 	return vv
 }
 
@@ -78,6 +83,7 @@ func (v *testValidators) getParamValidators(aliases ...string) (res []*Validator
 	v.iterAcct(aliases, func(t *testValidator) {
 		res = append(res, t.paramsValidator())
 	})
+
 	return
 }
 
@@ -95,6 +101,7 @@ func newTestValidatorsWithAliases(aliases []string) *testValidators {
 	for _, alias := range aliases {
 		validators[alias] = newTestValidator(alias)
 	}
+
 	return &testValidators{
 		validators: validators,
 	}

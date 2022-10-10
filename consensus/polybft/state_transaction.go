@@ -65,18 +65,23 @@ func (bp *BundleProof) EncodeAbi() ([]byte, error) {
 	stateSyncEventsForEncoding := stateSyncEventsToAbiSlice(bp.StateSyncs)
 
 	// convert proof to map for abi encoding
-	var proof []map[string]interface{}
+	proof := make([]map[string]interface{}, len(bp.Proof))
+	i := 0
+
 	for k, v := range bp.Proof {
-		proof = append(proof, map[string]interface{}{
+		i++
+
+		proof[i] = map[string]interface{}{
 			"hash":  k,
 			"value": v,
-		})
+		}
 	}
 
 	data := map[string]interface{}{
 		"stateSyncEvents": stateSyncEventsForEncoding,
 		"proof":           proof,
 	}
+
 	return executeBundleABIMethod.Encode(data)
 }
 
@@ -85,6 +90,7 @@ func (bp *BundleProof) DecodeAbi(txData []byte) error {
 	if len(txData) < abiMethodIDLength {
 		return fmt.Errorf("invalid bundle data, len = %d", len(txData))
 	}
+
 	rawResult, err := executeBundleABIMethod.Inputs.Decode(txData[abiMethodIDLength:])
 	if err != nil {
 		return err
@@ -94,29 +100,61 @@ func (bp *BundleProof) DecodeAbi(txData []byte) error {
 	if !isOk {
 		return fmt.Errorf("invalid bundle data")
 	}
+
 	stateSyncEventsEncoded, isOk := result["stateSyncEvents"].([]map[string]interface{})
 	if !isOk {
 		return fmt.Errorf("invalid bundle data")
 	}
+
 	proofEncoded, isOk := result["proof"].([]map[string]interface{})
 	if !isOk {
 		return fmt.Errorf("invalid bundle data")
 	}
 
 	stateSyncs := make([]*StateSyncEvent, len(stateSyncEventsEncoded))
+
 	for i, sse := range stateSyncEventsEncoded {
+		id, isOk := sse["id"].(uint64)
+		if !isOk {
+			return fmt.Errorf("type assertion failed on state sync (id field)")
+		}
+
+		sender, isOk := sse["sender"].(ethgo.Address)
+		if !isOk {
+			return fmt.Errorf("type assertion failed on state sync (sender field)")
+		}
+
+		target, isOk := sse["target"].(ethgo.Address)
+		if !isOk {
+			return fmt.Errorf("type assertion failed on state sync (target field)")
+		}
+
+		data, isOk := sse["data"].([]byte)
+		if !isOk {
+			return fmt.Errorf("type assertion failed on state sync (data field)")
+		}
+
 		stateSyncs[i] = &StateSyncEvent{
-			ID:     sse["id"].(uint64),
-			Sender: sse["sender"].(ethgo.Address),
-			Target: sse["target"].(ethgo.Address),
-			Data:   sse["data"].([]byte),
+			ID:     id,
+			Sender: sender,
+			Target: target,
+			Data:   data,
 		}
 	}
 
 	proof := map[types.Hash][]byte{}
+
 	for _, item := range proofEncoded {
-		hash := item["hash"].([types.HashLength]byte)
-		value := item["value"].([]byte)
+		hash, isOk := item["hash"].([types.HashLength]byte)
+		if !isOk {
+			return fmt.Errorf("proof data type assertion failed on hash field")
+		}
+
+		value, isOk := item["value"].([]byte)
+		if !isOk {
+			return fmt.Errorf("proof data type assertion failed on value field")
+		}
+
 		proof[hash] = value
 	}
 
@@ -124,6 +162,7 @@ func (bp *BundleProof) DecodeAbi(txData []byte) error {
 		Proof:      proof,
 		StateSyncs: stateSyncs,
 	}
+
 	return nil
 }
 
@@ -148,9 +187,8 @@ func NewCommitment(epoch, bundleSize uint64, stateSyncEvents []*StateSyncEvent) 
 	// if err != nil {
 	// 	return nil, err
 	// }
-
 	return &Commitment{
-		//MerkleTrie: trie, TO DO Nemanja - find what to do here
+		//MerkleTrie: trie, TODO: Nemanja - find what to do here
 		Epoch: epoch,
 	}, nil
 }
@@ -158,9 +196,8 @@ func NewCommitment(epoch, bundleSize uint64, stateSyncEvents []*StateSyncEvent) 
 // Hash calculates hash value for commitment object.
 // It is calculated as an aggregation of given merkle trie hash and epoch
 func (cm *Commitment) Hash() types.Hash {
-	// TO DO Nemanja - fix this
+	// TODO: Nemanja - fix this
 	//return commitmentHash(cm.MerkleTrie.Trie.Hash(), cm.Epoch)
-
 	return commitmentHash(types.Hash{}, cm.Epoch)
 }
 
@@ -271,6 +308,7 @@ func (cm *CommitmentMessageSigned) EncodeAbi() ([]byte, error) {
 		"aggregatedSignature": cm.AggSignature.AggregatedSignature,
 		"bitmap":              cm.AggSignature.Bitmap,
 	}
+
 	return registerCommitmentABIMethod.Encode([2]interface{}{commitment, signature})
 }
 
@@ -279,51 +317,59 @@ func (cm *CommitmentMessageSigned) DecodeAbi(txData []byte) error {
 	if len(txData) < abiMethodIDLength {
 		return fmt.Errorf("invalid bundle data, len = %d", len(txData))
 	}
+
 	rawResult, err := registerCommitmentABIMethod.Inputs.Decode(txData[abiMethodIDLength:])
 	if err != nil {
 		return err
 	}
 
-	result, isok := rawResult.(map[string]interface{})
-	if !isok {
+	result, isOk := rawResult.(map[string]interface{})
+	if !isOk {
 		return fmt.Errorf("invalid commitment data. Could not convert decoded data to map")
 	}
-	commitmentPart := result["commitment"].(map[string]interface{})
-	if !isok {
+
+	commitmentPart, isOk := result["commitment"].(map[string]interface{})
+	if !isOk {
 		return fmt.Errorf("invalid commitment data. Could not find commitment part")
 	}
-	signaturePart := result["signature"].(map[string]interface{})
-	if !isok {
+
+	signaturePart, isOk := result["signature"].(map[string]interface{})
+	if !isOk {
 		return fmt.Errorf("invalid commitment data. Could not find signature part")
 	}
 
-	merkleRoot, isok := commitmentPart["merkleRoot"].([types.HashLength]byte)
-	if !isok {
+	merkleRoot, isOk := commitmentPart["merkleRoot"].([types.HashLength]byte)
+	if !isOk {
 		return fmt.Errorf("invalid commitment data. Could not find merkle root hash")
 	}
-	fromIndex, isok := commitmentPart["fromIndex"].(uint64)
-	if !isok {
+
+	fromIndex, isOk := commitmentPart["fromIndex"].(uint64)
+	if !isOk {
 		return fmt.Errorf("invalid commitment data. Could not find fromIndex")
 	}
-	toIndex, isok := commitmentPart["toIndex"].(uint64)
-	if !isok {
+
+	toIndex, isOk := commitmentPart["toIndex"].(uint64)
+	if !isOk {
 		return fmt.Errorf("invalid commitment data. Could not find toIndex")
 	}
-	bundleSize, isok := commitmentPart["bundleSize"].(uint64)
-	if !isok {
+
+	bundleSize, isOk := commitmentPart["bundleSize"].(uint64)
+	if !isOk {
 		return fmt.Errorf("invalid commitment data. Could not find bundle size")
 	}
-	epoch, isok := commitmentPart["epoch"].(uint64)
-	if !isok {
+
+	epoch, isOk := commitmentPart["epoch"].(uint64)
+	if !isOk {
 		return fmt.Errorf("invalid commitment data. Could not find epoch")
 	}
 
-	aggregatedSignature, isok := signaturePart["aggregatedSignature"].([]byte)
-	if !isok {
+	aggregatedSignature, isOk := signaturePart["aggregatedSignature"].([]byte)
+	if !isOk {
 		return fmt.Errorf("invalid commitment data. Could convert aggregated signature")
 	}
-	bitmap, isok := signaturePart["bitmap"].([]byte)
-	if !isok {
+
+	bitmap, isOk := signaturePart["bitmap"].([]byte)
+	if !isOk {
 		return fmt.Errorf("invalid commitment data. Could not convert bitmap")
 	}
 
@@ -334,6 +380,7 @@ func (cm *CommitmentMessageSigned) DecodeAbi(txData []byte) error {
 			Bitmap:              bitmap,
 		},
 	}
+
 	return nil
 }
 
@@ -348,15 +395,15 @@ func decodeStateTransaction(txData []byte) (StateTransactionInput, error) {
 	}
 
 	sig := txData[:abiMethodIDLength]
+
 	var obj StateTransactionInput
+
 	if bytes.Equal(sig, registerCommitmentABIMethod.ID()) {
 		// bridge commitment
 		obj = &CommitmentMessageSigned{}
-
 	} else if bytes.Equal(sig, executeBundleABIMethod.ID()) {
 		// bundle proof
 		obj = &BundleProof{}
-
 	} else {
 		return nil, fmt.Errorf("unknown state transaction")
 	}
@@ -364,6 +411,7 @@ func decodeStateTransaction(txData []byte) (StateTransactionInput, error) {
 	if err := obj.DecodeAbi(txData); err != nil {
 		return nil, err
 	}
+
 	return obj, nil
 }
 
@@ -377,6 +425,7 @@ func stateSyncEventsToAbiSlice(stateSyncEvents []*StateSyncEvent) []map[string]i
 			"data":   sse.Data,
 		}
 	}
+
 	return result
 }
 
@@ -449,6 +498,7 @@ func (u *UptimeCounter) EncodeAbi() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return validatorsUptimeMethod.Encode([1]interface{}{uptime})
 }
 
@@ -457,19 +507,29 @@ func (u *UptimeCounter) DecodeAbi(txData []byte) error {
 	if len(txData) < abiMethodIDLength {
 		return fmt.Errorf("invalid bundle data, len = %d", len(txData))
 	}
+
 	raw, err := abi.Decode(validatorsUptimeMethod.Inputs, txData[abiMethodIDLength:])
 	if err != nil {
 		return err
 	}
 
-	resultMap := raw.(map[string]interface{})
-	bytes := resultMap["data"].([]byte)
+	resultMap, isOk := raw.(map[string]interface{})
+	if !isOk {
+		return fmt.Errorf("failed to decode uptime counter data")
+	}
+
+	bytes, isOk := resultMap["data"].([]byte)
+	if !isOk {
+		return fmt.Errorf("failed to decode uptime counter inner data")
+	}
 
 	var uptime []*UptimeInfo
 	if err = json.Unmarshal(bytes, &uptime); err != nil {
 		return err
 	}
+
 	u.validatorUptimes = uptime
+
 	return nil
 }
 
