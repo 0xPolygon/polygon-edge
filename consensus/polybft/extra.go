@@ -134,8 +134,8 @@ func (i *Extra) UnmarshalRLPWith(v *fastrlp.Value) error {
 	return nil
 }
 
-// CreateValidatorSetDelta calculates ValidatorSetDelta based on the provided old and new validator sets
-func CreateValidatorSetDelta(log hclog.Logger, oldValidatorSet, newValidatorSet AccountSet) *ValidatorSetDelta {
+// createValidatorSetDelta calculates ValidatorSetDelta based on the provided old and new validator sets
+func createValidatorSetDelta(log hclog.Logger, oldValidatorSet, newValidatorSet AccountSet) *ValidatorSetDelta {
 	var addedValidators AccountSet
 
 	oldValidatorSetMap := make(map[types.Address]*ValidatorAccount)
