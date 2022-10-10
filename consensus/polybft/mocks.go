@@ -48,6 +48,10 @@ func (v *testValidators) getValidators(aliases ...string) (res []*testValidator)
 	return
 }
 
+func (v *testValidators) toValidatorSet() *validatorSet {
+	return newValidatorSet(types.Address{}, v.getPublicIdentities())
+}
+
 func (v *testValidator) ValidatorAccount() *ValidatorAccount {
 	return &ValidatorAccount{
 		Address: types.Address(v.account.Ecdsa.Address()),

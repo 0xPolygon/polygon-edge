@@ -1,7 +1,6 @@
 package polybft
 
 import (
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"sync"
@@ -224,12 +223,7 @@ func (c *consensusRuntime) FSM() (*fsm, error) {
 	ff.postInsertHook = func() error {
 		if c.IsBridgeEnabled() {
 			if isEndOfEpoch && ff.commitmentToSaveOnRegister != nil {
-				if err := c.state.insertCommitmentMessage(ff.commitmentToSaveOnRegister); err != nil {
-					return err
-				}
-
-				if err := c.buildBundles(
-					epoch, ff.commitmentToSaveOnRegister.Message, nextStateSyncExecutionIdx); err != nil {
+				if err := c.buildFinalizedCommitment(epoch, ff.commitmentToSaveOnRegister, nextStateSyncExecutionIdx); err != nil {
 					return err
 				}
 			}
@@ -249,7 +243,7 @@ func (c *consensusRuntime) FSM() (*fsm, error) {
 		if isEndOfEpoch {
 			commitment, err := c.getCommitmentToRegister(epoch, nextRegisteredCommitmentIndex)
 			if err != nil {
-				if errors.Is(err, ErrCommitmentNotBuilt) {
+				if errors.Is(err, errCommitmentNotBuilt) {
 					c.logger.Info("[FSM] Have no built commitment to register",
 						"epoch", epoch.Number, "from state sync index", nextRegisteredCommitmentIndex)
 				} else if errors.Is(err, errQuorumNotReached) {
@@ -277,15 +271,28 @@ func (c *consensusRuntime) FSM() (*fsm, error) {
 				return nil, err
 			}
 
-			if len(nonExecutedCommitments) > 0 {
-				bundlesToExecute, err := c.state.getBundles(nextStateSyncExecutionIdx, maxBundlesPerSprint)
-				if err != nil {
-					return nil, err
+			var bundleProofs []*BundleProof
+			var commitments []*CommitmentMessageSigned
+			processedBundles := 0
+			foundGap := false
+			for _, c := range nonExecutedCommitments {
+				commitments = append(commitments, c.SignedCommitment)
+				if processedBundles >= maxBundlesPerSprint || foundGap {
+					// we can only execute a number of bundles per sprint
+					// it is a valid case that a proposer only has bundles built only for some commitments
+					// and because they must be sequential, if we find a gap, we should stop collecting
+					continue
 				}
-
-				ff.commitmentsToVerifyBundles = nonExecutedCommitments
-				ff.bundleProofs = bundlesToExecute
+				commitmentBundles, bundlesNum := c.getBundles(maxBundlesPerSprint, processedBundles)
+				if bundlesNum == 0 {
+					foundGap = true
+				} else {
+					bundleProofs = append(bundleProofs, commitmentBundles...)
+					processedBundles += bundlesNum
+				}
 			}
+			ff.commitmentsToVerifyBundles = commitments
+			ff.bundleProofs = bundleProofs
 		}
 	}
 
@@ -361,12 +368,8 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) error {
 		Validators:     validatorSet,
 	}
 
-	if err := c.state.cleanEpochsFromDB(); err != nil {
+	if err := c.state.cleanPreviousEpochsDataFromDb(epochNumber); err != nil {
 		c.logger.Error("Could not clean previous epochs from db.", "err", err)
-	}
-
-	if err := c.state.insertEpoch(epoch.Number); err != nil {
-		return fmt.Errorf("an error occurred while inserting new epoch in db. Reason: %w", err)
 	}
 
 	// create commitment for state sync events
@@ -400,15 +403,13 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) error {
 // for state sync events starting from given index and saves the message in database
 func (c *consensusRuntime) buildCommitment(epoch, fromIndex uint64) (*Commitment, error) {
 	// if it is not already built in the previous epoch
-	stateSyncEvents, err := c.state.getStateSyncEventsForCommitment(fromIndex, fromIndex+stateSyncMainBundleSize)
-	if err != nil {
-		if errors.Is(err, ErrNotEnoughStateSyncs) {
-			c.logger.Info("[buildCommitment] Not enough state syncs to build a commitment",
-				"epoch", epoch, "from state sync index", fromIndex)
-			// this is a valid case, there is not enough state syncs
-			return nil, nil
-		}
-
+	stateSyncEvents, err := c.state.getStateSyncEventsForCommitment(fromIndex, fromIndex+stateSyncMainBundleSize-1)
+	if len(stateSyncEvents) == 0 || (err != nil && errors.Is(err, errNotEnoughStateSyncs)) {
+		c.logger.Info("[buildCommitment] Not enough state syncs to build a commitment",
+			"epoch", epoch, "from state sync index", fromIndex)
+		// this is a valid case, there is not enough state syncs
+		return nil, nil
+	} else if err != nil {
 		return nil, err
 	}
 
@@ -417,9 +418,9 @@ func (c *consensusRuntime) buildCommitment(epoch, fromIndex uint64) (*Commitment
 		return nil, err
 	}
 
-	hash := commitment.Hash().Bytes()
+	hash := commitment.Hash()
 
-	signature, err := c.config.Key.Sign(hash)
+	signature, err := c.config.Key.Sign(hash.Bytes())
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign commitment message. Error: %w", err)
 	}
@@ -429,14 +430,15 @@ func (c *consensusRuntime) buildCommitment(epoch, fromIndex uint64) (*Commitment
 		Signature: signature,
 	}
 
-	if _, err = c.state.insertMessageVote(epoch, hash, sig); err != nil {
-		return nil, fmt.Errorf("failed to insert signature for hash=%v to the state."+
-			"Error: %v", hex.EncodeToString(hash), err)
+	hashHex := hash.String()
+	if _, err = c.state.insertMessageVote(epoch, hashHex, sig); err != nil {
+		return nil, fmt.Errorf("failed to insert signature for hash=%v to the state. "+
+			"Error: %w", hashHex, err)
 	}
 
 	// gossip message
 	msg := &TransportMessage{
-		Hash:        hash,
+		Hash:        hashHex,
 		Signature:   signature,
 		NodeID:      c.config.Key.NodeID(),
 		EpochNumber: epoch,
@@ -446,29 +448,30 @@ func (c *consensusRuntime) buildCommitment(epoch, fromIndex uint64) (*Commitment
 	return commitment, nil
 }
 
-// buildBundles builds bundles if there is a created commitment by the validator and inserts them into db
-func (c *consensusRuntime) buildBundles(epoch *epochMetadata, commitmentMsg *CommitmentMessage,
-	stateSyncExecutionIndex uint64) error {
+func (c *consensusRuntime) buildFinalizedCommitment(epoch *epochMetadata,
+	commitmentSigned *CommitmentMessageSigned, nextExecutionIndex uint64) error {
+
+	commitmentToExecute := &CommitmentToExecute{
+		SignedCommitment: commitmentSigned,
+		ToIndex:          commitmentSigned.Message.ToIndex,
+	}
+
 	if epoch.Commitment == nil {
 		// its a valid case when we do not have a built commitment so we can not build any proofs
 		// we will be able to validate them though, since we have CommitmentMessageSigned taken from
 		// register commitment state transaction when its block was inserted
 		c.logger.Info("[buildProofs] No commitment built.")
-
-		return nil
+		return c.state.insertCommitmentMessage(commitmentToExecute)
 	}
 
 	bundleProofs := []*BundleProof{}
 
-	// TO DO Nemanja - fix this with new merkle trie
+	// TODO - uncomment once changes from the integration with v3-contracts get moved to edge
+	//commitmentMsg := commitmentSigned.Message
 
-	// startBundleIdx := commitmentMsg.GetBundleIdxFromStateSyncEventIdx(stateSyncExecutionIndex)
+	// startBundleIdx := commitmentMsg.GetBundleIdxFromStateSyncEventIdx(nextExecutionIndex)
 	// for idx := startBundleIdx; idx < commitmentMsg.BundlesCount(); idx++ {
-	// 	p, err := epoch.Commitment.MerkleTrie.GenerateProof(uint(idx))
-	// 	if err != nil {
-	// 		return err
-	// 	}
-
+	// 	p := epoch.Commitment.MerkleTree.GenerateProof(idx, 0)
 	// 	events, err := c.getStateSyncEventsForBundle(commitmentMsg.GetFirstStateSyncIndexFromBundleIndex(idx),
 	// 		commitmentMsg.BundleSize)
 	// 	if err != nil {
@@ -482,7 +485,8 @@ func (c *consensusRuntime) buildBundles(epoch *epochMetadata, commitmentMsg *Com
 	// 		})
 	// }
 
-	return c.state.insertBundles(bundleProofs)
+	commitmentToExecute.Proofs = bundleProofs
+	return c.state.insertCommitmentMessage(commitmentToExecute)
 }
 
 // getAggSignatureForCommitmentMessage creates aggregated signatures for given commitment
@@ -497,7 +501,7 @@ func (c *consensusRuntime) getAggSignatureForCommitmentMessage(epoch *epochMetad
 	}
 
 	// get all the votes from the database for this commitment
-	votes, err := c.state.getMessageVotes(epoch.Number, commitmentHash.Bytes())
+	votes, err := c.state.getMessageVotes(commitmentHash.String())
 	if err != nil {
 		return Signature{}, err
 	}
@@ -506,7 +510,7 @@ func (c *consensusRuntime) getAggSignatureForCommitmentMessage(epoch *epochMetad
 
 	bitmap := bitmap.Bitmap{}
 
-	for _, vote := range votes {
+	for _, vote := range votes.Signatures {
 		index, exists := nodeIDIndexMap[vote.From]
 		if !exists {
 			continue // don't count this vote, because it does not belong to validator
@@ -601,7 +605,7 @@ func (c *consensusRuntime) deliverMessage(msg *TransportMessage) (bool, error) {
 
 	c.logger.Info(
 		"deliver message",
-		"hash", hex.EncodeToString(msg.Hash),
+		"hash", msg.Hash,
 		"sender", msg.NodeID,
 		"signatures", numSignatures,
 		"quorum", getQuorumSize(len(epoch.Validators)),
@@ -787,7 +791,7 @@ func (c *consensusRuntime) getCommitmentToRegister(epoch *epochMetadata,
 	registerCommitmentIndex uint64) (*CommitmentMessageSigned, error) {
 	if epoch.Commitment == nil {
 		// we did not build a commitment, so there is nothing to register
-		return nil, ErrCommitmentNotBuilt
+		return nil, errCommitmentNotBuilt
 	}
 
 	commitmentMessage := NewCommitmentMessage(

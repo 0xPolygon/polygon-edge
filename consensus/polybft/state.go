@@ -5,14 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math/big"
+	"math"
 	"sort"
+	"sync"
 
-	"github.com/0xPolygon/pbft-consensus"
 	"github.com/boltdb/bolt"
-	"github.com/hashicorp/go-hclog"
+	"github.com/hashicorp/go-memdb"
 
-	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
 )
 
@@ -23,14 +22,10 @@ events/
 |--> stateSyncEvent.Id -> *StateSyncEvent (json marshalled)
 
 commitments/
-|--> commitment.Message.ToIndex -> *CommitmentMessageSigned (json marshalled)
+|--> commitment.SignedCommitment.Message.ToIndex -> *CommitmentToExecute (json marshalled)
 
-bundles/
-|--> bundle.StateSyncs[0].Id -> *BundleProof (json marshalled)
-
-epochs/
-|--> epochNumber
-	|--> hash -> []*MessageSignatures (json marshalled)
+messageVotes/
+|--> hash -> *MessageVotes (json marshalled)
 
 validatorSnapshots/
 |--> epochNumber -> *AccountSet (json marshalled)
@@ -51,123 +46,301 @@ const (
 	// numberOfSnapshotsToLeaveInMemory defines a number of validator snapshots to leave in db
 	numberOfSnapshotsToLeaveInDB = 10
 	// number of stateSyncEvents to be processed before a commitment message can be created and gossiped
-	stateSyncMainBundleSize = 5
+	stateSyncMainBundleSize = 10
 	// number of stateSyncEvents to be grouped into one StateTransaction
 	stateSyncBundleSize = 5
+
+	stateSyncTable         = "state_sync"
+	commitmentTable        = "commitment"
+	messageVoteTable       = "vote"
+	validatorSnapshotTable = "snapshot"
 )
 
-// StateSyncEvent is a bridge event from the rootchain
-type StateSyncEvent struct {
-	// ID is the decoded 'index' field from the event
-	ID uint64
-	// Sender is the decoded 'sender' field from the event
-	Sender ethgo.Address
-	// Target is the decoded 'target' field from the event
-	Target ethgo.Address
-	// Data is the decoded 'data' field from the event
-	Data []byte
-	// Log contains raw data about smart contract event execution
-	Log *ethgo.Log
+var (
+	// bucket to store rootchain bridge events
+	syncStateEventsBucket = []byte(stateSyncTable)
+	//bucket to store commitments
+	commitmentsBucket = []byte(commitmentTable)
+	// bucket to store message votes (signatures)
+	messageVotesBucket = []byte(messageVoteTable)
+	// bucket to store validator snapshots
+	validatorSnapshotsBucket = []byte(validatorSnapshotTable)
+	// array of all parent buckets
+	parentBuckets = [][]byte{syncStateEventsBucket, commitmentsBucket, messageVotesBucket, validatorSnapshotsBucket}
+	// errNotEnoughStateSyncs error message
+	errNotEnoughStateSyncs = errors.New("there is either a gap or not enough sync events")
+	// errCommitmentNotBuilt error message
+	errCommitmentNotBuilt = errors.New("there is no built commitment to register")
+)
+
+// MemDBIterator is an interface implemented by every custom memdb iterator
+type MemDBIterator interface {
+	Next() (MemDBRecord, error)
 }
 
-// newStateSyncEvent creates an instance of pending state sync event.
-func newStateSyncEvent(
-	id uint64,
-	sender ethgo.Address,
-	target ethgo.Address,
-	data []byte, log *ethgo.Log,
-) *StateSyncEvent {
-	return &StateSyncEvent{
-		ID:     id,
-		Sender: sender,
-		Target: target,
-		Data:   data,
-		Log:    log,
+// memStateSchema represents the schema of the in-memory db
+var memStateSchema = &memdb.DBSchema{
+	Tables: map[string]*memdb.TableSchema{
+		// list of state syncs
+		stateSyncTable: {
+			Name: stateSyncTable,
+			Indexes: map[string]*memdb.IndexSchema{
+				"id": {
+					Name:    "id",
+					Unique:  true,
+					Indexer: &memdb.UintFieldIndex{Field: "ID"},
+				},
+			},
+		},
+		commitmentTable: {
+			Name: commitmentTable,
+			Indexes: map[string]*memdb.IndexSchema{
+				"id": {
+					Name:    "id",
+					Unique:  true,
+					Indexer: &memdb.UintFieldIndex{Field: "ToIndex"},
+				},
+			},
+		},
+		messageVoteTable: {
+			Name: messageVoteTable,
+			Indexes: map[string]*memdb.IndexSchema{
+				"id": {
+					Name:    "id",
+					Unique:  true,
+					Indexer: &memdb.UintFieldIndex{Field: "Epoch"},
+				},
+				"hash": {
+					Name:    "hash",
+					Unique:  true,
+					Indexer: &memdb.StringFieldIndex{Field: "Hash"},
+				},
+			},
+		},
+		validatorSnapshotTable: {
+			Name: validatorSnapshotTable,
+			Indexes: map[string]*memdb.IndexSchema{
+				"id": {
+					Name:    "id",
+					Unique:  true,
+					Indexer: &memdb.UintFieldIndex{Field: "Epoch"},
+				},
+			},
+		},
+	},
+}
+
+func getUpperBoundUint64(upperBound interface{}) uint64 {
+	if upperBound == nil {
+		// if there is no upper bound provided, than we return everything
+		return math.MaxUint64
 	}
+	upper, ok := upperBound.(uint64)
+	if !ok {
+		panic("state sync table upper bound not a uint64")
+	}
+	return upper
 }
 
-func decodeEvent(log *ethgo.Log) (*StateSyncEvent, error) {
-	raw, err := stateTransferEvent.ParseLog(log)
+var iterators = map[string]func(it memdb.ResultIterator, upperBound interface{}, first MemDBRecord) MemDBIterator{
+	stateSyncTable: func(it memdb.ResultIterator, upperBound interface{}, first MemDBRecord) MemDBIterator {
+		return &StateSyncIterator{iter: it, next: first.(*StateSyncEvent), upperBound: getUpperBoundUint64(upperBound)}
+	},
+	commitmentTable: func(it memdb.ResultIterator, upperBound interface{}, first MemDBRecord) MemDBIterator {
+		return &MemDBRecordIterator{iter: it, next: first, upperBound: getUpperBoundUint64(upperBound)}
+	},
+	messageVoteTable: func(it memdb.ResultIterator, upperBound interface{}, first MemDBRecord) MemDBIterator {
+		return &MemDBRecordIterator{iter: it, next: first, upperBound: getUpperBoundUint64(upperBound)}
+	},
+	validatorSnapshotTable: func(it memdb.ResultIterator, upperBound interface{}, first MemDBRecord) MemDBIterator {
+		return &MemDBRecordIterator{iter: it, next: first, upperBound: getUpperBoundUint64(upperBound)}
+	},
+}
+
+// StateSyncIterator is a custom memdb iterator that ensures
+// sequential order of state sync events that are returned from db
+type StateSyncIterator struct {
+	iter         memdb.ResultIterator
+	upperBound   uint64
+	next         MemDBRecord
+	lastGottenID uint64
+}
+
+// Next returns the next item of the iterator. It is **not** safe to call
+// Next after the last call returned nil.
+func (s *StateSyncIterator) Next() (MemDBRecord, error) {
+	res := s.next
+	s.next = nil
+
+	if res != nil {
+		s.lastGottenID = res.Key()
+	}
+
+	nextItem := s.iter.Next()
+	if nextItem == nil {
+		// for the case when there is not enough state sync events
+		if s.lastGottenID < s.upperBound && s.upperBound != math.MaxUint64 {
+			return nil, errNotEnoughStateSyncs
+		}
+		return res, nil
+	}
+
+	obj := nextItem.(MemDBRecord)
+	if obj.Key() > s.upperBound {
+		return res, nil
+	}
+
+	// ensure linearity
+	if res != nil && res.Key()+1 != obj.Key() {
+		// for the case when there is a gap in state syncs
+		return nil, errNotEnoughStateSyncs
+	}
+
+	s.next = obj
+	return res, nil
+}
+
+// MemDBRecordIterator is a custom iterator for all MemDBRecords
+type MemDBRecordIterator struct {
+	iter       memdb.ResultIterator
+	upperBound uint64
+	next       MemDBRecord
+}
+
+// Next returns the next item of the iterator. It is **not** safe to call
+// Next after the last call returned nil.
+func (s *MemDBRecordIterator) Next() (MemDBRecord, error) {
+	res := s.next
+	s.next = nil
+
+	nextItem := s.iter.Next()
+
+	if nextItem == nil {
+		return res, nil
+	}
+
+	obj := nextItem.(MemDBRecord)
+	if obj.Key() > s.upperBound {
+		return res, nil
+	}
+
+	s.next = obj
+	return res, nil
+}
+
+// insertToMemDb inserts a new record in provided table
+func insertToMemDb[V MemDBRecord](memdb *memdb.MemDB, table string, record V) error {
+	txn := memdb.Txn(true)
+	if err := txn.Insert(table, record); err != nil {
+		txn.Abort()
+		return err
+	}
+	txn.Commit()
+	return nil
+}
+
+// getFilteredFromMemDb returns a filtered collection of desired memdb records
+func getFilteredFromMemDb[V MemDBRecord](memdb *memdb.MemDB, table string,
+	lowerBound, upperBound interface{}) ([]V, error) {
+
+	txn := memdb.Txn(false)
+	defer txn.Abort()
+
+	memdbIterator, err := txn.LowerBound(table, "id", lowerBound)
 	if err != nil {
 		return nil, err
 	}
 
-	id, ok := raw["id"].(*big.Int)
-	if !ok {
-		return nil, fmt.Errorf("failed to decode id field of log: %+v", log)
+	var slice []V
+	iteratorCreator, exists := iterators[table]
+	if !exists {
+		panic(fmt.Sprintf("no iterator found for table: %v", table))
 	}
 
-	sender, ok := raw["sender"].(ethgo.Address)
-	if !ok {
-		return nil, fmt.Errorf("failed to decode sender field of log: %+v", log)
+	elem := memdbIterator.Next()
+	if elem == nil {
+		return slice, nil
 	}
 
-	target, ok := raw["target"].(ethgo.Address)
-	if !ok {
-		return nil, fmt.Errorf("failed to decode target field of log: %+v", log)
+	iterator := iteratorCreator(memdbIterator, upperBound, elem.(V))
+
+	for {
+		record, err := iterator.Next()
+		if err != nil {
+			return nil, err
+		}
+
+		if record == nil {
+			break
+		}
+
+		r := record.(V)
+		slice = append(slice, r)
 	}
 
-	data, ok := raw["data"].([]byte)
-	if !ok {
-		return nil, fmt.Errorf("failed to decode data field of log: %+v", log)
+	return slice, nil
+}
+
+func getFromMemDb[V MemDBRecord](memdb *memdb.MemDB, table, indexName string, id interface{}) (V, error) {
+	txn := memdb.Txn(false)
+	defer txn.Abort()
+
+	var record V
+	result, err := txn.First(table, indexName, id)
+	if err != nil {
+		return record, err
 	}
 
-	return newStateSyncEvent(id.Uint64(), sender, target, data, log), nil
+	if result != nil {
+		record = result.(V)
+	}
+	return record, nil
 }
 
-func (s *StateSyncEvent) String() string {
-	return fmt.Sprintf("Id=%d, Sender=%v, Target=%v", s.ID, s.Sender, s.Target)
-}
+func deleteFilteredFromMemDb(memdb *memdb.MemDB, table string, upperBound interface{}) error {
+	txn := memdb.Txn(true)
 
-// MessageSignature encapsulates sender identifier and its signature
-type MessageSignature struct {
-	// Signer of the vote
-	From pbft.NodeID
-	// Signature of the message
-	Signature []byte
-}
+	it, err := txn.ReverseLowerBound(table, "id", upperBound)
+	if err != nil {
+		txn.Abort()
+		return err
+	}
 
-// TransportMessage represents the payload which is gossiped across the network
-type TransportMessage struct {
-	// Hash is encoded data
-	Hash []byte
-	// Message signature
-	Signature []byte
-	// Node identifier
-	NodeID pbft.NodeID
-	// Number of epoch
-	EpochNumber uint64
-}
+	// Put them into a slice so there are no safety concerns while actually
+	// performing the deletes
+	var records []interface{}
+	for {
+		obj := it.Next()
+		if obj == nil {
+			break
+		}
 
-var (
-	// bucket to store rootchain bridge events
-	syncStateEventsBucket = []byte("events")
-	//bucket to store commitments
-	commitmentsBucket = []byte("commitments")
-	// bucket to store bundles
-	bundlesBucket = []byte("bundles")
-	// bucket to store epochs and all its nested buckets (message votes and message pool events)
-	epochsBucket = []byte("epochs")
-	// bucket to store message votes (signatures)
-	messageVotesBucket = []byte("votes")
-	// bucket to store validator snapshots
-	validatorSnapshotsBucket = []byte("validatorSnapshots")
-	// array of all parent buckets
-	parentBuckets = [][]byte{syncStateEventsBucket, commitmentsBucket, bundlesBucket,
-		epochsBucket, validatorSnapshotsBucket}
-	// ErrNotEnoughStateSyncs error message
-	ErrNotEnoughStateSyncs = errors.New("there is either a gap or not enough sync events")
-	// ErrCommitmentNotBuilt error message
-	ErrCommitmentNotBuilt = errors.New("there is no built commitment to register")
-)
+		records = append(records, obj)
+	}
+
+	for _, r := range records {
+		if err := txn.Delete(table, r); err != nil {
+			return err
+		}
+	}
+
+	txn.Commit()
+	return nil
+}
 
 // State represents a persistence layer which persists consensus data off-chain
 type State struct {
-	db     *bolt.DB
-	logger hclog.Logger
+	db    *bolt.DB
+	memdb *memdb.MemDB
+	// mu is a lock used for parallel writing to memdb
+	// since it does not support multiple writers at one time
+	// see the link: https://pkg.go.dev/github.com/hashicorp/go-memdb#MemDB.Txn
+	// only used for message votes
+	mu sync.Mutex
 }
 
-func newState(path string, logger hclog.Logger) (*State, error) {
+// newState creates a new instance of State
+func newState(path string) (*State, error) {
 	db, err := bolt.Open(path, 0666, nil)
 	if err != nil {
 		return nil, err
@@ -178,12 +351,74 @@ func newState(path string, logger hclog.Logger) (*State, error) {
 		return nil, err
 	}
 
+	memdb, err := memdb.NewMemDB(memStateSchema)
+	if err != nil {
+		return nil, err
+	}
+
 	state := &State{
-		db:     db,
-		logger: logger.Named("state"),
+		db:    db,
+		memdb: memdb,
+	}
+
+	if err := state.populateMemdb(); err != nil {
+		return nil, err
 	}
 
 	return state, nil
+}
+
+// populateMemdb populates memdb with data from boltDb
+func (s *State) populateMemdb() error {
+	if err := populateMemdbTable[*StateSyncEvent](s, stateSyncTable, syncStateEventsBucket); err != nil {
+		return err
+	}
+	if err := populateMemdbTable[*ValidatorSnapshot](s, validatorSnapshotTable,
+		validatorSnapshotsBucket); err != nil {
+		return err
+	}
+
+	if err := populateMemdbTable[*CommitmentToExecute](s, commitmentTable, commitmentsBucket); err != nil {
+		return err
+	}
+
+	return populateMemdbTable[*MessageVotes](s, messageVoteTable, messageVotesBucket)
+}
+
+// populateMemdbTable populates provided memdb table with data from boltDb
+func populateMemdbTable[V MemDBRecord](s *State, table string, bucket []byte) error {
+	records, err := list[V](s, bucket)
+	if err != nil {
+		return err
+	}
+
+	for _, r := range records {
+		if err := insertToMemDb(s.memdb, table, r); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// list returns all records of given type from boltDb
+func list[V MemDBRecord](s *State, bucket []byte) ([]V, error) {
+	records := []V{}
+
+	err := s.db.View(func(tx *bolt.Tx) error {
+		return tx.Bucket(bucket).ForEach(func(k, v []byte) error {
+			var record V
+			if err := json.Unmarshal(v, &record); err != nil {
+				return err
+			}
+			records = append(records, record)
+			return nil
+		})
+	})
+	if err != nil {
+		return nil, err
+	}
+	return records, nil
 }
 
 // initMainDBBuckets creates predefined buckets in bolt database if they don't exist already.
@@ -204,59 +439,43 @@ func initMainDBBuckets(db *bolt.DB) error {
 
 // insertValidatorSnapshot inserts a validator snapshot for the given epoch to its bucket in db
 func (s *State) insertValidatorSnapshot(epoch uint64, validatorSnapshot AccountSet) error {
+	snapshot := &ValidatorSnapshot{epoch, validatorSnapshot}
+	if err := insertToMemDb(s.memdb, validatorSnapshotTable, snapshot); err != nil {
+		return err
+	}
+
 	return s.db.Update(func(tx *bolt.Tx) error {
-		raw, err := validatorSnapshot.Marshal()
+		raw, err := json.Marshal(snapshot)
 		if err != nil {
 			return err
 		}
 
 		bucket := tx.Bucket(validatorSnapshotsBucket)
 
-		return bucket.Put(itob(epoch), raw)
+		return bucket.Put(convertToBytes(epoch), raw)
 	})
 }
 
 // getValidatorSnapshot queries the validator snapshot for given epoch from db
 func (s *State) getValidatorSnapshot(epoch uint64) (AccountSet, error) {
-	var validatorSnapshot AccountSet
-
-	err := s.db.View(func(tx *bolt.Tx) error {
-		bucket := tx.Bucket(validatorSnapshotsBucket)
-		v := bucket.Get(itob(epoch))
-		if v != nil {
-			return validatorSnapshot.Unmarshal(v)
-		}
-
-		return nil
-	})
-
-	return validatorSnapshot, err
-}
-
-// list iterates through all events in events bucket in db, unmarshals them, and returns as array
-func (s *State) list() ([]*StateSyncEvent, error) {
-	events := []*StateSyncEvent{}
-
-	err := s.db.View(func(tx *bolt.Tx) error {
-		return tx.Bucket(syncStateEventsBucket).ForEach(func(k, v []byte) error {
-			var event *StateSyncEvent
-			if err := json.Unmarshal(v, &event); err != nil {
-				return err
-			}
-			events = append(events, event)
-
-			return nil
-		})
-	})
+	memdbRecord, err := getFromMemDb[*ValidatorSnapshot](s.memdb, validatorSnapshotTable, "id", epoch)
 	if err != nil {
 		return nil, err
 	}
 
-	return events, nil
+	if memdbRecord != nil {
+		return memdbRecord.AccountSet, nil
+	}
+
+	return nil, nil
 }
 
 // insertStateSyncEvent inserts a new state sync event to state event bucket in db
 func (s *State) insertStateSyncEvent(event *StateSyncEvent) error {
+	if err := insertToMemDb(s.memdb, stateSyncTable, event); err != nil {
+		return err
+	}
+
 	return s.db.Update(func(tx *bolt.Tx) error {
 		raw, err := json.Marshal(event)
 		if err != nil {
@@ -264,119 +483,42 @@ func (s *State) insertStateSyncEvent(event *StateSyncEvent) error {
 		}
 
 		bucket := tx.Bucket(syncStateEventsBucket)
-
-		return bucket.Put(itob(event.ID), raw)
+		return bucket.Put(convertToBytes(event.ID), raw)
 	})
 }
 
 // getStateSyncEventsForCommitment returns state sync events for commitment
 // if there is an event with index that can not be found in db in given range, an error is returned
 func (s *State) getStateSyncEventsForCommitment(fromIndex, toIndex uint64) ([]*StateSyncEvent, error) {
-	var events []*StateSyncEvent
-
-	err := s.db.Update(func(tx *bolt.Tx) error {
-		bucket := tx.Bucket(syncStateEventsBucket)
-		for i := fromIndex; i < toIndex; i++ {
-			v := bucket.Get(itob(i))
-			if v == nil {
-				return ErrNotEnoughStateSyncs
-			}
-
-			var event *StateSyncEvent
-			if err := json.Unmarshal(v, &event); err != nil {
-				return err
-			}
-
-			events = append(events, event)
-		}
-
-		return nil
-	})
-
-	return events, err
-}
-
-// insertEpoch inserts a new epoch to db with its meta data
-func (s *State) insertEpoch(epoch uint64) error {
-	return s.db.Update(func(tx *bolt.Tx) error {
-		epochBucket, err := tx.Bucket(epochsBucket).CreateBucketIfNotExists(itob(epoch))
-		if err != nil {
-			return err
-		}
-		_, err = epochBucket.CreateBucketIfNotExists(messageVotesBucket)
-
-		return err
-	})
-}
-
-// isEpochInserted checks if given epoch is present in db
-func (s *State) isEpochInserted(epoch uint64) bool {
-	return s.db.View(func(tx *bolt.Tx) error {
-		_, err := getEpochBucket(tx, epoch)
-
-		return err
-	}) == nil
+	return getFilteredFromMemDb[*StateSyncEvent](s.memdb, stateSyncTable, fromIndex, toIndex)
 }
 
 // insertCommitmentMessage inserts signed commitment to db
-func (s *State) insertCommitmentMessage(commitment *CommitmentMessageSigned) error {
+func (s *State) insertCommitmentMessage(commitment *CommitmentToExecute) error {
+	if err := insertToMemDb(s.memdb, commitmentTable, commitment); err != nil {
+		return err
+	}
+
 	return s.db.Update(func(tx *bolt.Tx) error {
 		raw, err := json.Marshal(commitment)
 		if err != nil {
 			return err
 		}
 
-		if err := tx.Bucket(commitmentsBucket).Put(itob(commitment.Message.ToIndex), raw); err != nil {
-			return err
-		}
-
-		return nil
+		return tx.Bucket(commitmentsBucket).Put(convertToBytes(commitment.ToIndex), raw)
 	})
-}
-
-// getCommitmentMessage queries the signed commitment from the db
-func (s *State) getCommitmentMessage(toIndex uint64) (*CommitmentMessageSigned, error) {
-	var commitment *CommitmentMessageSigned
-
-	err := s.db.View(func(tx *bolt.Tx) error {
-		raw := tx.Bucket(commitmentsBucket).Get(itob(toIndex))
-		if raw == nil {
-			return nil
-		}
-
-		return json.Unmarshal(raw, &commitment)
-	})
-
-	return commitment, err
 }
 
 // getNonExecutedCommitments gets non executed commitments
 // (commitments whose toIndex is greater than or equal to startIndex)
-func (s *State) getNonExecutedCommitments(startIndex uint64) ([]*CommitmentMessageSigned, error) {
-	var commitments []*CommitmentMessageSigned
-
-	err := s.db.View(func(tx *bolt.Tx) error {
-		c := tx.Bucket(commitmentsBucket).Cursor()
-
-		for k, v := c.Last(); k != nil; k, v = c.Prev() {
-			if itou(k) < startIndex {
-				// reached a commitment that was executed
-				break
-			}
-
-			var commitment *CommitmentMessageSigned
-			if err := json.Unmarshal(v, &commitment); err != nil {
-				return err
-			}
-
-			commitments = append(commitments, commitment)
-		}
-
-		return nil
-	})
+func (s *State) getNonExecutedCommitments(startIndex uint64) ([]*CommitmentToExecute, error) {
+	commitments, err := getFilteredFromMemDb[*CommitmentToExecute](s.memdb, commitmentTable, startIndex, nil)
+	if err != nil {
+		return nil, err
+	}
 
 	sort.Slice(commitments, func(i, j int) bool {
-		return commitments[i].Message.FromIndex < commitments[j].Message.FromIndex
+		return commitments[i].SignedCommitment.Message.FromIndex < commitments[j].SignedCommitment.Message.FromIndex
 	})
 
 	return commitments, err
@@ -384,11 +526,20 @@ func (s *State) getNonExecutedCommitments(startIndex uint64) ([]*CommitmentMessa
 
 // cleanCommitments cleans all commitments that are older than the provided fromIndex, alongside their proofs
 func (s *State) cleanCommitments(stateSyncExecutionIndex uint64) error {
+	if stateSyncExecutionIndex <= 1 {
+		// small optimization, there is nothing to clean
+		return nil
+	}
+
+	if err := deleteFilteredFromMemDb(s.memdb, commitmentTable, stateSyncExecutionIndex-1); err != nil {
+		return err
+	}
+
 	return s.db.Update(func(tx *bolt.Tx) error {
 		commitmentsBucket := tx.Bucket(commitmentsBucket)
 		commitmentsCursor := commitmentsBucket.Cursor()
 		for k, _ := commitmentsCursor.First(); k != nil; k, _ = commitmentsCursor.Next() {
-			if itou(k) >= stateSyncExecutionIndex {
+			if convertToUint64(k) >= stateSyncExecutionIndex {
 				// reached a commitment that is not executed
 				break
 			}
@@ -398,192 +549,74 @@ func (s *State) cleanCommitments(stateSyncExecutionIndex uint64) error {
 			}
 		}
 
-		bundlesBucket := tx.Bucket(bundlesBucket)
-		bundlesCursor := bundlesBucket.Cursor()
-		for k, _ := bundlesCursor.First(); k != nil; k, _ = bundlesCursor.Next() {
-			if itou(k) >= stateSyncExecutionIndex {
-				// reached a bundle that is not executed
-				break
-			}
-
-			if err := bundlesBucket.Delete(k); err != nil {
-				return err
-			}
-		}
-
 		return nil
 	})
-}
-
-// insertBundles inserts the provided bundles to db
-func (s *State) insertBundles(bundles []*BundleProof) error {
-	return s.db.Update(func(tx *bolt.Tx) error {
-		bundlesBucket := tx.Bucket(bundlesBucket)
-		for _, b := range bundles {
-			raw, err := json.Marshal(b)
-			if err != nil {
-				return err
-			}
-
-			if err := bundlesBucket.Put(itob(b.ID()), raw); err != nil {
-				return err
-			}
-		}
-
-		return nil
-	})
-}
-
-// getBundles gets bundles that are not executed
-func (s *State) getBundles(stateSyncExecutionIndex, maxNumberOfBundles uint64) ([]*BundleProof, error) {
-	var bundles []*BundleProof
-
-	err := s.db.View(func(tx *bolt.Tx) error {
-		c := tx.Bucket(bundlesBucket).Cursor()
-		processed := uint64(0)
-		for k, v := c.First(); k != nil && processed < maxNumberOfBundles; k, v = c.Next() {
-			if itou(k) >= stateSyncExecutionIndex {
-				var bundle *BundleProof
-				if err := json.Unmarshal(v, &bundle); err != nil {
-					return err
-				}
-
-				bundles = append(bundles, bundle)
-				processed++
-			}
-		}
-
-		return nil
-	})
-
-	return bundles, err
 }
 
 // insertMessageVote inserts given vote to signatures bucket of given epoch
-func (s *State) insertMessageVote(epoch uint64, key []byte, vote *MessageSignature) (int, error) {
-	var numSignatures int
+func (s *State) insertMessageVote(epoch uint64, hash string, vote *MessageSignature) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	votes, err := s.getMessageVotes(hash)
+	if err != nil {
+		return 0, err
+	}
 
-	err := s.db.Update(func(tx *bolt.Tx) error {
-		signatures, err := s.getMessageVotesLocked(tx, epoch, key)
+	if votes == nil {
+		votes = &MessageVotes{
+			Epoch:      epoch,
+			Hash:       hash,
+			Signatures: make([]*MessageSignature, 0),
+		}
+	}
+
+	// check if the signature has already being included
+	for _, sigs := range votes.Signatures {
+		if sigs.From == vote.From {
+			return len(votes.Signatures), nil
+		}
+	}
+
+	votes.Signatures = append(votes.Signatures, vote)
+
+	err = insertToMemDb(s.memdb, messageVoteTable, votes)
+	if err != nil {
+		return 0, err
+	}
+
+	err = s.db.Update(func(tx *bolt.Tx) error {
+		raw, err := json.Marshal(votes)
 		if err != nil {
 			return err
 		}
 
-		// check if the signature has already being included
-		for _, sigs := range signatures {
-			if sigs.From == vote.From {
-				numSignatures = len(signatures)
-
-				return nil
-			}
-		}
-
-		if signatures == nil {
-			signatures = []*MessageSignature{vote}
-		} else {
-			signatures = append(signatures, vote)
-		}
-		numSignatures = len(signatures)
-
-		raw, err := json.Marshal(signatures)
-		if err != nil {
-			return err
-		}
-
-		bucket, err := getNestedBucketInEpoch(tx, epoch, messageVotesBucket)
-		if err != nil {
-			return err
-		}
-
-		if err := bucket.Put(key, raw); err != nil {
-			return err
-		}
-
-		return nil
+		bucket := tx.Bucket(messageVotesBucket)
+		return bucket.Put([]byte(hash), raw)
 	})
 
 	if err != nil {
 		return 0, err
 	}
 
-	return numSignatures, nil
+	return len(votes.Signatures), nil
 }
 
 // getMessageVotes gets all signatures from db associated with given epoch and hash
-func (s *State) getMessageVotes(epoch uint64, hash []byte) ([]*MessageSignature, error) {
-	var signatures []*MessageSignature
-
-	err := s.db.View(func(tx *bolt.Tx) error {
-		res, err := s.getMessageVotesLocked(tx, epoch, hash)
-		if err != nil {
-			return err
-		}
-		signatures = res
-
-		return nil
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	return signatures, nil
+func (s *State) getMessageVotes(hash string) (*MessageVotes, error) {
+	return getFromMemDb[*MessageVotes](s.memdb, messageVoteTable, "hash", hash)
 }
 
-// getMessageVotesLocked gets all signatures from db associated with given epoch and hash
-func (s *State) getMessageVotesLocked(tx *bolt.Tx, epoch uint64, hash []byte) ([]*MessageSignature, error) {
-	bucket, err := getNestedBucketInEpoch(tx, epoch, messageVotesBucket)
-	if err != nil {
-		return nil, err
+// cleanPreviousEpochsDataFromDb cleans data from previous epochs from memdb and boltDb
+func (s *State) cleanPreviousEpochsDataFromDb(currentEpoch uint64) error {
+	if err := deleteFilteredFromMemDb(s.memdb, messageVoteTable, currentEpoch-1); err != nil {
+		return err
 	}
 
-	v := bucket.Get(hash)
-	if v == nil {
-		return nil, nil
-	}
-
-	var signatures []*MessageSignature
-	if err := json.Unmarshal(v, &signatures); err != nil {
-		return nil, err
-	}
-
-	return signatures, nil
-}
-
-// getNestedBucketInEpoch returns a nested (child) bucket from db associated with given epoch
-func getNestedBucketInEpoch(tx *bolt.Tx, epoch uint64, bucketKey []byte) (*bolt.Bucket, error) {
-	epochBucket, err := getEpochBucket(tx, epoch)
-	if err != nil {
-		return nil, err
-	}
-
-	bucket := epochBucket.Bucket(bucketKey)
-
-	if epochBucket == nil {
-		return nil, fmt.Errorf("could not find %v bucket for epoch: %v", string(bucketKey), epoch)
-	}
-
-	return bucket, nil
-}
-
-// getEpochBucket returns bucket from db associated with given epoch
-func getEpochBucket(tx *bolt.Tx, epoch uint64) (*bolt.Bucket, error) {
-	epochBucket := tx.Bucket(epochsBucket).Bucket(itob(epoch))
-	if epochBucket == nil {
-		return nil, fmt.Errorf("could not find bucket for epoch: %v", epoch)
-	}
-
-	return epochBucket, nil
-}
-
-// cleanEpochsFromDB cleans epoch buckets from db
-func (s *State) cleanEpochsFromDB() error {
 	return s.db.Update(func(tx *bolt.Tx) error {
-		if err := tx.DeleteBucket(epochsBucket); err != nil {
+		if err := tx.DeleteBucket(messageVotesBucket); err != nil {
 			return err
 		}
-		_, err := tx.CreateBucket(epochsBucket)
-
+		_, err := tx.CreateBucket(messageVotesBucket)
 		return err
 	})
 }
@@ -591,23 +624,27 @@ func (s *State) cleanEpochsFromDB() error {
 // cleanValidatorSnapshotsFromDB cleans the validator snapshots bucket if a limit is reached,
 // but it leaves the latest (n) number of snapshots
 func (s *State) cleanValidatorSnapshotsFromDB(epoch uint64) error {
+	if numberOfSnapshotsToLeaveInDB < epoch {
+		if err := deleteFilteredFromMemDb(s.memdb, messageVoteTable, epoch-numberOfSnapshotsToLeaveInDB); err != nil {
+			return err
+		}
+	}
+
 	return s.db.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(validatorSnapshotsBucket)
 
 		// paired list
 		keys := make([][]byte, 0)
 		values := make([][]byte, 0)
-		if numberOfSnapshotsToLeaveInDB > 0 { // TODO this is always true?!
-			for i := 0; i < numberOfSnapshotsToLeaveInDB; i++ { // exclude the last inserted we already appended
-				key := itob(epoch)
-				value := bucket.Get(key)
-				if value == nil {
-					continue
-				}
-				keys = append(keys, key)
-				values = append(values, value)
-				epoch--
+		for i := 0; i < numberOfSnapshotsToLeaveInDB; i++ { // exclude the last inserted we already appended
+			key := convertToBytes(epoch)
+			value := bucket.Get(key)
+			if value == nil {
+				continue
 			}
+			keys = append(keys, key)
+			values = append(values, value)
+			epoch--
 		}
 
 		// removing an entire bucket is much faster than removing all keys
@@ -652,11 +689,6 @@ func (s *State) removeAllValidatorSnapshots() error {
 	})
 }
 
-// epochsDBStats returns stats of epochs bucket in db
-func (s *State) epochsDBStats() *bolt.BucketStats {
-	return s.bucketStats(epochsBucket)
-}
-
 // validatorSnapshotsDBStats returns stats of validators snapshot bucket in db
 func (s *State) validatorSnapshotsDBStats() *bolt.BucketStats {
 	return s.bucketStats(validatorSnapshotsBucket)
@@ -666,27 +698,25 @@ func (s *State) validatorSnapshotsDBStats() *bolt.BucketStats {
 func (s *State) bucketStats(bucketName []byte) *bolt.BucketStats {
 	var stats *bolt.BucketStats
 
-	err := s.db.View(func(tx *bolt.Tx) error {
+	s.db.View(func(tx *bolt.Tx) error {
 		s := tx.Bucket(bucketName).Stats()
 		stats = &s
 
 		return nil
 	})
 
-	if err != nil {
-		s.logger.Error("Cannot check bucket stats", "Bucket name", string(bucketName), "Error", err)
-	}
-
 	return stats
 }
 
-func itob(v uint64) []byte {
+// convertToBytes converts uint64 to bytes array
+func convertToBytes(v uint64) []byte {
 	b := make([]byte, 8)
 	binary.BigEndian.PutUint64(b, v)
 
 	return b
 }
 
-func itou(v []byte) uint64 {
+// convertToUint64 converts bytes array to uint64
+func convertToUint64(v []byte) uint64 {
 	return binary.BigEndian.Uint64(v)
 }
