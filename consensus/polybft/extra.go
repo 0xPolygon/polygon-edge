@@ -330,8 +330,6 @@ func (s *Signature) VerifyCommittedFields(validatorSet AccountSet, hash types.Ha
 		return fmt.Errorf("quorum not reached")
 	}
 
-	// TO DO Nemanja - what to do with signatures
-	// log.Trace("VerifyCommittedFields", "Filtered validators", filtered, "Bitmap", s.Bitmap)
 	rawMsg := hash[:]
 	blsPublicKeys := make([]*bls.PublicKey, len(filtered))
 

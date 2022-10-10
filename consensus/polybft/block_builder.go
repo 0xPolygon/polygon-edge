@@ -101,9 +101,8 @@ type BlockBuilder struct {
 	// header is the header for the block being created
 	header *types.Header
 
-	// transactions and receipts are the data included in the block
-	txns     []*types.Transaction
-	receipts []*types.Receipt
+	// transactions are the data included in the block
+	txns []*types.Transaction
 
 	// block is a reference to the already built block
 	block *types.Block
@@ -129,7 +128,6 @@ func (b *BlockBuilder) Reset() {
 
 	b.block = nil
 	b.txns = []*types.Transaction{}
-	b.receipts = []*types.Receipt{}
 
 	transition, err := b.params.Executor.BeginTxn(b.params.Parent.StateRoot, b.header, b.params.Coinbase)
 	if err != nil {
