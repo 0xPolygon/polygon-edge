@@ -68,7 +68,9 @@ var (
 	// array of all parent buckets
 	parentBuckets = [][]byte{syncStateEventsBucket, commitmentsBucket, messageVotesBucket, validatorSnapshotsBucket}
 	// errNotEnoughStateSyncs error message
-	errNotEnoughStateSyncs = errors.New("there is either a gap or not enough sync events")
+	errNotEnoughStateSyncs = errors.New("there is not enough sync events")
+	// errGapInStateSyncs error message
+	errGapInStateSyncs = errors.New("there is a gap in state sync events")
 	// errCommitmentNotBuilt error message
 	errCommitmentNotBuilt = errors.New("there is no built commitment to register")
 )
@@ -206,7 +208,7 @@ func (s *StateSyncIterator) Next() (MemDBRecord, error) {
 	// ensure linearity
 	if res != nil && res.Key()+1 != obj.Key() {
 		// for the case when there is a gap in state syncs
-		return nil, errNotEnoughStateSyncs
+		return nil, errGapInStateSyncs
 	}
 
 	s.next = obj
@@ -330,10 +332,12 @@ func getFromMemDB[V MemDBRecord](memdb *memdb.MemDB, table, indexName string, id
 	}
 
 	if result != nil {
-		record, isOk := result.(V)
+		r, isOk := result.(V)
 		if !isOk {
 			return record, errors.New("record not of given type")
 		}
+
+		record = r
 	}
 
 	return record, nil

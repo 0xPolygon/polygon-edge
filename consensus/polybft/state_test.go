@@ -252,10 +252,10 @@ func TestState_cleanValidatorSnapshotsFromDb(t *testing.T) {
 	}
 }
 
-func TestState_getStateSyncEventsForCommitment_NotEnoughEvents(t *testing.T) {
+func TestState_getStateSyncEventsForCommitment_NegativeCases(t *testing.T) {
 	state := newTestState(t)
 
-	for i := 0; i < stateSyncMainBundleSize-2; i++ {
+	for i := 0; i < stateSyncMainBundleSize; i++ {
 		assert.NoError(t, state.insertStateSyncEvent(&StateSyncEvent{
 			ID:   uint64(i),
 			Data: []byte{1, 2},
@@ -264,6 +264,20 @@ func TestState_getStateSyncEventsForCommitment_NotEnoughEvents(t *testing.T) {
 
 	_, err := state.getStateSyncEventsForCommitment(0, stateSyncMainBundleSize)
 	assert.ErrorIs(t, err, errNotEnoughStateSyncs)
+
+	t.Run("Get state sync events - not enough events", func(t *testing.T) {
+		_, err := state.getStateSyncEventsForCommitment(0, stateSyncMainBundleSize+1)
+		assert.ErrorIs(t, err, errNotEnoughStateSyncs)
+	})
+
+	t.Run("Get state sync events - there is a gap in events", func(t *testing.T) {
+		assert.NoError(t, state.insertStateSyncEvent(&StateSyncEvent{
+			ID:   uint64(stateSyncMainBundleSize + 2),
+			Data: []byte{1, 2},
+		}))
+		_, err := state.getStateSyncEventsForCommitment(0, stateSyncMainBundleSize+2)
+		assert.ErrorIs(t, err, errGapInStateSyncs)
+	})
 }
 
 func TestState_getStateSyncEventsForCommitment(t *testing.T) {
@@ -321,9 +335,17 @@ func TestState_getNonExecutedCommitments(t *testing.T) {
 		require.NoError(t, state.insertCommitmentMessage(commitmentToExecute))
 	}
 
-	commitmentsNotExecuted, err := state.getNonExecutedCommitments(lastExecutedCommitment)
-	assert.NoError(t, err)
-	assert.Equal(t, 2, len(commitmentsNotExecuted))
+	t.Run("Get non executed commitments", func(t *testing.T) {
+		commitmentsNotExecuted, err := state.getNonExecutedCommitments(lastExecutedCommitment)
+		assert.NoError(t, err)
+		assert.Len(t, commitmentsNotExecuted, 2)
+	})
+
+	t.Run("Get non executed commitments - nothing to execute", func(t *testing.T) {
+		commitmentsNotExecuted, err := state.getNonExecutedCommitments(lastExecutedCommitment + lastExecutedCommitment)
+		assert.NoError(t, err)
+		assert.Len(t, commitmentsNotExecuted, 0)
+	})
 }
 
 func TestState_cleanCommitments(t *testing.T) {
@@ -427,6 +449,13 @@ func TestMemdb_InsertGetDeleteStateSyncEvents(t *testing.T) {
 
 		require.NoError(t, err)
 		require.Len(t, events, 5)
+	})
+
+	t.Run("Get state sync events from an non existing id", func(t *testing.T) {
+		events, err := getFilteredFromMemDB[*StateSyncEvent](memdb, stateSyncTable, uint64(stateSyncCount+1), math.MaxUint64)
+
+		require.NoError(t, err)
+		require.Len(t, events, 0)
 	})
 
 	t.Run("Delete state sync events lower or equal to index 4", func(t *testing.T) {
@@ -534,6 +563,12 @@ func TestMemdb_InsertGetDeleteValidatorSnapshots(t *testing.T) {
 		snapshots, err := getFilteredFromMemDB[*ValidatorSnapshot](memdb, validatorSnapshotTable, uint64(3), uint64(epochsCount))
 		require.NoError(t, err)
 		require.Len(t, snapshots, 2)
+	})
+
+	t.Run("Get snapshots from a non existing epoch", func(t *testing.T) {
+		snapshots, err := getFilteredFromMemDB[*ValidatorSnapshot](memdb, validatorSnapshotTable, uint64(epochsCount), math.MaxUint64)
+		require.NoError(t, err)
+		require.Len(t, snapshots, 0)
 	})
 
 	t.Run("Delete snapshots lower or equal to epoch 2", func(t *testing.T) {
