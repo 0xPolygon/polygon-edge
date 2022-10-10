@@ -58,3 +58,7 @@ run-local:
 stop-local:
 	docker-compose -f ./docker/local/docker-compose.yml stop
 
+.PHONY: compile-v3-contracts
+compile-v3-contracts:
+	cd consensus/polybft/polybftcontracts && npm install && npm run compile
+
