@@ -23,7 +23,7 @@ jobs:
         run: make compile-v3-contracts
 
       - name: Run Go Test
-        run: go test -coverprofile coverage.out -timeout 20m `go list ./... | grep -v e2e`
+        run: make test
 
       - name: Upload coverage file to Codecov
         uses: codecov/codecov-action@v3
