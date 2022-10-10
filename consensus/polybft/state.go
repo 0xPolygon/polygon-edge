@@ -135,16 +135,24 @@ func getUpperBoundUint64(upperBound interface{}) uint64 {
 		// if there is no upper bound provided, than we return everything
 		return math.MaxUint64
 	}
+
 	upper, ok := upperBound.(uint64)
+
 	if !ok {
 		panic("state sync table upper bound not a uint64")
 	}
+
 	return upper
 }
 
 var iterators = map[string]func(it memdb.ResultIterator, upperBound interface{}, first MemDBRecord) MemDBIterator{
 	stateSyncTable: func(it memdb.ResultIterator, upperBound interface{}, first MemDBRecord) MemDBIterator {
-		return &StateSyncIterator{iter: it, next: first.(*StateSyncEvent), upperBound: getUpperBoundUint64(upperBound)}
+		event, isOk := first.(*StateSyncEvent)
+		if !isOk {
+			panic("element not of type StateSyncEvent")
+		}
+
+		return &StateSyncIterator{iter: it, next: event, upperBound: getUpperBoundUint64(upperBound)}
 	},
 	commitmentTable: func(it memdb.ResultIterator, upperBound interface{}, first MemDBRecord) MemDBIterator {
 		return &MemDBRecordIterator{iter: it, next: first, upperBound: getUpperBoundUint64(upperBound)}
@@ -182,10 +190,15 @@ func (s *StateSyncIterator) Next() (MemDBRecord, error) {
 		if s.lastGottenID < s.upperBound && s.upperBound != math.MaxUint64 {
 			return nil, errNotEnoughStateSyncs
 		}
+
 		return res, nil
 	}
 
-	obj := nextItem.(MemDBRecord)
+	obj, isOk := nextItem.(MemDBRecord)
+	if !isOk {
+		return nil, errors.New("item not a MemDBRecord")
+	}
+
 	if obj.Key() > s.upperBound {
 		return res, nil
 	}
@@ -197,6 +210,7 @@ func (s *StateSyncIterator) Next() (MemDBRecord, error) {
 	}
 
 	s.next = obj
+
 	return res, nil
 }
 
@@ -219,30 +233,37 @@ func (s *MemDBRecordIterator) Next() (MemDBRecord, error) {
 		return res, nil
 	}
 
-	obj := nextItem.(MemDBRecord)
+	obj, isOk := nextItem.(MemDBRecord)
+	if !isOk {
+		return nil, errors.New("item not a MemDBRecord")
+	}
+
 	if obj.Key() > s.upperBound {
 		return res, nil
 	}
 
 	s.next = obj
+
 	return res, nil
 }
 
-// insertToMemDb inserts a new record in provided table
-func insertToMemDb[V MemDBRecord](memdb *memdb.MemDB, table string, record V) error {
+// insertToMemDB inserts a new record in provided table
+func insertToMemDB[V MemDBRecord](memdb *memdb.MemDB, table string, record V) error {
 	txn := memdb.Txn(true)
 	if err := txn.Insert(table, record); err != nil {
 		txn.Abort()
+
 		return err
 	}
+
 	txn.Commit()
+
 	return nil
 }
 
-// getFilteredFromMemDb returns a filtered collection of desired memdb records
-func getFilteredFromMemDb[V MemDBRecord](memdb *memdb.MemDB, table string,
+// getFilteredFromMemDB returns a filtered collection of desired memdb records
+func getFilteredFromMemDB[V MemDBRecord](memdb *memdb.MemDB, table string,
 	lowerBound, upperBound interface{}) ([]V, error) {
-
 	txn := memdb.Txn(false)
 	defer txn.Abort()
 
@@ -252,7 +273,9 @@ func getFilteredFromMemDb[V MemDBRecord](memdb *memdb.MemDB, table string,
 	}
 
 	var slice []V
+
 	iteratorCreator, exists := iterators[table]
+
 	if !exists {
 		panic(fmt.Sprintf("no iterator found for table: %v", table))
 	}
@@ -262,7 +285,12 @@ func getFilteredFromMemDb[V MemDBRecord](memdb *memdb.MemDB, table string,
 		return slice, nil
 	}
 
-	iterator := iteratorCreator(memdbIterator, upperBound, elem.(V))
+	firstElement, isOk := elem.(V)
+	if !isOk {
+		return nil, errors.New("first element not of provided type")
+	}
+
+	iterator := iteratorCreator(memdbIterator, upperBound, firstElement)
 
 	for {
 		record, err := iterator.Next()
@@ -274,41 +302,53 @@ func getFilteredFromMemDb[V MemDBRecord](memdb *memdb.MemDB, table string,
 			break
 		}
 
-		r := record.(V)
+		r, isOk := record.(V)
+		if !isOk {
+			return nil, errors.New("element not of provided type")
+		}
+
 		slice = append(slice, r)
 	}
 
 	return slice, nil
 }
 
-func getFromMemDb[V MemDBRecord](memdb *memdb.MemDB, table, indexName string, id interface{}) (V, error) {
+func getFromMemDB[V MemDBRecord](memdb *memdb.MemDB, table, indexName string, id interface{}) (V, error) {
 	txn := memdb.Txn(false)
 	defer txn.Abort()
 
 	var record V
+
 	result, err := txn.First(table, indexName, id)
+
 	if err != nil {
 		return record, err
 	}
 
 	if result != nil {
-		record = result.(V)
+		record, isOk := result.(V)
+		if !isOk {
+			return record, errors.New("record not of given type")
+		}
 	}
+
 	return record, nil
 }
 
-func deleteFilteredFromMemDb(memdb *memdb.MemDB, table string, upperBound interface{}) error {
+func deleteFilteredFromMemDB(memdb *memdb.MemDB, table string, upperBound interface{}) error {
 	txn := memdb.Txn(true)
 
 	it, err := txn.ReverseLowerBound(table, "id", upperBound)
 	if err != nil {
 		txn.Abort()
+
 		return err
 	}
 
 	// Put them into a slice so there are no safety concerns while actually
 	// performing the deletes
 	var records []interface{}
+
 	for {
 		obj := it.Next()
 		if obj == nil {
@@ -325,6 +365,7 @@ func deleteFilteredFromMemDb(memdb *memdb.MemDB, table string, upperBound interf
 	}
 
 	txn.Commit()
+
 	return nil
 }
 
@@ -373,6 +414,7 @@ func (s *State) populateMemdb() error {
 	if err := populateMemdbTable[*StateSyncEvent](s, stateSyncTable, syncStateEventsBucket); err != nil {
 		return err
 	}
+
 	if err := populateMemdbTable[*ValidatorSnapshot](s, validatorSnapshotTable,
 		validatorSnapshotsBucket); err != nil {
 		return err
@@ -393,7 +435,7 @@ func populateMemdbTable[V MemDBRecord](s *State, table string, bucket []byte) er
 	}
 
 	for _, r := range records {
-		if err := insertToMemDb(s.memdb, table, r); err != nil {
+		if err := insertToMemDB(s.memdb, table, r); err != nil {
 			return err
 		}
 	}
@@ -412,12 +454,15 @@ func list[V MemDBRecord](s *State, bucket []byte) ([]V, error) {
 				return err
 			}
 			records = append(records, record)
+
 			return nil
 		})
 	})
+
 	if err != nil {
 		return nil, err
 	}
+
 	return records, nil
 }
 
@@ -440,7 +485,7 @@ func initMainDBBuckets(db *bolt.DB) error {
 // insertValidatorSnapshot inserts a validator snapshot for the given epoch to its bucket in db
 func (s *State) insertValidatorSnapshot(epoch uint64, validatorSnapshot AccountSet) error {
 	snapshot := &ValidatorSnapshot{epoch, validatorSnapshot}
-	if err := insertToMemDb(s.memdb, validatorSnapshotTable, snapshot); err != nil {
+	if err := insertToMemDB(s.memdb, validatorSnapshotTable, snapshot); err != nil {
 		return err
 	}
 
@@ -458,7 +503,7 @@ func (s *State) insertValidatorSnapshot(epoch uint64, validatorSnapshot AccountS
 
 // getValidatorSnapshot queries the validator snapshot for given epoch from db
 func (s *State) getValidatorSnapshot(epoch uint64) (AccountSet, error) {
-	memdbRecord, err := getFromMemDb[*ValidatorSnapshot](s.memdb, validatorSnapshotTable, "id", epoch)
+	memdbRecord, err := getFromMemDB[*ValidatorSnapshot](s.memdb, validatorSnapshotTable, "id", epoch)
 	if err != nil {
 		return nil, err
 	}
@@ -472,7 +517,7 @@ func (s *State) getValidatorSnapshot(epoch uint64) (AccountSet, error) {
 
 // insertStateSyncEvent inserts a new state sync event to state event bucket in db
 func (s *State) insertStateSyncEvent(event *StateSyncEvent) error {
-	if err := insertToMemDb(s.memdb, stateSyncTable, event); err != nil {
+	if err := insertToMemDB(s.memdb, stateSyncTable, event); err != nil {
 		return err
 	}
 
@@ -483,6 +528,7 @@ func (s *State) insertStateSyncEvent(event *StateSyncEvent) error {
 		}
 
 		bucket := tx.Bucket(syncStateEventsBucket)
+
 		return bucket.Put(convertToBytes(event.ID), raw)
 	})
 }
@@ -490,12 +536,12 @@ func (s *State) insertStateSyncEvent(event *StateSyncEvent) error {
 // getStateSyncEventsForCommitment returns state sync events for commitment
 // if there is an event with index that can not be found in db in given range, an error is returned
 func (s *State) getStateSyncEventsForCommitment(fromIndex, toIndex uint64) ([]*StateSyncEvent, error) {
-	return getFilteredFromMemDb[*StateSyncEvent](s.memdb, stateSyncTable, fromIndex, toIndex)
+	return getFilteredFromMemDB[*StateSyncEvent](s.memdb, stateSyncTable, fromIndex, toIndex)
 }
 
 // insertCommitmentMessage inserts signed commitment to db
 func (s *State) insertCommitmentMessage(commitment *CommitmentToExecute) error {
-	if err := insertToMemDb(s.memdb, commitmentTable, commitment); err != nil {
+	if err := insertToMemDB(s.memdb, commitmentTable, commitment); err != nil {
 		return err
 	}
 
@@ -512,7 +558,7 @@ func (s *State) insertCommitmentMessage(commitment *CommitmentToExecute) error {
 // getNonExecutedCommitments gets non executed commitments
 // (commitments whose toIndex is greater than or equal to startIndex)
 func (s *State) getNonExecutedCommitments(startIndex uint64) ([]*CommitmentToExecute, error) {
-	commitments, err := getFilteredFromMemDb[*CommitmentToExecute](s.memdb, commitmentTable, startIndex, nil)
+	commitments, err := getFilteredFromMemDB[*CommitmentToExecute](s.memdb, commitmentTable, startIndex, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -531,7 +577,7 @@ func (s *State) cleanCommitments(stateSyncExecutionIndex uint64) error {
 		return nil
 	}
 
-	if err := deleteFilteredFromMemDb(s.memdb, commitmentTable, stateSyncExecutionIndex-1); err != nil {
+	if err := deleteFilteredFromMemDB(s.memdb, commitmentTable, stateSyncExecutionIndex-1); err != nil {
 		return err
 	}
 
@@ -558,6 +604,7 @@ func (s *State) insertMessageVote(epoch uint64, hash string, vote *MessageSignat
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	votes, err := s.getMessageVotes(hash)
+
 	if err != nil {
 		return 0, err
 	}
@@ -579,7 +626,7 @@ func (s *State) insertMessageVote(epoch uint64, hash string, vote *MessageSignat
 
 	votes.Signatures = append(votes.Signatures, vote)
 
-	err = insertToMemDb(s.memdb, messageVoteTable, votes)
+	err = insertToMemDB(s.memdb, messageVoteTable, votes)
 	if err != nil {
 		return 0, err
 	}
@@ -591,6 +638,7 @@ func (s *State) insertMessageVote(epoch uint64, hash string, vote *MessageSignat
 		}
 
 		bucket := tx.Bucket(messageVotesBucket)
+
 		return bucket.Put([]byte(hash), raw)
 	})
 
@@ -603,12 +651,12 @@ func (s *State) insertMessageVote(epoch uint64, hash string, vote *MessageSignat
 
 // getMessageVotes gets all signatures from db associated with given epoch and hash
 func (s *State) getMessageVotes(hash string) (*MessageVotes, error) {
-	return getFromMemDb[*MessageVotes](s.memdb, messageVoteTable, "hash", hash)
+	return getFromMemDB[*MessageVotes](s.memdb, messageVoteTable, "hash", hash)
 }
 
-// cleanPreviousEpochsDataFromDb cleans data from previous epochs from memdb and boltDb
-func (s *State) cleanPreviousEpochsDataFromDb(currentEpoch uint64) error {
-	if err := deleteFilteredFromMemDb(s.memdb, messageVoteTable, currentEpoch-1); err != nil {
+// cleanPreviousEpochsDataFromDB cleans data from previous epochs from memdb and boltDb
+func (s *State) cleanPreviousEpochsDataFromDB(currentEpoch uint64) error {
+	if err := deleteFilteredFromMemDB(s.memdb, messageVoteTable, currentEpoch-1); err != nil {
 		return err
 	}
 
@@ -617,6 +665,7 @@ func (s *State) cleanPreviousEpochsDataFromDb(currentEpoch uint64) error {
 			return err
 		}
 		_, err := tx.CreateBucket(messageVotesBucket)
+
 		return err
 	})
 }
@@ -625,7 +674,7 @@ func (s *State) cleanPreviousEpochsDataFromDb(currentEpoch uint64) error {
 // but it leaves the latest (n) number of snapshots
 func (s *State) cleanValidatorSnapshotsFromDB(epoch uint64) error {
 	if numberOfSnapshotsToLeaveInDB < epoch {
-		if err := deleteFilteredFromMemDb(s.memdb, messageVoteTable, epoch-numberOfSnapshotsToLeaveInDB); err != nil {
+		if err := deleteFilteredFromMemDB(s.memdb, messageVoteTable, epoch-numberOfSnapshotsToLeaveInDB); err != nil {
 			return err
 		}
 	}

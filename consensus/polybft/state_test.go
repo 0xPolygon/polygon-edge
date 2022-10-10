@@ -19,8 +19,12 @@ import (
 )
 
 func newTestState(t *testing.T) *State {
+	t.Helper()
+
 	dir := fmt.Sprintf("/tmp/consensus-temp_%v", time.Now().Format(time.RFC3339))
+
 	err := os.Mkdir(dir, 0777)
+
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -35,6 +39,7 @@ func newTestState(t *testing.T) *State {
 			t.Fatal(err)
 		}
 	})
+
 	return state
 }
 
@@ -77,6 +82,7 @@ func TestState_InsertAndGetVotesForDifferentCommitment(t *testing.T) {
 	assert.NoError(t, err)
 
 	hash := commitmentMsg.Message.Hash()
+
 	assert.NoError(t, err)
 
 	_, err = state.insertMessageVote(0, hash.String(), &MessageSignature{
@@ -89,6 +95,7 @@ func TestState_InsertAndGetVotesForDifferentCommitment(t *testing.T) {
 	assert.NoError(t, err)
 
 	hash = commitmentMsg.Message.Hash()
+
 	assert.NoError(t, err)
 
 	_, err = state.insertMessageVote(2, hash.String(), &MessageSignature{
@@ -112,9 +119,12 @@ func TestState_InsertVoteConcurrent(t *testing.T) {
 
 	epoch := uint64(1)
 	hash := "hash"
+
 	var wg sync.WaitGroup
+
 	for i := 0; i < 100; i++ {
 		wg.Add(1)
+
 		go func(i int) {
 			defer wg.Done()
 
@@ -134,6 +144,7 @@ func TestState_InsertVoteConcurrent(t *testing.T) {
 
 func TestState_Insert_And_Cleanup(t *testing.T) {
 	state := newTestState(t)
+
 	for i := uint64(1); i < 1001; i++ {
 		hash := fmt.Sprintf("hash_%v", i)
 		_, _ = state.insertMessageVote(i, hash, &MessageSignature{
@@ -146,7 +157,7 @@ func TestState_Insert_And_Cleanup(t *testing.T) {
 	// Since we inserted 1000 message votes for 1000 epochs we expect to have 1000 buckets
 	assert.Equal(t, 1000, state.bucketStats(messageVotesBucket).KeyN)
 
-	err := state.cleanPreviousEpochsDataFromDb(1001)
+	err := state.cleanPreviousEpochsDataFromDB(1001)
 	assert.NoError(t, err)
 
 	assert.Equal(t, 0, state.bucketStats(messageVotesBucket).BucketN-1)
@@ -173,9 +184,13 @@ func TestState_Insert_And_Cleanup(t *testing.T) {
 
 func TestState_insertAndGetValidatorSnapshot(t *testing.T) {
 	epoch := uint64(1)
+
 	state := newTestState(t)
+
 	keys, err := bls.CreateRandomBlsKeys(3)
+
 	require.NoError(t, err)
+
 	snapshot := AccountSet{
 		&ValidatorAccount{Address: types.BytesToAddress([]byte{0x18}), BlsKey: keys[0].PublicKey()},
 		&ValidatorAccount{Address: types.BytesToAddress([]byte{0x23}), BlsKey: keys[1].PublicKey()},
@@ -184,13 +199,13 @@ func TestState_insertAndGetValidatorSnapshot(t *testing.T) {
 
 	assert.NoError(t, state.insertValidatorSnapshot(epoch, snapshot))
 
-	snapshotFromDb, err := state.getValidatorSnapshot(epoch)
+	snapshotFromDB, err := state.getValidatorSnapshot(epoch)
 	assert.NoError(t, err)
-	assert.Equal(t, snapshot.Len(), snapshotFromDb.Len())
+	assert.Equal(t, snapshot.Len(), snapshotFromDB.Len())
 
 	for i, v := range snapshot {
-		assert.Equal(t, v.Address, snapshotFromDb[i].Address)
-		assert.Equal(t, v.BlsKey, snapshotFromDb[i].BlsKey)
+		assert.Equal(t, v.Address, snapshotFromDB[i].Address)
+		assert.Equal(t, v.BlsKey, snapshotFromDB[i].BlsKey)
 	}
 }
 
@@ -198,6 +213,7 @@ func TestState_cleanValidatorSnapshotsFromDb(t *testing.T) {
 	state := newTestState(t)
 	keys, err := bls.CreateRandomBlsKeys(3)
 	require.NoError(t, err)
+
 	snapshot := AccountSet{
 		&ValidatorAccount{Address: types.BytesToAddress([]byte{0x18}), BlsKey: keys[0].PublicKey()},
 		&ValidatorAccount{Address: types.BytesToAddress([]byte{0x23}), BlsKey: keys[1].PublicKey()},
@@ -211,12 +227,14 @@ func TestState_cleanValidatorSnapshotsFromDb(t *testing.T) {
 		assert.NoError(t, state.insertValidatorSnapshot(epoch, snapshot))
 	}
 
-	snapshotFromDb, err := state.getValidatorSnapshot(epoch)
+	snapshotFromDB, err := state.getValidatorSnapshot(epoch)
+
 	assert.NoError(t, err)
-	assert.Equal(t, snapshot.Len(), snapshotFromDb.Len())
+	assert.Equal(t, snapshot.Len(), snapshotFromDB.Len())
+
 	for i, v := range snapshot {
-		assert.Equal(t, v.Address, snapshotFromDb[i].Address)
-		assert.Equal(t, v.BlsKey, snapshotFromDb[i].BlsKey)
+		assert.Equal(t, v.Address, snapshotFromDB[i].Address)
+		assert.Equal(t, v.BlsKey, snapshotFromDB[i].BlsKey)
 	}
 
 	assert.NoError(t, state.cleanValidatorSnapshotsFromDB(epoch))
@@ -224,10 +242,11 @@ func TestState_cleanValidatorSnapshotsFromDb(t *testing.T) {
 	// test that last (numberOfSnapshotsToLeaveInDb) of snapshots are left in db after cleanup
 	validatorSnapshotsBucketStats := state.validatorSnapshotsDBStats()
 	assert.Equal(t, numberOfSnapshotsToLeaveInDB, validatorSnapshotsBucketStats.KeyN)
+
 	for i := 0; i < numberOfSnapshotsToLeaveInDB; i++ {
-		snapshotFromDb, err = state.getValidatorSnapshot(epoch)
+		snapshotFromDB, err = state.getValidatorSnapshot(epoch)
 		assert.NoError(t, err)
-		assert.NotNil(t, snapshotFromDb)
+		assert.NotNil(t, snapshotFromDB)
 		epoch--
 	}
 }
@@ -273,11 +292,12 @@ func TestState_insertCommitmentMessage(t *testing.T) {
 	state := newTestState(t)
 	assert.NoError(t, state.insertCommitmentMessage(commitmentToExecute))
 
-	commitmentToExecuteFromDb, err := list[*CommitmentToExecute](state, commitmentsBucket)
+	commitmentToExecuteFromDB, err := list[*CommitmentToExecute](state, commitmentsBucket)
+
 	assert.NoError(t, err)
-	assert.NotNil(t, commitmentToExecuteFromDb)
-	assert.Len(t, commitmentToExecuteFromDb, 1)
-	assert.Equal(t, commitmentToExecute, commitmentToExecuteFromDb[0])
+	assert.NotNil(t, commitmentToExecuteFromDB)
+	assert.Len(t, commitmentToExecuteFromDB, 1)
+	assert.Equal(t, commitmentToExecute, commitmentToExecuteFromDB[0])
 }
 
 func TestState_getNonExecutedCommitments(t *testing.T) {
@@ -292,6 +312,7 @@ func TestState_getNonExecutedCommitments(t *testing.T) {
 	for i := uint64(0); i < numberOfCommitments; i++ {
 		commitment, err := createTestCommitmentMessage(i*bundleSize, bundleSize)
 		require.NoError(t, err)
+
 		commitmentToExecute := &CommitmentToExecute{
 			SignedCommitment: commitment,
 			ToIndex:          commitment.Message.ToIndex,
@@ -317,15 +338,18 @@ func TestState_cleanCommitments(t *testing.T) {
 
 	assert.NoError(t, state.cleanCommitments(lastCommitmentToIndex))
 
-	commitmentToExecute, err := getFromMemDb[*CommitmentToExecute](state.memdb, commitmentTable, "id", lastCommitmentToIndex)
+	commitmentToExecute, err := getFromMemDB[*CommitmentToExecute](state.memdb, commitmentTable, "id", lastCommitmentToIndex)
 	assert.NoError(t, err)
 	assert.Equal(t, lastCommitmentToIndex, commitmentToExecute.ToIndex)
 }
 
 func insertTestCommitments(t *testing.T, state *State, numberOfCommitments uint64) {
+	t.Helper()
+
 	for i := uint64(1); i <= numberOfCommitments; i++ {
 		commitment, err := createTestCommitmentMessage(i*stateSyncMainBundleSize, stateSyncMainBundleSize)
 		require.NoError(t, err)
+
 		commitmentToExecute := &CommitmentToExecute{
 			SignedCommitment: commitment,
 			ToIndex:          commitment.Message.ToIndex,
@@ -344,20 +368,20 @@ func createTestStateSyncs(numberOfEvents, startIndex uint64) []*StateSyncEvent {
 			Data:   []byte{0, 1},
 		})
 	}
+
 	return stateSyncEvents
 }
 
 func createTestCommitmentMessage(fromIndex, bundleSize uint64) (*CommitmentMessageSigned, error) {
 	// TODO - uncomment once changes from the integration with v3-contracts get moved to edge
 	// tree, err := NewMerkleTree([][]byte{
-	// 	{0, 1},
-	// 	{2, 3},
-	// 	{4, 5},
+	//      {0, 1},
+	//      {2, 3},
+	//      {4, 5},
 	// })
 	// if err != nil {
-	// 	return nil, err
+	//      return nil, err
 	// }
-
 	msg := &CommitmentMessage{
 		// MerkleRootHash: tree.Hash(),
 		MerkleRootHash: types.EmptyRootHash,
@@ -381,33 +405,33 @@ func TestMemdb_InsertGetDeleteStateSyncEvents(t *testing.T) {
 	stateSyncs := generateStateSyncEvents(t, stateSyncCount, 0)
 
 	for _, sse := range stateSyncs {
-		require.NoError(t, insertToMemDb(memdb, stateSyncTable, sse))
+		require.NoError(t, insertToMemDB(memdb, stateSyncTable, sse))
 	}
 
 	t.Run("Get all state sync events", func(t *testing.T) {
-		events, err := getFilteredFromMemDb[*StateSyncEvent](memdb, stateSyncTable, uint64(0), nil)
+		events, err := getFilteredFromMemDB[*StateSyncEvent](memdb, stateSyncTable, uint64(0), nil)
 		require.NoError(t, err)
 		require.Len(t, events, stateSyncCount)
 	})
 
 	t.Run("Get state sync events from beginning to middle", func(t *testing.T) {
-		events, err := getFilteredFromMemDb[*StateSyncEvent](memdb, stateSyncTable, uint64(0), uint64(4))
+		events, err := getFilteredFromMemDB[*StateSyncEvent](memdb, stateSyncTable, uint64(0), uint64(4))
 
 		require.NoError(t, err)
 		require.Len(t, events, 5)
 	})
 
 	t.Run("Get state sync events from middle to end", func(t *testing.T) {
-		events, err := getFilteredFromMemDb[*StateSyncEvent](memdb, stateSyncTable, uint64(5), uint64(stateSyncCount)-1)
+		events, err := getFilteredFromMemDB[*StateSyncEvent](memdb, stateSyncTable, uint64(5), uint64(stateSyncCount)-1)
 
 		require.NoError(t, err)
 		require.Len(t, events, 5)
 	})
 
 	t.Run("Delete state sync events lower or equal to index 4", func(t *testing.T) {
-		err := deleteFilteredFromMemDb(memdb, stateSyncTable, uint64(4))
+		err := deleteFilteredFromMemDB(memdb, stateSyncTable, uint64(4))
 		require.NoError(t, err)
-		events, err := getFilteredFromMemDb[*StateSyncEvent](memdb, stateSyncTable, uint64(0), nil)
+		events, err := getFilteredFromMemDB[*StateSyncEvent](memdb, stateSyncTable, uint64(0), nil)
 		require.NoError(t, err)
 		require.Len(t, events, 5)
 	})
@@ -415,82 +439,82 @@ func TestMemdb_InsertGetDeleteStateSyncEvents(t *testing.T) {
 
 // TODO - uncomment once changes from the integration with v3-contracts get moved to edge
 // func TestMemdb_InsertAndGetDeleteCommitmentsToExecute(t *testing.T) {
-// 	const (
-// 		epochsCount    = 5
-// 		stateSyncCount = 10
-// 		commitmentSize = 10
-// 		bundleSize     = 5
-// 	)
+//      const (
+//              epochsCount    = 5
+//              stateSyncCount = 10
+//              commitmentSize = 10
+//              bundleSize     = 5
+//      )
 
-// 	memdb, err := memdb.NewMemDB(memStateSchema)
-// 	require.NoError(t, err)
+//      memdb, err := memdb.NewMemDB(memStateSchema)
+//      require.NoError(t, err)
 
-// 	commitmentsToExecute := make([]*CommitmentToExecute, epochsCount)
-// 	for i := 0; i < epochsCount; i++ {
-// 		epoch := uint64(i)
-// 		stateSyncs := generateStateSyncEvents(t, stateSyncCount, uint64(i*stateSyncCount))
-// 		from := stateSyncs[0].ID
-// 		to := stateSyncs[len(stateSyncs)-1].ID
-// 		commitment, err := NewCommitment(epoch, from, to, bundleSize, stateSyncs)
-// 		require.NoError(t, err)
+//      commitmentsToExecute := make([]*CommitmentToExecute, epochsCount)
+//      for i := 0; i < epochsCount; i++ {
+//              epoch := uint64(i)
+//              stateSyncs := generateStateSyncEvents(t, stateSyncCount, uint64(i*stateSyncCount))
+//              from := stateSyncs[0].ID
+//              to := stateSyncs[len(stateSyncs)-1].ID
+//              commitment, err := NewCommitment(epoch, from, to, bundleSize, stateSyncs)
+//              require.NoError(t, err)
 
-// 		commitmentMessage := NewCommitmentMessage(commitment.MerkleTree.Hash(), from, to, bundleSize)
+//              commitmentMessage := NewCommitmentMessage(commitment.MerkleTree.Hash(), from, to, bundleSize)
 
-// 		var proofs []*BundleProof
-// 		for j := uint64(0); j < commitmentMessage.BundlesCount(); j++ {
-// 			proof := commitment.GenerateProof(j, 0)
-// 			require.NoError(t, err)
-// 			proofs = append(proofs, &BundleProof{
-// 				Proof:      proof,
-// 				StateSyncs: stateSyncs[j*bundleSize : (j*bundleSize)+bundleSize],
-// 			})
-// 		}
+//              var proofs []*BundleProof
+//              for j := uint64(0); j < commitmentMessage.BundlesCount(); j++ {
+//                      proof := commitment.GenerateProof(j, 0)
+//                      require.NoError(t, err)
+//                      proofs = append(proofs, &BundleProof{
+//                              Proof:      proof,
+//                              StateSyncs: stateSyncs[j*bundleSize : (j*bundleSize)+bundleSize],
+//                      })
+//              }
 
-// 		commitmentsToExecute[i] = &CommitmentToExecute{
-// 			SignedCommitment: &CommitmentMessageSigned{
-// 				Message:      commitmentMessage,
-// 				AggSignature: Signature{},
-// 			},
-// 			Proofs:  proofs,
-// 			ToIndex: commitmentMessage.ToIndex,
-// 		}
-// 	}
+//              commitmentsToExecute[i] = &CommitmentToExecute{
+//                      SignedCommitment: &CommitmentMessageSigned{
+//                              Message:      commitmentMessage,
+//                              AggSignature: Signature{},
+//                      },
+//                      Proofs:  proofs,
+//                      ToIndex: commitmentMessage.ToIndex,
+//              }
+//      }
 
-// 	for _, commitment := range commitmentsToExecute {
-// 		require.NoError(t, insertToMemDb(memdb, commitmentTable, commitment))
-// 	}
+//      for _, commitment := range commitmentsToExecute {
+//              require.NoError(t, insertToMemDb(memdb, commitmentTable, commitment))
+//      }
 
-// 	t.Run("Get all commitments to execute", func(t *testing.T) {
-// 		commitments, err := getFilteredFromMemDb[*CommitmentToExecute](memdb, commitmentTable,
-// 			commitmentsToExecute[0].ToIndex, nil)
-// 		require.NoError(t, err)
-// 		require.Len(t, commitments, epochsCount)
-// 	})
+//      t.Run("Get all commitments to execute", func(t *testing.T) {
+//              commitments, err := getFilteredFromMemDb[*CommitmentToExecute](memdb, commitmentTable,
+//                      commitmentsToExecute[0].ToIndex, nil)
+//              require.NoError(t, err)
+//              require.Len(t, commitments, epochsCount)
+//      })
 
-// 	t.Run("Get commitments from first commitment to some commitment in middle", func(t *testing.T) {
-// 		commitments, err := getFilteredFromMemDb[*CommitmentToExecute](memdb, commitmentTable,
-// 			commitmentsToExecute[0].ToIndex,
-// 			commitmentsToExecute[2].ToIndex)
+//      t.Run("Get commitments from first commitment to some commitment in middle", func(t *testing.T) {
+//              commitments, err := getFilteredFromMemDb[*CommitmentToExecute](memdb, commitmentTable,
+//                      commitmentsToExecute[0].ToIndex,
+//                      commitmentsToExecute[2].ToIndex)
 
-// 		require.NoError(t, err)
-// 		require.Len(t, commitments, 3)
-// 	})
+//              require.NoError(t, err)
+//              require.Len(t, commitments, 3)
+//      })
 
-// 	t.Run("Get commitments from middle to end", func(t *testing.T) {
-// 		commitments, err := getFilteredFromMemDb[*CommitmentToExecute](memdb, commitmentTable,
-// 			commitmentsToExecute[3].ToIndex,
-// 			commitmentsToExecute[len(commitmentsToExecute)-1].ToIndex)
-// 		require.NoError(t, err)
-// 		require.Len(t, commitments, 2)
-// 	})
+//      t.Run("Get commitments from middle to end", func(t *testing.T) {
+//              commitments, err := getFilteredFromMemDb[*CommitmentToExecute](memdb, commitmentTable,
+//                      commitmentsToExecute[3].ToIndex,
+//                      commitmentsToExecute[len(commitmentsToExecute)-1].ToIndex)
+//              require.NoError(t, err)
+//              require.Len(t, commitments, 2)
+//      })
 
-// 	t.Run("Delete commitments that have ToIndex lower or equal to 30", func(t *testing.T) {
-// 		err := deleteFilteredFromMemDb(memdb, commitmentTable, uint64(30))
-// 		require.NoError(t, err)
-// 		commitments, err := getFilteredFromMemDb[*CommitmentToExecute](memdb, commitmentTable, uint64(0), nil)
-// 		require.NoError(t, err)
-// 		require.Len(t, commitments, 2)
-// 	})
+//      t.Run("Delete commitments that have ToIndex lower or equal to 30", func(t *testing.T) {
+//              err := deleteFilteredFromMemDb(memdb, commitmentTable, uint64(30))
+//              require.NoError(t, err)
+//              commitments, err := getFilteredFromMemDb[*CommitmentToExecute](memdb, commitmentTable, uint64(0), nil)
+//              require.NoError(t, err)
+//              require.Len(t, commitments, 2)
+//      })
 // }
 
 func TestMemdb_InsertGetDeleteMessageVotes(t *testing.T) {
@@ -503,6 +527,7 @@ func TestMemdb_InsertGetDeleteMessageVotes(t *testing.T) {
 	require.NoError(t, err)
 
 	messageVotes := make([]*MessageVotes, epochsCount)
+
 	for i := 0; i < epochsCount; i++ {
 		signatures := make([]*MessageSignature, signaturesCount)
 		for j := 0; j < signaturesCount; j++ {
@@ -511,6 +536,7 @@ func TestMemdb_InsertGetDeleteMessageVotes(t *testing.T) {
 				Signature: []byte{0, 1},
 			}
 		}
+
 		messageVotes[i] = &MessageVotes{
 			Epoch:      uint64(i),
 			Hash:       fmt.Sprint(i),
@@ -519,38 +545,38 @@ func TestMemdb_InsertGetDeleteMessageVotes(t *testing.T) {
 	}
 
 	for _, vote := range messageVotes {
-		require.NoError(t, insertToMemDb(memdb, messageVoteTable, vote))
+		require.NoError(t, insertToMemDB(memdb, messageVoteTable, vote))
 	}
 
 	t.Run("Get votes from all epochs", func(t *testing.T) {
-		votes, err := getFilteredFromMemDb[*MessageVotes](memdb, messageVoteTable, uint64(0), nil)
+		votes, err := getFilteredFromMemDB[*MessageVotes](memdb, messageVoteTable, uint64(0), nil)
 		require.NoError(t, err)
 		require.Len(t, votes, epochsCount)
 	})
 
 	t.Run("Get votes from first to middle epoch", func(t *testing.T) {
-		votes, err := getFilteredFromMemDb[*MessageVotes](memdb, messageVoteTable, uint64(0), uint64(2))
+		votes, err := getFilteredFromMemDB[*MessageVotes](memdb, messageVoteTable, uint64(0), uint64(2))
 		require.NoError(t, err)
 		require.Len(t, votes, 3)
 	})
 
 	t.Run("Get vote based on hash", func(t *testing.T) {
-		vote, err := getFromMemDb[*MessageVotes](memdb, messageVoteTable, "hash", "1")
+		vote, err := getFromMemDB[*MessageVotes](memdb, messageVoteTable, "hash", "1")
 		require.NoError(t, err)
 		require.NotNil(t, vote)
 		require.Equal(t, vote.Hash, "1")
 	})
 
 	t.Run("Get vote based on non-existing hash", func(t *testing.T) {
-		vote, err := getFromMemDb[*MessageVotes](memdb, messageVoteTable, "hash", "1111")
+		vote, err := getFromMemDB[*MessageVotes](memdb, messageVoteTable, "hash", "1111")
 		require.NoError(t, err)
 		require.Nil(t, vote)
 	})
 
 	t.Run("Delete votes that are either from epoch 2 or previous epochs", func(t *testing.T) {
-		err := deleteFilteredFromMemDb(memdb, messageVoteTable, uint64(2))
+		err := deleteFilteredFromMemDB(memdb, messageVoteTable, uint64(2))
 		require.NoError(t, err)
-		votes, err := getFilteredFromMemDb[*MessageVotes](memdb, messageVoteTable, uint64(0), nil)
+		votes, err := getFilteredFromMemDB[*MessageVotes](memdb, messageVoteTable, uint64(0), nil)
 		require.NoError(t, err)
 		require.Len(t, votes, 2)
 	})
@@ -564,34 +590,35 @@ func TestMemdb_InsertGetDeleteValidatorSnapshots(t *testing.T) {
 
 	for i := 0; i < epochsCount; i++ {
 		validators := newTestValidators(5)
-		require.NoError(t, insertToMemDb(memdb, validatorSnapshotTable, &ValidatorSnapshot{
+
+		require.NoError(t, insertToMemDB(memdb, validatorSnapshotTable, &ValidatorSnapshot{
 			Epoch:      uint64(i),
 			AccountSet: validators.toValidatorSet().validators,
 		}))
 	}
 
 	t.Run("Get all snapshots", func(t *testing.T) {
-		snapshots, err := getFilteredFromMemDb[*ValidatorSnapshot](memdb, validatorSnapshotTable, uint64(0), nil)
+		snapshots, err := getFilteredFromMemDB[*ValidatorSnapshot](memdb, validatorSnapshotTable, uint64(0), nil)
 		require.NoError(t, err)
 		require.Len(t, snapshots, epochsCount)
 	})
 
 	t.Run("Get snapshots from beginning to middle", func(t *testing.T) {
-		snapshots, err := getFilteredFromMemDb[*ValidatorSnapshot](memdb, validatorSnapshotTable, uint64(0), uint64(2))
+		snapshots, err := getFilteredFromMemDB[*ValidatorSnapshot](memdb, validatorSnapshotTable, uint64(0), uint64(2))
 		require.NoError(t, err)
 		require.Len(t, snapshots, 3)
 	})
 
 	t.Run("Get snapshots from middle to end", func(t *testing.T) {
-		snapshots, err := getFilteredFromMemDb[*ValidatorSnapshot](memdb, validatorSnapshotTable, uint64(3), uint64(epochsCount))
+		snapshots, err := getFilteredFromMemDB[*ValidatorSnapshot](memdb, validatorSnapshotTable, uint64(3), uint64(epochsCount))
 		require.NoError(t, err)
 		require.Len(t, snapshots, 2)
 	})
 
 	t.Run("Delete snapshots lower or equal to epoch 2", func(t *testing.T) {
-		err := deleteFilteredFromMemDb(memdb, validatorSnapshotTable, uint64(2))
+		err := deleteFilteredFromMemDB(memdb, validatorSnapshotTable, uint64(2))
 		require.NoError(t, err)
-		snapshots, err := getFilteredFromMemDb[*ValidatorSnapshot](memdb, validatorSnapshotTable, uint64(0), nil)
+		snapshots, err := getFilteredFromMemDB[*ValidatorSnapshot](memdb, validatorSnapshotTable, uint64(0), nil)
 		require.NoError(t, err)
 		require.Len(t, snapshots, 2)
 	})
@@ -612,9 +639,9 @@ func TestMemdb_UpdateRecordInMemdb(t *testing.T) {
 		},
 	}
 
-	require.NoError(t, insertToMemDb(memdb, messageVoteTable, votes))
+	require.NoError(t, insertToMemDB(memdb, messageVoteTable, votes))
 
-	votes, err = getFromMemDb[*MessageVotes](memdb, messageVoteTable, "id", votes.Epoch)
+	votes, err = getFromMemDB[*MessageVotes](memdb, messageVoteTable, "id", votes.Epoch)
 	require.NoError(t, err)
 	require.Len(t, votes.Signatures, 1)
 
@@ -623,9 +650,9 @@ func TestMemdb_UpdateRecordInMemdb(t *testing.T) {
 		Signature: []byte{2, 3},
 	})
 
-	require.NoError(t, insertToMemDb(memdb, messageVoteTable, votes))
+	require.NoError(t, insertToMemDB(memdb, messageVoteTable, votes))
 
-	votes, err = getFromMemDb[*MessageVotes](memdb, messageVoteTable, "id", votes.Epoch)
+	votes, err = getFromMemDB[*MessageVotes](memdb, messageVoteTable, "id", votes.Epoch)
 	require.NoError(t, err)
 	require.Len(t, votes.Signatures, 2)
 }

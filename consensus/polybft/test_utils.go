@@ -36,7 +36,10 @@ func createSignature(t *testing.T, accounts []*wallet.Account, hash types.Hash) 
 }
 
 func generateStateSyncEvents(t *testing.T, eventsCount int, startIdx uint64) []*StateSyncEvent {
+	t.Helper()
+
 	stateSyncEvents := make([]*StateSyncEvent, eventsCount)
+
 	for i := 0; i < eventsCount; i++ {
 		stateSyncEvents[i] = &StateSyncEvent{
 			ID:     startIdx + uint64(i),
@@ -44,13 +47,18 @@ func generateStateSyncEvents(t *testing.T, eventsCount int, startIdx uint64) []*
 			Data:   generateRandomBytes(t),
 		}
 	}
+
 	return stateSyncEvents
 }
 
 // generateRandomBytes generates byte array with random data of 32 bytes length
 func generateRandomBytes(t *testing.T) (result []byte) {
+	t.Helper()
+
 	result = make([]byte, types.HashLength)
+
 	_, err := rand.Reader.Read(result)
 	require.NoError(t, err, "Cannot generate random byte array content.")
+
 	return
 }

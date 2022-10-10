@@ -272,18 +272,24 @@ func (c *consensusRuntime) FSM() (*fsm, error) {
 			}
 
 			var bundleProofs []*BundleProof
+
 			var commitments []*CommitmentMessageSigned
+
 			processedBundles := 0
 			foundGap := false
+
 			for _, c := range nonExecutedCommitments {
 				commitments = append(commitments, c.SignedCommitment)
+
 				if processedBundles >= maxBundlesPerSprint || foundGap {
 					// we can only execute a number of bundles per sprint
 					// it is a valid case that a proposer only has bundles built only for some commitments
 					// and because they must be sequential, if we find a gap, we should stop collecting
 					continue
 				}
+
 				commitmentBundles, bundlesNum := c.getBundles(maxBundlesPerSprint, processedBundles)
+
 				if bundlesNum == 0 {
 					foundGap = true
 				} else {
@@ -291,6 +297,7 @@ func (c *consensusRuntime) FSM() (*fsm, error) {
 					processedBundles += bundlesNum
 				}
 			}
+
 			ff.commitmentsToVerifyBundles = commitments
 			ff.bundleProofs = bundleProofs
 		}
@@ -298,12 +305,12 @@ func (c *consensusRuntime) FSM() (*fsm, error) {
 
 	// TODO: Nemanja
 	// if isEndOfEpoch {
-	// 	uptimeCounter, err := c.calculateUptime(parent)
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
+	//      uptimeCounter, err := c.calculateUptime(parent)
+	//      if err != nil {
+	//              return nil, err
+	//      }
 
-	// 	ff.uptimeCounter = uptimeCounter
+	//      ff.uptimeCounter = uptimeCounter
 	// }
 
 	c.logger.Info("[FSM built]",
@@ -339,21 +346,21 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) error {
 	}
 
 	/*
-		// We will uncomment this once we have the clear PoC for the checkpoint
-		lastCheckpoint := uint64(0)
+	   // We will uncomment this once we have the clear PoC for the checkpoint
+	   lastCheckpoint := uint64(0)
 
-		// get the blocks that should be signed for this checkpoint period
-		blocks := []*types.Block{}
+	   // get the blocks that should be signed for this checkpoint period
+	   blocks := []*types.Block{}
 
-		epochSize := c.config.Config.PolyBFT.Epoch
-		for i := lastCheckpoint * epochSize; i < epoch*epochSize; i++ {
-			block := c.config.Blockchain.GetBlockByNumber(i)
-			if block == nil {
-				panic("block not found")
-			} else {
-				blocks = append(blocks, block)
-			}
-		}
+	   epochSize := c.config.Config.PolyBFT.Epoch
+	   for i := lastCheckpoint * epochSize; i < epoch*epochSize; i++ {
+	           block := c.config.Blockchain.GetBlockByNumber(i)
+	           if block == nil {
+	                   panic("block not found")
+	           } else {
+	                   blocks = append(blocks, block)
+	           }
+	   }
 	*/
 
 	validatorSet, err := c.config.polybftBackend.GetValidators(c.lastBuiltBlock.Number, nil)
@@ -368,7 +375,7 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) error {
 		Validators:     validatorSet,
 	}
 
-	if err := c.state.cleanPreviousEpochsDataFromDb(epochNumber); err != nil {
+	if err := c.state.cleanPreviousEpochsDataFromDB(epochNumber); err != nil {
 		c.logger.Error("Could not clean previous epochs from db.", "err", err)
 	}
 
@@ -450,7 +457,6 @@ func (c *consensusRuntime) buildCommitment(epoch, fromIndex uint64) (*Commitment
 
 func (c *consensusRuntime) buildFinalizedCommitment(epoch *epochMetadata,
 	commitmentSigned *CommitmentMessageSigned, nextExecutionIndex uint64) error {
-
 	commitmentToExecute := &CommitmentToExecute{
 		SignedCommitment: commitmentSigned,
 		ToIndex:          commitmentSigned.Message.ToIndex,
@@ -461,6 +467,7 @@ func (c *consensusRuntime) buildFinalizedCommitment(epoch *epochMetadata,
 		// we will be able to validate them though, since we have CommitmentMessageSigned taken from
 		// register commitment state transaction when its block was inserted
 		c.logger.Info("[buildProofs] No commitment built.")
+
 		return c.state.insertCommitmentMessage(commitmentToExecute)
 	}
 
@@ -471,21 +478,22 @@ func (c *consensusRuntime) buildFinalizedCommitment(epoch *epochMetadata,
 
 	// startBundleIdx := commitmentMsg.GetBundleIdxFromStateSyncEventIdx(nextExecutionIndex)
 	// for idx := startBundleIdx; idx < commitmentMsg.BundlesCount(); idx++ {
-	// 	p := epoch.Commitment.MerkleTree.GenerateProof(idx, 0)
-	// 	events, err := c.getStateSyncEventsForBundle(commitmentMsg.GetFirstStateSyncIndexFromBundleIndex(idx),
-	// 		commitmentMsg.BundleSize)
-	// 	if err != nil {
-	// 		return err
-	// 	}
+	//      p := epoch.Commitment.MerkleTree.GenerateProof(idx, 0)
+	//      events, err := c.getStateSyncEventsForBundle(commitmentMsg.GetFirstStateSyncIndexFromBundleIndex(idx),
+	//              commitmentMsg.BundleSize)
+	//      if err != nil {
+	//              return err
+	//      }
 
-	// 	bundleProofs = append(bundleProofs,
-	// 		&BundleProof{
-	// 			Proof:      p,
-	// 			StateSyncs: events,
-	// 		})
+	//      bundleProofs = append(bundleProofs,
+	//              &BundleProof{
+	//                      Proof:      p,
+	//                      StateSyncs: events,
+	//              })
 	// }
 
 	commitmentToExecute.Proofs = bundleProofs
+
 	return c.state.insertCommitmentMessage(commitmentToExecute)
 }
 
@@ -832,11 +840,11 @@ func createStateTransaction(
 // with provided target address and inputData parameter which is ABI encoded byte array.
 func createStateTransactionWithData(target types.Address, inputData []byte, gasLimit uint64) *types.Transaction {
 	// return types.NewTx(
-	// 	&types.StateTransaction{
-	// 		To:    target,
-	// 		Input: inputData,
-	// 		Gas:   gasLimit,
-	// 	})
+	//      &types.StateTransaction{
+	//              To:    target,
+	//              Input: inputData,
+	//              Gas:   gasLimit,
+	//      })
 	// TODO: Nemanja - fix this with bridge
 	return nil
 }
