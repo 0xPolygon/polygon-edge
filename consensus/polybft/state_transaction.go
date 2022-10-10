@@ -464,7 +464,6 @@ func commitmentHash(merkleRootHash types.Hash, epoch uint64) types.Hash {
 	copy(data[:], merkleRootHash.Bytes())
 	binary.BigEndian.PutUint64(data[types.HashLength:], epoch)
 
-	// TO DO Nemanja - check this
 	return types.BytesToHash(crypto.Keccak256(data[:]))
 }
 

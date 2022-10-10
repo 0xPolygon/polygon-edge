@@ -146,7 +146,7 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 	// fill the block with transactions
 	now := time.Now()
 
-	// TO DO Nemanja - skip transactions
+	// TODO: Nemanja - skip transactions
 	// if err := f.blockBuilder.Fill(context.Background()); err != nil {
 	// 	return nil, err
 	// }

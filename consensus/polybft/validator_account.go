@@ -1,6 +1,7 @@
 package polybft
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -86,8 +87,7 @@ func (a *ValidatorAccount) UnmarshalRLPWith(v *fastrlp.Value) error {
 
 // fmt.Stringer implementation
 func (a ValidatorAccount) String() string {
-	// return fmt.Sprintf("Address=%v; Bls Key=%v", a.Address.Hex(), hexutil.Encode(a.BlsKey.Marshal()))
-	return fmt.Sprintf("Address=%v", a.Address.String()) // TO DO Nemanja check this
+	return fmt.Sprintf("Address=%v; BLS Key=%v", a.Address.String(), hex.EncodeToString(a.BlsKey.Marshal()))
 }
 
 // AccountSet is a type alias for slice of ValidatorAccount instances

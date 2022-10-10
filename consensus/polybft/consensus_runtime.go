@@ -25,7 +25,7 @@ const (
 
 var (
 	// state sync metrics
-	// TODO: Nemanja - what to do with metrics
+	// TODO: Nemanja - accommodate bridge metrics to Edge
 	// totalStateSyncsMeter = metrics.NewRegisteredMeter("consensus/bridge/stateSyncsTotal", nil)
 
 	// errNotAValidator represents "node is not a validator" error message
@@ -196,7 +196,7 @@ func (c *consensusRuntime) FSM() (*fsm, error) {
 		backend:        c.config.blockchain,
 		polybftBackend: c.config.polybftBackend,
 		blockBuilder:   blockBuilder,
-		validators:     newValidatorSet(types.BytesToAddress(parent.Miner), epoch.Validators), // TO DO Nemanja - check this
+		validators:     newValidatorSet(types.BytesToAddress(parent.Miner), epoch.Validators), // TODO: Nemanja - check this
 		isEndOfEpoch:   isEndOfEpoch,
 		isEndOfSprint:  isEndOfSprint,
 		epoch:          epoch.Number,
@@ -833,7 +833,7 @@ func createStateTransactionWithData(target types.Address, inputData []byte, gasL
 	// 		Input: inputData,
 	// 		Gas:   gasLimit,
 	// 	})
-	// TO DO Nemanja - fix this with bridge
+	// TODO: Nemanja - fix this with bridge
 	return nil
 }
 

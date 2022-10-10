@@ -209,7 +209,7 @@ func (p *Polybft) Initialize() error {
 	// set pbft topic, it will be check if/when the bridge is enabled
 	p.bridgeTopic = bridgeTopic
 
-	// set block time  Nemanja - not sure if I am going to need it
+	// set block time
 	p.blockTime = time.Duration(p.config.BlockTime)
 
 	// initialize polybft consensus data directory
@@ -255,8 +255,6 @@ func (p *Polybft) startSyncing() error {
 		}
 
 		if err := p.syncer.Sync(nullHandler); err != nil {
-			// TODO: Nemanja - should we only log here as ibft, it seems to me that we should panic
-			// p.logger.Error("watch sync failed", "err", err)
 			panic(fmt.Errorf("failed to sync blocks. Error: %w", err))
 		}
 	}()
