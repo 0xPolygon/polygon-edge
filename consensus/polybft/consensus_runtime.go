@@ -411,7 +411,7 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) error {
 func (c *consensusRuntime) buildCommitment(epoch, fromIndex uint64) (*Commitment, error) {
 	// if it is not already built in the previous epoch
 	stateSyncEvents, err := c.state.getStateSyncEventsForCommitment(fromIndex, fromIndex+stateSyncMainBundleSize-1)
-	if len(stateSyncEvents) == 0 || (err != nil && errors.Is(err, errNotEnoughStateSyncs)) {
+	if len(stateSyncEvents) == 0 {
 		c.logger.Info("[buildCommitment] Not enough state syncs to build a commitment",
 			"epoch", epoch, "from state sync index", fromIndex)
 		// this is a valid case, there is not enough state syncs
