@@ -261,9 +261,13 @@ func insertToMemDB[V MemDBRecord](memdb *memdb.MemDB, table string, record V) er
 	return nil
 }
 
+type Number interface {
+	int64 | uint64
+}
+
 // getFilteredFromMemDB returns a filtered collection of desired memdb records
-func getFilteredFromMemDB[V MemDBRecord](memdb *memdb.MemDB, table string,
-	lowerBound, upperBound interface{}) ([]V, error) {
+func getFilteredFromMemDB[V MemDBRecord, BV Number](memdb *memdb.MemDB, table string,
+	lowerBound, upperBound BV) ([]V, error) {
 	txn := memdb.Txn(false)
 	defer txn.Abort()
 
@@ -558,7 +562,7 @@ func (s *State) insertCommitmentMessage(commitment *CommitmentToExecute) error {
 // getNonExecutedCommitments gets non executed commitments
 // (commitments whose toIndex is greater than or equal to startIndex)
 func (s *State) getNonExecutedCommitments(startIndex uint64) ([]*CommitmentToExecute, error) {
-	commitments, err := getFilteredFromMemDB[*CommitmentToExecute](s.memdb, commitmentTable, startIndex, nil)
+	commitments, err := getFilteredFromMemDB[*CommitmentToExecute](s.memdb, commitmentTable, startIndex, math.MaxUint64)
 	if err != nil {
 		return nil, err
 	}

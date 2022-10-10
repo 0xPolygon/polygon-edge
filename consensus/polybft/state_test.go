@@ -3,6 +3,7 @@ package polybft
 import (
 	"bytes"
 	"fmt"
+	"math"
 	"os"
 	"path"
 	"sync"
@@ -409,7 +410,7 @@ func TestMemdb_InsertGetDeleteStateSyncEvents(t *testing.T) {
 	}
 
 	t.Run("Get all state sync events", func(t *testing.T) {
-		events, err := getFilteredFromMemDB[*StateSyncEvent](memdb, stateSyncTable, uint64(0), nil)
+		events, err := getFilteredFromMemDB[*StateSyncEvent](memdb, stateSyncTable, uint64(0), math.MaxUint64)
 		require.NoError(t, err)
 		require.Len(t, events, stateSyncCount)
 	})
@@ -431,7 +432,7 @@ func TestMemdb_InsertGetDeleteStateSyncEvents(t *testing.T) {
 	t.Run("Delete state sync events lower or equal to index 4", func(t *testing.T) {
 		err := deleteFilteredFromMemDB(memdb, stateSyncTable, uint64(4))
 		require.NoError(t, err)
-		events, err := getFilteredFromMemDB[*StateSyncEvent](memdb, stateSyncTable, uint64(0), nil)
+		events, err := getFilteredFromMemDB[*StateSyncEvent](memdb, stateSyncTable, uint64(0), math.MaxUint64)
 		require.NoError(t, err)
 		require.Len(t, events, 5)
 	})
@@ -469,7 +470,7 @@ func TestMemdb_InsertGetDeleteMessageVotes(t *testing.T) {
 	}
 
 	t.Run("Get votes from all epochs", func(t *testing.T) {
-		votes, err := getFilteredFromMemDB[*MessageVotes](memdb, messageVoteTable, uint64(0), nil)
+		votes, err := getFilteredFromMemDB[*MessageVotes](memdb, messageVoteTable, uint64(0), math.MaxUint64)
 		require.NoError(t, err)
 		require.Len(t, votes, epochsCount)
 	})
@@ -496,7 +497,7 @@ func TestMemdb_InsertGetDeleteMessageVotes(t *testing.T) {
 	t.Run("Delete votes that are either from epoch 2 or previous epochs", func(t *testing.T) {
 		err := deleteFilteredFromMemDB(memdb, messageVoteTable, uint64(2))
 		require.NoError(t, err)
-		votes, err := getFilteredFromMemDB[*MessageVotes](memdb, messageVoteTable, uint64(0), nil)
+		votes, err := getFilteredFromMemDB[*MessageVotes](memdb, messageVoteTable, uint64(0), math.MaxUint64)
 		require.NoError(t, err)
 		require.Len(t, votes, 2)
 	})
@@ -518,7 +519,7 @@ func TestMemdb_InsertGetDeleteValidatorSnapshots(t *testing.T) {
 	}
 
 	t.Run("Get all snapshots", func(t *testing.T) {
-		snapshots, err := getFilteredFromMemDB[*ValidatorSnapshot](memdb, validatorSnapshotTable, uint64(0), nil)
+		snapshots, err := getFilteredFromMemDB[*ValidatorSnapshot](memdb, validatorSnapshotTable, uint64(0), math.MaxUint64)
 		require.NoError(t, err)
 		require.Len(t, snapshots, epochsCount)
 	})
@@ -538,7 +539,7 @@ func TestMemdb_InsertGetDeleteValidatorSnapshots(t *testing.T) {
 	t.Run("Delete snapshots lower or equal to epoch 2", func(t *testing.T) {
 		err := deleteFilteredFromMemDB(memdb, validatorSnapshotTable, uint64(2))
 		require.NoError(t, err)
-		snapshots, err := getFilteredFromMemDB[*ValidatorSnapshot](memdb, validatorSnapshotTable, uint64(0), nil)
+		snapshots, err := getFilteredFromMemDB[*ValidatorSnapshot](memdb, validatorSnapshotTable, uint64(0), math.MaxUint64)
 		require.NoError(t, err)
 		require.Len(t, snapshots, 2)
 	})
