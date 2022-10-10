@@ -139,7 +139,7 @@ func getUpperBoundUint64(upperBound interface{}) uint64 {
 	upper, ok := upperBound.(uint64)
 
 	if !ok {
-		panic("state sync table upper bound not a uint64")
+		return math.MaxUint64
 	}
 
 	return upper
