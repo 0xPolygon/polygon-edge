@@ -23,7 +23,6 @@ func newTestState(t *testing.T) *State {
 	t.Helper()
 
 	dir := fmt.Sprintf("/tmp/consensus-temp_%v", time.Now().Format(time.RFC3339))
-
 	err := os.Mkdir(dir, 0777)
 
 	if err != nil {
@@ -184,27 +183,22 @@ func TestState_Insert_And_Cleanup(t *testing.T) {
 }
 
 func TestState_insertAndGetValidatorSnapshot(t *testing.T) {
-	epoch := uint64(1)
+	const (
+		epoch           = uint64(1)
+		numOfValidators = 3
+	)
 
 	state := newTestState(t)
 
-	keys, err := bls.CreateRandomBlsKeys(3)
+	validators := newTestValidators(numOfValidators).getPublicIdentities()
 
-	require.NoError(t, err)
-
-	snapshot := AccountSet{
-		&ValidatorAccount{Address: types.BytesToAddress([]byte{0x18}), BlsKey: keys[0].PublicKey()},
-		&ValidatorAccount{Address: types.BytesToAddress([]byte{0x23}), BlsKey: keys[1].PublicKey()},
-		&ValidatorAccount{Address: types.BytesToAddress([]byte{0x37}), BlsKey: keys[2].PublicKey()},
-	}
-
-	assert.NoError(t, state.insertValidatorSnapshot(epoch, snapshot))
+	assert.NoError(t, state.insertValidatorSnapshot(epoch, validators))
 
 	snapshotFromDB, err := state.getValidatorSnapshot(epoch)
 	assert.NoError(t, err)
-	assert.Equal(t, snapshot.Len(), snapshotFromDB.Len())
+	assert.Equal(t, numOfValidators, snapshotFromDB.Len())
 
-	for i, v := range snapshot {
+	for i, v := range validators {
 		assert.Equal(t, v.Address, snapshotFromDB[i].Address)
 		assert.Equal(t, v.BlsKey, snapshotFromDB[i].BlsKey)
 	}
