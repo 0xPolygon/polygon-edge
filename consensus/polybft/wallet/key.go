@@ -2,8 +2,6 @@ package wallet
 
 import (
 	"github.com/0xPolygon/pbft-consensus"
-	"github.com/0xPolygon/polygon-edge/crypto"
-	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo"
 )
 
@@ -36,18 +34,4 @@ func (k *Key) Sign(b []byte) ([]byte, error) {
 	}
 
 	return s.Marshal()
-}
-
-func (k *Key) SignTx(chainID uint64, txn *types.Transaction) (*types.Transaction, error) {
-	privKey, err := k.raw.GetEcdsaPrivateKey()
-	if err != nil {
-		return nil, err
-	}
-
-	signed, err := crypto.NewEIP155Signer(chainID).SignTx(txn, privKey)
-	if err != nil {
-		return nil, err
-	}
-
-	return signed, nil
 }

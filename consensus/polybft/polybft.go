@@ -271,7 +271,6 @@ func (p *Polybft) startSealing() error {
 
 	go func() {
 		// start the pbft process
-		AddDummyTx(uint64(p.config.Config.Params.ChainID), p.key, p.config.TxPool, 10)
 		p.startPbftProcess()
 	}()
 
