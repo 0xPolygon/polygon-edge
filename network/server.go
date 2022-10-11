@@ -337,8 +337,7 @@ func (s *Server) keepAliveMinimumPeerConnections() {
 				}
 			} else {
 				// dial random unconnected bootnode
-				randomNode := s.GetRandomBootnode()
-				if randomNode != nil {
+				if randomNode := s.GetRandomBootnode(); randomNode != nil {
 					s.addToDialQueue(randomNode, common.PriorityRandomDial)
 				}
 			}
