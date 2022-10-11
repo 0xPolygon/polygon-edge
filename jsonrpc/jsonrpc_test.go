@@ -1,10 +1,14 @@
 package jsonrpc
 
 import (
+	"bytes"
+	"encoding/json"
 	"net"
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/helper/tests"
+	"github.com/0xPolygon/polygon-edge/versioning"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/hashicorp/go-hclog"
 )
@@ -26,4 +30,39 @@ func TestHTTPServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+func Test_handleGetRequest(t *testing.T) {
+	var (
+		chainName = "polygon-edge-test"
+		chainID   = uint64(200)
+	)
+
+	jsonRPC := &JSONRPC{
+		config: &Config{
+			ChainName: chainName,
+			ChainID:   chainID,
+		},
+	}
+
+	mockWriter := bytes.NewBuffer(nil)
+
+	jsonRPC.handleGetRequest(mockWriter)
+
+	response := &GetResponse{}
+
+	assert.NoError(
+		t,
+		json.Unmarshal(mockWriter.Bytes(), response),
+	)
+
+	assert.Equal(
+		t,
+		&GetResponse{
+			Name:    chainName,
+			ChainID: chainID,
+			Version: versioning.Version,
+		},
+		response,
+	)
 }

@@ -11,7 +11,15 @@ import (
 )
 
 func TestWeb3EndpointSha3(t *testing.T) {
-	dispatcher := newDispatcher(hclog.NewNullLogger(), newMockStore(), 0, 0, 20, 1000)
+	dispatcher := newDispatcher(
+		hclog.NewNullLogger(),
+		newMockStore(),
+		&dispatcherParams{
+			chainID:                 0,
+			priceLimit:              0,
+			jsonRPCBatchLengthLimit: 20,
+			blockRangeLimit:         1000,
+		})
 
 	resp, err := dispatcher.Handle([]byte(`{
 		"method": "web3_sha3",
@@ -26,7 +34,22 @@ func TestWeb3EndpointSha3(t *testing.T) {
 }
 
 func TestWeb3EndpointClientVersion(t *testing.T) {
-	dispatcher := newDispatcher(hclog.NewNullLogger(), newMockStore(), 0, 0, 20, 1000)
+	var (
+		chainName = "test-chain"
+		chainID   = uint64(100)
+	)
+
+	dispatcher := newDispatcher(
+		hclog.NewNullLogger(),
+		newMockStore(),
+		&dispatcherParams{
+			chainID:                 chainID,
+			chainName:               chainName,
+			priceLimit:              0,
+			jsonRPCBatchLengthLimit: 20,
+			blockRangeLimit:         1000,
+		},
+	)
 
 	resp, err := dispatcher.Handle([]byte(`{
 		"method": "web3_clientVersion",
@@ -37,5 +60,12 @@ func TestWeb3EndpointClientVersion(t *testing.T) {
 	var res string
 
 	assert.NoError(t, expectJSONResult(resp, &res))
-	assert.Contains(t, res, fmt.Sprintf("polygon-edge [%v]", versioning.Version))
+	assert.Contains(t, res,
+		fmt.Sprintf(
+			clientVersionTemplate,
+			chainName,
+			chainID,
+			versioning.Version,
+		),
+	)
 }
