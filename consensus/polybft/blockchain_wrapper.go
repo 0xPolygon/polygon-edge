@@ -56,6 +56,9 @@ type blockchainBackend interface {
 	GetSystemState(config *PolyBFTConfig, provider contract.Provider) SystemState
 
 	SubscribeEvents() blockchain.Subscription
+
+	// CalculateGasLimit for specifici block
+	CalculateGasLimit(number uint64) (uint64, error)
 }
 
 var _ blockchainBackend = &blockchainWrapper{}
@@ -169,6 +172,11 @@ func (p *blockchainWrapper) GetSystemState(config *PolyBFTConfig, provider contr
 
 func (p *blockchainWrapper) SubscribeEvents() blockchain.Subscription {
 	return p.blockchain.SubscribeEvents()
+}
+
+// CalculateGasLimit for specific block
+func (p *blockchainWrapper) CalculateGasLimit(number uint64) (uint64, error) {
+	return p.blockchain.CalculateGasLimit(number)
 }
 
 var _ contract.Provider = &stateProvider{}

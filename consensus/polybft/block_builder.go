@@ -133,20 +133,7 @@ func (b *BlockBuilder) Build(handler func(h *types.Header)) (*StateBlock, error)
 		handler(b.header)
 	}
 
-	// TODO: Nemanja - see what to do with gas
-	// calculate gas limit based on parent header
-	//gasLimit, err := b.blockchain.CalculateGasLimit(header.Number)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// header.GasLimit = gasLimit
-
-	// Nemanja - fill transactions
-	// txs := i.writeTransactions(gasLimit, header.Number, transition)
-
-	// if err := i.PreCommitState(header, transition); err != nil {
-	// 	return nil, err
-	// }
+	// Txs are filled outside - from FSM
 
 	_, b.header.StateRoot = b.state.Commit()
 	b.header.GasUsed = b.state.TotalGas()

@@ -135,6 +135,11 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 		// }
 	}
 
+	gasLimit, err := f.backend.CalculateGasLimit(parent.Number + 1)
+	if err != nil {
+		return nil, err
+	}
+
 	// fill the block with transactions
 	successful, failed, skipped, timeout := f.blockBuilder.Fill()
 	if successful == 0 && failed > 0 {
@@ -154,6 +159,7 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 		h.Timestamp = uint64(headerTime.Unix())
 		h.ExtraData = append(make([]byte, 32), extra.MarshalRLPTo(nil)...)
 		h.MixHash = PolyMixDigest
+		h.GasLimit = gasLimit
 	})
 
 	if err != nil {
