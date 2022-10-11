@@ -144,7 +144,7 @@ func (p *genesisParams) getRequiredFlags() []string {
 func (p *genesisParams) initRawParams() error {
 	p.consensus = server.ConsensusType(p.consensusRaw)
 
-	if p.consensus == server.IBFTConsensus {
+	if p.consensus != server.PolyBFTConsensus {
 		if err := p.initIBFTValidatorType(); err != nil {
 			return err
 		}
