@@ -3,6 +3,7 @@ package genesis
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
@@ -72,6 +73,12 @@ type genesisParams struct {
 	consensusEngineConfig map[string]interface{}
 
 	genesisConfig *chain.Chain
+
+	// PolyBFT
+	validatorSetSize int
+	sprintSize       uint64
+	blockTime        time.Duration
+	validators       []string
 }
 
 func (p *genesisParams) validateFlags() error {
@@ -93,7 +100,7 @@ func (p *genesisParams) validateFlags() error {
 	}
 
 	// Check that the epoch size is correct
-	if p.epochSize < 2 && server.ConsensusType(p.consensusRaw) == server.IBFTConsensus {
+	if p.epochSize < 2 && p.isIBFTConsensus() {
 		// Epoch size must be greater than 1, so new transactions have a chance to be added to a block.
 		// Otherwise, every block would be an endblock (meaning it will not have any transactions).
 		// Check is placed here to avoid additional parsing if epochSize < 2
@@ -112,6 +119,10 @@ func (p *genesisParams) isIBFTConsensus() bool {
 	return server.ConsensusType(p.consensusRaw) == server.IBFTConsensus
 }
 
+func (p *genesisParams) isPolyBFTConsensus() bool {
+	return server.ConsensusType(p.consensusRaw) == server.PolyBFTConsensus
+}
+
 func (p *genesisParams) areValidatorsSetManually() bool {
 	return len(p.ibftValidatorsRaw) != 0
 }
@@ -121,24 +132,30 @@ func (p *genesisParams) areValidatorsSetByPrefix() bool {
 }
 
 func (p *genesisParams) getRequiredFlags() []string {
-	return []string{
-		command.BootnodeFlag,
+	if p.isIBFTConsensus() {
+		return []string{
+			command.BootnodeFlag,
+		}
 	}
+
+	return []string{}
 }
 
 func (p *genesisParams) initRawParams() error {
 	p.consensus = server.ConsensusType(p.consensusRaw)
 
-	if err := p.initIBFTValidatorType(); err != nil {
-		return err
-	}
+	if p.isIBFTConsensus() {
+		if err := p.initIBFTValidatorType(); err != nil {
+			return err
+		}
 
-	if err := p.initValidatorSet(); err != nil {
-		return err
-	}
+		if err := p.initValidatorSet(); err != nil {
+			return err
+		}
 
-	p.initIBFTExtraData()
-	p.initConsensusEngineConfig()
+		p.initIBFTExtraData()
+		p.initConsensusEngineConfig()
+	}
 
 	return nil
 }

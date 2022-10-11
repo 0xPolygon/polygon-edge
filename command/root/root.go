@@ -18,7 +18,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/txpool"
 	"github.com/0xPolygon/polygon-edge/command/version"
 	"github.com/0xPolygon/polygon-edge/command/whitelist"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/command/polybftgenesis"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/command/polybftsecrets"
 	"github.com/spf13/cobra"
 )
@@ -56,7 +55,6 @@ func (rc *RootCommand) registerSubCommands() {
 		server.GetCommand(),
 		whitelist.GetCommand(),
 		license.GetCommand(),
-		polybftgenesis.GetCommand(),
 		polybftsecrets.GetCommand(),
 	)
 }

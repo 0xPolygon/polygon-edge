@@ -25,8 +25,6 @@ func GetCommand() *cobra.Command {
 	setFlags(genesisCmd)
 	setLegacyFlags(genesisCmd)
 
-	helper.SetRequiredFlags(genesisCmd, params.getRequiredFlags())
-
 	genesisCmd.AddCommand(
 		// genesis predeploy
 		predeploy.GetCommand(),
@@ -107,7 +105,7 @@ func setFlags(cmd *cobra.Command) {
 		cmd.Flags().StringVar(
 			&params.validatorPrefixPath,
 			command.IBFTValidatorPrefixFlag,
-			"",
+			"test-chain-",
 			"prefix path for validator folder directory. "+
 				"Needs to be present if ibft-validator is omitted",
 		)
@@ -148,6 +146,34 @@ func setFlags(cmd *cobra.Command) {
 			"the maximum number of validators in the validator set for PoS",
 		)
 	}
+
+	// PolyBFT
+	{
+		cmd.Flags().IntVar(
+			&params.validatorSetSize,
+			validatorSetSizeFlag,
+			defaultValidatorSetSize,
+			"validator set size",
+		)
+		cmd.Flags().Uint64Var(
+			&params.sprintSize,
+			sprintSizeFlag,
+			defaultSprintSize,
+			"sprint size",
+		)
+		cmd.Flags().DurationVar(
+			&params.blockTime,
+			blockTimeFlag,
+			defaultBlockTime,
+			"block time",
+		)
+		cmd.Flags().StringArrayVar(
+			&params.validators,
+			validatorsFlag,
+			[]string{},
+			"validators list (format: <address>:<blskey>)",
+		)
+	}
 }
 
 // setLegacyFlags sets the legacy flags to preserve backwards compatibility
@@ -164,10 +190,12 @@ func setLegacyFlags(cmd *cobra.Command) {
 	_ = cmd.Flags().MarkHidden(chainIDFlagLEGACY)
 }
 
-func runPreRun(_ *cobra.Command, _ []string) error {
+func runPreRun(cmd *cobra.Command, _ []string) error {
 	if err := params.validateFlags(); err != nil {
 		return err
 	}
+
+	helper.SetRequiredFlags(cmd, params.getRequiredFlags())
 
 	return params.initRawParams()
 }
@@ -176,11 +204,32 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
-	if err := params.generateGenesis(); err != nil {
-		outputter.SetError(err)
+	var result command.CommandResult
+	if params.isIBFTConsensus() {
+		if err := params.generateGenesis(); err != nil {
+			outputter.SetError(err)
 
-		return
+			return
+		}
+		result = params.getResult()
+	} else if params.isPolyBFTConsensus() {
+		config, err := params.GetChainConfig()
+		if err != nil {
+			outputter.SetError(err)
+
+			return
+		}
+
+		if err := helper.WriteGenesisConfigToDisk(config, params.genesisPath); err != nil {
+			outputter.SetError(err)
+
+			return
+		}
+
+		result = &GenesisResult{
+			Message: fmt.Sprintf("Genesis written to %s\n", params.genesisPath),
+		}
 	}
 
-	outputter.SetCommandResult(params.getResult())
+	outputter.SetCommandResult(result)
 }

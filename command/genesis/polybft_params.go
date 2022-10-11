@@ -1,8 +1,7 @@
-package polybftgenesis
+package genesis
 
 import (
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"path"
 	"strings"
@@ -15,20 +14,13 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/polybftcontracts"
 	"github.com/0xPolygon/polygon-edge/server"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/spf13/cobra"
 	"github.com/umbracle/ethgo"
 )
 
 const (
-	dirFlag                 = "dir"
-	nameFlag                = "name"
-	premineFlag             = "premine"
-	chainIDFlag             = "chain-id"
-	blockGasLimitFlag       = "block-gas-limit"
 	validatorPrefixPathFlag = "prefix"
 
 	validatorSetSizeFlag = "validator-set-size"
-	epochSizeFlag        = "epoch-size"
 	sprintSizeFlag       = "sprint-size"
 	blockTimeFlag        = "block-time"
 	validatorsFlag       = "polybft-validators"
@@ -48,142 +40,6 @@ var (
 	sidechainERC20Addr       = ethgo.HexToAddress("0x47e9Fbef8C83A1714F1951F142132E6e90F5fa5D")
 	SidechainERC20BridgeAddr = ethgo.HexToAddress("0x8Be503bcdEd90ED42Eff31f56199399B2b0154CA")
 )
-
-var (
-	errValidatorsNotSpecified = errors.New("validator information not specified")
-	errUnsupportedConsensus   = errors.New("specified consensusRaw not supported")
-	errInvalidEpochSize       = errors.New("epoch size must be greater than 1")
-)
-
-type genesisParams struct {
-	genesisPath         string
-	name                string
-	validatorPrefixPath string
-	premine             []string
-	bootnodes           []string
-
-	chainID       int
-	blockGasLimit uint64
-
-	validatorSetSize int
-	sprintSize       uint64
-	epochSize        uint64
-	blockTime        time.Duration
-	validators       []string
-}
-
-func (p *genesisParams) setFlags(cmd *cobra.Command) {
-	flags := cmd.Flags()
-
-	flags.StringVar(
-		&p.genesisPath,
-		dirFlag,
-		fmt.Sprintf("./%s", command.DefaultGenesisFileName),
-		"the directory for the Polygon Edge genesis data",
-	)
-
-	flags.IntVar(
-		&p.chainID,
-		chainIDFlag,
-		command.DefaultChainID,
-		"the ID of the chain",
-	)
-
-	flags.StringVar(
-		&p.name,
-		nameFlag,
-		command.DefaultChainName,
-		"the name for the chain",
-	)
-
-	flags.StringArrayVar(
-		&p.premine,
-		premineFlag,
-		[]string{},
-		fmt.Sprintf(
-			"the premined accounts and balances (format: <address>[:<balance>]). Default premined balance: %s",
-			command.DefaultPremineBalance,
-		),
-	)
-
-	flags.Uint64Var(
-		&p.blockGasLimit,
-		blockGasLimitFlag,
-		command.DefaultGenesisGasLimit,
-		"the maximum amount of gas used by all transactions in a block",
-	)
-
-	flags.StringArrayVar(
-		&p.bootnodes,
-		command.BootnodeFlag,
-		[]string{},
-		"multiAddr URL for p2p discovery bootstrap. This flag can be used multiple times",
-	)
-
-	flags.StringVar(
-		&p.validatorPrefixPath,
-		validatorPrefixPathFlag,
-		"test-chain-",
-		"prefix path for validators",
-	)
-
-	// flags.BoolFlag(&flagset.BoolFlag{
-	// 	Name:  "bridge",
-	// 	Value: &c.bridge,
-	// })
-
-	flags.IntVar(
-		&p.validatorSetSize,
-		validatorSetSizeFlag,
-		defaultValidatorSetSize,
-		"validator set size",
-	)
-	flags.Uint64Var(
-		&p.epochSize,
-		epochSizeFlag,
-		defaultEpochSize,
-		"epoch size",
-	)
-	flags.Uint64Var(
-		&p.sprintSize,
-		sprintSizeFlag,
-		defaultSprintSize,
-		"sprint size",
-	)
-	flags.DurationVar(
-		&p.blockTime,
-		blockTimeFlag,
-		defaultBlockTime,
-		"block time",
-	)
-	flags.StringArrayVar(
-		&p.validators,
-		validatorsFlag,
-		[]string{},
-		"validators list (format: <address>:<blskey>)",
-	)
-}
-
-func (p *genesisParams) validateFlags() error {
-	// Check if the genesis file already exists
-	if generateError := verifyGenesisExistence(p.genesisPath); generateError != nil {
-		return errors.New(generateError.GetMessage())
-	}
-
-	// Check that the epoch size is correct
-	if p.epochSize < 2 {
-		// Epoch size must be greater than 1, so new transactions have a chance to be added to a block.
-		// Otherwise, every block would be an endblock (meaning it will not have any transactions).
-		// Check is placed here to avoid additional parsing if epochSize < 2
-		return errInvalidEpochSize
-	}
-
-	return nil
-}
-
-func (p *genesisParams) getRequiredFlags() []string {
-	return []string{} // command.BootnodeFlag,
-}
 
 func (p *genesisParams) getPolyBftConfig(validators []*polybft.Validator) (*polybft.PolyBFTConfig, error) {
 	smartContracts, err := deployContracts()
@@ -233,7 +89,7 @@ func (p *genesisParams) GetChainConfig() (*chain.Chain, error) {
 			Mixhash:    polybft.PolyMixDigest,
 		},
 		Params: &chain.Params{
-			ChainID: p.chainID,
+			ChainID: int(p.chainID),
 			Forks:   chain.AllForksEnabled,
 			Engine: map[string]interface{}{
 				string(server.PolyBFTConsensus): polyBftConfig,
