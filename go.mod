@@ -63,6 +63,11 @@ require (
 require (
 	github.com/0xPolygon/go-ibft v0.0.0-20220810095021-e43142f8d267
 	go.uber.org/atomic v1.10.0
+)
+
+require (
+	github.com/0xPolygon/go-ibft v0.0.0-20220810095021-e43142f8d267
+	go.uber.org/atomic v1.10.0
 	gopkg.in/DataDog/dd-trace-go.v1 v1.42.1
 )
 
