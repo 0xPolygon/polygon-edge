@@ -308,11 +308,47 @@ func (s *snapshotStore) deleteLower(num uint64) {
 	s.Lock()
 	defer s.Unlock()
 
-	i := sort.Search(len(s.list), func(i int) bool {
-		return s.list[i].Number >= num
-	})
+	pruneIndex := s.findClosestSnapshotIndex(num)
+	s.list = s.list[pruneIndex:]
+}
 
-	s.list = s.list[i:]
+// findClosestSnapshotIndex finds the closest snapshot index for the specified
+// block number
+func (s *snapshotStore) findClosestSnapshotIndex(blockNum uint64) int {
+	// Check if the block number is lower than the highest saved snapshot
+	if blockNum < s.list[0].Number {
+		return 0
+	}
+
+	// Check if the block number if higher than the highest saved snapshot
+	if blockNum > s.list[len(s.list)-1].Number {
+		return len(s.list) - 1
+	}
+
+	var (
+		low  = 0
+		high = len(s.list) - 1
+	)
+
+	// Find the closest value using binary search
+	for low <= high {
+		mid := (high + low) / 2
+
+		if blockNum < s.list[mid].Number {
+			high = mid - 1
+		} else if blockNum > s.list[mid].Number {
+			low = mid + 1
+		} else {
+			return mid
+		}
+	}
+
+	// Check which of the two positions is closest (and has a higher block num)
+	if s.list[low].Number-blockNum < blockNum-s.list[high].Number {
+		return high
+	}
+
+	return low
 }
 
 // find returns the index of the first closest snapshot to the number specified
