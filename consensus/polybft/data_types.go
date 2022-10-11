@@ -34,7 +34,7 @@ func (s *StateSyncEvent) String() string {
 
 var _ MemDBRecord = &StateSyncEvent{}
 
-//Key returns the ID field of state sync event which is the unique key in memdb
+// Key returns the ID field of state sync event which is the unique key in memdb
 func (s *StateSyncEvent) Key() uint64 {
 	return s.ID
 }
