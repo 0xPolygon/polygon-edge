@@ -272,7 +272,10 @@ func (c *state) Len() int {
 	return len(c.memory)
 }
 
-func (c *state) checkMemory(offset, size *big.Int) bool {
+// allocateMemory allocates memory to enable accessing in the range of [offset, offset+size]
+// throws error if the given offset and size are negative
+// consumes gas if memory needs to be expanded
+func (c *state) allocateMemory(offset, size *big.Int) bool {
 	if !offset.IsUint64() || !size.IsUint64() {
 		c.exit(errGasUintOverflow)
 
@@ -325,7 +328,7 @@ func (c *state) get2(dst []byte, offset, length *big.Int) ([]byte, bool) {
 		return nil, true
 	}
 
-	if !c.checkMemory(offset, length) {
+	if !c.allocateMemory(offset, length) {
 		return nil, false
 	}
 

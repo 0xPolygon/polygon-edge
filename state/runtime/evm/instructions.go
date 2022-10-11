@@ -419,7 +419,7 @@ func opMStore(c *state) {
 	offset := c.pop()
 	val := c.pop()
 
-	if !c.checkMemory(offset, wordSize) {
+	if !c.allocateMemory(offset, wordSize) {
 		return
 	}
 
@@ -452,7 +452,7 @@ func opMStore8(c *state) {
 	offset := c.pop()
 	val := c.pop()
 
-	if !c.checkMemory(offset, one) {
+	if !c.allocateMemory(offset, one) {
 		return
 	}
 
@@ -757,7 +757,7 @@ func opExtCodeCopy(c *state) {
 	codeOffset := c.pop()
 	length := c.pop()
 
-	if !c.checkMemory(memOffset, length) {
+	if !c.allocateMemory(memOffset, length) {
 		return
 	}
 
@@ -788,7 +788,7 @@ func opCallDataCopy(c *state) {
 	dataOffset := c.pop()
 	length := c.pop()
 
-	if !c.checkMemory(memOffset, length) {
+	if !c.allocateMemory(memOffset, length) {
 		return
 	}
 
@@ -813,7 +813,7 @@ func opReturnDataCopy(c *state) {
 	dataOffset := c.pop()
 	length := c.pop()
 
-	if !c.checkMemory(memOffset, length) {
+	if !c.allocateMemory(memOffset, length) {
 		return
 	}
 
@@ -850,7 +850,7 @@ func opCodeCopy(c *state) {
 	dataOffset := c.pop()
 	length := c.pop()
 
-	if !c.checkMemory(memOffset, length) {
+	if !c.allocateMemory(memOffset, length) {
 		return
 	}
 
@@ -1207,7 +1207,7 @@ func (c *state) buildCallContract(op OpCode) (*runtime.Contract, uint64, uint64,
 		return nil, 0, 0, nil
 	}
 	// Check if the memory return offsets are out of bounds
-	if !c.checkMemory(retOffset, retSize) {
+	if !c.allocateMemory(retOffset, retSize) {
 		return nil, 0, 0, nil
 	}
 
