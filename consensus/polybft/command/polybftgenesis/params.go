@@ -23,6 +23,7 @@ const (
 	dirFlag                 = "dir"
 	nameFlag                = "name"
 	premineFlag             = "premine"
+	premineValidatorsFlag   = "premine-validators"
 	chainIDFlag             = "chain-id"
 	blockGasLimitFlag       = "block-gas-limit"
 	validatorPrefixPathFlag = "prefix"
@@ -59,7 +60,6 @@ type genesisParams struct {
 	genesisPath         string
 	name                string
 	validatorPrefixPath string
-	premine             []string
 	bootnodes           []string
 
 	chainID       int
@@ -70,6 +70,9 @@ type genesisParams struct {
 	epochSize        uint64
 	blockTime        time.Duration
 	validators       []string
+
+	premine           []string
+	premineValidators string
 }
 
 func (p *genesisParams) setFlags(cmd *cobra.Command) {
@@ -104,6 +107,13 @@ func (p *genesisParams) setFlags(cmd *cobra.Command) {
 			"the premined accounts and balances (format: <address>[:<balance>]). Default premined balance: %s",
 			command.DefaultPremineBalance,
 		),
+	)
+
+	flags.StringVar(
+		&p.premineValidators,
+		premineValidatorsFlag,
+		command.DefaultPremineBalance,
+		"the amount which will be premined for all the validators",
 	)
 
 	flags.Uint64Var(
@@ -162,6 +172,9 @@ func (p *genesisParams) setFlags(cmd *cobra.Command) {
 		[]string{},
 		"validators list (format: <address>:<blskey>)",
 	)
+
+	cmd.MarkFlagsMutuallyExclusive(premineFlag, premineValidatorsFlag)
+	cmd.MarkFlagsMutuallyExclusive(validatorsFlag, premineValidatorsFlag)
 }
 
 func (p *genesisParams) validateFlags() error {
@@ -251,8 +264,19 @@ func (p *genesisParams) GetChainConfig() (*chain.Chain, error) {
 		}
 	}
 
+	var premine []string = nil
+	if len(p.premine) > 0 {
+		premine = p.premine
+	} else if p.premineValidators != "" {
+		premine = make([]string, len(validatorsInfo))
+		for i, vi := range validatorsInfo {
+			premine[i] = fmt.Sprintf("%s:%s",
+				vi.Account.Ecdsa.Address().String(), p.premineValidators)
+		}
+	}
+
 	// Premine accounts
-	if err := fillPremineMap(chainConfig.Genesis.Alloc, p.premine); err != nil {
+	if err := fillPremineMap(chainConfig.Genesis.Alloc, premine); err != nil {
 		return nil, err
 	}
 
