@@ -205,12 +205,14 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	defer outputter.WriteOutput()
 
 	var result command.CommandResult
+
 	if params.isIBFTConsensus() {
 		if err := params.generateGenesis(); err != nil {
 			outputter.SetError(err)
 
 			return
 		}
+
 		result = params.getResult()
 	} else if params.isPolyBFTConsensus() {
 		config, err := params.GetChainConfig()
