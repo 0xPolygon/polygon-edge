@@ -8,34 +8,19 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
+	hcf "github.com/hashicorp/go-hclog"
 )
 
 // TODO: Add opentracing
 
-// type txStatus uint8
+type txStatus uint8
 
-// const (
-// 	success txStatus = iota
-// 	fail
-// 	skip
-// 	nothing
-// )
-
-// type txPoolInterface interface {
-// 	Prepare()
-// 	Length() uint64
-// 	Peek() *types.Transaction
-// 	Pop(tx *types.Transaction)
-// 	Drop(tx *types.Transaction)
-// 	Demote(tx *types.Transaction)
-// 	ResetWithHeaders(headers ...*types.Header)
-// 	SetSealing(bool)
-// }
-
-// type txEvmTransition interface {
-// 	Write(txn *types.Transaction) error
-// 	WriteFailedReceipt(txn *types.Transaction) error
-// }
+const (
+	success txStatus = iota
+	fail
+	skip
+	nothing
+)
 
 // BlockBuilderParams are fields for the block that cannot be changed
 type BlockBuilderParams struct {
@@ -63,9 +48,9 @@ type BlockBuilderParams struct {
 	BlockTime time.Duration
 
 	// Logger
-	//Logger hcf.Logger
+	Logger hcf.Logger
 
-	// TxPool txPoolInterface // Reference to the transaction pool
+	TxPool txPoolInterface // Reference to the transaction pool
 }
 
 func NewBlockBuilder(params *BlockBuilderParams) *BlockBuilder {
@@ -148,23 +133,9 @@ func (b *BlockBuilder) Build(handler func(h *types.Header)) (*StateBlock, error)
 		handler(b.header)
 	}
 
-	// TODO: Nemanja - see what to do with gas
-	// calculate gas limit based on parent header
-	//gasLimit, err := b.blockchain.CalculateGasLimit(header.Number)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// header.GasLimit = gasLimit
+	// Txs are filled outside - from FSM
 
-	// Nemanja - fill transactions
-	// txs := i.writeTransactions(gasLimit, header.Number, transition)
-
-	// if err := i.PreCommitState(header, transition); err != nil {
-	// 	return nil, err
-	// }
-
-	_, root := b.state.Commit()
-	b.header.StateRoot = root
+	_, b.header.StateRoot = b.state.Commit()
 	b.header.GasUsed = b.state.TotalGas()
 
 	// build the block
@@ -183,19 +154,17 @@ func (b *BlockBuilder) Build(handler func(h *types.Header)) (*StateBlock, error)
 	}, nil
 }
 
-/*
 // Fill fills the block with transactions from the txpool
 func (b *BlockBuilder) Fill() (successful int, failed int, skipped int, timeout bool) {
-	executed := make([]*types.Transaction, 0)
-
 	var blockTimer = time.NewTimer(b.params.BlockTime)
 
 	defer func() {
-		b.params.Logger.Info(
+		b.params.Logger.Debug(
 			"executed txs",
 			"successful", successful,
 			"failed", failed,
 			"skipped", skipped,
+			"timeout", timeout,
 			"remaining", b.params.TxPool.Length(),
 		)
 	}()
@@ -218,7 +187,7 @@ write:
 
 			switch result {
 			case success:
-				executed = append(executed, tx)
+				b.txns = append(b.txns, tx)
 				successful++
 			case fail:
 				failed++
@@ -234,8 +203,8 @@ write:
 	return successful, failed, skipped, false
 }
 
-func (b *BlockBuilder) writeTransaction(
-	tx *types.Transaction) (txstat txStatus, continueProcessing bool) {
+func (b *BlockBuilder) writeTransaction(tx *types.Transaction) (
+	txstat txStatus, continueProcessing bool) {
 	if tx == nil {
 		return skip, false
 	}
@@ -243,20 +212,16 @@ func (b *BlockBuilder) writeTransaction(
 	if tx.ExceedsBlockGasLimit(b.params.GasLimit) {
 		b.params.TxPool.Drop(tx)
 
-		if err := b.params.Transition.WriteFailedReceipt(tx); err != nil {
-			b.params.Logger.Error(
-				fmt.Sprintf(
-					"unable to write failed receipt for transaction %s",
-					tx.Hash,
-				),
-			)
+		if err := b.state.WriteFailedReceipt(tx); err != nil {
+			b.params.Logger.Error("unable to write failed receipt for transaction",
+				"hash", tx.Hash)
 		}
 
 		// continue processing
 		return fail, true
 	}
 
-	if err := b.params.Transition.Write(tx); err != nil {
+	if err := b.state.Write(tx); err != nil {
 		if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok { //nolint:errorlint
 			// stop processing
 			return nothing, false
@@ -275,7 +240,6 @@ func (b *BlockBuilder) writeTransaction(
 
 	return success, true
 }
-*/
 
 // GetState returns StateDB reference
 func (b *BlockBuilder) GetState() *state.Transition {

@@ -20,7 +20,7 @@ var _ pbft.Backend = &fsm{}
 type blockBuilder interface {
 	Reset()
 	// CommitTransaction(tx *types.Transaction) error
-	// Fill(ctx context.Context) error
+	Fill() (int, int, int, bool)
 	Build(func(h *types.Header)) (*StateBlock, error)
 	GetState() *state.Transition
 }
@@ -135,6 +135,18 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 		// }
 	}
 
+	gasLimit, err := f.backend.CalculateGasLimit(parent.Number + 1)
+	if err != nil {
+		return nil, err
+	}
+
+	// fill the block with transactions
+	successful, failed, skipped, timeout := f.blockBuilder.Fill()
+	if successful == 0 && failed > 0 {
+		return nil, fmt.Errorf("block builder fill fail: failed = %d, skipped = %d, timeout = %v",
+			failed, skipped, timeout)
+	}
+
 	// set the timestamp
 	parentTime := time.Unix(int64(parent.Timestamp), 0)
 	headerTime := parentTime.Add(f.config.BlockTime)
@@ -143,20 +155,11 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 		headerTime = time.Now()
 	}
 
-	// fill the block with transactions
-	now := time.Now()
-
-	// TODO: Nemanja - skip transactions
-	// if err := f.blockBuilder.Fill(context.Background()); err != nil {
-	// 	return nil, err
-	// }
-
-	f.logger.Debug("Fill block", "time", time.Since(now))
-
 	stateBlock, err := f.blockBuilder.Build(func(h *types.Header) {
 		h.Timestamp = uint64(headerTime.Unix())
 		h.ExtraData = append(make([]byte, 32), extra.MarshalRLPTo(nil)...)
 		h.MixHash = PolyMixDigest
+		h.GasLimit = gasLimit
 	})
 
 	if err != nil {
@@ -164,16 +167,18 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 	}
 
 	f.block = stateBlock
-
-	proposal := &pbft.Proposal{
+	f.proposal = &pbft.Proposal{
 		Time: headerTime,
 		Data: stateBlock.Block.MarshalRLP(),
 		Hash: f.block.Block.Hash().Bytes(),
 	}
-	f.proposal = proposal
-	f.logger.Debug("[FSM Build Proposal]", "Proposal hash", hex.EncodeToHex(proposal.Hash))
 
-	return proposal, nil
+	f.logger.Debug("[FSM Build Proposal]",
+		"txs", len(stateBlock.Block.Transactions),
+		"time", time.Now(),
+		"Proposal hash", hex.EncodeToHex(f.proposal.Hash))
+
+	return f.proposal, nil
 }
 
 func (f *fsm) stateTransactions() []*types.Transaction {
@@ -255,7 +260,7 @@ func (f *fsm) ValidateCommit(from pbft.NodeID, seal []byte) error {
 
 // Validate validates a raw proposal (used if non-proposer)
 func (f *fsm) Validate(proposal *pbft.Proposal) error {
-	f.logger.Debug("[FSM Validate]", "Proposal hash", hex.EncodeToHex(proposal.Hash))
+	f.logger.Debug("[FSM Validate]", "hash", hex.EncodeToHex(proposal.Hash))
 
 	var block types.Block
 	if err := block.UnmarshalRLP(proposal.Data); err != nil {
@@ -315,6 +320,10 @@ func (f *fsm) Validate(proposal *pbft.Proposal) error {
 
 	f.block = builtBlock
 	f.proposal = proposal
+
+	f.logger.Debug("[FSM Validate]",
+		"txs", len(f.block.Block.Transactions),
+		"hash", hex.EncodeToHex(proposal.Hash))
 
 	return nil
 }

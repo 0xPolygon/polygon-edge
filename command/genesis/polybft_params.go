@@ -18,6 +18,7 @@ import (
 )
 
 const (
+	premineValidatorsFlag          = "premine-validators"
 	polyBftValidatorPrefixPathFlag = "validator-prefix"
 
 	validatorSetSizeFlag = "validator-set-size"
@@ -94,8 +95,19 @@ func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
 		}
 	}
 
+	var premine []string = nil
+	if len(p.premine) > 0 {
+		premine = p.premine
+	} else if p.premineValidators != "" {
+		premine = make([]string, len(validatorsInfo))
+		for i, vi := range validatorsInfo {
+			premine[i] = fmt.Sprintf("%s:%s",
+				vi.Account.Ecdsa.Address().String(), p.premineValidators)
+		}
+	}
+
 	// Premine accounts
-	if err := fillPremineMap(chainConfig.Genesis.Alloc, p.premine); err != nil {
+	if err := fillPremineMap(chainConfig.Genesis.Alloc, premine); err != nil {
 		return nil, err
 	}
 

@@ -303,6 +303,7 @@ func (p *Polybft) startRuntime() error {
 		State:          p.state,
 		blockchain:     p.blockchain,
 		polybftBackend: p,
+		txPool:         p.config.TxPool,
 	}
 
 	runtime, err := newConsensusRuntime(p.logger, runtimeConfig)

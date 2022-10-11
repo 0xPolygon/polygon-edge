@@ -14,11 +14,12 @@ import (
 )
 
 const (
-	dataPathFlag = "data-dir"
-	configFlag   = "config"
-	accountFlag  = "account"
-	networkFlag  = "network"
-	numFlag      = "num"
+	dataPathFlag   = "data-dir"
+	configFlag     = "config"
+	accountFlag    = "account"
+	privateKeyFlag = "private"
+	networkFlag    = "network"
+	numFlag        = "num"
 
 	// maxInitNum is the maximum value for "num" flag
 	maxInitNum = 30
@@ -32,10 +33,13 @@ var (
 )
 
 type initParams struct {
-	dataPath         string
-	configPath       string
+	dataPath   string
+	configPath string
+
 	generatesAccount bool
 	generatesNetwork bool
+
+	printPrivateKey bool
 
 	numberOfSecrets int
 }
@@ -94,6 +98,13 @@ func (ip *initParams) setFlags(cmd *cobra.Command) {
 		networkFlag,
 		true,
 		"the flag indicating whether new Network key is created",
+	)
+
+	cmd.Flags().BoolVar(
+		&ip.printPrivateKey,
+		privateKeyFlag,
+		false,
+		"the flag indicating whether Private key is printed",
 	)
 }
 
@@ -169,15 +180,24 @@ func (ip *initParams) getResult(secretsManager secrets.SecretsManager) (command.
 		err error
 	)
 
-	if ip.generatesNetwork {
+	if ip.generatesAccount {
 		account, err := wallet.GenerateNewAccountFromSecret(
 			secretsManager, secrets.ValidatorBLSKey)
 		if err != nil {
 			return nil, err
 		}
 
+		pk, err := account.Ecdsa.MarshallPrivateKey()
+		if err != nil {
+			return nil, err
+		}
+
 		res.Address = types.Address(account.Ecdsa.Address())
 		res.BLSPubkey = hex.EncodeToString(account.Bls.PublicKey().Marshal())
+
+		if ip.printPrivateKey {
+			res.PrivateKey = hex.EncodeToString(pk)
+		}
 	}
 
 	if ip.generatesNetwork {

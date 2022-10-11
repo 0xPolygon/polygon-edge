@@ -8,6 +8,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
+	hcf "github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/contract"
 )
@@ -33,7 +34,8 @@ type blockchainBackend interface {
 	CommitBlock(stateBlock *StateBlock) error
 
 	// NewBlockBuilder is a factory method that returns a block builder on top of 'parent'.
-	NewBlockBuilder(parent *types.Header, coinbase types.Address) (blockBuilder, error)
+	NewBlockBuilder(parent *types.Header, coinbase types.Address,
+		txPool txPoolInterface, logger hcf.Logger) (blockBuilder, error)
 
 	// ProcessBlock builds a final block from given 'block' on top of 'parent'.
 	ProcessBlock(parent *types.Header, block *types.Block) (*StateBlock, error)
@@ -54,6 +56,9 @@ type blockchainBackend interface {
 	GetSystemState(config *PolyBFTConfig, provider contract.Provider) SystemState
 
 	SubscribeEvents() blockchain.Subscription
+
+	// CalculateGasLimit for specifici block
+	CalculateGasLimit(number uint64) (uint64, error)
 }
 
 var _ blockchainBackend = &blockchainWrapper{}
@@ -86,13 +91,17 @@ func (p *blockchainWrapper) ProcessBlock(parent *types.Header, block *types.Bloc
 	// TODO: Call validate block in polybft
 	header := block.Header.Copy()
 
-	//transition, err := p.executor.BeginTxn(parent.Hash, header, b.params.Coinbase)
-	transition, err := p.executor.BeginTxn(parent.StateRoot, header, types.Address{})
+	transition, err := p.executor.BeginTxn(parent.StateRoot, header, types.BytesToAddress(header.Miner))
 	if err != nil {
 		return nil, err
 	}
 
-	// Nemanja - apply transactions from block
+	// apply transactions from block
+	for _, tx := range block.Transactions {
+		if err := transition.Write(tx); err != nil {
+			return nil, fmt.Errorf("process block tx error, tx = %v, err = %w", tx.Hash, err)
+		}
+	}
 
 	_, root := transition.Commit()
 
@@ -141,7 +150,8 @@ func (p *blockchainWrapper) GetHeaderByHash(hash types.Hash) (*types.Header, boo
 
 // NewBlockBuilder is an implementation of blockchainBackend interface
 func (p *blockchainWrapper) NewBlockBuilder(
-	parent *types.Header, coinbase types.Address) (blockBuilder, error) {
+	parent *types.Header, coinbase types.Address,
+	txPool txPoolInterface, logger hcf.Logger) (blockBuilder, error) {
 	return NewBlockBuilder(&BlockBuilderParams{
 		Parent:      parent,
 		Coinbase:    coinbase,
@@ -150,6 +160,8 @@ func (p *blockchainWrapper) NewBlockBuilder(
 		//TxPoolFactory: blockbuilder.NewEthTxPool(p.eth.TxPool()),
 		Executor: p.executor,
 		GasLimit: 10000000, // TODO: Nemanja - see what to do with this (p.eth.GenesisGasLimit(),)
+		TxPool:   txPool,
+		Logger:   logger,
 	}), nil
 }
 
@@ -160,6 +172,11 @@ func (p *blockchainWrapper) GetSystemState(config *PolyBFTConfig, provider contr
 
 func (p *blockchainWrapper) SubscribeEvents() blockchain.Subscription {
 	return p.blockchain.SubscribeEvents()
+}
+
+// CalculateGasLimit for specific block
+func (p *blockchainWrapper) CalculateGasLimit(number uint64) (uint64, error) {
+	return p.blockchain.CalculateGasLimit(number)
 }
 
 var _ contract.Provider = &stateProvider{}
