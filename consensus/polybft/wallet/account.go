@@ -42,11 +42,11 @@ func GenerateNewAccountFromSecret(secretManager secrets.SecretsManager, key stri
 		return nil, fmt.Errorf("failed to read account data: %w", err)
 	}
 
-	return newAccountFromBytes(accountBytes)
+	return NewAccountFromBytes(accountBytes)
 }
 
 // NewAccountFromBytes creates a new Account from bytes
-func newAccountFromBytes(content []byte) (*Account, error) {
+func NewAccountFromBytes(content []byte) (*Account, error) {
 	var stored *keystoreAccount
 	if err := json.Unmarshal(content, &stored); err != nil {
 		return nil, err

@@ -16,7 +16,7 @@ func TestAccount(t *testing.T) {
 	privKeyMarshalled, err := key.Bls.MarshalJSON()
 	require.NoError(t, err)
 
-	key1, err := newAccountFromBytes(bytes)
+	key1, err := NewAccountFromBytes(bytes)
 	require.NoError(t, err)
 
 	pubKeyMarshalled1 := key1.Bls.PublicKey().Marshal()

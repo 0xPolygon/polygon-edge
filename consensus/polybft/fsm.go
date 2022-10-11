@@ -20,7 +20,7 @@ var _ pbft.Backend = &fsm{}
 type blockBuilder interface {
 	Reset()
 	// CommitTransaction(tx *types.Transaction) error
-	// Fill(ctx context.Context) error
+	Fill() (int, int, int, bool)
 	Build(func(h *types.Header)) (*StateBlock, error)
 	GetState() *state.Transition
 }
@@ -135,6 +135,13 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 		// }
 	}
 
+	// fill the block with transactions
+	successful, failed, skipped, timeout := f.blockBuilder.Fill()
+	if successful == 0 && failed > 0 {
+		return nil, fmt.Errorf("block builder fill fail: failed = %d, skipped = %d, timeout = %v",
+			failed, skipped, timeout)
+	}
+
 	// set the timestamp
 	parentTime := time.Unix(int64(parent.Timestamp), 0)
 	headerTime := parentTime.Add(f.config.BlockTime)
@@ -142,16 +149,6 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 	if headerTime.Before(time.Now()) {
 		headerTime = time.Now()
 	}
-
-	// fill the block with transactions
-	now := time.Now()
-
-	// TODO: Nemanja - skip transactions
-	// if err := f.blockBuilder.Fill(context.Background()); err != nil {
-	// 	return nil, err
-	// }
-
-	f.logger.Debug("Fill block", "time", time.Since(now))
 
 	stateBlock, err := f.blockBuilder.Build(func(h *types.Header) {
 		h.Timestamp = uint64(headerTime.Unix())
@@ -164,16 +161,18 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 	}
 
 	f.block = stateBlock
-
-	proposal := &pbft.Proposal{
+	f.proposal = &pbft.Proposal{
 		Time: headerTime,
 		Data: stateBlock.Block.MarshalRLP(),
 		Hash: f.block.Block.Hash().Bytes(),
 	}
-	f.proposal = proposal
-	f.logger.Debug("[FSM Build Proposal]", "Proposal hash", hex.EncodeToHex(proposal.Hash))
 
-	return proposal, nil
+	f.logger.Debug("[FSM Build Proposal]",
+		"time", time.Now(),
+		"Proposal hash", hex.EncodeToHex(f.proposal.Hash),
+		"txs", len(stateBlock.Block.Transactions))
+
+	return f.proposal, nil
 }
 
 func (f *fsm) stateTransactions() []*types.Transaction {
@@ -315,6 +314,8 @@ func (f *fsm) Validate(proposal *pbft.Proposal) error {
 
 	f.block = builtBlock
 	f.proposal = proposal
+
+	f.logger.Debug("[FSM Validate Proposal]", "txs", len(f.block.Block.Transactions))
 
 	return nil
 }

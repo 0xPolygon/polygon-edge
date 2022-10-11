@@ -272,6 +272,7 @@ func (p *Polybft) startSealing() error {
 
 	go func() {
 		// start the pbft process
+		AddDummyTx(uint64(p.config.Config.Params.ChainID), p.config.TxPool, 10)
 		p.startPbftProcess()
 	}()
 
@@ -306,6 +307,7 @@ func (p *Polybft) startRuntime() error {
 		State:          p.state,
 		blockchain:     p.blockchain,
 		polybftBackend: p,
+		txPool:         p.config.TxPool,
 	}
 
 	runtime, err := newConsensusRuntime(p.logger, runtimeConfig)

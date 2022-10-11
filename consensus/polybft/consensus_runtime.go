@@ -39,6 +39,18 @@ type Transport interface {
 	Gossip(message interface{})
 }
 
+// txPoolInterface is an abstraction of transaction pool
+type TxPoolInterface interface {
+	Prepare()
+	Length() uint64
+	Peek() *types.Transaction
+	Pop(tx *types.Transaction)
+	Drop(tx *types.Transaction)
+	Demote(tx *types.Transaction)
+	ResetWithHeaders(headers ...*types.Header)
+	SetSealing(bool)
+}
+
 // epochMetadata is the static info for epoch currently being processed
 type epochMetadata struct {
 	// Number is the number of the epoch
@@ -69,6 +81,7 @@ type runtimeConfig struct {
 	State          *State
 	blockchain     blockchainBackend
 	polybftBackend polybftBackend
+	txPool         TxPoolInterface
 }
 
 // consensusRuntime is a struct that provides consensus runtime features like epoch, state and event management
@@ -181,7 +194,8 @@ func (c *consensusRuntime) FSM() (*fsm, error) {
 		return nil, errNotAValidator
 	}
 
-	blockBuilder, err := c.config.blockchain.NewBlockBuilder(parent, types.Address(c.config.Key.Address()))
+	blockBuilder, err := c.config.blockchain.NewBlockBuilder(
+		parent, types.Address(c.config.Key.Address()), c.config.txPool, c.logger)
 	if err != nil {
 		return nil, err
 	}
