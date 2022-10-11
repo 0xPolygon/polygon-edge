@@ -73,6 +73,8 @@ var (
 	errGapInStateSyncs = errors.New("there is a gap in state sync events")
 	// errCommitmentNotBuilt error message
 	errCommitmentNotBuilt = errors.New("there is no built commitment to register")
+	// errItemNotMemDBRecord error message
+	errItemNotMemDBRecord = errors.New("item not a MemDBRecord")
 )
 
 // MemDBIterator is an interface implemented by every custom memdb iterator
@@ -134,7 +136,7 @@ var memStateSchema = &memdb.DBSchema{
 
 func getUpperBoundUint64(upperBound interface{}) uint64 {
 	if upperBound == nil {
-		// if there is no upper bound provided, than we return everything
+		// if there is no upper bound provided, then we return everything
 		return math.MaxUint64
 	}
 
@@ -151,7 +153,7 @@ var iterators = map[string]func(it memdb.ResultIterator, upperBound interface{},
 	stateSyncTable: func(it memdb.ResultIterator, upperBound interface{}, first MemDBRecord) MemDBIterator {
 		event, isOk := first.(*StateSyncEvent)
 		if !isOk {
-			panic("element not of type StateSyncEvent")
+			panic("failed to create state sync events table iterator, because element is not of type StateSyncEvent")
 		}
 
 		return &StateSyncIterator{iter: it, next: event, upperBound: getUpperBoundUint64(upperBound)}
@@ -198,7 +200,7 @@ func (s *StateSyncIterator) Next() (MemDBRecord, error) {
 
 	obj, isOk := nextItem.(MemDBRecord)
 	if !isOk {
-		return nil, errors.New("item not a MemDBRecord")
+		return nil, errItemNotMemDBRecord
 	}
 
 	if obj.Key() > s.upperBound {
@@ -237,7 +239,7 @@ func (s *MemDBRecordIterator) Next() (MemDBRecord, error) {
 
 	obj, isOk := nextItem.(MemDBRecord)
 	if !isOk {
-		return nil, errors.New("item not a MemDBRecord")
+		return nil, errItemNotMemDBRecord
 	}
 
 	if obj.Key() > s.upperBound {
