@@ -100,7 +100,7 @@ func (p *genesisParams) validateFlags() error {
 	}
 
 	// Check that the epoch size is correct
-	if p.epochSize < 2 && p.isIBFTConsensus() {
+	if p.epochSize < 2 && (p.isIBFTConsensus() || p.isPolyBFTConsensus()) {
 		// Epoch size must be greater than 1, so new transactions have a chance to be added to a block.
 		// Otherwise, every block would be an endblock (meaning it will not have any transactions).
 		// Check is placed here to avoid additional parsing if epochSize < 2
@@ -144,7 +144,7 @@ func (p *genesisParams) getRequiredFlags() []string {
 func (p *genesisParams) initRawParams() error {
 	p.consensus = server.ConsensusType(p.consensusRaw)
 
-	if p.isIBFTConsensus() {
+	if p.consensus == server.IBFTConsensus {
 		if err := p.initIBFTValidatorType(); err != nil {
 			return err
 		}

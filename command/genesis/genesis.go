@@ -206,15 +206,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 	var result command.CommandResult
 
-	if params.isIBFTConsensus() {
-		if err := params.generateGenesis(); err != nil {
-			outputter.SetError(err)
-
-			return
-		}
-
-		result = params.getResult()
-	} else if params.isPolyBFTConsensus() {
+	if params.isPolyBFTConsensus() {
 		config, err := params.GetChainConfig()
 		if err != nil {
 			outputter.SetError(err)
@@ -231,6 +223,14 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		result = &GenesisResult{
 			Message: fmt.Sprintf("Genesis written to %s\n", params.genesisPath),
 		}
+	} else {
+		if err := params.generateGenesis(); err != nil {
+			outputter.SetError(err)
+
+			return
+		}
+
+		result = params.getResult()
 	}
 
 	outputter.SetCommandResult(result)
