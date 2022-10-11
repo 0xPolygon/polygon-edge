@@ -50,6 +50,14 @@ test-e2e:
 	go build -race -o artifacts/polygon-edge .
 	env EDGE_BINARY=${PWD}/artifacts/polygon-edge go test -v -timeout=30m ./e2e/...
 
+.PHONY: test-e2ev3
+test-e2ev3:
+    # We need to build the binary with the race flag enabled
+    # because it will get picked up and run during e2e tests
+    # and the e2e tests should error out if any kind of race is found
+	go build -race -o artifacts/polygon-edge .
+	env EDGE_BINARY=${PWD}/artifacts/polygon-edge go test -v -timeout=30m ./e2ev3/...
+
 .PHONY: run-local
 run-local:
 	docker-compose -f ./docker/local/docker-compose.yml up -d --build
