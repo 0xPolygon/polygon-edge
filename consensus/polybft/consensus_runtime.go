@@ -192,7 +192,7 @@ func (c *consensusRuntime) FSM() (*fsm, error) {
 	}
 
 	blockBuilder, err := c.config.blockchain.NewBlockBuilder(
-		parent, types.Address(c.config.Key.Address()), c.config.txPool, c.logger)
+		parent, types.Address(c.config.Key.Address()), c.config.txPool, c.config.PolyBFTConfig.BlockTime, c.logger)
 	if err != nil {
 		return nil, err
 	}
