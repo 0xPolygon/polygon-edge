@@ -607,8 +607,8 @@ func (p *Polybft) ProcessHeaders(_ []*types.Header) error {
 }
 
 // GetBlockCreator retrieves the block creator (or signer) given the block header
-func (p *Polybft) GetBlockCreator(_ *types.Header) (types.Address, error) {
-	return types.Address(p.key.Address()), nil
+func (p *Polybft) GetBlockCreator(h *types.Header) (types.Address, error) {
+	return types.BytesToAddress(h.Miner), nil
 }
 
 // PreCommitState a hook to be called before finalizing state transition on inserting block
