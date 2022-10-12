@@ -52,11 +52,6 @@ func NewBlockBuilder(params *BlockBuilderParams) *BlockBuilder {
 		params.Extra = make([]byte, 0)
 	}
 
-	if params.BlockTime == 0 {
-		// default block time to 2 seconds, if it is not provided with the parameters
-		params.BlockTime = 2 * time.Second
-	}
-
 	builder := &BlockBuilder{
 		params: params,
 	}
