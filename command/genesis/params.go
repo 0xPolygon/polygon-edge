@@ -79,6 +79,8 @@ type genesisParams struct {
 	sprintSize       uint64
 	blockTime        time.Duration
 	validators       []string
+
+	polyBftValidatorPrefixPath string
 }
 
 func (p *genesisParams) validateFlags() error {

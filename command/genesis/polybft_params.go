@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	validatorPrefixPathFlag = "prefix"
+	polyBftValidatorPrefixPathFlag = "validator-prefix"
 
 	validatorSetSizeFlag = "validator-set-size"
 	sprintSizeFlag       = "sprint-size"
@@ -29,6 +29,8 @@ const (
 	defaultSprintSize       = uint64(5)
 	defaultValidatorSetSize = 100
 	defaultBlockTime        = 2 * time.Second
+
+	defaultPolyBftValidatorPrefixPath = "test-chain-"
 
 	bootnodePortStart = 30301
 )
@@ -42,7 +44,7 @@ var (
 )
 
 func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
-	validatorsInfo, err := ReadValidatorsByRegexp(path.Dir(p.genesisPath), p.validatorPrefixPath)
+	validatorsInfo, err := ReadValidatorsByRegexp(path.Dir(p.genesisPath), p.polyBftValidatorPrefixPath)
 	if err != nil {
 		return nil, err
 	}

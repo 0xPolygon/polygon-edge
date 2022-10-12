@@ -105,7 +105,7 @@ func setFlags(cmd *cobra.Command) {
 		cmd.Flags().StringVar(
 			&params.validatorPrefixPath,
 			command.IBFTValidatorPrefixFlag,
-			"test-chain-",
+			"",
 			"prefix path for validator folder directory. "+
 				"Needs to be present if ibft-validator is omitted",
 		)
@@ -154,6 +154,12 @@ func setFlags(cmd *cobra.Command) {
 			validatorSetSizeFlag,
 			defaultValidatorSetSize,
 			"the total number of validators",
+		)
+		cmd.Flags().StringVar(
+			&params.polyBftValidatorPrefixPath,
+			polyBftValidatorPrefixPathFlag,
+			defaultPolyBftValidatorPrefixPath,
+			"prefix path for polybft validator folder directory",
 		)
 		cmd.Flags().Uint64Var(
 			&params.sprintSize,
