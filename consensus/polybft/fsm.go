@@ -20,8 +20,7 @@ var _ pbft.Backend = &fsm{}
 
 type blockBuilder interface {
 	Reset()
-	// CommitTransaction(tx *types.Transaction) error
-	Fill() (int, int, int, bool)
+	Fill() error
 	Build(func(h *types.Header)) (*StateBlock, error)
 	GetState() *state.Transition
 }
@@ -142,10 +141,8 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 	}
 
 	// fill the block with transactions
-	successful, failed, skipped, timeout := f.blockBuilder.Fill()
-	if successful == 0 && failed > 0 {
-		return nil, fmt.Errorf("block builder fill fail: failed = %d, skipped = %d, timeout = %v",
-			failed, skipped, timeout)
+	if f.blockBuilder.Fill(); err != nil {
+		return nil, err
 	}
 
 	// set the timestamp
@@ -176,8 +173,7 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 
 	f.logger.Debug("[FSM Build Proposal]",
 		"txs", len(stateBlock.Block.Transactions),
-		"time", time.Now(),
-		"Proposal hash", hex.EncodeToHex(f.proposal.Hash))
+		"hash", hex.EncodeToHex(f.proposal.Hash))
 
 	return f.proposal, nil
 }

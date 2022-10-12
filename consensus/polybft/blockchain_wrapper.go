@@ -2,8 +2,9 @@ package polybft
 
 import (
 	"fmt"
-	"github.com/hashicorp/go-hclog"
 	"math/big"
+
+	"github.com/hashicorp/go-hclog"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/consensus"
@@ -153,14 +154,12 @@ func (p *blockchainWrapper) NewBlockBuilder(
 	parent *types.Header, coinbase types.Address,
 	txPool txPoolInterface, logger hclog.Logger) (blockBuilder, error) {
 	return NewBlockBuilder(&BlockBuilderParams{
-
-		Parent:      parent,
-		Coinbase:    coinbase,
-		ChainConfig: p.blockchain.Config(),
-		Executor:    p.executor,
-		GasLimit:    parent.GasLimit,
-		TxPool:      txPool,
-		Logger:      logger,
+		Parent:   parent,
+		Coinbase: coinbase,
+		Executor: p.executor,
+		GasLimit: parent.GasLimit,
+		TxPool:   txPool,
+		Logger:   logger,
 	}), nil
 }
 

@@ -1,9 +1,9 @@
 package polybft
 
 import (
+	"fmt"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/state"
@@ -13,13 +13,13 @@ import (
 
 // TODO: Add opentracing
 
-type txStatus uint8
+type txWriteStatus uint8
 
 const (
-	success txStatus = iota
+	success txWriteStatus = iota
 	fail
 	skip
-	nothing
+	finishProcessing
 )
 
 // BlockBuilderParams are fields for the block that cannot be changed
@@ -27,16 +27,11 @@ type BlockBuilderParams struct {
 	// Parent block
 	Parent *types.Header
 
+	// Executor
 	Executor *state.Executor
 
 	// Coinbase that is signing the block
 	Coinbase types.Address
-
-	// ChainConfig is the configurtion of the chain
-	ChainConfig *chain.Params
-
-	// ChainContext interface is used during EVM execution
-	// ChainContext core.ChainContext
 
 	// Vanity extra for the block
 	Extra []byte
@@ -50,7 +45,8 @@ type BlockBuilderParams struct {
 	// Logger
 	Logger hcf.Logger
 
-	TxPool txPoolInterface // Reference to the transaction pool
+	// txPoolInterface implementation
+	TxPool txPoolInterface
 }
 
 func NewBlockBuilder(params *BlockBuilderParams) *BlockBuilder {
@@ -153,8 +149,10 @@ func (b *BlockBuilder) Build(handler func(h *types.Header)) (*StateBlock, error)
 }
 
 // Fill fills the block with transactions from the txpool
-func (b *BlockBuilder) Fill() (successful int, failed int, skipped int, timeout bool) {
-	var blockTimer = time.NewTimer(b.params.BlockTime)
+func (b *BlockBuilder) Fill() error {
+	successful, failed, skipped := 0, 0, 0
+	blockTimer := time.NewTimer(b.params.BlockTime)
+	timeout := false
 
 	defer func() {
 		b.params.Logger.Debug(
@@ -168,22 +166,21 @@ func (b *BlockBuilder) Fill() (successful int, failed int, skipped int, timeout 
 	}()
 
 	b.params.TxPool.Prepare()
-
 write:
 	for {
 		select {
 		case <-blockTimer.C:
-			return successful, failed, skipped, true
-		default:
-			tx := b.params.TxPool.Peek()
-			// execute transactions one by one
-			result, ok := b.writeTransaction(tx)
-
-			if !ok {
-				break write
+			timeout = true
+			if successful == 0 && failed > 0 {
+				return fmt.Errorf("block builder fill fail: failed = %d", failed)
 			}
 
-			switch result {
+			return nil
+		default:
+			tx := b.params.TxPool.Peek()
+
+			// execute transactions one by one
+			switch b.writeTransaction(tx) {
 			case success:
 				b.txns = append(b.txns, tx)
 				successful++
@@ -191,6 +188,8 @@ write:
 				failed++
 			case skip:
 				skipped++
+			case finishProcessing:
+				break write
 			}
 		}
 	}
@@ -198,13 +197,16 @@ write:
 	//	wait for the timer to expire
 	<-blockTimer.C
 
-	return successful, failed, skipped, false
+	if successful == 0 && failed > 0 {
+		return fmt.Errorf("block builder fill fail: failed = %d", failed)
+	}
+
+	return nil
 }
 
-func (b *BlockBuilder) writeTransaction(tx *types.Transaction) (
-	txstat txStatus, continueProcessing bool) {
+func (b *BlockBuilder) writeTransaction(tx *types.Transaction) txWriteStatus {
 	if tx == nil {
-		return skip, false
+		return finishProcessing
 	}
 
 	if tx.ExceedsBlockGasLimit(b.params.GasLimit) {
@@ -216,27 +218,27 @@ func (b *BlockBuilder) writeTransaction(tx *types.Transaction) (
 		}
 
 		// continue processing
-		return fail, true
+		return fail
 	}
 
 	if err := b.state.Write(tx); err != nil {
 		if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok { //nolint:errorlint
 			// stop processing
-			return nothing, false
+			return finishProcessing
 		} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable { //nolint:errorlint
 			b.params.TxPool.Demote(tx)
 
-			return skip, true
+			return skip
 		} else {
 			b.params.TxPool.Drop(tx)
 
-			return fail, true
+			return fail
 		}
 	}
 
 	b.params.TxPool.Pop(tx)
 
-	return success, true
+	return success
 }
 
 // GetState returns StateDB reference
