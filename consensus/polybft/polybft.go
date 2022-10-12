@@ -52,7 +52,6 @@ type polybftBackend interface {
 // Factory is the factory function to create a discovery consensus
 func Factory(params *consensus.Params) (consensus.Consensus, error) {
 	logger := params.Logger.Named("polybft")
-	logger.Info("polybft factory", "params", params.Config.Params, "specific consensus params", params.Config)
 
 	setupHeaderHashFunc()
 
@@ -286,8 +285,6 @@ func (p *Polybft) initializeConsensusConfig() {
 
 	customConfigJSON, _ := json.Marshal(customConfigGeneric)
 	json.Unmarshal(customConfigJSON, &polyBftConfig)
-
-	p.logger.Info(fmt.Sprintf("Polybft config %+v", polyBftConfig))
 
 	// TODO: Bridge, validators configuration
 	p.consensusConfig = &polyBftConfig
