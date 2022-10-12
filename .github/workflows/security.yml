@@ -1,26 +1,29 @@
 ---
 name: Security Scan
 on:  # yamllint disable-line rule:truthy
-  workflow_call: {}
+  workflow_call:
+    secrets:
+      SNYK_TOKEN:
+        required: true
   workflow_dispatch: {}
   schedule:
     - cron: '0 0 * * 0'
 
 jobs:
-  gosec:
-    name: Gosec and Publish
+  snyk:
+    name: Snyk and Publish
     runs-on: ubuntu-latest
     continue-on-error: true
-    env:
-      GO111MODULE: on  # yamllint disable-line rule:truthy
     steps:
       - name: Checkout Source
-        uses: actions/checkout@v2
-      - name: Run Gosec Security Scanner
-        uses: securego/gosec@master
+        uses: actions/checkout@master
+      - name: Run Snyk to check for vulnerabilities
+        uses: snyk/actions/golang@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
-          args: '-no-fail -fmt sarif -out results.sarif ./...'
-      - name: Upload SARIF file
+          args: --sarif-file-output=snyk.sarif
+      - name: Upload result to GitHub Code Scanning
         uses: github/codeql-action/upload-sarif@v2
         with:
-          sarif_file: results.sarif
+          sarif_file: snyk.sarif

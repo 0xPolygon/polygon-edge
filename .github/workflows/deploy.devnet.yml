@@ -13,9 +13,11 @@ permissions:
   security-events: write
 
 jobs:
-  gosec:
-    name: Gosec and Publish
+  snyk:
+    name: Snyk and Publish
     uses: 0xpolygon/polygon-edge/.github/workflows/security.yml@develop
+    secrets:
+      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
   build:
     name: Build

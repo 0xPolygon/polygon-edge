@@ -16,15 +16,12 @@ jobs:
     uses: 0xpolygon/polygon-edge/.github/workflows/test.yml@develop
     needs: build
 
-  gosec:
-    name: Gosec
+  snyk:
+    name: Snyk
     runs-on: ubuntu-latest
-    env:
-      GO111MODULE: on  # yamllint disable-line rule:truthy
     steps:
-      - name: Checkout Source
-        uses: actions/checkout@v2
-      - name: Run Gosec Security Scanner
-        uses: securego/gosec@master
-        with:
-          args: ./...
+      - uses: actions/checkout@master
+      - name: Run Snyk to check for vulnerabilities
+        uses: snyk/actions/golang@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
