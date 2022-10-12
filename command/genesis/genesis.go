@@ -165,13 +165,13 @@ func setFlags(cmd *cobra.Command) {
 			&params.blockTime,
 			blockTimeFlag,
 			defaultBlockTime,
-			"the predefined period which determines block creation frequence",
+			"the predefined period which determines block creation frequency",
 		)
 		cmd.Flags().StringArrayVar(
 			&params.validators,
 			validatorsFlag,
 			[]string{},
-			"validators defined by user throught a parametre (format: <address>:<blskey>)",
+			"validators defined by user throughout a parameter (format: <address>:<blskey>)",
 		)
 	}
 }
@@ -204,34 +204,19 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
-	var result command.CommandResult
+	var err error
 
 	if params.isPolyBFTConsensus() {
-		config, err := params.GetChainConfig()
-		if err != nil {
-			outputter.SetError(err)
-
-			return
-		}
-
-		if err := helper.WriteGenesisConfigToDisk(config, params.genesisPath); err != nil {
-			outputter.SetError(err)
-
-			return
-		}
-
-		result = &GenesisResult{
-			Message: fmt.Sprintf("Genesis written to %s\n", params.genesisPath),
-		}
+		err = params.generatePolyBftGenesis()
 	} else {
-		if err := params.generateGenesis(); err != nil {
-			outputter.SetError(err)
-
-			return
-		}
-
-		result = params.getResult()
+		err = params.generateGenesis()
 	}
 
-	outputter.SetCommandResult(result)
+	if err != nil {
+		outputter.SetError(err)
+
+		return
+	}
+
+	outputter.SetCommandResult(params.getResult())
 }
