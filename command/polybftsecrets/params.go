@@ -187,15 +187,15 @@ func (ip *initParams) getResult(secretsManager secrets.SecretsManager) (command.
 			return nil, err
 		}
 
-		pk, err := account.Ecdsa.MarshallPrivateKey()
-		if err != nil {
-			return nil, err
-		}
-
 		res.Address = types.Address(account.Ecdsa.Address())
 		res.BLSPubkey = hex.EncodeToString(account.Bls.PublicKey().Marshal())
 
 		if ip.printPrivateKey {
+			pk, err := account.Ecdsa.MarshallPrivateKey()
+			if err != nil {
+				return nil, err
+			}
+
 			res.PrivateKey = hex.EncodeToString(pk)
 		}
 	}
