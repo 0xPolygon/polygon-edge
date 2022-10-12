@@ -1,26 +1,17 @@
 package polybft
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/state"
+	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/0xPolygon/polygon-edge/types"
 	hcf "github.com/hashicorp/go-hclog"
 )
 
 // TODO: Add opentracing
-
-type txWriteStatus uint8
-
-const (
-	success txWriteStatus = iota
-	fail
-	skip
-	finishProcessing
-)
 
 // BlockBuilderParams are fields for the block that cannot be changed
 type BlockBuilderParams struct {
@@ -151,45 +142,24 @@ func (b *BlockBuilder) Build(handler func(h *types.Header)) (*StateBlock, error)
 
 // Fill fills the block with transactions from the txpool
 func (b *BlockBuilder) Fill() error {
-	successful, failed, skipped := 0, 0, 0
 	blockTimer := time.NewTimer(b.params.BlockTime)
-	timeout := false
-
-	defer func() {
-		b.params.Logger.Debug(
-			"executed txs",
-			"successful", successful,
-			"failed", failed,
-			"skipped", skipped,
-			"timeout", timeout,
-			"remaining", b.params.TxPool.Length(),
-		)
-	}()
 
 	b.params.TxPool.Prepare()
 write:
 	for {
 		select {
 		case <-blockTimer.C:
-			timeout = true
-			if successful == 0 && failed > 0 {
-				return fmt.Errorf("block builder fill fail: failed = %d", failed)
-			}
-
 			return nil
 		default:
 			tx := b.params.TxPool.Peek()
 
 			// execute transactions one by one
-			switch b.writeTransaction(tx) {
-			case success:
-				b.txns = append(b.txns, tx)
-				successful++
-			case fail:
-				failed++
-			case skip:
-				skipped++
-			case finishProcessing:
+			finished, err := b.writeTransaction(tx)
+			if err != nil {
+				b.params.Logger.Debug("Fill transaction error", "hash", tx.Hash, "err", err)
+			}
+
+			if finished {
 				break write
 			}
 		}
@@ -198,48 +168,44 @@ write:
 	//	wait for the timer to expire
 	<-blockTimer.C
 
-	if successful == 0 && failed > 0 {
-		return fmt.Errorf("block builder fill fail: failed = %d", failed)
-	}
-
 	return nil
 }
 
-func (b *BlockBuilder) writeTransaction(tx *types.Transaction) txWriteStatus {
+func (b *BlockBuilder) writeTransaction(tx *types.Transaction) (bool, error) {
 	if tx == nil {
-		return finishProcessing
+		return true, nil
 	}
 
 	if tx.ExceedsBlockGasLimit(b.params.GasLimit) {
 		b.params.TxPool.Drop(tx)
 
 		if err := b.state.WriteFailedReceipt(tx); err != nil {
-			b.params.Logger.Error("unable to write failed receipt for transaction",
-				"hash", tx.Hash)
+			return false, err
 		}
 
-		// continue processing
-		return fail
+		return false, txpool.ErrBlockLimitExceeded
 	}
 
 	if err := b.state.Write(tx); err != nil {
 		if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok { //nolint:errorlint
 			// stop processing
-			return finishProcessing
+			return true, err
 		} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable { //nolint:errorlint
 			b.params.TxPool.Demote(tx)
 
-			return skip
+			return false, err
 		} else {
 			b.params.TxPool.Drop(tx)
 
-			return fail
+			return false, err
 		}
 	}
 
+	// remove tx from the pool and add it to the list of all block transactions
 	b.params.TxPool.Pop(tx)
+	b.txns = append(b.txns, tx)
 
-	return success
+	return false, nil
 }
 
 // GetState returns StateDB reference
