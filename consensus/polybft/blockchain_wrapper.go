@@ -153,15 +153,14 @@ func (p *blockchainWrapper) NewBlockBuilder(
 	parent *types.Header, coinbase types.Address,
 	txPool txPoolInterface, logger hcf.Logger) (blockBuilder, error) {
 	return NewBlockBuilder(&BlockBuilderParams{
+
 		Parent:      parent,
 		Coinbase:    coinbase,
 		ChainConfig: p.blockchain.Config(),
-		//ChainContext:  p.blockchain,
-		//TxPoolFactory: blockbuilder.NewEthTxPool(p.eth.TxPool()),
-		Executor: p.executor,
-		GasLimit: 10000000, // TODO: Nemanja - see what to do with this (p.eth.GenesisGasLimit(),)
-		TxPool:   txPool,
-		Logger:   logger,
+		Executor:    p.executor,
+		GasLimit:    parent.GasLimit,
+		TxPool:      txPool,
+		Logger:      logger,
 	}), nil
 }
 
