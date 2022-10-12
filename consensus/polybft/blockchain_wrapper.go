@@ -153,11 +153,16 @@ func (p *blockchainWrapper) GetHeaderByHash(hash types.Hash) (*types.Header, boo
 func (p *blockchainWrapper) NewBlockBuilder(
 	parent *types.Header, coinbase types.Address,
 	txPool txPoolInterface, logger hclog.Logger) (blockBuilder, error) {
+	gasLimit, err := p.blockchain.CalculateGasLimit(parent.Number + 1)
+	if err != nil {
+		return nil, err
+	}
+
 	return NewBlockBuilder(&BlockBuilderParams{
 		Parent:   parent,
 		Coinbase: coinbase,
 		Executor: p.executor,
-		GasLimit: parent.GasLimit,
+		GasLimit: gasLimit,
 		TxPool:   txPool,
 		Logger:   logger,
 	}), nil
