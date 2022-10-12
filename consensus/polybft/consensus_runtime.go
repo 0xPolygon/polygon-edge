@@ -86,7 +86,7 @@ type consensusRuntime struct {
 	epoch *epochMetadata
 
 	// lock is a lock to access 'epoch'
-	lock sync.Mutex
+	lock sync.RWMutex
 
 	// lastBuiltBlock is the header of the last processed block
 	lastBuiltBlock *types.Header
@@ -117,11 +117,10 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 
 // getEpoch returns current epochMetadata in a thread-safe manner.
 func (c *consensusRuntime) getEpoch() *epochMetadata {
-	c.lock.Lock()
-	epoch := c.epoch
-	c.lock.Unlock()
+	c.lock.RLock()
+	defer c.lock.RUnlock()
 
-	return epoch
+	return c.epoch
 }
 
 func (c *consensusRuntime) IsBridgeEnabled() bool {
