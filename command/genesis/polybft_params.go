@@ -41,15 +41,20 @@ var (
 	sidechainERC20BridgeAddr = types.StringToAddress("0x8Be503bcdEd90ED42Eff31f56199399B2b0154CA")
 )
 
-func (p *genesisParams) getPolyBftConfig(validators []*polybft.Validator) (*polybft.PolyBFTConfig, error) {
+func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
+	validatorsInfo, err := ReadValidatorsByRegexp(path.Dir(p.genesisPath), p.validatorPrefixPath)
+	if err != nil {
+		return nil, err
+	}
+
 	smartContracts, err := deployContracts()
 	if err != nil {
 		return nil, err
 	}
 
-	config := &polybft.PolyBFTConfig{
+	polyBftConfig := &polybft.PolyBFTConfig{
 		// TODO: Bridge
-		InitialValidatorSet: validators,
+		InitialValidatorSet: p.getGenesisValidators(validatorsInfo),
 		BlockTime:           p.blockTime,
 		EpochSize:           p.epochSize,
 		SprintSize:          p.sprintSize,
@@ -57,20 +62,6 @@ func (p *genesisParams) getPolyBftConfig(validators []*polybft.Validator) (*poly
 		ValidatorSetAddr:    validatorSetAddr,
 		SidechainBridgeAddr: sidechainBridgeAddr,
 		SmartContracts:      smartContracts,
-	}
-
-	return config, nil
-}
-
-func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
-	validatorsInfo, err := ReadValidatorsByRegexp(path.Dir(p.genesisPath), p.validatorPrefixPath)
-	if err != nil {
-		return nil, err
-	}
-
-	polyBftConfig, err := p.getPolyBftConfig(p.getGenesisValidators(validatorsInfo))
-	if err != nil {
-		return nil, err
 	}
 
 	chainConfig := &chain.Chain{
