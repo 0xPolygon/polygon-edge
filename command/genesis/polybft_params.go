@@ -15,7 +15,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/polybftcontracts"
 	"github.com/0xPolygon/polygon-edge/server"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/umbracle/ethgo"
 )
 
 const (
@@ -63,7 +62,7 @@ func (p *genesisParams) getPolyBftConfig(validators []*polybft.Validator) (*poly
 	return config, nil
 }
 
-func (p *genesisParams) GetChainConfig() (*chain.Chain, error) {
+func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
 	validatorsInfo, err := ReadValidatorsByRegexp(path.Dir(p.genesisPath), p.validatorPrefixPath)
 	if err != nil {
 		return nil, err
@@ -119,7 +118,7 @@ func (p *genesisParams) getGenesisValidators(validators []GenesisTarget) (result
 			}
 
 			result = append(result, &polybft.Validator{
-				Address: types.Address(ethgo.HexToAddress(parts[0])),
+				Address: types.StringToAddress(parts[0]),
 				BlsKey:  parts[1],
 			})
 		}
@@ -138,7 +137,7 @@ func (p *genesisParams) getGenesisValidators(validators []GenesisTarget) (result
 }
 
 func (p *genesisParams) generatePolyBftGenesis() error {
-	config, err := params.GetChainConfig()
+	config, err := params.generatePolyBFTConfig()
 	if err != nil {
 		return err
 	}
@@ -150,25 +149,25 @@ func deployContracts() ([]polybft.SmartContract, error) {
 	predefinedContracts := []struct {
 		name     string
 		input    []interface{}
-		expected ethgo.Address
+		expected types.Address
 		chain    string
 	}{
 		{
 			// Validator smart contract
 			name:     "Validator",
-			expected: ethgo.Address(validatorSetAddr),
+			expected: validatorSetAddr,
 			chain:    "child",
 		},
 		{
 			// Bridge in the sidechain
 			name:     "SidechainBridge",
-			expected: ethgo.Address(sidechainBridgeAddr),
+			expected: sidechainBridgeAddr,
 			chain:    "child",
 		},
 		{
 			// Target ERC20 token
 			name:     "MintERC20",
-			expected: ethgo.Address(sidechainERC20Addr),
+			expected: sidechainERC20Addr,
 			chain:    "child",
 		},
 		{
@@ -177,15 +176,13 @@ func deployContracts() ([]polybft.SmartContract, error) {
 			input: []interface{}{
 				sidechainERC20Addr,
 			},
-			expected: ethgo.Address(sidechainERC20BridgeAddr),
+			expected: sidechainERC20BridgeAddr,
 			chain:    "child",
 		},
 	}
 
 	result := make([]polybft.SmartContract, 0, len(predefinedContracts))
 
-	// to call the init in validator smart contract we do not need much more context in the evm object
-	// that is why many fields are set as default (as of now).
 	for _, contract := range predefinedContracts {
 		artifact, err := polybftcontracts.ReadArtifact(contract.chain, contract.name)
 		if err != nil {
@@ -198,7 +195,7 @@ func deployContracts() ([]polybft.SmartContract, error) {
 		}
 
 		smartContract := polybft.SmartContract{
-			Address: types.Address(contract.expected),
+			Address: contract.expected,
 			Code:    input,
 			Name:    fmt.Sprintf("%s/%s", contract.chain, contract.name),
 		}

@@ -115,9 +115,9 @@ func ReadValidatorsByRegexp(dir, prefix string) ([]GenesisTarget, error) {
 		}
 	}
 
-	files = files[0:validCnt] // files is local variable, gc will collect everything after function returns
+	files = files[0:validCnt]
 
-	// we must sort files by number after the prefix not by name string -> eq test-dir-10 should be larger than test-dir-4
+	// we must sort files by number after the prefix not by name string
 	sort.Slice(files, func(i, j int) bool {
 		f := strings.TrimPrefix(files[i].Name(), prefix)
 		s := strings.TrimPrefix(files[j].Name(), prefix)
