@@ -2,13 +2,13 @@ package polybft
 
 import (
 	"fmt"
+	"github.com/hashicorp/go-hclog"
 	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
-	hcf "github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/contract"
 )
@@ -35,7 +35,7 @@ type blockchainBackend interface {
 
 	// NewBlockBuilder is a factory method that returns a block builder on top of 'parent'.
 	NewBlockBuilder(parent *types.Header, coinbase types.Address,
-		txPool txPoolInterface, logger hcf.Logger) (blockBuilder, error)
+		txPool txPoolInterface, logger hclog.Logger) (blockBuilder, error)
 
 	// ProcessBlock builds a final block from given 'block' on top of 'parent'.
 	ProcessBlock(parent *types.Header, block *types.Block) (*StateBlock, error)
@@ -151,7 +151,7 @@ func (p *blockchainWrapper) GetHeaderByHash(hash types.Hash) (*types.Header, boo
 // NewBlockBuilder is an implementation of blockchainBackend interface
 func (p *blockchainWrapper) NewBlockBuilder(
 	parent *types.Header, coinbase types.Address,
-	txPool txPoolInterface, logger hcf.Logger) (blockBuilder, error) {
+	txPool txPoolInterface, logger hclog.Logger) (blockBuilder, error) {
 	return NewBlockBuilder(&BlockBuilderParams{
 
 		Parent:      parent,

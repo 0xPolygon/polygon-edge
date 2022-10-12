@@ -183,7 +183,7 @@ func setFlags(cmd *cobra.Command) {
 			&params.premineValidators,
 			premineValidatorsFlag,
 			command.DefaultPremineBalance,
-			"the amount which will be premined for all the validators",
+			"the amount which will be premined to all the validators",
 		)
 
 		cmd.MarkFlagsMutuallyExclusive(premineFlag, premineValidatorsFlag)

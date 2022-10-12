@@ -36,7 +36,7 @@ type BlockBuilderParams struct {
 	ChainConfig *chain.Params
 
 	// ChainContext interface is used during EVM execution
-	//ChainContext core.ChainContext
+	// ChainContext core.ChainContext
 
 	// Vanity extra for the block
 	Extra []byte
@@ -132,8 +132,6 @@ func (b *BlockBuilder) Build(handler func(h *types.Header)) (*StateBlock, error)
 	if handler != nil {
 		handler(b.header)
 	}
-
-	// Txs are filled outside - from FSM
 
 	_, b.header.StateRoot = b.state.Commit()
 	b.header.GasUsed = b.state.TotalGas()
