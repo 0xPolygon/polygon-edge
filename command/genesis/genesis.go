@@ -153,25 +153,25 @@ func setFlags(cmd *cobra.Command) {
 			&params.validatorSetSize,
 			validatorSetSizeFlag,
 			defaultValidatorSetSize,
-			"validator set size",
+			"the total number of validators",
 		)
 		cmd.Flags().Uint64Var(
 			&params.sprintSize,
 			sprintSizeFlag,
 			defaultSprintSize,
-			"sprint size",
+			"the number of block included into a sprint",
 		)
 		cmd.Flags().DurationVar(
 			&params.blockTime,
 			blockTimeFlag,
 			defaultBlockTime,
-			"block time",
+			"the predefined period which determines block creation frequence",
 		)
 		cmd.Flags().StringArrayVar(
 			&params.validators,
 			validatorsFlag,
 			[]string{},
-			"validators list (format: <address>:<blskey>)",
+			"validators defined by user throught a parametre (format: <address>:<blskey>)",
 		)
 	}
 }
