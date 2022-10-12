@@ -146,18 +146,20 @@ func (p *genesisParams) getRequiredFlags() []string {
 func (p *genesisParams) initRawParams() error {
 	p.consensus = server.ConsensusType(p.consensusRaw)
 
-	if p.consensus != server.PolyBFTConsensus {
-		if err := p.initIBFTValidatorType(); err != nil {
-			return err
-		}
-
-		if err := p.initValidatorSet(); err != nil {
-			return err
-		}
-
-		p.initIBFTExtraData()
-		p.initConsensusEngineConfig()
+	if p.consensus == server.PolyBFTConsensus {
+		return nil
 	}
+
+	if err := p.initIBFTValidatorType(); err != nil {
+		return err
+	}
+
+	if err := p.initValidatorSet(); err != nil {
+		return err
+	}
+
+	p.initIBFTExtraData()
+	p.initConsensusEngineConfig()
 
 	return nil
 }
