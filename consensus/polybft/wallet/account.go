@@ -42,11 +42,11 @@ func GenerateNewAccountFromSecret(secretManager secrets.SecretsManager, key stri
 		return nil, fmt.Errorf("failed to read account data: %w", err)
 	}
 
-	return newAccountFromBytes(accountBytes)
+	return NewAccountFromBytes(accountBytes)
 }
 
-// NewAccountFromBytes creates a new Account from bytes
-func newAccountFromBytes(content []byte) (*Account, error) {
+// NewAccountFromBytes deserializes bytes to the new Account
+func NewAccountFromBytes(content []byte) (*Account, error) {
 	var stored *keystoreAccount
 	if err := json.Unmarshal(content, &stored); err != nil {
 		return nil, err
@@ -80,7 +80,7 @@ type keystoreAccount struct {
 	BlsPrivKey   string `json:"bls"`
 }
 
-// SaveAccount saves an account to the given path
+// ToBytes serializes account to slice of bytes
 func (a *Account) ToBytes() ([]byte, error) {
 	// get serialized ecdsa private key
 	ecdsaRaw, err := a.Ecdsa.MarshallPrivateKey()
