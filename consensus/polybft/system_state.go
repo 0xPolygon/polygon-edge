@@ -14,14 +14,15 @@ import (
 )
 
 var stateFunctions, _ = abi.NewABIFromList([]string{
-	"function getValidators() returns (tuple(address,uint256[4])[])",
-	"function getEpoch() returns (uint64)",
+	"function currentEpochId() returns (uint256)",
+	"function getCurrentValidatorSet() returns (address[])",
+	"function getValidator(address) returns (tuple(uint256[4],uint256,uint256,uint256))",
 	"function init(tuple(address ecdsa, uint256[4] bls)[] _validators, uint64 _validatorSetSize)",
 })
 
 var sidechainBridgeFunctions, _ = abi.NewABIFromList([]string{
-	"function getNextExecutionIndex() returns (uint64)",
-	"function getNextCommittedIndex() returns (uint64)",
+	"function counter() returns (uint256)",
+	"function lastCommittedId() returns (uint256)",
 })
 
 // SystemState is an interface to interact with the consensus system contracts in the chain
@@ -92,39 +93,49 @@ func (s *SystemStateImpl) InitValidatorSet(validators []*Validator, validatorSet
 
 // GetValidatorSet retrieves current validator set from the smart contract
 func (s *SystemStateImpl) GetValidatorSet() (AccountSet, error) {
-	ret, err := s.validatorContract.Call("getValidators", ethgo.Latest)
+	output, err := s.validatorContract.Call("getCurrentValidatorSet", ethgo.Latest)
 	if err != nil {
 		return nil, err
 	}
 
-	res := []*ValidatorAccount{}
+	res := AccountSet{}
 
-	validatorsMap, isOk := ret["0"].([]map[string]interface{})
+	addresses, isOk := output["0"].([]ethgo.Address)
 	if !isOk {
-		return nil, fmt.Errorf("failed to decode validator set data")
+		return nil, fmt.Errorf("failed to decode addresses of the current validator set")
 	}
 
-	for _, i := range validatorsMap {
-		address, isOk := i["0"].(ethgo.Address)
-		if !isOk {
-			return nil, fmt.Errorf("failed to decode validator address")
-		}
-
-		bigKey, isOk := i["1"].([4]*big.Int)
-		if !isOk {
-			return nil, fmt.Errorf("failed to decode validator bls key")
-		}
-
-		blsKey, err := bls.UnmarshalPublicKeyFromBigInt(bigKey)
-
+	queryValidator := func(addr ethgo.Address) (*ValidatorAccount, error) {
+		output, err := s.validatorContract.Call("getValidator", ethgo.Latest, addr)
 		if err != nil {
 			return nil, err
 		}
 
-		res = append(res, &ValidatorAccount{
-			Address: types.Address(address),
-			BlsKey:  blsKey,
-		})
+		output, isOk = output["0"].(map[string]interface{})
+		if !isOk {
+			return nil, fmt.Errorf("failed to decode validator data")
+		}
+
+		pubKey, err := bls.UnmarshalPublicKeyFromBigInt(output["0"].([4]*big.Int))
+		if err != nil {
+			return nil, err
+		}
+
+		val := &ValidatorAccount{
+			Address: types.Address(addr),
+			BlsKey:  pubKey,
+		}
+
+		return val, nil
+	}
+
+	for _, index := range addresses {
+		val, err := queryValidator(index)
+		if err != nil {
+			return nil, err
+		}
+
+		res = append(res, val)
 	}
 
 	return res, nil
@@ -132,47 +143,47 @@ func (s *SystemStateImpl) GetValidatorSet() (AccountSet, error) {
 
 // GetEpoch retrieves current epoch number from the smart contract
 func (s *SystemStateImpl) GetEpoch() (uint64, error) {
-	rawResult, err := s.validatorContract.Call("getEpoch", ethgo.Latest)
+	rawResult, err := s.validatorContract.Call("currentEpochId", ethgo.Latest)
 	if err != nil {
 		return 0, err
 	}
 
-	epochNumber, isOk := rawResult["0"].(uint64)
+	epochNumber, isOk := rawResult["0"].(*big.Int)
 	if !isOk {
 		return 0, fmt.Errorf("failed to decode epoch")
 	}
 
-	return epochNumber, nil
+	return epochNumber.Uint64(), nil
 }
 
 // GetNextExecutionIndex retrieves next bridge state sync index
 func (s *SystemStateImpl) GetNextExecutionIndex() (uint64, error) {
-	rawResult, err := s.sidechainBridgeContract.Call("getNextExecutionIndex", ethgo.Latest)
+	rawResult, err := s.sidechainBridgeContract.Call("counter", ethgo.Latest)
 	if err != nil {
 		return 0, err
 	}
 
-	nextExecutionIndex, isOk := rawResult["0"].(uint64)
+	nextExecutionIndex, isOk := rawResult["0"].(*big.Int)
 	if !isOk {
 		return 0, fmt.Errorf("failed to decode next execution index")
 	}
 
-	return nextExecutionIndex, nil
+	return nextExecutionIndex.Uint64() + 1, nil
 }
 
 // GetNextCommittedIndex retrieves next committed bridge state sync index
 func (s *SystemStateImpl) GetNextCommittedIndex() (uint64, error) {
-	rawResult, err := s.sidechainBridgeContract.Call("getNextCommittedIndex", ethgo.Latest)
+	rawResult, err := s.sidechainBridgeContract.Call("lastCommittedId", ethgo.Latest)
 	if err != nil {
 		return 0, err
 	}
 
-	nextCommittedIndex, isOk := rawResult["0"].(uint64)
+	nextCommittedIndex, isOk := rawResult["0"].(*big.Int)
 	if !isOk {
 		return 0, fmt.Errorf("failed to decode next committed index")
 	}
 
-	return nextCommittedIndex, nil
+	return nextCommittedIndex.Uint64() + 1, nil
 }
 
 func buildLogsFromReceipts(entry []*types.Receipt, header *types.Header) []*types.Log {

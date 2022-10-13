@@ -38,7 +38,7 @@ validatorSnapshots/
 
 var (
 	// ABI
-	stateTransferEvent      = abi.MustNewEvent("event StateSync(uint256 indexed id, address indexed sender, address indexed target, bytes data)") //nolint:lll
+	stateTransferEvent      = abi.MustNewEvent("event StateSynced(uint256 indexed id, address indexed sender, address indexed receiver, bytes data)") //nolint:lll
 	onStateReceiveMethod, _ = abi.NewMethod("function onStateReceive(uint64, address, bytes)")
 )
 
@@ -51,7 +51,7 @@ const (
 	// numberOfSnapshotsToLeaveInMemory defines a number of validator snapshots to leave in db
 	numberOfSnapshotsToLeaveInDB = 10
 	// number of stateSyncEvents to be processed before a commitment message can be created and gossiped
-	stateSyncMainBundleSize = 5
+	stateSyncMainBundleSize = 10
 	// number of stateSyncEvents to be grouped into one StateTransaction
 	stateSyncBundleSize = 5
 )
@@ -62,10 +62,12 @@ type StateSyncEvent struct {
 	ID uint64
 	// Sender is the decoded 'sender' field from the event
 	Sender ethgo.Address
-	// Target is the decoded 'target' field from the event
-	Target ethgo.Address
+	// Receiver is the decoded 'receiver' field from the event
+	Receiver ethgo.Address
 	// Data is the decoded 'data' field from the event
 	Data []byte
+	// Skip is the decoded 'skip' field from the event
+	Skip bool
 	// Log contains raw data about smart contract event execution
 	Log *ethgo.Log
 }
@@ -78,11 +80,11 @@ func newStateSyncEvent(
 	data []byte, log *ethgo.Log,
 ) *StateSyncEvent {
 	return &StateSyncEvent{
-		ID:     id,
-		Sender: sender,
-		Target: target,
-		Data:   data,
-		Log:    log,
+		ID:       id,
+		Sender:   sender,
+		Receiver: target,
+		Data:     data,
+		Log:      log,
 	}
 }
 
@@ -102,7 +104,7 @@ func decodeEvent(log *ethgo.Log) (*StateSyncEvent, error) {
 		return nil, fmt.Errorf("failed to decode sender field of log: %+v", log)
 	}
 
-	target, ok := raw["target"].(ethgo.Address)
+	target, ok := raw["receiver"].(ethgo.Address)
 	if !ok {
 		return nil, fmt.Errorf("failed to decode target field of log: %+v", log)
 	}
@@ -116,7 +118,7 @@ func decodeEvent(log *ethgo.Log) (*StateSyncEvent, error) {
 }
 
 func (s *StateSyncEvent) String() string {
-	return fmt.Sprintf("Id=%d, Sender=%v, Target=%v", s.ID, s.Sender, s.Target)
+	return fmt.Sprintf("Id=%d, Sender=%v, Target=%v", s.ID, s.Sender, s.Receiver)
 }
 
 // MessageSignature encapsulates sender identifier and its signature
@@ -276,7 +278,7 @@ func (s *State) getStateSyncEventsForCommitment(fromIndex, toIndex uint64) ([]*S
 
 	err := s.db.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(syncStateEventsBucket)
-		for i := fromIndex; i < toIndex; i++ {
+		for i := fromIndex; i <= toIndex; i++ {
 			v := bucket.Get(itob(i))
 			if v == nil {
 				return ErrNotEnoughStateSyncs

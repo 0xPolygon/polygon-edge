@@ -374,7 +374,12 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 				return fmt.Errorf("error for state transaction while unmarshaling signature: tx = %v, error = %w", tx.Hash, err)
 			}
 
-			verified := aggs.VerifyAggregated(signers.GetBlsKeys(), stateTxData.Message.Hash().Bytes())
+			hash, err := stateTxData.Message.Hash()
+			if err != nil {
+				return err
+			}
+
+			verified := aggs.VerifyAggregated(signers.GetBlsKeys(), hash.Bytes())
 			if !verified {
 				return fmt.Errorf("invalid signature for tx = %v", tx.Hash)
 			}
