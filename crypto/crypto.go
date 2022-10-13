@@ -8,6 +8,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"hash"
 	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/helper/hex"
@@ -44,6 +45,14 @@ const (
 var (
 	errInvalidSignature = errors.New("invalid signature")
 )
+
+// KeccakState wraps sha3.state. In addition to the usual hash methods, it also supports
+// Read to get a variable amount of data from the hash state. Read is faster than Sum
+// because it doesn't copy the internal state, but also modifies the internal state.
+type KeccakState interface {
+	hash.Hash
+	Read([]byte) (int, error)
+}
 
 func trimLeftZeros(b []byte) []byte {
 	i := 0
@@ -248,6 +257,30 @@ func Keccak256(v ...[]byte) []byte {
 	}
 
 	return h.Sum(nil)
+}
+
+// Keccak256Hash calculates and returns the Keccak256 hash of the input data,
+// converting it to an internal Hash data structure.
+func Keccak256Hash(v ...[]byte) (hash types.Hash) {
+	h := NewKeccakState()
+	for _, b := range v {
+		h.Write(b)
+	}
+
+	h.Read(hash[:])
+
+	return hash
+}
+
+// NewKeccakState creates a new KeccakState
+func NewKeccakState() KeccakState {
+	keccakState, isOk := sha3.NewLegacyKeccak256().(KeccakState)
+	if !isOk {
+		// this is only for linter, this will never happen
+		panic("newLegacyKeccak256 does not implement KeccakState interface")
+	}
+
+	return keccakState
 }
 
 // PubKeyToAddress returns the Ethereum address of a public key
