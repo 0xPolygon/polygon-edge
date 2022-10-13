@@ -43,7 +43,7 @@ var (
 	sidechainERC20Addr       = types.StringToAddress("0x47e9Fbef8C83A1714F1951F142132E6e90F5fa5D")
 	sidechainERC20BridgeAddr = types.StringToAddress("0x8Be503bcdEd90ED42Eff31f56199399B2b0154CA")
 
-	contractsRootFolder = "artifacts/contracts/"
+	contractsRootFolder = "consensus/polybft/polybftcontracts/artifacts/contracts"
 )
 
 func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
