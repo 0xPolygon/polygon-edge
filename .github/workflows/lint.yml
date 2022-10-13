@@ -24,5 +24,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
+      - name: Compile v3 contracts
+        run: make compile-v3-contracts
+
       - name: Lint
         uses: golangci/golangci-lint-action@v3
