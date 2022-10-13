@@ -11,10 +11,11 @@ bindata:
 .PHONY: protoc
 protoc:
 	protoc --go_out=. --go-grpc_out=. ./server/proto/*.proto
-	protoc --go_out=. --go-grpc_out=. ./protocol/proto/*.proto
+	#protoc --go_out=. --go-grpc_out=. ./protocol/proto/*.proto
 	protoc --go_out=. --go-grpc_out=. ./network/proto/*.proto
 	protoc --go_out=. --go-grpc_out=. ./txpool/proto/*.proto
 	protoc --go_out=. --go-grpc_out=. ./consensus/ibft/**/*.proto
+	protoc --go_out=. --go-grpc_out=. ./consensus/polybft/**/*.proto
 
 .PHONY: build
 build:
@@ -56,4 +57,8 @@ run-local:
 .PHONY: stop-local
 stop-local:
 	docker-compose -f ./docker/local/docker-compose.yml stop
+
+.PHONY: compile-v3-contracts
+compile-v3-contracts:
+	cd consensus/polybft/polybftcontracts && npm install && npm run compile
 

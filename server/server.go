@@ -189,6 +189,12 @@ func NewServer(config *Config) (*Server, error) {
 	m.executor.SetRuntime(precompiled.NewPrecompiled())
 	m.executor.SetRuntime(evm.NewEVM())
 
+	// custom write genesis hook per consensus engine
+	engineName := m.config.Chain.Params.GetEngine()
+	if factory, exists := genesisCreationFactory[ConsensusType(engineName)]; exists {
+		m.executor.GenesisPostHook = factory(m.config.Chain, engineName)
+	}
+
 	// compute the genesis root state
 	genesisRoot := m.executor.WriteGenesis(config.Chain.Genesis.Alloc)
 	config.Chain.Genesis.StateRoot = genesisRoot

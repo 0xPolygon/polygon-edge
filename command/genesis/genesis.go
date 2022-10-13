@@ -25,8 +25,6 @@ func GetCommand() *cobra.Command {
 	setFlags(genesisCmd)
 	setLegacyFlags(genesisCmd)
 
-	helper.SetRequiredFlags(genesisCmd, params.getRequiredFlags())
-
 	genesisCmd.AddCommand(
 		// genesis predeploy
 		predeploy.GetCommand(),
@@ -148,6 +146,40 @@ func setFlags(cmd *cobra.Command) {
 			"the maximum number of validators in the validator set for PoS",
 		)
 	}
+
+	// PolyBFT
+	{
+		cmd.Flags().IntVar(
+			&params.validatorSetSize,
+			validatorSetSizeFlag,
+			defaultValidatorSetSize,
+			"the total number of validators",
+		)
+		cmd.Flags().StringVar(
+			&params.polyBftValidatorPrefixPath,
+			polyBftValidatorPrefixPathFlag,
+			defaultPolyBftValidatorPrefixPath,
+			"prefix path for polybft validator folder directory",
+		)
+		cmd.Flags().Uint64Var(
+			&params.sprintSize,
+			sprintSizeFlag,
+			defaultSprintSize,
+			"the number of block included into a sprint",
+		)
+		cmd.Flags().DurationVar(
+			&params.blockTime,
+			blockTimeFlag,
+			defaultBlockTime,
+			"the predefined period which determines block creation frequency",
+		)
+		cmd.Flags().StringArrayVar(
+			&params.validators,
+			validatorsFlag,
+			[]string{},
+			"validators defined by user throughout a parameter (format: <address>:<blskey>)",
+		)
+	}
 }
 
 // setLegacyFlags sets the legacy flags to preserve backwards compatibility
@@ -164,10 +196,12 @@ func setLegacyFlags(cmd *cobra.Command) {
 	_ = cmd.Flags().MarkHidden(chainIDFlagLEGACY)
 }
 
-func runPreRun(_ *cobra.Command, _ []string) error {
+func runPreRun(cmd *cobra.Command, _ []string) error {
 	if err := params.validateFlags(); err != nil {
 		return err
 	}
+
+	helper.SetRequiredFlags(cmd, params.getRequiredFlags())
 
 	return params.initRawParams()
 }
@@ -176,7 +210,15 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
-	if err := params.generateGenesis(); err != nil {
+	var err error
+
+	if params.isPolyBFTConsensus() {
+		err = params.generatePolyBftGenesis()
+	} else {
+		err = params.generateGenesis()
+	}
+
+	if err != nil {
 		outputter.SetError(err)
 
 		return
