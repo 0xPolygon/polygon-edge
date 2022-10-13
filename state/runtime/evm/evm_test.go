@@ -87,6 +87,10 @@ func (m *mockHost) GetNonce(addr types.Address) uint64 {
 	panic("Not implemented in tests")
 }
 
+func (m *mockHost) Transfer(from types.Address, to types.Address, amount *big.Int) error {
+	panic("Not implemented in tests")
+}
+
 func TestRun(t *testing.T) {
 	t.Parallel()
 

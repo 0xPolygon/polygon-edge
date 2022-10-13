@@ -10,9 +10,11 @@ import (
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
+	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/polybftcontracts"
+	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/server"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -40,11 +42,7 @@ const (
 )
 
 var (
-	// hard code address for the sidechain (this is only being used for testing)
-	validatorSetAddr         = types.StringToAddress("0xBd770416a3345F91E4B34576cb804a576fa48EB1")
-	sidechainBridgeAddr      = types.StringToAddress("0x5a443704dd4B594B382c22a083e2BD3090A6feF3")
-	sidechainERC20Addr       = types.StringToAddress("0x47e9Fbef8C83A1714F1951F142132E6e90F5fa5D")
-	sidechainERC20BridgeAddr = types.StringToAddress("0x8Be503bcdEd90ED42Eff31f56199399B2b0154CA")
+	contractsRootFolder = "consensus/polybft/polybftcontracts/artifacts/contracts"
 )
 
 func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
@@ -64,8 +62,8 @@ func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
 		EpochSize:           p.epochSize,
 		SprintSize:          p.sprintSize,
 		ValidatorSetSize:    p.validatorSetSize,
-		ValidatorSetAddr:    validatorSetAddr,
-		SidechainBridgeAddr: sidechainBridgeAddr,
+		ValidatorSetAddr:    contracts.ValidatorSetContract,
+		SidechainBridgeAddr: contracts.StateReceiverContract,
 		SmartContracts:      smartContracts,
 	}
 
@@ -162,28 +160,19 @@ func (p *genesisParams) deployContracts() ([]polybft.SmartContract, error) {
 		{
 			// Validator smart contract
 			name:     "Validator",
-			expected: validatorSetAddr,
+			expected: contracts.ValidatorSetContract,
 			chain:    "child",
 		},
 		{
-			// Bridge in the sidechain
-			name:     "SidechainBridge",
-			expected: sidechainBridgeAddr,
+			// State receiver
+			name:     "StateReceiver",
+			expected: contracts.StateReceiverContract,
 			chain:    "child",
 		},
 		{
-			// Target ERC20 token
-			name:     "MintERC20",
-			expected: sidechainERC20Addr,
-			chain:    "child",
-		},
-		{
-			// Bridge wrapper for ERC20 token
-			name: "ERC20Bridge",
-			input: []interface{}{
-				sidechainERC20Addr,
-			},
-			expected: sidechainERC20BridgeAddr,
+			// Native Token contract (Matic ERC-20)
+			name:     "NativeTokenContract",
+			expected: contracts.NativeTokenContract,
 			chain:    "child",
 		},
 	}
@@ -228,5 +217,5 @@ func generateExtraDataPolyBft(validators []GenesisTarget) []byte {
 
 	extra := polybft.Extra{Validators: delta}
 
-	return append(make([]byte, 32), extra.MarshalRLPTo(nil)...)
+	return append(make([]byte, signer.IstanbulExtraVanity), extra.MarshalRLPTo(nil)...)
 }

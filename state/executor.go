@@ -555,7 +555,7 @@ func (t *Transition) run(contract *runtime.Contract, host runtime.Host) *runtime
 	}
 }
 
-func (t *Transition) transfer(from, to types.Address, amount *big.Int) error {
+func (t *Transition) Transfer(from, to types.Address, amount *big.Int) error {
 	if amount == nil {
 		return nil
 	}
@@ -590,7 +590,7 @@ func (t *Transition) applyCall(
 
 	if callType == runtime.Call {
 		// Transfers only allowed on calls
-		if err := t.transfer(c.Caller, c.Address, c.Value); err != nil {
+		if err := t.Transfer(c.Caller, c.Address, c.Value); err != nil {
 			return &runtime.ExecutionResult{
 				GasLeft: c.Gas,
 				Err:     err,
@@ -654,7 +654,7 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 	}
 
 	// Transfer the value
-	if err := t.transfer(c.Caller, c.Address, c.Value); err != nil {
+	if err := t.Transfer(c.Caller, c.Address, c.Value); err != nil {
 		return &runtime.ExecutionResult{
 			GasLeft: gasLimit,
 			Err:     err,

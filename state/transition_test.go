@@ -141,7 +141,7 @@ func TestTransfer(t *testing.T) {
 			transition := newTestTransition(tt.preState)
 
 			amount := big.NewInt(tt.amount)
-			err := transition.transfer(tt.from, tt.to, amount)
+			err := transition.Transfer(tt.from, tt.to, amount)
 
 			assert.Equal(t, tt.expectedErr, err)
 			if err == nil {
