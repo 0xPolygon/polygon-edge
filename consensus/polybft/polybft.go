@@ -113,11 +113,11 @@ type Polybft struct {
 }
 
 func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *state.Transition) error {
-	customConfigGeneric := config.Params.Engine[engineName]
+	const skipError = "empty response"
 
 	var pbftConfig PolyBFTConfig
 
-	customConfigJSON, _ := json.Marshal(customConfigGeneric)
+	customConfigJSON, _ := json.Marshal(config.Params.Engine[engineName])
 	json.Unmarshal(customConfigJSON, &pbftConfig)
 
 	return func(transition *state.Transition) error {
@@ -132,7 +132,10 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 
 			// init validators
 			if sc.Address == pbftConfig.ValidatorSetAddr {
-				systemState.InitValidatorSet(pbftConfig.InitialValidatorSet, pbftConfig.ValidatorSetSize)
+				err := systemState.InitValidatorSet(pbftConfig.InitialValidatorSet, pbftConfig.ValidatorSetSize)
+				if err != nil && err.Error() != skipError {
+					return err
+				}
 			}
 		}
 
@@ -190,7 +193,9 @@ func (p *Polybft) Initialize() error {
 
 		var msg *pbft.MessageReq
 		if err := json.Unmarshal(gossipMsg.Data, &msg); err != nil {
-			panic(err)
+			p.logger.Error("pbft topic message received error", "err", err)
+
+			return
 		}
 
 		p.pbft.PushMessage(msg)
@@ -318,10 +323,13 @@ func (p *Polybft) startRuntime() error {
 			msg, _ := obj.(*proto.TransportMessage)
 			var transportMsg *TransportMessage
 			if err := json.Unmarshal(msg.Data, &transportMsg); err != nil {
-				panic(err)
+				p.logger.Warn("Failed to deliver message", "err", err)
+
+				return
 			}
+
 			if _, err := p.runtime.deliverMessage(transportMsg); err != nil {
-				p.logger.Warn(fmt.Sprintf("Failed to deliver message. Error: %s", err))
+				p.logger.Warn("Failed to deliver message", "err", err)
 			}
 		})
 		if err != nil {

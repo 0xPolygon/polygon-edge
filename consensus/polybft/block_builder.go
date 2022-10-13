@@ -80,7 +80,7 @@ type BlockBuilder struct {
 
 // Reset is used to indicate that the current block building has been interrupted
 // and it has to clean any data
-func (b *BlockBuilder) Reset() {
+func (b *BlockBuilder) Reset() error {
 	b.header = &types.Header{
 		ParentHash:   b.params.Parent.Hash,
 		Number:       b.params.Parent.Number + 1,
@@ -91,7 +91,7 @@ func (b *BlockBuilder) Reset() {
 		TxRoot:       types.EmptyRootHash,
 		ReceiptsRoot: types.EmptyRootHash, // this avoids needing state for now
 		Sha3Uncles:   types.EmptyUncleHash,
-		GasLimit:     b.params.GasLimit, //will need to adjust dynamically later.
+		GasLimit:     b.params.GasLimit,
 	}
 
 	b.block = nil
@@ -99,10 +99,12 @@ func (b *BlockBuilder) Reset() {
 
 	transition, err := b.params.Executor.BeginTxn(b.params.Parent.StateRoot, b.header, b.params.Coinbase)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	b.state = transition
+
+	return nil
 }
 
 // Block returns the built block if nil, it is not built yet
@@ -203,7 +205,7 @@ func (b *BlockBuilder) writeTransaction(tx *types.Transaction) (bool, error) {
 	return false, nil
 }
 
-// GetState returns StateDB reference
+// GetState returns Transition reference
 func (b *BlockBuilder) GetState() *state.Transition {
 	return b.state
 }

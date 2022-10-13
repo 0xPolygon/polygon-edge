@@ -19,7 +19,7 @@ import (
 var _ pbft.Backend = &fsm{}
 
 type blockBuilder interface {
-	Reset()
+	Reset() error
 	Fill() error
 	Build(func(h *types.Header)) (*StateBlock, error)
 	GetState() *state.Transition
@@ -92,7 +92,11 @@ type fsm struct {
 }
 
 func (f *fsm) Init(info *pbft.RoundInfo) {
-	f.blockBuilder.Reset()
+	err := f.blockBuilder.Reset()
+	if err != nil {
+		panic(err) // TODO: handle differently
+	}
+
 	f.commitmentToSaveOnRegister = nil
 }
 
@@ -136,7 +140,7 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 	}
 
 	// fill the block with transactions
-	if f.blockBuilder.Fill(); err != nil {
+	if err := f.blockBuilder.Fill(); err != nil {
 		return nil, err
 	}
 

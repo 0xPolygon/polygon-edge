@@ -14,8 +14,8 @@ func setupHeaderHashFunc() {
 		// the extra field the seal and committed seal items
 		extra, err := GetIbftExtraClean(h.ExtraData)
 		if err != nil {
-			// TODO: this should not happen but we have to handle it somehow
-			panic(err)
+			// TODO: log error?
+			return types.ZeroHash
 		}
 
 		// override extra data without seals and committed seal items
