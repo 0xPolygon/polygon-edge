@@ -1,9 +1,11 @@
 package polybft
 
 import (
+	"bytes"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"sort"
 	"sync"
 	"sync/atomic"
 
@@ -14,7 +16,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 	hcf "github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
-	"github.com/umbracle/ethgo/abi"
 )
 
 const (
@@ -437,6 +438,7 @@ func (c *consensusRuntime) buildCommitment(epoch, fromIndex uint64) (*Commitment
 
 	hashBytes := hash.Bytes()
 	signature, err := c.config.Key.Sign(hashBytes)
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign commitment message. Error: %w", err)
 	}
@@ -470,6 +472,7 @@ func (c *consensusRuntime) buildBundles(epoch *epochMetadata, commitmentMsg *Com
 	stateSyncExecutionIndex uint64) error {
 	c.logger.Debug("[buildProofs] Building proofs...", "fromIndex", commitmentMsg.FromIndex,
 		"toIndex", commitmentMsg.ToIndex, "nextExecutionIndex", stateSyncExecutionIndex)
+
 	if epoch.Commitment == nil {
 		// its a valid case when we do not have a built commitment so we can not build any proofs
 		// we will be able to validate them though, since we have CommitmentMessageSigned taken from
@@ -486,6 +489,7 @@ func (c *consensusRuntime) buildBundles(epoch *epochMetadata, commitmentMsg *Com
 		p := epoch.Commitment.MerkleTree.GenerateProof(idx, 0)
 		events, err := c.getStateSyncEventsForBundle(commitmentMsg.GetFirstStateSyncIndexFromBundleIndex(idx),
 			commitmentMsg.BundleSize)
+
 		if err != nil {
 			return err
 		}
@@ -521,7 +525,8 @@ func (c *consensusRuntime) getAggSignatureForCommitmentMessage(epoch *epochMetad
 	}
 
 	var signatures bls.Signatures
-	var publicKeys [][]byte
+
+	publicKeys := make([][]byte, 0)
 	bitmap := bitmap.Bitmap{}
 
 	for _, vote := range votes {
@@ -650,9 +655,9 @@ func (c *consensusRuntime) getLatestSprintBlockNumber() uint64 {
 
 // calculateUptime calculates uptime for blocks starting from the last built block in current epoch,
 // and ending at the last block of previous epoch
-func (c *consensusRuntime) calculateUptime(currentBlock *types.Header) (*UptimeCounter, error) {
+func (c *consensusRuntime) calculateUptime(currentBlock *types.Header) (*CommitEpoch, error) {
 	epoch := c.getEpoch()
-	uptimeCounter := &UptimeCounter{validatorIndices: make(map[ethgo.Address]int)}
+	uptimeCounter := map[types.Address]uint64{}
 
 	if c.config.PolyBFTConfig.EpochSize < (uptimeLookbackSize + 1) {
 		// this means that epoch size must at least be 3 blocks,
@@ -673,7 +678,7 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header) (*UptimeC
 		}
 
 		for _, a := range signers.GetAddresses() {
-			uptimeCounter.AddUptime(ethgo.Address(a))
+			uptimeCounter[a]++
 		}
 
 		return nil
@@ -681,6 +686,9 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header) (*UptimeC
 
 	firstBlockInEpoch := calculateFirstBlockOfPeriod(currentBlock.Number, c.config.PolyBFTConfig.EpochSize)
 	lastBlockInPreviousEpoch := firstBlockInEpoch - 1
+
+	startBlock := (epoch.Number * c.config.PolyBFTConfig.EpochSize) - c.config.PolyBFTConfig.EpochSize + 1
+	endBlock := getEndEpochBlockNumber(epoch.Number, c.config.PolyBFTConfig.EpochSize)
 
 	blockHeader := currentBlock
 	validators := epoch.Validators
@@ -690,8 +698,10 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header) (*UptimeC
 			return nil, err
 		}
 
-		// blockHeader, ok := c.config.blockchain.GetHeaderByNumber(blockHeader.Number - 1)
-		_, _ = c.config.blockchain.GetHeaderByNumber(blockHeader.Number - 1)
+		blockHeader, ok := c.config.blockchain.GetHeaderByNumber(blockHeader.Number - 1)
+		if !ok {
+			return nil, fmt.Errorf("could not get block header for block %v", blockHeader.Number-1)
+		}
 	}
 
 	// since we need to calculate uptime for the last block of the previous epoch,
@@ -708,12 +718,42 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header) (*UptimeC
 				return nil, err
 			}
 
-			// blockHeader, ok := c.config.blockchain.GetHeaderByNumber(blockHeader.Number - 1)
-			_, _ = c.config.blockchain.GetHeaderByNumber(blockHeader.Number - 1)
+			blockHeader, ok := c.config.blockchain.GetHeaderByNumber(blockHeader.Number - 1)
+			if !ok {
+				return nil, fmt.Errorf("could not get block header for block %v", blockHeader.Number-1)
+			}
 		}
 	}
 
-	return uptimeCounter, nil
+	epochID := epoch.Number
+
+	uptime := Uptime{EpochID: epochID}
+
+	// include the data in the uptime counter in a deterministic way
+	addrSet := []types.Address{}
+	for addr := range uptimeCounter {
+		addrSet = append(addrSet, addr)
+	}
+
+	sort.Slice(addrSet, func(i, j int) bool {
+		return bytes.Compare(addrSet[i][:], addrSet[j][:]) > 0
+	})
+
+	for _, addr := range addrSet {
+		uptime.addValidatorUptime(addr, uptimeCounter[addr])
+	}
+
+	commitEpoch := &CommitEpoch{
+		EpochID: epochID,
+		Epoch: Epoch{
+			StartBlock: startBlock,
+			EndBlock:   endBlock,
+			EpochRoot:  types.Hash{},
+		},
+		Uptime: uptime,
+	}
+
+	return commitEpoch, nil
 }
 
 // setIsActiveValidator updates the activeValidatorFlag field
@@ -831,21 +871,6 @@ func (c *consensusRuntime) getCommitmentToRegister(epoch *epochMetadata,
 		AggSignature: aggregatedSignature,
 		PublicKeys:   publicKeys,
 	}, nil
-}
-
-// createStateTransaction creates a state transaction out of provided parameters.
-// args parameter is ABI encoded against provided ABI method.
-func createStateTransaction(
-	target types.Address,
-	abiMethod *abi.Method,
-	args interface{},
-) (*types.Transaction, error) {
-	abiEncodedArgs, err := abiMethod.Encode(args)
-	if err != nil {
-		return nil, fmt.Errorf("failed to encode arguments:%w", err)
-	}
-
-	return createStateTransactionWithData(target, abiEncodedArgs, stateTransactionsGasLimit), nil
 }
 
 // createStateTransactionWithData creates a state transaction
