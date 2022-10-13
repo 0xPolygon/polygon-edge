@@ -1,6 +1,6 @@
 
-.PHONY: download-spec-tests
-download-spec-tests:
+.PHONY: download-submodules
+download-submodules:
 	git submodule init
 	git submodule update
 
