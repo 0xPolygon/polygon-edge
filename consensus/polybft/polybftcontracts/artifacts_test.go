@@ -7,12 +7,12 @@ import (
 )
 
 func TestArtifacts(t *testing.T) {
-	artifact, err := ReadArtifact("sidechain", "Validator")
+	artifact, err := ReadArtifact("artifacts/contracts/", "sidechain", "Validator")
 	assert.NoError(t, err)
 	assert.NotNil(t, artifact)
 }
 
 func TestArtifactsError(t *testing.T) {
-	_, err := ReadArtifact("sidechaine", "Validator")
+	_, err := ReadArtifact("artifacts/contracts/", "sidechaine", "Validator")
 	assert.Error(t, err)
 }

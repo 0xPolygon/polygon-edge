@@ -9,11 +9,11 @@ on:  # yamllint disable-line rule:truthy
 jobs:
   build:
     name: Build
-    uses: 0xpolygon/polygon-edge/.github/workflows/build.yml
+    uses: 0xpolygon/polygon-edge/.github/workflows/build.yml@develop
 
   test:
     name: Test
-    uses: 0xpolygon/polygon-edge/.github/workflows/test.yml
+    uses: 0xpolygon/polygon-edge/.github/workflows/test.yml@develop
     needs: build
 
   gosec:
