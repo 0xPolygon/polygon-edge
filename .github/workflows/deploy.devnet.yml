@@ -15,15 +15,15 @@ permissions:
 jobs:
   gosec:
     name: Gosec and Publish
-    uses: 0xpolygon/polygon-edge/.github/workflows/security.yml@develop
+    uses: epikichi/polygon-edge/.github/workflows/security.yml@develop
 
   build:
     name: Build
-    uses: 0xpolygon/polygon-edge/.github/workflows/build.yml@develop
+    uses: epikichi/polygon-edge/.github/workflows/build.yml@develop
 
   test:
     name: Test
-    uses: 0xpolygon/polygon-edge/.github/workflows/test.yml@develop
+    uses: epikichi/polygon-edge/.github/workflows/test.yml@develop
     needs: build
 
   deploy_devnet:

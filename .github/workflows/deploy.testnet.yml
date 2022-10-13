@@ -14,14 +14,14 @@ permissions:
 jobs:
   gosec:
     name: Gosec and Publish
-    uses: 0xpolygon/polygon-edge/.github/workflows/security.yml@develop
+    uses: epikichi/polygon-edge/.github/workflows/security.yml@develop
 
   build:
-    uses: 0xpolygon/polygon-edge/.github/workflows/build.yml@develop
+    uses: epikichi/polygon-edge/.github/workflows/build.yml@develop
     name: Build
 
   test:
-    uses: 0xpolygon/polygon-edge/.github/workflows/test.yml@develop
+    uses: epikichi/polygon-edge/.github/workflows/test.yml@develop
     name: Test
     needs: build
 
@@ -154,7 +154,7 @@ jobs:
             }
 
   pandoras_box:
-    uses: 0xpolygon/polygon-edge/.github/workflows/pandoras_box.yml@develop
+    uses: epikichi/polygon-edge/.github/workflows/pandoras_box.yml@develop
     name: Pandora's Box
     needs: deploy_testnet
     secrets:
@@ -168,7 +168,7 @@ jobs:
       transaction_count: '10000'
 
   loadbot:
-    uses: 0xpolygon/polygon-edge/.github/workflows/loadbot.yml@develop
+    uses: epikichi/polygon-edge/.github/workflows/loadbot.yml@develop
     name: Loadbot
     needs: deploy_testnet
     secrets:
