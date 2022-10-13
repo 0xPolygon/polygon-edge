@@ -2,15 +2,15 @@ package polybft
 
 import (
 	"bytes"
-	"encoding/binary"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
 	"math/big"
+	"reflect"
 
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/mitchellh/mapstructure"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
 )
@@ -82,6 +82,7 @@ func (bp *BundleProof) DecodeAbi(txData []byte) error {
 	if len(txData) < abiMethodIDLength {
 		return fmt.Errorf("invalid bundle data, len = %d", len(txData))
 	}
+
 	rawResult, err := executeBundleABIMethod.Inputs.Decode(txData[abiMethodIDLength:])
 	if err != nil {
 		return err
@@ -91,23 +92,51 @@ func (bp *BundleProof) DecodeAbi(txData []byte) error {
 	if !isOk {
 		return fmt.Errorf("invalid bundle data")
 	}
+
 	stateSyncEventsEncoded, isOk := result["objs"].([]map[string]interface{})
 	if !isOk {
 		return fmt.Errorf("invalid state sync data")
 	}
+
 	proofEncoded, isOk := result["proof"].([][32]byte)
 	if !isOk {
 		return fmt.Errorf("invalid proof data")
 	}
 
 	stateSyncs := make([]*StateSyncEvent, len(stateSyncEventsEncoded))
+
 	for i, sse := range stateSyncEventsEncoded {
+		id, isOk := sse["id"].(*big.Int)
+		if !isOk {
+			return fmt.Errorf("invalid state sync event id")
+		}
+
+		sender, isOk := sse["sender"].(ethgo.Address)
+		if !isOk {
+			return fmt.Errorf("invalid state sync sender field")
+		}
+
+		receiver, isOk := sse["receiver"].(ethgo.Address)
+		if !isOk {
+			return fmt.Errorf("invalid state sync receiver field")
+		}
+
+		data, isOk := sse["data"].([]byte)
+		if !isOk {
+			return fmt.Errorf("invalid state sync data field")
+		}
+
+		skip, isOk := sse["skip"].(bool)
+		if !isOk {
+			return fmt.Errorf("invalid state sync skip field")
+		}
+
 		stateSyncs[i] = &StateSyncEvent{
-			ID:       (sse["id"].(*big.Int)).Uint64(),
-			Sender:   sse["sender"].(ethgo.Address),
-			Receiver: sse["receiver"].(ethgo.Address),
-			Data:     sse["data"].([]byte),
-			Skip:     sse["skip"].(bool),
+			ID:       id.Uint64(),
+			Sender:   sender,
+			Receiver: receiver,
+			Data:     data,
+			Skip:     skip,
 		}
 	}
 
@@ -120,6 +149,7 @@ func (bp *BundleProof) DecodeAbi(txData []byte) error {
 		Proof:      proof,
 		StateSyncs: stateSyncs,
 	}
+
 	return nil
 }
 
@@ -221,6 +251,7 @@ func (cm *CommitmentMessage) GetFirstStateSyncIndexFromBundleIndex(bundleIndex u
 	if bundleIndex == 0 {
 		return cm.FromIndex
 	}
+
 	return (cm.BundleSize * bundleIndex) + cm.FromIndex
 }
 
@@ -247,6 +278,7 @@ func (cm CommitmentMessage) VerifyProof(bundle *BundleProof) error {
 	}
 
 	bundleIndex := cm.GetBundleIdxFromStateSyncEventIdx(bundle.StateSyncs[0].ID)
+
 	return VerifyProof(bundleIndex, hash, bundle.Proof, cm.MerkleRootHash)
 }
 
@@ -298,7 +330,7 @@ func (cm *CommitmentMessageSigned) DecodeAbi(txData []byte) error {
 		return fmt.Errorf("invalid commitment data. Could not convert decoded data to map")
 	}
 
-	commitmentPart := result["bundle"].(map[string]interface{})
+	commitmentPart, isOk := result["bundle"].(map[string]interface{})
 	if !isOk {
 		return fmt.Errorf("invalid commitment data. Could not find commitment part")
 	}
@@ -308,7 +340,7 @@ func (cm *CommitmentMessageSigned) DecodeAbi(txData []byte) error {
 		return fmt.Errorf("invalid commitment data. Could not find signature part")
 	}
 
-	blsVerificationPart := result["bitmap"].([]byte)
+	blsVerificationPart, isOk := result["bitmap"].([]byte)
 	if !isOk {
 		return fmt.Errorf("invalid commitment data. Could not find bls verification part")
 	}
@@ -318,8 +350,8 @@ func (cm *CommitmentMessageSigned) DecodeAbi(txData []byte) error {
 		return err
 	}
 
-	blsMap, ok := decoded.(map[string]interface{})
-	if !ok {
+	blsMap, isOk := decoded.(map[string]interface{})
+	if !isOk {
 		return fmt.Errorf("invalid commitment data. Bls verification part not in correct format")
 	}
 
@@ -414,11 +446,13 @@ func stateSyncEventsToAbiSlice(stateSyncEvents []*StateSyncEvent) []map[string]i
 			"skip":     sse.Skip,
 		}
 	}
+
 	return result
 }
 
 func stateSyncEventsToHash(stateSyncEvents []*StateSyncEvent) ([]byte, error) {
 	stateSyncEventsForEncoding := stateSyncEventsToAbiSlice(stateSyncEvents)
+
 	stateSyncEncoded, err := stateSyncEventABIType.Encode([]interface{}{stateSyncEventsForEncoding})
 	if err != nil {
 		return nil, err
@@ -430,95 +464,145 @@ func stateSyncEventsToHash(stateSyncEvents []*StateSyncEvent) ([]byte, error) {
 func createMerkleTree(stateSyncEvents []*StateSyncEvent, bundleSize uint64) (*MerkleTree, error) {
 	bundlesCount := (uint64(len(stateSyncEvents)) + bundleSize - 1) / bundleSize
 	bundles := make([][]byte, bundlesCount)
+
 	for i := uint64(0); i < bundlesCount; i++ {
 		from, until := i*bundleSize, (i+1)*bundleSize
 		if until > uint64(len(stateSyncEvents)) {
 			until = uint64(len(stateSyncEvents))
 		}
+
 		hash, err := stateSyncEventsToHash(stateSyncEvents[from:until])
 		if err != nil {
 			return nil, err
 		}
+
 		bundles[i] = hash
 	}
 
 	return NewMerkleTree(bundles)
 }
 
-func commitmentHash(merkleRootHash types.Hash, epoch uint64) types.Hash {
-	data := [types.HashLength + 8]byte{}
-	copy(data[:], merkleRootHash.Bytes())
-	binary.BigEndian.PutUint64(data[types.HashLength:], epoch)
+var _ StateTransactionInput = &CommitEpoch{}
 
-	return types.BytesToHash(crypto.Keccak256(data[:]))
+var (
+	commitEpochMethod, _ = abi.NewMethod("function commitEpoch(" +
+		// new epoch id
+		"uint256 epochid," +
+		// Epoch
+		"tuple(uint256 startblock, uint256 endblock, bytes32 epochroot) epoch," +
+		// Uptime
+		"tuple(uint256 epochid,tuple(address validator,uint256 uptime)[] uptimedata,uint256 totaluptime) uptime)")
+)
+
+// Epoch holds the data about epoch execution (when it started and when it ended)
+type Epoch struct {
+	StartBlock uint64     `abi:"startblock"`
+	EndBlock   uint64     `abi:"endblock"`
+	EpochRoot  types.Hash `abi:"epochroot"`
 }
 
-var _ StateTransactionInput = &UptimeCounter{}
-
-// UptimeCounter contains information about how many blocks signed each validator during an epoch
-type UptimeCounter struct {
-	validatorIndices map[ethgo.Address]int
-	validatorUptimes []*UptimeInfo
+// Uptime holds the data about number of times validators sealed blocks
+// in a given epoch
+type Uptime struct {
+	EpochID     uint64            `abi:"epochid"`
+	UptimeData  []ValidatorUptime `abi:"uptimedata"`
+	TotalUptime uint64            `abi:"totaluptime"`
 }
 
-// AddUptime registers given validator, identified by address, to the uptime counter
-func (u *UptimeCounter) AddUptime(address ethgo.Address) {
-	if i, exists := u.validatorIndices[address]; exists {
-		u.validatorUptimes[i].Count++
-	} else {
-		u.validatorUptimes = append(u.validatorUptimes, &UptimeInfo{Address: address, Count: 1})
-		u.validatorIndices[address] = len(u.validatorUptimes) - 1
-	}
-}
-
-// UptimeInfo contains validator address and count (denoting how many block given validator has signed)
-type UptimeInfo struct {
-	Address ethgo.Address
-	Count   uint64
-}
-
-// EncodeAbi contains logic for encoding arbitrary data into ABI format
-func (u *UptimeCounter) EncodeAbi() ([]byte, error) {
-	uptime, err := json.Marshal(u.validatorUptimes)
-	if err != nil {
-		return nil, err
+func (u *Uptime) addValidatorUptime(address types.Address, count uint64) {
+	if u.UptimeData == nil {
+		u.UptimeData = []ValidatorUptime{}
 	}
 
-	return validatorsUptimeMethod.Encode([1]interface{}{uptime})
+	u.TotalUptime += count
+	u.UptimeData = append(u.UptimeData, ValidatorUptime{
+		Address: address,
+		Count:   count,
+	})
 }
 
-// DecodeAbi contains logic for decoding given ABI data
-func (u *UptimeCounter) DecodeAbi(txData []byte) error {
-	if len(txData) < abiMethodIDLength {
-		return fmt.Errorf("invalid bundle data, len = %d", len(txData))
+// ValidatorUptime contains data about how many blocks a given validator has sealed
+// in a single period (epoch)
+type ValidatorUptime struct {
+	Address types.Address `abi:"validator"`
+	Count   uint64        `abi:"uptime"`
+}
+
+// CommitEpoch contains data that is sent to ChildValidatorSet contract
+// to distribute rewards on the end of an epoch
+type CommitEpoch struct {
+	EpochID uint64 `abi:"epochid"`
+	Epoch   Epoch  `abi:"epoch"`
+	Uptime  Uptime `abi:"uptime"`
+}
+
+// EncodeAbi encodes the commit epoch object to be placed in a transaction
+func (c *CommitEpoch) EncodeAbi() ([]byte, error) {
+	return commitEpochMethod.Encode(c)
+}
+
+// DecodeAbi decodes the commit epoch object from the given transaction
+func (c *CommitEpoch) DecodeAbi(txData []byte) error {
+	return decodeStruct(commitEpochMethod.Inputs, txData, &c)
+}
+
+// Type returns the state transaction type for given data
+func (c *CommitEpoch) Type() StateTransactionType {
+	return stTypeEndEpoch
+}
+
+func decodeStruct(t *abi.Type, input []byte, out interface{}) error {
+	if len(input) < abiMethodIDLength {
+		return fmt.Errorf("invalid bundle data, len = %d", len(input))
 	}
 
-	raw, err := abi.Decode(validatorsUptimeMethod.Inputs, txData[abiMethodIDLength:])
+	input = input[abiMethodIDLength:]
+
+	val, err := abi.Decode(t, input)
 	if err != nil {
 		return err
 	}
 
-	resultMap, isOk := raw.(map[string]interface{})
-	if !isOk {
-		return fmt.Errorf("failed to decode uptime counter data")
+	metadata := &mapstructure.Metadata{}
+	dc := &mapstructure.DecoderConfig{
+		Result:     out,
+		DecodeHook: customHook,
+		TagName:    "abi",
+		Metadata:   metadata,
 	}
 
-	bytes, isOk := resultMap["data"].([]byte)
-	if !isOk {
-		return fmt.Errorf("failed to decode uptime counter inner data")
-	}
-
-	var uptime []*UptimeInfo
-	if err = json.Unmarshal(bytes, &uptime); err != nil {
+	ms, err := mapstructure.NewDecoder(dc)
+	if err != nil {
 		return err
 	}
 
-	u.validatorUptimes = uptime
+	if err = ms.Decode(val); err != nil {
+		return err
+	}
+
+	if len(metadata.Unused) != 0 {
+		return fmt.Errorf("some keys not used: %v", metadata.Unused)
+	}
 
 	return nil
 }
 
-// Type returns type of state transaction input
-func (u *UptimeCounter) Type() StateTransactionType {
-	return stTypeEndEpoch
+var bigTyp = reflect.TypeOf(new(big.Int))
+
+func customHook(f reflect.Type, t reflect.Type, data interface{}) (interface{}, error) {
+	if f == bigTyp && t.Kind() == reflect.Uint64 {
+		// convert big.Int to uint64 (if possible)
+		b, ok := data.(*big.Int)
+		if !ok {
+			return nil, fmt.Errorf("data not a big.Int")
+		}
+
+		if !b.IsUint64() {
+			return nil, fmt.Errorf("cannot format big.Int to uint64")
+		}
+
+		return b.Uint64(), nil
+	}
+
+	return data, nil
 }

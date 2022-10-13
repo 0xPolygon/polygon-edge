@@ -135,7 +135,8 @@ func (i *Extra) UnmarshalRLPWith(v *fastrlp.Value) error {
 }
 
 // createValidatorSetDelta calculates ValidatorSetDelta based on the provided old and new validator sets
-func createValidatorSetDelta(log hclog.Logger, oldValidatorSet, newValidatorSet AccountSet) *ValidatorSetDelta {
+func createValidatorSetDelta(log hclog.Logger, oldValidatorSet,
+	newValidatorSet AccountSet) (*ValidatorSetDelta, error) {
 	var addedValidators AccountSet
 
 	oldValidatorSetMap := make(map[types.Address]*ValidatorAccount)
@@ -153,12 +154,8 @@ func createValidatorSetDelta(log hclog.Logger, oldValidatorSet, newValidatorSet 
 		oldValidator, ok := oldValidatorSetMap[newValidator.Address]
 		if ok {
 			if !oldValidator.Equals(newValidator) {
-				log.Error(
-					fmt.Sprintf(
-						"validator '%s' found in both old and new validator set, but its BLS keys differ",
-						newValidator.Address.String(),
-					),
-				)
+				return nil, fmt.Errorf("validator '%s' found in both old and new validator set, but its BLS keys differ",
+					newValidator.Address.String())
 			}
 
 			// If it is, then discard it from removed validators...
@@ -174,10 +171,12 @@ func createValidatorSetDelta(log hclog.Logger, oldValidatorSet, newValidatorSet 
 		removedValsBitmap.Set(uint64(i))
 	}
 
-	return &ValidatorSetDelta{
+	delta := &ValidatorSetDelta{
 		Added:   addedValidators,
 		Removed: removedValsBitmap,
 	}
+
+	return delta, nil
 }
 
 // ValidatorSetDelta holds information about added and removed validators compared to the previous epoch

@@ -60,7 +60,7 @@ type fsm struct {
 	postInsertHook func() error
 
 	// uptimeCounter holds info about number of times validators sealed a block (only present if isEndOfEpoch is true)
-	uptimeCounter *UptimeCounter
+	uptimeCounter *CommitEpoch
 
 	// isEndOfEpoch indicates if epoch reached its end
 	isEndOfEpoch bool
@@ -108,6 +108,14 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 		return nil, err
 	}
 
+	// set the timestamp
+	parentTime := time.Unix(int64(parent.Timestamp), 0)
+	headerTime := parentTime.Add(f.config.BlockTime)
+
+	if headerTime.Before(time.Now()) {
+		headerTime = time.Now()
+	}
+
 	// TODO: we will need to revisit once slashing is implemented
 	extra := &Extra{Parent: extraParent.Committed}
 
@@ -149,14 +157,6 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 		return nil, err
 	}
 
-	// set the timestamp
-	parentTime := time.Unix(int64(parent.Timestamp), 0)
-	headerTime := parentTime.Add(f.config.BlockTime)
-
-	if headerTime.Before(time.Now()) {
-		headerTime = time.Now()
-	}
-
 	stateBlock, err := f.blockBuilder.Build(func(h *types.Header) {
 		h.Timestamp = uint64(headerTime.Unix())
 		h.ExtraData = append(make([]byte, signer.IstanbulExtraVanity), extra.MarshalRLPTo(nil)...)
@@ -196,6 +196,13 @@ func (f *fsm) stateTransactions() []*types.Transaction {
 
 			txns = append(txns,
 				createStateTransactionWithData(f.config.SidechainBridgeAddr, inputData))
+
+			// since proposer does not execute Validate (when we see the commitment to register in state transactions)
+			// we need to set commitment to save so that the proposer also saves its commitment that he registered
+			f.commitmentToSaveOnRegister = f.proposerCommitmentToRegister
+			f.logger.Debug("[fsm] Registering commitment",
+				"from", f.proposerCommitmentToRegister.Message.FromIndex,
+				"toIndex", f.proposerCommitmentToRegister.Message.ToIndex)
 		}
 	}
 
@@ -210,6 +217,10 @@ func (f *fsm) stateTransactions() []*types.Transaction {
 
 			txns = append(txns,
 				createStateTransactionWithData(f.config.SidechainBridgeAddr, inputData))
+
+			f.logger.Debug("[fsm] Executing bundle",
+				"fromIndex", bundle.StateSyncs[0].ID,
+				"toIndex", bundle.StateSyncs[len(bundle.StateSyncs)-1].ID)
 		}
 	}
 
@@ -504,7 +515,7 @@ func (f *fsm) getValidatorSetDelta(pendingBlockState *state.Transition) (*Valida
 		return nil, fmt.Errorf("failed to retrieve validator set for current block %w", err)
 	}
 
-	return createValidatorSetDelta(f.logger, f.validators.Accounts(), newValidators), nil
+	return createValidatorSetDelta(f.logger, f.validators.Accounts(), newValidators)
 }
 
 // verifyValidatorsUptimeTx creates uptime transaction and compares its hash with the one extracted from the block.
