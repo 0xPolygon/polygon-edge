@@ -9,15 +9,16 @@ on:  # yamllint disable-line rule:truthy
 jobs:
   build:
     name: Build
-    # uses: 0xpolygon/polygon-edge/.github/workflows/build.yml@develop
     uses: ./.github/workflows/build.yml
+    # TODO: Uncomment before merging to develop branch (and remove above line)
+    # uses: 0xpolygon/polygon-edge/.github/workflows/build.yml@develop
+
 
   test:
     name: Test
-    # uses: 0xpolygon/polygon-edge/.github/workflows/test.yml@develop
     uses: ./.github/workflows/test.yml
-    secrets:
-      GH_TOKEN_CLONE_PRIVATE: ${{ secrets.GH_TOKEN_CLONE_PRIVATE }}
+    # TODO: Uncomment before merging to develop branch (and remove above line)
+    # uses: 0xpolygon/polygon-edge/.github/workflows/test.yml@develop
     needs: build
 
   gosec:
