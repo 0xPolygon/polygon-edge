@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -236,9 +237,9 @@ func NewTestCluster(t *testing.T, name string, validatorsCount int, opts ...Clus
 		args := []string{
 			"genesis",
 			"--consensus", "polybft",
-			"--dir", tmpDir,
+			"--dir", path.Join(tmpDir, "genesis.json"),
 			//"--password", pwdFilePath,
-			//"--integrate", "./../v3-contracts/artifacts/contracts/",
+			"--integrate", "./../v3-contracts/artifacts/contracts/",
 			"--premine", "0x0000000000000000000000000000000000000000",
 		}
 
@@ -257,7 +258,7 @@ func NewTestCluster(t *testing.T, name string, validatorsCount int, opts ...Clus
 		}
 
 		if cluster.Config.ValidatorSetSize > 0 {
-			args = append(args, "--validatorSetSize", fmt.Sprint(cluster.Config.ValidatorSetSize))
+			args = append(args, "--validator-set-size", fmt.Sprint(cluster.Config.ValidatorSetSize))
 		}
 
 		// run cmd init-genesis with all the arguments
