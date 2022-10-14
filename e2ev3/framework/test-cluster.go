@@ -218,15 +218,15 @@ func NewTestCluster(t *testing.T, name string, validatorsCount int, opts ...Clus
 	}
 
 	// Create a file with account password
-	pwdFilePath, deleteFile := createAccountPasswordFile(t)
-	defer deleteFile()
+	//pwdFilePath, deleteFile := createAccountPasswordFile(t)
+	//defer deleteFile()
 
 	{
 		// run init account
-		err = cluster.cmdRun("init-account",
-			"--output", tmpDir,
+		err = cluster.cmdRun("polybft-secrets",
+			"--data-dir", tmpDir,
 			"--num", strconv.Itoa(validatorsCount),
-			"--password", pwdFilePath,
+			//"--password", pwdFilePath,
 		)
 		require.NoError(t, err)
 	}
@@ -234,10 +234,11 @@ func NewTestCluster(t *testing.T, name string, validatorsCount int, opts ...Clus
 	{
 		// create genesis file
 		args := []string{
-			"init-genesis",
-			"--output", tmpDir,
-			"--password", pwdFilePath,
-			"--integrate", "./../v3-contracts/artifacts/contracts/",
+			"genesis",
+			"--consensus", "polybft",
+			"--dir", tmpDir,
+			//"--password", pwdFilePath,
+			//"--integrate", "./../v3-contracts/artifacts/contracts/",
 			"--premine", "0x0000000000000000000000000000000000000000",
 		}
 
