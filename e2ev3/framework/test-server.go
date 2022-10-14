@@ -78,7 +78,7 @@ func NewTestServer(t *testing.T, clusterConfig *TestClusterConfig, callback Test
 	}
 
 	if config.DataDir == "" {
-		dataDir, err := ioutil.TempDir("/tmp", "polygon-sdk-e2e-")
+		dataDir, err := ioutil.TempDir("/tmp", "edge-e2e-")
 		assert.NoError(t, err)
 
 		config.DataDir = dataDir
@@ -104,16 +104,15 @@ func (t *TestServer) Start() {
 	args := []string{
 		"server",
 		// add data dir
-		"--datadir", config.DataDir,
+		"--data-dir", config.DataDir,
 		// add custom chain
 		"--chain", config.Chain,
 		// enable p2p port
-		"--port", fmt.Sprintf("%d", config.P2PPort),
+		"--libp2p", fmt.Sprintf(":%d", config.P2PPort),
 		// grpc port
-		"--grpc.addr", fmt.Sprintf("localhost:%d", config.GRPCPort),
+		"--grpc-address", fmt.Sprintf("localhost:%d", config.GRPCPort),
 		// enable jsonrpc
-		"--jsonrpc.modules", "eth",
-		"--http", "--http.port", fmt.Sprintf("%d", config.JsonRPCPort),
+		"--jsonrpc", fmt.Sprintf(":%d", config.JsonRPCPort),
 	}
 
 	if len(config.LogLevel) > 0 {
@@ -121,8 +120,8 @@ func (t *TestServer) Start() {
 	}
 
 	if config.Seal {
-		args = append(args, "--mine")
-		args = append(args, "--miner.password", config.Password)
+		args = append(args, "--seal")
+		//args = append(args, "--miner.password", config.Password)
 	}
 
 	// Start the server

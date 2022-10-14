@@ -225,7 +225,7 @@ func NewTestCluster(t *testing.T, name string, validatorsCount int, opts ...Clus
 	{
 		// run init account
 		err = cluster.cmdRun("polybft-secrets",
-			"--data-dir", tmpDir,
+			"--data-dir", path.Join(tmpDir, "test-chain-"),
 			"--num", strconv.Itoa(validatorsCount),
 			//"--password", pwdFilePath,
 		)
@@ -239,7 +239,7 @@ func NewTestCluster(t *testing.T, name string, validatorsCount int, opts ...Clus
 			"--consensus", "polybft",
 			"--dir", path.Join(tmpDir, "genesis.json"),
 			//"--password", pwdFilePath,
-			"--integrate", "./../v3-contracts/artifacts/contracts/",
+			"--integrate", "./../consensus/polybft/polybftcontracts/artifacts/contracts/",
 			"--premine", "0x0000000000000000000000000000000000000000",
 		}
 
@@ -280,7 +280,7 @@ func NewTestCluster(t *testing.T, name string, validatorsCount int, opts ...Clus
 
 func (c *TestCluster) initTestServer(t *testing.T, i int, isValidator bool) {
 	logLevel := os.Getenv(envLogLevel)
-	dataDir := c.Config.Dir("test-dir-" + strconv.Itoa(i))
+	dataDir := c.Config.Dir("test-chain-" + strconv.Itoa(i))
 
 	srv := NewTestServer(t, c.Config, func(config *TestServerConfig) {
 		config.DataDir = dataDir
@@ -308,6 +308,7 @@ func (c *TestCluster) cmdRun(args ...string) error {
 
 	cmd := exec.Command(c.Config.Binary, args...) // nolint:gosec
 	cmd.Stderr = &stdErr
+	cmd.Stdout = c.Config.GetStdout(args[0])
 
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("%v: %s", err, stdErr.String())
