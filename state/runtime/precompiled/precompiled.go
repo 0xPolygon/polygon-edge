@@ -57,6 +57,9 @@ func (p *Precompiled) setupContracts() {
 
 	// Native transfer precompile
 	p.register(contracts.NativeTransferPrecompile.String(), &nativeTransfer{})
+
+	// BLS aggregated signatures verification precompile
+	p.register(contracts.BLSAggSigsVerificationPrecompile.String(), &blsAggSignsVerification{})
 }
 
 func (p *Precompiled) register(addrStr string, b contract) {
