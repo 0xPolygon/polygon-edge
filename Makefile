@@ -56,7 +56,7 @@ test-e2e-polybft:
     # because it will get picked up and run during e2e tests
     # and the e2e tests should error out if any kind of race is found
 	go build -race -o artifacts/polygon-edge .
-	env EDGE_BINARY=${PWD}/artifacts/polygon-edge E2E_TESTS=true E2E_LOGS=true go test -v -timeout=30m ./e2ev3/...
+	env EDGE_BINARY=${PWD}/artifacts/polygon-edge E2E_TESTS=true E2E_LOGS=true go test -v -timeout=30m ./e2e-polybft/...
 
 .PHONY: run-local
 run-local:
