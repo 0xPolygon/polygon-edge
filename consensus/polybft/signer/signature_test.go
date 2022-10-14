@@ -109,6 +109,19 @@ func Test_AggregatedSignature(t *testing.T) {
 	assert.False(t, verifed)
 }
 
+func TestSignature_BigInt(t *testing.T) {
+	validTestMsg := testGenRandomBytes(t, MessageSize)
+
+	bls1, err := GenerateBlsKey()
+	require.NoError(t, err)
+
+	sig1, err := bls1.Sign(validTestMsg)
+	assert.NoError(t, err)
+
+	_, err = sig1.ToBigInt()
+	require.NoError(t, err)
+}
+
 // testGenRandomBytes generates byte array with random data
 func testGenRandomBytes(t *testing.T, size int) (blk []byte) {
 	t.Helper()

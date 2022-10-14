@@ -9,6 +9,7 @@ import (
 	bn256 "github.com/umbracle/go-eth-bn256"
 )
 
+// PublicKey represents bls public key
 type PublicKey struct {
 	p *bn256.G2
 }
