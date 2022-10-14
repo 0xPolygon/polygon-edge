@@ -24,6 +24,8 @@ jobs:
     uses: 0xpolygon/polygon-edge/.github/workflows/test.yml@develop
     name: Test
     needs: build
+    secrets:
+      GH_TOKEN_CLONE_PRIVATE: ${{ secrets.GH_TOKEN_CLONE_PRIVATE }}
 
   deploy_testnet:
     name: Update TestNet
