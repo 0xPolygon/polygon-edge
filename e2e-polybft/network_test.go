@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/e2ev3/framework"
+	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
 )
 
 func TestE2E_NetworkDiscoveryProtocol(t *testing.T) {

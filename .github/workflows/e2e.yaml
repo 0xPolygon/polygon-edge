@@ -24,6 +24,8 @@ jobs:
         run: make compile-v3-contracts
       - name: Run tests
         run: make test-e2e
+      - name: Run tests
+        run: make test-e2e-polybft
       - name: Archive test logs
         if: always()
         uses: actions/upload-artifact@v3

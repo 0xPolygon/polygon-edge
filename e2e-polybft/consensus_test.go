@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/e2ev3/framework"
+	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
