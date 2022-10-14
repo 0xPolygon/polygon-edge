@@ -12,7 +12,7 @@ import (
 type nativeTransfer struct{}
 
 func (c *nativeTransfer) gas(input []byte, _ *chain.ForksInTime) uint64 {
-	return baseGasCalc(input, 60, 12)
+	return 21000
 }
 
 func (c *nativeTransfer) run(input []byte, caller types.Address, host runtime.Host) ([]byte, error) {
