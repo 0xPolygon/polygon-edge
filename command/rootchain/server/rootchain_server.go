@@ -23,7 +23,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
-	smartcontracts "github.com/0xPolygon/polygon-edge/contracts/smart_contracts"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/polybftcontracts"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -241,7 +241,7 @@ func initialDeploy(outputter command.OutputFormatter) error {
 	}
 
 	for name, address := range deployContracts {
-		artifact := smartcontracts.MustReadArtifact("rootchain", name)
+		artifact := polybftcontracts.MustReadArtifact("rootchain", name)
 
 		input, err := artifact.DeployInput(nil)
 		if err != nil {

@@ -10,7 +10,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
-	smartcontracts "github.com/0xPolygon/polygon-edge/contracts/smart_contracts"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/polybftcontracts"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -86,6 +86,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	for i := range params.wallets {
 		wallet := params.wallets[i]
 		amount := params.amounts[i]
+		walletIndex := uint64(i)
 
 		g.Go(func() error {
 			select {
@@ -97,7 +98,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 					return fmt.Errorf("failed to create tx input: %w", err)
 				}
 
-				if _, err = helper.SendTxn(pendingNonce+uint64(i), txn); err != nil {
+				if _, err = helper.SendTxn(pendingNonce+walletIndex, txn); err != nil {
 					return fmt.Errorf("sending transaction to wallet: %s with amount: %s, failed with error: %w", wallet, amount, err)
 				}
 
@@ -128,7 +129,7 @@ func createTxInput(paramsType string, parameters ...interface{}) (*ethgo.Transac
 		return nil, fmt.Errorf("failed to encode parsed parameters: %w", err)
 	}
 
-	artifact := smartcontracts.MustReadArtifact("rootchain", "RootchainBridge")
+	artifact := polybftcontracts.MustReadArtifact("rootchain", "RootchainBridge")
 	method := artifact.Abi.Methods["emitEvent"]
 
 	input, err := method.Encode([]interface{}{types.StringToAddress(params.address), wrapperInput})
