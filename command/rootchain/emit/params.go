@@ -11,7 +11,7 @@ const (
 var (
 	errWalletsMissing       = errors.New("wallet flag value is not provided")
 	errAmountsMissing       = errors.New("amount flag value is not provided")
-	errInconsistentAccounts = errors.New("wallets and amounts must be provided in same numbers")
+	errInconsistentAccounts = errors.New("wallets and amounts must be provided in pairs")
 )
 
 type emitParams struct {
