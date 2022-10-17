@@ -243,7 +243,7 @@ var emptyFrom = types.Address{}
 func (t *Transition) WriteFailedReceipt(txn *types.Transaction) error {
 	signer := crypto.NewSigner(t.config, uint64(t.r.config.ChainID))
 
-	if txn.From == emptyFrom {
+	if txn.From == emptyFrom && txn.IsLegacyTx() {
 		// Decrypt the from address
 		from, err := signer.Sender(txn)
 		if err != nil {

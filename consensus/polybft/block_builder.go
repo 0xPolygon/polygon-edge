@@ -142,7 +142,10 @@ func (b *BlockBuilder) Build(handler func(h *types.Header)) (*StateBlock, error)
 
 func (b *BlockBuilder) WriteTx(tx *types.Transaction) error {
 	if tx.ExceedsBlockGasLimit(b.params.GasLimit) {
-		// TODO: do we need `b.state.WriteFailedReceipt` for arbitrary (in most cases state) tx?
+		if err := b.state.WriteFailedReceipt(tx); err != nil {
+			return err
+		}
+
 		return txpool.ErrBlockLimitExceeded
 	}
 
