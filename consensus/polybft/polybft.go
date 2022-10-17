@@ -60,7 +60,17 @@ func Factory(params *consensus.Params) (consensus.Consensus, error) {
 		closeCh: make(chan struct{}),
 		logger:  logger,
 	}
-	polybft.initializeConsensusConfig()
+
+	// initialize polybft consensus config
+	customConfigJSON, err := json.Marshal(params.Config.Config)
+	if err != nil {
+		return nil, err
+	}
+
+	err = json.Unmarshal(customConfigJSON, &polybft.consensusConfig)
+	if err != nil {
+		return nil, err
+	}
 
 	return polybft, nil
 }
@@ -115,12 +125,18 @@ type Polybft struct {
 func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *state.Transition) error {
 	const skipError = "empty response"
 
-	var pbftConfig PolyBFTConfig
-
-	customConfigJSON, _ := json.Marshal(config.Params.Engine[engineName])
-	json.Unmarshal(customConfigJSON, &pbftConfig)
+	configMap := config.Params.Engine[engineName]
 
 	return func(transition *state.Transition) error {
+		customConfigJSON, err := json.Marshal(configMap)
+		if err != nil {
+			return err
+		}
+
+		var pbftConfig PolyBFTConfig
+
+		json.Unmarshal(customConfigJSON, &pbftConfig)
+
 		provider := NewStateProvider(transition)
 		systemState := NewSystemState(&pbftConfig, provider)
 
@@ -280,19 +296,6 @@ func (p *Polybft) startSealing() error {
 	}()
 
 	return nil
-}
-
-// initializeConsensusConfig populates consensus configuration
-func (p *Polybft) initializeConsensusConfig() {
-	customConfigGeneric := p.config.Config.Config
-
-	var polyBftConfig PolyBFTConfig
-
-	customConfigJSON, _ := json.Marshal(customConfigGeneric)
-	json.Unmarshal(customConfigJSON, &polyBftConfig)
-
-	// TODO: Bridge, validators configuration
-	p.consensusConfig = &polyBftConfig
 }
 
 // startRuntime starts consensus runtime

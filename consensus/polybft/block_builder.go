@@ -40,7 +40,7 @@ type BlockBuilderParams struct {
 	TxPool txPoolInterface
 }
 
-func NewBlockBuilder(params *BlockBuilderParams) *BlockBuilder {
+func NewBlockBuilder(params *BlockBuilderParams) (*BlockBuilder, error) {
 	// extra can only be 32 size max. it is better to trim that to return
 	// an error that we have to propagate. It should be up to higher level
 	// code to error if the extra supplied by the user is too big.
@@ -55,9 +55,12 @@ func NewBlockBuilder(params *BlockBuilderParams) *BlockBuilder {
 	builder := &BlockBuilder{
 		params: params,
 	}
-	builder.Reset()
 
-	return builder
+	if err := builder.Reset(); err != nil {
+		return nil, err
+	}
+
+	return builder, nil
 }
 
 var _ blockBuilder = &BlockBuilder{}
