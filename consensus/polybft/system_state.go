@@ -1,7 +1,6 @@
 package polybft
 
 import (
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math/big"
@@ -17,7 +16,6 @@ var stateFunctions, _ = abi.NewABIFromList([]string{
 	"function currentEpochId() returns (uint256)",
 	"function getCurrentValidatorSet() returns (address[])",
 	"function getValidator(address) returns (tuple(uint256[4],uint256,uint256,uint256))",
-	"function init(tuple(address ecdsa, uint256[4] bls)[] _validators, uint64 _validatorSetSize)",
 })
 
 var sidechainBridgeFunctions, _ = abi.NewABIFromList([]string{
@@ -59,36 +57,6 @@ func NewSystemState(config *PolyBFTConfig, provider contract.Provider) *SystemSt
 	)
 
 	return s
-}
-
-func (s *SystemStateImpl) InitValidatorSet(validators []*Validator, validatorSetSize int) error {
-	validatorCons := make([]map[string]interface{}, len(validators))
-
-	for i, validator := range validators {
-		blsKey, err := hex.DecodeString(validator.BlsKey)
-		if err != nil {
-			return err
-		}
-
-		pubKey, err := bls.UnmarshalPublicKey(blsKey)
-		if err != nil {
-			return err
-		}
-
-		blsBigInts, err := pubKey.ToBigInt()
-		if err != nil {
-			return err
-		}
-
-		validatorCons[i] = map[string]interface{}{
-			"ecdsa": validator.Address,
-			"bls":   blsBigInts,
-		}
-	}
-
-	_, err := s.validatorContract.Call("init", ethgo.Latest, validatorCons, validatorSetSize)
-
-	return err
 }
 
 // GetValidatorSet retrieves current validator set from the smart contract
