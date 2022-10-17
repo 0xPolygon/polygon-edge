@@ -19,9 +19,6 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Compile v3 contracts
-        run: make compile-v3-contracts
-
       - name: Run Go Test
         run: go test -coverprofile coverage.out -timeout 20m `go list ./... | grep -v e2e`
 

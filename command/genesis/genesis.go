@@ -179,6 +179,15 @@ func setFlags(cmd *cobra.Command) {
 			[]string{},
 			"validators defined by user throughout a parameter (format: <address>:<blskey>)",
 		)
+		cmd.Flags().StringVar(
+			&params.premineValidators,
+			premineValidatorsFlag,
+			command.DefaultPremineBalance,
+			"the amount which will be premined to all the validators",
+		)
+
+		cmd.MarkFlagsMutuallyExclusive(premineFlag, premineValidatorsFlag)
+		cmd.MarkFlagsMutuallyExclusive(validatorsFlag, premineValidatorsFlag)
 	}
 }
 
