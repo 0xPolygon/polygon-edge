@@ -81,6 +81,7 @@ type genesisParams struct {
 	validators       []string
 
 	polyBftValidatorPrefixPath string
+	premineValidators          string
 }
 
 func (p *genesisParams) validateFlags() error {

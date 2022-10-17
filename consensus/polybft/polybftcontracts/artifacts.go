@@ -1,27 +1,16 @@
 package polybftcontracts
 
 import (
-	"embed"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"path/filepath"
 
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/umbracle/ethgo/abi"
 )
 
-//go:embed artifacts/contracts/*
-var artifactsDir embed.FS
-
-func MustReadArtifact(chain string, name string) *Artifact {
-	artifact, err := ReadArtifact(chain, name)
-	if err != nil {
-		panic(err)
-	}
-
-	return artifact
-}
-
-func ReadArtifact(chain string, name string) (*Artifact, error) {
+func ReadArtifact(rootFolder string, chain string, name string) (*Artifact, error) {
 	var directory string
 	if chain == "sidechain" || chain == "child" {
 		directory = "sidechain"
@@ -31,9 +20,15 @@ func ReadArtifact(chain string, name string) (*Artifact, error) {
 		return nil, fmt.Errorf("chain has to be either 'rootchain' or 'sidechain'")
 	}
 
-	fileName := fmt.Sprintf("artifacts/contracts/%s/%s.sol/%s.json", directory, name, name)
+	fileName := filepath.Join(rootFolder, directory,
+		fmt.Sprintf("%s.sol", name), fmt.Sprintf("%s.json", name))
+	absolutePath, err := filepath.Abs(fileName)
 
-	data, err := artifactsDir.ReadFile(fileName)
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := ioutil.ReadFile(absolutePath)
 	if err != nil {
 		return nil, err
 	}
