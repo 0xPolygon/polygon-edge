@@ -255,6 +255,7 @@ func (t *Transition) WriteFailedReceipt(txn *types.Transaction) error {
 
 	receipt := &types.Receipt{
 		CumulativeGasUsed: t.totalGas,
+		TransactionType:   txn.Type,
 		TxHash:            txn.Hash,
 		Logs:              t.state.Logs(),
 	}
@@ -290,6 +291,7 @@ func (t *Transition) Write(txn *types.Transaction) error {
 
 	receipt := &types.Receipt{
 		CumulativeGasUsed: t.totalGas,
+		TransactionType:   txn.Type,
 		TxHash:            txn.Hash,
 		GasUsed:           result.GasUsed,
 	}
