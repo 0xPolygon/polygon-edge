@@ -8,6 +8,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
+	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	secretsHelper "github.com/0xPolygon/polygon-edge/secrets/helper"
@@ -75,6 +76,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	newValidatorSender := newTxnSender(newValidatorAccount)
 
 	var validator *NewValidator
+
 	steps := []*txnStep{
 		{
 			name: "whitelist",
@@ -98,8 +100,14 @@ func runCommand(cmd *cobra.Command, _ []string) {
 				if err != nil {
 					panic(err)
 				}
+
+				validatorAddr, ok := event["validator"].(ethgo.Address)
+				if !ok {
+					panic("type assertions failed for parameter validator")
+				}
+
 				validator = &NewValidator{
-					Validator: event["validator"].(ethgo.Address),
+					Validator: validatorAddr,
 				}
 			},
 		},
@@ -114,10 +122,12 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	d := glint.New()
 	go d.Render(context.Background())
 
-	print := func(done bool) {
+	printStatus := func(done bool) {
 		comps := []glint.Component{}
+
 		for _, step := range steps {
 			var status glint.Component
+
 			var opts []glint.StyleOption
 
 			switch step.status {
@@ -126,6 +136,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 			case txnStepPending:
 				status = gc.Spinner()
+
 				opts = append(opts, glint.Color("yellow"))
 
 			case txnStepCompleted:
@@ -145,6 +156,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 				opts...,
 			))
 		}
+
 		if done {
 			if validator != nil {
 				comps = append(comps, glint.Text("\nDone: "+validator.Validator.String()))
@@ -160,10 +172,12 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 	for _, step := range steps {
 		step.status = txnStepPending
-		print(false)
+
+		printStatus(false)
 
 		txn := step.action()
 		receipt, err := txn.Wait()
+
 		if err != nil {
 			step.status = txnStepFailed
 		} else {
@@ -173,14 +187,17 @@ func runCommand(cmd *cobra.Command, _ []string) {
 				step.status = txnStepCompleted
 			}
 		}
+
 		if step.status == txnStepFailed {
 			break
 		}
+
 		if step.postHook != nil {
 			step.postHook(receipt)
 		}
 	}
-	print(true)
+
+	printStatus(true)
 
 	d.RenderFrame()
 	d.Pause()
@@ -192,7 +209,7 @@ const (
 )
 
 var (
-	stakeManager      = types.Address{0x1}
+	stakeManager      = contracts.ValidatorSetContract
 	stakeFn, _        = abi.NewMethod("function stake()")
 	whitelistFn, _    = abi.NewMethod("function addToWhitelist(address[])")
 	registerFn, _     = abi.NewMethod("function register(uint256[2] signature, uint256[4] pubkey)")
@@ -240,14 +257,17 @@ func (t *txnSender) sendTransaction(txn *types.Transaction) asyncTxn {
 	if txn.GasPrice.Uint64() == 0 {
 		txn.GasPrice = big.NewInt(defaultGasPrice)
 	}
+
 	if txn.Gas == 0 {
 		txn.Gas = defaultGasLimit
 	}
+
 	if txn.Nonce == 0 {
 		nonce, err := t.client.Eth().GetNonce(t.account.Ecdsa.Address(), ethgo.Latest)
 		if err != nil {
 			panic(err)
 		}
+
 		txn.Nonce = nonce
 	}
 
@@ -263,20 +283,24 @@ func (t *txnSender) sendTransaction(txn *types.Transaction) asyncTxn {
 
 	signer := crypto.NewEIP155Signer(chainID.Uint64())
 	signedTxn, err := signer.SignTx(txn, privateKey)
+
 	if err != nil {
 		panic(err)
 	}
 
 	txnRaw := signedTxn.MarshalRLP()
 	hash, err := t.client.Eth().SendRawTransaction(txnRaw)
+
 	if err != nil {
 		panic(err)
 	}
+
 	return &asyncTxnImpl{hash: hash, t: t}
 }
 
 func (t *txnSender) waitForReceipt(hash ethgo.Hash) (*ethgo.Receipt, error) {
 	var count uint64
+
 	for {
 		receipt, err := t.client.Eth().GetTransactionReceipt(hash)
 		if err != nil {
@@ -284,15 +308,19 @@ func (t *txnSender) waitForReceipt(hash ethgo.Hash) (*ethgo.Receipt, error) {
 				return nil, err
 			}
 		}
+
 		if receipt != nil {
 			return receipt, nil
 		}
+
 		if count > 1200 {
 			break
 		}
+
 		time.Sleep(100 * time.Millisecond)
 		count++
 	}
+
 	return nil, fmt.Errorf("timeout")
 }
 
@@ -301,15 +329,15 @@ func newDemoClient() *jsonrpc.Client {
 	if err != nil {
 		panic("cannot connect with jsonrpc")
 	}
+
 	return client
 }
 
 func newTxnSender(sender *wallet.Account) *txnSender {
-	s := &txnSender{
+	return &txnSender{
 		account: sender,
 		client:  newDemoClient(),
 	}
-	return s
 }
 
 func stake(sender *txnSender) asyncTxn {
@@ -327,6 +355,7 @@ func stake(sender *txnSender) asyncTxn {
 		Input: input,
 		Value: big.NewInt(1000),
 	})
+
 	return receipt
 }
 
@@ -342,17 +371,18 @@ func whitelist(sender *txnSender, addr types.Address) asyncTxn {
 		To:    &stakeManager,
 		Input: input,
 	})
+
 	return receipt
 }
 
 func fund(sender *txnSender, addr types.Address) asyncTxn {
 	genesisAmount, _ := new(big.Int).SetString("1000000000000000000", 10)
 
-	to := types.Address(addr)
 	receipt := sender.sendTransaction(&types.Transaction{
-		To:    &to,
+		To:    &addr,
 		Value: genesisAmount,
 	})
+
 	return receipt
 }
 
@@ -370,10 +400,12 @@ func registerValidator(sender *txnSender, account *wallet.Account) asyncTxn {
 	if err != nil {
 		panic(err)
 	}
+
 	pubKeys, err := account.Bls.PublicKey().ToBigInt()
 	if err != nil {
 		panic(err)
 	}
+
 	input, err := registerFn.Encode([]interface{}{
 		sigMarshal,
 		pubKeys,
