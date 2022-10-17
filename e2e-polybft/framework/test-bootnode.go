@@ -22,12 +22,15 @@ type TestBootnode struct {
 }
 
 func NewBootnode(t *testing.T, clusterConfig *TestClusterConfig, port int64) *TestBootnode {
+	t.Helper()
+
 	bootnode := &TestBootnode{
 		t:             t,
 		clusterConfig: clusterConfig,
 		port:          fmt.Sprint(port),
 	}
 	bootnode.Start()
+
 	return bootnode
 }
 
@@ -60,6 +63,7 @@ func (t *TestBootnode) Stop() {
 	if err := t.node.Stop(); err != nil {
 		t.t.Error(err)
 	}
+
 	t.node = nil
 }
 
@@ -80,9 +84,11 @@ func (t *TestBootnode) getEnode(timeout, period time.Duration) (string, error) {
 		case <-ticker.C:
 			logs := t.logs.String()
 			startIdx := strings.Index(logs, "enode://")
+
 			if startIdx != -1 {
 				enode := logs[startIdx:]
 				endIdx := strings.IndexAny(enode, " \n\r")
+
 				if endIdx != -1 {
 					enode = enode[:endIdx]
 				}

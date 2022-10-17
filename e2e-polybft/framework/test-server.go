@@ -13,7 +13,7 @@ import (
 
 type TestServerConfig struct {
 	Name        string
-	JsonRPCPort int64
+	JSONRPCPort int64
 	GRPCPort    int64
 	P2PPort     int64
 	Seal        bool
@@ -25,7 +25,7 @@ type TestServerConfig struct {
 
 type TestServerConfigCallback func(*TestServerConfig)
 
-const hostIp = "127.0.0.1"
+const hostIP = "127.0.0.1"
 
 var initialPortForServer = int64(12000)
 
@@ -42,18 +42,19 @@ type TestServer struct {
 }
 
 func (t *TestServer) GrpcAddr() string {
-	return fmt.Sprintf("%s:%d", hostIp, t.config.GRPCPort)
+	return fmt.Sprintf("%s:%d", hostIP, t.config.GRPCPort)
 }
 
-func (t *TestServer) JsonRPCAddr() string {
-	return fmt.Sprintf("http://%s:%d", hostIp, t.config.JsonRPCPort)
+func (t *TestServer) JSONRPCAddr() string {
+	return fmt.Sprintf("http://%s:%d", hostIP, t.config.JSONRPCPort)
 }
 
 func (t *TestServer) JSONRPC() *jsonrpc.Client {
-	clt, err := jsonrpc.NewClient(t.JsonRPCAddr())
+	clt, err := jsonrpc.NewClient(t.JSONRPCAddr())
 	if err != nil {
 		t.t.Fatal(err)
 	}
+
 	return clt
 }
 
@@ -66,9 +67,11 @@ func (t *TestServer) JSONRPC() *jsonrpc.Client {
 // }
 
 func NewTestServer(t *testing.T, clusterConfig *TestClusterConfig, callback TestServerConfigCallback) *TestServer {
+	t.Helper()
+
 	config := &TestServerConfig{
 		Name:        uuid.New().String(),
-		JsonRPCPort: getOpenPortForServer(),
+		JSONRPCPort: getOpenPortForServer(),
 		GRPCPort:    getOpenPortForServer(),
 		P2PPort:     getOpenPortForServer(),
 	}
@@ -90,6 +93,7 @@ func NewTestServer(t *testing.T, clusterConfig *TestClusterConfig, callback Test
 		config:        config,
 	}
 	srv.Start()
+
 	return srv
 }
 
@@ -112,7 +116,7 @@ func (t *TestServer) Start() {
 		// grpc port
 		"--grpc-address", fmt.Sprintf("localhost:%d", config.GRPCPort),
 		// enable jsonrpc
-		"--jsonrpc", fmt.Sprintf(":%d", config.JsonRPCPort),
+		"--jsonrpc", fmt.Sprintf(":%d", config.JSONRPCPort),
 	}
 
 	if len(config.LogLevel) > 0 {
@@ -131,6 +135,7 @@ func (t *TestServer) Start() {
 	if err != nil {
 		t.t.Fatal(err)
 	}
+
 	t.node = node
 }
 
@@ -138,5 +143,6 @@ func (t *TestServer) Stop() {
 	if err := t.node.Stop(); err != nil {
 		t.t.Fatal(err)
 	}
+
 	t.node = nil
 }

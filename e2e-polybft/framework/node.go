@@ -22,11 +22,13 @@ func newNode(binary string, args []string, stdout io.Writer) (*node, error) {
 	if err := cmd.Start(); err != nil {
 		return nil, err
 	}
+
 	n := &node{
 		cmd:    cmd,
 		doneCh: make(chan struct{}),
 	}
 	go n.run()
+
 	return n, nil
 }
 
@@ -58,11 +60,14 @@ func (n *node) Stop() error {
 		// the server is already stopped
 		return nil
 	}
+
 	if err := n.cmd.Process.Signal(os.Interrupt); err != nil {
 		return err
 	}
+
 	atomic.StoreUint64(&n.shuttingDown, 1)
 	<-n.Wait()
+
 	return nil
 }
 

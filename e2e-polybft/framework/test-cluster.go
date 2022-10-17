@@ -102,6 +102,7 @@ func (c *TestClusterConfig) GetStdout(name string) io.Writer {
 		if err != nil {
 			c.t.Fatal(err)
 		}
+
 		writers = append(writers, f)
 
 		c.t.Cleanup(func() {
@@ -111,12 +112,15 @@ func (c *TestClusterConfig) GetStdout(name string) io.Writer {
 			}
 		})
 	}
+
 	if c.WithStdout {
 		writers = append(writers, os.Stdout)
 	}
+
 	if len(writers) == 0 {
 		return io.Discard
 	}
+
 	return io.MultiWriter(writers...)
 }
 
@@ -125,6 +129,7 @@ func (c *TestClusterConfig) initLogsDir() {
 	if err := os.MkdirAll(logsDir, 0755); err != nil {
 		c.t.Fatal(err)
 	}
+
 	c.t.Logf("logs enabled for e2e test: %s", logsDir)
 	c.LogsDir = logsDir
 }
@@ -178,11 +183,13 @@ func isTrueEnv(e string) bool {
 }
 
 func NewTestCluster(t *testing.T, name string, validatorsCount int, opts ...ClusterOption) *TestCluster {
+	t.Helper()
+
 	if !isTrueEnv(envE2ETestsEnabled) {
 		t.Skip("Integration tests are disabled.")
 	}
 
-	tmpDir, err := ioutil.TempDir("/tmp", "e2e-v3")
+	tmpDir, err := ioutil.TempDir("/tmp", "e2e-polybft-")
 	require.NoError(t, err)
 
 	config := &TestClusterConfig{
@@ -266,12 +273,12 @@ func NewTestCluster(t *testing.T, name string, validatorsCount int, opts ...Clus
 		require.NoError(t, err)
 	}
 
-	for i := 1; i <= validatorsCount; i++ {
+	for i := 1; i <= int(cluster.Config.ValidatorSetSize); i++ {
 		cluster.initTestServer(t, i, true)
 	}
 
 	for i := 1; i <= cluster.Config.NonValidatorCount; i++ {
-		offsetIndex := i + validatorsCount
+		offsetIndex := i + int(cluster.Config.ValidatorSetSize)
 		cluster.initTestServer(t, offsetIndex, false)
 	}
 
@@ -279,6 +286,8 @@ func NewTestCluster(t *testing.T, name string, validatorsCount int, opts ...Clus
 }
 
 func (c *TestCluster) initTestServer(t *testing.T, i int, isValidator bool) {
+	t.Helper()
+
 	logLevel := os.Getenv(envLogLevel)
 	dataDir := c.Config.Dir("test-chain-" + strconv.Itoa(i))
 
@@ -295,6 +304,7 @@ func (c *TestCluster) initTestServer(t *testing.T, i int, isValidator bool) {
 	// 'node' reference since 'TestServer' creates a new one if restarted.
 	go func(node *node) {
 		<-node.Wait()
+
 		if !node.ExitResult().Signaled {
 			c.Fail(fmt.Errorf("server at dir '%s' has stopped unexpectedly", dataDir))
 		}
@@ -311,8 +321,9 @@ func (c *TestCluster) cmdRun(args ...string) error {
 	cmd.Stdout = c.Config.GetStdout(args[0])
 
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("%v: %s", err, stdErr.String())
+		return fmt.Errorf("%w: %s", err, stdErr.String())
 	}
+
 	return nil
 }
 
@@ -322,9 +333,11 @@ func (c *TestCluster) EmitTransfer(contractAddress, walletAddresses, amounts str
 	if len(contractAddress) == 0 {
 		return errors.New("provide contractAddress value")
 	}
+
 	if len(walletAddresses) == 0 {
 		return errors.New("provide at least one wallet address value")
 	}
+
 	if len(amounts) == 0 {
 		return errors.New("provide at least one amount value")
 	}
@@ -361,10 +374,13 @@ func (c *TestCluster) Stop() {
 }
 
 func (c *TestCluster) Stats(t *testing.T) {
+	t.Helper()
+
 	for index, i := range c.Servers {
 		if !i.isRunning() {
 			continue
 		}
+
 		num, err := i.JSONRPC().Eth().BlockNumber()
 		t.Log("Stats node", index, "err", err, "block", num, "validator", i.config.Seal)
 	}
@@ -401,17 +417,22 @@ func (c *TestCluster) WaitForBlock(n uint64, timeout time.Duration) error {
 		}
 
 		ok = true
+
 		for _, i := range c.Servers {
 			if !i.isRunning() {
 				continue
 			}
+
 			num, err := i.JSONRPC().Eth().BlockNumber()
+
 			if err != nil || num < n {
 				ok = false
+
 				break
 			}
 		}
 	}
+
 	return nil
 }
 
@@ -423,11 +444,13 @@ func (c *TestCluster) WaitForGeneric(dur time.Duration, fn func(*TestServer) boo
 				return true
 			}
 		}
+
 		return false
 	})
 }
 
 func (c *TestCluster) getOpenPort() int64 {
 	c.initialPort++
+
 	return c.initialPort
 }
