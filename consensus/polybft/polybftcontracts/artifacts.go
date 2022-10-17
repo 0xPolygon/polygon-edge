@@ -44,7 +44,7 @@ func ReadArtifact(chain string, name string) (*Artifact, error) {
 		DeployedBytecode string
 	}
 
-	if err := json.Unmarshal(data, &hexRes); err != nil {
+	if err = json.Unmarshal(data, &hexRes); err != nil {
 		return nil, fmt.Errorf("artifact found but no correct format: %w", err)
 	}
 
