@@ -643,8 +643,6 @@ func (c *consensusRuntime) getLatestSprintBlockNumber() uint64 {
 // calculateUptime calculates uptime for blocks starting from the last built block in current epoch,
 // and ending at the last block of previous epoch
 func (c *consensusRuntime) calculateUptime(currentBlock *types.Header) (*UptimeCounter, error) {
-	var ok bool
-
 	epoch := c.getEpoch()
 	uptimeCounter := &UptimeCounter{validatorIndices: make(map[ethgo.Address]int)}
 
@@ -679,13 +677,15 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header) (*UptimeC
 	blockHeader := currentBlock
 	validators := epoch.Validators
 
+	var found bool
+
 	for blockHeader.Number > firstBlockInEpoch {
 		if err := calculateUptimeForBlock(blockHeader, validators); err != nil {
 			return nil, err
 		}
 
-		blockHeader, ok = c.config.blockchain.GetHeaderByNumber(blockHeader.Number - 1)
-		if !ok {
+		blockHeader, found = c.config.blockchain.GetHeaderByNumber(blockHeader.Number - 1)
+		if !found {
 			return nil, blockchain.ErrNoBlock
 		}
 	}
@@ -704,8 +704,8 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header) (*UptimeC
 				return nil, err
 			}
 
-			blockHeader, ok = c.config.blockchain.GetHeaderByNumber(blockHeader.Number - 1)
-			if !ok {
+			blockHeader, found = c.config.blockchain.GetHeaderByNumber(blockHeader.Number - 1)
+			if !found {
 				return nil, blockchain.ErrNoBlock
 			}
 		}
