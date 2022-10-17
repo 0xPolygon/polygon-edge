@@ -10,20 +10,10 @@ import (
 	"github.com/umbracle/ethgo/abi"
 )
 
-func ReadArtifact(rootFolder string, chain string, name string) (*Artifact, error) {
-	var directory string
-	if chain == "sidechain" || chain == "child" {
-		directory = "sidechain"
-	} else if chain == "rootchain" || chain == "root" {
-		directory = "rootchain"
-	} else {
-		return nil, fmt.Errorf("chain has to be either 'rootchain' or 'sidechain'")
-	}
+func ReadArtifact(rootFolder, contractPath, contractName string) (*Artifact, error) {
+	fileName := filepath.Join(rootFolder, contractPath, fmt.Sprintf("%s.json", contractName))
 
-	fileName := filepath.Join(rootFolder, directory,
-		fmt.Sprintf("%s.sol", name), fmt.Sprintf("%s.json", name))
 	absolutePath, err := filepath.Abs(fileName)
-
 	if err != nil {
 		return nil, err
 	}
@@ -43,13 +33,11 @@ func ReadArtifact(rootFolder string, chain string, name string) (*Artifact, erro
 		return nil, fmt.Errorf("artifact found but no correct format: %w", err)
 	}
 
-	res := &Artifact{
+	return &Artifact{
 		Abi:              hexRes.Abi,
 		Bytecode:         hex.MustDecodeHex(hexRes.Bytecode),
 		DeployedBytecode: hex.MustDecodeHex(hexRes.DeployedBytecode),
-	}
-
-	return res, nil
+	}, nil
 }
 
 type Artifact struct {

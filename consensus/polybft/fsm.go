@@ -196,7 +196,7 @@ func (f *fsm) stateTransactions() []*types.Transaction {
 			}
 
 			txns = append(txns,
-				createStateTransactionWithData(f.config.SidechainBridgeAddr, inputData))
+				createStateTransactionWithData(f.config.StateReceiverAddr, inputData))
 
 			// since proposer does not execute Validate (when we see the commitment to register in state transactions)
 			// we need to set commitment to save so that the proposer also saves its commitment that he registered
@@ -217,7 +217,7 @@ func (f *fsm) stateTransactions() []*types.Transaction {
 			}
 
 			txns = append(txns,
-				createStateTransactionWithData(f.config.SidechainBridgeAddr, inputData))
+				createStateTransactionWithData(f.config.StateReceiverAddr, inputData))
 
 			f.logger.Debug("[fsm] Executing bundle",
 				"fromIndex", bundle.StateSyncs[0].ID,

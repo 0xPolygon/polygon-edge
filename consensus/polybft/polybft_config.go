@@ -1,6 +1,7 @@
 package polybft
 
 import (
+	"math/big"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/types"
@@ -14,8 +15,8 @@ type PolyBFTConfig struct {
 	ValidatorSetSize int `json:"validatorSetSize"`
 
 	// Address of the system contracts, as of now (testing) this is populated automatically during genesis
-	ValidatorSetAddr    types.Address `json:"validatorSetAddr"`
-	SidechainBridgeAddr types.Address `json:"sidechainBridgeAddr"`
+	ValidatorSetAddr  types.Address `json:"validatorSetAddr"`
+	StateReceiverAddr types.Address `json:"stateReceiverAddr"`
 
 	// size of the epoch and sprint
 	EpochSize  uint64 `json:"epochSize"`
@@ -23,7 +24,8 @@ type PolyBFTConfig struct {
 
 	BlockTime time.Duration `json:"blockTime"`
 
-	SmartContracts []SmartContract `json:"smartContracts"`
+	// Governance is the initial governance address
+	Governance types.Address `json:"governance"`
 }
 
 type SmartContract struct {
@@ -46,9 +48,13 @@ func (p *PolyBFTConfig) IsBridgeEnabled() bool {
 type Validator struct {
 	Address types.Address
 	BlsKey  string
+	Balance *big.Int `json:"balance"`
 }
 
 // DebugConfig is a struct used for test configuration in init genesis
 type DebugConfig struct {
 	ValidatorSetSize uint64 `json:"validatorSetSize"`
 }
+
+// PolyBFTRegisterMessage is a challenge message which needs to be signed by each validator account
+var PolyBFTRegisterMessage = "Polybft validator"

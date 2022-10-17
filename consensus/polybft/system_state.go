@@ -53,7 +53,7 @@ func NewSystemState(config *PolyBFTConfig, provider contract.Provider) *SystemSt
 		stateFunctions, contract.WithProvider(provider),
 	)
 	s.sidechainBridgeContract = contract.NewContract(
-		ethgo.Address(config.SidechainBridgeAddr),
+		ethgo.Address(config.StateReceiverAddr),
 		sidechainBridgeFunctions,
 		contract.WithProvider(provider),
 	)

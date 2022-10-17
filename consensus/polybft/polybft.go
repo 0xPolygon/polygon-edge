@@ -16,6 +16,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/proto"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
+	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/secrets"
@@ -31,13 +32,6 @@ const (
 	minSyncPeers = 2
 	pbftProto    = "/pbft/0.2"
 	bridgeProto  = "/bridge/0.2"
-
-	blockTimeKey           = "blockTime"
-	epochSizeKey           = "epochSize"
-	sprintSizeKey          = "sprintSize"
-	validatorSetSizeKey    = "validatorSetSize"
-	sidechainBridgeAddrKey = "sidechainBridgeAddr"
-	validatorSetAddrKey    = "validatorSetAddr"
 )
 
 // polybftBackend is an interface defining polybft methods needed by fsm and sync tracker
@@ -125,36 +119,21 @@ type Polybft struct {
 func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *state.Transition) error {
 	const skipError = "empty response"
 
-	configMap := config.Params.Engine[engineName]
+	var pbftConfig PolyBFTConfig
+
+	customConfigJSON, _ := json.Marshal(config.Params.Engine[engineName])
+	json.Unmarshal(customConfigJSON, &pbftConfig)
 
 	return func(transition *state.Transition) error {
-		customConfigJSON, err := json.Marshal(configMap)
+		// Initialize child validator set
+		input, err := getInitChildValidatorSetInput(pbftConfig.InitialValidatorSet, pbftConfig.Governance)
 		if err != nil {
 			return err
 		}
 
-		var pbftConfig PolyBFTConfig
-
-		if err = json.Unmarshal(customConfigJSON, &pbftConfig); err != nil {
+		result := transition.Call2(contracts.SystemCaller, contracts.ValidatorSetContract, input, big.NewInt(0), 1000000000)
+		if result.Failed() && result.Err.Error() != skipError {
 			return err
-		}
-
-		provider := NewStateProvider(transition)
-		systemState := NewSystemState(&pbftConfig, provider)
-
-		for _, sc := range pbftConfig.SmartContracts {
-			result := transition.Create2(types.ZeroAddress, sc.Code, big.NewInt(0), 10000000)
-			if result.Failed() {
-				return result.Err
-			}
-
-			// init validators
-			if sc.Address == pbftConfig.ValidatorSetAddr {
-				err := systemState.InitValidatorSet(pbftConfig.InitialValidatorSet, pbftConfig.ValidatorSetSize)
-				if err != nil && err.Error() != skipError {
-					return err
-				}
-			}
 		}
 
 		return nil
