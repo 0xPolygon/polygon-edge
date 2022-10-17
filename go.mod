@@ -15,7 +15,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/hashicorp/hcl v1.0.0
-	github.com/hashicorp/vault/api v1.8.0
+	github.com/hashicorp/vault/api v1.8.1
 	github.com/libp2p/go-libp2p v0.22.0
 	github.com/libp2p/go-libp2p-kbucket v0.5.0
 	github.com/libp2p/go-libp2p-pubsub v0.8.1
@@ -65,11 +65,7 @@ require (
 	go.uber.org/atomic v1.10.0
 )
 
-require (
-	github.com/0xPolygon/go-ibft v0.0.0-20220810095021-e43142f8d267
-	go.uber.org/atomic v1.10.0
-	gopkg.in/DataDog/dd-trace-go.v1 v1.42.1
-)
+require gopkg.in/DataDog/dd-trace-go.v1 v1.42.1
 
 require (
 	cloud.google.com/go v0.104.0 // indirect
