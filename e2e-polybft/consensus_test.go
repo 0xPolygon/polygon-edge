@@ -44,7 +44,7 @@ func TestE2E_Consensus_Sync_WithNonValidators(t *testing.T) {
 func TestE2E_Consensus_Sync(t *testing.T) {
 	// one node from the ensemble gets disconnected and connected again.
 	// It should be able to pick up from the synchronization protocol again.
-	cluster := framework.NewTestCluster(t, "consensus_sync", 7, framework.WithValidatorSnapshot(5))
+	cluster := framework.NewTestCluster(t, "consensus_sync", 5, framework.WithValidatorSnapshot(5))
 	defer cluster.Stop()
 
 	// wait for the start
@@ -88,15 +88,4 @@ func TestE2E_Consensus_Bulk_Drop(t *testing.T) {
 
 	// wait for block 10
 	assert.NoError(t, cluster.WaitForBlock(10, 2*time.Minute))
-}
-
-func TestE2E_Consensus_Basic_WithBootnodesAndNonValidators(t *testing.T) {
-	cluster := framework.NewTestCluster(t,
-		"consensus_basic_bootnodes_and_nonvalidators",
-		5,
-		framework.WithBootnode(),
-		framework.WithNonValidators(2))
-	defer cluster.Stop()
-
-	assert.NoError(t, cluster.WaitForBlock(12, 1*time.Minute))
 }

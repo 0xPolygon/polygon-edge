@@ -75,7 +75,6 @@ type TestClusterConfig struct {
 	Premine           []common.Address
 	HasBridge         bool
 	NonValidatorCount int
-	HasBootnode       bool
 	WithLogs          bool
 	WithStdout        bool
 	LogsDir           string
@@ -166,12 +165,6 @@ func WithNonValidators(num int) ClusterOption {
 	}
 }
 
-func WithBootnode() ClusterOption {
-	return func(h *TestClusterConfig) {
-		h.HasBootnode = true
-	}
-}
-
 func WithValidatorSnapshot(validatorsLen uint64) ClusterOption {
 	return func(h *TestClusterConfig) {
 		h.ValidatorSetSize = validatorsLen
@@ -219,15 +212,14 @@ func NewTestCluster(t *testing.T, name string, validatorsCount int, opts ...Clus
 		require.NoError(t, err)
 	}
 
-	// check if bootnodes are needed
-	if cluster.Config.HasBootnode {
-		// run cmd for starting a Bootnode and get its enode
-		cluster.Bootnode = NewBootnode(t, cluster.Config, cluster.getOpenPort())
-	}
-
 	// Create a file with account password
 	//pwdFilePath, deleteFile := createAccountPasswordFile(t)
 	//defer deleteFile()
+
+	// In case no validators are specified in opts, all nodes will be validators
+	if cluster.Config.ValidatorSetSize == 0 {
+		cluster.Config.ValidatorSetSize = uint64(validatorsCount)
+	}
 
 	{
 		// run init account
@@ -258,10 +250,6 @@ func NewTestCluster(t *testing.T, name string, validatorsCount int, opts ...Clus
 
 		if cluster.Config.HasBridge {
 			args = append(args, "--bridge")
-		}
-
-		if cluster.Config.HasBootnode {
-			args = append(args, "--bootnode", cluster.Bootnode.enode)
 		}
 
 		if cluster.Config.ValidatorSetSize > 0 {
@@ -362,10 +350,6 @@ func (c *TestCluster) Stop() {
 		if srv.isRunning() {
 			srv.Stop()
 		}
-	}
-
-	if c.Bootnode != nil {
-		c.Bootnode.Stop()
 	}
 
 	// if c.Bridge != nil {
