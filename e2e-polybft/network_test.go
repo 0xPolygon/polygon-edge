@@ -1,10 +1,13 @@
 package e2e
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
+	"github.com/stretchr/testify/assert"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 func TestE2E_NetworkDiscoveryProtocol(t *testing.T) {
@@ -23,12 +26,13 @@ func TestE2E_NetworkDiscoveryProtocol(t *testing.T) {
 		validatorCount, framework.WithNonValidators(nonValidatorCount))
 	defer cluster.Stop()
 
-	// ctx := context.Background()
+	ctx := context.Background()
 
 	// wait for everyone to have at least 'atLeastPeers' peers
-	// err := cluster.WaitForGeneric(testTimeout, func(ts *framework.TestServer) bool {
-	// 	status, err := ts.Conn().Status(ctx, &emptypb.Empty{})
-	// 	return err == nil && status.NumPeers >= atLeastPeers
-	// })
-	// assert.NoError(t, err)
+	err := cluster.WaitForGeneric(testTimeout, func(ts *framework.TestServer) bool {
+		peerList, err := ts.Conn().PeersList(ctx, &emptypb.Empty{})
+
+		return err == nil && len(peerList.GetPeers()) >= atLeastPeers
+	})
+	assert.NoError(t, err)
 }

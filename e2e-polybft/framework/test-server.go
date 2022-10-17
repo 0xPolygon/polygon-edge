@@ -6,9 +6,11 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/0xPolygon/polygon-edge/server/proto"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/umbracle/ethgo/jsonrpc"
+	"google.golang.org/grpc"
 )
 
 type TestServerConfig struct {
@@ -58,13 +60,14 @@ func (t *TestServer) JSONRPC() *jsonrpc.Client {
 	return clt
 }
 
-// func (t *TestServer) Conn() proto.BorClient {
-// 	conn, err := grpc.Dial(t.GrpcAddr(), grpc.WithInsecure())
-// 	if err != nil {
-// 		t.t.Fatal(err)
-// 	}
-// 	return proto.NewBorClient(conn)
-// }
+func (t *TestServer) Conn() proto.SystemClient {
+	conn, err := grpc.Dial(t.GrpcAddr(), grpc.WithInsecure())
+	if err != nil {
+		t.t.Fatal(err)
+	}
+
+	return proto.NewSystemClient(conn)
+}
 
 func NewTestServer(t *testing.T, clusterConfig *TestClusterConfig, callback TestServerConfigCallback) *TestServer {
 	t.Helper()
@@ -125,7 +128,6 @@ func (t *TestServer) Start() {
 
 	if config.Seal {
 		args = append(args, "--seal")
-		//args = append(args, "--miner.password", config.Password)
 	}
 
 	// Start the server

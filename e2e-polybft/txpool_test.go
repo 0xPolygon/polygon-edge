@@ -67,6 +67,7 @@ func TestE2E_TxPool_Transfer(t *testing.T) {
 	num := 20
 
 	receivers := []ethgo.Address{}
+
 	for i := 0; i < num; i++ {
 		key, err := wallet.GenerateKey()
 		assert.NoError(t, err)
@@ -98,6 +99,7 @@ func TestE2E_TxPool_Transfer(t *testing.T) {
 				return true
 			}
 		}
+
 		return false
 	})
 	assert.NoError(t, err)
@@ -157,11 +159,14 @@ func TestE2E_TxPool_Transfer_Linear(t *testing.T) {
 			if err != nil {
 				return true
 			}
+
 			if balance.Cmp(big.NewInt(0)) == 0 {
 				return true
 			}
+
 			return false
 		})
+
 		return err
 	}
 
@@ -169,6 +174,7 @@ func TestE2E_TxPool_Transfer_Linear(t *testing.T) {
 	receivers := []*wallet.Key{
 		premine,
 	}
+
 	for i := 0; i < num-1; i++ {
 		key, err := wallet.GenerateKey()
 		assert.NoError(t, err)

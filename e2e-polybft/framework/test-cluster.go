@@ -304,7 +304,7 @@ func (c *TestCluster) initTestServer(t *testing.T, i int, isValidator bool) {
 func (c *TestCluster) cmdRun(args ...string) error {
 	var stdErr bytes.Buffer
 
-	cmd := exec.Command(c.Config.Binary, args...) // nolint:gosec
+	cmd := exec.Command(c.Config.Binary, args...) //nolint:gosec
 	cmd.Stderr = &stdErr
 	cmd.Stdout = c.Config.GetStdout(args[0])
 
@@ -351,10 +351,6 @@ func (c *TestCluster) Stop() {
 			srv.Stop()
 		}
 	}
-
-	// if c.Bridge != nil {
-	// 	c.Bridge.Stop()
-	// }
 }
 
 func (c *TestCluster) Stats(t *testing.T) {
