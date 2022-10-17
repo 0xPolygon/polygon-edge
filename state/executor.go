@@ -445,17 +445,14 @@ func NewGasLimitReachedTransitionApplicationError(err error) *GasLimitReachedTra
 }
 
 func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, error) {
-	switch msg.Type {
-	case types.LegacyTx:
-		if err := checkAndProcessLegacyTx(msg, t); err != nil {
-			return nil, err
-		}
-	case types.StateTx:
+	if msg.IsStateTx() {
 		if err := checkAndProcessStateTx(msg, t); err != nil {
 			return nil, err
 		}
-	default:
-		return nil, fmt.Errorf("invalid tx type value: %d", msg.Type)
+	} else {
+		if err := checkAndProcessLegacyTx(msg, t); err != nil {
+			return nil, err
+		}
 	}
 
 	// the amount of gas required is available in the block
@@ -470,9 +467,9 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 	}
 
 	// the purchased gas is enough to cover intrinsic usage
-	availableGas := msg.Gas - intrinsicGasCost
+	gasLeft := msg.Gas - intrinsicGasCost
 	// because we are working with unsigned integers for gas, the `>` operator is used instead of the more intuitive `<`
-	if availableGas > msg.Gas {
+	if gasLeft > msg.Gas {
 		return nil, NewTransitionApplicationError(ErrNotEnoughIntrinsicGas, false)
 	}
 
@@ -485,9 +482,9 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 
 	var result *runtime.ExecutionResult
 	if msg.IsContractCreation() {
-		result = t.Create2(msg.From, msg.Input, value, availableGas)
+		result = t.Create2(msg.From, msg.Input, value, gasLeft)
 	} else {
-		result = t.Call2(msg.From, *msg.To, msg.Input, value, availableGas)
+		result = t.Call2(msg.From, *msg.To, msg.Input, value, gasLeft)
 	}
 
 	refund := t.state.GetRefund()
