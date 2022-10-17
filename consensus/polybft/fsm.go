@@ -131,6 +131,12 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 	}
 
 	if f.config.IsBridgeEnabled() {
+		if f.isEndOfEpoch && f.proposerCommitmentToRegister != nil {
+			// since proposer does not execute Validate (when we see the commitment to register in state transactions)
+			// we need to set commitment to save so that the proposer also saves its commitment that he registered
+			f.commitmentToSaveOnRegister = f.proposerCommitmentToRegister
+		}
+
 		for _, tx := range f.stateTransactions() {
 			if err := f.blockBuilder.WriteTx(tx); err != nil {
 				return nil, fmt.Errorf("failed to commit state transaction. Error: %w", err)
@@ -190,10 +196,6 @@ func (f *fsm) stateTransactions() []*types.Transaction {
 
 			txns = append(txns,
 				createStateTransactionWithData(f.config.SidechainBridgeAddr, inputData))
-
-			// since proposer does not execute Validate (when we see the commitment to register in state transactions)
-			// we need to set commitment to save so that the proposer also saves its commitment that he registered
-			f.commitmentToSaveOnRegister = f.proposerCommitmentToRegister
 		}
 	}
 
