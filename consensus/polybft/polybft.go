@@ -135,7 +135,9 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 
 		var pbftConfig PolyBFTConfig
 
-		json.Unmarshal(customConfigJSON, &pbftConfig)
+		if err = json.Unmarshal(customConfigJSON, &pbftConfig); err != nil {
+			return err
+		}
 
 		provider := NewStateProvider(transition)
 		systemState := NewSystemState(&pbftConfig, provider)
@@ -235,7 +237,7 @@ func (p *Polybft) Initialize() error {
 	// initialize polybft consensus data directory
 	p.dataDir = filepath.Join(p.config.Config.Path, "polybft")
 	// create the data dir if not exists
-	if err := os.MkdirAll(p.dataDir, 0755); err != nil {
+	if err := os.MkdirAll(p.dataDir, 0750); err != nil {
 		return fmt.Errorf("failed to create data directory. Error: %w", err)
 	}
 

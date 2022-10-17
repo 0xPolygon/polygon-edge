@@ -8,13 +8,13 @@ import (
 	"sync/atomic"
 
 	"github.com/0xPolygon/pbft-consensus"
+	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/types"
 	hcf "github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
-	"github.com/umbracle/ethgo/abi"
 )
 
 const (
@@ -180,6 +180,82 @@ func (c *consensusRuntime) NotifyProposalInserted(b *StateBlock) {
 	}
 }
 
+func (c *consensusRuntime) populateFsmIfBridgeEnabled(
+	ff *fsm, epoch *epochMetadata, isEndOfEpoch, isEndOfSprint bool) error {
+	systemState, err := c.getSystemState(c.lastBuiltBlock)
+	if err != nil {
+		return err
+	}
+
+	nextStateSyncExecutionIdx, err := systemState.GetNextExecutionIndex()
+	if err != nil {
+		return err
+	}
+
+	ff.stateSyncExecutionIndex = nextStateSyncExecutionIdx
+
+	ff.postInsertHook = func() error {
+		if c.IsBridgeEnabled() {
+			if isEndOfEpoch && ff.commitmentToSaveOnRegister != nil {
+				if err := c.state.insertCommitmentMessage(ff.commitmentToSaveOnRegister); err != nil {
+					return err
+				}
+
+				if err := c.buildBundles(
+					epoch, ff.commitmentToSaveOnRegister.Message, nextStateSyncExecutionIdx); err != nil {
+					return err
+				}
+			}
+		}
+
+		c.NotifyProposalInserted(ff.block)
+
+		return nil
+	}
+
+	nextRegisteredCommitmentIndex, err := systemState.GetNextCommittedIndex()
+	if err != nil {
+		return err
+	}
+
+	if isEndOfEpoch {
+		commitment, err := c.getCommitmentToRegister(epoch, nextRegisteredCommitmentIndex)
+		if err != nil {
+			if errors.Is(err, ErrCommitmentNotBuilt) || errors.Is(err, errQuorumNotReached) {
+				c.logger.Info("[FSM] Retrieving commitment error",
+					"epoch", epoch.Number, "index", nextRegisteredCommitmentIndex, "err", err)
+			} else {
+				return err
+			}
+		}
+
+		ff.proposerCommitmentToRegister = commitment
+	}
+
+	if isEndOfSprint {
+		if err := c.state.cleanCommitments(nextStateSyncExecutionIdx); err != nil {
+			return err
+		}
+
+		nonExecutedCommitments, err := c.state.getNonExecutedCommitments(nextStateSyncExecutionIdx)
+		if err != nil {
+			return err
+		}
+
+		if len(nonExecutedCommitments) > 0 {
+			bundlesToExecute, err := c.state.getBundles(nextStateSyncExecutionIdx, maxBundlesPerSprint)
+			if err != nil {
+				return err
+			}
+
+			ff.commitmentsToVerifyBundles = nonExecutedCommitments
+			ff.bundleProofs = bundlesToExecute
+		}
+	}
+
+	return nil
+}
+
 // FSM creates a new instance of fsm
 func (c *consensusRuntime) FSM() (*fsm, error) {
 	// figure out the parent. At this point this peer has done its best to sync up
@@ -214,101 +290,25 @@ func (c *consensusRuntime) FSM() (*fsm, error) {
 		logger:         c.logger.Named("fsm"),
 	}
 
-	var systemState SystemState
-
-	var nextStateSyncExecutionIdx uint64
-
 	if c.IsBridgeEnabled() {
-		systemState, err = c.getSystemState(c.lastBuiltBlock)
+		err := c.populateFsmIfBridgeEnabled(ff, epoch, isEndOfEpoch, isEndOfSprint)
 		if err != nil {
 			return nil, err
 		}
+	} else {
+		ff.postInsertHook = func() error {
+			c.NotifyProposalInserted(ff.block)
 
-		nextStateSyncExecutionIdx, err = systemState.GetNextExecutionIndex()
+			return nil
+		}
+	}
+
+	if isEndOfEpoch {
+		ff.uptimeCounter, err = c.calculateUptime(parent)
 		if err != nil {
 			return nil, err
 		}
-
-		ff.stateSyncExecutionIndex = nextStateSyncExecutionIdx
 	}
-
-	ff.postInsertHook = func() error {
-		if c.IsBridgeEnabled() {
-			if isEndOfEpoch && ff.commitmentToSaveOnRegister != nil {
-				if err := c.state.insertCommitmentMessage(ff.commitmentToSaveOnRegister); err != nil {
-					return err
-				}
-
-				if err := c.buildBundles(
-					epoch, ff.commitmentToSaveOnRegister.Message, nextStateSyncExecutionIdx); err != nil {
-					return err
-				}
-			}
-		}
-
-		c.NotifyProposalInserted(ff.block)
-
-		return nil
-	}
-
-	if c.IsBridgeEnabled() {
-		nextRegisteredCommitmentIndex, err := systemState.GetNextCommittedIndex()
-		if err != nil {
-			return nil, err
-		}
-
-		if isEndOfEpoch {
-			commitment, err := c.getCommitmentToRegister(epoch, nextRegisteredCommitmentIndex)
-			if err != nil {
-				if errors.Is(err, ErrCommitmentNotBuilt) {
-					c.logger.Info("[FSM] Have no built commitment to register",
-						"epoch", epoch.Number, "from state sync index", nextRegisteredCommitmentIndex)
-				} else if errors.Is(err, errQuorumNotReached) {
-					c.logger.Info("[FSM] Not enough votes to register commitment",
-						"epoch", epoch.Number, "from state sync index", nextRegisteredCommitmentIndex)
-				} else {
-					return nil, err
-				}
-			}
-
-			ff.proposerCommitmentToRegister = commitment
-		}
-
-		if isEndOfSprint {
-			if err != nil {
-				return nil, err
-			}
-
-			if err := c.state.cleanCommitments(nextStateSyncExecutionIdx); err != nil {
-				return nil, err
-			}
-
-			nonExecutedCommitments, err := c.state.getNonExecutedCommitments(nextStateSyncExecutionIdx)
-			if err != nil {
-				return nil, err
-			}
-
-			if len(nonExecutedCommitments) > 0 {
-				bundlesToExecute, err := c.state.getBundles(nextStateSyncExecutionIdx, maxBundlesPerSprint)
-				if err != nil {
-					return nil, err
-				}
-
-				ff.commitmentsToVerifyBundles = nonExecutedCommitments
-				ff.bundleProofs = bundlesToExecute
-			}
-		}
-	}
-
-	// TODO: Nemanja
-	// if isEndOfEpoch {
-	// 	uptimeCounter, err := c.calculateUptime(parent)
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
-
-	// 	ff.uptimeCounter = uptimeCounter
-	// }
 
 	c.logger.Info("[FSM built]",
 		"epoch", epoch.Number,
@@ -643,6 +643,8 @@ func (c *consensusRuntime) getLatestSprintBlockNumber() uint64 {
 // calculateUptime calculates uptime for blocks starting from the last built block in current epoch,
 // and ending at the last block of previous epoch
 func (c *consensusRuntime) calculateUptime(currentBlock *types.Header) (*UptimeCounter, error) {
+	var ok bool
+
 	epoch := c.getEpoch()
 	uptimeCounter := &UptimeCounter{validatorIndices: make(map[ethgo.Address]int)}
 
@@ -682,8 +684,10 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header) (*UptimeC
 			return nil, err
 		}
 
-		// blockHeader, ok := c.config.blockchain.GetHeaderByNumber(blockHeader.Number - 1)
-		_, _ = c.config.blockchain.GetHeaderByNumber(blockHeader.Number - 1)
+		blockHeader, ok = c.config.blockchain.GetHeaderByNumber(blockHeader.Number - 1)
+		if !ok {
+			return nil, blockchain.ErrNoBlock
+		}
 	}
 
 	// since we need to calculate uptime for the last block of the previous epoch,
@@ -700,8 +704,10 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header) (*UptimeC
 				return nil, err
 			}
 
-			// blockHeader, ok := c.config.blockchain.GetHeaderByNumber(blockHeader.Number - 1)
-			_, _ = c.config.blockchain.GetHeaderByNumber(blockHeader.Number - 1)
+			blockHeader, ok = c.config.blockchain.GetHeaderByNumber(blockHeader.Number - 1)
+			if !ok {
+				return nil, blockchain.ErrNoBlock
+			}
 		}
 	}
 
@@ -818,34 +824,6 @@ func (c *consensusRuntime) getCommitmentToRegister(epoch *epochMetadata,
 		Message:      commitmentMessage,
 		AggSignature: aggregatedSignature,
 	}, nil
-}
-
-// createStateTransaction creates a state transaction out of provided parameters.
-// args parameter is ABI encoded against provided ABI method.
-func createStateTransaction(
-	target types.Address,
-	abiMethod *abi.Method,
-	args interface{},
-) (*types.Transaction, error) {
-	abiEncodedArgs, err := abiMethod.Encode(args)
-	if err != nil {
-		return nil, fmt.Errorf("failed to encode arguments:%w", err)
-	}
-
-	return createStateTransactionWithData(target, abiEncodedArgs, stateTransactionsGasLimit), nil
-}
-
-// createStateTransactionWithData creates a state transaction
-// with provided target address and inputData parameter which is ABI encoded byte array.
-func createStateTransactionWithData(target types.Address, inputData []byte, gasLimit uint64) *types.Transaction {
-	// return types.NewTx(
-	// 	&types.StateTransaction{
-	// 		To:    target,
-	// 		Input: inputData,
-	// 		Gas:   gasLimit,
-	// 	})
-	// TODO: Nemanja - fix this with bridge
-	return nil
 }
 
 func validateVote(vote *MessageSignature, epoch *epochMetadata) error {

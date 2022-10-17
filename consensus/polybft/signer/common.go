@@ -1,12 +1,11 @@
 package bls
 
 import (
-	"crypto/rand"
 	"crypto/sha256"
 	"errors"
-	"fmt"
 	"math/big"
 
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	bn256 "github.com/umbracle/go-eth-bn256"
 )
 
@@ -21,33 +20,6 @@ var (
 	// TODO delete this point and use bn256.p
 	bn256P, _ = new(big.Int).SetString("21888242871839275222246405745257275088696311157297823662689037894645226208583", 10)
 )
-
-// genRandomBytes generates byte array with random data
-func genRandomBytes(size int) (blk []byte) {
-	blk = make([]byte, size)
-
-	_, err := rand.Reader.Read(blk)
-	if err != nil {
-		panic("Cannot generate message for tests. This should never happen")
-	}
-
-	return
-}
-
-// leftPadTo32Bytes appends zeros to bytes slice to make it exactly 32 bytes long
-func leftPadTo32Bytes(bytes []byte) ([]byte, error) {
-	expectedByteLen := 32
-	if len(bytes) > expectedByteLen {
-		return nil, fmt.Errorf("cannot pad %v byte array to %v bytes", len(bytes), expectedByteLen)
-	} else if len(bytes) == expectedByteLen {
-		return bytes, nil
-	}
-
-	result := make([]byte, expectedByteLen)
-	copy(result[expectedByteLen-len(bytes):], bytes)
-
-	return result, nil
-}
 
 func sum(ints ...*big.Int) *big.Int {
 	acc := big.NewInt(0)
@@ -87,27 +59,25 @@ func yFromX(x *big.Int) *big.Int {
 
 // g1FromInts returns G1 point based on the provided x and y.
 func g1FromInts(x *big.Int, y *big.Int) (*bn256.G1, error) {
-	if len(x.Bytes()) > 32 || len(y.Bytes()) > 32 {
+	const size = 32
+
+	if len(x.Bytes()) > size || len(y.Bytes()) > size {
 		return nil, errors.New("points on G1 are limited to 256-bit coordinates")
 	}
 
-	paddedX, err := leftPadTo32Bytes(x.Bytes())
-	if err != nil {
-		return nil, err
-	}
-
-	paddedY, err := leftPadTo32Bytes(y.Bytes())
-	if err != nil {
-		return nil, err
-	}
+	paddedX := common.PadLeftOrTrim(x.Bytes(), size)
+	paddedY := common.PadLeftOrTrim(y.Bytes(), size)
 
 	m := append(paddedX, paddedY...)
 
 	g1 := new(bn256.G1)
 
-	_, err = g1.Unmarshal(m)
+	_, err := g1.Unmarshal(m)
+	if err != nil {
+		return nil, err
+	}
 
-	return g1, err
+	return g1, nil
 }
 
 // g1HashToPoint hashes the provided byte slice, maps it into a G1

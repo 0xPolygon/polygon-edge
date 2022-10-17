@@ -1014,7 +1014,7 @@ func (b *Blockchain) ReadTxLookup(hash types.Hash) (types.Hash, bool) {
 // return error if the invalid signature found
 func (b *Blockchain) recoverFromFieldsInBlock(block *types.Block) error {
 	for _, tx := range block.Transactions {
-		if tx.From != types.ZeroAddress {
+		if tx.From != types.ZeroAddress || tx.Type == types.StateTx {
 			continue
 		}
 

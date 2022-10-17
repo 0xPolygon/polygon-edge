@@ -129,3 +129,36 @@ func TestRLPUnmarshal_Header_ComputeHash(t *testing.T) {
 	assert.NoError(t, h2.UnmarshalRLP(data))
 	assert.Equal(t, h.Hash, h2.Hash)
 }
+
+func TestRLPMarshall_And_Unmarshall_TypedTransaction(t *testing.T) {
+	addrTo := StringToAddress("11")
+	originalTx := &Transaction{
+		Nonce:    0,
+		GasPrice: big.NewInt(11),
+		Gas:      11,
+		To:       &addrTo,
+		Value:    big.NewInt(1),
+		Input:    []byte{1, 2},
+		V:        big.NewInt(25),
+		S:        big.NewInt(26),
+		R:        big.NewInt(27),
+	}
+
+	txTypes := []TxType{
+		StateTx,
+		LegacyTx,
+	}
+
+	for _, v := range txTypes {
+		originalTx.Type = v
+		originalTx.ComputeHash()
+
+		txRLP := originalTx.MarshalRLP()
+
+		unmarshalledTx := new(Transaction)
+		assert.NoError(t, unmarshalledTx.UnmarshalRLP(txRLP))
+
+		unmarshalledTx.ComputeHash()
+		assert.Equal(t, originalTx.Type, unmarshalledTx.Type)
+	}
+}
