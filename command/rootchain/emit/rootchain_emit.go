@@ -129,7 +129,11 @@ func createTxInput(paramsType string, parameters ...interface{}) (*ethgo.Transac
 		return nil, fmt.Errorf("failed to encode parsed parameters: %w", err)
 	}
 
-	artifact := polybftcontracts.MustReadArtifact("rootchain", "RootchainBridge")
+	artifact, err := polybftcontracts.ReadArtifact(helper.ContractRootFolder, "root", "RootchainBridge")
+	if err != nil {
+		return nil, fmt.Errorf("failed to read artifact: %w", err)
+	}
+
 	method := artifact.Abi.Methods["emitEvent"]
 
 	input, err := method.Encode([]interface{}{types.StringToAddress(params.address), wrapperInput})

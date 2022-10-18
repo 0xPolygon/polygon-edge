@@ -14,6 +14,8 @@ var (
 	RootchainBridgeAddress   = types.StringToAddress("0x6FE03c2768C9d800AF3Dedf1878b5687FE120a27")
 	SidechainBridgeAddr      = types.StringToAddress("0x8Be503bcdEd90ED42Eff31f56199399B2b0154CA")
 	CheckpointManagerAddress = types.StringToAddress("0x3d46A809D5767B81a8836f0E79145ba615A2Dd61")
+
+	ContractRootFolder = "consensus/polybft/polybftcontracts/artifacts/contracts"
 )
 
 func GetRootchainID() string {

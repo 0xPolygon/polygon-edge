@@ -246,7 +246,10 @@ func initialDeploy(outputter command.OutputFormatter) error {
 	}
 
 	for name, address := range deployContracts {
-		artifact := polybftcontracts.MustReadArtifact("rootchain", name)
+		artifact, err := polybftcontracts.ReadArtifact(helper.ContractRootFolder, "root", name)
+		if err != nil {
+			return fmt.Errorf("failed to read artifact: %w", err)
+		}
 
 		input, err := artifact.DeployInput(nil)
 		if err != nil {
