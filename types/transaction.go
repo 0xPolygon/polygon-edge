@@ -83,12 +83,14 @@ func (t *Transaction) IsStateTx() bool {
 
 // ComputeHash computes the hash of the transaction
 func (t *Transaction) ComputeHash() *Transaction {
+	ar := marshalArenaPool.Get()
 	hash := keccak.DefaultKeccakPool.Get()
 
-	if _, err := hash.Write(t.MarshalRLP()); err == nil {
-		hash.Sum(t.Hash[:0])
-		keccak.DefaultKeccakPool.Put(hash)
-	}
+	v := t.MarshalRLPWith(ar)
+	hash.WriteRlp(t.Hash[:0], v)
+
+	marshalArenaPool.Put(ar)
+	keccak.DefaultKeccakPool.Put(hash)
 
 	return t
 }
