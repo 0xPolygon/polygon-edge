@@ -29,12 +29,15 @@ const (
 	sprintSizeFlag       = "sprint-size"
 	blockTimeFlag        = "block-time"
 	validatorsFlag       = "polybft-validators"
+	bridgeFlag           = "bridge"
 
 	defaultEpochSize                  = uint64(10)
 	defaultSprintSize                 = uint64(5)
 	defaultValidatorSetSize           = 100
 	defaultBlockTime                  = 2 * time.Second
 	defaultPolyBftValidatorPrefixPath = "test-chain-"
+	defaultContractsRootFolder        = "core-contracts/artifacts/contracts"
+	defaultBridge                     = false
 
 	bootnodePortStart = 30301
 )
@@ -60,6 +63,10 @@ func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
 		ValidatorSetAddr:  contracts.ValidatorSetContract,
 		StateReceiverAddr: contracts.StateReceiverContract,
 		Governance:        types.Address(governanceAccount.Ecdsa.Address()),
+	}
+
+	if p.bridgeEnabled {
+		polyBftConfig.Bridge = &polybft.BridgeConfig{}
 	}
 
 	chainConfig := &chain.Chain{
