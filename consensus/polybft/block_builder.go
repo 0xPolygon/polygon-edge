@@ -140,6 +140,7 @@ func (b *BlockBuilder) Build(handler func(h *types.Header)) (*StateBlock, error)
 	}, nil
 }
 
+// WriteTx applies given transaction to the state. If transaction apply fails, it reverts the saved snapshot.
 func (b *BlockBuilder) WriteTx(tx *types.Transaction) error {
 	if tx.ExceedsBlockGasLimit(b.params.GasLimit) {
 		if err := b.state.WriteFailedReceipt(tx); err != nil {
@@ -189,31 +190,12 @@ write:
 	return nil
 }
 
-// CommitTransaction applies given transaction to the state. If transaction apply fails, it reverts the saved snapshot.
-func (b *BlockBuilder) CommitTransaction(tx *types.Transaction) error {
-	if tx.ExceedsBlockGasLimit(b.params.GasLimit) {
-		if err := b.state.WriteFailedReceipt(tx); err != nil {
-			return err
-		}
-
-		return txpool.ErrBlockLimitExceeded
-	}
-
-	if err := b.state.Write(tx); err != nil {
-		return err
-	}
-
-	b.txns = append(b.txns, tx)
-
-	return nil
-}
-
 func (b *BlockBuilder) writeTxPoolTransaction(tx *types.Transaction) (bool, error) {
 	if tx == nil {
 		return true, nil
 	}
 
-	err := b.CommitTransaction(tx)
+	err := b.WriteTx(tx)
 	if err != nil {
 		if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok { //nolint:errorlint
 			// stop processing

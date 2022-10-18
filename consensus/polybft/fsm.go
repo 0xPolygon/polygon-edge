@@ -26,7 +26,6 @@ type blockBuilder interface {
 	Fill() error
 	Build(func(h *types.Header)) (*StateBlock, error)
 	GetState() *state.Transition
-	CommitTransaction(tx *types.Transaction) error
 }
 
 const maxBundlesPerSprint = 50
