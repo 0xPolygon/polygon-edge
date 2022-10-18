@@ -4,16 +4,16 @@ import (
 	"errors"
 )
 
-const registerFlag = "register"
+const dataDirFlag = "data-dir"
 
 var errInvalidDir = errors.New("no data directory passed in")
 
 type registerParams struct {
-	testDir string
+	dataDirectory string
 }
 
 func (rp *registerParams) validateFlags() error {
-	if rp.testDir == "" {
+	if rp.dataDirectory == "" {
 		return errInvalidDir
 	}
 

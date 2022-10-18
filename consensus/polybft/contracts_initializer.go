@@ -29,8 +29,6 @@ func getInitChildValidatorSetInput(validators []*Validator, governanceAddr types
 	validatorStakes := make([]*big.Int, len(validators))
 
 	for i, g := range validators {
-		validatorAddresses[i] = g.Address
-
 		blsKey, err := hex.DecodeString(g.BlsKey)
 		if err != nil {
 			return nil, err
@@ -47,6 +45,7 @@ func getInitChildValidatorSetInput(validators []*Validator, governanceAddr types
 		}
 
 		validatorPubkeys[i] = pubKeyBig
+		validatorAddresses[i] = g.Address
 		validatorStakes[i] = g.Balance
 	}
 

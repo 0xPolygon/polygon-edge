@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/big"
 	"time"
@@ -28,7 +29,7 @@ func GetCommand() *cobra.Command {
 		Use:     "register",
 		Short:   "Registers a new validator",
 		PreRunE: runPreRun,
-		Run:     runCommand,
+		RunE:    runCommand,
 	}
 
 	helper.RegisterGRPCAddressFlag(registerCmd)
@@ -39,8 +40,8 @@ func GetCommand() *cobra.Command {
 
 func setFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(
-		&params.testDir,
-		registerFlag,
+		&params.dataDirectory,
+		dataDirFlag,
 		"",
 		"the directory name where new validator key is stored",
 	)
@@ -50,27 +51,27 @@ func runPreRun(_ *cobra.Command, _ []string) error {
 	return params.validateFlags()
 }
 
-func runCommand(cmd *cobra.Command, _ []string) {
+func runCommand(cmd *cobra.Command, _ []string) error {
 	secretsManager, err := secretsHelper.SetupLocalSecretsManager("./test-chain-1")
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	existingValidatorAccount, err := wallet.GenerateNewAccountFromSecret(secretsManager, secrets.ValidatorBLSKey)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	existingValidator := newTxnSender(existingValidatorAccount)
 
-	secretsManager, err = secretsHelper.SetupLocalSecretsManager(fmt.Sprintf("./%s", params.testDir))
+	secretsManager, err = secretsHelper.SetupLocalSecretsManager(fmt.Sprintf("./%s", params.dataDirectory))
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	newValidatorAccount, err := wallet.GenerateNewAccountFromSecret(secretsManager, secrets.ValidatorBLSKey)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	newValidatorSender := newTxnSender(newValidatorAccount)
@@ -95,20 +96,22 @@ func runCommand(cmd *cobra.Command, _ []string) {
 			action: func() asyncTxn {
 				return registerValidator(newValidatorSender, newValidatorAccount)
 			},
-			postHook: func(receipt *ethgo.Receipt) {
+			postHook: func(receipt *ethgo.Receipt) error {
 				event, err := newValidatorEvent.ParseLog(receipt.Logs[0])
 				if err != nil {
-					panic(err)
+					return err
 				}
 
 				validatorAddr, ok := event["validator"].(ethgo.Address)
 				if !ok {
-					panic("type assertions failed for parameter validator")
+					return errors.New("type assertions failed for parameter validator")
 				}
 
 				validator = &NewValidator{
 					Validator: validatorAddr,
 				}
+
+				return nil
 			},
 		},
 		{
@@ -193,7 +196,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		}
 
 		if step.postHook != nil {
-			step.postHook(receipt)
+			return step.postHook(receipt)
 		}
 	}
 
@@ -201,6 +204,8 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 	d.RenderFrame()
 	d.Pause()
+
+	return nil
 }
 
 const (
@@ -244,7 +249,7 @@ const (
 type txnStep struct {
 	name     string
 	action   func() asyncTxn
-	postHook func(receipt *ethgo.Receipt)
+	postHook func(receipt *ethgo.Receipt) error
 	status   txnStepStatus
 }
 
@@ -254,7 +259,7 @@ type txnSender struct {
 }
 
 func (t *txnSender) sendTransaction(txn *types.Transaction) asyncTxn {
-	if txn.GasPrice.Uint64() == 0 {
+	if txn.GasPrice == nil {
 		txn.GasPrice = big.NewInt(defaultGasPrice)
 	}
 
