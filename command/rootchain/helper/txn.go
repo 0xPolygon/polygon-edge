@@ -47,7 +47,10 @@ func GetDefAccount() types.Address {
 // SendTxn function sends transaction to the rootchain
 // blocks until receipt hash is returned
 func SendTxn(nonce uint64, txn *ethgo.Transaction) (*ethgo.Receipt, error) {
-	provider := getJRPCClient()
+	provider, err := getJRPCClient()
+	if err != nil {
+		return nil, err
+	}
 
 	txn.GasPrice = defaultGasPrice
 	txn.Gas = defaultGasLimit
@@ -81,23 +84,25 @@ func SendTxn(nonce uint64, txn *ethgo.Transaction) (*ethgo.Receipt, error) {
 	return receipt, nil
 }
 
-func ExistsCode(addr types.Address) bool {
-	provider := getJRPCClient()
+func ExistsCode(addr types.Address) (bool, error) {
+	provider, err := getJRPCClient()
+	if err != nil {
+		return false, err
+	}
 
 	code, err := provider.Eth().GetCode(ethgo.HexToAddress(addr.String()), ethgo.Latest)
 	if err != nil {
-		panic(err)
+		return false, err
 	}
 
-	if code == "0x" {
-		return false
-	}
-
-	return true
+	return code != "0x", nil
 }
 
 func GetPendingNonce(addr types.Address) (uint64, error) {
-	provider := getJRPCClient()
+	provider, err := getJRPCClient()
+	if err != nil {
+		return 0, err
+	}
 
 	nonce, err := provider.Eth().GetNonce(ethgo.HexToAddress(addr.String()), ethgo.Pending)
 	if err != nil {
@@ -108,7 +113,10 @@ func GetPendingNonce(addr types.Address) (uint64, error) {
 }
 
 func FundAccount(account types.Address) (types.Hash, error) {
-	provider := getJRPCClient()
+	provider, err := getJRPCClient()
+	if err != nil {
+		return types.Hash{}, err
+	}
 
 	accounts, err := provider.Eth().Accounts()
 	if err != nil {
@@ -137,19 +145,18 @@ func FundAccount(account types.Address) (types.Hash, error) {
 	return types.BytesToHash(receipt.TransactionHash.Bytes()), nil
 }
 
-func getJRPCClient() *jsonrpc.Client {
+func getJRPCClient() (*jsonrpc.Client, error) {
+	var err error
 	jrpcClientOnce.Do(func() {
 		ipAddr := ReadRootchainIP()
 
-		provider, err := jsonrpc.NewClient(ipAddr)
+		jrpcClient, err = jsonrpc.NewClient(ipAddr)
 		if err != nil {
-			panic(err)
+			return
 		}
-
-		jrpcClient = provider
 	})
 
-	return jrpcClient
+	return jrpcClient, err
 }
 
 func waitForReceipt(client *jsonrpc.Eth, hash ethgo.Hash) (*ethgo.Receipt, error) {

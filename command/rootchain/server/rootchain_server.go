@@ -225,13 +225,18 @@ func runRootchain(ctx context.Context, outputter command.OutputFormatter, closeC
 }
 
 func initialDeploy(outputter command.OutputFormatter) error {
+	existsCode, err := helper.ExistsCode(helper.RootchainBridgeAddress)
+	if err != nil {
+		return err
+	}
+
 	// if the bridge contract is not created, we have to deploy all the contracts
-	if helper.ExistsCode(helper.RootchainBridgeAddress) {
+	if existsCode {
 		return nil
 	}
 
 	// fund account
-	if _, err := helper.FundAccount(helper.GetDefAccount()); err != nil {
+	if _, err = helper.FundAccount(helper.GetDefAccount()); err != nil {
 		return err
 	}
 
