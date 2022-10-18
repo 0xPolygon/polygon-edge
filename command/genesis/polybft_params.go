@@ -58,7 +58,6 @@ func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
 	}
 
 	polyBftConfig := &polybft.PolyBFTConfig{
-		// TODO: Bridge
 		InitialValidatorSet: p.getGenesisValidators(validatorsInfo),
 		BlockTime:           p.blockTime,
 		EpochSize:           p.epochSize,

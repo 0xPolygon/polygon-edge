@@ -3,6 +3,7 @@ package polybft
 import (
 	"errors"
 	"fmt"
+	"math/big"
 	"time"
 
 	"github.com/0xPolygon/pbft-consensus"
@@ -20,15 +21,13 @@ var _ pbft.Backend = &fsm{}
 
 type blockBuilder interface {
 	Reset() error
+	WriteTx(*types.Transaction) error
 	Fill() error
 	Build(func(h *types.Header)) (*StateBlock, error)
 	GetState() *state.Transition
 }
 
-const (
-	stateTransactionsGasLimit = 1000000 // some arbitrary default gas limit for state transactions
-	maxBundlesPerSprint       = 50
-)
+const maxBundlesPerSprint = 50
 
 type fsm struct {
 	// PolyBFT consensus protocol configuration
@@ -113,14 +112,15 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 	extra := &Extra{Parent: extraParent.Committed}
 
 	if f.isEndOfEpoch {
-		// TODO: Nemanja - no transactions for now
-		// tx, err := f.createValidatorsUptimeTx()
-		// if err != nil {
-		// 	return nil, err
-		// }
-		// if err := f.blockBuilder.CommitTransaction(tx); err != nil {
-		// 	return nil, fmt.Errorf("failed to commit validators uptime transaction: %v", err)
-		// }
+		tx, err := f.createValidatorsUptimeTx()
+		if err != nil {
+			return nil, err
+		}
+
+		if err := f.blockBuilder.WriteTx(tx); err != nil {
+			return nil, fmt.Errorf("failed to commit validators uptime transaction: %w", err)
+		}
+
 		validatorsDelta, err := f.getValidatorSetDelta(f.blockBuilder.GetState())
 		if err != nil {
 			return nil, err
@@ -131,12 +131,17 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 	}
 
 	if f.config.IsBridgeEnabled() {
-		// TODO: Nemanja - no transactions for now
-		// for _, tx := range f.stateTransactions() {
-		// 	if err := f.blockBuilder.CommitTransaction(tx); err != nil {
-		// 		return nil, fmt.Errorf("failed to commit state transaction. Error: %v", err)
-		// 	}
-		// }
+		if f.isEndOfEpoch && f.proposerCommitmentToRegister != nil {
+			// since proposer does not execute Validate (when we see the commitment to register in state transactions)
+			// we need to set commitment to save so that the proposer also saves its commitment that he registered
+			f.commitmentToSaveOnRegister = f.proposerCommitmentToRegister
+		}
+
+		for _, tx := range f.stateTransactions() {
+			if err := f.blockBuilder.WriteTx(tx); err != nil {
+				return nil, fmt.Errorf("failed to commit state transaction. Error: %w", err)
+			}
+		}
 	}
 
 	// fill the block with transactions
@@ -190,11 +195,7 @@ func (f *fsm) stateTransactions() []*types.Transaction {
 			}
 
 			txns = append(txns,
-				createStateTransactionWithData(f.config.SidechainBridgeAddr, inputData, stateTransactionsGasLimit))
-
-			// since proposer does not execute Validate (when we see the commitment to register in state transactions)
-			// we need to set commitment to save so that the proposer also saves its commitment that he registered
-			f.commitmentToSaveOnRegister = f.proposerCommitmentToRegister
+				createStateTransactionWithData(f.config.SidechainBridgeAddr, inputData))
 		}
 	}
 
@@ -208,7 +209,7 @@ func (f *fsm) stateTransactions() []*types.Transaction {
 			}
 
 			txns = append(txns,
-				createStateTransactionWithData(f.config.SidechainBridgeAddr, inputData, stateTransactionsGasLimit))
+				createStateTransactionWithData(f.config.SidechainBridgeAddr, inputData))
 		}
 	}
 
@@ -225,7 +226,7 @@ func (f *fsm) createValidatorsUptimeTx() (*types.Transaction, error) {
 		return nil, err
 	}
 
-	return createStateTransactionWithData(f.config.ValidatorSetAddr, input, stateTransactionsGasLimit), nil
+	return createStateTransactionWithData(f.config.ValidatorSetAddr, input), nil
 }
 
 // ValidateCommit is used to validate that a given commit is valid
@@ -303,10 +304,9 @@ func (f *fsm) Validate(proposal *pbft.Proposal) error {
 		}
 	}
 
-	// TODO: Nemanja - do not validate state transaction because there isn't any
-	// if err := f.VerifyStateTransactions(block.Transactions); err != nil {
-	// 	return err
-	// }
+	if err := f.VerifyStateTransactions(block.Transactions); err != nil {
+		return err
+	}
 
 	builtBlock, err := f.backend.ProcessBlock(f.parent, &block)
 	if err != nil {
@@ -339,11 +339,10 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 	nextStateSyncBundleIndex := f.stateSyncExecutionIndex
 
 	for _, tx := range transactions {
-		// TO DO Nemanja - fix this with transactions
-		// skip if transaction is not of types.StateTransactionType type
-		// if tx.Type != types.StateTransactionType {
-		// 	continue
-		// }
+		if tx.Type != types.StateTx {
+			continue
+		}
+
 		if !f.isEndOfSprint {
 			return fmt.Errorf("state transaction in block which should not contain it: tx = %v", tx.Hash)
 		}
@@ -425,7 +424,7 @@ func (f *fsm) Insert(p *pbft.SealedProposal) error {
 	// create map for faster access to indexes
 	nodeIDIndexMap := make(map[pbft.NodeID]int, f.validators.Len())
 	for i, addr := range f.validators.Accounts().GetAddresses() {
-		nodeIDIndexMap[pbft.NodeID(addr.String())] = i // addr.String() == NodeId
+		nodeIDIndexMap[pbft.NodeID(addr.String())] = i
 	}
 
 	// populated bitmap according to nodeId from validator set and committed seals
@@ -559,4 +558,21 @@ func validateHeaderFields(parent *types.Header, header *types.Header) error {
 	}
 
 	return nil
+}
+
+// createStateTransactionWithData creates a state transaction
+// with provided target address and inputData parameter which is ABI encoded byte array.
+func createStateTransactionWithData(target types.Address, inputData []byte) *types.Transaction {
+	tx := &types.Transaction{
+		From:     types.ZeroAddress,
+		To:       &target,
+		Type:     types.StateTx,
+		Input:    inputData,
+		Gas:      types.StateTransactionGasLimit,
+		GasPrice: big.NewInt(0),
+	}
+
+	tx.ComputeHash()
+
+	return tx
 }

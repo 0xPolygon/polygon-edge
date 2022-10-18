@@ -32,6 +32,12 @@ type Receipt struct {
 	GasUsed         uint64
 	ContractAddress *Address
 	TxHash          Hash
+
+	TransactionType TxType
+}
+
+func (r *Receipt) IsLegacyTx() bool {
+	return r.TransactionType == LegacyTx
 }
 
 func (r *Receipt) SetStatus(s ReceiptStatus) {
