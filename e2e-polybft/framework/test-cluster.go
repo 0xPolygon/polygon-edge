@@ -124,7 +124,7 @@ func (c *TestClusterConfig) GetStdout(name string) io.Writer {
 }
 
 func (c *TestClusterConfig) initLogsDir() {
-	logsDir := path.Join("..", "e2e-logs", fmt.Sprintf("e2e-logs-%d", startTime), c.t.Name())
+	logsDir := path.Join("..", fmt.Sprintf("e2e-logs-%d", startTime), c.t.Name())
 
 	if err := os.MkdirAll(logsDir, 0755); err != nil {
 		c.t.Fatal(err)
