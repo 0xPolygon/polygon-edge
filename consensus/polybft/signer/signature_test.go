@@ -1,6 +1,7 @@
 package bls
 
 import (
+	"crypto/rand"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -12,12 +13,9 @@ const (
 	ParticipantsNumber = 64
 )
 
-var (
-	validTestMsg   = genRandomBytes(MessageSize)
-	invalidTestMsg = genRandomBytes(MessageSize)
-)
-
 func Test_VerifySignature(t *testing.T) {
+	validTestMsg, invalidTestMsg := testGenRandomBytes(t, MessageSize), testGenRandomBytes(t, MessageSize)
+
 	blsKey, _ := GenerateBlsKey()
 	signature, err := blsKey.Sign(validTestMsg)
 	require.NoError(t, err)
@@ -27,6 +25,8 @@ func Test_VerifySignature(t *testing.T) {
 }
 
 func Test_AggregatedSignatureSimple(t *testing.T) {
+	validTestMsg, invalidTestMsg := testGenRandomBytes(t, MessageSize), testGenRandomBytes(t, MessageSize)
+
 	bls1, _ := GenerateBlsKey()
 	bls2, _ := GenerateBlsKey()
 	bls3, _ := GenerateBlsKey()
@@ -49,6 +49,8 @@ func Test_AggregatedSignatureSimple(t *testing.T) {
 }
 
 func Test_AggregatedSignature(t *testing.T) {
+	validTestMsg, invalidTestMsg := testGenRandomBytes(t, MessageSize), testGenRandomBytes(t, MessageSize)
+
 	blsKeys, err := CreateRandomBlsKeys(ParticipantsNumber)
 	require.NoError(t, err)
 
@@ -105,4 +107,16 @@ func Test_AggregatedSignature(t *testing.T) {
 
 	verifed = aggSignature.Verify(aggPubs, invalidTestMsg)
 	assert.False(t, verifed)
+}
+
+// testGenRandomBytes generates byte array with random data
+func testGenRandomBytes(t *testing.T, size int) (blk []byte) {
+	t.Helper()
+
+	blk = make([]byte, size)
+
+	_, err := rand.Reader.Read(blk)
+	require.NoError(t, err)
+
+	return
 }

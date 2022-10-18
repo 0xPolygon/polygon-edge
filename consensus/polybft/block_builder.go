@@ -140,6 +140,24 @@ func (b *BlockBuilder) Build(handler func(h *types.Header)) (*StateBlock, error)
 	}, nil
 }
 
+func (b *BlockBuilder) WriteTx(tx *types.Transaction) error {
+	if tx.ExceedsBlockGasLimit(b.params.GasLimit) {
+		if err := b.state.WriteFailedReceipt(tx); err != nil {
+			return err
+		}
+
+		return txpool.ErrBlockLimitExceeded
+	}
+
+	if err := b.state.Write(tx); err != nil {
+		return err
+	}
+
+	b.txns = append(b.txns, tx)
+
+	return nil
+}
+
 // Fill fills the block with transactions from the txpool
 func (b *BlockBuilder) Fill() error {
 	blockTimer := time.NewTimer(b.params.BlockTime)
@@ -154,7 +172,7 @@ write:
 			tx := b.params.TxPool.Peek()
 
 			// execute transactions one by one
-			finished, err := b.writeTransaction(tx)
+			finished, err := b.writeTxPoolTransaction(tx)
 			if err != nil {
 				b.params.Logger.Debug("Fill transaction error", "hash", tx.Hash, "err", err)
 			}
@@ -171,7 +189,7 @@ write:
 	return nil
 }
 
-func (b *BlockBuilder) writeTransaction(tx *types.Transaction) (bool, error) {
+func (b *BlockBuilder) writeTxPoolTransaction(tx *types.Transaction) (bool, error) {
 	if tx == nil {
 		return true, nil
 	}
