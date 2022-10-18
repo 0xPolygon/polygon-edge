@@ -10,7 +10,7 @@ import (
 )
 
 func TestE2E_Consensus_Basic_WithNonValidators(t *testing.T) {
-	cluster := framework.NewTestCluster(t, "consensus_basic_nonvalidators", 7,
+	cluster := framework.NewTestCluster(t, 7,
 		framework.WithNonValidators(2), framework.WithValidatorSnapshot(5))
 	defer cluster.Stop()
 
@@ -20,7 +20,7 @@ func TestE2E_Consensus_Basic_WithNonValidators(t *testing.T) {
 func TestE2E_Consensus_Sync_WithNonValidators(t *testing.T) {
 	// one non-validator node from the ensemble gets disconnected and connected again.
 	// It should be able to pick up from the synchronization protocol again.
-	cluster := framework.NewTestCluster(t, "consensus_sync_nonvalidators", 7,
+	cluster := framework.NewTestCluster(t, 7,
 		framework.WithNonValidators(2), framework.WithValidatorSnapshot(5))
 	defer cluster.Stop()
 
@@ -44,7 +44,7 @@ func TestE2E_Consensus_Sync_WithNonValidators(t *testing.T) {
 func TestE2E_Consensus_Sync(t *testing.T) {
 	// one node from the ensemble gets disconnected and connected again.
 	// It should be able to pick up from the synchronization protocol again.
-	cluster := framework.NewTestCluster(t, "consensus_sync", 5, framework.WithValidatorSnapshot(5))
+	cluster := framework.NewTestCluster(t, 5, framework.WithValidatorSnapshot(5))
 	defer cluster.Stop()
 
 	// wait for the start
@@ -68,7 +68,7 @@ func TestE2E_Consensus_Bulk_Drop(t *testing.T) {
 	clusterSize := 5
 	bulkToDrop := 3
 
-	cluster := framework.NewTestCluster(t, "consensus_bulk_drop", clusterSize)
+	cluster := framework.NewTestCluster(t, clusterSize)
 	defer cluster.Stop()
 
 	// wait for cluster to start

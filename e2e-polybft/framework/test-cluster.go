@@ -55,7 +55,7 @@ func resolveBinary() string {
 func createAccountPasswordFile(t *testing.T) (string, func()) {
 	t.Helper()
 
-	pwdFile, err := ioutil.TempFile("", "v3-e2e")
+	pwdFile, err := ioutil.TempFile("", "e2e-polybft")
 	require.NoError(t, err)
 
 	_, err = pwdFile.WriteString(accountPassword)
@@ -124,7 +124,8 @@ func (c *TestClusterConfig) GetStdout(name string) io.Writer {
 }
 
 func (c *TestClusterConfig) initLogsDir() {
-	logsDir := fmt.Sprintf("../e2e-logs-%d-%s", startTime, c.Name)
+	logsDir := path.Join("..", "e2e-logs", fmt.Sprintf("e2e-logs-%d", startTime), c.t.Name())
+
 	if err := os.MkdirAll(logsDir, 0755); err != nil {
 		c.t.Fatal(err)
 	}
@@ -175,7 +176,7 @@ func isTrueEnv(e string) bool {
 	return strings.ToLower(os.Getenv(e)) == "true"
 }
 
-func NewTestCluster(t *testing.T, name string, validatorsCount int, opts ...ClusterOption) *TestCluster {
+func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *TestCluster {
 	t.Helper()
 
 	if !isTrueEnv(envE2ETestsEnabled) {
@@ -187,7 +188,6 @@ func NewTestCluster(t *testing.T, name string, validatorsCount int, opts ...Clus
 
 	config := &TestClusterConfig{
 		t:          t,
-		Name:       name,
 		WithLogs:   isTrueEnv(envLogsEnabled),
 		WithStdout: isTrueEnv(envStdoutEnabled),
 		TmpDir:     tmpDir,
