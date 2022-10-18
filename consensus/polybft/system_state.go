@@ -127,7 +127,7 @@ func (s *SystemStateImpl) GetValidatorSet() (AccountSet, error) {
 		})
 	}
 
-	return AccountSet(res), nil
+	return res, nil
 }
 
 // GetEpoch retrieves current epoch number from the smart contract

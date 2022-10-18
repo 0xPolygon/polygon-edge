@@ -1,11 +1,53 @@
 package types
 
 import (
+	"fmt"
 	"math/big"
 	"sync/atomic"
 
 	"github.com/0xPolygon/polygon-edge/helper/keccak"
+	"github.com/umbracle/fastrlp"
 )
+
+type TxType byte
+
+const (
+	LegacyTx TxType = 0x0
+	StateTx  TxType = 0x7f
+
+	StateTransactionGasLimit = 1000000 // some arbitrary default gas limit for state transactions
+)
+
+func ReadRlpTxType(rlpValue *fastrlp.Value) (TxType, error) {
+	bytes, err := rlpValue.Bytes()
+	if err != nil {
+		return LegacyTx, err
+	}
+
+	if len(bytes) != 1 {
+		return LegacyTx, fmt.Errorf("expected 1 byte transaction type, but size is %d", len(bytes))
+	}
+
+	b := TxType(bytes[0])
+
+	switch b {
+	case LegacyTx, StateTx:
+		return b, nil
+	default:
+		return LegacyTx, fmt.Errorf("invalid tx type value: %d", bytes[0])
+	}
+}
+
+func (t TxType) String() (s string) {
+	switch t {
+	case LegacyTx:
+		return "LegacyTx"
+	case StateTx:
+		return "StateTx"
+	default:
+		return "UnknownTX"
+	}
+}
 
 type Transaction struct {
 	Nonce    uint64
@@ -20,6 +62,8 @@ type Transaction struct {
 	Hash     Hash
 	From     Address
 
+	Type TxType
+
 	// Cache
 	size atomic.Value
 }
@@ -27,6 +71,14 @@ type Transaction struct {
 // IsContractCreation checks if tx is contract creation
 func (t *Transaction) IsContractCreation() bool {
 	return t.To == nil
+}
+
+func (t *Transaction) IsLegacyTx() bool {
+	return t.Type == LegacyTx
+}
+
+func (t *Transaction) IsStateTx() bool {
+	return t.Type == StateTx
 }
 
 // ComputeHash computes the hash of the transaction
