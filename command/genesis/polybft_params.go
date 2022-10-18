@@ -11,6 +11,8 @@ import (
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
+
+	rootchain "github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
@@ -66,7 +68,11 @@ func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
 	}
 
 	if p.bridgeEnabled {
-		polyBftConfig.Bridge = &polybft.BridgeConfig{}
+		polyBftConfig.Bridge = &polybft.BridgeConfig{
+			BridgeAddr:      rootchain.RootchainBridgeAddress,
+			CheckpointAddr:  rootchain.CheckpointManagerAddress,
+			JSONRPCEndpoint: rootchain.ReadRootchainIP(),
+		}
 	}
 
 	chainConfig := &chain.Chain{
