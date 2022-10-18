@@ -411,6 +411,8 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) error {
 		return fmt.Errorf("could not run checkpoint:%w", err)
 	}
 
+	c.logger.Info("restartEpoch", "epoch", epochNumber, "validators", validatorSet)
+
 	return nil
 }
 
