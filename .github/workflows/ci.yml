@@ -12,4 +12,6 @@ jobs:
   test:
     name: Test
     uses: ./.github/workflows/test.yml
+    secrets:
+      GH_TOKEN_CLONE_PRIVATE: ${{ secrets.GH_TOKEN_CLONE_PRIVATE }}
     needs: build

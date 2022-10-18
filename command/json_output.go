@@ -6,11 +6,18 @@ import (
 	"os"
 )
 
-type JSONOutput struct {
+// cliOutput implements OutputFormatter interface by printing the output into std out in JSON format
+type jsonOutput struct {
 	commonOutputFormatter
 }
 
-func (jo *JSONOutput) WriteOutput() {
+// newJSONOutput is the constructor of jsonOutput
+func newJSONOutput() *jsonOutput {
+	return &jsonOutput{}
+}
+
+// WriteOutput implements OutputFormatter interface
+func (jo *jsonOutput) WriteOutput() {
 	if jo.errorOutput != nil {
 		_, _ = fmt.Fprintln(os.Stderr, jo.getErrorOutput())
 
@@ -20,11 +27,21 @@ func (jo *JSONOutput) WriteOutput() {
 	_, _ = fmt.Fprintln(os.Stdout, jo.getCommandOutput())
 }
 
-func newJSONOutput() *JSONOutput {
-	return &JSONOutput{}
+// WriteCommandResult implements OutputFormatter interface
+func (jo *jsonOutput) WriteCommandResult(result CommandResult) {
+	_, _ = fmt.Fprintln(os.Stdout, result.GetOutput())
 }
 
-func (jo *JSONOutput) getErrorOutput() string {
+// WriteOutput implements OutputFormatter plus io.Writer interfaces
+func (jo *jsonOutput) Write(p []byte) (n int, err error) {
+	return os.Stdout.Write(p)
+}
+
+func (jo *jsonOutput) getErrorOutput() string {
+	if jo.errorOutput == nil {
+		return ""
+	}
+
 	return marshalJSONToString(
 		struct {
 			Err string `json:"error"`
@@ -34,7 +51,11 @@ func (jo *JSONOutput) getErrorOutput() string {
 	)
 }
 
-func (jo *JSONOutput) getCommandOutput() string {
+func (jo *jsonOutput) getCommandOutput() string {
+	if jo.commandOutput == nil {
+		return ""
+	}
+
 	return marshalJSONToString(jo.commandOutput)
 }
 
