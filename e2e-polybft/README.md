@@ -3,7 +3,7 @@
 
 The implemented E2E tests start a local instance of V3.
 
-As such, they require the binary 'borv3' to be available in the $PATH variable.
+As such, they require the binary 'polygon-edge' to be available in the $PATH variable.
 
 ## Step 1: Build the polygon-edge
 
