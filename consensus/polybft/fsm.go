@@ -563,15 +563,14 @@ func validateHeaderFields(parent *types.Header, header *types.Header) error {
 // createStateTransactionWithData creates a state transaction
 // with provided target address and inputData parameter which is ABI encoded byte array.
 func createStateTransactionWithData(target types.Address, inputData []byte) *types.Transaction {
-	// todo test
-	tx := new(types.Transaction)
-	_ = tx.UnmarshalRLP(inputData)
-
-	tx.From = types.ZeroAddress
-	tx.To = &target
-	tx.Gas = types.StateTransactionGasLimit
-	tx.GasPrice = big.NewInt(0)
-	tx.Type = types.StateTx
+	tx := &types.Transaction{
+		From:     types.ZeroAddress,
+		To:       &target,
+		Type:     types.StateTx,
+		Input:    inputData,
+		Gas:      types.StateTransactionGasLimit,
+		GasPrice: big.NewInt(0),
+	}
 
 	tx.ComputeHash()
 
