@@ -273,6 +273,18 @@ func (t *Transition) WriteFailedReceipt(txn *types.Transaction) error {
 
 // Write writes another transaction to the executor
 func (t *Transition) Write(txn *types.Transaction) error {
+	var err error
+
+	if txn.From == emptyFrom && txn.IsLegacyTx() {
+		// Decrypt the from address
+		signer := crypto.NewSigner(t.config, uint64(t.r.config.ChainID))
+
+		txn.From, err = signer.Sender(txn)
+		if err != nil {
+			return NewTransitionApplicationError(err, false)
+		}
+	}
+
 	// Make a local copy and apply the transaction
 	msg := txn.Copy()
 
@@ -835,22 +847,9 @@ func TransactionGasCost(msg *types.Transaction, isHomestead, isIstanbul bool) (u
 
 // checkAndProcessLegacyTx - first check if this message satisfies all consensus rules before
 // applying the message. The rules include these clauses:
-// 0. resolve from if not specified
 // 1. the nonce of the message caller is correct
 // 2. caller has enough balance to cover transaction fee(gaslimit * gasprice)
 func checkAndProcessLegacyTx(msg *types.Transaction, t *Transition) error {
-	// 0. check if msg from address is empty and try to resolve it
-	if msg.From == emptyFrom {
-		signer := crypto.NewSigner(t.config, uint64(t.r.config.ChainID))
-
-		from, err := signer.Sender(msg)
-		if err != nil {
-			return NewTransitionApplicationError(err, false)
-		}
-
-		msg.From = from
-	}
-
 	// 1. the nonce of the message caller is correct
 	if err := t.nonceCheck(msg); err != nil {
 		return NewTransitionApplicationError(err, true)
