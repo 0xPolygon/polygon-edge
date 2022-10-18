@@ -3,12 +3,12 @@
 
 The implemented E2E tests start a local instance of V3.
 
-As such, they require the binary 'borv3' to be available in the $PATH variable.
+As such, they require the binary 'polygon-edge' to be available in the $PATH variable.
 
 ## Step 1: Build the polygon-edge
 
 ```bash
-go build -o borv3 cmd/borv3/main.go && mv borv3 $GOPATH/bin
+go build -race -o artifacts/polygon-edge . && mv artifacts/polygon-edge $GOPATH/bin
 ```
 
 In this case we expect that $GOPATH is set and $GOPATH/bin is defined in $PATH as it is required for a complete Go installation.
