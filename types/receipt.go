@@ -40,10 +40,6 @@ func (r *Receipt) IsLegacyTx() bool {
 	return r.TransactionType == LegacyTx
 }
 
-func (r *Receipt) IsStateTx() bool {
-	return r.TransactionType == StateTx
-}
-
 func (r *Receipt) SetStatus(s ReceiptStatus) {
 	r.Status = &s
 }

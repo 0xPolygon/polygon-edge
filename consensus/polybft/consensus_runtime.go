@@ -195,16 +195,14 @@ func (c *consensusRuntime) populateFsmIfBridgeEnabled(
 	ff.stateSyncExecutionIndex = nextStateSyncExecutionIdx
 
 	ff.postInsertHook = func() error {
-		if c.IsBridgeEnabled() {
-			if isEndOfEpoch && ff.commitmentToSaveOnRegister != nil {
-				if err := c.state.insertCommitmentMessage(ff.commitmentToSaveOnRegister); err != nil {
-					return err
-				}
+		if isEndOfEpoch && ff.commitmentToSaveOnRegister != nil {
+			if err := c.state.insertCommitmentMessage(ff.commitmentToSaveOnRegister); err != nil {
+				return err
+			}
 
-				if err := c.buildBundles(
-					epoch, ff.commitmentToSaveOnRegister.Message, nextStateSyncExecutionIdx); err != nil {
-					return err
-				}
+			if err := c.buildBundles(
+				epoch, ff.commitmentToSaveOnRegister.Message, nextStateSyncExecutionIdx); err != nil {
+				return err
 			}
 		}
 
