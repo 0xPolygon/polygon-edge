@@ -113,14 +113,14 @@ func (p *blockchainWrapper) ProcessBlock(parent *types.Header, block *types.Bloc
 	}
 
 	// build the block
-	found := consensus.BuildBlock(consensus.BuildBlockParams{
+	builtBlock := consensus.BuildBlock(consensus.BuildBlockParams{
 		Header:   header,
 		Txns:     block.Transactions,
 		Receipts: transition.Receipts(),
 	})
 
 	return &StateBlock{
-		Block:    found,
+		Block:    builtBlock,
 		Receipts: transition.Receipts(),
 		State:    transition,
 	}, nil

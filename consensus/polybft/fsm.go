@@ -10,6 +10,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
+	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -581,7 +582,7 @@ func validateHeaderFields(parent *types.Header, header *types.Header) error {
 // with provided target address and inputData parameter which is ABI encoded byte array.
 func createStateTransactionWithData(target types.Address, inputData []byte) *types.Transaction {
 	tx := &types.Transaction{
-		From:     types.ZeroAddress,
+		From:     contracts.SystemCaller,
 		To:       &target,
 		Type:     types.StateTx,
 		Input:    inputData,

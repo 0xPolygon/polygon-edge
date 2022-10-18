@@ -361,10 +361,22 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 		return err
 	}
 
-	// Type
 	if len(elems) >= 10 {
+		// Type
 		if t.Type, err = ReadRlpTxType(elems[9]); err != nil {
 			return err
+		}
+
+		if t.IsStateTx() {
+			// From
+			if vv, err := v.Get(10).Bytes(); err == nil && len(vv) == AddressLength {
+				// address
+				addr := BytesToAddress(vv)
+				t.From = addr
+			} else {
+				// reset From
+				t.From = ZeroAddress
+			}
 		}
 	}
 

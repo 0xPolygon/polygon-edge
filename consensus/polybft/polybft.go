@@ -131,7 +131,8 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			return err
 		}
 
-		result := transition.Call2(contracts.SystemCaller, contracts.ValidatorSetContract, input, big.NewInt(0), 1000000000)
+		result := transition.Call2(contracts.SystemCaller, contracts.ValidatorSetContract, input,
+			big.NewInt(0), types.StateTransactionGasLimit)
 		if result.Failed() && result.Err.Error() != skipError {
 			return err
 		}

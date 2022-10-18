@@ -6,6 +6,7 @@ import (
 	"math"
 	"math/big"
 
+	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/state/runtime/evm"
 
 	"github.com/hashicorp/go-hclog"
@@ -878,9 +879,9 @@ func checkAndProcessStateTx(msg *types.Transaction, t *Transition) error {
 		)
 	}
 
-	if msg.From != types.ZeroAddress {
+	if msg.From != contracts.SystemCaller {
 		return NewTransitionApplicationError(
-			errors.New("from of state transaction must be zero"),
+			fmt.Errorf("state transaction sender must be %v, but got %v", contracts.SystemCaller, msg.From),
 			true,
 		)
 	}
