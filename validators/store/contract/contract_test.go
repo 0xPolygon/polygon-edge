@@ -476,7 +476,7 @@ func TestContractValidatorStore_CacheChange(t *testing.T) {
 	)
 
 	type testCase struct {
-		height uint64
+		height   uint64
 		expected validators.Validators
 	}
 
@@ -511,7 +511,7 @@ func TestContractValidatorStore_CacheChange(t *testing.T) {
 		t,
 		store.saveToValidatorSetCache(1, ecdsaValidators2),
 	)
-	
+
 	testCache(
 		t,
 		testCase{height: 0, expected: ecdsaValidators1},
