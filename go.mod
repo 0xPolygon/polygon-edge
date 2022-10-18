@@ -63,16 +63,12 @@ require (
 require (
 	github.com/0xPolygon/go-ibft v0.0.0-20220810095021-e43142f8d267
 	github.com/0xPolygon/pbft-consensus v0.0.0-20220823102839-109d9f873bf4
-	github.com/boltdb/bolt v1.3.1
+	go.etcd.io/bbolt v1.3.6
 	go.opentelemetry.io/otel v1.1.0
 	go.uber.org/atomic v1.10.0
 )
 
-require (
-	github.com/0xPolygon/go-ibft v0.0.0-20220810095021-e43142f8d267
-	go.uber.org/atomic v1.10.0
-	gopkg.in/DataDog/dd-trace-go.v1 v1.42.1
-)
+require gopkg.in/DataDog/dd-trace-go.v1 v1.42.1
 
 require (
 	cloud.google.com/go v0.104.0 // indirect
@@ -88,6 +84,7 @@ require (
 	github.com/andybalholm/brotli v1.0.4 // indirect
 	github.com/armon/go-radix v1.0.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
+	github.com/boltdb/bolt v1.3.1 // indirect
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.1 // indirect
 	github.com/btcsuite/btcutil v1.0.3-0.20201208143702-a53e38424cce // indirect
 	github.com/bwesterb/go-ristretto v1.2.0 // indirect

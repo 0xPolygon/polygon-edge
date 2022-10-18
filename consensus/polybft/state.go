@@ -9,8 +9,8 @@ import (
 	"sort"
 
 	"github.com/0xPolygon/pbft-consensus"
-	"github.com/boltdb/bolt"
 	"github.com/hashicorp/go-hclog"
+	bolt "go.etcd.io/bbolt"
 
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
