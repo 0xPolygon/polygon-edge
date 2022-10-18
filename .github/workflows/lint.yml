@@ -27,8 +27,5 @@ jobs:
           submodules: recursive
           token: ${{ secrets.GH_TOKEN_CLONE_PRIVATE }}
 
-      - name: Compile v3 contracts
-        run: make compile-v3-contracts
-
       - name: Lint
         uses: golangci/golangci-lint-action@v3
