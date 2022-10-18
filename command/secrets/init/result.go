@@ -4,23 +4,9 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/0xPolygon/polygon-edge/command"
-
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/types"
 )
-
-type Results []command.CommandResult
-
-func (r Results) GetOutput() string {
-	var buffer bytes.Buffer
-
-	for _, result := range r {
-		buffer.WriteString(result.GetOutput())
-	}
-
-	return buffer.String()
-}
 
 type SecretsInitResult struct {
 	Address   types.Address `json:"address"`
