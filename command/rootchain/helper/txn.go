@@ -44,6 +44,11 @@ func GetDefAccount() types.Address {
 	return types.BytesToAddress(defKey.Address().Bytes())
 }
 
+// GetDefKey returns rootchain admin account
+func GetDefKey() *wallet.Key {
+	return defKey
+}
+
 // SendTxn function sends transaction to the rootchain
 // blocks until receipt hash is returned
 func SendTxn(nonce uint64, txn *ethgo.Transaction) (*ethgo.Receipt, error) {

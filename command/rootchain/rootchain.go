@@ -6,6 +6,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/emit"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/fund"
+	"github.com/0xPolygon/polygon-edge/command/rootchain/initcontracts"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/server"
 )
 
@@ -31,5 +32,7 @@ func registerSubcommands(baseCmd *cobra.Command) {
 		fund.GetCommand(),
 		// rootchain server
 		server.GetCommand(),
+		// init-contracts
+		initcontracts.GetCommand(),
 	)
 }

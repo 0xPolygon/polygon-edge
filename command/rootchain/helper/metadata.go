@@ -15,6 +15,13 @@ var (
 	SidechainBridgeAddr      = types.StringToAddress("0x8Be503bcdEd90ED42Eff31f56199399B2b0154CA")
 	CheckpointManagerAddress = types.StringToAddress("0x3d46A809D5767B81a8836f0E79145ba615A2Dd61")
 
+	// RootValidatorSetAddress is an address of RootValidatorSet.sol smart contract
+	RootValidatorSetAddress = types.StringToAddress("0x72E1C51FE6dABF2e3d5701170cf5aD3620E6B8ba")
+	// BLSAddress is an address of BLS.sol smart contract
+	BLSAddress = types.StringToAddress("0x436604426F31A05f905C64edc973E575BdB46471")
+	// BN256G2Address is an address of BN256G2Address.sol smart contract
+	BN256G2Address = types.StringToAddress("0x947a581B2713F58A8145201DA41BCb6aAE90196B")
+
 	ContractRootFolder = "consensus/polybft/polybftcontracts/artifacts/contracts"
 )
 
