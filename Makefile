@@ -67,5 +67,5 @@ stop-local:
 
 .PHONY: compile-v3-contracts
 compile-v3-contracts:
-	cd v3-contracts && npm install && npm run compile
+	cd v3-contracts && npm install && npm run compile && cd ..
 
