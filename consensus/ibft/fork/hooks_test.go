@@ -54,7 +54,6 @@ func (m *mockUpdatableStore) UpdateValidatorSet(validators validators.Validators
 
 func Test_registerHeaderModifierHooks(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	t.Run("should do nothing if validator store doesn't implement HeaderModifier", func(t *testing.T) {
 		t.Parallel()
@@ -139,7 +138,6 @@ func Test_registerHeaderModifierHooks(t *testing.T) {
 
 func Test_registerUpdateValidatorsHooks(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	var (
 		vals = validators.NewECDSAValidatorSet(
@@ -312,6 +310,7 @@ func newTestTransition(
 
 func Test_registerStakingContractDeploymentHooks(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	hooks := &hook.Hooks{}
 	fork := &IBFTFork{
@@ -366,7 +365,6 @@ func Test_registerStakingContractDeploymentHooks(t *testing.T) {
 
 func Test_getPreDeployParams(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name   string

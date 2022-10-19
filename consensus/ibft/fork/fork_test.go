@@ -17,7 +17,6 @@ import (
 
 func TestIBFTForkUnmarshalJSON(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name     string
@@ -115,7 +114,6 @@ func TestIBFTForkUnmarshalJSON(t *testing.T) {
 
 func TestGetIBFTForks(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name   string
@@ -227,7 +225,6 @@ func TestGetIBFTForks(t *testing.T) {
 
 func TestIBFTForks_getFork(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	forks := IBFTForks{
 		{

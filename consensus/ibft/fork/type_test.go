@@ -30,7 +30,6 @@ func TestIBFTTypeString(t *testing.T) {
 
 func TestParseIBFTType(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		value string
