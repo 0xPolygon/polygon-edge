@@ -32,7 +32,6 @@ func TestFrontierSigner(t *testing.T) {
 
 func TestEIP155Signer_Sender(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	toAddress := types.StringToAddress("1")
 

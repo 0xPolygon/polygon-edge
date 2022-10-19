@@ -15,7 +15,6 @@ import (
 
 func TestEth_DecodeTxn(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name     string

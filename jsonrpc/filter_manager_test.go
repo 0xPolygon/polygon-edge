@@ -20,7 +20,6 @@ import (
 
 func Test_GetLogsForQuery(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	blockHash := types.StringToHash("1")
 

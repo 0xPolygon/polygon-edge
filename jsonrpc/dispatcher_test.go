@@ -59,7 +59,6 @@ func expectBatchJSONResult(data []byte, v interface{}) error {
 
 func TestDispatcher_HandleWebsocketConnection_EthSubscribe(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	t.Run("clients should be able to receive \"newHeads\" event thru eth_subscribe", func(t *testing.T) {
 		t.Parallel()

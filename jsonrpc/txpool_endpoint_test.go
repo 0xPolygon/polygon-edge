@@ -13,7 +13,6 @@ import (
 
 func TestContentEndpoint(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	t.Run("returns empty ContentResponse if tx pool has no transactions", func(t *testing.T) {
 		t.Parallel()
@@ -125,7 +124,6 @@ func TestContentEndpoint(t *testing.T) {
 
 func TestInspectEndpoint(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	t.Run("returns empty InspectResponse if tx pool has no transactions", func(t *testing.T) {
 		t.Parallel()
@@ -197,7 +195,6 @@ func TestInspectEndpoint(t *testing.T) {
 
 func TestStatusEndpoint(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	t.Run("returns empty StatusResponse if tx pool has no transactions", func(t *testing.T) {
 		t.Parallel()

@@ -42,7 +42,6 @@ func TestKeyEncoding(t *testing.T) {
 
 func TestCreate2(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	cases := []struct {
 		address  string
@@ -172,7 +171,6 @@ func TestValidateSignatureValues(t *testing.T) {
 
 func TestPrivateKeyRead(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	// Write private keys to disk, check if read is ok
 	testTable := []struct {
