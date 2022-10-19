@@ -118,14 +118,15 @@ type Polybft struct {
 }
 
 func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *state.Transition) error {
-	const skipError = "empty response"
-
-	var pbftConfig PolyBFTConfig
-
-	customConfigJSON, _ := json.Marshal(config.Params.Engine[engineName])
-	json.Unmarshal(customConfigJSON, &pbftConfig)
-
 	return func(transition *state.Transition) error {
+		var pbftConfig PolyBFTConfig
+
+		customConfigJSON, err := json.Marshal(config.Params.Engine[engineName])
+		if err != nil {
+			return err
+		}
+
+		json.Unmarshal(customConfigJSON, &pbftConfig)
 		// Initialize child validator set
 		input, err := getInitChildValidatorSetInput(pbftConfig.InitialValidatorSet, pbftConfig.Governance)
 		if err != nil {
@@ -135,7 +136,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 		result := transition.Call2(contracts.SystemCaller, contracts.ValidatorSetContract, input,
 			big.NewInt(0), 10_000_000)
 
-		if result.Failed() && result.Err.Error() != skipError {
+		if result.Failed() {
 			if result.Reverted() {
 				unpackedRevert, err := abi.UnpackRevertError(result.ReturnValue)
 				if err == nil {
