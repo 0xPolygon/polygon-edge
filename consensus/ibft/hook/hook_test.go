@@ -51,7 +51,6 @@ func newTestHooks(
 
 func TestShouldWriteTransactions(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	t.Run("should return true if the function is not set", func(t *testing.T) {
 		t.Parallel()
@@ -81,7 +80,6 @@ func TestShouldWriteTransactions(t *testing.T) {
 
 func TestModifyHeader(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	t.Run("should do nothing if the function is not set", func(t *testing.T) {
 		t.Parallel()
@@ -128,7 +126,6 @@ func TestModifyHeader(t *testing.T) {
 //nolint:dupl
 func TestVerifyHeader(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	t.Run("should return nil if the function is not set", func(t *testing.T) {
 		t.Parallel()
@@ -172,7 +169,6 @@ func TestVerifyHeader(t *testing.T) {
 //nolint:dupl
 func TestVerifyBlock(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	t.Run("should return nil if the function is not set", func(t *testing.T) {
 		t.Parallel()
@@ -224,7 +220,6 @@ func TestVerifyBlock(t *testing.T) {
 //nolint:dupl
 func TestProcessHeader(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	t.Run("should do nothing if the function is not set", func(t *testing.T) {
 		t.Parallel()
@@ -267,7 +262,6 @@ func TestProcessHeader(t *testing.T) {
 
 func TestPreCommitState(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	var (
 		txn = &state.Transition{}
@@ -316,7 +310,6 @@ func TestPreCommitState(t *testing.T) {
 //nolint:dupl
 func TestPostInsertBlock(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	t.Run("should do nothing if the function is not set", func(t *testing.T) {
 		t.Parallel()

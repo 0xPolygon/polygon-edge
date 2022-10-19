@@ -40,7 +40,6 @@ func createTestSnapshotJSON(t *testing.T, snapshot *snapshot.Snapshot) string {
 
 func TestSnapshotValidatorStoreWrapper(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name                   string
@@ -305,7 +304,6 @@ func TestNewContractValidatorStoreWrapperClose(t *testing.T) {
 
 func TestNewContractValidatorStoreWrapperGetValidators(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	t.Run("should return error if getSigner returns error", func(t *testing.T) {
 		t.Parallel()
@@ -357,7 +355,6 @@ func TestNewContractValidatorStoreWrapperGetValidators(t *testing.T) {
 
 func Test_calculateContractStoreFetchingHeight(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name      string

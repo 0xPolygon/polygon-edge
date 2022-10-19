@@ -766,7 +766,6 @@ func TestForkManagerGetHooks(t *testing.T) {
 
 func TestForkManager_initializeKeyManagers(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	key, keyBytes, err := crypto.GenerateAndEncodeECDSAPrivateKey()
 	assert.NoError(t, err)
