@@ -79,7 +79,6 @@ func Test_wrapCommitHash(t *testing.T) {
 //nolint
 func Test_getOrCreateECDSAKey(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	testKey, testKeyEncoded := newTestECDSAKey(t)
 
@@ -192,7 +191,6 @@ func Test_getOrCreateECDSAKey(t *testing.T) {
 //nolint
 func Test_getOrCreateBLSKey(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	testKey, testKeyEncoded := newTestBLSKey(t)
 

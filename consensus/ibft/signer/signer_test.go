@@ -171,7 +171,6 @@ func TestSignerAddress(t *testing.T) {
 
 func TestSignerInitIBFTExtra(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name                 string
@@ -233,8 +232,6 @@ func TestSignerInitIBFTExtra(t *testing.T) {
 }
 
 func TestSignerGetIBFTExtra(t *testing.T) {
-	defer goleak.VerifyNone(t)
-
 	tests := []struct {
 		name          string
 		header        *types.Header
@@ -475,8 +472,6 @@ func TestSignerGetIBFTExtra(t *testing.T) {
 }
 
 func TestSignerWriteProposerSeal(t *testing.T) {
-	defer goleak.VerifyNone(t)
-
 	tests := []struct {
 		name           string
 		header         *types.Header
@@ -597,8 +592,6 @@ func TestSignerWriteProposerSeal(t *testing.T) {
 }
 
 func TestSignerEcrecoverFromHeader(t *testing.T) {
-	defer goleak.VerifyNone(t)
-
 	tests := []struct {
 		name         string
 		header       *types.Header
@@ -746,7 +739,6 @@ func TestVerifyCommittedSeal(t *testing.T) {
 
 func TestSignerWriteCommittedSeals(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name           string
@@ -870,8 +862,6 @@ func TestSignerWriteCommittedSeals(t *testing.T) {
 }
 
 func TestSignerVerifyCommittedSeals(t *testing.T) {
-	defer goleak.VerifyNone(t)
-
 	tests := []struct {
 		name                    string
 		header                  *types.Header

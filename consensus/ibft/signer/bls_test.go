@@ -436,7 +436,6 @@ func TestBLSKeyManagerVerifyCommittedSeal(t *testing.T) {
 
 func TestBLSKeyManagerGenerateCommittedSeals(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	blsKeyManager1, _, _ := newTestBLSKeyManager(t)
 
@@ -623,7 +622,6 @@ func TestBLSKeyManagerSignIBFTMessageAndEcrecover(t *testing.T) {
 
 func Test_getBLSSignatures(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	validatorKeyManager, _, _ := newTestBLSKeyManager(t)
 	nonValidatorKeyManager, _, _ := newTestBLSKeyManager(t)
@@ -801,7 +799,6 @@ func Test_getBLSSignatures(t *testing.T) {
 
 func Test_createAggregatedBLSPubKeys(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	t.Run("multiple validators", func(t *testing.T) {
 		t.Parallel()
@@ -902,7 +899,6 @@ func Test_createAggregatedBLSPubKeys(t *testing.T) {
 
 func Test_verifyBLSCommittedSealsImpl(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	validatorKeyManager1, _, _ := newTestBLSKeyManager(t)
 	validatorKeyManager2, _, _ := newTestBLSKeyManager(t)

@@ -24,7 +24,6 @@ func JSONMarshalHelper(t *testing.T, extra *IstanbulExtra) string {
 
 func TestIstanbulExtraMarshalAndUnmarshal(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name  string
@@ -239,7 +238,6 @@ func Test_packProposerSealIntoExtra(t *testing.T) {
 
 func Test_packCommittedSealsIntoExtra(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name              string
@@ -443,7 +441,6 @@ func Test_unmarshalRLPForParentCS(t *testing.T) {
 
 func Test_putIbftExtra(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name   string

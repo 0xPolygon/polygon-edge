@@ -26,7 +26,6 @@ func newTestECDSAKeyManager(t *testing.T) (KeyManager, *ecdsa.PrivateKey) {
 
 func TestNewECDSAKeyManager(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	testKey, testKeyEncoded := newTestECDSAKey(t)
 
@@ -215,7 +214,6 @@ func TestECDSAKeyManagerSignCommittedSeal(t *testing.T) {
 
 func TestECDSAKeyManagerVerifyCommittedSeal(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	ecdsaKeyManager1, _ := newTestECDSAKeyManager(t)
 	ecdsaKeyManager2, _ := newTestECDSAKeyManager(t)
@@ -309,7 +307,6 @@ func TestECDSAKeyManagerVerifyCommittedSeal(t *testing.T) {
 
 func TestECDSAKeyManagerGenerateCommittedSeals(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	ecdsaKeyManager1, _ := newTestECDSAKeyManager(t)
 
@@ -463,7 +460,6 @@ func TestECDSAKeyManagerSignIBFTMessageAndEcrecover(t *testing.T) {
 
 func TestECDSAKeyManager_verifyCommittedSealsImpl(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	ecdsaKeyManager1, _ := newTestECDSAKeyManager(t)
 	ecdsaKeyManager2, _ := newTestECDSAKeyManager(t)
