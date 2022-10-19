@@ -13,7 +13,6 @@ import (
 // marshalled and unmarshalled from JSON
 func TestHeader_JSON(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	var (
 		headerJSON = `{

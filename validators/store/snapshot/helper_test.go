@@ -28,7 +28,6 @@ var (
 
 func Test_isAuthorize(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name         string
@@ -71,7 +70,6 @@ func Test_isAuthorize(t *testing.T) {
 
 func Test_shouldProcessVote(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name       string
@@ -176,7 +174,6 @@ func Test_shouldProcessVote(t *testing.T) {
 
 func Test_addsOrDelsCandidate(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name string

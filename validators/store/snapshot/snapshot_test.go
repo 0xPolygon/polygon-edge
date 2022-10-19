@@ -101,7 +101,6 @@ func newTestSnapshotValidatorStore(
 
 func TestNewSnapshotValidatorStore(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	var (
 		logger     = hclog.NewNullLogger()
@@ -210,7 +209,6 @@ func TestNewSnapshotValidatorStore(t *testing.T) {
 
 func TestSnapshotValidatorStore_initialize(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	var (
 		initialCandidates        = []*store.Candidate{}
@@ -621,7 +619,6 @@ func TestSnapshotValidatorStoreCandidates(t *testing.T) {
 
 func TestSnapshotValidatorStoreGetValidators(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name        string
@@ -683,7 +680,6 @@ func TestSnapshotValidatorStoreGetValidators(t *testing.T) {
 
 func TestSnapshotValidatorStoreVotes(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name        string
@@ -743,7 +739,6 @@ func TestSnapshotValidatorStoreVotes(t *testing.T) {
 
 func TestSnapshotValidatorStoreUpdateValidatorSet(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	var (
 		// Add a snapshot so that snapshot can be used from the target height
@@ -882,7 +877,6 @@ func TestSnapshotValidatorStoreUpdateValidatorSet(t *testing.T) {
 
 func TestSnapshotValidatorStoreModifyHeader(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	var (
 		targetNumber uint64 = 20
@@ -1080,7 +1074,6 @@ func TestSnapshotValidatorStoreModifyHeader(t *testing.T) {
 
 func TestSnapshotValidatorStoreVerifyHeader(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name        string
@@ -1139,7 +1132,6 @@ func TestSnapshotValidatorStoreVerifyHeader(t *testing.T) {
 
 func TestSnapshotValidatorStoreProcessHeadersInRange(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	var (
 		epochSize     uint64 = 10
@@ -1374,7 +1366,6 @@ func TestSnapshotValidatorStoreProcessHeadersInRange(t *testing.T) {
 
 func TestSnapshotValidatorStoreProcessHeader(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	var (
 		epochSize         uint64 = 10
@@ -1676,7 +1667,6 @@ func TestSnapshotValidatorStoreProcessHeader(t *testing.T) {
 
 func TestSnapshotValidatorStorePropose(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	var (
 		latestHeight uint64 = 20
@@ -1836,7 +1826,6 @@ func TestSnapshotValidatorStorePropose(t *testing.T) {
 
 func TestSnapshotValidatorStore_addCandidate(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name              string
@@ -1931,7 +1920,6 @@ func TestSnapshotValidatorStore_addCandidate(t *testing.T) {
 
 func TestSnapshotValidatorStore_addHeaderSnap(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	var (
 		headerHeight uint64 = 10
@@ -2230,7 +2218,6 @@ func TestSnapshotValidatorStore_pickOneCandidate(t *testing.T) {
 
 func TestSnapshotValidatorStore_saveSnapshotIfChanged(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	var (
 		headerHeight uint64 = 30
@@ -2335,7 +2322,6 @@ func TestSnapshotValidatorStore_saveSnapshotIfChanged(t *testing.T) {
 
 func TestSnapshotValidatorStore_resetSnapshot(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	var (
 		headerHeight uint64 = 30
@@ -2424,7 +2410,6 @@ func TestSnapshotValidatorStore_resetSnapshot(t *testing.T) {
 
 func TestSnapshotValidatorStore_removeLowerSnapshots(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	var (
 		epochSize uint64 = 10
@@ -2494,8 +2479,6 @@ func TestSnapshotValidatorStore_removeLowerSnapshots(t *testing.T) {
 }
 
 func TestSnapshotValidatorStore_processVote(t *testing.T) {
-	defer goleak.VerifyNone(t)
-
 	var (
 		headerNumber uint64 = 21
 
@@ -2740,7 +2723,6 @@ func TestSnapshotValidatorStore_processVote(t *testing.T) {
 
 func Test_validatorToMiner(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name        string
@@ -2794,7 +2776,6 @@ func Test_validatorToMiner(t *testing.T) {
 
 func Test_minerToValidator(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name          string

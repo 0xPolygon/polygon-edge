@@ -155,7 +155,6 @@ func newTestContractValidatorStore(
 
 func TestNewContractValidatorStore(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	var (
 		logger     = hclog.NewNullLogger()
@@ -237,7 +236,6 @@ func TestContractValidatorStoreSourceType(t *testing.T) {
 
 func TestContractValidatorStoreGetValidators(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	var (
 		stateRoot = types.StringToHash("1")

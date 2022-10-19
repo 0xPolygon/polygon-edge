@@ -32,7 +32,6 @@ func TestFetchValidators(t *testing.T) {
 
 func TestFetchECDSAValidators(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	var (
 		ecdsaValidators = validators.NewECDSAValidatorSet(
@@ -90,7 +89,6 @@ func TestFetchECDSAValidators(t *testing.T) {
 
 func TestFetchBLSValidators(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	var (
 		blsValidators = validators.NewBLSValidatorSet(

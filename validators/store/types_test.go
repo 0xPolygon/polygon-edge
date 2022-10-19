@@ -81,7 +81,6 @@ func createExampleBLSVoteJSON(
 
 func TestSourceTypeString(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		sourceType SourceType
@@ -111,7 +110,6 @@ func TestSourceTypeString(t *testing.T) {
 
 func TestVoteJSONMarshal(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	testMarshalJSON := func(
 		t *testing.T,
@@ -171,7 +169,6 @@ func TestVoteJSONMarshal(t *testing.T) {
 
 func TestVoteJSONUnmarshal(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	testUnmarshalJSON := func(
 		t *testing.T,
@@ -258,7 +255,6 @@ func TestVoteJSONUnmarshal(t *testing.T) {
 
 func TestVoteEqual(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name     string
