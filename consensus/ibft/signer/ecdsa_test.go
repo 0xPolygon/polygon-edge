@@ -370,7 +370,6 @@ func TestECDSAKeyManagerGenerateCommittedSeals(t *testing.T) {
 
 func TestECDSAKeyManagerVerifyCommittedSeals(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	ecdsaKeyManager1, _ := newTestECDSAKeyManager(t)
 

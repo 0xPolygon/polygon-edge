@@ -340,7 +340,6 @@ func Test_ecrecover(t *testing.T) {
 
 func TestNewKeyManagerFromType(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	testECDSAKey, testECDSAKeyEncoded := newTestECDSAKey(t)
 	testBLSKey, testBLSKeyEncoded := newTestBLSKey(t)
@@ -417,7 +416,6 @@ func TestNewKeyManagerFromType(t *testing.T) {
 
 func Test_verifyIBFTExtraSize(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name      string

@@ -124,7 +124,6 @@ func TestIstanbulExtraMarshalAndUnmarshal(t *testing.T) {
 
 func Test_packProposerSealIntoExtra(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	newProposerSeal := []byte("new proposer seal")
 
@@ -373,7 +372,6 @@ func Test_packCommittedSealsIntoExtra(t *testing.T) {
 
 func Test_unmarshalRLPForParentCS(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name        string

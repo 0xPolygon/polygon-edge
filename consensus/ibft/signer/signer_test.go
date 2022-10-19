@@ -988,7 +988,6 @@ func TestSignerVerifyCommittedSeals(t *testing.T) {
 
 func TestSignerVerifyParentCommittedSeals(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	parentHeaderHash := crypto.Keccak256(types.ZeroAddress.Bytes())
 
@@ -1235,7 +1234,6 @@ func TestEcrecoverFromIBFTMessage(t *testing.T) {
 
 func TestSignerSignIBFTMessageAndEcrecoverFromIBFTMessage(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	msg := []byte("message")
 

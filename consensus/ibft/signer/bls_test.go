@@ -94,7 +94,6 @@ func assertEqualAggregatedBLSPublicKeys(t *testing.T, apk1, apk2 *bls_sig.MultiP
 
 func TestNewBLSKeyManager(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	testECDSAKey, testECDSAKeyEncoded := newTestECDSAKey(t)
 	testBLSKey, testBLSKeyEncoded := newTestBLSKey(t)
@@ -338,7 +337,6 @@ func TestBLSKeyManagerSignCommittedSeal(t *testing.T) {
 
 func TestBLSKeyManagerVerifyCommittedSeal(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	blsKeyManager1, _, blsSecretKey1 := newTestBLSKeyManager(t)
 	blsKeyManager2, _, _ := newTestBLSKeyManager(t)
@@ -526,7 +524,6 @@ func TestBLSKeyManagerGenerateCommittedSeals(t *testing.T) {
 
 func TestBLSKeyManagerVerifyCommittedSeals(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	blsKeyManager1, _, _ := newTestBLSKeyManager(t)
 
