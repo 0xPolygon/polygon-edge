@@ -12,6 +12,8 @@ jobs:
     uses: ./.github/workflows/build.yml
     # TODO: Uncomment before merging to develop branch (and remove above line)
     # uses: 0xpolygon/polygon-edge/.github/workflows/build.yml@develop
+    secrets:
+      GH_TOKEN_CLONE_PRIVATE: ${{ secrets.GH_TOKEN_CLONE_PRIVATE }}
 
   test:
     name: Test
@@ -19,6 +21,8 @@ jobs:
     # TODO: Uncomment before merging to develop branch (and remove above line)
     # uses: 0xpolygon/polygon-edge/.github/workflows/test.yml@develop
     needs: build
+    secrets:
+      GH_TOKEN_CLONE_PRIVATE: ${{ secrets.GH_TOKEN_CLONE_PRIVATE }}
 
   gosec:
     name: Gosec
