@@ -25,6 +25,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/umbracle/ethgo/abi"
 	"go.opentelemetry.io/otel"
 )
 
@@ -132,9 +133,17 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 		}
 
 		result := transition.Call2(contracts.SystemCaller, contracts.ValidatorSetContract, input,
-			big.NewInt(0), types.StateTransactionGasLimit)
+			big.NewInt(0), 10_000_000)
+
 		if result.Failed() && result.Err.Error() != skipError {
-			return err
+			if result.Reverted() {
+				unpackedRevert, err := abi.UnpackRevertError(result.ReturnValue)
+				if err == nil {
+					fmt.Printf("ChildValidatorSet.initialize %v\n", unpackedRevert)
+				}
+			}
+
+			return result.Err
 		}
 
 		return nil
