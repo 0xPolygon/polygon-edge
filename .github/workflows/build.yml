@@ -11,6 +11,10 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+        with:
+          submodules: recursive
+          token: ${{ secrets.GH_TOKEN_CLONE_PRIVATE }}
+          
       - name: Setup Go environment
         uses: actions/setup-go@v3.3.0
         with:
