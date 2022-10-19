@@ -126,7 +126,10 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			return err
 		}
 
-		json.Unmarshal(customConfigJSON, &pbftConfig)
+		err = json.Unmarshal(customConfigJSON, &pbftConfig)
+		if err != nil {
+			return err
+		}
 		// Initialize child validator set
 		input, err := getInitChildValidatorSetInput(pbftConfig.InitialValidatorSet, pbftConfig.Governance)
 		if err != nil {

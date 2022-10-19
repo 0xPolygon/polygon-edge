@@ -18,7 +18,7 @@ func ReadArtifact(rootFolder, contractPath, contractName string) (*Artifact, err
 		return nil, err
 	}
 
-	data, err := ioutil.ReadFile(absolutePath)
+	data, err := ioutil.ReadFile(filepath.Clean(absolutePath))
 	if err != nil {
 		return nil, err
 	}
