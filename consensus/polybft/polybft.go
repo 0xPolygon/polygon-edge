@@ -134,7 +134,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 		}
 
 		result := transition.Call2(contracts.SystemCaller, contracts.ValidatorSetContract, input,
-			big.NewInt(0), 10_000_000)
+			big.NewInt(0), 100_000_000)
 
 		if result.Failed() {
 			if result.Reverted() {
