@@ -32,7 +32,6 @@ build:
 
 .PHONY: lint
 lint:
-	$(MAKE) compile-v3-contracts
 	golangci-lint run --config .golangci.yml
 
 .PHONY: generate-bsd-licenses
@@ -41,7 +40,6 @@ generate-bsd-licenses:
 
 .PHONY: test
 test:
-	$(MAKE) compile-v3-contracts
 	go test -coverprofile coverage.out -timeout=20m `go list ./... | grep -v e2e`
 
 .PHONY: test-e2e
@@ -49,7 +47,6 @@ test-e2e:
     # We need to build the binary with the race flag enabled
     # because it will get picked up and run during e2e tests
     # and the e2e tests should error out if any kind of race is found
-	$(MAKE) compile-v3-contracts
 	go build -race -o artifacts/polygon-edge .
 	env EDGE_BINARY=${PWD}/artifacts/polygon-edge go test -v -timeout=30m ./e2e/...
 

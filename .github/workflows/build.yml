@@ -23,9 +23,6 @@ jobs:
         with:
           go-version: 1.18.x
 
-      - name: Compile contracts
-        run: make compile-v3-contracts
-
       - name: Build Polygon Edge
         run: go build -tags netgo -ldflags="-s -w -linkmode external -extldflags "-static" -X \"github.com/0xPolygon/polygon-edge/versioning.Version=${GITHUB_REF_NAME}\" -X \"github.com/0xPolygon/polygon-edge/versioning.Commit=${GITHUB_SHA}\"" && tar -czvf polygon-edge.tar.gz polygon-edge
         env:
