@@ -25,7 +25,6 @@ func hash(str string) types.Hash {
 
 func TestGenesisAlloc(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	cases := []struct {
 		input  string
@@ -106,7 +105,6 @@ func TestGenesisAlloc(t *testing.T) {
 
 func TestGenesisX(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	cases := []struct {
 		input  string

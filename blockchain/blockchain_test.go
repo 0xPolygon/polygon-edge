@@ -551,7 +551,6 @@ func TestForkUnknownParents(t *testing.T) {
 
 func TestBlockchainWriteBody(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	var (
 		addr = types.StringToAddress("1")
@@ -672,7 +671,6 @@ func TestBlockchainWriteBody(t *testing.T) {
 
 func Test_recoverFromFieldsInBlock(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	var (
 		addr1 = types.StringToAddress("1")
@@ -760,7 +758,6 @@ func Test_recoverFromFieldsInBlock(t *testing.T) {
 
 func Test_recoverFromFieldsInTransactions(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	var (
 		addr1 = types.StringToAddress("1")
@@ -1054,7 +1051,6 @@ func TestGasPriceAverage(t *testing.T) {
 // errors are handled correctly
 func TestBlockchain_VerifyBlockParent(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	emptyHeader := &types.Header{
 		Hash:       types.ZeroHash,
@@ -1211,7 +1207,6 @@ func TestBlockchain_VerifyBlockParent(t *testing.T) {
 // TestBlockchain_VerifyBlockBody makes sure that the block body is verified correctly
 func TestBlockchain_VerifyBlockBody(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	emptyHeader := &types.Header{
 		Hash:       types.ZeroHash,
