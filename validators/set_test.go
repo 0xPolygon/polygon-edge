@@ -11,7 +11,6 @@ import (
 
 func TestSetType(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	t.Run("ECDSAValidators", func(t *testing.T) {
 		t.Parallel()
@@ -52,7 +51,6 @@ func TestSetLen(t *testing.T) {
 
 func TestSetEqual(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name     string
@@ -151,7 +149,6 @@ func TestSetEqual(t *testing.T) {
 
 func TestSetCopy(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name       string
@@ -226,7 +223,6 @@ func TestSetAt(t *testing.T) {
 
 func TestSetIndex(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name       string
@@ -281,7 +277,6 @@ func TestSetIndex(t *testing.T) {
 
 func TestSetIncludes(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name       string
@@ -336,7 +331,6 @@ func TestSetIncludes(t *testing.T) {
 
 func TestSetAdd(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name               string
@@ -417,7 +411,6 @@ func TestSetAdd(t *testing.T) {
 
 func TestSetDel(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name               string
@@ -498,7 +491,6 @@ func TestSetDel(t *testing.T) {
 
 func TestSetMerge(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name               string
@@ -589,7 +581,6 @@ func TestSetMerge(t *testing.T) {
 
 func TestSetMarshalAndUnmarshal(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name       string

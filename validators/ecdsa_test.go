@@ -72,7 +72,6 @@ func TestECDSAValidatorCopy(t *testing.T) {
 
 func TestECDSAValidatorEqual(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name     string

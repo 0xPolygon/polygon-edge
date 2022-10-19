@@ -81,8 +81,6 @@ func shuffleTxPoolEvents(
 }
 
 func TestEventSubscription_ProcessedEvents(t *testing.T) {
-	defer goleak.VerifyNone(t)
-
 	// Set up the default values
 	supportedEvents := []proto.EventType{
 		proto.EventType_ADDED,
@@ -164,7 +162,6 @@ func TestEventSubscription_ProcessedEvents(t *testing.T) {
 
 func TestEventSubscription_EventSupported(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	supportedEvents := []proto.EventType{
 		proto.EventType_ADDED,

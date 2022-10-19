@@ -9,7 +9,6 @@ import (
 
 func TestParseValidatorType(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	t.Run("ECDSA", func(t *testing.T) {
 		t.Parallel()

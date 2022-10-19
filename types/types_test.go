@@ -11,7 +11,6 @@ import (
 
 func TestEIP55(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	cases := []struct {
 		address  string

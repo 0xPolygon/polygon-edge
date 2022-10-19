@@ -40,7 +40,6 @@ func createTestBLSValidatorString(
 
 func TestNewValidatorFromType(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name          string
@@ -94,7 +93,6 @@ func TestNewValidatorFromType(t *testing.T) {
 
 func TestNewValidatorSetFromType(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name          string
@@ -142,7 +140,6 @@ func TestNewValidatorSetFromType(t *testing.T) {
 
 func TestParseValidator(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name string
@@ -197,7 +194,6 @@ func TestParseValidator(t *testing.T) {
 
 func TestParseValidators(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name string
@@ -278,7 +274,6 @@ func TestParseECDSAValidator(t *testing.T) {
 
 func TestParseBLSValidator(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name string

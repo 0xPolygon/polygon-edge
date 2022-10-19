@@ -130,7 +130,6 @@ func TestBLSValidatorCopy(t *testing.T) {
 
 func TestBLSValidatorEqual(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name     string
