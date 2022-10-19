@@ -61,7 +61,6 @@ func (m *mockSecretManager) GetSecret(name string) ([]byte, error) {
 
 func TestNewForkManager(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	_, ecdsaKeyBytes, err := crypto.GenerateAndEncodeECDSAPrivateKey()
 	assert.NoError(t, err)
@@ -306,7 +305,6 @@ func TestNewForkManager(t *testing.T) {
 
 func TestForkManagerClose(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	t.Run("should call all Close methods of ValidatorStore", func(t *testing.T) {
 		t.Parallel()
@@ -375,7 +373,6 @@ type MockKeyManager struct {
 
 func TestForkManagerGetSigner(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	var (
 		ecdsaKeyManager = &MockKeyManager{
@@ -514,7 +511,6 @@ func TestForkManagerGetSigner(t *testing.T) {
 
 func TestForkManagerGetValidatorStore(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name            string
@@ -622,7 +618,6 @@ func TestForkManagerGetValidatorStore(t *testing.T) {
 
 func TestForkManagerGetValidators(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	var epochSize uint64 = 10
 

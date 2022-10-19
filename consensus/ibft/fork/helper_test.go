@@ -44,7 +44,6 @@ func createTestTempDirectory(t *testing.T) string {
 
 func Test_loadSnapshotMetadata(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	t.Run("should return error if the file doesn't exist", func(t *testing.T) {
 		t.Parallel()
@@ -91,7 +90,6 @@ func Test_loadSnapshotMetadata(t *testing.T) {
 
 func Test_loadSnapshots(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	t.Run("should return error if the file doesn't exist", func(t *testing.T) {
 		t.Parallel()
@@ -151,7 +149,6 @@ func Test_loadSnapshots(t *testing.T) {
 
 func Test_readDataStore(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	t.Run("should return error if the file doesn't exist", func(t *testing.T) {
 		t.Parallel()
@@ -218,7 +215,6 @@ func Test_readDataStore(t *testing.T) {
 
 func Test_writeDataStore(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name               string
