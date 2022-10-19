@@ -94,7 +94,6 @@ func (m *systemClientMock) BlockByNumber(
 
 func Test_determineTo(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	toPtr := func(x uint64) *uint64 {
 		return &x
@@ -162,6 +161,7 @@ func Test_determineTo(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			resTo, resToHash, err := determineTo(context.Background(), tt.systemClientMock, tt.targetTo)
 			assert.Equal(t, tt.err, err)
