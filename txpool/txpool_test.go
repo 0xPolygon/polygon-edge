@@ -110,14 +110,11 @@ type result struct {
 	slots    uint64
 }
 
-func TestMain(m *testing.M) {
-	goleak.VerifyTestMain(m)
-}
-
 /* Single account cases (unit tests) */
 
 func TestAddTxErrors(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	poolSigner := crypto.NewEIP155Signer(100)
 
@@ -146,6 +143,8 @@ func TestAddTxErrors(t *testing.T) {
 
 	t.Run("ErrNegativeValue", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
+
 		pool := setupPool()
 
 		tx := newTx(defaultAddr, 0, 1)
@@ -159,6 +158,8 @@ func TestAddTxErrors(t *testing.T) {
 
 	t.Run("ErrBlockLimitExceeded", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
+
 		pool := setupPool()
 
 		tx := newTx(defaultAddr, 0, 1)
@@ -175,6 +176,8 @@ func TestAddTxErrors(t *testing.T) {
 
 	t.Run("ErrExtractSignature", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
+
 		pool := setupPool()
 
 		tx := newTx(defaultAddr, 0, 1)
@@ -187,6 +190,8 @@ func TestAddTxErrors(t *testing.T) {
 
 	t.Run("ErrInvalidSender", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
+
 		pool := setupPool()
 
 		tx := newTx(addr1, 0, 1)
@@ -203,6 +208,8 @@ func TestAddTxErrors(t *testing.T) {
 
 	t.Run("ErrUnderpriced", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
+
 		pool := setupPool()
 		pool.priceLimit = 1000000
 
@@ -217,6 +224,8 @@ func TestAddTxErrors(t *testing.T) {
 
 	t.Run("ErrInvalidAccountState", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
+
 		pool := setupPool()
 		pool.store = faultyMockStore{}
 
@@ -233,6 +242,8 @@ func TestAddTxErrors(t *testing.T) {
 
 	t.Run("ErrTxPoolOverflow", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
+
 		pool := setupPool()
 
 		// fill the pool
@@ -249,6 +260,8 @@ func TestAddTxErrors(t *testing.T) {
 
 	t.Run("ErrIntrinsicGas", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
+
 		pool := setupPool()
 
 		tx := newTx(defaultAddr, 0, 1)
@@ -263,6 +276,8 @@ func TestAddTxErrors(t *testing.T) {
 
 	t.Run("ErrAlreadyKnown", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
+
 		pool := setupPool()
 
 		tx := newTx(defaultAddr, 0, 1)
@@ -285,6 +300,8 @@ func TestAddTxErrors(t *testing.T) {
 
 	t.Run("ErrOversizedData", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
+
 		pool := setupPool()
 
 		tx := newTx(defaultAddr, 0, 1)
@@ -305,6 +322,8 @@ func TestAddTxErrors(t *testing.T) {
 
 	t.Run("ErrNonceTooLow", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
+
 		pool := setupPool()
 
 		// faultyMockStore.GetNonce() == 99999
@@ -320,6 +339,8 @@ func TestAddTxErrors(t *testing.T) {
 
 	t.Run("ErrInsufficientFunds", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
+
 		pool := setupPool()
 
 		tx := newTx(defaultAddr, 0, 1)
@@ -335,11 +356,13 @@ func TestAddTxErrors(t *testing.T) {
 
 func TestPruneAccountsWithNonceHoles(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	t.Run(
 		"no enqueued to prune",
 		func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			pool, err := newTestPool()
 			assert.NoError(t, err)
@@ -363,6 +386,7 @@ func TestPruneAccountsWithNonceHoles(t *testing.T) {
 		"skip valid account",
 		func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			pool, err := newTestPool()
 			assert.NoError(t, err)
@@ -397,6 +421,7 @@ func TestPruneAccountsWithNonceHoles(t *testing.T) {
 		"prune nonce hole account",
 		func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			pool, err := newTestPool()
 			assert.NoError(t, err)
@@ -429,11 +454,13 @@ func TestPruneAccountsWithNonceHoles(t *testing.T) {
 
 func TestAddTxHighPressure(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	t.Run(
 		"pruning handler is signaled",
 		func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			pool, err := newTestPool()
 			assert.NoError(t, err)
@@ -463,6 +490,7 @@ func TestAddTxHighPressure(t *testing.T) {
 		"reject tx with nonce not matching expected",
 		func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			pool, err := newTestPool()
 			assert.NoError(t, err)
@@ -486,6 +514,7 @@ func TestAddTxHighPressure(t *testing.T) {
 		"accept tx with expected nonce during high gauge level",
 		func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			pool, err := newTestPool()
 			assert.NoError(t, err)
@@ -514,6 +543,7 @@ func TestAddTxHighPressure(t *testing.T) {
 
 func TestAddGossipTx(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	key, sender := tests.GenerateKeyAndAddr(t)
 	signer := crypto.NewEIP155Signer(uint64(100))
@@ -521,6 +551,7 @@ func TestAddGossipTx(t *testing.T) {
 
 	t.Run("node is a validator", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		pool, err := newTestPool()
 		assert.NoError(t, err)
@@ -549,6 +580,7 @@ func TestAddGossipTx(t *testing.T) {
 
 	t.Run("node is a non validator", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		pool, err := newTestPool()
 		assert.NoError(t, err)
@@ -577,6 +609,7 @@ func TestAddGossipTx(t *testing.T) {
 
 func TestDropKnownGossipTx(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	pool, err := newTestPool()
 	assert.NoError(t, err)
@@ -602,11 +635,13 @@ func TestDropKnownGossipTx(t *testing.T) {
 
 func TestEnqueueHandler(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	t.Run(
 		"enqueue new tx with higher nonce",
 		func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			pool, err := newTestPool()
 			assert.NoError(t, err)
@@ -628,6 +663,7 @@ func TestEnqueueHandler(t *testing.T) {
 		"reject new tx with low nonce",
 		func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			pool, err := newTestPool()
 			assert.NoError(t, err)
@@ -653,6 +689,7 @@ func TestEnqueueHandler(t *testing.T) {
 		"signal promotion for new tx with expected nonce",
 		func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			pool, err := newTestPool()
 			assert.NoError(t, err)
@@ -678,6 +715,7 @@ func TestEnqueueHandler(t *testing.T) {
 		"reject new tx when enqueued is full",
 		func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			fillEnqueued := func(pool *TxPool, num uint64) {
 				//	first tx will signal promotion, grab the signal
@@ -733,12 +771,14 @@ func TestEnqueueHandler(t *testing.T) {
 
 func TestPromoteHandler(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	t.Run("nothing to promote", func(t *testing.T) {
 		/* This test demonstrates that if some promotion handler
 		got its job done by a previous one, it will not perform any logic
 		by doing an early return. */
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		pool, err := newTestPool()
 		assert.NoError(t, err)
@@ -777,6 +817,7 @@ func TestPromoteHandler(t *testing.T) {
 
 	t.Run("promote one tx", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		pool, err := newTestPool()
 		assert.NoError(t, err)
@@ -800,6 +841,7 @@ func TestPromoteHandler(t *testing.T) {
 
 	t.Run("promote several txs", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 		/* This example illustrates the flexibility of the handlers:
 		One promotion handler can be executed at any time after it
 		was invoked (when the runtime decides), resulting in promotion
@@ -846,6 +888,7 @@ func TestPromoteHandler(t *testing.T) {
 		/* In this scenario, each received tx will be instantly promoted.
 		All txs are sent in the order of expected nonce. */
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		pool, err := newTestPool()
 		assert.NoError(t, err)
@@ -871,6 +914,7 @@ func TestPromoteHandler(t *testing.T) {
 		"promote handler discards cheaper tx",
 		func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			// helper
 			newPricedTx := func(
@@ -976,9 +1020,11 @@ func TestPromoteHandler(t *testing.T) {
 
 func TestResetAccount(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	t.Run("reset promoted", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		testCases := []struct {
 			name     string
@@ -1044,6 +1090,7 @@ func TestResetAccount(t *testing.T) {
 			test := test
 			t.Run(test.name, func(t *testing.T) {
 				t.Parallel()
+				defer goleak.VerifyNone(t)
 
 				pool, err := newTestPool()
 				assert.NoError(t, err)
@@ -1096,6 +1143,7 @@ func TestResetAccount(t *testing.T) {
 
 	t.Run("reset enqueued", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		testCases := []struct {
 			name     string
@@ -1182,6 +1230,7 @@ func TestResetAccount(t *testing.T) {
 			test := test
 			t.Run(test.name, func(t *testing.T) {
 				t.Parallel()
+				defer goleak.VerifyNone(t)
 
 				pool, err := newTestPool()
 				assert.NoError(t, err)
@@ -1223,6 +1272,7 @@ func TestResetAccount(t *testing.T) {
 
 	t.Run("reset enqueued and promoted", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		testCases := []struct {
 			name     string
@@ -1330,6 +1380,7 @@ func TestResetAccount(t *testing.T) {
 			test := test
 			t.Run(test.name, func(t *testing.T) {
 				t.Parallel()
+				defer goleak.VerifyNone(t)
 
 				pool, err := newTestPool()
 				assert.NoError(t, err)
@@ -1388,6 +1439,7 @@ func TestResetAccount(t *testing.T) {
 
 func TestPop(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	pool, err := newTestPool()
 	assert.NoError(t, err)
@@ -1415,6 +1467,7 @@ func TestPop(t *testing.T) {
 
 func TestDrop(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	pool, err := newTestPool()
 	assert.NoError(t, err)
@@ -1444,9 +1497,12 @@ func TestDrop(t *testing.T) {
 
 func TestDemote(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	t.Run("Demote increments counter", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
+
 		// create pool
 		pool, err := newTestPool()
 		assert.NoError(t, err)
@@ -1480,6 +1536,7 @@ func TestDemote(t *testing.T) {
 
 	t.Run("Demote calls Drop", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		// create pool
 		pool, err := newTestPool()
@@ -1518,6 +1575,7 @@ func TestDemote(t *testing.T) {
 
 func Test_updateAccountSkipsCounts(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	sendTx := func(
 		t *testing.T,
@@ -1542,6 +1600,7 @@ func Test_updateAccountSkipsCounts(t *testing.T) {
 
 	checkTxExistence := func(t *testing.T, pool *TxPool, txHash types.Hash, shouldExist bool) {
 		t.Helper()
+		defer goleak.VerifyNone(t)
 
 		_, ok := pool.index.get(txHash)
 
@@ -1550,6 +1609,8 @@ func Test_updateAccountSkipsCounts(t *testing.T) {
 
 	t.Run("should drop the first transaction from promoted queue", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
+
 		// create pool
 		pool, err := newTestPool()
 		assert.NoError(t, err)
@@ -1585,6 +1646,8 @@ func Test_updateAccountSkipsCounts(t *testing.T) {
 
 	t.Run("should drop the first transaction from enqueued queue", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
+
 		// create pool
 		pool, err := newTestPool()
 		assert.NoError(t, err)
@@ -1620,6 +1683,8 @@ func Test_updateAccountSkipsCounts(t *testing.T) {
 
 	t.Run("should not drop a transaction", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
+
 		// create pool
 		pool, err := newTestPool()
 		assert.NoError(t, err)
@@ -1657,6 +1722,7 @@ func Test_updateAccountSkipsCounts(t *testing.T) {
 // TestPermissionSmartContractDeployment tests sending deployment tx with deployment whitelist
 func TestPermissionSmartContractDeployment(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	signer := crypto.NewEIP155Signer(uint64(100))
 
@@ -1687,6 +1753,8 @@ func TestPermissionSmartContractDeployment(t *testing.T) {
 
 	t.Run("contract deployment whitelist empty, anyone can deploy", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
+
 		pool := setupPool()
 
 		tx := newTx(defaultAddr, 0, 1)
@@ -1694,8 +1762,11 @@ func TestPermissionSmartContractDeployment(t *testing.T) {
 
 		assert.NoError(t, pool.validateTx(signTx(tx)))
 	})
+
 	t.Run("Addresses inside whitelist can deploy smart contract", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
+
 		pool := setupPool()
 		pool.deploymentWhitelist.add(addr1)
 		pool.deploymentWhitelist.add(defaultAddr)
@@ -1705,8 +1776,11 @@ func TestPermissionSmartContractDeployment(t *testing.T) {
 
 		assert.NoError(t, pool.validateTx(signTx(tx)))
 	})
+
 	t.Run("Addresses outside whitelist can not deploy smart contract", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
+
 		pool := setupPool()
 		pool.deploymentWhitelist.add(addr1)
 		pool.deploymentWhitelist.add(addr2)
@@ -1778,6 +1852,7 @@ var signerEIP155 = crypto.NewEIP155Signer(100)
 
 func TestResetAccounts_Promoted(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	var (
 		eoa1 = new(eoa).create(t)
@@ -1897,6 +1972,7 @@ func TestResetAccounts_Promoted(t *testing.T) {
 
 func TestResetAccounts_Enqueued(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	commonAssert := func(accounts map[types.Address]accountState, pool *TxPool) {
 		for addr := range accounts {
@@ -1922,6 +1998,7 @@ func TestResetAccounts_Enqueued(t *testing.T) {
 
 	t.Run("reset will promote", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		allTxs := map[types.Address][]*types.Transaction{
 			addr1: {
@@ -2016,6 +2093,7 @@ func TestResetAccounts_Enqueued(t *testing.T) {
 
 	t.Run("reset will not promote", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		allTxs := map[types.Address][]*types.Transaction{
 			addr1: {
@@ -2099,6 +2177,7 @@ func TestResetAccounts_Enqueued(t *testing.T) {
 
 func TestExecutablesOrder(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	newPricedTx := func(addr types.Address, nonce, gasPrice uint64) *types.Transaction {
 		tx := newTx(addr, nonce, 1)
@@ -2199,6 +2278,7 @@ func TestExecutablesOrder(t *testing.T) {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			pool, err := newTestPool()
 			assert.NoError(t, err)
@@ -2271,6 +2351,7 @@ type statusTx struct {
 
 func TestRecovery(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	commonAssert := func(accounts map[types.Address]accountState, pool *TxPool) {
 		for addr := range accounts {
@@ -2376,6 +2457,7 @@ func TestRecovery(t *testing.T) {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			// helper callback for transition errors
 			status := func(tx *types.Transaction) (s status) {
@@ -2451,6 +2533,7 @@ func TestRecovery(t *testing.T) {
 
 func TestGetTxs(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	var (
 		eoa1 = new(eoa).create(t)
@@ -2589,6 +2672,7 @@ func TestGetTxs(t *testing.T) {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			find := func(
 				tx *types.Transaction,

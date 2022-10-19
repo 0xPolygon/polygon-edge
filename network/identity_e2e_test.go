@@ -5,11 +5,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
+
+	"github.com/0xPolygon/polygon-edge/chain"
 )
 
 func TestIdentityHandshake(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	defaultChainID := 100
 
 	testTable := []struct {
@@ -28,6 +32,8 @@ func TestIdentityHandshake(t *testing.T) {
 
 	for _, testCase := range testTable {
 		t.Run(testCase.name, func(t *testing.T) {
+			defer goleak.VerifyNone(t)
+
 			params := map[int]*CreateServerParams{
 				0: {
 					ConfigCallback: func(c *Config) {

@@ -18,11 +18,9 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-func TestMain(m *testing.M) {
-	goleak.VerifyTestMain(m)
-}
-
 func TestGenesis(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	b := NewTestBlockchain(t, nil)
 
 	// add genesis block
@@ -436,6 +434,8 @@ func TestInsertHeaders(t *testing.T) {
 
 	for _, cc := range cases {
 		t.Run(cc.Name, func(t *testing.T) {
+			defer goleak.VerifyNone(t)
+
 			b := NewTestBlockchain(t, nil)
 
 			chain := dummyChain{
@@ -531,6 +531,8 @@ func TestInsertHeaders(t *testing.T) {
 }
 
 func TestForkUnknownParents(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	b := NewTestBlockchain(t, nil)
 
 	h0 := NewTestHeaders(10)
@@ -549,6 +551,7 @@ func TestForkUnknownParents(t *testing.T) {
 
 func TestBlockchainWriteBody(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	var (
 		addr = types.StringToAddress("1")
@@ -575,6 +578,7 @@ func TestBlockchainWriteBody(t *testing.T) {
 
 	t.Run("should succeed if tx has from field", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		tx := &types.Transaction{
 			Value: big.NewInt(10),
@@ -604,6 +608,7 @@ func TestBlockchainWriteBody(t *testing.T) {
 
 	t.Run("should return error if tx doesn't have from and recovering address fails", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		tx := &types.Transaction{
 			Value: big.NewInt(10),
@@ -633,6 +638,7 @@ func TestBlockchainWriteBody(t *testing.T) {
 
 	t.Run("should recover from address and store to storage", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		tx := &types.Transaction{
 			Value: big.NewInt(10),
@@ -666,6 +672,7 @@ func TestBlockchainWriteBody(t *testing.T) {
 
 func Test_recoverFromFieldsInBlock(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	var (
 		addr1 = types.StringToAddress("1")
@@ -681,6 +688,7 @@ func Test_recoverFromFieldsInBlock(t *testing.T) {
 
 	t.Run("should succeed", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		txFromByTxHash := map[types.Hash]types.Address{}
 		chain := &Blockchain{
@@ -711,6 +719,7 @@ func Test_recoverFromFieldsInBlock(t *testing.T) {
 
 	t.Run("should stop and return error if recovery fails", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		txFromByTxHash := map[types.Hash]types.Address{}
 		chain := &Blockchain{
@@ -751,6 +760,7 @@ func Test_recoverFromFieldsInBlock(t *testing.T) {
 
 func Test_recoverFromFieldsInTransactions(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	var (
 		addr1 = types.StringToAddress("1")
@@ -766,6 +776,7 @@ func Test_recoverFromFieldsInTransactions(t *testing.T) {
 
 	t.Run("should succeed", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		txFromByTxHash := map[types.Hash]types.Address{}
 		chain := &Blockchain{
@@ -795,6 +806,7 @@ func Test_recoverFromFieldsInTransactions(t *testing.T) {
 
 	t.Run("should succeed even though recovery fails for some transactions", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		txFromByTxHash := map[types.Hash]types.Address{}
 		chain := &Blockchain{
@@ -829,6 +841,7 @@ func Test_recoverFromFieldsInTransactions(t *testing.T) {
 
 	t.Run("should return false if all transactions has from field", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		txFromByTxHash := map[types.Hash]types.Address{}
 		chain := &Blockchain{
@@ -858,6 +871,8 @@ func Test_recoverFromFieldsInTransactions(t *testing.T) {
 }
 
 func TestBlockchainReadBody(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	storage, err := memory.NewMemoryStorage(nil)
 	assert.NoError(t, err)
 
@@ -943,6 +958,8 @@ func TestCalculateGasLimit(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			defer goleak.VerifyNone(t)
+
 			storageCallback := func(storage *storage.MockStorage) {
 				storage.HookReadHeader(func(hash types.Hash) (*types.Header, error) {
 					return &types.Header{
@@ -1010,6 +1027,8 @@ func TestGasPriceAverage(t *testing.T) {
 
 	for _, testCase := range testTable {
 		t.Run(testCase.name, func(t *testing.T) {
+			defer goleak.VerifyNone(t)
+
 			// Setup the mock data
 			blockchain := NewTestBlockchain(t, nil)
 			blockchain.gpAverage.price = testCase.previousAverage
@@ -1035,6 +1054,7 @@ func TestGasPriceAverage(t *testing.T) {
 // errors are handled correctly
 func TestBlockchain_VerifyBlockParent(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	emptyHeader := &types.Header{
 		Hash:       types.ZeroHash,
@@ -1044,6 +1064,7 @@ func TestBlockchain_VerifyBlockParent(t *testing.T) {
 
 	t.Run("Missing parent block", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		// Set up the storage callback
 		storageCallback := func(storage *storage.MockStorage) {
@@ -1071,6 +1092,7 @@ func TestBlockchain_VerifyBlockParent(t *testing.T) {
 
 	t.Run("Parent hash mismatch", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		// Set up the storage callback
 		storageCallback := func(storage *storage.MockStorage) {
@@ -1097,6 +1119,7 @@ func TestBlockchain_VerifyBlockParent(t *testing.T) {
 
 	t.Run("Invalid block sequence", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		// Set up the storage callback
 		storageCallback := func(storage *storage.MockStorage) {
@@ -1124,6 +1147,7 @@ func TestBlockchain_VerifyBlockParent(t *testing.T) {
 
 	t.Run("Invalid block sequence", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		// Set up the storage callback
 		storageCallback := func(storage *storage.MockStorage) {
@@ -1152,6 +1176,7 @@ func TestBlockchain_VerifyBlockParent(t *testing.T) {
 
 	t.Run("Invalid block gas limit", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		parentHeader := emptyHeader.Copy()
 		parentHeader.GasLimit = 5000
@@ -1186,6 +1211,7 @@ func TestBlockchain_VerifyBlockParent(t *testing.T) {
 // TestBlockchain_VerifyBlockBody makes sure that the block body is verified correctly
 func TestBlockchain_VerifyBlockBody(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	emptyHeader := &types.Header{
 		Hash:       types.ZeroHash,
@@ -1194,6 +1220,7 @@ func TestBlockchain_VerifyBlockBody(t *testing.T) {
 
 	t.Run("Invalid SHA3 Uncles root", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		blockchain, err := NewMockBlockchain(nil)
 		if err != nil {
@@ -1211,6 +1238,7 @@ func TestBlockchain_VerifyBlockBody(t *testing.T) {
 
 	t.Run("Invalid Transactions root", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		blockchain, err := NewMockBlockchain(nil)
 		if err != nil {
@@ -1228,6 +1256,7 @@ func TestBlockchain_VerifyBlockBody(t *testing.T) {
 
 	t.Run("Invalid execution result - missing parent", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		// Set up the storage callback
 		storageCallback := func(storage *storage.MockStorage) {
@@ -1255,6 +1284,7 @@ func TestBlockchain_VerifyBlockBody(t *testing.T) {
 
 	t.Run("Invalid execution result - unable to fetch block creator", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		errBlockCreatorNotFound := errors.New("not found")
 
@@ -1294,6 +1324,7 @@ func TestBlockchain_VerifyBlockBody(t *testing.T) {
 
 	t.Run("Invalid execution result - unable to execute transactions", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		errUnableToExecute := errors.New("unable to execute transactions")
 

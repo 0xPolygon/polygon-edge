@@ -12,6 +12,7 @@ import (
 
 func newStorage(t *testing.T) (storage.Storage, func()) {
 	t.Helper()
+	defer goleak.VerifyNone(t)
 
 	path, err := os.MkdirTemp("/tmp", "minimal_storage")
 	if err != nil {
@@ -34,10 +35,6 @@ func newStorage(t *testing.T) (storage.Storage, func()) {
 	}
 
 	return s, closeFn
-}
-
-func TestMain(m *testing.M) {
-	goleak.VerifyTestMain(m)
 }
 
 func TestStorage(t *testing.T) {

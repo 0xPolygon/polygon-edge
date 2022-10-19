@@ -4,6 +4,8 @@ import (
 	"reflect"
 	"testing"
 
+	"go.uber.org/goleak"
+
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -18,6 +20,8 @@ var (
 )
 
 func TestFilterDecode(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	cases := []struct {
 		str string
 		res *LogQuery
@@ -142,6 +146,8 @@ func TestFilterDecode(t *testing.T) {
 }
 
 func TestFilterMatch(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	cases := []struct {
 		filter LogQuery
 		log    *types.Log

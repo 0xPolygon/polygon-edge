@@ -4,13 +4,17 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
+
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestEth_TxnPool_SendRawTransaction(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	store := &mockStoreTxn{}
 	eth := newTestEthEndpoint(store)
 
@@ -32,6 +36,8 @@ func TestEth_TxnPool_SendRawTransaction(t *testing.T) {
 }
 
 func TestEth_TxnPool_SendTransaction(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	store := &mockStoreTxn{}
 	store.AddAccount(addr0)
 	eth := newTestEthEndpoint(store)

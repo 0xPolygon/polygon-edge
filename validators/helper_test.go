@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
+
 	testHelper "github.com/0xPolygon/polygon-edge/helper/tests"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -38,6 +40,7 @@ func createTestBLSValidatorString(
 
 func TestNewValidatorFromType(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name          string
@@ -70,6 +73,7 @@ func TestNewValidatorFromType(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			res, err := NewValidatorFromType(test.validatorType)
 
@@ -90,6 +94,7 @@ func TestNewValidatorFromType(t *testing.T) {
 
 func TestNewValidatorSetFromType(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name          string
@@ -124,6 +129,7 @@ func TestNewValidatorSetFromType(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			assert.Equal(
 				t,
@@ -136,6 +142,7 @@ func TestNewValidatorSetFromType(t *testing.T) {
 
 func TestParseValidator(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name string
@@ -174,6 +181,7 @@ func TestParseValidator(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			val, err := ParseValidator(
 				test.validatorType,
@@ -189,6 +197,7 @@ func TestParseValidator(t *testing.T) {
 
 func TestParseValidators(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name string
@@ -242,6 +251,7 @@ func TestParseValidators(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			vals, err := ParseValidators(
 				test.validatorType,
@@ -257,6 +267,7 @@ func TestParseValidators(t *testing.T) {
 
 func TestParseECDSAValidator(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	assert.Equal(
 		t,
@@ -267,6 +278,7 @@ func TestParseECDSAValidator(t *testing.T) {
 
 func TestParseBLSValidator(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name string
@@ -307,6 +319,7 @@ func TestParseBLSValidator(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			val, err := ParseBLSValidator(
 				test.validatorStr,

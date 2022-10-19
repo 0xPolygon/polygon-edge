@@ -1,6 +1,10 @@
 package precompiled
 
-import "testing"
+import (
+	"testing"
+
+	"go.uber.org/goleak"
+)
 
 var bn256AddTests = []precompiledTest{
 	{
@@ -73,6 +77,8 @@ var bn256AddTests = []precompiledTest{
 }
 
 func TestBN256Add(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	p := &Precompiled{}
 	testPrecompiled(t, &bn256Add{p}, bn256AddTests)
 }
@@ -154,6 +160,8 @@ var bn256ScalarMulTests = []precompiledTest{
 }
 
 func TestBN256ScalarMul(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	p := &Precompiled{}
 	testPrecompiled(t, &bn256Mul{p}, bn256ScalarMulTests)
 }
@@ -219,6 +227,8 @@ var bn256PairingTests = []precompiledTest{
 }
 
 func TestBN256Pairing(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	p := &Precompiled{}
 	testPrecompiled(t, &bn256Pairing{p}, bn256PairingTests)
 }

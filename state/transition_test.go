@@ -4,10 +4,12 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/state/runtime"
-	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
+
+	"github.com/0xPolygon/polygon-edge/state/runtime"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 func newTestTransition(preState map[types.Address]*PreState) *Transition {
@@ -23,6 +25,7 @@ func newTestTransition(preState map[types.Address]*PreState) *Transition {
 
 func TestSubGasLimitPrice(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name        string
@@ -66,6 +69,7 @@ func TestSubGasLimitPrice(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			transition := newTestTransition(tt.preState)
 			msg := &types.Transaction{
@@ -90,6 +94,7 @@ func TestSubGasLimitPrice(t *testing.T) {
 
 func TestTransfer(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name        string
@@ -137,6 +142,7 @@ func TestTransfer(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			transition := newTestTransition(tt.preState)
 

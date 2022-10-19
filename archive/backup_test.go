@@ -7,12 +7,14 @@ import (
 	"io"
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/server/proto"
-	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"
+
+	"github.com/0xPolygon/polygon-edge/server/proto"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 type recvData struct {
@@ -92,6 +94,7 @@ func (m *systemClientMock) BlockByNumber(
 
 func Test_determineTo(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	toPtr := func(x uint64) *uint64 {
 		return &x
@@ -251,6 +254,8 @@ func Test_processExportStream(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			defer goleak.VerifyNone(t)
+
 			var buffer bytes.Buffer
 			from, to, err := processExportStream(tt.mockSystemExportClient, hclog.NewNullLogger(), &buffer, 0, 0)
 

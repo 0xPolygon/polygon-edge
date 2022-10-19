@@ -9,15 +9,18 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/blockchain"
-	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/gorilla/websocket"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
+
+	"github.com/0xPolygon/polygon-edge/blockchain"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 func Test_GetLogsForQuery(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	blockHash := types.StringToHash("1")
 
@@ -135,6 +138,7 @@ func Test_GetLogsForQuery(t *testing.T) {
 		testCase := testCase
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			foundLogs, logError := f.GetLogsForQuery(testCase.query)
 
@@ -154,6 +158,7 @@ func Test_GetLogsForQuery(t *testing.T) {
 
 func Test_GetLogFilterFromID(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	store := newMockStore()
 
@@ -177,6 +182,7 @@ func Test_GetLogFilterFromID(t *testing.T) {
 
 func TestFilterLog(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	store := newMockStore()
 
@@ -241,6 +247,7 @@ func TestFilterLog(t *testing.T) {
 
 func TestFilterBlock(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	store := newMockStore()
 
@@ -306,6 +313,7 @@ func TestFilterBlock(t *testing.T) {
 
 func TestFilterTimeout(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	store := newMockStore()
 
@@ -326,6 +334,7 @@ func TestFilterTimeout(t *testing.T) {
 
 func TestRemoveFilterByWebsocket(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	store := newMockStore()
 
@@ -346,6 +355,7 @@ func TestRemoveFilterByWebsocket(t *testing.T) {
 
 func Test_flushWsFilters(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	store := newMockStore()
 
@@ -408,24 +418,28 @@ func Test_flushWsFilters(t *testing.T) {
 
 	t.Run("should remove if sendUpdates returns websocket.ErrCloseSent", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		runTest(t, websocket.ErrCloseSent, false)
 	})
 
 	t.Run("should remove if sendUpdates returns net.ErrClosed", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		runTest(t, net.ErrClosed, false)
 	})
 
 	t.Run("should keep if sendUpdates returns unknown error", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		runTest(t, errors.New("hoge"), true)
 	})
 
 	t.Run("should keep if sendUpdates doesn't return error", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		runTest(t, nil, true)
 	})
@@ -433,6 +447,7 @@ func Test_flushWsFilters(t *testing.T) {
 
 func TestFilterWebsocket(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	store := newMockStore()
 
@@ -546,6 +561,7 @@ func (m *MockClosedWSConnection) WriteMessage(_messageType int, _data []byte) er
 
 func TestClosedFilterDeletion(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	store := newMockStore()
 

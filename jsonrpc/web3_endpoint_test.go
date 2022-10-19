@@ -4,13 +4,16 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/versioning"
-
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
+
+	"github.com/0xPolygon/polygon-edge/versioning"
 )
 
 func TestWeb3EndpointSha3(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	dispatcher := newDispatcher(
 		hclog.NewNullLogger(),
 		newMockStore(),
@@ -34,6 +37,8 @@ func TestWeb3EndpointSha3(t *testing.T) {
 }
 
 func TestWeb3EndpointClientVersion(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	var (
 		chainName = "test-chain"
 		chainID   = uint64(100)

@@ -3,12 +3,15 @@ package jsonrpc
 import (
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
+
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 func TestBlockNumberOrHash_UnmarshalJSON(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	var blockHash types.Hash
 	err := blockHash.UnmarshalText([]byte("0xe0ee62fd4a39a6988e24df0b406b90af71932e1b01d5561400a8eab943a33d68"))
@@ -88,6 +91,7 @@ func TestBlockNumberOrHash_UnmarshalJSON(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			bnh := BlockNumberOrHash{}
 			err := bnh.UnmarshalJSON([]byte(tt.rawRequest))

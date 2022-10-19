@@ -5,9 +5,12 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
 )
 
 func TestPushOpcodes(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	code := make([]byte, 33)
 	for i := 0; i < 33; i++ {
 		code[i] = byte(i + 1)

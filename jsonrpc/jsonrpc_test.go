@@ -14,11 +14,9 @@ import (
 	"github.com/0xPolygon/polygon-edge/versioning"
 )
 
-func TestMain(m *testing.M) {
-	goleak.VerifyTestMain(m)
-}
-
 func TestHTTPServer(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	store := newMockStore()
 	port, portErr := tests.GetFreePort()
 
@@ -38,6 +36,8 @@ func TestHTTPServer(t *testing.T) {
 }
 
 func Test_handleGetRequest(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	var (
 		chainName = "polygon-edge-test"
 		chainID   = uint64(200)

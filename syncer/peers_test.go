@@ -7,6 +7,7 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
 )
 
 var (
@@ -74,6 +75,7 @@ func peerMapToPeers(peerMap *PeerMap) []*NoForkPeer {
 
 func TestConstructor(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	peers := peers
 
@@ -94,6 +96,7 @@ func TestConstructor(t *testing.T) {
 
 func TestPutPeer(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	initialPeers := peers[:1]
 	peers := peers[1:]
@@ -117,6 +120,7 @@ func TestPutPeer(t *testing.T) {
 
 func TestBestPeer(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name     string
@@ -151,6 +155,7 @@ func TestBestPeer(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			peerMap := NewPeerMap(test.peers)
 

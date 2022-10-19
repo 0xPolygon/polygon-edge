@@ -8,10 +8,12 @@ import (
 	"os"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
+
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -113,6 +115,8 @@ func Test_importBlocks(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			defer goleak.VerifyNone(t)
+
 			progression := progress.NewProgressionWrapper(progress.ChainSyncRestore)
 			blockStream := newTestBlockStream(tt.metadata, tt.archiveBlocks...)
 			err := importBlocks(tt.chain, blockStream, progression)
@@ -185,6 +189,8 @@ func Test_consumeCommonBlocks(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			defer goleak.VerifyNone(t)
+
 			osSignal := make(<-chan os.Signal)
 			resultBlock, err := consumeCommonBlocks(tt.chain, tt.blockStream, osSignal)
 
@@ -218,6 +224,8 @@ func Test_parseBlock(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			defer goleak.VerifyNone(t)
+
 			block, err := tt.blockstream.nextBlock()
 
 			assert.Equal(t, tt.block, block)
@@ -243,6 +251,8 @@ func Test_parseMetadata(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			defer goleak.VerifyNone(t)
+
 			metadata, err := tt.blockstream.getMetadata()
 			assert.Equal(t, tt.err, err)
 			assert.Equal(t, tt.metadata, metadata)
@@ -273,6 +283,8 @@ func Test_loadRLPPrefix(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			defer goleak.VerifyNone(t)
+
 			data, err := tt.blockstream.loadRLPPrefix()
 			assert.Equal(t, tt.err, err)
 			assert.Equal(t, tt.data, data)
@@ -325,6 +337,8 @@ func Test_loadPrefixSize(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			defer goleak.VerifyNone(t)
+
 			headerSize, payloadSize, err := tt.blockstream.loadPrefixSize(0, tt.prefix)
 			assert.Equal(t, tt.err, err)
 			assert.Equal(t, tt.consumed, headerSize)
@@ -365,6 +379,8 @@ func Test_loadPayload(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			defer goleak.VerifyNone(t)
+
 			err := tt.blockstream.loadPayload(tt.offset, tt.size)
 			assert.Equal(t, tt.err, err)
 			assert.Equal(t, tt.newBuffer, tt.blockstream.buffer)
@@ -394,6 +410,8 @@ func Test_parrseMetadata(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			defer goleak.VerifyNone(t)
+
 			metadata, err := tt.blockstream.parseMetadata(tt.size)
 			assert.Equal(t, tt.err, err)
 			assert.Equal(t, tt.metadata, metadata)
@@ -423,6 +441,8 @@ func Test_parrseBlock(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			defer goleak.VerifyNone(t)
+
 			block, err := tt.blockstream.parseBlock(tt.size)
 			assert.Equal(t, tt.err, err)
 			assert.Equal(t, tt.block, block)
@@ -457,6 +477,8 @@ func Test_reserveCap(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			defer goleak.VerifyNone(t)
+
 			tt.blockstream.reserveCap(tt.expectedSize)
 			assert.Equal(t, tt.newLen, len(tt.blockstream.buffer))
 			assert.Greater(t, cap(tt.blockstream.buffer), tt.newLen)

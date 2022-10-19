@@ -2,6 +2,8 @@ package precompiled
 
 import (
 	"testing"
+
+	"go.uber.org/goleak"
 )
 
 var modExpTests = []precompiledTest{
@@ -87,6 +89,8 @@ var modExpTests = []precompiledTest{
 }
 
 func TestModExp(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	p := &Precompiled{}
 	testPrecompiled(t, &modExp{p}, modExpTests)
 }

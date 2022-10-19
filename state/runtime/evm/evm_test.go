@@ -89,12 +89,9 @@ func (m *mockHost) GetNonce(addr types.Address) uint64 {
 	panic("Not implemented in tests")
 }
 
-func TestMain(m *testing.M) {
-	goleak.VerifyTestMain(m)
-}
-
 func TestRun(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name     string
@@ -162,6 +159,7 @@ func TestRun(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			evm := NewEVM()
 			contract := newMockContract(tt.value, tt.gas, tt.code)

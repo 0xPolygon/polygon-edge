@@ -9,13 +9,16 @@ import (
 	"testing"
 	"text/template"
 
-	"github.com/0xPolygon/polygon-edge/helper/hex"
-
-	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
+
+	"github.com/0xPolygon/polygon-edge/helper/hex"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 func TestBasicTypes_Encode(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	// decode basic types
 	cases := []struct {
 		obj interface{}
@@ -48,6 +51,8 @@ func TestBasicTypes_Encode(t *testing.T) {
 }
 
 func TestDecode_TxnArgs(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	var (
 		addr = types.Address{0x0}
 		num  = argUint64(16)
@@ -96,6 +101,8 @@ func TestDecode_TxnArgs(t *testing.T) {
 }
 
 func TestToTransaction_Returns_V_R_S_ValuesWithoutLeading0(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	hexWithLeading0 := "0x0ba93811466694b3b3cb8853cb8227b7c9f49db10bf6e7db59d20ac904961565"
 	hexWithoutLeading0 := "0xba93811466694b3b3cb8853cb8227b7c9f49db10bf6e7db59d20ac904961565"
 	v, _ := hex.DecodeHex(hexWithLeading0)

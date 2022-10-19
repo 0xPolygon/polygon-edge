@@ -7,13 +7,15 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/umbracle/fastrlp"
+	"go.uber.org/goleak"
+
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/stretchr/testify/assert"
-	"github.com/umbracle/fastrlp"
 )
 
 var (
@@ -23,6 +25,8 @@ var (
 )
 
 func TestEth_State_GetBalance(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	store := &mockSpecialStore{
 		account: &mockAccount{
 			address: addr0,
@@ -122,6 +126,8 @@ func TestEth_State_GetBalance(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			defer goleak.VerifyNone(t)
+
 			filter := BlockNumberOrHash{
 				BlockNumber: tt.blockNumber,
 				BlockHash:   tt.blockHash,
@@ -155,6 +161,8 @@ func TestEth_State_GetBalance(t *testing.T) {
 }
 
 func TestEth_State_GetTransactionCount(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	store := &mockSpecialStore{
 		account: &mockAccount{
 			address: addr0,
@@ -255,6 +263,8 @@ func TestEth_State_GetTransactionCount(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			defer goleak.VerifyNone(t)
+
 			filter := BlockNumberOrHash{
 				BlockNumber: tt.blockNumber,
 				BlockHash:   tt.blockHash,
@@ -273,6 +283,8 @@ func TestEth_State_GetTransactionCount(t *testing.T) {
 }
 
 func TestEth_State_GetCode(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	store := &mockSpecialStore{
 		account: &mockAccount{
 			address: addr0,
@@ -376,6 +388,8 @@ func TestEth_State_GetCode(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			defer goleak.VerifyNone(t)
+
 			filter := BlockNumberOrHash{
 				BlockNumber: tt.blockNumber,
 				BlockHash:   tt.blockHash,
@@ -398,6 +412,8 @@ func TestEth_State_GetCode(t *testing.T) {
 }
 
 func TestEth_State_GetStorageAt(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	store := &mockSpecialStore{
 		account: &mockAccount{
 			address: addr0,
@@ -547,6 +563,8 @@ func TestEth_State_GetStorageAt(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			defer goleak.VerifyNone(t)
+
 			for addr, storage := range tt.initialStorage {
 				store.account = &mockAccount{
 					address: addr,
@@ -619,6 +637,8 @@ func getExampleStore() *mockSpecialStore {
 // the latest block gas limit for the upper bound, or the specified
 // gas limit in the transaction
 func TestEth_EstimateGas_GasLimit(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	// TODO Make this test run in parallel when the race
 	// condition is fixed in gas estimation
 	store := getExampleStore()
@@ -658,6 +678,8 @@ func TestEth_EstimateGas_GasLimit(t *testing.T) {
 
 	for _, testCase := range testTable {
 		t.Run(testCase.name, func(t *testing.T) {
+			defer goleak.VerifyNone(t)
+
 			// Set up the apply hook
 			if errors.Is(testCase.expectedError, state.ErrNotEnoughIntrinsicGas) {
 				// We want to trigger a situation where no value in the gas range is correct
@@ -707,6 +729,8 @@ func TestEth_EstimateGas_GasLimit(t *testing.T) {
 }
 
 func TestEth_EstimateGas_Reverts(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	// Example revert data that has the string "revert reason" as the revert reason
 	exampleReturnData := "08c379a000000000000000000000000000000000000000000000000000000000000000" +
 		"20000000000000000000000000000000000000000000000000000000000000000d72657665727420726561736f6e" +
@@ -746,6 +770,8 @@ func TestEth_EstimateGas_Reverts(t *testing.T) {
 }
 
 func TestEth_EstimateGas_Errors(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	store := getExampleStore()
 	ethEndpoint := newTestEthEndpoint(store)
 

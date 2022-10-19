@@ -7,13 +7,15 @@ import (
 	"net"
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/syncer/proto"
-	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/test/bufconn"
 	"google.golang.org/protobuf/types/known/emptypb"
+
+	"github.com/0xPolygon/polygon-edge/syncer/proto"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 const bufSize = 1024 * 1024
@@ -54,6 +56,7 @@ func newMockGrpcClient(t *testing.T, service *syncPeerService) proto.SyncPeerCli
 
 func Test_syncPeerService_GetBlocks(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	blocks := createMockBlocks(10)
 
@@ -86,6 +89,7 @@ func Test_syncPeerService_GetBlocks(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			blockMap := make(map[uint64]*types.Block)
 
@@ -137,6 +141,7 @@ func Test_syncPeerService_GetBlocks(t *testing.T) {
 
 func TestGetStatus(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	headerNumber := uint64(10)
 

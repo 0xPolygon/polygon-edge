@@ -5,9 +5,12 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
 )
 
 func TestState_FaultyNodes(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	cases := []struct {
 		Network, Faulty uint64
 	}{
@@ -31,6 +34,8 @@ func TestState_FaultyNodes(t *testing.T) {
 // TestNumValid checks if the quorum size is calculated
 // correctly based on number of validators (network size).
 func TestNumValid(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	cases := []struct {
 		Network, Quorum uint64
 	}{

@@ -5,9 +5,11 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
+
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
-	"github.com/stretchr/testify/assert"
 )
 
 func JSONMarshalHelper(t *testing.T, extra *IstanbulExtra) string {
@@ -22,6 +24,7 @@ func JSONMarshalHelper(t *testing.T, extra *IstanbulExtra) string {
 
 func TestIstanbulExtraMarshalAndUnmarshal(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name  string
@@ -100,6 +103,7 @@ func TestIstanbulExtraMarshalAndUnmarshal(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			// create original data
 			originalExtraJSON := JSONMarshalHelper(t, test.extra)
@@ -120,6 +124,7 @@ func TestIstanbulExtraMarshalAndUnmarshal(t *testing.T) {
 
 func Test_packProposerSealIntoExtra(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	newProposerSeal := []byte("new proposer seal")
 
@@ -198,6 +203,7 @@ func Test_packProposerSealIntoExtra(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			originalProposerSeal := test.extra.ProposerSeal
 
@@ -234,6 +240,7 @@ func Test_packProposerSealIntoExtra(t *testing.T) {
 
 func Test_packCommittedSealsIntoExtra(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name              string
@@ -327,6 +334,7 @@ func Test_packCommittedSealsIntoExtra(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			originalCommittedSeals := test.extra.CommittedSeals
 
@@ -365,6 +373,7 @@ func Test_packCommittedSealsIntoExtra(t *testing.T) {
 
 func Test_unmarshalRLPForParentCS(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name        string
@@ -418,6 +427,7 @@ func Test_unmarshalRLPForParentCS(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			bytesData := test.extra.MarshalRLPTo(nil)
 
@@ -435,6 +445,7 @@ func Test_unmarshalRLPForParentCS(t *testing.T) {
 
 func Test_putIbftExtra(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name   string
@@ -488,6 +499,7 @@ func Test_putIbftExtra(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			putIbftExtra(test.header, test.extra)
 

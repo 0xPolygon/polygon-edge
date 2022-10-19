@@ -5,12 +5,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
+
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 func TestSubscription(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	var (
 		e              = &eventStream{}

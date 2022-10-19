@@ -6,10 +6,12 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
 )
 
 func TestECDSAValidatorsMarshalJSON(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	validators := &Set{
 		ValidatorType: ECDSAValidatorType,
@@ -43,6 +45,7 @@ func TestECDSAValidatorsMarshalJSON(t *testing.T) {
 
 func TestECDSAValidatorsUnmarshalJSON(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	inputStr := fmt.Sprintf(
 		`[
@@ -79,6 +82,7 @@ func TestECDSAValidatorsUnmarshalJSON(t *testing.T) {
 
 func TestBLSValidatorsMarshalJSON(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	validators := &Set{
 		ValidatorType: BLSValidatorType,
@@ -116,6 +120,7 @@ func TestBLSValidatorsMarshalJSON(t *testing.T) {
 
 func TestBLSValidatorsUnmarshalJSON(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	inputStr := fmt.Sprintf(
 		`[

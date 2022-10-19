@@ -8,13 +8,15 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/hashicorp/go-hclog"
+	"go.uber.org/goleak"
+
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/state/runtime/evm"
 	"github.com/0xPolygon/polygon-edge/state/runtime/precompiled"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/hashicorp/go-hclog"
 )
 
 var (
@@ -103,6 +105,7 @@ func RunSpecificTest(t *testing.T, file string, c stateCase, name, fork string, 
 
 func TestState(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	long := []string{
 		"static_Call50000",

@@ -15,11 +15,9 @@ import (
 	"github.com/0xPolygon/polygon-edge/secrets"
 )
 
-func TestMain(m *testing.M) {
-	goleak.VerifyTestMain(m)
-}
-
 func TestLocalSecretsManagerFactory(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	// Set up the expected folder structure
 	workingDirectory, tempErr := os.MkdirTemp("/tmp", "local-secrets-manager")
 	if tempErr != nil {
@@ -60,6 +58,8 @@ func TestLocalSecretsManagerFactory(t *testing.T) {
 
 	for _, testCase := range testTable {
 		t.Run(testCase.name, func(t *testing.T) {
+			defer goleak.VerifyNone(t)
+
 			localSecretsManager, factoryErr := SecretsManagerFactory(nil, testCase.config)
 			if testCase.shouldSucceed {
 				assert.NotNil(t, localSecretsManager)
@@ -125,9 +125,9 @@ func generateAndEncodeLibp2pKey() (libp2pCrypto.PrivKey, []byte, error) {
 	return priv, []byte(hex.EncodeToString(buf)), nil
 }
 
-func TestLocalSecretsManager_GetSetSecret(
-	t *testing.T,
-) {
+func TestLocalSecretsManager_GetSetSecret(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	// Set up the values used in the test table
 	validatorKey, validatorKeyEncoded, genErr := crypto.GenerateAndEncodeECDSAPrivateKey()
 	if genErr != nil {
@@ -203,6 +203,8 @@ func TestLocalSecretsManager_GetSetSecret(
 
 	for _, testCase := range testTable {
 		t.Run(testCase.name, func(t *testing.T) {
+			defer goleak.VerifyNone(t)
+
 			// Get an instance of the secrets manager
 			manager := getLocalSecretsManager(t)
 
@@ -230,6 +232,8 @@ func TestLocalSecretsManager_GetSetSecret(
 }
 
 func TestLocalSecretsManager_RemoveSecret(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	// Set up the values used in the test table
 	_, validatorKeyEncoded, genErr := crypto.GenerateAndEncodeECDSAPrivateKey()
 	if genErr != nil {
@@ -263,6 +267,8 @@ func TestLocalSecretsManager_RemoveSecret(t *testing.T) {
 
 	for _, testCase := range testTable {
 		t.Run(testCase.name, func(t *testing.T) {
+			defer goleak.VerifyNone(t)
+
 			removeErr := manager.RemoveSecret(testCase.secretName)
 
 			if testCase.shouldSucceed {

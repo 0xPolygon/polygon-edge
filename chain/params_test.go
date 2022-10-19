@@ -5,9 +5,13 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"go.uber.org/goleak"
 )
 
 func TestValidateChainID(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	for id, name := range chains {
 		c, err := ImportFromName(strings.ToLower(name))
 		if err == nil {
@@ -19,6 +23,8 @@ func TestValidateChainID(t *testing.T) {
 }
 
 func TestParamsForks(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	cases := []struct {
 		input  string
 		output *Forks
@@ -46,6 +52,8 @@ func TestParamsForks(t *testing.T) {
 }
 
 func TestParamsForksInTime(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	f := Forks{
 		Homestead:      NewFork(0),
 		Byzantium:      NewFork(1000),

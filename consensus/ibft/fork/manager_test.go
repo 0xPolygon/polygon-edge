@@ -5,6 +5,10 @@ import (
 	"path"
 	"testing"
 
+	"github.com/hashicorp/go-hclog"
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
+
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/hook"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/crypto"
@@ -15,8 +19,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/validators"
 	"github.com/0xPolygon/polygon-edge/validators/store"
 	"github.com/0xPolygon/polygon-edge/validators/store/snapshot"
-	"github.com/hashicorp/go-hclog"
-	"github.com/stretchr/testify/assert"
 )
 
 type mockValidatorStore struct {
@@ -59,6 +61,7 @@ func (m *mockSecretManager) GetSecret(name string) ([]byte, error) {
 
 func TestNewForkManager(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	_, ecdsaKeyBytes, err := crypto.GenerateAndEncodeECDSAPrivateKey()
 	assert.NoError(t, err)
@@ -70,6 +73,7 @@ func TestNewForkManager(t *testing.T) {
 
 	t.Run("should return error if ibftConfig is empty", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		_, err := NewForkManager(
 			logger,
@@ -86,6 +90,7 @@ func TestNewForkManager(t *testing.T) {
 
 	t.Run("should return error if key manager initialization fails", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		var (
 			epochSize uint64 = 10
@@ -118,6 +123,7 @@ func TestNewForkManager(t *testing.T) {
 
 	t.Run("should return error if validator store initialization fails", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		var (
 			latestNumber uint64 = 50
@@ -171,6 +177,7 @@ func TestNewForkManager(t *testing.T) {
 
 	t.Run("PoA and ECDSA", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		var (
 			latestNumber uint64 = 50
@@ -252,6 +259,7 @@ func TestNewForkManager(t *testing.T) {
 
 	t.Run("PoS and BLS", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		var (
 			epochSize uint64 = 10
@@ -298,9 +306,11 @@ func TestNewForkManager(t *testing.T) {
 
 func TestForkManagerClose(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	t.Run("should call all Close methods of ValidatorStore", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		numCalls := 0
 
@@ -329,6 +339,7 @@ func TestForkManagerClose(t *testing.T) {
 
 	t.Run("should return error if one of Close method returns error", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		numCalls := 0
 
@@ -364,6 +375,7 @@ type MockKeyManager struct {
 
 func TestForkManagerGetSigner(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	var (
 		ecdsaKeyManager = &MockKeyManager{
@@ -476,6 +488,7 @@ func TestForkManagerGetSigner(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			fm := &ForkManager{
 				forks:       test.forks,
@@ -501,6 +514,7 @@ func TestForkManagerGetSigner(t *testing.T) {
 
 func TestForkManagerGetValidatorStore(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name            string
@@ -582,6 +596,7 @@ func TestForkManagerGetValidatorStore(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			fm := &ForkManager{
 				forks:           test.forks,
@@ -607,6 +622,7 @@ func TestForkManagerGetValidatorStore(t *testing.T) {
 
 func TestForkManagerGetValidators(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	var epochSize uint64 = 10
 
@@ -688,6 +704,7 @@ func TestForkManagerGetValidators(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			fm := &ForkManager{
 				forks:           test.forks,
@@ -714,6 +731,7 @@ func TestForkManagerGetValidators(t *testing.T) {
 
 func TestForkManagerGetHooks(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	var (
 		height uint64 = 25
@@ -753,6 +771,7 @@ func TestForkManagerGetHooks(t *testing.T) {
 
 func TestForkManager_initializeKeyManagers(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	key, keyBytes, err := crypto.GenerateAndEncodeECDSAPrivateKey()
 	assert.NoError(t, err)
@@ -816,6 +835,7 @@ func TestForkManager_initializeKeyManagers(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			fm := &ForkManager{
 				forks:          test.forks,
@@ -840,6 +860,7 @@ func TestForkManager_initializeKeyManagers(t *testing.T) {
 
 func TestForkManager_initializeValidatorStores(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	var (
 		logger     = hclog.NewNullLogger()
@@ -884,6 +905,7 @@ func TestForkManager_initializeValidatorStores(t *testing.T) {
 
 func TestForkManager_initializeHooksRegisters(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	var (
 		forks = IBFTForks{

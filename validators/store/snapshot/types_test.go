@@ -6,11 +6,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
+
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
 	"github.com/0xPolygon/polygon-edge/validators/store"
-	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -110,6 +112,7 @@ func newTestVote(
 
 func TestSnapshotMarshalJSON(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	testMarshalJSON := func(
 		t *testing.T,
@@ -130,6 +133,7 @@ func TestSnapshotMarshalJSON(t *testing.T) {
 
 	t.Run("ECDSAValidators", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		vote := newTestVote(ecdsaValidator2, addr1, true)
 
@@ -158,6 +162,7 @@ func TestSnapshotMarshalJSON(t *testing.T) {
 
 	t.Run("BLSValidators", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		vote := newTestVote(blsValidator2, addr1, false)
 
@@ -187,6 +192,7 @@ func TestSnapshotMarshalJSON(t *testing.T) {
 
 func TestSnapshotUnmarshalJSON(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	testUnmarshalJSON := func(
 		t *testing.T,
@@ -204,6 +210,7 @@ func TestSnapshotUnmarshalJSON(t *testing.T) {
 
 	t.Run("ECDSAValidators", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		testUnmarshalJSON(
 			t,
@@ -231,6 +238,7 @@ func TestSnapshotUnmarshalJSON(t *testing.T) {
 
 	t.Run("ECDSAValidators (Legacy format)", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		testUnmarshalJSON(
 			t,
@@ -273,6 +281,7 @@ func TestSnapshotUnmarshalJSON(t *testing.T) {
 
 	t.Run("BLSValidators", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		testUnmarshalJSON(
 			t,
@@ -300,6 +309,7 @@ func TestSnapshotUnmarshalJSON(t *testing.T) {
 
 	t.Run("error handling", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		tests := []struct {
 			name    string
@@ -362,6 +372,7 @@ func TestSnapshotUnmarshalJSON(t *testing.T) {
 
 func TestSnapshotEqual(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name     string
@@ -454,6 +465,7 @@ func TestSnapshotEqual(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			assert.Equal(
 				t,
@@ -466,6 +478,7 @@ func TestSnapshotEqual(t *testing.T) {
 
 func TestSnapshotCount(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name     string
@@ -519,6 +532,7 @@ func TestSnapshotCount(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			visited := make([]*store.Vote, 0, len(test.snapshot.Votes))
 
@@ -536,6 +550,7 @@ func TestSnapshotCount(t *testing.T) {
 
 func TestSnapshotAddVote(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name     string
@@ -576,6 +591,7 @@ func TestSnapshotAddVote(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			test.snapshot.AddVote(
 				test.vote.Validator,
@@ -590,6 +606,7 @@ func TestSnapshotAddVote(t *testing.T) {
 
 func TestSnapshotCopy(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name     string
@@ -626,6 +643,7 @@ func TestSnapshotCopy(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			copied := test.snapshot.Copy()
 
@@ -646,6 +664,7 @@ func TestSnapshotCopy(t *testing.T) {
 
 func TestSnapshotCountByVoterAndCandidate(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name      string
@@ -674,6 +693,7 @@ func TestSnapshotCountByVoterAndCandidate(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			assert.Equal(
 				t,
@@ -689,6 +709,7 @@ func TestSnapshotCountByVoterAndCandidate(t *testing.T) {
 
 func TestSnapshotCountByCandidate(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name      string
@@ -715,6 +736,7 @@ func TestSnapshotCountByCandidate(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			assert.Equal(
 				t,
@@ -729,6 +751,7 @@ func TestSnapshotCountByCandidate(t *testing.T) {
 
 func TestSnapshotRemoveVotes(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name     string
@@ -773,6 +796,7 @@ func TestSnapshotRemoveVotes(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			test.snapshot.RemoveVotes(
 				test.fn,
@@ -787,6 +811,7 @@ func TestSnapshotRemoveVotes(t *testing.T) {
 
 func TestSnapshotRemoveVotesByVoter(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name     string
@@ -826,6 +851,7 @@ func TestSnapshotRemoveVotesByVoter(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			test.snapshot.RemoveVotesByVoter(
 				test.voter,
@@ -840,6 +866,7 @@ func TestSnapshotRemoveVotesByVoter(t *testing.T) {
 
 func TestSnapshotRemoveVotesByCandidate(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name      string
@@ -880,6 +907,7 @@ func TestSnapshotRemoveVotesByCandidate(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			test.snapshot.RemoveVotesByCandidate(
 				test.candidate,
@@ -894,6 +922,7 @@ func TestSnapshotRemoveVotesByCandidate(t *testing.T) {
 
 func Test_snapshotSortedListLen(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name     string
@@ -915,6 +944,7 @@ func Test_snapshotSortedListLen(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			assert.Equal(
 				t,
@@ -927,6 +957,7 @@ func Test_snapshotSortedListLen(t *testing.T) {
 
 func Test_snapshotSortedListSwap(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name     string
@@ -956,6 +987,7 @@ func Test_snapshotSortedListSwap(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			test.list.Swap(test.i, test.j)
 
@@ -970,6 +1002,7 @@ func Test_snapshotSortedListSwap(t *testing.T) {
 
 func Test_snapshotSortedListLess(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name     string
@@ -1008,6 +1041,7 @@ func Test_snapshotSortedListLess(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			assert.Equal(
 				t,
@@ -1020,6 +1054,7 @@ func Test_snapshotSortedListLess(t *testing.T) {
 
 func Test_newSnapshotStore(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	var (
 		metadata = &SnapshotMetadata{
@@ -1049,6 +1084,7 @@ func Test_newSnapshotStore(t *testing.T) {
 
 func Test_snapshotStore_getLastBlock(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	var (
 		metadata = &SnapshotMetadata{
@@ -1070,6 +1106,7 @@ func Test_snapshotStore_getLastBlock(t *testing.T) {
 
 func Test_snapshotStore_updateLastBlock(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	var (
 		metadata = &SnapshotMetadata{
@@ -1095,6 +1132,7 @@ func Test_snapshotStore_updateLastBlock(t *testing.T) {
 
 func Test_snapshotStore_deleteLower(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	metadata := &SnapshotMetadata{
 		LastBlock: 10,
@@ -1152,6 +1190,7 @@ func Test_snapshotStore_deleteLower(t *testing.T) {
 
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			store := newSnapshotStore(
 				metadata,
@@ -1174,6 +1213,7 @@ func Test_snapshotStore_deleteLower(t *testing.T) {
 
 func Test_snapshotStore_find(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name      string
@@ -1242,6 +1282,7 @@ func Test_snapshotStore_find(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			store := newSnapshotStore(
 				&SnapshotMetadata{},
@@ -1259,6 +1300,7 @@ func Test_snapshotStore_find(t *testing.T) {
 
 func Test_snapshotStore_add(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	var (
 		snapshots = []*Snapshot{
@@ -1302,6 +1344,7 @@ func Test_snapshotStore_add(t *testing.T) {
 
 func Test_snapshotStore_putByNumber(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name             string
@@ -1351,6 +1394,7 @@ func Test_snapshotStore_putByNumber(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			store := newSnapshotStore(
 				&SnapshotMetadata{},

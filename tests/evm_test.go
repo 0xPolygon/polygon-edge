@@ -7,6 +7,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/hashicorp/go-hclog"
+	"github.com/umbracle/fastrlp"
+	"go.uber.org/goleak"
+
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
@@ -15,8 +19,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/state/runtime/evm"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/hashicorp/go-hclog"
-	"github.com/umbracle/fastrlp"
 )
 
 var mainnetChainConfig = chain.Params{
@@ -138,6 +140,7 @@ func rlpHashLogs(logs []*types.Log) (res types.Hash) {
 
 func TestEVM(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	folders, err := listFolders(vmTests)
 	if err != nil {

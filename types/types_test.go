@@ -9,12 +9,9 @@ import (
 	"go.uber.org/goleak"
 )
 
-func TestMain(m *testing.M) {
-	goleak.VerifyTestMain(m)
-}
-
 func TestEIP55(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	cases := []struct {
 		address  string
@@ -63,6 +60,7 @@ func TestEIP55(t *testing.T) {
 
 		t.Run("", func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			addr := StringToAddress(c.address)
 			assert.Equal(t, c.expected, addr.String())
@@ -71,6 +69,8 @@ func TestEIP55(t *testing.T) {
 }
 
 func TestTransactionCopy(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	addrTo := StringToAddress("11")
 	txn := &Transaction{
 		Nonce:    0,

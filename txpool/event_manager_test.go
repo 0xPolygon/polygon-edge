@@ -5,13 +5,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/txpool/proto"
-	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
+
+	"github.com/0xPolygon/polygon-edge/txpool/proto"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 func TestEventManager_SubscribeCancel(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	numSubscriptions := 10
 	subscriptions := make([]*subscribeResult, numSubscriptions)
 	defaultEvents := []proto.EventType{proto.EventType_PROMOTED}
@@ -50,6 +54,8 @@ func TestEventManager_SubscribeCancel(t *testing.T) {
 }
 
 func TestEventManager_SubscribeClose(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	numSubscriptions := 10
 	subscriptions := make([]*subscribeResult, numSubscriptions)
 	defaultEvents := []proto.EventType{proto.EventType_PROMOTED}
@@ -77,6 +83,8 @@ func TestEventManager_SubscribeClose(t *testing.T) {
 }
 
 func TestEventManager_SignalEvent(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	totalEvents := 10
 	invalidEvents := 3
 	validEvents := totalEvents - invalidEvents
@@ -134,6 +142,8 @@ func TestEventManager_SignalEvent(t *testing.T) {
 }
 
 func TestEventManager_SignalEventOrder(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	totalEvents := 1000
 	supportedEventTypes := []proto.EventType{
 		proto.EventType_ADDED,

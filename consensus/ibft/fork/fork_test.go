@@ -15,12 +15,9 @@ import (
 	"github.com/0xPolygon/polygon-edge/validators"
 )
 
-func TestMain(m *testing.M) {
-	goleak.VerifyTestMain(m)
-}
-
 func TestIBFTForkUnmarshalJSON(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name     string
@@ -103,6 +100,7 @@ func TestIBFTForkUnmarshalJSON(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			fork := &IBFTFork{}
 
@@ -117,6 +115,7 @@ func TestIBFTForkUnmarshalJSON(t *testing.T) {
 
 func TestGetIBFTForks(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name   string
@@ -207,6 +206,7 @@ func TestGetIBFTForks(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			res, err := GetIBFTForks(test.config)
 
@@ -227,6 +227,7 @@ func TestGetIBFTForks(t *testing.T) {
 
 func TestIBFTForks_getFork(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	forks := IBFTForks{
 		{
@@ -284,6 +285,7 @@ func TestIBFTForks_getFork(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			assert.Equal(
 				t,
@@ -296,6 +298,7 @@ func TestIBFTForks_getFork(t *testing.T) {
 
 func TestIBFTForks_filterByType(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	forks := IBFTForks{
 		{

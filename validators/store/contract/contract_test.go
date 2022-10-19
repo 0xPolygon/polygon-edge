@@ -153,12 +153,9 @@ func newTestContractValidatorStore(
 	}
 }
 
-func TestMain(m *testing.M) {
-	goleak.VerifyTestMain(m)
-}
-
 func TestNewContractValidatorStore(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	var (
 		logger     = hclog.NewNullLogger()
@@ -214,6 +211,7 @@ func TestNewContractValidatorStore(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			res, err := NewContractValidatorStore(
 				logger,
@@ -230,6 +228,7 @@ func TestNewContractValidatorStore(t *testing.T) {
 
 func TestContractValidatorStoreSourceType(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	s := &ContractValidatorStore{}
 
@@ -238,6 +237,7 @@ func TestContractValidatorStoreSourceType(t *testing.T) {
 
 func TestContractValidatorStoreGetValidators(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	var (
 		stateRoot = types.StringToHash("1")
@@ -456,6 +456,8 @@ func TestContractValidatorStoreGetValidators(t *testing.T) {
 }
 
 func TestContractValidatorStore_CacheChange(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	var (
 		cacheSize = 2
 
@@ -534,6 +536,7 @@ func TestContractValidatorStore_CacheChange(t *testing.T) {
 
 func TestContractValidatorStore_NoCache(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	var (
 		store = newTestContractValidatorStore(

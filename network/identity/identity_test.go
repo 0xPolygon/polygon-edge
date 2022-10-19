@@ -32,13 +32,11 @@ func newIdentityService(
 	}
 }
 
-func TestMain(m *testing.M) {
-	goleak.VerifyTestMain(m)
-}
-
 // TestTemporaryDial tests temporary peer connections,
 // by making sure temporary dials aren't saved as persistent peers
 func TestTemporaryDial(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	peersArray := make([]peer.ID, 0)
 
 	// Create an instance of the identity service
@@ -84,6 +82,8 @@ func TestTemporaryDial(t *testing.T) {
 
 // TestHandshake_Errors tests peer connections errors
 func TestHandshake_Errors(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	peersArray := make([]peer.ID, 0)
 	requesterChainID := int64(1)
 	responderChainID := requesterChainID + 1 // different chain ID

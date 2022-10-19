@@ -7,11 +7,13 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/helper/hex"
-	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/umbracle/fastrlp"
+	"go.uber.org/goleak"
 	"golang.org/x/crypto/sha3"
+
+	"github.com/0xPolygon/polygon-edge/helper/hex"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 type mockState struct {
@@ -126,6 +128,8 @@ func randomHash() types.Hash {
 }
 
 func TestSnapshotUpdateData(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	txn := newTestTxn(defaultPreState)
 
 	txn.SetState(addr1, hash1, hash1)

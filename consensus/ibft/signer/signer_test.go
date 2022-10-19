@@ -107,12 +107,9 @@ func getTestExtraBytes(
 	)
 }
 
-func TestMain(m *testing.M) {
-	goleak.VerifyTestMain(m)
-}
-
 func TestNewKeyManager(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	keyManager := &MockKeyManager{}
 	parentKeyManager := &MockKeyManager{}
@@ -134,6 +131,7 @@ func TestNewKeyManager(t *testing.T) {
 
 func TestSignerType(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	validatorType := validators.ECDSAValidatorType
 	signer := newTestSingleKeyManagerSigner(
@@ -153,6 +151,7 @@ func TestSignerType(t *testing.T) {
 
 func TestSignerAddress(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	addr := testAddr1
 	signer := newTestSingleKeyManagerSigner(
@@ -172,6 +171,7 @@ func TestSignerAddress(t *testing.T) {
 
 func TestSignerInitIBFTExtra(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name                 string
@@ -198,6 +198,7 @@ func TestSignerInitIBFTExtra(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			header := &types.Header{}
 
@@ -232,6 +233,8 @@ func TestSignerInitIBFTExtra(t *testing.T) {
 }
 
 func TestSignerGetIBFTExtra(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	tests := []struct {
 		name          string
 		header        *types.Header
@@ -452,6 +455,8 @@ func TestSignerGetIBFTExtra(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			defer goleak.VerifyNone(t)
+
 			extra, err := test.signer.GetIBFTExtra(test.header)
 
 			assert.Equal(
@@ -470,6 +475,8 @@ func TestSignerGetIBFTExtra(t *testing.T) {
 }
 
 func TestSignerWriteProposerSeal(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	tests := []struct {
 		name           string
 		header         *types.Header
@@ -568,6 +575,8 @@ func TestSignerWriteProposerSeal(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			defer goleak.VerifyNone(t)
+
 			UseIstanbulHeaderHashInTest(t, test.signer)
 
 			header, err := test.signer.WriteProposerSeal(test.header)
@@ -588,6 +597,8 @@ func TestSignerWriteProposerSeal(t *testing.T) {
 }
 
 func TestSignerEcrecoverFromHeader(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	tests := []struct {
 		name         string
 		header       *types.Header
@@ -651,6 +662,8 @@ func TestSignerEcrecoverFromHeader(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			defer goleak.VerifyNone(t)
+
 			UseIstanbulHeaderHashInTest(t, test.signer)
 
 			addr, err := test.signer.EcrecoverFromHeader(test.header)
@@ -672,6 +685,7 @@ func TestSignerEcrecoverFromHeader(t *testing.T) {
 
 func TestSignerCreateCommittedSeal(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	hash := crypto.Keccak256([]byte{0x1})
 	sig := crypto.Keccak256([]byte{0x2})
@@ -698,6 +712,7 @@ func TestSignerCreateCommittedSeal(t *testing.T) {
 
 func TestVerifyCommittedSeal(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	hash := crypto.Keccak256([]byte{0x1})
 	sig := crypto.Keccak256([]byte{0x2})
@@ -731,6 +746,7 @@ func TestVerifyCommittedSeal(t *testing.T) {
 
 func TestSignerWriteCommittedSeals(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name           string
@@ -833,6 +849,7 @@ func TestSignerWriteCommittedSeals(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			signer := newTestSingleKeyManagerSigner(test.keyManager)
 
@@ -853,6 +870,8 @@ func TestSignerWriteCommittedSeals(t *testing.T) {
 }
 
 func TestSignerVerifyCommittedSeals(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	tests := []struct {
 		name                    string
 		header                  *types.Header
@@ -930,6 +949,8 @@ func TestSignerVerifyCommittedSeals(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			defer goleak.VerifyNone(t)
+
 			var expectedSig []byte
 
 			signer := newTestSingleKeyManagerSigner(&MockKeyManager{
@@ -967,6 +988,7 @@ func TestSignerVerifyCommittedSeals(t *testing.T) {
 
 func TestSignerVerifyParentCommittedSeals(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	parentHeaderHash := crypto.Keccak256(types.ZeroAddress.Bytes())
 
@@ -1107,6 +1129,7 @@ func TestSignerVerifyParentCommittedSeals(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			expectedSig := crypto.Keccak256(
 				wrapCommitHash(
@@ -1147,6 +1170,7 @@ func TestSignerVerifyParentCommittedSeals(t *testing.T) {
 
 func TestSignerSignIBFTMessage(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	msg := []byte("test")
 	sig := []byte("signature")
@@ -1178,6 +1202,7 @@ func TestSignerSignIBFTMessage(t *testing.T) {
 
 func TestEcrecoverFromIBFTMessage(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	msg := []byte("test")
 	sig := []byte("signature")
@@ -1210,6 +1235,7 @@ func TestEcrecoverFromIBFTMessage(t *testing.T) {
 
 func TestSignerSignIBFTMessageAndEcrecoverFromIBFTMessage(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	msg := []byte("message")
 
@@ -1235,6 +1261,7 @@ func TestSignerSignIBFTMessageAndEcrecoverFromIBFTMessage(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			signer := newTestSingleKeyManagerSigner(test.keyManager)
 

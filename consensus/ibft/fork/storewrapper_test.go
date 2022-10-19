@@ -8,6 +8,10 @@ import (
 	"path"
 	"testing"
 
+	"github.com/hashicorp/go-hclog"
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
+
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	testHelper "github.com/0xPolygon/polygon-edge/helper/tests"
 	"github.com/0xPolygon/polygon-edge/state"
@@ -15,8 +19,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/validators"
 	"github.com/0xPolygon/polygon-edge/validators/store"
 	"github.com/0xPolygon/polygon-edge/validators/store/snapshot"
-	"github.com/hashicorp/go-hclog"
-	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -38,6 +40,7 @@ func createTestSnapshotJSON(t *testing.T, snapshot *snapshot.Snapshot) string {
 
 func TestSnapshotValidatorStoreWrapper(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name                   string
@@ -107,6 +110,7 @@ func TestSnapshotValidatorStoreWrapper(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			dirPath := createTestTempDirectory(t)
 
@@ -149,6 +153,7 @@ func TestSnapshotValidatorStoreWrapper(t *testing.T) {
 
 func TestSnapshotValidatorStoreWrapperGetValidators(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	var (
 		epochSize uint64 = 10
@@ -195,6 +200,7 @@ func TestSnapshotValidatorStoreWrapperGetValidators(t *testing.T) {
 
 func TestSnapshotValidatorStoreWrapperClose(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	var (
 		dirPath = createTestTempDirectory(t)
@@ -266,6 +272,7 @@ func (m *MockExecutor) BeginTxn(hash types.Hash, header *types.Header, addr type
 
 func TestNewContractValidatorStoreWrapper(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	_, err := NewContractValidatorStoreWrapper(
 		hclog.NewNullLogger(),
@@ -281,6 +288,7 @@ func TestNewContractValidatorStoreWrapper(t *testing.T) {
 
 func TestNewContractValidatorStoreWrapperClose(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	wrapper, err := NewContractValidatorStoreWrapper(
 		hclog.NewNullLogger(),
@@ -297,9 +305,11 @@ func TestNewContractValidatorStoreWrapperClose(t *testing.T) {
 
 func TestNewContractValidatorStoreWrapperGetValidators(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	t.Run("should return error if getSigner returns error", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		wrapper, err := NewContractValidatorStoreWrapper(
 			hclog.NewNullLogger(),
@@ -319,6 +329,7 @@ func TestNewContractValidatorStoreWrapperGetValidators(t *testing.T) {
 
 	t.Run("should return error if GetValidatorsByHeight returns error", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		wrapper, err := NewContractValidatorStoreWrapper(
 			hclog.NewNullLogger(),
@@ -346,6 +357,7 @@ func TestNewContractValidatorStoreWrapperGetValidators(t *testing.T) {
 
 func Test_calculateContractStoreFetchingHeight(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name      string
@@ -403,6 +415,7 @@ func Test_calculateContractStoreFetchingHeight(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			assert.Equal(
 				t,

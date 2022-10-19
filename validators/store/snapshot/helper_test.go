@@ -3,9 +3,11 @@ package snapshot
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
+
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
-	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -26,6 +28,7 @@ var (
 
 func Test_isAuthorize(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name         string
@@ -56,6 +59,7 @@ func Test_isAuthorize(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			res, err := isAuthorize(test.nonce)
 
@@ -67,6 +71,7 @@ func Test_isAuthorize(t *testing.T) {
 
 func Test_shouldProcessVote(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name       string
@@ -158,6 +163,7 @@ func Test_shouldProcessVote(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			assert.Equal(
 				t,
@@ -170,6 +176,7 @@ func Test_shouldProcessVote(t *testing.T) {
 
 func Test_addsOrDelsCandidate(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name string
@@ -292,6 +299,7 @@ func Test_addsOrDelsCandidate(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			err := addsOrDelsCandidate(
 				test.validators,

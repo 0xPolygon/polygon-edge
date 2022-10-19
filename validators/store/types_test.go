@@ -79,12 +79,9 @@ func createExampleBLSVoteJSON(
 	)
 }
 
-func TestMain(m *testing.M) {
-	goleak.VerifyTestMain(m)
-}
-
 func TestSourceTypeString(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		sourceType SourceType
@@ -105,6 +102,7 @@ func TestSourceTypeString(t *testing.T) {
 
 		t.Run(test.expected, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			assert.Equal(t, test.expected, test.sourceType.String())
 		})
@@ -113,6 +111,7 @@ func TestSourceTypeString(t *testing.T) {
 
 func TestVoteJSONMarshal(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	testMarshalJSON := func(
 		t *testing.T,
@@ -133,6 +132,7 @@ func TestVoteJSONMarshal(t *testing.T) {
 
 	t.Run("ECDSAValidator", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		testMarshalJSON(
 			t,
@@ -151,6 +151,7 @@ func TestVoteJSONMarshal(t *testing.T) {
 
 	t.Run("BLSValidator", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		testMarshalJSON(
 			t,
@@ -170,6 +171,7 @@ func TestVoteJSONMarshal(t *testing.T) {
 
 func TestVoteJSONUnmarshal(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	testUnmarshalJSON := func(
 		t *testing.T,
@@ -187,6 +189,7 @@ func TestVoteJSONUnmarshal(t *testing.T) {
 
 	t.Run("ECDSAValidator", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		testUnmarshalJSON(
 			t,
@@ -209,6 +212,7 @@ func TestVoteJSONUnmarshal(t *testing.T) {
 
 	t.Run("ECDSAValidator (legacy format)", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		testUnmarshalJSON(
 			t,
@@ -230,6 +234,7 @@ func TestVoteJSONUnmarshal(t *testing.T) {
 
 	t.Run("BLSValidator", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		testUnmarshalJSON(
 			t,
@@ -253,6 +258,7 @@ func TestVoteJSONUnmarshal(t *testing.T) {
 
 func TestVoteEqual(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name     string
@@ -323,6 +329,7 @@ func TestVoteEqual(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			assert.Equal(
 				t,
@@ -335,6 +342,7 @@ func TestVoteEqual(t *testing.T) {
 
 func TestVoteCopy(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	v1 := &Vote{
 		Validator: addr1,

@@ -3,13 +3,16 @@ package ibft
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
+
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestSign_Sealer(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	pool := newTesterAccountPool(t)
 	pool.add("A")
@@ -47,6 +50,7 @@ func TestSign_Sealer(t *testing.T) {
 
 func TestSign_CommittedSeals(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	pool := newTesterAccountPool(t)
 	pool.add("A", "B", "C", "D", "E")

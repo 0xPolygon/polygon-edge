@@ -4,8 +4,10 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
+
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 func TestFrontierSigner(t *testing.T) {
@@ -30,6 +32,7 @@ func TestFrontierSigner(t *testing.T) {
 
 func TestEIP155Signer_Sender(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	toAddress := types.StringToAddress("1")
 
@@ -75,6 +78,7 @@ func TestEIP155Signer_Sender(t *testing.T) {
 		testCase := testCase
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			key, keyGenError := GenerateECDSAKey()
 			if keyGenError != nil {
@@ -105,6 +109,8 @@ func TestEIP155Signer_Sender(t *testing.T) {
 }
 
 func TestEIP155Signer_ChainIDMismatch(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	chainIDS := []uint64{1, 10, 100}
 	toAddress := types.StringToAddress("1")
 

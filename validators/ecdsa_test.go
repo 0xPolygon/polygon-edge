@@ -3,12 +3,15 @@ package validators
 import (
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
+
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 func TestNewECDSAValidator(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	assert.Equal(
 		t,
@@ -19,6 +22,7 @@ func TestNewECDSAValidator(t *testing.T) {
 
 func TestECDSAValidatorType(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	assert.Equal(
 		t,
@@ -29,6 +33,7 @@ func TestECDSAValidatorType(t *testing.T) {
 
 func TestECDSAValidatorString(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	assert.Equal(
 		t,
@@ -39,6 +44,7 @@ func TestECDSAValidatorString(t *testing.T) {
 
 func TestECDSAValidatorAddr(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	assert.Equal(
 		t,
@@ -49,6 +55,7 @@ func TestECDSAValidatorAddr(t *testing.T) {
 
 func TestECDSAValidatorCopy(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	v1 := NewECDSAValidator(addr1)
 
@@ -65,6 +72,7 @@ func TestECDSAValidatorCopy(t *testing.T) {
 
 func TestECDSAValidatorEqual(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name     string
@@ -103,6 +111,7 @@ func TestECDSAValidatorEqual(t *testing.T) {
 
 func TestECDSAValidatorMarshalAndUnmarshal(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	val1 := NewECDSAValidator(addr1)
 
@@ -120,6 +129,7 @@ func TestECDSAValidatorMarshalAndUnmarshal(t *testing.T) {
 
 func TestECDSAValidatorBytes(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	val := NewECDSAValidator(addr1)
 
@@ -133,6 +143,7 @@ func TestECDSAValidatorBytes(t *testing.T) {
 
 func TestECDSAValidatorFromBytes(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	val1 := NewECDSAValidator(addr1)
 	marshalledData := types.MarshalRLPTo(val1.MarshalRLPWith, nil)

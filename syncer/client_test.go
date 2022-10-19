@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/network"
@@ -69,6 +70,7 @@ func createTestSyncerService(t *testing.T, chain Blockchain) (*syncPeerService, 
 
 func TestGetPeerStatus(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	clientSrv := newTestNetwork(t)
 	client := newTestSyncPeerClient(clientSrv, nil)
@@ -101,6 +103,7 @@ func TestGetPeerStatus(t *testing.T) {
 
 func TestGetConnectedPeerStatuses(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	clientSrv := newTestNetwork(t)
 	client := newTestSyncPeerClient(clientSrv, nil)
@@ -165,6 +168,7 @@ func TestGetConnectedPeerStatuses(t *testing.T) {
 
 func TestStatusPubSub(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	clientSrv := newTestNetwork(t)
 	client := newTestSyncPeerClient(clientSrv, nil)
@@ -230,6 +234,7 @@ func TestStatusPubSub(t *testing.T) {
 
 func TestPeerConnectionUpdateEventCh(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	var (
 		// network layer
@@ -376,6 +381,7 @@ func TestPeerConnectionUpdateEventCh(t *testing.T) {
 //nolint:tparallel
 func Test_shouldEmitBlocks(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	var (
 		// network layer
@@ -464,16 +470,19 @@ func Test_shouldEmitBlocks(t *testing.T) {
 	}
 
 	t.Run("should send own status via gossip if shouldEmitBlocks is set", func(t *testing.T) {
+		defer goleak.VerifyNone(t)
 		testGossip(t, true)
 	})
 
 	t.Run("shouldn't send own status via gossip if shouldEmitBlocks is reset", func(t *testing.T) {
+		defer goleak.VerifyNone(t)
 		testGossip(t, false)
 	})
 }
 
 func Test_syncPeerClient_GetBlocks(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	clientSrv := newTestNetwork(t)
 	client := newTestSyncPeerClient(clientSrv, nil)

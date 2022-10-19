@@ -11,10 +11,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/helper/keccak"
 )
 
-func TestMain(m *testing.M) {
-	goleak.VerifyTestMain(m)
-}
-
 func BenchmarkFast(b *testing.B) {
 	f := acquireFastHasher()
 
@@ -41,6 +37,8 @@ func BenchmarkSlow(b *testing.B) {
 }
 
 func TestFastHasher(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	f := FastHasher{
 		k: keccak.NewKeccak256(),
 	}

@@ -9,11 +9,9 @@ import (
 	"go.uber.org/goleak"
 )
 
-func TestMain(m *testing.M) {
-	goleak.VerifyTestMain(m)
-}
-
 func TestDialQueue(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	q := NewDialQueue()
 
 	info0 := &peer.AddrInfo{
@@ -58,6 +56,8 @@ func TestDialQueue(t *testing.T) {
 }
 
 func TestDel(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	type Action string
 
 	const (
@@ -150,6 +150,8 @@ func TestDel(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			defer goleak.VerifyNone(t)
+
 			q := NewDialQueue()
 			for _, task := range tt.tasks {
 				id := peer.ID(task.id)

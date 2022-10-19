@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
 )
 
 func discoveryConfig(c *Config) {
@@ -16,6 +17,8 @@ func discoveryConfig(c *Config) {
 }
 
 func TestDiscovery_ConnectedPopulatesRoutingTable(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	// when two nodes connect, they populate their kademlia routing tables
 	servers, createErr := createServers(2, nil)
 	if createErr != nil {
@@ -36,6 +39,8 @@ func TestDiscovery_ConnectedPopulatesRoutingTable(t *testing.T) {
 }
 
 func TestRoutingTable_Connected(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	defaultConfig := &CreateServerParams{
 		ConfigCallback: func(c *Config) {
 			c.MaxInboundPeers = 1
@@ -80,6 +85,8 @@ func TestRoutingTable_Connected(t *testing.T) {
 }
 
 func TestRoutingTable_Disconnected(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	defaultConfig := &CreateServerParams{
 		ConfigCallback: func(c *Config) {
 			c.MaxInboundPeers = 1
@@ -138,6 +145,8 @@ func TestRoutingTable_Disconnected(t *testing.T) {
 }
 
 func TestRoutingTable_ConnectionFailure(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	defaultConfig := &CreateServerParams{
 		ConfigCallback: func(c *Config) {
 			c.MaxInboundPeers = 1
@@ -177,6 +186,8 @@ func TestRoutingTable_ConnectionFailure(t *testing.T) {
 }
 
 func TestDiscovery_FullNetwork(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	defaultConfig := &CreateServerParams{
 		ConfigCallback: discoveryConfig,
 	}

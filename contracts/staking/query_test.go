@@ -68,11 +68,9 @@ func (m *TxMock) GetNonce(addr types.Address) uint64 {
 	return 0
 }
 
-func TestMain(m *testing.M) {
-	goleak.VerifyTestMain(m)
-}
-
 func Test_decodeValidators(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	tests := []struct {
 		name     string
 		value    []byte
@@ -105,6 +103,8 @@ func Test_decodeValidators(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			defer goleak.VerifyNone(t)
+
 			method := abis.StakingABI.Methods["validators"]
 			assert.NotNil(t, method)
 
@@ -120,6 +120,8 @@ func Test_decodeValidators(t *testing.T) {
 }
 
 func TestQueryValidators(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	method := abis.StakingABI.Methods["validators"]
 	if method == nil {
 		t.Fail()
@@ -204,6 +206,8 @@ func TestQueryValidators(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			defer goleak.VerifyNone(t)
+
 			method := abis.StakingABI.Methods["validators"]
 			assert.NotNil(t, method)
 

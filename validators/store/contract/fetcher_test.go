@@ -5,15 +5,18 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
+
 	testHelper "github.com/0xPolygon/polygon-edge/helper/tests"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestFetchValidators(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	// only check error handling because of the duplicated tests below
 	fakeValidatorType := validators.ValidatorType("fake")
@@ -29,6 +32,7 @@ func TestFetchValidators(t *testing.T) {
 
 func TestFetchECDSAValidators(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	var (
 		ecdsaValidators = validators.NewECDSAValidatorSet(
@@ -70,6 +74,7 @@ func TestFetchECDSAValidators(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			res, err := FetchValidators(
 				validators.ECDSAValidatorType,
@@ -85,6 +90,7 @@ func TestFetchECDSAValidators(t *testing.T) {
 
 func TestFetchBLSValidators(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	var (
 		blsValidators = validators.NewBLSValidatorSet(
@@ -128,6 +134,7 @@ func TestFetchBLSValidators(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			res, err := FetchValidators(
 				validators.BLSValidatorType,

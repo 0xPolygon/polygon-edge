@@ -7,11 +7,9 @@ import (
 	"go.uber.org/goleak"
 )
 
-func TestMain(m *testing.M) {
-	goleak.VerifyTestMain(m)
-}
-
 func TestSupportedServiceManager(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	testTable := []struct {
 		name        string
 		serviceName SecretsManagerType
@@ -46,6 +44,8 @@ func TestSupportedServiceManager(t *testing.T) {
 
 	for _, testCase := range testTable {
 		t.Run(testCase.name, func(t *testing.T) {
+			defer goleak.VerifyNone(t)
+
 			assert.Equal(
 				t,
 				testCase.supported,

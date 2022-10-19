@@ -4,10 +4,12 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
 )
 
 func TestEncoding_HasTermSymbol(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	testTable := []struct {
 		name           string
@@ -45,6 +47,7 @@ func TestEncoding_HasTermSymbol(t *testing.T) {
 		testCase := testCase
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			assert.Equal(t, testCase.shouldHaveTerm, hasTerminator(testCase.value))
 		})
@@ -57,6 +60,7 @@ const (
 
 func TestEncoding_KeyBytesToHexNibbles(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	testTable := []struct {
 		name           string
@@ -111,6 +115,7 @@ func TestEncoding_KeyBytesToHexNibbles(t *testing.T) {
 		testCase := testCase
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			output := bytesToHexNibbles(testCase.inputString)
 
@@ -130,6 +135,7 @@ func TestEncoding_HexCompact(t *testing.T) {
 	// 2        0010    |   terminating (leaf)         even
 	// 3        0011    |   terminating (leaf)         odd
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	testTable := []struct {
 		name           string
@@ -162,6 +168,7 @@ func TestEncoding_HexCompact(t *testing.T) {
 		testCase := testCase
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			compactOutput := encodeCompact(testCase.inputHex)
 

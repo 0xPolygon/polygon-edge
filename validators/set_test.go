@@ -3,15 +3,19 @@ package validators
 import (
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
+
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 func TestSetType(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	t.Run("ECDSAValidators", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		assert.Equal(
 			t,
@@ -22,6 +26,7 @@ func TestSetType(t *testing.T) {
 
 	t.Run("BLSValidators", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		assert.Equal(
 			t,
@@ -33,6 +38,7 @@ func TestSetType(t *testing.T) {
 
 func TestSetLen(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	assert.Equal(
 		t,
@@ -46,6 +52,7 @@ func TestSetLen(t *testing.T) {
 
 func TestSetEqual(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name     string
@@ -131,6 +138,7 @@ func TestSetEqual(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			assert.Equal(
 				t,
@@ -143,6 +151,7 @@ func TestSetEqual(t *testing.T) {
 
 func TestSetCopy(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name       string
@@ -169,6 +178,7 @@ func TestSetCopy(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			copied := test.validators.Copy()
 
@@ -188,6 +198,7 @@ func TestSetCopy(t *testing.T) {
 
 func TestSetAt(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	validators := NewECDSAValidatorSet(
 		NewECDSAValidator(addr1),
@@ -215,6 +226,7 @@ func TestSetAt(t *testing.T) {
 
 func TestSetIndex(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name       string
@@ -256,6 +268,7 @@ func TestSetIndex(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			assert.Equal(
 				t,
@@ -268,6 +281,7 @@ func TestSetIndex(t *testing.T) {
 
 func TestSetIncludes(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name       string
@@ -309,6 +323,7 @@ func TestSetIncludes(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			assert.Equal(
 				t,
@@ -321,6 +336,7 @@ func TestSetIncludes(t *testing.T) {
 
 func TestSetAdd(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name               string
@@ -382,6 +398,7 @@ func TestSetAdd(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			assert.ErrorIs(
 				t,
@@ -400,6 +417,7 @@ func TestSetAdd(t *testing.T) {
 
 func TestSetDel(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name               string
@@ -461,6 +479,7 @@ func TestSetDel(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			assert.ErrorIs(
 				t,
@@ -479,6 +498,7 @@ func TestSetDel(t *testing.T) {
 
 func TestSetMerge(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name               string
@@ -550,6 +570,7 @@ func TestSetMerge(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			assert.ErrorIs(
 				t,
@@ -568,6 +589,7 @@ func TestSetMerge(t *testing.T) {
 
 func TestSetMarshalAndUnmarshal(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name       string
@@ -594,6 +616,7 @@ func TestSetMarshalAndUnmarshal(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			encoded := types.MarshalRLPTo(test.validators.MarshalRLPWith, nil)
 

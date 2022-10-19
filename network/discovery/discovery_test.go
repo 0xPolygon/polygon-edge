@@ -71,14 +71,12 @@ func getRandomPeers(t *testing.T, count int) []*peer.AddrInfo {
 	return peersInfo
 }
 
-func TestMain(m *testing.M) {
-	goleak.VerifyTestMain(m)
-}
-
 // TestDiscoveryService_BootnodePeerDiscovery makes sure the
 // discovery service's peer discovery mechanism through the bootnode works as
 // expected
 func TestDiscoveryService_BootnodePeerDiscovery(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	randomBootnode := &peer.AddrInfo{
 		ID: "RandomBootnode",
 	}
@@ -193,6 +191,8 @@ func TestDiscoveryService_BootnodePeerDiscovery(t *testing.T) {
 // TestDiscoveryService_AddToTable tests that peers are added correctly
 // both to the discovery routing table, and the networking server's peer store
 func TestDiscoveryService_AddToTable(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	randomPeer := getRandomPeers(t, 1)[0]
 	peerStore := make(map[peer.ID]*peer.AddrInfo)
 
@@ -269,6 +269,8 @@ func TestDiscoveryService_AddToTable(t *testing.T) {
 // TestDiscoveryService_RegularPeerDiscoveryUnconnected makes sure the peers who disconnected
 // in the middle of peer discovery are not queried for their peer sets
 func TestDiscoveryService_RegularPeerDiscoveryUnconnected(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	randomPeer := getRandomPeers(t, 1)[0]
 	peerStore := make(map[peer.ID]*peer.AddrInfo)
 

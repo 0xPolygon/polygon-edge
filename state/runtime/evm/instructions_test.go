@@ -4,11 +4,13 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
+
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -64,6 +66,8 @@ func test2toBool(t *testing.T, f instruction, tests cases2ToBool) {
 }
 
 func TestAdd(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	test2to1(t, opAdd, cases2To1{
 		{one, one, two},
 		{zero, one, one},
@@ -71,6 +75,8 @@ func TestAdd(t *testing.T) {
 }
 
 func TestGt(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	test2toBool(t, opGt, cases2ToBool{
 		{one, one, false},
 		{two, one, false},
@@ -79,6 +85,8 @@ func TestGt(t *testing.T) {
 }
 
 func TestIsZero(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	test2toBool(t, opIsZero, cases2ToBool{
 		{one, one, false},
 		{zero, zero, true},
@@ -87,6 +95,8 @@ func TestIsZero(t *testing.T) {
 }
 
 func TestMStore(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	s, closeFn := getState()
 	defer closeFn()
 
@@ -118,6 +128,8 @@ var (
 )
 
 func TestCreate(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	type state struct {
 		gas    uint64
 		sp     int
@@ -356,6 +368,8 @@ func TestCreate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			defer goleak.VerifyNone(t)
+
 			s, closeFn := getState()
 			defer closeFn()
 

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
 )
 
 type codeHelper struct {
@@ -33,6 +34,8 @@ func getState() (*state, func()) {
 }
 
 func TestStackTop(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	s, closeFn := getState()
 	defer closeFn()
 
@@ -44,6 +47,8 @@ func TestStackTop(t *testing.T) {
 }
 
 func TestStackOverflow(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	code := codeHelper{}
 	for i := 0; i < stackSize; i++ {
 		code.push1()
@@ -70,6 +75,8 @@ func TestStackOverflow(t *testing.T) {
 }
 
 func TestStackUnderflow(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	s, closeFn := getState()
 	defer closeFn()
 
@@ -99,6 +106,8 @@ func TestStackUnderflow(t *testing.T) {
 }
 
 func TestOpcodeNotFound(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	s, closeFn := getState()
 	defer closeFn()
 

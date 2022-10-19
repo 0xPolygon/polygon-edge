@@ -10,10 +10,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
+
 	"github.com/0xPolygon/polygon-edge/helper/tests"
 	"github.com/0xPolygon/polygon-edge/txpool/proto"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/stretchr/testify/assert"
 )
 
 func shuffleTxPoolEvents(
@@ -79,6 +81,8 @@ func shuffleTxPoolEvents(
 }
 
 func TestEventSubscription_ProcessedEvents(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	// Set up the default values
 	supportedEvents := []proto.EventType{
 		proto.EventType_ADDED,
@@ -110,6 +114,8 @@ func TestEventSubscription_ProcessedEvents(t *testing.T) {
 
 	for _, testCase := range testTable {
 		t.Run(testCase.name, func(t *testing.T) {
+			defer goleak.VerifyNone(t)
+
 			subscription := &eventSubscription{
 				eventTypes: supportedEvents,
 				outputCh:   make(chan *proto.TxPoolEvent, len(testCase.events)),
@@ -158,6 +164,7 @@ func TestEventSubscription_ProcessedEvents(t *testing.T) {
 
 func TestEventSubscription_EventSupported(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	supportedEvents := []proto.EventType{
 		proto.EventType_ADDED,
@@ -193,6 +200,7 @@ func TestEventSubscription_EventSupported(t *testing.T) {
 		testCase := testCase
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			for _, eventType := range testCase.events {
 				assert.Equal(t, testCase.supported, subscription.eventSupported(eventType))

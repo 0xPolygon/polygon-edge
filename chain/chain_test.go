@@ -23,12 +23,9 @@ func hash(str string) types.Hash {
 	return types.StringToHash(str)
 }
 
-func TestMain(m *testing.M) {
-	goleak.VerifyTestMain(m)
-}
-
 func TestGenesisAlloc(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	cases := []struct {
 		input  string
@@ -93,6 +90,7 @@ func TestGenesisAlloc(t *testing.T) {
 
 		t.Run("", func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			var dec map[types.Address]GenesisAccount
 			if err := json.Unmarshal([]byte(c.input), &dec); err != nil {
@@ -108,6 +106,7 @@ func TestGenesisAlloc(t *testing.T) {
 
 func TestGenesisX(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	cases := []struct {
 		input  string
@@ -146,6 +145,7 @@ func TestGenesisX(t *testing.T) {
 
 		t.Run("", func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			var dec *Genesis
 			if err := json.Unmarshal([]byte(c.input), &dec); err != nil {
@@ -160,6 +160,8 @@ func TestGenesisX(t *testing.T) {
 }
 
 func TestChainFolder(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	// it should be able to parse all the chains in the ./chains folder
 	files, err := os.ReadDir("./chains")
 	if err != nil {

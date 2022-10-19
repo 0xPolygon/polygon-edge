@@ -4,11 +4,11 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"go.uber.org/goleak"
 
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -49,15 +49,13 @@ func newTestHooks(
 	}
 }
 
-func TestMain(m *testing.M) {
-	goleak.VerifyTestMain(m)
-}
-
 func TestShouldWriteTransactions(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	t.Run("should return true if the function is not set", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		hooks := newTestHooks(nil, nil, nil, nil, nil, nil, nil)
 
@@ -66,6 +64,7 @@ func TestShouldWriteTransactions(t *testing.T) {
 
 	t.Run("should call ShouldWriteTransactionFunc", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		shouldWriteTransaction := func(x uint64) bool {
 			assert.LessOrEqual(t, x, uint64(1))
@@ -82,9 +81,11 @@ func TestShouldWriteTransactions(t *testing.T) {
 
 func TestModifyHeader(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	t.Run("should do nothing if the function is not set", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		header := testHeader.Copy()
 
@@ -96,6 +97,7 @@ func TestModifyHeader(t *testing.T) {
 
 	t.Run("should call ModifyHeader", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		header := testHeader.Copy()
 
@@ -126,9 +128,11 @@ func TestModifyHeader(t *testing.T) {
 //nolint:dupl
 func TestVerifyHeader(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	t.Run("should return nil if the function is not set", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		header := testHeader.Copy()
 
@@ -140,6 +144,7 @@ func TestVerifyHeader(t *testing.T) {
 
 	t.Run("should call VerifyHeader", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		header := testHeader.Copy()
 
@@ -167,9 +172,11 @@ func TestVerifyHeader(t *testing.T) {
 //nolint:dupl
 func TestVerifyBlock(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	t.Run("should return nil if the function is not set", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		block := &types.Block{
 			Header:       testBlock.Header.Copy(),
@@ -185,6 +192,7 @@ func TestVerifyBlock(t *testing.T) {
 
 	t.Run("should call VerifyHeader", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		block := &types.Block{
 			Header:       testBlock.Header.Copy(),
@@ -216,9 +224,11 @@ func TestVerifyBlock(t *testing.T) {
 //nolint:dupl
 func TestProcessHeader(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	t.Run("should do nothing if the function is not set", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		header := testHeader.Copy()
 
@@ -230,6 +240,7 @@ func TestProcessHeader(t *testing.T) {
 
 	t.Run("should call ProcessHeader", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		header := testHeader.Copy()
 
@@ -256,6 +267,7 @@ func TestProcessHeader(t *testing.T) {
 
 func TestPreCommitState(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	var (
 		txn = &state.Transition{}
@@ -263,6 +275,7 @@ func TestPreCommitState(t *testing.T) {
 
 	t.Run("should do nothing if the function is not set", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		header := testHeader.Copy()
 
@@ -274,6 +287,7 @@ func TestPreCommitState(t *testing.T) {
 
 	t.Run("should call ProcessHeader", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		header := testHeader.Copy()
 
@@ -302,9 +316,11 @@ func TestPreCommitState(t *testing.T) {
 //nolint:dupl
 func TestPostInsertBlock(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	t.Run("should do nothing if the function is not set", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		block := &types.Block{
 			Header:       testBlock.Header.Copy(),
@@ -320,6 +336,7 @@ func TestPostInsertBlock(t *testing.T) {
 
 	t.Run("should call ProcessHeader", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		block := &types.Block{
 			Header:       testBlock.Header.Copy(),

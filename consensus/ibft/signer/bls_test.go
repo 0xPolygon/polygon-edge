@@ -6,14 +6,16 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/coinbase/kryptology/pkg/signatures/bls/bls_sig"
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
+
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	testHelper "github.com/0xPolygon/polygon-edge/helper/tests"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
-	"github.com/coinbase/kryptology/pkg/signatures/bls/bls_sig"
-	"github.com/stretchr/testify/assert"
 )
 
 func newTestBLSKeyManager(t *testing.T) (KeyManager, *ecdsa.PrivateKey, *bls_sig.SecretKey) {
@@ -92,6 +94,7 @@ func assertEqualAggregatedBLSPublicKeys(t *testing.T, apk1, apk2 *bls_sig.MultiP
 
 func TestNewBLSKeyManager(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	testECDSAKey, testECDSAKeyEncoded := newTestECDSAKey(t)
 	testBLSKey, testBLSKeyEncoded := newTestBLSKey(t)
@@ -199,6 +202,7 @@ func TestNewBLSKeyManager(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			res, err := NewBLSKeyManager(test.mockSecretManager)
 
@@ -210,6 +214,7 @@ func TestNewBLSKeyManager(t *testing.T) {
 
 func TestNewECDSAKeyManagerFromKeys(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	testKey, _ := newTestECDSAKey(t)
 	testBLSKey, _ := newTestBLSKey(t)
@@ -227,6 +232,7 @@ func TestNewECDSAKeyManagerFromKeys(t *testing.T) {
 
 func TestBLSKeyManagerType(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	blsKeyManager, _, _ := newTestBLSKeyManager(t)
 
@@ -239,6 +245,7 @@ func TestBLSKeyManagerType(t *testing.T) {
 
 func TestBLSKeyManagerAddress(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	ecdsaKey, _ := newTestECDSAKey(t)
 	blsKey, _ := newTestBLSKey(t)
@@ -253,6 +260,7 @@ func TestBLSKeyManagerAddress(t *testing.T) {
 
 func TestBLSKeyManagerNewEmptyValidators(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	blsKeyManager, _, _ := newTestBLSKeyManager(t)
 
@@ -265,6 +273,7 @@ func TestBLSKeyManagerNewEmptyValidators(t *testing.T) {
 
 func TestBLSKeyManagerNewEmptyCommittedSeals(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	blsKeyManager, _, _ := newTestBLSKeyManager(t)
 
@@ -277,6 +286,7 @@ func TestBLSKeyManagerNewEmptyCommittedSeals(t *testing.T) {
 
 func TestBLSKeyManagerSignProposerSeal(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	blsKeyManager, _, _ := newTestBLSKeyManager(t)
 	msg := crypto.Keccak256(
@@ -298,6 +308,7 @@ func TestBLSKeyManagerSignProposerSeal(t *testing.T) {
 
 func TestBLSKeyManagerSignCommittedSeal(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	ecdsaKeyManager, _, blsKey := newTestBLSKeyManager(t)
 	blsPubKey, err := blsKey.GetPublicKey()
@@ -327,6 +338,7 @@ func TestBLSKeyManagerSignCommittedSeal(t *testing.T) {
 
 func TestBLSKeyManagerVerifyCommittedSeal(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	blsKeyManager1, _, blsSecretKey1 := newTestBLSKeyManager(t)
 	blsKeyManager2, _, _ := newTestBLSKeyManager(t)
@@ -408,6 +420,7 @@ func TestBLSKeyManagerVerifyCommittedSeal(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			assert.ErrorIs(
 				t,
@@ -425,6 +438,7 @@ func TestBLSKeyManagerVerifyCommittedSeal(t *testing.T) {
 
 func TestBLSKeyManagerGenerateCommittedSeals(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	blsKeyManager1, _, _ := newTestBLSKeyManager(t)
 
@@ -497,6 +511,7 @@ func TestBLSKeyManagerGenerateCommittedSeals(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			res, err := blsKeyManager1.GenerateCommittedSeals(
 				test.sealMap,
@@ -511,6 +526,7 @@ func TestBLSKeyManagerGenerateCommittedSeals(t *testing.T) {
 
 func TestBLSKeyManagerVerifyCommittedSeals(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	blsKeyManager1, _, _ := newTestBLSKeyManager(t)
 
@@ -574,6 +590,7 @@ func TestBLSKeyManagerVerifyCommittedSeals(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			res, err := blsKeyManager1.VerifyCommittedSeals(
 				test.rawCommittedSeals,
@@ -589,6 +606,7 @@ func TestBLSKeyManagerVerifyCommittedSeals(t *testing.T) {
 
 func TestBLSKeyManagerSignIBFTMessageAndEcrecover(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	blsKeyManager, _, _ := newTestBLSKeyManager(t)
 	msg := crypto.Keccak256([]byte("message"))
@@ -608,6 +626,7 @@ func TestBLSKeyManagerSignIBFTMessageAndEcrecover(t *testing.T) {
 
 func Test_getBLSSignatures(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	validatorKeyManager, _, _ := newTestBLSKeyManager(t)
 	nonValidatorKeyManager, _, _ := newTestBLSKeyManager(t)
@@ -691,6 +710,7 @@ func Test_getBLSSignatures(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			sigs, bitmap, err := getBLSSignatures(
 				test.sealMap,
@@ -709,6 +729,7 @@ func Test_getBLSSignatures(t *testing.T) {
 
 	t.Run("multiple committed seals by validators", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		// which validator signed committed seals
 		signerFlags := []bool{
@@ -783,9 +804,11 @@ func Test_getBLSSignatures(t *testing.T) {
 
 func Test_createAggregatedBLSPubKeys(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	t.Run("multiple validators", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		// which validator signed committed seals
 		signerFlags := []bool{
@@ -848,6 +871,7 @@ func Test_createAggregatedBLSPubKeys(t *testing.T) {
 
 	t.Run("should return error if bitMap is empty", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		aggrecatedPubKeys, num, err := createAggregatedBLSPubKeys(
 			validators.NewBLSValidatorSet(),
@@ -861,6 +885,7 @@ func Test_createAggregatedBLSPubKeys(t *testing.T) {
 
 	t.Run("should return error if public key is wrong", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		aggrecatedPubKeys, num, err := createAggregatedBLSPubKeys(
 			validators.NewBLSValidatorSet(
@@ -880,6 +905,7 @@ func Test_createAggregatedBLSPubKeys(t *testing.T) {
 
 func Test_verifyBLSCommittedSealsImpl(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	validatorKeyManager1, _, _ := newTestBLSKeyManager(t)
 	validatorKeyManager2, _, _ := newTestBLSKeyManager(t)
@@ -1059,6 +1085,7 @@ func Test_verifyBLSCommittedSealsImpl(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			res, err := verifyBLSCommittedSealsImpl(
 				test.committedSeal,

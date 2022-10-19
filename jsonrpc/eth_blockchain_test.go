@@ -6,15 +6,19 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
+
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestEth_Block_GetBlockByNumber(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	store := &mockBlockStore{}
 	for i := 0; i < 10; i++ {
 		store.add(newTestBlock(uint64(i), hash1))
@@ -53,6 +57,8 @@ func TestEth_Block_GetBlockByNumber(t *testing.T) {
 }
 
 func TestEth_Block_GetBlockByHash(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	store := &mockBlockStore{}
 	store.add(newTestBlock(1, hash1))
 
@@ -68,6 +74,8 @@ func TestEth_Block_GetBlockByHash(t *testing.T) {
 }
 
 func TestEth_Block_BlockNumber(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	store := &mockBlockStore{}
 	store.add(&types.Block{
 		Header: &types.Header{
@@ -83,6 +91,8 @@ func TestEth_Block_BlockNumber(t *testing.T) {
 }
 
 func TestEth_Block_GetBlockTransactionCountByNumber(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	store := &mockBlockStore{}
 	block := newTestBlock(1, hash1)
 
@@ -102,9 +112,11 @@ func TestEth_Block_GetBlockTransactionCountByNumber(t *testing.T) {
 
 func TestEth_GetTransactionByHash(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	t.Run("returns correct transaction data if transaction is found in a sealed block", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		store := &mockBlockStore{}
 		eth := newTestEthEndpoint(store)
@@ -133,6 +145,7 @@ func TestEth_GetTransactionByHash(t *testing.T) {
 
 	t.Run("returns correct transaction data if transaction is found in tx pool (pending)", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		store := &mockBlockStore{}
 		eth := newTestEthEndpoint(store)
@@ -158,6 +171,7 @@ func TestEth_GetTransactionByHash(t *testing.T) {
 
 	t.Run("returns nil if transaction is nowhere to be found", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		eth := newTestEthEndpoint(&mockBlockStore{})
 
@@ -170,9 +184,11 @@ func TestEth_GetTransactionByHash(t *testing.T) {
 
 func TestEth_GetTransactionReceipt(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	t.Run("returns nil if transaction with same hash not found", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		store := &mockBlockStore{}
 		eth := newTestEthEndpoint(store)
@@ -185,6 +201,7 @@ func TestEth_GetTransactionReceipt(t *testing.T) {
 
 	t.Run("returns correct receipt data for found transaction", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		store := newMockBlockStore()
 		eth := newTestEthEndpoint(store)
@@ -218,10 +235,14 @@ func TestEth_GetTransactionReceipt(t *testing.T) {
 }
 
 func TestEth_Syncing(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	store := newMockBlockStore()
 	eth := newTestEthEndpoint(store)
 
 	t.Run("returns progression struct if sync is progress", func(t *testing.T) {
+		defer goleak.VerifyNone(t)
+
 		store.isSyncing = true
 
 		res, err := eth.Syncing()
@@ -238,6 +259,8 @@ func TestEth_Syncing(t *testing.T) {
 	})
 
 	t.Run("returns \"false\" if sync is not progress", func(t *testing.T) {
+		defer goleak.VerifyNone(t)
+
 		store.isSyncing = false
 
 		res, err := eth.Syncing()
@@ -250,12 +273,16 @@ func TestEth_Syncing(t *testing.T) {
 
 // if price-limit flag is set its value should be returned if it is higher than avg gas price
 func TestEth_GetPrice_PriceLimitSet(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	priceLimit := uint64(100333)
 	store := newMockBlockStore()
 	// not using newTestEthEndpoint as we need to set priceLimit
 	eth := newTestEthEndpointWithPriceLimit(store, priceLimit)
 
 	t.Run("returns price limit flag value when it is larger than average gas price", func(t *testing.T) {
+		defer goleak.VerifyNone(t)
+
 		res, err := eth.GasPrice()
 		store.averageGasPrice = 0
 		assert.NoError(t, err)
@@ -265,6 +292,8 @@ func TestEth_GetPrice_PriceLimitSet(t *testing.T) {
 	})
 
 	t.Run("returns average gas price when it is larger than set price limit flag", func(t *testing.T) {
+		defer goleak.VerifyNone(t)
+
 		store.averageGasPrice = 500000
 		res, err := eth.GasPrice()
 		assert.NoError(t, err)
@@ -275,6 +304,8 @@ func TestEth_GetPrice_PriceLimitSet(t *testing.T) {
 }
 
 func TestEth_GasPrice(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	store := newMockBlockStore()
 	store.averageGasPrice = 9999
 	eth := newTestEthEndpoint(store)
@@ -288,9 +319,11 @@ func TestEth_GasPrice(t *testing.T) {
 
 func TestEth_Call(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	t.Run("returns error if transaction execution fails", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		store := newMockBlockStore()
 		store.add(newTestBlock(100, hash1))
@@ -315,6 +348,7 @@ func TestEth_Call(t *testing.T) {
 
 	t.Run("returns a value representing result of the successful transaction execution", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		store := newMockBlockStore()
 		store.add(newTestBlock(100, hash1))

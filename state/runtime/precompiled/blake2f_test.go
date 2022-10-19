@@ -3,9 +3,13 @@ package precompiled
 import (
 	"bytes"
 	"testing"
+
+	"go.uber.org/goleak"
 )
 
 func TestBlake2f(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	b := &blake2f{}
 
 	ReadTestCase(t, "blake2f.json", func(t *testing.T, c *TestCase) {

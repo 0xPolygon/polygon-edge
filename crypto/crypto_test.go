@@ -15,11 +15,9 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-func TestMain(m *testing.M) {
-	goleak.VerifyTestMain(m)
-}
-
 func TestKeyEncoding(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	for i := 0; i < 10; i++ {
 		priv, _ := GenerateECDSAKey()
 
@@ -44,6 +42,7 @@ func TestKeyEncoding(t *testing.T) {
 
 func TestCreate2(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	cases := []struct {
 		address  string
@@ -100,6 +99,7 @@ func TestCreate2(t *testing.T) {
 
 		t.Run("", func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			address := types.StringToAddress(c.address)
 			initCode := hex.MustDecodeHex(c.initCode)
@@ -122,6 +122,8 @@ func TestCreate2(t *testing.T) {
 }
 
 func TestValidateSignatureValues(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	one := big.NewInt(1)
 	zero := big.NewInt(0)
 	secp256k1N, _ := new(big.Int).SetString("fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141", 16)
@@ -170,6 +172,7 @@ func TestValidateSignatureValues(t *testing.T) {
 
 func TestPrivateKeyRead(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	// Write private keys to disk, check if read is ok
 	testTable := []struct {
@@ -209,6 +212,7 @@ func TestPrivateKeyRead(t *testing.T) {
 		testCase := testCase
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			privateKey, err := BytesToECDSAPrivateKey([]byte(testCase.privateKeyHex))
 			if err != nil && !testCase.shouldFail {
@@ -230,6 +234,8 @@ func TestPrivateKeyRead(t *testing.T) {
 }
 
 func TestPrivateKeyGeneration(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	tempFile := "./privateKeyTesting-" + strconv.FormatInt(time.Now().Unix(), 10) + ".key"
 
 	t.Cleanup(func() {

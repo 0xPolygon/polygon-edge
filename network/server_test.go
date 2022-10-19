@@ -8,19 +8,21 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/network/common"
-	peerEvent "github.com/0xPolygon/polygon-edge/network/event"
-
-	"github.com/0xPolygon/polygon-edge/helper/tests"
-
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
+
+	"github.com/0xPolygon/polygon-edge/helper/tests"
+	"github.com/0xPolygon/polygon-edge/network/common"
+	peerEvent "github.com/0xPolygon/polygon-edge/network/event"
 )
 
 func TestConnLimit_Inbound(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	// we should not receive more inbound connections if we are already connected to max peers
 	defaultConfig := &CreateServerParams{
 		ConfigCallback: func(c *Config) {
@@ -76,6 +78,8 @@ func TestConnLimit_Inbound(t *testing.T) {
 }
 
 func TestConnLimit_Outbound(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	// we should not try to make connections if we are already connected to max peers
 	defaultConfig := &CreateServerParams{
 		ConfigCallback: func(c *Config) {
@@ -135,6 +139,8 @@ func TestConnLimit_Outbound(t *testing.T) {
 }
 
 func TestPeerEvent_EmitAndSubscribe(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	server, createErr := CreateServer(&CreateServerParams{ConfigCallback: func(c *Config) {
 		c.NoDiscover = true
 	}})
@@ -166,6 +172,8 @@ func TestPeerEvent_EmitAndSubscribe(t *testing.T) {
 	}
 
 	t.Run("Serial event emit and read", func(t *testing.T) {
+		defer goleak.VerifyNone(t)
+
 		for i := 0; i < count; i++ {
 			id, event := getIDAndEventType(i)
 			server.emitEvent(id, event)
@@ -179,6 +187,8 @@ func TestPeerEvent_EmitAndSubscribe(t *testing.T) {
 	})
 
 	t.Run("Async event emit and read", func(t *testing.T) {
+		defer goleak.VerifyNone(t)
+
 		for i := 0; i < count; i++ {
 			id, event := getIDAndEventType(i)
 			server.emitEvent(id, event)
@@ -195,6 +205,8 @@ func TestPeerEvent_EmitAndSubscribe(t *testing.T) {
 }
 
 func TestEncodingPeerAddr(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	_, pub, err := crypto.GenerateKeyPair(crypto.Secp256k1, 256)
 	assert.NoError(t, err)
 
@@ -216,6 +228,8 @@ func TestEncodingPeerAddr(t *testing.T) {
 }
 
 func TestAddrInfoToString(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	defaultPeerID := peer.ID("123")
 	defaultPort := 5000
 
@@ -281,6 +295,8 @@ func TestAddrInfoToString(t *testing.T) {
 
 	for _, testCase := range testTable {
 		t.Run(testCase.name, func(t *testing.T) {
+			defer goleak.VerifyNone(t)
+
 			// Construct the multiaddrs
 			multiAddrs, constructErr := constructMultiAddrs(testCase.addresses)
 			if constructErr != nil {
@@ -298,6 +314,8 @@ func TestAddrInfoToString(t *testing.T) {
 }
 
 func TestJoinWhenAlreadyConnected(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	// if we try to join an already connected node, the watcher
 	// should finish as well
 	servers, createErr := createServers(2, nil)
@@ -322,6 +340,8 @@ func TestJoinWhenAlreadyConnected(t *testing.T) {
 }
 
 func TestNat(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	testIP := "192.0.2.1"
 	testPort := 1500 // important to be less than 2000 because of other tests and more than 1024 because of OS security
 	testMultiAddrString := fmt.Sprintf("/ip4/%s/tcp/%d", testIP, testPort)
@@ -369,6 +389,8 @@ func TestNat(t *testing.T) {
 
 // TestPeerReconnection checks whether the node is able to reconnect with bootnodes on losing all active connections
 func TestPeerReconnection(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	bootnodeConfig := &CreateServerParams{
 		ConfigCallback: func(c *Config) {
 			c.MaxInboundPeers = 3
@@ -477,6 +499,8 @@ func TestPeerReconnection(t *testing.T) {
 }
 
 func TestReconnectionWithNewIP(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	natIP := "127.0.0.1"
 
 	_, dir0 := GenerateTestLibp2pKey(t)
@@ -560,6 +584,8 @@ func TestReconnectionWithNewIP(t *testing.T) {
 }
 
 func TestSelfConnection_WithBootNodes(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	// Create a temporary directory for storing the key file
 	key, directoryName := GenerateTestLibp2pKey(t)
 	peerID, err := peer.IDFromPrivateKey(key)
@@ -583,6 +609,8 @@ func TestSelfConnection_WithBootNodes(t *testing.T) {
 
 	for _, tt := range testTable {
 		t.Run(tt.name, func(t *testing.T) {
+			defer goleak.VerifyNone(t)
+
 			server, createErr := CreateServer(&CreateServerParams{
 				ConfigCallback: func(c *Config) {
 					c.NoDiscover = false
@@ -602,6 +630,8 @@ func TestSelfConnection_WithBootNodes(t *testing.T) {
 }
 
 func TestRunDial(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	// setupServers returns server and list of peer's server
 	setupServers := func(t *testing.T, maxPeers []int64) []*Server {
 		t.Helper()
@@ -633,6 +663,8 @@ func TestRunDial(t *testing.T) {
 	}
 
 	t.Run("should connect to all peers", func(t *testing.T) {
+		defer goleak.VerifyNone(t)
+
 		maxPeers := []int64{2, 1, 1}
 		servers := setupServers(t, maxPeers)
 		srv, peers := servers[0], servers[1:]
@@ -646,6 +678,8 @@ func TestRunDial(t *testing.T) {
 	})
 
 	t.Run("should fail to connect to some peers due to reaching limit", func(t *testing.T) {
+		defer goleak.VerifyNone(t)
+
 		maxPeers := []int64{2, 1, 1, 1}
 		servers := setupServers(t, maxPeers)
 		srv, peers := servers[0], servers[1:]
@@ -666,6 +700,8 @@ func TestRunDial(t *testing.T) {
 	})
 
 	t.Run("should try to connect after adding a peer to queue", func(t *testing.T) {
+		defer goleak.VerifyNone(t)
+
 		maxPeers := []int64{1, 0, 1}
 		servers := setupServers(t, maxPeers)
 		srv, peers := servers[0], servers[1:]
@@ -686,6 +722,8 @@ func TestRunDial(t *testing.T) {
 }
 
 func TestMinimumBootNodeCount(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	tests := []struct {
 		name          string
 		bootNodes     []string
@@ -710,6 +748,8 @@ func TestMinimumBootNodeCount(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			defer goleak.VerifyNone(t)
+
 			_, createErr := CreateServer(&CreateServerParams{
 				ServerCallback: func(server *Server) {
 					server.config.Chain.Bootnodes = tt.bootNodes
@@ -726,6 +766,8 @@ func TestMinimumBootNodeCount(t *testing.T) {
 }
 
 func TestMultiAddrFromDns(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	port := 12345
 
 	tests := []struct {
@@ -823,6 +865,8 @@ func TestMultiAddrFromDns(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			defer goleak.VerifyNone(t)
+
 			multiAddr, err := common.MultiAddrFromDNS(tt.dnsAddress, tt.port)
 			if !tt.err {
 				assert.NotNil(t, multiAddr, "Multi Address should not be nil")
@@ -837,6 +881,8 @@ func TestMultiAddrFromDns(t *testing.T) {
 // TestPeerAdditionDeletion tests that the server's peer connection
 // information handling is valid
 func TestPeerAdditionDeletion(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	createServer := func() *Server {
 		server, createErr := CreateServer(nil)
 		if createErr != nil {
@@ -890,6 +936,8 @@ func TestPeerAdditionDeletion(t *testing.T) {
 	}
 
 	t.Run("peers are added correctly", func(t *testing.T) {
+		defer goleak.VerifyNone(t)
+
 		server := createServer()
 
 		// TODO increase this number to something astronomical
@@ -899,6 +947,8 @@ func TestPeerAdditionDeletion(t *testing.T) {
 	})
 
 	t.Run("no duplicate peers added", func(t *testing.T) {
+		defer goleak.VerifyNone(t)
+
 		server := createServer()
 
 		randomPeers, err := generateRandomPeers(t, 1)
@@ -921,6 +971,8 @@ func TestPeerAdditionDeletion(t *testing.T) {
 	})
 
 	t.Run("existing peer with the opposite conn. direction", func(t *testing.T) {
+		defer goleak.VerifyNone(t)
+
 		server := createServer()
 
 		randomPeers, err := generateRandomPeers(t, 1)
@@ -962,6 +1014,8 @@ func TestPeerAdditionDeletion(t *testing.T) {
 	})
 
 	t.Run("peers are removed correctly", func(t *testing.T) {
+		defer goleak.VerifyNone(t)
+
 		server := createServer()
 		peersNum := 10
 

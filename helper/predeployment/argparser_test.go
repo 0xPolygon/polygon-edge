@@ -4,10 +4,12 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
 )
 
 func TestParseArguments_validInput(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	testTable := []struct {
 		name           string
@@ -120,6 +122,7 @@ func TestParseArguments_validInput(t *testing.T) {
 
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			res, err := ParseArguments(testCase.arguments)
 

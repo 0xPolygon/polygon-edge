@@ -5,12 +5,14 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
 )
 
 // TestDecodeUint64 verifies that uint64 values
 // are properly decoded from hex
 func TestDecodeUint64(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	uint64Array := []uint64{
 		0,

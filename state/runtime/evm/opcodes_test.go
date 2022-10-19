@@ -4,9 +4,12 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
 )
 
 func TestOpcodesString(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	assert := func(op OpCode, str string) {
 		assert.Equal(t, op.String(), str)
 	}

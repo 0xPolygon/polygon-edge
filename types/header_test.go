@@ -6,12 +6,14 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
 )
 
 // TestHeader_JSON makes sure the Header is properly
 // marshalled and unmarshalled from JSON
 func TestHeader_JSON(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	var (
 		headerJSON = `{
@@ -55,6 +57,7 @@ func TestHeader_JSON(t *testing.T) {
 
 	t.Run("Header marshalled to JSON", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		marshalledHeader, err := json.Marshal(&header)
 		if err != nil {
@@ -66,6 +69,7 @@ func TestHeader_JSON(t *testing.T) {
 
 	t.Run("Header unmarshalled from JSON", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		unmarshalledHeader := Header{}
 		if err := json.Unmarshal([]byte(headerJSON), &unmarshalledHeader); err != nil {

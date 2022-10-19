@@ -5,14 +5,17 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/state"
-	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
+
+	"github.com/0xPolygon/polygon-edge/state"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 func TestEth_DecodeTxn(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name     string
@@ -148,6 +151,7 @@ func TestEth_DecodeTxn(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			if tt.res != nil {
 				tt.res.ComputeHash()
@@ -167,6 +171,7 @@ func TestEth_DecodeTxn(t *testing.T) {
 
 func TestEth_GetNextNonce(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	// Set up the mock accounts
 	accounts := []struct {
@@ -219,6 +224,7 @@ func TestEth_GetNextNonce(t *testing.T) {
 		testCase := testCase
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			// Grab the nonce
 			nonce, err := eth.getNextNonce(testCase.account, testCase.number)

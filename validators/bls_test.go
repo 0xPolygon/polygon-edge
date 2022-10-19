@@ -6,13 +6,16 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
+
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestBLSValidatorPublicKeyString(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	assert.Equal(
 		t,
@@ -23,6 +26,7 @@ func TestBLSValidatorPublicKeyString(t *testing.T) {
 
 func TestBLSValidatorPublicKeyMarshal(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	res, err := json.Marshal(testBLSPubKey1)
 
@@ -40,6 +44,7 @@ func TestBLSValidatorPublicKeyMarshal(t *testing.T) {
 
 func TestBLSValidatorPublicKeyUnmarshal(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	key := BLSValidatorPublicKey{}
 
@@ -60,6 +65,7 @@ func TestBLSValidatorPublicKeyUnmarshal(t *testing.T) {
 
 func TestNewBLSValidator(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	assert.Equal(
 		t,
@@ -70,6 +76,7 @@ func TestNewBLSValidator(t *testing.T) {
 
 func TestBLSValidatorType(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	assert.Equal(
 		t,
@@ -80,6 +87,7 @@ func TestBLSValidatorType(t *testing.T) {
 
 func TestBLSValidatorString(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	assert.Equal(
 		t,
@@ -94,6 +102,7 @@ func TestBLSValidatorString(t *testing.T) {
 
 func TestBLSValidatorAddr(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	assert.Equal(
 		t,
@@ -104,6 +113,7 @@ func TestBLSValidatorAddr(t *testing.T) {
 
 func TestBLSValidatorCopy(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	v1 := NewBLSValidator(addr1, testBLSPubKey1)
 	v2 := v1.Copy()
@@ -120,6 +130,7 @@ func TestBLSValidatorCopy(t *testing.T) {
 
 func TestBLSValidatorEqual(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name     string
@@ -152,6 +163,7 @@ func TestBLSValidatorEqual(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			assert.Equal(
 				t,
@@ -164,6 +176,7 @@ func TestBLSValidatorEqual(t *testing.T) {
 
 func TestBLSValidatorMarshalAndUnmarshal(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	val1 := NewBLSValidator(addr1, testBLSPubKey1)
 
@@ -181,6 +194,7 @@ func TestBLSValidatorMarshalAndUnmarshal(t *testing.T) {
 
 func TestBLSValidatorBytes(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	val := NewBLSValidator(addr1, testBLSPubKey1)
 
@@ -194,6 +208,7 @@ func TestBLSValidatorBytes(t *testing.T) {
 
 func TestBLSValidatorFromBytes(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	val1 := NewBLSValidator(addr1, testBLSPubKey1)
 	marshalledData := types.MarshalRLPTo(val1.MarshalRLPWith, nil)

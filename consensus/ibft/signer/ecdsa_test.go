@@ -5,6 +5,8 @@ import (
 	"errors"
 	"testing"
 
+	"go.uber.org/goleak"
+
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	testHelper "github.com/0xPolygon/polygon-edge/helper/tests"
@@ -24,6 +26,7 @@ func newTestECDSAKeyManager(t *testing.T) (KeyManager, *ecdsa.PrivateKey) {
 
 func TestNewECDSAKeyManager(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	testKey, testKeyEncoded := newTestECDSAKey(t)
 
@@ -85,6 +88,7 @@ func TestNewECDSAKeyManager(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			res, err := NewECDSAKeyManager(test.mockSecretManager)
 
@@ -93,8 +97,10 @@ func TestNewECDSAKeyManager(t *testing.T) {
 		})
 	}
 }
+
 func TestNewECDSAKeyManagerFromKey(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	testKey, _ := newTestECDSAKey(t)
 
@@ -110,6 +116,7 @@ func TestNewECDSAKeyManagerFromKey(t *testing.T) {
 
 func TestECDSAKeyManagerType(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	ecdsaKeyManager, _ := newTestECDSAKeyManager(t)
 
@@ -122,6 +129,7 @@ func TestECDSAKeyManagerType(t *testing.T) {
 
 func TestECDSAKeyManagerAddress(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	ecdsaKey, _ := newTestECDSAKey(t)
 	ecdsaKeyManager := NewECDSAKeyManagerFromKey(ecdsaKey)
@@ -135,6 +143,7 @@ func TestECDSAKeyManagerAddress(t *testing.T) {
 
 func TestECDSAKeyManagerNewEmptyValidators(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	ecdsaKeyManager, _ := newTestECDSAKeyManager(t)
 
@@ -147,6 +156,7 @@ func TestECDSAKeyManagerNewEmptyValidators(t *testing.T) {
 
 func TestECDSAKeyManagerNewEmptyCommittedSeals(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	ecdsaKeyManager, _ := newTestECDSAKeyManager(t)
 
@@ -159,6 +169,7 @@ func TestECDSAKeyManagerNewEmptyCommittedSeals(t *testing.T) {
 
 func TestECDSAKeyManagerSignProposerSeal(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	ecdsaKeyManager, _ := newTestECDSAKeyManager(t)
 	msg := crypto.Keccak256(
@@ -180,6 +191,7 @@ func TestECDSAKeyManagerSignProposerSeal(t *testing.T) {
 
 func TestECDSAKeyManagerSignCommittedSeal(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	ecdsaKeyManager, _ := newTestECDSAKeyManager(t)
 	msg := crypto.Keccak256(
@@ -203,6 +215,7 @@ func TestECDSAKeyManagerSignCommittedSeal(t *testing.T) {
 
 func TestECDSAKeyManagerVerifyCommittedSeal(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	ecdsaKeyManager1, _ := newTestECDSAKeyManager(t)
 	ecdsaKeyManager2, _ := newTestECDSAKeyManager(t)
@@ -278,6 +291,7 @@ func TestECDSAKeyManagerVerifyCommittedSeal(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			assert.ErrorIs(
 				t,
@@ -295,6 +309,7 @@ func TestECDSAKeyManagerVerifyCommittedSeal(t *testing.T) {
 
 func TestECDSAKeyManagerGenerateCommittedSeals(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	ecdsaKeyManager1, _ := newTestECDSAKeyManager(t)
 
@@ -340,6 +355,7 @@ func TestECDSAKeyManagerGenerateCommittedSeals(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			res, err := ecdsaKeyManager1.GenerateCommittedSeals(
 				test.sealMap,
@@ -354,6 +370,7 @@ func TestECDSAKeyManagerGenerateCommittedSeals(t *testing.T) {
 
 func TestECDSAKeyManagerVerifyCommittedSeals(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	ecdsaKeyManager1, _ := newTestECDSAKeyManager(t)
 
@@ -411,6 +428,7 @@ func TestECDSAKeyManagerVerifyCommittedSeals(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			res, err := ecdsaKeyManager1.VerifyCommittedSeals(
 				test.committedSeals,
@@ -426,6 +444,7 @@ func TestECDSAKeyManagerVerifyCommittedSeals(t *testing.T) {
 
 func TestECDSAKeyManagerSignIBFTMessageAndEcrecover(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	ecdsaKeyManager, _ := newTestECDSAKeyManager(t)
 	msg := crypto.Keccak256([]byte("message"))
@@ -445,6 +464,7 @@ func TestECDSAKeyManagerSignIBFTMessageAndEcrecover(t *testing.T) {
 
 func TestECDSAKeyManager_verifyCommittedSealsImpl(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	ecdsaKeyManager1, _ := newTestECDSAKeyManager(t)
 	ecdsaKeyManager2, _ := newTestECDSAKeyManager(t)
@@ -540,6 +560,7 @@ func TestECDSAKeyManager_verifyCommittedSealsImpl(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			res, err := ecdsaKeyManager1.(*ECDSAKeyManager).verifyCommittedSealsImpl(
 				test.committedSeals,

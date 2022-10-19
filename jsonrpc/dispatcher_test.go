@@ -7,9 +7,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
+
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 var (
@@ -57,9 +59,11 @@ func expectBatchJSONResult(data []byte, v interface{}) error {
 
 func TestDispatcher_HandleWebsocketConnection_EthSubscribe(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	t.Run("clients should be able to receive \"newHeads\" event thru eth_subscribe", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		store := newMockStore()
 		dispatcher := newDispatcher(
@@ -102,6 +106,8 @@ func TestDispatcher_HandleWebsocketConnection_EthSubscribe(t *testing.T) {
 }
 
 func TestDispatcher_WebsocketConnection_RequestFormats(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	store := newMockStore()
 	dispatcher := newDispatcher(
 		hclog.NewNullLogger(),
@@ -212,6 +218,8 @@ func (m *mockService) Filter(f LogQuery) (interface{}, error) {
 }
 
 func TestDispatcherFuncDecode(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	srv := &mockService{msgCh: make(chan interface{}, 10)}
 
 	dispatcher := newDispatcher(
@@ -289,6 +297,8 @@ func TestDispatcherFuncDecode(t *testing.T) {
 }
 
 func TestDispatcherBatchRequest(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	handle := func(dispatcher *Dispatcher, reqBody []byte) []byte {
 		res, _ := dispatcher.Handle(reqBody)
 

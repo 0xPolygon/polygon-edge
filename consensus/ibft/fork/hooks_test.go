@@ -4,6 +4,10 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/hashicorp/go-hclog"
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
+
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/hook"
 	"github.com/0xPolygon/polygon-edge/contracts/staking"
@@ -16,8 +20,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
 	"github.com/0xPolygon/polygon-edge/validators/store"
-	"github.com/hashicorp/go-hclog"
-	"github.com/stretchr/testify/assert"
 )
 
 type mockHeaderModifierStore struct {
@@ -52,9 +54,11 @@ func (m *mockUpdatableStore) UpdateValidatorSet(validators validators.Validators
 
 func Test_registerHeaderModifierHooks(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	t.Run("should do nothing if validator store doesn't implement HeaderModifier", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		type invalidValidatorStoreMock struct {
 			store.ValidatorStore
@@ -74,6 +78,7 @@ func Test_registerHeaderModifierHooks(t *testing.T) {
 
 	t.Run("should register functions to the hooks", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		var (
 			header = &types.Header{
@@ -134,6 +139,7 @@ func Test_registerHeaderModifierHooks(t *testing.T) {
 
 func Test_registerUpdateValidatorsHooks(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	var (
 		vals = validators.NewECDSAValidatorSet(
@@ -144,6 +150,7 @@ func Test_registerUpdateValidatorsHooks(t *testing.T) {
 
 	t.Run("should do nothing if validator store doesn't implement Updatable", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		type invalidValidatorStoreMock struct {
 			store.ValidatorStore
@@ -163,6 +170,7 @@ func Test_registerUpdateValidatorsHooks(t *testing.T) {
 
 	t.Run("should register UpdateValidatorSet to the hooks", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		var (
 			fromHeight uint64 = 10
@@ -213,6 +221,7 @@ func Test_registerUpdateValidatorsHooks(t *testing.T) {
 
 func Test_registerTxInclusionGuardHooks(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	epochSize := uint64(10)
 	hooks := &hook.Hooks{}
@@ -357,6 +366,7 @@ func Test_registerStakingContractDeploymentHooks(t *testing.T) {
 
 func Test_getPreDeployParams(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name   string
@@ -389,6 +399,7 @@ func Test_getPreDeployParams(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			assert.Equal(
 				t,

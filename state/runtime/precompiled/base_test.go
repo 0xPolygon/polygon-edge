@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
 
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 )
@@ -29,6 +30,8 @@ func testPrecompiled(t *testing.T, p contract, cases []precompiledTest) {
 }
 
 func TestECRecover(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	var tests = []precompiledTest{
 		{
 			Input:    "38d18acb67d25c8bb9942764b62f18e17054f66a817bd4295423adf9ed98873e000000000000000000000000000000000000000000000000000000000000001b38d18acb67d25c8bb9942764b62f18e17054f66a817bd4295423adf9ed98873e789d1dd423d25f0772d2748d60f7e4b81bb14d086eba8e8e8efb6dcff8a4ae02",
@@ -42,6 +45,8 @@ func TestECRecover(t *testing.T) {
 }
 
 func TestSha256(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	var tests = []precompiledTest{
 		{
 			Input:    "38d18acb67d25c8bb9942764b62f18e17054f66a817bd4295423adf9ed98873e000000000000000000000000000000000000000000000000000000000000001b38d18acb67d25c8bb9942764b62f18e17054f66a817bd4295423adf9ed98873e789d1dd423d25f0772d2748d60f7e4b81bb14d086eba8e8e8efb6dcff8a4ae02",
@@ -54,6 +59,8 @@ func TestSha256(t *testing.T) {
 }
 
 func TestRipeMD(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	var tests = []precompiledTest{
 		{
 			Input:    "38d18acb67d25c8bb9942764b62f18e17054f66a817bd4295423adf9ed98873e000000000000000000000000000000000000000000000000000000000000001b38d18acb67d25c8bb9942764b62f18e17054f66a817bd4295423adf9ed98873e789d1dd423d25f0772d2748d60f7e4b81bb14d086eba8e8e8efb6dcff8a4ae02",
@@ -66,6 +73,8 @@ func TestRipeMD(t *testing.T) {
 }
 
 func TestIdentity(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	var tests = []precompiledTest{
 		{
 			Input:    "38d18acb67d25c8bb9942764b62f18e17054f66a817bd4295423adf9ed98873e000000000000000000000000000000000000000000000000000000000000001b38d18acb67d25c8bb9942764b62f18e17054f66a817bd4295423adf9ed98873e789d1dd423d25f0772d2748d60f7e4b81bb14d086eba8e8e8efb6dcff8a4ae02",

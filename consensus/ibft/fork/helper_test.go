@@ -7,13 +7,15 @@ import (
 	"path"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
+
 	"github.com/0xPolygon/polygon-edge/crypto"
 	testHelper "github.com/0xPolygon/polygon-edge/helper/tests"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
 	"github.com/0xPolygon/polygon-edge/validators/store"
 	"github.com/0xPolygon/polygon-edge/validators/store/snapshot"
-	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -42,9 +44,11 @@ func createTestTempDirectory(t *testing.T) string {
 
 func Test_loadSnapshotMetadata(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	t.Run("should return error if the file doesn't exist", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		dirPath := createTestTempDirectory(t)
 		filePath := path.Join(dirPath, "test.dat")
@@ -57,6 +61,7 @@ func Test_loadSnapshotMetadata(t *testing.T) {
 
 	t.Run("should load metadata", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		metadata := &snapshot.SnapshotMetadata{
 			LastBlock: 100,
@@ -86,9 +91,11 @@ func Test_loadSnapshotMetadata(t *testing.T) {
 
 func Test_loadSnapshots(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	t.Run("should return error if the file doesn't exist", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		dirPath := createTestTempDirectory(t)
 		filePath := path.Join(dirPath, "test.dat")
@@ -101,6 +108,7 @@ func Test_loadSnapshots(t *testing.T) {
 
 	t.Run("should load metadata", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		snapshots := []*snapshot.Snapshot{
 			{
@@ -143,9 +151,11 @@ func Test_loadSnapshots(t *testing.T) {
 
 func Test_readDataStore(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	t.Run("should return error if the file doesn't exist", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		dirPath := createTestTempDirectory(t)
 		filePath := path.Join(dirPath, "test.dat")
@@ -160,6 +170,7 @@ func Test_readDataStore(t *testing.T) {
 
 	t.Run("should return error if the content is not json", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		dirPath := createTestTempDirectory(t)
 		filePath := path.Join(dirPath, "test.dat")
@@ -180,6 +191,7 @@ func Test_readDataStore(t *testing.T) {
 
 	t.Run("should read and map to object", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		dirPath := createTestTempDirectory(t)
 		filePath := path.Join(dirPath, "test.dat")
@@ -206,6 +218,7 @@ func Test_readDataStore(t *testing.T) {
 
 func Test_writeDataStore(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name               string
@@ -234,6 +247,7 @@ func Test_writeDataStore(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			dirPath := createTestTempDirectory(t)
 			filePath := path.Join(dirPath, "test.dat")

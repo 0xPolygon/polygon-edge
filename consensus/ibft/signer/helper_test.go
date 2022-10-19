@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"testing"
 
+	"go.uber.org/goleak"
+
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/secrets"
@@ -57,6 +59,7 @@ func newTestBLSKey(t *testing.T) (*bls_sig.SecretKey, []byte) {
 // Make sure the target function always returns the same result
 func Test_wrapCommitHash(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	var (
 		input             = crypto.Keccak256([]byte{0x1})
@@ -76,6 +79,7 @@ func Test_wrapCommitHash(t *testing.T) {
 //nolint
 func Test_getOrCreateECDSAKey(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	testKey, testKeyEncoded := newTestECDSAKey(t)
 
@@ -175,6 +179,7 @@ func Test_getOrCreateECDSAKey(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			res, err := getOrCreateECDSAKey(test.mockSecretManager)
 
@@ -187,6 +192,7 @@ func Test_getOrCreateECDSAKey(t *testing.T) {
 //nolint
 func Test_getOrCreateBLSKey(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	testKey, testKeyEncoded := newTestBLSKey(t)
 
@@ -285,6 +291,7 @@ func Test_getOrCreateBLSKey(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			res, err := getOrCreateBLSKey(test.mockSecretManager)
 
@@ -297,6 +304,7 @@ func Test_getOrCreateBLSKey(t *testing.T) {
 // make sure that header hash calculation returns the same hash
 func Test_calculateHeaderHash(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	assert.Equal(
 		t,
@@ -307,6 +315,7 @@ func Test_calculateHeaderHash(t *testing.T) {
 
 func Test_ecrecover(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	testKey, _ := newTestECDSAKey(t)
 	signerAddress := crypto.PubKeyToAddress(&testKey.PublicKey)
@@ -331,6 +340,7 @@ func Test_ecrecover(t *testing.T) {
 
 func TestNewKeyManagerFromType(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	testECDSAKey, testECDSAKeyEncoded := newTestECDSAKey(t)
 	testBLSKey, testBLSKeyEncoded := newTestBLSKey(t)
@@ -389,6 +399,7 @@ func TestNewKeyManagerFromType(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			res, err := NewKeyManagerFromType(test.mockSecretManager, test.validatorType)
 
@@ -406,6 +417,7 @@ func TestNewKeyManagerFromType(t *testing.T) {
 
 func Test_verifyIBFTExtraSize(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name      string
@@ -439,6 +451,7 @@ func Test_verifyIBFTExtraSize(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			header := &types.Header{
 				ExtraData: test.extraData,

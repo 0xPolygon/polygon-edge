@@ -99,12 +99,9 @@ func newTestSnapshotValidatorStore(
 	}
 }
 
-func TestMain(m *testing.M) {
-	goleak.VerifyTestMain(m)
-}
-
 func TestNewSnapshotValidatorStore(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	var (
 		logger     = hclog.NewNullLogger()
@@ -128,6 +125,7 @@ func TestNewSnapshotValidatorStore(t *testing.T) {
 
 	t.Run("should return error", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		store, err := NewSnapshotValidatorStore(
 			logger,
@@ -154,6 +152,7 @@ func TestNewSnapshotValidatorStore(t *testing.T) {
 
 	t.Run("should succeed", func(t *testing.T) {
 		t.Parallel()
+		defer goleak.VerifyNone(t)
 
 		vals := validators.NewECDSAValidatorSet(
 			ecdsaValidator1,
@@ -211,6 +210,7 @@ func TestNewSnapshotValidatorStore(t *testing.T) {
 
 func TestSnapshotValidatorStore_initialize(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	var (
 		initialCandidates        = []*store.Candidate{}
@@ -478,6 +478,7 @@ func TestSnapshotValidatorStore_initialize(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			snapshotStore := newTestSnapshotValidatorStore(
 				newMockBlockchain(test.latestHeaderNumber, test.headers),
@@ -515,6 +516,7 @@ func TestSnapshotValidatorStore_initialize(t *testing.T) {
 
 func TestSnapshotValidatorStoreSourceType(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	snapshotStore := newTestSnapshotValidatorStore(
 		nil,
@@ -534,6 +536,7 @@ func TestSnapshotValidatorStoreSourceType(t *testing.T) {
 
 func TestSnapshotValidatorStoreGetSnapshotMetadata(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	var (
 		lastBlock = uint64(10)
@@ -559,6 +562,7 @@ func TestSnapshotValidatorStoreGetSnapshotMetadata(t *testing.T) {
 
 func TestSnapshotValidatorStoreGetSnapshots(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	var (
 		snapshots = []*Snapshot{
@@ -586,6 +590,7 @@ func TestSnapshotValidatorStoreGetSnapshots(t *testing.T) {
 
 func TestSnapshotValidatorStoreCandidates(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	var (
 		candidates = []*store.Candidate{
@@ -616,6 +621,7 @@ func TestSnapshotValidatorStoreCandidates(t *testing.T) {
 
 func TestSnapshotValidatorStoreGetValidators(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name        string
@@ -656,6 +662,7 @@ func TestSnapshotValidatorStoreGetValidators(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			snapshotStore := newTestSnapshotValidatorStore(
 				nil,
@@ -676,6 +683,7 @@ func TestSnapshotValidatorStoreGetValidators(t *testing.T) {
 
 func TestSnapshotValidatorStoreVotes(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name        string
@@ -714,6 +722,7 @@ func TestSnapshotValidatorStoreVotes(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			snapshotStore := newTestSnapshotValidatorStore(
 				nil,
@@ -734,6 +743,7 @@ func TestSnapshotValidatorStoreVotes(t *testing.T) {
 
 func TestSnapshotValidatorStoreUpdateValidatorSet(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	var (
 		// Add a snapshot so that snapshot can be used from the target height
@@ -848,6 +858,7 @@ func TestSnapshotValidatorStoreUpdateValidatorSet(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			snapshotStore := newTestSnapshotValidatorStore(
 				test.blockchain,
@@ -871,6 +882,7 @@ func TestSnapshotValidatorStoreUpdateValidatorSet(t *testing.T) {
 
 func TestSnapshotValidatorStoreModifyHeader(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	var (
 		targetNumber uint64 = 20
@@ -1039,6 +1051,7 @@ func TestSnapshotValidatorStoreModifyHeader(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			header := newInitialHeader()
 
@@ -1067,6 +1080,7 @@ func TestSnapshotValidatorStoreModifyHeader(t *testing.T) {
 
 func TestSnapshotValidatorStoreVerifyHeader(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name        string
@@ -1099,6 +1113,7 @@ func TestSnapshotValidatorStoreVerifyHeader(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			header := &types.Header{
 				Nonce: test.nonce,
@@ -1124,6 +1139,7 @@ func TestSnapshotValidatorStoreVerifyHeader(t *testing.T) {
 
 func TestSnapshotValidatorStoreProcessHeadersInRange(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	var (
 		epochSize     uint64 = 10
@@ -1311,6 +1327,7 @@ func TestSnapshotValidatorStoreProcessHeadersInRange(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			snapshotStore := newTestSnapshotValidatorStore(
 				newMockBlockchain(0, test.headers),
@@ -1357,6 +1374,7 @@ func TestSnapshotValidatorStoreProcessHeadersInRange(t *testing.T) {
 
 func TestSnapshotValidatorStoreProcessHeader(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	var (
 		epochSize         uint64 = 10
@@ -1622,6 +1640,7 @@ func TestSnapshotValidatorStoreProcessHeader(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			snapshotStore := newTestSnapshotValidatorStore(
 				nil,
@@ -1657,6 +1676,7 @@ func TestSnapshotValidatorStoreProcessHeader(t *testing.T) {
 
 func TestSnapshotValidatorStorePropose(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	var (
 		latestHeight uint64 = 20
@@ -1790,6 +1810,7 @@ func TestSnapshotValidatorStorePropose(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			snapshotStore := newTestSnapshotValidatorStore(
 				nil,
@@ -1815,6 +1836,7 @@ func TestSnapshotValidatorStorePropose(t *testing.T) {
 
 func TestSnapshotValidatorStore_addCandidate(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name              string
@@ -1877,6 +1899,7 @@ func TestSnapshotValidatorStore_addCandidate(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			snapshotStore := newTestSnapshotValidatorStore(
 				nil,
@@ -1908,6 +1931,7 @@ func TestSnapshotValidatorStore_addCandidate(t *testing.T) {
 
 func TestSnapshotValidatorStore_addHeaderSnap(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	var (
 		headerHeight uint64 = 10
@@ -2001,6 +2025,7 @@ func TestSnapshotValidatorStore_addHeaderSnap(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			snapshotStore := newTestSnapshotValidatorStore(
 				nil,
@@ -2030,6 +2055,7 @@ func TestSnapshotValidatorStore_addHeaderSnap(t *testing.T) {
 
 func TestSnapshotValidatorStore_getSnapshot(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	var (
 		snapthots = []*Snapshot{
@@ -2063,6 +2089,7 @@ func TestSnapshotValidatorStore_getSnapshot(t *testing.T) {
 
 func TestSnapshotValidatorStore_getLatestSnapshot(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	var (
 		snapthots = []*Snapshot{
@@ -2096,6 +2123,7 @@ func TestSnapshotValidatorStore_getLatestSnapshot(t *testing.T) {
 
 func TestSnapshotValidatorStore_cleanObsoleteCandidates(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	var (
 		validators = validators.NewECDSAValidatorSet(
@@ -2153,6 +2181,7 @@ func TestSnapshotValidatorStore_cleanObsoleteCandidates(t *testing.T) {
 
 func TestSnapshotValidatorStore_pickOneCandidate(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	var (
 		proposer = ecdsaValidator1.Addr()
@@ -2201,6 +2230,7 @@ func TestSnapshotValidatorStore_pickOneCandidate(t *testing.T) {
 
 func TestSnapshotValidatorStore_saveSnapshotIfChanged(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	var (
 		headerHeight uint64 = 30
@@ -2281,6 +2311,7 @@ func TestSnapshotValidatorStore_saveSnapshotIfChanged(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			snapshotStore := newTestSnapshotValidatorStore(
 				nil,
@@ -2304,6 +2335,7 @@ func TestSnapshotValidatorStore_saveSnapshotIfChanged(t *testing.T) {
 
 func TestSnapshotValidatorStore_resetSnapshot(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	var (
 		headerHeight uint64 = 30
@@ -2368,6 +2400,7 @@ func TestSnapshotValidatorStore_resetSnapshot(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			snapshotStore := newTestSnapshotValidatorStore(
 				nil,
@@ -2391,6 +2424,7 @@ func TestSnapshotValidatorStore_resetSnapshot(t *testing.T) {
 
 func TestSnapshotValidatorStore_removeLowerSnapshots(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	var (
 		epochSize uint64 = 10
@@ -2437,6 +2471,7 @@ func TestSnapshotValidatorStore_removeLowerSnapshots(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			snapshotStore := newTestSnapshotValidatorStore(
 				nil,
@@ -2459,6 +2494,8 @@ func TestSnapshotValidatorStore_removeLowerSnapshots(t *testing.T) {
 }
 
 func TestSnapshotValidatorStore_processVote(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	var (
 		headerNumber uint64 = 21
 
@@ -2679,6 +2716,8 @@ func TestSnapshotValidatorStore_processVote(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			defer goleak.VerifyNone(t)
+
 			testHelper.AssertErrorMessageContains(
 				t,
 				test.expectedErr,
@@ -2701,6 +2740,7 @@ func TestSnapshotValidatorStore_processVote(t *testing.T) {
 
 func Test_validatorToMiner(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name        string
@@ -2733,6 +2773,7 @@ func Test_validatorToMiner(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			res, err := validatorToMiner(test.validator)
 
@@ -2753,6 +2794,7 @@ func Test_validatorToMiner(t *testing.T) {
 
 func Test_minerToValidator(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name          string
@@ -2789,6 +2831,7 @@ func Test_minerToValidator(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			res, err := minerToValidator(test.validatorType, test.miner)
 

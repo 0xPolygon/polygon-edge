@@ -4,12 +4,15 @@ import (
 	"errors"
 	"testing"
 
-	testHelper "github.com/0xPolygon/polygon-edge/helper/tests"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
+
+	testHelper "github.com/0xPolygon/polygon-edge/helper/tests"
 )
 
 func TestIBFTTypeString(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	cases := map[IBFTType]string{
 		PoA: "PoA",
@@ -27,6 +30,7 @@ func TestIBFTTypeString(t *testing.T) {
 
 func TestParseIBFTType(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		value string
@@ -55,6 +59,7 @@ func TestParseIBFTType(t *testing.T) {
 
 		t.Run(test.value, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			res, err := ParseIBFTType(test.value)
 

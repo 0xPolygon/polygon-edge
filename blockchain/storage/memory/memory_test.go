@@ -8,15 +8,13 @@ import (
 	"github.com/0xPolygon/polygon-edge/blockchain/storage"
 )
 
-func TestMain(m *testing.M) {
-	goleak.VerifyTestMain(m)
-}
-
 func TestStorage(t *testing.T) {
 	t.Helper()
+	defer goleak.VerifyNone(t)
 
 	f := func(t *testing.T) (storage.Storage, func()) {
 		t.Helper()
+		defer goleak.VerifyNone(t)
 
 		s, _ := NewMemoryStorage(nil)
 

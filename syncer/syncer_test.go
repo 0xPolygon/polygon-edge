@@ -193,12 +193,9 @@ var (
 	}
 )
 
-func TestMain(m *testing.M) {
-	goleak.VerifyTestMain(m)
-}
-
 func Test_initializePeerMap(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	syncer := NewTestSyncer(
 		nil,
@@ -226,6 +223,7 @@ func Test_initializePeerMap(t *testing.T) {
 
 func Test_startPeerStatusUpdateProcess(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	syncer := NewTestSyncer(
 		nil,
@@ -261,6 +259,7 @@ func Test_startPeerStatusUpdateProcess(t *testing.T) {
 
 func Test_startPeerDisconnectEventProcess(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name            string
@@ -352,6 +351,7 @@ func Test_startPeerDisconnectEventProcess(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			syncer := NewTestSyncer(
 				nil,
@@ -400,6 +400,7 @@ func Test_startPeerDisconnectEventProcess(t *testing.T) {
 
 func TestHasSyncPeer(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	peerStatuses := []*NoForkPeer{
 		{
@@ -445,6 +446,7 @@ func TestHasSyncPeer(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			syncer := NewTestSyncer(
 				nil,
@@ -494,6 +496,7 @@ func createMockBlocks(num int) []*types.Block {
 
 func TestSync(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	blocks := createMockBlocks(10)
 
@@ -603,6 +606,7 @@ func TestSync(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			var (
 				syncedBlocks      = make([]*types.Block, 0, len(test.blocks))
@@ -662,6 +666,7 @@ func TestSync(t *testing.T) {
 
 func Test_bulkSyncWithPeer(t *testing.T) {
 	t.Parallel()
+	defer goleak.VerifyNone(t)
 
 	blockNum := 30
 	blocks := make([]*types.Block, blockNum) // 1 to 30
@@ -822,6 +827,7 @@ func Test_bulkSyncWithPeer(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			var (
 				syncedBlocks = make([]*types.Block, 0, len(test.blocks))
