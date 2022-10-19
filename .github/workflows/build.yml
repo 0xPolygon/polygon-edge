@@ -3,6 +3,9 @@ name: Build
 on:  # yamllint disable-line rule:truthy
   workflow_dispatch:
   workflow_call:
+    secrets:
+      GH_TOKEN_CLONE_PRIVATE:
+        required: true
 
 jobs:
   go_build:
@@ -14,7 +17,7 @@ jobs:
         with:
           submodules: recursive
           token: ${{ secrets.GH_TOKEN_CLONE_PRIVATE }}
-          
+
       - name: Setup Go environment
         uses: actions/setup-go@v3.3.0
         with:
