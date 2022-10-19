@@ -4,10 +4,12 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
+
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/stretchr/testify/assert"
 )
 
 func newMockContract(value *big.Int, gas uint64, code []byte) *runtime.Contract {
@@ -85,6 +87,10 @@ func (m *mockHost) Empty(addr types.Address) bool {
 
 func (m *mockHost) GetNonce(addr types.Address) uint64 {
 	panic("Not implemented in tests")
+}
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
 }
 
 func TestRun(t *testing.T) {

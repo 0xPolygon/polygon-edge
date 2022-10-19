@@ -6,15 +6,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/helper/tests"
-	"github.com/0xPolygon/polygon-edge/network/common"
-	"github.com/0xPolygon/polygon-edge/network/proto"
-	networkTesting "github.com/0xPolygon/polygon-edge/network/testing"
 	"github.com/hashicorp/go-hclog"
 	kb "github.com/libp2p/go-libp2p-kbucket"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
 	"google.golang.org/grpc"
+
+	"github.com/0xPolygon/polygon-edge/helper/tests"
+	"github.com/0xPolygon/polygon-edge/network/common"
+	"github.com/0xPolygon/polygon-edge/network/proto"
+	networkTesting "github.com/0xPolygon/polygon-edge/network/testing"
 )
 
 // newDiscoveryService creates a new discovery service instance
@@ -67,6 +69,10 @@ func getRandomPeers(t *testing.T, count int) []*peer.AddrInfo {
 	}
 
 	return peersInfo
+}
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
 }
 
 // TestDiscoveryService_BootnodePeerDiscovery makes sure the

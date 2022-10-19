@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
+
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
-	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -75,6 +77,10 @@ func createExampleBLSVoteJSON(
 		candidate.BLSPublicKey,
 		validator,
 	)
+}
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
 }
 
 func TestSourceTypeString(t *testing.T) {

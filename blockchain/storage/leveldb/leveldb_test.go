@@ -4,8 +4,10 @@ import (
 	"os"
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/blockchain/storage"
 	"github.com/hashicorp/go-hclog"
+	"go.uber.org/goleak"
+
+	"github.com/0xPolygon/polygon-edge/blockchain/storage"
 )
 
 func newStorage(t *testing.T) (storage.Storage, func()) {
@@ -32,6 +34,10 @@ func newStorage(t *testing.T) (storage.Storage, func()) {
 	}
 
 	return s, closeFn
+}
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
 }
 
 func TestStorage(t *testing.T) {

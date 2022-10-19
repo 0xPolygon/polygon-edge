@@ -4,13 +4,15 @@ import (
 	"context"
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/network/proto"
-	networkTesting "github.com/0xPolygon/polygon-edge/network/testing"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
 	"google.golang.org/grpc"
+
+	"github.com/0xPolygon/polygon-edge/network/proto"
+	networkTesting "github.com/0xPolygon/polygon-edge/network/testing"
 )
 
 // newIdentityService creates a new identity service instance
@@ -28,6 +30,10 @@ func newIdentityService(
 		baseServer: baseServer,
 		logger:     hclog.NewNullLogger(),
 	}
+}
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
 }
 
 // TestTemporaryDial tests temporary peer connections,

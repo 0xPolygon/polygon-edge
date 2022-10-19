@@ -7,13 +7,15 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/hashicorp/go-hclog"
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
+
 	"github.com/0xPolygon/polygon-edge/crypto"
 	testHelper "github.com/0xPolygon/polygon-edge/helper/tests"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
 	"github.com/0xPolygon/polygon-edge/validators/store"
-	"github.com/hashicorp/go-hclog"
-	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -95,6 +97,10 @@ func newTestSnapshotValidatorStore(
 		candidatesLock: sync.RWMutex{},
 		epochSize:      epochSize,
 	}
+}
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
 }
 
 func TestNewSnapshotValidatorStore(t *testing.T) {

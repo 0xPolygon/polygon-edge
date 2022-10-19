@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"go.uber.org/goleak"
+
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -19,6 +21,10 @@ func addr(str string) types.Address {
 
 func hash(str string) types.Hash {
 	return types.StringToHash(str)
+}
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
 }
 
 func TestGenesisAlloc(t *testing.T) {

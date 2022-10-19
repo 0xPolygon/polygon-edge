@@ -6,12 +6,17 @@ import (
 	"net"
 	"testing"
 
+	"github.com/hashicorp/go-hclog"
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
+
 	"github.com/0xPolygon/polygon-edge/helper/tests"
 	"github.com/0xPolygon/polygon-edge/versioning"
-	"github.com/stretchr/testify/assert"
-
-	"github.com/hashicorp/go-hclog"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
 
 func TestHTTPServer(t *testing.T) {
 	store := newMockStore()

@@ -4,9 +4,11 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
+
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -45,6 +47,10 @@ func newTestHooks(
 		PreCommitStateFunc:         preCommitState,
 		PostInsertBlockFunc:        postInsertBlock,
 	}
+}
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
 }
 
 func TestShouldWriteTransactions(t *testing.T) {

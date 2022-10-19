@@ -6,8 +6,14 @@ import (
 	"math/big"
 	"testing"
 
+	"go.uber.org/goleak"
+
 	"github.com/0xPolygon/polygon-edge/helper/keccak"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
 
 func BenchmarkFast(b *testing.B) {
 	f := acquireFastHasher()

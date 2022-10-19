@@ -4,6 +4,11 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/hashicorp/go-hclog"
+	lru "github.com/hashicorp/golang-lru"
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
+
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/contracts/staking"
 	"github.com/0xPolygon/polygon-edge/crypto"
@@ -15,9 +20,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
 	"github.com/0xPolygon/polygon-edge/validators/store"
-	"github.com/hashicorp/go-hclog"
-	lru "github.com/hashicorp/golang-lru"
-	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -149,6 +151,10 @@ func newTestContractValidatorStore(
 		executor:          executor,
 		validatorSetCache: cache,
 	}
+}
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
 }
 
 func TestNewContractValidatorStore(t *testing.T) {

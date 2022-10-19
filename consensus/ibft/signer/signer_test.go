@@ -6,11 +6,13 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
+
 	"github.com/0xPolygon/polygon-edge/crypto"
 	testHelper "github.com/0xPolygon/polygon-edge/helper/tests"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
-	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -103,6 +105,10 @@ func getTestExtraBytes(
 		make([]byte, IstanbulExtraVanity),
 		extra.MarshalRLPTo(nil)...,
 	)
+}
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
 }
 
 func TestNewKeyManager(t *testing.T) {
