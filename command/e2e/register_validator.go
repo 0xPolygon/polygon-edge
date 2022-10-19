@@ -26,7 +26,7 @@ var params registerParams
 
 func GetCommand() *cobra.Command {
 	registerCmd := &cobra.Command{
-		Use:     "register",
+		Use:     "register-validator",
 		Short:   "Registers a new validator",
 		PreRunE: runPreRun,
 		RunE:    runCommand,
@@ -97,21 +97,31 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 				return registerValidator(newValidatorSender, newValidatorAccount)
 			},
 			postHook: func(receipt *ethgo.Receipt) error {
-				event, err := newValidatorEvent.ParseLog(receipt.Logs[0])
-				if err != nil {
-					return err
+				if receipt.Status != uint64(types.ReceiptSuccess) {
+					return errors.New("register validator transaction failed")
 				}
 
-				validatorAddr, ok := event["validator"].(ethgo.Address)
-				if !ok {
-					return errors.New("type assertions failed for parameter validator")
+				for _, log := range receipt.Logs {
+					if newValidatorEvent.Match(log) {
+						event, err := newValidatorEvent.ParseLog(log)
+						if err != nil {
+							return err
+						}
+
+						validatorAddr, ok := event["validator"].(ethgo.Address)
+						if !ok {
+							return errors.New("type assertions failed for parameter validator")
+						}
+
+						validator = &NewValidator{
+							Validator: validatorAddr,
+						}
+
+						return nil
+					}
 				}
 
-				validator = &NewValidator{
-					Validator: validatorAddr,
-				}
-
-				return nil
+				return errors.New("NewValidator event was not emitted")
 			},
 		},
 		{
@@ -201,12 +211,16 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 			}
 		}
 
-		if step.status == txnStepFailed {
-			break
+		if step.postHook != nil {
+			err := step.postHook(receipt)
+			if err != nil {
+				step.status = txnStepFailed
+				step.err = err
+			}
 		}
 
-		if step.postHook != nil {
-			return step.postHook(receipt)
+		if step.status == txnStepFailed {
+			break
 		}
 	}
 
@@ -339,7 +353,7 @@ func (t *txnSender) waitForReceipt(hash ethgo.Hash) (*ethgo.Receipt, error) {
 			break
 		}
 
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(1000 * time.Millisecond)
 		count++
 	}
 
