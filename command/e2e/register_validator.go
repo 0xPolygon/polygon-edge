@@ -158,13 +158,22 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 				).Row(),
 				opts...,
 			))
+			if step.err != nil {
+				comps = append(comps, glint.Style(
+					glint.Layout(
+						status,
+						glint.Layout(glint.Text("error: "+step.err.Error())).MarginLeft(5),
+					).Row(),
+					opts...,
+				))
+			}
 		}
 
 		if done {
 			if validator != nil {
-				comps = append(comps, glint.Text("\nDone: "+validator.Validator.String()))
+				comps = append(comps, glint.Text("\nDone: "+validator.Validator.String()+"\n"))
 			} else {
-				comps = append(comps, glint.Text("\nDone:"))
+				comps = append(comps, glint.Text("\nDone\n"))
 			}
 		} else {
 			comps = append(comps, glint.Text("\nWaiting..."))
@@ -183,6 +192,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 
 		if err != nil {
 			step.status = txnStepFailed
+			step.err = err
 		} else {
 			if receipt.Status == uint64(types.ReceiptFailed) {
 				step.status = txnStepFailed
@@ -231,9 +241,15 @@ type asyncTxn interface {
 type asyncTxnImpl struct {
 	t    *txnSender
 	hash ethgo.Hash
+	err  error
 }
 
 func (a *asyncTxnImpl) Wait() (*ethgo.Receipt, error) {
+	// propagate error if there were any
+	if a.err != nil {
+		return nil, a.err
+	}
+
 	return a.t.waitForReceipt(a.hash)
 }
 
@@ -251,6 +267,7 @@ type txnStep struct {
 	action   func() asyncTxn
 	postHook func(receipt *ethgo.Receipt) error
 	status   txnStepStatus
+	err      error
 }
 
 type txnSender struct {
@@ -270,7 +287,7 @@ func (t *txnSender) sendTransaction(txn *types.Transaction) asyncTxn {
 	if txn.Nonce == 0 {
 		nonce, err := t.client.Eth().GetNonce(t.account.Ecdsa.Address(), ethgo.Latest)
 		if err != nil {
-			panic(err)
+			return &asyncTxnImpl{err: err}
 		}
 
 		txn.Nonce = nonce
@@ -278,26 +295,26 @@ func (t *txnSender) sendTransaction(txn *types.Transaction) asyncTxn {
 
 	chainID, err := t.client.Eth().ChainID()
 	if err != nil {
-		panic(err)
+		return &asyncTxnImpl{err: err}
 	}
 
 	privateKey, err := t.account.GetEcdsaPrivateKey()
 	if err != nil {
-		panic(err)
+		return &asyncTxnImpl{err: err}
 	}
 
 	signer := crypto.NewEIP155Signer(chainID.Uint64())
 	signedTxn, err := signer.SignTx(txn, privateKey)
 
 	if err != nil {
-		panic(err)
+		return &asyncTxnImpl{err: err}
 	}
 
 	txnRaw := signedTxn.MarshalRLP()
 	hash, err := t.client.Eth().SendRawTransaction(txnRaw)
 
 	if err != nil {
-		panic(err)
+		return &asyncTxnImpl{err: err}
 	}
 
 	return &asyncTxnImpl{hash: hash, t: t}
@@ -352,7 +369,7 @@ func stake(sender *txnSender) asyncTxn {
 
 	input, err := stakeFn.Encode([]interface{}{})
 	if err != nil {
-		panic(err)
+		return &asyncTxnImpl{err: err}
 	}
 
 	receipt := sender.sendTransaction(&types.Transaction{
@@ -369,7 +386,7 @@ func whitelist(sender *txnSender, addr types.Address) asyncTxn {
 		[]types.Address{addr},
 	})
 	if err != nil {
-		panic(err)
+		return &asyncTxnImpl{err: err}
 	}
 
 	receipt := sender.sendTransaction(&types.Transaction{
@@ -393,22 +410,22 @@ func fund(sender *txnSender, addr types.Address) asyncTxn {
 
 func registerValidator(sender *txnSender, account *wallet.Account) asyncTxn {
 	if registerFn == nil {
-		panic("failed to create method")
+		return &asyncTxnImpl{err: errors.New("failed to create method")}
 	}
 
 	signature, err := account.Bls.Sign([]byte("Polybft validator"))
 	if err != nil {
-		panic(err)
+		return &asyncTxnImpl{err: err}
 	}
 
 	sigMarshal, err := signature.ToBigInt()
 	if err != nil {
-		panic(err)
+		return &asyncTxnImpl{err: err}
 	}
 
 	pubKeys, err := account.Bls.PublicKey().ToBigInt()
 	if err != nil {
-		panic(err)
+		return &asyncTxnImpl{err: err}
 	}
 
 	input, err := registerFn.Encode([]interface{}{
@@ -416,7 +433,7 @@ func registerValidator(sender *txnSender, account *wallet.Account) asyncTxn {
 		pubKeys,
 	})
 	if err != nil {
-		panic(err)
+		return &asyncTxnImpl{err: err}
 	}
 
 	return sender.sendTransaction(&types.Transaction{
