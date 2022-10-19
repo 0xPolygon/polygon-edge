@@ -25,7 +25,6 @@ func newTestTransition(preState map[types.Address]*PreState) *Transition {
 
 func TestSubGasLimitPrice(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name        string
@@ -94,7 +93,6 @@ func TestSubGasLimitPrice(t *testing.T) {
 
 func TestTransfer(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name        string

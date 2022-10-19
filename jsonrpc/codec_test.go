@@ -11,7 +11,6 @@ import (
 
 func TestBlockNumberOrHash_UnmarshalJSON(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	var blockHash types.Hash
 	err := blockHash.UnmarshalText([]byte("0xe0ee62fd4a39a6988e24df0b406b90af71932e1b01d5561400a8eab943a33d68"))

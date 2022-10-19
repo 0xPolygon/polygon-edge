@@ -170,7 +170,6 @@ func TestEth_DecodeTxn(t *testing.T) {
 
 func TestEth_GetNextNonce(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	// Set up the mock accounts
 	accounts := []struct {

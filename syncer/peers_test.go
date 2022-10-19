@@ -120,7 +120,6 @@ func TestPutPeer(t *testing.T) {
 
 func TestBestPeer(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name     string

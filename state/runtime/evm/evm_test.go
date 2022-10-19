@@ -91,7 +91,6 @@ func (m *mockHost) GetNonce(addr types.Address) uint64 {
 
 func TestRun(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name     string

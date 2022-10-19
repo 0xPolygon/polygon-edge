@@ -8,12 +8,11 @@ import (
 )
 
 func TestBlake2f(t *testing.T) {
-	defer goleak.VerifyNone(t)
-
 	b := &blake2f{}
 
 	ReadTestCase(t, "blake2f.json", func(t *testing.T, c *TestCase) {
 		t.Helper()
+		defer goleak.VerifyNone(t)
 
 		out, err := b.run(c.Input)
 		if err != nil {

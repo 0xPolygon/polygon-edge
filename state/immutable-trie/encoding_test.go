@@ -60,7 +60,6 @@ const (
 
 func TestEncoding_KeyBytesToHexNibbles(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	testTable := []struct {
 		name           string
@@ -135,7 +134,6 @@ func TestEncoding_HexCompact(t *testing.T) {
 	// 2        0010    |   terminating (leaf)         even
 	// 3        0011    |   terminating (leaf)         odd
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	testTable := []struct {
 		name           string
