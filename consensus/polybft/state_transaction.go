@@ -111,12 +111,12 @@ func (bp *BundleProof) DecodeAbi(txData []byte) error {
 			return fmt.Errorf("invalid state sync event id")
 		}
 
-		sender, isOk := sse["sender"].(ethgo.Address)
+		senderEthgo, isOk := sse["sender"].(ethgo.Address)
 		if !isOk {
 			return fmt.Errorf("invalid state sync sender field")
 		}
 
-		receiver, isOk := sse["receiver"].(ethgo.Address)
+		receiverEthgo, isOk := sse["receiver"].(ethgo.Address)
 		if !isOk {
 			return fmt.Errorf("invalid state sync receiver field")
 		}
@@ -133,8 +133,8 @@ func (bp *BundleProof) DecodeAbi(txData []byte) error {
 
 		stateSyncs[i] = &StateSyncEvent{
 			ID:       id.Uint64(),
-			Sender:   sender,
-			Receiver: receiver,
+			Sender:   types.Address(senderEthgo),
+			Receiver: types.Address(receiverEthgo),
 			Data:     data,
 			Skip:     skip,
 		}
