@@ -97,7 +97,7 @@ func (c *TestClusterConfig) GetStdout(name string) io.Writer {
 			c.initLogsDir()
 		})
 
-		f, err := os.OpenFile(filepath.Join(c.LogsDir, name+".log"), os.O_RDWR|os.O_APPEND|os.O_CREATE, 0660)
+		f, err := os.OpenFile(filepath.Join(c.LogsDir, name+".log"), os.O_RDWR|os.O_APPEND|os.O_CREATE, 0600)
 		if err != nil {
 			c.t.Fatal(err)
 		}
@@ -126,7 +126,7 @@ func (c *TestClusterConfig) GetStdout(name string) io.Writer {
 func (c *TestClusterConfig) initLogsDir() {
 	logsDir := path.Join("..", fmt.Sprintf("e2e-logs-%d", startTime), c.t.Name())
 
-	if err := os.MkdirAll(logsDir, 0755); err != nil {
+	if err := os.MkdirAll(logsDir, 0750); err != nil {
 		c.t.Fatal(err)
 	}
 
