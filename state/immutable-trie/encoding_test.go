@@ -9,7 +9,6 @@ import (
 
 func TestEncoding_HasTermSymbol(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	testTable := []struct {
 		name           string

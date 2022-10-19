@@ -105,7 +105,6 @@ func RunSpecificTest(t *testing.T, file string, c stateCase, name, fork string, 
 
 func TestState(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	long := []string{
 		"static_Call50000",
@@ -130,6 +129,7 @@ func TestState(t *testing.T) {
 		folder := folder
 		t.Run(folder, func(t *testing.T) {
 			t.Parallel()
+			defer goleak.VerifyNone(t)
 
 			files, err := listFiles(folder)
 			if err != nil {

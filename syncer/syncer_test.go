@@ -259,7 +259,6 @@ func Test_startPeerStatusUpdateProcess(t *testing.T) {
 
 func Test_startPeerDisconnectEventProcess(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	tests := []struct {
 		name            string
@@ -400,7 +399,6 @@ func Test_startPeerDisconnectEventProcess(t *testing.T) {
 
 func TestHasSyncPeer(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	peerStatuses := []*NoForkPeer{
 		{
@@ -496,7 +494,6 @@ func createMockBlocks(num int) []*types.Block {
 
 func TestSync(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	blocks := createMockBlocks(10)
 
@@ -666,7 +663,6 @@ func TestSync(t *testing.T) {
 
 func Test_bulkSyncWithPeer(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	blockNum := 30
 	blocks := make([]*types.Block, blockNum) // 1 to 30

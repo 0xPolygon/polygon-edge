@@ -34,6 +34,7 @@ func decodeHex(t *testing.T, input string) []byte {
 func ReadTestCase(t *testing.T, path string, f func(t *testing.T, c *TestCase)) {
 	t.Helper()
 	t.Parallel()
+
 	defer goleak.VerifyNone(t)
 
 	data, err := os.ReadFile(filepath.Join("./fixtures", path))

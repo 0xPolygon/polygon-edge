@@ -140,7 +140,6 @@ func rlpHashLogs(logs []*types.Log) (res types.Hash) {
 
 func TestEVM(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	folders, err := listFolders(vmTests)
 	if err != nil {
@@ -163,6 +162,7 @@ func TestEVM(t *testing.T) {
 			file := file
 			t.Run(file, func(t *testing.T) {
 				t.Parallel()
+				defer goleak.VerifyNone(t)
 
 				if !strings.HasSuffix(file, ".json") {
 					return

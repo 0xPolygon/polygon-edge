@@ -114,7 +114,6 @@ type result struct {
 
 func TestAddTxErrors(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	poolSigner := crypto.NewEIP155Signer(100)
 
@@ -356,7 +355,6 @@ func TestAddTxErrors(t *testing.T) {
 
 func TestPruneAccountsWithNonceHoles(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	t.Run(
 		"no enqueued to prune",
@@ -454,7 +452,6 @@ func TestPruneAccountsWithNonceHoles(t *testing.T) {
 
 func TestAddTxHighPressure(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	t.Run(
 		"pruning handler is signaled",
@@ -543,7 +540,6 @@ func TestAddTxHighPressure(t *testing.T) {
 
 func TestAddGossipTx(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	key, sender := tests.GenerateKeyAndAddr(t)
 	signer := crypto.NewEIP155Signer(uint64(100))
@@ -635,7 +631,6 @@ func TestDropKnownGossipTx(t *testing.T) {
 
 func TestEnqueueHandler(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	t.Run(
 		"enqueue new tx with higher nonce",
@@ -771,7 +766,6 @@ func TestEnqueueHandler(t *testing.T) {
 
 func TestPromoteHandler(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	t.Run("nothing to promote", func(t *testing.T) {
 		/* This test demonstrates that if some promotion handler
@@ -1020,7 +1014,6 @@ func TestPromoteHandler(t *testing.T) {
 
 func TestResetAccount(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	t.Run("reset promoted", func(t *testing.T) {
 		t.Parallel()
@@ -1497,7 +1490,6 @@ func TestDrop(t *testing.T) {
 
 func TestDemote(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	t.Run("Demote increments counter", func(t *testing.T) {
 		t.Parallel()
@@ -1575,7 +1567,6 @@ func TestDemote(t *testing.T) {
 
 func Test_updateAccountSkipsCounts(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	sendTx := func(
 		t *testing.T,
@@ -1722,7 +1713,6 @@ func Test_updateAccountSkipsCounts(t *testing.T) {
 // TestPermissionSmartContractDeployment tests sending deployment tx with deployment whitelist
 func TestPermissionSmartContractDeployment(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	signer := crypto.NewEIP155Signer(uint64(100))
 
@@ -1972,7 +1962,6 @@ func TestResetAccounts_Promoted(t *testing.T) {
 
 func TestResetAccounts_Enqueued(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	commonAssert := func(accounts map[types.Address]accountState, pool *TxPool) {
 		for addr := range accounts {
@@ -2177,7 +2166,6 @@ func TestResetAccounts_Enqueued(t *testing.T) {
 
 func TestExecutablesOrder(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	newPricedTx := func(addr types.Address, nonce, gasPrice uint64) *types.Transaction {
 		tx := newTx(addr, nonce, 1)
@@ -2351,7 +2339,6 @@ type statusTx struct {
 
 func TestRecovery(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	commonAssert := func(accounts map[types.Address]accountState, pool *TxPool) {
 		for addr := range accounts {
@@ -2533,7 +2520,6 @@ func TestRecovery(t *testing.T) {
 
 func TestGetTxs(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	var (
 		eoa1 = new(eoa).create(t)

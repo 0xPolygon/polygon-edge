@@ -56,7 +56,6 @@ func newMockGrpcClient(t *testing.T, service *syncPeerService) proto.SyncPeerCli
 
 func Test_syncPeerService_GetBlocks(t *testing.T) {
 	t.Parallel()
-	defer goleak.VerifyNone(t)
 
 	blocks := createMockBlocks(10)
 
