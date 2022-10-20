@@ -40,10 +40,16 @@ func GetCommand() *cobra.Command {
 
 func setFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(
-		&params.dataDirectory,
+		&params.newValidatorDataDir,
 		dataDirFlag,
 		"",
-		"the directory name where new validator key is stored",
+		"the directory path where new validator key is stored",
+	)
+	cmd.Flags().StringVar(
+		&params.registratorValidatorDataDir,
+		registratorDataDirFlag,
+		"",
+		"the directory path where registrator validator key is stored",
 	)
 }
 
@@ -52,7 +58,7 @@ func runPreRun(_ *cobra.Command, _ []string) error {
 }
 
 func runCommand(cmd *cobra.Command, _ []string) error {
-	secretsManager, err := secretsHelper.SetupLocalSecretsManager("./test-chain-1")
+	secretsManager, err := secretsHelper.SetupLocalSecretsManager(params.registratorValidatorDataDir)
 	if err != nil {
 		return err
 	}
@@ -62,9 +68,9 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	existingValidator := newTxnSender(existingValidatorAccount)
+	existingValidatorSender := newTxnSender(existingValidatorAccount)
 
-	secretsManager, err = secretsHelper.SetupLocalSecretsManager(fmt.Sprintf("./%s", params.dataDirectory))
+	secretsManager, err = secretsHelper.SetupLocalSecretsManager(params.newValidatorDataDir)
 	if err != nil {
 		return err
 	}
@@ -82,13 +88,13 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		{
 			name: "whitelist",
 			action: func() asyncTxn {
-				return whitelist(existingValidator, types.Address(newValidatorAccount.Ecdsa.Address()))
+				return whitelist(existingValidatorSender, types.Address(newValidatorAccount.Ecdsa.Address()))
 			},
 		},
 		{
 			name: "fund",
 			action: func() asyncTxn {
-				return fund(existingValidator, types.Address(newValidatorAccount.Ecdsa.Address()))
+				return fund(existingValidatorSender, types.Address(newValidatorAccount.Ecdsa.Address()))
 			},
 		},
 		{
