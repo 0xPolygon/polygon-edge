@@ -28,7 +28,7 @@ jobs:
         uses: github/codeql-action/upload-sarif@v2
         with:
           sarif_file: snyk.sarif
-  snyk:
+  snyk-code:
     name: Snyk Code and Publish
     runs-on: ubuntu-latest
     continue-on-error: true
