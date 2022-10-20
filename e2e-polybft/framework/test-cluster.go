@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
@@ -55,7 +54,7 @@ func resolveBinary() string {
 func createAccountPasswordFile(t *testing.T) (string, func()) {
 	t.Helper()
 
-	pwdFile, err := ioutil.TempFile("", "e2e-polybft")
+	pwdFile, err := os.CreateTemp("", "e2e-polybft")
 	require.NoError(t, err)
 
 	_, err = pwdFile.WriteString(accountPassword)
@@ -183,7 +182,7 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		t.Skip("Integration tests are disabled.")
 	}
 
-	tmpDir, err := ioutil.TempDir("/tmp", "e2e-polybft-")
+	tmpDir, err := os.MkdirTemp("/tmp", "e2e-polybft-")
 	require.NoError(t, err)
 
 	config := &TestClusterConfig{
