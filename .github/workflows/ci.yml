@@ -29,6 +29,8 @@ jobs:
   snyk-code:
     name: Snyk Code
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@master
       - name: Run Snyk SAST to check for code vulnerabilities
         uses: snyk/actions/golang@master
         with:
