@@ -186,8 +186,8 @@ func setFlags(cmd *cobra.Command) {
 			"the amount which will be premined to all the validators",
 		)
 		cmd.Flags().StringVar(
-			&params.integrate,
-			integrateFlag,
+			&params.smartContractsRootPath,
+			smartContractsRootPathFlag,
 			defaultContractsRootFolder,
 			"the smart contracts folder",
 		)

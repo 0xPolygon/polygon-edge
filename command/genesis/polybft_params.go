@@ -20,12 +20,12 @@ import (
 const (
 	premineValidatorsFlag          = "premine-validators"
 	polyBftValidatorPrefixPathFlag = "validator-prefix"
+	smartContractsRootPathFlag     = "contracts-path"
 
 	validatorSetSizeFlag = "validator-set-size"
 	sprintSizeFlag       = "sprint-size"
 	blockTimeFlag        = "block-time"
 	validatorsFlag       = "polybft-validators"
-	integrateFlag        = "integrate"
 
 	defaultEpochSize        = uint64(10)
 	defaultSprintSize       = uint64(5)
@@ -191,7 +191,7 @@ func (p *genesisParams) deployContracts() ([]polybft.SmartContract, error) {
 	result := make([]polybft.SmartContract, 0, len(predefinedContracts))
 
 	for _, contract := range predefinedContracts {
-		artifact, err := polybftcontracts.ReadArtifact(p.integrate, contract.chain, contract.name)
+		artifact, err := polybftcontracts.ReadArtifact(p.smartContractsRootPath, contract.chain, contract.name)
 		if err != nil {
 			return nil, err
 		}
