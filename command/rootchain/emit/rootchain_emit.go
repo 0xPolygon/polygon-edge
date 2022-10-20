@@ -11,6 +11,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/polybftcontracts"
+	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -18,7 +19,7 @@ var (
 	params emitParams
 
 	contractsToParamTypes = map[string]string{
-		helper.SidechainBridgeAddr.String(): "tuple(address,uint256)",
+		contracts.NativeTokenContract.String(): "tuple(address,uint256)",
 	}
 )
 
@@ -40,7 +41,7 @@ func setFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(
 		&params.address,
 		contractFlag,
-		helper.SidechainBridgeAddr.String(),
+		contracts.NativeTokenContract.String(),
 		"ERC20 bridge contract address",
 	)
 
@@ -129,12 +130,12 @@ func createTxInput(paramsType string, parameters ...interface{}) (*ethgo.Transac
 		return nil, fmt.Errorf("failed to encode parsed parameters: %w", err)
 	}
 
-	artifact, err := polybftcontracts.ReadArtifact(helper.ContractRootFolder, "root", "RootchainBridge")
+	artifact, err := polybftcontracts.ReadArtifact(helper.ContractRootFolder, "root/StateSender.sol", "StateSender")
 	if err != nil {
 		return nil, fmt.Errorf("failed to read artifact: %w", err)
 	}
 
-	method := artifact.Abi.Methods["emitEvent"]
+	method := artifact.Abi.Methods["syncState"]
 
 	input, err := method.Encode([]interface{}{types.StringToAddress(params.address), wrapperInput})
 	if err != nil {
@@ -142,7 +143,7 @@ func createTxInput(paramsType string, parameters ...interface{}) (*ethgo.Transac
 	}
 
 	return &ethgo.Transaction{
-		To:    (*ethgo.Address)(&helper.RootchainBridgeAddress),
+		To:    (*ethgo.Address)(&helper.StateSenderAddress),
 		Input: input,
 	}, nil
 }

@@ -4,17 +4,16 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/0xPolygon/polygon-edge/types"
 	dockertypes "github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
-
-	"github.com/0xPolygon/polygon-edge/types"
 )
 
 var (
-	RootchainBridgeAddress   = types.StringToAddress("0x6FE03c2768C9d800AF3Dedf1878b5687FE120a27")
-	SidechainBridgeAddr      = types.StringToAddress("0x8Be503bcdEd90ED42Eff31f56199399B2b0154CA")
+	// StateSenderAddress is an address of StateSender.sol smart contract
+	StateSenderAddress = types.StringToAddress("0x6FE03c2768C9d800AF3Dedf1878b5687FE120a27")
+	// CheckpointManagerAddress is an address of CheckpointManager.sol smart contract
 	CheckpointManagerAddress = types.StringToAddress("0x3d46A809D5767B81a8836f0E79145ba615A2Dd61")
-
 	// RootValidatorSetAddress is an address of RootValidatorSet.sol smart contract
 	RootValidatorSetAddress = types.StringToAddress("0x72E1C51FE6dABF2e3d5701170cf5aD3620E6B8ba")
 	// BLSAddress is an address of BLS.sol smart contract
@@ -22,7 +21,7 @@ var (
 	// BN256G2Address is an address of BN256G2Address.sol smart contract
 	BN256G2Address = types.StringToAddress("0x947a581B2713F58A8145201DA41BCb6aAE90196B")
 
-	ContractRootFolder = "consensus/polybft/polybftcontracts/artifacts/contracts"
+	ContractRootFolder = "./v3-contracts/artifacts/contracts/"
 )
 
 func GetRootchainID() string {

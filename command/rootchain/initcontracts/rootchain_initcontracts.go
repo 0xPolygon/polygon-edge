@@ -17,12 +17,9 @@ import (
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/genesis"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
-	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/types"
 )
-
-const receiptStatusOk = 0
 
 var (
 	params initContractsParams
@@ -48,6 +45,10 @@ var (
 		"uint256[4][] validatorPubkeys)")
 
 	bn256P, _ = new(big.Int).SetString("21888242871839275222246405745257275088696311157297823662689037894645226208583", 10)
+)
+
+const (
+	contractsDeploymentTitle = "[ROOTCHAIN - CONTRACTS DEPLOYMENT]"
 )
 
 // GetCommand returns the rootchain emit command
@@ -93,26 +94,35 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
-	if ok, err := helper.ExistsCode(contracts.SystemCaller); err != nil {
-		outputter.SetError(fmt.Errorf("failed to deploy: %w", err))
+	outputter.WriteCommandResult(&messageResult{
+		Message: fmt.Sprintf("%s started...", contractsDeploymentTitle),
+	})
+
+	if ok, err := helper.ExistsCode(helper.StateSenderAddress); err != nil {
+		outputter.SetError(fmt.Errorf("failed to check if rootchain contracts are deployed: %w", err))
 
 		return
 	} else if ok {
-		outputter.SetCommandResult(&result{AlreadyDeployed: true})
+		outputter.SetCommandResult(&messageResult{
+			Message: fmt.Sprintf("%s contracts are already deployed. Aborting.", contractsDeploymentTitle),
+		})
 
 		return
 	}
 
-	if err := deployContracts(); err != nil {
+	if err := deployContracts(outputter); err != nil {
 		outputter.SetError(fmt.Errorf("failed to deploy: %w", err))
 
 		return
 	}
 
-	outputter.SetCommandResult(&result{AlreadyDeployed: false})
+	outputter.SetCommandResult(&messageResult{
+		Message: fmt.Sprintf("%s finished. All contracts are successfully deployed and initialized.",
+			contractsDeploymentTitle),
+	})
 }
 
-func deployContracts() error {
+func deployContracts(outputter command.OutputFormatter) error {
 	// if the bridge contract is not created, we have to deploy all the contracts
 	// fund account
 	if _, err := helper.FundAccount(helper.GetDefAccount()); err != nil {
@@ -127,7 +137,7 @@ func deployContracts() error {
 		{
 			name:     "StateSender",
 			path:     "root/StateSender.sol",
-			expected: helper.RootchainBridgeAddress,
+			expected: helper.StateSenderAddress,
 		},
 		{
 			name:     "CheckpointManager",
@@ -176,6 +186,8 @@ func deployContracts() error {
 			return fmt.Errorf("wrong deployed address for contract %s: expected %s but found %s",
 				contract.name, contract.expected, receipt.ContractAddress)
 		}
+
+		outputter.WriteCommandResult(newDeployContractsResult(contract.name, contract.expected, receipt.TransactionHash))
 	}
 
 	pendingNonce += uint64(len(deployContracts))
@@ -184,11 +196,19 @@ func deployContracts() error {
 		return err
 	}
 
-	pendingNonce += 1
+	outputter.WriteCommandResult(&messageResult{
+		Message: fmt.Sprintf("%s CheckpointManager contract is initialized", contractsDeploymentTitle),
+	})
+
+	pendingNonce++
 
 	if err := initializeRootValidatorSet(pendingNonce); err != nil {
 		return err
 	}
+
+	outputter.WriteCommandResult(&messageResult{
+		Message: fmt.Sprintf("%s RootValidatorSet contract is initialized", contractsDeploymentTitle),
+	})
 
 	return nil
 }
@@ -218,7 +238,7 @@ func initializeCheckpointManager(nonce uint64) error {
 		return fmt.Errorf("failed to send transaction to CheckpointManager. error: %w", err)
 	}
 
-	if receipt.Status != receiptStatusOk {
+	if receipt.Status != uint64(types.ReceiptSuccess) {
 		return errors.New("failed to initialize CheckpointManager")
 	}
 
@@ -255,9 +275,9 @@ func initializeRootValidatorSet(nonce uint64) error {
 		return fmt.Errorf("failed to encode parameters for RootValidatorSet.initialize. error: %w", err)
 	}
 
-	checkpointManagerAddress := ethgo.BytesToAddress(helper.RootValidatorSetAddress.Bytes())
+	rootValidatorSetAddress := ethgo.Address(helper.RootValidatorSetAddress)
 	txn := &ethgo.Transaction{
-		To:    &checkpointManagerAddress,
+		To:    &rootValidatorSetAddress,
 		Input: initRootValidatorSetInput,
 	}
 
@@ -266,7 +286,7 @@ func initializeRootValidatorSet(nonce uint64) error {
 		return fmt.Errorf("failed to send transaction to RootValidatorSet. error: %w", err)
 	}
 
-	if receipt.Status != receiptStatusOk {
+	if receipt.Status != uint64(types.ReceiptSuccess) {
 		return errors.New("failed to initialize RootValidatorSet")
 	}
 
@@ -283,20 +303,18 @@ func readContractBytecode(rootPath, contractPath, contractName string) ([]byte, 
 
 	filePath := filepath.Join(absolutePath, contractPath, strings.TrimSuffix(fileName, ".sol")+".json")
 
-	data, err := ioutil.ReadFile(filePath)
+	data, err := ioutil.ReadFile(filepath.Clean(filePath))
 	if err != nil {
 		return nil, err
 	}
 
 	var artifact struct {
-		// Abi              *abi.ABI
-		Bytecode         string
-		DeployedBytecode string
+		Bytecode string `json:"bytecode"`
 	}
 
 	if err := json.Unmarshal(data, &artifact); err != nil {
 		return nil, err
 	}
 
-	return hex.MustDecodeHex(artifact.DeployedBytecode), nil
+	return hex.MustDecodeHex(artifact.Bytecode), nil
 }
