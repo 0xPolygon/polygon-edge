@@ -90,17 +90,19 @@ func newFileLogger(config *Config) (hclog.Logger, error) {
 	}
 
 	return hclog.New(&hclog.LoggerOptions{
-		Name:   "polygon",
-		Level:  config.LogLevel,
-		Output: logFileWriter,
+		Name:       "polygon",
+		Level:      config.LogLevel,
+		Output:     logFileWriter,
+		JSONFormat: config.JSONLogFormat,
 	}), nil
 }
 
 // newCLILogger returns minimal logger instance that sends all logs to standard output
 func newCLILogger(config *Config) hclog.Logger {
 	return hclog.New(&hclog.LoggerOptions{
-		Name:  "polygon",
-		Level: config.LogLevel,
+		Name:       "polygon",
+		Level:      config.LogLevel,
+		JSONFormat: config.JSONLogFormat,
 	})
 }
 
