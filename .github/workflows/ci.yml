@@ -25,3 +25,9 @@ jobs:
         uses: snyk/actions/golang@master
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      - name: Run Snyk SAST to check for code vulnerabilities
+        uses: snyk/actions/golang@master
+        with:
+          command: code test
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}

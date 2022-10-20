@@ -28,3 +28,22 @@ jobs:
         uses: github/codeql-action/upload-sarif@v2
         with:
           sarif_file: snyk.sarif
+  snyk:
+    name: Snyk Code and Publish
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@master
+      - name: Run Snyk SAST to check for vulnerabilities
+        uses: snyk/actions/golang@master
+        continue-on-error: true
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --sarif-file-output=snyk.sarif
+          command: code test
+      - name: Upload result to GitHub Code Scanning
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: snyk.sarif
