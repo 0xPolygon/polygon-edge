@@ -7,8 +7,49 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
+	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/stretchr/testify/mock"
 )
+
+var _ blockBuilder = &blockBuilderMock{}
+
+type blockBuilderMock struct {
+	mock.Mock
+}
+
+func (m *blockBuilderMock) Reset() error {
+	_ = m.Called()
+	return nil
+}
+
+func (m *blockBuilderMock) WriteTx(tx *types.Transaction) error {
+	args := m.Called(tx)
+	if len(args) == 0 {
+		return nil
+	}
+	return args.Error(0)
+}
+
+func (m *blockBuilderMock) Fill() error {
+	args := m.Called()
+	if len(args) == 0 {
+		return nil
+	}
+	return args.Error(0)
+}
+
+func (m *blockBuilderMock) Build(handler func(*types.Header)) (*StateBlock, error) {
+	args := m.Called(handler)
+	builtBlock := args.Get(0).(*StateBlock)
+	handler(builtBlock.Block.Header)
+	return builtBlock, nil
+}
+
+func (m *blockBuilderMock) GetState() *state.Transition {
+	args := m.Called()
+	return args.Get(0).(*state.Transition)
+}
 
 type testValidator struct {
 	alias   string
