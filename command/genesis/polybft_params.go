@@ -69,7 +69,7 @@ func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
 
 	if p.bridgeEnabled {
 		polyBftConfig.Bridge = &polybft.BridgeConfig{
-			BridgeAddr:      rootchain.RootchainBridgeAddress,
+			BridgeAddr:      rootchain.StateSenderAddress,
 			CheckpointAddr:  rootchain.CheckpointManagerAddress,
 			JSONRPCEndpoint: rootchain.ReadRootchainIP(),
 		}
