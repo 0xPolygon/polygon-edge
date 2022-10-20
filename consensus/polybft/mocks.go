@@ -2,6 +2,7 @@ package polybft
 
 import (
 	"fmt"
+	"math/big"
 	"sort"
 	"strconv"
 	"time"
@@ -276,17 +277,8 @@ func (t *transportMock) Gossip(message interface{}) {
 	_ = t.Called(message)
 }
 
-type testValidator struct {
-	alias   string
-	account *wallet.Account
-}
-
 type testValidators struct {
 	validators map[string]*testValidator
-}
-
-func newTestValidator(alias string) *testValidator {
-	return &testValidator{alias: alias, account: wallet.GenerateAccount()}
 }
 
 func newTestValidators(validatorsCount int) *testValidators {
@@ -298,34 +290,20 @@ func newTestValidators(validatorsCount int) *testValidators {
 	return newTestValidatorsWithAliases(aliases)
 }
 
-func (v *testValidators) getPublicIdentities(aliases ...string) (res AccountSet) { //nolint:unparam
-	v.iterAcct(aliases, func(t *testValidator) {
-		res = append(res, t.ValidatorAccount())
-	})
+func newTestValidatorsWithAliases(aliases []string) *testValidators {
+	validators := map[string]*testValidator{}
+	for _, alias := range aliases {
+		validators[alias] = newTestValidator(alias)
+	}
 
-	return
+	return &testValidators{
+		validators: validators,
+	}
 }
 
-func (v *testValidators) getPrivateIdentities(aliases ...string) (res []*wallet.Account) {
-	v.iterAcct(aliases, func(t *testValidator) {
-		res = append(res, t.account)
-	})
-
-	return
-}
-
-func (v *testValidators) getValidators(aliases ...string) (res []*testValidator) {
-	v.iterAcct(aliases, func(t *testValidator) {
-		res = append(res, t)
-	})
-
-	return
-}
-
-func (v *testValidator) ValidatorAccount() *ValidatorAccount {
-	return &ValidatorAccount{
-		Address: types.Address(v.account.Ecdsa.Address()),
-		BlsKey:  v.account.Bls.PublicKey(),
+func (v *testValidators) create(alias string) {
+	if _, ok := v.validators[alias]; !ok {
+		v.validators[alias] = newTestValidator(alias)
 	}
 }
 
@@ -344,6 +322,38 @@ func (v *testValidators) iterAcct(aliases []string, handle func(t *testValidator
 	}
 }
 
+func (v *testValidators) getParamValidators(aliases ...string) (res []*Validator) {
+	v.iterAcct(aliases, func(t *testValidator) {
+		res = append(res, t.paramsValidator())
+	})
+
+	return
+}
+
+func (v *testValidators) getValidators(aliases ...string) (res []*testValidator) {
+	v.iterAcct(aliases, func(t *testValidator) {
+		res = append(res, t)
+	})
+
+	return
+}
+
+func (v *testValidators) getPublicIdentities(aliases ...string) (res AccountSet) { //nolint:unparam
+	v.iterAcct(aliases, func(t *testValidator) {
+		res = append(res, t.ValidatorAccount())
+	})
+
+	return
+}
+
+func (v *testValidators) getPrivateIdentities(aliases ...string) (res []*wallet.Account) {
+	v.iterAcct(aliases, func(t *testValidator) {
+		res = append(res, t.account)
+	})
+
+	return
+}
+
 func (v *testValidators) getValidator(alias string) *testValidator {
 	vv, ok := v.validators[alias]
 	if !ok {
@@ -353,32 +363,17 @@ func (v *testValidators) getValidator(alias string) *testValidator {
 	return vv
 }
 
-func (v *testValidators) getParamValidators(aliases ...string) (res []*Validator) {
-	v.iterAcct(aliases, func(t *testValidator) {
-		res = append(res, t.paramsValidator())
-	})
-
-	return
+func (v *testValidators) toValidatorSet() *validatorSet {
+	return newValidatorSet(types.Address{}, v.getPublicIdentities())
 }
 
-func (v *testValidator) paramsValidator() *Validator {
-	bls := v.account.Bls.PublicKey().Marshal()
-
-	return &Validator{
-		Address: v.Address(),
-		BlsKey:  hex.EncodeToHex(bls),
-	}
+type testValidator struct {
+	alias   string
+	account *wallet.Account
 }
 
-func newTestValidatorsWithAliases(aliases []string) *testValidators {
-	validators := map[string]*testValidator{}
-	for _, alias := range aliases {
-		validators[alias] = newTestValidator(alias)
-	}
-
-	return &testValidators{
-		validators: validators,
-	}
+func newTestValidator(alias string) *testValidator {
+	return &testValidator{alias: alias, account: wallet.GenerateAccount()}
 }
 
 func (v *testValidator) Address() types.Address {
@@ -389,9 +384,20 @@ func (v *testValidator) Key() *wallet.Key {
 	return wallet.NewKey(v.account)
 }
 
-func (v *testValidators) create(alias string) {
-	if _, ok := v.validators[alias]; !ok {
-		v.validators[alias] = newTestValidator(alias)
+func (v *testValidator) paramsValidator() *Validator {
+	bls := v.account.Bls.PublicKey().Marshal()
+
+	return &Validator{
+		Address: v.Address(),
+		BlsKey:  hex.EncodeToString(bls),
+		Balance: big.NewInt(1000),
+	}
+}
+
+func (v *testValidator) ValidatorAccount() *ValidatorAccount {
+	return &ValidatorAccount{
+		Address: types.Address(v.account.Ecdsa.Address()),
+		BlsKey:  v.account.Bls.PublicKey(),
 	}
 }
 
