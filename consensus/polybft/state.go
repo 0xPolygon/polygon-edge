@@ -9,7 +9,6 @@ import (
 	"sort"
 
 	"github.com/0xPolygon/pbft-consensus"
-	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	bolt "go.etcd.io/bbolt"
 
@@ -61,9 +60,9 @@ type StateSyncEvent struct {
 	// ID is the decoded 'index' field from the event
 	ID uint64
 	// Sender is the decoded 'sender' field from the event
-	Sender types.Address
+	Sender ethgo.Address
 	// Receiver is the decoded 'receiver' field from the event
-	Receiver types.Address
+	Receiver ethgo.Address
 	// Data is the decoded 'data' field from the event
 	Data []byte
 	// Skip is the decoded 'skip' field from the event
@@ -75,8 +74,8 @@ type StateSyncEvent struct {
 // newStateSyncEvent creates an instance of pending state sync event.
 func newStateSyncEvent(
 	id uint64,
-	sender types.Address,
-	target types.Address,
+	sender ethgo.Address,
+	target ethgo.Address,
 	data []byte, log *ethgo.Log,
 ) *StateSyncEvent {
 	return &StateSyncEvent{
@@ -99,12 +98,12 @@ func decodeEvent(log *ethgo.Log) (*StateSyncEvent, error) {
 		return nil, fmt.Errorf("failed to decode id field of log: %+v", log)
 	}
 
-	sender, ok := raw["sender"].(types.Address)
+	sender, ok := raw["sender"].(ethgo.Address)
 	if !ok {
 		return nil, fmt.Errorf("failed to decode sender field of log: %+v", log)
 	}
 
-	target, ok := raw["receiver"].(types.Address)
+	target, ok := raw["receiver"].(ethgo.Address)
 	if !ok {
 		return nil, fmt.Errorf("failed to decode target field of log: %+v", log)
 	}

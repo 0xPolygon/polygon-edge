@@ -14,11 +14,15 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/umbracle/ethgo"
 )
 
 func newTestState(t *testing.T) *State {
+	t.Helper()
+
 	dir := fmt.Sprintf("/tmp/consensus-temp_%v", time.Now().Format(time.RFC3339))
 	err := os.Mkdir(dir, 0777)
+
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -33,13 +37,14 @@ func newTestState(t *testing.T) *State {
 			t.Fatal(err)
 		}
 	})
+
 	return state
 }
 
 func TestState_InsertEvent(t *testing.T) {
 	state := newTestState(t)
 
-	evnt1 := newStateSyncEvent(0, types.Address{}, types.Address{}, nil, nil)
+	evnt1 := newStateSyncEvent(0, ethgo.Address{}, ethgo.Address{}, nil, nil)
 	err := state.insertStateSyncEvent(evnt1)
 	assert.NoError(t, err)
 
@@ -73,10 +78,14 @@ func TestState_InsertVoteConcurrent(t *testing.T) {
 
 	epoch := uint64(1)
 	assert.NoError(t, state.insertEpoch(epoch))
+
 	hash := []byte{1, 2}
+
 	var wg sync.WaitGroup
+
 	for i := 0; i < 100; i++ {
 		wg.Add(1)
+
 		go func(i int) {
 			defer wg.Done()
 
@@ -97,10 +106,13 @@ func TestState_InsertVoteConcurrent(t *testing.T) {
 func TestState_Insert_And_Cleanup(t *testing.T) {
 	state := newTestState(t)
 	hash1 := []byte{1, 2}
+
 	for i := uint64(1); i < 1001; i++ {
 		epoch := i
 		err := state.insertEpoch(epoch)
+
 		assert.NoError(t, err)
+
 		_, _ = state.insertMessageVote(epoch, hash1, &MessageSignature{
 			From:      "NODE_1",
 			Signature: []byte{1, 2},
@@ -142,7 +154,9 @@ func TestState_insertAndGetValidatorSnapshot(t *testing.T) {
 	epoch := uint64(1)
 	state := newTestState(t)
 	keys, err := bls.CreateRandomBlsKeys(3)
+
 	require.NoError(t, err)
+
 	snapshot := AccountSet{
 		&ValidatorAccount{Address: types.BytesToAddress([]byte{0x18}), BlsKey: keys[0].PublicKey()},
 		&ValidatorAccount{Address: types.BytesToAddress([]byte{0x23}), BlsKey: keys[1].PublicKey()},
@@ -151,20 +165,23 @@ func TestState_insertAndGetValidatorSnapshot(t *testing.T) {
 
 	assert.NoError(t, state.insertValidatorSnapshot(epoch, snapshot))
 
-	snapshotFromDb, err := state.getValidatorSnapshot(epoch)
+	snapshotFromDB, err := state.getValidatorSnapshot(epoch)
+
 	assert.NoError(t, err)
-	assert.Equal(t, snapshot.Len(), snapshotFromDb.Len())
+	assert.Equal(t, snapshot.Len(), snapshotFromDB.Len())
 
 	for i, v := range snapshot {
-		assert.Equal(t, v.Address, snapshotFromDb[i].Address)
-		assert.Equal(t, v.BlsKey, snapshotFromDb[i].BlsKey)
+		assert.Equal(t, v.Address, snapshotFromDB[i].Address)
+		assert.Equal(t, v.BlsKey, snapshotFromDB[i].BlsKey)
 	}
 }
 
 func TestState_cleanValidatorSnapshotsFromDb(t *testing.T) {
 	state := newTestState(t)
 	keys, err := bls.CreateRandomBlsKeys(3)
+
 	require.NoError(t, err)
+
 	snapshot := AccountSet{
 		&ValidatorAccount{Address: types.BytesToAddress([]byte{0x18}), BlsKey: keys[0].PublicKey()},
 		&ValidatorAccount{Address: types.BytesToAddress([]byte{0x23}), BlsKey: keys[1].PublicKey()},
@@ -178,23 +195,27 @@ func TestState_cleanValidatorSnapshotsFromDb(t *testing.T) {
 		assert.NoError(t, state.insertValidatorSnapshot(epoch, snapshot))
 	}
 
-	snapshotFromDb, err := state.getValidatorSnapshot(epoch)
+	snapshotFromDB, err := state.getValidatorSnapshot(epoch)
+
 	assert.NoError(t, err)
-	assert.Equal(t, snapshot.Len(), snapshotFromDb.Len())
+	assert.Equal(t, snapshot.Len(), snapshotFromDB.Len())
+
 	for i, v := range snapshot {
-		assert.Equal(t, v.Address, snapshotFromDb[i].Address)
-		assert.Equal(t, v.BlsKey, snapshotFromDb[i].BlsKey)
+		assert.Equal(t, v.Address, snapshotFromDB[i].Address)
+		assert.Equal(t, v.BlsKey, snapshotFromDB[i].BlsKey)
 	}
 
 	assert.NoError(t, state.cleanValidatorSnapshotsFromDB(epoch))
 
 	// test that last (numberOfSnapshotsToLeaveInDb) of snapshots are left in db after cleanup
 	validatorSnapshotsBucketStats := state.validatorSnapshotsDBStats()
+
 	assert.Equal(t, numberOfSnapshotsToLeaveInDB, validatorSnapshotsBucketStats.KeyN)
+
 	for i := 0; i < numberOfSnapshotsToLeaveInDB; i++ {
-		snapshotFromDb, err = state.getValidatorSnapshot(epoch)
+		snapshotFromDB, err = state.getValidatorSnapshot(epoch)
 		assert.NoError(t, err)
-		assert.NotNil(t, snapshotFromDb)
+		assert.NotNil(t, snapshotFromDB)
 		epoch--
 	}
 }
@@ -235,10 +256,11 @@ func TestState_insertCommitmentMessage(t *testing.T) {
 	state := newTestState(t)
 	assert.NoError(t, state.insertCommitmentMessage(commitment))
 
-	commitmentFromDb, err := state.getCommitmentMessage(commitment.Message.ToIndex)
+	commitmentFromDB, err := state.getCommitmentMessage(commitment.Message.ToIndex)
+
 	assert.NoError(t, err)
-	assert.NotNil(t, commitmentFromDb)
-	assert.Equal(t, commitment, commitmentFromDb)
+	assert.NotNil(t, commitmentFromDB)
+	assert.Equal(t, commitment, commitmentFromDB)
 }
 
 func TestState_getNonExecutedCommitments(t *testing.T) {
@@ -300,15 +322,18 @@ func TestState_insertAndGetBundles(t *testing.T) {
 
 	insertTestBundles(t, state, numberOfBundles)
 
-	bundlesFromDb, err := state.getBundles(0, maxBundlesPerSprint)
+	bundlesFromDB, err := state.getBundles(0, maxBundlesPerSprint)
+
 	assert.NoError(t, err)
-	assert.Equal(t, numberOfBundles, len(bundlesFromDb))
-	assert.Equal(t, uint64(0), bundlesFromDb[0].ID())
-	assert.Equal(t, stateSyncBundleSize, len(bundlesFromDb[0].StateSyncs))
-	assert.NotNil(t, bundlesFromDb[0].Proof)
+	assert.Equal(t, numberOfBundles, len(bundlesFromDB))
+	assert.Equal(t, uint64(0), bundlesFromDB[0].ID())
+	assert.Equal(t, stateSyncBundleSize, len(bundlesFromDB[0].StateSyncs))
+	assert.NotNil(t, bundlesFromDB[0].Proof)
 }
 
 func insertTestCommitments(t *testing.T, state *State, epoch, numberOfCommitments uint64) {
+	t.Helper()
+
 	for i := uint64(0); i <= numberOfCommitments; i++ {
 		commitment, err := createTestCommitmentMessage(i * stateSyncMainBundleSize)
 		require.NoError(t, err)
@@ -317,7 +342,10 @@ func insertTestCommitments(t *testing.T, state *State, epoch, numberOfCommitment
 }
 
 func insertTestBundles(t *testing.T, state *State, numberOfBundles uint64) {
+	t.Helper()
+
 	bundles := make([]*BundleProof, numberOfBundles)
+
 	for i := uint64(0); i < numberOfBundles; i++ {
 		bundle := &BundleProof{
 			Proof:      []types.Hash{types.BytesToHash(generateRandomBytes(t))},
@@ -334,11 +362,12 @@ func createTestStateSyncs(numberOfEvents, startIndex uint64) []*StateSyncEvent {
 	for i := startIndex; i < numberOfEvents+startIndex; i++ {
 		stateSyncEvents = append(stateSyncEvents, &StateSyncEvent{
 			ID:       i,
-			Sender:   types.ZeroAddress,
-			Receiver: types.ZeroAddress,
+			Sender:   ethgo.ZeroAddress,
+			Receiver: ethgo.ZeroAddress,
 			Data:     []byte{0, 1},
 		})
 	}
+
 	return stateSyncEvents
 }
 

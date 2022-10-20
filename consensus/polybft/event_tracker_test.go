@@ -19,6 +19,7 @@ func (m *mockEventSubscriber) AddLog(log *ethgo.Log) {
 	if len(m.logs) == 0 {
 		m.logs = []*ethgo.Log{}
 	}
+
 	m.logs = append(m.logs, log)
 }
 

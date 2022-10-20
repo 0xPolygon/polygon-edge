@@ -133,8 +133,8 @@ func (bp *BundleProof) DecodeAbi(txData []byte) error {
 
 		stateSyncs[i] = &StateSyncEvent{
 			ID:       id.Uint64(),
-			Sender:   types.Address(senderEthgo),
-			Receiver: types.Address(receiverEthgo),
+			Sender:   senderEthgo,
+			Receiver: receiverEthgo,
 			Data:     data,
 			Skip:     skip,
 		}

@@ -20,8 +20,10 @@ func TestCommitmentMessage_Hash(t *testing.T) {
 
 	trie1, err := createMerkleTree(stateSyncEvents, bundleSize)
 	require.NoError(t, err)
+
 	trie2, err := createMerkleTree(stateSyncEvents[0:len(stateSyncEvents)-1], bundleSize)
 	require.NoError(t, err)
+
 	commitmentMessage1 := NewCommitmentMessage(trie1.Hash(), 2, 8, bundleSize)
 	commitmentMessage2 := NewCommitmentMessage(trie1.Hash(), 2, 8, bundleSize)
 	commitmentMessage3 := NewCommitmentMessage(trie1.Hash(), 6, 10, bundleSize)
@@ -58,6 +60,7 @@ func TestCommitmentMessage_ToRegisterCommitmentInputData(t *testing.T) {
 	require.NotEmpty(t, inputData)
 
 	var actualSignedCommitmentMsg CommitmentMessageSigned
+
 	require.NoError(t, actualSignedCommitmentMsg.DecodeAbi(inputData))
 	require.NoError(t, err)
 	require.Equal(t, *expectedSignedCommitmentMsg.Message, *actualSignedCommitmentMsg.Message)
@@ -74,6 +77,7 @@ func TestCommitmentMessage_VerifyProof(t *testing.T) {
 		if until > uint64(len(stateSyncs)) {
 			until = uint64(len(stateSyncs))
 		}
+
 		proof := commitment.MerkleTree.GenerateProof(i, 0)
 		bundleProof := &BundleProof{
 			Proof:      proof,
@@ -173,16 +177,21 @@ func TestCommitmentMessage_VerifyProof_StateSyncHashNotEqualToProof(t *testing.T
 
 func buildCommitmentAndStateSyncs(t *testing.T, stateSyncsCount int,
 	epoch, bundleSize, startIdx uint64) (*Commitment, *CommitmentMessage, []*StateSyncEvent) {
+	t.Helper()
+
 	stateSyncEvents := generateStateSyncEvents(t, stateSyncsCount, startIdx)
 
 	fromIndex := stateSyncEvents[0].ID
 	toIndex := stateSyncEvents[len(stateSyncEvents)-1].ID
 	commitment, err := NewCommitment(epoch, fromIndex, toIndex, bundleSize, stateSyncEvents)
+
 	require.NoError(t, err)
+
 	commitmentMsg := NewCommitmentMessage(commitment.MerkleTree.Hash(),
 		fromIndex,
 		toIndex,
 		bundleSize)
+
 	require.NoError(t, err)
 
 	return commitment, commitmentMsg, stateSyncEvents
@@ -216,11 +225,13 @@ func TestStateTransaction_Encoding(t *testing.T) {
 
 	for _, c := range cases {
 		res, err := c.EncodeAbi()
+
 		require.NoError(t, err)
 
 		// use reflection to create another type and decode
 		val := reflect.New(reflect.TypeOf(c).Elem()).Interface()
-		obj := val.(StateTransactionInput)
+		obj, ok := val.(StateTransactionInput)
+		assert.True(t, ok)
 
 		err = obj.DecodeAbi(res)
 		require.NoError(t, err)
