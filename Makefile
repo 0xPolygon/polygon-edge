@@ -58,14 +58,13 @@ test-e2e-polybft:
 
 .PHONY: run-local
 run-local:
-	$(MAKE) compile-v3-contracts
+	$(MAKE) compile-core-contracts
 	docker-compose -f ./docker/local/docker-compose.yml up -d --build
 
 .PHONY: stop-local
 stop-local:
 	docker-compose -f ./docker/local/docker-compose.yml stop
 
-.PHONY: compile-v3-contracts
-compile-v3-contracts:
-	cd v3-contracts && npm install && npm run compile && cd ..
-
+.PHONY: compile-core-contracts
+compile-core-contracts:
+	cd core-contracts && npm install && npm run compile && cd ..

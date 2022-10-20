@@ -21,7 +21,7 @@ var (
 	// BN256G2Address is an address of BN256G2Address.sol smart contract
 	BN256G2Address = types.StringToAddress("0x947a581B2713F58A8145201DA41BCb6aAE90196B")
 
-	ContractRootFolder = "./v3-contracts/artifacts/contracts/"
+	ContractRootFolder = "./core-contracts/artifacts/contracts/"
 )
 
 func GetRootchainID() string {

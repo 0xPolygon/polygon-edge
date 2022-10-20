@@ -1,6 +1,6 @@
 [submodule "tests/tests"]
 	path = tests/tests
 	url = https://github.com/ethereum/tests.git 
-[submodule "v3-contracts"]
-	path = v3-contracts
-	url = https://github.com/maticnetwork/v3-contracts
+[submodule "core-contracts"]
+	path = core-contracts
+	url = https://github.com/0xPolygon/core-contracts
