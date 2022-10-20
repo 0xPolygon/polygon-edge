@@ -13,12 +13,10 @@ import (
 var _ runtime.Runtime = &Precompiled{}
 
 var (
-	// boolType represents the boolean ABI type
-	boolType = abi.MustNewType("bool")
-	// abiBoolTrue ABI encoded "true" boolean value
-	abiBoolTrue = abiBoolMustEncode(true, boolType)
-	// abiBoolFalse ABI encoded "false" boolean value
-	abiBoolFalse = abiBoolMustEncode(false, boolType)
+	// abiBoolTrue is ABI encoded true boolean value
+	abiBoolTrue = abiBoolMustEncode(true)
+	// abiBoolFalse is ABI encoded false boolean value
+	abiBoolFalse = abiBoolMustEncode(false)
 )
 
 type contract interface {
@@ -200,8 +198,8 @@ func extendByteSlice(b []byte, needLen int) []byte {
 
 // abiBoolMustEncode encodes the given value using the given ABI type.
 // panics if there is an error occurred.
-func abiBoolMustEncode(v bool, t *abi.Type) []byte {
-	raw, err := t.Encode(v)
+func abiBoolMustEncode(v bool) []byte {
+	raw, err := abi.MustNewType("bool").Encode(v)
 	if err != nil {
 		panic(err)
 	}

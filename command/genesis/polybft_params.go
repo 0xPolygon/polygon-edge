@@ -38,7 +38,6 @@ const (
 	defaultValidatorSetSize           = 100
 	defaultBlockTime                  = 2 * time.Second
 	defaultPolyBftValidatorPrefixPath = "test-chain-"
-	defaultContractsRootFolder        = "core-contracts/artifacts/contracts"
 
 	bootnodePortStart = 30301
 )

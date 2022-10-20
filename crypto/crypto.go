@@ -274,13 +274,7 @@ func Keccak256Hash(v ...[]byte) (hash types.Hash) {
 
 // NewKeccakState creates a new KeccakState
 func NewKeccakState() KeccakState {
-	keccakState, isOk := sha3.NewLegacyKeccak256().(KeccakState)
-	if !isOk {
-		// this is only for linter, this will never happen
-		panic("newLegacyKeccak256 does not implement KeccakState interface")
-	}
-
-	return keccakState
+	return sha3.NewLegacyKeccak256().(KeccakState) //nolint:forcetypeassert
 }
 
 // PubKeyToAddress returns the Ethereum address of a public key
