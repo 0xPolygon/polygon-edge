@@ -37,6 +37,6 @@ jobs:
         uses: snyk/actions/golang@master
         with:
           command: code test
-          args: --org ${{ secrets.SNYK_ORG }}
+          args: --org=${{ secrets.SNYK_ORG }}
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
