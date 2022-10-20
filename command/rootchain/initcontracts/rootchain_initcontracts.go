@@ -17,6 +17,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/genesis"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
+	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -69,7 +70,7 @@ func setFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(
 		&params.contractsPath,
 		contractsPathFlag,
-		defaultContractsPath,
+		contracts.ContractsRootFolder,
 		"Root path for the smart contracts",
 	)
 	cmd.Flags().StringVar(

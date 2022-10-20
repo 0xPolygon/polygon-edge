@@ -130,7 +130,7 @@ func createTxInput(paramsType string, parameters ...interface{}) (*ethgo.Transac
 		return nil, fmt.Errorf("failed to encode parsed parameters: %w", err)
 	}
 
-	artifact, err := polybftcontracts.ReadArtifact(helper.ContractRootFolder, "root/StateSender.sol", "StateSender")
+	artifact, err := polybftcontracts.ReadArtifact(contracts.ContractsRootFolder, "root/StateSender.sol", "StateSender")
 	if err != nil {
 		return nil, fmt.Errorf("failed to read artifact: %w", err)
 	}

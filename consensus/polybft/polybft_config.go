@@ -55,6 +55,3 @@ type Validator struct {
 type DebugConfig struct {
 	ValidatorSetSize uint64 `json:"validatorSetSize"`
 }
-
-// PolyBFTRegisterMessage is a challenge message which needs to be signed by each validator account
-var PolyBFTRegisterMessage = "Polybft validator"

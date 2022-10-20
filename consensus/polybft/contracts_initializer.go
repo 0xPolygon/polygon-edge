@@ -59,7 +59,7 @@ func getInitChildValidatorSetInput(validators []*Validator, governanceAddr types
 		validatorStakes,
 		// address of the deployed BLS contract
 		contracts.BLSContract,
-		buildRegisterMessage(PolyBFTRegisterMessage),
+		buildRegisterMessage(contracts.PolyBFTRegisterMessage),
 		governanceAddr,
 	})
 	if err != nil {

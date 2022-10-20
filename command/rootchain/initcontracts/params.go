@@ -5,7 +5,6 @@ const (
 	validatorPrefixPathFlag = "validator-prefix"
 	validatorPathFlag       = "validator-path"
 
-	defaultContractsPath       = "./core-contracts/artifacts/contracts/"
 	defaultValidatorPrefixPath = "test-chain-"
 	defaultValidatorPath       = "./"
 )

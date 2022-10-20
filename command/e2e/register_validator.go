@@ -427,7 +427,7 @@ func registerValidator(sender *txnSender, account *wallet.Account) asyncTxn {
 		return &asyncTxnImpl{err: errors.New("failed to create method")}
 	}
 
-	signature, err := account.Bls.Sign([]byte("Polybft validator"))
+	signature, err := account.Bls.Sign([]byte(contracts.PolyBFTRegisterMessage))
 	if err != nil {
 		return &asyncTxnImpl{err: err}
 	}
