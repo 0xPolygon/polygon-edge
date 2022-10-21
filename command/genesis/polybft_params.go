@@ -20,6 +20,7 @@ import (
 const (
 	premineValidatorsFlag          = "premine-validators"
 	polyBftValidatorPrefixPathFlag = "validator-prefix"
+	smartContractsRootPathFlag     = "contracts-path"
 
 	validatorSetSizeFlag = "validator-set-size"
 	sprintSizeFlag       = "sprint-size"
@@ -34,6 +35,8 @@ const (
 	defaultPolyBftValidatorPrefixPath = "test-chain-"
 
 	bootnodePortStart = 30301
+
+	defaultContractsRootFolder = "consensus/polybft/polybftcontracts/artifacts/contracts"
 )
 
 var (
@@ -42,8 +45,6 @@ var (
 	sidechainBridgeAddr      = types.StringToAddress("0x5a443704dd4B594B382c22a083e2BD3090A6feF3")
 	sidechainERC20Addr       = types.StringToAddress("0x47e9Fbef8C83A1714F1951F142132E6e90F5fa5D")
 	sidechainERC20BridgeAddr = types.StringToAddress("0x8Be503bcdEd90ED42Eff31f56199399B2b0154CA")
-
-	contractsRootFolder = "consensus/polybft/polybftcontracts/artifacts/contracts"
 )
 
 func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
@@ -52,7 +53,7 @@ func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
 		return nil, err
 	}
 
-	smartContracts, err := deployContracts()
+	smartContracts, err := p.deployContracts()
 	if err != nil {
 		return nil, err
 	}
@@ -151,7 +152,7 @@ func (p *genesisParams) generatePolyBftGenesis() error {
 	return helper.WriteGenesisConfigToDisk(config, params.genesisPath)
 }
 
-func deployContracts() ([]polybft.SmartContract, error) {
+func (p *genesisParams) deployContracts() ([]polybft.SmartContract, error) {
 	predefinedContracts := []struct {
 		name     string
 		input    []interface{}
@@ -190,7 +191,7 @@ func deployContracts() ([]polybft.SmartContract, error) {
 	result := make([]polybft.SmartContract, 0, len(predefinedContracts))
 
 	for _, contract := range predefinedContracts {
-		artifact, err := polybftcontracts.ReadArtifact(contractsRootFolder, contract.chain, contract.name)
+		artifact, err := polybftcontracts.ReadArtifact(p.smartContractsRootPath, contract.chain, contract.name)
 		if err != nil {
 			return nil, err
 		}

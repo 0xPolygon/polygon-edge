@@ -62,9 +62,10 @@ require (
 require (
 	github.com/0xPolygon/go-ibft v0.0.0-20220810095021-e43142f8d267
 	github.com/0xPolygon/pbft-consensus v0.0.0-20220823102839-109d9f873bf4
-	github.com/boltdb/bolt v1.3.1
 	github.com/docker/docker v20.10.18+incompatible
 	github.com/docker/go-connections v0.4.0
+	github.com/ethereum/go-ethereum v1.10.25
+	go.etcd.io/bbolt v1.3.6
 	go.opentelemetry.io/otel v1.1.0
 	golang.org/x/sync v0.0.0-20220929204114-8fcdb60fdcc0
 	gopkg.in/DataDog/dd-trace-go.v1 v1.43.1
@@ -197,7 +198,6 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.37.0 // indirect
 	github.com/whyrusleeping/timecache v0.0.0-20160911033111-cfcb2f1abfee // indirect
-	go.etcd.io/bbolt v1.3.6 // indirect
 	go.opencensus.io v0.23.0 // indirect
 	go.opentelemetry.io/otel/trace v1.1.0 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
