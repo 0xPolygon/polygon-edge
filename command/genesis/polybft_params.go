@@ -144,7 +144,6 @@ func (p *genesisParams) getGenesisValidators(validators []GenesisTarget,
 			result = append(result, &polybft.Validator{
 				Address: addr,
 				BlsKey:  parts[1],
-				Balance: getBalance(addr, allocs),
 			})
 		}
 	} else {
@@ -154,22 +153,11 @@ func (p *genesisParams) getGenesisValidators(validators []GenesisTarget,
 			result = append(result, &polybft.Validator{
 				Address: addr,
 				BlsKey:  hex.EncodeToString(pubKeyMarshalled),
-				Balance: getBalance(addr, allocs),
 			})
 		}
 	}
 
 	return result
-}
-
-// getBalance returns balance for genesis account based on its address.
-// If not found in provided allocations map, 0 is returned.
-func getBalance(address types.Address, allocations map[types.Address]*chain.GenesisAccount) *big.Int {
-	if genesisAcc, ok := allocations[address]; ok {
-		return genesisAcc.Balance
-	}
-
-	return big.NewInt(0)
 }
 
 func (p *genesisParams) generatePolyBftGenesis() error {

@@ -3,7 +3,6 @@ package framework
 import (
 	"os/exec"
 	"testing"
-	"time"
 
 	"github.com/0xPolygon/polygon-edge/command/rootchain/server"
 )
@@ -46,8 +45,9 @@ func (t *TestBridge) Start() error {
 
 	t.node = bridgeNode
 
-	// TODO: read stdout until some string is written into it (for example `Http server started` line)
-	time.Sleep(time.Second * 10)
+	if err = server.PingServer(nil); err != nil {
+		return err
+	}
 
 	initContracts := []string{
 		"rootchain",
@@ -55,11 +55,7 @@ func (t *TestBridge) Start() error {
 	}
 
 	cmd := exec.Command(resolveBinary(), initContracts...) //nolint:gosec
-	if err := cmd.Run(); err != nil {
-		return err
-	}
-
-	return server.PingServer(nil)
+	return cmd.Run()
 }
 
 func (t *TestBridge) Stop() {
