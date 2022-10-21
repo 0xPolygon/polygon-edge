@@ -185,6 +185,13 @@ func setFlags(cmd *cobra.Command) {
 			command.DefaultPremineBalance,
 			"the amount which will be premined to all the validators",
 		)
+		cmd.Flags().StringVar(
+			&params.smartContractsRootPath,
+			smartContractsRootPathFlag,
+			defaultContractsRootFolder,
+			"the smart contracts folder",
+		)
+
 		cmd.MarkFlagsMutuallyExclusive(premineFlag, premineValidatorsFlag)
 		cmd.MarkFlagsMutuallyExclusive(validatorsFlag, premineValidatorsFlag)
 	}

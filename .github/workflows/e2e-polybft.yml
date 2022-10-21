@@ -1,5 +1,5 @@
 ---
-name: E2E tests
+name: PolyBFT E2E tests
 on:  # yamllint disable-line rule:truthy
   push:
     branches:
@@ -26,7 +26,7 @@ jobs:
       - name: Compile v3 contracts
         run: make compile-v3-contracts
       - name: Run tests
-        run: make test-e2e
+        run: make test-e2e-polybft
       - name: Archive test logs
         if: always()
         uses: actions/upload-artifact@v3
