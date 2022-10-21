@@ -17,6 +17,7 @@ jobs:
     uses: 0xpolygon/polygon-edge/.github/workflows/security.yml@develop
     secrets:
       SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      SNYK_ORG: ${{ secrets.SNYK_ORG }}
 
   build:
     uses: 0xpolygon/polygon-edge/.github/workflows/build.yml@develop
