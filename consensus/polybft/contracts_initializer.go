@@ -10,6 +10,13 @@ import (
 	"github.com/umbracle/ethgo/abi"
 )
 
+const (
+	// safe numbers for the test
+	newEpochReward   = 1
+	newMinStake      = 1
+	newMinDelegation = 1
+)
+
 var (
 	initCallStaking, _ = abi.NewMethod("function initialize(" +
 		"uint256 newEpochReward," +
@@ -49,17 +56,20 @@ func getInitChildValidatorSetInput(validators []*Validator, governanceAddr types
 		validatorStakes[i] = g.Balance
 	}
 
+	registerMessage, err := bls.MarshalMessageToBigInt([]byte(contracts.PolyBFTRegisterMessage))
+	if err != nil {
+		return nil, err
+	}
+
 	input, err := initCallStaking.Encode([]interface{}{
-		// safe numbers for the test
-		big.NewInt(1),
-		big.NewInt(1),
-		big.NewInt(1),
+		big.NewInt(newEpochReward),
+		big.NewInt(newMinStake),
+		big.NewInt(newMinDelegation),
 		validatorAddresses,
 		validatorPubkeys,
 		validatorStakes,
-		// address of the deployed BLS contract
-		contracts.BLSContract,
-		buildRegisterMessage(contracts.PolyBFTRegisterMessage),
+		contracts.BLSContract, // address of the deployed BLS contract
+		registerMessage,
 		governanceAddr,
 	})
 	if err != nil {
@@ -67,13 +77,4 @@ func getInitChildValidatorSetInput(validators []*Validator, governanceAddr types
 	}
 
 	return input, nil
-}
-
-func buildRegisterMessage(m string) [2]*big.Int {
-	data, err := bls.MarshalMessageToBigInt([]byte(m))
-	if err != nil {
-		panic("error building register message: " + err.Error())
-	}
-
-	return data
 }
