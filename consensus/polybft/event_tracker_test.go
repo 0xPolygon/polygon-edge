@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/testutil"
@@ -52,7 +53,7 @@ func TestEventTracker_TrackSyncEvents(t *testing.T) {
 	sub := &mockEventSubscriber{}
 
 	tracker := &eventTracker{
-		logger:     newTestLogger(),
+		logger:     hclog.NewNullLogger(),
 		subscriber: sub,
 		dataDir:    tmpDir,
 		config: &PolyBFTConfig{

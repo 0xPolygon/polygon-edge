@@ -16,6 +16,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -53,9 +54,9 @@ func TestConsensusRuntime_GetVotes(t *testing.T) {
 
 	for i := 0; i < int(votesCount); i++ {
 		validator := validatorAccounts.getValidator(validatorIds[i])
-		signature := validator.mustSign(hash.Bytes())
+		signature, err := validator.mustSign(hash.Bytes()).Marshal()
 
-		_, err := state.insertMessageVote(epoch, hash.Bytes(),
+		_, err = state.insertMessageVote(epoch, hash.Bytes(),
 			&MessageSignature{
 				From:      validator.Key().NodeID(),
 				Signature: signature,
@@ -93,7 +94,7 @@ func TestConsensusRuntime_deliverMessage_MessageWhenEpochNotStarted(t *testing.T
 	validators := newTestValidatorsWithAliases(validatorIds)
 	localValidator := validators.getValidator("A")
 	runtime := &consensusRuntime{
-		logger:              newTestLogger(),
+		logger:              hclog.NewNullLogger(),
 		activeValidatorFlag: 1,
 		state:               state,
 		config:              &runtimeConfig{Key: localValidator.Key()},
@@ -135,7 +136,7 @@ func TestConsensusRuntime_deliverMessage_MessageWhenEpochNotStarted(t *testing.T
 func TestConsensusRuntime_AddLog(t *testing.T) {
 	state := newTestState(t)
 	runtime := &consensusRuntime{
-		logger: newTestLogger(),
+		logger: hclog.NewNullLogger(),
 		state:  state,
 		config: &runtimeConfig{Key: createTestKey(t)},
 	}
@@ -316,7 +317,7 @@ func TestConsensusRuntime_deliverMessage_EpochNotStarted(t *testing.T) {
 	account := newTestValidator("A")
 
 	runtime := &consensusRuntime{
-		logger: newTestLogger(),
+		logger: hclog.NewNullLogger(),
 		state:  state,
 		config: &runtimeConfig{
 			PolyBFTConfig: &PolyBFTConfig{
@@ -350,7 +351,7 @@ func TestConsensusRuntime_deliverMessage_ForExistingEpochAndCommitmentMessage(t 
 	sender := validators.getValidator("SENDER").Key()
 
 	runtime := &consensusRuntime{
-		logger:              newTestLogger(),
+		logger:              hclog.NewNullLogger(),
 		state:               state,
 		activeValidatorFlag: 1,
 		config: &runtimeConfig{
@@ -430,7 +431,7 @@ func TestConsensusRuntime_NotifyProposalInserted_EndOfEpoch(t *testing.T) {
 	polybftBackendMock.On("GetValidators", mock.Anything, mock.Anything).Return(validatorSet).Once()
 
 	runtime := &consensusRuntime{
-		logger: newTestLogger(),
+		logger: hclog.NewNullLogger(),
 		state:  newTestState(t),
 		config: &runtimeConfig{
 			PolyBFTConfig: &PolyBFTConfig{
@@ -504,7 +505,7 @@ func TestConsensusRuntime_FSM_NotEndOfEpoch_NotEndOfSprint(t *testing.T) {
 	blockchainMock.On("NewBlockBuilder", mock.Anything).Return(&BlockBuilder{}, nil).Once()
 
 	runtime := &consensusRuntime{
-		logger:              newTestLogger(),
+		logger:              hclog.NewNullLogger(),
 		activeValidatorFlag: 1,
 		config: &runtimeConfig{
 			PolyBFTConfig: &PolyBFTConfig{
@@ -609,7 +610,7 @@ func TestConsensusRuntime_FSM_EndOfEpoch_BuildRegisterCommitment_And_Uptime(t *t
 	}
 
 	runtime := &consensusRuntime{
-		logger:         newTestLogger(),
+		logger:         hclog.NewNullLogger(),
 		state:          state,
 		epoch:          metadata,
 		config:         config,
@@ -667,7 +668,7 @@ func TestConsensusRuntime_FSM_EndOfEpoch_RegisterCommitmentNotFound(t *testing.T
 	}
 
 	runtime := &consensusRuntime{
-		logger:         newTestLogger(),
+		logger:         hclog.NewNullLogger(),
 		epoch:          metadata,
 		config:         config,
 		lastBuiltBlock: lastBuiltBlock,
@@ -749,7 +750,7 @@ func TestConsensusRuntime_FSM_EndOfEpoch_BuildRegisterCommitment_QuorumNotReache
 	}
 
 	runtime := &consensusRuntime{
-		logger:         newTestLogger(),
+		logger:         hclog.NewNullLogger(),
 		state:          state,
 		epoch:          metadata,
 		config:         config,
@@ -791,7 +792,7 @@ func Test_NewConsensusRuntime(t *testing.T) {
 		Key:           key,
 		blockchain:    &blockchainMock{},
 	}
-	runtime, err := newConsensusRuntime(newTestLogger(), config)
+	runtime, err := newConsensusRuntime(hclog.NewNullLogger(), config)
 	assert.NoError(t, err)
 
 	assert.False(t, runtime.isActiveValidator())
@@ -846,7 +847,7 @@ func TestConsensusRuntime_FSM_EndOfSprint_HasBundlesToExecute(t *testing.T) {
 	blockchainMock.On("GetSystemState", mock.Anything, mock.Anything).Return(systemStateMock).Once()
 
 	runtime := &consensusRuntime{
-		logger:              newTestLogger(),
+		logger:              hclog.NewNullLogger(),
 		activeValidatorFlag: 1,
 		state:               state,
 		config: &runtimeConfig{
@@ -1075,7 +1076,7 @@ func TestConsensusRuntime_restartEpoch_FirstRestart_NoStateSyncEvents(t *testing
 	polybftBackendMock.On("GetValidators", mock.Anything, mock.Anything).Return(validators.getPublicIdentities()).Once()
 
 	runtime := &consensusRuntime{
-		logger:              newTestLogger(),
+		logger:              hclog.NewNullLogger(),
 		activeValidatorFlag: 1,
 		state:               state,
 		config: &runtimeConfig{
@@ -1129,7 +1130,7 @@ func TestConsensusRuntime_restartEpoch_FirstRestart_BuildsCommitment(t *testing.
 	localValidatorID := validatorIds[rand.Intn(len(validatorIds))]
 	localValidator := validatorAccs.getValidator(localValidatorID)
 	runtime := &consensusRuntime{
-		logger:              newTestLogger(),
+		logger:              hclog.NewNullLogger(),
 		activeValidatorFlag: 1,
 		state:               state,
 		config: &runtimeConfig{
@@ -1173,8 +1174,7 @@ func TestConsensusRuntime_restartEpoch_FirstRestart_BuildsCommitment(t *testing.
 			continue
 		}
 
-		signature := validator.mustSign(commitmentHash.Bytes())
-
+		signature, err := validator.mustSign(commitmentHash.Bytes()).Marshal()
 		require.NoError(t, err)
 
 		_, err = state.insertMessageVote(runtime.epoch.Number, commitmentHash.Bytes(),
@@ -1238,7 +1238,7 @@ func TestConsensusRuntime_restartEpoch_NewEpochToRun_BuildCommitment(t *testing.
 	polybftBackendMock.On("GetValidators", mock.Anything, mock.Anything).Return(newValidatorSet).Once()
 
 	runtime := &consensusRuntime{
-		logger:              newTestLogger(),
+		logger:              hclog.NewNullLogger(),
 		activeValidatorFlag: 1,
 		state:               state,
 		config: &runtimeConfig{
@@ -1294,8 +1294,9 @@ func TestConsensusRuntime_restartEpoch_NewEpochToRun_BuildCommitment(t *testing.
 
 	for _, validatorID := range originalValidatorIds {
 		validator := originalValidators.getValidator(validatorID)
-		signature := validator.mustSign(commitmentHash.Bytes())
-		_, err := state.insertMessageVote(runtime.epoch.Number, commitmentHash.Bytes(),
+		signature, err := validator.mustSign(commitmentHash.Bytes()).Marshal()
+		require.NoError(t, err)
+		_, err = state.insertMessageVote(runtime.epoch.Number, commitmentHash.Bytes(),
 			&MessageSignature{
 				From:      validator.Key().NodeID(),
 				Signature: signature,
@@ -1398,7 +1399,7 @@ func TestConsensusRuntime_buildBundles_NoCommitment(t *testing.T) {
 	commitmentMsg := NewCommitmentMessage(types.Hash{}, 0, 4, 5)
 
 	runtime := &consensusRuntime{
-		logger: newTestLogger(),
+		logger: hclog.NewNullLogger(),
 		state:  state,
 		epoch:  &epochMetadata{Number: 0},
 	}
@@ -1436,7 +1437,7 @@ func TestConsensusRuntime_buildBundles(t *testing.T) {
 	require.NoError(t, state.insertCommitmentMessage(commitmentMsgSigned))
 
 	runtime := &consensusRuntime{
-		logger: newTestLogger(),
+		logger: hclog.NewNullLogger(),
 		state:  state,
 		epoch: &epochMetadata{
 			Number: epoch,
@@ -1523,7 +1524,7 @@ func TestConsensusRuntime_FSM_EndOfEpoch_PostHook(t *testing.T) {
 	}
 
 	runtime := &consensusRuntime{
-		logger:         newTestLogger(),
+		logger:         hclog.NewNullLogger(),
 		state:          state,
 		epoch:          metadata,
 		config:         config,
@@ -1586,7 +1587,8 @@ func createTestTransportMessage(t *testing.T, hash []byte, epochNumber uint64, k
 func createTestMessageVote(t *testing.T, hash []byte, validator *testValidator) *MessageSignature {
 	t.Helper()
 
-	signature := validator.mustSign(hash)
+	signature, err := validator.mustSign(hash).Marshal()
+	require.NoError(t, err)
 
 	return &MessageSignature{
 		From:      validator.Key().NodeID(),

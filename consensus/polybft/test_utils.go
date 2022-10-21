@@ -9,11 +9,8 @@ import (
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/umbracle/ethgo"
-
-	hclog "github.com/hashicorp/go-hclog"
-
 	"github.com/stretchr/testify/require"
+	"github.com/umbracle/ethgo"
 )
 
 func createSignature(t *testing.T, accounts []*wallet.Account, hash types.Hash) *Signature {
@@ -35,13 +32,6 @@ func createSignature(t *testing.T, accounts []*wallet.Account, hash types.Hash) 
 	require.NoError(t, err)
 
 	return &Signature{AggregatedSignature: aggs, Bitmap: bmp}
-}
-
-func newTestLogger() hclog.Logger {
-	return hclog.New(&hclog.LoggerOptions{
-		Name: "polygon",
-		//Level: config.LogLevel,
-	})
 }
 
 func generateStateSyncEvents(t *testing.T, eventsCount int, startIdx uint64) []*StateSyncEvent {

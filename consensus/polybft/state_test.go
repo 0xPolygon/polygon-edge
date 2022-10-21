@@ -12,6 +12,7 @@ import (
 	"github.com/0xPolygon/pbft-consensus"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
@@ -27,7 +28,7 @@ func newTestState(t *testing.T) *State {
 		t.Fatal(err)
 	}
 
-	state, err := newState(path.Join(dir, "my.db"), newTestLogger())
+	state, err := newState(path.Join(dir, "my.db"), hclog.NewNullLogger())
 	if err != nil {
 		t.Fatal(err)
 	}
