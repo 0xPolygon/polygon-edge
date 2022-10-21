@@ -74,7 +74,9 @@ func (m *blockchainMock) GetHeaderByNumber(number uint64) (*types.Header, bool) 
 
 	getHeaderCallback, ok := args.Get(0).(func(number uint64) *types.Header)
 	if ok {
-		return getHeaderCallback(number), true
+		h := getHeaderCallback(number)
+
+		return h, h != nil
 	}
 
 	panic("Unsupported mock for GetHeaderByNumber")
