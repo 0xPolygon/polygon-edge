@@ -237,7 +237,7 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			"--consensus", "polybft",
 			"--dir", path.Join(tmpDir, "genesis.json"),
 			//"--password", pwdFilePath,
-			"--contracts-path", "./../consensus/polybft/polybftcontracts/artifacts/contracts/",
+			"--contracts-path", "./../core-contracts/artifacts/contracts/",
 			"--premine", "0x0000000000000000000000000000000000000000",
 		}
 
