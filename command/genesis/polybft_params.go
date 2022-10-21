@@ -15,10 +15,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/polybftcontracts"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
-	"github.com/0xPolygon/polygon-edge/secrets"
-	secretsHelper "github.com/0xPolygon/polygon-edge/secrets/helper"
 	"github.com/0xPolygon/polygon-edge/server"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -53,20 +50,8 @@ func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
 		return nil, err
 	}
 
-	// use test-chain-1 as governance address (if found). If the validators from
-	// utils.ReadValidatorsByRegexp are read in order, we could use that list instead.
-	// The important point is to have `test-chain-1` as the governance address for the
-	// e2e register command.
-	secretsManager, err := secretsHelper.SetupLocalSecretsManager("./test-chain-1")
-	if err != nil {
-		return nil, err
-	}
-
-	governanceAccount, err := wallet.GenerateNewAccountFromSecret(secretsManager, secrets.ValidatorBLSKey)
-	if err != nil {
-		return nil, err
-	}
-
+	// use 1st account as governance address
+	governanceAccount := validatorsInfo[0].Account
 	polyBftConfig := &polybft.PolyBFTConfig{
 		InitialValidatorSet: p.getGenesisValidators(validatorsInfo),
 		BlockTime:           p.blockTime,
