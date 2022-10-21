@@ -24,7 +24,7 @@ jobs:
         with:
           go-version: 1.18.x
       - name: Compile v3 contracts
-        run: make compile-v3-contracts
+        run: make compile-core-contracts
       - name: Run tests
         run: make test-e2e-polybft
       - name: Archive test logs
