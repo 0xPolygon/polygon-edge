@@ -69,9 +69,6 @@ type fsm struct {
 	// isEndOfSprint indicates if sprint reached its end
 	isEndOfSprint bool
 
-	// current epoch
-	epoch uint64
-
 	// proposerCommitmentToRegister is a commitment that is registered via state transaction by proposer
 	proposerCommitmentToRegister *CommitmentMessageSigned
 
@@ -175,7 +172,7 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 	f.proposal = &pbft.Proposal{
 		Time: headerTime,
 		Data: stateBlock.Block.MarshalRLP(),
-		Hash: f.block.Block.Hash().Bytes(),
+		Hash: stateBlock.Block.Hash().Bytes(),
 	}
 
 	f.logger.Debug("[FSM Build Proposal]",

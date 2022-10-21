@@ -530,7 +530,6 @@ func TestConsensusRuntime_FSM_NotEndOfEpoch_NotEndOfSprint(t *testing.T) {
 	assert.False(t, fsm.isEndOfSprint)
 	assert.True(t, fsm.ValidatorSet().Includes(runtime.config.Key.NodeID()))
 	assert.Equal(t, lastBlock.Number, fsm.parent.Number)
-	assert.Equal(t, runtime.epoch.Number, fsm.epoch)
 
 	assert.NotNil(t, fsm.blockBuilder)
 	assert.NotNil(t, fsm.backend)
@@ -876,9 +875,6 @@ func TestConsensusRuntime_FSM_EndOfSprint_HasBundlesToExecute(t *testing.T) {
 
 	// check if it is end of sprint
 	require.True(t, fsm.isEndOfSprint)
-
-	// check if it the correct epoch
-	require.Equal(t, epochNumber, fsm.epoch)
 
 	// check if commitment message to execute is attached to fsm
 	require.Len(t, fsm.bundleProofs, 1)
