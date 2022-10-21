@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -31,9 +31,14 @@ const (
 
 	// envStdoutEnabled signal whether the output of the nodes get piped to stdout
 	envStdoutEnabled = "E2E_STDOUT"
+)
 
+const (
 	// path to core contracts
-	contractsPath = "./../core-contracts/artifacts/contracts/"
+	defaultContractsPath = "./../core-contracts/artifacts/contracts/"
+
+	// prefix for validator directory
+	defaultValidatorPrefix = "test-chain-"
 )
 
 var startTime int64
@@ -55,13 +60,15 @@ type TestClusterConfig struct {
 	t *testing.T
 
 	Name              string
-	Premine           []common.Address
+	Premine           []types.Address
 	HasBridge         bool
 	NonValidatorCount int
 	WithLogs          bool
 	WithStdout        bool
 	LogsDir           string
 	TmpDir            string
+	ContractsDir      string
+	ValidatorPrefix   string
 	Binary            string
 	ValidatorSetSize  uint64
 
@@ -131,9 +138,9 @@ type TestCluster struct {
 
 type ClusterOption func(*TestClusterConfig)
 
-func WithPremine(address common.Address) ClusterOption {
+func WithPremine(addresses ...types.Address) ClusterOption {
 	return func(h *TestClusterConfig) {
-		h.Premine = append(h.Premine, address)
+		h.Premine = append(h.Premine, addresses...)
 	}
 }
 
@@ -179,6 +186,14 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		Binary:     resolveBinary(),
 	}
 
+	if config.ContractsDir == "" {
+		config.ContractsDir = defaultContractsPath
+	}
+
+	if config.ValidatorPrefix == "" {
+		config.ValidatorPrefix = defaultValidatorPrefix
+	}
+
 	for _, opt := range opts {
 		opt(config)
 	}
@@ -205,7 +220,7 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 	{
 		// run init account
 		err = cluster.cmdRun("polybft-secrets",
-			"--data-dir", path.Join(tmpDir, "test-chain-"),
+			"--data-dir", path.Join(tmpDir, cluster.Config.ValidatorPrefix),
 			"--num", strconv.Itoa(validatorsCount),
 		)
 		require.NoError(t, err)
@@ -216,7 +231,8 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			"genesis",
 			"--consensus", "polybft",
 			"--dir", path.Join(tmpDir, "genesis.json"),
-			"--contracts-path", contractsPath,
+			"--contracts-path", defaultContractsPath,
+			"--epoch-size", "10",
 			"--premine", "0x0000000000000000000000000000000000000000",
 		}
 
@@ -255,7 +271,7 @@ func (c *TestCluster) initTestServer(t *testing.T, i int, isValidator bool) {
 	t.Helper()
 
 	logLevel := os.Getenv(envLogLevel)
-	dataDir := c.Config.Dir("test-chain-" + strconv.Itoa(i))
+	dataDir := c.Config.Dir(c.Config.ValidatorPrefix + strconv.Itoa(i))
 
 	srv := NewTestServer(t, c.Config, func(config *TestServerConfig) {
 		config.DataDir = dataDir

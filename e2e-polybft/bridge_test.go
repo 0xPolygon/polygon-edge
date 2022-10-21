@@ -6,8 +6,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
@@ -53,28 +55,32 @@ func checkLogs(
 }
 
 func TestE2E_Bridge_MainWorkflow(t *testing.T) {
-	cluster := framework.NewTestCluster(t, 5, framework.WithBridge())
+	const num = 10
+
+	var (
+		wallets, amounts [num]string
+		premines         [num]types.Address
+	)
+
+	for i := 0; i < num; i++ {
+		premines[i] = types.Address(wallet.GenerateAccount().Ecdsa.Address())
+		wallets[i] = premines[i].String()
+		amounts[i] = fmt.Sprintf("%d", 100)
+	}
+
+	cluster := framework.NewTestCluster(t, 5, framework.WithBridge(), framework.WithPremine(premines[:]...))
 	defer cluster.Stop()
 
 	// wait for a couple of blocks
 	require.NoError(t, cluster.WaitForBlock(2, 1*time.Minute))
 
 	// send a few transactions to the bridge
-	num := 10
-
-	var wallets, amounts []string
-
-	for i := 0; i < num; i++ {
-		wallets = append(wallets, fmt.Sprintf("0x%040x", 1))
-		amounts = append(amounts, fmt.Sprintf("%d", 100))
-	}
-
 	require.NoError(
 		t,
 		cluster.EmitTransfer(
 			contracts.NativeTokenContract.String(),
-			strings.Join(wallets, ","),
-			strings.Join(amounts, ","),
+			strings.Join(wallets[:], ","),
+			strings.Join(amounts[:], ","),
 		),
 	)
 

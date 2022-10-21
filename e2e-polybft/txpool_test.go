@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
@@ -19,7 +19,7 @@ func TestE2E_TxPool_Transfer(t *testing.T) {
 	sender, err := wallet.GenerateKey()
 	assert.NoError(t, err)
 
-	cluster := framework.NewTestCluster(t, 5, framework.WithPremine(common.Address(sender.Address())))
+	cluster := framework.NewTestCluster(t, 5, framework.WithPremine(types.Address(sender.Address())))
 	defer cluster.Stop()
 
 	assert.NoError(t, cluster.WaitForBlock(2, 1*time.Minute))
@@ -106,7 +106,7 @@ func TestE2E_TxPool_Transfer_Linear(t *testing.T) {
 	assert.NoError(t, err)
 
 	// first account should have some matics premined
-	cluster := framework.NewTestCluster(t, 5, framework.WithPremine(common.Address(premine.Address())))
+	cluster := framework.NewTestCluster(t, 5, framework.WithPremine(types.Address(premine.Address())))
 	defer cluster.Stop()
 
 	require.NoError(t, cluster.WaitForBlock(2, 1*time.Minute))

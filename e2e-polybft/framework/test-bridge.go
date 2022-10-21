@@ -1,6 +1,8 @@
 package framework
 
 import (
+	"bytes"
+	"fmt"
 	"os/exec"
 	"testing"
 
@@ -52,10 +54,22 @@ func (t *TestBridge) Start() error {
 	initContracts := []string{
 		"rootchain",
 		"init-contracts",
+		"--path", t.clusterConfig.ContractsDir,
+		"--validator-path", t.clusterConfig.TmpDir,
+		"--validator-prefix", t.clusterConfig.ValidatorPrefix,
 	}
 
+	var stdErr bytes.Buffer
+
 	cmd := exec.Command(resolveBinary(), initContracts...) //nolint:gosec
-	return cmd.Run()
+	cmd.Stderr = &stdErr
+	cmd.Stdout = t.clusterConfig.GetStdout(args[0])
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("%w: %s", err, stdErr.String())
+	}
+
+	return nil
 }
 
 func (t *TestBridge) Stop() {
