@@ -36,6 +36,7 @@ func (t *TestBridge) Start() error {
 	args := []string{
 		"rootchain",
 		"server",
+		"--data-dir", t.clusterConfig.Dir("test-rootchain"),
 	}
 
 	stdout := t.clusterConfig.GetStdout("bridge")
@@ -63,10 +64,14 @@ func (t *TestBridge) Start() error {
 
 	cmd := exec.Command(resolveBinary(), initContracts...) //nolint:gosec
 	cmd.Stderr = &stdErr
-	cmd.Stdout = t.clusterConfig.GetStdout(args[0])
+	cmd.Stdout = stdout
 
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("%w: %s", err, stdErr.String())
+	}
+
+	if stdErr.Len() > 0 {
+		return fmt.Errorf("failed to deploy contracts to the root chain: %s", stdErr.String())
 	}
 
 	return nil

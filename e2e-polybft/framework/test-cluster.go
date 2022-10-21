@@ -206,6 +206,15 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		once:        sync.Once{},
 	}
 
+	{
+		// run init account
+		err = cluster.cmdRun("polybft-secrets",
+			"--data-dir", path.Join(tmpDir, cluster.Config.ValidatorPrefix),
+			"--num", strconv.Itoa(validatorsCount),
+		)
+		require.NoError(t, err)
+	}
+
 	if cluster.Config.HasBridge {
 		// start bridge
 		cluster.Bridge, err = NewTestBridge(t, cluster.Config)
@@ -215,15 +224,6 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 	// In case no validators are specified in opts, all nodes will be validators
 	if cluster.Config.ValidatorSetSize == 0 {
 		cluster.Config.ValidatorSetSize = uint64(validatorsCount)
-	}
-
-	{
-		// run init account
-		err = cluster.cmdRun("polybft-secrets",
-			"--data-dir", path.Join(tmpDir, cluster.Config.ValidatorPrefix),
-			"--num", strconv.Itoa(validatorsCount),
-		)
-		require.NoError(t, err)
 	}
 
 	{
@@ -302,7 +302,11 @@ func (c *TestCluster) cmdRun(args ...string) error {
 	cmd.Stdout = c.Config.GetStdout(args[0])
 
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("%w: %s", err, stdErr.String())
+		return err
+	}
+
+	if stdErr.Len() > 0 {
+		return fmt.Errorf("failed to execute: %s", stdErr.String())
 	}
 
 	return nil
