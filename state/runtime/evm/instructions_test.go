@@ -13,6 +13,8 @@ import (
 
 var (
 	two = big.NewInt(2)
+
+	allEnabledForks = chain.AllForksEnabled.At(0)
 )
 
 type cases2To1 []struct {
@@ -375,6 +377,197 @@ func TestCreate(t *testing.T) {
 			assert.Equal(t, tt.resultState.memory, s.memory, "memory in state after execution is not correct")
 			assert.Equal(t, tt.resultState.stop, s.stop, "stop in state after execution is not correct")
 			assert.Equal(t, tt.resultState.err, s.err, "err in state after execution is not correct")
+		})
+	}
+}
+
+func Test_opReturnDataCopy(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		config      *chain.ForksInTime
+		initState   *state
+		resultState *state
+	}{
+		{
+			name: "should return error if Byzantium is not applied",
+			config: &chain.ForksInTime{
+				Byzantium: false,
+			},
+			initState: &state{},
+			resultState: &state{
+				config: &chain.ForksInTime{
+					Byzantium: false,
+				},
+				stop: true,
+				err:  errOpCodeNotFound,
+			},
+		},
+		{
+			name:   "should return error if memOffset is negative",
+			config: &allEnabledForks,
+			initState: &state{
+				stack: []*big.Int{
+					big.NewInt(0),  // length
+					big.NewInt(0),  // dataOffset
+					big.NewInt(-1), // memOffset
+				},
+				sp: 3,
+			},
+			resultState: &state{
+				config: &allEnabledForks,
+				stack: []*big.Int{
+					big.NewInt(0),
+					big.NewInt(0),
+					big.NewInt(-1),
+				},
+				sp:   0,
+				stop: true,
+				err:  errGasUintOverflow,
+			},
+		},
+		{
+			name:   "should return error if dataOffset is negative",
+			config: &allEnabledForks,
+			initState: &state{
+				stack: []*big.Int{
+					big.NewInt(1),  // length
+					big.NewInt(-1), // dataOffset
+					big.NewInt(0),  // memOffset
+				},
+				sp:     3,
+				memory: make([]byte, 1),
+			},
+			resultState: &state{
+				config: &allEnabledForks,
+				stack: []*big.Int{
+					big.NewInt(1),
+					big.NewInt(-1),
+					big.NewInt(0),
+				},
+				sp:     0,
+				memory: make([]byte, 1),
+				stop:   true,
+				err:    errGasUintOverflow,
+			},
+		},
+		{
+			name:   "should return error if length is negative",
+			config: &allEnabledForks,
+			initState: &state{
+				stack: []*big.Int{
+					big.NewInt(-1), // length
+					big.NewInt(0),  // dataOffset
+					big.NewInt(0),  // memOffset
+				},
+				sp: 3,
+			},
+			resultState: &state{
+				config: &allEnabledForks,
+				stack: []*big.Int{
+					big.NewInt(-1),
+					big.NewInt(0),
+					big.NewInt(0),
+				},
+				sp:   0,
+				stop: true,
+				err:  errGasUintOverflow,
+			},
+		},
+		{
+			name:   "should copy data from returnData to memory",
+			config: &allEnabledForks,
+			initState: &state{
+				stack: []*big.Int{
+					big.NewInt(1), // length
+					big.NewInt(0), // dataOffset
+					big.NewInt(0), // memOffset
+				},
+				sp:         3,
+				returnData: []byte{0xff},
+				memory:     []byte{0x0},
+				gas:        10,
+			},
+			resultState: &state{
+				config: &allEnabledForks,
+				stack: []*big.Int{
+					big.NewInt(1),
+					big.NewInt(0),
+					big.NewInt(0),
+				},
+				sp:          0,
+				returnData:  []byte{0xff},
+				memory:      []byte{0xff},
+				gas:         7,
+				lastGasCost: 0,
+				stop:        false,
+				err:         nil,
+			},
+		},
+		{
+			name:   "should expand memory and copy data returnData",
+			config: &allEnabledForks,
+			initState: &state{
+				stack: []*big.Int{
+					big.NewInt(5), // length
+					big.NewInt(1), // dataOffset
+					big.NewInt(2), // memOffset
+				},
+				sp:         3,
+				returnData: []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06},
+				memory:     []byte{0x11, 0x22},
+				gas:        20,
+			},
+			resultState: &state{
+				config: &allEnabledForks,
+				stack: []*big.Int{
+					big.NewInt(6), // updated for end index
+					big.NewInt(1),
+					big.NewInt(2),
+				},
+				sp:         0,
+				returnData: []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06},
+				memory: append(
+					// 1 word (32 bytes)
+					[]byte{0x11, 0x22, 0x02, 0x03, 0x04, 0x05, 0x06},
+					make([]byte, 25)...,
+				),
+				gas:         14,
+				lastGasCost: 3,
+				stop:        false,
+				err:         nil,
+			},
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			state, closeFn := getState()
+			defer closeFn()
+
+			state.gas = test.initState.gas
+			state.sp = test.initState.sp
+			state.stack = test.initState.stack
+			state.memory = test.initState.memory
+			state.returnData = test.initState.returnData
+			state.config = test.config
+
+			// assign nil to some fields in cached state object
+			state.code = nil
+			state.host = nil
+			state.msg = nil
+			state.evm = nil
+			state.bitmap = bitmap{}
+			state.ret = nil
+
+			opReturnDataCopy(state)
+
+			assert.Equal(t, test.resultState, state)
 		})
 	}
 }
