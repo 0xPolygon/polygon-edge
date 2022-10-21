@@ -263,7 +263,7 @@ func (cm *CommitmentMessage) ContainsStateSync(stateSyncIndex uint64) bool {
 
 // BundlesCount calculates bundles count contained in given CommitmentMessge
 func (cm *CommitmentMessage) BundlesCount() uint64 {
-	return uint64(math.Ceil((float64(cm.ToIndex) - float64(cm.FromIndex) + 1) / float64(cm.BundleSize)))
+	return (cm.ToIndex - cm.FromIndex + cm.BundleSize) / cm.BundleSize
 }
 
 // VerifyProof validates given bundle proof against merkle trie root hash contained in the CommitmentMessage

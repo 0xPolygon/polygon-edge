@@ -236,10 +236,6 @@ func (c *consensusRuntime) populateFsmIfBridgeEnabled(
 	}
 
 	if isEndOfSprint {
-		if err != nil {
-			return err
-		}
-
 		if err := c.state.cleanCommitments(nextStateSyncExecutionIdx); err != nil {
 			return err
 		}
