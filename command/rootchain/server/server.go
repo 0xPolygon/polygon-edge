@@ -92,7 +92,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	}
 
 	// Ping geth server to make sure everything is up and running
-	if err := pingServer(closeCh); err != nil {
+	if err := PingServer(closeCh); err != nil {
 		close(closeCh)
 
 		if ip, err := helper.ReadRootchainIP(); err != nil {
@@ -242,7 +242,7 @@ func gatherLogs(ctx context.Context, outputter command.OutputFormatter) error {
 	return nil
 }
 
-func pingServer(closeCh <-chan struct{}) error {
+func PingServer(closeCh <-chan struct{}) error {
 	httpTimer := time.NewTimer(30 * time.Second)
 	httpClient := http.Client{
 		Timeout: 5 * time.Second,

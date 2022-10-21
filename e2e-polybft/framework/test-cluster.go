@@ -134,10 +134,10 @@ func (c *TestClusterConfig) initLogsDir() {
 }
 
 type TestCluster struct {
-	Config   *TestClusterConfig
-	Servers  []*TestServer
-	Bootnode *TestBootnode
-	// Bridge      *TestBridge
+	Config      *TestClusterConfig
+	Servers     []*TestServer
+	Bootnode    *TestBootnode
+	Bridge      *TestBridge
 	initialPort int64
 
 	once         sync.Once
@@ -175,12 +175,14 @@ func isTrueEnv(e string) bool {
 	return strings.ToLower(os.Getenv(e)) == "true"
 }
 
+var genesisPath string
+
 func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *TestCluster {
 	t.Helper()
 
-	if !isTrueEnv(envE2ETestsEnabled) {
-		t.Skip("Integration tests are disabled.")
-	}
+	// if !isTrueEnv(envE2ETestsEnabled) {
+	// 	t.Skip("Integration tests are disabled.")
+	// }
 
 	tmpDir, err := os.MkdirTemp("/tmp", "e2e-polybft-")
 	require.NoError(t, err)
@@ -207,13 +209,13 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 
 	if cluster.Config.HasBridge {
 		// start bridge
-		// cluster.Bridge, err = NewTestBridge(t, cluster.Config)
+		cluster.Bridge, err = NewTestBridge(t, cluster.Config)
 		require.NoError(t, err)
 	}
 
 	// Create a file with account password
-	//pwdFilePath, deleteFile := createAccountPasswordFile(t)
-	//defer deleteFile()
+	// pwdFilePath, deleteFile := createAccountPasswordFile(t)
+	// defer deleteFile()
 
 	// In case no validators are specified in opts, all nodes will be validators
 	if cluster.Config.ValidatorSetSize == 0 {
@@ -225,7 +227,7 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		err = cluster.cmdRun("polybft-secrets",
 			"--data-dir", path.Join(tmpDir, "test-chain-"),
 			"--num", strconv.Itoa(validatorsCount),
-			//"--password", pwdFilePath,
+			// "--password", pwdFilePath,
 		)
 		require.NoError(t, err)
 	}
@@ -236,7 +238,7 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			"genesis",
 			"--consensus", "polybft",
 			"--dir", path.Join(tmpDir, "genesis.json"),
-			//"--password", pwdFilePath,
+			// "--password", pwdFilePath,
 			"--contracts-path", "./../core-contracts/artifacts/contracts/",
 			"--premine", "0x0000000000000000000000000000000000000000",
 		}
