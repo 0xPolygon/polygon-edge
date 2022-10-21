@@ -32,8 +32,8 @@ const (
 	// envStdoutEnabled signal whether the output of the nodes get piped to stdout
 	envStdoutEnabled = "E2E_STDOUT"
 
-	// accountPassword is the default account password
-	accountPassword = "qwerty"
+	// path to core contracts
+	contractsPath = "./../core-contracts/artifacts/contracts/"
 )
 
 var startTime int64
@@ -49,22 +49,6 @@ func resolveBinary() string {
 	}
 	// fallback
 	return "polygon-edge"
-}
-
-func createAccountPasswordFile(t *testing.T) (string, func()) {
-	t.Helper()
-
-	pwdFile, err := os.CreateTemp("", "e2e-polybft")
-	require.NoError(t, err)
-
-	_, err = pwdFile.WriteString(accountPassword)
-	require.NoError(t, err)
-	require.NoError(t, pwdFile.Close())
-
-	return pwdFile.Name(), func() {
-		err = os.Remove(pwdFile.Name())
-		require.NoError(t, err)
-	}
 }
 
 type TestClusterConfig struct {
@@ -213,10 +197,6 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		require.NoError(t, err)
 	}
 
-	// Create a file with account password
-	// pwdFilePath, deleteFile := createAccountPasswordFile(t)
-	// defer deleteFile()
-
 	// In case no validators are specified in opts, all nodes will be validators
 	if cluster.Config.ValidatorSetSize == 0 {
 		cluster.Config.ValidatorSetSize = uint64(validatorsCount)
@@ -227,19 +207,16 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		err = cluster.cmdRun("polybft-secrets",
 			"--data-dir", path.Join(tmpDir, "test-chain-"),
 			"--num", strconv.Itoa(validatorsCount),
-			// "--password", pwdFilePath,
 		)
 		require.NoError(t, err)
 	}
 
 	{
-		// create genesis file
 		args := []string{
 			"genesis",
 			"--consensus", "polybft",
 			"--dir", path.Join(tmpDir, "genesis.json"),
-			// "--password", pwdFilePath,
-			"--contracts-path", "./../core-contracts/artifacts/contracts/",
+			"--contracts-path", contractsPath,
 			"--premine", "0x0000000000000000000000000000000000000000",
 		}
 
@@ -285,7 +262,6 @@ func (c *TestCluster) initTestServer(t *testing.T, i int, isValidator bool) {
 		config.Seal = isValidator
 		config.Chain = c.Config.Dir("genesis.json")
 		config.P2PPort = c.getOpenPort()
-		config.Password = accountPassword
 		config.LogLevel = logLevel
 	})
 
@@ -331,8 +307,7 @@ func (c *TestCluster) EmitTransfer(contractAddress, walletAddresses, amounts str
 		return errors.New("provide at least one amount value")
 	}
 
-	return c.cmdRun("e2e",
-		"rootchain",
+	return c.cmdRun("rootchain",
 		"emit",
 		"--contract", contractAddress,
 		"--wallets", walletAddresses,
@@ -347,6 +322,14 @@ func (c *TestCluster) Fail(err error) {
 }
 
 func (c *TestCluster) Stop() {
+	if c.Bridge != nil {
+		c.Bridge.Stop()
+	}
+
+	if c.Bootnode != nil {
+		c.Bootnode.Stop()
+	}
+
 	for _, srv := range c.Servers {
 		if srv.isRunning() {
 			srv.Stop()

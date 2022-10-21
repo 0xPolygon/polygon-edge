@@ -1,9 +1,9 @@
 package framework
 
 import (
-	"fmt"
 	"os/exec"
 	"testing"
+	"time"
 
 	"github.com/0xPolygon/polygon-edge/command/rootchain/server"
 )
@@ -12,21 +12,25 @@ type TestBridge struct {
 	t             *testing.T
 	clusterConfig *TestClusterConfig
 	node          *node
-	node2         *node
 }
 
 func NewTestBridge(t *testing.T, clusterConfig *TestClusterConfig) (*TestBridge, error) {
+	t.Helper()
+
 	bridge := &TestBridge{
 		t:             t,
 		clusterConfig: clusterConfig,
 	}
+
 	err := bridge.Start()
-	return bridge, err
+	if err != nil {
+		return nil, err
+	}
+
+	return bridge, nil
 }
 
 func (t *TestBridge) Start() error {
-
-	fmt.Println("Start bridge")
 	// Build arguments
 	args := []string{
 		"rootchain",
@@ -39,29 +43,21 @@ func (t *TestBridge) Start() error {
 	if err != nil {
 		return err
 	}
+
 	t.node = bridgeNode
-	// ti := time.After(10 * time.Second)
-	// go func() {
-	//
-	// 	select {
-	// 	case <-ti:
-	// 		fmt.Println("Starting init contracts")
-	// 		args := []string{
-	// 			"rootchain",
-	// 			"init-contracts",
-	// 		}
-	// 		_, _ = newNode(t.clusterConfig.Binary, args, stdout)
-	//
-	// 	}
-	//
-	// }()
+
+	// TODO: read stdout until some string is written into it (for example `Http server started` line)
+	time.Sleep(time.Second * 10)
 
 	initContracts := []string{
 		"rootchain",
 		"init-contracts",
 	}
-	cmd := exec.Command(resolveBinary(), initContracts...)
-	cmd.Start()
+
+	cmd := exec.Command(resolveBinary(), initContracts...) //nolint:gosec
+	if err := cmd.Run(); err != nil {
+		return err
+	}
 
 	return server.PingServer(nil)
 }
@@ -70,5 +66,6 @@ func (t *TestBridge) Stop() {
 	if err := t.node.Stop(); err != nil {
 		t.t.Error(err)
 	}
+
 	t.node = nil
 }

@@ -36,17 +36,24 @@ func checkLogs(
 	expectedCount int,
 	assertFn func(i int, status ResultEventStatus) bool,
 ) {
-	assert.Len(t, logs, expectedCount)
+	t.Helper()
+	require.Len(t, logs, expectedCount)
+
 	for i, log := range logs {
 		res, err := stateSyncResultEvent.ParseLog(log)
 		assert.NoError(t, err)
+
 		t.Logf("Block Number=%d, Decoded Log=%v", log.BlockNumber, res)
-		assert.True(t, assertFn(i, ResultEventStatus(res["status"].(uint8))))
+
+		status, ok := res["status"].(uint8)
+		require.True(t, ok)
+
+		assert.True(t, assertFn(i, ResultEventStatus(status)))
 	}
 }
 
 func TestE2E_Bridge_MainWorkflow(t *testing.T) {
-	cluster := framework.NewTestCluster(t, 5) // , framework.WithBridge())
+	cluster := framework.NewTestCluster(t, 5, framework.WithBridge())
 	defer cluster.Stop()
 
 	// wait for a couple of blocks
@@ -54,7 +61,9 @@ func TestE2E_Bridge_MainWorkflow(t *testing.T) {
 
 	// send a few transactions to the bridge
 	num := 10
+
 	var wallets, amounts []string
+
 	for i := 0; i < num; i++ {
 		wallets = append(wallets, fmt.Sprintf("0x%040x", 1))
 		amounts = append(amounts, fmt.Sprintf("%d", 100))
@@ -79,6 +88,7 @@ func TestE2E_Bridge_MainWorkflow(t *testing.T) {
 			{&id},
 		},
 	}
+
 	filter.SetFromUint64(0)
 	filter.SetToUint64(100)
 

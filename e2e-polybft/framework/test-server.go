@@ -21,7 +21,6 @@ type TestServerConfig struct {
 	Seal        bool
 	DataDir     string
 	Chain       string
-	Password    string
 	LogLevel    string
 }
 
