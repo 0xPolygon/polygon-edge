@@ -109,14 +109,6 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 		return nil, err
 	}
 
-	// set the timestamp
-	parentTime := time.Unix(int64(parent.Timestamp), 0)
-	headerTime := parentTime.Add(f.config.BlockTime)
-
-	if headerTime.Before(time.Now()) {
-		headerTime = time.Now()
-	}
-
 	// TODO: we will need to revisit once slashing is implemented
 	extra := &Extra{Parent: extraParent.Committed}
 
@@ -144,6 +136,9 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 			// since proposer does not execute Validate (when we see the commitment to register in state transactions)
 			// we need to set commitment to save so that the proposer also saves its commitment that he registered
 			f.commitmentToSaveOnRegister = f.proposerCommitmentToRegister
+			f.logger.Debug("[FSM] Registering commitment",
+				"from", f.proposerCommitmentToRegister.Message.FromIndex,
+				"toIndex", f.proposerCommitmentToRegister.Message.ToIndex)
 		}
 
 		for _, tx := range f.stateTransactions() {
@@ -156,6 +151,14 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 	// fill the block with transactions
 	if err := f.blockBuilder.Fill(); err != nil {
 		return nil, err
+	}
+
+	// set the timestamp
+	parentTime := time.Unix(int64(parent.Timestamp), 0)
+	headerTime := parentTime.Add(f.config.BlockTime)
+
+	if headerTime.Before(time.Now()) {
+		headerTime = time.Now()
 	}
 
 	stateBlock, err := f.blockBuilder.Build(func(h *types.Header) {
@@ -197,13 +200,6 @@ func (f *fsm) stateTransactions() []*types.Transaction {
 
 			txns = append(txns,
 				createStateTransactionWithData(f.config.StateReceiverAddr, inputData))
-
-			// since proposer does not execute Validate (when we see the commitment to register in state transactions)
-			// we need to set commitment to save so that the proposer also saves its commitment that he registered
-			f.commitmentToSaveOnRegister = f.proposerCommitmentToRegister
-			f.logger.Debug("[fsm] Registering commitment",
-				"from", f.proposerCommitmentToRegister.Message.FromIndex,
-				"toIndex", f.proposerCommitmentToRegister.Message.ToIndex)
 		}
 	}
 

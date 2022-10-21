@@ -53,14 +53,14 @@ func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
 	// use 1st account as governance address
 	governanceAccount := validatorsInfo[0].Account
 	polyBftConfig := &polybft.PolyBFTConfig{
-		InitialValidatorSet: p.getGenesisValidators(validatorsInfo),
-		BlockTime:           p.blockTime,
-		EpochSize:           p.epochSize,
-		SprintSize:          p.sprintSize,
-		ValidatorSetSize:    p.validatorSetSize,
-		ValidatorSetAddr:    contracts.ValidatorSetContract,
-		StateReceiverAddr:   contracts.StateReceiverContract,
-		Governance:          types.Address(governanceAccount.Ecdsa.Address()),
+
+		BlockTime:         p.blockTime,
+		EpochSize:         p.epochSize,
+		SprintSize:        p.sprintSize,
+		ValidatorSetSize:  p.validatorSetSize,
+		ValidatorSetAddr:  contracts.ValidatorSetContract,
+		StateReceiverAddr: contracts.StateReceiverContract,
+		Governance:        types.Address(governanceAccount.Ecdsa.Address()),
 	}
 
 	chainConfig := &chain.Chain{
@@ -107,10 +107,14 @@ func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
 		return nil, err
 	}
 
+	// Set initial validator set
+	polyBftConfig.InitialValidatorSet = p.getGenesisValidators(validatorsInfo, chainConfig.Genesis.Alloc)
+
 	return chainConfig, nil
 }
 
-func (p *genesisParams) getGenesisValidators(validators []GenesisTarget) (result []*polybft.Validator) {
+func (p *genesisParams) getGenesisValidators(validators []GenesisTarget,
+	allocs map[types.Address]*chain.GenesisAccount) (result []*polybft.Validator) {
 	if len(p.validators) > 0 {
 		for _, validator := range p.validators {
 			parts := strings.Split(validator, ":")
@@ -118,25 +122,37 @@ func (p *genesisParams) getGenesisValidators(validators []GenesisTarget) (result
 				continue
 			}
 
+			addr := types.StringToAddress(parts[0])
+
 			result = append(result, &polybft.Validator{
-				Address: types.StringToAddress(parts[0]),
+				Address: addr,
 				BlsKey:  parts[1],
-				Balance: big.NewInt(1000), // hard-coded balance
+				Balance: getBalance(addr, allocs),
 			})
 		}
 	} else {
 		for _, validator := range validators {
 			pubKeyMarshalled := validator.Account.Bls.PublicKey().Marshal()
-
+			addr := types.Address(validator.Account.Ecdsa.Address())
 			result = append(result, &polybft.Validator{
-				Address: types.Address(validator.Account.Ecdsa.Address()),
+				Address: addr,
 				BlsKey:  hex.EncodeToString(pubKeyMarshalled),
-				Balance: big.NewInt(1000), // hard-coded balance
+				Balance: getBalance(addr, allocs),
 			})
 		}
 	}
 
 	return result
+}
+
+// getBalance returns balance for genesis account based on its address.
+// If not found in provided allocations map, 0 is returned.
+func getBalance(address types.Address, allocations map[types.Address]*chain.GenesisAccount) *big.Int {
+	if genesisAcc, ok := allocations[address]; ok {
+		return genesisAcc.Balance
+	}
+
+	return big.NewInt(0)
 }
 
 func (p *genesisParams) generatePolyBftGenesis() error {
