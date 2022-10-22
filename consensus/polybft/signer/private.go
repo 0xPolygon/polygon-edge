@@ -43,25 +43,3 @@ func UnmarshalPrivateKey(data []byte) (*PrivateKey, error) {
 
 	return &PrivateKey{p: p}, err
 }
-
-// func UnmarshalPrivateKeyBinary(data []byte) (*PrivateKey, error) {
-// 	if len(data) != 64 {
-// 		return nil, fmt.Errorf("secret key must be %d bytes", 64)
-// 	}
-
-// 	zeros := make([]byte, len(data))
-// 	if subtle.ConstantTimeCompare(data, zeros) == 1 {
-// 		return nil, errors.New("secret key cannot be zero")
-// 	}
-
-// 	p := new(big.Int)
-// 	outBytes := make([]byte, len(data))
-
-// 	for i, j := 0, len(data)-1; j >= 0; i, j = i+1, j-1 {
-// 		outBytes[i] = data[j]
-// 	}
-
-// 	p.SetBytes(outBytes)
-
-// 	return &PrivateKey{p: p}, nil
-// }

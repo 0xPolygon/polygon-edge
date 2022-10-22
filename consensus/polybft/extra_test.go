@@ -87,7 +87,6 @@ func TestExtra_Encoding(t *testing.T) {
 
 	for _, c := range cases {
 		data := c.extra.MarshalRLPTo(nil)
-
 		extra := &Extra{}
 		assert.NoError(t, extra.UnmarshalRLP(data))
 		assert.Equal(t, c.extra, extra)
@@ -98,18 +97,24 @@ func TestExtra_UnmarshalRLPWith_NegativeCases(t *testing.T) {
 	t.Parallel()
 
 	t.Run("Incorrect RLP marshalled data type", func(t *testing.T) {
+		t.Parallel()
+
 		extra := &Extra{}
 		ar := &fastrlp.Arena{}
 		require.Error(t, extra.UnmarshalRLPWith(ar.NewBool(false)))
 	})
 
 	t.Run("Incorrect count of RLP marshalled array elements", func(t *testing.T) {
+		t.Parallel()
+
 		extra := &Extra{}
 		ar := &fastrlp.Arena{}
 		require.ErrorContains(t, extra.UnmarshalRLPWith(ar.NewArray()), "not enough elements to decode extra, expected 4 but found 0")
 	})
 
 	t.Run("Incorrect ValidatorSetDelta marshalled", func(t *testing.T) {
+		t.Parallel()
+
 		extra := &Extra{}
 		ar := &fastrlp.Arena{}
 		extraMarshalled := ar.NewArray()
@@ -123,6 +128,8 @@ func TestExtra_UnmarshalRLPWith_NegativeCases(t *testing.T) {
 	})
 
 	t.Run("Incorrect Seal marshalled", func(t *testing.T) {
+		t.Parallel()
+
 		extra := &Extra{}
 		ar := &fastrlp.Arena{}
 		extraMarshalled := ar.NewArray()
@@ -135,6 +142,8 @@ func TestExtra_UnmarshalRLPWith_NegativeCases(t *testing.T) {
 	})
 
 	t.Run("Incorrect Parent signatures marshalled", func(t *testing.T) {
+		t.Parallel()
+
 		extra := &Extra{}
 		ar := &fastrlp.Arena{}
 		extraMarshalled := ar.NewArray()
@@ -150,6 +159,8 @@ func TestExtra_UnmarshalRLPWith_NegativeCases(t *testing.T) {
 	})
 
 	t.Run("Incorrect Committed signatures marshalled", func(t *testing.T) {
+		t.Parallel()
+
 		extra := &Extra{}
 		ar := &fastrlp.Arena{}
 		extraMarshalled := ar.NewArray()
@@ -174,6 +185,8 @@ func TestSignature_VerifyCommittedFields(t *testing.T) {
 	t.Parallel()
 
 	t.Run("Valid signatures", func(t *testing.T) {
+		t.Parallel()
+
 		numValidators := 100
 		vals := newTestValidators(numValidators)
 		msgHash := types.Hash{0x1}
@@ -208,6 +221,8 @@ func TestSignature_VerifyCommittedFields(t *testing.T) {
 	})
 
 	t.Run("Invalid bitmap provided", func(t *testing.T) {
+		t.Parallel()
+
 		validatorSet := newTestValidators(3).getPublicIdentities()
 		bmp := bitmap.Bitmap{}
 
@@ -224,12 +239,16 @@ func TestSignature_UnmarshalRLPWith_NegativeCases(t *testing.T) {
 	t.Parallel()
 
 	t.Run("Incorrect RLP marshalled data type", func(t *testing.T) {
+		t.Parallel()
+
 		ar := &fastrlp.Arena{}
 		signature := Signature{}
 		require.ErrorContains(t, signature.UnmarshalRLPWith(ar.NewNull()), "array type expected for signature struct")
 	})
 
 	t.Run("Incorrect AggregatedSignature field data type", func(t *testing.T) {
+		t.Parallel()
+
 		ar := &fastrlp.Arena{}
 		signature := Signature{}
 		signatureMarshalled := ar.NewArray()
@@ -304,6 +323,8 @@ func TestExtra_CreateValidatorSetDelta_Cases(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+
 			vals := newTestValidatorsWithAliases([]string{})
 
 			for _, name := range c.oldSet {
