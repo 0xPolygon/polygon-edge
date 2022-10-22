@@ -335,6 +335,7 @@ func TestState_insertAndGetBundles(t *testing.T) {
 	t.Parallel()
 
 	const numberOfBundles = 10
+
 	state := newTestState(t)
 	commitment, err := createTestCommitmentMessage(0)
 	require.NoError(t, err)

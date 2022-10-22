@@ -779,6 +779,7 @@ func TestFSM_Validate_IncorrectMixHash(t *testing.T) {
 	t.Parallel()
 
 	const parentBlockNumber = 10
+
 	validators := newTestValidators(5)
 	parent := &types.Header{
 		Number:    parentBlockNumber,
@@ -1069,6 +1070,8 @@ func TestFSM_CalcProposer(t *testing.T) {
 	validatorSet := newTestValidators(validatorsCount).getPublicIdentities()
 
 	t.Run("Undefined last proposer", func(t *testing.T) {
+		t.Parallel()
+
 		cases := []struct{ round, expectedIndex uint64 }{
 			{0, 0},
 			{2, 2},
@@ -1082,6 +1085,8 @@ func TestFSM_CalcProposer(t *testing.T) {
 	})
 
 	t.Run("Seed last proposer", func(t *testing.T) {
+		t.Parallel()
+
 		cases := []struct {
 			lastProposer  types.Address
 			round         uint64

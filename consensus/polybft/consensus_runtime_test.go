@@ -94,6 +94,7 @@ func TestConsensusRuntime_deliverMessage_MessageWhenEpochNotStarted(t *testing.T
 	t.Parallel()
 
 	const epoch = uint64(5)
+
 	validatorIds := []string{"A", "B", "C", "D", "E", "F", "G"}
 	state := newTestState(t)
 	validators := newTestValidatorsWithAliases(validatorIds)

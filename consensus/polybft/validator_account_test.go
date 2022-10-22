@@ -130,6 +130,8 @@ func TestAccountSet_ApplyDelta(t *testing.T) {
 		snapshot := AccountSet{}
 
 		t.Run(cc.name, func(t *testing.T) {
+			t.Parallel()
+
 			for _, step := range cc.steps {
 				delta := &ValidatorSetDelta{
 					Added:   vals.getPublicIdentities(step.added...),

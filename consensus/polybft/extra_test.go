@@ -375,6 +375,8 @@ func TestExtra_InitGenesisValidatorsDelta(t *testing.T) {
 	t.Parallel()
 
 	t.Run("Happy path", func(t *testing.T) {
+		t.Parallel()
+
 		const validatorsCount = 7
 		vals := newTestValidators(validatorsCount)
 
@@ -410,6 +412,8 @@ func TestExtra_InitGenesisValidatorsDelta(t *testing.T) {
 	})
 
 	t.Run("Invalid Extra data", func(t *testing.T) {
+		t.Parallel()
+
 		validators := newTestValidators(5)
 		polyBftConfig := PolyBFTConfig{InitialValidatorSet: validators.getParamValidators()}
 
@@ -459,18 +463,24 @@ func TestValidatorSetDelta_UnmarshalRLPWith_NegativeCases(t *testing.T) {
 	t.Parallel()
 
 	t.Run("Incorrect RLP value type provided", func(t *testing.T) {
+		t.Parallel()
+
 		ar := &fastrlp.Arena{}
 		delta := &ValidatorSetDelta{}
 		require.ErrorContains(t, delta.UnmarshalRLPWith(ar.NewNull()), "value is not of type array")
 	})
 
 	t.Run("Empty RLP array provided", func(t *testing.T) {
+		t.Parallel()
+
 		ar := &fastrlp.Arena{}
 		delta := &ValidatorSetDelta{}
 		require.NoError(t, delta.UnmarshalRLPWith(ar.NewArray()))
 	})
 
 	t.Run("Incorrect RLP array size", func(t *testing.T) {
+		t.Parallel()
+
 		ar := &fastrlp.Arena{}
 		deltaMarshalled := ar.NewArray()
 		deltaMarshalled.Set(ar.NewBytes([]byte{0x59}))
@@ -481,6 +491,8 @@ func TestValidatorSetDelta_UnmarshalRLPWith_NegativeCases(t *testing.T) {
 	})
 
 	t.Run("Incorrect RLP value type for Added field", func(t *testing.T) {
+		t.Parallel()
+
 		ar := &fastrlp.Arena{}
 		deltaMarshalled := ar.NewArray()
 		deltaMarshalled.Set(ar.NewBytes([]byte{0x59}))
@@ -490,6 +502,8 @@ func TestValidatorSetDelta_UnmarshalRLPWith_NegativeCases(t *testing.T) {
 	})
 
 	t.Run("Incorrect RLP value type for ValidatorAccount in Added field", func(t *testing.T) {
+		t.Parallel()
+
 		ar := &fastrlp.Arena{}
 		deltaMarshalled := ar.NewArray()
 		addedArray := ar.NewArray()
@@ -501,6 +515,8 @@ func TestValidatorSetDelta_UnmarshalRLPWith_NegativeCases(t *testing.T) {
 	})
 
 	t.Run("Incorrect RLP value type for Removed field", func(t *testing.T) {
+		t.Parallel()
+
 		ar := &fastrlp.Arena{}
 		deltaMarshalled := ar.NewArray()
 		addedValidators := newTestValidators(3).getPublicIdentities()
