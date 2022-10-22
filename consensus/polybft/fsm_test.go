@@ -24,7 +24,7 @@ import (
 
 func TestFSM_ValidateHeader(t *testing.T) {
 	parent := &types.Header{Number: 0}
-	parent.ComputeHash()
+	_ = parent.ComputeHash()
 
 	header := &types.Header{Number: 0}
 
@@ -129,22 +129,21 @@ func TestFSM_Init(t *testing.T) {
 
 func TestFSM_BuildProposal_WithoutUptimeTxGood(t *testing.T) {
 	const (
-		epoch                    = 0
 		accountCount             = 5
 		committedCount           = 4
 		parentCount              = 3
 		confirmedStateSyncsCount = 5
-		parentBlockID            = 1023
+		parentBlockNumber        = 1023
 	)
 
 	validators := newTestValidators(accountCount)
 	validatorSet := validators.getPublicIdentities()
 	extra := createTestExtra(validatorSet, AccountSet{}, accountCount-1, committedCount, parentCount)
 
-	parent := &types.Header{Number: parentBlockID, ExtraData: extra}
-	parent.ComputeHash()
-	buildBlock := createDummyStateBlock(parentBlockID+1, parent.Hash)
-	mBlockBuilder := newBlockBuilderMock(buildBlock)
+	parent := &types.Header{Number: parentBlockNumber, ExtraData: extra}
+	_ = parent.ComputeHash()
+	stateBlock := createDummyStateBlock(parentBlockNumber+1, parent.Hash)
+	mBlockBuilder := newBlockBuilderMock(stateBlock)
 
 	commitment := createTestCommitment(t, validators.getPrivateIdentities())
 	fsm := &fsm{parent: parent, blockBuilder: mBlockBuilder, config: &PolyBFTConfig{}, backend: &blockchainMock{},
@@ -154,9 +153,9 @@ func TestFSM_BuildProposal_WithoutUptimeTxGood(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, proposal)
 
-	rlpBlock := buildBlock.Block.MarshalRLP()
+	rlpBlock := stateBlock.Block.MarshalRLP()
 	assert.Equal(t, rlpBlock, proposal.Data)
-	assert.Equal(t, buildBlock.Block.Hash().Bytes(), proposal.Hash)
+	assert.Equal(t, stateBlock.Block.Hash().Bytes(), proposal.Hash)
 
 	mBlockBuilder.AssertExpectations(t)
 }
@@ -175,12 +174,12 @@ func TestFSM_BuildProposal_WithUptimeTxGood(t *testing.T) {
 
 	parent := &types.Header{Number: parentBlockNumber, ExtraData: extra}
 	_ = parent.ComputeHash()
-	builtBlock := createDummyStateBlock(parentBlockNumber+1, parent.Hash)
+	stateBlock := createDummyStateBlock(parentBlockNumber+1, parent.Hash)
 	commitment := createTestCommitment(t, validators.getPrivateIdentities())
 
 	transition := &state.Transition{}
 	mBlockBuilder := &blockBuilderMock{}
-	mBlockBuilder.On("Build", mock.Anything).Return(builtBlock).Once()
+	mBlockBuilder.On("Build", mock.Anything).Return(stateBlock).Once()
 	mBlockBuilder.On("Fill", mock.Anything).Return(nil).Once()
 	mBlockBuilder.On("WriteTx", mock.Anything).Return(error(nil)).Once()
 	mBlockBuilder.On("GetState").Return(transition).Once()
@@ -205,9 +204,9 @@ func TestFSM_BuildProposal_WithUptimeTxGood(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, proposal)
 
-	rlpBlock := builtBlock.Block.MarshalRLP()
+	rlpBlock := stateBlock.Block.MarshalRLP()
 	assert.Equal(t, rlpBlock, proposal.Data)
-	assert.Equal(t, builtBlock.Block.Hash().Bytes(), proposal.Hash)
+	assert.Equal(t, stateBlock.Block.Hash().Bytes(), proposal.Hash)
 
 	mBlockBuilder.AssertExpectations(t)
 	systemStateMock.AssertExpectations(t)
@@ -216,17 +215,16 @@ func TestFSM_BuildProposal_WithUptimeTxGood(t *testing.T) {
 
 func TestFSM_BuildProposal_EpochEndingBlock_FailedToCommitStateTx(t *testing.T) {
 	const (
-		epoch          = 0
-		accountCount   = 5
-		committedCount = 4
-		parentCount    = 3
-		parentBlockID  = 1023
+		accountCount      = 5
+		committedCount    = 4
+		parentCount       = 3
+		parentBlockNumber = 1023
 	)
 
 	validators := newTestValidators(accountCount)
 	extra := createTestExtra(validators.getPublicIdentities(), AccountSet{}, accountCount-1, committedCount, parentCount)
 
-	parent := &types.Header{Number: parentBlockID, ExtraData: extra}
+	parent := &types.Header{Number: parentBlockNumber, ExtraData: extra}
 	commitment := createTestCommitment(t, validators.getPrivateIdentities())
 
 	mBlockBuilder := new(blockBuilderMock)
@@ -256,11 +254,11 @@ func TestFSM_BuildProposal_EpochEndingBlock_ValidatorsDeltaExists(t *testing.T) 
 	extra := createTestExtra(validatorSet, AccountSet{}, validatorsCount-1, signaturesCount, signaturesCount)
 	parent := &types.Header{Number: parentBlockNumber, ExtraData: extra}
 	_ = parent.ComputeHash()
-	builtBlock := createDummyStateBlock(parentBlockNumber+1, parent.Hash)
+	stateBlock := createDummyStateBlock(parentBlockNumber+1, parent.Hash)
 
 	transition := &state.Transition{}
 	blockBuilderMock := new(blockBuilderMock)
-	blockBuilderMock.On("Build", mock.Anything).Return(builtBlock).Once()
+	blockBuilderMock.On("Build", mock.Anything).Return(stateBlock).Once()
 	blockBuilderMock.On("Fill", mock.Anything).Return(nil).Once()
 	blockBuilderMock.On("WriteTx", mock.Anything).Return(error(nil)).Once()
 	blockBuilderMock.On("GetState").Return(transition).Once()
@@ -291,7 +289,7 @@ func TestFSM_BuildProposal_EpochEndingBlock_ValidatorsDeltaExists(t *testing.T) 
 	assert.NoError(t, err)
 	assert.NotNil(t, proposal)
 
-	blockExtra, err := GetIbftExtra(builtBlock.Block.Header.ExtraData)
+	blockExtra, err := GetIbftExtra(stateBlock.Block.Header.ExtraData)
 	assert.NoError(t, err)
 	assert.Len(t, blockExtra.Validators.Added, 2)
 	assert.False(t, blockExtra.Validators.IsEmpty())
@@ -326,10 +324,10 @@ func TestFSM_BuildProposal_NonEpochEndingBlock_ValidatorsDeltaEmpty(t *testing.T
 	extra := createTestExtra(testValidators.getPublicIdentities(), AccountSet{}, accountCount-1, signaturesCount, signaturesCount)
 	parent := &types.Header{Number: parentBlockNumber, ExtraData: extra}
 	_ = parent.ComputeHash()
-	buildBlock := createDummyStateBlock(parentBlockNumber+1, parent.Hash)
+	stateBlock := createDummyStateBlock(parentBlockNumber+1, parent.Hash)
 
 	blockBuilderMock := &blockBuilderMock{}
-	blockBuilderMock.On("Build", mock.Anything).Return(buildBlock).Once()
+	blockBuilderMock.On("Build", mock.Anything).Return(stateBlock).Once()
 	blockBuilderMock.On("Fill", mock.Anything).Return(nil).Once()
 
 	systemStateMock := new(systemStateMock)
@@ -342,7 +340,7 @@ func TestFSM_BuildProposal_NonEpochEndingBlock_ValidatorsDeltaEmpty(t *testing.T
 	assert.NoError(t, err)
 	assert.NotNil(t, proposal)
 
-	blockExtra, err := GetIbftExtra(buildBlock.Block.Header.ExtraData)
+	blockExtra, err := GetIbftExtra(stateBlock.Block.Header.ExtraData)
 	assert.NoError(t, err)
 	assert.True(t, blockExtra.Validators.IsEmpty())
 
@@ -434,12 +432,7 @@ func TestFSM_VerifyStateTransactions_StateTransactionAndSprintIsFalse(t *testing
 }
 
 func TestFSM_VerifyStateTransactions_StateTransactionPass(t *testing.T) {
-	const (
-		epoch         = 4
-		accountsCount = 5
-	)
-
-	validators := newTestValidators(accountsCount)
+	validators := newTestValidators(5)
 	commitment := createTestCommitment(t, validators.getPrivateIdentities())
 
 	fsm := &fsm{
@@ -465,12 +458,7 @@ func TestFSM_VerifyStateTransactions_StateTransactionPass(t *testing.T) {
 }
 
 func TestFSM_VerifyStateTransactions_StateTransactionQuorumNotReached(t *testing.T) {
-	const (
-		epoch         = 4
-		accountsCount = 5
-	)
-
-	validators := newTestValidators(accountsCount)
+	validators := newTestValidators(5)
 	commitment := createTestCommitment(t, validators.getPrivateIdentities())
 	commitment.AggSignature = Signature{
 		AggregatedSignature: []byte{1, 2},
@@ -500,12 +488,7 @@ func TestFSM_VerifyStateTransactions_StateTransactionQuorumNotReached(t *testing
 }
 
 func TestFSM_VerifyStateTransactions_StateTransactionInvalidSignature(t *testing.T) {
-	const (
-		epoch         = 4
-		accountsCount = 5
-	)
-
-	validators := newTestValidators(accountsCount)
+	validators := newTestValidators(5)
 	commitment := createTestCommitment(t, validators.getPrivateIdentities())
 	nonValidators := newTestValidators(3)
 	aggregatedSigs := bls.Signatures{}
@@ -563,8 +546,8 @@ func TestFSM_ValidateCommit_WrongValidator(t *testing.T) {
 		ExtraData: createTestExtra(validators.getPublicIdentities(), AccountSet{}, 5, 3, 3),
 	}
 	_ = parent.ComputeHash()
-	builtBlock := createDummyStateBlock(parentBlockNumber+1, parent.Hash)
-	mBlockBuilder := newBlockBuilderMock(builtBlock)
+	stateBlock := createDummyStateBlock(parentBlockNumber+1, parent.Hash)
+	mBlockBuilder := newBlockBuilderMock(stateBlock)
 	fsm := &fsm{parent: parent, blockBuilder: mBlockBuilder, config: &PolyBFTConfig{}, backend: &blockchainMock{},
 		validators: validators.toValidatorSet(), logger: hclog.NewNullLogger()}
 	_, err := fsm.BuildProposal()
@@ -587,8 +570,8 @@ func TestFSM_ValidateCommit_InvalidHash(t *testing.T) {
 		ExtraData: createTestExtra(validators.getPublicIdentities(), AccountSet{}, 5, 3, 3),
 	}
 	_ = parent.ComputeHash()
-	buildBlock := createDummyStateBlock(parentBlockNumber+1, parent.Hash)
-	mBlockBuilder := newBlockBuilderMock(buildBlock)
+	stateBlock := createDummyStateBlock(parentBlockNumber+1, parent.Hash)
+	mBlockBuilder := newBlockBuilderMock(stateBlock)
 
 	fsm := &fsm{parent: parent, blockBuilder: mBlockBuilder, config: &PolyBFTConfig{}, backend: &blockchainMock{},
 		validators: validators.toValidatorSet(), logger: hclog.NewNullLogger()}
@@ -611,8 +594,8 @@ func TestFSM_ValidateCommit_Good(t *testing.T) {
 
 	parent := &types.Header{Number: parentBlockNumber, ExtraData: createTestExtra(validatorSet, AccountSet{}, 5, 3, 3)}
 	_ = parent.ComputeHash()
-	buildBlock := createDummyStateBlock(parentBlockNumber+1, parent.Hash)
-	mBlockBuilder := newBlockBuilderMock(buildBlock)
+	stateBlock := createDummyStateBlock(parentBlockNumber+1, parent.Hash)
+	mBlockBuilder := newBlockBuilderMock(stateBlock)
 
 	fsm := &fsm{parent: parent, blockBuilder: mBlockBuilder, config: &PolyBFTConfig{}, backend: &blockchainMock{},
 		validators: newValidatorSet(types.Address{}, validatorSet), logger: hclog.NewNullLogger()}
@@ -638,8 +621,8 @@ func TestFSM_Validate_IncorrectSignHash(t *testing.T) {
 	parent := &types.Header{Number: parentBlockNumber,
 		ExtraData: createTestExtra(validators.getPublicIdentities(), AccountSet{}, accountsCount, signaturesCount, signaturesCount)}
 	_ = parent.ComputeHash()
-	buildBlock := createDummyStateBlock(parentBlockNumber+1, parent.Hash)
-	mBlockBuilder := newBlockBuilderMock(buildBlock)
+	stateBlock := createDummyStateBlock(parentBlockNumber+1, parent.Hash)
+	mBlockBuilder := newBlockBuilderMock(stateBlock)
 
 	fsm := &fsm{parent: parent, blockBuilder: mBlockBuilder, config: &PolyBFTConfig{}, backend: &blockchainMock{},
 		validators: validators.toValidatorSet(), logger: hclog.NewNullLogger(),
@@ -653,38 +636,34 @@ func TestFSM_Validate_IncorrectSignHash(t *testing.T) {
 	require.ErrorContains(t, err, "incorrect sign hash")
 }
 
-func TestFSM_Validate_IncorrectHeaderParent(t *testing.T) {
-	t.Skip("WIP Incorrect sign hash error")
-
+func TestFSM_Validate_IncorrectHeaderParentHash(t *testing.T) {
 	const (
 		accountsCount     = 5
-		parentBlockNumber = 10
+		parentBlockNumber = 25
 		signaturesCount   = 3
 	)
 
-	setupHeaderHashFunc()
-
 	validators := newTestValidators(accountsCount)
-
 	parent := &types.Header{
 		Number:    parentBlockNumber,
 		ExtraData: createTestExtra(validators.getPublicIdentities(), AccountSet{}, 4, signaturesCount, signaturesCount),
 	}
 	_ = parent.ComputeHash()
-	builtBlock := createDummyStateBlock(parentBlockNumber+1, types.Hash{100, 200}) // pass wrong parent hash!
-	mBlockBuilder := newBlockBuilderMock(builtBlock)
 
-	fsm := &fsm{parent: parent, blockBuilder: mBlockBuilder, config: &PolyBFTConfig{}, backend: &blockchainMock{},
+	fsm := &fsm{parent: parent, config: &PolyBFTConfig{}, backend: &blockchainMock{},
 		validators: validators.toValidatorSet(), logger: hclog.NewNullLogger()}
-	proposal, _ := fsm.BuildProposal()
+
+	stateBlock := createDummyStateBlock(parent.Number+1, types.Hash{100, 15})
+	proposal := &pbft.Proposal{
+		Data: stateBlock.Block.MarshalRLP(),
+		Hash: stateBlock.Block.Hash().Bytes(),
+	}
 
 	err := fsm.Validate(proposal)
 	require.ErrorContains(t, err, "incorrect header parent hash")
 }
 
 func TestFSM_Validate_InvalidNumber(t *testing.T) {
-	t.Skip("WIP Incorrect sign hash error")
-
 	const (
 		accountsCount     = 5
 		parentBlockNumber = 10
@@ -700,15 +679,17 @@ func TestFSM_Validate_InvalidNumber(t *testing.T) {
 
 	// try some invalid block numbers, parentBlockNumber + 1 should be correct
 	for _, blockNum := range []uint64{parentBlockNumber - 1, parentBlockNumber, parentBlockNumber + 2} {
-		buildBlock := createDummyStateBlock(blockNum, parent.Hash)
-		mBlockBuilder := newBlockBuilderMock(buildBlock)
+		stateBlock := createDummyStateBlock(blockNum, parent.Hash)
+		mBlockBuilder := newBlockBuilderMock(stateBlock)
 
 		fsm := &fsm{parent: parent, blockBuilder: mBlockBuilder, config: &PolyBFTConfig{}, backend: &blockchainMock{},
 			validators: validators.toValidatorSet(), logger: hclog.NewNullLogger()}
-		proposal, err := fsm.BuildProposal()
-		require.NoError(t, err)
+		proposal := &pbft.Proposal{
+			Data: stateBlock.Block.MarshalRLP(),
+			Hash: stateBlock.Block.Hash().Bytes(),
+		}
 
-		err = fsm.Validate(proposal)
+		err := fsm.Validate(proposal)
 		require.ErrorContains(t, err, "invalid number")
 	}
 }
@@ -731,10 +712,10 @@ func TestFSM_Validate_TimestampOlder(t *testing.T) {
 			ParentHash: parent.Hash,
 			Timestamp:  blockTime,
 		}
-		builtBlock := &StateBlock{Block: consensus.BuildBlock(consensus.BuildBlockParams{Header: header})}
+		stateBlock := &StateBlock{Block: consensus.BuildBlock(consensus.BuildBlockParams{Header: header})}
 		proposal := &pbft.Proposal{
-			Data: builtBlock.Block.MarshalRLP(),
-			Hash: builtBlock.Block.Hash().Bytes(),
+			Data: stateBlock.Block.MarshalRLP(),
+			Hash: stateBlock.Block.Hash().Bytes(),
 		}
 		fsm := &fsm{parent: parent, config: &PolyBFTConfig{}, backend: &blockchainMock{},
 			validators: validators.toValidatorSet(), logger: hclog.NewNullLogger()}
@@ -782,7 +763,6 @@ func TestFSM_Validate_IncorrectMixHash(t *testing.T) {
 
 func TestFSM_Insert_Good(t *testing.T) {
 	const (
-		epoch             = 1
 		accountCount      = 5
 		parentBlockNumber = 10
 		signaturesCount   = 3
@@ -856,7 +836,6 @@ func TestFSM_Insert_Good(t *testing.T) {
 
 func TestFSM_Insert_InvalidNode(t *testing.T) {
 	const (
-		epoch             = 1
 		accountCount      = 5
 		parentBlockNumber = 10
 		signaturesCount   = 3
@@ -1368,43 +1347,28 @@ func TestFSM_VerifyStateTransaction_CommitmentDoesNotExist(t *testing.T) {
 }
 
 func TestFSM_Validate_FailToVerifySignatures(t *testing.T) {
-	t.Skip("WIP Incorrect sign hash error")
-
 	const (
-		accountsCount   = 5
-		parentBlockID   = 10
-		signaturesCount = 3
+		accountsCount     = 5
+		parentBlockNumber = 10
+		signaturesCount   = 3
 	)
 
 	validators := newTestValidators(accountsCount)
 	validatorSet := validators.getPublicIdentities()
 
 	parent := &types.Header{
-		Number:    parentBlockID,
+		Number:    parentBlockNumber,
 		ExtraData: createTestExtra(validatorSet, AccountSet{}, 4, signaturesCount, signaturesCount),
 	}
 	_ = parent.ComputeHash()
-
-	buildBlock := createDummyStateBlock(parentBlockID+1, parent.Hash)
-	mBlockBuilder := newBlockBuilderMock(buildBlock)
-	mBlockBuilder.On("WriteTx", mock.Anything).Return(nil).Twice()
-	mBlockBuilder.On("GetState").Return(&state.Transition{})
-
-	systemStateMock := new(systemStateMock)
-	systemStateMock.On("GetValidatorSet").Return(validatorSet, nil).Once()
-
-	blockchainMock := new(blockchainMock)
-	blockchainMock.On("GetStateProvider", mock.Anything).Return(new(stateProviderMock)).Once()
-	blockchainMock.On("GetSystemState", mock.Anything, mock.Anything).Return(systemStateMock).Once()
 
 	polybftBackendMock := new(polybftBackendMock)
 	polybftBackendMock.On("GetValidators", mock.Anything, mock.Anything).Return(validatorSet, nil).Once()
 
 	fsm := &fsm{
-		parent:                       parent,
-		blockBuilder:                 mBlockBuilder,
-		config:                       &PolyBFTConfig{Bridge: &BridgeConfig{}},
-		backend:                      blockchainMock,
+		parent: parent,
+		config: &PolyBFTConfig{Bridge: &BridgeConfig{}},
+		// backend:                      blockchainMock,
 		polybftBackend:               polybftBackendMock,
 		validators:                   newValidatorSet(types.Address{}, validatorSet),
 		proposerCommitmentToRegister: createTestCommitment(t, validators.getPrivateIdentities()),
@@ -1413,15 +1377,24 @@ func TestFSM_Validate_FailToVerifySignatures(t *testing.T) {
 		logger:                       hclog.NewNullLogger(),
 	}
 
-	proposal, err := fsm.BuildProposal()
-	assert.NoError(t, err)
+	finalBlock := consensus.BuildBlock(consensus.BuildBlockParams{
+		Header: &types.Header{
+			Number:     parentBlockNumber + 1,
+			ParentHash: parent.Hash,
+			Timestamp:  parent.Timestamp + 1,
+			MixHash:    PolyMixDigest,
+			Difficulty: 1,
+			ExtraData:  parent.ExtraData,
+		},
+	})
+	proposal := &pbft.Proposal{
+		Data: finalBlock.MarshalRLP(),
+		Hash: finalBlock.Hash().Bytes(),
+	}
 
 	assert.ErrorContains(t, fsm.Validate(proposal), "failed to verify signatures")
 
-	mBlockBuilder.AssertExpectations(t)
-	blockchainMock.AssertExpectations(t)
 	polybftBackendMock.AssertExpectations(t)
-	systemStateMock.AssertExpectations(t)
 }
 
 func generateValidatorDelta(validatorCount int, allAccounts, previousValidatorSet AccountSet) (vd *ValidatorSetDelta) {
@@ -1453,7 +1426,6 @@ func createDummyStateBlock(blockNumber uint64, parentHash types.Hash) *StateBloc
 	finalBlock := consensus.BuildBlock(consensus.BuildBlockParams{
 		Header: &types.Header{Number: blockNumber, ParentHash: parentHash, Difficulty: 1},
 	})
-	_ = finalBlock.Header.ComputeHash()
 
 	return &StateBlock{Block: finalBlock}
 }
@@ -1537,9 +1509,9 @@ func createTestCommitment(t *testing.T, accounts []*wallet.Account) *CommitmentM
 	}
 }
 
-func newBlockBuilderMock(builtBlock *StateBlock) *blockBuilderMock {
+func newBlockBuilderMock(stateBlock *StateBlock) *blockBuilderMock {
 	mBlockBuilder := new(blockBuilderMock)
-	mBlockBuilder.On("Build", mock.Anything).Return(builtBlock).Once()
+	mBlockBuilder.On("Build", mock.Anything).Return(stateBlock).Once()
 	mBlockBuilder.On("Fill", mock.Anything).Return(nil).Once()
 
 	return mBlockBuilder

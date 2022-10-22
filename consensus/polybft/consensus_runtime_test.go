@@ -1162,7 +1162,8 @@ func TestConsensusRuntime_restartEpoch_FirstRestart_BuildsCommitment(t *testing.
 	require.Equal(t, 1, len(votes))
 	require.Equal(t, localValidator.Key().NodeID(), votes[0].From)
 
-	signature := localValidator.mustSign(commitmentHash.Bytes())
+	signature, err := localValidator.mustSign(commitmentHash.Bytes()).Marshal()
+	require.NoError(t, err)
 	require.Equal(t, signature, votes[0].Signature)
 
 	for _, validator := range validatorAccs.validators {
