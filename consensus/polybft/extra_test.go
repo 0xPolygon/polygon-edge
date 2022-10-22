@@ -18,6 +18,8 @@ import (
 )
 
 func TestExtra_Encoding(t *testing.T) {
+	t.Parallel()
+
 	parentStr := []byte("Here is the parent signature")
 	committedStr := []byte("Here is the committed signature")
 	bitmapStr := []byte("Here are the bitmap bytes")
@@ -93,6 +95,8 @@ func TestExtra_Encoding(t *testing.T) {
 }
 
 func TestExtra_UnmarshalRLPWith_NegativeCases(t *testing.T) {
+	t.Parallel()
+
 	t.Run("Incorrect RLP marshalled data type", func(t *testing.T) {
 		extra := &Extra{}
 		ar := &fastrlp.Arena{}
@@ -167,6 +171,8 @@ func TestExtra_UnmarshalRLPWith_NegativeCases(t *testing.T) {
 }
 
 func TestSignature_VerifyCommittedFields(t *testing.T) {
+	t.Parallel()
+
 	t.Run("Valid signatures", func(t *testing.T) {
 		numValidators := 100
 		vals := newTestValidators(numValidators)
@@ -215,6 +221,8 @@ func TestSignature_VerifyCommittedFields(t *testing.T) {
 }
 
 func TestSignature_UnmarshalRLPWith_NegativeCases(t *testing.T) {
+	t.Parallel()
+
 	t.Run("Incorrect RLP marshalled data type", func(t *testing.T) {
 		ar := &fastrlp.Arena{}
 		signature := Signature{}
@@ -241,6 +249,8 @@ func TestSignature_UnmarshalRLPWith_NegativeCases(t *testing.T) {
 }
 
 func TestExtra_VerifyCommittedFieldsRandom(t *testing.T) {
+	t.Parallel()
+
 	numValidators := 100
 	vals := newTestValidators(numValidators)
 	msgHash := types.Hash{0x1}
@@ -274,6 +284,8 @@ func TestExtra_VerifyCommittedFieldsRandom(t *testing.T) {
 }
 
 func TestExtra_CreateValidatorSetDelta_Cases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name    string
 		oldSet  []string
@@ -322,8 +334,9 @@ func TestExtra_CreateValidatorSetDelta_Cases(t *testing.T) {
 }
 
 func TestExtra_CreateValidatorSetDelta_BlsDiffer(t *testing.T) {
-	vals := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
+	t.Parallel()
 
+	vals := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
 	oldValidatorSet := vals.getPublicIdentities("A", "B", "C", "D")
 
 	// change the public bls key of 'B'
@@ -338,6 +351,8 @@ func TestExtra_CreateValidatorSetDelta_BlsDiffer(t *testing.T) {
 }
 
 func TestExtra_InitGenesisValidatorsDelta(t *testing.T) {
+	t.Parallel()
+
 	t.Run("Happy path", func(t *testing.T) {
 		const validatorsCount = 7
 		vals := newTestValidators(validatorsCount)
@@ -391,6 +406,8 @@ func TestExtra_InitGenesisValidatorsDelta(t *testing.T) {
 }
 
 func TestValidatorSetDelta_Copy(t *testing.T) {
+	t.Parallel()
+
 	const (
 		originalValidatorsCount = 10
 		addedValidatorsCount    = 2
@@ -418,6 +435,8 @@ func TestValidatorSetDelta_Copy(t *testing.T) {
 }
 
 func TestValidatorSetDelta_UnmarshalRLPWith_NegativeCases(t *testing.T) {
+	t.Parallel()
+
 	t.Run("Incorrect RLP value type provided", func(t *testing.T) {
 		ar := &fastrlp.Arena{}
 		delta := &ValidatorSetDelta{}
@@ -476,6 +495,8 @@ func TestValidatorSetDelta_UnmarshalRLPWith_NegativeCases(t *testing.T) {
 }
 
 func Test_GetIbftExtraClean_Fail(t *testing.T) {
+	t.Parallel()
+
 	randomBytes := [ExtraVanity]byte{}
 	_, err := rand.Read(randomBytes[:])
 	require.NoError(t, err)

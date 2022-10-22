@@ -14,6 +14,8 @@ const (
 )
 
 func Test_VerifySignature(t *testing.T) {
+	t.Parallel()
+
 	validTestMsg, invalidTestMsg := testGenRandomBytes(t, MessageSize), testGenRandomBytes(t, MessageSize)
 
 	blsKey, _ := GenerateBlsKey()
@@ -25,6 +27,8 @@ func Test_VerifySignature(t *testing.T) {
 }
 
 func Test_AggregatedSignatureSimple(t *testing.T) {
+	t.Parallel()
+
 	validTestMsg, invalidTestMsg := testGenRandomBytes(t, MessageSize), testGenRandomBytes(t, MessageSize)
 
 	bls1, _ := GenerateBlsKey()
@@ -49,6 +53,8 @@ func Test_AggregatedSignatureSimple(t *testing.T) {
 }
 
 func Test_AggregatedSignature(t *testing.T) {
+	t.Parallel()
+
 	validTestMsg, invalidTestMsg := testGenRandomBytes(t, MessageSize), testGenRandomBytes(t, MessageSize)
 
 	blsKeys, err := CreateRandomBlsKeys(ParticipantsNumber)
@@ -110,6 +116,8 @@ func Test_AggregatedSignature(t *testing.T) {
 }
 
 func TestSignature_BigInt(t *testing.T) {
+	t.Parallel()
+
 	validTestMsg := testGenRandomBytes(t, MessageSize)
 
 	bls1, err := GenerateBlsKey()

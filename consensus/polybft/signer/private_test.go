@@ -8,6 +8,8 @@ import (
 )
 
 func Test_PrivateMarshal(t *testing.T) {
+	t.Parallel()
+
 	blsKey, err := GenerateBlsKey() // structure which holds private/public key pair
 	require.NoError(t, err)
 

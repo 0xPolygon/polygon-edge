@@ -25,6 +25,8 @@ func (m *mockEventSubscriber) AddLog(log *ethgo.Log) {
 }
 
 func TestEventTracker_TrackSyncEvents(t *testing.T) {
+	t.Parallel()
+
 	server := testutil.NewTestServer(t, nil)
 	defer server.Close()
 

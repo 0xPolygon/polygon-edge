@@ -8,6 +8,8 @@ import (
 )
 
 func Test_PublicMarshal(t *testing.T) {
+	t.Parallel()
+
 	blsKey, err := GenerateBlsKey() // structure which holds private/public key pair
 	require.NoError(t, err)
 
@@ -25,6 +27,8 @@ func Test_PublicMarshal(t *testing.T) {
 }
 
 func TestPublic_UnmarshalPublicKeyFromBigInt(t *testing.T) {
+	t.Parallel()
+
 	key, _ := GenerateBlsKey()
 	pub := key.PublicKey()
 

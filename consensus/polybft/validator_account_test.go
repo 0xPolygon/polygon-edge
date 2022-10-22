@@ -11,6 +11,8 @@ import (
 )
 
 func TestAccountSet_GetAddresses(t *testing.T) {
+	t.Parallel()
+
 	address1, address2, address3 := types.Address{4, 3}, types.Address{68, 123}, types.Address{168, 123}
 	ac := AccountSet{
 		&ValidatorAccount{Address: address1},
@@ -25,6 +27,8 @@ func TestAccountSet_GetAddresses(t *testing.T) {
 }
 
 func TestAccountSet_GetBlsKeys(t *testing.T) {
+	t.Parallel()
+
 	keys, err := bls.CreateRandomBlsKeys(3)
 	assert.NoError(t, err)
 
@@ -42,6 +46,8 @@ func TestAccountSet_GetBlsKeys(t *testing.T) {
 }
 
 func TestAccountSet_IndexContainsAddressesAndContainsNodeId(t *testing.T) {
+	t.Parallel()
+
 	const count = 10
 
 	dummy := types.Address{2, 3, 4}
@@ -64,6 +70,8 @@ func TestAccountSet_IndexContainsAddressesAndContainsNodeId(t *testing.T) {
 }
 
 func TestAccountSet_Len(t *testing.T) {
+	t.Parallel()
+
 	const count = 10
 
 	ac := AccountSet{}
@@ -75,6 +83,8 @@ func TestAccountSet_Len(t *testing.T) {
 }
 
 func TestAccountSet_ApplyDelta(t *testing.T) {
+	t.Parallel()
+
 	// Add a couple of validators to the snapshot => validators are present in the snapshot after applying such delta
 	vals := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
 

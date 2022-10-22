@@ -8,6 +8,8 @@ import (
 )
 
 func Test_SingleSign(t *testing.T) {
+	t.Parallel()
+
 	validTestMsg, invalidTestMsg := testGenRandomBytes(t, MessageSize), testGenRandomBytes(t, MessageSize)
 
 	blsKey, err := GenerateBlsKey() // structure which holds private/public key pair
@@ -27,6 +29,8 @@ func Test_SingleSign(t *testing.T) {
 }
 
 func Test_AggregatedSign(t *testing.T) {
+	t.Parallel()
+
 	validTestMsg, invalidTestMsg := testGenRandomBytes(t, MessageSize), testGenRandomBytes(t, MessageSize)
 
 	keys, err := CreateRandomBlsKeys(ParticipantsNumber) // create keys for validators

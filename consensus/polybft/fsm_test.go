@@ -23,6 +23,8 @@ import (
 )
 
 func TestFSM_ValidateHeader(t *testing.T) {
+	t.Parallel()
+
 	parent := &types.Header{Number: 0}
 	_ = parent.ComputeHash()
 
@@ -53,6 +55,8 @@ func TestFSM_ValidateHeader(t *testing.T) {
 }
 
 func TestFSM_verifyValidatorsUptimeTx(t *testing.T) {
+	t.Parallel()
+
 	fsm := &fsm{
 		config:        &PolyBFTConfig{ValidatorSetAddr: contracts.ValidatorSetContract},
 		isEndOfEpoch:  true,
@@ -118,6 +122,8 @@ func TestFSM_verifyValidatorsUptimeTx(t *testing.T) {
 }
 
 func TestFSM_Init(t *testing.T) {
+	t.Parallel()
+
 	mblockBuilder := &blockBuilderMock{}
 	mblockBuilder.On("Reset").Once()
 
@@ -128,6 +134,8 @@ func TestFSM_Init(t *testing.T) {
 }
 
 func TestFSM_BuildProposal_WithoutUptimeTxGood(t *testing.T) {
+	t.Parallel()
+
 	const (
 		accountCount             = 5
 		committedCount           = 4
@@ -161,6 +169,8 @@ func TestFSM_BuildProposal_WithoutUptimeTxGood(t *testing.T) {
 }
 
 func TestFSM_BuildProposal_WithUptimeTxGood(t *testing.T) {
+	t.Parallel()
+
 	const (
 		accountCount             = 5
 		committedCount           = 4
@@ -214,6 +224,8 @@ func TestFSM_BuildProposal_WithUptimeTxGood(t *testing.T) {
 }
 
 func TestFSM_BuildProposal_EpochEndingBlock_FailedToCommitStateTx(t *testing.T) {
+	t.Parallel()
+
 	const (
 		accountCount      = 5
 		committedCount    = 4
@@ -243,6 +255,8 @@ func TestFSM_BuildProposal_EpochEndingBlock_FailedToCommitStateTx(t *testing.T) 
 }
 
 func TestFSM_BuildProposal_EpochEndingBlock_ValidatorsDeltaExists(t *testing.T) {
+	t.Parallel()
+
 	const (
 		validatorsCount          = 6
 		remainingValidatorsCount = 3
@@ -314,6 +328,8 @@ func TestFSM_BuildProposal_EpochEndingBlock_ValidatorsDeltaExists(t *testing.T) 
 }
 
 func TestFSM_BuildProposal_NonEpochEndingBlock_ValidatorsDeltaEmpty(t *testing.T) {
+	t.Parallel()
+
 	const (
 		accountCount      = 6
 		signaturesCount   = 4
@@ -349,6 +365,8 @@ func TestFSM_BuildProposal_NonEpochEndingBlock_ValidatorsDeltaEmpty(t *testing.T
 }
 
 func TestFSM_BuildProposal_EpochEndingBlock_FailToCreateValidatorsDelta(t *testing.T) {
+	t.Parallel()
+
 	const (
 		accountCount      = 6
 		signaturesCount   = 4
@@ -395,6 +413,8 @@ func TestFSM_BuildProposal_EpochEndingBlock_FailToCreateValidatorsDelta(t *testi
 }
 
 func TestFSM_VerifyStateTransactions_MiddleOfEpochWithTransaction(t *testing.T) {
+	t.Parallel()
+
 	fsm := &fsm{config: &PolyBFTConfig{}, uptimeCounter: createTestUptimeCounter(t, nil, 10)}
 	tx, err := fsm.createValidatorsUptimeTx()
 	assert.NoError(t, err)
@@ -403,18 +423,24 @@ func TestFSM_VerifyStateTransactions_MiddleOfEpochWithTransaction(t *testing.T) 
 }
 
 func TestFSM_VerifyStateTransactions_MiddleOfEpochWithoutTransaction(t *testing.T) {
+	t.Parallel()
+
 	fsm := &fsm{config: &PolyBFTConfig{}, uptimeCounter: createTestUptimeCounter(t, nil, 10)}
 	err := fsm.VerifyStateTransactions([]*types.Transaction{})
 	assert.NoError(t, err)
 }
 
 func TestFSM_VerifyStateTransactions_EndOfEpochWithoutTransaction(t *testing.T) {
+	t.Parallel()
+
 	fsm := &fsm{config: &PolyBFTConfig{}, isEndOfEpoch: true, uptimeCounter: createTestUptimeCounter(t, nil, 10)}
 	err := fsm.VerifyStateTransactions([]*types.Transaction{})
 	assert.EqualError(t, err, "uptime transaction is not found in the epoch ending block")
 }
 
 func TestFSM_VerifyStateTransactions_EndOfEpochWrongValidatorsUptimeTx(t *testing.T) {
+	t.Parallel()
+
 	fsm := &fsm{config: &PolyBFTConfig{}, isEndOfEpoch: true, uptimeCounter: createTestUptimeCounter(t, nil, 10)}
 	uptimeCounter, err := createTestUptimeCounter(t, nil, 5).EncodeAbi()
 	require.NoError(t, err)
@@ -425,6 +451,8 @@ func TestFSM_VerifyStateTransactions_EndOfEpochWrongValidatorsUptimeTx(t *testin
 }
 
 func TestFSM_VerifyStateTransactions_StateTransactionAndSprintIsFalse(t *testing.T) {
+	t.Parallel()
+
 	fsm := &fsm{config: &PolyBFTConfig{}, uptimeCounter: createTestUptimeCounter(t, nil, 10)}
 	dummyStateTx := &types.Transaction{To: &contracts.StateReceiverContract, Type: types.StateTx}
 	err := fsm.VerifyStateTransactions([]*types.Transaction{dummyStateTx})
@@ -432,6 +460,8 @@ func TestFSM_VerifyStateTransactions_StateTransactionAndSprintIsFalse(t *testing
 }
 
 func TestFSM_VerifyStateTransactions_StateTransactionPass(t *testing.T) {
+	t.Parallel()
+
 	validators := newTestValidators(5)
 	commitment := createTestCommitment(t, validators.getPrivateIdentities())
 
@@ -458,6 +488,8 @@ func TestFSM_VerifyStateTransactions_StateTransactionPass(t *testing.T) {
 }
 
 func TestFSM_VerifyStateTransactions_StateTransactionQuorumNotReached(t *testing.T) {
+	t.Parallel()
+
 	validators := newTestValidators(5)
 	commitment := createTestCommitment(t, validators.getPrivateIdentities())
 	commitment.AggSignature = Signature{
@@ -488,6 +520,8 @@ func TestFSM_VerifyStateTransactions_StateTransactionQuorumNotReached(t *testing
 }
 
 func TestFSM_VerifyStateTransactions_StateTransactionInvalidSignature(t *testing.T) {
+	t.Parallel()
+
 	validators := newTestValidators(5)
 	commitment := createTestCommitment(t, validators.getPrivateIdentities())
 	nonValidators := newTestValidators(3)
@@ -525,6 +559,8 @@ func TestFSM_VerifyStateTransactions_StateTransactionInvalidSignature(t *testing
 }
 
 func TestFSM_ValidateCommit_ProposalIsNil(t *testing.T) {
+	t.Parallel()
+
 	fsm := &fsm{}
 	err := fsm.ValidateCommit(pbft.NodeID(""), []byte{})
 	assert.ErrorContains(t, err, "proposal unavailable")
@@ -535,6 +571,8 @@ func TestFSM_ValidateCommit_ProposalIsNil(t *testing.T) {
 }
 
 func TestFSM_ValidateCommit_WrongValidator(t *testing.T) {
+	t.Parallel()
+
 	const (
 		accountsCount     = 5
 		parentBlockNumber = 10
@@ -558,6 +596,8 @@ func TestFSM_ValidateCommit_WrongValidator(t *testing.T) {
 }
 
 func TestFSM_ValidateCommit_InvalidHash(t *testing.T) {
+	t.Parallel()
+
 	const (
 		accountsCount     = 5
 		parentBlockNumber = 10
@@ -587,6 +627,8 @@ func TestFSM_ValidateCommit_InvalidHash(t *testing.T) {
 }
 
 func TestFSM_ValidateCommit_Good(t *testing.T) {
+	t.Parallel()
+
 	const parentBlockNumber = 10
 
 	validators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E"})
@@ -610,6 +652,8 @@ func TestFSM_ValidateCommit_Good(t *testing.T) {
 }
 
 func TestFSM_Validate_IncorrectSignHash(t *testing.T) {
+	t.Parallel()
+
 	const (
 		parentBlockNumber = 10
 		accountsCount     = 5
@@ -637,6 +681,8 @@ func TestFSM_Validate_IncorrectSignHash(t *testing.T) {
 }
 
 func TestFSM_Validate_IncorrectHeaderParentHash(t *testing.T) {
+	t.Parallel()
+
 	const (
 		accountsCount     = 5
 		parentBlockNumber = 25
@@ -664,6 +710,8 @@ func TestFSM_Validate_IncorrectHeaderParentHash(t *testing.T) {
 }
 
 func TestFSM_Validate_InvalidNumber(t *testing.T) {
+	t.Parallel()
+
 	const (
 		accountsCount     = 5
 		parentBlockNumber = 10
@@ -695,6 +743,8 @@ func TestFSM_Validate_InvalidNumber(t *testing.T) {
 }
 
 func TestFSM_Validate_TimestampOlder(t *testing.T) {
+	t.Parallel()
+
 	const parentBlockNumber = 10
 
 	validators := newTestValidators(5)
@@ -726,8 +776,9 @@ func TestFSM_Validate_TimestampOlder(t *testing.T) {
 }
 
 func TestFSM_Validate_IncorrectMixHash(t *testing.T) {
-	const parentBlockNumber = 10
+	t.Parallel()
 
+	const parentBlockNumber = 10
 	validators := newTestValidators(5)
 	parent := &types.Header{
 		Number:    parentBlockNumber,
@@ -762,6 +813,8 @@ func TestFSM_Validate_IncorrectMixHash(t *testing.T) {
 }
 
 func TestFSM_Insert_Good(t *testing.T) {
+	t.Parallel()
+
 	const (
 		accountCount      = 5
 		parentBlockNumber = 10
@@ -835,6 +888,8 @@ func TestFSM_Insert_Good(t *testing.T) {
 }
 
 func TestFSM_Insert_InvalidNode(t *testing.T) {
+	t.Parallel()
+
 	const (
 		accountCount      = 5
 		parentBlockNumber = 10
@@ -903,6 +958,8 @@ func TestFSM_Insert_InvalidNode(t *testing.T) {
 }
 
 func TestFSM_Height(t *testing.T) {
+	t.Parallel()
+
 	parentNumber := uint64(3)
 	parent := &types.Header{Number: parentNumber}
 	fsm := &fsm{parent: parent}
@@ -910,6 +967,8 @@ func TestFSM_Height(t *testing.T) {
 }
 
 func TestFSM_IsStuck(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		localBlockNumber uint64
 		peerBlockNumber  uint64
@@ -931,6 +990,8 @@ func TestFSM_IsStuck(t *testing.T) {
 }
 
 func TestFSM_StateTransactionsEndOfSprint(t *testing.T) {
+	t.Parallel()
+
 	const (
 		commitmentsCount = 8
 		from             = 15
@@ -1002,6 +1063,8 @@ func TestFSM_StateTransactionsEndOfSprint(t *testing.T) {
 }
 
 func TestFSM_CalcProposer(t *testing.T) {
+	t.Parallel()
+
 	const validatorsCount = 10
 	validatorSet := newTestValidators(validatorsCount).getPublicIdentities()
 
@@ -1037,6 +1100,8 @@ func TestFSM_CalcProposer(t *testing.T) {
 }
 
 func TestFSM_VerifyStateTransaction_NotEndOfSprint(t *testing.T) {
+	t.Parallel()
+
 	cm, _, sse := buildCommitmentAndStateSyncs(t, 10, uint64(3), uint64(1), 2)
 	f := &fsm{
 		isEndOfSprint: false,
@@ -1058,6 +1123,8 @@ func TestFSM_VerifyStateTransaction_NotEndOfSprint(t *testing.T) {
 }
 
 func TestFSM_VerifyStateTransaction_ValidBothTypesOfStateTransactions(t *testing.T) {
+	t.Parallel()
+
 	var (
 		commitmentMessages [2]*CommitmentMessage
 		commitments        [2]*Commitment
@@ -1124,6 +1191,8 @@ func TestFSM_VerifyStateTransaction_ValidBothTypesOfStateTransactions(t *testing
 }
 
 func TestFSM_VerifyStateTransaction_InvalidTypeOfStateTransactions(t *testing.T) {
+	t.Parallel()
+
 	f := &fsm{
 		isEndOfSprint: true,
 		config:        &PolyBFTConfig{},
@@ -1138,6 +1207,8 @@ func TestFSM_VerifyStateTransaction_InvalidTypeOfStateTransactions(t *testing.T)
 }
 
 func TestFSM_VerifyStateTransaction_QuorumNotReached(t *testing.T) {
+	t.Parallel()
+
 	validators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
 	_, commitmentMessage, _ := buildCommitmentAndStateSyncs(t, 10, uint64(3), uint64(1), 2)
 	f := &fsm{
@@ -1167,6 +1238,8 @@ func TestFSM_VerifyStateTransaction_QuorumNotReached(t *testing.T) {
 }
 
 func TestFSM_VerifyStateTransaction_InvalidSignature(t *testing.T) {
+	t.Parallel()
+
 	validators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
 	_, commitmentMessage, _ := buildCommitmentAndStateSyncs(t, 10, uint64(3), uint64(1), 2)
 	f := &fsm{
@@ -1204,6 +1277,8 @@ func TestFSM_VerifyStateTransaction_InvalidSignature(t *testing.T) {
 }
 
 func TestFSM_VerifyStateTransaction_BundlesNotInSequentialOrder(t *testing.T) {
+	t.Parallel()
+
 	validators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
 	commitment, commitmentMessage, stateSyncs := buildCommitmentAndStateSyncs(t, 10, uint64(3), uint64(2), 2)
 
@@ -1241,6 +1316,8 @@ func TestFSM_VerifyStateTransaction_BundlesNotInSequentialOrder(t *testing.T) {
 }
 
 func TestFSM_VerifyStateTransaction_TwoCommitmentMessages(t *testing.T) {
+	t.Parallel()
+
 	validators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
 	_, commitmentMessage, _ := buildCommitmentAndStateSyncs(t, 10, uint64(3), uint64(1), 2)
 	f := &fsm{
@@ -1274,6 +1351,8 @@ func TestFSM_VerifyStateTransaction_TwoCommitmentMessages(t *testing.T) {
 }
 
 func TestFSM_VerifyStateTransaction_ProofError(t *testing.T) {
+	t.Parallel()
+
 	validators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
 	commitment, commitmentMessage, stateSyncs := buildCommitmentAndStateSyncs(t, 10, uint64(3), uint64(2), 2)
 
@@ -1308,6 +1387,8 @@ func TestFSM_VerifyStateTransaction_ProofError(t *testing.T) {
 }
 
 func TestFSM_VerifyStateTransaction_CommitmentDoesNotExist(t *testing.T) {
+	t.Parallel()
+
 	validators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
 	commitment, commitmentMessage, stateSyncs := buildCommitmentAndStateSyncs(t, 10, uint64(3), uint64(1), 2)
 	hash, err := commitmentMessage.Hash()
@@ -1347,6 +1428,8 @@ func TestFSM_VerifyStateTransaction_CommitmentDoesNotExist(t *testing.T) {
 }
 
 func TestFSM_Validate_FailToVerifySignatures(t *testing.T) {
+	t.Parallel()
+
 	const (
 		accountsCount     = 5
 		parentBlockNumber = 10

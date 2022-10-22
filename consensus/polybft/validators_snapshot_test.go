@@ -12,6 +12,7 @@ import (
 )
 
 func TestValidatorsSnapshotCache_GetSnapshot_Build(t *testing.T) {
+	t.Parallel()
 	assertions := assert.New(t)
 
 	const (
@@ -87,6 +88,7 @@ func TestValidatorsSnapshotCache_GetSnapshot_Build(t *testing.T) {
 }
 
 func TestValidatorsSnapshotCache_GetSnapshot_FetchFromCache(t *testing.T) {
+	t.Parallel()
 	require := require.New(t)
 
 	const (
@@ -129,7 +131,9 @@ func TestValidatorsSnapshotCache_GetSnapshot_FetchFromCache(t *testing.T) {
 }
 
 func TestValidatorsSnapshotCache_Cleanup(t *testing.T) {
+	t.Parallel()
 	require := require.New(t)
+
 	blockchainMock := new(blockchainMock)
 	cache := &testValidatorsCache{
 		validatorsSnapshotCache: newValidatorsSnapshotCache(hclog.NewNullLogger(), newTestState(t), 10, blockchainMock),
@@ -170,6 +174,7 @@ func TestValidatorsSnapshotCache_Cleanup(t *testing.T) {
 }
 
 func TestValidatorsSnapshotCache_ComputeSnapshot_UnknownEpochEndingBlock(t *testing.T) {
+	t.Parallel()
 	assertions := assert.New(t)
 
 	const (
@@ -196,6 +201,7 @@ func TestValidatorsSnapshotCache_ComputeSnapshot_UnknownEpochEndingBlock(t *test
 }
 
 func TestValidatorsSnapshotCache_ComputeSnapshot_IncorrectExtra(t *testing.T) {
+	t.Parallel()
 	assertions := assert.New(t)
 
 	const (
@@ -223,6 +229,7 @@ func TestValidatorsSnapshotCache_ComputeSnapshot_IncorrectExtra(t *testing.T) {
 }
 
 func TestValidatorsSnapshotCache_ComputeSnapshot_ApplyDeltaFail(t *testing.T) {
+	t.Parallel()
 	assertions := assert.New(t)
 
 	const (

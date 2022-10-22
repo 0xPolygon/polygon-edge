@@ -7,6 +7,8 @@ import (
 )
 
 func TestMerkleTree_VerifyProofs(t *testing.T) {
+	t.Parallel()
+
 	const dataLen = 515
 
 	verifyProof := func(numOfItems uint64) {
@@ -33,6 +35,8 @@ func TestMerkleTree_VerifyProofs(t *testing.T) {
 }
 
 func TestMerkleTree_VerifyProof_InvalidProof(t *testing.T) {
+	t.Parallel()
+
 	const dataLen = 10
 	data := make([][]byte, dataLen)
 

@@ -11,6 +11,8 @@ import (
 )
 
 func TestCommitmentMessage_Hash(t *testing.T) {
+	t.Parallel()
+
 	const (
 		bundleSize  = uint64(2)
 		eventsCount = 10
@@ -45,6 +47,8 @@ func TestCommitmentMessage_Hash(t *testing.T) {
 }
 
 func TestCommitmentMessage_ToRegisterCommitmentInputData(t *testing.T) {
+	t.Parallel()
+
 	const epoch, bundleSize, eventsCount = uint64(100), uint64(3), 11
 	_, commitmentMessage, _ := buildCommitmentAndStateSyncs(t, eventsCount, epoch, bundleSize, uint64(2))
 	expectedSignedCommitmentMsg := &CommitmentMessageSigned{
@@ -68,6 +72,8 @@ func TestCommitmentMessage_ToRegisterCommitmentInputData(t *testing.T) {
 }
 
 func TestCommitmentMessage_VerifyProof(t *testing.T) {
+	t.Parallel()
+
 	const epoch, bundleSize, eventsCount = uint64(100), uint64(3), 11
 	commitment, commitmentMessage, stateSyncs := buildCommitmentAndStateSyncs(t, eventsCount, epoch, bundleSize, 0)
 	require.Equal(t, uint64(4), commitmentMessage.BundlesCount())
@@ -96,6 +102,8 @@ func TestCommitmentMessage_VerifyProof(t *testing.T) {
 }
 
 func TestCommitmentMessage_GetBundleIdxFromStateSyncEventIdx(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		eventsCount int
 		bundleSize  uint64
@@ -115,6 +123,8 @@ func TestCommitmentMessage_GetBundleIdxFromStateSyncEventIdx(t *testing.T) {
 }
 
 func TestCommitmentMessage_GetFirstStateSyncIndexFromBundleIndex(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		bundleSize    uint64
 		fromIndex     uint64
@@ -139,14 +149,16 @@ func TestCommitmentMessage_GetFirstStateSyncIndexFromBundleIndex(t *testing.T) {
 }
 
 func TestCommitmentMessage_VerifyProof_NoStateSyncsInBundle(t *testing.T) {
+	t.Parallel()
+
 	commitment := &CommitmentMessage{FromIndex: 0, ToIndex: 4, BundleSize: 5}
-
 	err := commitment.VerifyProof(&BundleProof{})
-
 	assert.ErrorContains(t, err, "no state sync events")
 }
 
 func TestCommitmentMessage_VerifyProof_StateSyncHashNotEqualToProof(t *testing.T) {
+	t.Parallel()
+
 	const (
 		bundleIndex = 0
 		bundleSize  = 5
@@ -198,6 +210,8 @@ func buildCommitmentAndStateSyncs(t *testing.T, stateSyncsCount int,
 }
 
 func TestStateTransaction_Signature(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		m   *abi.Method
 		sig string
@@ -214,6 +228,8 @@ func TestStateTransaction_Signature(t *testing.T) {
 }
 
 func TestStateTransaction_Encoding(t *testing.T) {
+	t.Parallel()
+
 	cases := []StateTransactionInput{
 		// empty commit epoch
 		&CommitEpoch{

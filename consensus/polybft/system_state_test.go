@@ -21,8 +21,9 @@ import (
 )
 
 func TestSystemState_GetValidatorSet(t *testing.T) {
-	cc := &testutil.Contract{}
+	t.Parallel()
 
+	cc := &testutil.Contract{}
 	cc.AddCallback(func() string {
 		return `
 
@@ -75,6 +76,8 @@ func TestSystemState_GetValidatorSet(t *testing.T) {
 }
 
 func TestSystemState_GetNextExecutionAndCommittedIndex(t *testing.T) {
+	t.Parallel()
+
 	var sideChainBridgeABI, _ = abi.NewABIFromList([]string{
 		"function setNextExecutionIndex(uint256 _index) public payable",
 		"function setNextCommittedIndex(uint256 _index) public payable",
@@ -139,6 +142,8 @@ func TestSystemState_GetNextExecutionAndCommittedIndex(t *testing.T) {
 }
 
 func TestSystemState_GetEpoch(t *testing.T) {
+	t.Parallel()
+
 	setEpochMethod, err := abi.NewMethod("function setEpoch(uint256 _epochId) public payable")
 	require.NoError(t, err)
 
@@ -184,6 +189,8 @@ func TestSystemState_GetEpoch(t *testing.T) {
 }
 
 func TestStateProvider_Txn_Panics(t *testing.T) {
+	t.Parallel()
+
 	transition := newTestTransition(t)
 
 	provider := &stateProvider{
@@ -223,6 +230,8 @@ func newTestTransition(t *testing.T) *state.Transition {
 }
 
 func Test_buildLogsFromReceipts(t *testing.T) {
+	t.Parallel()
+
 	defaultHeader := &types.Header{
 		Number: 100,
 	}

@@ -21,7 +21,7 @@ import (
 func newTestState(t *testing.T) *State {
 	t.Helper()
 
-	dir := fmt.Sprintf("/tmp/consensus-temp_%v", time.Now().Format(time.RFC3339))
+	dir := fmt.Sprintf("/tmp/consensus-temp_%v", time.Now().Format(time.RFC3339Nano))
 	err := os.Mkdir(dir, 0777)
 
 	if err != nil {
@@ -43,8 +43,9 @@ func newTestState(t *testing.T) *State {
 }
 
 func TestState_InsertEvent(t *testing.T) {
-	state := newTestState(t)
+	t.Parallel()
 
+	state := newTestState(t)
 	evnt1 := newStateSyncEvent(0, ethgo.Address{}, ethgo.Address{}, nil, nil)
 	err := state.insertStateSyncEvent(evnt1)
 	assert.NoError(t, err)
@@ -55,6 +56,8 @@ func TestState_InsertEvent(t *testing.T) {
 }
 
 func TestState_Insert_And_Get_MessageVotes(t *testing.T) {
+	t.Parallel()
+
 	state := newTestState(t)
 	epoch := uint64(1)
 	assert.NoError(t, state.insertEpoch(epoch))
@@ -75,8 +78,9 @@ func TestState_Insert_And_Get_MessageVotes(t *testing.T) {
 }
 
 func TestState_InsertVoteConcurrent(t *testing.T) {
-	state := newTestState(t)
+	t.Parallel()
 
+	state := newTestState(t)
 	epoch := uint64(1)
 	assert.NoError(t, state.insertEpoch(epoch))
 
@@ -105,6 +109,8 @@ func TestState_InsertVoteConcurrent(t *testing.T) {
 }
 
 func TestState_Insert_And_Cleanup(t *testing.T) {
+	t.Parallel()
+
 	state := newTestState(t)
 	hash1 := []byte{1, 2}
 
@@ -152,6 +158,8 @@ func TestState_Insert_And_Cleanup(t *testing.T) {
 }
 
 func TestState_insertAndGetValidatorSnapshot(t *testing.T) {
+	t.Parallel()
+
 	epoch := uint64(1)
 	state := newTestState(t)
 	keys, err := bls.CreateRandomBlsKeys(3)
@@ -178,9 +186,10 @@ func TestState_insertAndGetValidatorSnapshot(t *testing.T) {
 }
 
 func TestState_cleanValidatorSnapshotsFromDb(t *testing.T) {
+	t.Parallel()
+
 	state := newTestState(t)
 	keys, err := bls.CreateRandomBlsKeys(3)
-
 	require.NoError(t, err)
 
 	snapshot := AccountSet{
@@ -222,6 +231,8 @@ func TestState_cleanValidatorSnapshotsFromDb(t *testing.T) {
 }
 
 func TestState_getStateSyncEventsForCommitment_NotEnoughEvents(t *testing.T) {
+	t.Parallel()
+
 	state := newTestState(t)
 
 	for i := 0; i < stateSyncMainBundleSize-2; i++ {
@@ -236,6 +247,8 @@ func TestState_getStateSyncEventsForCommitment_NotEnoughEvents(t *testing.T) {
 }
 
 func TestState_getStateSyncEventsForCommitment(t *testing.T) {
+	t.Parallel()
+
 	state := newTestState(t)
 
 	for i := 0; i < stateSyncMainBundleSize; i++ {
@@ -251,6 +264,8 @@ func TestState_getStateSyncEventsForCommitment(t *testing.T) {
 }
 
 func TestState_insertCommitmentMessage(t *testing.T) {
+	t.Parallel()
+
 	commitment, err := createTestCommitmentMessage(11)
 	require.NoError(t, err)
 
@@ -265,6 +280,8 @@ func TestState_insertCommitmentMessage(t *testing.T) {
 }
 
 func TestState_getNonExecutedCommitments(t *testing.T) {
+	t.Parallel()
+
 	const (
 		numberOfCommitments    = 10
 		lastExecutedCommitment = 80
@@ -284,6 +301,8 @@ func TestState_getNonExecutedCommitments(t *testing.T) {
 }
 
 func TestState_cleanCommitments(t *testing.T) {
+	t.Parallel()
+
 	const (
 		numberOfCommitments = 10
 		numberOfBundles     = 10
@@ -313,10 +332,10 @@ func TestState_cleanCommitments(t *testing.T) {
 }
 
 func TestState_insertAndGetBundles(t *testing.T) {
+	t.Parallel()
+
 	const numberOfBundles = 10
-
 	state := newTestState(t)
-
 	commitment, err := createTestCommitmentMessage(0)
 	require.NoError(t, err)
 	require.NoError(t, state.insertCommitmentMessage(commitment))

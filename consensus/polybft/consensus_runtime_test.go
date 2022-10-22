@@ -25,6 +25,8 @@ import (
 )
 
 func TestConsensusRuntime_GetVotes(t *testing.T) {
+	t.Parallel()
+
 	const (
 		epoch           = uint64(1)
 		validatorsCount = 7
@@ -70,6 +72,8 @@ func TestConsensusRuntime_GetVotes(t *testing.T) {
 }
 
 func TestConsensusRuntime_GetVotesError(t *testing.T) {
+	t.Parallel()
+
 	const (
 		epoch           = uint64(1)
 		stateSyncsCount = 30
@@ -87,8 +91,9 @@ func TestConsensusRuntime_GetVotesError(t *testing.T) {
 }
 
 func TestConsensusRuntime_deliverMessage_MessageWhenEpochNotStarted(t *testing.T) {
-	const epoch = uint64(5)
+	t.Parallel()
 
+	const epoch = uint64(5)
 	validatorIds := []string{"A", "B", "C", "D", "E", "F", "G"}
 	state := newTestState(t)
 	validators := newTestValidatorsWithAliases(validatorIds)
@@ -134,6 +139,8 @@ func TestConsensusRuntime_deliverMessage_MessageWhenEpochNotStarted(t *testing.T
 }
 
 func TestConsensusRuntime_AddLog(t *testing.T) {
+	t.Parallel()
+
 	state := newTestState(t)
 	runtime := &consensusRuntime{
 		logger: hclog.NewNullLogger(),
@@ -169,6 +176,8 @@ func TestConsensusRuntime_AddLog(t *testing.T) {
 }
 
 func TestConsensusRuntime_getQuorumSize(t *testing.T) {
+	t.Parallel()
+
 	var cases = []struct {
 		num, quorum int
 	}{
@@ -182,6 +191,8 @@ func TestConsensusRuntime_getQuorumSize(t *testing.T) {
 }
 
 func TestConsensusRuntime_isEndOfEpoch_NotReachedEnd(t *testing.T) {
+	t.Parallel()
+
 	var cases = []struct {
 		epochSize, parentBlockNumber uint64
 	}{
@@ -216,6 +227,8 @@ func TestConsensusRuntime_isEndOfEpoch_NotReachedEnd(t *testing.T) {
 }
 
 func TestConsensusRuntime_isEndOfEpoch_ReachedEnd(t *testing.T) {
+	t.Parallel()
+
 	runtime := &consensusRuntime{
 		config: &runtimeConfig{
 			PolyBFTConfig: &PolyBFTConfig{
@@ -231,6 +244,8 @@ func TestConsensusRuntime_isEndOfEpoch_ReachedEnd(t *testing.T) {
 }
 
 func TestConsensusRuntime_isEndOfEpoch_Block0(t *testing.T) {
+	t.Parallel()
+
 	runtime := &consensusRuntime{
 		config: &runtimeConfig{
 			PolyBFTConfig: &PolyBFTConfig{
@@ -246,6 +261,8 @@ func TestConsensusRuntime_isEndOfEpoch_Block0(t *testing.T) {
 }
 
 func TestConsensusRuntime_isEndOfSprint_NotReachedEnd(t *testing.T) {
+	t.Parallel()
+
 	var cases = []struct {
 		sprintSize, parentBlockNumber uint64
 	}{
@@ -279,6 +296,8 @@ func TestConsensusRuntime_isEndOfSprint_NotReachedEnd(t *testing.T) {
 }
 
 func TestConsensusRuntime_isEndOfSprint_ReachedEnd(t *testing.T) {
+	t.Parallel()
+
 	runtime := &consensusRuntime{
 		config: &runtimeConfig{
 			PolyBFTConfig: &PolyBFTConfig{
@@ -294,6 +313,8 @@ func TestConsensusRuntime_isEndOfSprint_ReachedEnd(t *testing.T) {
 }
 
 func TestConsensusRuntime_isEndOfSprint_Block0(t *testing.T) {
+	t.Parallel()
+
 	runtime := &consensusRuntime{
 		config: &runtimeConfig{
 			PolyBFTConfig: &PolyBFTConfig{
@@ -309,6 +330,8 @@ func TestConsensusRuntime_isEndOfSprint_Block0(t *testing.T) {
 }
 
 func TestConsensusRuntime_deliverMessage_EpochNotStarted(t *testing.T) {
+	t.Parallel()
+
 	state := newTestState(t)
 	err := state.insertEpoch(1)
 	assert.NoError(t, err)
@@ -342,6 +365,8 @@ func TestConsensusRuntime_deliverMessage_EpochNotStarted(t *testing.T) {
 }
 
 func TestConsensusRuntime_deliverMessage_ForExistingEpochAndCommitmentMessage(t *testing.T) {
+	t.Parallel()
+
 	state := newTestState(t)
 	err := state.insertEpoch(1)
 	require.NoError(t, err)
@@ -377,6 +402,8 @@ func TestConsensusRuntime_deliverMessage_ForExistingEpochAndCommitmentMessage(t 
 }
 
 func TestConsensusRuntime_deliverMessage_SenderMessageNotInCurrentValidatorset(t *testing.T) {
+	t.Parallel()
+
 	state := newTestState(t)
 	err := state.insertEpoch(1)
 	require.NoError(t, err)
@@ -406,6 +433,8 @@ func TestConsensusRuntime_deliverMessage_SenderMessageNotInCurrentValidatorset(t
 }
 
 func TestConsensusRuntime_NotifyProposalInserted_EndOfEpoch(t *testing.T) {
+	t.Parallel()
+
 	const (
 		epochSize       = uint64(10)
 		validatorsCount = 7
@@ -455,6 +484,8 @@ func TestConsensusRuntime_NotifyProposalInserted_EndOfEpoch(t *testing.T) {
 }
 
 func TestConsensusRuntime_NotifyProposalInserted_MiddleOfEpoch(t *testing.T) {
+	t.Parallel()
+
 	const (
 		epochSize   = uint64(10)
 		blockNumber = epochSize + 2
@@ -477,6 +508,8 @@ func TestConsensusRuntime_NotifyProposalInserted_MiddleOfEpoch(t *testing.T) {
 }
 
 func TestConsensusRuntime_FSM_NotInValidatorSet(t *testing.T) {
+	t.Parallel()
+
 	validators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D"})
 	runtime := &consensusRuntime{
 		activeValidatorFlag: 1,
@@ -497,10 +530,10 @@ func TestConsensusRuntime_FSM_NotInValidatorSet(t *testing.T) {
 }
 
 func TestConsensusRuntime_FSM_NotEndOfEpoch_NotEndOfSprint(t *testing.T) {
+	t.Parallel()
+
 	lastBlock := &types.Header{Number: 1}
-
 	validators := newTestValidators(3)
-
 	blockchainMock := new(blockchainMock)
 	blockchainMock.On("NewBlockBuilder", mock.Anything).Return(&BlockBuilder{}, nil).Once()
 
@@ -538,6 +571,8 @@ func TestConsensusRuntime_FSM_NotEndOfEpoch_NotEndOfSprint(t *testing.T) {
 }
 
 func TestConsensusRuntime_FSM_EndOfEpoch_BuildRegisterCommitment_And_Uptime(t *testing.T) {
+	t.Parallel()
+
 	const (
 		epoch               = 0
 		epochSize           = uint64(10)
@@ -632,6 +667,8 @@ func TestConsensusRuntime_FSM_EndOfEpoch_BuildRegisterCommitment_And_Uptime(t *t
 }
 
 func TestConsensusRuntime_FSM_EndOfEpoch_RegisterCommitmentNotFound(t *testing.T) {
+	t.Parallel()
+
 	const (
 		epochSize           = uint64(10)
 		sprintSize          = uint64(5)
@@ -685,6 +722,8 @@ func TestConsensusRuntime_FSM_EndOfEpoch_RegisterCommitmentNotFound(t *testing.T
 }
 
 func TestConsensusRuntime_FSM_EndOfEpoch_BuildRegisterCommitment_QuorumNotReached(t *testing.T) {
+	t.Parallel()
+
 	const (
 		epoch               = 0
 		epochSize           = uint64(10)
@@ -768,6 +807,8 @@ func TestConsensusRuntime_FSM_EndOfEpoch_BuildRegisterCommitment_QuorumNotReache
 }
 
 func Test_NewConsensusRuntime(t *testing.T) {
+	t.Parallel()
+
 	_, err := os.Create("/tmp/consensusState.db")
 	require.NoError(t, err)
 
@@ -806,6 +847,8 @@ func Test_NewConsensusRuntime(t *testing.T) {
 }
 
 func TestConsensusRuntime_FSM_EndOfSprint_HasBundlesToExecute(t *testing.T) {
+	t.Parallel()
+
 	const (
 		epochNumber        = uint64(2)
 		fromIndex          = uint64(5)
@@ -886,6 +929,8 @@ func TestConsensusRuntime_FSM_EndOfSprint_HasBundlesToExecute(t *testing.T) {
 }
 
 func TestConsensusRuntime_IsEndOfPeriod(t *testing.T) {
+	t.Parallel()
+
 	config := &runtimeConfig{PolyBFTConfig: &PolyBFTConfig{SprintSize: 5, EpochSize: 10}}
 	runtime := &consensusRuntime{
 		config:         config,
@@ -960,6 +1005,8 @@ func assertPeriodEvent(t *testing.T,
 }
 
 func TestConsensusRuntime_GetEpochNumber(t *testing.T) {
+	t.Parallel()
+
 	var cases = []struct {
 		blockNumber         uint64
 		epochSize           uint64
@@ -981,6 +1028,8 @@ func TestConsensusRuntime_GetEpochNumber(t *testing.T) {
 }
 
 func TestConsensusRuntime_GetEndEpochBlockNumber(t *testing.T) {
+	t.Parallel()
+
 	var cases = []struct {
 		epochNumber   uint64
 		epochSize     uint64
@@ -999,6 +1048,8 @@ func TestConsensusRuntime_GetEndEpochBlockNumber(t *testing.T) {
 }
 
 func TestConsensusRuntime_calculateFirstBlockOfPeriod(t *testing.T) {
+	t.Parallel()
+
 	var cases = []struct {
 		blockNumber    uint64
 		periodSize     uint64
@@ -1021,6 +1072,8 @@ func TestConsensusRuntime_calculateFirstBlockOfPeriod(t *testing.T) {
 }
 
 func TestConsensusRuntime_restartEpoch_SameEpochNumberAsTheLastOne(t *testing.T) {
+	t.Parallel()
+
 	newCurrentHeader := &types.Header{Number: 6}
 	validatorSet := newTestValidators(3).getPublicIdentities()
 
@@ -1057,6 +1110,8 @@ func TestConsensusRuntime_restartEpoch_SameEpochNumberAsTheLastOne(t *testing.T)
 }
 
 func TestConsensusRuntime_restartEpoch_FirstRestart_NoStateSyncEvents(t *testing.T) {
+	t.Parallel()
+
 	newCurrentHeader := &types.Header{Number: 0}
 	state := newTestState(t)
 
@@ -1095,6 +1150,8 @@ func TestConsensusRuntime_restartEpoch_FirstRestart_NoStateSyncEvents(t *testing
 }
 
 func TestConsensusRuntime_restartEpoch_FirstRestart_BuildsCommitment(t *testing.T) {
+	t.Parallel()
+
 	const (
 		epoch              = uint64(3)
 		epochSize          = uint64(10)
@@ -1194,6 +1251,8 @@ func TestConsensusRuntime_restartEpoch_FirstRestart_BuildsCommitment(t *testing.
 }
 
 func TestConsensusRuntime_restartEpoch_NewEpochToRun_BuildCommitment(t *testing.T) {
+	t.Parallel()
+
 	const (
 		blockNumber        = 11
 		nextCommittedIndex = uint64(10)
@@ -1319,6 +1378,8 @@ func TestConsensusRuntime_restartEpoch_NewEpochToRun_BuildCommitment(t *testing.
 }
 
 func TestConsensusRuntime_calculateUptime_EpochSizeToSmall(t *testing.T) {
+	t.Parallel()
+
 	config := &PolyBFTConfig{
 		ValidatorSetAddr: contracts.ValidatorSetContract,
 		EpochSize:        2,
@@ -1339,6 +1400,8 @@ func TestConsensusRuntime_calculateUptime_EpochSizeToSmall(t *testing.T) {
 }
 
 func TestConsensusRuntime_calculateUptime_SecondEpoch(t *testing.T) {
+	t.Parallel()
+
 	validators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E"})
 	config := &PolyBFTConfig{
 		ValidatorSetAddr: contracts.ValidatorSetContract,
@@ -1376,6 +1439,8 @@ func TestConsensusRuntime_calculateUptime_SecondEpoch(t *testing.T) {
 }
 
 func TestConsensusRuntime_validateVote_VoteSentFromUnknownValidator(t *testing.T) {
+	t.Parallel()
+
 	epoch := &epochMetadata{Validators: newTestValidators(5).getPublicIdentities()}
 	nonValidatorAccount := createTestKey(t)
 	hash := crypto.Keccak256Hash(generateRandomBytes(t)).Bytes()
@@ -1391,10 +1456,10 @@ func TestConsensusRuntime_validateVote_VoteSentFromUnknownValidator(t *testing.T
 }
 
 func TestConsensusRuntime_buildBundles_NoCommitment(t *testing.T) {
+	t.Parallel()
+
 	state := newTestState(t)
-
 	commitmentMsg := NewCommitmentMessage(types.Hash{}, 0, 4, 5)
-
 	runtime := &consensusRuntime{
 		logger: hclog.NewNullLogger(),
 		state:  state,
@@ -1410,6 +1475,8 @@ func TestConsensusRuntime_buildBundles_NoCommitment(t *testing.T) {
 }
 
 func TestConsensusRuntime_buildBundles(t *testing.T) {
+	t.Parallel()
+
 	const (
 		epoch                 = 0
 		bundleSize            = 5
@@ -1453,6 +1520,8 @@ func TestConsensusRuntime_buildBundles(t *testing.T) {
 }
 
 func TestConsensusRuntime_FSM_EndOfEpoch_PostHook(t *testing.T) {
+	t.Parallel()
+
 	const (
 		epoch               = 0
 		epochSize           = uint64(10)
