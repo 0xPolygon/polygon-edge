@@ -412,3 +412,28 @@ func (v *testValidator) mustSign(hash []byte) *bls.Signature {
 
 	return signature
 }
+
+type testHeadersMap struct {
+	headersByNumber map[uint64]*types.Header
+}
+
+func (t *testHeadersMap) addHeader(header *types.Header) {
+	if t.headersByNumber == nil {
+		t.headersByNumber = map[uint64]*types.Header{}
+	}
+
+	t.headersByNumber[header.Number] = header
+}
+
+func (t *testHeadersMap) getHeader(number uint64) *types.Header {
+	return t.headersByNumber[number]
+}
+
+func (t *testHeadersMap) getHeaders() []*types.Header {
+	headers := make([]*types.Header, 0, len(t.headersByNumber))
+	for _, header := range t.headersByNumber {
+		headers = append(headers, header)
+	}
+
+	return headers
+}
