@@ -82,7 +82,7 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 	parentHeader.ComputeHash()
 	parentCommitted := createSignature(t, accountSetParent, parentHeader.Hash)
 
-	// now create new extra with commited and add it to parent header
+	// now create new extra with committed and add it to parent header
 	parentExtra = &Extra{Validators: parentDelta, Committed: parentCommitted}
 	parentHeader.ExtraData = append(make([]byte, 32), parentExtra.MarshalRLPTo(nil)...)
 
@@ -124,7 +124,7 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 		validatorsCache: newValidatorsSnapshotCache(hclog.NewNullLogger(), newTestState(t), polyBftConfig.EpochSize, blockchainMock),
 	}
 
-	// sice parent signature is intentionally disregarded the follwoing error is expected
+	// sice parent signature is intentionally disregarded the following error is expected
 	assert.ErrorContains(t, polybft.VerifyHeader(currentHeader), "failed to verify signatures for parent of block")
 
 	// create valid extra filed for current header and check the header
@@ -134,16 +134,16 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 	assert.NoError(t, polybft.VerifyHeader(currentHeader))
 
 	// clean validator snapshot cache (reinstantiate it), submit invalid validator set for parnet signature and expect the following error
-	// polybft.validatorsCache = newValidatorsSnapshotCache(hclog.NewNullLogger(), newTestState(t), polyBftConfig.EpochSize, blockchainMock)
-	// assert.NoError(t, polybft.validatorsCache.storeSnapshot(1, validatorSetCurrent)) // invalid valdator set is submitted
-	// assert.NoError(t, polybft.validatorsCache.storeSnapshot(2, validatorSetCurrent))
-	// assert.ErrorContains(t, polybft.VerifyHeader(currentHeader), "failed to verify signatures for parent of block")
+	polybft.validatorsCache = newValidatorsSnapshotCache(hclog.NewNullLogger(), newTestState(t), polyBftConfig.EpochSize, blockchainMock)
+	assert.NoError(t, polybft.validatorsCache.storeSnapshot(0, validatorSetCurrent)) // invalid valdator set is submitted
+	assert.NoError(t, polybft.validatorsCache.storeSnapshot(1, validatorSetCurrent))
+	assert.ErrorContains(t, polybft.VerifyHeader(currentHeader), "failed to verify signatures for parent of block")
 
 	// cleant validators cache again and set valid snapsots
-	// polybft.validatorsCache = newValidatorsSnapshotCache(hclog.NewNullLogger(), newTestState(t), polyBftConfig.EpochSize, blockchainMock)
-	// assert.NoError(t, polybft.validatorsCache.storeSnapshot(1, validatorSetParent))
-	// assert.NoError(t, polybft.validatorsCache.storeSnapshot(2, validatorSetCurrent))
-	// assert.NoError(t, polybft.VerifyHeader(currentHeader))
+	polybft.validatorsCache = newValidatorsSnapshotCache(hclog.NewNullLogger(), newTestState(t), polyBftConfig.EpochSize, blockchainMock)
+	assert.NoError(t, polybft.validatorsCache.storeSnapshot(0, validatorSetParent))
+	assert.NoError(t, polybft.validatorsCache.storeSnapshot(1, validatorSetCurrent))
+	assert.NoError(t, polybft.VerifyHeader(currentHeader))
 
 	// add current header to the blockchain (headersMap) and try validating again
 	headersMap.addHeader(currentHeader)
