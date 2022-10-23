@@ -83,7 +83,21 @@ func (m *blockchainMock) GetHeaderByNumber(number uint64) (*types.Header, bool) 
 }
 
 func (m *blockchainMock) GetHeaderByHash(hash types.Hash) (*types.Header, bool) {
-	return nil, false
+	args := m.Called(hash)
+	header, ok := args.Get(0).(*types.Header)
+
+	if ok {
+		return header, true
+	}
+
+	getHeaderCallback, ok := args.Get(0).(func(hash types.Hash) *types.Header)
+	if ok {
+		h := getHeaderCallback(hash)
+
+		return h, h != nil
+	}
+
+	panic("Unsupported mock for GetHeaderByHash")
 }
 
 func (m *blockchainMock) GetSystemState(config *PolyBFTConfig, provider contract.Provider) SystemState {
@@ -427,6 +441,15 @@ func (t *testHeadersMap) addHeader(header *types.Header) {
 
 func (t *testHeadersMap) getHeader(number uint64) *types.Header {
 	return t.headersByNumber[number]
+}
+
+func (t *testHeadersMap) getHeaderByHash(hash types.Hash) *types.Header {
+	for _, header := range t.headersByNumber {
+		if header.Hash == hash {
+			return header
+		}
+	}
+	return nil
 }
 
 func (t *testHeadersMap) getHeaders() []*types.Header {

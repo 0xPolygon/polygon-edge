@@ -33,10 +33,10 @@ func TestValidatorsSnapshotCache_GetSnapshot_Build(t *testing.T) {
 			oddValidators = append(oddValidators, allValidators[i])
 		}
 	}
-	headersMap.addHeader(createHeader(0, nil, allValidators[:validatorSetSize]))
-	headersMap.addHeader(createHeader(1*epochSize, allValidators[:validatorSetSize], allValidators[validatorSetSize:]))
-	headersMap.addHeader(createHeader(2*epochSize, allValidators[validatorSetSize:], oddValidators))
-	headersMap.addHeader(createHeader(3*epochSize, oddValidators, evenValidators))
+	headersMap.addHeader(createValidatorDeltaHeader(0, nil, allValidators[:validatorSetSize]))
+	headersMap.addHeader(createValidatorDeltaHeader(1*epochSize, allValidators[:validatorSetSize], allValidators[validatorSetSize:]))
+	headersMap.addHeader(createValidatorDeltaHeader(2*epochSize, allValidators[validatorSetSize:], oddValidators))
+	headersMap.addHeader(createValidatorDeltaHeader(3*epochSize, oddValidators, evenValidators))
 
 	var cases = []struct {
 		blockNumber       uint64
@@ -185,8 +185,8 @@ func TestValidatorsSnapshotCache_ComputeSnapshot_UnknownEpochEndingBlock(t *test
 
 	allValidators := newTestValidators(totalValidators).getPublicIdentities()
 	headersMap := &testHeadersMap{}
-	headersMap.addHeader(createHeader(0, nil, allValidators[:validatorSetSize]))
-	headersMap.addHeader(createHeader(1*epochSize, allValidators[:validatorSetSize], allValidators[validatorSetSize:]))
+	headersMap.addHeader(createValidatorDeltaHeader(0, nil, allValidators[:validatorSetSize]))
+	headersMap.addHeader(createValidatorDeltaHeader(1*epochSize, allValidators[:validatorSetSize], allValidators[validatorSetSize:]))
 
 	blockchainMock := new(blockchainMock)
 	blockchainMock.On("GetHeaderByNumber", mock.Anything).Return(headersMap.getHeader)
@@ -212,7 +212,7 @@ func TestValidatorsSnapshotCache_ComputeSnapshot_IncorrectExtra(t *testing.T) {
 
 	allValidators := newTestValidators(totalValidators).getPublicIdentities()
 	headersMap := &testHeadersMap{}
-	invalidHeader := createHeader(1*epochSize, allValidators[:validatorSetSize], allValidators[validatorSetSize:])
+	invalidHeader := createValidatorDeltaHeader(1*epochSize, allValidators[:validatorSetSize], allValidators[validatorSetSize:])
 	invalidHeader.ExtraData = []byte{0x2, 0x7}
 	headersMap.addHeader(invalidHeader)
 
@@ -240,8 +240,8 @@ func TestValidatorsSnapshotCache_ComputeSnapshot_ApplyDeltaFail(t *testing.T) {
 
 	allValidators := newTestValidators(totalValidators).getPublicIdentities()
 	headersMap := &testHeadersMap{}
-	headersMap.addHeader(createHeader(0, nil, allValidators[:validatorSetSize]))
-	headersMap.addHeader(createHeader(1*epochSize, nil, allValidators[:validatorSetSize]))
+	headersMap.addHeader(createValidatorDeltaHeader(0, nil, allValidators[:validatorSetSize]))
+	headersMap.addHeader(createValidatorDeltaHeader(1*epochSize, nil, allValidators[:validatorSetSize]))
 
 	blockchainMock := new(blockchainMock)
 	blockchainMock.On("GetHeaderByNumber", mock.Anything).Return(headersMap.getHeader)
@@ -255,7 +255,7 @@ func TestValidatorsSnapshotCache_ComputeSnapshot_ApplyDeltaFail(t *testing.T) {
 	assertions.ErrorContains(err, "failed to apply delta to the validators snapshot, block#10")
 }
 
-func createHeader(number uint64, oldValidatorSet, newValidatorSet AccountSet) *types.Header {
+func createValidatorDeltaHeader(number uint64, oldValidatorSet, newValidatorSet AccountSet) *types.Header {
 	delta, _ := createValidatorSetDelta(hclog.NewNullLogger(), oldValidatorSet, newValidatorSet)
 	extra := &Extra{Validators: delta}
 

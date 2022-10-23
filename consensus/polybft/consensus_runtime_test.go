@@ -1663,12 +1663,6 @@ func createTestMessageVote(t *testing.T, hash []byte, validator *testValidator) 
 	}
 }
 
-func createTestKey(t *testing.T) *wallet.Key {
-	t.Helper()
-
-	return wallet.NewKey(wallet.GenerateAccount())
-}
-
 func createTestBlocksForUptime(t *testing.T, numberOfBlocks uint64,
 	validatorSet AccountSet) (*types.Header, *testHeadersMap) {
 	t.Helper()

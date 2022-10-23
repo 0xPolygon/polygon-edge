@@ -13,6 +13,12 @@ import (
 	"github.com/umbracle/ethgo"
 )
 
+func createTestKey(t *testing.T) *wallet.Key {
+	t.Helper()
+
+	return wallet.NewKey(wallet.GenerateAccount())
+}
+
 func createSignature(t *testing.T, accounts []*wallet.Account, hash types.Hash) *Signature {
 	t.Helper()
 
