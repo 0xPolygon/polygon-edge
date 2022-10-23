@@ -11,16 +11,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestPolybft_VerifyHeader_Good(t *testing.T) {
+func TestPolybft_VerifyHeader(t *testing.T) {
 	t.Parallel()
 
 	const (
-		allValidatorsSize = 6 // all together there are 6 validators
+		allValidatorsSize = 6 // overall there are 6 validators
 		validatorSetSize  = 5 // only 5 validators are active at the time
 	)
 
 	// create all valdators
 	validators := newTestValidators(allValidatorsSize)
+
+	// create configuration
 	polyBftConfig := PolyBFTConfig{
 		InitialValidatorSet: validators.getParamValidators(),
 		EpochSize:           10,
@@ -32,10 +34,8 @@ func TestPolybft_VerifyHeader_Good(t *testing.T) {
 	accounts := validators.getPrivateIdentities()
 
 	// calculate validators before and after the end of the first epoch
-	validatorSetParent := validatorSet[:len(validatorSet)-1]
-	validatorSetCurrent := validatorSet[1:]
-	accountSetParent := accounts[:len(accounts)-1]
-	accountSetCurrent := accounts[1:]
+	validatorSetParent, validatorSetCurrent := validatorSet[:len(validatorSet)-1], validatorSet[1:]
+	accountSetParent, accountSetCurrent := accounts[:len(accounts)-1], accounts[1:]
 
 	// create header map to simulate blockchain
 	headersMap := &testHeadersMap{}
@@ -43,6 +43,7 @@ func TestPolybft_VerifyHeader_Good(t *testing.T) {
 	// create genesis header
 	genesisDelta, err := createValidatorSetDelta(hclog.NewNullLogger(), nil, validatorSetParent)
 	require.NoError(t, err)
+
 	genesisExtra := &Extra{Validators: genesisDelta}
 	genesisHeader := &types.Header{
 		Number:    0,
@@ -103,8 +104,10 @@ func TestPolybft_VerifyHeader_Good(t *testing.T) {
 	}
 	currentHeader.ComputeHash()
 
+	//
 	currentCommitted := createSignature(t, accountSetCurrent, currentHeader.Hash)
-	currentExtra = &Extra{Validators: currentDelta, Committed: currentCommitted, Parent: parentCommitted}
+	// forget Parent field (parent signature) intentionally
+	currentExtra = &Extra{Validators: currentDelta, Committed: currentCommitted}
 	currentHeader.ExtraData = append(make([]byte, 32), currentExtra.MarshalRLPTo(nil)...)
 
 	// mock blockchain
@@ -121,16 +124,28 @@ func TestPolybft_VerifyHeader_Good(t *testing.T) {
 		validatorsCache: newValidatorsSnapshotCache(hclog.NewNullLogger(), newTestState(t), polyBftConfig.EpochSize, blockchainMock),
 	}
 
-	// check if current header is not added into the block chain
+	// sice parent signature is intentionally disregarded the follwoing error is expected
+	assert.ErrorContains(t, polybft.VerifyHeader(currentHeader), "failed to verify signatures for parent of block")
+
+	// create valid extra filed for current header and check the header
+	// this is the situation before a block (a valid header) is added to the blockchain
+	currentExtra = &Extra{Validators: currentDelta, Committed: currentCommitted, Parent: parentCommitted}
+	currentHeader.ExtraData = append(make([]byte, 32), currentExtra.MarshalRLPTo(nil)...)
 	assert.NoError(t, polybft.VerifyHeader(currentHeader))
 
-	// add current header  to block chain and try validating again
-	headersMap.addHeader(currentHeader)
-	assert.NoError(t, polybft.VerifyHeader(currentHeader))
+	// clean validator snapshot cache (reinstantiate it), submit invalid validator set for parnet signature and expect the following error
+	// polybft.validatorsCache = newValidatorsSnapshotCache(hclog.NewNullLogger(), newTestState(t), polyBftConfig.EpochSize, blockchainMock)
+	// assert.NoError(t, polybft.validatorsCache.storeSnapshot(1, validatorSetCurrent)) // invalid valdator set is submitted
+	// assert.NoError(t, polybft.validatorsCache.storeSnapshot(2, validatorSetCurrent))
+	// assert.ErrorContains(t, polybft.VerifyHeader(currentHeader), "failed to verify signatures for parent of block")
 
-	// cleant validators cache and set them manualy, afterwards try header verification again
-	// polybft.validatorsCache.cleanup()
+	// cleant validators cache again and set valid snapsots
+	// polybft.validatorsCache = newValidatorsSnapshotCache(hclog.NewNullLogger(), newTestState(t), polyBftConfig.EpochSize, blockchainMock)
 	// assert.NoError(t, polybft.validatorsCache.storeSnapshot(1, validatorSetParent))
 	// assert.NoError(t, polybft.validatorsCache.storeSnapshot(2, validatorSetCurrent))
 	// assert.NoError(t, polybft.VerifyHeader(currentHeader))
+
+	// add current header to the blockchain (headersMap) and try validating again
+	headersMap.addHeader(currentHeader)
+	assert.NoError(t, polybft.VerifyHeader(currentHeader))
 }
