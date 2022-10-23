@@ -22,6 +22,9 @@ jobs:
           submodules: recursive
           token: ${{ secrets.GH_TOKEN_CLONE_PRIVATE }}
 
+      - name: Install Dependencies
+        run: ./setup-ci.sh
+
       - name: Run Go Test
         run: go test -coverprofile coverage.out -timeout 20m `go list ./... | grep -v e2e`
 
