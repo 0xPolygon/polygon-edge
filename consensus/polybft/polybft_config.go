@@ -1,6 +1,7 @@
 package polybft
 
 import (
+	"encoding/json"
 	"math/big"
 	"time"
 
@@ -28,12 +29,6 @@ type PolyBFTConfig struct {
 	Governance types.Address `json:"governance"`
 }
 
-type SmartContract struct {
-	Address types.Address `json:"address"`
-	Code    []byte        `json:"code"`
-	Name    string        `json:"name"`
-}
-
 // BridgeConfig is the configuration for the bridge
 type BridgeConfig struct {
 	BridgeAddr      types.Address `json:"bridgeAddr"`
@@ -46,9 +41,42 @@ func (p *PolyBFTConfig) IsBridgeEnabled() bool {
 }
 
 type Validator struct {
-	Address types.Address
-	BlsKey  string
-	Balance *big.Int `json:"balance"`
+	Address types.Address `json:"address"`
+	BlsKey  string        `json:"blsKey"`
+	Balance *big.Int      `json:"balance"`
+}
+
+type validatorRaw struct {
+	Address types.Address `json:"address"`
+	BlsKey  string        `json:"blsKey"`
+	Balance *string       `json:"balance"`
+}
+
+func (v *Validator) MarshalJSON() ([]byte, error) {
+	raw := &validatorRaw{Address: v.Address, BlsKey: v.BlsKey}
+	raw.Balance = types.EncodeBigInt(v.Balance)
+
+	return json.Marshal(raw)
+}
+
+func (v *Validator) UnmarshalJSON(data []byte) error {
+	var raw validatorRaw
+
+	var err error
+
+	if err = json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	v.Address = raw.Address
+	v.BlsKey = raw.BlsKey
+	v.Balance, err = types.ParseUint256orHex(raw.Balance)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // DebugConfig is a struct used for test configuration in init genesis

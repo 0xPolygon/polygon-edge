@@ -53,7 +53,6 @@ func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
 	// use 1st account as governance address
 	governanceAccount := validatorsInfo[0].Account
 	polyBftConfig := &polybft.PolyBFTConfig{
-
 		BlockTime:         p.blockTime,
 		EpochSize:         p.epochSize,
 		SprintSize:        p.sprintSize,
