@@ -52,8 +52,7 @@ type Blockchain struct {
 	config  *chain.Chain // Config containing chain information
 	genesis types.Hash   // The hash of the genesis block
 
-	headersCache    *lru.Cache // LRU cache for the headers
-	difficultyCache *lru.Cache // LRU cache for the difficulty
+	headersCache *lru.Cache // LRU cache for the headers
 
 	// We need to keep track of block receipts between the verification phase
 	// and the insertion phase of a new block coming in. To avoid having to
@@ -66,8 +65,7 @@ type Blockchain struct {
 	// any new fields from being added
 	receiptsCache *lru.Cache // LRU cache for the block receipts
 
-	currentHeader     atomic.Value // The current header
-	currentDifficulty atomic.Value // The current difficulty of the chain (total difficulty)
+	currentHeader atomic.Value // The current header
 
 	stream *eventStream // Event subscriptions
 
@@ -245,11 +243,6 @@ func (b *Blockchain) initCaches(size int) error {
 		return fmt.Errorf("unable to create headers cache, %w", err)
 	}
 
-	b.difficultyCache, err = lru.New(size)
-	if err != nil {
-		return fmt.Errorf("unable to create difficulty cache, %w", err)
-	}
-
 	b.receiptsCache, err = lru.New(size)
 	if err != nil {
 		return fmt.Errorf("unable to create receipts cache, %w", err)
@@ -280,11 +273,6 @@ func (b *Blockchain) ComputeGenesis() error {
 			return fmt.Errorf("failed to get header with hash %s", head.String())
 		}
 
-		diff, ok := b.GetTD(head)
-		if !ok {
-			return fmt.Errorf("failed to read difficulty")
-		}
-
 		b.logger.Info(
 			"Current header",
 			"hash",
@@ -293,7 +281,7 @@ func (b *Blockchain) ComputeGenesis() error {
 			header.Number,
 		)
 
-		b.setCurrentHeader(header, diff)
+		b.setCurrentHeader(header)
 	} else {
 		// empty storage, write the genesis
 		if err := b.writeGenesis(b.config.Genesis); err != nil {
@@ -316,14 +304,10 @@ func (b *Blockchain) SetConsensus(c Verifier) {
 }
 
 // setCurrentHeader sets the current header
-func (b *Blockchain) setCurrentHeader(h *types.Header, diff *big.Int) {
+func (b *Blockchain) setCurrentHeader(h *types.Header) {
 	// Update the header (atomic)
 	header := h.Copy()
 	b.currentHeader.Store(header)
-
-	// Update the difficulty (atomic)
-	difficulty := new(big.Int).Set(diff)
-	b.currentDifficulty.Store(difficulty)
 }
 
 // Header returns the current header (atomic)
@@ -334,16 +318,6 @@ func (b *Blockchain) Header() *types.Header {
 	}
 
 	return header
-}
-
-// CurrentTD returns the current total difficulty (atomic)
-func (b *Blockchain) CurrentTD() *big.Int {
-	td, ok := b.currentDifficulty.Load().(*big.Int)
-	if !ok {
-		return nil
-	}
-
-	return td
 }
 
 // Config returns the blockchain configuration
@@ -435,7 +409,7 @@ func (b *Blockchain) writeGenesisImpl(header *types.Header) error {
 	}
 
 	// Advance the head
-	if _, err := b.advanceHead(header); err != nil {
+	if err := b.db.WriteCanonicalHeader(header); err != nil {
 		return err
 	}
 
@@ -454,78 +428,18 @@ func (b *Blockchain) Empty() bool {
 	return !ok
 }
 
-// GetChainTD returns the latest difficulty
-func (b *Blockchain) GetChainTD() (*big.Int, bool) {
-	header := b.Header()
-
-	return b.GetTD(header.Hash)
-}
-
-// GetTD returns the difficulty for the header hash
-func (b *Blockchain) GetTD(hash types.Hash) (*big.Int, bool) {
-	return b.readTotalDifficulty(hash)
-}
-
 // writeCanonicalHeader writes the new header
 func (b *Blockchain) writeCanonicalHeader(event *Event, h *types.Header) error {
-	parentTD, ok := b.readTotalDifficulty(h.ParentHash)
-	if !ok {
-		return fmt.Errorf("parent difficulty not found")
-	}
-
-	newTD := big.NewInt(0).Add(parentTD, new(big.Int).SetUint64(h.Difficulty))
-	if err := b.db.WriteCanonicalHeader(h, newTD); err != nil {
+	if err := b.db.WriteCanonicalHeader(h); err != nil {
 		return err
 	}
 
 	event.Type = EventHead
 	event.AddNewHeader(h)
-	event.SetDifficulty(newTD)
 
-	b.setCurrentHeader(h, newTD)
+	b.setCurrentHeader(h)
 
 	return nil
-}
-
-// advanceHead Sets the passed in header as the new head of the chain
-func (b *Blockchain) advanceHead(newHeader *types.Header) (*big.Int, error) {
-	// Write the current head hash into storage
-	if err := b.db.WriteHeadHash(newHeader.Hash); err != nil {
-		return nil, err
-	}
-
-	// Write the current head number into storage
-	if err := b.db.WriteHeadNumber(newHeader.Number); err != nil {
-		return nil, err
-	}
-
-	// Matches the current head number with the current hash
-	if err := b.db.WriteCanonicalHash(newHeader.Number, newHeader.Hash); err != nil {
-		return nil, err
-	}
-
-	// Check if there was a parent difficulty
-	parentTD := big.NewInt(0)
-
-	if newHeader.ParentHash != types.StringToHash("") {
-		td, ok := b.readTotalDifficulty(newHeader.ParentHash)
-		if !ok {
-			return nil, fmt.Errorf("parent difficulty not found")
-		}
-
-		parentTD = td
-	}
-
-	// Calculate the new total difficulty
-	newTD := big.NewInt(0).Add(parentTD, big.NewInt(0).SetUint64(newHeader.Difficulty))
-	if err := b.db.WriteTotalDifficulty(newHeader.Hash, newTD); err != nil {
-		return nil, err
-	}
-
-	// Update the blockchain reference
-	b.setCurrentHeader(newHeader, newTD)
-
-	return newTD, nil
 }
 
 // GetReceiptsByHash returns the receipts by their hash
@@ -587,32 +501,6 @@ func (b *Blockchain) readBody(hash types.Hash) (*types.Body, bool) {
 	}
 
 	return bb, true
-}
-
-// readTotalDifficulty reads the total difficulty associated with the hash
-func (b *Blockchain) readTotalDifficulty(headerHash types.Hash) (*big.Int, bool) {
-	// Try to find the difficulty in the cache
-	foundDifficulty, ok := b.difficultyCache.Get(headerHash)
-	if ok {
-		// Hit, return the difficulty
-		fd, ok := foundDifficulty.(*big.Int)
-		if !ok {
-			return nil, false
-		}
-
-		return fd, true
-	}
-
-	// Miss, read the difficulty from the DB
-	dbDifficulty, ok := b.db.ReadTotalDifficulty(headerHash)
-	if !ok {
-		return nil, false
-	}
-
-	// Update the difficulty cache
-	b.difficultyCache.Add(headerHash, dbDifficulty)
-
-	return dbDifficulty, true
 }
 
 // GetHeaderByNumber returns the header using the block number
@@ -1137,173 +1025,10 @@ func (b *Blockchain) writeHeaderImpl(evnt *Event, header *types.Header) error {
 	// Write the data
 	if header.ParentHash == currentHeader.Hash {
 		// Fast path to save the new canonical header
-		return b.writeCanonicalHeader(evnt, header)
+		return fmt.Errorf("not sequential")
 	}
 
-	if err := b.db.WriteHeader(header); err != nil {
-		return err
-	}
-
-	currentTD, ok := b.readTotalDifficulty(currentHeader.Hash)
-	if !ok {
-		panic("failed to get header difficulty")
-	}
-
-	// parent total difficulty of incoming header
-	parentTD, ok := b.readTotalDifficulty(header.ParentHash)
-	if !ok {
-		return fmt.Errorf(
-			"parent of %s (%d) not found",
-			header.Hash.String(),
-			header.Number,
-		)
-	}
-
-	// Write the difficulty
-	if err := b.db.WriteTotalDifficulty(
-		header.Hash,
-		big.NewInt(0).Add(
-			parentTD,
-			big.NewInt(0).SetUint64(header.Difficulty),
-		),
-	); err != nil {
-		return err
-	}
-
-	// Update the headers cache
-	b.headersCache.Add(header.Hash, header)
-
-	incomingTD := big.NewInt(0).Add(parentTD, big.NewInt(0).SetUint64(header.Difficulty))
-	if incomingTD.Cmp(currentTD) > 0 {
-		// new block has higher difficulty, reorg the chain
-		if err := b.handleReorg(evnt, currentHeader, header); err != nil {
-			return err
-		}
-	} else {
-		// new block has lower difficulty, create a new fork
-		evnt.AddOldHeader(header)
-		evnt.Type = EventFork
-
-		if err := b.writeFork(header); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// writeFork writes the new header forks to the DB
-func (b *Blockchain) writeFork(header *types.Header) error {
-	forks, err := b.db.ReadForks()
-	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			forks = []types.Hash{}
-		} else {
-			return err
-		}
-	}
-
-	newForks := []types.Hash{}
-
-	for _, fork := range forks {
-		if fork != header.ParentHash {
-			newForks = append(newForks, fork)
-		}
-	}
-
-	newForks = append(newForks, header.Hash)
-	if err := b.db.WriteForks(newForks); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// handleReorg handles a reorganization event
-func (b *Blockchain) handleReorg(
-	evnt *Event,
-	oldHeader *types.Header,
-	newHeader *types.Header,
-) error {
-	newChainHead := newHeader
-	oldChainHead := oldHeader
-
-	oldChain := []*types.Header{}
-	newChain := []*types.Header{}
-
-	var ok bool
-
-	// Fill up the old headers array
-	for oldHeader.Number > newHeader.Number {
-		oldHeader, ok = b.readHeader(oldHeader.ParentHash)
-		if !ok {
-			return fmt.Errorf("header '%s' not found", oldHeader.ParentHash.String())
-		}
-
-		oldChain = append(oldChain, oldHeader)
-	}
-
-	// Fill up the new headers array
-	for newHeader.Number > oldHeader.Number {
-		newHeader, ok = b.readHeader(newHeader.ParentHash)
-		if !ok {
-			return fmt.Errorf("header '%s' not found", newHeader.ParentHash.String())
-		}
-
-		newChain = append(newChain, newHeader)
-	}
-
-	for oldHeader.Hash != newHeader.Hash {
-		oldHeader, ok = b.readHeader(oldHeader.ParentHash)
-		if !ok {
-			return fmt.Errorf("header '%s' not found", oldHeader.ParentHash.String())
-		}
-
-		newHeader, ok = b.readHeader(newHeader.ParentHash)
-		if !ok {
-			return fmt.Errorf("header '%s' not found", newHeader.ParentHash.String())
-		}
-
-		oldChain = append(oldChain, oldHeader)
-	}
-
-	for _, b := range oldChain[:len(oldChain)-1] {
-		evnt.AddOldHeader(b)
-	}
-
-	evnt.AddOldHeader(oldChainHead)
-	evnt.AddNewHeader(newChainHead)
-
-	for _, b := range newChain {
-		evnt.AddNewHeader(b)
-	}
-
-	if err := b.writeFork(oldChainHead); err != nil {
-		return fmt.Errorf("failed to write the old header as fork: %w", err)
-	}
-
-	// Update canonical chain numbers
-	for _, h := range newChain {
-		if err := b.db.WriteCanonicalHash(h.Number, h.Hash); err != nil {
-			return err
-		}
-	}
-
-	diff, err := b.advanceHead(newChainHead)
-	if err != nil {
-		return err
-	}
-
-	// Set the event type and difficulty
-	evnt.Type = EventReorg
-	evnt.SetDifficulty(diff)
-
-	return nil
-}
-
-// GetForks returns the forks
-func (b *Blockchain) GetForks() ([]types.Hash, error) {
-	return b.db.ReadForks()
+	return b.writeCanonicalHeader(evnt, header)
 }
 
 // GetBlockByHash returns the block using the block hash

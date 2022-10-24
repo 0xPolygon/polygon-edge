@@ -1,8 +1,6 @@
 package storage
 
 import (
-	"math/big"
-
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 )
@@ -17,16 +15,10 @@ type Storage interface {
 	WriteHeadHash(h types.Hash) error
 	WriteHeadNumber(uint64) error
 
-	WriteForks(forks []types.Hash) error
-	ReadForks() ([]types.Hash, error)
-
-	WriteTotalDifficulty(hash types.Hash, diff *big.Int) error
-	ReadTotalDifficulty(hash types.Hash) (*big.Int, bool)
-
 	WriteHeader(h *types.Header) error
 	ReadHeader(hash types.Hash) (*types.Header, error)
 
-	WriteCanonicalHeader(h *types.Header, diff *big.Int) error
+	WriteCanonicalHeader(h *types.Header) error
 
 	WriteBody(hash types.Hash, body *types.Body) error
 	ReadBody(hash types.Hash) (*types.Body, error)
