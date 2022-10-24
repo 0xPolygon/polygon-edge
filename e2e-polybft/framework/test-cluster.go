@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/command/genesis"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/require"
 )
@@ -62,6 +63,7 @@ type TestClusterConfig struct {
 	Name              string
 	Premine           []types.Address
 	HasBridge         bool
+	BootnodeCount     int
 	NonValidatorCount int
 	WithLogs          bool
 	WithStdout        bool
@@ -127,7 +129,6 @@ func (c *TestClusterConfig) initLogsDir() {
 type TestCluster struct {
 	Config      *TestClusterConfig
 	Servers     []*TestServer
-	Bootnode    *TestBootnode
 	Bridge      *TestBridge
 	initialPort int64
 
@@ -159,6 +160,12 @@ func WithNonValidators(num int) ClusterOption {
 func WithValidatorSnapshot(validatorsLen uint64) ClusterOption {
 	return func(h *TestClusterConfig) {
 		h.ValidatorSetSize = validatorsLen
+	}
+}
+
+func WithBootnodeCount(cnt int) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.BootnodeCount = cnt
 	}
 }
 
@@ -244,6 +251,22 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 
 		if cluster.Config.HasBridge {
 			args = append(args, "--bridge")
+		}
+
+		if cluster.Config.BootnodeCount > 0 {
+			validators, err := genesis.ReadValidatorsByRegexp(cluster.Config.TmpDir, cluster.Config.ValidatorPrefix)
+			require.NoError(t, err)
+
+			cnt := cluster.Config.BootnodeCount
+			if len(validators) < cnt {
+				cnt = len(validators)
+			}
+
+			for i := 0; i < cnt; i++ {
+				maddr := fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s",
+					"127.0.0.1", cluster.initialPort+int64(i+1), validators[i].NodeID)
+				args = append(args, "--bootnode", maddr)
+			}
 		}
 
 		if cluster.Config.ValidatorSetSize > 0 {
@@ -344,10 +367,6 @@ func (c *TestCluster) Fail(err error) {
 func (c *TestCluster) Stop() {
 	if c.Bridge != nil {
 		c.Bridge.Stop()
-	}
-
-	if c.Bootnode != nil {
-		c.Bootnode.Stop()
 	}
 
 	for _, srv := range c.Servers {
