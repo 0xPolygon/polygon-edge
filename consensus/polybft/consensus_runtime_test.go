@@ -57,6 +57,7 @@ func TestConsensusRuntime_GetVotes(t *testing.T) {
 	for i := 0; i < int(votesCount); i++ {
 		validator := validatorAccounts.getValidator(validatorIds[i])
 		signature, err := validator.mustSign(hash.Bytes()).Marshal()
+		require.NoError(t, err)
 
 		_, err = state.insertMessageVote(epoch, hash.Bytes(),
 			&MessageSignature{

@@ -12,6 +12,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// the test initializes polybft and chain mock (map of headers) after wihch a new header is verified
+// firstly, two invalid situation of header verifications are triggered (missing Committed field and invalid validators for ParentCommitted)
+// afterwards, valid inclusion into the block chain is checked
+// and at the end there is a situation when header is already a part of blockchain
 func TestPolybft_VerifyHeader(t *testing.T) {
 	t.Parallel()
 
@@ -67,7 +71,7 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 		}
 		header.ComputeHash()
 
-		// add header from 1 to 9 to map
+		// add headers from 1 to 9 to map (blockchain imitation)
 		headersMap.addHeader(header)
 	}
 
@@ -98,7 +102,6 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 	currentExtra := &Extra{Validators: currentDelta, Parent: parentCommitted}
 	currentHeader := &types.Header{
 		Number:     polyBftConfig.EpochSize + 1,
-		ExtraData:  append(make([]byte, signer.IstanbulExtraVanity), currentExtra.MarshalRLPTo(nil)...),
 		ParentHash: parentHeader.Hash,
 		Timestamp:  parentHeader.Timestamp + 1,
 		MixHash:    PolyMixDigest,
@@ -140,7 +143,7 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 	assert.NoError(t, polybft.validatorsCache.storeSnapshot(1, validatorSetCurrent))
 	assert.ErrorContains(t, polybft.VerifyHeader(currentHeader), "failed to verify signatures for parent of block")
 
-	// clean validators cache again and set valid snapsots
+	// clean validators cache again and set valid snapshots
 	polybft.validatorsCache = newValidatorsSnapshotCache(hclog.NewNullLogger(), newTestState(t), polyBftConfig.EpochSize, blockchainMock)
 	assert.NoError(t, polybft.validatorsCache.storeSnapshot(0, validatorSetParent))
 	assert.NoError(t, polybft.validatorsCache.storeSnapshot(1, validatorSetCurrent))
