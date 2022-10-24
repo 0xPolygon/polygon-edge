@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
@@ -47,7 +48,7 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 	genesisExtra := &Extra{Validators: genesisDelta}
 	genesisHeader := &types.Header{
 		Number:    0,
-		ExtraData: append(make([]byte, 32), genesisExtra.MarshalRLPTo(nil)...),
+		ExtraData: append(make([]byte, signer.IstanbulExtraVanity), genesisExtra.MarshalRLPTo(nil)...),
 	}
 	genesisHeader.ComputeHash()
 
@@ -62,7 +63,7 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 		extra := &Extra{Validators: delta}
 		header := &types.Header{
 			Number:    uint64(i),
-			ExtraData: append(make([]byte, 32), extra.MarshalRLPTo(nil)...),
+			ExtraData: append(make([]byte, signer.IstanbulExtraVanity), extra.MarshalRLPTo(nil)...),
 		}
 		header.ComputeHash()
 
@@ -77,15 +78,15 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 	parentExtra := &Extra{Validators: parentDelta}
 	parentHeader := &types.Header{
 		Number:    polyBftConfig.EpochSize,
-		ExtraData: append(make([]byte, 32), parentExtra.MarshalRLPTo(nil)...),
+		ExtraData: append(make([]byte, signer.IstanbulExtraVanity), parentExtra.MarshalRLPTo(nil)...),
 		Timestamp: uint64(time.Now().UTC().UnixMilli()),
 	}
-	parentHeader.ComputeHash()
+	_ = parentHeader.ComputeHash()
 	parentCommitted := createSignature(t, accountSetParent, parentHeader.Hash)
 
 	// now create new extra with committed and add it to parent header
 	parentExtra = &Extra{Validators: parentDelta, Committed: parentCommitted}
-	parentHeader.ExtraData = append(make([]byte, 32), parentExtra.MarshalRLPTo(nil)...)
+	parentHeader.ExtraData = append(make([]byte, signer.IstanbulExtraVanity), parentExtra.MarshalRLPTo(nil)...)
 
 	// add parent header  to map
 	headersMap.addHeader(parentHeader)
@@ -97,19 +98,18 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 	currentExtra := &Extra{Validators: currentDelta, Parent: parentCommitted}
 	currentHeader := &types.Header{
 		Number:     polyBftConfig.EpochSize + 1,
-		ExtraData:  append(make([]byte, 32), currentExtra.MarshalRLPTo(nil)...),
+		ExtraData:  append(make([]byte, signer.IstanbulExtraVanity), currentExtra.MarshalRLPTo(nil)...),
 		ParentHash: parentHeader.Hash,
 		Timestamp:  parentHeader.Timestamp + 1,
 		MixHash:    PolyMixDigest,
 		Difficulty: 1,
 	}
-	currentHeader.ComputeHash()
+	_ = currentHeader.ComputeHash()
 
-	//
 	currentCommitted := createSignature(t, accountSetCurrent, currentHeader.Hash)
 	// forget Parent field (parent signature) intentionally
 	currentExtra = &Extra{Validators: currentDelta, Committed: currentCommitted}
-	currentHeader.ExtraData = append(make([]byte, 32), currentExtra.MarshalRLPTo(nil)...)
+	currentHeader.ExtraData = append(make([]byte, signer.IstanbulExtraVanity), currentExtra.MarshalRLPTo(nil)...)
 
 	// mock blockchain
 	blockchainMock := new(blockchainMock)
@@ -131,7 +131,7 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 	// create valid extra filed for current header and check the header
 	// this is the situation before a block (a valid header) is added to the blockchain
 	currentExtra = &Extra{Validators: currentDelta, Committed: currentCommitted, Parent: parentCommitted}
-	currentHeader.ExtraData = append(make([]byte, 32), currentExtra.MarshalRLPTo(nil)...)
+	currentHeader.ExtraData = append(make([]byte, signer.IstanbulExtraVanity), currentExtra.MarshalRLPTo(nil)...)
 	assert.NoError(t, polybft.VerifyHeader(currentHeader))
 
 	// clean validator snapshot cache (reinstantiate it), submit invalid validator set for parnet signature and expect the following error
@@ -140,7 +140,7 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 	assert.NoError(t, polybft.validatorsCache.storeSnapshot(1, validatorSetCurrent))
 	assert.ErrorContains(t, polybft.VerifyHeader(currentHeader), "failed to verify signatures for parent of block")
 
-	// cleant validators cache again and set valid snapsots
+	// clean validators cache again and set valid snapsots
 	polybft.validatorsCache = newValidatorsSnapshotCache(hclog.NewNullLogger(), newTestState(t), polyBftConfig.EpochSize, blockchainMock)
 	assert.NoError(t, polybft.validatorsCache.storeSnapshot(0, validatorSetParent))
 	assert.NoError(t, polybft.validatorsCache.storeSnapshot(1, validatorSetCurrent))
