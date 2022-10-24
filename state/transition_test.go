@@ -10,12 +10,12 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func newTestTransition(preState map[types.Address]*PreState) *Transition1 {
+func newTestTransition(preState map[types.Address]*PreState) *StateTransition {
 	if preState == nil {
 		preState = defaultPreState
 	}
 
-	return &Transition1{
+	return &StateTransition{
 		logger: hclog.NewNullLogger(),
 		state:  newTestTxn(preState),
 	}

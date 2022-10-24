@@ -33,7 +33,7 @@ type Executor struct {
 	state    State
 	GetHash  GetHashByNumberHelper
 
-	PostHook func(txn *Transition1) // TODO
+	PostHook func(txn *StateTransition) // TODO
 }
 
 // NewExecutor creates a new executor
@@ -153,7 +153,7 @@ func (e *Executor) BeginTxn(
 		ChainID:    int64(e.config.ChainID),
 	}
 
-	txn := &Transition1{
+	txn := &StateTransition{
 		logger:  e.logger,
 		r:       e,
 		ctx:     env2,
@@ -166,13 +166,13 @@ func (e *Executor) BeginTxn(
 		totalGas: 0,
 	}
 
-	tt := &Transition{Transition1: txn, state: e.state, snap: auxSnap2}
+	tt := &Transition{StateTransition: txn, state: e.state, snap: auxSnap2}
 
 	return tt, nil
 }
 
 type Transition struct {
-	*Transition1
+	*StateTransition
 
 	state State
 	snap  Snapshot
@@ -180,7 +180,7 @@ type Transition struct {
 
 // Commit commits the final result
 func (t *Transition) Commit() (Snapshot, types.Hash) {
-	objs := t.Transition1.Commit1()
+	objs := t.StateTransition.Commit1()
 	s2, root := t.snap.Commit(objs)
 
 	return s2, types.BytesToHash(root)

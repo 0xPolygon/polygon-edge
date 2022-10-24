@@ -54,7 +54,7 @@ func RunSpecificTest(t *testing.T, file string, c stateCase, name, fork string, 
 	xxx.SetRuntime(precompiled.NewPrecompiled())
 	xxx.SetRuntime(evm.NewEVM())
 
-	xxx.PostHook = func(t *state.Transition1) {
+	xxx.PostHook = func(t *state.StateTransition) {
 		if name == "failed_tx_xcf416c53" {
 			// create the account
 			t.Txn().TouchAccount(ripemd)
