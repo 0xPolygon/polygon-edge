@@ -166,7 +166,7 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 	stateBlock, err := f.blockBuilder.Build(func(h *types.Header) {
 		h.Timestamp = uint64(headerTime.Unix())
 		h.ExtraData = append(make([]byte, signer.IstanbulExtraVanity), extra.MarshalRLPTo(nil)...)
-		h.MixHash = PolyMixDigest
+		h.MixHash = PolyBFTMixDigest
 	})
 
 	if err != nil {
@@ -564,7 +564,7 @@ func validateHeaderFields(parent *types.Header, header *types.Header) error {
 		return fmt.Errorf("timestamp older than parent")
 	}
 	// verify mix digest
-	if header.MixHash != PolyMixDigest {
+	if header.MixHash != PolyBFTMixDigest {
 		return fmt.Errorf("mix digest is not correct")
 	}
 	// difficulty must be > 0

@@ -83,6 +83,21 @@ func TestExtra_Encoding(t *testing.T) {
 				Committed: &Signature{AggregatedSignature: committedStr, Bitmap: bitmapStr},
 			},
 		},
+		{
+			&Extra{
+				Parent:    &Signature{AggregatedSignature: parentStr, Bitmap: bitmapStr},
+				Committed: &Signature{AggregatedSignature: committedStr, Bitmap: bitmapStr},
+				Checkpoint: &CheckpointData{
+					BlockNumber:           25,
+					BlockHash:             types.BytesToHash(generateRandomBytes(t)),
+					BlockRound:            0,
+					EpochNumber:           3,
+					CurrentValidatorsHash: types.BytesToHash(generateRandomBytes(t)),
+					NextValidatorsHash:    types.BytesToHash(generateRandomBytes(t)),
+					EventRoot:             types.BytesToHash(generateRandomBytes(t)),
+				},
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -109,7 +124,7 @@ func TestExtra_UnmarshalRLPWith_NegativeCases(t *testing.T) {
 
 		extra := &Extra{}
 		ar := &fastrlp.Arena{}
-		require.ErrorContains(t, extra.UnmarshalRLPWith(ar.NewArray()), "not enough elements to decode extra, expected 4 but found 0")
+		require.ErrorContains(t, extra.UnmarshalRLPWith(ar.NewArray()), "incorrect elements count to decode Extra, expected 5 but found 0")
 	})
 
 	t.Run("Incorrect ValidatorSetDelta marshalled", func(t *testing.T) {
@@ -177,6 +192,33 @@ func TestExtra_UnmarshalRLPWith_NegativeCases(t *testing.T) {
 		committedArr := ar.NewArray()
 		committedArr.Set(ar.NewBytes([]byte{}))
 		extraMarshalled.Set(committedArr)
+		require.Error(t, extra.UnmarshalRLPWith(extraMarshalled))
+	})
+
+	t.Run("Incorrect Checkpoint data marshalled", func(t *testing.T) {
+		t.Parallel()
+
+		ar := &fastrlp.Arena{}
+		extraMarshalled := ar.NewArray()
+		deltaMarshalled := new(ValidatorSetDelta).MarshalRLPWith(ar)
+		extraMarshalled.Set(deltaMarshalled)       // ValidatorSetDelta
+		extraMarshalled.Set(ar.NewBytes([]byte{})) // Seal
+
+		// Parent
+		key := wallet.GenerateAccount()
+		parentSignature := createSignature(t, []*wallet.Account{key}, types.BytesToHash(generateRandomBytes(t)))
+		extraMarshalled.Set(parentSignature.MarshalRLPWith(ar))
+
+		// Committed
+		committedSignature := createSignature(t, []*wallet.Account{key}, types.BytesToHash(generateRandomBytes(t)))
+		extraMarshalled.Set(committedSignature.MarshalRLPWith(ar))
+
+		// Checkpoint data
+		checkpointDataArr := ar.NewArray()
+		checkpointDataArr.Set(ar.NewBytes(generateRandomBytes(t)))
+		extraMarshalled.Set(checkpointDataArr)
+
+		extra := &Extra{}
 		require.Error(t, extra.UnmarshalRLPWith(extraMarshalled))
 	})
 }
@@ -541,4 +583,26 @@ func Test_GetIbftExtraClean_Fail(t *testing.T) {
 	extra, err := GetIbftExtraClean(append(randomBytes[:], []byte{0x12, 0x6}...))
 	require.Error(t, err)
 	require.Nil(t, extra)
+}
+
+func TestCheckpointData_Hash(t *testing.T) {
+	origCheckpoint := &CheckpointData{
+		BlockNumber:           25,
+		BlockHash:             types.BytesToHash(generateRandomBytes(t)),
+		BlockRound:            0,
+		EpochNumber:           3,
+		CurrentValidatorsHash: types.BytesToHash(generateRandomBytes(t)),
+		NextValidatorsHash:    types.BytesToHash(generateRandomBytes(t)),
+		EventRoot:             types.BytesToHash(generateRandomBytes(t)),
+	}
+	copyCheckpoint := &CheckpointData{}
+	*copyCheckpoint = *origCheckpoint
+
+	origHash, err := origCheckpoint.Hash()
+	require.NoError(t, err)
+
+	copyHash, err := copyCheckpoint.Hash()
+	require.NoError(t, err)
+
+	require.Equal(t, origHash, copyHash)
 }

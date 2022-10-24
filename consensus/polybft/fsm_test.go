@@ -44,7 +44,7 @@ func TestFSM_ValidateHeader(t *testing.T) {
 
 	// mix digest
 	assert.ErrorContains(t, validateHeaderFields(parent, header), "mix digest is not correct")
-	header.MixHash = PolyMixDigest
+	header.MixHash = PolyBFTMixDigest
 
 	// difficulty
 	header.Difficulty = 0
@@ -1470,7 +1470,7 @@ func TestFSM_Validate_FailToVerifySignatures(t *testing.T) {
 			Number:     parentBlockNumber + 1,
 			ParentHash: parent.Hash,
 			Timestamp:  parent.Timestamp + 1,
-			MixHash:    PolyMixDigest,
+			MixHash:    PolyBFTMixDigest,
 			Difficulty: 1,
 			ExtraData:  parent.ExtraData,
 		},

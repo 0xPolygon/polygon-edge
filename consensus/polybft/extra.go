@@ -2,14 +2,15 @@ package polybft
 
 import (
 	"fmt"
+	"math/big"
 
 	"github.com/hashicorp/go-hclog"
 
-	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
-
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
+	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
+	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/umbracle/ethgo"
+	"github.com/umbracle/ethgo/abi"
 	"github.com/umbracle/fastrlp"
 )
 
@@ -21,10 +22,8 @@ const (
 	ExtraSeal = 65
 )
 
-var (
-	// PolyMixDigest represents a hash of "PolyBFT Mix" to identify whether the block is from PolyBFT consensus engine
-	PolyMixDigest = types.Hash(ethgo.HexToHash("adce6e5230abe012342a44e4e9b6d05997d6f015387ae0e59be924afc7ec70c1"))
-)
+// PolyBFTMixDigest represents a hash of "PolyBFT Mix" to identify whether the block is from PolyBFT consensus engine
+var PolyBFTMixDigest = types.StringToHash("adce6e5230abe012342a44e4e9b6d05997d6f015387ae0e59be924afc7ec70c1")
 
 // Extra defines the structure of the extra field for Istanbul
 type Extra struct {
@@ -32,6 +31,7 @@ type Extra struct {
 	Seal       []byte
 	Parent     *Signature
 	Committed  *Signature
+	Checkpoint *CheckpointData
 }
 
 // MarshalRLPTo defines the marshal function wrapper for Extra
@@ -73,6 +73,13 @@ func (i *Extra) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 		vv.Set(i.Committed.MarshalRLPWith(ar))
 	}
 
+	// Checkpoint
+	if i.Checkpoint == nil {
+		vv.Set(ar.NewNullArray())
+	} else {
+		vv.Set(i.Checkpoint.MarshalRLPWith(ar))
+	}
+
 	return vv
 }
 
@@ -88,46 +95,46 @@ func (i *Extra) UnmarshalRLPWith(v *fastrlp.Value) error {
 		return err
 	}
 
-	if num := len(elems); num != 4 {
-		return fmt.Errorf("not enough elements to decode extra, expected 4 but found %d", num)
+	if num := len(elems); num != 5 {
+		return fmt.Errorf("incorrect elements count to decode Extra, expected 5 but found %d", num)
 	}
 
 	// Validators
-	{
-		if elems[0].Elems() > 0 {
-			i.Validators = &ValidatorSetDelta{}
-			if err := i.Validators.UnmarshalRLPWith(elems[0]); err != nil {
-				return err
-			}
+	if elems[0].Elems() > 0 {
+		i.Validators = &ValidatorSetDelta{}
+		if err := i.Validators.UnmarshalRLPWith(elems[0]); err != nil {
+			return err
 		}
 	}
 
 	// Seal
-	{
-		if elems[1].Len() > 0 {
-			if i.Seal, err = elems[1].GetBytes(i.Seal); err != nil {
-				return err
-			}
+	if elems[1].Len() > 0 {
+		if i.Seal, err = elems[1].GetBytes(i.Seal); err != nil {
+			return err
 		}
 	}
 
 	// Parent
-	{
-		if elems[2].Elems() > 0 {
-			i.Parent = &Signature{}
-			if err := i.Parent.UnmarshalRLPWith(elems[2]); err != nil {
-				return err
-			}
+	if elems[2].Elems() > 0 {
+		i.Parent = &Signature{}
+		if err := i.Parent.UnmarshalRLPWith(elems[2]); err != nil {
+			return err
 		}
 	}
 
 	// Committed
-	{
-		if elems[3].Elems() > 0 {
-			i.Committed = &Signature{}
-			if err := i.Committed.UnmarshalRLPWith(elems[3]); err != nil {
-				return err
-			}
+	if elems[3].Elems() > 0 {
+		i.Committed = &Signature{}
+		if err := i.Committed.UnmarshalRLPWith(elems[3]); err != nil {
+			return err
+		}
+	}
+
+	// Checkpoint
+	if elems[4].Elems() > 0 {
+		i.Checkpoint = &CheckpointData{}
+		if err := i.Checkpoint.UnmarshalRLPWith(elems[4]); err != nil {
+			return err
 		}
 	}
 
@@ -301,8 +308,8 @@ func (s *Signature) UnmarshalRLPWith(v *fastrlp.Value) error {
 	}
 
 	// there should be exactly two elements (aggregated signature and bitmap)
-	if len(vals) != 2 {
-		return fmt.Errorf("invalid rlp values")
+	if num := len(vals); num != 2 {
+		return fmt.Errorf("incorrect elements count to decode Signature, expected 2 but found %d", num)
 	}
 
 	s.AggregatedSignature, err = vals[0].GetBytes(nil)
@@ -350,10 +357,150 @@ func (s *Signature) VerifyCommittedFields(validatorSet AccountSet, hash types.Ha
 	return nil
 }
 
+var checkpointDataABIType = abi.MustNewType(`tuple(
+	uint256 chainId,
+	uint256 blockNumber,
+	bytes32 blockHash,
+	uint256 blockRound, 
+	uint256 epochNumber,
+	bytes32 currentValidatorsHash,
+	bytes32 nextValidatorsHash,
+	bytes32 eventRoot)`)
+
+// CheckpointData represents data needed for checkpointing mechanism
+type CheckpointData struct {
+	ChainID               uint64
+	BlockNumber           uint64
+	BlockHash             types.Hash
+	BlockRound            uint64
+	EpochNumber           uint64
+	CurrentValidatorsHash types.Hash
+	NextValidatorsHash    types.Hash
+	EventRoot             types.Hash
+}
+
+// MarshalRLPWith defines the marshal function implementation for CheckpointData
+func (c *CheckpointData) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
+	vv := ar.NewArray()
+	// ChainID
+	vv.Set(ar.NewUint(c.ChainID))
+	// BlockNumber
+	vv.Set(ar.NewUint(c.BlockNumber))
+	// BlockHash
+	vv.Set(ar.NewBytes(c.BlockHash.Bytes()))
+	// BlockRound
+	vv.Set(ar.NewUint(c.BlockRound))
+	// EpochNumber
+	vv.Set(ar.NewUint(c.EpochNumber))
+	// CurrentValidatorsHash
+	vv.Set(ar.NewBytes(c.CurrentValidatorsHash.Bytes()))
+	// NextValidatorsHash
+	vv.Set(ar.NewBytes(c.NextValidatorsHash.Bytes()))
+	// EventRoot
+	vv.Set(ar.NewBytes(c.EventRoot.Bytes()))
+
+	return vv
+}
+
+// UnmarshalRLPWith unmarshals CheckpointData object from the RLP format
+func (c *CheckpointData) UnmarshalRLPWith(v *fastrlp.Value) error {
+	vals, err := v.GetElems()
+	if err != nil {
+		return fmt.Errorf("array type expected for CheckpointData struct")
+	}
+
+	// there should be exactly 8 elements:
+	// ChainID, BlockNumber, BlockHash, BlockRound,
+	// EpochNumber, CurrentValidatorsHash, NextValidatorsHash, EventRoot
+	if num := len(vals); num != 8 {
+		return fmt.Errorf("incorrect elements count to decode CheckpointData, expected 8 but found %d", num)
+	}
+
+	// ChainID
+	c.ChainID, err = vals[0].GetUint64()
+	if err != nil {
+		return err
+	}
+
+	// BlockNumber
+	c.BlockNumber, err = vals[1].GetUint64()
+	if err != nil {
+		return err
+	}
+
+	// BlockHash
+	blockHashRaw, err := vals[2].GetBytes(nil)
+	if err != nil {
+		return err
+	}
+
+	c.BlockHash = types.BytesToHash(blockHashRaw)
+
+	// BlockRound
+	c.BlockRound, err = vals[3].GetUint64()
+	if err != nil {
+		return err
+	}
+
+	// EpochNumber
+	c.EpochNumber, err = vals[4].GetUint64()
+	if err != nil {
+		return err
+	}
+
+	// CurrentValidatorsHash
+	currentValidatorsHashRaw, err := vals[5].GetBytes(nil)
+	if err != nil {
+		return err
+	}
+
+	c.CurrentValidatorsHash = types.BytesToHash(currentValidatorsHashRaw)
+
+	// NextValidatorsHash
+	nextValidatorsHashRaw, err := vals[6].GetBytes(nil)
+	if err != nil {
+		return err
+	}
+
+	c.NextValidatorsHash = types.BytesToHash(nextValidatorsHashRaw)
+
+	// EventRoot
+	eventRootRaw, err := vals[7].GetBytes(nil)
+	if err != nil {
+		return err
+	}
+
+	c.EventRoot = types.BytesToHash(eventRootRaw)
+
+	return nil
+}
+
+// Hash calculates keccak256 hash of the CheckpointData.
+// CheckpointData is ABI encoded and then hashed.
+func (c *CheckpointData) Hash() ([]byte, error) {
+	checkpointMap := map[string]interface{}{
+		"chainId":               new(big.Int).SetUint64(c.ChainID),
+		"blockNumber":           new(big.Int).SetUint64(c.BlockNumber),
+		"blockHash":             c.BlockHash.Bytes(),
+		"blockRound":            new(big.Int).SetUint64(c.BlockRound),
+		"epochNumber":           new(big.Int).SetUint64(c.EpochNumber),
+		"currentValidatorsHash": c.CurrentValidatorsHash.Bytes(),
+		"nextValidatorsHash":    c.NextValidatorsHash.Bytes(),
+		"eventRoot":             c.EventRoot.Bytes(),
+	}
+
+	abiEncoded, err := checkpointDataABIType.Encode(checkpointMap)
+	if err != nil {
+		return nil, err
+	}
+
+	return crypto.Keccak256(abiEncoded), nil
+}
+
 // GetIbftExtraClean returns unmarshaled extra field from the passed in header,
 // but without signatures for the given header (it only includes signatures for the parent block)
-func GetIbftExtraClean(extraB []byte) ([]byte, error) {
-	extra, err := GetIbftExtra(extraB)
+func GetIbftExtraClean(extraRaw []byte) ([]byte, error) {
+	extra, err := GetIbftExtra(extraRaw)
 	if err != nil {
 		return nil, err
 	}
@@ -361,6 +508,7 @@ func GetIbftExtraClean(extraB []byte) ([]byte, error) {
 	ibftExtra := &Extra{
 		Parent:     extra.Parent,
 		Validators: extra.Validators,
+		Checkpoint: &CheckpointData{},
 		Seal:       []byte{},
 		Committed:  &Signature{},
 	}
