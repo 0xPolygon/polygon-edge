@@ -15,8 +15,10 @@ type Snapshot struct {
 var emptyStateHash = types.StringToHash("0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
 
 func (s *Snapshot) GetStorage(addr types.Address, root types.Hash, rawkey types.Hash) types.Hash {
-	var err error
-	var trie *Trie
+	var (
+		err  error
+		trie *Trie
+	)
 
 	if root == emptyStateHash {
 		trie = s.state.newTrie()
@@ -35,6 +37,7 @@ func (s *Snapshot) GetStorage(addr types.Address, root types.Hash, rawkey types.
 	}
 
 	p := &fastrlp.Parser{}
+
 	v, err := p.Parse(val)
 	if err != nil {
 		return types.Hash{}
@@ -55,10 +58,12 @@ func (s *Snapshot) GetAccount(addr types.Address) (*state.Account, error) {
 	if !ok {
 		return nil, nil
 	}
+
 	var account state.Account
 	if err := account.UnmarshalRlp(data); err != nil {
 		return nil, err
 	}
+
 	return &account, nil
 }
 

@@ -18,10 +18,12 @@ func (m *mockSnapshot) GetStorage(addr types.Address, root types.Hash, key types
 	if !ok {
 		return types.Hash{}
 	}
+
 	res, ok := raw.State[key]
 	if !ok {
 		return types.Hash{}
 	}
+
 	return res
 }
 
@@ -30,10 +32,12 @@ func (m *mockSnapshot) GetAccount(addr types.Address) (*Account, error) {
 	if !ok {
 		return nil, fmt.Errorf("account not found")
 	}
+
 	acct := &Account{
 		Balance: new(big.Int).SetUint64(raw.Balance),
 		Nonce:   raw.Nonce,
 	}
+
 	return acct, nil
 }
 
