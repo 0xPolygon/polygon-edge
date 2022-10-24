@@ -1,6 +1,8 @@
 package polybft
 
 import (
+	"encoding/json"
+	"math/big"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/types"
@@ -14,8 +16,8 @@ type PolyBFTConfig struct {
 	ValidatorSetSize int `json:"validatorSetSize"`
 
 	// Address of the system contracts, as of now (testing) this is populated automatically during genesis
-	ValidatorSetAddr    types.Address `json:"validatorSetAddr"`
-	SidechainBridgeAddr types.Address `json:"sidechainBridgeAddr"`
+	ValidatorSetAddr  types.Address `json:"validatorSetAddr"`
+	StateReceiverAddr types.Address `json:"stateReceiverAddr"`
 
 	// size of the epoch and sprint
 	EpochSize  uint64 `json:"epochSize"`
@@ -23,13 +25,8 @@ type PolyBFTConfig struct {
 
 	BlockTime time.Duration `json:"blockTime"`
 
-	SmartContracts []SmartContract `json:"smartContracts"`
-}
-
-type SmartContract struct {
-	Address types.Address `json:"address"`
-	Code    []byte        `json:"code"`
-	Name    string        `json:"name"`
+	// Governance is the initial governance address
+	Governance types.Address `json:"governance"`
 }
 
 // BridgeConfig is the configuration for the bridge
@@ -44,8 +41,42 @@ func (p *PolyBFTConfig) IsBridgeEnabled() bool {
 }
 
 type Validator struct {
-	Address types.Address
-	BlsKey  string
+	Address types.Address `json:"address"`
+	BlsKey  string        `json:"blsKey"`
+	Balance *big.Int      `json:"balance"`
+}
+
+type validatorRaw struct {
+	Address types.Address `json:"address"`
+	BlsKey  string        `json:"blsKey"`
+	Balance *string       `json:"balance"`
+}
+
+func (v *Validator) MarshalJSON() ([]byte, error) {
+	raw := &validatorRaw{Address: v.Address, BlsKey: v.BlsKey}
+	raw.Balance = types.EncodeBigInt(v.Balance)
+
+	return json.Marshal(raw)
+}
+
+func (v *Validator) UnmarshalJSON(data []byte) error {
+	var raw validatorRaw
+
+	var err error
+
+	if err = json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	v.Address = raw.Address
+	v.BlsKey = raw.BlsKey
+	v.Balance, err = types.ParseUint256orHex(raw.Balance)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // DebugConfig is a struct used for test configuration in init genesis

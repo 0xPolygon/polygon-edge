@@ -1,9 +1,11 @@
 package polybft
 
 import (
+	"bytes"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"sort"
 	"sync"
 	"sync/atomic"
 
@@ -219,9 +221,12 @@ func (c *consensusRuntime) populateFsmIfBridgeEnabled(
 	if isEndOfEpoch {
 		commitment, err := c.getCommitmentToRegister(epoch, nextRegisteredCommitmentIndex)
 		if err != nil {
-			if errors.Is(err, ErrCommitmentNotBuilt) || errors.Is(err, errQuorumNotReached) {
-				c.logger.Info("[FSM] Retrieving commitment error",
-					"epoch", epoch.Number, "index", nextRegisteredCommitmentIndex, "err", err)
+			if errors.Is(err, ErrCommitmentNotBuilt) {
+				c.logger.Debug("[FSM] Have no built commitment to register",
+					"epoch", epoch.Number, "from state sync index", nextRegisteredCommitmentIndex)
+			} else if errors.Is(err, errQuorumNotReached) {
+				c.logger.Debug("[FSM] Not enough votes to register commitment",
+					"epoch", epoch.Number, "from state sync index", nextRegisteredCommitmentIndex)
 			} else {
 				return err
 			}
@@ -402,17 +407,20 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) error {
 		return fmt.Errorf("could not run checkpoint:%w", err)
 	}
 
+	c.logger.Info("restartEpoch", "block number", header.Number, "epoch", epochNumber, "validators", validatorSet)
+
 	return nil
 }
 
 // buildCommitment builds a commitment message (if it is not already built in previous epoch)
 // for state sync events starting from given index and saves the message in database
 func (c *consensusRuntime) buildCommitment(epoch, fromIndex uint64) (*Commitment, error) {
+	toIndex := fromIndex + stateSyncMainBundleSize - 1
 	// if it is not already built in the previous epoch
-	stateSyncEvents, err := c.state.getStateSyncEventsForCommitment(fromIndex, fromIndex+stateSyncMainBundleSize)
+	stateSyncEvents, err := c.state.getStateSyncEventsForCommitment(fromIndex, toIndex)
 	if err != nil {
 		if errors.Is(err, ErrNotEnoughStateSyncs) {
-			c.logger.Info("[buildCommitment] Not enough state syncs to build a commitment",
+			c.logger.Debug("[buildCommitment] Not enough state syncs to build a commitment",
 				"epoch", epoch, "from state sync index", fromIndex)
 			// this is a valid case, there is not enough state syncs
 			return nil, nil
@@ -421,14 +429,19 @@ func (c *consensusRuntime) buildCommitment(epoch, fromIndex uint64) (*Commitment
 		return nil, err
 	}
 
-	commitment, err := NewCommitment(epoch, stateSyncBundleSize, stateSyncEvents)
+	commitment, err := NewCommitment(epoch, fromIndex, toIndex, stateSyncBundleSize, stateSyncEvents)
 	if err != nil {
 		return nil, err
 	}
 
-	hash := commitment.Hash().Bytes()
+	hash, err := commitment.Hash()
+	if err != nil {
+		return nil, err
+	}
 
-	signature, err := c.config.Key.Sign(hash)
+	hashBytes := hash.Bytes()
+	signature, err := c.config.Key.Sign(hashBytes)
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign commitment message. Error: %w", err)
 	}
@@ -438,19 +451,21 @@ func (c *consensusRuntime) buildCommitment(epoch, fromIndex uint64) (*Commitment
 		Signature: signature,
 	}
 
-	if _, err = c.state.insertMessageVote(epoch, hash, sig); err != nil {
+	if _, err = c.state.insertMessageVote(epoch, hashBytes, sig); err != nil {
 		return nil, fmt.Errorf("failed to insert signature for hash=%v to the state."+
-			"Error: %v", hex.EncodeToString(hash), err)
+			"Error: %v", hex.EncodeToString(hashBytes), err)
 	}
 
 	// gossip message
 	msg := &TransportMessage{
-		Hash:        hash,
+		Hash:        hashBytes,
 		Signature:   signature,
 		NodeID:      c.config.Key.NodeID(),
 		EpochNumber: epoch,
 	}
 	c.config.Transport.Gossip(msg)
+
+	c.logger.Debug("[buildCommitment] Built commitment", "from", commitment.FromIndex, "to", commitment.ToIndex)
 
 	return commitment, nil
 }
@@ -458,38 +473,39 @@ func (c *consensusRuntime) buildCommitment(epoch, fromIndex uint64) (*Commitment
 // buildBundles builds bundles if there is a created commitment by the validator and inserts them into db
 func (c *consensusRuntime) buildBundles(epoch *epochMetadata, commitmentMsg *CommitmentMessage,
 	stateSyncExecutionIndex uint64) error {
+	c.logger.Debug("[buildProofs] Building proofs...", "fromIndex", commitmentMsg.FromIndex,
+		"toIndex", commitmentMsg.ToIndex, "nextExecutionIndex", stateSyncExecutionIndex)
+
 	if epoch.Commitment == nil {
 		// its a valid case when we do not have a built commitment so we can not build any proofs
 		// we will be able to validate them though, since we have CommitmentMessageSigned taken from
 		// register commitment state transaction when its block was inserted
-		c.logger.Info("[buildProofs] No commitment built.")
+		c.logger.Debug("[buildProofs] No commitment built.")
 
 		return nil
 	}
 
 	bundleProofs := []*BundleProof{}
+	startBundleIdx := commitmentMsg.GetBundleIdxFromStateSyncEventIdx(stateSyncExecutionIndex)
 
-	// TO DO Nemanja - fix this with new merkle trie
+	for idx := startBundleIdx; idx < commitmentMsg.BundlesCount(); idx++ {
+		p := epoch.Commitment.MerkleTree.GenerateProof(idx, 0)
+		events, err := c.getStateSyncEventsForBundle(commitmentMsg.GetFirstStateSyncIndexFromBundleIndex(idx),
+			commitmentMsg.BundleSize)
 
-	// startBundleIdx := commitmentMsg.GetBundleIdxFromStateSyncEventIdx(stateSyncExecutionIndex)
-	// for idx := startBundleIdx; idx < commitmentMsg.BundlesCount(); idx++ {
-	// 	p, err := epoch.Commitment.MerkleTrie.GenerateProof(uint(idx))
-	// 	if err != nil {
-	// 		return err
-	// 	}
+		if err != nil {
+			return err
+		}
 
-	// 	events, err := c.getStateSyncEventsForBundle(commitmentMsg.GetFirstStateSyncIndexFromBundleIndex(idx),
-	// 		commitmentMsg.BundleSize)
-	// 	if err != nil {
-	// 		return err
-	// 	}
+		bundleProofs = append(bundleProofs,
+			&BundleProof{
+				Proof:      p,
+				StateSyncs: events,
+			})
+	}
 
-	// 	bundleProofs = append(bundleProofs,
-	// 		&BundleProof{
-	// 			Proof:      p,
-	// 			StateSyncs: events,
-	// 		})
-	// }
+	c.logger.Debug("[buildProofs] Building proofs finished.", "fromIndex", commitmentMsg.FromIndex,
+		"toIndex", commitmentMsg.ToIndex, "nextExecutionIndex", stateSyncExecutionIndex)
 
 	return c.state.insertBundles(bundleProofs)
 }
@@ -497,7 +513,7 @@ func (c *consensusRuntime) buildBundles(epoch *epochMetadata, commitmentMsg *Com
 // getAggSignatureForCommitmentMessage creates aggregated signatures for given commitment
 // if it has a quorum of votes
 func (c *consensusRuntime) getAggSignatureForCommitmentMessage(epoch *epochMetadata,
-	commitmentHash types.Hash) (Signature, error) {
+	commitmentHash types.Hash) (Signature, [][]byte, error) {
 	validators := epoch.Validators
 
 	nodeIDIndexMap := make(map[pbft.NodeID]int, validators.Len())
@@ -508,11 +524,12 @@ func (c *consensusRuntime) getAggSignatureForCommitmentMessage(epoch *epochMetad
 	// get all the votes from the database for this commitment
 	votes, err := c.state.getMessageVotes(epoch.Number, commitmentHash.Bytes())
 	if err != nil {
-		return Signature{}, err
+		return Signature{}, nil, err
 	}
 
 	var signatures bls.Signatures
 
+	publicKeys := make([][]byte, 0)
 	bitmap := bitmap.Bitmap{}
 
 	for _, vote := range votes {
@@ -523,21 +540,22 @@ func (c *consensusRuntime) getAggSignatureForCommitmentMessage(epoch *epochMetad
 
 		signature, err := bls.UnmarshalSignature(vote.Signature)
 		if err != nil {
-			return Signature{}, err
+			return Signature{}, nil, err
 		}
 
 		bitmap.Set(uint64(index))
 
 		signatures = append(signatures, signature)
+		publicKeys = append(publicKeys, validators[index].BlsKey.Marshal())
 	}
 
 	if len(signatures) < getQuorumSize(validators.Len()) {
-		return Signature{}, errQuorumNotReached
+		return Signature{}, nil, errQuorumNotReached
 	}
 
 	aggregatedSignature, err := signatures.Aggregate().Marshal()
 	if err != nil {
-		return Signature{}, err
+		return Signature{}, nil, err
 	}
 
 	result := Signature{
@@ -545,12 +563,12 @@ func (c *consensusRuntime) getAggSignatureForCommitmentMessage(epoch *epochMetad
 		Bitmap:              bitmap,
 	}
 
-	return result, nil
+	return result, publicKeys, nil
 }
 
 // getStateSyncEventsForBundle gets state sync events from database for the appropriate bundle
 func (c *consensusRuntime) getStateSyncEventsForBundle(from, bundleSize uint64) ([]*StateSyncEvent, error) {
-	until := bundleSize + from
+	until := bundleSize + from - 1
 
 	return c.state.getStateSyncEventsForCommitment(from, until)
 }
@@ -640,9 +658,9 @@ func (c *consensusRuntime) getLatestSprintBlockNumber() uint64 {
 
 // calculateUptime calculates uptime for blocks starting from the last built block in current epoch,
 // and ending at the last block of previous epoch
-func (c *consensusRuntime) calculateUptime(currentBlock *types.Header) (*UptimeCounter, error) {
+func (c *consensusRuntime) calculateUptime(currentBlock *types.Header) (*CommitEpoch, error) {
 	epoch := c.getEpoch()
-	uptimeCounter := &UptimeCounter{validatorIndices: make(map[ethgo.Address]int)}
+	uptimeCounter := map[types.Address]uint64{}
 
 	if c.config.PolyBFTConfig.EpochSize < (uptimeLookbackSize + 1) {
 		// this means that epoch size must at least be 3 blocks,
@@ -663,7 +681,7 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header) (*UptimeC
 		}
 
 		for _, a := range signers.GetAddresses() {
-			uptimeCounter.AddUptime(ethgo.Address(a))
+			uptimeCounter[a]++
 		}
 
 		return nil
@@ -671,6 +689,9 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header) (*UptimeC
 
 	firstBlockInEpoch := calculateFirstBlockOfPeriod(currentBlock.Number, c.config.PolyBFTConfig.EpochSize)
 	lastBlockInPreviousEpoch := firstBlockInEpoch - 1
+
+	startBlock := (epoch.Number * c.config.PolyBFTConfig.EpochSize) - c.config.PolyBFTConfig.EpochSize + 1
+	endBlock := getEndEpochBlockNumber(epoch.Number, c.config.PolyBFTConfig.EpochSize)
 
 	blockHeader := currentBlock
 	validators := epoch.Validators
@@ -709,7 +730,35 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header) (*UptimeC
 		}
 	}
 
-	return uptimeCounter, nil
+	epochID := epoch.Number
+
+	uptime := Uptime{EpochID: epochID}
+
+	// include the data in the uptime counter in a deterministic way
+	addrSet := []types.Address{}
+	for addr := range uptimeCounter {
+		addrSet = append(addrSet, addr)
+	}
+
+	sort.Slice(addrSet, func(i, j int) bool {
+		return bytes.Compare(addrSet[i][:], addrSet[j][:]) > 0
+	})
+
+	for _, addr := range addrSet {
+		uptime.addValidatorUptime(addr, uptimeCounter[addr])
+	}
+
+	commitEpoch := &CommitEpoch{
+		EpochID: epochID,
+		Epoch: Epoch{
+			StartBlock: startBlock,
+			EndBlock:   endBlock,
+			EpochRoot:  types.Hash{},
+		},
+		Uptime: uptime,
+	}
+
+	return commitEpoch, nil
 }
 
 // setIsActiveValidator updates the activeValidatorFlag field
@@ -805,15 +854,19 @@ func (c *consensusRuntime) getCommitmentToRegister(epoch *epochMetadata,
 		return nil, ErrCommitmentNotBuilt
 	}
 
+	toIndex := registerCommitmentIndex + stateSyncMainBundleSize - 1
 	commitmentMessage := NewCommitmentMessage(
-		// epoch.Commitment.MerkleTrie.Trie.Hash(),
-		types.EmptyRootHash, // TO DO Nemanja - fix this with bridge
+		epoch.Commitment.MerkleTree.Hash(),
 		registerCommitmentIndex,
-		registerCommitmentIndex+stateSyncMainBundleSize-1,
-		epoch.Number,
+		toIndex,
 		stateSyncBundleSize)
 
-	aggregatedSignature, err := c.getAggSignatureForCommitmentMessage(epoch, epoch.Commitment.Hash())
+	commitmentHash, err := epoch.Commitment.Hash()
+	if err != nil {
+		return nil, err
+	}
+
+	aggregatedSignature, publicKeys, err := c.getAggSignatureForCommitmentMessage(epoch, commitmentHash)
 	if err != nil {
 		return nil, err
 	}
@@ -821,6 +874,7 @@ func (c *consensusRuntime) getCommitmentToRegister(epoch *epochMetadata,
 	return &CommitmentMessageSigned{
 		Message:      commitmentMessage,
 		AggSignature: aggregatedSignature,
+		PublicKeys:   publicKeys,
 	}, nil
 }
 

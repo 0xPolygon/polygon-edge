@@ -3,6 +3,7 @@ package genesis
 import (
 	"encoding/hex"
 	"fmt"
+	"math/big"
 	"path"
 	"strings"
 	"time"
@@ -10,9 +11,11 @@ import (
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
+	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/polybftcontracts"
+	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/server"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -27,24 +30,13 @@ const (
 	blockTimeFlag        = "block-time"
 	validatorsFlag       = "polybft-validators"
 
-	defaultEpochSize        = uint64(10)
-	defaultSprintSize       = uint64(5)
-	defaultValidatorSetSize = 100
-	defaultBlockTime        = 2 * time.Second
-
+	defaultEpochSize                  = uint64(10)
+	defaultSprintSize                 = uint64(5)
+	defaultValidatorSetSize           = 100
+	defaultBlockTime                  = 2 * time.Second
 	defaultPolyBftValidatorPrefixPath = "test-chain-"
 
 	bootnodePortStart = 30301
-
-	defaultContractsRootFolder = "consensus/polybft/polybftcontracts/artifacts/contracts"
-)
-
-var (
-	// hard code address for the sidechain (this is only being used for testing)
-	validatorSetAddr         = types.StringToAddress("0xBd770416a3345F91E4B34576cb804a576fa48EB1")
-	sidechainBridgeAddr      = types.StringToAddress("0x5a443704dd4B594B382c22a083e2BD3090A6feF3")
-	sidechainERC20Addr       = types.StringToAddress("0x47e9Fbef8C83A1714F1951F142132E6e90F5fa5D")
-	sidechainERC20BridgeAddr = types.StringToAddress("0x8Be503bcdEd90ED42Eff31f56199399B2b0154CA")
 )
 
 func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
@@ -53,20 +45,21 @@ func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
 		return nil, err
 	}
 
-	smartContracts, err := p.deployContracts()
+	alloc, err := p.deployContracts()
 	if err != nil {
 		return nil, err
 	}
 
+	// use 1st account as governance address
+	governanceAccount := validatorsInfo[0].Account
 	polyBftConfig := &polybft.PolyBFTConfig{
-		InitialValidatorSet: p.getGenesisValidators(validatorsInfo),
-		BlockTime:           p.blockTime,
-		EpochSize:           p.epochSize,
-		SprintSize:          p.sprintSize,
-		ValidatorSetSize:    p.validatorSetSize,
-		ValidatorSetAddr:    validatorSetAddr,
-		SidechainBridgeAddr: sidechainBridgeAddr,
-		SmartContracts:      smartContracts,
+		BlockTime:         p.blockTime,
+		EpochSize:         p.epochSize,
+		SprintSize:        p.sprintSize,
+		ValidatorSetSize:  p.validatorSetSize,
+		ValidatorSetAddr:  contracts.ValidatorSetContract,
+		StateReceiverAddr: contracts.StateReceiverContract,
+		Governance:        types.Address(governanceAccount.Ecdsa.Address()),
 	}
 
 	chainConfig := &chain.Chain{
@@ -74,7 +67,7 @@ func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
 		Genesis: &chain.Genesis{
 			GasLimit:   p.blockGasLimit,
 			Difficulty: 0,
-			Alloc:      map[types.Address]*chain.GenesisAccount{},
+			Alloc:      alloc,
 			ExtraData:  generateExtraDataPolyBft(validatorsInfo),
 			GasUsed:    command.DefaultGenesisGasUsed,
 			Mixhash:    polybft.PolyMixDigest,
@@ -113,10 +106,14 @@ func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
 		return nil, err
 	}
 
+	// Set initial validator set
+	polyBftConfig.InitialValidatorSet = p.getGenesisValidators(validatorsInfo, chainConfig.Genesis.Alloc)
+
 	return chainConfig, nil
 }
 
-func (p *genesisParams) getGenesisValidators(validators []GenesisTarget) (result []*polybft.Validator) {
+func (p *genesisParams) getGenesisValidators(validators []GenesisTarget,
+	allocs map[types.Address]*chain.GenesisAccount) (result []*polybft.Validator) {
 	if len(p.validators) > 0 {
 		for _, validator := range p.validators {
 			parts := strings.Split(validator, ":")
@@ -124,23 +121,37 @@ func (p *genesisParams) getGenesisValidators(validators []GenesisTarget) (result
 				continue
 			}
 
+			addr := types.StringToAddress(parts[0])
+
 			result = append(result, &polybft.Validator{
-				Address: types.StringToAddress(parts[0]),
+				Address: addr,
 				BlsKey:  parts[1],
+				Balance: getBalance(addr, allocs),
 			})
 		}
 	} else {
 		for _, validator := range validators {
 			pubKeyMarshalled := validator.Account.Bls.PublicKey().Marshal()
-
+			addr := types.Address(validator.Account.Ecdsa.Address())
 			result = append(result, &polybft.Validator{
-				Address: types.Address(validator.Account.Ecdsa.Address()),
+				Address: addr,
 				BlsKey:  hex.EncodeToString(pubKeyMarshalled),
+				Balance: getBalance(addr, allocs),
 			})
 		}
 	}
 
 	return result
+}
+
+// getBalance returns balance for genesis account based on its address.
+// If not found in provided allocations map, 0 is returned.
+func getBalance(address types.Address, allocations map[types.Address]*chain.GenesisAccount) *big.Int {
+	if genesisAcc, ok := allocations[address]; ok {
+		return genesisAcc.Balance
+	}
+
+	return big.NewInt(0)
 }
 
 func (p *genesisParams) generatePolyBftGenesis() error {
@@ -152,65 +163,59 @@ func (p *genesisParams) generatePolyBftGenesis() error {
 	return helper.WriteGenesisConfigToDisk(config, params.genesisPath)
 }
 
-func (p *genesisParams) deployContracts() ([]polybft.SmartContract, error) {
-	predefinedContracts := []struct {
-		name     string
-		input    []interface{}
-		expected types.Address
-		chain    string
+func (p *genesisParams) deployContracts() (map[types.Address]*chain.GenesisAccount, error) {
+	genesisContracts := []struct {
+		name         string
+		relativePath string
+		address      types.Address
 	}{
 		{
-			// Validator smart contract
-			name:     "Validator",
-			expected: validatorSetAddr,
-			chain:    "child",
+			// Validator contract
+			name:         "ChildValidatorSet",
+			relativePath: "child/ChildValidatorSet.sol",
+			address:      contracts.ValidatorSetContract,
 		},
 		{
-			// Bridge in the sidechain
-			name:     "SidechainBridge",
-			expected: sidechainBridgeAddr,
-			chain:    "child",
+			// State receiver contract
+			name:         "StateReceiver",
+			relativePath: "child/StateReceiver.sol",
+			address:      contracts.StateReceiverContract,
 		},
 		{
-			// Target ERC20 token
-			name:     "MintERC20",
-			expected: sidechainERC20Addr,
-			chain:    "child",
+			// Native Token contract (Matic ERC-20)
+			name:         "MRC20",
+			relativePath: "child/MRC20.sol",
+			address:      contracts.NativeTokenContract,
 		},
 		{
-			// Bridge wrapper for ERC20 token
-			name: "ERC20Bridge",
-			input: []interface{}{
-				sidechainERC20Addr,
-			},
-			expected: sidechainERC20BridgeAddr,
-			chain:    "child",
+			// BLS contract
+			name:         "BLS",
+			relativePath: "common/BLS.sol",
+			address:      contracts.BLSContract,
+		},
+		{
+			// Merkle contract
+			name:         "Merkle",
+			relativePath: "common/Merkle.sol",
+			address:      contracts.MerkleContract,
 		},
 	}
 
-	result := make([]polybft.SmartContract, 0, len(predefinedContracts))
+	allocations := make(map[types.Address]*chain.GenesisAccount, len(genesisContracts))
 
-	for _, contract := range predefinedContracts {
-		artifact, err := polybftcontracts.ReadArtifact(p.smartContractsRootPath, contract.chain, contract.name)
+	for _, contract := range genesisContracts {
+		artifact, err := polybftcontracts.ReadArtifact(p.smartContractsRootPath, contract.relativePath, contract.name)
 		if err != nil {
 			return nil, err
 		}
 
-		input, err := artifact.DeployInput(contract.input)
-		if err != nil {
-			return nil, err
+		allocations[contract.address] = &chain.GenesisAccount{
+			Balance: big.NewInt(0),
+			Code:    artifact.DeployedBytecode,
 		}
-
-		smartContract := polybft.SmartContract{
-			Address: contract.expected,
-			Code:    input,
-			Name:    fmt.Sprintf("%s/%s", contract.chain, contract.name),
-		}
-
-		result = append(result, smartContract)
 	}
 
-	return result, nil
+	return allocations, nil
 }
 
 func generateExtraDataPolyBft(validators []GenesisTarget) []byte {
@@ -228,5 +233,5 @@ func generateExtraDataPolyBft(validators []GenesisTarget) []byte {
 
 	extra := polybft.Extra{Validators: delta}
 
-	return append(make([]byte, 32), extra.MarshalRLPTo(nil)...)
+	return append(make([]byte, signer.IstanbulExtraVanity), extra.MarshalRLPTo(nil)...)
 }

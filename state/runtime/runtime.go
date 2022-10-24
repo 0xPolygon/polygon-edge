@@ -69,6 +69,7 @@ type Host interface {
 	Callx(*Contract, Host) *ExecutionResult
 	Empty(addr types.Address) bool
 	GetNonce(addr types.Address) uint64
+	Transfer(from types.Address, to types.Address, amount *big.Int) error
 }
 
 // ExecutionResult includes all output after executing given evm
@@ -107,6 +108,8 @@ var (
 	ErrDepth                    = errors.New("max call depth exceeded")
 	ErrExecutionReverted        = errors.New("execution was reverted")
 	ErrCodeStoreOutOfGas        = errors.New("contract creation code storage out of gas")
+	ErrUnauthorizedCaller       = errors.New("unauthorized caller")
+	ErrInvalidInputData         = errors.New("invalid input data")
 )
 
 type CallType int

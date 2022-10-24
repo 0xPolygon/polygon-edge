@@ -28,6 +28,8 @@ jobs:
     name: Test
     uses: ./.github/workflows/test.yml
     needs: build
+    secrets:
+      GH_TOKEN_CLONE_PRIVATE: ${{ secrets.GH_TOKEN_CLONE_PRIVATE }}
 
   deploy_devnet:
     name: Deploy DevNet

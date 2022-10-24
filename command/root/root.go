@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/0xPolygon/polygon-edge/command/backup"
+	"github.com/0xPolygon/polygon-edge/command/e2e"
 	"github.com/0xPolygon/polygon-edge/command/genesis"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/command/ibft"
@@ -59,6 +60,7 @@ func (rc *RootCommand) registerSubCommands() {
 		whitelist.GetCommand(),
 		license.GetCommand(),
 		polybftsecrets.GetCommand(),
+		e2e.GetCommand(),
 	)
 }
 

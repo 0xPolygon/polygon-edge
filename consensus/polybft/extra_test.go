@@ -304,7 +304,8 @@ func TestExtra_CreateValidatorSetDelta_Cases(t *testing.T) {
 			oldValidatorSet := vals.getPublicIdentities(c.oldSet...)
 			newValidatorSet := vals.getPublicIdentities(c.newSet...)
 
-			delta := createValidatorSetDelta(hclog.NewNullLogger(), oldValidatorSet, newValidatorSet)
+			delta, err := createValidatorSetDelta(hclog.NewNullLogger(), oldValidatorSet, newValidatorSet)
+			require.NoError(t, err)
 
 			// added items
 			assert.Len(t, delta.Added, len(c.added))
@@ -332,8 +333,8 @@ func TestExtra_CreateValidatorSetDelta_BlsDiffer(t *testing.T) {
 
 	newValidatorSet[0].BlsKey = privateKey.PublicKey()
 
-	delta := createValidatorSetDelta(hclog.NewNullLogger(), oldValidatorSet, newValidatorSet)
-	assert.Len(t, delta.Added, 2)
+	_, err = createValidatorSetDelta(hclog.NewNullLogger(), oldValidatorSet, newValidatorSet)
+	require.Error(t, err)
 }
 
 func TestExtra_InitGenesisValidatorsDelta(t *testing.T) {
@@ -397,7 +398,8 @@ func TestValidatorSetDelta_Copy(t *testing.T) {
 
 	oldValidatorSet := newTestValidators(originalValidatorsCount).getPublicIdentities()
 	newValidatorSet := oldValidatorSet[:len(oldValidatorSet)-2]
-	originalDelta := createValidatorSetDelta(hclog.NewNullLogger(), oldValidatorSet, newValidatorSet)
+	originalDelta, err := createValidatorSetDelta(hclog.NewNullLogger(), oldValidatorSet, newValidatorSet)
+	require.NoError(t, err)
 	require.NotNil(t, originalDelta)
 	require.Empty(t, originalDelta.Added)
 

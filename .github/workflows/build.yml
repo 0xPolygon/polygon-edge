@@ -3,6 +3,9 @@ name: Build
 on:  # yamllint disable-line rule:truthy
   workflow_dispatch:
   workflow_call:
+    secrets:
+      GH_TOKEN_CLONE_PRIVATE:
+        required: true
 
 jobs:
   go_build:
@@ -11,13 +14,14 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+        with:
+          submodules: recursive
+          token: ${{ secrets.GH_TOKEN_CLONE_PRIVATE }}
+
       - name: Setup Go environment
         uses: actions/setup-go@v3.3.0
         with:
           go-version: 1.18.x
-
-      - name: Compile contracts
-        run: make compile-v3-contracts
 
       - name: Build Polygon Edge
         run: go build -tags netgo -ldflags="-s -w -linkmode external -extldflags "-static" -X \"github.com/0xPolygon/polygon-edge/versioning.Version=${GITHUB_REF_NAME}\" -X \"github.com/0xPolygon/polygon-edge/versioning.Commit=${GITHUB_SHA}\"" && tar -czvf polygon-edge.tar.gz polygon-edge

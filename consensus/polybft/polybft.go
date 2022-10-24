@@ -6,16 +6,17 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math/big"
 	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/0xPolygon/pbft-consensus"
 	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/proto"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
+	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/secrets"
@@ -31,13 +32,6 @@ const (
 	minSyncPeers = 2
 	pbftProto    = "/pbft/0.2"
 	bridgeProto  = "/bridge/0.2"
-
-	blockTimeKey           = "blockTime"
-	epochSizeKey           = "epochSize"
-	sprintSizeKey          = "sprintSize"
-	validatorSetSizeKey    = "validatorSetSize"
-	sidechainBridgeAddrKey = "sidechainBridgeAddr"
-	validatorSetAddrKey    = "validatorSetAddr"
 )
 
 // polybftBackend is an interface defining polybft methods needed by fsm and sync tracker
@@ -123,41 +117,35 @@ type Polybft struct {
 }
 
 func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *state.Transition) error {
-	const skipError = "empty response"
-
-	configMap := config.Params.Engine[engineName]
-
 	return func(transition *state.Transition) error {
-		customConfigJSON, err := json.Marshal(configMap)
+		var pbftConfig PolyBFTConfig
+
+		customConfigJSON, err := json.Marshal(config.Params.Engine[engineName])
 		if err != nil {
 			return err
 		}
 
-		var pbftConfig PolyBFTConfig
-
-		if err = json.Unmarshal(customConfigJSON, &pbftConfig); err != nil {
+		err = json.Unmarshal(customConfigJSON, &pbftConfig)
+		if err != nil {
+			return err
+		}
+		// Initialize child validator set
+		input, err := getInitChildValidatorSetInput(pbftConfig.InitialValidatorSet, pbftConfig.Governance)
+		if err != nil {
 			return err
 		}
 
-		provider := NewStateProvider(transition)
-		systemState := NewSystemState(&pbftConfig, provider)
-
-		for _, sc := range pbftConfig.SmartContracts {
-			result := transition.Create2(types.ZeroAddress, sc.Code, big.NewInt(0), 10000000)
-			if result.Failed() {
-				return result.Err
-			}
-
-			// init validators
-			if sc.Address == pbftConfig.ValidatorSetAddr {
-				err := systemState.InitValidatorSet(pbftConfig.InitialValidatorSet, pbftConfig.ValidatorSetSize)
-				if err != nil && err.Error() != skipError {
-					return err
-				}
-			}
+		if err = initContract(contracts.ValidatorSetContract, input, "ChildValidatorSet", transition); err != nil {
+			return err
 		}
 
-		return nil
+		input, err = initNativeTokenMethod.Encode(
+			[]interface{}{helper.GetDefAccount(), nativeTokenName, nativeTokenSymbol})
+		if err != nil {
+			return err
+		}
+
+		return initContract(contracts.NativeTokenContract, input, "MRC20", transition)
 	}
 }
 
@@ -393,7 +381,6 @@ SYNC:
 	lastBlock := p.blockchain.CurrentHeader()
 	p.logger.Info("startPbftProcess",
 		"header hash", lastBlock.Hash,
-		"computed hash", lastBlock.Hash,
 		"header number", lastBlock.Number)
 
 	currentValidators, err := p.GetValidators(lastBlock.Number, nil)
