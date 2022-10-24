@@ -67,12 +67,12 @@ func (s *Snapshot) GetAccount(addr types.Address) (*state.Account, error) {
 	return &account, nil
 }
 
+func (s *Snapshot) GetCode(hash types.Hash) ([]byte, bool) {
+	return s.state.GetCode(hash)
+}
+
 func (s *Snapshot) Commit(objs []*state.Object) (state.Snapshot, []byte) {
 	trie, root := s.trie.Commit(objs)
 
 	return &Snapshot{trie: trie, state: s.state}, root
-}
-
-func (s *Snapshot) GetCode(hash types.Hash) ([]byte, bool) {
-	return s.state.GetCode(hash)
 }
