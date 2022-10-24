@@ -449,6 +449,7 @@ func (t *testHeadersMap) getHeaderByHash(hash types.Hash) *types.Header {
 			return header
 		}
 	}
+
 	return nil
 }
 

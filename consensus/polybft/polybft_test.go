@@ -58,6 +58,7 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 	for i := 1; i < int(polyBftConfig.EpochSize); i++ {
 		delta, err := createValidatorSetDelta(hclog.NewNullLogger(), validatorSetParent, validatorSetParent)
 		require.NoError(t, err)
+
 		extra := &Extra{Validators: delta}
 		header := &types.Header{
 			Number:    uint64(i),
