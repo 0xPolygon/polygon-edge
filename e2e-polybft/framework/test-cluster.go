@@ -178,9 +178,9 @@ var genesisPath string
 func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *TestCluster {
 	t.Helper()
 
-	// if !isTrueEnv(envE2ETestsEnabled) {
-	// 	t.Skip("Integration tests are disabled.")
-	// }
+	if !isTrueEnv(envE2ETestsEnabled) {
+		t.Skip("Integration tests are disabled.")
+	}
 
 	tmpDir, err := os.MkdirTemp("/tmp", "e2e-polybft-")
 	require.NoError(t, err)

@@ -14,10 +14,9 @@ func TestE2E_NetworkDiscoveryProtocol(t *testing.T) {
 	const (
 		validatorCount    = 5
 		nonValidatorCount = 5
-		testTimeout       = time.Second * 60
-
-		// each node in cluster finds at least 2 more peers beside bootnode
-		peersCount = 3
+		// each node in cluster should find at least 2 more peers beside bootnode
+		atLeastPeers = 3
+		testTimeout  = time.Second * 60
 	)
 
 	// create cluster
@@ -33,7 +32,7 @@ func TestE2E_NetworkDiscoveryProtocol(t *testing.T) {
 	err := cluster.WaitForGeneric(testTimeout, func(ts *framework.TestServer) bool {
 		peerList, err := ts.Conn().PeersList(ctx, &emptypb.Empty{})
 
-		return err == nil && len(peerList.GetPeers()) >= peersCount
+		return err == nil && len(peerList.GetPeers()) >= atLeastPeers
 	})
 	assert.NoError(t, err)
 }
