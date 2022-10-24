@@ -41,7 +41,8 @@ const (
 	defaultContractsRootFolder        = "core-contracts/artifacts/contracts"
 	defaultBridge                     = false
 
-	bootnodePortStart = 30301
+	bootnodePortStart   = 30301
+	defaultStakeBalance = 100
 )
 
 func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
@@ -169,7 +170,7 @@ func getBalance(address types.Address, allocations map[types.Address]*chain.Gene
 		return genesisAcc.Balance
 	}
 
-	return big.NewInt(0)
+	return big.NewInt(defaultStakeBalance)
 }
 
 func (p *genesisParams) generatePolyBftGenesis() error {

@@ -59,16 +59,16 @@ func TestE2E_Bridge_MainWorkflow(t *testing.T) {
 
 	var (
 		wallets, amounts [num]string
-		premines         [num]types.Address
+		premine          [num]types.Address
 	)
 
 	for i := 0; i < num; i++ {
-		premines[i] = types.Address(wallet.GenerateAccount().Ecdsa.Address())
-		wallets[i] = premines[i].String()
+		premine[i] = types.Address(wallet.GenerateAccount().Ecdsa.Address())
+		wallets[i] = premine[i].String()
 		amounts[i] = fmt.Sprintf("%d", 100)
 	}
 
-	cluster := framework.NewTestCluster(t, 5, framework.WithBridge(), framework.WithPremine(premines[:]...))
+	cluster := framework.NewTestCluster(t, 5, framework.WithBridge(), framework.WithPremine(premine[:]...))
 	defer cluster.Stop()
 
 	// wait for a couple of blocks
