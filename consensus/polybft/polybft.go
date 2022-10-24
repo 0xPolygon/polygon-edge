@@ -6,13 +6,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math/big"
 	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/0xPolygon/pbft-consensus"
 	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/proto"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
@@ -25,7 +25,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/umbracle/ethgo/abi"
 	"go.opentelemetry.io/otel"
 )
 
@@ -136,21 +135,17 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			return err
 		}
 
-		result := transition.Call2(contracts.SystemCaller, contracts.ValidatorSetContract, input,
-			big.NewInt(0), 100_000_000)
-
-		if result.Failed() {
-			if result.Reverted() {
-				unpackedRevert, err := abi.UnpackRevertError(result.ReturnValue)
-				if err == nil {
-					fmt.Printf("ChildValidatorSet.initialize %v\n", unpackedRevert)
-				}
-			}
-
-			return result.Err
+		if err = initContract(contracts.ValidatorSetContract, input, "ChildValidatorSet", transition); err != nil {
+			return err
 		}
 
-		return nil
+		input, err = initNativeTokenMethod.Encode(
+			[]interface{}{helper.GetDefAccount(), nativeTokenName, nativeTokenSymbol})
+		if err != nil {
+			return err
+		}
+
+		return initContract(contracts.NativeTokenContract, input, "MRC20", transition)
 	}
 }
 

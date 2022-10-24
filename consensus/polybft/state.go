@@ -38,8 +38,7 @@ validatorSnapshots/
 
 var (
 	// ABI
-	stateTransferEvent      = abi.MustNewEvent("event StateSynced(uint256 indexed id, address indexed sender, address indexed receiver, bytes data)") //nolint:lll
-	onStateReceiveMethod, _ = abi.NewMethod("function onStateReceive(uint64, address, bytes)")
+	stateTransferEvent = abi.MustNewEvent("event StateSynced(uint256 indexed id, address indexed sender, address indexed receiver, bytes data)") //nolint:lll
 )
 
 const (
