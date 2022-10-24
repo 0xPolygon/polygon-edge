@@ -103,6 +103,7 @@ func (txn *Txn) getStateObject(addr types.Address) (*StateObject, bool) {
 	if err != nil {
 		return nil, false
 	}
+
 	if account == nil {
 		return nil, false
 	}
@@ -476,6 +477,7 @@ func (txn *Txn) GetCommittedState(addr types.Address, key types.Hash) types.Hash
 	if !ok {
 		return types.Hash{}
 	}
+
 	return txn.snapshot.GetStorage(addr, obj.Account.Root, key)
 }
 

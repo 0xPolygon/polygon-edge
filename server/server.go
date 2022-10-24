@@ -308,10 +308,12 @@ func (t *txpoolHub) GetNonce(root types.Hash, addr types.Address) uint64 {
 	if err != nil {
 		return 0
 	}
+
 	account, err := snap.GetAccount(addr)
 	if err != nil {
 		return 0
 	}
+
 	return account.Nonce
 }
 
@@ -320,10 +322,12 @@ func (t *txpoolHub) GetBalance(root types.Hash, addr types.Address) (*big.Int, e
 	if err != nil {
 		return nil, fmt.Errorf("unable to get snapshot for root, %w", err)
 	}
+
 	account, err := snap.GetAccount(addr)
 	if err != nil {
 		return big.NewInt(0), nil
 	}
+
 	return account.Balance, nil
 }
 
@@ -438,10 +442,12 @@ func (j *jsonRPCHub) GetAccount(root types.Hash, addr types.Address) (*state.Acc
 	if err != nil {
 		return nil, err
 	}
+
 	account, err := snap.GetAccount(addr)
 	if err != nil {
 		return nil, err
 	}
+
 	return account, nil
 }
 
@@ -455,7 +461,9 @@ func (j *jsonRPCHub) GetStorage(root types.Hash, addr types.Address, slot types.
 	if err != nil {
 		return nil, err
 	}
+
 	res := snap.GetStorage(addr, root, slot)
+
 	return res.Bytes(), nil
 }
 
