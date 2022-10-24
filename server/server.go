@@ -18,7 +18,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	configHelper "github.com/0xPolygon/polygon-edge/helper/config"
-	"github.com/0xPolygon/polygon-edge/helper/keccak"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/jsonrpc"
 	"github.com/0xPolygon/polygon-edge/network"
@@ -304,22 +303,15 @@ type txpoolHub struct {
 }
 
 func (t *txpoolHub) GetNonce(root types.Hash, addr types.Address) uint64 {
+	// TODO: Use a function that returns only Account
 	snap, err := t.state.NewSnapshotAt(root)
 	if err != nil {
 		return 0
 	}
-
-	result, ok := snap.Get(keccak.Keccak256(nil, addr.Bytes()))
-	if !ok {
+	account, err := snap.GetAccount(addr)
+	if err != nil {
 		return 0
 	}
-
-	var account state.Account
-
-	if err := account.UnmarshalRlp(result); err != nil {
-		return 0
-	}
-
 	return account.Nonce
 }
 
@@ -328,17 +320,10 @@ func (t *txpoolHub) GetBalance(root types.Hash, addr types.Address) (*big.Int, e
 	if err != nil {
 		return nil, fmt.Errorf("unable to get snapshot for root, %w", err)
 	}
-
-	result, ok := snap.Get(keccak.Keccak256(nil, addr.Bytes()))
-	if !ok {
+	account, err := snap.GetAccount(addr)
+	if err != nil {
 		return big.NewInt(0), nil
 	}
-
-	var account state.Account
-	if err = account.UnmarshalRlp(result); err != nil {
-		return nil, fmt.Errorf("unable to unmarshal account from snapshot, %w", err)
-	}
-
 	return account.Balance, nil
 }
 
@@ -448,36 +433,16 @@ func (j *jsonRPCHub) GetPeers() int {
 	return len(j.Server.Peers())
 }
 
-func (j *jsonRPCHub) getState(root types.Hash, slot []byte) ([]byte, error) {
-	// the values in the trie are the hashed objects of the keys
-	key := keccak.Keccak256(nil, slot)
-
+func (j *jsonRPCHub) GetAccount(root types.Hash, addr types.Address) (*state.Account, error) {
 	snap, err := j.state.NewSnapshotAt(root)
 	if err != nil {
 		return nil, err
 	}
-
-	result, ok := snap.Get(key)
-
-	if !ok {
-		return nil, jsonrpc.ErrStateNotFound
-	}
-
-	return result, nil
-}
-
-func (j *jsonRPCHub) GetAccount(root types.Hash, addr types.Address) (*state.Account, error) {
-	obj, err := j.getState(root, addr.Bytes())
+	account, err := snap.GetAccount(addr)
 	if err != nil {
 		return nil, err
 	}
-
-	var account state.Account
-	if err := account.UnmarshalRlp(obj); err != nil {
-		return nil, err
-	}
-
-	return &account, nil
+	return account, nil
 }
 
 // GetForksInTime returns the active forks at the given block height
@@ -486,19 +451,12 @@ func (j *jsonRPCHub) GetForksInTime(blockNumber uint64) chain.ForksInTime {
 }
 
 func (j *jsonRPCHub) GetStorage(root types.Hash, addr types.Address, slot types.Hash) ([]byte, error) {
-	account, err := j.GetAccount(root, addr)
-
+	snap, err := j.state.NewSnapshotAt(root)
 	if err != nil {
 		return nil, err
 	}
-
-	obj, err := j.getState(account.Root, slot.Bytes())
-
-	if err != nil {
-		return nil, err
-	}
-
-	return obj, nil
+	res := snap.GetStorage(addr, root, slot)
+	return res.Bytes(), nil
 }
 
 func (j *jsonRPCHub) GetCode(hash types.Hash) ([]byte, error) {

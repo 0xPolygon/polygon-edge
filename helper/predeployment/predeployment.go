@@ -124,7 +124,7 @@ func getPredeployAccount(address types.Address, input, deployedBytecode []byte) 
 	snapshot := st.NewSnapshot()
 
 	// Create a radix
-	radix := state.NewTxn(st, snapshot)
+	radix := state.NewTxn(snapshot)
 
 	// Create the contract object for the EVM
 	contract := runtime.NewContractCreation(
