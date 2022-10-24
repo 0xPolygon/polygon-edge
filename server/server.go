@@ -325,7 +325,7 @@ func (t *txpoolHub) GetBalance(root types.Hash, addr types.Address) (*big.Int, e
 
 	account, err := snap.GetAccount(addr)
 	if err != nil {
-		return big.NewInt(0), nil
+		return big.NewInt(0), err
 	}
 
 	return account.Balance, nil
