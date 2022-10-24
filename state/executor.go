@@ -6,6 +6,7 @@ import (
 	"math"
 	"math/big"
 
+	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/state/runtime/evm"
 
 	"github.com/hashicorp/go-hclog"
@@ -555,7 +556,7 @@ func (t *Transition) run(contract *runtime.Contract, host runtime.Host) *runtime
 	}
 }
 
-func (t *Transition) transfer(from, to types.Address, amount *big.Int) error {
+func (t *Transition) Transfer(from, to types.Address, amount *big.Int) error {
 	if amount == nil {
 		return nil
 	}
@@ -590,7 +591,7 @@ func (t *Transition) applyCall(
 
 	if callType == runtime.Call {
 		// Transfers only allowed on calls
-		if err := t.transfer(c.Caller, c.Address, c.Value); err != nil {
+		if err := t.Transfer(c.Caller, c.Address, c.Value); err != nil {
 			return &runtime.ExecutionResult{
 				GasLeft: c.Gas,
 				Err:     err,
@@ -654,7 +655,7 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 	}
 
 	// Transfer the value
-	if err := t.transfer(c.Caller, c.Address, c.Value); err != nil {
+	if err := t.Transfer(c.Caller, c.Address, c.Value); err != nil {
 		return &runtime.ExecutionResult{
 			GasLeft: gasLimit,
 			Err:     err,
@@ -878,9 +879,9 @@ func checkAndProcessStateTx(msg *types.Transaction, t *Transition) error {
 		)
 	}
 
-	if msg.From != types.ZeroAddress {
+	if msg.From != contracts.SystemCaller {
 		return NewTransitionApplicationError(
-			errors.New("from of state transaction must be zero"),
+			fmt.Errorf("state transaction sender must be %v, but got %v", contracts.SystemCaller, msg.From),
 			true,
 		)
 	}

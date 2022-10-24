@@ -19,12 +19,9 @@ import (
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/go-connections/nat"
 	"github.com/spf13/cobra"
-	"github.com/umbracle/ethgo"
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/polybftcontracts"
-	"github.com/0xPolygon/polygon-edge/types"
 )
 
 const (
@@ -93,14 +90,6 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	if err := pingServer(closeCh); err != nil {
 		close(closeCh)
 		outputter.SetError(fmt.Errorf("failed to ping rootchain server at address %s: %w", helper.ReadRootchainIP(), err))
-
-		return
-	}
-
-	// perform any initial deploy  of contracts
-	if err := initialDeploy(outputter); err != nil {
-		close(closeCh)
-		outputter.SetError(fmt.Errorf("failed to deploy: %w", err))
 
 		return
 	}
@@ -220,63 +209,6 @@ func runRootchain(ctx context.Context, outputter command.OutputFormatter, closeC
 		}
 		close(closeCh)
 	}()
-
-	return nil
-}
-
-func initialDeploy(outputter command.OutputFormatter) error {
-	existsCode, err := helper.ExistsCode(helper.RootchainBridgeAddress)
-	if err != nil {
-		return err
-	}
-
-	// if the bridge contract is not created, we have to deploy all the contracts
-	if existsCode {
-		return nil
-	}
-
-	// fund account
-	if _, err = helper.FundAccount(helper.GetDefAccount()); err != nil {
-		return err
-	}
-
-	deployContracts := map[string]types.Address{
-		"RootchainBridge": helper.RootchainBridgeAddress,
-		"Checkpoint":      helper.CheckpointManagerAddress,
-	}
-
-	for name, address := range deployContracts {
-		artifact, err := polybftcontracts.ReadArtifact(helper.ContractRootFolder, "root", name)
-		if err != nil {
-			return fmt.Errorf("failed to read artifact: %w", err)
-		}
-
-		input, err := artifact.DeployInput(nil)
-		if err != nil {
-			return err
-		}
-
-		txn := &ethgo.Transaction{
-			To:    nil, // contract deployment
-			Input: input,
-		}
-
-		pendingNonce, err := helper.GetPendingNonce(helper.GetDefAccount())
-		if err != nil {
-			return err
-		}
-
-		receipt, err := helper.SendTxn(pendingNonce, txn)
-		if err != nil {
-			return err
-		}
-
-		if types.Address(receipt.ContractAddress) != address {
-			return fmt.Errorf("wrong deployed address for %s: expected %s but found %s", name, address, receipt.ContractAddress)
-		}
-
-		outputter.WriteCommandResult(newInitialDeployResult(name, address, receipt.TransactionHash))
-	}
 
 	return nil
 }

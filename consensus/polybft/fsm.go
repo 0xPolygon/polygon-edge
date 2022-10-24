@@ -10,6 +10,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
+	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -60,7 +61,7 @@ type fsm struct {
 	postInsertHook func() error
 
 	// uptimeCounter holds info about number of times validators sealed a block (only present if isEndOfEpoch is true)
-	uptimeCounter *UptimeCounter
+	uptimeCounter *CommitEpoch
 
 	// isEndOfEpoch indicates if epoch reached its end
 	isEndOfEpoch bool
@@ -135,6 +136,9 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 			// since proposer does not execute Validate (when we see the commitment to register in state transactions)
 			// we need to set commitment to save so that the proposer also saves its commitment that he registered
 			f.commitmentToSaveOnRegister = f.proposerCommitmentToRegister
+			f.logger.Debug("[FSM] Registering commitment",
+				"from", f.proposerCommitmentToRegister.Message.FromIndex,
+				"toIndex", f.proposerCommitmentToRegister.Message.ToIndex)
 		}
 
 		for _, tx := range f.stateTransactions() {
@@ -195,7 +199,7 @@ func (f *fsm) stateTransactions() []*types.Transaction {
 			}
 
 			txns = append(txns,
-				createStateTransactionWithData(f.config.SidechainBridgeAddr, inputData))
+				createStateTransactionWithData(f.config.StateReceiverAddr, inputData))
 		}
 	}
 
@@ -209,7 +213,11 @@ func (f *fsm) stateTransactions() []*types.Transaction {
 			}
 
 			txns = append(txns,
-				createStateTransactionWithData(f.config.SidechainBridgeAddr, inputData))
+				createStateTransactionWithData(f.config.StateReceiverAddr, inputData))
+
+			f.logger.Debug("[fsm] Executing bundle",
+				"fromIndex", bundle.StateSyncs[0].ID,
+				"toIndex", bundle.StateSyncs[len(bundle.StateSyncs)-1].ID)
 		}
 	}
 
@@ -374,7 +382,12 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 				return fmt.Errorf("error for state transaction while unmarshaling signature: tx = %v, error = %w", tx.Hash, err)
 			}
 
-			verified := aggs.VerifyAggregated(signers.GetBlsKeys(), stateTxData.Message.Hash().Bytes())
+			hash, err := stateTxData.Message.Hash()
+			if err != nil {
+				return err
+			}
+
+			verified := aggs.VerifyAggregated(signers.GetBlsKeys(), hash.Bytes())
 			if !verified {
 				return fmt.Errorf("invalid signature for tx = %v", tx.Hash)
 			}
@@ -499,7 +512,7 @@ func (f *fsm) getValidatorSetDelta(pendingBlockState *state.Transition) (*Valida
 		return nil, fmt.Errorf("failed to retrieve validator set for current block %w", err)
 	}
 
-	return createValidatorSetDelta(f.logger, f.validators.Accounts(), newValidators), nil
+	return createValidatorSetDelta(f.logger, f.validators.Accounts(), newValidators)
 }
 
 // verifyValidatorsUptimeTx creates uptime transaction and compares its hash with the one extracted from the block.
@@ -564,7 +577,7 @@ func validateHeaderFields(parent *types.Header, header *types.Header) error {
 // with provided target address and inputData parameter which is ABI encoded byte array.
 func createStateTransactionWithData(target types.Address, inputData []byte) *types.Transaction {
 	tx := &types.Transaction{
-		From:     types.ZeroAddress,
+		From:     contracts.SystemCaller,
 		To:       &target,
 		Type:     types.StateTx,
 		Input:    inputData,

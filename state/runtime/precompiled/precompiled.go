@@ -4,15 +4,24 @@ import (
 	"encoding/binary"
 
 	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/umbracle/ethgo/abi"
 )
 
 var _ runtime.Runtime = &Precompiled{}
 
+var (
+	// abiBoolTrue is ABI encoded true boolean value
+	abiBoolTrue = abiBoolMustEncode(true)
+	// abiBoolFalse is ABI encoded false boolean value
+	abiBoolFalse = abiBoolMustEncode(false)
+)
+
 type contract interface {
 	gas(input []byte, config *chain.ForksInTime) uint64
-	run(input []byte) ([]byte, error)
+	run(input []byte, caller types.Address, host runtime.Host) ([]byte, error)
 }
 
 // Precompiled is the runtime for the precompiled contracts
@@ -43,6 +52,15 @@ func (p *Precompiled) setupContracts() {
 
 	// Istanbul fork
 	p.register("9", &blake2f{p})
+
+	// Native transfer precompile
+	p.register(contracts.NativeTransferPrecompile.String(), &nativeTransfer{})
+
+	// BLS aggregated signatures verification precompile
+	p.register(contracts.BLSAggSigsVerificationPrecompile.String(), &blsAggSignsVerification{})
+
+	// Console precompile
+	p.register(contracts.ConsolePrecompile.String(), &console{})
 }
 
 func (p *Precompiled) register(addrStr string, b contract) {
@@ -94,7 +112,7 @@ func (p *Precompiled) Name() string {
 }
 
 // Run runs an execution
-func (p *Precompiled) Run(c *runtime.Contract, _ runtime.Host, config *chain.ForksInTime) *runtime.ExecutionResult {
+func (p *Precompiled) Run(c *runtime.Contract, host runtime.Host, config *chain.ForksInTime) *runtime.ExecutionResult {
 	contract := p.contracts[c.CodeAddress]
 	gasCost := contract.gas(c.Input, config)
 
@@ -107,7 +125,7 @@ func (p *Precompiled) Run(c *runtime.Contract, _ runtime.Host, config *chain.For
 	}
 
 	c.Gas = c.Gas - gasCost
-	returnValue, err := contract.run(c.Input)
+	returnValue, err := contract.run(c.Input, c.Caller, host)
 
 	result := &runtime.ExecutionResult{
 		ReturnValue: returnValue,
@@ -176,4 +194,15 @@ func extendByteSlice(b []byte, needLen int) []byte {
 	}
 
 	return b[:needLen]
+}
+
+// abiBoolMustEncode encodes the given value using the given ABI type.
+// panics if there is an error occurred.
+func abiBoolMustEncode(v bool) []byte {
+	raw, err := abi.MustNewType("bool").Encode(v)
+	if err != nil {
+		panic(err)
+	}
+
+	return raw
 }

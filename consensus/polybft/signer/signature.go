@@ -2,10 +2,12 @@ package bls
 
 import (
 	"errors"
+	"math/big"
 
 	bn256 "github.com/umbracle/go-eth-bn256"
 )
 
+// Signature represents bls signature which is point on the curve
 type Signature struct {
 	p *bn256.G1
 }
@@ -64,6 +66,21 @@ func UnmarshalSignature(raw []byte) (*Signature, error) {
 	_, err := p.Unmarshal(raw)
 
 	return &Signature{p: p}, err
+}
+
+// ToBigInt marshalls signature (which is point) to 2 big ints - one for each coordinate
+func (s Signature) ToBigInt() ([2]*big.Int, error) {
+	sig, err := s.Marshal()
+	if err != nil {
+		return [2]*big.Int{}, err
+	}
+
+	res := [2]*big.Int{
+		new(big.Int).SetBytes(sig[0:32]),
+		new(big.Int).SetBytes(sig[32:64]),
+	}
+
+	return res, nil
 }
 
 // Signatures is a slice of signatures
