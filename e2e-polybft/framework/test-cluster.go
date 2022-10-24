@@ -173,8 +173,6 @@ func isTrueEnv(e string) bool {
 	return strings.ToLower(os.Getenv(e)) == "true"
 }
 
-var genesisPath string
-
 func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *TestCluster {
 	t.Helper()
 
