@@ -198,10 +198,11 @@ type Transition struct {
 	totalGas uint64
 }
 
-func NewTransition(config chain.ForksInTime, radix *Txn) *Transition {
+func NewTransition(config chain.ForksInTime, snap Snapshot, radix *Txn) *Transition {
 	return &Transition{
 		config: config,
 		state:  radix,
+		snap:   snap,
 		r: &Executor{
 			runtimes: []runtime.Runtime{
 				evm.NewEVM(),

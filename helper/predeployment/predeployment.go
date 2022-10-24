@@ -141,7 +141,7 @@ func getPredeployAccount(address types.Address, input, deployedBytecode []byte) 
 	config := chain.AllForksEnabled.At(0)
 
 	// Create a transition
-	transition := state.NewTransition(config, radix)
+	transition := state.NewTransition(config, snapshot, radix)
 
 	// Run the transition through the EVM
 	res := evm.NewEVM().Run(contract, transition, &config)
