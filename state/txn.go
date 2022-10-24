@@ -14,8 +14,8 @@ import (
 )
 
 type readSnapshot interface {
-	GetStorage2(addr types.Address, root types.Hash, key types.Hash) types.Hash
-	GetAccount2(addr types.Address) (*Account, error)
+	GetStorage(addr types.Address, root types.Hash, key types.Hash) types.Hash
+	GetAccount(addr types.Address) (*Account, error)
 	GetCode(hash types.Hash) ([]byte, bool)
 }
 
@@ -99,7 +99,7 @@ func (txn *execTxn) getStateObject(addr types.Address) (*StateObject, bool) {
 		return obj.Copy(), true
 	}
 
-	account, err := txn.snapshot.GetAccount2(addr)
+	account, err := txn.snapshot.GetAccount(addr)
 	if err != nil {
 		return nil, false
 	}
@@ -336,7 +336,7 @@ func (txn *execTxn) GetState(addr types.Address, key types.Hash) types.Hash {
 		}
 	}
 
-	return txn.snapshot.GetStorage2(addr, object.Account.Root, key)
+	return txn.snapshot.GetStorage(addr, object.Account.Root, key)
 }
 
 // Nonce
@@ -476,7 +476,7 @@ func (txn *execTxn) GetCommittedState(addr types.Address, key types.Hash) types.
 	if !ok {
 		return types.Hash{}
 	}
-	return txn.snapshot.GetStorage2(addr, obj.Account.Root, key)
+	return txn.snapshot.GetStorage(addr, obj.Account.Root, key)
 }
 
 func (txn *execTxn) TouchAccount(addr types.Address) {
