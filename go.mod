@@ -61,7 +61,7 @@ require (
 )
 
 require (
-	github.com/0xPolygon/go-ibft v0.0.0-20220810095021-e43142f8d267
+	github.com/0xPolygon/go-ibft v0.0.0-20221025100404-da21f2dfb62b
 	github.com/0xPolygon/pbft-consensus v0.0.0-20220823102839-109d9f873bf4
 	github.com/docker/docker v20.10.18+incompatible
 	github.com/docker/go-connections v0.4.0
@@ -72,6 +72,7 @@ require (
 	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
 	gopkg.in/DataDog/dd-trace-go.v1 v1.42.1
 )
+
 
 require (
 	cloud.google.com/go v0.104.0 // indirect
