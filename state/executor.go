@@ -644,6 +644,7 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 	}
 
 	result := t.run(c, host)
+	result.Address = c.Address
 
 	if result.Failed() {
 		t.state.RevertToSnapshot(snapshot)

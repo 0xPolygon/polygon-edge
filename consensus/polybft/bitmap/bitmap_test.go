@@ -7,6 +7,8 @@ import (
 )
 
 func TestBitmap_Set(t *testing.T) {
+	t.Parallel()
+
 	data := []int{8, 15, 0, 7, 31, 60, 112, 7, 16, 241, 189, 60, 0, 19, 14, 25}
 	unique := map[int]struct{}{}
 
@@ -35,6 +37,8 @@ func TestBitmap_Set(t *testing.T) {
 }
 
 func TestBitmap_Extend(t *testing.T) {
+	t.Parallel()
+
 	data := [][2]int{
 		{0, 1},
 		{8, 2},

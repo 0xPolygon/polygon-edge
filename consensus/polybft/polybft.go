@@ -506,7 +506,7 @@ func (p *Polybft) VerifyHeader(header *types.Header) error {
 	parent, ok := p.blockchain.GetHeaderByHash(header.ParentHash)
 	if !ok {
 		return fmt.Errorf(
-			"unable to get parent header for block number %d",
+			"unable to get parent header by hash for block number %d",
 			header.Number,
 		)
 	}
@@ -522,7 +522,7 @@ func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, parents []*type
 		return nil
 	}
 
-	// validate header fields
+	//validate header fields
 	if err := validateHeaderFields(parent, header); err != nil {
 		return fmt.Errorf("failed to validate header for block %d. error = %w", blockNumber, err)
 	}
