@@ -46,7 +46,7 @@ func TestState_InsertEvent(t *testing.T) {
 	t.Parallel()
 
 	state := newTestState(t)
-	evnt1 := newStateSyncEvent(0, ethgo.Address{}, ethgo.Address{}, nil, nil)
+	evnt1 := newStateSyncEvent(0, ethgo.Address{}, ethgo.Address{}, nil)
 	err := state.insertStateSyncEvent(evnt1)
 	assert.NoError(t, err)
 
@@ -350,6 +350,83 @@ func TestState_insertAndGetBundles(t *testing.T) {
 	assert.Equal(t, uint64(0), bundlesFromDB[0].ID())
 	assert.Equal(t, stateSyncBundleSize, len(bundlesFromDB[0].StateSyncs))
 	assert.NotNil(t, bundlesFromDB[0].Proof)
+}
+
+func TestState_Insert_And_Get_ExitEvents_PerEpoch(t *testing.T) {
+	const (
+		numOfEpochs         = 11
+		numOfBlocksPerEpoch = 10
+		numOfEventsPerBlock = 11
+	)
+
+	state := newTestState(t)
+	insertTestExitEvents(t, state, numOfEpochs, numOfBlocksPerEpoch, numOfEventsPerBlock)
+
+	start := time.Now()
+
+	events, err := state.getExitEventsByEpoch(1)
+
+	fmt.Printf("Gotten events for epoch in: %v", time.Since(start))
+
+	assert.NoError(t, err)
+	assert.Len(t, events, numOfBlocksPerEpoch*numOfEventsPerBlock)
+}
+
+func TestState_Insert_And_Get_ExitEvents_ForProof(t *testing.T) {
+	const (
+		numOfEpochs         = 11
+		numOfBlocksPerEpoch = 10
+		numOfEventsPerBlock = 10
+	)
+
+	state := newTestState(t)
+	insertTestExitEvents(t, state, numOfEpochs, numOfBlocksPerEpoch, numOfEventsPerBlock)
+
+	var cases = []struct {
+		exitEventID            uint64
+		epoch                  uint64
+		checkpointBlockNumber  uint64
+		expectedNumberOfEvents int
+	}{
+		{1, 1, 1, 10},
+		{15, 1, 2, 20},
+		{78, 1, 8, 80},
+		{111, 2, 12, 20},
+		{140, 2, 14, 40},
+		{254, 3, 26, 60},
+		{377, 4, 38, 80},
+		{1045, 11, 105, 50},
+	}
+
+	for _, c := range cases {
+		events, err := state.getExitEventsForProof(c.exitEventID, c.epoch, c.checkpointBlockNumber)
+
+		assert.NoError(t, err)
+		assert.Len(t, events, c.expectedNumberOfEvents)
+	}
+}
+
+func insertTestExitEvents(t *testing.T, state *State,
+	numOfEpochs, numOfBlocksPerEpoch, numOfEventsPerBlock int) {
+	t.Helper()
+
+	index, block := uint64(1), uint64(1)
+	start := time.Now()
+
+	for i := uint64(1); i <= uint64(numOfEpochs); i++ {
+		for j := 1; j <= numOfBlocksPerEpoch; j++ {
+			for k := 1; k <= numOfEventsPerBlock; k++ {
+				event := &ExitEvent{index, ethgo.ZeroAddress, ethgo.ZeroAddress, []byte{0, 1}, i, block}
+				assert.NoError(t, state.insertExitEvent(event))
+
+				index++
+			}
+			block++
+		}
+	}
+
+	fmt.Printf("Inserted %v exit events in: %v\n", numOfEpochs*numOfBlocksPerEpoch*numOfEventsPerBlock,
+		time.Since(start))
 }
 
 func insertTestCommitments(t *testing.T, state *State, epoch, numberOfCommitments uint64) {

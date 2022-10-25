@@ -150,7 +150,7 @@ func (c *consensusRuntime) AddLog(eventLog *ethgo.Log) {
 		"index", eventLog.LogIndex,
 	)
 
-	event, err := decodeEvent(eventLog)
+	event, err := decodeStateSyncEvent(eventLog)
 	if err != nil {
 		c.logger.Error("failed to decode state sync event", "hash", eventLog.TransactionHash, "err", err)
 

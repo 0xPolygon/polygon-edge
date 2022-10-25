@@ -150,7 +150,7 @@ func TestConsensusRuntime_AddLog(t *testing.T) {
 		config: &runtimeConfig{Key: createTestKey(t)},
 	}
 	topics := make([]ethgo.Hash, 4)
-	topics[0] = stateTransferEvent.ID()
+	topics[0] = stateTransferEventABI.ID()
 	topics[1] = ethgo.BytesToHash([]byte{0x1})
 	topics[2] = ethgo.BytesToHash(runtime.config.Key.Address().Bytes())
 	topics[3] = ethgo.BytesToHash(contracts.NativeTokenContract[:])
@@ -167,7 +167,7 @@ func TestConsensusRuntime_AddLog(t *testing.T) {
 		Topics:          topics,
 		Data:            encodedData,
 	}
-	event, err := decodeEvent(log)
+	event, err := decodeStateSyncEvent(log)
 	require.NoError(t, err)
 	runtime.AddLog(log)
 
