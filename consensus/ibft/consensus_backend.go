@@ -133,9 +133,9 @@ func (i *backendIBFT) HasQuorum(blockNumber uint64, messages []*protoIBFT.Messag
 	if len(messages) > 0 {
 		switch messages[0].GetType() {
 		case protoIBFT.MessageType_PREPARE:
-			return len(messages) >= int(quorum)-1
-		case protoIBFT.MessageType_COMMIT:
-			return len(messages) >= int(quorum)
+			return len(messages) < int(quorum)-1
+		case protoIBFT.MessageType_ROUND_CHANGE:
+			return len(messages) < int(quorum)
 		}
 	}
 
