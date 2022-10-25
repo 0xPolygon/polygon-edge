@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -73,8 +74,12 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	closeCh := make(chan struct{})
 
 	// Check if the client is already running
-	if containerID := helper.GetRootchainID(); containerID != "" {
-		outputter.SetError(fmt.Errorf("rootchain already running: %s", containerID))
+	if cid, err := helper.GetRootchainID(); !errors.Is(err, helper.ErrRootchainNotFound) {
+		if err != nil {
+			outputter.SetError(err)
+		} else if cid != "" {
+			outputter.SetError(fmt.Errorf("rootchain already running: %s", cid))
+		}
 
 		return
 	}
@@ -87,9 +92,14 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	}
 
 	// Ping geth server to make sure everything is up and running
-	if err := pingServer(closeCh); err != nil {
+	if err := PingServer(closeCh); err != nil {
 		close(closeCh)
-		outputter.SetError(fmt.Errorf("failed to ping rootchain server at address %s: %w", helper.ReadRootchainIP(), err))
+
+		if ip, err := helper.ReadRootchainIP(); err != nil {
+			outputter.SetError(fmt.Errorf("failed to ping rootchain server: %w", err))
+		} else {
+			outputter.SetError(fmt.Errorf("failed to ping rootchain server at address %s: %w", ip, err))
+		}
 
 		return
 	}
@@ -232,7 +242,7 @@ func gatherLogs(ctx context.Context, outputter command.OutputFormatter) error {
 	return nil
 }
 
-func pingServer(closeCh <-chan struct{}) error {
+func PingServer(closeCh <-chan struct{}) error {
 	httpTimer := time.NewTimer(30 * time.Second)
 	httpClient := http.Client{
 		Timeout: 5 * time.Second,

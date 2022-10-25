@@ -11,6 +11,8 @@ import (
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
+
+	rootchain "github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
@@ -29,14 +31,17 @@ const (
 	sprintSizeFlag       = "sprint-size"
 	blockTimeFlag        = "block-time"
 	validatorsFlag       = "polybft-validators"
+	bridgeFlag           = "bridge"
 
 	defaultEpochSize                  = uint64(10)
 	defaultSprintSize                 = uint64(5)
 	defaultValidatorSetSize           = 100
 	defaultBlockTime                  = 2 * time.Second
 	defaultPolyBftValidatorPrefixPath = "test-chain-"
+	defaultBridge                     = false
 
-	bootnodePortStart = 30301
+	bootnodePortStart   = 30301
+	defaultStakeBalance = 100
 )
 
 func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
@@ -60,6 +65,19 @@ func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
 		ValidatorSetAddr:  contracts.ValidatorSetContract,
 		StateReceiverAddr: contracts.StateReceiverContract,
 		Governance:        types.Address(governanceAccount.Ecdsa.Address()),
+	}
+
+	if p.bridgeEnabled {
+		ip, err := rootchain.ReadRootchainIP()
+		if err != nil {
+			return nil, err
+		}
+
+		polyBftConfig.Bridge = &polybft.BridgeConfig{
+			BridgeAddr:      rootchain.StateSenderAddress,
+			CheckpointAddr:  rootchain.CheckpointManagerAddress,
+			JSONRPCEndpoint: ip,
+		}
 	}
 
 	chainConfig := &chain.Chain{
@@ -151,7 +169,7 @@ func getBalance(address types.Address, allocations map[types.Address]*chain.Gene
 		return genesisAcc.Balance
 	}
 
-	return big.NewInt(0)
+	return big.NewInt(defaultStakeBalance)
 }
 
 func (p *genesisParams) generatePolyBftGenesis() error {

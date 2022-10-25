@@ -10,7 +10,6 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/polybftcontracts"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -21,6 +20,8 @@ var (
 	contractsToParamTypes = map[string]string{
 		contracts.NativeTokenContract.String(): "tuple(address,uint256)",
 	}
+
+	syncStateAbiMethod, _ = abi.NewMethod("function syncState(address receiver, bytes data)")
 )
 
 // GetCommand returns the rootchain emit command
@@ -130,14 +131,9 @@ func createTxInput(paramsType string, parameters ...interface{}) (*ethgo.Transac
 		return nil, fmt.Errorf("failed to encode parsed parameters: %w", err)
 	}
 
-	artifact, err := polybftcontracts.ReadArtifact(contracts.ContractsRootFolder, "root/StateSender.sol", "StateSender")
-	if err != nil {
-		return nil, fmt.Errorf("failed to read artifact: %w", err)
-	}
+	sender := types.StringToAddress(params.address)
 
-	method := artifact.Abi.Methods["syncState"]
-
-	input, err := method.Encode([]interface{}{types.StringToAddress(params.address), wrapperInput})
+	input, err := syncStateAbiMethod.Encode([]interface{}{sender, wrapperInput})
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode provided parameters: %w", err)
 	}

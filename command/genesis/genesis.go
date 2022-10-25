@@ -192,7 +192,12 @@ func setFlags(cmd *cobra.Command) {
 			contracts.ContractsRootFolder,
 			"the smart contracts folder",
 		)
-
+		cmd.Flags().BoolVar(
+			&params.bridgeEnabled,
+			bridgeFlag,
+			defaultBridge,
+			"enabling bridge, default is not enabled",
+		)
 		cmd.MarkFlagsMutuallyExclusive(premineFlag, premineValidatorsFlag)
 		cmd.MarkFlagsMutuallyExclusive(validatorsFlag, premineValidatorsFlag)
 	}

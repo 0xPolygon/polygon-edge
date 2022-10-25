@@ -64,7 +64,6 @@ require (
 	github.com/0xPolygon/pbft-consensus v0.0.0-20220823102839-109d9f873bf4
 	github.com/docker/docker v20.10.18+incompatible
 	github.com/docker/go-connections v0.4.0
-	github.com/ethereum/go-ethereum v1.10.25
 	github.com/mitchellh/go-glint v0.0.0-20210722152315-6515ceb4a127
 	go.etcd.io/bbolt v1.3.6
 	go.opentelemetry.io/otel v1.1.0

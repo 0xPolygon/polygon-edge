@@ -14,16 +14,16 @@ func TestE2E_NetworkDiscoveryProtocol(t *testing.T) {
 	const (
 		validatorCount    = 5
 		nonValidatorCount = 5
-		// there is race condition which results that libp2p can execute ConnectedF twice and
-		// both peers can close their outgoing/incoming connection
-		// because of that, we are relaxing condition of 9 connections to 7 for each peer
-		atLeastPeers = 7
+		// each node in cluster should find at least 2 more peers beside bootnode
+		atLeastPeers = 3
 		testTimeout  = time.Second * 60
 	)
 
 	// create cluster
 	cluster := framework.NewTestCluster(t, 10,
-		framework.WithValidatorSnapshot(validatorCount), framework.WithNonValidators(nonValidatorCount))
+		framework.WithValidatorSnapshot(validatorCount),
+		framework.WithNonValidators(nonValidatorCount),
+		framework.WithBootnodeCount(1))
 	defer cluster.Stop()
 
 	ctx := context.Background()
