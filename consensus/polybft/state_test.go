@@ -362,23 +362,23 @@ func TestState_Insert_And_Get_ExitEvents_PerEpoch(t *testing.T) {
 	state := newTestState(t)
 	insertTestExitEvents(t, state, numOfEpochs, numOfBlocksPerEpoch, numOfEventsPerBlock)
 
-	start := time.Now()
+	t.Run("Get events for existing epoch", func(t *testing.T) {
+		start := time.Now()
 
-	events, err := state.getExitEventsByEpoch(1)
+		events, err := state.getExitEventsByEpoch(1)
 
-	fmt.Printf("Gotten events for epoch in: %v", time.Since(start))
+		fmt.Printf("Gotten events for epoch in: %v", time.Since(start))
 
-	assert.NoError(t, err)
-	assert.Len(t, events, numOfBlocksPerEpoch*numOfEventsPerBlock)
-}
+		assert.NoError(t, err)
+		assert.Len(t, events, numOfBlocksPerEpoch*numOfEventsPerBlock)
+	})
 
-func TestState_Insert_And_Get_ExitEvents_PerEpoch_NoEventsInEpoch(t *testing.T) {
-	state := newTestState(t)
+	t.Run("Get events for non-existing epoch", func(t *testing.T) {
+		events, err := state.getExitEventsByEpoch(12)
 
-	events, err := state.getExitEventsByEpoch(1)
-
-	assert.NoError(t, err)
-	assert.Len(t, events, 0)
+		assert.NoError(t, err)
+		assert.Len(t, events, 0)
+	})
 }
 
 func TestState_Insert_And_Get_ExitEvents_ForProof(t *testing.T) {

@@ -534,6 +534,8 @@ func TestConsensusRuntime_FSM_NotInValidatorSet(t *testing.T) {
 func TestConsensusRuntime_FSM_NotEndOfEpoch_NotEndOfSprint(t *testing.T) {
 	t.Parallel()
 
+	state := newTestState(t)
+
 	lastBlock := &types.Header{Number: 1}
 	validators := newTestValidators(3)
 	blockchainMock := new(blockchainMock)
@@ -555,6 +557,7 @@ func TestConsensusRuntime_FSM_NotEndOfEpoch_NotEndOfSprint(t *testing.T) {
 			Validators: validators.getPublicIdentities(),
 		},
 		lastBuiltBlock: lastBlock,
+		state:          state,
 	}
 
 	fsm, err := runtime.FSM()
@@ -1639,17 +1642,6 @@ func TestConsensusRuntime_FSM_EndOfEpoch_PostHook(t *testing.T) {
 	blockchainMock.AssertExpectations(t)
 }
 
-func TestConsensusRuntime_getExitEventRootHash_NoEvents(t *testing.T) {
-	state := newTestState(t)
-	runtime := &consensusRuntime{
-		state: state,
-	}
-
-	hash, err := runtime.getExitEventRootHash(1)
-	require.NoError(t, err)
-	require.Equal(t, types.Hash{}, hash)
-}
-
 func TestConsensusRuntime_getExitEventRootHash(t *testing.T) {
 	const (
 		numOfBlocks         = 10
@@ -1663,27 +1655,20 @@ func TestConsensusRuntime_getExitEventRootHash(t *testing.T) {
 
 	encodedEvents := setupExitEventsForProofVerification(t, state, numOfBlocks, numOfEventsPerBlock)
 
-	tree, err := NewMerkleTree(encodedEvents)
-	require.NoError(t, err)
+	t.Run("Get exit event root hash", func(t *testing.T) {
+		tree, err := NewMerkleTree(encodedEvents)
+		require.NoError(t, err)
 
-	hash, err := runtime.getExitEventRootHash(1)
-	require.NoError(t, err)
-	require.Equal(t, tree.Hash(), hash)
-}
+		hash, err := runtime.getExitEventRootHash(1)
+		require.NoError(t, err)
+		require.Equal(t, tree.Hash(), hash)
+	})
 
-func TestConsensusRuntime_generateExitProof_NoEvent(t *testing.T) {
-	const (
-		numOfBlocks         = 10
-		numOfEventsPerBlock = 2
-	)
-
-	state := newTestState(t)
-	runtime := &consensusRuntime{
-		state: state,
-	}
-
-	_, err := runtime.generateExitProof(1, 1, 1)
-	require.ErrorContains(t, err, "could not find any exit event that has an id")
+	t.Run("Get exit event root hash - no events", func(t *testing.T) {
+		hash, err := runtime.getExitEventRootHash(2)
+		require.NoError(t, err)
+		require.Equal(t, types.Hash{}, hash)
+	})
 }
 
 func TestConsensusRuntime_generateExitProof(t *testing.T) {
@@ -1698,7 +1683,6 @@ func TestConsensusRuntime_generateExitProof(t *testing.T) {
 	}
 
 	encodedEvents := setupExitEventsForProofVerification(t, state, numOfBlocks, numOfEventsPerBlock)
-
 	checkpointEvents := encodedEvents[:numOfEventsPerBlock]
 
 	// manually create merkle tree for a desired checkpoint to verify the generated proof
@@ -1709,37 +1693,23 @@ func TestConsensusRuntime_generateExitProof(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, proof)
 
-	// verify generated proof on desired tree
-	require.NoError(t, VerifyProof(1, encodedEvents[1], proof, tree.Hash()))
-}
+	t.Run("Generate and validate exit proof", func(t *testing.T) {
+		// verify generated proof on desired tree
+		require.NoError(t, VerifyProof(1, encodedEvents[1], proof, tree.Hash()))
+	})
 
-func TestConsensusRuntime_generateExitProof_InvalidProof(t *testing.T) {
-	const (
-		numOfBlocks         = 10
-		numOfEventsPerBlock = 2
-	)
+	t.Run("Generate and validate exit proof - invalid proof", func(t *testing.T) {
+		invalidProof := proof
+		invalidProof[0][0]++
 
-	state := newTestState(t)
-	runtime := &consensusRuntime{
-		state: state,
-	}
+		// verify generated proof on desired tree
+		require.ErrorContains(t, VerifyProof(1, encodedEvents[1], invalidProof, tree.Hash()), "not a member of merkle tree")
+	})
 
-	encodedEvents := setupExitEventsForProofVerification(t, state, numOfBlocks, numOfEventsPerBlock)
-
-	checkpointEvents := encodedEvents[:numOfEventsPerBlock]
-
-	// manually create merkle tree for a desired checkpoint to verify the generated proof
-	tree, err := NewMerkleTree(checkpointEvents)
-	require.NoError(t, err)
-
-	proof, err := runtime.generateExitProof(1, 1, 1)
-	require.NoError(t, err)
-	require.NotNil(t, proof)
-
-	proof[0][0]++
-
-	// verify generated proof on desired tree
-	require.ErrorContains(t, VerifyProof(1, encodedEvents[1], proof, tree.Hash()), "not a member of merkle tree")
+	t.Run("Generate exit proof - no event", func(t *testing.T) {
+		_, err := runtime.generateExitProof(21, 1, 1)
+		require.ErrorContains(t, err, "could not find any exit event that has an id")
+	})
 }
 
 func setupExitEventsForProofVerification(t *testing.T, state *State,
