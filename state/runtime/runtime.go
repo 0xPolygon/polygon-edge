@@ -75,10 +75,11 @@ type Host interface {
 // ExecutionResult includes all output after executing given evm
 // message no matter the execution itself is successful or not.
 type ExecutionResult struct {
-	ReturnValue []byte // Returned data from the runtime (function result or data supplied with revert opcode)
-	GasLeft     uint64 // Total gas left as result of execution
-	GasUsed     uint64 // Total gas used as result of execution
-	Err         error  // Any error encountered during the execution, listed below
+	ReturnValue []byte        // Returned data from the runtime (function result or data supplied with revert opcode)
+	GasLeft     uint64        // Total gas left as result of execution
+	GasUsed     uint64        // Total gas used as result of execution
+	Err         error         // Any error encountered during the execution, listed below
+	Address     types.Address // Contract address
 }
 
 func (r *ExecutionResult) Succeeded() bool { return r.Err == nil }

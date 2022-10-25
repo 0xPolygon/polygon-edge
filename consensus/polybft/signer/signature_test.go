@@ -9,12 +9,14 @@ import (
 )
 
 const (
-	MessageSize        = 5000
-	ParticipantsNumber = 64
+	messageSize        = 5000
+	participantsNumber = 64
 )
 
 func Test_VerifySignature(t *testing.T) {
-	validTestMsg, invalidTestMsg := testGenRandomBytes(t, MessageSize), testGenRandomBytes(t, MessageSize)
+	t.Parallel()
+
+	validTestMsg, invalidTestMsg := testGenRandomBytes(t, messageSize), testGenRandomBytes(t, messageSize)
 
 	blsKey, _ := GenerateBlsKey()
 	signature, err := blsKey.Sign(validTestMsg)
@@ -25,7 +27,9 @@ func Test_VerifySignature(t *testing.T) {
 }
 
 func Test_AggregatedSignatureSimple(t *testing.T) {
-	validTestMsg, invalidTestMsg := testGenRandomBytes(t, MessageSize), testGenRandomBytes(t, MessageSize)
+	t.Parallel()
+
+	validTestMsg, invalidTestMsg := testGenRandomBytes(t, messageSize), testGenRandomBytes(t, messageSize)
 
 	bls1, _ := GenerateBlsKey()
 	bls2, _ := GenerateBlsKey()
@@ -49,9 +53,11 @@ func Test_AggregatedSignatureSimple(t *testing.T) {
 }
 
 func Test_AggregatedSignature(t *testing.T) {
-	validTestMsg, invalidTestMsg := testGenRandomBytes(t, MessageSize), testGenRandomBytes(t, MessageSize)
+	t.Parallel()
 
-	blsKeys, err := CreateRandomBlsKeys(ParticipantsNumber)
+	validTestMsg, invalidTestMsg := testGenRandomBytes(t, messageSize), testGenRandomBytes(t, messageSize)
+
+	blsKeys, err := CreateRandomBlsKeys(participantsNumber)
 	require.NoError(t, err)
 
 	allPubs := collectPublicKeys(blsKeys)
@@ -110,7 +116,9 @@ func Test_AggregatedSignature(t *testing.T) {
 }
 
 func TestSignature_BigInt(t *testing.T) {
-	validTestMsg := testGenRandomBytes(t, MessageSize)
+	t.Parallel()
+
+	validTestMsg := testGenRandomBytes(t, messageSize)
 
 	bls1, err := GenerateBlsKey()
 	require.NoError(t, err)

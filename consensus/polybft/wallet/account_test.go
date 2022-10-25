@@ -8,6 +8,8 @@ import (
 )
 
 func TestAccount(t *testing.T) {
+	t.Parallel()
+
 	key := GenerateAccount()
 	bytes, err := key.ToBytes()
 	require.NoError(t, err)

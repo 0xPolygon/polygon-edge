@@ -286,10 +286,9 @@ func (c *consensusRuntime) FSM() (*fsm, error) {
 		backend:        c.config.blockchain,
 		polybftBackend: c.config.polybftBackend,
 		blockBuilder:   blockBuilder,
-		validators:     newValidatorSet(types.BytesToAddress(parent.Miner), epoch.Validators), // TODO: Nemanja - check this
+		validators:     newValidatorSet(types.BytesToAddress(parent.Miner), epoch.Validators),
 		isEndOfEpoch:   isEndOfEpoch,
 		isEndOfSprint:  isEndOfSprint,
-		epoch:          epoch.Number,
 		logger:         c.logger.Named("fsm"),
 	}
 

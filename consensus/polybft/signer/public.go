@@ -48,9 +48,13 @@ func (p *PublicKey) UnmarshalJSON(b []byte) error {
 	}
 
 	pk, err := UnmarshalPublicKey(d)
+	if err != nil {
+		return err
+	}
+
 	p.p = pk.p
 
-	return err
+	return nil
 }
 
 // UnmarshalPublicKey reads the public key from the given byte array

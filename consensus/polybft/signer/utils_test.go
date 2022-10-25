@@ -8,7 +8,9 @@ import (
 )
 
 func Test_SingleSign(t *testing.T) {
-	validTestMsg, invalidTestMsg := testGenRandomBytes(t, MessageSize), testGenRandomBytes(t, MessageSize)
+	t.Parallel()
+
+	validTestMsg, invalidTestMsg := testGenRandomBytes(t, messageSize), testGenRandomBytes(t, messageSize)
 
 	blsKey, err := GenerateBlsKey() // structure which holds private/public key pair
 	require.NoError(t, err)
@@ -27,9 +29,11 @@ func Test_SingleSign(t *testing.T) {
 }
 
 func Test_AggregatedSign(t *testing.T) {
-	validTestMsg, invalidTestMsg := testGenRandomBytes(t, MessageSize), testGenRandomBytes(t, MessageSize)
+	t.Parallel()
 
-	keys, err := CreateRandomBlsKeys(ParticipantsNumber) // create keys for validators
+	validTestMsg, invalidTestMsg := testGenRandomBytes(t, messageSize), testGenRandomBytes(t, messageSize)
+
+	keys, err := CreateRandomBlsKeys(participantsNumber) // create keys for validators
 	require.NoError(t, err)
 
 	pubKeys := collectPublicKeys(keys)

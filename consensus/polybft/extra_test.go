@@ -18,6 +18,8 @@ import (
 )
 
 func TestExtra_Encoding(t *testing.T) {
+	t.Parallel()
+
 	parentStr := []byte("Here is the parent signature")
 	committedStr := []byte("Here is the committed signature")
 	bitmapStr := []byte("Here are the bitmap bytes")
@@ -85,7 +87,6 @@ func TestExtra_Encoding(t *testing.T) {
 
 	for _, c := range cases {
 		data := c.extra.MarshalRLPTo(nil)
-
 		extra := &Extra{}
 		assert.NoError(t, extra.UnmarshalRLP(data))
 		assert.Equal(t, c.extra, extra)
@@ -93,19 +94,27 @@ func TestExtra_Encoding(t *testing.T) {
 }
 
 func TestExtra_UnmarshalRLPWith_NegativeCases(t *testing.T) {
+	t.Parallel()
+
 	t.Run("Incorrect RLP marshalled data type", func(t *testing.T) {
+		t.Parallel()
+
 		extra := &Extra{}
 		ar := &fastrlp.Arena{}
 		require.Error(t, extra.UnmarshalRLPWith(ar.NewBool(false)))
 	})
 
 	t.Run("Incorrect count of RLP marshalled array elements", func(t *testing.T) {
+		t.Parallel()
+
 		extra := &Extra{}
 		ar := &fastrlp.Arena{}
 		require.ErrorContains(t, extra.UnmarshalRLPWith(ar.NewArray()), "not enough elements to decode extra, expected 4 but found 0")
 	})
 
 	t.Run("Incorrect ValidatorSetDelta marshalled", func(t *testing.T) {
+		t.Parallel()
+
 		extra := &Extra{}
 		ar := &fastrlp.Arena{}
 		extraMarshalled := ar.NewArray()
@@ -119,6 +128,8 @@ func TestExtra_UnmarshalRLPWith_NegativeCases(t *testing.T) {
 	})
 
 	t.Run("Incorrect Seal marshalled", func(t *testing.T) {
+		t.Parallel()
+
 		extra := &Extra{}
 		ar := &fastrlp.Arena{}
 		extraMarshalled := ar.NewArray()
@@ -131,6 +142,8 @@ func TestExtra_UnmarshalRLPWith_NegativeCases(t *testing.T) {
 	})
 
 	t.Run("Incorrect Parent signatures marshalled", func(t *testing.T) {
+		t.Parallel()
+
 		extra := &Extra{}
 		ar := &fastrlp.Arena{}
 		extraMarshalled := ar.NewArray()
@@ -146,6 +159,8 @@ func TestExtra_UnmarshalRLPWith_NegativeCases(t *testing.T) {
 	})
 
 	t.Run("Incorrect Committed signatures marshalled", func(t *testing.T) {
+		t.Parallel()
+
 		extra := &Extra{}
 		ar := &fastrlp.Arena{}
 		extraMarshalled := ar.NewArray()
@@ -167,7 +182,11 @@ func TestExtra_UnmarshalRLPWith_NegativeCases(t *testing.T) {
 }
 
 func TestSignature_VerifyCommittedFields(t *testing.T) {
+	t.Parallel()
+
 	t.Run("Valid signatures", func(t *testing.T) {
+		t.Parallel()
+
 		numValidators := 100
 		vals := newTestValidators(numValidators)
 		msgHash := types.Hash{0x1}
@@ -202,6 +221,8 @@ func TestSignature_VerifyCommittedFields(t *testing.T) {
 	})
 
 	t.Run("Invalid bitmap provided", func(t *testing.T) {
+		t.Parallel()
+
 		validatorSet := newTestValidators(3).getPublicIdentities()
 		bmp := bitmap.Bitmap{}
 
@@ -215,13 +236,19 @@ func TestSignature_VerifyCommittedFields(t *testing.T) {
 }
 
 func TestSignature_UnmarshalRLPWith_NegativeCases(t *testing.T) {
+	t.Parallel()
+
 	t.Run("Incorrect RLP marshalled data type", func(t *testing.T) {
+		t.Parallel()
+
 		ar := &fastrlp.Arena{}
 		signature := Signature{}
 		require.ErrorContains(t, signature.UnmarshalRLPWith(ar.NewNull()), "array type expected for signature struct")
 	})
 
 	t.Run("Incorrect AggregatedSignature field data type", func(t *testing.T) {
+		t.Parallel()
+
 		ar := &fastrlp.Arena{}
 		signature := Signature{}
 		signatureMarshalled := ar.NewArray()
@@ -241,6 +268,8 @@ func TestSignature_UnmarshalRLPWith_NegativeCases(t *testing.T) {
 }
 
 func TestExtra_VerifyCommittedFieldsRandom(t *testing.T) {
+	t.Parallel()
+
 	numValidators := 100
 	vals := newTestValidators(numValidators)
 	msgHash := types.Hash{0x1}
@@ -274,6 +303,8 @@ func TestExtra_VerifyCommittedFieldsRandom(t *testing.T) {
 }
 
 func TestExtra_CreateValidatorSetDelta_Cases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name    string
 		oldSet  []string
@@ -292,6 +323,8 @@ func TestExtra_CreateValidatorSetDelta_Cases(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+
 			vals := newTestValidatorsWithAliases([]string{})
 
 			for _, name := range c.oldSet {
@@ -322,8 +355,9 @@ func TestExtra_CreateValidatorSetDelta_Cases(t *testing.T) {
 }
 
 func TestExtra_CreateValidatorSetDelta_BlsDiffer(t *testing.T) {
-	vals := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
+	t.Parallel()
 
+	vals := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
 	oldValidatorSet := vals.getPublicIdentities("A", "B", "C", "D")
 
 	// change the public bls key of 'B'
@@ -338,7 +372,11 @@ func TestExtra_CreateValidatorSetDelta_BlsDiffer(t *testing.T) {
 }
 
 func TestExtra_InitGenesisValidatorsDelta(t *testing.T) {
+	t.Parallel()
+
 	t.Run("Happy path", func(t *testing.T) {
+		t.Parallel()
+
 		const validatorsCount = 7
 		vals := newTestValidators(validatorsCount)
 
@@ -374,6 +412,8 @@ func TestExtra_InitGenesisValidatorsDelta(t *testing.T) {
 	})
 
 	t.Run("Invalid Extra data", func(t *testing.T) {
+		t.Parallel()
+
 		validators := newTestValidators(5)
 		polyBftConfig := PolyBFTConfig{InitialValidatorSet: validators.getParamValidators()}
 
@@ -391,6 +431,8 @@ func TestExtra_InitGenesisValidatorsDelta(t *testing.T) {
 }
 
 func TestValidatorSetDelta_Copy(t *testing.T) {
+	t.Parallel()
+
 	const (
 		originalValidatorsCount = 10
 		addedValidatorsCount    = 2
@@ -418,19 +460,27 @@ func TestValidatorSetDelta_Copy(t *testing.T) {
 }
 
 func TestValidatorSetDelta_UnmarshalRLPWith_NegativeCases(t *testing.T) {
+	t.Parallel()
+
 	t.Run("Incorrect RLP value type provided", func(t *testing.T) {
+		t.Parallel()
+
 		ar := &fastrlp.Arena{}
 		delta := &ValidatorSetDelta{}
 		require.ErrorContains(t, delta.UnmarshalRLPWith(ar.NewNull()), "value is not of type array")
 	})
 
 	t.Run("Empty RLP array provided", func(t *testing.T) {
+		t.Parallel()
+
 		ar := &fastrlp.Arena{}
 		delta := &ValidatorSetDelta{}
 		require.NoError(t, delta.UnmarshalRLPWith(ar.NewArray()))
 	})
 
 	t.Run("Incorrect RLP array size", func(t *testing.T) {
+		t.Parallel()
+
 		ar := &fastrlp.Arena{}
 		deltaMarshalled := ar.NewArray()
 		deltaMarshalled.Set(ar.NewBytes([]byte{0x59}))
@@ -441,6 +491,8 @@ func TestValidatorSetDelta_UnmarshalRLPWith_NegativeCases(t *testing.T) {
 	})
 
 	t.Run("Incorrect RLP value type for Added field", func(t *testing.T) {
+		t.Parallel()
+
 		ar := &fastrlp.Arena{}
 		deltaMarshalled := ar.NewArray()
 		deltaMarshalled.Set(ar.NewBytes([]byte{0x59}))
@@ -450,6 +502,8 @@ func TestValidatorSetDelta_UnmarshalRLPWith_NegativeCases(t *testing.T) {
 	})
 
 	t.Run("Incorrect RLP value type for ValidatorAccount in Added field", func(t *testing.T) {
+		t.Parallel()
+
 		ar := &fastrlp.Arena{}
 		deltaMarshalled := ar.NewArray()
 		addedArray := ar.NewArray()
@@ -461,6 +515,8 @@ func TestValidatorSetDelta_UnmarshalRLPWith_NegativeCases(t *testing.T) {
 	})
 
 	t.Run("Incorrect RLP value type for Removed field", func(t *testing.T) {
+		t.Parallel()
+
 		ar := &fastrlp.Arena{}
 		deltaMarshalled := ar.NewArray()
 		addedValidators := newTestValidators(3).getPublicIdentities()
@@ -476,6 +532,8 @@ func TestValidatorSetDelta_UnmarshalRLPWith_NegativeCases(t *testing.T) {
 }
 
 func Test_GetIbftExtraClean_Fail(t *testing.T) {
+	t.Parallel()
+
 	randomBytes := [ExtraVanity]byte{}
 	_, err := rand.Read(randomBytes[:])
 	require.NoError(t, err)

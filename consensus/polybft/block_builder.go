@@ -78,6 +78,7 @@ type BlockBuilder struct {
 	// block is a reference to the already built block
 	block *types.Block
 
+	// state is in memory state transition
 	state *state.Transition
 }
 
