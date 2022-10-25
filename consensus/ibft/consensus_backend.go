@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/0xPolygon/go-ibft/messages"
+	protoIBFT "github.com/0xPolygon/go-ibft/messages/proto"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/state"
@@ -123,6 +124,22 @@ func (i *backendIBFT) Quorum(blockNumber uint64) uint64 {
 	quorumFn := i.quorumSize(blockNumber)
 
 	return uint64(quorumFn(validators))
+}
+
+// HasQuorum returns true if quorum is reached for the given height
+func (i *backendIBFT) HasQuorum(blockNumber uint64, messages []*protoIBFT.Message) bool {
+	quorum := i.Quorum(blockNumber)
+
+	if len(messages) > 0 {
+		switch messages[0].GetType() {
+		case protoIBFT.MessageType_PREPARE:
+			return len(messages) >= int(quorum)-1
+		case protoIBFT.MessageType_COMMIT:
+			return len(messages) >= int(quorum)
+		}
+	}
+
+	return false
 }
 
 // buildBlock builds the block, based on the passed in snapshot and parent header
