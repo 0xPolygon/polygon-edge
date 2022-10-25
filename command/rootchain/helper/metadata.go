@@ -2,6 +2,7 @@ package helper
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/0xPolygon/polygon-edge/types"
@@ -20,52 +21,51 @@ var (
 	BLSAddress = types.StringToAddress("0x436604426F31A05f905C64edc973E575BdB46471")
 	// BN256G2Address is an address of BN256G2Address.sol smart contract
 	BN256G2Address = types.StringToAddress("0x947a581B2713F58A8145201DA41BCb6aAE90196B")
+
+	ErrRootchainNotFound = errors.New("rootchain not found")
+	ErrRootchainPortBind = errors.New("port 8545 is not bind with localhost")
 )
 
-func GetRootchainID() string {
+func GetRootchainID() (string, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
-		panic(err)
+		return "", fmt.Errorf("rootchain id error: %w", err)
 	}
 
 	containers, err := cli.ContainerList(context.Background(), dockertypes.ContainerListOptions{})
 	if err != nil {
-		panic(err)
+		return "", fmt.Errorf("rootchain id error: %w", err)
 	}
-
-	var contID string
 
 	for _, c := range containers {
 		if c.Labels["edge-type"] == "rootchain" {
-			contID = c.ID
-
-			break
+			return c.ID, nil
 		}
 	}
 
-	return contID
+	return "", ErrRootchainNotFound
 }
 
-func ReadRootchainIP() string {
+func ReadRootchainIP() (string, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
-		panic(err)
+		return "", fmt.Errorf("rootchain id error: %w", err)
 	}
 
-	contID := GetRootchainID()
-	if contID == "" {
-		panic("container not found")
+	contID, err := GetRootchainID()
+	if err != nil {
+		return "", err
 	}
 
 	inspect, err := cli.ContainerInspect(context.Background(), contID)
 	if err != nil {
-		panic(err)
+		return "", fmt.Errorf("rootchain ip error: %w", err)
 	}
 
 	ports, ok := inspect.HostConfig.PortBindings["8545/tcp"]
 	if !ok || len(ports) == 0 {
-		panic("port 8545 is not bind with localhost")
+		return "", ErrRootchainPortBind
 	}
 
-	return fmt.Sprintf("http://%s:%s", ports[0].HostIP, ports[0].HostPort)
+	return fmt.Sprintf("http://%s:%s", ports[0].HostIP, ports[0].HostPort), nil
 }

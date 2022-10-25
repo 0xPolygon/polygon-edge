@@ -15,7 +15,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/0xPolygon/polygon-edge/command/genesis"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -31,9 +32,14 @@ const (
 
 	// envStdoutEnabled signal whether the output of the nodes get piped to stdout
 	envStdoutEnabled = "E2E_STDOUT"
+)
 
-	// accountPassword is the default account password
-	accountPassword = "qwerty"
+const (
+	// path to core contracts
+	defaultContractsPath = "./../core-contracts/artifacts/contracts/"
+
+	// prefix for validator directory
+	defaultValidatorPrefix = "test-chain-"
 )
 
 var startTime int64
@@ -51,33 +57,20 @@ func resolveBinary() string {
 	return "polygon-edge"
 }
 
-func createAccountPasswordFile(t *testing.T) (string, func()) {
-	t.Helper()
-
-	pwdFile, err := os.CreateTemp("", "e2e-polybft")
-	require.NoError(t, err)
-
-	_, err = pwdFile.WriteString(accountPassword)
-	require.NoError(t, err)
-	require.NoError(t, pwdFile.Close())
-
-	return pwdFile.Name(), func() {
-		err = os.Remove(pwdFile.Name())
-		require.NoError(t, err)
-	}
-}
-
 type TestClusterConfig struct {
 	t *testing.T
 
 	Name              string
-	Premine           []common.Address
+	Premine           []types.Address
 	HasBridge         bool
+	BootnodeCount     int
 	NonValidatorCount int
 	WithLogs          bool
 	WithStdout        bool
 	LogsDir           string
 	TmpDir            string
+	ContractsDir      string
+	ValidatorPrefix   string
 	Binary            string
 	ValidatorSetSize  uint64
 
@@ -134,10 +127,9 @@ func (c *TestClusterConfig) initLogsDir() {
 }
 
 type TestCluster struct {
-	Config   *TestClusterConfig
-	Servers  []*TestServer
-	Bootnode *TestBootnode
-	// Bridge      *TestBridge
+	Config      *TestClusterConfig
+	Servers     []*TestServer
+	Bridge      *TestBridge
 	initialPort int64
 
 	once         sync.Once
@@ -147,9 +139,9 @@ type TestCluster struct {
 
 type ClusterOption func(*TestClusterConfig)
 
-func WithPremine(address common.Address) ClusterOption {
+func WithPremine(addresses ...types.Address) ClusterOption {
 	return func(h *TestClusterConfig) {
-		h.Premine = append(h.Premine, address)
+		h.Premine = append(h.Premine, addresses...)
 	}
 }
 
@@ -168,6 +160,12 @@ func WithNonValidators(num int) ClusterOption {
 func WithValidatorSnapshot(validatorsLen uint64) ClusterOption {
 	return func(h *TestClusterConfig) {
 		h.ValidatorSetSize = validatorsLen
+	}
+}
+
+func WithBootnodeCount(cnt int) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.BootnodeCount = cnt
 	}
 }
 
@@ -193,6 +191,14 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		Binary:     resolveBinary(),
 	}
 
+	if config.ContractsDir == "" {
+		config.ContractsDir = defaultContractsPath
+	}
+
+	if config.ValidatorPrefix == "" {
+		config.ValidatorPrefix = defaultValidatorPrefix
+	}
+
 	for _, opt := range opts {
 		opt(config)
 	}
@@ -205,15 +211,20 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		once:        sync.Once{},
 	}
 
-	if cluster.Config.HasBridge {
-		// start bridge
-		// cluster.Bridge, err = NewTestBridge(t, cluster.Config)
+	{
+		// run init account
+		err = cluster.cmdRun("polybft-secrets",
+			"--data-dir", path.Join(tmpDir, cluster.Config.ValidatorPrefix),
+			"--num", strconv.Itoa(validatorsCount),
+		)
 		require.NoError(t, err)
 	}
 
-	// Create a file with account password
-	//pwdFilePath, deleteFile := createAccountPasswordFile(t)
-	//defer deleteFile()
+	if cluster.Config.HasBridge {
+		// start bridge
+		cluster.Bridge, err = NewTestBridge(t, cluster.Config)
+		require.NoError(t, err)
+	}
 
 	// In case no validators are specified in opts, all nodes will be validators
 	if cluster.Config.ValidatorSetSize == 0 {
@@ -221,23 +232,12 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 	}
 
 	{
-		// run init account
-		err = cluster.cmdRun("polybft-secrets",
-			"--data-dir", path.Join(tmpDir, "test-chain-"),
-			"--num", strconv.Itoa(validatorsCount),
-			//"--password", pwdFilePath,
-		)
-		require.NoError(t, err)
-	}
-
-	{
-		// create genesis file
 		args := []string{
 			"genesis",
 			"--consensus", "polybft",
 			"--dir", path.Join(tmpDir, "genesis.json"),
-			//"--password", pwdFilePath,
-			"--contracts-path", "./../core-contracts/artifacts/contracts/",
+			"--contracts-path", defaultContractsPath,
+			"--epoch-size", "10",
 			"--premine", "0x0000000000000000000000000000000000000000",
 		}
 
@@ -249,6 +249,22 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 
 		if cluster.Config.HasBridge {
 			args = append(args, "--bridge")
+		}
+
+		if cluster.Config.BootnodeCount > 0 {
+			validators, err := genesis.ReadValidatorsByRegexp(cluster.Config.TmpDir, cluster.Config.ValidatorPrefix)
+			require.NoError(t, err)
+
+			cnt := cluster.Config.BootnodeCount
+			if len(validators) < cnt {
+				cnt = len(validators)
+			}
+
+			for i := 0; i < cnt; i++ {
+				maddr := fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s",
+					"127.0.0.1", cluster.initialPort+int64(i+1), validators[i].NodeID)
+				args = append(args, "--bootnode", maddr)
+			}
 		}
 
 		if cluster.Config.ValidatorSetSize > 0 {
@@ -276,14 +292,13 @@ func (c *TestCluster) initTestServer(t *testing.T, i int, isValidator bool) {
 	t.Helper()
 
 	logLevel := os.Getenv(envLogLevel)
-	dataDir := c.Config.Dir("test-chain-" + strconv.Itoa(i))
+	dataDir := c.Config.Dir(c.Config.ValidatorPrefix + strconv.Itoa(i))
 
 	srv := NewTestServer(t, c.Config, func(config *TestServerConfig) {
 		config.DataDir = dataDir
 		config.Seal = isValidator
 		config.Chain = c.Config.Dir("genesis.json")
 		config.P2PPort = c.getOpenPort()
-		config.Password = accountPassword
 		config.LogLevel = logLevel
 	})
 
@@ -308,7 +323,11 @@ func (c *TestCluster) cmdRun(args ...string) error {
 	cmd.Stdout = c.Config.GetStdout(args[0])
 
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("%w: %s", err, stdErr.String())
+		return err
+	}
+
+	if stdErr.Len() > 0 {
+		return fmt.Errorf("failed to execute: %s", stdErr.String())
 	}
 
 	return nil
@@ -329,8 +348,7 @@ func (c *TestCluster) EmitTransfer(contractAddress, walletAddresses, amounts str
 		return errors.New("provide at least one amount value")
 	}
 
-	return c.cmdRun("e2e",
-		"rootchain",
+	return c.cmdRun("rootchain",
 		"emit",
 		"--contract", contractAddress,
 		"--wallets", walletAddresses,
@@ -345,6 +363,10 @@ func (c *TestCluster) Fail(err error) {
 }
 
 func (c *TestCluster) Stop() {
+	if c.Bridge != nil {
+		c.Bridge.Stop()
+	}
+
 	for _, srv := range c.Servers {
 		if srv.isRunning() {
 			srv.Stop()

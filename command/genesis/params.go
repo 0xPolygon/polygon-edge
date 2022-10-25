@@ -83,6 +83,7 @@ type genesisParams struct {
 	polyBftValidatorPrefixPath string
 	premineValidators          string
 	smartContractsRootPath     string
+	bridgeEnabled              bool
 }
 
 func (p *genesisParams) validateFlags() error {
