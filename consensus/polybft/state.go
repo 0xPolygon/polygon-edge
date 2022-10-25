@@ -44,6 +44,7 @@ var (
 	// ABI
 	stateTransferEventABI = abi.MustNewEvent("event StateSynced(uint256 indexed id, address indexed sender, address indexed receiver, bytes data)")   //nolint:lll
 	exitEventABI          = abi.MustNewEvent("event L2StateSynced(uint256 indexed id, address indexed sender, address indexed receiver, bytes data)") //nolint:lll
+	exitEventABIType      = abi.MustNewType("tuple(uint256 id, address sender, address receiver, bytes data)")
 )
 
 const (
@@ -59,6 +60,17 @@ const (
 	// number of stateSyncEvents to be grouped into one StateTransaction
 	stateSyncBundleSize = 5
 )
+
+type ExitEventNotFoundError struct {
+	exitID          uint64
+	epoch           uint64
+	checkpointBlock uint64
+}
+
+func (e *ExitEventNotFoundError) Error() string {
+	return fmt.Sprintf("could not find any exit event that has an id: %v, added in block: %v and epoch: %v",
+		e.exitID, e.checkpointBlock, e.epoch)
+}
 
 // StateSyncEvent is a bridge event from the rootchain
 type StateSyncEvent struct {
@@ -155,17 +167,17 @@ func decodeExitEvent(log *ethgo.Log, epoch, block uint64) (*ExitEvent, error) {
 // ExitEvent is an event emitted by Exit contract
 type ExitEvent struct {
 	// ID is the decoded 'index' field from the event
-	ID uint64
+	ID uint64 `abi:"id"`
 	// Sender is the decoded 'sender' field from the event
-	Sender ethgo.Address
+	Sender ethgo.Address `abi:"sender"`
 	// Receiver is the decoded 'receiver' field from the event
-	Receiver ethgo.Address
+	Receiver ethgo.Address `abi:"receiver"`
 	// Data is the decoded 'data' field from the event
-	Data []byte
+	Data []byte `abi:"data"`
 	// Epoch is the epoch number in which exit event was added
-	Epoch uint64
+	Epoch uint64 `abi:"-"`
 	// BlockNumber is the block in which exit event was added
-	BlockNumber uint64
+	BlockNumber uint64 `abi:"-"`
 }
 
 // MessageSignature encapsulates sender identifier and its signature
@@ -336,35 +348,9 @@ func (s *State) insertExitEvent(event *ExitEvent) error {
 	})
 }
 
-// getExitEventsByEpoch returns all exit events that happened in the given epoch
-func (s *State) getExitEventsByEpoch(epoch uint64) ([]*ExitEvent, error) {
-	var events []*ExitEvent
-
-	err := s.db.View(func(tx *bolt.Tx) error {
-		c := tx.Bucket(exitEventsBucket).Cursor()
-
-		prefix := itob(epoch)
-		for k, v := c.Seek(prefix); bytes.HasPrefix(k, prefix); k, v = c.Next() {
-			var event *ExitEvent
-			if err := json.Unmarshal(v, &event); err != nil {
-				return err
-			}
-
-			if event.Epoch == epoch {
-				events = append(events, event)
-			}
-		}
-
-		return nil
-	})
-
-	return events, err
-}
-
-// getExitEventsForProof returns all exit events that happened in and prior to the given checkpoint block number
-// with respect to the epoch in which block is added
-func (s *State) getExitEventsForProof(exitEventID, epoch, checkpointBlockNumber uint64) ([]*ExitEvent, error) {
-	var events []*ExitEvent
+// getExitEvent returns exit event with given id, which happened in given epoch and given block number
+func (s *State) getExitEvent(exitEventID, epoch, checkpointBlockNumber uint64) (*ExitEvent, error) {
+	var exitEvent *ExitEvent
 
 	err := s.db.View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(exitEventsBucket)
@@ -372,16 +358,36 @@ func (s *State) getExitEventsForProof(exitEventID, epoch, checkpointBlockNumber 
 		key := compose([][]byte{itob(epoch), itob(exitEventID), itob(checkpointBlockNumber)})
 		v := bucket.Get(key)
 		if v == nil {
-			return fmt.Errorf("could not find any exit event that has an id: %v, added in block: %v and epoch: %v",
-				exitEventID, checkpointBlockNumber, epoch)
+			return &ExitEventNotFoundError{exitEventID, checkpointBlockNumber, epoch}
 		}
 
-		var event *ExitEvent
-		if err := json.Unmarshal(v, &event); err != nil {
-			return err
-		}
+		return json.Unmarshal(v, &exitEvent)
+	})
 
-		c := bucket.Cursor()
+	return exitEvent, err
+}
+
+// getExitEventsByEpoch returns all exit events that happened in the given epoch
+func (s *State) getExitEventsByEpoch(epoch uint64) ([]*ExitEvent, error) {
+	return s.getExitEvents(epoch, func(exitEvent *ExitEvent) bool {
+		return exitEvent.Epoch == epoch
+	})
+}
+
+// getExitEventsForProof returns all exit events that happened in and prior to the given checkpoint block number
+// with respect to the epoch in which block is added
+func (s *State) getExitEventsForProof(epoch, checkpointBlock uint64) ([]*ExitEvent, error) {
+	return s.getExitEvents(epoch, func(exitEvent *ExitEvent) bool {
+		return exitEvent.Epoch == epoch && exitEvent.BlockNumber <= checkpointBlock
+	})
+}
+
+// getExitEvents returns exit events for given epoch and provided filter
+func (s *State) getExitEvents(epoch uint64, filter func(exitEvent *ExitEvent) bool) ([]*ExitEvent, error) {
+	var events []*ExitEvent
+
+	err := s.db.View(func(tx *bolt.Tx) error {
+		c := tx.Bucket(exitEventsBucket).Cursor()
 		prefix := itob(epoch)
 
 		for k, v := c.Seek(prefix); bytes.HasPrefix(k, prefix); k, v = c.Next() {
@@ -390,7 +396,7 @@ func (s *State) getExitEventsForProof(exitEventID, epoch, checkpointBlockNumber 
 				return err
 			}
 
-			if event.Epoch == epoch && event.BlockNumber <= checkpointBlockNumber {
+			if filter(event) {
 				events = append(events, event)
 			}
 		}

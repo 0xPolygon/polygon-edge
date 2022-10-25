@@ -372,6 +372,15 @@ func TestState_Insert_And_Get_ExitEvents_PerEpoch(t *testing.T) {
 	assert.Len(t, events, numOfBlocksPerEpoch*numOfEventsPerBlock)
 }
 
+func TestState_Insert_And_Get_ExitEvents_PerEpoch_NoEventsInEpoch(t *testing.T) {
+	state := newTestState(t)
+
+	events, err := state.getExitEventsByEpoch(1)
+
+	assert.NoError(t, err)
+	assert.Len(t, events, 0)
+}
+
 func TestState_Insert_And_Get_ExitEvents_ForProof(t *testing.T) {
 	const (
 		numOfEpochs         = 11
@@ -383,27 +392,36 @@ func TestState_Insert_And_Get_ExitEvents_ForProof(t *testing.T) {
 	insertTestExitEvents(t, state, numOfEpochs, numOfBlocksPerEpoch, numOfEventsPerBlock)
 
 	var cases = []struct {
-		exitEventID            uint64
 		epoch                  uint64
 		checkpointBlockNumber  uint64
 		expectedNumberOfEvents int
 	}{
-		{1, 1, 1, 10},
-		{15, 1, 2, 20},
-		{78, 1, 8, 80},
-		{111, 2, 12, 20},
-		{140, 2, 14, 40},
-		{254, 3, 26, 60},
-		{377, 4, 38, 80},
-		{1045, 11, 105, 50},
+		{1, 1, 10},
+		{1, 2, 20},
+		{1, 8, 80},
+		{2, 12, 20},
+		{2, 14, 40},
+		{3, 26, 60},
+		{4, 38, 80},
+		{11, 105, 50},
 	}
 
 	for _, c := range cases {
-		events, err := state.getExitEventsForProof(c.exitEventID, c.epoch, c.checkpointBlockNumber)
+		events, err := state.getExitEventsForProof(c.epoch, c.checkpointBlockNumber)
 
 		assert.NoError(t, err)
 		assert.Len(t, events, c.expectedNumberOfEvents)
 	}
+}
+
+func TestState_Insert_And_Get_ExitEvents_ForProof_NoEvents(t *testing.T) {
+	state := newTestState(t)
+	insertTestExitEvents(t, state, 1, 10, 1)
+
+	events, err := state.getExitEventsForProof(2, 11)
+
+	assert.NoError(t, err)
+	assert.Nil(t, events)
 }
 
 func insertTestExitEvents(t *testing.T, state *State,
@@ -416,7 +434,7 @@ func insertTestExitEvents(t *testing.T, state *State,
 	for i := uint64(1); i <= uint64(numOfEpochs); i++ {
 		for j := 1; j <= numOfBlocksPerEpoch; j++ {
 			for k := 1; k <= numOfEventsPerBlock; k++ {
-				event := &ExitEvent{index, ethgo.ZeroAddress, ethgo.ZeroAddress, []byte{0, 1}, i, block}
+				event := &ExitEvent{index, ethgo.HexToAddress("0x101"), ethgo.HexToAddress("0x102"), []byte{11, 22}, i, block}
 				assert.NoError(t, state.insertExitEvent(event))
 
 				index++

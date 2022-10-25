@@ -1639,6 +1639,133 @@ func TestConsensusRuntime_FSM_EndOfEpoch_PostHook(t *testing.T) {
 	blockchainMock.AssertExpectations(t)
 }
 
+func TestConsensusRuntime_getExitEventRootHash_NoEvents(t *testing.T) {
+	state := newTestState(t)
+	runtime := &consensusRuntime{
+		state: state,
+	}
+
+	hash, err := runtime.getExitEventRootHash(1)
+	require.NoError(t, err)
+	require.Equal(t, types.Hash{}, hash)
+}
+
+func TestConsensusRuntime_getExitEventRootHash(t *testing.T) {
+	const (
+		numOfBlocks         = 10
+		numOfEventsPerBlock = 2
+	)
+
+	state := newTestState(t)
+	runtime := &consensusRuntime{
+		state: state,
+	}
+
+	encodedEvents := setupExitEventsForProofVerification(t, state, numOfBlocks, numOfEventsPerBlock)
+
+	tree, err := NewMerkleTree(encodedEvents)
+	require.NoError(t, err)
+
+	hash, err := runtime.getExitEventRootHash(1)
+	require.NoError(t, err)
+	require.Equal(t, tree.Hash(), hash)
+}
+
+func TestConsensusRuntime_generateExitProof_NoEvent(t *testing.T) {
+	const (
+		numOfBlocks         = 10
+		numOfEventsPerBlock = 2
+	)
+
+	state := newTestState(t)
+	runtime := &consensusRuntime{
+		state: state,
+	}
+
+	_, err := runtime.generateExitProof(1, 1, 1)
+	require.ErrorContains(t, err, "could not find any exit event that has an id")
+}
+
+func TestConsensusRuntime_generateExitProof(t *testing.T) {
+	const (
+		numOfBlocks         = 10
+		numOfEventsPerBlock = 2
+	)
+
+	state := newTestState(t)
+	runtime := &consensusRuntime{
+		state: state,
+	}
+
+	encodedEvents := setupExitEventsForProofVerification(t, state, numOfBlocks, numOfEventsPerBlock)
+
+	checkpointEvents := encodedEvents[:numOfEventsPerBlock]
+
+	// manually create merkle tree for a desired checkpoint to verify the generated proof
+	tree, err := NewMerkleTree(checkpointEvents)
+	require.NoError(t, err)
+
+	proof, err := runtime.generateExitProof(1, 1, 1)
+	require.NoError(t, err)
+	require.NotNil(t, proof)
+
+	// verify generated proof on desired tree
+	require.NoError(t, VerifyProof(1, encodedEvents[1], proof, tree.Hash()))
+}
+
+func TestConsensusRuntime_generateExitProof_InvalidProof(t *testing.T) {
+	const (
+		numOfBlocks         = 10
+		numOfEventsPerBlock = 2
+	)
+
+	state := newTestState(t)
+	runtime := &consensusRuntime{
+		state: state,
+	}
+
+	encodedEvents := setupExitEventsForProofVerification(t, state, numOfBlocks, numOfEventsPerBlock)
+
+	checkpointEvents := encodedEvents[:numOfEventsPerBlock]
+
+	// manually create merkle tree for a desired checkpoint to verify the generated proof
+	tree, err := NewMerkleTree(checkpointEvents)
+	require.NoError(t, err)
+
+	proof, err := runtime.generateExitProof(1, 1, 1)
+	require.NoError(t, err)
+	require.NotNil(t, proof)
+
+	proof[0][0]++
+
+	// verify generated proof on desired tree
+	require.ErrorContains(t, VerifyProof(1, encodedEvents[1], proof, tree.Hash()), "not a member of merkle tree")
+}
+
+func setupExitEventsForProofVerification(t *testing.T, state *State,
+	numOfBlocks, numOfEventsPerBlock uint64) [][]byte {
+	t.Helper()
+
+	encodedEvents := make([][]byte, numOfBlocks*numOfEventsPerBlock)
+	index := uint64(0)
+
+	for i := uint64(1); i <= numOfBlocks; i++ {
+		for j := uint64(1); j <= numOfEventsPerBlock; j++ {
+			e := &ExitEvent{index, ethgo.ZeroAddress, ethgo.ZeroAddress, []byte{0, 1}, 1, i}
+			require.NoError(t, state.insertExitEvent(e))
+
+			b, err := exitEventABIType.Encode(e)
+
+			require.NoError(t, err)
+
+			encodedEvents[index] = b
+			index++
+		}
+	}
+
+	return encodedEvents
+}
+
 func createTestTransportMessage(t *testing.T, hash []byte, epochNumber uint64, key *wallet.Key) *TransportMessage {
 	t.Helper()
 

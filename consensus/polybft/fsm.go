@@ -85,6 +85,9 @@ type fsm struct {
 	// stateSyncExecutionIndex is the next state sync execution index in smart contract
 	stateSyncExecutionIndex uint64
 
+	// eventRoot is the root hash of exit event tree
+	eventRoot types.Hash
+
 	logger hcf.Logger // The logger object
 }
 

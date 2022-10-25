@@ -276,6 +276,11 @@ func (c *consensusRuntime) FSM() (*fsm, error) {
 		return nil, err
 	}
 
+	eventRoot, err := c.getExitEventRootHash(epoch.Number)
+	if err != nil {
+		return nil, err
+	}
+
 	pendingBlockNumber := c.getPendingBlockNumber()
 	isEndOfSprint := c.isEndOfSprint(pendingBlockNumber)
 	isEndOfEpoch := c.isEndOfEpoch(pendingBlockNumber)
@@ -289,6 +294,7 @@ func (c *consensusRuntime) FSM() (*fsm, error) {
 		validators:     newValidatorSet(types.BytesToAddress(parent.Miner), epoch.Validators),
 		isEndOfEpoch:   isEndOfEpoch,
 		isEndOfSprint:  isEndOfSprint,
+		eventRoot:      eventRoot,
 		logger:         c.logger.Named("fsm"),
 	}
 
@@ -760,6 +766,50 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header) (*CommitE
 	return commitEpoch, nil
 }
 
+// getExitEventRootHash returns the exit event root hash from gathered exit events in given epoch
+func (c *consensusRuntime) getExitEventRootHash(epoch uint64) (types.Hash, error) {
+	exitEvents, err := c.state.getExitEventsByEpoch(epoch)
+	if err != nil {
+		return types.Hash{}, err
+	}
+
+	if len(exitEvents) == 0 {
+		return types.Hash{}, nil
+	}
+
+	tree, err := createExitTree(exitEvents)
+	if err != nil {
+		return types.Hash{}, err
+	}
+
+	return tree.Hash(), nil
+}
+
+// generateExitProof generates proof of exit
+func (c *consensusRuntime) generateExitProof(exitID, epoch, checkpointBlock uint64) ([]types.Hash, error) {
+	exitEvent, err := c.state.getExitEvent(exitID, epoch, checkpointBlock)
+	if err != nil {
+		return nil, err
+	}
+
+	e, err := exitEventABIType.Encode(exitEvent)
+	if err != nil {
+		return nil, err
+	}
+
+	exitEvents, err := c.state.getExitEventsForProof(epoch, checkpointBlock)
+	if err != nil {
+		return nil, err
+	}
+
+	tree, err := createExitTree(exitEvents)
+	if err != nil {
+		return nil, err
+	}
+
+	return tree.GenerateProofForLeaf(e, 0)
+}
+
 // setIsActiveValidator updates the activeValidatorFlag field
 func (c *consensusRuntime) setIsActiveValidator(isActiveValidator bool) {
 	if isActiveValidator {
@@ -888,4 +938,21 @@ func validateVote(vote *MessageSignature, epoch *epochMetadata) error {
 	}
 
 	return nil
+}
+
+// createExitTree creates an exit event merkle tree from provided exit events
+func createExitTree(exitEvents []*ExitEvent) (*MerkleTree, error) {
+	numOfEvents := len(exitEvents)
+	data := make([][]byte, numOfEvents)
+
+	for i := 0; i < numOfEvents; i++ {
+		b, err := exitEventABIType.Encode(exitEvents[i])
+		if err != nil {
+			return nil, err
+		}
+
+		data[i] = b
+	}
+
+	return NewMerkleTree(data)
 }
