@@ -18,6 +18,7 @@ type TxContext struct {
 	GasLimit   int64
 	ChainID    int64
 	Difficulty types.Hash
+	Tracer Tracer
 }
 
 // StorageStatus is the status of the storage access
@@ -69,6 +70,69 @@ type Host interface {
 	Callx(*Contract, Host) *ExecutionResult
 	Empty(addr types.Address) bool
 	GetNonce(addr types.Address) uint64
+	GetTracer() Tracer
+	GetRefund() uint64
+}
+
+type Tracer interface {
+	// Tx-level
+	TxStart(gasLimit uint64)
+	TxEnd(gasLeft uint64)
+
+	// Top-level call frame
+	CallStart(
+		from, to types.Address,
+		callType CallType,
+		gas uint64,
+		value *big.Int,
+		input []byte,
+	)
+	CallEnd(
+		output []byte,
+		gasUsed uint64,
+		err error,
+	)
+
+	// Call frame during execution
+	InnerCallStart(
+		typ CallType,
+		from, to types.Address,
+		gas uint64,
+		value *big.Int,
+		input []byte,
+	)
+	InnerCallEnd(
+		output []byte,
+		gasUsed uint64,
+		err error,
+	)
+
+	// Op-level
+	CaptureMemory([]byte)
+	CaptureStack([]*big.Int)
+	CaptureStorage(opCode int, contractAddress types.Address, stack []*big.Int, sp int, host Host)
+	ExecuteState(
+		contractAddress types.Address,
+		ip int,
+		// TODO: fix cycle import
+		opcode int,
+		availableGas uint64,
+		cost uint64,
+		// TODO: add context
+		lastReturnData []byte,
+		depth int,
+		err error,
+		host Host,
+	)
+	ExecuteFault(
+		ip int,
+		// TODO: fix cycle import
+		opcode int,
+		availableGas uint64,
+		cost uint64,
+		depth int,
+		err error,
+	)
 }
 
 // ExecutionResult includes all output after executing given evm

@@ -73,6 +73,7 @@ type state struct {
 	stop bool
 
 	gas uint64
+	currentConsumedGas uint64
 
 	// bitvec bitvec
 	bitmap bitmap
@@ -193,6 +194,8 @@ func (c *state) swap(n int) {
 }
 
 func (c *state) consumeGas(gas uint64) bool {
+	c.currentConsumedGas += gas
+	
 	if c.gas < gas {
 		c.exit(errOutOfGas)
 
@@ -210,17 +213,69 @@ func (c *state) resetReturnData() {
 
 // Run executes the virtual machine
 func (c *state) Run() ([]byte, error) {
-	var vmerr error
+	var (
+		vmerr error
+		logged bool
 
-	codeSize := len(c.code)
+		op OpCode
+		ipCopy int
+		gasCopy uint64
+
+		ok bool
+	)
+
+	tracer := c.host.GetTracer()
+
+	defer func() {
+		if vmerr == nil || tracer == nil {
+			return
+		}
+
+		if !logged {
+			tracer.ExecuteState(
+				c.msg.Address,
+				ipCopy,
+				int(op),
+				gasCopy,
+				// XXX: c.currentConsumedGas is not the total of gas assumption in a instruction
+				// when the execution terminated in the middle
+				c.currentConsumedGas,
+				c.returnData,
+				c.msg.Depth,
+				c.err,
+				c.host,
+			)
+		} else {
+			tracer.ExecuteFault(
+				ipCopy,
+				int(op),
+				gasCopy,
+				// XXX: c.currentConsumedGas is not the total of gas assumption in a instruction
+				// when the execution terminated in the middle
+				c.currentConsumedGas,
+				c.msg.Depth,
+				c.err,
+			)
+		}
+	}()
+
 	for !c.stop {
-		if c.ip >= codeSize {
+		op, ok = c.CurrentOpCode()
+
+		if tracer != nil {
+			logged, ipCopy, gasCopy = false, c.ip, c.gas
+
+			// copy data before execution
+			tracer.CaptureMemory(c.memory)
+			tracer.CaptureStack(c.stack)
+			tracer.CaptureStorage(int(op), c.msg.Address, c.stack, c.sp, c.host)	
+		}
+
+		if !ok {
 			c.halt()
 
 			break
 		}
-
-		op := OpCode(c.code[c.ip])
 
 		inst := dispatchTable[op]
 		if inst.inst == nil {
@@ -228,12 +283,14 @@ func (c *state) Run() ([]byte, error) {
 
 			break
 		}
+
 		// check if the depth of the stack is enough for the instruction
 		if c.sp < inst.stack {
 			c.exit(errStackUnderflow)
 
 			break
 		}
+
 		// consume the gas of the instruction
 		if !c.consumeGas(inst.gas) {
 			c.exit(errOutOfGas)
@@ -250,6 +307,25 @@ func (c *state) Run() ([]byte, error) {
 
 			break
 		}
+
+		// TODO: track before memory expansion, return data
+		if c.err == nil && tracer != nil {
+			logged = true
+
+			tracer.ExecuteState(
+				c.msg.Address,
+				c.ip,
+				int(op),
+				gasCopy,
+				c.currentConsumedGas,
+				// TODO: copy
+				c.returnData,
+				c.msg.Depth,
+				c.err,
+				c.host,
+			)
+		}
+
 		c.ip++
 	}
 
@@ -353,4 +429,12 @@ func (c *state) Show() string {
 	}
 
 	return strings.Join(str, "\n")
+}
+
+func (c *state) CurrentOpCode() (OpCode, bool) {
+	if codeSize := len(c.code); c.ip >= codeSize {
+		return STOP, false
+	}
+
+	return OpCode(c.code[c.ip]), true
 }

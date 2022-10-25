@@ -87,6 +87,14 @@ func (m *mockHost) GetNonce(addr types.Address) uint64 {
 	panic("Not implemented in tests")
 }
 
+func (t *mockHost) GetTracer() runtime.Tracer {
+	panic("Not implemented in tests")
+}
+
+func (t *mockHost) GetRefund() uint64 {
+	panic("Not implemented in tests")
+}
+
 func TestRun(t *testing.T) {
 	t.Parallel()
 

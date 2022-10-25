@@ -6,14 +6,12 @@ import (
 	"math"
 	"math/big"
 
-	"github.com/0xPolygon/polygon-edge/state/runtime/evm"
-
-	"github.com/hashicorp/go-hclog"
-
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
+	"github.com/0xPolygon/polygon-edge/state/runtime/evm"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/hashicorp/go-hclog"
 )
 
 const (
@@ -140,7 +138,7 @@ func (e *Executor) BeginTxn(
 	header *types.Header,
 	coinbaseReceiver types.Address,
 ) (*Transition, error) {
-	config := e.config.Forks.At(header.Number)
+	forkConfig := e.config.Forks.At(header.Number)
 
 	auxSnap2, err := e.state.NewSnapshotAt(parentRoot)
 	if err != nil {
@@ -149,7 +147,7 @@ func (e *Executor) BeginTxn(
 
 	newTxn := NewTxn(e.state, auxSnap2)
 
-	env2 := runtime.TxContext{
+	txCtx := runtime.TxContext{
 		Coinbase:   coinbaseReceiver,
 		Timestamp:  int64(header.Timestamp),
 		Number:     int64(header.Number),
@@ -161,12 +159,12 @@ func (e *Executor) BeginTxn(
 	txn := &Transition{
 		logger:   e.logger,
 		r:        e,
-		ctx:      env2,
+		ctx:      txCtx,
 		state:    newTxn,
 		getHash:  e.GetHash(header),
 		auxState: e.state,
-		config:   config,
-		gasPool:  uint64(env2.GasLimit),
+		config:   forkConfig,
+		gasPool:  uint64(txCtx.GasLimit),
 
 		receipts: []*types.Receipt{},
 		totalGas: 0,
@@ -264,7 +262,7 @@ func (t *Transition) Write(txn *types.Transaction) error {
 	// Make a local copy and apply the transaction
 	msg := txn.Copy()
 
-	result, e := t.Apply(msg)
+	result, e := t.Apply(msg, nil)
 	if e != nil {
 		t.logger.Error("failed to apply tx", "err", e)
 
@@ -348,10 +346,13 @@ func (t *Transition) GetTxnHash() types.Hash {
 }
 
 // Apply applies a new transaction
-func (t *Transition) Apply(msg *types.Transaction) (*runtime.ExecutionResult, error) {
+func (t *Transition) Apply(
+	msg *types.Transaction,
+	tracer runtime.Tracer,
+) (*runtime.ExecutionResult, error) {
 	s := t.state.Snapshot()
-	result, err := t.apply(msg)
 
+	result, err := t.apply(msg, tracer)
 	if err != nil {
 		t.state.RevertToSnapshot(s)
 	}
@@ -433,7 +434,10 @@ func NewGasLimitReachedTransitionApplicationError(err error) *GasLimitReachedTra
 	}
 }
 
-func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, error) {
+func (t *Transition) apply(
+	msg *types.Transaction,
+	tracer runtime.Tracer,
+) (*runtime.ExecutionResult, error) {
 	// First check this message satisfies all consensus rules before
 	// applying the message. The rules include these clauses
 	//
@@ -458,6 +462,12 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 	// 3. the amount of gas required is available in the block
 	if err := t.subGasPool(msg.Gas); err != nil {
 		return nil, NewGasLimitReachedTransitionApplicationError(err)
+	}
+
+	t.ctx.Tracer = tracer
+
+	if t.ctx.Tracer != nil {
+		t.ctx.Tracer.TxStart(msg.Gas)
 	}
 
 	// 4. there is no overflow when calculating intrinsic gas
@@ -495,6 +505,10 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 
 	refund := txn.GetRefund()
 	result.UpdateGasUsed(msg.Gas, refund)
+
+	if t.ctx.Tracer != nil {
+		t.ctx.Tracer.TxEnd(result.GasLeft)
+	}
 
 	// refund the sender
 	remaining := new(big.Int).Mul(new(big.Int).SetUint64(result.GasLeft), gasPrice)
@@ -589,7 +603,48 @@ func (t *Transition) applyCall(
 		}
 	}
 
-	result := t.run(c, host)
+	var result *runtime.ExecutionResult
+
+	if t.ctx.Tracer != nil {
+		// XXX: Depth begins from 0 in geth
+		if c.Depth == 1 {
+			t.ctx.Tracer.CallStart(
+				c.Caller,
+				c.Address,
+				callType,
+				c.Gas,
+				c.Value,
+				c.Input,
+			)
+
+			defer func() {
+				t.ctx.Tracer.CallEnd(
+					result.ReturnValue,
+					result.GasUsed,
+					result.Err,
+				)
+			}()
+		} else {
+			t.ctx.Tracer.InnerCallStart(
+				runtime.Call,
+				c.Caller,
+				c.Address,
+				c.Gas,
+				c.Value,
+				c.Input,
+			)
+
+			defer func() {
+				t.ctx.Tracer.InnerCallEnd(
+					result.ReturnValue,
+					result.GasUsed,
+					result.Err,
+				)
+			}()
+		}
+	}
+
+	result = t.run(c, host)
 	if result.Failed() {
 		t.state.RevertToSnapshot(snapshot)
 	}
@@ -652,8 +707,47 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 		}
 	}
 
-	result := t.run(c, host)
+	var result *runtime.ExecutionResult
+	
+	if t.ctx.Tracer != nil {
+		if c.Depth == 1 {
+			t.ctx.Tracer.CallStart(
+				c.Caller,
+				c.Address,
+				evm.CREATE,
+				c.Gas,
+				c.Value,
+				c.Input,
+			)
 
+			defer func() {
+				t.ctx.Tracer.CallEnd(
+					result.ReturnValue,
+					result.GasUsed,
+					result.Err,
+				)
+			}()
+		} else {
+			t.ctx.Tracer.InnerCallStart(
+				evm.CREATE,
+				c.Caller,
+				c.Address,
+				c.Gas,
+				c.Value,
+				c.Input,
+			)
+
+			defer func() {
+				t.ctx.Tracer.InnerCallEnd(
+					result.ReturnValue,
+					result.GasUsed,
+					result.Err,
+				)
+			}()
+		}
+	}
+
+	result = t.run(c, host)
 	if result.Failed() {
 		t.state.RevertToSnapshot(snapshot)
 
@@ -791,6 +885,14 @@ func (t *Transition) SetCodeDirectly(addr types.Address, code []byte) error {
 	t.state.SetCode(addr, code)
 
 	return nil
+}
+
+func (t *Transition) GetTracer() runtime.Tracer {
+	return t.ctx.Tracer
+}
+
+func (t *Transition) GetRefund() uint64 {
+	return t.state.GetRefund()
 }
 
 func TransactionGasCost(msg *types.Transaction, isHomestead, isIstanbul bool) (uint64, error) {

@@ -521,14 +521,58 @@ func (j *jsonRPCHub) ApplyTxn(
 	}
 
 	transition, err := j.BeginTxn(header.StateRoot, header, blockCreator)
-
 	if err != nil {
 		return
 	}
 
-	result, err = transition.Apply(txn)
+	result, err = transition.Apply(txn, nil)
 
 	return
+}
+
+func (j *jsonRPCHub) TraceSealedTxn(
+	block *types.Block,
+	targetTxHash types.Hash,
+	tracer runtime.Tracer,
+) (*runtime.ExecutionResult, error) {
+	if block.Number() == 0 {
+		return nil, errors.New("genesis block can't have transaction")
+	}
+
+	parentHeader, ok := j.GetHeaderByHash(block.ParentHash())
+	if !ok {
+		return nil, errors.New("parent header not found")
+	}
+
+	blockCreator, err := j.GetConsensus().GetBlockCreator(block.Header)
+	if err != nil {
+		return nil, err
+	}
+
+	transition, err := j.BeginTxn(parentHeader.StateRoot, block.Header, blockCreator)
+	if err != nil {
+		return nil, err
+	}
+
+	var targetTx *types.Transaction
+
+	for _, tx := range block.Transactions {
+		if tx.Hash == targetTxHash {
+			targetTx = tx
+
+			break
+		}
+
+		if _, err := transition.Apply(tx, nil); err != nil {
+			return nil, err
+		}
+	}
+
+	if targetTx == nil {
+		return nil, errors.New("target tx not found")
+	}
+
+	return transition.Apply(targetTx, tracer)
 }
 
 func (j *jsonRPCHub) GetSyncProgression() *progress.Progression {
