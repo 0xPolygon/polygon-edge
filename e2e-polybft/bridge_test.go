@@ -21,8 +21,6 @@ var stateSyncResultEvent = abi.MustNewEvent(`event StateSyncResult(
 		uint8 indexed status,
 		bytes32 message)`)
 
-// event StateSyncResult(uint256 indexed counter, ResultStatus indexed status, bytes32 message);
-
 type ResultEventStatus uint8
 
 const (
