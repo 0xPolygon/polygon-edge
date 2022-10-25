@@ -318,22 +318,6 @@ func (s *State) list() ([]*StateSyncEvent, error) {
 	return events, nil
 }
 
-func compose(slices [][]byte) []byte {
-	var totalLen, i int
-
-	for _, s := range slices {
-		totalLen += len(s)
-	}
-
-	tmp := make([]byte, totalLen)
-
-	for _, s := range slices {
-		i += copy(tmp[i:], s)
-	}
-
-	return tmp
-}
-
 // insertStateSyncEvent inserts a new state sync event to state event bucket in db
 func (s *State) insertExitEvent(event *ExitEvent) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
@@ -344,7 +328,7 @@ func (s *State) insertExitEvent(event *ExitEvent) error {
 
 		bucket := tx.Bucket(exitEventsBucket)
 
-		return bucket.Put(compose([][]byte{itob(event.Epoch), itob(event.ID), itob(event.BlockNumber)}), raw)
+		return bucket.Put(bytes.Join([][]byte{itob(event.Epoch), itob(event.ID), itob(event.BlockNumber)}, nil), raw)
 	})
 }
 
@@ -355,7 +339,7 @@ func (s *State) getExitEvent(exitEventID, epoch, checkpointBlockNumber uint64) (
 	err := s.db.View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(exitEventsBucket)
 
-		key := compose([][]byte{itob(epoch), itob(exitEventID), itob(checkpointBlockNumber)})
+		key := bytes.Join([][]byte{itob(epoch), itob(exitEventID), itob(checkpointBlockNumber)}, nil)
 		v := bucket.Get(key)
 		if v == nil {
 			return &ExitEventNotFoundError{exitEventID, checkpointBlockNumber, epoch}
