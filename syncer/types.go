@@ -1,6 +1,7 @@
 package syncer
 
 import (
+	"context"
 	"math/big"
 	"time"
 
@@ -36,7 +37,7 @@ type Network interface {
 	// Peers returns current connected peers
 	Peers() []*network.PeerConnInfo
 	// SubscribeCh returns a channel of peer event
-	SubscribeCh() (<-chan *event.PeerEvent, error)
+	SubscribeCh(context.Context) (<-chan *event.PeerEvent, error)
 	// GetPeerDistance returns the distance between the node and given peer
 	GetPeerDistance(peer.ID) *big.Int
 	// NewProtoConnection opens up a new stream on the set protocol to the peer,

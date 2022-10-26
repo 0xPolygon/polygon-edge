@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/network/common"
@@ -353,22 +352,29 @@ func (s *Server) runDial() {
 	// having events go missing, as they're crucial to the functioning
 	// of the runDial mechanism
 	notifyCh := make(chan struct{}, 1)
-	defer close(notifyCh)
 
-	if err := s.SubscribeFn(func(event *peerEvent.PeerEvent) {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// cancel context first
+	defer close(notifyCh)
+	defer cancel()
+
+	if err := s.SubscribeFn(ctx, func(event *peerEvent.PeerEvent) {
 		// Only concerned about the listed event types
 		switch event.Type {
 		case
 			peerEvent.PeerConnected,
 			peerEvent.PeerFailedToConnect,
 			peerEvent.PeerDisconnected,
-			peerEvent.PeerDialCompleted, // @Yoshiki, not sure we need to monitor this event type here
+			peerEvent.PeerDialCompleted,
 			peerEvent.PeerAddedToDialQueue:
 		default:
 			return
 		}
 
 		select {
+		case <-ctx.Done():
+			return
 		case notifyCh <- struct{}{}:
 		default:
 		}
@@ -704,7 +710,7 @@ func (s *Server) Subscribe() (*Subscription, error) {
 }
 
 // SubscribeFn is a helper method to run subscription of PeerEvents
-func (s *Server) SubscribeFn(handler func(evnt *peerEvent.PeerEvent)) error {
+func (s *Server) SubscribeFn(ctx context.Context, handler func(evnt *peerEvent.PeerEvent)) error {
 	sub, err := s.Subscribe()
 	if err != nil {
 		return err
@@ -713,13 +719,18 @@ func (s *Server) SubscribeFn(handler func(evnt *peerEvent.PeerEvent)) error {
 	go func() {
 		for {
 			select {
-			case evnt := <-sub.GetCh():
-				handler(evnt)
+			case <-ctx.Done():
+				sub.Close()
+
+				return
 
 			case <-s.closeCh:
 				sub.Close()
 
 				return
+
+			case evnt := <-sub.GetCh():
+				handler(evnt)
 			}
 		}
 	}()
@@ -728,27 +739,33 @@ func (s *Server) SubscribeFn(handler func(evnt *peerEvent.PeerEvent)) error {
 }
 
 // SubscribeCh returns an event of of subscription events
-func (s *Server) SubscribeCh() (<-chan *peerEvent.PeerEvent, error) {
+func (s *Server) SubscribeCh(ctx context.Context) (<-chan *peerEvent.PeerEvent, error) {
 	ch := make(chan *peerEvent.PeerEvent)
+	ctx, cancel := context.WithCancel(ctx)
 
-	var isClosed int32 = 0
-
-	err := s.SubscribeFn(func(evnt *peerEvent.PeerEvent) {
-		if atomic.LoadInt32(&isClosed) == 0 {
-			ch <- evnt
+	err := s.SubscribeFn(ctx, func(evnt *peerEvent.PeerEvent) {
+		select {
+		case <-ctx.Done():
+			return
+		case ch <- evnt:
 		}
 	})
-	if err != nil {
-		atomic.StoreInt32(&isClosed, 1)
+
+	cleanup := func() {
+		cancel()
 		close(ch)
+	}
+
+	if err != nil {
+		cleanup()
 
 		return nil, err
 	}
 
 	go func() {
 		<-s.closeCh
-		atomic.StoreInt32(&isClosed, 1)
-		close(ch)
+
+		cleanup()
 	}()
 
 	return ch, nil
