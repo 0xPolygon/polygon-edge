@@ -2,9 +2,7 @@
 package polybft
 
 import (
-	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -288,7 +286,6 @@ func (p *Polybft) initRuntime() {
 
 // startRuntime starts consensus runtime
 func (p *Polybft) startRuntime() error {
-
 	if p.runtime.IsBridgeEnabled() {
 		err := p.runtime.startEventTracker()
 		if err != nil {
@@ -323,87 +320,67 @@ func (p *Polybft) startPbftProcess() {
 		return
 	}
 
-	// subscribe to new block events
-	var (
-		newBlockSub   = p.blockchain.SubscribeEvents()
-		syncerBlockCh = make(chan uint64)
-	)
+	newBlockSub := p.blockchain.SubscribeEvents()
+	syncerBlockCh := make(chan struct{})
 
-	// Receive a notification every time syncer manages
-	// to insert a valid block.
 	go func() {
 		eventCh := newBlockSub.GetEventCh()
 
 		for {
-			select {
-			case ev := <-eventCh:
-				currentBlockNum := p.blockchain.CurrentHeader().Number
-				if ev.Source == "syncer" {
-					if ev.NewChain[0].Number < currentBlockNum {
-						continue
-					}
+			if ev := <-eventCh; ev.Source == "syncer" {
+				if ev.NewChain[0].Number < p.blockchain.CurrentHeader().Number {
+					// The blockchain notification system can eventually deliver
+					// stale block notifications. These should be ignored
+					continue
 				}
 
-				if p.isSynced() {
-					syncerBlockCh <- currentBlockNum
-				}
-
-			case <-p.closeCh:
-				return
+				syncerBlockCh <- struct{}{}
 			}
 		}
 	}()
 
 	defer newBlockSub.Close()
 
-SYNC:
-	if !p.isSynced() {
-		<-syncerBlockCh
-	}
-
-	lastBlock := p.blockchain.CurrentHeader()
-	p.logger.Info("startPbftProcess",
-		"header hash", lastBlock.Hash,
-		"header number", lastBlock.Number)
-
-	currentValidators, err := p.GetValidators(lastBlock.Number, nil)
-	if err != nil {
-		p.logger.Error("failed to query current validator set", "block number", lastBlock.Number, "error", err)
-	}
-
-	p.runtime.setIsActiveValidator(currentValidators.ContainsNodeID(p.key.NodeID()))
-
-	if !p.runtime.isActiveValidator() {
-		// inactive validator is not part of the consensus protocol and it should just perform syncing
-		goto SYNC
-	}
-
-	// we have to start the bridge snapshot when we have finished syncing
-	if err := p.runtime.restartEpoch(lastBlock); err != nil {
-		p.logger.Error("failed to restart epoch", "error", err)
-
-		goto SYNC
-	}
+	sequenceCh := make(<-chan struct{})
+	isValidator := false
 
 	for {
-		if err := p.runCycle(); err != nil {
-			if errors.Is(err, errNotAValidator) {
-				p.logger.Info("Node is no longer in validator set")
-			} else {
-				p.logger.Error("an error occurred while running a state machine cycle.", "error", err)
-			}
+		latest := p.blockchain.CurrentHeader().Number
+		pending := latest + 1
 
-			goto SYNC
+		currentValidators, err := p.GetValidators(latest, nil)
+		if err != nil {
+			p.logger.Error("failed to query current validator set", "block number", latest, "error", err)
 		}
 
-		switch p.ibft.GetState() {
-		case pbft.SyncState:
-			// we need to go back to sync
-			goto SYNC
-		case pbft.DoneState:
-			// everything worked, move to the next iteration
-		default:
-			// stopped
+		p.runtime.setIsActiveValidator(currentValidators.ContainsNodeID(p.key.NodeID()))
+		isValidator = p.runtime.isActiveValidator()
+
+		//p.txpool.SetSealing(isValidator) // Nemanja: is this necessary
+
+		if isValidator {
+			_, err := p.runtime.FSM() // Nemanja: what to do if it is an error
+			if err != nil {
+				p.logger.Error("failed to create fsm", "block number", latest, "error", err)
+
+				continue
+			}
+
+			sequenceCh = p.ibft.runSequence(pending)
+		}
+
+		select {
+		case <-syncerBlockCh:
+			if isValidator {
+				p.ibft.stopSequence()
+				p.logger.Info("canceled sequence", "sequence", pending)
+			}
+		case <-sequenceCh:
+		case <-p.closeCh:
+			if isValidator {
+				p.ibft.stopSequence()
+			}
+
 			return
 		}
 	}
@@ -417,30 +394,6 @@ func (p *Polybft) isSynced() bool {
 
 	return syncProgression == nil ||
 		p.blockchain.CurrentHeader().Number >= syncProgression.HighestBlock
-}
-
-// runCycle runs a single cycle of the state machine and indicates if node should exit the consensus or keep on running
-func (p *Polybft) runCycle() error {
-	ff, err := p.runtime.FSM()
-	if err != nil {
-		return err
-	}
-
-	if err = p.ibft.SetBackend(ff); err != nil {
-		return err
-	}
-
-	// this cancel is not sexy
-	ctx, cancelFn := context.WithCancel(context.Background())
-
-	go func() {
-		<-p.closeCh
-		cancelFn()
-	}()
-
-	p.ibft.Run(ctx)
-
-	return nil
 }
 
 func (p *Polybft) waitForNPeers() bool {
