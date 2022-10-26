@@ -22,7 +22,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/syncer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
-	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 const (
@@ -190,11 +189,10 @@ func (p *Polybft) Initialize() error {
 	// 	pbft.WithTracer(otel.Tracer("Pbft")),
 	// }
 
-	p.ibft = newIBFT(p.logger, p.runtime, p.runtime)
+	p.ibft = newIBFT(p.logger, p.runtime, p)
 
-	// subscribe to consensus and bridge topics
-	if err = p.subscribeToTopics(); err != nil {
-		return err
+	if err := p.subscribeToIbftTopic(); err != nil {
+		return fmt.Errorf("topic subscription failed: %w", err)
 	}
 
 	// set block time
@@ -268,17 +266,15 @@ func (p *Polybft) startSealing() error {
 
 // initRuntime creates consensus runtime
 func (p *Polybft) initRuntime() {
-	transportWrapper := newRuntimeTransportWrapper(p.bridgeTopic, p.consensusTopic)
 	runtimeConfig := &runtimeConfig{
-		PolyBFTConfig:      p.consensusConfig,
-		Key:                p.key,
-		DataDir:            p.dataDir,
-		BridgeTransport:    transportWrapper,
-		ConsensusTransport: transportWrapper,
-		State:              p.state,
-		blockchain:         p.blockchain,
-		polybftBackend:     p,
-		txPool:             p.config.TxPool,
+		PolyBFTConfig:   p.consensusConfig,
+		Key:             p.key,
+		DataDir:         p.dataDir,
+		BridgeTransport: &runtimeTransportWrapper{p.bridgeTopic},
+		State:           p.state,
+		blockchain:      p.blockchain,
+		polybftBackend:  p,
+		txPool:          p.config.TxPool,
 	}
 
 	p.runtime = newConsensusRuntime(p.logger, runtimeConfig)
@@ -287,26 +283,14 @@ func (p *Polybft) initRuntime() {
 // startRuntime starts consensus runtime
 func (p *Polybft) startRuntime() error {
 	if p.runtime.IsBridgeEnabled() {
-		err := p.runtime.startEventTracker()
-		if err != nil {
+		// start bridge event tracker
+		if err := p.runtime.startEventTracker(); err != nil {
 			return fmt.Errorf("starting event tracker  failed:%w", err)
 		}
 
-		err = p.bridgeTopic.Subscribe(func(obj interface{}, from peer.ID) {
-			msg, _ := obj.(*proto.TransportMessage)
-			var transportMsg *TransportMessage
-			if err := json.Unmarshal(msg.Data, &transportMsg); err != nil {
-				p.logger.Warn("Failed to deliver message", "err", err)
-
-				return
-			}
-
-			if _, err := p.runtime.deliverMessage(transportMsg); err != nil {
-				p.logger.Warn("Failed to deliver message", "err", err)
-			}
-		})
-		if err != nil {
-			return fmt.Errorf("topic subscription failed:%w", err)
+		// subscribe to bridge topic
+		if err := p.runtime.subscribeToBridgeTopic(p.bridgeTopic); err != nil {
+			return fmt.Errorf("bridge topic subscription failed: %w", err)
 		}
 	}
 
