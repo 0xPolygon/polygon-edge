@@ -686,6 +686,8 @@ func TestRunDial(t *testing.T) {
 }
 
 func TestSubscribeFn(t *testing.T) {
+	t.Parallel()
+
 	setupServer := func(t *testing.T, shouldCloseAfterTest bool) *Server {
 		t.Helper()
 
@@ -714,7 +716,7 @@ func TestSubscribeFn(t *testing.T) {
 
 	toChannel := func(t *testing.T, ctx context.Context, server *Server) <-chan *peerEvent.PeerEvent {
 		t.Helper()
-		
+
 		eventCh := make(chan *peerEvent.PeerEvent)
 
 		t.Cleanup(func() {
@@ -734,7 +736,7 @@ func TestSubscribeFn(t *testing.T) {
 		t *testing.T,
 		eventCh <-chan *peerEvent.PeerEvent,
 		timeout time.Duration,
-	) ( *peerEvent.PeerEvent, bool) {
+	) (*peerEvent.PeerEvent, bool) {
 		t.Helper()
 
 		select {
@@ -747,7 +749,7 @@ func TestSubscribeFn(t *testing.T) {
 
 	event := &peerEvent.PeerEvent{
 		PeerID: peer.ID("test"),
-		Type: peerEvent.PeerConnected,
+		Type:   peerEvent.PeerConnected,
 	}
 
 	t.Run("should call callback", func(t *testing.T) {
@@ -764,7 +766,7 @@ func TestSubscribeFn(t *testing.T) {
 
 		server.EmitEvent(event)
 
-		res, received := waitForEvent(t, eventCh, time.Second * 5)
+		res, received := waitForEvent(t, eventCh, time.Second*5)
 
 		assert.True(t, received)
 		assert.Equal(t, event, res)
@@ -784,7 +786,7 @@ func TestSubscribeFn(t *testing.T) {
 
 		server.EmitEvent(event)
 
-		_, received := waitForEvent(t, eventCh, time.Second * 5)
+		_, received := waitForEvent(t, eventCh, time.Second*5)
 
 		assert.False(t, received)
 	})
@@ -806,7 +808,7 @@ func TestSubscribeFn(t *testing.T) {
 
 		server.EmitEvent(event)
 
-		_, received := waitForEvent(t, eventCh, time.Second * 5)
+		_, received := waitForEvent(t, eventCh, time.Second*5)
 
 		assert.False(t, received)
 	})
