@@ -236,11 +236,16 @@ func (p *Polybft) startSyncing() error {
 	}
 
 	go func() {
-		nullHandler := func(b *types.Block) bool {
+		blockHandler := func(b *types.Block) bool {
+			// TODO: rename NotifyProposalInserted
+			// parameter should we header and not StateBlock also
+			// txpool.ResetWithHeaders(b.Header) should be called
+			p.runtime.NotifyProposalInserted(&StateBlock{Block: b})
+
 			return false
 		}
 
-		if err := p.syncer.Sync(nullHandler); err != nil {
+		if err := p.syncer.Sync(blockHandler); err != nil {
 			panic(fmt.Errorf("failed to sync blocks. Error: %w", err))
 		}
 	}()
@@ -305,42 +310,41 @@ func (p *Polybft) startPbftProcess() {
 	}
 
 	newBlockSub := p.blockchain.SubscribeEvents()
+	defer newBlockSub.Close()
+
 	syncerBlockCh := make(chan struct{})
 
 	go func() {
 		eventCh := newBlockSub.GetEventCh()
 
 		for {
-			if ev := <-eventCh; ev.Source == "syncer" {
-				if ev.NewChain[0].Number < p.blockchain.CurrentHeader().Number {
-					// The blockchain notification system can eventually deliver
-					// stale block notifications. These should be ignored
-					continue
+			select {
+			case <-p.closeCh:
+				return
+			case ev := <-eventCh:
+				// The blockchain notification system can eventually deliver
+				// stale block notifications. These should be ignored
+				if ev.Source == "syncer" && ev.NewChain[0].Number > p.blockchain.CurrentHeader().Number {
+					syncerBlockCh <- struct{}{}
 				}
-
-				syncerBlockCh <- struct{}{}
 			}
 		}
 	}()
 
-	defer newBlockSub.Close()
-
-	sequenceCh := make(<-chan struct{})
-	isValidator := false
+	var sequenceCh <-chan struct{}
 
 	for {
 		latest := p.blockchain.CurrentHeader().Number
-		pending := latest + 1
 
 		currentValidators, err := p.GetValidators(latest, nil)
 		if err != nil {
 			p.logger.Error("failed to query current validator set", "block number", latest, "error", err)
 		}
 
-		p.runtime.setIsActiveValidator(currentValidators.ContainsNodeID(p.key.NodeID()))
-		isValidator = p.runtime.isActiveValidator()
+		isValidator := currentValidators.ContainsNodeID(p.key.NodeID())
+		p.runtime.setIsActiveValidator(isValidator)
 
-		//p.txpool.SetSealing(isValidator) // Nemanja: is this necessary
+		p.config.TxPool.SetSealing(isValidator) // update tx pool
 
 		if isValidator {
 			_, err := p.runtime.FSM() // Nemanja: what to do if it is an error
@@ -350,14 +354,16 @@ func (p *Polybft) startPbftProcess() {
 				continue
 			}
 
-			sequenceCh = p.ibft.runSequence(pending)
+			sequenceCh = p.ibft.runSequence(latest + 1)
+		} else {
+			sequenceCh = nil
 		}
 
 		select {
 		case <-syncerBlockCh:
 			if isValidator {
 				p.ibft.stopSequence()
-				p.logger.Info("canceled sequence", "sequence", pending)
+				p.logger.Info("canceled sequence", "sequence", latest+1)
 			}
 		case <-sequenceCh:
 		case <-p.closeCh:
@@ -372,12 +378,7 @@ func (p *Polybft) startPbftProcess() {
 
 // isSynced return true if the current header from the local storage corresponds to the highest block of syncer
 func (p *Polybft) isSynced() bool {
-	// TODO: Check could we change following condition to this:
-	// p.syncer.GetSyncProgression().CurrentBlock >= p.syncer.GetSyncProgression().HighestBlock
-	syncProgression := p.syncer.GetSyncProgression()
-
-	return syncProgression == nil ||
-		p.blockchain.CurrentHeader().Number >= syncProgression.HighestBlock
+	return false // TODO: remove this method
 }
 
 func (p *Polybft) waitForNPeers() bool {
@@ -388,8 +389,7 @@ func (p *Polybft) waitForNPeers() bool {
 		case <-time.After(2 * time.Second):
 		}
 
-		numPeers := len(p.config.Network.Peers())
-		if numPeers >= minSyncPeers {
+		if len(p.config.Network.Peers()) >= minSyncPeers {
 			break
 		}
 	}
