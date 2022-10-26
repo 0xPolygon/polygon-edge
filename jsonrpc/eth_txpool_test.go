@@ -63,6 +63,7 @@ func (m *mockStoreTxn) AddTx(tx *types.Transaction) error {
 func (m *mockStoreTxn) GetNonce(addr types.Address) uint64 {
 	return 1
 }
+
 func (m *mockStoreTxn) AddAccount(addr types.Address) *mockAccount {
 	if m.accounts == nil {
 		m.accounts = map[types.Address]*mockAccount{}
