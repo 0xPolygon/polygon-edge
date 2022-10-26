@@ -70,7 +70,7 @@ type Polybft struct {
 	closeCh chan struct{}
 
 	// ibft is the ibft engine
-	ibft *MyIBFTConsensus
+	ibft *IBFTConsensusWrapper
 
 	// state is reference to the struct which encapsulates consensus data persistence logic
 	state *State
@@ -189,7 +189,7 @@ func (p *Polybft) Initialize() error {
 	// 	pbft.WithTracer(otel.Tracer("Pbft")),
 	// }
 
-	p.ibft = newIBFT(p.logger, p.runtime, p)
+	p.ibft = newIBFTConsensusWrapper(p.logger, p.runtime, p)
 
 	if err := p.subscribeToIbftTopic(); err != nil {
 		return fmt.Errorf("topic subscription failed: %w", err)

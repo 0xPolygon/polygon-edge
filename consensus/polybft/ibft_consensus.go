@@ -2,56 +2,47 @@ package polybft
 
 import (
 	"context"
-	"sync"
 
 	"github.com/0xPolygon/go-ibft/core"
 )
 
-// IBFTConsensus is a convenience wrapper for the go-ibft package
-type MyIBFTConsensus struct {
+// IBFTConsensusWrapper is a convenience wrapper for the go-ibft package
+type IBFTConsensusWrapper struct {
 	*core.IBFT
 
-	wg sync.WaitGroup
-
 	cancelSequence context.CancelFunc
+	sequenceDone   chan struct{}
 }
 
-func newIBFT(
+func newIBFTConsensusWrapper(
 	logger core.Logger,
 	backend core.Backend,
 	transport core.Transport,
-) *MyIBFTConsensus {
-	return &MyIBFTConsensus{
+) *IBFTConsensusWrapper {
+	return &IBFTConsensusWrapper{
 		IBFT: core.NewIBFT(logger, backend, transport),
-		wg:   sync.WaitGroup{},
 	}
 }
 
 // runSequence starts the underlying consensus mechanism for the given height.
 // It may be called by a single thread at any given time
-func (c *MyIBFTConsensus) runSequence(height uint64) <-chan struct{} {
-	done := make(chan struct{})
-	ctx, cancel := context.WithCancel(context.Background())
+func (c *IBFTConsensusWrapper) runSequence(height uint64) <-chan struct{} {
+	var ctx context.Context
 
-	c.cancelSequence = cancel
-
-	c.wg.Add(1)
+	c.sequenceDone = make(chan struct{})
+	ctx, c.cancelSequence = context.WithCancel(context.Background())
 
 	go func() {
-		defer func() {
-			cancel()
-			c.wg.Done()
-			close(done)
-		}()
-
-		c.RunSequence(ctx, height)
+		c.IBFT.RunSequence(ctx, height)
+		c.cancelSequence()
+		close(c.sequenceDone)
 	}()
 
-	return done
+	return c.sequenceDone
 }
 
 // stopSequence terminates the running IBFT sequence gracefully and waits for it to return
-func (c *MyIBFTConsensus) stopSequence() {
+func (c *IBFTConsensusWrapper) stopSequence() {
 	c.cancelSequence()
-	c.wg.Wait()
+	<-c.sequenceDone // waits until routine inside runSequence finishes
 }
