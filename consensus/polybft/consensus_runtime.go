@@ -9,6 +9,8 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/0xPolygon/go-ibft/messages"
+	"github.com/0xPolygon/go-ibft/messages/proto"
 	"github.com/0xPolygon/pbft-consensus"
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
@@ -111,21 +113,14 @@ type consensusRuntime struct {
 }
 
 // newConsensusRuntime creates and starts a new consensus runtime instance with event tracking
-func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRuntime, error) {
+func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) *consensusRuntime {
 	runtime := &consensusRuntime{
 		state:  config.State,
 		config: config,
 		logger: log.Named("consensus_runtime"),
 	}
 
-	if runtime.IsBridgeEnabled() {
-		err := runtime.startEventTracker()
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return runtime, nil
+	return runtime
 }
 
 // getEpoch returns current epochMetadata in a thread-safe manner.
@@ -888,4 +883,83 @@ func validateVote(vote *MessageSignature, epoch *epochMetadata) error {
 	}
 
 	return nil
+}
+
+func (c *consensusRuntime) BuildProposal(blockNumber uint64) []byte {
+	panic("not implemented")
+}
+
+// InsertBlock inserts a proposal with the specified committed seals
+func (c *consensusRuntime) InsertBlock(proposal []byte, committedSeals []*messages.CommittedSeal) {
+	panic("not implemented")
+}
+
+// ID returns the validator's ID
+func (c *consensusRuntime) ID() []byte {
+	panic("not implemented")
+}
+
+// MaximumFaultyNodes returns the maximum number of faulty nodes based
+// on the validator set.
+func (c *consensusRuntime) MaximumFaultyNodes() uint64 {
+	panic("not implemented")
+}
+
+// Quorum returns what is the quorum size for the
+// specified block height.
+func (c *consensusRuntime) Quorum(blockHeight uint64) uint64 {
+	panic("not implemented")
+}
+
+// BuildPrePrepareMessage builds a PREPREPARE message based on the passed in proposal
+func (c *consensusRuntime) BuildPrePrepareMessage(
+	proposal []byte,
+	certificate *proto.RoundChangeCertificate,
+	view *proto.View,
+) *proto.Message {
+	panic("not implemented")
+}
+
+// BuildPrepareMessage builds a PREPARE message based on the passed in proposal
+func (c *consensusRuntime) BuildPrepareMessage(proposalHash []byte, view *proto.View) *proto.Message {
+	panic("not implemented")
+}
+
+// BuildCommitMessage builds a COMMIT message based on the passed in proposal
+func (c *consensusRuntime) BuildCommitMessage(proposalHash []byte, view *proto.View) *proto.Message {
+	panic("not implemented")
+}
+
+// BuildRoundChangeMessage builds a ROUND_CHANGE message based on the passed in proposal
+func (c *consensusRuntime) BuildRoundChangeMessage(
+	proposal []byte,
+	certificate *proto.PreparedCertificate,
+	view *proto.View,
+) *proto.Message {
+	panic("not implemented")
+}
+
+// IsValidBlock checks if the proposed block is child of parent
+func (c *consensusRuntime) IsValidBlock(block []byte) bool {
+	panic("not implemented")
+}
+
+// IsValidSender checks if signature is from sender
+func (c *consensusRuntime) IsValidSender(msg *proto.Message) bool {
+	panic("not implemented")
+}
+
+// IsProposer checks if the passed in ID is the Proposer for current view (sequence, round)
+func (c *consensusRuntime) IsProposer(id []byte, height, round uint64) bool {
+	panic("not implemented")
+}
+
+// IsValidProposalHash checks if the hash matches the proposal
+func (c *consensusRuntime) IsValidProposalHash(proposal, hash []byte) bool {
+	panic("not implemented")
+}
+
+// IsValidCommittedSeal checks if the seal for the proposal is valid
+func (c *consensusRuntime) IsValidCommittedSeal(proposal []byte, committedSeal *messages.CommittedSeal) bool {
+	panic("not implemented")
 }

@@ -25,7 +25,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"go.opentelemetry.io/otel"
 )
 
 const (
@@ -73,8 +72,8 @@ type Polybft struct {
 	// close closes all the pbft consensus
 	closeCh chan struct{}
 
-	// pbft is the pbft engine
-	pbft *pbft.Pbft
+	// ibft is the ibft engine
+	ibft *MyIBFTConsensus
 
 	// state is reference to the struct which encapsulates consensus data persistence logic
 	state *State
@@ -177,13 +176,15 @@ func (p *Polybft) Initialize() error {
 		executor:   p.config.Executor,
 	}
 
+	p.initRuntime()
+
 	// initialize pbft engine
-	opts := []pbft.ConfigOption{
-		pbft.WithLogger(p.logger.Named("Pbft").
-			StandardLogger(&hclog.StandardLoggerOptions{}),
-		),
-		pbft.WithTracer(otel.Tracer("Pbft")),
-	}
+	// opts := []pbft.ConfigOption{
+	// 	pbft.WithLogger(p.logger.Named("Pbft").
+	// 		StandardLogger(&hclog.StandardLoggerOptions{}),
+	// 	),
+	// 	pbft.WithTracer(otel.Tracer("Pbft")),
+	// }
 
 	// create pbft topic
 	p.pbftTopic, err = p.config.Network.NewTopic(pbftProto, &proto.GossipMessage{})
@@ -191,7 +192,7 @@ func (p *Polybft) Initialize() error {
 		return fmt.Errorf("failed to create pbft topic. Error: %w", err)
 	}
 
-	p.pbft = pbft.New(p.key, &pbftTransportWrapper{topic: p.pbftTopic}, opts...)
+	p.ibft = newMyIBFT(p.logger, p.runtime)
 
 	// check pbft topic - listen for transport messages and relay them to pbft
 	err = p.pbftTopic.Subscribe(func(obj interface{}, from peer.ID) {
@@ -204,7 +205,7 @@ func (p *Polybft) Initialize() error {
 			return
 		}
 
-		p.pbft.PushMessage(msg)
+		p.ibft.PushMessage(msg)
 	})
 
 	if err != nil {
@@ -288,8 +289,8 @@ func (p *Polybft) startSealing() error {
 	return nil
 }
 
-// startRuntime starts consensus runtime
-func (p *Polybft) startRuntime() error {
+// initRuntime creates consensus runtime
+func (p *Polybft) initRuntime() {
 	runtimeConfig := &runtimeConfig{
 		PolyBFTConfig: p.consensusConfig,
 		Key:           p.key,
@@ -304,15 +305,19 @@ func (p *Polybft) startRuntime() error {
 		txPool:         p.config.TxPool,
 	}
 
-	runtime, err := newConsensusRuntime(p.logger, runtimeConfig)
-	if err != nil {
-		return err
-	}
+	p.runtime = newConsensusRuntime(p.logger, runtimeConfig)
+}
 
-	p.runtime = runtime
+// startRuntime starts consensus runtime
+func (p *Polybft) startRuntime() error {
 
-	if runtime.IsBridgeEnabled() {
-		err := p.bridgeTopic.Subscribe(func(obj interface{}, from peer.ID) {
+	if p.runtime.IsBridgeEnabled() {
+		err := p.runtime.startEventTracker()
+		if err != nil {
+			return fmt.Errorf("starting event tracker  failed:%w", err)
+		}
+
+		err = p.bridgeTopic.Subscribe(func(obj interface{}, from peer.ID) {
 			msg, _ := obj.(*proto.TransportMessage)
 			var transportMsg *TransportMessage
 			if err := json.Unmarshal(msg.Data, &transportMsg); err != nil {
@@ -413,7 +418,7 @@ SYNC:
 			goto SYNC
 		}
 
-		switch p.pbft.GetState() {
+		switch p.ibft.GetState() {
 		case pbft.SyncState:
 			// we need to go back to sync
 			goto SYNC
@@ -443,7 +448,7 @@ func (p *Polybft) runCycle() error {
 		return err
 	}
 
-	if err = p.pbft.SetBackend(ff); err != nil {
+	if err = p.ibft.SetBackend(ff); err != nil {
 		return err
 	}
 
@@ -455,7 +460,7 @@ func (p *Polybft) runCycle() error {
 		cancelFn()
 	}()
 
-	p.pbft.Run(ctx)
+	p.ibft.Run(ctx)
 
 	return nil
 }
