@@ -87,11 +87,11 @@ func (m *mockHost) GetNonce(addr types.Address) uint64 {
 	panic("Not implemented in tests")
 }
 
-func (t *mockHost) GetTracer() runtime.Tracer {
+func (m *mockHost) GetTracer() runtime.Tracer {
 	return nil
 }
 
-func (t *mockHost) GetRefund() uint64 {
+func (m *mockHost) GetRefund() uint64 {
 	panic("Not implemented in tests")
 }
 
