@@ -530,7 +530,6 @@ func (j *jsonRPCHub) ApplyTxn(
 	return
 }
 
-
 func (j *jsonRPCHub) TraceMinedBlock(
 	block *types.Block,
 	tracer runtime.Tracer,
@@ -612,6 +611,28 @@ func (j *jsonRPCHub) TraceMinedTxn(
 	}
 
 	if _, err := transition.Apply(targetTx, tracer); err != nil {
+		return nil, err
+	}
+
+	return tracer.GetResult(), nil
+}
+
+func (j *jsonRPCHub) TraceCall(
+	tx *types.Transaction,
+	parentHeader *types.Header,
+	tracer runtime.Tracer,
+) (interface{}, error) {
+	blockCreator, err := j.GetConsensus().GetBlockCreator(parentHeader)
+	if err != nil {
+		return nil, err
+	}
+
+	transition, err := j.BeginTxn(parentHeader.StateRoot, parentHeader, blockCreator)
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err := transition.Apply(tx, tracer); err != nil {
 		return nil, err
 	}
 

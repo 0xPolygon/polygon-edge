@@ -10,7 +10,7 @@ type latestHeaderGetter interface {
 	Header() *types.Header
 }
 
-func GetNumericBlockNumber(number BlockNumber, headerGetter latestHeaderGetter) (uint64, error) {
+func getNumericBlockNumber(number BlockNumber, headerGetter latestHeaderGetter) (uint64, error) {
 	switch number {
 	case LatestBlockNumber:
 		return headerGetter.Header().Number, nil

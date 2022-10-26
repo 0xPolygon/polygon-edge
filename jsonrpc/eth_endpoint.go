@@ -131,7 +131,7 @@ func (e *Eth) Syncing() (interface{}, error) {
 
 // GetBlockByNumber returns information about a block by block number
 func (e *Eth) GetBlockByNumber(number BlockNumber, fullTx bool) (interface{}, error) {
-	num, err := GetNumericBlockNumber(number, e.store)
+	num, err := getNumericBlockNumber(number, e.store)
 	if err != nil {
 		return nil, err
 	}
@@ -155,7 +155,7 @@ func (e *Eth) GetBlockByHash(hash types.Hash, fullTx bool) (interface{}, error) 
 }
 
 func (e *Eth) GetBlockTransactionCountByNumber(number BlockNumber) (interface{}, error) {
-	num, err := GetNumericBlockNumber(number, e.store)
+	num, err := getNumericBlockNumber(number, e.store)
 	if err != nil {
 		return nil, err
 	}
