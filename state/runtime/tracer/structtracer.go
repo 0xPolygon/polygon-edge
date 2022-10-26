@@ -11,57 +11,63 @@ import (
 )
 
 type StructLog struct {
-	Pc            uint64                      `json:"pc"`
-	Op            int                         `json:"op"`
-	Gas           uint64                      `json:"gas"`
-	GasCost       uint64                      `json:"gasCost"`
-	Memory        []byte                      `json:"memory,omitempty"`
-	MemorySize    int                         `json:"memSize"`
-	Stack         []*big.Int                  `json:"stack"`
-	ReturnData    []byte                      `json:"returnData,omitempty"`
-	Storage       map[types.Hash]types.Hash   `json:"storage"`
-	Depth         int                         `json:"depth"`
-	RefundCounter uint64                      `json:"refund"`
-	Err           error                       `json:"err"`
+	Pc            uint64                    `json:"pc"`
+	Op            int                       `json:"op"`
+	Gas           uint64                    `json:"gas"`
+	GasCost       uint64                    `json:"gasCost"`
+	Memory        []byte                    `json:"memory,omitempty"`
+	MemorySize    int                       `json:"memSize"`
+	Stack         []*big.Int                `json:"stack"`
+	ReturnData    []byte                    `json:"returnData,omitempty"`
+	Storage       map[types.Hash]types.Hash `json:"storage"`
+	Depth         int                       `json:"depth"`
+	RefundCounter uint64                    `json:"refund"`
+	Err           error                     `json:"err"`
 }
 
 type StructTracer struct {
 	Config Config
 
-	logs []StructLog
-	gasLimit uint64
+	logs        []StructLog
+	gasLimit    uint64
 	consumedGas uint64
-	output []byte
-	err error
-	storage map[types.Address]map[types.Hash]types.Hash
+	output      []byte
+	err         error
+	storage     map[types.Address]map[types.Hash]types.Hash
 
 	currentMemory []byte
-	currentStack []*big.Int
+	currentStack  []*big.Int
 }
 
 func NewStructTracer() *StructTracer {
 	return &StructTracer{
 		Config: Config{
-			EnableMemory: true,
-			DisableStack: false,
-			DisableStorage: false,
+			EnableMemory:     true,
+			DisableStack:     false,
+			DisableStorage:   false,
 			EnableReturnData: true,
-			Limit: 0,
+			Limit:            0,
 		},
 		storage: make(map[types.Address]map[types.Hash]types.Hash),
 	}
 }
 
+func (t *StructTracer) Clear() {
+	t.logs = t.logs[:0]
+	t.gasLimit = 0
+	t.consumedGas = 0
+	t.output = t.output[:0]
+	t.err = nil
+	t.storage = make(map[types.Address]map[types.Hash]types.Hash)
+	t.currentMemory = t.currentMemory[:0]
+	t.currentStack = t.currentStack[:0]
+}
 
 func (t *StructTracer) TxStart(gasLimit uint64) {
-	fmt.Printf("TxStart gasLimit=%d\n", gasLimit)
-	
 	t.gasLimit = gasLimit
 }
 
 func (t *StructTracer) TxEnd(gasLeft uint64) {
-	fmt.Printf("TxEnd gasLeft=%d, gasLimit=%d\n", gasLeft, t.gasLimit)
-
 	t.consumedGas = t.gasLimit - gasLeft
 }
 
@@ -71,7 +77,8 @@ func (t *StructTracer) CallStart(
 	gas uint64,
 	value *big.Int,
 	input []byte,
-) {}
+) {
+}
 
 func (t *StructTracer) CallEnd(
 	output []byte,
@@ -125,7 +132,7 @@ func (t *StructTracer) CaptureStack(stack []*big.Int) {
 
 func (t *StructTracer) CaptureStorage(
 	opcode int,
-	contractAddress types.Address, 
+	contractAddress types.Address,
 	stack []*big.Int,
 	sp int,
 	host runtime.Host,
@@ -139,7 +146,7 @@ func (t *StructTracer) CaptureStorage(
 	}
 
 	switch opcode {
-	case  evm.SLOAD:
+	case evm.SLOAD:
 		if sp < 1 {
 			break
 		}
@@ -155,7 +162,7 @@ func (t *StructTracer) CaptureStorage(
 		}
 
 		slot := types.BytesToHash(stack[sp-2].Bytes())
-		value :=  types.BytesToHash(stack[sp-1].Bytes())
+		value := types.BytesToHash(stack[sp-1].Bytes())
 
 		t.storage[contractAddress][slot] = value
 	}
@@ -177,11 +184,11 @@ func (t *StructTracer) ExecuteState(
 	}
 
 	var (
-		memory []byte
+		memory     []byte
 		memorySize int
-		stack []*big.Int
+		stack      []*big.Int
 		returnData []byte
-		storage map[types.Hash]types.Hash
+		storage    map[types.Hash]types.Hash
 	)
 
 	if t.Config.EnableMemory {
@@ -211,18 +218,18 @@ func (t *StructTracer) ExecuteState(
 	t.logs = append(
 		t.logs,
 		StructLog{
-			Pc: uint64(ip),
-			Op: opcode,
-			Gas: availableGas,
-			GasCost: cost,
-			Memory: memory,
-			MemorySize: memorySize,
-			Stack: stack,
-			ReturnData: returnData,
-			Storage: storage,
-			Depth: depth,
+			Pc:            uint64(ip),
+			Op:            opcode,
+			Gas:           availableGas,
+			GasCost:       cost,
+			Memory:        memory,
+			MemorySize:    memorySize,
+			Stack:         stack,
+			ReturnData:    returnData,
+			Storage:       storage,
+			Depth:         depth,
 			RefundCounter: host.GetRefund(),
-			Err: err,
+			Err:           err,
 		},
 	)
 }
@@ -239,13 +246,13 @@ func (t *StructTracer) ExecuteFault(
 }
 
 type StructTraceResult struct {
-	Gas uint64 `json:"gas"`
-	Failed bool `json:"failed"`
-	ReturnValue string `json:"return_value"`
-	StructLogs []StructLog `json:"logs"`
+	Gas         uint64      `json:"gas"`
+	Failed      bool        `json:"failed"`
+	ReturnValue string      `json:"return_value"`
+	StructLogs  []StructLog `json:"logs"`
 }
 
-func (t *StructTracer) GetResult() *StructTraceResult {
+func (t *StructTracer) GetResult() interface{} {
 	var returnValue string
 
 	if t.err != nil && !errors.Is(t.err, runtime.ErrExecutionReverted) {
@@ -255,13 +262,13 @@ func (t *StructTracer) GetResult() *StructTraceResult {
 	}
 
 	return &StructTraceResult{
-		Gas: t.consumedGas,
-		Failed: t.err != nil,
+		Gas:         t.consumedGas,
+		Failed:      t.err != nil,
 		ReturnValue: returnValue,
-		StructLogs: t.logs,
+		StructLogs:  t.logs,
 	}
 }
 
 func (t *StructTracer) canAppendLog() bool {
-	return t.Config.Limit == 0 || len(t.logs) <  t.Config.Limit
+	return t.Config.Limit == 0 || len(t.logs) < t.Config.Limit
 }

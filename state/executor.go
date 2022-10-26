@@ -708,7 +708,7 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 	}
 
 	var result *runtime.ExecutionResult
-	
+
 	if t.ctx.Tracer != nil {
 		if c.Depth == 1 {
 			t.ctx.Tracer.CallStart(

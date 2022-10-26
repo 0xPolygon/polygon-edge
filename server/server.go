@@ -530,11 +530,50 @@ func (j *jsonRPCHub) ApplyTxn(
 	return
 }
 
-func (j *jsonRPCHub) TraceSealedTxn(
+
+func (j *jsonRPCHub) TraceMinedBlock(
+	block *types.Block,
+	tracer runtime.Tracer,
+) ([]interface{}, error) {
+	if block.Number() == 0 {
+		return nil, errors.New("genesis block can't have transaction")
+	}
+
+	parentHeader, ok := j.GetHeaderByHash(block.ParentHash())
+	if !ok {
+		return nil, errors.New("parent header not found")
+	}
+
+	blockCreator, err := j.GetConsensus().GetBlockCreator(block.Header)
+	if err != nil {
+		return nil, err
+	}
+
+	transition, err := j.BeginTxn(parentHeader.StateRoot, block.Header, blockCreator)
+	if err != nil {
+		return nil, err
+	}
+
+	results := make([]interface{}, len(block.Transactions))
+
+	for idx, tx := range block.Transactions {
+		tracer.Clear()
+
+		if _, err := transition.Apply(tx, tracer); err != nil {
+			return nil, err
+		}
+
+		results[idx] = tracer.GetResult()
+	}
+
+	return results, nil
+}
+
+func (j *jsonRPCHub) TraceMinedTxn(
 	block *types.Block,
 	targetTxHash types.Hash,
 	tracer runtime.Tracer,
-) (*runtime.ExecutionResult, error) {
+) (interface{}, error) {
 	if block.Number() == 0 {
 		return nil, errors.New("genesis block can't have transaction")
 	}
@@ -572,7 +611,11 @@ func (j *jsonRPCHub) TraceSealedTxn(
 		return nil, errors.New("target tx not found")
 	}
 
-	return transition.Apply(targetTx, tracer)
+	if _, err := transition.Apply(targetTx, tracer); err != nil {
+		return nil, err
+	}
+
+	return tracer.GetResult(), nil
 }
 
 func (j *jsonRPCHub) GetSyncProgression() *progress.Progression {

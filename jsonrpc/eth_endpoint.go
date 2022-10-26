@@ -129,35 +129,14 @@ func (e *Eth) Syncing() (interface{}, error) {
 	return false, nil
 }
 
-func GetNumericBlockNumber(number BlockNumber, e *Eth) (uint64, error) {
-	switch number {
-	case LatestBlockNumber:
-		return e.store.Header().Number, nil
-
-	case EarliestBlockNumber:
-		return 0, nil
-
-	case PendingBlockNumber:
-		return 0, fmt.Errorf("fetching the pending header is not supported")
-
-	default:
-		if number < 0 {
-			return 0, fmt.Errorf("invalid argument 0: block number larger than int64")
-		}
-
-		return uint64(number), nil
-	}
-}
-
 // GetBlockByNumber returns information about a block by block number
 func (e *Eth) GetBlockByNumber(number BlockNumber, fullTx bool) (interface{}, error) {
-	num, err := GetNumericBlockNumber(number, e)
+	num, err := GetNumericBlockNumber(number, e.store)
 	if err != nil {
 		return nil, err
 	}
 
 	block, ok := e.store.GetBlockByNumber(num, true)
-
 	if !ok {
 		return nil, nil
 	}
@@ -176,7 +155,7 @@ func (e *Eth) GetBlockByHash(hash types.Hash, fullTx bool) (interface{}, error) 
 }
 
 func (e *Eth) GetBlockTransactionCountByNumber(number BlockNumber) (interface{}, error) {
-	num, err := GetNumericBlockNumber(number, e)
+	num, err := GetNumericBlockNumber(number, e.store)
 	if err != nil {
 		return nil, err
 	}

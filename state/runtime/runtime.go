@@ -18,7 +18,7 @@ type TxContext struct {
 	GasLimit   int64
 	ChainID    int64
 	Difficulty types.Hash
-	Tracer Tracer
+	Tracer     Tracer
 }
 
 // StorageStatus is the status of the storage access
@@ -75,6 +75,9 @@ type Host interface {
 }
 
 type Tracer interface {
+	Clear()
+	GetResult() interface{}
+
 	// Tx-level
 	TxStart(gasLimit uint64)
 	TxEnd(gasLeft uint64)

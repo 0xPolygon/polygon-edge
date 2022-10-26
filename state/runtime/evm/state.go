@@ -72,7 +72,7 @@ type state struct {
 	err  error
 	stop bool
 
-	gas uint64
+	gas                uint64
 	currentConsumedGas uint64
 
 	// bitvec bitvec
@@ -195,7 +195,7 @@ func (c *state) swap(n int) {
 
 func (c *state) consumeGas(gas uint64) bool {
 	c.currentConsumedGas += gas
-	
+
 	if c.gas < gas {
 		c.exit(errOutOfGas)
 
@@ -214,11 +214,11 @@ func (c *state) resetReturnData() {
 // Run executes the virtual machine
 func (c *state) Run() ([]byte, error) {
 	var (
-		vmerr error
+		vmerr  error
 		logged bool
 
-		op OpCode
-		ipCopy int
+		op      OpCode
+		ipCopy  int
 		gasCopy uint64
 
 		ok bool
@@ -268,7 +268,7 @@ func (c *state) Run() ([]byte, error) {
 			// copy data before execution
 			tracer.CaptureMemory(c.memory)
 			tracer.CaptureStack(c.stack)
-			tracer.CaptureStorage(int(op), c.msg.Address, c.stack, c.sp, c.host)	
+			tracer.CaptureStorage(int(op), c.msg.Address, c.stack, c.sp, c.host)
 		}
 
 		if !ok {
