@@ -82,6 +82,10 @@ func (m *mockStoreTxn) Header() *types.Header {
 	return &types.Header{}
 }
 
+func (m *mockStoreTxn) GetHeaderByNumber(uint64) (*types.Header, bool) {
+	return &types.Header{}, true
+}
+
 func (m *mockStoreTxn) GetAccount(root types.Hash, addr types.Address) (*state.Account, error) {
 	acct, ok := m.accounts[addr]
 	if !ok {

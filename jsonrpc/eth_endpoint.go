@@ -18,9 +18,6 @@ import (
 )
 
 type ethTxPoolStore interface {
-	// GetNonce returns the next nonce for this address
-	GetNonce(addr types.Address) uint64
-
 	// AddTx adds a new transaction to the tx pool
 	AddTx(tx *types.Transaction) error
 
@@ -38,9 +35,6 @@ type ethStateStore interface {
 type ethBlockchainStore interface {
 	// Header returns the current header of the chain (genesis if empty)
 	Header() *types.Header
-
-	// GetHeaderByNumber returns the header by number
-	GetHeaderByNumber(block uint64) (*types.Header, bool)
 
 	// GetBlockByHash gets a block using the provided hash
 	GetBlockByHash(hash types.Hash, full bool) (*types.Block, bool)
@@ -73,6 +67,8 @@ type ethStore interface {
 
 // Eth is the eth jsonrpc endpoint
 type Eth struct {
+	*endpointHelper
+
 	logger        hclog.Logger
 	store         ethStore
 	chainID       uint64
@@ -131,7 +127,7 @@ func (e *Eth) Syncing() (interface{}, error) {
 
 // GetBlockByNumber returns information about a block by block number
 func (e *Eth) GetBlockByNumber(number BlockNumber, fullTx bool) (interface{}, error) {
-	num, err := getNumericBlockNumber(number, e.store)
+	num, err := e.getNumericBlockNumber(number)
 	if err != nil {
 		return nil, err
 	}
@@ -155,7 +151,7 @@ func (e *Eth) GetBlockByHash(hash types.Hash, fullTx bool) (interface{}, error) 
 }
 
 func (e *Eth) GetBlockTransactionCountByNumber(number BlockNumber) (interface{}, error) {
-	num, err := getNumericBlockNumber(number, e.store)
+	num, err := e.getNumericBlockNumber(number)
 	if err != nil {
 		return nil, err
 	}
@@ -798,122 +794,4 @@ func (e *Eth) UninstallFilter(id string) (bool, error) {
 // Unsubscribe uninstalls a filter in a websocket
 func (e *Eth) Unsubscribe(id string) (bool, error) {
 	return e.filterManager.Uninstall(id), nil
-}
-
-func (e *Eth) getBlockHeader(number BlockNumber) (*types.Header, error) {
-	switch number {
-	case LatestBlockNumber:
-		return e.store.Header(), nil
-
-	case EarliestBlockNumber:
-		header, ok := e.store.GetHeaderByNumber(uint64(0))
-		if !ok {
-			return nil, fmt.Errorf("error fetching genesis block header")
-		}
-
-		return header, nil
-
-	case PendingBlockNumber:
-		return nil, fmt.Errorf("fetching the pending header is not supported")
-
-	default:
-		// Convert the block number from hex to uint64
-		header, ok := e.store.GetHeaderByNumber(uint64(number))
-		if !ok {
-			return nil, fmt.Errorf("error fetching block number %d header", uint64(number))
-		}
-
-		return header, nil
-	}
-}
-
-// getNextNonce returns the next nonce for the account for the specified block
-func (e *Eth) getNextNonce(address types.Address, number BlockNumber) (uint64, error) {
-	if number == PendingBlockNumber {
-		// Grab the latest pending nonce from the TxPool
-		//
-		// If the account is not initialized in the local TxPool,
-		// return the latest nonce from the world state
-		res := e.store.GetNonce(address)
-
-		return res, nil
-	}
-
-	header, err := e.getBlockHeader(number)
-	if err != nil {
-		return 0, err
-	}
-
-	acc, err := e.store.GetAccount(header.StateRoot, address)
-
-	//nolint:govet
-	if errors.As(err, &ErrStateNotFound) {
-		// If the account doesn't exist / isn't initialized,
-		// return a nonce value of 0
-		return 0, nil
-	} else if err != nil {
-		return 0, err
-	}
-
-	return acc.Nonce, nil
-}
-
-func (e *Eth) decodeTxn(arg *txnArgs) (*types.Transaction, error) {
-	// set default values
-	if arg.From == nil {
-		arg.From = &types.ZeroAddress
-		arg.Nonce = argUintPtr(0)
-	} else if arg.Nonce == nil {
-		// get nonce from the pool
-		nonce, err := e.getNextNonce(*arg.From, LatestBlockNumber)
-		if err != nil {
-			return nil, err
-		}
-		arg.Nonce = argUintPtr(nonce)
-	}
-
-	if arg.Value == nil {
-		arg.Value = argBytesPtr([]byte{})
-	}
-
-	if arg.GasPrice == nil {
-		arg.GasPrice = argBytesPtr([]byte{})
-	}
-
-	var input []byte
-	if arg.Data != nil {
-		input = *arg.Data
-	} else if arg.Input != nil {
-		input = *arg.Input
-	}
-
-	if arg.To == nil {
-		if input == nil {
-			return nil, fmt.Errorf("contract creation without data provided")
-		}
-	}
-
-	if input == nil {
-		input = []byte{}
-	}
-
-	if arg.Gas == nil {
-		arg.Gas = argUintPtr(0)
-	}
-
-	txn := &types.Transaction{
-		From:     *arg.From,
-		Gas:      uint64(*arg.Gas),
-		GasPrice: new(big.Int).SetBytes(*arg.GasPrice),
-		Value:    new(big.Int).SetBytes(*arg.Value),
-		Input:    input,
-		Nonce:    uint64(*arg.Nonce),
-	}
-	if arg.To != nil {
-		txn.To = arg.To
-	}
-
-	txn.ComputeHash()
-
-	return txn, nil
 }

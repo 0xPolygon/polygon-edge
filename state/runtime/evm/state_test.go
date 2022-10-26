@@ -54,6 +54,7 @@ func TestStackOverflow(t *testing.T) {
 
 	s.code = code.buf
 	s.gas = 10000
+	s.host = &mockHost{}
 
 	_, err := s.Run()
 	assert.NoError(t, err)

@@ -501,6 +501,7 @@ func Test_opReturnDataCopy(t *testing.T) {
 				memory:      []byte{0xff},
 				gas:         7,
 				lastGasCost: 0,
+				currentConsumedGas: 3,
 				stop:        false,
 				err:         nil,
 			},
@@ -535,6 +536,7 @@ func Test_opReturnDataCopy(t *testing.T) {
 				),
 				gas:         14,
 				lastGasCost: 3,
+				currentConsumedGas: 6,
 				stop:        false,
 				err:         nil,
 			},
@@ -564,6 +566,7 @@ func Test_opReturnDataCopy(t *testing.T) {
 			state.evm = nil
 			state.bitmap = bitmap{}
 			state.ret = nil
+			state.currentConsumedGas = 0
 
 			opReturnDataCopy(state)
 

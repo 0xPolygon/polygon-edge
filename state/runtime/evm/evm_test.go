@@ -88,7 +88,7 @@ func (m *mockHost) GetNonce(addr types.Address) uint64 {
 }
 
 func (t *mockHost) GetTracer() runtime.Tracer {
-	panic("Not implemented in tests")
+	return nil
 }
 
 func (t *mockHost) GetRefund() uint64 {
@@ -128,6 +128,7 @@ func TestRun(t *testing.T) {
 			expected: &runtime.ExecutionResult{
 				ReturnValue: []uint8{0x03},
 				GasLeft:     4976,
+				GasUsed:     24,
 			},
 		},
 		{
@@ -139,6 +140,7 @@ func TestRun(t *testing.T) {
 			expected: &runtime.ExecutionResult{
 				ReturnValue: nil,
 				GasLeft:     0,
+				GasUsed:     5000,
 				Err:         errStackUnderflow,
 			},
 		},
@@ -153,6 +155,7 @@ func TestRun(t *testing.T) {
 			},
 			expected: &runtime.ExecutionResult{
 				ReturnValue: nil,
+				GasUsed:     6,
 				// gas consumed for 2 push1 ops
 				GasLeft: 4994,
 				Err:     errRevert,

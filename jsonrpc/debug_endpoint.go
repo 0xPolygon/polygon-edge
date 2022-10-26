@@ -3,7 +3,6 @@ package jsonrpc
 import (
 	"errors"
 	"fmt"
-	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state"
@@ -13,9 +12,6 @@ import (
 )
 
 type debugBlockchainStore interface {
-	// Header returns the latest header
-	Header() *types.Header
-
 	// ReadTxLookup returns a block hash in which a given txn was mined
 	ReadTxLookup(txnHash types.Hash) (types.Hash, bool)
 
@@ -24,8 +20,6 @@ type debugBlockchainStore interface {
 
 	// GetBlockByNumber gets a block using the provided height
 	GetBlockByNumber(num uint64, full bool) (*types.Block, bool)
-
-	GetHeaderByNumber(num uint64) (*types.Header, bool)
 
 	TraceMinedBlock(*types.Block, runtime.Tracer) ([]interface{}, error)
 
@@ -50,6 +44,8 @@ type debugStore interface {
 
 // Debug is the debug jsonrpc endpoint
 type Debug struct {
+	*endpointHelper
+
 	store debugStore
 }
 
@@ -64,7 +60,7 @@ func (d *Debug) TraceBlockByNumber(
 	blockNumber BlockNumber,
 	config *TraceConfig,
 ) (interface{}, error) {
-	num, err := getNumericBlockNumber(blockNumber, d.store)
+	num, err := d.getNumericBlockNumber(blockNumber)
 	if err != nil {
 		return nil, err
 	}
@@ -191,148 +187,4 @@ func (d *Debug) getTxAndBlockByTxHash(txHash types.Hash) (*types.Transaction, *t
 	}
 
 	return nil, nil
-}
-
-// TODO: make common function
-func (d *Debug) getHeaderFromBlockNumberOrHash(bnh *BlockNumberOrHash) (*types.Header, error) {
-	var (
-		header *types.Header
-		err    error
-	)
-
-	if bnh.BlockNumber != nil {
-		header, err = d.getBlockHeader(*bnh.BlockNumber)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get the header of block %d: %w", *bnh.BlockNumber, err)
-		}
-	} else if bnh.BlockHash != nil {
-		block, ok := d.store.GetBlockByHash(*bnh.BlockHash, false)
-		if !ok {
-			return nil, fmt.Errorf("could not find block referenced by the hash %s", bnh.BlockHash.String())
-		}
-
-		header = block.Header
-	}
-
-	return header, nil
-}
-
-// TODO: make common function
-func (d *Debug) getBlockHeader(number BlockNumber) (*types.Header, error) {
-	switch number {
-	case LatestBlockNumber:
-		return d.store.Header(), nil
-
-	case EarliestBlockNumber:
-		header, ok := d.store.GetHeaderByNumber(uint64(0))
-		if !ok {
-			return nil, fmt.Errorf("error fetching genesis block header")
-		}
-
-		return header, nil
-
-	case PendingBlockNumber:
-		return nil, fmt.Errorf("fetching the pending header is not supported")
-
-	default:
-		// Convert the block number from hex to uint64
-		header, ok := d.store.GetHeaderByNumber(uint64(number))
-		if !ok {
-			return nil, fmt.Errorf("error fetching block number %d header", uint64(number))
-		}
-
-		return header, nil
-	}
-}
-
-// TODO: make common function
-func (d *Debug) getNextNonce(address types.Address, number BlockNumber) (uint64, error) {
-	if number == PendingBlockNumber {
-		// Grab the latest pending nonce from the TxPool
-		//
-		// If the account is not initialized in the local TxPool,
-		// return the latest nonce from the world state
-		res := d.store.GetNonce(address)
-
-		return res, nil
-	}
-
-	header, err := d.getBlockHeader(number)
-	if err != nil {
-		return 0, err
-	}
-
-	acc, err := d.store.GetAccount(header.StateRoot, address)
-
-	//nolint:govet
-	if errors.As(err, &ErrStateNotFound) {
-		// If the account doesn't exist / isn't initialized,
-		// return a nonce value of 0
-		return 0, nil
-	} else if err != nil {
-		return 0, err
-	}
-
-	return acc.Nonce, nil
-}
-
-// TODO: make common function
-func (d *Debug) decodeTxn(arg *txnArgs) (*types.Transaction, error) {
-	// set default values
-	if arg.From == nil {
-		arg.From = &types.ZeroAddress
-		arg.Nonce = argUintPtr(0)
-	} else if arg.Nonce == nil {
-		// get nonce from the pool
-		nonce, err := d.getNextNonce(*arg.From, LatestBlockNumber)
-		if err != nil {
-			return nil, err
-		}
-		arg.Nonce = argUintPtr(nonce)
-	}
-
-	if arg.Value == nil {
-		arg.Value = argBytesPtr([]byte{})
-	}
-
-	if arg.GasPrice == nil {
-		arg.GasPrice = argBytesPtr([]byte{})
-	}
-
-	var input []byte
-	if arg.Data != nil {
-		input = *arg.Data
-	} else if arg.Input != nil {
-		input = *arg.Input
-	}
-
-	if arg.To == nil {
-		if input == nil {
-			return nil, fmt.Errorf("contract creation without data provided")
-		}
-	}
-
-	if input == nil {
-		input = []byte{}
-	}
-
-	if arg.Gas == nil {
-		arg.Gas = argUintPtr(0)
-	}
-
-	txn := &types.Transaction{
-		From:     *arg.From,
-		Gas:      uint64(*arg.Gas),
-		GasPrice: new(big.Int).SetBytes(*arg.GasPrice),
-		Value:    new(big.Int).SetBytes(*arg.Value),
-		Input:    input,
-		Nonce:    uint64(*arg.Nonce),
-	}
-	if arg.To != nil {
-		txn.To = arg.To
-	}
-
-	txn.ComputeHash()
-
-	return txn, nil
 }
