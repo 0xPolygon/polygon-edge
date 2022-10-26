@@ -717,16 +717,14 @@ func (s *Server) SubscribeFn(ctx context.Context, handler func(evnt *peerEvent.P
 	}
 
 	go func() {
+		defer sub.Close()
+
 		for {
 			select {
 			case <-ctx.Done():
-				sub.Close()
-
 				return
 
 			case <-s.closeCh:
-				sub.Close()
-
 				return
 
 			case evnt := <-sub.GetCh():
