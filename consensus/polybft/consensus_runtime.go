@@ -38,11 +38,6 @@ var (
 	errQuorumNotReached = errors.New("quorum not reached for commitment message")
 )
 
-// Transport is an abstraction of network layer
-type Transport interface {
-	Gossip(message interface{})
-}
-
 // txPoolInterface is an abstraction of transaction pool
 type txPoolInterface interface {
 	Prepare()
@@ -76,14 +71,15 @@ type epochMetadata struct {
 
 // runtimeConfig is a struct that holds configuration data for given consensus runtime
 type runtimeConfig struct {
-	PolyBFTConfig  *PolyBFTConfig
-	DataDir        string
-	Transport      Transport
-	Key            *wallet.Key
-	State          *State
-	blockchain     blockchainBackend
-	polybftBackend polybftBackend
-	txPool         txPoolInterface
+	PolyBFTConfig      *PolyBFTConfig
+	DataDir            string
+	BridgeTransport    BridgeTransport
+	ConsensusTransport ConsensusTransport
+	Key                *wallet.Key
+	State              *State
+	blockchain         blockchainBackend
+	polybftBackend     polybftBackend
+	txPool             txPoolInterface
 }
 
 // consensusRuntime is a struct that provides consensus runtime features like epoch, state and event management
@@ -457,7 +453,10 @@ func (c *consensusRuntime) buildCommitment(epoch, fromIndex uint64) (*Commitment
 		NodeID:      c.config.Key.NodeID(),
 		EpochNumber: epoch,
 	}
-	c.config.Transport.Gossip(msg)
+
+	if err := c.config.BridgeTransport.Gossip(msg); err != nil {
+		c.logger.Warn("failed to gossip bridge message", "err", err)
+	}
 
 	c.logger.Debug("[buildCommitment] Built commitment", "from", commitment.FromIndex, "to", commitment.ToIndex)
 

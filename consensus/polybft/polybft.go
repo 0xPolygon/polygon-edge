@@ -100,7 +100,7 @@ type Polybft struct {
 	syncer syncer.Syncer
 
 	// topic for pbft consensus
-	pbftTopic *network.Topic
+	consensusTopic *network.Topic
 
 	// topic for pbft consensus
 	bridgeTopic *network.Topic
@@ -176,6 +176,12 @@ func (p *Polybft) Initialize() error {
 		executor:   p.config.Executor,
 	}
 
+	// create bridge and consensus topics
+	if err := p.createTopics(); err != nil {
+		return err
+	}
+
+	// set pbft topic, it will be check if/when the bridge is enabled
 	p.initRuntime()
 
 	// initialize pbft engine
@@ -186,39 +192,12 @@ func (p *Polybft) Initialize() error {
 	// 	pbft.WithTracer(otel.Tracer("Pbft")),
 	// }
 
-	// create pbft topic
-	p.pbftTopic, err = p.config.Network.NewTopic(pbftProto, &proto.GossipMessage{})
-	if err != nil {
-		return fmt.Errorf("failed to create pbft topic. Error: %w", err)
+	p.ibft = newIBFT(p.logger, p.runtime, p.runtime)
+
+	// subscribe to consensus and bridge topics
+	if err = p.subscribeToTopics(); err != nil {
+		return err
 	}
-
-	p.ibft = newMyIBFT(p.logger, p.runtime)
-
-	// check pbft topic - listen for transport messages and relay them to pbft
-	err = p.pbftTopic.Subscribe(func(obj interface{}, from peer.ID) {
-		gossipMsg, _ := obj.(*proto.GossipMessage)
-
-		var msg *pbft.MessageReq
-		if err := json.Unmarshal(gossipMsg.Data, &msg); err != nil {
-			p.logger.Error("pbft topic message received error", "err", err)
-
-			return
-		}
-
-		p.ibft.PushMessage(msg)
-	})
-
-	if err != nil {
-		return fmt.Errorf("topic subscription failed: %w", err)
-	}
-
-	// create bridge topic
-	bridgeTopic, err := p.config.Network.NewTopic(bridgeProto, &proto.TransportMessage{})
-	if err != nil {
-		return fmt.Errorf("failed to create bridge topic. Error: %w", err)
-	}
-	// set pbft topic, it will be check if/when the bridge is enabled
-	p.bridgeTopic = bridgeTopic
 
 	// set block time
 	p.blockTime = time.Duration(p.config.BlockTime)
@@ -291,18 +270,17 @@ func (p *Polybft) startSealing() error {
 
 // initRuntime creates consensus runtime
 func (p *Polybft) initRuntime() {
+	transportWrapper := newRuntimeTransportWrapper(p.bridgeTopic, p.consensusTopic)
 	runtimeConfig := &runtimeConfig{
-		PolyBFTConfig: p.consensusConfig,
-		Key:           p.key,
-		DataDir:       p.dataDir,
-		Transport: &bridgeTransportWrapper{
-			topic:  p.bridgeTopic,
-			logger: p.logger.Named("bridge_transport"),
-		},
-		State:          p.state,
-		blockchain:     p.blockchain,
-		polybftBackend: p,
-		txPool:         p.config.TxPool,
+		PolyBFTConfig:      p.consensusConfig,
+		Key:                p.key,
+		DataDir:            p.dataDir,
+		BridgeTransport:    transportWrapper,
+		ConsensusTransport: transportWrapper,
+		State:              p.state,
+		blockchain:         p.blockchain,
+		polybftBackend:     p,
+		txPool:             p.config.TxPool,
 	}
 
 	p.runtime = newConsensusRuntime(p.logger, runtimeConfig)
@@ -637,29 +615,6 @@ func (p *pbftTransportWrapper) Gossip(msg *pbft.MessageReq) error {
 		&proto.GossipMessage{
 			Data: data,
 		})
-}
-
-type bridgeTransportWrapper struct {
-	topic  *network.Topic
-	logger hclog.Logger
-}
-
-func (b *bridgeTransportWrapper) Gossip(msg interface{}) {
-	data, err := json.Marshal(msg)
-	if err != nil {
-		b.logger.Warn("Failed to marshal bridge message", "err", err)
-
-		return
-	}
-
-	protoMsg := &proto.GossipMessage{
-		Data: data,
-	}
-
-	err = b.topic.Publish(protoMsg)
-	if err != nil {
-		b.logger.Warn("Failed to gossip bridge message", "err", err)
-	}
 }
 
 var _ polybftBackend = &Polybft{}
