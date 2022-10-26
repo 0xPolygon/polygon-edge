@@ -251,7 +251,7 @@ func newBlockStreamWriter(
 
 func (w *blockStreamWriter) appendBlock(b *types.Block) error {
 	data := b.MarshalRLP()
-	if maxHeaderInfoSize+w.buf.Len()+len(data) >= w.maxPayload {
+	if uint64(maxHeaderInfoSize+w.buf.Len()+len(data)) >= w.maxPayload {
 		// send buffered data to client first
 		if err := w.flush(); err != nil {
 			return err
