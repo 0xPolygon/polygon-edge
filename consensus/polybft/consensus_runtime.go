@@ -285,6 +285,7 @@ func (c *consensusRuntime) FSM() (*fsm, error) {
 		parent:            parent,
 		backend:           c.config.blockchain,
 		polybftBackend:    c.config.polybftBackend,
+		epochNumber:       epoch.Number,
 		blockBuilder:      blockBuilder,
 		validators:        newValidatorSet(types.BytesToAddress(parent.Miner), epoch.Validators),
 		isEndOfEpoch:      isEndOfEpoch,
