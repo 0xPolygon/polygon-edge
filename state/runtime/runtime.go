@@ -117,8 +117,7 @@ type Tracer interface {
 	ExecuteState(
 		contractAddress types.Address,
 		ip int,
-		// TODO: fix cycle import
-		opcode int,
+		opcode string,
 		availableGas uint64,
 		cost uint64,
 		// TODO: add context
@@ -129,8 +128,7 @@ type Tracer interface {
 	)
 	ExecuteFault(
 		ip int,
-		// TODO: fix cycle import
-		opcode int,
+		opcode string,
 		availableGas uint64,
 		cost uint64,
 		depth int,

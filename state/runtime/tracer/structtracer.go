@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/state/runtime/evm"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -12,7 +13,7 @@ import (
 
 type StructLog struct {
 	Pc            uint64                    `json:"pc"`
-	Op            int                       `json:"op"`
+	Op            string                    `json:"op"`
 	Gas           uint64                    `json:"gas"`
 	GasCost       uint64                    `json:"gasCost"`
 	Memory        []byte                    `json:"memory,omitempty"`
@@ -23,6 +24,14 @@ type StructLog struct {
 	Depth         int                       `json:"depth"`
 	RefundCounter uint64                    `json:"refund"`
 	Err           error                     `json:"err"`
+}
+
+func (l *StructLog) ErrorString() string {
+	if l.Err != nil {
+		return l.Err.Error()
+	}
+
+	return ""
 }
 
 type StructTracer struct {
@@ -171,7 +180,7 @@ func (t *StructTracer) CaptureStorage(
 func (t *StructTracer) ExecuteState(
 	contractAddress types.Address,
 	ip int,
-	opcode int,
+	opcode string,
 	availableGas uint64,
 	cost uint64,
 	lastReturnData []byte,
@@ -236,7 +245,7 @@ func (t *StructTracer) ExecuteState(
 
 func (t *StructTracer) ExecuteFault(
 	ip int,
-	opcode int,
+	opcode string,
 	availableGas uint64,
 	cost uint64,
 	depth int,
@@ -246,10 +255,23 @@ func (t *StructTracer) ExecuteFault(
 }
 
 type StructTraceResult struct {
-	Gas         uint64      `json:"gas"`
-	Failed      bool        `json:"failed"`
-	ReturnValue string      `json:"return_value"`
-	StructLogs  []StructLog `json:"logs"`
+	Failed      bool           `json:"failed"`
+	Gas         uint64         `json:"gas"`
+	ReturnValue string         `json:"returnValue"`
+	StructLogs  []StructLogRes `json:"structLogs"`
+}
+
+type StructLogRes struct {
+	Pc            uint64             `json:"pc"`
+	Op            string             `json:"op"`
+	Gas           uint64             `json:"gas"`
+	GasCost       uint64             `json:"gasCost"`
+	Depth         int                `json:"depth"`
+	Error         string             `json:"error,omitempty"`
+	Stack         *[]string          `json:"stack,omitempty"`
+	Memory        *[]string          `json:"memory,omitempty"`
+	Storage       *map[string]string `json:"storage,omitempty"`
+	RefundCounter uint64             `json:"refund,omitempty"`
 }
 
 func (t *StructTracer) GetResult() interface{} {
@@ -262,13 +284,58 @@ func (t *StructTracer) GetResult() interface{} {
 	}
 
 	return &StructTraceResult{
-		Gas:         t.consumedGas,
 		Failed:      t.err != nil,
+		Gas:         t.consumedGas,
 		ReturnValue: returnValue,
-		StructLogs:  t.logs,
+		StructLogs:  formatStructLogs(t.logs),
 	}
 }
 
 func (t *StructTracer) canAppendLog() bool {
 	return t.Config.Limit == 0 || len(t.logs) < t.Config.Limit
+}
+
+func formatStructLogs(originalLogs []StructLog) []StructLogRes {
+	res := make([]StructLogRes, len(originalLogs))
+
+	for index, log := range originalLogs {
+		res[index] = StructLogRes{
+			Pc:            log.Pc,
+			Op:            log.Op,
+			Gas:           log.Gas,
+			GasCost:       log.GasCost,
+			Depth:         log.Depth,
+			Error:         log.ErrorString(),
+			RefundCounter: log.RefundCounter,
+		}
+
+		if log.Stack != nil {
+			stack := make([]string, len(log.Stack))
+			for i, value := range log.Stack {
+				stack[i] = hex.EncodeBig(value)
+			}
+
+			res[index].Stack = &stack
+		}
+
+		if log.Memory != nil {
+			memory := make([]string, 0, (len(log.Memory)+31)/32)
+			for i := 0; i+32 <= len(log.Memory); i += 32 {
+				memory = append(memory, fmt.Sprintf("%x", log.Memory[i:i+32]))
+			}
+
+			res[index].Memory = &memory
+		}
+
+		if log.Storage != nil {
+			storage := make(map[string]string)
+			for i, storageValue := range log.Storage {
+				storage[fmt.Sprintf("%x", i)] = fmt.Sprintf("%x", storageValue)
+			}
+
+			res[index].Storage = &storage
+		}
+	}
+
+	return res
 }

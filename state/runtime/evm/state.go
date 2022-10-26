@@ -235,7 +235,7 @@ func (c *state) Run() ([]byte, error) {
 			tracer.ExecuteState(
 				c.msg.Address,
 				ipCopy,
-				int(op),
+				op.String(),
 				gasCopy,
 				// XXX: c.currentConsumedGas is not the total of gas assumption in a instruction
 				// when the execution terminated in the middle
@@ -248,7 +248,7 @@ func (c *state) Run() ([]byte, error) {
 		} else {
 			tracer.ExecuteFault(
 				ipCopy,
-				int(op),
+				op.String(),
 				gasCopy,
 				// XXX: c.currentConsumedGas is not the total of gas assumption in a instruction
 				// when the execution terminated in the middle
@@ -315,7 +315,7 @@ func (c *state) Run() ([]byte, error) {
 			tracer.ExecuteState(
 				c.msg.Address,
 				c.ip,
-				int(op),
+				op.String(),
 				gasCopy,
 				c.currentConsumedGas,
 				// TODO: copy
