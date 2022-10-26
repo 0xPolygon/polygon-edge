@@ -88,8 +88,6 @@ func TestExtra_Encoding(t *testing.T) {
 				Parent:    &Signature{AggregatedSignature: parentStr, Bitmap: bitmapStr},
 				Committed: &Signature{AggregatedSignature: committedStr, Bitmap: bitmapStr},
 				Checkpoint: &CheckpointData{
-					BlockNumber:           25,
-					BlockHash:             types.BytesToHash(generateRandomBytes(t)),
 					BlockRound:            0,
 					EpochNumber:           3,
 					CurrentValidatorsHash: types.BytesToHash(generateRandomBytes(t)),
@@ -586,9 +584,13 @@ func Test_GetIbftExtraClean_Fail(t *testing.T) {
 }
 
 func TestCheckpointData_Hash(t *testing.T) {
+	const (
+		chainID     = uint64(1)
+		blockNumber = uint64(27)
+	)
+
+	blockHash := types.BytesToHash(generateRandomBytes(t))
 	origCheckpoint := &CheckpointData{
-		BlockNumber:           25,
-		BlockHash:             types.BytesToHash(generateRandomBytes(t)),
 		BlockRound:            0,
 		EpochNumber:           3,
 		CurrentValidatorsHash: types.BytesToHash(generateRandomBytes(t)),
@@ -598,10 +600,10 @@ func TestCheckpointData_Hash(t *testing.T) {
 	copyCheckpoint := &CheckpointData{}
 	*copyCheckpoint = *origCheckpoint
 
-	origHash, err := origCheckpoint.Hash()
+	origHash, err := origCheckpoint.Hash(chainID, blockNumber, blockHash)
 	require.NoError(t, err)
 
-	copyHash, err := copyCheckpoint.Hash()
+	copyHash, err := copyCheckpoint.Hash(chainID, blockNumber, blockHash)
 	require.NoError(t, err)
 
 	require.Equal(t, origHash, copyHash)

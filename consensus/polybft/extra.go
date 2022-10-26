@@ -369,9 +369,6 @@ var checkpointDataABIType = abi.MustNewType(`tuple(
 
 // CheckpointData represents data needed for checkpointing mechanism
 type CheckpointData struct {
-	ChainID               uint64
-	BlockNumber           uint64
-	BlockHash             types.Hash
 	BlockRound            uint64
 	EpochNumber           uint64
 	CurrentValidatorsHash types.Hash
@@ -382,12 +379,6 @@ type CheckpointData struct {
 // MarshalRLPWith defines the marshal function implementation for CheckpointData
 func (c *CheckpointData) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 	vv := ar.NewArray()
-	// ChainID
-	vv.Set(ar.NewUint(c.ChainID))
-	// BlockNumber
-	vv.Set(ar.NewUint(c.BlockNumber))
-	// BlockHash
-	vv.Set(ar.NewBytes(c.BlockHash.Bytes()))
 	// BlockRound
 	vv.Set(ar.NewUint(c.BlockRound))
 	// EpochNumber
@@ -409,47 +400,26 @@ func (c *CheckpointData) UnmarshalRLPWith(v *fastrlp.Value) error {
 		return fmt.Errorf("array type expected for CheckpointData struct")
 	}
 
-	// there should be exactly 8 elements:
-	// ChainID, BlockNumber, BlockHash, BlockRound,
-	// EpochNumber, CurrentValidatorsHash, NextValidatorsHash, EventRoot
-	if num := len(vals); num != 8 {
-		return fmt.Errorf("incorrect elements count to decode CheckpointData, expected 8 but found %d", num)
+	// there should be exactly 5 elements:
+	// BlockRound, EpochNumber, CurrentValidatorsHash, NextValidatorsHash, EventRoot
+	if num := len(vals); num != 5 {
+		return fmt.Errorf("incorrect elements count to decode CheckpointData, expected 5 but found %d", num)
 	}
-
-	// ChainID
-	c.ChainID, err = vals[0].GetUint64()
-	if err != nil {
-		return err
-	}
-
-	// BlockNumber
-	c.BlockNumber, err = vals[1].GetUint64()
-	if err != nil {
-		return err
-	}
-
-	// BlockHash
-	blockHashRaw, err := vals[2].GetBytes(nil)
-	if err != nil {
-		return err
-	}
-
-	c.BlockHash = types.BytesToHash(blockHashRaw)
 
 	// BlockRound
-	c.BlockRound, err = vals[3].GetUint64()
+	c.BlockRound, err = vals[0].GetUint64()
 	if err != nil {
 		return err
 	}
 
 	// EpochNumber
-	c.EpochNumber, err = vals[4].GetUint64()
+	c.EpochNumber, err = vals[1].GetUint64()
 	if err != nil {
 		return err
 	}
 
 	// CurrentValidatorsHash
-	currentValidatorsHashRaw, err := vals[5].GetBytes(nil)
+	currentValidatorsHashRaw, err := vals[2].GetBytes(nil)
 	if err != nil {
 		return err
 	}
@@ -457,7 +427,7 @@ func (c *CheckpointData) UnmarshalRLPWith(v *fastrlp.Value) error {
 	c.CurrentValidatorsHash = types.BytesToHash(currentValidatorsHashRaw)
 
 	// NextValidatorsHash
-	nextValidatorsHashRaw, err := vals[6].GetBytes(nil)
+	nextValidatorsHashRaw, err := vals[3].GetBytes(nil)
 	if err != nil {
 		return err
 	}
@@ -465,7 +435,7 @@ func (c *CheckpointData) UnmarshalRLPWith(v *fastrlp.Value) error {
 	c.NextValidatorsHash = types.BytesToHash(nextValidatorsHashRaw)
 
 	// EventRoot
-	eventRootRaw, err := vals[7].GetBytes(nil)
+	eventRootRaw, err := vals[4].GetBytes(nil)
 	if err != nil {
 		return err
 	}
@@ -477,11 +447,11 @@ func (c *CheckpointData) UnmarshalRLPWith(v *fastrlp.Value) error {
 
 // Hash calculates keccak256 hash of the CheckpointData.
 // CheckpointData is ABI encoded and then hashed.
-func (c *CheckpointData) Hash() ([]byte, error) {
+func (c *CheckpointData) Hash(chainID uint64, blockNumber uint64, blockHash types.Hash) ([]byte, error) {
 	checkpointMap := map[string]interface{}{
-		"chainId":               new(big.Int).SetUint64(c.ChainID),
-		"blockNumber":           new(big.Int).SetUint64(c.BlockNumber),
-		"blockHash":             c.BlockHash.Bytes(),
+		"chainId":               new(big.Int).SetUint64(chainID),
+		"blockNumber":           new(big.Int).SetUint64(blockNumber),
+		"blockHash":             blockHash.Bytes(),
 		"blockRound":            new(big.Int).SetUint64(c.BlockRound),
 		"epochNumber":           new(big.Int).SetUint64(c.EpochNumber),
 		"currentValidatorsHash": c.CurrentValidatorsHash.Bytes(),
@@ -508,7 +478,7 @@ func GetIbftExtraClean(extraRaw []byte) ([]byte, error) {
 	ibftExtra := &Extra{
 		Parent:     extra.Parent,
 		Validators: extra.Validators,
-		Checkpoint: &CheckpointData{},
+		Checkpoint: extra.Checkpoint,
 		Seal:       []byte{},
 		Committed:  &Signature{},
 	}
