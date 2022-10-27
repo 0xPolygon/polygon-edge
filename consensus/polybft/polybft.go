@@ -8,11 +8,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/0xPolygon/pbft-consensus"
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/proto"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
@@ -540,21 +538,3 @@ func (p *Polybft) PreCommitState(_ *types.Header, _ *state.Transition) error {
 	// Not required
 	return nil
 }
-
-type pbftTransportWrapper struct {
-	topic *network.Topic
-}
-
-func (p *pbftTransportWrapper) Gossip(msg *pbft.MessageReq) error {
-	data, err := json.Marshal(msg)
-	if err != nil {
-		return err
-	}
-
-	return p.topic.Publish(
-		&proto.GossipMessage{
-			Data: data,
-		})
-}
-
-var _ polybftBackend = &Polybft{}
