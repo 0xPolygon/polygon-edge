@@ -171,7 +171,7 @@ func TestFSM_BuildProposal_WithoutUptimeTxGood(t *testing.T) {
 		NextValidatorsHash:    nextValidatorsHash,
 	}
 
-	proposalHash, err := fsm.getProposalHash(checkpoint, stateBlock.Block.Number(), stateBlock.Block.Hash())
+	proposalHash, err := getSignHash(fsm.backend.GetChainID(), checkpoint, stateBlock.Block.Number(), stateBlock.Block.Hash())
 	require.NoError(t, err)
 
 	rlpBlock := stateBlock.Block.MarshalRLP()
@@ -237,7 +237,7 @@ func TestFSM_BuildProposal_WithUptimeTxGood(t *testing.T) {
 		NextValidatorsHash:    nextValidatorsHash,
 	}
 
-	proposalHash, err := fsm.getProposalHash(checkpoint, stateBlock.Block.Number(), stateBlock.Block.Hash())
+	proposalHash, err := getSignHash(fsm.backend.GetChainID(), checkpoint, stateBlock.Block.Number(), stateBlock.Block.Hash())
 	require.NoError(t, err)
 	assert.Equal(t, rlpBlock, proposal.Data)
 	assert.Equal(t, proposalHash.Bytes(), proposal.Hash)
@@ -719,7 +719,7 @@ func TestFSM_Validate_IncorrectHeaderParentHash(t *testing.T) {
 
 	stateBlock := createDummyStateBlock(parent.Number+1, types.Hash{100, 15}, parent.ExtraData)
 
-	proposalHash, err := fsm.getProposalHash(&CheckpointData{}, stateBlock.Block.Number(), stateBlock.Block.Hash())
+	proposalHash, err := getSignHash(fsm.backend.GetChainID(), &CheckpointData{}, stateBlock.Block.Number(), stateBlock.Block.Hash())
 	require.NoError(t, err)
 
 	proposal := &pbft.Proposal{
@@ -754,7 +754,7 @@ func TestFSM_Validate_InvalidNumber(t *testing.T) {
 		fsm := &fsm{parent: parent, blockBuilder: mBlockBuilder, config: &PolyBFTConfig{}, backend: &blockchainMock{},
 			validators: validators.toValidatorSet(), logger: hclog.NewNullLogger()}
 
-		proposalHash, err := fsm.getProposalHash(&CheckpointData{}, stateBlock.Block.Number(), stateBlock.Block.Hash())
+		proposalHash, err := getSignHash(fsm.backend.GetChainID(), &CheckpointData{}, stateBlock.Block.Number(), stateBlock.Block.Hash())
 		require.NoError(t, err)
 
 		proposal := &pbft.Proposal{
@@ -792,7 +792,7 @@ func TestFSM_Validate_TimestampOlder(t *testing.T) {
 		fsm := &fsm{parent: parent, config: &PolyBFTConfig{}, backend: &blockchainMock{},
 			validators: validators.toValidatorSet(), logger: hclog.NewNullLogger()}
 
-		proposalHash, err := fsm.getProposalHash(&CheckpointData{}, header.Number, header.Hash)
+		proposalHash, err := getSignHash(fsm.backend.GetChainID(), &CheckpointData{}, header.Number, header.Hash)
 		require.NoError(t, err)
 
 		proposal := &pbft.Proposal{
@@ -837,7 +837,7 @@ func TestFSM_Validate_IncorrectMixHash(t *testing.T) {
 	}
 	rlpBlock := buildBlock.Block.MarshalRLP()
 
-	proposalHash, err := fsm.getProposalHash(&CheckpointData{}, header.Number, header.Hash)
+	proposalHash, err := getSignHash(fsm.backend.GetChainID(), &CheckpointData{}, header.Number, header.Hash)
 	require.NoError(t, err)
 
 	proposal := &pbft.Proposal{
@@ -1512,7 +1512,7 @@ func TestFSM_Validate_FailToVerifySignatures(t *testing.T) {
 		},
 	})
 
-	proposalHash, err := fsm.getProposalHash(&CheckpointData{}, finalBlock.Number(), finalBlock.Hash())
+	proposalHash, err := getSignHash(fsm.backend.GetChainID(), &CheckpointData{}, finalBlock.Number(), finalBlock.Hash())
 	require.NoError(t, err)
 
 	proposal := &pbft.Proposal{

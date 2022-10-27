@@ -204,7 +204,8 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 
 	f.block = stateBlock
 
-	proposalHash, err := f.getProposalHash(extra.Checkpoint, f.Height(), stateBlock.Block.Hash())
+	proposalHash, err := getSignHash(f.backend.GetChainID(),
+		extra.Checkpoint, f.Height(), stateBlock.Block.Hash())
 	if err != nil {
 		return nil, err
 	}
@@ -222,13 +223,13 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 	return f.proposal, nil
 }
 
-// getProposalHash calculates composite hash, which consists of blockHash and checkpoint hash appended to it
+// getSignHash calculates composite hash, which consists of blockHash and checkpoint hash appended to it
 // proposalHash = keccak256([]byte {blockHash, checkpointHash})
-func (f *fsm) getProposalHash(checkpoint *CheckpointData,
+func getSignHash(chainID uint64, checkpoint *CheckpointData,
 	blockNumber uint64, blockHash types.Hash) (types.Hash, error) {
-	checkpointHash, err := checkpoint.Hash(uint64(f.backend.GetChainID()), blockNumber, blockHash)
+	checkpointHash, err := checkpoint.Hash(chainID, blockNumber, blockHash)
 	if err != nil {
-		return types.ZeroHash, fmt.Errorf("failed to calculate proposal hash: %w", err)
+		return types.ZeroHash, fmt.Errorf("failed to calculate sign hash: %w", err)
 	}
 
 	aggregatedHashRaw := crypto.Keccak256(bytes.Join([][]byte{blockHash.Bytes(), checkpointHash}, nil))
@@ -327,7 +328,7 @@ func (f *fsm) Validate(proposal *pbft.Proposal) error {
 		return err
 	}
 
-	calculatedProposalHash, err := f.getProposalHash(extra.Checkpoint, block.Number(), block.Hash())
+	calculatedProposalHash, err := getSignHash(f.backend.GetChainID(), extra.Checkpoint, block.Number(), block.Hash())
 	if err != nil {
 		return err
 	}
@@ -367,7 +368,7 @@ func (f *fsm) Validate(proposal *pbft.Proposal) error {
 			return err
 		}
 
-		parentHash, err := f.getProposalHash(parentExtra.Checkpoint, f.parent.Number, f.parent.Hash)
+		parentHash, err := getSignHash(f.backend.GetChainID(), parentExtra.Checkpoint, f.parent.Number, f.parent.Hash)
 		if err != nil {
 			return err
 		}

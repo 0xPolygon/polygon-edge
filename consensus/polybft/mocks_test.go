@@ -114,7 +114,7 @@ func (m *blockchainMock) CalculateGasLimit(number uint64) (uint64, error) {
 	return 0, nil
 }
 
-func (m *blockchainMock) GetChainID() int {
+func (m *blockchainMock) GetChainID() uint64 {
 	return 0
 }
 
