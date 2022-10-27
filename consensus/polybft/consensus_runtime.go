@@ -136,7 +136,7 @@ func (cr *consensusRuntime) IsBridgeEnabled() bool {
 
 // AddLog is an implementation of eventSubscription interface,
 // and is called from the event tracker when an event is final on the rootchain
-func (cr *consensusRuntime) AddLog(eventLog *ethgo.Log) { // nolint
+func (cr *consensusRuntime) AddLog(eventLog *ethgo.Log) {
 	cr.logger.Info(
 		"Add State sync event",
 		"block", eventLog.BlockNumber,

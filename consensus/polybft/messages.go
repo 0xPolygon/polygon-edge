@@ -24,10 +24,15 @@ func signMessage(msg *protoIBFT.Message, signer signer.Signer) (*protoIBFT.Messa
 	return msg, nil
 }
 
-func (cr *consensusRuntime) BuildPrePrepareMessage(proposal []byte, certificate *protoIBFT.RoundChangeCertificate, view *protoIBFT.View) *protoIBFT.Message {
+func (cr *consensusRuntime) BuildPrePrepareMessage(
+	proposal []byte,
+	certificate *protoIBFT.RoundChangeCertificate,
+	view *protoIBFT.View,
+) *protoIBFT.Message {
 	block := types.Block{}
 	if err := block.UnmarshalRLP(proposal); err != nil {
 		cr.logger.Error(fmt.Sprintf("cannot unmarshal RLP:%s", err))
+
 		return nil
 	}
 
@@ -49,8 +54,10 @@ func (cr *consensusRuntime) BuildPrePrepareMessage(proposal []byte, certificate 
 	message, err := signMessage(&msg, cr.currentSigner)
 	if err != nil {
 		cr.logger.Error("Cannot sign message", "Error", err)
+
 		return nil
 	}
+
 	return message
 }
 
@@ -69,8 +76,10 @@ func (cr *consensusRuntime) BuildPrepareMessage(proposalHash []byte, view *proto
 	message, err := signMessage(&msg, cr.currentSigner)
 	if err != nil {
 		cr.logger.Error("Cannot sign message.", "Error", err)
+
 		return nil
 	}
+
 	return message
 }
 
@@ -78,6 +87,7 @@ func (cr *consensusRuntime) BuildCommitMessage(proposalHash []byte, view *protoI
 	committedSeal, err := cr.currentSigner.CreateCommittedSeal(proposalHash)
 	if err != nil {
 		cr.logger.Error("Cannot create committed seal message.", "Error", err)
+
 		return nil
 	}
 
@@ -96,12 +106,18 @@ func (cr *consensusRuntime) BuildCommitMessage(proposalHash []byte, view *protoI
 	message, err := signMessage(&msg, cr.currentSigner)
 	if err != nil {
 		cr.logger.Error("Cannot sign message", "Error", err)
+
 		return nil
 	}
+
 	return message
 }
 
-func (cr *consensusRuntime) BuildRoundChangeMessage(proposal []byte, certificate *protoIBFT.PreparedCertificate, view *protoIBFT.View) *protoIBFT.Message {
+func (cr *consensusRuntime) BuildRoundChangeMessage(
+	proposal []byte,
+	certificate *protoIBFT.PreparedCertificate,
+	view *protoIBFT.View,
+) *protoIBFT.Message {
 	msg := protoIBFT.Message{
 		View: view,
 		From: cr.ID(),
@@ -115,6 +131,7 @@ func (cr *consensusRuntime) BuildRoundChangeMessage(proposal []byte, certificate
 	signedMsg, err := signMessage(&msg, cr.currentSigner)
 	if err != nil {
 		cr.logger.Error("Cannot sign message", "Error", err)
+
 		return nil
 	}
 
