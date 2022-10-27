@@ -47,6 +47,7 @@ func Factory(params *consensus.Params) (consensus.Consensus, error) {
 		config:  params,
 		closeCh: make(chan struct{}),
 		logger:  logger,
+		txPool:  params.TxPool,
 	}
 
 	// initialize polybft consensus config
@@ -108,6 +109,9 @@ type Polybft struct {
 
 	// logger
 	logger hclog.Logger
+
+	// tx pool as interface
+	txPool txPoolInterface
 }
 
 func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *state.Transition) error {
@@ -235,10 +239,7 @@ func (p *Polybft) startSyncing() error {
 
 	go func() {
 		blockHandler := func(b *types.Block) bool {
-			// TODO: rename NotifyProposalInserted
-			// parameter should we header and not StateBlock also
-			// txpool.ResetWithHeaders(b.Header) should be called
-			p.runtime.NotifyProposalInserted(&StateBlock{Block: b})
+			p.runtime.OnBlockInserted(b)
 
 			return false
 		}
@@ -277,7 +278,7 @@ func (p *Polybft) initRuntime() {
 		State:           p.state,
 		blockchain:      p.blockchain,
 		polybftBackend:  p,
-		txPool:          p.config.TxPool,
+		txPool:          p.txPool,
 	}
 
 	p.runtime = newConsensusRuntime(p.logger, runtimeConfig)
@@ -345,7 +346,7 @@ func (p *Polybft) startPbftProcess() {
 		isValidator := currentValidators.ContainsNodeID(p.key.NodeID())
 		p.runtime.setIsActiveValidator(isValidator)
 
-		p.config.TxPool.SetSealing(isValidator) // update tx pool
+		p.txPool.SetSealing(isValidator) // update tx pool
 
 		if isValidator {
 			_, err := p.runtime.FSM() // Nemanja: what to do if it is an error

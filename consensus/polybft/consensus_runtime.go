@@ -43,9 +43,11 @@ type txPoolInterface interface {
 	Prepare()
 	Length() uint64
 	Peek() *types.Transaction
-	Pop(tx *types.Transaction)
-	Drop(tx *types.Transaction)
-	Demote(tx *types.Transaction)
+	Pop(*types.Transaction)
+	Drop(*types.Transaction)
+	Demote(*types.Transaction)
+	SetSealing(bool)
+	ResetWithHeaders(...*types.Header)
 }
 
 // epochMetadata is the static info for epoch currently being processed
@@ -158,17 +160,20 @@ func (c *consensusRuntime) AddLog(eventLog *ethgo.Log) { //nolint
 	return // TODO: Delete this when metrics is established. This is added just to trick linter.
 }
 
-// NotifyProposalInserted is an implementation of fsmNotify interface
-func (c *consensusRuntime) NotifyProposalInserted(b *StateBlock) {
-	lastHeader := b.Block.Header
-	if c.isEndOfEpoch(lastHeader.Number) {
+// OnBlockInserted is called whenever fsm or syncer inserts new block
+func (c *consensusRuntime) OnBlockInserted(block *types.Block) {
+	// after the block has been written we reset the txpool so that the old transactions are removed
+	c.config.txPool.ResetWithHeaders(block.Header)
+
+	if c.isEndOfEpoch(block.Header.Number) {
 		// reset the epoch. Internally it updates the parent block header.
-		if err := c.restartEpoch(lastHeader); err != nil {
+		if err := c.restartEpoch(block.Header); err != nil {
 			c.logger.Error("failed to restart epoch after block inserted", "err", err)
 		}
 	} else {
-		// inside the epoch, update last built block header
-		c.lastBuiltBlock = lastHeader
+		c.lock.Lock()
+		c.lastBuiltBlock = block.Header
+		c.lock.Unlock()
 	}
 }
 
@@ -198,7 +203,7 @@ func (c *consensusRuntime) populateFsmIfBridgeEnabled(
 			}
 		}
 
-		c.NotifyProposalInserted(ff.block)
+		c.OnBlockInserted(ff.block.Block)
 
 		return nil
 	}
@@ -289,7 +294,7 @@ func (c *consensusRuntime) FSM() (*fsm, error) {
 		}
 	} else {
 		ff.postInsertHook = func() error {
-			c.NotifyProposalInserted(ff.block)
+			c.OnBlockInserted(ff.block.Block)
 
 			return nil
 		}
@@ -313,9 +318,7 @@ func (c *consensusRuntime) FSM() (*fsm, error) {
 
 // restartEpoch resets the previously run epoch and moves to the next one
 func (c *consensusRuntime) restartEpoch(header *types.Header) error {
-	c.lastBuiltBlock = header
-
-	systemState, err := c.getSystemState(c.lastBuiltBlock)
+	systemState, err := c.getSystemState(header)
 	if err != nil {
 		return err
 	}
@@ -352,7 +355,7 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) error {
 		}
 	*/
 
-	validatorSet, err := c.config.polybftBackend.GetValidators(c.lastBuiltBlock.Number, nil)
+	validatorSet, err := c.config.polybftBackend.GetValidators(header.Number, nil)
 	if err != nil {
 		return err
 	}
@@ -389,6 +392,7 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) error {
 
 	c.lock.Lock()
 	c.epoch = epoch
+	c.lastBuiltBlock = header
 	c.lock.Unlock()
 
 	err = c.runCheckpoint(epoch)
