@@ -242,3 +242,7 @@ func (d *Dev) Close() error {
 
 	return nil
 }
+
+func (d *Dev) GenerateExitProof(exitID, epoch, checkpointBlock uint64) ([]types.Hash, error) {
+	return nil, nil
+}

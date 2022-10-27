@@ -34,6 +34,9 @@ type Consensus interface {
 	// GetSyncProgression retrieves the current sync progression, if any
 	GetSyncProgression() *progress.Progression
 
+	// GenerateExitProof generates exit proof for given exit event id
+	GenerateExitProof(exitID, epoch, checkpointNumber uint64) ([]types.Hash, error)
+
 	// Initialize initializes the consensus (e.g. setup data)
 	Initialize() error
 

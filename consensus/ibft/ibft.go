@@ -532,6 +532,10 @@ func (i *backendIBFT) SetHeaderHash() {
 	}
 }
 
+func (i *backendIBFT) GenerateExitProof(exitID, epoch, checkpointBlock uint64) ([]types.Hash, error) {
+	return nil, nil
+}
+
 // updateCurrentModules updates Signer, Hooks, and Validators
 // that are used at specified height
 // by fetching from ForkManager

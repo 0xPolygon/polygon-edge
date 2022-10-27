@@ -75,6 +75,10 @@ func (d *Dummy) Close() error {
 	return nil
 }
 
+func (d *Dummy) GenerateExitProof(exitID, epoch, checkpointBlock uint64) ([]types.Hash, error) {
+	return nil, nil
+}
+
 func (d *Dummy) run() {
 	d.logger.Info("started")
 	// do nothing
