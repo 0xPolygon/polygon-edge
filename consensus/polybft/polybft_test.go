@@ -54,7 +54,7 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 		Number:    0,
 		ExtraData: append(make([]byte, signer.IstanbulExtraVanity), genesisExtra.MarshalRLPTo(nil)...),
 	}
-	genesisHeader.ComputeHash()
+	_ = genesisHeader.ComputeHash()
 
 	// add genesis header to map
 	headersMap.addHeader(genesisHeader)
@@ -64,7 +64,7 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 		delta, err := createValidatorSetDelta(hclog.NewNullLogger(), validatorSetParent, validatorSetParent)
 		require.NoError(t, err)
 
-		extra := &Extra{Validators: delta}
+		extra := &Extra{Validators: delta, Checkpoint: &CheckpointData{}}
 		header := &types.Header{
 			Number:    uint64(i),
 			ExtraData: append(make([]byte, signer.IstanbulExtraVanity), extra.MarshalRLPTo(nil)...),
@@ -75,31 +75,40 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 		headersMap.addHeader(header)
 	}
 
+	// mock blockchain
+	blockchainMock := new(blockchainMock)
+	blockchainMock.On("GetHeaderByNumber", mock.Anything).Return(headersMap.getHeader)
+	blockchainMock.On("GetHeaderByHash", mock.Anything).Return(headersMap.getHeaderByHash)
+
 	// create parent header (block 10)
 	parentDelta, err := createValidatorSetDelta(hclog.NewNullLogger(), validatorSetParent, validatorSetCurrent)
 	require.NoError(t, err)
 
-	parentExtra := &Extra{Validators: parentDelta}
+	parentExtra := &Extra{Validators: parentDelta, Checkpoint: &CheckpointData{}}
 	parentHeader := &types.Header{
 		Number:    polyBftConfig.EpochSize,
 		ExtraData: append(make([]byte, signer.IstanbulExtraVanity), parentExtra.MarshalRLPTo(nil)...),
-		Timestamp: uint64(time.Now().UTC().UnixMilli()),
+		Timestamp: uint64(time.Now().UnixMilli()),
 	}
 	_ = parentHeader.ComputeHash()
-	parentCommitted := createSignature(t, accountSetParent, parentHeader.Hash)
+
+	signHash, err := getSignHash(blockchainMock.GetChainID(), parentExtra.Checkpoint, parentHeader.Number, parentHeader.Hash)
+	require.NoError(t, err)
+
+	parentCommitted := createSignature(t, accountSetParent, signHash)
 
 	// now create new extra with committed and add it to parent header
-	parentExtra = &Extra{Validators: parentDelta, Committed: parentCommitted}
+	parentExtra = &Extra{Validators: parentDelta, Committed: parentCommitted, Checkpoint: &CheckpointData{}}
 	parentHeader.ExtraData = append(make([]byte, signer.IstanbulExtraVanity), parentExtra.MarshalRLPTo(nil)...)
 
-	// add parent header  to map
+	// add parent header to map
 	headersMap.addHeader(parentHeader)
 
 	// create current header (block 11) with all appropriate fields required for validation
 	currentDelta, err := createValidatorSetDelta(hclog.NewNullLogger(), validatorSetCurrent, validatorSetCurrent)
 	require.NoError(t, err)
 
-	currentExtra := &Extra{Validators: currentDelta, Parent: parentCommitted}
+	currentExtra := &Extra{Validators: currentDelta, Parent: parentCommitted, Checkpoint: &CheckpointData{}}
 	currentHeader := &types.Header{
 		Number:     polyBftConfig.EpochSize + 1,
 		ParentHash: parentHeader.Hash,
@@ -109,15 +118,13 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 	}
 	_ = currentHeader.ComputeHash()
 
-	currentCommitted := createSignature(t, accountSetCurrent, currentHeader.Hash)
-	// forget Parent field (parent signature) intentionally
-	currentExtra = &Extra{Validators: currentDelta, Committed: currentCommitted}
-	currentHeader.ExtraData = append(make([]byte, signer.IstanbulExtraVanity), currentExtra.MarshalRLPTo(nil)...)
+	signingHash, err := getSignHash(blockchainMock.GetChainID(), &CheckpointData{}, currentHeader.Number, currentHeader.Hash)
+	require.NoError(t, err)
 
-	// mock blockchain
-	blockchainMock := new(blockchainMock)
-	blockchainMock.On("GetHeaderByNumber", mock.Anything).Return(headersMap.getHeader)
-	blockchainMock.On("GetHeaderByHash", mock.Anything).Return(headersMap.getHeaderByHash)
+	currentCommitted := createSignature(t, accountSetCurrent, signingHash)
+	// forget Parent field (parent signature) intentionally
+	currentExtra = &Extra{Validators: currentDelta, Committed: currentCommitted, Checkpoint: &CheckpointData{}}
+	currentHeader.ExtraData = append(make([]byte, signer.IstanbulExtraVanity), currentExtra.MarshalRLPTo(nil)...)
 
 	// create polybft with appropriate mocks
 	polybft := &Polybft{
@@ -128,12 +135,17 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 		validatorsCache: newValidatorsSnapshotCache(hclog.NewNullLogger(), newTestState(t), polyBftConfig.EpochSize, blockchainMock),
 	}
 
-	// sice parent signature is intentionally disregarded the following error is expected
+	// since parent signature is intentionally disregarded the following error is expected
 	assert.ErrorContains(t, polybft.VerifyHeader(currentHeader), "failed to verify signatures for parent of block")
 
 	// create valid extra filed for current header and check the header
 	// this is the situation before a block (a valid header) is added to the blockchain
-	currentExtra = &Extra{Validators: currentDelta, Committed: currentCommitted, Parent: parentCommitted}
+	currentExtra = &Extra{
+		Validators: currentDelta,
+		Committed:  currentCommitted,
+		Parent:     parentCommitted,
+		Checkpoint: &CheckpointData{},
+	}
 	currentHeader.ExtraData = append(make([]byte, signer.IstanbulExtraVanity), currentExtra.MarshalRLPTo(nil)...)
 	assert.NoError(t, polybft.VerifyHeader(currentHeader))
 
