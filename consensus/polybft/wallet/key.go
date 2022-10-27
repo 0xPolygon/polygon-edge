@@ -1,7 +1,6 @@
 package wallet
 
 import (
-	"github.com/0xPolygon/pbft-consensus"
 	"github.com/umbracle/ethgo"
 )
 
@@ -23,8 +22,8 @@ func (k *Key) Address() ethgo.Address {
 	return k.raw.Ecdsa.Address()
 }
 
-func (k *Key) NodeID() pbft.NodeID {
-	return pbft.NodeID(k.String())
+func (k *Key) NodeID() string {
+	return k.String()
 }
 
 func (k *Key) Sign(b []byte) ([]byte, error) {

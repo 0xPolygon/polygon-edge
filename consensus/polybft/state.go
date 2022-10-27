@@ -8,7 +8,6 @@ import (
 	"math/big"
 	"sort"
 
-	"github.com/0xPolygon/pbft-consensus"
 	"github.com/hashicorp/go-hclog"
 	bolt "go.etcd.io/bbolt"
 
@@ -123,7 +122,7 @@ func (s *StateSyncEvent) String() string {
 // MessageSignature encapsulates sender identifier and its signature
 type MessageSignature struct {
 	// Signer of the vote
-	From pbft.NodeID
+	From string
 	// Signature of the message
 	Signature []byte
 }
@@ -135,7 +134,7 @@ type TransportMessage struct {
 	// Message signature
 	Signature []byte
 	// Node identifier
-	NodeID pbft.NodeID
+	NodeID string
 	// Number of epoch
 	EpochNumber uint64
 }
@@ -143,7 +142,7 @@ type TransportMessage struct {
 var (
 	// bucket to store rootchain bridge events
 	syncStateEventsBucket = []byte("events")
-	//bucket to store commitments
+	// bucket to store commitments
 	commitmentsBucket = []byte("commitments")
 	// bucket to store bundles
 	bundlesBucket = []byte("bundles")

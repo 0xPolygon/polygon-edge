@@ -11,7 +11,6 @@ import (
 
 	"github.com/0xPolygon/go-ibft/messages"
 	"github.com/0xPolygon/go-ibft/messages/proto"
-	"github.com/0xPolygon/pbft-consensus"
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
@@ -58,7 +57,7 @@ type epochMetadata struct {
 	LastCheckpoint uint64
 
 	// CheckpointProposer is the validator that has to send the checkpoint, assume it is static for now.
-	CheckpointProposer pbft.NodeID
+	CheckpointProposer string
 
 	// Blocks is the list of blocks that we have to checkpoint in rootchain
 	Blocks []*types.Block
@@ -512,9 +511,9 @@ func (cr *consensusRuntime) getAggSignatureForCommitmentMessage(epoch *epochMeta
 	commitmentHash types.Hash) (Signature, [][]byte, error) {
 	validators := epoch.Validators
 
-	nodeIDIndexMap := make(map[pbft.NodeID]int, validators.Len())
+	nodeIDIndexMap := make(map[string]int, validators.Len())
 	for i, validator := range validators {
-		nodeIDIndexMap[pbft.NodeID(validator.Address.String())] = i
+		nodeIDIndexMap[validator.Address.String()] = i
 	}
 
 	// get all the votes from the database for this commitment
@@ -876,7 +875,7 @@ func (cr *consensusRuntime) getCommitmentToRegister(epoch *epochMetadata,
 
 func validateVote(vote *MessageSignature, epoch *epochMetadata) error {
 	// get senders address
-	senderAddress := types.StringToAddress(string(vote.From))
+	senderAddress := types.StringToAddress(vote.From)
 	if !epoch.Validators.ContainsAddress(senderAddress) {
 		return fmt.Errorf(
 			"message is received from sender %s, which is not in current validator set",

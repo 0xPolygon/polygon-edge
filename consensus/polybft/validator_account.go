@@ -9,7 +9,6 @@ import (
 
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 
-	"github.com/0xPolygon/pbft-consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/fastrlp"
@@ -119,9 +118,9 @@ func (as AccountSet) Len() int {
 }
 
 // ContainsNodeID checks whether ValidatorAccount with given nodeID is present in the AccountSet
-func (as AccountSet) ContainsNodeID(nodeID pbft.NodeID) bool {
+func (as AccountSet) ContainsNodeID(nodeID string) bool {
 	for _, validator := range as {
-		if validator.Address.String() == string(nodeID) {
+		if validator.Address.String() == nodeID {
 			return true
 		}
 	}

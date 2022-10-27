@@ -562,11 +562,11 @@ func TestFSM_ValidateCommit_ProposalIsNil(t *testing.T) {
 	t.Parallel()
 
 	fsm := &fsm{}
-	err := fsm.ValidateCommit(pbft.NodeID(""), []byte{})
+	err := fsm.ValidateCommit("", []byte{})
 	assert.ErrorContains(t, err, "proposal unavailable")
 
 	fsm.proposal = &pbft.Proposal{}
-	err = fsm.ValidateCommit(pbft.NodeID(""), []byte{})
+	err = fsm.ValidateCommit("", []byte{})
 	assert.ErrorContains(t, err, "proposal unavailable")
 }
 
@@ -591,7 +591,7 @@ func TestFSM_ValidateCommit_WrongValidator(t *testing.T) {
 	_, err := fsm.BuildProposal()
 	require.NoError(t, err)
 
-	err = fsm.ValidateCommit(pbft.NodeID("0x7467674"), types.ZeroAddress.Bytes())
+	err = fsm.ValidateCommit("0x7467674", types.ZeroAddress.Bytes())
 	require.ErrorContains(t, err, "unable to resolve validator")
 }
 
@@ -622,7 +622,7 @@ func TestFSM_ValidateCommit_InvalidHash(t *testing.T) {
 	wrongSignature, err := nonValidatorAcc.mustSign([]byte("Foo")).Marshal()
 	require.NoError(t, err)
 
-	err = fsm.ValidateCommit(pbft.NodeID(validators.getValidator("0").Address().String()), wrongSignature)
+	err = fsm.ValidateCommit(validators.getValidator("0").Address().String(), wrongSignature)
 	require.ErrorContains(t, err, "incorrect commit signature from")
 }
 

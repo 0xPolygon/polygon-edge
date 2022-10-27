@@ -18,7 +18,7 @@ import (
 	"github.com/umbracle/ethgo"
 )
 
-var _ pbft.Backend = &fsm{}
+// var _ pbft.Backend = &fsm{}
 
 type blockBuilder interface {
 	Reset() error
@@ -235,12 +235,12 @@ func (f *fsm) createValidatorsUptimeTx() (*types.Transaction, error) {
 }
 
 // ValidateCommit is used to validate that a given commit is valid
-func (f *fsm) ValidateCommit(from pbft.NodeID, seal []byte) error {
+func (f *fsm) ValidateCommit(from string, seal []byte) error {
 	if f.proposal == nil || f.proposal.Hash == nil {
 		return fmt.Errorf("incorrect commit from %s. proposal unavailable", from)
 	}
 
-	fromAddress := types.Address(ethgo.HexToAddress(string(from)))
+	fromAddress := types.Address(ethgo.HexToAddress(from))
 	validator := f.validators.Accounts().GetValidatorAccount(fromAddress)
 
 	if validator == nil {
@@ -432,9 +432,9 @@ func (f *fsm) Insert(p *pbft.SealedProposal) error {
 	extra, _ := GetIbftExtra(f.block.Block.Header.ExtraData)
 
 	// create map for faster access to indexes
-	nodeIDIndexMap := make(map[pbft.NodeID]int, f.validators.Len())
+	nodeIDIndexMap := make(map[string]int, f.validators.Len())
 	for i, addr := range f.validators.Accounts().GetAddresses() {
-		nodeIDIndexMap[pbft.NodeID(addr.String())] = i
+		nodeIDIndexMap[addr.String()] = i
 	}
 
 	// populated bitmap according to nodeId from validator set and committed seals
@@ -443,7 +443,7 @@ func (f *fsm) Insert(p *pbft.SealedProposal) error {
 	signatures := make(bls.Signatures, 0, len(p.CommittedSeals))
 
 	for _, commSeal := range p.CommittedSeals {
-		index, exists := nodeIDIndexMap[commSeal.NodeID]
+		index, exists := nodeIDIndexMap[string(commSeal.NodeID)]
 		if !exists {
 			return fmt.Errorf("invalid node id = %s", commSeal.NodeID)
 		}
@@ -490,7 +490,7 @@ func (f *fsm) Height() uint64 {
 }
 
 // ValidatorSet returns the validator set for the current round
-func (f *fsm) ValidatorSet() pbft.ValidatorSet {
+func (f *fsm) ValidatorSet() ValidatorSet {
 	return f.validators
 }
 

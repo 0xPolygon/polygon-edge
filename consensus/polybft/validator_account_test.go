@@ -3,7 +3,6 @@ package polybft
 import (
 	"testing"
 
-	"github.com/0xPolygon/pbft-consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -61,12 +60,12 @@ func TestAccountSet_IndexContainsAddressesAndContainsNodeId(t *testing.T) {
 	for i, a := range addresses {
 		assert.Equal(t, i, validators.Index(a))
 		assert.True(t, validators.ContainsAddress(a))
-		assert.True(t, validators.ContainsNodeID(pbft.NodeID(a.String())))
+		assert.True(t, validators.ContainsNodeID(a.String()))
 	}
 
 	assert.Equal(t, -1, validators.Index(dummy))
 	assert.False(t, validators.ContainsAddress(dummy))
-	assert.False(t, validators.ContainsNodeID(pbft.NodeID(dummy.String())))
+	assert.False(t, validators.ContainsNodeID(dummy.String()))
 }
 
 func TestAccountSet_Len(t *testing.T) {
