@@ -275,7 +275,7 @@ func (p *Polybft) initRuntime() {
 		PolyBFTConfig:   p.consensusConfig,
 		Key:             p.key,
 		DataDir:         p.dataDir,
-		BridgeTransport: &runtimeTransportWrapper{p.bridgeTopic},
+		BridgeTransport: &runtimeTransportWrapper{p.bridgeTopic, p.logger},
 		State:           p.state,
 		blockchain:      p.blockchain,
 		polybftBackend:  p,

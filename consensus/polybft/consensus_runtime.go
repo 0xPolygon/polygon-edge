@@ -452,10 +452,7 @@ func (c *consensusRuntime) buildCommitment(epoch, fromIndex uint64) (*Commitment
 		NodeID:      c.config.Key.NodeID(),
 		EpochNumber: epoch,
 	}
-
-	if err := c.config.BridgeTransport.Gossip(msg); err != nil {
-		c.logger.Warn("failed to gossip bridge message", "err", err)
-	}
+	c.config.BridgeTransport.Multicast(msg)
 
 	c.logger.Debug("[buildCommitment] Built commitment", "from", commitment.FromIndex, "to", commitment.ToIndex)
 
