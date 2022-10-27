@@ -932,6 +932,6 @@ func (cr *consensusRuntime) MaximumFaultyNodes() uint64 {
 	panic("not implemented")
 }
 
-func (cr *consensusRuntime) Quorum(blockHeight uint64) uint64 {
-	panic("not implemented")
+func (cr *consensusRuntime) Quorum(validatorsCount uint64) uint64 {
+	return (validatorsCount + 1) / 2
 }
