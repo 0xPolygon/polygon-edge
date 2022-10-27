@@ -331,7 +331,10 @@ func (p *Polybft) startPbftProcess() {
 		}
 	}()
 
-	var sequenceCh <-chan struct{}
+	var (
+		sequenceCh   <-chan struct{}
+		stopSequence func()
+	)
 
 	for {
 		latest := p.blockchain.CurrentHeader().Number
@@ -354,21 +357,21 @@ func (p *Polybft) startPbftProcess() {
 				continue
 			}
 
-			sequenceCh = p.ibft.runSequence(latest + 1)
+			sequenceCh, stopSequence = p.ibft.runSequence(latest + 1)
 		} else {
-			sequenceCh = nil
+			sequenceCh, stopSequence = nil, nil
 		}
 
 		select {
 		case <-syncerBlockCh:
 			if isValidator {
-				p.ibft.stopSequence()
+				stopSequence()
 				p.logger.Info("canceled sequence", "sequence", latest+1)
 			}
 		case <-sequenceCh:
 		case <-p.closeCh:
 			if isValidator {
-				p.ibft.stopSequence()
+				stopSequence()
 			}
 
 			return
