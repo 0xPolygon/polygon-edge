@@ -4,20 +4,21 @@ import (
 	"fmt"
 
 	protoIBFT "github.com/0xPolygon/go-ibft/messages/proto"
-	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/types"
 	"google.golang.org/protobuf/proto"
 )
 
 // Implementation of core.MessageConstructor interface
 
-func signMessage(msg *protoIBFT.Message, signer signer.Signer) (*protoIBFT.Message, error) {
+func signMessage(msg *protoIBFT.Message, key *wallet.Key) (*protoIBFT.Message, error) {
 	raw, err := proto.Marshal(msg)
 	if err != nil {
 		return nil, fmt.Errorf("cannot marshal message:%w", err)
 	}
 
-	if msg.Signature, err = signer.SignIBFTMessage(raw); err != nil {
+	// TODO check message signature
+	if msg.Signature, err = key.Sign(raw); err != nil {
 		return nil, fmt.Errorf("cannot create message signature:%w", err)
 	}
 
@@ -51,7 +52,7 @@ func (cr *consensusRuntime) BuildPrePrepareMessage(
 		},
 	}
 
-	message, err := signMessage(&msg, cr.currentSigner)
+	message, err := signMessage(&msg, cr.config.Key)
 	if err != nil {
 		cr.logger.Error("Cannot sign message", "Error", err)
 
@@ -73,7 +74,7 @@ func (cr *consensusRuntime) BuildPrepareMessage(proposalHash []byte, view *proto
 		},
 	}
 
-	message, err := signMessage(&msg, cr.currentSigner)
+	message, err := signMessage(&msg, cr.config.Key)
 	if err != nil {
 		cr.logger.Error("Cannot sign message.", "Error", err)
 
@@ -84,7 +85,8 @@ func (cr *consensusRuntime) BuildPrepareMessage(proposalHash []byte, view *proto
 }
 
 func (cr *consensusRuntime) BuildCommitMessage(proposalHash []byte, view *protoIBFT.View) *protoIBFT.Message {
-	committedSeal, err := cr.currentSigner.CreateCommittedSeal(proposalHash)
+	// TODO check committedSeal signature
+	committedSeal, err := cr.config.Key.Sign(proposalHash) // .CreateCommittedSeal(proposalHash)
 	if err != nil {
 		cr.logger.Error("Cannot create committed seal message.", "Error", err)
 
@@ -103,7 +105,7 @@ func (cr *consensusRuntime) BuildCommitMessage(proposalHash []byte, view *protoI
 		},
 	}
 
-	message, err := signMessage(&msg, cr.currentSigner)
+	message, err := signMessage(&msg, cr.config.Key)
 	if err != nil {
 		cr.logger.Error("Cannot sign message", "Error", err)
 
@@ -128,7 +130,7 @@ func (cr *consensusRuntime) BuildRoundChangeMessage(
 		}},
 	}
 
-	signedMsg, err := signMessage(&msg, cr.currentSigner)
+	signedMsg, err := signMessage(&msg, cr.config.Key)
 	if err != nil {
 		cr.logger.Error("Cannot sign message", "Error", err)
 

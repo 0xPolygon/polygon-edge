@@ -12,7 +12,6 @@ import (
 	"github.com/0xPolygon/go-ibft/messages"
 	"github.com/0xPolygon/go-ibft/messages/proto"
 	"github.com/0xPolygon/polygon-edge/blockchain"
-	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
@@ -89,8 +88,7 @@ type consensusRuntime struct {
 	// state is reference to the struct which encapsulates bridge events persistence logic
 	state *State
 
-	// Signer at current sequence
-	currentSigner signer.Signer
+	fsm *fsm
 
 	// eventTracker is a reference to the log event tracker
 	eventTracker *eventTracker
@@ -887,8 +885,8 @@ func validateVote(vote *MessageSignature, epoch *epochMetadata) error {
 }
 
 // Implementation of core.Verifier
-// =======
 func (cr *consensusRuntime) IsValidBlock(block []byte) bool {
+	// todo polybft.fsm.Validate
 	panic("not implemented")
 }
 
@@ -904,31 +902,45 @@ func (cr *consensusRuntime) IsProposer(id []byte, height, round uint64) bool {
 
 // IsValidProposalHash checks if the hash matches the proposal
 func (cr *consensusRuntime) IsValidProposalHash(proposal, hash []byte) bool {
-	panic("not implemented")
+	newBlock := &types.Block{}
+	if err := newBlock.UnmarshalRLP(proposal); err != nil {
+		cr.logger.Error("unable to unmarshal proposal", "err", err)
+
+		return false
+	}
+
+	blockHash := newBlock.Header.Hash.Bytes()
+
+	return bytes.Equal(blockHash, hash)
 }
 
 // IsValidCommittedSeal checks if the seal for the proposal is valid
 func (cr *consensusRuntime) IsValidCommittedSeal(proposal []byte, committedSeal *messages.CommittedSeal) bool {
+	// todo needs fsm
+	//  polybft.fsm.ValidateCommit
 	panic("not implemented")
 }
 
 // Implementation of core.Backend
 // ====
-func (cr *consensusRuntime) ID() []byte {
-	return cr.currentSigner.Address().Bytes()
-}
-
 func (cr *consensusRuntime) BuildProposal(blockNumber uint64) []byte {
+	// 	 todo needs fsm
+	// 	  polybft.fsm.BuildProposal
 	panic("not implemented")
 }
 
 func (cr *consensusRuntime) InsertBlock(proposal []byte, committedSeals []*messages.CommittedSeal) {
+	// 	 todo needs fsm
+	// 	  polybft.fsm.Insert
 	panic("not implemented")
 }
 
+func (cr *consensusRuntime) ID() []byte {
+	return cr.config.Key.Address().Bytes()
+}
+
 func (cr *consensusRuntime) MaximumFaultyNodes() uint64 {
-	// return uint64(ibft.CalcMaxFaultyNodes())
-	panic("not implemented")
+	return uint64((len(cr.epoch.Validators) - 1) / 3)
 }
 
 func (cr *consensusRuntime) Quorum(validatorsCount uint64) uint64 {
