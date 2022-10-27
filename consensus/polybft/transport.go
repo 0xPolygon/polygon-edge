@@ -24,6 +24,7 @@ type runtimeTransportWrapper struct {
 
 var _ BridgeTransport = (*runtimeTransportWrapper)(nil)
 
+// Multicast publishes any message as pbftproto.TransportMessage
 func (g *runtimeTransportWrapper) Multicast(msg interface{}) {
 	data, err := json.Marshal(msg)
 	if err != nil {
@@ -32,8 +33,8 @@ func (g *runtimeTransportWrapper) Multicast(msg interface{}) {
 		return
 	}
 
-	tmsg := &pbftproto.TransportMessage{Data: data}
-	if err := g.bridgeTopic.Publish(tmsg); err != nil {
+	err = g.bridgeTopic.Publish(&pbftproto.TransportMessage{Data: data})
+	if err != nil {
 		g.logger.Warn("failed to gossip bridge message", "err", err)
 	}
 }
@@ -62,6 +63,7 @@ func (cr *consensusRuntime) subscribeToBridgeTopic(topic *network.Topic) error {
 	})
 }
 
+// subscribeToIbftTopic subscribes to ibft topic
 func (p *Polybft) subscribeToIbftTopic() error {
 	return p.consensusTopic.Subscribe(func(obj interface{}, _ peer.ID) {
 		// this check is from ibft impl
@@ -107,6 +109,7 @@ func (p *Polybft) createTopics() (err error) {
 	return nil
 }
 
+// Multicast is implementation of core.Transport interface
 func (p *Polybft) Multicast(msg *proto.Message) {
 	if err := p.consensusTopic.Publish(msg); err != nil {
 		p.logger.Warn("failed to multicast consensus message", "err", err)
