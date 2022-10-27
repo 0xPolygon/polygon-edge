@@ -111,57 +111,74 @@ func decodeStateSyncEvent(log *ethgo.Log) (*StateSyncEvent, error) {
 		return nil, err
 	}
 
-	id, ok := raw["id"].(*big.Int)
-	if !ok {
-		return nil, fmt.Errorf("failed to decode id field of log: %+v", log)
+	eventGeneric, err := decodeEventData(raw, log,
+		func(id *big.Int, sender, receiver ethgo.Address, data []byte) interface{} {
+			return newStateSyncEvent(id.Uint64(), sender, receiver, data)
+		})
+	if err != nil {
+		return nil, err
 	}
 
-	sender, ok := raw["sender"].(ethgo.Address)
+	stateSyncEvent, ok := eventGeneric.(*StateSyncEvent)
 	if !ok {
-		return nil, fmt.Errorf("failed to decode sender field of log: %+v", log)
+		return nil, errors.New("failed to convert event to StateSyncEvent instance")
 	}
 
-	target, ok := raw["receiver"].(ethgo.Address)
-	if !ok {
-		return nil, fmt.Errorf("failed to decode target field of log: %+v", log)
-	}
-
-	data, ok := raw["data"].([]byte)
-	if !ok {
-		return nil, fmt.Errorf("failed to decode data field of log: %+v", log)
-	}
-
-	return newStateSyncEvent(id.Uint64(), sender, target, data), nil
+	return stateSyncEvent, nil
 }
 
-// TODO - maybe the two decodeEvent functions can be merged since data is pretty similar
 func decodeExitEvent(log *ethgo.Log, epoch, block uint64) (*ExitEvent, error) {
 	raw, err := exitEventABI.ParseLog(log)
 	if err != nil {
 		return nil, err
 	}
 
-	id, ok := raw["id"].(*big.Int)
+	eventGeneric, err := decodeEventData(raw, log,
+		func(id *big.Int, sender, receiver ethgo.Address, data []byte) interface{} {
+			return &ExitEvent{ID: id.Uint64(),
+				Sender:      sender,
+				Receiver:    receiver,
+				Data:        data,
+				Epoch:       epoch,
+				BlockNumber: block}
+		})
+	if err != nil {
+		return nil, err
+	}
+
+	exitEvent, ok := eventGeneric.(*ExitEvent)
+	if !ok {
+		return nil, errors.New("failed to convert event to ExitEvent instance")
+	}
+
+	return exitEvent, err
+}
+
+// decodeEventData decodes provided map of event metadata and
+// creates a generic instance which is returned by eventCreator callback
+func decodeEventData(eventDataMap map[string]interface{}, log *ethgo.Log,
+	eventCreator func(*big.Int, ethgo.Address, ethgo.Address, []byte) interface{}) (interface{}, error) {
+	id, ok := eventDataMap["id"].(*big.Int)
 	if !ok {
 		return nil, fmt.Errorf("failed to decode id field of log: %+v", log)
 	}
 
-	sender, ok := raw["sender"].(ethgo.Address)
+	sender, ok := eventDataMap["sender"].(ethgo.Address)
 	if !ok {
 		return nil, fmt.Errorf("failed to decode sender field of log: %+v", log)
 	}
 
-	target, ok := raw["receiver"].(ethgo.Address)
+	receiver, ok := eventDataMap["receiver"].(ethgo.Address)
 	if !ok {
-		return nil, fmt.Errorf("failed to decode target field of log: %+v", log)
+		return nil, fmt.Errorf("failed to decode receiver field of log: %+v", log)
 	}
 
-	data, ok := raw["data"].([]byte)
+	data, ok := eventDataMap["data"].([]byte)
 	if !ok {
 		return nil, fmt.Errorf("failed to decode data field of log: %+v", log)
 	}
 
-	return &ExitEvent{id.Uint64(), sender, target, data, epoch, block}, nil
+	return eventCreator(id, sender, receiver, data), nil
 }
 
 // ExitEvent is an event emitted by Exit contract
