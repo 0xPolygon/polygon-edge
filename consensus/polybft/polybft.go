@@ -516,13 +516,6 @@ func (p *Polybft) VerifyHeader(header *types.Header) error {
 
 func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, parents []*types.Header) error {
 	blockNumber := header.Number
-	if blockNumber == 0 {
-		// TODO: Remove, this was just for simplicity since I had started the chain already,
-		//  add the mix hash into the genesis command
-		p.logger.Info("We are here, block number = 0!")
-
-		return nil
-	}
 
 	//validate header fields
 	if err := validateHeaderFields(parent, header); err != nil {
