@@ -770,16 +770,16 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header) (*CommitE
 func (c *consensusRuntime) getExitEventRootHash(epoch uint64) (types.Hash, error) {
 	exitEvents, err := c.state.getExitEventsByEpoch(epoch)
 	if err != nil {
-		return types.Hash{}, err
+		return types.ZeroHash, err
 	}
 
 	if len(exitEvents) == 0 {
-		return types.Hash{}, nil
+		return types.ZeroHash, nil
 	}
 
 	tree, err := createExitTree(exitEvents)
 	if err != nil {
-		return types.Hash{}, err
+		return types.ZeroHash, err
 	}
 
 	return tree.Hash(), nil

@@ -61,13 +61,13 @@ const (
 	stateSyncBundleSize = 5
 )
 
-type ExitEventNotFoundError struct {
+type exitEventNotFoundError struct {
 	exitID          uint64
 	epoch           uint64
 	checkpointBlock uint64
 }
 
-func (e *ExitEventNotFoundError) Error() string {
+func (e *exitEventNotFoundError) Error() string {
 	return fmt.Sprintf("could not find any exit event that has an id: %v, added in block: %v and epoch: %v",
 		e.exitID, e.checkpointBlock, e.epoch)
 }
@@ -139,7 +139,7 @@ func decodeExitEvent(log *ethgo.Log, epoch, block uint64) (*ExitEvent, error) {
 				Sender:      sender,
 				Receiver:    receiver,
 				Data:        data,
-				Epoch:       epoch,
+				EpochNumber: epoch,
 				BlockNumber: block}
 		})
 	if err != nil {
@@ -191,8 +191,8 @@ type ExitEvent struct {
 	Receiver ethgo.Address `abi:"receiver"`
 	// Data is the decoded 'data' field from the event
 	Data []byte `abi:"data"`
-	// Epoch is the epoch number in which exit event was added
-	Epoch uint64 `abi:"-"`
+	// EpochNumber is the epoch number in which exit event was added
+	EpochNumber uint64 `abi:"-"`
 	// BlockNumber is the block in which exit event was added
 	BlockNumber uint64 `abi:"-"`
 }
@@ -345,7 +345,7 @@ func (s *State) insertExitEvent(event *ExitEvent) error {
 
 		bucket := tx.Bucket(exitEventsBucket)
 
-		return bucket.Put(bytes.Join([][]byte{itob(event.Epoch), itob(event.ID), itob(event.BlockNumber)}, nil), raw)
+		return bucket.Put(bytes.Join([][]byte{itob(event.EpochNumber), itob(event.ID), itob(event.BlockNumber)}, nil), raw)
 	})
 }
 
@@ -359,7 +359,11 @@ func (s *State) getExitEvent(exitEventID, epoch, checkpointBlockNumber uint64) (
 		key := bytes.Join([][]byte{itob(epoch), itob(exitEventID), itob(checkpointBlockNumber)}, nil)
 		v := bucket.Get(key)
 		if v == nil {
-			return &ExitEventNotFoundError{exitEventID, checkpointBlockNumber, epoch}
+			return &exitEventNotFoundError{
+				exitID:          exitEventID,
+				checkpointBlock: checkpointBlockNumber,
+				epoch:           epoch,
+			}
 		}
 
 		return json.Unmarshal(v, &exitEvent)
@@ -371,7 +375,7 @@ func (s *State) getExitEvent(exitEventID, epoch, checkpointBlockNumber uint64) (
 // getExitEventsByEpoch returns all exit events that happened in the given epoch
 func (s *State) getExitEventsByEpoch(epoch uint64) ([]*ExitEvent, error) {
 	return s.getExitEvents(epoch, func(exitEvent *ExitEvent) bool {
-		return exitEvent.Epoch == epoch
+		return exitEvent.EpochNumber == epoch
 	})
 }
 
@@ -379,7 +383,7 @@ func (s *State) getExitEventsByEpoch(epoch uint64) ([]*ExitEvent, error) {
 // with respect to the epoch in which block is added
 func (s *State) getExitEventsForProof(epoch, checkpointBlock uint64) ([]*ExitEvent, error) {
 	return s.getExitEvents(epoch, func(exitEvent *ExitEvent) bool {
-		return exitEvent.Epoch == epoch && exitEvent.BlockNumber <= checkpointBlock
+		return exitEvent.EpochNumber == epoch && exitEvent.BlockNumber <= checkpointBlock
 	})
 }
 

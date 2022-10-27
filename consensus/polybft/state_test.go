@@ -363,11 +363,7 @@ func TestState_Insert_And_Get_ExitEvents_PerEpoch(t *testing.T) {
 	insertTestExitEvents(t, state, numOfEpochs, numOfBlocksPerEpoch, numOfEventsPerBlock)
 
 	t.Run("Get events for existing epoch", func(t *testing.T) {
-		start := time.Now()
-
 		events, err := state.getExitEventsByEpoch(1)
-
-		fmt.Printf("Gotten events for epoch in: %v", time.Since(start))
 
 		assert.NoError(t, err)
 		assert.Len(t, events, numOfBlocksPerEpoch*numOfEventsPerBlock)
@@ -429,7 +425,6 @@ func insertTestExitEvents(t *testing.T, state *State,
 	t.Helper()
 
 	index, block := uint64(1), uint64(1)
-	start := time.Now()
 
 	for i := uint64(1); i <= uint64(numOfEpochs); i++ {
 		for j := 1; j <= numOfBlocksPerEpoch; j++ {
@@ -442,9 +437,6 @@ func insertTestExitEvents(t *testing.T, state *State,
 			block++
 		}
 	}
-
-	fmt.Printf("Inserted %v exit events in: %v\n", numOfEpochs*numOfBlocksPerEpoch*numOfEventsPerBlock,
-		time.Since(start))
 }
 
 func insertTestCommitments(t *testing.T, state *State, epoch, numberOfCommitments uint64) {
