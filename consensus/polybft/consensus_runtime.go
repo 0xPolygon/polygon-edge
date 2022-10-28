@@ -780,8 +780,8 @@ func (c *consensusRuntime) getExitEventRootHash(epoch uint64) (types.Hash, error
 	return tree.Hash(), nil
 }
 
-// generateExitProof generates proof of exit
-func (c *consensusRuntime) generateExitProof(exitID, epoch, checkpointBlock uint64) ([]types.Hash, error) {
+// GenerateExitProof generates proof of exit
+func (c *consensusRuntime) GenerateExitProof(exitID, epoch, checkpointBlock uint64) ([]types.Hash, error) {
 	exitEvent, err := c.state.getExitEvent(exitID, epoch, checkpointBlock)
 	if err != nil {
 		return nil, err

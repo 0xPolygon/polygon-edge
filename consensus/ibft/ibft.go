@@ -532,8 +532,9 @@ func (i *backendIBFT) SetHeaderHash() {
 	}
 }
 
-func (i *backendIBFT) GenerateExitProof(exitID, epoch, checkpointBlock uint64) ([]types.Hash, error) {
-	return nil, nil
+// GetBridgeProvider returns an instance of BridgeDataProvider
+func (i *backendIBFT) GetBridgeProvider() consensus.BridgeDataProvider {
+	return nil
 }
 
 // updateCurrentModules updates Signer, Hooks, and Validators

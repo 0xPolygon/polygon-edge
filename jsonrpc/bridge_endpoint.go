@@ -15,6 +15,6 @@ type Bridge struct {
 }
 
 // GenerateExitProof generates exit proof for given exit event
-func (b *Bridge) GenerateExitProof(exitID, epoch, checkpointBlock BlockNumber) (interface{}, error) {
+func (b *Bridge) GenerateExitProof(exitID, epoch, checkpointBlock argUint64) (interface{}, error) {
 	return b.store.GenerateExitProof(uint64(exitID), uint64(epoch), uint64(checkpointBlock))
 }

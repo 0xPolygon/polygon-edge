@@ -618,9 +618,9 @@ func (p *Polybft) PreCommitState(_ *types.Header, _ *state.Transition) error {
 	return nil
 }
 
-// GenerateExitProof generates proof for given exit event
-func (p *Polybft) GenerateExitProof(exitID, epoch, checkpointBlock uint64) ([]types.Hash, error) {
-	return p.runtime.generateExitProof(exitID, epoch, checkpointBlock)
+// GetBridgeProvider returns an instance of BridgeDataProvider
+func (p *Polybft) GetBridgeProvider() consensus.BridgeDataProvider {
+	return p.runtime
 }
 
 type pbftTransportWrapper struct {
