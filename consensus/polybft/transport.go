@@ -12,7 +12,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 )
 
-// Transport is an abstraction of network layer for a bridge
+// Bridge transport is an abstraction of network layer for a bridge
 type BridgeTransport interface {
 	Multicast(msg interface{})
 }
