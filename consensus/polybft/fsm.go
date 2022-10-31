@@ -1,7 +1,6 @@
 package polybft
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"math/big"
@@ -12,7 +11,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/contracts"
-	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -204,16 +202,15 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 
 	f.block = stateBlock
 
-	proposalHash, err := getSignHash(f.backend.GetChainID(),
-		extra.Checkpoint, f.Height(), stateBlock.Block.Hash())
+	checkpointHash, err := extra.Checkpoint.Hash(f.backend.GetChainID(), f.Height(), stateBlock.Block.Hash())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to calculate sign hash: %w", err)
 	}
 
 	f.proposal = &pbft.Proposal{
 		Time: headerTime,
 		Data: stateBlock.Block.MarshalRLP(),
-		Hash: proposalHash.Bytes(),
+		Hash: checkpointHash.Bytes(),
 	}
 
 	f.logger.Debug("[FSM Build Proposal]",
@@ -221,20 +218,6 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 		"hash", hex.EncodeToHex(f.proposal.Hash))
 
 	return f.proposal, nil
-}
-
-// getSignHash calculates composite hash, which consists of blockHash and checkpoint hash appended to it
-// proposalHash = keccak256([]byte {blockHash, checkpointHash})
-func getSignHash(chainID uint64, checkpoint *CheckpointData,
-	blockNumber uint64, blockHash types.Hash) (types.Hash, error) {
-	checkpointHash, err := checkpoint.Hash(chainID, blockNumber, blockHash)
-	if err != nil {
-		return types.ZeroHash, fmt.Errorf("failed to calculate sign hash: %w", err)
-	}
-
-	aggregatedHashRaw := crypto.Keccak256(bytes.Join([][]byte{blockHash.Bytes(), checkpointHash}, nil))
-
-	return types.BytesToHash(aggregatedHashRaw), nil
 }
 
 func (f *fsm) stateTransactions() []*types.Transaction {
@@ -328,13 +311,13 @@ func (f *fsm) Validate(proposal *pbft.Proposal) error {
 		return err
 	}
 
-	calculatedProposalHash, err := getSignHash(f.backend.GetChainID(), extra.Checkpoint, block.Number(), block.Hash())
+	checkpointHash, err := extra.Checkpoint.Hash(f.backend.GetChainID(), block.Number(), block.Hash())
 	if err != nil {
 		return err
 	}
 
 	// validate proposal
-	if calculatedProposalHash != types.BytesToHash(proposal.Hash) {
+	if checkpointHash != types.BytesToHash(proposal.Hash) {
 		return fmt.Errorf("incorrect sign hash (current header#%d)", block.Number())
 	}
 
@@ -368,16 +351,16 @@ func (f *fsm) Validate(proposal *pbft.Proposal) error {
 			return err
 		}
 
-		parentHash, err := getSignHash(f.backend.GetChainID(), parentExtra.Checkpoint, f.parent.Number, f.parent.Hash)
+		parentCheckpointHash, err := parentExtra.Checkpoint.Hash(f.backend.GetChainID(), f.parent.Number, f.parent.Hash)
 		if err != nil {
 			return err
 		}
 
-		if err := blockExtra.Parent.VerifyCommittedFields(validators, parentHash); err != nil {
+		if err := blockExtra.Parent.VerifyCommittedFields(validators, parentCheckpointHash); err != nil {
 			return fmt.Errorf(
-				"failed to verify signatures for (parent) block#%d. Block hash: %v, block#%d",
+				"failed to verify signatures for (parent) block#%d. Parent hash: %v, Current block#%d",
 				f.parent.Number,
-				parentHash,
+				parentCheckpointHash,
 				blockNumber,
 			)
 		}

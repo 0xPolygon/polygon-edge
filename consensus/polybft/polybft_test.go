@@ -54,7 +54,7 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 		Number:    0,
 		ExtraData: append(make([]byte, signer.IstanbulExtraVanity), genesisExtra.MarshalRLPTo(nil)...),
 	}
-	_ = genesisHeader.ComputeHash()
+	genesisHeader.ComputeHash()
 
 	// add genesis header to map
 	headersMap.addHeader(genesisHeader)
@@ -90,12 +90,12 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 		ExtraData: append(make([]byte, signer.IstanbulExtraVanity), parentExtra.MarshalRLPTo(nil)...),
 		Timestamp: uint64(time.Now().UnixMilli()),
 	}
-	_ = parentHeader.ComputeHash()
+	parentHeader.ComputeHash()
 
-	signHash, err := getSignHash(blockchainMock.GetChainID(), parentExtra.Checkpoint, parentHeader.Number, parentHeader.Hash)
+	checkpointHash, err := parentExtra.Checkpoint.Hash(blockchainMock.GetChainID(), parentHeader.Number, parentHeader.Hash)
 	require.NoError(t, err)
 
-	parentCommitted := createSignature(t, accountSetParent, signHash)
+	parentCommitted := createSignature(t, accountSetParent, checkpointHash)
 
 	// now create new extra with committed and add it to parent header
 	parentExtra = &Extra{Validators: parentDelta, Committed: parentCommitted, Checkpoint: &CheckpointData{}}
@@ -116,9 +116,9 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 		MixHash:    PolyBFTMixDigest,
 		Difficulty: 1,
 	}
-	_ = currentHeader.ComputeHash()
+	currentHeader.ComputeHash()
 
-	signingHash, err := getSignHash(blockchainMock.GetChainID(), &CheckpointData{}, currentHeader.Number, currentHeader.Hash)
+	signingHash, err := new(CheckpointData).Hash(blockchainMock.GetChainID(), currentHeader.Number, currentHeader.Hash)
 	require.NoError(t, err)
 
 	currentCommitted := createSignature(t, accountSetCurrent, signingHash)

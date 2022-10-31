@@ -447,7 +447,7 @@ func (c *CheckpointData) UnmarshalRLPWith(v *fastrlp.Value) error {
 
 // Hash calculates keccak256 hash of the CheckpointData.
 // CheckpointData is ABI encoded and then hashed.
-func (c *CheckpointData) Hash(chainID uint64, blockNumber uint64, blockHash types.Hash) ([]byte, error) {
+func (c *CheckpointData) Hash(chainID uint64, blockNumber uint64, blockHash types.Hash) (types.Hash, error) {
 	checkpointMap := map[string]interface{}{
 		"chainId":               new(big.Int).SetUint64(chainID),
 		"blockNumber":           new(big.Int).SetUint64(blockNumber),
@@ -461,10 +461,10 @@ func (c *CheckpointData) Hash(chainID uint64, blockNumber uint64, blockHash type
 
 	abiEncoded, err := checkpointDataABIType.Encode(checkpointMap)
 	if err != nil {
-		return nil, err
+		return types.ZeroHash, err
 	}
 
-	return crypto.Keccak256(abiEncoded), nil
+	return types.BytesToHash(crypto.Keccak256(abiEncoded)), nil
 }
 
 // GetIbftExtraClean returns unmarshaled extra field from the passed in header,

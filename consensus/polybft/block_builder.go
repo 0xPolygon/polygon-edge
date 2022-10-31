@@ -132,7 +132,7 @@ func (b *BlockBuilder) Build(handler func(h *types.Header)) (*StateBlock, error)
 		Receipts: b.state.Receipts(),
 	})
 
-	_ = b.block.Header.ComputeHash()
+	b.block.Header.ComputeHash()
 
 	return &StateBlock{
 		Block:    b.block,
