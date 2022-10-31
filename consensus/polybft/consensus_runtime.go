@@ -8,6 +8,7 @@ import (
 	"sort"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/0xPolygon/pbft-consensus"
 	"github.com/0xPolygon/polygon-edge/blockchain"
@@ -20,9 +21,10 @@ import (
 )
 
 const (
-	eventsBufferSize   = 10
-	stateFileName      = "consensusState.db"
-	uptimeLookbackSize = 2 // number of blocks to calculate uptime from the previous epoch
+	eventsBufferSize       = 10
+	stateFileName          = "consensusState.db"
+	uptimeLookbackSize     = 2                // number of blocks to calculate uptime from the previous epoch
+	checkpointTimeInterval = 30 * time.Minute // frequency at which sending checkpoints are sent to the rootchain
 )
 
 var (
@@ -115,15 +117,21 @@ type consensusRuntime struct {
 	// activeValidatorFlag indicates whether the given node is amongst currently active validator set
 	activeValidatorFlag uint32
 
+	// checkpointsOffset represents offset between checkpoint blocks (applicable only for non-epoch ending blocks)
+	checkpointsOffset uint64
+
+	// logger instance
 	logger hcf.Logger
 }
 
 // newConsensusRuntime creates and starts a new consensus runtime instance with event tracking
 func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRuntime, error) {
+	blockTimeInMillis := config.PolyBFTConfig.BlockTime.Milliseconds()
 	runtime := &consensusRuntime{
-		state:  config.State,
-		config: config,
-		logger: log.Named("consensus_runtime"),
+		state:             config.State,
+		config:            config,
+		logger:            log.Named("consensus_runtime"),
+		checkpointsOffset: uint64(checkpointTimeInterval.Milliseconds() / blockTimeInMillis),
 	}
 
 	if runtime.IsBridgeEnabled() {
@@ -649,6 +657,16 @@ func (c *consensusRuntime) deliverMessage(msg *TransportMessage) (bool, error) {
 func (c *consensusRuntime) runCheckpoint(epoch *epochMetadata) error {
 	// TODO: Implement checkpoint
 	return nil
+}
+
+// isCheckpointBlock returns indication whether given block is the checkpoint block.
+// Returns true for either epoch ending block or
+// at each N blocks, where N is calculated as division between predefined checkpoint interval and block time
+func (c *consensusRuntime) isCheckpointBlock() bool {
+	pendingBlockNumber := c.getPendingBlockNumber()
+
+	return c.isEndOfEpoch(pendingBlockNumber) ||
+		pendingBlockNumber%c.checkpointsOffset == 0
 }
 
 // getLatestSprintBlockNumber returns latest sprint block number

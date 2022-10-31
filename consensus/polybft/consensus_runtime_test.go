@@ -826,6 +826,7 @@ func Test_NewConsensusRuntime(t *testing.T) {
 		ValidatorSetAddr: types.Address{0x11},
 		EpochSize:        10,
 		SprintSize:       10,
+		BlockTime:        2 * time.Second,
 	}
 
 	key := createTestKey(t)
@@ -1723,6 +1724,49 @@ func TestConsensusRuntime_GenerateExitProof(t *testing.T) {
 		_, err := runtime.GenerateExitProof(21, 1, 1)
 		require.ErrorContains(t, err, "could not find any exit event that has an id")
 	})
+}
+
+func TestConsensusRuntime_isCheckpointBlock(t *testing.T) {
+	t.Parallel()
+
+	epochSize := uint64(10)
+	config := &runtimeConfig{
+		PolyBFTConfig: &PolyBFTConfig{
+			EpochSize: epochSize,
+			BlockTime: 30 * time.Second,
+		},
+	}
+
+	cases := []struct {
+		name              string
+		blockNumber       uint64
+		isCheckpointBlock bool
+	}{
+		{
+			name:              "Checkpoint block (epoch ending block)",
+			blockNumber:       9,
+			isCheckpointBlock: true,
+		},
+		{
+			name:              "Not checkpoint block (non-epoch ending block)",
+			blockNumber:       5,
+			isCheckpointBlock: false,
+		},
+		{
+			name:              "Checkpoint block (non-epoch ending block, checkpoint interval elapsed)",
+			blockNumber:       59,
+			isCheckpointBlock: true,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			runtime, err := newConsensusRuntime(hclog.NewNullLogger(), config)
+			require.NoError(t, err)
+			runtime.lastBuiltBlock = &types.Header{Number: c.blockNumber}
+			require.Equal(t, c.isCheckpointBlock, runtime.isCheckpointBlock())
+		})
+	}
 }
 
 func setupExitEventsForProofVerification(t *testing.T, state *State,
