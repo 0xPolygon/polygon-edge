@@ -94,11 +94,11 @@ type consensusRuntime struct {
 	// eventTracker is a reference to the log event tracker
 	eventTracker *eventTracker
 
+	// lock is a lock to access 'epoch' and `lastBuiltBlock`
+	lock sync.RWMutex
+
 	// epoch is the metadata for the current epoch
 	epoch *epochMetadata
-
-	// lock is a lock to access 'epoch'
-	lock sync.RWMutex
 
 	// lastBuiltBlock is the header of the last processed block
 	lastBuiltBlock *types.Header
@@ -178,8 +178,8 @@ func (c *consensusRuntime) OnBlockInserted(block *types.Block) {
 }
 
 func (c *consensusRuntime) populateFsmIfBridgeEnabled(
-	ff *fsm, epoch *epochMetadata, isEndOfEpoch, isEndOfSprint bool) error {
-	systemState, err := c.getSystemState(c.lastBuiltBlock)
+	ff *fsm, epoch *epochMetadata, lastBuiltBlock *types.Header, isEndOfEpoch, isEndOfSprint bool) error {
+	systemState, err := c.getSystemState(lastBuiltBlock)
 	if err != nil {
 		return err
 	}
@@ -258,8 +258,9 @@ func (c *consensusRuntime) populateFsmIfBridgeEnabled(
 func (c *consensusRuntime) FSM() (*fsm, error) {
 	// figure out the parent. At this point this peer has done its best to sync up
 	// to the head of their remote peers.
-	parent := c.lastBuiltBlock
-	epoch := c.getEpoch()
+	c.lock.RLock()
+	parent, epoch := c.lastBuiltBlock, c.epoch
+	c.lock.RUnlock()
 
 	if !epoch.Validators.ContainsNodeID(c.config.Key.NodeID()) {
 		return nil, errNotAValidator
@@ -271,7 +272,7 @@ func (c *consensusRuntime) FSM() (*fsm, error) {
 		return nil, err
 	}
 
-	pendingBlockNumber := c.getPendingBlockNumber()
+	pendingBlockNumber := parent.Number + 1
 	isEndOfSprint := c.isEndOfSprint(pendingBlockNumber)
 	isEndOfEpoch := c.isEndOfEpoch(pendingBlockNumber)
 
@@ -288,7 +289,7 @@ func (c *consensusRuntime) FSM() (*fsm, error) {
 	}
 
 	if c.IsBridgeEnabled() {
-		err := c.populateFsmIfBridgeEnabled(ff, epoch, isEndOfEpoch, isEndOfSprint)
+		err := c.populateFsmIfBridgeEnabled(ff, epoch, parent, isEndOfEpoch, isEndOfSprint)
 		if err != nil {
 			return nil, err
 		}
@@ -301,7 +302,7 @@ func (c *consensusRuntime) FSM() (*fsm, error) {
 	}
 
 	if isEndOfEpoch {
-		ff.uptimeCounter, err = c.calculateUptime(parent)
+		ff.uptimeCounter, err = c.calculateUptime(parent, epoch)
 		if err != nil {
 			return nil, err
 		}
@@ -635,24 +636,9 @@ func (c *consensusRuntime) runCheckpoint(epoch *epochMetadata) error {
 	return nil
 }
 
-// getLatestSprintBlockNumber returns latest sprint block number
-func (c *consensusRuntime) getLatestSprintBlockNumber() uint64 {
-	lastBuiltBlockNumber := c.lastBuiltBlock.Number
-
-	sprintSizeMod := lastBuiltBlockNumber % c.config.PolyBFTConfig.SprintSize
-	if sprintSizeMod == 0 {
-		return lastBuiltBlockNumber
-	}
-
-	sprintBlockNumber := lastBuiltBlockNumber - sprintSizeMod
-
-	return sprintBlockNumber
-}
-
 // calculateUptime calculates uptime for blocks starting from the last built block in current epoch,
 // and ending at the last block of previous epoch
-func (c *consensusRuntime) calculateUptime(currentBlock *types.Header) (*CommitEpoch, error) {
-	epoch := c.getEpoch()
+func (c *consensusRuntime) calculateUptime(currentBlock *types.Header, epoch *epochMetadata) (*CommitEpoch, error) {
 	uptimeCounter := map[types.Address]uint64{}
 
 	if c.config.PolyBFTConfig.EpochSize < (uptimeLookbackSize + 1) {
@@ -766,11 +752,6 @@ func (c *consensusRuntime) setIsActiveValidator(isActiveValidator bool) {
 // isActiveValidator indicates if node is in validator set or not
 func (c *consensusRuntime) isActiveValidator() bool {
 	return atomic.LoadUint32(&c.activeValidatorFlag) == 1
-}
-
-// getPendingBlockNumber returns block number currently being built (last built block number + 1)
-func (c *consensusRuntime) getPendingBlockNumber() uint64 {
-	return c.lastBuiltBlock.Number + 1
 }
 
 // isEndOfEpoch checks if an end of an epoch is reached with the current block
