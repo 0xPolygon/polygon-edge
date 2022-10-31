@@ -153,7 +153,7 @@ func (i *backendIBFT) buildBlock(parent *types.Header) (*types.Block, error) {
 		}
 	})
 
-	i.logger.Info("build block", "number", header.Number, "txs", len(txs))
+	i.logger.Info("build block", "number", stateBlock.Block.Header.Number, "txs", len(stateBlock.Block.Transactions))
 
 	return stateBlock.Block, nil
 }

@@ -112,11 +112,11 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 
 	builder := blockbuilder.BlockBuilder{}
 	builder.Fill()
-	builder.Build()
+	block := builder.Build(nil)
 
 	// after the block has been written we reset the txpool so that
 	// the old transactions are removed
-	d.txpool.ResetWithHeaders(block.Header)
+	d.txpool.ResetWithHeaders(block.Block.Header)
 
 	return nil
 }
