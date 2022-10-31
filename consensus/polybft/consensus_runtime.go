@@ -268,7 +268,12 @@ func (cr *consensusRuntime) FSM() error {
 	}
 
 	blockBuilder, err := cr.config.blockchain.NewBlockBuilder(
-		parent, types.Address(cr.config.Key.Address()), cr.config.txPool, cr.config.PolyBFTConfig.BlockTime, cr.logger)
+		parent,
+		types.Address(cr.config.Key.Address()),
+		cr.config.txPool,
+		cr.config.PolyBFTConfig.BlockTime,
+		cr.logger,
+	)
 	if err != nil {
 		return err
 	}
@@ -482,7 +487,7 @@ func (cr *consensusRuntime) buildBundles(epoch *epochMetadata, commitmentMsg *Co
 		return nil
 	}
 
-	bundleProofs := []*BundleProof{}
+	var bundleProofs []*BundleProof
 	startBundleIdx := commitmentMsg.GetBundleIdxFromStateSyncEventIdx(stateSyncExecutionIndex)
 
 	for idx := startBundleIdx; idx < commitmentMsg.BundlesCount(); idx++ {
@@ -843,9 +848,8 @@ func validateVote(vote *MessageSignature, epoch *epochMetadata) error {
 }
 
 // Implementation of core.Verifier
-// ====
+
 func (cr *consensusRuntime) IsValidBlock(proposal []byte) bool {
-	// todo polybft.fsm.Validate
 	var block types.Block
 	if err := block.UnmarshalRLP(proposal); err != nil {
 		cr.logger.Error("failed to decode block data", "error", err)
@@ -864,8 +868,8 @@ func (cr *consensusRuntime) IsValidBlock(proposal []byte) bool {
 	// validate header fields
 	if err := validateHeaderFields(cr.fsm.parent, block.Header); err != nil {
 		cr.logger.Error("failed to validate header",
-			"parent header", cr.fsm.parent.Number,
-			"parent block", cr.fsm.parent.Number,
+			"parentHeader", cr.fsm.parent.Number,
+			"parentBlock", cr.fsm.parent.Number,
 			"block", block.Number(),
 			"error", err)
 
@@ -899,10 +903,10 @@ func (cr *consensusRuntime) IsValidBlock(proposal []byte) bool {
 		if err := blockExtra.Parent.VerifyCommittedFields(validators, parentHash); err != nil {
 			cr.logger.Error(
 				"failed to verify signatures for (parent)",
-				"parent block",
-				cr.fsm.parent.Number,
-				"parent hash", parentHash,
+				"parentBlock", cr.fsm.parent.Number,
+				"parentHash", parentHash,
 				"block", block,
+				"error", err,
 			)
 
 			return false
@@ -985,7 +989,7 @@ func (cr *consensusRuntime) IsValidCommittedSeal(proposalHash []byte, committedS
 }
 
 // Implementation of core.Backend
-// ====
+
 func (cr *consensusRuntime) BuildProposal(blockNumber uint64) []byte {
 	if cr.lastBuiltBlock.Number+1 != blockNumber {
 		cr.logger.Error(
@@ -997,7 +1001,7 @@ func (cr *consensusRuntime) BuildProposal(blockNumber uint64) []byte {
 		return nil
 	}
 
-	prposal, err := cr.fsm.BuildProposal()
+	proposal, err := cr.fsm.BuildProposal()
 
 	if err != nil {
 		cr.logger.Info(
@@ -1009,7 +1013,7 @@ func (cr *consensusRuntime) BuildProposal(blockNumber uint64) []byte {
 		return nil
 	}
 
-	return prposal.Data
+	return proposal.Data
 }
 
 func (cr *consensusRuntime) InsertBlock(proposal []byte, committedSeals []*messages.CommittedSeal) {

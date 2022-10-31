@@ -9,15 +9,12 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// Implementation of core.MessageConstructor interface
-
 func signMessage(msg *protoIBFT.Message, key *wallet.Key) (*protoIBFT.Message, error) {
 	raw, err := proto.Marshal(msg)
 	if err != nil {
 		return nil, fmt.Errorf("cannot marshal message:%w", err)
 	}
 
-	// TODO check message signature
 	if msg.Signature, err = key.Sign(raw); err != nil {
 		return nil, fmt.Errorf("cannot create message signature:%w", err)
 	}
@@ -85,7 +82,6 @@ func (cr *consensusRuntime) BuildPrepareMessage(proposalHash []byte, view *proto
 }
 
 func (cr *consensusRuntime) BuildCommitMessage(proposalHash []byte, view *protoIBFT.View) *protoIBFT.Message {
-	// TODO check committedSeal signature
 	committedSeal, err := cr.config.Key.Sign(proposalHash)
 	if err != nil {
 		cr.logger.Error("Cannot create committed seal message.", "error", err)
