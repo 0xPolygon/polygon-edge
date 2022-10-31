@@ -765,9 +765,11 @@ func (s *Server) updateConnCountMetrics(direction network.Direction) {
 func (s *Server) updatePendingConnCountMetrics(direction network.Direction) {
 	switch direction {
 	case network.DirInbound:
-		metrics.SetGauge([]string{"pending_inbound_connections_count"}, float32(s.connectionCounts.GetPendingInboundConnCount()))
+		metrics.SetGauge([]string{"pending_inbound_connections_count"},
+			float32(s.connectionCounts.GetPendingInboundConnCount()))
 
 	case network.DirOutbound:
-		metrics.SetGauge([]string{"pending_outbound_connections_count"}, float32(s.connectionCounts.GetPendingOutboundConnCount()))
+		metrics.SetGauge([]string{"pending_outbound_connections_count"},
+			float32(s.connectionCounts.GetPendingOutboundConnCount()))
 	}
 }
