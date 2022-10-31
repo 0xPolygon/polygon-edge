@@ -437,7 +437,6 @@ func (j *jsonRPCHub) GetForksInTime(blockNumber uint64) chain.ForksInTime {
 }
 
 func (j *jsonRPCHub) GetAccount(root types.Hash, addr types.Address) (*state.Account, error) {
-	fmt.Println("get account", root, addr, j.state)
 	snap, err := j.state.NewSnapshotAt(root)
 	if err != nil {
 		return nil, err
@@ -456,7 +455,6 @@ func (j *jsonRPCHub) GetAccount(root types.Hash, addr types.Address) (*state.Acc
 }
 
 func (j *jsonRPCHub) GetStorage(root types.Hash, addr types.Address, slot types.Hash) ([]byte, error) {
-	fmt.Println("get storage", root, addr, j.state)
 	snap, err := j.state.NewSnapshotAt(root)
 	if err != nil {
 		return nil, err
