@@ -274,7 +274,7 @@ func NewTxPool(
 // is invoked in a separate goroutine.
 func (p *TxPool) Start() {
 	// set default value of txpool pending transactions gauge
-	metrics.IncrCounter([]string{"pending_transactions"}, 0)
+	metrics.SetGauge([]string{"pending_transactions"}, 0)
 
 	//	run the handler for high gauge level pruning
 	go func() {
@@ -405,7 +405,7 @@ func (p *TxPool) Pop(tx *types.Transaction) {
 	p.gauge.decrease(slotsRequired(tx))
 
 	// update metrics
-	metrics.IncrCounter([]string{"pending_transactions"}, -1)
+	metrics.SetGauge([]string{"pending_transactions"}, -1)
 
 	// update executables
 	if tx := account.promoted.peek(); tx != nil {
@@ -448,7 +448,7 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 	clearAccountQueue(dropped)
 
 	// update metrics
-	metrics.IncrCounter([]string{"pending_transactions"}, float32(-1*len(dropped)))
+	metrics.SetGauge([]string{"pending_transactions"}, float32(-1*len(dropped)))
 
 	// drop enqueued
 	dropped = account.enqueued.clear()
@@ -794,7 +794,7 @@ func (p *TxPool) handlePromoteRequest(req promoteRequest) {
 	p.gauge.decrease(slotsRequired(pruned...))
 
 	// update metrics
-	metrics.IncrCounter([]string{"pending_transactions"}, float32(len(promoted)))
+	metrics.SetGauge([]string{"pending_transactions"}, float32(len(promoted)))
 
 	p.eventManager.signalEvent(proto.EventType_PROMOTED, toHash(promoted...)...)
 }
@@ -886,7 +886,7 @@ func (p *TxPool) resetAccounts(stateNonces map[types.Address]uint64) {
 			toHash(allPrunedPromoted...)...,
 		)
 
-		metrics.IncrCounter([]string{"pending_transactions"}, float32(-1*len(allPrunedPromoted)))
+		metrics.SetGauge([]string{"pending_transactions"}, float32(-1*len(allPrunedPromoted)))
 	}
 
 	if len(allPrunedEnqueued) > 0 {
