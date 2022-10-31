@@ -119,7 +119,8 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 
 	// TODO: we will need to revisit once slashing is implemented
 	extra := &Extra{Parent: extraParent.Committed}
-	nextValidators := AccountSet{}
+	// for non-epoch ending blocks, currentValidatorsHash is the same as the nextValidatorsHash
+	nextValidators := f.validators.Accounts()
 
 	if f.isEndOfEpoch {
 		tx, err := f.createValidatorsUptimeTx()

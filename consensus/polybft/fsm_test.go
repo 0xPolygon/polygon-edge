@@ -163,12 +163,9 @@ func TestFSM_BuildProposal_WithoutUptimeTxGood(t *testing.T) {
 	currentValidatorsHash, err := validatorSet.Hash()
 	require.NoError(t, err)
 
-	nextValidatorsHash, err := AccountSet{}.Hash()
-	require.NoError(t, err)
-
 	checkpoint := &CheckpointData{
 		CurrentValidatorsHash: currentValidatorsHash,
-		NextValidatorsHash:    nextValidatorsHash,
+		NextValidatorsHash:    currentValidatorsHash,
 	}
 
 	checkpointHash, err := checkpoint.Hash(fsm.backend.GetChainID(), stateBlock.Block.Number(), stateBlock.Block.Hash())
