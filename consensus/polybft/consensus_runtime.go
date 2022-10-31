@@ -219,11 +219,17 @@ func (cr *consensusRuntime) populateFsmIfBridgeEnabled(
 		commitment, err := cr.getCommitmentToRegister(epoch, nextRegisteredCommitmentIndex)
 		if err != nil {
 			if errors.Is(err, ErrCommitmentNotBuilt) {
-				cr.logger.Debug("[FSM] Have no built commitment to register",
-					"epoch", epoch.Number, "from state sync index", nextRegisteredCommitmentIndex)
+				cr.logger.Debug(
+					"[FSM] Have no built commitment to register",
+					"epoch", epoch.Number,
+					"from state sync index", nextRegisteredCommitmentIndex,
+				)
 			} else if errors.Is(err, errQuorumNotReached) {
-				cr.logger.Debug("[FSM] Not enough votes to register commitment",
-					"epoch", epoch.Number, "from state sync index", nextRegisteredCommitmentIndex)
+				cr.logger.Debug(
+					"[FSM] Not enough votes to register commitment",
+					"epoch", epoch.Number,
+					"from state sync index", nextRegisteredCommitmentIndex,
+				)
 			} else {
 				return err
 			}
@@ -314,7 +320,8 @@ func (cr *consensusRuntime) FSM() error {
 		}
 	}
 
-	cr.logger.Info("[FSM built]",
+	cr.logger.Info(
+		"[FSM built]",
 		"epoch", epoch.Number,
 		"endOfEpoch", isEndOfEpoch,
 		"endOfSprint", isEndOfSprint,
@@ -409,7 +416,12 @@ func (cr *consensusRuntime) restartEpoch(header *types.Header) error {
 		return fmt.Errorf("could not run checkpoint:%w", err)
 	}
 
-	cr.logger.Info("restartEpoch", "block number", header.Number, "epoch", epochNumber, "validators", validatorSet)
+	cr.logger.Info(
+		"restartEpoch",
+		"block number", header.Number,
+		"epoch", epochNumber,
+		"validators", validatorSet,
+	)
 
 	return nil
 }
@@ -422,8 +434,11 @@ func (cr *consensusRuntime) buildCommitment(epoch, fromIndex uint64) (*Commitmen
 	stateSyncEvents, err := cr.state.getStateSyncEventsForCommitment(fromIndex, toIndex)
 	if err != nil {
 		if errors.Is(err, ErrNotEnoughStateSyncs) {
-			cr.logger.Debug("[buildCommitment] Not enough state syncs to build a commitment",
-				"epoch", epoch, "from state sync index", fromIndex)
+			cr.logger.Debug(
+				"[buildCommitment] Not enough state syncs to build a commitment",
+				"epoch", epoch,
+				"from state sync index", fromIndex,
+			)
 			// this is a valid case, there is not enough state syncs
 			return nil, nil
 		}
@@ -454,8 +469,9 @@ func (cr *consensusRuntime) buildCommitment(epoch, fromIndex uint64) (*Commitmen
 	}
 
 	if _, err = cr.state.insertMessageVote(epoch, hashBytes, sig); err != nil {
-		return nil, fmt.Errorf("failed to insert signature for hash=%v to the state."+
-			"Error: %v", hex.EncodeToString(hashBytes), err)
+		return nil, fmt.Errorf(
+			"failed to insert signature for hash=%v to the state. Error: %v",
+			hex.EncodeToString(hashBytes), err)
 	}
 
 	// gossip message
@@ -467,7 +483,11 @@ func (cr *consensusRuntime) buildCommitment(epoch, fromIndex uint64) (*Commitmen
 	}
 	cr.config.BridgeTransport.Multicast(msg)
 
-	cr.logger.Debug("[buildCommitment] Built commitment", "from", commitment.FromIndex, "to", commitment.ToIndex)
+	cr.logger.Debug(
+		"[buildCommitment] Built commitment",
+		"from", commitment.FromIndex,
+		"to", commitment.ToIndex,
+	)
 
 	return commitment, nil
 }
@@ -475,8 +495,12 @@ func (cr *consensusRuntime) buildCommitment(epoch, fromIndex uint64) (*Commitmen
 // buildBundles builds bundles if there is a created commitment by the validator and inserts them into db
 func (cr *consensusRuntime) buildBundles(epoch *epochMetadata, commitmentMsg *CommitmentMessage,
 	stateSyncExecutionIndex uint64) error {
-	cr.logger.Debug("[buildProofs] Building proofs...", "fromIndex", commitmentMsg.FromIndex,
-		"toIndex", commitmentMsg.ToIndex, "nextExecutionIndex", stateSyncExecutionIndex)
+	cr.logger.Debug(
+		"[buildProofs] Building proofs...",
+		"fromIndex", commitmentMsg.FromIndex,
+		"toIndex", commitmentMsg.ToIndex,
+		"nextExecutionIndex", stateSyncExecutionIndex,
+	)
 
 	if epoch.Commitment == nil {
 		// its a valid case when we do not have a built commitment so we can not build any proofs
@@ -506,8 +530,12 @@ func (cr *consensusRuntime) buildBundles(epoch *epochMetadata, commitmentMsg *Co
 			})
 	}
 
-	cr.logger.Debug("[buildProofs] Building proofs finished.", "fromIndex", commitmentMsg.FromIndex,
-		"toIndex", commitmentMsg.ToIndex, "nextExecutionIndex", stateSyncExecutionIndex)
+	cr.logger.Debug(
+		"[buildProofs] Building proofs finished.",
+		"fromIndex", commitmentMsg.FromIndex,
+		"toIndex", commitmentMsg.ToIndex,
+		"nextExecutionIndex", stateSyncExecutionIndex,
+	)
 
 	return cr.state.insertBundles(bundleProofs)
 }
@@ -737,7 +765,7 @@ func (cr *consensusRuntime) calculateUptime(currentBlock *types.Header) (*Commit
 	uptime := Uptime{EpochID: epochID}
 
 	// include the data in the uptime counter in a deterministic way
-	addrSet := []types.Address{}
+	var addrSet []types.Address
 	for addr := range uptimeCounter {
 		addrSet = append(addrSet, addr)
 	}
@@ -865,7 +893,8 @@ func (cr *consensusRuntime) IsValidBlock(proposal []byte) bool {
 
 	// validate header fields
 	if err := validateHeaderFields(cr.fsm.parent, block.Header); err != nil {
-		cr.logger.Error("failed to validate header",
+		cr.logger.Error(
+			"failed to validate header",
 			"parentHeader", cr.fsm.parent.Number,
 			"parentBlock", cr.fsm.parent.Number,
 			"block", block.Number(),
@@ -935,7 +964,8 @@ func (cr *consensusRuntime) IsValidBlock(proposal []byte) bool {
 
 	cr.fsm.proposal = &fsmProposal
 
-	cr.logger.Debug("[FSM Validate]",
+	cr.logger.Debug(
+		"[FSM Validate]",
 		"txs", len(cr.fsm.block.Block.Transactions),
 		"hash", block.Hash().String())
 
@@ -974,10 +1004,7 @@ func (cr *consensusRuntime) IsValidCommittedSeal(proposalHash []byte, committedS
 	err := cr.fsm.ValidateCommit(committedSeal.Signer, committedSeal.Signature, proposalHash)
 
 	if err != nil {
-		cr.logger.Info(
-			"Invalid committed seal",
-			"err", err,
-		)
+		cr.logger.Info("Invalid committed seal", "err", err)
 
 		return false
 	}
@@ -989,11 +1016,7 @@ func (cr *consensusRuntime) IsValidCommittedSeal(proposalHash []byte, committedS
 
 func (cr *consensusRuntime) BuildProposal(blockNumber uint64) []byte {
 	if cr.lastBuiltBlock.Number+1 != blockNumber {
-		cr.logger.Error(
-			"unable to build block, due to lack of parent block",
-			"num",
-			cr.lastBuiltBlock.Number,
-		)
+		cr.logger.Error("unable to build block, due to lack of parent block", "num", cr.lastBuiltBlock.Number)
 
 		return nil
 	}
