@@ -1671,7 +1671,7 @@ func TestConsensusRuntime_getExitEventRootHash(t *testing.T) {
 	})
 }
 
-func TestConsensusRuntime_generateExitProof(t *testing.T) {
+func TestConsensusRuntime_GenerateExitProof(t *testing.T) {
 	const (
 		numOfBlocks         = 10
 		numOfEventsPerBlock = 2
@@ -1689,7 +1689,7 @@ func TestConsensusRuntime_generateExitProof(t *testing.T) {
 	tree, err := NewMerkleTree(checkpointEvents)
 	require.NoError(t, err)
 
-	proof, err := runtime.generateExitProof(1, 1, 1)
+	proof, err := runtime.GenerateExitProof(1, 1, 1)
 	require.NoError(t, err)
 	require.NotNil(t, proof)
 
@@ -1707,7 +1707,7 @@ func TestConsensusRuntime_generateExitProof(t *testing.T) {
 	})
 
 	t.Run("Generate exit proof - no event", func(t *testing.T) {
-		_, err := runtime.generateExitProof(21, 1, 1)
+		_, err := runtime.GenerateExitProof(21, 1, 1)
 		require.ErrorContains(t, err, "could not find any exit event that has an id")
 	})
 }

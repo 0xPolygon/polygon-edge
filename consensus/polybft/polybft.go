@@ -618,6 +618,11 @@ func (p *Polybft) PreCommitState(_ *types.Header, _ *state.Transition) error {
 	return nil
 }
 
+// GetBridgeProvider returns an instance of BridgeDataProvider
+func (p *Polybft) GetBridgeProvider() consensus.BridgeDataProvider {
+	return p.runtime
+}
+
 type pbftTransportWrapper struct {
 	topic *network.Topic
 }

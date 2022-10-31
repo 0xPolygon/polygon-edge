@@ -34,6 +34,9 @@ type Consensus interface {
 	// GetSyncProgression retrieves the current sync progression, if any
 	GetSyncProgression() *progress.Progression
 
+	// GetBridgeProvider returns an instance of BridgeDataProvider
+	GetBridgeProvider() BridgeDataProvider
+
 	// Initialize initializes the consensus (e.g. setup data)
 	Initialize() error
 
@@ -75,3 +78,9 @@ type Params struct {
 
 // Factory is the factory function to create a discovery consensus
 type Factory func(*Params) (Consensus, error)
+
+// BridgeDataProvider is an interface providing bridge related functions
+type BridgeDataProvider interface {
+	// GenerateExit proof generates proof of exit for given exit event
+	GenerateExitProof(exitID, epoch, checkpointBlock uint64) ([]types.Hash, error)
+}

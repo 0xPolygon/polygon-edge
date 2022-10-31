@@ -133,3 +133,9 @@ func (m *mockStore) GetTxs(inclQueued bool) (
 func (m *mockStore) GetCapacity() (uint64, uint64) {
 	return 0, 0
 }
+
+func (m *mockStore) GenerateExitProof(exitID, epoch, checkpointNumber uint64) ([]types.Hash, error) {
+	hash := types.BytesToHash([]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
+
+	return []types.Hash{hash}, nil
+}
