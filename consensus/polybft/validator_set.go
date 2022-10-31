@@ -7,7 +7,7 @@ import (
 // ValidatorSet is a wrapper interface around pbft.ValidatorSet and it holds current validator set
 type ValidatorSet interface {
 	CalcProposer(round uint64) string
-	Includes(id string) bool
+	Includes(address types.Address) bool
 	Len() int
 
 	Accounts() AccountSet
@@ -47,8 +47,8 @@ func (v validatorSet) CalcProposer(round uint64) string {
 	return v.validators[pick].Address.String()
 }
 
-func (v validatorSet) Includes(id string) bool {
-	return v.validators.ContainsNodeID(id)
+func (v validatorSet) Includes(address types.Address) bool {
+	return v.validators.ContainsAddress(address)
 }
 
 func (v validatorSet) Len() int {

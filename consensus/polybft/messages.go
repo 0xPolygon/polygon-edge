@@ -5,6 +5,7 @@ import (
 
 	protoIBFT "github.com/0xPolygon/go-ibft/messages/proto"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
+	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"google.golang.org/protobuf/proto"
 )
@@ -15,7 +16,7 @@ func signMessage(msg *protoIBFT.Message, key *wallet.Key) (*protoIBFT.Message, e
 		return nil, fmt.Errorf("cannot marshal message:%w", err)
 	}
 
-	if msg.Signature, err = key.Sign(raw); err != nil {
+	if msg.Signature, err = key.SignEcdsa(raw); err != nil {
 		return nil, fmt.Errorf("cannot create message signature:%w", err)
 	}
 
@@ -134,4 +135,14 @@ func (cr *consensusRuntime) BuildRoundChangeMessage(
 	}
 
 	return signedMsg
+}
+
+// Ecrecover recovers signer address from the given digest and signature
+func RecoverAddressFromSignature(sig, msg []byte) (types.Address, error) {
+	pub, err := crypto.RecoverPubkey(sig, msg)
+	if err != nil {
+		return types.Address{}, err
+	}
+
+	return crypto.PubKeyToAddress(pub), nil
 }

@@ -34,3 +34,7 @@ func (k *Key) Sign(b []byte) ([]byte, error) {
 
 	return s.Marshal()
 }
+
+func (k *Key) SignEcdsa(b []byte) ([]byte, error) {
+	return k.raw.Ecdsa.Sign(b)
+}

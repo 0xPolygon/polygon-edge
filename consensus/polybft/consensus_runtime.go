@@ -978,7 +978,48 @@ func (cr *consensusRuntime) IsValidBlock(proposal []byte) bool {
 
 // IsValidSender checks if signature is from sender
 func (cr *consensusRuntime) IsValidSender(msg *proto.Message) bool {
-	// TODO it is always true
+	fsm := cr.fsm
+
+	if fsm == nil {
+		cr.logger.Error("IsValidSender fsm not initialized")
+
+		return false
+	}
+
+	msgNoSig, err := msg.PayloadNoSig()
+	if err != nil {
+		return false
+	}
+
+	signerAddress, err := RecoverAddressFromSignature(msg.Signature, msgNoSig)
+	if err != nil {
+		cr.logger.Error("failed to ecrecover message", "err", err)
+
+		return false
+	}
+
+	// verify the signature came from the sender
+	if !bytes.Equal(msg.From, signerAddress.Bytes()) {
+		cr.logger.Error(
+			"signer address doesn't match with From",
+			"from", hex.EncodeToString(msg.From),
+			"signer", signerAddress,
+			"err", err,
+		)
+
+		return false
+	}
+
+	// verify the sender is in the active validator set
+	if !fsm.validators.Includes(signerAddress) {
+		cr.logger.Error(
+			"signer address doesn't included in validators",
+			"signer", signerAddress,
+		)
+
+		return false
+	}
+
 	return true
 }
 
