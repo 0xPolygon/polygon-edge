@@ -179,13 +179,13 @@ func (m *blockBuilderMock) WriteTx(tx *types.Transaction) error {
 	return args.Error(0)
 }
 
-func (m *blockBuilderMock) Fill() error {
+func (m *blockBuilderMock) Fill() []*types.Receipt {
 	args := m.Called()
 	if len(args) == 0 {
 		return nil
 	}
 
-	return args.Error(0)
+	return args.Get(0).([]*types.Receipt) //nolint:forcetypeassert
 }
 
 func (m *blockBuilderMock) Build(handler func(*types.Header)) (*StateBlock, error) {
@@ -296,6 +296,24 @@ type transportMock struct {
 
 func (t *transportMock) Gossip(message interface{}) {
 	_ = t.Called(message)
+}
+
+var _ checkpointBackend = &checkpointBackendMock{}
+
+type checkpointBackendMock struct {
+	mock.Mock
+}
+
+func (c *checkpointBackendMock) BuildEventRoot(epoch uint64) (types.Hash, error) {
+	args := c.Called()
+
+	return args.Get(0).(types.Hash), args.Error(1) //nolint:forcetypeassert
+}
+
+func (c *checkpointBackendMock) InsertExitEvents(exitEvents []*ExitEvent) error {
+	c.Called()
+
+	return nil
 }
 
 type testValidators struct {

@@ -10,6 +10,7 @@ import (
 	"sort"
 
 	"github.com/0xPolygon/pbft-consensus"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	bolt "go.etcd.io/bbolt"
 
@@ -128,7 +129,12 @@ func decodeStateSyncEvent(log *ethgo.Log) (*StateSyncEvent, error) {
 }
 
 func decodeExitEvent(log *ethgo.Log, epoch, block uint64) (*ExitEvent, error) {
-	raw, err := exitEventABI.ParseLog(log)
+	if !exitEventABI.Match(log) {
+		// valid case, not an exit event
+		return nil, errNotAnExitEvent
+	}
+
+	raw, err := exitEventABI.Inputs.ParseLog(log)
 	if err != nil {
 		return nil, err
 	}
@@ -179,6 +185,21 @@ func decodeEventData(eventDataMap map[string]interface{}, log *ethgo.Log,
 	}
 
 	return eventCreator(id, sender, receiver, data), nil
+}
+
+// convert converts types.Log to ethgo.Log
+func convert(log *types.Log) *ethgo.Log {
+	l := &ethgo.Log{
+		Address: ethgo.Address(log.Address),
+		Data:    log.Data,
+		Topics:  make([]ethgo.Hash, len(log.Topics)),
+	}
+
+	for i := 0; i < len(log.Topics); i++ {
+		l.Topics[i] = ethgo.Hash(log.Topics[i])
+	}
+
+	return l
 }
 
 // ExitEvent is an event emitted by Exit contract
@@ -235,10 +256,12 @@ var (
 	// array of all parent buckets
 	parentBuckets = [][]byte{syncStateEventsBucket, exitEventsBucket, commitmentsBucket, bundlesBucket,
 		epochsBucket, validatorSnapshotsBucket}
-	// ErrNotEnoughStateSyncs error message
-	ErrNotEnoughStateSyncs = errors.New("there is either a gap or not enough sync events")
-	// ErrCommitmentNotBuilt error message
-	ErrCommitmentNotBuilt = errors.New("there is no built commitment to register")
+	// errNotEnoughStateSyncs error message
+	errNotEnoughStateSyncs = errors.New("there is either a gap or not enough sync events")
+	// errCommitmentNotBuilt error message
+	errCommitmentNotBuilt = errors.New("there is no built commitment to register")
+	// errNotAnExitEvent error message
+	errNotAnExitEvent = errors.New("log not an exit event")
 )
 
 // State represents a persistence layer which persists consensus data off-chain
@@ -335,18 +358,36 @@ func (s *State) list() ([]*StateSyncEvent, error) {
 	return events, nil
 }
 
-// insertStateSyncEvent inserts a new state sync event to state event bucket in db
-func (s *State) insertExitEvent(event *ExitEvent) error {
+// insertExitEvents inserts collection of exit events to exit event bucket in bolt db
+func (s *State) insertExitEvents(exitEvents []*ExitEvent) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
-		raw, err := json.Marshal(event)
-		if err != nil {
-			return err
+		bucket := tx.Bucket(exitEventsBucket)
+		for i := 0; i < len(exitEvents); i++ {
+			if err := insertExitEventToBucket(bucket, exitEvents[i]); err != nil {
+				return err
+			}
 		}
 
-		bucket := tx.Bucket(exitEventsBucket)
-
-		return bucket.Put(bytes.Join([][]byte{itob(event.EpochNumber), itob(event.ID), itob(event.BlockNumber)}, nil), raw)
+		return nil
 	})
+}
+
+// insertExitEvent inserts a new exit event to exit event bucket in bolt db
+func (s *State) insertExitEvent(event *ExitEvent) error {
+	return s.db.Update(func(tx *bolt.Tx) error {
+		return insertExitEventToBucket(tx.Bucket(exitEventsBucket), event)
+	})
+}
+
+// insertExitEventToBucket inserts exit event to exit event bucket
+func insertExitEventToBucket(bucket *bolt.Bucket, exitEvent *ExitEvent) error {
+	raw, err := json.Marshal(exitEvent)
+	if err != nil {
+		return err
+	}
+
+	return bucket.Put(bytes.Join([][]byte{itob(exitEvent.EpochNumber),
+		itob(exitEvent.ID), itob(exitEvent.BlockNumber)}, nil), raw)
 }
 
 // getExitEvent returns exit event with given id, which happened in given epoch and given block number
@@ -436,7 +477,7 @@ func (s *State) getStateSyncEventsForCommitment(fromIndex, toIndex uint64) ([]*S
 		for i := fromIndex; i <= toIndex; i++ {
 			v := bucket.Get(itob(i))
 			if v == nil {
-				return ErrNotEnoughStateSyncs
+				return errNotEnoughStateSyncs
 			}
 
 			var event *StateSyncEvent

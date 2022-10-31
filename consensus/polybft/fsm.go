@@ -23,7 +23,7 @@ var _ pbft.Backend = &fsm{}
 type blockBuilder interface {
 	Reset() error
 	WriteTx(*types.Transaction) error
-	Fill() error
+	Fill() []*types.Receipt
 	Build(func(h *types.Header)) (*StateBlock, error)
 	GetState() *state.Transition
 }
@@ -91,8 +91,8 @@ type fsm struct {
 	// stateSyncExecutionIndex is the next state sync execution index in smart contract
 	stateSyncExecutionIndex uint64
 
-	// buildEventRootFn returns the root hash of exit event tree
-	buildEventRootFn func(epoch uint64) (types.Hash, error)
+	// checkpointBackend provides functions for working with checkpoints and exit events
+	checkpointBackend checkpointBackend
 
 	// logger instance
 	logger hcf.Logger
@@ -161,8 +161,31 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 	}
 
 	// fill the block with transactions
-	if err := f.blockBuilder.Fill(); err != nil {
-		return nil, err
+	receipts := f.blockBuilder.Fill()
+	events := make([]*ExitEvent, 0)
+
+	for i := 0; i < len(receipts); i++ {
+		if len(receipts[i].Logs) == 0 {
+			continue
+		}
+
+		event, err := decodeExitEvent(convert(receipts[i].Logs[0]), f.epochNumber, parent.Number+1)
+		if err != nil {
+			if errors.Is(err, errNotAnExitEvent) {
+				// valid case, transaction is not an exit transaction
+				continue
+			}
+
+			return nil, err
+		}
+
+		events = append(events, event)
+	}
+
+	if len(events) > 0 {
+		if err := f.checkpointBackend.InsertExitEvents(events); err != nil {
+			return nil, err
+		}
 	}
 
 	// set the timestamp
@@ -183,7 +206,7 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 		return nil, err
 	}
 
-	eventRoot, err := f.buildEventRootFn(f.epochNumber)
+	eventRoot, err := f.checkpointBackend.BuildEventRoot(f.epochNumber)
 	if err != nil {
 		return nil, err
 	}

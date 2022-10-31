@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
+	"github.com/umbracle/ethgo/abi"
 )
 
 func newTestState(t *testing.T) *State {
@@ -243,7 +244,7 @@ func TestState_getStateSyncEventsForCommitment_NotEnoughEvents(t *testing.T) {
 	}
 
 	_, err := state.getStateSyncEventsForCommitment(0, stateSyncMainBundleSize-1)
-	assert.ErrorIs(t, err, ErrNotEnoughStateSyncs)
+	assert.ErrorIs(t, err, errNotEnoughStateSyncs)
 }
 
 func TestState_getStateSyncEventsForCommitment(t *testing.T) {
@@ -418,6 +419,52 @@ func TestState_Insert_And_Get_ExitEvents_ForProof_NoEvents(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Nil(t, events)
+}
+
+func TestState_decodeExitEvent(t *testing.T) {
+	const (
+		exitID      = 1
+		epoch       = 1
+		blockNumber = 10
+	)
+
+	state := newTestState(t)
+
+	topics := make([]ethgo.Hash, 4)
+	topics[0] = exitEventABI.ID()
+	topics[1] = ethgo.BytesToHash([]byte{exitID})
+	topics[2] = ethgo.BytesToHash(ethgo.HexToAddress("0x1111").Bytes())
+	topics[3] = ethgo.BytesToHash(ethgo.HexToAddress("0x2222").Bytes())
+	personType := abi.MustNewType("tuple(string firstName, string lastName)")
+	encodedData, err := personType.Encode(map[string]string{"firstName": "John", "lastName": "Doe"})
+	require.NoError(t, err)
+
+	log := &ethgo.Log{
+		Address: ethgo.ZeroAddress,
+		Topics:  topics,
+		Data:    encodedData,
+	}
+
+	event, err := decodeExitEvent(log, epoch, blockNumber)
+	require.NoError(t, err)
+	require.Equal(t, uint64(exitID), event.ID)
+	require.Equal(t, uint64(epoch), event.EpochNumber)
+	require.Equal(t, uint64(blockNumber), event.BlockNumber)
+
+	require.NoError(t, state.insertExitEvent(event))
+}
+
+func TestState_decodeExitEvent_NotAnExitEvent(t *testing.T) {
+	topics := make([]ethgo.Hash, 4)
+	topics[0] = stateTransferEventABI.ID()
+
+	log := &ethgo.Log{
+		Address: ethgo.ZeroAddress,
+		Topics:  topics,
+	}
+
+	_, err := decodeExitEvent(log, 1, 1)
+	require.ErrorIs(t, err, errNotAnExitEvent)
 }
 
 func insertTestExitEvents(t *testing.T, state *State,
