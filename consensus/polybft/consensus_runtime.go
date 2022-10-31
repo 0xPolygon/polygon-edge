@@ -841,9 +841,82 @@ func validateVote(vote *MessageSignature, epoch *epochMetadata) error {
 }
 
 // Implementation of core.Verifier
-func (cr *consensusRuntime) IsValidBlock(block []byte) bool {
+func (cr *consensusRuntime) IsValidBlock(proposal []byte) bool {
 	// todo polybft.fsm.Validate
-	panic("not implemented")
+
+	var block types.Block
+	if err := block.UnmarshalRLP(proposal); err != nil {
+		cr.logger.Error("failed to decode block data", "error", err)
+		return false
+
+	}
+
+	cr.logger.Debug("[FSM Validate]", "hash", block.Hash().String())
+
+	// validate proposal
+	// TODO this
+	// if block.Hash() != types.BytesToHash(proposal.Hash()) {
+	// 	return fmt.Errorf("incorrect sign hash (current header#%d)", block.Number())
+	// }
+
+	// validate header fields
+	if err := validateHeaderFields(cr.fsm.parent, block.Header); err != nil {
+		return fmt.Errorf("failed to validate header (parent header# %d, current header#%d): %w",
+			cr.fsm.parent.Number, block.Number(), err)
+	}
+
+	blockExtra, err := GetIbftExtra(block.Header.ExtraData)
+	if err != nil {
+		cr.logger.Error("cannot get block extra data", "error", err)
+		return false
+	}
+
+	// TODO: Validate validator set delta?
+
+	blockNumber := block.Number()
+	if blockNumber > 1 {
+		// verify parent signature
+		// We skip block 0 (genesis) and block 1 (parent is genesis)
+		// since those blocks do not include any parent information with signatures
+		validators, err := cr.fsm.polybftBackend.GetValidators(blockNumber-2, nil)
+		if err != nil {
+			cr.logger.Error("cannot get validators", "error", err)
+			return false
+		}
+
+		cr.logger.Trace("[FSM Validate]", "Block", blockNumber, "parent validators", validators)
+		parentHash := cr.fsm.parent.Hash
+
+		if err := blockExtra.Parent.VerifyCommittedFields(validators, parentHash); err != nil {
+			cr.logger.Error(
+				"failed to verify signatures for (parent)",
+				"parent block",
+				cr.fsm.parent.Number,
+				"parent hash", parentHash,
+				"block", block,
+			)
+		}
+	}
+
+	if err := cr.fsm.VerifyStateTransactions(block.Transactions); err != nil {
+		cr.logger.Error("cannot verify state transactions", "error", err)
+		return false
+	}
+
+	builtBlock, err := cr.fsm.backend.ProcessBlock(cr.fsm.parent, &block)
+	if err != nil {
+		cr.logger.Error("cannot process block", "error", err)
+		return false
+	}
+
+	cr.fsm.block = builtBlock
+	cr.fsm.proposal = proposal
+
+	cr.logger.Debug("[FSM Validate]",
+		"txs", len(cr.fsm.block.Block.Transactions),
+		"hash", block.Hash().String())
+
+	return true
 }
 
 // IsValidSender checks if signature is from sender

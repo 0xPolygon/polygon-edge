@@ -54,7 +54,7 @@ func (cr *consensusRuntime) BuildPrePrepareMessage(
 
 	message, err := signMessage(&msg, cr.config.Key)
 	if err != nil {
-		cr.logger.Error("Cannot sign message", "Error", err)
+		cr.logger.Error("Cannot sign message", "error", err)
 
 		return nil
 	}
@@ -76,7 +76,7 @@ func (cr *consensusRuntime) BuildPrepareMessage(proposalHash []byte, view *proto
 
 	message, err := signMessage(&msg, cr.config.Key)
 	if err != nil {
-		cr.logger.Error("Cannot sign message.", "Error", err)
+		cr.logger.Error("Cannot sign message.", "error", err)
 
 		return nil
 	}
@@ -86,9 +86,9 @@ func (cr *consensusRuntime) BuildPrepareMessage(proposalHash []byte, view *proto
 
 func (cr *consensusRuntime) BuildCommitMessage(proposalHash []byte, view *protoIBFT.View) *protoIBFT.Message {
 	// TODO check committedSeal signature
-	committedSeal, err := cr.config.Key.Sign(proposalHash) // .CreateCommittedSeal(proposalHash)
+	committedSeal, err := cr.config.Key.Sign(proposalHash)
 	if err != nil {
-		cr.logger.Error("Cannot create committed seal message.", "Error", err)
+		cr.logger.Error("Cannot create committed seal message.", "error", err)
 
 		return nil
 	}
@@ -107,7 +107,7 @@ func (cr *consensusRuntime) BuildCommitMessage(proposalHash []byte, view *protoI
 
 	message, err := signMessage(&msg, cr.config.Key)
 	if err != nil {
-		cr.logger.Error("Cannot sign message", "Error", err)
+		cr.logger.Error("Cannot sign message", "error", err)
 
 		return nil
 	}
