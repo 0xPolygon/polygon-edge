@@ -152,9 +152,10 @@ func TestFSM_BuildProposal_WithoutUptimeTxGood(t *testing.T) {
 	parent.ComputeHash()
 	stateBlock := createDummyStateBlock(parentBlockNumber+1, parent.Hash, extra)
 	mBlockBuilder := newBlockBuilderMock(stateBlock)
+	eventRootCallback := func(epoch uint64) (types.Hash, error) { return types.ZeroHash, nil }
 
 	fsm := &fsm{parent: parent, blockBuilder: mBlockBuilder, config: &PolyBFTConfig{}, backend: &blockchainMock{},
-		validators: validators.toValidatorSet(), logger: hclog.NewNullLogger()}
+		validators: validators.toValidatorSet(), buildEventRootFn: eventRootCallback, logger: hclog.NewNullLogger()}
 
 	proposal, err := fsm.BuildProposal()
 	assert.NoError(t, err)
@@ -211,11 +212,14 @@ func TestFSM_BuildProposal_WithUptimeTxGood(t *testing.T) {
 		Return(NewStateProvider(transition)).Once()
 	blockChainMock.On("GetSystemState", mock.Anything, mock.Anything).Return(systemStateMock).Once()
 
+	eventRootCallback := func(epoch uint64) (types.Hash, error) { return types.ZeroHash, nil }
+
 	fsm := &fsm{parent: parent, blockBuilder: mBlockBuilder, config: &PolyBFTConfig{}, backend: blockChainMock,
-		isEndOfEpoch:  true,
-		validators:    validators.toValidatorSet(),
-		uptimeCounter: createTestUptimeCounter(t, nil, 10),
-		logger:        hclog.NewNullLogger(),
+		isEndOfEpoch:     true,
+		validators:       validators.toValidatorSet(),
+		uptimeCounter:    createTestUptimeCounter(t, nil, 10),
+		buildEventRootFn: eventRootCallback,
+		logger:           hclog.NewNullLogger(),
 	}
 
 	proposal, err := fsm.BuildProposal()
@@ -262,10 +266,13 @@ func TestFSM_BuildProposal_EpochEndingBlock_FailedToCommitStateTx(t *testing.T) 
 	mBlockBuilder := new(blockBuilderMock)
 	mBlockBuilder.On("WriteTx", mock.Anything).Return(errors.New("error")).Once()
 
+	eventRootCallback := func(epoch uint64) (types.Hash, error) { return types.ZeroHash, nil }
+
 	fsm := &fsm{parent: parent, blockBuilder: mBlockBuilder, config: &PolyBFTConfig{}, backend: &blockchainMock{},
-		isEndOfEpoch:  true,
-		validators:    newValidatorSet(types.Address{}, validators.getPublicIdentities()),
-		uptimeCounter: createTestUptimeCounter(t, nil, 10),
+		isEndOfEpoch:     true,
+		validators:       newValidatorSet(types.Address{}, validators.getPublicIdentities()),
+		uptimeCounter:    createTestUptimeCounter(t, nil, 10),
+		buildEventRootFn: eventRootCallback,
 	}
 
 	_, err := fsm.BuildProposal()
@@ -307,15 +314,18 @@ func TestFSM_BuildProposal_EpochEndingBlock_ValidatorsDeltaExists(t *testing.T) 
 		Return(NewStateProvider(transition)).Once()
 	blockChainMock.On("GetSystemState", mock.Anything, mock.Anything).Return(systemStateMock).Once()
 
+	eventRootCallback := func(epoch uint64) (types.Hash, error) { return types.ZeroHash, nil }
+
 	fsm := &fsm{
-		parent:        parent,
-		blockBuilder:  blockBuilderMock,
-		config:        &PolyBFTConfig{},
-		backend:       blockChainMock,
-		isEndOfEpoch:  true,
-		validators:    newValidatorSet(types.Address{}, validatorSet),
-		uptimeCounter: createTestUptimeCounter(t, validatorSet, 10),
-		logger:        hclog.NewNullLogger(),
+		parent:           parent,
+		blockBuilder:     blockBuilderMock,
+		config:           &PolyBFTConfig{},
+		backend:          blockChainMock,
+		isEndOfEpoch:     true,
+		validators:       newValidatorSet(types.Address{}, validatorSet),
+		uptimeCounter:    createTestUptimeCounter(t, validatorSet, 10),
+		buildEventRootFn: eventRootCallback,
+		logger:           hclog.NewNullLogger(),
 	}
 
 	proposal, err := fsm.BuildProposal()
@@ -367,9 +377,11 @@ func TestFSM_BuildProposal_NonEpochEndingBlock_ValidatorsDeltaEmpty(t *testing.T
 
 	systemStateMock := new(systemStateMock)
 
+	eventRootCallback := func(epoch uint64) (types.Hash, error) { return types.ZeroHash, nil }
+
 	fsm := &fsm{parent: parent, blockBuilder: blockBuilderMock,
 		config: &PolyBFTConfig{}, backend: &blockchainMock{},
-		isEndOfEpoch: false, validators: testValidators.toValidatorSet(), logger: hclog.NewNullLogger()}
+		isEndOfEpoch: false, validators: testValidators.toValidatorSet(), buildEventRootFn: eventRootCallback, logger: hclog.NewNullLogger()}
 
 	proposal, err := fsm.BuildProposal()
 	assert.NoError(t, err)
@@ -411,13 +423,16 @@ func TestFSM_BuildProposal_EpochEndingBlock_FailToCreateValidatorsDelta(t *testi
 		Return(NewStateProvider(transition)).Once()
 	blockChainMock.On("GetSystemState", mock.Anything, mock.Anything).Return(systemStateMock).Once()
 
+	eventRootCallback := func(epoch uint64) (types.Hash, error) { return types.ZeroHash, nil }
+
 	fsm := &fsm{parent: parent,
-		blockBuilder:  blockBuilderMock,
-		config:        &PolyBFTConfig{},
-		backend:       blockChainMock,
-		isEndOfEpoch:  true,
-		validators:    testValidators.toValidatorSet(),
-		uptimeCounter: createTestUptimeCounter(t, allAccounts, 10),
+		blockBuilder:     blockBuilderMock,
+		config:           &PolyBFTConfig{},
+		backend:          blockChainMock,
+		isEndOfEpoch:     true,
+		validators:       testValidators.toValidatorSet(),
+		uptimeCounter:    createTestUptimeCounter(t, allAccounts, 10),
+		buildEventRootFn: eventRootCallback,
 	}
 
 	proposal, err := fsm.BuildProposal()
@@ -601,8 +616,9 @@ func TestFSM_ValidateCommit_WrongValidator(t *testing.T) {
 	parent.ComputeHash()
 	stateBlock := createDummyStateBlock(parentBlockNumber+1, parent.Hash, parent.ExtraData)
 	mBlockBuilder := newBlockBuilderMock(stateBlock)
+	eventRootCallback := func(epoch uint64) (types.Hash, error) { return types.ZeroHash, nil }
 	fsm := &fsm{parent: parent, blockBuilder: mBlockBuilder, config: &PolyBFTConfig{}, backend: &blockchainMock{},
-		validators: validators.toValidatorSet(), logger: hclog.NewNullLogger()}
+		validators: validators.toValidatorSet(), logger: hclog.NewNullLogger(), buildEventRootFn: eventRootCallback}
 	_, err := fsm.BuildProposal()
 	require.NoError(t, err)
 
@@ -627,8 +643,10 @@ func TestFSM_ValidateCommit_InvalidHash(t *testing.T) {
 	parent.ComputeHash()
 	stateBlock := createDummyStateBlock(parentBlockNumber+1, parent.Hash, parent.ExtraData)
 	mBlockBuilder := newBlockBuilderMock(stateBlock)
+	eventRootCallback := func(epoch uint64) (types.Hash, error) { return types.ZeroHash, nil }
+
 	fsm := &fsm{parent: parent, blockBuilder: mBlockBuilder, config: &PolyBFTConfig{}, backend: &blockchainMock{},
-		validators: validators.toValidatorSet(), logger: hclog.NewNullLogger()}
+		validators: validators.toValidatorSet(), buildEventRootFn: eventRootCallback, logger: hclog.NewNullLogger()}
 
 	_, err := fsm.BuildProposal()
 	assert.NoError(t, err)
@@ -653,9 +671,10 @@ func TestFSM_ValidateCommit_Good(t *testing.T) {
 	parent.ComputeHash()
 	stateBlock := createDummyStateBlock(parentBlockNumber+1, parent.Hash, parent.ExtraData)
 	mBlockBuilder := newBlockBuilderMock(stateBlock)
+	eventRootCallback := func(epoch uint64) (types.Hash, error) { return types.ZeroHash, nil }
 
 	fsm := &fsm{parent: parent, blockBuilder: mBlockBuilder, config: &PolyBFTConfig{}, backend: &blockchainMock{},
-		validators: newValidatorSet(types.Address{}, validatorSet), logger: hclog.NewNullLogger()}
+		validators: newValidatorSet(types.Address{}, validatorSet), buildEventRootFn: eventRootCallback, logger: hclog.NewNullLogger()}
 	_, err := fsm.BuildProposal()
 	require.NoError(t, err)
 
@@ -682,9 +701,10 @@ func TestFSM_Validate_IncorrectSignHash(t *testing.T) {
 	parent.ComputeHash()
 	stateBlock := createDummyStateBlock(parentBlockNumber+1, parent.Hash, parent.ExtraData)
 	mBlockBuilder := newBlockBuilderMock(stateBlock)
+	eventRootCallback := func(epoch uint64) (types.Hash, error) { return types.ZeroHash, nil }
 
 	fsm := &fsm{parent: parent, blockBuilder: mBlockBuilder, config: &PolyBFTConfig{}, backend: &blockchainMock{},
-		validators: validators.toValidatorSet(), logger: hclog.NewNullLogger(),
+		validators: validators.toValidatorSet(), buildEventRootFn: eventRootCallback, logger: hclog.NewNullLogger(),
 	}
 	proposal, err := fsm.BuildProposal()
 	require.NoError(t, err)
