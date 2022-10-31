@@ -15,18 +15,18 @@ permissions:
 jobs:
   snyk:
     name: Snyk and Publish
-    uses: 0xpolygon/polygon-edge/.github/workflows/security.yml@develop
+    uses: ./.github/workflows/security.yml
     secrets:
       SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
       SNYK_ORG: ${{ secrets.SNYK_ORG }}
 
   build:
     name: Build
-    uses: 0xpolygon/polygon-edge/.github/workflows/build.yml@develop
+    uses: ./.github/workflows/build.yml
 
   test:
     name: Test
-    uses: 0xpolygon/polygon-edge/.github/workflows/test.yml@develop
+    uses: ./.github/workflows/test.yml
     needs: build
 
   deploy_devnet:
