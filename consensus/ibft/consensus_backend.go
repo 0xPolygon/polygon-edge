@@ -125,7 +125,18 @@ func (i *backendIBFT) Quorum(blockNumber uint64) uint64 {
 
 // buildBlock builds the block, based on the passed in snapshot and parent header
 func (i *backendIBFT) buildBlock(parent *types.Header) (*types.Block, error) {
-	bb := blockbuilder.BlockBuilder{}
+	params := &blockbuilder.BlockBuilderParams{
+		Parent:         parent,
+		Executor:       i.executor,
+		Coinbase:       i.currentSigner.Address(),
+		BlockGasTarget: i.blockchain.Config().BlockGasTarget,
+		Logger:         i.logger,
+		TxPool:         i.txpool,
+	}
+	bbuilder, err := blockbuilder.NewBlockBuilder(params)
+	if err != nil {
+		return nil, err
+	}
 
 	parentCommittedSeals, err := i.extractParentCommittedSeals(parent)
 	if err != nil {
@@ -133,9 +144,9 @@ func (i *backendIBFT) buildBlock(parent *types.Header) (*types.Block, error) {
 	}
 
 	// fill with transactions
-	bb.Fill()
+	bbuilder.Fill()
 
-	stateBlock := bb.Build(func(header *types.Header) {
+	stateBlock := bbuilder.Build(func(header *types.Header) {
 		if err := i.currentHooks.ModifyHeader(header, i.currentSigner.Address()); err != nil {
 			panic(err)
 		}

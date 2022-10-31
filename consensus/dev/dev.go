@@ -109,9 +109,20 @@ func (d *Dev) run() {
 // writeNewBLock generates a new block based on transactions from the pool,
 // and writes them to the blockchain
 func (d *Dev) writeNewBlock(parent *types.Header) error {
-	builder := blockbuilder.BlockBuilder{}
-	builder.Fill()
-	block := builder.Build(nil)
+	params := &blockbuilder.BlockBuilderParams{
+		Parent:         parent,
+		Executor:       d.executor,
+		BlockGasTarget: d.blockchain.Config().BlockGasTarget,
+		Logger:         d.logger,
+		TxPool:         d.txpool,
+	}
+	bbuilder, err := blockbuilder.NewBlockBuilder(params)
+	if err != nil {
+		return err
+	}
+
+	bbuilder.Fill()
+	block := bbuilder.Build(nil)
 
 	// after the block has been written we reset the txpool so that
 	// the old transactions are removed

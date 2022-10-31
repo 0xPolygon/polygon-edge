@@ -66,6 +66,8 @@ func NewBlockBuilder(params *BlockBuilderParams) (*BlockBuilder, error) {
 
 	if params.Logger == nil {
 		params.Logger = hclog.NewNullLogger()
+	} else {
+		params.Logger = params.Logger.Named("block-builder")
 	}
 
 	builder := &BlockBuilder{
