@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/0xPolygon/go-ibft/messages"
 	"github.com/0xPolygon/pbft-consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
@@ -429,27 +430,33 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 }
 
 // Insert inserts the sealed proposal
-func (f *fsm) Insert(p *pbft.SealedProposal) error {
+func (f *fsm) Insert(proposal []byte, committedSeals []*messages.CommittedSeal) error {
+	// what to do with this?
+	newBlock := &types.Block{}
+	if err := newBlock.UnmarshalRLP(proposal); err != nil {
+		return fmt.Errorf("cannot unmarshal proposal %w", err)
+	}
+
 	// In this function we should try to return little to no errors since
 	// at this point everything we have to do is just commit something that
 	// we should have already computed beforehand.
 	extra, _ := GetIbftExtra(f.block.Block.Header.ExtraData)
 
 	// create map for faster access to indexes
-	nodeIDIndexMap := make(map[string]int, f.validators.Len())
+	nodeIDIndexMap := make(map[types.Address]int, f.validators.Len())
 	for i, addr := range f.validators.Accounts().GetAddresses() {
-		nodeIDIndexMap[addr.String()] = i
+		nodeIDIndexMap[addr] = i
 	}
 
 	// populated bitmap according to nodeId from validator set and committed seals
 	// also populate slice of signatures
 	bitmap := bitmap.Bitmap{}
-	signatures := make(bls.Signatures, 0, len(p.CommittedSeals))
+	signatures := make(bls.Signatures, 0, len(committedSeals))
 
-	for _, commSeal := range p.CommittedSeals {
-		index, exists := nodeIDIndexMap[string(commSeal.NodeID)]
+	for _, commSeal := range committedSeals {
+		index, exists := nodeIDIndexMap[types.BytesToAddress(commSeal.Signer)]
 		if !exists {
-			return fmt.Errorf("invalid node id = %s", commSeal.NodeID)
+			return fmt.Errorf("invalid node id = %s", types.BytesToAddress(commSeal.Signer).String())
 		}
 
 		s, err := bls.UnmarshalSignature(commSeal.Signature)

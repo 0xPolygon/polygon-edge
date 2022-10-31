@@ -1017,64 +1017,11 @@ func (cr *consensusRuntime) BuildProposal(blockNumber uint64) []byte {
 }
 
 func (cr *consensusRuntime) InsertBlock(proposal []byte, committedSeals []*messages.CommittedSeal) {
-	// newBlock := &types.Block{}
-	// if err := newBlock.UnmarshalRLP(proposal); err != nil {
-	// 	cr.logger.Error("cannot unmarshal proposal", "err", err)
+	if err := cr.fsm.Insert(proposal, committedSeals); err != nil {
+		cr.logger.Error("cannot insert proposal", "err", err)
 
-	// 	return
-	// }
-
-	// committedSealsMap := make(map[types.Address][]byte, len(committedSeals))
-
-	// for _, cm := range committedSeals {
-	// 	committedSealsMap[types.BytesToAddress(cm.Signer)] = cm.Signature
-	// }
-
-	// // Push the committed seals to the header
-	// header, err := i.currentSigner.WriteCommittedSeals(newBlock.Header, committedSealsMap)
-	// if err != nil {
-	// 	i.logger.Error("cannot write committed seals", "err", err)
-
-	// 	return
-	// }
-
-	// newBlock.Header = header
-
-	// // Save the block locally
-	// if err := i.blockchain.WriteBlock(newBlock, "consensus"); err != nil {
-	// 	i.logger.Error("cannot write block", "err", err)
-
-	// 	return
-	// }
-
-	// i.updateMetrics(newBlock)
-
-	// i.logger.Info(
-	// 	"block committed",
-	// 	"number", newBlock.Number(),
-	// 	"hash", newBlock.Hash(),
-	// 	"validation_type", i.currentSigner.Type(),
-	// 	"validators", i.currentValidators.Len(),
-	// 	"committed", len(committedSeals),
-	// )
-
-	// if err := i.currentHooks.PostInsertBlock(newBlock); err != nil {
-	// 	i.logger.Error(
-	// 		"failed to call PostInsertBlock hook",
-	// 		"height", newBlock.Number(),
-	// 		"hash", newBlock.Hash(),
-	// 		"err", err,
-	// 	)
-
-	// 	return
-	// }
-
-	// // after the block has been written we reset the txpool so that
-	// // the old transactions are removed
-	// i.txpool.ResetWithHeaders(newBlock.Header)
-
-	// cr.fsm.Insert()
-	panic("not implemented")
+		return
+	}
 }
 
 func (cr *consensusRuntime) ID() []byte {
