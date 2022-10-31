@@ -54,7 +54,7 @@ type fsm struct {
 	block *StateBlock
 
 	// proposal is the current proposal being processed
-	proposal []byte
+	proposal *pbft.Proposal
 
 	// postInsertHook represents custom handler which is executed once fsm.Insert is invoked,
 	// meaning that current block is inserted successfully

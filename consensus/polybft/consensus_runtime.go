@@ -841,14 +841,14 @@ func validateVote(vote *MessageSignature, epoch *epochMetadata) error {
 }
 
 // Implementation of core.Verifier
+// ====
 func (cr *consensusRuntime) IsValidBlock(proposal []byte) bool {
 	// todo polybft.fsm.Validate
-
 	var block types.Block
 	if err := block.UnmarshalRLP(proposal); err != nil {
 		cr.logger.Error("failed to decode block data", "error", err)
-		return false
 
+		return false
 	}
 
 	cr.logger.Debug("[FSM Validate]", "hash", block.Hash().String())
@@ -861,13 +861,19 @@ func (cr *consensusRuntime) IsValidBlock(proposal []byte) bool {
 
 	// validate header fields
 	if err := validateHeaderFields(cr.fsm.parent, block.Header); err != nil {
-		return fmt.Errorf("failed to validate header (parent header# %d, current header#%d): %w",
-			cr.fsm.parent.Number, block.Number(), err)
+		cr.logger.Error("failed to validate header",
+			"parent header", cr.fsm.parent.Number,
+			"parent block", cr.fsm.parent.Number,
+			"block", block.Number(),
+			"error", err)
+
+		return false
 	}
 
 	blockExtra, err := GetIbftExtra(block.Header.ExtraData)
 	if err != nil {
 		cr.logger.Error("cannot get block extra data", "error", err)
+
 		return false
 	}
 
@@ -881,6 +887,7 @@ func (cr *consensusRuntime) IsValidBlock(proposal []byte) bool {
 		validators, err := cr.fsm.polybftBackend.GetValidators(blockNumber-2, nil)
 		if err != nil {
 			cr.logger.Error("cannot get validators", "error", err)
+
 			return false
 		}
 
@@ -895,22 +902,27 @@ func (cr *consensusRuntime) IsValidBlock(proposal []byte) bool {
 				"parent hash", parentHash,
 				"block", block,
 			)
+
+			return false
 		}
 	}
 
 	if err := cr.fsm.VerifyStateTransactions(block.Transactions); err != nil {
 		cr.logger.Error("cannot verify state transactions", "error", err)
+
 		return false
 	}
 
 	builtBlock, err := cr.fsm.backend.ProcessBlock(cr.fsm.parent, &block)
 	if err != nil {
 		cr.logger.Error("cannot process block", "error", err)
+
 		return false
 	}
 
 	cr.fsm.block = builtBlock
-	cr.fsm.proposal = proposal
+	// TODO assing proposal
+	// cr.fsm.proposal = proposal
 
 	cr.logger.Debug("[FSM Validate]",
 		"txs", len(cr.fsm.block.Block.Transactions),
@@ -991,7 +1003,6 @@ func (cr *consensusRuntime) BuildProposal(blockNumber uint64) []byte {
 }
 
 func (cr *consensusRuntime) InsertBlock(proposal []byte, committedSeals []*messages.CommittedSeal) {
-
 	// newBlock := &types.Block{}
 	// if err := newBlock.UnmarshalRLP(proposal); err != nil {
 	// 	cr.logger.Error("cannot unmarshal proposal", "err", err)
