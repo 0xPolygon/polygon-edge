@@ -56,6 +56,12 @@ type fsm struct {
 	// proposal is the current proposal being processed
 	proposal *pbft.Proposal
 
+	// blockRound represents the current round from the consensus engine
+	blockRound uint64
+
+	// epochNumber denotes current epoch number
+	epochNumber uint64
+
 	// postInsertHook represents custom handler which is executed once fsm.Insert is invoked,
 	// meaning that current block is inserted successfully
 	postInsertHook func() error
@@ -85,10 +91,11 @@ type fsm struct {
 	// stateSyncExecutionIndex is the next state sync execution index in smart contract
 	stateSyncExecutionIndex uint64
 
-	// generateEventRoot returns the root hash of exit event tree
-	generateEventRoot func(epoch uint64) (types.Hash, error)
+	// buildEventRootFn returns the root hash of exit event tree
+	buildEventRootFn func(epoch uint64) (types.Hash, error)
 
-	logger hcf.Logger // The logger object
+	// logger instance
+	logger hcf.Logger
 }
 
 func (f *fsm) Init(info *pbft.RoundInfo) {
@@ -97,6 +104,7 @@ func (f *fsm) Init(info *pbft.RoundInfo) {
 		panic(err) // TODO: handle differently
 	}
 
+	f.blockRound = info.CurrentRound
 	f.commitmentToSaveOnRegister = nil
 }
 
@@ -111,6 +119,8 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 
 	// TODO: we will need to revisit once slashing is implemented
 	extra := &Extra{Parent: extraParent.Committed}
+	// for non-epoch ending blocks, currentValidatorsHash is the same as the nextValidatorsHash
+	nextValidators := f.validators.Accounts()
 
 	if f.isEndOfEpoch {
 		tx, err := f.createValidatorsUptimeTx()
@@ -122,10 +132,12 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 			return nil, fmt.Errorf("failed to commit validators uptime transaction: %w", err)
 		}
 
-		validatorsDelta, err := f.getValidatorSetDelta(f.blockBuilder.GetState())
+		nextValidators, err = f.getCurrentValidators(f.blockBuilder.GetState())
 		if err != nil {
 			return nil, err
 		}
+
+		validatorsDelta, err := createValidatorSetDelta(f.logger, f.validators.Accounts(), nextValidators)
 
 		extra.Validators = validatorsDelta
 		f.logger.Trace("[FSM Build Proposal]", "Validators Delta", validatorsDelta)
@@ -161,12 +173,32 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 		headerTime = time.Now()
 	}
 
-	// TODO - Here we will call f.generateEventRootFunc(epoch) to get the exit root after adding transactions
+	currentValidatorsHash, err := f.validators.Accounts().Hash()
+	if err != nil {
+		return nil, err
+	}
 
+	nextValidatorsHash, err := nextValidators.Hash()
+	if err != nil {
+		return nil, err
+	}
+
+	eventRoot, err := f.buildEventRootFn(f.epochNumber)
+	if err != nil {
+		return nil, err
+	}
+
+	extra.Checkpoint = &CheckpointData{
+		BlockRound:            f.blockRound,
+		EpochNumber:           f.epochNumber,
+		CurrentValidatorsHash: currentValidatorsHash,
+		NextValidatorsHash:    nextValidatorsHash,
+		EventRoot:             eventRoot,
+	}
 	stateBlock, err := f.blockBuilder.Build(func(h *types.Header) {
 		h.Timestamp = uint64(headerTime.Unix())
 		h.ExtraData = append(make([]byte, signer.IstanbulExtraVanity), extra.MarshalRLPTo(nil)...)
-		h.MixHash = PolyMixDigest
+		h.MixHash = PolyBFTMixDigest
 	})
 
 	if err != nil {
@@ -174,10 +206,16 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 	}
 
 	f.block = stateBlock
+
+	checkpointHash, err := extra.Checkpoint.Hash(f.backend.GetChainID(), f.Height(), stateBlock.Block.Hash())
+	if err != nil {
+		return nil, fmt.Errorf("failed to calculate sign hash: %w", err)
+	}
+
 	f.proposal = &pbft.Proposal{
 		Time: headerTime,
 		Data: stateBlock.Block.MarshalRLP(),
-		Hash: stateBlock.Block.Hash().Bytes(),
+		Hash: checkpointHash.Bytes(),
 	}
 
 	f.logger.Debug("[FSM Build Proposal]",
@@ -273,8 +311,18 @@ func (f *fsm) Validate(proposal *pbft.Proposal) error {
 		return fmt.Errorf("failed to decode block data. Error: %w", err)
 	}
 
+	extra, err := GetIbftExtra(block.Header.ExtraData)
+	if err != nil {
+		return err
+	}
+
+	checkpointHash, err := extra.Checkpoint.Hash(f.backend.GetChainID(), block.Number(), block.Hash())
+	if err != nil {
+		return err
+	}
+
 	// validate proposal
-	if block.Hash() != types.BytesToHash(proposal.Hash) {
+	if checkpointHash != types.BytesToHash(proposal.Hash) {
 		return fmt.Errorf("incorrect sign hash (current header#%d)", block.Number())
 	}
 
@@ -302,13 +350,22 @@ func (f *fsm) Validate(proposal *pbft.Proposal) error {
 		}
 
 		f.logger.Trace("[FSM Validate]", "Block", blockNumber, "parent validators", validators)
-		parentHash := f.parent.Hash
 
-		if err := blockExtra.Parent.VerifyCommittedFields(validators, parentHash); err != nil {
+		parentExtra, err := GetIbftExtra(f.parent.ExtraData)
+		if err != nil {
+			return err
+		}
+
+		parentCheckpointHash, err := parentExtra.Checkpoint.Hash(f.backend.GetChainID(), f.parent.Number, f.parent.Hash)
+		if err != nil {
+			return err
+		}
+
+		if err := blockExtra.Parent.VerifyCommittedFields(validators, parentCheckpointHash); err != nil {
 			return fmt.Errorf(
-				"failed to verify signatures for (parent) block#%d. Block hash: %v, block#%d",
+				"failed to verify signatures for (parent) block#%d. Parent hash: %v, Current block#%d",
 				f.parent.Number,
-				parentHash,
+				parentCheckpointHash,
 				blockNumber,
 			)
 		}
@@ -504,17 +561,17 @@ func (f *fsm) IsStuck(num uint64) (uint64, bool) {
 	return f.polybftBackend.CheckIfStuck(num)
 }
 
-// getValidatorSetDelta calculates validator set delta based on parent and current header
-func (f *fsm) getValidatorSetDelta(pendingBlockState *state.Transition) (*ValidatorSetDelta, error) {
+// getCurrentValidators queries smart contract on the given block height and returns currently active validator set
+func (f *fsm) getCurrentValidators(pendingBlockState *state.Transition) (AccountSet, error) {
 	provider := f.backend.GetStateProvider(pendingBlockState)
 	systemState := f.backend.GetSystemState(f.config, provider)
 	newValidators, err := systemState.GetValidatorSet()
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve validator set for current block %w", err)
+		return nil, fmt.Errorf("failed to retrieve validator set for block#%d: %w", f.Height(), err)
 	}
 
-	return createValidatorSetDelta(f.logger, f.validators.Accounts(), newValidators)
+	return newValidators, nil
 }
 
 // verifyValidatorsUptimeTx creates uptime transaction and compares its hash with the one extracted from the block.
@@ -564,7 +621,7 @@ func validateHeaderFields(parent *types.Header, header *types.Header) error {
 		return fmt.Errorf("timestamp older than parent")
 	}
 	// verify mix digest
-	if header.MixHash != PolyMixDigest {
+	if header.MixHash != PolyBFTMixDigest {
 		return fmt.Errorf("mix digest is not correct")
 	}
 	// difficulty must be > 0

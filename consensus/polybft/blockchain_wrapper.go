@@ -60,8 +60,11 @@ type blockchainBackend interface {
 
 	SubscribeEvents() blockchain.Subscription
 
-	// CalculateGasLimit for specifici block
+	// CalculateGasLimit calculates required gas limit for specific block
 	CalculateGasLimit(number uint64) (uint64, error)
+
+	// GetChainID returns chain id of the current blockchain
+	GetChainID() uint64
 }
 
 var _ blockchainBackend = &blockchainWrapper{}
@@ -183,6 +186,10 @@ func (p *blockchainWrapper) SubscribeEvents() blockchain.Subscription {
 // CalculateGasLimit for specific block
 func (p *blockchainWrapper) CalculateGasLimit(number uint64) (uint64, error) {
 	return p.blockchain.CalculateGasLimit(number)
+}
+
+func (p *blockchainWrapper) GetChainID() uint64 {
+	return uint64(p.blockchain.Config().ChainID)
 }
 
 var _ contract.Provider = &stateProvider{}

@@ -56,10 +56,7 @@ func getInitChildValidatorSetInput(validators []*Validator, governanceAddr types
 			return nil, err
 		}
 
-		pubKeyBig, err := pubKey.ToBigInt()
-		if err != nil {
-			return nil, err
-		}
+		pubKeyBig := pubKey.ToBigInt()
 
 		validatorPubkeys[i] = pubKeyBig
 		validatorAddresses[i] = g.Address

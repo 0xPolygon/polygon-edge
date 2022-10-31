@@ -443,14 +443,9 @@ func registerValidator(sender *txnSender, account *wallet.Account) asyncTxn {
 		return &asyncTxnImpl{err: err}
 	}
 
-	pubKeys, err := account.Bls.PublicKey().ToBigInt()
-	if err != nil {
-		return &asyncTxnImpl{err: err}
-	}
-
 	input, err := registerFn.Encode([]interface{}{
 		sigMarshal,
-		pubKeys,
+		account.Bls.PublicKey().ToBigInt(),
 	})
 	if err != nil {
 		return &asyncTxnImpl{err: err}
