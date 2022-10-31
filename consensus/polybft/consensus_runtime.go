@@ -321,9 +321,7 @@ func (cr *consensusRuntime) FSM() error {
 
 // restartEpoch resets the previously run epoch and moves to the next one
 func (cr *consensusRuntime) restartEpoch(header *types.Header) error {
-	cr.lastBuiltBlock = header
-
-	systemState, err := cr.getSystemState(cr.lastBuiltBlock)
+	systemState, err := cr.getSystemState(header)
 	if err != nil {
 		return err
 	}
