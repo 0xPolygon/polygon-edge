@@ -757,7 +757,7 @@ func (s *Server) updateConnCountMetrics(direction network.Direction) {
 		metrics.SetGauge([]string{"inbound_connections_count"}, float32(s.connectionCounts.GetInboundConnCount()))
 
 	case network.DirOutbound:
-		metrics.SetGauge([]string{"outbound_connections_count"}, float32(s.connectionCounts.GetInboundConnCount()))
+		metrics.SetGauge([]string{"outbound_connections_count"}, float32(s.connectionCounts.GetOutboundConnCount()))
 	}
 }
 
