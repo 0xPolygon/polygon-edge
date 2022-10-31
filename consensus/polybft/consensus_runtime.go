@@ -470,8 +470,10 @@ func (cr *consensusRuntime) buildCommitment(epoch, fromIndex uint64) (*Commitmen
 
 	if _, err = cr.state.insertMessageVote(epoch, hashBytes, sig); err != nil {
 		return nil, fmt.Errorf(
-			"failed to insert signature for hash=%v to the state. Error: %v",
-			hex.EncodeToString(hashBytes), err)
+			"failed to insert signature for hash=%v to the state. Error: %w",
+			hex.EncodeToString(hashBytes),
+			err,
+		)
 	}
 
 	// gossip message
@@ -512,6 +514,7 @@ func (cr *consensusRuntime) buildBundles(epoch *epochMetadata, commitmentMsg *Co
 	}
 
 	var bundleProofs []*BundleProof
+
 	startBundleIdx := commitmentMsg.GetBundleIdxFromStateSyncEventIdx(stateSyncExecutionIndex)
 
 	for idx := startBundleIdx; idx < commitmentMsg.BundlesCount(); idx++ {
@@ -765,7 +768,8 @@ func (cr *consensusRuntime) calculateUptime(currentBlock *types.Header) (*Commit
 	uptime := Uptime{EpochID: epochID}
 
 	// include the data in the uptime counter in a deterministic way
-	var addrSet []types.Address
+	addrSet := []types.Address{}
+
 	for addr := range uptimeCounter {
 		addrSet = append(addrSet, addr)
 	}
