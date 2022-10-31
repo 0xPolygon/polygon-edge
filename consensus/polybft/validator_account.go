@@ -8,12 +8,16 @@ import (
 	"reflect"
 
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
+	"github.com/0xPolygon/polygon-edge/crypto"
 
 	"github.com/0xPolygon/pbft-consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/umbracle/ethgo/abi"
 	"github.com/umbracle/fastrlp"
 )
+
+var accountSetABIType = abi.MustNewType(`tuple(address _address, uint256[4] blsKey)[]`)
 
 // ValidatorAccount represents a validator from the validator set
 type ValidatorAccount struct {
@@ -154,6 +158,24 @@ func (as AccountSet) Copy() AccountSet {
 	}
 
 	return AccountSet(copiedAccs)
+}
+
+// Hash returns hash value of the AccountSet
+func (as AccountSet) Hash() (types.Hash, error) {
+	accountSetMaps := make([]map[string]interface{}, len(as))
+	for i, acc := range as {
+		accountSetMaps[i] = map[string]interface{}{
+			"_address": acc.Address,
+			"blsKey":   acc.BlsKey.ToBigInt(),
+		}
+	}
+
+	abiEncoded, err := accountSetABIType.Encode(accountSetMaps)
+	if err != nil {
+		return types.ZeroHash, err
+	}
+
+	return types.BytesToHash(crypto.Keccak256(abiEncoded)), nil
 }
 
 // GetValidatorAccount tries to retrieve validator account by given address from the account set.

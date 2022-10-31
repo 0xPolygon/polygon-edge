@@ -516,11 +516,6 @@ func (p *Polybft) VerifyHeader(header *types.Header) error {
 
 func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, parents []*types.Header) error {
 	blockNumber := header.Number
-	if blockNumber == 0 {
-		// TODO: Remove, this was just for simplicity since I had started the chain already,
-		//  add the mix hash into the genesis command
-		return nil
-	}
 
 	//validate header fields
 	if err := validateHeaderFields(parent, header); err != nil {
@@ -539,25 +534,23 @@ func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, parents []*type
 	}
 
 	if extra.Committed == nil {
-		return fmt.Errorf(
-			"failed to verify signatures for block %d because signatures are nil. Block hash: %v",
-			blockNumber,
-			header.Hash,
-		)
+		return fmt.Errorf("failed to verify signatures for block %d because signatures are not present", blockNumber)
 	}
 
-	if err := extra.Committed.VerifyCommittedFields(validators, header.Hash); err != nil {
-		return fmt.Errorf("failed to verify signatures for block %d. Block hash: %v", blockNumber, header.Hash)
+	checkpointHash, err := extra.Checkpoint.Hash(p.blockchain.GetChainID(), header.Number, header.Hash)
+	if err != nil {
+		return err
+	}
+
+	if err := extra.Committed.VerifyCommittedFields(validators, checkpointHash); err != nil {
+		return fmt.Errorf("failed to verify signatures for block %d. Signed hash %v", blockNumber, checkpointHash)
 	}
 
 	// validate the signatures for parent (skip block 1 because genesis does not have committed)
 	if blockNumber > 1 {
 		if extra.Parent == nil {
-			return fmt.Errorf(
-				"failed to verify signatures for parent of block %d because signatures are nil. Parent hash: %v",
-				blockNumber,
-				parent.Hash,
-			)
+			return fmt.Errorf("failed to verify signatures for parent of block %d because signatures are not present",
+				blockNumber)
 		}
 
 		parentValidators, err := p.GetValidators(blockNumber-2, parents)
@@ -569,7 +562,17 @@ func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, parents []*type
 			)
 		}
 
-		if err := extra.Parent.VerifyCommittedFields(parentValidators, parent.Hash); err != nil {
+		parentExtra, err := GetIbftExtra(parent.ExtraData)
+		if err != nil {
+			return err
+		}
+
+		parentCheckpointHash, err := parentExtra.Checkpoint.Hash(p.blockchain.GetChainID(), parent.Number, parent.Hash)
+		if err != nil {
+			return err
+		}
+
+		if err := extra.Parent.VerifyCommittedFields(parentValidators, parentCheckpointHash); err != nil {
 			return fmt.Errorf("failed to verify signatures for parent of block %d. Parent hash: %v", blockNumber, parent.Hash)
 		}
 	}

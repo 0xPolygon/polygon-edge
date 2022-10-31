@@ -281,16 +281,17 @@ func (c *consensusRuntime) FSM() (*fsm, error) {
 	isEndOfEpoch := c.isEndOfEpoch(pendingBlockNumber)
 
 	ff := &fsm{
-		config:            c.config.PolyBFTConfig,
-		parent:            parent,
-		backend:           c.config.blockchain,
-		polybftBackend:    c.config.polybftBackend,
-		blockBuilder:      blockBuilder,
-		validators:        newValidatorSet(types.BytesToAddress(parent.Miner), epoch.Validators),
-		isEndOfEpoch:      isEndOfEpoch,
-		isEndOfSprint:     isEndOfSprint,
-		generateEventRoot: c.getExitEventRootHash,
-		logger:            c.logger.Named("fsm"),
+		config:           c.config.PolyBFTConfig,
+		parent:           parent,
+		backend:          c.config.blockchain,
+		polybftBackend:   c.config.polybftBackend,
+		epochNumber:      epoch.Number,
+		blockBuilder:     blockBuilder,
+		validators:       newValidatorSet(types.BytesToAddress(parent.Miner), epoch.Validators),
+		isEndOfEpoch:     isEndOfEpoch,
+		isEndOfSprint:    isEndOfSprint,
+		buildEventRootFn: c.getExitEventRootHash,
+		logger:           c.logger.Named("fsm"),
 	}
 
 	if c.IsBridgeEnabled() {

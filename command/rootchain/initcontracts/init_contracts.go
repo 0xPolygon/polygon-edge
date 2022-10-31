@@ -257,11 +257,7 @@ func initializeRootValidatorSet(nonce uint64) error {
 	validatorAddresses := make([]types.Address, len(validatorsInfo))
 
 	for i, valid := range validatorsInfo {
-		pubKeyBig, err := valid.Account.Bls.PublicKey().ToBigInt()
-		if err != nil {
-			return fmt.Errorf("failed to encode pubkey for RootValidatorSet.initialize. error: %w", err)
-		}
-
+		pubKeyBig := valid.Account.Bls.PublicKey().ToBigInt()
 		validatorAddresses[i] = types.Address(valid.Account.Ecdsa.Address())
 		validatorPubKeys[i] = pubKeyBig
 	}
