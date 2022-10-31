@@ -42,9 +42,11 @@ type txPoolInterface interface {
 	Prepare()
 	Length() uint64
 	Peek() *types.Transaction
-	Pop(tx *types.Transaction)
-	Drop(tx *types.Transaction)
-	Demote(tx *types.Transaction)
+	Pop(*types.Transaction)
+	Drop(*types.Transaction)
+	Demote(*types.Transaction)
+	SetSealing(bool)
+	ResetWithHeaders(...*types.Header)
 }
 
 // epochMetadata is the static info for epoch currently being processed
@@ -159,17 +161,20 @@ func (cr *consensusRuntime) AddLog(eventLog *ethgo.Log) {
 	return // TODO: Delete this when metrics is established. This is added just to trick linter.
 }
 
-// NotifyProposalInserted is an implementation of fsmNotify interface
-func (cr *consensusRuntime) NotifyProposalInserted(b *types.Block) {
-	lastHeader := b.Header
-	if cr.isEndOfEpoch(lastHeader.Number) {
+// OnBlockInserted is called whenever fsm or syncer inserts new block
+func (cr *consensusRuntime) OnBlockInserted(block *types.Block) {
+	// after the block has been written we reset the txpool so that the old transactions are removed
+	cr.config.txPool.ResetWithHeaders(block.Header)
+
+	if cr.isEndOfEpoch(block.Header.Number) {
 		// reset the epoch. Internally it updates the parent block header.
-		if err := cr.restartEpoch(lastHeader); err != nil {
+		if err := cr.restartEpoch(block.Header); err != nil {
 			cr.logger.Error("failed to restart epoch after block inserted", "err", err)
 		}
 	} else {
-		// inside the epoch, update last built block header
-		cr.lastBuiltBlock = lastHeader
+		cr.lock.Lock()
+		cr.lastBuiltBlock = block.Header
+		cr.lock.Unlock()
 	}
 }
 
@@ -199,7 +204,7 @@ func (cr *consensusRuntime) populateFsmIfBridgeEnabled(
 			}
 		}
 
-		cr.NotifyProposalInserted(ff.block.Block)
+		cr.OnBlockInserted(ff.block.Block)
 
 		return nil
 	}
@@ -290,7 +295,7 @@ func (cr *consensusRuntime) FSM() error {
 		}
 	} else {
 		ff.postInsertHook = func() error {
-			cr.NotifyProposalInserted(ff.block.Block)
+			cr.OnBlockInserted(ff.block.Block)
 
 			return nil
 		}
@@ -355,7 +360,7 @@ func (cr *consensusRuntime) restartEpoch(header *types.Header) error {
 		}
 	*/
 
-	validatorSet, err := cr.config.polybftBackend.GetValidators(cr.lastBuiltBlock.Number, nil)
+	validatorSet, err := cr.config.polybftBackend.GetValidators(header.Number, nil)
 	if err != nil {
 		return err
 	}
@@ -392,6 +397,7 @@ func (cr *consensusRuntime) restartEpoch(header *types.Header) error {
 
 	cr.lock.Lock()
 	cr.epoch = epoch
+	cr.lastBuiltBlock = header
 	cr.lock.Unlock()
 
 	err = cr.runCheckpoint(epoch)
@@ -455,10 +461,7 @@ func (cr *consensusRuntime) buildCommitment(epoch, fromIndex uint64) (*Commitmen
 		NodeID:      cr.config.Key.NodeID(),
 		EpochNumber: epoch,
 	}
-
-	if err := cr.config.BridgeTransport.Gossip(msg); err != nil {
-		cr.logger.Warn("failed to gossip bridge message", "err", err)
-	}
+	cr.config.BridgeTransport.Multicast(msg)
 
 	cr.logger.Debug("[buildCommitment] Built commitment", "from", commitment.FromIndex, "to", commitment.ToIndex)
 

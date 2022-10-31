@@ -9,9 +9,6 @@ import (
 // IBFTConsensusWrapper is a convenience wrapper for the go-ibft package
 type IBFTConsensusWrapper struct {
 	*core.IBFT
-
-	cancelSequence context.CancelFunc
-	sequenceDone   chan struct{}
 }
 
 func newIBFTConsensusWrapper(
@@ -26,23 +23,21 @@ func newIBFTConsensusWrapper(
 
 // runSequence starts the underlying consensus mechanism for the given height.
 // It may be called by a single thread at any given time
-func (c *IBFTConsensusWrapper) runSequence(height uint64) <-chan struct{} {
-	var ctx context.Context
-
-	c.sequenceDone = make(chan struct{})
-	ctx, c.cancelSequence = context.WithCancel(context.Background())
+// It returns channel which will be closed after c.IBFT.RunSequence is done
+// and stopSequence function which can be used to halt c.IBFT.RunSequence routine from outside
+func (c *IBFTConsensusWrapper) runSequence(height uint64) (<-chan struct{}, func()) {
+	sequenceDone := make(chan struct{})
+	ctx, cancelSequence := context.WithCancel(context.Background())
 
 	go func() {
 		c.IBFT.RunSequence(ctx, height)
-		c.cancelSequence()
-		close(c.sequenceDone)
+		cancelSequence()
+		close(sequenceDone)
 	}()
 
-	return c.sequenceDone
-}
-
-// stopSequence terminates the running IBFT sequence gracefully and waits for it to return
-func (c *IBFTConsensusWrapper) stopSequence() {
-	c.cancelSequence()
-	<-c.sequenceDone // waits until routine inside runSequence finishes
+	return sequenceDone, func() {
+		// stopSequence terminates the running IBFT sequence gracefully and waits for it to return
+		cancelSequence()
+		<-sequenceDone // waits until c.IBFT.RunSequenc routine finishes
+	}
 }

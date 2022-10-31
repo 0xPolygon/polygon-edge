@@ -8,11 +8,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/0xPolygon/pbft-consensus"
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/proto"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
@@ -46,6 +44,7 @@ func Factory(params *consensus.Params) (consensus.Consensus, error) {
 		config:  params,
 		closeCh: make(chan struct{}),
 		logger:  logger,
+		txPool:  params.TxPool,
 	}
 
 	// initialize polybft consensus config
@@ -107,6 +106,9 @@ type Polybft struct {
 
 	// logger
 	logger hclog.Logger
+
+	// tx pool as interface
+	txPool txPoolInterface
 }
 
 func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *state.Transition) error {
@@ -234,10 +236,7 @@ func (p *Polybft) startSyncing() error {
 
 	go func() {
 		blockHandler := func(b *types.Block) bool {
-			// TODO: rename NotifyProposalInserted
-			// parameter should we header and not StateBlock also
-			// txpool.ResetWithHeaders(b.Header) should be called
-			p.runtime.NotifyProposalInserted(b)
+			p.runtime.OnBlockInserted(b)
 
 			return false
 		}
@@ -272,11 +271,11 @@ func (p *Polybft) initRuntime() {
 		PolyBFTConfig:   p.consensusConfig,
 		Key:             p.key,
 		DataDir:         p.dataDir,
-		BridgeTransport: &runtimeTransportWrapper{p.bridgeTopic},
+		BridgeTransport: &runtimeTransportWrapper{p.bridgeTopic, p.logger},
 		State:           p.state,
 		blockchain:      p.blockchain,
 		polybftBackend:  p,
-		txPool:          p.config.TxPool,
+		txPool:          p.txPool,
 	}
 
 	p.runtime = newConsensusRuntime(p.logger, runtimeConfig)
@@ -328,7 +327,10 @@ func (p *Polybft) startPbftProcess() {
 		}
 	}()
 
-	var sequenceCh <-chan struct{}
+	var (
+		sequenceCh   <-chan struct{}
+		stopSequence func()
+	)
 
 	for {
 		latest := p.blockchain.CurrentHeader().Number
@@ -341,7 +343,7 @@ func (p *Polybft) startPbftProcess() {
 		isValidator := currentValidators.ContainsNodeID(p.key.NodeID())
 		p.runtime.setIsActiveValidator(isValidator)
 
-		p.config.TxPool.SetSealing(isValidator) // update tx pool
+		p.txPool.SetSealing(isValidator) // update tx pool
 
 		if isValidator {
 			err = p.runtime.FSM() // initialze fsm as a stateless ibft backet via runtime as an adapter
@@ -351,21 +353,21 @@ func (p *Polybft) startPbftProcess() {
 				continue
 			}
 
-			sequenceCh = p.ibft.runSequence(latest + 1)
+			sequenceCh, stopSequence = p.ibft.runSequence(latest + 1)
 		} else {
-			sequenceCh = nil
+			sequenceCh, stopSequence = nil, nil
 		}
 
 		select {
 		case <-syncerBlockCh:
 			if isValidator {
-				p.ibft.stopSequence()
+				stopSequence()
 				p.logger.Info("canceled sequence", "sequence", latest+1)
 			}
 		case <-sequenceCh:
 		case <-p.closeCh:
 			if isValidator {
-				p.ibft.stopSequence()
+				stopSequence()
 			}
 
 			return
@@ -514,21 +516,3 @@ func (p *Polybft) PreCommitState(_ *types.Header, _ *state.Transition) error {
 	// Not required
 	return nil
 }
-
-type pbftTransportWrapper struct {
-	topic *network.Topic
-}
-
-func (p *pbftTransportWrapper) Gossip(msg *pbft.MessageReq) error {
-	data, err := json.Marshal(msg)
-	if err != nil {
-		return err
-	}
-
-	return p.topic.Publish(
-		&proto.GossipMessage{
-			Data: data,
-		})
-}
-
-var _ polybftBackend = &Polybft{}

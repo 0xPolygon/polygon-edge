@@ -8,27 +8,34 @@ import (
 	pbftproto "github.com/0xPolygon/polygon-edge/consensus/polybft/proto"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 // Transport is an abstraction of network layer for a bridge
 type BridgeTransport interface {
-	Gossip(msg interface{}) error
+	Multicast(msg interface{})
 }
 
 type runtimeTransportWrapper struct {
 	bridgeTopic *network.Topic
+	logger      hclog.Logger
 }
 
 var _ BridgeTransport = (*runtimeTransportWrapper)(nil)
 
-func (g *runtimeTransportWrapper) Gossip(msg interface{}) error {
-	if data, err := json.Marshal(msg); err != nil {
-		return err
-	} else {
-		return g.bridgeTopic.Publish(&pbftproto.TransportMessage{
-			Data: data,
-		})
+// Multicast publishes any message as pbftproto.TransportMessage
+func (g *runtimeTransportWrapper) Multicast(msg interface{}) {
+	data, err := json.Marshal(msg)
+	if err != nil {
+		g.logger.Warn("failed to marshal bridge message", "err", err)
+
+		return
+	}
+
+	err = g.bridgeTopic.Publish(&pbftproto.TransportMessage{Data: data})
+	if err != nil {
+		g.logger.Warn("failed to gossip bridge message", "err", err)
 	}
 }
 
@@ -56,6 +63,7 @@ func (cr *consensusRuntime) subscribeToBridgeTopic(topic *network.Topic) error {
 	})
 }
 
+// subscribeToIbftTopic subscribes to ibft topic
 func (p *Polybft) subscribeToIbftTopic() error {
 	return p.consensusTopic.Subscribe(func(obj interface{}, _ peer.ID) {
 		// this check is from ibft impl
@@ -101,6 +109,7 @@ func (p *Polybft) createTopics() (err error) {
 	return nil
 }
 
+// Multicast is implementation of core.Transport interface
 func (p *Polybft) Multicast(msg *proto.Message) {
 	if err := p.consensusTopic.Publish(msg); err != nil {
 		p.logger.Warn("failed to multicast consensus message", "err", err)
