@@ -39,7 +39,7 @@ require (
 
 require (
 	cloud.google.com/go/secretmanager v1.7.0
-	github.com/armon/go-metrics v0.4.0 // indirect
+	github.com/armon/go-metrics v0.4.0
 	github.com/aws/aws-sdk-go v1.44.61
 	github.com/benbjohnson/clock v1.3.0 // indirect
 	github.com/coinbase/kryptology v1.8.0
@@ -65,11 +65,7 @@ require (
 	go.uber.org/atomic v1.10.0
 )
 
-require (
-	github.com/0xPolygon/go-ibft v0.0.0-20220810095021-e43142f8d267
-	go.uber.org/atomic v1.10.0
-	gopkg.in/DataDog/dd-trace-go.v1 v1.42.1
-)
+require gopkg.in/DataDog/dd-trace-go.v1 v1.42.1
 
 require (
 	cloud.google.com/go v0.104.0 // indirect

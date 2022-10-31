@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/armon/go-metrics"
 	"github.com/golang/protobuf/ptypes/any"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -170,9 +171,6 @@ type TxPool struct {
 	// and should therefore gossip transactions
 	sealing atomic.Bool
 
-	// prometheus API
-	metrics *Metrics
-
 	// Event manager for txpool events
 	eventManager *eventManager
 
@@ -225,14 +223,12 @@ func NewTxPool(
 	store store,
 	grpcServer *grpc.Server,
 	network *network.Server,
-	metrics *Metrics,
 	config *Config,
 ) (*TxPool, error) {
 	pool := &TxPool{
 		logger:      logger.Named("txpool"),
 		forks:       forks,
 		store:       store,
-		metrics:     metrics,
 		executables: newPricedQueue(),
 		accounts:    accountsMap{maxEnqueuedLimit: config.MaxAccountEnqueued},
 		index:       lookupMap{all: make(map[types.Hash]*types.Transaction)},
@@ -278,7 +274,7 @@ func NewTxPool(
 // is invoked in a separate goroutine.
 func (p *TxPool) Start() {
 	// set default value of txpool pending transactions gauge
-	p.metrics.PendingTxs.Set(0)
+	metrics.IncrCounter([]string{"pending_transactions"}, 0)
 
 	//	run the handler for high gauge level pruning
 	go func() {
@@ -409,7 +405,7 @@ func (p *TxPool) Pop(tx *types.Transaction) {
 	p.gauge.decrease(slotsRequired(tx))
 
 	// update metrics
-	p.metrics.PendingTxs.Add(-1)
+	metrics.IncrCounter([]string{"pending_transactions"}, -1)
 
 	// update executables
 	if tx := account.promoted.peek(); tx != nil {
@@ -452,7 +448,7 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 	clearAccountQueue(dropped)
 
 	// update metrics
-	p.metrics.PendingTxs.Add(float64(-1 * len(dropped)))
+	metrics.IncrCounter([]string{"pending_transactions"}, float32(-1*len(dropped)))
 
 	// drop enqueued
 	dropped = account.enqueued.clear()
@@ -798,7 +794,8 @@ func (p *TxPool) handlePromoteRequest(req promoteRequest) {
 	p.gauge.decrease(slotsRequired(pruned...))
 
 	// update metrics
-	p.metrics.PendingTxs.Add(float64(len(promoted)))
+	metrics.IncrCounter([]string{"pending_transactions"}, float32(len(promoted)))
+
 	p.eventManager.signalEvent(proto.EventType_PROMOTED, toHash(promoted...)...)
 }
 
@@ -889,7 +886,7 @@ func (p *TxPool) resetAccounts(stateNonces map[types.Address]uint64) {
 			toHash(allPrunedPromoted...)...,
 		)
 
-		p.metrics.PendingTxs.Add(float64(-1 * len(allPrunedPromoted)))
+		metrics.IncrCounter([]string{"pending_transactions"}, float32(-1*len(allPrunedPromoted)))
 	}
 
 	if len(allPrunedEnqueued) > 0 {
