@@ -11,7 +11,6 @@ import (
 
 	"github.com/0xPolygon/go-ibft/messages"
 	"github.com/0xPolygon/go-ibft/messages/proto"
-	"github.com/0xPolygon/pbft-consensus"
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
@@ -880,98 +879,11 @@ func validateVote(vote *MessageSignature, epoch *epochMetadata) error {
 }
 
 func (cr *consensusRuntime) IsValidBlock(proposal []byte) bool {
-	var block types.Block
-	if err := block.UnmarshalRLP(proposal); err != nil {
-		cr.logger.Error("failed to decode block data", "error", err)
+	if err := cr.fsm.Validate(proposal); err != nil {
+		cr.logger.Error("failed validate proposal", "error", err)
 
 		return false
 	}
-
-	cr.logger.Debug("[FSM Validate]", "hash", block.Hash().String())
-
-	// validate proposal
-	// TODO do we need this?
-	// if block.Hash() != types.BytesToHash(proposal.Hash()) {
-	// 	return fmt.Errorf("incorrect sign hash (current header#%d)", block.Number())
-	// }
-
-	// validate header fields
-	if err := validateHeaderFields(cr.fsm.parent, block.Header); err != nil {
-		cr.logger.Error(
-			"failed to validate header",
-			"parentHeader", cr.fsm.parent.Number,
-			"parentBlock", cr.fsm.parent.Number,
-			"block", block.Number(),
-			"error", err)
-
-		return false
-	}
-
-	blockExtra, err := GetIbftExtra(block.Header.ExtraData)
-	if err != nil {
-		cr.logger.Error("cannot get block extra data", "error", err)
-
-		return false
-	}
-
-	// TODO: Validate validator set delta?
-
-	blockNumber := block.Number()
-	if blockNumber > 1 {
-		// verify parent signature
-		// We skip block 0 (genesis) and block 1 (parent is genesis)
-		// since those blocks do not include any parent information with signatures
-		validators, err := cr.fsm.polybftBackend.GetValidators(blockNumber-2, nil)
-		if err != nil {
-			cr.logger.Error("cannot get validators", "error", err)
-
-			return false
-		}
-
-		cr.logger.Trace("[FSM Validate]", "Block", blockNumber, "parent validators", validators)
-		parentHash := cr.fsm.parent.Hash
-
-		if err := blockExtra.Parent.VerifyCommittedFields(validators, parentHash); err != nil {
-			cr.logger.Error(
-				"failed to verify signatures for (parent)",
-				"parentBlock", cr.fsm.parent.Number,
-				"parentHash", parentHash,
-				"block", block,
-				"error", err,
-			)
-
-			return false
-		}
-	}
-
-	if err := cr.fsm.VerifyStateTransactions(block.Transactions); err != nil {
-		cr.logger.Error("cannot verify state transactions", "error", err)
-
-		return false
-	}
-
-	builtBlock, err := cr.fsm.backend.ProcessBlock(cr.fsm.parent, &block)
-	if err != nil {
-		cr.logger.Error("cannot process block", "error", err)
-
-		return false
-	}
-
-	cr.fsm.block = builtBlock
-
-	fsmProposal := pbft.Proposal{
-		Data: proposal,
-		// TODO add rest of the fields?
-		// Time:
-		// Hash:
-	}
-
-	cr.fsm.proposal = &fsmProposal
-
-	cr.logger.Debug(
-		"[FSM Validate]",
-		"txs", len(cr.fsm.block.Block.Transactions),
-		"hash", block.Hash().String())
 
 	return true
 }
@@ -1069,11 +981,7 @@ func (cr *consensusRuntime) BuildProposal(blockNumber uint64) []byte {
 	proposal, err := cr.fsm.BuildProposal()
 
 	if err != nil {
-		cr.logger.Info(
-			"Unable to create porposal",
-			"blockNumber", blockNumber,
-			"err", err,
-		)
+		cr.logger.Info("Unable to create porposal", "blockNumber", blockNumber, "err", err)
 
 		return nil
 	}

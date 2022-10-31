@@ -8,12 +8,10 @@ import (
 	"time"
 
 	"github.com/0xPolygon/go-ibft/messages"
-	"github.com/0xPolygon/pbft-consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/contracts"
-	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 	hcf "github.com/hashicorp/go-hclog"
@@ -44,7 +42,7 @@ type fsm struct {
 	// polybftBackend implements methods needed from the polybft
 	polybftBackend polybftBackend
 
-	// validators is the list of pbft validators for this round
+	// validators is the list of validators for this round
 	validators ValidatorSet
 
 	// blockBuilder is the block builder for proposers
@@ -55,7 +53,7 @@ type fsm struct {
 	block *StateBlock
 
 	// proposal is the current proposal being processed
-	proposal *pbft.Proposal
+	proposal []byte
 
 	// postInsertHook represents custom handler which is executed once fsm.Insert is invoked,
 	// meaning that current block is inserted successfully
@@ -162,17 +160,13 @@ func (f *fsm) BuildProposal() ([]byte, error) {
 
 	f.block = stateBlock
 
-	f.proposal = &pbft.Proposal{
-		Time: headerTime,
-		Data: stateBlock.Block.MarshalRLP(),
-		Hash: stateBlock.Block.Hash().Bytes(),
-	}
+	f.proposal = stateBlock.Block.MarshalRLP()
 
 	f.logger.Debug("[FSM Build Proposal]",
 		"txs", len(stateBlock.Block.Transactions),
-		"hash", hex.EncodeToHex(f.proposal.Hash))
+		"hash", stateBlock.Block.Hash().String())
 
-	return f.proposal.Data, nil
+	return f.proposal, nil
 }
 
 func (f *fsm) stateTransactions() []*types.Transaction {
@@ -229,15 +223,19 @@ func (f *fsm) createValidatorsUptimeTx() (*types.Transaction, error) {
 
 // ValidateCommit is used to validate that a given commit is valid
 func (f *fsm) ValidateCommit(signer []byte, seal []byte, proposalHash []byte) error {
-
 	from := types.BytesToAddress(signer)
 
-	if f.proposal == nil || f.proposal.Hash == nil {
-		return fmt.Errorf("incorrect commit from %s. proposal unavailable", from)
+	if f.proposal == nil {
+		return fmt.Errorf("incorrect commit from %s. current proposal unavailable", from)
 	}
 
-	if bytes.Equal(f.proposal.Hash, proposalHash) {
-		return fmt.Errorf("incorrect prposal hash submitted via consensus engine from %s. proposal unavailable", from)
+	newBlock := &types.Block{}
+	if err := newBlock.UnmarshalRLP(f.proposal); err != nil {
+		f.logger.Error("unable to unmarshal proposal", "err", err)
+	}
+
+	if bytes.Equal(newBlock.Hash().Bytes(), proposalHash) {
+		return fmt.Errorf("incorrect prposal hash submitted via consensus engine from %s", from)
 	}
 
 	validator := f.validators.Accounts().GetValidatorAccount(from)
@@ -251,7 +249,7 @@ func (f *fsm) ValidateCommit(signer []byte, seal []byte, proposalHash []byte) er
 		return fmt.Errorf("failed to unmarshall signature: %w", err)
 	}
 
-	if !signature.Verify(validator.BlsKey, f.proposal.Hash) {
+	if !signature.Verify(validator.BlsKey, proposalHash) {
 		return fmt.Errorf("incorrect commit signature from %s", from)
 	}
 
@@ -259,18 +257,13 @@ func (f *fsm) ValidateCommit(signer []byte, seal []byte, proposalHash []byte) er
 }
 
 // Validate validates a raw proposal (used if non-proposer)
-func (f *fsm) Validate(proposal *pbft.Proposal) error {
-	f.logger.Debug("[FSM Validate]", "hash", hex.EncodeToHex(proposal.Hash))
-
+func (f *fsm) Validate(proposal []byte) error {
 	var block types.Block
-	if err := block.UnmarshalRLP(proposal.Data); err != nil {
-		return fmt.Errorf("failed to decode block data. Error: %w", err)
+	if err := block.UnmarshalRLP(proposal); err != nil {
+		return fmt.Errorf("failed to validate, cannot decode block data. Error: %w", err)
 	}
 
-	// validate proposal
-	if block.Hash() != types.BytesToHash(proposal.Hash) {
-		return fmt.Errorf("incorrect sign hash (current header#%d)", block.Number())
-	}
+	f.logger.Debug("[FSM Validate]", "hash", block.Hash().String())
 
 	// validate header fields
 	if err := validateHeaderFields(f.parent, block.Header); err != nil {
@@ -320,9 +313,7 @@ func (f *fsm) Validate(proposal *pbft.Proposal) error {
 	f.block = builtBlock
 	f.proposal = proposal
 
-	f.logger.Debug("[FSM Validate]",
-		"txs", len(f.block.Block.Transactions),
-		"hash", hex.EncodeToHex(proposal.Hash))
+	f.logger.Debug("[FSM Validate]", "txs", len(f.block.Block.Transactions), "hash", block.Hash().String())
 
 	return nil
 }
