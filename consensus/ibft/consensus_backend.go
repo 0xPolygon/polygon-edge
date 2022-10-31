@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/0xPolygon/go-ibft/messages"
-	"github.com/0xPolygon/polygon-edge/consensus"
+	"github.com/0xPolygon/polygon-edge/blockbuilder"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -127,78 +127,35 @@ func (i *backendIBFT) Quorum(blockNumber uint64) uint64 {
 
 // buildBlock builds the block, based on the passed in snapshot and parent header
 func (i *backendIBFT) buildBlock(parent *types.Header) (*types.Block, error) {
-	header := &types.Header{
-		ParentHash: parent.Hash,
-		Number:     parent.Number + 1,
-		Miner:      types.ZeroAddress.Bytes(),
-		Nonce:      types.Nonce{},
-		MixHash:    signer.IstanbulDigest,
-		// this is required because blockchain needs difficulty to organize blocks and forks
-		Difficulty: parent.Number + 1,
-		StateRoot:  types.EmptyRootHash, // this avoids needing state for now
-		Sha3Uncles: types.EmptyUncleHash,
-		GasLimit:   parent.GasLimit, // Inherit from parent for now, will need to adjust dynamically later.
-	}
-
-	// calculate gas limit based on parent header
-	gasLimit, err := i.blockchain.CalculateGasLimit(header.Number)
-	if err != nil {
-		return nil, err
-	}
-
-	header.GasLimit = gasLimit
-
-	if err := i.currentHooks.ModifyHeader(header, i.currentSigner.Address()); err != nil {
-		return nil, err
-	}
-
-	// set the timestamp
-	header.Timestamp = uint64(time.Now().Unix())
+	bb := blockbuilder.BlockBuilder{}
 
 	parentCommittedSeals, err := i.extractParentCommittedSeals(parent)
 	if err != nil {
 		return nil, err
 	}
 
-	i.currentSigner.InitIBFTExtra(header, i.currentValidators, parentCommittedSeals)
+	// fill with transactions
+	bb.Fill()
 
-	transition, err := i.executor.BeginTxn(parent.StateRoot, header, i.currentSigner.Address())
-	if err != nil {
-		return nil, err
-	}
+	stateBlock := bb.Build(func(header *types.Header) {
+		if err := i.currentHooks.ModifyHeader(header, i.currentSigner.Address()); err != nil {
+			panic(err)
+		}
 
-	txs := i.writeTransactions(gasLimit, header.Number, transition)
+		// set the timestamp
+		header.Timestamp = uint64(time.Now().Unix())
 
-	if err := i.PreCommitState(header, transition); err != nil {
-		return nil, err
-	}
+		i.currentSigner.InitIBFTExtra(header, i.currentValidators, parentCommittedSeals)
 
-	_, root := transition.Commit()
-	header.StateRoot = root
-	header.GasUsed = transition.TotalGas()
-
-	// build the block
-	block := consensus.BuildBlock(consensus.BuildBlockParams{
-		Header:   header,
-		Txns:     txs,
-		Receipts: transition.Receipts(),
+		header, err = i.currentSigner.WriteProposerSeal(header)
+		if err != nil {
+			panic(err)
+		}
 	})
-
-	// write the seal of the block after all the fields are completed
-	header, err = i.currentSigner.WriteProposerSeal(header)
-	if err != nil {
-		return nil, err
-	}
-
-	block.Header = header
-
-	// compute the hash, this is only a provisional hash since the final one
-	// is sealed after all the committed seals
-	block.Header.ComputeHash()
 
 	i.logger.Info("build block", "number", header.Number, "txs", len(txs))
 
-	return block, nil
+	return stateBlock.Block, nil
 }
 
 type status uint8
