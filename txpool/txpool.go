@@ -4,13 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"sync/atomic"
 	"time"
-
-	"github.com/golang/protobuf/ptypes/any"
-	"github.com/hashicorp/go-hclog"
-	"github.com/libp2p/go-libp2p/core/peer"
-	"go.uber.org/atomic"
-	"google.golang.org/grpc"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/chain"
@@ -18,6 +13,10 @@ import (
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/txpool/proto"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/golang/protobuf/ptypes/any"
+	"github.com/hashicorp/go-hclog"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"google.golang.org/grpc"
 )
 
 const (
@@ -168,7 +167,7 @@ type TxPool struct {
 
 	// flag indicating if the current node is a sealer,
 	// and should therefore gossip transactions
-	sealing atomic.Bool
+	sealing uint32
 
 	// prometheus API
 	metrics *Metrics
@@ -325,12 +324,16 @@ func (p *TxPool) SetSigner(s signer) {
 
 // SetSealing sets the sealing flag
 func (p *TxPool) SetSealing(sealing bool) {
-	p.sealing.Store(sealing)
+	if sealing {
+		atomic.StoreUint32(&p.sealing, 1)
+	} else {
+		atomic.StoreUint32(&p.sealing, 0)
+	}
 }
 
 // sealing returns the current set sealing flag
 func (p *TxPool) getSealing() bool {
-	return p.sealing.Load()
+	return atomic.LoadUint32(&p.sealing) == 1
 }
 
 // AddTx adds a new transaction to the pool (sent from json-RPC/gRPC endpoints)
