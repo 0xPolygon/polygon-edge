@@ -847,8 +847,6 @@ func validateVote(vote *MessageSignature, epoch *epochMetadata) error {
 	return nil
 }
 
-// Implementation of core.Verifier
-
 func (cr *consensusRuntime) IsValidBlock(proposal []byte) bool {
 	var block types.Block
 	if err := block.UnmarshalRLP(proposal); err != nil {
@@ -973,8 +971,7 @@ func (cr *consensusRuntime) IsValidProposalHash(proposal, hash []byte) bool {
 
 // IsValidCommittedSeal checks if the seal for the proposal is valid
 func (cr *consensusRuntime) IsValidCommittedSeal(proposalHash []byte, committedSeal *messages.CommittedSeal) bool {
-	from := types.BytesToAddress(committedSeal.Signer)
-	err := cr.fsm.ValidateCommit(from, committedSeal.Signature, proposalHash)
+	err := cr.fsm.ValidateCommit(committedSeal.Signer, committedSeal.Signature, proposalHash)
 
 	if err != nil {
 		cr.logger.Info(
@@ -1013,7 +1010,7 @@ func (cr *consensusRuntime) BuildProposal(blockNumber uint64) []byte {
 		return nil
 	}
 
-	return proposal.Data
+	return proposal
 }
 
 func (cr *consensusRuntime) InsertBlock(proposal []byte, committedSeals []*messages.CommittedSeal) {
@@ -1029,7 +1026,7 @@ func (cr *consensusRuntime) ID() []byte {
 }
 
 func (cr *consensusRuntime) MaximumFaultyNodes() uint64 {
-	return uint64((len(cr.epoch.Validators) - 1) / 3)
+	return uint64((len(cr.fsm.validators.Accounts()) - 1) / 3)
 }
 
 func (cr *consensusRuntime) Quorum(validatorsCount uint64) uint64 {

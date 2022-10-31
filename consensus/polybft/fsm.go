@@ -89,17 +89,8 @@ type fsm struct {
 	logger hcf.Logger // The logger object
 }
 
-func (f *fsm) Init(info *pbft.RoundInfo) {
-	err := f.blockBuilder.Reset()
-	if err != nil {
-		panic(err) // TODO: handle differently
-	}
-
-	f.commitmentToSaveOnRegister = nil
-}
-
 // BuildProposal builds a proposal for the current round (used if proposer)
-func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
+func (f *fsm) BuildProposal() ([]byte, error) {
 	parent := f.parent
 
 	extraParent, err := GetIbftExtra(parent.ExtraData)
@@ -181,7 +172,7 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 		"txs", len(stateBlock.Block.Transactions),
 		"hash", hex.EncodeToHex(f.proposal.Hash))
 
-	return f.proposal, nil
+	return f.proposal.Data, nil
 }
 
 func (f *fsm) stateTransactions() []*types.Transaction {
@@ -237,7 +228,10 @@ func (f *fsm) createValidatorsUptimeTx() (*types.Transaction, error) {
 }
 
 // ValidateCommit is used to validate that a given commit is valid
-func (f *fsm) ValidateCommit(from types.Address, seal []byte, proposalHash []byte) error {
+func (f *fsm) ValidateCommit(signer []byte, seal []byte, proposalHash []byte) error {
+
+	from := types.BytesToAddress(signer)
+
 	if f.proposal == nil || f.proposal.Hash == nil {
 		return fmt.Errorf("incorrect commit from %s. proposal unavailable", from)
 	}
