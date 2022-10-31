@@ -180,7 +180,8 @@ func TestFSM_BuildProposal_WithExitEvents(t *testing.T) {
 
 	mBlockBuilder := new(blockBuilderMock)
 	mBlockBuilder.On("Build", mock.Anything).Return(stateBlock).Once()
-	mBlockBuilder.On("Fill", mock.Anything).Return(receipts).Once()
+	mBlockBuilder.On("Fill").Once()
+	mBlockBuilder.On("Receipts", mock.Anything).Return(receipts).Once()
 
 	fsm := &fsm{parent: parent, blockBuilder: mBlockBuilder, config: &PolyBFTConfig{}, backend: &blockchainMock{},
 		validators: validators.toValidatorSet(), checkpointBackend: runtime, logger: hclog.NewNullLogger(), epochNumber: epoch}
@@ -232,7 +233,8 @@ func TestFSM_BuildProposal_WithExitEvents_ErrorInDecoding(t *testing.T) {
 	}}
 
 	mBlockBuilder := new(blockBuilderMock)
-	mBlockBuilder.On("Fill", mock.Anything).Return([]*types.Receipt{receipt}).Once()
+	mBlockBuilder.On("Fill").Once()
+	mBlockBuilder.On("Receipts", mock.Anything).Return([]*types.Receipt{receipt}).Once()
 
 	fsm := &fsm{parent: parent, blockBuilder: mBlockBuilder, config: &PolyBFTConfig{}, backend: &blockchainMock{},
 		validators: validators.toValidatorSet(), checkpointBackend: runtime, logger: hclog.NewNullLogger(), epochNumber: epoch}
@@ -315,9 +317,7 @@ func TestFSM_BuildProposal_WithUptimeTxGood(t *testing.T) {
 	stateBlock := createDummyStateBlock(parentBlockNumber+1, parent.Hash, extra)
 
 	transition := &state.Transition{}
-	mBlockBuilder := &blockBuilderMock{}
-	mBlockBuilder.On("Build", mock.Anything).Return(stateBlock).Once()
-	mBlockBuilder.On("Fill", mock.Anything).Return([]*types.Receipt{}).Once()
+	mBlockBuilder := newBlockBuilderMock(stateBlock)
 	mBlockBuilder.On("WriteTx", mock.Anything).Return(error(nil)).Once()
 	mBlockBuilder.On("GetState").Return(transition).Once()
 
@@ -414,9 +414,7 @@ func TestFSM_BuildProposal_EpochEndingBlock_ValidatorsDeltaExists(t *testing.T) 
 	stateBlock := createDummyStateBlock(parentBlockNumber+1, parent.Hash, extra)
 
 	transition := &state.Transition{}
-	blockBuilderMock := new(blockBuilderMock)
-	blockBuilderMock.On("Build", mock.Anything).Return(stateBlock).Once()
-	blockBuilderMock.On("Fill", mock.Anything).Return([]*types.Receipt{}).Once()
+	blockBuilderMock := newBlockBuilderMock(stateBlock)
 	blockBuilderMock.On("WriteTx", mock.Anything).Return(error(nil)).Once()
 	blockBuilderMock.On("GetState").Return(transition).Once()
 
@@ -492,7 +490,8 @@ func TestFSM_BuildProposal_NonEpochEndingBlock_ValidatorsDeltaEmpty(t *testing.T
 
 	blockBuilderMock := &blockBuilderMock{}
 	blockBuilderMock.On("Build", mock.Anything).Return(stateBlock).Once()
-	blockBuilderMock.On("Fill", mock.Anything).Return([]*types.Receipt{}).Once()
+	blockBuilderMock.On("Fill").Once()
+	blockBuilderMock.On("Receipts", mock.Anything).Return([]*types.Receipt{}).Once()
 
 	checkpointBackendMock := new(checkpointBackendMock)
 	checkpointBackendMock.On("BuildEventRoot", mock.Anything).Return(types.ZeroHash, nil).Once()
@@ -1794,7 +1793,8 @@ func createTestCommitment(t *testing.T, accounts []*wallet.Account) *CommitmentM
 func newBlockBuilderMock(stateBlock *StateBlock) *blockBuilderMock {
 	mBlockBuilder := new(blockBuilderMock)
 	mBlockBuilder.On("Build", mock.Anything).Return(stateBlock).Once()
-	mBlockBuilder.On("Fill", mock.Anything).Return([]*types.Receipt{}).Once()
+	mBlockBuilder.On("Fill", mock.Anything).Once()
+	mBlockBuilder.On("Receipts", mock.Anything).Return([]*types.Receipt{}).Once()
 
 	return mBlockBuilder
 }

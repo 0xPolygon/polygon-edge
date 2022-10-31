@@ -23,9 +23,10 @@ var _ pbft.Backend = &fsm{}
 type blockBuilder interface {
 	Reset() error
 	WriteTx(*types.Transaction) error
-	Fill() []*types.Receipt
+	Fill()
 	Build(func(h *types.Header)) (*StateBlock, error)
 	GetState() *state.Transition
+	Receipts() []*types.Receipt
 }
 
 const maxBundlesPerSprint = 50
@@ -161,7 +162,9 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 	}
 
 	// fill the block with transactions
-	receipts := f.blockBuilder.Fill()
+	f.blockBuilder.Fill()
+
+	receipts := f.blockBuilder.Receipts()
 	events := make([]*ExitEvent, 0)
 
 	for i := 0; i < len(receipts); i++ {

@@ -179,11 +179,13 @@ func (m *blockBuilderMock) WriteTx(tx *types.Transaction) error {
 	return args.Error(0)
 }
 
-func (m *blockBuilderMock) Fill() []*types.Receipt {
+func (m *blockBuilderMock) Fill() {
+	m.Called()
+}
+
+// Receipts returns the collection of transaction receipts for given block
+func (m *blockBuilderMock) Receipts() []*types.Receipt {
 	args := m.Called()
-	if len(args) == 0 {
-		return nil
-	}
 
 	return args.Get(0).([]*types.Receipt) //nolint:forcetypeassert
 }

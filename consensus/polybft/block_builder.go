@@ -161,7 +161,7 @@ func (b *BlockBuilder) WriteTx(tx *types.Transaction) error {
 }
 
 // Fill fills the block with transactions from the txpool
-func (b *BlockBuilder) Fill() []*types.Receipt {
+func (b *BlockBuilder) Fill() {
 	blockTimer := time.NewTimer(b.params.BlockTime)
 
 	b.params.TxPool.Prepare()
@@ -169,7 +169,7 @@ write:
 	for {
 		select {
 		case <-blockTimer.C:
-			return b.state.Receipts()
+			return
 		default:
 			tx := b.params.TxPool.Peek()
 
@@ -187,7 +187,10 @@ write:
 
 	//	wait for the timer to expire
 	<-blockTimer.C
+}
 
+// Receipts returns the collection of transaction receipts for given block
+func (b *BlockBuilder) Receipts() []*types.Receipt {
 	return b.state.Receipts()
 }
 
