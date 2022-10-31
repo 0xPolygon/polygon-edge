@@ -11,6 +11,7 @@ import (
 
 	"github.com/0xPolygon/go-ibft/messages"
 	"github.com/0xPolygon/go-ibft/messages/proto"
+	"github.com/0xPolygon/pbft-consensus"
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
@@ -855,7 +856,7 @@ func (cr *consensusRuntime) IsValidBlock(proposal []byte) bool {
 	cr.logger.Debug("[FSM Validate]", "hash", block.Hash().String())
 
 	// validate proposal
-	// TODO this
+	// TODO do we need this?
 	// if block.Hash() != types.BytesToHash(proposal.Hash()) {
 	// 	return fmt.Errorf("incorrect sign hash (current header#%d)", block.Number())
 	// }
@@ -922,8 +923,15 @@ func (cr *consensusRuntime) IsValidBlock(proposal []byte) bool {
 	}
 
 	cr.fsm.block = builtBlock
-	// TODO assing proposal
-	// cr.fsm.proposal = proposal
+
+	fsmProposal := pbft.Proposal{
+		Data: proposal,
+		// TODO add rest of the fields?
+		// Time:
+		// Hash:
+	}
+
+	cr.fsm.proposal = &fsmProposal
 
 	cr.logger.Debug("[FSM Validate]",
 		"txs", len(cr.fsm.block.Block.Transactions),
