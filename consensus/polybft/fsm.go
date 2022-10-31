@@ -1,6 +1,7 @@
 package polybft
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"math/big"
@@ -15,7 +16,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 	hcf "github.com/hashicorp/go-hclog"
-	"github.com/umbracle/ethgo"
 )
 
 // var _ pbft.Backend = &fsm{}
@@ -169,6 +169,7 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 	}
 
 	f.block = stateBlock
+
 	f.proposal = &pbft.Proposal{
 		Time: headerTime,
 		Data: stateBlock.Block.MarshalRLP(),
@@ -235,13 +236,16 @@ func (f *fsm) createValidatorsUptimeTx() (*types.Transaction, error) {
 }
 
 // ValidateCommit is used to validate that a given commit is valid
-func (f *fsm) ValidateCommit(from string, seal []byte) error {
+func (f *fsm) ValidateCommit(from types.Address, seal []byte, proposalHash []byte) error {
 	if f.proposal == nil || f.proposal.Hash == nil {
 		return fmt.Errorf("incorrect commit from %s. proposal unavailable", from)
 	}
 
-	fromAddress := types.Address(ethgo.HexToAddress(from))
-	validator := f.validators.Accounts().GetValidatorAccount(fromAddress)
+	if bytes.Equal(f.proposal.Hash, proposalHash) {
+		return fmt.Errorf("incorrect prposal hash submitted via consensus engine from %s. proposal unavailable", from)
+	}
+
+	validator := f.validators.Accounts().GetValidatorAccount(from)
 
 	if validator == nil {
 		return fmt.Errorf("unable to resolve validator %s", from)
@@ -492,11 +496,6 @@ func (f *fsm) Height() uint64 {
 // ValidatorSet returns the validator set for the current round
 func (f *fsm) ValidatorSet() ValidatorSet {
 	return f.validators
-}
-
-// IsStuck returns whether the pbft is stuck
-func (f *fsm) IsStuck(num uint64) (uint64, bool) {
-	return f.polybftBackend.CheckIfStuck(num)
 }
 
 // getValidatorSetDelta calculates validator set delta based on parent and current header

@@ -160,8 +160,8 @@ func (cr *consensusRuntime) AddLog(eventLog *ethgo.Log) {
 }
 
 // NotifyProposalInserted is an implementation of fsmNotify interface
-func (cr *consensusRuntime) NotifyProposalInserted(b *StateBlock) {
-	lastHeader := b.Block.Header
+func (cr *consensusRuntime) NotifyProposalInserted(b *types.Block) {
+	lastHeader := b.Header
 	if cr.isEndOfEpoch(lastHeader.Number) {
 		// reset the epoch. Internally it updates the parent block header.
 		if err := cr.restartEpoch(lastHeader); err != nil {
@@ -199,7 +199,7 @@ func (cr *consensusRuntime) populateFsmIfBridgeEnabled(
 			}
 		}
 
-		cr.NotifyProposalInserted(ff.block)
+		cr.NotifyProposalInserted(ff.block.Block)
 
 		return nil
 	}
@@ -251,20 +251,20 @@ func (cr *consensusRuntime) populateFsmIfBridgeEnabled(
 }
 
 // FSM creates a new instance of fsm
-func (cr *consensusRuntime) FSM() (*fsm, error) {
+func (cr *consensusRuntime) FSM() error {
 	// figure out the parent. At this point this peer has done its best to sync up
 	// to the head of their remote peers.
 	parent := cr.lastBuiltBlock
 	epoch := cr.getEpoch()
 
 	if !epoch.Validators.ContainsNodeID(cr.config.Key.NodeID()) {
-		return nil, errNotAValidator
+		return errNotAValidator
 	}
 
 	blockBuilder, err := cr.config.blockchain.NewBlockBuilder(
 		parent, types.Address(cr.config.Key.Address()), cr.config.txPool, cr.config.PolyBFTConfig.BlockTime, cr.logger)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	pendingBlockNumber := cr.getPendingBlockNumber()
@@ -286,11 +286,11 @@ func (cr *consensusRuntime) FSM() (*fsm, error) {
 	if cr.IsBridgeEnabled() {
 		err := cr.populateFsmIfBridgeEnabled(ff, epoch, isEndOfEpoch, isEndOfSprint)
 		if err != nil {
-			return nil, err
+			return err
 		}
 	} else {
 		ff.postInsertHook = func() error {
-			cr.NotifyProposalInserted(ff.block)
+			cr.NotifyProposalInserted(ff.block.Block)
 
 			return nil
 		}
@@ -299,7 +299,7 @@ func (cr *consensusRuntime) FSM() (*fsm, error) {
 	if isEndOfEpoch {
 		ff.uptimeCounter, err = cr.calculateUptime(parent)
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
 
@@ -309,7 +309,9 @@ func (cr *consensusRuntime) FSM() (*fsm, error) {
 		"endOfSprint", isEndOfSprint,
 	)
 
-	return ff, nil
+	cr.fsm = ff
+
+	return nil
 }
 
 // restartEpoch resets the previously run epoch and moves to the next one
@@ -793,52 +795,6 @@ func (cr *consensusRuntime) getSystemState(header *types.Header) (SystemState, e
 	return cr.config.blockchain.GetSystemState(cr.config.PolyBFTConfig, provider), nil
 }
 
-// isEndOfPeriod checks if an end of a period (either it be sprint or epoch)
-// is reached with the current block (the parent block of the current fsm iteration)
-func isEndOfPeriod(blockNumber, periodSize uint64) bool {
-	return blockNumber%periodSize == 0
-}
-
-// getQuorumSize returns result of division of given number by two,
-// but rounded to next integer value (similar to math.Ceil function).
-func getQuorumSize(validatorsCount int) int {
-	return (validatorsCount + 1) / 2
-}
-
-// calculateFirstBlockOfPeriod calculates the first block of a period
-func calculateFirstBlockOfPeriod(currentBlockNumber, periodSize uint64) uint64 {
-	if currentBlockNumber <= periodSize {
-		return 1 // it's the first epoch
-	}
-
-	switch currentBlockNumber % periodSize {
-	case 1:
-		return currentBlockNumber
-	case 0:
-		return currentBlockNumber - periodSize + 1
-	default:
-		return currentBlockNumber - (currentBlockNumber % periodSize) + 1
-	}
-}
-
-// getEpochNumber returns epoch number for given blockNumber and epochSize.
-// Epoch number is derived as a result of division of block number and epoch size.
-// Since epoch number is 1-based (0 block represents special case zero epoch),
-// we are incrementing result by one for non epoch-ending blocks.
-func getEpochNumber(blockNumber, epochSize uint64) uint64 {
-	if isEndOfPeriod(blockNumber, epochSize) {
-		return blockNumber / epochSize
-	}
-
-	return blockNumber/epochSize + 1
-}
-
-// getEndEpochBlockNumber returns block number which corresponds
-// to the one at the beginning of the given epoch with regards to epochSize
-func getEndEpochBlockNumber(epoch, epochSize uint64) uint64 {
-	return epoch * epochSize
-}
-
 // getCommitmentToRegister gets commitments to register via state transaction
 func (cr *consensusRuntime) getCommitmentToRegister(epoch *epochMetadata,
 	registerCommitmentIndex uint64) (*CommitmentMessageSigned, error) {
@@ -897,7 +853,9 @@ func (cr *consensusRuntime) IsValidSender(msg *proto.Message) bool {
 
 // IsProposer checks if the passed in ID is the Proposer for current view (sequence, round)
 func (cr *consensusRuntime) IsProposer(id []byte, height, round uint64) bool {
-	panic("not implemented")
+	nextProposer := cr.fsm.validators.CalcProposer(round)
+
+	return types.BytesToAddress(id) == types.StringToAddress(nextProposer)
 }
 
 // IsValidProposalHash checks if the hash matches the proposal
@@ -915,23 +873,109 @@ func (cr *consensusRuntime) IsValidProposalHash(proposal, hash []byte) bool {
 }
 
 // IsValidCommittedSeal checks if the seal for the proposal is valid
-func (cr *consensusRuntime) IsValidCommittedSeal(proposal []byte, committedSeal *messages.CommittedSeal) bool {
-	// todo needs fsm
-	//  polybft.fsm.ValidateCommit
-	panic("not implemented")
+func (cr *consensusRuntime) IsValidCommittedSeal(proposalHash []byte, committedSeal *messages.CommittedSeal) bool {
+	from := types.BytesToAddress(committedSeal.Signer)
+	err := cr.fsm.ValidateCommit(from, committedSeal.Signature, proposalHash)
+
+	if err != nil {
+		cr.logger.Info(
+			"Invalid committed seal",
+			"err", err,
+		)
+
+		return false
+	}
+
+	return true
 }
 
 // Implementation of core.Backend
 // ====
 func (cr *consensusRuntime) BuildProposal(blockNumber uint64) []byte {
-	// 	 todo needs fsm
-	// 	  polybft.fsm.BuildProposal
-	panic("not implemented")
+	if cr.lastBuiltBlock.Number+1 != blockNumber {
+		cr.logger.Error(
+			"unable to build block, due to lack of parent block",
+			"num",
+			cr.lastBuiltBlock.Number,
+		)
+
+		return nil
+	}
+
+	prposal, err := cr.fsm.BuildProposal()
+
+	if err != nil {
+		cr.logger.Info(
+			"Unable to create porposal",
+			"blockNumber", blockNumber,
+			"err", err,
+		)
+
+		return nil
+	}
+
+	return prposal.Data
 }
 
 func (cr *consensusRuntime) InsertBlock(proposal []byte, committedSeals []*messages.CommittedSeal) {
-	// 	 todo needs fsm
-	// 	  polybft.fsm.Insert
+
+	// newBlock := &types.Block{}
+	// if err := newBlock.UnmarshalRLP(proposal); err != nil {
+	// 	cr.logger.Error("cannot unmarshal proposal", "err", err)
+
+	// 	return
+	// }
+
+	// committedSealsMap := make(map[types.Address][]byte, len(committedSeals))
+
+	// for _, cm := range committedSeals {
+	// 	committedSealsMap[types.BytesToAddress(cm.Signer)] = cm.Signature
+	// }
+
+	// // Push the committed seals to the header
+	// header, err := i.currentSigner.WriteCommittedSeals(newBlock.Header, committedSealsMap)
+	// if err != nil {
+	// 	i.logger.Error("cannot write committed seals", "err", err)
+
+	// 	return
+	// }
+
+	// newBlock.Header = header
+
+	// // Save the block locally
+	// if err := i.blockchain.WriteBlock(newBlock, "consensus"); err != nil {
+	// 	i.logger.Error("cannot write block", "err", err)
+
+	// 	return
+	// }
+
+	// i.updateMetrics(newBlock)
+
+	// i.logger.Info(
+	// 	"block committed",
+	// 	"number", newBlock.Number(),
+	// 	"hash", newBlock.Hash(),
+	// 	"validation_type", i.currentSigner.Type(),
+	// 	"validators", i.currentValidators.Len(),
+	// 	"committed", len(committedSeals),
+	// )
+
+	// if err := i.currentHooks.PostInsertBlock(newBlock); err != nil {
+	// 	i.logger.Error(
+	// 		"failed to call PostInsertBlock hook",
+	// 		"height", newBlock.Number(),
+	// 		"hash", newBlock.Hash(),
+	// 		"err", err,
+	// 	)
+
+	// 	return
+	// }
+
+	// // after the block has been written we reset the txpool so that
+	// // the old transactions are removed
+	// i.txpool.ResetWithHeaders(newBlock.Header)
+
+	// cr.fsm.Insert()
 	panic("not implemented")
 }
 
@@ -944,5 +988,5 @@ func (cr *consensusRuntime) MaximumFaultyNodes() uint64 {
 }
 
 func (cr *consensusRuntime) Quorum(validatorsCount uint64) uint64 {
-	return (validatorsCount + 1) / 2
+	return uint64(getQuorumSize(int(validatorsCount)))
 }

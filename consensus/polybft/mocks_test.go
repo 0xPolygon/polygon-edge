@@ -120,24 +120,6 @@ type polybftBackendMock struct {
 	mock.Mock
 }
 
-// CheckIfStuck checks if state machine is stuck.
-func (p *polybftBackendMock) CheckIfStuck(num uint64) (uint64, bool) {
-	args := p.Called(num)
-
-	if len(args) == 2 {
-		return args.Get(0).(uint64), args.Bool(1) //nolint:forcetypeassert
-	} else if len(args) == 1 {
-		peerHeight, ok := args.Get(0).(uint64)
-		if ok {
-			return peerHeight, num < peerHeight
-		}
-
-		return 0, args.Bool(0)
-	}
-
-	return 0, false
-}
-
 // GetValidators retrieves validator set for the given block
 func (p *polybftBackendMock) GetValidators(blockNumber uint64, parents []*types.Header) (AccountSet, error) {
 	args := p.Called(blockNumber, parents)

@@ -32,9 +32,6 @@ const (
 
 // polybftBackend is an interface defining polybft methods needed by fsm and sync tracker
 type polybftBackend interface {
-	// CheckIfStuck checks if state machine is stuck.
-	CheckIfStuck(num uint64) (uint64, bool)
-
 	// GetValidators retrieves validator set for the given block
 	GetValidators(blockNumber uint64, parents []*types.Header) (AccountSet, error)
 }
@@ -240,7 +237,7 @@ func (p *Polybft) startSyncing() error {
 			// TODO: rename NotifyProposalInserted
 			// parameter should we header and not StateBlock also
 			// txpool.ResetWithHeaders(b.Header) should be called
-			p.runtime.NotifyProposalInserted(&StateBlock{Block: b})
+			p.runtime.NotifyProposalInserted(b)
 
 			return false
 		}
@@ -347,7 +344,7 @@ func (p *Polybft) startPbftProcess() {
 		p.config.TxPool.SetSealing(isValidator) // update tx pool
 
 		if isValidator {
-			_, err := p.runtime.FSM() // Nemanja: what to do if it is an error
+			err = p.runtime.FSM() // initialze fsm as a stateless ibft backet via runtime as an adapter
 			if err != nil {
 				p.logger.Error("failed to create fsm", "block number", latest, "error", err)
 
@@ -495,26 +492,6 @@ func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, parents []*type
 	}
 
 	return nil
-}
-
-func (p *Polybft) CheckIfStuck(num uint64) (uint64, bool) {
-	if !p.isSynced() {
-		// we are currently syncing new data, for sure we are stuck.
-		// We can return 0 here at least for now since that value is only used
-		// for the open telemetry tracing.
-		return 0, true
-	}
-
-	// Now, we have to check if the current value of the round 'num' is lower
-	// than our currently synced block.
-	currentHeader := p.blockchain.CurrentHeader().Number
-	if currentHeader > num {
-		// at this point, it will exit the sync process and start the fsm round again
-		// (or sync a small number of blocks) to start from the correct position.
-		return currentHeader, true
-	}
-
-	return 0, false
 }
 
 func (p *Polybft) GetValidators(blockNumber uint64, parents []*types.Header) (AccountSet, error) {

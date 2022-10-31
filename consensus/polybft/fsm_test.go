@@ -1,5 +1,6 @@
 package polybft
 
+/*
 import (
 	"errors"
 	"fmt"
@@ -967,29 +968,6 @@ func TestFSM_Height(t *testing.T) {
 	assert.Equal(t, parentNumber+1, fsm.Height())
 }
 
-func TestFSM_IsStuck(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		localBlockNumber uint64
-		peerBlockNumber  uint64
-		expectedStuck    bool
-	}{
-		{localBlockNumber: 3, peerBlockNumber: 32, expectedStuck: true},
-		{localBlockNumber: 70, peerBlockNumber: 67, expectedStuck: false},
-	}
-	for _, c := range cases {
-		polybftBackendMock := new(polybftBackendMock)
-		polybftBackendMock.On("CheckIfStuck", mock.Anything).Return(c.peerBlockNumber).Once()
-
-		fsm := &fsm{polybftBackend: polybftBackendMock}
-		remoteBlockNumber, isStuck := fsm.IsStuck(c.localBlockNumber)
-		assert.Equal(t, c.peerBlockNumber, remoteBlockNumber)
-		assert.Equal(t, c.expectedStuck, isStuck)
-		polybftBackendMock.AssertExpectations(t)
-	}
-}
-
 func TestFSM_StateTransactionsEndOfSprint(t *testing.T) {
 	t.Parallel()
 
@@ -1637,3 +1615,4 @@ func createTestUptimeCounter(t *testing.T, validatorSet AccountSet, epochSize ui
 
 	return commitEpoch
 }
+*/
