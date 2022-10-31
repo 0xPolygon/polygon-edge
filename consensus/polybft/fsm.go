@@ -324,7 +324,7 @@ func (f *fsm) Validate(proposal *pbft.Proposal) error {
 
 	checkpointHash, err := extra.Checkpoint.Hash(f.backend.GetChainID(), block.Number(), block.Hash())
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to calculate sign hash: %w", err)
 	}
 
 	// validate proposal
@@ -364,7 +364,7 @@ func (f *fsm) Validate(proposal *pbft.Proposal) error {
 
 		parentCheckpointHash, err := parentExtra.Checkpoint.Hash(f.backend.GetChainID(), f.parent.Number, f.parent.Hash)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to calculate parent block sign hash: %w", err)
 		}
 
 		if err := blockExtra.Parent.VerifyCommittedFields(validators, parentCheckpointHash); err != nil {
