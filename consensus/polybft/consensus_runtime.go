@@ -150,7 +150,7 @@ func (c *consensusRuntime) AddLog(eventLog *ethgo.Log) {
 		"index", eventLog.LogIndex,
 	)
 
-	event, err := decodeEvent(eventLog)
+	event, err := decodeStateSyncEvent(eventLog)
 	if err != nil {
 		c.logger.Error("failed to decode state sync event", "hash", eventLog.TransactionHash, "err", err)
 
@@ -281,15 +281,16 @@ func (c *consensusRuntime) FSM() (*fsm, error) {
 	isEndOfEpoch := c.isEndOfEpoch(pendingBlockNumber)
 
 	ff := &fsm{
-		config:         c.config.PolyBFTConfig,
-		parent:         parent,
-		backend:        c.config.blockchain,
-		polybftBackend: c.config.polybftBackend,
-		blockBuilder:   blockBuilder,
-		validators:     newValidatorSet(types.BytesToAddress(parent.Miner), epoch.Validators),
-		isEndOfEpoch:   isEndOfEpoch,
-		isEndOfSprint:  isEndOfSprint,
-		logger:         c.logger.Named("fsm"),
+		config:            c.config.PolyBFTConfig,
+		parent:            parent,
+		backend:           c.config.blockchain,
+		polybftBackend:    c.config.polybftBackend,
+		blockBuilder:      blockBuilder,
+		validators:        newValidatorSet(types.BytesToAddress(parent.Miner), epoch.Validators),
+		isEndOfEpoch:      isEndOfEpoch,
+		isEndOfSprint:     isEndOfSprint,
+		generateEventRoot: c.getExitEventRootHash,
+		logger:            c.logger.Named("fsm"),
 	}
 
 	if c.IsBridgeEnabled() {
@@ -760,6 +761,50 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header) (*CommitE
 	return commitEpoch, nil
 }
 
+// getExitEventRootHash returns the exit event root hash from gathered exit events in given epoch
+func (c *consensusRuntime) getExitEventRootHash(epoch uint64) (types.Hash, error) {
+	exitEvents, err := c.state.getExitEventsByEpoch(epoch)
+	if err != nil {
+		return types.ZeroHash, err
+	}
+
+	if len(exitEvents) == 0 {
+		return types.ZeroHash, nil
+	}
+
+	tree, err := createExitTree(exitEvents)
+	if err != nil {
+		return types.ZeroHash, err
+	}
+
+	return tree.Hash(), nil
+}
+
+// GenerateExitProof generates proof of exit
+func (c *consensusRuntime) GenerateExitProof(exitID, epoch, checkpointBlock uint64) ([]types.Hash, error) {
+	exitEvent, err := c.state.getExitEvent(exitID, epoch, checkpointBlock)
+	if err != nil {
+		return nil, err
+	}
+
+	e, err := exitEventABIType.Encode(exitEvent)
+	if err != nil {
+		return nil, err
+	}
+
+	exitEvents, err := c.state.getExitEventsForProof(epoch, checkpointBlock)
+	if err != nil {
+		return nil, err
+	}
+
+	tree, err := createExitTree(exitEvents)
+	if err != nil {
+		return nil, err
+	}
+
+	return tree.GenerateProofForLeaf(e, 0)
+}
+
 // setIsActiveValidator updates the activeValidatorFlag field
 func (c *consensusRuntime) setIsActiveValidator(isActiveValidator bool) {
 	if isActiveValidator {
@@ -888,4 +933,21 @@ func validateVote(vote *MessageSignature, epoch *epochMetadata) error {
 	}
 
 	return nil
+}
+
+// createExitTree creates an exit event merkle tree from provided exit events
+func createExitTree(exitEvents []*ExitEvent) (*MerkleTree, error) {
+	numOfEvents := len(exitEvents)
+	data := make([][]byte, numOfEvents)
+
+	for i := 0; i < numOfEvents; i++ {
+		b, err := exitEventABIType.Encode(exitEvents[i])
+		if err != nil {
+			return nil, err
+		}
+
+		data[i] = b
+	}
+
+	return NewMerkleTree(data)
 }

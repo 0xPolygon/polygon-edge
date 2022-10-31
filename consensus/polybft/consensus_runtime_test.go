@@ -150,7 +150,7 @@ func TestConsensusRuntime_AddLog(t *testing.T) {
 		config: &runtimeConfig{Key: createTestKey(t)},
 	}
 	topics := make([]ethgo.Hash, 4)
-	topics[0] = stateTransferEvent.ID()
+	topics[0] = stateTransferEventABI.ID()
 	topics[1] = ethgo.BytesToHash([]byte{0x1})
 	topics[2] = ethgo.BytesToHash(runtime.config.Key.Address().Bytes())
 	topics[3] = ethgo.BytesToHash(contracts.NativeTokenContract[:])
@@ -167,7 +167,7 @@ func TestConsensusRuntime_AddLog(t *testing.T) {
 		Topics:          topics,
 		Data:            encodedData,
 	}
-	event, err := decodeEvent(log)
+	event, err := decodeStateSyncEvent(log)
 	require.NoError(t, err)
 	runtime.AddLog(log)
 
@@ -534,6 +534,8 @@ func TestConsensusRuntime_FSM_NotInValidatorSet(t *testing.T) {
 func TestConsensusRuntime_FSM_NotEndOfEpoch_NotEndOfSprint(t *testing.T) {
 	t.Parallel()
 
+	state := newTestState(t)
+
 	lastBlock := &types.Header{Number: 1}
 	validators := newTestValidators(3)
 	blockchainMock := new(blockchainMock)
@@ -555,6 +557,7 @@ func TestConsensusRuntime_FSM_NotEndOfEpoch_NotEndOfSprint(t *testing.T) {
 			Validators: validators.getPublicIdentities(),
 		},
 		lastBuiltBlock: lastBlock,
+		state:          state,
 	}
 
 	fsm, err := runtime.FSM()
@@ -1637,6 +1640,100 @@ func TestConsensusRuntime_FSM_EndOfEpoch_PostHook(t *testing.T) {
 
 	systemStateMock.AssertExpectations(t)
 	blockchainMock.AssertExpectations(t)
+}
+
+func TestConsensusRuntime_getExitEventRootHash(t *testing.T) {
+	const (
+		numOfBlocks         = 10
+		numOfEventsPerBlock = 2
+	)
+
+	state := newTestState(t)
+	runtime := &consensusRuntime{
+		state: state,
+	}
+
+	encodedEvents := setupExitEventsForProofVerification(t, state, numOfBlocks, numOfEventsPerBlock)
+
+	t.Run("Get exit event root hash", func(t *testing.T) {
+		tree, err := NewMerkleTree(encodedEvents)
+		require.NoError(t, err)
+
+		hash, err := runtime.getExitEventRootHash(1)
+		require.NoError(t, err)
+		require.Equal(t, tree.Hash(), hash)
+	})
+
+	t.Run("Get exit event root hash - no events", func(t *testing.T) {
+		hash, err := runtime.getExitEventRootHash(2)
+		require.NoError(t, err)
+		require.Equal(t, types.Hash{}, hash)
+	})
+}
+
+func TestConsensusRuntime_GenerateExitProof(t *testing.T) {
+	const (
+		numOfBlocks         = 10
+		numOfEventsPerBlock = 2
+	)
+
+	state := newTestState(t)
+	runtime := &consensusRuntime{
+		state: state,
+	}
+
+	encodedEvents := setupExitEventsForProofVerification(t, state, numOfBlocks, numOfEventsPerBlock)
+	checkpointEvents := encodedEvents[:numOfEventsPerBlock]
+
+	// manually create merkle tree for a desired checkpoint to verify the generated proof
+	tree, err := NewMerkleTree(checkpointEvents)
+	require.NoError(t, err)
+
+	proof, err := runtime.GenerateExitProof(1, 1, 1)
+	require.NoError(t, err)
+	require.NotNil(t, proof)
+
+	t.Run("Generate and validate exit proof", func(t *testing.T) {
+		// verify generated proof on desired tree
+		require.NoError(t, VerifyProof(1, encodedEvents[1], proof, tree.Hash()))
+	})
+
+	t.Run("Generate and validate exit proof - invalid proof", func(t *testing.T) {
+		invalidProof := proof
+		invalidProof[0][0]++
+
+		// verify generated proof on desired tree
+		require.ErrorContains(t, VerifyProof(1, encodedEvents[1], invalidProof, tree.Hash()), "not a member of merkle tree")
+	})
+
+	t.Run("Generate exit proof - no event", func(t *testing.T) {
+		_, err := runtime.GenerateExitProof(21, 1, 1)
+		require.ErrorContains(t, err, "could not find any exit event that has an id")
+	})
+}
+
+func setupExitEventsForProofVerification(t *testing.T, state *State,
+	numOfBlocks, numOfEventsPerBlock uint64) [][]byte {
+	t.Helper()
+
+	encodedEvents := make([][]byte, numOfBlocks*numOfEventsPerBlock)
+	index := uint64(0)
+
+	for i := uint64(1); i <= numOfBlocks; i++ {
+		for j := uint64(1); j <= numOfEventsPerBlock; j++ {
+			e := &ExitEvent{index, ethgo.ZeroAddress, ethgo.ZeroAddress, []byte{0, 1}, 1, i}
+			require.NoError(t, state.insertExitEvent(e))
+
+			b, err := exitEventABIType.Encode(e)
+
+			require.NoError(t, err)
+
+			encodedEvents[index] = b
+			index++
+		}
+	}
+
+	return encodedEvents
 }
 
 func createTestTransportMessage(t *testing.T, hash []byte, epochNumber uint64, key *wallet.Key) *TransportMessage {

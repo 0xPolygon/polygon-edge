@@ -446,6 +446,7 @@ type jsonRPCHub struct {
 	*state.Executor
 	*network.Server
 	consensus.Consensus
+	consensus.BridgeDataProvider
 }
 
 // HELPER + WRAPPER METHODS //
@@ -563,6 +564,7 @@ func (s *Server) setupJSONRPC() error {
 		Executor:           s.executor,
 		Consensus:          s.consensus,
 		Server:             s.network,
+		BridgeDataProvider: s.consensus.GetBridgeProvider(),
 	}
 
 	conf := &jsonrpc.Config{

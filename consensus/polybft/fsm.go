@@ -85,6 +85,9 @@ type fsm struct {
 	// stateSyncExecutionIndex is the next state sync execution index in smart contract
 	stateSyncExecutionIndex uint64
 
+	// generateEventRoot returns the root hash of exit event tree
+	generateEventRoot func(epoch uint64) (types.Hash, error)
+
 	logger hcf.Logger // The logger object
 }
 
@@ -157,6 +160,8 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 	if headerTime.Before(time.Now()) {
 		headerTime = time.Now()
 	}
+
+	// TODO - Here we will call f.generateEventRootFunc(epoch) to get the exit root after adding transactions
 
 	stateBlock, err := f.blockBuilder.Build(func(h *types.Header) {
 		h.Timestamp = uint64(headerTime.Unix())

@@ -242,3 +242,7 @@ func (d *Dev) Close() error {
 
 	return nil
 }
+
+func (d *Dev) GetBridgeProvider() consensus.BridgeDataProvider {
+	return nil
+}
