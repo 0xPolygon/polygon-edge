@@ -12,6 +12,8 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
+var errLeafNotFound = errors.New("leaf not found")
+
 // MerkleTree is the structure for the Merkle tree.
 type MerkleTree struct {
 	// hasher is a pointer to the hashing struct (e.g., Keccak256)
@@ -65,6 +67,17 @@ func NewMerkleTreeWithHashing(data [][]byte, hash hash.Hash) (*MerkleTree, error
 	return tree, nil
 }
 
+// LeafIndex returns the index of given leaf if found in tree
+func (t *MerkleTree) LeafIndex(leaf []byte) (uint64, error) {
+	for i, d := range t.data {
+		if bytes.Equal(d, leaf) {
+			return uint64(i), nil
+		}
+	}
+
+	return 0, errLeafNotFound
+}
+
 // Hash is the Merkle Tree root hash
 func (t *MerkleTree) Hash() types.Hash {
 	return types.BytesToHash(t.nodes[1])
@@ -76,7 +89,6 @@ func (t *MerkleTree) String() string {
 }
 
 // GenerateProof generates the proof of membership for a piece of data in the Merkle tree.
-// If the data is not present in the tree this will return an error.
 func (t *MerkleTree) GenerateProof(index uint64, height int) []types.Hash {
 	proofLen := int(math.Ceil(math.Log2(float64(len(t.data))))) - height
 	proofHashes := make([]types.Hash, proofLen)
@@ -90,6 +102,17 @@ func (t *MerkleTree) GenerateProof(index uint64, height int) []types.Hash {
 	}
 
 	return proofHashes
+}
+
+// GenerateProofForLeaf generates the proof of membership for a piece of data in the Merkle tree.
+// If the data is not present in the tree this will return an error
+func (t *MerkleTree) GenerateProofForLeaf(leaf []byte, height int) ([]types.Hash, error) {
+	leafIndex, err := t.LeafIndex(leaf)
+	if err != nil {
+		return nil, err
+	}
+
+	return t.GenerateProof(leafIndex, height), nil
 }
 
 // VerifyProof verifies a Merkle tree proof of membership for provided data using the default hash type (Keccak256)

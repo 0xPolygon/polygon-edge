@@ -529,6 +529,11 @@ func (i *backendIBFT) SetHeaderHash() {
 	}
 }
 
+// GetBridgeProvider returns an instance of BridgeDataProvider
+func (i *backendIBFT) GetBridgeProvider() consensus.BridgeDataProvider {
+	return nil
+}
+
 // updateCurrentModules updates Signer, Hooks, and Validators
 // that are used at specified height
 // by fetching from ForkManager

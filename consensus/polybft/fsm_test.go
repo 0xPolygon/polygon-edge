@@ -1559,7 +1559,7 @@ func createTestCommitment(t *testing.T, accounts []*wallet.Account) *CommitmentM
 			uint64(i),
 			accounts[i].Ecdsa.Address(),
 			accounts[0].Ecdsa.Address(),
-			[]byte{}, nil,
+			[]byte{},
 		)
 
 		bitmap.Set(uint64(i))
