@@ -942,7 +942,55 @@ func (cr *consensusRuntime) IsValidBlock(proposal []byte) bool {
 
 // IsValidSender checks if signature is from sender
 func (cr *consensusRuntime) IsValidSender(msg *proto.Message) bool {
-	panic("not implemented")
+	_, err := msg.PayloadNoSig() // msgNoSig
+	if err != nil {
+		return false
+	}
+
+	// TODO handle EcrecoverFromIBFTMessage
+
+	// signerAddress, err := cr.currentSigner.EcrecoverFromIBFTMessage(
+	// 	msg.Signature,
+	// 	msgNoSig,
+	// )
+
+	if err != nil {
+		cr.logger.Error("failed to ecrecover message", "err", err)
+
+		return false
+	}
+
+	var signerAddress types.Address
+
+	// verify the signature came from the sender
+	if !bytes.Equal(msg.From, signerAddress.Bytes()) {
+		cr.logger.Error(
+			"signer address doesn't match with From",
+			"from", hex.EncodeToString(msg.From),
+			"signer", signerAddress,
+			"err", err,
+		)
+
+		return false
+	}
+
+	// TODO do we need this?
+	// validators, err := cr.forkManager.GetValidators(msg.View.Height)
+	// if err != nil {
+	// 	return false
+	// }
+
+	// verify the sender is in the active validator set
+	if !cr.epoch.Validators.ContainsNodeID(signerAddress.String()) {
+		cr.logger.Error(
+			"signer address doesn't included in validators",
+			"signer", signerAddress,
+		)
+
+		return false
+	}
+
+	return true
 }
 
 // IsProposer checks if the passed in ID is the Proposer for current view (sequence, round)
