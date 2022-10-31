@@ -1761,6 +1761,8 @@ func TestConsensusRuntime_isCheckpointBlock(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+
 			runtime, err := newConsensusRuntime(hclog.NewNullLogger(), config)
 			require.NoError(t, err)
 			runtime.lastBuiltBlock = &types.Header{Number: c.blockNumber}

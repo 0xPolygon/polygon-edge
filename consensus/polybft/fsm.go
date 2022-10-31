@@ -58,8 +58,8 @@ type fsm struct {
 	// proposal is the current proposal being processed
 	proposal *pbft.Proposal
 
-	// blockRound represents the current round from the consensus engine
-	blockRound uint64
+	// roundInfo represents the current round information, which is retrieved by the consensus engine
+	roundInfo *pbft.RoundInfo
 
 	// epochNumber denotes current epoch number
 	epochNumber uint64
@@ -106,7 +106,7 @@ func (f *fsm) Init(info *pbft.RoundInfo) {
 		panic(err) // TODO: handle differently
 	}
 
-	f.blockRound = info.CurrentRound
+	f.roundInfo = info
 	f.commitmentToSaveOnRegister = nil
 }
 
@@ -194,7 +194,7 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 	}
 
 	extra.Checkpoint = &CheckpointData{
-		BlockRound:            f.blockRound,
+		BlockRound:            f.roundInfo.CurrentRound,
 		EpochNumber:           f.epochNumber,
 		CurrentValidatorsHash: currentValidatorsHash,
 		NextValidatorsHash:    nextValidatorsHash,

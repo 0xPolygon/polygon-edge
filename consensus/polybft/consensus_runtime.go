@@ -224,6 +224,14 @@ func (c *consensusRuntime) populateFsmIfBridgeEnabled(
 			}
 		}
 
+		if c.isCheckpointBlock() && ff.roundInfo.IsProposer {
+			// TODO: submit checkpoint here
+			// err := submitCheckpoint()
+			// if err != nil {
+			// 	return err
+			// }
+		}
+
 		c.NotifyProposalInserted(ff.block)
 
 		return nil
@@ -287,7 +295,8 @@ func (c *consensusRuntime) FSM() (*fsm, error) {
 	}
 
 	blockBuilder, err := c.config.blockchain.NewBlockBuilder(
-		parent, types.Address(c.config.Key.Address()), c.config.txPool, c.config.PolyBFTConfig.BlockTime, c.logger)
+		parent, types.Address(c.config.Key.Address()), c.config.txPool,
+		c.config.PolyBFTConfig.BlockTime, c.logger)
 	if err != nil {
 		return nil, err
 	}
@@ -418,11 +427,6 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) error {
 	c.lock.Lock()
 	c.epoch = epoch
 	c.lock.Unlock()
-
-	err = c.runCheckpoint(epoch)
-	if err != nil {
-		return fmt.Errorf("could not run checkpoint:%w", err)
-	}
 
 	c.logger.Info("restartEpoch", "block number", header.Number, "epoch", epochNumber, "validators", validatorSet)
 
@@ -652,11 +656,6 @@ func (c *consensusRuntime) deliverMessage(msg *TransportMessage) (bool, error) {
 	)
 
 	return true, nil
-}
-
-func (c *consensusRuntime) runCheckpoint(epoch *epochMetadata) error {
-	// TODO: Implement checkpoint
-	return nil
 }
 
 // isCheckpointBlock returns indication whether given block is the checkpoint block.
