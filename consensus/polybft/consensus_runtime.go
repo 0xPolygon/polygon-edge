@@ -120,6 +120,9 @@ type consensusRuntime struct {
 	// checkpointsOffset represents offset between checkpoint blocks (applicable only for non-epoch ending blocks)
 	checkpointsOffset uint64
 
+	// checkpointManager represents abstraction for checkpoint submission
+	checkpointManager *checkpointManager
+
 	// logger instance
 	logger hcf.Logger
 }
@@ -138,6 +141,14 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 		err := runtime.startEventTracker()
 		if err != nil {
 			return nil, err
+		}
+
+		runtime.checkpointManager = &checkpointManager{
+			sender:           types.Address(config.Key.Address()),
+			blockchain:       config.blockchain,
+			rootchain:        &defaultRootchainInteractor{},
+			consensusBackend: config.polybftBackend,
+			epochSize:        config.PolyBFTConfig.EpochSize,
 		}
 	}
 
@@ -185,16 +196,15 @@ func (c *consensusRuntime) AddLog(eventLog *ethgo.Log) {
 }
 
 // NotifyProposalInserted is an implementation of fsmNotify interface
-func (c *consensusRuntime) NotifyProposalInserted(b *StateBlock) {
-	lastHeader := b.Block.Header
-	if c.isEndOfEpoch(lastHeader.Number) {
+func (c *consensusRuntime) NotifyProposalInserted(header *types.Header) {
+	if c.isEndOfEpoch(header.Number) {
 		// reset the epoch. Internally it updates the parent block header.
-		if err := c.restartEpoch(lastHeader); err != nil {
+		if err := c.restartEpoch(header); err != nil {
 			c.logger.Error("failed to restart epoch after block inserted", "err", err)
 		}
 	} else {
 		// inside the epoch, update last built block header
-		c.lastBuiltBlock = lastHeader
+		c.lastBuiltBlock = header
 	}
 }
 
@@ -224,15 +234,16 @@ func (c *consensusRuntime) populateFsmIfBridgeEnabled(
 			}
 		}
 
-		if c.isCheckpointBlock() && ff.roundInfo.IsProposer {
-			// TODO: submit checkpoint here
-			// err := submitCheckpoint()
-			// if err != nil {
-			// 	return err
-			// }
+		if c.isCheckpointBlock(ff.block.Block.Number()) && ff.roundInfo.IsProposer {
+			go func(header types.Header, epochNumber uint64) {
+				err := c.checkpointManager.submitCheckpoint(header, epochNumber)
+				if err != nil {
+					c.logger.Warn("failed to submit checkpoint", "epoch number", epochNumber, "error", err)
+				}
+			}(*ff.block.Block.Header, ff.epochNumber)
 		}
 
-		c.NotifyProposalInserted(ff.block)
+		c.NotifyProposalInserted(ff.block.Block.Header)
 
 		return nil
 	}
@@ -326,7 +337,7 @@ func (c *consensusRuntime) FSM() (*fsm, error) {
 		}
 	} else {
 		ff.postInsertHook = func() error {
-			c.NotifyProposalInserted(ff.block)
+			c.NotifyProposalInserted(ff.block.Block.Header)
 
 			return nil
 		}
@@ -370,24 +381,6 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) error {
 			return nil
 		}
 	}
-
-	/*
-		// We will uncomment this once we have the clear PoC for the checkpoint
-		lastCheckpoint := uint64(0)
-
-		// get the blocks that should be signed for this checkpoint period
-		blocks := []*types.Block{}
-
-		epochSize := c.config.Config.PolyBFT.Epoch
-		for i := lastCheckpoint * epochSize; i < epoch*epochSize; i++ {
-			block := c.config.Blockchain.GetBlockByNumber(i)
-			if block == nil {
-				panic("block not found")
-			} else {
-				blocks = append(blocks, block)
-			}
-		}
-	*/
 
 	validatorSet, err := c.config.polybftBackend.GetValidators(c.lastBuiltBlock.Number, nil)
 	if err != nil {
@@ -661,11 +654,9 @@ func (c *consensusRuntime) deliverMessage(msg *TransportMessage) (bool, error) {
 // isCheckpointBlock returns indication whether given block is the checkpoint block.
 // Returns true for either epoch ending block or
 // at each N blocks, where N is calculated as division between predefined checkpoint interval and block time
-func (c *consensusRuntime) isCheckpointBlock() bool {
-	pendingBlockNumber := c.getPendingBlockNumber()
-
-	return c.isEndOfEpoch(pendingBlockNumber) ||
-		pendingBlockNumber%c.checkpointsOffset == 0
+func (c *consensusRuntime) isCheckpointBlock(blockNumber uint64) bool {
+	return c.isEndOfEpoch(blockNumber) ||
+		blockNumber%c.checkpointsOffset == 0
 }
 
 // getLatestSprintBlockNumber returns latest sprint block number

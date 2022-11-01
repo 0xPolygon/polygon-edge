@@ -162,6 +162,16 @@ func (as AccountSet) Copy() AccountSet {
 
 // Hash returns hash value of the AccountSet
 func (as AccountSet) Hash() (types.Hash, error) {
+	abiEncoded, err := as.EncodeAbi()
+	if err != nil {
+		return types.ZeroHash, err
+	}
+
+	return types.BytesToHash(crypto.Keccak256(abiEncoded)), nil
+}
+
+// EncodeAbi encodes AccountSet to the ABI format
+func (as AccountSet) EncodeAbi() ([]byte, error) {
 	accountSetMaps := make([]map[string]interface{}, len(as))
 	for i, acc := range as {
 		accountSetMaps[i] = map[string]interface{}{
@@ -170,12 +180,7 @@ func (as AccountSet) Hash() (types.Hash, error) {
 		}
 	}
 
-	abiEncoded, err := accountSetABIType.Encode(accountSetMaps)
-	if err != nil {
-		return types.ZeroHash, err
-	}
-
-	return types.BytesToHash(crypto.Keccak256(abiEncoded)), nil
+	return accountSetABIType.Encode(accountSetMaps)
 }
 
 // GetValidatorAccount tries to retrieve validator account by given address from the account set.

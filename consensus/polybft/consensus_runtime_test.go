@@ -475,7 +475,7 @@ func TestConsensusRuntime_NotifyProposalInserted_EndOfEpoch(t *testing.T) {
 			Number: currentEpochNumber,
 		},
 	}
-	runtime.NotifyProposalInserted(builtBlock)
+	runtime.NotifyProposalInserted(builtBlock.Block.Header)
 
 	require.True(t, runtime.state.isEpochInserted(currentEpochNumber+1))
 	require.Equal(t, newEpochNumber, runtime.epoch.Number)
@@ -504,7 +504,7 @@ func TestConsensusRuntime_NotifyProposalInserted_MiddleOfEpoch(t *testing.T) {
 			PolyBFTConfig: &PolyBFTConfig{EpochSize: epochSize},
 			blockchain:    new(blockchainMock)},
 	}
-	runtime.NotifyProposalInserted(builtBlock)
+	runtime.NotifyProposalInserted(builtBlock.Block.Header)
 
 	require.Equal(t, header.Number, runtime.lastBuiltBlock.Number)
 }
@@ -1744,7 +1744,7 @@ func TestConsensusRuntime_isCheckpointBlock(t *testing.T) {
 	}{
 		{
 			name:              "Checkpoint block (epoch ending block)",
-			blockNumber:       9,
+			blockNumber:       10,
 			isCheckpointBlock: true,
 		},
 		{
@@ -1754,7 +1754,7 @@ func TestConsensusRuntime_isCheckpointBlock(t *testing.T) {
 		},
 		{
 			name:              "Checkpoint block (non-epoch ending block, checkpoint interval elapsed)",
-			blockNumber:       59,
+			blockNumber:       60,
 			isCheckpointBlock: true,
 		},
 	}
@@ -1766,7 +1766,7 @@ func TestConsensusRuntime_isCheckpointBlock(t *testing.T) {
 			runtime, err := newConsensusRuntime(hclog.NewNullLogger(), config)
 			require.NoError(t, err)
 			runtime.lastBuiltBlock = &types.Header{Number: c.blockNumber}
-			require.Equal(t, c.isCheckpointBlock, runtime.isCheckpointBlock())
+			require.Equal(t, c.isCheckpointBlock, runtime.isCheckpointBlock(c.blockNumber))
 		})
 	}
 }
