@@ -177,23 +177,6 @@ func (p *Polybft) Initialize() error {
 		return err
 	}
 
-	// set pbft topic, it will be check if/when the bridge is enabled
-	p.initRuntime()
-
-	// initialize pbft engine
-	// opts := []pbft.ConfigOption{
-	// 	pbft.WithLogger(p.logger.Named("Pbft").
-	// 		StandardLogger(&hclog.StandardLoggerOptions{}),
-	// 	),
-	// 	pbft.WithTracer(otel.Tracer("Pbft")),
-	// }
-
-	p.ibft = newIBFTConsensusWrapper(p.logger, p.runtime, p)
-
-	if err := p.subscribeToIbftTopic(); err != nil {
-		return fmt.Errorf("topic subscription failed: %w", err)
-	}
-
 	// set block time
 	p.blockTime = time.Duration(p.config.BlockTime)
 
@@ -211,6 +194,15 @@ func (p *Polybft) Initialize() error {
 
 	p.state = stt
 	p.validatorsCache = newValidatorsSnapshotCache(p.config.Logger, stt, p.consensusConfig.EpochSize, p.blockchain)
+
+	// set pbft topic, it will be check if/when the bridge is enabled
+	p.initRuntime()
+
+	p.ibft = newIBFTConsensusWrapper(p.logger, p.runtime, p)
+
+	if err := p.subscribeToIbftTopic(); err != nil {
+		return fmt.Errorf("topic subscription failed: %w", err)
+	}
 
 	return nil
 }
