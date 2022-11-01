@@ -54,7 +54,7 @@ type txPoolInterface interface {
 // checkpointBackend is an interface providing functions for working with checkpoints and exit evens
 type checkpointBackend interface {
 	// BuildEventRoot generates an event root hash from exit events in given epoch
-	BuildEventRoot(epoch uint64) (types.Hash, error)
+	BuildEventRoot(epoch uint64, nonCommittedExitEvents []*ExitEvent) (types.Hash, error)
 	// InsertExitEvents inserts provided exit events to persistence storage
 	InsertExitEvents(exitEvents []*ExitEvent) error
 }
@@ -776,17 +776,18 @@ func (c *consensusRuntime) InsertExitEvents(exitEvents []*ExitEvent) error {
 }
 
 // BuildEventRoot is an implementation of checkpointBackend interface
-func (c *consensusRuntime) BuildEventRoot(epoch uint64) (types.Hash, error) {
+func (c *consensusRuntime) BuildEventRoot(epoch uint64, nonCommittedExitEvents []*ExitEvent) (types.Hash, error) {
 	exitEvents, err := c.state.getExitEventsByEpoch(epoch)
 	if err != nil {
 		return types.ZeroHash, err
 	}
 
-	if len(exitEvents) == 0 {
+	allEvents := append(exitEvents, nonCommittedExitEvents...)
+	if len(allEvents) == 0 {
 		return types.ZeroHash, nil
 	}
 
-	tree, err := createExitTree(exitEvents)
+	tree, err := createExitTree(allEvents)
 	if err != nil {
 		return types.ZeroHash, err
 	}

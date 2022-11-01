@@ -178,23 +178,34 @@ func TestFSM_BuildProposal_WithExitEvents(t *testing.T) {
 		}}
 	}
 
+	blockchainMock := new(blockchainMock)
+	blockchainMock.On("CommitBlock", mock.Anything).Return(nil).Once()
+
 	mBlockBuilder := new(blockBuilderMock)
 	mBlockBuilder.On("Build", mock.Anything).Return(stateBlock).Once()
 	mBlockBuilder.On("Fill").Once()
-	mBlockBuilder.On("Receipts", mock.Anything).Return(receipts).Once()
+	mBlockBuilder.On("Receipts", mock.Anything).Return(receipts).Twice()
 
-	fsm := &fsm{parent: parent, blockBuilder: mBlockBuilder, config: &PolyBFTConfig{}, backend: &blockchainMock{},
-		validators: validators.toValidatorSet(), checkpointBackend: runtime, logger: hclog.NewNullLogger(), epochNumber: epoch}
+	fsm := &fsm{parent: parent, blockBuilder: mBlockBuilder, config: &PolyBFTConfig{}, backend: blockchainMock,
+		validators: validators.toValidatorSet(), checkpointBackend: runtime, logger: hclog.NewNullLogger(),
+		epochNumber: epoch, postInsertHook: func() error { return nil }}
 
 	proposal, err := fsm.BuildProposal()
-	assert.NoError(t, err)
-	assert.NotNil(t, proposal)
+	require.NoError(t, err)
+	require.NotNil(t, proposal)
+
+	sealedProposal := &pbft.SealedProposal{
+		Proposal: proposal,
+	}
+
+	require.NoError(t, fsm.Insert(sealedProposal))
 
 	events, err := runtime.state.getExitEventsByEpoch(epoch)
 	require.NoError(t, err)
 	require.Len(t, events, numOfReceipts)
 
 	mBlockBuilder.AssertExpectations(t)
+	blockchainMock.AssertExpectations(t)
 }
 
 func TestFSM_BuildProposal_WithExitEvents_ErrorInDecoding(t *testing.T) {
@@ -270,7 +281,7 @@ func TestFSM_BuildProposal_WithoutUptimeTxGood(t *testing.T) {
 	stateBlock := createDummyStateBlock(parentBlockNumber+1, parent.Hash, extra)
 	mBlockBuilder := newBlockBuilderMock(stateBlock)
 	checkpointBackendMock := new(checkpointBackendMock)
-	checkpointBackendMock.On("BuildEventRoot", mock.Anything).Return(types.ZeroHash, nil).Once()
+	checkpointBackendMock.On("BuildEventRoot", mock.Anything, mock.Anything).Return(types.ZeroHash, nil).Once()
 
 	fsm := &fsm{parent: parent, blockBuilder: mBlockBuilder, config: &PolyBFTConfig{}, backend: &blockchainMock{},
 		validators: validators.toValidatorSet(), checkpointBackend: checkpointBackendMock, logger: hclog.NewNullLogger()}
@@ -330,7 +341,7 @@ func TestFSM_BuildProposal_WithUptimeTxGood(t *testing.T) {
 	blockChainMock.On("GetSystemState", mock.Anything, mock.Anything).Return(systemStateMock).Once()
 
 	checkpointBackendMock := new(checkpointBackendMock)
-	checkpointBackendMock.On("BuildEventRoot", mock.Anything).Return(types.ZeroHash, nil).Once()
+	checkpointBackendMock.On("BuildEventRoot", mock.Anything, mock.Anything).Return(types.ZeroHash, nil).Once()
 
 	fsm := &fsm{parent: parent, blockBuilder: mBlockBuilder, config: &PolyBFTConfig{}, backend: blockChainMock,
 		isEndOfEpoch:      true,
@@ -430,7 +441,7 @@ func TestFSM_BuildProposal_EpochEndingBlock_ValidatorsDeltaExists(t *testing.T) 
 	blockChainMock.On("GetSystemState", mock.Anything, mock.Anything).Return(systemStateMock).Once()
 
 	checkpointBackendMock := new(checkpointBackendMock)
-	checkpointBackendMock.On("BuildEventRoot", mock.Anything).Return(types.ZeroHash, nil).Once()
+	checkpointBackendMock.On("BuildEventRoot", mock.Anything, mock.Anything).Return(types.ZeroHash, nil).Once()
 
 	fsm := &fsm{
 		parent:            parent,
@@ -494,7 +505,7 @@ func TestFSM_BuildProposal_NonEpochEndingBlock_ValidatorsDeltaEmpty(t *testing.T
 	blockBuilderMock.On("Receipts", mock.Anything).Return([]*types.Receipt{}).Once()
 
 	checkpointBackendMock := new(checkpointBackendMock)
-	checkpointBackendMock.On("BuildEventRoot", mock.Anything).Return(types.ZeroHash, nil).Once()
+	checkpointBackendMock.On("BuildEventRoot", mock.Anything, mock.Anything).Return(types.ZeroHash, nil).Once()
 
 	systemStateMock := new(systemStateMock)
 
@@ -736,7 +747,7 @@ func TestFSM_ValidateCommit_WrongValidator(t *testing.T) {
 	stateBlock := createDummyStateBlock(parentBlockNumber+1, parent.Hash, parent.ExtraData)
 	mBlockBuilder := newBlockBuilderMock(stateBlock)
 	checkpointBackendMock := new(checkpointBackendMock)
-	checkpointBackendMock.On("BuildEventRoot", mock.Anything).Return(types.ZeroHash, nil).Once()
+	checkpointBackendMock.On("BuildEventRoot", mock.Anything, mock.Anything).Return(types.ZeroHash, nil).Once()
 
 	fsm := &fsm{parent: parent, blockBuilder: mBlockBuilder, config: &PolyBFTConfig{}, backend: &blockchainMock{},
 		validators: validators.toValidatorSet(), logger: hclog.NewNullLogger(), checkpointBackend: checkpointBackendMock}
@@ -766,7 +777,7 @@ func TestFSM_ValidateCommit_InvalidHash(t *testing.T) {
 	stateBlock := createDummyStateBlock(parentBlockNumber+1, parent.Hash, parent.ExtraData)
 	mBlockBuilder := newBlockBuilderMock(stateBlock)
 	checkpointBackendMock := new(checkpointBackendMock)
-	checkpointBackendMock.On("BuildEventRoot", mock.Anything).Return(types.ZeroHash, nil).Once()
+	checkpointBackendMock.On("BuildEventRoot", mock.Anything, mock.Anything).Return(types.ZeroHash, nil).Once()
 
 	fsm := &fsm{parent: parent, blockBuilder: mBlockBuilder, config: &PolyBFTConfig{}, backend: &blockchainMock{},
 		validators: validators.toValidatorSet(), checkpointBackend: checkpointBackendMock, logger: hclog.NewNullLogger()}
@@ -796,7 +807,7 @@ func TestFSM_ValidateCommit_Good(t *testing.T) {
 	stateBlock := createDummyStateBlock(parentBlockNumber+1, parent.Hash, parent.ExtraData)
 	mBlockBuilder := newBlockBuilderMock(stateBlock)
 	checkpointBackendMock := new(checkpointBackendMock)
-	checkpointBackendMock.On("BuildEventRoot", mock.Anything).Return(types.ZeroHash, nil).Once()
+	checkpointBackendMock.On("BuildEventRoot", mock.Anything, mock.Anything).Return(types.ZeroHash, nil).Once()
 
 	fsm := &fsm{parent: parent, blockBuilder: mBlockBuilder, config: &PolyBFTConfig{}, backend: &blockchainMock{},
 		validators: newValidatorSet(types.Address{}, validatorSet), checkpointBackend: checkpointBackendMock, logger: hclog.NewNullLogger()}
@@ -829,7 +840,7 @@ func TestFSM_Validate_IncorrectSignHash(t *testing.T) {
 	stateBlock := createDummyStateBlock(parentBlockNumber+1, parent.Hash, parent.ExtraData)
 	mBlockBuilder := newBlockBuilderMock(stateBlock)
 	checkpointBackendMock := new(checkpointBackendMock)
-	checkpointBackendMock.On("BuildEventRoot", mock.Anything).Return(types.ZeroHash, nil).Once()
+	checkpointBackendMock.On("BuildEventRoot", mock.Anything, mock.Anything).Return(types.ZeroHash, nil).Once()
 
 	fsm := &fsm{parent: parent, blockBuilder: mBlockBuilder, config: &PolyBFTConfig{}, backend: &blockchainMock{},
 		validators: validators.toValidatorSet(), checkpointBackend: checkpointBackendMock, logger: hclog.NewNullLogger(),

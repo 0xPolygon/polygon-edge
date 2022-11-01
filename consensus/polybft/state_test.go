@@ -463,8 +463,9 @@ func TestState_decodeExitEvent_NotAnExitEvent(t *testing.T) {
 		Topics:  topics,
 	}
 
-	_, err := decodeExitEvent(log, 1, 1)
-	require.ErrorIs(t, err, errNotAnExitEvent)
+	event, err := decodeExitEvent(log, 1, 1)
+	require.NoError(t, err)
+	require.Nil(t, event)
 }
 
 func insertTestExitEvents(t *testing.T, state *State,

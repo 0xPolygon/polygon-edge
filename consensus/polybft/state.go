@@ -131,7 +131,7 @@ func decodeStateSyncEvent(log *ethgo.Log) (*StateSyncEvent, error) {
 func decodeExitEvent(log *ethgo.Log, epoch, block uint64) (*ExitEvent, error) {
 	if !exitEventABI.Match(log) {
 		// valid case, not an exit event
-		return nil, errNotAnExitEvent
+		return nil, nil
 	}
 
 	raw, err := exitEventABI.Inputs.ParseLog(log)
@@ -448,6 +448,11 @@ func (s *State) getExitEvents(epoch uint64, filter func(exitEvent *ExitEvent) bo
 		}
 
 		return nil
+	})
+
+	// enforce sequential order
+	sort.Slice(events, func(i, j int) bool {
+		return events[i].ID < events[j].ID
 	})
 
 	return events, err
