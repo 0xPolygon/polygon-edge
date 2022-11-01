@@ -106,31 +106,36 @@ func (c checkpointManager) submitCheckpoint(latestHeader types.Header, epochNumb
 
 // submitCheckpointInternal encodes checkpoint data for the given block and
 // sends a transaction to the CheckpointManager rootchain contract
-func (c *checkpointManager) submitCheckpointInternal(nonce uint64, txn *ethgo.Transaction, header types.Header, extra Extra) error {
-	input, err := c.abiEncodeCheckpointBlock(header, extra)
+func (c *checkpointManager) submitCheckpointInternal(nonce uint64, txn *ethgo.Transaction,
+	header types.Header, extra Extra) error {
+	nextEpochValidators, err := c.consensusBackend.GetValidators(header.Number, nil)
+	if err != nil {
+		return err
+	}
+
+	input, err := c.abiEncodeCheckpointBlock(header, extra, nextEpochValidators)
 	if err != nil {
 		return fmt.Errorf("failed to encode checkpoint data to ABI for block %d: %w", header.Number, err)
 	}
 
 	txn.Input = input
+
 	receipt, err := c.rootchain.SendTransaction(nonce, txn)
 	if err != nil {
 		return err
 	}
+
 	if receipt.Status == uint64(types.ReceiptFailed) {
 		return fmt.Errorf("transaction execution failed for block %d", header.Number)
 	}
+
 	return nil
 }
 
-// abiEncodeCheckpointBlock encodes input data for submitCheckpoint function on CheckpointManager smart contract for a given header
-func (c *checkpointManager) abiEncodeCheckpointBlock(header types.Header, extra Extra) ([]byte, error) {
-	validators, err := c.consensusBackend.GetValidators(header.Number, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	validatorsAbi, err := validators.EncodeAbi()
+// abiEncodeCheckpointBlock encodes checkpoint data into ABI format for a given header
+func (c *checkpointManager) abiEncodeCheckpointBlock(header types.Header, extra Extra,
+	nextValidators AccountSet) ([]byte, error) {
+	nextValidatorsAbiEncoded, err := nextValidators.EncodeAbi()
 	if err != nil {
 		return nil, err
 	}
@@ -144,7 +149,7 @@ func (c *checkpointManager) abiEncodeCheckpointBlock(header types.Header, extra 
 		"blockHash":           header.Hash,
 		"blockRound":          new(big.Int).SetUint64(extra.Checkpoint.BlockRound),
 		"eventRoot":           extra.Checkpoint.EventRoot.Bytes(),
-		"nextValidators":      validatorsAbi,
+		"nextValidators":      nextValidatorsAbiEncoded,
 	}
 
 	return submitCheckpointMethod.Encode(params)
@@ -163,7 +168,8 @@ func (d *defaultRootchainInteractor) Call(from types.Address, to types.Address, 
 	return helper.Call(ethgo.Address(from), ethgo.Address(to), input)
 }
 
-func (d *defaultRootchainInteractor) SendTransaction(nonce uint64, transaction *ethgo.Transaction) (*ethgo.Receipt, error) {
+func (d *defaultRootchainInteractor) SendTransaction(nonce uint64,
+	transaction *ethgo.Transaction) (*ethgo.Receipt, error) {
 	return helper.SendTxn(nonce, transaction)
 }
 
