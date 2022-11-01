@@ -6,13 +6,13 @@ import (
 	"math"
 	"math/big"
 
-	"github.com/0xPolygon/polygon-edge/state/runtime/evm"
-
 	"github.com/hashicorp/go-hclog"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
+	"github.com/0xPolygon/polygon-edge/state/runtime/evm"
+	"github.com/0xPolygon/polygon-edge/state/runtime/precompiled"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -32,11 +32,10 @@ type GetHashByNumberHelper = func(*types.Header) GetHashByNumber
 
 // Executor is the main entity
 type Executor struct {
-	logger   hclog.Logger
-	config   *chain.Params
-	runtimes []runtime.Runtime
-	state    State
-	GetHash  GetHashByNumberHelper
+	logger  hclog.Logger
+	config  *chain.Params
+	state   State
+	GetHash GetHashByNumberHelper
 
 	PostHook func(txn *Transition)
 }
@@ -44,10 +43,9 @@ type Executor struct {
 // NewExecutor creates a new executor
 func NewExecutor(config *chain.Params, s State, logger hclog.Logger) *Executor {
 	return &Executor{
-		logger:   logger,
-		config:   config,
-		runtimes: []runtime.Runtime{},
-		state:    s,
+		logger: logger,
+		config: config,
+		state:  s,
 	}
 }
 
@@ -77,11 +75,6 @@ func (e *Executor) WriteGenesis(alloc map[types.Address]*chain.GenesisAccount) t
 	_, root := snap.Commit(objs)
 
 	return types.BytesToHash(root)
-}
-
-// SetRuntime adds a runtime to the runtime set
-func (e *Executor) SetRuntime(r runtime.Runtime) {
-	e.runtimes = append(e.runtimes, r)
 }
 
 type BlockResult struct {
@@ -160,7 +153,6 @@ func (e *Executor) BeginTxn(
 
 	txn := &Transition{
 		logger:   e.logger,
-		r:        e,
 		ctx:      env2,
 		state:    newTxn,
 		getHash:  e.GetHash(header),
@@ -170,6 +162,10 @@ func (e *Executor) BeginTxn(
 
 		receipts: []*types.Receipt{},
 		totalGas: 0,
+
+		evm:         evm.NewEVM(),
+		precompiles: precompiled.NewPrecompiled(),
+		PostHook:    e.PostHook,
 	}
 
 	return txn, nil
@@ -184,7 +180,6 @@ type Transition struct {
 	// the current block being processed
 	block *types.Block
 
-	r       *Executor
 	config  chain.ForksInTime
 	state   *Txn
 	getHash GetHashByNumber
@@ -194,17 +189,20 @@ type Transition struct {
 	// result
 	receipts []*types.Receipt
 	totalGas uint64
+
+	PostHook func(t *Transition)
+
+	// runtimes
+	evm         *evm.EVM
+	precompiles *precompiled.Precompiled
 }
 
 func NewTransition(config chain.ForksInTime, radix *Txn) *Transition {
 	return &Transition{
-		config: config,
-		state:  radix,
-		r: &Executor{
-			runtimes: []runtime.Runtime{
-				evm.NewEVM(),
-			},
-		},
+		config:      config,
+		state:       radix,
+		evm:         evm.NewEVM(),
+		precompiles: precompiled.NewPrecompiled(),
 	}
 }
 
@@ -219,7 +217,7 @@ func (t *Transition) Receipts() []*types.Receipt {
 var emptyFrom = types.Address{}
 
 func (t *Transition) WriteFailedReceipt(txn *types.Transaction) error {
-	signer := crypto.NewSigner(t.config, uint64(t.r.config.ChainID))
+	signer := crypto.NewSigner(t.config, uint64(t.ctx.ChainID))
 
 	if txn.From == emptyFrom {
 		// Decrypt the from address
@@ -250,7 +248,7 @@ func (t *Transition) WriteFailedReceipt(txn *types.Transaction) error {
 
 // Write writes another transaction to the executor
 func (t *Transition) Write(txn *types.Transaction) error {
-	signer := crypto.NewSigner(t.config, uint64(t.r.config.ChainID))
+	signer := crypto.NewSigner(t.config, uint64(t.ctx.ChainID))
 
 	var err error
 	if txn.From == emptyFrom {
@@ -356,8 +354,8 @@ func (t *Transition) Apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 		t.state.RevertToSnapshot(s)
 	}
 
-	if t.r.PostHook != nil {
-		t.r.PostHook(t)
+	if t.PostHook != nil {
+		t.PostHook(t)
 	}
 
 	return result, err
@@ -535,14 +533,17 @@ func (t *Transition) Call2(
 }
 
 func (t *Transition) run(contract *runtime.Contract, host runtime.Host) *runtime.ExecutionResult {
-	for _, r := range t.r.runtimes {
-		if r.CanRun(contract, host, &t.config) {
-			return r.Run(contract, host, &t.config)
-		}
+	// check the precompiles
+	if t.precompiles.CanRun(contract, host, &t.config) {
+		return t.precompiles.Run(contract, host, &t.config)
+	}
+	// check the evm
+	if t.evm.CanRun(contract, host, &t.config) {
+		return t.evm.Run(contract, host, &t.config)
 	}
 
 	return &runtime.ExecutionResult{
-		Err: fmt.Errorf("not found"),
+		Err: fmt.Errorf("runtime not found"),
 	}
 }
 
