@@ -233,8 +233,8 @@ func (f *fsm) ValidateCommit(signer []byte, seal []byte, proposalHash []byte) er
 		f.logger.Error("unable to unmarshal proposal", "err", err)
 	}
 
-	if bytes.Equal(newBlock.Hash().Bytes(), proposalHash) {
-		return fmt.Errorf("incorrect prposal hash submitted via consensus engine from %s", from)
+	if !bytes.Equal(newBlock.Hash().Bytes(), proposalHash) {
+		return fmt.Errorf("incorrect proposal hash submitted via consensus engine from %s, is: %v expected: %v", from, newBlock.Hash().Bytes(), proposalHash)
 	}
 
 	validator := f.validators.Accounts().GetValidatorAccount(from)
