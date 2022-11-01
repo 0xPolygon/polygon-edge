@@ -6,6 +6,8 @@ import (
 	"math/big"
 	"time"
 
+	goAtomic "sync/atomic"
+
 	"github.com/armon/go-metrics"
 	"github.com/golang/protobuf/ptypes/any"
 	"github.com/hashicorp/go-hclog"
@@ -179,6 +181,10 @@ type TxPool struct {
 
 	// indicates which txpool operator commands should be implemented
 	proto.UnimplementedTxnPoolOperatorServer
+
+	// pending is the list of pending and ready transactions. This variable
+	// is accessed with atomics
+	pending int64
 }
 
 // deploymentWhitelist map which contains all addresses which can deploy contracts
@@ -269,12 +275,17 @@ func NewTxPool(
 	return pool, nil
 }
 
+func (p *TxPool) updatePending(i int64) {
+	newPending := goAtomic.AddInt64(&p.pending, i)
+	metrics.SetGauge([]string{"pending_transactions"}, float32(newPending))
+}
+
 // Start runs the pool's main loop in the background.
 // On each request received, the appropriate handler
 // is invoked in a separate goroutine.
 func (p *TxPool) Start() {
 	// set default value of txpool pending transactions gauge
-	metrics.SetGauge([]string{"pending_transactions"}, 0)
+	p.updatePending(0)
 
 	//	run the handler for high gauge level pruning
 	go func() {
@@ -405,7 +416,7 @@ func (p *TxPool) Pop(tx *types.Transaction) {
 	p.gauge.decrease(slotsRequired(tx))
 
 	// update metrics
-	metrics.SetGauge([]string{"pending_transactions"}, -1)
+	p.updatePending(-1)
 
 	// update executables
 	if tx := account.promoted.peek(); tx != nil {
@@ -448,7 +459,7 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 	clearAccountQueue(dropped)
 
 	// update metrics
-	metrics.SetGauge([]string{"pending_transactions"}, float32(-1*len(dropped)))
+	p.updatePending(-1 * int64(len(dropped)))
 
 	// drop enqueued
 	dropped = account.enqueued.clear()
@@ -794,7 +805,7 @@ func (p *TxPool) handlePromoteRequest(req promoteRequest) {
 	p.gauge.decrease(slotsRequired(pruned...))
 
 	// update metrics
-	metrics.SetGauge([]string{"pending_transactions"}, float32(len(promoted)))
+	p.updatePending(int64(len(promoted)))
 
 	p.eventManager.signalEvent(proto.EventType_PROMOTED, toHash(promoted...)...)
 }
@@ -886,7 +897,7 @@ func (p *TxPool) resetAccounts(stateNonces map[types.Address]uint64) {
 			toHash(allPrunedPromoted...)...,
 		)
 
-		metrics.SetGauge([]string{"pending_transactions"}, float32(-1*len(allPrunedPromoted)))
+		p.updatePending(int64(-1 * len(allPrunedPromoted)))
 	}
 
 	if len(allPrunedEnqueued) > 0 {
