@@ -1,7 +1,6 @@
 package polybft
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"math/big"
@@ -224,21 +223,22 @@ func (f *fsm) createValidatorsUptimeTx() (*types.Transaction, error) {
 func (f *fsm) ValidateCommit(signer []byte, seal []byte, proposalHash []byte) error {
 	from := types.BytesToAddress(signer)
 
-	if f.proposal == nil {
-		return fmt.Errorf("incorrect commit from %s. current proposal unavailable", from)
-	}
+	// TODO: I dont think this is needed here. Just delete or uncomment if needed
+	// if f.proposal == nil {
+	// 	return fmt.Errorf("incorrect commit from %s. current proposal unavailable", from)
+	// }
 
-	newBlock := &types.Block{}
-	if err := newBlock.UnmarshalRLP(f.proposal); err != nil {
-		f.logger.Error("unable to unmarshal proposal", "err", err)
-	}
+	// newBlock := &types.Block{}
+	// if err := newBlock.UnmarshalRLP(f.proposal); err != nil {
+	// 	f.logger.Error("unable to unmarshal proposal", "err", err)
+	// }
 
-	if !bytes.Equal(newBlock.Hash().Bytes(), proposalHash) {
-		return fmt.Errorf("incorrect proposal hash submitted via consensus engine from %s, is: %v expected: %v", from, newBlock.Hash().Bytes(), proposalHash)
-	}
+	// if !bytes.Equal(newBlock.Hash().Bytes(), proposalHash) {
+	// 	return fmt.Errorf("incorrect proposal hash submitted via consensus engine from %s, is: %v expected: %v",
+	// 		from, newBlock.Hash().Bytes(), proposalHash)
+	// }
 
 	validator := f.validators.Accounts().GetValidatorAccount(from)
-
 	if validator == nil {
 		return fmt.Errorf("unable to resolve validator %s", from)
 	}
@@ -292,14 +292,14 @@ func (f *fsm) Validate(proposal []byte) error {
 		}
 
 		f.logger.Trace("[FSM Validate]", "Block", blockNumber, "parent validators", validators)
-		parentHash := f.parent.Hash
 
-		if err := blockExtra.Parent.VerifyCommittedFields(validators, parentHash); err != nil {
+		if err := blockExtra.Parent.VerifyCommittedFields(validators, f.parent.Hash); err != nil {
 			return fmt.Errorf(
-				"failed to verify signatures for (parent) block#%d. Block hash: %v, block#%d",
+				"failed to verify signatures for (parent) block#%d. Block hash: %v, block#%d. Error: %w",
 				f.parent.Number,
-				parentHash,
+				f.parent.Hash,
 				blockNumber,
+				err,
 			)
 		}
 	}

@@ -418,8 +418,7 @@ func (p *Polybft) GetSyncProgression() *progress.Progression {
 // VerifyHeader implements consensus.Engine and checks whether a header conforms to the consensus rules
 func (p *Polybft) VerifyHeader(header *types.Header) error {
 	// Short circuit if the header is known
-	_, ok := p.blockchain.GetHeaderByHash(header.Hash)
-	if ok {
+	if _, ok := p.blockchain.GetHeaderByHash(header.Hash); ok {
 		return nil
 	}
 
@@ -467,7 +466,8 @@ func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, parents []*type
 	}
 
 	if err := extra.Committed.VerifyCommittedFields(validators, header.Hash); err != nil {
-		return fmt.Errorf("failed to verify signatures for block %d. Block hash: %v", blockNumber, header.Hash)
+		return fmt.Errorf("failed to verify signatures for block %d. Block hash: %v. Error: %w",
+			blockNumber, header.Hash, err)
 	}
 
 	// validate the signatures for parent (skip block 1 because genesis does not have committed)
@@ -483,14 +483,15 @@ func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, parents []*type
 		parentValidators, err := p.GetValidators(blockNumber-2, parents)
 		if err != nil {
 			return fmt.Errorf(
-				"failed to validate header for block %d. could not retrieve parent validators:%w",
+				"failed to validate header for block %d. could not retrieve parent validators: %w",
 				blockNumber,
 				err,
 			)
 		}
 
 		if err := extra.Parent.VerifyCommittedFields(parentValidators, parent.Hash); err != nil {
-			return fmt.Errorf("failed to verify signatures for parent of block %d. Parent hash: %v", blockNumber, parent.Hash)
+			return fmt.Errorf("failed to verify signatures for parent of block %d. Parent hash: %v. Error: %w",
+				blockNumber, parent.Hash, err)
 		}
 	}
 

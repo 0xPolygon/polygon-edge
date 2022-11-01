@@ -326,10 +326,9 @@ func (s *Signature) VerifyCommittedFields(validatorSet AccountSet, hash types.Ha
 	}
 
 	if len(filtered) < getQuorumSize(validatorSet.Len()) {
-		return fmt.Errorf("quorum not reached")
+		return fmt.Errorf("quorum not reached: %d of %d", len(filtered), getQuorumSize(validatorSet.Len()))
 	}
 
-	rawMsg := hash[:]
 	blsPublicKeys := make([]*bls.PublicKey, len(filtered))
 
 	for i, validator := range filtered {
@@ -342,8 +341,7 @@ func (s *Signature) VerifyCommittedFields(validatorSet AccountSet, hash types.Ha
 		return err
 	}
 
-	isOk := aggs.VerifyAggregated(blsPublicKeys, rawMsg)
-	if !isOk {
+	if !aggs.VerifyAggregated(blsPublicKeys, hash[:]) {
 		return fmt.Errorf("could not verify signature")
 	}
 

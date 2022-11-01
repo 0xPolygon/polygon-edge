@@ -397,7 +397,7 @@ func (cr *consensusRuntime) restartEpoch(header *types.Header) error {
 		"restartEpoch",
 		"block number", header.Number,
 		"epoch", epochNumber,
-		"validators", validatorSet,
+		"validators", validatorSet.Len(),
 	)
 
 	return nil
@@ -868,14 +868,6 @@ func (cr *consensusRuntime) IsValidBlock(proposal []byte) bool {
 
 // IsValidSender checks if signature is from sender
 func (cr *consensusRuntime) IsValidSender(msg *proto.Message) bool {
-	fsm := cr.fsm
-
-	if fsm == nil {
-		cr.logger.Error("IsValidSender fsm not initialized")
-
-		return false
-	}
-
 	msgNoSig, err := msg.PayloadNoSig()
 	if err != nil {
 		return false
@@ -901,7 +893,7 @@ func (cr *consensusRuntime) IsValidSender(msg *proto.Message) bool {
 	}
 
 	// verify the sender is in the active validator set
-	if !fsm.validators.Includes(signerAddress) {
+	if !cr.fsm.validators.Includes(signerAddress) {
 		cr.logger.Error(
 			"signer address doesn't included in validators",
 			"signer", signerAddress,
@@ -922,22 +914,19 @@ func (cr *consensusRuntime) IsProposer(id []byte, height, round uint64) bool {
 
 // IsValidProposalHash checks if the hash matches the proposal
 func (cr *consensusRuntime) IsValidProposalHash(proposal, hash []byte) bool {
-	newBlock := &types.Block{}
+	newBlock := types.Block{}
 	if err := newBlock.UnmarshalRLP(proposal); err != nil {
 		cr.logger.Error("unable to unmarshal proposal", "err", err)
 
 		return false
 	}
 
-	blockHash := newBlock.Header.Hash.Bytes()
-
-	return bytes.Equal(blockHash, hash)
+	return bytes.Equal(newBlock.Header.Hash.Bytes(), hash)
 }
 
 // IsValidCommittedSeal checks if the seal for the proposal is valid
 func (cr *consensusRuntime) IsValidCommittedSeal(proposalHash []byte, committedSeal *messages.CommittedSeal) bool {
 	err := cr.fsm.ValidateCommit(committedSeal.Signer, committedSeal.Signature, proposalHash)
-
 	if err != nil {
 		cr.logger.Info("Invalid committed seal", "err", err)
 
@@ -957,7 +946,6 @@ func (cr *consensusRuntime) BuildProposal(blockNumber uint64) []byte {
 	}
 
 	proposal, err := cr.fsm.BuildProposal()
-
 	if err != nil {
 		cr.logger.Info("Unable to create porposal", "blockNumber", blockNumber, "err", err)
 
@@ -996,9 +984,9 @@ func (cr *consensusRuntime) ID() []byte {
 }
 
 func (cr *consensusRuntime) MaximumFaultyNodes() uint64 {
-	return uint64((len(cr.fsm.validators.Accounts()) - 1) / 3)
+	return uint64(cr.fsm.validators.Len()-1) / 3
 }
 
-func (cr *consensusRuntime) Quorum(validatorsCount uint64) uint64 {
-	return uint64(getQuorumSize(int(validatorsCount)))
+func (cr *consensusRuntime) Quorum(blockHeight uint64) uint64 {
+	return uint64(getQuorumSize(cr.fsm.validators.Len()))
 }
