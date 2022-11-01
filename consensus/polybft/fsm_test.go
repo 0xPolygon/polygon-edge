@@ -184,7 +184,8 @@ func TestFSM_BuildProposal_WithExitEvents(t *testing.T) {
 	mBlockBuilder := new(blockBuilderMock)
 	mBlockBuilder.On("Build", mock.Anything).Return(stateBlock).Once()
 	mBlockBuilder.On("Fill").Once()
-	mBlockBuilder.On("Receipts", mock.Anything).Return(receipts).Twice()
+	mBlockBuilder.On("Receipts", mock.Anything).Return(receipts).Once()
+	stateBlock.Receipts = receipts
 
 	fsm := &fsm{parent: parent, blockBuilder: mBlockBuilder, config: &PolyBFTConfig{}, backend: blockchainMock,
 		validators: validators.toValidatorSet(), checkpointBackend: runtime, logger: hclog.NewNullLogger(),

@@ -187,16 +187,16 @@ func decodeEventData(eventDataMap map[string]interface{}, log *ethgo.Log,
 	return eventCreator(id, sender, receiver, data), nil
 }
 
-// convert converts types.Log to ethgo.Log
-func convert(log *types.Log) *ethgo.Log {
+// convertLog converts types.Log to ethgo.Log
+func convertLog(log *types.Log) *ethgo.Log {
 	l := &ethgo.Log{
 		Address: ethgo.Address(log.Address),
 		Data:    log.Data,
 		Topics:  make([]ethgo.Hash, len(log.Topics)),
 	}
 
-	for i := 0; i < len(log.Topics); i++ {
-		l.Topics[i] = ethgo.Hash(log.Topics[i])
+	for i, topic := range log.Topics {
+		l.Topics[i] = ethgo.Hash(topic)
 	}
 
 	return l

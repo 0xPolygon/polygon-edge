@@ -538,11 +538,11 @@ func (f *fsm) Insert(p *pbft.SealedProposal) error {
 		Bitmap:              bitmap,
 	}
 
-	// Write extar data to header
+	// Write extra data to header
 	f.block.Block.Header.ExtraData = append(make([]byte, 32), extra.MarshalRLPTo(nil)...)
 
 	// commit exit events only when we finalize a block
-	events, err := getExitEventsFromReceipts(f.epochNumber, f.block.Block.Number(), f.blockBuilder.Receipts())
+	events, err := getExitEventsFromReceipts(f.epochNumber, f.block.Block.Number(), f.block.Receipts)
 	if err != nil {
 		return err
 	}
@@ -673,7 +673,7 @@ func getExitEventsFromReceipts(epoch, block uint64, receipts []*types.Receipt) (
 		}
 
 		for j := 0; j < len(receipts[i].Logs); j++ {
-			event, err := decodeExitEvent(convert(receipts[i].Logs[j]), epoch, block)
+			event, err := decodeExitEvent(convertLog(receipts[i].Logs[j]), epoch, block)
 			if err != nil {
 				return nil, err
 			}
