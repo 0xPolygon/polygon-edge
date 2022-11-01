@@ -267,13 +267,17 @@ func (f *fsm) Validate(proposal []byte) error {
 
 	// validate header fields
 	if err := validateHeaderFields(f.parent, block.Header); err != nil {
-		return fmt.Errorf("failed to validate header (parent header# %d, current header#%d): %w",
-			f.parent.Number, block.Number(), err)
+		return fmt.Errorf(
+			"failed to validate header (parent header# %d, current header#%d): %w",
+			f.parent.Number,
+			block.Number(),
+			err,
+		)
 	}
 
 	blockExtra, err := GetIbftExtra(block.Header.ExtraData)
 	if err != nil {
-		return err
+		return fmt.Errorf("cannot get extra data:%w", err)
 	}
 
 	// TODO: Validate validator set delta?
@@ -285,7 +289,7 @@ func (f *fsm) Validate(proposal []byte) error {
 		// since those blocks do not include any parent information with signatures
 		validators, err := f.polybftBackend.GetValidators(blockNumber-2, nil)
 		if err != nil {
-			return err
+			return fmt.Errorf("cannot get validators:%w", err)
 		}
 
 		f.logger.Trace("[FSM Validate]", "Block", blockNumber, "parent validators", validators)
@@ -419,7 +423,7 @@ func (f *fsm) Insert(proposal []byte, committedSeals []*messages.CommittedSeal) 
 	// what to do with this?
 	newBlock := &types.Block{}
 	if err := newBlock.UnmarshalRLP(proposal); err != nil {
-		return fmt.Errorf("cannot unmarshal proposal %w", err)
+		return fmt.Errorf("cannot unmarshal proposal: %w", err)
 	}
 
 	// In this function we should try to return little to no errors since
@@ -497,7 +501,7 @@ func (f *fsm) getValidatorSetDelta(pendingBlockState *state.Transition) (*Valida
 	newValidators, err := systemState.GetValidatorSet()
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve validator set for current block %w", err)
+		return nil, fmt.Errorf("failed to retrieve validator set for current block: %w", err)
 	}
 
 	return createValidatorSetDelta(f.logger, f.validators.Accounts(), newValidators)

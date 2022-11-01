@@ -412,7 +412,7 @@ func (cr *consensusRuntime) restartEpoch(header *types.Header) error {
 
 	err = cr.runCheckpoint(epoch)
 	if err != nil {
-		return fmt.Errorf("could not run checkpoint:%w", err)
+		return fmt.Errorf("could not run checkpoint: %w", err)
 	}
 
 	cr.logger.Info(
