@@ -192,23 +192,6 @@ func (cr *consensusRuntime) populateFsmIfBridgeEnabled(
 
 	ff.stateSyncExecutionIndex = nextStateSyncExecutionIdx
 
-	ff.postInsertHook = func() error {
-		if isEndOfEpoch && ff.commitmentToSaveOnRegister != nil {
-			if err := cr.state.insertCommitmentMessage(ff.commitmentToSaveOnRegister); err != nil {
-				return err
-			}
-
-			if err := cr.buildBundles(
-				epoch, ff.commitmentToSaveOnRegister.Message, nextStateSyncExecutionIdx); err != nil {
-				return err
-			}
-		}
-
-		cr.OnBlockInserted(ff.block.Block)
-
-		return nil
-	}
-
 	nextRegisteredCommitmentIndex, err := systemState.GetNextCommittedIndex()
 	if err != nil {
 		return err
@@ -296,6 +279,7 @@ func (cr *consensusRuntime) FSM() error {
 		validators:     newValidatorSet(types.BytesToAddress(parent.Miner), epoch.Validators),
 		isEndOfEpoch:   isEndOfEpoch,
 		isEndOfSprint:  isEndOfSprint,
+		epoch:          cr.epoch,
 		logger:         cr.logger.Named("fsm"),
 	}
 
@@ -303,12 +287,6 @@ func (cr *consensusRuntime) FSM() error {
 		err := cr.populateFsmIfBridgeEnabled(ff, epoch, isEndOfEpoch, isEndOfSprint)
 		if err != nil {
 			return err
-		}
-	} else {
-		ff.postInsertHook = func() error {
-			cr.OnBlockInserted(ff.block.Block)
-
-			return nil
 		}
 	}
 
@@ -494,7 +472,7 @@ func (cr *consensusRuntime) buildCommitment(epoch, fromIndex uint64) (*Commitmen
 }
 
 // buildBundles builds bundles if there is a created commitment by the validator and inserts them into db
-func (cr *consensusRuntime) buildBundles(epoch *epochMetadata, commitmentMsg *CommitmentMessage,
+func (cr *consensusRuntime) buildBundles(commitment *Commitment, commitmentMsg *CommitmentMessage,
 	stateSyncExecutionIndex uint64) error {
 	cr.logger.Debug(
 		"[buildProofs] Building proofs...",
@@ -503,7 +481,7 @@ func (cr *consensusRuntime) buildBundles(epoch *epochMetadata, commitmentMsg *Co
 		"nextExecutionIndex", stateSyncExecutionIndex,
 	)
 
-	if epoch.Commitment == nil {
+	if commitment == nil {
 		// its a valid case when we do not have a built commitment so we can not build any proofs
 		// we will be able to validate them though, since we have CommitmentMessageSigned taken from
 		// register commitment state transaction when its block was inserted
@@ -517,7 +495,7 @@ func (cr *consensusRuntime) buildBundles(epoch *epochMetadata, commitmentMsg *Co
 	startBundleIdx := commitmentMsg.GetBundleIdxFromStateSyncEventIdx(stateSyncExecutionIndex)
 
 	for idx := startBundleIdx; idx < commitmentMsg.BundlesCount(); idx++ {
-		p := epoch.Commitment.MerkleTree.GenerateProof(idx, 0)
+		p := commitment.MerkleTree.GenerateProof(idx, 0)
 		events, err := cr.getStateSyncEventsForBundle(commitmentMsg.GetFirstStateSyncIndexFromBundleIndex(idx),
 			commitmentMsg.BundleSize)
 
@@ -939,7 +917,7 @@ func (cr *consensusRuntime) IsValidSender(msg *proto.Message) bool {
 func (cr *consensusRuntime) IsProposer(id []byte, height, round uint64) bool {
 	nextProposer := cr.fsm.validators.CalcProposer(round)
 
-	return types.BytesToAddress(id) == types.StringToAddress(nextProposer)
+	return bytes.Equal(id, nextProposer[:])
 }
 
 // IsValidProposalHash checks if the hash matches the proposal
@@ -990,11 +968,27 @@ func (cr *consensusRuntime) BuildProposal(blockNumber uint64) []byte {
 }
 
 func (cr *consensusRuntime) InsertBlock(proposal []byte, committedSeals []*messages.CommittedSeal) {
-	if err := cr.fsm.Insert(proposal, committedSeals); err != nil {
+	fsm := cr.fsm
+	if err := fsm.Insert(proposal, committedSeals); err != nil {
 		cr.logger.Error("cannot insert proposal", "err", err)
 
 		return
 	}
+
+	if cr.IsBridgeEnabled() {
+		if fsm.isEndOfEpoch && fsm.commitmentToSaveOnRegister != nil {
+			if err := cr.state.insertCommitmentMessage(fsm.commitmentToSaveOnRegister); err != nil {
+				cr.logger.Error("insert proposal, insert commitment message error", "err", err)
+			}
+
+			if err := cr.buildBundles(
+				fsm.epoch.Commitment, fsm.commitmentToSaveOnRegister.Message, fsm.stateSyncExecutionIndex); err != nil {
+				cr.logger.Error("insert proposal, build bundles error", "err", err)
+			}
+		}
+	}
+
+	cr.OnBlockInserted(fsm.block.Block)
 }
 
 func (cr *consensusRuntime) ID() []byte {

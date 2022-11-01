@@ -55,10 +55,6 @@ type fsm struct {
 	// proposal is the current proposal being processed
 	proposal []byte
 
-	// postInsertHook represents custom handler which is executed once fsm.Insert is invoked,
-	// meaning that current block is inserted successfully
-	postInsertHook func() error
-
 	// uptimeCounter holds info about number of times validators sealed a block (only present if isEndOfEpoch is true)
 	uptimeCounter *CommitEpoch
 
@@ -67,6 +63,9 @@ type fsm struct {
 
 	// isEndOfSprint indicates if sprint reached its end
 	isEndOfSprint bool
+
+	// current epoch metadata
+	epoch *epochMetadata
 
 	// proposerCommitmentToRegister is a commitment that is registered via state transaction by proposer
 	proposerCommitmentToRegister *CommitmentMessageSigned
@@ -473,15 +472,7 @@ func (f *fsm) Insert(proposal []byte, committedSeals []*messages.CommittedSeal) 
 	// Write extar data to header
 	f.block.Block.Header.ExtraData = append(make([]byte, 32), extra.MarshalRLPTo(nil)...)
 
-	if err := f.backend.CommitBlock(f.block); err != nil {
-		return err
-	}
-
-	if err := f.postInsertHook(); err != nil {
-		return err
-	}
-
-	return nil
+	return f.backend.CommitBlock(f.block)
 }
 
 // Height returns the height for the current round

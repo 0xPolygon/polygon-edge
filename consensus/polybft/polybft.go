@@ -333,11 +333,11 @@ func (p *Polybft) startPbftProcess() {
 	)
 
 	for {
-		latest := p.blockchain.CurrentHeader().Number
+		latestHeader := p.blockchain.CurrentHeader()
 
-		currentValidators, err := p.GetValidators(latest, nil)
+		currentValidators, err := p.GetValidators(latestHeader.Number, nil)
 		if err != nil {
-			p.logger.Error("failed to query current validator set", "block number", latest, "error", err)
+			p.logger.Error("failed to query current validator set", "block number", latestHeader.Number, "error", err)
 		}
 
 		isValidator := currentValidators.ContainsNodeID(p.key.NodeID())
@@ -346,14 +346,23 @@ func (p *Polybft) startPbftProcess() {
 		p.txPool.SetSealing(isValidator) // update tx pool
 
 		if isValidator {
+			// must initialize runtime epoch if not initialized already
+			if p.runtime.epoch == nil {
+				if err = p.runtime.restartEpoch(latestHeader); err != nil {
+					p.logger.Error("failed to retart epoch fsm", "block number", latestHeader.Number, "error", err)
+
+					continue
+				}
+			}
+
 			err = p.runtime.FSM() // initialze fsm as a stateless ibft backet via runtime as an adapter
 			if err != nil {
-				p.logger.Error("failed to create fsm", "block number", latest, "error", err)
+				p.logger.Error("failed to create fsm", "block number", latestHeader.Number, "error", err)
 
 				continue
 			}
 
-			sequenceCh, stopSequence = p.ibft.runSequence(latest + 1)
+			sequenceCh, stopSequence = p.ibft.runSequence(latestHeader.Number + 1)
 		} else {
 			sequenceCh, stopSequence = nil, nil
 		}
@@ -362,7 +371,7 @@ func (p *Polybft) startPbftProcess() {
 		case <-syncerBlockCh:
 			if isValidator {
 				stopSequence()
-				p.logger.Info("canceled sequence", "sequence", latest+1)
+				p.logger.Info("canceled sequence", "sequence", latestHeader.Number+1)
 			}
 		case <-sequenceCh:
 		case <-p.closeCh:
