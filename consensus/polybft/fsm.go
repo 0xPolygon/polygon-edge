@@ -165,13 +165,6 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 	// fill the block with transactions
 	f.blockBuilder.Fill()
 
-	// TODO - remove
-	// if len(events) > 0 {
-	// 	if err := f.checkpointBackend.InsertExitEvents(events); err != nil {
-	// 		return nil, err
-	// 	}
-	// }
-
 	// set the timestamp
 	parentTime := time.Unix(int64(parent.Timestamp), 0)
 	headerTime := parentTime.Add(f.config.BlockTime)
