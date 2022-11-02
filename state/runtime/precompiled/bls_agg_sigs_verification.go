@@ -18,9 +18,9 @@ var (
 	errBLSVInvalidMsg             = errors.New("invalid message")
 	errBLSVInvalidBlsPart         = errors.New("bls verification part not in correct format")
 	errBLSVInvalidPubKeysPart     = errors.New("could not find public keys part")
-	// blsVerificationABIType is ABI type used for BLS signatures verification.
+	// BlsVerificationABIType is ABI type used for BLS signatures verification.
 	// It includes BLS public keys and bitmap representing signer validator accounts.
-	blsVerificationABIType = abi.MustNewType("tuple(bytes[], bytes)")
+	BlsVerificationABIType = abi.MustNewType("tuple(bytes[], bytes)")
 	// inputDataABIType is the ABI signature of the precompiled contract input data
 	inputDataABIType = abi.MustNewType("tuple(bytes32, bytes, bytes)")
 )
@@ -73,7 +73,7 @@ func (c *blsAggSignsVerification) run(input []byte, caller types.Address, host r
 		return nil, errBLSVInvalidPubKeys
 	}
 
-	decoded, err := blsVerificationABIType.Decode(blsVerification)
+	decoded, err := BlsVerificationABIType.Decode(blsVerification)
 	if err != nil {
 		return nil, err
 	}
