@@ -62,7 +62,7 @@ func (c checkpointManager) submitCheckpoint(latestHeader types.Header, epochNumb
 		return err
 	}
 
-	pendingNonce, err := c.rootchain.GetPendingNonce(c.sender)
+	nonce, err := c.rootchain.GetPendingNonce(c.sender)
 	if err != nil {
 		return err
 	}
@@ -89,11 +89,11 @@ func (c checkpointManager) submitCheckpoint(latestHeader types.Header, epochNumb
 			continue
 		}
 
-		err = c.submitCheckpointInternal(pendingNonce, txn, *header, *extra)
+		err = c.submitCheckpointInternal(nonce, txn, *header, *extra)
 		if err != nil {
 			return err
 		}
-		pendingNonce++
+		nonce++
 	}
 
 	extra, err := GetIbftExtra(latestHeader.ExtraData)
@@ -101,7 +101,7 @@ func (c checkpointManager) submitCheckpoint(latestHeader types.Header, epochNumb
 		return err
 	}
 
-	return c.submitCheckpointInternal(pendingNonce, txn, latestHeader, *extra)
+	return c.submitCheckpointInternal(nonce, txn, latestHeader, *extra)
 }
 
 // submitCheckpointInternal encodes checkpoint data for the given block and
@@ -154,6 +154,8 @@ func (c *checkpointManager) abiEncodeCheckpointBlock(header types.Header, extra 
 
 	return submitCheckpointMethod.Encode(params)
 }
+
+var _ rootchainInteractor = (*defaultRootchainInteractor)(nil)
 
 type rootchainInteractor interface {
 	Call(from types.Address, to types.Address, input []byte) (string, error)

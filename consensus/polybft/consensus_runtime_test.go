@@ -1596,11 +1596,12 @@ func TestConsensusRuntime_FSM_EndOfEpoch_PostHook(t *testing.T) {
 	}
 
 	runtime := &consensusRuntime{
-		logger:         hclog.NewNullLogger(),
-		state:          state,
-		epoch:          metadata,
-		config:         config,
-		lastBuiltBlock: lastBuiltBlock,
+		logger:            hclog.NewNullLogger(),
+		state:             state,
+		epoch:             metadata,
+		config:            config,
+		lastBuiltBlock:    lastBuiltBlock,
+		checkpointsOffset: sprintSize,
 	}
 
 	fsm, err := runtime.FSM()
@@ -1760,6 +1761,7 @@ func TestConsensusRuntime_isCheckpointBlock(t *testing.T) {
 	}
 
 	for _, c := range cases {
+		c := c
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
 
