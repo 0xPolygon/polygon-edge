@@ -14,17 +14,17 @@ permissions:
 jobs:
   snyk:
     name: Snyk and Publish
-    uses: 0xpolygon/polygon-edge/.github/workflows/security.yml@develop
+    uses: ./.github/workflows/security.yml
     secrets:
       SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
       SNYK_ORG: ${{ secrets.SNYK_ORG }}
 
   build:
-    uses: 0xpolygon/polygon-edge/.github/workflows/build.yml@develop
+    uses: ./.github/workflows/build.yml
     name: Build
 
   test:
-    uses: 0xpolygon/polygon-edge/.github/workflows/test.yml@develop
+    uses: ./.github/workflows/test.yml
     name: Test
     needs: build
 
@@ -157,7 +157,7 @@ jobs:
             }
 
   pandoras_box:
-    uses: 0xpolygon/polygon-edge/.github/workflows/pandoras_box.yml@develop
+    uses: ./.github/workflows/pandoras_box.yml
     name: Pandora's Box
     needs: deploy_testnet
     secrets:
@@ -171,7 +171,7 @@ jobs:
       transaction_count: '10000'
 
   loadbot:
-    uses: 0xpolygon/polygon-edge/.github/workflows/loadbot.yml@develop
+    uses: ./.github/workflows/loadbot.yml
     name: Loadbot
     needs: deploy_testnet
     secrets:

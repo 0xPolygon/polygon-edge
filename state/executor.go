@@ -101,8 +101,6 @@ func (e *Executor) ProcessBlock(
 		return nil, err
 	}
 
-	txn.block = block
-
 	for _, t := range block.Transactions {
 		if t.ExceedsBlockGasLimit(block.Header.GasLimit) {
 			if err := txn.WriteFailedReceipt(t); err != nil {
@@ -180,9 +178,6 @@ type Transition struct {
 
 	// dummy
 	auxState State
-
-	// the current block being processed
-	block *types.Block
 
 	r       *Executor
 	config  chain.ForksInTime
@@ -341,10 +336,6 @@ func (t *Transition) SetTxn(txn *Txn) {
 
 func (t *Transition) Txn() *Txn {
 	return t.state
-}
-
-func (t *Transition) GetTxnHash() types.Hash {
-	return t.block.Hash()
 }
 
 // Apply applies a new transaction

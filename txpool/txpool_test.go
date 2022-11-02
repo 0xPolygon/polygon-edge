@@ -31,8 +31,6 @@ var (
 		Homestead: chain.NewFork(0),
 		Istanbul:  chain.NewFork(0),
 	}
-
-	nilMetrics = NilMetrics()
 )
 
 // addresses used in tests
@@ -88,7 +86,6 @@ func newTestPoolWithSlots(maxSlots uint64, mockStore ...store) (*TxPool, error) 
 		storeToUse,
 		nil,
 		nil,
-		nilMetrics,
 		&Config{
 			PriceLimit:          defaultPriceLimit,
 			MaxSlots:            maxSlots,
@@ -2683,23 +2680,23 @@ func TestSetSealing(t *testing.T) {
 		expectedValue bool
 	}{
 		{
-			initialValue: false,
-			value: false,
+			initialValue:  false,
+			value:         false,
 			expectedValue: false,
 		},
 		{
-			initialValue: false,
-			value: true,
+			initialValue:  false,
+			value:         true,
 			expectedValue: true,
 		},
 		{
-			initialValue: true,
-			value: false,
+			initialValue:  true,
+			value:         false,
 			expectedValue: false,
 		},
 		{
-			initialValue: true,
-			value: true,
+			initialValue:  true,
+			value:         true,
 			expectedValue: true,
 		},
 	}
