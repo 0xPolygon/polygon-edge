@@ -422,6 +422,8 @@ func TestState_Insert_And_Get_ExitEvents_ForProof_NoEvents(t *testing.T) {
 }
 
 func TestState_decodeExitEvent(t *testing.T) {
+	t.Parallel()
+
 	const (
 		exitID      = 1
 		epoch       = 1
@@ -455,6 +457,8 @@ func TestState_decodeExitEvent(t *testing.T) {
 }
 
 func TestState_decodeExitEvent_NotAnExitEvent(t *testing.T) {
+	t.Parallel()
+
 	topics := make([]ethgo.Hash, 4)
 	topics[0] = stateTransferEventABI.ID()
 

@@ -1643,6 +1643,8 @@ func TestConsensusRuntime_FSM_EndOfEpoch_PostHook(t *testing.T) {
 }
 
 func TestConsensusRuntime_getExitEventRootHash(t *testing.T) {
+	t.Parallel()
+
 	const (
 		numOfBlocks         = 10
 		numOfEventsPerBlock = 2
@@ -1656,6 +1658,8 @@ func TestConsensusRuntime_getExitEventRootHash(t *testing.T) {
 	encodedEvents := setupExitEventsForProofVerification(t, state, numOfBlocks, numOfEventsPerBlock)
 
 	t.Run("Get exit event root hash", func(t *testing.T) {
+		t.Parallel()
+
 		tree, err := NewMerkleTree(encodedEvents)
 		require.NoError(t, err)
 
@@ -1665,6 +1669,8 @@ func TestConsensusRuntime_getExitEventRootHash(t *testing.T) {
 	})
 
 	t.Run("Get exit event root hash - no events", func(t *testing.T) {
+		t.Parallel()
+
 		hash, err := runtime.BuildEventRoot(2, nil)
 		require.NoError(t, err)
 		require.Equal(t, types.Hash{}, hash)
@@ -1672,6 +1678,8 @@ func TestConsensusRuntime_getExitEventRootHash(t *testing.T) {
 }
 
 func TestConsensusRuntime_GenerateExitProof(t *testing.T) {
+	t.Parallel()
+
 	const (
 		numOfBlocks         = 10
 		numOfEventsPerBlock = 2
@@ -1694,11 +1702,14 @@ func TestConsensusRuntime_GenerateExitProof(t *testing.T) {
 	require.NotNil(t, proof)
 
 	t.Run("Generate and validate exit proof", func(t *testing.T) {
+		t.Parallel()
 		// verify generated proof on desired tree
 		require.NoError(t, VerifyProof(1, encodedEvents[1], proof, tree.Hash()))
 	})
 
 	t.Run("Generate and validate exit proof - invalid proof", func(t *testing.T) {
+		t.Parallel()
+
 		invalidProof := proof
 		invalidProof[0][0]++
 
@@ -1707,6 +1718,8 @@ func TestConsensusRuntime_GenerateExitProof(t *testing.T) {
 	})
 
 	t.Run("Generate exit proof - no event", func(t *testing.T) {
+		t.Parallel()
+
 		_, err := runtime.GenerateExitProof(21, 1, 1)
 		require.ErrorContains(t, err, "could not find any exit event that has an id")
 	})
