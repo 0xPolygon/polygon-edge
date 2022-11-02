@@ -13,11 +13,11 @@ import (
 func signMessage(msg *protoIBFT.Message, key *wallet.Key) (*protoIBFT.Message, error) {
 	raw, err := proto.Marshal(msg)
 	if err != nil {
-		return nil, fmt.Errorf("cannot marshal message:%w", err)
+		return nil, fmt.Errorf("cannot marshal message: %w", err)
 	}
 
 	if msg.Signature, err = key.SignEcdsa(raw); err != nil {
-		return nil, fmt.Errorf("cannot create message signature:%w", err)
+		return nil, fmt.Errorf("cannot create message signature: %w", err)
 	}
 
 	return msg, nil
@@ -137,11 +137,11 @@ func (cr *consensusRuntime) BuildRoundChangeMessage(
 	return signedMsg
 }
 
-// Ecrecover recovers signer address from the given digest and signature
+// RecoverAddressFromSignature recovers signer address from the given digest and signature
 func RecoverAddressFromSignature(sig, msg []byte) (types.Address, error) {
 	pub, err := crypto.RecoverPubkey(sig, msg)
 	if err != nil {
-		return types.Address{}, err
+		return types.Address{}, fmt.Errorf("cannot recover addrese from signature: %w", err)
 	}
 
 	return crypto.PubKeyToAddress(pub), nil

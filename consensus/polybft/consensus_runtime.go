@@ -179,7 +179,12 @@ func (cr *consensusRuntime) OnBlockInserted(block *types.Block) {
 }
 
 func (cr *consensusRuntime) populateFsmIfBridgeEnabled(
-	ff *fsm, epoch *epochMetadata, lastBuiltBlock *types.Header, isEndOfEpoch, isEndOfSprint bool) error {
+	ff *fsm,
+	epoch *epochMetadata,
+	lastBuiltBlock *types.Header,
+	isEndOfEpoch,
+	isEndOfSprint bool,
+) error {
 	systemState, err := cr.getSystemState(lastBuiltBlock)
 	if err != nil {
 		return err
@@ -187,14 +192,14 @@ func (cr *consensusRuntime) populateFsmIfBridgeEnabled(
 
 	nextStateSyncExecutionIdx, err := systemState.GetNextExecutionIndex()
 	if err != nil {
-		return err
+		return fmt.Errorf("cannot get next execution index: %w", err)
 	}
 
 	ff.stateSyncExecutionIndex = nextStateSyncExecutionIdx
 
 	nextRegisteredCommitmentIndex, err := systemState.GetNextCommittedIndex()
 	if err != nil {
-		return err
+		return fmt.Errorf("cannot get next committed index: %w", err)
 	}
 
 	if isEndOfEpoch {
@@ -213,7 +218,7 @@ func (cr *consensusRuntime) populateFsmIfBridgeEnabled(
 					"from state sync index", nextRegisteredCommitmentIndex,
 				)
 			} else {
-				return err
+				return fmt.Errorf("cannot get commitment to register: %w", err)
 			}
 		}
 
@@ -222,18 +227,18 @@ func (cr *consensusRuntime) populateFsmIfBridgeEnabled(
 
 	if isEndOfSprint {
 		if err := cr.state.cleanCommitments(nextStateSyncExecutionIdx); err != nil {
-			return err
+			return fmt.Errorf("cannot clean commitments: %w", err)
 		}
 
 		nonExecutedCommitments, err := cr.state.getNonExecutedCommitments(nextStateSyncExecutionIdx)
 		if err != nil {
-			return err
+			return fmt.Errorf("cannot get non executed commitments: %w", err)
 		}
 
 		if len(nonExecutedCommitments) > 0 {
 			bundlesToExecute, err := cr.state.getBundles(nextStateSyncExecutionIdx, maxBundlesPerSprint)
 			if err != nil {
-				return err
+				return fmt.Errorf("cannot get bundles: %w", err)
 			}
 
 			ff.commitmentsToVerifyBundles = nonExecutedCommitments
@@ -264,7 +269,7 @@ func (cr *consensusRuntime) FSM() error {
 		cr.logger,
 	)
 	if err != nil {
-		return err
+		return fmt.Errorf("cannot create block builder: %w", err)
 	}
 
 	pendingBlockNumber := parent.Number + 1
@@ -287,14 +292,14 @@ func (cr *consensusRuntime) FSM() error {
 	if cr.IsBridgeEnabled() {
 		err := cr.populateFsmIfBridgeEnabled(ff, epoch, parent, isEndOfEpoch, isEndOfSprint)
 		if err != nil {
-			return err
+			return fmt.Errorf("cannot populate fsm: %w", err)
 		}
 	}
 
 	if isEndOfEpoch {
 		ff.uptimeCounter, err = cr.calculateUptime(parent, epoch)
 		if err != nil {
-			return err
+			return fmt.Errorf("cannot calculate uptime: %w", err)
 		}
 	}
 
@@ -974,6 +979,6 @@ func (cr *consensusRuntime) MaximumFaultyNodes() uint64 {
 	return uint64(cr.fsm.validators.Len()-1) / 3
 }
 
-func (cr *consensusRuntime) Quorum(blockHeight uint64) uint64 {
+func (cr *consensusRuntime) Quorum(_ uint64) uint64 {
 	return uint64(getQuorumSize(cr.fsm.validators.Len()))
 }
