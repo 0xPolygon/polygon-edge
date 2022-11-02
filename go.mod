@@ -6,7 +6,6 @@ require (
 	github.com/btcsuite/btcd v0.22.1
 	github.com/containerd/cgroups v1.0.4 // indirect
 	github.com/elastic/gosigar v0.14.2 // indirect
-	github.com/go-kit/kit v0.12.0
 	github.com/golang/protobuf v1.5.2
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/websocket v1.5.0
@@ -60,10 +59,7 @@ require (
 	lukechampine.com/blake3 v1.1.7 // indirect
 )
 
-require (
-	github.com/0xPolygon/go-ibft v0.0.0-20220810095021-e43142f8d267
-	go.uber.org/atomic v1.10.0 // indirect
-)
+require github.com/0xPolygon/go-ibft v0.0.0-20220810095021-e43142f8d267
 
 require gopkg.in/DataDog/dd-trace-go.v1 v1.42.1
 
@@ -187,6 +183,7 @@ require (
 	github.com/valyala/fasthttp v1.37.0 // indirect
 	github.com/whyrusleeping/timecache v0.0.0-20160911033111-cfcb2f1abfee // indirect
 	go.opencensus.io v0.23.0 // indirect
+	go.uber.org/atomic v1.10.0 // indirect
 	go.uber.org/multierr v1.8.0 // indirect
 	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4 // indirect
 	golang.org/x/net v0.0.0-20220909164309-bea034e7d591 // indirect
