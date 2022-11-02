@@ -22,9 +22,6 @@ var (
 		"uint256 chainID, bytes aggregatedSignature, bytes validatorsBitmap, " +
 		"uint256 epochNumber, uint256 blockNumber, bytes32 blockHash, uint256 blockRound," +
 		"bytes32 eventRoot, tuple(address _address, uint256[4] blsKey)[] nextValidators" + ")")
-
-	burazBrat, _ = abi.NewMethod(
-		"function submitCheckpoint(tuple(address _address, uint256[4] blsKey)[] nextValidators)")
 )
 
 type checkpointManager struct {
