@@ -95,11 +95,11 @@ type consensusRuntime struct {
 	// eventTracker is a reference to the log event tracker
 	eventTracker *eventTracker
 
+	// lock is a lock to access 'epoch' and `lastBuiltBlock`
+	lock sync.RWMutex
+
 	// epoch is the metadata for the current epoch
 	epoch *epochMetadata
-
-	// lock is a lock to access 'epoch'
-	lock sync.RWMutex
 
 	// lastBuiltBlock is the header of the last processed block
 	lastBuiltBlock *types.Header
@@ -179,8 +179,8 @@ func (cr *consensusRuntime) OnBlockInserted(block *types.Block) {
 }
 
 func (cr *consensusRuntime) populateFsmIfBridgeEnabled(
-	ff *fsm, epoch *epochMetadata, isEndOfEpoch, isEndOfSprint bool) error {
-	systemState, err := cr.getSystemState(cr.lastBuiltBlock)
+	ff *fsm, epoch *epochMetadata, lastBuiltBlock *types.Header, isEndOfEpoch, isEndOfSprint bool) error {
+	systemState, err := cr.getSystemState(lastBuiltBlock)
 	if err != nil {
 		return err
 	}
@@ -248,8 +248,9 @@ func (cr *consensusRuntime) populateFsmIfBridgeEnabled(
 func (cr *consensusRuntime) FSM() error {
 	// figure out the parent. At this point this peer has done its best to sync up
 	// to the head of their remote peers.
-	parent := cr.lastBuiltBlock
-	epoch := cr.getEpoch()
+	cr.lock.RLock()
+	parent, epoch := cr.lastBuiltBlock, cr.epoch
+	cr.lock.RUnlock()
 
 	if !epoch.Validators.ContainsNodeID(cr.config.Key.NodeID()) {
 		return errNotAValidator
@@ -266,7 +267,7 @@ func (cr *consensusRuntime) FSM() error {
 		return err
 	}
 
-	pendingBlockNumber := cr.getPendingBlockNumber()
+	pendingBlockNumber := parent.Number + 1
 	isEndOfSprint := cr.isEndOfSprint(pendingBlockNumber)
 	isEndOfEpoch := cr.isEndOfEpoch(pendingBlockNumber)
 
@@ -279,19 +280,19 @@ func (cr *consensusRuntime) FSM() error {
 		validators:     newValidatorSet(types.BytesToAddress(parent.Miner), epoch.Validators),
 		isEndOfEpoch:   isEndOfEpoch,
 		isEndOfSprint:  isEndOfSprint,
-		epoch:          cr.epoch,
+		epoch:          epoch,
 		logger:         cr.logger.Named("fsm"),
 	}
 
 	if cr.IsBridgeEnabled() {
-		err := cr.populateFsmIfBridgeEnabled(ff, epoch, isEndOfEpoch, isEndOfSprint)
+		err := cr.populateFsmIfBridgeEnabled(ff, epoch, parent, isEndOfEpoch, isEndOfSprint)
 		if err != nil {
 			return err
 		}
 	}
 
 	if isEndOfEpoch {
-		ff.uptimeCounter, err = cr.calculateUptime(parent)
+		ff.uptimeCounter, err = cr.calculateUptime(parent, epoch)
 		if err != nil {
 			return err
 		}
@@ -652,24 +653,9 @@ func (cr *consensusRuntime) runCheckpoint(epoch *epochMetadata) error {
 	return nil
 }
 
-// getLatestSprintBlockNumber returns latest sprint block number
-func (cr *consensusRuntime) getLatestSprintBlockNumber() uint64 {
-	lastBuiltBlockNumber := cr.lastBuiltBlock.Number
-
-	sprintSizeMod := lastBuiltBlockNumber % cr.config.PolyBFTConfig.SprintSize
-	if sprintSizeMod == 0 {
-		return lastBuiltBlockNumber
-	}
-
-	sprintBlockNumber := lastBuiltBlockNumber - sprintSizeMod
-
-	return sprintBlockNumber
-}
-
 // calculateUptime calculates uptime for blocks starting from the last built block in current epoch,
 // and ending at the last block of previous epoch
-func (cr *consensusRuntime) calculateUptime(currentBlock *types.Header) (*CommitEpoch, error) {
-	epoch := cr.getEpoch()
+func (cr *consensusRuntime) calculateUptime(currentBlock *types.Header, epoch *epochMetadata) (*CommitEpoch, error) {
 	uptimeCounter := map[types.Address]uint64{}
 
 	if cr.config.PolyBFTConfig.EpochSize < (uptimeLookbackSize + 1) {
@@ -784,11 +770,6 @@ func (cr *consensusRuntime) setIsActiveValidator(isActiveValidator bool) {
 // isActiveValidator indicates if node is in validator set or not
 func (cr *consensusRuntime) isActiveValidator() bool {
 	return atomic.LoadUint32(&cr.activeValidatorFlag) == 1
-}
-
-// getPendingBlockNumber returns block number currently being built (last built block number + 1)
-func (cr *consensusRuntime) getPendingBlockNumber() uint64 {
-	return cr.lastBuiltBlock.Number + 1
 }
 
 // isEndOfEpoch checks if an end of an epoch is reached with the current block
@@ -939,8 +920,12 @@ func (cr *consensusRuntime) IsValidCommittedSeal(proposalHash []byte, committedS
 // Implementation of core.Backend
 
 func (cr *consensusRuntime) BuildProposal(blockNumber uint64) []byte {
-	if cr.lastBuiltBlock.Number+1 != blockNumber {
-		cr.logger.Error("unable to build block, due to lack of parent block", "num", cr.lastBuiltBlock.Number)
+	cr.lock.RLock()
+	lastBuiltBlock := cr.lastBuiltBlock.Number
+	cr.lock.RUnlock()
+
+	if lastBuiltBlock+1 != blockNumber {
+		cr.logger.Error("unable to build block, due to lack of parent block", "num", lastBuiltBlock)
 
 		return nil
 	}
@@ -964,13 +949,15 @@ func (cr *consensusRuntime) InsertBlock(proposal []byte, committedSeals []*messa
 	}
 
 	if cr.IsBridgeEnabled() {
+		epoch := cr.getEpoch()
+
 		if fsm.isEndOfEpoch && fsm.commitmentToSaveOnRegister != nil {
 			if err := cr.state.insertCommitmentMessage(fsm.commitmentToSaveOnRegister); err != nil {
 				cr.logger.Error("insert proposal, insert commitment message error", "err", err)
 			}
 
 			if err := cr.buildBundles(
-				fsm.epoch.Commitment, fsm.commitmentToSaveOnRegister.Message, fsm.stateSyncExecutionIndex); err != nil {
+				epoch.Commitment, fsm.commitmentToSaveOnRegister.Message, fsm.stateSyncExecutionIndex); err != nil {
 				cr.logger.Error("insert proposal, build bundles error", "err", err)
 			}
 		}
