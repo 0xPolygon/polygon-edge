@@ -17,8 +17,6 @@ import (
 	hcf "github.com/hashicorp/go-hclog"
 )
 
-// var _ pbft.Backend = &fsm{}
-
 type blockBuilder interface {
 	Reset() error
 	WriteTx(*types.Transaction) error
@@ -158,7 +156,6 @@ func (f *fsm) BuildProposal() ([]byte, error) {
 	}
 
 	f.block = stateBlock
-
 	f.proposal = stateBlock.Block.MarshalRLP()
 
 	f.logger.Debug("[FSM Build Proposal]",
