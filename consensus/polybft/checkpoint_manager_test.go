@@ -15,7 +15,59 @@ import (
 	"github.com/umbracle/ethgo"
 )
 
+func TestCheckpointManager_submitCheckpoint(t *testing.T) {
+	t.Parallel()
+
+	validators := newTestValidators(5).getPublicIdentities()
+	rootchainMock := new(dummyRootchainInteractor)
+	rootchainMock.On("Call", mock.Anything, mock.Anything, mock.Anything).
+		Return("1", error(nil)).
+		Once()
+	rootchainMock.On("GetPendingNonce", mock.Anything).
+		Return(uint64(1), error(nil)).
+		Once()
+	rootchainMock.On("SendTransaction", mock.Anything, mock.Anything).
+		Return(&ethgo.Receipt{Status: uint64(types.ReceiptSuccess)}, error(nil)).
+		Once()
+
+	backendMock := new(polybftBackendMock)
+	backendMock.On("GetValidators", mock.Anything, mock.Anything).Return(validators)
+
+	checkpointHeader := &types.Header{Number: 1}
+
+	c := &checkpointManager{
+		sender:           types.StringToAddress("2"),
+		rootchain:        rootchainMock,
+		consensusBackend: backendMock,
+		blockchain:       &blockchainMock{},
+	}
+	bmp := bitmap.Bitmap{}
+
+	for i := range validators {
+		bmp.Set(uint64(i))
+	}
+
+	checkpoint := &CheckpointData{
+		BlockRound:  1,
+		EpochNumber: 1,
+		EventRoot:   types.BytesToHash(generateRandomBytes(t)),
+	}
+	extraRaw := createTestExtra(validators, validators, 3, 3, 3)
+	extra, err := GetIbftExtra(extraRaw)
+	require.NoError(t, err)
+
+	extra.Checkpoint = checkpoint
+	checkpointHeader.ExtraData = append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...)
+	checkpointHeader.ComputeHash()
+
+	err = c.submitCheckpoint(*checkpointHeader, 1)
+	require.NoError(t, err)
+	rootchainMock.AssertExpectations(t)
+}
+
 func TestCheckpointManager_abiEncodeCheckpointBlock(t *testing.T) {
+	t.Parallel()
+
 	const epochSize = uint64(10)
 
 	currentValidators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D"})
@@ -26,7 +78,6 @@ func TestCheckpointManager_abiEncodeCheckpointBlock(t *testing.T) {
 		EpochNumber: getEpochNumber(header.Number, epochSize),
 		EventRoot:   types.BytesToHash(generateRandomBytes(t)),
 	}
-	extra := &Extra{Checkpoint: checkpoint}
 
 	proposalHash := generateRandomBytes(t)
 
@@ -43,6 +94,7 @@ func TestCheckpointManager_abiEncodeCheckpointBlock(t *testing.T) {
 	aggSignature, err := signature.Marshal()
 	require.NoError(t, err)
 
+	extra := &Extra{Checkpoint: checkpoint}
 	extra.Committed = &Signature{
 		AggregatedSignature: aggSignature,
 		Bitmap:              bmp,
@@ -145,5 +197,5 @@ func (d dummyRootchainInteractor) SendTransaction(nonce uint64, transaction *eth
 func (d dummyRootchainInteractor) GetPendingNonce(address types.Address) (uint64, error) {
 	args := d.Called(address)
 
-	return uint64(args.Int(0)), args.Error(1)
+	return args.Get(0).(uint64), args.Error(1) //nolint:forcetypeassert
 }

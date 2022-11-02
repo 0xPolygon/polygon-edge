@@ -32,7 +32,6 @@ type checkpointManager struct {
 	blockchain       blockchainBackend
 	rootchain        rootchainInteractor
 	consensusBackend polybftBackend
-	epochSize        uint64
 }
 
 // getCurrentCheckpointID queries CheckpointManager smart contract and retrieves current checkpoint id

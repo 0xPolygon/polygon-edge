@@ -148,7 +148,6 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 			blockchain:       config.blockchain,
 			rootchain:        &defaultRootchainInteractor{},
 			consensusBackend: config.polybftBackend,
-			epochSize:        config.PolyBFTConfig.EpochSize,
 		}
 	}
 
