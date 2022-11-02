@@ -8,7 +8,6 @@ import (
 	"sort"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/0xPolygon/pbft-consensus"
 	"github.com/0xPolygon/polygon-edge/blockchain"
@@ -21,10 +20,9 @@ import (
 )
 
 const (
-	eventsBufferSize       = 10
-	stateFileName          = "consensusState.db"
-	uptimeLookbackSize     = 2                // number of blocks to calculate uptime from the previous epoch
-	checkpointTimeInterval = 30 * time.Minute // frequency at which sending checkpoints are sent to the rootchain
+	eventsBufferSize   = 10
+	stateFileName      = "consensusState.db"
+	uptimeLookbackSize = 2 // number of blocks to calculate uptime from the previous epoch
 )
 
 var (
@@ -117,9 +115,6 @@ type consensusRuntime struct {
 	// activeValidatorFlag indicates whether the given node is amongst currently active validator set
 	activeValidatorFlag uint32
 
-	// checkpointsOffset represents offset between checkpoint blocks (applicable only for non-epoch ending blocks)
-	checkpointsOffset uint64
-
 	// checkpointManager represents abstraction for checkpoint submission
 	checkpointManager *checkpointManager
 
@@ -129,12 +124,10 @@ type consensusRuntime struct {
 
 // newConsensusRuntime creates and starts a new consensus runtime instance with event tracking
 func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRuntime, error) {
-	blockTimeInMillis := config.PolyBFTConfig.BlockTime.Milliseconds()
 	runtime := &consensusRuntime{
-		state:             config.State,
-		config:            config,
-		logger:            log.Named("consensus_runtime"),
-		checkpointsOffset: uint64(checkpointTimeInterval.Milliseconds() / blockTimeInMillis),
+		state:  config.State,
+		config: config,
+		logger: log.Named("consensus_runtime"),
 	}
 
 	if runtime.IsBridgeEnabled() {
@@ -143,12 +136,12 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 			return nil, err
 		}
 
-		runtime.checkpointManager = &checkpointManager{
-			sender:           types.Address(config.Key.Address()),
-			blockchain:       config.blockchain,
-			rootchain:        &defaultRootchainInteractor{},
-			consensusBackend: config.polybftBackend,
-		}
+		runtime.checkpointManager = newCheckpointManager(
+			types.Address(config.Key.Address()),
+			config.PolyBFTConfig.BlockTime,
+			&defaultRootchainInteractor{},
+			config.blockchain,
+			config.polybftBackend)
 	}
 
 	return runtime, nil
@@ -233,7 +226,9 @@ func (c *consensusRuntime) populateFsmIfBridgeEnabled(
 			}
 		}
 
-		if c.isCheckpointBlock(ff.block.Block.Number()) && ff.roundInfo.IsProposer {
+		blockNumber := ff.block.Block.Number()
+		if ff.roundInfo.IsProposer &&
+			(c.isEndOfEpoch(blockNumber) || c.checkpointManager.isCheckpointIntervalElapsed(blockNumber)) {
 			go func(header types.Header, epochNumber uint64) {
 				err := c.checkpointManager.submitCheckpoint(header, epochNumber)
 				if err != nil {
@@ -650,14 +645,6 @@ func (c *consensusRuntime) deliverMessage(msg *TransportMessage) (bool, error) {
 	return true, nil
 }
 
-// isCheckpointBlock returns indication whether given block is the checkpoint block.
-// Returns true for either epoch ending block or
-// at each N blocks, where N is calculated as division between predefined checkpoint interval and block time
-func (c *consensusRuntime) isCheckpointBlock(blockNumber uint64) bool {
-	return c.isEndOfEpoch(blockNumber) ||
-		blockNumber%c.checkpointsOffset == 0
-}
-
 // getLatestSprintBlockNumber returns latest sprint block number
 func (c *consensusRuntime) getLatestSprintBlockNumber() uint64 {
 	lastBuiltBlockNumber := c.lastBuiltBlock.Number
@@ -844,6 +831,12 @@ func (c *consensusRuntime) isActiveValidator() bool {
 // getPendingBlockNumber returns block number currently being built (last built block number + 1)
 func (c *consensusRuntime) getPendingBlockNumber() uint64 {
 	return c.lastBuiltBlock.Number + 1
+}
+
+// isCheckpointBlock returns true for epoch ending blocks or
+// blocks in the middle of the epoch which are offseted by predefined count of blocks
+func (c *consensusRuntime) isCheckpointBlock(blockNumber uint64) bool {
+	return c.isEndOfEpoch(blockNumber) || c.checkpointManager.isCheckpointIntervalElapsed(blockNumber)
 }
 
 // isEndOfEpoch checks if an end of an epoch is reached with the current block

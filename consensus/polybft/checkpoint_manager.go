@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/big"
 	"strconv"
+	"time"
 
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -22,13 +23,40 @@ var (
 		"uint256 chainID, bytes aggregatedSignature, bytes validatorsBitmap, " +
 		"uint256 epochNumber, uint256 blockNumber, bytes32 blockHash, uint256 blockRound," +
 		"bytes32 eventRoot, tuple(address _address, uint256[4] blsKey)[] nextValidators" + ")")
+
+	// frequency at which checkpoints are sent to the rootchain
+	checkpointTimeInterval = 30 * time.Minute
 )
 
+// checkpointManager encapsulates logic for checkpoint data submission
 type checkpointManager struct {
-	sender           types.Address
-	blockchain       blockchainBackend
-	rootchain        rootchainInteractor
+	// sender address
+	sender types.Address
+	// blockchain is abstraction for blockchain
+	blockchain blockchainBackend
+	// consensusBackend is abstraction for polybft consensus specific functions
 	consensusBackend polybftBackend
+	// rootchain represents abstraction for rootchain interaction
+	rootchain rootchainInteractor
+	// checkpointsOffset represents offset between checkpoint blocks (applicable only for non-epoch ending blocks)
+	checkpointsOffset uint64
+}
+
+// newCheckpointManager creates a new instance of checkpointManager
+func newCheckpointManager(sender types.Address, blockTime time.Duration, interactor rootchainInteractor,
+	blockchain blockchainBackend, backend polybftBackend) *checkpointManager {
+	r := interactor
+	if interactor == nil {
+		r = &defaultRootchainInteractor{}
+	}
+
+	return &checkpointManager{
+		sender:            sender,
+		blockchain:        blockchain,
+		consensusBackend:  backend,
+		rootchain:         r,
+		checkpointsOffset: uint64(checkpointTimeInterval.Milliseconds() / blockTime.Milliseconds()),
+	}
 }
 
 // getCurrentCheckpointID queries CheckpointManager smart contract and retrieves current checkpoint id
@@ -147,6 +175,13 @@ func (c *checkpointManager) abiEncodeCheckpointBlock(header types.Header, extra 
 	}
 
 	return submitCheckpointMethod.Encode(params)
+}
+
+// isCheckpointIntervalElapsed returns indication whether given block is the checkpoint block.
+// Returns true at each N blocks, where N is calculated
+// as division between predefined checkpoint interval and block time
+func (c *checkpointManager) isCheckpointIntervalElapsed(blockNumber uint64) bool {
+	return blockNumber%c.checkpointsOffset == 0
 }
 
 var _ rootchainInteractor = (*defaultRootchainInteractor)(nil)

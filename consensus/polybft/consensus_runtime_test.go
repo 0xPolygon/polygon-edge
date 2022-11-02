@@ -1596,12 +1596,11 @@ func TestConsensusRuntime_FSM_EndOfEpoch_PostHook(t *testing.T) {
 	}
 
 	runtime := &consensusRuntime{
-		logger:            hclog.NewNullLogger(),
-		state:             state,
-		epoch:             metadata,
-		config:            config,
-		lastBuiltBlock:    lastBuiltBlock,
-		checkpointsOffset: sprintSize,
+		logger:         hclog.NewNullLogger(),
+		state:          state,
+		epoch:          metadata,
+		config:         config,
+		lastBuiltBlock: lastBuiltBlock,
 	}
 
 	fsm, err := runtime.FSM()
@@ -1727,7 +1726,7 @@ func TestConsensusRuntime_GenerateExitProof(t *testing.T) {
 	})
 }
 
-func TestConsensusRuntime_isCheckpointBlock(t *testing.T) {
+func TestCheckpointManager_isCheckpointBlock(t *testing.T) {
 	t.Parallel()
 
 	epochSize := uint64(10)
@@ -1767,6 +1766,7 @@ func TestConsensusRuntime_isCheckpointBlock(t *testing.T) {
 
 			runtime, err := newConsensusRuntime(hclog.NewNullLogger(), config)
 			require.NoError(t, err)
+			runtime.checkpointManager = newCheckpointManager(types.ZeroAddress, config.PolyBFTConfig.BlockTime, nil, nil, nil)
 			runtime.lastBuiltBlock = &types.Header{Number: c.blockNumber}
 			require.Equal(t, c.isCheckpointBlock, runtime.isCheckpointBlock(c.blockNumber))
 		})
