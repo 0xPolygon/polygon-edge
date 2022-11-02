@@ -1,6 +1,7 @@
 package network
 
 import (
+	"context"
 	"crypto/rand"
 	"fmt"
 	"math/big"
@@ -222,7 +223,7 @@ func (s *Server) setupDiscovery() error {
 	)
 
 	// Register a network event handler
-	if subscribeErr := s.SubscribeFn(discoveryService.HandleNetworkEvent); subscribeErr != nil {
+	if subscribeErr := s.SubscribeFn(context.Background(), discoveryService.HandleNetworkEvent); subscribeErr != nil {
 		return fmt.Errorf("unable to subscribe to network events, %w", subscribeErr)
 	}
 
