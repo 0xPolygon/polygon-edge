@@ -174,7 +174,7 @@ func (p *Polybft) Initialize() error {
 
 	// create bridge and consensus topics
 	if err := p.createTopics(); err != nil {
-		return err
+		return fmt.Errorf("cannot create topics: %w", err)
 	}
 
 	// set block time
@@ -278,7 +278,7 @@ func (p *Polybft) startRuntime() error {
 	if p.runtime.IsBridgeEnabled() {
 		// start bridge event tracker
 		if err := p.runtime.startEventTracker(); err != nil {
-			return fmt.Errorf("starting event tracker  failed:%w", err)
+			return fmt.Errorf("starting event tracker  failed: %w", err)
 		}
 
 		// subscribe to bridge topic
@@ -355,8 +355,6 @@ func (p *Polybft) startPbftProcess() {
 			}
 
 			sequenceCh, stopSequence = p.ibft.runSequence(latestHeader.Number + 1)
-		} else {
-			sequenceCh, stopSequence = nil, nil
 		}
 
 		select {

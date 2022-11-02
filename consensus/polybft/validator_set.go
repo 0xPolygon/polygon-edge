@@ -4,12 +4,19 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-// ValidatorSet is a wrapper interface around pbft.ValidatorSet and it holds current validator set
+// ValidatorSet interface of the current validator set
 type ValidatorSet interface {
+
+	// CalcProposer calculates next proposer based on the passed round
 	CalcProposer(round uint64) types.Address
+
+	// Includes checks if the passed address in included in the current validator set
 	Includes(address types.Address) bool
+
+	// Len returns the size of the validator set
 	Len() int
 
+	// Accounts returns the list of the ValidatorAccount
 	Accounts() AccountSet
 }
 

@@ -1081,7 +1081,7 @@ func (cr *consensusRuntime) BuildRoundChangeMessage(
 	return signedMsg
 }
 
-// eecoverAddressFromSignature recovers signer address from the given digest and signature
+// recoverAddressFromSignature recovers signer address from the given digest and signature
 func recoverAddressFromSignature(sig, msg []byte) (types.Address, error) {
 	pub, err := crypto.RecoverPubkey(sig, msg)
 	if err != nil {
@@ -1091,6 +1091,7 @@ func recoverAddressFromSignature(sig, msg []byte) (types.Address, error) {
 	return crypto.PubKeyToAddress(pub), nil
 }
 
+// signMessage signs the message  with ecdsa
 func signMessage(msg *proto.Message, key *wallet.Key) (*proto.Message, error) {
 	raw, err := protobuf.Marshal(msg)
 	if err != nil {
@@ -1104,6 +1105,7 @@ func signMessage(msg *proto.Message, key *wallet.Key) (*proto.Message, error) {
 	return msg, nil
 }
 
+// validateVote validates if the senders address is in active validator set
 func validateVote(vote *MessageSignature, epoch *epochMetadata) error {
 	// get senders address
 	senderAddress := types.StringToAddress(vote.From)

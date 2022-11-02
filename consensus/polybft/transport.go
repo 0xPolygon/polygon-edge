@@ -93,17 +93,15 @@ func (p *Polybft) subscribeToIbftTopic() error {
 // createTopics create all topics for a PolyBft instance
 func (p *Polybft) createTopics() (err error) {
 	if p.consensusConfig.IsBridgeEnabled() {
-		// create bridge topic
 		p.bridgeTopic, err = p.config.Network.NewTopic(bridgeProto, &pbftproto.TransportMessage{})
 		if err != nil {
 			return fmt.Errorf("failed to create bridge topic. Error: %w", err)
 		}
 	}
 
-	// create pbft topic
 	p.consensusTopic, err = p.config.Network.NewTopic(pbftProto, &proto.Message{})
 	if err != nil {
-		return fmt.Errorf("failed to create pbft topic. Error: %w", err)
+		return fmt.Errorf("failed to create consensus topic. Error: %w", err)
 	}
 
 	return nil
@@ -112,6 +110,6 @@ func (p *Polybft) createTopics() (err error) {
 // Multicast is implementation of core.Transport interface
 func (p *Polybft) Multicast(msg *proto.Message) {
 	if err := p.consensusTopic.Publish(msg); err != nil {
-		p.logger.Warn("failed to multicast consensus message", "err", err)
+		p.logger.Warn("failed to multicast consensus message", "error", err)
 	}
 }
