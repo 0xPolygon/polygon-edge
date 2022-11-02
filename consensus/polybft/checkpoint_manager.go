@@ -20,8 +20,11 @@ var (
 	// submit checkpoint function on CheckpointManager contract
 	submitCheckpointMethod, _ = abi.NewMethod("function submitCheckpoint(" +
 		"uint256 chainID, bytes aggregatedSignature, bytes validatorsBitmap, " +
-		"uint256 epochNumber, uint256 blockNumber, bytes32 blockHash, uint256 blockRound" +
+		"uint256 epochNumber, uint256 blockNumber, bytes32 blockHash, uint256 blockRound," +
 		"bytes32 eventRoot, tuple(address _address, uint256[4] blsKey)[] nextValidators" + ")")
+
+	burazBrat, _ = abi.NewMethod(
+		"function submitCheckpoint(tuple(address _address, uint256[4] blsKey)[] nextValidators)")
 )
 
 type checkpointManager struct {
@@ -135,11 +138,6 @@ func (c *checkpointManager) submitCheckpointInternal(nonce uint64, txn *ethgo.Tr
 // abiEncodeCheckpointBlock encodes checkpoint data into ABI format for a given header
 func (c *checkpointManager) abiEncodeCheckpointBlock(header types.Header, extra Extra,
 	nextValidators AccountSet) ([]byte, error) {
-	nextValidatorsAbiEncoded, err := nextValidators.EncodeAbi()
-	if err != nil {
-		return nil, err
-	}
-
 	params := map[string]interface{}{
 		"chainID":             new(big.Int).SetUint64(c.blockchain.GetChainID()),
 		"aggregatedSignature": extra.Committed.AggregatedSignature,
@@ -149,7 +147,7 @@ func (c *checkpointManager) abiEncodeCheckpointBlock(header types.Header, extra 
 		"blockHash":           header.Hash,
 		"blockRound":          new(big.Int).SetUint64(extra.Checkpoint.BlockRound),
 		"eventRoot":           extra.Checkpoint.EventRoot.Bytes(),
-		"nextValidators":      nextValidatorsAbiEncoded,
+		"nextValidators":      nextValidators.AsGenericMaps(),
 	}
 
 	return submitCheckpointMethod.Encode(params)
