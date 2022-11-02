@@ -11,10 +11,13 @@ import (
 
 	"github.com/0xPolygon/go-ibft/messages"
 	"github.com/0xPolygon/go-ibft/messages/proto"
+	protobuf "google.golang.org/protobuf/proto"
+
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
+	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
 	hcf "github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
@@ -829,19 +832,6 @@ func (cr *consensusRuntime) getCommitmentToRegister(epoch *epochMetadata,
 	}, nil
 }
 
-func validateVote(vote *MessageSignature, epoch *epochMetadata) error {
-	// get senders address
-	senderAddress := types.StringToAddress(vote.From)
-	if !epoch.Validators.ContainsAddress(senderAddress) {
-		return fmt.Errorf(
-			"message is received from sender %s, which is not in current validator set",
-			vote.From,
-		)
-	}
-
-	return nil
-}
-
 func (cr *consensusRuntime) IsValidBlock(proposal []byte) bool {
 	if err := cr.fsm.Validate(proposal); err != nil {
 		cr.logger.Error("failed validate proposal", "error", err)
@@ -852,14 +842,13 @@ func (cr *consensusRuntime) IsValidBlock(proposal []byte) bool {
 	return true
 }
 
-// IsValidSender checks if signature is from sender
 func (cr *consensusRuntime) IsValidSender(msg *proto.Message) bool {
 	msgNoSig, err := msg.PayloadNoSig()
 	if err != nil {
 		return false
 	}
 
-	signerAddress, err := RecoverAddressFromSignature(msg.Signature, msgNoSig)
+	signerAddress, err := recoverAddressFromSignature(msg.Signature, msgNoSig)
 	if err != nil {
 		cr.logger.Error("failed to ecrecover message", "err", err)
 
@@ -891,14 +880,12 @@ func (cr *consensusRuntime) IsValidSender(msg *proto.Message) bool {
 	return true
 }
 
-// IsProposer checks if the passed in ID is the Proposer for current view (sequence, round)
 func (cr *consensusRuntime) IsProposer(id []byte, height, round uint64) bool {
 	nextProposer := cr.fsm.validators.CalcProposer(round)
 
 	return bytes.Equal(id, nextProposer[:])
 }
 
-// IsValidProposalHash checks if the hash matches the proposal
 func (cr *consensusRuntime) IsValidProposalHash(proposal, hash []byte) bool {
 	newBlock := types.Block{}
 	if err := newBlock.UnmarshalRLP(proposal); err != nil {
@@ -910,7 +897,6 @@ func (cr *consensusRuntime) IsValidProposalHash(proposal, hash []byte) bool {
 	return bytes.Equal(newBlock.Header.Hash.Bytes(), hash)
 }
 
-// IsValidCommittedSeal checks if the seal for the proposal is valid
 func (cr *consensusRuntime) IsValidCommittedSeal(proposalHash []byte, committedSeal *messages.CommittedSeal) bool {
 	err := cr.fsm.ValidateCommit(committedSeal.Signer, committedSeal.Signature, proposalHash)
 	if err != nil {
@@ -921,8 +907,6 @@ func (cr *consensusRuntime) IsValidCommittedSeal(proposalHash []byte, committedS
 
 	return true
 }
-
-// Implementation of core.Backend
 
 func (cr *consensusRuntime) BuildProposal(blockNumber uint64) []byte {
 	cr.lock.RLock()
@@ -981,4 +965,154 @@ func (cr *consensusRuntime) MaximumFaultyNodes() uint64 {
 
 func (cr *consensusRuntime) Quorum(_ uint64) uint64 {
 	return uint64(getQuorumSize(cr.fsm.validators.Len()))
+}
+
+func (cr *consensusRuntime) BuildPrePrepareMessage(
+	proposal []byte,
+	certificate *proto.RoundChangeCertificate,
+	view *proto.View,
+) *proto.Message {
+	block := types.Block{}
+	if err := block.UnmarshalRLP(proposal); err != nil {
+		cr.logger.Error(fmt.Sprintf("cannot unmarshal RLP:%s", err))
+
+		return nil
+	}
+
+	proposalHash := block.Hash().Bytes()
+
+	msg := proto.Message{
+		View: view,
+		From: cr.ID(),
+		Type: proto.MessageType_PREPREPARE,
+		Payload: &proto.Message_PreprepareData{
+			PreprepareData: &proto.PrePrepareMessage{
+				Proposal:     proposal,
+				ProposalHash: proposalHash,
+				Certificate:  certificate,
+			},
+		},
+	}
+
+	message, err := signMessage(&msg, cr.config.Key)
+	if err != nil {
+		cr.logger.Error("Cannot sign message", "error", err)
+
+		return nil
+	}
+
+	return message
+}
+
+func (cr *consensusRuntime) BuildPrepareMessage(proposalHash []byte, view *proto.View) *proto.Message {
+	msg := proto.Message{
+		View: view,
+		From: cr.ID(),
+		Type: proto.MessageType_PREPARE,
+		Payload: &proto.Message_PrepareData{
+			PrepareData: &proto.PrepareMessage{
+				ProposalHash: proposalHash,
+			},
+		},
+	}
+
+	message, err := signMessage(&msg, cr.config.Key)
+	if err != nil {
+		cr.logger.Error("Cannot sign message.", "error", err)
+
+		return nil
+	}
+
+	return message
+}
+
+func (cr *consensusRuntime) BuildCommitMessage(proposalHash []byte, view *proto.View) *proto.Message {
+	committedSeal, err := cr.config.Key.Sign(proposalHash)
+	if err != nil {
+		cr.logger.Error("Cannot create committed seal message.", "error", err)
+
+		return nil
+	}
+
+	msg := proto.Message{
+		View: view,
+		From: cr.ID(),
+		Type: proto.MessageType_COMMIT,
+		Payload: &proto.Message_CommitData{
+			CommitData: &proto.CommitMessage{
+				ProposalHash:  proposalHash,
+				CommittedSeal: committedSeal,
+			},
+		},
+	}
+
+	message, err := signMessage(&msg, cr.config.Key)
+	if err != nil {
+		cr.logger.Error("Cannot sign message", "error", err)
+
+		return nil
+	}
+
+	return message
+}
+
+func (cr *consensusRuntime) BuildRoundChangeMessage(
+	proposal []byte,
+	certificate *proto.PreparedCertificate,
+	view *proto.View,
+) *proto.Message {
+	msg := proto.Message{
+		View: view,
+		From: cr.ID(),
+		Type: proto.MessageType_ROUND_CHANGE,
+		Payload: &proto.Message_RoundChangeData{RoundChangeData: &proto.RoundChangeMessage{
+			LastPreparedProposedBlock: proposal,
+			LatestPreparedCertificate: certificate,
+		}},
+	}
+
+	signedMsg, err := signMessage(&msg, cr.config.Key)
+	if err != nil {
+		cr.logger.Error("Cannot sign message", "Error", err)
+
+		return nil
+	}
+
+	return signedMsg
+}
+
+// eecoverAddressFromSignature recovers signer address from the given digest and signature
+func recoverAddressFromSignature(sig, msg []byte) (types.Address, error) {
+	pub, err := crypto.RecoverPubkey(sig, msg)
+	if err != nil {
+		return types.Address{}, fmt.Errorf("cannot recover addrese from signature: %w", err)
+	}
+
+	return crypto.PubKeyToAddress(pub), nil
+}
+
+func signMessage(msg *proto.Message, key *wallet.Key) (*proto.Message, error) {
+	raw, err := protobuf.Marshal(msg)
+	if err != nil {
+		return nil, fmt.Errorf("cannot marshal message: %w", err)
+	}
+
+	if msg.Signature, err = key.SignEcdsa(raw); err != nil {
+		return nil, fmt.Errorf("cannot create message signature: %w", err)
+	}
+
+	return msg, nil
+}
+
+func validateVote(vote *MessageSignature, epoch *epochMetadata) error {
+	// get senders address
+	senderAddress := types.StringToAddress(vote.From)
+	if !epoch.Validators.ContainsAddress(senderAddress) {
+		return fmt.Errorf(
+			"message is received from sender %s, which is not in current validator set",
+			vote.From,
+		)
+	}
+
+	return nil
 }

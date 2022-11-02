@@ -376,11 +376,6 @@ func (p *Polybft) startPbftProcess() {
 	}
 }
 
-// isSynced return true if the current header from the local storage corresponds to the highest block of syncer
-func (p *Polybft) isSynced() bool {
-	return false // TODO: remove this method
-}
-
 func (p *Polybft) waitForNPeers() bool {
 	for {
 		select {
@@ -441,7 +436,7 @@ func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, parents []*type
 		return nil
 	}
 
-	//validate header fields
+	// validate header fields
 	if err := validateHeaderFields(parent, header); err != nil {
 		return fmt.Errorf("failed to validate header for block %d. error = %w", blockNumber, err)
 	}
@@ -466,8 +461,12 @@ func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, parents []*type
 	}
 
 	if err := extra.Committed.VerifyCommittedFields(validators, header.Hash); err != nil {
-		return fmt.Errorf("failed to verify signatures for block %d. Block hash: %v. Error: %w",
-			blockNumber, header.Hash, err)
+		return fmt.Errorf(
+			"failed to verify signatures for block %d. Block hash: %v. Error: %w",
+			blockNumber,
+			header.Hash,
+			err,
+		)
 	}
 
 	// validate the signatures for parent (skip block 1 because genesis does not have committed)
