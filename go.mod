@@ -6,7 +6,6 @@ require (
 	github.com/btcsuite/btcd v0.22.1
 	github.com/containerd/cgroups v1.0.4 // indirect
 	github.com/elastic/gosigar v0.14.2 // indirect
-	github.com/go-kit/kit v0.12.0
 	github.com/golang/protobuf v1.5.2
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/websocket v1.5.0
@@ -39,7 +38,7 @@ require (
 
 require (
 	cloud.google.com/go/secretmanager v1.7.0
-	github.com/armon/go-metrics v0.4.0
+	github.com/armon/go-metrics v0.4.1
 	github.com/aws/aws-sdk-go v1.44.61
 	github.com/benbjohnson/clock v1.3.0 // indirect
 	github.com/coinbase/kryptology v1.8.0
