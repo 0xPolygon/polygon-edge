@@ -324,11 +324,16 @@ func (p *TxPool) SetSigner(s signer) {
 
 // SetSealing sets the sealing flag
 func (p *TxPool) SetSealing(sealing bool) {
+	newValue := uint32(0)
 	if sealing {
-		atomic.StoreUint32(&p.sealing, 1)
-	} else {
-		atomic.StoreUint32(&p.sealing, 0)
+		newValue = 1
 	}
+
+	atomic.CompareAndSwapUint32(
+		&p.sealing,
+		p.sealing,
+		newValue,
+	)
 }
 
 // sealing returns the current set sealing flag
