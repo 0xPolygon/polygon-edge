@@ -10,6 +10,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/network/common"
 	"github.com/0xPolygon/polygon-edge/network/dial"
 	"github.com/0xPolygon/polygon-edge/network/discovery"
+	"github.com/armon/go-metrics"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/p2p/security/noise"
 	rawGrpc "google.golang.org/grpc"
@@ -65,8 +66,6 @@ type Server struct {
 
 	peers     map[peer.ID]*PeerConnInfo // map of all peer connections
 	peersLock sync.Mutex                // lock for the peer map
-
-	metrics *Metrics // reference for metrics tracking
 
 	dialQueue *dial.DialQueue // queue used to asynchronously connect to peers
 
@@ -138,7 +137,6 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		host:             host,
 		addrs:            host.Addrs(),
 		peers:            make(map[peer.ID]*PeerConnInfo),
-		metrics:          config.Metrics,
 		dialQueue:        dial.NewDialQueue(),
 		closeCh:          make(chan struct{}),
 		emitterPeerEvent: emitter,
@@ -516,9 +514,7 @@ func (s *Server) removePeerInfo(peerID peer.ID) *PeerConnInfo {
 		}
 	}
 
-	s.metrics.TotalPeerCount.Set(
-		float64(len(s.peers)),
-	)
+	metrics.SetGauge([]string{"peers"}, float32(len(s.peers)))
 
 	return connectionInfo
 }
@@ -773,13 +769,10 @@ func (s *Server) SubscribeCh(ctx context.Context) (<-chan *peerEvent.PeerEvent, 
 func (s *Server) updateConnCountMetrics(direction network.Direction) {
 	switch direction {
 	case network.DirInbound:
-		s.metrics.InboundConnectionsCount.Set(
-			float64(s.connectionCounts.GetInboundConnCount()),
-		)
+		metrics.SetGauge([]string{"inbound_connections_count"}, float32(s.connectionCounts.GetInboundConnCount()))
+
 	case network.DirOutbound:
-		s.metrics.OutboundConnectionsCount.Set(
-			float64(s.connectionCounts.GetOutboundConnCount()),
-		)
+		metrics.SetGauge([]string{"outbound_connections_count"}, float32(s.connectionCounts.GetOutboundConnCount()))
 	}
 }
 
@@ -787,12 +780,11 @@ func (s *Server) updateConnCountMetrics(direction network.Direction) {
 func (s *Server) updatePendingConnCountMetrics(direction network.Direction) {
 	switch direction {
 	case network.DirInbound:
-		s.metrics.PendingInboundConnectionsCount.Set(
-			float64(s.connectionCounts.GetPendingInboundConnCount()),
-		)
+		metrics.SetGauge([]string{"pending_inbound_connections_count"},
+			float32(s.connectionCounts.GetPendingInboundConnCount()))
+
 	case network.DirOutbound:
-		s.metrics.PendingOutboundConnectionsCount.Set(
-			float64(s.connectionCounts.GetPendingOutboundConnCount()),
-		)
+		metrics.SetGauge([]string{"pending_outbound_connections_count"},
+			float32(s.connectionCounts.GetPendingOutboundConnCount()))
 	}
 }

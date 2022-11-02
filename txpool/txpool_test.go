@@ -30,8 +30,6 @@ var (
 		Homestead: chain.NewFork(0),
 		Istanbul:  chain.NewFork(0),
 	}
-
-	nilMetrics = NilMetrics()
 )
 
 // addresses used in tests
@@ -87,7 +85,6 @@ func newTestPoolWithSlots(maxSlots uint64, mockStore ...store) (*TxPool, error) 
 		storeToUse,
 		nil,
 		nil,
-		nilMetrics,
 		&Config{
 			PriceLimit:          defaultPriceLimit,
 			MaxSlots:            maxSlots,
