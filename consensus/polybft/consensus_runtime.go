@@ -51,6 +51,14 @@ type txPoolInterface interface {
 	Demote(tx *types.Transaction)
 }
 
+// checkpointBackend is an interface providing functions for working with checkpoints and exit evens
+type checkpointBackend interface {
+	// BuildEventRoot generates an event root hash from exit events in given epoch
+	BuildEventRoot(epoch uint64, nonCommittedExitEvents []*ExitEvent) (types.Hash, error)
+	// InsertExitEvents inserts provided exit events to persistence storage
+	InsertExitEvents(exitEvents []*ExitEvent) error
+}
+
 // epochMetadata is the static info for epoch currently being processed
 type epochMetadata struct {
 	// Number is the number of the epoch
@@ -221,7 +229,7 @@ func (c *consensusRuntime) populateFsmIfBridgeEnabled(
 	if isEndOfEpoch {
 		commitment, err := c.getCommitmentToRegister(epoch, nextRegisteredCommitmentIndex)
 		if err != nil {
-			if errors.Is(err, ErrCommitmentNotBuilt) {
+			if errors.Is(err, errCommitmentNotBuilt) {
 				c.logger.Debug("[FSM] Have no built commitment to register",
 					"epoch", epoch.Number, "from state sync index", nextRegisteredCommitmentIndex)
 			} else if errors.Is(err, errQuorumNotReached) {
@@ -281,17 +289,17 @@ func (c *consensusRuntime) FSM() (*fsm, error) {
 	isEndOfEpoch := c.isEndOfEpoch(pendingBlockNumber)
 
 	ff := &fsm{
-		config:           c.config.PolyBFTConfig,
-		parent:           parent,
-		backend:          c.config.blockchain,
-		polybftBackend:   c.config.polybftBackend,
-		epochNumber:      epoch.Number,
-		blockBuilder:     blockBuilder,
-		validators:       newValidatorSet(types.BytesToAddress(parent.Miner), epoch.Validators),
-		isEndOfEpoch:     isEndOfEpoch,
-		isEndOfSprint:    isEndOfSprint,
-		buildEventRootFn: c.getExitEventRootHash,
-		logger:           c.logger.Named("fsm"),
+		config:            c.config.PolyBFTConfig,
+		parent:            parent,
+		backend:           c.config.blockchain,
+		polybftBackend:    c.config.polybftBackend,
+		checkpointBackend: c,
+		epochNumber:       epoch.Number,
+		blockBuilder:      blockBuilder,
+		validators:        newValidatorSet(types.BytesToAddress(parent.Miner), epoch.Validators),
+		isEndOfEpoch:      isEndOfEpoch,
+		isEndOfSprint:     isEndOfSprint,
+		logger:            c.logger.Named("fsm"),
 	}
 
 	if c.IsBridgeEnabled() {
@@ -420,7 +428,7 @@ func (c *consensusRuntime) buildCommitment(epoch, fromIndex uint64) (*Commitment
 	// if it is not already built in the previous epoch
 	stateSyncEvents, err := c.state.getStateSyncEventsForCommitment(fromIndex, toIndex)
 	if err != nil {
-		if errors.Is(err, ErrNotEnoughStateSyncs) {
+		if errors.Is(err, errNotEnoughStateSyncs) {
 			c.logger.Debug("[buildCommitment] Not enough state syncs to build a commitment",
 				"epoch", epoch, "from state sync index", fromIndex)
 			// this is a valid case, there is not enough state syncs
@@ -762,18 +770,24 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header) (*CommitE
 	return commitEpoch, nil
 }
 
-// getExitEventRootHash returns the exit event root hash from gathered exit events in given epoch
-func (c *consensusRuntime) getExitEventRootHash(epoch uint64) (types.Hash, error) {
+// InsertExitEvents is an implementation of checkpointBackend interface
+func (c *consensusRuntime) InsertExitEvents(exitEvents []*ExitEvent) error {
+	return c.state.insertExitEvents(exitEvents)
+}
+
+// BuildEventRoot is an implementation of checkpointBackend interface
+func (c *consensusRuntime) BuildEventRoot(epoch uint64, nonCommittedExitEvents []*ExitEvent) (types.Hash, error) {
 	exitEvents, err := c.state.getExitEventsByEpoch(epoch)
 	if err != nil {
 		return types.ZeroHash, err
 	}
 
-	if len(exitEvents) == 0 {
+	allEvents := append(exitEvents, nonCommittedExitEvents...)
+	if len(allEvents) == 0 {
 		return types.ZeroHash, nil
 	}
 
-	tree, err := createExitTree(exitEvents)
+	tree, err := createExitTree(allEvents)
 	if err != nil {
 		return types.ZeroHash, err
 	}
@@ -896,7 +910,7 @@ func (c *consensusRuntime) getCommitmentToRegister(epoch *epochMetadata,
 	registerCommitmentIndex uint64) (*CommitmentMessageSigned, error) {
 	if epoch.Commitment == nil {
 		// we did not build a commitment, so there is nothing to register
-		return nil, ErrCommitmentNotBuilt
+		return nil, errCommitmentNotBuilt
 	}
 
 	toIndex := registerCommitmentIndex + stateSyncMainBundleSize - 1

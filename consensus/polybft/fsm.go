@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"sort"
 	"time"
 
 	"github.com/0xPolygon/pbft-consensus"
@@ -23,9 +24,10 @@ var _ pbft.Backend = &fsm{}
 type blockBuilder interface {
 	Reset() error
 	WriteTx(*types.Transaction) error
-	Fill() error
+	Fill()
 	Build(func(h *types.Header)) (*StateBlock, error)
 	GetState() *state.Transition
+	Receipts() []*types.Receipt
 }
 
 const maxBundlesPerSprint = 50
@@ -91,8 +93,8 @@ type fsm struct {
 	// stateSyncExecutionIndex is the next state sync execution index in smart contract
 	stateSyncExecutionIndex uint64
 
-	// buildEventRootFn returns the root hash of exit event tree
-	buildEventRootFn func(epoch uint64) (types.Hash, error)
+	// checkpointBackend provides functions for working with checkpoints and exit events
+	checkpointBackend checkpointBackend
 
 	// logger instance
 	logger hcf.Logger
@@ -161,9 +163,7 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 	}
 
 	// fill the block with transactions
-	if err := f.blockBuilder.Fill(); err != nil {
-		return nil, err
-	}
+	f.blockBuilder.Fill()
 
 	// set the timestamp
 	parentTime := time.Unix(int64(parent.Timestamp), 0)
@@ -183,7 +183,12 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 		return nil, err
 	}
 
-	eventRoot, err := f.buildEventRootFn(f.epochNumber)
+	events, err := getExitEventsFromReceipts(f.epochNumber, parent.Number+1, f.blockBuilder.Receipts())
+	if err != nil {
+		return nil, err
+	}
+
+	eventRoot, err := f.checkpointBackend.BuildEventRoot(f.epochNumber, events)
 	if err != nil {
 		return nil, err
 	}
@@ -195,6 +200,7 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 		NextValidatorsHash:    nextValidatorsHash,
 		EventRoot:             eventRoot,
 	}
+
 	stateBlock, err := f.blockBuilder.Build(func(h *types.Header) {
 		h.Timestamp = uint64(headerTime.Unix())
 		h.ExtraData = append(make([]byte, signer.IstanbulExtraVanity), extra.MarshalRLPTo(nil)...)
@@ -532,18 +538,26 @@ func (f *fsm) Insert(p *pbft.SealedProposal) error {
 		Bitmap:              bitmap,
 	}
 
-	// Write extar data to header
+	// Write extra data to header
 	f.block.Block.Header.ExtraData = append(make([]byte, 32), extra.MarshalRLPTo(nil)...)
 
 	if err := f.backend.CommitBlock(f.block); err != nil {
 		return err
 	}
 
-	if err := f.postInsertHook(); err != nil {
+	// commit exit events only when we finalize a block
+	events, err := getExitEventsFromReceipts(f.epochNumber, f.block.Block.Number(), f.block.Receipts)
+	if err != nil {
 		return err
 	}
 
-	return nil
+	if len(events) > 0 {
+		if err := f.checkpointBackend.InsertExitEvents(events); err != nil {
+			return err
+		}
+	}
+
+	return f.postInsertHook()
 }
 
 // Height returns the height for the current round
@@ -647,4 +661,36 @@ func createStateTransactionWithData(target types.Address, inputData []byte) *typ
 	tx.ComputeHash()
 
 	return tx
+}
+
+// getExitEventsFromReceipts parses logs from receipts to find exit events
+func getExitEventsFromReceipts(epoch, block uint64, receipts []*types.Receipt) ([]*ExitEvent, error) {
+	events := make([]*ExitEvent, 0)
+
+	for i := 0; i < len(receipts); i++ {
+		if len(receipts[i].Logs) == 0 {
+			continue
+		}
+
+		for j := 0; j < len(receipts[i].Logs); j++ {
+			event, err := decodeExitEvent(convertLog(receipts[i].Logs[j]), epoch, block)
+			if err != nil {
+				return nil, err
+			}
+
+			if event == nil {
+				// valid case, not an exit event
+				continue
+			}
+
+			events = append(events, event)
+		}
+	}
+
+	// enforce sequential order
+	sort.Slice(events, func(i, j int) bool {
+		return events[i].ID < events[j].ID
+	})
+
+	return events, nil
 }

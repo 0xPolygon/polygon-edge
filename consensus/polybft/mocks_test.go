@@ -19,7 +19,7 @@ import (
 	"github.com/umbracle/ethgo/contract"
 )
 
-var _ blockchainBackend = &blockchainMock{}
+var _ blockchainBackend = (*blockchainMock)(nil)
 
 type blockchainMock struct {
 	mock.Mock
@@ -118,7 +118,7 @@ func (m *blockchainMock) GetChainID() uint64 {
 	return 0
 }
 
-var _ polybftBackend = &polybftBackendMock{}
+var _ polybftBackend = (*polybftBackendMock)(nil)
 
 type polybftBackendMock struct {
 	mock.Mock
@@ -158,7 +158,7 @@ func (p *polybftBackendMock) GetValidators(blockNumber uint64, parents []*types.
 	panic("polybftBackendMock.GetValidators doesn't support such combination of arguments")
 }
 
-var _ blockBuilder = &blockBuilderMock{}
+var _ blockBuilder = (*blockBuilderMock)(nil)
 
 type blockBuilderMock struct {
 	mock.Mock
@@ -179,13 +179,15 @@ func (m *blockBuilderMock) WriteTx(tx *types.Transaction) error {
 	return args.Error(0)
 }
 
-func (m *blockBuilderMock) Fill() error {
-	args := m.Called()
-	if len(args) == 0 {
-		return nil
-	}
+func (m *blockBuilderMock) Fill() {
+	m.Called()
+}
 
-	return args.Error(0)
+// Receipts returns the collection of transaction receipts for given block
+func (m *blockBuilderMock) Receipts() []*types.Receipt {
+	args := m.Called()
+
+	return args.Get(0).([]*types.Receipt) //nolint:forcetypeassert
 }
 
 func (m *blockBuilderMock) Build(handler func(*types.Header)) (*StateBlock, error) {
@@ -203,7 +205,7 @@ func (m *blockBuilderMock) GetState() *state.Transition {
 	return args.Get(0).(*state.Transition) //nolint:forcetypeassert
 }
 
-var _ SystemState = &systemStateMock{}
+var _ SystemState = (*systemStateMock)(nil)
 
 type systemStateMock struct {
 	mock.Mock
@@ -274,7 +276,7 @@ func (m *systemStateMock) GetEpoch() (uint64, error) {
 	return 0, nil
 }
 
-var _ contract.Provider = &stateProviderMock{}
+var _ contract.Provider = (*stateProviderMock)(nil)
 
 type stateProviderMock struct {
 	mock.Mock
@@ -288,7 +290,7 @@ func (s *stateProviderMock) Txn(ethgo.Address, ethgo.Key, []byte) (contract.Txn,
 	return nil, nil
 }
 
-var _ Transport = &transportMock{}
+var _ Transport = (*transportMock)(nil)
 
 type transportMock struct {
 	mock.Mock
@@ -296,6 +298,24 @@ type transportMock struct {
 
 func (t *transportMock) Gossip(message interface{}) {
 	_ = t.Called(message)
+}
+
+var _ checkpointBackend = (*checkpointBackendMock)(nil)
+
+type checkpointBackendMock struct {
+	mock.Mock
+}
+
+func (c *checkpointBackendMock) BuildEventRoot(epoch uint64, nonCommittedExitEvents []*ExitEvent) (types.Hash, error) {
+	args := c.Called()
+
+	return args.Get(0).(types.Hash), args.Error(1) //nolint:forcetypeassert
+}
+
+func (c *checkpointBackendMock) InsertExitEvents(exitEvents []*ExitEvent) error {
+	c.Called()
+
+	return nil
 }
 
 type testValidators struct {
