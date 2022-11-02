@@ -1,6 +1,7 @@
 package polybft
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"math/big"
@@ -223,20 +224,20 @@ func (f *fsm) createValidatorsUptimeTx() (*types.Transaction, error) {
 func (f *fsm) ValidateCommit(signer []byte, seal []byte, proposalHash []byte) error {
 	from := types.BytesToAddress(signer)
 
-	// TODO: I dont think this is needed here. Just delete or uncomment if needed
-	// if f.proposal == nil {
-	// 	return fmt.Errorf("incorrect commit from %s. current proposal unavailable", from)
-	// }
+	// TODO: I dont think this is needed here (check !bytes.Equal(newBlock.Hash().Bytes(), proposalHash))
+	if f.proposal == nil {
+		return fmt.Errorf("incorrect commit from %s. current proposal unavailable", from)
+	}
 
-	// newBlock := &types.Block{}
-	// if err := newBlock.UnmarshalRLP(f.proposal); err != nil {
-	// 	f.logger.Error("unable to unmarshal proposal", "err", err)
-	// }
+	newBlock := &types.Block{}
+	if err := newBlock.UnmarshalRLP(f.proposal); err != nil {
+		f.logger.Error("unable to unmarshal proposal", "err", err)
+	}
 
-	// if !bytes.Equal(newBlock.Hash().Bytes(), proposalHash) {
-	// 	return fmt.Errorf("incorrect proposal hash submitted via consensus engine from %s, is: %v expected: %v",
-	// 		from, newBlock.Hash().Bytes(), proposalHash)
-	// }
+	if !bytes.Equal(newBlock.Hash().Bytes(), proposalHash) {
+		return fmt.Errorf("incorrect proposal hash submitted via consensus engine from %s, is: %v expected: %v",
+			from, newBlock.Hash().Bytes(), proposalHash)
+	}
 
 	validator := f.validators.Accounts().GetValidatorAccount(from)
 	if validator == nil {
