@@ -18,12 +18,6 @@ func TestE2E_Consensus_Basic_WithNonValidators(t *testing.T) {
 }
 
 func TestE2E_Consensus_Sync_WithNonValidators(t *testing.T) {
-	for i := 0; i < 100; i++ {
-		consensusSyncWithNonValidatorsExecute(t)
-	}
-}
-
-func consensusSyncWithNonValidatorsExecute(t *testing.T) {
 	t.Helper()
 
 	// one non-validator node from the ensemble gets disconnected and connected again.
