@@ -541,6 +541,10 @@ func (f *fsm) Insert(p *pbft.SealedProposal) error {
 	// Write extra data to header
 	f.block.Block.Header.ExtraData = append(make([]byte, 32), extra.MarshalRLPTo(nil)...)
 
+	if err := f.backend.CommitBlock(f.block); err != nil {
+		return err
+	}
+
 	// commit exit events only when we finalize a block
 	events, err := getExitEventsFromReceipts(f.epochNumber, f.block.Block.Number(), f.block.Receipts)
 	if err != nil {
@@ -551,10 +555,6 @@ func (f *fsm) Insert(p *pbft.SealedProposal) error {
 		if err := f.checkpointBackend.InsertExitEvents(events); err != nil {
 			return err
 		}
-	}
-
-	if err := f.backend.CommitBlock(f.block); err != nil {
-		return err
 	}
 
 	return f.postInsertHook()
