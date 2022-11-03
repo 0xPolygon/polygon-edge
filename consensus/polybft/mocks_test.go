@@ -284,15 +284,15 @@ func (s *stateProviderMock) Txn(ethgo.Address, ethgo.Key, []byte) (contract.Txn,
 	return nil, nil
 }
 
-// var _ Transport = &transportMock{}
+var _ BridgeTransport = &transportMock{}
 
-// type transportMock struct {
-// 	mock.Mock
-// }
+type transportMock struct {
+	mock.Mock
+}
 
-// func (t *transportMock) Gossip(message interface{}) {
-// 	_ = t.Called(message)
-// }
+func (t *transportMock) Multicast(msg interface{}) {
+	_ = t.Called(msg)
+}
 
 type testValidators struct {
 	validators map[string]*testValidator

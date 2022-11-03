@@ -44,7 +44,7 @@ func (cr *consensusRuntime) subscribeToBridgeTopic(topic *network.Topic) error {
 	return topic.Subscribe(func(obj interface{}, _ peer.ID) {
 		msg, ok := obj.(*pbftproto.TransportMessage)
 		if !ok {
-			cr.logger.Warn("failed to deliver message", "err", "invalid msg")
+			cr.logger.Warn("failed to deliver message, invalid msg", "obj", obj)
 
 			return
 		}
@@ -52,7 +52,7 @@ func (cr *consensusRuntime) subscribeToBridgeTopic(topic *network.Topic) error {
 		var transportMsg *TransportMessage
 
 		if err := json.Unmarshal(msg.Data, &transportMsg); err != nil {
-			cr.logger.Warn("failed to deliver message", "err", err)
+			cr.logger.Warn("failed to deliver message", "err", err, "obj", obj)
 
 			return
 		}
