@@ -3,20 +3,8 @@ package chain
 import (
 	"encoding/json"
 	"reflect"
-	"strings"
 	"testing"
 )
-
-func TestValidateChainID(t *testing.T) {
-	for id, name := range chains {
-		c, err := ImportFromName(strings.ToLower(name))
-		if err == nil {
-			if c.Params.ChainID != int(id) {
-				t.Fatalf("Network id does not match for %s. Expected %d but found %d", name, c.Params.ChainID, id)
-			}
-		}
-	}
-}
 
 func TestParamsForks(t *testing.T) {
 	cases := []struct {
