@@ -175,7 +175,6 @@ type Transition struct {
 	// dummy
 	auxState State
 
-	r       *Executor
 	config  chain.ForksInTime
 	state   *Txn
 	getHash GetHashByNumber
