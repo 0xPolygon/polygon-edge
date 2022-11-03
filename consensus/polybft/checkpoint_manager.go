@@ -219,6 +219,12 @@ func (c *checkpointManager) isEndOfEpoch(header types.Header, parentHeader *type
 		return false, nil, err
 	}
 
+	// don't query parent for the first block,
+	// since genesis block doesn't have checkpoint data set
+	if header.Number == 1 {
+		return false, extra, nil
+	}
+
 	if parentHeader == nil {
 		foundParent := false
 		parentHeader, foundParent = c.blockchain.GetHeaderByNumber(header.Number - 1)
