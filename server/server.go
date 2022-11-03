@@ -143,6 +143,7 @@ func NewServer(config *Config) (*Server, error) {
 	if err := m.setupTelemetry(); err != nil {
 		return nil, err
 	}
+
 	if config.Telemetry.PrometheusAddr != nil {
 		m.prometheusServer = m.startPrometheusServer(config.Telemetry.PrometheusAddr)
 	}
