@@ -64,7 +64,7 @@ require (
 	go.uber.org/atomic v1.10.0
 )
 
-require gopkg.in/DataDog/dd-trace-go.v1 v1.42.1
+require gopkg.in/DataDog/dd-trace-go.v1 v1.43.1
 
 require (
 	cloud.google.com/go v0.104.0 // indirect
@@ -187,6 +187,8 @@ require (
 	github.com/whyrusleeping/timecache v0.0.0-20160911033111-cfcb2f1abfee // indirect
 	go.opencensus.io v0.23.0 // indirect
 	go.uber.org/multierr v1.8.0 // indirect
+	go4.org/intern v0.0.0-20211027215823-ae77deb06f29 // indirect
+	go4.org/unsafe/assume-no-moving-gc v0.0.0-20220617031537-928513b29760 // indirect
 	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4 // indirect
 	golang.org/x/net v0.0.0-20220909164309-bea034e7d591 // indirect
 	golang.org/x/oauth2 v0.0.0-20220909003341-f21342109be1 // indirect
@@ -198,4 +200,5 @@ require (
 	google.golang.org/appengine v1.6.7 // indirect
 	gopkg.in/square/go-jose.v2 v2.6.0 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
+	inet.af/netaddr v0.0.0-20220617031823-097006376321 // indirect
 )
