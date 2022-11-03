@@ -5,6 +5,7 @@ import (
 	"math/big"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
@@ -33,13 +34,23 @@ func TestCheckpointManager_submitCheckpoint(t *testing.T) {
 	backendMock := new(polybftBackendMock)
 	backendMock.On("GetValidators", mock.Anything, mock.Anything).Return(validators)
 
-	checkpointHeader := &types.Header{Number: 1}
+	parentExtra := &Extra{Checkpoint: &CheckpointData{EpochNumber: 1}}
+	headersMap := &testHeadersMap{}
+	headersMap.addHeader(&types.Header{
+		Number:    1,
+		ExtraData: append(make([]byte, ExtraVanity), parentExtra.MarshalRLPTo(nil)...),
+	})
+	// mock blockchain
+	blockchainMock := new(blockchainMock)
+	blockchainMock.On("GetHeaderByNumber", mock.Anything).Return(headersMap.getHeader)
+
+	checkpointHeader := &types.Header{Number: 2}
 
 	c := &checkpointManager{
 		sender:           types.StringToAddress("2"),
 		rootchain:        rootchainMock,
 		consensusBackend: backendMock,
-		blockchain:       &blockchainMock{},
+		blockchain:       blockchainMock,
 	}
 	bmp := bitmap.Bitmap{}
 
@@ -172,6 +183,64 @@ func TestCheckpointManager_getCurrentCheckpointID(t *testing.T) {
 			rootchainMock.AssertExpectations(t)
 
 			t.Logf(c.name)
+		})
+	}
+}
+
+func TestCheckpointManager_isCheckpointBlock(t *testing.T) {
+	t.Parallel()
+
+	const (
+		blockTime = 30 * time.Second
+		epochSize = uint64(10)
+	)
+
+	cases := []struct {
+		name              string
+		blockNumber       uint64
+		isCheckpointBlock bool
+	}{
+		{
+			name:              "Checkpoint block (epoch ending block)",
+			blockNumber:       11,
+			isCheckpointBlock: true,
+		},
+		{
+			name:              "Not checkpoint block (non-epoch ending block)",
+			blockNumber:       5,
+			isCheckpointBlock: false,
+		},
+		{
+			name:              "Checkpoint block (non-epoch ending block, checkpoint interval elapsed)",
+			blockNumber:       60,
+			isCheckpointBlock: true,
+		},
+	}
+
+	for _, c := range cases {
+		c := c
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+
+			parentExtra := &Extra{Checkpoint: &CheckpointData{EpochNumber: getEpochNumber(c.blockNumber-1, epochSize)}}
+			headersMap := &testHeadersMap{}
+			headersMap.addHeader(&types.Header{
+				Number:    c.blockNumber - 1,
+				ExtraData: append(make([]byte, ExtraVanity), parentExtra.MarshalRLPTo(nil)...),
+			})
+			// mock blockchain
+			blockchainMock := new(blockchainMock)
+			blockchainMock.On("GetHeaderByNumber", mock.Anything).Return(headersMap.getHeader)
+
+			checkpointMgr := newCheckpointManager(types.ZeroAddress, blockTime, nil, blockchainMock, nil)
+			extra := &Extra{Checkpoint: &CheckpointData{EpochNumber: getEpochNumber(c.blockNumber, epochSize)}}
+			header := &types.Header{
+				Number:    c.blockNumber,
+				ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...),
+			}
+			isCheckpointBlock, err := checkpointMgr.isCheckpointBlock(*header)
+			require.NoError(t, err)
+			require.Equal(t, c.isCheckpointBlock, isCheckpointBlock)
 		})
 	}
 }

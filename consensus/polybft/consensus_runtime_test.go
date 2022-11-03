@@ -1604,6 +1604,8 @@ func TestConsensusRuntime_FSM_EndOfEpoch_PostHook(t *testing.T) {
 	}
 
 	fsm, err := runtime.FSM()
+	fsm.roundInfo = &pbft.RoundInfo{}
+
 	assert.NoError(t, err)
 	assert.NotNil(t, fsm.proposerCommitmentToRegister)
 	assert.Equal(t, fromIndex, fsm.proposerCommitmentToRegister.Message.FromIndex)
@@ -1618,8 +1620,12 @@ func TestConsensusRuntime_FSM_EndOfEpoch_PostHook(t *testing.T) {
 	// we add this for NotifyProposalInserted,
 	// and we are adding first block so we do not need to mock the restart epoch on block insert
 	// since we only care if the commitment data gets saved in db on postHook
+	extra := &Extra{}
 	fsm.block = &StateBlock{Block: consensus.BuildBlock(consensus.BuildBlockParams{
-		Header: &types.Header{Number: 1},
+		Header: &types.Header{
+			Number:    1,
+			ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...),
+		},
 	})}
 
 	// we registered commitment in fsm
@@ -1726,53 +1732,6 @@ func TestConsensusRuntime_GenerateExitProof(t *testing.T) {
 	})
 }
 
-func TestCheckpointManager_isCheckpointBlock(t *testing.T) {
-	t.Parallel()
-
-	epochSize := uint64(10)
-	config := &runtimeConfig{
-		PolyBFTConfig: &PolyBFTConfig{
-			EpochSize: epochSize,
-			BlockTime: 30 * time.Second,
-		},
-	}
-
-	cases := []struct {
-		name              string
-		blockNumber       uint64
-		isCheckpointBlock bool
-	}{
-		{
-			name:              "Checkpoint block (epoch ending block)",
-			blockNumber:       10,
-			isCheckpointBlock: true,
-		},
-		{
-			name:              "Not checkpoint block (non-epoch ending block)",
-			blockNumber:       5,
-			isCheckpointBlock: false,
-		},
-		{
-			name:              "Checkpoint block (non-epoch ending block, checkpoint interval elapsed)",
-			blockNumber:       60,
-			isCheckpointBlock: true,
-		},
-	}
-
-	for _, c := range cases {
-		c := c
-		t.Run(c.name, func(t *testing.T) {
-			t.Parallel()
-
-			runtime, err := newConsensusRuntime(hclog.NewNullLogger(), config)
-			require.NoError(t, err)
-			runtime.checkpointManager = newCheckpointManager(types.ZeroAddress, config.PolyBFTConfig.BlockTime, nil, nil, nil)
-			runtime.lastBuiltBlock = &types.Header{Number: c.blockNumber}
-			require.Equal(t, c.isCheckpointBlock, runtime.isCheckpointBlock(c.blockNumber))
-		})
-	}
-}
-
 func setupExitEventsForProofVerification(t *testing.T, state *State,
 	numOfBlocks, numOfEventsPerBlock uint64) [][]byte {
 	t.Helper()
@@ -1829,9 +1788,10 @@ func createTestBlocksForUptime(t *testing.T, numberOfBlocks uint64,
 	headerMap := &testHeadersMap{}
 	bitmaps := createTestBitmapsForUptime(t, validatorSet, numberOfBlocks)
 
+	extra := &Extra{}
 	genesisBlock := &types.Header{
 		Number:    0,
-		ExtraData: []byte{},
+		ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...),
 	}
 	parentHash := types.BytesToHash(big.NewInt(0).Bytes())
 

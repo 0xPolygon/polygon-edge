@@ -226,15 +226,20 @@ func (c *consensusRuntime) populateFsmIfBridgeEnabled(
 			}
 		}
 
-		blockNumber := ff.block.Block.Number()
-		if ff.roundInfo.IsProposer &&
-			(c.isEndOfEpoch(blockNumber) || c.checkpointManager.isCheckpointIntervalElapsed(blockNumber)) {
-			go func(header types.Header, epochNumber uint64) {
-				err := c.checkpointManager.submitCheckpoint(header, epochNumber)
-				if err != nil {
-					c.logger.Warn("failed to submit checkpoint", "epoch number", epochNumber, "error", err)
-				}
-			}(*ff.block.Block.Header, ff.epochNumber)
+		if ff.roundInfo.IsProposer {
+			isCheckpointBlock, err := c.checkpointManager.isCheckpointBlock(*ff.block.Block.Header)
+			if err != nil {
+				return err
+			}
+
+			if isCheckpointBlock {
+				go func(header types.Header, epochNumber uint64) {
+					err := c.checkpointManager.submitCheckpoint(header, epochNumber)
+					if err != nil {
+						c.logger.Warn("failed to submit checkpoint", "epoch number", epochNumber, "error", err)
+					}
+				}(*ff.block.Block.Header, ff.epochNumber)
+			}
 		}
 
 		c.NotifyProposalInserted(ff.block.Block.Header)
@@ -831,12 +836,6 @@ func (c *consensusRuntime) isActiveValidator() bool {
 // getPendingBlockNumber returns block number currently being built (last built block number + 1)
 func (c *consensusRuntime) getPendingBlockNumber() uint64 {
 	return c.lastBuiltBlock.Number + 1
-}
-
-// isCheckpointBlock returns true for epoch ending blocks or
-// blocks in the middle of the epoch which are offseted by predefined count of blocks
-func (c *consensusRuntime) isCheckpointBlock(blockNumber uint64) bool {
-	return c.isEndOfEpoch(blockNumber) || c.checkpointManager.isCheckpointIntervalElapsed(blockNumber)
 }
 
 // isEndOfEpoch checks if an end of an epoch is reached with the current block

@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/0xPolygon/pbft-consensus"
-	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/contracts"
@@ -203,7 +202,7 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 
 	stateBlock, err := f.blockBuilder.Build(func(h *types.Header) {
 		h.Timestamp = uint64(headerTime.Unix())
-		h.ExtraData = append(make([]byte, signer.IstanbulExtraVanity), extra.MarshalRLPTo(nil)...)
+		h.ExtraData = append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...)
 		h.MixHash = PolyBFTMixDigest
 	})
 
