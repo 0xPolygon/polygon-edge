@@ -27,8 +27,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/state"
 	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
-	"github.com/0xPolygon/polygon-edge/state/runtime/evm"
-	"github.com/0xPolygon/polygon-edge/state/runtime/precompiled"
 	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
@@ -145,6 +143,7 @@ func NewServer(config *Config) (*Server, error) {
 	if err := m.setupTelemetry(); err != nil {
 		return nil, err
 	}
+
 	if config.Telemetry.PrometheusAddr != nil {
 		m.prometheusServer = m.startPrometheusServer(config.Telemetry.PrometheusAddr)
 	}
@@ -185,8 +184,6 @@ func NewServer(config *Config) (*Server, error) {
 	m.state = st
 
 	m.executor = state.NewExecutor(config.Chain.Params, st, logger)
-	m.executor.SetRuntime(precompiled.NewPrecompiled())
-	m.executor.SetRuntime(evm.NewEVM())
 
 	// compute the genesis root state
 	genesisRoot := m.executor.WriteGenesis(config.Chain.Genesis.Alloc)
