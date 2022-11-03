@@ -8,9 +8,11 @@ import (
 	"time"
 
 	"github.com/0xPolygon/go-ibft/messages"
+	"github.com/0xPolygon/go-ibft/messages/proto"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -315,6 +317,31 @@ func (f *fsm) Validate(proposal []byte) error {
 	f.proposal = proposal
 
 	f.logger.Debug("[FSM Validate]", "txs", len(f.block.Block.Transactions), "hash", block.Hash().String())
+
+	return nil
+}
+
+// Validate sender address and signature
+func (f *fsm) ValidateSender(msg *proto.Message) error {
+	msgNoSig, err := msg.PayloadNoSig()
+	if err != nil {
+		return err
+	}
+
+	signerAddress, err := wallet.RecoverAddressFromSignature(msg.Signature, msgNoSig)
+	if err != nil {
+		return fmt.Errorf("failed to ecrecover message: %w", err)
+	}
+
+	// verify the signature came from the sender
+	if !bytes.Equal(msg.From, signerAddress.Bytes()) {
+		return fmt.Errorf("signer address %s doesn't match From field", signerAddress.String())
+	}
+
+	// verify the sender is in the active validator set
+	if !f.validators.Includes(signerAddress) {
+		return fmt.Errorf("signer address %s is not included in validator set", signerAddress.String())
+	}
 
 	return nil
 }

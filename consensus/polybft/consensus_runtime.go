@@ -11,13 +11,11 @@ import (
 
 	"github.com/0xPolygon/go-ibft/messages"
 	"github.com/0xPolygon/go-ibft/messages/proto"
-	protobuf "google.golang.org/protobuf/proto"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
-	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
 	hcf "github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
@@ -843,36 +841,9 @@ func (cr *consensusRuntime) IsValidBlock(proposal []byte) bool {
 }
 
 func (cr *consensusRuntime) IsValidSender(msg *proto.Message) bool {
-	msgNoSig, err := msg.PayloadNoSig()
+	err := cr.fsm.ValidateSender(msg)
 	if err != nil {
-		return false
-	}
-
-	signerAddress, err := recoverAddressFromSignature(msg.Signature, msgNoSig)
-	if err != nil {
-		cr.logger.Error("failed to ecrecover message", "err", err)
-
-		return false
-	}
-
-	// verify the signature came from the sender
-	if !bytes.Equal(msg.From, signerAddress.Bytes()) {
-		cr.logger.Error(
-			"signer address doesn't match with From",
-			"from", hex.EncodeToString(msg.From),
-			"signer", signerAddress,
-			"err", err,
-		)
-
-		return false
-	}
-
-	// verify the sender is in the active validator set
-	if !cr.fsm.validators.Includes(signerAddress) {
-		cr.logger.Error(
-			"signer address doesn't included in validators",
-			"signer", signerAddress,
-		)
+		cr.logger.Error("invalid sender", "err", err)
 
 		return false
 	}
@@ -994,7 +965,7 @@ func (cr *consensusRuntime) BuildPrePrepareMessage(
 		},
 	}
 
-	message, err := signMessage(&msg, cr.config.Key)
+	message, err := cr.config.Key.SignEcdsaMessage(&msg)
 	if err != nil {
 		cr.logger.Error("Cannot sign message", "error", err)
 
@@ -1016,7 +987,7 @@ func (cr *consensusRuntime) BuildPrepareMessage(proposalHash []byte, view *proto
 		},
 	}
 
-	message, err := signMessage(&msg, cr.config.Key)
+	message, err := cr.config.Key.SignEcdsaMessage(&msg)
 	if err != nil {
 		cr.logger.Error("Cannot sign message.", "error", err)
 
@@ -1046,7 +1017,7 @@ func (cr *consensusRuntime) BuildCommitMessage(proposalHash []byte, view *proto.
 		},
 	}
 
-	message, err := signMessage(&msg, cr.config.Key)
+	message, err := cr.config.Key.SignEcdsaMessage(&msg)
 	if err != nil {
 		cr.logger.Error("Cannot sign message", "error", err)
 
@@ -1071,7 +1042,7 @@ func (cr *consensusRuntime) BuildRoundChangeMessage(
 		}},
 	}
 
-	signedMsg, err := signMessage(&msg, cr.config.Key)
+	signedMsg, err := cr.config.Key.SignEcdsaMessage(&msg)
 	if err != nil {
 		cr.logger.Error("Cannot sign message", "Error", err)
 
@@ -1079,30 +1050,6 @@ func (cr *consensusRuntime) BuildRoundChangeMessage(
 	}
 
 	return signedMsg
-}
-
-// recoverAddressFromSignature recovers signer address from the given digest and signature
-func recoverAddressFromSignature(sig, msg []byte) (types.Address, error) {
-	pub, err := crypto.RecoverPubkey(sig, msg)
-	if err != nil {
-		return types.Address{}, fmt.Errorf("cannot recover addrese from signature: %w", err)
-	}
-
-	return crypto.PubKeyToAddress(pub), nil
-}
-
-// signMessage signs the message  with ecdsa
-func signMessage(msg *proto.Message, key *wallet.Key) (*proto.Message, error) {
-	raw, err := protobuf.Marshal(msg)
-	if err != nil {
-		return nil, fmt.Errorf("cannot marshal message: %w", err)
-	}
-
-	if msg.Signature, err = key.SignEcdsa(raw); err != nil {
-		return nil, fmt.Errorf("cannot create message signature: %w", err)
-	}
-
-	return msg, nil
 }
 
 // validateVote validates if the senders address is in active validator set
