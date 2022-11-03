@@ -119,10 +119,11 @@ func (c checkpointManager) submitCheckpoint(latestHeader types.Header, epochNumb
 			continue
 		}
 
-		err = c.submitCheckpointInternal(nonce, txn, *header, *extra)
+		err = c.submitCheckpointInternal(nonce, txn, *header, *extra, true)
 		if err != nil {
 			return err
 		}
+
 		nonce++
 	}
 
@@ -131,19 +132,19 @@ func (c checkpointManager) submitCheckpoint(latestHeader types.Header, epochNumb
 		return err
 	}
 
-	return c.submitCheckpointInternal(nonce, txn, latestHeader, *extra)
+	isEndOfEpoch, _, err := c.isEndOfEpoch(latestHeader, nil)
+	if err != nil {
+		return err
+	}
+
+	return c.submitCheckpointInternal(nonce, txn, latestHeader, *extra, isEndOfEpoch)
 }
 
 // submitCheckpointInternal encodes checkpoint data for the given block and
 // sends a transaction to the CheckpointManager rootchain contract
 func (c *checkpointManager) submitCheckpointInternal(nonce uint64, txn *ethgo.Transaction,
-	header types.Header, extra Extra) error {
+	header types.Header, extra Extra, isEndOfEpoch bool) error {
 	nextEpochValidators := AccountSet{}
-
-	isEndOfEpoch, _, err := c.isEndOfEpoch(header, nil)
-	if err != nil {
-		return err
-	}
 
 	if isEndOfEpoch {
 		var err error
