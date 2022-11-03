@@ -99,17 +99,21 @@ func (c checkpointManager) submitCheckpoint(latestHeader types.Header, epochNumb
 		To: &checkpointManagerAddr,
 	}
 
+	var parentHeader *types.Header
 	// detect any pending (previously failed) checkpoints and send them
 	for blockNum := checkpointID + 1; blockNum < latestHeader.Number; blockNum++ {
-		header, exists := c.blockchain.GetHeaderByNumber(blockNum)
-		if !exists {
+		header, found := c.blockchain.GetHeaderByNumber(blockNum)
+		if !found {
 			return fmt.Errorf("block %d was not found", blockNum)
 		}
 
-		isEndOfEpoch, extra, err := c.isEndOfEpoch(*header)
+		isEndOfEpoch, extra, err := c.isEndOfEpoch(*header, parentHeader)
 		if err != nil {
 			return err
 		}
+
+		parentHeader = header
+
 		// send pending checkpoints only for epoch ending blocks
 		if !isEndOfEpoch {
 			continue
@@ -136,7 +140,7 @@ func (c *checkpointManager) submitCheckpointInternal(nonce uint64, txn *ethgo.Tr
 	header types.Header, extra Extra) error {
 	nextEpochValidators := AccountSet{}
 
-	isEndOfEpoch, _, err := c.isEndOfEpoch(header)
+	isEndOfEpoch, _, err := c.isEndOfEpoch(header, nil)
 	if err != nil {
 		return err
 	}
@@ -199,7 +203,7 @@ func (c *checkpointManager) isCheckpointBlock(header types.Header) (bool, error)
 		return true, nil
 	}
 
-	isEndOfEpoch, _, err := c.isEndOfEpoch(header)
+	isEndOfEpoch, _, err := c.isEndOfEpoch(header, nil)
 	if err != nil {
 		return false, err
 	}
@@ -209,15 +213,19 @@ func (c *checkpointManager) isCheckpointBlock(header types.Header) (bool, error)
 
 // isEndOfEpoch determines if it is end of the epoch based on provided ValidatorSetDelta from Extra.
 // Epoch ending blocks have non-empty delta.
-func (c *checkpointManager) isEndOfEpoch(header types.Header) (bool, *Extra, error) {
+func (c *checkpointManager) isEndOfEpoch(header types.Header, parentHeader *types.Header) (bool, *Extra, error) {
 	extra, err := GetIbftExtra(header.ExtraData)
 	if err != nil {
 		return false, nil, err
 	}
 
-	parentHeader, foundParent := c.blockchain.GetHeaderByNumber(header.Number - 1)
-	if !foundParent {
-		return false, nil, fmt.Errorf("failed to find parent of header=%d", header.Number)
+	if parentHeader == nil {
+		foundParent := false
+		parentHeader, foundParent = c.blockchain.GetHeaderByNumber(header.Number - 1)
+
+		if !foundParent {
+			return false, nil, fmt.Errorf("failed to find parent of header=%d", header.Number)
+		}
 	}
 
 	parentExtra, err := GetIbftExtra(parentHeader.ExtraData)
