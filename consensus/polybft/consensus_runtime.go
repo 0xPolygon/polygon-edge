@@ -120,12 +120,16 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) *consensusRuntim
 	return runtime
 }
 
-// getEpoch returns current epochMetadata in a thread-safe manner.
-func (c *consensusRuntime) getEpoch() *epochMetadata {
+// getLastBultBlockAndEpoch returns last build block and current epochMetadata in a thread-safe manner.
+func (c *consensusRuntime) getLastBultBlockAndEpoch() (*types.Header, *epochMetadata) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
-	return c.epoch
+	// create copy of data
+	lastBuiltBlock, epoch := new(types.Header), new(epochMetadata)
+	*lastBuiltBlock, *epoch = *c.lastBuiltBlock, *c.epoch
+
+	return lastBuiltBlock, epoch
 }
 
 func (c *consensusRuntime) IsBridgeEnabled() bool {
@@ -258,9 +262,7 @@ func (c *consensusRuntime) populateFsmIfBridgeEnabled(
 func (c *consensusRuntime) FSM() (*fsm, error) {
 	// figure out the parent. At this point this peer has done its best to sync up
 	// to the head of their remote peers.
-	c.lock.RLock()
-	parent, epoch := c.lastBuiltBlock, c.epoch
-	c.lock.RUnlock()
+	parent, epoch := c.getLastBultBlockAndEpoch()
 
 	if !epoch.Validators.ContainsNodeID(c.config.Key.NodeID()) {
 		return nil, errNotAValidator
@@ -329,7 +331,7 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) error {
 		return err
 	}
 
-	lastEpoch := c.getEpoch()
+	_, lastEpoch := c.getLastBultBlockAndEpoch()
 	if lastEpoch != nil {
 		// Epoch might be already in memory, if its the same number do nothing.
 		// Otherwise, reset the epoch metadata and restart the async services
@@ -590,7 +592,8 @@ func (c *consensusRuntime) startEventTracker() error {
 // deliverMessage receives the message vote from transport and inserts it in state db for given epoch.
 // It returns indicator whether message is processed successfully and error object if any.
 func (c *consensusRuntime) deliverMessage(msg *TransportMessage) (bool, error) {
-	epoch := c.getEpoch()
+	_, epoch := c.getLastBultBlockAndEpoch()
+
 	if epoch == nil || msg.EpochNumber < epoch.Number {
 		// Epoch metadata is undefined
 		// or received message for some of the older epochs.
