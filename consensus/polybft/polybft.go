@@ -209,23 +209,19 @@ func (p *Polybft) Initialize() error {
 
 // Start starts the consensus and servers
 func (p *Polybft) Start() error {
-	p.logger.Info("starting polybft consensus")
+	p.logger.Info("starting polybft consensus", "signer", p.key.String())
 
-	// start syncer
-	if err := p.startSyncing(); err != nil {
-		return err
-	}
-
-	// start consensus
-	return p.startSealing()
-}
-
-// startSyncing starts the synchroniser
-func (p *Polybft) startSyncing() error {
+	// start syncer (also initializes peer map)
 	if err := p.syncer.Start(); err != nil {
 		return fmt.Errorf("failed to start syncer. Error: %w", err)
 	}
 
+	// we need to call restart epoch on runtime to initialize epoch state
+	if err := p.runtime.restartEpoch(p.blockchain.CurrentHeader()); err != nil {
+		return fmt.Errorf("consensus runtime start - restart epoch failed: %w", err)
+	}
+
+	// start syncing
 	go func() {
 		blockHandler := func(b *types.Block) bool {
 			p.runtime.OnBlockInserted(b)
@@ -238,26 +234,10 @@ func (p *Polybft) startSyncing() error {
 		}
 	}()
 
-	return nil
-}
-
-// startSealing is executed if the PolyBFT protocol is running in sealing mode.
-func (p *Polybft) startSealing() error {
-	p.logger.Info("Using signer", "address", p.key.String())
-
-	// we need to call restart epoch on runtime to initialize epoch state
-	if err := p.runtime.restartEpoch(p.blockchain.CurrentHeader()); err != nil {
-		return fmt.Errorf("consensus runtime start - restart epoch failed: %w", err)
-	}
-
+	// start pbft process
 	if err := p.startRuntime(); err != nil {
 		return fmt.Errorf("consensus runtime start failed: %w", err)
 	}
-
-	go func() {
-		// start the pbft process
-		p.startPbftProcess()
-	}()
 
 	return nil
 }
@@ -291,6 +271,8 @@ func (p *Polybft) startRuntime() error {
 			return fmt.Errorf("bridge topic subscription failed: %w", err)
 		}
 	}
+
+	go p.startPbftProcess()
 
 	return nil
 }
