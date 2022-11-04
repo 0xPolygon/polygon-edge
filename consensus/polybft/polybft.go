@@ -341,7 +341,11 @@ func (p *Polybft) startPbftProcess() {
 			// must initialize runtime epoch if not initialized already
 			if p.runtime.epoch == nil {
 				if err = p.runtime.restartEpoch(latestHeader); err != nil {
-					p.logger.Error("failed to retart epoch fsm", "block number", latestHeader.Number, "error", err)
+					p.logger.Error(
+						"failed to restart epoch fsm",
+						"block number", latestHeader.Number,
+						"error", err,
+					)
 
 					continue
 				}
