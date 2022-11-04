@@ -38,7 +38,8 @@ type checkpointManager struct {
 	// rootchain represents abstraction for rootchain interaction
 	rootchain rootchainInteractor
 	// checkpointsOffset represents offset between checkpoint blocks (applicable only for non-epoch ending blocks)
-	checkpointsOffset uint64
+	checkpointsOffset    uint64
+	lastCheckpointNumber uint64
 }
 
 // newCheckpointManager creates a new instance of checkpointManager
@@ -80,8 +81,8 @@ func (c checkpointManager) getCurrentCheckpointID() (uint64, error) {
 }
 
 // submitCheckpoint sends a transaction which with checkpoint data to the rootchain
-func (c checkpointManager) submitCheckpoint(latestHeader types.Header) error {
-	checkpointID, err := c.getCurrentCheckpointID()
+func (c checkpointManager) submitCheckpoint(latestHeader types.Header, isEndOfEpoch bool) error {
+	currentCheckpointID, err := c.getCurrentCheckpointID()
 	if err != nil {
 		return err
 	}
@@ -96,40 +97,57 @@ func (c checkpointManager) submitCheckpoint(latestHeader types.Header) error {
 		To: &checkpointManagerAddr,
 	}
 
-	var parentHeader *types.Header
-	// detect any pending (previously failed) checkpoints and send them
-	for blockNum := checkpointID + 1; blockNum < latestHeader.Number; blockNum++ {
-		header, found := c.blockchain.GetHeaderByNumber(blockNum)
-		if !found {
-			return fmt.Errorf("block %d was not found", blockNum)
-		}
+	var found bool
 
-		isEndOfEpoch, extra, err := c.isEndOfEpoch(*header, parentHeader)
+	var currentHeader, nextHeader *types.Header
+
+	initialBlockNumber := currentCheckpointID + 1
+
+	currentHeader, found = c.blockchain.GetHeaderByNumber(initialBlockNumber)
+	if !found {
+		return fmt.Errorf("block %d was not found", initialBlockNumber)
+	}
+
+	nextHeader, found = c.blockchain.GetHeaderByNumber(initialBlockNumber + 1)
+	if !found {
+		return fmt.Errorf("block %d was not found", initialBlockNumber+1)
+	}
+
+	// detect any pending end-of-epoch (previously failed) checkpoints and send them
+	for nextHeader.Number < latestHeader.Number {
+		currentExtra, err := GetIbftExtra(currentHeader.ExtraData)
 		if err != nil {
 			return err
 		}
 
-		parentHeader = header
+		nextExtra, err := GetIbftExtra(currentHeader.ExtraData)
+		if err != nil {
+			return err
+		}
 
-		// send pending checkpoints only for epoch ending blocks
-		if !isEndOfEpoch {
+		//pass only endOfEpoch blocks
+		if currentExtra.Checkpoint.EpochNumber == nextExtra.Checkpoint.EpochNumber {
 			continue
 		}
 
-		err = c.submitCheckpointInternal(nonce, txn, *header, *extra, true)
+		currentCheckpointID = currentHeader.Number
+
+		err = c.submitCheckpointInternal(nonce, txn, *currentHeader, *currentExtra, true)
 		if err != nil {
 			return err
 		}
 
+		currentHeader = nextHeader
+
+		nextHeader, found = c.blockchain.GetHeaderByNumber(currentHeader.Number + 1)
+		if !found {
+			return fmt.Errorf("block %d was not found", initialBlockNumber+1)
+		}
 		nonce++
 	}
 
+	//we need to send checkpoint for the latest block
 	extra, err := GetIbftExtra(latestHeader.ExtraData)
-	if err != nil {
-		return err
-	}
-
-	isEndOfEpoch, _, err := c.isEndOfEpoch(latestHeader, nil)
 	if err != nil {
 		return err
 	}
@@ -152,7 +170,7 @@ func (c *checkpointManager) submitCheckpointInternal(nonce uint64, txn *ethgo.Tr
 		}
 	}
 
-	input, err := c.abiEncodeCheckpointBlock(header, extra, nextEpochValidators)
+	input, err := c.abiEncodeCheckpointBlock(header.Number, header.Hash, extra, nextEpochValidators)
 	if err != nil {
 		return fmt.Errorf("failed to encode checkpoint data to ABI for block %d: %w", header.Number, err)
 	}
@@ -172,15 +190,15 @@ func (c *checkpointManager) submitCheckpointInternal(nonce uint64, txn *ethgo.Tr
 }
 
 // abiEncodeCheckpointBlock encodes checkpoint data into ABI format for a given header
-func (c *checkpointManager) abiEncodeCheckpointBlock(header types.Header, extra Extra,
+func (c *checkpointManager) abiEncodeCheckpointBlock(headerNumber uint64, headerHash types.Hash, extra Extra,
 	nextValidators AccountSet) ([]byte, error) {
 	params := map[string]interface{}{
 		"chainID":             new(big.Int).SetUint64(c.blockchain.GetChainID()),
 		"aggregatedSignature": extra.Committed.AggregatedSignature,
 		"validatorsBitmap":    extra.Committed.Bitmap,
 		"epochNumber":         new(big.Int).SetUint64(extra.Checkpoint.EpochNumber),
-		"blockNumber":         new(big.Int).SetUint64(header.Number),
-		"blockHash":           header.Hash,
+		"blockNumber":         new(big.Int).SetUint64(headerNumber),
+		"blockHash":           headerHash,
 		"blockRound":          new(big.Int).SetUint64(extra.Checkpoint.BlockRound),
 		"eventRoot":           extra.Checkpoint.EventRoot.Bytes(),
 		"nextValidators":      nextValidators.AsGenericMaps(),
@@ -196,56 +214,8 @@ func (c *checkpointManager) setCheckpointsOffset(checkpointsOffset uint64) {
 
 // isCheckpointBlock returns true for epoch ending blocks and
 // blocks in the middle of the epoch which are offseted by predefined count of blocks
-func (c *checkpointManager) isCheckpointBlock(header types.Header) (bool, error) {
-	lastCheckpointBlockNumber, err := c.getCurrentCheckpointID()
-	if err != nil {
-		return false, err
-	}
-
-	if lastCheckpointBlockNumber+c.checkpointsOffset == header.Number {
-		return true, nil
-	}
-
-	isEndOfEpoch, _, err := c.isEndOfEpoch(header, nil)
-	if err != nil {
-		return false, err
-	}
-
-	return isEndOfEpoch, nil
-}
-
-// isEndOfEpoch determines if it is end of the epoch based on provided ValidatorSetDelta from Extra.
-// Epoch ending blocks have non-empty delta.
-func (c *checkpointManager) isEndOfEpoch(header types.Header, parentHeader *types.Header) (bool, *Extra, error) {
-	extra, err := GetIbftExtra(header.ExtraData)
-	if err != nil {
-		return false, nil, err
-	}
-
-	// don't query parent for the first block,
-	// since genesis block doesn't have checkpoint data set
-	if header.Number == 1 {
-		return false, extra, nil
-	}
-
-	if parentHeader == nil {
-		foundParent := false
-		parentHeader, foundParent = c.blockchain.GetHeaderByNumber(header.Number - 1)
-
-		if !foundParent {
-			return false, nil, fmt.Errorf("failed to find parent of header=%d", header.Number)
-		}
-	}
-
-	parentExtra, err := GetIbftExtra(parentHeader.ExtraData)
-	if err != nil {
-		return false, nil, err
-	}
-
-	parentEpochNumber := parentExtra.Checkpoint.EpochNumber
-	currentEpochNumber := extra.Checkpoint.EpochNumber
-
-	return parentEpochNumber < currentEpochNumber, extra, err
+func (c *checkpointManager) isCheckpointBlock(header types.Header) bool {
+	return header.Number == c.lastCheckpointNumber+c.checkpointsOffset
 }
 
 var _ rootchainInteractor = (*defaultRootchainInteractor)(nil)

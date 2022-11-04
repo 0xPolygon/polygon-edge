@@ -70,7 +70,7 @@ func TestCheckpointManager_submitCheckpoint(t *testing.T) {
 	checkpointHeader.ExtraData = append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...)
 	checkpointHeader.ComputeHash()
 
-	err = c.submitCheckpoint(*checkpointHeader)
+	err = c.submitCheckpoint(*checkpointHeader, false)
 	require.NoError(t, err)
 	rootchainMock.AssertExpectations(t)
 }
@@ -113,7 +113,7 @@ func TestCheckpointManager_abiEncodeCheckpointBlock(t *testing.T) {
 	header.ComputeHash()
 
 	c := &checkpointManager{blockchain: &blockchainMock{}}
-	checkpointDataEncoded, err := c.abiEncodeCheckpointBlock(*header, *extra, nextValidators.getPublicIdentities())
+	checkpointDataEncoded, err := c.abiEncodeCheckpointBlock(header.Number, header.Hash, *extra, nextValidators.getPublicIdentities())
 	require.NoError(t, err)
 
 	decodedCheckpointData, err := submitCheckpointMethod.Inputs.Decode(checkpointDataEncoded[4:])
@@ -199,11 +199,6 @@ func TestCheckpointManager_isCheckpointBlock(t *testing.T) {
 		isCheckpointBlock bool
 	}{
 		{
-			name:              "Checkpoint block (epoch ending block)",
-			blockNumber:       11,
-			isCheckpointBlock: true,
-		},
-		{
 			name:              "Not checkpoint block (non-epoch ending block)",
 			blockNumber:       5,
 			isCheckpointBlock: false,
@@ -244,8 +239,7 @@ func TestCheckpointManager_isCheckpointBlock(t *testing.T) {
 				Number:    c.blockNumber,
 				ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...),
 			}
-			isCheckpointBlock, err := checkpointMgr.isCheckpointBlock(*header)
-			require.NoError(t, err)
+			isCheckpointBlock := checkpointMgr.isCheckpointBlock(*header)
 			require.Equal(t, c.isCheckpointBlock, isCheckpointBlock)
 		})
 	}
