@@ -2,19 +2,15 @@
 package polybft
 
 import (
-	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"time"
 
-	"github.com/0xPolygon/pbft-consensus"
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/proto"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
@@ -24,8 +20,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/syncer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
-	"github.com/libp2p/go-libp2p/core/peer"
-	"go.opentelemetry.io/otel"
 )
 
 const (
@@ -73,8 +67,8 @@ type Polybft struct {
 	// close closes all the pbft consensus
 	closeCh chan struct{}
 
-	// pbft is the pbft engine
-	pbft *pbft.Pbft
+	// ibft is the ibft engine
+	ibft *IBFTConsensusWrapper
 
 	// state is reference to the struct which encapsulates consensus data persistence logic
 	state *State
@@ -101,7 +95,7 @@ type Polybft struct {
 	syncer syncer.Syncer
 
 	// topic for pbft consensus
-	pbftTopic *network.Topic
+	consensusTopic *network.Topic
 
 	// topic for pbft consensus
 	bridgeTopic *network.Topic
@@ -177,47 +171,27 @@ func (p *Polybft) Initialize() error {
 		executor:   p.config.Executor,
 	}
 
+	// create bridge and consensus topics
+	if err := p.createTopics(); err != nil {
+		return err
+	}
+
+	// set pbft topic, it will be check if/when the bridge is enabled
+	p.initRuntime()
+
 	// initialize pbft engine
-	opts := []pbft.ConfigOption{
-		pbft.WithLogger(p.logger.Named("Pbft").
-			StandardLogger(&hclog.StandardLoggerOptions{}),
-		),
-		pbft.WithTracer(otel.Tracer("Pbft")),
-	}
+	// opts := []pbft.ConfigOption{
+	// 	pbft.WithLogger(p.logger.Named("Pbft").
+	// 		StandardLogger(&hclog.StandardLoggerOptions{}),
+	// 	),
+	// 	pbft.WithTracer(otel.Tracer("Pbft")),
+	// }
 
-	// create pbft topic
-	p.pbftTopic, err = p.config.Network.NewTopic(pbftProto, &proto.GossipMessage{})
-	if err != nil {
-		return fmt.Errorf("failed to create pbft topic. Error: %w", err)
-	}
+	p.ibft = newIBFTConsensusWrapper(p.logger, p.runtime, p)
 
-	p.pbft = pbft.New(p.key, &pbftTransportWrapper{topic: p.pbftTopic}, opts...)
-
-	// check pbft topic - listen for transport messages and relay them to pbft
-	err = p.pbftTopic.Subscribe(func(obj interface{}, from peer.ID) {
-		gossipMsg, _ := obj.(*proto.GossipMessage)
-
-		var msg *pbft.MessageReq
-		if err := json.Unmarshal(gossipMsg.Data, &msg); err != nil {
-			p.logger.Error("pbft topic message received error", "err", err)
-
-			return
-		}
-
-		p.pbft.PushMessage(msg)
-	})
-
-	if err != nil {
+	if err := p.subscribeToIbftTopic(); err != nil {
 		return fmt.Errorf("topic subscription failed: %w", err)
 	}
-
-	// create bridge topic
-	bridgeTopic, err := p.config.Network.NewTopic(bridgeProto, &proto.TransportMessage{})
-	if err != nil {
-		return fmt.Errorf("failed to create bridge topic. Error: %w", err)
-	}
-	// set pbft topic, it will be check if/when the bridge is enabled
-	p.bridgeTopic = bridgeTopic
 
 	// set block time
 	p.blockTime = time.Duration(p.config.BlockTime)
@@ -260,11 +234,16 @@ func (p *Polybft) startSyncing() error {
 	}
 
 	go func() {
-		nullHandler := func(b *types.Block) bool {
+		blockHandler := func(b *types.Block) bool {
+			// TODO: rename NotifyProposalInserted
+			// parameter should we header and not StateBlock also
+			// txpool.ResetWithHeaders(b.Header) should be called
+			p.runtime.NotifyProposalInserted(&StateBlock{Block: b})
+
 			return false
 		}
 
-		if err := p.syncer.Sync(nullHandler); err != nil {
+		if err := p.syncer.Sync(blockHandler); err != nil {
 			panic(fmt.Errorf("failed to sync blocks. Error: %w", err))
 		}
 	}()
@@ -288,45 +267,33 @@ func (p *Polybft) startSealing() error {
 	return nil
 }
 
+// initRuntime creates consensus runtime
+func (p *Polybft) initRuntime() {
+	runtimeConfig := &runtimeConfig{
+		PolyBFTConfig:   p.consensusConfig,
+		Key:             p.key,
+		DataDir:         p.dataDir,
+		BridgeTransport: &runtimeTransportWrapper{p.bridgeTopic, p.logger},
+		State:           p.state,
+		blockchain:      p.blockchain,
+		polybftBackend:  p,
+		txPool:          p.config.TxPool,
+	}
+
+	p.runtime = newConsensusRuntime(p.logger, runtimeConfig)
+}
+
 // startRuntime starts consensus runtime
 func (p *Polybft) startRuntime() error {
-	runtimeConfig := &runtimeConfig{
-		PolyBFTConfig: p.consensusConfig,
-		Key:           p.key,
-		DataDir:       p.dataDir,
-		Transport: &bridgeTransportWrapper{
-			topic:  p.bridgeTopic,
-			logger: p.logger.Named("bridge_transport"),
-		},
-		State:          p.state,
-		blockchain:     p.blockchain,
-		polybftBackend: p,
-		txPool:         p.config.TxPool,
-	}
+	if p.runtime.IsBridgeEnabled() {
+		// start bridge event tracker
+		if err := p.runtime.startEventTracker(); err != nil {
+			return fmt.Errorf("starting event tracker failed:%w", err)
+		}
 
-	runtime, err := newConsensusRuntime(p.logger, runtimeConfig)
-	if err != nil {
-		return err
-	}
-
-	p.runtime = runtime
-
-	if runtime.IsBridgeEnabled() {
-		err := p.bridgeTopic.Subscribe(func(obj interface{}, from peer.ID) {
-			msg, _ := obj.(*proto.TransportMessage)
-			var transportMsg *TransportMessage
-			if err := json.Unmarshal(msg.Data, &transportMsg); err != nil {
-				p.logger.Warn("Failed to deliver message", "err", err)
-
-				return
-			}
-
-			if _, err := p.runtime.deliverMessage(transportMsg); err != nil {
-				p.logger.Warn("Failed to deliver message", "err", err)
-			}
-		})
-		if err != nil {
-			return fmt.Errorf("topic subscription failed:%w", err)
+		// subscribe to bridge topic
+		if err := p.runtime.subscribeToBridgeTopic(p.bridgeTopic); err != nil {
+			return fmt.Errorf("bridge topic subscription failed: %w", err)
 		}
 	}
 
@@ -340,87 +307,69 @@ func (p *Polybft) startPbftProcess() {
 		return
 	}
 
-	// subscribe to new block events
-	var (
-		newBlockSub   = p.blockchain.SubscribeEvents()
-		syncerBlockCh = make(chan uint64)
-	)
+	newBlockSub := p.blockchain.SubscribeEvents()
+	defer newBlockSub.Close()
 
-	// Receive a notification every time syncer manages
-	// to insert a valid block.
+	syncerBlockCh := make(chan struct{})
+
 	go func() {
 		eventCh := newBlockSub.GetEventCh()
 
 		for {
 			select {
-			case ev := <-eventCh:
-				currentBlockNum := p.blockchain.CurrentHeader().Number
-				if ev.Source == "syncer" {
-					if ev.NewChain[0].Number < currentBlockNum {
-						continue
-					}
-				}
-
-				if p.isSynced() {
-					syncerBlockCh <- currentBlockNum
-				}
-
 			case <-p.closeCh:
 				return
+			case ev := <-eventCh:
+				// The blockchain notification system can eventually deliver
+				// stale block notifications. These should be ignored
+				if ev.Source == "syncer" && ev.NewChain[0].Number > p.blockchain.CurrentHeader().Number {
+					syncerBlockCh <- struct{}{}
+				}
 			}
 		}
 	}()
 
-	defer newBlockSub.Close()
-
-SYNC:
-	if !p.isSynced() {
-		<-syncerBlockCh
-	}
-
-	lastBlock := p.blockchain.CurrentHeader()
-	p.logger.Info("startPbftProcess",
-		"header hash", lastBlock.Hash,
-		"header number", lastBlock.Number)
-
-	currentValidators, err := p.GetValidators(lastBlock.Number, nil)
-	if err != nil {
-		p.logger.Error("failed to query current validator set", "block number", lastBlock.Number, "error", err)
-	}
-
-	p.runtime.setIsActiveValidator(currentValidators.ContainsNodeID(p.key.NodeID()))
-
-	if !p.runtime.isActiveValidator() {
-		// inactive validator is not part of the consensus protocol and it should just perform syncing
-		goto SYNC
-	}
-
-	// we have to start the bridge snapshot when we have finished syncing
-	if err := p.runtime.restartEpoch(lastBlock); err != nil {
-		p.logger.Error("failed to restart epoch", "error", err)
-
-		goto SYNC
-	}
+	var (
+		sequenceCh   <-chan struct{}
+		stopSequence func()
+	)
 
 	for {
-		if err := p.runCycle(); err != nil {
-			if errors.Is(err, errNotAValidator) {
-				p.logger.Info("Node is no longer in validator set")
-			} else {
-				p.logger.Error("an error occurred while running a state machine cycle.", "error", err)
-			}
+		latest := p.blockchain.CurrentHeader().Number
 
-			goto SYNC
+		currentValidators, err := p.GetValidators(latest, nil)
+		if err != nil {
+			p.logger.Error("failed to query current validator set", "block number", latest, "error", err)
 		}
 
-		switch p.pbft.GetState() {
-		case pbft.SyncState:
-			// we need to go back to sync
-			goto SYNC
-		case pbft.DoneState:
-			// everything worked, move to the next iteration
-		default:
-			// stopped
+		isValidator := currentValidators.ContainsNodeID(p.key.NodeID())
+		p.runtime.setIsActiveValidator(isValidator)
+
+		p.config.TxPool.SetSealing(isValidator) // update tx pool
+
+		if isValidator {
+			_, err := p.runtime.FSM() // Nemanja: what to do if it is an error
+			if err != nil {
+				p.logger.Error("failed to create fsm", "block number", latest, "error", err)
+
+				continue
+			}
+
+			sequenceCh, stopSequence = p.ibft.runSequence(latest + 1)
+		}
+
+		select {
+		case <-syncerBlockCh:
+			if isValidator {
+				stopSequence()
+				p.logger.Info("canceled sequence", "sequence", latest+1)
+			}
+		case <-sequenceCh:
+		case <-p.closeCh:
+			if isValidator {
+				stopSequence()
+			}
+
 			return
 		}
 	}
@@ -428,36 +377,7 @@ SYNC:
 
 // isSynced return true if the current header from the local storage corresponds to the highest block of syncer
 func (p *Polybft) isSynced() bool {
-	// TODO: Check could we change following condition to this:
-	// p.syncer.GetSyncProgression().CurrentBlock >= p.syncer.GetSyncProgression().HighestBlock
-	syncProgression := p.syncer.GetSyncProgression()
-
-	return syncProgression == nil ||
-		p.blockchain.CurrentHeader().Number >= syncProgression.HighestBlock
-}
-
-// runCycle runs a single cycle of the state machine and indicates if node should exit the consensus or keep on running
-func (p *Polybft) runCycle() error {
-	ff, err := p.runtime.FSM()
-	if err != nil {
-		return err
-	}
-
-	if err = p.pbft.SetBackend(ff); err != nil {
-		return err
-	}
-
-	// this cancel is not sexy
-	ctx, cancelFn := context.WithCancel(context.Background())
-
-	go func() {
-		<-p.closeCh
-		cancelFn()
-	}()
-
-	p.pbft.Run(ctx)
-
-	return nil
+	return false // TODO: remove this method
 }
 
 func (p *Polybft) waitForNPeers() bool {
@@ -468,8 +388,7 @@ func (p *Polybft) waitForNPeers() bool {
 		case <-time.After(2 * time.Second):
 		}
 
-		numPeers := len(p.config.Network.Peers())
-		if numPeers >= minSyncPeers {
+		if len(p.config.Network.Peers()) >= minSyncPeers {
 			break
 		}
 	}
@@ -617,44 +536,3 @@ func (p *Polybft) PreCommitState(_ *types.Header, _ *state.Transition) error {
 	// Not required
 	return nil
 }
-
-type pbftTransportWrapper struct {
-	topic *network.Topic
-}
-
-func (p *pbftTransportWrapper) Gossip(msg *pbft.MessageReq) error {
-	data, err := json.Marshal(msg)
-	if err != nil {
-		return err
-	}
-
-	return p.topic.Publish(
-		&proto.GossipMessage{
-			Data: data,
-		})
-}
-
-type bridgeTransportWrapper struct {
-	topic  *network.Topic
-	logger hclog.Logger
-}
-
-func (b *bridgeTransportWrapper) Gossip(msg interface{}) {
-	data, err := json.Marshal(msg)
-	if err != nil {
-		b.logger.Warn("Failed to marshal bridge message", "err", err)
-
-		return
-	}
-
-	protoMsg := &proto.GossipMessage{
-		Data: data,
-	}
-
-	err = b.topic.Publish(protoMsg)
-	if err != nil {
-		b.logger.Warn("Failed to gossip bridge message", "err", err)
-	}
-}
-
-var _ polybftBackend = &Polybft{}
