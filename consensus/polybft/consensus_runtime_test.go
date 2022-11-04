@@ -1596,11 +1596,12 @@ func TestConsensusRuntime_FSM_EndOfEpoch_PostHook(t *testing.T) {
 	}
 
 	runtime := &consensusRuntime{
-		logger:         hclog.NewNullLogger(),
-		state:          state,
-		epoch:          metadata,
-		config:         config,
-		lastBuiltBlock: lastBuiltBlock,
+		logger:            hclog.NewNullLogger(),
+		state:             state,
+		epoch:             metadata,
+		config:            config,
+		lastBuiltBlock:    lastBuiltBlock,
+		checkpointManager: newCheckpointManager(types.StringToAddress("3"), 5, nil, nil, nil),
 	}
 
 	fsm, err := runtime.FSM()

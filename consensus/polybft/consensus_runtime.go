@@ -226,20 +226,18 @@ func (c *consensusRuntime) populateFsmIfBridgeEnabled(
 			}
 		}
 
-		if ff.roundInfo.IsProposer {
-			isCheckpointBlock, err := c.checkpointManager.isCheckpointBlock(*ff.block.Block.Header)
-			if err != nil {
-				return err
-			}
+		isCheckpointBlock := isEndOfEpoch || c.checkpointManager.isCheckpointBlock(ff.block.Block.Header.Number)
+		if ff.roundInfo.IsProposer && isCheckpointBlock {
+			go func(header types.Header, epochNumber uint64) {
+				err := c.checkpointManager.submitCheckpoint(header, isEndOfEpoch)
+				if err != nil {
+					c.logger.Warn("failed to submit checkpoint", "epoch number", epochNumber, "error", err)
+				}
+			}(*ff.block.Block.Header, ff.epochNumber)
+		}
 
-			if isCheckpointBlock {
-				go func(header types.Header, epochNumber uint64) {
-					err := c.checkpointManager.submitCheckpoint(header)
-					if err != nil {
-						c.logger.Warn("failed to submit checkpoint", "epoch number", epochNumber, "error", err)
-					}
-				}(*ff.block.Block.Header, ff.epochNumber)
-			}
+		if isCheckpointBlock {
+			c.checkpointManager.lastCheckpointNumber = ff.block.Block.Header.Number
 		}
 
 		c.NotifyProposalInserted(ff.block.Block.Header)
