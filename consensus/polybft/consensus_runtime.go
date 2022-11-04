@@ -43,9 +43,11 @@ type txPoolInterface interface {
 	Prepare()
 	Length() uint64
 	Peek() *types.Transaction
-	Pop(tx *types.Transaction)
-	Drop(tx *types.Transaction)
-	Demote(tx *types.Transaction)
+	Pop(*types.Transaction)
+	Drop(*types.Transaction)
+	Demote(*types.Transaction)
+	SetSealing(bool)
+	ResetWithHeaders(...*types.Header)
 }
 
 // epochMetadata is the static info for epoch currently being processed
@@ -92,11 +94,11 @@ type consensusRuntime struct {
 	// eventTracker is a reference to the log event tracker
 	eventTracker *eventTracker
 
+	// lock is a lock to access 'epoch' and `lastBuiltBlock`
+	lock sync.RWMutex
+
 	// epoch is the metadata for the current epoch
 	epoch *epochMetadata
-
-	// lock is a lock to access 'epoch'
-	lock sync.RWMutex
 
 	// lastBuiltBlock is the header of the last processed block
 	lastBuiltBlock *types.Header
@@ -118,12 +120,16 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) *consensusRuntim
 	return runtime
 }
 
-// getEpoch returns current epochMetadata in a thread-safe manner.
-func (c *consensusRuntime) getEpoch() *epochMetadata {
+// getLastBultBlockAndEpoch returns last build block and current epochMetadata in a thread-safe manner.
+func (c *consensusRuntime) getLastBultBlockAndEpoch() (*types.Header, *epochMetadata) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
-	return c.epoch
+	// create copy of data
+	lastBuiltBlock, epoch := new(types.Header), new(epochMetadata)
+	*lastBuiltBlock, *epoch = *c.lastBuiltBlock, *c.epoch
+
+	return lastBuiltBlock, epoch
 }
 
 func (c *consensusRuntime) IsBridgeEnabled() bool {
@@ -158,23 +164,26 @@ func (c *consensusRuntime) AddLog(eventLog *ethgo.Log) { //nolint
 	return // TODO: Delete this when metrics is established. This is added just to trick linter.
 }
 
-// NotifyProposalInserted is an implementation of fsmNotify interface
-func (c *consensusRuntime) NotifyProposalInserted(b *StateBlock) {
-	lastHeader := b.Block.Header
-	if c.isEndOfEpoch(lastHeader.Number) {
+// OnBlockInserted is called whenever fsm or syncer inserts new block
+func (c *consensusRuntime) OnBlockInserted(block *types.Block) {
+	// after the block has been written we reset the txpool so that the old transactions are removed
+	c.config.txPool.ResetWithHeaders(block.Header)
+
+	if c.isEndOfEpoch(block.Header.Number) {
 		// reset the epoch. Internally it updates the parent block header.
-		if err := c.restartEpoch(lastHeader); err != nil {
+		if err := c.restartEpoch(block.Header); err != nil {
 			c.logger.Error("failed to restart epoch after block inserted", "err", err)
 		}
 	} else {
-		// inside the epoch, update last built block header
-		c.lastBuiltBlock = lastHeader
+		c.lock.Lock()
+		c.lastBuiltBlock = block.Header
+		c.lock.Unlock()
 	}
 }
 
 func (c *consensusRuntime) populateFsmIfBridgeEnabled(
-	ff *fsm, epoch *epochMetadata, isEndOfEpoch, isEndOfSprint bool) error {
-	systemState, err := c.getSystemState(c.lastBuiltBlock)
+	ff *fsm, epoch *epochMetadata, lastBuiltBlock *types.Header, isEndOfEpoch, isEndOfSprint bool) error {
+	systemState, err := c.getSystemState(lastBuiltBlock)
 	if err != nil {
 		return err
 	}
@@ -198,7 +207,7 @@ func (c *consensusRuntime) populateFsmIfBridgeEnabled(
 			}
 		}
 
-		c.NotifyProposalInserted(ff.block)
+		c.OnBlockInserted(ff.block.Block)
 
 		return nil
 	}
@@ -253,8 +262,7 @@ func (c *consensusRuntime) populateFsmIfBridgeEnabled(
 func (c *consensusRuntime) FSM() (*fsm, error) {
 	// figure out the parent. At this point this peer has done its best to sync up
 	// to the head of their remote peers.
-	parent := c.lastBuiltBlock
-	epoch := c.getEpoch()
+	parent, epoch := c.getLastBultBlockAndEpoch()
 
 	if !epoch.Validators.ContainsNodeID(c.config.Key.NodeID()) {
 		return nil, errNotAValidator
@@ -266,7 +274,7 @@ func (c *consensusRuntime) FSM() (*fsm, error) {
 		return nil, err
 	}
 
-	pendingBlockNumber := c.getPendingBlockNumber()
+	pendingBlockNumber := parent.Number + 1
 	isEndOfSprint := c.isEndOfSprint(pendingBlockNumber)
 	isEndOfEpoch := c.isEndOfEpoch(pendingBlockNumber)
 
@@ -283,20 +291,20 @@ func (c *consensusRuntime) FSM() (*fsm, error) {
 	}
 
 	if c.IsBridgeEnabled() {
-		err := c.populateFsmIfBridgeEnabled(ff, epoch, isEndOfEpoch, isEndOfSprint)
+		err := c.populateFsmIfBridgeEnabled(ff, epoch, parent, isEndOfEpoch, isEndOfSprint)
 		if err != nil {
 			return nil, err
 		}
 	} else {
 		ff.postInsertHook = func() error {
-			c.NotifyProposalInserted(ff.block)
+			c.OnBlockInserted(ff.block.Block)
 
 			return nil
 		}
 	}
 
 	if isEndOfEpoch {
-		ff.uptimeCounter, err = c.calculateUptime(parent)
+		ff.uptimeCounter, err = c.calculateUptime(parent, epoch)
 		if err != nil {
 			return nil, err
 		}
@@ -313,9 +321,7 @@ func (c *consensusRuntime) FSM() (*fsm, error) {
 
 // restartEpoch resets the previously run epoch and moves to the next one
 func (c *consensusRuntime) restartEpoch(header *types.Header) error {
-	c.lastBuiltBlock = header
-
-	systemState, err := c.getSystemState(c.lastBuiltBlock)
+	systemState, err := c.getSystemState(header)
 	if err != nil {
 		return err
 	}
@@ -325,7 +331,7 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) error {
 		return err
 	}
 
-	lastEpoch := c.getEpoch()
+	_, lastEpoch := c.getLastBultBlockAndEpoch()
 	if lastEpoch != nil {
 		// Epoch might be already in memory, if its the same number do nothing.
 		// Otherwise, reset the epoch metadata and restart the async services
@@ -352,7 +358,7 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) error {
 		}
 	*/
 
-	validatorSet, err := c.config.polybftBackend.GetValidators(c.lastBuiltBlock.Number, nil)
+	validatorSet, err := c.config.polybftBackend.GetValidators(header.Number, nil)
 	if err != nil {
 		return err
 	}
@@ -389,6 +395,7 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) error {
 
 	c.lock.Lock()
 	c.epoch = epoch
+	c.lastBuiltBlock = header
 	c.lock.Unlock()
 
 	err = c.runCheckpoint(epoch)
@@ -585,7 +592,8 @@ func (c *consensusRuntime) startEventTracker() error {
 // deliverMessage receives the message vote from transport and inserts it in state db for given epoch.
 // It returns indicator whether message is processed successfully and error object if any.
 func (c *consensusRuntime) deliverMessage(msg *TransportMessage) (bool, error) {
-	epoch := c.getEpoch()
+	_, epoch := c.getLastBultBlockAndEpoch()
+
 	if epoch == nil || msg.EpochNumber < epoch.Number {
 		// Epoch metadata is undefined
 		// or received message for some of the older epochs.
@@ -631,24 +639,9 @@ func (c *consensusRuntime) runCheckpoint(epoch *epochMetadata) error {
 	return nil
 }
 
-// getLatestSprintBlockNumber returns latest sprint block number
-func (c *consensusRuntime) getLatestSprintBlockNumber() uint64 {
-	lastBuiltBlockNumber := c.lastBuiltBlock.Number
-
-	sprintSizeMod := lastBuiltBlockNumber % c.config.PolyBFTConfig.SprintSize
-	if sprintSizeMod == 0 {
-		return lastBuiltBlockNumber
-	}
-
-	sprintBlockNumber := lastBuiltBlockNumber - sprintSizeMod
-
-	return sprintBlockNumber
-}
-
 // calculateUptime calculates uptime for blocks starting from the last built block in current epoch,
 // and ending at the last block of previous epoch
-func (c *consensusRuntime) calculateUptime(currentBlock *types.Header) (*CommitEpoch, error) {
-	epoch := c.getEpoch()
+func (c *consensusRuntime) calculateUptime(currentBlock *types.Header, epoch *epochMetadata) (*CommitEpoch, error) {
 	uptimeCounter := map[types.Address]uint64{}
 
 	if c.config.PolyBFTConfig.EpochSize < (uptimeLookbackSize + 1) {
@@ -762,11 +755,6 @@ func (c *consensusRuntime) setIsActiveValidator(isActiveValidator bool) {
 // isActiveValidator indicates if node is in validator set or not
 func (c *consensusRuntime) isActiveValidator() bool {
 	return atomic.LoadUint32(&c.activeValidatorFlag) == 1
-}
-
-// getPendingBlockNumber returns block number currently being built (last built block number + 1)
-func (c *consensusRuntime) getPendingBlockNumber() uint64 {
-	return c.lastBuiltBlock.Number + 1
 }
 
 // isEndOfEpoch checks if an end of an epoch is reached with the current block
