@@ -899,12 +899,11 @@ func (c *consensusRuntime) IsValidCommittedSeal(proposalHash []byte, committedSe
 }
 
 func (c *consensusRuntime) BuildProposal(blockNumber uint64) []byte {
-	c.lock.RLock()
-	lastBuiltBlock := c.lastBuiltBlock.Number
-	c.lock.RUnlock()
+	lastBuiltBlock, _ := c.getLastBuiltBlockAndEpoch()
 
-	if lastBuiltBlock+1 != blockNumber {
-		c.logger.Error("unable to build block, due to lack of parent block", "num", lastBuiltBlock)
+	if lastBuiltBlock.Number+1 != blockNumber {
+		c.logger.Error("unable to build block, due to lack of parent block",
+			"last", lastBuiltBlock.Number, "num", blockNumber)
 
 		return nil
 	}
@@ -928,7 +927,7 @@ func (c *consensusRuntime) InsertBlock(proposal []byte, committedSeals []*messag
 	}
 
 	if c.IsBridgeEnabled() {
-		epoch := c.getEpoch()
+		_, epoch := c.getLastBuiltBlockAndEpoch()
 
 		if fsm.isEndOfEpoch && fsm.commitmentToSaveOnRegister != nil {
 			if err := c.state.insertCommitmentMessage(fsm.commitmentToSaveOnRegister); err != nil {
