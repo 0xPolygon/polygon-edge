@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/0xPolygon/go-ibft/messages"
+	"github.com/0xPolygon/go-ibft/messages/proto"
 	protoIBFT "github.com/0xPolygon/go-ibft/messages/proto"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
@@ -104,7 +105,7 @@ func (i *backendIBFT) ID() []byte {
 	return i.currentSigner.Address().Bytes()
 }
 
-func (i *backendIBFT) MaximumFaultyNodes() uint64 {
+func (i *backendIBFT) MaximumFaulty() uint64 {
 	return uint64(CalcMaxFaultyNodes(i.currentValidators))
 }
 
@@ -127,15 +128,17 @@ func (i *backendIBFT) Quorum(blockNumber uint64) uint64 {
 }
 
 // HasQuorum returns true if quorum is reached for the given height
-func (i *backendIBFT) HasQuorum(blockNumber uint64, messages []*protoIBFT.Message) bool {
-	quorum := i.Quorum(blockNumber)
+func (i *backendIBFT) HasQuorum(view *protoIBFT.View, messages []*protoIBFT.Message) bool {
+	quorum := i.Quorum(view.Height)
 
 	if len(messages) > 0 {
 		switch messages[0].GetType() {
-		case protoIBFT.MessageType_PREPARE:
-			return len(messages) < int(quorum)-1
-		case protoIBFT.MessageType_ROUND_CHANGE:
-			return len(messages) < int(quorum)
+		case proto.MessageType_PREPREPARE:
+			return len(messages) > 1
+		case proto.MessageType_PREPARE:
+			return len(messages) >= int(quorum)-1
+		case proto.MessageType_ROUND_CHANGE, proto.MessageType_COMMIT:
+			return len(messages) >= int(quorum)
 		}
 	}
 
