@@ -226,7 +226,7 @@ func (c *consensusRuntime) populateFsmIfBridgeEnabled(
 			}
 		}
 
-		isCheckpointBlock := c.checkpointManager.isCheckpointBlock(*ff.block.Block.Header) || isEndOfEpoch
+		isCheckpointBlock := isEndOfEpoch || c.checkpointManager.isCheckpointBlock(ff.block.Block.Header.Number)
 		if ff.roundInfo.IsProposer && isCheckpointBlock {
 			go func(header types.Header, epochNumber uint64) {
 				err := c.checkpointManager.submitCheckpoint(header, isEndOfEpoch)

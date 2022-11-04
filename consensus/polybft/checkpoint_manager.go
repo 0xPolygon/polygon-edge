@@ -214,8 +214,8 @@ func (c *checkpointManager) setCheckpointsOffset(checkpointsOffset uint64) {
 
 // isCheckpointBlock returns true for epoch ending blocks and
 // blocks in the middle of the epoch which are offseted by predefined count of blocks
-func (c *checkpointManager) isCheckpointBlock(header types.Header) bool {
-	return header.Number == c.lastCheckpointNumber+c.checkpointsOffset
+func (c *checkpointManager) isCheckpointBlock(blockNumber uint64) bool {
+	return blockNumber == c.lastCheckpointNumber+c.checkpointsOffset
 }
 
 var _ rootchainInteractor = (*defaultRootchainInteractor)(nil)

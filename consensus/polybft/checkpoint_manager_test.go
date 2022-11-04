@@ -21,7 +21,7 @@ func TestCheckpointManager_submitCheckpoint(t *testing.T) {
 	validators := newTestValidators(5).getPublicIdentities()
 	rootchainMock := new(dummyRootchainInteractor)
 	rootchainMock.On("Call", mock.Anything, mock.Anything, mock.Anything).
-		Return("1", error(nil)).
+		Return("0", error(nil)).
 		Once()
 	rootchainMock.On("GetPendingNonce", mock.Anything).
 		Return(uint64(1), error(nil)).
@@ -37,6 +37,10 @@ func TestCheckpointManager_submitCheckpoint(t *testing.T) {
 	headersMap := &testHeadersMap{}
 	headersMap.addHeader(&types.Header{
 		Number:    1,
+		ExtraData: append(make([]byte, ExtraVanity), parentExtra.MarshalRLPTo(nil)...),
+	})
+	headersMap.addHeader(&types.Header{
+		Number:    2,
 		ExtraData: append(make([]byte, ExtraVanity), parentExtra.MarshalRLPTo(nil)...),
 	})
 	// mock blockchain
@@ -187,11 +191,6 @@ func TestCheckpointManager_getCurrentCheckpointID(t *testing.T) {
 func TestCheckpointManager_isCheckpointBlock(t *testing.T) {
 	t.Parallel()
 
-	const (
-		epochSize        = uint64(10)
-		checkpointOffset = 5
-	)
-
 	cases := []struct {
 		name              string
 		blockNumber       uint64
@@ -199,15 +198,16 @@ func TestCheckpointManager_isCheckpointBlock(t *testing.T) {
 		isCheckpointBlock bool
 	}{
 		{
-			name:              "Not checkpoint block (non-epoch ending block)",
-			blockNumber:       5,
+			name:              "Not checkpoint block",
+			blockNumber:       3,
+			checkpointsOffset: 6,
 			isCheckpointBlock: false,
 		},
 		{
-			name:              "Checkpoint block (non-epoch ending block, checkpoint offset matched)",
+			name:              "Checkpoint block",
 			blockNumber:       6,
+			checkpointsOffset: 6,
 			isCheckpointBlock: true,
-			checkpointsOffset: 5,
 		},
 	}
 
@@ -216,31 +216,8 @@ func TestCheckpointManager_isCheckpointBlock(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
 
-			parentExtra := &Extra{Checkpoint: &CheckpointData{EpochNumber: getEpochNumber(c.blockNumber-1, epochSize)}}
-			headersMap := &testHeadersMap{}
-			headersMap.addHeader(&types.Header{
-				Number:    c.blockNumber - 1,
-				ExtraData: append(make([]byte, ExtraVanity), parentExtra.MarshalRLPTo(nil)...),
-			})
-
-			// rootchain mock
-			rootchainMock := new(dummyRootchainInteractor)
-			rootchainMock.On("Call", mock.Anything, mock.Anything, mock.Anything).
-				Return("1", error(nil)).
-				Once()
-
-			// mock blockchain
-			blockchainMock := new(blockchainMock)
-			blockchainMock.On("GetHeaderByNumber", mock.Anything).Return(headersMap.getHeader)
-
-			checkpointMgr := newCheckpointManager(types.ZeroAddress, c.checkpointsOffset, rootchainMock, blockchainMock, nil)
-			extra := &Extra{Checkpoint: &CheckpointData{EpochNumber: getEpochNumber(c.blockNumber, epochSize)}}
-			header := &types.Header{
-				Number:    c.blockNumber,
-				ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...),
-			}
-			isCheckpointBlock := checkpointMgr.isCheckpointBlock(*header)
-			require.Equal(t, c.isCheckpointBlock, isCheckpointBlock)
+			checkpointMgr := newCheckpointManager(types.ZeroAddress, c.checkpointsOffset, nil, nil, nil)
+			require.Equal(t, c.isCheckpointBlock, checkpointMgr.isCheckpointBlock(c.blockNumber))
 		})
 	}
 }
