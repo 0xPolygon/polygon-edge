@@ -245,6 +245,11 @@ func (p *Polybft) startSyncing() error {
 func (p *Polybft) startSealing() error {
 	p.logger.Info("Using signer", "address", p.key.String())
 
+	// we need to call restart epoch on runtime to initialize epoch state
+	if err := p.runtime.restartEpoch(p.blockchain.CurrentHeader()); err != nil {
+		return fmt.Errorf("consensus runtime start - restart epoch failed: %w", err)
+	}
+
 	if err := p.startRuntime(); err != nil {
 		return fmt.Errorf("consensus runtime start failed: %w", err)
 	}
@@ -338,19 +343,6 @@ func (p *Polybft) startPbftProcess() {
 		p.txPool.SetSealing(isValidator) // update tx pool
 
 		if isValidator {
-			// must initialize runtime epoch if not initialized already
-			if p.runtime.epoch == nil {
-				if err = p.runtime.restartEpoch(latestHeader); err != nil {
-					p.logger.Error(
-						"failed to restart epoch fsm",
-						"block number", latestHeader.Number,
-						"error", err,
-					)
-
-					continue
-				}
-			}
-
 			err = p.runtime.FSM() // initialze fsm as a stateless ibft backet via runtime as an adapter
 			if err != nil {
 				p.logger.Error("failed to create fsm", "block number", latestHeader.Number, "error", err)

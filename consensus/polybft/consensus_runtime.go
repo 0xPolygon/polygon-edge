@@ -130,22 +130,21 @@ func (c *consensusRuntime) getEpoch() *epochMetadata {
 	return c.epoch
 }
 
+// isCurrentEpoch checks if current epoch inside runtime is passed one
+func (c *consensusRuntime) isCurrentEpoch(epoch uint64) bool {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	return c.epoch != nil && c.epoch.Number == epoch
+}
+
 // getLastBuiltBlockAndEpoch returns last build block and current epochMetadata in a thread-safe manner.
 func (c *consensusRuntime) getLastBuiltBlockAndEpoch() (*types.Header, *epochMetadata) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
-	var lastBuiltBlock *types.Header
-	if c.lastBuiltBlock != nil {
-		lastBuiltBlock = new(types.Header)
-		*lastBuiltBlock = *c.lastBuiltBlock
-	}
-
-	var epoch *epochMetadata
-	if c.epoch != nil {
-		epoch = new(epochMetadata)
-		*epoch = *c.epoch
-	}
+	lastBuiltBlock, epoch := new(types.Header), new(epochMetadata)
+	*lastBuiltBlock, *epoch = *c.lastBuiltBlock, *c.epoch
 
 	return lastBuiltBlock, epoch
 }
@@ -346,13 +345,10 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) error {
 		return err
 	}
 
-	_, lastEpoch := c.getLastBuiltBlockAndEpoch()
-	if lastEpoch != nil {
-		// Epoch might be already in memory, if its the same number do nothing.
-		// Otherwise, reset the epoch metadata and restart the async services
-		if lastEpoch.Number == epochNumber {
-			return nil
-		}
+	// Epoch might be already in memory, if it is do nothing.
+	// Otherwise, reset the epoch metadata and restart the async services
+	if c.isCurrentEpoch(epochNumber) {
+		return nil
 	}
 
 	/*
