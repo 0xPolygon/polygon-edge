@@ -61,7 +61,7 @@ require (
 )
 
 require (
-	github.com/0xPolygon/go-ibft v0.0.0-20221025100404-da21f2dfb62b
+	github.com/0xPolygon/go-ibft v0.0.0-20221104170147-481527cd942a
 	github.com/0xPolygon/pbft-consensus v0.0.0-20220823102839-109d9f873bf4
 	github.com/docker/docker v20.10.18+incompatible
 	github.com/docker/go-connections v0.4.0
