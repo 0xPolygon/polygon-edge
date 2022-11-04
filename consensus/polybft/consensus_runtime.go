@@ -138,7 +138,7 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 
 		runtime.checkpointManager = newCheckpointManager(
 			types.Address(config.Key.Address()),
-			config.PolyBFTConfig.BlockTime,
+			defaultCheckpointsOffset,
 			&defaultRootchainInteractor{},
 			config.blockchain,
 			config.polybftBackend)
@@ -234,7 +234,7 @@ func (c *consensusRuntime) populateFsmIfBridgeEnabled(
 
 			if isCheckpointBlock {
 				go func(header types.Header, epochNumber uint64) {
-					err := c.checkpointManager.submitCheckpoint(header, epochNumber)
+					err := c.checkpointManager.submitCheckpoint(header)
 					if err != nil {
 						c.logger.Warn("failed to submit checkpoint", "epoch number", epochNumber, "error", err)
 					}

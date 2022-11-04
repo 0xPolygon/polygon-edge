@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math/big"
 	"strconv"
-	"time"
 
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -25,7 +24,7 @@ var (
 		"bytes32 eventRoot, tuple(address _address, uint256[4] blsKey)[] nextValidators" + ")")
 
 	// frequency at which checkpoints are sent to the rootchain
-	checkpointTimeInterval = 30 * time.Minute
+	defaultCheckpointsOffset = uint64(900)
 )
 
 // checkpointManager encapsulates logic for checkpoint data submission
@@ -43,7 +42,7 @@ type checkpointManager struct {
 }
 
 // newCheckpointManager creates a new instance of checkpointManager
-func newCheckpointManager(sender types.Address, blockTime time.Duration, interactor rootchainInteractor,
+func newCheckpointManager(sender types.Address, checkpointOffset uint64, interactor rootchainInteractor,
 	blockchain blockchainBackend, backend polybftBackend) *checkpointManager {
 	r := interactor
 	if interactor == nil {
@@ -55,36 +54,34 @@ func newCheckpointManager(sender types.Address, blockTime time.Duration, interac
 		blockchain:        blockchain,
 		consensusBackend:  backend,
 		rootchain:         r,
-		checkpointsOffset: uint64(checkpointTimeInterval.Milliseconds() / blockTime.Milliseconds()),
+		checkpointsOffset: checkpointOffset,
 	}
 }
 
 // getCurrentCheckpointID queries CheckpointManager smart contract and retrieves current checkpoint id
-func (c checkpointManager) getCurrentCheckpointID(epochNumber uint64) (uint64, error) {
+func (c checkpointManager) getCurrentCheckpointID() (uint64, error) {
 	checkpointIDMethodEncoded, err := currentCheckpointIDMethod.Encode([]interface{}{})
 	if err != nil {
-		return 0, fmt.Errorf("failed to encode currentCheckpointId function parameters for epoch=%d: %w",
-			epochNumber, err)
+		return 0, fmt.Errorf("failed to encode currentCheckpointId function parameters: %w", err)
 	}
 
 	currentCheckpointID, err := c.rootchain.Call(c.sender, helper.CheckpointManagerAddress, checkpointIDMethodEncoded)
 	if err != nil {
-		return 0, fmt.Errorf("failed to invoke currentCheckpointId function on the rootchain for epoch=%d: %w",
-			epochNumber, err)
+		return 0, fmt.Errorf("failed to invoke currentCheckpointId function on the rootchain: %w", err)
 	}
 
 	checkpointID, err := strconv.ParseUint(currentCheckpointID, 0, 64)
 	if err != nil {
-		return 0, fmt.Errorf("failed to convert current checkpoint id '%s' to number for epoch=%d: %w",
-			currentCheckpointID, epochNumber, err)
+		return 0, fmt.Errorf("failed to convert current checkpoint id '%s' to number: %w",
+			currentCheckpointID, err)
 	}
 
 	return checkpointID, nil
 }
 
 // submitCheckpoint sends a transaction which with checkpoint data to the rootchain
-func (c checkpointManager) submitCheckpoint(latestHeader types.Header, epochNumber uint64) error {
-	checkpointID, err := c.getCurrentCheckpointID(epochNumber)
+func (c checkpointManager) submitCheckpoint(latestHeader types.Header) error {
+	checkpointID, err := c.getCurrentCheckpointID()
 	if err != nil {
 		return err
 	}
@@ -200,7 +197,12 @@ func (c *checkpointManager) setCheckpointsOffset(checkpointsOffset uint64) {
 // isCheckpointBlock returns true for epoch ending blocks and
 // blocks in the middle of the epoch which are offseted by predefined count of blocks
 func (c *checkpointManager) isCheckpointBlock(header types.Header) (bool, error) {
-	if header.Number%c.checkpointsOffset == 0 {
+	lastCheckpointBlockNumber, err := c.getCurrentCheckpointID()
+	if err != nil {
+		return false, err
+	}
+
+	if lastCheckpointBlockNumber+c.checkpointsOffset == header.Number {
 		return true, nil
 	}
 

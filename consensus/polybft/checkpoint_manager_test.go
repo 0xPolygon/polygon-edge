@@ -5,7 +5,6 @@ import (
 	"math/big"
 	"strconv"
 	"testing"
-	"time"
 
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
@@ -71,7 +70,7 @@ func TestCheckpointManager_submitCheckpoint(t *testing.T) {
 	checkpointHeader.ExtraData = append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...)
 	checkpointHeader.ComputeHash()
 
-	err = c.submitCheckpoint(*checkpointHeader, 1)
+	err = c.submitCheckpoint(*checkpointHeader)
 	require.NoError(t, err)
 	rootchainMock.AssertExpectations(t)
 }
@@ -149,7 +148,7 @@ func TestCheckpointManager_getCurrentCheckpointID(t *testing.T) {
 			name:         "Rootchain call returns an error",
 			checkpointID: "",
 			returnError:  errors.New("internal error"),
-			errSubstring: "failed to invoke currentCheckpointId function on the rootchain for epoch=",
+			errSubstring: "failed to invoke currentCheckpointId function on the rootchain",
 		},
 		{
 			name:         "Failed to parse return value from rootchain",
@@ -170,7 +169,7 @@ func TestCheckpointManager_getCurrentCheckpointID(t *testing.T) {
 				Once()
 
 			checkpointMgr := &checkpointManager{rootchain: rootchainMock}
-			actualCheckpointID, err := checkpointMgr.getCurrentCheckpointID(1)
+			actualCheckpointID, err := checkpointMgr.getCurrentCheckpointID()
 			if c.errSubstring == "" {
 				expectedCheckpointID, err := strconv.ParseUint(c.checkpointID, 0, 64)
 				require.NoError(t, err)
@@ -181,8 +180,6 @@ func TestCheckpointManager_getCurrentCheckpointID(t *testing.T) {
 			}
 
 			rootchainMock.AssertExpectations(t)
-
-			t.Logf(c.name)
 		})
 	}
 }
@@ -191,13 +188,14 @@ func TestCheckpointManager_isCheckpointBlock(t *testing.T) {
 	t.Parallel()
 
 	const (
-		blockTime = 30 * time.Second
-		epochSize = uint64(10)
+		epochSize        = uint64(10)
+		checkpointOffset = 5
 	)
 
 	cases := []struct {
 		name              string
 		blockNumber       uint64
+		checkpointsOffset uint64
 		isCheckpointBlock bool
 	}{
 		{
@@ -211,9 +209,10 @@ func TestCheckpointManager_isCheckpointBlock(t *testing.T) {
 			isCheckpointBlock: false,
 		},
 		{
-			name:              "Checkpoint block (non-epoch ending block, checkpoint interval elapsed)",
-			blockNumber:       60,
+			name:              "Checkpoint block (non-epoch ending block, checkpoint offset matched)",
+			blockNumber:       6,
 			isCheckpointBlock: true,
+			checkpointsOffset: 5,
 		},
 	}
 
@@ -228,11 +227,18 @@ func TestCheckpointManager_isCheckpointBlock(t *testing.T) {
 				Number:    c.blockNumber - 1,
 				ExtraData: append(make([]byte, ExtraVanity), parentExtra.MarshalRLPTo(nil)...),
 			})
+
+			// rootchain mock
+			rootchainMock := new(dummyRootchainInteractor)
+			rootchainMock.On("Call", mock.Anything, mock.Anything, mock.Anything).
+				Return("1", error(nil)).
+				Once()
+
 			// mock blockchain
 			blockchainMock := new(blockchainMock)
 			blockchainMock.On("GetHeaderByNumber", mock.Anything).Return(headersMap.getHeader)
 
-			checkpointMgr := newCheckpointManager(types.ZeroAddress, blockTime, nil, blockchainMock, nil)
+			checkpointMgr := newCheckpointManager(types.ZeroAddress, c.checkpointsOffset, rootchainMock, blockchainMock, nil)
 			extra := &Extra{Checkpoint: &CheckpointData{EpochNumber: getEpochNumber(c.blockNumber, epochSize)}}
 			header := &types.Header{
 				Number:    c.blockNumber,
