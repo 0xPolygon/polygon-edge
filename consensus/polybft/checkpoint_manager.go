@@ -23,7 +23,7 @@ var (
 		"uint256 epochNumber, uint256 blockNumber, bytes32 blockHash, uint256 blockRound," +
 		"bytes32 eventRoot, tuple(address _address, uint256[4] blsKey)[] nextValidators" + ")")
 
-	// frequency at which checkpoints are sent to the rootchain
+	// frequency at which checkpoints are sent to the rootchain (in blocks count)
 	defaultCheckpointsOffset = uint64(900)
 )
 
