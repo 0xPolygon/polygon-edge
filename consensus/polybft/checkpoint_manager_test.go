@@ -21,7 +21,7 @@ func TestCheckpointManager_submitCheckpoint(t *testing.T) {
 	validators := newTestValidators(5).getPublicIdentities()
 	rootchainMock := new(dummyRootchainInteractor)
 	rootchainMock.On("Call", mock.Anything, mock.Anything, mock.Anything).
-		Return("0", error(nil)).
+		Return("1", error(nil)).
 		Once()
 	rootchainMock.On("GetPendingNonce", mock.Anything).
 		Return(uint64(1), error(nil)).
@@ -39,10 +39,7 @@ func TestCheckpointManager_submitCheckpoint(t *testing.T) {
 		Number:    1,
 		ExtraData: append(make([]byte, ExtraVanity), parentExtra.MarshalRLPTo(nil)...),
 	})
-	headersMap.addHeader(&types.Header{
-		Number:    2,
-		ExtraData: append(make([]byte, ExtraVanity), parentExtra.MarshalRLPTo(nil)...),
-	})
+
 	// mock blockchain
 	blockchainMock := new(blockchainMock)
 	blockchainMock.On("GetHeaderByNumber", mock.Anything).Return(headersMap.getHeader)

@@ -38,8 +38,9 @@ type checkpointManager struct {
 	// rootchain represents abstraction for rootchain interaction
 	rootchain rootchainInteractor
 	// checkpointsOffset represents offset between checkpoint blocks (applicable only for non-epoch ending blocks)
-	checkpointsOffset    uint64
-	lastCheckpointNumber uint64
+	checkpointsOffset uint64
+	// latestCheckpointID represents last checkpointed block number
+	latestCheckpointID uint64
 }
 
 // newCheckpointManager creates a new instance of checkpointManager
@@ -97,52 +98,45 @@ func (c checkpointManager) submitCheckpoint(latestHeader types.Header, isEndOfEp
 		To: &checkpointManagerAddr,
 	}
 
-	var found bool
-
-	var currentHeader, nextHeader *types.Header
+	var parentHeader *types.Header
 
 	initialBlockNumber := currentCheckpointID + 1
+	// detect any pending (previously failed) checkpoints and send them
+	for blockNumber := initialBlockNumber; blockNumber < latestHeader.Number; blockNumber++ {
+		currentHeader, found := c.blockchain.GetHeaderByNumber(blockNumber)
+		if !found {
+			return fmt.Errorf("block %d was not found", blockNumber)
+		}
 
-	currentHeader, found = c.blockchain.GetHeaderByNumber(initialBlockNumber)
-	if !found {
-		return fmt.Errorf("block %d was not found", initialBlockNumber)
-	}
+		if parentHeader == nil {
+			parentHeader, found = c.blockchain.GetHeaderByNumber(blockNumber - 1)
+			if !found {
+				return fmt.Errorf("block %d was not found", blockNumber-1)
+			}
+		}
 
-	nextHeader, found = c.blockchain.GetHeaderByNumber(initialBlockNumber + 1)
-	if !found {
-		return fmt.Errorf("block %d was not found", initialBlockNumber+1)
-	}
-
-	// detect any pending end-of-epoch (previously failed) checkpoints and send them
-	for nextHeader.Number < latestHeader.Number {
 		currentExtra, err := GetIbftExtra(currentHeader.ExtraData)
 		if err != nil {
 			return err
 		}
 
-		nextExtra, err := GetIbftExtra(currentHeader.ExtraData)
+		parentExtra, err := GetIbftExtra(parentHeader.ExtraData)
 		if err != nil {
 			return err
 		}
 
-		//pass only endOfEpoch blocks
-		if currentExtra.Checkpoint.EpochNumber == nextExtra.Checkpoint.EpochNumber {
+		parentHeader = currentHeader
+
+		// send pending checkpoints only for epoch ending blocks
+		if currentExtra.Checkpoint.EpochNumber == parentExtra.Checkpoint.EpochNumber {
 			continue
 		}
-
-		currentCheckpointID = currentHeader.Number
 
 		err = c.submitCheckpointInternal(nonce, txn, *currentHeader, *currentExtra, true)
 		if err != nil {
 			return err
 		}
 
-		currentHeader = nextHeader
-
-		nextHeader, found = c.blockchain.GetHeaderByNumber(currentHeader.Number + 1)
-		if !found {
-			return fmt.Errorf("block %d was not found", initialBlockNumber+1)
-		}
 		nonce++
 	}
 
@@ -207,15 +201,10 @@ func (c *checkpointManager) abiEncodeCheckpointBlock(headerNumber uint64, header
 	return submitCheckpointMethod.Encode(params)
 }
 
-// setCheckpointsOffset sets new checkpointsOffset value
-func (c *checkpointManager) setCheckpointsOffset(checkpointsOffset uint64) {
-	c.checkpointsOffset = checkpointsOffset
-}
-
-// isCheckpointBlock returns true for epoch ending blocks and
-// blocks in the middle of the epoch which are offseted by predefined count of blocks
+// isCheckpointBlock returns true for blocks in the middle of the epoch
+// which are offseted by predefined count of blocks
 func (c *checkpointManager) isCheckpointBlock(blockNumber uint64) bool {
-	return blockNumber == c.lastCheckpointNumber+c.checkpointsOffset
+	return blockNumber == c.latestCheckpointID+c.checkpointsOffset
 }
 
 var _ rootchainInteractor = (*defaultRootchainInteractor)(nil)

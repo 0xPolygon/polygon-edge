@@ -237,7 +237,7 @@ func (c *consensusRuntime) populateFsmIfBridgeEnabled(
 		}
 
 		if isCheckpointBlock {
-			c.checkpointManager.lastCheckpointNumber = ff.block.Block.Header.Number
+			c.checkpointManager.latestCheckpointID = ff.block.Block.Header.Number
 		}
 
 		c.NotifyProposalInserted(ff.block.Block.Header)
@@ -328,8 +328,7 @@ func (c *consensusRuntime) FSM() (*fsm, error) {
 	}
 
 	if c.IsBridgeEnabled() {
-		err := c.populateFsmIfBridgeEnabled(ff, epoch, isEndOfEpoch, isEndOfSprint)
-		if err != nil {
+		if err := c.populateFsmIfBridgeEnabled(ff, epoch, isEndOfEpoch, isEndOfSprint); err != nil {
 			return nil, err
 		}
 	} else {
