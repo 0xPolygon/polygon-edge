@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/0xPolygon/go-ibft/messages"
-	"github.com/0xPolygon/go-ibft/messages/proto"
 	protoIBFT "github.com/0xPolygon/go-ibft/messages/proto"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
@@ -105,6 +104,7 @@ func (i *backendIBFT) ID() []byte {
 	return i.currentSigner.Address().Bytes()
 }
 
+// Q: This is not being used in go-ibft
 func (i *backendIBFT) MaximumFaulty() uint64 {
 	return uint64(CalcMaxFaultyNodes(i.currentValidators))
 }
@@ -133,11 +133,11 @@ func (i *backendIBFT) HasQuorum(view *protoIBFT.View, messages []*protoIBFT.Mess
 
 	if len(messages) > 0 {
 		switch messages[0].GetType() {
-		case proto.MessageType_PREPREPARE:
+		case protoIBFT.MessageType_PREPREPARE:
 			return len(messages) > 1
-		case proto.MessageType_PREPARE:
+		case protoIBFT.MessageType_PREPARE:
 			return len(messages) >= int(quorum)-1
-		case proto.MessageType_ROUND_CHANGE, proto.MessageType_COMMIT:
+		case protoIBFT.MessageType_ROUND_CHANGE, protoIBFT.MessageType_COMMIT:
 			return len(messages) >= int(quorum)
 		}
 	}
