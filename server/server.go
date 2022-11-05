@@ -32,6 +32,7 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/umbracle/ethgo/abi"
 	"google.golang.org/grpc"
 )
 
@@ -505,7 +506,34 @@ func (j *jsonRPCHub) GetCode(hash types.Hash) ([]byte, error) {
 	return res, nil
 }
 
-func (j *jsonRPCHub) ApplyTxn(
+func constructErrorFromRevert(result *runtime.ExecutionResult) error {
+	revertErrMsg, unpackErr := abi.UnpackRevertError(result.ReturnValue)
+	if unpackErr != nil {
+		return result.Err
+	}
+
+	return fmt.Errorf("%w: %s", result.Err, revertErrMsg)
+}
+
+func (j *jsonRPCHub) Call(txn *types.Transaction, header *types.Header) ([]byte, error) {
+	result, err := j.applyTxnImpl(header, txn)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check if an EVM revert happened
+	if result.Reverted() {
+		return nil, constructErrorFromRevert(result)
+	}
+
+	if result.Failed() {
+		return nil, fmt.Errorf("unable to execute call: %w", result.Err)
+	}
+
+	return result.ReturnValue, nil
+}
+
+func (j *jsonRPCHub) applyTxnImpl(
 	header *types.Header,
 	txn *types.Transaction,
 ) (result *runtime.ExecutionResult, err error) {
@@ -537,6 +565,174 @@ func (j *jsonRPCHub) GetSyncProgression() *progress.Progression {
 	}
 
 	return nil
+}
+
+// EstimateGas estimates the gas needed to execute a transaction
+func (j *jsonRPCHub) EstimateGas(transaction *types.Transaction, header *types.Header) (uint64, error) {
+	forksInTime := j.GetForksInTime(header.Number)
+
+	var standardGas uint64
+	if transaction.IsContractCreation() && forksInTime.Homestead {
+		standardGas = state.TxGasContractCreation
+	} else {
+		standardGas = state.TxGas
+	}
+
+	var (
+		lowEnd  = standardGas
+		highEnd uint64
+	)
+
+	// If the gas limit was passed in, use it as a ceiling
+	if transaction.Gas != 0 && transaction.Gas >= standardGas {
+		highEnd = transaction.Gas
+	} else {
+		// If not, use the referenced block number
+		highEnd = header.GasLimit
+	}
+
+	gasPriceInt := new(big.Int).Set(transaction.GasPrice)
+	valueInt := new(big.Int).Set(transaction.Value)
+
+	var availableBalance *big.Int
+
+	// If the sender address is present, figure out how much available funds
+	// are we working with
+	if transaction.From != types.ZeroAddress {
+		// Get the account balance
+		// If the account is not initialized yet in state,
+		// assume it's an empty account
+		accountBalance := big.NewInt(0)
+		acc, err := j.GetAccount(header.StateRoot, transaction.From)
+
+		//nolint:govet
+		if err != nil {
+			// An unrelated error occurred, return it
+			return 0, err
+		} else if err == nil {
+			// No error when fetching the account,
+			// read the balance from state
+			accountBalance = acc.Balance
+		}
+
+		availableBalance = new(big.Int).Set(accountBalance)
+
+		if transaction.Value != nil {
+			if valueInt.Cmp(availableBalance) > 0 {
+				return 0, fmt.Errorf("error") //ErrInsufficientFunds
+			}
+
+			availableBalance.Sub(availableBalance, valueInt)
+		}
+	}
+
+	// Recalculate the gas ceiling based on the available funds (if any)
+	// and the passed in gas price (if present)
+	if gasPriceInt.BitLen() != 0 && // Gas price has been set
+		availableBalance != nil && // Available balance is found
+		availableBalance.Cmp(big.NewInt(0)) > 0 { // Available balance > 0
+		gasAllowance := new(big.Int).Div(availableBalance, gasPriceInt)
+
+		// Check the gas allowance for this account, make sure high end is capped to it
+		if gasAllowance.IsUint64() && highEnd > gasAllowance.Uint64() {
+			highEnd = gasAllowance.Uint64()
+		}
+	}
+
+	// Checks if executor level valid gas errors occurred
+	isGasApplyError := func(err error) bool {
+		// Not linting this as the underlying error is actually wrapped
+		//nolint:govet
+		return errors.As(err, &state.ErrNotEnoughIntrinsicGas)
+	}
+
+	// Checks if EVM level valid gas errors occurred
+	isGasEVMError := func(err error) bool {
+		return errors.Is(err, runtime.ErrOutOfGas) ||
+			errors.Is(err, runtime.ErrCodeStoreOutOfGas)
+	}
+
+	// Checks if the EVM reverted during execution
+	isEVMRevertError := func(err error) bool {
+		return errors.Is(err, runtime.ErrExecutionReverted)
+	}
+
+	// Run the transaction with the specified gas value.
+	// Returns a status indicating if the transaction failed and the accompanying error
+	testTransaction := func(gas uint64, shouldOmitErr bool) (bool, error) {
+		// Create a dummy transaction with the new gas
+		txn := transaction.Copy()
+		txn.Gas = gas
+
+		result, applyErr := j.applyTxnImpl(header, txn)
+
+		if applyErr != nil {
+			// Check the application error.
+			// Gas apply errors are valid, and should be ignored
+			if isGasApplyError(applyErr) && shouldOmitErr {
+				// Specifying the transaction failed, but not providing an error
+				// is an indication that a valid error occurred due to low gas,
+				// which will increase the lower bound for the search
+				return true, nil
+			}
+
+			return true, applyErr
+		}
+
+		// Check if an out of gas error happened during EVM execution
+		if result.Failed() {
+			if isGasEVMError(result.Err) && shouldOmitErr {
+				// Specifying the transaction failed, but not providing an error
+				// is an indication that a valid error occurred due to low gas,
+				// which will increase the lower bound for the search
+				return true, nil
+			}
+
+			if isEVMRevertError(result.Err) {
+				// The EVM reverted during execution, attempt to extract the
+				// error message and return it
+				return true, constructErrorFromRevert(result)
+			}
+
+			return true, result.Err
+		}
+
+		return false, nil
+	}
+
+	// Start the binary search for the lowest possible gas price
+	for lowEnd < highEnd {
+		mid := (lowEnd + highEnd) / 2
+
+		failed, testErr := testTransaction(mid, true)
+		if testErr != nil &&
+			!isEVMRevertError(testErr) {
+			// Reverts are ignored in the binary search, but are checked later on
+			// during the execution for the optimal gas limit found
+			return 0, testErr
+		}
+
+		if failed {
+			// If the transaction failed => increase the gas
+			lowEnd = mid + 1
+		} else {
+			// If the transaction didn't fail => make this ok value the high end
+			highEnd = mid
+		}
+	}
+
+	// Check if the highEnd is a good value to make the transaction pass
+	failed, err := testTransaction(highEnd, false)
+	if failed {
+		// The transaction shouldn't fail, for whatever reason, at highEnd
+		return 0, fmt.Errorf(
+			"unable to apply transaction even for the highest gas limit %d: %w",
+			highEnd,
+			err,
+		)
+	}
+
+	return highEnd, nil
 }
 
 // SETUP //
