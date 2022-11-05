@@ -133,3 +133,7 @@ func (m *mockStore) GetTxs(inclQueued bool) (
 func (m *mockStore) GetCapacity() (uint64, uint64) {
 	return 0, 0
 }
+
+func (m *mockStore) GetPeers() int {
+	return 20
+}

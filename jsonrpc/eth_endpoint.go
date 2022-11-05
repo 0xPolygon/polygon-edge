@@ -10,7 +10,6 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/helper/common"
-	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
@@ -119,9 +118,9 @@ func (e *Eth) Syncing() (interface{}, error) {
 		// Node is bulk syncing, return the status
 		return progression{
 			Type:          string(syncProgression.SyncType),
-			StartingBlock: hex.EncodeUint64(syncProgression.StartingBlock),
-			CurrentBlock:  hex.EncodeUint64(syncProgression.CurrentBlock),
-			HighestBlock:  hex.EncodeUint64(syncProgression.HighestBlock),
+			StartingBlock: argUint64(syncProgression.StartingBlock),
+			CurrentBlock:  argUint64(syncProgression.CurrentBlock),
+			HighestBlock:  argUint64(syncProgression.HighestBlock),
 		}, nil
 	}
 
@@ -201,12 +200,7 @@ func (e *Eth) BlockNumber() (interface{}, error) {
 }
 
 // SendRawTransaction sends a raw transaction
-func (e *Eth) SendRawTransaction(input string) (interface{}, error) {
-	buf, decodeErr := hex.DecodeHex(input)
-	if decodeErr != nil {
-		return nil, fmt.Errorf("unable to decode input, %w", decodeErr)
-	}
-
+func (e *Eth) SendRawTransaction(buf argBytes) (interface{}, error) {
 	tx := &types.Transaction{}
 	if err := tx.UnmarshalRLP(buf); err != nil {
 		return nil, err
@@ -406,11 +400,6 @@ func (e *Eth) GetStorageAt(
 	// Get the storage for the passed in location
 	result, err := e.store.GetStorage(header.StateRoot, address, index)
 	if err != nil {
-		//nolint:govet
-		if errors.As(err, &ErrStateNotFound) {
-			return argBytesPtr(types.ZeroHash[:]), nil
-		}
-
 		return nil, err
 	}
 
@@ -433,12 +422,12 @@ func (e *Eth) GetStorageAt(
 
 // GasPrice returns the average gas price based on the last x blocks
 // taking into consideration operator defined price limit
-func (e *Eth) GasPrice() (string, error) {
+func (e *Eth) GasPrice() (interface{}, error) {
 	// Fetch average gas price in uint64
 	avgGasPrice := e.store.GetAvgGasPrice().Uint64()
 
 	// Return --price-limit flag defined value if it is greater than avgGasPrice
-	return hex.EncodeUint64(common.Max(e.priceLimit, avgGasPrice)), nil
+	return argUint64(common.Max(e.priceLimit, avgGasPrice)), nil
 }
 
 // Call executes a smart contract call using the transaction object data
@@ -674,7 +663,7 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 		)
 	}
 
-	return hex.EncodeUint64(highEnd), nil
+	return argUint64(highEnd), nil
 }
 
 // GetFilterLogs returns an array of logs for the specified filter

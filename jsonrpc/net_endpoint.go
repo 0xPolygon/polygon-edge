@@ -27,5 +27,5 @@ func (n *Net) Listening() (interface{}, error) {
 func (n *Net) PeerCount() (interface{}, error) {
 	peers := n.store.GetPeers()
 
-	return strconv.FormatInt(int64(peers), 10), nil
+	return argUint64(peers), nil
 }
