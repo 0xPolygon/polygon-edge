@@ -26,7 +26,7 @@ func (w *Web3) ClientVersion() (interface{}, error) {
 }
 
 // Sha3 returns Keccak-256 (not the standardized SHA3-256) of the given data
-func (w *Web3) Sha3(v argBytes) (argBytes, error) {
+func (w *Web3) Sha3(v argBytes) (interface{}, error) {
 	dst := keccak.Keccak256(nil, v)
 
 	return argBytes(dst), nil
