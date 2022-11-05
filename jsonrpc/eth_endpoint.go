@@ -22,9 +22,6 @@ type ethTxPoolStore interface {
 
 	// AddTx adds a new transaction to the tx pool
 	AddTx(tx *types.Transaction) error
-
-	// GetPendingTx gets the pending transaction from the transaction pool, if it's present
-	GetPendingTx(txHash types.Hash) (*types.Transaction, bool)
 }
 
 type ethStateStore interface {
@@ -36,22 +33,16 @@ type ethStateStore interface {
 
 type ethBlockchainStore interface {
 	// Header returns the current header of the chain (genesis if empty)
-	Header() *types.Header
-
-	// GetHeaderByNumber returns the header by number
-	GetHeaderByNumber(block uint64) (*types.Header, bool)
+	Header() *Block
 
 	// GetBlockByHash gets a block using the provided hash
-	GetBlockByHash(hash types.Hash, full bool) (*types.Block, bool)
+	GetBlockByHash(hash types.Hash, full bool) (*Block, bool)
 
 	// GetBlockByNumber returns a block using the provided number
-	GetBlockByNumber(num uint64, full bool) (*types.Block, bool)
+	GetBlockByNumber(num uint64, full bool) (*Block, bool)
 
-	// ReadTxLookup returns a block hash in which a given txn was mined
-	ReadTxLookup(txnHash types.Hash) (types.Hash, bool)
-
-	// GetReceiptsByHash returns the receipts for a block hash
-	GetReceiptsByHash(hash types.Hash) ([]*types.Receipt, error)
+	// GetTransactionByHash returns the transaction by hash (with the receipt if it has finished)
+	GetTransactionByHash(hash types.Hash, withReceipt bool) (*Transaction, *Receipt, error)
 
 	// GetAvgGasPrice returns the average gas price
 	GetAvgGasPrice() *big.Int
@@ -102,7 +93,6 @@ func (e *Eth) getHeaderFromBlockNumberOrHash(bnh BlockNumberOrHash) (*types.Head
 		if err != nil {
 			return nil, fmt.Errorf("failed to get the header of block %d: %w", *bnh.BlockNumber, err)
 		}
-
 		return header, nil
 	}
 
@@ -133,7 +123,7 @@ func (e *Eth) Syncing() (interface{}, error) {
 func GetNumericBlockNumber(number BlockNumber, e *Eth) (uint64, error) {
 	switch number {
 	case LatestBlockNumber:
-		return e.store.Header().Number, nil
+		return uint64(e.store.Header().Number), nil
 
 	case EarliestBlockNumber:
 		return 0, nil
@@ -158,12 +148,11 @@ func (e *Eth) GetBlockByNumber(number BlockNumber, fullTx bool) (interface{}, er
 	}
 
 	block, ok := e.store.GetBlockByNumber(num, true)
-
 	if !ok {
 		return nil, nil
 	}
 
-	return toBlock(block, fullTx), nil
+	return block, nil
 }
 
 // GetBlockByHash returns information about a block by hash
@@ -173,7 +162,7 @@ func (e *Eth) GetBlockByHash(hash types.Hash, fullTx bool) (interface{}, error) 
 		return nil, nil
 	}
 
-	return toBlock(block, fullTx), nil
+	return block, nil
 }
 
 func (e *Eth) GetBlockTransactionCountByNumber(number BlockNumber) (interface{}, error) {
@@ -198,7 +187,7 @@ func (e *Eth) BlockNumber() (interface{}, error) {
 		return nil, fmt.Errorf("header has a nil value")
 	}
 
-	return argUintPtr(h.Number), nil
+	return h.Number, nil
 }
 
 // SendRawTransaction sends a raw transaction
@@ -227,155 +216,20 @@ func (e *Eth) SendTransaction(_ *txnArgs) (interface{}, error) {
 // If the transaction is still pending -> return the txn with some fields omitted
 // If the transaction is sealed into a block -> return the whole txn with all fields
 func (e *Eth) GetTransactionByHash(hash types.Hash) (interface{}, error) {
-	// findSealedTx is a helper method for checking the world state
-	// for the transaction with the provided hash
-	findSealedTx := func() *transaction {
-		// Check the chain state for the transaction
-		blockHash, ok := e.store.ReadTxLookup(hash)
-		if !ok {
-			// Block not found in storage
-			return nil
-		}
-
-		block, ok := e.store.GetBlockByHash(blockHash, true)
-
-		if !ok {
-			// Block receipts not found in storage
-			return nil
-		}
-
-		// Find the transaction within the block
-		for idx, txn := range block.Transactions {
-			if txn.Hash == hash {
-				return toTransaction(
-					txn,
-					argUintPtr(block.Number()),
-					argHashPtr(block.Hash()),
-					&idx,
-				)
-			}
-		}
-
-		return nil
+	txn, _, err := e.store.GetTransactionByHash(hash, false)
+	if err != nil {
+		return nil, err
 	}
-
-	// findPendingTx is a helper method for checking the TxPool
-	// for the pending transaction with the provided hash
-	findPendingTx := func() *transaction {
-		// Check the TxPool for the transaction if it's pending
-		if pendingTx, pendingFound := e.store.GetPendingTx(hash); pendingFound {
-			return toPendingTransaction(pendingTx)
-		}
-
-		// Transaction not found in the TxPool
-		return nil
-	}
-
-	// 1. Check the chain state for the txn
-	if resultTxn := findSealedTx(); resultTxn != nil {
-		return resultTxn, nil
-	}
-
-	// 2. Check the TxPool for the txn
-	if resultTxn := findPendingTx(); resultTxn != nil {
-		return resultTxn, nil
-	}
-
-	// Transaction not found in state or TxPool
-	e.logger.Warn(
-		fmt.Sprintf("Transaction with hash [%s] not found", hash),
-	)
-
-	return nil, nil
+	return txn, nil
 }
 
 // GetTransactionReceipt returns a transaction receipt by his hash
 func (e *Eth) GetTransactionReceipt(hash types.Hash) (interface{}, error) {
-	blockHash, ok := e.store.ReadTxLookup(hash)
-	if !ok {
-		// txn not found
-		return nil, nil
-	}
-
-	block, ok := e.store.GetBlockByHash(blockHash, true)
-	if !ok {
-		// block not found
-		e.logger.Warn(
-			fmt.Sprintf("Block with hash [%s] not found", blockHash.String()),
-		)
-
-		return nil, nil
-	}
-
-	receipts, err := e.store.GetReceiptsByHash(blockHash)
+	_, receipt, err := e.store.GetTransactionByHash(hash, true)
 	if err != nil {
-		// block receipts not found
-		e.logger.Warn(
-			fmt.Sprintf("Receipts for block with hash [%s] not found", blockHash.String()),
-		)
-
-		return nil, nil
+		return nil, err
 	}
-
-	if len(receipts) == 0 {
-		// Receipts not written yet on the db
-		e.logger.Warn(
-			fmt.Sprintf("No receipts found for block with hash [%s]", blockHash.String()),
-		)
-
-		return nil, nil
-	}
-	// find the transaction in the body
-	indx := -1
-
-	for i, txn := range block.Transactions {
-		if txn.Hash == hash {
-			indx = i
-
-			break
-		}
-	}
-
-	if indx == -1 {
-		// txn not found
-		return nil, nil
-	}
-
-	txn := block.Transactions[indx]
-	raw := receipts[indx]
-
-	logs := make([]*Log, len(raw.Logs))
-	for indx, elem := range raw.Logs {
-		logs[indx] = &Log{
-			Address:     elem.Address,
-			Topics:      elem.Topics,
-			Data:        argBytes(elem.Data),
-			BlockHash:   block.Hash(),
-			BlockNumber: argUint64(block.Number()),
-			TxHash:      txn.Hash,
-			TxIndex:     argUint64(indx),
-			LogIndex:    argUint64(indx),
-			Removed:     false,
-		}
-	}
-
-	res := &receipt{
-		Root:              raw.Root,
-		CumulativeGasUsed: argUint64(raw.CumulativeGasUsed),
-		LogsBloom:         raw.LogsBloom,
-		Status:            argUint64(*raw.Status),
-		TxHash:            txn.Hash,
-		TxIndex:           argUint64(indx),
-		BlockHash:         block.Hash(),
-		BlockNumber:       argUint64(block.Number()),
-		GasUsed:           argUint64(raw.GasUsed),
-		ContractAddress:   raw.ContractAddress,
-		FromAddr:          txn.From,
-		ToAddr:            txn.To,
-		Logs:              logs,
-	}
-
-	return res, nil
+	return receipt, nil
 }
 
 // GetStorageAt returns the contract storage at the index position
@@ -778,13 +632,13 @@ func (e *Eth) Unsubscribe(id string) (bool, error) {
 	return e.filterManager.Uninstall(id), nil
 }
 
-func (e *Eth) getBlockHeader(number BlockNumber) (*types.Header, error) {
+func (e *Eth) getBlockHeader(number BlockNumber) (*Block, error) {
 	switch number {
 	case LatestBlockNumber:
 		return e.store.Header(), nil
 
 	case EarliestBlockNumber:
-		header, ok := e.store.GetHeaderByNumber(uint64(0))
+		header, ok := e.store.GetBlockByNumber(uint64(0), false)
 		if !ok {
 			return nil, fmt.Errorf("error fetching genesis block header")
 		}
@@ -796,7 +650,7 @@ func (e *Eth) getBlockHeader(number BlockNumber) (*types.Header, error) {
 
 	default:
 		// Convert the block number from hex to uint64
-		header, ok := e.store.GetHeaderByNumber(uint64(number))
+		header, ok := e.store.GetBlockByNumber(uint64(number), false)
 		if !ok {
 			return nil, fmt.Errorf("error fetching block number %d header", uint64(number))
 		}

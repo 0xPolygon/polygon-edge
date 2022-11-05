@@ -14,7 +14,7 @@ type transactionOrHash interface {
 	getHash() types.Hash
 }
 
-type transaction struct {
+type Transaction struct {
 	Nonce       argUint64      `json:"nonce"`
 	GasPrice    argBig         `json:"gasPrice"`
 	Gas         argUint64      `json:"gas"`
@@ -31,7 +31,7 @@ type transaction struct {
 	TxIndex     *argUint64     `json:"transactionIndex"`
 }
 
-func (t transaction) getHash() types.Hash { return t.Hash }
+func (t Transaction) getHash() types.Hash { return t.Hash }
 
 // Redefine to implement getHash() of transactionOrHash
 type transactionHash types.Hash
@@ -42,7 +42,7 @@ func (h transactionHash) MarshalText() ([]byte, error) {
 	return []byte(types.Hash(h).String()), nil
 }
 
-func toPendingTransaction(t *types.Transaction) *transaction {
+func toPendingTransaction(t *types.Transaction) *Transaction {
 	return toTransaction(t, nil, nil, nil)
 }
 
@@ -51,8 +51,8 @@ func toTransaction(
 	blockNumber *argUint64,
 	blockHash *types.Hash,
 	txIndex *int,
-) *transaction {
-	res := &transaction{
+) *Transaction {
+	res := &Transaction{
 		Nonce:    argUint64(t.Nonce),
 		GasPrice: argBig(*t.GasPrice),
 		Gas:      argUint64(t.Gas),
@@ -81,7 +81,7 @@ func toTransaction(
 	return res
 }
 
-type block struct {
+type Block struct {
 	ParentHash      types.Hash          `json:"parentHash"`
 	Sha3Uncles      types.Hash          `json:"sha3Uncles"`
 	Miner           argBytes            `json:"miner"`
@@ -104,9 +104,9 @@ type block struct {
 	Uncles          []types.Hash        `json:"uncles"`
 }
 
-func toBlock(b *types.Block, fullTx bool) *block {
+func toBlock(b *types.Block, fullTx bool) *Block {
 	h := b.Header
-	res := &block{
+	res := &Block{
 		ParentHash:      h.ParentHash,
 		Sha3Uncles:      h.Sha3Uncles,
 		Miner:           argBytes(h.Miner),
@@ -155,7 +155,7 @@ func toBlock(b *types.Block, fullTx bool) *block {
 	return res
 }
 
-type receipt struct {
+type Receipt struct {
 	Root              types.Hash     `json:"root"`
 	CumulativeGasUsed argUint64      `json:"cumulativeGasUsed"`
 	LogsBloom         types.Bloom    `json:"logsBloom"`
