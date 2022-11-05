@@ -91,27 +91,29 @@ func (e *Eth) ChainId() (interface{}, error) {
 	return argUintPtr(e.chainID), nil
 }
 
-func (e *Eth) getHeaderFromBlockNumberOrHash(bnh *BlockNumberOrHash) (*types.Header, error) {
-	var (
-		header *types.Header
-		err    error
-	)
+func (e *Eth) getHeaderFromBlockNumberOrHash(bnh BlockNumberOrHash) (*types.Header, error) {
+	// The filter is empty, use the latest block by default
+	if bnh.BlockNumber == nil && bnh.BlockHash == nil {
+		bnh.BlockNumber, _ = createBlockNumberPointer("latest")
+	}
 
 	if bnh.BlockNumber != nil {
-		header, err = e.getBlockHeader(*bnh.BlockNumber)
+		// block number
+		header, err := e.getBlockHeader(*bnh.BlockNumber)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get the header of block %d: %w", *bnh.BlockNumber, err)
 		}
-	} else if bnh.BlockHash != nil {
-		block, ok := e.store.GetBlockByHash(*bnh.BlockHash, false)
-		if !ok {
-			return nil, fmt.Errorf("could not find block referenced by the hash %s", bnh.BlockHash.String())
-		}
 
-		header = block.Header
+		return header, nil
 	}
 
-	return header, nil
+	// block hash
+	block, ok := e.store.GetBlockByHash(*bnh.BlockHash, false)
+	if !ok {
+		return nil, fmt.Errorf("could not find block referenced by the hash %s", bnh.BlockHash.String())
+	}
+
+	return block.Header, nil
 }
 
 func (e *Eth) Syncing() (interface{}, error) {
@@ -388,19 +390,9 @@ func (e *Eth) GetStorageAt(
 	index types.Hash,
 	filter BlockNumberOrHash,
 ) (interface{}, error) {
-	var (
-		header *types.Header
-		err    error
-	)
-
-	// The filter is empty, use the latest block by default
-	if filter.BlockNumber == nil && filter.BlockHash == nil {
-		filter.BlockNumber, _ = createBlockNumberPointer("latest")
-	}
-
-	header, err = e.getHeaderFromBlockNumberOrHash(&filter)
+	header, err := e.getHeaderFromBlockNumberOrHash(filter)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get header from block hash or block number")
+		return nil, err
 	}
 
 	// Get the storage for the passed in location
@@ -413,6 +405,8 @@ func (e *Eth) GetStorageAt(
 
 		return nil, err
 	}
+
+	// TODO: GetStorage should return the values already parsed
 
 	// Parse the RLP value
 	p := &fastrlp.Parser{}
@@ -443,23 +437,12 @@ func (e *Eth) GasPrice() (string, error) {
 
 // Call executes a smart contract call using the transaction object data
 func (e *Eth) Call(arg *txnArgs, filter BlockNumberOrHash) (interface{}, error) {
-	var (
-		header *types.Header
-		err    error
-	)
-
-	// The filter is empty, use the latest block by default
-	if filter.BlockNumber == nil && filter.BlockHash == nil {
-		filter.BlockNumber, _ = createBlockNumberPointer("latest")
-	}
-
-	header, err = e.getHeaderFromBlockNumberOrHash(&filter)
+	header, err := e.getHeaderFromBlockNumberOrHash(filter)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get header from block hash or block number")
+		return nil, err
 	}
 
 	transaction, err := e.decodeTxn(arg)
-
 	if err != nil {
 		return nil, err
 	}
@@ -694,19 +677,9 @@ func (e *Eth) GetLogs(query *LogQuery) (interface{}, error) {
 
 // GetBalance returns the account's balance at the referenced block.
 func (e *Eth) GetBalance(address types.Address, filter BlockNumberOrHash) (interface{}, error) {
-	var (
-		header *types.Header
-		err    error
-	)
-
-	// The filter is empty, use the latest block by default
-	if filter.BlockNumber == nil && filter.BlockHash == nil {
-		filter.BlockNumber, _ = createBlockNumberPointer("latest")
-	}
-
-	header, err = e.getHeaderFromBlockNumberOrHash(&filter)
+	header, err := e.getHeaderFromBlockNumberOrHash(filter)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get header from block hash or block number")
+		return nil, err
 	}
 
 	// Extract the account balance
@@ -736,7 +709,7 @@ func (e *Eth) GetTransactionCount(address types.Address, filter BlockNumberOrHas
 	}
 
 	if filter.BlockNumber == nil {
-		header, err = e.getHeaderFromBlockNumberOrHash(&filter)
+		header, err = e.getHeaderFromBlockNumberOrHash(filter)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get header from block hash or block number")
 		}
@@ -760,19 +733,9 @@ func (e *Eth) GetTransactionCount(address types.Address, filter BlockNumberOrHas
 
 // GetCode returns account code at given block number
 func (e *Eth) GetCode(address types.Address, filter BlockNumberOrHash) (interface{}, error) {
-	var (
-		header *types.Header
-		err    error
-	)
-
-	// The filter is empty, use the latest block by default
-	if filter.BlockNumber == nil && filter.BlockHash == nil {
-		filter.BlockNumber, _ = createBlockNumberPointer("latest")
-	}
-
-	header, err = e.getHeaderFromBlockNumberOrHash(&filter)
+	header, err := e.getHeaderFromBlockNumberOrHash(filter)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get header from block hash or block number")
+		return nil, err
 	}
 
 	emptySlice := []byte{}
