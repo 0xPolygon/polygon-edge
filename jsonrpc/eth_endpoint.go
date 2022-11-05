@@ -400,6 +400,11 @@ func (e *Eth) GetStorageAt(
 	// Get the storage for the passed in location
 	result, err := e.store.GetStorage(header.StateRoot, address, index)
 	if err != nil {
+		//nolint:govet
+		if errors.As(err, &ErrStateNotFound) {
+			return argBytesPtr(types.ZeroHash[:]), nil
+		}
+
 		return nil, err
 	}
 
