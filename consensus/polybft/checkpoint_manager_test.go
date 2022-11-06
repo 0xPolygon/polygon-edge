@@ -28,23 +28,62 @@ func TestCheckpointManager_submitCheckpoint(t *testing.T) {
 		Once()
 	rootchainMock.On("SendTransaction", mock.Anything, mock.Anything).
 		Return(&ethgo.Receipt{Status: uint64(types.ReceiptSuccess)}, error(nil)).
-		Once()
+		Times(2)
 
 	backendMock := new(polybftBackendMock)
 	backendMock.On("GetValidators", mock.Anything, mock.Anything).Return(validators)
 
-	parentExtra := &Extra{Checkpoint: &CheckpointData{EpochNumber: 1}}
+	checkpoint := &CheckpointData{
+		BlockRound:  1,
+		EpochNumber: 4,
+		EventRoot:   types.BytesToHash(generateRandomBytes(t)),
+	}
+	extra := createTestExtraObject(validators, validators, 3, 3, 3)
+	extra.Checkpoint = checkpoint
+
+	latestCheckpointHeader := &types.Header{
+		Number:    4,
+		ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...)}
+	latestCheckpointHeader.ComputeHash()
+
+	checkpoint1 := checkpoint.Copy()
+	checkpoint1.EpochNumber = 1
+
+	checkpoint2 := checkpoint.Copy()
+	checkpoint2.EpochNumber = 2
+
+	checkpoint3 := checkpoint.Copy()
+	checkpoint3.EpochNumber = 3
+
+	extra = createTestExtraObject(validators, validators, 4, 4, 4)
+	extra.Checkpoint = checkpoint1
+	extra3 := createTestExtraObject(validators, validators, 4, 4, 4)
+	extra3.Checkpoint = checkpoint3
+
 	headersMap := &testHeadersMap{}
-	headersMap.addHeader(&types.Header{
+	header1 := &types.Header{
 		Number:    1,
-		ExtraData: append(make([]byte, ExtraVanity), parentExtra.MarshalRLPTo(nil)...),
-	})
+		ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...),
+	}
+	header1.ComputeHash()
+
+	header2 := header1.Copy()
+	header2.Number = 2
+	header2.ComputeHash()
+
+	header3 := &types.Header{
+		Number:    3,
+		ExtraData: append(make([]byte, ExtraVanity), extra3.MarshalRLPTo(nil)...),
+	}
+	header3.ComputeHash()
+
+	headersMap.addHeader(header1)
+	headersMap.addHeader(header2)
+	headersMap.addHeader(header3)
 
 	// mock blockchain
 	blockchainMock := new(blockchainMock)
 	blockchainMock.On("GetHeaderByNumber", mock.Anything).Return(headersMap.getHeader)
-
-	checkpointHeader := &types.Header{Number: 2}
 
 	c := &checkpointManager{
 		sender:           types.StringToAddress("2"),
@@ -52,26 +91,8 @@ func TestCheckpointManager_submitCheckpoint(t *testing.T) {
 		consensusBackend: backendMock,
 		blockchain:       blockchainMock,
 	}
-	bmp := bitmap.Bitmap{}
 
-	for i := range validators {
-		bmp.Set(uint64(i))
-	}
-
-	checkpoint := &CheckpointData{
-		BlockRound:  1,
-		EpochNumber: 1,
-		EventRoot:   types.BytesToHash(generateRandomBytes(t)),
-	}
-	extraRaw := createTestExtra(validators, validators, 3, 3, 3)
-	extra, err := GetIbftExtra(extraRaw)
-	require.NoError(t, err)
-
-	extra.Checkpoint = checkpoint
-	checkpointHeader.ExtraData = append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...)
-	checkpointHeader.ComputeHash()
-
-	err = c.submitCheckpoint(*checkpointHeader, false)
+	err := c.submitCheckpoint(*latestCheckpointHeader, false)
 	require.NoError(t, err)
 	rootchainMock.AssertExpectations(t)
 }

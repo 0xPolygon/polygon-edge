@@ -1742,10 +1742,23 @@ func createTestExtra(
 	committedSignaturesCount,
 	parentSignaturesCount int,
 ) []byte {
+	extraData := createTestExtraObject(allAccounts, previousValidatorSet, validatorsCount, committedSignaturesCount, parentSignaturesCount)
+	marshaled := extraData.MarshalRLPTo(nil)
+	result := make([]byte, ExtraVanity+len(marshaled))
+	copy(result[ExtraVanity:], marshaled)
+
+	return result
+}
+
+func createTestExtraObject(allAccounts,
+	previousValidatorSet AccountSet,
+	validatorsCount,
+	committedSignaturesCount,
+	parentSignaturesCount int) *Extra {
 	accountCount := len(allAccounts)
 	dummySignature := [64]byte{}
 	bitmapCommitted, bitmapParent := bitmap.Bitmap{}, bitmap.Bitmap{}
-	extraData := Extra{}
+	extraData := &Extra{}
 	extraData.Validators = generateValidatorDelta(validatorsCount, allAccounts, previousValidatorSet)
 
 	for j := range rand.Perm(accountCount)[:committedSignaturesCount] {
@@ -1759,11 +1772,8 @@ func createTestExtra(
 	extraData.Parent = &Signature{Bitmap: bitmapCommitted, AggregatedSignature: dummySignature[:]}
 	extraData.Committed = &Signature{Bitmap: bitmapParent, AggregatedSignature: dummySignature[:]}
 	extraData.Checkpoint = &CheckpointData{}
-	marshaled := extraData.MarshalRLPTo(nil)
-	result := make([]byte, ExtraVanity+len(marshaled))
-	copy(result[ExtraVanity:], marshaled)
 
-	return result
+	return extraData
 }
 
 func createTestCommitment(t *testing.T, accounts []*wallet.Account) *CommitmentMessageSigned {
