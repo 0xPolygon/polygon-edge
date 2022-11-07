@@ -82,7 +82,7 @@ func (c checkpointManager) getCurrentCheckpointID() (uint64, error) {
 	return checkpointID, nil
 }
 
-// submitCheckpoint sends a transaction which with checkpoint data to the rootchain
+// submitCheckpoint sends a transaction with checkpoint data to the rootchain
 func (c checkpointManager) submitCheckpoint(latestHeader types.Header, isEndOfEpoch bool) error {
 	lastCheckpointBlockNumber, err := c.getCurrentCheckpointID()
 	if err != nil {
