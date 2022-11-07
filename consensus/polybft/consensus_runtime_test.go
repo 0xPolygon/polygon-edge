@@ -340,7 +340,7 @@ func TestConsensusRuntime_deliverMessage_EpochNotStarted(t *testing.T) {
 	assert.NoError(t, err)
 
 	// random node not among validator set
-	account := newTestValidator("A")
+	account := newTestValidator("A", 1)
 
 	runtime := &consensusRuntime{
 		logger: hclog.NewNullLogger(),
@@ -1274,7 +1274,7 @@ func TestConsensusRuntime_restartEpoch_NewEpochToRun_BuildCommitment(t *testing.
 		newValidatorSet[i-1] = oldValidatorSet[i].Copy()
 	}
 
-	newValidatorSet[validatorsCount-1] = newTestValidator("G").ValidatorAccount()
+	newValidatorSet[validatorsCount-1] = newTestValidator("G", 1).ValidatorAccount()
 
 	header := &types.Header{Number: blockNumber}
 

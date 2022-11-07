@@ -289,20 +289,24 @@ func newTestValidators(validatorsCount int) *testValidators {
 	return newTestValidatorsWithAliases(aliases)
 }
 
-func newTestValidatorsWithAliases(aliases []string) *testValidators {
+func newTestValidatorsWithAliases(aliases []string, votingPowers ...[]uint64) *testValidators {
 	validators := map[string]*testValidator{}
-	for _, alias := range aliases {
-		validators[alias] = newTestValidator(alias)
+
+	for i, alias := range aliases {
+		votingPower := uint64(1)
+		if len(votingPowers) == 1 {
+			votingPower = votingPowers[0][i]
+		}
+
+		validators[alias] = newTestValidator(alias, votingPower)
 	}
 
-	return &testValidators{
-		validators: validators,
-	}
+	return &testValidators{validators: validators}
 }
 
-func (v *testValidators) create(alias string) {
+func (v *testValidators) create(alias string, votingPower uint64) {
 	if _, ok := v.validators[alias]; !ok {
-		v.validators[alias] = newTestValidator(alias)
+		v.validators[alias] = newTestValidator(alias, votingPower)
 	}
 }
 
@@ -337,7 +341,7 @@ func (v *testValidators) getValidators(aliases ...string) (res []*testValidator)
 	return
 }
 
-func (v *testValidators) getPublicIdentities(aliases ...string) (res AccountSet) { //nolint:unparam
+func (v *testValidators) getPublicIdentities(aliases ...string) (res AccountSet) {
 	v.iterAcct(aliases, func(t *testValidator) {
 		res = append(res, t.ValidatorAccount())
 	})
@@ -367,12 +371,17 @@ func (v *testValidators) toValidatorSet() *validatorSet {
 }
 
 type testValidator struct {
-	alias   string
-	account *wallet.Account
+	alias       string
+	account     *wallet.Account
+	votingPower uint64
 }
 
-func newTestValidator(alias string) *testValidator {
-	return &testValidator{alias: alias, account: wallet.GenerateAccount()}
+func newTestValidator(alias string, votingPower uint64) *testValidator {
+	return &testValidator{
+		alias:       alias,
+		votingPower: votingPower,
+		account:     wallet.GenerateAccount(),
+	}
 }
 
 func (v *testValidator) Address() types.Address {
@@ -395,8 +404,9 @@ func (v *testValidator) paramsValidator() *Validator {
 
 func (v *testValidator) ValidatorAccount() *ValidatorAccount {
 	return &ValidatorAccount{
-		Address: types.Address(v.account.Ecdsa.Address()),
-		BlsKey:  v.account.Bls.PublicKey(),
+		Address:     types.Address(v.account.Ecdsa.Address()),
+		BlsKey:      v.account.Bls.PublicKey(),
+		VotingPower: v.votingPower,
 	}
 }
 

@@ -619,7 +619,7 @@ func TestFSM_ValidateCommit_InvalidHash(t *testing.T) {
 	_, err := fsm.BuildProposal()
 	assert.NoError(t, err)
 
-	nonValidatorAcc := newTestValidator("non_validator")
+	nonValidatorAcc := newTestValidator("non_validator", 1)
 	wrongSignature, err := nonValidatorAcc.mustSign([]byte("Foo")).Marshal()
 	require.NoError(t, err)
 
@@ -936,7 +936,7 @@ func TestFSM_Insert_InvalidNode(t *testing.T) {
 	require.NoError(t, err)
 
 	// create test account outside of validator set
-	nonValidatorAccount := newTestValidator("non_validator")
+	nonValidatorAccount := newTestValidator("non_validator", 1)
 	nonValidatorSignature, err := nonValidatorAccount.mustSign(proposalHash).Marshal()
 	require.NoError(t, err)
 
@@ -1237,7 +1237,7 @@ func TestFSM_VerifyStateTransaction_InvalidSignature(t *testing.T) {
 	var txns []*types.Transaction
 
 	signature := createSignature(t, validators.getPrivateIdentities("A", "B", "C", "D"), hash)
-	invalidValidator := newTestValidator("G")
+	invalidValidator := newTestValidator("G", 1)
 	invalidSignature, err := invalidValidator.mustSign([]byte("malicious message")).Marshal()
 	require.NoError(t, err)
 

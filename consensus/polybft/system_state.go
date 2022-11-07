@@ -89,9 +89,15 @@ func (s *SystemStateImpl) GetValidatorSet() (AccountSet, error) {
 			return nil, err
 		}
 
+		stake, ok := output["1"].(*big.Int)
+		if !ok {
+			return nil, fmt.Errorf("failed to decode stake")
+		}
+
 		val := &ValidatorAccount{
-			Address: types.Address(addr),
-			BlsKey:  pubKey,
+			Address:     types.Address(addr),
+			BlsKey:      pubKey,
+			VotingPower: stake.Uint64(),
 		}
 
 		return val, nil

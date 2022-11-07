@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/big"
 	"reflect"
 
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
@@ -16,8 +17,9 @@ import (
 
 // ValidatorAccount represents a validator from the validator set
 type ValidatorAccount struct {
-	Address types.Address
-	BlsKey  *bls.PublicKey
+	Address     types.Address
+	BlsKey      *bls.PublicKey
+	VotingPower uint64
 }
 
 // Equals compares ValidatorAccount equality
@@ -35,8 +37,9 @@ func (a ValidatorAccount) Copy() *ValidatorAccount {
 	blsKey, _ := bls.UnmarshalPublicKey(copiedBlsKey)
 
 	return &ValidatorAccount{
-		Address: types.BytesToAddress(a.Address[:]),
-		BlsKey:  blsKey,
+		Address:     types.BytesToAddress(a.Address[:]),
+		BlsKey:      blsKey,
+		VotingPower: a.VotingPower,
 	}
 }
 
@@ -47,6 +50,8 @@ func (a ValidatorAccount) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 	vv.Set(ar.NewBytes(a.Address.Bytes()))
 	// BlsKey
 	vv.Set(ar.NewCopyBytes(a.BlsKey.Marshal()))
+	// VotingPower
+	vv.Set(ar.NewBigInt(new(big.Int).SetUint64(a.VotingPower)))
 
 	return vv
 }
@@ -58,35 +63,48 @@ func (a *ValidatorAccount) UnmarshalRLPWith(v *fastrlp.Value) error {
 		return err
 	}
 
-	if num := len(elems); num != 2 {
-		return fmt.Errorf("not enough elements to decode validator account, expected 2 but found %d", num)
-	}
-	// Address
-	{
-		addressRaw, err := elems[0].GetBytes(nil)
-		if err != nil {
-			return fmt.Errorf("expected 'Address' field encoded as bytes. Error: %w", err)
-		}
-		a.Address = types.BytesToAddress(addressRaw)
+	if num := len(elems); num != 3 {
+		return fmt.Errorf("incorrect elements count to decode validator account, expected 3 but found %d", num)
 	}
 
-	{
-		blsKeyRaw, err := elems[1].GetBytes(nil)
-		if err != nil {
-			return fmt.Errorf("expected 'BlsKey' encoded as bytes. Error: %w", err)
-		}
-		a.BlsKey, err = bls.UnmarshalPublicKey(blsKeyRaw)
-		if err != nil {
-			return fmt.Errorf("failed to unmarshal BLS public key. Error: %w", err)
-		}
+	// Address
+	addressRaw, err := elems[0].GetBytes(nil)
+	if err != nil {
+		return fmt.Errorf("expected 'Address' field encoded as bytes. Error: %w", err)
 	}
+
+	a.Address = types.BytesToAddress(addressRaw)
+
+	// BlsKey
+	blsKeyRaw, err := elems[1].GetBytes(nil)
+	if err != nil {
+		return fmt.Errorf("expected 'BlsKey' encoded as bytes. Error: %w", err)
+	}
+
+	blsKey, err := bls.UnmarshalPublicKey(blsKeyRaw)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal BLS public key. Error: %w", err)
+	}
+
+	a.BlsKey = blsKey
+
+	// VotingPower
+	votingPower := new(big.Int)
+
+	err = elems[2].GetBigInt(votingPower)
+	if err != nil {
+		return fmt.Errorf("expected 'Voting power' encoded as big int. Error: %w", err)
+	}
+
+	a.VotingPower = votingPower.Uint64()
 
 	return nil
 }
 
 // fmt.Stringer implementation
 func (a ValidatorAccount) String() string {
-	return fmt.Sprintf("Address=%v; BLS Key=%v", a.Address.String(), hex.EncodeToString(a.BlsKey.Marshal()))
+	return fmt.Sprintf("Address=%v; BLS Key=%v; Voting Power=%d",
+		a.Address.String(), hex.EncodeToString(a.BlsKey.Marshal()), a.VotingPower)
 }
 
 // AccountSet is a type alias for slice of ValidatorAccount instances

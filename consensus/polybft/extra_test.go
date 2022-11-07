@@ -328,10 +328,10 @@ func TestExtra_CreateValidatorSetDelta_Cases(t *testing.T) {
 			vals := newTestValidatorsWithAliases([]string{})
 
 			for _, name := range c.oldSet {
-				vals.create(name)
+				vals.create(name, 1)
 			}
 			for _, name := range c.newSet {
-				vals.create(name)
+				vals.create(name, 1)
 			}
 
 			oldValidatorSet := vals.getPublicIdentities(c.oldSet...)
