@@ -31,8 +31,8 @@ func (m *blockchainMock) CurrentHeader() *types.Header {
 	return args.Get(0).(*types.Header) //nolint:forcetypeassert
 }
 
-func (m *blockchainMock) CommitBlock(stateBlock *StateBlock) error {
-	args := m.Called(stateBlock)
+func (m *blockchainMock) CommitBlock(block *types.Block) error {
+	args := m.Called(block)
 
 	return args.Error(0)
 }

@@ -325,8 +325,8 @@ func (s *Signature) VerifyCommittedFields(validatorSet AccountSet, hash types.Ha
 		return err
 	}
 
-	if len(filtered) < getQuorumSize(validatorSet.Len()) {
-		return fmt.Errorf("quorum not reached: %d of %d", len(filtered), getQuorumSize(validatorSet.Len()))
+	if quorum := getQuorumSize(validatorSet.Len()); len(filtered) < quorum {
+		return fmt.Errorf("quorum not reached: %d of %d", len(filtered), quorum)
 	}
 
 	blsPublicKeys := make([]*bls.PublicKey, len(filtered))

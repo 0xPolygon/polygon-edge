@@ -130,14 +130,6 @@ func (c *consensusRuntime) getEpoch() *epochMetadata {
 	return c.epoch
 }
 
-// isCurrentEpoch checks if current epoch inside runtime is passed one
-func (c *consensusRuntime) isCurrentEpoch(epoch uint64) bool {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
-
-	return c.epoch != nil && c.epoch.Number == epoch
-}
-
 // getLastBuiltBlockAndEpoch returns last build block and current epochMetadata in a thread-safe manner.
 func (c *consensusRuntime) getLastBuiltBlockAndEpoch() (*types.Header, *epochMetadata) {
 	c.lock.RLock()
@@ -303,7 +295,6 @@ func (c *consensusRuntime) FSM() error {
 		validators:     newValidatorSet(types.BytesToAddress(parent.Miner), epoch.Validators),
 		isEndOfEpoch:   isEndOfEpoch,
 		isEndOfSprint:  isEndOfSprint,
-		epoch:          epoch,
 		logger:         c.logger.Named("fsm"),
 	}
 
@@ -345,10 +336,13 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) error {
 		return err
 	}
 
-	// Epoch might be already in memory, if it is do nothing.
-	// Otherwise, reset the epoch metadata and restart the async services
-	if c.isCurrentEpoch(epochNumber) {
-		return nil
+	lastEpoch := c.getEpoch()
+	if lastEpoch != nil {
+		// Epoch might be already in memory, if its the same number do nothing.
+		// Otherwise, reset the epoch metadata and restart the async services
+		if lastEpoch.Number == epochNumber {
+			return nil
+		}
 	}
 
 	/*
@@ -916,7 +910,9 @@ func (c *consensusRuntime) BuildProposal(blockNumber uint64) []byte {
 
 func (c *consensusRuntime) InsertBlock(proposal []byte, committedSeals []*messages.CommittedSeal) {
 	fsm := c.fsm
-	if err := fsm.Insert(proposal, committedSeals); err != nil {
+
+	block, err := fsm.Insert(proposal, committedSeals)
+	if err != nil {
 		c.logger.Error("cannot insert proposal", "err", err)
 
 		return
@@ -937,7 +933,7 @@ func (c *consensusRuntime) InsertBlock(proposal []byte, committedSeals []*messag
 		}
 	}
 
-	c.OnBlockInserted(fsm.block.Block)
+	c.OnBlockInserted(block)
 }
 
 func (c *consensusRuntime) ID() []byte {

@@ -34,7 +34,7 @@ type blockchainBackend interface {
 	CurrentHeader() *types.Header
 
 	// CommitBlock commits a block to the chain.
-	CommitBlock(stateBlock *StateBlock) error
+	CommitBlock(block *types.Block) error
 
 	// NewBlockBuilder is a factory method that returns a block builder on top of 'parent'.
 	NewBlockBuilder(parent *types.Header, coinbase types.Address,
@@ -77,16 +77,8 @@ func (p *blockchainWrapper) CurrentHeader() *types.Header {
 }
 
 // CommitBlock commits a block to the chain
-func (p *blockchainWrapper) CommitBlock(stateBlock *StateBlock) error {
-	// logs := buildLogsFromReceipts(stateBlock.Receipts, stateBlock.Block.GetHeader())
-	// status, err := p.blockchain.WriteBlockAndSetHead(stateBlock.Block,
-	// stateBlock.Receipts, logs, stateBlock.State, true)
-	// if err != nil {
-	// 	return err
-	// } else if status != core.CanonStatTy {
-	// 	return fmt.Errorf("non canonical change")
-	// }
-	return p.blockchain.WriteBlock(stateBlock.Block, "consensus")
+func (p *blockchainWrapper) CommitBlock(block *types.Block) error {
+	return p.blockchain.WriteBlock(block, "consensus")
 }
 
 // ProcessBlock builds a final block from given 'block' on top of 'parent'

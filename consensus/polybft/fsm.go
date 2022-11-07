@@ -48,13 +48,6 @@ type fsm struct {
 	// blockBuilder is the block builder for proposers
 	blockBuilder blockBuilder
 
-	// block is the current block being process in this round.
-	// It should be populated after the Accept state in pbft-consensus.
-	block *StateBlock
-
-	// proposal is the current proposal being processed
-	proposal []byte
-
 	// uptimeCounter holds info about number of times validators sealed a block (only present if isEndOfEpoch is true)
 	uptimeCounter *CommitEpoch
 
@@ -63,9 +56,6 @@ type fsm struct {
 
 	// isEndOfSprint indicates if sprint reached its end
 	isEndOfSprint bool
-
-	// current epoch metadata
-	epoch *epochMetadata
 
 	// proposerCommitmentToRegister is a commitment that is registered via state transaction by proposer
 	proposerCommitmentToRegister *CommitmentMessageSigned
@@ -157,14 +147,11 @@ func (f *fsm) BuildProposal() ([]byte, error) {
 		return nil, err
 	}
 
-	f.block = stateBlock
-	f.proposal = stateBlock.Block.MarshalRLP()
-
 	f.logger.Debug("[FSM Build Proposal]",
 		"txs", len(stateBlock.Block.Transactions),
 		"hash", stateBlock.Block.Hash().String())
 
-	return f.proposal, nil
+	return stateBlock.Block.MarshalRLP(), nil
 }
 
 func (f *fsm) stateTransactions() []*types.Transaction {
@@ -222,21 +209,6 @@ func (f *fsm) createValidatorsUptimeTx() (*types.Transaction, error) {
 // ValidateCommit is used to validate that a given commit is valid
 func (f *fsm) ValidateCommit(signer []byte, seal []byte, proposalHash []byte) error {
 	from := types.BytesToAddress(signer)
-
-	// TODO: I dont think this is needed here (check !bytes.Equal(newBlock.Hash().Bytes(), proposalHash))
-	if f.proposal == nil {
-		return fmt.Errorf("incorrect commit from %s. current proposal unavailable", from)
-	}
-
-	newBlock := &types.Block{}
-	if err := newBlock.UnmarshalRLP(f.proposal); err != nil {
-		f.logger.Error("unable to unmarshal proposal", "err", err)
-	}
-
-	if !bytes.Equal(newBlock.Hash().Bytes(), proposalHash) {
-		return fmt.Errorf("incorrect proposal hash submitted via consensus engine from %s, is: %v expected: %v",
-			from, newBlock.Hash().Bytes(), proposalHash)
-	}
 
 	validator := f.validators.Accounts().GetValidatorAccount(from)
 	if validator == nil {
@@ -308,15 +280,11 @@ func (f *fsm) Validate(proposal []byte) error {
 		return err
 	}
 
-	builtBlock, err := f.backend.ProcessBlock(f.parent, &block)
-	if err != nil {
+	if _, err = f.backend.ProcessBlock(f.parent, &block); err != nil {
 		return err
 	}
 
-	f.block = builtBlock
-	f.proposal = proposal
-
-	f.logger.Debug("[FSM Validate]", "txs", len(f.block.Block.Transactions), "hash", block.Hash().String())
+	f.logger.Debug("[FSM Validate]", "txs", len(block.Transactions), "hash", block.Hash().String())
 
 	return nil
 }
@@ -443,17 +411,16 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 }
 
 // Insert inserts the sealed proposal
-func (f *fsm) Insert(proposal []byte, committedSeals []*messages.CommittedSeal) error {
-	// what to do with this?
+func (f *fsm) Insert(proposal []byte, committedSeals []*messages.CommittedSeal) (*types.Block, error) {
 	newBlock := &types.Block{}
 	if err := newBlock.UnmarshalRLP(proposal); err != nil {
-		return fmt.Errorf("cannot unmarshal proposal: %w", err)
+		return nil, fmt.Errorf("cannot unmarshal proposal: %w", err)
 	}
 
 	// In this function we should try to return little to no errors since
 	// at this point everything we have to do is just commit something that
 	// we should have already computed beforehand.
-	extra, _ := GetIbftExtra(f.block.Block.Header.ExtraData)
+	extra, _ := GetIbftExtra(newBlock.Header.ExtraData)
 
 	// create map for faster access to indexes
 	nodeIDIndexMap := make(map[types.Address]int, f.validators.Len())
@@ -469,12 +436,12 @@ func (f *fsm) Insert(proposal []byte, committedSeals []*messages.CommittedSeal) 
 	for _, commSeal := range committedSeals {
 		index, exists := nodeIDIndexMap[types.BytesToAddress(commSeal.Signer)]
 		if !exists {
-			return fmt.Errorf("invalid node id = %s", types.BytesToAddress(commSeal.Signer).String())
+			return nil, fmt.Errorf("invalid node id = %s", types.BytesToAddress(commSeal.Signer).String())
 		}
 
 		s, err := bls.UnmarshalSignature(commSeal.Signature)
 		if err != nil {
-			return fmt.Errorf("invalid signature = %s", commSeal.Signature)
+			return nil, fmt.Errorf("invalid signature = %s", commSeal.Signature)
 		}
 
 		signatures = append(signatures, s)
@@ -484,7 +451,7 @@ func (f *fsm) Insert(proposal []byte, committedSeals []*messages.CommittedSeal) 
 
 	aggregatedSignature, err := signatures.Aggregate().Marshal()
 	if err != nil {
-		return fmt.Errorf("could not aggregate seals: %w", err)
+		return nil, fmt.Errorf("could not aggregate seals: %w", err)
 	}
 
 	// include aggregated signature of all committed seals
@@ -495,9 +462,13 @@ func (f *fsm) Insert(proposal []byte, committedSeals []*messages.CommittedSeal) 
 	}
 
 	// Write extar data to header
-	f.block.Block.Header.ExtraData = append(make([]byte, 32), extra.MarshalRLPTo(nil)...)
+	newBlock.Header.ExtraData = append(make([]byte, 32), extra.MarshalRLPTo(nil)...)
 
-	return f.backend.CommitBlock(f.block)
+	if err = f.backend.CommitBlock(newBlock); err != nil {
+		return nil, err
+	}
+
+	return newBlock, nil
 }
 
 // Height returns the height for the current round
