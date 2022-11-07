@@ -109,7 +109,7 @@ func (i *backendIBFT) MaximumFaulty() uint64 {
 	return uint64(CalcMaxFaultyNodes(i.currentValidators))
 }
 
-func (i *backendIBFT) Quorum(blockNumber uint64) uint64 {
+func (i *backendIBFT) quorum(blockNumber uint64) uint64 {
 	validators, err := i.forkManager.GetValidators(blockNumber)
 	if err != nil {
 		i.logger.Error(
@@ -129,7 +129,7 @@ func (i *backendIBFT) Quorum(blockNumber uint64) uint64 {
 
 // HasQuorum returns true if quorum is reached for the given height
 func (i *backendIBFT) HasQuorum(view *protoIBFT.View, messages []*protoIBFT.Message) bool {
-	quorum := i.Quorum(view.Height)
+	quorum := i.quorum(view.Height)
 
 	if len(messages) > 0 {
 		switch messages[0].GetType() {
