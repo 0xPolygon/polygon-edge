@@ -195,7 +195,6 @@ func TestCheckpointManager_getCurrentCheckpointID(t *testing.T) {
 			if c.errSubstring == "" {
 				expectedCheckpointID, err := strconv.ParseUint(c.checkpointID, 0, 64)
 				require.NoError(t, err)
-				require.NoError(t, err)
 				require.Equal(t, expectedCheckpointID, actualCheckpointID)
 			} else {
 				require.ErrorContains(t, err, c.errSubstring)

@@ -141,7 +141,7 @@ func (c checkpointManager) submitCheckpoint(latestHeader types.Header, isEndOfEp
 			continue
 		}
 
-		err = c.submitCheckpointInternal(nonce, txn, *parentHeader, *parentExtra, true)
+		err = c.encodeAndSendCheckpoint(nonce, txn, *parentHeader, *parentExtra, true)
 		if err != nil {
 			return err
 		}
@@ -155,12 +155,12 @@ func (c checkpointManager) submitCheckpoint(latestHeader types.Header, isEndOfEp
 		return err
 	}
 
-	return c.submitCheckpointInternal(nonce, txn, latestHeader, *extra, isEndOfEpoch)
+	return c.encodeAndSendCheckpoint(nonce, txn, latestHeader, *extra, isEndOfEpoch)
 }
 
-// submitCheckpointInternal encodes checkpoint data for the given block and
+// encodeAndSendCheckpoint encodes checkpoint data for the given block and
 // sends a transaction to the CheckpointManager rootchain contract
-func (c *checkpointManager) submitCheckpointInternal(nonce uint64, txn *ethgo.Transaction,
+func (c *checkpointManager) encodeAndSendCheckpoint(nonce uint64, txn *ethgo.Transaction,
 	header types.Header, extra Extra, isEndOfEpoch bool) error {
 	nextEpochValidators := AccountSet{}
 
