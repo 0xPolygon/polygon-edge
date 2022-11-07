@@ -141,7 +141,7 @@ func (c checkpointManager) submitCheckpoint(latestHeader types.Header, isEndOfEp
 			continue
 		}
 
-		err = c.submitCheckpointInternal(nonce, txn, *currentHeader, *currentExtra, true)
+		err = c.submitCheckpointInternal(nonce, txn, *parentHeader, *parentExtra, true)
 		if err != nil {
 			return err
 		}
