@@ -502,7 +502,7 @@ func TestValidatorSetDelta_UnmarshalRLPWith_NegativeCases(t *testing.T) {
 		require.ErrorContains(t, delta.UnmarshalRLPWith(deltaMarshalled), "array expected for added validators")
 	})
 
-	t.Run("Incorrect RLP value type for ValidatorAccount in Added field", func(t *testing.T) {
+	t.Run("Incorrect RLP value type for ValidatorMetadata in Added field", func(t *testing.T) {
 		t.Parallel()
 
 		ar := &fastrlp.Arena{}

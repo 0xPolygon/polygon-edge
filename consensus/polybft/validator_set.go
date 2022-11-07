@@ -16,7 +16,7 @@ type ValidatorSet interface {
 	// Len returns the size of the validator set
 	Len() int
 
-	// Accounts returns the list of the ValidatorAccount
+	// Accounts returns the list of the ValidatorMetadata
 	Accounts() AccountSet
 }
 

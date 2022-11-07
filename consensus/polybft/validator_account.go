@@ -15,14 +15,14 @@ import (
 	"github.com/umbracle/fastrlp"
 )
 
-// ValidatorAccount represents a validator from the validator set
+// ValidatorMetadata represents a validator metadata (its public identity)
 type ValidatorMetadata struct {
 	Address     types.Address
 	BlsKey      *bls.PublicKey
 	VotingPower uint64
 }
 
-// Equals compares ValidatorAccount equality
+// Equals compares ValidatorMetadata equality
 func (a ValidatorMetadata) Equals(b *ValidatorMetadata) bool {
 	if b == nil {
 		return false
@@ -31,7 +31,7 @@ func (a ValidatorMetadata) Equals(b *ValidatorMetadata) bool {
 	return a.Address == b.Address && reflect.DeepEqual(a.BlsKey, b.BlsKey)
 }
 
-// Copy returns a deep copy of ValidatorAccount
+// Copy returns a deep copy of ValidatorMetadata
 func (a ValidatorMetadata) Copy() *ValidatorMetadata {
 	copiedBlsKey := a.BlsKey.Marshal()
 	blsKey, _ := bls.UnmarshalPublicKey(copiedBlsKey)
@@ -43,7 +43,7 @@ func (a ValidatorMetadata) Copy() *ValidatorMetadata {
 	}
 }
 
-// MarshalRLPWith marshals ValidatorAccount to the RLP format
+// MarshalRLPWith marshals ValidatorMetadata to the RLP format
 func (a ValidatorMetadata) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 	vv := ar.NewArray()
 	// Address
@@ -56,7 +56,7 @@ func (a ValidatorMetadata) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 	return vv
 }
 
-// UnmarshalRLPWith unmarshals ValidatorAccount from the RLP format
+// UnmarshalRLPWith unmarshals ValidatorMetadata from the RLP format
 func (a *ValidatorMetadata) UnmarshalRLPWith(v *fastrlp.Value) error {
 	elems, err := v.GetElems()
 	if err != nil {
@@ -107,7 +107,7 @@ func (a ValidatorMetadata) String() string {
 		a.Address.String(), hex.EncodeToString(a.BlsKey.Marshal()), a.VotingPower)
 }
 
-// AccountSet is a type alias for slice of ValidatorAccount instances
+// AccountSet is a type alias for slice of ValidatorMetadata instances
 type AccountSet []*ValidatorMetadata
 
 // GetAddresses aggregates addresses for given AccountSet
@@ -135,7 +135,7 @@ func (as AccountSet) Len() int {
 	return len(as)
 }
 
-// ContainsNodeID checks whether ValidatorAccount with given nodeID is present in the AccountSet
+// ContainsNodeID checks whether ValidatorMetadata with given nodeID is present in the AccountSet
 func (as AccountSet) ContainsNodeID(nodeID string) bool {
 	for _, validator := range as {
 		if validator.Address.String() == nodeID {
@@ -146,13 +146,13 @@ func (as AccountSet) ContainsNodeID(nodeID string) bool {
 	return false
 }
 
-// ContainsAddress checks whether ValidatorAccount with given address is present in the AccountSet
+// ContainsAddress checks whether ValidatorMetadata with given address is present in the AccountSet
 func (as AccountSet) ContainsAddress(address types.Address) bool {
 	return as.Index(address) != -1
 }
 
-// Index returns index of the given ValidatorAccount, identified by address within the AccountSet.
-// If given ValidatorAccount is not present, it returns -1.
+// Index returns index of the given ValidatorMetadata, identified by address within the AccountSet.
+// If given ValidatorMetadata is not present, it returns -1.
 func (as AccountSet) Index(addr types.Address) int {
 	for indx, validator := range as {
 		if validator.Address == addr {
