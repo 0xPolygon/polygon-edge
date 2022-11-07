@@ -1274,7 +1274,7 @@ func TestConsensusRuntime_restartEpoch_NewEpochToRun_BuildCommitment(t *testing.
 		newValidatorSet[i-1] = oldValidatorSet[i].Copy()
 	}
 
-	newValidatorSet[validatorsCount-1] = newTestValidator("G", 1).ValidatorAccount()
+	newValidatorSet[validatorsCount-1] = newTestValidator("G", 1).ValidatorMetadata()
 
 	header := &types.Header{Number: blockNumber}
 

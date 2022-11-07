@@ -16,14 +16,14 @@ import (
 )
 
 // ValidatorAccount represents a validator from the validator set
-type ValidatorAccount struct {
+type ValidatorMetadata struct {
 	Address     types.Address
 	BlsKey      *bls.PublicKey
 	VotingPower uint64
 }
 
 // Equals compares ValidatorAccount equality
-func (a ValidatorAccount) Equals(b *ValidatorAccount) bool {
+func (a ValidatorMetadata) Equals(b *ValidatorMetadata) bool {
 	if b == nil {
 		return false
 	}
@@ -32,11 +32,11 @@ func (a ValidatorAccount) Equals(b *ValidatorAccount) bool {
 }
 
 // Copy returns a deep copy of ValidatorAccount
-func (a ValidatorAccount) Copy() *ValidatorAccount {
+func (a ValidatorMetadata) Copy() *ValidatorMetadata {
 	copiedBlsKey := a.BlsKey.Marshal()
 	blsKey, _ := bls.UnmarshalPublicKey(copiedBlsKey)
 
-	return &ValidatorAccount{
+	return &ValidatorMetadata{
 		Address:     types.BytesToAddress(a.Address[:]),
 		BlsKey:      blsKey,
 		VotingPower: a.VotingPower,
@@ -44,7 +44,7 @@ func (a ValidatorAccount) Copy() *ValidatorAccount {
 }
 
 // MarshalRLPWith marshals ValidatorAccount to the RLP format
-func (a ValidatorAccount) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
+func (a ValidatorMetadata) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 	vv := ar.NewArray()
 	// Address
 	vv.Set(ar.NewBytes(a.Address.Bytes()))
@@ -57,7 +57,7 @@ func (a ValidatorAccount) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 }
 
 // UnmarshalRLPWith unmarshals ValidatorAccount from the RLP format
-func (a *ValidatorAccount) UnmarshalRLPWith(v *fastrlp.Value) error {
+func (a *ValidatorMetadata) UnmarshalRLPWith(v *fastrlp.Value) error {
 	elems, err := v.GetElems()
 	if err != nil {
 		return err
@@ -102,13 +102,13 @@ func (a *ValidatorAccount) UnmarshalRLPWith(v *fastrlp.Value) error {
 }
 
 // fmt.Stringer implementation
-func (a ValidatorAccount) String() string {
+func (a ValidatorMetadata) String() string {
 	return fmt.Sprintf("Address=%v; BLS Key=%v; Voting Power=%d",
 		a.Address.String(), hex.EncodeToString(a.BlsKey.Marshal()), a.VotingPower)
 }
 
 // AccountSet is a type alias for slice of ValidatorAccount instances
-type AccountSet []*ValidatorAccount
+type AccountSet []*ValidatorMetadata
 
 // GetAddresses aggregates addresses for given AccountSet
 func (as AccountSet) GetAddresses() []types.Address {
@@ -165,7 +165,7 @@ func (as AccountSet) Index(addr types.Address) int {
 
 // Copy returns deep copy of AccountSet
 func (as AccountSet) Copy() AccountSet {
-	copiedAccs := make([]*ValidatorAccount, as.Len())
+	copiedAccs := make([]*ValidatorMetadata, as.Len())
 	for i, acc := range as {
 		copiedAccs[i] = acc.Copy()
 	}
@@ -175,7 +175,7 @@ func (as AccountSet) Copy() AccountSet {
 
 // GetValidatorAccount tries to retrieve validator account by given address from the account set.
 // It returns nil if such account is not found.
-func (as AccountSet) GetValidatorAccount(address types.Address) *ValidatorAccount {
+func (as AccountSet) GetValidatorAccount(address types.Address) *ValidatorMetadata {
 	i := as.Index(address)
 	if i == -1 {
 		return nil

@@ -389,7 +389,7 @@ func TestExtra_InitGenesisValidatorsDelta(t *testing.T) {
 
 		var i int
 		for _, validator := range vals.validators {
-			delta.Added[i] = &ValidatorAccount{
+			delta.Added[i] = &ValidatorMetadata{
 				Address: types.Address(validator.account.Ecdsa.Address()),
 				BlsKey:  validator.account.Bls.PublicKey(),
 			}

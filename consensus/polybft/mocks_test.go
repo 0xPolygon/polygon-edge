@@ -343,7 +343,7 @@ func (v *testValidators) getValidators(aliases ...string) (res []*testValidator)
 
 func (v *testValidators) getPublicIdentities(aliases ...string) (res AccountSet) {
 	v.iterAcct(aliases, func(t *testValidator) {
-		res = append(res, t.ValidatorAccount())
+		res = append(res, t.ValidatorMetadata())
 	})
 
 	return
@@ -402,8 +402,8 @@ func (v *testValidator) paramsValidator() *Validator {
 	}
 }
 
-func (v *testValidator) ValidatorAccount() *ValidatorAccount {
-	return &ValidatorAccount{
+func (v *testValidator) ValidatorMetadata() *ValidatorMetadata {
+	return &ValidatorMetadata{
 		Address:     types.Address(v.account.Ecdsa.Address()),
 		BlsKey:      v.account.Bls.PublicKey(),
 		VotingPower: v.votingPower,
