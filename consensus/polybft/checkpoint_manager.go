@@ -61,6 +61,7 @@ func newCheckpointManager(sender types.Address, checkpointOffset uint64, interac
 }
 
 // getCurrentCheckpointID queries CheckpointManager smart contract and retrieves current checkpoint id
+// (the latest checkpoint block number)
 func (c checkpointManager) getCurrentCheckpointID() (uint64, error) {
 	checkpointIDMethodEncoded, err := currentCheckpointIDMethod.Encode([]interface{}{})
 	if err != nil {
@@ -83,7 +84,7 @@ func (c checkpointManager) getCurrentCheckpointID() (uint64, error) {
 
 // submitCheckpoint sends a transaction which with checkpoint data to the rootchain
 func (c checkpointManager) submitCheckpoint(latestHeader types.Header, isEndOfEpoch bool) error {
-	currentCheckpointID, err := c.getCurrentCheckpointID()
+	lastCheckpointBlockNumber, err := c.getCurrentCheckpointID()
 	if err != nil {
 		return err
 	}
@@ -98,11 +99,26 @@ func (c checkpointManager) submitCheckpoint(latestHeader types.Header, isEndOfEp
 		To: &checkpointManagerAddr,
 	}
 
-	var parentHeader *types.Header
+	initialBlockNumber := lastCheckpointBlockNumber + 1
 
 	var parentExtra *Extra
 
-	initialBlockNumber := currentCheckpointID + 1
+	var parentHeader *types.Header
+
+	if initialBlockNumber < latestHeader.Number {
+		found := false
+		parentHeader, found = c.blockchain.GetHeaderByNumber(lastCheckpointBlockNumber)
+
+		if !found {
+			return fmt.Errorf("block %d was not found", lastCheckpointBlockNumber)
+		}
+
+		parentExtra, err = GetIbftExtra(parentHeader.ExtraData)
+		if err != nil {
+			return err
+		}
+	}
+
 	// detect any pending (previously failed) checkpoints and send them
 	for blockNumber := initialBlockNumber; blockNumber < latestHeader.Number; blockNumber++ {
 		currentHeader, found := c.blockchain.GetHeaderByNumber(blockNumber)
@@ -113,18 +129,6 @@ func (c checkpointManager) submitCheckpoint(latestHeader types.Header, isEndOfEp
 		currentExtra, err := GetIbftExtra(currentHeader.ExtraData)
 		if err != nil {
 			return err
-		}
-
-		if parentHeader == nil {
-			parentHeader, found = c.blockchain.GetHeaderByNumber(blockNumber - 1)
-			if !found {
-				return fmt.Errorf("block %d was not found", blockNumber-1)
-			}
-
-			parentExtra, err = GetIbftExtra(parentHeader.ExtraData)
-			if err != nil {
-				return err
-			}
 		}
 
 		parentEpochNumber := parentExtra.Checkpoint.EpochNumber
