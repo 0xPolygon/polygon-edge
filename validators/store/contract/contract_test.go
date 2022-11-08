@@ -11,6 +11,7 @@ import (
 	testHelper "github.com/0xPolygon/polygon-edge/helper/tests"
 	"github.com/0xPolygon/polygon-edge/state"
 	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
+	"github.com/0xPolygon/polygon-edge/state/runtime/precompiled"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
 	"github.com/0xPolygon/polygon-edge/validators/store"
@@ -82,7 +83,7 @@ func newTestTransition(
 
 	ex := state.NewExecutor(&chain.Params{
 		Forks: chain.AllForksEnabled,
-	}, st, hclog.NewNullLogger())
+	}, st, hclog.NewNullLogger(), precompiled.NewPrecompiled())
 
 	rootHash := ex.WriteGenesis(nil)
 

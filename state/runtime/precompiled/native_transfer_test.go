@@ -26,7 +26,7 @@ func Test_NativeTransferPrecompile(t *testing.T) {
 	snapshot := st.NewSnapshot()
 	// Create a radix
 	radix := state.NewTxn(st, snapshot)
-	transition := state.NewTransition(chain.AllForksEnabled.At(0), radix)
+	transition := state.NewTransition(chain.AllForksEnabled.At(0), radix, NewPrecompiled())
 	contract := &nativeTransfer{}
 	abiType := abi.MustNewType("tuple(address, address, uint256)")
 	run := func(caller, from, to types.Address, amount *big.Int, host runtime.Host) error {
@@ -55,7 +55,7 @@ func Test_NativeTransferPrecompile(t *testing.T) {
 		stateTrie.CreateAccount(sender)
 		stateTrie.CreateAccount(receiver)
 		stateTrie.AddBalance(sender, big.NewInt(1000))
-		transition := state.NewTransition(chain.AllForksEnabled.At(0), stateTrie)
+		transition := state.NewTransition(chain.AllForksEnabled.At(0), stateTrie, NewPrecompiled())
 
 		require.NoError(t, run(contracts.NativeTokenContract, sender, receiver, big.NewInt(100), transition))
 		require.Equal(t, big.NewInt(900), stateTrie.GetBalance(sender))

@@ -14,6 +14,7 @@ import (
 	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/state/runtime/evm"
+	"github.com/0xPolygon/polygon-edge/state/runtime/precompiled"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo/abi"
 )
@@ -141,7 +142,7 @@ func getPredeployAccount(address types.Address, input, deployedBytecode []byte) 
 	config := chain.AllForksEnabled.At(0)
 
 	// Create a transition
-	transition := state.NewTransition(config, radix)
+	transition := state.NewTransition(config, radix, precompiled.NewPrecompiled())
 
 	// Run the transition through the EVM
 	res := evm.NewEVM().Run(contract, transition, &config)

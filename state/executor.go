@@ -13,7 +13,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/state/runtime/evm"
-	"github.com/0xPolygon/polygon-edge/state/runtime/precompiled"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -33,21 +32,23 @@ type GetHashByNumberHelper = func(*types.Header) GetHashByNumber
 
 // Executor is the main entity
 type Executor struct {
-	logger  hclog.Logger
-	config  *chain.Params
-	state   State
-	GetHash GetHashByNumberHelper
+	logger      hclog.Logger
+	config      *chain.Params
+	state       State
+	precompiles runtime.Runtime
+	GetHash     GetHashByNumberHelper
 
 	PostHook        func(txn *Transition)
 	GenesisPostHook func(*Transition) error
 }
 
 // NewExecutor creates a new executor
-func NewExecutor(config *chain.Params, s State, logger hclog.Logger) *Executor {
+func NewExecutor(config *chain.Params, s State, logger hclog.Logger, precompiles runtime.Runtime) *Executor {
 	return &Executor{
-		logger: logger,
-		config: config,
-		state:  s,
+		logger:      logger,
+		config:      config,
+		state:       s,
+		precompiles: precompiles,
 	}
 }
 
@@ -184,7 +185,7 @@ func (e *Executor) BeginTxn(
 		totalGas: 0,
 
 		evm:         evm.NewEVM(),
-		precompiles: precompiled.NewPrecompiled(),
+		precompiles: e.precompiles,
 		PostHook:    e.PostHook,
 	}
 
@@ -211,15 +212,15 @@ type Transition struct {
 
 	// runtimes
 	evm         *evm.EVM
-	precompiles *precompiled.Precompiled
+	precompiles runtime.Runtime
 }
 
-func NewTransition(config chain.ForksInTime, radix *Txn) *Transition {
+func NewTransition(config chain.ForksInTime, radix *Txn, precompiles runtime.Runtime) *Transition {
 	return &Transition{
 		config:      config,
 		state:       radix,
 		evm:         evm.NewEVM(),
-		precompiles: precompiled.NewPrecompiled(),
+		precompiles: precompiles,
 	}
 }
 
@@ -266,7 +267,6 @@ func (t *Transition) WriteFailedReceipt(txn *types.Transaction) error {
 
 // Write writes another transaction to the executor
 func (t *Transition) Write(txn *types.Transaction) error {
-
 	var err error
 
 	if txn.From == emptyFrom && txn.IsLegacyTx() {
