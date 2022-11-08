@@ -113,7 +113,6 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 		validatorsCache: newValidatorsSnapshotCache(
 			hclog.NewNullLogger(),
 			newTestState(t),
-			polyBftConfig.EpochSize,
 			blockchainMock,
 		),
 	}
@@ -158,15 +157,15 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 	assert.NoError(t, polybft.VerifyHeader(currentHeader))
 
 	// clean validator snapshot cache (reinstantiate it), submit invalid validator set for parnet signature and expect the following error
-	polybft.validatorsCache = newValidatorsSnapshotCache(hclog.NewNullLogger(), newTestState(t), polyBftConfig.EpochSize, blockchainMock)
-	assert.NoError(t, polybft.validatorsCache.storeSnapshot(0, validatorSetCurrent)) // invalid valdator set is submitted
-	assert.NoError(t, polybft.validatorsCache.storeSnapshot(1, validatorSetCurrent))
+	polybft.validatorsCache = newValidatorsSnapshotCache(hclog.NewNullLogger(), newTestState(t), blockchainMock)
+	assert.NoError(t, polybft.validatorsCache.storeSnapshot(parentHeader.Number-1, validatorSetCurrent)) // invalid valdator set is submitted
+	assert.NoError(t, polybft.validatorsCache.storeSnapshot(currentHeader.Number-1, validatorSetCurrent))
 	assert.ErrorContains(t, polybft.VerifyHeader(currentHeader), "failed to verify signatures for parent of block")
 
 	// clean validators cache again and set valid snapshots
-	polybft.validatorsCache = newValidatorsSnapshotCache(hclog.NewNullLogger(), newTestState(t), polyBftConfig.EpochSize, blockchainMock)
-	assert.NoError(t, polybft.validatorsCache.storeSnapshot(0, validatorSetParent))
-	assert.NoError(t, polybft.validatorsCache.storeSnapshot(1, validatorSetCurrent))
+	polybft.validatorsCache = newValidatorsSnapshotCache(hclog.NewNullLogger(), newTestState(t), blockchainMock)
+	assert.NoError(t, polybft.validatorsCache.storeSnapshot(parentHeader.Number-1, validatorSetParent))
+	assert.NoError(t, polybft.validatorsCache.storeSnapshot(currentHeader.Number-1, validatorSetCurrent))
 	assert.NoError(t, polybft.VerifyHeader(currentHeader))
 
 	// add current header to the blockchain (headersMap) and try validating again

@@ -12,7 +12,6 @@ import (
 type validatorsSnapshotCache struct {
 	snapshots  map[uint64]AccountSet
 	state      *State
-	epochSize  uint64
 	blockchain blockchainBackend
 	lock       sync.Mutex
 	logger     hclog.Logger
@@ -20,12 +19,11 @@ type validatorsSnapshotCache struct {
 
 // newValidatorsSnapshotCache initializes a new instance of validatorsSnapshotCache
 func newValidatorsSnapshotCache(
-	logger hclog.Logger, state *State, epochSize uint64, blockchain blockchainBackend,
+	logger hclog.Logger, state *State, blockchain blockchainBackend,
 ) *validatorsSnapshotCache {
 	return &validatorsSnapshotCache{
 		snapshots:  map[uint64]AccountSet{},
 		state:      state,
-		epochSize:  epochSize,
 		blockchain: blockchain,
 		logger:     logger.Named("validators_snapshot"),
 	}
@@ -38,58 +36,55 @@ func (v *validatorsSnapshotCache) GetSnapshot(blockNumber uint64, parents []*typ
 	v.lock.Lock()
 	defer v.lock.Unlock()
 
-	epochNumber := getEpochNumber(blockNumber, v.epochSize)
-	if !isEndOfPeriod(blockNumber, v.epochSize) && epochNumber > 0 {
-		// snapshot is retrieved for the previous epoch
-		// since the last block of the previous epoch contains validator set for the current epoch
-		epochNumber--
-	}
-
-	v.logger.Trace("Retrieving snapshot started...", "Block", blockNumber, "Epoch", epochNumber)
+	v.logger.Trace("Retrieving snapshot started...", "Block", blockNumber)
 
 	var snapshot AccountSet
 
-	currentEpochNumber := epochNumber
+	lastBlockWithSnapshot := blockNumber
 
-	for ; ; currentEpochNumber-- {
-		snapshot = v.snapshots[currentEpochNumber]
+	for ; ; lastBlockWithSnapshot-- {
+		snapshot = v.snapshots[lastBlockWithSnapshot]
 		if snapshot != nil {
-			v.logger.Trace("Found snapshot in memory cache", "Epoch", currentEpochNumber)
+			v.logger.Trace("Found snapshot in memory cache", "Block", lastBlockWithSnapshot)
 
 			break
 		}
 
-		dbSnapshot, err := v.state.getValidatorSnapshot(currentEpochNumber)
+		dbSnapshot, err := v.state.getValidatorSnapshot(lastBlockWithSnapshot)
 		if err != nil {
 			return nil, fmt.Errorf(
-				"failed to retrieve validators snapshot from the database for epoch=%d: %w",
-				currentEpochNumber,
+				"failed to retrieve validators snapshot from the database for block=%d: %w",
+				lastBlockWithSnapshot,
 				err,
 			)
 		}
 
 		if dbSnapshot != nil {
 			snapshot = dbSnapshot
-			v.snapshots[currentEpochNumber] = dbSnapshot.Copy()
-			v.logger.Trace("Found snapshot in database", "Epoch", currentEpochNumber)
+			v.snapshots[lastBlockWithSnapshot] = dbSnapshot.Copy()
+			v.logger.Trace("Found snapshot in database", "Block", lastBlockWithSnapshot)
 
 			break
 		}
 
-		if currentEpochNumber == 0 {
+		if lastBlockWithSnapshot == 0 {
 			// prevent underflow of uint64
 			break
 		}
 	}
 
-	if snapshot != nil && currentEpochNumber == epochNumber {
+	if snapshot != nil && lastBlockWithSnapshot == blockNumber {
+		if err := v.cleanup(); err != nil {
+			// error on cleanup should not block or fail any action
+			v.logger.Error("could not clean validator snapshots from cache and db", "err", err)
+		}
+
 		return snapshot, nil
 	}
 
 	if snapshot == nil {
-		// Haven't managed to retrieve snapshot for any epoch from the cache.
+		// Haven't managed to retrieve snapshot for any block from the cache.
 		// Build snapshot from the scratch, by applying delta from the genesis block.
-		// log.Trace("Building validators snapshot from scratch...")
 		initialSnapshot, err := v.computeSnapshot(nil, 0, parents)
 		if err != nil {
 			return nil, fmt.Errorf("failed to compute snapshot for epoch 0: %w", err)
@@ -106,24 +101,22 @@ func (v *validatorsSnapshotCache) GetSnapshot(blockNumber uint64, parents []*typ
 		v.logger.Trace("Built validators snapshot")
 	}
 
-	// Create most recent snapshot by incrementally applying validator set deltas from the resolved epoch ending block
-	// which have snapshot associated to the last epoch ending block which is less than the one snapshot is requested for.
-	endEpochBlockNumber := getEndEpochBlockNumber(currentEpochNumber, v.epochSize)
+	// Create most recent snapshot by incrementally applying validator set deltas from the resolved block
+	// which have snapshot associated to the last block which is less than the one snapshot is requested for.
 	deltasCount := 0
 
 	v.logger.Trace("Applying deltas started...",
-		"endEpochBlockNumber", endEpochBlockNumber,
+		"lastBlockWithSnapshot", lastBlockWithSnapshot,
 		"blockNumber", blockNumber)
 
-	for endEpochBlockNumber+v.epochSize <= blockNumber {
-		endEpochBlockNumber += v.epochSize
-		currentEpochNumber++
+	for lastBlockWithSnapshot < blockNumber {
+		lastBlockWithSnapshot++
 
-		v.logger.Trace("Applying delta", "epochEndBlock", endEpochBlockNumber)
+		v.logger.Trace("Applying delta", "blockWithSnapshot", lastBlockWithSnapshot)
 
-		intermediateSnapshot, err := v.computeSnapshot(snapshot, endEpochBlockNumber, parents)
+		intermediateSnapshot, err := v.computeSnapshot(snapshot, lastBlockWithSnapshot, parents)
 		if err != nil {
-			return nil, fmt.Errorf("failed to compute snapshot for epoch %d: %w", currentEpochNumber, err)
+			return nil, fmt.Errorf("failed to compute snapshot for block %d: %w", lastBlockWithSnapshot, err)
 		}
 
 		snapshot = intermediateSnapshot
@@ -131,16 +124,15 @@ func (v *validatorsSnapshotCache) GetSnapshot(blockNumber uint64, parents []*typ
 	}
 
 	if deltasCount > 0 {
-		err := v.storeSnapshot(currentEpochNumber, snapshot)
+		err := v.storeSnapshot(lastBlockWithSnapshot, snapshot)
 		if err != nil {
-			return nil, fmt.Errorf("failed to store validators snapshot for epoch %d: %w", currentEpochNumber, err)
+			return nil, fmt.Errorf("failed to store validators snapshot for block %d: %w", lastBlockWithSnapshot, err)
 		}
 	}
 
 	v.logger.Trace(
 		fmt.Sprintf("Applied %d delta(s) to the validators snapshot", deltasCount),
-		"EndEpochBlock", endEpochBlockNumber,
-		"Epoch", currentEpochNumber,
+		"BlockNumber", lastBlockWithSnapshot,
 	)
 
 	if err := v.cleanup(); err != nil {
@@ -154,17 +146,17 @@ func (v *validatorsSnapshotCache) GetSnapshot(blockNumber uint64, parents []*typ
 // computeSnapshot gets desired block header by block number, extracts its extra and applies given delta to the snapshot
 func (v *validatorsSnapshotCache) computeSnapshot(
 	existingSnapshot AccountSet,
-	epochEndBlockNumber uint64,
+	blockNumber uint64,
 	parents []*types.Header,
 ) (AccountSet, error) {
 	var header *types.Header
 
-	v.logger.Trace("Compute snapshot started...", "BlockNumber", epochEndBlockNumber)
+	v.logger.Trace("Compute snapshot started...", "BlockNumber", blockNumber)
 
 	if len(parents) > 0 {
 		for i := len(parents) - 1; i >= 0; i-- {
 			parentHeader := parents[i]
-			if parentHeader.Number == epochEndBlockNumber {
+			if parentHeader.Number == blockNumber {
 				v.logger.Trace("Compute snapshot. Found header in parents", "Header", parentHeader.Number)
 				header = parentHeader
 
@@ -176,9 +168,9 @@ func (v *validatorsSnapshotCache) computeSnapshot(
 	if header == nil {
 		var ok bool
 
-		header, ok = v.blockchain.GetHeaderByNumber(epochEndBlockNumber)
+		header, ok = v.blockchain.GetHeaderByNumber(blockNumber)
 		if !ok {
-			return nil, fmt.Errorf("unknown block. Block number=%v", epochEndBlockNumber)
+			return nil, fmt.Errorf("unknown block. Block number=%v", blockNumber)
 		}
 	}
 
@@ -192,13 +184,10 @@ func (v *validatorsSnapshotCache) computeSnapshot(
 		snapshot = AccountSet{}
 	}
 
-	snapshot, err = snapshot.ApplyDelta(extra.Validators)
-	if err != nil {
-		return nil, fmt.Errorf("failed to apply delta to the validators snapshot, block#%d: %w", header.Number, err)
-	}
+	snapshot = snapshot.ApplyDelta(extra.Validators)
 
 	v.logger.Trace("Computed snapshot",
-		"blockNumber", epochEndBlockNumber,
+		"blockNumber", blockNumber,
 		"snapshot", snapshot,
 		"delta", extra.Validators)
 
@@ -206,12 +195,12 @@ func (v *validatorsSnapshotCache) computeSnapshot(
 }
 
 // storeSnapshot stores given snapshot to the in-memory cache and database
-func (v *validatorsSnapshotCache) storeSnapshot(epoch uint64, snapshot AccountSet) error {
+func (v *validatorsSnapshotCache) storeSnapshot(block uint64, snapshot AccountSet) error {
 	copySnap := snapshot.Copy()
-	v.snapshots[epoch] = copySnap
+	v.snapshots[block] = copySnap
 
-	if err := v.state.insertValidatorSnapshot(epoch, copySnap); err != nil {
-		return fmt.Errorf("failed to insert validator snapshot for epoch %d to the database: %w", epoch, err)
+	if err := v.state.insertValidatorSnapshot(block, copySnap); err != nil {
+		return fmt.Errorf("failed to insert validator snapshot for block %d to the database: %w", block, err)
 	}
 
 	v.logger.Trace("Store snapshot", "Snapshots", v.snapshots)
@@ -222,28 +211,28 @@ func (v *validatorsSnapshotCache) storeSnapshot(epoch uint64, snapshot AccountSe
 // Cleanup cleans the validators cache in memory and db
 func (v *validatorsSnapshotCache) cleanup() error {
 	if len(v.snapshots) >= validatorSnapshotLimit {
-		latestEpoch := uint64(0)
+		latestBlock := uint64(0)
 
 		for e := range v.snapshots {
-			if e > latestEpoch {
-				latestEpoch = e
+			if e > latestBlock {
+				latestBlock = e
 			}
 		}
 
-		epoch := latestEpoch
+		block := latestBlock
 		cache := make(map[uint64]AccountSet, numberOfSnapshotsToLeaveInMemory)
 
 		for i := 0; i < numberOfSnapshotsToLeaveInMemory; i++ {
-			if snapshot, exists := v.snapshots[epoch]; exists {
-				cache[epoch] = snapshot
+			if snapshot, exists := v.snapshots[block]; exists {
+				cache[block] = snapshot
 			}
 
-			epoch--
+			block--
 		}
 
 		v.snapshots = cache
 
-		return v.state.cleanValidatorSnapshotsFromDB(latestEpoch)
+		return v.state.cleanValidatorSnapshotsFromDB(latestBlock)
 	}
 
 	return nil

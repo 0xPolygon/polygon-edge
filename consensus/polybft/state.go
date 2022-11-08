@@ -59,9 +59,9 @@ const (
 	// that can be stored in cache (both memory and db)
 	validatorSnapshotLimit = 100
 	// numberOfSnapshotsToLeaveInMemory defines a number of validator snapshots to leave in memory
-	numberOfSnapshotsToLeaveInMemory = 2
+	numberOfSnapshotsToLeaveInMemory = 12
 	// numberOfSnapshotsToLeaveInMemory defines a number of validator snapshots to leave in db
-	numberOfSnapshotsToLeaveInDB = 10
+	numberOfSnapshotsToLeaveInDB = 20
 	// number of stateSyncEvents to be processed before a commitment message can be created and gossiped
 	stateSyncCommitmentSize = 10
 )
@@ -290,8 +290,8 @@ func initMainDBBuckets(db *bolt.DB) error {
 	return err
 }
 
-// insertValidatorSnapshot inserts a validator snapshot for the given epoch to its bucket in db
-func (s *State) insertValidatorSnapshot(epoch uint64, validatorSnapshot AccountSet) error {
+// insertValidatorSnapshot inserts a validator snapshot for the given block to its bucket in db
+func (s *State) insertValidatorSnapshot(block uint64, validatorSnapshot AccountSet) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
 		raw, err := validatorSnapshot.Marshal()
 		if err != nil {
@@ -300,17 +300,17 @@ func (s *State) insertValidatorSnapshot(epoch uint64, validatorSnapshot AccountS
 
 		bucket := tx.Bucket(validatorSnapshotsBucket)
 
-		return bucket.Put(itob(epoch), raw)
+		return bucket.Put(itob(block), raw)
 	})
 }
 
-// getValidatorSnapshot queries the validator snapshot for given epoch from db
-func (s *State) getValidatorSnapshot(epoch uint64) (AccountSet, error) {
+// getValidatorSnapshot queries the validator snapshot for given block from db
+func (s *State) getValidatorSnapshot(block uint64) (AccountSet, error) {
 	var validatorSnapshot AccountSet
 
 	err := s.db.View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(validatorSnapshotsBucket)
-		v := bucket.Get(itob(epoch))
+		v := bucket.Get(itob(block))
 		if v != nil {
 			return validatorSnapshot.Unmarshal(v)
 		}
@@ -705,24 +705,22 @@ func (s *State) cleanEpochsFromDB() error {
 
 // cleanValidatorSnapshotsFromDB cleans the validator snapshots bucket if a limit is reached,
 // but it leaves the latest (n) number of snapshots
-func (s *State) cleanValidatorSnapshotsFromDB(epoch uint64) error {
+func (s *State) cleanValidatorSnapshotsFromDB(block uint64) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(validatorSnapshotsBucket)
 
 		// paired list
 		keys := make([][]byte, 0)
 		values := make([][]byte, 0)
-		if numberOfSnapshotsToLeaveInDB > 0 { // TODO this is always true?!
-			for i := 0; i < numberOfSnapshotsToLeaveInDB; i++ { // exclude the last inserted we already appended
-				key := itob(epoch)
-				value := bucket.Get(key)
-				if value == nil {
-					continue
-				}
-				keys = append(keys, key)
-				values = append(values, value)
-				epoch--
+		for i := 0; i < numberOfSnapshotsToLeaveInDB; i++ { // exclude the last inserted we already appended
+			key := itob(block)
+			value := bucket.Get(key)
+			if value == nil {
+				continue
 			}
+			keys = append(keys, key)
+			values = append(values, value)
+			block--
 		}
 
 		// removing an entire bucket is much faster than removing all keys

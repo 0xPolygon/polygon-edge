@@ -282,7 +282,7 @@ func (as AccountSet) ApplyDelta(validatorsDelta *ValidatorSetDelta) (AccountSet,
 	// Append added validators
 	for _, addedValidator := range validatorsDelta.Added {
 		if validators.ContainsAddress(addedValidator.Address) {
-			return nil, fmt.Errorf("validator %v is already present in the validators snapshot", addedValidator.Address.String())
+			continue
 		}
 
 		validators = append(validators, addedValidator)
