@@ -445,6 +445,14 @@ func (c *CheckpointData) UnmarshalRLPWith(v *fastrlp.Value) error {
 	return nil
 }
 
+// Copy returns deep copy of CheckpointData instance
+func (c *CheckpointData) Copy() *CheckpointData {
+	newCheckpointData := new(CheckpointData)
+	*newCheckpointData = *c
+
+	return newCheckpointData
+}
+
 // Hash calculates keccak256 hash of the CheckpointData.
 // CheckpointData is ABI encoded and then hashed.
 func (c *CheckpointData) Hash(chainID uint64, blockNumber uint64, blockHash types.Hash) (types.Hash, error) {

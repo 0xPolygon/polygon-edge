@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/0xPolygon/pbft-consensus"
-	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/contracts"
@@ -58,8 +57,8 @@ type fsm struct {
 	// proposal is the current proposal being processed
 	proposal *pbft.Proposal
 
-	// blockRound represents the current round from the consensus engine
-	blockRound uint64
+	// roundInfo represents the current round information, which is retrieved by the consensus engine
+	roundInfo *pbft.RoundInfo
 
 	// epochNumber denotes current epoch number
 	epochNumber uint64
@@ -106,7 +105,7 @@ func (f *fsm) Init(info *pbft.RoundInfo) {
 		panic(err) // TODO: handle differently
 	}
 
-	f.blockRound = info.CurrentRound
+	f.roundInfo = info
 	f.commitmentToSaveOnRegister = nil
 }
 
@@ -194,7 +193,7 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 	}
 
 	extra.Checkpoint = &CheckpointData{
-		BlockRound:            f.blockRound,
+		BlockRound:            f.roundInfo.CurrentRound,
 		EpochNumber:           f.epochNumber,
 		CurrentValidatorsHash: currentValidatorsHash,
 		NextValidatorsHash:    nextValidatorsHash,
@@ -203,7 +202,7 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 
 	stateBlock, err := f.blockBuilder.Build(func(h *types.Header) {
 		h.Timestamp = uint64(headerTime.Unix())
-		h.ExtraData = append(make([]byte, signer.IstanbulExtraVanity), extra.MarshalRLPTo(nil)...)
+		h.ExtraData = append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...)
 		h.MixHash = PolyBFTMixDigest
 	})
 
@@ -324,7 +323,7 @@ func (f *fsm) Validate(proposal *pbft.Proposal) error {
 
 	checkpointHash, err := extra.Checkpoint.Hash(f.backend.GetChainID(), block.Number(), block.Hash())
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to calculate sign hash: %w", err)
 	}
 
 	// validate proposal
@@ -364,7 +363,7 @@ func (f *fsm) Validate(proposal *pbft.Proposal) error {
 
 		parentCheckpointHash, err := parentExtra.Checkpoint.Hash(f.backend.GetChainID(), f.parent.Number, f.parent.Hash)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to calculate parent block sign hash: %w", err)
 		}
 
 		if err := blockExtra.Parent.VerifyCommittedFields(validators, parentCheckpointHash); err != nil {

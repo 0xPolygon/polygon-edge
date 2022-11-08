@@ -539,7 +539,7 @@ func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, parents []*type
 
 	checkpointHash, err := extra.Checkpoint.Hash(p.blockchain.GetChainID(), header.Number, header.Hash)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to calculate sign hash: %w", err)
 	}
 
 	if err := extra.Committed.VerifyCommittedFields(validators, checkpointHash); err != nil {
@@ -569,7 +569,7 @@ func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, parents []*type
 
 		parentCheckpointHash, err := parentExtra.Checkpoint.Hash(p.blockchain.GetChainID(), parent.Number, parent.Hash)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to calculate parent block sign hash: %w", err)
 		}
 
 		if err := extra.Parent.VerifyCommittedFields(parentValidators, parentCheckpointHash); err != nil {
