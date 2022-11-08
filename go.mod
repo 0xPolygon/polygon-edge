@@ -27,7 +27,7 @@ require (
 	github.com/prometheus/client_golang v1.13.0
 	github.com/ryanuber/columnize v2.1.2+incompatible
 	github.com/spf13/cobra v1.5.0
-	github.com/stretchr/testify v1.8.0
+	github.com/stretchr/testify v1.8.1
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
 	github.com/umbracle/fastrlp v0.0.0-20220527094140-59d5dd30e722
 	github.com/umbracle/go-eth-bn256 v0.0.0-20190607160430-b36caf4e0f6b
@@ -61,7 +61,7 @@ require (
 )
 
 require (
-	github.com/0xPolygon/go-ibft v0.0.0-20221104170147-481527cd942a
+	github.com/0xPolygon/go-ibft v0.0.0-20221108082142-d9166abecd9c
 	github.com/0xPolygon/pbft-consensus v0.0.0-20220823102839-109d9f873bf4
 	github.com/docker/docker v20.10.18+incompatible
 	github.com/docker/go-connections v0.4.0
@@ -72,7 +72,6 @@ require (
 	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
 	gopkg.in/DataDog/dd-trace-go.v1 v1.42.1
 )
-
 
 require (
 	cloud.google.com/go v0.104.0 // indirect
@@ -210,7 +209,7 @@ require (
 	github.com/spacemonkeygo/spacelog v0.0.0-20180420211403-2296661a0572 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	github.com/stretchr/objx v0.4.0 // indirect
+	github.com/stretchr/objx v0.5.0 // indirect
 	github.com/tinylib/msgp v1.1.2 // indirect
 	github.com/tj/go-spin v1.1.0 // indirect
 	github.com/tyler-smith/go-bip39 v1.1.0 // indirect
