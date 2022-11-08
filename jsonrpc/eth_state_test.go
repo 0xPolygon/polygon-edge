@@ -700,7 +700,7 @@ func TestEth_EstimateGas_GasLimit(t *testing.T) {
 				assert.NoError(t, estimateErr)
 
 				// Make sure the estimate is correct
-				assert.Equal(t, fmt.Sprintf("0x%x", testCase.intrinsicGasCost), estimate)
+				assert.Equal(t, argUint64(testCase.intrinsicGasCost), estimate)
 			}
 		})
 	}
