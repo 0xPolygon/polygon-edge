@@ -195,7 +195,7 @@ func (p *Polybft) Initialize() error {
 	p.state = stt
 	p.validatorsCache = newValidatorsSnapshotCache(p.config.Logger, stt, p.consensusConfig.EpochSize, p.blockchain)
 
-	// set pbft topic, it will be check if/when the bridge is enabled
+	// create runtime
 	p.initRuntime()
 
 	p.ibft = newIBFTConsensusWrapper(p.logger, p.runtime, p)
@@ -319,7 +319,7 @@ func (p *Polybft) startPbftProcess() {
 			p.logger.Error("failed to query current validator set", "block number", latestHeader.Number, "error", err)
 		}
 
-		isValidator := currentValidators.ContainsNodeID(p.key.NodeID())
+		isValidator := currentValidators.ContainsNodeID(p.key.String())
 		p.runtime.setIsActiveValidator(isValidator)
 
 		p.txPool.SetSealing(isValidator) // update tx pool

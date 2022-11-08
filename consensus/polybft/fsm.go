@@ -434,9 +434,11 @@ func (f *fsm) Insert(proposal []byte, committedSeals []*messages.CommittedSeal) 
 	signatures := make(bls.Signatures, 0, len(committedSeals))
 
 	for _, commSeal := range committedSeals {
-		index, exists := nodeIDIndexMap[types.BytesToAddress(commSeal.Signer)]
+		signerAddr := types.BytesToAddress(commSeal.Signer)
+
+		index, exists := nodeIDIndexMap[signerAddr]
 		if !exists {
-			return nil, fmt.Errorf("invalid node id = %s", types.BytesToAddress(commSeal.Signer).String())
+			return nil, fmt.Errorf("invalid node id = %s", signerAddr.String())
 		}
 
 		s, err := bls.UnmarshalSignature(commSeal.Signature)
@@ -462,7 +464,7 @@ func (f *fsm) Insert(proposal []byte, committedSeals []*messages.CommittedSeal) 
 	}
 
 	// Write extar data to header
-	newBlock.Header.ExtraData = append(make([]byte, 32), extra.MarshalRLPTo(nil)...)
+	newBlock.Header.ExtraData = append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...)
 
 	if err = f.backend.CommitBlock(newBlock); err != nil {
 		return nil, err

@@ -91,6 +91,7 @@ type consensusRuntime struct {
 	// state is reference to the struct which encapsulates bridge events persistence logic
 	state *State
 
+	// fsm instance which is created for each `runSequence`
 	fsm *fsm
 
 	// eventTracker is a reference to the log event tracker
@@ -266,10 +267,6 @@ func (c *consensusRuntime) FSM() error {
 	// figure out the parent. At this point this peer has done its best to sync up
 	// to the head of their remote peers.
 	parent, epoch := c.getLastBuiltBlockAndEpoch()
-
-	if !epoch.Validators.ContainsNodeID(c.config.Key.NodeID()) {
-		return errNotAValidator
-	}
 
 	blockBuilder, err := c.config.blockchain.NewBlockBuilder(
 		parent,
@@ -456,7 +453,7 @@ func (c *consensusRuntime) buildCommitment(epoch, fromIndex uint64) (*Commitment
 	}
 
 	sig := &MessageSignature{
-		From:      c.config.Key.NodeID(),
+		From:      c.config.Key.String(),
 		Signature: signature,
 	}
 
@@ -469,13 +466,12 @@ func (c *consensusRuntime) buildCommitment(epoch, fromIndex uint64) (*Commitment
 	}
 
 	// gossip message
-	msg := &TransportMessage{
+	c.config.BridgeTransport.Multicast(&TransportMessage{
 		Hash:        hashBytes,
 		Signature:   signature,
-		NodeID:      c.config.Key.NodeID(),
+		NodeID:      c.config.Key.String(),
 		EpochNumber: epoch,
-	}
-	c.config.BridgeTransport.Multicast(msg)
+	})
 
 	c.logger.Debug(
 		"[buildCommitment] Built commitment",

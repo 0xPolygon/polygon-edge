@@ -28,10 +28,6 @@ func (k *Key) Address() ethgo.Address {
 	return k.raw.Ecdsa.Address()
 }
 
-func (k *Key) NodeID() string {
-	return k.String()
-}
-
 func (k *Key) Sign(b []byte) ([]byte, error) {
 	s, err := k.raw.Bls.Sign(b)
 	if err != nil {
@@ -41,10 +37,6 @@ func (k *Key) Sign(b []byte) ([]byte, error) {
 	return s.Marshal()
 }
 
-func (k *Key) SignEcdsa(b []byte) ([]byte, error) {
-	return k.raw.Ecdsa.Sign(b)
-}
-
 // SignEcdsaMessage signs the proto message  with ecdsa
 func (k *Key) SignEcdsaMessage(msg *proto.Message) (*proto.Message, error) {
 	raw, err := protobuf.Marshal(msg)
@@ -52,7 +44,7 @@ func (k *Key) SignEcdsaMessage(msg *proto.Message) (*proto.Message, error) {
 		return nil, fmt.Errorf("cannot marshal message: %w", err)
 	}
 
-	if msg.Signature, err = k.SignEcdsa(raw); err != nil {
+	if msg.Signature, err = k.raw.Ecdsa.Sign(raw); err != nil {
 		return nil, fmt.Errorf("cannot create message signature: %w", err)
 	}
 
