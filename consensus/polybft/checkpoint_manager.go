@@ -101,9 +101,10 @@ func (c checkpointManager) submitCheckpoint(latestHeader types.Header, isEndOfEp
 
 	initialBlockNumber := lastCheckpointBlockNumber + 1
 
-	var parentExtra *Extra
-
-	var parentHeader *types.Header
+	var (
+		parentExtra  *Extra
+		parentHeader *types.Header
+	)
 
 	if initialBlockNumber < latestHeader.Number {
 		found := false
