@@ -185,6 +185,7 @@ func (i *backendIBFT) buildBlock(parent *types.Header) (*types.Block, error) {
 	// Get the block transactions
 	writeCtx, cancelFn := context.WithDeadline(context.Background(), potentialTimestamp)
 	defer cancelFn()
+
 	txs := i.writeTransactions(
 		writeCtx,
 		gasLimit,
@@ -255,8 +256,6 @@ func (i *backendIBFT) writeTransactions(
 	}
 
 	var (
-		// blockTimer = time.NewTimer(i.blockTime)
-
 		successful = 0
 		failed     = 0
 		skipped    = 0
