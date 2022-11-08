@@ -162,20 +162,25 @@ func (as AccountSet) Copy() AccountSet {
 
 // Hash returns hash value of the AccountSet
 func (as AccountSet) Hash() (types.Hash, error) {
-	accountSetMaps := make([]map[string]interface{}, len(as))
-	for i, acc := range as {
-		accountSetMaps[i] = map[string]interface{}{
-			"_address": acc.Address,
-			"blsKey":   acc.BlsKey.ToBigInt(),
-		}
-	}
-
-	abiEncoded, err := accountSetABIType.Encode(accountSetMaps)
+	abiEncoded, err := accountSetABIType.Encode(as.AsGenericMaps())
 	if err != nil {
 		return types.ZeroHash, err
 	}
 
 	return types.BytesToHash(crypto.Keccak256(abiEncoded)), nil
+}
+
+// AsGenericMaps convert AccountSet object to slice of maps, where each key denotes field name mapped to a value
+func (as AccountSet) AsGenericMaps() []map[string]interface{} {
+	accountSetMaps := make([]map[string]interface{}, len(as))
+	for i, v := range as {
+		accountSetMaps[i] = map[string]interface{}{
+			"_address": v.Address,
+			"blsKey":   v.BlsKey.ToBigInt(),
+		}
+	}
+
+	return accountSetMaps
 }
 
 // GetValidatorAccount tries to retrieve validator account by given address from the account set.

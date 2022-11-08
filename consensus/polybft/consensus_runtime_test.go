@@ -475,7 +475,7 @@ func TestConsensusRuntime_NotifyProposalInserted_EndOfEpoch(t *testing.T) {
 			Number: currentEpochNumber,
 		},
 	}
-	runtime.NotifyProposalInserted(builtBlock)
+	runtime.NotifyProposalInserted(builtBlock.Block.Header)
 
 	require.True(t, runtime.state.isEpochInserted(currentEpochNumber+1))
 	require.Equal(t, newEpochNumber, runtime.epoch.Number)
@@ -504,7 +504,7 @@ func TestConsensusRuntime_NotifyProposalInserted_MiddleOfEpoch(t *testing.T) {
 			PolyBFTConfig: &PolyBFTConfig{EpochSize: epochSize},
 			blockchain:    new(blockchainMock)},
 	}
-	runtime.NotifyProposalInserted(builtBlock)
+	runtime.NotifyProposalInserted(builtBlock.Block.Header)
 
 	require.Equal(t, header.Number, runtime.lastBuiltBlock.Number)
 }
@@ -826,6 +826,7 @@ func Test_NewConsensusRuntime(t *testing.T) {
 		ValidatorSetAddr: types.Address{0x11},
 		EpochSize:        10,
 		SprintSize:       10,
+		BlockTime:        2 * time.Second,
 	}
 
 	key := createTestKey(t)
@@ -1595,14 +1596,17 @@ func TestConsensusRuntime_FSM_EndOfEpoch_PostHook(t *testing.T) {
 	}
 
 	runtime := &consensusRuntime{
-		logger:         hclog.NewNullLogger(),
-		state:          state,
-		epoch:          metadata,
-		config:         config,
-		lastBuiltBlock: lastBuiltBlock,
+		logger:            hclog.NewNullLogger(),
+		state:             state,
+		epoch:             metadata,
+		config:            config,
+		lastBuiltBlock:    lastBuiltBlock,
+		checkpointManager: newCheckpointManager(types.StringToAddress("3"), 5, nil, nil, nil),
 	}
 
 	fsm, err := runtime.FSM()
+	fsm.roundInfo = &pbft.RoundInfo{}
+
 	assert.NoError(t, err)
 	assert.NotNil(t, fsm.proposerCommitmentToRegister)
 	assert.Equal(t, fromIndex, fsm.proposerCommitmentToRegister.Message.FromIndex)
@@ -1617,8 +1621,12 @@ func TestConsensusRuntime_FSM_EndOfEpoch_PostHook(t *testing.T) {
 	// we add this for NotifyProposalInserted,
 	// and we are adding first block so we do not need to mock the restart epoch on block insert
 	// since we only care if the commitment data gets saved in db on postHook
+	extra := &Extra{}
 	fsm.block = &StateBlock{Block: consensus.BuildBlock(consensus.BuildBlockParams{
-		Header: &types.Header{Number: 1},
+		Header: &types.Header{
+			Number:    1,
+			ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...),
+		},
 	})}
 
 	// we registered commitment in fsm
@@ -1781,9 +1789,10 @@ func createTestBlocksForUptime(t *testing.T, numberOfBlocks uint64,
 	headerMap := &testHeadersMap{}
 	bitmaps := createTestBitmapsForUptime(t, validatorSet, numberOfBlocks)
 
+	extra := &Extra{}
 	genesisBlock := &types.Header{
 		Number:    0,
-		ExtraData: []byte{},
+		ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...),
 	}
 	parentHash := types.BytesToHash(big.NewInt(0).Bytes())
 
