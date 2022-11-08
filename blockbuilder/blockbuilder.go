@@ -127,10 +127,9 @@ func (b *BlockBuilder) Reset() error {
 }
 
 // Fill fills the block with transactions from the txpool
-func (b *BlockBuilder) Fill() error {
+func (b *BlockBuilder) Fill() {
 	b.params.TxPool.Prepare()
 
-write:
 	for {
 		tx := b.params.TxPool.Peek()
 
@@ -141,11 +140,9 @@ write:
 		}
 
 		if finished {
-			break write
+			return
 		}
 	}
-
-	return nil
 }
 
 func (b *BlockBuilder) writeTx(tx *types.Transaction) error {
