@@ -139,7 +139,7 @@ func createValidatorSetDelta(log hclog.Logger, oldValidatorSet,
 	newValidatorSet AccountSet) (*ValidatorSetDelta, error) {
 	var addedValidators AccountSet
 
-	oldValidatorSetMap := make(map[types.Address]*ValidatorAccount)
+	oldValidatorSetMap := make(map[types.Address]*ValidatorMetadata)
 	removedValidators := map[types.Address]int{}
 
 	for i, validator := range oldValidatorSet {
@@ -226,7 +226,7 @@ func (d *ValidatorSetDelta) UnmarshalRLPWith(v *fastrlp.Value) error {
 			d.Added = make(AccountSet, len(validatorsRaw))
 
 			for i, validatorRaw := range validatorsRaw {
-				acc := &ValidatorAccount{}
+				acc := &ValidatorMetadata{}
 				if err = acc.UnmarshalRLPWith(validatorRaw); err != nil {
 					return err
 				}

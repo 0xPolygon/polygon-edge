@@ -328,10 +328,10 @@ func TestExtra_CreateValidatorSetDelta_Cases(t *testing.T) {
 			vals := newTestValidatorsWithAliases([]string{})
 
 			for _, name := range c.oldSet {
-				vals.create(name)
+				vals.create(name, 1)
 			}
 			for _, name := range c.newSet {
-				vals.create(name)
+				vals.create(name, 1)
 			}
 
 			oldValidatorSet := vals.getPublicIdentities(c.oldSet...)
@@ -389,9 +389,10 @@ func TestExtra_InitGenesisValidatorsDelta(t *testing.T) {
 
 		var i int
 		for _, validator := range vals.validators {
-			delta.Added[i] = &ValidatorAccount{
-				Address: types.Address(validator.account.Ecdsa.Address()),
-				BlsKey:  validator.account.Bls.PublicKey(),
+			delta.Added[i] = &ValidatorMetadata{
+				Address:     types.Address(validator.account.Ecdsa.Address()),
+				BlsKey:      validator.account.Bls.PublicKey(),
+				VotingPower: validator.votingPower,
 			}
 			i++
 		}
@@ -501,7 +502,7 @@ func TestValidatorSetDelta_UnmarshalRLPWith_NegativeCases(t *testing.T) {
 		require.ErrorContains(t, delta.UnmarshalRLPWith(deltaMarshalled), "array expected for added validators")
 	})
 
-	t.Run("Incorrect RLP value type for ValidatorAccount in Added field", func(t *testing.T) {
+	t.Run("Incorrect RLP value type for ValidatorMetadata in Added field", func(t *testing.T) {
 		t.Parallel()
 
 		ar := &fastrlp.Arena{}

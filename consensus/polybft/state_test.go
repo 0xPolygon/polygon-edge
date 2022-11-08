@@ -166,9 +166,9 @@ func TestState_insertAndGetValidatorSnapshot(t *testing.T) {
 	require.NoError(t, err)
 
 	snapshot := AccountSet{
-		&ValidatorAccount{Address: types.BytesToAddress([]byte{0x18}), BlsKey: keys[0].PublicKey()},
-		&ValidatorAccount{Address: types.BytesToAddress([]byte{0x23}), BlsKey: keys[1].PublicKey()},
-		&ValidatorAccount{Address: types.BytesToAddress([]byte{0x37}), BlsKey: keys[2].PublicKey()},
+		&ValidatorMetadata{Address: types.BytesToAddress([]byte{0x18}), BlsKey: keys[0].PublicKey()},
+		&ValidatorMetadata{Address: types.BytesToAddress([]byte{0x23}), BlsKey: keys[1].PublicKey()},
+		&ValidatorMetadata{Address: types.BytesToAddress([]byte{0x37}), BlsKey: keys[2].PublicKey()},
 	}
 
 	assert.NoError(t, state.insertValidatorSnapshot(epoch, snapshot))
@@ -192,9 +192,9 @@ func TestState_cleanValidatorSnapshotsFromDb(t *testing.T) {
 	require.NoError(t, err)
 
 	snapshot := AccountSet{
-		&ValidatorAccount{Address: types.BytesToAddress([]byte{0x18}), BlsKey: keys[0].PublicKey()},
-		&ValidatorAccount{Address: types.BytesToAddress([]byte{0x23}), BlsKey: keys[1].PublicKey()},
-		&ValidatorAccount{Address: types.BytesToAddress([]byte{0x37}), BlsKey: keys[2].PublicKey()},
+		&ValidatorMetadata{Address: types.BytesToAddress([]byte{0x18}), BlsKey: keys[0].PublicKey()},
+		&ValidatorMetadata{Address: types.BytesToAddress([]byte{0x23}), BlsKey: keys[1].PublicKey()},
+		&ValidatorMetadata{Address: types.BytesToAddress([]byte{0x37}), BlsKey: keys[2].PublicKey()},
 	}
 
 	var epoch uint64
