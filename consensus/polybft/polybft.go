@@ -92,10 +92,10 @@ type Polybft struct {
 	// reference to the syncer
 	syncer syncer.Syncer
 
-	// topic for pbft consensus
+	// topic for consensus engine messages
 	consensusTopic *network.Topic
 
-	// topic for pbft consensus
+	// topic for bridge messages
 	bridgeTopic *network.Topic
 
 	// key encapsulates ECDSA address and BLS signing logic
