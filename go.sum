@@ -72,8 +72,12 @@ filippo.io/edwards25519 v1.0.0-rc.1/go.mod h1:N1IkdkCkiLB6tki+MYJoSx2JTY9NUlxZE7
 git.apache.org/thrift.git v0.0.0-20180902110319-2566ecd5d999/go.mod h1:fPE2ZNJGynbRyZ4dJvy6G277gSllfV2HJqblrnkyeyg=
 github.com/0xPolygon/go-ibft v0.0.0-20221104170147-481527cd942a h1:LMX1UNxDahRIbjyooNjlT51KXj7qojjZLfj8aVj9kOM=
 github.com/0xPolygon/go-ibft v0.0.0-20221104170147-481527cd942a/go.mod h1:Rt/DArBRrUobxynHKEGhdcjoalzTlIMUGHtqaiCHd7o=
+github.com/0xPolygon/go-ibft v0.0.0-20221107110809-390e2d2c7f7f h1:a364KJev0OSxPGfooqNwStAHjIgBENvVb11jWBdAqKw=
+github.com/0xPolygon/go-ibft v0.0.0-20221107110809-390e2d2c7f7f/go.mod h1:Rt/DArBRrUobxynHKEGhdcjoalzTlIMUGHtqaiCHd7o=
 github.com/0xPolygon/go-ibft v0.0.0-20221108082142-d9166abecd9c h1:aUQwz/WoeJPlU/OxvfJ4j/j/JcfalOlg/81L6GMwHRQ=
 github.com/0xPolygon/go-ibft v0.0.0-20221108082142-d9166abecd9c/go.mod h1:uJ9EHbl+8StbRhvKgfxDextK32FlVNOiBnRPlAgrQK8=
+github.com/0xPolygon/go-ibft v0.0.0-20221108092319-805919c413bf h1:A6JWrAZkW56CKX7SeFnzQm6l8xJGp3mlz9owgFW5IQQ=
+github.com/0xPolygon/go-ibft v0.0.0-20221108092319-805919c413bf/go.mod h1:uJ9EHbl+8StbRhvKgfxDextK32FlVNOiBnRPlAgrQK8=
 github.com/0xPolygon/pbft-consensus v0.0.0-20220823102839-109d9f873bf4 h1:29mg7kQFiNuJYdTcZUCkENBNd6TQP1KZGngKCSvHs6s=
 github.com/0xPolygon/pbft-consensus v0.0.0-20220823102839-109d9f873bf4/go.mod h1:U2777z/QNFyfu/NkXMBTNmR+I0lAI5g3sEh+eaDt0M0=
 github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 h1:UQHMgLO+TxOElx5B5HZ4hJQsoJ/PvUvKRhJHDQXO8P8=
