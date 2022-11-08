@@ -1096,41 +1096,80 @@ func Test_snapshotStore_updateLastBlock(t *testing.T) {
 func Test_snapshotStore_deleteLower(t *testing.T) {
 	t.Parallel()
 
-	var (
-		metadata = &SnapshotMetadata{
-			LastBlock: 10,
-		}
+	metadata := &SnapshotMetadata{
+		LastBlock: 10,
+	}
 
-		snapshots = []*Snapshot{
-			{Number: 10},
-			{Number: 19},
-			{Number: 20},
-			{Number: 21},
-			{Number: 30},
-		}
-
-		boundary = uint64(20)
-	)
-
-	store := newSnapshotStore(
-		metadata,
-		snapshots,
-	)
-
-	store.deleteLower(boundary)
-
-	assert.Equal(
-		t,
-		&snapshotStore{
-			lastNumber: metadata.LastBlock,
-			list: []*Snapshot{
-				{Number: 20},
-				{Number: 21},
+	testTable := []struct {
+		name              string
+		snapshots         []*Snapshot
+		boundary          uint64
+		expectedSnapshots []*Snapshot
+	}{
+		{
+			"Drop lower-number snapshots",
+			[]*Snapshot{
+				{Number: 10},
+				{Number: 19},
+				{Number: 25},
+				{Number: 30},
+			},
+			uint64(20),
+			[]*Snapshot{
+				{Number: 25},
 				{Number: 30},
 			},
 		},
-		store,
-	)
+		{
+			"Higher block value",
+			[]*Snapshot{
+				{Number: 10},
+				{Number: 11},
+				{Number: 12},
+				{Number: 13},
+				{Number: 14},
+			},
+			uint64(15),
+			[]*Snapshot{
+				{Number: 14},
+			},
+		},
+		{
+			// Single snapshots shouldn't be dropped
+			"Single snapshot",
+			[]*Snapshot{
+				{Number: 10},
+			},
+			uint64(15),
+			[]*Snapshot{
+				{Number: 10},
+			},
+		},
+	}
+
+	for _, testCase := range testTable {
+		testCase := testCase
+
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			store := newSnapshotStore(
+				metadata,
+				testCase.snapshots,
+			)
+
+			store.deleteLower(testCase.boundary)
+
+			assert.Equal(
+				t,
+				&snapshotStore{
+					lastNumber: metadata.LastBlock,
+					list:       testCase.expectedSnapshots,
+				},
+				store,
+			)
+		})
+	}
 }
 
 func Test_snapshotStore_find(t *testing.T) {

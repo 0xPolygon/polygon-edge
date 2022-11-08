@@ -162,6 +162,11 @@ func GetJSONRPCAddress(cmd *cobra.Command) string {
 	return cmd.Flag(command.JSONRPCFlag).Value.String()
 }
 
+// GetJSONLogFormat extracts the set JSON Format flag
+func GetJSONLogFormat(cmd *cobra.Command) bool {
+	return cmd.Flag(command.JSONOutputFlag).Changed
+}
+
 // RegisterJSONOutputFlag registers the --json output setting for all child commands
 func RegisterJSONOutputFlag(cmd *cobra.Command) {
 	cmd.PersistentFlags().Bool(
