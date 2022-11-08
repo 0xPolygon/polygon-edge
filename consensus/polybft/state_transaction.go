@@ -432,6 +432,27 @@ func decodeStateTransaction(txData []byte) (StateTransactionInput, error) {
 	return obj, nil
 }
 
+func getCommitmentMessageSignedTx(txs []*types.Transaction) (*CommitmentMessageSigned, error) {
+	for _, tx := range txs {
+		// skip non state CommitmentMessageSigned transactions
+		if tx.Type != types.StateTx ||
+			len(tx.Input) < abiMethodIDLength ||
+			!bytes.Equal(tx.Input[:abiMethodIDLength], commitBundleABIMethod.ID()) {
+			continue
+		}
+
+		obj := &CommitmentMessageSigned{}
+
+		if err := obj.DecodeAbi(tx.Input); err != nil {
+			return nil, fmt.Errorf("get commitment message signed tx error: %w", err)
+		}
+
+		return obj, nil
+	}
+
+	return nil, nil
+}
+
 func stateSyncEventsToAbiSlice(stateSyncEvents []*StateSyncEvent) []map[string]interface{} {
 	result := make([]map[string]interface{}, len(stateSyncEvents))
 	for i, sse := range stateSyncEvents {
