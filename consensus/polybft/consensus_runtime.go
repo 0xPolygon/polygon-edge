@@ -320,6 +320,7 @@ func (c *consensusRuntime) FSM() error {
 		isEndOfEpoch:      isEndOfEpoch,
 		isEndOfSprint:     isEndOfSprint,
 		logger:            c.logger.Named("fsm"),
+		roundInfo:         newRoundInfo(false, 0),
 	}
 
 	if c.IsBridgeEnabled() {
@@ -1009,14 +1010,30 @@ func (c *consensusRuntime) BuildPrePrepareMessage(
 	certificate *proto.RoundChangeCertificate,
 	view *proto.View,
 ) *proto.Message {
+	fsm := c.fsm
+
 	block := types.Block{}
 	if err := block.UnmarshalRLP(proposal); err != nil {
-		c.logger.Error(fmt.Sprintf("cannot unmarshal RLP:%s", err))
+		c.logger.Error(fmt.Sprintf("cannot unmarshal RLP: %s", err))
 
 		return nil
 	}
 
-	proposalHash := block.Hash().Bytes()
+	fsm.roundInfo = newRoundInfo(true, view.Round)
+
+	extra, err := GetIbftExtra(block.Header.ExtraData)
+	if err != nil {
+		c.logger.Error("failed to extract extra for block %d: %w", block.Number(), err)
+
+		return nil
+	}
+
+	proposalHash, err := extra.Checkpoint.Hash(c.config.blockchain.GetChainID(), block.Number(), block.Hash())
+	if err != nil {
+		c.logger.Error("failed to calculate proposal hash for block %d: %w", block.Number(), err)
+
+		return nil
+	}
 
 	msg := proto.Message{
 		View: view,
@@ -1025,7 +1042,7 @@ func (c *consensusRuntime) BuildPrePrepareMessage(
 		Payload: &proto.Message_PreprepareData{
 			PreprepareData: &proto.PrePrepareMessage{
 				Proposal:     proposal,
-				ProposalHash: proposalHash,
+				ProposalHash: proposalHash.Bytes(),
 				Certificate:  certificate,
 			},
 		},
@@ -1101,6 +1118,8 @@ func (c *consensusRuntime) BuildRoundChangeMessage(
 	certificate *proto.PreparedCertificate,
 	view *proto.View,
 ) *proto.Message {
+	fsm := c.fsm
+
 	msg := proto.Message{
 		View: view,
 		From: c.ID(),
@@ -1110,6 +1129,8 @@ func (c *consensusRuntime) BuildRoundChangeMessage(
 			LatestPreparedCertificate: certificate,
 		}},
 	}
+
+	fsm.roundInfo = newRoundInfo(false, view.Round)
 
 	signedMsg, err := c.config.Key.SignEcdsaMessage(&msg)
 	if err != nil {
