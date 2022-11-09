@@ -268,6 +268,10 @@ func (c *consensusRuntime) FSM() error {
 	// to the head of their remote peers.
 	parent, epoch := c.getLastBuiltBlockAndEpoch()
 
+	if !epoch.Validators.ContainsNodeID(c.config.Key.String()) {
+		return errNotAValidator
+	}
+
 	blockBuilder, err := c.config.blockchain.NewBlockBuilder(
 		parent,
 		types.Address(c.config.Key.Address()),
@@ -617,7 +621,7 @@ func (c *consensusRuntime) startEventTracker() error {
 // deliverMessage receives the message vote from transport and inserts it in state db for given epoch.
 // It returns indicator whether message is processed successfully and error object if any.
 func (c *consensusRuntime) deliverMessage(msg *TransportMessage) (bool, error) {
-	_, epoch := c.getLastBuiltBlockAndEpoch()
+	epoch := c.getEpoch()
 
 	if epoch == nil || msg.EpochNumber < epoch.Number {
 		// Epoch metadata is undefined
@@ -904,6 +908,7 @@ func (c *consensusRuntime) BuildProposal(blockNumber uint64) []byte {
 	return proposal
 }
 
+// InsertBlock inserts a proposal with the specified committed seals
 func (c *consensusRuntime) InsertBlock(proposal []byte, committedSeals []*messages.CommittedSeal) {
 	fsm := c.fsm
 
@@ -932,18 +937,22 @@ func (c *consensusRuntime) InsertBlock(proposal []byte, committedSeals []*messag
 	c.OnBlockInserted(block)
 }
 
+// ID return ID (address actually) of the current node
 func (c *consensusRuntime) ID() []byte {
 	return c.config.Key.Address().Bytes()
 }
 
+// MaximumFaultyNodes returns the maximum number of faulty nodes based on the validator set
 func (c *consensusRuntime) MaximumFaultyNodes() uint64 {
 	return uint64(c.fsm.validators.Len()-1) / 3
 }
 
+// Quorum returns what is the quorum size for the specified block height
 func (c *consensusRuntime) Quorum(_ uint64) uint64 {
 	return uint64(getQuorumSize(c.fsm.validators.Len()))
 }
 
+// BuildPrePrepareMessage builds a PREPREPARE message based on the passed in proposal
 func (c *consensusRuntime) BuildPrePrepareMessage(
 	proposal []byte,
 	certificate *proto.RoundChangeCertificate,
@@ -981,6 +990,7 @@ func (c *consensusRuntime) BuildPrePrepareMessage(
 	return message
 }
 
+// BuildPrepareMessage builds a PREPARE message based on the passed in proposal
 func (c *consensusRuntime) BuildPrepareMessage(proposalHash []byte, view *proto.View) *proto.Message {
 	msg := proto.Message{
 		View: view,
@@ -1003,6 +1013,7 @@ func (c *consensusRuntime) BuildPrepareMessage(proposalHash []byte, view *proto.
 	return message
 }
 
+// BuildCommitMessage builds a COMMIT message based on the passed in proposal
 func (c *consensusRuntime) BuildCommitMessage(proposalHash []byte, view *proto.View) *proto.Message {
 	committedSeal, err := c.config.Key.Sign(proposalHash)
 	if err != nil {
@@ -1033,6 +1044,7 @@ func (c *consensusRuntime) BuildCommitMessage(proposalHash []byte, view *proto.V
 	return message
 }
 
+// BuildRoundChangeMessage builds a ROUND_CHANGE message based on the passed in proposal
 func (c *consensusRuntime) BuildRoundChangeMessage(
 	proposal []byte,
 	certificate *proto.PreparedCertificate,
