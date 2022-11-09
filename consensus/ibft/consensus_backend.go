@@ -31,7 +31,7 @@ func (i *backendIBFT) BuildProposal(view *proto.View) []byte {
 
 	block, err := i.buildBlock(latestHeader)
 	if err != nil {
-		i.logger.Error("cannot build block", "num", view, "err", err)
+		i.logger.Error("cannot build block", "num", view.Height, "err", err)
 
 		return nil
 	}
