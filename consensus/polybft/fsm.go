@@ -28,18 +28,6 @@ type blockBuilder interface {
 	Receipts() []*types.Receipt
 }
 
-type roundInfo struct {
-	isProposer   bool
-	currentRound uint64
-}
-
-func newRoundInfo(isProposer bool, currentRound uint64) *roundInfo {
-	return &roundInfo{
-		isProposer:   isProposer,
-		currentRound: currentRound,
-	}
-}
-
 const maxBundlesPerSprint = 50
 
 type fsm struct {
@@ -63,10 +51,6 @@ type fsm struct {
 
 	// epochNumber denotes current epoch number
 	epochNumber uint64
-
-	// TODO: Populate roundInfo
-	// roundInfo represents the current round information, which is retrieved by the consensus engine
-	roundInfo *roundInfo
 
 	// uptimeCounter holds info about number of times validators sealed a block (only present if isEndOfEpoch is true)
 	uptimeCounter *CommitEpoch
@@ -100,19 +84,8 @@ type fsm struct {
 	logger hcf.Logger
 }
 
-// TODO: Change this to use IBFT hooks (Build*Message)
-// func (f *fsm) Init(info *pbft.RoundInfo) {
-// 	err := f.blockBuilder.Reset()
-// 	if err != nil {
-// 		panic(err) // TODO: handle differently
-// 	}
-
-// 	f.roundInfo = info
-// 	f.commitmentToSaveOnRegister = nil
-// }
-
 // BuildProposal builds a proposal for the current round (used if proposer)
-func (f *fsm) BuildProposal() ([]byte, error) {
+func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 	parent := f.parent
 
 	extraParent, err := GetIbftExtra(parent.ExtraData)
@@ -195,7 +168,7 @@ func (f *fsm) BuildProposal() ([]byte, error) {
 	}
 
 	extra.Checkpoint = &CheckpointData{
-		BlockRound:            f.roundInfo.currentRound,
+		BlockRound:            currentRound,
 		EpochNumber:           f.epochNumber,
 		CurrentValidatorsHash: currentValidatorsHash,
 		NextValidatorsHash:    nextValidatorsHash,

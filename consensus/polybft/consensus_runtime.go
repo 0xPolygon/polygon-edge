@@ -320,7 +320,6 @@ func (c *consensusRuntime) FSM() error {
 		isEndOfEpoch:      isEndOfEpoch,
 		isEndOfSprint:     isEndOfSprint,
 		logger:            c.logger.Named("fsm"),
-		roundInfo:         newRoundInfo(false, 0),
 	}
 
 	if c.IsBridgeEnabled() {
@@ -926,19 +925,19 @@ func (c *consensusRuntime) IsValidCommittedSeal(proposalHash []byte, committedSe
 	return true
 }
 
-func (c *consensusRuntime) BuildProposal(blockNumber uint64) []byte {
+func (c *consensusRuntime) BuildProposal(view *proto.View) []byte {
 	lastBuiltBlock, _ := c.getLastBuiltBlockAndEpoch()
 
-	if lastBuiltBlock.Number+1 != blockNumber {
+	if lastBuiltBlock.Number+1 != view.Height {
 		c.logger.Error("unable to build block, due to lack of parent block",
-			"last", lastBuiltBlock.Number, "num", blockNumber)
+			"last", lastBuiltBlock.Number, "num", view.Height)
 
 		return nil
 	}
 
-	proposal, err := c.fsm.BuildProposal()
+	proposal, err := c.fsm.BuildProposal(view.Round)
 	if err != nil {
-		c.logger.Info("Unable to create porposal", "blockNumber", blockNumber, "err", err)
+		c.logger.Info("Unable to create porposal", "blockNumber", view, "err", err)
 
 		return nil
 	}
@@ -971,7 +970,9 @@ func (c *consensusRuntime) InsertBlock(proposal []byte, committedSeals []*messag
 			}
 
 			isCheckpointBlock := fsm.isEndOfEpoch || c.checkpointManager.isCheckpointBlock(block.Header.Number)
-			if fsm.roundInfo.isProposer && isCheckpointBlock {
+			isProposer := types.Address(c.config.Key.Address()) == types.BytesToAddress(block.Header.Miner)
+
+			if isProposer && isCheckpointBlock {
 				go func(header types.Header, epochNumber uint64) {
 					err := c.checkpointManager.submitCheckpoint(header, fsm.isEndOfEpoch)
 					if err != nil {
@@ -1010,16 +1011,12 @@ func (c *consensusRuntime) BuildPrePrepareMessage(
 	certificate *proto.RoundChangeCertificate,
 	view *proto.View,
 ) *proto.Message {
-	fsm := c.fsm
-
 	block := types.Block{}
 	if err := block.UnmarshalRLP(proposal); err != nil {
 		c.logger.Error(fmt.Sprintf("cannot unmarshal RLP: %s", err))
 
 		return nil
 	}
-
-	fsm.roundInfo = newRoundInfo(true, view.Round)
 
 	extra, err := GetIbftExtra(block.Header.ExtraData)
 	if err != nil {
@@ -1118,8 +1115,6 @@ func (c *consensusRuntime) BuildRoundChangeMessage(
 	certificate *proto.PreparedCertificate,
 	view *proto.View,
 ) *proto.Message {
-	fsm := c.fsm
-
 	msg := proto.Message{
 		View: view,
 		From: c.ID(),
@@ -1129,8 +1124,6 @@ func (c *consensusRuntime) BuildRoundChangeMessage(
 			LatestPreparedCertificate: certificate,
 		}},
 	}
-
-	fsm.roundInfo = newRoundInfo(false, view.Round)
 
 	signedMsg, err := c.config.Key.SignEcdsaMessage(&msg)
 	if err != nil {
