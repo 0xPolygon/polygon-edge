@@ -984,7 +984,7 @@ func (c *consensusRuntime) InsertBlock(proposal []byte, committedSeals []*messag
 			}
 
 			isCheckpointBlock := fsm.isEndOfEpoch || c.checkpointManager.isCheckpointBlock(block.Header.Number)
-			isProposer := types.Address(c.config.Key.Address()) == types.BytesToAddress(block.Header.Miner)
+			isProposer := bytes.Equal(c.config.Key.Address().Bytes(), block.Header.Miner)
 
 			if isProposer && isCheckpointBlock {
 				go func(header types.Header, epochNumber uint64) {
