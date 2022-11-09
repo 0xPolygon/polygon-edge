@@ -340,7 +340,7 @@ func (f *fsm) Validate(proposal []byte) error {
 	return nil
 }
 
-// Validate sender address and signature
+// ValidateSender validates sender address and signature
 func (f *fsm) ValidateSender(msg *proto.Message) error {
 	msgNoSig, err := msg.PayloadNoSig()
 	if err != nil {
