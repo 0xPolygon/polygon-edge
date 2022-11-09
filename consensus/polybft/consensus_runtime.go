@@ -982,11 +982,10 @@ func (c *consensusRuntime) InsertBlock(proposal []byte, committedSeals []*messag
 				epoch.Commitment, fsm.commitmentToSaveOnRegister.Message, fsm.stateSyncExecutionIndex); err != nil {
 				c.logger.Error("insert proposal, build bundles error", "error", err)
 			}
+		}
 
-			isCheckpointBlock := fsm.isEndOfEpoch || c.checkpointManager.isCheckpointBlock(block.Header.Number)
-			isProposer := bytes.Equal(c.config.Key.Address().Bytes(), block.Header.Miner)
-
-			if isProposer && isCheckpointBlock {
+		if fsm.isEndOfEpoch || c.checkpointManager.isCheckpointBlock(block.Header.Number) {
+			if bytes.Equal(c.config.Key.Address().Bytes(), block.Header.Miner) { // true if node is proposer
 				go func(header types.Header, epochNumber uint64) {
 					err := c.checkpointManager.submitCheckpoint(header, fsm.isEndOfEpoch)
 					if err != nil {
@@ -995,9 +994,7 @@ func (c *consensusRuntime) InsertBlock(proposal []byte, committedSeals []*messag
 				}(*block.Header, fsm.epochNumber)
 			}
 
-			if isCheckpointBlock {
-				c.checkpointManager.latestCheckpointID = block.Number()
-			}
+			c.checkpointManager.latestCheckpointID = block.Number()
 		}
 	}
 
