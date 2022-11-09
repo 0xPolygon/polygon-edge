@@ -2,12 +2,10 @@ package jsonrpc
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
-	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -232,9 +230,9 @@ func TestEth_Syncing(t *testing.T) {
 		//nolint:forcetypeassert
 		response := res.(progression)
 		assert.NotEqual(t, progress.ChainSyncBulk, response.Type)
-		assert.Equal(t, fmt.Sprintf("0x%x", 1), response.StartingBlock)
-		assert.Equal(t, fmt.Sprintf("0x%x", 10), response.CurrentBlock)
-		assert.Equal(t, fmt.Sprintf("0x%x", 100), response.HighestBlock)
+		assert.Equal(t, argUint64(1), response.StartingBlock)
+		assert.Equal(t, argUint64(10), response.CurrentBlock)
+		assert.Equal(t, argUint64(100), response.HighestBlock)
 	})
 
 	t.Run("returns \"false\" if sync is not progress", func(t *testing.T) {
@@ -261,7 +259,7 @@ func TestEth_GetPrice_PriceLimitSet(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, res)
 
-		assert.Equal(t, hex.EncodeUint64(priceLimit), res)
+		assert.Equal(t, argUint64(priceLimit), res)
 	})
 
 	t.Run("returns average gas price when it is larger than set price limit flag", func(t *testing.T) {
@@ -270,7 +268,7 @@ func TestEth_GetPrice_PriceLimitSet(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, res)
 
-		assert.GreaterOrEqual(t, res, hex.EncodeUint64(priceLimit))
+		assert.GreaterOrEqual(t, res, argUint64(priceLimit))
 	})
 }
 
@@ -283,7 +281,7 @@ func TestEth_GasPrice(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, res)
 
-	assert.Equal(t, fmt.Sprintf("0x%x", store.averageGasPrice), res)
+	assert.Equal(t, argUint64(store.averageGasPrice), res)
 }
 
 func TestEth_Call(t *testing.T) {

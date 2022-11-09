@@ -53,14 +53,38 @@ type mockStore struct {
 	receiptsLock sync.Mutex
 	receipts     map[types.Hash][]*types.Receipt
 	accounts     map[types.Address]*state.Account
+
+	// headers is the list of historical headers
+	headers []*types.Header
 }
 
 func newMockStore() *mockStore {
-	return &mockStore{
+	m := &mockStore{
 		header:       &types.Header{Number: 0},
 		subscription: blockchain.NewMockSubscription(),
 		accounts:     map[types.Address]*state.Account{},
 	}
+	m.addHeader(m.header)
+
+	return m
+}
+
+func (m *mockStore) addHeader(header *types.Header) {
+	if m.headers == nil {
+		m.headers = []*types.Header{}
+	}
+
+	m.headers = append(m.headers, header)
+}
+
+func (m *mockStore) headerLoop(cond func(h *types.Header) bool) *types.Header {
+	for _, header := range m.headers {
+		if cond(header) {
+			return header
+		}
+	}
+
+	return nil
 }
 
 func (m *mockStore) emitEvent(evnt *mockEvent) {
@@ -115,12 +139,28 @@ func (m *mockStore) SubscribeEvents() blockchain.Subscription {
 	return m.subscription
 }
 
+func (m *mockStore) GetHeaderByNumber(number uint64) (*types.Header, bool) {
+	header := m.headerLoop(func(header *types.Header) bool {
+		return header.Number == number
+	})
+
+	return header, header != nil
+}
+
 func (m *mockStore) GetBlockByHash(hash types.Hash, full bool) (*types.Block, bool) {
-	return nil, false
+	header := m.headerLoop(func(header *types.Header) bool {
+		return header.Hash == hash
+	})
+
+	return &types.Block{Header: header}, header != nil
 }
 
 func (m *mockStore) GetBlockByNumber(num uint64, full bool) (*types.Block, bool) {
-	return nil, false
+	header := m.headerLoop(func(header *types.Header) bool {
+		return header.Number == num
+	})
+
+	return &types.Block{Header: header}, header != nil
 }
 
 func (m *mockStore) GetTxs(inclQueued bool) (
@@ -132,4 +172,8 @@ func (m *mockStore) GetTxs(inclQueued bool) (
 
 func (m *mockStore) GetCapacity() (uint64, uint64) {
 	return 0, 0
+}
+
+func (m *mockStore) GetPeers() int {
+	return 20
 }
