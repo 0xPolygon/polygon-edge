@@ -128,7 +128,11 @@ func (i *backendIBFT) quorum(blockNumber uint64) uint64 {
 }
 
 // HasQuorum returns true if quorum is reached for the given height
-func (i *backendIBFT) HasQuorum(view *protoIBFT.View, messages []*protoIBFT.Message, msgType protoIBFT.MessageType) bool {
+func (i *backendIBFT) HasQuorum(
+	view *protoIBFT.View,
+	messages []*protoIBFT.Message,
+	msgType protoIBFT.MessageType,
+) bool {
 	quorum := i.quorum(view.Height)
 
 	switch msgType {
