@@ -307,6 +307,11 @@ func (c *consensusRuntime) FSM() error {
 	pendingBlockNumber := parent.Number + 1
 	isEndOfSprint := c.isEndOfSprint(pendingBlockNumber)
 	isEndOfEpoch := c.isEndOfEpoch(pendingBlockNumber)
+	valSet, err := NewValidatorSet(epoch.Validators)
+
+	if err != nil {
+		return fmt.Errorf("cannot create validator set for fsm: %w", err)
+	}
 
 	ff := &fsm{
 		config:            c.config.PolyBFTConfig,
@@ -316,7 +321,7 @@ func (c *consensusRuntime) FSM() error {
 		checkpointBackend: c,
 		epochNumber:       epoch.Number,
 		blockBuilder:      blockBuilder,
-		validators:        newValidatorSet(types.BytesToAddress(parent.Miner), epoch.Validators),
+		validators:        valSet,
 		isEndOfEpoch:      isEndOfEpoch,
 		isEndOfSprint:     isEndOfSprint,
 		logger:            c.logger.Named("fsm"),
@@ -898,7 +903,12 @@ func (c *consensusRuntime) IsValidSender(msg *proto.Message) bool {
 }
 
 func (c *consensusRuntime) IsProposer(id []byte, height, round uint64) bool {
-	nextProposer := c.fsm.validators.CalcProposer(round)
+	nextProposer, err := c.fsm.validators.CalcProposer(round)
+	if err != nil {
+		c.logger.Error("cannot calculate proposer", "error", err)
+
+		return false
+	}
 
 	return bytes.Equal(id, nextProposer[:])
 }

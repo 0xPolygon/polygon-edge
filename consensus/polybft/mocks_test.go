@@ -390,8 +390,8 @@ func (v *testValidators) getValidator(alias string) *testValidator {
 	return vv
 }
 
-func (v *testValidators) toValidatorSet() *validatorSet {
-	return newValidatorSet(types.Address{}, v.getPublicIdentities())
+func (v *testValidators) toValidatorSet() (*validatorSet, error) {
+	return NewValidatorSet(v.getPublicIdentities())
 }
 
 type testValidator struct {
