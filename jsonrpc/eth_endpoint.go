@@ -711,7 +711,7 @@ func (e *Eth) GetTransactionCount(address types.Address, filter BlockNumberOrHas
 	if filter.BlockNumber == nil {
 		header, err = e.getHeaderFromBlockNumberOrHash(filter)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get header from block hash or block number: %v", err)
+			return nil, fmt.Errorf("failed to get header from block hash or block number: %w", err)
 		}
 
 		blockNumber = BlockNumber(header.Number)
