@@ -6,19 +6,20 @@ import (
 	"time"
 
 	"github.com/0xPolygon/go-ibft/messages"
+	"github.com/0xPolygon/go-ibft/messages/proto"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-func (i *backendIBFT) BuildProposal(blockNumber uint64) []byte {
+func (i *backendIBFT) BuildProposal(view *proto.View) []byte {
 	var (
 		latestHeader      = i.blockchain.Header()
 		latestBlockNumber = latestHeader.Number
 	)
 
-	if latestBlockNumber+1 != blockNumber {
+	if latestBlockNumber+1 != view.Height {
 		i.logger.Error(
 			"unable to build block, due to lack of parent block",
 			"num",
@@ -30,7 +31,7 @@ func (i *backendIBFT) BuildProposal(blockNumber uint64) []byte {
 
 	block, err := i.buildBlock(latestHeader)
 	if err != nil {
-		i.logger.Error("cannot build block", "num", blockNumber, "err", err)
+		i.logger.Error("cannot build block", "num", view.Height, "err", err)
 
 		return nil
 	}

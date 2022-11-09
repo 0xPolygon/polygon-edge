@@ -179,13 +179,13 @@ func (c *consensusRuntime) AddLog(eventLog *ethgo.Log) {
 
 	event, err := decodeStateSyncEvent(eventLog)
 	if err != nil {
-		c.logger.Error("failed to decode state sync event", "hash", eventLog.TransactionHash, "err", err)
+		c.logger.Error("failed to decode state sync event", "hash", eventLog.TransactionHash, "error", err)
 
 		return
 	}
 
 	if err := c.state.insertStateSyncEvent(event); err != nil {
-		c.logger.Error("failed to insert state sync event", "hash", eventLog.TransactionHash, "err", err)
+		c.logger.Error("failed to insert state sync event", "hash", eventLog.TransactionHash, "error", err)
 
 		return
 	}
@@ -203,7 +203,7 @@ func (c *consensusRuntime) OnBlockInserted(block *types.Block) {
 	if c.isEndOfEpoch(block.Header.Number) {
 		// reset the epoch. Internally it updates the parent block header.
 		if err := c.restartEpoch(block.Header); err != nil {
-			c.logger.Error("failed to restart epoch after block inserted", "err", err)
+			c.logger.Error("failed to restart epoch after block inserted", "error", err)
 		}
 	} else {
 		c.lock.Lock()
@@ -382,7 +382,7 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) error {
 	}
 
 	if err := c.state.cleanEpochsFromDB(); err != nil {
-		c.logger.Error("Could not clean previous epochs from db.", "err", err)
+		c.logger.Error("Could not clean previous epochs from db.", "error", err)
 	}
 
 	if err := c.state.insertEpoch(epoch.Number); err != nil {
@@ -878,7 +878,7 @@ func (c *consensusRuntime) getCommitmentToRegister(epoch *epochMetadata,
 
 func (c *consensusRuntime) IsValidBlock(proposal []byte) bool {
 	if err := c.fsm.Validate(proposal); err != nil {
-		c.logger.Error("failed validate proposal", "error", err)
+		c.logger.Error("failed to validate proposal", "error", err)
 
 		return false
 	}
@@ -889,7 +889,7 @@ func (c *consensusRuntime) IsValidBlock(proposal []byte) bool {
 func (c *consensusRuntime) IsValidSender(msg *proto.Message) bool {
 	err := c.fsm.ValidateSender(msg)
 	if err != nil {
-		c.logger.Error("invalid sender", "err", err)
+		c.logger.Error("invalid sender", "error", err)
 
 		return false
 	}
@@ -904,20 +904,34 @@ func (c *consensusRuntime) IsProposer(id []byte, height, round uint64) bool {
 }
 
 func (c *consensusRuntime) IsValidProposalHash(proposal, hash []byte) bool {
-	newBlock := types.Block{}
-	if err := newBlock.UnmarshalRLP(proposal); err != nil {
-		c.logger.Error("unable to unmarshal proposal", "err", err)
+	block := types.Block{}
+	if err := block.UnmarshalRLP(proposal); err != nil {
+		c.logger.Error("unable to unmarshal proposal", "error", err)
 
 		return false
 	}
 
-	return bytes.Equal(newBlock.Header.Hash.Bytes(), hash)
+	extra, err := GetIbftExtra(block.Header.ExtraData)
+	if err != nil {
+		c.logger.Error("failed to retrieve extra", "block number", block.Number(), "error", err)
+
+		return false
+	}
+
+	proposalHash, err := extra.Checkpoint.Hash(c.config.blockchain.GetChainID(), block.Number(), block.Hash())
+	if err != nil {
+		c.logger.Error("failed to calculate proposal hash", "block number", block.Number(), "error", err)
+
+		return false
+	}
+
+	return bytes.Equal(proposalHash.Bytes(), hash)
 }
 
 func (c *consensusRuntime) IsValidCommittedSeal(proposalHash []byte, committedSeal *messages.CommittedSeal) bool {
 	err := c.fsm.ValidateCommit(committedSeal.Signer, committedSeal.Signature, proposalHash)
 	if err != nil {
-		c.logger.Info("Invalid committed seal", "err", err)
+		c.logger.Info("Invalid committed seal", "error", err)
 
 		return false
 	}
@@ -925,19 +939,19 @@ func (c *consensusRuntime) IsValidCommittedSeal(proposalHash []byte, committedSe
 	return true
 }
 
-func (c *consensusRuntime) BuildProposal(blockNumber uint64) []byte {
+func (c *consensusRuntime) BuildProposal(view *proto.View) []byte {
 	lastBuiltBlock, _ := c.getLastBuiltBlockAndEpoch()
 
-	if lastBuiltBlock.Number+1 != blockNumber {
+	if lastBuiltBlock.Number+1 != view.Height {
 		c.logger.Error("unable to build block, due to lack of parent block",
-			"last", lastBuiltBlock.Number, "num", blockNumber)
+			"last", lastBuiltBlock.Number, "num", view.Height)
 
 		return nil
 	}
 
-	proposal, err := c.fsm.BuildProposal()
+	proposal, err := c.fsm.BuildProposal(view.Round)
 	if err != nil {
-		c.logger.Info("Unable to create porposal", "blockNumber", blockNumber, "err", err)
+		c.logger.Info("Unable to create porposal", "blockNumber", view.Height, "error", err)
 
 		return nil
 	}
@@ -951,7 +965,7 @@ func (c *consensusRuntime) InsertBlock(proposal []byte, committedSeals []*messag
 
 	block, err := fsm.Insert(proposal, committedSeals)
 	if err != nil {
-		c.logger.Error("cannot insert proposal", "err", err)
+		c.logger.Error("cannot insert proposal", "error", err)
 
 		return
 	}
@@ -961,16 +975,18 @@ func (c *consensusRuntime) InsertBlock(proposal []byte, committedSeals []*messag
 
 		if fsm.isEndOfEpoch && fsm.commitmentToSaveOnRegister != nil {
 			if err := c.state.insertCommitmentMessage(fsm.commitmentToSaveOnRegister); err != nil {
-				c.logger.Error("insert proposal, insert commitment message error", "err", err)
+				c.logger.Error("insert proposal, insert commitment message error", "error", err)
 			}
 
 			if err := c.buildBundles(
 				epoch.Commitment, fsm.commitmentToSaveOnRegister.Message, fsm.stateSyncExecutionIndex); err != nil {
-				c.logger.Error("insert proposal, build bundles error", "err", err)
+				c.logger.Error("insert proposal, build bundles error", "error", err)
 			}
 
 			isCheckpointBlock := fsm.isEndOfEpoch || c.checkpointManager.isCheckpointBlock(block.Header.Number)
-			if fsm.roundInfo.isProposer && isCheckpointBlock {
+			isProposer := bytes.Equal(c.config.Key.Address().Bytes(), block.Header.Miner)
+
+			if isProposer && isCheckpointBlock {
 				go func(header types.Header, epochNumber uint64) {
 					err := c.checkpointManager.submitCheckpoint(header, fsm.isEndOfEpoch)
 					if err != nil {
@@ -1011,12 +1027,24 @@ func (c *consensusRuntime) BuildPrePrepareMessage(
 ) *proto.Message {
 	block := types.Block{}
 	if err := block.UnmarshalRLP(proposal); err != nil {
-		c.logger.Error(fmt.Sprintf("cannot unmarshal RLP:%s", err))
+		c.logger.Error(fmt.Sprintf("cannot unmarshal RLP: %s", err))
 
 		return nil
 	}
 
-	proposalHash := block.Hash().Bytes()
+	extra, err := GetIbftExtra(block.Header.ExtraData)
+	if err != nil {
+		c.logger.Error("failed to retrieve extra for block %d: %w", block.Number(), err)
+
+		return nil
+	}
+
+	proposalHash, err := extra.Checkpoint.Hash(c.config.blockchain.GetChainID(), block.Number(), block.Hash())
+	if err != nil {
+		c.logger.Error("failed to calculate proposal hash for block %d: %w", block.Number(), err)
+
+		return nil
+	}
 
 	msg := proto.Message{
 		View: view,
@@ -1025,7 +1053,7 @@ func (c *consensusRuntime) BuildPrePrepareMessage(
 		Payload: &proto.Message_PreprepareData{
 			PreprepareData: &proto.PrePrepareMessage{
 				Proposal:     proposal,
-				ProposalHash: proposalHash,
+				ProposalHash: proposalHash.Bytes(),
 				Certificate:  certificate,
 			},
 		},
@@ -1087,7 +1115,7 @@ func (c *consensusRuntime) BuildCommitMessage(proposalHash []byte, view *proto.V
 
 	message, err := c.config.Key.SignEcdsaMessage(&msg)
 	if err != nil {
-		c.logger.Error("Cannot sign message", "error", err)
+		c.logger.Error("Cannot sign message", "Error", err)
 
 		return nil
 	}
