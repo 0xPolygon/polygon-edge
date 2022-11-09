@@ -16,17 +16,9 @@ import (
 	"github.com/umbracle/ethgo/contract"
 )
 
-// // ethereumBackend is an interface that wraps the methods called on ethereum backend protocol
-// type ethereumBackend interface {
-// 	// PeersLen returns the number of peers the node is connected to
-// 	PeersLen() int
-// 	// TxPool returns the current transaction pool
-// 	TxPool() *core.TxPool
-// 	// Broadcast block broadcasts the newly inserted block to the rest of the peers
-// 	BroadcastBlock(block *types.Block, propagate bool)
-// 	// GenesisGasLimit returns the initial gas limit for a block
-// 	GenesisGasLimit() uint64
-// }
+const (
+	consensusSource = "consensus"
+)
 
 // blockchain is an interface that wraps the methods called on blockchain
 type blockchainBackend interface {
@@ -75,7 +67,7 @@ func (p *blockchainWrapper) CurrentHeader() *types.Header {
 
 // CommitBlock commits a block to the chain
 func (p *blockchainWrapper) CommitBlock(block *types.Block) error {
-	return p.blockchain.WriteBlock(block, "consensus")
+	return p.blockchain.WriteBlock(block, consensusSource)
 }
 
 // ProcessBlock builds a final block from given 'block' on top of 'parent'

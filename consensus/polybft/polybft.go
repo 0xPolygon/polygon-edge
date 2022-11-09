@@ -325,7 +325,8 @@ func (p *Polybft) startPbftProcess() {
 		p.txPool.SetSealing(isValidator) // update tx pool
 
 		if isValidator {
-			err = p.runtime.FSM() // initialze fsm as a stateless ibft backet via runtime as an adapter
+			// initialze FSM as a stateless ibft backend via runtime as an adapter
+			err = p.runtime.FSM()
 			if err != nil {
 				p.logger.Error("failed to create fsm", "block number", latestHeader.Number, "error", err)
 
