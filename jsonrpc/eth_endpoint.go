@@ -94,7 +94,7 @@ func (e *Eth) ChainId() (interface{}, error) {
 func (e *Eth) getHeaderFromBlockNumberOrHash(bnh BlockNumberOrHash) (*types.Header, error) {
 	// The filter is empty, use the latest block by default
 	if bnh.BlockNumber == nil && bnh.BlockHash == nil {
-		bnh.BlockNumber, _ = createBlockNumberPointer("latest")
+		bnh.BlockNumber, _ = createBlockNumberPointer(latest)
 	}
 
 	if bnh.BlockNumber != nil {
@@ -711,7 +711,7 @@ func (e *Eth) GetTransactionCount(address types.Address, filter BlockNumberOrHas
 	if filter.BlockNumber == nil {
 		header, err = e.getHeaderFromBlockNumberOrHash(filter)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get header from block hash or block number")
+			return nil, fmt.Errorf("failed to get header from block hash or block number: %v", err)
 		}
 
 		blockNumber = BlockNumber(header.Number)
