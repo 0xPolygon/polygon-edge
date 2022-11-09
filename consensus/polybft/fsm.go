@@ -210,7 +210,7 @@ func (f *fsm) createValidatorsUptimeTx() (*types.Transaction, error) {
 func (f *fsm) ValidateCommit(signer []byte, seal []byte, proposalHash []byte) error {
 	from := types.BytesToAddress(signer)
 
-	validator := f.validators.Accounts().GetValidatorAccount(from)
+	validator := f.validators.Accounts().GetValidatorMetadata(from)
 	if validator == nil {
 		return fmt.Errorf("unable to resolve validator %s", from)
 	}

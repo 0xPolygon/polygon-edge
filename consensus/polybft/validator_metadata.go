@@ -173,9 +173,9 @@ func (as AccountSet) Copy() AccountSet {
 	return AccountSet(copiedAccs)
 }
 
-// GetValidatorAccount tries to retrieve validator account by given address from the account set.
+// GetValidatorMetadata tries to retrieve validator account metadata by given address from the account set.
 // It returns nil if such account is not found.
-func (as AccountSet) GetValidatorAccount(address types.Address) *ValidatorMetadata {
+func (as AccountSet) GetValidatorMetadata(address types.Address) *ValidatorMetadata {
 	i := as.Index(address)
 	if i == -1 {
 		return nil
