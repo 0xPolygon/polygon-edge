@@ -122,7 +122,7 @@ func TestEth_GetTransactionByHash(t *testing.T) {
 		assert.NotNil(t, res)
 
 		//nolint:forcetypeassert
-		foundTxn := res.(*transaction)
+		foundTxn := res.(*Transaction)
 		assert.Equal(t, argUint64(testTxn.Nonce), foundTxn.Nonce)
 		assert.Equal(t, argUint64(block.Number()), *foundTxn.BlockNumber)
 		assert.Equal(t, block.Hash(), *foundTxn.BlockHash)
@@ -147,7 +147,7 @@ func TestEth_GetTransactionByHash(t *testing.T) {
 		assert.NotNil(t, res)
 
 		//nolint:forcetypeassert
-		foundTxn := res.(*transaction)
+		foundTxn := res.(*Transaction)
 		assert.Equal(t, argUint64(testTxn.Nonce), foundTxn.Nonce)
 		assert.Nil(t, foundTxn.BlockNumber)
 		assert.Nil(t, foundTxn.BlockHash)
@@ -208,7 +208,7 @@ func TestEth_GetTransactionReceipt(t *testing.T) {
 		assert.NotNil(t, res)
 
 		//nolint:forcetypeassert
-		response := res.(*receipt)
+		response := res.(*Receipt)
 		assert.Equal(t, txn.Hash, response.TxHash)
 		assert.Equal(t, block.Hash(), response.BlockHash)
 		assert.NotNil(t, response.Logs)
