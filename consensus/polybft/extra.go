@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/hashicorp/go-hclog"
-
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/crypto"
@@ -32,6 +30,7 @@ type Extra struct {
 	Parent     *Signature
 	Committed  *Signature
 	Checkpoint *CheckpointData
+	Round      uint64 // round in which the block was sealed
 }
 
 // MarshalRLPTo defines the marshal function wrapper for Extra
@@ -80,6 +79,9 @@ func (i *Extra) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 		vv.Set(i.Checkpoint.MarshalRLPWith(ar))
 	}
 
+	// round
+	vv.Set(ar.NewUint(i.Round))
+
 	return vv
 }
 
@@ -90,13 +92,15 @@ func (i *Extra) UnmarshalRLP(input []byte) error {
 
 // UnmarshalRLPWith defines the unmarshal implementation for Extra
 func (i *Extra) UnmarshalRLPWith(v *fastrlp.Value) error {
+	const expectedElements = 6
+
 	elems, err := v.GetElems()
 	if err != nil {
 		return err
 	}
 
-	if num := len(elems); num != 5 {
-		return fmt.Errorf("incorrect elements count to decode Extra, expected 5 but found %d", num)
+	if num := len(elems); num != expectedElements {
+		return fmt.Errorf("incorrect elements count to decode Extra, expected %d but found %d", expectedElements, num)
 	}
 
 	// Validators
@@ -138,12 +142,20 @@ func (i *Extra) UnmarshalRLPWith(v *fastrlp.Value) error {
 		}
 	}
 
+	// Sealed round
+	{
+		round, err := elems[5].GetUint64()
+		if err != nil {
+			return fmt.Errorf("cannot get sealed round: %w", err)
+		}
+		i.Round = round
+	}
+
 	return nil
 }
 
 // createValidatorSetDelta calculates ValidatorSetDelta based on the provided old and new validator sets
-func createValidatorSetDelta(log hclog.Logger, oldValidatorSet,
-	newValidatorSet AccountSet) (*ValidatorSetDelta, error) {
+func createValidatorSetDelta(oldValidatorSet, newValidatorSet AccountSet) (*ValidatorSetDelta, error) {
 	var addedValidators AccountSet
 
 	oldValidatorSetMap := make(map[types.Address]*ValidatorMetadata)

@@ -46,7 +46,7 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 	headersMap := &testHeadersMap{}
 
 	// create genesis header
-	genesisDelta, err := createValidatorSetDelta(hclog.NewNullLogger(), nil, validatorSetParent)
+	genesisDelta, err := createValidatorSetDelta(nil, validatorSetParent)
 	require.NoError(t, err)
 
 	genesisExtra := &Extra{Validators: genesisDelta}
@@ -61,7 +61,7 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 
 	// create headers from 1 to 9
 	for i := 1; i < int(polyBftConfig.EpochSize); i++ {
-		delta, err := createValidatorSetDelta(hclog.NewNullLogger(), validatorSetParent, validatorSetParent)
+		delta, err := createValidatorSetDelta(validatorSetParent, validatorSetParent)
 		require.NoError(t, err)
 
 		extra := &Extra{Validators: delta, Checkpoint: &CheckpointData{}}
@@ -81,7 +81,7 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 	blockchainMock.On("GetHeaderByHash", mock.Anything).Return(headersMap.getHeaderByHash)
 
 	// create parent header (block 10)
-	parentDelta, err := createValidatorSetDelta(hclog.NewNullLogger(), validatorSetParent, validatorSetCurrent)
+	parentDelta, err := createValidatorSetDelta(validatorSetParent, validatorSetCurrent)
 	require.NoError(t, err)
 
 	parentExtra := &Extra{Validators: parentDelta, Checkpoint: &CheckpointData{}}
@@ -105,7 +105,7 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 	headersMap.addHeader(parentHeader)
 
 	// create current header (block 11) with all appropriate fields required for validation
-	currentDelta, err := createValidatorSetDelta(hclog.NewNullLogger(), validatorSetCurrent, validatorSetCurrent)
+	currentDelta, err := createValidatorSetDelta(validatorSetCurrent, validatorSetCurrent)
 	require.NoError(t, err)
 
 	currentExtra := &Extra{Validators: currentDelta, Parent: parentCommitted, Checkpoint: &CheckpointData{}}
@@ -132,7 +132,12 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 		logger:          hclog.NewNullLogger(),
 		consensusConfig: &polyBftConfig,
 		blockchain:      blockchainMock,
-		validatorsCache: newValidatorsSnapshotCache(hclog.NewNullLogger(), newTestState(t), polyBftConfig.EpochSize, blockchainMock),
+		validatorsCache: newValidatorsSnapshotCache(
+			hclog.NewNullLogger(),
+			newTestState(t),
+			polyBftConfig.EpochSize,
+			blockchainMock,
+		),
 	}
 
 	// since parent signature is intentionally disregarded the following error is expected
