@@ -266,7 +266,6 @@ func (t *Transition) WriteFailedReceipt(txn *types.Transaction) error {
 
 // Write writes another transaction to the executor
 func (t *Transition) Write(txn *types.Transaction) error {
-
 	var err error
 
 	if txn.From == emptyFrom && txn.IsLegacyTx() {
