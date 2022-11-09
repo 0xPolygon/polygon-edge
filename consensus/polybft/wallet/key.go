@@ -37,7 +37,7 @@ func (k *Key) Sign(b []byte) ([]byte, error) {
 	return s.Marshal()
 }
 
-// SignEcdsaMessage signs the proto message  with ecdsa
+// SignEcdsaMessage signs the proto message with ecdsa
 func (k *Key) SignEcdsaMessage(msg *proto.Message) (*proto.Message, error) {
 	raw, err := protobuf.Marshal(msg)
 	if err != nil {
