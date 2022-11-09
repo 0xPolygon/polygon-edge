@@ -128,18 +128,16 @@ func (i *backendIBFT) quorum(blockNumber uint64) uint64 {
 }
 
 // HasQuorum returns true if quorum is reached for the given height
-func (i *backendIBFT) HasQuorum(view *protoIBFT.View, messages []*protoIBFT.Message) bool {
+func (i *backendIBFT) HasQuorum(view *protoIBFT.View, messages []*protoIBFT.Message, msgType protoIBFT.MessageType) bool {
 	quorum := i.quorum(view.Height)
 
-	if len(messages) > 0 {
-		switch messages[0].GetType() {
-		case protoIBFT.MessageType_PREPREPARE:
-			return len(messages) > 1
-		case protoIBFT.MessageType_PREPARE:
-			return len(messages) >= int(quorum)-1
-		case protoIBFT.MessageType_ROUND_CHANGE, protoIBFT.MessageType_COMMIT:
-			return len(messages) >= int(quorum)
-		}
+	switch msgType {
+	case protoIBFT.MessageType_PREPREPARE:
+		return len(messages) >= 0
+	case protoIBFT.MessageType_PREPARE:
+		return len(messages) >= int(quorum)-1
+	case protoIBFT.MessageType_ROUND_CHANGE, protoIBFT.MessageType_COMMIT:
+		return len(messages) >= int(quorum)
 	}
 
 	return false
