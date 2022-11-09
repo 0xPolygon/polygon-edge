@@ -1,7 +1,6 @@
 package jsonrpc
 
 import (
-	"errors"
 	"math/big"
 	"sync"
 
@@ -115,7 +114,7 @@ func (m *mockStore) GetAccount(root types.Hash, addr types.Address) (*state.Acco
 		return acc, nil
 	}
 
-	return nil, errors.New("given root and slot not found in storage")
+	return nil, ErrStateNotFound
 }
 
 func (m *mockStore) SetAccount(addr types.Address, account *state.Account) {
