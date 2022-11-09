@@ -261,7 +261,7 @@ func createValidatorDeltaHeader(number uint64, oldValidatorSet, newValidatorSet 
 
 	return &types.Header{
 		Number:    number,
-		ExtraData: append(make([]byte, 32), extra.MarshalRLPTo(nil)...),
+		ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...),
 	}
 }
 

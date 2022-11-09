@@ -26,7 +26,7 @@ type blockchainBackend interface {
 	CurrentHeader() *types.Header
 
 	// CommitBlock commits a block to the chain.
-	CommitBlock(block *types.Block) error
+	CommitBlock(block *types.Block) ([]*types.Receipt, error)
 
 	// NewBlockBuilder is a factory method that returns a block builder on top of 'parent'.
 	NewBlockBuilder(parent *types.Header, coinbase types.Address,
@@ -51,6 +51,9 @@ type blockchainBackend interface {
 	GetSystemState(config *PolyBFTConfig, provider contract.Provider) SystemState
 
 	SubscribeEvents() blockchain.Subscription
+
+	// GetChainID returns chain id of the current blockchain
+	GetChainID() uint64
 }
 
 var _ blockchainBackend = &blockchainWrapper{}
@@ -66,8 +69,13 @@ func (p *blockchainWrapper) CurrentHeader() *types.Header {
 }
 
 // CommitBlock commits a block to the chain
-func (p *blockchainWrapper) CommitBlock(block *types.Block) error {
-	return p.blockchain.WriteBlock(block, consensusSource)
+func (p *blockchainWrapper) CommitBlock(block *types.Block) ([]*types.Receipt, error) {
+	err := p.blockchain.WriteBlock(block, consensusSource)
+	if err != nil {
+		return nil, err
+	}
+
+	return p.blockchain.GetCachedReceipts(block.Hash())
 }
 
 // ProcessBlock builds a final block from given 'block' on top of 'parent'
@@ -159,6 +167,10 @@ func (p *blockchainWrapper) GetSystemState(config *PolyBFTConfig, provider contr
 
 func (p *blockchainWrapper) SubscribeEvents() blockchain.Subscription {
 	return p.blockchain.SubscribeEvents()
+}
+
+func (p *blockchainWrapper) GetChainID() uint64 {
+	return uint64(p.blockchain.Config().ChainID)
 }
 
 var _ contract.Provider = &stateProvider{}

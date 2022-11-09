@@ -265,6 +265,7 @@ func runPreRun(cmd *cobra.Command, _ []string) error {
 	// The config file will have precedence over --flag
 	params.setRawGRPCAddress(helper.GetGRPCAddress(cmd))
 	params.setRawJSONRPCAddress(helper.GetJSONRPCAddress(cmd))
+	params.setJSONLogFormat(helper.GetJSONLogFormat(cmd))
 
 	// Check if the config file has been specified
 	// Config file settings will override JSON-RPC and GRPC address values

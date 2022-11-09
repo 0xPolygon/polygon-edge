@@ -9,11 +9,15 @@ import (
 	"reflect"
 
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
+	"github.com/0xPolygon/polygon-edge/crypto"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/umbracle/ethgo/abi"
 	"github.com/umbracle/fastrlp"
 )
+
+var accountSetABIType = abi.MustNewType(`tuple(address _address, uint256[4] blsKey)[]`)
 
 // ValidatorMetadata represents a validator metadata (its public identity)
 type ValidatorMetadata struct {
@@ -171,6 +175,29 @@ func (as AccountSet) Copy() AccountSet {
 	}
 
 	return AccountSet(copiedAccs)
+}
+
+// Hash returns hash value of the AccountSet
+func (as AccountSet) Hash() (types.Hash, error) {
+	abiEncoded, err := accountSetABIType.Encode(as.AsGenericMaps())
+	if err != nil {
+		return types.ZeroHash, err
+	}
+
+	return types.BytesToHash(crypto.Keccak256(abiEncoded)), nil
+}
+
+// AsGenericMaps convert AccountSet object to slice of maps, where each key denotes field name mapped to a value
+func (as AccountSet) AsGenericMaps() []map[string]interface{} {
+	accountSetMaps := make([]map[string]interface{}, len(as))
+	for i, v := range as {
+		accountSetMaps[i] = map[string]interface{}{
+			"_address": v.Address,
+			"blsKey":   v.BlsKey.ToBigInt(),
+		}
+	}
+
+	return accountSetMaps
 }
 
 // GetValidatorMetadata tries to retrieve validator account metadata by given address from the account set.

@@ -9,6 +9,7 @@ import (
 	"reflect"
 
 	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/0xPolygon/polygon-edge/state/runtime/precompiled"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/mitchellh/mapstructure"
 	"github.com/umbracle/ethgo"
@@ -31,11 +32,6 @@ var (
 		"tuple(uint256 id, address sender, address receiver, bytes data, bool skip)[] objs)")
 
 	validatorsUptimeMethod, _ = abi.NewMethod("function uptime(bytes data)")
-
-	// BlsVerificationABIType is ABI type used for BLS signatures verification.
-	// It includes BLS public keys and bitmap representing signer validator accounts.
-	// TODO - move this to precompile, once we implement it on edge
-	BlsVerificationABIType = abi.MustNewType("tuple(bytes[], bytes)")
 )
 
 // StateTransactionInput is an abstraction for different state transaction inputs
@@ -300,7 +296,8 @@ func (cm *CommitmentMessageSigned) EncodeAbi() ([]byte, error) {
 		"root":    cm.Message.MerkleRootHash,
 	}
 
-	blsVerificationPart, err := BlsVerificationABIType.Encode([2]interface{}{cm.PublicKeys, cm.AggSignature.Bitmap})
+	blsVerificationPart, err := precompiled.BlsVerificationABIType.Encode(
+		[2]interface{}{cm.PublicKeys, cm.AggSignature.Bitmap})
 	if err != nil {
 		return nil, err
 	}
@@ -345,7 +342,7 @@ func (cm *CommitmentMessageSigned) DecodeAbi(txData []byte) error {
 		return fmt.Errorf("invalid commitment data. Could not find bls verification part")
 	}
 
-	decoded, err := BlsVerificationABIType.Decode(blsVerificationPart)
+	decoded, err := precompiled.BlsVerificationABIType.Decode(blsVerificationPart)
 	if err != nil {
 		return err
 	}

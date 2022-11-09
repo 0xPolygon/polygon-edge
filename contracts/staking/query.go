@@ -22,7 +22,7 @@ var (
 	AddrStakingContract = types.StringToAddress("1001")
 
 	// Gas limit used when querying the validator set
-	queryGasLimit uint64 = 100000
+	queryGasLimit uint64 = 1000000
 
 	ErrMethodNotFoundInABI = errors.New("method not found in ABI")
 	ErrFailedTypeAssertion = errors.New("failed type assertion")

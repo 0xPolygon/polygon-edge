@@ -7,6 +7,7 @@ import (
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestAccountSet_GetAddresses(t *testing.T) {
@@ -158,4 +159,26 @@ func TestAccountSet_ApplyDelta(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestAccountSet_Hash(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Hash non-empty account set", func(t *testing.T) {
+		t.Parallel()
+
+		v := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
+		hash, err := v.getPublicIdentities().Hash()
+		require.NoError(t, err)
+		require.NotEqual(t, types.ZeroHash, hash)
+	})
+
+	t.Run("Hash empty account set", func(t *testing.T) {
+		t.Parallel()
+
+		empty := AccountSet{}
+		hash, err := empty.Hash()
+		require.NoError(t, err)
+		require.NotEqual(t, types.ZeroHash, hash)
+	})
 }

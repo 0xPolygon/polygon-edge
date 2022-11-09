@@ -88,7 +88,7 @@ func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
 			Alloc:      alloc,
 			ExtraData:  generateExtraDataPolyBft(validatorsInfo),
 			GasUsed:    command.DefaultGenesisGasUsed,
-			Mixhash:    polybft.PolyMixDigest,
+			Mixhash:    polybft.PolyBFTMixDigest,
 		},
 		Params: &chain.Params{
 			ChainID: int(p.chainID),

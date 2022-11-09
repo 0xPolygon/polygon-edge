@@ -1,6 +1,7 @@
 package polybft
 
 import (
+	"bytes"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
@@ -8,6 +9,7 @@ import (
 	"math/big"
 	"sort"
 
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	bolt "go.etcd.io/bbolt"
 
@@ -18,7 +20,7 @@ import (
 /*
 The client has a boltDB backed state store. The schema as of looks as follows:
 
-events/
+state sync events/
 |--> stateSyncEvent.Id -> *StateSyncEvent (json marshalled)
 
 commitments/
@@ -33,11 +35,16 @@ epochs/
 
 validatorSnapshots/
 |--> epochNumber -> *AccountSet (json marshalled)
+
+exit events/
+|--> (id+epoch+blockNumber) -> *ExitEvent (json marshalled)
 */
 
 var (
 	// ABI
-	stateTransferEvent = abi.MustNewEvent("event StateSynced(uint256 indexed id, address indexed sender, address indexed receiver, bytes data)") //nolint:lll
+	stateTransferEventABI = abi.MustNewEvent("event StateSynced(uint256 indexed id, address indexed sender, address indexed receiver, bytes data)")   //nolint:lll
+	exitEventABI          = abi.MustNewEvent("event L2StateSynced(uint256 indexed id, address indexed sender, address indexed receiver, bytes data)") //nolint:lll
+	exitEventABIType      = abi.MustNewType("tuple(uint256 id, address sender, address receiver, bytes data)")
 )
 
 const (
@@ -54,6 +61,17 @@ const (
 	stateSyncBundleSize = 5
 )
 
+type exitEventNotFoundError struct {
+	exitID          uint64
+	epoch           uint64
+	checkpointBlock uint64
+}
+
+func (e *exitEventNotFoundError) Error() string {
+	return fmt.Sprintf("could not find any exit event that has an id: %v, added in block: %v and epoch: %v",
+		e.exitID, e.checkpointBlock, e.epoch)
+}
+
 // StateSyncEvent is a bridge event from the rootchain
 type StateSyncEvent struct {
 	// ID is the decoded 'index' field from the event
@@ -66,8 +84,6 @@ type StateSyncEvent struct {
 	Data []byte
 	// Skip is the decoded 'skip' field from the event
 	Skip bool
-	// Log contains raw data about smart contract event execution
-	Log *ethgo.Log
 }
 
 // newStateSyncEvent creates an instance of pending state sync event.
@@ -75,48 +91,130 @@ func newStateSyncEvent(
 	id uint64,
 	sender ethgo.Address,
 	target ethgo.Address,
-	data []byte, log *ethgo.Log,
+	data []byte,
 ) *StateSyncEvent {
 	return &StateSyncEvent{
 		ID:       id,
 		Sender:   sender,
 		Receiver: target,
 		Data:     data,
-		Log:      log,
 	}
-}
-
-func decodeEvent(log *ethgo.Log) (*StateSyncEvent, error) {
-	raw, err := stateTransferEvent.ParseLog(log)
-	if err != nil {
-		return nil, err
-	}
-
-	id, ok := raw["id"].(*big.Int)
-	if !ok {
-		return nil, fmt.Errorf("failed to decode id field of log: %+v", log)
-	}
-
-	sender, ok := raw["sender"].(ethgo.Address)
-	if !ok {
-		return nil, fmt.Errorf("failed to decode sender field of log: %+v", log)
-	}
-
-	target, ok := raw["receiver"].(ethgo.Address)
-	if !ok {
-		return nil, fmt.Errorf("failed to decode target field of log: %+v", log)
-	}
-
-	data, ok := raw["data"].([]byte)
-	if !ok {
-		return nil, fmt.Errorf("failed to decode data field of log: %+v", log)
-	}
-
-	return newStateSyncEvent(id.Uint64(), sender, target, data, log), nil
 }
 
 func (s *StateSyncEvent) String() string {
 	return fmt.Sprintf("Id=%d, Sender=%v, Target=%v", s.ID, s.Sender, s.Receiver)
+}
+
+func decodeStateSyncEvent(log *ethgo.Log) (*StateSyncEvent, error) {
+	raw, err := stateTransferEventABI.ParseLog(log)
+	if err != nil {
+		return nil, err
+	}
+
+	eventGeneric, err := decodeEventData(raw, log,
+		func(id *big.Int, sender, receiver ethgo.Address, data []byte) interface{} {
+			return newStateSyncEvent(id.Uint64(), sender, receiver, data)
+		})
+	if err != nil {
+		return nil, err
+	}
+
+	stateSyncEvent, ok := eventGeneric.(*StateSyncEvent)
+	if !ok {
+		return nil, errors.New("failed to convert event to StateSyncEvent instance")
+	}
+
+	return stateSyncEvent, nil
+}
+
+func decodeExitEvent(log *ethgo.Log, epoch, block uint64) (*ExitEvent, error) {
+	if !exitEventABI.Match(log) {
+		// valid case, not an exit event
+		return nil, nil
+	}
+
+	raw, err := exitEventABI.Inputs.ParseLog(log)
+	if err != nil {
+		return nil, err
+	}
+
+	eventGeneric, err := decodeEventData(raw, log,
+		func(id *big.Int, sender, receiver ethgo.Address, data []byte) interface{} {
+			return &ExitEvent{ID: id.Uint64(),
+				Sender:      sender,
+				Receiver:    receiver,
+				Data:        data,
+				EpochNumber: epoch,
+				BlockNumber: block}
+		})
+	if err != nil {
+		return nil, err
+	}
+
+	exitEvent, ok := eventGeneric.(*ExitEvent)
+	if !ok {
+		return nil, errors.New("failed to convert event to ExitEvent instance")
+	}
+
+	return exitEvent, err
+}
+
+// decodeEventData decodes provided map of event metadata and
+// creates a generic instance which is returned by eventCreator callback
+func decodeEventData(eventDataMap map[string]interface{}, log *ethgo.Log,
+	eventCreator func(*big.Int, ethgo.Address, ethgo.Address, []byte) interface{}) (interface{}, error) {
+	id, ok := eventDataMap["id"].(*big.Int)
+	if !ok {
+		return nil, fmt.Errorf("failed to decode id field of log: %+v", log)
+	}
+
+	sender, ok := eventDataMap["sender"].(ethgo.Address)
+	if !ok {
+		return nil, fmt.Errorf("failed to decode sender field of log: %+v", log)
+	}
+
+	receiver, ok := eventDataMap["receiver"].(ethgo.Address)
+	if !ok {
+		return nil, fmt.Errorf("failed to decode receiver field of log: %+v", log)
+	}
+
+	data, ok := eventDataMap["data"].([]byte)
+	if !ok {
+		return nil, fmt.Errorf("failed to decode data field of log: %+v", log)
+	}
+
+	return eventCreator(id, sender, receiver, data), nil
+}
+
+// convertLog converts types.Log to ethgo.Log
+func convertLog(log *types.Log) *ethgo.Log {
+	l := &ethgo.Log{
+		Address: ethgo.Address(log.Address),
+		Data:    log.Data,
+		Topics:  make([]ethgo.Hash, len(log.Topics)),
+	}
+
+	for i, topic := range log.Topics {
+		l.Topics[i] = ethgo.Hash(topic)
+	}
+
+	return l
+}
+
+// ExitEvent is an event emitted by Exit contract
+type ExitEvent struct {
+	// ID is the decoded 'index' field from the event
+	ID uint64 `abi:"id"`
+	// Sender is the decoded 'sender' field from the event
+	Sender ethgo.Address `abi:"sender"`
+	// Receiver is the decoded 'receiver' field from the event
+	Receiver ethgo.Address `abi:"receiver"`
+	// Data is the decoded 'data' field from the event
+	Data []byte `abi:"data"`
+	// EpochNumber is the epoch number in which exit event was added
+	EpochNumber uint64 `abi:"-"`
+	// BlockNumber is the block in which exit event was added
+	BlockNumber uint64 `abi:"-"`
 }
 
 // MessageSignature encapsulates sender identifier and its signature
@@ -141,7 +239,9 @@ type TransportMessage struct {
 
 var (
 	// bucket to store rootchain bridge events
-	syncStateEventsBucket = []byte("events")
+	syncStateEventsBucket = []byte("stateSyncEvents")
+	// bucket to store exit contract events
+	exitEventsBucket = []byte("exitEvent")
 	// bucket to store commitments
 	commitmentsBucket = []byte("commitments")
 	// bucket to store bundles
@@ -153,12 +253,14 @@ var (
 	// bucket to store validator snapshots
 	validatorSnapshotsBucket = []byte("validatorSnapshots")
 	// array of all parent buckets
-	parentBuckets = [][]byte{syncStateEventsBucket, commitmentsBucket, bundlesBucket,
+	parentBuckets = [][]byte{syncStateEventsBucket, exitEventsBucket, commitmentsBucket, bundlesBucket,
 		epochsBucket, validatorSnapshotsBucket}
-	// ErrNotEnoughStateSyncs error message
-	ErrNotEnoughStateSyncs = errors.New("there is either a gap or not enough sync events")
-	// ErrCommitmentNotBuilt error message
-	ErrCommitmentNotBuilt = errors.New("there is no built commitment to register")
+	// errNotEnoughStateSyncs error message
+	errNotEnoughStateSyncs = errors.New("there is either a gap or not enough sync events")
+	// errCommitmentNotBuilt error message
+	errCommitmentNotBuilt = errors.New("there is no built commitment to register")
+	// errNotAnExitEvent error message
+	errNotAnExitEvent = errors.New("log not an exit event")
 )
 
 // State represents a persistence layer which persists consensus data off-chain
@@ -255,6 +357,106 @@ func (s *State) list() ([]*StateSyncEvent, error) {
 	return events, nil
 }
 
+// insertExitEvents inserts a slice of exit events to exit event bucket in bolt db
+func (s *State) insertExitEvents(exitEvents []*ExitEvent) error {
+	return s.db.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(exitEventsBucket)
+		for i := 0; i < len(exitEvents); i++ {
+			if err := insertExitEventToBucket(bucket, exitEvents[i]); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+}
+
+// insertExitEvent inserts a new exit event to exit event bucket in bolt db
+func (s *State) insertExitEvent(event *ExitEvent) error {
+	return s.db.Update(func(tx *bolt.Tx) error {
+		return insertExitEventToBucket(tx.Bucket(exitEventsBucket), event)
+	})
+}
+
+// insertExitEventToBucket inserts exit event to exit event bucket
+func insertExitEventToBucket(bucket *bolt.Bucket, exitEvent *ExitEvent) error {
+	raw, err := json.Marshal(exitEvent)
+	if err != nil {
+		return err
+	}
+
+	return bucket.Put(bytes.Join([][]byte{itob(exitEvent.EpochNumber),
+		itob(exitEvent.ID), itob(exitEvent.BlockNumber)}, nil), raw)
+}
+
+// getExitEvent returns exit event with given id, which happened in given epoch and given block number
+func (s *State) getExitEvent(exitEventID, epoch, checkpointBlockNumber uint64) (*ExitEvent, error) {
+	var exitEvent *ExitEvent
+
+	err := s.db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(exitEventsBucket)
+
+		key := bytes.Join([][]byte{itob(epoch), itob(exitEventID), itob(checkpointBlockNumber)}, nil)
+		v := bucket.Get(key)
+		if v == nil {
+			return &exitEventNotFoundError{
+				exitID:          exitEventID,
+				checkpointBlock: checkpointBlockNumber,
+				epoch:           epoch,
+			}
+		}
+
+		return json.Unmarshal(v, &exitEvent)
+	})
+
+	return exitEvent, err
+}
+
+// getExitEventsByEpoch returns all exit events that happened in the given epoch
+func (s *State) getExitEventsByEpoch(epoch uint64) ([]*ExitEvent, error) {
+	return s.getExitEvents(epoch, func(exitEvent *ExitEvent) bool {
+		return exitEvent.EpochNumber == epoch
+	})
+}
+
+// getExitEventsForProof returns all exit events that happened in and prior to the given checkpoint block number
+// with respect to the epoch in which block is added
+func (s *State) getExitEventsForProof(epoch, checkpointBlock uint64) ([]*ExitEvent, error) {
+	return s.getExitEvents(epoch, func(exitEvent *ExitEvent) bool {
+		return exitEvent.EpochNumber == epoch && exitEvent.BlockNumber <= checkpointBlock
+	})
+}
+
+// getExitEvents returns exit events for given epoch and provided filter
+func (s *State) getExitEvents(epoch uint64, filter func(exitEvent *ExitEvent) bool) ([]*ExitEvent, error) {
+	var events []*ExitEvent
+
+	err := s.db.View(func(tx *bolt.Tx) error {
+		c := tx.Bucket(exitEventsBucket).Cursor()
+		prefix := itob(epoch)
+
+		for k, v := c.Seek(prefix); bytes.HasPrefix(k, prefix); k, v = c.Next() {
+			var event *ExitEvent
+			if err := json.Unmarshal(v, &event); err != nil {
+				return err
+			}
+
+			if filter(event) {
+				events = append(events, event)
+			}
+		}
+
+		return nil
+	})
+
+	// enforce sequential order
+	sort.Slice(events, func(i, j int) bool {
+		return events[i].ID < events[j].ID
+	})
+
+	return events, err
+}
+
 // insertStateSyncEvent inserts a new state sync event to state event bucket in db
 func (s *State) insertStateSyncEvent(event *StateSyncEvent) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
@@ -279,7 +481,7 @@ func (s *State) getStateSyncEventsForCommitment(fromIndex, toIndex uint64) ([]*S
 		for i := fromIndex; i <= toIndex; i++ {
 			v := bucket.Get(itob(i))
 			if v == nil {
-				return ErrNotEnoughStateSyncs
+				return errNotEnoughStateSyncs
 			}
 
 			var event *StateSyncEvent

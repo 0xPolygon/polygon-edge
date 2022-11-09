@@ -44,11 +44,6 @@ func GetDefAccount() types.Address {
 	return types.BytesToAddress(defKey.Address().Bytes())
 }
 
-// GetDefKey returns rootchain admin account
-func GetDefKey() *wallet.Key {
-	return defKey
-}
-
 // SendTxn function sends transaction to the rootchain
 // blocks until receipt hash is returned
 func SendTxn(nonce uint64, txn *ethgo.Transaction) (*ethgo.Receipt, error) {
@@ -87,6 +82,24 @@ func SendTxn(nonce uint64, txn *ethgo.Transaction) (*ethgo.Receipt, error) {
 	}
 
 	return receipt, nil
+}
+
+// Call function is used to query a smart contract on given 'to' address
+func Call(from, to ethgo.Address, input []byte) (string, error) {
+	provider, err := getJSONRPCClient()
+	if err != nil {
+		return "", err
+	}
+
+	callMsg := &ethgo.CallMsg{
+		From:     from,
+		To:       &to,
+		Data:     input,
+		GasPrice: defaultGasPrice,
+		Gas:      big.NewInt(defaultGasLimit),
+	}
+
+	return provider.Eth().Call(callMsg, ethgo.Pending)
 }
 
 func ExistsCode(addr types.Address) (bool, error) {

@@ -151,7 +151,7 @@ func TestConsensusRuntime_AddLog(t *testing.T) {
 		config: &runtimeConfig{Key: createTestKey(t)},
 	}
 	topics := make([]ethgo.Hash, 4)
-	topics[0] = stateTransferEvent.ID()
+	topics[0] = stateTransferEventABI.ID()
 	topics[1] = ethgo.BytesToHash([]byte{0x1})
 	topics[2] = ethgo.BytesToHash(runtime.config.Key.Address().Bytes())
 	topics[3] = ethgo.BytesToHash(contracts.NativeTokenContract[:])
@@ -168,7 +168,7 @@ func TestConsensusRuntime_AddLog(t *testing.T) {
 		Topics:          topics,
 		Data:            encodedData,
 	}
-	event, err := decodeEvent(log)
+	event, err := decodeStateSyncEvent(log)
 	require.NoError(t, err)
 	runtime.AddLog(log)
 
@@ -476,7 +476,7 @@ func TestConsensusRuntime_NotifyProposalInserted_EndOfEpoch(t *testing.T) {
 			Number: currentEpochNumber,
 		},
 	}
-	runtime.NotifyProposalInserted(builtBlock)
+	runtime.NotifyProposalInserted(builtBlock.Block.Header)
 
 	require.True(t, runtime.state.isEpochInserted(currentEpochNumber+1))
 	require.Equal(t, newEpochNumber, runtime.epoch.Number)
@@ -505,7 +505,7 @@ func TestConsensusRuntime_NotifyProposalInserted_MiddleOfEpoch(t *testing.T) {
 			PolyBFTConfig: &PolyBFTConfig{EpochSize: epochSize},
 			blockchain:    new(blockchainMock)},
 	}
-	runtime.NotifyProposalInserted(builtBlock)
+	runtime.NotifyProposalInserted(builtBlock.Block.Header)
 
 	require.Equal(t, header.Number, runtime.lastBuiltBlock.Number)
 }
@@ -535,6 +535,8 @@ func TestConsensusRuntime_FSM_NotInValidatorSet(t *testing.T) {
 func TestConsensusRuntime_FSM_NotEndOfEpoch_NotEndOfSprint(t *testing.T) {
 	t.Parallel()
 
+	state := newTestState(t)
+
 	lastBlock := &types.Header{Number: 1}
 	validators := newTestValidators(3)
 	blockchainMock := new(blockchainMock)
@@ -556,6 +558,7 @@ func TestConsensusRuntime_FSM_NotEndOfEpoch_NotEndOfSprint(t *testing.T) {
 			Validators: validators.getPublicIdentities(),
 		},
 		lastBuiltBlock: lastBlock,
+		state:          state,
 	}
 
 	fsm, err := runtime.FSM()
@@ -824,6 +827,7 @@ func Test_NewConsensusRuntime(t *testing.T) {
 		ValidatorSetAddr: types.Address{0x11},
 		EpochSize:        10,
 		SprintSize:       10,
+		BlockTime:        2 * time.Second,
 	}
 
 	key := createTestKey(t)
@@ -1592,14 +1596,17 @@ func TestConsensusRuntime_FSM_EndOfEpoch_PostHook(t *testing.T) {
 	}
 
 	runtime := &consensusRuntime{
-		logger:         hclog.NewNullLogger(),
-		state:          state,
-		epoch:          metadata,
-		config:         config,
-		lastBuiltBlock: lastBuiltBlock,
+		logger:            hclog.NewNullLogger(),
+		state:             state,
+		epoch:             metadata,
+		config:            config,
+		lastBuiltBlock:    lastBuiltBlock,
+		checkpointManager: newCheckpointManager(types.StringToAddress("3"), 5, nil, nil, nil),
 	}
 
 	fsm, err := runtime.FSM()
+	fsm.roundInfo = &pbft.RoundInfo{}
+
 	assert.NoError(t, err)
 	assert.NotNil(t, fsm.proposerCommitmentToRegister)
 	assert.Equal(t, fromIndex, fsm.proposerCommitmentToRegister.Message.FromIndex)
@@ -1614,8 +1621,12 @@ func TestConsensusRuntime_FSM_EndOfEpoch_PostHook(t *testing.T) {
 	// we add this for NotifyProposalInserted,
 	// and we are adding first block so we do not need to mock the restart epoch on block insert
 	// since we only care if the commitment data gets saved in db on postHook
+	extra := &Extra{}
 	fsm.block = &StateBlock{Block: consensus.BuildBlock(consensus.BuildBlockParams{
-		Header: &types.Header{Number: 1},
+		Header: &types.Header{
+			Number:    1,
+			ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...),
+		},
 	})}
 
 	// we registered commitment in fsm
@@ -1637,6 +1648,113 @@ func TestConsensusRuntime_FSM_EndOfEpoch_PostHook(t *testing.T) {
 
 	systemStateMock.AssertExpectations(t)
 	blockchainMock.AssertExpectations(t)
+}
+
+func TestConsensusRuntime_getExitEventRootHash(t *testing.T) {
+	t.Parallel()
+
+	const (
+		numOfBlocks         = 10
+		numOfEventsPerBlock = 2
+	)
+
+	state := newTestState(t)
+	runtime := &consensusRuntime{
+		state: state,
+	}
+
+	encodedEvents := setupExitEventsForProofVerification(t, state, numOfBlocks, numOfEventsPerBlock)
+
+	t.Run("Get exit event root hash", func(t *testing.T) {
+		t.Parallel()
+
+		tree, err := NewMerkleTree(encodedEvents)
+		require.NoError(t, err)
+
+		hash, err := runtime.BuildEventRoot(1, nil)
+		require.NoError(t, err)
+		require.Equal(t, tree.Hash(), hash)
+	})
+
+	t.Run("Get exit event root hash - no events", func(t *testing.T) {
+		t.Parallel()
+
+		hash, err := runtime.BuildEventRoot(2, nil)
+		require.NoError(t, err)
+		require.Equal(t, types.Hash{}, hash)
+	})
+}
+
+func TestConsensusRuntime_GenerateExitProof(t *testing.T) {
+	t.Parallel()
+
+	const (
+		numOfBlocks         = 10
+		numOfEventsPerBlock = 2
+	)
+
+	state := newTestState(t)
+	runtime := &consensusRuntime{
+		state: state,
+	}
+
+	encodedEvents := setupExitEventsForProofVerification(t, state, numOfBlocks, numOfEventsPerBlock)
+	checkpointEvents := encodedEvents[:numOfEventsPerBlock]
+
+	// manually create merkle tree for a desired checkpoint to verify the generated proof
+	tree, err := NewMerkleTree(checkpointEvents)
+	require.NoError(t, err)
+
+	proof, err := runtime.GenerateExitProof(1, 1, 1)
+	require.NoError(t, err)
+	require.NotNil(t, proof)
+
+	t.Run("Generate and validate exit proof", func(t *testing.T) {
+		t.Parallel()
+		// verify generated proof on desired tree
+		require.NoError(t, VerifyProof(1, encodedEvents[1], proof, tree.Hash()))
+	})
+
+	t.Run("Generate and validate exit proof - invalid proof", func(t *testing.T) {
+		t.Parallel()
+
+		invalidProof := proof
+		invalidProof[0][0]++
+
+		// verify generated proof on desired tree
+		require.ErrorContains(t, VerifyProof(1, encodedEvents[1], invalidProof, tree.Hash()), "not a member of merkle tree")
+	})
+
+	t.Run("Generate exit proof - no event", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := runtime.GenerateExitProof(21, 1, 1)
+		require.ErrorContains(t, err, "could not find any exit event that has an id")
+	})
+}
+
+func setupExitEventsForProofVerification(t *testing.T, state *State,
+	numOfBlocks, numOfEventsPerBlock uint64) [][]byte {
+	t.Helper()
+
+	encodedEvents := make([][]byte, numOfBlocks*numOfEventsPerBlock)
+	index := uint64(0)
+
+	for i := uint64(1); i <= numOfBlocks; i++ {
+		for j := uint64(1); j <= numOfEventsPerBlock; j++ {
+			e := &ExitEvent{index, ethgo.ZeroAddress, ethgo.ZeroAddress, []byte{0, 1}, 1, i}
+			require.NoError(t, state.insertExitEvent(e))
+
+			b, err := exitEventABIType.Encode(e)
+
+			require.NoError(t, err)
+
+			encodedEvents[index] = b
+			index++
+		}
+	}
+
+	return encodedEvents
 }
 
 func createTestTransportMessage(t *testing.T, hash []byte, epochNumber uint64, key *wallet.Key) *TransportMessage {
@@ -1671,9 +1789,10 @@ func createTestBlocksForUptime(t *testing.T, numberOfBlocks uint64,
 	headerMap := &testHeadersMap{}
 	bitmaps := createTestBitmapsForUptime(t, validatorSet, numberOfBlocks)
 
+	extra := &Extra{}
 	genesisBlock := &types.Header{
 		Number:    0,
-		ExtraData: []byte{},
+		ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...),
 	}
 	parentHash := types.BytesToHash(big.NewInt(0).Bytes())
 

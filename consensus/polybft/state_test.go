@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
+	"github.com/umbracle/ethgo/abi"
 )
 
 func newTestState(t *testing.T) *State {
@@ -45,7 +46,7 @@ func TestState_InsertEvent(t *testing.T) {
 	t.Parallel()
 
 	state := newTestState(t)
-	evnt1 := newStateSyncEvent(0, ethgo.Address{}, ethgo.Address{}, nil, nil)
+	evnt1 := newStateSyncEvent(0, ethgo.Address{}, ethgo.Address{}, nil)
 	err := state.insertStateSyncEvent(evnt1)
 	assert.NoError(t, err)
 
@@ -242,7 +243,7 @@ func TestState_getStateSyncEventsForCommitment_NotEnoughEvents(t *testing.T) {
 	}
 
 	_, err := state.getStateSyncEventsForCommitment(0, stateSyncMainBundleSize-1)
-	assert.ErrorIs(t, err, ErrNotEnoughStateSyncs)
+	assert.ErrorIs(t, err, errNotEnoughStateSyncs)
 }
 
 func TestState_getStateSyncEventsForCommitment(t *testing.T) {
@@ -349,6 +350,144 @@ func TestState_insertAndGetBundles(t *testing.T) {
 	assert.Equal(t, uint64(0), bundlesFromDB[0].ID())
 	assert.Equal(t, stateSyncBundleSize, len(bundlesFromDB[0].StateSyncs))
 	assert.NotNil(t, bundlesFromDB[0].Proof)
+}
+
+func TestState_Insert_And_Get_ExitEvents_PerEpoch(t *testing.T) {
+	const (
+		numOfEpochs         = 11
+		numOfBlocksPerEpoch = 10
+		numOfEventsPerBlock = 11
+	)
+
+	state := newTestState(t)
+	insertTestExitEvents(t, state, numOfEpochs, numOfBlocksPerEpoch, numOfEventsPerBlock)
+
+	t.Run("Get events for existing epoch", func(t *testing.T) {
+		events, err := state.getExitEventsByEpoch(1)
+
+		assert.NoError(t, err)
+		assert.Len(t, events, numOfBlocksPerEpoch*numOfEventsPerBlock)
+	})
+
+	t.Run("Get events for non-existing epoch", func(t *testing.T) {
+		events, err := state.getExitEventsByEpoch(12)
+
+		assert.NoError(t, err)
+		assert.Len(t, events, 0)
+	})
+}
+
+func TestState_Insert_And_Get_ExitEvents_ForProof(t *testing.T) {
+	const (
+		numOfEpochs         = 11
+		numOfBlocksPerEpoch = 10
+		numOfEventsPerBlock = 10
+	)
+
+	state := newTestState(t)
+	insertTestExitEvents(t, state, numOfEpochs, numOfBlocksPerEpoch, numOfEventsPerBlock)
+
+	var cases = []struct {
+		epoch                  uint64
+		checkpointBlockNumber  uint64
+		expectedNumberOfEvents int
+	}{
+		{1, 1, 10},
+		{1, 2, 20},
+		{1, 8, 80},
+		{2, 12, 20},
+		{2, 14, 40},
+		{3, 26, 60},
+		{4, 38, 80},
+		{11, 105, 50},
+	}
+
+	for _, c := range cases {
+		events, err := state.getExitEventsForProof(c.epoch, c.checkpointBlockNumber)
+
+		assert.NoError(t, err)
+		assert.Len(t, events, c.expectedNumberOfEvents)
+	}
+}
+
+func TestState_Insert_And_Get_ExitEvents_ForProof_NoEvents(t *testing.T) {
+	state := newTestState(t)
+	insertTestExitEvents(t, state, 1, 10, 1)
+
+	events, err := state.getExitEventsForProof(2, 11)
+
+	assert.NoError(t, err)
+	assert.Nil(t, events)
+}
+
+func TestState_decodeExitEvent(t *testing.T) {
+	t.Parallel()
+
+	const (
+		exitID      = 1
+		epoch       = 1
+		blockNumber = 10
+	)
+
+	state := newTestState(t)
+
+	topics := make([]ethgo.Hash, 4)
+	topics[0] = exitEventABI.ID()
+	topics[1] = ethgo.BytesToHash([]byte{exitID})
+	topics[2] = ethgo.BytesToHash(ethgo.HexToAddress("0x1111").Bytes())
+	topics[3] = ethgo.BytesToHash(ethgo.HexToAddress("0x2222").Bytes())
+	personType := abi.MustNewType("tuple(string firstName, string lastName)")
+	encodedData, err := personType.Encode(map[string]string{"firstName": "John", "lastName": "Doe"})
+	require.NoError(t, err)
+
+	log := &ethgo.Log{
+		Address: ethgo.ZeroAddress,
+		Topics:  topics,
+		Data:    encodedData,
+	}
+
+	event, err := decodeExitEvent(log, epoch, blockNumber)
+	require.NoError(t, err)
+	require.Equal(t, uint64(exitID), event.ID)
+	require.Equal(t, uint64(epoch), event.EpochNumber)
+	require.Equal(t, uint64(blockNumber), event.BlockNumber)
+
+	require.NoError(t, state.insertExitEvent(event))
+}
+
+func TestState_decodeExitEvent_NotAnExitEvent(t *testing.T) {
+	t.Parallel()
+
+	topics := make([]ethgo.Hash, 4)
+	topics[0] = stateTransferEventABI.ID()
+
+	log := &ethgo.Log{
+		Address: ethgo.ZeroAddress,
+		Topics:  topics,
+	}
+
+	event, err := decodeExitEvent(log, 1, 1)
+	require.NoError(t, err)
+	require.Nil(t, event)
+}
+
+func insertTestExitEvents(t *testing.T, state *State,
+	numOfEpochs, numOfBlocksPerEpoch, numOfEventsPerBlock int) {
+	t.Helper()
+
+	index, block := uint64(1), uint64(1)
+
+	for i := uint64(1); i <= uint64(numOfEpochs); i++ {
+		for j := 1; j <= numOfBlocksPerEpoch; j++ {
+			for k := 1; k <= numOfEventsPerBlock; k++ {
+				event := &ExitEvent{index, ethgo.HexToAddress("0x101"), ethgo.HexToAddress("0x102"), []byte{11, 22}, i, block}
+				assert.NoError(t, state.insertExitEvent(event))
+
+				index++
+			}
+			block++
+		}
+	}
 }
 
 func insertTestCommitments(t *testing.T, state *State, epoch, numberOfCommitments uint64) {

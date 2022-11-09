@@ -50,6 +50,14 @@ type txPoolInterface interface {
 	ResetWithHeaders(...*types.Header)
 }
 
+// checkpointBackend is an interface providing functions for working with checkpoints and exit evens
+type checkpointBackend interface {
+	// BuildEventRoot generates an event root hash from exit events in given epoch
+	BuildEventRoot(epoch uint64, nonCommittedExitEvents []*ExitEvent) (types.Hash, error)
+	// InsertExitEvents inserts provided exit events to persistence storage
+	InsertExitEvents(exitEvents []*ExitEvent) error
+}
+
 // epochMetadata is the static info for epoch currently being processed
 type epochMetadata struct {
 	// Number is the number of the epoch
@@ -109,6 +117,10 @@ type consensusRuntime struct {
 	// activeValidatorFlag indicates whether the given node is amongst currently active validator set
 	activeValidatorFlag uint32
 
+	// checkpointManager represents abstraction for checkpoint submission
+	checkpointManager *checkpointManager
+
+	// logger instance
 	logger hcf.Logger
 }
 
@@ -118,6 +130,15 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) *consensusRuntim
 		state:  config.State,
 		config: config,
 		logger: log.Named("consensus_runtime"),
+	}
+
+	if runtime.IsBridgeEnabled() {
+		runtime.checkpointManager = newCheckpointManager(
+			types.Address(config.Key.Address()),
+			defaultCheckpointsOffset,
+			&defaultRootchainInteractor{},
+			config.blockchain,
+			config.polybftBackend)
 	}
 
 	return runtime
@@ -156,7 +177,7 @@ func (c *consensusRuntime) AddLog(eventLog *ethgo.Log) {
 		"index", eventLog.LogIndex,
 	)
 
-	event, err := decodeEvent(eventLog)
+	event, err := decodeStateSyncEvent(eventLog)
 	if err != nil {
 		c.logger.Error("failed to decode state sync event", "hash", eventLog.TransactionHash, "err", err)
 
@@ -218,7 +239,7 @@ func (c *consensusRuntime) populateFsmIfBridgeEnabled(
 	if isEndOfEpoch {
 		commitment, err := c.getCommitmentToRegister(epoch, nextRegisteredCommitmentIndex)
 		if err != nil {
-			if errors.Is(err, ErrCommitmentNotBuilt) {
+			if errors.Is(err, errCommitmentNotBuilt) {
 				c.logger.Debug(
 					"[FSM] Have no built commitment to register",
 					"epoch", epoch.Number,
@@ -288,15 +309,17 @@ func (c *consensusRuntime) FSM() error {
 	isEndOfEpoch := c.isEndOfEpoch(pendingBlockNumber)
 
 	ff := &fsm{
-		config:         c.config.PolyBFTConfig,
-		parent:         parent,
-		backend:        c.config.blockchain,
-		polybftBackend: c.config.polybftBackend,
-		blockBuilder:   blockBuilder,
-		validators:     newValidatorSet(types.BytesToAddress(parent.Miner), epoch.Validators),
-		isEndOfEpoch:   isEndOfEpoch,
-		isEndOfSprint:  isEndOfSprint,
-		logger:         c.logger.Named("fsm"),
+		config:            c.config.PolyBFTConfig,
+		parent:            parent,
+		backend:           c.config.blockchain,
+		polybftBackend:    c.config.polybftBackend,
+		checkpointBackend: c,
+		epochNumber:       epoch.Number,
+		blockBuilder:      blockBuilder,
+		validators:        newValidatorSet(types.BytesToAddress(parent.Miner), epoch.Validators),
+		isEndOfEpoch:      isEndOfEpoch,
+		isEndOfSprint:     isEndOfSprint,
+		logger:            c.logger.Named("fsm"),
 	}
 
 	if c.IsBridgeEnabled() {
@@ -346,24 +369,6 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) error {
 		}
 	}
 
-	/*
-		// We will uncomment this once we have the clear PoC for the checkpoint
-		lastCheckpoint := uint64(0)
-
-		// get the blocks that should be signed for this checkpoint period
-		blocks := []*types.Block{}
-
-		epochSize := c.config.Config.PolyBFT.Epoch
-		for i := lastCheckpoint * epochSize; i < epoch*epochSize; i++ {
-			block := c.config.Blockchain.GetBlockByNumber(i)
-			if block == nil {
-				panic("block not found")
-			} else {
-				blocks = append(blocks, block)
-			}
-		}
-	*/
-
 	validatorSet, err := c.config.polybftBackend.GetValidators(header.Number, nil)
 	if err != nil {
 		return err
@@ -404,17 +409,7 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) error {
 	c.lastBuiltBlock = header
 	c.lock.Unlock()
 
-	err = c.runCheckpoint(epoch)
-	if err != nil {
-		return fmt.Errorf("could not run checkpoint: %w", err)
-	}
-
-	c.logger.Info(
-		"restartEpoch",
-		"block number", header.Number,
-		"epoch", epochNumber,
-		"validators", validatorSet.Len(),
-	)
+	c.logger.Info("restartEpoch", "block number", header.Number, "epoch", epochNumber, "validators", validatorSet.Len())
 
 	return nil
 }
@@ -426,12 +421,9 @@ func (c *consensusRuntime) buildCommitment(epoch, fromIndex uint64) (*Commitment
 	// if it is not already built in the previous epoch
 	stateSyncEvents, err := c.state.getStateSyncEventsForCommitment(fromIndex, toIndex)
 	if err != nil {
-		if errors.Is(err, ErrNotEnoughStateSyncs) {
-			c.logger.Debug(
-				"[buildCommitment] Not enough state syncs to build a commitment",
-				"epoch", epoch,
-				"from state sync index", fromIndex,
-			)
+		if errors.Is(err, errNotEnoughStateSyncs) {
+			c.logger.Debug("[buildCommitment] Not enough state syncs to build a commitment",
+				"epoch", epoch, "from state sync index", fromIndex)
 			// this is a valid case, there is not enough state syncs
 			return nil, nil
 		}
@@ -663,11 +655,6 @@ func (c *consensusRuntime) deliverMessage(msg *TransportMessage) (bool, error) {
 	return true, nil
 }
 
-func (c *consensusRuntime) runCheckpoint(epoch *epochMetadata) error {
-	// TODO: Implement checkpoint
-	return nil
-}
-
 // calculateUptime calculates uptime for blocks starting from the last built block in current epoch,
 // and ending at the last block of previous epoch
 func (c *consensusRuntime) calculateUptime(currentBlock *types.Header, epoch *epochMetadata) (*CommitEpoch, error) {
@@ -773,6 +760,56 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header, epoch *ep
 	return commitEpoch, nil
 }
 
+// InsertExitEvents is an implementation of checkpointBackend interface
+func (c *consensusRuntime) InsertExitEvents(exitEvents []*ExitEvent) error {
+	return c.state.insertExitEvents(exitEvents)
+}
+
+// BuildEventRoot is an implementation of checkpointBackend interface
+func (c *consensusRuntime) BuildEventRoot(epoch uint64, nonCommittedExitEvents []*ExitEvent) (types.Hash, error) {
+	exitEvents, err := c.state.getExitEventsByEpoch(epoch)
+	if err != nil {
+		return types.ZeroHash, err
+	}
+
+	allEvents := append(exitEvents, nonCommittedExitEvents...)
+	if len(allEvents) == 0 {
+		return types.ZeroHash, nil
+	}
+
+	tree, err := createExitTree(allEvents)
+	if err != nil {
+		return types.ZeroHash, err
+	}
+
+	return tree.Hash(), nil
+}
+
+// GenerateExitProof generates proof of exit
+func (c *consensusRuntime) GenerateExitProof(exitID, epoch, checkpointBlock uint64) ([]types.Hash, error) {
+	exitEvent, err := c.state.getExitEvent(exitID, epoch, checkpointBlock)
+	if err != nil {
+		return nil, err
+	}
+
+	e, err := exitEventABIType.Encode(exitEvent)
+	if err != nil {
+		return nil, err
+	}
+
+	exitEvents, err := c.state.getExitEventsForProof(epoch, checkpointBlock)
+	if err != nil {
+		return nil, err
+	}
+
+	tree, err := createExitTree(exitEvents)
+	if err != nil {
+		return nil, err
+	}
+
+	return tree.GenerateProofForLeaf(e, 0)
+}
+
 // setIsActiveValidator updates the activeValidatorFlag field
 func (c *consensusRuntime) setIsActiveValidator(isActiveValidator bool) {
 	if isActiveValidator {
@@ -812,7 +849,7 @@ func (c *consensusRuntime) getCommitmentToRegister(epoch *epochMetadata,
 	registerCommitmentIndex uint64) (*CommitmentMessageSigned, error) {
 	if epoch.Commitment == nil {
 		// we did not build a commitment, so there is nothing to register
-		return nil, ErrCommitmentNotBuilt
+		return nil, errCommitmentNotBuilt
 	}
 
 	toIndex := registerCommitmentIndex + stateSyncMainBundleSize - 1
@@ -930,6 +967,20 @@ func (c *consensusRuntime) InsertBlock(proposal []byte, committedSeals []*messag
 			if err := c.buildBundles(
 				epoch.Commitment, fsm.commitmentToSaveOnRegister.Message, fsm.stateSyncExecutionIndex); err != nil {
 				c.logger.Error("insert proposal, build bundles error", "err", err)
+			}
+
+			isCheckpointBlock := fsm.isEndOfEpoch || c.checkpointManager.isCheckpointBlock(block.Header.Number)
+			if fsm.roundInfo.isProposer && isCheckpointBlock {
+				go func(header types.Header, epochNumber uint64) {
+					err := c.checkpointManager.submitCheckpoint(header, fsm.isEndOfEpoch)
+					if err != nil {
+						c.logger.Warn("failed to submit checkpoint", "epoch number", epochNumber, "error", err)
+					}
+				}(*block.Header, fsm.epochNumber)
+			}
+
+			if isCheckpointBlock {
+				c.checkpointManager.latestCheckpointID = block.Number()
 			}
 		}
 	}
@@ -1082,4 +1133,21 @@ func validateVote(vote *MessageSignature, epoch *epochMetadata) error {
 	}
 
 	return nil
+}
+
+// createExitTree creates an exit event merkle tree from provided exit events
+func createExitTree(exitEvents []*ExitEvent) (*MerkleTree, error) {
+	numOfEvents := len(exitEvents)
+	data := make([][]byte, numOfEvents)
+
+	for i := 0; i < numOfEvents; i++ {
+		b, err := exitEventABIType.Encode(exitEvents[i])
+		if err != nil {
+			return nil, err
+		}
+
+		data[i] = b
+	}
+
+	return NewMerkleTree(data)
 }
