@@ -272,15 +272,18 @@ func (c *state) Len() int {
 	return len(c.memory)
 }
 
-func (c *state) checkMemory(offset, size *big.Int) bool {
-	if size.Sign() == 0 {
-		return true
-	}
-
+// allocateMemory allocates memory to enable accessing in the range of [offset, offset+size]
+// throws error if the given offset and size are negative
+// consumes gas if memory needs to be expanded
+func (c *state) allocateMemory(offset, size *big.Int) bool {
 	if !offset.IsUint64() || !size.IsUint64() {
 		c.exit(errGasUintOverflow)
 
 		return false
+	}
+
+	if size.Sign() == 0 {
+		return true
 	}
 
 	o := offset.Uint64()
@@ -292,7 +295,7 @@ func (c *state) checkMemory(offset, size *big.Int) bool {
 		return false
 	}
 
-	if newSize, m := o+s, uint64(len(c.memory)); m < newSize {
+	if newSize, currentSize := o+s, uint64(len(c.memory)); currentSize < newSize {
 		w := (newSize + 31) / 32
 		newCost := 3*w + w*w/512
 		cost := newCost - c.lastGasCost
@@ -325,7 +328,7 @@ func (c *state) get2(dst []byte, offset, length *big.Int) ([]byte, bool) {
 		return nil, true
 	}
 
-	if !c.checkMemory(offset, length) {
+	if !c.allocateMemory(offset, length) {
 		return nil, false
 	}
 

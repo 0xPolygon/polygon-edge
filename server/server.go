@@ -27,8 +27,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/state"
 	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
-	"github.com/0xPolygon/polygon-edge/state/runtime/evm"
-	"github.com/0xPolygon/polygon-edge/state/runtime/precompiled"
 	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
@@ -65,8 +63,6 @@ type Server struct {
 	// transaction pool
 	txpool *txpool.TxPool
 
-	serverMetrics *serverMetrics
-
 	prometheusServer *http.Server
 
 	// secrets manager
@@ -90,17 +86,19 @@ func newFileLogger(config *Config) (hclog.Logger, error) {
 	}
 
 	return hclog.New(&hclog.LoggerOptions{
-		Name:   "polygon",
-		Level:  config.LogLevel,
-		Output: logFileWriter,
+		Name:       "polygon",
+		Level:      config.LogLevel,
+		Output:     logFileWriter,
+		JSONFormat: config.JSONLogFormat,
 	}), nil
 }
 
 // newCLILogger returns minimal logger instance that sends all logs to standard output
 func newCLILogger(config *Config) hclog.Logger {
 	return hclog.New(&hclog.LoggerOptions{
-		Name:  "polygon",
-		Level: config.LogLevel,
+		Name:       "polygon",
+		Level:      config.LogLevel,
+		JSONFormat: config.JSONLogFormat,
 	})
 }
 
@@ -142,11 +140,12 @@ func NewServer(config *Config) (*Server, error) {
 		return nil, fmt.Errorf("failed to create data directories: %w", err)
 	}
 
+	if err := m.setupTelemetry(); err != nil {
+		return nil, err
+	}
+
 	if config.Telemetry.PrometheusAddr != nil {
-		m.serverMetrics = metricProvider("polygon", config.Chain.Name, true)
 		m.prometheusServer = m.startPrometheusServer(config.Telemetry.PrometheusAddr)
-	} else {
-		m.serverMetrics = metricProvider("polygon", config.Chain.Name, false)
 	}
 
 	// Set up datadog profiler
@@ -165,7 +164,6 @@ func NewServer(config *Config) (*Server, error) {
 		netConfig.Chain = m.config.Chain
 		netConfig.DataDir = filepath.Join(m.config.DataDir, "libp2p")
 		netConfig.SecretsManager = m.secretsManager
-		netConfig.Metrics = m.serverMetrics.network
 
 		network, err := network.NewServer(logger, netConfig)
 		if err != nil {
@@ -186,8 +184,6 @@ func NewServer(config *Config) (*Server, error) {
 	m.state = st
 
 	m.executor = state.NewExecutor(config.Chain.Params, st, logger)
-	m.executor.SetRuntime(precompiled.NewPrecompiled())
-	m.executor.SetRuntime(evm.NewEVM())
 
 	// custom write genesis hook per consensus engine
 	engineName := m.config.Chain.Params.GetEngine()
@@ -228,7 +224,6 @@ func NewServer(config *Config) (*Server, error) {
 			hub,
 			m.grpcServer,
 			m.network,
-			m.serverMetrics.txpool,
 			&txpool.Config{
 				MaxSlots:            m.config.MaxSlots,
 				PriceLimit:          m.config.PriceLimit,
@@ -422,7 +417,6 @@ func (s *Server) setupConsensus() error {
 			Executor:       s.executor,
 			Grpc:           s.grpcServer,
 			Logger:         s.logger,
-			Metrics:        s.serverMetrics.consensus,
 			SecretsManager: s.secretsManager,
 			BlockTime:      s.config.BlockTime,
 		},
