@@ -62,12 +62,13 @@ func (e *Executor) WriteGenesis(alloc map[types.Address]*chain.GenesisAccount) t
 	}
 
 	transition := &Transition{
-		logger:   e.logger,
-		ctx:      env,
-		state:    txn,
-		auxState: e.state,
-		gasPool:  uint64(env.GasLimit),
-		config:   config,
+		logger:      e.logger,
+		ctx:         env,
+		state:       txn,
+		auxState:    e.state,
+		gasPool:     uint64(env.GasLimit),
+		config:      config,
+		precompiles: precompiled.NewPrecompiled(),
 	}
 
 	for addr, account := range alloc {
