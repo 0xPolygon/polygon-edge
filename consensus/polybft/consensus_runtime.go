@@ -218,31 +218,41 @@ func (c *consensusRuntime) OnBlockInserted(block *types.Block) {
 }
 
 func (c *consensusRuntime) createCommitmentAndBundles(txs []*types.Transaction) error {
-	if commitment, err := getCommitmentMessageSignedTx(txs); err != nil {
+	if !c.IsBridgeEnabled() {
+		return nil
+	}
+
+	commitment, err := getCommitmentMessageSignedTx(txs)
+	if err != nil {
 		return err
-	} else if commitment != nil {
-		if err := c.state.insertCommitmentMessage(commitment); err != nil {
-			return fmt.Errorf("insert commitment message error: %w", err)
-		}
+	}
 
-		// TODO: keep systemState.GetNextExecutionIndex() also in cr?
-		// Maybe some immutable structure `consensusMetaData`?
-		previousBlock, epoch := c.getLastBuiltBlockAndEpoch()
+	// no commitment message -> this is not end of epoch block
+	if commitment == nil {
+		return nil
+	}
 
-		systemState, err := c.getSystemState(previousBlock)
-		if err != nil {
-			return fmt.Errorf("build bundles, get system state error: %w", err)
-		}
+	if err := c.state.insertCommitmentMessage(commitment); err != nil {
+		return fmt.Errorf("insert commitment message error: %w", err)
+	}
 
-		nextStateSyncExecutionIdx, err := systemState.GetNextExecutionIndex()
-		if err != nil {
-			return fmt.Errorf("build bundles, get next execution index error: %w", err)
-		}
+	// TODO: keep systemState.GetNextExecutionIndex() also in cr?
+	// Maybe some immutable structure `consensusMetaData`?
+	previousBlock, epoch := c.getLastBuiltBlockAndEpoch()
 
-		if err := c.buildBundles(
-			epoch.Commitment, commitment.Message, nextStateSyncExecutionIdx); err != nil {
-			return fmt.Errorf("build bundles error: %w", err)
-		}
+	systemState, err := c.getSystemState(previousBlock)
+	if err != nil {
+		return fmt.Errorf("build bundles, get system state error: %w", err)
+	}
+
+	nextStateSyncExecutionIdx, err := systemState.GetNextExecutionIndex()
+	if err != nil {
+		return fmt.Errorf("build bundles, get next execution index error: %w", err)
+	}
+
+	if err := c.buildBundles(
+		epoch.Commitment, commitment.Message, nextStateSyncExecutionIdx); err != nil {
+		return fmt.Errorf("build bundles error: %w", err)
 	}
 
 	return nil
