@@ -515,6 +515,7 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 		// assume it's an empty account
 		accountBalance := big.NewInt(0)
 		acc, err := e.store.GetAccount(header.StateRoot, transaction.From)
+
 		if err != nil && !errors.Is(err, ErrStateNotFound) {
 			// An unrelated error occurred, return it
 			return nil, err
@@ -730,6 +731,7 @@ func (e *Eth) GetCode(address types.Address, filter BlockNumberOrHash) (interfac
 
 	emptySlice := []byte{}
 	acc, err := e.store.GetAccount(header.StateRoot, address)
+
 	if errors.Is(err, ErrStateNotFound) {
 		// If the account doesn't exist / is not initialized yet,
 		// return the default value
