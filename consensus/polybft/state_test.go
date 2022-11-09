@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/pbft-consensus"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
@@ -73,7 +72,7 @@ func TestState_Insert_And_Get_MessageVotes(t *testing.T) {
 	votes, err := state.getMessageVotes(epoch, hash)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(votes))
-	assert.Equal(t, pbft.NodeID("NODE_1"), votes[0].From)
+	assert.Equal(t, "NODE_1", votes[0].From)
 	assert.True(t, bytes.Equal([]byte{1, 2}, votes[0].Signature))
 }
 
@@ -95,7 +94,7 @@ func TestState_InsertVoteConcurrent(t *testing.T) {
 			defer wg.Done()
 
 			_, _ = state.insertMessageVote(epoch, hash, &MessageSignature{
-				From:      pbft.NodeID(fmt.Sprintf("NODE_%d", i)),
+				From:      fmt.Sprintf("NODE_%d", i),
 				Signature: []byte{1, 2},
 			})
 		}(i)
@@ -167,9 +166,9 @@ func TestState_insertAndGetValidatorSnapshot(t *testing.T) {
 	require.NoError(t, err)
 
 	snapshot := AccountSet{
-		&ValidatorAccount{Address: types.BytesToAddress([]byte{0x18}), BlsKey: keys[0].PublicKey()},
-		&ValidatorAccount{Address: types.BytesToAddress([]byte{0x23}), BlsKey: keys[1].PublicKey()},
-		&ValidatorAccount{Address: types.BytesToAddress([]byte{0x37}), BlsKey: keys[2].PublicKey()},
+		&ValidatorMetadata{Address: types.BytesToAddress([]byte{0x18}), BlsKey: keys[0].PublicKey()},
+		&ValidatorMetadata{Address: types.BytesToAddress([]byte{0x23}), BlsKey: keys[1].PublicKey()},
+		&ValidatorMetadata{Address: types.BytesToAddress([]byte{0x37}), BlsKey: keys[2].PublicKey()},
 	}
 
 	assert.NoError(t, state.insertValidatorSnapshot(epoch, snapshot))
@@ -193,9 +192,9 @@ func TestState_cleanValidatorSnapshotsFromDb(t *testing.T) {
 	require.NoError(t, err)
 
 	snapshot := AccountSet{
-		&ValidatorAccount{Address: types.BytesToAddress([]byte{0x18}), BlsKey: keys[0].PublicKey()},
-		&ValidatorAccount{Address: types.BytesToAddress([]byte{0x23}), BlsKey: keys[1].PublicKey()},
-		&ValidatorAccount{Address: types.BytesToAddress([]byte{0x37}), BlsKey: keys[2].PublicKey()},
+		&ValidatorMetadata{Address: types.BytesToAddress([]byte{0x18}), BlsKey: keys[0].PublicKey()},
+		&ValidatorMetadata{Address: types.BytesToAddress([]byte{0x23}), BlsKey: keys[1].PublicKey()},
+		&ValidatorMetadata{Address: types.BytesToAddress([]byte{0x37}), BlsKey: keys[2].PublicKey()},
 	}
 
 	var epoch uint64

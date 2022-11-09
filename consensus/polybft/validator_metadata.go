@@ -5,24 +5,25 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/big"
 	"reflect"
 
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 
-	"github.com/0xPolygon/pbft-consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/fastrlp"
 )
 
-// ValidatorAccount represents a validator from the validator set
-type ValidatorAccount struct {
-	Address types.Address
-	BlsKey  *bls.PublicKey
+// ValidatorMetadata represents a validator metadata (its public identity)
+type ValidatorMetadata struct {
+	Address     types.Address
+	BlsKey      *bls.PublicKey
+	VotingPower uint64
 }
 
-// Equals compares ValidatorAccount equality
-func (a ValidatorAccount) Equals(b *ValidatorAccount) bool {
+// Equals compares ValidatorMetadata equality
+func (a ValidatorMetadata) Equals(b *ValidatorMetadata) bool {
 	if b == nil {
 		return false
 	}
@@ -30,68 +31,84 @@ func (a ValidatorAccount) Equals(b *ValidatorAccount) bool {
 	return a.Address == b.Address && reflect.DeepEqual(a.BlsKey, b.BlsKey)
 }
 
-// Copy returns a deep copy of ValidatorAccount
-func (a ValidatorAccount) Copy() *ValidatorAccount {
+// Copy returns a deep copy of ValidatorMetadata
+func (a ValidatorMetadata) Copy() *ValidatorMetadata {
 	copiedBlsKey := a.BlsKey.Marshal()
 	blsKey, _ := bls.UnmarshalPublicKey(copiedBlsKey)
 
-	return &ValidatorAccount{
-		Address: types.BytesToAddress(a.Address[:]),
-		BlsKey:  blsKey,
+	return &ValidatorMetadata{
+		Address:     types.BytesToAddress(a.Address[:]),
+		BlsKey:      blsKey,
+		VotingPower: a.VotingPower,
 	}
 }
 
-// MarshalRLPWith marshals ValidatorAccount to the RLP format
-func (a ValidatorAccount) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
+// MarshalRLPWith marshals ValidatorMetadata to the RLP format
+func (a ValidatorMetadata) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 	vv := ar.NewArray()
 	// Address
 	vv.Set(ar.NewBytes(a.Address.Bytes()))
 	// BlsKey
 	vv.Set(ar.NewCopyBytes(a.BlsKey.Marshal()))
+	// VotingPower
+	vv.Set(ar.NewBigInt(new(big.Int).SetUint64(a.VotingPower)))
 
 	return vv
 }
 
-// UnmarshalRLPWith unmarshals ValidatorAccount from the RLP format
-func (a *ValidatorAccount) UnmarshalRLPWith(v *fastrlp.Value) error {
+// UnmarshalRLPWith unmarshals ValidatorMetadata from the RLP format
+func (a *ValidatorMetadata) UnmarshalRLPWith(v *fastrlp.Value) error {
 	elems, err := v.GetElems()
 	if err != nil {
 		return err
 	}
 
-	if num := len(elems); num != 2 {
-		return fmt.Errorf("not enough elements to decode validator account, expected 2 but found %d", num)
-	}
-	// Address
-	{
-		addressRaw, err := elems[0].GetBytes(nil)
-		if err != nil {
-			return fmt.Errorf("expected 'Address' field encoded as bytes. Error: %w", err)
-		}
-		a.Address = types.BytesToAddress(addressRaw)
+	if num := len(elems); num != 3 {
+		return fmt.Errorf("incorrect elements count to decode validator account, expected 3 but found %d", num)
 	}
 
-	{
-		blsKeyRaw, err := elems[1].GetBytes(nil)
-		if err != nil {
-			return fmt.Errorf("expected 'BlsKey' encoded as bytes. Error: %w", err)
-		}
-		a.BlsKey, err = bls.UnmarshalPublicKey(blsKeyRaw)
-		if err != nil {
-			return fmt.Errorf("failed to unmarshal BLS public key. Error: %w", err)
-		}
+	// Address
+	addressRaw, err := elems[0].GetBytes(nil)
+	if err != nil {
+		return fmt.Errorf("expected 'Address' field encoded as bytes. Error: %w", err)
 	}
+
+	a.Address = types.BytesToAddress(addressRaw)
+
+	// BlsKey
+	blsKeyRaw, err := elems[1].GetBytes(nil)
+	if err != nil {
+		return fmt.Errorf("expected 'BlsKey' encoded as bytes. Error: %w", err)
+	}
+
+	blsKey, err := bls.UnmarshalPublicKey(blsKeyRaw)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal BLS public key. Error: %w", err)
+	}
+
+	a.BlsKey = blsKey
+
+	// VotingPower
+	votingPower := new(big.Int)
+
+	err = elems[2].GetBigInt(votingPower)
+	if err != nil {
+		return fmt.Errorf("expected 'Voting power' encoded as big int. Error: %w", err)
+	}
+
+	a.VotingPower = votingPower.Uint64()
 
 	return nil
 }
 
 // fmt.Stringer implementation
-func (a ValidatorAccount) String() string {
-	return fmt.Sprintf("Address=%v; BLS Key=%v", a.Address.String(), hex.EncodeToString(a.BlsKey.Marshal()))
+func (a ValidatorMetadata) String() string {
+	return fmt.Sprintf("Address=%v; BLS Key=%v; Voting Power=%d",
+		a.Address.String(), hex.EncodeToString(a.BlsKey.Marshal()), a.VotingPower)
 }
 
-// AccountSet is a type alias for slice of ValidatorAccount instances
-type AccountSet []*ValidatorAccount
+// AccountSet is a type alias for slice of ValidatorMetadata instances
+type AccountSet []*ValidatorMetadata
 
 // GetAddresses aggregates addresses for given AccountSet
 func (as AccountSet) GetAddresses() []types.Address {
@@ -118,10 +135,10 @@ func (as AccountSet) Len() int {
 	return len(as)
 }
 
-// ContainsNodeID checks whether ValidatorAccount with given nodeID is present in the AccountSet
-func (as AccountSet) ContainsNodeID(nodeID pbft.NodeID) bool {
+// ContainsNodeID checks whether ValidatorMetadata with given nodeID is present in the AccountSet
+func (as AccountSet) ContainsNodeID(nodeID string) bool {
 	for _, validator := range as {
-		if validator.Address.String() == string(nodeID) {
+		if validator.Address.String() == nodeID {
 			return true
 		}
 	}
@@ -129,13 +146,13 @@ func (as AccountSet) ContainsNodeID(nodeID pbft.NodeID) bool {
 	return false
 }
 
-// ContainsAddress checks whether ValidatorAccount with given address is present in the AccountSet
+// ContainsAddress checks whether ValidatorMetadata with given address is present in the AccountSet
 func (as AccountSet) ContainsAddress(address types.Address) bool {
 	return as.Index(address) != -1
 }
 
-// Index returns index of the given ValidatorAccount, identified by address within the AccountSet.
-// If given ValidatorAccount is not present, it returns -1.
+// Index returns index of the given ValidatorMetadata, identified by address within the AccountSet.
+// If given ValidatorMetadata is not present, it returns -1.
 func (as AccountSet) Index(addr types.Address) int {
 	for indx, validator := range as {
 		if validator.Address == addr {
@@ -148,7 +165,7 @@ func (as AccountSet) Index(addr types.Address) int {
 
 // Copy returns deep copy of AccountSet
 func (as AccountSet) Copy() AccountSet {
-	copiedAccs := make([]*ValidatorAccount, as.Len())
+	copiedAccs := make([]*ValidatorMetadata, as.Len())
 	for i, acc := range as {
 		copiedAccs[i] = acc.Copy()
 	}
@@ -156,9 +173,9 @@ func (as AccountSet) Copy() AccountSet {
 	return AccountSet(copiedAccs)
 }
 
-// GetValidatorAccount tries to retrieve validator account by given address from the account set.
+// GetValidatorMetadata tries to retrieve validator account metadata by given address from the account set.
 // It returns nil if such account is not found.
-func (as AccountSet) GetValidatorAccount(address types.Address) *ValidatorAccount {
+func (as AccountSet) GetValidatorMetadata(address types.Address) *ValidatorMetadata {
 	i := as.Index(address)
 	if i == -1 {
 		return nil

@@ -12,7 +12,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 )
 
-// Bridge transport is an abstraction of network layer for a bridge
+// BridgeTransport is an abstraction of network layer for a bridge
 type BridgeTransport interface {
 	Multicast(msg interface{})
 }
@@ -40,11 +40,11 @@ func (g *runtimeTransportWrapper) Multicast(msg interface{}) {
 }
 
 // subscribeToBridgeTopic subscribes for bridge topic
-func (cr *consensusRuntime) subscribeToBridgeTopic(topic *network.Topic) error {
+func (c *consensusRuntime) subscribeToBridgeTopic(topic *network.Topic) error {
 	return topic.Subscribe(func(obj interface{}, _ peer.ID) {
 		msg, ok := obj.(*pbftproto.TransportMessage)
 		if !ok {
-			cr.logger.Warn("failed to deliver message, invalid msg", "obj", obj)
+			c.logger.Warn("failed to deliver message, invalid msg", "obj", obj)
 
 			return
 		}
@@ -52,13 +52,13 @@ func (cr *consensusRuntime) subscribeToBridgeTopic(topic *network.Topic) error {
 		var transportMsg *TransportMessage
 
 		if err := json.Unmarshal(msg.Data, &transportMsg); err != nil {
-			cr.logger.Warn("failed to deliver message", "err", err, "obj", obj)
+			c.logger.Warn("failed to deliver message", "error", err)
 
 			return
 		}
 
-		if _, err := cr.deliverMessage(transportMsg); err != nil {
-			cr.logger.Warn("failed to deliver message", "err", err)
+		if _, err := c.deliverMessage(transportMsg); err != nil {
+			c.logger.Warn("failed to deliver message", "error", err)
 		}
 	})
 }
@@ -93,17 +93,15 @@ func (p *Polybft) subscribeToIbftTopic() error {
 // createTopics create all topics for a PolyBft instance
 func (p *Polybft) createTopics() (err error) {
 	if p.consensusConfig.IsBridgeEnabled() {
-		// create bridge topic
 		p.bridgeTopic, err = p.config.Network.NewTopic(bridgeProto, &pbftproto.TransportMessage{})
 		if err != nil {
-			return fmt.Errorf("failed to create bridge topic. Error: %w", err)
+			return fmt.Errorf("failed to create bridge topic: %w", err)
 		}
 	}
 
-	// create pbft topic
 	p.consensusTopic, err = p.config.Network.NewTopic(pbftProto, &proto.Message{})
 	if err != nil {
-		return fmt.Errorf("failed to create pbft topic. Error: %w", err)
+		return fmt.Errorf("failed to create consensus topic: %w", err)
 	}
 
 	return nil
@@ -112,6 +110,6 @@ func (p *Polybft) createTopics() (err error) {
 // Multicast is implementation of core.Transport interface
 func (p *Polybft) Multicast(msg *proto.Message) {
 	if err := p.consensusTopic.Publish(msg); err != nil {
-		p.logger.Warn("failed to multicast consensus message", "err", err)
+		p.logger.Warn("failed to multicast consensus message", "error", err)
 	}
 }

@@ -30,9 +30,6 @@ const (
 
 // polybftBackend is an interface defining polybft methods needed by fsm and sync tracker
 type polybftBackend interface {
-	// CheckIfStuck checks if state machine is stuck.
-	CheckIfStuck(num uint64) (uint64, bool)
-
 	// GetValidators retrieves validator set for the given block
 	GetValidators(blockNumber uint64, parents []*types.Header) (AccountSet, error)
 }
@@ -95,10 +92,10 @@ type Polybft struct {
 	// reference to the syncer
 	syncer syncer.Syncer
 
-	// topic for pbft consensus
+	// topic for consensus engine messages
 	consensusTopic *network.Topic
 
-	// topic for pbft consensus
+	// topic for bridge messages
 	bridgeTopic *network.Topic
 
 	// key encapsulates ECDSA address and BLS signing logic
@@ -177,24 +174,7 @@ func (p *Polybft) Initialize() error {
 
 	// create bridge and consensus topics
 	if err := p.createTopics(); err != nil {
-		return err
-	}
-
-	// set pbft topic, it will be check if/when the bridge is enabled
-	p.initRuntime()
-
-	// initialize pbft engine
-	// opts := []pbft.ConfigOption{
-	// 	pbft.WithLogger(p.logger.Named("Pbft").
-	// 		StandardLogger(&hclog.StandardLoggerOptions{}),
-	// 	),
-	// 	pbft.WithTracer(otel.Tracer("Pbft")),
-	// }
-
-	p.ibft = newIBFTConsensusWrapper(p.logger, p.runtime, p)
-
-	if err := p.subscribeToIbftTopic(); err != nil {
-		return fmt.Errorf("topic subscription failed: %w", err)
+		return fmt.Errorf("cannot create topics: %w", err)
 	}
 
 	// set block time
@@ -215,28 +195,33 @@ func (p *Polybft) Initialize() error {
 	p.state = stt
 	p.validatorsCache = newValidatorsSnapshotCache(p.config.Logger, stt, p.consensusConfig.EpochSize, p.blockchain)
 
+	// create runtime
+	p.initRuntime()
+
+	p.ibft = newIBFTConsensusWrapper(p.logger, p.runtime, p)
+
+	if err := p.subscribeToIbftTopic(); err != nil {
+		return fmt.Errorf("topic subscription failed: %w", err)
+	}
+
 	return nil
 }
 
 // Start starts the consensus and servers
 func (p *Polybft) Start() error {
-	p.logger.Info("starting polybft consensus")
+	p.logger.Info("starting polybft consensus", "signer", p.key.String())
 
-	// start syncer
-	if err := p.startSyncing(); err != nil {
-		return err
-	}
-
-	// start consensus
-	return p.startSealing()
-}
-
-// startSyncing starts the synchroniser
-func (p *Polybft) startSyncing() error {
+	// start syncer (also initializes peer map)
 	if err := p.syncer.Start(); err != nil {
 		return fmt.Errorf("failed to start syncer. Error: %w", err)
 	}
 
+	// we need to call restart epoch on runtime to initialize epoch state
+	if err := p.runtime.restartEpoch(p.blockchain.CurrentHeader()); err != nil {
+		return fmt.Errorf("consensus runtime start - restart epoch failed: %w", err)
+	}
+
+	// start syncing
 	go func() {
 		blockHandler := func(b *types.Block) bool {
 			p.runtime.OnBlockInserted(b)
@@ -249,21 +234,10 @@ func (p *Polybft) startSyncing() error {
 		}
 	}()
 
-	return nil
-}
-
-// startSealing is executed if the PolyBFT protocol is running in sealing mode.
-func (p *Polybft) startSealing() error {
-	p.logger.Info("Using signer", "address", p.key.String())
-
+	// start pbft process
 	if err := p.startRuntime(); err != nil {
 		return fmt.Errorf("consensus runtime start failed: %w", err)
 	}
-
-	go func() {
-		// start the pbft process
-		p.startPbftProcess()
-	}()
 
 	return nil
 }
@@ -289,7 +263,7 @@ func (p *Polybft) startRuntime() error {
 	if p.runtime.IsBridgeEnabled() {
 		// start bridge event tracker
 		if err := p.runtime.startEventTracker(); err != nil {
-			return fmt.Errorf("starting event tracker failed:%w", err)
+			return fmt.Errorf("starting event tracker  failed: %w", err)
 		}
 
 		// subscribe to bridge topic
@@ -297,6 +271,8 @@ func (p *Polybft) startRuntime() error {
 			return fmt.Errorf("bridge topic subscription failed: %w", err)
 		}
 	}
+
+	go p.startPbftProcess()
 
 	return nil
 }
@@ -336,34 +312,35 @@ func (p *Polybft) startPbftProcess() {
 	)
 
 	for {
-		latest := p.blockchain.CurrentHeader().Number
+		latestHeader := p.blockchain.CurrentHeader()
 
-		currentValidators, err := p.GetValidators(latest, nil)
+		currentValidators, err := p.GetValidators(latestHeader.Number, nil)
 		if err != nil {
-			p.logger.Error("failed to query current validator set", "block number", latest, "error", err)
+			p.logger.Error("failed to query current validator set", "block number", latestHeader.Number, "error", err)
 		}
 
-		isValidator := currentValidators.ContainsNodeID(p.key.NodeID())
+		isValidator := currentValidators.ContainsNodeID(p.key.String())
 		p.runtime.setIsActiveValidator(isValidator)
 
 		p.txPool.SetSealing(isValidator) // update tx pool
 
 		if isValidator {
-			_, err := p.runtime.FSM() // Nemanja: what to do if it is an error
+			// initialze FSM as a stateless ibft backend via runtime as an adapter
+			err = p.runtime.FSM()
 			if err != nil {
-				p.logger.Error("failed to create fsm", "block number", latest, "error", err)
+				p.logger.Error("failed to create fsm", "block number", latestHeader.Number, "error", err)
 
 				continue
 			}
 
-			sequenceCh, stopSequence = p.ibft.runSequence(latest + 1)
+			sequenceCh, stopSequence = p.ibft.runSequence(latestHeader.Number + 1)
 		}
 
 		select {
 		case <-syncerBlockCh:
 			if isValidator {
 				stopSequence()
-				p.logger.Info("canceled sequence", "sequence", latest+1)
+				p.logger.Info("canceled sequence", "sequence", latestHeader.Number+1)
 			}
 		case <-sequenceCh:
 		case <-p.closeCh:
@@ -374,11 +351,6 @@ func (p *Polybft) startPbftProcess() {
 			return
 		}
 	}
-}
-
-// isSynced return true if the current header from the local storage corresponds to the highest block of syncer
-func (p *Polybft) isSynced() bool {
-	return false // TODO: remove this method
 }
 
 func (p *Polybft) waitForNPeers() bool {
@@ -418,8 +390,7 @@ func (p *Polybft) GetSyncProgression() *progress.Progression {
 // VerifyHeader implements consensus.Engine and checks whether a header conforms to the consensus rules
 func (p *Polybft) VerifyHeader(header *types.Header) error {
 	// Short circuit if the header is known
-	_, ok := p.blockchain.GetHeaderByHash(header.Hash)
-	if ok {
+	if _, ok := p.blockchain.GetHeaderByHash(header.Hash); ok {
 		return nil
 	}
 
@@ -442,7 +413,7 @@ func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, parents []*type
 		return nil
 	}
 
-	//validate header fields
+	// validate header fields
 	if err := validateHeaderFields(parent, header); err != nil {
 		return fmt.Errorf("failed to validate header for block %d. error = %w", blockNumber, err)
 	}
@@ -467,7 +438,12 @@ func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, parents []*type
 	}
 
 	if err := extra.Committed.VerifyCommittedFields(validators, header.Hash); err != nil {
-		return fmt.Errorf("failed to verify signatures for block %d. Block hash: %v", blockNumber, header.Hash)
+		return fmt.Errorf(
+			"failed to verify signatures for block %d. Block hash: %v. Error: %w",
+			blockNumber,
+			header.Hash,
+			err,
+		)
 	}
 
 	// validate the signatures for parent (skip block 1 because genesis does not have committed)
@@ -483,38 +459,19 @@ func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, parents []*type
 		parentValidators, err := p.GetValidators(blockNumber-2, parents)
 		if err != nil {
 			return fmt.Errorf(
-				"failed to validate header for block %d. could not retrieve parent validators:%w",
+				"failed to validate header for block %d. could not retrieve parent validators: %w",
 				blockNumber,
 				err,
 			)
 		}
 
 		if err := extra.Parent.VerifyCommittedFields(parentValidators, parent.Hash); err != nil {
-			return fmt.Errorf("failed to verify signatures for parent of block %d. Parent hash: %v", blockNumber, parent.Hash)
+			return fmt.Errorf("failed to verify signatures for parent of block %d. Parent hash: %v. Error: %w",
+				blockNumber, parent.Hash, err)
 		}
 	}
 
 	return nil
-}
-
-func (p *Polybft) CheckIfStuck(num uint64) (uint64, bool) {
-	if !p.isSynced() {
-		// we are currently syncing new data, for sure we are stuck.
-		// We can return 0 here at least for now since that value is only used
-		// for the open telemetry tracing.
-		return 0, true
-	}
-
-	// Now, we have to check if the current value of the round 'num' is lower
-	// than our currently synced block.
-	currentHeader := p.blockchain.CurrentHeader().Number
-	if currentHeader > num {
-		// at this point, it will exit the sync process and start the fsm round again
-		// (or sync a small number of blocks) to start from the correct position.
-		return currentHeader, true
-	}
-
-	return 0, false
 }
 
 func (p *Polybft) GetValidators(blockNumber uint64, parents []*types.Header) (AccountSet, error) {

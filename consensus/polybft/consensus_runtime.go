@@ -11,7 +11,7 @@ import (
 
 	"github.com/0xPolygon/go-ibft/messages"
 	"github.com/0xPolygon/go-ibft/messages/proto"
-	"github.com/0xPolygon/pbft-consensus"
+
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
@@ -59,7 +59,7 @@ type epochMetadata struct {
 	LastCheckpoint uint64
 
 	// CheckpointProposer is the validator that has to send the checkpoint, assume it is static for now.
-	CheckpointProposer pbft.NodeID
+	CheckpointProposer string
 
 	// Blocks is the list of blocks that we have to checkpoint in rootchain
 	Blocks []*types.Block
@@ -91,6 +91,9 @@ type consensusRuntime struct {
 	// state is reference to the struct which encapsulates bridge events persistence logic
 	state *State
 
+	// fsm instance which is created for each `runSequence`
+	fsm *fsm
+
 	// eventTracker is a reference to the log event tracker
 	eventTracker *eventTracker
 
@@ -120,12 +123,19 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) *consensusRuntim
 	return runtime
 }
 
-// getLastBultBlockAndEpoch returns last build block and current epochMetadata in a thread-safe manner.
-func (c *consensusRuntime) getLastBultBlockAndEpoch() (*types.Header, *epochMetadata) {
+// getEpoch returns current epochMetadata in a thread-safe manner.
+func (c *consensusRuntime) getEpoch() *epochMetadata {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
-	// create copy of data
+	return c.epoch
+}
+
+// getLastBuiltBlockAndEpoch returns last build block and current epochMetadata in a thread-safe manner.
+func (c *consensusRuntime) getLastBuiltBlockAndEpoch() (*types.Header, *epochMetadata) {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
 	lastBuiltBlock, epoch := new(types.Header), new(epochMetadata)
 	*lastBuiltBlock, *epoch = *c.lastBuiltBlock, *c.epoch
 
@@ -138,7 +148,7 @@ func (c *consensusRuntime) IsBridgeEnabled() bool {
 
 // AddLog is an implementation of eventSubscription interface,
 // and is called from the event tracker when an event is final on the rootchain
-func (c *consensusRuntime) AddLog(eventLog *ethgo.Log) { //nolint
+func (c *consensusRuntime) AddLog(eventLog *ethgo.Log) {
 	c.logger.Info(
 		"Add State sync event",
 		"block", eventLog.BlockNumber,
@@ -182,7 +192,12 @@ func (c *consensusRuntime) OnBlockInserted(block *types.Block) {
 }
 
 func (c *consensusRuntime) populateFsmIfBridgeEnabled(
-	ff *fsm, epoch *epochMetadata, lastBuiltBlock *types.Header, isEndOfEpoch, isEndOfSprint bool) error {
+	ff *fsm,
+	epoch *epochMetadata,
+	lastBuiltBlock *types.Header,
+	isEndOfEpoch,
+	isEndOfSprint bool,
+) error {
 	systemState, err := c.getSystemState(lastBuiltBlock)
 	if err != nil {
 		return err
@@ -190,44 +205,33 @@ func (c *consensusRuntime) populateFsmIfBridgeEnabled(
 
 	nextStateSyncExecutionIdx, err := systemState.GetNextExecutionIndex()
 	if err != nil {
-		return err
+		return fmt.Errorf("cannot get next execution index: %w", err)
 	}
 
 	ff.stateSyncExecutionIndex = nextStateSyncExecutionIdx
 
-	ff.postInsertHook = func() error {
-		if isEndOfEpoch && ff.commitmentToSaveOnRegister != nil {
-			if err := c.state.insertCommitmentMessage(ff.commitmentToSaveOnRegister); err != nil {
-				return err
-			}
-
-			if err := c.buildBundles(
-				epoch, ff.commitmentToSaveOnRegister.Message, nextStateSyncExecutionIdx); err != nil {
-				return err
-			}
-		}
-
-		c.OnBlockInserted(ff.block.Block)
-
-		return nil
-	}
-
 	nextRegisteredCommitmentIndex, err := systemState.GetNextCommittedIndex()
 	if err != nil {
-		return err
+		return fmt.Errorf("cannot get next committed index: %w", err)
 	}
 
 	if isEndOfEpoch {
 		commitment, err := c.getCommitmentToRegister(epoch, nextRegisteredCommitmentIndex)
 		if err != nil {
 			if errors.Is(err, ErrCommitmentNotBuilt) {
-				c.logger.Debug("[FSM] Have no built commitment to register",
-					"epoch", epoch.Number, "from state sync index", nextRegisteredCommitmentIndex)
+				c.logger.Debug(
+					"[FSM] Have no built commitment to register",
+					"epoch", epoch.Number,
+					"from state sync index", nextRegisteredCommitmentIndex,
+				)
 			} else if errors.Is(err, errQuorumNotReached) {
-				c.logger.Debug("[FSM] Not enough votes to register commitment",
-					"epoch", epoch.Number, "from state sync index", nextRegisteredCommitmentIndex)
+				c.logger.Debug(
+					"[FSM] Not enough votes to register commitment",
+					"epoch", epoch.Number,
+					"from state sync index", nextRegisteredCommitmentIndex,
+				)
 			} else {
-				return err
+				return fmt.Errorf("cannot get commitment to register: %w", err)
 			}
 		}
 
@@ -236,18 +240,18 @@ func (c *consensusRuntime) populateFsmIfBridgeEnabled(
 
 	if isEndOfSprint {
 		if err := c.state.cleanCommitments(nextStateSyncExecutionIdx); err != nil {
-			return err
+			return fmt.Errorf("cannot clean commitments: %w", err)
 		}
 
 		nonExecutedCommitments, err := c.state.getNonExecutedCommitments(nextStateSyncExecutionIdx)
 		if err != nil {
-			return err
+			return fmt.Errorf("cannot get non executed commitments: %w", err)
 		}
 
 		if len(nonExecutedCommitments) > 0 {
 			bundlesToExecute, err := c.state.getBundles(nextStateSyncExecutionIdx, maxBundlesPerSprint)
 			if err != nil {
-				return err
+				return fmt.Errorf("cannot get bundles: %w", err)
 			}
 
 			ff.commitmentsToVerifyBundles = nonExecutedCommitments
@@ -259,19 +263,24 @@ func (c *consensusRuntime) populateFsmIfBridgeEnabled(
 }
 
 // FSM creates a new instance of fsm
-func (c *consensusRuntime) FSM() (*fsm, error) {
+func (c *consensusRuntime) FSM() error {
 	// figure out the parent. At this point this peer has done its best to sync up
 	// to the head of their remote peers.
-	parent, epoch := c.getLastBultBlockAndEpoch()
+	parent, epoch := c.getLastBuiltBlockAndEpoch()
 
-	if !epoch.Validators.ContainsNodeID(c.config.Key.NodeID()) {
-		return nil, errNotAValidator
+	if !epoch.Validators.ContainsNodeID(c.config.Key.String()) {
+		return errNotAValidator
 	}
 
 	blockBuilder, err := c.config.blockchain.NewBlockBuilder(
-		parent, types.Address(c.config.Key.Address()), c.config.txPool, c.config.PolyBFTConfig.BlockTime, c.logger)
+		parent,
+		types.Address(c.config.Key.Address()),
+		c.config.txPool,
+		c.config.PolyBFTConfig.BlockTime,
+		c.logger,
+	)
 	if err != nil {
-		return nil, err
+		return fmt.Errorf("cannot create block builder: %w", err)
 	}
 
 	pendingBlockNumber := parent.Number + 1
@@ -293,30 +302,27 @@ func (c *consensusRuntime) FSM() (*fsm, error) {
 	if c.IsBridgeEnabled() {
 		err := c.populateFsmIfBridgeEnabled(ff, epoch, parent, isEndOfEpoch, isEndOfSprint)
 		if err != nil {
-			return nil, err
-		}
-	} else {
-		ff.postInsertHook = func() error {
-			c.OnBlockInserted(ff.block.Block)
-
-			return nil
+			return fmt.Errorf("cannot populate fsm: %w", err)
 		}
 	}
 
 	if isEndOfEpoch {
 		ff.uptimeCounter, err = c.calculateUptime(parent, epoch)
 		if err != nil {
-			return nil, err
+			return fmt.Errorf("cannot calculate uptime: %w", err)
 		}
 	}
 
-	c.logger.Info("[FSM built]",
+	c.logger.Info(
+		"[FSM built]",
 		"epoch", epoch.Number,
 		"endOfEpoch", isEndOfEpoch,
 		"endOfSprint", isEndOfSprint,
 	)
 
-	return ff, nil
+	c.fsm = ff
+
+	return nil
 }
 
 // restartEpoch resets the previously run epoch and moves to the next one
@@ -331,7 +337,7 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) error {
 		return err
 	}
 
-	_, lastEpoch := c.getLastBultBlockAndEpoch()
+	lastEpoch := c.getEpoch()
 	if lastEpoch != nil {
 		// Epoch might be already in memory, if its the same number do nothing.
 		// Otherwise, reset the epoch metadata and restart the async services
@@ -400,10 +406,15 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) error {
 
 	err = c.runCheckpoint(epoch)
 	if err != nil {
-		return fmt.Errorf("could not run checkpoint:%w", err)
+		return fmt.Errorf("could not run checkpoint: %w", err)
 	}
 
-	c.logger.Info("restartEpoch", "block number", header.Number, "epoch", epochNumber, "validators", validatorSet)
+	c.logger.Info(
+		"restartEpoch",
+		"block number", header.Number,
+		"epoch", epochNumber,
+		"validators", validatorSet.Len(),
+	)
 
 	return nil
 }
@@ -416,8 +427,11 @@ func (c *consensusRuntime) buildCommitment(epoch, fromIndex uint64) (*Commitment
 	stateSyncEvents, err := c.state.getStateSyncEventsForCommitment(fromIndex, toIndex)
 	if err != nil {
 		if errors.Is(err, ErrNotEnoughStateSyncs) {
-			c.logger.Debug("[buildCommitment] Not enough state syncs to build a commitment",
-				"epoch", epoch, "from state sync index", fromIndex)
+			c.logger.Debug(
+				"[buildCommitment] Not enough state syncs to build a commitment",
+				"epoch", epoch,
+				"from state sync index", fromIndex,
+			)
 			// this is a valid case, there is not enough state syncs
 			return nil, nil
 		}
@@ -443,36 +457,46 @@ func (c *consensusRuntime) buildCommitment(epoch, fromIndex uint64) (*Commitment
 	}
 
 	sig := &MessageSignature{
-		From:      c.config.Key.NodeID(),
+		From:      c.config.Key.String(),
 		Signature: signature,
 	}
 
 	if _, err = c.state.insertMessageVote(epoch, hashBytes, sig); err != nil {
-		return nil, fmt.Errorf("failed to insert signature for hash=%v to the state."+
-			"Error: %v", hex.EncodeToString(hashBytes), err)
+		return nil, fmt.Errorf(
+			"failed to insert signature for hash=%v to the state. Error: %w",
+			hex.EncodeToString(hashBytes),
+			err,
+		)
 	}
 
 	// gossip message
-	msg := &TransportMessage{
+	c.config.BridgeTransport.Multicast(&TransportMessage{
 		Hash:        hashBytes,
 		Signature:   signature,
-		NodeID:      c.config.Key.NodeID(),
+		NodeID:      c.config.Key.String(),
 		EpochNumber: epoch,
-	}
-	c.config.BridgeTransport.Multicast(msg)
+	})
 
-	c.logger.Debug("[buildCommitment] Built commitment", "from", commitment.FromIndex, "to", commitment.ToIndex)
+	c.logger.Debug(
+		"[buildCommitment] Built commitment",
+		"from", commitment.FromIndex,
+		"to", commitment.ToIndex,
+	)
 
 	return commitment, nil
 }
 
 // buildBundles builds bundles if there is a created commitment by the validator and inserts them into db
-func (c *consensusRuntime) buildBundles(epoch *epochMetadata, commitmentMsg *CommitmentMessage,
+func (c *consensusRuntime) buildBundles(commitment *Commitment, commitmentMsg *CommitmentMessage,
 	stateSyncExecutionIndex uint64) error {
-	c.logger.Debug("[buildProofs] Building proofs...", "fromIndex", commitmentMsg.FromIndex,
-		"toIndex", commitmentMsg.ToIndex, "nextExecutionIndex", stateSyncExecutionIndex)
+	c.logger.Debug(
+		"[buildProofs] Building proofs...",
+		"fromIndex", commitmentMsg.FromIndex,
+		"toIndex", commitmentMsg.ToIndex,
+		"nextExecutionIndex", stateSyncExecutionIndex,
+	)
 
-	if epoch.Commitment == nil {
+	if commitment == nil {
 		// its a valid case when we do not have a built commitment so we can not build any proofs
 		// we will be able to validate them though, since we have CommitmentMessageSigned taken from
 		// register commitment state transaction when its block was inserted
@@ -481,11 +505,12 @@ func (c *consensusRuntime) buildBundles(epoch *epochMetadata, commitmentMsg *Com
 		return nil
 	}
 
-	bundleProofs := []*BundleProof{}
+	var bundleProofs []*BundleProof
+
 	startBundleIdx := commitmentMsg.GetBundleIdxFromStateSyncEventIdx(stateSyncExecutionIndex)
 
 	for idx := startBundleIdx; idx < commitmentMsg.BundlesCount(); idx++ {
-		p := epoch.Commitment.MerkleTree.GenerateProof(idx, 0)
+		p := commitment.MerkleTree.GenerateProof(idx, 0)
 		events, err := c.getStateSyncEventsForBundle(commitmentMsg.GetFirstStateSyncIndexFromBundleIndex(idx),
 			commitmentMsg.BundleSize)
 
@@ -500,8 +525,12 @@ func (c *consensusRuntime) buildBundles(epoch *epochMetadata, commitmentMsg *Com
 			})
 	}
 
-	c.logger.Debug("[buildProofs] Building proofs finished.", "fromIndex", commitmentMsg.FromIndex,
-		"toIndex", commitmentMsg.ToIndex, "nextExecutionIndex", stateSyncExecutionIndex)
+	c.logger.Debug(
+		"[buildProofs] Building proofs finished.",
+		"fromIndex", commitmentMsg.FromIndex,
+		"toIndex", commitmentMsg.ToIndex,
+		"nextExecutionIndex", stateSyncExecutionIndex,
+	)
 
 	return c.state.insertBundles(bundleProofs)
 }
@@ -512,9 +541,9 @@ func (c *consensusRuntime) getAggSignatureForCommitmentMessage(epoch *epochMetad
 	commitmentHash types.Hash) (Signature, [][]byte, error) {
 	validators := epoch.Validators
 
-	nodeIDIndexMap := make(map[pbft.NodeID]int, validators.Len())
+	nodeIDIndexMap := make(map[string]int, validators.Len())
 	for i, validator := range validators {
-		nodeIDIndexMap[pbft.NodeID(validator.Address.String())] = i
+		nodeIDIndexMap[validator.Address.String()] = i
 	}
 
 	// get all the votes from the database for this commitment
@@ -592,7 +621,7 @@ func (c *consensusRuntime) startEventTracker() error {
 // deliverMessage receives the message vote from transport and inserts it in state db for given epoch.
 // It returns indicator whether message is processed successfully and error object if any.
 func (c *consensusRuntime) deliverMessage(msg *TransportMessage) (bool, error) {
-	_, epoch := c.getLastBultBlockAndEpoch()
+	epoch := c.getEpoch()
 
 	if epoch == nil || msg.EpochNumber < epoch.Number {
 		// Epoch metadata is undefined
@@ -718,6 +747,7 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header, epoch *ep
 
 	// include the data in the uptime counter in a deterministic way
 	addrSet := []types.Address{}
+
 	for addr := range uptimeCounter {
 		addrSet = append(addrSet, addr)
 	}
@@ -777,52 +807,6 @@ func (c *consensusRuntime) getSystemState(header *types.Header) (SystemState, er
 	return c.config.blockchain.GetSystemState(c.config.PolyBFTConfig, provider), nil
 }
 
-// isEndOfPeriod checks if an end of a period (either it be sprint or epoch)
-// is reached with the current block (the parent block of the current fsm iteration)
-func isEndOfPeriod(blockNumber, periodSize uint64) bool {
-	return blockNumber%periodSize == 0
-}
-
-// getQuorumSize returns result of division of given number by two,
-// but rounded to next integer value (similar to math.Ceil function).
-func getQuorumSize(validatorsCount int) int {
-	return (validatorsCount + 1) / 2
-}
-
-// calculateFirstBlockOfPeriod calculates the first block of a period
-func calculateFirstBlockOfPeriod(currentBlockNumber, periodSize uint64) uint64 {
-	if currentBlockNumber <= periodSize {
-		return 1 // it's the first epoch
-	}
-
-	switch currentBlockNumber % periodSize {
-	case 1:
-		return currentBlockNumber
-	case 0:
-		return currentBlockNumber - periodSize + 1
-	default:
-		return currentBlockNumber - (currentBlockNumber % periodSize) + 1
-	}
-}
-
-// getEpochNumber returns epoch number for given blockNumber and epochSize.
-// Epoch number is derived as a result of division of block number and epoch size.
-// Since epoch number is 1-based (0 block represents special case zero epoch),
-// we are incrementing result by one for non epoch-ending blocks.
-func getEpochNumber(blockNumber, epochSize uint64) uint64 {
-	if isEndOfPeriod(blockNumber, epochSize) {
-		return blockNumber / epochSize
-	}
-
-	return blockNumber/epochSize + 1
-}
-
-// getEndEpochBlockNumber returns block number which corresponds
-// to the one at the beginning of the given epoch with regards to epochSize
-func getEndEpochBlockNumber(epoch, epochSize uint64) uint64 {
-	return epoch * epochSize
-}
-
 // getCommitmentToRegister gets commitments to register via state transaction
 func (c *consensusRuntime) getCommitmentToRegister(epoch *epochMetadata,
 	registerCommitmentIndex uint64) (*CommitmentMessageSigned, error) {
@@ -855,43 +839,117 @@ func (c *consensusRuntime) getCommitmentToRegister(epoch *epochMetadata,
 	}, nil
 }
 
-func validateVote(vote *MessageSignature, epoch *epochMetadata) error {
-	// get senders address
-	senderAddress := types.StringToAddress(string(vote.From))
-	if !epoch.Validators.ContainsAddress(senderAddress) {
-		return fmt.Errorf(
-			"message is received from sender %s, which is not in current validator set",
-			vote.From,
-		)
+func (c *consensusRuntime) IsValidBlock(proposal []byte) bool {
+	if err := c.fsm.Validate(proposal); err != nil {
+		c.logger.Error("failed validate proposal", "error", err)
+
+		return false
 	}
 
-	return nil
+	return true
+}
+
+func (c *consensusRuntime) IsValidSender(msg *proto.Message) bool {
+	err := c.fsm.ValidateSender(msg)
+	if err != nil {
+		c.logger.Error("invalid sender", "err", err)
+
+		return false
+	}
+
+	return true
+}
+
+func (c *consensusRuntime) IsProposer(id []byte, height, round uint64) bool {
+	nextProposer := c.fsm.validators.CalcProposer(round)
+
+	return bytes.Equal(id, nextProposer[:])
+}
+
+func (c *consensusRuntime) IsValidProposalHash(proposal, hash []byte) bool {
+	newBlock := types.Block{}
+	if err := newBlock.UnmarshalRLP(proposal); err != nil {
+		c.logger.Error("unable to unmarshal proposal", "err", err)
+
+		return false
+	}
+
+	return bytes.Equal(newBlock.Header.Hash.Bytes(), hash)
+}
+
+func (c *consensusRuntime) IsValidCommittedSeal(proposalHash []byte, committedSeal *messages.CommittedSeal) bool {
+	err := c.fsm.ValidateCommit(committedSeal.Signer, committedSeal.Signature, proposalHash)
+	if err != nil {
+		c.logger.Info("Invalid committed seal", "err", err)
+
+		return false
+	}
+
+	return true
 }
 
 func (c *consensusRuntime) BuildProposal(blockNumber uint64) []byte {
-	panic("not implemented")
+	lastBuiltBlock, _ := c.getLastBuiltBlockAndEpoch()
+
+	if lastBuiltBlock.Number+1 != blockNumber {
+		c.logger.Error("unable to build block, due to lack of parent block",
+			"last", lastBuiltBlock.Number, "num", blockNumber)
+
+		return nil
+	}
+
+	proposal, err := c.fsm.BuildProposal()
+	if err != nil {
+		c.logger.Info("Unable to create porposal", "blockNumber", blockNumber, "err", err)
+
+		return nil
+	}
+
+	return proposal
 }
 
 // InsertBlock inserts a proposal with the specified committed seals
 func (c *consensusRuntime) InsertBlock(proposal []byte, committedSeals []*messages.CommittedSeal) {
-	panic("not implemented")
+	fsm := c.fsm
+
+	block, err := fsm.Insert(proposal, committedSeals)
+	if err != nil {
+		c.logger.Error("cannot insert proposal", "err", err)
+
+		return
+	}
+
+	if c.IsBridgeEnabled() {
+		_, epoch := c.getLastBuiltBlockAndEpoch()
+
+		if fsm.isEndOfEpoch && fsm.commitmentToSaveOnRegister != nil {
+			if err := c.state.insertCommitmentMessage(fsm.commitmentToSaveOnRegister); err != nil {
+				c.logger.Error("insert proposal, insert commitment message error", "err", err)
+			}
+
+			if err := c.buildBundles(
+				epoch.Commitment, fsm.commitmentToSaveOnRegister.Message, fsm.stateSyncExecutionIndex); err != nil {
+				c.logger.Error("insert proposal, build bundles error", "err", err)
+			}
+		}
+	}
+
+	c.OnBlockInserted(block)
 }
 
-// ID returns the validator's ID
+// ID return ID (address actually) of the current node
 func (c *consensusRuntime) ID() []byte {
-	panic("not implemented")
+	return c.config.Key.Address().Bytes()
 }
 
-// MaximumFaultyNodes returns the maximum number of faulty nodes based
-// on the validator set.
+// MaximumFaultyNodes returns the maximum number of faulty nodes based on the validator set
 func (c *consensusRuntime) MaximumFaultyNodes() uint64 {
-	panic("not implemented")
+	return uint64(c.fsm.validators.Len()-1) / 3
 }
 
-// Quorum returns what is the quorum size for the
-// specified block height.
-func (c *consensusRuntime) Quorum(blockHeight uint64) uint64 {
-	panic("not implemented")
+// Quorum returns what is the quorum size for the specified block height
+func (c *consensusRuntime) Quorum(_ uint64) uint64 {
+	return uint64(getQuorumSize(c.fsm.validators.Len()))
 }
 
 // BuildPrePrepareMessage builds a PREPREPARE message based on the passed in proposal
@@ -900,17 +958,90 @@ func (c *consensusRuntime) BuildPrePrepareMessage(
 	certificate *proto.RoundChangeCertificate,
 	view *proto.View,
 ) *proto.Message {
-	panic("not implemented")
+	block := types.Block{}
+	if err := block.UnmarshalRLP(proposal); err != nil {
+		c.logger.Error(fmt.Sprintf("cannot unmarshal RLP:%s", err))
+
+		return nil
+	}
+
+	proposalHash := block.Hash().Bytes()
+
+	msg := proto.Message{
+		View: view,
+		From: c.ID(),
+		Type: proto.MessageType_PREPREPARE,
+		Payload: &proto.Message_PreprepareData{
+			PreprepareData: &proto.PrePrepareMessage{
+				Proposal:     proposal,
+				ProposalHash: proposalHash,
+				Certificate:  certificate,
+			},
+		},
+	}
+
+	message, err := c.config.Key.SignEcdsaMessage(&msg)
+	if err != nil {
+		c.logger.Error("Cannot sign message", "error", err)
+
+		return nil
+	}
+
+	return message
 }
 
 // BuildPrepareMessage builds a PREPARE message based on the passed in proposal
 func (c *consensusRuntime) BuildPrepareMessage(proposalHash []byte, view *proto.View) *proto.Message {
-	panic("not implemented")
+	msg := proto.Message{
+		View: view,
+		From: c.ID(),
+		Type: proto.MessageType_PREPARE,
+		Payload: &proto.Message_PrepareData{
+			PrepareData: &proto.PrepareMessage{
+				ProposalHash: proposalHash,
+			},
+		},
+	}
+
+	message, err := c.config.Key.SignEcdsaMessage(&msg)
+	if err != nil {
+		c.logger.Error("Cannot sign message.", "error", err)
+
+		return nil
+	}
+
+	return message
 }
 
 // BuildCommitMessage builds a COMMIT message based on the passed in proposal
 func (c *consensusRuntime) BuildCommitMessage(proposalHash []byte, view *proto.View) *proto.Message {
-	panic("not implemented")
+	committedSeal, err := c.config.Key.Sign(proposalHash)
+	if err != nil {
+		c.logger.Error("Cannot create committed seal message.", "error", err)
+
+		return nil
+	}
+
+	msg := proto.Message{
+		View: view,
+		From: c.ID(),
+		Type: proto.MessageType_COMMIT,
+		Payload: &proto.Message_CommitData{
+			CommitData: &proto.CommitMessage{
+				ProposalHash:  proposalHash,
+				CommittedSeal: committedSeal,
+			},
+		},
+	}
+
+	message, err := c.config.Key.SignEcdsaMessage(&msg)
+	if err != nil {
+		c.logger.Error("Cannot sign message", "error", err)
+
+		return nil
+	}
+
+	return message
 }
 
 // BuildRoundChangeMessage builds a ROUND_CHANGE message based on the passed in proposal
@@ -919,30 +1050,36 @@ func (c *consensusRuntime) BuildRoundChangeMessage(
 	certificate *proto.PreparedCertificate,
 	view *proto.View,
 ) *proto.Message {
-	panic("not implemented")
+	msg := proto.Message{
+		View: view,
+		From: c.ID(),
+		Type: proto.MessageType_ROUND_CHANGE,
+		Payload: &proto.Message_RoundChangeData{RoundChangeData: &proto.RoundChangeMessage{
+			LastPreparedProposedBlock: proposal,
+			LatestPreparedCertificate: certificate,
+		}},
+	}
+
+	signedMsg, err := c.config.Key.SignEcdsaMessage(&msg)
+	if err != nil {
+		c.logger.Error("Cannot sign message", "Error", err)
+
+		return nil
+	}
+
+	return signedMsg
 }
 
-// IsValidBlock checks if the proposed block is child of parent
-func (c *consensusRuntime) IsValidBlock(block []byte) bool {
-	panic("not implemented")
-}
+// validateVote validates if the senders address is in active validator set
+func validateVote(vote *MessageSignature, epoch *epochMetadata) error {
+	// get senders address
+	senderAddress := types.StringToAddress(vote.From)
+	if !epoch.Validators.ContainsAddress(senderAddress) {
+		return fmt.Errorf(
+			"message is received from sender %s, which is not in current validator set",
+			vote.From,
+		)
+	}
 
-// IsValidSender checks if signature is from sender
-func (c *consensusRuntime) IsValidSender(msg *proto.Message) bool {
-	panic("not implemented")
-}
-
-// IsProposer checks if the passed in ID is the Proposer for current view (sequence, round)
-func (c *consensusRuntime) IsProposer(id []byte, height, round uint64) bool {
-	panic("not implemented")
-}
-
-// IsValidProposalHash checks if the hash matches the proposal
-func (c *consensusRuntime) IsValidProposalHash(proposal, hash []byte) bool {
-	panic("not implemented")
-}
-
-// IsValidCommittedSeal checks if the seal for the proposal is valid
-func (c *consensusRuntime) IsValidCommittedSeal(proposal []byte, committedSeal *messages.CommittedSeal) bool {
-	panic("not implemented")
+	return nil
 }

@@ -139,7 +139,7 @@ func createValidatorSetDelta(log hclog.Logger, oldValidatorSet,
 	newValidatorSet AccountSet) (*ValidatorSetDelta, error) {
 	var addedValidators AccountSet
 
-	oldValidatorSetMap := make(map[types.Address]*ValidatorAccount)
+	oldValidatorSetMap := make(map[types.Address]*ValidatorMetadata)
 	removedValidators := map[types.Address]int{}
 
 	for i, validator := range oldValidatorSet {
@@ -226,7 +226,7 @@ func (d *ValidatorSetDelta) UnmarshalRLPWith(v *fastrlp.Value) error {
 			d.Added = make(AccountSet, len(validatorsRaw))
 
 			for i, validatorRaw := range validatorsRaw {
-				acc := &ValidatorAccount{}
+				acc := &ValidatorMetadata{}
 				if err = acc.UnmarshalRLPWith(validatorRaw); err != nil {
 					return err
 				}
@@ -325,11 +325,10 @@ func (s *Signature) VerifyCommittedFields(validatorSet AccountSet, hash types.Ha
 		return err
 	}
 
-	if len(filtered) < getQuorumSize(validatorSet.Len()) {
-		return fmt.Errorf("quorum not reached")
+	if quorum := getQuorumSize(validatorSet.Len()); len(filtered) < quorum {
+		return fmt.Errorf("quorum not reached: %d of %d", len(filtered), quorum)
 	}
 
-	rawMsg := hash[:]
 	blsPublicKeys := make([]*bls.PublicKey, len(filtered))
 
 	for i, validator := range filtered {
@@ -342,8 +341,7 @@ func (s *Signature) VerifyCommittedFields(validatorSet AccountSet, hash types.Ha
 		return err
 	}
 
-	isOk := aggs.VerifyAggregated(blsPublicKeys, rawMsg)
-	if !isOk {
+	if !aggs.VerifyAggregated(blsPublicKeys, hash[:]) {
 		return fmt.Errorf("could not verify signature")
 	}
 

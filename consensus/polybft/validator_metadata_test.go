@@ -3,7 +3,6 @@ package polybft
 import (
 	"testing"
 
-	"github.com/0xPolygon/pbft-consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -15,9 +14,9 @@ func TestAccountSet_GetAddresses(t *testing.T) {
 
 	address1, address2, address3 := types.Address{4, 3}, types.Address{68, 123}, types.Address{168, 123}
 	ac := AccountSet{
-		&ValidatorAccount{Address: address1},
-		&ValidatorAccount{Address: address2},
-		&ValidatorAccount{Address: address3},
+		&ValidatorMetadata{Address: address1},
+		&ValidatorMetadata{Address: address2},
+		&ValidatorMetadata{Address: address3},
 	}
 	rs := ac.GetAddresses()
 	assert.Len(t, rs, 3)
@@ -34,9 +33,9 @@ func TestAccountSet_GetBlsKeys(t *testing.T) {
 
 	key1, key2, key3 := keys[0], keys[1], keys[2]
 	ac := AccountSet{
-		&ValidatorAccount{BlsKey: key1.PublicKey()},
-		&ValidatorAccount{BlsKey: key2.PublicKey()},
-		&ValidatorAccount{BlsKey: key3.PublicKey()},
+		&ValidatorMetadata{BlsKey: key1.PublicKey()},
+		&ValidatorMetadata{BlsKey: key2.PublicKey()},
+		&ValidatorMetadata{BlsKey: key3.PublicKey()},
 	}
 	rs := ac.GetBlsKeys()
 	assert.Len(t, rs, 3)
@@ -61,12 +60,12 @@ func TestAccountSet_IndexContainsAddressesAndContainsNodeId(t *testing.T) {
 	for i, a := range addresses {
 		assert.Equal(t, i, validators.Index(a))
 		assert.True(t, validators.ContainsAddress(a))
-		assert.True(t, validators.ContainsNodeID(pbft.NodeID(a.String())))
+		assert.True(t, validators.ContainsNodeID(a.String()))
 	}
 
 	assert.Equal(t, -1, validators.Index(dummy))
 	assert.False(t, validators.ContainsAddress(dummy))
-	assert.False(t, validators.ContainsNodeID(pbft.NodeID(dummy.String())))
+	assert.False(t, validators.ContainsNodeID(dummy.String()))
 }
 
 func TestAccountSet_Len(t *testing.T) {
@@ -77,7 +76,7 @@ func TestAccountSet_Len(t *testing.T) {
 	ac := AccountSet{}
 
 	for i := 0; i < count; i++ {
-		ac = append(ac, &ValidatorAccount{})
+		ac = append(ac, &ValidatorMetadata{})
 		assert.Equal(t, i+1, ac.Len())
 	}
 }
@@ -152,7 +151,7 @@ func TestAccountSet_ApplyDelta(t *testing.T) {
 				}
 				for _, acct := range step.expect {
 					v := vals.getValidator(acct)
-					if !snapshot.ContainsAddress(v.ValidatorAccount().Address) {
+					if !snapshot.ContainsAddress(v.ValidatorMetadata().Address) {
 						t.Fatalf("not found '%s'", acct)
 					}
 				}
