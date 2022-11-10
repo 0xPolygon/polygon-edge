@@ -58,6 +58,8 @@ github.com/0xPolygon/go-ibft v0.0.0-20221108092319-805919c413bf h1:A6JWrAZkW56CK
 github.com/0xPolygon/go-ibft v0.0.0-20221108092319-805919c413bf/go.mod h1:uJ9EHbl+8StbRhvKgfxDextK32FlVNOiBnRPlAgrQK8=
 github.com/0xPolygon/go-ibft v0.0.0-20221109145700-83353bef1c07 h1:SQDhRWlLXmF/TNV17DMBlTjEvNyp4r+Kb3Y9HSLtY3A=
 github.com/0xPolygon/go-ibft v0.0.0-20221109145700-83353bef1c07/go.mod h1:uJ9EHbl+8StbRhvKgfxDextK32FlVNOiBnRPlAgrQK8=
+github.com/0xPolygon/go-ibft v0.0.0-20221109165724-ff0b77dd5f69 h1:7WV/2aoWQSEVdu4SglqKuwdKylhq1Cl/zXX/9GjreY0=
+github.com/0xPolygon/go-ibft v0.0.0-20221109165724-ff0b77dd5f69/go.mod h1:uJ9EHbl+8StbRhvKgfxDextK32FlVNOiBnRPlAgrQK8=
 github.com/0xPolygon/pbft-consensus v0.0.0-20220823102839-109d9f873bf4 h1:29mg7kQFiNuJYdTcZUCkENBNd6TQP1KZGngKCSvHs6s=
 github.com/0xPolygon/pbft-consensus v0.0.0-20220823102839-109d9f873bf4/go.mod h1:U2777z/QNFyfu/NkXMBTNmR+I0lAI5g3sEh+eaDt0M0=
 github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 h1:UQHMgLO+TxOElx5B5HZ4hJQsoJ/PvUvKRhJHDQXO8P8=

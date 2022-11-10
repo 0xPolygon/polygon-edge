@@ -13,13 +13,13 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-func (i *backendIBFT) BuildProposal(blockNumber uint64) []byte {
+func (i *backendIBFT) BuildProposal(view *protoIBFT.View) []byte {
 	var (
 		latestHeader      = i.blockchain.Header()
 		latestBlockNumber = latestHeader.Number
 	)
 
-	if latestBlockNumber+1 != blockNumber {
+	if latestBlockNumber+1 != view.Height {
 		i.logger.Error(
 			"unable to build block, due to lack of parent block",
 			"num",
@@ -31,7 +31,7 @@ func (i *backendIBFT) BuildProposal(blockNumber uint64) []byte {
 
 	block, err := i.buildBlock(latestHeader)
 	if err != nil {
-		i.logger.Error("cannot build block", "num", blockNumber, "err", err)
+		i.logger.Error("cannot build block", "num", view.Height, "err", err)
 
 		return nil
 	}
@@ -129,11 +129,11 @@ func (i *backendIBFT) quorum(blockNumber uint64) uint64 {
 
 // HasQuorum returns true if quorum is reached for the given height
 func (i *backendIBFT) HasQuorum(
-	view *protoIBFT.View,
+	blockNumber uint64,
 	messages []*protoIBFT.Message,
 	msgType protoIBFT.MessageType,
 ) bool {
-	quorum := i.quorum(view.Height)
+	quorum := i.quorum(blockNumber)
 
 	switch msgType {
 	case protoIBFT.MessageType_PREPREPARE:
