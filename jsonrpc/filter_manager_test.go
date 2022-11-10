@@ -513,13 +513,13 @@ func TestHeadStream(t *testing.T) {
 
 	b := &blockStream{}
 
-	b.push(&types.Header{Hash: types.StringToHash("1")})
-	b.push(&types.Header{Hash: types.StringToHash("2")})
+	b.push(&block{Hash: types.StringToHash("1")})
+	b.push(&block{Hash: types.StringToHash("2")})
 
 	cur := b.Head()
 
-	b.push(&types.Header{Hash: types.StringToHash("3")})
-	b.push(&types.Header{Hash: types.StringToHash("4")})
+	b.push(&block{Hash: types.StringToHash("3")})
+	b.push(&block{Hash: types.StringToHash("4")})
 
 	// get the updates, there are two new entries
 	updates, next := cur.getUpdates()

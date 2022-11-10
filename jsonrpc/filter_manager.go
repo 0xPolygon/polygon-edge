@@ -114,7 +114,7 @@ type blockFilter struct {
 }
 
 // takeBlockUpdates advances blocks from head to latest and returns header array
-func (f *blockFilter) takeBlockUpdates() []*types.Header {
+func (f *blockFilter) takeBlockUpdates() []*block {
 	updates, newHead := f.block.getUpdates()
 	f.setHeadElem(newHead)
 
@@ -265,7 +265,10 @@ func NewFilterManager(logger hclog.Logger, store filterManagerStore, blockRangeL
 
 	// start blockstream with the current header
 	header := store.Header()
-	m.blockStream.push(header)
+
+	// TODO: Make Header return jsonrpc.block object directly
+	block := toBlock(&types.Block{Header: header}, false)
+	m.blockStream.push(block)
 
 	// start the head watcher
 	m.subscription = store.SubscribeEvents()
@@ -648,18 +651,20 @@ func (f *FilterManager) processEvent(evnt *blockchain.Event) {
 	defer f.RUnlock()
 
 	for _, header := range evnt.NewChain {
+		block := toBlock(&types.Block{Header: header}, false)
+
 		// first include all the new headers in the blockstream for BlockFilter
-		f.blockStream.push(header)
+		f.blockStream.push(block)
 
 		// process new chain to include new logs for LogFilter
-		if processErr := f.appendLogsToFilters(header); processErr != nil {
+		if processErr := f.appendLogsToFilters(block); processErr != nil {
 			f.logger.Error(fmt.Sprintf("Unable to process block, %v", processErr))
 		}
 	}
 }
 
 // appendLogsToFilters makes each LogFilters append logs in the header
-func (f *FilterManager) appendLogsToFilters(header *types.Header) error {
+func (f *FilterManager) appendLogsToFilters(header *block) error {
 	receipts, err := f.store.GetReceiptsByHash(header.Hash)
 	if err != nil {
 		return err
@@ -691,7 +696,7 @@ func (f *FilterManager) appendLogsToFilters(header *types.Header) error {
 						Address:     log.Address,
 						Topics:      log.Topics,
 						Data:        argBytes(log.Data),
-						BlockNumber: argUint64(header.Number),
+						BlockNumber: header.Number,
 						BlockHash:   header.Hash,
 						TxHash:      receipt.TxHash,
 						TxIndex:     argUint64(indx),
@@ -823,7 +828,7 @@ func (b *blockStream) Head() *headElem {
 	return b.head
 }
 
-func (b *blockStream) push(header *types.Header) {
+func (b *blockStream) push(header *block) {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
@@ -839,12 +844,12 @@ func (b *blockStream) push(header *types.Header) {
 }
 
 type headElem struct {
-	header *types.Header
+	header *block
 	next   *headElem
 }
 
-func (h *headElem) getUpdates() ([]*types.Header, *headElem) {
-	res := make([]*types.Header, 0)
+func (h *headElem) getUpdates() ([]*block, *headElem) {
+	res := make([]*block, 0)
 
 	cur := h
 
