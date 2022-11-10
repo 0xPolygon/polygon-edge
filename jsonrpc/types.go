@@ -81,7 +81,7 @@ func toTransaction(
 	return res
 }
 
-type Block struct {
+type block struct {
 	ParentHash      types.Hash          `json:"parentHash"`
 	Sha3Uncles      types.Hash          `json:"sha3Uncles"`
 	Miner           argBytes            `json:"miner"`
@@ -104,9 +104,9 @@ type Block struct {
 	Uncles          []types.Hash        `json:"uncles"`
 }
 
-func toBlock(b *types.Block, fullTx bool) *Block {
+func toBlock(b *types.Block, fullTx bool) *block {
 	h := b.Header
-	res := &Block{
+	res := &block{
 		ParentHash:      h.ParentHash,
 		Sha3Uncles:      h.Sha3Uncles,
 		Miner:           argBytes(h.Miner),
