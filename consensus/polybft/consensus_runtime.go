@@ -950,12 +950,14 @@ func (c *consensusRuntime) IsProposer(id []byte, height, round uint64) bool {
 }
 
 func (c *consensusRuntime) IsValidProposalHash(proposal, hash []byte) bool {
-	block := types.Block{}
-	if err := block.UnmarshalRLP(proposal); err != nil {
+	proposalObj := Proposal{}
+	if err := proposalObj.UnmarshalRLP(proposal); err != nil {
 		c.logger.Error("unable to unmarshal proposal", "error", err)
 
 		return false
 	}
+
+	block := proposalObj.Block
 
 	extra, err := GetIbftExtra(block.Header.ExtraData)
 	if err != nil {
@@ -1075,12 +1077,14 @@ func (c *consensusRuntime) BuildPrePrepareMessage(
 	certificate *protoIBFT.RoundChangeCertificate,
 	view *protoIBFT.View,
 ) *protoIBFT.Message {
-	block := types.Block{}
-	if err := block.UnmarshalRLP(proposal); err != nil {
+	proposalObj := Proposal{}
+	if err := proposalObj.UnmarshalRLP(proposal); err != nil {
 		c.logger.Error(fmt.Sprintf("cannot unmarshal RLP: %s", err))
 
 		return nil
 	}
+
+	block := proposalObj.Block
 
 	extra, err := GetIbftExtra(block.Header.ExtraData)
 	if err != nil {

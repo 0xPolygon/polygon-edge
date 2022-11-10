@@ -182,7 +182,9 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 		"txs", len(stateBlock.Block.Transactions),
 		"hash", checkpointHash.String())
 
-	return stateBlock.Block.MarshalRLP(), nil
+	proposal := &Proposal{Block: stateBlock.Block, Hash: checkpointHash}
+
+	return proposal.MarshalRLP(), nil
 }
 
 func (f *fsm) stateTransactions() []*types.Transaction {
@@ -259,42 +261,46 @@ func (f *fsm) ValidateCommit(signer []byte, seal []byte, proposalHash []byte) er
 }
 
 // Validate validates a raw proposal (used if non-proposer)
-func (f *fsm) Validate(proposal []byte) error {
-	var block types.Block
-	if err := block.UnmarshalRLP(proposal); err != nil {
+func (f *fsm) Validate(proposalBytes []byte) error {
+	var proposal Proposal
+	if err := proposal.UnmarshalRLP(proposalBytes); err != nil {
 		return fmt.Errorf("failed to validate, cannot decode block data. Error: %w", err)
 	}
 
-	extra, err := GetIbftExtra(block.Header.ExtraData)
+	extra, err := GetIbftExtra(proposal.Block.Header.ExtraData)
 	if err != nil {
 		return err
 	}
 
-	checkpointHash, err := extra.Checkpoint.Hash(f.backend.GetChainID(), block.Number(), block.Hash())
+	checkpointHash, err := extra.Checkpoint.Hash(f.backend.GetChainID(), proposal.Block.Number(), proposal.Block.Hash())
 	if err != nil {
 		return fmt.Errorf("failed to calculate signed hash: %w", err)
+	}
+
+	if checkpointHash != proposal.Hash {
+		return fmt.Errorf("incorrect proposal hash")
 	}
 
 	f.logger.Debug("[FSM Validate]", "signed hash", checkpointHash.String())
 
 	// validate header fields
-	if err := validateHeaderFields(f.parent, block.Header); err != nil {
+	if err := validateHeaderFields(f.parent, proposal.Block.Header); err != nil {
 		return fmt.Errorf(
 			"failed to validate header (parent header# %d, current header#%d): %w",
 			f.parent.Number,
-			block.Number(),
+			proposal.Block.Number(),
 			err,
 		)
 	}
 
-	blockExtra, err := GetIbftExtra(block.Header.ExtraData)
+	blockExtra, err := GetIbftExtra(proposal.Block.Header.ExtraData)
 	if err != nil {
 		return fmt.Errorf("cannot get extra data:%w", err)
 	}
 
 	// TODO: Validate validator set delta?
 
-	blockNumber := block.Number()
+	blockNumber := proposal.Block.Number()
 	if blockNumber > 1 {
 		// verify parent signature
 		// We skip block 0 (genesis) and block 1 (parent is genesis)
@@ -327,15 +333,15 @@ func (f *fsm) Validate(proposal []byte) error {
 		}
 	}
 
-	if err := f.VerifyStateTransactions(block.Transactions); err != nil {
+	if err := f.VerifyStateTransactions(proposal.Block.Transactions); err != nil {
 		return err
 	}
 
-	if _, err = f.backend.ProcessBlock(f.parent, &block); err != nil {
+	if _, err = f.backend.ProcessBlock(f.parent, proposal.Block); err != nil {
 		return err
 	}
 
-	f.logger.Debug("[FSM Validate]", "txs", len(block.Transactions), "hash", block.Hash().String())
+	f.logger.Debug("[FSM Validate]", "txs", len(proposal.Block.Transactions), "hash", proposal.Block.Hash().String())
 
 	return nil
 }
@@ -461,16 +467,16 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 }
 
 // Insert inserts the sealed proposal
-func (f *fsm) Insert(proposal []byte, committedSeals []*messages.CommittedSeal) (*types.Block, error) {
-	newBlock := &types.Block{}
-	if err := newBlock.UnmarshalRLP(proposal); err != nil {
+func (f *fsm) Insert(proposalBytes []byte, committedSeals []*messages.CommittedSeal) (*types.Block, error) {
+	proposal := &Proposal{}
+	if err := proposal.UnmarshalRLP(proposalBytes); err != nil {
 		return nil, fmt.Errorf("cannot unmarshal proposal: %w", err)
 	}
 
 	// In this function we should try to return little to no errors since
 	// at this point everything we have to do is just commit something that
 	// we should have already computed beforehand.
-	extra, _ := GetIbftExtra(newBlock.Header.ExtraData)
+	extra, _ := GetIbftExtra(proposal.Block.Header.ExtraData)
 
 	// create map for faster access to indexes
 	nodeIDIndexMap := make(map[types.Address]int, f.validators.Len())
@@ -514,17 +520,17 @@ func (f *fsm) Insert(proposal []byte, committedSeals []*messages.CommittedSeal) 
 	}
 
 	// Write extar data to header
-	newBlock.Header.ExtraData = append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...)
+	proposal.Block.Header.ExtraData = append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...)
 
-	receipts, err := f.backend.CommitBlock(newBlock)
+	receipts, err := f.backend.CommitBlock(proposal.Block)
 	if err != nil {
 		return nil, err
 	}
 
 	// commit exit events only when we finalize a block
-	events, err := getExitEventsFromReceipts(f.epochNumber, newBlock.Number(), receipts)
+	events, err := getExitEventsFromReceipts(f.epochNumber, proposal.Block.Number(), receipts)
 	if err != nil {
-		return newBlock, err
+		return nil, err
 	}
 
 	if len(events) > 0 {
@@ -533,7 +539,7 @@ func (f *fsm) Insert(proposal []byte, committedSeals []*messages.CommittedSeal) 
 		}
 	}
 
-	return newBlock, nil
+	return proposal.Block, nil
 }
 
 // Height returns the height for the current round

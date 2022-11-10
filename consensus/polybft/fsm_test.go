@@ -262,6 +262,7 @@ func TestFSM_BuildProposal_WithoutUptimeTxGood(t *testing.T) {
 		parentCount              = 3
 		confirmedStateSyncsCount = 5
 		parentBlockNumber        = 1023
+		round                    = 5
 	)
 
 	validators := newTestValidators(accountCount)
@@ -278,7 +279,7 @@ func TestFSM_BuildProposal_WithoutUptimeTxGood(t *testing.T) {
 	fsm := &fsm{parent: parent, blockBuilder: mBlockBuilder, config: &PolyBFTConfig{}, backend: &blockchainMock{},
 		validators: validators.toValidatorSet(), checkpointBackend: checkpointBackendMock, logger: hclog.NewNullLogger()}
 
-	proposal, err := fsm.BuildProposal(1)
+	proposal, err := fsm.BuildProposal(round)
 	assert.NoError(t, err)
 	assert.NotNil(t, proposal)
 
@@ -288,17 +289,16 @@ func TestFSM_BuildProposal_WithoutUptimeTxGood(t *testing.T) {
 	checkpoint := &CheckpointData{
 		CurrentValidatorsHash: currentValidatorsHash,
 		NextValidatorsHash:    currentValidatorsHash,
+		BlockRound:            round,
 	}
 
-	// TODO: checkpointHash should be checked by proposalHash
-	_, err = checkpoint.Hash(fsm.backend.GetChainID(), stateBlock.Block.Number(), stateBlock.Block.Hash())
+	checkpointHash, err := checkpoint.Hash(fsm.backend.GetChainID(), stateBlock.Block.Number(), stateBlock.Block.Hash())
 	require.NoError(t, err)
 
-	rlpBlock := stateBlock.Block.MarshalRLP()
-	assert.Equal(t, rlpBlock, proposal)
+	proposalObj := Proposal{Block: stateBlock.Block, Hash: checkpointHash}
 
-	block := types.Block{}
-	require.NoError(t, block.UnmarshalRLP(proposal))
+	assert.Equal(t, proposalObj.MarshalRLP(), proposal)
+	assert.NoError(t, proposalObj.UnmarshalRLP(proposal))
 
 	mBlockBuilder.AssertExpectations(t)
 	checkpointBackendMock.AssertExpectations(t)
@@ -361,14 +361,12 @@ func TestFSM_BuildProposal_WithUptimeTxGood(t *testing.T) {
 		NextValidatorsHash:    nextValidatorsHash,
 	}
 
-	// TODO: checkpointHash should be checked by proposalHash
-	_, err = checkpoint.Hash(fsm.backend.GetChainID(), stateBlock.Block.Number(), stateBlock.Block.Hash())
+	checkpointHash, err := checkpoint.Hash(fsm.backend.GetChainID(), stateBlock.Block.Number(), stateBlock.Block.Hash())
 	require.NoError(t, err)
 
-	block := types.Block{}
-	require.NoError(t, block.UnmarshalRLP(proposal))
+	proposalObj := Proposal{Block: stateBlock.Block, Hash: checkpointHash}
 
-	assert.Equal(t, stateBlock.Block.MarshalRLP(), proposal)
+	assert.Equal(t, proposalObj.MarshalRLP(), proposal)
 
 	mBlockBuilder.AssertExpectations(t)
 	systemStateMock.AssertExpectations(t)
@@ -802,20 +800,18 @@ func TestFSM_ValidateCommit_Good(t *testing.T) {
 	proposal, err := fsm.BuildProposal(0)
 	require.NoError(t, err)
 
-	block := types.Block{}
-	require.NoError(t, block.UnmarshalRLP(proposal))
+	proposalObj := Proposal{}
+	require.NoError(t, proposalObj.UnmarshalRLP(proposal))
 
 	validator := validators.getValidator("A")
-	seal, err := validator.mustSign(block.Hash().Bytes()).Marshal()
+	seal, err := validator.mustSign(proposalObj.Block.Hash().Bytes()).Marshal()
 	require.NoError(t, err)
-	err = fsm.ValidateCommit(validator.Key().Address().Bytes(), seal, block.Hash().Bytes())
+	err = fsm.ValidateCommit(validator.Key().Address().Bytes(), seal, proposalObj.Block.Hash().Bytes())
 	require.NoError(t, err)
 
 	checkpointBackendMock.AssertExpectations(t)
 }
 
-// TODO: uncomment test after we change proposal structure
-/*
 func TestFSM_Validate_IncorrectSignHash(t *testing.T) {
 	t.Parallel()
 
@@ -841,17 +837,16 @@ func TestFSM_Validate_IncorrectSignHash(t *testing.T) {
 	proposal, err := fsm.BuildProposal(0)
 	require.NoError(t, err)
 
-	block := types.Block{}
-	require.NoError(t, block.UnmarshalRLP(proposal))
+	proposalObj := Proposal{}
+	require.NoError(t, proposalObj.UnmarshalRLP(proposal))
 
-	block.Header.Hash = types.Hash{32, 33} // make the wrong hash
-	proposal = block.MarshalRLP()
+	proposalObj.Block.Header.Hash = types.Hash{32, 33} // make the wrong hash
+	proposal = proposalObj.MarshalRLP()
 
 	err = fsm.Validate(proposal)
-	require.ErrorContains(t, err, "incorrect sign hash")
+	require.ErrorContains(t, err, "incorrect proposal hash")
 	checkpointBackendMock.AssertExpectations(t)
 }
-*/
 
 func TestFSM_Validate_IncorrectHeaderParentHash(t *testing.T) {
 	t.Parallel()
@@ -874,13 +869,14 @@ func TestFSM_Validate_IncorrectHeaderParentHash(t *testing.T) {
 
 	stateBlock := createDummyStateBlock(parent.Number+1, types.Hash{100, 15}, parent.ExtraData)
 
-	hash, err := new(CheckpointData).Hash(fsm.backend.GetChainID(), stateBlock.Block.Number(), stateBlock.Block.Hash())
+	proposalHash, err := new(CheckpointData).Hash(fsm.backend.GetChainID(), stateBlock.Block.Number(), stateBlock.Block.Hash())
 	require.NoError(t, err)
 
-	stateBlock.Block.Header.Hash = hash
-	proposal := stateBlock.Block.MarshalRLP()
+	stateBlock.Block.Header.Hash = proposalHash
+	proposalObj := Proposal{Block: stateBlock.Block, Hash: proposalHash}
 
-	err = fsm.Validate(proposal)
+	err = fsm.Validate(proposalObj.MarshalRLP())
+
 	require.ErrorContains(t, err, "incorrect header parent hash")
 }
 
@@ -911,9 +907,9 @@ func TestFSM_Validate_InvalidNumber(t *testing.T) {
 		require.NoError(t, err)
 
 		stateBlock.Block.Header.Hash = proposalHash
-		proposal := stateBlock.Block.MarshalRLP()
+		proposalObj := Proposal{Block: stateBlock.Block, Hash: proposalHash}
 
-		err = fsm.Validate(proposal)
+		err = fsm.Validate(proposalObj.MarshalRLP())
 		require.ErrorContains(t, err, "invalid number")
 	}
 }
@@ -943,13 +939,13 @@ func TestFSM_Validate_TimestampOlder(t *testing.T) {
 		fsm := &fsm{parent: parent, config: &PolyBFTConfig{}, backend: &blockchainMock{},
 			validators: validators.toValidatorSet(), logger: hclog.NewNullLogger()}
 
-		checkpointHash, err := new(CheckpointData).Hash(fsm.backend.GetChainID(), header.Number, header.Hash)
+		proposalHash, err := new(CheckpointData).Hash(fsm.backend.GetChainID(), header.Number, header.Hash)
 		require.NoError(t, err)
 
-		stateBlock.Block.Header.Hash = checkpointHash
-		proposal := stateBlock.Block.MarshalRLP()
+		proposalObj := Proposal{Block: stateBlock.Block, Hash: proposalHash}
 
-		err = fsm.Validate(proposal)
+		err = fsm.Validate(proposalObj.MarshalRLP())
+
 		assert.ErrorContains(t, err, "timestamp older than parent")
 	}
 }
@@ -984,12 +980,13 @@ func TestFSM_Validate_IncorrectMixHash(t *testing.T) {
 		validators: validators.toValidatorSet(),
 		logger:     hclog.NewNullLogger(),
 	}
-	rlpBlock := buildBlock.Block.MarshalRLP()
 
-	_, err := new(CheckpointData).Hash(fsm.backend.GetChainID(), header.Number, header.Hash)
+	checkpointHash, err := new(CheckpointData).Hash(fsm.backend.GetChainID(), header.Number, header.Hash)
 	require.NoError(t, err)
 
-	err = fsm.Validate(rlpBlock)
+	proposalObj := Proposal{Block: buildBlock.Block, Hash: checkpointHash}
+
+	err = fsm.Validate(proposalObj.MarshalRLP())
 	assert.ErrorContains(t, err, "mix digest is not correct")
 }
 
@@ -1044,9 +1041,9 @@ func TestFSM_Insert_Good(t *testing.T) {
 		})
 	}
 
-	proposal := buildBlock.Block.MarshalRLP()
+	proposal := Proposal{Block: buildBlock.Block}
 
-	block, err := fsm.Insert(proposal, commitedSeals)
+	block, err := fsm.Insert(proposal.MarshalRLP(), commitedSeals)
 
 	require.NoError(t, err)
 	mBackendMock.AssertExpectations(t)
@@ -1081,7 +1078,7 @@ func TestFSM_Insert_InvalidNode(t *testing.T) {
 		validators: newValidatorSet(types.Address{}, validatorSet[0:len(validatorSet)-1]),
 	}
 
-	proposal := buildBlock.Block.MarshalRLP()
+	proposalObj := Proposal{Block: buildBlock.Block}
 	validatorA := validators.getValidator("A")
 	validatorB := validators.getValidator("B")
 	proposalHash := buildBlock.Block.Hash().Bytes()
@@ -1102,7 +1099,7 @@ func TestFSM_Insert_InvalidNode(t *testing.T) {
 		{Signer: nonValidatorAccount.Address().Bytes(), Signature: nonValidatorSignature}, // this one should fail
 	}
 
-	_, err = fsm.Insert(proposal, commitedSeals)
+	_, err = fsm.Insert(proposalObj.MarshalRLP(), commitedSeals)
 	assert.ErrorContains(t, err, "invalid node id")
 }
 
@@ -1605,9 +1602,9 @@ func TestFSM_Validate_FailToVerifySignatures(t *testing.T) {
 	require.NoError(t, err)
 
 	finalBlock.Header.Hash = checkpointHash
-	proposal := finalBlock.MarshalRLP()
+	proposalObj := Proposal{Block: finalBlock, Hash: checkpointHash}
 
-	assert.ErrorContains(t, fsm.Validate(proposal), "failed to verify signatures")
+	assert.ErrorContains(t, fsm.Validate(proposalObj.MarshalRLP()), "failed to verify signatures")
 
 	polybftBackendMock.AssertExpectations(t)
 }
