@@ -55,4 +55,3 @@ jobs:
           SLACK_CHANNEL: ${{ secrets.SLACK_CHANNEL }}
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-    if: github.actor == 'lazartravica' || github.actor == 'zivkovicmilos' || github.actor == 'trimixlover' || github.actor == 'Aleksao998'
