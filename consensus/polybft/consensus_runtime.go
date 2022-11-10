@@ -308,8 +308,8 @@ func (c *consensusRuntime) FSM() error {
 	isEndOfSprint := c.isEndOfSprint(pendingBlockNumber)
 	isEndOfEpoch := c.isEndOfEpoch(pendingBlockNumber)
 
-	for i, _ := range epoch.Validators {
-		// TODO handle set voting power
+	// TODO handle set voting power
+	for i := range epoch.Validators {
 		epoch.Validators[i].VotingPower = 5
 	}
 
@@ -322,6 +322,7 @@ func (c *consensusRuntime) FSM() error {
 		iterationNumber := uint64(0)
 		currentHeader := parent
 		lastBlockOfPreviousEpoch := getEndEpochBlockNumber(epoch.Number-1, c.config.PolyBFTConfig.EpochSize)
+
 		for currentHeader.Number > lastBlockOfPreviousEpoch {
 			blockExtra, err := GetIbftExtra(currentHeader.ExtraData)
 			if err != nil {
@@ -329,12 +330,13 @@ func (c *consensusRuntime) FSM() error {
 			}
 
 			iterationNumber += blockExtra.Round + 1 // because round 0 is one of the iterations
-			ok := false
-			currentHeader, ok = c.config.blockchain.GetHeaderByNumber(currentHeader.Number - 1)
+			currentHeader, ok := c.config.blockchain.GetHeaderByNumber(currentHeader.Number - 1)
+
 			if !ok {
 				return fmt.Errorf("cannot find header by number: %d", currentHeader.Number)
 			}
 		}
+
 		if iterationNumber > 0 {
 			err = valSet.IncrementProposerPriority(iterationNumber)
 			if err != nil {
