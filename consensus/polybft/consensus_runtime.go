@@ -257,6 +257,8 @@ func (c *consensusRuntime) OnBlockInserted(block *types.Block) {
 		err   error
 	)
 
+	// TODO - this condition will need to be changed to recognize that either slashing happened
+	// or epoch reached its fixed size
 	if c.isEndOfEpoch(block.Header.Number) {
 		if epoch, err = c.restartEpoch(block.Header); err != nil {
 			c.logger.Error("failed to restart epoch after block inserted", "error", err)
@@ -456,7 +458,7 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) (*epochMetadata, e
 		Validators: validatorSet,
 	})
 
-	firstBlockInEpoch, err := getFirstBlockOfEpoch(header, c.config.blockchain.GetHeaderByNumber)
+	firstBlockInEpoch, err := getFirstBlockOfEpoch(epochNumber, header, c.config.blockchain.GetHeaderByNumber)
 	if err != nil {
 		return nil, err
 	}
@@ -761,7 +763,7 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header, epoch *ep
 	}
 
 	// calculate uptime for current epoch
-	for blockExtra.Checkpoint.EpochNumber == epochID {
+	for blockHeader.Number > epoch.FirstBlockInEpoch {
 		if err := calculateUptimeForBlock(blockExtra, epoch.Validators); err != nil {
 			return nil, err
 		}
@@ -769,11 +771,8 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header, epoch *ep
 		blockHeader, blockExtra, err = getBlockData(blockHeader.Number-1, c.config.blockchain.GetHeaderByNumber)
 	}
 
-	epochStartBlock := blockHeader.Number + 1
-	epochEndBlock := currentBlock.Number + 1
-
 	// calculate uptime for blocks from previous epoch that were not processed in previous uptime
-	// since we can not calculate uptime for the last block in epoch
+	// since we can not calculate uptime for the last block in epoch (because of parent signatures)
 	if blockHeader.Number > uptimeLookbackSize {
 		for i := 0; i < uptimeLookbackSize; i++ {
 			validators, err := c.config.polybftBackend.GetValidators(blockHeader.Number-2, nil)
@@ -812,8 +811,8 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header, epoch *ep
 	commitEpoch := &CommitEpoch{
 		EpochID: epoch.Number,
 		Epoch: Epoch{
-			StartBlock: epochStartBlock,
-			EndBlock:   epochEndBlock,
+			StartBlock: epoch.FirstBlockInEpoch,
+			EndBlock:   currentBlock.Number + 1,
 			EpochRoot:  types.Hash{},
 		},
 		Uptime: uptime,
