@@ -259,7 +259,7 @@ func (c *consensusRuntime) OnBlockInserted(block *types.Block) {
 
 	// TODO - this condition will need to be changed to recognize that either slashing happened
 	// or epoch reached its fixed size
-	if c.isEndOfEpoch(block.Header.Number) {
+	if c.isFixedSizeOfEpochMet(block.Header.Number) {
 		if epoch, err = c.restartEpoch(block.Header); err != nil {
 			c.logger.Error("failed to restart epoch after block inserted", "error", err)
 
@@ -378,7 +378,7 @@ func (c *consensusRuntime) FSM() error {
 
 	pendingBlockNumber := parent.Number + 1
 	isEndOfSprint := c.isEndOfSprint(pendingBlockNumber)
-	isEndOfEpoch := slash || c.isEndOfEpoch(pendingBlockNumber)
+	isEndOfEpoch := slash || c.isFixedSizeOfEpochMet(pendingBlockNumber)
 
 	valSet := NewValidatorSet(epoch.Validators, c.logger)
 
@@ -911,9 +911,9 @@ func (c *consensusRuntime) isActiveValidator() bool {
 	return atomic.LoadUint32(&c.activeValidatorFlag) == 1
 }
 
-// isEndOfEpoch checks if epoch reached its end that was configured by its default size
+// isFixedSizeOfEpochMet checks if epoch reached its end that was configured by its default size
 // this is only true if no slashing occurred in the given epoch
-func (c *consensusRuntime) isEndOfEpoch(blockNumber uint64) bool {
+func (c *consensusRuntime) isFixedSizeOfEpochMet(blockNumber uint64) bool {
 	epoch := c.getEpoch()
 
 	return (blockNumber - c.config.PolyBFTConfig.EpochSize + 1) == epoch.FirstBlockInEpoch
