@@ -372,21 +372,22 @@ func (c *consensusRuntime) FSM() error {
 		for currentHeader.Number > lastBlockOfPreviousEpoch {
 			blockExtra, err := GetIbftExtra(currentHeader.ExtraData)
 			if err != nil {
-				return fmt.Errorf("cannot get ibft extra data: %w", err)
+				return fmt.Errorf("cannot get ibft extra: %w", err)
 			}
 
 			iterationNumber += blockExtra.Round + 1 // because round 0 is one of the iterations
-			currentHeader, ok := c.config.blockchain.GetHeaderByNumber(currentHeader.Number - 1)
+			ok := false
 
+			currentHeader, ok = c.config.blockchain.GetHeaderByNumber(currentHeader.Number - 1)
 			if !ok {
-				return fmt.Errorf("cannot find header by number: %d", currentHeader.Number)
+				return fmt.Errorf("cannot get header by number: %d", currentHeader.Number)
 			}
 		}
 
 		if iterationNumber > 0 {
 			err = valSet.IncrementProposerPriority(iterationNumber)
 			if err != nil {
-				return fmt.Errorf("cannot increment proposer priority: %w", err)
+				return fmt.Errorf("cannot increment proposer priority in fsm: %w", err)
 			}
 		}
 	}
