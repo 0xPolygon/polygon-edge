@@ -6,19 +6,20 @@ import (
 	"time"
 
 	"github.com/0xPolygon/go-ibft/messages"
+	protoIBFT "github.com/0xPolygon/go-ibft/messages/proto"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-func (i *backendIBFT) BuildProposal(blockNumber uint64) []byte {
+func (i *backendIBFT) BuildProposal(view *protoIBFT.View) []byte {
 	var (
 		latestHeader      = i.blockchain.Header()
 		latestBlockNumber = latestHeader.Number
 	)
 
-	if latestBlockNumber+1 != blockNumber {
+	if latestBlockNumber+1 != view.Height {
 		i.logger.Error(
 			"unable to build block, due to lack of parent block",
 			"num",
@@ -30,7 +31,7 @@ func (i *backendIBFT) BuildProposal(blockNumber uint64) []byte {
 
 	block, err := i.buildBlock(latestHeader)
 	if err != nil {
-		i.logger.Error("cannot build block", "num", blockNumber, "err", err)
+		i.logger.Error("cannot build block", "num", view.Height, "err", err)
 
 		return nil
 	}
@@ -103,11 +104,7 @@ func (i *backendIBFT) ID() []byte {
 	return i.currentSigner.Address().Bytes()
 }
 
-func (i *backendIBFT) MaximumFaultyNodes() uint64 {
-	return uint64(CalcMaxFaultyNodes(i.currentValidators))
-}
-
-func (i *backendIBFT) Quorum(blockNumber uint64) uint64 {
+func (i *backendIBFT) quorum(blockNumber uint64) uint64 {
 	validators, err := i.forkManager.GetValidators(blockNumber)
 	if err != nil {
 		i.logger.Error(
@@ -123,6 +120,26 @@ func (i *backendIBFT) Quorum(blockNumber uint64) uint64 {
 	quorumFn := i.quorumSize(blockNumber)
 
 	return uint64(quorumFn(validators))
+}
+
+// HasQuorum returns true if quorum is reached for the given height
+func (i *backendIBFT) HasQuorum(
+	blockNumber uint64,
+	messages []*protoIBFT.Message,
+	msgType protoIBFT.MessageType,
+) bool {
+	quorum := i.quorum(blockNumber)
+
+	switch msgType {
+	case protoIBFT.MessageType_PREPREPARE:
+		return len(messages) >= 0
+	case protoIBFT.MessageType_PREPARE:
+		return len(messages) >= int(quorum)-1
+	case protoIBFT.MessageType_ROUND_CHANGE, protoIBFT.MessageType_COMMIT:
+		return len(messages) >= int(quorum)
+	}
+
+	return false
 }
 
 // buildBlock builds the block, based on the passed in snapshot and parent header
