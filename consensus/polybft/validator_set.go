@@ -1,14 +1,22 @@
 package polybft
 
 import (
-	"github.com/0xPolygon/pbft-consensus"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-// ValidatorSet is a wrapper interface around pbft.ValidatorSet and it holds current validator set
+// ValidatorSet interface of the current validator set
 type ValidatorSet interface {
-	pbft.ValidatorSet
 
+	// CalcProposer calculates next proposer based on the passed round
+	CalcProposer(round uint64) types.Address
+
+	// Includes checks if the passed address in included in the current validator set
+	Includes(address types.Address) bool
+
+	// Len returns the size of the validator set
+	Len() int
+
+	// Accounts returns the list of the ValidatorMetadata
 	Accounts() AccountSet
 }
 
@@ -28,7 +36,7 @@ func (v validatorSet) Accounts() AccountSet {
 	return v.validators
 }
 
-func (v validatorSet) CalcProposer(round uint64) pbft.NodeID {
+func (v validatorSet) CalcProposer(round uint64) types.Address {
 	var seed uint64
 	if v.last == (types.Address{}) {
 		seed = round
@@ -43,11 +51,11 @@ func (v validatorSet) CalcProposer(round uint64) pbft.NodeID {
 
 	pick := seed % uint64(v.validators.Len())
 
-	return pbft.NodeID(v.validators[pick].Address.String())
+	return v.validators[pick].Address
 }
 
-func (v validatorSet) Includes(id pbft.NodeID) bool {
-	return v.validators.ContainsNodeID(id)
+func (v validatorSet) Includes(address types.Address) bool {
+	return v.validators.ContainsAddress(address)
 }
 
 func (v validatorSet) Len() int {

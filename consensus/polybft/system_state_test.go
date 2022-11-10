@@ -28,8 +28,8 @@ func TestSystemState_GetValidatorSet(t *testing.T) {
 
 		struct Validator {
 			uint256[4] id;
-			uint256 sender;
-			uint256 receiver;
+			uint256 stake;
+			uint256 totalStake;
 			uint256 data;
 		}
 
@@ -46,7 +46,7 @@ func TestSystemState_GetValidatorSet(t *testing.T) {
 				16798350082249088544573448433070681576641749462807627179536437108134609634615,
 				21427200503135995176566340351867145775962083994845221446131416289459495591422
 			];
-			return Validator(key, 0, 0, 0);
+			return Validator(key, 10, 0, 0);
 		}
 
 		`
@@ -72,6 +72,7 @@ func TestSystemState_GetValidatorSet(t *testing.T) {
 	validators, err := st.GetValidatorSet()
 	assert.NoError(t, err)
 	assert.Equal(t, types.Address(ethgo.HexToAddress("1")), validators[0].Address)
+	assert.Equal(t, uint64(10), validators[0].VotingPower)
 }
 
 func TestSystemState_GetNextExecutionAndCommittedIndex(t *testing.T) {

@@ -32,7 +32,7 @@ func TestE2E_Consensus_Sync_WithNonValidators(t *testing.T) {
 	node.Stop()
 
 	// wait for at least 15 more blocks before starting again
-	assert.NoError(t, cluster.WaitForBlock(35, 1*time.Minute))
+	assert.NoError(t, cluster.WaitForBlock(35, 2*time.Minute))
 
 	// start the node again
 	node.Start()
@@ -55,7 +55,7 @@ func TestE2E_Consensus_Sync(t *testing.T) {
 	node.Stop()
 
 	// wait for at least 15 more blocks before starting again
-	assert.NoError(t, cluster.WaitForBlock(20, 1*time.Minute))
+	assert.NoError(t, cluster.WaitForBlock(20, 2*time.Minute))
 
 	// start the node again
 	node.Start()

@@ -938,6 +938,21 @@ func (b *Blockchain) WriteBlock(block *types.Block, source string) error {
 	return nil
 }
 
+// GetCachedReceipts retrieves cached receipts for given headerHash
+func (b *Blockchain) GetCachedReceipts(headerHash types.Hash) ([]*types.Receipt, error) {
+	receipts, found := b.receiptsCache.Get(headerHash)
+	if !found {
+		return nil, fmt.Errorf("failed to retrieve receipts for header hash: %s", headerHash)
+	}
+
+	extractedReceipts, ok := receipts.([]*types.Receipt)
+	if !ok {
+		return nil, errors.New("invalid type assertion for receipts")
+	}
+
+	return extractedReceipts, nil
+}
+
 // extractBlockReceipts extracts the receipts from the passed in block
 func (b *Blockchain) extractBlockReceipts(block *types.Block) ([]*types.Receipt, error) {
 	// Check the cache for the block receipts

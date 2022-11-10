@@ -31,10 +31,10 @@ func (m *blockchainMock) CurrentHeader() *types.Header {
 	return args.Get(0).(*types.Header) //nolint:forcetypeassert
 }
 
-func (m *blockchainMock) CommitBlock(stateBlock *StateBlock) error {
-	args := m.Called(stateBlock)
+func (m *blockchainMock) CommitBlock(block *types.Block) ([]*types.Receipt, error) {
+	args := m.Called(block)
 
-	return args.Error(0)
+	return args.Get(0).([]*types.Receipt), args.Error(1) //nolint:forcetypeassert
 }
 
 func (m *blockchainMock) NewBlockBuilder(parent *types.Header, coinbase types.Address,
@@ -122,24 +122,6 @@ var _ polybftBackend = (*polybftBackendMock)(nil)
 
 type polybftBackendMock struct {
 	mock.Mock
-}
-
-// CheckIfStuck checks if state machine is stuck.
-func (p *polybftBackendMock) CheckIfStuck(num uint64) (uint64, bool) {
-	args := p.Called(num)
-
-	if len(args) == 2 {
-		return args.Get(0).(uint64), args.Bool(1) //nolint:forcetypeassert
-	} else if len(args) == 1 {
-		peerHeight, ok := args.Get(0).(uint64)
-		if ok {
-			return peerHeight, num < peerHeight
-		}
-
-		return 0, args.Bool(0)
-	}
-
-	return 0, false
 }
 
 // GetValidators retrieves validator set for the given block
@@ -290,14 +272,14 @@ func (s *stateProviderMock) Txn(ethgo.Address, ethgo.Key, []byte) (contract.Txn,
 	return nil, nil
 }
 
-var _ Transport = (*transportMock)(nil)
+var _ BridgeTransport = (*transportMock)(nil)
 
 type transportMock struct {
 	mock.Mock
 }
 
-func (t *transportMock) Gossip(message interface{}) {
-	_ = t.Called(message)
+func (t *transportMock) Multicast(msg interface{}) {
+	_ = t.Called(msg)
 }
 
 var _ checkpointBackend = (*checkpointBackendMock)(nil)
@@ -331,20 +313,24 @@ func newTestValidators(validatorsCount int) *testValidators {
 	return newTestValidatorsWithAliases(aliases)
 }
 
-func newTestValidatorsWithAliases(aliases []string) *testValidators {
+func newTestValidatorsWithAliases(aliases []string, votingPowers ...[]uint64) *testValidators {
 	validators := map[string]*testValidator{}
-	for _, alias := range aliases {
-		validators[alias] = newTestValidator(alias)
+
+	for i, alias := range aliases {
+		votingPower := uint64(1)
+		if len(votingPowers) == 1 {
+			votingPower = votingPowers[0][i]
+		}
+
+		validators[alias] = newTestValidator(alias, votingPower)
 	}
 
-	return &testValidators{
-		validators: validators,
-	}
+	return &testValidators{validators: validators}
 }
 
-func (v *testValidators) create(alias string) {
+func (v *testValidators) create(alias string, votingPower uint64) {
 	if _, ok := v.validators[alias]; !ok {
-		v.validators[alias] = newTestValidator(alias)
+		v.validators[alias] = newTestValidator(alias, votingPower)
 	}
 }
 
@@ -379,9 +365,9 @@ func (v *testValidators) getValidators(aliases ...string) (res []*testValidator)
 	return
 }
 
-func (v *testValidators) getPublicIdentities(aliases ...string) (res AccountSet) { //nolint:unparam
+func (v *testValidators) getPublicIdentities(aliases ...string) (res AccountSet) {
 	v.iterAcct(aliases, func(t *testValidator) {
-		res = append(res, t.ValidatorAccount())
+		res = append(res, t.ValidatorMetadata())
 	})
 
 	return
@@ -409,12 +395,17 @@ func (v *testValidators) toValidatorSet() *validatorSet {
 }
 
 type testValidator struct {
-	alias   string
-	account *wallet.Account
+	alias       string
+	account     *wallet.Account
+	votingPower uint64
 }
 
-func newTestValidator(alias string) *testValidator {
-	return &testValidator{alias: alias, account: wallet.GenerateAccount()}
+func newTestValidator(alias string, votingPower uint64) *testValidator {
+	return &testValidator{
+		alias:       alias,
+		votingPower: votingPower,
+		account:     wallet.GenerateAccount(),
+	}
 }
 
 func (v *testValidator) Address() types.Address {
@@ -435,10 +426,11 @@ func (v *testValidator) paramsValidator() *Validator {
 	}
 }
 
-func (v *testValidator) ValidatorAccount() *ValidatorAccount {
-	return &ValidatorAccount{
-		Address: types.Address(v.account.Ecdsa.Address()),
-		BlsKey:  v.account.Bls.PublicKey(),
+func (v *testValidator) ValidatorMetadata() *ValidatorMetadata {
+	return &ValidatorMetadata{
+		Address:     types.Address(v.account.Ecdsa.Address()),
+		BlsKey:      v.account.Bls.PublicKey(),
+		VotingPower: v.votingPower,
 	}
 }
 
@@ -484,4 +476,46 @@ func (t *testHeadersMap) getHeaders() []*types.Header {
 	}
 
 	return headers
+}
+
+var _ txPoolInterface = (*txPoolMock)(nil)
+
+type txPoolMock struct {
+	mock.Mock
+}
+
+func (tp *txPoolMock) Prepare() {
+	tp.Called()
+}
+
+func (tp *txPoolMock) Length() uint64 {
+	args := tp.Called()
+
+	return args[0].(uint64) //nolint
+}
+
+func (tp *txPoolMock) Peek() *types.Transaction {
+	args := tp.Called()
+
+	return args[0].(*types.Transaction) //nolint
+}
+
+func (tp *txPoolMock) Pop(tx *types.Transaction) {
+	tp.Called(tx)
+}
+
+func (tp *txPoolMock) Drop(tx *types.Transaction) {
+	tp.Called(tx)
+}
+
+func (tp *txPoolMock) Demote(tx *types.Transaction) {
+	tp.Called(tx)
+}
+
+func (tp *txPoolMock) SetSealing(v bool) {
+	tp.Called(v)
+}
+
+func (tp *txPoolMock) ResetWithHeaders(values ...*types.Header) {
+	tp.Called(values)
 }
