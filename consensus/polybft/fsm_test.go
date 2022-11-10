@@ -1,5 +1,12 @@
 package polybft
 
+import (
+	"math/rand"
+
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
+	"github.com/0xPolygon/polygon-edge/types"
+)
+
 /*
 import (
 	"errors"
@@ -1675,31 +1682,6 @@ func TestFSM_Validate_FailToVerifySignatures(t *testing.T) {
 	polybftBackendMock.AssertExpectations(t)
 }
 
-func generateValidatorDelta(validatorCount int, allAccounts, previousValidatorSet AccountSet) (vd *ValidatorSetDelta) {
-	oldMap := make(map[types.Address]int, previousValidatorSet.Len())
-	for i, x := range previousValidatorSet {
-		oldMap[x.Address] = i
-	}
-
-	vd = &ValidatorSetDelta{}
-	vd.Removed = bitmap.Bitmap{}
-
-	for _, id := range rand.Perm(len(allAccounts))[:validatorCount] {
-		_, exists := oldMap[allAccounts[id].Address]
-		if !exists {
-			vd.Added = append(vd.Added, allAccounts[id])
-		}
-
-		delete(oldMap, allAccounts[id].Address)
-	}
-
-	for _, v := range oldMap {
-		vd.Removed.Set(uint64(v))
-	}
-
-	return
-}
-
 func createDummyStateBlock(blockNumber uint64, parentHash types.Hash, extraData []byte) *StateBlock {
 	finalBlock := consensus.BuildBlock(consensus.BuildBlockParams{
 		Header: &types.Header{
@@ -1726,32 +1708,6 @@ func createTestExtra(
 	copy(result[ExtraVanity:], marshaled)
 
 	return result
-}
-
-func createTestExtraObject(allAccounts,
-	previousValidatorSet AccountSet,
-	validatorsCount,
-	committedSignaturesCount,
-	parentSignaturesCount int) *Extra {
-	accountCount := len(allAccounts)
-	dummySignature := [64]byte{}
-	bitmapCommitted, bitmapParent := bitmap.Bitmap{}, bitmap.Bitmap{}
-	extraData := &Extra{}
-	extraData.Validators = generateValidatorDelta(validatorsCount, allAccounts, previousValidatorSet)
-
-	for j := range rand.Perm(accountCount)[:committedSignaturesCount] {
-		bitmapCommitted.Set(uint64(j))
-	}
-
-	for j := range rand.Perm(accountCount)[:parentSignaturesCount] {
-		bitmapParent.Set(uint64(j))
-	}
-
-	extraData.Parent = &Signature{Bitmap: bitmapCommitted, AggregatedSignature: dummySignature[:]}
-	extraData.Committed = &Signature{Bitmap: bitmapParent, AggregatedSignature: dummySignature[:]}
-	extraData.Checkpoint = &CheckpointData{}
-
-	return extraData
 }
 
 func createTestCommitment(t *testing.T, accounts []*wallet.Account) *CommitmentMessageSigned {
@@ -1845,3 +1801,54 @@ func createTestUptimeCounter(t *testing.T, validatorSet AccountSet, epochSize ui
 	return commitEpoch
 }
 */
+
+func createTestExtraObject(allAccounts,
+	previousValidatorSet AccountSet,
+	validatorsCount,
+	committedSignaturesCount,
+	parentSignaturesCount int) *Extra {
+	accountCount := len(allAccounts)
+	dummySignature := [64]byte{}
+	bitmapCommitted, bitmapParent := bitmap.Bitmap{}, bitmap.Bitmap{}
+	extraData := &Extra{}
+	extraData.Validators = generateValidatorDelta(validatorsCount, allAccounts, previousValidatorSet)
+
+	for j := range rand.Perm(accountCount)[:committedSignaturesCount] {
+		bitmapCommitted.Set(uint64(j))
+	}
+
+	for j := range rand.Perm(accountCount)[:parentSignaturesCount] {
+		bitmapParent.Set(uint64(j))
+	}
+
+	extraData.Parent = &Signature{Bitmap: bitmapCommitted, AggregatedSignature: dummySignature[:]}
+	extraData.Committed = &Signature{Bitmap: bitmapParent, AggregatedSignature: dummySignature[:]}
+	extraData.Checkpoint = &CheckpointData{}
+
+	return extraData
+}
+
+func generateValidatorDelta(validatorCount int, allAccounts, previousValidatorSet AccountSet) (vd *ValidatorSetDelta) {
+	oldMap := make(map[types.Address]int, previousValidatorSet.Len())
+	for i, x := range previousValidatorSet {
+		oldMap[x.Address] = i
+	}
+
+	vd = &ValidatorSetDelta{}
+	vd.Removed = bitmap.Bitmap{}
+
+	for _, id := range rand.Perm(len(allAccounts))[:validatorCount] {
+		_, exists := oldMap[allAccounts[id].Address]
+		if !exists {
+			vd.Added = append(vd.Added, allAccounts[id])
+		}
+
+		delete(oldMap, allAccounts[id].Address)
+	}
+
+	for _, v := range oldMap {
+		vd.Removed.Set(uint64(v))
+	}
+
+	return
+}

@@ -200,6 +200,11 @@ func (c *consensusRuntime) OnBlockInserted(block *types.Block) {
 	// after the block has been written we reset the txpool so that the old transactions are removed
 	c.config.txPool.ResetWithHeaders(block.Header)
 
+	// handle commitment and bundles creation
+	if err := c.createCommitmentAndBundles(block.Transactions); err != nil {
+		c.logger.Error("on block inserted error", "err", err)
+	}
+
 	if c.isEndOfEpoch(block.Header.Number) {
 		// reset the epoch. Internally it updates the parent block header.
 		if err := c.restartEpoch(block.Header); err != nil {
@@ -210,6 +215,47 @@ func (c *consensusRuntime) OnBlockInserted(block *types.Block) {
 		c.lastBuiltBlock = block.Header
 		c.lock.Unlock()
 	}
+}
+
+func (c *consensusRuntime) createCommitmentAndBundles(txs []*types.Transaction) error {
+	if !c.IsBridgeEnabled() {
+		return nil
+	}
+
+	commitment, err := getCommitmentMessageSignedTx(txs)
+	if err != nil {
+		return err
+	}
+
+	// no commitment message -> this is not end of epoch block
+	if commitment == nil {
+		return nil
+	}
+
+	if err := c.state.insertCommitmentMessage(commitment); err != nil {
+		return fmt.Errorf("insert commitment message error: %w", err)
+	}
+
+	// TODO: keep systemState.GetNextExecutionIndex() also in cr?
+	// Maybe some immutable structure `consensusMetaData`?
+	previousBlock, epoch := c.getLastBuiltBlockAndEpoch()
+
+	systemState, err := c.getSystemState(previousBlock)
+	if err != nil {
+		return fmt.Errorf("build bundles, get system state error: %w", err)
+	}
+
+	nextStateSyncExecutionIdx, err := systemState.GetNextExecutionIndex()
+	if err != nil {
+		return fmt.Errorf("build bundles, get next execution index error: %w", err)
+	}
+
+	if err := c.buildBundles(
+		epoch.Commitment, commitment.Message, nextStateSyncExecutionIdx); err != nil {
+		return fmt.Errorf("build bundles error: %w", err)
+	}
+
+	return nil
 }
 
 func (c *consensusRuntime) populateFsmIfBridgeEnabled(
@@ -971,19 +1017,6 @@ func (c *consensusRuntime) InsertBlock(proposal []byte, committedSeals []*messag
 	}
 
 	if c.IsBridgeEnabled() {
-		_, epoch := c.getLastBuiltBlockAndEpoch()
-
-		if fsm.isEndOfEpoch && fsm.commitmentToSaveOnRegister != nil {
-			if err := c.state.insertCommitmentMessage(fsm.commitmentToSaveOnRegister); err != nil {
-				c.logger.Error("insert proposal, insert commitment message error", "error", err)
-			}
-
-			if err := c.buildBundles(
-				epoch.Commitment, fsm.commitmentToSaveOnRegister.Message, fsm.stateSyncExecutionIndex); err != nil {
-				c.logger.Error("insert proposal, build bundles error", "error", err)
-			}
-		}
-
 		if fsm.isEndOfEpoch || c.checkpointManager.isCheckpointBlock(block.Header.Number) {
 			if bytes.Equal(c.config.Key.Address().Bytes(), block.Header.Miner) { // true if node is proposer
 				go func(header types.Header, epochNumber uint64) {
