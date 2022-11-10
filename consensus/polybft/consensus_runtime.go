@@ -307,10 +307,40 @@ func (c *consensusRuntime) FSM() error {
 	pendingBlockNumber := parent.Number + 1
 	isEndOfSprint := c.isEndOfSprint(pendingBlockNumber)
 	isEndOfEpoch := c.isEndOfEpoch(pendingBlockNumber)
-	valSet, err := NewValidatorSet(epoch.Validators)
 
+	for i, _ := range epoch.Validators {
+		// TODO handle set voting power
+		epoch.Validators[i].VotingPower = 5
+	}
+
+	valSet, err := NewValidatorSet(epoch.Validators)
 	if err != nil {
 		return fmt.Errorf("cannot create validator set for fsm: %w", err)
+	}
+
+	if epoch.Number > 0 { // it must be at least epoc
+		iterationNumber := uint64(0)
+		currentHeader := parent
+		lastBlockOfPreviousEpoch := getEndEpochBlockNumber(epoch.Number-1, c.config.PolyBFTConfig.EpochSize)
+		for currentHeader.Number > lastBlockOfPreviousEpoch {
+			blockExtra, err := GetIbftExtra(currentHeader.ExtraData)
+			if err != nil {
+				return err
+			}
+
+			iterationNumber += blockExtra.Round + 1 // because round 0 is one of the iterations
+			ok := false
+			currentHeader, ok = c.config.blockchain.GetHeaderByNumber(currentHeader.Number - 1)
+			if !ok {
+				return fmt.Errorf("cannot find header by number: %d", currentHeader.Number)
+			}
+		}
+		if iterationNumber > 0 {
+			err = valSet.IncrementProposerPriority(iterationNumber)
+			if err != nil {
+				return fmt.Errorf("cannot increment proposer priority: %w", err)
+			}
+		}
 	}
 
 	ff := &fsm{
@@ -414,7 +444,12 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) error {
 	c.lastBuiltBlock = header
 	c.lock.Unlock()
 
-	c.logger.Info("restartEpoch", "block number", header.Number, "epoch", epochNumber, "validators", validatorSet.Len())
+	c.logger.Info(
+		"restartEpoch",
+		"block number", header.Number,
+		"epoch", epochNumber,
+		"validators", validatorSet.Len(),
+	)
 
 	return nil
 }
@@ -534,8 +569,10 @@ func (c *consensusRuntime) buildBundles(commitment *Commitment, commitmentMsg *C
 
 // getAggSignatureForCommitmentMessage creates aggregated signatures for given commitment
 // if it has a quorum of votes
-func (c *consensusRuntime) getAggSignatureForCommitmentMessage(epoch *epochMetadata,
-	commitmentHash types.Hash) (Signature, [][]byte, error) {
+func (c *consensusRuntime) getAggSignatureForCommitmentMessage(
+	epoch *epochMetadata,
+	commitmentHash types.Hash,
+) (Signature, [][]byte, error) {
 	validators := epoch.Validators
 
 	nodeIDIndexMap := make(map[string]int, validators.Len())

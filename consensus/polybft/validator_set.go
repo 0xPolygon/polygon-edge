@@ -120,7 +120,7 @@ func NewValidatorSet(valz AccountSet) (*validatorSet, error) {
 
 	err := validatorSet.updateWithChangeSet()
 	if err != nil {
-		return nil, fmt.Errorf("cannot create validator set: %w", err)
+		return nil, fmt.Errorf("cannot update changeset: %w", err)
 	}
 	// _, quorum, err := pbft.CalculateQuorum(validatorSet.VotingPower())
 	// if err != nil {
@@ -213,8 +213,9 @@ func (v *validatorSet) incrementProposerPriority() (*ValidatorAccount, error) {
 func (v *validatorSet) TotalVotingPower() (int64, error) {
 	if v.totalVotingPower == 0 {
 		err := v.updateTotalVotingPower()
-
-		return 0, fmt.Errorf("cannot update total voting power: %w", err)
+		if err != nil {
+			return 0, fmt.Errorf("cannot update total voting power: %w", err)
+		}
 	}
 
 	return v.totalVotingPower, nil
@@ -227,7 +228,6 @@ func (v *validatorSet) updateWithChangeSet() error {
 	}
 	// Scale and center.
 	totalVotingPower, err := v.TotalVotingPower()
-
 	if err != nil {
 		return fmt.Errorf("cannot get total voting power: %w", err)
 	}
@@ -305,7 +305,7 @@ func (v *validatorSet) rescalePriorities(diffMax int64) error {
 	// removed if all tests would init. voting power appropriately;
 	// i.e. diffMax should always be > 0
 	if diffMax <= 0 {
-		return fmt.Errorf("defference between priorities must be positive")
+		return fmt.Errorf("difference between priorities must be positive")
 	}
 
 	// Calculating ceil(diff/diffMax):
@@ -348,7 +348,7 @@ func (v *validatorSet) updateTotalVotingPower() error {
 	return nil
 }
 
-func (v validatorSet) Accounts() AccountSet {
+func (v *validatorSet) Accounts() AccountSet {
 	var accountSet = make([]*ValidatorMetadata, len(v.validators))
 	for i, validator := range v.validators {
 		accountSet[i] = validator.Metadata
@@ -357,7 +357,7 @@ func (v validatorSet) Accounts() AccountSet {
 	return accountSet
 }
 
-func (v validatorSet) CalcProposer(round uint64) (types.Address, error) {
+func (v *validatorSet) CalcProposer(round uint64) (types.Address, error) {
 	vc := v.Copy()
 	err := vc.IncrementProposerPriority(round + 1) // if round = 0 then we need one iteration
 
@@ -411,7 +411,7 @@ func (v *validatorSet) findProposer() (*ValidatorAccount, error) {
 	return proposer, nil
 }
 
-func (v validatorSet) Includes(address types.Address) bool {
+func (v *validatorSet) Includes(address types.Address) bool {
 	for _, validator := range v.validators {
 		if validator.Metadata.Address == address {
 			return true
@@ -421,7 +421,7 @@ func (v validatorSet) Includes(address types.Address) bool {
 	return false
 }
 
-func (v validatorSet) Len() int {
+func (v *validatorSet) Len() int {
 	return len(v.validators)
 }
 
