@@ -104,11 +104,6 @@ func (i *backendIBFT) ID() []byte {
 	return i.currentSigner.Address().Bytes()
 }
 
-// Q: This is not being used in go-ibft
-func (i *backendIBFT) MaximumFaulty() uint64 {
-	return uint64(CalcMaxFaultyNodes(i.currentValidators))
-}
-
 func (i *backendIBFT) quorum(blockNumber uint64) uint64 {
 	validators, err := i.forkManager.GetValidators(blockNumber)
 	if err != nil {
