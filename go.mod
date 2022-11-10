@@ -60,7 +60,7 @@ require (
 )
 
 require (
-	github.com/0xPolygon/go-ibft v0.0.0-20221109135749-49b0ca1c3b8b
+	github.com/0xPolygon/go-ibft v0.0.0-20221109165724-ff0b77dd5f69
 	github.com/docker/docker v20.10.18+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/mitchellh/go-glint v0.0.0-20210722152315-6515ceb4a127
