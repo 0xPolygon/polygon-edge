@@ -1,14 +1,6 @@
 package polybft
 
 import (
-	"math/rand"
-
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
-	"github.com/0xPolygon/polygon-edge/types"
-)
-
-/*
-import (
 	"errors"
 	"fmt"
 	"math/big"
@@ -16,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	pbft "github.com/0xPolygon/pbft-consensus"
+	"github.com/0xPolygon/go-ibft/messages"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
@@ -130,18 +122,6 @@ func TestFSM_verifyValidatorsUptimeTx(t *testing.T) {
 	assert.NoError(t, fsm.verifyValidatorsUptimeTx(block.Transactions))
 }
 
-func TestFSM_Init(t *testing.T) {
-	t.Parallel()
-
-	mblockBuilder := &blockBuilderMock{}
-	mblockBuilder.On("Reset").Once()
-
-	fsm := &fsm{blockBuilder: mblockBuilder}
-	fsm.Init(&pbft.RoundInfo{})
-	assert.Nil(t, fsm.proposal)
-	mblockBuilder.AssertExpectations(t)
-}
-
 func TestFSM_BuildProposal_WithExitEvents(t *testing.T) {
 	t.Parallel()
 
@@ -149,7 +129,7 @@ func TestFSM_BuildProposal_WithExitEvents(t *testing.T) {
 		accountCount      = 5
 		committedCount    = 4
 		parentCount       = 3
-		parentBlockNumber = 1023
+		parentBlockNumber = uint64(1023)
 		numOfReceipts     = 10
 		epoch             = 100
 	)
@@ -187,7 +167,7 @@ func TestFSM_BuildProposal_WithExitEvents(t *testing.T) {
 	}
 
 	blockchainMock := new(blockchainMock)
-	blockchainMock.On("CommitBlock", mock.Anything).Return(nil).Once()
+	blockchainMock.On("CommitBlock", mock.Anything).Return(receipts, nil).Once()
 
 	mBlockBuilder := new(blockBuilderMock)
 	mBlockBuilder.On("Build", mock.Anything).Return(stateBlock).Once()
@@ -197,19 +177,20 @@ func TestFSM_BuildProposal_WithExitEvents(t *testing.T) {
 
 	fsm := &fsm{parent: parent, blockBuilder: mBlockBuilder, config: &PolyBFTConfig{}, backend: blockchainMock,
 		validators: validators.toValidatorSet(), checkpointBackend: runtime, logger: hclog.NewNullLogger(),
-		epochNumber: epoch, postInsertHook: func() error { return nil },
-		roundInfo: &pbft.RoundInfo{},
+		epochNumber: epoch,
 	}
 
-	proposal, err := fsm.BuildProposal()
+	proposal, err := fsm.BuildProposal(1)
 	require.NoError(t, err)
 	require.NotNil(t, proposal)
 
-	sealedProposal := &pbft.SealedProposal{
-		Proposal: proposal,
-	}
+	commitedSeals := []*messages.CommittedSeal{}
 
-	require.NoError(t, fsm.Insert(sealedProposal))
+	block, err := fsm.Insert(proposal, commitedSeals)
+
+	require.NoError(t, err)
+	require.Equal(t, parentBlockNumber+1, block.Number())
+	require.Equal(t, parent.Hash, block.ParentHash())
 
 	events, err := runtime.state.getExitEventsByEpoch(epoch)
 	require.NoError(t, err)
@@ -261,7 +242,7 @@ func TestFSM_BuildProposal_WithExitEvents_ErrorInDecoding(t *testing.T) {
 	fsm := &fsm{parent: parent, blockBuilder: mBlockBuilder, config: &PolyBFTConfig{}, backend: &blockchainMock{},
 		validators: validators.toValidatorSet(), checkpointBackend: runtime, logger: hclog.NewNullLogger(), epochNumber: epoch}
 
-	proposal, err := fsm.BuildProposal()
+	proposal, err := fsm.BuildProposal(0)
 	assert.Error(t, err)
 	assert.Nil(t, proposal)
 
@@ -295,10 +276,9 @@ func TestFSM_BuildProposal_WithoutUptimeTxGood(t *testing.T) {
 	checkpointBackendMock.On("BuildEventRoot", mock.Anything, mock.Anything).Return(types.ZeroHash, nil).Once()
 
 	fsm := &fsm{parent: parent, blockBuilder: mBlockBuilder, config: &PolyBFTConfig{}, backend: &blockchainMock{},
-		validators: validators.toValidatorSet(), checkpointBackend: checkpointBackendMock, logger: hclog.NewNullLogger(),
-		roundInfo: &pbft.RoundInfo{}}
+		validators: validators.toValidatorSet(), checkpointBackend: checkpointBackendMock, logger: hclog.NewNullLogger()}
 
-	proposal, err := fsm.BuildProposal()
+	proposal, err := fsm.BuildProposal(1)
 	assert.NoError(t, err)
 	assert.NotNil(t, proposal)
 
@@ -310,12 +290,15 @@ func TestFSM_BuildProposal_WithoutUptimeTxGood(t *testing.T) {
 		NextValidatorsHash:    currentValidatorsHash,
 	}
 
-	checkpointHash, err := checkpoint.Hash(fsm.backend.GetChainID(), stateBlock.Block.Number(), stateBlock.Block.Hash())
+	// TODO: checkpointHash should be checked by proposalHash
+	_, err = checkpoint.Hash(fsm.backend.GetChainID(), stateBlock.Block.Number(), stateBlock.Block.Hash())
 	require.NoError(t, err)
 
 	rlpBlock := stateBlock.Block.MarshalRLP()
-	assert.Equal(t, rlpBlock, proposal.Data)
-	assert.Equal(t, checkpointHash, types.BytesToHash(proposal.Hash))
+	assert.Equal(t, rlpBlock, proposal)
+
+	block := types.Block{}
+	require.NoError(t, block.UnmarshalRLP(proposal))
 
 	mBlockBuilder.AssertExpectations(t)
 	checkpointBackendMock.AssertExpectations(t)
@@ -361,14 +344,12 @@ func TestFSM_BuildProposal_WithUptimeTxGood(t *testing.T) {
 		uptimeCounter:     createTestUptimeCounter(t, nil, 10),
 		checkpointBackend: checkpointBackendMock,
 		logger:            hclog.NewNullLogger(),
-		roundInfo:         &pbft.RoundInfo{},
 	}
 
-	proposal, err := fsm.BuildProposal()
+	proposal, err := fsm.BuildProposal(0)
 	assert.NoError(t, err)
 	assert.NotNil(t, proposal)
 
-	rlpBlock := stateBlock.Block.MarshalRLP()
 	currentValidatorsHash, err := validators.getPublicIdentities().Hash()
 	require.NoError(t, err)
 
@@ -380,10 +361,14 @@ func TestFSM_BuildProposal_WithUptimeTxGood(t *testing.T) {
 		NextValidatorsHash:    nextValidatorsHash,
 	}
 
-	checkpointHash, err := checkpoint.Hash(fsm.backend.GetChainID(), stateBlock.Block.Number(), stateBlock.Block.Hash())
+	// TODO: checkpointHash should be checked by proposalHash
+	_, err = checkpoint.Hash(fsm.backend.GetChainID(), stateBlock.Block.Number(), stateBlock.Block.Hash())
 	require.NoError(t, err)
-	assert.Equal(t, rlpBlock, proposal.Data)
-	assert.Equal(t, checkpointHash.Bytes(), proposal.Hash)
+
+	block := types.Block{}
+	require.NoError(t, block.UnmarshalRLP(proposal))
+
+	assert.Equal(t, stateBlock.Block.MarshalRLP(), proposal)
 
 	mBlockBuilder.AssertExpectations(t)
 	systemStateMock.AssertExpectations(t)
@@ -414,10 +399,9 @@ func TestFSM_BuildProposal_EpochEndingBlock_FailedToCommitStateTx(t *testing.T) 
 		validators:        newValidatorSet(types.Address{}, validators.getPublicIdentities()),
 		uptimeCounter:     createTestUptimeCounter(t, nil, 10),
 		checkpointBackend: new(checkpointBackendMock),
-		roundInfo:         &pbft.RoundInfo{},
 	}
 
-	_, err := fsm.BuildProposal()
+	_, err := fsm.BuildProposal(0)
 	assert.ErrorContains(t, err, "failed to commit validators uptime transaction")
 	mBlockBuilder.AssertExpectations(t)
 }
@@ -467,10 +451,9 @@ func TestFSM_BuildProposal_EpochEndingBlock_ValidatorsDeltaExists(t *testing.T) 
 		uptimeCounter:     createTestUptimeCounter(t, validatorSet, 10),
 		checkpointBackend: checkpointBackendMock,
 		logger:            hclog.NewNullLogger(),
-		roundInfo:         &pbft.RoundInfo{},
 	}
 
-	proposal, err := fsm.BuildProposal()
+	proposal, err := fsm.BuildProposal(0)
 	assert.NoError(t, err)
 	assert.NotNil(t, proposal)
 
@@ -527,10 +510,9 @@ func TestFSM_BuildProposal_NonEpochEndingBlock_ValidatorsDeltaEmpty(t *testing.T
 	fsm := &fsm{parent: parent, blockBuilder: blockBuilderMock,
 		config: &PolyBFTConfig{}, backend: &blockchainMock{},
 		isEndOfEpoch: false, validators: testValidators.toValidatorSet(),
-		checkpointBackend: checkpointBackendMock, logger: hclog.NewNullLogger(),
-		roundInfo: &pbft.RoundInfo{}}
+		checkpointBackend: checkpointBackendMock, logger: hclog.NewNullLogger()}
 
-	proposal, err := fsm.BuildProposal()
+	proposal, err := fsm.BuildProposal(0)
 	assert.NoError(t, err)
 	assert.NotNil(t, proposal)
 
@@ -579,11 +561,10 @@ func TestFSM_BuildProposal_EpochEndingBlock_FailToCreateValidatorsDelta(t *testi
 		validators:        testValidators.toValidatorSet(),
 		uptimeCounter:     createTestUptimeCounter(t, allAccounts, 10),
 		checkpointBackend: new(checkpointBackendMock),
-		roundInfo:         &pbft.RoundInfo{},
 	}
 
-	proposal, err := fsm.BuildProposal()
-	assert.ErrorContains(t, err, fmt.Sprintf("failed to retrieve validator set for block#%d: failed to get validators set", parentBlockNumber+1))
+	proposal, err := fsm.BuildProposal(0)
+	assert.ErrorContains(t, err, "failed to retrieve validator set for current block: failed to get validators set")
 	assert.Nil(t, proposal)
 
 	blockBuilderMock.AssertNotCalled(t, "Build")
@@ -735,18 +716,6 @@ func TestFSM_VerifyStateTransactions_StateTransactionInvalidSignature(t *testing
 	assert.ErrorContains(t, err, "invalid signature")
 }
 
-func TestFSM_ValidateCommit_ProposalIsNil(t *testing.T) {
-	t.Parallel()
-
-	fsm := &fsm{}
-	err := fsm.ValidateCommit("", []byte{})
-	assert.ErrorContains(t, err, "proposal unavailable")
-
-	fsm.proposal = &pbft.Proposal{}
-	err = fsm.ValidateCommit("", []byte{})
-	assert.ErrorContains(t, err, "proposal unavailable")
-}
-
 func TestFSM_ValidateCommit_WrongValidator(t *testing.T) {
 	t.Parallel()
 
@@ -767,13 +736,12 @@ func TestFSM_ValidateCommit_WrongValidator(t *testing.T) {
 	checkpointBackendMock.On("BuildEventRoot", mock.Anything, mock.Anything).Return(types.ZeroHash, nil).Once()
 
 	fsm := &fsm{parent: parent, blockBuilder: mBlockBuilder, config: &PolyBFTConfig{}, backend: &blockchainMock{},
-		validators: validators.toValidatorSet(), logger: hclog.NewNullLogger(), checkpointBackend: checkpointBackendMock,
-		roundInfo: &pbft.RoundInfo{}}
+		validators: validators.toValidatorSet(), logger: hclog.NewNullLogger(), checkpointBackend: checkpointBackendMock}
 
-	_, err := fsm.BuildProposal()
+	_, err := fsm.BuildProposal(0)
 	require.NoError(t, err)
 
-	err = fsm.ValidateCommit("0x7467674", types.ZeroAddress.Bytes())
+	err = fsm.ValidateCommit([]byte("0x7467674"), types.ZeroAddress.Bytes(), []byte{})
 	require.ErrorContains(t, err, "unable to resolve validator")
 	checkpointBackendMock.AssertExpectations(t)
 }
@@ -799,17 +767,16 @@ func TestFSM_ValidateCommit_InvalidHash(t *testing.T) {
 	checkpointBackendMock.On("BuildEventRoot", mock.Anything, mock.Anything).Return(types.ZeroHash, nil).Once()
 
 	fsm := &fsm{parent: parent, blockBuilder: mBlockBuilder, config: &PolyBFTConfig{}, backend: &blockchainMock{},
-		validators: validators.toValidatorSet(), checkpointBackend: checkpointBackendMock, logger: hclog.NewNullLogger(),
-		roundInfo: &pbft.RoundInfo{}}
+		validators: validators.toValidatorSet(), checkpointBackend: checkpointBackendMock, logger: hclog.NewNullLogger()}
 
-	_, err := fsm.BuildProposal()
+	_, err := fsm.BuildProposal(0)
 	assert.NoError(t, err)
 
 	nonValidatorAcc := newTestValidator("non_validator", 1)
 	wrongSignature, err := nonValidatorAcc.mustSign([]byte("Foo")).Marshal()
 	require.NoError(t, err)
 
-	err = fsm.ValidateCommit(validators.getValidator("0").Address().String(), wrongSignature)
+	err = fsm.ValidateCommit(validators.getValidator("0").Address().Bytes(), wrongSignature, []byte{})
 	require.ErrorContains(t, err, "incorrect commit signature from")
 	checkpointBackendMock.AssertExpectations(t)
 }
@@ -830,20 +797,25 @@ func TestFSM_ValidateCommit_Good(t *testing.T) {
 	checkpointBackendMock.On("BuildEventRoot", mock.Anything, mock.Anything).Return(types.ZeroHash, nil).Once()
 
 	fsm := &fsm{parent: parent, blockBuilder: mBlockBuilder, config: &PolyBFTConfig{}, backend: &blockchainMock{},
-		validators: newValidatorSet(types.Address{}, validatorSet), checkpointBackend: checkpointBackendMock, logger: hclog.NewNullLogger(),
-		roundInfo: &pbft.RoundInfo{}}
-	_, err := fsm.BuildProposal()
+		validators:        newValidatorSet(types.Address{}, validatorSet),
+		checkpointBackend: checkpointBackendMock, logger: hclog.NewNullLogger()}
+	proposal, err := fsm.BuildProposal(0)
 	require.NoError(t, err)
 
+	block := types.Block{}
+	require.NoError(t, block.UnmarshalRLP(proposal))
+
 	validator := validators.getValidator("A")
-	seal, err := validator.mustSign(fsm.proposal.Hash).Marshal()
+	seal, err := validator.mustSign(block.Hash().Bytes()).Marshal()
 	require.NoError(t, err)
-	err = fsm.ValidateCommit(validator.Key().NodeID(), seal)
+	err = fsm.ValidateCommit(validator.Key().Address().Bytes(), seal, block.Hash().Bytes())
 	require.NoError(t, err)
 
 	checkpointBackendMock.AssertExpectations(t)
 }
 
+// TODO: uncomment test after we change proposal structure
+/*
 func TestFSM_Validate_IncorrectSignHash(t *testing.T) {
 	t.Parallel()
 
@@ -864,18 +836,22 @@ func TestFSM_Validate_IncorrectSignHash(t *testing.T) {
 	checkpointBackendMock.On("BuildEventRoot", mock.Anything, mock.Anything).Return(types.ZeroHash, nil).Once()
 
 	fsm := &fsm{parent: parent, blockBuilder: mBlockBuilder, config: &PolyBFTConfig{}, backend: &blockchainMock{},
-		validators: validators.toValidatorSet(), checkpointBackend: checkpointBackendMock, logger: hclog.NewNullLogger(),
-		roundInfo: &pbft.RoundInfo{},
-	}
-	proposal, err := fsm.BuildProposal()
+		validators: validators.toValidatorSet(), checkpointBackend: checkpointBackendMock, logger: hclog.NewNullLogger()}
+
+	proposal, err := fsm.BuildProposal(0)
 	require.NoError(t, err)
 
-	proposal.Hash = []byte{32, 33} // make the wrong hash
+	block := types.Block{}
+	require.NoError(t, block.UnmarshalRLP(proposal))
+
+	block.Header.Hash = types.Hash{32, 33} // make the wrong hash
+	proposal = block.MarshalRLP()
 
 	err = fsm.Validate(proposal)
 	require.ErrorContains(t, err, "incorrect sign hash")
 	checkpointBackendMock.AssertExpectations(t)
 }
+*/
 
 func TestFSM_Validate_IncorrectHeaderParentHash(t *testing.T) {
 	t.Parallel()
@@ -898,13 +874,11 @@ func TestFSM_Validate_IncorrectHeaderParentHash(t *testing.T) {
 
 	stateBlock := createDummyStateBlock(parent.Number+1, types.Hash{100, 15}, parent.ExtraData)
 
-	checkpointHash, err := new(CheckpointData).Hash(fsm.backend.GetChainID(), stateBlock.Block.Number(), stateBlock.Block.Hash())
+	hash, err := new(CheckpointData).Hash(fsm.backend.GetChainID(), stateBlock.Block.Number(), stateBlock.Block.Hash())
 	require.NoError(t, err)
 
-	proposal := &pbft.Proposal{
-		Data: stateBlock.Block.MarshalRLP(),
-		Hash: checkpointHash.Bytes(),
-	}
+	stateBlock.Block.Header.Hash = hash
+	proposal := stateBlock.Block.MarshalRLP()
 
 	err = fsm.Validate(proposal)
 	require.ErrorContains(t, err, "incorrect header parent hash")
@@ -936,10 +910,8 @@ func TestFSM_Validate_InvalidNumber(t *testing.T) {
 		proposalHash, err := new(CheckpointData).Hash(fsm.backend.GetChainID(), stateBlock.Block.Number(), stateBlock.Block.Hash())
 		require.NoError(t, err)
 
-		proposal := &pbft.Proposal{
-			Data: stateBlock.Block.MarshalRLP(),
-			Hash: proposalHash.Bytes(),
-		}
+		stateBlock.Block.Header.Hash = proposalHash
+		proposal := stateBlock.Block.MarshalRLP()
 
 		err = fsm.Validate(proposal)
 		require.ErrorContains(t, err, "invalid number")
@@ -974,10 +946,8 @@ func TestFSM_Validate_TimestampOlder(t *testing.T) {
 		checkpointHash, err := new(CheckpointData).Hash(fsm.backend.GetChainID(), header.Number, header.Hash)
 		require.NoError(t, err)
 
-		proposal := &pbft.Proposal{
-			Data: stateBlock.Block.MarshalRLP(),
-			Hash: checkpointHash.Bytes(),
-		}
+		stateBlock.Block.Header.Hash = checkpointHash
+		proposal := stateBlock.Block.MarshalRLP()
 
 		err = fsm.Validate(proposal)
 		assert.ErrorContains(t, err, "timestamp older than parent")
@@ -1016,15 +986,10 @@ func TestFSM_Validate_IncorrectMixHash(t *testing.T) {
 	}
 	rlpBlock := buildBlock.Block.MarshalRLP()
 
-	checkpointHash, err := new(CheckpointData).Hash(fsm.backend.GetChainID(), header.Number, header.Hash)
+	_, err := new(CheckpointData).Hash(fsm.backend.GetChainID(), header.Number, header.Hash)
 	require.NoError(t, err)
 
-	proposal := &pbft.Proposal{
-		Data: rlpBlock,
-		Hash: checkpointHash.Bytes(),
-	}
-
-	err = fsm.Validate(proposal)
+	err = fsm.Validate(rlpBlock)
 	assert.ErrorContains(t, err, "mix digest is not correct")
 }
 
@@ -1033,7 +998,7 @@ func TestFSM_Insert_Good(t *testing.T) {
 
 	const (
 		accountCount      = 5
-		parentBlockNumber = 10
+		parentBlockNumber = uint64(10)
 		signaturesCount   = 3
 	)
 
@@ -1052,38 +1017,20 @@ func TestFSM_Insert_Good(t *testing.T) {
 	mBlockBuilder := newBlockBuilderMock(buildBlock)
 	mBackendMock := &blockchainMock{}
 	mBackendMock.On("CommitBlock", mock.MatchedBy(func(i interface{}) bool {
-		stateBlock, ok := i.(*StateBlock)
+		stateBlock, ok := i.(*types.Block)
 		require.True(t, ok)
 
-		return stateBlock == buildBlock
-	})).Return(error(nil)).Once()
+		return stateBlock.Number() == buildBlock.Block.Number() && stateBlock.Hash() == buildBlock.Block.Hash()
+	})).Return([]*types.Receipt(nil), error(nil)).Once()
 
 	fsm := &fsm{parent: parent,
 		blockBuilder: mBlockBuilder,
 		config:       &PolyBFTConfig{},
 		backend:      mBackendMock,
 		validators:   newValidatorSet(types.Address{}, validatorSet[0:len(validatorSet)-1]),
-		block:        buildBlock,
-	}
-	postInsertHookInvoked := false
-	// postInsertHook should be called at the end of Insert
-	fsm.postInsertHook = func() error {
-		assert.Equal(t, buildBlock, fsm.block)
-
-		postInsertHookInvoked = true
-
-		return nil
 	}
 
-	rlpBlock := buildBlock.Block.MarshalRLP()
-	proposal := &pbft.SealedProposal{
-		Proposal: &pbft.Proposal{
-			Data: rlpBlock,
-			Hash: buildBlock.Block.Hash().Bytes(),
-		},
-		Proposer: pbft.NodeID(validatorSet[0].Address.String()),
-		Number:   parentBlockNumber + 1,
-	}
+	var commitedSeals []*messages.CommittedSeal
 
 	for i := 0; i < signaturesCount; i++ {
 		sign, err := allAccounts[i].Bls.Sign(buildBlock.Block.Hash().Bytes())
@@ -1091,16 +1038,19 @@ func TestFSM_Insert_Good(t *testing.T) {
 		sigRaw, err := sign.Marshal()
 		assert.NoError(t, err)
 
-		proposal.CommittedSeals = append(proposal.CommittedSeals, pbft.CommittedSeal{
-			NodeID:    pbft.NodeID(validatorSet[i].Address.String()),
+		commitedSeals = append(commitedSeals, &messages.CommittedSeal{
+			Signer:    validatorSet[i].Address.Bytes(),
 			Signature: sigRaw,
 		})
 	}
 
-	err := fsm.Insert(proposal)
-	assert.NoError(t, err)
-	assert.True(t, postInsertHookInvoked)
+	proposal := buildBlock.Block.MarshalRLP()
+
+	block, err := fsm.Insert(proposal, commitedSeals)
+
+	require.NoError(t, err)
 	mBackendMock.AssertExpectations(t)
+	assert.Equal(t, parentBlockNumber+1, block.Number())
 }
 
 func TestFSM_Insert_InvalidNode(t *testing.T) {
@@ -1129,18 +1079,9 @@ func TestFSM_Insert_InvalidNode(t *testing.T) {
 
 	fsm := &fsm{parent: parent, blockBuilder: mBlockBuilder, config: &PolyBFTConfig{}, backend: &blockchainMock{},
 		validators: newValidatorSet(types.Address{}, validatorSet[0:len(validatorSet)-1]),
-		block:      buildBlock,
-	}
-	postInsertHookInvoked := false
-	// postInsertHook should be called at the end of Insert.
-	// In this test case it is not expected to be called
-	fsm.postInsertHook = func() error {
-		postInsertHookInvoked = true
-
-		return nil
 	}
 
-	rlpBlock := buildBlock.Block.MarshalRLP()
+	proposal := buildBlock.Block.MarshalRLP()
 	validatorA := validators.getValidator("A")
 	validatorB := validators.getValidator("B")
 	proposalHash := buildBlock.Block.Hash().Bytes()
@@ -1155,23 +1096,14 @@ func TestFSM_Insert_InvalidNode(t *testing.T) {
 	nonValidatorSignature, err := nonValidatorAccount.mustSign(proposalHash).Marshal()
 	require.NoError(t, err)
 
-	proposal := &pbft.SealedProposal{
-		Proposal: &pbft.Proposal{
-			Data: rlpBlock,
-			Hash: proposalHash,
-		},
-		CommittedSeals: []pbft.CommittedSeal{
-			{NodeID: pbft.NodeID(validatorA.Address().String()), Signature: sigA},
-			{NodeID: pbft.NodeID(validatorB.Address().String()), Signature: sigB},
-			{NodeID: pbft.NodeID(nonValidatorAccount.Address().String()), Signature: nonValidatorSignature}, // this one should fail
-		},
-		Proposer: pbft.NodeID(validatorA.Address().String()),
-		Number:   parentBlockNumber + 1,
+	commitedSeals := []*messages.CommittedSeal{
+		{Signer: validatorA.Address().Bytes(), Signature: sigA},
+		{Signer: validatorB.Address().Bytes(), Signature: sigB},
+		{Signer: nonValidatorAccount.Address().Bytes(), Signature: nonValidatorSignature}, // this one should fail
 	}
 
-	err = fsm.Insert(proposal)
+	_, err = fsm.Insert(proposal, commitedSeals)
 	assert.ErrorContains(t, err, "invalid node id")
-	assert.False(t, postInsertHookInvoked)
 }
 
 func TestFSM_Height(t *testing.T) {
@@ -1273,7 +1205,7 @@ func TestFSM_CalcProposer(t *testing.T) {
 		for _, c := range cases {
 			f := &fsm{validators: newValidatorSet(types.Address{}, validatorSet.Copy())}
 			proposer := f.validators.CalcProposer(c.round)
-			assert.Equal(t, pbft.NodeID(validatorSet[c.expectedIndex].Address.String()), proposer)
+			assert.Equal(t, validatorSet[c.expectedIndex].Address, proposer)
 		}
 	})
 
@@ -1292,7 +1224,7 @@ func TestFSM_CalcProposer(t *testing.T) {
 		for _, c := range cases {
 			f := &fsm{validators: newValidatorSet(c.lastProposer, validatorSet.Copy())}
 			proposer := f.validators.CalcProposer(c.round)
-			assert.Equal(t, pbft.NodeID(validatorSet[c.expectedIndex].Address.String()), proposer)
+			assert.Equal(t, validatorSet[c.expectedIndex].Address, proposer)
 		}
 	})
 }
@@ -1672,10 +1604,8 @@ func TestFSM_Validate_FailToVerifySignatures(t *testing.T) {
 	checkpointHash, err := new(CheckpointData).Hash(fsm.backend.GetChainID(), finalBlock.Number(), finalBlock.Hash())
 	require.NoError(t, err)
 
-	proposal := &pbft.Proposal{
-		Data: finalBlock.MarshalRLP(),
-		Hash: checkpointHash.Bytes(),
-	}
+	finalBlock.Header.Hash = checkpointHash
+	proposal := finalBlock.MarshalRLP()
 
 	assert.ErrorContains(t, fsm.Validate(proposal), "failed to verify signatures")
 
@@ -1800,7 +1730,6 @@ func createTestUptimeCounter(t *testing.T, validatorSet AccountSet, epochSize ui
 
 	return commitEpoch
 }
-*/
 
 func createTestExtraObject(allAccounts,
 	previousValidatorSet AccountSet,
