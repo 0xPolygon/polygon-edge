@@ -10,7 +10,7 @@ import (
 	"sync/atomic"
 
 	"github.com/0xPolygon/go-ibft/messages"
-	"github.com/0xPolygon/go-ibft/messages/proto"
+	protoIBFT "github.com/0xPolygon/go-ibft/messages/proto"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
@@ -932,7 +932,7 @@ func (c *consensusRuntime) IsValidBlock(proposal []byte) bool {
 	return true
 }
 
-func (c *consensusRuntime) IsValidSender(msg *proto.Message) bool {
+func (c *consensusRuntime) IsValidSender(msg *protoIBFT.Message) bool {
 	err := c.fsm.ValidateSender(msg)
 	if err != nil {
 		c.logger.Error("invalid sender", "error", err)
@@ -985,7 +985,7 @@ func (c *consensusRuntime) IsValidCommittedSeal(proposalHash []byte, committedSe
 	return true
 }
 
-func (c *consensusRuntime) BuildProposal(view *proto.View) []byte {
+func (c *consensusRuntime) BuildProposal(view *protoIBFT.View) []byte {
 	lastBuiltBlock, _ := c.getLastBuiltBlockAndEpoch()
 
 	if lastBuiltBlock.Number+1 != view.Height {
@@ -1049,12 +1049,32 @@ func (c *consensusRuntime) Quorum(_ uint64) uint64 {
 	return uint64(getQuorumSize(c.fsm.validators.Len()))
 }
 
+// HasQuorum returns true if quorum is reached for the given blockNumber
+func (c *consensusRuntime) HasQuorum(
+	blockNumber uint64,
+	messages []*protoIBFT.Message,
+	msgType protoIBFT.MessageType,
+) bool {
+	quorum := c.Quorum(blockNumber)
+
+	switch msgType {
+	case protoIBFT.MessageType_PREPREPARE:
+		return len(messages) >= 0
+	case protoIBFT.MessageType_PREPARE:
+		return len(messages) >= int(quorum)-1
+	case protoIBFT.MessageType_ROUND_CHANGE, protoIBFT.MessageType_COMMIT:
+		return len(messages) >= int(quorum)
+	}
+
+	return false
+}
+
 // BuildPrePrepareMessage builds a PREPREPARE message based on the passed in proposal
 func (c *consensusRuntime) BuildPrePrepareMessage(
 	proposal []byte,
-	certificate *proto.RoundChangeCertificate,
-	view *proto.View,
-) *proto.Message {
+	certificate *protoIBFT.RoundChangeCertificate,
+	view *protoIBFT.View,
+) *protoIBFT.Message {
 	block := types.Block{}
 	if err := block.UnmarshalRLP(proposal); err != nil {
 		c.logger.Error(fmt.Sprintf("cannot unmarshal RLP: %s", err))
@@ -1076,12 +1096,12 @@ func (c *consensusRuntime) BuildPrePrepareMessage(
 		return nil
 	}
 
-	msg := proto.Message{
+	msg := protoIBFT.Message{
 		View: view,
 		From: c.ID(),
-		Type: proto.MessageType_PREPREPARE,
-		Payload: &proto.Message_PreprepareData{
-			PreprepareData: &proto.PrePrepareMessage{
+		Type: protoIBFT.MessageType_PREPREPARE,
+		Payload: &protoIBFT.Message_PreprepareData{
+			PreprepareData: &protoIBFT.PrePrepareMessage{
 				Proposal:     proposal,
 				ProposalHash: proposalHash.Bytes(),
 				Certificate:  certificate,
@@ -1100,13 +1120,13 @@ func (c *consensusRuntime) BuildPrePrepareMessage(
 }
 
 // BuildPrepareMessage builds a PREPARE message based on the passed in proposal
-func (c *consensusRuntime) BuildPrepareMessage(proposalHash []byte, view *proto.View) *proto.Message {
-	msg := proto.Message{
+func (c *consensusRuntime) BuildPrepareMessage(proposalHash []byte, view *protoIBFT.View) *protoIBFT.Message {
+	msg := protoIBFT.Message{
 		View: view,
 		From: c.ID(),
-		Type: proto.MessageType_PREPARE,
-		Payload: &proto.Message_PrepareData{
-			PrepareData: &proto.PrepareMessage{
+		Type: protoIBFT.MessageType_PREPARE,
+		Payload: &protoIBFT.Message_PrepareData{
+			PrepareData: &protoIBFT.PrepareMessage{
 				ProposalHash: proposalHash,
 			},
 		},
@@ -1123,7 +1143,7 @@ func (c *consensusRuntime) BuildPrepareMessage(proposalHash []byte, view *proto.
 }
 
 // BuildCommitMessage builds a COMMIT message based on the passed in proposal
-func (c *consensusRuntime) BuildCommitMessage(proposalHash []byte, view *proto.View) *proto.Message {
+func (c *consensusRuntime) BuildCommitMessage(proposalHash []byte, view *protoIBFT.View) *protoIBFT.Message {
 	committedSeal, err := c.config.Key.Sign(proposalHash)
 	if err != nil {
 		c.logger.Error("Cannot create committed seal message.", "error", err)
@@ -1131,12 +1151,12 @@ func (c *consensusRuntime) BuildCommitMessage(proposalHash []byte, view *proto.V
 		return nil
 	}
 
-	msg := proto.Message{
+	msg := protoIBFT.Message{
 		View: view,
 		From: c.ID(),
-		Type: proto.MessageType_COMMIT,
-		Payload: &proto.Message_CommitData{
-			CommitData: &proto.CommitMessage{
+		Type: protoIBFT.MessageType_COMMIT,
+		Payload: &protoIBFT.Message_CommitData{
+			CommitData: &protoIBFT.CommitMessage{
 				ProposalHash:  proposalHash,
 				CommittedSeal: committedSeal,
 			},
@@ -1156,14 +1176,14 @@ func (c *consensusRuntime) BuildCommitMessage(proposalHash []byte, view *proto.V
 // BuildRoundChangeMessage builds a ROUND_CHANGE message based on the passed in proposal
 func (c *consensusRuntime) BuildRoundChangeMessage(
 	proposal []byte,
-	certificate *proto.PreparedCertificate,
-	view *proto.View,
-) *proto.Message {
-	msg := proto.Message{
+	certificate *protoIBFT.PreparedCertificate,
+	view *protoIBFT.View,
+) *protoIBFT.Message {
+	msg := protoIBFT.Message{
 		View: view,
 		From: c.ID(),
-		Type: proto.MessageType_ROUND_CHANGE,
-		Payload: &proto.Message_RoundChangeData{RoundChangeData: &proto.RoundChangeMessage{
+		Type: protoIBFT.MessageType_ROUND_CHANGE,
+		Payload: &protoIBFT.Message_RoundChangeData{RoundChangeData: &protoIBFT.RoundChangeMessage{
 			LastPreparedProposedBlock: proposal,
 			LatestPreparedCertificate: certificate,
 		}},
