@@ -108,13 +108,12 @@ func (b *block) Copy() *block {
 	bb := new(block)
 	*bb = *b
 
-	bb.Miner = make([]byte, 0)
-	copy(bb.Miner[:], b.Miner)
+	bb.Miner = make([]byte, len(b.Miner))
+	copy(bb.Miner[:], b.Miner[:])
 
-	bb.ExtraData = make([]byte, 0)
-	copy(bb.ExtraData, b.ExtraData)
+	bb.ExtraData = make([]byte, len(b.ExtraData))
+	copy(bb.ExtraData[:], b.ExtraData[:])
 
-	// TODO in this commit
 	return bb
 }
 
