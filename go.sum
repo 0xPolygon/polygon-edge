@@ -48,6 +48,8 @@ dmitri.shuralyov.com/state v0.0.0-20180228185332-28bcc343414c/go.mod h1:0PRwlb0D
 filippo.io/edwards25519 v1.0.0-rc.1 h1:m0VOOB23frXZvAOK44usCgLWvtsxIoMCTBGJZlpmGfU=
 filippo.io/edwards25519 v1.0.0-rc.1/go.mod h1:N1IkdkCkiLB6tki+MYJoSx2JTY9NUlxZE7eHn5EwJns=
 git.apache.org/thrift.git v0.0.0-20180902110319-2566ecd5d999/go.mod h1:fPE2ZNJGynbRyZ4dJvy6G277gSllfV2HJqblrnkyeyg=
+github.com/0xPolygon/go-ibft v0.0.0-20221109165724-ff0b77dd5f69 h1:7WV/2aoWQSEVdu4SglqKuwdKylhq1Cl/zXX/9GjreY0=
+github.com/0xPolygon/go-ibft v0.0.0-20221109165724-ff0b77dd5f69/go.mod h1:uJ9EHbl+8StbRhvKgfxDextK32FlVNOiBnRPlAgrQK8=
 github.com/0xPolygon/go-ibft v0.0.0-20221109135749-49b0ca1c3b8b h1:nkyfDDOxlLdrp1lTG1kmpn6v2wGekWkGB8xXD+Bh9ck=
 github.com/0xPolygon/go-ibft v0.0.0-20221109135749-49b0ca1c3b8b/go.mod h1:uJ9EHbl+8StbRhvKgfxDextK32FlVNOiBnRPlAgrQK8=
 github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 h1:UQHMgLO+TxOElx5B5HZ4hJQsoJ/PvUvKRhJHDQXO8P8=

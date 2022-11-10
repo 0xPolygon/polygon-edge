@@ -64,9 +64,6 @@ type fsm struct {
 	// proposerCommitmentToRegister is a commitment that is registered via state transaction by proposer
 	proposerCommitmentToRegister *CommitmentMessageSigned
 
-	// commitmentToSaveOnRegister is a commitment that is verified on register and needs to be saved in db
-	commitmentToSaveOnRegister *CommitmentMessageSigned
-
 	// bundleProofs is an array of bundles to be executed on end of sprint
 	bundleProofs []*BundleProof
 
@@ -120,15 +117,6 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 	}
 
 	if f.config.IsBridgeEnabled() {
-		if f.isEndOfEpoch && f.proposerCommitmentToRegister != nil {
-			// since proposer does not execute Validate (when we see the commitment to register in state transactions)
-			// we need to set commitment to save so that the proposer also saves its commitment that he registered
-			f.commitmentToSaveOnRegister = f.proposerCommitmentToRegister
-			f.logger.Debug("[FSM] Registering commitment",
-				"from", f.proposerCommitmentToRegister.Message.FromIndex,
-				"toIndex", f.proposerCommitmentToRegister.Message.ToIndex)
-		}
-
 		for _, tx := range f.stateTransactions() {
 			if err := f.blockBuilder.WriteTx(tx); err != nil {
 				return nil, fmt.Errorf("failed to commit state transaction. Error: %w", err)
@@ -352,7 +340,7 @@ func (f *fsm) Validate(proposal []byte) error {
 	return nil
 }
 
-// Validate sender address and signature
+// ValidateSender validates sender address and signature
 func (f *fsm) ValidateSender(msg *proto.Message) error {
 	msgNoSig, err := msg.PayloadNoSig()
 	if err != nil {
@@ -438,7 +426,6 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 				return fmt.Errorf("invalid signature for tx = %v", tx.Hash)
 			}
 
-			f.commitmentToSaveOnRegister = stateTxData
 		case *BundleProof:
 			// every other bundle has to be in sequential order
 			if stateTxData.ID() != nextStateSyncBundleIndex {
