@@ -329,8 +329,6 @@ func (c *consensusRuntime) populateFsmIfBridgeEnabled(
 	return nil
 }
 
-
-
 // FSM creates a new instance of fsm
 func (c *consensusRuntime) FSM() error {
 	// figure out the parent. At this point this peer has done its best to sync up
@@ -374,7 +372,7 @@ func (c *consensusRuntime) FSM() error {
 		for currentHeader.Number > lastBlockOfPreviousEpoch {
 			blockExtra, err := GetIbftExtra(currentHeader.ExtraData)
 			if err != nil {
-				return err
+				return fmt.Errorf("cannot get ibft extra data: %w", err)
 			}
 
 			iterationNumber += blockExtra.Round + 1 // because round 0 is one of the iterations
@@ -432,7 +430,6 @@ func (c *consensusRuntime) FSM() error {
 
 	return nil
 }
-
 
 // restartEpoch resets the previously run epoch and moves to the next one
 func (c *consensusRuntime) restartEpoch(header *types.Header) error {
@@ -1069,19 +1066,6 @@ func (c *consensusRuntime) InsertBlock(proposal []byte, committedSeals []*messag
 	}
 
 	if c.IsBridgeEnabled() {
-		_, epoch := c.getLastBuiltBlockAndEpoch()
-
-		if fsm.isEndOfEpoch && fsm.commitmentToSaveOnRegister != nil {
-			if err := c.state.insertCommitmentMessage(fsm.commitmentToSaveOnRegister); err != nil {
-				c.logger.Error("insert proposal, insert commitment message error", "error", err)
-			}
-
-			if err := c.buildBundles(
-				epoch.Commitment, fsm.commitmentToSaveOnRegister.Message, fsm.stateSyncExecutionIndex); err != nil {
-				c.logger.Error("insert proposal, build bundles error", "error", err)
-			}
-		}
-
 		if fsm.isEndOfEpoch || c.checkpointManager.isCheckpointBlock(block.Header.Number) {
 			if bytes.Equal(c.config.Key.Address().Bytes(), block.Header.Miner) { // true if node is proposer
 				go func(header types.Header, epochNumber uint64) {
@@ -1112,6 +1096,26 @@ func (c *consensusRuntime) MaximumFaultyNodes() uint64 {
 // Quorum returns what is the quorum size for the specified block height
 func (c *consensusRuntime) Quorum(_ uint64) uint64 {
 	return uint64(getQuorumSize(c.fsm.validators.Len()))
+}
+
+// HasQuorum returns true if quorum is reached for the given blockNumber
+func (c *consensusRuntime) HasQuorum(
+	blockNumber uint64,
+	messages []*proto.Message,
+	msgType proto.MessageType,
+) bool {
+	quorum := c.Quorum(blockNumber)
+
+	switch msgType {
+	case proto.MessageType_PREPREPARE:
+		return len(messages) >= 0
+	case proto.MessageType_PREPARE:
+		return len(messages) >= int(quorum)-1
+	case proto.MessageType_ROUND_CHANGE, proto.MessageType_COMMIT:
+		return len(messages) >= int(quorum)
+	}
+
+	return false
 }
 
 // BuildPrePrepareMessage builds a PREPREPARE message based on the passed in proposal
