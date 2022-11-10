@@ -184,7 +184,10 @@ func (v *validatorsSnapshotCache) computeSnapshot(
 		snapshot = AccountSet{}
 	}
 
-	snapshot = snapshot.ApplyDelta(extra.Validators)
+	snapshot, err = snapshot.ApplyDelta(extra.Validators)
+	if err != nil {
+		return nil, fmt.Errorf("failed to apply delta to the validators snapshot, block#%d: %w", header.Number, err)
+	}
 
 	v.logger.Trace("Computed snapshot",
 		"blockNumber", blockNumber,
