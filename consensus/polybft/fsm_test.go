@@ -1,6 +1,14 @@
 package polybft
 
 import (
+	"math/rand"
+
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
+	"github.com/0xPolygon/polygon-edge/types"
+)
+
+/*
+import (
 	"errors"
 	"fmt"
 	"math/big"
@@ -731,11 +739,11 @@ func TestFSM_ValidateCommit_ProposalIsNil(t *testing.T) {
 	t.Parallel()
 
 	fsm := &fsm{}
-	err := fsm.ValidateCommit(pbft.NodeID(""), []byte{})
+	err := fsm.ValidateCommit("", []byte{})
 	assert.ErrorContains(t, err, "proposal unavailable")
 
 	fsm.proposal = &pbft.Proposal{}
-	err = fsm.ValidateCommit(pbft.NodeID(""), []byte{})
+	err = fsm.ValidateCommit("", []byte{})
 	assert.ErrorContains(t, err, "proposal unavailable")
 }
 
@@ -765,7 +773,7 @@ func TestFSM_ValidateCommit_WrongValidator(t *testing.T) {
 	_, err := fsm.BuildProposal()
 	require.NoError(t, err)
 
-	err = fsm.ValidateCommit(pbft.NodeID("0x7467674"), types.ZeroAddress.Bytes())
+	err = fsm.ValidateCommit("0x7467674", types.ZeroAddress.Bytes())
 	require.ErrorContains(t, err, "unable to resolve validator")
 	checkpointBackendMock.AssertExpectations(t)
 }
@@ -797,11 +805,11 @@ func TestFSM_ValidateCommit_InvalidHash(t *testing.T) {
 	_, err := fsm.BuildProposal()
 	assert.NoError(t, err)
 
-	nonValidatorAcc := newTestValidator("non_validator")
+	nonValidatorAcc := newTestValidator("non_validator", 1)
 	wrongSignature, err := nonValidatorAcc.mustSign([]byte("Foo")).Marshal()
 	require.NoError(t, err)
 
-	err = fsm.ValidateCommit(pbft.NodeID(validators.getValidator("0").Address().String()), wrongSignature)
+	err = fsm.ValidateCommit(validators.getValidator("0").Address().String(), wrongSignature)
 	require.ErrorContains(t, err, "incorrect commit signature from")
 	checkpointBackendMock.AssertExpectations(t)
 }
@@ -1143,7 +1151,7 @@ func TestFSM_Insert_InvalidNode(t *testing.T) {
 	require.NoError(t, err)
 
 	// create test account outside of validator set
-	nonValidatorAccount := newTestValidator("non_validator")
+	nonValidatorAccount := newTestValidator("non_validator", 1)
 	nonValidatorSignature, err := nonValidatorAccount.mustSign(proposalHash).Marshal()
 	require.NoError(t, err)
 
@@ -1173,29 +1181,6 @@ func TestFSM_Height(t *testing.T) {
 	parent := &types.Header{Number: parentNumber}
 	fsm := &fsm{parent: parent}
 	assert.Equal(t, parentNumber+1, fsm.Height())
-}
-
-func TestFSM_IsStuck(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		localBlockNumber uint64
-		peerBlockNumber  uint64
-		expectedStuck    bool
-	}{
-		{localBlockNumber: 3, peerBlockNumber: 32, expectedStuck: true},
-		{localBlockNumber: 70, peerBlockNumber: 67, expectedStuck: false},
-	}
-	for _, c := range cases {
-		polybftBackendMock := new(polybftBackendMock)
-		polybftBackendMock.On("CheckIfStuck", mock.Anything).Return(c.peerBlockNumber).Once()
-
-		fsm := &fsm{polybftBackend: polybftBackendMock}
-		remoteBlockNumber, isStuck := fsm.IsStuck(c.localBlockNumber)
-		assert.Equal(t, c.peerBlockNumber, remoteBlockNumber)
-		assert.Equal(t, c.expectedStuck, isStuck)
-		polybftBackendMock.AssertExpectations(t)
-	}
 }
 
 func TestFSM_StateTransactionsEndOfSprint(t *testing.T) {
@@ -1467,7 +1452,7 @@ func TestFSM_VerifyStateTransaction_InvalidSignature(t *testing.T) {
 	var txns []*types.Transaction
 
 	signature := createSignature(t, validators.getPrivateIdentities("A", "B", "C", "D"), hash)
-	invalidValidator := newTestValidator("G")
+	invalidValidator := newTestValidator("G", 1)
 	invalidSignature, err := invalidValidator.mustSign([]byte("malicious message")).Marshal()
 	require.NoError(t, err)
 
@@ -1697,31 +1682,6 @@ func TestFSM_Validate_FailToVerifySignatures(t *testing.T) {
 	polybftBackendMock.AssertExpectations(t)
 }
 
-func generateValidatorDelta(validatorCount int, allAccounts, previousValidatorSet AccountSet) (vd *ValidatorSetDelta) {
-	oldMap := make(map[types.Address]int, previousValidatorSet.Len())
-	for i, x := range previousValidatorSet {
-		oldMap[x.Address] = i
-	}
-
-	vd = &ValidatorSetDelta{}
-	vd.Removed = bitmap.Bitmap{}
-
-	for _, id := range rand.Perm(len(allAccounts))[:validatorCount] {
-		_, exists := oldMap[allAccounts[id].Address]
-		if !exists {
-			vd.Added = append(vd.Added, allAccounts[id])
-		}
-
-		delete(oldMap, allAccounts[id].Address)
-	}
-
-	for _, v := range oldMap {
-		vd.Removed.Set(uint64(v))
-	}
-
-	return
-}
-
 func createDummyStateBlock(blockNumber uint64, parentHash types.Hash, extraData []byte) *StateBlock {
 	finalBlock := consensus.BuildBlock(consensus.BuildBlockParams{
 		Header: &types.Header{
@@ -1748,32 +1708,6 @@ func createTestExtra(
 	copy(result[ExtraVanity:], marshaled)
 
 	return result
-}
-
-func createTestExtraObject(allAccounts,
-	previousValidatorSet AccountSet,
-	validatorsCount,
-	committedSignaturesCount,
-	parentSignaturesCount int) *Extra {
-	accountCount := len(allAccounts)
-	dummySignature := [64]byte{}
-	bitmapCommitted, bitmapParent := bitmap.Bitmap{}, bitmap.Bitmap{}
-	extraData := &Extra{}
-	extraData.Validators = generateValidatorDelta(validatorsCount, allAccounts, previousValidatorSet)
-
-	for j := range rand.Perm(accountCount)[:committedSignaturesCount] {
-		bitmapCommitted.Set(uint64(j))
-	}
-
-	for j := range rand.Perm(accountCount)[:parentSignaturesCount] {
-		bitmapParent.Set(uint64(j))
-	}
-
-	extraData.Parent = &Signature{Bitmap: bitmapCommitted, AggregatedSignature: dummySignature[:]}
-	extraData.Committed = &Signature{Bitmap: bitmapParent, AggregatedSignature: dummySignature[:]}
-	extraData.Checkpoint = &CheckpointData{}
-
-	return extraData
 }
 
 func createTestCommitment(t *testing.T, accounts []*wallet.Account) *CommitmentMessageSigned {
@@ -1865,4 +1799,56 @@ func createTestUptimeCounter(t *testing.T, validatorSet AccountSet, epochSize ui
 	}
 
 	return commitEpoch
+}
+*/
+
+func createTestExtraObject(allAccounts,
+	previousValidatorSet AccountSet,
+	validatorsCount,
+	committedSignaturesCount,
+	parentSignaturesCount int) *Extra {
+	accountCount := len(allAccounts)
+	dummySignature := [64]byte{}
+	bitmapCommitted, bitmapParent := bitmap.Bitmap{}, bitmap.Bitmap{}
+	extraData := &Extra{}
+	extraData.Validators = generateValidatorDelta(validatorsCount, allAccounts, previousValidatorSet)
+
+	for j := range rand.Perm(accountCount)[:committedSignaturesCount] {
+		bitmapCommitted.Set(uint64(j))
+	}
+
+	for j := range rand.Perm(accountCount)[:parentSignaturesCount] {
+		bitmapParent.Set(uint64(j))
+	}
+
+	extraData.Parent = &Signature{Bitmap: bitmapCommitted, AggregatedSignature: dummySignature[:]}
+	extraData.Committed = &Signature{Bitmap: bitmapParent, AggregatedSignature: dummySignature[:]}
+	extraData.Checkpoint = &CheckpointData{}
+
+	return extraData
+}
+
+func generateValidatorDelta(validatorCount int, allAccounts, previousValidatorSet AccountSet) (vd *ValidatorSetDelta) {
+	oldMap := make(map[types.Address]int, previousValidatorSet.Len())
+	for i, x := range previousValidatorSet {
+		oldMap[x.Address] = i
+	}
+
+	vd = &ValidatorSetDelta{}
+	vd.Removed = bitmap.Bitmap{}
+
+	for _, id := range rand.Perm(len(allAccounts))[:validatorCount] {
+		_, exists := oldMap[allAccounts[id].Address]
+		if !exists {
+			vd.Added = append(vd.Added, allAccounts[id])
+		}
+
+		delete(oldMap, allAccounts[id].Address)
+	}
+
+	for _, v := range oldMap {
+		vd.Removed.Set(uint64(v))
+	}
+
+	return
 }

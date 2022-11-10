@@ -122,7 +122,7 @@ func (i *backendIBFT) quorum(blockNumber uint64) uint64 {
 	return uint64(quorumFn(validators))
 }
 
-// HasQuorum returns true if quorum is reached for the given height
+// HasQuorum returns true if quorum is reached for the given blockNumber
 func (i *backendIBFT) HasQuorum(
 	blockNumber uint64,
 	messages []*protoIBFT.Message,

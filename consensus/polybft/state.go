@@ -9,7 +9,6 @@ import (
 	"math/big"
 	"sort"
 
-	"github.com/0xPolygon/pbft-consensus"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	bolt "go.etcd.io/bbolt"
@@ -221,7 +220,7 @@ type ExitEvent struct {
 // MessageSignature encapsulates sender identifier and its signature
 type MessageSignature struct {
 	// Signer of the vote
-	From pbft.NodeID
+	From string
 	// Signature of the message
 	Signature []byte
 }
@@ -233,7 +232,7 @@ type TransportMessage struct {
 	// Message signature
 	Signature []byte
 	// Node identifier
-	NodeID pbft.NodeID
+	NodeID string
 	// Number of epoch
 	EpochNumber uint64
 }

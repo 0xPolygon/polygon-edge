@@ -16,17 +16,9 @@ import (
 	"github.com/umbracle/ethgo/contract"
 )
 
-// // ethereumBackend is an interface that wraps the methods called on ethereum backend protocol
-// type ethereumBackend interface {
-// 	// PeersLen returns the number of peers the node is connected to
-// 	PeersLen() int
-// 	// TxPool returns the current transaction pool
-// 	TxPool() *core.TxPool
-// 	// Broadcast block broadcasts the newly inserted block to the rest of the peers
-// 	BroadcastBlock(block *types.Block, propagate bool)
-// 	// GenesisGasLimit returns the initial gas limit for a block
-// 	GenesisGasLimit() uint64
-// }
+const (
+	consensusSource = "consensus"
+)
 
 // blockchain is an interface that wraps the methods called on blockchain
 type blockchainBackend interface {
@@ -34,7 +26,7 @@ type blockchainBackend interface {
 	CurrentHeader() *types.Header
 
 	// CommitBlock commits a block to the chain.
-	CommitBlock(stateBlock *StateBlock) error
+	CommitBlock(block *types.Block) ([]*types.Receipt, error)
 
 	// NewBlockBuilder is a factory method that returns a block builder on top of 'parent'.
 	NewBlockBuilder(parent *types.Header, coinbase types.Address,
@@ -60,9 +52,6 @@ type blockchainBackend interface {
 
 	SubscribeEvents() blockchain.Subscription
 
-	// CalculateGasLimit calculates required gas limit for specific block
-	CalculateGasLimit(number uint64) (uint64, error)
-
 	// GetChainID returns chain id of the current blockchain
 	GetChainID() uint64
 }
@@ -80,16 +69,13 @@ func (p *blockchainWrapper) CurrentHeader() *types.Header {
 }
 
 // CommitBlock commits a block to the chain
-func (p *blockchainWrapper) CommitBlock(stateBlock *StateBlock) error {
-	// logs := buildLogsFromReceipts(stateBlock.Receipts, stateBlock.Block.GetHeader())
-	// status, err := p.blockchain.WriteBlockAndSetHead(stateBlock.Block,
-	// stateBlock.Receipts, logs, stateBlock.State, true)
-	// if err != nil {
-	// 	return err
-	// } else if status != core.CanonStatTy {
-	// 	return fmt.Errorf("non canonical change")
-	// }
-	return p.blockchain.WriteBlock(stateBlock.Block, "consensus")
+func (p *blockchainWrapper) CommitBlock(block *types.Block) ([]*types.Receipt, error) {
+	err := p.blockchain.WriteBlock(block, consensusSource)
+	if err != nil {
+		return nil, err
+	}
+
+	return p.blockchain.GetCachedReceipts(block.Hash())
 }
 
 // ProcessBlock builds a final block from given 'block' on top of 'parent'
@@ -181,11 +167,6 @@ func (p *blockchainWrapper) GetSystemState(config *PolyBFTConfig, provider contr
 
 func (p *blockchainWrapper) SubscribeEvents() blockchain.Subscription {
 	return p.blockchain.SubscribeEvents()
-}
-
-// CalculateGasLimit for specific block
-func (p *blockchainWrapper) CalculateGasLimit(number uint64) (uint64, error) {
-	return p.blockchain.CalculateGasLimit(number)
 }
 
 func (p *blockchainWrapper) GetChainID() uint64 {

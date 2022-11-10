@@ -1,24 +1,23 @@
 package polybft
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"math/big"
 	"sort"
 	"time"
 
-	"github.com/0xPolygon/pbft-consensus"
+	"github.com/0xPolygon/go-ibft/messages"
+	"github.com/0xPolygon/go-ibft/messages/proto"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
-	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 	hcf "github.com/hashicorp/go-hclog"
-	"github.com/umbracle/ethgo"
 )
-
-var _ pbft.Backend = &fsm{}
 
 type blockBuilder interface {
 	Reset() error
@@ -44,28 +43,14 @@ type fsm struct {
 	// polybftBackend implements methods needed from the polybft
 	polybftBackend polybftBackend
 
-	// validators is the list of pbft validators for this round
+	// validators is the list of validators for this round
 	validators ValidatorSet
 
 	// blockBuilder is the block builder for proposers
 	blockBuilder blockBuilder
 
-	// block is the current block being process in this round.
-	// It should be populated after the Accept state in pbft-consensus.
-	block *StateBlock
-
-	// proposal is the current proposal being processed
-	proposal *pbft.Proposal
-
-	// roundInfo represents the current round information, which is retrieved by the consensus engine
-	roundInfo *pbft.RoundInfo
-
 	// epochNumber denotes current epoch number
 	epochNumber uint64
-
-	// postInsertHook represents custom handler which is executed once fsm.Insert is invoked,
-	// meaning that current block is inserted successfully
-	postInsertHook func() error
 
 	// uptimeCounter holds info about number of times validators sealed a block (only present if isEndOfEpoch is true)
 	uptimeCounter *CommitEpoch
@@ -78,9 +63,6 @@ type fsm struct {
 
 	// proposerCommitmentToRegister is a commitment that is registered via state transaction by proposer
 	proposerCommitmentToRegister *CommitmentMessageSigned
-
-	// commitmentToSaveOnRegister is a commitment that is verified on register and needs to be saved in db
-	commitmentToSaveOnRegister *CommitmentMessageSigned
 
 	// bundleProofs is an array of bundles to be executed on end of sprint
 	bundleProofs []*BundleProof
@@ -99,18 +81,8 @@ type fsm struct {
 	logger hcf.Logger
 }
 
-func (f *fsm) Init(info *pbft.RoundInfo) {
-	err := f.blockBuilder.Reset()
-	if err != nil {
-		panic(err) // TODO: handle differently
-	}
-
-	f.roundInfo = info
-	f.commitmentToSaveOnRegister = nil
-}
-
 // BuildProposal builds a proposal for the current round (used if proposer)
-func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
+func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 	parent := f.parent
 
 	extraParent, err := GetIbftExtra(parent.ExtraData)
@@ -145,15 +117,6 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 	}
 
 	if f.config.IsBridgeEnabled() {
-		if f.isEndOfEpoch && f.proposerCommitmentToRegister != nil {
-			// since proposer does not execute Validate (when we see the commitment to register in state transactions)
-			// we need to set commitment to save so that the proposer also saves its commitment that he registered
-			f.commitmentToSaveOnRegister = f.proposerCommitmentToRegister
-			f.logger.Debug("[FSM] Registering commitment",
-				"from", f.proposerCommitmentToRegister.Message.FromIndex,
-				"toIndex", f.proposerCommitmentToRegister.Message.ToIndex)
-		}
-
 		for _, tx := range f.stateTransactions() {
 			if err := f.blockBuilder.WriteTx(tx); err != nil {
 				return nil, fmt.Errorf("failed to commit state transaction. Error: %w", err)
@@ -193,7 +156,7 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 	}
 
 	extra.Checkpoint = &CheckpointData{
-		BlockRound:            f.roundInfo.CurrentRound,
+		BlockRound:            currentRound,
 		EpochNumber:           f.epochNumber,
 		CurrentValidatorsHash: currentValidatorsHash,
 		NextValidatorsHash:    nextValidatorsHash,
@@ -210,24 +173,16 @@ func (f *fsm) BuildProposal() (*pbft.Proposal, error) {
 		return nil, err
 	}
 
-	f.block = stateBlock
-
 	checkpointHash, err := extra.Checkpoint.Hash(f.backend.GetChainID(), f.Height(), stateBlock.Block.Hash())
 	if err != nil {
 		return nil, fmt.Errorf("failed to calculate sign hash: %w", err)
 	}
 
-	f.proposal = &pbft.Proposal{
-		Time: headerTime,
-		Data: stateBlock.Block.MarshalRLP(),
-		Hash: checkpointHash.Bytes(),
-	}
-
 	f.logger.Debug("[FSM Build Proposal]",
 		"txs", len(stateBlock.Block.Transactions),
-		"hash", hex.EncodeToHex(f.proposal.Hash))
+		"hash", checkpointHash.String())
 
-	return f.proposal, nil
+	return stateBlock.Block.MarshalRLP(), nil
 }
 
 func (f *fsm) stateTransactions() []*types.Transaction {
@@ -283,14 +238,10 @@ func (f *fsm) createValidatorsUptimeTx() (*types.Transaction, error) {
 }
 
 // ValidateCommit is used to validate that a given commit is valid
-func (f *fsm) ValidateCommit(from pbft.NodeID, seal []byte) error {
-	if f.proposal == nil || f.proposal.Hash == nil {
-		return fmt.Errorf("incorrect commit from %s. proposal unavailable", from)
-	}
+func (f *fsm) ValidateCommit(signer []byte, seal []byte, proposalHash []byte) error {
+	from := types.BytesToAddress(signer)
 
-	fromAddress := types.Address(ethgo.HexToAddress(string(from)))
-	validator := f.validators.Accounts().GetValidatorAccount(fromAddress)
-
+	validator := f.validators.Accounts().GetValidatorMetadata(from)
 	if validator == nil {
 		return fmt.Errorf("unable to resolve validator %s", from)
 	}
@@ -300,7 +251,7 @@ func (f *fsm) ValidateCommit(from pbft.NodeID, seal []byte) error {
 		return fmt.Errorf("failed to unmarshall signature: %w", err)
 	}
 
-	if !signature.Verify(validator.BlsKey, f.proposal.Hash) {
+	if !signature.Verify(validator.BlsKey, proposalHash) {
 		return fmt.Errorf("incorrect commit signature from %s", from)
 	}
 
@@ -308,12 +259,10 @@ func (f *fsm) ValidateCommit(from pbft.NodeID, seal []byte) error {
 }
 
 // Validate validates a raw proposal (used if non-proposer)
-func (f *fsm) Validate(proposal *pbft.Proposal) error {
-	f.logger.Debug("[FSM Validate]", "hash", hex.EncodeToHex(proposal.Hash))
-
+func (f *fsm) Validate(proposal []byte) error {
 	var block types.Block
-	if err := block.UnmarshalRLP(proposal.Data); err != nil {
-		return fmt.Errorf("failed to decode block data. Error: %w", err)
+	if err := block.UnmarshalRLP(proposal); err != nil {
+		return fmt.Errorf("failed to validate, cannot decode block data. Error: %w", err)
 	}
 
 	extra, err := GetIbftExtra(block.Header.ExtraData)
@@ -323,23 +272,24 @@ func (f *fsm) Validate(proposal *pbft.Proposal) error {
 
 	checkpointHash, err := extra.Checkpoint.Hash(f.backend.GetChainID(), block.Number(), block.Hash())
 	if err != nil {
-		return fmt.Errorf("failed to calculate sign hash: %w", err)
+		return fmt.Errorf("failed to calculate signed hash: %w", err)
 	}
 
-	// validate proposal
-	if checkpointHash != types.BytesToHash(proposal.Hash) {
-		return fmt.Errorf("incorrect sign hash (current header#%d)", block.Number())
-	}
+	f.logger.Debug("[FSM Validate]", "signed hash", checkpointHash.String())
 
 	// validate header fields
 	if err := validateHeaderFields(f.parent, block.Header); err != nil {
-		return fmt.Errorf("failed to validate header (parent header# %d, current header#%d): %w",
-			f.parent.Number, block.Number(), err)
+		return fmt.Errorf(
+			"failed to validate header (parent header# %d, current header#%d): %w",
+			f.parent.Number,
+			block.Number(),
+			err,
+		)
 	}
 
 	blockExtra, err := GetIbftExtra(block.Header.ExtraData)
 	if err != nil {
-		return err
+		return fmt.Errorf("cannot get extra data:%w", err)
 	}
 
 	// TODO: Validate validator set delta?
@@ -351,7 +301,7 @@ func (f *fsm) Validate(proposal *pbft.Proposal) error {
 		// since those blocks do not include any parent information with signatures
 		validators, err := f.polybftBackend.GetValidators(blockNumber-2, nil)
 		if err != nil {
-			return err
+			return fmt.Errorf("cannot get validators:%w", err)
 		}
 
 		f.logger.Trace("[FSM Validate]", "Block", blockNumber, "parent validators", validators)
@@ -368,10 +318,11 @@ func (f *fsm) Validate(proposal *pbft.Proposal) error {
 
 		if err := blockExtra.Parent.VerifyCommittedFields(validators, parentCheckpointHash); err != nil {
 			return fmt.Errorf(
-				"failed to verify signatures for (parent) block#%d. Parent hash: %v, Current block#%d",
+				"failed to verify signatures for (parent) block#%d, parent signed hash: %v, current block#%d: %w",
 				f.parent.Number,
 				parentCheckpointHash,
 				blockNumber,
+				err,
 			)
 		}
 	}
@@ -380,17 +331,36 @@ func (f *fsm) Validate(proposal *pbft.Proposal) error {
 		return err
 	}
 
-	builtBlock, err := f.backend.ProcessBlock(f.parent, &block)
+	if _, err = f.backend.ProcessBlock(f.parent, &block); err != nil {
+		return err
+	}
+
+	f.logger.Debug("[FSM Validate]", "txs", len(block.Transactions), "hash", block.Hash().String())
+
+	return nil
+}
+
+// ValidateSender validates sender address and signature
+func (f *fsm) ValidateSender(msg *proto.Message) error {
+	msgNoSig, err := msg.PayloadNoSig()
 	if err != nil {
 		return err
 	}
 
-	f.block = builtBlock
-	f.proposal = proposal
+	signerAddress, err := wallet.RecoverAddressFromSignature(msg.Signature, msgNoSig)
+	if err != nil {
+		return fmt.Errorf("failed to ecrecover message: %w", err)
+	}
 
-	f.logger.Debug("[FSM Validate]",
-		"txs", len(f.block.Block.Transactions),
-		"hash", hex.EncodeToHex(proposal.Hash))
+	// verify the signature came from the sender
+	if !bytes.Equal(msg.From, signerAddress.Bytes()) {
+		return fmt.Errorf("signer address %s doesn't match From field", signerAddress.String())
+	}
+
+	// verify the sender is in the active validator set
+	if !f.validators.Includes(signerAddress) {
+		return fmt.Errorf("signer address %s is not included in validator set", signerAddress.String())
+	}
 
 	return nil
 }
@@ -456,7 +426,6 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 				return fmt.Errorf("invalid signature for tx = %v", tx.Hash)
 			}
 
-			f.commitmentToSaveOnRegister = stateTxData
 		case *BundleProof:
 			// every other bundle has to be in sequential order
 			if stateTxData.ID() != nextStateSyncBundleIndex {
@@ -492,32 +461,39 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 }
 
 // Insert inserts the sealed proposal
-func (f *fsm) Insert(p *pbft.SealedProposal) error {
+func (f *fsm) Insert(proposal []byte, committedSeals []*messages.CommittedSeal) (*types.Block, error) {
+	newBlock := &types.Block{}
+	if err := newBlock.UnmarshalRLP(proposal); err != nil {
+		return nil, fmt.Errorf("cannot unmarshal proposal: %w", err)
+	}
+
 	// In this function we should try to return little to no errors since
 	// at this point everything we have to do is just commit something that
 	// we should have already computed beforehand.
-	extra, _ := GetIbftExtra(f.block.Block.Header.ExtraData)
+	extra, _ := GetIbftExtra(newBlock.Header.ExtraData)
 
 	// create map for faster access to indexes
-	nodeIDIndexMap := make(map[pbft.NodeID]int, f.validators.Len())
+	nodeIDIndexMap := make(map[types.Address]int, f.validators.Len())
 	for i, addr := range f.validators.Accounts().GetAddresses() {
-		nodeIDIndexMap[pbft.NodeID(addr.String())] = i
+		nodeIDIndexMap[addr] = i
 	}
 
 	// populated bitmap according to nodeId from validator set and committed seals
 	// also populate slice of signatures
 	bitmap := bitmap.Bitmap{}
-	signatures := make(bls.Signatures, 0, len(p.CommittedSeals))
+	signatures := make(bls.Signatures, 0, len(committedSeals))
 
-	for _, commSeal := range p.CommittedSeals {
-		index, exists := nodeIDIndexMap[commSeal.NodeID]
+	for _, commSeal := range committedSeals {
+		signerAddr := types.BytesToAddress(commSeal.Signer)
+
+		index, exists := nodeIDIndexMap[signerAddr]
 		if !exists {
-			return fmt.Errorf("invalid node id = %s", commSeal.NodeID)
+			return nil, fmt.Errorf("invalid node id = %s", signerAddr.String())
 		}
 
 		s, err := bls.UnmarshalSignature(commSeal.Signature)
 		if err != nil {
-			return fmt.Errorf("invalid signature = %s", commSeal.Signature)
+			return nil, fmt.Errorf("invalid signature = %s", commSeal.Signature)
 		}
 
 		signatures = append(signatures, s)
@@ -527,7 +503,7 @@ func (f *fsm) Insert(p *pbft.SealedProposal) error {
 
 	aggregatedSignature, err := signatures.Aggregate().Marshal()
 	if err != nil {
-		return fmt.Errorf("could not aggregate seals: %w", err)
+		return nil, fmt.Errorf("could not aggregate seals: %w", err)
 	}
 
 	// include aggregated signature of all committed seals
@@ -537,26 +513,27 @@ func (f *fsm) Insert(p *pbft.SealedProposal) error {
 		Bitmap:              bitmap,
 	}
 
-	// Write extra data to header
-	f.block.Block.Header.ExtraData = append(make([]byte, 32), extra.MarshalRLPTo(nil)...)
+	// Write extar data to header
+	newBlock.Header.ExtraData = append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...)
 
-	if err := f.backend.CommitBlock(f.block); err != nil {
-		return err
+	receipts, err := f.backend.CommitBlock(newBlock)
+	if err != nil {
+		return nil, err
 	}
 
 	// commit exit events only when we finalize a block
-	events, err := getExitEventsFromReceipts(f.epochNumber, f.block.Block.Number(), f.block.Receipts)
+	events, err := getExitEventsFromReceipts(f.epochNumber, newBlock.Number(), receipts)
 	if err != nil {
-		return err
+		return newBlock, err
 	}
 
 	if len(events) > 0 {
 		if err := f.checkpointBackend.InsertExitEvents(events); err != nil {
-			return err
+			return nil, err
 		}
 	}
 
-	return f.postInsertHook()
+	return newBlock, nil
 }
 
 // Height returns the height for the current round
@@ -565,13 +542,8 @@ func (f *fsm) Height() uint64 {
 }
 
 // ValidatorSet returns the validator set for the current round
-func (f *fsm) ValidatorSet() pbft.ValidatorSet {
+func (f *fsm) ValidatorSet() ValidatorSet {
 	return f.validators
-}
-
-// IsStuck returns whether the pbft is stuck
-func (f *fsm) IsStuck(num uint64) (uint64, bool) {
-	return f.polybftBackend.CheckIfStuck(num)
 }
 
 // getCurrentValidators queries smart contract on the given block height and returns currently active validator set
@@ -581,7 +553,7 @@ func (f *fsm) getCurrentValidators(pendingBlockState *state.Transition) (Account
 	newValidators, err := systemState.GetValidatorSet()
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve validator set for block#%d: %w", f.Height(), err)
+		return nil, fmt.Errorf("failed to retrieve validator set for current block: %w", err)
 	}
 
 	return newValidators, nil

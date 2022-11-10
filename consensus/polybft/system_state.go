@@ -73,7 +73,7 @@ func (s *SystemStateImpl) GetValidatorSet() (AccountSet, error) {
 		return nil, fmt.Errorf("failed to decode addresses of the current validator set")
 	}
 
-	queryValidator := func(addr ethgo.Address) (*ValidatorAccount, error) {
+	queryValidator := func(addr ethgo.Address) (*ValidatorMetadata, error) {
 		output, err := s.validatorContract.Call("getValidator", ethgo.Latest, addr)
 		if err != nil {
 			return nil, err
@@ -89,9 +89,15 @@ func (s *SystemStateImpl) GetValidatorSet() (AccountSet, error) {
 			return nil, err
 		}
 
-		val := &ValidatorAccount{
-			Address: types.Address(addr),
-			BlsKey:  pubKey,
+		stake, ok := output["1"].(*big.Int)
+		if !ok {
+			return nil, fmt.Errorf("failed to decode stake")
+		}
+
+		val := &ValidatorMetadata{
+			Address:     types.Address(addr),
+			BlsKey:      pubKey,
+			VotingPower: stake.Uint64(),
 		}
 
 		return val, nil
