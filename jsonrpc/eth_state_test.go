@@ -774,7 +774,7 @@ type mockSpecialStore struct {
 }
 
 func (m *mockSpecialStore) GetBlockByHash(hash types.Hash, full bool) (*types.Block, bool) {
-	if m.block.Header.Hash.String() != hash.String() {
+	if m.block.Header.Hash != hash {
 		return nil, false
 	}
 
@@ -782,7 +782,7 @@ func (m *mockSpecialStore) GetBlockByHash(hash types.Hash, full bool) (*types.Bl
 }
 
 func (m *mockSpecialStore) GetAccount(root types.Hash, addr types.Address) (*Account, error) {
-	if m.account.address.String() != addr.String() {
+	if m.account.address != addr {
 		return nil, ErrStateNotFound
 	}
 
@@ -806,7 +806,7 @@ func (m *mockSpecialStore) GetNonce(addr types.Address) uint64 {
 }
 
 func (m *mockSpecialStore) GetStorage(root types.Hash, addr types.Address, slot types.Hash) ([]byte, error) {
-	if m.account.address.String() != addr.String() {
+	if m.account.address != addr {
 		return nil, ErrStateNotFound
 	}
 
@@ -821,7 +821,7 @@ func (m *mockSpecialStore) GetStorage(root types.Hash, addr types.Address, slot 
 }
 
 func (m *mockSpecialStore) GetCode(root types.Hash, addr types.Address) ([]byte, error) {
-	if m.account.address.String() != addr.String() {
+	if m.account.address != addr {
 		return nil, ErrStateNotFound
 	}
 
