@@ -38,9 +38,6 @@ type ethBlockchainStore interface {
 	// Header returns the current header of the chain (genesis if empty)
 	Header() *types.Header
 
-	// GetHeaderByNumber returns the header by number
-	GetHeaderByNumber(block uint64) (*types.Header, bool)
-
 	// GetBlockByHash gets a block using the provided hash
 	GetBlockByHash(hash types.Hash, full bool) (*types.Block, bool)
 
@@ -779,24 +776,24 @@ func (e *Eth) getBlockHeader(number BlockNumber) (*types.Header, error) {
 		return e.store.Header(), nil
 
 	case EarliestBlockNumber:
-		header, ok := e.store.GetHeaderByNumber(uint64(0))
+		block, ok := e.store.GetBlockByNumber(uint64(0), false)
 		if !ok {
 			return nil, fmt.Errorf("error fetching genesis block header")
 		}
 
-		return header, nil
+		return block.Header, nil
 
 	case PendingBlockNumber:
 		return nil, fmt.Errorf("fetching the pending header is not supported")
 
 	default:
 		// Convert the block number from hex to uint64
-		header, ok := e.store.GetHeaderByNumber(uint64(number))
+		block, ok := e.store.GetBlockByNumber(uint64(number), false)
 		if !ok {
 			return nil, fmt.Errorf("error fetching block number %d header", uint64(number))
 		}
 
-		return header, nil
+		return block.Header, nil
 	}
 }
 

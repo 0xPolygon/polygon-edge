@@ -138,14 +138,6 @@ func (m *mockStore) SubscribeEvents() blockchain.Subscription {
 	return m.subscription
 }
 
-func (m *mockStore) GetHeaderByNumber(number uint64) (*types.Header, bool) {
-	header := m.headerLoop(func(header *types.Header) bool {
-		return header.Number == number
-	})
-
-	return header, header != nil
-}
-
 func (m *mockStore) GetBlockByHash(hash types.Hash, full bool) (*types.Block, bool) {
 	header := m.headerLoop(func(header *types.Header) bool {
 		return header.Hash == hash

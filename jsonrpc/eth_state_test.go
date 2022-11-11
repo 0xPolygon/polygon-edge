@@ -792,12 +792,12 @@ func (m *mockSpecialStore) GetAccount(root types.Hash, addr types.Address) (*sta
 	return m.account.account, nil
 }
 
-func (m *mockSpecialStore) GetHeaderByNumber(blockNumber uint64) (*types.Header, bool) {
+func (m *mockSpecialStore) GetBlockByNumber(blockNumber uint64, full bool) (*types.Block, bool) {
 	if m.block.Number() != blockNumber {
 		return nil, false
 	}
 
-	return m.block.Header, true
+	return m.block, true
 }
 
 func (m *mockSpecialStore) Header() *types.Header {
