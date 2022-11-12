@@ -3,36 +3,30 @@ package server
 import (
 	"fmt"
 	"os"
+	"time"
 
-	"github.com/0xPolygon/polygon-edge/consensus"
-	"github.com/0xPolygon/polygon-edge/network"
-	"github.com/0xPolygon/polygon-edge/txpool"
+	"github.com/armon/go-metrics"
+	"github.com/armon/go-metrics/prometheus"
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 	"gopkg.in/DataDog/dd-trace-go.v1/profiler"
 )
 
-// serverMetrics holds the metric instances of all sub systems
-type serverMetrics struct {
-	consensus *consensus.Metrics
-	network   *network.Metrics
-	txpool    *txpool.Metrics
-}
+func (s *Server) setupTelemetry() error {
+	inm := metrics.NewInmemSink(10*time.Second, time.Minute)
+	metrics.DefaultInmemSignal(inm)
 
-// metricProvider serverMetric instance for the given ChainID and nameSpace
-func metricProvider(nameSpace string, chainID string, metricsRequired bool) *serverMetrics {
-	if metricsRequired {
-		return &serverMetrics{
-			consensus: consensus.GetPrometheusMetrics(nameSpace, "chain_id", chainID),
-			network:   network.GetPrometheusMetrics(nameSpace, "chain_id", chainID),
-			txpool:    txpool.GetPrometheusMetrics(nameSpace, "chain_id", chainID),
-		}
+	promSink, err := prometheus.NewPrometheusSink()
+	if err != nil {
+		return err
 	}
 
-	return &serverMetrics{
-		consensus: consensus.NilMetrics(),
-		network:   network.NilMetrics(),
-		txpool:    txpool.NilMetrics(),
-	}
+	metricsConf := metrics.DefaultConfig("edge")
+	metricsConf.EnableHostname = false
+	metrics.NewGlobal(metricsConf, metrics.FanoutSink{
+		inm, promSink,
+	})
+
+	return nil
 }
 
 // enableDataDogProfiler enables DataDog profiler. Enable it by setting DD_ENABLE env var.

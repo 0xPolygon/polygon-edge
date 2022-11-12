@@ -1,8 +1,8 @@
 package network
 
 import (
+	"context"
 	"crypto/rand"
-	"errors"
 	"fmt"
 	"math/big"
 	"time"
@@ -15,10 +15,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	rawGrpc "google.golang.org/grpc"
-)
-
-var (
-	errPeerDisconnected = errors.New("peer disconnected before the discovery client was initialized")
 )
 
 // GetRandomBootnode fetches a random bootnode that's currently
@@ -69,7 +65,8 @@ func (s *Server) NewDiscoveryClient(peerID peer.ID) (proto.DiscoveryClient, erro
 	// Check if there is a peer connection at this point in time,
 	// as there might have been a disconnection previously
 	if !s.IsConnected(peerID) && !isTemporaryDial {
-		return nil, errPeerDisconnected
+		return nil, fmt.Errorf("could not initialize new discovery client - peer [%s] not connected",
+			peerID.String())
 	}
 
 	// Check if there is an active stream connection already
@@ -93,7 +90,7 @@ func (s *Server) NewDiscoveryClient(peerID peer.ID) (proto.DiscoveryClient, erro
 	return proto.NewDiscoveryClient(protoStream), nil
 }
 
-// saveProtocolStream saves the protocol stream to the peer
+// SaveProtocolStream saves the protocol stream to the peer
 // protocol stream reference [Thread safe]
 func (s *Server) SaveProtocolStream(
 	protocol string,
@@ -226,7 +223,7 @@ func (s *Server) setupDiscovery() error {
 	)
 
 	// Register a network event handler
-	if subscribeErr := s.SubscribeFn(discoveryService.HandleNetworkEvent); subscribeErr != nil {
+	if subscribeErr := s.SubscribeFn(context.Background(), discoveryService.HandleNetworkEvent); subscribeErr != nil {
 		return fmt.Errorf("unable to subscribe to network events, %w", subscribeErr)
 	}
 
@@ -244,6 +241,11 @@ func (s *Server) setupDiscovery() error {
 	s.discovery = discoveryService
 
 	return nil
+}
+
+func (s *Server) TemporaryDialPeer(peerAddrInfo *peer.AddrInfo) {
+	s.logger.Debug("creating new temporary dial to peer", "peer", peerAddrInfo.ID)
+	s.addToDialQueue(peerAddrInfo, common.PriorityRandomDial)
 }
 
 // registerDiscoveryService registers the discovery protocol to be available

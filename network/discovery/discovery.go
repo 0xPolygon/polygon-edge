@@ -76,6 +76,9 @@ type networkingServer interface {
 	// RemoveTemporaryDial removes a peer from the temporary dial map
 	RemoveTemporaryDial(peerID peer.ID)
 
+	// TemporaryDialPeer dials the peer temporarily
+	TemporaryDialPeer(peerAddrInfo *peer.AddrInfo)
+
 	// CONNECTION INFORMATION //
 
 	// HasFreeConnectionSlot checks if there is an available connection slot for the set direction [Thread safe]
@@ -300,6 +303,7 @@ func (d *DiscoveryService) regularPeerDiscovery() {
 		return
 	}
 
+	d.logger.Debug("running regular peer discovery", "peer", peerID.String())
 	// Try to discover the peers connected to the reference peer
 	if err := d.attemptToFindPeers(*peerID); err != nil {
 		d.logger.Error(
@@ -312,7 +316,7 @@ func (d *DiscoveryService) regularPeerDiscovery() {
 	}
 }
 
-// bootnodeDiscovery queries a random (unconnected) bootnode for new peers
+// bootnodePeerDiscovery queries a random (unconnected) bootnode for new peers
 // and adds them to the routing table
 func (d *DiscoveryService) bootnodePeerDiscovery() {
 	if !d.baseServer.HasFreeConnectionSlot(network.DirOutbound) {
@@ -331,7 +335,6 @@ func (d *DiscoveryService) bootnodePeerDiscovery() {
 		// Get a random unconnected bootnode from the bootnode set
 		bootnode = d.baseServer.GetRandomBootnode()
 		if bootnode == nil {
-			// No bootnodes available
 			return
 		}
 
@@ -361,10 +364,16 @@ func (d *DiscoveryService) bootnodePeerDiscovery() {
 		}
 	}()
 
+	// Make sure we are peered with a bootnode
+	d.baseServer.TemporaryDialPeer(bootnode)
+
 	// Find peers from the referenced bootnode
 	foundNodes, err := d.findPeersCall(bootnode.ID, true)
 	if err != nil {
-		d.logger.Error("Unable to execute bootnode peer discovery, %w", err)
+		d.logger.Error("Unable to execute bootnode peer discovery",
+			"bootnode", bootnode.ID.String(),
+			"err", err.Error(),
+		)
 
 		return
 	}

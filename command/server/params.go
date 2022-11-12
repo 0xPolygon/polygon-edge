@@ -138,6 +138,10 @@ func (p *serverParams) setRawJSONRPCAddress(jsonRPCAddress string) {
 	p.rawConfig.JSONRPCAddr = jsonRPCAddress
 }
 
+func (p *serverParams) setJSONLogFormat(jsonLogFormat bool) {
+	p.rawConfig.JSONLogFormat = jsonLogFormat
+}
+
 func (p *serverParams) generateConfig() *server.Config {
 	return &server.Config{
 		Chain: p.genesisConfig,
@@ -172,6 +176,7 @@ func (p *serverParams) generateConfig() *server.Config {
 		RestoreFile:        p.getRestoreFilePath(),
 		BlockTime:          p.rawConfig.BlockTime,
 		LogLevel:           hclog.LevelFromString(p.rawConfig.LogLevel),
+		JSONLogFormat:      p.rawConfig.JSONLogFormat,
 		LogFilePath:        p.logFileLocation,
 	}
 }

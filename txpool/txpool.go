@@ -4,13 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"sync/atomic"
 	"time"
-
-	"github.com/golang/protobuf/ptypes/any"
-	"github.com/hashicorp/go-hclog"
-	"github.com/libp2p/go-libp2p/core/peer"
-	"go.uber.org/atomic"
-	"google.golang.org/grpc"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/chain"
@@ -18,6 +13,11 @@ import (
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/txpool/proto"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/armon/go-metrics"
+	"github.com/golang/protobuf/ptypes/any"
+	"github.com/hashicorp/go-hclog"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"google.golang.org/grpc"
 )
 
 const (
@@ -168,10 +168,7 @@ type TxPool struct {
 
 	// flag indicating if the current node is a sealer,
 	// and should therefore gossip transactions
-	sealing atomic.Bool
-
-	// prometheus API
-	metrics *Metrics
+	sealing uint32
 
 	// Event manager for txpool events
 	eventManager *eventManager
@@ -181,6 +178,10 @@ type TxPool struct {
 
 	// indicates which txpool operator commands should be implemented
 	proto.UnimplementedTxnPoolOperatorServer
+
+	// pending is the list of pending and ready transactions. This variable
+	// is accessed with atomics
+	pending int64
 }
 
 // deploymentWhitelist map which contains all addresses which can deploy contracts
@@ -225,14 +226,12 @@ func NewTxPool(
 	store store,
 	grpcServer *grpc.Server,
 	network *network.Server,
-	metrics *Metrics,
 	config *Config,
 ) (*TxPool, error) {
 	pool := &TxPool{
 		logger:      logger.Named("txpool"),
 		forks:       forks,
 		store:       store,
-		metrics:     metrics,
 		executables: newPricedQueue(),
 		accounts:    accountsMap{maxEnqueuedLimit: config.MaxAccountEnqueued},
 		index:       lookupMap{all: make(map[types.Hash]*types.Transaction)},
@@ -273,12 +272,17 @@ func NewTxPool(
 	return pool, nil
 }
 
+func (p *TxPool) updatePending(i int64) {
+	newPending := atomic.AddInt64(&p.pending, i)
+	metrics.SetGauge([]string{"pending_transactions"}, float32(newPending))
+}
+
 // Start runs the pool's main loop in the background.
 // On each request received, the appropriate handler
 // is invoked in a separate goroutine.
 func (p *TxPool) Start() {
 	// set default value of txpool pending transactions gauge
-	p.metrics.PendingTxs.Set(0)
+	p.updatePending(0)
 
 	//	run the handler for high gauge level pruning
 	go func() {
@@ -325,12 +329,21 @@ func (p *TxPool) SetSigner(s signer) {
 
 // SetSealing sets the sealing flag
 func (p *TxPool) SetSealing(sealing bool) {
-	p.sealing.Store(sealing)
+	newValue := uint32(0)
+	if sealing {
+		newValue = 1
+	}
+
+	atomic.CompareAndSwapUint32(
+		&p.sealing,
+		p.sealing,
+		newValue,
+	)
 }
 
 // sealing returns the current set sealing flag
 func (p *TxPool) getSealing() bool {
-	return p.sealing.Load()
+	return atomic.LoadUint32(&p.sealing) == 1
 }
 
 // AddTx adds a new transaction to the pool (sent from json-RPC/gRPC endpoints)
@@ -409,7 +422,7 @@ func (p *TxPool) Pop(tx *types.Transaction) {
 	p.gauge.decrease(slotsRequired(tx))
 
 	// update metrics
-	p.metrics.PendingTxs.Add(-1)
+	p.updatePending(-1)
 
 	// update executables
 	if tx := account.promoted.peek(); tx != nil {
@@ -452,7 +465,7 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 	clearAccountQueue(dropped)
 
 	// update metrics
-	p.metrics.PendingTxs.Add(float64(-1 * len(dropped)))
+	p.updatePending(-1 * int64(len(dropped)))
 
 	// drop enqueued
 	dropped = account.enqueued.clear()
@@ -798,7 +811,8 @@ func (p *TxPool) handlePromoteRequest(req promoteRequest) {
 	p.gauge.decrease(slotsRequired(pruned...))
 
 	// update metrics
-	p.metrics.PendingTxs.Add(float64(len(promoted)))
+	p.updatePending(int64(len(promoted)))
+
 	p.eventManager.signalEvent(proto.EventType_PROMOTED, toHash(promoted...)...)
 }
 
@@ -889,7 +903,7 @@ func (p *TxPool) resetAccounts(stateNonces map[types.Address]uint64) {
 			toHash(allPrunedPromoted...)...,
 		)
 
-		p.metrics.PendingTxs.Add(float64(-1 * len(allPrunedPromoted)))
+		p.updatePending(int64(-1 * len(allPrunedPromoted)))
 	}
 
 	if len(allPrunedEnqueued) > 0 {

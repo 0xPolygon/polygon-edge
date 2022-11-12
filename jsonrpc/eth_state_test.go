@@ -700,7 +700,7 @@ func TestEth_EstimateGas_GasLimit(t *testing.T) {
 				assert.NoError(t, estimateErr)
 
 				// Make sure the estimate is correct
-				assert.Equal(t, fmt.Sprintf("0x%x", testCase.intrinsicGasCost), estimate)
+				assert.Equal(t, argUint64(testCase.intrinsicGasCost), estimate)
 			}
 		})
 	}
@@ -792,12 +792,12 @@ func (m *mockSpecialStore) GetAccount(root types.Hash, addr types.Address) (*sta
 	return m.account.account, nil
 }
 
-func (m *mockSpecialStore) GetHeaderByNumber(blockNumber uint64) (*types.Header, bool) {
+func (m *mockSpecialStore) GetBlockByNumber(blockNumber uint64, full bool) (*types.Block, bool) {
 	if m.block.Number() != blockNumber {
 		return nil, false
 	}
 
-	return m.block.Header, true
+	return m.block, true
 }
 
 func (m *mockSpecialStore) Header() *types.Header {
