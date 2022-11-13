@@ -338,14 +338,20 @@ func (s *Signature) UnmarshalRLPWith(v *fastrlp.Value) error {
 }
 
 // VerifyCommittedFields is checking for consensus proof in the header
-func (s *Signature) VerifyCommittedFields(validatorSet AccountSet, hash types.Hash) error {
-	filtered, err := validatorSet.GetFilteredValidators(s.Bitmap)
+func (s *Signature) VerifyCommittedFields(validators AccountSet, hash types.Hash) error {
+	filtered, err := validators.GetFilteredValidators(s.Bitmap)
 	if err != nil {
-		return err
+		return fmt.Errorf("verify committed fields - cannot get signers. Error: %w", err)
 	}
 
-	if quorum := getQuorumSize(validatorSet.Len()); len(filtered) < quorum {
-		return fmt.Errorf("quorum not reached: %d of %d", len(filtered), quorum)
+	validatorSet, err := NewValidatorSet(validators)
+	if err != nil {
+		return fmt.Errorf("verify committed fields - cannot create validator set. Error: %w", err)
+	}
+
+	signerAddresses := filtered.GetAddresses()
+	if !validatorSet.HasQuorum(signerAddresses) {
+		return fmt.Errorf("verify committed fields - quorum not reached")
 	}
 
 	blsPublicKeys := make([]*bls.PublicKey, len(filtered))
@@ -361,7 +367,7 @@ func (s *Signature) VerifyCommittedFields(validatorSet AccountSet, hash types.Ha
 	}
 
 	if !aggs.VerifyAggregated(blsPublicKeys, hash[:]) {
-		return fmt.Errorf("could not verify signature")
+		return fmt.Errorf("verify committed fields - could not verify signature")
 	}
 
 	return nil
