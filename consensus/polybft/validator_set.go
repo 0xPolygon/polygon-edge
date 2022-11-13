@@ -346,9 +346,10 @@ func (v validatorSet) HasQuorum(signers []types.Address) bool {
 // calculateVotingPower calculates voting power for provided validator ids
 func (v validatorSet) calculateVotingPower(signers []types.Address) uint64 {
 	accumulatedVotingPower := uint64(0)
-	for _, nodeId := range signers {
-		accumulatedVotingPower += v.votingPowerMap[nodeId]
+	for _, address := range signers {
+		accumulatedVotingPower += v.votingPowerMap[address]
 	}
+
 	return accumulatedVotingPower
 }
 
