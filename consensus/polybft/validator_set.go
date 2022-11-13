@@ -99,6 +99,9 @@ type ValidatorSet interface {
 
 	// checks if submitted signers have reached quorum
 	HasQuorum(signers []types.Address) bool
+
+	// checks if submitted signers have reached prepare quorum
+	HasPrepareQuorum(signers []types.Address) bool
 }
 
 type validatorSet struct {
@@ -338,9 +341,14 @@ func (v *validatorSet) rescalePriorities(diffMax int64) error {
 }
 
 // HasQuorum determines if there is quorum of enough signers reached,
-// based on its voting power and quorum size from PBFT consensus
+// based on its voting power and quorum size
 func (v validatorSet) HasQuorum(signers []types.Address) bool {
 	return v.calculateVotingPower(signers) >= v.quorumSize
+}
+
+// checks if submitted signers have reached prepare quorum
+func (v validatorSet) HasPrepareQuorum(signers []types.Address) bool {
+	return v.calculateVotingPower(signers) >= v.quorumSize-1
 }
 
 // calculateVotingPower calculates voting power for provided validator ids

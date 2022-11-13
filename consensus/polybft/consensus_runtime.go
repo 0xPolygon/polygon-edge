@@ -1089,31 +1089,32 @@ func (c *consensusRuntime) ID() []byte {
 	return c.config.Key.Address().Bytes()
 }
 
-// MaximumFaultyNodes returns the maximum number of faulty nodes based on the validator set
-func (c *consensusRuntime) MaximumFaultyNodes() uint64 {
-	return uint64(c.fsm.validators.Len()-1) / 3
-}
-
-// Quorum returns what is the quorum size for the specified block height
-func (c *consensusRuntime) Quorum(_ uint64) uint64 {
-	return uint64(getQuorumSize(c.fsm.validators.Len()))
-}
-
 // HasQuorum returns true if quorum is reached for the given blockNumber
 func (c *consensusRuntime) HasQuorum(
 	blockNumber uint64,
 	messages []*proto.Message,
 	msgType proto.MessageType,
 ) bool {
-	quorum := c.Quorum(blockNumber)
+	// if we are not using consensus engine for current block return false
+	if c.fsm.parent.Number+1 != blockNumber {
+		return false
+	}
 
+	// extract the addresses of all the senders of the messages
+	senders := []types.Address{}
+
+	for _, message := range messages {
+		senders = append(senders, types.BytesToAddress(message.From))
+	}
+
+	// check quorum
 	switch msgType {
 	case proto.MessageType_PREPREPARE:
 		return len(messages) >= 0
 	case proto.MessageType_PREPARE:
-		return len(messages) >= int(quorum)-1
+		return c.fsm.validators.HasPrepareQuorum(senders)
 	case proto.MessageType_ROUND_CHANGE, proto.MessageType_COMMIT:
-		return len(messages) >= int(quorum)
+		return c.fsm.validators.HasQuorum(senders)
 	}
 
 	return false
