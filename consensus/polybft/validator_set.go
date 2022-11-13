@@ -2,6 +2,7 @@ package polybft
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"math"
 	"math/big"
@@ -25,10 +26,16 @@ const (
 	PriorityWindowSizeFactor = 2
 )
 
-// ErrTotalVotingPowerOverflow is returned if the total voting power of the
-// resulting validator set exceeds MaxTotalVotingPower.
-var ErrTotalVotingPowerOverflow = fmt.Errorf("total voting power of resulting valset exceeds max %d",
-	MaxTotalVotingPower)
+var (
+	// ErrTotalVotingPowerOverflow is returned if the total voting power of the
+	// resulting validator set exceeds MaxTotalVotingPower.
+	ErrTotalVotingPowerOverflow = fmt.Errorf(
+		"total voting power of resulting valset exceeds max %d", MaxTotalVotingPower)
+
+	// ErrTotalVotingPowerOverflow is returned if the total voting power is zero
+	ErrInvalidTotalVotingPower = errors.New(
+		"invalid voting power configuration provided: total voting power must be greater than 0")
+)
 
 type ValidatorAccount struct {
 	Metadata         *ValidatorMetadata
@@ -89,6 +96,9 @@ type ValidatorSet interface {
 
 	// IncrementProposerPriority increments priorities number of times
 	IncrementProposerPriority(times uint64) error
+
+	// checks if submitted signers have reached quorum
+	HasQuorum(signers []types.Address) bool
 }
 
 type validatorSet struct {
@@ -103,6 +113,12 @@ type validatorSet struct {
 
 	// totalVotingPower denotes voting power of entire validator set
 	totalVotingPower int64
+
+	// quorum
+	quorumSize uint64
+
+	// votingPowerMap represents voting powers per validator address
+	votingPowerMap map[types.Address]uint64
 }
 
 // NewValidatorSet creates a new validator set.
@@ -114,21 +130,19 @@ func NewValidatorSet(valz AccountSet) (*validatorSet, error) {
 
 	validatorSet := &validatorSet{
 		validators: validators,
-		// TODO voting power
-		// votingPowerMap: make(map[pbft.NodeID]uint64, len(validators)),
 	}
+
+	// populate voting power map
+	validatorSet.populateVotingPower()
+
+	// callculate quorum according to submitted voting powers
+	validatorSet.calculateQuorum()
 
 	err := validatorSet.updateWithChangeSet()
 	if err != nil {
 		return nil, fmt.Errorf("cannot update changeset: %w", err)
 	}
-	// _, quorum, err := pbft.CalculateQuorum(validatorSet.VotingPower())
-	// if err != nil {
-	// 	panic(fmt.Sprintf("cannot calculate quorum for validator set: %v", err))
-	// }
 
-	// TODO quorum size
-	// validatorSet.quorumSize = quorum
 	if len(valz) > 0 {
 		err = validatorSet.IncrementProposerPriority(1)
 		if err != nil {
@@ -323,6 +337,21 @@ func (v *validatorSet) rescalePriorities(diffMax int64) error {
 	return nil
 }
 
+// HasQuorum determines if there is quorum of enough signers reached,
+// based on its voting power and quorum size from PBFT consensus
+func (v validatorSet) HasQuorum(signers []types.Address) bool {
+	return v.calculateVotingPower(signers) >= v.quorumSize
+}
+
+// calculateVotingPower calculates voting power for provided validator ids
+func (v validatorSet) calculateVotingPower(signers []types.Address) uint64 {
+	accumulatedVotingPower := uint64(0)
+	for _, nodeId := range signers {
+		accumulatedVotingPower += v.votingPowerMap[nodeId]
+	}
+	return accumulatedVotingPower
+}
+
 // IsNilOrEmpty returns true if validator set is nil or empty.
 func (v *validatorSet) IsNilOrEmpty() bool {
 	return v == nil || len(v.validators) == 0
@@ -423,6 +452,30 @@ func (v *validatorSet) Includes(address types.Address) bool {
 
 func (v *validatorSet) Len() int {
 	return len(v.validators)
+}
+
+// CalculateQuorum calculates max faulty voting power and quorum size for given voting power map
+func (v *validatorSet) calculateQuorum() error {
+	totalVotingPower := uint64(0)
+	for _, v := range v.votingPowerMap {
+		totalVotingPower += v
+	}
+
+	if totalVotingPower == 0 {
+		return ErrInvalidTotalVotingPower
+	}
+
+	maxFaultyVotingPower := (totalVotingPower - 1) / 3
+	v.quorumSize = 2*maxFaultyVotingPower + 1
+
+	return nil
+}
+
+func (v *validatorSet) populateVotingPower() {
+	v.votingPowerMap = make(map[types.Address]uint64)
+	for _, validator := range v.validators {
+		v.votingPowerMap[validator.Metadata.Address] = validator.Metadata.VotingPower
+	}
 }
 
 // Compute the difference between the max and min ProposerPriority of that set.
