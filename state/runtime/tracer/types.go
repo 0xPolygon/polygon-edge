@@ -22,7 +22,7 @@ type Tracer interface {
 	TxStart(gasLimit uint64)
 	TxEnd(gasLeft uint64)
 
-	// Top-level call frame
+	// Call-level
 	CallStart(
 		depth int, // begins from 1
 		from, to types.Address,
@@ -39,7 +39,6 @@ type Tracer interface {
 	)
 
 	// Op-level
-	// Captures contract state
 	CaptureState(
 		// memory
 		memory []byte,
