@@ -601,31 +601,14 @@ func (t *Transition) applyCall(
 
 	var result *runtime.ExecutionResult
 
-	if t.ctx.Tracer != nil {
-		t.ctx.Tracer.CallStart(
-			c.Depth,
-			c.Caller,
-			c.Address,
-			callType,
-			c.Gas,
-			c.Value,
-			c.Input,
-		)
-
-		defer func() {
-			t.ctx.Tracer.CallEnd(
-				c.Depth,
-				result.ReturnValue,
-				result.GasUsed,
-				result.Err,
-			)
-		}()
-	}
+	t.captureCallStart(c, callType)
 
 	result = t.run(c, host)
 	if result.Failed() {
 		t.state.RevertToSnapshot(snapshot)
 	}
+
+	t.captureCallEnd(c, result)
 
 	return result
 }
@@ -687,26 +670,8 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 
 	var result *runtime.ExecutionResult
 
-	if t.ctx.Tracer != nil {
-		t.ctx.Tracer.CallStart(
-			c.Depth,
-			c.Caller,
-			c.Address,
-			evm.CREATE,
-			c.Gas,
-			c.Value,
-			c.Input,
-		)
-
-		defer func() {
-			t.ctx.Tracer.CallEnd(
-				c.Depth,
-				result.ReturnValue,
-				result.GasUsed,
-				result.Err,
-			)
-		}()
-	}
+	t.captureCallStart(c, evm.CREATE)
+	defer t.captureCallEnd(c, result)
 
 	result = t.run(c, host)
 	if result.Failed() {
@@ -897,4 +862,35 @@ func TransactionGasCost(msg *types.Transaction, isHomestead, isIstanbul bool) (u
 	}
 
 	return cost, nil
+}
+
+// captureCallStart calls CallStart in Tracer if context has the tracer
+func (t *Transition) captureCallStart(c *runtime.Contract, callType runtime.CallType) {
+	if t.ctx.Tracer == nil {
+		return
+	}
+
+	t.ctx.Tracer.CallStart(
+		c.Depth,
+		c.Caller,
+		c.Address,
+		callType,
+		c.Gas,
+		c.Value,
+		c.Input,
+	)
+}
+
+// captureCallEnd calls CallEnd in Tracer if context has the tracer
+func (t *Transition) captureCallEnd(c *runtime.Contract, result *runtime.ExecutionResult) {
+	if t.ctx.Tracer == nil {
+		return
+	}
+
+	t.ctx.Tracer.CallEnd(
+		c.Depth,
+		result.ReturnValue,
+		result.GasUsed,
+		result.Err,
+	)
 }
