@@ -54,10 +54,11 @@ type Debug struct {
 }
 
 type TraceConfig struct {
-	structtracer.Config
-	// Tracer  *string
-	// Timeout *string
-	// Reexec  *uint64
+	EnableMemory     bool `json:"enableMemory"`
+	DisableStack     bool `json:"disableStack"`
+	DisableStorage   bool `json:"disableStorage"`
+	EnableReturnData bool `json:"enableReturnData"`
+	// Timeout *string `json:"timeout"`
 }
 
 func (d *Debug) TraceBlockByNumber(
@@ -120,7 +121,7 @@ func (d *Debug) TraceTransaction(
 		return nil, errors.New("genesis is not traceable")
 	}
 
-	tracer := structtracer.NewStructTracer()
+	tracer := newTracer(config)
 
 	return d.store.TraceMinedTxn(block, tx.Hash, tracer)
 }
@@ -155,7 +156,7 @@ func (d *Debug) TraceCall(
 		tx.Gas = header.GasLimit
 	}
 
-	tracer := structtracer.NewStructTracer()
+	tracer := newTracer(config)
 
 	return d.store.TraceCall(tx, header, tracer)
 }
@@ -168,7 +169,7 @@ func (d *Debug) traceBlock(
 		return nil, errors.New("genesis is not traceable")
 	}
 
-	tracer := structtracer.NewStructTracer()
+	tracer := newTracer(config)
 
 	return d.store.TraceMinedBlock(block, tracer)
 }
@@ -195,4 +196,14 @@ func (d *Debug) getHeaderFromBlockNumberOrHash(bnh *BlockNumberOrHash) (*types.H
 	}
 
 	return header, nil
+}
+
+func newTracer(config *TraceConfig) tracer.Tracer {
+	return structtracer.NewStructTracer(structtracer.Config{
+		EnableMemory:     config.EnableMemory,
+		EnableStack:      !config.DisableStack,
+		EnableStorage:    !config.DisableStorage,
+		EnableReturnData: config.EnableReturnData,
+		Limit:            0,
+	})
 }

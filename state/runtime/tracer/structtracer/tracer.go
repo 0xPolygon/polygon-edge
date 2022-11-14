@@ -14,8 +14,8 @@ import (
 
 type Config struct {
 	EnableMemory     bool // enable memory capture
-	DisableStack     bool // disable stack capture
-	DisableStorage   bool // disable storage capture
+	EnableStack      bool // disable stack capture
+	EnableStorage    bool // disable storage capture
 	EnableReturnData bool // enable return data capture
 	Limit            int  // maximum length of output, but zero means unlimited
 }
@@ -57,15 +57,9 @@ type StructTracer struct {
 	currentStack  []*big.Int
 }
 
-func NewStructTracer() *StructTracer {
+func NewStructTracer(config Config) *StructTracer {
 	return &StructTracer{
-		Config: Config{
-			EnableMemory:     true,
-			DisableStack:     false,
-			DisableStorage:   false,
-			EnableReturnData: true,
-			Limit:            0,
-		},
+		Config:  config,
 		storage: make(map[types.Address]map[types.Hash]types.Hash),
 	}
 }
@@ -148,7 +142,7 @@ func (t *StructTracer) captureMemory(
 func (t *StructTracer) captureStack(
 	stack []*big.Int,
 ) {
-	if t.Config.DisableStack {
+	if !t.Config.EnableStack {
 		return
 	}
 
@@ -166,7 +160,7 @@ func (t *StructTracer) captureStorage(
 	sp int,
 	host tracer.RuntimeHost,
 ) {
-	if t.Config.DisableStorage || (opCode != evm.SLOAD && opCode != evm.SSTORE) {
+	if !t.Config.EnableStorage || (opCode != evm.SLOAD && opCode != evm.SSTORE) {
 		return
 	}
 
@@ -221,7 +215,7 @@ func (t *StructTracer) ExecuteState(
 		memorySize = len(memory)
 	}
 
-	if !t.Config.DisableStack {
+	if t.Config.EnableStack {
 		stack = t.currentStack
 	}
 
@@ -229,7 +223,7 @@ func (t *StructTracer) ExecuteState(
 		returnData = lastReturnData
 	}
 
-	if !t.Config.DisableStorage {
+	if t.Config.EnableStorage {
 		contractStorage, ok := t.storage[contractAddress]
 		if ok {
 			storage = make(map[types.Hash]types.Hash, len(contractStorage))
