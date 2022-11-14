@@ -10,6 +10,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
@@ -458,7 +459,7 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) (*epochMetadata, e
 		Validators: validatorSet,
 	})
 
-	firstBlockInEpoch, err := getFirstBlockOfEpoch(epochNumber, header, c.config.blockchain.GetHeaderByNumber)
+	firstBlockInEpoch, err := c.getFirstBlockOfEpoch(epochNumber, header)
 	if err != nil {
 		return nil, err
 	}
@@ -768,7 +769,7 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header, epoch *ep
 			return nil, err
 		}
 
-		blockHeader, blockExtra, err = getBlockData(blockHeader.Number-1, c.config.blockchain.GetHeaderByNumber)
+		blockHeader, blockExtra, err = c.getBlockData(blockHeader.Number - 1)
 	}
 
 	// calculate uptime for blocks from previous epoch that were not processed in previous uptime
@@ -784,7 +785,7 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header, epoch *ep
 				return nil, err
 			}
 
-			blockHeader, blockExtra, err = getBlockData(blockHeader.Number-1, c.config.blockchain.GetHeaderByNumber)
+			blockHeader, blockExtra, err = c.getBlockData(blockHeader.Number - 1)
 		}
 	}
 
@@ -1297,6 +1298,57 @@ func (c *consensusRuntime) BuildRoundChangeMessage(
 	}
 
 	return signedMsg
+}
+
+// getFirstBlockOfEpoch returns the first block of epoch in which provided header resides
+func (c *consensusRuntime) getFirstBlockOfEpoch(epochNumber uint64, latestHeader *types.Header) (uint64, error) {
+	if latestHeader.Number == 0 {
+		// if we are starting the chain, we know that the first block is block 1
+		return 1, nil
+	}
+
+	blockHeader := latestHeader
+	blockExtra, err := GetIbftExtra(latestHeader.ExtraData)
+
+	if err != nil {
+		return 0, err
+	}
+
+	if epochNumber != blockExtra.Checkpoint.EpochNumber {
+		// its a regular epoch ending. No out of sync happened
+		return latestHeader.Number + 1, nil
+	}
+
+	// node was out of sync, so we need to figure out what was the first block of the given epoch
+	epoch := blockExtra.Checkpoint.EpochNumber
+
+	var firstBlockInEpoch uint64
+
+	for blockExtra.Checkpoint.EpochNumber == epoch {
+		firstBlockInEpoch = blockHeader.Number
+		blockHeader, blockExtra, err = c.getBlockData(blockHeader.Number - 1)
+
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	return firstBlockInEpoch, nil
+}
+
+// getBlockData returns block header and extra
+func (c *consensusRuntime) getBlockData(blockNumber uint64) (*types.Header, *Extra, error) {
+	blockHeader, found := c.config.blockchain.GetHeaderByNumber(blockNumber)
+	if !found {
+		return nil, nil, blockchain.ErrNoBlock
+	}
+
+	blockExtra, err := GetIbftExtra(blockHeader.ExtraData)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return blockHeader, blockExtra, nil
 }
 
 // validateVote validates if the senders address is in active validator set
