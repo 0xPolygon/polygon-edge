@@ -11,29 +11,24 @@ import (
 )
 
 const (
-	// MaxTotalVotingPower - the maximum allowed total voting power.
+	// maxTotalVotingPower - the maximum allowed total voting power.
 	// It needs to be sufficiently small to, in all cases:
 	// 1. prevent clipping in incrementProposerPriority()
 	// 2. let (diff+diffMax-1) not overflow in IncrementProposerPriority()
 	// (Proof of 1 is tricky, left to the reader).
 	// It could be higher, but this is sufficiently large for our purposes,
 	// and leaves room for defensive purposes.
-	MaxTotalVotingPower = int64(math.MaxInt64) / 8
+	maxTotalVotingPower = int64(math.MaxInt64) / 8
 
-	// PriorityWindowSizeFactor - is a constant that when multiplied with the
+	// priorityWindowSizeFactor - is a constant that when multiplied with the
 	// total voting power gives the maximum allowed distance between validator
 	// priorities.
-	PriorityWindowSizeFactor = 2
+	priorityWindowSizeFactor = 2
 )
 
 var (
-	// ErrTotalVotingPowerOverflow is returned if the total voting power of the
-	// resulting validator set exceeds MaxTotalVotingPower.
-	ErrTotalVotingPowerOverflow = fmt.Errorf(
-		"total voting power of resulting valset exceeds max %d", MaxTotalVotingPower)
-
-	// ErrTotalVotingPowerOverflow is returned if the total voting power is zero
-	ErrInvalidTotalVotingPower = errors.New(
+	// errInvalidTotalVotingPower is returned if the total voting power is zero
+	errInvalidTotalVotingPower = errors.New(
 		"invalid voting power configuration provided: total voting power must be greater than 0")
 )
 
@@ -137,7 +132,7 @@ func NewValidatorSet(valz AccountSet) (*validatorSet, error) {
 	// populate voting power map
 	validatorSet.populateVotingPower()
 
-	// callculate quorum according to submitted voting powers
+	// calculate quorum according to submitted voting powers
 	validatorSet.calculateQuorum()
 
 	err := validatorSet.updateWithChangeSet()
@@ -153,6 +148,38 @@ func NewValidatorSet(valz AccountSet) (*validatorSet, error) {
 	}
 
 	return validatorSet, nil
+}
+
+// populateVotingPower populates voting power map
+// for each validator in the current validator set
+func (v *validatorSet) populateVotingPower() {
+	v.votingPowerMap = make(map[types.Address]uint64, len(v.validators))
+	for _, validator := range v.validators {
+		v.votingPowerMap[validator.Metadata.Address] = validator.Metadata.VotingPower
+	}
+}
+
+// calculateQuorum calculates quorum size for given voting power map
+func (v *validatorSet) calculateQuorum() error {
+	totalVotingPower := uint64(0)
+	for _, v := range v.votingPowerMap {
+		totalVotingPower += v
+	}
+
+	if totalVotingPower == 0 {
+		return errInvalidTotalVotingPower
+	}
+
+	// If there cannot be faulty nodes (less than 4 nodes in the network),
+	// then quorum size is determined as total voting power (namely all the nodes must send vote).
+	// Otherwise quorum size is calculated as 2/3 supermajority
+	if v.calcMaxFaultyNodes() == 0 {
+		v.quorumSize = totalVotingPower
+	} else {
+		v.quorumSize = uint64(math.Ceil(float64(2 / 3 * totalVotingPower)))
+	}
+
+	return nil
 }
 
 // IncrementProposerPriority increments ProposerPriority of each validator and
@@ -176,7 +203,7 @@ func (v *validatorSet) IncrementProposerPriority(times uint64) error {
 		return fmt.Errorf("cannot calculate total voting power")
 	}
 
-	diffMax := PriorityWindowSizeFactor * vp
+	diffMax := priorityWindowSizeFactor * vp
 
 	err = v.rescalePriorities(diffMax)
 	if err != nil {
@@ -248,7 +275,7 @@ func (v *validatorSet) updateWithChangeSet() error {
 		return fmt.Errorf("cannot get total voting power: %w", err)
 	}
 
-	err = v.rescalePriorities(PriorityWindowSizeFactor * totalVotingPower)
+	err = v.rescalePriorities(priorityWindowSizeFactor * totalVotingPower)
 	if err != nil {
 		return fmt.Errorf("cannot rescale priorities: %w", err)
 	}
@@ -339,11 +366,6 @@ func (v *validatorSet) rescalePriorities(diffMax int64) error {
 	return nil
 }
 
-// calcMaxFaultyNodes calculates maximum faulty nodes in order to have Byzantine fault tollerant properties
-func (v *validatorSet) calcMaxFaultyNodes() uint64 {
-	return uint64((v.Len() - 1) / 3)
-}
-
 // HasQuorum determines if there is quorum of enough signers reached,
 // based on its voting power and quorum size
 func (v validatorSet) HasQuorum(signers []types.Address) bool {
@@ -353,6 +375,11 @@ func (v validatorSet) HasQuorum(signers []types.Address) bool {
 // checks if submitted signers have reached prepare quorum
 func (v validatorSet) HasPrepareQuorum(signers []types.Address) bool {
 	return v.calculateVotingPower(signers) >= v.quorumSize-1
+}
+
+// calcMaxFaultyNodes calculates maximum faulty nodes in order to have Byzantine fault tollerant properties
+func (v validatorSet) calcMaxFaultyNodes() uint64 {
+	return uint64((v.Len() - 1) / 3)
 }
 
 // calculateVotingPower calculates voting power for provided validator ids
@@ -376,10 +403,10 @@ func (v *validatorSet) updateTotalVotingPower() error {
 	for _, val := range v.validators {
 		// mind overflow
 		sum = safeAddClip(sum, int64(val.Metadata.VotingPower))
-		if sum > MaxTotalVotingPower {
+		if sum > maxTotalVotingPower {
 			return fmt.Errorf(
 				"total voting power cannot be guarded to not exceed %v; got: %v",
-				MaxTotalVotingPower,
+				maxTotalVotingPower,
 				sum,
 			)
 		}
@@ -465,36 +492,6 @@ func (v *validatorSet) Includes(address types.Address) bool {
 
 func (v *validatorSet) Len() int {
 	return len(v.validators)
-}
-
-// CalculateQuorum calculates max faulty voting power and quorum size for given voting power map
-func (v *validatorSet) calculateQuorum() error {
-	totalVotingPower := uint64(0)
-	for _, v := range v.votingPowerMap {
-		totalVotingPower += v
-	}
-
-	if totalVotingPower == 0 {
-		return ErrInvalidTotalVotingPower
-	}
-
-	// If there cannot be faulty nodes (less than 4 nodes in the network),
-	// then quorum size is determined as total voting power (namely all the nodes must send vote).
-	// Otherwise quorum size is calculated as 2/3 supermajority
-	if v.calcMaxFaultyNodes() == 0 {
-		v.quorumSize = totalVotingPower
-	} else {
-		v.quorumSize = uint64(math.Ceil(float64(2 / 3 * totalVotingPower)))
-	}
-
-	return nil
-}
-
-func (v *validatorSet) populateVotingPower() {
-	v.votingPowerMap = make(map[types.Address]uint64)
-	for _, validator := range v.validators {
-		v.votingPowerMap[validator.Metadata.Address] = validator.Metadata.VotingPower
-	}
 }
 
 // Compute the difference between the max and min ProposerPriority of that set.

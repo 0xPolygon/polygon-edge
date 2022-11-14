@@ -568,8 +568,8 @@ func verifyValidatorSet(t *testing.T, valSet *validatorSet) {
 		"expected total priority in (-%d, %d). Got %d", valsCount, valsCount, tpp)
 	// verify that priorities are scaled
 	dist := computeMaxMinPriorityDiff(valSet)
-	assert.True(t, dist <= PriorityWindowSizeFactor*tvp,
-		"expected priority distance < %d. Got %d", PriorityWindowSizeFactor*tvp, dist)
+	assert.True(t, dist <= priorityWindowSizeFactor*tvp,
+		"expected priority distance < %d. Got %d", priorityWindowSizeFactor*tvp, dist)
 }
 
 func valSetTotalProposerPriority(valSet *validatorSet) int64 {
