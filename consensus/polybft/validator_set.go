@@ -183,7 +183,7 @@ func (v *validatorSet) calculateQuorum() error {
 		v.quorumSize = uint64(math.Ceil(float64((2 * totalVotingPower) / 3)))
 	}
 
-	v.logger.Info("calculateQuorum", "quorum", v.quorumSize, "voting powers map", v.votingPowerMap)
+	v.logger.Debug("calculateQuorum", "quorum", v.quorumSize, "voting powers map", v.votingPowerMap)
 
 	return nil
 }
