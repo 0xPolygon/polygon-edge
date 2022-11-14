@@ -107,9 +107,11 @@ func (txn *Txn) getStateObject(addr types.Address) (*StateObject, bool) {
 	if account == nil {
 		return nil, false
 	}
+
 	obj := &StateObject{
 		Account: account.Copy(),
 	}
+
 	return obj, true
 }
 
