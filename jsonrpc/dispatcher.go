@@ -78,12 +78,7 @@ func newDispatcher(
 }
 
 func (d *Dispatcher) registerEndpoints(store JSONRPCStore) {
-	helper := &endpointHelper{
-		store,
-	}
-
 	d.endpoints.Eth = &Eth{
-		helper,
 		d.logger,
 		store,
 		d.params.chainID,
@@ -102,7 +97,6 @@ func (d *Dispatcher) registerEndpoints(store JSONRPCStore) {
 		store,
 	}
 	d.endpoints.Debug = &Debug{
-		helper,
 		store,
 	}
 

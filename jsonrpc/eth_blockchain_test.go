@@ -339,7 +339,6 @@ func TestEth_Call(t *testing.T) {
 
 type testStore interface {
 	ethStore
-	endpointHelperStore
 }
 
 type mockBlockStore struct {
