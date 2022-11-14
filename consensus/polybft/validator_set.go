@@ -81,7 +81,6 @@ func (v *ValidatorAccount) CompareProposerPriority(other *ValidatorAccount) (*Va
 
 // ValidatorSet interface of the current validator set
 type ValidatorSet interface {
-
 	// CalcProposer calculates next proposer based on the passed round
 	CalcProposer(round uint64) (types.Address, error)
 
@@ -340,6 +339,11 @@ func (v *validatorSet) rescalePriorities(diffMax int64) error {
 	return nil
 }
 
+// calcMaxFaultyNodes calculates maximum faulty nodes in order to have Byzantine fault tollerant properties
+func (v *validatorSet) calcMaxFaultyNodes() uint64 {
+	return uint64((v.Len() - 1) / 3)
+}
+
 // HasQuorum determines if there is quorum of enough signers reached,
 // based on its voting power and quorum size
 func (v validatorSet) HasQuorum(signers []types.Address) bool {
@@ -474,8 +478,14 @@ func (v *validatorSet) calculateQuorum() error {
 		return ErrInvalidTotalVotingPower
 	}
 
-	maxFaultyVotingPower := (totalVotingPower - 1) / 3
-	v.quorumSize = 2*maxFaultyVotingPower + 1
+	// If there cannot be faulty nodes (less than 4 nodes in the network),
+	// then quorum size is determined as total voting power (namely all the nodes must send vote).
+	// Otherwise quorum size is calculated as 2/3 supermajority
+	if v.calcMaxFaultyNodes() == 0 {
+		v.quorumSize = totalVotingPower
+	} else {
+		v.quorumSize = uint64(math.Ceil(float64(2 / 3 * totalVotingPower)))
+	}
 
 	return nil
 }
