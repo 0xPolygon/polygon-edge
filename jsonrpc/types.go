@@ -104,6 +104,19 @@ type block struct {
 	Uncles          []types.Hash        `json:"uncles"`
 }
 
+func (b *block) Copy() *block {
+	bb := new(block)
+	*bb = *b
+
+	bb.Miner = make([]byte, len(b.Miner))
+	copy(bb.Miner[:], b.Miner[:])
+
+	bb.ExtraData = make([]byte, len(b.ExtraData))
+	copy(bb.ExtraData[:], b.ExtraData[:])
+
+	return bb
+}
+
 func toBlock(b *types.Block, fullTx bool) *block {
 	h := b.Header
 	res := &block{
