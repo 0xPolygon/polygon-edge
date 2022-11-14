@@ -10,6 +10,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/state/runtime/evm"
+	"github.com/0xPolygon/polygon-edge/state/runtime/tracer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 )
@@ -365,10 +366,6 @@ func (t *Transition) Apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 // This method is called only by test
 func (t *Transition) ContextPtr() *runtime.TxContext {
 	return &t.ctx
-}
-
-func (t *Transition) SetTracer(tracer runtime.Tracer) {
-	t.ctx.Tracer = tracer
 }
 
 func (t *Transition) subGasLimitPrice(msg *types.Transaction) error {
@@ -813,7 +810,13 @@ func (t *Transition) SetCodeDirectly(addr types.Address, code []byte) error {
 	return nil
 }
 
-func (t *Transition) GetTracer() runtime.Tracer {
+// SetTracer sets tracer to the context in order to enable it
+func (t *Transition) SetTracer(tracer tracer.Tracer) {
+	t.ctx.Tracer = tracer
+}
+
+// GetTracer returns a tracer in context
+func (t *Transition) GetTracer() tracer.Tracer {
 	return t.ctx.Tracer
 }
 
@@ -874,7 +877,7 @@ func (t *Transition) captureCallStart(c *runtime.Contract, callType runtime.Call
 		c.Depth,
 		c.Caller,
 		c.Address,
-		callType,
+		int(callType),
 		c.Gas,
 		c.Value,
 		c.Input,

@@ -7,8 +7,8 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state"
-	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/state/runtime/tracer"
+	"github.com/0xPolygon/polygon-edge/state/runtime/tracer/structtracer"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -28,11 +28,11 @@ type debugBlockchainStore interface {
 	// GetBlockByNumber gets a block using the provided height
 	GetBlockByNumber(num uint64, full bool) (*types.Block, bool)
 
-	TraceMinedBlock(*types.Block, runtime.Tracer) ([]interface{}, error)
+	TraceMinedBlock(*types.Block, tracer.Tracer) ([]interface{}, error)
 
-	TraceMinedTxn(*types.Block, types.Hash, runtime.Tracer) (interface{}, error)
+	TraceMinedTxn(*types.Block, types.Hash, tracer.Tracer) (interface{}, error)
 
-	TraceCall(*types.Transaction, *types.Header, runtime.Tracer) (interface{}, error)
+	TraceCall(*types.Transaction, *types.Header, tracer.Tracer) (interface{}, error)
 }
 
 type debugTxPoolStore interface {
@@ -55,7 +55,7 @@ type Debug struct {
 }
 
 type TraceConfig struct {
-	tracer.Config
+	structtracer.Config
 	// Tracer  *string
 	// Timeout *string
 	// Reexec  *uint64
@@ -121,7 +121,7 @@ func (d *Debug) TraceTransaction(
 		return nil, errors.New("genesis is not traceable")
 	}
 
-	tracer := tracer.NewStructTracer()
+	tracer := structtracer.NewStructTracer()
 
 	return d.store.TraceMinedTxn(block, tx.Hash, tracer)
 }
@@ -156,7 +156,7 @@ func (d *Debug) TraceCall(
 		tx.Gas = header.GasLimit
 	}
 
-	tracer := tracer.NewStructTracer()
+	tracer := structtracer.NewStructTracer()
 
 	return d.store.TraceCall(tx, header, tracer)
 }
@@ -169,7 +169,7 @@ func (d *Debug) traceBlock(
 		return nil, errors.New("genesis is not traceable")
 	}
 
-	tracer := tracer.NewStructTracer()
+	tracer := structtracer.NewStructTracer()
 
 	return d.store.TraceMinedBlock(block, tracer)
 }

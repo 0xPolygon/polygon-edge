@@ -1,4 +1,4 @@
-package tracer
+package structtracer
 
 import (
 	"errors"
@@ -8,8 +8,17 @@ import (
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/state/runtime/evm"
+	"github.com/0xPolygon/polygon-edge/state/runtime/tracer"
 	"github.com/0xPolygon/polygon-edge/types"
 )
+
+type Config struct {
+	EnableMemory     bool // enable memory capture
+	DisableStack     bool // disable stack capture
+	DisableStorage   bool // disable storage capture
+	EnableReturnData bool // enable return data capture
+	Limit            int  // maximum length of output, but zero means unlimited
+}
 
 type StructLog struct {
 	Pc            uint64                    `json:"pc"`
@@ -83,7 +92,7 @@ func (t *StructTracer) TxEnd(gasLeft uint64) {
 func (t *StructTracer) CallStart(
 	depth int,
 	from, to types.Address,
-	callType runtime.CallType,
+	callType int,
 	gas uint64,
 	value *big.Int,
 	input []byte,
@@ -108,7 +117,7 @@ func (t *StructTracer) CaptureState(
 	opCode int,
 	contractAddress types.Address,
 	sp int,
-	host runtime.Host,
+	host tracer.RuntimeHost,
 ) {
 	t.captureMemory(memory)
 
@@ -155,7 +164,7 @@ func (t *StructTracer) captureStorage(
 	opCode int,
 	contractAddress types.Address,
 	sp int,
-	host runtime.Host,
+	host tracer.RuntimeHost,
 ) {
 	if t.Config.DisableStorage || (opCode != evm.SLOAD && opCode != evm.SSTORE) {
 		return
@@ -187,13 +196,13 @@ func (t *StructTracer) captureStorage(
 func (t *StructTracer) ExecuteState(
 	contractAddress types.Address,
 	ip int,
-	opcode string,
+	opCode string,
 	availableGas uint64,
 	cost uint64,
 	lastReturnData []byte,
 	depth int,
 	err error,
-	host runtime.Host,
+	host tracer.RuntimeHost,
 ) {
 	if !t.canAppendLog() {
 		return
@@ -235,7 +244,7 @@ func (t *StructTracer) ExecuteState(
 		t.logs,
 		StructLog{
 			Pc:            uint64(ip),
-			Op:            opcode,
+			Op:            opCode,
 			Gas:           availableGas,
 			GasCost:       cost,
 			Memory:        memory,

@@ -5,6 +5,7 @@ import (
 	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/state/runtime/tracer"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -18,7 +19,7 @@ type TxContext struct {
 	GasLimit   int64
 	ChainID    int64
 	Difficulty types.Hash
-	Tracer     Tracer
+	Tracer     tracer.Tracer
 }
 
 // StorageStatus is the status of the storage access
@@ -70,59 +71,8 @@ type Host interface {
 	Callx(*Contract, Host) *ExecutionResult
 	Empty(addr types.Address) bool
 	GetNonce(addr types.Address) uint64
-	GetTracer() Tracer
+	GetTracer() tracer.Tracer
 	GetRefund() uint64
-}
-
-type Tracer interface {
-	Clear()
-	GetResult() interface{}
-
-	// Tx-level
-	TxStart(gasLimit uint64)
-	TxEnd(gasLeft uint64)
-
-	// Top-level call frame
-	CallStart(
-		depth int, // begins from 1
-		from, to types.Address,
-		callType CallType,
-		gas uint64,
-		value *big.Int,
-		input []byte,
-	)
-	CallEnd(
-		depth int, // begins from 1
-		output []byte,
-		gasUsed uint64,
-		err error,
-	)
-
-	// Op-level
-	// Captures contract state
-	CaptureState(
-		// memory
-		memory []byte,
-		// stack
-		stack []*big.Int,
-		// storage
-		opCode int,
-		contractAddress types.Address,
-		sp int,
-		host Host,
-	)
-	ExecuteState(
-		contractAddress types.Address,
-		ip int,
-		opcode string,
-		availableGas uint64,
-		cost uint64,
-		// TODO: add context
-		lastReturnData []byte,
-		depth int,
-		err error,
-		host Host,
-	)
 }
 
 // ExecutionResult includes all output after executing given evm

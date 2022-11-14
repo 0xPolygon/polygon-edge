@@ -29,6 +29,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/state/runtime/evm"
 	"github.com/0xPolygon/polygon-edge/state/runtime/precompiled"
+	"github.com/0xPolygon/polygon-edge/state/runtime/tracer"
 	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
@@ -532,7 +533,7 @@ func (j *jsonRPCHub) ApplyTxn(
 
 func (j *jsonRPCHub) TraceMinedBlock(
 	block *types.Block,
-	tracer runtime.Tracer,
+	tracer tracer.Tracer,
 ) ([]interface{}, error) {
 	if block.Number() == 0 {
 		return nil, errors.New("genesis block can't have transaction")
@@ -573,7 +574,7 @@ func (j *jsonRPCHub) TraceMinedBlock(
 func (j *jsonRPCHub) TraceMinedTxn(
 	block *types.Block,
 	targetTxHash types.Hash,
-	tracer runtime.Tracer,
+	tracer tracer.Tracer,
 ) (interface{}, error) {
 	if block.Number() == 0 {
 		return nil, errors.New("genesis block can't have transaction")
@@ -624,7 +625,7 @@ func (j *jsonRPCHub) TraceMinedTxn(
 func (j *jsonRPCHub) TraceCall(
 	tx *types.Transaction,
 	parentHeader *types.Header,
-	tracer runtime.Tracer,
+	tracer tracer.Tracer,
 ) (interface{}, error) {
 	blockCreator, err := j.GetConsensus().GetBlockCreator(parentHeader)
 	if err != nil {

@@ -6,6 +6,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
+	"github.com/0xPolygon/polygon-edge/state/runtime/tracer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
 )
@@ -87,7 +88,7 @@ func (m *mockHost) GetNonce(addr types.Address) uint64 {
 	panic("Not implemented in tests")
 }
 
-func (m *mockHost) GetTracer() runtime.Tracer {
+func (m *mockHost) GetTracer() tracer.Tracer {
 	return nil
 }
 
