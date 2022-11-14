@@ -804,6 +804,14 @@ func (m *mockSpecialStore) Header() *types.Header {
 	return m.block.Header
 }
 
+func (m *mockSpecialStore) GetHeaderByNumber(num uint64) (*types.Header, bool) {
+	if m.block.Header.Number != num {
+		return nil, false
+	}
+
+	return m.block.Header, true
+}
+
 func (m *mockSpecialStore) GetNonce(addr types.Address) uint64 {
 	return 1
 }

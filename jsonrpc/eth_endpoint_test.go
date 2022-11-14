@@ -157,8 +157,7 @@ func TestEth_DecodeTxn(t *testing.T) {
 				store.SetAccount(addr, acc)
 			}
 
-			eth := newTestEthEndpoint(store)
-			res, err := eth.decodeTxn(tt.arg)
+			res, err := DecodeTxn(tt.arg, store)
 			assert.Equal(t, tt.res, res)
 			assert.Equal(t, tt.err, err)
 		})
@@ -221,7 +220,7 @@ func TestEth_GetNextNonce(t *testing.T) {
 			t.Parallel()
 
 			// Grab the nonce
-			nonce, err := eth.getNextNonce(testCase.account, testCase.number)
+			nonce, err := GetNextNonce(testCase.account, testCase.number, eth.store)
 
 			// Assert errors
 			assert.NoError(t, err)
@@ -248,6 +247,7 @@ func TestEth_HeaderResolveBlock(t *testing.T) {
 	// Set up the mock store
 	store := newMockStore()
 	store.header.Number = 10
+	store.headerByNumber[10] = &types.Header{Number: 10}
 
 	eth := newTestEthEndpoint(store)
 

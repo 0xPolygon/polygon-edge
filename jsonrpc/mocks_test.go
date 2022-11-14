@@ -47,21 +47,23 @@ type mockEvent struct {
 type mockStore struct {
 	JSONRPCStore
 
-	header       *types.Header
-	subscription *blockchain.MockSubscription
-	receiptsLock sync.Mutex
-	receipts     map[types.Hash][]*types.Receipt
-	accounts     map[types.Address]*state.Account
+	header         *types.Header
+	headerByNumber map[uint64]*types.Header
+	subscription   *blockchain.MockSubscription
+	receiptsLock   sync.Mutex
+	receipts       map[types.Hash][]*types.Receipt
+	accounts       map[types.Address]*state.Account
 
 	// headers is the list of historical headers
-	headers []*types.Header
+	historicalHeaders []*types.Header
 }
 
 func newMockStore() *mockStore {
 	m := &mockStore{
-		header:       &types.Header{Number: 0},
-		subscription: blockchain.NewMockSubscription(),
-		accounts:     map[types.Address]*state.Account{},
+		header:         &types.Header{Number: 0},
+		headerByNumber: make(map[uint64]*types.Header),
+		subscription:   blockchain.NewMockSubscription(),
+		accounts:       map[types.Address]*state.Account{},
 	}
 	m.addHeader(m.header)
 
@@ -69,15 +71,15 @@ func newMockStore() *mockStore {
 }
 
 func (m *mockStore) addHeader(header *types.Header) {
-	if m.headers == nil {
-		m.headers = []*types.Header{}
+	if m.historicalHeaders == nil {
+		m.historicalHeaders = []*types.Header{}
 	}
 
-	m.headers = append(m.headers, header)
+	m.historicalHeaders = append(m.historicalHeaders, header)
 }
 
 func (m *mockStore) headerLoop(cond func(h *types.Header) bool) *types.Header {
-	for _, header := range m.headers {
+	for _, header := range m.historicalHeaders {
 		if cond(header) {
 			return header
 		}
@@ -123,6 +125,12 @@ func (m *mockStore) SetAccount(addr types.Address, account *state.Account) {
 
 func (m *mockStore) Header() *types.Header {
 	return m.header
+}
+
+func (m *mockStore) GetHeaderByNumber(num uint64) (*types.Header, bool) {
+	header, ok := m.headerByNumber[num]
+
+	return header, ok
 }
 
 func (m *mockStore) GetReceiptsByHash(hash types.Hash) ([]*types.Receipt, error) {
