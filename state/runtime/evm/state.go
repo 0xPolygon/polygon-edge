@@ -266,9 +266,14 @@ func (c *state) Run() ([]byte, error) {
 			logged, ipCopy, gasCopy = false, c.ip, c.gas
 
 			// copy data before execution
-			tracer.CaptureMemory(c.memory)
-			tracer.CaptureStack(c.stack)
-			tracer.CaptureStorage(int(op), c.msg.Address, c.stack, c.sp, c.host)
+			tracer.CaptureState(
+				c.memory,
+				c.stack,
+				int(op),
+				c.msg.Address,
+				c.sp,
+				c.host,
+			)
 		}
 
 		if !ok {

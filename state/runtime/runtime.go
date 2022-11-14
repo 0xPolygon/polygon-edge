@@ -99,9 +99,18 @@ type Tracer interface {
 	)
 
 	// Op-level
-	CaptureMemory([]byte)
-	CaptureStack([]*big.Int)
-	CaptureStorage(opCode int, contractAddress types.Address, stack []*big.Int, sp int, host Host)
+	// Captures contract state
+	CaptureState(
+		// memory
+		memory []byte,
+		// stack
+		stack []*big.Int,
+		// storage
+		opCode int,
+		contractAddress types.Address,
+		sp int,
+		host Host,
+	)
 	ExecuteState(
 		contractAddress types.Address,
 		ip int,

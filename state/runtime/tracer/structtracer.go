@@ -102,18 +102,43 @@ func (t *StructTracer) CallEnd(
 	}
 }
 
-func (t *StructTracer) CaptureMemory(mem []byte) {
+func (t *StructTracer) CaptureState(
+	memory []byte,
+	stack []*big.Int,
+	opCode int,
+	contractAddress types.Address,
+	sp int,
+	host runtime.Host,
+) {
+	t.captureMemory(memory)
+
+	t.captureStack(stack)
+
+	t.captureStorage(
+		stack,
+		opCode,
+		contractAddress,
+		sp,
+		host,
+	)
+}
+
+func (t *StructTracer) captureMemory(
+	memory []byte,
+) {
 	if !t.Config.EnableMemory {
 		return
 	}
 
 	// always allocate new space to get new reference
-	t.currentMemory = make([]byte, len(mem))
+	t.currentMemory = make([]byte, len(memory))
 
-	copy(t.currentMemory, mem)
+	copy(t.currentMemory, memory)
 }
 
-func (t *StructTracer) CaptureStack(stack []*big.Int) {
+func (t *StructTracer) captureStack(
+	stack []*big.Int,
+) {
 	if t.Config.DisableStack {
 		return
 	}
@@ -125,22 +150,18 @@ func (t *StructTracer) CaptureStack(stack []*big.Int) {
 	}
 }
 
-func (t *StructTracer) CaptureStorage(
-	opcode int,
-	contractAddress types.Address,
+func (t *StructTracer) captureStorage(
 	stack []*big.Int,
+	opCode int,
+	contractAddress types.Address,
 	sp int,
 	host runtime.Host,
 ) {
-	if t.Config.DisableStorage || (opcode != evm.SLOAD && opcode != evm.SSTORE) {
+	if t.Config.DisableStorage || (opCode != evm.SLOAD && opCode != evm.SSTORE) {
 		return
 	}
 
-	if _, ok := t.storage[contractAddress]; !ok {
-		t.storage[contractAddress] = make(map[types.Hash]types.Hash)
-	}
-
-	switch opcode {
+	switch opCode {
 	case evm.SLOAD:
 		if sp < 1 {
 			break
