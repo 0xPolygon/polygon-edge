@@ -262,7 +262,7 @@ func (t *Transition) Write(txn *types.Transaction) error {
 	// Make a local copy and apply the transaction
 	msg := txn.Copy()
 
-	result, e := t.Apply(msg, nil)
+	result, e := t.Apply(msg)
 	if e != nil {
 		t.logger.Error("failed to apply tx", "err", e)
 
@@ -346,13 +346,10 @@ func (t *Transition) GetTxnHash() types.Hash {
 }
 
 // Apply applies a new transaction
-func (t *Transition) Apply(
-	msg *types.Transaction,
-	tracer runtime.Tracer,
-) (*runtime.ExecutionResult, error) {
+func (t *Transition) Apply(msg *types.Transaction) (*runtime.ExecutionResult, error) {
 	s := t.state.Snapshot()
 
-	result, err := t.apply(msg, tracer)
+	result, err := t.apply(msg)
 	if err != nil {
 		t.state.RevertToSnapshot(s)
 	}
@@ -368,6 +365,10 @@ func (t *Transition) Apply(
 // This method is called only by test
 func (t *Transition) ContextPtr() *runtime.TxContext {
 	return &t.ctx
+}
+
+func (t *Transition) SetTracer(tracer runtime.Tracer) {
+	t.ctx.Tracer = tracer
 }
 
 func (t *Transition) subGasLimitPrice(msg *types.Transaction) error {
@@ -434,10 +435,7 @@ func NewGasLimitReachedTransitionApplicationError(err error) *GasLimitReachedTra
 	}
 }
 
-func (t *Transition) apply(
-	msg *types.Transaction,
-	tracer runtime.Tracer,
-) (*runtime.ExecutionResult, error) {
+func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, error) {
 	// First check this message satisfies all consensus rules before
 	// applying the message. The rules include these clauses
 	//
@@ -463,8 +461,6 @@ func (t *Transition) apply(
 	if err := t.subGasPool(msg.Gas); err != nil {
 		return nil, NewGasLimitReachedTransitionApplicationError(err)
 	}
-
-	t.ctx.Tracer = tracer
 
 	if t.ctx.Tracer != nil {
 		t.ctx.Tracer.TxStart(msg.Gas)

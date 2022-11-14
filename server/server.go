@@ -525,7 +525,7 @@ func (j *jsonRPCHub) ApplyTxn(
 		return
 	}
 
-	result, err = transition.Apply(txn, nil)
+	result, err = transition.Apply(txn)
 
 	return
 }
@@ -553,12 +553,14 @@ func (j *jsonRPCHub) TraceMinedBlock(
 		return nil, err
 	}
 
+	transition.SetTracer(tracer)
+
 	results := make([]interface{}, len(block.Transactions))
 
 	for idx, tx := range block.Transactions {
 		tracer.Clear()
 
-		if _, err := transition.Apply(tx, tracer); err != nil {
+		if _, err := transition.Apply(tx); err != nil {
 			return nil, err
 		}
 
@@ -601,7 +603,7 @@ func (j *jsonRPCHub) TraceMinedTxn(
 			break
 		}
 
-		if _, err := transition.Apply(tx, nil); err != nil {
+		if _, err := transition.Apply(tx); err != nil {
 			return nil, err
 		}
 	}
@@ -610,7 +612,9 @@ func (j *jsonRPCHub) TraceMinedTxn(
 		return nil, errors.New("target tx not found")
 	}
 
-	if _, err := transition.Apply(targetTx, tracer); err != nil {
+	transition.SetTracer(tracer)
+
+	if _, err := transition.Apply(targetTx); err != nil {
 		return nil, err
 	}
 
@@ -632,7 +636,9 @@ func (j *jsonRPCHub) TraceCall(
 		return nil, err
 	}
 
-	if _, err := transition.Apply(tx, tracer); err != nil {
+	transition.SetTracer(tracer)
+
+	if _, err := transition.Apply(tx); err != nil {
 		return nil, err
 	}
 

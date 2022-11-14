@@ -43,7 +43,7 @@ type TxMock struct {
 	nonce     map[types.Address]uint64
 }
 
-func (m *TxMock) Apply(tx *types.Transaction, tracer runtime.Tracer) (*runtime.ExecutionResult, error) {
+func (m *TxMock) Apply(tx *types.Transaction) (*runtime.ExecutionResult, error) {
 	if m.hashToRes == nil {
 		return nil, nil
 	}
