@@ -25,26 +25,17 @@ const (
 	PriorityWindowSizeFactor = 2
 )
 
-// ErrTotalVotingPowerOverflow is returned if the total voting power of the
-// resulting validator set exceeds MaxTotalVotingPower.
-var ErrTotalVotingPowerOverflow = fmt.Errorf("total voting power of resulting valset exceeds max %d",
-	MaxTotalVotingPower)
-
 type ValidatorAccount struct {
 	Metadata         *ValidatorMetadata
 	ProposerPriority int64
 }
 
 // NewValidator returns a new validator with the given pubkey and voting power.
-func NewValidator(metadata *ValidatorMetadata) *ValidatorAccount {
+func NewValidator(metadata *ValidatorMetadata, priority int64) *ValidatorAccount {
 	return &ValidatorAccount{
 		Metadata:         metadata,
-		ProposerPriority: 0,
+		ProposerPriority: priority,
 	}
-}
-
-func (v ValidatorAccount) Copy() *ValidatorAccount {
-	return NewValidator(v.Metadata.Copy())
 }
 
 // CompareProposerPriority returns the one with higher proposer priority.
@@ -109,7 +100,7 @@ type validatorSet struct {
 func NewValidatorSet(valz AccountSet) (*validatorSet, error) {
 	var validators = make([]*ValidatorAccount, len(valz))
 	for i, v := range valz {
-		validators[i] = NewValidator(v)
+		validators[i] = NewValidator(v, 0)
 	}
 
 	validatorSet := &validatorSet{
@@ -129,12 +120,12 @@ func NewValidatorSet(valz AccountSet) (*validatorSet, error) {
 
 	// TODO quorum size
 	// validatorSet.quorumSize = quorum
-	if len(valz) > 0 {
-		err = validatorSet.IncrementProposerPriority(1)
-		if err != nil {
-			return nil, fmt.Errorf("cannot create validator set: %w", err)
-		}
-	}
+	// if len(valz) > 0 {
+	// 	err = validatorSet.IncrementProposerPriority(1)
+	// 	if err != nil {
+	// 		return nil, fmt.Errorf("cannot create validator set: %w", err)
+	// 	}
+	// }
 
 	return validatorSet, nil
 }
@@ -365,7 +356,7 @@ func (v *validatorSet) CalcProposer(round uint64) (types.Address, error) {
 		return types.ZeroAddress, fmt.Errorf("cannot increment proposer priority: %w", err)
 	}
 
-	proposer, err := vc.GetProposer()
+	proposer, err := vc.getProposer()
 	if err != nil {
 		return types.ZeroAddress, fmt.Errorf("cannot get proposer: %w", err)
 	}
@@ -373,9 +364,22 @@ func (v *validatorSet) CalcProposer(round uint64) (types.Address, error) {
 	return proposer.Metadata.Address, nil
 }
 
-// GetProposer returns the current proposer. If the validator set is empty, nil
-// is returned.
-func (v *validatorSet) GetProposer() (*ValidatorAccount, error) {
+func (v *validatorSet) Includes(address types.Address) bool {
+	for _, validator := range v.validators {
+		if validator.Metadata.Address == address {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (v *validatorSet) Len() int {
+	return len(v.validators)
+}
+
+// getProposer returns the current proposer
+func (v *validatorSet) getProposer() (*ValidatorAccount, error) {
 	if v.IsNilOrEmpty() {
 		return nil, fmt.Errorf("validators cannot be nil or empty")
 	}
@@ -390,7 +394,7 @@ func (v *validatorSet) GetProposer() (*ValidatorAccount, error) {
 		v.proposer = proposer
 	}
 
-	return v.proposer.Copy(), nil
+	return NewValidator(v.proposer.Metadata, v.proposer.ProposerPriority), nil
 }
 
 func (v *validatorSet) findProposer() (*ValidatorAccount, error) {
@@ -409,20 +413,6 @@ func (v *validatorSet) findProposer() (*ValidatorAccount, error) {
 	}
 
 	return proposer, nil
-}
-
-func (v *validatorSet) Includes(address types.Address) bool {
-	for _, validator := range v.validators {
-		if validator.Metadata.Address == address {
-			return true
-		}
-	}
-
-	return false
-}
-
-func (v *validatorSet) Len() int {
-	return len(v.validators)
 }
 
 // Compute the difference between the max and min ProposerPriority of that set.
@@ -458,58 +448,12 @@ func (v *validatorSet) Copy() *validatorSet {
 	}
 }
 
-// Makes a copy of the validator list.
+// validatorListCopy makes a copy of the validator list.
 func validatorListCopy(valList []*ValidatorAccount) []*ValidatorAccount {
 	valCopy := make([]*ValidatorAccount, len(valList))
 	for i, val := range valList {
-		valCopy[i] = val.Copy()
+		valCopy[i] = NewValidator(val.Metadata, val.ProposerPriority)
 	}
 
 	return valCopy
-}
-
-func safeAdd(a, b int64) (int64, bool) {
-	if b > 0 && a > math.MaxInt64-b {
-		return -1, true
-	} else if b < 0 && a < math.MinInt64-b {
-		return -1, true
-	}
-
-	return a + b, false
-}
-
-func safeSub(a, b int64) (int64, bool) {
-	if b > 0 && a < math.MinInt64+b {
-		return -1, true
-	} else if b < 0 && a > math.MaxInt64+b {
-		return -1, true
-	}
-
-	return a - b, false
-}
-
-func safeAddClip(a, b int64) int64 {
-	c, overflow := safeAdd(a, b)
-	if overflow {
-		if b < 0 {
-			return math.MinInt64
-		}
-
-		return math.MaxInt64
-	}
-
-	return c
-}
-
-func safeSubClip(a, b int64) int64 {
-	c, overflow := safeSub(a, b)
-	if overflow {
-		if b > 0 {
-			return math.MinInt64
-		}
-
-		return math.MaxInt64
-	}
-
-	return c
 }
