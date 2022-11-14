@@ -133,9 +133,12 @@ func NewValidatorSet(valz AccountSet) (*validatorSet, error) {
 	validatorSet.populateVotingPower()
 
 	// calculate quorum according to submitted voting powers
-	validatorSet.calculateQuorum()
+	err := validatorSet.calculateQuorum()
+	if err != nil {
+		return nil, err
+	}
 
-	err := validatorSet.updateWithChangeSet()
+	err = validatorSet.updateWithChangeSet()
 	if err != nil {
 		return nil, fmt.Errorf("cannot update changeset: %w", err)
 	}
