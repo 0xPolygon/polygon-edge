@@ -39,8 +39,7 @@ const (
 	defaultPolyBftValidatorPrefixPath = "test-chain-"
 	defaultBridge                     = false
 
-	bootnodePortStart   = 30301
-	defaultStakeBalance = 1_000_000
+	bootnodePortStart = 30301
 )
 
 func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
@@ -144,6 +143,7 @@ func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
 func (p *genesisParams) getGenesisValidators(validators []GenesisTarget,
 	allocs map[types.Address]*chain.GenesisAccount) ([]*polybft.Validator, error) {
 	result := make([]*polybft.Validator, 0)
+
 	if len(p.validators) > 0 {
 		for _, validator := range p.validators {
 			parts := strings.Split(validator, ":")
@@ -152,6 +152,7 @@ func (p *genesisParams) getGenesisValidators(validators []GenesisTarget,
 			}
 
 			addr := types.StringToAddress(parts[0])
+
 			balance, err := getBalanceInWei(addr, allocs)
 			if err != nil {
 				return nil, err
@@ -192,6 +193,7 @@ func getBalanceInWei(address types.Address, allocations map[types.Address]*chain
 	}
 
 	val := command.DefaultPremineBalance
+
 	amount, err := types.ParseUint256orHex(&val)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse amount %s: %w", val, err)
