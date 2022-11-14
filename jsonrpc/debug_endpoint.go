@@ -297,6 +297,7 @@ func (d *Debug) getNextNonce(address types.Address, number BlockNumber) (uint64,
 	return acc.Nonce, nil
 }
 
+//nolint:dupl
 func (d *Debug) decodeTxn(arg *txnArgs) (*types.Transaction, error) {
 	// set default values
 	if arg.From == nil {

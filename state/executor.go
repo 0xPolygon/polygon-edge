@@ -602,42 +602,24 @@ func (t *Transition) applyCall(
 	var result *runtime.ExecutionResult
 
 	if t.ctx.Tracer != nil {
-		// XXX: Depth begins from 0 in geth
-		if c.Depth == 1 {
-			t.ctx.Tracer.CallStart(
-				c.Caller,
-				c.Address,
-				callType,
-				c.Gas,
-				c.Value,
-				c.Input,
-			)
+		t.ctx.Tracer.CallStart(
+			c.Depth,
+			c.Caller,
+			c.Address,
+			callType,
+			c.Gas,
+			c.Value,
+			c.Input,
+		)
 
-			defer func() {
-				t.ctx.Tracer.CallEnd(
-					result.ReturnValue,
-					result.GasUsed,
-					result.Err,
-				)
-			}()
-		} else {
-			t.ctx.Tracer.InnerCallStart(
-				runtime.Call,
-				c.Caller,
-				c.Address,
-				c.Gas,
-				c.Value,
-				c.Input,
+		defer func() {
+			t.ctx.Tracer.CallEnd(
+				c.Depth,
+				result.ReturnValue,
+				result.GasUsed,
+				result.Err,
 			)
-
-			defer func() {
-				t.ctx.Tracer.InnerCallEnd(
-					result.ReturnValue,
-					result.GasUsed,
-					result.Err,
-				)
-			}()
-		}
+		}()
 	}
 
 	result = t.run(c, host)
@@ -706,41 +688,24 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 	var result *runtime.ExecutionResult
 
 	if t.ctx.Tracer != nil {
-		if c.Depth == 1 {
-			t.ctx.Tracer.CallStart(
-				c.Caller,
-				c.Address,
-				evm.CREATE,
-				c.Gas,
-				c.Value,
-				c.Input,
-			)
+		t.ctx.Tracer.CallStart(
+			c.Depth,
+			c.Caller,
+			c.Address,
+			evm.CREATE,
+			c.Gas,
+			c.Value,
+			c.Input,
+		)
 
-			defer func() {
-				t.ctx.Tracer.CallEnd(
-					result.ReturnValue,
-					result.GasUsed,
-					result.Err,
-				)
-			}()
-		} else {
-			t.ctx.Tracer.InnerCallStart(
-				evm.CREATE,
-				c.Caller,
-				c.Address,
-				c.Gas,
-				c.Value,
-				c.Input,
+		defer func() {
+			t.ctx.Tracer.CallEnd(
+				c.Depth,
+				result.ReturnValue,
+				result.GasUsed,
+				result.Err,
 			)
-
-			defer func() {
-				t.ctx.Tracer.InnerCallEnd(
-					result.ReturnValue,
-					result.GasUsed,
-					result.Err,
-				)
-			}()
-		}
+		}()
 	}
 
 	result = t.run(c, host)

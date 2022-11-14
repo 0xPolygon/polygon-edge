@@ -81,6 +81,7 @@ func (t *StructTracer) TxEnd(gasLeft uint64) {
 }
 
 func (t *StructTracer) CallStart(
+	depth int,
 	from, to types.Address,
 	callType runtime.CallType,
 	gas uint64,
@@ -90,30 +91,15 @@ func (t *StructTracer) CallStart(
 }
 
 func (t *StructTracer) CallEnd(
+	depth int,
 	output []byte,
 	_gasUsed uint64,
 	err error,
 ) {
-	t.output = output
-	t.err = err
-}
-
-func (t *StructTracer) InnerCallStart(
-	typ runtime.CallType,
-	from, to types.Address,
-	gas uint64,
-	value *big.Int,
-	input []byte,
-) {
-	// NOTHING TO DO
-}
-
-func (t *StructTracer) InnerCallEnd(
-	output []byte,
-	gasUsed uint64,
-	err error,
-) {
-	// NOTHING TO DO
+	if depth == 1 {
+		t.output = output
+		t.err = err
+	}
 }
 
 func (t *StructTracer) CaptureMemory(mem []byte) {

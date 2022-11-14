@@ -84,6 +84,7 @@ type Tracer interface {
 
 	// Top-level call frame
 	CallStart(
+		depth int, // begins from 1
 		from, to types.Address,
 		callType CallType,
 		gas uint64,
@@ -91,20 +92,7 @@ type Tracer interface {
 		input []byte,
 	)
 	CallEnd(
-		output []byte,
-		gasUsed uint64,
-		err error,
-	)
-
-	// Call frame during execution
-	InnerCallStart(
-		typ CallType,
-		from, to types.Address,
-		gas uint64,
-		value *big.Int,
-		input []byte,
-	)
-	InnerCallEnd(
+		depth int, // begins from 1
 		output []byte,
 		gasUsed uint64,
 		err error,
