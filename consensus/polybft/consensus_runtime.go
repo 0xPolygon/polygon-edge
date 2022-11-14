@@ -354,7 +354,7 @@ func (c *consensusRuntime) FSM() error {
 	isEndOfSprint := c.isEndOfSprint(pendingBlockNumber)
 	isEndOfEpoch := c.isEndOfEpoch(pendingBlockNumber)
 
-	valSet, err := NewValidatorSet(epoch.Validators)
+	valSet, err := NewValidatorSet(epoch.Validators, c.logger)
 	if err != nil {
 		return fmt.Errorf("cannot create validator set for fsm: %w", err)
 	}
@@ -1092,14 +1092,17 @@ func (c *consensusRuntime) HasQuorum(
 ) bool {
 	// if we are not using consensus engine for current block return false
 	if c.fsm.parent.Number+1 != blockNumber {
+		c.logger.Warn("HasQuorum checking against stale block",
+			"blockNumber", blockNumber, "parentBlock", c.fsm.parent.Number)
+
 		return false
 	}
 
 	// extract the addresses of all the senders of the messages
-	senders := []types.Address{}
+	senders := make([]types.Address, len(messages))
 
-	for _, message := range messages {
-		senders = append(senders, types.BytesToAddress(message.From))
+	for i, message := range messages {
+		senders[i] = types.BytesToAddress(message.From)
 	}
 
 	// check quorum

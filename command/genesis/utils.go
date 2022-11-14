@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/secrets/helper"
@@ -63,12 +64,11 @@ func verifyGenesisExistence(genesisPath string) *GenesisGenError {
 func fillPremineMap(
 	premineMap map[types.Address]*chain.GenesisAccount,
 	premine []string,
-	defaultPremineBalance string,
 ) error {
 	for _, prem := range premine {
 		var addr types.Address
 
-		val := defaultPremineBalance
+		val := command.DefaultPremineBalance
 
 		if indx := strings.Index(prem, ":"); indx != -1 {
 			// <addr>:<balance>

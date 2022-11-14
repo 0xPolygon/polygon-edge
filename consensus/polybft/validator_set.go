@@ -8,6 +8,7 @@ import (
 	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/hashicorp/go-hclog"
 )
 
 const (
@@ -116,10 +117,13 @@ type validatorSet struct {
 
 	// votingPowerMap represents voting powers per validator address
 	votingPowerMap map[types.Address]uint64
+
+	// logger instance
+	logger hclog.Logger
 }
 
 // NewValidatorSet creates a new validator set.
-func NewValidatorSet(valz AccountSet) (*validatorSet, error) {
+func NewValidatorSet(valz AccountSet, logger hclog.Logger) (*validatorSet, error) {
 	var validators = make([]*ValidatorAccount, len(valz))
 	for i, v := range valz {
 		validators[i] = NewValidator(v)
@@ -127,6 +131,7 @@ func NewValidatorSet(valz AccountSet) (*validatorSet, error) {
 
 	validatorSet := &validatorSet{
 		validators: validators,
+		logger:     logger.Named("validator_set"),
 	}
 
 	// populate voting power map
@@ -179,8 +184,10 @@ func (v *validatorSet) calculateQuorum() error {
 	if v.calcMaxFaultyNodes() == 0 {
 		v.quorumSize = totalVotingPower
 	} else {
-		v.quorumSize = uint64(math.Ceil(float64(2 / 3 * totalVotingPower)))
+		v.quorumSize = uint64(math.Ceil(float64((2 * totalVotingPower) / 3)))
 	}
+
+	v.logger.Info("calculateQuorum", "quorum", v.quorumSize, "voting powers map", v.votingPowerMap)
 
 	return nil
 }
@@ -371,13 +378,21 @@ func (v *validatorSet) rescalePriorities(diffMax int64) error {
 
 // HasQuorum determines if there is quorum of enough signers reached,
 // based on its voting power and quorum size
-func (v validatorSet) HasQuorum(signers []types.Address) bool {
-	return v.calculateVotingPower(signers) >= v.quorumSize
+func (v *validatorSet) HasQuorum(signers []types.Address) bool {
+	votingPower := v.calculateVotingPower(signers)
+	v.logger.Debug("HasQuorum", "voting power", votingPower, "quorum", v.quorumSize,
+		"hasQuorum", votingPower >= v.quorumSize)
+
+	return votingPower >= v.quorumSize
 }
 
 // checks if submitted signers have reached prepare quorum
-func (v validatorSet) HasPrepareQuorum(signers []types.Address) bool {
-	return v.calculateVotingPower(signers) >= v.quorumSize-1
+func (v *validatorSet) HasPrepareQuorum(signers []types.Address) bool {
+	votingPower := v.calculateVotingPower(signers)
+	v.logger.Debug("HasPrepareQuorum", "voting power", votingPower, "quorum", v.quorumSize,
+		"hasQuorum", votingPower >= v.quorumSize-1)
+
+	return votingPower >= v.quorumSize-1
 }
 
 // calcMaxFaultyNodes calculates maximum faulty nodes in order to have Byzantine fault tollerant properties

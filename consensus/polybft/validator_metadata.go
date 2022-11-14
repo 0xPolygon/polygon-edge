@@ -17,6 +17,8 @@ import (
 	"github.com/umbracle/fastrlp"
 )
 
+const WeiScalingFactor = 1_000_000_000_000_000_000 // 10^18
+
 var accountSetABIType = abi.MustNewType(`tuple(address _address, uint256[4] blsKey)[]`)
 
 // ValidatorMetadata represents a validator metadata (its public identity)

@@ -391,7 +391,7 @@ func (v *testValidators) getValidator(alias string) *testValidator {
 }
 
 func (v *testValidators) toValidatorSet() (*validatorSet, error) {
-	return NewValidatorSet(v.getPublicIdentities())
+	return NewValidatorSet(v.getPublicIdentities(), hclog.NewNullLogger())
 }
 
 type testValidator struct {

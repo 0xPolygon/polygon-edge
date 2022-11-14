@@ -8,6 +8,7 @@ import (
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo/abi"
 	"github.com/umbracle/fastrlp"
 )
@@ -344,7 +345,7 @@ func (s *Signature) VerifyCommittedFields(validators AccountSet, hash types.Hash
 		return fmt.Errorf("verify committed fields - cannot get signers. Error: %w", err)
 	}
 
-	validatorSet, err := NewValidatorSet(validators)
+	validatorSet, err := NewValidatorSet(validators, hclog.NewNullLogger())
 	if err != nil {
 		return fmt.Errorf("verify committed fields - cannot create validator set. Error: %w", err)
 	}

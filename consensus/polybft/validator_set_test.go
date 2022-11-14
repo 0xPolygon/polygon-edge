@@ -8,6 +8,7 @@ import (
 
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -46,7 +47,7 @@ func TestValSetIndex(t *testing.T) {
 			Address:     addresses[4],
 			VotingPower: 30,
 		},
-	})
+	}, hclog.NewNullLogger())
 	require.NoError(t, err)
 	// validate no changes to validator set positions
 	for i, v := range vs.Accounts() {
@@ -97,7 +98,7 @@ func TestCalculateProposer(t *testing.T) {
 			Address:     types.Address{0x5},
 			VotingPower: 5,
 		},
-	})
+	}, hclog.NewNullLogger())
 	require.NoError(t, err)
 	assert.Equal(t, int64(15), vs.totalVotingPower)
 
@@ -170,7 +171,7 @@ func TestCalcProposer(t *testing.T) {
 			Address:     types.Address{0x3},
 			VotingPower: 3,
 		},
-	})
+	}, hclog.NewNullLogger())
 	require.NoError(t, err)
 
 	proposer, err := vs.CalcProposer(0)
@@ -210,7 +211,7 @@ func TestProposerSelection1(t *testing.T) {
 			Address:     types.Address{0x3},
 			VotingPower: 330,
 		},
-	})
+	}, hclog.NewNullLogger())
 	require.NoError(t, err)
 
 	var proposers = make([]types.Address, numberOfIteration)
@@ -262,7 +263,7 @@ func TestIncrementProposerPriorityPositiveTimes(t *testing.T) {
 			Address:     types.Address{0x3},
 			VotingPower: 330,
 		},
-	})
+	}, hclog.NewNullLogger())
 
 	require.NoError(t, err)
 	proposer, err := vset.GetProposer()
@@ -301,7 +302,7 @@ func TestIncrementProposerPrioritySameVotingPower(t *testing.T) {
 			Address:     types.Address{0x3},
 			VotingPower: 1,
 		},
-	})
+	}, hclog.NewNullLogger())
 	require.NoError(t, err)
 	assert.Equal(t, int64(3), vs.totalVotingPower)
 
@@ -369,7 +370,7 @@ func TestAveragingInIncrementProposerPriorityWithVotingPower(t *testing.T) {
 		},
 	}
 
-	vals, err := NewValidatorSet(valz)
+	vals, err := NewValidatorSet(valz, hclog.NewNullLogger())
 
 	tcs := []struct {
 		vals                 *validatorSet
@@ -498,7 +499,7 @@ func TestValidatorSetTotalVotingPowerPanicsOnOverflow(t *testing.T) {
 		{Address: types.Address{0x1}, VotingPower: math.MaxInt64},
 		{Address: types.Address{0x2}, VotingPower: math.MaxInt64},
 		{Address: types.Address{0x3}, VotingPower: math.MaxInt64},
-	})
+	}, hclog.NewNullLogger())
 	require.Error(t, err)
 
 	err = vs.IncrementProposerPriority(1)
@@ -541,7 +542,7 @@ func TestUpdatesForNewValidatorSet(t *testing.T) {
 	v1 := &ValidatorMetadata{Address: types.Address{0x1}, VotingPower: 100}
 	v2 := &ValidatorMetadata{Address: types.Address{0x2}, VotingPower: 100}
 	accountSet := []*ValidatorMetadata{v1, v2}
-	valSet, err := NewValidatorSet(accountSet)
+	valSet, err := NewValidatorSet(accountSet, hclog.NewNullLogger())
 	require.NoError(t, err)
 
 	err = valSet.IncrementProposerPriority(1)
