@@ -250,17 +250,6 @@ func (t *StructTracer) ExecuteState(
 	)
 }
 
-func (t *StructTracer) ExecuteFault(
-	ip int,
-	opcode string,
-	availableGas uint64,
-	cost uint64,
-	depth int,
-	err error,
-) {
-	// NOTHING TO DO
-}
-
 type StructTraceResult struct {
 	Failed      bool           `json:"failed"`
 	Gas         uint64         `json:"gas"`

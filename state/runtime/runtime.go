@@ -123,14 +123,6 @@ type Tracer interface {
 		err error,
 		host Host,
 	)
-	ExecuteFault(
-		ip int,
-		opcode string,
-		availableGas uint64,
-		cost uint64,
-		depth int,
-		err error,
-	)
 }
 
 // ExecutionResult includes all output after executing given evm

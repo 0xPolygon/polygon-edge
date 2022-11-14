@@ -86,6 +86,7 @@ func (c *state) reset() {
 	c.sp = 0
 	c.ip = 0
 	c.gas = 0
+	c.currentConsumedGas = 0
 	c.lastGasCost = 0
 	c.stop = false
 	c.err = nil
@@ -214,67 +215,17 @@ func (c *state) resetReturnData() {
 // Run executes the virtual machine
 func (c *state) Run() ([]byte, error) {
 	var (
-		vmerr  error
-		logged bool
+		vmerr error
 
-		op      OpCode
-		ipCopy  int
-		gasCopy uint64
-
+		op OpCode
 		ok bool
 	)
 
-	tracer := c.host.GetTracer()
-
-	defer func() {
-		if vmerr == nil || tracer == nil {
-			return
-		}
-
-		if !logged {
-			tracer.ExecuteState(
-				c.msg.Address,
-				ipCopy,
-				op.String(),
-				gasCopy,
-				// XXX: c.currentConsumedGas is not the total of gas assumption in a instruction
-				// when the execution terminated in the middle
-				c.currentConsumedGas,
-				c.returnData,
-				c.msg.Depth,
-				c.err,
-				c.host,
-			)
-		} else {
-			tracer.ExecuteFault(
-				ipCopy,
-				op.String(),
-				gasCopy,
-				// XXX: c.currentConsumedGas is not the total of gas assumption in a instruction
-				// when the execution terminated in the middle
-				c.currentConsumedGas,
-				c.msg.Depth,
-				c.err,
-			)
-		}
-	}()
-
 	for !c.stop {
 		op, ok = c.CurrentOpCode()
+		ipCopy, gasCopy := c.ip, c.gas
 
-		if tracer != nil {
-			logged, ipCopy, gasCopy = false, c.ip, c.gas
-
-			// copy data before execution
-			tracer.CaptureState(
-				c.memory,
-				c.stack,
-				int(op),
-				c.msg.Address,
-				c.sp,
-				c.host,
-			)
-		}
+		c.captureState(int(op))
 
 		if !ok {
 			c.halt()
@@ -285,6 +236,7 @@ func (c *state) Run() ([]byte, error) {
 		inst := dispatchTable[op]
 		if inst.inst == nil {
 			c.exit(errOpCodeNotFound)
+			c.captureExecutionError(op.String(), ipCopy, gasCopy)
 
 			break
 		}
@@ -292,6 +244,7 @@ func (c *state) Run() ([]byte, error) {
 		// check if the depth of the stack is enough for the instruction
 		if c.sp < inst.stack {
 			c.exit(errStackUnderflow)
+			c.captureExecutionError(op.String(), ipCopy, gasCopy)
 
 			break
 		}
@@ -299,9 +252,13 @@ func (c *state) Run() ([]byte, error) {
 		// consume the gas of the instruction
 		if !c.consumeGas(inst.gas) {
 			c.exit(errOutOfGas)
+			c.captureExecutionError(op.String(), ipCopy, gasCopy)
 
 			break
 		}
+
+		// TODO: track before memory expansion, return data
+		c.captureSuccessfulExecution(op.String(), gasCopy)
 
 		// execute the instruction
 		inst.inst(c)
@@ -311,24 +268,6 @@ func (c *state) Run() ([]byte, error) {
 			c.exit(errStackOverflow)
 
 			break
-		}
-
-		// TODO: track before memory expansion, return data
-		if c.err == nil && tracer != nil {
-			logged = true
-
-			tracer.ExecuteState(
-				c.msg.Address,
-				c.ip,
-				op.String(),
-				gasCopy,
-				c.currentConsumedGas,
-				// TODO: copy
-				c.returnData,
-				c.msg.Depth,
-				c.err,
-				c.host,
-			)
 		}
 
 		c.ip++
@@ -442,4 +381,68 @@ func (c *state) CurrentOpCode() (OpCode, bool) {
 	}
 
 	return OpCode(c.code[c.ip]), true
+}
+
+func (c *state) captureState(opCode int) {
+	tracer := c.host.GetTracer()
+	if tracer == nil {
+		return
+	}
+
+	tracer.CaptureState(
+		c.memory,
+		c.stack,
+		opCode,
+		c.msg.Address,
+		c.sp,
+		c.host,
+	)
+}
+
+func (c *state) captureSuccessfulExecution(
+	opCode string,
+	gas uint64,
+) {
+	tracer := c.host.GetTracer()
+
+	if tracer == nil {
+		return
+	}
+
+	tracer.ExecuteState(
+		c.msg.Address,
+		c.ip,
+		opCode,
+		gas,
+		c.currentConsumedGas,
+		// TODO: copy
+		c.returnData,
+		c.msg.Depth,
+		c.err,
+		c.host,
+	)
+}
+
+func (c *state) captureExecutionError(
+	opCode string,
+	ip int,
+	gas uint64,
+) {
+	tracer := c.host.GetTracer()
+
+	if tracer == nil {
+		return
+	}
+
+	tracer.ExecuteState(
+		c.msg.Address,
+		ip,
+		opCode,
+		gas,
+		c.currentConsumedGas,
+		c.returnData,
+		c.msg.Depth,
+		c.err,
+		c.host,
+	)
 }
