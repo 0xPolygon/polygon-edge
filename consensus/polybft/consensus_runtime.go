@@ -354,11 +354,6 @@ func (c *consensusRuntime) FSM() error {
 	isEndOfSprint := c.isEndOfSprint(pendingBlockNumber)
 	isEndOfEpoch := c.isEndOfEpoch(pendingBlockNumber)
 
-	// TODO handle set voting power
-	for i := range epoch.Validators {
-		epoch.Validators[i].VotingPower = 5
-	}
-
 	valSet, err := NewValidatorSet(epoch.Validators)
 	if err != nil {
 		return fmt.Errorf("cannot create validator set for fsm: %w", err)

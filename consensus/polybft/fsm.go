@@ -270,13 +270,6 @@ func (f *fsm) Validate(proposal []byte) error {
 		return err
 	}
 
-	checkpointHash, err := extra.Checkpoint.Hash(f.backend.GetChainID(), block.Number(), block.Hash())
-	if err != nil {
-		return fmt.Errorf("failed to calculate signed hash: %w", err)
-	}
-
-	f.logger.Debug("[FSM Validate]", "signed hash", checkpointHash.String())
-
 	// validate header fields
 	if err := validateHeaderFields(f.parent, block.Header); err != nil {
 		return fmt.Errorf(
@@ -335,7 +328,12 @@ func (f *fsm) Validate(proposal []byte) error {
 		return err
 	}
 
-	f.logger.Debug("[FSM Validate]", "txs", len(block.Transactions), "hash", block.Hash().String())
+	checkpointHash, err := extra.Checkpoint.Hash(f.backend.GetChainID(), block.Number(), block.Hash())
+	if err != nil {
+		return fmt.Errorf("failed to calculate signed hash: %w", err)
+	}
+
+	f.logger.Debug("[FSM Validate]", "txs", len(block.Transactions), "signed hash", checkpointHash)
 
 	return nil
 }

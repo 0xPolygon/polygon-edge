@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 
@@ -13,7 +14,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/helper"
 
 	rootchain "github.com/0xPolygon/polygon-edge/command/rootchain/helper"
-	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/polybftcontracts"
@@ -41,7 +41,7 @@ const (
 	defaultBridge                     = false
 
 	bootnodePortStart   = 30301
-	defaultStakeBalance = 100
+	defaultStakeBalance = 1_000_000
 )
 
 func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
@@ -50,7 +50,7 @@ func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
 		return nil, err
 	}
 
-	alloc, err := p.deployContracts()
+	allocs, err := p.deployContracts()
 	if err != nil {
 		return nil, err
 	}
@@ -82,14 +82,6 @@ func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
 
 	chainConfig := &chain.Chain{
 		Name: p.name,
-		Genesis: &chain.Genesis{
-			GasLimit:   p.blockGasLimit,
-			Difficulty: 0,
-			Alloc:      alloc,
-			ExtraData:  generateExtraDataPolyBft(validatorsInfo),
-			GasUsed:    command.DefaultGenesisGasUsed,
-			Mixhash:    polybft.PolyBFTMixDigest,
-		},
 		Params: &chain.Params{
 			ChainID: int(p.chainID),
 			Forks:   chain.AllForksEnabled,
@@ -119,13 +111,23 @@ func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
 		}
 	}
 
-	// Premine accounts
-	if err := fillPremineMap(chainConfig.Genesis.Alloc, premine); err != nil {
+	// premine accounts
+	if err := fillPremineMap(allocs, premine, strconv.Itoa(defaultStakeBalance)); err != nil {
 		return nil, err
 	}
 
+	// populate genesis parameters
+	chainConfig.Genesis = &chain.Genesis{
+		GasLimit:   p.blockGasLimit,
+		Difficulty: 0,
+		Alloc:      allocs,
+		ExtraData:  generateExtraDataPolyBft(validatorsInfo, allocs),
+		GasUsed:    command.DefaultGenesisGasUsed,
+		Mixhash:    polybft.PolyBFTMixDigest,
+	}
+
 	// Set initial validator set
-	polyBftConfig.InitialValidatorSet = p.getGenesisValidators(validatorsInfo, chainConfig.Genesis.Alloc)
+	polyBftConfig.InitialValidatorSet = p.getGenesisValidators(validatorsInfo, allocs)
 
 	return chainConfig, nil
 }
@@ -236,20 +238,24 @@ func (p *genesisParams) deployContracts() (map[types.Address]*chain.GenesisAccou
 	return allocations, nil
 }
 
-func generateExtraDataPolyBft(validators []GenesisTarget) []byte {
+// generateExtraDataPolyBft populates Extra with specific fields required for polybft consensus protocol
+func generateExtraDataPolyBft(validators []GenesisTarget, allocs map[types.Address]*chain.GenesisAccount) []byte {
 	delta := &polybft.ValidatorSetDelta{
 		Added:   make(polybft.AccountSet, len(validators)),
 		Removed: bitmap.Bitmap{},
 	}
 
 	for i, validator := range validators {
-		delta.Added[i] = &polybft.ValidatorMetadata{
-			Address: types.Address(validator.Account.Ecdsa.Address()),
-			BlsKey:  validator.Account.Bls.PublicKey(),
+		address := types.Address(validator.Account.Ecdsa.Address())
+		validatorMetadata := &polybft.ValidatorMetadata{
+			Address:     address,
+			BlsKey:      validator.Account.Bls.PublicKey(),
+			VotingPower: getBalance(address, allocs).Uint64(),
 		}
+		delta.Added[i] = validatorMetadata
 	}
 
 	extra := polybft.Extra{Validators: delta}
 
-	return append(make([]byte, signer.IstanbulExtraVanity), extra.MarshalRLPTo(nil)...)
+	return append(make([]byte, polybft.ExtraVanity), extra.MarshalRLPTo(nil)...)
 }
