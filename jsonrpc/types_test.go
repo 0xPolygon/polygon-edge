@@ -13,6 +13,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestBasicTypes_Encode(t *testing.T) {
@@ -124,4 +125,15 @@ func TestToTransaction_Returns_V_R_S_ValuesWithoutLeading0(t *testing.T) {
 	assert.Equal(t, hexWithoutLeading0, string(jsonV))
 	assert.Equal(t, hexWithoutLeading0, string(jsonR))
 	assert.Equal(t, hexWithoutLeading0, string(jsonS))
+}
+
+func TestBlock_Copy(t *testing.T) {
+	b := &block{
+		ExtraData: []byte{0x1},
+		Miner:     []byte{0x2},
+		Uncles:    []types.Hash{{0x0, 0x1}},
+	}
+
+	bb := b.Copy()
+	require.Equal(t, b, bb)
 }

@@ -3,9 +3,7 @@ package chain
 import (
 	"encoding/json"
 	"math/big"
-	"os"
 	"reflect"
-	"strings"
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/types"
@@ -150,20 +148,5 @@ func TestGenesisX(t *testing.T) {
 				t.Fatal("bad")
 			}
 		})
-	}
-}
-
-func TestChainFolder(t *testing.T) {
-	// it should be able to parse all the chains in the ./chains folder
-	files, err := os.ReadDir("./chains")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	for _, f := range files {
-		name := strings.TrimSuffix(f.Name(), ".json")
-		if _, err := ImportFromName(name); err != nil {
-			t.Fatalf("Failed to parse %s: %v", name, err)
-		}
 	}
 }

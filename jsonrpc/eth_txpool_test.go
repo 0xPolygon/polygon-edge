@@ -4,7 +4,6 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
@@ -21,7 +20,7 @@ func TestEth_TxnPool_SendRawTransaction(t *testing.T) {
 	txn.ComputeHash()
 
 	data := txn.MarshalRLP()
-	_, err := eth.SendRawTransaction(hex.EncodeToHex(data))
+	_, err := eth.SendRawTransaction(data)
 	assert.NoError(t, err)
 	assert.NotEqual(t, store.txn.Hash, types.ZeroHash)
 
@@ -43,7 +42,7 @@ func TestEth_TxnPool_SendTransaction(t *testing.T) {
 		GasPrice: big.NewInt(int64(1)),
 	}
 
-	_, err := eth.SendRawTransaction(hex.EncodeToHex(txToSend.MarshalRLP()))
+	_, err := eth.SendRawTransaction(txToSend.MarshalRLP())
 	assert.NoError(t, err)
 	assert.NotEqual(t, store.txn.Hash, types.ZeroHash)
 }

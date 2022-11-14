@@ -221,23 +221,6 @@ func (s *KeyValueStorage) ReadBody(hash types.Hash) (*types.Body, error) {
 	return body, err
 }
 
-// SNAPSHOTS //
-
-// WriteSnapshot writes the snapshot to the DB
-func (s *KeyValueStorage) WriteSnapshot(hash types.Hash, blob []byte) error {
-	return s.set(SNAPSHOTS, hash.Bytes(), blob)
-}
-
-// ReadSnapshot reads the snapshot from the DB
-func (s *KeyValueStorage) ReadSnapshot(hash types.Hash) ([]byte, bool) {
-	data, ok := s.get(SNAPSHOTS, hash.Bytes())
-	if !ok {
-		return []byte{}, false
-	}
-
-	return data, true
-}
-
 // RECEIPTS //
 
 // WriteReceipts writes the receipts

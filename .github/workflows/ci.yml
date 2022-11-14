@@ -9,34 +9,9 @@ on:  # yamllint disable-line rule:truthy
 jobs:
   build:
     name: Build
-    uses: 0xpolygon/polygon-edge/.github/workflows/build.yml@develop
+    uses: ./.github/workflows/build.yml
 
   test:
     name: Test
-    uses: 0xpolygon/polygon-edge/.github/workflows/test.yml@develop
+    uses: ./.github/workflows/test.yml
     needs: build
-
-  snyk:
-    name: Snyk
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@master
-      - name: Run Snyk to check for vulnerabilities
-        uses: snyk/actions/golang@master
-        with:
-          args: --org=${{ secrets.SNYK_ORG }} --severity-threshold=high
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-
-  snyk-code:
-    name: Snyk Code
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@master
-      - name: Run Snyk SAST to check for code vulnerabilities
-        uses: snyk/actions/golang@master
-        with:
-          command: code test
-          args: --org=${{ secrets.SNYK_ORG }}
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}

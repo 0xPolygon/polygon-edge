@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"crypto/rand"
+	"fmt"
 	"math/big"
 	"testing"
 	"time"
@@ -30,8 +31,6 @@ var (
 		Homestead: chain.NewFork(0),
 		Istanbul:  chain.NewFork(0),
 	}
-
-	nilMetrics = NilMetrics()
 )
 
 // addresses used in tests
@@ -87,7 +86,6 @@ func newTestPoolWithSlots(maxSlots uint64, mockStore ...store) (*TxPool, error) 
 		storeToUse,
 		nil,
 		nil,
-		nilMetrics,
 		&Config{
 			PriceLimit:          defaultPriceLimit,
 			MaxSlots:            maxSlots,
@@ -2666,6 +2664,68 @@ func TestGetTxs(t *testing.T) {
 					assert.True(t, found)
 				}
 			}
+		})
+	}
+}
+
+func TestSetSealing(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		// the value that is set before the operation
+		initialValue bool
+		// the value to be set by SetSealing
+		value bool
+		// the value that is set after the operation
+		expectedValue bool
+	}{
+		{
+			initialValue:  false,
+			value:         false,
+			expectedValue: false,
+		},
+		{
+			initialValue:  false,
+			value:         true,
+			expectedValue: true,
+		},
+		{
+			initialValue:  true,
+			value:         false,
+			expectedValue: false,
+		},
+		{
+			initialValue:  true,
+			value:         true,
+			expectedValue: true,
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		name := fmt.Sprintf("initial=%t, value=%t", test.initialValue, test.value)
+
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			pool, err := newTestPool()
+			assert.NoError(t, err)
+
+			// Set initial value
+			pool.sealing = 0
+			if test.initialValue {
+				pool.sealing = 1
+			}
+
+			// call the target
+			pool.SetSealing(test.value)
+
+			// get the result
+			assert.Equal(
+				t,
+				test.expectedValue,
+				pool.getSealing(),
+			)
 		})
 	}
 }
