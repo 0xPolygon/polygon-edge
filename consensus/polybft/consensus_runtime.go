@@ -624,9 +624,9 @@ func (c *consensusRuntime) getAggSignatureForCommitmentMessage(
 ) (Signature, [][]byte, error) {
 	validators := epoch.Validators
 
-	nodeIDIndexMap := make(map[string]int, validators.Len())
+	validatorAddrToIndex := make(map[string]int, validators.Len())
 	for i, validator := range validators {
-		nodeIDIndexMap[validator.Address.String()] = i
+		validatorAddrToIndex[validator.Address.String()] = i
 	}
 
 	// get all the votes from the database for this commitment
@@ -641,7 +641,7 @@ func (c *consensusRuntime) getAggSignatureForCommitmentMessage(
 	bitmap := bitmap.Bitmap{}
 
 	for _, vote := range votes {
-		index, exists := nodeIDIndexMap[vote.From]
+		index, exists := validatorAddrToIndex[vote.From]
 		if !exists {
 			continue // don't count this vote, because it does not belong to validator
 		}
