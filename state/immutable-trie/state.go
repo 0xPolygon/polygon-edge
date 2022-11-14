@@ -1,7 +1,6 @@
 package itrie
 
 import (
-	"errors"
 	"fmt"
 
 	lru "github.com/hashicorp/golang-lru"
@@ -65,23 +64,22 @@ func (s *State) newTrieAt(root types.Hash) (*Trie, error) {
 	if ok {
 		t, ok := tt.(*Trie)
 		if !ok {
-			return nil, errors.New("invalid type assertion")
+			return nil, fmt.Errorf("invalid type assertion on root: %s", root)
 		}
 
 		t.state = s
 
 		trie, ok := tt.(*Trie)
 		if !ok {
-			return nil, errors.New("invalid type assertion")
+			return nil, fmt.Errorf("invalid type assertion on root: %s", root)
 		}
 
 		return trie, nil
 	}
 
 	n, ok, err := GetNode(root.Bytes(), s.storage)
-
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get storage root %s: %w", root, err)
 	}
 
 	if !ok {
