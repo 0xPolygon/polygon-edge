@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"net"
+	"os"
 
 	"github.com/0xPolygon/polygon-edge/command/server/config"
 
@@ -117,10 +118,34 @@ func (p *serverParams) initSecretsConfig() error {
 func (p *serverParams) initGenesisConfig() error {
 	var parseErr error
 
-	if p.genesisConfig, parseErr = chain.Import(
-		p.rawConfig.GenesisPath,
-	); parseErr != nil {
-		return parseErr
+	// check if the genesis file exists
+	var genesisExists bool
+	if _, err := os.Stat(p.rawConfig.GenesisPath); err == nil {
+		genesisExists = true
+	} else if errors.Is(err, os.ErrNotExist) {
+		genesisExists = false
+	} else {
+		return fmt.Errorf("failed to read genesis file '%s': %w", p.rawConfig.GenesisPath, err)
+	}
+
+	if p.isDevMode && !genesisExists {
+		// load a default chain if dev mode and a custom genesis
+		// file is not supplied
+		p.genesisConfig = &chain.Chain{
+			Name: "default",
+			Params: &chain.Params{
+				Engine: map[string]interface{}{
+					"dev": map[string]interface{}{},
+				},
+			},
+			Genesis: &chain.Genesis{},
+		}
+	} else {
+		if p.genesisConfig, parseErr = chain.Import(
+			p.rawConfig.GenesisPath,
+		); parseErr != nil {
+			return parseErr
+		}
 	}
 
 	// if block-gas-target flag is set override genesis.json value
