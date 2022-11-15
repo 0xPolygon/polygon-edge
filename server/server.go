@@ -525,7 +525,8 @@ func (j *jsonRPCHub) ApplyTxn(
 	return
 }
 
-func (j *jsonRPCHub) TraceMinedBlock(
+// TraceBlock traces all transactions in the given block and returns all results
+func (j *jsonRPCHub) TraceBlock(
 	block *types.Block,
 	tracer tracer.Tracer,
 ) ([]interface{}, error) {
@@ -565,7 +566,8 @@ func (j *jsonRPCHub) TraceMinedBlock(
 	return results, nil
 }
 
-func (j *jsonRPCHub) TraceMinedTxn(
+// TraceTxn traces a transaction in the block, associated with the given hash
+func (j *jsonRPCHub) TraceTxn(
 	block *types.Block,
 	targetTxHash types.Hash,
 	tracer tracer.Tracer,
@@ -598,6 +600,7 @@ func (j *jsonRPCHub) TraceMinedTxn(
 			break
 		}
 
+		// Execute transactions without tracer until reaching the target transaction
 		if _, err := transition.Apply(tx); err != nil {
 			return nil, err
 		}

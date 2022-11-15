@@ -27,10 +27,13 @@ type debugBlockchainStore interface {
 	// GetBlockByNumber gets a block using the provided height
 	GetBlockByNumber(num uint64, full bool) (*types.Block, bool)
 
-	TraceMinedBlock(*types.Block, tracer.Tracer) ([]interface{}, error)
+	// TraceBlock traces all transactions in the given block
+	TraceBlock(*types.Block, tracer.Tracer) ([]interface{}, error)
 
-	TraceMinedTxn(*types.Block, types.Hash, tracer.Tracer) (interface{}, error)
+	// TraceTxn traces a transaction in the block, associated with the given hash
+	TraceTxn(*types.Block, types.Hash, tracer.Tracer) (interface{}, error)
 
+	// TraceCall traces a single call at the point when the given header is mined
 	TraceCall(*types.Transaction, *types.Header, tracer.Tracer) (interface{}, error)
 }
 
@@ -113,7 +116,6 @@ func (d *Debug) TraceTransaction(
 ) (interface{}, error) {
 	tx, block := GetTxAndBlockByTxHash(txHash, d.store)
 	if tx == nil {
-		// TODO: check error schema
 		return nil, fmt.Errorf("tx %s not found", txHash.String())
 	}
 
@@ -123,7 +125,7 @@ func (d *Debug) TraceTransaction(
 
 	tracer := newTracer(config)
 
-	return d.store.TraceMinedTxn(block, tx.Hash, tracer)
+	return d.store.TraceTxn(block, tx.Hash, tracer)
 }
 
 func (d *Debug) TraceCall(
@@ -131,17 +133,12 @@ func (d *Debug) TraceCall(
 	filter BlockNumberOrHash,
 	config *TraceConfig,
 ) (interface{}, error) {
-	var (
-		header *types.Header
-		err    error
-	)
-
 	// The filter is empty, use the latest block by default
 	if filter.BlockNumber == nil && filter.BlockHash == nil {
 		filter.BlockNumber, _ = createBlockNumberPointer("latest")
 	}
 
-	header, err = d.getHeaderFromBlockNumberOrHash(&filter)
+	header, err := d.getHeaderFromBlockNumberOrHash(&filter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get header from block hash or block number")
 	}
@@ -171,7 +168,7 @@ func (d *Debug) traceBlock(
 
 	tracer := newTracer(config)
 
-	return d.store.TraceMinedBlock(block, tracer)
+	return d.store.TraceBlock(block, tracer)
 }
 
 // getHeaderFromBlockNumberOrHash returns a header using the provided number or hash
