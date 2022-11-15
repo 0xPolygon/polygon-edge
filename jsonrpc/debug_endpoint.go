@@ -222,6 +222,7 @@ func (d *Debug) getHeaderFromBlockNumberOrHash(bnh *BlockNumberOrHash) (*types.H
 	return header, nil
 }
 
+// newTracer creates new tracer by config
 func newTracer(
 	ctx context.Context,
 	config *TraceConfig,
@@ -242,7 +243,6 @@ func newTracer(
 		EnableStack:      !config.DisableStack,
 		EnableStorage:    !config.DisableStorage,
 		EnableReturnData: config.EnableReturnData,
-		Limit:            0,
 	})
 
 	// cancellation of context is done by caller

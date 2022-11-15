@@ -18,7 +18,6 @@ type Config struct {
 	EnableStack      bool // disable stack capture
 	EnableStorage    bool // disable storage capture
 	EnableReturnData bool // enable return data capture
-	Limit            int  // maximum length of output, but zero means unlimited
 }
 
 type StructLog struct {
@@ -218,10 +217,6 @@ func (t *StructTracer) ExecuteState(
 	err error,
 	host tracer.RuntimeHost,
 ) {
-	if !t.canAppendLog() {
-		return
-	}
-
 	var (
 		memory     []byte
 		memorySize int
@@ -312,10 +307,6 @@ func (t *StructTracer) GetResult() (interface{}, error) {
 		ReturnValue: returnValue,
 		StructLogs:  formatStructLogs(t.logs),
 	}, nil
-}
-
-func (t *StructTracer) canAppendLog() bool {
-	return t.Config.Limit == 0 || len(t.logs) < t.Config.Limit
 }
 
 func formatStructLogs(originalLogs []StructLog) []StructLogRes {
