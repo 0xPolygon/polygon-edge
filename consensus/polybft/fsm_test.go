@@ -262,7 +262,10 @@ func TestFSM_BuildProposal_WithoutUptimeTxGood(t *testing.T) {
 		parentCount              = 3
 		confirmedStateSyncsCount = 5
 		parentBlockNumber        = 1023
+		currentRound             = 1
 	)
+
+	eventRoot := types.ZeroHash
 
 	validators := newTestValidators(accountCount)
 	validatorSet := validators.getPublicIdentities()
@@ -273,25 +276,25 @@ func TestFSM_BuildProposal_WithoutUptimeTxGood(t *testing.T) {
 	stateBlock := createDummyStateBlock(parentBlockNumber+1, parent.Hash, extra)
 	mBlockBuilder := newBlockBuilderMock(stateBlock)
 	checkpointBackendMock := new(checkpointBackendMock)
-	checkpointBackendMock.On("BuildEventRoot", mock.Anything, mock.Anything).Return(types.ZeroHash, nil).Once()
+	checkpointBackendMock.On("BuildEventRoot", mock.Anything, mock.Anything).Return(eventRoot, nil).Once()
 
-	fsm := &fsm{parent: parent, blockBuilder: mBlockBuilder, config: &PolyBFTConfig{}, backend: &blockchainMock{},
+	blockchainMock := &blockchainMock{}
+	runtime := &consensusRuntime{
+		logger: hclog.NewNullLogger(),
+		config: &runtimeConfig{
+			Key:        wallet.NewKey(validators.getPrivateIdentities()[0]),
+			blockchain: blockchainMock,
+		},
+	}
+
+	fsm := &fsm{parent: parent, blockBuilder: mBlockBuilder, config: &PolyBFTConfig{}, backend: blockchainMock,
 		validators: validators.toValidatorSet(), checkpointBackend: checkpointBackendMock, logger: hclog.NewNullLogger()}
 
-	proposal, err := fsm.BuildProposal(1)
+	proposal, err := fsm.BuildProposal(currentRound)
 	assert.NoError(t, err)
 	assert.NotNil(t, proposal)
 
 	currentValidatorsHash, err := validatorSet.Hash()
-	require.NoError(t, err)
-
-	checkpoint := &CheckpointData{
-		CurrentValidatorsHash: currentValidatorsHash,
-		NextValidatorsHash:    currentValidatorsHash,
-	}
-
-	// TODO: checkpointHash should be checked by proposalHash
-	_, err = checkpoint.Hash(fsm.backend.GetChainID(), stateBlock.Block.Number(), stateBlock.Block.Hash())
 	require.NoError(t, err)
 
 	rlpBlock := stateBlock.Block.MarshalRLP()
@@ -299,6 +302,20 @@ func TestFSM_BuildProposal_WithoutUptimeTxGood(t *testing.T) {
 
 	block := types.Block{}
 	require.NoError(t, block.UnmarshalRLP(proposal))
+
+	checkpoint := &CheckpointData{
+		BlockRound:            currentRound,
+		EpochNumber:           fsm.epochNumber,
+		EventRoot:             eventRoot,
+		CurrentValidatorsHash: currentValidatorsHash,
+		NextValidatorsHash:    currentValidatorsHash,
+	}
+
+	checkpointHash, err := checkpoint.Hash(fsm.backend.GetChainID(), block.Number(), block.Hash())
+	require.NoError(t, err)
+
+	msg := runtime.BuildPrePrepareMessage(proposal, nil, nil)
+	require.Equal(t, checkpointHash.Bytes(), msg.GetPreprepareData().ProposalHash)
 
 	mBlockBuilder.AssertExpectations(t)
 	checkpointBackendMock.AssertExpectations(t)
@@ -312,8 +329,11 @@ func TestFSM_BuildProposal_WithUptimeTxGood(t *testing.T) {
 		committedCount           = 4
 		parentCount              = 3
 		confirmedStateSyncsCount = 5
+		currentRound             = 0
 		parentBlockNumber        = 1023
 	)
+
+	eventRoot := types.ZeroHash
 
 	validators := newTestValidators(accountCount)
 	extra := createTestExtra(validators.getPublicIdentities(), AccountSet{}, accountCount-1, committedCount, parentCount)
@@ -336,7 +356,15 @@ func TestFSM_BuildProposal_WithUptimeTxGood(t *testing.T) {
 	blockChainMock.On("GetSystemState", mock.Anything, mock.Anything).Return(systemStateMock).Once()
 
 	checkpointBackendMock := new(checkpointBackendMock)
-	checkpointBackendMock.On("BuildEventRoot", mock.Anything, mock.Anything).Return(types.ZeroHash, nil).Once()
+	checkpointBackendMock.On("BuildEventRoot", mock.Anything, mock.Anything).Return(eventRoot, nil).Once()
+
+	runtime := &consensusRuntime{
+		logger: hclog.NewNullLogger(),
+		config: &runtimeConfig{
+			Key:        wallet.NewKey(validators.getPrivateIdentities()[0]),
+			blockchain: blockChainMock,
+		},
+	}
 
 	fsm := &fsm{parent: parent, blockBuilder: mBlockBuilder, config: &PolyBFTConfig{}, backend: blockChainMock,
 		isEndOfEpoch:      true,
@@ -346,9 +374,14 @@ func TestFSM_BuildProposal_WithUptimeTxGood(t *testing.T) {
 		logger:            hclog.NewNullLogger(),
 	}
 
-	proposal, err := fsm.BuildProposal(0)
+	proposal, err := fsm.BuildProposal(currentRound)
 	assert.NoError(t, err)
 	assert.NotNil(t, proposal)
+
+	block := types.Block{}
+	require.NoError(t, block.UnmarshalRLP(proposal))
+
+	assert.Equal(t, stateBlock.Block.MarshalRLP(), proposal)
 
 	currentValidatorsHash, err := validators.getPublicIdentities().Hash()
 	require.NoError(t, err)
@@ -357,18 +390,18 @@ func TestFSM_BuildProposal_WithUptimeTxGood(t *testing.T) {
 	require.NoError(t, err)
 
 	checkpoint := &CheckpointData{
+		BlockRound:            currentRound,
+		EpochNumber:           fsm.epochNumber,
+		EventRoot:             eventRoot,
 		CurrentValidatorsHash: currentValidatorsHash,
 		NextValidatorsHash:    nextValidatorsHash,
 	}
 
-	// TODO: checkpointHash should be checked by proposalHash
-	_, err = checkpoint.Hash(fsm.backend.GetChainID(), stateBlock.Block.Number(), stateBlock.Block.Hash())
+	checkpointHash, err := checkpoint.Hash(fsm.backend.GetChainID(), block.Number(), block.Hash())
 	require.NoError(t, err)
 
-	block := types.Block{}
-	require.NoError(t, block.UnmarshalRLP(proposal))
-
-	assert.Equal(t, stateBlock.Block.MarshalRLP(), proposal)
+	msg := runtime.BuildPrePrepareMessage(proposal, nil, nil)
+	require.Equal(t, checkpointHash.Bytes(), msg.GetPreprepareData().ProposalHash)
 
 	mBlockBuilder.AssertExpectations(t)
 	systemStateMock.AssertExpectations(t)
