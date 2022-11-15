@@ -1,10 +1,6 @@
 package types
 
 import (
-	"database/sql/driver"
-	"errors"
-	"fmt"
-
 	goHex "encoding/hex"
 
 	"github.com/0xPolygon/polygon-edge/helper/hex"
@@ -63,26 +59,6 @@ func (b *Bloom) UnmarshalText(input []byte) error {
 
 func (b Bloom) String() string {
 	return hex.EncodeToHex(b[:])
-}
-
-func (b Bloom) Value() (driver.Value, error) {
-	return b.String(), nil
-}
-
-func (b *Bloom) Scan(src interface{}) error {
-	stringVal, ok := src.([]byte)
-	if !ok {
-		return errors.New("invalid type assert")
-	}
-
-	bb, decodeErr := hex.DecodeHex(string(stringVal))
-	if decodeErr != nil {
-		return fmt.Errorf("unable to decode value, %w", decodeErr)
-	}
-
-	copy(b[:], bb[:])
-
-	return nil
 }
 
 // MarshalText implements encoding.TextMarshaler
