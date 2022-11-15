@@ -849,7 +849,6 @@ type headElem struct {
 
 func (h *headElem) getUpdates() ([]*block, *headElem) {
 	res := make([]*block, 0)
-
 	cur := h
 
 	for {
