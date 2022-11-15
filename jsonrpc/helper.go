@@ -5,8 +5,11 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
+)
+
+var (
+	ErrHeaderNotFound = errors.New("header not found")
 )
 
 type latestHeaderGetter interface {
@@ -67,13 +70,13 @@ func GetBlockHeader(number BlockNumber, store headerGetter) (*types.Header, erro
 	}
 }
 
-type blockGetter interface {
+type txLookupAndBlockGetter interface {
 	ReadTxLookup(types.Hash) (types.Hash, bool)
 	GetBlockByHash(types.Hash, bool) (*types.Block, bool)
 }
 
 // GetTxAndBlockByTxHash returns the tx and the block including the tx by given tx hash
-func GetTxAndBlockByTxHash(txHash types.Hash, store blockGetter) (*types.Transaction, *types.Block) {
+func GetTxAndBlockByTxHash(txHash types.Hash, store txLookupAndBlockGetter) (*types.Transaction, *types.Block) {
 	blockHash, ok := store.ReadTxLookup(txHash)
 	if !ok {
 		return nil, nil
@@ -93,11 +96,44 @@ func GetTxAndBlockByTxHash(txHash types.Hash, store blockGetter) (*types.Transac
 	return nil, nil
 }
 
+type blockGetter interface {
+	Header() *types.Header
+	GetHeaderByNumber(uint64) (*types.Header, bool)
+	GetBlockByHash(types.Hash, bool) (*types.Block, bool)
+}
+
+func GetHeaderFromBlockNumberOrHash(bnh BlockNumberOrHash, store blockGetter) (*types.Header, error) {
+	var (
+		header *types.Header
+		err    error
+	)
+
+	if bnh.BlockNumber != nil {
+		header, err = GetBlockHeader(*bnh.BlockNumber, store)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get the header of block %d: %w", *bnh.BlockNumber, err)
+		}
+	} else if bnh.BlockHash != nil {
+		block, ok := store.GetBlockByHash(*bnh.BlockHash, false)
+		if !ok {
+			return nil, fmt.Errorf("could not find block referenced by the hash %s", bnh.BlockHash.String())
+		}
+
+		header = block.Header
+	}
+
+	if header == nil {
+		return nil, ErrHeaderNotFound
+	}
+
+	return header, nil
+}
+
 type nonceGetter interface {
 	Header() *types.Header
 	GetHeaderByNumber(uint64) (*types.Header, bool)
 	GetNonce(types.Address) uint64
-	GetAccount(types.Hash, types.Address) (*state.Account, error)
+	GetAccount(root types.Hash, addr types.Address) (*Account, error)
 }
 
 func GetNextNonce(address types.Address, number BlockNumber, store nonceGetter) (uint64, error) {
