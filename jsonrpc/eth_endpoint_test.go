@@ -5,7 +5,6 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
@@ -16,7 +15,7 @@ func TestEth_DecodeTxn(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		accounts map[types.Address]*state.Account
+		accounts map[types.Address]*Account
 		arg      *txnArgs
 		res      *types.Transaction
 		err      error
@@ -77,7 +76,7 @@ func TestEth_DecodeTxn(t *testing.T) {
 		},
 		{
 			name: "should set latest nonce as default",
-			accounts: map[types.Address]*state.Account{
+			accounts: map[types.Address]*Account{
 				addr1: {
 					Nonce: 10,
 				},
@@ -170,11 +169,11 @@ func TestEth_GetNextNonce(t *testing.T) {
 	// Set up the mock accounts
 	accounts := []struct {
 		address types.Address
-		account *state.Account
+		account *Account
 	}{
 		{
 			types.StringToAddress("123"),
-			&state.Account{
+			&Account{
 				Nonce: 5,
 			},
 		},

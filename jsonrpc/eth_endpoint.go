@@ -27,11 +27,16 @@ type ethTxPoolStore interface {
 	GetNonce(addr types.Address) uint64
 }
 
+type Account struct {
+	Balance *big.Int
+	Nonce   uint64
+}
+
 type ethStateStore interface {
-	GetAccount(root types.Hash, addr types.Address) (*state.Account, error)
+	GetAccount(root types.Hash, addr types.Address) (*Account, error)
 	GetStorage(root types.Hash, addr types.Address, slot types.Hash) ([]byte, error)
 	GetForksInTime(blockNumber uint64) chain.ForksInTime
-	GetCode(hash types.Hash) ([]byte, error)
+	GetCode(root types.Hash, addr types.Address) ([]byte, error)
 }
 
 type ethBlockchainStore interface {
@@ -708,7 +713,7 @@ func (e *Eth) GetCode(address types.Address, filter BlockNumberOrHash) (interfac
 	}
 
 	emptySlice := []byte{}
-	acc, err := e.store.GetAccount(header.StateRoot, address)
+	code, err := e.store.GetCode(header.StateRoot, address)
 
 	if errors.Is(err, ErrStateNotFound) {
 		// If the account doesn't exist / is not initialized yet,
@@ -716,12 +721,6 @@ func (e *Eth) GetCode(address types.Address, filter BlockNumberOrHash) (interfac
 		return "0x", nil
 	} else if err != nil {
 		return argBytesPtr(emptySlice), err
-	}
-
-	code, err := e.store.GetCode(types.BytesToHash(acc.CodeHash))
-	if err != nil {
-		// TODO This is just a workaround. Figure out why CodeHash is populated for regular accounts
-		return argBytesPtr(emptySlice), nil
 	}
 
 	return argBytesPtr(code), nil

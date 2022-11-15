@@ -460,6 +460,11 @@ func NewTestServers(t *testing.T, num int, conf func(*TestServerConfig)) []*Test
 		}
 	})
 
+	logsDir, err := initLogsDir(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// It is safe to use a dummy MultiAddr here, since this init method
 	// is called for the Dev consensus mode, and IBFT servers are initialized with NewIBFTServersManager.
 	// This method needs to be standardized in the future
@@ -471,7 +476,11 @@ func NewTestServers(t *testing.T, num int, conf func(*TestServerConfig)) []*Test
 			t.Fatal(err)
 		}
 
-		srv := NewTestServer(t, dataDir, conf)
+		srv := NewTestServer(t, dataDir, func(c *TestServerConfig) {
+			c.SetLogsDir(logsDir)
+			c.SetSaveLogs(true)
+			conf(c)
+		})
 		srv.Config.SetBootnodes(bootnodes)
 
 		srvs = append(srvs, srv)
