@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -14,7 +13,7 @@ func TestE2E_Consensus_Basic_WithNonValidators(t *testing.T) {
 		framework.WithNonValidators(2), framework.WithValidatorSnapshot(5))
 	defer cluster.Stop()
 
-	assert.NoError(t, cluster.WaitForBlock(22, 1*time.Minute))
+	require.NoError(t, cluster.WaitForBlock(22, 1*time.Minute))
 }
 
 func TestE2E_Consensus_Sync_WithNonValidators(t *testing.T) {
@@ -25,43 +24,43 @@ func TestE2E_Consensus_Sync_WithNonValidators(t *testing.T) {
 	defer cluster.Stop()
 
 	// wait for the start
-	assert.NoError(t, cluster.WaitForBlock(20, 1*time.Minute))
+	require.NoError(t, cluster.WaitForBlock(20, 1*time.Minute))
 
 	// stop one non-validator node
 	node := cluster.Servers[6]
 	node.Stop()
 
 	// wait for at least 15 more blocks before starting again
-	assert.NoError(t, cluster.WaitForBlock(35, 2*time.Minute))
+	require.NoError(t, cluster.WaitForBlock(35, 2*time.Minute))
 
 	// start the node again
 	node.Start()
 
 	// wait for block 55
-	assert.NoError(t, cluster.WaitForBlock(55, 2*time.Minute))
+	require.NoError(t, cluster.WaitForBlock(55, 2*time.Minute))
 }
 
 func TestE2E_Consensus_Sync(t *testing.T) {
 	// one node from the ensemble gets disconnected and connected again.
 	// It should be able to pick up from the synchronization protocol again.
-	cluster := framework.NewTestCluster(t, 5, framework.WithValidatorSnapshot(5))
+	cluster := framework.NewTestCluster(t, 6, framework.WithValidatorSnapshot(6))
 	defer cluster.Stop()
 
 	// wait for the start
-	assert.NoError(t, cluster.WaitForBlock(5, 1*time.Minute))
+	require.NoError(t, cluster.WaitForBlock(5, 1*time.Minute))
 
 	// stop one node
 	node := cluster.Servers[0]
 	node.Stop()
 
 	// wait for at least 15 more blocks before starting again
-	assert.NoError(t, cluster.WaitForBlock(20, 2*time.Minute))
+	require.NoError(t, cluster.WaitForBlock(20, 2*time.Minute))
 
 	// start the node again
 	node.Start()
 
 	// wait for block 35
-	assert.NoError(t, cluster.WaitForBlock(35, 2*time.Minute))
+	require.NoError(t, cluster.WaitForBlock(35, 2*time.Minute))
 }
 
 func TestE2E_Consensus_Bulk_Drop(t *testing.T) {
@@ -87,5 +86,5 @@ func TestE2E_Consensus_Bulk_Drop(t *testing.T) {
 	}
 
 	// wait for block 10
-	assert.NoError(t, cluster.WaitForBlock(10, 2*time.Minute))
+	require.NoError(t, cluster.WaitForBlock(10, 2*time.Minute))
 }
