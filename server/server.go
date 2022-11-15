@@ -460,7 +460,7 @@ func (j *jsonRPCHub) getState(root types.Hash, slot []byte) ([]byte, error) {
 	return result, nil
 }
 
-func (j *jsonRPCHub) GetAccount(root types.Hash, addr types.Address) (*state.Account, error) {
+func (j *jsonRPCHub) getAccountImpl(root types.Hash, addr types.Address) (*state.Account, error) {
 	obj, err := j.getState(root, addr.Bytes())
 	if err != nil {
 		return nil, err
@@ -474,20 +474,32 @@ func (j *jsonRPCHub) GetAccount(root types.Hash, addr types.Address) (*state.Acc
 	return &account, nil
 }
 
+func (j *jsonRPCHub) GetAccount(root types.Hash, addr types.Address) (*jsonrpc.Account, error) {
+	acct, err := j.getAccountImpl(root, addr)
+	if err != nil {
+		return nil, err
+	}
+
+	account := &jsonrpc.Account{
+		Nonce:   acct.Nonce,
+		Balance: new(big.Int).Set(acct.Balance),
+	}
+
+	return account, nil
+}
+
 // GetForksInTime returns the active forks at the given block height
 func (j *jsonRPCHub) GetForksInTime(blockNumber uint64) chain.ForksInTime {
 	return j.Executor.GetForksInTime(blockNumber)
 }
 
 func (j *jsonRPCHub) GetStorage(root types.Hash, addr types.Address, slot types.Hash) ([]byte, error) {
-	account, err := j.GetAccount(root, addr)
-
+	account, err := j.getAccountImpl(root, addr)
 	if err != nil {
 		return nil, err
 	}
 
 	obj, err := j.getState(account.Root, slot.Bytes())
-
 	if err != nil {
 		return nil, err
 	}
@@ -495,14 +507,18 @@ func (j *jsonRPCHub) GetStorage(root types.Hash, addr types.Address, slot types.
 	return obj, nil
 }
 
-func (j *jsonRPCHub) GetCode(hash types.Hash) ([]byte, error) {
-	res, ok := j.state.GetCode(hash)
+func (j *jsonRPCHub) GetCode(root types.Hash, addr types.Address) ([]byte, error) {
+	account, err := j.getAccountImpl(root, addr)
+	if err != nil {
+		return nil, err
+	}
 
+	code, ok := j.state.GetCode(account.Root)
 	if !ok {
 		return nil, fmt.Errorf("unable to fetch code")
 	}
 
-	return res, nil
+	return code, nil
 }
 
 func (j *jsonRPCHub) ApplyTxn(
