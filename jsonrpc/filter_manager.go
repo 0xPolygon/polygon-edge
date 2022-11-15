@@ -295,11 +295,11 @@ func (f *FilterManager) Run() {
 
 	for {
 		// check for the next filter to be removed
-		filterBase := f.nextTimeoutFilter()
+		filterID, filterExpiresAt := f.nextTimeoutFilter()
 
 		// set timer to remove filter
-		if filterBase != nil {
-			timeoutCh = time.After(time.Until(filterBase.expiresAt))
+		if filterID != "" {
+			timeoutCh = time.After(time.Until(filterExpiresAt))
 		}
 
 		select {
@@ -312,8 +312,8 @@ func (f *FilterManager) Run() {
 		case <-timeoutCh:
 			// timeout for filter
 			// if filter still exists
-			if !f.Uninstall(filterBase.id) {
-				f.logger.Warn("failed to uninstall filter", "id", filterBase.id)
+			if !f.Uninstall(filterID) {
+				f.logger.Warn("failed to uninstall filter", "id", filterID)
 			}
 
 		case <-f.updateCh:
@@ -618,18 +618,18 @@ func (f *FilterManager) emitSignalToUpdateCh() {
 
 // nextTimeoutFilter returns the filter that will be expired next
 // nextTimeoutFilter returns the only filter with timeout
-func (f *FilterManager) nextTimeoutFilter() *filterBase {
+func (f *FilterManager) nextTimeoutFilter() (string, time.Time) {
 	f.RLock()
 	defer f.RUnlock()
 
 	if len(f.timeouts) == 0 {
-		return nil
+		return "", time.Time{}
 	}
 
 	// peek the first item
 	base := f.timeouts[0]
 
-	return base
+	return base.id, base.expiresAt
 }
 
 // dispatchEvent is an event handler for new block event
