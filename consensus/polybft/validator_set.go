@@ -336,12 +336,13 @@ func (v *validatorSet) CalcProposer(round uint64) (types.Address, error) {
 		return types.ZeroAddress, fmt.Errorf("cannot increment proposer priority: %w", err)
 	}
 
-	proposer, err := vc.getProposer()
+	// keep proposer in the original validator set
+	v.proposer, err = vc.getProposer()
 	if err != nil {
 		return types.ZeroAddress, fmt.Errorf("cannot get proposer: %w", err)
 	}
 
-	return proposer.Metadata.Address, nil
+	return v.proposer.Metadata.Address, nil
 }
 
 func (v *validatorSet) Includes(address types.Address) bool {
