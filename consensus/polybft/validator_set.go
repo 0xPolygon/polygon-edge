@@ -249,7 +249,6 @@ func (v *validatorSet) getValWithMostPriority() (*ValidatorAccount, error) {
 	return res, nil
 }
 
-// Should not be called on an empty validator set.
 func (v *validatorSet) computeAvgProposerPriority() (int64, error) {
 	if v.isNilOrEmpty() {
 		return 0, fmt.Errorf("validator set cannot be nul or empty")
@@ -381,6 +380,7 @@ func (v *validatorSet) getProposer() (*ValidatorAccount, error) {
 	return NewValidator(v.proposer.Metadata, v.proposer.ProposerPriority), nil
 }
 
+// findProposer finds proposer with the biggest priority in the validator set
 func (v *validatorSet) findProposer() (*ValidatorAccount, error) {
 	var (
 		proposer *ValidatorAccount

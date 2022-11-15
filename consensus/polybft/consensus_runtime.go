@@ -371,10 +371,11 @@ func (c *consensusRuntime) FSM() error {
 			}
 
 			iterationNumber += blockExtra.Round + 1 // because round 0 is one of the iterations
-			ok := false
 
-			currentHeader, ok = c.config.blockchain.GetHeaderByNumber(currentHeader.Number - 1)
-			if !ok {
+			var found bool
+			currentHeader, found = c.config.blockchain.GetHeaderByNumber(currentHeader.Number - 1)
+
+			if !found {
 				return fmt.Errorf("cannot get header by number: %d", currentHeader.Number)
 			}
 		}
