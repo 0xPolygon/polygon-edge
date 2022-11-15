@@ -917,7 +917,7 @@ func (c *consensusRuntime) isActiveValidator() bool {
 func (c *consensusRuntime) isFixedSizeOfEpochMet(blockNumber uint64) bool {
 	epoch := c.getEpoch()
 
-	return (blockNumber - c.config.PolyBFTConfig.EpochSize + 1) == epoch.FirstBlockInEpoch
+	return epoch.FirstBlockInEpoch+c.config.PolyBFTConfig.EpochSize-1 == blockNumber
 }
 
 // isEndOfSprint checks if an end of an sprint is reached with the current block
