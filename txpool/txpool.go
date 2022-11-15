@@ -4,16 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"sync/atomic"
 	"time"
-
-	goAtomic "sync/atomic"
-
-	"github.com/armon/go-metrics"
-	"github.com/golang/protobuf/ptypes/any"
-	"github.com/hashicorp/go-hclog"
-	"github.com/libp2p/go-libp2p/core/peer"
-	"go.uber.org/atomic"
-	"google.golang.org/grpc"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/chain"
@@ -21,6 +13,11 @@ import (
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/txpool/proto"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/armon/go-metrics"
+	"github.com/golang/protobuf/ptypes/any"
+	"github.com/hashicorp/go-hclog"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"google.golang.org/grpc"
 )
 
 const (
@@ -171,7 +168,7 @@ type TxPool struct {
 
 	// flag indicating if the current node is a sealer,
 	// and should therefore gossip transactions
-	sealing atomic.Bool
+	sealing uint32
 
 	// Event manager for txpool events
 	eventManager *eventManager
@@ -276,7 +273,7 @@ func NewTxPool(
 }
 
 func (p *TxPool) updatePending(i int64) {
-	newPending := goAtomic.AddInt64(&p.pending, i)
+	newPending := atomic.AddInt64(&p.pending, i)
 	metrics.SetGauge([]string{"pending_transactions"}, float32(newPending))
 }
 
@@ -332,12 +329,21 @@ func (p *TxPool) SetSigner(s signer) {
 
 // SetSealing sets the sealing flag
 func (p *TxPool) SetSealing(sealing bool) {
-	p.sealing.Store(sealing)
+	newValue := uint32(0)
+	if sealing {
+		newValue = 1
+	}
+
+	atomic.CompareAndSwapUint32(
+		&p.sealing,
+		p.sealing,
+		newValue,
+	)
 }
 
 // sealing returns the current set sealing flag
 func (p *TxPool) getSealing() bool {
-	return p.sealing.Load()
+	return atomic.LoadUint32(&p.sealing) == 1
 }
 
 // AddTx adds a new transaction to the pool (sent from json-RPC/gRPC endpoints)

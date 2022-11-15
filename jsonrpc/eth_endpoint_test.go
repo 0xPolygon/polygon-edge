@@ -239,3 +239,62 @@ func newTestEthEndpoint(store ethStore) *Eth {
 func newTestEthEndpointWithPriceLimit(store ethStore, priceLimit uint64) *Eth {
 	return &Eth{hclog.NewNullLogger(), store, 100, nil, priceLimit}
 }
+
+func TestEth_HeaderResolveBlock(t *testing.T) {
+	// Set up the mock store
+	store := newMockStore()
+	store.header.Number = 10
+
+	eth := newTestEthEndpoint(store)
+
+	latest := LatestBlockNumber
+	blockNum5 := BlockNumber(5)
+	blockNum10 := BlockNumber(10)
+	hash := types.Hash{0x1}
+
+	cases := []struct {
+		filter BlockNumberOrHash
+		err    bool
+	}{
+		{
+			// both fields are empty
+			BlockNumberOrHash{},
+			false,
+		},
+		{
+			// return the latest block number
+			BlockNumberOrHash{BlockNumber: &latest},
+			false,
+		},
+		{
+			// specific real block number
+			BlockNumberOrHash{BlockNumber: &blockNum10},
+			false,
+		},
+		{
+			// specific block number (not found)
+			BlockNumberOrHash{BlockNumber: &blockNum5},
+			true,
+		},
+		{
+			// specific block by hash (found). By default all blocks in the mock have hash zero
+			BlockNumberOrHash{BlockHash: &types.ZeroHash},
+			false,
+		},
+		{
+			// specific block by hash (not found)
+			BlockNumberOrHash{BlockHash: &hash},
+			true,
+		},
+	}
+
+	for _, c := range cases {
+		header, err := eth.getHeaderFromBlockNumberOrHash(c.filter)
+		if c.err {
+			assert.Error(t, err)
+		} else {
+			assert.NoError(t, err)
+			assert.Equal(t, header.Number, uint64(10))
+		}
+	}
+}
