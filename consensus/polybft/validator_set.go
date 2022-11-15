@@ -105,27 +105,12 @@ func NewValidatorSet(valz AccountSet) (*validatorSet, error) {
 
 	validatorSet := &validatorSet{
 		validators: validators,
-		// TODO voting power
-		// votingPowerMap: make(map[pbft.NodeID]uint64, len(validators)),
 	}
 
 	err := validatorSet.updateWithChangeSet()
 	if err != nil {
 		return nil, fmt.Errorf("cannot update changeset: %w", err)
 	}
-	// _, quorum, err := pbft.CalculateQuorum(validatorSet.VotingPower())
-	// if err != nil {
-	// 	panic(fmt.Sprintf("cannot calculate quorum for validator set: %v", err))
-	// }
-
-	// TODO quorum size
-	// validatorSet.quorumSize = quorum
-	// if len(valz) > 0 {
-	// 	err = validatorSet.IncrementProposerPriority(1)
-	// 	if err != nil {
-	// 		return nil, fmt.Errorf("cannot create validator set: %w", err)
-	// 	}
-	// }
 
 	return validatorSet, nil
 }
@@ -133,7 +118,7 @@ func NewValidatorSet(valz AccountSet) (*validatorSet, error) {
 // IncrementProposerPriority increments ProposerPriority of each validator and
 // updates the proposer.
 func (v *validatorSet) IncrementProposerPriority(times uint64) error {
-	if v.IsNilOrEmpty() {
+	if v.isNilOrEmpty() {
 		return fmt.Errorf("validator set cannot be nul or empty")
 	}
 
@@ -144,7 +129,6 @@ func (v *validatorSet) IncrementProposerPriority(times uint64) error {
 	// Cap the difference between priorities to be proportional to 2*totalPower by
 	// re-normalizing priorities, i.e., rescale all priorities by multiplying with:
 	//  2*totalVotingPower/(maxPriority - minPriority)
-
 	vp, err := v.TotalVotingPower()
 
 	if err != nil {
@@ -164,7 +148,7 @@ func (v *validatorSet) IncrementProposerPriority(times uint64) error {
 	}
 
 	var proposer *ValidatorAccount
-	// Call IncrementProposerPriority(1) times times.
+
 	for i := uint64(0); i < times; i++ {
 		proposer, err = v.incrementProposerPriority()
 		if err != nil {
@@ -267,7 +251,7 @@ func (v *validatorSet) getValWithMostPriority() (*ValidatorAccount, error) {
 
 // Should not be called on an empty validator set.
 func (v *validatorSet) computeAvgProposerPriority() (int64, error) {
-	if v.IsNilOrEmpty() {
+	if v.isNilOrEmpty() {
 		return 0, fmt.Errorf("validator set cannot be nul or empty")
 	}
 
@@ -289,7 +273,7 @@ func (v *validatorSet) computeAvgProposerPriority() (int64, error) {
 // rescalePriorities rescales the priorities such that the distance between the
 // maximum and minimum is smaller than `diffMax`.
 func (v *validatorSet) rescalePriorities(diffMax int64) error {
-	if v.IsNilOrEmpty() {
+	if v.isNilOrEmpty() {
 		return fmt.Errorf("validator set cannot be nul or empty")
 	}
 	// NOTE: This check is merely a sanity check which could be
@@ -314,8 +298,8 @@ func (v *validatorSet) rescalePriorities(diffMax int64) error {
 	return nil
 }
 
-// IsNilOrEmpty returns true if validator set is nil or empty.
-func (v *validatorSet) IsNilOrEmpty() bool {
+// isNilOrEmpty returns true if validator set is nil or empty.
+func (v *validatorSet) isNilOrEmpty() bool {
 	return v == nil || len(v.validators) == 0
 }
 
@@ -380,7 +364,7 @@ func (v *validatorSet) Len() int {
 
 // getProposer returns the current proposer
 func (v *validatorSet) getProposer() (*ValidatorAccount, error) {
-	if v.IsNilOrEmpty() {
+	if v.isNilOrEmpty() {
 		return nil, fmt.Errorf("validators cannot be nil or empty")
 	}
 
@@ -415,7 +399,26 @@ func (v *validatorSet) findProposer() (*ValidatorAccount, error) {
 	return proposer, nil
 }
 
-// Compute the difference between the max and min ProposerPriority of that set.
+// Copy each validator into a new ValidatorSet.
+func (v *validatorSet) Copy() *validatorSet {
+	return &validatorSet{
+		validators:       validatorListCopy(v.validators),
+		proposer:         v.proposer,
+		totalVotingPower: v.totalVotingPower,
+	}
+}
+
+// validatorListCopy makes a copy of the validator list.
+func validatorListCopy(valList []*ValidatorAccount) []*ValidatorAccount {
+	valCopy := make([]*ValidatorAccount, len(valList))
+	for i, val := range valList {
+		valCopy[i] = NewValidator(val.Metadata, val.ProposerPriority)
+	}
+
+	return valCopy
+}
+
+// computeMaxMinPriorityDiff computes the difference between the max and min ProposerPriority of that set.
 func computeMaxMinPriorityDiff(v *validatorSet) int64 {
 	max := int64(math.MinInt64)
 	min := int64(math.MaxInt64)
@@ -437,23 +440,4 @@ func computeMaxMinPriorityDiff(v *validatorSet) int64 {
 	}
 
 	return diff
-}
-
-// Copy each validator into a new ValidatorSet.
-func (v *validatorSet) Copy() *validatorSet {
-	return &validatorSet{
-		validators:       validatorListCopy(v.validators),
-		proposer:         v.proposer,
-		totalVotingPower: v.totalVotingPower,
-	}
-}
-
-// validatorListCopy makes a copy of the validator list.
-func validatorListCopy(valList []*ValidatorAccount) []*ValidatorAccount {
-	valCopy := make([]*ValidatorAccount, len(valList))
-	for i, val := range valList {
-		valCopy[i] = NewValidator(val.Metadata, val.ProposerPriority)
-	}
-
-	return valCopy
 }
