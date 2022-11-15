@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"sync/atomic"
 
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
@@ -46,6 +47,9 @@ func (l *StructLog) ErrorString() string {
 type StructTracer struct {
 	Config Config
 
+	reason    error
+	interrupt uint32
+
 	logs        []StructLog
 	gasLimit    uint64
 	consumedGas uint64
@@ -62,6 +66,15 @@ func NewStructTracer(config Config) *StructTracer {
 		Config:  config,
 		storage: make(map[types.Address]map[types.Hash]types.Hash),
 	}
+}
+
+func (t *StructTracer) Cancel(err error) {
+	t.reason = err
+	atomic.StoreUint32(&t.interrupt, 1)
+}
+
+func (t *StructTracer) cancelled() bool {
+	return atomic.LoadUint32(&t.interrupt) == 1
 }
 
 func (t *StructTracer) Clear() {
@@ -112,7 +125,14 @@ func (t *StructTracer) CaptureState(
 	contractAddress types.Address,
 	sp int,
 	host tracer.RuntimeHost,
+	state tracer.VMState,
 ) {
+	if t.cancelled() {
+		state.Halt()
+
+		return
+	}
+
 	t.captureMemory(memory)
 
 	t.captureStack(stack)
@@ -273,7 +293,11 @@ type StructLogRes struct {
 	RefundCounter uint64             `json:"refund,omitempty"`
 }
 
-func (t *StructTracer) GetResult() interface{} {
+func (t *StructTracer) GetResult() (interface{}, error) {
+	if t.reason != nil {
+		return nil, t.reason
+	}
+
 	var returnValue string
 
 	if t.err != nil && !errors.Is(t.err, runtime.ErrExecutionReverted) {
@@ -287,7 +311,7 @@ func (t *StructTracer) GetResult() interface{} {
 		Gas:         t.consumedGas,
 		ReturnValue: returnValue,
 		StructLogs:  formatStructLogs(t.logs),
-	}
+	}, nil
 }
 
 func (t *StructTracer) canAppendLog() bool {

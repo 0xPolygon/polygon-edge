@@ -1,14 +1,23 @@
 package jsonrpc
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/state/runtime/tracer"
 	"github.com/0xPolygon/polygon-edge/state/runtime/tracer/structtracer"
 	"github.com/0xPolygon/polygon-edge/types"
+)
+
+var (
+	defaultTraceTimeout = 5 * time.Second
+
+	// errExecutionTimeout indicates the execution was terminated due to timeout
+	errExecutionTimeout = errors.New("execution timeout")
 )
 
 type debugBlockchainStore interface {
@@ -57,11 +66,11 @@ type Debug struct {
 }
 
 type TraceConfig struct {
-	EnableMemory     bool `json:"enableMemory"`
-	DisableStack     bool `json:"disableStack"`
-	DisableStorage   bool `json:"disableStorage"`
-	EnableReturnData bool `json:"enableReturnData"`
-	// Timeout *string `json:"timeout"`
+	EnableMemory     bool    `json:"enableMemory"`
+	DisableStack     bool    `json:"disableStack"`
+	DisableStorage   bool    `json:"disableStorage"`
+	EnableReturnData bool    `json:"enableReturnData"`
+	Timeout          *string `json:"timeout"`
 }
 
 func (d *Debug) TraceBlockByNumber(
@@ -123,7 +132,13 @@ func (d *Debug) TraceTransaction(
 		return nil, errors.New("genesis is not traceable")
 	}
 
-	tracer := newTracer(config)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	tracer, err := newTracer(ctx, config)
+	if err != nil {
+		return nil, err
+	}
 
 	return d.store.TraceTxn(block, tx.Hash, tracer)
 }
@@ -153,7 +168,13 @@ func (d *Debug) TraceCall(
 		tx.Gas = header.GasLimit
 	}
 
-	tracer := newTracer(config)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	tracer, err := newTracer(ctx, config)
+	if err != nil {
+		return nil, err
+	}
 
 	return d.store.TraceCall(tx, header, tracer)
 }
@@ -166,7 +187,13 @@ func (d *Debug) traceBlock(
 		return nil, errors.New("genesis is not traceable")
 	}
 
-	tracer := newTracer(config)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	tracer, err := newTracer(ctx, config)
+	if err != nil {
+		return nil, err
+	}
 
 	return d.store.TraceBlock(block, tracer)
 }
@@ -195,12 +222,39 @@ func (d *Debug) getHeaderFromBlockNumberOrHash(bnh *BlockNumberOrHash) (*types.H
 	return header, nil
 }
 
-func newTracer(config *TraceConfig) tracer.Tracer {
-	return structtracer.NewStructTracer(structtracer.Config{
+func newTracer(
+	ctx context.Context,
+	config *TraceConfig,
+) (tracer.Tracer, error) {
+	var (
+		timeout = defaultTraceTimeout
+		err     error
+	)
+
+	if config.Timeout != nil {
+		if timeout, err = time.ParseDuration(*config.Timeout); err != nil {
+			return nil, err
+		}
+	}
+
+	tracer := structtracer.NewStructTracer(structtracer.Config{
 		EnableMemory:     config.EnableMemory,
 		EnableStack:      !config.DisableStack,
 		EnableStorage:    !config.DisableStorage,
 		EnableReturnData: config.EnableReturnData,
 		Limit:            0,
 	})
+
+	// cancellation of context is done by caller
+	timeoutCtx, _ := context.WithTimeout(context.Background(), timeout)
+
+	go func() {
+		<-timeoutCtx.Done()
+
+		if errors.Is(timeoutCtx.Err(), context.DeadlineExceeded) {
+			tracer.Cancel(errExecutionTimeout)
+		}
+	}()
+
+	return tracer, nil
 }

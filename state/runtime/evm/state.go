@@ -115,7 +115,7 @@ func (c *state) validJumpdest(dest *big.Int) bool {
 	return c.bitmap.isSet(uint(udest))
 }
 
-func (c *state) halt() {
+func (c *state) Halt() {
 	c.stop = true
 }
 
@@ -228,7 +228,7 @@ func (c *state) Run() ([]byte, error) {
 		c.captureState(int(op))
 
 		if !ok {
-			c.halt()
+			c.Halt()
 
 			break
 		}
@@ -396,6 +396,7 @@ func (c *state) captureState(opCode int) {
 		c.msg.Address,
 		c.sp,
 		c.host,
+		c,
 	)
 }
 

@@ -14,9 +14,18 @@ type RuntimeHost interface {
 	GetStorage(types.Address, types.Hash) types.Hash
 }
 
+type VMState interface {
+	// Halt tells VM to terminate its process
+	Halt()
+}
+
 type Tracer interface {
+	// Cancel tells termination of execution and tracing
+	Cancel(error)
+	// Clear clears the tracked data
 	Clear()
-	GetResult() interface{}
+	// GetResult returns a result based on tracked data
+	GetResult() (interface{}, error)
 
 	// Tx-level
 	TxStart(gasLimit uint64)
@@ -49,6 +58,7 @@ type Tracer interface {
 		contractAddress types.Address,
 		sp int,
 		host RuntimeHost,
+		state VMState,
 	)
 	ExecuteState(
 		contractAddress types.Address,

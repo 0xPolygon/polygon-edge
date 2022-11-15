@@ -560,7 +560,9 @@ func (j *jsonRPCHub) TraceBlock(
 			return nil, err
 		}
 
-		results[idx] = tracer.GetResult()
+		if results[idx], err = tracer.GetResult(); err != nil {
+			return nil, err
+		}
 	}
 
 	return results, nil
@@ -616,7 +618,7 @@ func (j *jsonRPCHub) TraceTxn(
 		return nil, err
 	}
 
-	return tracer.GetResult(), nil
+	return tracer.GetResult()
 }
 
 func (j *jsonRPCHub) TraceCall(
@@ -640,7 +642,7 @@ func (j *jsonRPCHub) TraceCall(
 		return nil, err
 	}
 
-	return tracer.GetResult(), nil
+	return tracer.GetResult()
 }
 
 func (j *jsonRPCHub) GetSyncProgression() *progress.Progression {
