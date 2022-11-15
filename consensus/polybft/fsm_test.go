@@ -52,6 +52,9 @@ func TestFSM_ValidateHeader(t *testing.T) {
 	assert.ErrorContains(t, validateHeaderFields(parent, header), "difficulty should be greater than zero")
 
 	header.Difficulty = 1
+	assert.ErrorContains(t, validateHeaderFields(parent, header), "invalid header hash")
+
+	header.ComputeHash()
 	assert.NoError(t, validateHeaderFields(parent, header))
 }
 
