@@ -27,42 +27,42 @@ type ValidatorMetadata struct {
 }
 
 // Equals compares ValidatorMetadata equality
-func (a ValidatorMetadata) Equals(b *ValidatorMetadata) bool {
+func (v *ValidatorMetadata) Equals(b *ValidatorMetadata) bool {
 	if b == nil {
 		return false
 	}
 
-	return a.Address == b.Address && reflect.DeepEqual(a.BlsKey, b.BlsKey)
+	return v.Address == b.Address && reflect.DeepEqual(v.BlsKey, b.BlsKey)
 }
 
 // Copy returns a deep copy of ValidatorMetadata
-func (a ValidatorMetadata) Copy() *ValidatorMetadata {
-	copiedBlsKey := a.BlsKey.Marshal()
+func (v *ValidatorMetadata) Copy() *ValidatorMetadata {
+	copiedBlsKey := v.BlsKey.Marshal()
 	blsKey, _ := bls.UnmarshalPublicKey(copiedBlsKey)
 
 	return &ValidatorMetadata{
-		Address:     types.BytesToAddress(a.Address[:]),
+		Address:     types.BytesToAddress(v.Address[:]),
 		BlsKey:      blsKey,
-		VotingPower: a.VotingPower,
+		VotingPower: v.VotingPower,
 	}
 }
 
 // MarshalRLPWith marshals ValidatorMetadata to the RLP format
-func (a ValidatorMetadata) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
+func (v *ValidatorMetadata) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 	vv := ar.NewArray()
 	// Address
-	vv.Set(ar.NewBytes(a.Address.Bytes()))
+	vv.Set(ar.NewBytes(v.Address.Bytes()))
 	// BlsKey
-	vv.Set(ar.NewCopyBytes(a.BlsKey.Marshal()))
+	vv.Set(ar.NewCopyBytes(v.BlsKey.Marshal()))
 	// VotingPower
-	vv.Set(ar.NewBigInt(new(big.Int).SetUint64(a.VotingPower)))
+	vv.Set(ar.NewBigInt(new(big.Int).SetUint64(v.VotingPower)))
 
 	return vv
 }
 
 // UnmarshalRLPWith unmarshals ValidatorMetadata from the RLP format
-func (a *ValidatorMetadata) UnmarshalRLPWith(v *fastrlp.Value) error {
-	elems, err := v.GetElems()
+func (v *ValidatorMetadata) UnmarshalRLPWith(val *fastrlp.Value) error {
+	elems, err := val.GetElems()
 	if err != nil {
 		return err
 	}
@@ -77,7 +77,7 @@ func (a *ValidatorMetadata) UnmarshalRLPWith(v *fastrlp.Value) error {
 		return fmt.Errorf("expected 'Address' field encoded as bytes. Error: %w", err)
 	}
 
-	a.Address = types.BytesToAddress(addressRaw)
+	v.Address = types.BytesToAddress(addressRaw)
 
 	// BlsKey
 	blsKeyRaw, err := elems[1].GetBytes(nil)
@@ -90,7 +90,7 @@ func (a *ValidatorMetadata) UnmarshalRLPWith(v *fastrlp.Value) error {
 		return fmt.Errorf("failed to unmarshal BLS public key. Error: %w", err)
 	}
 
-	a.BlsKey = blsKey
+	v.BlsKey = blsKey
 
 	// VotingPower
 	votingPower := new(big.Int)
@@ -100,15 +100,15 @@ func (a *ValidatorMetadata) UnmarshalRLPWith(v *fastrlp.Value) error {
 		return fmt.Errorf("expected 'Voting power' encoded as big int. Error: %w", err)
 	}
 
-	a.VotingPower = votingPower.Uint64()
+	v.VotingPower = votingPower.Uint64()
 
 	return nil
 }
 
 // fmt.Stringer implementation
-func (a ValidatorMetadata) String() string {
+func (v *ValidatorMetadata) String() string {
 	return fmt.Sprintf("Address=%v; BLS Key=%v; Voting Power=%d",
-		a.Address.String(), hex.EncodeToString(a.BlsKey.Marshal()), a.VotingPower)
+		v.Address.String(), hex.EncodeToString(v.BlsKey.Marshal()), v.VotingPower)
 }
 
 // AccountSet is a type alias for slice of ValidatorMetadata instances
