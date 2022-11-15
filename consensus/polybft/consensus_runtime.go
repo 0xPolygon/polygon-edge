@@ -617,10 +617,15 @@ func (c *consensusRuntime) getAggSignatureForCommitmentMessage(
 	epoch *epochMetadata,
 	commitmentHash types.Hash,
 ) (Signature, [][]byte, error) {
-	validators := epoch.Validators
+	validatorSet, err := NewValidatorSet(epoch.Validators, c.logger)
+	if err != nil {
+		return Signature{}, nil, err
+	}
 
-	validatorAddrToIndex := make(map[string]int, validators.Len())
-	for i, validator := range validators {
+	validatorAddrToIndex := make(map[string]int, validatorSet.Len())
+	validatorsMetadata := validatorSet.Accounts()
+
+	for i, validator := range validatorsMetadata {
 		validatorAddrToIndex[validator.Address.String()] = i
 	}
 
@@ -634,6 +639,7 @@ func (c *consensusRuntime) getAggSignatureForCommitmentMessage(
 
 	publicKeys := make([][]byte, 0)
 	bitmap := bitmap.Bitmap{}
+	signers := make([]types.Address, 0)
 
 	for _, vote := range votes {
 		index, exists := validatorAddrToIndex[vote.From]
@@ -649,10 +655,11 @@ func (c *consensusRuntime) getAggSignatureForCommitmentMessage(
 		bitmap.Set(uint64(index))
 
 		signatures = append(signatures, signature)
-		publicKeys = append(publicKeys, validators[index].BlsKey.Marshal())
+		publicKeys = append(publicKeys, validatorsMetadata[index].BlsKey.Marshal())
+		signers = append(signers, types.StringToAddress(vote.From))
 	}
 
-	if len(signatures) < getQuorumSize(validators.Len()) {
+	if !validatorSet.HasQuorum(signers) {
 		return Signature{}, nil, errQuorumNotReached
 	}
 
@@ -735,7 +742,6 @@ func (c *consensusRuntime) deliverMessage(msg *TransportMessage) (bool, error) {
 		"hash", hex.EncodeToString(msg.Hash),
 		"sender", msg.NodeID,
 		"signatures", numSignatures,
-		"quorum", getQuorumSize(len(epoch.Validators)),
 	)
 
 	return true, nil
