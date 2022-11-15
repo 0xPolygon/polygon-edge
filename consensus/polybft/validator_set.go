@@ -83,9 +83,6 @@ type ValidatorSet interface {
 }
 
 type validatorSet struct {
-	// last proposer of a block
-	last types.Address
-
 	// validators represents current list of validators with their priority
 	validators []*ValidatorAccount
 
