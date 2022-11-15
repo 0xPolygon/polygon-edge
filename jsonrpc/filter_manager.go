@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
@@ -255,7 +256,6 @@ func NewFilterManager(logger hclog.Logger, store filterManagerStore, blockRangeL
 		logger:          logger.Named("filter"),
 		timeout:         defaultTimeout,
 		store:           store,
-		blockStream:     &blockStream{},
 		blockRangeLimit: blockRangeLimit,
 		filters:         make(map[string]filter),
 		timeouts:        timeHeapImpl{},
@@ -268,7 +268,7 @@ func NewFilterManager(logger hclog.Logger, store filterManagerStore, blockRangeL
 
 	// TODO: Make Header return jsonrpc.block object directly
 	block := toBlock(&types.Block{Header: header}, false)
-	m.blockStream.push(block)
+	m.blockStream = newBlockStream(block)
 
 	// start the head watcher
 	m.subscription = store.SubscribeEvents()
@@ -809,14 +809,23 @@ func (t *timeHeapImpl) Pop() interface{} {
 // of the stream at any point
 type blockStream struct {
 	lock sync.Mutex
-	head *headElem
+	head atomic.Value
+}
+
+func newBlockStream(head *block) *blockStream {
+	b := &blockStream{}
+	b.head.Store(&headElem{header: head})
+
+	return b
 }
 
 func (b *blockStream) Head() *headElem {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
-	return b.head
+	head, _ := b.head.Load().(*headElem)
+
+	return head
 }
 
 func (b *blockStream) push(header *block) {
@@ -827,16 +836,15 @@ func (b *blockStream) push(header *block) {
 		header: header.Copy(),
 	}
 
-	if b.head != nil {
-		b.head.next = newHead
-	}
+	oldHead, _ := b.head.Load().(*headElem)
+	oldHead.next.Store(newHead)
 
-	b.head = newHead
+	b.head.Store(newHead)
 }
 
 type headElem struct {
 	header *block
-	next   *headElem
+	next   atomic.Value
 }
 
 func (h *headElem) getUpdates() ([]*block, *headElem) {
@@ -844,9 +852,19 @@ func (h *headElem) getUpdates() ([]*block, *headElem) {
 
 	cur := h
 
-	for cur.next != nil {
-		cur = cur.next
-		res = append(res, cur.header)
+	for {
+		next := cur.next.Load()
+		if next == nil {
+			// no more messages
+			break
+		} else {
+			nextElem, _ := next.(*headElem)
+
+			if nextElem.header != nil {
+				res = append(res, nextElem.header)
+			}
+			cur = nextElem
+		}
 	}
 
 	return res, cur

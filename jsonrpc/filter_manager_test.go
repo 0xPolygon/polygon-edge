@@ -511,9 +511,7 @@ func newMockWsConnWithMsgCh() (*mockWsConn, <-chan []byte) {
 func TestHeadStream(t *testing.T) {
 	t.Parallel()
 
-	b := &blockStream{}
-
-	b.push(&block{Hash: types.StringToHash("1")})
+	b := newBlockStream(&block{Hash: types.StringToHash("1")})
 	b.push(&block{Hash: types.StringToHash("2")})
 
 	cur := b.Head()
