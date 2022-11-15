@@ -60,9 +60,6 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 		return extra.Committed
 	}
 
-	// setup custom hash header func
-	setupHeaderHashFunc()
-
 	// create all valdators
 	validators := newTestValidators(allValidatorsSize)
 

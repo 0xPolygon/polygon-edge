@@ -557,3 +557,8 @@ func (tp *syncerMock) Sync(func(*types.Block) bool) error {
 
 	return args.Error(0)
 }
+
+func init() {
+	// setup custom hash header func
+	setupHeaderHashFunc()
+}
