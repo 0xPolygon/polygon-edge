@@ -198,6 +198,7 @@ func NewTransition(config chain.ForksInTime, snap Snapshot, radix *Txn) *Transit
 	return &Transition{
 		config:      config,
 		state:       radix,
+		snap:        snap,
 		evm:         evm.NewEVM(),
 		precompiles: precompiled.NewPrecompiled(),
 	}
