@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/helper/hex"
-	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/state/runtime/tracer"
 	"github.com/0xPolygon/polygon-edge/state/runtime/tracer/structtracer"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -17,7 +16,9 @@ var (
 	defaultTraceTimeout = 5 * time.Second
 
 	// errExecutionTimeout indicates the execution was terminated due to timeout
-	errExecutionTimeout = errors.New("execution timeout")
+	errExecutionTimeout  = errors.New("execution timeout")
+	errTraceGenesisBlock = errors.New("genesis is not traceable")
+	errBlockNotFound     = errors.New("block not found")
 )
 
 type debugBlockchainStore interface {
@@ -51,7 +52,7 @@ type debugTxPoolStore interface {
 }
 
 type debugStateStore interface {
-	GetAccount(root types.Hash, addr types.Address) (*state.Account, error)
+	GetAccount(root types.Hash, addr types.Address) (*Account, error)
 }
 
 type debugStore interface {
@@ -129,7 +130,7 @@ func (d *Debug) TraceTransaction(
 	}
 
 	if block.Number() == 0 {
-		return nil, errors.New("genesis is not traceable")
+		return nil, errTraceGenesisBlock
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -153,7 +154,7 @@ func (d *Debug) TraceCall(
 		filter.BlockNumber, _ = createBlockNumberPointer("latest")
 	}
 
-	header, err := d.getHeaderFromBlockNumberOrHash(&filter)
+	header, err := GetHeaderFromBlockNumberOrHash(filter, d.store)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get header from block hash or block number")
 	}
@@ -184,7 +185,7 @@ func (d *Debug) traceBlock(
 	config *TraceConfig,
 ) (interface{}, error) {
 	if block.Number() == 0 {
-		return nil, errors.New("genesis is not traceable")
+		return nil, errTraceGenesisBlock
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -196,30 +197,6 @@ func (d *Debug) traceBlock(
 	}
 
 	return d.store.TraceBlock(block, tracer)
-}
-
-// getHeaderFromBlockNumberOrHash returns a header using the provided number or hash
-func (d *Debug) getHeaderFromBlockNumberOrHash(bnh *BlockNumberOrHash) (*types.Header, error) {
-	var (
-		header *types.Header
-		err    error
-	)
-
-	if bnh.BlockNumber != nil {
-		header, err = GetBlockHeader(*bnh.BlockNumber, d.store)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get the header of block %d: %w", *bnh.BlockNumber, err)
-		}
-	} else if bnh.BlockHash != nil {
-		block, ok := d.store.GetBlockByHash(*bnh.BlockHash, false)
-		if !ok {
-			return nil, fmt.Errorf("could not find block referenced by the hash %s", bnh.BlockHash.String())
-		}
-
-		header = block.Header
-	}
-
-	return header, nil
 }
 
 // newTracer creates new tracer by config

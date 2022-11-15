@@ -246,9 +246,6 @@ func TestEth_HeaderResolveBlock(t *testing.T) {
 	// Set up the mock store
 	store := newMockStore()
 	store.header.Number = 10
-	store.headerByNumber[10] = &types.Header{Number: 10}
-
-	eth := newTestEthEndpoint(store)
 
 	latest := LatestBlockNumber
 	blockNum5 := BlockNumber(5)
@@ -292,7 +289,7 @@ func TestEth_HeaderResolveBlock(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		header, err := eth.getHeaderFromBlockNumberOrHash(c.filter)
+		header, err := GetHeaderFromBlockNumberOrHash(c.filter, store)
 		if c.err {
 			assert.Error(t, err)
 		} else {

@@ -103,30 +103,28 @@ type blockGetter interface {
 }
 
 func GetHeaderFromBlockNumberOrHash(bnh BlockNumberOrHash, store blockGetter) (*types.Header, error) {
-	var (
-		header *types.Header
-		err    error
-	)
+	// The filter is empty, use the latest block by default
+	if bnh.BlockNumber == nil && bnh.BlockHash == nil {
+		bnh.BlockNumber, _ = createBlockNumberPointer(latest)
+	}
 
 	if bnh.BlockNumber != nil {
-		header, err = GetBlockHeader(*bnh.BlockNumber, store)
+		// block number
+		header, err := GetBlockHeader(*bnh.BlockNumber, store)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get the header of block %d: %w", *bnh.BlockNumber, err)
 		}
-	} else if bnh.BlockHash != nil {
-		block, ok := store.GetBlockByHash(*bnh.BlockHash, false)
-		if !ok {
-			return nil, fmt.Errorf("could not find block referenced by the hash %s", bnh.BlockHash.String())
-		}
 
-		header = block.Header
+		return header, nil
 	}
 
-	if header == nil {
-		return nil, ErrHeaderNotFound
+	// block hash
+	block, ok := store.GetBlockByHash(*bnh.BlockHash, false)
+	if !ok {
+		return nil, fmt.Errorf("could not find block referenced by the hash %s", bnh.BlockHash.String())
 	}
 
-	return header, nil
+	return block.Header, nil
 }
 
 type nonceGetter interface {

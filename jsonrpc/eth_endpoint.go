@@ -95,31 +95,6 @@ func (e *Eth) ChainId() (interface{}, error) {
 	return argUintPtr(e.chainID), nil
 }
 
-func (e *Eth) getHeaderFromBlockNumberOrHash(bnh BlockNumberOrHash) (*types.Header, error) {
-	// The filter is empty, use the latest block by default
-	if bnh.BlockNumber == nil && bnh.BlockHash == nil {
-		bnh.BlockNumber, _ = createBlockNumberPointer(latest)
-	}
-
-	if bnh.BlockNumber != nil {
-		// block number
-		header, err := GetBlockHeader(*bnh.BlockNumber, e.store)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get the header of block %d: %w", *bnh.BlockNumber, err)
-		}
-
-		return header, nil
-	}
-
-	// block hash
-	block, ok := e.store.GetBlockByHash(*bnh.BlockHash, false)
-	if !ok {
-		return nil, fmt.Errorf("could not find block referenced by the hash %s", bnh.BlockHash.String())
-	}
-
-	return block.Header, nil
-}
-
 func (e *Eth) Syncing() (interface{}, error) {
 	if syncProgression := e.store.GetSyncProgression(); syncProgression != nil {
 		// Node is bulk syncing, return the status
@@ -368,7 +343,7 @@ func (e *Eth) GetStorageAt(
 	index types.Hash,
 	filter BlockNumberOrHash,
 ) (interface{}, error) {
-	header, err := e.getHeaderFromBlockNumberOrHash(filter)
+	header, err := GetHeaderFromBlockNumberOrHash(filter, e.store)
 	if err != nil {
 		return nil, err
 	}
@@ -414,7 +389,7 @@ func (e *Eth) GasPrice() (interface{}, error) {
 
 // Call executes a smart contract call using the transaction object data
 func (e *Eth) Call(arg *txnArgs, filter BlockNumberOrHash) (interface{}, error) {
-	header, err := e.getHeaderFromBlockNumberOrHash(filter)
+	header, err := GetHeaderFromBlockNumberOrHash(filter, e.store)
 	if err != nil {
 		return nil, err
 	}
@@ -652,7 +627,7 @@ func (e *Eth) GetLogs(query *LogQuery) (interface{}, error) {
 
 // GetBalance returns the account's balance at the referenced block.
 func (e *Eth) GetBalance(address types.Address, filter BlockNumberOrHash) (interface{}, error) {
-	header, err := e.getHeaderFromBlockNumberOrHash(filter)
+	header, err := GetHeaderFromBlockNumberOrHash(filter, e.store)
 	if err != nil {
 		return nil, err
 	}
@@ -683,7 +658,7 @@ func (e *Eth) GetTransactionCount(address types.Address, filter BlockNumberOrHas
 	}
 
 	if filter.BlockNumber == nil {
-		header, err = e.getHeaderFromBlockNumberOrHash(filter)
+		header, err = GetHeaderFromBlockNumberOrHash(filter, e.store)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get header from block hash or block number: %w", err)
 		}
@@ -707,7 +682,7 @@ func (e *Eth) GetTransactionCount(address types.Address, filter BlockNumberOrHas
 
 // GetCode returns account code at given block number
 func (e *Eth) GetCode(address types.Address, filter BlockNumberOrHash) (interface{}, error) {
-	header, err := e.getHeaderFromBlockNumberOrHash(filter)
+	header, err := GetHeaderFromBlockNumberOrHash(filter, e.store)
 	if err != nil {
 		return nil, err
 	}

@@ -122,12 +122,6 @@ func (m *mockStore) Header() *types.Header {
 	return m.header
 }
 
-func (m *mockStore) GetHeaderByNumber(num uint64) (*types.Header, bool) {
-	header, ok := m.headerByNumber[num]
-
-	return header, ok
-}
-
 func (m *mockStore) GetReceiptsByHash(hash types.Hash) ([]*types.Receipt, error) {
 	m.receiptsLock.Lock()
 	defer m.receiptsLock.Unlock()
@@ -139,6 +133,14 @@ func (m *mockStore) GetReceiptsByHash(hash types.Hash) ([]*types.Receipt, error)
 
 func (m *mockStore) SubscribeEvents() blockchain.Subscription {
 	return m.subscription
+}
+
+func (m *mockStore) GetHeaderByNumber(num uint64) (*types.Header, bool) {
+	header := m.headerLoop(func(header *types.Header) bool {
+		return header.Number == num
+	})
+
+	return header, header != nil
 }
 
 func (m *mockStore) GetBlockByHash(hash types.Hash, full bool) (*types.Block, bool) {
