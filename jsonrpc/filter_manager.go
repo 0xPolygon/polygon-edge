@@ -671,7 +671,14 @@ func (f *FilterManager) appendLogsToFilters(header *block) error {
 	}
 
 	// Get logFilters from filters
-	logFilters := f.getLogFilters()
+	logFilters := make([]*logFilter, 0)
+
+	for _, f := range f.filters {
+		if logFilter, ok := f.(*logFilter); ok {
+			logFilters = append(logFilters, logFilter)
+		}
+	}
+
 	if len(logFilters) == 0 {
 		return nil
 	}
@@ -750,22 +757,6 @@ func (f *FilterManager) flushWsFilters() error {
 	}
 
 	return nil
-}
-
-// getLogFilters returns logFilters
-func (f *FilterManager) getLogFilters() []*logFilter {
-	f.RLock()
-	defer f.RUnlock()
-
-	logFilters := make([]*logFilter, 0)
-
-	for _, f := range f.filters {
-		if logFilter, ok := f.(*logFilter); ok {
-			logFilters = append(logFilters, logFilter)
-		}
-	}
-
-	return logFilters
 }
 
 type timeHeapImpl []*filterBase
