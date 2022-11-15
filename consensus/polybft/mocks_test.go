@@ -543,13 +543,13 @@ func (tp *syncerMock) Close() error {
 func (tp *syncerMock) GetSyncProgression() *progress.Progression {
 	args := tp.Called()
 
-	return args[0].(*progress.Progression) // nolint
+	return args[0].(*progress.Progression) //nolint
 }
 
 func (tp *syncerMock) HasSyncPeer() bool {
 	args := tp.Called()
 
-	return args[0].(bool) // nolint
+	return args[0].(bool) //nolint
 }
 
 func (tp *syncerMock) Sync(func(*types.Block) bool) error {
