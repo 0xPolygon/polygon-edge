@@ -26,36 +26,35 @@ import (
 func TestFSM_ValidateHeader(t *testing.T) {
 	t.Parallel()
 
-	parent := &types.Header{Number: 0}
-	parent.ComputeHash()
-
+	parent := &types.Header{Number: 0, Hash: types.BytesToHash([]byte{1, 2, 3})}
 	header := &types.Header{Number: 0}
 
 	// parent hash
-	assert.ErrorContains(t, validateHeaderFields(parent, header), "incorrect header parent hash")
+	require.ErrorContains(t, validateHeaderFields(parent, header), "incorrect header parent hash")
 	header.ParentHash = parent.Hash
 
 	// sequence number
-	assert.ErrorContains(t, validateHeaderFields(parent, header), "invalid number")
+	require.ErrorContains(t, validateHeaderFields(parent, header), "invalid number")
 	header.Number = 1
 
 	// failed timestamp
-	assert.ErrorContains(t, validateHeaderFields(parent, header), "timestamp older than parent")
+	require.ErrorContains(t, validateHeaderFields(parent, header), "timestamp older than parent")
 	header.Timestamp = 10
 
 	// mix digest
-	assert.ErrorContains(t, validateHeaderFields(parent, header), "mix digest is not correct")
+	require.ErrorContains(t, validateHeaderFields(parent, header), "mix digest is not correct")
 	header.MixHash = PolyBFTMixDigest
 
 	// difficulty
 	header.Difficulty = 0
-	assert.ErrorContains(t, validateHeaderFields(parent, header), "difficulty should be greater than zero")
+	require.ErrorContains(t, validateHeaderFields(parent, header), "difficulty should be greater than zero")
 
 	header.Difficulty = 1
-	assert.ErrorContains(t, validateHeaderFields(parent, header), "invalid header hash")
+	header.Hash = types.BytesToHash([]byte{11, 22, 33})
+	require.ErrorContains(t, validateHeaderFields(parent, header), "invalid header hash")
 
 	header.ComputeHash()
-	assert.NoError(t, validateHeaderFields(parent, header))
+	require.NoError(t, validateHeaderFields(parent, header))
 }
 
 func TestFSM_verifyValidatorsUptimeTx(t *testing.T) {
