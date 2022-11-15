@@ -847,45 +847,6 @@ func TestFSM_ValidateCommit_Good(t *testing.T) {
 	checkpointBackendMock.AssertExpectations(t)
 }
 
-// TODO: uncomment test after we change proposal structure
-/*
-func TestFSM_Validate_IncorrectSignHash(t *testing.T) {
-	t.Parallel()
-
-	const (
-		parentBlockNumber = 10
-		accountsCount     = 5
-		signaturesCount   = 3
-	)
-
-	validators := newTestValidators(accountsCount)
-
-	parent := &types.Header{Number: parentBlockNumber,
-		ExtraData: createTestExtra(validators.getPublicIdentities(), AccountSet{}, accountsCount, signaturesCount, signaturesCount)}
-	parent.ComputeHash()
-	stateBlock := createDummyStateBlock(parentBlockNumber+1, parent.Hash, parent.ExtraData)
-	mBlockBuilder := newBlockBuilderMock(stateBlock)
-	checkpointBackendMock := new(checkpointBackendMock)
-	checkpointBackendMock.On("BuildEventRoot", mock.Anything, mock.Anything).Return(types.ZeroHash, nil).Once()
-
-	fsm := &fsm{parent: parent, blockBuilder: mBlockBuilder, config: &PolyBFTConfig{}, backend: &blockchainMock{},
-		validators: validators.toValidatorSet(), checkpointBackend: checkpointBackendMock, logger: hclog.NewNullLogger()}
-
-	proposal, err := fsm.BuildProposal(0)
-	require.NoError(t, err)
-
-	block := types.Block{}
-	require.NoError(t, block.UnmarshalRLP(proposal))
-
-	block.Header.Hash = types.Hash{32, 33} // make the wrong hash
-	proposal = block.MarshalRLP()
-
-	err = fsm.Validate(proposal)
-	require.ErrorContains(t, err, "incorrect sign hash")
-	checkpointBackendMock.AssertExpectations(t)
-}
-*/
-
 func TestFSM_Validate_IncorrectHeaderParentHash(t *testing.T) {
 	t.Parallel()
 
