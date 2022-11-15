@@ -1,10 +1,14 @@
 package polybft
 
 import (
+	"errors"
 	"testing"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
+	"github.com/0xPolygon/polygon-edge/helper/progress"
+	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
@@ -164,4 +168,76 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 	// add current header to the blockchain (headersMap) and try validating again
 	headersMap.addHeader(currentHeader)
 	assert.NoError(t, polybft.VerifyHeader(currentHeader))
+}
+
+func TestPolybft_Close(t *testing.T) {
+	syncer := &syncerMock{}
+	syncer.On("Close", mock.Anything).Return(error(nil)).Once()
+
+	polybft := Polybft{
+		closeCh: make(chan struct{}),
+		syncer:  syncer,
+	}
+
+	assert.NoError(t, polybft.Close())
+
+	<-polybft.closeCh
+
+	syncer.AssertExpectations(t)
+
+	errExpected := errors.New("something")
+	syncer.On("Close", mock.Anything).Return(errExpected).Once()
+
+	polybft.closeCh = make(chan struct{})
+
+	assert.Error(t, errExpected, polybft.Close())
+
+	select {
+	case <-polybft.closeCh:
+		assert.Fail(t, "channel closing is invoked")
+	case <-time.After(time.Millisecond * 100):
+	}
+
+	syncer.AssertExpectations(t)
+}
+
+func TestPolybft_GetSyncProgression(t *testing.T) {
+	result := &progress.Progression{}
+
+	syncer := &syncerMock{}
+	syncer.On("GetSyncProgression", mock.Anything).Return(result).Once()
+
+	polybft := Polybft{
+		syncer: syncer,
+	}
+
+	assert.Equal(t, result, polybft.GetSyncProgression())
+}
+
+func Test_Factory(t *testing.T) {
+	const epochSize = uint64(141)
+
+	txPool := &txpool.TxPool{}
+
+	params := &consensus.Params{
+		TxPool: txPool,
+		Logger: hclog.Default(),
+		Config: &consensus.Config{
+			Config: map[string]interface{}{
+				"EpochSize": epochSize,
+			},
+		},
+	}
+
+	r, err := Factory(params)
+
+	require.NoError(t, err)
+	require.NotNil(t, r)
+
+	polybft, ok := r.(*Polybft)
+	require.True(t, ok)
+
+	assert.Equal(t, txPool, polybft.txPool)
+	assert.Equal(t, epochSize, polybft.consensusConfig.EpochSize)
+	assert.Equal(t, params, polybft.config)
 }
