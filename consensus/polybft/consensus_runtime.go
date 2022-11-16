@@ -1117,7 +1117,7 @@ func (c *consensusRuntime) HasQuorum(
 	case proto.MessageType_PREPREPARE:
 		return len(messages) >= 0
 	case proto.MessageType_PREPARE:
-		return c.fsm.validators.HasPrepareQuorum(senders)
+		return c.fsm.validators.HasQuorumWithoutProposer(senders)
 	case proto.MessageType_ROUND_CHANGE, proto.MessageType_COMMIT:
 		return c.fsm.validators.HasQuorum(senders)
 	}

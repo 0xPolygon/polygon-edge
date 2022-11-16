@@ -92,7 +92,7 @@ type ValidatorSet interface {
 	HasQuorum(signers []types.Address) bool
 
 	// checks if submitted signers have reached prepare quorum
-	HasPrepareQuorum(signers []types.Address) bool
+	HasQuorumWithoutProposer(signers []types.Address) bool
 }
 
 type validatorSet struct {
@@ -371,12 +371,14 @@ func (v *validatorSet) HasQuorum(signers []types.Address) bool {
 }
 
 // checks if submitted signers have reached prepare quorum
-func (v *validatorSet) HasPrepareQuorum(signers []types.Address) bool {
+func (v *validatorSet) HasQuorumWithoutProposer(signers []types.Address) bool {
 	votingPower := v.calculateVotingPower(signers)
-	v.logger.Debug("HasPrepareQuorum", "voting power", votingPower, "quorum", v.quorumSize,
+	v.logger.Debug("HasQuorumWithoutProposer", "voting power", votingPower, "quorum", v.quorumSize,
 		"hasQuorum", votingPower >= v.quorumSize-1)
 
-	return votingPower >= v.quorumSize-1
+	proposerVP := v.votingPowerMap[v.proposer.Metadata.Address]
+
+	return votingPower >= v.quorumSize-proposerVP
 }
 
 // calcMaxFaultyNodes calculates maximum faulty nodes in order to have Byzantine fault tollerant properties
