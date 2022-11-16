@@ -2004,6 +2004,96 @@ func TestConsensusRuntime_HasQuorum(t *testing.T) {
 	}
 }
 
+func TestConsensusRuntime_BuildRoundChangeMessage(t *testing.T) {
+	t.Parallel()
+
+	key := createTestKey(t)
+	view, proposal, certificate := &proto.View{}, []byte{1}, &proto.PreparedCertificate{}
+
+	runtime := &consensusRuntime{
+		config: &runtimeConfig{
+			Key: key,
+		},
+	}
+
+	expected := proto.Message{
+		View: view,
+		From: key.Address().Bytes(),
+		Type: proto.MessageType_ROUND_CHANGE,
+		Payload: &proto.Message_RoundChangeData{RoundChangeData: &proto.RoundChangeMessage{
+			LastPreparedProposedBlock: proposal,
+			LatestPreparedCertificate: certificate,
+		}},
+	}
+
+	signedMsg, err := key.SignEcdsaMessage(&expected)
+	require.NoError(t, err)
+
+	assert.Equal(t, signedMsg, runtime.BuildRoundChangeMessage(proposal, certificate, view))
+}
+
+func TestConsensusRuntime_BuildCommitMessage(t *testing.T) {
+	t.Parallel()
+
+	key := createTestKey(t)
+	view, proposalHash := &proto.View{}, []byte{1, 2, 4}
+
+	runtime := &consensusRuntime{
+		config: &runtimeConfig{
+			Key: key,
+		},
+	}
+
+	committedSeal, err := key.Sign(proposalHash)
+	require.NoError(t, err)
+
+	expected := proto.Message{
+		View: view,
+		From: key.Address().Bytes(),
+		Type: proto.MessageType_COMMIT,
+		Payload: &proto.Message_CommitData{
+			CommitData: &proto.CommitMessage{
+				ProposalHash:  proposalHash,
+				CommittedSeal: committedSeal,
+			},
+		},
+	}
+
+	signedMsg, err := key.SignEcdsaMessage(&expected)
+	require.NoError(t, err)
+
+	assert.Equal(t, signedMsg, runtime.BuildCommitMessage(proposalHash, view))
+}
+
+func TestConsensusRuntime_BuildPrepareMessage(t *testing.T) {
+	t.Parallel()
+
+	key := createTestKey(t)
+	view, proposalHash := &proto.View{}, []byte{1, 2, 4}
+
+	runtime := &consensusRuntime{
+		config: &runtimeConfig{
+			Key: key,
+		},
+	}
+
+	expected := proto.Message{
+		View: view,
+		From: key.Address().Bytes(),
+		Type: proto.MessageType_PREPARE,
+		Payload: &proto.Message_PrepareData{
+			PrepareData: &proto.PrepareMessage{
+				ProposalHash: proposalHash,
+			},
+		},
+	}
+
+	signedMsg, err := key.SignEcdsaMessage(&expected)
+	require.NoError(t, err)
+
+	assert.Equal(t, signedMsg, runtime.BuildPrepareMessage(proposalHash, view))
+}
+
 func setupExitEventsForProofVerification(t *testing.T, state *State,
 	numOfBlocks, numOfEventsPerBlock uint64) [][]byte {
 	t.Helper()
