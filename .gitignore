@@ -21,8 +21,6 @@ main
 
 # exclude build folder
 artifacts
-consensus/polybft/polybftcontracts/cache
-consensus/polybft/polybftcontracts/package-lock.json
 node_modules
 
 # Log files
