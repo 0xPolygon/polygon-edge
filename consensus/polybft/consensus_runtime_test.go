@@ -214,12 +214,12 @@ func TestConsensusRuntime_isEndOfEpoch_NotReachedEnd(t *testing.T) {
 	}
 }
 
-func TestConsensusRuntime_isEndOfEpoch_ReachedEnd(t *testing.T) {
+func TestConsensusRuntime_isFixedSizeOfEpochMet_ReachedEnd(t *testing.T) {
 	t.Parallel()
 
 	// because of slashing, we can assume some epochs started at random numbers
 	var cases = []struct {
-		epochSize, firstBlockInEpoch, parentBlockNumber uint64
+		epochSize, firstBlockInEpoch, blockNumber uint64
 	}{
 		{4, 1, 4},
 		{5, 1, 5},
@@ -243,64 +243,86 @@ func TestConsensusRuntime_isEndOfEpoch_ReachedEnd(t *testing.T) {
 		runtime.epoch.FirstBlockInEpoch = c.firstBlockInEpoch
 		assert.True(
 			t,
-			runtime.isFixedSizeOfEpochMet(c.parentBlockNumber),
+			runtime.isFixedSizeOfEpochMet(c.blockNumber),
 			fmt.Sprintf(
 				"Not expected end of epoch for epoch size=%v and parent block number=%v",
 				c.epochSize,
-				c.parentBlockNumber),
+				c.blockNumber),
 		)
 	}
 }
 
-func TestConsensusRuntime_isEndOfSprint_NotReachedEnd(t *testing.T) {
+func TestConsensusRuntime_isFixedSizeOfSprintMet_NotReachedEnd(t *testing.T) {
 	t.Parallel()
 
+	// because of slashing, we can assume some epochs started at random numbers
 	var cases = []struct {
-		sprintSize, parentBlockNumber uint64
+		sprintSize, firstBlockInEpoch, blockNumber uint64
 	}{
-		{4, 2},
-		{5, 3},
-		{6, 6},
-		{7, 7},
-		{8, 8},
-		{9, 9},
-		{10, 10},
-		{5, 1},
+		{4, 1, 2},
+		{5, 1, 3},
+		{6, 0, 6},
+		{7, 0, 4},
+		{8, 0, 5},
+		{9, 4, 9},
+		{10, 7, 10},
+		{10, 1, 1},
 	}
 
 	runtime := &consensusRuntime{
 		config: &runtimeConfig{
 			PolyBFTConfig: &PolyBFTConfig{},
 		},
-		lastBuiltBlock: &types.Header{},
+		epoch: &epochMetadata{},
 	}
 
 	for _, c := range cases {
 		runtime.config.PolyBFTConfig.SprintSize = c.sprintSize
+		runtime.epoch.FirstBlockInEpoch = c.firstBlockInEpoch
 		assert.False(t,
-			runtime.isEndOfSprint(c.parentBlockNumber+1),
+			runtime.isFixedSizeOfSprintMet(c.blockNumber),
 			fmt.Sprintf(
 				"Not expected end of sprint for sprint size=%v and parent block number=%v",
 				c.sprintSize,
-				c.parentBlockNumber),
+				c.blockNumber),
 		)
 	}
 }
 
-func TestConsensusRuntime_isEndOfSprint_ReachedEnd(t *testing.T) {
+func TestConsensusRuntime_isFixedSizeOfSprintMet_ReachedEnd(t *testing.T) {
 	t.Parallel()
+
+	// because of slashing, we can assume some epochs started at random numbers
+	var cases = []struct {
+		sprintSize, firstBlockInEpoch, blockNumber uint64
+	}{
+		{4, 1, 4},
+		{5, 1, 5},
+		{6, 0, 5},
+		{7, 0, 6},
+		{8, 0, 7},
+		{9, 4, 12},
+		{10, 7, 16},
+		{10, 1, 10},
+	}
 
 	runtime := &consensusRuntime{
 		config: &runtimeConfig{
-			PolyBFTConfig: &PolyBFTConfig{
-				EpochSize:  10,
-				SprintSize: 5,
-			},
+			PolyBFTConfig: &PolyBFTConfig{},
 		},
+		epoch: &epochMetadata{},
 	}
 
-	for _, v := range []uint64{5, 10, 25, 100} {
-		assert.True(t, runtime.isEndOfSprint(v))
+	for _, c := range cases {
+		runtime.config.PolyBFTConfig.SprintSize = c.sprintSize
+		runtime.epoch.FirstBlockInEpoch = c.firstBlockInEpoch
+		assert.True(t,
+			runtime.isFixedSizeOfSprintMet(c.blockNumber),
+			fmt.Sprintf(
+				"Not expected end of sprint for sprint size=%v and parent block number=%v",
+				c.sprintSize,
+				c.blockNumber),
+		)
 	}
 }
 
@@ -916,6 +938,7 @@ func TestConsensusRuntime_FSM_EndOfSprint_HasCommitmentsToRegister(t *testing.T)
 
 	const (
 		epochNumber        = uint64(2)
+		firstBlockInEpoch  = uint64(21)
 		fromIndex          = uint64(5)
 		nextCommittedIndex = uint64(3)
 		stateSyncsCount    = 30
@@ -986,9 +1009,10 @@ func TestConsensusRuntime_FSM_EndOfSprint_HasCommitmentsToRegister(t *testing.T)
 		state:               config.State,
 		config:              config,
 		epoch: &epochMetadata{
-			Number:     epochNumber,
-			Validators: validatorSet,
-			Commitment: commitment,
+			Number:            epochNumber,
+			FirstBlockInEpoch: firstBlockInEpoch,
+			Validators:        validatorSet,
+			Commitment:        commitment,
 		},
 		lastBuiltBlock: lastBlock,
 	}
