@@ -5,6 +5,7 @@ import (
 	"math/big"
 	"sort"
 	"strconv"
+	"testing"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
@@ -17,6 +18,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/contract"
 )
@@ -394,6 +396,15 @@ func (v *testValidators) getValidator(alias string) *testValidator {
 
 func (v *testValidators) toValidatorSet() (*validatorSet, error) {
 	return NewValidatorSet(v.getPublicIdentities())
+}
+
+func (v *testValidators) toValidatorSetWithError(t *testing.T) *validatorSet {
+	t.Helper()
+
+	vs, err := NewValidatorSet(v.getPublicIdentities())
+	require.NoError(t, err)
+
+	return vs
 }
 
 type testValidator struct {
