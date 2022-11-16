@@ -1829,6 +1829,105 @@ func TestConsensusRuntime_IsValidSender(t *testing.T) {
 	blockchainMock.AssertExpectations(t)
 }
 
+func TestConsensusRuntime_IsValidProposalHash(t *testing.T) {
+	t.Parallel()
+
+	extra := &Extra{
+		Checkpoint: &CheckpointData{
+			EpochNumber: 1,
+			BlockRound:  1,
+		},
+	}
+	block := &types.Block{
+		Header: &types.Header{
+			Number:    10,
+			ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...),
+		},
+	}
+	block.Header.ComputeHash()
+
+	proposalHash, err := extra.Checkpoint.Hash(0, block.Number(), block.Hash())
+	require.NoError(t, err)
+
+	runtime := &consensusRuntime{
+		logger: hclog.NewNullLogger(),
+		config: &runtimeConfig{blockchain: new(blockchainMock)},
+	}
+
+	require.True(t, runtime.IsValidProposalHash(block.MarshalRLP(), proposalHash.Bytes()))
+}
+
+func TestConsensusRuntime_IsValidProposalHash_InvalidProposalHash(t *testing.T) {
+	t.Parallel()
+
+	extra := &Extra{
+		Checkpoint: &CheckpointData{
+			EpochNumber: 1,
+			BlockRound:  1,
+		},
+	}
+
+	block := &types.Block{
+		Header: &types.Header{
+			Number:    10,
+			ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...),
+		},
+	}
+
+	proposalHash, err := extra.Checkpoint.Hash(0, block.Number(), block.Hash())
+	require.NoError(t, err)
+
+	extra.Checkpoint.BlockRound = 2 // change it so it is not the same as in proposal hash
+	block.Header.ExtraData = append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...)
+	block.Header.ComputeHash()
+
+	runtime := &consensusRuntime{
+		logger: hclog.NewNullLogger(),
+		config: &runtimeConfig{blockchain: new(blockchainMock)},
+	}
+
+	require.False(t, runtime.IsValidProposalHash(block.MarshalRLP(), proposalHash.Bytes()))
+}
+
+func TestConsensusRuntime_IsValidProposalHash_InvalidExtra(t *testing.T) {
+	t.Parallel()
+
+	extra := &Extra{
+		Checkpoint: &CheckpointData{
+			EpochNumber: 1,
+			BlockRound:  1,
+		},
+	}
+
+	block := &types.Block{
+		Header: &types.Header{
+			Number:    10,
+			ExtraData: []byte{1, 2, 3}, // invalid extra in block
+		},
+	}
+	block.Header.ComputeHash()
+
+	proposalHash, err := extra.Checkpoint.Hash(0, block.Number(), block.Hash())
+	require.NoError(t, err)
+
+	runtime := &consensusRuntime{
+		logger: hclog.NewNullLogger(),
+		config: &runtimeConfig{blockchain: new(blockchainMock)},
+	}
+
+	require.False(t, runtime.IsValidProposalHash(block.MarshalRLP(), proposalHash.Bytes()))
+}
+
+func TestConsensusRuntime_BuildProposal_InvalidParent(t *testing.T) {
+	runtime := &consensusRuntime{
+		logger:         hclog.NewNullLogger(),
+		lastBuiltBlock: &types.Header{Number: 2},
+		epoch:          &epochMetadata{Number: 1},
+	}
+
+	require.Nil(t, runtime.BuildProposal(&proto.View{Height: 5, Round: 1}))
+}
+
 func setupExitEventsForProofVerification(t *testing.T, state *State,
 	numOfBlocks, numOfEventsPerBlock uint64) [][]byte {
 	t.Helper()
