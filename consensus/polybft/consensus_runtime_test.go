@@ -1,6 +1,5 @@
 package polybft
 
-/*
 import (
 	"bytes"
 	"fmt"
@@ -47,7 +46,7 @@ func TestConsensusRuntime_GetVotes(t *testing.T) {
 
 	commitment, _, _ := buildCommitmentAndStateSyncs(t, stateSyncsCount, epoch, bundleSize, 0)
 
-	quorumSize := uint(getQuorumSize(len(runtime.epoch.Validators)))
+	quorumSize := validatorAccounts.toValidatorSetWithError(t).quorumSize
 	require.NoError(t, state.insertEpoch(epoch))
 
 	votesCount := quorumSize + 1
@@ -176,21 +175,6 @@ func TestConsensusRuntime_AddLog(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, stateSyncs, 1)
 	require.Equal(t, event.ID, stateSyncs[0].ID)
-}
-
-func TestConsensusRuntime_getQuorumSize(t *testing.T) {
-	t.Parallel()
-
-	var cases = []struct {
-		num, quorum int
-	}{
-		{4, 2},
-		{5, 3},
-	}
-
-	for _, c := range cases {
-		assert.Equal(t, c.quorum, getQuorumSize(c.num))
-	}
 }
 
 func TestConsensusRuntime_isEndOfEpoch_NotReachedEnd(t *testing.T) {
@@ -516,10 +500,20 @@ func TestConsensusRuntime_FSM_NotEndOfEpoch_NotEndOfSprint(t *testing.T) {
 
 	state := newTestState(t)
 
-	lastBlock := &types.Header{Number: 1}
+	extra := &Extra{}
+	firstBlock := &types.Header{
+		Number:    0,
+		ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...),
+	}
+	lastBlock := &types.Header{
+		Number:    1,
+		ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...),
+	}
+
 	validators := newTestValidators(3)
 	blockchainMock := new(blockchainMock)
 	blockchainMock.On("NewBlockBuilder", mock.Anything).Return(&BlockBuilder{}, nil).Once()
+	blockchainMock.On("GetHeaderByNumber", mock.Anything).Return(firstBlock, true).Once()
 
 	runtime := &consensusRuntime{
 		logger:              hclog.NewNullLogger(),
@@ -541,7 +535,7 @@ func TestConsensusRuntime_FSM_NotEndOfEpoch_NotEndOfSprint(t *testing.T) {
 	}
 
 	err := runtime.FSM()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.True(t, runtime.isActiveValidator())
 	assert.False(t, runtime.fsm.isEndOfEpoch)
@@ -869,7 +863,11 @@ func TestConsensusRuntime_FSM_EndOfSprint_HasBundlesToExecute(t *testing.T) {
 	validatorAccs := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F", "G"})
 	validatorSet := validatorAccs.getPublicIdentities()
 
-	lastBlock := types.Header{Number: 24}
+	extra := &Extra{}
+	lastBlock := &types.Header{
+		Number:    24,
+		ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...),
+	}
 
 	systemStateMock := new(systemStateMock)
 	systemStateMock.On("GetNextCommittedIndex").Return(nextCommittedIndex, nil).Once()
@@ -879,6 +877,13 @@ func TestConsensusRuntime_FSM_EndOfSprint_HasBundlesToExecute(t *testing.T) {
 	blockchainMock.On("NewBlockBuilder").Return(&BlockBuilder{}, nil).Once()
 	blockchainMock.On("GetStateProviderForBlock", mock.Anything).Return(new(stateProviderMock)).Once()
 	blockchainMock.On("GetSystemState", mock.Anything, mock.Anything).Return(systemStateMock).Once()
+
+	for i := 0; i < int(lastBlock.Number); i++ {
+		blockchainMock.On("GetHeaderByNumber", uint64(i)).Return(&types.Header{
+			Number:    uint64(i),
+			ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...),
+		}, true).Maybe()
+	}
 
 	runtime := &consensusRuntime{
 		logger:              hclog.NewNullLogger(),
@@ -900,7 +905,7 @@ func TestConsensusRuntime_FSM_EndOfSprint_HasBundlesToExecute(t *testing.T) {
 			Validators: validatorSet,
 			Commitment: commitment,
 		},
-		lastBuiltBlock: &lastBlock,
+		lastBuiltBlock: lastBlock,
 	}
 
 	require.NoError(t, runtime.buildBundles(runtime.getEpoch().Commitment, commitmentMsg, fromIndex))
@@ -1895,4 +1900,3 @@ func insertTestStateSyncEvents(t *testing.T, numberOfEvents int, startIndex uint
 
 	return stateSyncs
 }
-*/
