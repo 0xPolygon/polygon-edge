@@ -342,17 +342,17 @@ func (s *Signature) UnmarshalRLPWith(v *fastrlp.Value) error {
 func (s *Signature) VerifyCommittedFields(validators AccountSet, hash types.Hash) error {
 	filtered, err := validators.GetFilteredValidators(s.Bitmap)
 	if err != nil {
-		return fmt.Errorf("verify committed fields - cannot get signers. Error: %w", err)
+		return err
 	}
 
 	validatorSet, err := NewValidatorSet(validators, hclog.NewNullLogger())
 	if err != nil {
-		return fmt.Errorf("verify committed fields - cannot create validator set. Error: %w", err)
+		return err
 	}
 
 	signerAddresses := filtered.GetAddresses()
 	if !validatorSet.HasQuorum(signerAddresses) {
-		return fmt.Errorf("verify committed fields - quorum not reached")
+		return fmt.Errorf("quorum not reached")
 	}
 
 	blsPublicKeys := make([]*bls.PublicKey, len(filtered))
@@ -368,7 +368,7 @@ func (s *Signature) VerifyCommittedFields(validators AccountSet, hash types.Hash
 	}
 
 	if !aggs.VerifyAggregated(blsPublicKeys, hash[:]) {
-		return fmt.Errorf("verify committed fields - could not verify signature")
+		return fmt.Errorf("could not verify aggregated signature")
 	}
 
 	return nil
