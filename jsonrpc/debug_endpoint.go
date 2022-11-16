@@ -150,7 +150,7 @@ func (d *Debug) TraceCall(
 ) (interface{}, error) {
 	header, err := GetHeaderFromBlockNumberOrHash(filter, d.store)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get header from block hash or block number")
+		return nil, ErrHeaderNotFound
 	}
 
 	tx, err := DecodeTxn(arg, d.store)
