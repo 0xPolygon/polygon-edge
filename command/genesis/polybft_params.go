@@ -39,7 +39,7 @@ const (
 	defaultPolyBftValidatorPrefixPath = "test-chain-"
 	defaultBridge                     = false
 
-	bootnodePortStart   = 10000
+	bootnodePortStart   = 1
 	defaultStakeBalance = 100
 )
 
@@ -102,7 +102,7 @@ func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
 	// set generic validators as bootnodes if needed
 	if len(p.bootnodes) == 0 {
 		for i, validator := range validatorsInfo {
-			bnode := fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", "127.0.0.1", bootnodePortStart*(i+1)+1, validator.NodeID)
+			bnode := fmt.Sprintf("/ip4/%s/tcp/%d0001/p2p/%s", "127.0.0.1", bootnodePortStart+i, validator.NodeID)
 			chainConfig.Bootnodes = append(chainConfig.Bootnodes, bnode)
 		}
 	}
