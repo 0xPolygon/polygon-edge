@@ -15,10 +15,9 @@ import (
 var (
 	defaultTraceTimeout = 5 * time.Second
 
-	// errExecutionTimeout indicates the execution was terminated due to timeout
-	errExecutionTimeout  = errors.New("execution timeout")
-	errTraceGenesisBlock = errors.New("genesis is not traceable")
-	errBlockNotFound     = errors.New("block not found")
+	// ErrExecutionTimeout indicates the execution was terminated due to timeout
+	ErrExecutionTimeout  = errors.New("execution timeout")
+	ErrTraceGenesisBlock = errors.New("genesis is not traceable")
 )
 
 type debugBlockchainStore interface {
@@ -85,7 +84,7 @@ func (d *Debug) TraceBlockByNumber(
 
 	block, ok := d.store.GetBlockByNumber(num, true)
 	if !ok {
-		return nil, errors.New("block not found")
+		return nil, fmt.Errorf("block %d not found", num)
 	}
 
 	return d.traceBlock(block, config)
@@ -97,7 +96,7 @@ func (d *Debug) TraceBlockByHash(
 ) (interface{}, error) {
 	block, ok := d.store.GetBlockByHash(blockHash, true)
 	if !ok {
-		return nil, errors.New("block not found")
+		return nil, fmt.Errorf("block %s not found", blockHash)
 	}
 
 	return d.traceBlock(block, config)
@@ -130,7 +129,7 @@ func (d *Debug) TraceTransaction(
 	}
 
 	if block.Number() == 0 {
-		return nil, errTraceGenesisBlock
+		return nil, ErrTraceGenesisBlock
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -180,7 +179,7 @@ func (d *Debug) traceBlock(
 	config *TraceConfig,
 ) (interface{}, error) {
 	if block.Number() == 0 {
-		return nil, errTraceGenesisBlock
+		return nil, ErrTraceGenesisBlock
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -224,7 +223,7 @@ func newTracer(
 		<-timeoutCtx.Done()
 
 		if errors.Is(timeoutCtx.Err(), context.DeadlineExceeded) {
-			tracer.Cancel(errExecutionTimeout)
+			tracer.Cancel(ErrExecutionTimeout)
 		}
 	}()
 

@@ -187,7 +187,7 @@ func TestTraceBlockByNumber(t *testing.T) {
 		config      *TraceConfig
 		store       *debugEndpointMockStore
 		result      interface{}
-		err         error
+		err         bool
 	}{
 		{
 			name:        "should trace the latest block",
@@ -210,7 +210,7 @@ func TestTraceBlockByNumber(t *testing.T) {
 				},
 			},
 			result: testTraceResults,
-			err:    nil,
+			err:    false,
 		},
 		{
 			name:        "should trace the block at the given height",
@@ -230,7 +230,7 @@ func TestTraceBlockByNumber(t *testing.T) {
 				},
 			},
 			result: testTraceResults,
-			err:    nil,
+			err:    false,
 		},
 		{
 			name:        "should return errTraceGenesisBlock for genesis block",
@@ -245,7 +245,7 @@ func TestTraceBlockByNumber(t *testing.T) {
 				},
 			},
 			result: nil,
-			err:    errTraceGenesisBlock,
+			err:    true,
 		},
 		{
 			name:        "should return errBlockNotFound",
@@ -260,7 +260,7 @@ func TestTraceBlockByNumber(t *testing.T) {
 				},
 			},
 			result: nil,
-			err:    errBlockNotFound,
+			err:    true,
 		},
 	}
 
@@ -275,7 +275,12 @@ func TestTraceBlockByNumber(t *testing.T) {
 			res, err := endpoint.TraceBlockByNumber(test.blockNumber, test.config)
 
 			assert.Equal(t, test.result, res)
-			assert.Equal(t, test.err, err)
+
+			if test.err {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
 		})
 	}
 }
@@ -289,7 +294,7 @@ func TestTraceBlockByHash(t *testing.T) {
 		config    *TraceConfig
 		store     *debugEndpointMockStore
 		result    interface{}
-		err       error
+		err       bool
 	}{
 		{
 			name:      "should trace the latest block",
@@ -309,7 +314,7 @@ func TestTraceBlockByHash(t *testing.T) {
 				},
 			},
 			result: testTraceResults,
-			err:    nil,
+			err:    false,
 		},
 		{
 			name:      "should return errBlockNotFound",
@@ -324,7 +329,7 @@ func TestTraceBlockByHash(t *testing.T) {
 				},
 			},
 			result: nil,
-			err:    errBlockNotFound,
+			err:    true,
 		},
 	}
 
@@ -339,7 +344,12 @@ func TestTraceBlockByHash(t *testing.T) {
 			res, err := endpoint.TraceBlockByHash(test.blockHash, test.config)
 
 			assert.Equal(t, test.result, res)
-			assert.Equal(t, test.err, err)
+
+			if test.err {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
 		})
 	}
 }
@@ -725,7 +735,7 @@ func Test_newTracer(t *testing.T) {
 
 		res, err := tracer.GetResult()
 		assert.Nil(t, res)
-		assert.Equal(t, errExecutionTimeout, err)
+		assert.Equal(t, ErrExecutionTimeout, err)
 	})
 
 	t.Run("GetResult should return normal result if context is canceled before timeout", func(t *testing.T) {
