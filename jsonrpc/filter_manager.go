@@ -335,7 +335,7 @@ func (f *FilterManager) Close() {
 func (f *FilterManager) NewBlockFilter(ws wsConn) string {
 	filter := &blockFilter{
 		filterBase: newFilterBase(ws),
-		block:      f.blockStream.Head(),
+		block:      f.blockStream.getHead(),
 	}
 
 	if filter.hasWSConn() {
@@ -819,10 +819,7 @@ func newBlockStream(head *block) *blockStream {
 	return b
 }
 
-func (b *blockStream) Head() *headElem {
-	b.lock.Lock()
-	defer b.lock.Unlock()
-
+func (b *blockStream) getHead() *headElem {
 	head, _ := b.head.Load().(*headElem)
 
 	return head

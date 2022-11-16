@@ -516,7 +516,7 @@ func TestHeadStream_Basic(t *testing.T) {
 	b := newBlockStream(&block{Hash: types.StringToHash("1")})
 	b.push(&block{Hash: types.StringToHash("2")})
 
-	cur := b.Head()
+	cur := b.getHead()
 
 	b.push(&block{Hash: types.StringToHash("3")})
 	b.push(&block{Hash: types.StringToHash("4")})
@@ -559,7 +559,7 @@ func TestHeadStream_Concurrent(t *testing.T) {
 	errCh := make(chan error, nReaders)
 
 	// All subscribers start from the same point
-	head := b.Head()
+	head := b.getHead()
 
 	for i := 0; i < nReaders; i++ {
 		go func(i int) {
