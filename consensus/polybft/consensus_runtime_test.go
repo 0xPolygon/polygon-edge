@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/0xPolygon/go-ibft/messages/proto"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
@@ -1751,6 +1752,81 @@ func TestConsensusRuntime_GenerateExitProof(t *testing.T) {
 		_, err := runtime.GenerateExitProof(21, 1, 1)
 		require.ErrorContains(t, err, "could not find any exit event that has an id")
 	})
+}
+
+func TestConsensusRuntime_IsValidSender(t *testing.T) {
+	t.Parallel()
+
+	validatorAccounts := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
+
+	extra := &Extra{}
+	lastBuildBlock := &types.Header{
+		Number:    0,
+		ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...),
+	}
+
+	blockchainMock := new(blockchainMock)
+	blockchainMock.On("NewBlockBuilder", mock.Anything).Return(&BlockBuilder{}, nil).Once()
+
+	state := newTestState(t)
+	runtime := &consensusRuntime{
+		state: state,
+		config: &runtimeConfig{
+			Key:           validatorAccounts.getValidator("B").Key(),
+			blockchain:    blockchainMock,
+			PolyBFTConfig: &PolyBFTConfig{EpochSize: 10, SprintSize: 5},
+		},
+		lastBuiltBlock: lastBuildBlock,
+		epoch: &epochMetadata{
+			Number:     1,
+			Validators: validatorAccounts.getPublicIdentities()[:len(validatorAccounts.validators)-1],
+		},
+		logger: hclog.NewNullLogger(),
+	}
+
+	require.NoError(t, runtime.FSM())
+
+	sender := validatorAccounts.getValidator("A")
+	msg, err := sender.Key().SignEcdsaMessage(&proto.Message{
+		From: sender.Address().Bytes(),
+	})
+
+	require.NoError(t, err)
+
+	assert.True(t, runtime.IsValidSender(msg))
+	blockchainMock.AssertExpectations(t)
+
+	// sender not in current epoch validators
+	sender = validatorAccounts.getValidator("F")
+	msg, err = sender.Key().SignEcdsaMessage(&proto.Message{
+		From: sender.Address().Bytes(),
+	})
+
+	require.NoError(t, err)
+
+	assert.False(t, runtime.IsValidSender(msg))
+	blockchainMock.AssertExpectations(t)
+
+	// signature does not come from sender
+	sender = validatorAccounts.getValidator("A")
+	msg, err = sender.Key().SignEcdsaMessage(&proto.Message{
+		From: validatorAccounts.getValidator("B").Address().Bytes(),
+	})
+
+	require.NoError(t, err)
+
+	assert.False(t, runtime.IsValidSender(msg))
+	blockchainMock.AssertExpectations(t)
+
+	// invalid signature
+	sender = validatorAccounts.getValidator("A")
+	msg = &proto.Message{
+		From:      sender.Address().Bytes(),
+		Signature: []byte{1, 2},
+	}
+
+	assert.False(t, runtime.IsValidSender(msg))
+	blockchainMock.AssertExpectations(t)
 }
 
 func setupExitEventsForProofVerification(t *testing.T, state *State,
