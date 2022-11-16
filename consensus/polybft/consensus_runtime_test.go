@@ -304,6 +304,8 @@ func TestConsensusRuntime_isFixedSizeOfSprintMet_ReachedEnd(t *testing.T) {
 		{9, 4, 12},
 		{10, 7, 16},
 		{10, 1, 10},
+		{5, 1, 10},
+		{3, 3, 5},
 	}
 
 	runtime := &consensusRuntime{

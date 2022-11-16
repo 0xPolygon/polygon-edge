@@ -924,7 +924,7 @@ func (c *consensusRuntime) isFixedSizeOfEpochMet(blockNumber uint64) bool {
 func (c *consensusRuntime) isFixedSizeOfSprintMet(blockNumber uint64) bool {
 	epoch := c.getEpoch()
 
-	return epoch.FirstBlockInEpoch+c.config.PolyBFTConfig.SprintSize-1 == blockNumber
+	return (blockNumber-epoch.FirstBlockInEpoch+1)%c.config.PolyBFTConfig.SprintSize == 0
 }
 
 // getSystemState builds SystemState instance for the most current block header
