@@ -96,9 +96,6 @@ type ValidatorSet interface {
 }
 
 type validatorSet struct {
-	// last proposer of a block
-	last types.Address
-
 	// validators represents current list of validators with their priority
 	validators []*ValidatorAccount
 
@@ -315,7 +312,6 @@ func (v *validatorSet) getValWithMostPriority() (*ValidatorAccount, error) {
 	return res, nil
 }
 
-// Should not be called on an empty validator set.
 func (v *validatorSet) computeAvgProposerPriority() (int64, error) {
 	if v.isNilOrEmpty() {
 		return 0, fmt.Errorf("validator set cannot be nul or empty")
@@ -440,12 +436,13 @@ func (v *validatorSet) CalcProposer(round uint64) (types.Address, error) {
 		return types.ZeroAddress, fmt.Errorf("cannot increment proposer priority: %w", err)
 	}
 
-	proposer, err := vc.getProposer()
+	// keep proposer in the original validator set
+	v.proposer, err = vc.getProposer()
 	if err != nil {
 		return types.ZeroAddress, fmt.Errorf("cannot get proposer: %w", err)
 	}
 
-	return proposer.Metadata.Address, nil
+	return v.proposer.Metadata.Address, nil
 }
 
 func (v *validatorSet) Includes(address types.Address) bool {
@@ -481,6 +478,7 @@ func (v *validatorSet) getProposer() (*ValidatorAccount, error) {
 	return NewValidator(v.proposer.Metadata, v.proposer.ProposerPriority), nil
 }
 
+// findProposer finds proposer with the biggest priority in the validator set
 func (v *validatorSet) findProposer() (*ValidatorAccount, error) {
 	var (
 		proposer *ValidatorAccount

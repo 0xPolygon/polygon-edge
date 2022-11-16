@@ -17,87 +17,85 @@ import (
 )
 
 func TestCheckpointManager_submitCheckpoint(t *testing.T) {
-	t.Skip("FIX ME")
-	// t.Parallel()
+	t.Parallel()
 
-	// validators := newTestValidators(5).getPublicIdentities()
-	// rootchainMock := new(dummyRootchainInteractor)
-	// rootchainMock.On("Call", mock.Anything, mock.Anything, mock.Anything).
-	// 	Return("1", error(nil)).
-	// 	Once()
-	// rootchainMock.On("GetPendingNonce", mock.Anything).
-	// 	Return(uint64(1), error(nil)).
-	// 	Once()
-	// rootchainMock.On("SendTransaction", mock.Anything, mock.Anything).
-	// 	Return(&ethgo.Receipt{Status: uint64(types.ReceiptSuccess)}, error(nil)).
-	// 	Times(2)
+	validators := newTestValidators(5).getPublicIdentities()
+	rootchainMock := new(dummyRootchainInteractor)
+	rootchainMock.On("Call", mock.Anything, mock.Anything, mock.Anything).
+		Return("1", error(nil)).
+		Once()
+	rootchainMock.On("GetPendingNonce", mock.Anything).
+		Return(uint64(1), error(nil)).
+		Once()
+	rootchainMock.On("SendTransaction", mock.Anything, mock.Anything).
+		Return(&ethgo.Receipt{Status: uint64(types.ReceiptSuccess)}, error(nil)).
+		Times(2)
 
-	// backendMock := new(polybftBackendMock)
-	// backendMock.On("GetValidators", mock.Anything, mock.Anything).Return(validators)
+	backendMock := new(polybftBackendMock)
+	backendMock.On("GetValidators", mock.Anything, mock.Anything).Return(validators)
 
-	// checkpoint := &CheckpointData{
-	// 	BlockRound:  1,
-	// 	EpochNumber: 4,
-	// 	EventRoot:   types.BytesToHash(generateRandomBytes(t)),
-	// }
-	// extra := createTestExtraObject(validators, validators, 3, 3, 3)
-	// extra.Checkpoint = checkpoint
+	checkpoint := &CheckpointData{
+		BlockRound:  1,
+		EpochNumber: 4,
+		EventRoot:   types.BytesToHash(generateRandomBytes(t)),
+	}
+	extra := createTestExtraObject(validators, validators, 3, 3, 3)
+	extra.Checkpoint = checkpoint
 
-	// latestCheckpointHeader := &types.Header{
-	// 	Number:    4,
-	// 	ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...)}
-	// latestCheckpointHeader.ComputeHash()
+	latestCheckpointHeader := &types.Header{
+		Number:    4,
+		ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...)}
+	latestCheckpointHeader.ComputeHash()
 
-	// checkpoint1 := checkpoint.Copy()
-	// checkpoint1.EpochNumber = 1
+	checkpoint1 := checkpoint.Copy()
+	checkpoint1.EpochNumber = 1
 
-	// checkpoint2 := checkpoint.Copy()
-	// checkpoint2.EpochNumber = 2
+	checkpoint2 := checkpoint.Copy()
+	checkpoint2.EpochNumber = 2
 
-	// checkpoint3 := checkpoint.Copy()
-	// checkpoint3.EpochNumber = 3
+	checkpoint3 := checkpoint.Copy()
+	checkpoint3.EpochNumber = 3
 
-	// extra = createTestExtraObject(validators, validators, 4, 4, 4)
-	// extra.Checkpoint = checkpoint1
-	// extra3 := createTestExtraObject(validators, validators, 4, 4, 4)
-	// extra3.Checkpoint = checkpoint3
+	extra = createTestExtraObject(validators, validators, 4, 4, 4)
+	extra.Checkpoint = checkpoint1
+	extra3 := createTestExtraObject(validators, validators, 4, 4, 4)
+	extra3.Checkpoint = checkpoint3
 
-	// headersMap := &testHeadersMap{}
-	// header1 := &types.Header{
-	// 	Number:    1,
-	// 	ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...),
-	// }
-	// header1.ComputeHash()
+	headersMap := &testHeadersMap{}
+	header1 := &types.Header{
+		Number:    1,
+		ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...),
+	}
+	header1.ComputeHash()
 
-	// header2 := header1.Copy()
-	// header2.Number = 2
-	// header2.ComputeHash()
+	header2 := header1.Copy()
+	header2.Number = 2
+	header2.ComputeHash()
 
-	// header3 := &types.Header{
-	// 	Number:    3,
-	// 	ExtraData: append(make([]byte, ExtraVanity), extra3.MarshalRLPTo(nil)...),
-	// }
-	// header3.ComputeHash()
+	header3 := &types.Header{
+		Number:    3,
+		ExtraData: append(make([]byte, ExtraVanity), extra3.MarshalRLPTo(nil)...),
+	}
+	header3.ComputeHash()
 
-	// headersMap.addHeader(header1)
-	// headersMap.addHeader(header2)
-	// headersMap.addHeader(header3)
+	headersMap.addHeader(header1)
+	headersMap.addHeader(header2)
+	headersMap.addHeader(header3)
 
-	// // mock blockchain
-	// blockchainMock := new(blockchainMock)
-	// blockchainMock.On("GetHeaderByNumber", mock.Anything).Return(headersMap.getHeader)
+	// mock blockchain
+	blockchainMock := new(blockchainMock)
+	blockchainMock.On("GetHeaderByNumber", mock.Anything).Return(headersMap.getHeader)
 
-	// c := &checkpointManager{
-	// 	sender:           types.StringToAddress("2"),
-	// 	rootchain:        rootchainMock,
-	// 	consensusBackend: backendMock,
-	// 	blockchain:       blockchainMock,
-	// }
+	c := &checkpointManager{
+		sender:           types.StringToAddress("2"),
+		rootchain:        rootchainMock,
+		consensusBackend: backendMock,
+		blockchain:       blockchainMock,
+	}
 
-	// err := c.submitCheckpoint(*latestCheckpointHeader, false)
-	// require.NoError(t, err)
-	// rootchainMock.AssertExpectations(t)
-	require.Fail(t, "FIX ME")
+	err := c.submitCheckpoint(*latestCheckpointHeader, false)
+	require.NoError(t, err)
+	rootchainMock.AssertExpectations(t)
 }
 
 func TestCheckpointManager_abiEncodeCheckpointBlock(t *testing.T) {

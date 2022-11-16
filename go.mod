@@ -65,7 +65,6 @@ require (
 	github.com/docker/go-connections v0.4.0
 	github.com/mitchellh/go-glint v0.0.0-20210722152315-6515ceb4a127
 	go.etcd.io/bbolt v1.3.6
-	go.uber.org/atomic v1.10.0
 )
 
 require (
@@ -216,6 +215,7 @@ require (
 	github.com/valyala/fasthttp v1.37.0 // indirect
 	github.com/whyrusleeping/timecache v0.0.0-20160911033111-cfcb2f1abfee // indirect
 	go.opencensus.io v0.23.0 // indirect
+	go.uber.org/atomic v1.10.0 // indirect
 	go.uber.org/multierr v1.8.0 // indirect
 	go4.org/intern v0.0.0-20211027215823-ae77deb06f29 // indirect
 	go4.org/unsafe/assume-no-moving-gc v0.0.0-20220617031537-928513b29760 // indirect
