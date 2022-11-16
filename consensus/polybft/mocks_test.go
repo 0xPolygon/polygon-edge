@@ -5,16 +5,20 @@ import (
 	"math/big"
 	"sort"
 	"strconv"
+	"testing"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
+	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/state"
+	"github.com/0xPolygon/polygon-edge/syncer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/contract"
 )
@@ -394,6 +398,15 @@ func (v *testValidators) toValidatorSet() (*validatorSet, error) {
 	return NewValidatorSet(v.getPublicIdentities(), hclog.NewNullLogger())
 }
 
+func (v *testValidators) toValidatorSetWithError(t *testing.T) *validatorSet {
+	t.Helper()
+
+	vs, err := NewValidatorSet(v.getPublicIdentities())
+	require.NoError(t, err)
+
+	return vs
+}
+
 type testValidator struct {
 	alias       string
 	account     *wallet.Account
@@ -518,4 +531,45 @@ func (tp *txPoolMock) SetSealing(v bool) {
 
 func (tp *txPoolMock) ResetWithHeaders(values ...*types.Header) {
 	tp.Called(values)
+}
+
+var _ syncer.Syncer = (*syncerMock)(nil)
+
+type syncerMock struct {
+	mock.Mock
+}
+
+func (tp *syncerMock) Start() error {
+	args := tp.Called()
+
+	return args.Error(0)
+}
+
+func (tp *syncerMock) Close() error {
+	args := tp.Called()
+
+	return args.Error(0)
+}
+
+func (tp *syncerMock) GetSyncProgression() *progress.Progression {
+	args := tp.Called()
+
+	return args[0].(*progress.Progression) //nolint
+}
+
+func (tp *syncerMock) HasSyncPeer() bool {
+	args := tp.Called()
+
+	return args[0].(bool) //nolint
+}
+
+func (tp *syncerMock) Sync(func(*types.Block) bool) error {
+	args := tp.Called()
+
+	return args.Error(0)
+}
+
+func init() {
+	// setup custom hash header func
+	setupHeaderHashFunc()
 }

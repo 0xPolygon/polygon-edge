@@ -15,7 +15,6 @@ import (
 	rootchain "github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/polybftcontracts"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/server"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -252,7 +251,7 @@ func (p *genesisParams) deployContracts() (map[types.Address]*chain.GenesisAccou
 	allocations := make(map[types.Address]*chain.GenesisAccount, len(genesisContracts))
 
 	for _, contract := range genesisContracts {
-		artifact, err := polybftcontracts.ReadArtifact(p.smartContractsRootPath, contract.relativePath, contract.name)
+		artifact, err := polybft.ReadArtifact(p.smartContractsRootPath, contract.relativePath, contract.name)
 		if err != nil {
 			return nil, err
 		}

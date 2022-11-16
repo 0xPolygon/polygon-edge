@@ -611,6 +611,10 @@ func validateHeaderFields(parent *types.Header, header *types.Header) error {
 	if header.Difficulty <= 0 {
 		return fmt.Errorf("difficulty should be greater than zero")
 	}
+	// calculated header hash must be correct
+	if header.Hash != types.HeaderHash(header) {
+		return fmt.Errorf("invalid header hash")
+	}
 
 	return nil
 }
