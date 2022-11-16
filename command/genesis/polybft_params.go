@@ -15,6 +15,7 @@ import (
 	rootchain "github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
+	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/server"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -113,7 +114,20 @@ func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
 		return nil, err
 	}
 
-	genesisExtraData, err := generateExtraDataPolyBft(validatorsInfo, allocs)
+	// set initial validator set
+	genesisValidators, err := p.getGenesisValidators(validatorsInfo, allocs)
+	if err != nil {
+		return nil, err
+	}
+
+	polyBftConfig.InitialValidatorSet = genesisValidators
+
+	pubKeys := make([]*bls.PublicKey, len(validatorsInfo))
+	for i, validatorInfo := range validatorsInfo {
+		pubKeys[i] = validatorInfo.Account.Bls.PublicKey()
+	}
+
+	genesisExtraData, err := generateExtraDataPolyBft(genesisValidators, pubKeys)
 	if err != nil {
 		return nil, err
 	}
@@ -127,14 +141,6 @@ func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
 		GasUsed:    command.DefaultGenesisGasUsed,
 		Mixhash:    polybft.PolyBFTMixDigest,
 	}
-
-	// Set initial validator set
-	genesisValidators, err := p.getGenesisValidators(validatorsInfo, allocs)
-	if err != nil {
-		return nil, err
-	}
-
-	polyBftConfig.InitialValidatorSet = genesisValidators
 
 	return chainConfig, nil
 }
@@ -266,27 +272,23 @@ func (p *genesisParams) deployContracts() (map[types.Address]*chain.GenesisAccou
 }
 
 // generateExtraDataPolyBft populates Extra with specific fields required for polybft consensus protocol
-func generateExtraDataPolyBft(validators []GenesisTarget,
-	allocs map[types.Address]*chain.GenesisAccount) ([]byte, error) {
+func generateExtraDataPolyBft(validators []*polybft.Validator, publicKeys []*bls.PublicKey) ([]byte, error) {
+	if len(validators) != len(publicKeys) {
+		return nil, fmt.Errorf("expected same length for genesis validators and BLS public keys")
+	}
+
 	delta := &polybft.ValidatorSetDelta{
 		Added:   make(polybft.AccountSet, len(validators)),
 		Removed: bitmap.Bitmap{},
 	}
 
 	for i, validator := range validators {
-		address := types.Address(validator.Account.Ecdsa.Address())
-
-		balanceInWei, err := getBalanceInWei(address, allocs)
-		if err != nil {
-			return nil, err
+		delta.Added[i] = &polybft.ValidatorMetadata{
+			Address: validator.Address,
+			BlsKey:  publicKeys[i],
+			// convert from wei to token amount (voting power == tokens amount)
+			VotingPower: validator.Balance.Div(validator.Balance, big.NewInt(polybft.WeiScalingFactor)).Uint64(),
 		}
-
-		validatorMetadata := &polybft.ValidatorMetadata{
-			Address:     address,
-			BlsKey:      validator.Account.Bls.PublicKey(),
-			VotingPower: balanceInWei.Div(balanceInWei, big.NewInt(polybft.WeiScalingFactor)).Uint64(),
-		}
-		delta.Added[i] = validatorMetadata
 	}
 
 	extra := polybft.Extra{Validators: delta}
