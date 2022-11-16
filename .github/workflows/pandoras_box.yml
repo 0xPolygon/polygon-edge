@@ -151,6 +151,10 @@ jobs:
                       {
                         "type": "mrkdwn",
                         "text": "Workflow: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|Results>"
+                      },
+                      {
+                        "type": "mrkdwn",
+                        "text": "Txn Count: `${{ inputs.transaction_count }}`"
                       }
                     ]
                   }

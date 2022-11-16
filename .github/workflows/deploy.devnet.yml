@@ -165,3 +165,35 @@ jobs:
                 }
               ]
             }
+
+  pandoras_box:
+    uses: ./.github/workflows/pandoras_box.yml
+    name: Pandora's Box
+    needs: deploy_devnet
+    secrets:
+      SLACK_PERFORMANCE_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
+      PANDORAS_TARGET: ${{ secrets.PANDORAS_TARGET }}
+      PANDORAS_MNEMONIC: ${{ secrets.PANDORAS_MNEMONIC }}
+    with:
+      runner: devnet
+      environment: devnet
+      transaction_batch: '200'
+      transaction_count: '10000'
+
+  loadbot:
+    uses: ./.github/workflows/loadbot.yml
+    name: Loadbot
+    needs: deploy_devnet
+    secrets:
+      SLACK_PERFORMANCE_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
+      LOADBOT_JSONRPC_URL: ${{ secrets.LOADBOT_JSONRPC_URL }}
+      LOADBOT_SENDER_ADDRESS: ${{ secrets.LOADBOT_SENDER_ADDRESS }}
+      LOADBOT_GRPC_ADDRESS: ${{ secrets.LOADBOT_GRPC_ADDRESS }}
+      LOADBOT_0x1AB8C3df809b85012a009c0264eb92dB04eD6EFa: ${{ secrets.LOADBOT_0x1AB8C3df809b85012a009c0264eb92dB04eD6EFa }}
+    with:
+      runner: devnet
+      environment: devnet
+      chain_id: '701'
+      transaction_value: '100'
+      transaction_count: '10000'
+      transactions_per_second: '200'
