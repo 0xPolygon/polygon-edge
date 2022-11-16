@@ -1,9 +1,13 @@
 package jsonrpc
 
 import (
+	"context"
 	"encoding/json"
+	"math/big"
 	"testing"
+	"time"
 
+	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state/runtime/tracer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
@@ -174,45 +178,6 @@ func TestDebugTraceConfigDecode(t *testing.T) {
 	}
 }
 
-func testCreateTestHeader(height uint64, hash types.Hash) *types.Header {
-	return &types.Header{
-		Number: height,
-		Hash:   hash,
-	}
-}
-
-func testWrapHeaderWithEmptyBlock(h *types.Header) *types.Block {
-	return &types.Block{
-		Header:       h,
-		Transactions: []*types.Transaction{},
-	}
-}
-
-var (
-	// test data
-	genesisHeader = testCreateTestHeader(0, types.BytesToHash([]byte{0}))
-	genesisBlock  = testWrapHeaderWithEmptyBlock(genesisHeader)
-
-	latestHeader = testCreateTestHeader(100, types.BytesToHash([]byte{100}))
-	latestBlock  = testWrapHeaderWithEmptyBlock(latestHeader)
-
-	hash10   = types.BytesToHash([]byte{10})
-	header10 = testCreateTestHeader(10, hash10)
-	block10  = testWrapHeaderWithEmptyBlock(header10)
-
-	hash11 = types.BytesToHash([]byte{11})
-
-	sampleResult = map[string]interface{}{
-		"failed":      false,
-		"gas":         1000,
-		"returnValue": "test return",
-		"structLogs": []interface{}{
-			"log1",
-			"log2",
-		},
-	}
-)
-
 func TestTraceBlockByNumber(t *testing.T) {
 	t.Parallel()
 
@@ -230,21 +195,21 @@ func TestTraceBlockByNumber(t *testing.T) {
 			config:      &TraceConfig{},
 			store: &debugEndpointMockStore{
 				headerFn: func() *types.Header {
-					return latestHeader
+					return testLatestHeader
 				},
 				getBlockByNumberFn: func(num uint64, full bool) (*types.Block, bool) {
-					assert.Equal(t, latestHeader.Number, num)
+					assert.Equal(t, testLatestHeader.Number, num)
 					assert.True(t, full)
 
-					return latestBlock, true
+					return testLatestBlock, true
 				},
 				traceBlockFn: func(block *types.Block, tracer tracer.Tracer) ([]interface{}, error) {
-					assert.Equal(t, latestBlock, block)
+					assert.Equal(t, testLatestBlock, block)
 
-					return []interface{}{sampleResult}, nil
+					return testTraceResults, nil
 				},
 			},
-			result: []interface{}{sampleResult},
+			result: testTraceResults,
 			err:    nil,
 		},
 		{
@@ -253,18 +218,18 @@ func TestTraceBlockByNumber(t *testing.T) {
 			config:      &TraceConfig{},
 			store: &debugEndpointMockStore{
 				getBlockByNumberFn: func(num uint64, full bool) (*types.Block, bool) {
-					assert.Equal(t, header10.Number, num)
+					assert.Equal(t, testHeader10.Number, num)
 					assert.True(t, full)
 
-					return block10, true
+					return testBlock10, true
 				},
 				traceBlockFn: func(block *types.Block, tracer tracer.Tracer) ([]interface{}, error) {
-					assert.Equal(t, block10, block)
+					assert.Equal(t, testBlock10, block)
 
-					return []interface{}{sampleResult}, nil
+					return testTraceResults, nil
 				},
 			},
-			result: []interface{}{sampleResult},
+			result: testTraceResults,
 			err:    nil,
 		},
 		{
@@ -273,10 +238,10 @@ func TestTraceBlockByNumber(t *testing.T) {
 			config:      &TraceConfig{},
 			store: &debugEndpointMockStore{
 				getBlockByNumberFn: func(num uint64, full bool) (*types.Block, bool) {
-					assert.Equal(t, genesisHeader.Number, num)
+					assert.Equal(t, testGenesisHeader.Number, num)
 					assert.True(t, full)
 
-					return genesisBlock, true
+					return testGenesisBlock, true
 				},
 			},
 			result: nil,
@@ -328,31 +293,31 @@ func TestTraceBlockByHash(t *testing.T) {
 	}{
 		{
 			name:      "should trace the latest block",
-			blockHash: hash10,
+			blockHash: testHeader10.Hash,
 			config:    &TraceConfig{},
 			store: &debugEndpointMockStore{
 				getBlockByHashFn: func(hash types.Hash, full bool) (*types.Block, bool) {
-					assert.Equal(t, hash10, hash)
+					assert.Equal(t, testHeader10.Hash, hash)
 					assert.True(t, full)
 
-					return block10, true
+					return testBlock10, true
 				},
 				traceBlockFn: func(block *types.Block, tracer tracer.Tracer) ([]interface{}, error) {
-					assert.Equal(t, block10, block)
+					assert.Equal(t, testBlock10, block)
 
-					return []interface{}{sampleResult}, nil
+					return testTraceResults, nil
 				},
 			},
-			result: []interface{}{sampleResult},
+			result: testTraceResults,
 			err:    nil,
 		},
 		{
 			name:      "should return errBlockNotFound",
-			blockHash: hash11,
+			blockHash: testHash11,
 			config:    &TraceConfig{},
 			store: &debugEndpointMockStore{
 				getBlockByHashFn: func(hash types.Hash, full bool) (*types.Block, bool) {
-					assert.Equal(t, hash11, hash)
+					assert.Equal(t, testHash11, hash)
 					assert.True(t, full)
 
 					return nil, false
@@ -377,4 +342,414 @@ func TestTraceBlockByHash(t *testing.T) {
 			assert.Equal(t, test.err, err)
 		})
 	}
+}
+
+func TestTraceBlock(t *testing.T) {
+	t.Parallel()
+
+	blockBytes := testLatestBlock.MarshalRLP()
+	blockHex := hex.EncodeToHex(blockBytes)
+
+	tests := []struct {
+		name   string
+		input  string
+		config *TraceConfig
+		store  *debugEndpointMockStore
+		result interface{}
+		err    bool
+	}{
+		{
+			name:   "should trace the given block",
+			input:  blockHex,
+			config: &TraceConfig{},
+			store: &debugEndpointMockStore{
+				traceBlockFn: func(block *types.Block, tracer tracer.Tracer) ([]interface{}, error) {
+					assert.Equal(t, testLatestBlock, block)
+
+					return testTraceResults, nil
+				},
+			},
+			result: testTraceResults,
+			err:    false,
+		},
+		{
+			name:   "should return error in case of invalid block",
+			input:  "hoge",
+			config: &TraceConfig{},
+			store:  &debugEndpointMockStore{},
+			result: nil,
+			err:    true,
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			endpoint := &Debug{test.store}
+
+			res, err := endpoint.TraceBlock(test.input, test.config)
+
+			assert.Equal(t, test.result, res)
+
+			if test.err {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestTraceTransaction(t *testing.T) {
+	t.Parallel()
+
+	blockWithTx := &types.Block{
+		Header: testBlock10.Header,
+		Transactions: []*types.Transaction{
+			testTx1,
+		},
+	}
+
+	tests := []struct {
+		name   string
+		txHash types.Hash
+		config *TraceConfig
+		store  *debugEndpointMockStore
+		result interface{}
+		err    bool
+	}{
+		{
+			name:   "should trace the given transaction",
+			txHash: testTxHash1,
+			config: &TraceConfig{},
+			store: &debugEndpointMockStore{
+				readTxLookupFn: func(hash types.Hash) (types.Hash, bool) {
+					assert.Equal(t, testTxHash1, hash)
+
+					return testBlock10.Hash(), true
+				},
+				getBlockByHashFn: func(hash types.Hash, full bool) (*types.Block, bool) {
+					assert.Equal(t, testBlock10.Hash(), hash)
+					assert.True(t, full)
+
+					return blockWithTx, true
+				},
+				traceTxnFn: func(block *types.Block, txHash types.Hash, tracer tracer.Tracer) (interface{}, error) {
+					assert.Equal(t, blockWithTx, block)
+					assert.Equal(t, testTxHash1, txHash)
+
+					return testTraceResult, nil
+				},
+			},
+			result: testTraceResult,
+			err:    false,
+		},
+		{
+			name:   "should return error if ReadTxLookup returns null",
+			txHash: testTxHash1,
+			config: &TraceConfig{},
+			store: &debugEndpointMockStore{
+				readTxLookupFn: func(hash types.Hash) (types.Hash, bool) {
+					assert.Equal(t, testTxHash1, hash)
+
+					return types.ZeroHash, false
+				},
+			},
+			result: nil,
+			err:    true,
+		},
+		{
+			name:   "should return error if block not found",
+			txHash: testTxHash1,
+			config: &TraceConfig{},
+			store: &debugEndpointMockStore{
+				readTxLookupFn: func(hash types.Hash) (types.Hash, bool) {
+					assert.Equal(t, testTxHash1, hash)
+
+					return testBlock10.Hash(), true
+				},
+				getBlockByHashFn: func(hash types.Hash, full bool) (*types.Block, bool) {
+					assert.Equal(t, testBlock10.Hash(), hash)
+					assert.True(t, full)
+
+					return nil, false
+				},
+			},
+			result: nil,
+			err:    true,
+		},
+		{
+			name:   "should return error if the tx is not including the block",
+			txHash: testTxHash1,
+			config: &TraceConfig{},
+			store: &debugEndpointMockStore{
+				readTxLookupFn: func(hash types.Hash) (types.Hash, bool) {
+					assert.Equal(t, testTxHash1, hash)
+
+					return testBlock10.Hash(), true
+				},
+				getBlockByHashFn: func(hash types.Hash, full bool) (*types.Block, bool) {
+					assert.Equal(t, testBlock10.Hash(), hash)
+					assert.True(t, full)
+
+					return testBlock10, true
+				},
+			},
+			result: nil,
+			err:    true,
+		},
+		{
+			name:   "should return error if the block is genesis",
+			txHash: testTxHash1,
+			config: &TraceConfig{},
+			store: &debugEndpointMockStore{
+				readTxLookupFn: func(hash types.Hash) (types.Hash, bool) {
+					assert.Equal(t, testTxHash1, hash)
+
+					return testBlock10.Hash(), true
+				},
+				getBlockByHashFn: func(hash types.Hash, full bool) (*types.Block, bool) {
+					assert.Equal(t, testBlock10.Hash(), hash)
+					assert.True(t, full)
+
+					return &types.Block{
+						Header: testGenesisHeader,
+						Transactions: []*types.Transaction{
+							testTx1,
+						},
+					}, true
+				},
+			},
+			result: nil,
+			err:    true,
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			endpoint := &Debug{test.store}
+
+			res, err := endpoint.TraceTransaction(test.txHash, test.config)
+
+			assert.Equal(t, test.result, res)
+
+			if test.err {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestTraceCall(t *testing.T) {
+	t.Parallel()
+
+	var (
+		from     = types.StringToAddress("1")
+		to       = types.StringToAddress("2")
+		gas      = argUint64(10000)
+		gasPrice = argBytes(new(big.Int).SetUint64(10).Bytes())
+		value    = argBytes(new(big.Int).SetUint64(1000).Bytes())
+		data     = argBytes([]byte("data"))
+		input    = argBytes([]byte("input"))
+		nonce    = argUint64(1)
+
+		blockNumber = BlockNumber(testBlock10.Number())
+
+		txArg = &txnArgs{
+			From:     &from,
+			To:       &to,
+			Gas:      &gas,
+			GasPrice: &gasPrice,
+			Value:    &value,
+			Data:     &data,
+			Input:    &input,
+			Nonce:    &nonce,
+		}
+		decodedTx = &types.Transaction{
+			Nonce:    uint64(nonce),
+			GasPrice: new(big.Int).SetBytes([]byte(gasPrice)),
+			Gas:      uint64(gas),
+			To:       &to,
+			Value:    new(big.Int).SetBytes([]byte(value)),
+			Input:    data,
+			From:     from,
+		}
+	)
+
+	decodedTx.ComputeHash()
+
+	tests := []struct {
+		name   string
+		arg    *txnArgs
+		filter BlockNumberOrHash
+		config *TraceConfig
+		store  *debugEndpointMockStore
+		result interface{}
+		err    bool
+	}{
+		{
+			name: "should trace the given transaction",
+			arg:  txArg,
+			filter: BlockNumberOrHash{
+				BlockNumber: &blockNumber,
+			},
+			config: &TraceConfig{},
+			store: &debugEndpointMockStore{
+				getHeaderByNumberFn: func(num uint64) (*types.Header, bool) {
+					assert.Equal(t, testBlock10.Number(), num)
+
+					return testHeader10, true
+				},
+				traceCallFn: func(tx *types.Transaction, header *types.Header, tracer tracer.Tracer) (interface{}, error) {
+					assert.Equal(t, decodedTx, tx)
+					assert.Equal(t, testHeader10, header)
+
+					return testTraceResult, nil
+				},
+			},
+			result: testTraceResult,
+			err:    false,
+		},
+		{
+			name: "should return error if block not found",
+			arg:  txArg,
+			filter: BlockNumberOrHash{
+				BlockHash: &testHeader10.Hash,
+			},
+			config: &TraceConfig{},
+			store: &debugEndpointMockStore{
+				getBlockByHashFn: func(hash types.Hash, full bool) (*types.Block, bool) {
+					assert.Equal(t, testHeader10.Hash, hash)
+					assert.False(t, full)
+
+					return nil, false
+				},
+			},
+			result: nil,
+			err:    true,
+		},
+		{
+			name: "should return error if decoding transaction fails",
+			arg: &txnArgs{
+				From:     &from,
+				Gas:      &gas,
+				GasPrice: &gasPrice,
+				Value:    &value,
+				Nonce:    &nonce,
+			},
+			filter: BlockNumberOrHash{},
+			config: &TraceConfig{},
+			store: &debugEndpointMockStore{
+				headerFn: func() *types.Header {
+					return testLatestHeader
+				},
+			},
+			result: nil,
+			err:    true,
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			endpoint := &Debug{test.store}
+
+			res, err := endpoint.TraceCall(test.arg, test.filter, test.config)
+
+			assert.Equal(t, test.result, res)
+
+			if test.err {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func Test_newTracer(t *testing.T) {
+	t.Parallel()
+
+	t.Run("should create tracer", func(t *testing.T) {
+		t.Parallel()
+
+		ctx, cancel := context.WithCancel(context.Background())
+		t.Cleanup(func() {
+			cancel()
+		})
+
+		tracer, err := newTracer(ctx, &TraceConfig{
+			EnableMemory:     true,
+			EnableReturnData: true,
+			DisableStack:     false,
+			DisableStorage:   false,
+		})
+
+		assert.NotNil(t, tracer)
+		assert.NoError(t, err)
+	})
+
+	t.Run("GetResult should return errExecutionTimeout if timeout happens", func(t *testing.T) {
+		t.Parallel()
+
+		ctx, cancel := context.WithCancel(context.Background())
+		t.Cleanup(func() {
+			cancel()
+		})
+
+		timeout := "0s"
+		tracer, err := newTracer(ctx, &TraceConfig{
+			EnableMemory:     true,
+			EnableReturnData: true,
+			DisableStack:     false,
+			DisableStorage:   false,
+			Timeout:          &timeout,
+		})
+
+		assert.NoError(t, err)
+
+		// wait until timeout
+		time.Sleep(100 * time.Millisecond)
+
+		res, err := tracer.GetResult()
+		assert.Nil(t, res)
+		assert.Equal(t, errExecutionTimeout, err)
+	})
+
+	t.Run("GetResult should return normal result if context is canceled before timeout", func(t *testing.T) {
+		t.Parallel()
+
+		ctx, cancel := context.WithCancel(context.Background())
+		t.Cleanup(func() {
+			cancel()
+		})
+
+		timeout := "1s"
+		tracer, err := newTracer(ctx, &TraceConfig{
+			EnableMemory:     true,
+			EnableReturnData: true,
+			DisableStack:     false,
+			DisableStorage:   false,
+			Timeout:          &timeout,
+		})
+
+		assert.NoError(t, err)
+
+		cancel()
+
+		_, err = tracer.GetResult()
+		assert.NoError(t, err)
+	})
 }

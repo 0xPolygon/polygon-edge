@@ -149,11 +149,6 @@ func (d *Debug) TraceCall(
 	filter BlockNumberOrHash,
 	config *TraceConfig,
 ) (interface{}, error) {
-	// The filter is empty, use the latest block by default
-	if filter.BlockNumber == nil && filter.BlockHash == nil {
-		filter.BlockNumber, _ = createBlockNumberPointer("latest")
-	}
-
 	header, err := GetHeaderFromBlockNumberOrHash(filter, d.store)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get header from block hash or block number")

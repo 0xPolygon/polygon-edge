@@ -23,7 +23,6 @@ var (
 	ErrBlockNotFound                    = errors.New("block not found")
 	ErrIncorrectBlockRange              = errors.New("incorrect range")
 	ErrBlockRangeTooHigh                = errors.New("block range too high")
-	ErrPendingBlockNumber               = errors.New("pending block number is not supported")
 	ErrNoWSConnection                   = errors.New("no websocket connection")
 )
 

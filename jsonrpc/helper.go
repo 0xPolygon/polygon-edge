@@ -9,7 +9,11 @@ import (
 )
 
 var (
-	ErrHeaderNotFound = errors.New("header not found")
+	ErrHeaderNotFound           = errors.New("header not found")
+	ErrPendingBlockNumber       = errors.New("fetching the pending header is not supported")
+	ErrNegativeBlockNumber      = errors.New("invalid argument 0: block number larger than int64")
+	ErrFailedFetchGenesis       = errors.New("error fetching genesis block header")
+	ErrNoDataInContractCreation = errors.New("contract creation without data provided")
 )
 
 type latestHeaderGetter interface {
@@ -26,11 +30,11 @@ func GetNumericBlockNumber(number BlockNumber, store latestHeaderGetter) (uint64
 		return 0, nil
 
 	case PendingBlockNumber:
-		return 0, fmt.Errorf("fetching the pending header is not supported")
+		return 0, ErrPendingBlockNumber
 
 	default:
 		if number < 0 {
-			return 0, fmt.Errorf("invalid argument 0: block number larger than int64")
+			return 0, ErrNegativeBlockNumber
 		}
 
 		return uint64(number), nil
@@ -51,13 +55,13 @@ func GetBlockHeader(number BlockNumber, store headerGetter) (*types.Header, erro
 	case EarliestBlockNumber:
 		header, ok := store.GetHeaderByNumber(uint64(0))
 		if !ok {
-			return nil, fmt.Errorf("error fetching genesis block header")
+			return nil, ErrFailedFetchGenesis
 		}
 
 		return header, nil
 
 	case PendingBlockNumber:
-		return nil, fmt.Errorf("fetching the pending header is not supported")
+		return nil, ErrPendingBlockNumber
 
 	default:
 		// Convert the block number from hex to uint64
@@ -153,7 +157,7 @@ func GetNextNonce(address types.Address, number BlockNumber, store nonceGetter) 
 	acc, err := store.GetAccount(header.StateRoot, address)
 
 	//nolint:govet
-	if errors.As(err, &ErrStateNotFound) {
+	if errors.Is(err, ErrStateNotFound) {
 		// If the account doesn't exist / isn't initialized,
 		// return a nonce value of 0
 		return 0, nil
@@ -193,10 +197,8 @@ func DecodeTxn(arg *txnArgs, store nonceGetter) (*types.Transaction, error) {
 		input = *arg.Input
 	}
 
-	if arg.To == nil {
-		if input == nil {
-			return nil, fmt.Errorf("contract creation without data provided")
-		}
+	if arg.To == nil && input == nil {
+		return nil, ErrNoDataInContractCreation
 	}
 
 	if input == nil {
