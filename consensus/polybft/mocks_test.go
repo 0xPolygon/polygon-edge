@@ -401,7 +401,7 @@ func (v *testValidators) toValidatorSet() (*validatorSet, error) {
 func (v *testValidators) toValidatorSetWithError(t *testing.T) *validatorSet {
 	t.Helper()
 
-	vs, err := NewValidatorSet(v.getPublicIdentities())
+	vs, err := NewValidatorSet(v.getPublicIdentities(), hclog.NewNullLogger())
 	require.NoError(t, err)
 
 	return vs

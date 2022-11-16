@@ -429,7 +429,7 @@ func TestFSM_BuildProposal_EpochEndingBlock_FailedToCommitStateTx(t *testing.T) 
 	mBlockBuilder := new(blockBuilderMock)
 	mBlockBuilder.On("WriteTx", mock.Anything).Return(errors.New("error")).Once()
 
-	validatorSet, err := NewValidatorSet(validators.getPublicIdentities())
+	validatorSet, err := NewValidatorSet(validators.getPublicIdentities(), hclog.NewNullLogger())
 
 	fsm := &fsm{parent: parent, blockBuilder: mBlockBuilder, config: &PolyBFTConfig{}, backend: &blockchainMock{},
 		isEndOfEpoch:      true,
@@ -478,7 +478,7 @@ func TestFSM_BuildProposal_EpochEndingBlock_ValidatorsDeltaExists(t *testing.T) 
 	checkpointBackendMock := new(checkpointBackendMock)
 	checkpointBackendMock.On("BuildEventRoot", mock.Anything, mock.Anything).Return(types.ZeroHash, nil).Once()
 
-	validatorSet, err := NewValidatorSet(validators)
+	validatorSet, err := NewValidatorSet(validators, hclog.NewNullLogger())
 	require.NoError(t, err)
 
 	fsm := &fsm{
@@ -666,7 +666,7 @@ func TestFSM_VerifyStateTransactions_StateTransactionPass(t *testing.T) {
 
 	validators := newTestValidators(5)
 
-	validatorSet, err := NewValidatorSet(validators.getPublicIdentities())
+	validatorSet, err := NewValidatorSet(validators.getPublicIdentities(), hclog.NewNullLogger())
 	require.NoError(t, err)
 
 	fsm := &fsm{
@@ -699,7 +699,7 @@ func TestFSM_VerifyStateTransactions_StateTransactionQuorumNotReached(t *testing
 		Bitmap:              []byte{},
 	}
 
-	validatorSet, err := NewValidatorSet(validators.getPublicIdentities())
+	validatorSet, err := NewValidatorSet(validators.getPublicIdentities(), hclog.NewNullLogger())
 	require.NoError(t, err)
 
 	fsm := &fsm{
@@ -741,7 +741,7 @@ func TestFSM_VerifyStateTransactions_StateTransactionInvalidSignature(t *testing
 
 	commitment.AggSignature.AggregatedSignature = sig
 
-	validatorSet, err := NewValidatorSet(validators.getPublicIdentities())
+	validatorSet, err := NewValidatorSet(validators.getPublicIdentities(), hclog.NewNullLogger())
 	require.NoError(t, err)
 
 	fsm := &fsm{
@@ -846,7 +846,7 @@ func TestFSM_ValidateCommit_Good(t *testing.T) {
 	checkpointBackendMock := new(checkpointBackendMock)
 	checkpointBackendMock.On("BuildEventRoot", mock.Anything, mock.Anything).Return(types.ZeroHash, nil).Once()
 
-	validatorSet, err := NewValidatorSet(validatorsMetadata)
+	validatorSet, err := NewValidatorSet(validatorsMetadata, hclog.NewNullLogger())
 	require.NoError(t, err)
 
 	fsm := &fsm{parent: parent, blockBuilder: mBlockBuilder, config: &PolyBFTConfig{}, backend: &blockchainMock{},
@@ -1037,7 +1037,7 @@ func TestFSM_Insert_Good(t *testing.T) {
 		return stateBlock.Number() == buildBlock.Block.Number() && stateBlock.Hash() == buildBlock.Block.Hash()
 	})).Return([]*types.Receipt(nil), error(nil)).Once()
 
-	validatorSet, err := NewValidatorSet(validatorsMetadata[0 : len(validatorsMetadata)-1])
+	validatorSet, err := NewValidatorSet(validatorsMetadata[0:len(validatorsMetadata)-1], hclog.NewNullLogger())
 	require.NoError(t, err)
 
 	fsm := &fsm{parent: parent,
@@ -1094,7 +1094,7 @@ func TestFSM_Insert_InvalidNode(t *testing.T) {
 	buildBlock := &StateBlock{Block: finalBlock}
 	mBlockBuilder := newBlockBuilderMock(buildBlock)
 
-	validatorSet, err := NewValidatorSet(validatorsMetadata[0 : len(validatorsMetadata)-1])
+	validatorSet, err := NewValidatorSet(validatorsMetadata[0:len(validatorsMetadata)-1], hclog.NewNullLogger())
 	require.NoError(t, err)
 
 	fsm := &fsm{parent: parent, blockBuilder: mBlockBuilder, config: &PolyBFTConfig{}, backend: &blockchainMock{},
@@ -1430,7 +1430,7 @@ func TestFSM_VerifyStateTransaction_TwoCommitmentMessages(t *testing.T) {
 	validators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
 	_, commitmentMessage, _ := buildCommitmentAndStateSyncs(t, 10, uint64(3), uint64(1), 2)
 
-	validatorSet, err := NewValidatorSet(validators.getPublicIdentities())
+	validatorSet, err := NewValidatorSet(validators.getPublicIdentities(), hclog.NewNullLogger())
 	require.NoError(t, err)
 
 	f := &fsm{
@@ -1561,7 +1561,7 @@ func TestFSM_Validate_FailToVerifySignatures(t *testing.T) {
 	polybftBackendMock := new(polybftBackendMock)
 	polybftBackendMock.On("GetValidators", mock.Anything, mock.Anything).Return(validatorsMetadata, nil).Once()
 
-	validatorSet, err := NewValidatorSet(validatorsMetadata)
+	validatorSet, err := NewValidatorSet(validatorsMetadata, hclog.NewNullLogger())
 	require.NoError(t, err)
 
 	fsm := &fsm{
