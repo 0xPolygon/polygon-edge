@@ -45,8 +45,8 @@ func getInitChildValidatorSetInput(validators []*Validator, governanceAddr types
 	validatorPubkeys := make([][4]*big.Int, len(validators))
 	validatorStakes := make([]*big.Int, len(validators))
 
-	for i, g := range validators {
-		blsKey, err := hex.DecodeString(g.BlsKey)
+	for i, validator := range validators {
+		blsKey, err := hex.DecodeString(validator.BlsKey)
 		if err != nil {
 			return nil, err
 		}
@@ -59,8 +59,8 @@ func getInitChildValidatorSetInput(validators []*Validator, governanceAddr types
 		pubKeyBig := pubKey.ToBigInt()
 
 		validatorPubkeys[i] = pubKeyBig
-		validatorAddresses[i] = g.Address
-		validatorStakes[i] = g.Balance // TODO: In Wei or tokens?
+		validatorAddresses[i] = validator.Address
+		validatorStakes[i] = validator.Balance
 	}
 
 	registerMessage, err := bls.MarshalMessageToBigInt([]byte(contracts.PolyBFTRegisterMessage))
