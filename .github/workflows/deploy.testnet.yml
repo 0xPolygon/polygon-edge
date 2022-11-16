@@ -22,6 +22,8 @@ jobs:
   build:
     uses: ./.github/workflows/build.yml
     name: Build
+    secrets:
+      GH_TOKEN_CLONE_PRIVATE: ${{ secrets.GH_TOKEN_CLONE_PRIVATE }}
 
   test:
     uses: ./.github/workflows/test.yml
