@@ -27,7 +27,7 @@ import (
 const (
 	eventsBufferSize   = 10
 	stateFileName      = "consensusState.db"
-	uptimeLookbackSize = 1 // number of blocks to calculate uptime from the previous epoch
+	uptimeLookbackSize = 2 // number of blocks to calculate uptime from the previous epoch
 )
 
 var (
