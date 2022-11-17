@@ -155,13 +155,9 @@ func (v *validatorSet) populateVotingPower() {
 
 // calculateQuorum calculates quorum size for given voting power map
 func (v *validatorSet) calculateQuorum() error {
-	totalVotingPower := uint64(0)
-	for _, v := range v.votingPowerMap {
-		totalVotingPower += v
-	}
-
-	if totalVotingPower == 0 {
-		return errInvalidTotalVotingPower
+	totalVotingPower, err := v.TotalVotingPower()
+	if err != nil {
+		return err
 	}
 
 	// quorum size is calculated as 2/3 supermajority
@@ -247,6 +243,10 @@ func (v *validatorSet) TotalVotingPower() (int64, error) {
 		if err != nil {
 			return 0, fmt.Errorf("cannot update total voting power: %w", err)
 		}
+	}
+
+	if v.totalVotingPower == 0 {
+		return 0, errInvalidTotalVotingPower
 	}
 
 	return v.totalVotingPower, nil
