@@ -65,6 +65,7 @@ func TestStackOverflow(t *testing.T) {
 	s.reset()
 	s.code = code.buf
 	s.gas = 10000
+	s.host = &mockHost{}
 
 	_, err = s.Run()
 	assert.Equal(t, errStackOverflow, err)
@@ -85,6 +86,7 @@ func TestStackUnderflow(t *testing.T) {
 
 	s.code = code.buf
 	s.gas = 10000
+	s.host = &mockHost{}
 
 	_, err := s.Run()
 	assert.NoError(t, err)
@@ -94,6 +96,7 @@ func TestStackUnderflow(t *testing.T) {
 	s.reset()
 	s.code = code.buf
 	s.gas = 10000
+	s.host = &mockHost{}
 
 	_, err = s.Run()
 	assert.Equal(t, errStackUnderflow, err)
@@ -105,6 +108,7 @@ func TestOpcodeNotFound(t *testing.T) {
 
 	s.code = []byte{0xA5}
 	s.gas = 1000
+	s.host = &mockHost{}
 
 	_, err := s.Run()
 	assert.Equal(t, errOpCodeNotFound, err)

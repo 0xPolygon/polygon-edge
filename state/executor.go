@@ -798,7 +798,7 @@ func (t *Transition) SetTracer(tracer tracer.Tracer) {
 }
 
 // GetTracer returns a tracer in context
-func (t *Transition) GetTracer() tracer.Tracer {
+func (t *Transition) GetTracer() runtime.VMTracer {
 	return t.ctx.Tracer
 }
 

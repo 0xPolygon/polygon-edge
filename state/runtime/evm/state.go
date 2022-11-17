@@ -99,6 +99,7 @@ func (c *state) reset() {
 		c.memory[i] = 0
 	}
 
+	c.stack = c.stack[:0]
 	c.tmp = c.tmp[:0]
 	c.ret = c.ret[:0]
 	c.code = c.code[:0]

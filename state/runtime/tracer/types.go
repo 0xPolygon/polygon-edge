@@ -48,11 +48,8 @@ type Tracer interface {
 
 	// Op-level
 	CaptureState(
-		// memory
 		memory []byte,
-		// stack
 		stack []*big.Int,
-		// storage
 		opCode int,
 		contractAddress types.Address,
 		sp int,
