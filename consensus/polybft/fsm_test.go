@@ -1245,58 +1245,62 @@ func TestFSM_VerifyStateTransaction_ValidBothTypesOfStateTransactions(t *testing
 	commitments[0], commitmentMessages[0], stateSyncs[0] = buildCommitmentAndStateSyncs(t, 10, uint64(3), uint64(1), 2)
 	commitments[1], commitmentMessages[1], stateSyncs[1] = buildCommitmentAndStateSyncs(t, 10, uint64(3), uint64(1), 12)
 
-	for i, x := range commitmentMessages {
-		// add register commitment state transaction
-		hash, err := x.Hash()
-		require.NoError(t, err)
-		signature := createSignature(t, validators.getPrivateIdentities("A", "B", "C"), hash)
-		signedCommitments[i] = &CommitmentMessageSigned{
-			Message:      x,
-			AggSignature: *signature,
-		}
-	}
-
-	f := &fsm{
-		isEndOfSprint:              true,
-		config:                     &PolyBFTConfig{},
-		validators:                 validators.toValidatorSetWithError(t),
-		commitmentsToVerifyBundles: signedCommitments[:],
-		stateSyncExecutionIndex:    commitmentMessages[0].FromIndex,
-	}
-
-	var txns []*types.Transaction
-
-	for i, x := range commitmentMessages {
-		inputData, err := signedCommitments[i].EncodeAbi()
-		require.NoError(t, err)
-
-		if i == 0 {
-			tx := createStateTransactionWithData(f.config.StateReceiverAddr, inputData)
-			txns = append(txns, tx)
-		}
-
-		// add execute bundle state transactions
-		end := x.BundlesCount()
-		if i == 1 {
-			end -= 2
-		}
-
-		for idx := uint64(0); idx < end; idx++ {
-			proof := commitments[i].MerkleTree.GenerateProof(idx, 0)
-			bf := &BundleProof{
-				Proof:      proof,
-				StateSyncs: stateSyncs[i][idx : idx+1],
+	executeForValidators := func(aliases ...string) error {
+		for i, x := range commitmentMessages {
+			// add register commitment state transaction
+			hash, err := x.Hash()
+			require.NoError(t, err)
+			signature := createSignature(t, validators.getPrivateIdentities(aliases...), hash)
+			signedCommitments[i] = &CommitmentMessageSigned{
+				Message:      x,
+				AggSignature: *signature,
 			}
-			inputData, err := bf.EncodeAbi()
+		}
+
+		f := &fsm{
+			isEndOfSprint:              true,
+			config:                     &PolyBFTConfig{},
+			validators:                 validators.toValidatorSetWithError(t),
+			commitmentsToVerifyBundles: signedCommitments[:],
+			stateSyncExecutionIndex:    commitmentMessages[0].FromIndex,
+		}
+
+		var txns []*types.Transaction
+
+		for i, x := range commitmentMessages {
+			inputData, err := signedCommitments[i].EncodeAbi()
 			require.NoError(t, err)
 
-			txns = append(txns,
-				createStateTransactionWithData(f.config.StateReceiverAddr, inputData))
+			if i == 0 {
+				tx := createStateTransactionWithData(f.config.StateReceiverAddr, inputData)
+				txns = append(txns, tx)
+			}
+
+			// add execute bundle state transactions
+			end := x.BundlesCount()
+			if i == 1 {
+				end -= 2
+			}
+
+			for idx := uint64(0); idx < end; idx++ {
+				proof := commitments[i].MerkleTree.GenerateProof(idx, 0)
+				bf := &BundleProof{
+					Proof:      proof,
+					StateSyncs: stateSyncs[i][idx : idx+1],
+				}
+				inputData, err := bf.EncodeAbi()
+				require.NoError(t, err)
+
+				txns = append(txns,
+					createStateTransactionWithData(f.config.StateReceiverAddr, inputData))
+			}
 		}
+
+		return f.VerifyStateTransactions(txns)
 	}
 
-	err := f.VerifyStateTransactions(txns)
-	require.NoError(t, err)
+	assert.NoError(t, executeForValidators("A", "B", "C", "D"))
+	assert.ErrorContains(t, executeForValidators("A", "B", "C"), "quorum size not reached for state tx")
 }
 
 func TestFSM_VerifyStateTransaction_InvalidTypeOfStateTransactions(t *testing.T) {
