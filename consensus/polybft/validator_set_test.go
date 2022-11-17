@@ -494,6 +494,83 @@ func TestUpdatesForNewValidatorSet(t *testing.T) {
 	verifyValidatorSet(t, valSet)
 }
 
+func TestValidatorSet_HasQuorum(t *testing.T) {
+	t.Parallel()
+
+	t.Run("BFT conditions met", func(t *testing.T) {
+		t.Parallel()
+		// enough signers for quorum (2/3 super-majority of validators are signers)
+		validators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F", "G"})
+		vs, err := validators.toValidatorSet()
+		require.NoError(t, err)
+
+		signers := []types.Address{}
+		validators.iterAcct([]string{"A", "B", "C", "D", "E"}, func(v *testValidator) {
+			signers = append(signers, v.Address())
+		})
+
+		require.True(t, vs.HasQuorum(signers))
+
+		// not enough signers for quorum (less than 2/3 super-majority of validators are signers)
+		signers = []types.Address{}
+		validators.iterAcct([]string{"A", "B", "C", "D"}, func(v *testValidator) {
+			signers = append(signers, v.Address())
+		})
+		require.False(t, vs.HasQuorum(signers))
+	})
+
+	t.Run("BFT conditions aren't met", func(t *testing.T) {
+		t.Parallel()
+		validators := newTestValidatorsWithAliases([]string{"A", "B", "C"})
+		vs, err := validators.toValidatorSet()
+		require.NoError(t, err)
+
+		// BFT conditions aren't met (less than 5 validators)
+		// in order to have a quorum satisfied, all the validators need to be among signers
+		signers := []types.Address{}
+		validators.iterAcct([]string{"A", "B", "C"}, func(v *testValidator) {
+			signers = append(signers, v.Address())
+		})
+		require.True(t, vs.HasQuorum(signers))
+
+		// not entire validator set are among signers, quorum isn't satisfied
+		signers = []types.Address{}
+		validators.iterAcct([]string{"A", "B"}, func(v *testValidator) {
+			signers = append(signers, v.Address())
+		})
+		require.False(t, vs.HasQuorum(signers))
+	})
+}
+
+func TestValidatorSet_HasQuorumWithoutProposer(t *testing.T) {
+	t.Parallel()
+
+	validators := newTestValidatorsWithAliases([]string{"A", "B", "C"})
+	vs, err := validators.toValidatorSet()
+	require.NoError(t, err)
+
+	_, err = vs.CalcProposer(0)
+	require.NoError(t, err)
+
+	// BFT conditions aren't met (less than 5 validators)
+	// in order to have a quorum satisfied, all the validators need to be among signers
+	signers := []types.Address{}
+
+	validators.iterAcct([]string{"B", "C"}, func(v *testValidator) {
+		signers = append(signers, v.Address())
+	})
+	require.True(t, vs.HasQuorumWithoutProposer(signers))
+
+	// no quorum, since only a single validator is signed
+	// (it doesn't have enough voting power, even when proposer voting power is subtracted from quorum size)
+	signers = []types.Address{}
+
+	validators.iterAcct([]string{"B"}, func(v *testValidator) {
+		signers = append(signers, v.Address())
+	})
+	require.False(t, vs.HasQuorumWithoutProposer(signers))
+}
+
 func verifyValidatorSet(t *testing.T, valSet *validatorSet) {
 	t.Helper()
 	// verify that the capacity and length of validators is the same

@@ -170,7 +170,7 @@ func (v *validatorSet) calculateQuorum() error {
 	if v.calcMaxFaultyNodes() == 0 {
 		v.quorumSize = totalVotingPower
 	} else {
-		v.quorumSize = uint64(math.Ceil(float64((2 * totalVotingPower) / 3)))
+		v.quorumSize = uint64(math.Ceil((2 * float64(totalVotingPower)) / 3))
 	}
 
 	v.logger.Debug("calculateQuorum", "quorum", v.quorumSize, "voting powers map", v.votingPowerMap)
@@ -363,22 +363,22 @@ func (v *validatorSet) rescalePriorities(diffMax int64) error {
 // HasQuorum determines if there is quorum of enough signers reached,
 // based on its voting power and quorum size
 func (v *validatorSet) HasQuorum(signers []types.Address) bool {
-	votingPower := v.calculateVotingPower(signers)
-	v.logger.Debug("HasQuorum", "voting power", votingPower, "quorum", v.quorumSize,
-		"hasQuorum", votingPower >= v.quorumSize)
+	signersVotingPower := v.calculateVotingPower(signers)
+	v.logger.Debug("HasQuorum", "signers voting power", signersVotingPower, "quorum", v.quorumSize,
+		"hasQuorum", signersVotingPower >= v.quorumSize)
 
-	return votingPower >= v.quorumSize
+	return signersVotingPower >= v.quorumSize
 }
 
 // checks if submitted signers have reached prepare quorum
 func (v *validatorSet) HasQuorumWithoutProposer(signers []types.Address) bool {
-	votingPower := v.calculateVotingPower(signers)
-	v.logger.Debug("HasQuorumWithoutProposer", "voting power", votingPower, "quorum", v.quorumSize,
-		"hasQuorum", votingPower >= v.quorumSize-1)
+	signersVotingPower := v.calculateVotingPower(signers)
+	proposerVotingPower := v.votingPowerMap[v.proposer.Metadata.Address]
+	hasQuorum := signersVotingPower >= v.quorumSize-proposerVotingPower
+	v.logger.Debug("HasQuorumWithoutProposer", "signers voting power", signersVotingPower, "quorum", v.quorumSize,
+		"hasQuorum", hasQuorum)
 
-	proposerVP := v.votingPowerMap[v.proposer.Metadata.Address]
-
-	return votingPower >= v.quorumSize-proposerVP
+	return hasQuorum
 }
 
 // calcMaxFaultyNodes calculates maximum faulty nodes in order to have Byzantine fault tollerant properties
