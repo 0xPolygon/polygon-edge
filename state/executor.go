@@ -875,7 +875,6 @@ func (t *Transition) captureCallEnd(c *runtime.Contract, result *runtime.Executi
 	t.ctx.Tracer.CallEnd(
 		c.Depth,
 		result.ReturnValue,
-		result.GasUsed,
 		result.Err,
 	)
 }

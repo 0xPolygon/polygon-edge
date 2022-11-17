@@ -412,11 +412,10 @@ func (c *state) captureSuccessfulExecution(
 
 	tracer.ExecuteState(
 		c.msg.Address,
-		c.ip,
+		uint64(c.ip),
 		opCode,
 		gas,
 		c.currentConsumedGas,
-		// TODO: copy
 		c.returnData,
 		c.msg.Depth,
 		c.err,
@@ -437,7 +436,7 @@ func (c *state) captureExecutionError(
 
 	tracer.ExecuteState(
 		c.msg.Address,
-		ip,
+		uint64(ip),
 		opCode,
 		gas,
 		c.currentConsumedGas,

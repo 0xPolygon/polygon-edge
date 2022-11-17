@@ -77,6 +77,8 @@ func (t *StructTracer) cancelled() bool {
 }
 
 func (t *StructTracer) Clear() {
+	t.reason = nil
+	t.interrupt = 0
 	t.logs = t.logs[:0]
 	t.gasLimit = 0
 	t.consumedGas = 0
@@ -108,7 +110,6 @@ func (t *StructTracer) CallStart(
 func (t *StructTracer) CallEnd(
 	depth int,
 	output []byte,
-	_gasUsed uint64,
 	err error,
 ) {
 	if depth == 1 {
@@ -183,10 +184,16 @@ func (t *StructTracer) captureStorage(
 		return
 	}
 
+	_, inited := t.storage[contractAddress]
+
 	switch opCode {
 	case evm.SLOAD:
 		if sp < 1 {
-			break
+			return
+		}
+
+		if !inited {
+			t.storage[contractAddress] = make(map[types.Hash]types.Hash)
 		}
 
 		slot := types.BytesToHash(stack[sp-1].Bytes())
@@ -196,7 +203,11 @@ func (t *StructTracer) captureStorage(
 
 	case evm.SSTORE:
 		if sp < 2 {
-			break
+			return
+		}
+
+		if !inited {
+			t.storage[contractAddress] = make(map[types.Hash]types.Hash)
 		}
 
 		slot := types.BytesToHash(stack[sp-2].Bytes())
@@ -208,7 +219,7 @@ func (t *StructTracer) captureStorage(
 
 func (t *StructTracer) ExecuteState(
 	contractAddress types.Address,
-	ip int,
+	ip uint64,
 	opCode string,
 	availableGas uint64,
 	cost uint64,
@@ -226,16 +237,24 @@ func (t *StructTracer) ExecuteState(
 	)
 
 	if t.Config.EnableMemory {
-		memory = t.currentMemory
-		memorySize = len(memory)
+		memorySize = len(t.currentMemory)
+
+		memory = make([]byte, memorySize)
+		copy(memory, t.currentMemory)
 	}
 
 	if t.Config.EnableStack {
-		stack = t.currentStack
+		stack = make([]*big.Int, len(t.currentStack))
+
+		for i, v := range t.currentStack {
+			stack[i] = new(big.Int).Set(v)
+		}
 	}
 
 	if t.Config.EnableReturnData {
-		returnData = lastReturnData
+		returnData = make([]byte, len(lastReturnData))
+
+		copy(returnData, lastReturnData)
 	}
 
 	if t.Config.EnableStorage {
@@ -252,7 +271,7 @@ func (t *StructTracer) ExecuteState(
 	t.logs = append(
 		t.logs,
 		StructLog{
-			Pc:            uint64(ip),
+			Pc:            ip,
 			Op:            opCode,
 			Gas:           availableGas,
 			GasCost:       cost,
@@ -276,16 +295,16 @@ type StructTraceResult struct {
 }
 
 type StructLogRes struct {
-	Pc            uint64             `json:"pc"`
-	Op            string             `json:"op"`
-	Gas           uint64             `json:"gas"`
-	GasCost       uint64             `json:"gasCost"`
-	Depth         int                `json:"depth"`
-	Error         string             `json:"error,omitempty"`
-	Stack         *[]string          `json:"stack,omitempty"`
-	Memory        *[]string          `json:"memory,omitempty"`
-	Storage       *map[string]string `json:"storage,omitempty"`
-	RefundCounter uint64             `json:"refund,omitempty"`
+	Pc            uint64            `json:"pc"`
+	Op            string            `json:"op"`
+	Gas           uint64            `json:"gas"`
+	GasCost       uint64            `json:"gasCost"`
+	Depth         int               `json:"depth"`
+	Error         string            `json:"error,omitempty"`
+	Stack         []string          `json:"stack,omitempty"`
+	Memory        []string          `json:"memory,omitempty"`
+	Storage       map[string]string `json:"storage,omitempty"`
+	RefundCounter uint64            `json:"refund,omitempty"`
 }
 
 func (t *StructTracer) GetResult() (interface{}, error) {
@@ -329,25 +348,25 @@ func formatStructLogs(originalLogs []StructLog) []StructLogRes {
 				stack[i] = hex.EncodeBig(value)
 			}
 
-			res[index].Stack = &stack
+			res[index].Stack = stack
 		}
 
 		if log.Memory != nil {
 			memory := make([]string, 0, (len(log.Memory)+31)/32)
 			for i := 0; i+32 <= len(log.Memory); i += 32 {
-				memory = append(memory, fmt.Sprintf("%x", log.Memory[i:i+32]))
+				memory = append(memory, hex.EncodeToString(log.Memory[i:i+32]))
 			}
 
-			res[index].Memory = &memory
+			res[index].Memory = memory
 		}
 
 		if log.Storage != nil {
 			storage := make(map[string]string)
 			for i, storageValue := range log.Storage {
-				storage[fmt.Sprintf("%x", i)] = fmt.Sprintf("%x", storageValue)
+				storage[hex.EncodeToString(i.Bytes())] = hex.EncodeToString(storageValue.Bytes())
 			}
 
-			res[index].Storage = &storage
+			res[index].Storage = storage
 		}
 	}
 

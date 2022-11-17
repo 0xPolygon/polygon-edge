@@ -43,7 +43,6 @@ type Tracer interface {
 	CallEnd(
 		depth int, // begins from 1
 		output []byte,
-		gasUsed uint64,
 		err error,
 	)
 
@@ -62,11 +61,10 @@ type Tracer interface {
 	)
 	ExecuteState(
 		contractAddress types.Address,
-		ip int,
+		ip uint64,
 		opcode string,
 		availableGas uint64,
 		cost uint64,
-		// TODO: add context
 		lastReturnData []byte,
 		depth int,
 		err error,
