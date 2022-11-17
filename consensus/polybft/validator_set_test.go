@@ -497,49 +497,26 @@ func TestUpdatesForNewValidatorSet(t *testing.T) {
 func TestValidatorSet_HasQuorum(t *testing.T) {
 	t.Parallel()
 
-	t.Run("BFT conditions met", func(t *testing.T) {
-		t.Parallel()
-		// enough signers for quorum (2/3 super-majority of validators are signers)
-		validators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F", "G"})
-		vs, err := validators.toValidatorSet()
-		require.NoError(t, err)
+	// enough signers for quorum (2/3 super-majority of validators are signers)
+	validators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F", "G"})
+	vs, err := validators.toValidatorSet()
+	require.NoError(t, err)
 
-		signers := []types.Address{}
-		validators.iterAcct([]string{"A", "B", "C", "D", "E"}, func(v *testValidator) {
-			signers = append(signers, v.Address())
-		})
+	signers := []types.Address{}
 
-		require.True(t, vs.HasQuorum(signers))
-
-		// not enough signers for quorum (less than 2/3 super-majority of validators are signers)
-		signers = []types.Address{}
-		validators.iterAcct([]string{"A", "B", "C", "D"}, func(v *testValidator) {
-			signers = append(signers, v.Address())
-		})
-		require.False(t, vs.HasQuorum(signers))
+	validators.iterAcct([]string{"A", "B", "C", "D", "E"}, func(v *testValidator) {
+		signers = append(signers, v.Address())
 	})
 
-	t.Run("BFT conditions aren't met", func(t *testing.T) {
-		t.Parallel()
-		validators := newTestValidatorsWithAliases([]string{"A", "B", "C"})
-		vs, err := validators.toValidatorSet()
-		require.NoError(t, err)
+	require.True(t, vs.HasQuorum(signers))
 
-		// BFT conditions aren't met (less than 5 validators)
-		// in order to have a quorum satisfied, all the validators need to be among signers
-		signers := []types.Address{}
-		validators.iterAcct([]string{"A", "B", "C"}, func(v *testValidator) {
-			signers = append(signers, v.Address())
-		})
-		require.True(t, vs.HasQuorum(signers))
+	// not enough signers for quorum (less than 2/3 super-majority of validators are signers)
+	signers = []types.Address{}
 
-		// not entire validator set are among signers, quorum isn't satisfied
-		signers = []types.Address{}
-		validators.iterAcct([]string{"A", "B"}, func(v *testValidator) {
-			signers = append(signers, v.Address())
-		})
-		require.False(t, vs.HasQuorum(signers))
+	validators.iterAcct([]string{"A", "B", "C", "D"}, func(v *testValidator) {
+		signers = append(signers, v.Address())
 	})
+	require.False(t, vs.HasQuorum(signers))
 }
 
 func TestValidatorSet_HasQuorumWithoutProposer(t *testing.T) {

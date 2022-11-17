@@ -164,15 +164,8 @@ func (v *validatorSet) calculateQuorum() error {
 		return errInvalidTotalVotingPower
 	}
 
-	// If there cannot be faulty nodes (less than 4 nodes in the network),
-	// then quorum size is determined as total voting power (namely all the nodes must send vote).
-	// Otherwise quorum size is calculated as 2/3 supermajority
-	if v.calcMaxFaultyNodes() == 0 {
-		v.quorumSize = totalVotingPower
-	} else {
-		v.quorumSize = uint64(math.Ceil((2 * float64(totalVotingPower)) / 3))
-	}
-
+	// quorum size is calculated as 2/3 supermajority
+	v.quorumSize = uint64(math.Ceil((2 * float64(totalVotingPower)) / 3))
 	v.logger.Debug("calculateQuorum", "quorum", v.quorumSize, "voting powers map", v.votingPowerMap)
 
 	return nil
@@ -379,11 +372,6 @@ func (v *validatorSet) HasQuorumWithoutProposer(signers []types.Address) bool {
 		"hasQuorum", hasQuorum)
 
 	return hasQuorum
-}
-
-// calcMaxFaultyNodes calculates maximum faulty nodes in order to have Byzantine fault tollerant properties
-func (v validatorSet) calcMaxFaultyNodes() uint64 {
-	return uint64((v.Len() - 1) / 3)
 }
 
 // calculateVotingPower calculates voting power for provided validator ids
