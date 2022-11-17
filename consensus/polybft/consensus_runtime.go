@@ -1105,11 +1105,10 @@ func (c *consensusRuntime) HasQuorum(
 		return false
 	}
 
-	// extract the addresses of all the senders of the messages
-	senders := make([]types.Address, len(messages))
-
+	// extract the addresses of all the signers of the messages
+	signers := make([]types.Address, len(messages))
 	for i, message := range messages {
-		senders[i] = types.BytesToAddress(message.From)
+		signers[i] = types.BytesToAddress(message.From)
 	}
 
 	// check quorum
@@ -1117,9 +1116,9 @@ func (c *consensusRuntime) HasQuorum(
 	case proto.MessageType_PREPREPARE:
 		return len(messages) >= 0
 	case proto.MessageType_PREPARE:
-		return c.fsm.validators.HasQuorumWithoutProposer(senders)
+		return c.fsm.validators.HasQuorumWithoutProposer(signers)
 	case proto.MessageType_ROUND_CHANGE, proto.MessageType_COMMIT:
-		return c.fsm.validators.HasQuorum(senders)
+		return c.fsm.validators.HasQuorum(signers)
 	default:
 		return false
 	}
