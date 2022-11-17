@@ -177,16 +177,19 @@ func TestBlock_Encoding(t *testing.T) {
 		testBlock("testsuite/block-empty.json")
 	})
 
-	t.Run("block with transactions", func(t *testing.T) {
+	t.Run("block with transaction hashes", func(t *testing.T) {
 		b.Transactions = []transactionOrHash{
 			transactionHash{0x8},
 		}
 		testBlock("testsuite/block-with-txn-hashes.json")
 	})
 
-	t.Run("block with transactions", func(t *testing.T) {
+	t.Run("block with transaction bodies", func(t *testing.T) {
 		// TODO: do the same tests for the transaction object and enable this test
-		t.Skip("TODO")
+		b.Transactions = []transactionOrHash{
+			mockTxn(),
+		}
+		testBlock("testsuite/block-with-txn-bodies.json")
 	})
 }
 
@@ -197,4 +200,54 @@ func removeWhiteSpace(d []byte) []byte {
 	s = strings.Replace(s, " ", "", -1)
 
 	return []byte(s)
+}
+
+func mockTxn() *transaction {
+	to := types.Address{}
+
+	tt := &transaction{
+		Nonce:       1,
+		GasPrice:    argBig(*big.NewInt(10)),
+		Gas:         100,
+		To:          &to,
+		Value:       argBig(*big.NewInt(1000)),
+		Input:       []byte{0x1, 0x2},
+		V:           argBig(*big.NewInt(1)),
+		R:           argBig(*big.NewInt(2)),
+		S:           argBig(*big.NewInt(3)),
+		Hash:        types.Hash{0x2},
+		From:        types.Address{0x3},
+		BlockHash:   &types.ZeroHash,
+		BlockNumber: argUintPtr(1),
+		TxIndex:     argUintPtr(2),
+	}
+
+	return tt
+}
+
+func TestTransaction_Encoding(t *testing.T) {
+	tt := mockTxn()
+
+	testTransaction := func(name string) {
+		res, err := json.Marshal(tt)
+		require.NoError(t, err)
+
+		data, err := testsuite.ReadFile(name)
+		require.NoError(t, err)
+
+		data = removeWhiteSpace(data)
+		require.Equal(t, res, data)
+	}
+
+	t.Run("sealed", func(t *testing.T) {
+		testTransaction("testsuite/transaction-sealed.json")
+	})
+
+	t.Run("pending", func(t *testing.T) {
+		tt.BlockHash = nil
+		tt.BlockNumber = nil
+		tt.TxIndex = nil
+
+		testTransaction("testsuite/transaction-pending.json")
+	})
 }
