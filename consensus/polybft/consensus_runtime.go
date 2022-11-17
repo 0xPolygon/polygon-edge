@@ -1114,12 +1114,14 @@ func (c *consensusRuntime) HasQuorum(
 
 	// check quorum
 	switch msgType {
-	default: // proto.MessageType_PREPREPARE etc
-		return true
+	case proto.MessageType_PREPREPARE:
+		return len(messages) >= 0
 	case proto.MessageType_PREPARE:
 		return c.fsm.validators.HasQuorumWithoutProposer(senders)
 	case proto.MessageType_ROUND_CHANGE, proto.MessageType_COMMIT:
 		return c.fsm.validators.HasQuorum(senders)
+	default:
+		return false
 	}
 }
 

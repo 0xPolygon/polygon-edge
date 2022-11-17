@@ -88,10 +88,10 @@ type ValidatorSet interface {
 	// IncrementProposerPriority increments priorities number of times
 	IncrementProposerPriority(times uint64) error
 
-	// checks if submitted signers have reached quorum
+	// checks if signers have reached quorum
 	HasQuorum(signers []types.Address) bool
 
-	// checks if submitted signers have reached prepare quorum
+	// checks if submitted signers have reached quorum without proposer voting power
 	HasQuorumWithoutProposer(signers []types.Address) bool
 }
 
