@@ -40,6 +40,8 @@ const (
 	defaultBridge                     = false
 
 	bootnodePortStart = 30301
+
+	WeiScalingFactor = 1_000_000_000_000_000_000 // 10^18
 )
 
 func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
@@ -284,14 +286,18 @@ func generateExtraDataPolyBft(validators []*polybft.Validator, publicKeys []*bls
 
 	for i, validator := range validators {
 		delta.Added[i] = &polybft.ValidatorMetadata{
-			Address: validator.Address,
-			BlsKey:  publicKeys[i],
-			// convert from wei to token amount (voting power == tokens amount)
-			VotingPower: validator.Balance.Div(validator.Balance, big.NewInt(polybft.WeiScalingFactor)).Uint64(),
+			Address:     validator.Address,
+			BlsKey:      publicKeys[i],
+			VotingPower: convertWeiToTokensAmount(validator.Balance).Uint64(),
 		}
 	}
 
 	extra := polybft.Extra{Validators: delta}
 
 	return append(make([]byte, polybft.ExtraVanity), extra.MarshalRLPTo(nil)...), nil
+}
+
+// convertWeiToTokensAmount converts provided wei balance to tokens amount
+func convertWeiToTokensAmount(weiBalance *big.Int) *big.Int {
+	return weiBalance.Div(weiBalance, big.NewInt(WeiScalingFactor))
 }
