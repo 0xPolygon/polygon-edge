@@ -14,155 +14,79 @@ import (
 func TestValSetIndex(t *testing.T) {
 	t.Parallel()
 
-	keys, err := bls.CreateRandomBlsKeys(5)
-	require.NoError(t, err)
-
-	addresses := []types.Address{{0x10}, {0x52}, {0x33}, {0x74}, {0x60}}
-
-	vs, err := NewValidatorSet([]*ValidatorMetadata{
-		{
-			BlsKey:      keys[0].PublicKey(),
-			Address:     addresses[0],
-			VotingPower: 10,
-		},
-		{
-			BlsKey:      keys[1].PublicKey(),
-			Address:     addresses[1],
-			VotingPower: 100,
-		},
-		{
-			BlsKey:      keys[2].PublicKey(),
-			Address:     addresses[2],
-			VotingPower: 1,
-		},
-		{
-			BlsKey:      keys[3].PublicKey(),
-			Address:     addresses[3],
-			VotingPower: 50,
-		},
-		{
-			BlsKey:      keys[4].PublicKey(),
-			Address:     addresses[4],
-			VotingPower: 30,
-		},
-	})
-	require.NoError(t, err)
+	validators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E"}, []uint64{10, 100, 1, 50, 30})
+	metadata := validators.getPublicIdentities()
+	vs := validators.toValidatorSetWithError(t)
 	// validate no changes to validator set positions
 	for i, v := range vs.Accounts() {
-		assert.Equal(t, addresses[i], v.Address)
+		assert.Equal(t, metadata[i].Address, v.Address)
 	}
 
 	proposer, err := vs.CalcProposer(0)
 	require.NoError(t, err)
-	assert.Equal(t, proposer, addresses[1])
-
+	assert.Equal(t, proposer, metadata[1].Address)
 	// validate no changes to validator set positions
 	for i, v := range vs.Accounts() {
-		assert.Equal(t, addresses[i], v.Address)
+		assert.Equal(t, metadata[i].Address, v.Address)
 	}
 }
 
 func TestCalculateProposer(t *testing.T) {
 	t.Parallel()
 
-	keys, err := bls.CreateRandomBlsKeys(5)
-	require.NoError(t, err)
+	validators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E"}, []uint64{1, 2, 3, 4, 5})
+	metadata := validators.getPublicIdentities()
+	vs := validators.toValidatorSetWithError(t)
 
-	vs, err := NewValidatorSet([]*ValidatorMetadata{
-		{
-			BlsKey:      keys[0].PublicKey(),
-			Address:     types.Address{0x1},
-			VotingPower: 1,
-		},
-		{
-			BlsKey:      keys[1].PublicKey(),
-			Address:     types.Address{0x2},
-			VotingPower: 2,
-		},
-		{
-			BlsKey:      keys[2].PublicKey(),
-			Address:     types.Address{0x3},
-			VotingPower: 3,
-		},
-		{
-			BlsKey:      keys[3].PublicKey(),
-			Address:     types.Address{0x4},
-			VotingPower: 4,
-		},
-		{
-			BlsKey:      keys[4].PublicKey(),
-			Address:     types.Address{0x5},
-			VotingPower: 5,
-		},
-	})
-	require.NoError(t, err)
 	assert.Equal(t, int64(15), vs.totalVotingPower)
 
 	currProposerAddress, err := vs.CalcProposer(0)
 	require.NoError(t, err)
-	assert.Equal(t, types.Address{0x5}, currProposerAddress)
+	assert.Equal(t, metadata[4].Address, currProposerAddress)
 
 	proposerAddressR1, err := vs.CalcProposer(1)
 	require.NoError(t, err)
-	assert.Equal(t, types.Address{0x4}, proposerAddressR1)
+	assert.Equal(t, metadata[3].Address, proposerAddressR1)
 
 	proposerAddressR2, err := vs.CalcProposer(2)
 	require.NoError(t, err)
-	assert.Equal(t, types.Address{0x3}, proposerAddressR2)
+	assert.Equal(t, metadata[2].Address, proposerAddressR2)
 
 	proposerAddressR3, err := vs.CalcProposer(3)
 	require.NoError(t, err)
-	assert.Equal(t, types.Address{0x2}, proposerAddressR3)
+	assert.Equal(t, metadata[1].Address, proposerAddressR3)
 
 	proposerAddressR4, err := vs.CalcProposer(4)
 	require.NoError(t, err)
-	assert.Equal(t, types.Address{0x5}, proposerAddressR4)
+	assert.Equal(t, metadata[4].Address, proposerAddressR4)
 
 	proposerAddressR5, err := vs.CalcProposer(5)
 	require.NoError(t, err)
-	assert.Equal(t, types.Address{0x4}, proposerAddressR5)
+	assert.Equal(t, metadata[3].Address, proposerAddressR5)
 
 	proposerAddressR6, err := vs.CalcProposer(6)
 	require.NoError(t, err)
-	assert.Equal(t, types.Address{0x1}, proposerAddressR6)
+	assert.Equal(t, metadata[0].Address, proposerAddressR6)
 }
 
 func TestCalcProposer(t *testing.T) {
 	t.Parallel()
 
-	keys, err := bls.CreateRandomBlsKeys(5)
-	require.NoError(t, err)
-
-	vs, err := NewValidatorSet([]*ValidatorMetadata{
-		{
-			BlsKey:      keys[0].PublicKey(),
-			Address:     types.Address{0x1},
-			VotingPower: 1,
-		},
-		{
-			BlsKey:      keys[1].PublicKey(),
-			Address:     types.Address{0x2},
-			VotingPower: 2,
-		},
-		{
-			BlsKey:      keys[2].PublicKey(),
-			Address:     types.Address{0x3},
-			VotingPower: 3,
-		},
-	})
-	require.NoError(t, err)
+	validators := newTestValidatorsWithAliases([]string{"A", "B", "C"}, []uint64{1, 2, 3})
+	metadata := validators.getPublicIdentities()
+	vs := validators.toValidatorSetWithError(t)
 
 	proposerR0, err := vs.CalcProposer(0)
 	require.NoError(t, err)
-	assert.Equal(t, types.Address{0x3}, proposerR0)
+	assert.Equal(t, metadata[2].Address, proposerR0)
 
 	proposerR1, err := vs.CalcProposer(1)
 	require.NoError(t, err)
-	assert.Equal(t, types.Address{0x2}, proposerR1)
+	assert.Equal(t, metadata[1].Address, proposerR1)
 
 	proposerR2, err := vs.CalcProposer(2)
 	require.NoError(t, err)
-	assert.Equal(t, types.Address{0x1}, proposerR2)
+	assert.Equal(t, metadata[0].Address, proposerR2)
 }
 
 func TestProposerSelection1(t *testing.T) {
@@ -218,39 +142,21 @@ func TestProposerSelection1(t *testing.T) {
 func TestIncrementProposerPriorityPositiveTimes(t *testing.T) {
 	t.Parallel()
 
-	keys, err := bls.CreateRandomBlsKeys(3)
-	require.NoError(t, err)
+	validators := newTestValidatorsWithAliases([]string{"A", "B", "C"}, []uint64{1000, 300, 330})
+	metadata := validators.getPublicIdentities()
+	vs := validators.toValidatorSetWithError(t)
 
-	vset, err := NewValidatorSet([]*ValidatorMetadata{
-		{
-			BlsKey:      keys[0].PublicKey(),
-			Address:     types.Address{0x1},
-			VotingPower: 1000,
-		},
-		{
-			BlsKey:      keys[1].PublicKey(),
-			Address:     types.Address{0x2},
-			VotingPower: 300,
-		},
-		{
-			BlsKey:      keys[2].PublicKey(),
-			Address:     types.Address{0x3},
-			VotingPower: 330,
-		},
-	})
-
-	require.NoError(t, err)
-	proposerAddressR0, err := vset.CalcProposer(0)
-	assert.Equal(t, types.Address{0x1}, proposerAddressR0)
+	proposerAddressR0, err := vs.CalcProposer(0)
+	assert.Equal(t, metadata[0].Address, proposerAddressR0)
 
 	// priority must be > 0
-	err = vset.IncrementProposerPriority(0)
+	err = vs.IncrementProposerPriority(0)
 	require.Error(t, err)
 
-	proposerAddressR1, err := vset.CalcProposer(1)
+	proposerAddressR1, err := vs.CalcProposer(1)
 	require.NoError(t, err)
 
-	assert.Equal(t, types.Address{0x3}, proposerAddressR1)
+	assert.Equal(t, metadata[2].Address, proposerAddressR1)
 }
 
 func TestIncrementProposerPrioritySameVotingPower(t *testing.T) {
