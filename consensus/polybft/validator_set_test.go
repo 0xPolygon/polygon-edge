@@ -522,7 +522,7 @@ func TestValidatorSet_HasQuorum(t *testing.T) {
 func TestValidatorSet_HasQuorumWithoutProposer(t *testing.T) {
 	t.Parallel()
 
-	validators := newTestValidatorsWithAliases([]string{"A", "B", "C"})
+	validators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
 	vs, err := validators.toValidatorSet()
 	require.NoError(t, err)
 
@@ -533,7 +533,7 @@ func TestValidatorSet_HasQuorumWithoutProposer(t *testing.T) {
 	// in order to have a quorum satisfied, all the validators need to be among signers
 	signers := []types.Address{}
 
-	validators.iterAcct([]string{"B", "C"}, func(v *testValidator) {
+	validators.iterAcct([]string{"B", "C", "D"}, func(v *testValidator) {
 		signers = append(signers, v.Address())
 	})
 	require.True(t, vs.HasQuorumWithoutProposer(signers))
@@ -542,7 +542,7 @@ func TestValidatorSet_HasQuorumWithoutProposer(t *testing.T) {
 	// (it doesn't have enough voting power, even when proposer voting power is subtracted from quorum size)
 	signers = []types.Address{}
 
-	validators.iterAcct([]string{"B"}, func(v *testValidator) {
+	validators.iterAcct([]string{"B", "C"}, func(v *testValidator) {
 		signers = append(signers, v.Address())
 	})
 	require.False(t, vs.HasQuorumWithoutProposer(signers))
