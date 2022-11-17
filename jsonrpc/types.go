@@ -104,6 +104,19 @@ type block struct {
 	Uncles          []types.Hash        `json:"uncles"`
 }
 
+func (b *block) Copy() *block {
+	bb := new(block)
+	*bb = *b
+
+	bb.Miner = make([]byte, len(b.Miner))
+	copy(bb.Miner[:], b.Miner[:])
+
+	bb.ExtraData = make([]byte, len(b.ExtraData))
+	copy(bb.ExtraData[:], b.ExtraData[:])
+
+	return bb
+}
+
 func toBlock(b *types.Block, fullTx bool) *block {
 	h := b.Header
 	res := &block{
@@ -305,8 +318,8 @@ type txnArgs struct {
 }
 
 type progression struct {
-	Type          string `json:"type"`
-	StartingBlock string `json:"startingBlock"`
-	CurrentBlock  string `json:"currentBlock"`
-	HighestBlock  string `json:"highestBlock"`
+	Type          string    `json:"type"`
+	StartingBlock argUint64 `json:"startingBlock"`
+	CurrentBlock  argUint64 `json:"currentBlock"`
+	HighestBlock  argUint64 `json:"highestBlock"`
 }

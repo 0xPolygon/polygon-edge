@@ -124,7 +124,7 @@ func getPredeployAccount(address types.Address, input, deployedBytecode []byte) 
 	snapshot := st.NewSnapshot()
 
 	// Create a radix
-	radix := state.NewTxn(st, snapshot)
+	radix := state.NewTxn(snapshot)
 
 	// Create the contract object for the EVM
 	contract := runtime.NewContractCreation(
@@ -141,7 +141,7 @@ func getPredeployAccount(address types.Address, input, deployedBytecode []byte) 
 	config := chain.AllForksEnabled.At(0)
 
 	// Create a transition
-	transition := state.NewTransition(config, radix)
+	transition := state.NewTransition(config, snapshot, radix)
 
 	// Run the transition through the EVM
 	res := evm.NewEVM().Run(contract, transition, &config)

@@ -2,6 +2,7 @@ package jsonrpc
 
 import (
 	"bytes"
+	"embed"
 	"encoding/json"
 	"math/big"
 	"reflect"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestBasicTypes_Encode(t *testing.T) {
@@ -124,4 +126,75 @@ func TestToTransaction_Returns_V_R_S_ValuesWithoutLeading0(t *testing.T) {
 	assert.Equal(t, hexWithoutLeading0, string(jsonV))
 	assert.Equal(t, hexWithoutLeading0, string(jsonR))
 	assert.Equal(t, hexWithoutLeading0, string(jsonS))
+}
+
+func TestBlock_Copy(t *testing.T) {
+	b := &block{
+		ExtraData: []byte{0x1},
+		Miner:     []byte{0x2},
+		Uncles:    []types.Hash{{0x0, 0x1}},
+	}
+
+	bb := b.Copy()
+	require.Equal(t, b, bb)
+}
+
+//go:embed testsuite/*
+var testsuite embed.FS
+
+func TestBlock_Encoding(t *testing.T) {
+	b := block{
+		ParentHash:   types.Hash{0x1},
+		Sha3Uncles:   types.Hash{0x2},
+		Miner:        types.Address{0x1}.Bytes(),
+		StateRoot:    types.Hash{0x4},
+		TxRoot:       types.Hash{0x5},
+		ReceiptsRoot: types.Hash{0x6},
+		LogsBloom:    types.Bloom{0x0},
+		Difficulty:   10,
+		Number:       11,
+		GasLimit:     12,
+		GasUsed:      13,
+		Timestamp:    14,
+		ExtraData:    []byte{97, 98, 99, 100, 101, 102},
+		MixHash:      types.Hash{0x7},
+		Nonce:        types.Nonce{10},
+		Hash:         types.Hash{0x8},
+	}
+
+	testBlock := func(name string) {
+		res, err := json.Marshal(b)
+		require.NoError(t, err)
+
+		data, err := testsuite.ReadFile(name)
+		require.NoError(t, err)
+
+		data = removeWhiteSpace(data)
+		require.Equal(t, res, data)
+	}
+
+	t.Run("empty block", func(t *testing.T) {
+		testBlock("testsuite/block-empty.json")
+	})
+
+	t.Run("block with transactions", func(t *testing.T) {
+		b.Transactions = []transactionOrHash{
+			transactionHash{0x8},
+		}
+		testBlock("testsuite/block-with-txn-hashes.json")
+	})
+
+	t.Run("block with transactions", func(t *testing.T) {
+		// TODO: do the same tests for the transaction object and enable this test
+		t.Skip("TODO")
+	})
+}
+
+func removeWhiteSpace(d []byte) []byte {
+	s := string(d)
+	s = strings.Replace(s, "\n", "", -1)
+	s = strings.Replace(s, "\t", "", -1)
+	s = strings.Replace(s, " ", "", -1)
+
+	return []byte(s)
 }

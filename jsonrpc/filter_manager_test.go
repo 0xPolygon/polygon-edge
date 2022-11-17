@@ -3,7 +3,9 @@ package jsonrpc
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math/big"
+	"math/rand"
 	"net"
 	"strconv"
 	"testing"
@@ -508,18 +510,16 @@ func newMockWsConnWithMsgCh() (*mockWsConn, <-chan []byte) {
 	return mock, msgCh
 }
 
-func TestHeadStream(t *testing.T) {
+func TestHeadStream_Basic(t *testing.T) {
 	t.Parallel()
 
-	b := &blockStream{}
+	b := newBlockStream(&block{Hash: types.StringToHash("1")})
+	b.push(&block{Hash: types.StringToHash("2")})
 
-	b.push(&types.Header{Hash: types.StringToHash("1")})
-	b.push(&types.Header{Hash: types.StringToHash("2")})
+	cur := b.getHead()
 
-	cur := b.Head()
-
-	b.push(&types.Header{Hash: types.StringToHash("3")})
-	b.push(&types.Header{Hash: types.StringToHash("4")})
+	b.push(&block{Hash: types.StringToHash("3")})
+	b.push(&block{Hash: types.StringToHash("4")})
 
 	// get the updates, there are two new entries
 	updates, next := cur.getUpdates()
@@ -530,6 +530,70 @@ func TestHeadStream(t *testing.T) {
 	// there are no new entries
 	updates, _ = next.getUpdates()
 	assert.Len(t, updates, 0)
+}
+
+func TestHeadStream_Concurrent(t *testing.T) {
+	t.Parallel()
+
+	nReaders := 20
+	nMessages := 10
+
+	b := newBlockStream(&block{Number: 0})
+
+	// Write co-routine with jitter
+	go func() {
+		seed := time.Now().UnixNano()
+		t.Logf("Using seed %d", seed)
+
+		z := rand.NewZipf(rand.New(rand.NewSource(seed)), 1.5, 1.5, 50)
+
+		for i := 0; i < nMessages; i++ {
+			b.push(&block{Number: argUint64(i)})
+
+			wait := time.Duration(z.Uint64()) * time.Millisecond
+			time.Sleep(wait)
+		}
+	}()
+
+	// Run n subscribers following and verifying
+	errCh := make(chan error, nReaders)
+
+	// All subscribers start from the same point
+	head := b.getHead()
+
+	for i := 0; i < nReaders; i++ {
+		go func(i int) {
+			item := head
+			expect := uint64(0)
+
+			for {
+				blocks, next := item.getUpdates()
+
+				for _, block := range blocks {
+					if num := uint64(block.Number); num != expect {
+						errCh <- fmt.Errorf("subscriber %05d bad event want=%d, got=%d", i, num, expect)
+
+						return
+					}
+					expect++
+
+					if expect == uint64(nMessages) {
+						// Succeeded
+						errCh <- nil
+
+						return
+					}
+				}
+
+				item = next
+			}
+		}(i)
+	}
+
+	for i := 0; i < nReaders; i++ {
+		err := <-errCh
+		assert.NoError(t, err)
+	}
 }
 
 type MockClosedWSConnection struct{}
