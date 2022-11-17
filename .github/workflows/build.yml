@@ -39,9 +39,13 @@ jobs:
           GOARC: amd64
           GOOS: linux
         run: |
-          buildsha1=$(shasum -a256 ./polygon-edge)
+          buildsha1=$(shasum -a256 ./polygon-edge | awk '{print 1}')
           go build -tags netgo -ldflags="-s -w -linkmode external -extldflags "-static" -X \"github.com/0xPolygon/polygon-edge/versioning.Version=${GITHUB_REF_NAME}\" -X \"github.com/0xPolygon/polygon-edge/versioning.Commit=${GITHUB_SHA}\""
-          buildsha2=$(shasum -a256 ./polygon-edge)
+          buildsha2=$(shasum -a256 ./polygon-edge | awk '{print 1}')
+
+          echo "Build 1 SHA: $buildsha1"
+          echo "Build 2 SHA: $buildsha2"
+
           if [ "$buildsha1" != "$buildsha2" ]; then
             echo "Build artifact does not match original"
             exit 1
