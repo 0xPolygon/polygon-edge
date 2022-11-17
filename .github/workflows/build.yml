@@ -30,3 +30,21 @@ jobs:
           name: polygon-edge
           path: polygon-edge.tar.gz
           retention-days: 3
+      
+      - name: 'Verify Build Reproducability'
+        continue-on-error: true
+        env:
+          CC: gcc
+          CXX: g++
+          GOARC: amd64
+          GOOS: linux
+        run: |
+          buildsha1=$(shasum -a256 ./polygon-edge)
+          go build -tags netgo -ldflags="-s -w -linkmode external -extldflags "-static" -X \"github.com/0xPolygon/polygon-edge/versioning.Version=${GITHUB_REF_NAME}\" -X \"github.com/0xPolygon/polygon-edge/versioning.Commit=${GITHUB_SHA}\""
+          buildsha2=$(shasum -a256 ./polygon-edge)
+          if [ "$buildsha1" != "$buildsha2" ]; then
+            echo "Build artifact does not match original"
+            exit 1
+          else
+            echo "Build artifact matches original"
+          fi
