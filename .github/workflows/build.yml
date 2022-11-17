@@ -30,7 +30,7 @@ jobs:
           name: polygon-edge
           path: polygon-edge.tar.gz
           retention-days: 3
-      
+
       - name: 'Verify Build Reproducability'
         continue-on-error: true
         env:
