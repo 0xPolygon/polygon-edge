@@ -423,7 +423,7 @@ func getNumberOfIteration(parent *types.Header, epochNumber uint64, c *consensus
 			return 0, fmt.Errorf("cannot get ibft extra: %w", err)
 		}
 
-		iterationNumber += blockExtra.Round + 1 // because round 0 is one of the iterations
+		iterationNumber += blockExtra.Checkpoint.BlockRound + 1 // because round 0 is one of the iterations
 
 		var found bool
 		currentHeader, found = c.config.blockchain.GetHeaderByNumber(currentHeader.Number - 1)
