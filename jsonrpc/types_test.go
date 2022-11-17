@@ -185,7 +185,6 @@ func TestBlock_Encoding(t *testing.T) {
 	})
 
 	t.Run("block with transaction bodies", func(t *testing.T) {
-		// TODO: do the same tests for the transaction object and enable this test
 		b.Transactions = []transactionOrHash{
 			mockTxn(),
 		}
