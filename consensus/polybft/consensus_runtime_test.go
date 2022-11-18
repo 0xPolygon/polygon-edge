@@ -1946,6 +1946,9 @@ func TestConsensusRuntime_HasQuorum(t *testing.T) {
 	validatorAccounts := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
 
 	extra := &Extra{}
+	extra.Checkpoint = &CheckpointData{}
+	extra.Checkpoint.BlockRound = 0
+
 	lastBuildBlock := &types.Header{
 		Number:    1,
 		ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...),
