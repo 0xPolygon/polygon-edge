@@ -120,7 +120,7 @@ func TestExtra_UnmarshalRLPWith_NegativeCases(t *testing.T) {
 
 		extra := &Extra{}
 		ar := &fastrlp.Arena{}
-		require.ErrorContains(t, extra.UnmarshalRLPWith(ar.NewArray()), "incorrect elements count to decode Extra, expected 6 but found 0")
+		require.ErrorContains(t, extra.UnmarshalRLPWith(ar.NewArray()), "incorrect elements count to decode Extra, expected 5 but found 0")
 	})
 
 	t.Run("Incorrect ValidatorSetDelta marshalled", func(t *testing.T) {
