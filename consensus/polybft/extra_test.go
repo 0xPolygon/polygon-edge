@@ -10,8 +10,6 @@ import (
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/hashicorp/go-hclog"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/fastrlp"
@@ -377,7 +375,7 @@ func TestExtra_CreateValidatorSetDelta_Cases(t *testing.T) {
 			oldValidatorSet := vals.getPublicIdentities(c.oldSet...)
 			newValidatorSet := vals.getPublicIdentities(c.newSet...)
 
-			delta, err := createValidatorSetDelta(hclog.NewNullLogger(), oldValidatorSet, newValidatorSet)
+			delta, err := createValidatorSetDelta(oldValidatorSet, newValidatorSet)
 			require.NoError(t, err)
 
 			// added items
@@ -407,7 +405,7 @@ func TestExtra_CreateValidatorSetDelta_BlsDiffer(t *testing.T) {
 
 	newValidatorSet[0].BlsKey = privateKey.PublicKey()
 
-	_, err = createValidatorSetDelta(hclog.NewNullLogger(), oldValidatorSet, newValidatorSet)
+	_, err = createValidatorSetDelta(oldValidatorSet, newValidatorSet)
 	require.Error(t, err)
 }
 
@@ -481,7 +479,7 @@ func TestValidatorSetDelta_Copy(t *testing.T) {
 
 	oldValidatorSet := newTestValidators(originalValidatorsCount).getPublicIdentities()
 	newValidatorSet := oldValidatorSet[:len(oldValidatorSet)-2]
-	originalDelta, err := createValidatorSetDelta(hclog.NewNullLogger(), oldValidatorSet, newValidatorSet)
+	originalDelta, err := createValidatorSetDelta(oldValidatorSet, newValidatorSet)
 	require.NoError(t, err)
 	require.NotNil(t, originalDelta)
 	require.Empty(t, originalDelta.Added)

@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/hashicorp/go-hclog"
-
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/crypto"
@@ -90,13 +88,15 @@ func (i *Extra) UnmarshalRLP(input []byte) error {
 
 // UnmarshalRLPWith defines the unmarshal implementation for Extra
 func (i *Extra) UnmarshalRLPWith(v *fastrlp.Value) error {
+	const expectedElements = 5
+
 	elems, err := v.GetElems()
 	if err != nil {
 		return err
 	}
 
-	if num := len(elems); num != 5 {
-		return fmt.Errorf("incorrect elements count to decode Extra, expected 5 but found %d", num)
+	if num := len(elems); num != expectedElements {
+		return fmt.Errorf("incorrect elements count to decode Extra, expected %d but found %d", expectedElements, num)
 	}
 
 	// Validators
@@ -142,8 +142,7 @@ func (i *Extra) UnmarshalRLPWith(v *fastrlp.Value) error {
 }
 
 // createValidatorSetDelta calculates ValidatorSetDelta based on the provided old and new validator sets
-func createValidatorSetDelta(log hclog.Logger, oldValidatorSet,
-	newValidatorSet AccountSet) (*ValidatorSetDelta, error) {
+func createValidatorSetDelta(oldValidatorSet, newValidatorSet AccountSet) (*ValidatorSetDelta, error) {
 	var addedValidators AccountSet
 
 	oldValidatorSetMap := make(map[types.Address]*ValidatorMetadata)

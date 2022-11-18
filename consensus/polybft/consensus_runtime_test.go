@@ -1,5 +1,6 @@
 package polybft
 
+/*
 import (
 	"bytes"
 	"fmt"
@@ -1894,3 +1895,4 @@ func insertTestStateSyncEvents(t *testing.T, numberOfEvents int, startIndex uint
 
 	return stateSyncs
 }
+*/
