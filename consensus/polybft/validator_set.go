@@ -379,7 +379,7 @@ func (v validatorSet) calculateVotingPower(signers []types.Address) uint64 {
 	return accumulatedVotingPower
 }
 
-// IsNilOrEmpty returns true if validator set is nil or empty.
+// isNilOrEmpty returns true if validator set is nil or empty.
 func (v *validatorSet) isNilOrEmpty() bool {
 	return v == nil || len(v.validators) == 0
 }
