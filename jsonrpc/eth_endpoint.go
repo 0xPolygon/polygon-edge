@@ -134,14 +134,11 @@ func (e *Eth) Syncing() (interface{}, error) {
 
 func GetNumericBlockNumber(number BlockNumber, e *Eth) (uint64, error) {
 	switch number {
-	case LatestBlockNumber:
+	case LatestBlockNumber, PendingBlockNumber:
 		return e.store.Header().Number, nil
 
 	case EarliestBlockNumber:
 		return 0, nil
-
-	case PendingBlockNumber:
-		return 0, fmt.Errorf("fetching the pending header is not supported")
 
 	default:
 		if number < 0 {
