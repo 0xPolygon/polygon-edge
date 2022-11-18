@@ -771,7 +771,7 @@ func (e *Eth) Unsubscribe(id string) (bool, error) {
 
 func (e *Eth) getBlockHeader(number BlockNumber) (*types.Header, error) {
 	switch number {
-	case LatestBlockNumber:
+	case LatestBlockNumber, PendingBlockNumber:
 		return e.store.Header(), nil
 
 	case EarliestBlockNumber:
@@ -781,9 +781,6 @@ func (e *Eth) getBlockHeader(number BlockNumber) (*types.Header, error) {
 		}
 
 		return block.Header, nil
-
-	case PendingBlockNumber:
-		return nil, fmt.Errorf("fetching the pending header is not supported")
 
 	default:
 		// Convert the block number from hex to uint64
