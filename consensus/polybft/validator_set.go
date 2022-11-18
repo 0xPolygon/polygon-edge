@@ -2,27 +2,35 @@ package polybft
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"math"
 	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/hashicorp/go-hclog"
 )
 
 const (
-	// MaxTotalVotingPower - the maximum allowed total voting power.
+	// maxTotalVotingPower - the maximum allowed total voting power.
 	// It needs to be sufficiently small to, in all cases:
 	// 1. prevent clipping in incrementProposerPriority()
 	// 2. let (diff+diffMax-1) not overflow in IncrementProposerPriority()
 	// (Proof of 1 is tricky, left to the reader).
 	// It could be higher, but this is sufficiently large for our purposes,
 	// and leaves room for defensive purposes.
-	MaxTotalVotingPower = int64(math.MaxInt64) / 8
+	maxTotalVotingPower = int64(math.MaxInt64) / 8
 
-	// PriorityWindowSizeFactor - is a constant that when multiplied with the
+	// priorityWindowSizeFactor - is a constant that when multiplied with the
 	// total voting power gives the maximum allowed distance between validator
 	// priorities.
-	PriorityWindowSizeFactor = 2
+	priorityWindowSizeFactor = 2
+)
+
+var (
+	// errInvalidTotalVotingPower is returned if the total voting power is zero
+	errInvalidTotalVotingPower = errors.New(
+		"invalid voting power configuration provided: total voting power must be greater than 0")
 )
 
 type ValidatorAccount struct {
@@ -65,7 +73,6 @@ func (v *ValidatorAccount) CompareProposerPriority(other *ValidatorAccount) (*Va
 
 // ValidatorSet interface of the current validator set
 type ValidatorSet interface {
-
 	// CalcProposer calculates next proposer based on the passed round
 	CalcProposer(round uint64) (types.Address, error)
 
@@ -80,6 +87,12 @@ type ValidatorSet interface {
 
 	// IncrementProposerPriority increments priorities number of times
 	IncrementProposerPriority(times uint64) error
+
+	// checks if submitted signers have reached quorum
+	HasQuorum(signers []types.Address) bool
+
+	// checks if submitted signers have reached quorum without proposer voting power
+	HasQuorumWithoutProposer(signers []types.Address) bool
 }
 
 type validatorSet struct {
@@ -91,10 +104,19 @@ type validatorSet struct {
 
 	// totalVotingPower denotes voting power of entire validator set
 	totalVotingPower int64
+
+	// quorum
+	quorumSize uint64
+
+	// votingPowerMap represents voting powers per validator address
+	votingPowerMap map[types.Address]uint64
+
+	// logger instance
+	logger hclog.Logger
 }
 
 // NewValidatorSet creates a new validator set.
-func NewValidatorSet(valz AccountSet) (*validatorSet, error) {
+func NewValidatorSet(valz AccountSet, logger hclog.Logger) (*validatorSet, error) {
 	var validators = make([]*ValidatorAccount, len(valz))
 	for i, v := range valz {
 		validators[i] = NewValidator(v, 0)
@@ -102,14 +124,47 @@ func NewValidatorSet(valz AccountSet) (*validatorSet, error) {
 
 	validatorSet := &validatorSet{
 		validators: validators,
+		logger:     logger.Named("validator_set"),
 	}
 
-	err := validatorSet.updateWithChangeSet()
+	// populate voting power map
+	validatorSet.populateVotingPower()
+
+	// calculate quorum according to submitted voting powers
+	err := validatorSet.calculateQuorum()
+	if err != nil {
+		return nil, err
+	}
+
+	err = validatorSet.updateWithChangeSet()
 	if err != nil {
 		return nil, fmt.Errorf("cannot update changeset: %w", err)
 	}
 
 	return validatorSet, nil
+}
+
+// populateVotingPower populates voting power map
+// for each validator in the current validator set
+func (v *validatorSet) populateVotingPower() {
+	v.votingPowerMap = make(map[types.Address]uint64, len(v.validators))
+	for _, validator := range v.validators {
+		v.votingPowerMap[validator.Metadata.Address] = validator.Metadata.VotingPower
+	}
+}
+
+// calculateQuorum calculates quorum size for given voting power map
+func (v *validatorSet) calculateQuorum() error {
+	totalVotingPower, err := v.TotalVotingPower()
+	if err != nil {
+		return err
+	}
+
+	// quorum size is calculated as 2/3 supermajority
+	v.quorumSize = uint64(math.Ceil((2 * float64(totalVotingPower)) / 3))
+	v.logger.Debug("calculateQuorum", "quorum", v.quorumSize, "voting powers map", v.votingPowerMap)
+
+	return nil
 }
 
 // IncrementProposerPriority increments ProposerPriority of each validator and
@@ -132,7 +187,7 @@ func (v *validatorSet) IncrementProposerPriority(times uint64) error {
 		return fmt.Errorf("cannot calculate total voting power: %w", err)
 	}
 
-	diffMax := PriorityWindowSizeFactor * vp
+	diffMax := priorityWindowSizeFactor * vp
 
 	err = v.rescalePriorities(diffMax)
 	if err != nil {
@@ -190,6 +245,10 @@ func (v *validatorSet) TotalVotingPower() (int64, error) {
 		}
 	}
 
+	if v.totalVotingPower == 0 {
+		return 0, errInvalidTotalVotingPower
+	}
+
 	return v.totalVotingPower, nil
 }
 
@@ -199,7 +258,7 @@ func (v *validatorSet) updateWithChangeSet() error {
 		return fmt.Errorf("cannot update total voting power: %w", err)
 	}
 
-	err = v.rescalePriorities(PriorityWindowSizeFactor * v.totalVotingPower)
+	err = v.rescalePriorities(priorityWindowSizeFactor * v.totalVotingPower)
 	if err != nil {
 		return fmt.Errorf("cannot rescale priorities: %w", err)
 	}
@@ -289,6 +348,37 @@ func (v *validatorSet) rescalePriorities(diffMax int64) error {
 	return nil
 }
 
+// HasQuorum determines if there is quorum of enough signers reached,
+// based on its voting power and quorum size
+func (v *validatorSet) HasQuorum(signers []types.Address) bool {
+	signersVotingPower := v.calculateVotingPower(signers)
+	v.logger.Debug("HasQuorum", "signers voting power", signersVotingPower, "quorum", v.quorumSize,
+		"hasQuorum", signersVotingPower >= v.quorumSize)
+
+	return signersVotingPower >= v.quorumSize
+}
+
+// checks if submitted signers have reached prepare quorum
+func (v *validatorSet) HasQuorumWithoutProposer(signers []types.Address) bool {
+	signersVotingPower := v.calculateVotingPower(signers)
+	proposerVotingPower := v.votingPowerMap[v.proposer.Metadata.Address]
+	hasQuorum := signersVotingPower >= v.quorumSize-proposerVotingPower
+	v.logger.Debug("HasQuorumWithoutProposer", "signers voting power", signersVotingPower, "quorum", v.quorumSize,
+		"hasQuorum", hasQuorum)
+
+	return hasQuorum
+}
+
+// calculateVotingPower calculates voting power for provided validator ids
+func (v validatorSet) calculateVotingPower(signers []types.Address) uint64 {
+	accumulatedVotingPower := uint64(0)
+	for _, address := range signers {
+		accumulatedVotingPower += v.votingPowerMap[address]
+	}
+
+	return accumulatedVotingPower
+}
+
 // isNilOrEmpty returns true if validator set is nil or empty.
 func (v *validatorSet) isNilOrEmpty() bool {
 	return v == nil || len(v.validators) == 0
@@ -300,10 +390,10 @@ func (v *validatorSet) updateTotalVotingPower() error {
 	for _, val := range v.validators {
 		// mind overflow
 		sum = safeAddClip(sum, int64(val.Metadata.VotingPower))
-		if sum > MaxTotalVotingPower {
+		if sum > maxTotalVotingPower {
 			return fmt.Errorf(
 				"total voting power cannot be guarded to not exceed %v; got: %v",
-				MaxTotalVotingPower,
+				maxTotalVotingPower,
 				sum,
 			)
 		}

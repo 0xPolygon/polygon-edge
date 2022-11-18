@@ -354,7 +354,7 @@ func (c *consensusRuntime) FSM() error {
 	isEndOfSprint := c.isEndOfSprint(pendingBlockNumber)
 	isEndOfEpoch := c.isEndOfEpoch(pendingBlockNumber)
 
-	valSet, err := NewValidatorSet(epoch.Validators)
+	valSet, err := NewValidatorSet(epoch.Validators, c.logger)
 	if err != nil {
 		return fmt.Errorf("cannot create validator set for fsm: %w", err)
 	}
@@ -626,11 +626,16 @@ func (c *consensusRuntime) getAggSignatureForCommitmentMessage(
 	epoch *epochMetadata,
 	commitmentHash types.Hash,
 ) (Signature, [][]byte, error) {
-	validators := epoch.Validators
+	validatorSet, err := NewValidatorSet(epoch.Validators, c.logger)
+	if err != nil {
+		return Signature{}, nil, err
+	}
 
-	nodeIDIndexMap := make(map[string]int, validators.Len())
-	for i, validator := range validators {
-		nodeIDIndexMap[validator.Address.String()] = i
+	validatorAddrToIndex := make(map[string]int, validatorSet.Len())
+	validatorsMetadata := validatorSet.Accounts()
+
+	for i, validator := range validatorsMetadata {
+		validatorAddrToIndex[validator.Address.String()] = i
 	}
 
 	// get all the votes from the database for this commitment
@@ -643,9 +648,10 @@ func (c *consensusRuntime) getAggSignatureForCommitmentMessage(
 
 	publicKeys := make([][]byte, 0)
 	bitmap := bitmap.Bitmap{}
+	signers := make([]types.Address, 0)
 
 	for _, vote := range votes {
-		index, exists := nodeIDIndexMap[vote.From]
+		index, exists := validatorAddrToIndex[vote.From]
 		if !exists {
 			continue // don't count this vote, because it does not belong to validator
 		}
@@ -658,10 +664,11 @@ func (c *consensusRuntime) getAggSignatureForCommitmentMessage(
 		bitmap.Set(uint64(index))
 
 		signatures = append(signatures, signature)
-		publicKeys = append(publicKeys, validators[index].BlsKey.Marshal())
+		publicKeys = append(publicKeys, validatorsMetadata[index].BlsKey.Marshal())
+		signers = append(signers, types.StringToAddress(vote.From))
 	}
 
-	if len(signatures) < getQuorumSize(validators.Len()) {
+	if !validatorSet.HasQuorum(signers) {
 		return Signature{}, nil, errQuorumNotReached
 	}
 
@@ -744,7 +751,6 @@ func (c *consensusRuntime) deliverMessage(msg *TransportMessage) (bool, error) {
 		"hash", hex.EncodeToString(msg.Hash),
 		"sender", msg.NodeID,
 		"signatures", numSignatures,
-		"quorum", getQuorumSize(len(epoch.Validators)),
 	)
 
 	return true, nil
@@ -1093,34 +1099,37 @@ func (c *consensusRuntime) ID() []byte {
 	return c.config.Key.Address().Bytes()
 }
 
-// MaximumFaultyNodes returns the maximum number of faulty nodes based on the validator set
-func (c *consensusRuntime) MaximumFaultyNodes() uint64 {
-	return uint64(c.fsm.validators.Len()-1) / 3
-}
-
-// Quorum returns what is the quorum size for the specified block height
-func (c *consensusRuntime) Quorum(_ uint64) uint64 {
-	return uint64(getQuorumSize(c.fsm.validators.Len()))
-}
-
 // HasQuorum returns true if quorum is reached for the given blockNumber
 func (c *consensusRuntime) HasQuorum(
 	blockNumber uint64,
 	messages []*proto.Message,
 	msgType proto.MessageType,
 ) bool {
-	quorum := c.Quorum(blockNumber)
+	// if we are not using consensus engine for current block return false
+	if c.fsm.parent.Number+1 != blockNumber {
+		c.logger.Warn("HasQuorum checking against stale block",
+			"blockNumber", blockNumber, "parentBlock", c.fsm.parent.Number)
 
+		return false
+	}
+
+	// extract the addresses of all the signers of the messages
+	signers := make([]types.Address, len(messages))
+	for i, message := range messages {
+		signers[i] = types.BytesToAddress(message.From)
+	}
+
+	// check quorum
 	switch msgType {
 	case proto.MessageType_PREPREPARE:
 		return len(messages) >= 0
 	case proto.MessageType_PREPARE:
-		return len(messages) >= int(quorum)-1
+		return c.fsm.validators.HasQuorumWithoutProposer(signers)
 	case proto.MessageType_ROUND_CHANGE, proto.MessageType_COMMIT:
-		return len(messages) >= int(quorum)
+		return c.fsm.validators.HasQuorum(signers)
+	default:
+		return false
 	}
-
-	return false
 }
 
 // BuildPrePrepareMessage builds a PREPREPARE message based on the passed in proposal

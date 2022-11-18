@@ -7,6 +7,7 @@ import (
 
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -92,7 +93,7 @@ func TestCalcProposerSamePriority(t *testing.T) {
 			Address:     types.Address{0x3},
 			VotingPower: 3,
 		},
-	})
+	}, hclog.NewNullLogger())
 	require.NoError(t, err)
 
 	proposerR0, err := vs.CalcProposer(0)
@@ -132,7 +133,7 @@ func TestProposerSelection1(t *testing.T) {
 			Address:     types.Address{0x3},
 			VotingPower: 330,
 		},
-	})
+	}, hclog.NewNullLogger())
 	require.NoError(t, err)
 
 	var proposers = make([]types.Address, numberOfIteration)
@@ -200,7 +201,7 @@ func TestIncrementProposerPrioritySameVotingPower(t *testing.T) {
 			Address:     types.Address{0x3},
 			VotingPower: 1,
 		},
-	})
+	}, hclog.NewNullLogger())
 	require.NoError(t, err)
 	assert.Equal(t, int64(3), vs.totalVotingPower)
 
@@ -258,7 +259,7 @@ func TestAveragingInIncrementProposerPriorityWithVotingPower(t *testing.T) {
 		},
 	}
 
-	vals, err := NewValidatorSet(valz)
+	vals, err := NewValidatorSet(valz, hclog.NewNullLogger())
 	assert.NoError(t, err)
 
 	tcs := []struct {
@@ -400,8 +401,7 @@ func TestValidatorSetTotalVotingPowerErrorOnOverflow(t *testing.T) {
 		{Address: types.Address{0x1}, VotingPower: math.MaxInt64},
 		{Address: types.Address{0x2}, VotingPower: math.MaxInt64},
 		{Address: types.Address{0x3}, VotingPower: math.MaxInt64},
-	})
-
+	}, hclog.NewNullLogger())
 	require.Error(t, err)
 }
 
@@ -411,12 +411,66 @@ func TestUpdatesForNewValidatorSet(t *testing.T) {
 	v1 := &ValidatorMetadata{Address: types.Address{0x1}, VotingPower: 100}
 	v2 := &ValidatorMetadata{Address: types.Address{0x2}, VotingPower: 100}
 	accountSet := []*ValidatorMetadata{v1, v2}
-	valSet, err := NewValidatorSet(accountSet)
+	valSet, err := NewValidatorSet(accountSet, hclog.NewNullLogger())
 	require.NoError(t, err)
 
 	_, err = valSet.CalcProposer(1)
 	require.NoError(t, err)
 	verifyValidatorSet(t, valSet)
+}
+
+func TestValidatorSet_HasQuorum(t *testing.T) {
+	t.Parallel()
+
+	// enough signers for quorum (2/3 super-majority of validators are signers)
+	validators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F", "G"})
+	vs, err := validators.toValidatorSet()
+	require.NoError(t, err)
+
+	signers := []types.Address{}
+
+	validators.iterAcct([]string{"A", "B", "C", "D", "E"}, func(v *testValidator) {
+		signers = append(signers, v.Address())
+	})
+
+	require.True(t, vs.HasQuorum(signers))
+
+	// not enough signers for quorum (less than 2/3 super-majority of validators are signers)
+	signers = []types.Address{}
+
+	validators.iterAcct([]string{"A", "B", "C", "D"}, func(v *testValidator) {
+		signers = append(signers, v.Address())
+	})
+	require.False(t, vs.HasQuorum(signers))
+}
+
+func TestValidatorSet_HasQuorumWithoutProposer(t *testing.T) {
+	t.Parallel()
+
+	validators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
+	vs, err := validators.toValidatorSet()
+	require.NoError(t, err)
+
+	_, err = vs.CalcProposer(0)
+	require.NoError(t, err)
+
+	// BFT conditions aren't met (less than 5 validators)
+	// in order to have a quorum satisfied, all the validators need to be among signers
+	signers := []types.Address{}
+
+	validators.iterAcct([]string{"B", "C", "D"}, func(v *testValidator) {
+		signers = append(signers, v.Address())
+	})
+	require.True(t, vs.HasQuorumWithoutProposer(signers))
+
+	// no quorum, since only a single validator is signed
+	// (it doesn't have enough voting power, even when proposer voting power is subtracted from quorum size)
+	signers = []types.Address{}
+
+	validators.iterAcct([]string{"B", "C"}, func(v *testValidator) {
+		signers = append(signers, v.Address())
+	})
+	require.False(t, vs.HasQuorumWithoutProposer(signers))
 }
 
 func verifyValidatorSet(t *testing.T, valSet *validatorSet) {
@@ -438,8 +492,8 @@ func verifyValidatorSet(t *testing.T, valSet *validatorSet) {
 		"expected total priority in (-%d, %d). Got %d", valsCount, valsCount, tpp)
 	// verify that priorities are scaled
 	dist := computeMaxMinPriorityDiff(valSet)
-	assert.True(t, dist <= PriorityWindowSizeFactor*tvp,
-		"expected priority distance < %d. Got %d", PriorityWindowSizeFactor*tvp, dist)
+	assert.True(t, dist <= priorityWindowSizeFactor*tvp,
+		"expected priority distance < %d. Got %d", priorityWindowSizeFactor*tvp, dist)
 }
 
 func valSetTotalProposerPriority(valSet *validatorSet) int64 {
