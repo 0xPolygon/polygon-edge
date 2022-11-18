@@ -5,14 +5,13 @@ import (
 	"sync"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
-	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
 type mockAccount struct {
 	address types.Address
 	code    []byte
-	account *state.Account
+	account *Account
 	storage map[types.Hash][]byte
 }
 
@@ -21,9 +20,7 @@ func (m *mockAccount) Storage(k types.Hash, v []byte) {
 }
 
 func (m *mockAccount) Code(code []byte) {
-	codeHash := types.BytesToHash(m.address.Bytes())
 	m.code = code
-	m.account.CodeHash = codeHash.Bytes()
 }
 
 func (m *mockAccount) Nonce(n uint64) {
@@ -51,7 +48,7 @@ type mockStore struct {
 	subscription *blockchain.MockSubscription
 	receiptsLock sync.Mutex
 	receipts     map[types.Hash][]*types.Receipt
-	accounts     map[types.Address]*state.Account
+	accounts     map[types.Address]*Account
 
 	// headers is the list of historical headers
 	headers []*types.Header
@@ -61,7 +58,7 @@ func newMockStore() *mockStore {
 	m := &mockStore{
 		header:       &types.Header{Number: 0},
 		subscription: blockchain.NewMockSubscription(),
-		accounts:     map[types.Address]*state.Account{},
+		accounts:     map[types.Address]*Account{},
 	}
 	m.addHeader(m.header)
 
@@ -87,6 +84,7 @@ func (m *mockStore) headerLoop(cond func(h *types.Header) bool) *types.Header {
 }
 
 func (m *mockStore) emitEvent(evnt *mockEvent) {
+	m.receiptsLock.Lock()
 	if m.receipts == nil {
 		m.receipts = map[types.Hash][]*types.Receipt{}
 	}
@@ -105,11 +103,12 @@ func (m *mockStore) emitEvent(evnt *mockEvent) {
 		m.receipts[i.header.Hash] = i.receipts
 		bEvnt.OldChain = append(bEvnt.OldChain, i.header)
 	}
+	m.receiptsLock.Unlock()
 
 	m.subscription.Push(bEvnt)
 }
 
-func (m *mockStore) GetAccount(root types.Hash, addr types.Address) (*state.Account, error) {
+func (m *mockStore) GetAccount(root types.Hash, addr types.Address) (*Account, error) {
 	if acc, ok := m.accounts[addr]; ok {
 		return acc, nil
 	}
@@ -117,7 +116,7 @@ func (m *mockStore) GetAccount(root types.Hash, addr types.Address) (*state.Acco
 	return nil, ErrStateNotFound
 }
 
-func (m *mockStore) SetAccount(addr types.Address, account *state.Account) {
+func (m *mockStore) SetAccount(addr types.Address, account *Account) {
 	m.accounts[addr] = account
 }
 
@@ -136,14 +135,6 @@ func (m *mockStore) GetReceiptsByHash(hash types.Hash) ([]*types.Receipt, error)
 
 func (m *mockStore) SubscribeEvents() blockchain.Subscription {
 	return m.subscription
-}
-
-func (m *mockStore) GetHeaderByNumber(number uint64) (*types.Header, bool) {
-	header := m.headerLoop(func(header *types.Header) bool {
-		return header.Number == number
-	})
-
-	return header, header != nil
 }
 
 func (m *mockStore) GetBlockByHash(hash types.Hash, full bool) (*types.Block, bool) {

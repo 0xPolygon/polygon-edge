@@ -118,7 +118,7 @@ var accountArenaPool fastrlp.ArenaPool
 
 var stateArenaPool fastrlp.ArenaPool // TODO, Remove once we do update in fastrlp
 
-func (t *Trie) Commit(objs []*state.Object) (state.Snapshot, []byte) {
+func (t *Trie) Commit(objs []*state.Object) (*Trie, []byte) {
 	// Create an insertion batch for all the entries
 	batch := t.storage.Batch()
 
@@ -143,14 +143,9 @@ func (t *Trie) Commit(objs []*state.Object) (state.Snapshot, []byte) {
 			}
 
 			if len(obj.Storage) != 0 {
-				localSnapshot, err := t.state.NewSnapshotAt(obj.Root)
+				trie, err := t.state.newTrieAt(obj.Root)
 				if err != nil {
 					panic(err)
-				}
-
-				trie, ok := localSnapshot.(*Trie)
-				if !ok {
-					panic("invalid type assertion")
 				}
 
 				localTxn := trie.Txn()
