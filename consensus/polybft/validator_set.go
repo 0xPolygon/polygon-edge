@@ -184,7 +184,7 @@ func (v *validatorSet) IncrementProposerPriority(times uint64) error {
 	vp, err := v.TotalVotingPower()
 
 	if err != nil {
-		return fmt.Errorf("cannot calculate total voting power")
+		return fmt.Errorf("cannot calculate total voting power: %w", err)
 	}
 
 	diffMax := priorityWindowSizeFactor * vp
@@ -257,13 +257,8 @@ func (v *validatorSet) updateWithChangeSet() error {
 	if err != nil {
 		return fmt.Errorf("cannot update total voting power: %w", err)
 	}
-	// Scale and center.
-	totalVotingPower, err := v.TotalVotingPower()
-	if err != nil {
-		return fmt.Errorf("cannot get total voting power: %w", err)
-	}
 
-	err = v.rescalePriorities(priorityWindowSizeFactor * totalVotingPower)
+	err = v.rescalePriorities(PriorityWindowSizeFactor * v.totalVotingPower)
 	if err != nil {
 		return fmt.Errorf("cannot rescale priorities: %w", err)
 	}

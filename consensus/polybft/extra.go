@@ -31,7 +31,6 @@ type Extra struct {
 	Parent     *Signature
 	Committed  *Signature
 	Checkpoint *CheckpointData
-	Round      uint64 // round in which the block was sealed
 }
 
 // MarshalRLPTo defines the marshal function wrapper for Extra
@@ -80,9 +79,6 @@ func (i *Extra) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 		vv.Set(i.Checkpoint.MarshalRLPWith(ar))
 	}
 
-	// round
-	vv.Set(ar.NewUint(i.Round))
-
 	return vv
 }
 
@@ -93,7 +89,7 @@ func (i *Extra) UnmarshalRLP(input []byte) error {
 
 // UnmarshalRLPWith defines the unmarshal implementation for Extra
 func (i *Extra) UnmarshalRLPWith(v *fastrlp.Value) error {
-	const expectedElements = 6
+	const expectedElements = 5
 
 	elems, err := v.GetElems()
 	if err != nil {
@@ -141,15 +137,6 @@ func (i *Extra) UnmarshalRLPWith(v *fastrlp.Value) error {
 		if err := i.Checkpoint.UnmarshalRLPWith(elems[4]); err != nil {
 			return err
 		}
-	}
-
-	// Sealed round
-	{
-		round, err := elems[5].GetUint64()
-		if err != nil {
-			return fmt.Errorf("cannot get sealed round: %w", err)
-		}
-		i.Round = round
 	}
 
 	return nil

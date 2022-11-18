@@ -100,8 +100,7 @@ func (v *ValidatorMetadata) UnmarshalRLPWith(val *fastrlp.Value) error {
 		return fmt.Errorf("expected 'Voting power' encoded as big int. Error: %w", err)
 	}
 
-	// TODO due to bug in the code for now this is fixed
-	// EVM-153 solves this
+	// TODO this is a bug fixed in EVM-153
 	v.VotingPower = 1 // votingPower.Uint64()
 
 	return nil

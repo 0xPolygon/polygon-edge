@@ -359,32 +359,15 @@ func (c *consensusRuntime) FSM() error {
 		return fmt.Errorf("cannot create validator set for fsm: %w", err)
 	}
 
-	if epoch.Number > 0 { // it must be at least epoc
-		iterationNumber := uint64(0)
-		currentHeader := parent
-		lastBlockOfPreviousEpoch := getEndEpochBlockNumber(epoch.Number-1, c.config.PolyBFTConfig.EpochSize)
+	iterationNumber, err := getNumberOfIteration(parent, epoch.Number, c)
+	if err != nil {
+		return fmt.Errorf("cannot get number of iteration: %w", err)
+	}
 
-		for currentHeader.Number > lastBlockOfPreviousEpoch {
-			blockExtra, err := GetIbftExtra(currentHeader.ExtraData)
-			if err != nil {
-				return fmt.Errorf("cannot get ibft extra: %w", err)
-			}
-
-			iterationNumber += blockExtra.Round + 1 // because round 0 is one of the iterations
-
-			var found bool
-			currentHeader, found = c.config.blockchain.GetHeaderByNumber(currentHeader.Number - 1)
-
-			if !found {
-				return fmt.Errorf("cannot get header by number: %d", currentHeader.Number)
-			}
-		}
-
-		if iterationNumber > 0 {
-			err = valSet.IncrementProposerPriority(iterationNumber)
-			if err != nil {
-				return fmt.Errorf("cannot increment proposer priority in fsm: %w", err)
-			}
+	if iterationNumber > 0 {
+		err = valSet.IncrementProposerPriority(iterationNumber)
+		if err != nil {
+			return fmt.Errorf("cannot increment proposer priority in fsm: %w", err)
 		}
 	}
 
@@ -426,6 +409,31 @@ func (c *consensusRuntime) FSM() error {
 	c.fsm = ff
 
 	return nil
+}
+
+// getNumberOfIteration returns number of iteration that are needed for the proposer calculation
+func getNumberOfIteration(parent *types.Header, epochNumber uint64, c *consensusRuntime) (uint64, error) {
+	iterationNumber := uint64(0)
+	currentHeader := parent
+	lastBlockOfPreviousEpoch := getEndEpochBlockNumber(epochNumber-1, c.config.PolyBFTConfig.EpochSize)
+
+	for currentHeader.Number > lastBlockOfPreviousEpoch {
+		blockExtra, err := GetIbftExtra(currentHeader.ExtraData)
+		if err != nil {
+			return 0, fmt.Errorf("cannot get ibft extra: %w", err)
+		}
+
+		iterationNumber += blockExtra.Checkpoint.BlockRound + 1 // because round 0 is one of the iterations
+
+		var found bool
+		currentHeader, found = c.config.blockchain.GetHeaderByNumber(currentHeader.Number - 1)
+
+		if !found {
+			return 0, fmt.Errorf("cannot get header by number: %d", currentHeader.Number)
+		}
+	}
+
+	return iterationNumber, nil
 }
 
 // restartEpoch resets the previously run epoch and moves to the next one

@@ -45,7 +45,6 @@ func TestExtra_Encoding(t *testing.T) {
 			&Extra{
 				Validators: &ValidatorSetDelta{},
 				Seal:       []byte{3, 4},
-				Round:      55,
 			},
 		},
 		{
@@ -55,7 +54,6 @@ func TestExtra_Encoding(t *testing.T) {
 				},
 				Parent:    &Signature{},
 				Committed: &Signature{},
-				Round:     1,
 			},
 		},
 		{
@@ -65,7 +63,6 @@ func TestExtra_Encoding(t *testing.T) {
 				},
 				Parent:    &Signature{AggregatedSignature: parentStr, Bitmap: bitmapStr},
 				Committed: &Signature{},
-				Round:     15,
 			},
 		},
 		{
@@ -76,7 +73,6 @@ func TestExtra_Encoding(t *testing.T) {
 				},
 				Parent:    &Signature{},
 				Committed: &Signature{AggregatedSignature: committedStr, Bitmap: bitmapStr},
-				Round:     1,
 			},
 		},
 		{
