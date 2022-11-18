@@ -650,6 +650,7 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 	var result *runtime.ExecutionResult
 
 	t.captureCallStart(c, evm.CREATE)
+
 	defer func() {
 		// pass result to be set later
 		t.captureCallEnd(c, result)
