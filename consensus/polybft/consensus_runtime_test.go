@@ -501,7 +501,9 @@ func TestConsensusRuntime_FSM_NotEndOfEpoch_NotEndOfSprint(t *testing.T) {
 
 	state := newTestState(t)
 
-	extra := &Extra{}
+	extra := &Extra{
+		Checkpoint: &CheckpointData{},
+	}
 	firstBlock := &types.Header{
 		Number:    0,
 		ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...),
@@ -864,7 +866,10 @@ func TestConsensusRuntime_FSM_EndOfSprint_HasBundlesToExecute(t *testing.T) {
 	validatorAccs := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F", "G"})
 	validatorSet := validatorAccs.getPublicIdentities()
 
-	extra := &Extra{}
+	extra := &Extra{
+		Checkpoint: &CheckpointData{},
+	}
+
 	lastBlock := &types.Header{
 		Number:    24,
 		ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...),
@@ -1945,9 +1950,9 @@ func TestConsensusRuntime_HasQuorum(t *testing.T) {
 
 	validatorAccounts := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
 
-	extra := &Extra{}
-	extra.Checkpoint = &CheckpointData{}
-	extra.Checkpoint.BlockRound = 0
+	extra := &Extra{
+		Checkpoint: &CheckpointData{},
+	}
 
 	lastBuildBlock := &types.Header{
 		Number:    1,
@@ -2156,7 +2161,9 @@ func createTestBlocksForUptime(t *testing.T, numberOfBlocks uint64,
 	headerMap := &testHeadersMap{}
 	bitmaps := createTestBitmapsForUptime(t, validatorSet, numberOfBlocks)
 
-	extra := &Extra{}
+	extra := &Extra{
+		Checkpoint: &CheckpointData{},
+	}
 	genesisBlock := &types.Header{
 		Number:    0,
 		ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...),
@@ -2225,8 +2232,9 @@ func createTestExtraForAccounts(t *testing.T, validators AccountSet, b bitmap.Bi
 			Added:   validators,
 			Removed: bitmap.Bitmap{},
 		},
-		Parent:    &Signature{Bitmap: b, AggregatedSignature: dummySignature[:]},
-		Committed: &Signature{Bitmap: b, AggregatedSignature: dummySignature[:]},
+		Parent:     &Signature{Bitmap: b, AggregatedSignature: dummySignature[:]},
+		Committed:  &Signature{Bitmap: b, AggregatedSignature: dummySignature[:]},
+		Checkpoint: &CheckpointData{},
 	}
 
 	marshaled := extraData.MarshalRLPTo(nil)
