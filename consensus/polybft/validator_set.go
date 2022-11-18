@@ -258,7 +258,7 @@ func (v *validatorSet) updateWithChangeSet() error {
 		return fmt.Errorf("cannot update total voting power: %w", err)
 	}
 
-	err = v.rescalePriorities(PriorityWindowSizeFactor * v.totalVotingPower)
+	err = v.rescalePriorities(priorityWindowSizeFactor * v.totalVotingPower)
 	if err != nil {
 		return fmt.Errorf("cannot rescale priorities: %w", err)
 	}
