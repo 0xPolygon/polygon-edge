@@ -743,7 +743,7 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header, epoch *ep
 	epochID := epoch.Number
 	totalBlocks := uint64(0)
 
-	calculateUptimeForBlock := func(blockExtra *Extra, validators AccountSet) error {
+	getSealersForBlock := func(blockExtra *Extra, validators AccountSet) error {
 		signers, err := validators.GetFilteredValidators(blockExtra.Parent.Bitmap)
 		if err != nil {
 			return err
@@ -765,7 +765,7 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header, epoch *ep
 
 	// calculate uptime for current epoch
 	for blockHeader.Number > epoch.FirstBlockInEpoch {
-		if err := calculateUptimeForBlock(blockExtra, epoch.Validators); err != nil {
+		if err := getSealersForBlock(blockExtra, epoch.Validators); err != nil {
 			return nil, err
 		}
 
@@ -781,7 +781,7 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header, epoch *ep
 				return nil, err
 			}
 
-			if err := calculateUptimeForBlock(blockExtra, validators); err != nil {
+			if err := getSealersForBlock(blockExtra, validators); err != nil {
 				return nil, err
 			}
 
@@ -1382,4 +1382,19 @@ func createExitTree(exitEvents []*ExitEvent) (*MerkleTree, error) {
 	}
 
 	return NewMerkleTree(data)
+}
+
+// getSealersForBlock checks who sealed a given block and updates the counter
+func getSealersForBlock(sealersCounter map[types.Address]uint64,
+	blockExtra *Extra, validators AccountSet) error {
+	signers, err := validators.GetFilteredValidators(blockExtra.Parent.Bitmap)
+	if err != nil {
+		return err
+	}
+
+	for _, a := range signers.GetAddresses() {
+		sealersCounter[a]++
+	}
+
+	return nil
 }
