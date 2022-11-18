@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
@@ -114,7 +115,7 @@ type blockFilter struct {
 }
 
 // takeBlockUpdates advances blocks from head to latest and returns header array
-func (f *blockFilter) takeBlockUpdates() []*types.Header {
+func (f *blockFilter) takeBlockUpdates() []*block {
 	updates, newHead := f.block.getUpdates()
 	f.setHeadElem(newHead)
 
@@ -255,7 +256,6 @@ func NewFilterManager(logger hclog.Logger, store filterManagerStore, blockRangeL
 		logger:          logger.Named("filter"),
 		timeout:         defaultTimeout,
 		store:           store,
-		blockStream:     &blockStream{},
 		blockRangeLimit: blockRangeLimit,
 		filters:         make(map[string]filter),
 		timeouts:        timeHeapImpl{},
@@ -265,7 +265,10 @@ func NewFilterManager(logger hclog.Logger, store filterManagerStore, blockRangeL
 
 	// start blockstream with the current header
 	header := store.Header()
-	m.blockStream.push(header)
+
+	// TODO: Make Header return jsonrpc.block object directly
+	block := toBlock(&types.Block{Header: header}, false)
+	m.blockStream = newBlockStream(block)
 
 	// start the head watcher
 	m.subscription = store.SubscribeEvents()
@@ -292,11 +295,11 @@ func (f *FilterManager) Run() {
 
 	for {
 		// check for the next filter to be removed
-		filterBase := f.nextTimeoutFilter()
+		filterID, filterExpiresAt := f.nextTimeoutFilter()
 
 		// set timer to remove filter
-		if filterBase != nil {
-			timeoutCh = time.After(time.Until(filterBase.expiresAt))
+		if filterID != "" {
+			timeoutCh = time.After(time.Until(filterExpiresAt))
 		}
 
 		select {
@@ -309,8 +312,8 @@ func (f *FilterManager) Run() {
 		case <-timeoutCh:
 			// timeout for filter
 			// if filter still exists
-			if !f.Uninstall(filterBase.id) {
-				f.logger.Warn("failed to uninstall filter", "id", filterBase.id)
+			if !f.Uninstall(filterID) {
+				f.logger.Warn("failed to uninstall filter", "id", filterID)
 			}
 
 		case <-f.updateCh:
@@ -332,7 +335,7 @@ func (f *FilterManager) Close() {
 func (f *FilterManager) NewBlockFilter(ws wsConn) string {
 	filter := &blockFilter{
 		filterBase: newFilterBase(ws),
-		block:      f.blockStream.Head(),
+		block:      f.blockStream.getHead(),
 	}
 
 	if filter.hasWSConn() {
@@ -615,18 +618,18 @@ func (f *FilterManager) emitSignalToUpdateCh() {
 
 // nextTimeoutFilter returns the filter that will be expired next
 // nextTimeoutFilter returns the only filter with timeout
-func (f *FilterManager) nextTimeoutFilter() *filterBase {
+func (f *FilterManager) nextTimeoutFilter() (string, time.Time) {
 	f.RLock()
 	defer f.RUnlock()
 
 	if len(f.timeouts) == 0 {
-		return nil
+		return "", time.Time{}
 	}
 
 	// peek the first item
 	base := f.timeouts[0]
 
-	return base
+	return base.id, base.expiresAt
 }
 
 // dispatchEvent is an event handler for new block event
@@ -648,25 +651,34 @@ func (f *FilterManager) processEvent(evnt *blockchain.Event) {
 	defer f.RUnlock()
 
 	for _, header := range evnt.NewChain {
+		block := toBlock(&types.Block{Header: header}, false)
+
 		// first include all the new headers in the blockstream for BlockFilter
-		f.blockStream.push(header)
+		f.blockStream.push(block)
 
 		// process new chain to include new logs for LogFilter
-		if processErr := f.appendLogsToFilters(header); processErr != nil {
+		if processErr := f.appendLogsToFilters(block); processErr != nil {
 			f.logger.Error(fmt.Sprintf("Unable to process block, %v", processErr))
 		}
 	}
 }
 
 // appendLogsToFilters makes each LogFilters append logs in the header
-func (f *FilterManager) appendLogsToFilters(header *types.Header) error {
+func (f *FilterManager) appendLogsToFilters(header *block) error {
 	receipts, err := f.store.GetReceiptsByHash(header.Hash)
 	if err != nil {
 		return err
 	}
 
 	// Get logFilters from filters
-	logFilters := f.getLogFilters()
+	logFilters := make([]*logFilter, 0)
+
+	for _, f := range f.filters {
+		if logFilter, ok := f.(*logFilter); ok {
+			logFilters = append(logFilters, logFilter)
+		}
+	}
+
 	if len(logFilters) == 0 {
 		return nil
 	}
@@ -691,7 +703,7 @@ func (f *FilterManager) appendLogsToFilters(header *types.Header) error {
 						Address:     log.Address,
 						Topics:      log.Topics,
 						Data:        argBytes(log.Data),
-						BlockNumber: argUint64(header.Number),
+						BlockNumber: header.Number,
 						BlockHash:   header.Hash,
 						TxHash:      receipt.TxHash,
 						TxIndex:     argUint64(indx),
@@ -747,22 +759,6 @@ func (f *FilterManager) flushWsFilters() error {
 	return nil
 }
 
-// getLogFilters returns logFilters
-func (f *FilterManager) getLogFilters() []*logFilter {
-	f.RLock()
-	defer f.RUnlock()
-
-	logFilters := make([]*logFilter, 0)
-
-	for _, f := range f.filters {
-		if logFilter, ok := f.(*logFilter); ok {
-			logFilters = append(logFilters, logFilter)
-		}
-	}
-
-	return logFilters
-}
-
 type timeHeapImpl []*filterBase
 
 func (t *timeHeapImpl) addFilter(filter *filterBase) {
@@ -813,17 +809,23 @@ func (t *timeHeapImpl) Pop() interface{} {
 // of the stream at any point
 type blockStream struct {
 	lock sync.Mutex
-	head *headElem
+	head atomic.Value
 }
 
-func (b *blockStream) Head() *headElem {
-	b.lock.Lock()
-	defer b.lock.Unlock()
+func newBlockStream(head *block) *blockStream {
+	b := &blockStream{}
+	b.head.Store(&headElem{header: head})
 
-	return b.head
+	return b
 }
 
-func (b *blockStream) push(header *types.Header) {
+func (b *blockStream) getHead() *headElem {
+	head, _ := b.head.Load().(*headElem)
+
+	return head
+}
+
+func (b *blockStream) push(header *block) {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
@@ -831,26 +833,34 @@ func (b *blockStream) push(header *types.Header) {
 		header: header.Copy(),
 	}
 
-	if b.head != nil {
-		b.head.next = newHead
-	}
+	oldHead, _ := b.head.Load().(*headElem)
+	oldHead.next.Store(newHead)
 
-	b.head = newHead
+	b.head.Store(newHead)
 }
 
 type headElem struct {
-	header *types.Header
-	next   *headElem
+	header *block
+	next   atomic.Value
 }
 
-func (h *headElem) getUpdates() ([]*types.Header, *headElem) {
-	res := make([]*types.Header, 0)
-
+func (h *headElem) getUpdates() ([]*block, *headElem) {
+	res := make([]*block, 0)
 	cur := h
 
-	for cur.next != nil {
-		cur = cur.next
-		res = append(res, cur.header)
+	for {
+		next := cur.next.Load()
+		if next == nil {
+			// no more messages
+			break
+		} else {
+			nextElem, _ := next.(*headElem)
+
+			if nextElem.header != nil {
+				res = append(res, nextElem.header)
+			}
+			cur = nextElem
+		}
 	}
 
 	return res, cur

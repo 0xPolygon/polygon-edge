@@ -53,7 +53,7 @@ func NewExecutor(config *chain.Params, s State, logger hclog.Logger) *Executor {
 
 func (e *Executor) WriteGenesis(alloc map[types.Address]*chain.GenesisAccount) types.Hash {
 	snap := e.state.NewSnapshot()
-	txn := NewTxn(e.state, snap)
+	txn := NewTxn(snap)
 	config := e.config.Forks.At(0)
 
 	env := runtime.TxContext{
@@ -161,7 +161,7 @@ func (e *Executor) BeginTxn(
 		return nil, err
 	}
 
-	newTxn := NewTxn(e.state, auxSnap2)
+	newTxn := NewTxn(auxSnap2)
 
 	env2 := runtime.TxContext{
 		Coinbase:   coinbaseReceiver,
@@ -176,6 +176,7 @@ func (e *Executor) BeginTxn(
 		logger:   e.logger,
 		ctx:      env2,
 		state:    newTxn,
+		snap:     auxSnap2,
 		getHash:  e.GetHash(header),
 		auxState: e.state,
 		config:   config,
@@ -197,6 +198,7 @@ type Transition struct {
 
 	// dummy
 	auxState State
+	snap     Snapshot
 
 	config  chain.ForksInTime
 	state   *Txn
@@ -215,10 +217,11 @@ type Transition struct {
 	precompiles *precompiled.Precompiled
 }
 
-func NewTransition(config chain.ForksInTime, radix *Txn) *Transition {
+func NewTransition(config chain.ForksInTime, snap Snapshot, radix *Txn) *Transition {
 	return &Transition{
 		config:      config,
 		state:       radix,
+		snap:        snap,
 		evm:         evm.NewEVM(),
 		precompiles: precompiled.NewPrecompiled(),
 	}
@@ -293,8 +296,6 @@ func (t *Transition) Write(txn *types.Transaction) error {
 
 	logs := t.state.Logs()
 
-	var root []byte
-
 	receipt := &types.Receipt{
 		CumulativeGasUsed: t.totalGas,
 		TransactionType:   txn.Type,
@@ -302,21 +303,13 @@ func (t *Transition) Write(txn *types.Transaction) error {
 		GasUsed:           result.GasUsed,
 	}
 
-	if t.config.Byzantium {
-		// The suicided accounts are set as deleted for the next iteration
-		t.state.CleanDeleteObjects(true)
+	// The suicided accounts are set as deleted for the next iteration
+	t.state.CleanDeleteObjects(true)
 
-		if result.Failed() {
-			receipt.SetStatus(types.ReceiptFailed)
-		} else {
-			receipt.SetStatus(types.ReceiptSuccess)
-		}
+	if result.Failed() {
+		receipt.SetStatus(types.ReceiptFailed)
 	} else {
-		objs := t.state.Commit(t.config.EIP155)
-		ss, aux := t.state.snapshot.Commit(objs)
-		t.state = NewTxn(t.auxState, ss)
-		root = aux
-		receipt.Root = types.BytesToHash(root)
+		receipt.SetStatus(types.ReceiptSuccess)
 	}
 
 	// if the transaction created a contract, store the creation address in the receipt.
@@ -335,7 +328,7 @@ func (t *Transition) Write(txn *types.Transaction) error {
 // Commit commits the final result
 func (t *Transition) Commit() (Snapshot, types.Hash) {
 	objs := t.state.Commit(t.config.EIP155)
-	s2, root := t.state.snapshot.Commit(objs)
+	s2, root := t.snap.Commit(objs)
 
 	return s2, types.BytesToHash(root)
 }
@@ -352,10 +345,6 @@ func (t *Transition) subGasPool(amount uint64) error {
 
 func (t *Transition) addGasPool(amount uint64) {
 	t.gasPool += amount
-}
-
-func (t *Transition) SetTxn(txn *Txn) {
-	t.state = txn
 }
 
 func (t *Transition) Txn() *Txn {

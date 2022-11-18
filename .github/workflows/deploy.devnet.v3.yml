@@ -1,10 +1,11 @@
 ---
-name: TestNet Workflow
+name: DevNet-V3 Workflow
+
 on:  # yamllint disable-line rule:truthy
   workflow_dispatch:
   push:
     branches:
-      - 'release/**'
+      - feature/v3-parity
 
 permissions:
   id-token: write
@@ -20,25 +21,25 @@ jobs:
       SNYK_ORG: ${{ secrets.SNYK_ORG }}
 
   build:
-    uses: ./.github/workflows/build.yml
     name: Build
+    uses: ./.github/workflows/build.yml
     secrets:
       GH_TOKEN_CLONE_PRIVATE: ${{ secrets.GH_TOKEN_CLONE_PRIVATE }}
 
   test:
-    uses: ./.github/workflows/test.yml
     name: Test
+    uses: ./.github/workflows/test.yml
     needs: build
     secrets:
       GH_TOKEN_CLONE_PRIVATE: ${{ secrets.GH_TOKEN_CLONE_PRIVATE }}
 
-  deploy_testnet:
-    name: Update TestNet
+  deploy_devnet_v3:
+    name: Deploy DevNet V3
     needs: build
-    concurrency: deploy_testnet
+    concurrency: deploy_devnet_v3
     environment:
-      name: testnet
-      url: https://rpc.us-east-1.tn.testing.psdk.io/
+      name: devnet-v3-parity
+      url: https://rpc.us-east-1.dnv3.testing.psdk.io/
     runs-on: ubuntu-latest
     steps:
       - name: Download Polygon Edge Artifact
@@ -54,6 +55,7 @@ jobs:
 
       - name: Notify Slack
         uses: slackapi/slack-github-action@v1.22.0
+        if: false
         continue-on-error: true
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_DEPLOYMENT_WEBHOOK_URL }}
@@ -66,14 +68,14 @@ jobs:
                   "type": "header",
                   "text": {
                     "type": "plain_text",
-                    "text": "Testnet Deployment - Started"
+                    "text": "Devnet V3 Deployment - Started"
                   }
                 },
                 {
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "Testnet Deployment Status: ${{ job.status }}\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|Job Status>"
+                    "text": "Devnet V3 Deployment Status: ${{ job.status }}\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|Job Status>"
                   }
                 }
               ]
@@ -82,49 +84,57 @@ jobs:
       - name: Publish Binary package to S3
         run: |
           aws s3 cp ./polygon-edge.tar.gz s3://${{ secrets.POLYGON_EDGE_ARTIFACT_BUCKET }} --metadata "{\"commit_sha\":\"${GITHUB_SHA}\"}"
-      - name: Deploy to Testnet
+
+      - name: Deploy DevNet V3
         continue-on-error: true
         env:
           VALIDATOR_ASGS: ${{ secrets.VALIDATOR_ASGS }}
         run: |
-          echo "Deploying new TestNet..."
+          # Parallel deploy all nodes, relying on ALB Health Checks
+          echo "Deploying new Devnet V3"
+          echo "--------------------"
+
+          # Should finish relatively fast. Can add a check to guard against pre-mature cycle
+          echo "Cleaning up the data directories and stopping Polygon-Edge DevNet V3 service..."
+          aws ssm send-command --document-name polygon-edge-validators-maintenance-clean-data --targets Key=tag:aws:autoscaling:groupName,Values=$VALIDATOR_ASGS >> /dev/null
+
           for vasg in ${VALIDATOR_ASGS//,/ }
           do
               instance_id=$(aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names  $vasg --query 'AutoScalingGroups[0].Instances[0].InstanceId' --output text)
-
               echo "Draining $instance_id in $vasg"
               irid=$(aws autoscaling start-instance-refresh --auto-scaling-group-name $vasg --query InstanceRefreshId --output text)
+          done
 
-              echo "Waiting for instance to clear health check..."
-              refresh_status=Pending
-              until [ $refresh_status != "InProgress" ] && [ $refresh_status != "Pending" ]
+          echo "Waiting for instance to clear health check..."
+          pending=true
+
+          until [ $pending != true ]
+          do
+              pending=false
+              sleep 10
+              for vasg in ${VALIDATOR_ASGS//,/ }
               do
-                  sleep 10
-                  refresh_status=$(aws autoscaling describe-instance-refreshes --instance-refresh-ids $irid --auto-scaling-group-name $vasg --query 'InstanceRefreshes[0].Status' --output text)
-
+                  refresh_status=$(aws autoscaling describe-instance-refreshes --auto-scaling-group-name $vasg --query 'InstanceRefreshes[0].Status' --output text)
                   echo "ASG: $vasg"
                   echo "Status: $refresh_status"
+
+                  if [ "$refresh_status" == "Successful" ]
+                  then
+                      VALIDATOR_ASGS=${VALIDATOR_ASGS//$vasg/}
+                      instance_id=$(aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names $vasg --query 'AutoScalingGroups[0].Instances[0].InstanceId' --output text)
+
+                      echo "-------------------------------------------------"
+                      echo "New validator: $instance_id successfully deployed"
+                      echo "-------------------------------------------------"
+                  fi
+                  pending=true
               done
-
-              if [ "$refresh_status" != "Successful" ]
-              then
-                  echo "instance refresh failed."
-                  echo "autoscaling group: $vasg"
-                  echo "instance refresh id: $irid"
-                  exit 1
-              fi
-
-              instance_id=$(aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names $vasg --query 'AutoScalingGroups[0].Instances[0].InstanceId' --output text)
-              echo "-------------------------------------------------"
-              echo "New validator: $instance_id successfully deployed"
-              echo "-------------------------------------------------"
-
+              echo ""
           done
-          echo "Testnet Deployment Complete"
+          echo "Devnet V3 Deployment Complete"
 
-      - name: Notify Slack
+      - name: Notify Slack - Failures
         uses: slackapi/slack-github-action@v1.22.0
-        continue-on-error: true
         if: ${{ job.status != 'success' }}
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_DEPLOYMENT_WEBHOOK_URL }}
@@ -137,7 +147,7 @@ jobs:
                   "type": "header",
                   "text": {
                     "type": "plain_text",
-                    "text": "Testnet Deployment - Failed"
+                    "text": "Devnet V3 Deployment - Failed"
                   }
                 },
                 {
@@ -154,7 +164,7 @@ jobs:
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "Commit SHA: <${{ github.server_url }}/${{ github.repository }}/tree/${{ github.sha }}|${{ github.sha }}>\nPre-release: <${{ github.server_url }}/${{ github.repository }}/tree/${{ github.ref_name }}|${{ github.ref_name}}>"
+                    "text": "Commit SHA: <${{ github.server_url }}/${{ github.repository }}/tree/${{ github.sha }}|${{ github.sha }}>\nBranch: <${{ github.server_url }}/${{ github.repository }}/tree/${{ github.ref_name }}|${{ github.ref_name}}>"
                   }
                 }
               ]
@@ -163,21 +173,21 @@ jobs:
   pandoras_box:
     uses: ./.github/workflows/pandoras_box.yml
     name: Pandora's Box
-    needs: deploy_testnet
+    needs: deploy_devnet_v3
     secrets:
       SLACK_PERFORMANCE_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
       PANDORAS_TARGET: ${{ secrets.PANDORAS_TARGET }}
       PANDORAS_MNEMONIC: ${{ secrets.PANDORAS_MNEMONIC }}
     with:
-      runner: testnet
-      environment: testnet
+      runner: devnet-v3-parity
+      environment: devnet-v3-parity
       transaction_batch: '200'
       transaction_count: '10000'
 
   loadbot:
     uses: ./.github/workflows/loadbot.yml
     name: Loadbot
-    needs: deploy_testnet
+    needs: deploy_devnet_v3
     secrets:
       SLACK_PERFORMANCE_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
       LOADBOT_JSONRPC_URL: ${{ secrets.LOADBOT_JSONRPC_URL }}
@@ -185,8 +195,8 @@ jobs:
       LOADBOT_GRPC_ADDRESS: ${{ secrets.LOADBOT_GRPC_ADDRESS }}
       LOADBOT_0x1AB8C3df809b85012a009c0264eb92dB04eD6EFa: ${{ secrets.LOADBOT_0x1AB8C3df809b85012a009c0264eb92dB04eD6EFa }}
     with:
-      runner: testnet
-      environment: testnet
+      runner: devnet-v3-parity
+      environment: devnet-v3-parity
       chain_id: '750'
       transaction_value: '100'
       transaction_count: '10000'

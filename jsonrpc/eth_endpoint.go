@@ -27,19 +27,21 @@ type ethTxPoolStore interface {
 	GetPendingTx(txHash types.Hash) (*types.Transaction, bool)
 }
 
+type Account struct {
+	Balance *big.Int
+	Nonce   uint64
+}
+
 type ethStateStore interface {
-	GetAccount(root types.Hash, addr types.Address) (*state.Account, error)
+	GetAccount(root types.Hash, addr types.Address) (*Account, error)
 	GetStorage(root types.Hash, addr types.Address, slot types.Hash) ([]byte, error)
 	GetForksInTime(blockNumber uint64) chain.ForksInTime
-	GetCode(hash types.Hash) ([]byte, error)
+	GetCode(root types.Hash, addr types.Address) ([]byte, error)
 }
 
 type ethBlockchainStore interface {
 	// Header returns the current header of the chain (genesis if empty)
 	Header() *types.Header
-
-	// GetHeaderByNumber returns the header by number
-	GetHeaderByNumber(block uint64) (*types.Header, bool)
 
 	// GetBlockByHash gets a block using the provided hash
 	GetBlockByHash(hash types.Hash, full bool) (*types.Block, bool)
@@ -729,7 +731,7 @@ func (e *Eth) GetCode(address types.Address, filter BlockNumberOrHash) (interfac
 	}
 
 	emptySlice := []byte{}
-	acc, err := e.store.GetAccount(header.StateRoot, address)
+	code, err := e.store.GetCode(header.StateRoot, address)
 
 	if errors.Is(err, ErrStateNotFound) {
 		// If the account doesn't exist / is not initialized yet,
@@ -737,12 +739,6 @@ func (e *Eth) GetCode(address types.Address, filter BlockNumberOrHash) (interfac
 		return "0x", nil
 	} else if err != nil {
 		return argBytesPtr(emptySlice), err
-	}
-
-	code, err := e.store.GetCode(types.BytesToHash(acc.CodeHash))
-	if err != nil {
-		// TODO This is just a workaround. Figure out why CodeHash is populated for regular accounts
-		return argBytesPtr(emptySlice), nil
 	}
 
 	return argBytesPtr(code), nil
@@ -779,24 +775,24 @@ func (e *Eth) getBlockHeader(number BlockNumber) (*types.Header, error) {
 		return e.store.Header(), nil
 
 	case EarliestBlockNumber:
-		header, ok := e.store.GetHeaderByNumber(uint64(0))
+		block, ok := e.store.GetBlockByNumber(uint64(0), false)
 		if !ok {
 			return nil, fmt.Errorf("error fetching genesis block header")
 		}
 
-		return header, nil
+		return block.Header, nil
 
 	case PendingBlockNumber:
 		return nil, fmt.Errorf("fetching the pending header is not supported")
 
 	default:
 		// Convert the block number from hex to uint64
-		header, ok := e.store.GetHeaderByNumber(uint64(number))
+		block, ok := e.store.GetBlockByNumber(uint64(number), false)
 		if !ok {
 			return nil, fmt.Errorf("error fetching block number %d header", uint64(number))
 		}
 
-		return header, nil
+		return block.Header, nil
 	}
 }
 
