@@ -234,13 +234,7 @@ func (i *backendIBFT) calcHeaderTimestamp(parentUnix uint64, currentTime time.Ti
 // roundUpTime rounds up the specified time to the
 // nearest higher multiple
 func roundUpTime(t time.Time, roundOn time.Duration) time.Time {
-	roundedTime := t.Round(roundOn)
-
-	if t.Sub(roundedTime) >= 0 {
-		roundedTime = roundedTime.Add(roundOn)
-	}
-
-	return roundedTime
+	return t.Add(roundOn / 2).Round(roundOn)
 }
 
 type status uint8
