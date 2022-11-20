@@ -26,8 +26,17 @@ type ValidatorMetadata struct {
 	VotingPower uint64
 }
 
-// Equals compares ValidatorMetadata equality
+// Equals checks ValidatorMetadata equality
 func (v *ValidatorMetadata) Equals(b *ValidatorMetadata) bool {
+	if b == nil {
+		return false
+	}
+
+	return v.EqualAddressAndBlsKey(b) && v.VotingPower == b.VotingPower
+}
+
+// EqualAddressAndBlsKey checks ValidatorMetadata equality against Address and BlsKey fields
+func (v *ValidatorMetadata) EqualAddressAndBlsKey(b *ValidatorMetadata) bool {
 	if b == nil {
 		return false
 	}
