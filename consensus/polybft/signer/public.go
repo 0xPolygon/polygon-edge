@@ -38,25 +38,6 @@ func (p *PublicKey) MarshalJSON() ([]byte, error) {
 	return json.Marshal(p.p.Marshal())
 }
 
-// UnmarshalJSON implements the json.Marshaler interface.
-func (p *PublicKey) UnmarshalJSON(b []byte) error {
-	var d []byte
-
-	err := json.Unmarshal(b, &d)
-	if err != nil {
-		return err
-	}
-
-	pk, err := UnmarshalPublicKey(d)
-	if err != nil {
-		return err
-	}
-
-	p.p = pk.p
-
-	return nil
-}
-
 // UnmarshalPublicKey reads the public key from the given byte array
 func UnmarshalPublicKey(raw []byte) (*PublicKey, error) {
 	if len(raw) == 0 {

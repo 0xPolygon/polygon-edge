@@ -37,20 +37,3 @@ func TestPublic_UnmarshalPublicKeyFromBigInt(t *testing.T) {
 
 	require.Equal(t, pub, pub2)
 }
-
-func TestPublic_MarshalUnmarshalJSON(t *testing.T) {
-	t.Parallel()
-
-	key, err := GenerateBlsKey()
-	require.NoError(t, err)
-
-	pubKey := key.PublicKey()
-	marshaledPubKey, err := pubKey.MarshalJSON()
-	require.NoError(t, err)
-
-	newPubKey := new(PublicKey)
-
-	err = newPubKey.UnmarshalJSON(marshaledPubKey)
-	require.NoError(t, err)
-	require.Equal(t, pubKey, newPubKey)
-}
