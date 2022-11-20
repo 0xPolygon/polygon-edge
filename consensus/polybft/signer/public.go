@@ -1,7 +1,6 @@
 package bls
 
 import (
-	"encoding/json"
 	"errors"
 	"math/big"
 
@@ -31,11 +30,6 @@ func (p *PublicKey) aggregate(onemore *PublicKey) *PublicKey {
 // Marshal marshal the key to bytes.
 func (p *PublicKey) Marshal() []byte {
 	return p.p.Marshal()
-}
-
-// MarshalJSON implements the json.Marshaler interface.
-func (p *PublicKey) MarshalJSON() ([]byte, error) {
-	return json.Marshal(p.p.Marshal())
 }
 
 // UnmarshalPublicKey reads the public key from the given byte array
