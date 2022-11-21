@@ -25,8 +25,6 @@ func (m *mockEventSubscriber) AddLog(log *ethgo.Log) {
 }
 
 func TestEventTracker_TrackSyncEvents(t *testing.T) {
-	// TODO: Check with @ferranbt how to fix this test, due to the changes in https://github.com/umbracle/ethgo/pull/229
-	t.Skip("FIX ME")
 	t.Parallel()
 
 	server := testutil.DeployTestServer(t, nil)
@@ -51,7 +49,9 @@ func TestEventTracker_TrackSyncEvents(t *testing.T) {
 
 	// prefill with 10 events
 	for i := 0; i < 10; i++ {
-		server.TxnTo(addr, "emitEvent")
+		receipt, err := server.TxnTo(addr, "emitEvent")
+		require.NoError(t, err)
+		require.True(t, receipt.Status == uint64(types.ReceiptSuccess))
 	}
 
 	sub := &mockEventSubscriber{}
@@ -76,7 +76,9 @@ func TestEventTracker_TrackSyncEvents(t *testing.T) {
 
 	// send 10 more events
 	for i := 0; i < 10; i++ {
-		server.TxnTo(addr, "emitEvent")
+		receipt, err := server.TxnTo(addr, "emitEvent")
+		require.NoError(t, err)
+		require.True(t, receipt.Status == uint64(types.ReceiptSuccess))
 	}
 
 	time.Sleep(2 * time.Second)
