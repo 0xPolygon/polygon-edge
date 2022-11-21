@@ -85,13 +85,11 @@ func TestAccountSet_Len(t *testing.T) {
 func TestAccountSet_ApplyDelta(t *testing.T) {
 	t.Parallel()
 
-	// Add a couple of validators to the snapshot => validators are present in the snapshot after applying such delta
-	vals := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
-
 	type Step struct {
-		added  []string
-		remove []uint64
-		expect []string
+		added    []string
+		updated  map[string]uint64
+		removed  []uint64
+		expected map[string]uint64
 	}
 
 	cases := []struct {
@@ -104,13 +102,17 @@ func TestAccountSet_ApplyDelta(t *testing.T) {
 				{
 					[]string{"A", "B", "C", "D"},
 					nil,
-					[]string{"A", "B", "C", "D"},
+					nil,
+					map[string]uint64{"A": 1, "B": 1, "C": 1, "D": 1},
 				},
 				{
-					// add two new items and remove 3 (one does not exists)
+					// add two new validators and remove 3 (one does not exists)
+					// update voting powers to subset of validators
+					// (two of them added in the previous step and one added in the current one)
 					[]string{"E", "F"},
+					map[string]uint64{"A": 30, "D": 10, "E": 5},
 					[]uint64{1, 2, 5},
-					[]string{"A", "D", "E", "F"},
+					map[string]uint64{"A": 30, "D": 10, "E": 5, "F": 1},
 				},
 			},
 		},
@@ -119,42 +121,46 @@ func TestAccountSet_ApplyDelta(t *testing.T) {
 			steps: []*Step{
 				{
 					[]string{"A"},
+					nil,
 					[]uint64{0},
-					[]string{"A"},
+					map[string]uint64{"A": 1},
 				},
 			},
 		},
 	}
 
 	for _, cc := range cases {
-		snapshot := AccountSet{}
-
 		t.Run(cc.name, func(t *testing.T) {
 			t.Parallel()
 
+			snapshot := AccountSet{}
+			vals := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
+
 			for _, step := range cc.steps {
+				// Add a couple of validators to the snapshot => validators are present in the snapshot after applying such delta
+
 				delta := &ValidatorSetDelta{
 					Added:   vals.getPublicIdentities(step.added...),
 					Removed: bitmap.Bitmap{},
 				}
-				for _, i := range step.remove {
+				for _, i := range step.removed {
 					delta.Removed.Set(i)
 				}
+
+				// update voting powers
+				delta.Updated = vals.updateVotingPowers(step.updated)
 
 				// apply delta
 				var err error
 				snapshot, err = snapshot.ApplyDelta(delta)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				// validate validator set
-				if len(step.expect) != snapshot.Len() {
-					t.Fatal("incorrect length")
-				}
-				for _, acct := range step.expect {
-					v := vals.getValidator(acct)
-					if !snapshot.ContainsAddress(v.ValidatorMetadata().Address) {
-						t.Fatalf("not found '%s'", acct)
-					}
+				require.Equal(t, len(step.expected), snapshot.Len())
+				for validatorAlias, votingPower := range step.expected {
+					v := vals.getValidator(validatorAlias).ValidatorMetadata()
+					require.True(t, snapshot.ContainsAddress(v.Address), "validator '%s' not found in snapshot", validatorAlias)
+					require.Equal(t, votingPower, v.VotingPower)
 				}
 			}
 		})
