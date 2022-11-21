@@ -3,8 +3,6 @@ name: Pull Request CI
 on:  # yamllint disable-line rule:truthy
   workflow_dispatch: {}
   pull_request:
-    paths:
-      - '**.go'
 
 jobs:
   build:
