@@ -51,7 +51,7 @@ func TestEventTracker_TrackSyncEvents(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		receipt, err := server.TxnTo(addr, "emitEvent")
 		require.NoError(t, err)
-		require.True(t, receipt.Status == uint64(types.ReceiptSuccess))
+		require.Equal(t, uint64(types.ReceiptSuccess), receipt.Status)
 	}
 
 	sub := &mockEventSubscriber{}
@@ -78,7 +78,7 @@ func TestEventTracker_TrackSyncEvents(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		receipt, err := server.TxnTo(addr, "emitEvent")
 		require.NoError(t, err)
-		require.True(t, receipt.Status == uint64(types.ReceiptSuccess))
+		require.Equal(t, uint64(types.ReceiptSuccess), receipt.Status)
 	}
 
 	time.Sleep(2 * time.Second)
