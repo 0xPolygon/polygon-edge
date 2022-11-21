@@ -27,23 +27,13 @@ var (
 
 	initCheckpointManager, _ = abi.NewMethod("function initialize(" +
 		// BLS contract address
-		"address blsContract," +
+		"address newBls," +
 		// BN256G2 contract address
-		"address bn256g2Contract," +
-		// RootValidatorSet contract address
-		"address rootValidatorSetContract," +
+		"address newBn256G2," +
 		// domain used for BLS signing
-		"bytes32 domain)")
-
-	initRootValidatorSet, _ = abi.NewMethod("function initialize(" +
-		// governance account address
-		"address governance," +
-		// CheckpointManager contract address
-		"address newCheckpointManager," +
-		// genesis validator set addresses
-		"address[] validatorAddresses," +
-		// genesis validator set public keys
-		"uint256[4][] validatorPubkeys)")
+		"bytes32 newDomain," +
+		// RootValidatorSet contract address
+		"tuple(address _address, uint256[4] blsKey, uint256 votingPower)[] newValidatorSet)")
 
 	bn256P, _ = new(big.Int).SetString("21888242871839275222246405745257275088696311157297823662689037894645226208583", 10)
 )
@@ -146,11 +136,6 @@ func deployContracts(outputter command.OutputFormatter) error {
 			expected: helper.CheckpointManagerAddress,
 		},
 		{
-			name:     "RootValidatorSet",
-			path:     "root/RootValidatorSet.sol",
-			expected: helper.RootValidatorSetAddress,
-		},
-		{
 			name:     "BLS",
 			path:     "common/BLS.sol",
 			expected: helper.BLSAddress,
@@ -201,27 +186,19 @@ func deployContracts(outputter command.OutputFormatter) error {
 		Message: fmt.Sprintf("%s CheckpointManager contract is initialized", contractsDeploymentTitle),
 	})
 
-	pendingNonce++
-
-	if err := initializeRootValidatorSet(pendingNonce); err != nil {
-		return err
-	}
-
-	outputter.WriteCommandResult(&messageResult{
-		Message: fmt.Sprintf("%s RootValidatorSet contract is initialized", contractsDeploymentTitle),
-	})
-
 	return nil
 }
 
 // initializeCheckpointManager invokes initialize function on CheckpointManager smart contract
 func initializeCheckpointManager(nonce uint64) error {
+	validatorSetMap, err := validatorSetToABISlice()
+
 	initCheckpointInput, err := initCheckpointManager.Encode(
 		[]interface{}{
 			helper.BLSAddress,
 			helper.BN256G2Address,
-			helper.RootValidatorSetAddress,
 			bn256P.Bytes(),
+			validatorSetMap,
 		})
 
 	if err != nil {
@@ -247,47 +224,23 @@ func initializeCheckpointManager(nonce uint64) error {
 }
 
 // initializeCheckpointManager invokes initialize function on CheckpointManager smart contract
-func initializeRootValidatorSet(nonce uint64) error {
+func validatorSetToABISlice() ([]map[string]interface{}, error) {
 	validatorsInfo, err := genesis.ReadValidatorsByRegexp(path.Dir(params.validatorPath), params.validatorPrefixPath)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	validatorPubKeys := make([][4]*big.Int, len(validatorsInfo))
-	validatorAddresses := make([]types.Address, len(validatorsInfo))
+	validatorSetMap := make([]map[string]interface{}, len(validatorsInfo))
 
 	for i, valid := range validatorsInfo {
-		pubKeyBig := valid.Account.Bls.PublicKey().ToBigInt()
-		validatorAddresses[i] = types.Address(valid.Account.Ecdsa.Address())
-		validatorPubKeys[i] = pubKeyBig
+		validatorSetMap[i] = map[string]interface{}{
+			"_address":    types.Address(valid.Account.Ecdsa.Address()),
+			"blsKey":      valid.Account.Bls.PublicKey().ToBigInt(),
+			"votingPower": 1, // TODO - get voting power
+		}
 	}
 
-	initRootValidatorSetInput, err := initRootValidatorSet.Encode([]interface{}{
-		helper.GetDefAccount(),
-		helper.CheckpointManagerAddress,
-		validatorAddresses,
-		validatorPubKeys,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to encode parameters for RootValidatorSet.initialize. error: %w", err)
-	}
-
-	rootValidatorSetAddress := ethgo.Address(helper.RootValidatorSetAddress)
-	txn := &ethgo.Transaction{
-		To:    &rootValidatorSetAddress,
-		Input: initRootValidatorSetInput,
-	}
-
-	receipt, err := helper.SendTxn(nonce, txn)
-	if err != nil {
-		return fmt.Errorf("failed to send transaction to RootValidatorSet. error: %w", err)
-	}
-
-	if receipt.Status != uint64(types.ReceiptSuccess) {
-		return errors.New("failed to initialize RootValidatorSet")
-	}
-
-	return nil
+	return validatorSetMap, nil
 }
 
 func readContractBytecode(rootPath, contractPath, contractName string) ([]byte, error) {

@@ -6,7 +6,9 @@ import (
 	"strconv"
 
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
+	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
 )
@@ -14,14 +16,17 @@ import (
 var (
 	// currentCheckpointIDMethod is an ABI method object representation for
 	// currentCheckpointId getter function on CheckpointManager contract
-	currentCheckpointIDMethod, _ = abi.NewMethod("function currentCheckpointId() returns (uint256)")
+	currentCheckpointIDMethod, _ = abi.NewMethod("function checkpointBlockNumbers() returns (uint256[])")
 
 	// submitCheckpointMethod is an ABI method object representation for
 	// submit checkpoint function on CheckpointManager contract
-	submitCheckpointMethod, _ = abi.NewMethod("function submitCheckpoint(" +
-		"uint256 chainID, bytes aggregatedSignature, bytes validatorsBitmap, " +
-		"uint256 epochNumber, uint256 blockNumber, bytes32 blockHash, uint256 blockRound," +
-		"bytes32 eventRoot, tuple(address _address, uint256[4] blsKey)[] nextValidators" + ")")
+	submitCheckpointMethod, _ = abi.NewMethod("function submit(" +
+		"uint256 chainID," +
+		"tuple(bytes32 blockHash, uint256 blockRound, bytes32 currentValidatorSetHash) checkpointMetadata," +
+		"tuple(uint256 epoch, uint256 blockNumber, bytes32 eventRoot) checkpoint," +
+		"uint256[2] calldata signature," +
+		"tuple(address _address, uint256[4] blsKey, uint256 votingPower)[] newValidatorSet," +
+		"bytes validatorsBitmap)")
 
 	// frequency at which checkpoints are sent to the rootchain (in blocks count)
 	defaultCheckpointsOffset = uint64(900)
@@ -41,6 +46,8 @@ type checkpointManager struct {
 	checkpointsOffset uint64
 	// latestCheckpointID represents last checkpointed block number
 	latestCheckpointID uint64
+
+	logger hclog.Logger
 }
 
 // newCheckpointManager creates a new instance of checkpointManager
@@ -73,6 +80,8 @@ func (c checkpointManager) getCurrentCheckpointID() (uint64, error) {
 		return 0, fmt.Errorf("failed to invoke currentCheckpointId function on the rootchain: %w", err)
 	}
 
+	c.logger.Info("[checkpoint] Gotten currentCheckpointId", "c", currentCheckpointID)
+
 	checkpointID, err := strconv.ParseUint(currentCheckpointID, 0, 64)
 	if err != nil {
 		return 0, fmt.Errorf("failed to convert current checkpoint id '%s' to number: %w",
@@ -84,6 +93,8 @@ func (c checkpointManager) getCurrentCheckpointID() (uint64, error) {
 
 // submitCheckpoint sends a transaction with checkpoint data to the rootchain
 func (c checkpointManager) submitCheckpoint(latestHeader types.Header, isEndOfEpoch bool) error {
+	c.logger.Info("[checkpoint] Submitting checkpoint...", "block", latestHeader.Number)
+
 	lastCheckpointBlockNumber, err := c.getCurrentCheckpointID()
 	if err != nil {
 		return err
@@ -170,12 +181,18 @@ func (c *checkpointManager) encodeAndSendCheckpoint(nonce uint64, txn *ethgo.Tra
 		nextEpochValidators, err = c.consensusBackend.GetValidators(header.Number, nil)
 
 		if err != nil {
+			c.logger.Info("[checkpoint] Submitting checkpoint done with error.",
+				"block", header.Number, "epoch", extra.Checkpoint.EpochNumber, "err", err)
+
 			return err
 		}
 	}
 
 	input, err := c.abiEncodeCheckpointBlock(header.Number, header.Hash, extra, nextEpochValidators)
 	if err != nil {
+		c.logger.Info("[checkpoint] Submitting checkpoint done with error.",
+			"block", header.Number, "epoch", extra.Checkpoint.EpochNumber, "err", err)
+
 		return fmt.Errorf("failed to encode checkpoint data to ABI for block %d: %w", header.Number, err)
 	}
 
@@ -183,12 +200,21 @@ func (c *checkpointManager) encodeAndSendCheckpoint(nonce uint64, txn *ethgo.Tra
 
 	receipt, err := c.rootchain.SendTransaction(nonce, txn)
 	if err != nil {
+		c.logger.Info("[checkpoint] Submitting checkpoint done with error.",
+			"block", header.Number, "epoch", extra.Checkpoint.EpochNumber, "err", err)
+
 		return err
 	}
 
 	if receipt.Status == uint64(types.ReceiptFailed) {
+		c.logger.Info("[checkpoint] Submitting checkpoint done with error.",
+			"block", header.Number, "epoch", extra.Checkpoint.EpochNumber, "err", err)
+
 		return fmt.Errorf("transaction execution failed for block %d", header.Number)
 	}
+
+	c.logger.Info("[checkpoint] Submitting checkpoint done successfully.",
+		"block", header.Number, "epoch", extra.Checkpoint.EpochNumber)
 
 	return nil
 }
@@ -196,16 +222,31 @@ func (c *checkpointManager) encodeAndSendCheckpoint(nonce uint64, txn *ethgo.Tra
 // abiEncodeCheckpointBlock encodes checkpoint data into ABI format for a given header
 func (c *checkpointManager) abiEncodeCheckpointBlock(headerNumber uint64, headerHash types.Hash, extra Extra,
 	nextValidators AccountSet) ([]byte, error) {
+	aggs, err := bls.UnmarshalSignature(extra.Committed.AggregatedSignature)
+	if err != nil {
+		return nil, err
+	}
+
+	bigIntSig, err := aggs.ToBigInt()
+	if err != nil {
+		return nil, err
+	}
+
 	params := map[string]interface{}{
-		"chainID":             new(big.Int).SetUint64(c.blockchain.GetChainID()),
-		"aggregatedSignature": extra.Committed.AggregatedSignature,
-		"validatorsBitmap":    extra.Committed.Bitmap,
-		"epochNumber":         new(big.Int).SetUint64(extra.Checkpoint.EpochNumber),
-		"blockNumber":         new(big.Int).SetUint64(headerNumber),
-		"blockHash":           headerHash,
-		"blockRound":          new(big.Int).SetUint64(extra.Checkpoint.BlockRound),
-		"eventRoot":           extra.Checkpoint.EventRoot.Bytes(),
-		"nextValidators":      nextValidators.AsGenericMaps(),
+		"chainID": new(big.Int).SetUint64(c.blockchain.GetChainID()),
+		"checkpointMetadata": map[string]interface{}{
+			"blockHash":               headerHash,
+			"blockRound":              new(big.Int).SetUint64(extra.Checkpoint.BlockRound),
+			"currentValidatorSetHash": extra.Checkpoint.CurrentValidatorsHash,
+		},
+		"checkpoint": map[string]interface{}{
+			"epoch":       new(big.Int).SetUint64(extra.Checkpoint.EpochNumber),
+			"blockNumber": new(big.Int).SetUint64(headerNumber),
+			"eventRoot":   extra.Checkpoint.EventRoot,
+		},
+		"signature":      bigIntSig,
+		"nextValidators": nextValidators.AsGenericMaps(),
+		"bitmap":         extra.Committed.Bitmap,
 	}
 
 	return submitCheckpointMethod.Encode(params)

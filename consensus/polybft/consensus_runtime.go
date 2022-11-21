@@ -139,6 +139,7 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) *consensusRuntim
 			&defaultRootchainInteractor{},
 			config.blockchain,
 			config.polybftBackend)
+		runtime.checkpointManager.logger = log.Named("checkpoint_manager")
 	}
 
 	return runtime
@@ -1090,7 +1091,10 @@ func (c *consensusRuntime) InsertBlock(proposal []byte, committedSeals []*messag
 				go func(header types.Header, epochNumber uint64) {
 					err := c.checkpointManager.submitCheckpoint(header, fsm.isEndOfEpoch)
 					if err != nil {
-						c.logger.Warn("failed to submit checkpoint", "epoch number", epochNumber, "error", err)
+						c.logger.Warn("failed to submit checkpoint",
+							"block", block.Header.Number,
+							"epoch number", epochNumber,
+							"error", err)
 					}
 				}(*block.Header, fsm.epochNumber)
 			}
