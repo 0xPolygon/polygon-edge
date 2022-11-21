@@ -27,8 +27,7 @@ func (m *mockEventSubscriber) AddLog(log *ethgo.Log) {
 func TestEventTracker_TrackSyncEvents(t *testing.T) {
 	t.Parallel()
 
-	server := testutil.NewTestServer(t, nil)
-	defer server.Close()
+	server := testutil.DeployTestServer(t, nil)
 
 	tmpDir, err := os.MkdirTemp("/tmp", "test-event-tracker")
 	defer os.RemoveAll(tmpDir)
@@ -45,11 +44,14 @@ func TestEventTracker_TrackSyncEvents(t *testing.T) {
 			`
 	})
 
-	_, addr := server.DeployContract(cc)
+	_, addr, err := server.DeployContract(cc)
+	require.NoError(t, err)
 
 	// prefill with 10 events
 	for i := 0; i < 10; i++ {
-		server.TxnTo(addr, "emitEvent")
+		receipt, err := server.TxnTo(addr, "emitEvent")
+		require.NoError(t, err)
+		require.Equal(t, uint64(types.ReceiptSuccess), receipt.Status)
 	}
 
 	sub := &mockEventSubscriber{}
@@ -74,7 +76,9 @@ func TestEventTracker_TrackSyncEvents(t *testing.T) {
 
 	// send 10 more events
 	for i := 0; i < 10; i++ {
-		server.TxnTo(addr, "emitEvent")
+		receipt, err := server.TxnTo(addr, "emitEvent")
+		require.NoError(t, err)
+		require.Equal(t, uint64(types.ReceiptSuccess), receipt.Status)
 	}
 
 	time.Sleep(2 * time.Second)
