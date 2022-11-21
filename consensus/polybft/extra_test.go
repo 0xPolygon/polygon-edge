@@ -2,6 +2,7 @@ package polybft
 
 import (
 	"crypto/rand"
+	"math/big"
 	mrand "math/rand"
 	"testing"
 
@@ -350,6 +351,7 @@ func TestExtra_CreateValidatorSetDelta_Cases(t *testing.T) {
 		oldSet  []string
 		newSet  []string
 		added   []string
+		updated []string
 		removed []uint64
 	}{
 		{
@@ -357,6 +359,7 @@ func TestExtra_CreateValidatorSetDelta_Cases(t *testing.T) {
 			[]string{"A", "B", "C", "E", "F"},
 			[]string{"B", "E", "H"},
 			[]string{"H"},
+			[]string{"B", "E"},
 			[]uint64{0, 2, 4},
 		},
 	}
@@ -375,20 +378,34 @@ func TestExtra_CreateValidatorSetDelta_Cases(t *testing.T) {
 			}
 
 			oldValidatorSet := vals.getPublicIdentities(c.oldSet...)
+			// update voting power to random value
+			maxVotingPower := big.NewInt(100)
+			for _, name := range c.updated {
+				v := vals.getValidator(name)
+				vp, err := rand.Int(rand.Reader, maxVotingPower)
+				require.NoError(t, err)
+				v.votingPower = vp.Uint64()
+			}
 			newValidatorSet := vals.getPublicIdentities(c.newSet...)
 
 			delta, err := createValidatorSetDelta(hclog.NewNullLogger(), oldValidatorSet, newValidatorSet)
 			require.NoError(t, err)
 
-			// added items
-			assert.Len(t, delta.Added, len(c.added))
-			for index, item := range c.added {
-				assert.Equal(t, delta.Added[index].Address, vals.getValidator(item).Address())
+			// added validators
+			require.Len(t, delta.Added, len(c.added))
+			for i, name := range c.added {
+				require.Equal(t, delta.Added[i].Address, vals.getValidator(name).Address())
 			}
 
-			// removed items
+			// removed validators
 			for _, i := range c.removed {
-				assert.True(t, delta.Removed.IsSet(i))
+				require.True(t, delta.Removed.IsSet(i))
+			}
+
+			// updated validators
+			require.Len(t, delta.Updated, len(c.updated))
+			for i, name := range c.updated {
+				require.Equal(t, delta.Updated[i].Address, vals.getValidator(name).Address())
 			}
 		})
 	}
