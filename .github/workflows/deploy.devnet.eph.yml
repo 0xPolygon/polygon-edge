@@ -1,5 +1,5 @@
 ---
-name: DevNet-V3 Workflow
+name: Ephemeral DevNet Workflow
 
 on:  # yamllint disable-line rule:truthy
   workflow_dispatch:
@@ -30,13 +30,13 @@ jobs:
     secrets:
       GH_TOKEN_CLONE_PRIVATE: ${{ secrets.GH_TOKEN_CLONE_PRIVATE }}
 
-  deploy_devnet_v3:
-    name: Deploy DevNet V3
+  deploy_eph_devnet:
+    name: Deploy Ephemeral DevNet
     needs: build
-    concurrency: deploy_devnet_v3
+    concurrency: deploy_eph_devnet
     environment:
-      name: devnet-v3-parity
-      url: https://rpc.us-east-1.dnv3.testing.psdk.io/
+      name: devnet-ephemeral
+      url: https://rpc.us-east-1.deph.testing.psdk.io/
     runs-on: ubuntu-latest
     steps:
       - name: Download Polygon Edge Artifact
@@ -65,14 +65,14 @@ jobs:
                   "type": "header",
                   "text": {
                     "type": "plain_text",
-                    "text": "Devnet V3 Deployment - Started"
+                    "text": "Ephemeral Devnet Deployment - Started"
                   }
                 },
                 {
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "Devnet V3 Deployment Status: ${{ job.status }}\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|Job Status>"
+                    "text": "Ephemeral Devnet Deployment Status: ${{ job.status }}\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|Job Status>"
                   }
                 }
               ]
@@ -82,17 +82,17 @@ jobs:
         run: |
           aws s3 cp ./polygon-edge.tar.gz s3://${{ secrets.POLYGON_EDGE_ARTIFACT_BUCKET }} --metadata "{\"commit_sha\":\"${GITHUB_SHA}\"}"
 
-      - name: Deploy DevNet V3
+      - name: Deploy Ephemeral DevNet
         continue-on-error: true
         env:
           VALIDATOR_ASGS: ${{ secrets.VALIDATOR_ASGS }}
         run: |
           # Parallel deploy all nodes, relying on ALB Health Checks
-          echo "Deploying new Devnet V3"
+          echo "Deploying Ephemeral Devnet"
           echo "--------------------"
 
           # Should finish relatively fast. Can add a check to guard against pre-mature cycle
-          echo "Cleaning up the data directories and stopping Polygon-Edge DevNet V3 service..."
+          echo "Cleaning up the data directories and stopping Polygon-Edge service..."
           aws ssm send-command --document-name polygon-edge-validators-maintenance-clean-data --targets Key=tag:aws:autoscaling:groupName,Values=$VALIDATOR_ASGS >> /dev/null
 
           for vasg in ${VALIDATOR_ASGS//,/ }
@@ -128,7 +128,7 @@ jobs:
               done
               echo ""
           done
-          echo "Devnet V3 Deployment Complete"
+          echo "Ephemeral Devnet Deployment Complete"
 
       - name: Notify Slack - Failures
         uses: slackapi/slack-github-action@v1.22.0
@@ -144,7 +144,7 @@ jobs:
                   "type": "header",
                   "text": {
                     "type": "plain_text",
-                    "text": "Devnet V3 Deployment - Failed"
+                    "text": "Ephemeral Devnet Deployment - Failed"
                   }
                 },
                 {
@@ -170,13 +170,13 @@ jobs:
   pandoras_box:
     uses: ./.github/workflows/pandoras_box.yml
     name: Pandora's Box
-    needs: deploy_devnet_v3
+    needs: deploy_eph_devnet
     secrets:
       SLACK_PERFORMANCE_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
       PANDORAS_TARGET: ${{ secrets.PANDORAS_TARGET }}
       PANDORAS_MNEMONIC: ${{ secrets.PANDORAS_MNEMONIC }}
     with:
-      runner: devnet-v3-parity
-      environment: devnet-v3-parity
+      runner: devnet-ephemeral
+      environment: devnet-ephemeral
       transaction_batch: '200'
       transaction_count: '10000'
