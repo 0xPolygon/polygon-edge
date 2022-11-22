@@ -258,7 +258,6 @@ func (c *state) Run() ([]byte, error) {
 			break
 		}
 
-		// TODO: track before memory expansion, return data
 		c.captureSuccessfulExecution(op.String(), gasCopy)
 
 		// execute the instruction
