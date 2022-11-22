@@ -133,10 +133,11 @@ type promoteRequest struct {
 // transactions are the first-in-line of some promoted queue,
 // ready to be written to the state (primaries).
 type TxPool struct {
-	logger hclog.Logger
-	signer signer
-	forks  chain.ForksInTime
-	store  store
+	logger  hclog.Logger
+	signer  signer
+	forks   chain.ForksInTime
+	store   store
+	journal Journal
 
 	// map of all accounts registered by the pool
 	accounts accountsMap
@@ -232,6 +233,7 @@ func NewTxPool(
 		logger:      logger.Named("txpool"),
 		forks:       forks,
 		store:       store,
+		journal:     newMemoryJournal(),
 		executables: newPricedQueue(),
 		accounts:    accountsMap{maxEnqueuedLimit: config.MaxAccountEnqueued},
 		index:       lookupMap{all: make(map[types.Hash]*types.Transaction)},
@@ -449,6 +451,10 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 
 		// increase counter
 		droppedCount += len(txs)
+
+		for _, tx := range txs {
+			p.journal.logDroppedTx(tx.Hash)
+		}
 	}
 
 	defer func() {
@@ -551,6 +557,8 @@ func (p *TxPool) processEvent(event *blockchain.Event) {
 
 		// Extract latest nonces
 		for _, tx := range block.Transactions {
+			p.journal.logSuccessfulTx(tx.Hash)
+
 			var err error
 
 			addr := tx.From
@@ -587,6 +595,8 @@ func (p *TxPool) processEvent(event *blockchain.Event) {
 		if err := p.addTx(reorg, tx); err != nil {
 			p.logger.Error("add tx", "err", err)
 		}
+
+		p.journal.resetTxStatus(tx.Hash)
 	}
 
 	// reset accounts with the new state
