@@ -5,11 +5,11 @@ on:  # yamllint disable-line rule:truthy
     inputs:
       runner:
         description: The runner to execute on
-        default: 'devnet-ephemeral'
+        default: 'ubuntu-latest'
         type: choice
         options:
+          - ubuntu-latest
           - devnet
-          - devnet-ephemeral
           - testnet
       environment:
         description: The environment to run against
