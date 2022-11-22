@@ -156,7 +156,7 @@ jobs:
               ]
             }
 
-  pandoras_box:
+  pandoras_box_eoa:
     uses: ./.github/workflows/pandoras_box.yml
     name: Pandora's Box
     needs: deploy_testnet
@@ -169,6 +169,35 @@ jobs:
       environment: testnet
       transaction_batch: '200'
       transaction_count: '10000'
+      mode: EOA
+  pandoras_box_erc20:
+    uses: ./.github/workflows/pandoras_box.yml
+    name: Pandora's Box
+    needs: pandoras_box_eoa
+    secrets:
+      SLACK_PERFORMANCE_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
+      PANDORAS_TARGET: ${{ secrets.PANDORAS_TARGET }}
+      PANDORAS_MNEMONIC: ${{ secrets.PANDORAS_MNEMONIC }}
+    with:
+      runner: testnet
+      environment: testnet
+      transaction_batch: '200'
+      transaction_count: '10000'
+      mode: ERC20
+  pandoras_box_erc721:
+    uses: ./.github/workflows/pandoras_box.yml
+    name: Pandora's Box
+    needs: pandoras_box_erc20
+    secrets:
+      SLACK_PERFORMANCE_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
+      PANDORAS_TARGET: ${{ secrets.PANDORAS_TARGET }}
+      PANDORAS_MNEMONIC: ${{ secrets.PANDORAS_MNEMONIC }}
+    with:
+      runner: testnet
+      environment: testnet
+      transaction_batch: '200'
+      transaction_count: '10000'
+      mode: ERC721
 
   loadbot:
     uses: ./.github/workflows/loadbot.yml
