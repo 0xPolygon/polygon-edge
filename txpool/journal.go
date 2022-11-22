@@ -10,7 +10,7 @@ import (
 type TxStatus int8
 
 const (
-	TxSuccessful TxStatus = iota // Tx has been mined in a block successfuly
+	TxSuccessful TxStatus = iota // Tx has been mined in a block successfully
 	TxDropped                    // Tx was dropped for some reason
 )
 

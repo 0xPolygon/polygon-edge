@@ -46,6 +46,7 @@ type TestServerConfig struct {
 	ValidatorType           validators.ValidatorType // Validator Type
 	Bootnodes               []string                 // Bootnode Addresses
 	PriceLimit              *uint64                  // Minimum gas price limit to enforce for acceptance into the pool
+	MaxSlots                *uint64                  // Maximum available slots in TxPool
 	DevInterval             int                      // Dev consensus update interval [s]
 	EpochSize               uint64                   // The epoch size in blocks for the IBFT layer
 	BlockGasLimit           uint64                   // Block gas limit
@@ -164,6 +165,11 @@ func (t *TestServerConfig) SetBootnodes(bootnodes []string) {
 // SetPriceLimit sets the gas price limit
 func (t *TestServerConfig) SetPriceLimit(priceLimit *uint64) {
 	t.PriceLimit = priceLimit
+}
+
+// SetMaxSlots sets the max limit of slots
+func (t *TestServerConfig) SetMaxSlots(maxSlot *uint64) {
+	t.MaxSlots = maxSlot
 }
 
 // SetBlockLimit sets the block gas limit

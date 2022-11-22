@@ -95,6 +95,12 @@ func newTestPoolWithSlots(maxSlots uint64, mockStore ...store) (*TxPool, error) 
 	)
 }
 
+func assertTxStatus(t *testing.T, pool *TxPool, hash types.Hash, expected TxStatus) {
+	t.Helper()
+
+	assert.Equal(t, pool.journal.txStatus(hash), &expected)
+}
+
 type accountState struct {
 	enqueued,
 	promoted,
@@ -394,10 +400,13 @@ func TestPruneAccountsWithNonceHoles(t *testing.T) {
 			assert.NoError(t, err)
 			pool.SetSigner(&mockSigner{})
 
+			tx := newTx(addr1, 5, 1)
+			tx.ComputeHash()
+
 			//	enqueue tx
 			go func() {
 				assert.NoError(t,
-					pool.addTx(local, newTx(addr1, 5, 1)),
+					pool.addTx(local, tx),
 				)
 			}()
 			pool.handleEnqueueRequest(<-pool.enqueueReqCh)
@@ -410,11 +419,13 @@ func TestPruneAccountsWithNonceHoles(t *testing.T) {
 				pool.accounts.get(addr1).getNonce(),
 				pool.accounts.get(addr1).enqueued.peek().Nonce,
 			)
+			assert.Nil(t, pool.journal.txStatus(tx.Hash))
 
 			pool.pruneAccountsWithNonceHoles()
 
 			assert.Equal(t, uint64(0), pool.gauge.read())
 			assert.Equal(t, uint64(0), pool.accounts.get(addr1).enqueued.length())
+			assertTxStatus(t, pool, tx.Hash, TxDropped)
 		},
 	)
 }
@@ -1412,9 +1423,12 @@ func TestDrop(t *testing.T) {
 	assert.NoError(t, err)
 	pool.SetSigner(&mockSigner{})
 
+	tx := newTx(addr1, 0, 1)
+	tx.ComputeHash()
+
 	// send 1 tx and promote it
 	go func() {
-		err := pool.addTx(local, newTx(addr1, 0, 1))
+		err := pool.addTx(local, tx)
 		assert.NoError(t, err)
 	}()
 	go pool.handleEnqueueRequest(<-pool.enqueueReqCh)
@@ -1423,15 +1437,17 @@ func TestDrop(t *testing.T) {
 	assert.Equal(t, uint64(1), pool.gauge.read())
 	assert.Equal(t, uint64(1), pool.accounts.get(addr1).getNonce())
 	assert.Equal(t, uint64(1), pool.accounts.get(addr1).promoted.length())
+	assert.Nil(t, pool.journal.txStatus(tx.Hash))
 
 	// pop the tx
 	pool.Prepare()
-	tx := pool.Peek()
+	tx = pool.Peek()
 	pool.Drop(tx)
 
 	assert.Equal(t, uint64(0), pool.gauge.read())
 	assert.Equal(t, uint64(0), pool.accounts.get(addr1).getNonce())
 	assert.Equal(t, uint64(0), pool.accounts.get(addr1).promoted.length())
+	assertTxStatus(t, pool, tx.Hash, TxDropped)
 }
 
 func TestDemote(t *testing.T) {
@@ -1478,9 +1494,12 @@ func TestDemote(t *testing.T) {
 		assert.NoError(t, err)
 		pool.SetSigner(&mockSigner{})
 
+		tx := newTx(addr1, 0, 1)
+		tx.ComputeHash()
+
 		// send tx
 		go func() {
-			err := pool.addTx(local, newTx(addr1, 0, 1))
+			err := pool.addTx(local, tx)
 			assert.NoError(t, err)
 		}()
 		go pool.handleEnqueueRequest(<-pool.enqueueReqCh)
@@ -1495,7 +1514,7 @@ func TestDemote(t *testing.T) {
 
 		// call demote
 		pool.Prepare()
-		tx := pool.Peek()
+		tx = pool.Peek()
 		pool.Demote(tx)
 
 		// account was dropped
@@ -1505,6 +1524,7 @@ func TestDemote(t *testing.T) {
 
 		// demotions are reset to 0
 		assert.Equal(t, uint64(0), pool.accounts.get(addr1).Demotions())
+		assertTxStatus(t, pool, tx.Hash, TxDropped)
 	})
 }
 
@@ -1573,6 +1593,7 @@ func Test_updateAccountSkipsCounts(t *testing.T) {
 		assert.Zero(t, accountMap.skips)
 		assert.Zero(t, pool.gauge.read())
 		checkTxExistence(t, pool, tx.Hash, false)
+		assertTxStatus(t, pool, tx.Hash, TxDropped)
 	})
 
 	t.Run("should drop the first transaction from enqueued queue", func(t *testing.T) {
@@ -1608,6 +1629,7 @@ func Test_updateAccountSkipsCounts(t *testing.T) {
 		assert.Zero(t, accountMap.skips)
 		assert.Zero(t, pool.gauge.read())
 		checkTxExistence(t, pool, tx.Hash, false)
+		assertTxStatus(t, pool, tx.Hash, TxDropped)
 	})
 
 	t.Run("should not drop a transaction", func(t *testing.T) {
@@ -1643,6 +1665,7 @@ func Test_updateAccountSkipsCounts(t *testing.T) {
 		assert.Equal(t, uint64(0), accountMap.skips)
 		assert.Equal(t, slotsRequired(tx), pool.gauge.read())
 		checkTxExistence(t, pool, tx.Hash, true)
+		assert.Nil(t, pool.journal.txStatus(tx.Hash))
 	})
 }
 

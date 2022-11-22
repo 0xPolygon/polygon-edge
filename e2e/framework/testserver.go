@@ -416,6 +416,10 @@ func (t *TestServer) Start(ctx context.Context) error {
 		args = append(args, "--price-limit", strconv.FormatUint(*t.Config.PriceLimit, 10))
 	}
 
+	if t.Config.MaxSlots != nil {
+		args = append(args, "--max-slots", strconv.FormatUint(*t.Config.MaxSlots, 10))
+	}
+
 	if t.Config.ShowsLog || t.Config.SaveLogs {
 		args = append(args, "--log-level", "debug")
 	}
@@ -548,19 +552,27 @@ type PreparedTransaction struct {
 	To       *types.Address
 	Value    *big.Int
 	Input    []byte
+	Nonce    *uint64
 }
 
-// SendRawTx signs the transaction with the provided private key, executes it, and returns the receipt
-func (t *TestServer) SendRawTx(
+func (t *TestServer) SendRawTxWithoutConfirmation(
 	ctx context.Context,
 	tx *PreparedTransaction,
 	signerKey *ecdsa.PrivateKey,
-) (*ethgo.Receipt, error) {
+) (ethgo.Hash, error) {
 	client := t.JSONRPC()
 
-	nextNonce, err := client.Eth().GetNonce(ethgo.Address(tx.From), ethgo.Latest)
-	if err != nil {
-		return nil, err
+	var (
+		nextNonce uint64
+		err       error
+	)
+
+	if tx.Nonce != nil {
+		nextNonce = *tx.Nonce
+	} else {
+		if nextNonce, err = client.Eth().GetNonce(ethgo.Address(tx.From), ethgo.Latest); err != nil {
+			return ethgo.ZeroHash, err
+		}
 	}
 
 	signedTx, err := t.SignTx(&types.Transaction{
@@ -573,10 +585,19 @@ func (t *TestServer) SendRawTx(
 		Nonce:    nextNonce,
 	}, signerKey)
 	if err != nil {
-		return nil, err
+		return ethgo.ZeroHash, err
 	}
 
-	txHash, err := client.Eth().SendRawTransaction(signedTx.MarshalRLP())
+	return client.Eth().SendRawTransaction(signedTx.MarshalRLP())
+}
+
+// SendRawTx signs the transaction with the provided private key, executes it, and returns the receipt
+func (t *TestServer) SendRawTx(
+	ctx context.Context,
+	tx *PreparedTransaction,
+	signerKey *ecdsa.PrivateKey,
+) (*ethgo.Receipt, error) {
+	txHash, err := t.SendRawTxWithoutConfirmation(ctx, tx, signerKey)
 	if err != nil {
 		return nil, err
 	}

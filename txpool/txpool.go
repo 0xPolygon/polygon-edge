@@ -446,15 +446,10 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 
 	// pool resource cleanup
 	clearAccountQueue := func(txs []*types.Transaction) {
-		p.index.remove(txs...)
-		p.gauge.decrease(slotsRequired(txs...))
+		p.cleanupForDroppedTxns(txs...)
 
 		// increase counter
 		droppedCount += len(txs)
-
-		for _, tx := range txs {
-			p.journal.logDroppedTx(tx.Hash)
-		}
 	}
 
 	defer func() {
@@ -716,8 +711,7 @@ func (p *TxPool) pruneAccountsWithNonceHoles() {
 
 			removed := account.enqueued.clear()
 
-			p.index.remove(removed...)
-			p.gauge.decrease(slotsRequired(removed...))
+			p.cleanupForDroppedTxns(removed...)
 
 			return true
 		},
@@ -787,6 +781,7 @@ func (p *TxPool) handleEnqueueRequest(req enqueueRequest) {
 		p.logger.Error("enqueue request", "err", err)
 
 		p.index.remove(tx)
+		p.journal.logDroppedTx(tx.Hash)
 
 		return
 	}
@@ -817,8 +812,7 @@ func (p *TxPool) handlePromoteRequest(req promoteRequest) {
 	promoted, pruned := account.promote()
 	p.logger.Debug("promote request", "promoted", promoted, "addr", addr.String())
 
-	p.index.remove(pruned...)
-	p.gauge.decrease(slotsRequired(pruned...))
+	p.cleanupForDroppedTxns(pruned...)
 
 	// update metrics
 	p.updatePending(int64(len(promoted)))
@@ -961,6 +955,16 @@ func (p *TxPool) updateAccountSkipsCounts(latestActiveAccounts map[types.Address
 			return true
 		},
 	)
+}
+
+// cleanupForDroppedTxns cleans some data for dropped transactions and record to journal
+func (p *TxPool) cleanupForDroppedTxns(txs ...*types.Transaction) {
+	p.index.remove(txs...)
+	p.gauge.decrease(slotsRequired(txs...))
+
+	for _, tx := range txs {
+		p.journal.logDroppedTx(tx.Hash)
+	}
 }
 
 // createAccountOnce creates an account and

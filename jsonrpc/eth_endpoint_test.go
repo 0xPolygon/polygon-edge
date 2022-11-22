@@ -297,3 +297,49 @@ func TestEth_HeaderResolveBlock(t *testing.T) {
 		}
 	}
 }
+
+func TestEth_TxStatus(t *testing.T) {
+	var (
+		succeededTxHash   = types.StringToHash("1")
+		droppedTxHash     = types.StringToHash("2")
+		unconfirmedTxHash = types.StringToHash("3")
+
+		success = "success"
+		dropped = "dropped"
+	)
+
+	// Set up the mock store
+	store := newMockStore()
+	store.txStatusByHash = map[types.Hash]string{
+		succeededTxHash: success,
+		droppedTxHash:   dropped,
+	}
+
+	eth := newTestEthEndpoint(store)
+
+	tests := []struct {
+		txHash   types.Hash
+		expected *string
+	}{
+		{
+			succeededTxHash,
+			&success,
+		},
+		{
+			droppedTxHash,
+			&dropped,
+		},
+		{
+			unconfirmedTxHash,
+			// shoukd be nil
+			nil,
+		},
+	}
+
+	for _, test := range tests {
+		status, err := eth.TxStatus(test.txHash)
+
+		assert.Equal(t, test.expected, status)
+		assert.Nil(t, err)
+	}
+}
