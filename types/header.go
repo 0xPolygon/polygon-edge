@@ -54,6 +54,11 @@ func (n Nonce) String() string {
 	return hex.EncodeToHex(n[:])
 }
 
+// MarshalText implements encoding.TextMarshaler
+func (n Nonce) MarshalText() ([]byte, error) {
+	return []byte(n.String()), nil
+}
+
 func (h *Header) Copy() *Header {
 	newHeader := &Header{
 		ParentHash:   h.ParentHash,
