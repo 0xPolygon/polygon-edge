@@ -405,7 +405,7 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 				return fmt.Errorf("error for state transaction while retrieving signers: tx = %v, error = %w", tx.Hash, err)
 			}
 
-			if !f.validators.HasQuorum(signers.GetAddresses()) {
+			if !f.validators.HasQuorum(signers.GetAddressesAsMap()) {
 				return fmt.Errorf("quorum size not reached for state tx: %v", tx.Hash)
 			}
 

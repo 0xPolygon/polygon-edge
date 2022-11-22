@@ -648,7 +648,7 @@ func (c *consensusRuntime) getAggSignatureForCommitmentMessage(
 
 	publicKeys := make([][]byte, 0)
 	bitmap := bitmap.Bitmap{}
-	signers := make([]types.Address, 0)
+	signers := make(map[types.Address]struct{}, 0)
 
 	for _, vote := range votes {
 		index, exists := validatorAddrToIndex[vote.From]
@@ -665,7 +665,7 @@ func (c *consensusRuntime) getAggSignatureForCommitmentMessage(
 
 		signatures = append(signatures, signature)
 		publicKeys = append(publicKeys, validatorsMetadata[index].BlsKey.Marshal())
-		signers = append(signers, types.StringToAddress(vote.From))
+		signers[types.StringToAddress(vote.From)] = struct{}{}
 	}
 
 	if !validatorSet.HasQuorum(signers) {
@@ -1114,9 +1114,17 @@ func (c *consensusRuntime) HasQuorum(
 	}
 
 	// extract the addresses of all the signers of the messages
-	signers := make([]types.Address, len(messages))
-	for i, message := range messages {
-		signers[i] = types.BytesToAddress(message.From)
+	signers := make(map[types.Address]struct{}, len(messages))
+
+	for _, message := range messages {
+		if message.Type != msgType {
+			c.logger.Warn("HasQuorum received not matching message and message type",
+				"type of message", message.Type, "submitted message type", msgType)
+
+			return false
+		}
+
+		signers[types.BytesToAddress(message.From)] = struct{}{}
 	}
 
 	// check quorum

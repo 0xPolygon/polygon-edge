@@ -235,7 +235,7 @@ func TestSignature_VerifyCommittedFields(t *testing.T) {
 
 		var signatures bls.Signatures
 		bitmap := bitmap.Bitmap{}
-		signers := make([]types.Address, validatorSet.Len())
+		signers := make(map[types.Address]struct{}, validatorSet.Len())
 
 		for i, val := range vals.getValidators() {
 			bitmap.Set(uint64(i))
@@ -253,7 +253,7 @@ func TestSignature_VerifyCommittedFields(t *testing.T) {
 			}
 
 			err = s.VerifyCommittedFields(validatorsMetadata, msgHash)
-			signers[i] = val.Address()
+			signers[val.Address()] = struct{}{}
 
 			if !validatorSet.HasQuorum(signers) {
 				assert.ErrorContains(t, err, "quorum not reached", "failed for %d", i)

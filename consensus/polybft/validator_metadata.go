@@ -124,6 +124,16 @@ func (as AccountSet) GetAddresses() []types.Address {
 	return res
 }
 
+// GetAddresses aggregates addresses as map for given AccountSet
+func (as AccountSet) GetAddressesAsMap() map[types.Address]struct{} {
+	res := make(map[types.Address]struct{}, len(as))
+	for _, account := range as {
+		res[account.Address] = struct{}{}
+	}
+
+	return res
+}
+
 // GetBlsKeys aggregates public BLS keys for given AccountSet
 func (as AccountSet) GetBlsKeys() []*bls.PublicKey {
 	res := make([]*bls.PublicKey, 0, len(as))
