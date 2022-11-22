@@ -165,7 +165,7 @@ jobs:
                       },
                       {
                         "type": "mrkdwn",
-                        "text": "Test Mode: '${{ inputs.mode }}'"
+                        "text": "Test Mode: `${{ inputs.mode }}`"
                       },
                       {
                         "type": "mrkdwn",
