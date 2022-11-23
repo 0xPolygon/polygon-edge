@@ -76,7 +76,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	pendingNonce, err := helper.GetPendingNonce(helper.GetDefAccount())
+	pendingNonce, err := helper.GetPendingNonce(helper.GetRootchainAdminAddr())
 	if err != nil {
 		outputter.SetError(fmt.Errorf("could not get pending nonce: %w", err))
 
@@ -100,7 +100,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 					return fmt.Errorf("failed to create tx input: %w", err)
 				}
 
-				if _, err = helper.SendTxn(pendingNonce+walletIndex, txn); err != nil {
+				if _, err = helper.SendTxn(pendingNonce+walletIndex, txn, helper.GetRootchainAdminKey()); err != nil {
 					return fmt.Errorf("sending transaction to wallet: %s with amount: %s, failed with error: %w", wallet, amount, err)
 				}
 

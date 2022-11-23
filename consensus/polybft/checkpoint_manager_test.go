@@ -13,6 +13,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -20,7 +21,8 @@ func TestCheckpointManager_submitCheckpoint(t *testing.T) {
 	t.Skip("FIX ME")
 	t.Parallel()
 
-	validators := newTestValidators(5).getPublicIdentities()
+	validators := newTestValidators(5)
+	validatorsMetadata := validators.getPublicIdentities()
 	rootchainMock := new(dummyRootchainInteractor)
 	rootchainMock.On("Call", mock.Anything, mock.Anything, mock.Anything).
 		Return("1", error(nil)).
@@ -40,7 +42,7 @@ func TestCheckpointManager_submitCheckpoint(t *testing.T) {
 		EpochNumber: 4,
 		EventRoot:   types.BytesToHash(generateRandomBytes(t)),
 	}
-	extra := createTestExtraObject(validators, validators, 3, 3, 3)
+	extra := createTestExtraObject(validatorsMetadata, validatorsMetadata, 3, 3, 3)
 	extra.Checkpoint = checkpoint
 
 	latestCheckpointHeader := &types.Header{
@@ -57,9 +59,9 @@ func TestCheckpointManager_submitCheckpoint(t *testing.T) {
 	checkpoint3 := checkpoint.Copy()
 	checkpoint3.EpochNumber = 3
 
-	extra = createTestExtraObject(validators, validators, 4, 4, 4)
+	extra = createTestExtraObject(validatorsMetadata, validatorsMetadata, 4, 4, 4)
 	extra.Checkpoint = checkpoint1
-	extra3 := createTestExtraObject(validators, validators, 4, 4, 4)
+	extra3 := createTestExtraObject(validatorsMetadata, validatorsMetadata, 4, 4, 4)
 	extra3.Checkpoint = checkpoint3
 
 	headersMap := &testHeadersMap{}
@@ -87,8 +89,9 @@ func TestCheckpointManager_submitCheckpoint(t *testing.T) {
 	blockchainMock := new(blockchainMock)
 	blockchainMock.On("GetHeaderByNumber", mock.Anything).Return(headersMap.getHeader)
 
+	validatorAcc := validators.getValidator("A")
 	c := &checkpointManager{
-		sender:           types.StringToAddress("2"),
+		signer:           wallet.NewEcdsaSigner(validatorAcc.Key()),
 		rootchain:        rootchainMock,
 		consensusBackend: backendMock,
 		blockchain:       blockchainMock,
@@ -237,7 +240,7 @@ func TestCheckpointManager_isCheckpointBlock(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
 
-			checkpointMgr := newCheckpointManager(types.ZeroAddress, c.checkpointsOffset, nil, nil, nil)
+			checkpointMgr := newCheckpointManager(nil, c.checkpointsOffset, nil, nil, nil)
 			require.Equal(t, c.isCheckpointBlock, checkpointMgr.isCheckpointBlock(c.blockNumber))
 		})
 	}
@@ -255,8 +258,8 @@ func (d dummyRootchainInteractor) Call(from types.Address, to types.Address, inp
 	return args.String(0), args.Error(1)
 }
 
-func (d dummyRootchainInteractor) SendTransaction(nonce uint64, transaction *ethgo.Transaction) (*ethgo.Receipt, error) {
-	args := d.Called(nonce, transaction)
+func (d dummyRootchainInteractor) SendTransaction(nonce uint64, transaction *ethgo.Transaction, signer ethgo.Key) (*ethgo.Receipt, error) {
+	args := d.Called(nonce, transaction, signer)
 
 	return args.Get(0).(*ethgo.Receipt), args.Error(1) //nolint:forcetypeassert
 }

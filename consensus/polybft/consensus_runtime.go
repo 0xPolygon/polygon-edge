@@ -134,7 +134,7 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) *consensusRuntim
 
 	if runtime.IsBridgeEnabled() {
 		runtime.checkpointManager = newCheckpointManager(
-			types.Address(config.Key.Address()),
+			wallet.NewEcdsaSigner(config.Key),
 			defaultCheckpointsOffset,
 			&defaultRootchainInteractor{},
 			config.blockchain,

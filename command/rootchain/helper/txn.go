@@ -22,7 +22,7 @@ const (
 var (
 	// use a deterministic wallet/private key so that the address of the deployed contracts
 	// are deterministic
-	defKey *wallet.Key
+	rootchainAdminKey *wallet.Key
 
 	jrpcClientLock sync.Mutex
 	jsonRPCClient  *jsonrpc.Client
@@ -34,19 +34,23 @@ func init() {
 		panic(err)
 	}
 
-	defKey, err = wallet.NewWalletFromPrivKey(dec)
+	rootchainAdminKey, err = wallet.NewWalletFromPrivKey(dec)
 	if err != nil {
 		panic(err)
 	}
 }
 
-func GetDefAccount() types.Address {
-	return types.BytesToAddress(defKey.Address().Bytes())
+func GetRootchainAdminAddr() types.Address {
+	return types.Address(rootchainAdminKey.Address())
+}
+
+func GetRootchainAdminKey() ethgo.Key {
+	return rootchainAdminKey
 }
 
 // SendTxn function sends transaction to the rootchain
 // blocks until receipt hash is returned
-func SendTxn(nonce uint64, txn *ethgo.Transaction) (*ethgo.Receipt, error) {
+func SendTxn(nonce uint64, txn *ethgo.Transaction, key ethgo.Key) (*ethgo.Receipt, error) {
 	provider, err := getJSONRPCClient()
 	if err != nil {
 		return nil, err
@@ -62,7 +66,7 @@ func SendTxn(nonce uint64, txn *ethgo.Transaction) (*ethgo.Receipt, error) {
 	}
 
 	signer := wallet.NewEIP155Signer(chainID.Uint64())
-	if txn, err = signer.SignTx(txn, defKey); err != nil {
+	if txn, err = signer.SignTx(txn, key); err != nil {
 		return nil, err
 	}
 

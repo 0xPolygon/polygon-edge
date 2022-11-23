@@ -116,7 +116,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 func deployContracts(outputter command.OutputFormatter) error {
 	// if the bridge contract is not created, we have to deploy all the contracts
 	// fund account
-	if _, err := helper.FundAccount(helper.GetDefAccount()); err != nil {
+	if _, err := helper.FundAccount(helper.GetRootchainAdminAddr()); err != nil {
 		return err
 	}
 
@@ -147,7 +147,7 @@ func deployContracts(outputter command.OutputFormatter) error {
 		},
 	}
 
-	pendingNonce, err := helper.GetPendingNonce(helper.GetDefAccount())
+	pendingNonce, err := helper.GetPendingNonce(helper.GetRootchainAdminAddr())
 	if err != nil {
 		return err
 	}
@@ -163,7 +163,7 @@ func deployContracts(outputter command.OutputFormatter) error {
 			Input: bytecode,
 		}
 
-		receipt, err := helper.SendTxn(pendingNonce+uint64(i), txn)
+		receipt, err := helper.SendTxn(pendingNonce+uint64(i), txn, helper.GetRootchainAdminKey())
 		if err != nil {
 			return err
 		}
@@ -211,7 +211,7 @@ func initializeCheckpointManager(nonce uint64) error {
 		Input: initCheckpointInput,
 	}
 
-	receipt, err := helper.SendTxn(nonce, txn)
+	receipt, err := helper.SendTxn(nonce, txn, helper.GetRootchainAdminKey())
 	if err != nil {
 		return fmt.Errorf("failed to send transaction to CheckpointManager. error: %w", err)
 	}

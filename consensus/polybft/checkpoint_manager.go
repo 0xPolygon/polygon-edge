@@ -34,8 +34,10 @@ var (
 
 // checkpointManager encapsulates logic for checkpoint data submission
 type checkpointManager struct {
-	// sender address
-	sender types.Address
+	// signer is the identity of the node submitting a checkpoint
+	signer ethgo.Key
+	// signerAddress is the address of the node submitting a checkpoint
+	signerAddress types.Address
 	// blockchain is abstraction for blockchain
 	blockchain blockchainBackend
 	// consensusBackend is abstraction for polybft consensus specific functions
@@ -51,7 +53,7 @@ type checkpointManager struct {
 }
 
 // newCheckpointManager creates a new instance of checkpointManager
-func newCheckpointManager(sender types.Address, checkpointOffset uint64, interactor rootchainInteractor,
+func newCheckpointManager(signer ethgo.Key, checkpointOffset uint64, interactor rootchainInteractor,
 	blockchain blockchainBackend, backend polybftBackend) *checkpointManager {
 	r := interactor
 	if interactor == nil {
@@ -59,7 +61,8 @@ func newCheckpointManager(sender types.Address, checkpointOffset uint64, interac
 	}
 
 	return &checkpointManager{
-		sender:            sender,
+		signer:            signer,
+		signerAddress:     types.Address(signer.Address()),
 		blockchain:        blockchain,
 		consensusBackend:  backend,
 		rootchain:         r,
@@ -74,7 +77,10 @@ func (c checkpointManager) getLatestCheckpointBlock() (uint64, error) {
 		return 0, fmt.Errorf("failed to encode currentCheckpointId function parameters: %w", err)
 	}
 
-	latestCheckpointBlockRaw, err := c.rootchain.Call(c.sender, helper.CheckpointManagerAddress, checkpointIDMethodEncoded)
+	latestCheckpointBlockRaw, err := c.rootchain.Call(
+		c.signerAddress,
+		helper.CheckpointManagerAddress,
+		checkpointIDMethodEncoded)
 	if err != nil {
 		return 0, fmt.Errorf("failed to invoke currentCheckpointId function on the rootchain: %w", err)
 	}
@@ -99,7 +105,7 @@ func (c checkpointManager) submitCheckpoint(latestHeader types.Header, isEndOfEp
 		return err
 	}
 
-	nonce, err := c.rootchain.GetPendingNonce(c.sender)
+	nonce, err := c.rootchain.GetPendingNonce(c.signerAddress)
 	if err != nil {
 		return err
 	}
@@ -107,9 +113,8 @@ func (c checkpointManager) submitCheckpoint(latestHeader types.Header, isEndOfEp
 	checkpointManagerAddr := ethgo.Address(helper.CheckpointManagerAddress)
 	txn := &ethgo.Transaction{
 		To:   &checkpointManagerAddr,
-		From: ethgo.Address(c.sender),
+		From: ethgo.Address(c.signerAddress),
 	}
-
 	initialBlockNumber := lastCheckpointBlockNumber + 1
 
 	var (
@@ -153,8 +158,7 @@ func (c checkpointManager) submitCheckpoint(latestHeader types.Header, isEndOfEp
 			continue
 		}
 
-		err = c.encodeAndSendCheckpoint(nonce, txn, *parentHeader, *parentExtra, true)
-		if err != nil {
+		if err = c.encodeAndSendCheckpoint(nonce, txn, *parentHeader, *parentExtra, true); err != nil {
 			return err
 		}
 		nonce++
@@ -166,7 +170,7 @@ func (c checkpointManager) submitCheckpoint(latestHeader types.Header, isEndOfEp
 		return err
 	}
 
-	return c.encodeAndSendCheckpoint(nonce+1, txn, latestHeader, *extra, isEndOfEpoch)
+	return c.encodeAndSendCheckpoint(nonce, txn, latestHeader, *extra, isEndOfEpoch)
 }
 
 // encodeAndSendCheckpoint encodes checkpoint data for the given block and
@@ -193,7 +197,7 @@ func (c *checkpointManager) encodeAndSendCheckpoint(nonce uint64, txn *ethgo.Tra
 
 	c.logger.Info("sending checkpoint tx...", "nonce", nonce)
 
-	receipt, err := c.rootchain.SendTransaction(nonce, txn)
+	receipt, err := c.rootchain.SendTransaction(nonce, txn, c.signer)
 	if err != nil {
 		return err
 	}
@@ -251,7 +255,7 @@ var _ rootchainInteractor = (*defaultRootchainInteractor)(nil)
 
 type rootchainInteractor interface {
 	Call(from types.Address, to types.Address, input []byte) (string, error)
-	SendTransaction(nonce uint64, transaction *ethgo.Transaction) (*ethgo.Receipt, error)
+	SendTransaction(nonce uint64, transaction *ethgo.Transaction, signer ethgo.Key) (*ethgo.Receipt, error)
 	GetPendingNonce(address types.Address) (uint64, error)
 }
 
@@ -263,8 +267,8 @@ func (d *defaultRootchainInteractor) Call(from types.Address, to types.Address, 
 }
 
 func (d *defaultRootchainInteractor) SendTransaction(nonce uint64,
-	transaction *ethgo.Transaction) (*ethgo.Receipt, error) {
-	return helper.SendTxn(nonce, transaction)
+	transaction *ethgo.Transaction, signer ethgo.Key) (*ethgo.Receipt, error) {
+	return helper.SendTxn(nonce, transaction, signer)
 }
 
 func (d *defaultRootchainInteractor) GetPendingNonce(address types.Address) (uint64, error) {

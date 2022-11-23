@@ -1613,13 +1613,14 @@ func TestConsensusRuntime_FSM_EndOfEpoch_OnBlockInserted(t *testing.T) {
 		txPool:     txPool,
 	}
 
+	signer := validatorAccounts.getValidator("A").Key()
 	runtime := &consensusRuntime{
 		logger:            hclog.NewNullLogger(),
 		state:             state,
 		epoch:             metadata,
 		config:            config,
 		lastBuiltBlock:    lastBuiltBlock,
-		checkpointManager: newCheckpointManager(types.StringToAddress("3"), 5, nil, nil, nil),
+		checkpointManager: newCheckpointManager(wallet.NewEcdsaSigner(signer), 5, nil, nil, nil),
 	}
 
 	err = runtime.FSM()

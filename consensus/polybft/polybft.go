@@ -134,7 +134,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 		}
 
 		input, err = initNativeTokenMethod.Encode(
-			[]interface{}{helper.GetDefAccount(), nativeTokenName, nativeTokenSymbol})
+			[]interface{}{helper.GetRootchainAdminAddr(), nativeTokenName, nativeTokenSymbol})
 		if err != nil {
 			return err
 		}
