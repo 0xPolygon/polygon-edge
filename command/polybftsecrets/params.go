@@ -151,23 +151,15 @@ func (ip *initParams) initKeys(secretsManager secrets.SecretsManager) error {
 	}
 
 	if ip.generatesAccount {
+		if secretsManager.HasSecret(secrets.ValidatorKey) {
+			return fmt.Errorf(`secrets "%s" has been already initialized`, secrets.ValidatorKey)
+		}
+
 		if secretsManager.HasSecret(secrets.ValidatorBLSKey) {
 			return fmt.Errorf(`secrets "%s" has been already initialized`, secrets.ValidatorBLSKey)
 		}
 
-		account := wallet.GenerateAccount()
-
-		bytes, err := account.ToBytes()
-		if err != nil {
-			return err
-		}
-
-		err = secretsManager.SetSecret(
-			secrets.ValidatorBLSKey,
-			bytes)
-		if err != nil {
-			return err
-		}
+		return wallet.GenerateAccount().Save(secretsManager)
 	}
 
 	return nil
@@ -181,8 +173,7 @@ func (ip *initParams) getResult(secretsManager secrets.SecretsManager) (command.
 	)
 
 	if ip.generatesAccount {
-		account, err := wallet.GenerateNewAccountFromSecret(
-			secretsManager, secrets.ValidatorBLSKey)
+		account, err := wallet.NewAccountFromSecret(secretsManager)
 		if err != nil {
 			return nil, err
 		}

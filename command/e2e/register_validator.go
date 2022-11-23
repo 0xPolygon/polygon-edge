@@ -11,7 +11,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/crypto"
-	"github.com/0xPolygon/polygon-edge/secrets"
 	secretsHelper "github.com/0xPolygon/polygon-edge/secrets/helper"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/mitchellh/go-glint"
@@ -63,7 +62,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	existingValidatorAccount, err := wallet.GenerateNewAccountFromSecret(secretsManager, secrets.ValidatorBLSKey)
+	existingValidatorAccount, err := wallet.NewAccountFromSecret(secretsManager)
 	if err != nil {
 		return err
 	}
@@ -75,7 +74,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	newValidatorAccount, err := wallet.GenerateNewAccountFromSecret(secretsManager, secrets.ValidatorBLSKey)
+	newValidatorAccount, err := wallet.NewAccountFromSecret(secretsManager)
 	if err != nil {
 		return err
 	}
