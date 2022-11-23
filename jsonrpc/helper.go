@@ -10,6 +10,7 @@ import (
 
 var (
 	ErrHeaderNotFound           = errors.New("header not found")
+	ErrLatestNotFound           = errors.New("latest header not found")
 	ErrPendingBlockNumber       = errors.New("fetching the pending header is not supported")
 	ErrNegativeBlockNumber      = errors.New("invalid argument 0: block number must not be negative")
 	ErrFailedFetchGenesis       = errors.New("error fetching genesis block header")
@@ -24,7 +25,12 @@ type latestHeaderGetter interface {
 func GetNumericBlockNumber(number BlockNumber, store latestHeaderGetter) (uint64, error) {
 	switch number {
 	case LatestBlockNumber:
-		return store.Header().Number, nil
+		latest := store.Header()
+		if latest == nil {
+			return 0, ErrLatestNotFound
+		}
+
+		return latest.Number, nil
 
 	case EarliestBlockNumber:
 		return 0, nil

@@ -85,6 +85,17 @@ func TestGetNumericBlockNumber(t *testing.T) {
 			err:      nil,
 		},
 		{
+			name: "should return the latest block's number if latest is given",
+			num:  LatestBlockNumber,
+			store: &debugEndpointMockStore{
+				headerFn: func() *types.Header {
+					return nil
+				},
+			},
+			expected: 0,
+			err:      ErrLatestNotFound,
+		},
+		{
 			name:     "should return 0 number if earliest is given",
 			num:      EarliestBlockNumber,
 			store:    &debugEndpointMockStore{},
