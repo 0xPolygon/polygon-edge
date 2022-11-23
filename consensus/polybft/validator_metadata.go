@@ -26,8 +26,17 @@ type ValidatorMetadata struct {
 	VotingPower uint64
 }
 
-// Equals compares ValidatorMetadata equality
+// Equals checks ValidatorMetadata equality
 func (v *ValidatorMetadata) Equals(b *ValidatorMetadata) bool {
+	if b == nil {
+		return false
+	}
+
+	return v.EqualAddressAndBlsKey(b) && v.VotingPower == b.VotingPower
+}
+
+// EqualAddressAndBlsKey checks ValidatorMetadata equality against Address and BlsKey fields
+func (v *ValidatorMetadata) EqualAddressAndBlsKey(b *ValidatorMetadata) bool {
 	if b == nil {
 		return false
 	}
@@ -266,6 +275,17 @@ func (as AccountSet) ApplyDelta(validatorsDelta *ValidatorSetDelta) (AccountSet,
 		}
 
 		validators = append(validators, addedValidator)
+	}
+
+	// Handle updated validators (find them in the validators slice and insert to appropriate index)
+	for _, updatedValidator := range validatorsDelta.Updated {
+		validatorIndex := validators.Index(updatedValidator.Address)
+		if validatorIndex == -1 {
+			return nil, fmt.Errorf("incorrect delta provided: validator %s is marked as updated but not found in the validators",
+				updatedValidator.Address)
+		}
+
+		validators[validatorIndex] = updatedValidator
 	}
 
 	return validators, nil
