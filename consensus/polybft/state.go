@@ -58,7 +58,7 @@ const (
 	// number of stateSyncEvents to be processed before a commitment message can be created and gossiped
 	stateSyncMainBundleSize = 10
 	// number of stateSyncEvents to be grouped into one StateTransaction
-	stateSyncBundleSize = 5
+	stateSyncBundleSize = 1
 )
 
 type exitEventNotFoundError struct {
