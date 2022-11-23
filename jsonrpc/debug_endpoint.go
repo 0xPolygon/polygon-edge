@@ -15,8 +15,10 @@ import (
 var (
 	defaultTraceTimeout = 5 * time.Second
 
-	ErrExecutionTimeout  = errors.New("execution timeout")        // ErrExecutionTimeout indicates the execution was terminated due to timeout
-	ErrTraceGenesisBlock = errors.New("genesis is not traceable") // ErrTraceGenesisBlock is an error returned when tracing genesis block which can't be traced
+	// ErrExecutionTimeout indicates the execution was terminated due to timeout
+	ErrExecutionTimeout = errors.New("execution timeout")
+	// ErrTraceGenesisBlock is an error returned when tracing genesis block which can't be traced
+	ErrTraceGenesisBlock = errors.New("genesis is not traceable")
 )
 
 type debugBlockchainStore interface {
