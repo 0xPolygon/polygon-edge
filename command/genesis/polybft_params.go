@@ -292,7 +292,7 @@ func generateExtraDataPolyBft(validators []*polybft.Validator, publicKeys []*bls
 		}
 	}
 
-	extra := polybft.Extra{Validators: delta}
+	extra := polybft.Extra{Validators: delta, Checkpoint: &polybft.CheckpointData{}}
 
 	return append(make([]byte, polybft.ExtraVanity), extra.MarshalRLPTo(nil)...), nil
 }

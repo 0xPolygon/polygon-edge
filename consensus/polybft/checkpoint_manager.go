@@ -16,17 +16,17 @@ import (
 var (
 	// currentCheckpointIDMethod is an ABI method object representation for
 	// currentCheckpointId getter function on CheckpointManager contract
-	currentCheckpointIDMethod, _ = abi.NewMethod("function checkpointBlockNumbers() returns (uint256[])")
+	currentCheckpointIDMethod, _ = abi.NewMethod("function latestCheckpointBlockNumber() returns (uint256)")
 
 	// submitCheckpointMethod is an ABI method object representation for
 	// submit checkpoint function on CheckpointManager contract
 	submitCheckpointMethod, _ = abi.NewMethod("function submit(" +
-		"uint256 chainID," +
+		"uint256 chainId," +
 		"tuple(bytes32 blockHash, uint256 blockRound, bytes32 currentValidatorSetHash) checkpointMetadata," +
 		"tuple(uint256 epoch, uint256 blockNumber, bytes32 eventRoot) checkpoint," +
-		"uint256[2] calldata signature," +
+		"uint256[2] signature," +
 		"tuple(address _address, uint256[4] blsKey, uint256 votingPower)[] newValidatorSet," +
-		"bytes validatorsBitmap)")
+		"bytes bitmap)")
 
 	// frequency at which checkpoints are sent to the rootchain (in blocks count)
 	defaultCheckpointsOffset = uint64(900)
@@ -67,35 +67,34 @@ func newCheckpointManager(sender types.Address, checkpointOffset uint64, interac
 	}
 }
 
-// getCurrentCheckpointID queries CheckpointManager smart contract and retrieves current checkpoint id
-// (the latest checkpoint block number)
-func (c checkpointManager) getCurrentCheckpointID() (uint64, error) {
+// getLatestCheckpointBlock queries CheckpointManager smart contract and retrieves latest checkpoint block number
+func (c checkpointManager) getLatestCheckpointBlock() (uint64, error) {
 	checkpointIDMethodEncoded, err := currentCheckpointIDMethod.Encode([]interface{}{})
 	if err != nil {
 		return 0, fmt.Errorf("failed to encode currentCheckpointId function parameters: %w", err)
 	}
 
-	currentCheckpointID, err := c.rootchain.Call(c.sender, helper.CheckpointManagerAddress, checkpointIDMethodEncoded)
+	latestCheckpointBlockRaw, err := c.rootchain.Call(c.sender, helper.CheckpointManagerAddress, checkpointIDMethodEncoded)
 	if err != nil {
 		return 0, fmt.Errorf("failed to invoke currentCheckpointId function on the rootchain: %w", err)
 	}
 
-	c.logger.Info("[checkpoint] Gotten currentCheckpointId", "c", currentCheckpointID)
-
-	checkpointID, err := strconv.ParseUint(currentCheckpointID, 0, 64)
+	latestCheckpointBlockNum, err := strconv.ParseUint(latestCheckpointBlockRaw, 0, 64)
 	if err != nil {
 		return 0, fmt.Errorf("failed to convert current checkpoint id '%s' to number: %w",
-			currentCheckpointID, err)
+			latestCheckpointBlockRaw, err)
 	}
 
-	return checkpointID, nil
+	c.logger.Info("[checkpoint] latest checkpoint block", "number", latestCheckpointBlockNum)
+
+	return latestCheckpointBlockNum, nil
 }
 
 // submitCheckpoint sends a transaction with checkpoint data to the rootchain
 func (c checkpointManager) submitCheckpoint(latestHeader types.Header, isEndOfEpoch bool) error {
 	c.logger.Info("[checkpoint] Submitting checkpoint...", "block", latestHeader.Number)
 
-	lastCheckpointBlockNumber, err := c.getCurrentCheckpointID()
+	lastCheckpointBlockNumber, err := c.getLatestCheckpointBlock()
 	if err != nil {
 		return err
 	}
@@ -149,8 +148,13 @@ func (c checkpointManager) submitCheckpoint(latestHeader types.Header, isEndOfEp
 		parentExtra = currentExtra
 
 		// send pending checkpoints only for epoch ending blocks
-		if parentEpochNumber == currentEpochNumber {
+		if blockNumber == 1 || parentEpochNumber == currentEpochNumber {
 			continue
+		}
+
+		nonce, err = c.rootchain.GetPendingNonce(c.sender)
+		if err != nil {
+			return err
 		}
 
 		err = c.encodeAndSendCheckpoint(nonce, txn, *parentHeader, *parentExtra, true)
@@ -158,7 +162,7 @@ func (c checkpointManager) submitCheckpoint(latestHeader types.Header, isEndOfEp
 			return err
 		}
 
-		nonce++
+		// nonce++
 	}
 
 	//we need to send checkpoint for the latest block
@@ -233,7 +237,7 @@ func (c *checkpointManager) abiEncodeCheckpointBlock(headerNumber uint64, header
 	}
 
 	params := map[string]interface{}{
-		"chainID": new(big.Int).SetUint64(c.blockchain.GetChainID()),
+		"chainId": new(big.Int).SetUint64(c.blockchain.GetChainID()),
 		"checkpointMetadata": map[string]interface{}{
 			"blockHash":               headerHash,
 			"blockRound":              new(big.Int).SetUint64(extra.Checkpoint.BlockRound),
@@ -244,9 +248,9 @@ func (c *checkpointManager) abiEncodeCheckpointBlock(headerNumber uint64, header
 			"blockNumber": new(big.Int).SetUint64(headerNumber),
 			"eventRoot":   extra.Checkpoint.EventRoot,
 		},
-		"signature":      bigIntSig,
-		"nextValidators": nextValidators.AsGenericMaps(),
-		"bitmap":         extra.Committed.Bitmap,
+		"signature":       bigIntSig,
+		"newValidatorSet": nextValidators.AsGenericMaps(),
+		"bitmap":          extra.Committed.Bitmap,
 	}
 
 	return submitCheckpointMethod.Encode(params)

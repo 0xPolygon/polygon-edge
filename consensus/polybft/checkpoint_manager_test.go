@@ -195,7 +195,7 @@ func TestCheckpointManager_getCurrentCheckpointID(t *testing.T) {
 				Once()
 
 			checkpointMgr := &checkpointManager{rootchain: rootchainMock}
-			actualCheckpointID, err := checkpointMgr.getCurrentCheckpointID()
+			actualCheckpointID, err := checkpointMgr.getLatestCheckpointBlock()
 			if c.errSubstring == "" {
 				expectedCheckpointID, err := strconv.ParseUint(c.checkpointID, 0, 64)
 				require.NoError(t, err)
