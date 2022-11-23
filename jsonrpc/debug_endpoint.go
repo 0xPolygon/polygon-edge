@@ -132,7 +132,9 @@ func (d *Debug) TraceTransaction(
 		return nil, ErrTraceGenesisBlock
 	}
 
-	tracer, err := newTracer(config)
+	tracer, cancel, err := newTracer(config)
+	defer cancel()
+
 	if err != nil {
 		return nil, err
 	}
@@ -160,7 +162,9 @@ func (d *Debug) TraceCall(
 		tx.Gas = header.GasLimit
 	}
 
-	tracer, err := newTracer(config)
+	tracer, cancel, err := newTracer(config)
+	defer cancel()
+
 	if err != nil {
 		return nil, err
 	}
@@ -176,7 +180,9 @@ func (d *Debug) traceBlock(
 		return nil, ErrTraceGenesisBlock
 	}
 
-	tracer, err := newTracer(config)
+	tracer, cancel, err := newTracer(config)
+	defer cancel()
+
 	if err != nil {
 		return nil, err
 	}
@@ -185,7 +191,11 @@ func (d *Debug) traceBlock(
 }
 
 // newTracer creates new tracer by config
-func newTracer(config *TraceConfig) (tracer.Tracer, error) {
+func newTracer(config *TraceConfig) (
+	tracer.Tracer,
+	context.CancelFunc,
+	error,
+) {
 	var (
 		timeout = defaultTraceTimeout
 		err     error
@@ -193,7 +203,7 @@ func newTracer(config *TraceConfig) (tracer.Tracer, error) {
 
 	if config.Timeout != nil {
 		if timeout, err = time.ParseDuration(*config.Timeout); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
@@ -204,8 +214,7 @@ func newTracer(config *TraceConfig) (tracer.Tracer, error) {
 		EnableReturnData: config.EnableReturnData,
 	})
 
-	// cancellation of context is done by caller
-	timeoutCtx, _ := context.WithTimeout(context.Background(), timeout)
+	timeoutCtx, cancel := context.WithTimeout(context.Background(), timeout)
 
 	go func() {
 		<-timeoutCtx.Done()
@@ -215,5 +224,6 @@ func newTracer(config *TraceConfig) (tracer.Tracer, error) {
 		}
 	}()
 
-	return tracer, nil
+	// cancellation of context is done by caller
+	return tracer, cancel, nil
 }

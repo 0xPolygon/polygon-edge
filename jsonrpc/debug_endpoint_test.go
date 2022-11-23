@@ -694,11 +694,15 @@ func Test_newTracer(t *testing.T) {
 	t.Run("should create tracer", func(t *testing.T) {
 		t.Parallel()
 
-		tracer, err := newTracer(&TraceConfig{
+		tracer, cancel, err := newTracer(&TraceConfig{
 			EnableMemory:     true,
 			EnableReturnData: true,
 			DisableStack:     false,
 			DisableStorage:   false,
+		})
+
+		t.Cleanup(func() {
+			cancel()
 		})
 
 		assert.NotNil(t, tracer)
@@ -709,12 +713,16 @@ func Test_newTracer(t *testing.T) {
 		t.Parallel()
 
 		timeout := "0s"
-		tracer, err := newTracer(&TraceConfig{
+		tracer, cancel, err := newTracer(&TraceConfig{
 			EnableMemory:     true,
 			EnableReturnData: true,
 			DisableStack:     false,
 			DisableStorage:   false,
 			Timeout:          &timeout,
+		})
+
+		t.Cleanup(func() {
+			cancel()
 		})
 
 		assert.NoError(t, err)
@@ -725,5 +733,27 @@ func Test_newTracer(t *testing.T) {
 		res, err := tracer.GetResult()
 		assert.Nil(t, res)
 		assert.Equal(t, ErrExecutionTimeout, err)
+	})
+
+	t.Run("GetResult should not return if cancel is called beforre timeout", func(t *testing.T) {
+		t.Parallel()
+
+		timeout := "5s"
+		tracer, cancel, err := newTracer(&TraceConfig{
+			EnableMemory:     true,
+			EnableReturnData: true,
+			DisableStack:     false,
+			DisableStorage:   false,
+			Timeout:          &timeout,
+		})
+
+		assert.NoError(t, err)
+
+		cancel()
+
+		res, err := tracer.GetResult()
+
+		assert.NotNil(t, res)
+		assert.NoError(t, err)
 	})
 }
