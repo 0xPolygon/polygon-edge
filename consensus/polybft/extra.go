@@ -144,7 +144,8 @@ func (i *Extra) UnmarshalRLPWith(v *fastrlp.Value) error {
 // createValidatorSetDelta calculates ValidatorSetDelta based on the provided old and new validator sets
 func createValidatorSetDelta(log hclog.Logger, oldValidatorSet,
 	newValidatorSet AccountSet) (*ValidatorSetDelta, error) {
-	var addedValidators AccountSet
+	addedValidators := make(AccountSet, 0)
+	updatedValidators := make(AccountSet, 0)
 
 	oldValidatorSetMap := make(map[types.Address]*ValidatorMetadata)
 	removedValidators := map[types.Address]int{}
@@ -158,15 +159,19 @@ func createValidatorSetDelta(log hclog.Logger, oldValidatorSet,
 
 	for _, newValidator := range newValidatorSet {
 		// Check if the validator is among both old and new validator set
-		oldValidator, ok := oldValidatorSetMap[newValidator.Address]
-		if ok {
-			if !oldValidator.Equals(newValidator) {
+		oldValidator, validatorExists := oldValidatorSetMap[newValidator.Address]
+		if validatorExists {
+			if !oldValidator.EqualAddressAndBlsKey(newValidator) {
 				return nil, fmt.Errorf("validator '%s' found in both old and new validator set, but its BLS keys differ",
 					newValidator.Address.String())
 			}
 
 			// If it is, then discard it from removed validators...
 			delete(removedValidators, newValidator.Address)
+
+			if !oldValidator.Equals(newValidator) {
+				updatedValidators = append(updatedValidators, newValidator)
+			}
 		} else {
 			// ...otherwise it is added
 			addedValidators = append(addedValidators, newValidator)
@@ -180,6 +185,7 @@ func createValidatorSetDelta(log hclog.Logger, oldValidatorSet,
 
 	delta := &ValidatorSetDelta{
 		Added:   addedValidators,
+		Updated: updatedValidators,
 		Removed: removedValsBitmap,
 	}
 
@@ -188,8 +194,10 @@ func createValidatorSetDelta(log hclog.Logger, oldValidatorSet,
 
 // ValidatorSetDelta holds information about added and removed validators compared to the previous epoch
 type ValidatorSetDelta struct {
-	// Added is the list of new validators for the epoch
+	// Added is the slice of added validators
 	Added AccountSet
+	// Updated is the slice of updated valiadtors
+	Updated AccountSet
 	// Removed is a bitmap of the validators removed from the set
 	Removed bitmap.Bitmap
 }
@@ -256,9 +264,11 @@ func (d *ValidatorSetDelta) UnmarshalRLPWith(v *fastrlp.Value) error {
 	return nil
 }
 
-// IsEmpty returns indication whether delta is empty (namely added and removed slices are empty)
+// IsEmpty returns indication whether delta is empty (namely added, updated slices and removed bitmap are empty)
 func (d *ValidatorSetDelta) IsEmpty() bool {
-	return len(d.Added) == 0 && d.Removed.Len() == 0
+	return len(d.Added) == 0 &&
+		len(d.Updated) == 0 &&
+		d.Removed.Len() == 0
 }
 
 // Copy creates deep copy of ValidatorSetDelta
