@@ -337,7 +337,7 @@ func (s *Signature) VerifyCommittedFields(validators AccountSet, hash types.Hash
 		return err
 	}
 
-	signerAddresses := filtered.GetAddressesAsMap()
+	signerAddresses := filtered.GetAddressesAsSet()
 	if !validatorSet.HasQuorum(signerAddresses) {
 		return fmt.Errorf("quorum not reached")
 	}
