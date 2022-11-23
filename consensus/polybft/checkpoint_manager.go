@@ -106,7 +106,8 @@ func (c checkpointManager) submitCheckpoint(latestHeader types.Header, isEndOfEp
 
 	checkpointManagerAddr := ethgo.Address(helper.CheckpointManagerAddress)
 	txn := &ethgo.Transaction{
-		To: &checkpointManagerAddr,
+		To:   &checkpointManagerAddr,
+		From: ethgo.Address(c.sender),
 	}
 
 	initialBlockNumber := lastCheckpointBlockNumber + 1
@@ -152,26 +153,20 @@ func (c checkpointManager) submitCheckpoint(latestHeader types.Header, isEndOfEp
 			continue
 		}
 
-		nonce, err = c.rootchain.GetPendingNonce(c.sender)
-		if err != nil {
-			return err
-		}
-
 		err = c.encodeAndSendCheckpoint(nonce, txn, *parentHeader, *parentExtra, true)
 		if err != nil {
 			return err
 		}
-
-		// nonce++
+		nonce++
 	}
 
-	//we need to send checkpoint for the latest block
+	// we need to send checkpoint for the latest block
 	extra, err := GetIbftExtra(latestHeader.ExtraData)
 	if err != nil {
 		return err
 	}
 
-	return c.encodeAndSendCheckpoint(nonce, txn, latestHeader, *extra, isEndOfEpoch)
+	return c.encodeAndSendCheckpoint(nonce+1, txn, latestHeader, *extra, isEndOfEpoch)
 }
 
 // encodeAndSendCheckpoint encodes checkpoint data for the given block and
@@ -185,35 +180,25 @@ func (c *checkpointManager) encodeAndSendCheckpoint(nonce uint64, txn *ethgo.Tra
 		nextEpochValidators, err = c.consensusBackend.GetValidators(header.Number, nil)
 
 		if err != nil {
-			c.logger.Info("[checkpoint] Submitting checkpoint done with error.",
-				"block", header.Number, "epoch", extra.Checkpoint.EpochNumber, "err", err)
-
 			return err
 		}
 	}
 
 	input, err := c.abiEncodeCheckpointBlock(header.Number, header.Hash, extra, nextEpochValidators)
 	if err != nil {
-		c.logger.Info("[checkpoint] Submitting checkpoint done with error.",
-			"block", header.Number, "epoch", extra.Checkpoint.EpochNumber, "err", err)
-
 		return fmt.Errorf("failed to encode checkpoint data to ABI for block %d: %w", header.Number, err)
 	}
 
 	txn.Input = input
 
+	c.logger.Info("sending checkpoint tx...", "nonce", nonce)
+
 	receipt, err := c.rootchain.SendTransaction(nonce, txn)
 	if err != nil {
-		c.logger.Info("[checkpoint] Submitting checkpoint done with error.",
-			"block", header.Number, "epoch", extra.Checkpoint.EpochNumber, "err", err)
-
 		return err
 	}
 
 	if receipt.Status == uint64(types.ReceiptFailed) {
-		c.logger.Info("[checkpoint] Submitting checkpoint done with error.",
-			"block", header.Number, "epoch", extra.Checkpoint.EpochNumber, "err", err)
-
 		return fmt.Errorf("transaction execution failed for block %d", header.Number)
 	}
 
