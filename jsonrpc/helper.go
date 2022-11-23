@@ -11,7 +11,7 @@ import (
 var (
 	ErrHeaderNotFound           = errors.New("header not found")
 	ErrPendingBlockNumber       = errors.New("fetching the pending header is not supported")
-	ErrNegativeBlockNumber      = errors.New("invalid argument 0: block number larger than int64")
+	ErrNegativeBlockNumber      = errors.New("invalid argument 0: block number must not be negative")
 	ErrFailedFetchGenesis       = errors.New("error fetching genesis block header")
 	ErrNoDataInContractCreation = errors.New("contract creation without data provided")
 )
