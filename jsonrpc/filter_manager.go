@@ -397,27 +397,12 @@ func (f *FilterManager) getLogsFromBlock(query *LogQuery, block *types.Block) ([
 }
 
 func (f *FilterManager) getLogsFromBlocks(query *LogQuery) ([]*Log, error) {
-	latestBlockNumber := f.store.Header().Number
-
-	resolveNum := func(num BlockNumber) (uint64, error) {
-		switch num {
-		case PendingBlockNumber:
-			return 0, ErrPendingBlockNumber
-		case EarliestBlockNumber:
-			num = 0
-		case LatestBlockNumber:
-			return latestBlockNumber, nil
-		}
-
-		return uint64(num), nil
-	}
-
-	from, err := resolveNum(query.fromBlock)
+	from, err := GetNumericBlockNumber(query.fromBlock, f.store)
 	if err != nil {
 		return nil, err
 	}
 
-	to, err := resolveNum(query.toBlock)
+	to, err := GetNumericBlockNumber(query.toBlock, f.store)
 	if err != nil {
 		return nil, err
 	}
