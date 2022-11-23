@@ -132,10 +132,7 @@ func (d *Debug) TraceTransaction(
 		return nil, ErrTraceGenesisBlock
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	tracer, err := newTracer(ctx, config)
+	tracer, err := newTracer(config)
 	if err != nil {
 		return nil, err
 	}
@@ -163,10 +160,7 @@ func (d *Debug) TraceCall(
 		tx.Gas = header.GasLimit
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	tracer, err := newTracer(ctx, config)
+	tracer, err := newTracer(config)
 	if err != nil {
 		return nil, err
 	}
@@ -182,10 +176,7 @@ func (d *Debug) traceBlock(
 		return nil, ErrTraceGenesisBlock
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	tracer, err := newTracer(ctx, config)
+	tracer, err := newTracer(config)
 	if err != nil {
 		return nil, err
 	}
@@ -194,10 +185,7 @@ func (d *Debug) traceBlock(
 }
 
 // newTracer creates new tracer by config
-func newTracer(
-	ctx context.Context,
-	config *TraceConfig,
-) (tracer.Tracer, error) {
+func newTracer(config *TraceConfig) (tracer.Tracer, error) {
 	var (
 		timeout = defaultTraceTimeout
 		err     error

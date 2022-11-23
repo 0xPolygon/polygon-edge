@@ -1,7 +1,6 @@
 package jsonrpc
 
 import (
-	"context"
 	"encoding/json"
 	"math/big"
 	"testing"
@@ -695,12 +694,7 @@ func Test_newTracer(t *testing.T) {
 	t.Run("should create tracer", func(t *testing.T) {
 		t.Parallel()
 
-		ctx, cancel := context.WithCancel(context.Background())
-		t.Cleanup(func() {
-			cancel()
-		})
-
-		tracer, err := newTracer(ctx, &TraceConfig{
+		tracer, err := newTracer(&TraceConfig{
 			EnableMemory:     true,
 			EnableReturnData: true,
 			DisableStack:     false,
@@ -714,13 +708,8 @@ func Test_newTracer(t *testing.T) {
 	t.Run("GetResult should return errExecutionTimeout if timeout happens", func(t *testing.T) {
 		t.Parallel()
 
-		ctx, cancel := context.WithCancel(context.Background())
-		t.Cleanup(func() {
-			cancel()
-		})
-
 		timeout := "0s"
-		tracer, err := newTracer(ctx, &TraceConfig{
+		tracer, err := newTracer(&TraceConfig{
 			EnableMemory:     true,
 			EnableReturnData: true,
 			DisableStack:     false,
@@ -736,30 +725,5 @@ func Test_newTracer(t *testing.T) {
 		res, err := tracer.GetResult()
 		assert.Nil(t, res)
 		assert.Equal(t, ErrExecutionTimeout, err)
-	})
-
-	t.Run("GetResult should return normal result if context is canceled before timeout", func(t *testing.T) {
-		t.Parallel()
-
-		ctx, cancel := context.WithCancel(context.Background())
-		t.Cleanup(func() {
-			cancel()
-		})
-
-		timeout := "1s"
-		tracer, err := newTracer(ctx, &TraceConfig{
-			EnableMemory:     true,
-			EnableReturnData: true,
-			DisableStack:     false,
-			DisableStorage:   false,
-			Timeout:          &timeout,
-		})
-
-		assert.NoError(t, err)
-
-		cancel()
-
-		_, err = tracer.GetResult()
-		assert.NoError(t, err)
 	})
 }
