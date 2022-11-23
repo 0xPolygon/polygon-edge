@@ -1997,13 +1997,11 @@ func TestConsensusRuntime_HasQuorum(t *testing.T) {
 		assert.False(t, runtime.HasQuorum(lastBuildBlock.Number, nil, msgType))
 	}
 
-	// MessageType_PREPREPARE
-	for _, x := range validatorAccounts.validators {
-		messages = append(messages, &proto.Message{
-			From: x.Address().Bytes(),
-			Type: proto.MessageType_PREPREPARE,
-		})
-	}
+	// MessageType_PREPREPARE - only one message is enough
+	messages = append(messages, &proto.Message{
+		From: proposer.Bytes(),
+		Type: proto.MessageType_PREPREPARE,
+	})
 
 	assert.True(t, runtime.HasQuorum(lastBuildBlock.Number+1, nil, proto.MessageType_PREPREPARE))
 	assert.True(t, runtime.HasQuorum(lastBuildBlock.Number+1, messages, proto.MessageType_PREPREPARE))
@@ -2014,7 +2012,7 @@ func TestConsensusRuntime_HasQuorum(t *testing.T) {
 	for _, x := range validatorAccounts.validators {
 		address := x.Address()
 
-		// propser must not be included in prepare messages
+		// proposer must not be included in prepare messages
 		if address != proposer {
 			messages = append(messages, &proto.Message{
 				From: address[:],
