@@ -88,12 +88,12 @@ func TestStructTracerCancel(t *testing.T) {
 	tracer := NewStructTracer(testEmptyConfig)
 
 	assert.Nil(t, tracer.reason)
-	assert.Equal(t, uint32(0), tracer.interrupt)
+	assert.False(t, tracer.interrupt)
 
 	tracer.Cancel(err)
 
 	assert.Equal(t, err, tracer.reason)
-	assert.Equal(t, uint32(1), tracer.interrupt)
+	assert.True(t, tracer.interrupt)
 }
 
 func TestStructTracer_canceled(t *testing.T) {
@@ -121,7 +121,7 @@ func TestStructTracerClear(t *testing.T) {
 			EnableReturnData: true,
 		},
 		reason:    errors.New("timeout"),
-		interrupt: 1,
+		interrupt: true,
 		logs: []StructLog{
 			{
 				Pc: 1,
@@ -155,7 +155,7 @@ func TestStructTracerClear(t *testing.T) {
 				EnableReturnData: true,
 			},
 			reason:        nil,
-			interrupt:     0,
+			interrupt:     false,
 			logs:          []StructLog{},
 			gasLimit:      0,
 			consumedGas:   0,
@@ -446,7 +446,7 @@ func TestStructTracerCaptureState(t *testing.T) {
 			name: "should call Halt() if it's been canceled",
 			tracer: &StructTracer{
 				Config:    testEmptyConfig,
-				interrupt: 1,
+				interrupt: true,
 			},
 			memory:          memory,
 			stack:           stack,
@@ -459,7 +459,7 @@ func TestStructTracerCaptureState(t *testing.T) {
 			},
 			expectedTracer: &StructTracer{
 				Config:    testEmptyConfig,
-				interrupt: 1,
+				interrupt: true,
 			},
 			expectedVMState: &mockState{
 				halted: true,

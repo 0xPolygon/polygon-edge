@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"sync/atomic"
+	"sync"
 
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
@@ -46,8 +46,9 @@ func (l *StructLog) ErrorString() string {
 type StructTracer struct {
 	Config Config
 
-	reason    error
-	interrupt uint32
+	cancelLock sync.RWMutex
+	reason     error
+	interrupt  bool
 
 	logs        []StructLog
 	gasLimit    uint64
@@ -62,23 +63,30 @@ type StructTracer struct {
 
 func NewStructTracer(config Config) *StructTracer {
 	return &StructTracer{
-		Config:  config,
-		storage: make(map[types.Address]map[types.Hash]types.Hash),
+		Config:     config,
+		cancelLock: sync.RWMutex{},
+		storage:    make(map[types.Address]map[types.Hash]types.Hash),
 	}
 }
 
 func (t *StructTracer) Cancel(err error) {
+	t.cancelLock.Lock()
+	defer t.cancelLock.Unlock()
+
 	t.reason = err
-	atomic.StoreUint32(&t.interrupt, 1)
+	t.interrupt = true
 }
 
 func (t *StructTracer) cancelled() bool {
-	return atomic.LoadUint32(&t.interrupt) == 1
+	t.cancelLock.RLock()
+	defer t.cancelLock.RUnlock()
+
+	return t.interrupt
 }
 
 func (t *StructTracer) Clear() {
 	t.reason = nil
-	t.interrupt = 0
+	t.interrupt = false
 	t.logs = t.logs[:0]
 	t.gasLimit = 0
 	t.consumedGas = 0
