@@ -10,7 +10,7 @@ import (
 type RuntimeHost interface {
 	// GetRefund returns refunded value
 	GetRefund() uint64
-	// GetStorage access the storage slot at the given address and slot ha
+	// GetStorage access the storage slot at the given address and slot hash
 	GetStorage(types.Address, types.Hash) types.Hash
 }
 
