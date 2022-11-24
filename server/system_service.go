@@ -224,6 +224,8 @@ func (s *systemService) Export(req *proto.ExportRequest, stream proto.System_Exp
 
 const (
 	defaultMaxGRPCPayloadSize uint64 = 512 * 1024 // 4MB
+	// number of header fields * bytes per field (From, To, Latest all them uint64)
+	maxHeaderInfoSize int = 3 * 8
 )
 
 type blockStreamWriter struct {
@@ -250,8 +252,7 @@ func newBlockStreamWriter(
 
 func (w *blockStreamWriter) appendBlock(b *types.Block) error {
 	data := b.MarshalRLP()
-
-	if uint64(w.buf.Len()+len(data)) >= w.maxPayload {
+	if uint64(maxHeaderInfoSize+w.buf.Len()+len(data)) >= w.maxPayload {
 		// send buffered data to client first
 		if err := w.flush(); err != nil {
 			return err

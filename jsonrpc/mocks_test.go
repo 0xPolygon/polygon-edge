@@ -84,6 +84,7 @@ func (m *mockStore) headerLoop(cond func(h *types.Header) bool) *types.Header {
 }
 
 func (m *mockStore) emitEvent(evnt *mockEvent) {
+	m.receiptsLock.Lock()
 	if m.receipts == nil {
 		m.receipts = map[types.Hash][]*types.Receipt{}
 	}
@@ -102,6 +103,7 @@ func (m *mockStore) emitEvent(evnt *mockEvent) {
 		m.receipts[i.header.Hash] = i.receipts
 		bEvnt.OldChain = append(bEvnt.OldChain, i.header)
 	}
+	m.receiptsLock.Unlock()
 
 	m.subscription.Push(bEvnt)
 }
