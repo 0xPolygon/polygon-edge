@@ -213,7 +213,7 @@ func (as AccountSet) AsGenericMaps() []map[string]interface{} {
 		accountSetMaps[i] = map[string]interface{}{
 			"_address":    v.Address,
 			"blsKey":      v.BlsKey.ToBigInt(),
-			"votingPower": v.VotingPower,
+			"votingPower": new(big.Int).SetUint64(v.VotingPower),
 		}
 	}
 

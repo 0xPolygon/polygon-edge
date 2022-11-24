@@ -195,8 +195,6 @@ func (c *checkpointManager) encodeAndSendCheckpoint(nonce uint64, txn *ethgo.Tra
 
 	txn.Input = input
 
-	c.logger.Info("sending checkpoint tx...", "nonce", nonce)
-
 	receipt, err := c.rootchain.SendTransaction(nonce, txn, c.signer)
 	if err != nil {
 		return err
