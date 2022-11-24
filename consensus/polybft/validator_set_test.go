@@ -427,19 +427,19 @@ func TestValidatorSet_HasQuorum(t *testing.T) {
 	vs, err := validators.toValidatorSet()
 	require.NoError(t, err)
 
-	signers := []types.Address{}
+	signers := make(map[types.Address]struct{})
 
 	validators.iterAcct([]string{"A", "B", "C", "D", "E"}, func(v *testValidator) {
-		signers = append(signers, v.Address())
+		signers[v.Address()] = struct{}{}
 	})
 
 	require.True(t, vs.HasQuorum(signers))
 
 	// not enough signers for quorum (less than 2/3 super-majority of validators are signers)
-	signers = []types.Address{}
+	signers = make(map[types.Address]struct{})
 
 	validators.iterAcct([]string{"A", "B", "C", "D"}, func(v *testValidator) {
-		signers = append(signers, v.Address())
+		signers[v.Address()] = struct{}{}
 	})
 	require.False(t, vs.HasQuorum(signers))
 }
@@ -447,30 +447,49 @@ func TestValidatorSet_HasQuorum(t *testing.T) {
 func TestValidatorSet_HasQuorumWithoutProposer(t *testing.T) {
 	t.Parallel()
 
-	validators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
+	validatorAliases := []string{"A", "B", "C", "D", "E", "F"}
+	validators := newTestValidatorsWithAliases(validatorAliases)
 	vs, err := validators.toValidatorSet()
 	require.NoError(t, err)
 
-	_, err = vs.CalcProposer(0)
+	proposer, err := vs.CalcProposer(0)
 	require.NoError(t, err)
 
-	// BFT conditions aren't met (less than 5 validators)
-	// in order to have a quorum satisfied, all the validators need to be among signers
-	signers := []types.Address{}
+	// prposer included, no quorum
+	signers := make(map[types.Address]struct{})
 
 	validators.iterAcct([]string{"B", "C", "D"}, func(v *testValidator) {
-		signers = append(signers, v.Address())
+		signers[v.Address()] = struct{}{}
 	})
-	require.True(t, vs.HasQuorumWithoutProposer(signers))
 
-	// no quorum, since only a single validator is signed
-	// (it doesn't have enough voting power, even when proposer voting power is subtracted from quorum size)
-	signers = []types.Address{}
-
-	validators.iterAcct([]string{"B", "C"}, func(v *testValidator) {
-		signers = append(signers, v.Address())
-	})
+	signers[proposer] = struct{}{}
 	require.False(t, vs.HasQuorumWithoutProposer(signers))
+
+	// not enough signers, no qourum
+	signers = make(map[types.Address]struct{})
+
+	for _, alias := range validatorAliases {
+		tv := validators.getValidator(alias)
+		if tv.Address() != proposer {
+			signers[tv.Address()] = struct{}{}
+
+			break
+		}
+	}
+
+	require.False(t, vs.HasQuorumWithoutProposer(signers))
+
+	// do not include proposer and add enough signers
+	signers = make(map[types.Address]struct{})
+
+	for _, alias := range validatorAliases {
+		tv := validators.getValidator(alias)
+		if tv.Address() != proposer {
+			signers[tv.Address()] = struct{}{}
+		}
+	}
+
+	require.True(t, vs.HasQuorumWithoutProposer(signers))
 }
 
 func verifyValidatorSet(t *testing.T, valSet *validatorSet) {

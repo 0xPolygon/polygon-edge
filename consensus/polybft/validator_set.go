@@ -89,10 +89,10 @@ type ValidatorSet interface {
 	IncrementProposerPriority(times uint64) error
 
 	// checks if submitted signers have reached quorum
-	HasQuorum(signers []types.Address) bool
+	HasQuorum(signers map[types.Address]struct{}) bool
 
 	// checks if submitted signers have reached quorum without proposer voting power
-	HasQuorumWithoutProposer(signers []types.Address) bool
+	HasQuorumWithoutProposer(signers map[types.Address]struct{}) bool
 }
 
 type validatorSet struct {
@@ -350,7 +350,7 @@ func (v *validatorSet) rescalePriorities(diffMax int64) error {
 
 // HasQuorum determines if there is quorum of enough signers reached,
 // based on its voting power and quorum size
-func (v *validatorSet) HasQuorum(signers []types.Address) bool {
+func (v *validatorSet) HasQuorum(signers map[types.Address]struct{}) bool {
 	signersVotingPower := v.calculateVotingPower(signers)
 	v.logger.Debug("HasQuorum", "signers voting power", signersVotingPower, "quorum", v.quorumSize,
 		"hasQuorum", signersVotingPower >= v.quorumSize)
@@ -359,7 +359,13 @@ func (v *validatorSet) HasQuorum(signers []types.Address) bool {
 }
 
 // checks if submitted signers have reached prepare quorum
-func (v *validatorSet) HasQuorumWithoutProposer(signers []types.Address) bool {
+func (v *validatorSet) HasQuorumWithoutProposer(signers map[types.Address]struct{}) bool {
+	if _, ok := signers[v.proposer.Metadata.Address]; ok {
+		v.logger.Warn("HasQuorumWithoutProposer failed - proposer is among signers but it is not expected to be")
+
+		return false
+	}
+
 	signersVotingPower := v.calculateVotingPower(signers)
 	proposerVotingPower := v.votingPowerMap[v.proposer.Metadata.Address]
 	hasQuorum := signersVotingPower >= v.quorumSize-proposerVotingPower
@@ -370,9 +376,9 @@ func (v *validatorSet) HasQuorumWithoutProposer(signers []types.Address) bool {
 }
 
 // calculateVotingPower calculates voting power for provided validator ids
-func (v validatorSet) calculateVotingPower(signers []types.Address) uint64 {
+func (v validatorSet) calculateVotingPower(signers map[types.Address]struct{}) uint64 {
 	accumulatedVotingPower := uint64(0)
-	for _, address := range signers {
+	for address := range signers {
 		accumulatedVotingPower += v.votingPowerMap[address]
 	}
 

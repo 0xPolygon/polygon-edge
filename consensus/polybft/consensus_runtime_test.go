@@ -1982,14 +1982,14 @@ func TestConsensusRuntime_HasQuorum(t *testing.T) {
 	}
 
 	require.NoError(t, runtime.FSM())
+	proposer, err := runtime.fsm.validators.CalcProposer(0)
+
+	require.NoError(t, err)
 
 	messages := make([]*proto.Message, 0, len(validatorAccounts.validators))
 
-	for _, x := range validatorAccounts.validators {
-		messages = append(messages, &proto.Message{
-			From: x.Address().Bytes(),
-		})
-	}
+	// Unknown message type
+	assert.False(t, runtime.HasQuorum(lastBuildBlock.Number+1, messages, -1))
 
 	// invalid block number
 	for _, msgType := range []proto.MessageType{proto.MessageType_PREPREPARE, proto.MessageType_PREPARE,
@@ -1997,19 +1997,54 @@ func TestConsensusRuntime_HasQuorum(t *testing.T) {
 		assert.False(t, runtime.HasQuorum(lastBuildBlock.Number, nil, msgType))
 	}
 
-	// Unknown message type
-	assert.False(t, runtime.HasQuorum(lastBuildBlock.Number+1, messages, -1))
+	// MessageType_PREPREPARE - only one message is enough
+	messages = append(messages, &proto.Message{
+		From: proposer.Bytes(),
+		Type: proto.MessageType_PREPREPARE,
+	})
 
-	// MessageType_PREPREPARE
-	assert.True(t, runtime.HasQuorum(lastBuildBlock.Number+1, nil, proto.MessageType_PREPREPARE))
+	assert.False(t, runtime.HasQuorum(lastBuildBlock.Number+1, nil, proto.MessageType_PREPREPARE))
 	assert.True(t, runtime.HasQuorum(lastBuildBlock.Number+1, messages, proto.MessageType_PREPREPARE))
 
 	// MessageType_PREPARE
+	messages = make([]*proto.Message, 0, len(validatorAccounts.validators))
+
+	for _, x := range validatorAccounts.validators {
+		address := x.Address()
+
+		// proposer must not be included in prepare messages
+		if address != proposer {
+			messages = append(messages, &proto.Message{
+				From: address[:],
+				Type: proto.MessageType_PREPARE,
+			})
+		}
+	}
+
+	// enough quorum
 	assert.True(t, runtime.HasQuorum(lastBuildBlock.Number+1, messages, proto.MessageType_PREPARE))
+
+	// not enough quorum
 	assert.False(t, runtime.HasQuorum(lastBuildBlock.Number+1, messages[:1], proto.MessageType_PREPARE))
+
+	// include proposer which is not allowed
+	messages = append(messages, &proto.Message{
+		From: proposer[:],
+		Type: proto.MessageType_PREPARE,
+	})
+	assert.False(t, runtime.HasQuorum(lastBuildBlock.Number+1, messages, proto.MessageType_PREPARE))
 
 	//proto.MessageType_ROUND_CHANGE, proto.MessageType_COMMIT
 	for _, msgType := range []proto.MessageType{proto.MessageType_ROUND_CHANGE, proto.MessageType_COMMIT} {
+		messages = make([]*proto.Message, 0, len(validatorAccounts.validators))
+
+		for _, x := range validatorAccounts.validators {
+			messages = append(messages, &proto.Message{
+				From: x.Address().Bytes(),
+				Type: msgType,
+			})
+		}
+
 		assert.True(t, runtime.HasQuorum(lastBuildBlock.Number+1, messages, msgType))
 		assert.False(t, runtime.HasQuorum(lastBuildBlock.Number+1, messages[:1], msgType))
 	}
