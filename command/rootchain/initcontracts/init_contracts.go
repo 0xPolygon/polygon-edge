@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/big"
+	"os"
 	"path"
 	"path/filepath"
 	"strings"
@@ -14,6 +15,7 @@ import (
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
 
+	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/genesis"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
@@ -75,6 +77,12 @@ func setFlags(cmd *cobra.Command) {
 		defaultValidatorPrefixPath,
 		"Validators prefix path",
 	)
+	cmd.Flags().StringVar(
+		&params.genesisPath,
+		genesisPathFlag,
+		defaultGenesisPath,
+		"Genesis configuration path",
+	)
 }
 
 func runPreRun(_ *cobra.Command, _ []string) error {
@@ -102,7 +110,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	}
 
 	if err := deployContracts(outputter); err != nil {
-		outputter.SetError(fmt.Errorf("failed to deploy: %w", err))
+		outputter.SetError(fmt.Errorf("failed to deploy rootchain contracts: %w", err))
 
 		return
 	}
@@ -111,6 +119,25 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		Message: fmt.Sprintf("%s finished. All contracts are successfully deployed and initialized.",
 			contractsDeploymentTitle),
 	})
+}
+
+func getGenesisAlloc() (map[types.Address]*chain.GenesisAccount, error) {
+	genesisFile, err := os.Open(params.genesisPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open genesis config file: %w", err)
+	}
+
+	genesisRaw, err := ioutil.ReadAll(genesisFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read genesis config file: %w", err)
+	}
+
+	var chain *chain.Chain
+	if err := json.Unmarshal(genesisRaw, &chain); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal genesis configuration: %w", err)
+	}
+
+	return chain.Genesis.Alloc, nil
 }
 
 func deployContracts(outputter command.OutputFormatter) error {
@@ -191,8 +218,12 @@ func deployContracts(outputter command.OutputFormatter) error {
 
 // initializeCheckpointManager invokes initialize function on CheckpointManager smart contract
 func initializeCheckpointManager(nonce uint64) error {
-	validatorSetMap, err := validatorSetToABISlice()
+	allocs, err := getGenesisAlloc()
+	if err != nil {
+		return err
+	}
 
+	validatorSetMap, err := validatorSetToABISlice(allocs)
 	initCheckpointInput, err := initCheckpointManager.Encode(
 		[]interface{}{
 			helper.BLSAddress,
@@ -224,7 +255,7 @@ func initializeCheckpointManager(nonce uint64) error {
 }
 
 // initializeCheckpointManager invokes initialize function on CheckpointManager smart contract
-func validatorSetToABISlice() ([]map[string]interface{}, error) {
+func validatorSetToABISlice(allocs map[types.Address]*chain.GenesisAccount) ([]map[string]interface{}, error) {
 	validatorsInfo, err := genesis.ReadValidatorsByRegexp(path.Dir(params.validatorPath), params.validatorPrefixPath)
 	if err != nil {
 		return nil, err
@@ -232,11 +263,12 @@ func validatorSetToABISlice() ([]map[string]interface{}, error) {
 
 	validatorSetMap := make([]map[string]interface{}, len(validatorsInfo))
 
-	for i, valid := range validatorsInfo {
+	for i, validatorInfo := range validatorsInfo {
+		addr := types.Address(validatorInfo.Account.Ecdsa.Address())
 		validatorSetMap[i] = map[string]interface{}{
-			"_address":    types.Address(valid.Account.Ecdsa.Address()),
-			"blsKey":      valid.Account.Bls.PublicKey().ToBigInt(),
-			"votingPower": 1, // TODO - get voting power
+			"_address":    addr,
+			"blsKey":      validatorInfo.Account.Bls.PublicKey().ToBigInt(),
+			"votingPower": convertWeiToTokensAmount(chain.GetGenesisAccountBalance(addr, allocs)),
 		}
 	}
 
@@ -267,4 +299,10 @@ func readContractBytecode(rootPath, contractPath, contractName string) ([]byte, 
 	}
 
 	return hex.MustDecodeHex(artifact.Bytecode), nil
+}
+
+// TODO: Use the one from the polybft_params
+// convertWeiToTokensAmount converts provided wei balance to tokens amount
+func convertWeiToTokensAmount(weiBalance *big.Int) *big.Int {
+	return weiBalance.Div(weiBalance, big.NewInt(genesis.WeiScalingFactor))
 }

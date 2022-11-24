@@ -41,7 +41,7 @@ const (
 
 	bootnodePortStart = 30301
 
-	WeiScalingFactor = 1_000_000_000_000_000_000 // 10^18
+	WeiScalingFactor = int64(1e18) // 10^18
 )
 
 func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
@@ -160,15 +160,10 @@ func (p *genesisParams) getGenesisValidators(validators []GenesisTarget,
 
 			addr := types.StringToAddress(parts[0])
 
-			balance, err := getBalanceInWei(addr, allocs)
-			if err != nil {
-				return nil, err
-			}
-
 			result = append(result, &polybft.Validator{
 				Address: addr,
 				BlsKey:  parts[1],
-				Balance: balance,
+				Balance: chain.GetGenesisAccountBalance(addr, allocs),
 			})
 		}
 	} else {
@@ -176,37 +171,15 @@ func (p *genesisParams) getGenesisValidators(validators []GenesisTarget,
 			pubKeyMarshalled := validator.Account.Bls.PublicKey().Marshal()
 			addr := types.Address(validator.Account.Ecdsa.Address())
 
-			balance, err := getBalanceInWei(addr, allocs)
-			if err != nil {
-				return nil, err
-			}
-
 			result = append(result, &polybft.Validator{
 				Address: addr,
 				BlsKey:  hex.EncodeToString(pubKeyMarshalled),
-				Balance: balance,
+				Balance: chain.GetGenesisAccountBalance(addr, allocs),
 			})
 		}
 	}
 
 	return result, nil
-}
-
-// getBalanceInWei returns balance for genesis account based on its address.
-// If not found in provided allocations map, 1M native tokens is returned.
-func getBalanceInWei(address types.Address, allocations map[types.Address]*chain.GenesisAccount) (*big.Int, error) {
-	if genesisAcc, ok := allocations[address]; ok {
-		return genesisAcc.Balance, nil
-	}
-
-	val := command.DefaultPremineBalance
-
-	amount, err := types.ParseUint256orHex(&val)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse amount %s: %w", val, err)
-	}
-
-	return amount, nil
 }
 
 func (p *genesisParams) generatePolyBftGenesis() error {

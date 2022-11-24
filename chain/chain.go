@@ -361,3 +361,13 @@ func importChain(content []byte) (*Chain, error) {
 
 	return chain, nil
 }
+
+// GetGenesisAccountBalance returns balance for genesis account based on its address.
+// If not found in provided allocations map, 0 is returned.
+func GetGenesisAccountBalance(address types.Address, allocations map[types.Address]*GenesisAccount) *big.Int {
+	if genesisAcc, ok := allocations[address]; ok {
+		return genesisAcc.Balance
+	}
+
+	return big.NewInt(0)
+}
