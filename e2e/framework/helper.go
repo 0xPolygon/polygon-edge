@@ -543,7 +543,7 @@ func WaitForServersToSeal(servers []*TestServer, desiredHeight uint64) []error {
 		wg.Add(1)
 
 		go func(indx int) {
-			waitCtx, waitCancelFn := context.WithTimeout(context.Background(), time.Minute)
+			waitCtx, waitCancelFn := context.WithTimeout(context.Background(), 2*time.Minute)
 			defer func() {
 				waitCancelFn()
 				wg.Done()
