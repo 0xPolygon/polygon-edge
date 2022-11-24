@@ -48,7 +48,7 @@ test-e2e:
     # because it will get picked up and run during e2e tests
     # and the e2e tests should error out if any kind of race is found
 	go build -race -o artifacts/polygon-edge .
-	env EDGE_BINARY=${PWD}/artifacts/polygon-edge go test -v -run TestClusterBlockSync -timeout=30m ./e2e/...
+	env EDGE_BINARY=${PWD}/artifacts/polygon-edge go test -v -run TestClusterBlockSync -timeout=120m ./e2e/...
 
 .PHONY: test-e2ev3
 test-e2e-polybft:
