@@ -1,8 +1,6 @@
 package types
 
 import (
-	"database/sql/driver"
-	"errors"
 	"fmt"
 	"strings"
 	"unicode"
@@ -50,26 +48,6 @@ func (h Hash) String() string {
 	return hex.EncodeToHex(h[:])
 }
 
-func (h Hash) Value() (driver.Value, error) {
-	return h.String(), nil
-}
-
-func (h *Hash) Scan(src interface{}) error {
-	stringVal, ok := src.([]byte)
-	if !ok {
-		return errors.New("invalid type assert")
-	}
-
-	hh, decodeErr := hex.DecodeHex(string(stringVal))
-	if decodeErr != nil {
-		return fmt.Errorf("unable to decode value, %w", decodeErr)
-	}
-
-	copy(h[:], hh[:])
-
-	return nil
-}
-
 // checksumEncode returns the checksummed address with 0x prefix, as by EIP-55
 // https://github.com/ethereum/EIPs/blob/master/EIPS/eip-55.md
 func (a Address) checksumEncode() string {
@@ -105,26 +83,6 @@ func (a Address) String() string {
 
 func (a Address) Bytes() []byte {
 	return a[:]
-}
-
-func (a Address) Value() (driver.Value, error) {
-	return a.String(), nil
-}
-
-func (a *Address) Scan(src interface{}) error {
-	stringVal, ok := src.([]byte)
-	if !ok {
-		return errors.New("invalid type assert")
-	}
-
-	aa, decodeErr := hex.DecodeHex(string(stringVal))
-	if decodeErr != nil {
-		return fmt.Errorf("unable to decode value, %w", decodeErr)
-	}
-
-	copy(a[:], aa[:])
-
-	return nil
 }
 
 func StringToHash(str string) Hash {

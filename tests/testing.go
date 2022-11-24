@@ -228,7 +228,7 @@ func buildState(
 	s := itrie.NewState(itrie.NewMemoryStorage())
 	snap := s.NewSnapshot()
 
-	txn := state.NewTxn(s, snap)
+	txn := state.NewTxn(snap)
 
 	for addr, alloc := range allocs {
 		txn.CreateAccount(addr)
