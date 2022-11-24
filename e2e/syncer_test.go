@@ -54,7 +54,7 @@ func TestClusterBlockSync(t *testing.T) {
 		runTest(t, validators.ECDSAValidatorType)
 	})
 
-	for i := 0; i < 30; i++ {
+	for i := 0; i < 70; i++ {
 		t.Run("BLS", func(t *testing.T) {
 			runTest(t, validators.BLSValidatorType)
 		})
