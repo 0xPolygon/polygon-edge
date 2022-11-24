@@ -112,6 +112,8 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 
 		validatorsDelta, err := createValidatorSetDelta(f.validators.Accounts(), nextValidators)
 
+		f.logger.Debug("[FSM Build Proposal]", "NextValidators", nextValidators)
+
 		extra.Validators = validatorsDelta
 		f.logger.Trace("[FSM Build Proposal]", "Validators Delta", validatorsDelta)
 	}

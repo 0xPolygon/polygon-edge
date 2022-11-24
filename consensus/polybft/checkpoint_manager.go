@@ -188,6 +188,8 @@ func (c *checkpointManager) encodeAndSendCheckpoint(nonce uint64, txn *ethgo.Tra
 		}
 	}
 
+	c.logger.Debug("[checkpoint]", "NextValidators", nextEpochValidators)
+
 	input, err := c.abiEncodeCheckpointBlock(header.Number, header.Hash, extra, nextEpochValidators)
 	if err != nil {
 		return fmt.Errorf("failed to encode checkpoint data to ABI for block %d: %w", header.Number, err)

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/0xPolygon/polygon-edge/chain"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/state"
@@ -60,7 +61,7 @@ func getInitChildValidatorSetInput(validators []*Validator, governanceAddr types
 
 		validatorPubkeys[i] = pubKeyBig
 		validatorAddresses[i] = validator.Address
-		validatorStakes[i] = validator.Balance
+		validatorStakes[i] = chain.ConvertWeiToTokensAmount(validator.Balance)
 	}
 
 	registerMessage, err := bls.MarshalMessageToBigInt([]byte(contracts.PolyBFTRegisterMessage))

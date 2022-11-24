@@ -378,5 +378,5 @@ func GetGenesisAccountBalance(address types.Address, allocations map[types.Addre
 
 // convertWeiToTokensAmount converts provided wei balance to tokens amount
 func ConvertWeiToTokensAmount(weiBalance *big.Int) *big.Int {
-	return weiBalance.Div(weiBalance, big.NewInt(weiScalingFactor))
+	return new(big.Int).Div(weiBalance, big.NewInt(weiScalingFactor))
 }
