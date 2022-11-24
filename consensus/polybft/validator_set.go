@@ -361,7 +361,7 @@ func (v *validatorSet) HasQuorum(signers map[types.Address]struct{}) bool {
 // checks if submitted signers have reached prepare quorum
 func (v *validatorSet) HasQuorumWithoutProposer(signers map[types.Address]struct{}) bool {
 	if _, ok := signers[v.proposer.Metadata.Address]; ok {
-		v.logger.Info("HasQuorumWithoutProposer failed - proposer is among signers but it is not expected to be")
+		v.logger.Warn("HasQuorumWithoutProposer failed - proposer is among signers but it is not expected to be")
 
 		return false
 	}
