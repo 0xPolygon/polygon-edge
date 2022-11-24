@@ -17,7 +17,7 @@ import (
 	"github.com/umbracle/fastrlp"
 )
 
-var accountSetABIType = abi.MustNewType(`tuple(address _address, uint256[4] blsKey, uint256 votingPower)[]`)
+var accountSetABIType = abi.MustNewType(`tuple(tuple(address _address, uint256[4] blsKey, uint256 votingPower)[])`)
 
 // ValidatorMetadata represents a validator metadata (its public identity)
 type ValidatorMetadata struct {
@@ -198,7 +198,7 @@ func (as AccountSet) Copy() AccountSet {
 
 // Hash returns hash value of the AccountSet
 func (as AccountSet) Hash() (types.Hash, error) {
-	abiEncoded, err := accountSetABIType.Encode(as.AsGenericMaps())
+	abiEncoded, err := accountSetABIType.Encode([]interface{}{as.AsGenericMaps()})
 	if err != nil {
 		return types.ZeroHash, err
 	}

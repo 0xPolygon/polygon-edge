@@ -472,12 +472,12 @@ func (c *CheckpointData) Hash(chainID uint64, blockNumber uint64, blockHash type
 	checkpointMap := map[string]interface{}{
 		"chainId":               new(big.Int).SetUint64(chainID),
 		"blockNumber":           new(big.Int).SetUint64(blockNumber),
-		"blockHash":             blockHash.Bytes(),
+		"blockHash":             blockHash,
 		"blockRound":            new(big.Int).SetUint64(c.BlockRound),
 		"epochNumber":           new(big.Int).SetUint64(c.EpochNumber),
-		"currentValidatorsHash": c.CurrentValidatorsHash.Bytes(),
-		"nextValidatorsHash":    c.NextValidatorsHash.Bytes(),
-		"eventRoot":             c.EventRoot.Bytes(),
+		"currentValidatorsHash": c.CurrentValidatorsHash,
+		"nextValidatorsHash":    c.NextValidatorsHash,
+		"eventRoot":             c.EventRoot,
 	}
 
 	abiEncoded, err := checkpointDataABIType.Encode(checkpointMap)
