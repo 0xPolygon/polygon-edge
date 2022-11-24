@@ -2003,7 +2003,7 @@ func TestConsensusRuntime_HasQuorum(t *testing.T) {
 		Type: proto.MessageType_PREPREPARE,
 	})
 
-	assert.True(t, runtime.HasQuorum(lastBuildBlock.Number+1, nil, proto.MessageType_PREPREPARE))
+	assert.False(t, runtime.HasQuorum(lastBuildBlock.Number+1, nil, proto.MessageType_PREPREPARE))
 	assert.True(t, runtime.HasQuorum(lastBuildBlock.Number+1, messages, proto.MessageType_PREPREPARE))
 
 	// MessageType_PREPARE

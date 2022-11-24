@@ -132,8 +132,14 @@ func (i *backendIBFT) HasQuorum(
 
 	switch msgType {
 	case protoIBFT.MessageType_PREPREPARE:
-		return len(messages) >= 0
+		return len(messages) >= 1
 	case protoIBFT.MessageType_PREPARE:
+		for _, message := range messages {
+			if message.Type == protoIBFT.MessageType_PREPREPARE {
+				return len(messages) >= int(quorum)
+			}
+		}
+
 		return len(messages) >= int(quorum)-1
 	case protoIBFT.MessageType_ROUND_CHANGE, protoIBFT.MessageType_COMMIT:
 		return len(messages) >= int(quorum)

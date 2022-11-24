@@ -1113,15 +1113,14 @@ func (c *consensusRuntime) HasQuorum(
 		return false
 	}
 
+	ppIncluded := false
+
 	// extract the addresses of all the signers of the messages
 	signers := make(map[types.Address]struct{}, len(messages))
 
 	for _, message := range messages {
-		if message.Type != msgType {
-			c.logger.Warn("HasQuorum received not matching message and message type",
-				"type of message", message.Type, "submitted message type", msgType)
-
-			return false
+		if message.Type == proto.MessageType_PREPREPARE {
+			ppIncluded = true
 		}
 
 		signers[types.BytesToAddress(message.From)] = struct{}{}
@@ -1130,8 +1129,12 @@ func (c *consensusRuntime) HasQuorum(
 	// check quorum
 	switch msgType {
 	case proto.MessageType_PREPREPARE:
-		return len(messages) >= 0
+		return len(messages) >= 1
 	case proto.MessageType_PREPARE:
+		if ppIncluded {
+			return c.fsm.validators.HasQuorum(signers)
+		}
+
 		return c.fsm.validators.HasQuorumWithoutProposer(signers)
 	case proto.MessageType_ROUND_CHANGE, proto.MessageType_COMMIT:
 		return c.fsm.validators.HasQuorum(signers)
