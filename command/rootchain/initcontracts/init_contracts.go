@@ -265,10 +265,16 @@ func validatorSetToABISlice(allocs map[types.Address]*chain.GenesisAccount) ([]m
 
 	for i, validatorInfo := range validatorsInfo {
 		addr := types.Address(validatorInfo.Account.Ecdsa.Address())
+
+		genesisBalance, err := chain.GetGenesisAccountBalance(addr, allocs)
+		if err != nil {
+			return nil, err
+		}
+
 		validatorSetMap[i] = map[string]interface{}{
 			"_address":    addr,
 			"blsKey":      validatorInfo.Account.Bls.PublicKey().ToBigInt(),
-			"votingPower": convertWeiToTokensAmount(chain.GetGenesisAccountBalance(addr, allocs)),
+			"votingPower": chain.ConvertWeiToTokensAmount(genesisBalance),
 		}
 	}
 
@@ -299,10 +305,4 @@ func readContractBytecode(rootPath, contractPath, contractName string) ([]byte, 
 	}
 
 	return hex.MustDecodeHex(artifact.Bytecode), nil
-}
-
-// TODO: Use the one from the polybft_params
-// convertWeiToTokensAmount converts provided wei balance to tokens amount
-func convertWeiToTokensAmount(weiBalance *big.Int) *big.Int {
-	return weiBalance.Div(weiBalance, big.NewInt(genesis.WeiScalingFactor))
 }

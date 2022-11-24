@@ -40,8 +40,6 @@ const (
 	defaultBridge                     = false
 
 	bootnodePortStart = 30301
-
-	WeiScalingFactor = int64(1e18) // 10^18
 )
 
 func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
@@ -160,10 +158,15 @@ func (p *genesisParams) getGenesisValidators(validators []GenesisTarget,
 
 			addr := types.StringToAddress(parts[0])
 
+			balance, err := chain.GetGenesisAccountBalance(addr, allocs)
+			if err != nil {
+				return nil, err
+			}
+
 			result = append(result, &polybft.Validator{
 				Address: addr,
 				BlsKey:  parts[1],
-				Balance: chain.GetGenesisAccountBalance(addr, allocs),
+				Balance: balance,
 			})
 		}
 	} else {
@@ -171,10 +174,15 @@ func (p *genesisParams) getGenesisValidators(validators []GenesisTarget,
 			pubKeyMarshalled := validator.Account.Bls.PublicKey().Marshal()
 			addr := types.Address(validator.Account.Ecdsa.Address())
 
+			balance, err := chain.GetGenesisAccountBalance(addr, allocs)
+			if err != nil {
+				return nil, err
+			}
+
 			result = append(result, &polybft.Validator{
 				Address: addr,
 				BlsKey:  hex.EncodeToString(pubKeyMarshalled),
-				Balance: chain.GetGenesisAccountBalance(addr, allocs),
+				Balance: balance,
 			})
 		}
 	}
@@ -261,16 +269,11 @@ func generateExtraDataPolyBft(validators []*polybft.Validator, publicKeys []*bls
 		delta.Added[i] = &polybft.ValidatorMetadata{
 			Address:     validator.Address,
 			BlsKey:      publicKeys[i],
-			VotingPower: convertWeiToTokensAmount(validator.Balance).Uint64(),
+			VotingPower: chain.ConvertWeiToTokensAmount(validator.Balance).Uint64(),
 		}
 	}
 
 	extra := polybft.Extra{Validators: delta, Checkpoint: &polybft.CheckpointData{}}
 
 	return append(make([]byte, polybft.ExtraVanity), extra.MarshalRLPTo(nil)...), nil
-}
-
-// convertWeiToTokensAmount converts provided wei balance to tokens amount
-func convertWeiToTokensAmount(weiBalance *big.Int) *big.Int {
-	return weiBalance.Div(weiBalance, big.NewInt(WeiScalingFactor))
 }

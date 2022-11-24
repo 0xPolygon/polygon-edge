@@ -20,6 +20,10 @@ var (
 	GenesisDifficulty = big.NewInt(131072)
 )
 
+const (
+	weiScalingFactor = int64(1e18) // 10^18
+)
+
 // Chain is the blockchain chain configuration
 type Chain struct {
 	Name      string   `json:"name"`
@@ -362,12 +366,17 @@ func importChain(content []byte) (*Chain, error) {
 	return chain, nil
 }
 
-// GetGenesisAccountBalance returns balance for genesis account based on its address.
+// GetGenesisAccountBalance returns balance for genesis account based on its address (expressed in weis).
 // If not found in provided allocations map, 0 is returned.
-func GetGenesisAccountBalance(address types.Address, allocations map[types.Address]*GenesisAccount) *big.Int {
+func GetGenesisAccountBalance(address types.Address, allocations map[types.Address]*GenesisAccount) (*big.Int, error) {
 	if genesisAcc, ok := allocations[address]; ok {
-		return genesisAcc.Balance
+		return genesisAcc.Balance, nil
 	}
 
-	return big.NewInt(0)
+	return big.NewInt(0), fmt.Errorf("genesis account %s is not found among genesis allocations", address)
+}
+
+// convertWeiToTokensAmount converts provided wei balance to tokens amount
+func ConvertWeiToTokensAmount(weiBalance *big.Int) *big.Int {
+	return weiBalance.Div(weiBalance, big.NewInt(weiScalingFactor))
 }
