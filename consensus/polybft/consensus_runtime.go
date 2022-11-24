@@ -856,6 +856,20 @@ func (c *consensusRuntime) GenerateExitProof(exitID, epoch, checkpointBlock uint
 	return tree.GenerateProofForLeaf(e, 0)
 }
 
+// GetStateSyncProof returns the proof of the bundle for the state sync
+func (c *consensusRuntime) GetStateSyncProof(stateSyncID uint64) ([]types.Hash, error) {
+	bundlesToExecute, err := c.state.getBundles(stateSyncID, 1)
+	if err != nil {
+		return nil, fmt.Errorf("cannot get bundles: %w", err)
+	}
+
+	if len(bundlesToExecute) == 0 {
+		return nil, fmt.Errorf("cannot find StateSync with id %d", stateSyncID)
+	}
+
+	return bundlesToExecute[0].Proof, nil
+}
+
 // setIsActiveValidator updates the activeValidatorFlag field
 func (c *consensusRuntime) setIsActiveValidator(isActiveValidator bool) {
 	if isActiveValidator {
