@@ -1,11 +1,13 @@
 package polybft
 
 import (
+	"bytes"
 	"fmt"
 	"math/big"
 	"strconv"
 
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
@@ -188,8 +190,6 @@ func (c *checkpointManager) encodeAndSendCheckpoint(nonce uint64, txn *ethgo.Tra
 		}
 	}
 
-	c.logger.Debug("[checkpoint]", "NextValidators", nextEpochValidators)
-
 	input, err := c.abiEncodeCheckpointBlock(header.Number, header.Hash, extra, nextEpochValidators)
 	if err != nil {
 		return fmt.Errorf("failed to encode checkpoint data to ABI for block %d: %w", header.Number, err)
@@ -220,7 +220,7 @@ func (c *checkpointManager) abiEncodeCheckpointBlock(headerNumber uint64, header
 		return nil, err
 	}
 
-	bigIntSig, err := aggs.ToBigInt()
+	encodedAggSigs, err := aggs.ToBigInt()
 	if err != nil {
 		return nil, err
 	}
@@ -237,9 +237,79 @@ func (c *checkpointManager) abiEncodeCheckpointBlock(headerNumber uint64, header
 			"blockNumber": new(big.Int).SetUint64(headerNumber),
 			"eventRoot":   extra.Checkpoint.EventRoot,
 		},
-		"signature":       bigIntSig,
+		"signature":       encodedAggSigs,
 		"newValidatorSet": nextValidators.AsGenericMaps(),
 		"bitmap":          extra.Committed.Bitmap,
+	}
+
+	c.logger.Info("[checkpoint]", "aggregated signature",
+		fmt.Sprintf("[0]=%s, [1]=%s", encodedAggSigs[0], encodedAggSigs[1]))
+
+	currentValidators, err := c.consensusBackend.GetValidators(headerNumber-1, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	filteredValidators, err := currentValidators.GetFilteredValidators(extra.Committed.Bitmap)
+	if err != nil {
+		return nil, err
+	}
+
+	bmp := bitmap.Bitmap(extra.Committed.Bitmap)
+
+	var buffer bytes.Buffer
+
+	for i := uint64(0); i < bmp.Len(); i++ {
+		if bmp.IsSet(i) {
+			buffer.WriteString("1")
+		} else {
+			buffer.WriteString("0")
+		}
+	}
+
+	c.logger.Info("[checkpoint] filtered bls keys", "bitmap", buffer.String())
+
+	for i, v := range filteredValidators {
+		bigIntsBlsKey := v.BlsKey.ToBigInt()
+		c.logger.Info(fmt.Sprintf("[checkpoint] %d. address=%s", i+1, v.Address))
+		c.logger.Info(fmt.Sprintf("[checkpoint] %d. bls key [0]=%s, [1]=%s, [2]=%s, [3]=%s",
+			i+1, bigIntsBlsKey[0], bigIntsBlsKey[1], bigIntsBlsKey[2], bigIntsBlsKey[3]))
+	}
+
+	c.logger.Info("[checkpoint] all bls keys")
+
+	for i, v := range currentValidators {
+		bigIntsBlsKey := v.BlsKey.ToBigInt()
+		c.logger.Info(fmt.Sprintf("[checkpoint] %d. bls key [0]=%s, [1]=%s, [2]=%s, [3]=%s",
+			i+1, bigIntsBlsKey[0], bigIntsBlsKey[1], bigIntsBlsKey[2], bigIntsBlsKey[3]))
+	}
+
+	hash, err := extra.Checkpoint.Hash(c.blockchain.GetChainID(), headerNumber, headerHash)
+	if err != nil {
+		return nil, err
+	}
+
+	aggregatedKey := bls.AggregatePublicKeys(filteredValidators.GetBlsKeys()).ToBigInt()
+
+	c.logger.Info(fmt.Sprintf("[checkpoint] Aggregated key [0]=%s, [1]=%s, [2]=%s, [3]=%s",
+		aggregatedKey[0], aggregatedKey[1], aggregatedKey[2], aggregatedKey[3]))
+
+	g1Point, err := bls.G1HashToPoint(hash.Bytes())
+	if err != nil {
+		return nil, err
+	}
+
+	g1BigInts, err := bls.G1ToBigInt(g1Point)
+	if err != nil {
+		return nil, err
+	}
+
+	c.logger.Info("[checkpoing]", "G1 point", fmt.Sprintf("[0]=%s [1]=%s", g1BigInts[0], g1BigInts[1]))
+
+	if aggs.VerifyAggregated(filteredValidators.GetBlsKeys(), hash.Bytes()) {
+		c.logger.Info("[checkpoint] VERIFY SIGS SUCCESS")
+	} else {
+		c.logger.Error("[checkpoint] VERIFY SIGS FAIL")
 	}
 
 	return submitCheckpointMethod.Encode(params)
