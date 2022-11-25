@@ -29,11 +29,11 @@ func (m *mockEventSubscriber) AddLog(log *ethgo.Log) {
 	m.logs = append(m.logs, log)
 }
 
-func (m *mockEventSubscriber) getLogs() []*ethgo.Log {
+func (m *mockEventSubscriber) len() int {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
-	return m.logs
+	return len(m.logs)
 }
 
 func TestEventTracker_TrackSyncEvents(t *testing.T) {
@@ -82,12 +82,12 @@ func TestEventTracker_TrackSyncEvents(t *testing.T) {
 	require.NoError(t, err)
 
 	time.Sleep(2 * time.Second)
-	require.Len(t, sub.getLogs(), 10)
+	require.Equal(t, sub.len(), 10)
 	// send 10 more events
 	for i := 0; i < 10; i++ {
 		server.TxnTo(addr, "emitEvent")
 	}
 
 	time.Sleep(2 * time.Second)
-	require.Len(t, sub.getLogs(), 20)
+	require.Equal(t, sub.len(), 20)
 }
