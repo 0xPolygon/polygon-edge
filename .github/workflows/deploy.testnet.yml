@@ -162,7 +162,7 @@ jobs:
 
   pandoras_box_eoa:
     uses: ./.github/workflows/pandoras_box.yml
-    name: Pandora's Box
+    name: Pandora's Box EOA
     needs: deploy_testnet
     secrets:
       SLACK_PERFORMANCE_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
@@ -176,8 +176,8 @@ jobs:
       mode: EOA
   pandoras_box_erc20:
     uses: ./.github/workflows/pandoras_box.yml
-    name: Pandora's Box
-    needs: pandoras_box_eoa
+    name: Pandora's Box ERC20
+    needs: deploy_testnet
     secrets:
       SLACK_PERFORMANCE_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
       PANDORAS_TARGET: ${{ secrets.PANDORAS_TARGET }}
@@ -190,8 +190,8 @@ jobs:
       mode: ERC20
   pandoras_box_erc721:
     uses: ./.github/workflows/pandoras_box.yml
-    name: Pandora's Box
-    needs: pandoras_box_erc20
+    name: Pandora's Box ERC721
+    needs: deploy_testnet
     secrets:
       SLACK_PERFORMANCE_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
       PANDORAS_TARGET: ${{ secrets.PANDORAS_TARGET }}
