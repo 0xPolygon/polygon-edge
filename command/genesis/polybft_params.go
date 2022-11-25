@@ -1,10 +1,12 @@
 package genesis
 
 import (
+	"bytes"
 	"encoding/hex"
 	"fmt"
 	"math/big"
 	"path"
+	"sort"
 	"strings"
 	"time"
 
@@ -272,6 +274,11 @@ func generateExtraDataPolyBft(validators []*polybft.Validator, publicKeys []*bls
 			VotingPower: chain.ConvertWeiToTokensAmount(validator.Balance).Uint64(),
 		}
 	}
+
+	// Order validators based on its addresses
+	sort.Slice(delta.Added, func(i, j int) bool {
+		return bytes.Compare(delta.Added[i].Address[:], delta.Added[j].Address[:]) < 0
+	})
 
 	extra := polybft.Extra{Validators: delta, Checkpoint: &polybft.CheckpointData{}}
 
