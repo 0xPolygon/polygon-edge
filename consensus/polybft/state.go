@@ -72,6 +72,7 @@ func (e *exitEventNotFoundError) Error() string {
 		e.exitID, e.checkpointBlock, e.epoch)
 }
 
+// TODO: remove and refactor to use types.StateSyncEvent
 // StateSyncEvent is a bridge event from the rootchain
 type StateSyncEvent types.StateSyncEvent
 
