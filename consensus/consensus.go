@@ -84,5 +84,5 @@ type BridgeDataProvider interface {
 	GenerateExitProof(exitID, epoch, checkpointBlock uint64) ([]types.Hash, error)
 
 	// GetStateSyncProof retrieves the StateSync Bundle proof
-	GetStateSyncProof(stateSyncID uint64) ([]types.Hash, error)
+	GetStateSyncProof(stateSyncID uint64) (*types.StateSyncProof, error)
 }

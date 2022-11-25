@@ -174,8 +174,12 @@ func (m *mockStore) GetPeers() int {
 	return 20
 }
 
-func (m *mockStore) GetStateSyncProof(stateSyncID uint64) ([]types.Hash, error) {
+func (m *mockStore) GetStateSyncProof(stateSyncID uint64) (*types.StateSyncProof, error) {
 	hash := types.BytesToHash([]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
+	ssp := &types.StateSyncProof{
+		Proof:     []types.Hash{hash},
+		StateSync: types.StateSyncEvent{},
+	}
 
-	return []types.Hash{hash}, nil
+	return ssp, nil
 }

@@ -857,7 +857,7 @@ func (c *consensusRuntime) GenerateExitProof(exitID, epoch, checkpointBlock uint
 }
 
 // GetStateSyncProof returns the proof of the bundle for the state sync
-func (c *consensusRuntime) GetStateSyncProof(stateSyncID uint64) ([]types.Hash, error) {
+func (c *consensusRuntime) GetStateSyncProof(stateSyncID uint64) (*types.StateSyncProof, error) {
 	bundlesToExecute, err := c.state.getBundles(stateSyncID, 1)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get bundles: %w", err)
@@ -867,7 +867,16 @@ func (c *consensusRuntime) GetStateSyncProof(stateSyncID uint64) ([]types.Hash, 
 		return nil, fmt.Errorf("cannot find StateSync with id %d", stateSyncID)
 	}
 
-	return bundlesToExecute[0].Proof, nil
+	for _, bundle := range bundlesToExecute[0].StateSyncs {
+		if bundle.ID == stateSyncID {
+			return &types.StateSyncProof{
+				Proof:     bundlesToExecute[0].Proof,
+				StateSync: types.StateSyncEvent(*bundle),
+			}, nil
+		}
+	}
+
+	return nil, fmt.Errorf("cannot find StateSync with id %d", stateSyncID)
 }
 
 // setIsActiveValidator updates the activeValidatorFlag field
