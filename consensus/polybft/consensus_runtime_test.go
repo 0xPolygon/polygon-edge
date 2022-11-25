@@ -1732,7 +1732,9 @@ func TestConsensusRuntime_GenerateExitProof(t *testing.T) {
 	t.Run("Generate and validate exit proof - invalid proof", func(t *testing.T) {
 		t.Parallel()
 
-		invalidProof := proof
+		// copy and make proof invalid
+		invalidProof := make([]types.Hash, len(proof))
+		copy(invalidProof, proof)
 		invalidProof[0][0]++
 
 		// verify generated proof on desired tree
