@@ -1,9 +1,7 @@
 package polybft
 
 import (
-	"bytes"
 	"fmt"
-	"sort"
 	"sync"
 
 	"github.com/0xPolygon/polygon-edge/types"
@@ -203,11 +201,6 @@ func (v *validatorsSnapshotCache) computeSnapshot(
 		"blockNumber", epochEndBlockNumber,
 		"snapshot", snapshot,
 		"delta", extra.Validators)
-
-	// TODO: Temp
-	sort.Slice(snapshot, func(i, j int) bool {
-		return bytes.Compare(snapshot[i].Address[:], snapshot[j].Address[:]) < 0
-	})
 
 	return snapshot, nil
 }
