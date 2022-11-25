@@ -1,6 +1,7 @@
 package initcontracts
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -262,6 +264,11 @@ func validatorSetToABISlice(allocs map[types.Address]*chain.GenesisAccount) ([]m
 	}
 
 	validatorSetMap := make([]map[string]interface{}, len(validatorsInfo))
+
+	sort.Slice(validatorsInfo, func(i, j int) bool {
+		return bytes.Compare(validatorsInfo[i].Account.Ecdsa.Address().Bytes(),
+			validatorsInfo[j].Account.Ecdsa.Address().Bytes()) < 0
+	})
 
 	for i, validatorInfo := range validatorsInfo {
 		addr := types.Address(validatorInfo.Account.Ecdsa.Address())
