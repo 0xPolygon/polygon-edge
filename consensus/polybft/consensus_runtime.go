@@ -310,20 +310,20 @@ func (c *consensusRuntime) populateFsmIfBridgeEnabled(
 			return fmt.Errorf("cannot clean commitments: %w", err)
 		}
 
-		nonExecutedCommitments, err := c.state.getNonExecutedCommitments(nextStateSyncExecutionIdx)
-		if err != nil {
-			return fmt.Errorf("cannot get non executed commitments: %w", err)
-		}
+		// nonExecutedCommitments, err := c.state.getNonExecutedCommitments(nextStateSyncExecutionIdx)
+		// if err != nil {
+		// 	return fmt.Errorf("cannot get non executed commitments: %w", err)
+		// }
 
-		if len(nonExecutedCommitments) > 0 {
-			bundlesToExecute, err := c.state.getBundles(nextStateSyncExecutionIdx, maxBundlesPerSprint)
-			if err != nil {
-				return fmt.Errorf("cannot get bundles: %w", err)
-			}
+		// if len(nonExecutedCommitments) > 0 {
+		// 	bundlesToExecute, err := c.state.getBundles(nextStateSyncExecutionIdx, maxBundlesPerSprint)
+		// 	if err != nil {
+		// 		return fmt.Errorf("cannot get bundles: %w", err)
+		// 	}
 
-			ff.commitmentsToVerifyBundles = nonExecutedCommitments
-			ff.bundleProofs = bundlesToExecute
-		}
+		// 	ff.commitmentsToVerifyBundles = nonExecutedCommitments
+		// 	ff.bundleProofs = bundlesToExecute
+		// }
 	}
 
 	return nil

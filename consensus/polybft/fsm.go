@@ -203,23 +203,23 @@ func (f *fsm) stateTransactions() []*types.Transaction {
 		}
 	}
 
-	if f.isEndOfSprint {
-		for _, bundle := range f.bundleProofs {
-			inputData, err := bundle.EncodeAbi()
-			if err != nil {
-				f.logger.Error("stateTransactions failed to encode input data for state sync execution", "Error", err)
+	// if f.isEndOfSprint {
+	// 	for _, bundle := range f.bundleProofs {
+	// 		inputData, err := bundle.EncodeAbi()
+	// 		if err != nil {
+	// 			f.logger.Error("stateTransactions failed to encode input data for state sync execution", "Error", err)
 
-				return nil
-			}
+	// 			return nil
+	// 		}
 
-			txns = append(txns,
-				createStateTransactionWithData(f.config.StateReceiverAddr, inputData))
+	// 		txns = append(txns,
+	// 			createStateTransactionWithData(f.config.StateReceiverAddr, inputData))
 
-			f.logger.Debug("[fsm] Executing bundle",
-				"fromIndex", bundle.StateSyncs[0].ID,
-				"toIndex", bundle.StateSyncs[len(bundle.StateSyncs)-1].ID)
-		}
-	}
+	// 		f.logger.Debug("[fsm] Executing bundle",
+	// 			"fromIndex", bundle.StateSyncs[0].ID,
+	// 			"toIndex", bundle.StateSyncs[len(bundle.StateSyncs)-1].ID)
+	// 	}
+	// }
 
 	f.logger.Debug("Apply state transaction", "num", len(txns))
 
