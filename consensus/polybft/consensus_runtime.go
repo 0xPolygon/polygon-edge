@@ -864,7 +864,7 @@ func (c *consensusRuntime) GetStateSyncProof(stateSyncID uint64) (*types.StateSy
 	}
 
 	if len(bundlesToExecute) == 0 {
-		return nil, fmt.Errorf("cannot find StateSync with id %d", stateSyncID)
+		return nil, fmt.Errorf("cannot find bundle containing StateSync id %d", stateSyncID)
 	}
 
 	for _, bundle := range bundlesToExecute[0].StateSyncs {
