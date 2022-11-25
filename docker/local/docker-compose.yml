@@ -24,7 +24,8 @@ services:
       dockerfile: docker/local/Dockerfile
     command: ["server", "--data-dir", "/data", "--chain", "/genesis/genesis.json", "--grpc-address", "0.0.0.0:9632", "--libp2p", "0.0.0.0:1478", "--jsonrpc", "0.0.0.0:8545", "--seal"]
     depends_on:
-      - init
+      init:
+        condition: service_completed_successfully
     ports:
       - '10000:9632'
       - '10002:8545'
@@ -41,7 +42,8 @@ services:
       dockerfile: docker/local/Dockerfile
     command: ["server", "--data-dir", "/data", "--chain", "/genesis/genesis.json", "--grpc-address", "0.0.0.0:9632", "--libp2p", "0.0.0.0:1478", "--jsonrpc", "0.0.0.0:8545", "--seal"]
     depends_on:
-      - init
+      init:
+        condition: service_completed_successfully
     ports:
       - '20000:9632'
       - '20002:8545'
@@ -58,7 +60,8 @@ services:
       dockerfile: docker/local/Dockerfile
     command: ["server", "--data-dir", "/data", "--chain", "/genesis/genesis.json", "--grpc-address", "0.0.0.0:9632", "--libp2p", "0.0.0.0:1478", "--jsonrpc", "0.0.0.0:8545", "--seal"]
     depends_on:
-      - init
+      init:
+        condition: service_completed_successfully
     ports:
       - '30000:9632'
       - '30002:8545'
@@ -75,7 +78,8 @@ services:
       dockerfile: docker/local/Dockerfile
     command: ["server", "--data-dir", "/data", "--chain", "/genesis/genesis.json", "--grpc-address", "0.0.0.0:9632", "--libp2p", "0.0.0.0:1478", "--jsonrpc", "0.0.0.0:8545", "--seal"]
     depends_on:
-      - init
+      init:
+        condition: service_completed_successfully
     ports:
       - '40000:9632'
       - '40002:8545'
