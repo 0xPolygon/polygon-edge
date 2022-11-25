@@ -1059,8 +1059,13 @@ func (c *consensusRuntime) HasQuorum(
 
 	switch msgType {
 	case protoIBFT.MessageType_PREPREPARE:
-		return len(messages) >= 0
+		return len(messages) >= 1
 	case protoIBFT.MessageType_PREPARE:
+		// two cases -> first message is MessageType_PREPREPARE, and other -> MessageType_PREPREPARE is not included
+		if len(messages) > 0 && messages[0].Type == protoIBFT.MessageType_PREPREPARE {
+			return len(messages) >= int(quorum)
+		}
+
 		return len(messages) >= int(quorum)-1
 	case protoIBFT.MessageType_ROUND_CHANGE, protoIBFT.MessageType_COMMIT:
 		return len(messages) >= int(quorum)
