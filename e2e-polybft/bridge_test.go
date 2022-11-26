@@ -53,6 +53,19 @@ func checkLogs(
 	}
 }
 
+func stateSyncEventsToAbiSlice(stateSyncEvent types.StateSyncEvent) []map[string]interface{} {
+	result := make([]map[string]interface{}, 1)
+	result[0] = map[string]interface{}{
+		"id":       stateSyncEvent.ID,
+		"sender":   stateSyncEvent.Sender,
+		"receiver": stateSyncEvent.Receiver,
+		"data":     stateSyncEvent.Data,
+		"skip":     stateSyncEvent.Skip,
+	}
+
+	return result
+}
+
 func TestE2E_Bridge_MainWorkflow(t *testing.T) {
 	const num = 10
 
@@ -97,12 +110,17 @@ func TestE2E_Bridge_MainWorkflow(t *testing.T) {
 
 	t.Log(stateSyncProof)
 
+	input, err := types.ExecuteBundleABIMethod.Encode([2]interface{}{stateSyncProof.Proof, stateSyncEventsToAbiSlice(stateSyncProof.StateSync)})
+	require.NoError(t, err)
+
 	// execute the state sync
 	rawTxn := &ethgo.Transaction{
 		From:     ethgo.Address(premine[0]),
 		To:       (*ethgo.Address)(&contracts.StateReceiverContract),
 		GasPrice: 0,
 		Gas:      types.StateTransactionGasLimit,
+		Type:     ethgo.TransactionType(types.StateTx),
+		Input:    input,
 	}
 
 	chID, err := cluster.Servers[0].JSONRPC().Eth().ChainID()

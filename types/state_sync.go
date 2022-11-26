@@ -1,6 +1,13 @@
 package types
 
-import "github.com/umbracle/ethgo"
+import (
+	"github.com/umbracle/ethgo"
+	"github.com/umbracle/ethgo/abi"
+)
+
+var ExecuteBundleABIMethod, _ = abi.NewMethod("function execute(" +
+	"bytes32[] proof, " +
+	"tuple(uint256 id, address sender, address receiver, bytes data, bool skip)[] objs)")
 
 // StateSyncEvent is a bridge event from the rootchain
 type StateSyncEvent struct {
