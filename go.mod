@@ -68,6 +68,7 @@ require (
 )
 
 require (
+	github.com/prysmaticlabs/go-bls v0.0.0-20190211215340-0e61c30f2187
 	golang.org/x/sync v0.0.0-20220929204114-8fcdb60fdcc0
 	gopkg.in/DataDog/dd-trace-go.v1 v1.43.1
 )
@@ -200,7 +201,6 @@ require (
 	github.com/prometheus/client_model v0.2.0 // indirect
 	github.com/prometheus/common v0.37.0 // indirect
 	github.com/prometheus/procfs v0.8.0 // indirect
-	github.com/prysmaticlabs/go-bls v0.0.0-20190211215340-0e61c30f2187 // indirect
 	github.com/raulk/go-watchdog v1.3.0 // indirect
 	github.com/ryanuber/go-glob v1.0.0 // indirect
 	github.com/sirupsen/logrus v1.8.1 // indirect
