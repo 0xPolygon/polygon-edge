@@ -1105,17 +1105,8 @@ func (c *consensusRuntime) HasQuorum(
 	messages []*proto.Message,
 	msgType proto.MessageType,
 ) bool {
-	// if we are not using consensus engine for current block return false
-	if c.fsm.parent.Number+1 != blockNumber {
-		c.logger.Warn("HasQuorum checking against stale block",
-			"blockNumber", blockNumber, "parentBlock", c.fsm.parent.Number)
-
-		return false
-	}
-
-	ppIncluded := false
-
 	// extract the addresses of all the signers of the messages
+	ppIncluded := false
 	signers := make(map[types.Address]struct{}, len(messages))
 
 	for _, message := range messages {

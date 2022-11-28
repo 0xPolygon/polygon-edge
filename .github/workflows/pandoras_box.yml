@@ -4,7 +4,7 @@ on:  # yamllint disable-line rule:truthy
   workflow_dispatch:
     inputs:
       runner:
-        description: 'The runner to execute on'
+        description: The runner to execute on
         default: 'ubuntu-latest'
         type: choice
         options:
@@ -12,7 +12,7 @@ on:  # yamllint disable-line rule:truthy
           - devnet
           - testnet
       environment:
-        description: 'The environment to run against'
+        description: The environment to run against
         required: false
         type: environment
       transaction_count:
@@ -23,6 +23,14 @@ on:  # yamllint disable-line rule:truthy
         default: '100'
         description: The transaction batch size
         type: string
+      mode:
+        default: 'EOA'
+        description: The mode for the stress test
+        type: choice
+        options:
+          - EOA
+          - ERC20
+          - ERC721
   workflow_call:
     inputs:
       transaction_count:
@@ -34,13 +42,17 @@ on:  # yamllint disable-line rule:truthy
         description: The transaction batch size
         type: string
       environment:
-        description: 'The environment to run against'
+        description: The environment to run against
         type: string
         required: true
       runner:
         required: true
         type: string
         description: The runner label to use
+      mode:
+        required: true
+        description: The mode for the stress test
+        type: string
     secrets:
       SLACK_PERFORMANCE_WEBHOOK_URL:
         required: true
@@ -103,7 +115,7 @@ jobs:
       - id: pandora
         name: Open Pandora's Box
         run: |
-          pandoras-box -url ${{ secrets.PANDORAS_TARGET }} -m "${{ secrets.PANDORAS_MNEMONIC }}" -b ${{ inputs.transaction_batch }} -t ${{ inputs.transaction_count }} -o pandorasConsequences.json
+          pandoras-box -url ${{ secrets.PANDORAS_TARGET }} --mode "${{ inputs.mode }}" -m "${{ secrets.PANDORAS_MNEMONIC }}" -b ${{ inputs.transaction_batch }} -t ${{ inputs.transaction_count }} -o pandorasConsequences.json
           echo "::set-output name=tps::$(cat pandorasConsequences.json | jq -r '.averageTPS')"
       - name: Archive Pandora's Consequences
         continue-on-error: true
@@ -135,6 +147,13 @@ jobs:
                   }
                 },
                 {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "Total Transactions Sent: `${{ inputs.transaction_count }}`"
+                  }
+                },
+                {
                   "type": "divider"
                 },
                 {
@@ -143,6 +162,10 @@ jobs:
                       {
                         "type": "mrkdwn",
                         "text": "Environment: `${{ inputs.environment }}`"
+                      },
+                      {
+                        "type": "mrkdwn",
+                        "text": "Test Mode: `${{ inputs.mode }}`"
                       },
                       {
                         "type": "mrkdwn",

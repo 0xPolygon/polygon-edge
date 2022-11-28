@@ -407,6 +407,23 @@ func (v *testValidators) toValidatorSetWithError(t *testing.T) *validatorSet {
 	return vs
 }
 
+func (v *testValidators) updateVotingPowers(votingPowersMap map[string]uint64) AccountSet {
+	if len(votingPowersMap) == 0 {
+		return AccountSet{}
+	}
+
+	aliases := []string{}
+	for alias := range votingPowersMap {
+		aliases = append(aliases, alias)
+	}
+
+	v.iterAcct(aliases, func(t *testValidator) {
+		t.votingPower = votingPowersMap[t.alias]
+	})
+
+	return v.getPublicIdentities(aliases...)
+}
+
 type testValidator struct {
 	alias       string
 	account     *wallet.Account

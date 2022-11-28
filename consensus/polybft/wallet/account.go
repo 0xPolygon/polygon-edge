@@ -2,8 +2,6 @@ package wallet
 
 import (
 	"crypto/ecdsa"
-	"encoding/hex"
-	"encoding/json"
 	"fmt"
 
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
@@ -35,39 +33,29 @@ func GenerateAccount() *Account {
 	}
 }
 
-func GenerateNewAccountFromSecret(secretManager secrets.SecretsManager, key string) (*Account, error) {
-	// read account
-	accountBytes, err := secretManager.GetSecret(key)
-	if err != nil {
+// NewAccountFromSecret creates new account by using provided secretsManager
+func NewAccountFromSecret(secretsManager secrets.SecretsManager) (*Account, error) {
+	var (
+		bytes []byte
+		err   error
+	)
+
+	// ECDSA
+	if bytes, err = secretsManager.GetSecret(secrets.ValidatorKey); err != nil {
 		return nil, fmt.Errorf("failed to read account data: %w", err)
 	}
 
-	return NewAccountFromBytes(accountBytes)
-}
-
-// NewAccountFromBytes deserializes bytes to the new Account
-func NewAccountFromBytes(content []byte) (*Account, error) {
-	var stored *keystoreAccount
-	if err := json.Unmarshal(content, &stored); err != nil {
-		return nil, err
-	}
-
-	ecdsaRaw, err := hex.DecodeString(stored.EcdsaPrivKey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode ecdsa: %w", err)
-	}
-
-	blsRaw, err := hex.DecodeString(stored.BlsPrivKey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode bls: %w", err)
-	}
-
-	ecdsaKey, err := wallet.NewWalletFromPrivKey(ecdsaRaw)
+	ecdsaKey, err := wallet.NewWalletFromPrivKey(bytes)
 	if err != nil {
 		return nil, err
 	}
 
-	blsKey, err := bls.UnmarshalPrivateKey(blsRaw)
+	// BLS
+	if bytes, err = secretsManager.GetSecret(secrets.ValidatorBLSKey); err != nil {
+		return nil, fmt.Errorf("failed to read account data: %w", err)
+	}
+
+	blsKey, err := bls.UnmarshalPrivateKey(bytes)
 	if err != nil {
 		return nil, err
 	}
@@ -75,31 +63,25 @@ func NewAccountFromBytes(content []byte) (*Account, error) {
 	return &Account{Ecdsa: ecdsaKey, Bls: blsKey}, nil
 }
 
-type keystoreAccount struct {
-	EcdsaPrivKey string `json:"ecdsa"`
-	BlsPrivKey   string `json:"bls"`
-}
-
 // ToBytes serializes account to slice of bytes
-func (a *Account) ToBytes() ([]byte, error) {
+func (a *Account) Save(secretsManager secrets.SecretsManager) (err error) {
+	var ecdsaRaw, blsRaw []byte
+
 	// get serialized ecdsa private key
-	ecdsaRaw, err := a.Ecdsa.MarshallPrivateKey()
-	if err != nil {
-		return nil, err
+	if ecdsaRaw, err = a.Ecdsa.MarshallPrivateKey(); err != nil {
+		return err
+	}
+
+	if err = secretsManager.SetSecret(secrets.ValidatorKey, ecdsaRaw); err != nil {
+		return err
 	}
 
 	// get serialized bls private key
-	blsRaw, err := a.Bls.MarshalJSON()
-	if err != nil {
-		return nil, err
+	if blsRaw, err = a.Bls.MarshalJSON(); err != nil {
+		return err
 	}
 
-	stored := &keystoreAccount{
-		EcdsaPrivKey: hex.EncodeToString(ecdsaRaw),
-		BlsPrivKey:   hex.EncodeToString(blsRaw),
-	}
-
-	return json.Marshal(stored)
+	return secretsManager.SetSecret(secrets.ValidatorBLSKey, blsRaw)
 }
 
 func (a *Account) GetEcdsaPrivateKey() (*ecdsa.PrivateKey, error) {

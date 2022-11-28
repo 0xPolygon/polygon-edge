@@ -15,7 +15,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/network"
-	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/syncer"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -149,8 +148,7 @@ func (p *Polybft) Initialize() error {
 	p.logger.Info("initializing polybft...")
 
 	// read account
-	account, err := wallet.GenerateNewAccountFromSecret(
-		p.config.SecretsManager, secrets.ValidatorBLSKey)
+	account, err := wallet.NewAccountFromSecret(p.config.SecretsManager)
 	if err != nil {
 		return fmt.Errorf("failed to read account data. Error: %w", err)
 	}
