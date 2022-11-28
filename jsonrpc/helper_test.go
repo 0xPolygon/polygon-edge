@@ -187,11 +187,15 @@ func TestGetBlockHeader(t *testing.T) {
 			err:      ErrFailedFetchGenesis,
 		},
 		{
-			name:     "should return error if pending is given",
-			num:      PendingBlockNumber,
-			store:    &debugEndpointMockStore{},
-			expected: nil,
-			err:      ErrPendingBlockNumber,
+			name: "should return latest if pending is given",
+			num:  PendingBlockNumber,
+			store: &debugEndpointMockStore{
+				headerFn: func() *types.Header {
+					return testLatestHeader
+				},
+			},
+			expected: testLatestHeader,
+			err:      nil,
 		},
 		{
 			name: "should return header at arbitrary height",
