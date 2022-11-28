@@ -552,38 +552,6 @@ func (s *State) getCommitmentMessage(toIndex uint64) (*CommitmentMessageSigned, 
 	return commitment, err
 }
 
-// getNonExecutedCommitments gets non executed commitments
-// (commitments whose toIndex is greater than or equal to startIndex)
-func (s *State) getNonExecutedCommitments(startIndex uint64) ([]*CommitmentMessageSigned, error) {
-	var commitments []*CommitmentMessageSigned
-
-	err := s.db.View(func(tx *bolt.Tx) error {
-		c := tx.Bucket(commitmentsBucket).Cursor()
-
-		for k, v := c.Last(); k != nil; k, v = c.Prev() {
-			if itou(k) < startIndex {
-				// reached a commitment that was executed
-				break
-			}
-
-			var commitment *CommitmentMessageSigned
-			if err := json.Unmarshal(v, &commitment); err != nil {
-				return err
-			}
-
-			commitments = append(commitments, commitment)
-		}
-
-		return nil
-	})
-
-	sort.Slice(commitments, func(i, j int) bool {
-		return commitments[i].Message.FromIndex < commitments[j].Message.FromIndex
-	})
-
-	return commitments, err
-}
-
 // cleanCommitments cleans all commitments that are older than the provided fromIndex, alongside their proofs
 func (s *State) cleanCommitments(stateSyncExecutionIndex uint64) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
