@@ -16,8 +16,7 @@ func Test_SingleSign(t *testing.T) {
 	require.NoError(t, err)
 
 	// Sign valid message
-	signature, err := blsKey.Sign(validTestMsg)
-	assert.NoError(t, err)
+	signature := blsKey.Sign(validTestMsg)
 
 	isOk := signature.Verify(blsKey.PublicKey(), validTestMsg)
 	assert.True(t, isOk)
@@ -45,13 +44,12 @@ func Test_AggregatedSign(t *testing.T) {
 
 	// test all signatures at once
 	for i := 0; i < len(keys); i++ {
-		sign, err := keys[i].Sign(validTestMsg)
-		require.NoError(t, err)
+		sign := keys[i].Sign(validTestMsg)
 
 		signatures = append(signatures, sign)
 
 		// verify correctness of IncludeSignature
-		aggSignature = aggSignature.Aggregate(sign)
+		aggSignature.Aggregate(sign)
 
 		isOk = aggSignature.VerifyAggregated(pubKeys[:i+1], validTestMsg)
 		assert.True(t, isOk)

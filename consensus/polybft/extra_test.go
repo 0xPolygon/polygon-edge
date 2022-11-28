@@ -241,8 +241,7 @@ func TestSignature_VerifyCommittedFields(t *testing.T) {
 		for i, val := range vals.getValidators() {
 			bitmap.Set(uint64(i))
 
-			tempSign, err := val.account.Bls.Sign(msgHash[:])
-			require.NoError(t, err)
+			tempSign := val.account.Bls.Sign(msgHash[:])
 
 			signatures = append(signatures, tempSign)
 			aggs, err := signatures.Aggregate().Marshal()
@@ -328,8 +327,7 @@ func TestExtra_VerifyCommittedFieldsRandom(t *testing.T) {
 	for _, index := range valIndxsRnd {
 		bitmap.Set(uint64(index))
 
-		tempSign, err := accounts[index].account.Bls.Sign(msgHash[:])
-		require.NoError(t, err)
+		tempSign := accounts[index].account.Bls.Sign(msgHash[:])
 
 		signature = append(signature, tempSign)
 	}

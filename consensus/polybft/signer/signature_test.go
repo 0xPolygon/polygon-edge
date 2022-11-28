@@ -19,8 +19,7 @@ func Test_VerifySignature(t *testing.T) {
 	validTestMsg, invalidTestMsg := testGenRandomBytes(t, messageSize), testGenRandomBytes(t, messageSize)
 
 	blsKey, _ := GenerateBlsKey()
-	signature, err := blsKey.Sign(validTestMsg)
-	require.NoError(t, err)
+	signature := blsKey.Sign(validTestMsg)
 
 	assert.True(t, signature.Verify(blsKey.PublicKey(), validTestMsg))
 	assert.False(t, signature.Verify(blsKey.PublicKey(), invalidTestMsg))
@@ -34,21 +33,20 @@ func Test_AggregatedSignatureSimple(t *testing.T) {
 	bls1, _ := GenerateBlsKey()
 	bls2, _ := GenerateBlsKey()
 	bls3, _ := GenerateBlsKey()
-	sig1, err := bls1.Sign(validTestMsg)
-	require.NoError(t, err)
-	sig2, err := bls2.Sign(validTestMsg)
-	require.NoError(t, err)
-	sig3, err := bls3.Sign(validTestMsg)
-	require.NoError(t, err)
+	sig1 := bls1.Sign(validTestMsg)
+	sig2 := bls2.Sign(validTestMsg)
+	sig3 := bls3.Sign(validTestMsg)
 
-	verified := sig1.Aggregate(sig2).
-		Aggregate(sig3).
-		Verify(bls1.PublicKey().aggregate(bls2.PublicKey()).aggregate(bls3.PublicKey()), validTestMsg)
+	bls1.PublicKey().aggregate(bls2.PublicKey())
+	bls1.PublicKey().aggregate(bls3.PublicKey())
+
+	sig1.Aggregate(sig2)
+	sig1.Aggregate(sig3)
+
+	verified := sig1.Verify(bls1.PublicKey(), validTestMsg)
 	assert.True(t, verified)
 
-	notVerified := sig1.Aggregate(sig2).
-		Aggregate(sig3).
-		Verify(bls1.PublicKey().aggregate(bls2.PublicKey()).aggregate(bls3.PublicKey()), invalidTestMsg)
+	notVerified := sig1.Verify(bls1.PublicKey(), invalidTestMsg)
 	assert.False(t, notVerified)
 }
 
@@ -67,14 +65,13 @@ func Test_AggregatedSignature(t *testing.T) {
 	var manuallyAggSignature *Signature
 
 	for i, key := range blsKeys {
-		signature, err := key.Sign(validTestMsg)
-		require.NoError(t, err)
+		signature := key.Sign(validTestMsg)
 
 		allSignatures = append(allSignatures, signature)
 		if i == 0 {
 			manuallyAggSignature = allSignatures[i]
 		} else {
-			manuallyAggSignature = manuallyAggSignature.Aggregate(allSignatures[i])
+			manuallyAggSignature.Aggregate(allSignatures[i])
 		}
 	}
 
@@ -86,7 +83,7 @@ func Test_AggregatedSignature(t *testing.T) {
 		if i == 0 {
 			manuallyAggPubs = pubKey
 		} else {
-			manuallyAggPubs = manuallyAggPubs.aggregate(pubKey)
+			manuallyAggPubs.aggregate(pubKey)
 		}
 	}
 
@@ -123,8 +120,7 @@ func TestSignature_BigInt(t *testing.T) {
 	bls1, err := GenerateBlsKey()
 	require.NoError(t, err)
 
-	sig1, err := bls1.Sign(validTestMsg)
-	assert.NoError(t, err)
+	sig1 := bls1.Sign(validTestMsg)
 
 	_, err = sig1.ToBigInt()
 	require.NoError(t, err)

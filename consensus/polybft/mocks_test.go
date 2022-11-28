@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
-	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
@@ -462,15 +461,6 @@ func (v *testValidator) ValidatorMetadata() *ValidatorMetadata {
 		BlsKey:      v.account.Bls.PublicKey(),
 		VotingPower: v.votingPower,
 	}
-}
-
-func (v *testValidator) mustSign(hash []byte) *bls.Signature {
-	signature, err := v.account.Bls.Sign(hash)
-	if err != nil {
-		panic(fmt.Sprintf("BUG: failed to sign: %v", err))
-	}
-
-	return signature
 }
 
 type testHeadersMap struct {

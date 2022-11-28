@@ -733,7 +733,7 @@ func TestFSM_VerifyStateTransactions_StateTransactionInvalidSignature(t *testing
 	aggregatedSigs := bls.Signatures{}
 
 	nonValidators.iterAcct(nil, func(t *testValidator) {
-		aggregatedSigs = append(aggregatedSigs, t.mustSign([]byte("dummyHash")))
+		aggregatedSigs = append(aggregatedSigs, t.account.Bls.Sign([]byte("dummyHash")))
 	})
 
 	sig, err := aggregatedSigs.Aggregate().Marshal()
@@ -823,7 +823,7 @@ func TestFSM_ValidateCommit_InvalidHash(t *testing.T) {
 	assert.NoError(t, err)
 
 	nonValidatorAcc := newTestValidator("non_validator", 1)
-	wrongSignature, err := nonValidatorAcc.mustSign([]byte("Foo")).Marshal()
+	wrongSignature, err := nonValidatorAcc.account.Bls.Sign([]byte("Foo")).Marshal()
 	require.NoError(t, err)
 
 	err = fsm.ValidateCommit(validators.getValidator("0").Address().Bytes(), wrongSignature, []byte{})
@@ -859,7 +859,7 @@ func TestFSM_ValidateCommit_Good(t *testing.T) {
 	require.NoError(t, block.UnmarshalRLP(proposal))
 
 	validator := validators.getValidator("A")
-	seal, err := validator.mustSign(block.Hash().Bytes()).Marshal()
+	seal, err := validator.account.Bls.Sign(block.Hash().Bytes()).Marshal()
 	require.NoError(t, err)
 	err = fsm.ValidateCommit(validator.Key().Address().Bytes(), seal, block.Hash().Bytes())
 	require.NoError(t, err)
@@ -1050,8 +1050,7 @@ func TestFSM_Insert_Good(t *testing.T) {
 	var commitedSeals []*messages.CommittedSeal
 
 	for i := 0; i < signaturesCount; i++ {
-		sign, err := allAccounts[i].Bls.Sign(buildBlock.Block.Hash().Bytes())
-		assert.NoError(t, err)
+		sign := allAccounts[i].Bls.Sign(buildBlock.Block.Hash().Bytes())
 		sigRaw, err := sign.Marshal()
 		assert.NoError(t, err)
 
@@ -1105,15 +1104,15 @@ func TestFSM_Insert_InvalidNode(t *testing.T) {
 	validatorA := validators.getValidator("A")
 	validatorB := validators.getValidator("B")
 	proposalHash := buildBlock.Block.Hash().Bytes()
-	sigA, err := validatorA.mustSign(proposalHash).Marshal()
+	sigA, err := validatorA.account.Bls.Sign(proposalHash).Marshal()
 	require.NoError(t, err)
 
-	sigB, err := validatorB.mustSign(proposalHash).Marshal()
+	sigB, err := validatorB.account.Bls.Sign(proposalHash).Marshal()
 	require.NoError(t, err)
 
 	// create test account outside of validator set
 	nonValidatorAccount := newTestValidator("non_validator", 1)
-	nonValidatorSignature, err := nonValidatorAccount.mustSign(proposalHash).Marshal()
+	nonValidatorSignature, err := nonValidatorAccount.account.Bls.Sign(proposalHash).Marshal()
 	require.NoError(t, err)
 
 	commitedSeals := []*messages.CommittedSeal{
@@ -1368,7 +1367,7 @@ func TestFSM_VerifyStateTransaction_InvalidSignature(t *testing.T) {
 
 	signature := createSignature(t, validators.getPrivateIdentities("A", "B", "C", "D"), hash)
 	invalidValidator := newTestValidator("G", 1)
-	invalidSignature, err := invalidValidator.mustSign([]byte("malicious message")).Marshal()
+	invalidSignature, err := invalidValidator.account.Bls.Sign([]byte("malicious message")).Marshal()
 	require.NoError(t, err)
 
 	cmSigned := &CommitmentMessageSigned{
@@ -1657,9 +1656,7 @@ func createTestCommitment(t *testing.T, accounts []*wallet.Account) *CommitmentM
 	var signatures bls.Signatures
 
 	for _, a := range accounts {
-		signature, err := a.Bls.Sign(hash.Bytes())
-		assert.NoError(t, err)
-
+		signature := a.Bls.Sign(hash.Bytes())
 		signatures = append(signatures, signature)
 	}
 

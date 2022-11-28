@@ -28,9 +28,7 @@ func createSignature(t *testing.T, accounts []*wallet.Account, hash types.Hash) 
 	for i, x := range accounts {
 		bmp.Set(uint64(i))
 
-		src, err := x.Bls.Sign(hash[:])
-		require.NoError(t, err)
-
+		src := x.Bls.Sign(hash[:])
 		signatures = append(signatures, src)
 	}
 

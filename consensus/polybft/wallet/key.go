@@ -29,10 +29,7 @@ func (k *Key) Address() ethgo.Address {
 }
 
 func (k *Key) Sign(b []byte) ([]byte, error) {
-	s, err := k.raw.Bls.Sign(b)
-	if err != nil {
-		return nil, err
-	}
+	s := k.raw.Bls.Sign(b)
 
 	return s.Marshal()
 }

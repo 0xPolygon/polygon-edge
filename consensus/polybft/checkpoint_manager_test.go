@@ -119,7 +119,7 @@ func TestCheckpointManager_abiEncodeCheckpointBlock(t *testing.T) {
 	signature := &bls.Signature{}
 
 	currentValidators.iterAcct(nil, func(v *testValidator) {
-		signature = signature.Aggregate(v.mustSign(proposalHash))
+		signature.Aggregate(v.account.Bls.Sign(proposalHash))
 		bmp.Set(i)
 		i++
 	})

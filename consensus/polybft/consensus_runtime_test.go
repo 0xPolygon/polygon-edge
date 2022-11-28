@@ -56,7 +56,7 @@ func TestConsensusRuntime_GetVotes(t *testing.T) {
 
 	for i := 0; i < int(votesCount); i++ {
 		validator := validatorAccounts.getValidator(validatorIds[i])
-		signature, err := validator.mustSign(hash.Bytes()).Marshal()
+		signature, err := validator.account.Bls.Sign(hash.Bytes()).Marshal()
 		require.NoError(t, err)
 
 		_, err = state.insertMessageVote(epoch, hash.Bytes(),
@@ -600,8 +600,7 @@ func TestConsensusRuntime_FSM_EndOfEpoch_BuildRegisterCommitment_And_Uptime(t *t
 	require.NoError(t, err)
 
 	for _, a := range accounts {
-		signature, err := a.Bls.Sign(hash.Bytes())
-		require.NoError(t, err)
+		signature := a.Bls.Sign(hash.Bytes())
 		signatureRaw, err := signature.Marshal()
 		require.NoError(t, err)
 		_, err = state.insertMessageVote(epoch, hash.Bytes(), &MessageSignature{
@@ -1236,7 +1235,7 @@ func TestConsensusRuntime_restartEpoch_FirstRestart_BuildsCommitment(t *testing.
 	require.Equal(t, 1, len(votes))
 	require.Equal(t, localValidator.Key().String(), votes[0].From)
 
-	signature, err := localValidator.mustSign(commitmentHash.Bytes()).Marshal()
+	signature, err := localValidator.account.Bls.Sign(commitmentHash.Bytes()).Marshal()
 	require.NoError(t, err)
 	require.Equal(t, signature, votes[0].Signature)
 
@@ -1245,7 +1244,7 @@ func TestConsensusRuntime_restartEpoch_FirstRestart_BuildsCommitment(t *testing.
 			continue
 		}
 
-		signature, err := validator.mustSign(commitmentHash.Bytes()).Marshal()
+		signature, err := validator.account.Bls.Sign(commitmentHash.Bytes()).Marshal()
 		require.NoError(t, err)
 
 		_, err = state.insertMessageVote(runtime.epoch.Number, commitmentHash.Bytes(),
@@ -1367,7 +1366,7 @@ func TestConsensusRuntime_restartEpoch_NewEpochToRun_BuildCommitment(t *testing.
 
 	for _, validatorID := range originalValidatorIds {
 		validator := originalValidators.getValidator(validatorID)
-		signature, err := validator.mustSign(commitmentHash.Bytes()).Marshal()
+		signature, err := validator.account.Bls.Sign(commitmentHash.Bytes()).Marshal()
 		require.NoError(t, err)
 		_, err = state.insertMessageVote(runtime.epoch.Number, commitmentHash.Bytes(),
 			&MessageSignature{
@@ -1587,8 +1586,7 @@ func TestConsensusRuntime_FSM_EndOfEpoch_OnBlockInserted(t *testing.T) {
 	require.NoError(t, err)
 
 	for _, a := range signingAccounts {
-		signature, err := a.Bls.Sign(hash.Bytes())
-		require.NoError(t, err)
+		signature := a.Bls.Sign(hash.Bytes())
 		signatureRaw, err := signature.Marshal()
 		require.NoError(t, err)
 		_, err = state.insertMessageVote(epoch, hash.Bytes(), &MessageSignature{
@@ -2182,7 +2180,7 @@ func createTestTransportMessage(t *testing.T, hash []byte, epochNumber uint64, k
 func createTestMessageVote(t *testing.T, hash []byte, validator *testValidator) *MessageSignature {
 	t.Helper()
 
-	signature, err := validator.mustSign(hash).Marshal()
+	signature, err := validator.account.Bls.Sign(hash).Marshal()
 	require.NoError(t, err)
 
 	return &MessageSignature{

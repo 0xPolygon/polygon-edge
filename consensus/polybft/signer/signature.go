@@ -4,26 +4,17 @@ import (
 	"errors"
 	"math/big"
 
-	bn256 "github.com/umbracle/go-eth-bn256"
+	"github.com/prysmaticlabs/go-bls"
 )
 
 // Signature represents bls signature which is point on the curve
 type Signature struct {
-	p *bn256.G1
+	sig *bls.Sign
 }
 
 // Verify checks the BLS signature of the message against the public key of its signer
 func (s *Signature) Verify(publicKey *PublicKey, message []byte) bool {
-	hashPoint, err := g1HashToPoint(message)
-	if err != nil {
-		// this should never happen, probably need a log here
-		return false
-	}
-
-	a := []*bn256.G1{new(bn256.G1).Neg(s.p), hashPoint}
-	b := []*bn256.G2{&g2, publicKey.p}
-
-	return bn256.PairingCheck(a, b)
+	return s.sig.Verify(publicKey.p, message)
 }
 
 // VerifyAggregated checks the BLS signature of the message against the aggregated public keys of its signers
@@ -34,38 +25,27 @@ func (s *Signature) VerifyAggregated(publicKeys []*PublicKey, msg []byte) bool {
 }
 
 // Aggregate adds the given signatures
-func (s *Signature) Aggregate(onemore *Signature) *Signature {
-	var p *bn256.G1
-	if s.p == nil {
-		p = new(bn256.G1).Set(&zeroG1)
-	} else {
-		p = new(bn256.G1).Set(s.p)
-	}
-
-	p.Add(p, onemore.p)
-
-	return &Signature{p: p}
+func (s *Signature) Aggregate(onemore *Signature) {
+	s.sig.Add(onemore.sig)
 }
 
 // Marshal the signature to bytes.
 func (s *Signature) Marshal() ([]byte, error) {
-	if s.p == nil {
+	if s.sig == nil {
 		return nil, errors.New("cannot marshal empty signature")
 	}
 
-	return s.p.Marshal(), nil
+	return s.sig.Serialize(), nil
 }
 
 // UnmarshalSignature reads the signature from the given byte array
 func UnmarshalSignature(raw []byte) (*Signature, error) {
-	if len(raw) == 0 {
-		return nil, errors.New("cannot unmarshal signature from empty slice")
+	sig := &Signature{}
+	if err := sig.sig.Deserialize(raw); err != nil {
+		return nil, err
 	}
 
-	p := new(bn256.G1)
-	_, err := p.Unmarshal(raw)
-
-	return &Signature{p: p}, err
+	return sig, nil
 }
 
 // ToBigInt marshalls signature (which is point) to 2 big ints - one for each coordinate
@@ -88,11 +68,10 @@ type Signatures []*Signature
 
 // Aggregate sums the given array of signatures
 func (s Signatures) Aggregate() *Signature {
-	p := *new(bn256.G1).Set(&zeroG1)
-	for _, sig := range s {
-		point := new(bn256.G1).Set(sig.p)
-		p.Add(&p, point)
+	firstSig := s[0]
+	for i := 1; i < len(s); i++ {
+		firstSig.sig.Add(s[i].sig)
 	}
 
-	return &Signature{p: &p}
+	return firstSig
 }

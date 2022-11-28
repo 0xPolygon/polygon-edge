@@ -1,21 +1,19 @@
 package bls
 
 import (
-	"crypto/rand"
 	"math/big"
 
-	bn256 "github.com/umbracle/go-eth-bn256"
+	"github.com/prysmaticlabs/go-bls"
 )
 
 // GenerateBlsKey creates a random private and its corresponding public keys
 func GenerateBlsKey() (*PrivateKey, error) {
-	priv, _, err := bn256.RandomG2(rand.Reader)
-	if err != nil {
-		return nil, err
-	}
+	var secret *bls.SecretKey
+
+	secret.SetByCSPRNG()
 
 	return &PrivateKey{
-		p: priv,
+		secret: secret,
 	}, nil
 }
 

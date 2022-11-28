@@ -6,36 +6,27 @@ import (
 	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/helper/common"
-	bn256 "github.com/umbracle/go-eth-bn256"
+	"github.com/prysmaticlabs/go-bls"
 )
 
 // PublicKey represents bls public key
 type PublicKey struct {
-	p *bn256.G2
+	p *bls.PublicKey
 }
 
 // aggregate adds the given public keys
-func (p *PublicKey) aggregate(onemore *PublicKey) *PublicKey {
-	var g2 *bn256.G2
-	if p.p == nil {
-		g2 = new(bn256.G2).Set(&zeroG2)
-	} else {
-		g2 = new(bn256.G2).Set(p.p)
-	}
-
-	g2.Add(g2, onemore.p)
-
-	return &PublicKey{p: g2}
+func (p *PublicKey) aggregate(onemore *PublicKey) {
+	p.p.Add(onemore.p)
 }
 
 // Marshal marshal the key to bytes.
 func (p *PublicKey) Marshal() []byte {
-	return p.p.Marshal()
+	return p.p.Serialize()
 }
 
 // MarshalJSON implements the json.Marshaler interface.
 func (p *PublicKey) MarshalJSON() ([]byte, error) {
-	return json.Marshal(p.p.Marshal())
+	return json.Marshal(p.p.Serialize())
 }
 
 // UnmarshalJSON implements the json.Marshaler interface.
@@ -63,10 +54,12 @@ func UnmarshalPublicKey(raw []byte) (*PublicKey, error) {
 		return nil, errors.New("cannot unmarshal public key from empty slice")
 	}
 
-	p := new(bn256.G2)
-	_, err := p.Unmarshal(raw)
+	publicKey := &PublicKey{}
+	if err := publicKey.p.Deserialize(raw); err != nil {
+		return nil, err
+	}
 
-	return &PublicKey{p: p}, err
+	return publicKey, nil
 }
 
 // ToBigInt converts public key to 4 big ints
@@ -104,10 +97,10 @@ func UnmarshalPublicKeyFromBigInt(b [4]*big.Int) (*PublicKey, error) {
 
 // aggregatePublicKeys calculates P1 + P2 + ...
 func aggregatePublicKeys(pubs []*PublicKey) *PublicKey {
-	res := *new(bn256.G2).Set(&zeroG2)
-	for i := 0; i < len(pubs); i++ {
-		res.Add(&res, pubs[i].p)
+	firstKey := pubs[0]
+	for i := 1; i < len(pubs); i++ {
+		firstKey.aggregate(pubs[i])
 	}
 
-	return &PublicKey{p: &res}
+	return firstKey
 }
