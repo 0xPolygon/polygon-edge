@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -8,12 +9,14 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
+	"github.com/0xPolygon/polygon-edge/helper/tests"
 	"github.com/0xPolygon/polygon-edge/types"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
+	"github.com/umbracle/ethgo/jsonrpc"
 	ethgow "github.com/umbracle/ethgo/wallet"
 )
 
@@ -66,6 +69,59 @@ func stateSyncEventsToAbiSlice(stateSyncEvent types.StateSyncEvent) []map[string
 	return result
 }
 
+func executeStateSync(t *testing.T, client *jsonrpc.Client, account ethgo.Key, stateSyncID string) {
+	t.Helper()
+
+	// retrieve state sync proof
+	var stateSyncProof types.StateSyncProof
+	err := client.Call("bridge_getStateSyncProof", &stateSyncProof, stateSyncID)
+	require.NoError(t, err)
+
+	t.Log("State sync proofs:", stateSyncProof)
+
+	input, err := types.ExecuteBundleABIMethod.Encode([2]interface{}{stateSyncProof.Proof, stateSyncEventsToAbiSlice(stateSyncProof.StateSync)})
+	require.NoError(t, err)
+
+	t.Log(stateSyncEventsToAbiSlice(stateSyncProof.StateSync))
+
+	nonce, err := client.Eth().GetNonce(account.Address(), ethgo.Latest)
+	require.NoError(t, err)
+
+	// execute the state sync
+	rawTxn := &ethgo.Transaction{
+		From:     account.Address(),
+		To:       (*ethgo.Address)(&contracts.StateReceiverContract),
+		GasPrice: 0,
+		Gas:      types.StateTransactionGasLimit,
+		Input:    input,
+		Nonce:    nonce,
+	}
+
+	chID, err := client.Eth().ChainID()
+	require.NoError(t, err)
+
+	signer := ethgow.NewEIP155Signer(chID.Uint64())
+	signedTxn, err := signer.SignTx(rawTxn, account)
+	require.NoError(t, err)
+
+	txnRaw, err := signedTxn.MarshalRLPTo(nil)
+	require.NoError(t, err)
+
+	hash, err := client.Eth().SendRawTransaction(txnRaw)
+	require.NoError(t, err)
+
+	t.Log("Waiting for receipt", hash)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	receipt, err := tests.WaitForReceipt(ctx, client.Eth(), hash)
+	require.NoError(t, err)
+	require.NotNil(t, receipt)
+
+	t.Log("Logs", len(receipt.Logs))
+}
+
 func TestE2E_Bridge_MainWorkflow(t *testing.T) {
 	const num = 10
 
@@ -102,51 +158,12 @@ func TestE2E_Bridge_MainWorkflow(t *testing.T) {
 	require.NoError(t, cluster.WaitForBlock(25, 1*time.Minute))
 
 	// commitments should've been stored
-	var stateSyncProof types.StateSyncProof
-
-	// retrieve state sync proofs
-	err := cluster.Servers[0].JSONRPC().Call("bridge_getStateSyncProof", &stateSyncProof, "1")
-	require.NoError(t, err)
-
-	t.Log(stateSyncProof)
-
-	input, err := types.ExecuteBundleABIMethod.Encode([2]interface{}{stateSyncProof.Proof, stateSyncEventsToAbiSlice(stateSyncProof.StateSync)})
-	require.NoError(t, err)
-
-	// execute the state sync
-	rawTxn := &ethgo.Transaction{
-		From:     ethgo.Address(premine[0]),
-		To:       (*ethgo.Address)(&contracts.StateReceiverContract),
-		GasPrice: 0,
-		Gas:      types.StateTransactionGasLimit,
-		Type:     ethgo.TransactionType(types.StateTx),
-		Input:    input,
+	// execute the state sysncs
+	for i := 0; i < num; i++ {
+		executeStateSync(t, cluster.Servers[0].JSONRPC(), accounts[i], fmt.Sprintf("%x", i+1))
 	}
 
-	chID, err := cluster.Servers[0].JSONRPC().Eth().ChainID()
-	require.NoError(t, err)
-
-	signer := ethgow.NewEIP155Signer(chID.Uint64())
-	signedTxn, err := signer.SignTx(rawTxn, accounts[0])
-	assert.NoError(t, err)
-
-	txnRaw, err := signedTxn.MarshalRLPTo(nil)
-	assert.NoError(t, err)
-
-	hash, err := cluster.Servers[0].JSONRPC().Eth().SendRawTransaction(txnRaw)
-	assert.NoError(t, err)
-
-	var receipt *ethgo.Receipt
-	for count := 0; count < 100 || receipt == nil; count++ {
-		receipt, err = cluster.Servers[0].JSONRPC().Eth().GetTransactionReceipt(hash)
-		assert.NoError(t, err)
-
-		time.Sleep(50 * time.Millisecond)
-	}
-	require.NotNil(t, receipt)
-	t.Log(receipt.Logs)
-
-	// the transaction is mined and there should be a success event
+	// the transactions are mined and there should be a success events
 	id := stateSyncResultEvent.ID()
 	filter := &ethgo.LogFilter{
 		Topics: [][]*ethgo.Hash{
@@ -158,7 +175,7 @@ func TestE2E_Bridge_MainWorkflow(t *testing.T) {
 	filter.SetToUint64(100)
 
 	logs, err := cluster.Servers[0].JSONRPC().Eth().GetLogs(filter)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert that all state syncs are executed successfully
 	checkLogs(t, logs, num,
