@@ -15,8 +15,8 @@ import (
 
 type Config struct {
 	EnableMemory     bool // enable memory capture
-	EnableStack      bool // disable stack capture
-	EnableStorage    bool // disable storage capture
+	EnableStack      bool // enable stack capture
+	EnableStorage    bool // enable storage capture
 	EnableReturnData bool // enable return data capture
 }
 
@@ -192,7 +192,7 @@ func (t *StructTracer) captureStorage(
 		return
 	}
 
-	_, inited := t.storage[contractAddress]
+	_, initialized := t.storage[contractAddress]
 
 	switch opCode {
 	case evm.SLOAD:
@@ -200,7 +200,7 @@ func (t *StructTracer) captureStorage(
 			return
 		}
 
-		if !inited {
+		if !initialized {
 			t.storage[contractAddress] = make(map[types.Hash]types.Hash)
 		}
 
@@ -214,7 +214,7 @@ func (t *StructTracer) captureStorage(
 			return
 		}
 
-		if !inited {
+		if !initialized {
 			t.storage[contractAddress] = make(map[types.Hash]types.Hash)
 		}
 
