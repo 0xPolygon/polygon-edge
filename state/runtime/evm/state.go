@@ -224,7 +224,7 @@ func (c *state) Run() ([]byte, error) {
 
 	for !c.stop {
 		op, ok = c.CurrentOpCode()
-		ipCopy, gasCopy := c.ip, c.gas
+		gasCopy := c.gas
 
 		c.captureState(int(op))
 
@@ -237,7 +237,7 @@ func (c *state) Run() ([]byte, error) {
 		inst := dispatchTable[op]
 		if inst.inst == nil {
 			c.exit(errOpCodeNotFound)
-			c.captureExecutionError(op.String(), ipCopy, gasCopy)
+			c.captureExecutionError(op.String(), c.ip, gasCopy)
 
 			break
 		}
@@ -245,7 +245,7 @@ func (c *state) Run() ([]byte, error) {
 		// check if the depth of the stack is enough for the instruction
 		if c.sp < inst.stack {
 			c.exit(errStackUnderflow)
-			c.captureExecutionError(op.String(), ipCopy, gasCopy)
+			c.captureExecutionError(op.String(), c.ip, gasCopy)
 
 			break
 		}
@@ -253,7 +253,7 @@ func (c *state) Run() ([]byte, error) {
 		// consume the gas of the instruction
 		if !c.consumeGas(inst.gas) {
 			c.exit(errOutOfGas)
-			c.captureExecutionError(op.String(), ipCopy, gasCopy)
+			c.captureExecutionError(op.String(), c.ip, gasCopy)
 
 			break
 		}
