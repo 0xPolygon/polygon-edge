@@ -12,7 +12,6 @@ import (
 
 func ReadArtifact(rootFolder, contractPath, contractName string) (*Artifact, error) {
 	fileName := filepath.Join(rootFolder, contractPath, fmt.Sprintf("%s.json", contractName))
-
 	absolutePath, err := filepath.Abs(fileName)
 	if err != nil {
 		return nil, err

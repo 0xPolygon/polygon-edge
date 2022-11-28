@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/command/helper"
+	"github.com/hashicorp/go-hclog"
 	"io"
 	"os"
 	"os/exec"
@@ -74,7 +77,8 @@ type TestClusterConfig struct {
 	Binary            string
 	ValidatorSetSize  uint64
 
-	logsDirOnce sync.Once
+	GenesisGenerator func(v []genesis.GenesisTarget) *chain.Chain
+	logsDirOnce      sync.Once
 }
 
 func (c *TestClusterConfig) Dir(name string) string {
@@ -163,6 +167,12 @@ func WithValidatorSnapshot(validatorsLen uint64) ClusterOption {
 	}
 }
 
+func WithGenesisGenerator(f func(validators []genesis.GenesisTarget) *chain.Chain) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.GenesisGenerator = f
+	}
+}
+
 func WithBootnodeCount(cnt int) ClusterOption {
 	return func(h *TestClusterConfig) {
 		h.BootnodeCount = cnt
@@ -174,18 +184,20 @@ func isTrueEnv(e string) bool {
 }
 
 func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *TestCluster {
-	t.Helper()
+	tt := time.Now()
+	//t.Helper()
 
-	if !isTrueEnv(envE2ETestsEnabled) {
-		t.Skip("Integration tests are disabled.")
-	}
+	//if !isTrueEnv(envE2ETestsEnabled) {
+	//	t.Skip("Integration tests are disabled.")
+	//}
 
 	tmpDir, err := os.MkdirTemp("/tmp", "e2e-polybft-")
 	require.NoError(t, err)
+	t.Log(tmpDir)
 
 	config := &TestClusterConfig{
 		t:          t,
-		WithLogs:   isTrueEnv(envLogsEnabled),
+		WithLogs:   true, //isTrueEnv(envLogsEnabled),
 		WithStdout: isTrueEnv(envStdoutEnabled),
 		TmpDir:     tmpDir,
 		Binary:     resolveBinary(),
@@ -210,7 +222,8 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		failCh:      make(chan struct{}),
 		once:        sync.Once{},
 	}
-
+	t.Log("run polybft-secrets", time.Since(tt))
+	// создают нужное число валидаторов с ключами
 	{
 		// run init account
 		err = cluster.cmdRun("polybft-secrets",
@@ -231,67 +244,88 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		cluster.Config.ValidatorSetSize = uint64(validatorsCount)
 	}
 
-	{
-		args := []string{
-			"genesis",
-			"--consensus", "polybft",
-			"--dir", path.Join(tmpDir, "genesis.json"),
-			"--contracts-path", defaultContractsPath,
-			"--epoch-size", "10",
-			"--premine", "0x0000000000000000000000000000000000000000",
-		}
-
-		if len(cluster.Config.Premine) != 0 {
-			for _, addr := range cluster.Config.Premine {
-				args = append(args, "--premine", addr.String())
-			}
-		}
-
-		if cluster.Config.HasBridge {
-			args = append(args, "--bridge")
-		}
-
-		if cluster.Config.BootnodeCount > 0 {
-			validators, err := genesis.ReadValidatorsByRegexp(cluster.Config.TmpDir, cluster.Config.ValidatorPrefix)
-			require.NoError(t, err)
-
-			cnt := cluster.Config.BootnodeCount
-			if len(validators) < cnt {
-				cnt = len(validators)
-			}
-
-			for i := 0; i < cnt; i++ {
-				maddr := fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s",
-					"127.0.0.1", cluster.initialPort+int64(i+1), validators[i].NodeID)
-				args = append(args, "--bootnode", maddr)
-			}
-		}
-
-		if cluster.Config.ValidatorSetSize > 0 {
-			args = append(args, "--validator-set-size", fmt.Sprint(cluster.Config.ValidatorSetSize))
-		}
-
-		// run cmd init-genesis with all the arguments
-		err = cluster.cmdRun(args...)
+	t.Log("run genesis", time.Since(tt))
+	genesisPath := path.Join(tmpDir, "genesis.json")
+	if cluster.Config.GenesisGenerator != nil {
+		validators, err := genesis.ReadValidatorsByRegexp(cluster.Config.TmpDir, cluster.Config.ValidatorPrefix)
 		require.NoError(t, err)
+
+		clusterGenesis := cluster.Config.GenesisGenerator(validators)
+		err = helper.WriteGenesisConfigToDisk(clusterGenesis, genesisPath)
+		require.NoError(t, err)
+	} else {
+		err = GenerateGenesis(genesisPath, cluster)
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 
+	t.Log("run test servers", time.Since(tt))
 	for i := 1; i <= int(cluster.Config.ValidatorSetSize); i++ {
 		cluster.initTestServer(t, i, true)
 	}
 
+	t.Log("run nnonon test servers", time.Since(tt))
 	for i := 1; i <= cluster.Config.NonValidatorCount; i++ {
 		offsetIndex := i + int(cluster.Config.ValidatorSetSize)
 		cluster.initTestServer(t, offsetIndex, false)
 	}
+	t.Log("finish", time.Since(tt))
 
 	return cluster
+}
+
+func GenerateGenesis(path string, cluster *TestCluster) (err error) {
+	args := []string{
+		"genesis",
+		"--consensus", "polybft",
+		"--dir", path,
+		"--contracts-path", defaultContractsPath,
+		"--epoch-size", "10",
+		"--premine", "0x0000000000000000000000000000000000000000",
+	}
+
+	if len(cluster.Config.Premine) != 0 {
+		for _, addr := range cluster.Config.Premine {
+			args = append(args, "--premine", addr.String())
+		}
+	}
+
+	if cluster.Config.HasBridge {
+		args = append(args, "--bridge")
+	}
+
+	if cluster.Config.BootnodeCount > 0 {
+		validators, err := genesis.ReadValidatorsByRegexp(cluster.Config.TmpDir, cluster.Config.ValidatorPrefix)
+		if err != nil {
+			return err
+		}
+
+		cnt := cluster.Config.BootnodeCount
+		if len(validators) < cnt {
+			cnt = len(validators)
+		}
+
+		for i := 0; i < cnt; i++ {
+			maddr := fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s",
+				"127.0.0.1", cluster.initialPort+int64(i+1), validators[i].NodeID)
+			args = append(args, "--bootnode", maddr)
+		}
+	}
+
+	if cluster.Config.ValidatorSetSize > 0 {
+		args = append(args, "--validator-set-size", fmt.Sprint(cluster.Config.ValidatorSetSize))
+	}
+
+	// run cmd init-genesis with all the arguments
+	err = cluster.cmdRun(args...)
+	return err
 }
 
 func (c *TestCluster) initTestServer(t *testing.T, i int, isValidator bool) {
 	t.Helper()
 
-	logLevel := os.Getenv(envLogLevel)
+	logLevel := hclog.Info.String() //os.Getenv(envLogLevel)
 	dataDir := c.Config.Dir(c.Config.ValidatorPrefix + strconv.Itoa(i))
 
 	srv := NewTestServer(t, c.Config, func(config *TestServerConfig) {
@@ -419,13 +453,13 @@ func (c *TestCluster) WaitForBlock(n uint64, timeout time.Duration) error {
 
 		ok = true
 
-		for _, i := range c.Servers {
-			if !i.isRunning() {
+		for i, s := range c.Servers {
+			if !s.isRunning() {
 				continue
 			}
 
-			num, err := i.JSONRPC().Eth().BlockNumber()
-
+			num, err := s.JSONRPC().Eth().BlockNumber()
+			fmt.Println("server", i, "Current block", num, err)
 			if err != nil || num < n {
 				ok = false
 

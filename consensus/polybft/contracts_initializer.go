@@ -3,6 +3,7 @@ package polybft
 import (
 	"encoding/hex"
 	"fmt"
+	"github.com/umbracle/ethgo"
 	"math/big"
 
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
@@ -69,7 +70,8 @@ func getInitChildValidatorSetInput(validators []*Validator, governanceAddr types
 	}
 
 	input, err := initCallStaking.Encode([]interface{}{
-		big.NewInt(newEpochReward),
+		ethgo.Gwei(newEpochReward),
+		//big.NewInt(newEpochReward),
 		big.NewInt(newMinStake),
 		big.NewInt(newMinDelegation),
 		validatorAddresses,
