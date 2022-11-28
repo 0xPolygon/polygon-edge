@@ -2,6 +2,7 @@ package polybft
 
 import (
 	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -13,15 +14,26 @@ import (
 )
 
 type mockEventSubscriber struct {
+	lock sync.RWMutex
 	logs []*ethgo.Log
 }
 
 func (m *mockEventSubscriber) AddLog(log *ethgo.Log) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
 	if len(m.logs) == 0 {
 		m.logs = []*ethgo.Log{}
 	}
 
 	m.logs = append(m.logs, log)
+}
+
+func (m *mockEventSubscriber) len() int {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
+	return len(m.logs)
 }
 
 func TestEventTracker_TrackSyncEvents(t *testing.T) {
@@ -72,8 +84,7 @@ func TestEventTracker_TrackSyncEvents(t *testing.T) {
 	require.NoError(t, err)
 
 	time.Sleep(2 * time.Second)
-	require.Len(t, sub.logs, 10)
-
+	require.Equal(t, sub.len(), 10)
 	// send 10 more events
 	for i := 0; i < 10; i++ {
 		receipt, err := server.TxnTo(addr, "emitEvent")
@@ -82,5 +93,5 @@ func TestEventTracker_TrackSyncEvents(t *testing.T) {
 	}
 
 	time.Sleep(2 * time.Second)
-	require.Len(t, sub.logs, 20)
+	require.Equal(t, sub.len(), 20)
 }
