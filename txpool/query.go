@@ -46,15 +46,3 @@ func (p *TxPool) GetTxs(inclQueued bool) (
 
 	return
 }
-
-// GetTxStatus gets TxStatus from journal and returns
-func (p *TxPool) GetTxStatus(txHash types.Hash) *string {
-	status := p.journal.txStatus(txHash)
-	if status == nil {
-		return nil
-	}
-
-	ret := status.String()
-
-	return &ret
-}

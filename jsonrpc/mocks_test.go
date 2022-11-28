@@ -52,8 +52,6 @@ type mockStore struct {
 
 	// headers is the list of historical headers
 	headers []*types.Header
-
-	txStatusByHash map[types.Hash]string
 }
 
 func newMockStore() *mockStore {
@@ -168,13 +166,4 @@ func (m *mockStore) GetCapacity() (uint64, uint64) {
 
 func (m *mockStore) GetPeers() int {
 	return 20
-}
-
-func (m *mockStore) GetTxStatus(txHash types.Hash) *string {
-	status, ok := m.txStatusByHash[txHash]
-	if !ok {
-		return nil
-	}
-
-	return &status
 }

@@ -506,191 +506,191 @@ func TestTxPool_GetPendingTx(t *testing.T) {
 	assert.Equal(t, receipt.BlockHash, tx.BlockHash)
 }
 
-// Test that the tx that doesn't reach TxPool is not recorded in TxPool journal and JSON-RPC returns null
-func Test_TxStatus_Unconfirmed(t *testing.T) {
-	t.Parallel()
+// // Test that the tx that doesn't reach TxPool is not recorded in TxPool journal and JSON-RPC returns null
+// func Test_TxStatus_Unconfirmed(t *testing.T) {
+// 	t.Parallel()
 
-	ibftManager := framework.NewIBFTServersManager(t,
-		IBFTMinNodes,
-		IBFTDirPrefix,
-		func(i int, config *framework.TestServerConfig) {},
-	)
+// 	ibftManager := framework.NewIBFTServersManager(t,
+// 		IBFTMinNodes,
+// 		IBFTDirPrefix,
+// 		func(i int, config *framework.TestServerConfig) {},
+// 	)
 
-	var (
-		startTimeout = 60 * time.Second
-	)
+// 	var (
+// 		startTimeout = 60 * time.Second
+// 	)
 
-	ctxForStart, cancelStart := context.WithTimeout(context.Background(), startTimeout)
-	defer cancelStart()
+// 	ctxForStart, cancelStart := context.WithTimeout(context.Background(), startTimeout)
+// 	defer cancelStart()
 
-	txHash := ethgo.HexToHash(types.StringToHash("1").String())
+// 	txHash := ethgo.HexToHash(types.StringToHash("1").String())
 
-	ibftManager.StartServers(ctxForStart)
+// 	ibftManager.StartServers(ctxForStart)
 
-	srv := ibftManager.GetServer(0)
-	response := srv.CallJSONRPC(map[string]interface{}{
-		"id":      1,
-		"jsonrpc": "2.0",
-		"method":  "eth_txStatus",
-		"params": []interface{}{
-			txHash.String(),
-		},
-	})
+// 	srv := ibftManager.GetServer(0)
+// 	response := srv.CallJSONRPC(map[string]interface{}{
+// 		"id":      1,
+// 		"jsonrpc": "2.0",
+// 		"method":  "eth_txStatus",
+// 		"params": []interface{}{
+// 			txHash.String(),
+// 		},
+// 	})
 
-	res, ok := response["result"]
-	assert.True(t, ok)
-	assert.Nil(t, res)
-}
+// 	res, ok := response["result"]
+// 	assert.True(t, ok)
+// 	assert.Nil(t, res)
+// }
 
-// Test that the mined tx is marked as successful in TxPool journal and JSON-RPC returns "success"
-func Test_TxStatus_Successful(t *testing.T) {
-	t.Parallel()
+// // Test that the mined tx is marked as successful in TxPool journal and JSON-RPC returns "success"
+// func Test_TxStatus_Successful(t *testing.T) {
+// 	t.Parallel()
 
-	var (
-		senderKey, senderAddr = tests.GenerateKeyAndAddr(t)
-		_, receiverAddr       = tests.GenerateKeyAndAddr(t)
-	)
+// 	var (
+// 		senderKey, senderAddr = tests.GenerateKeyAndAddr(t)
+// 		_, receiverAddr       = tests.GenerateKeyAndAddr(t)
+// 	)
 
-	ibftManager := framework.NewIBFTServersManager(t,
-		IBFTMinNodes,
-		IBFTDirPrefix,
-		func(i int, config *framework.TestServerConfig) {
-			config.Premine(senderAddr, framework.EthToWei(10))
-		},
-	)
+// 	ibftManager := framework.NewIBFTServersManager(t,
+// 		IBFTMinNodes,
+// 		IBFTDirPrefix,
+// 		func(i int, config *framework.TestServerConfig) {
+// 			config.Premine(senderAddr, framework.EthToWei(10))
+// 		},
+// 	)
 
-	var (
-		startTimeout = 60 * time.Second
-		txTimeout    = 20 * time.Second
-	)
+// 	var (
+// 		startTimeout = 60 * time.Second
+// 		txTimeout    = 20 * time.Second
+// 	)
 
-	ctxForStart, cancelStart := context.WithTimeout(context.Background(), startTimeout)
-	defer cancelStart()
+// 	ctxForStart, cancelStart := context.WithTimeout(context.Background(), startTimeout)
+// 	defer cancelStart()
 
-	ibftManager.StartServers(ctxForStart)
+// 	ibftManager.StartServers(ctxForStart)
 
-	txn := &framework.PreparedTransaction{
-		From:     senderAddr,
-		To:       &receiverAddr,
-		GasPrice: big.NewInt(10000),
-		Gas:      1000000,
-		Value:    framework.EthToWei(1),
-	}
+// 	txn := &framework.PreparedTransaction{
+// 		From:     senderAddr,
+// 		To:       &receiverAddr,
+// 		GasPrice: big.NewInt(10000),
+// 		Gas:      1000000,
+// 		Value:    framework.EthToWei(1),
+// 	}
 
-	ctxForTx, cancelTx := context.WithTimeout(context.Background(), txTimeout)
-	defer cancelTx()
+// 	ctxForTx, cancelTx := context.WithTimeout(context.Background(), txTimeout)
+// 	defer cancelTx()
 
-	// send tx and wait for receipt
-	receipt, err := ibftManager.
-		GetServer(0).
-		SendRawTx(ctxForTx, txn, senderKey)
+// 	// send tx and wait for receipt
+// 	receipt, err := ibftManager.
+// 		GetServer(0).
+// 		SendRawTx(ctxForTx, txn, senderKey)
 
-	assert.NoError(t, err)
+// 	assert.NoError(t, err)
 
-	if receipt == nil {
-		t.Fatalf("receipt not received")
-	}
+// 	if receipt == nil {
+// 		t.Fatalf("receipt not received")
+// 	}
 
-	srv := ibftManager.GetServer(0)
-	response := srv.CallJSONRPC(map[string]interface{}{
-		"id":      1,
-		"jsonrpc": "2.0",
-		"method":  "eth_txStatus",
-		"params": []interface{}{
-			receipt.TransactionHash.String(),
-		},
-	})
+// 	srv := ibftManager.GetServer(0)
+// 	response := srv.CallJSONRPC(map[string]interface{}{
+// 		"id":      1,
+// 		"jsonrpc": "2.0",
+// 		"method":  "eth_txStatus",
+// 		"params": []interface{}{
+// 			receipt.TransactionHash.String(),
+// 		},
+// 	})
 
-	result, ok := response["result"].(string)
-	assert.True(t, ok)
-	assert.Equal(t, "success", result)
-}
+// 	result, ok := response["result"].(string)
+// 	assert.True(t, ok)
+// 	assert.Equal(t, "success", result)
+// }
 
-// Test that the dropped tx is marked as dropped in TxPool journal and JSON-RPC returns "dropped"
-func Test_TxStatus_Dropped(t *testing.T) {
-	t.Parallel()
+// // Test that the dropped tx is marked as dropped in TxPool journal and JSON-RPC returns "dropped"
+// func Test_TxStatus_Dropped(t *testing.T) {
+// 	t.Parallel()
 
-	var (
-		senderKey, senderAddr = tests.GenerateKeyAndAddr(t)
-		_, receiverAddr       = tests.GenerateKeyAndAddr(t)
+// 	var (
+// 		senderKey, senderAddr = tests.GenerateKeyAndAddr(t)
+// 		_, receiverAddr       = tests.GenerateKeyAndAddr(t)
 
-		// Drop Tx by nonce hole transaction pruning that is occurred when reaching limit of slot
-		maxSlots = uint64(2)
-	)
+// 		// Drop Tx by nonce hole transaction pruning that is occurred when reaching limit of slot
+// 		maxSlots = uint64(2)
+// 	)
 
-	ibftManager := framework.NewIBFTServersManager(t,
-		IBFTMinNodes,
-		IBFTDirPrefix,
-		func(i int, config *framework.TestServerConfig) {
-			config.Premine(senderAddr, framework.EthToWei(10))
-			config.SetMaxSlots(&maxSlots)
-		},
-	)
+// 	ibftManager := framework.NewIBFTServersManager(t,
+// 		IBFTMinNodes,
+// 		IBFTDirPrefix,
+// 		func(i int, config *framework.TestServerConfig) {
+// 			config.Premine(senderAddr, framework.EthToWei(10))
+// 			config.SetMaxSlots(&maxSlots)
+// 		},
+// 	)
 
-	var (
-		startTimeout = 60 * time.Second
-		txTimeout    = 20 * time.Second
-	)
+// 	var (
+// 		startTimeout = 60 * time.Second
+// 		txTimeout    = 20 * time.Second
+// 	)
 
-	ctxForStart, cancelStart := context.WithTimeout(context.Background(), startTimeout)
-	defer cancelStart()
+// 	ctxForStart, cancelStart := context.WithTimeout(context.Background(), startTimeout)
+// 	defer cancelStart()
 
-	ibftManager.StartServers(ctxForStart)
+// 	ibftManager.StartServers(ctxForStart)
 
-	// set 1 to create nonce hole
-	var (
-		nonce1 = uint64(1)
-		nonce2 = uint64(2)
-	)
+// 	// set 1 to create nonce hole
+// 	var (
+// 		nonce1 = uint64(1)
+// 		nonce2 = uint64(2)
+// 	)
 
-	sendTx := func(t *testing.T, tx *framework.PreparedTransaction) ethgo.Hash {
-		t.Helper()
+// 	sendTx := func(t *testing.T, tx *framework.PreparedTransaction) ethgo.Hash {
+// 		t.Helper()
 
-		ctxForTx, cancelTx := context.WithTimeout(context.Background(), txTimeout)
+// 		ctxForTx, cancelTx := context.WithTimeout(context.Background(), txTimeout)
 
-		t.Cleanup(func() {
-			cancelTx()
-		})
+// 		t.Cleanup(func() {
+// 			cancelTx()
+// 		})
 
-		// send tx and wait for receipt
-		txHash, err := ibftManager.
-			GetServer(0).
-			SendRawTxWithoutConfirmation(ctxForTx, tx, senderKey)
+// 		// send tx and wait for receipt
+// 		txHash, err := ibftManager.
+// 			GetServer(0).
+// 			SendRawTxWithoutConfirmation(ctxForTx, tx, senderKey)
 
-		assert.NoError(t, err)
+// 		assert.NoError(t, err)
 
-		return txHash
-	}
+// 		return txHash
+// 	}
 
-	txHash1 := sendTx(t, &framework.PreparedTransaction{
-		From:     senderAddr,
-		To:       &receiverAddr,
-		GasPrice: big.NewInt(10000),
-		Gas:      1000000,
-		Value:    framework.EthToWei(1),
-		Nonce:    &nonce1,
-	})
+// 	txHash1 := sendTx(t, &framework.PreparedTransaction{
+// 		From:     senderAddr,
+// 		To:       &receiverAddr,
+// 		GasPrice: big.NewInt(10000),
+// 		Gas:      1000000,
+// 		Value:    framework.EthToWei(1),
+// 		Nonce:    &nonce1,
+// 	})
 
-	_ = sendTx(t, &framework.PreparedTransaction{
-		From:     senderAddr,
-		To:       &receiverAddr,
-		GasPrice: big.NewInt(10000),
-		Gas:      1000000,
-		Value:    framework.EthToWei(1),
-		Nonce:    &nonce2,
-	})
+// 	_ = sendTx(t, &framework.PreparedTransaction{
+// 		From:     senderAddr,
+// 		To:       &receiverAddr,
+// 		GasPrice: big.NewInt(10000),
+// 		Gas:      1000000,
+// 		Value:    framework.EthToWei(1),
+// 		Nonce:    &nonce2,
+// 	})
 
-	srv := ibftManager.GetServer(0)
-	response := srv.CallJSONRPC(map[string]interface{}{
-		"id":      1,
-		"jsonrpc": "2.0",
-		"method":  "eth_txStatus",
-		"params": []interface{}{
-			txHash1.String(),
-		},
-	})
+// 	srv := ibftManager.GetServer(0)
+// 	response := srv.CallJSONRPC(map[string]interface{}{
+// 		"id":      1,
+// 		"jsonrpc": "2.0",
+// 		"method":  "eth_txStatus",
+// 		"params": []interface{}{
+// 			txHash1.String(),
+// 		},
+// 	})
 
-	result, ok := response["result"].(string)
-	assert.True(t, ok)
-	assert.Equal(t, "dropped", result)
-}
+// 	result, ok := response["result"].(string)
+// 	assert.True(t, ok)
+// 	assert.Equal(t, "dropped", result)
+// }

@@ -25,12 +25,6 @@ type ethTxPoolStore interface {
 
 	// GetPendingTx gets the pending transaction from the transaction pool, if it's present
 	GetPendingTx(txHash types.Hash) (*types.Transaction, bool)
-
-	// GetTxStatus returns the status of transaction that has been added to TxPool
-	// success: tx has been mined
-	// dropped: tx was dropped for some reason
-	// it returns nil if the Tx is not added to TxPool
-	GetTxStatus(txHash types.Hash) *string
 }
 
 type Account struct {
@@ -773,11 +767,6 @@ func (e *Eth) UninstallFilter(id string) (bool, error) {
 // Unsubscribe uninstalls a filter in a websocket
 func (e *Eth) Unsubscribe(id string) (bool, error) {
 	return e.filterManager.Uninstall(id), nil
-}
-
-// TxStatus returns a status of the Tx that has been added in TxPool
-func (e *Eth) TxStatus(txHash types.Hash) (*string, error) {
-	return e.store.GetTxStatus(txHash), nil
 }
 
 func (e *Eth) getBlockHeader(number BlockNumber) (*types.Header, error) {

@@ -133,11 +133,10 @@ type promoteRequest struct {
 // transactions are the first-in-line of some promoted queue,
 // ready to be written to the state (primaries).
 type TxPool struct {
-	logger  hclog.Logger
-	signer  signer
-	forks   chain.ForksInTime
-	store   store
-	journal Journal
+	logger hclog.Logger
+	signer signer
+	forks  chain.ForksInTime
+	store  store
 
 	// map of all accounts registered by the pool
 	accounts accountsMap
@@ -233,7 +232,6 @@ func NewTxPool(
 		logger:      logger.Named("txpool"),
 		forks:       forks,
 		store:       store,
-		journal:     newMemoryJournal(),
 		executables: newPricedQueue(),
 		accounts:    accountsMap{maxEnqueuedLimit: config.MaxAccountEnqueued},
 		index:       lookupMap{all: make(map[types.Hash]*types.Transaction)},
@@ -446,7 +444,8 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 
 	// pool resource cleanup
 	clearAccountQueue := func(txs []*types.Transaction) {
-		p.cleanupForDroppedTxns(txs...)
+		p.index.remove(txs...)
+		p.gauge.decrease(slotsRequired(txs...))
 
 		// increase counter
 		droppedCount += len(txs)
@@ -552,8 +551,6 @@ func (p *TxPool) processEvent(event *blockchain.Event) {
 
 		// Extract latest nonces
 		for _, tx := range block.Transactions {
-			p.journal.logSuccessfulTx(tx.Hash)
-
 			var err error
 
 			addr := tx.From
@@ -590,8 +587,6 @@ func (p *TxPool) processEvent(event *blockchain.Event) {
 		if err := p.addTx(reorg, tx); err != nil {
 			p.logger.Error("add tx", "err", err)
 		}
-
-		p.journal.resetTxStatus(tx.Hash)
 	}
 
 	// reset accounts with the new state
@@ -711,7 +706,8 @@ func (p *TxPool) pruneAccountsWithNonceHoles() {
 
 			removed := account.enqueued.clear()
 
-			p.cleanupForDroppedTxns(removed...)
+			p.index.remove(removed...)
+			p.gauge.decrease(slotsRequired(removed...))
 
 			return true
 		},
@@ -781,7 +777,6 @@ func (p *TxPool) handleEnqueueRequest(req enqueueRequest) {
 		p.logger.Error("enqueue request", "err", err)
 
 		p.index.remove(tx)
-		p.journal.logDroppedTx(tx.Hash)
 
 		return
 	}
@@ -812,7 +807,8 @@ func (p *TxPool) handlePromoteRequest(req promoteRequest) {
 	promoted, pruned := account.promote()
 	p.logger.Debug("promote request", "promoted", promoted, "addr", addr.String())
 
-	p.cleanupForDroppedTxns(pruned...)
+	p.index.remove(pruned...)
+	p.gauge.decrease(slotsRequired(pruned...))
 
 	// update metrics
 	p.updatePending(int64(len(promoted)))
@@ -955,16 +951,6 @@ func (p *TxPool) updateAccountSkipsCounts(latestActiveAccounts map[types.Address
 			return true
 		},
 	)
-}
-
-// cleanupForDroppedTxns cleans some data for dropped transactions and record to journal
-func (p *TxPool) cleanupForDroppedTxns(txs ...*types.Transaction) {
-	p.index.remove(txs...)
-	p.gauge.decrease(slotsRequired(txs...))
-
-	for _, tx := range txs {
-		p.journal.logDroppedTx(tx.Hash)
-	}
 }
 
 // createAccountOnce creates an account and
