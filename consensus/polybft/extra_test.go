@@ -11,8 +11,6 @@ import (
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/hashicorp/go-hclog"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/fastrlp"
@@ -232,10 +230,13 @@ func TestSignature_VerifyCommittedFields(t *testing.T) {
 		vals := newTestValidators(numValidators)
 		msgHash := types.Hash{0x1}
 
-		ac := vals.getPublicIdentities()
+		validatorsMetadata := vals.getPublicIdentities()
+		validatorSet, err := vals.toValidatorSet()
+		require.NoError(t, err)
 
 		var signatures bls.Signatures
 		bitmap := bitmap.Bitmap{}
+		signers := make(map[types.Address]struct{}, validatorSet.Len())
 
 		for i, val := range vals.getValidators() {
 			bitmap.Set(uint64(i))
@@ -252,8 +253,10 @@ func TestSignature_VerifyCommittedFields(t *testing.T) {
 				Bitmap:              bitmap,
 			}
 
-			err = s.VerifyCommittedFields(ac, msgHash)
-			if i+1 < getQuorumSize(numValidators) {
+			err = s.VerifyCommittedFields(validatorsMetadata, msgHash)
+			signers[val.Address()] = struct{}{}
+
+			if !validatorSet.HasQuorum(signers) {
 				assert.ErrorContains(t, err, "quorum not reached", "failed for %d", i)
 			} else {
 				assert.NoError(t, err)
@@ -388,7 +391,7 @@ func TestExtra_CreateValidatorSetDelta_Cases(t *testing.T) {
 			}
 			newValidatorSet := vals.getPublicIdentities(c.newSet...)
 
-			delta, err := createValidatorSetDelta(hclog.NewNullLogger(), oldValidatorSet, newValidatorSet)
+			delta, err := createValidatorSetDelta(oldValidatorSet, newValidatorSet)
 			require.NoError(t, err)
 
 			// added validators
@@ -424,7 +427,7 @@ func TestExtra_CreateValidatorSetDelta_BlsDiffer(t *testing.T) {
 
 	newValidatorSet[0].BlsKey = privateKey.PublicKey()
 
-	_, err = createValidatorSetDelta(hclog.NewNullLogger(), oldValidatorSet, newValidatorSet)
+	_, err = createValidatorSetDelta(oldValidatorSet, newValidatorSet)
 	require.Error(t, err)
 }
 
@@ -498,7 +501,7 @@ func TestValidatorSetDelta_Copy(t *testing.T) {
 
 	oldValidatorSet := newTestValidators(originalValidatorsCount).getPublicIdentities()
 	newValidatorSet := oldValidatorSet[:len(oldValidatorSet)-2]
-	originalDelta, err := createValidatorSetDelta(hclog.NewNullLogger(), oldValidatorSet, newValidatorSet)
+	originalDelta, err := createValidatorSetDelta(oldValidatorSet, newValidatorSet)
 	require.NoError(t, err)
 	require.NotNil(t, originalDelta)
 	require.Empty(t, originalDelta.Added)

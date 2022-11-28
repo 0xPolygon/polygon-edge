@@ -256,7 +256,7 @@ func TestValidatorsSnapshotCache_ComputeSnapshot_ApplyDeltaFail(t *testing.T) {
 }
 
 func createValidatorDeltaHeader(number uint64, oldValidatorSet, newValidatorSet AccountSet) *types.Header {
-	delta, _ := createValidatorSetDelta(hclog.NewNullLogger(), oldValidatorSet, newValidatorSet)
+	delta, _ := createValidatorSetDelta(oldValidatorSet, newValidatorSet)
 	extra := &Extra{Validators: delta}
 
 	return &types.Header{

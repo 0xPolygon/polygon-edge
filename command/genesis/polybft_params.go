@@ -13,9 +13,9 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/helper"
 
 	rootchain "github.com/0xPolygon/polygon-edge/command/rootchain/helper"
-	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
+	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/server"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -39,8 +39,9 @@ const (
 	defaultPolyBftValidatorPrefixPath = "test-chain-"
 	defaultBridge                     = false
 
-	bootnodePortStart   = 30301
-	defaultStakeBalance = 100
+	bootnodePortStart = 30301
+
+	WeiScalingFactor = 1_000_000_000_000_000_000 // 10^18
 )
 
 func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
@@ -49,7 +50,7 @@ func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
 		return nil, err
 	}
 
-	alloc, err := p.deployContracts()
+	allocs, err := p.deployContracts()
 	if err != nil {
 		return nil, err
 	}
@@ -81,14 +82,6 @@ func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
 
 	chainConfig := &chain.Chain{
 		Name: p.name,
-		Genesis: &chain.Genesis{
-			GasLimit:   p.blockGasLimit,
-			Difficulty: 0,
-			Alloc:      alloc,
-			ExtraData:  generateExtraDataPolyBft(validatorsInfo),
-			GasUsed:    command.DefaultGenesisGasUsed,
-			Mixhash:    polybft.PolyBFTMixDigest,
-		},
 		Params: &chain.Params{
 			ChainID: int(p.chainID),
 			Forks:   chain.AllForksEnabled,
@@ -118,19 +111,46 @@ func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
 		}
 	}
 
-	// Premine accounts
-	if err := fillPremineMap(chainConfig.Genesis.Alloc, premine); err != nil {
+	// premine accounts
+	if err := fillPremineMap(allocs, premine); err != nil {
 		return nil, err
 	}
 
-	// Set initial validator set
-	polyBftConfig.InitialValidatorSet = p.getGenesisValidators(validatorsInfo, chainConfig.Genesis.Alloc)
+	// set initial validator set
+	genesisValidators, err := p.getGenesisValidators(validatorsInfo, allocs)
+	if err != nil {
+		return nil, err
+	}
+
+	polyBftConfig.InitialValidatorSet = genesisValidators
+
+	pubKeys := make([]*bls.PublicKey, len(validatorsInfo))
+	for i, validatorInfo := range validatorsInfo {
+		pubKeys[i] = validatorInfo.Account.Bls.PublicKey()
+	}
+
+	genesisExtraData, err := generateExtraDataPolyBft(genesisValidators, pubKeys)
+	if err != nil {
+		return nil, err
+	}
+
+	// populate genesis parameters
+	chainConfig.Genesis = &chain.Genesis{
+		GasLimit:   p.blockGasLimit,
+		Difficulty: 0,
+		Alloc:      allocs,
+		ExtraData:  genesisExtraData,
+		GasUsed:    command.DefaultGenesisGasUsed,
+		Mixhash:    polybft.PolyBFTMixDigest,
+	}
 
 	return chainConfig, nil
 }
 
 func (p *genesisParams) getGenesisValidators(validators []GenesisTarget,
-	allocs map[types.Address]*chain.GenesisAccount) (result []*polybft.Validator) {
+	allocs map[types.Address]*chain.GenesisAccount) ([]*polybft.Validator, error) {
+	result := make([]*polybft.Validator, 0)
+
 	if len(p.validators) > 0 {
 		for _, validator := range p.validators {
 			parts := strings.Split(validator, ":")
@@ -140,35 +160,53 @@ func (p *genesisParams) getGenesisValidators(validators []GenesisTarget,
 
 			addr := types.StringToAddress(parts[0])
 
+			balance, err := getBalanceInWei(addr, allocs)
+			if err != nil {
+				return nil, err
+			}
+
 			result = append(result, &polybft.Validator{
 				Address: addr,
 				BlsKey:  parts[1],
-				Balance: getBalance(addr, allocs),
+				Balance: balance,
 			})
 		}
 	} else {
 		for _, validator := range validators {
 			pubKeyMarshalled := validator.Account.Bls.PublicKey().Marshal()
 			addr := types.Address(validator.Account.Ecdsa.Address())
+
+			balance, err := getBalanceInWei(addr, allocs)
+			if err != nil {
+				return nil, err
+			}
+
 			result = append(result, &polybft.Validator{
 				Address: addr,
 				BlsKey:  hex.EncodeToString(pubKeyMarshalled),
-				Balance: getBalance(addr, allocs),
+				Balance: balance,
 			})
 		}
 	}
 
-	return result
+	return result, nil
 }
 
-// getBalance returns balance for genesis account based on its address.
-// If not found in provided allocations map, 0 is returned.
-func getBalance(address types.Address, allocations map[types.Address]*chain.GenesisAccount) *big.Int {
+// getBalanceInWei returns balance for genesis account based on its address.
+// If not found in provided allocations map, 1M native tokens is returned.
+func getBalanceInWei(address types.Address, allocations map[types.Address]*chain.GenesisAccount) (*big.Int, error) {
 	if genesisAcc, ok := allocations[address]; ok {
-		return genesisAcc.Balance
+		return genesisAcc.Balance, nil
 	}
 
-	return big.NewInt(defaultStakeBalance)
+	val := command.DefaultPremineBalance
+
+	amount, err := types.ParseUint256orHex(&val)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse amount %s: %w", val, err)
+	}
+
+	return amount, nil
 }
 
 func (p *genesisParams) generatePolyBftGenesis() error {
@@ -235,7 +273,12 @@ func (p *genesisParams) deployContracts() (map[types.Address]*chain.GenesisAccou
 	return allocations, nil
 }
 
-func generateExtraDataPolyBft(validators []GenesisTarget) []byte {
+// generateExtraDataPolyBft populates Extra with specific fields required for polybft consensus protocol
+func generateExtraDataPolyBft(validators []*polybft.Validator, publicKeys []*bls.PublicKey) ([]byte, error) {
+	if len(validators) != len(publicKeys) {
+		return nil, fmt.Errorf("expected same length for genesis validators and BLS public keys")
+	}
+
 	delta := &polybft.ValidatorSetDelta{
 		Added:   make(polybft.AccountSet, len(validators)),
 		Removed: bitmap.Bitmap{},
@@ -243,12 +286,18 @@ func generateExtraDataPolyBft(validators []GenesisTarget) []byte {
 
 	for i, validator := range validators {
 		delta.Added[i] = &polybft.ValidatorMetadata{
-			Address: types.Address(validator.Account.Ecdsa.Address()),
-			BlsKey:  validator.Account.Bls.PublicKey(),
+			Address:     validator.Address,
+			BlsKey:      publicKeys[i],
+			VotingPower: convertWeiToTokensAmount(validator.Balance).Uint64(),
 		}
 	}
 
 	extra := polybft.Extra{Validators: delta}
 
-	return append(make([]byte, signer.IstanbulExtraVanity), extra.MarshalRLPTo(nil)...)
+	return append(make([]byte, polybft.ExtraVanity), extra.MarshalRLPTo(nil)...), nil
+}
+
+// convertWeiToTokensAmount converts provided wei balance to tokens amount
+func convertWeiToTokensAmount(weiBalance *big.Int) *big.Int {
+	return weiBalance.Div(weiBalance, big.NewInt(WeiScalingFactor))
 }

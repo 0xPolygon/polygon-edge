@@ -4,12 +4,11 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/hashicorp/go-hclog"
-
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo/abi"
 	"github.com/umbracle/fastrlp"
 )
@@ -90,13 +89,15 @@ func (i *Extra) UnmarshalRLP(input []byte) error {
 
 // UnmarshalRLPWith defines the unmarshal implementation for Extra
 func (i *Extra) UnmarshalRLPWith(v *fastrlp.Value) error {
+	const expectedElements = 5
+
 	elems, err := v.GetElems()
 	if err != nil {
 		return err
 	}
 
-	if num := len(elems); num != 5 {
-		return fmt.Errorf("incorrect elements count to decode Extra, expected 5 but found %d", num)
+	if num := len(elems); num != expectedElements {
+		return fmt.Errorf("incorrect elements count to decode Extra, expected %d but found %d", expectedElements, num)
 	}
 
 	// Validators
@@ -142,10 +143,8 @@ func (i *Extra) UnmarshalRLPWith(v *fastrlp.Value) error {
 }
 
 // createValidatorSetDelta calculates ValidatorSetDelta based on the provided old and new validator sets
-func createValidatorSetDelta(log hclog.Logger, oldValidatorSet,
-	newValidatorSet AccountSet) (*ValidatorSetDelta, error) {
-	addedValidators := make(AccountSet, 0)
-	updatedValidators := make(AccountSet, 0)
+func createValidatorSetDelta(oldValidatorSet, newValidatorSet AccountSet) (*ValidatorSetDelta, error) {
+	var addedValidators, updatedValidators AccountSet
 
 	oldValidatorSetMap := make(map[types.Address]*ValidatorMetadata)
 	removedValidators := map[types.Address]int{}
@@ -336,14 +335,20 @@ func (s *Signature) UnmarshalRLPWith(v *fastrlp.Value) error {
 }
 
 // VerifyCommittedFields is checking for consensus proof in the header
-func (s *Signature) VerifyCommittedFields(validatorSet AccountSet, hash types.Hash) error {
-	filtered, err := validatorSet.GetFilteredValidators(s.Bitmap)
+func (s *Signature) VerifyCommittedFields(validators AccountSet, hash types.Hash) error {
+	filtered, err := validators.GetFilteredValidators(s.Bitmap)
 	if err != nil {
 		return err
 	}
 
-	if quorum := getQuorumSize(validatorSet.Len()); len(filtered) < quorum {
-		return fmt.Errorf("quorum not reached: %d of %d", len(filtered), quorum)
+	validatorSet, err := NewValidatorSet(validators, hclog.NewNullLogger())
+	if err != nil {
+		return err
+	}
+
+	signerAddresses := filtered.GetAddressesAsSet()
+	if !validatorSet.HasQuorum(signerAddresses) {
+		return fmt.Errorf("quorum not reached")
 	}
 
 	blsPublicKeys := make([]*bls.PublicKey, len(filtered))
@@ -359,7 +364,7 @@ func (s *Signature) VerifyCommittedFields(validatorSet AccountSet, hash types.Ha
 	}
 
 	if !aggs.VerifyAggregated(blsPublicKeys, hash[:]) {
-		return fmt.Errorf("could not verify signature")
+		return fmt.Errorf("could not verify aggregated signature")
 	}
 
 	return nil

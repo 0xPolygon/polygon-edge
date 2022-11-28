@@ -82,7 +82,7 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 	headersMap := &testHeadersMap{}
 
 	// create genesis header
-	genesisDelta, err := createValidatorSetDelta(hclog.NewNullLogger(), nil, validatorSetParent)
+	genesisDelta, err := createValidatorSetDelta(nil, validatorSetParent)
 	require.NoError(t, err)
 
 	genesisHeader := &types.Header{Number: 0}
@@ -93,7 +93,7 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 
 	// create headers from 1 to 9
 	for i := 1; i < int(polyBftConfig.EpochSize); i++ {
-		delta, err := createValidatorSetDelta(hclog.NewNullLogger(), validatorSetParent, validatorSetParent)
+		delta, err := createValidatorSetDelta(validatorSetParent, validatorSetParent)
 		require.NoError(t, err)
 
 		header := &types.Header{Number: uint64(i)}
@@ -114,11 +114,16 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 		logger:          hclog.NewNullLogger(),
 		consensusConfig: &polyBftConfig,
 		blockchain:      blockchainMock,
-		validatorsCache: newValidatorsSnapshotCache(hclog.NewNullLogger(), newTestState(t), polyBftConfig.EpochSize, blockchainMock),
+		validatorsCache: newValidatorsSnapshotCache(
+			hclog.NewNullLogger(),
+			newTestState(t),
+			polyBftConfig.EpochSize,
+			blockchainMock,
+		),
 	}
 
 	// create parent header (block 10)
-	parentDelta, err := createValidatorSetDelta(hclog.NewNullLogger(), validatorSetParent, validatorSetCurrent)
+	parentDelta, err := createValidatorSetDelta(validatorSetParent, validatorSetCurrent)
 	require.NoError(t, err)
 
 	parentHeader := &types.Header{
@@ -131,7 +136,7 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 	headersMap.addHeader(parentHeader)
 
 	// create current header (block 11) with all appropriate fields required for validation
-	currentDelta, err := createValidatorSetDelta(hclog.NewNullLogger(), validatorSetCurrent, validatorSetCurrent)
+	currentDelta, err := createValidatorSetDelta(validatorSetCurrent, validatorSetCurrent)
 	require.NoError(t, err)
 
 	currentHeader := &types.Header{
