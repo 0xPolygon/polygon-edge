@@ -52,6 +52,7 @@ func Test_NativeTransferPrecompile(t *testing.T) {
 	})
 }
 
+// d dummyHost
 var _ runtime.Host = (*dummyHost)(nil)
 
 type dummyHost struct {
@@ -148,4 +149,12 @@ func (d dummyHost) Transfer(from types.Address, to types.Address, amount *big.In
 	d.balances[to] = new(big.Int).Add(receiverBalance, amount)
 
 	return nil
+}
+
+func (d dummyHost) GetTracer() runtime.VMTracer {
+	return nil
+}
+
+func (d dummyHost) GetRefund() uint64 {
+	return 0
 }

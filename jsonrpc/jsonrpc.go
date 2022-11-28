@@ -56,6 +56,7 @@ type JSONRPCStore interface {
 	txPoolStore
 	filterManagerStore
 	bridgeStore
+	debugStore
 }
 
 type Config struct {

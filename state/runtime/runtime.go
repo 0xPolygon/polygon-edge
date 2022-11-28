@@ -5,6 +5,7 @@ import (
 	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/state/runtime/tracer"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -18,6 +19,7 @@ type TxContext struct {
 	GasLimit   int64
 	ChainID    int64
 	Difficulty types.Hash
+	Tracer     tracer.Tracer
 }
 
 // StorageStatus is the status of the storage access
@@ -70,6 +72,31 @@ type Host interface {
 	Empty(addr types.Address) bool
 	GetNonce(addr types.Address) uint64
 	Transfer(from types.Address, to types.Address, amount *big.Int) error
+	GetTracer() VMTracer
+	GetRefund() uint64
+}
+
+type VMTracer interface {
+	CaptureState(
+		memory []byte,
+		stack []*big.Int,
+		opCode int,
+		contractAddress types.Address,
+		sp int,
+		host tracer.RuntimeHost,
+		state tracer.VMState,
+	)
+	ExecuteState(
+		contractAddress types.Address,
+		ip uint64,
+		opcode string,
+		availableGas uint64,
+		cost uint64,
+		lastReturnData []byte,
+		depth int,
+		err error,
+		host tracer.RuntimeHost,
+	)
 }
 
 // ExecutionResult includes all output after executing given evm

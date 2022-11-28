@@ -26,6 +26,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/state"
 	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
+	"github.com/0xPolygon/polygon-edge/state/runtime/tracer"
 	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
@@ -515,7 +516,6 @@ func (j *jsonRPCHub) ApplyTxn(
 	}
 
 	transition, err := j.BeginTxn(header.StateRoot, header, blockCreator)
-
 	if err != nil {
 		return
 	}
@@ -523,6 +523,126 @@ func (j *jsonRPCHub) ApplyTxn(
 	result, err = transition.Apply(txn)
 
 	return
+}
+
+// TraceBlock traces all transactions in the given block and returns all results
+func (j *jsonRPCHub) TraceBlock(
+	block *types.Block,
+	tracer tracer.Tracer,
+) ([]interface{}, error) {
+	if block.Number() == 0 {
+		return nil, errors.New("genesis block can't have transaction")
+	}
+
+	parentHeader, ok := j.GetHeaderByHash(block.ParentHash())
+	if !ok {
+		return nil, errors.New("parent header not found")
+	}
+
+	blockCreator, err := j.GetConsensus().GetBlockCreator(block.Header)
+	if err != nil {
+		return nil, err
+	}
+
+	transition, err := j.BeginTxn(parentHeader.StateRoot, block.Header, blockCreator)
+	if err != nil {
+		return nil, err
+	}
+
+	transition.SetTracer(tracer)
+
+	results := make([]interface{}, len(block.Transactions))
+
+	for idx, tx := range block.Transactions {
+		tracer.Clear()
+
+		if _, err := transition.Apply(tx); err != nil {
+			return nil, err
+		}
+
+		if results[idx], err = tracer.GetResult(); err != nil {
+			return nil, err
+		}
+	}
+
+	return results, nil
+}
+
+// TraceTxn traces a transaction in the block, associated with the given hash
+func (j *jsonRPCHub) TraceTxn(
+	block *types.Block,
+	targetTxHash types.Hash,
+	tracer tracer.Tracer,
+) (interface{}, error) {
+	if block.Number() == 0 {
+		return nil, errors.New("genesis block can't have transaction")
+	}
+
+	parentHeader, ok := j.GetHeaderByHash(block.ParentHash())
+	if !ok {
+		return nil, errors.New("parent header not found")
+	}
+
+	blockCreator, err := j.GetConsensus().GetBlockCreator(block.Header)
+	if err != nil {
+		return nil, err
+	}
+
+	transition, err := j.BeginTxn(parentHeader.StateRoot, block.Header, blockCreator)
+	if err != nil {
+		return nil, err
+	}
+
+	var targetTx *types.Transaction
+
+	for _, tx := range block.Transactions {
+		if tx.Hash == targetTxHash {
+			targetTx = tx
+
+			break
+		}
+
+		// Execute transactions without tracer until reaching the target transaction
+		if _, err := transition.Apply(tx); err != nil {
+			return nil, err
+		}
+	}
+
+	if targetTx == nil {
+		return nil, errors.New("target tx not found")
+	}
+
+	transition.SetTracer(tracer)
+
+	if _, err := transition.Apply(targetTx); err != nil {
+		return nil, err
+	}
+
+	return tracer.GetResult()
+}
+
+func (j *jsonRPCHub) TraceCall(
+	tx *types.Transaction,
+	parentHeader *types.Header,
+	tracer tracer.Tracer,
+) (interface{}, error) {
+	blockCreator, err := j.GetConsensus().GetBlockCreator(parentHeader)
+	if err != nil {
+		return nil, err
+	}
+
+	transition, err := j.BeginTxn(parentHeader.StateRoot, parentHeader, blockCreator)
+	if err != nil {
+		return nil, err
+	}
+
+	transition.SetTracer(tracer)
+
+	if _, err := transition.Apply(tx); err != nil {
+		return nil, err
+	}
+
+	return tracer.GetResult()
 }
 
 func (j *jsonRPCHub) GetSyncProgression() *progress.Progression {
