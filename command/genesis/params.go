@@ -3,6 +3,7 @@ package genesis
 import (
 	"errors"
 	"fmt"
+	"math/big"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/chain"
@@ -369,4 +370,19 @@ func (p *genesisParams) getResult() command.CommandResult {
 	return &GenesisResult{
 		Message: fmt.Sprintf("Genesis written to %s\n", p.genesisPath),
 	}
+}
+
+func NewTestPolyBFT(name string,
+	chainID uint64,
+	blockTime time.Duration,
+	epochSize, sprintSize uint64, validatorsInfo []GenesisTarget, governanceAccount types.Address, stake map[types.Address]*big.Int, scPath string) (*chain.Chain, error) {
+	gp := &genesisParams{
+		name:       name,
+		chainID:    chainID,
+		epochSize:  epochSize,
+		sprintSize: sprintSize,
+		blockTime:  blockTime,
+	}
+	gp.smartContractsRootPath = scPath
+	return gp.GeneratePolyBFTConfig(validatorsInfo, governanceAccount, stake)
 }

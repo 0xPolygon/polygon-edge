@@ -44,19 +44,52 @@ const (
 	WeiScalingFactor = 1_000_000_000_000_000_000 // 10^18
 )
 
-func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
-	validatorsInfo, err := ReadValidatorsByRegexp(path.Dir(p.genesisPath), p.polyBftValidatorPrefixPath)
-	if err != nil {
-		return nil, err
+var (
+	GenesisContracts = []struct {
+		Name         string
+		RelativePath string
+		Address      types.Address
+	}{
+		{
+			// Validator contract
+			Name:         "ChildValidatorSet",
+			RelativePath: "child/ChildValidatorSet.sol",
+			Address:      contracts.ValidatorSetContract,
+		},
+		{
+			// State receiver contract
+			Name:         "StateReceiver",
+			RelativePath: "child/StateReceiver.sol",
+			Address:      contracts.StateReceiverContract,
+		},
+		{
+			// Native Token contract (Matic ERC-20)
+			Name:         "MRC20",
+			RelativePath: "child/MRC20.sol",
+			Address:      contracts.NativeTokenContract,
+		},
+		{
+			// BLS contract
+			Name:         "BLS",
+			RelativePath: "common/BLS.sol",
+			Address:      contracts.BLSContract,
+		},
+		{
+			// Merkle contract
+			Name:         "Merkle",
+			RelativePath: "common/Merkle.sol",
+			Address:      contracts.MerkleContract,
+		},
 	}
+)
 
+func (p *genesisParams) GeneratePolyBFTConfig(validatorsInfo []GenesisTarget, governanceAddress types.Address, stake map[types.Address]*big.Int) (*chain.Chain, error) {
 	allocs, err := p.deployContracts()
 	if err != nil {
 		return nil, err
 	}
 
 	// use 1st account as governance address
-	governanceAccount := validatorsInfo[0].Account
 	polyBftConfig := &polybft.PolyBFTConfig{
 		BlockTime:         p.blockTime,
 		EpochSize:         p.epochSize,
@@ -64,7 +97,7 @@ func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
 		ValidatorSetSize:  p.validatorSetSize,
 		ValidatorSetAddr:  contracts.ValidatorSetContract,
 		StateReceiverAddr: contracts.StateReceiverContract,
-		Governance:        types.Address(governanceAccount.Ecdsa.Address()),
+		Governance:        governanceAddress,
 	}
 
 	if p.bridgeEnabled {
@@ -109,6 +142,18 @@ func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
 			premine[i] = fmt.Sprintf("%s:%s",
 				vi.Account.Ecdsa.Address().String(), p.premineValidators)
 		}
+	}
+
+	//setup stake for validator set
+	//todo stake shouldn be a part of prealloc
+	fmt.Println("alloc", allocs)
+	for k, v := range stake {
+		genAcc := allocs[k]
+		if genAcc == nil {
+			genAcc = &chain.GenesisAccount{}
+		}
+		genAcc.Balance = v
+		allocs[k] = genAcc
 	}
 
 	// premine accounts
@@ -210,7 +255,12 @@ func getBalanceInWei(address types.Address, allocations map[types.Address]*chain
 }
 
 func (p *genesisParams) generatePolyBftGenesis() error {
-	config, err := params.generatePolyBFTConfig()
+	validatorsInfo, err := ReadValidatorsByRegexp(path.Dir(p.genesisPath), p.polyBftValidatorPrefixPath)
+	if err != nil {
+		return err
+	}
+
+	config, err := params.GeneratePolyBFTConfig(validatorsInfo, types.Address(validatorsInfo[0].Account.Ecdsa.Address()), nil)
 	if err != nil {
 		return err
 	}
@@ -219,52 +269,17 @@ func (p *genesisParams) generatePolyBftGenesis() error {
 }
 
 func (p *genesisParams) deployContracts() (map[types.Address]*chain.GenesisAccount, error) {
-	genesisContracts := []struct {
-		name         string
-		relativePath string
-		address      types.Address
-	}{
-		{
-			// Validator contract
-			name:         "ChildValidatorSet",
-			relativePath: "child/ChildValidatorSet.sol",
-			address:      contracts.ValidatorSetContract,
-		},
-		{
-			// State receiver contract
-			name:         "StateReceiver",
-			relativePath: "child/StateReceiver.sol",
-			address:      contracts.StateReceiverContract,
-		},
-		{
-			// Native Token contract (Matic ERC-20)
-			name:         "MRC20",
-			relativePath: "child/MRC20.sol",
-			address:      contracts.NativeTokenContract,
-		},
-		{
-			// BLS contract
-			name:         "BLS",
-			relativePath: "common/BLS.sol",
-			address:      contracts.BLSContract,
-		},
-		{
-			// Merkle contract
-			name:         "Merkle",
-			relativePath: "common/Merkle.sol",
-			address:      contracts.MerkleContract,
-		},
-	}
 
-	allocations := make(map[types.Address]*chain.GenesisAccount, len(genesisContracts))
+	allocations := make(map[types.Address]*chain.GenesisAccount, len(GenesisContracts))
 
-	for _, contract := range genesisContracts {
-		artifact, err := polybft.ReadArtifact(p.smartContractsRootPath, contract.relativePath, contract.name)
+	fmt.Println("smartContractsRootPath", p.smartContractsRootPath)
+	for _, c := range GenesisContracts {
+		artifact, err := polybft.ReadArtifact(p.smartContractsRootPath, c.RelativePath, c.Name)
 		if err != nil {
 			return nil, err
 		}
 
-		allocations[contract.address] = &chain.GenesisAccount{
+		allocations[c.Address] = &chain.GenesisAccount{
 			Balance: big.NewInt(0),
 			Code:    artifact.DeployedBytecode,
 		}
@@ -301,3 +316,46 @@ func generateExtraDataPolyBft(validators []*polybft.Validator, publicKeys []*bls
 func convertWeiToTokensAmount(weiBalance *big.Int) *big.Int {
 	return weiBalance.Div(weiBalance, big.NewInt(WeiScalingFactor))
 }
+
+//func GenerateTestPolyBFTConfig(name string, chainID int) (*chain.Chain, error) {
+//
+//	polyBftConfig := &polybft.PolyBFTConfig{
+//		BlockTime:         blockTime,
+//		EpochSize:         epochSize,
+//		SprintSize:        sprintSize,
+//		ValidatorSetSize:  validatorSetSize,
+//		ValidatorSetAddr:  contracts.ValidatorSetContract,
+//		StateReceiverAddr: contracts.StateReceiverContract,
+//		Governance:        governanceAccount, //types.Address(governanceAccount.Ecdsa.Address()),
+//	}
+//
+//	chainConfig := &chain.Chain{
+//		Name: name,
+//		Params: &chain.Params{
+//			ChainID: chainID,
+//			Forks:   chain.AllForksEnabled,
+//			Engine: map[string]interface{}{
+//				string(server.PolyBFTConsensus): polyBftConfig,
+//			},
+//		},
+//		Genesis: &chain.Genesis{
+//			GasLimit:   p.blockGasLimit,
+//			Difficulty: 1,
+//			Alloc:      map[types.Address]*chain.GenesisAccount{},
+//			ExtraData:  p.extraData,
+//			GasUsed:    command.DefaultGenesisGasUsed,
+//		},
+//	}
+//
+//	gp := genesisParams{}
+//	gp.smartContractsRootPath = "/Users/boris/GolandProjects/polygon-edge/core-contracts/artifacts/contracts/"
+//	initialContracts, err := gp.deployContracts()
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	chainConfig.Genesis.Alloc = initialContracts
+//
+//	return chainConfig, nil
+//
+//}
