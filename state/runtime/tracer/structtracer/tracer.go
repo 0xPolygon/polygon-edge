@@ -309,9 +309,9 @@ type StructLogRes struct {
 	GasCost       uint64            `json:"gasCost"`
 	Depth         int               `json:"depth"`
 	Error         string            `json:"error,omitempty"`
-	Stack         []string          `json:"stack,omitempty"`
-	Memory        []string          `json:"memory,omitempty"`
-	Storage       map[string]string `json:"storage,omitempty"`
+	Stack         []string          `json:"stack"`
+	Memory        []string          `json:"memory"`
+	Storage       map[string]string `json:"storage"`
 	RefundCounter uint64            `json:"refund,omitempty"`
 }
 
@@ -350,31 +350,27 @@ func formatStructLogs(originalLogs []StructLog) []StructLogRes {
 			RefundCounter: log.RefundCounter,
 		}
 
-		if log.Stack != nil {
-			stack := make([]string, len(log.Stack))
-			for i, value := range log.Stack {
-				stack[i] = hex.EncodeBig(value)
-			}
+		res[index].Stack = make([]string, len(log.Stack))
 
-			res[index].Stack = stack
+		for i, value := range log.Stack {
+			res[index].Stack[i] = hex.EncodeBig(value)
 		}
+
+		res[index].Memory = make([]string, 0, (len(log.Memory)+31)/32)
 
 		if log.Memory != nil {
-			memory := make([]string, 0, (len(log.Memory)+31)/32)
 			for i := 0; i+32 <= len(log.Memory); i += 32 {
-				memory = append(memory, hex.EncodeToString(log.Memory[i:i+32]))
+				res[index].Memory = append(
+					res[index].Memory,
+					hex.EncodeToString(log.Memory[i:i+32]),
+				)
 			}
-
-			res[index].Memory = memory
 		}
 
-		if log.Storage != nil {
-			storage := make(map[string]string)
-			for i, storageValue := range log.Storage {
-				storage[hex.EncodeToString(i.Bytes())] = hex.EncodeToString(storageValue.Bytes())
-			}
+		res[index].Storage = make(map[string]string)
 
-			res[index].Storage = storage
+		for key, value := range log.Storage {
+			res[index].Storage[hex.EncodeToString(key.Bytes())] = hex.EncodeToString(value.Bytes())
 		}
 	}
 
