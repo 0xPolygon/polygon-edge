@@ -305,10 +305,6 @@ func (t *txpoolHub) GetNonce(root types.Hash, addr types.Address) uint64 {
 		return 0
 	}
 
-	if account == nil {
-		return 0
-	}
-
 	return account.Nonce
 }
 
@@ -317,10 +313,6 @@ func (t *txpoolHub) GetBalance(root types.Hash, addr types.Address) (*big.Int, e
 
 	if err != nil {
 		return big.NewInt(0), err
-	}
-
-	if account == nil {
-		return big.NewInt(0), nil
 	}
 
 	return account.Balance, nil
