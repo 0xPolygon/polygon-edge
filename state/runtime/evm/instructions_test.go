@@ -496,13 +496,14 @@ func Test_opReturnDataCopy(t *testing.T) {
 					big.NewInt(0),
 					big.NewInt(0),
 				},
-				sp:          0,
-				returnData:  []byte{0xff},
-				memory:      []byte{0xff},
-				gas:         7,
-				lastGasCost: 0,
-				stop:        false,
-				err:         nil,
+				sp:                 0,
+				returnData:         []byte{0xff},
+				memory:             []byte{0xff},
+				gas:                7,
+				lastGasCost:        0,
+				currentConsumedGas: 3,
+				stop:               false,
+				err:                nil,
 			},
 		},
 		{
@@ -533,10 +534,11 @@ func Test_opReturnDataCopy(t *testing.T) {
 					[]byte{0x11, 0x22, 0x02, 0x03, 0x04, 0x05, 0x06},
 					make([]byte, 25)...,
 				),
-				gas:         14,
-				lastGasCost: 3,
-				stop:        false,
-				err:         nil,
+				gas:                14,
+				lastGasCost:        3,
+				currentConsumedGas: 6,
+				stop:               false,
+				err:                nil,
 			},
 		},
 	}
@@ -564,6 +566,7 @@ func Test_opReturnDataCopy(t *testing.T) {
 			state.evm = nil
 			state.bitmap = bitmap{}
 			state.ret = nil
+			state.currentConsumedGas = 0
 
 			opReturnDataCopy(state)
 
