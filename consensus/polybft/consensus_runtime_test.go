@@ -913,8 +913,6 @@ func TestConsensusRuntime_FSM_EndOfSprint_HasBundlesToExecute(t *testing.T) {
 	require.True(t, fsm.isEndOfSprint)
 
 	// check if commitment message to execute is attached to fsm
-	require.Len(t, fsm.bundleProofs, 1)
-	require.Len(t, fsm.commitmentsToVerifyBundles, 1)
 	require.Nil(t, fsm.proposerCommitmentToRegister)
 
 	systemStateMock.AssertExpectations(t)
@@ -1658,7 +1656,7 @@ func TestConsensusRuntime_FSM_EndOfEpoch_OnBlockInserted(t *testing.T) {
 
 	bundles, err := state.getBundles(fromIndex, maxBundlesPerSprint)
 	assert.NoError(t, err)
-	assert.Equal(t, 2, len(bundles))
+	assert.Equal(t, 10, len(bundles))
 
 	systemStateMock.AssertExpectations(t)
 	blockchainMock.AssertExpectations(t)
