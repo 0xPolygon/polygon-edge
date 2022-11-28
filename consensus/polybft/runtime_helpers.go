@@ -6,12 +6,6 @@ func isEndOfPeriod(blockNumber, periodSize uint64) bool {
 	return blockNumber%periodSize == 0
 }
 
-// getQuorumSize returns result of division of given number by two,
-// but rounded to next integer value (similar to math.Ceil function).
-func getQuorumSize(validatorsCount int) int {
-	return (validatorsCount + 1) / 2
-}
-
 // calculateFirstBlockOfPeriod calculates the first block of a period
 func calculateFirstBlockOfPeriod(currentBlockNumber, periodSize uint64) uint64 {
 	if currentBlockNumber <= periodSize {

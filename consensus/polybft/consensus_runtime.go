@@ -10,7 +10,7 @@ import (
 	"sync/atomic"
 
 	"github.com/0xPolygon/go-ibft/messages"
-	protoIBFT "github.com/0xPolygon/go-ibft/messages/proto"
+	"github.com/0xPolygon/go-ibft/messages/proto"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
@@ -354,6 +354,23 @@ func (c *consensusRuntime) FSM() error {
 	isEndOfSprint := c.isEndOfSprint(pendingBlockNumber)
 	isEndOfEpoch := c.isEndOfEpoch(pendingBlockNumber)
 
+	valSet, err := NewValidatorSet(epoch.Validators, c.logger)
+	if err != nil {
+		return fmt.Errorf("cannot create validator set for fsm: %w", err)
+	}
+
+	iterationNumber, err := getNumberOfIteration(parent, epoch.Number, c)
+	if err != nil {
+		return fmt.Errorf("cannot get number of iteration: %w", err)
+	}
+
+	if iterationNumber > 0 {
+		err = valSet.IncrementProposerPriority(iterationNumber)
+		if err != nil {
+			return fmt.Errorf("cannot increment proposer priority in fsm: %w", err)
+		}
+	}
+
 	ff := &fsm{
 		config:            c.config.PolyBFTConfig,
 		parent:            parent,
@@ -362,7 +379,7 @@ func (c *consensusRuntime) FSM() error {
 		checkpointBackend: c,
 		epochNumber:       epoch.Number,
 		blockBuilder:      blockBuilder,
-		validators:        newValidatorSet(types.BytesToAddress(parent.Miner), epoch.Validators),
+		validators:        valSet,
 		isEndOfEpoch:      isEndOfEpoch,
 		isEndOfSprint:     isEndOfSprint,
 		logger:            c.logger.Named("fsm"),
@@ -392,6 +409,31 @@ func (c *consensusRuntime) FSM() error {
 	c.fsm = ff
 
 	return nil
+}
+
+// getNumberOfIteration returns number of iteration that are needed for the proposer calculation
+func getNumberOfIteration(parent *types.Header, epochNumber uint64, c *consensusRuntime) (uint64, error) {
+	iterationNumber := uint64(0)
+	currentHeader := parent
+	lastBlockOfPreviousEpoch := getEndEpochBlockNumber(epochNumber-1, c.config.PolyBFTConfig.EpochSize)
+
+	for currentHeader.Number > lastBlockOfPreviousEpoch {
+		blockExtra, err := GetIbftExtra(currentHeader.ExtraData)
+		if err != nil {
+			return 0, fmt.Errorf("cannot get ibft extra: %w", err)
+		}
+
+		iterationNumber += blockExtra.Checkpoint.BlockRound + 1 // because round 0 is one of the iterations
+
+		var found bool
+		currentHeader, found = c.config.blockchain.GetHeaderByNumber(currentHeader.Number - 1)
+
+		if !found {
+			return 0, fmt.Errorf("cannot get header by number: %d", currentHeader.Number)
+		}
+	}
+
+	return iterationNumber, nil
 }
 
 // restartEpoch resets the previously run epoch and moves to the next one
@@ -455,7 +497,12 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) error {
 	c.lastBuiltBlock = header
 	c.lock.Unlock()
 
-	c.logger.Info("restartEpoch", "block number", header.Number, "epoch", epochNumber, "validators", validatorSet.Len())
+	c.logger.Info(
+		"restartEpoch",
+		"block number", header.Number,
+		"epoch", epochNumber,
+		"validators", validatorSet.Len(),
+	)
 
 	return nil
 }
@@ -575,13 +622,20 @@ func (c *consensusRuntime) buildBundles(commitment *Commitment, commitmentMsg *C
 
 // getAggSignatureForCommitmentMessage creates aggregated signatures for given commitment
 // if it has a quorum of votes
-func (c *consensusRuntime) getAggSignatureForCommitmentMessage(epoch *epochMetadata,
-	commitmentHash types.Hash) (Signature, [][]byte, error) {
-	validators := epoch.Validators
+func (c *consensusRuntime) getAggSignatureForCommitmentMessage(
+	epoch *epochMetadata,
+	commitmentHash types.Hash,
+) (Signature, [][]byte, error) {
+	validatorSet, err := NewValidatorSet(epoch.Validators, c.logger)
+	if err != nil {
+		return Signature{}, nil, err
+	}
 
-	nodeIDIndexMap := make(map[string]int, validators.Len())
-	for i, validator := range validators {
-		nodeIDIndexMap[validator.Address.String()] = i
+	validatorAddrToIndex := make(map[string]int, validatorSet.Len())
+	validatorsMetadata := validatorSet.Accounts()
+
+	for i, validator := range validatorsMetadata {
+		validatorAddrToIndex[validator.Address.String()] = i
 	}
 
 	// get all the votes from the database for this commitment
@@ -594,9 +648,10 @@ func (c *consensusRuntime) getAggSignatureForCommitmentMessage(epoch *epochMetad
 
 	publicKeys := make([][]byte, 0)
 	bitmap := bitmap.Bitmap{}
+	signers := make(map[types.Address]struct{}, 0)
 
 	for _, vote := range votes {
-		index, exists := nodeIDIndexMap[vote.From]
+		index, exists := validatorAddrToIndex[vote.From]
 		if !exists {
 			continue // don't count this vote, because it does not belong to validator
 		}
@@ -609,10 +664,11 @@ func (c *consensusRuntime) getAggSignatureForCommitmentMessage(epoch *epochMetad
 		bitmap.Set(uint64(index))
 
 		signatures = append(signatures, signature)
-		publicKeys = append(publicKeys, validators[index].BlsKey.Marshal())
+		publicKeys = append(publicKeys, validatorsMetadata[index].BlsKey.Marshal())
+		signers[types.StringToAddress(vote.From)] = struct{}{}
 	}
 
-	if len(signatures) < getQuorumSize(validators.Len()) {
+	if !validatorSet.HasQuorum(signers) {
 		return Signature{}, nil, errQuorumNotReached
 	}
 
@@ -695,7 +751,6 @@ func (c *consensusRuntime) deliverMessage(msg *TransportMessage) (bool, error) {
 		"hash", hex.EncodeToString(msg.Hash),
 		"sender", msg.NodeID,
 		"signatures", numSignatures,
-		"quorum", getQuorumSize(len(epoch.Validators)),
 	)
 
 	return true, nil
@@ -932,7 +987,7 @@ func (c *consensusRuntime) IsValidBlock(proposal []byte) bool {
 	return true
 }
 
-func (c *consensusRuntime) IsValidSender(msg *protoIBFT.Message) bool {
+func (c *consensusRuntime) IsValidSender(msg *proto.Message) bool {
 	err := c.fsm.ValidateSender(msg)
 	if err != nil {
 		c.logger.Error("invalid sender", "error", err)
@@ -944,7 +999,12 @@ func (c *consensusRuntime) IsValidSender(msg *protoIBFT.Message) bool {
 }
 
 func (c *consensusRuntime) IsProposer(id []byte, height, round uint64) bool {
-	nextProposer := c.fsm.validators.CalcProposer(round)
+	nextProposer, err := c.fsm.validators.CalcProposer(round)
+	if err != nil {
+		c.logger.Error("cannot calculate proposer", "error", err)
+
+		return false
+	}
 
 	return bytes.Equal(id, nextProposer[:])
 }
@@ -985,7 +1045,7 @@ func (c *consensusRuntime) IsValidCommittedSeal(proposalHash []byte, committedSe
 	return true
 }
 
-func (c *consensusRuntime) BuildProposal(view *protoIBFT.View) []byte {
+func (c *consensusRuntime) BuildProposal(view *proto.View) []byte {
 	lastBuiltBlock, _ := c.getLastBuiltBlockAndEpoch()
 
 	if lastBuiltBlock.Number+1 != view.Height {
@@ -1039,47 +1099,47 @@ func (c *consensusRuntime) ID() []byte {
 	return c.config.Key.Address().Bytes()
 }
 
-// MaximumFaultyNodes returns the maximum number of faulty nodes based on the validator set
-func (c *consensusRuntime) MaximumFaultyNodes() uint64 {
-	return uint64(c.fsm.validators.Len()-1) / 3
-}
-
-// Quorum returns what is the quorum size for the specified block height
-func (c *consensusRuntime) Quorum(_ uint64) uint64 {
-	return uint64(getQuorumSize(c.fsm.validators.Len()))
-}
-
 // HasQuorum returns true if quorum is reached for the given blockNumber
 func (c *consensusRuntime) HasQuorum(
 	blockNumber uint64,
-	messages []*protoIBFT.Message,
-	msgType protoIBFT.MessageType,
+	messages []*proto.Message,
+	msgType proto.MessageType,
 ) bool {
-	quorum := c.Quorum(blockNumber)
+	// extract the addresses of all the signers of the messages
+	ppIncluded := false
+	signers := make(map[types.Address]struct{}, len(messages))
 
-	switch msgType {
-	case protoIBFT.MessageType_PREPREPARE:
-		return len(messages) >= 1
-	case protoIBFT.MessageType_PREPARE:
-		// two cases -> first message is MessageType_PREPREPARE, and other -> MessageType_PREPREPARE is not included
-		if len(messages) > 0 && messages[0].Type == protoIBFT.MessageType_PREPREPARE {
-			return len(messages) >= int(quorum)
+	for _, message := range messages {
+		if message.Type == proto.MessageType_PREPREPARE {
+			ppIncluded = true
 		}
 
-		return len(messages) >= int(quorum)-1
-	case protoIBFT.MessageType_ROUND_CHANGE, protoIBFT.MessageType_COMMIT:
-		return len(messages) >= int(quorum)
+		signers[types.BytesToAddress(message.From)] = struct{}{}
 	}
 
-	return false
+	// check quorum
+	switch msgType {
+	case proto.MessageType_PREPREPARE:
+		return len(messages) >= 1
+	case proto.MessageType_PREPARE:
+		if ppIncluded {
+			return c.fsm.validators.HasQuorum(signers)
+		}
+
+		return c.fsm.validators.HasQuorumWithoutProposer(signers)
+	case proto.MessageType_ROUND_CHANGE, proto.MessageType_COMMIT:
+		return c.fsm.validators.HasQuorum(signers)
+	default:
+		return false
+	}
 }
 
 // BuildPrePrepareMessage builds a PREPREPARE message based on the passed in proposal
 func (c *consensusRuntime) BuildPrePrepareMessage(
 	proposal []byte,
-	certificate *protoIBFT.RoundChangeCertificate,
-	view *protoIBFT.View,
-) *protoIBFT.Message {
+	certificate *proto.RoundChangeCertificate,
+	view *proto.View,
+) *proto.Message {
 	block := types.Block{}
 	if err := block.UnmarshalRLP(proposal); err != nil {
 		c.logger.Error(fmt.Sprintf("cannot unmarshal RLP: %s", err))
@@ -1101,12 +1161,12 @@ func (c *consensusRuntime) BuildPrePrepareMessage(
 		return nil
 	}
 
-	msg := protoIBFT.Message{
+	msg := proto.Message{
 		View: view,
 		From: c.ID(),
-		Type: protoIBFT.MessageType_PREPREPARE,
-		Payload: &protoIBFT.Message_PreprepareData{
-			PreprepareData: &protoIBFT.PrePrepareMessage{
+		Type: proto.MessageType_PREPREPARE,
+		Payload: &proto.Message_PreprepareData{
+			PreprepareData: &proto.PrePrepareMessage{
 				Proposal:     proposal,
 				ProposalHash: proposalHash.Bytes(),
 				Certificate:  certificate,
@@ -1125,13 +1185,13 @@ func (c *consensusRuntime) BuildPrePrepareMessage(
 }
 
 // BuildPrepareMessage builds a PREPARE message based on the passed in proposal
-func (c *consensusRuntime) BuildPrepareMessage(proposalHash []byte, view *protoIBFT.View) *protoIBFT.Message {
-	msg := protoIBFT.Message{
+func (c *consensusRuntime) BuildPrepareMessage(proposalHash []byte, view *proto.View) *proto.Message {
+	msg := proto.Message{
 		View: view,
 		From: c.ID(),
-		Type: protoIBFT.MessageType_PREPARE,
-		Payload: &protoIBFT.Message_PrepareData{
-			PrepareData: &protoIBFT.PrepareMessage{
+		Type: proto.MessageType_PREPARE,
+		Payload: &proto.Message_PrepareData{
+			PrepareData: &proto.PrepareMessage{
 				ProposalHash: proposalHash,
 			},
 		},
@@ -1148,7 +1208,7 @@ func (c *consensusRuntime) BuildPrepareMessage(proposalHash []byte, view *protoI
 }
 
 // BuildCommitMessage builds a COMMIT message based on the passed in proposal
-func (c *consensusRuntime) BuildCommitMessage(proposalHash []byte, view *protoIBFT.View) *protoIBFT.Message {
+func (c *consensusRuntime) BuildCommitMessage(proposalHash []byte, view *proto.View) *proto.Message {
 	committedSeal, err := c.config.Key.Sign(proposalHash)
 	if err != nil {
 		c.logger.Error("Cannot create committed seal message.", "error", err)
@@ -1156,12 +1216,12 @@ func (c *consensusRuntime) BuildCommitMessage(proposalHash []byte, view *protoIB
 		return nil
 	}
 
-	msg := protoIBFT.Message{
+	msg := proto.Message{
 		View: view,
 		From: c.ID(),
-		Type: protoIBFT.MessageType_COMMIT,
-		Payload: &protoIBFT.Message_CommitData{
-			CommitData: &protoIBFT.CommitMessage{
+		Type: proto.MessageType_COMMIT,
+		Payload: &proto.Message_CommitData{
+			CommitData: &proto.CommitMessage{
 				ProposalHash:  proposalHash,
 				CommittedSeal: committedSeal,
 			},
@@ -1181,14 +1241,14 @@ func (c *consensusRuntime) BuildCommitMessage(proposalHash []byte, view *protoIB
 // BuildRoundChangeMessage builds a ROUND_CHANGE message based on the passed in proposal
 func (c *consensusRuntime) BuildRoundChangeMessage(
 	proposal []byte,
-	certificate *protoIBFT.PreparedCertificate,
-	view *protoIBFT.View,
-) *protoIBFT.Message {
-	msg := protoIBFT.Message{
+	certificate *proto.PreparedCertificate,
+	view *proto.View,
+) *proto.Message {
+	msg := proto.Message{
 		View: view,
 		From: c.ID(),
-		Type: protoIBFT.MessageType_ROUND_CHANGE,
-		Payload: &protoIBFT.Message_RoundChangeData{RoundChangeData: &protoIBFT.RoundChangeMessage{
+		Type: proto.MessageType_ROUND_CHANGE,
+		Payload: &proto.Message_RoundChangeData{RoundChangeData: &proto.RoundChangeMessage{
 			LastPreparedProposedBlock: proposal,
 			LatestPreparedCertificate: certificate,
 		}},
