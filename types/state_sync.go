@@ -9,6 +9,9 @@ var ExecuteBundleABIMethod, _ = abi.NewMethod("function execute(" +
 	"bytes32[] proof, " +
 	"tuple(uint256 id, address sender, address receiver, bytes data, bool skip)[] objs)")
 
+var stateSyncEventABIType = abi.MustNewType(
+	"tuple(tuple(uint256 id, address sender, address receiver, bytes data, bool skip)[])")
+
 // StateSyncEvent is a bridge event from the rootchain
 type StateSyncEvent struct {
 	// ID is the decoded 'index' field from the event

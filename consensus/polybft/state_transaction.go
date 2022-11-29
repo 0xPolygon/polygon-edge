@@ -20,6 +20,9 @@ var (
 	stateSyncEventABIType = abi.MustNewType(
 		"tuple(tuple(uint256 id, address sender, address receiver, bytes data, bool skip)[])")
 
+	stateSyncABIType = abi.MustNewType(
+		"tuple(uint256 id, address sender, address receiver, bytes data, bool skip)")
+
 	bundleABIType = abi.MustNewType("tuple(uint256 startId, uint256 endId, uint256 leaves, bytes32 root)")
 
 	commitBundleABIMethod, _ = abi.NewMethod("function commit(" +
@@ -164,9 +167,8 @@ type Commitment struct {
 }
 
 // NewCommitment creates a new commitment object
-func NewCommitment(epoch, fromIndex, toIndex, bundleSize uint64,
-	stateSyncEvents []*StateSyncEvent) (*Commitment, error) {
-	tree, err := createMerkleTree(stateSyncEvents, bundleSize)
+func NewCommitment(epoch uint64, stateSyncEvents []*StateSyncEvent) (*Commitment, error) {
+	tree, err := createMerkleTree(stateSyncEvents)
 	if err != nil {
 		return nil, err
 	}
@@ -174,9 +176,9 @@ func NewCommitment(epoch, fromIndex, toIndex, bundleSize uint64,
 	return &Commitment{
 		MerkleTree: tree,
 		Epoch:      epoch,
-		FromIndex:  fromIndex,
-		ToIndex:    toIndex,
-		LeavesNum:  (toIndex - fromIndex + bundleSize) / bundleSize,
+		FromIndex:  stateSyncEvents[0].ID,
+		ToIndex:    stateSyncEvents[len(stateSyncEvents)-1].ID,
+		LeavesNum:  uint64(len(stateSyncEvents)),
 	}, nil
 }
 
@@ -479,25 +481,27 @@ func stateSyncEventsToHash(stateSyncEvents []*StateSyncEvent) ([]byte, error) {
 	return stateSyncEncoded, nil
 }
 
-func createMerkleTree(stateSyncEvents []*StateSyncEvent, bundleSize uint64) (*MerkleTree, error) {
-	bundlesCount := (uint64(len(stateSyncEvents)) + bundleSize - 1) / bundleSize
-	bundles := make([][]byte, bundlesCount)
+func createMerkleTree(stateSyncEvents []*StateSyncEvent) (*MerkleTree, error) {
+	ssh := make([][]byte, len(stateSyncEvents))
 
-	for i := uint64(0); i < bundlesCount; i++ {
-		from, until := i*bundleSize, (i+1)*bundleSize
-		if until > uint64(len(stateSyncEvents)) {
-			until = uint64(len(stateSyncEvents))
+	for i, sse := range stateSyncEvents {
+		t := map[string]interface{}{
+			"id":       sse.ID,
+			"sender":   sse.Sender,
+			"receiver": sse.Receiver,
+			"data":     sse.Data,
+			"skip":     sse.Skip,
 		}
 
-		hash, err := stateSyncEventsToHash(stateSyncEvents[from:until])
+		data, err := stateSyncABIType.Encode(t)
 		if err != nil {
 			return nil, err
 		}
 
-		bundles[i] = hash
+		ssh[i] = data
 	}
 
-	return NewMerkleTree(bundles)
+	return NewMerkleTree(ssh)
 }
 
 var _ StateTransactionInput = &CommitEpoch{}

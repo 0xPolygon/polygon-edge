@@ -201,7 +201,7 @@ func (c *consensusRuntime) OnBlockInserted(block *types.Block) {
 	c.config.txPool.ResetWithHeaders(block.Header)
 
 	// handle commitment and bundles creation
-	if err := c.createCommitmentAndBundles(block.Transactions); err != nil {
+	if err := c.createCommitment(block.Transactions); err != nil {
 		c.logger.Error("on block inserted error", "err", err)
 	}
 
@@ -217,7 +217,7 @@ func (c *consensusRuntime) OnBlockInserted(block *types.Block) {
 	}
 }
 
-func (c *consensusRuntime) createCommitmentAndBundles(txs []*types.Transaction) error {
+func (c *consensusRuntime) createCommitment(txs []*types.Transaction) error {
 	if !c.IsBridgeEnabled() {
 		return nil
 	}
@@ -242,17 +242,17 @@ func (c *consensusRuntime) createCommitmentAndBundles(txs []*types.Transaction) 
 
 	systemState, err := c.getSystemState(previousBlock)
 	if err != nil {
-		return fmt.Errorf("build bundles, get system state error: %w", err)
+		return fmt.Errorf("create commitment, get system state error: %w", err)
 	}
 
 	nextStateSyncExecutionIdx, err := systemState.GetNextExecutionIndex()
 	if err != nil {
-		return fmt.Errorf("build bundles, get next execution index error: %w", err)
+		return fmt.Errorf("create commitment, get next execution index error: %w", err)
 	}
 
 	if err := c.buildBundles(
 		epoch.Commitment, commitment.Message, nextStateSyncExecutionIdx); err != nil {
-		return fmt.Errorf("build bundles error: %w", err)
+		return fmt.Errorf("create commitment error: %w", err)
 	}
 
 	return nil
@@ -509,7 +509,7 @@ func (c *consensusRuntime) buildCommitment(epoch, fromIndex uint64) (*Commitment
 		return nil, err
 	}
 
-	commitment, err := NewCommitment(epoch, fromIndex, toIndex, stateSyncBundleSize, stateSyncEvents)
+	commitment, err := NewCommitment(epoch, stateSyncEvents)
 	if err != nil {
 		return nil, err
 	}

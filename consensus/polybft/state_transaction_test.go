@@ -20,10 +20,10 @@ func TestCommitmentMessage_Hash(t *testing.T) {
 
 	stateSyncEvents := generateStateSyncEvents(t, eventsCount, 0)
 
-	trie1, err := createMerkleTree(stateSyncEvents, bundleSize)
+	trie1, err := createMerkleTree(stateSyncEvents)
 	require.NoError(t, err)
 
-	trie2, err := createMerkleTree(stateSyncEvents[0:len(stateSyncEvents)-1], bundleSize)
+	trie2, err := createMerkleTree(stateSyncEvents[0 : len(stateSyncEvents)-1])
 	require.NoError(t, err)
 
 	commitmentMessage1 := NewCommitmentMessage(trie1.Hash(), 2, 8, bundleSize)
@@ -167,7 +167,7 @@ func TestCommitmentMessage_VerifyProof_StateSyncHashNotEqualToProof(t *testing.T
 	)
 
 	stateSyncs := generateStateSyncEvents(t, 5, 0)
-	trie, err := createMerkleTree(stateSyncs, bundleSize)
+	trie, err := createMerkleTree(stateSyncs)
 	require.NoError(t, err)
 
 	proof := trie.GenerateProof(bundleIndex, 0)
@@ -195,7 +195,7 @@ func buildCommitmentAndStateSyncs(t *testing.T, stateSyncsCount int,
 
 	fromIndex := stateSyncEvents[0].ID
 	toIndex := stateSyncEvents[len(stateSyncEvents)-1].ID
-	commitment, err := NewCommitment(epoch, fromIndex, toIndex, bundleSize, stateSyncEvents)
+	commitment, err := NewCommitment(epoch, stateSyncEvents)
 
 	require.NoError(t, err)
 

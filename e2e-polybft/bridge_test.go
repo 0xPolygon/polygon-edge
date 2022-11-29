@@ -56,7 +56,7 @@ func checkLogs(
 	}
 }
 
-func stateSyncEventsToAbiSlice(stateSyncEvent types.StateSyncEvent) []map[string]interface{} {
+func stateSyncEventToAbiSlice(stateSyncEvent types.StateSyncEvent) []map[string]interface{} {
 	result := make([]map[string]interface{}, 1)
 	result[0] = map[string]interface{}{
 		"id":       stateSyncEvent.ID,
@@ -79,10 +79,10 @@ func executeStateSync(t *testing.T, client *jsonrpc.Client, account ethgo.Key, s
 
 	t.Log("State sync proofs:", stateSyncProof)
 
-	input, err := types.ExecuteBundleABIMethod.Encode([2]interface{}{stateSyncProof.Proof, stateSyncEventsToAbiSlice(stateSyncProof.StateSync)})
+	input, err := types.ExecuteBundleABIMethod.Encode([2]interface{}{stateSyncProof.Proof, stateSyncEventToAbiSlice(stateSyncProof.StateSync)})
 	require.NoError(t, err)
 
-	t.Log(stateSyncEventsToAbiSlice(stateSyncProof.StateSync))
+	t.Log(stateSyncEventToAbiSlice(stateSyncProof.StateSync))
 
 	nonce, err := client.Eth().GetNonce(account.Address(), ethgo.Latest)
 	require.NoError(t, err)

@@ -1647,7 +1647,7 @@ func createTestCommitment(t *testing.T, accounts []*wallet.Account) *CommitmentM
 		bitmap.Set(uint64(i))
 	}
 
-	stateSyncsTrie, err := createMerkleTree(stateSyncEvents, stateSyncBundleSize)
+	stateSyncsTrie, err := createMerkleTree(stateSyncEvents)
 	require.NoError(t, err)
 
 	commitment := NewCommitmentMessage(stateSyncsTrie.Hash(), 0, uint64(len(stateSyncEvents)), stateSyncBundleSize)

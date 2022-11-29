@@ -591,7 +591,7 @@ func TestConsensusRuntime_FSM_EndOfEpoch_BuildRegisterCommitment_And_Uptime(t *t
 		require.NoError(t, state.insertStateSyncEvent(event))
 	}
 
-	trie, err := createMerkleTree(stateSyncs, bundleSize)
+	trie, err := createMerkleTree(stateSyncs)
 	require.NoError(t, err)
 
 	commitment := &Commitment{MerkleTree: trie, Epoch: epoch}
@@ -741,7 +741,7 @@ func TestConsensusRuntime_FSM_EndOfEpoch_BuildRegisterCommitment_QuorumNotReache
 		require.NoError(t, state.insertStateSyncEvent(event))
 	}
 
-	trie, err := createMerkleTree(stateSyncs, bundleSize)
+	trie, err := createMerkleTree(stateSyncs)
 	require.NoError(t, err)
 
 	commitment := &Commitment{MerkleTree: trie, Epoch: epoch}
@@ -852,7 +852,7 @@ func TestConsensusRuntime_FSM_EndOfSprint_HasBundlesToExecute(t *testing.T) {
 
 	stateSyncs := insertTestStateSyncEvents(t, stateSyncsCount, fromIndex, state)
 
-	commitment, err := NewCommitment(epochNumber, fromIndex, fromIndex+bundleSize, bundleSize, stateSyncs)
+	commitment, err := NewCommitment(epochNumber, stateSyncs)
 	require.NoError(t, err)
 
 	commitmentMsg := NewCommitmentMessage(commitment.MerkleTree.Hash(), fromIndex,
@@ -1225,7 +1225,7 @@ func TestConsensusRuntime_restartEpoch_FirstRestart_BuildsCommitment(t *testing.
 
 	commitmentHash, err := commitment.Hash()
 	require.NoError(t, err)
-	stateSyncsTrie, err := createMerkleTree(stateSyncs[nextCommittedIndex:nextCommittedIndex+stateSyncMainBundleSize], stateSyncBundleSize)
+	stateSyncsTrie, err := createMerkleTree(stateSyncs[nextCommittedIndex : nextCommittedIndex+stateSyncMainBundleSize])
 	require.NoError(t, err)
 	require.Equal(t, stateSyncsTrie.Hash(), commitment.MerkleTree.Hash())
 
@@ -1375,7 +1375,7 @@ func TestConsensusRuntime_restartEpoch_NewEpochToRun_BuildCommitment(t *testing.
 		require.NoError(t, err)
 	}
 
-	stateSyncTrie, err := createMerkleTree(allStateSyncs[nextCommittedIndex:nextCommittedIndex+stateSyncMainBundleSize], stateSyncBundleSize)
+	stateSyncTrie, err := createMerkleTree(allStateSyncs[nextCommittedIndex : nextCommittedIndex+stateSyncMainBundleSize])
 	require.NoError(t, err)
 	require.NotNil(t, stateSyncTrie)
 
@@ -1506,7 +1506,7 @@ func TestConsensusRuntime_buildBundles(t *testing.T) {
 
 	state := newTestState(t)
 	stateSyncs := insertTestStateSyncEvents(t, bundleSize, 0, state)
-	trie, err := createMerkleTree(stateSyncs, bundleSize)
+	trie, err := createMerkleTree(stateSyncs)
 	require.NoError(t, err)
 
 	commitmentMsg := NewCommitmentMessage(trie.Hash(), fromIndex, toIndex, bundleSize)
@@ -1577,7 +1577,7 @@ func TestConsensusRuntime_FSM_EndOfEpoch_OnBlockInserted(t *testing.T) {
 		require.NoError(t, state.insertStateSyncEvent(event))
 	}
 
-	trie, err := createMerkleTree(stateSyncs, stateSyncBundleSize)
+	trie, err := createMerkleTree(stateSyncs)
 	require.NoError(t, err)
 
 	commitment := &Commitment{MerkleTree: trie, Epoch: epoch}
