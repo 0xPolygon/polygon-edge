@@ -6,56 +6,46 @@ import (
 	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/helper/common"
-	bn254 "github.com/kilic/bn254"
-	kilic "github.com/kilic/bn254/bls"
+	"github.com/kilic/bn254"
 )
 
 // PublicKey represents bls public key
 type PublicKey struct {
-	p *kilic.PublicKey
+	p *bn254.PointG2
 }
 
 // aggregate adds the given public keys
-func (p *PublicKey) aggregate(onemore *PublicKey) *PublicKey {
-	// var agg *kilic.PublicKey
-	// if p.p == nil {
-	// 	agg = new(kilic.G2).Set(&zeroG2)
-	// } else {
-	// 	agg = new(kilic.G2).Set(p.p)
-	// }
-
-	// g2.Add(g2, onemore.p)
-
-	// return &PublicKey{p: agg}
-
+func (p *PublicKey) aggregate(next *PublicKey) *PublicKey {
 	g := bn254.NewG2()
 
-	if p.p == nil {
-		agg = new(kilic.PublicKey).Set(&zeroG2)
-	} else {
-		agg = new(kilic.G2).Set(p.p)
+	newp := new(bn254.PointG2)
+	newp.Zero()
+
+	if p.p != nil {
+		if next.p != nil {
+			g.Add(newp, p.p, next.p)
+		} else {
+			newp.Set(p.p)
+		}
+	} else if next.p != nil {
+		newp.Set(next.p)
 	}
 
-	g := bn254.NewG2()
-	if len(keys) == 0 {
-		return &AggregatedKey{g.Zero()}
-	}
-	
-	 := new(PointG2).Set(keys[0].point)
-	for i := 1; i < len(keys); i++ {
-		g.Add(aggregated, aggregated, keys[i].point)
-	}
-	return &AggregatedKey{aggregated}
+	return &PublicKey{p: newp}
 }
 
 // Marshal marshal the key to bytes.
 func (p *PublicKey) Marshal() []byte {
-	return p.p.ToBytes()
+	if p.p == nil {
+		return nil
+	}
+
+	return bn254.NewG2().ToBytes(p.p)
 }
 
 // MarshalJSON implements the json.Marshaler interface.
 func (p *PublicKey) MarshalJSON() ([]byte, error) {
-	return json.Marshal(p.p.ToBytes())
+	return json.Marshal(p.Marshal())
 }
 
 // UnmarshalJSON implements the json.Marshaler interface.
@@ -83,12 +73,12 @@ func UnmarshalPublicKey(raw []byte) (*PublicKey, error) {
 		return nil, errors.New("cannot unmarshal public key from empty slice")
 	}
 
-	p, err := kilic.PublicKeyFromBytes(raw)
+	p, err := bn254.NewG2().FromBytes(raw)
 	if err != nil {
 		return nil, err
 	}
 
-	return &PublicKey{p: p}, err
+	return &PublicKey{p: p}, nil
 }
 
 // ToBigInt converts public key to 4 big ints
@@ -126,10 +116,15 @@ func UnmarshalPublicKeyFromBigInt(b [4]*big.Int) (*PublicKey, error) {
 
 // aggregatePublicKeys calculates P1 + P2 + ...
 func aggregatePublicKeys(pubs []*PublicKey) *PublicKey {
-	res := *new(kilic.G2).Set(&zeroG2)
-	for i := 0; i < len(pubs); i++ {
-		res.Add(&res, pubs[i].p)
+	g, newp := bn254.NewG2(), new(bn254.PointG2)
+
+	newp.Set(g.Zero())
+
+	for _, x := range pubs {
+		if x.p != nil {
+			g.Add(newp, newp, x.p)
+		}
 	}
 
-	return &PublicKey{p: &res}
+	return &PublicKey{p: newp}
 }

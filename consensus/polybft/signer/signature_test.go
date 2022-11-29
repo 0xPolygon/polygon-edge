@@ -42,8 +42,9 @@ func Test_AggregatedSignatureSimple(t *testing.T) {
 	require.NoError(t, err)
 
 	verified := sig1.Aggregate(sig2).
-		Aggregate(sig3).
-		Verify(bls1.PublicKey().aggregate(bls2.PublicKey()).aggregate(bls3.PublicKey()), validTestMsg)
+		Aggregate(sig3).Aggregate(&Signature{}).
+		Verify(bls1.PublicKey().aggregate(bls2.PublicKey()).
+			aggregate(bls3.PublicKey()).aggregate(&PublicKey{}), validTestMsg)
 	assert.True(t, verified)
 
 	notVerified := sig1.Aggregate(sig2).
@@ -128,6 +129,32 @@ func TestSignature_BigInt(t *testing.T) {
 
 	_, err = sig1.ToBigInt()
 	require.NoError(t, err)
+}
+
+func TestSignature_Unmarshal(t *testing.T) {
+	t.Parallel()
+
+	validTestMsg := testGenRandomBytes(t, messageSize)
+
+	bls1, err := GenerateBlsKey()
+	require.NoError(t, err)
+
+	sig, err := bls1.Sign(validTestMsg)
+	require.NoError(t, err)
+
+	bytes, err := sig.Marshal()
+	require.NoError(t, err)
+
+	sig2, err := UnmarshalSignature(bytes)
+	require.NoError(t, err)
+
+	assert.Equal(t, sig, sig2)
+
+	_, err = UnmarshalSignature([]byte{})
+	assert.Error(t, err)
+
+	_, err = UnmarshalSignature(nil)
+	assert.Error(t, err)
 }
 
 // testGenRandomBytes generates byte array with random data
