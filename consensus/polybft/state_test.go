@@ -279,27 +279,6 @@ func TestState_insertCommitmentMessage(t *testing.T) {
 	assert.Equal(t, commitment, commitmentFromDB)
 }
 
-func TestState_getNonExecutedCommitments(t *testing.T) {
-	t.Parallel()
-
-	const (
-		numberOfCommitments    = 10
-		lastExecutedCommitment = 80
-	)
-
-	state := newTestState(t)
-
-	for i := uint64(0); i < numberOfCommitments; i++ {
-		commitment, err := createTestCommitmentMessage(i * stateSyncMainBundleSize)
-		require.NoError(t, err)
-		require.NoError(t, state.insertCommitmentMessage(commitment))
-	}
-
-	commitmentsNotExecuted, err := state.getNonExecutedCommitments(lastExecutedCommitment)
-	assert.NoError(t, err)
-	assert.Equal(t, 2, len(commitmentsNotExecuted))
-}
-
 func TestState_cleanCommitments(t *testing.T) {
 	t.Parallel()
 

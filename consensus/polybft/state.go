@@ -58,7 +58,7 @@ const (
 	// number of stateSyncEvents to be processed before a commitment message can be created and gossiped
 	stateSyncMainBundleSize = 10
 	// number of stateSyncEvents to be grouped into one StateTransaction
-	stateSyncBundleSize = 5
+	stateSyncBundleSize = 1
 )
 
 type exitEventNotFoundError struct {
@@ -72,19 +72,9 @@ func (e *exitEventNotFoundError) Error() string {
 		e.exitID, e.checkpointBlock, e.epoch)
 }
 
+// TODO: remove and refactor to use types.StateSyncEvent
 // StateSyncEvent is a bridge event from the rootchain
-type StateSyncEvent struct {
-	// ID is the decoded 'index' field from the event
-	ID uint64
-	// Sender is the decoded 'sender' field from the event
-	Sender ethgo.Address
-	// Receiver is the decoded 'receiver' field from the event
-	Receiver ethgo.Address
-	// Data is the decoded 'data' field from the event
-	Data []byte
-	// Skip is the decoded 'skip' field from the event
-	Skip bool
-}
+type StateSyncEvent types.StateSyncEvent
 
 // newStateSyncEvent creates an instance of pending state sync event.
 func newStateSyncEvent(
@@ -550,38 +540,6 @@ func (s *State) getCommitmentMessage(toIndex uint64) (*CommitmentMessageSigned, 
 	})
 
 	return commitment, err
-}
-
-// getNonExecutedCommitments gets non executed commitments
-// (commitments whose toIndex is greater than or equal to startIndex)
-func (s *State) getNonExecutedCommitments(startIndex uint64) ([]*CommitmentMessageSigned, error) {
-	var commitments []*CommitmentMessageSigned
-
-	err := s.db.View(func(tx *bolt.Tx) error {
-		c := tx.Bucket(commitmentsBucket).Cursor()
-
-		for k, v := c.Last(); k != nil; k, v = c.Prev() {
-			if itou(k) < startIndex {
-				// reached a commitment that was executed
-				break
-			}
-
-			var commitment *CommitmentMessageSigned
-			if err := json.Unmarshal(v, &commitment); err != nil {
-				return err
-			}
-
-			commitments = append(commitments, commitment)
-		}
-
-		return nil
-	})
-
-	sort.Slice(commitments, func(i, j int) bool {
-		return commitments[i].Message.FromIndex < commitments[j].Message.FromIndex
-	})
-
-	return commitments, err
 }
 
 // cleanCommitments cleans all commitments that are older than the provided fromIndex, alongside their proofs

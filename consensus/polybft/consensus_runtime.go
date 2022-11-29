@@ -309,21 +309,6 @@ func (c *consensusRuntime) populateFsmIfBridgeEnabled(
 		if err := c.state.cleanCommitments(nextStateSyncExecutionIdx); err != nil {
 			return fmt.Errorf("cannot clean commitments: %w", err)
 		}
-
-		nonExecutedCommitments, err := c.state.getNonExecutedCommitments(nextStateSyncExecutionIdx)
-		if err != nil {
-			return fmt.Errorf("cannot get non executed commitments: %w", err)
-		}
-
-		if len(nonExecutedCommitments) > 0 {
-			bundlesToExecute, err := c.state.getBundles(nextStateSyncExecutionIdx, maxBundlesPerSprint)
-			if err != nil {
-				return fmt.Errorf("cannot get bundles: %w", err)
-			}
-
-			ff.commitmentsToVerifyBundles = nonExecutedCommitments
-			ff.bundleProofs = bundlesToExecute
-		}
 	}
 
 	return nil
@@ -909,6 +894,29 @@ func (c *consensusRuntime) GenerateExitProof(exitID, epoch, checkpointBlock uint
 	}
 
 	return tree.GenerateProofForLeaf(e, 0)
+}
+
+// GetStateSyncProof returns the proof of the bundle for the state sync
+func (c *consensusRuntime) GetStateSyncProof(stateSyncID uint64) (*types.StateSyncProof, error) {
+	bundlesToExecute, err := c.state.getBundles(stateSyncID, 1)
+	if err != nil {
+		return nil, fmt.Errorf("cannot get bundles: %w", err)
+	}
+
+	if len(bundlesToExecute) == 0 {
+		return nil, fmt.Errorf("cannot find bundle containing StateSync id %d", stateSyncID)
+	}
+
+	for _, bundle := range bundlesToExecute[0].StateSyncs {
+		if bundle.ID == stateSyncID {
+			return &types.StateSyncProof{
+				Proof:     bundlesToExecute[0].Proof,
+				StateSync: types.StateSyncEvent(*bundle),
+			}, nil
+		}
+	}
+
+	return nil, fmt.Errorf("cannot find StateSync with id %d", stateSyncID)
 }
 
 // setIsActiveValidator updates the activeValidatorFlag field
