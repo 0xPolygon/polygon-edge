@@ -700,6 +700,7 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 	}
 
 	result.GasLeft -= gasCost
+	result.Address = c.Address
 	t.state.SetCode(c.Address, result.ReturnValue)
 
 	return result
