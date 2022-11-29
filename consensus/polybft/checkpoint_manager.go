@@ -8,6 +8,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
 )
@@ -47,11 +48,13 @@ type checkpointManager struct {
 	checkpointsOffset uint64
 	// latestCheckpointID represents last checkpointed block number
 	latestCheckpointID uint64
+	// logger instance
+	logger hclog.Logger
 }
 
 // newCheckpointManager creates a new instance of checkpointManager
 func newCheckpointManager(signer ethgo.Key, checkpointOffset uint64, interactor rootchainInteractor,
-	blockchain blockchainBackend, backend polybftBackend) *checkpointManager {
+	blockchain blockchainBackend, backend polybftBackend, logger hclog.Logger) *checkpointManager {
 	r := interactor
 	if interactor == nil {
 		r = &defaultRootchainInteractor{}
@@ -64,11 +67,12 @@ func newCheckpointManager(signer ethgo.Key, checkpointOffset uint64, interactor 
 		consensusBackend:  backend,
 		rootchain:         r,
 		checkpointsOffset: checkpointOffset,
+		logger:            logger,
 	}
 }
 
 // getLatestCheckpointBlock queries CheckpointManager smart contract and retrieves latest checkpoint block number
-func (c checkpointManager) getLatestCheckpointBlock() (uint64, error) {
+func (c *checkpointManager) getLatestCheckpointBlock() (uint64, error) {
 	checkpointBlockNumMethodEncoded, err := currentCheckpointBlockNumMethod.Encode([]interface{}{})
 	if err != nil {
 		return 0, fmt.Errorf("failed to encode currentCheckpointId function parameters: %w", err)
@@ -92,11 +96,15 @@ func (c checkpointManager) getLatestCheckpointBlock() (uint64, error) {
 }
 
 // submitCheckpoint sends a transaction with checkpoint data to the rootchain
-func (c checkpointManager) submitCheckpoint(latestHeader types.Header, isEndOfEpoch bool) error {
+func (c *checkpointManager) submitCheckpoint(latestHeader types.Header, isEndOfEpoch bool) error {
 	lastCheckpointBlockNumber, err := c.getLatestCheckpointBlock()
 	if err != nil {
 		return err
 	}
+
+	c.logger.Debug("submitCheckpoint invoked...",
+		"latest checkpoint block", lastCheckpointBlockNumber,
+		"checkpoint block", latestHeader.Number)
 
 	nonce, err := c.rootchain.GetPendingNonce(c.signerAddress)
 	if err != nil {
@@ -170,6 +178,8 @@ func (c checkpointManager) submitCheckpoint(latestHeader types.Header, isEndOfEp
 // sends a transaction to the CheckpointManager rootchain contract
 func (c *checkpointManager) encodeAndSendCheckpoint(nonce uint64, txn *ethgo.Transaction,
 	header types.Header, extra Extra, isEndOfEpoch bool) error {
+	c.logger.Debug("send checkpoint txn...", "block number", header.Number)
+
 	nextEpochValidators := AccountSet{}
 
 	if isEndOfEpoch {
@@ -194,8 +204,10 @@ func (c *checkpointManager) encodeAndSendCheckpoint(nonce uint64, txn *ethgo.Tra
 	}
 
 	if receipt.Status == uint64(types.ReceiptFailed) {
-		return fmt.Errorf("transaction execution failed for block %d", header.Number)
+		return fmt.Errorf("checkpoint submission transaction failed for block %d", header.Number)
 	}
+
+	c.logger.Debug("send checkpoint txn success", "block number", header.Number)
 
 	return nil
 }

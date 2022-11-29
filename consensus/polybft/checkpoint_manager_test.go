@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
@@ -94,6 +95,7 @@ func TestCheckpointManager_submitCheckpoint(t *testing.T) {
 		rootchain:        rootchainMock,
 		consensusBackend: backendMock,
 		blockchain:       blockchainMock,
+		logger:           hclog.NewNullLogger(),
 	}
 
 	err := c.submitCheckpoint(*latestCheckpointHeader, false)
@@ -144,6 +146,7 @@ func TestCheckpointManager_abiEncodeCheckpointBlock(t *testing.T) {
 	c := &checkpointManager{
 		blockchain:       &blockchainMock{},
 		consensusBackend: backendMock,
+		logger:           hclog.NewNullLogger(),
 	}
 	checkpointDataEncoded, err := c.abiEncodeCheckpointBlock(header.Number, header.Hash, *extra, nextValidators.getPublicIdentities())
 	require.NoError(t, err)
@@ -217,7 +220,10 @@ func TestCheckpointManager_getCurrentCheckpointID(t *testing.T) {
 				Return(c.checkpointID, c.returnError).
 				Once()
 
-			checkpointMgr := &checkpointManager{rootchain: rootchainMock}
+			checkpointMgr := &checkpointManager{
+				rootchain: rootchainMock,
+				logger:    hclog.NewNullLogger(),
+			}
 			actualCheckpointID, err := checkpointMgr.getLatestCheckpointBlock()
 			if c.errSubstring == "" {
 				expectedCheckpointID, err := strconv.ParseUint(c.checkpointID, 0, 64)
@@ -260,7 +266,7 @@ func TestCheckpointManager_isCheckpointBlock(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
 
-			checkpointMgr := newCheckpointManager(wallet.NewEcdsaSigner(createTestKey(t)), c.checkpointsOffset, nil, nil, nil)
+			checkpointMgr := newCheckpointManager(wallet.NewEcdsaSigner(createTestKey(t)), c.checkpointsOffset, nil, nil, nil, hclog.NewNullLogger())
 			require.Equal(t, c.isCheckpointBlock, checkpointMgr.isCheckpointBlock(c.blockNumber))
 		})
 	}
