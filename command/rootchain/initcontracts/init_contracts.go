@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"math/big"
 	"os"
 	"path"
 	"path/filepath"
@@ -21,6 +20,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/genesis"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
+	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -38,9 +38,6 @@ var (
 		"bytes32 newDomain," +
 		// RootValidatorSet contract address
 		"tuple(address _address, uint256[4] blsKey, uint256 votingPower)[] newValidatorSet)")
-
-	// TODO: AI Stefan Switch to the new domain value
-	bn256P, _ = new(big.Int).SetString("21888242871839275222246405745257275088696311157297823662689037894645226208583", 10)
 )
 
 const (
@@ -231,7 +228,7 @@ func initializeCheckpointManager(nonce uint64) error {
 		[]interface{}{
 			helper.BLSAddress,
 			helper.BN256G2Address,
-			bn256P.Bytes(),
+			bls.GetDomain(),
 			validatorSetMap,
 		})
 
