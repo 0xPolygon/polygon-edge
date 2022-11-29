@@ -97,15 +97,15 @@ type Signatures []*Signature
 
 // Aggregate sums the given array of signatures
 func (s Signatures) Aggregate() *Signature {
-	g, newp := bn254.NewG1(), new(bn254.PointG1)
+	g := bn254.NewG1()
+	aggSignature := &Signature{p: new(bn254.PointG1).Set(g.Zero())}
 
-	newp.Set(g.Zero())
-
-	for _, x := range s {
-		if x.p != nil {
-			g.Add(newp, newp, x.p)
+	if len(s) > 0 {
+		aggSignature = s[0]
+		for _, currentSig := range s[1:] {
+			aggSignature = aggSignature.Aggregate(currentSig)
 		}
 	}
 
-	return &Signature{p: newp}
+	return &Signature{p: aggSignature.p}
 }
