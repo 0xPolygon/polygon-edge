@@ -24,6 +24,12 @@ func TestExperiment(t *testing.T) {
 	sender := wallet.NewKey(senderKey)
 	governanceKey, _ := crypto.GenerateECDSAKey()
 	governance := wallet.NewKey(governanceKey)
+
+	validatorSetSize := 5
+
+	//epochReward := big.NewInt(1) //ethgo.Gwei(100)
+	minStake := ethgo.Gwei(1)
+	minDelegation := ethgo.Gwei(1)
 	//wallet
 	chainID := uint64(123)
 
@@ -37,7 +43,7 @@ func TestExperiment(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	cluster := framework.NewTestCluster(t, 30,
+	cluster := framework.NewTestCluster(t, validatorSetSize,
 		func(config *framework.TestClusterConfig) {
 			config.WithLogs = true
 		},
@@ -56,8 +62,12 @@ func TestExperiment(t *testing.T) {
 				validators,
 				types.Address(governance.Address()),
 				stakeMap,
-				scPath)
-
+				scPath,
+				nil,
+				minStake,
+				minDelegation,
+			)
+			require.NoError(t, err)
 			//setup sender and governance balances
 			ch.Genesis.Alloc[types.Address(sender.Address())] = &chain.GenesisAccount{
 				Balance: ethgo.Ether(10),
@@ -65,8 +75,6 @@ func TestExperiment(t *testing.T) {
 			ch.Genesis.Alloc[types.Address(governance.Address())] = &chain.GenesisAccount{
 				Balance: ethgo.Ether(10),
 			}
-
-			require.NoError(t, err)
 			return ch
 		}),
 	)
@@ -108,6 +116,20 @@ func TestExperiment(t *testing.T) {
 	h1 := f(1, ethgo.Address{}, big.NewInt(100))
 	t.Log(client.GetTransactionByHash(h1))
 	t.Log(client.GetTransactionReceipt(h1))
+
+	go func() {
+		ticker := time.Tick(time.Second * 20)
+		for _ = range ticker {
+			for i, s := range cluster.Servers {
+				bl, err := s.JSONRPC().Eth().GetBlockByNumber(ethgo.Latest, false)
+				if err != nil {
+					t.Log(i, "get block", err)
+					continue
+				}
+				t.Log(i, "block", bl.Number, bl.Hash, bl.StateRoot, bl.ParentHash)
+			}
+		}
+	}()
 
 	require.NoError(t, cluster.WaitForBlock(22, 2*time.Minute))
 	t.Log("Validator's balances")
@@ -197,5 +219,4 @@ func TestExperiment(t *testing.T) {
 
 	require.NoError(t, cluster.WaitForBlock(13000, 1000*time.Minute))
 	cancel()
-
 }

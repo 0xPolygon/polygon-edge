@@ -80,6 +80,9 @@ type genesisParams struct {
 	sprintSize       uint64
 	blockTime        time.Duration
 	validators       []string
+	epochReward      *big.Int
+	minStake         *big.Int
+	minDelegation    *big.Int
 
 	polyBftValidatorPrefixPath string
 	premineValidators          string
@@ -375,13 +378,23 @@ func (p *genesisParams) getResult() command.CommandResult {
 func NewTestPolyBFT(name string,
 	chainID uint64,
 	blockTime time.Duration,
-	epochSize, sprintSize uint64, validatorsInfo []GenesisTarget, governanceAccount types.Address, stake map[types.Address]*big.Int, scPath string) (*chain.Chain, error) {
+	epochSize, sprintSize uint64,
+	validatorsInfo []GenesisTarget,
+	governanceAccount types.Address,
+	stake map[types.Address]*big.Int,
+	scPath string,
+	epochReward *big.Int,
+	minStake *big.Int,
+	minDelegation *big.Int) (*chain.Chain, error) {
 	gp := &genesisParams{
-		name:       name,
-		chainID:    chainID,
-		epochSize:  epochSize,
-		sprintSize: sprintSize,
-		blockTime:  blockTime,
+		name:          name,
+		chainID:       chainID,
+		epochSize:     epochSize,
+		sprintSize:    sprintSize,
+		blockTime:     blockTime,
+		epochReward:   epochReward,
+		minStake:      minStake,
+		minDelegation: minDelegation,
 	}
 	gp.smartContractsRootPath = scPath
 	return gp.GeneratePolyBFTConfig(validatorsInfo, governanceAccount, stake)

@@ -124,7 +124,13 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			return err
 		}
 		// Initialize child validator set
-		input, err := getInitChildValidatorSetInput(pbftConfig.InitialValidatorSet, pbftConfig.Governance)
+		input, err := getInitChildValidatorSetInput(
+			pbftConfig.InitialValidatorSet,
+			pbftConfig.Governance,
+			pbftConfig.Reward,
+			pbftConfig.MinStake,
+			pbftConfig.MinDelegation,
+		)
 		if err != nil {
 			return err
 		}

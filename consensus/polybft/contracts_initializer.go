@@ -3,7 +3,6 @@ package polybft
 import (
 	"encoding/hex"
 	"fmt"
-	"github.com/umbracle/ethgo"
 	"math/big"
 
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
@@ -41,7 +40,7 @@ var (
 	nativeTokenSymbol = "MATIC"
 )
 
-func getInitChildValidatorSetInput(validators []*Validator, governanceAddr types.Address) ([]byte, error) {
+func getInitChildValidatorSetInput(validators []*Validator, governanceAddr types.Address, epochReward, minStake, minDelegation *big.Int) ([]byte, error) {
 	validatorAddresses := make([]types.Address, len(validators))
 	validatorPubkeys := make([][4]*big.Int, len(validators))
 	validatorStakes := make([]*big.Int, len(validators))
@@ -69,11 +68,20 @@ func getInitChildValidatorSetInput(validators []*Validator, governanceAddr types
 		return nil, err
 	}
 
+	if epochReward == nil {
+		epochReward = big.NewInt(newEpochReward)
+	}
+	if minStake == nil {
+		minStake = big.NewInt(newMinStake)
+	}
+	if minDelegation == nil {
+		minDelegation = big.NewInt(newMinDelegation)
+	}
+
 	input, err := initCallStaking.Encode([]interface{}{
-		ethgo.Gwei(newEpochReward),
-		//big.NewInt(newEpochReward),
-		big.NewInt(newMinStake),
-		big.NewInt(newMinDelegation),
+		epochReward,
+		minStake,
+		minDelegation,
 		validatorAddresses,
 		validatorPubkeys,
 		validatorStakes,

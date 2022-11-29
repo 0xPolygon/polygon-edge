@@ -20,8 +20,12 @@ type PolyBFTConfig struct {
 	StateReceiverAddr types.Address `json:"stateReceiverAddr"`
 
 	// size of the epoch and sprint
-	EpochSize  uint64 `json:"epochSize"`
-	SprintSize uint64 `json:"sprintSize"`
+	EpochSize  uint64   `json:"epochSize"`
+	SprintSize uint64   `json:"sprintSize"`
+	Reward     *big.Int `json:"reward"`
+
+	MinStake      *big.Int `json:"minStake"`
+	MinDelegation *big.Int `json:"minDelegation"`
 
 	BlockTime time.Duration `json:"blockTime"`
 
