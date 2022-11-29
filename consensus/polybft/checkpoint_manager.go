@@ -25,7 +25,7 @@ var (
 	submitCheckpointMethod, _ = abi.NewMethod("function submit(" +
 		"uint256 chainId," +
 		"tuple(bytes32 blockHash, uint256 blockRound, bytes32 currentValidatorSetHash) checkpointMetadata," +
-		"tuple(uint256 epoch, uint256 blockNumber, bytes32 eventRoot) checkpoint," +
+		"tuple(uint256 epochNumber, uint256 blockNumber, bytes32 eventRoot) checkpoint," +
 		"uint256[2] signature," +
 		"tuple(address _address, uint256[4] blsKey, uint256 votingPower)[] newValidatorSet," +
 		"bytes bitmap)")
@@ -233,7 +233,7 @@ func (c *checkpointManager) abiEncodeCheckpointBlock(headerNumber uint64, header
 			"currentValidatorSetHash": extra.Checkpoint.CurrentValidatorsHash,
 		},
 		"checkpoint": map[string]interface{}{
-			"epoch":       new(big.Int).SetUint64(extra.Checkpoint.EpochNumber),
+			"epochNumber": new(big.Int).SetUint64(extra.Checkpoint.EpochNumber),
 			"blockNumber": new(big.Int).SetUint64(headerNumber),
 			"eventRoot":   extra.Checkpoint.EventRoot,
 		},

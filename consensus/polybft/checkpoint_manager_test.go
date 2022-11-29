@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
@@ -18,10 +19,9 @@ import (
 )
 
 func TestCheckpointManager_submitCheckpoint(t *testing.T) {
-	t.Skip("FIX ME")
 	t.Parallel()
 
-	validators := newTestValidators(5)
+	validators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E"})
 	validatorsMetadata := validators.getPublicIdentities()
 	rootchainMock := new(dummyRootchainInteractor)
 	rootchainMock.On("Call", mock.Anything, mock.Anything, mock.Anything).
@@ -30,12 +30,12 @@ func TestCheckpointManager_submitCheckpoint(t *testing.T) {
 	rootchainMock.On("GetPendingNonce", mock.Anything).
 		Return(uint64(1), error(nil)).
 		Once()
-	rootchainMock.On("SendTransaction", mock.Anything, mock.Anything).
+	rootchainMock.On("SendTransaction", mock.Anything, mock.Anything, mock.Anything).
 		Return(&ethgo.Receipt{Status: uint64(types.ReceiptSuccess)}, error(nil)).
 		Times(2)
 
 	backendMock := new(polybftBackendMock)
-	backendMock.On("GetValidators", mock.Anything, mock.Anything).Return(validators)
+	backendMock.On("GetValidators", mock.Anything, mock.Anything).Return(validatorsMetadata)
 
 	checkpoint := &CheckpointData{
 		BlockRound:  1,
@@ -95,6 +95,7 @@ func TestCheckpointManager_submitCheckpoint(t *testing.T) {
 		rootchain:        rootchainMock,
 		consensusBackend: backendMock,
 		blockchain:       blockchainMock,
+		logger:           hclog.NewNullLogger(),
 	}
 
 	err := c.submitCheckpoint(*latestCheckpointHeader, false)
@@ -103,7 +104,6 @@ func TestCheckpointManager_submitCheckpoint(t *testing.T) {
 }
 
 func TestCheckpointManager_abiEncodeCheckpointBlock(t *testing.T) {
-	t.Skip("FIX ME")
 	t.Parallel()
 
 	const epochSize = uint64(10)
@@ -140,25 +140,47 @@ func TestCheckpointManager_abiEncodeCheckpointBlock(t *testing.T) {
 	header.ExtraData = append(make([]byte, signer.IstanbulExtraVanity), extra.MarshalRLPTo(nil)...)
 	header.ComputeHash()
 
-	c := &checkpointManager{blockchain: &blockchainMock{}}
+	backendMock := new(polybftBackendMock)
+	backendMock.On("GetValidators", mock.Anything, mock.Anything).Return(currentValidators.getPublicIdentities())
+
+	c := &checkpointManager{
+		blockchain:       &blockchainMock{},
+		consensusBackend: backendMock,
+		logger:           hclog.NewNullLogger()}
 	checkpointDataEncoded, err := c.abiEncodeCheckpointBlock(header.Number, header.Hash, *extra, nextValidators.getPublicIdentities())
 	require.NoError(t, err)
 
 	decodedCheckpointData, err := submitCheckpointMethod.Inputs.Decode(checkpointDataEncoded[4:])
 	require.NoError(t, err)
 
-	checkpointDataMap, ok := decodedCheckpointData.(map[string]interface{})
+	submitCheckpointInputData, ok := decodedCheckpointData.(map[string]interface{})
 	require.True(t, ok)
 
-	eventRootDecoded, ok := checkpointDataMap["eventRoot"].([types.HashLength]byte)
+	checkpointData, ok := submitCheckpointInputData["checkpoint"].(map[string]interface{})
 	require.True(t, ok)
-	require.Equal(t, new(big.Int).SetUint64(checkpoint.BlockRound), checkpointDataMap["blockRound"])
-	require.Equal(t, new(big.Int).SetUint64(checkpoint.EpochNumber), checkpointDataMap["epochNumber"])
-	require.Equal(t, checkpoint.EventRoot, types.BytesToHash(eventRootDecoded[:]))
+
+	checkpointMetadata, ok := submitCheckpointInputData["checkpointMetadata"].(map[string]interface{})
+	require.True(t, ok)
+
+	eventRoot, ok := checkpointData["eventRoot"].([types.HashLength]byte)
+	require.True(t, ok)
+
+	blockRound, ok := checkpointMetadata["blockRound"].(*big.Int)
+	require.True(t, ok)
+
+	epochNumber, ok := checkpointData["epochNumber"].(*big.Int)
+	require.True(t, ok)
+
+	blockNumber, ok := checkpointData["blockNumber"].(*big.Int)
+	require.True(t, ok)
+
+	require.Equal(t, new(big.Int).SetUint64(checkpoint.EpochNumber), epochNumber)
+	require.Equal(t, new(big.Int).SetUint64(header.Number), blockNumber)
+	require.Equal(t, checkpoint.EventRoot, types.BytesToHash(eventRoot[:]))
+	require.Equal(t, new(big.Int).SetUint64(checkpoint.BlockRound), blockRound)
 }
 
 func TestCheckpointManager_getCurrentCheckpointID(t *testing.T) {
-	t.Skip("FIX ME")
 	t.Parallel()
 
 	cases := []struct {
@@ -197,7 +219,7 @@ func TestCheckpointManager_getCurrentCheckpointID(t *testing.T) {
 				Return(c.checkpointID, c.returnError).
 				Once()
 
-			checkpointMgr := &checkpointManager{rootchain: rootchainMock}
+			checkpointMgr := &checkpointManager{rootchain: rootchainMock, logger: hclog.NewNullLogger()}
 			actualCheckpointID, err := checkpointMgr.getLatestCheckpointBlock()
 			if c.errSubstring == "" {
 				expectedCheckpointID, err := strconv.ParseUint(c.checkpointID, 0, 64)
