@@ -12,7 +12,6 @@ import (
 	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
-	bls2 "github.com/kilic/bn254/bls"
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/contract"
@@ -92,17 +91,13 @@ func TestBLSDebugTest(t *testing.T) {
 	t.Log(c.Call("currentCheckpointBlockNumber", ethgo.Latest))
 	t.Log(c.Call("domain", ethgo.Latest))
 
-	blsKeys := make([]*bls2.KeyPair, len(validators))
-
 	accSet := make(polybft.AccountSet, len(validators))
 	for i := range validators {
-		blsKeys[i], err = bls2.NewKeyPair(nil)
 		require.NoError(t, err)
 
-		validators[i].Account.Bls.PublicKey()
 		accSet[i] = &polybft.ValidatorMetadata{
-			Address: types.Address(validators[i].Account.Ecdsa.Address()),
-			//BlsKey:      blsKeys[i].Public.ToBytes(),
+			Address:     types.Address(validators[i].Account.Ecdsa.Address()),
+			BlsKey:      validators[i].Account.Bls.PublicKey(),
 			VotingPower: 100,
 		}
 	}
