@@ -20,16 +20,17 @@ import (
 )
 
 func TestExperiment(t *testing.T) {
+	//t.Skip()
 	senderKey, _ := crypto.GenerateECDSAKey()
 	sender := wallet.NewKey(senderKey)
 	governanceKey, _ := crypto.GenerateECDSAKey()
 	governance := wallet.NewKey(governanceKey)
 
-	validatorSetSize := 5
+	validatorSetSize := 30
 
-	//epochReward := big.NewInt(1) //ethgo.Gwei(100)
-	minStake := ethgo.Gwei(1)
-	minDelegation := ethgo.Gwei(1)
+	epochReward := ethgo.Gwei(1)
+	minStake := big.NewInt(1)
+	minDelegation := big.NewInt(1)
 	//wallet
 	chainID := uint64(123)
 
@@ -58,12 +59,12 @@ func TestExperiment(t *testing.T) {
 				chainID,
 				2*time.Second,
 				10,
-				5,
+				10,
 				validators,
 				types.Address(governance.Address()),
 				stakeMap,
 				scPath,
-				nil,
+				epochReward,
 				minStake,
 				minDelegation,
 			)

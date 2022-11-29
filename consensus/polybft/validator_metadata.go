@@ -211,8 +211,9 @@ func (as AccountSet) AsGenericMaps() []map[string]interface{} {
 	accountSetMaps := make([]map[string]interface{}, len(as))
 	for i, v := range as {
 		accountSetMaps[i] = map[string]interface{}{
-			"_address": v.Address,
-			"blsKey":   v.BlsKey.ToBigInt(),
+			"_address":    v.Address,
+			"blsKey":      v.BlsKey.ToBigInt(),
+			"votingPower": big.NewInt(0).SetUint64(v.VotingPower),
 		}
 	}
 

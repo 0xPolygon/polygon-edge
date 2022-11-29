@@ -325,7 +325,7 @@ func GenerateGenesis(path string, cluster *TestCluster) (err error) {
 func (c *TestCluster) initTestServer(t *testing.T, i int, isValidator bool) {
 	t.Helper()
 
-	logLevel := hclog.Info.String() //os.Getenv(envLogLevel)
+	logLevel := hclog.Debug.String() //os.Getenv(envLogLevel)
 	dataDir := c.Config.Dir(c.Config.ValidatorPrefix + strconv.Itoa(i))
 
 	srv := NewTestServer(t, c.Config, func(config *TestServerConfig) {
