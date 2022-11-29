@@ -139,7 +139,6 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) *consensusRuntim
 			&defaultRootchainInteractor{},
 			config.blockchain,
 			config.polybftBackend)
-		runtime.checkpointManager.logger = log.Named("checkpoint_manager")
 	}
 
 	return runtime

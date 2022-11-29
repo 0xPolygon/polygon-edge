@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
@@ -95,7 +94,6 @@ func TestCheckpointManager_submitCheckpoint(t *testing.T) {
 		rootchain:        rootchainMock,
 		consensusBackend: backendMock,
 		blockchain:       blockchainMock,
-		logger:           hclog.NewNullLogger(),
 	}
 
 	err := c.submitCheckpoint(*latestCheckpointHeader, false)
@@ -146,7 +144,7 @@ func TestCheckpointManager_abiEncodeCheckpointBlock(t *testing.T) {
 	c := &checkpointManager{
 		blockchain:       &blockchainMock{},
 		consensusBackend: backendMock,
-		logger:           hclog.NewNullLogger()}
+	}
 	checkpointDataEncoded, err := c.abiEncodeCheckpointBlock(header.Number, header.Hash, *extra, nextValidators.getPublicIdentities())
 	require.NoError(t, err)
 
@@ -219,7 +217,7 @@ func TestCheckpointManager_getCurrentCheckpointID(t *testing.T) {
 				Return(c.checkpointID, c.returnError).
 				Once()
 
-			checkpointMgr := &checkpointManager{rootchain: rootchainMock, logger: hclog.NewNullLogger()}
+			checkpointMgr := &checkpointManager{rootchain: rootchainMock}
 			actualCheckpointID, err := checkpointMgr.getLatestCheckpointBlock()
 			if c.errSubstring == "" {
 				expectedCheckpointID, err := strconv.ParseUint(c.checkpointID, 0, 64)

@@ -26,10 +26,8 @@ import (
 )
 
 const (
-	imageName = "go-ethereum-console"
-	imageTag  = "latest"
-	// imageName       = "ethereum/client-go"
-	// imageTag        = "v1.9.25"
+	imageName       = "ethereum/client-go"
+	imageTag        = "v1.9.25"
 	defaultHostIP   = "127.0.0.1"
 	defaultHostPort = "8545"
 )
@@ -132,9 +130,7 @@ func runRootchain(ctx context.Context, outputter command.OutputFormatter, closeC
 	}
 
 	// try to pull the image
-	// reader, err := dockerClient.ImagePull(ctx, "docker.io/"+imageName+":"+imageTag, dockertypes.ImagePullOptions{})
-	reader, err := dockerClient.ImagePull(ctx,
-		"ghcr.io/0xpolygon/go-ethereum-console:latest", dockertypes.ImagePullOptions{})
+	reader, err := dockerClient.ImagePull(ctx, "docker.io/"+imageName+":"+imageTag, dockertypes.ImagePullOptions{})
 	if err != nil {
 		return err
 	}
