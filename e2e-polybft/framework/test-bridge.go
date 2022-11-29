@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
+	"path"
+	"strconv"
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/command/rootchain/server"
@@ -65,6 +67,22 @@ func (t *TestBridge) deployRootchainContracts(genesisPath string) error {
 		"--validator-path", t.clusterConfig.TmpDir,
 		"--validator-prefix", t.clusterConfig.ValidatorPrefix,
 		"--genesis-path", genesisPath,
+	}
+
+	err := runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("bridge"))
+	if err != nil {
+		return fmt.Errorf("failed to deploy rootchain contracts: %w", err)
+	}
+
+	return nil
+}
+
+func (t *TestBridge) fundValidators() error {
+	args := []string{
+		"rootchain",
+		"fund",
+		"--data-dir", path.Join(t.clusterConfig.TmpDir, t.clusterConfig.ValidatorPrefix),
+		"--num", strconv.Itoa(int(t.clusterConfig.ValidatorSetSize) + t.clusterConfig.NonValidatorCount),
 	}
 
 	err := runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("bridge"))
