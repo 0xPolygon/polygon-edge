@@ -6,36 +6,56 @@ import (
 	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/helper/common"
-	bn256 "github.com/umbracle/go-eth-bn256"
+	bn254 "github.com/kilic/bn254"
+	kilic "github.com/kilic/bn254/bls"
 )
 
 // PublicKey represents bls public key
 type PublicKey struct {
-	p *bn256.G2
+	p *kilic.PublicKey
 }
 
 // aggregate adds the given public keys
 func (p *PublicKey) aggregate(onemore *PublicKey) *PublicKey {
-	var g2 *bn256.G2
+	// var agg *kilic.PublicKey
+	// if p.p == nil {
+	// 	agg = new(kilic.G2).Set(&zeroG2)
+	// } else {
+	// 	agg = new(kilic.G2).Set(p.p)
+	// }
+
+	// g2.Add(g2, onemore.p)
+
+	// return &PublicKey{p: agg}
+
+	g := bn254.NewG2()
+
 	if p.p == nil {
-		g2 = new(bn256.G2).Set(&zeroG2)
+		agg = new(kilic.PublicKey).Set(&zeroG2)
 	} else {
-		g2 = new(bn256.G2).Set(p.p)
+		agg = new(kilic.G2).Set(p.p)
 	}
 
-	g2.Add(g2, onemore.p)
-
-	return &PublicKey{p: g2}
+	g := bn254.NewG2()
+	if len(keys) == 0 {
+		return &AggregatedKey{g.Zero()}
+	}
+	
+	 := new(PointG2).Set(keys[0].point)
+	for i := 1; i < len(keys); i++ {
+		g.Add(aggregated, aggregated, keys[i].point)
+	}
+	return &AggregatedKey{aggregated}
 }
 
 // Marshal marshal the key to bytes.
 func (p *PublicKey) Marshal() []byte {
-	return p.p.Marshal()
+	return p.p.ToBytes()
 }
 
 // MarshalJSON implements the json.Marshaler interface.
 func (p *PublicKey) MarshalJSON() ([]byte, error) {
-	return json.Marshal(p.p.Marshal())
+	return json.Marshal(p.p.ToBytes())
 }
 
 // UnmarshalJSON implements the json.Marshaler interface.
@@ -63,8 +83,10 @@ func UnmarshalPublicKey(raw []byte) (*PublicKey, error) {
 		return nil, errors.New("cannot unmarshal public key from empty slice")
 	}
 
-	p := new(bn256.G2)
-	_, err := p.Unmarshal(raw)
+	p, err := kilic.PublicKeyFromBytes(raw)
+	if err != nil {
+		return nil, err
+	}
 
 	return &PublicKey{p: p}, err
 }
@@ -104,7 +126,7 @@ func UnmarshalPublicKeyFromBigInt(b [4]*big.Int) (*PublicKey, error) {
 
 // aggregatePublicKeys calculates P1 + P2 + ...
 func aggregatePublicKeys(pubs []*PublicKey) *PublicKey {
-	res := *new(bn256.G2).Set(&zeroG2)
+	res := *new(kilic.G2).Set(&zeroG2)
 	for i := 0; i < len(pubs); i++ {
 		res.Add(&res, pubs[i].p)
 	}
