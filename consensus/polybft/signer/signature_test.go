@@ -62,7 +62,7 @@ func Test_AggregatedSignature(t *testing.T) {
 	require.NoError(t, err)
 
 	allPubs := collectPublicKeys(blsKeys)
-	aggPubs := AggregatePublicKeys(allPubs)
+	aggPubs := aggregatePublicKeys(allPubs)
 	allSignatures := Signatures{}
 
 	var manuallyAggSignature *Signature

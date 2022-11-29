@@ -5,7 +5,6 @@ import (
 	"math/big"
 
 	"github.com/kilic/bn254"
-	bn256 "github.com/umbracle/go-eth-bn256"
 )
 
 // Signature represents bls signature which is point on the curve
@@ -30,7 +29,7 @@ func (s *Signature) Verify(publicKey *PublicKey, message []byte) bool {
 
 // VerifyAggregated checks the BLS signature of the message against the aggregated public keys of its signers
 func (s *Signature) VerifyAggregated(publicKeys []*PublicKey, msg []byte) bool {
-	aggPubs := AggregatePublicKeys(publicKeys)
+	aggPubs := aggregatePublicKeys(publicKeys)
 
 	return s.Verify(aggPubs, msg)
 }
@@ -88,17 +87,6 @@ func (s Signature) ToBigInt() ([2]*big.Int, error) {
 	res := [2]*big.Int{
 		new(big.Int).SetBytes(sig[0:32]),
 		new(big.Int).SetBytes(sig[32:64]),
-	}
-
-	return res, nil
-}
-
-// ToBigInt marshalls signature (which is point) to 2 big ints - one for each coordinate
-func G1ToBigInt(g1 *bn256.G1) ([2]*big.Int, error) {
-	b := g1.Marshal()
-	res := [2]*big.Int{
-		new(big.Int).SetBytes(b[0:32]),
-		new(big.Int).SetBytes(b[32:64]),
 	}
 
 	return res, nil
