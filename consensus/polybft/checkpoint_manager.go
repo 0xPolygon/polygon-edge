@@ -16,9 +16,9 @@ import (
 )
 
 var (
-	// currentCheckpointIDMethod is an ABI method object representation for
-	// currentCheckpointId getter function on CheckpointManager contract
-	currentCheckpointIDMethod, _ = abi.NewMethod("function latestCheckpointBlockNumber() returns (uint256)")
+	// currentCheckpointBlockNumMethod is an ABI method object representation for
+	// currentCheckpointBlockNumber getter function on CheckpointManager contract
+	currentCheckpointBlockNumMethod, _ = abi.NewMethod("function currentCheckpointBlockNumber() returns (uint256)")
 
 	// submitCheckpointMethod is an ABI method object representation for
 	// submit checkpoint function on CheckpointManager contract
@@ -74,7 +74,7 @@ func newCheckpointManager(signer ethgo.Key, checkpointOffset uint64, interactor 
 
 // getLatestCheckpointBlock queries CheckpointManager smart contract and retrieves latest checkpoint block number
 func (c checkpointManager) getLatestCheckpointBlock() (uint64, error) {
-	checkpointIDMethodEncoded, err := currentCheckpointIDMethod.Encode([]interface{}{})
+	checkpointBlockNumMethodEncoded, err := currentCheckpointBlockNumMethod.Encode([]interface{}{})
 	if err != nil {
 		return 0, fmt.Errorf("failed to encode currentCheckpointId function parameters: %w", err)
 	}
@@ -82,7 +82,7 @@ func (c checkpointManager) getLatestCheckpointBlock() (uint64, error) {
 	latestCheckpointBlockRaw, err := c.rootchain.Call(
 		c.signerAddress,
 		helper.CheckpointManagerAddress,
-		checkpointIDMethodEncoded)
+		checkpointBlockNumMethodEncoded)
 	if err != nil {
 		return 0, fmt.Errorf("failed to invoke currentCheckpointId function on the rootchain: %w", err)
 	}
