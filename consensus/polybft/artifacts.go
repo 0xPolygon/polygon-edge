@@ -6,8 +6,9 @@ import (
 	"io/ioutil"
 	"path/filepath"
 
-	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/umbracle/ethgo/abi"
+
+	"github.com/0xPolygon/polygon-edge/helper/hex"
 )
 
 func ReadArtifact(rootFolder, contractPath, contractName string) (*Artifact, error) {

@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/0xPolygon/polygon-edge/state"
-	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/fastrlp"
 	"golang.org/x/crypto/sha3"
+
+	"github.com/0xPolygon/polygon-edge/state"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 // Node represents a node reference
@@ -185,6 +186,7 @@ func (t *Trie) Commit(objs []*state.Object) (*Trie, []byte) {
 	root, _ := tt.Hash()
 
 	nTrie := tt.Commit()
+
 	nTrie.state = t.state
 	nTrie.storage = t.storage
 
