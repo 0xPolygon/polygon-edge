@@ -1,91 +1,59 @@
 package txpool
 
 import (
-	"sync"
+	"fmt"
 
 	"github.com/0xPolygon/polygon-edge/types"
+	lru "github.com/hashicorp/golang-lru"
 )
-
-// TxStatus indicates the status of tx that is added to TxPool
-type TxStatus int8
 
 const (
-	TxSuccessful TxStatus = iota // Tx has been mined in a block successfully
-	TxDropped                    // Tx was dropped for some reason
+	TxErrorJournalDefaultSize = 1000
 )
 
-var (
-	// txStatusToString is a mapping from TxStatus to text status
-	txStatusToString = map[TxStatus]string{
-		TxSuccessful: "success",
-		TxDropped:    "dropped",
-	}
-)
+// TxDiscardJournal records the reason of transaction discard
+type TxDiscardJournal interface {
+	// addDiscardTx records the reason of discard
+	logDiscardedTx(txHash types.Hash, reason string)
 
-// String returns text status from status code
-func (s *TxStatus) String() string {
-	if s == nil {
-		return ""
-	}
-
-	return txStatusToString[*s]
-}
-
-// Journal records the statuses of transactions added into TxPool
-type Journal interface {
-	// logSuccessfulTx marked the Tx as mined
-	logSuccessfulTx(txHash types.Hash)
-	// logDroppedTx marked the Tx as dropped
-	logDroppedTx(txHash types.Hash)
-	// resetTxStatus removes the status of the tx from journal
-	resetTxStatus(txHash types.Hash)
-	// txStatus returns the Tx status recorded in Journal
-	txStatus(txHash types.Hash) *TxStatus
+	// getReason return the reason of transaction discard
+	GetReason(txHash types.Hash) (*string, error)
 }
 
 // memoryJournal is an implementation of Journal and it saves data in-memory
-type memoryJournal struct {
-	txHashMap sync.Map
+type memoryTxErrorJournal struct {
+	reasons *lru.Cache
 }
 
 // newMemoryJournal initializes memoryJournal
-func newMemoryJournal() *memoryJournal {
-	return &memoryJournal{
-		txHashMap: sync.Map{},
+func newMemoryTxErrorJournal() (*memoryTxErrorJournal, error) {
+	reasons, err := lru.New(TxErrorJournalDefaultSize)
+	if err != nil {
+		return nil, err
 	}
+
+	return &memoryTxErrorJournal{
+		reasons: reasons,
+	}, nil
 }
 
-// logSuccessfulTx marked the Tx as mined
-func (j *memoryJournal) logSuccessfulTx(txHash types.Hash) {
-	j.txHashMap.Store(txHash, true)
+// logDiscardedTx records the reason of transaction discard
+func (j *memoryTxErrorJournal) logDiscardedTx(txHash types.Hash, reason string) {
+	j.reasons.Add(txHash, reason)
 }
 
-// logDroppedTx marked the Tx as dropped
-func (j *memoryJournal) logDroppedTx(txHash types.Hash) {
-	j.txHashMap.Store(txHash, false)
-}
-
-// resetTxStatus removes the status of the tx from journal
-func (j *memoryJournal) resetTxStatus(txHash types.Hash) {
-	j.txHashMap.Delete(txHash)
-}
-
-// txStatus returns the Tx status recorded in Journal
-func (j *memoryJournal) txStatus(txHash types.Hash) *TxStatus {
-	rawValue, ok := j.txHashMap.Load(txHash)
+// getReason returns the reason
+func (j *memoryTxErrorJournal) GetReason(txHash types.Hash) (*string, error) {
+	rawData, ok := j.reasons.Get(txHash)
 	if !ok {
-		return nil
+		return nil, nil
 	}
 
-	value, ok := rawValue.(bool)
+	reason, ok := rawData.(string)
 	if !ok {
-		return nil
+		// should not reach here
+		return nil, fmt.Errorf("wrong type conversion, expected=string actual=%T", rawData)
 	}
 
-	txStatus := TxSuccessful
-	if !value {
-		txStatus = TxDropped
-	}
-
-	return &txStatus
+	return &reason, nil
 }
