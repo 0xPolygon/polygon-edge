@@ -105,7 +105,7 @@ func TestFilterDecode(t *testing.T) {
 				"toBlock": "earliest"
 			}`,
 			&LogQuery{
-				fromBlock: PendingBlockNumber,
+				fromBlock: LatestBlockNumber, // pending = latest
 				toBlock:   EarliestBlockNumber,
 			},
 		},

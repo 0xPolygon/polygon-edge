@@ -11,7 +11,6 @@ import (
 var (
 	ErrHeaderNotFound           = errors.New("header not found")
 	ErrLatestNotFound           = errors.New("latest header not found")
-	ErrPendingBlockNumber       = errors.New("fetching the pending header is not supported")
 	ErrNegativeBlockNumber      = errors.New("invalid argument 0: block number must not be negative")
 	ErrFailedFetchGenesis       = errors.New("error fetching genesis block header")
 	ErrNoDataInContractCreation = errors.New("contract creation without data provided")
@@ -24,7 +23,7 @@ type latestHeaderGetter interface {
 // GetNumericBlockNumber returns block number based on current state or specified number
 func GetNumericBlockNumber(number BlockNumber, store latestHeaderGetter) (uint64, error) {
 	switch number {
-	case LatestBlockNumber:
+	case LatestBlockNumber, PendingBlockNumber:
 		latest := store.Header()
 		if latest == nil {
 			return 0, ErrLatestNotFound
@@ -34,9 +33,6 @@ func GetNumericBlockNumber(number BlockNumber, store latestHeaderGetter) (uint64
 
 	case EarliestBlockNumber:
 		return 0, nil
-
-	case PendingBlockNumber:
-		return 0, ErrPendingBlockNumber
 
 	default:
 		if number < 0 {
@@ -55,7 +51,7 @@ type headerGetter interface {
 // GetBlockHeader returns a header using the provided number
 func GetBlockHeader(number BlockNumber, store headerGetter) (*types.Header, error) {
 	switch number {
-	case LatestBlockNumber:
+	case PendingBlockNumber, LatestBlockNumber:
 		return store.Header(), nil
 
 	case EarliestBlockNumber:
@@ -65,9 +61,6 @@ func GetBlockHeader(number BlockNumber, store headerGetter) (*types.Header, erro
 		}
 
 		return header, nil
-
-	case PendingBlockNumber:
-		return nil, ErrPendingBlockNumber
 
 	default:
 		// Convert the block number from hex to uint64

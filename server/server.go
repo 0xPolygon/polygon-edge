@@ -304,14 +304,28 @@ type txpoolHub struct {
 	*blockchain.Blockchain
 }
 
-func (t *txpoolHub) GetNonce(root types.Hash, addr types.Address) uint64 {
-	// TODO: Use a function that returns only Account
-	snap, err := t.state.NewSnapshotAt(root)
+// getAccountImpl is used for fetching account state from both TxPool and JSON-RPC
+func getAccountImpl(state state.State, root types.Hash, addr types.Address) (*state.Account, error) {
+	snap, err := state.NewSnapshotAt(root)
 	if err != nil {
-		return 0
+		return nil, fmt.Errorf("unable to get snapshot for root '%s': %w", root, err)
 	}
 
 	account, err := snap.GetAccount(addr)
+	if err != nil {
+		return nil, err
+	}
+
+	if account == nil {
+		return nil, jsonrpc.ErrStateNotFound
+	}
+
+	return account, nil
+}
+
+func (t *txpoolHub) GetNonce(root types.Hash, addr types.Address) uint64 {
+	account, err := getAccountImpl(t.state, root, addr)
+
 	if err != nil {
 		return 0
 	}
@@ -320,12 +334,8 @@ func (t *txpoolHub) GetNonce(root types.Hash, addr types.Address) uint64 {
 }
 
 func (t *txpoolHub) GetBalance(root types.Hash, addr types.Address) (*big.Int, error) {
-	snap, err := t.state.NewSnapshotAt(root)
-	if err != nil {
-		return nil, fmt.Errorf("unable to get snapshot for root, %w", err)
-	}
+	account, err := getAccountImpl(t.state, root, addr)
 
-	account, err := snap.GetAccount(addr)
 	if err != nil {
 		return big.NewInt(0), err
 	}
@@ -433,32 +443,12 @@ type jsonRPCHub struct {
 	consensus.BridgeDataProvider
 }
 
-// HELPER + WRAPPER METHODS //
-
 func (j *jsonRPCHub) GetPeers() int {
 	return len(j.Server.Peers())
 }
 
-func (j *jsonRPCHub) getAccountImpl(root types.Hash, addr types.Address) (*state.Account, error) {
-	snap, err := j.state.NewSnapshotAt(root)
-	if err != nil {
-		return nil, err
-	}
-
-	account, err := snap.GetAccount(addr)
-	if err != nil {
-		return nil, err
-	}
-
-	if account == nil {
-		return nil, jsonrpc.ErrStateNotFound
-	}
-
-	return account, nil
-}
-
 func (j *jsonRPCHub) GetAccount(root types.Hash, addr types.Address) (*jsonrpc.Account, error) {
-	acct, err := j.getAccountImpl(root, addr)
+	acct, err := getAccountImpl(j.state, root, addr)
 	if err != nil {
 		return nil, err
 	}
@@ -477,7 +467,7 @@ func (j *jsonRPCHub) GetForksInTime(blockNumber uint64) chain.ForksInTime {
 }
 
 func (j *jsonRPCHub) GetStorage(stateRoot types.Hash, addr types.Address, slot types.Hash) ([]byte, error) {
-	account, err := j.getAccountImpl(stateRoot, addr)
+	account, err := getAccountImpl(j.state, stateRoot, addr)
 	if err != nil {
 		return nil, err
 	}
@@ -493,12 +483,12 @@ func (j *jsonRPCHub) GetStorage(stateRoot types.Hash, addr types.Address, slot t
 }
 
 func (j *jsonRPCHub) GetCode(root types.Hash, addr types.Address) ([]byte, error) {
-	account, err := j.getAccountImpl(root, addr)
+	account, err := getAccountImpl(j.state, root, addr)
 	if err != nil {
 		return nil, err
 	}
 
-	code, ok := j.state.GetCode(account.Root)
+	code, ok := j.state.GetCode(types.BytesToHash(account.CodeHash))
 	if !ok {
 		return nil, fmt.Errorf("unable to fetch code")
 	}
