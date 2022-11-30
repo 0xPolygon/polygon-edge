@@ -276,7 +276,7 @@ func TestDispatcherFuncDecode(t *testing.T) {
 		{
 			"filter",
 			`[{"fromBlock": "pending", "toBlock": "earliest"}]`,
-			LogQuery{fromBlock: PendingBlockNumber, toBlock: EarliestBlockNumber},
+			LogQuery{fromBlock: LatestBlockNumber, toBlock: EarliestBlockNumber}, // pending = latest
 		},
 	}
 

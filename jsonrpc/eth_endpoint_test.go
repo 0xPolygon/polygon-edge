@@ -156,8 +156,7 @@ func TestEth_DecodeTxn(t *testing.T) {
 				store.SetAccount(addr, acc)
 			}
 
-			eth := newTestEthEndpoint(store)
-			res, err := eth.decodeTxn(tt.arg)
+			res, err := DecodeTxn(tt.arg, store)
 			assert.Equal(t, tt.res, res)
 			assert.Equal(t, tt.err, err)
 		})
@@ -220,7 +219,7 @@ func TestEth_GetNextNonce(t *testing.T) {
 			t.Parallel()
 
 			// Grab the nonce
-			nonce, err := eth.getNextNonce(testCase.account, testCase.number)
+			nonce, err := GetNextNonce(testCase.account, testCase.number, eth.store)
 
 			// Assert errors
 			assert.NoError(t, err)
@@ -231,20 +230,22 @@ func TestEth_GetNextNonce(t *testing.T) {
 	}
 }
 
-func newTestEthEndpoint(store ethStore) *Eth {
-	return &Eth{hclog.NewNullLogger(), store, 100, nil, 0}
+func newTestEthEndpoint(store testStore) *Eth {
+	return &Eth{
+		hclog.NewNullLogger(), store, 100, nil, 0,
+	}
 }
 
-func newTestEthEndpointWithPriceLimit(store ethStore, priceLimit uint64) *Eth {
-	return &Eth{hclog.NewNullLogger(), store, 100, nil, priceLimit}
+func newTestEthEndpointWithPriceLimit(store testStore, priceLimit uint64) *Eth {
+	return &Eth{
+		hclog.NewNullLogger(), store, 100, nil, priceLimit,
+	}
 }
 
 func TestEth_HeaderResolveBlock(t *testing.T) {
 	// Set up the mock store
 	store := newMockStore()
 	store.header.Number = 10
-
-	eth := newTestEthEndpoint(store)
 
 	latest := LatestBlockNumber
 	blockNum5 := BlockNumber(5)
@@ -288,7 +289,7 @@ func TestEth_HeaderResolveBlock(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		header, err := eth.getHeaderFromBlockNumberOrHash(c.filter)
+		header, err := GetHeaderFromBlockNumberOrHash(c.filter, store)
 		if c.err {
 			assert.Error(t, err)
 		} else {
