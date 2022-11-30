@@ -298,6 +298,25 @@ type txpoolHub struct {
 	*blockchain.Blockchain
 }
 
+// getAccountImpl is used for fetching account state from both TxPool and JSON-RPC
+func getAccountImpl(state state.State, root types.Hash, addr types.Address) (*state.Account, error) {
+	snap, err := state.NewSnapshotAt(root)
+	if err != nil {
+		return nil, err
+	}
+
+	account, err := snap.GetAccount(addr)
+	if err != nil {
+		return nil, err
+	}
+
+	if account == nil {
+		return nil, jsonrpc.ErrStateNotFound
+	}
+
+	return account, nil
+}
+
 func (t *txpoolHub) GetNonce(root types.Hash, addr types.Address) uint64 {
 	account, err := getAccountImpl(t.state, root, addr)
 
@@ -417,28 +436,8 @@ type jsonRPCHub struct {
 	consensus.Consensus
 }
 
-// HELPER + WRAPPER METHODS //
-
 func (j *jsonRPCHub) GetPeers() int {
 	return len(j.Server.Peers())
-}
-
-func getAccountImpl(state state.State, root types.Hash, addr types.Address) (*state.Account, error) {
-	snap, err := state.NewSnapshotAt(root)
-	if err != nil {
-		return nil, err
-	}
-
-	account, err := snap.GetAccount(addr)
-	if err != nil {
-		return nil, err
-	}
-
-	if account == nil {
-		return nil, jsonrpc.ErrStateNotFound
-	}
-
-	return account, nil
 }
 
 func (j *jsonRPCHub) GetAccount(root types.Hash, addr types.Address) (*jsonrpc.Account, error) {
