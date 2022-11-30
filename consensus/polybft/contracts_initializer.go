@@ -77,7 +77,7 @@ func getInitChildValidatorSetInput(polyBFTConfig PolyBFTConfig) ([]byte, error) 
 		"validatorAddresses": validatorAddresses,
 		"validatorPubkeys":   validatorPubkeys,
 		"validatorStakes":    validatorStakes,
-		"newBLS":             contracts.BLSContract, // address of the deployed BLS contract
+		"newBls":             contracts.BLSContract, // address of the deployed BLS contract
 		"newMessage":         registerMessage,
 		"governance":         polyBFTConfig.Governance,
 	}
