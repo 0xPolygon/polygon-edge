@@ -1,10 +1,12 @@
 package polybft
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"math/big"
 	"time"
 
+	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -44,6 +46,7 @@ type Validator struct {
 	Address types.Address `json:"address"`
 	BlsKey  string        `json:"blsKey"`
 	Balance *big.Int      `json:"balance"`
+	NodeID  string        `json:"-"`
 }
 
 type validatorRaw struct {
@@ -77,6 +80,16 @@ func (v *Validator) UnmarshalJSON(data []byte) error {
 	}
 
 	return nil
+}
+
+// UnmarshalBLSPublicKey unmarshals the hex encoded BLS public key
+func (v *Validator) UnmarshalBLSPublicKey() (*bls.PublicKey, error) {
+	decoded, err := hex.DecodeString(v.BlsKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return bls.UnmarshalPublicKey(decoded)
 }
 
 // DebugConfig is a struct used for test configuration in init genesis

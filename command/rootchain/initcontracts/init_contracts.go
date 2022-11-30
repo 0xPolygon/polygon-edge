@@ -264,21 +264,24 @@ func validatorSetToABISlice(allocs map[types.Address]*chain.GenesisAccount) ([]m
 	validatorSetMap := make([]map[string]interface{}, len(validatorsInfo))
 
 	sort.Slice(validatorsInfo, func(i, j int) bool {
-		return bytes.Compare(validatorsInfo[i].Account.Ecdsa.Address().Bytes(),
-			validatorsInfo[j].Account.Ecdsa.Address().Bytes()) < 0
+		return bytes.Compare(validatorsInfo[i].Address.Bytes(),
+			validatorsInfo[j].Address.Bytes()) < 0
 	})
 
 	for i, validatorInfo := range validatorsInfo {
-		addr := types.Address(validatorInfo.Account.Ecdsa.Address())
+		genesisBalance, err := chain.GetGenesisAccountBalance(validatorInfo.Address, allocs)
+		if err != nil {
+			return nil, err
+		}
 
-		genesisBalance, err := chain.GetGenesisAccountBalance(addr, allocs)
+		blsKey, err := validatorInfo.UnmarshallBLSPublicKey()
 		if err != nil {
 			return nil, err
 		}
 
 		validatorSetMap[i] = map[string]interface{}{
-			"_address":    addr,
-			"blsKey":      validatorInfo.Account.Bls.PublicKey().ToBigInt(),
+			"_address":    validatorInfo.Address,
+			"blsKey":      blsKey.ToBigInt(),
 			"votingPower": chain.ConvertWeiToTokensAmount(genesisBalance),
 		}
 	}

@@ -258,7 +258,7 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 
 		// premine all the validators by default
 		for _, validator := range validators {
-			args = append(args, "--premine", validator.Account.Ecdsa.Address().String())
+			args = append(args, "--premine", validator.Address.String())
 		}
 
 		if cluster.Config.BootnodeCount > 0 {
