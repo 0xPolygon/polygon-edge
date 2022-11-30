@@ -373,7 +373,7 @@ func GetGenesisAccountBalance(address types.Address, allocations map[types.Addre
 		return genesisAcc.Balance, nil
 	}
 
-	return big.NewInt(0), fmt.Errorf("genesis account %s is not found among genesis allocations", address)
+	return nil, fmt.Errorf("genesis account %s is not found among genesis allocations", address)
 }
 
 // ConvertWeiToTokensAmount converts provided wei amount to tokens amount

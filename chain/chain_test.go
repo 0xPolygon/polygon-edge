@@ -177,7 +177,7 @@ func TestGetGenesisAccountBalance(t *testing.T) {
 			name:            "Query non-existing account",
 			address:         testAddr,
 			allocs:          nil,
-			expectedBalance: big.NewInt(0),
+			expectedBalance: nil,
 			shouldFail:      true,
 		},
 	}
