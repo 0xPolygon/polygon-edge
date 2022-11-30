@@ -44,7 +44,7 @@ var (
 	// ABI
 	stateTransferEventABI = abi.MustNewEvent("event StateSynced(uint256 indexed id, address indexed sender, address indexed receiver, bytes data)")   //nolint:lll
 	exitEventABI          = abi.MustNewEvent("event L2StateSynced(uint256 indexed id, address indexed sender, address indexed receiver, bytes data)") //nolint:lll
-	exitEventABIType      = abi.MustNewType("tuple(uint256 id, address sender, address receiver, bytes data)")
+	ExitEventABIType      = abi.MustNewType("tuple(uint256 id, address sender, address receiver, bytes data)")
 )
 
 const (

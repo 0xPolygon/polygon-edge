@@ -11,6 +11,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/state"
 	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
@@ -172,6 +173,56 @@ func TestBLSDebugTest(t *testing.T) {
 		"bitmap":          bm,
 	}
 	submitInput, err := rootchainArtifact.Abi.GetMethod("submit").Encode(params)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	exits := make([]*polybft.ExitEvent, 10)
+	for i := range exits {
+		exits[i] = &polybft.ExitEvent{
+			ID:          uint64(i),
+			Sender:      ethgo.Address{uint8(i)},
+			Receiver:    ethgo.Address{uint8(i)},
+			Data:        []byte{uint8(i)},
+			EpochNumber: 1,
+			BlockNumber: 0,
+		}
+	}
+	proofExitEvent, err := polybft.ExitEventABIType.Encode(exits[3])
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	trie, err := polybft.CreateExitTree(exits)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	proof, err := trie.GenerateProofForLeaf(proofExitEvent, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	leafIndex, err := trie.LeafIndex(proofExitEvent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	/*
+	   bytes32 eventRoot,
+	   bytes32 leaf,
+	   uint256 leafIndex,
+	   bytes32[] calldata proof
+
+	*/
+
+	eventMembershipParams := map[string]interface{}{
+		"eventRoot": types.Hash{123},
+		//"eventRoot": trie.Hash(),
+		"leaf":      proofExitEvent,
+		"leafIndex": leafIndex,
+		"proof":     proof,
+	}
+	spew.Dump(eventMembershipParams)
+	submitInput, err = rootchainArtifact.Abi.GetMethod("getEventMembershipByStateRoot").Encode(eventMembershipParams)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -893,7 +893,7 @@ func (c *consensusRuntime) GenerateExitProof(exitID, epoch, checkpointBlock uint
 		return nil, err
 	}
 
-	e, err := exitEventABIType.Encode(exitEvent)
+	e, err := ExitEventABIType.Encode(exitEvent)
 	if err != nil {
 		return nil, err
 	}
@@ -1278,18 +1278,21 @@ func validateVote(vote *MessageSignature, epoch *epochMetadata) error {
 	return nil
 }
 
+func CreateExitTree(exitEvents []*ExitEvent) (*MerkleTree, error) {
+	return createExitTree(exitEvents)
+}
+
 // createExitTree creates an exit event merkle tree from provided exit events
 func createExitTree(exitEvents []*ExitEvent) (*MerkleTree, error) {
 	numOfEvents := len(exitEvents)
 	data := make([][]byte, numOfEvents)
 
 	for i := 0; i < numOfEvents; i++ {
-		b, err := exitEventABIType.Encode(exitEvents[i])
+		b, err := ExitEventABIType.Encode(exitEvents[i])
 		if err != nil {
 			return nil, err
 		}
-
-		data[i] = b
+		data[i] = b //crypto.Keccak256(b)
 	}
 
 	return NewMerkleTree(data)

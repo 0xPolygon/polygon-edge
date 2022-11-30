@@ -2154,7 +2154,7 @@ func setupExitEventsForProofVerification(t *testing.T, state *State,
 			e := &ExitEvent{index, ethgo.ZeroAddress, ethgo.ZeroAddress, []byte{0, 1}, 1, i}
 			require.NoError(t, state.insertExitEvent(e))
 
-			b, err := exitEventABIType.Encode(e)
+			b, err := ExitEventABIType.Encode(e)
 
 			require.NoError(t, err)
 
