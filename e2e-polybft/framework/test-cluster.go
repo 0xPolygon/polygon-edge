@@ -226,16 +226,18 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		require.NoError(t, err)
 	}
 
-	// In case no validators are specified in opts, all nodes will be validators
+	// in case no validators are specified in opts, all nodes will be validators
 	if cluster.Config.ValidatorSetSize == 0 {
 		cluster.Config.ValidatorSetSize = uint64(validatorsCount)
 	}
 
+	genesisPath := path.Join(tmpDir, "genesis.json")
 	{
+		// run genesis configuration population
 		args := []string{
 			"genesis",
 			"--consensus", "polybft",
-			"--dir", path.Join(tmpDir, "genesis.json"),
+			"--dir", genesisPath,
 			"--contracts-path", defaultContractsPath,
 			"--epoch-size", "10",
 			"--premine", "0x0000000000000000000000000000000000000000",
@@ -251,10 +253,15 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			args = append(args, "--bridge")
 		}
 
-		if cluster.Config.BootnodeCount > 0 {
-			validators, err := genesis.ReadValidatorsByRegexp(cluster.Config.TmpDir, cluster.Config.ValidatorPrefix)
-			require.NoError(t, err)
+		validators, err := genesis.ReadValidatorsByRegexp(cluster.Config.TmpDir, cluster.Config.ValidatorPrefix)
+		require.NoError(t, err)
 
+		// premine all the validators by default
+		for _, validator := range validators {
+			args = append(args, "--premine", validator.Account.Ecdsa.Address().String())
+		}
+
+		if cluster.Config.BootnodeCount > 0 {
 			cnt := cluster.Config.BootnodeCount
 			if len(validators) < cnt {
 				cnt = len(validators)
@@ -273,6 +280,11 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 
 		// run cmd init-genesis with all the arguments
 		err = cluster.cmdRun(args...)
+		require.NoError(t, err)
+	}
+
+	if cluster.Config.HasBridge {
+		err := cluster.Bridge.deployRootchainContracts(genesisPath)
 		require.NoError(t, err)
 	}
 

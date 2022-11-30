@@ -2,7 +2,9 @@ package framework
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
+	"io"
 	"os/exec"
 	"testing"
 
@@ -52,26 +54,22 @@ func (t *TestBridge) Start() error {
 		return err
 	}
 
-	initContracts := []string{
+	return nil
+}
+
+func (t *TestBridge) deployRootchainContracts(genesisPath string) error {
+	args := []string{
 		"rootchain",
 		"init-contracts",
 		"--path", t.clusterConfig.ContractsDir,
 		"--validator-path", t.clusterConfig.TmpDir,
 		"--validator-prefix", t.clusterConfig.ValidatorPrefix,
+		"--genesis-path", genesisPath,
 	}
 
-	var stdErr bytes.Buffer
-
-	cmd := exec.Command(resolveBinary(), initContracts...) //nolint:gosec
-	cmd.Stderr = &stdErr
-	cmd.Stdout = stdout
-
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("%w: %s", err, stdErr.String())
-	}
-
-	if stdErr.Len() > 0 {
-		return fmt.Errorf("failed to deploy contracts to the root chain: %s", stdErr.String())
+	err := runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("bridge"))
+	if err != nil {
+		return fmt.Errorf("failed to deploy rootchain contracts: %w", err)
 	}
 
 	return nil
@@ -83,4 +81,23 @@ func (t *TestBridge) Stop() {
 	}
 
 	t.node = nil
+}
+
+// runCommand executes command with given arguments
+func runCommand(binary string, args []string, stdout io.Writer) error {
+	var stdErr bytes.Buffer
+
+	cmd := exec.Command(binary, args...)
+	cmd.Stderr = &stdErr
+	cmd.Stdout = stdout
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("%w: %s", err, stdErr.String())
+	}
+
+	if stdErr.Len() > 0 {
+		return errors.New(stdErr.String())
+	}
+
+	return nil
 }
