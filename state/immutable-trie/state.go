@@ -104,19 +104,23 @@ func (s *State) AddState(root types.Hash, t *Trie) {
 
 func (s *State) setState(s1 *State) {
 	m := s.m
-	m.Lock()
-	defer m.Unlock()
-
 	m1 := s1.m
-	m1.RLock()
-	defer m1.RUnlock()
 
+	m.Lock()
+
+	m1.RLock()
 	*s = *s1
+	m1.RUnlock()
+
+	m.Unlock()
 }
 
 func (s *State) setForTrie(t *Trie) {
-	s.m.RLock()
-	defer s.m.RUnlock()
+	t.state.m.Lock()
 
+	s.m.RLock()
 	t.state = s
+	s.m.RUnlock()
+
+	t.state.m.Unlock()
 }
