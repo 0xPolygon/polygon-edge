@@ -394,6 +394,7 @@ func (c *consensusRuntime) FSM() error {
 	c.lock.Lock()
 	c.fsm = ff
 	c.lock.Unlock()
+
 	return nil
 }
 
@@ -999,6 +1000,7 @@ func (c *consensusRuntime) IsValidBlock(proposal []byte) bool {
 func (c *consensusRuntime) IsValidSender(msg *proto.Message) bool {
 	c.lock.Lock()
 	defer c.lock.Unlock()
+
 	err := c.fsm.ValidateSender(msg)
 	if err != nil {
 		c.logger.Error("invalid sender", "error", err)
@@ -1012,6 +1014,7 @@ func (c *consensusRuntime) IsValidSender(msg *proto.Message) bool {
 func (c *consensusRuntime) IsProposer(id []byte, height, round uint64) bool {
 	c.lock.Lock()
 	defer c.lock.Unlock()
+
 	nextProposer, err := c.fsm.validators.CalcProposer(round)
 	if err != nil {
 		c.logger.Error("cannot calculate proposer", "error", err)
