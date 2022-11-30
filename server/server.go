@@ -481,7 +481,7 @@ func (j *jsonRPCHub) GetCode(root types.Hash, addr types.Address) ([]byte, error
 		return nil, err
 	}
 
-	code, ok := j.state.GetCode(account.Root)
+	code, ok := j.state.GetCode(types.BytesToHash(account.CodeHash))
 	if !ok {
 		return nil, fmt.Errorf("unable to fetch code")
 	}
