@@ -302,7 +302,7 @@ type txpoolHub struct {
 func getAccountImpl(state state.State, root types.Hash, addr types.Address) (*state.Account, error) {
 	snap, err := state.NewSnapshotAt(root)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unable to get snapshot for root '%s': %w", root, err)
 	}
 
 	account, err := snap.GetAccount(addr)
