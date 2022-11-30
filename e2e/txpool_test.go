@@ -583,6 +583,7 @@ func Test_TxDropped(t *testing.T) {
 	})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+
 	t.Cleanup(func() {
 		cancel()
 	})
