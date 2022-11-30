@@ -3,6 +3,7 @@ package genesis
 import (
 	"fmt"
 	"io/ioutil"
+	"math/big"
 	"os"
 	"path/filepath"
 	"sort"
@@ -40,6 +41,11 @@ func (g *GenesisGenError) GetType() string {
 	return g.errorType
 }
 
+type premineInfo struct {
+	address types.Address
+	balance *big.Int
+}
+
 // verifyGenesisExistence checks if the genesis file at the specified path is present
 func verifyGenesisExistence(genesisPath string) *GenesisGenError {
 	_, err := os.Stat(genesisPath)
@@ -61,34 +67,33 @@ func verifyGenesisExistence(genesisPath string) *GenesisGenError {
 }
 
 // fillPremineMap fills the premine map for the genesis.json file with passed in balances and accounts
-func fillPremineMap(
-	premineMap map[types.Address]*chain.GenesisAccount,
-	premine []string,
-) error {
-	for _, prem := range premine {
-		var addr types.Address
-
-		val := command.DefaultPremineBalance
-
-		if indx := strings.Index(prem, ":"); indx != -1 {
-			// <addr>:<balance>
-			addr, val = types.StringToAddress(prem[:indx]), prem[indx+1:]
-		} else {
-			// <addr>
-			addr = types.StringToAddress(prem)
-		}
-
-		amount, err := types.ParseUint256orHex(&val)
-		if err != nil {
-			return fmt.Errorf("failed to parse amount %s: %w", val, err)
-		}
-
-		premineMap[addr] = &chain.GenesisAccount{
-			Balance: amount,
+func fillPremineMap(premineMap map[types.Address]*chain.GenesisAccount, premineInfos []*premineInfo) {
+	for _, premine := range premineInfos {
+		premineMap[premine.address] = &chain.GenesisAccount{
+			Balance: premine.balance,
 		}
 	}
+}
 
-	return nil
+// parsePremineInfo parses provided premine information and returns premine address and premine balance
+func parsePremineInfo(premineInfoRaw string) (*premineInfo, error) {
+	address := types.ZeroAddress
+	val := command.DefaultPremineBalance
+
+	if delimiterIdx := strings.Index(premineInfoRaw, ":"); delimiterIdx != -1 {
+		// <addr>:<balance>
+		address, val = types.StringToAddress(premineInfoRaw[:delimiterIdx]), premineInfoRaw[delimiterIdx+1:]
+	} else {
+		// <addr>
+		address = types.StringToAddress(premineInfoRaw)
+	}
+
+	amount, err := types.ParseUint256orHex(&val)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse amount %s: %w", val, err)
+	}
+
+	return &premineInfo{address: address, balance: amount}, nil
 }
 
 type GenesisTarget struct {

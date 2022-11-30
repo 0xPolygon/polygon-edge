@@ -198,7 +198,6 @@ func setFlags(cmd *cobra.Command) {
 			defaultBridge,
 			"enabling bridge, default is not enabled",
 		)
-		cmd.MarkFlagsMutuallyExclusive(premineFlag, premineValidatorsFlag)
 		cmd.MarkFlagsMutuallyExclusive(validatorsFlag, premineValidatorsFlag)
 	}
 }
