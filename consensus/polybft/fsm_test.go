@@ -1150,7 +1150,7 @@ func TestFSM_StateTransactionsEndOfSprint(t *testing.T) {
 	var commitments [commitmentsCount]*CommitmentMessage
 
 	for i := 0; i < commitmentsCount; i++ {
-		commitment, commitmentMessage, sse := buildCommitmentAndStateSyncs(t, eventsSize, uint64(3), bundleSize, eventsSize*uint64(i))
+		commitment, commitmentMessage, sse := buildCommitmentAndStateSyncs(t, eventsSize, uint64(3), eventsSize*uint64(i))
 		commitments[i] = commitmentMessage
 
 		for j := uint64(0); j < commitmentMessage.BundlesCount(); j++ {
@@ -1211,7 +1211,7 @@ func TestFSM_StateTransactionsEndOfSprint(t *testing.T) {
 func TestFSM_VerifyStateTransaction_NotEndOfSprint(t *testing.T) {
 	t.Parallel()
 
-	cm, _, sse := buildCommitmentAndStateSyncs(t, 10, uint64(3), uint64(1), 2)
+	cm, _, sse := buildCommitmentAndStateSyncs(t, 10, uint64(3), 2)
 	f := &fsm{
 		isEndOfSprint: false,
 		config:        &PolyBFTConfig{},
@@ -1242,8 +1242,8 @@ func TestFSM_VerifyStateTransaction_ValidBothTypesOfStateTransactions(t *testing
 	)
 
 	validators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E"})
-	commitments[0], commitmentMessages[0], stateSyncs[0] = buildCommitmentAndStateSyncs(t, 10, uint64(3), uint64(1), 2)
-	commitments[1], commitmentMessages[1], stateSyncs[1] = buildCommitmentAndStateSyncs(t, 10, uint64(3), uint64(1), 12)
+	commitments[0], commitmentMessages[0], stateSyncs[0] = buildCommitmentAndStateSyncs(t, 10, uint64(3), 2)
+	commitments[1], commitmentMessages[1], stateSyncs[1] = buildCommitmentAndStateSyncs(t, 10, uint64(3), 12)
 
 	executeForValidators := func(aliases ...string) error {
 		for i, x := range commitmentMessages {
@@ -1323,7 +1323,7 @@ func TestFSM_VerifyStateTransaction_QuorumNotReached(t *testing.T) {
 	t.Parallel()
 
 	validators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
-	_, commitmentMessage, _ := buildCommitmentAndStateSyncs(t, 10, uint64(3), uint64(1), 2)
+	_, commitmentMessage, _ := buildCommitmentAndStateSyncs(t, 10, uint64(3), 2)
 	f := &fsm{
 		isEndOfSprint: true,
 		config:        &PolyBFTConfig{},
@@ -1354,7 +1354,7 @@ func TestFSM_VerifyStateTransaction_InvalidSignature(t *testing.T) {
 	t.Parallel()
 
 	validators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
-	_, commitmentMessage, _ := buildCommitmentAndStateSyncs(t, 10, uint64(3), uint64(1), 2)
+	_, commitmentMessage, _ := buildCommitmentAndStateSyncs(t, 10, uint64(3), 2)
 	f := &fsm{
 		isEndOfSprint: true,
 		config:        &PolyBFTConfig{},
@@ -1393,7 +1393,7 @@ func TestFSM_VerifyStateTransaction_BundlesNotInSequentialOrder(t *testing.T) {
 	t.Parallel()
 
 	validators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
-	commitment, commitmentMessage, stateSyncs := buildCommitmentAndStateSyncs(t, 10, uint64(3), uint64(2), 2)
+	commitment, commitmentMessage, stateSyncs := buildCommitmentAndStateSyncs(t, 10, uint64(3), 2)
 
 	hash, err := commitmentMessage.Hash()
 	require.NoError(t, err)
@@ -1432,7 +1432,7 @@ func TestFSM_VerifyStateTransaction_TwoCommitmentMessages(t *testing.T) {
 	t.Parallel()
 
 	validators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
-	_, commitmentMessage, _ := buildCommitmentAndStateSyncs(t, 10, uint64(3), uint64(1), 2)
+	_, commitmentMessage, _ := buildCommitmentAndStateSyncs(t, 10, uint64(3), 2)
 
 	validatorSet, err := NewValidatorSet(validators.getPublicIdentities(), hclog.NewNullLogger())
 	require.NoError(t, err)
@@ -1471,7 +1471,7 @@ func TestFSM_VerifyStateTransaction_ProofError(t *testing.T) {
 	t.Parallel()
 
 	validators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
-	commitment, commitmentMessage, stateSyncs := buildCommitmentAndStateSyncs(t, 10, uint64(3), uint64(2), 2)
+	commitment, commitmentMessage, stateSyncs := buildCommitmentAndStateSyncs(t, 10, uint64(3), 2)
 
 	proof := commitment.MerkleTree.GenerateProof(0, 0)
 	bf := &BundleProof{
@@ -1507,7 +1507,7 @@ func TestFSM_VerifyStateTransaction_CommitmentDoesNotExist(t *testing.T) {
 	t.Parallel()
 
 	validators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
-	commitment, commitmentMessage, stateSyncs := buildCommitmentAndStateSyncs(t, 10, uint64(3), uint64(1), 2)
+	commitment, commitmentMessage, stateSyncs := buildCommitmentAndStateSyncs(t, 10, uint64(3), 2)
 	hash, err := commitmentMessage.Hash()
 	require.NoError(t, err)
 	signature := createSignature(t, validators.getPrivateIdentities("A", "B", "C", "D", "E"), hash)

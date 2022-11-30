@@ -45,7 +45,7 @@ func TestConsensusRuntime_GetVotes(t *testing.T) {
 		},
 	}
 
-	commitment, _, _ := buildCommitmentAndStateSyncs(t, stateSyncsCount, epoch, bundleSize, 0)
+	commitment, _, _ := buildCommitmentAndStateSyncs(t, stateSyncsCount, epoch, 0)
 
 	quorumSize := validatorAccounts.toValidatorSetWithError(t).quorumSize
 	require.NoError(t, state.insertEpoch(epoch))
@@ -84,7 +84,7 @@ func TestConsensusRuntime_GetVotesError(t *testing.T) {
 
 	state := newTestState(t)
 	runtime := &consensusRuntime{state: state}
-	commitment, _, _ := buildCommitmentAndStateSyncs(t, 5, epoch, bundleSize, startIndex)
+	commitment, _, _ := buildCommitmentAndStateSyncs(t, 5, epoch, startIndex)
 	hash, err := commitment.Hash()
 	require.NoError(t, err)
 	_, err = runtime.state.getMessageVotes(epoch, hash.Bytes())
@@ -645,7 +645,6 @@ func TestConsensusRuntime_FSM_EndOfEpoch_BuildRegisterCommitment_And_Uptime(t *t
 	assert.NotNil(t, fsm.proposerCommitmentToRegister)
 	assert.Equal(t, fromIndex, fsm.proposerCommitmentToRegister.Message.FromIndex)
 	assert.Equal(t, toIndex, fsm.proposerCommitmentToRegister.Message.ToIndex)
-	assert.Equal(t, uint64(bundleSize), fsm.proposerCommitmentToRegister.Message.BundleSize)
 	assert.Equal(t, trie.Hash(), fsm.proposerCommitmentToRegister.Message.MerkleRootHash)
 
 	systemStateMock.AssertExpectations(t)
@@ -1629,7 +1628,6 @@ func TestConsensusRuntime_FSM_EndOfEpoch_OnBlockInserted(t *testing.T) {
 	assert.NotNil(t, fsm.proposerCommitmentToRegister)
 	assert.Equal(t, fromIndex, fsm.proposerCommitmentToRegister.Message.FromIndex)
 	assert.Equal(t, toIndex, fsm.proposerCommitmentToRegister.Message.ToIndex)
-	assert.Equal(t, uint64(stateSyncBundleSize), fsm.proposerCommitmentToRegister.Message.BundleSize)
 	assert.Equal(t, trie.Hash(), fsm.proposerCommitmentToRegister.Message.MerkleRootHash)
 	assert.NotNil(t, fsm.proposerCommitmentToRegister.AggSignature)
 	assert.True(t, fsm.isEndOfEpoch)
@@ -1662,13 +1660,12 @@ func TestConsensusRuntime_FSM_EndOfEpoch_OnBlockInserted(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, fromIndex, commitmentMsgFromDB.Message.FromIndex)
 	assert.Equal(t, toIndex, commitmentMsgFromDB.Message.ToIndex)
-	assert.Equal(t, uint64(stateSyncBundleSize), commitmentMsgFromDB.Message.BundleSize)
 	assert.Equal(t, trie.Hash(), commitmentMsgFromDB.Message.MerkleRootHash)
 	assert.NotNil(t, commitmentMsgFromDB.AggSignature)
 
 	bundles, err := state.getBundles(fromIndex, maxBundlesPerSprint)
 	assert.NoError(t, err)
-	assert.Equal(t, 10, len(bundles))
+	assert.Equal(t, 10, len(bundles[0].StateSyncs))
 
 	systemStateMock.AssertExpectations(t)
 	blockchainMock.AssertExpectations(t)

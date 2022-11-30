@@ -34,6 +34,10 @@ var (
 		"bytes32[] proof, " +
 		"tuple(uint256 id, address sender, address receiver, bytes data, bool skip)[] objs)")
 
+	executeStateSyncABIMethod, _ = abi.NewMethod("function execute(" +
+		"bytes32[] proof, " +
+		"tuple(uint256 id, address sender, address receiver, bytes data, bool skip) stateSync)")
+
 	validatorsUptimeMethod, _ = abi.NewMethod("function uptime(bytes data)")
 )
 
@@ -205,7 +209,7 @@ type CommitmentMessage struct {
 	FromIndex      uint64
 	ToIndex        uint64
 	Epoch          uint64
-	BundleSize     uint64
+	// BundleSize     uint64
 }
 
 // NewCommitmentMessage creates a new commitment message based on provided merkle root hash
@@ -217,7 +221,7 @@ func NewCommitmentMessage(merkleRootHash types.Hash, fromIndex, toIndex, bundleS
 		MerkleRootHash: merkleRootHash,
 		FromIndex:      fromIndex,
 		ToIndex:        toIndex,
-		BundleSize:     bundleSize,
+		// BundleSize:     bundleSize,
 	}
 }
 
@@ -240,7 +244,7 @@ func (cm *CommitmentMessage) Hash() (types.Hash, error) {
 
 // GetBundleIdxFromStateSyncEventIdx resolves bundle index based on given state sync event index
 func (cm *CommitmentMessage) GetBundleIdxFromStateSyncEventIdx(stateSyncEventIdx uint64) uint64 {
-	return (stateSyncEventIdx - cm.FromIndex) / cm.BundleSize
+	return (stateSyncEventIdx - cm.FromIndex)
 }
 
 // GetFirstStateSyncIndexFromBundleIndex returns first state sync index based on bundle size and given bundle index
@@ -250,7 +254,7 @@ func (cm *CommitmentMessage) GetFirstStateSyncIndexFromBundleIndex(bundleIndex u
 		return cm.FromIndex
 	}
 
-	return (cm.BundleSize * bundleIndex) + cm.FromIndex
+	return (bundleIndex) + cm.FromIndex
 }
 
 // ContainsStateSync checks whether CommitmentMessage contains state sync event identified by index,
@@ -261,7 +265,7 @@ func (cm *CommitmentMessage) ContainsStateSync(stateSyncIndex uint64) bool {
 
 // BundlesCount calculates bundles count contained in given CommitmentMessge
 func (cm *CommitmentMessage) BundlesCount() uint64 {
-	return (cm.ToIndex - cm.FromIndex + cm.BundleSize) / cm.BundleSize
+	return cm.ToIndex - cm.FromIndex
 }
 
 // VerifyProof validates given bundle proof against merkle trie root hash contained in the CommitmentMessage
@@ -278,6 +282,20 @@ func (cm CommitmentMessage) VerifyProof(bundle *BundleProof) error {
 	bundleIndex := cm.GetBundleIdxFromStateSyncEventIdx(bundle.StateSyncs[0].ID)
 
 	return VerifyProof(bundleIndex, hash, bundle.Proof, cm.MerkleRootHash)
+}
+
+// VerifyProof validates given bundle proof against merkle trie root hash contained in the CommitmentMessage
+func (cm CommitmentMessage) VerifyStateSyncProof(stateSyncProof *types.StateSyncProof) error {
+	if stateSyncProof.StateSync == nil {
+		return errors.New("no state sync event")
+	}
+
+	hash, err := stateSyncABIType.Encode(stateSyncProof.StateSync)
+	if err != nil {
+		return err
+	}
+
+	return VerifyProof(stateSyncProof.StateSync.ID, hash, stateSyncProof.Proof, cm.MerkleRootHash)
 }
 
 var _ StateTransactionInput = &CommitmentMessageSigned{}

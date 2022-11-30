@@ -523,7 +523,6 @@ func createTestCommitmentMessage(fromIndex uint64) (*CommitmentMessageSigned, er
 		MerkleRootHash: tree.Hash(),
 		FromIndex:      fromIndex,
 		ToIndex:        fromIndex + stateSyncMainBundleSize - 1,
-		BundleSize:     2,
 	}
 
 	return &CommitmentMessageSigned{
