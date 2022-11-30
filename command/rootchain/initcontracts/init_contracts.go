@@ -274,7 +274,7 @@ func validatorSetToABISlice(allocs map[types.Address]*chain.GenesisAccount) ([]m
 			return nil, err
 		}
 
-		blsKey, err := validatorInfo.UnmarshallBLSPublicKey()
+		blsKey, err := validatorInfo.UnmarshalBLSPublicKey()
 		if err != nil {
 			return nil, err
 		}

@@ -276,7 +276,7 @@ func generateExtraDataPolyBft(validators []*polybft.Validator) ([]byte, error) {
 	}
 
 	for i, validator := range validators {
-		blsKey, err := validator.UnmarshallBLSPublicKey()
+		blsKey, err := validator.UnmarshalBLSPublicKey()
 		if err != nil {
 			return nil, err
 		}
