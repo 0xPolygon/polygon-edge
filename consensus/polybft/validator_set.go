@@ -501,7 +501,7 @@ func (v *validatorSet) Copy() *validatorSet {
 func validatorListCopy(valList []*ValidatorAccount) []*ValidatorAccount {
 	valCopy := make([]*ValidatorAccount, len(valList))
 	for i, val := range valList {
-		valCopy[i] = NewValidator(val.Metadata, val.ProposerPriority)
+		valCopy[i] = NewValidator(val.Metadata.Copy(), val.ProposerPriority)
 	}
 
 	return valCopy
