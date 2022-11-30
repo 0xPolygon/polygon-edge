@@ -177,8 +177,8 @@ func TestEth_GetTransactionReceipt(t *testing.T) {
 
 		res, err := eth.GetTransactionReceipt(hash1)
 
-		assert.NoError(t, err)
 		assert.Nil(t, res)
+		assert.Nil(t, err)
 	})
 
 	t.Run("returns the reason of discard", func(t *testing.T) {
@@ -195,8 +195,8 @@ func TestEth_GetTransactionReceipt(t *testing.T) {
 
 		res, err := eth.GetTransactionReceipt(hash1)
 
-		assert.NoError(t, err)
-		assert.Equal(t, reason, res)
+		assert.Nil(t, res)
+		assert.Error(t, errors.New(reason), err)
 	})
 
 	t.Run("returns correct receipt data for found transaction", func(t *testing.T) {

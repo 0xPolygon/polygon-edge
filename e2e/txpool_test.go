@@ -3,6 +3,7 @@ package e2e
 import (
 	"context"
 	"crypto/ecdsa"
+	"encoding/json"
 	"errors"
 	"math/big"
 	"testing"
@@ -581,35 +582,36 @@ func Test_TxDropped(t *testing.T) {
 		Nonce:    &nonce2,
 	})
 
-	// send a transaction that can be included in a block
-	hash0 := sendTx(t, &framework.PreparedTransaction{
-		From:     senderAddr,
-		To:       &receiverAddr,
-		GasPrice: big.NewInt(10000),
-		Gas:      1000000,
-		Value:    framework.EthToWei(1),
-		Nonce:    &nonce0,
-	})
-
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	t.Cleanup(func() {
 		cancel()
 	})
 
-	tests.WaitForReceipt(ctx, ibftManager.GetServer(0).JSONRPC().Eth(), hash0)
+	// send a transaction that can be included in a block
+	_, err := ibftManager.
+		GetServer(0).
+		SendRawTx(ctx, &framework.PreparedTransaction{
+			From:     senderAddr,
+			To:       &receiverAddr,
+			GasPrice: big.NewInt(10000),
+			Gas:      1000000,
+			Value:    framework.EthToWei(1),
+			Nonce:    &nonce0,
+		}, senderKey)
 
-	srv := ibftManager.GetServer(0)
-	res := srv.CallJSONRPC(map[string]interface{}{
-		"id":      1,
-		"jsonrpc": "2.0",
-		"method":  "eth_getTransactionReceipt",
-		"params": []interface{}{
-			txHash1.String(),
-		},
-	})
+	assert.NoError(t, err)
 
-	result, ok := res["result"].(string)
+	// Get receipt of target tx
+	// should return error
+	res, err := ibftManager.GetServer(0).JSONRPC().Eth().GetTransactionReceipt(txHash1)
+
+	assert.Nil(t, res)
+
+	errObj := make(map[string]interface{})
+	assert.NoError(t, json.Unmarshal([]byte(err.Error()), &errObj))
+
+	message, ok := errObj["message"].(string)
 
 	assert.True(t, ok)
-	assert.Equal(t, "Tx discarded by reaching txpool size limit", result)
+	assert.Equal(t, "Tx discarded by reaching txpool size limit", message)
 }

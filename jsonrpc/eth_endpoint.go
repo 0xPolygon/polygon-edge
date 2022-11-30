@@ -309,7 +309,7 @@ func (e *Eth) GetTransactionReceipt(hash types.Hash) (interface{}, error) {
 		}
 
 		if reason != nil {
-			return *reason, nil
+			return nil, errors.New(*reason)
 		}
 
 		return nil, nil
