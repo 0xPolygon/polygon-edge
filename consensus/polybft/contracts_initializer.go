@@ -22,7 +22,7 @@ const (
 
 var (
 	childValidatorSetInitializer, _ = abi.NewMethod("function initialize(" +
-		"tuple(uint256 epochReward, uint256 minStake, uint256 minDelegation, uint256 epochSize) initParams," +
+		"tuple(uint256 epochReward, uint256 minStake, uint256 minDelegation, uint256 epochSize) init," +
 		"address[] validatorAddresses," +
 		"uint256[4][] validatorPubkeys," +
 		"uint256[] validatorStakes," +
@@ -68,11 +68,11 @@ func getInitChildValidatorSetInput(polyBFTConfig PolyBFTConfig) ([]byte, error) 
 	}
 
 	params := map[string]interface{}{
-		"initParams": map[string]interface{}{
-			"epochReward":   epochReward,
-			"minStake":      minStake,
-			"minDelegation": minDelegation,
-			"epochSize":     polyBFTConfig.EpochSize,
+		"init": map[string]interface{}{
+			"epochReward":   big.NewInt(epochReward),
+			"minStake":      big.NewInt(minStake),
+			"minDelegation": big.NewInt(minDelegation),
+			"epochSize":     new(big.Int).SetUint64(polyBFTConfig.EpochSize),
 		},
 		"validatorAddresses": validatorAddresses,
 		"validatorPubkeys":   validatorPubkeys,
