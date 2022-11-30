@@ -936,7 +936,7 @@ func opSelfDestruct(c *state) {
 	}
 
 	c.host.Selfdestruct(c.msg.Address, address)
-	c.halt()
+	c.Halt()
 }
 
 func opJump(c *state) {
@@ -1044,7 +1044,7 @@ func opLog(size int) instruction {
 }
 
 func opStop(c *state) {
-	c.halt()
+	c.Halt()
 }
 
 func opCreate(op OpCode) instruction {
@@ -1396,7 +1396,7 @@ func opHalt(op OpCode) instruction {
 		if op == REVERT {
 			c.exit(errRevert)
 		} else {
-			c.halt()
+			c.Halt()
 		}
 	}
 }

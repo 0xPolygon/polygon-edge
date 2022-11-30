@@ -26,6 +26,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/state"
 	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
+	"github.com/0xPolygon/polygon-edge/state/runtime/tracer"
 	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
@@ -297,14 +298,28 @@ type txpoolHub struct {
 	*blockchain.Blockchain
 }
 
-func (t *txpoolHub) GetNonce(root types.Hash, addr types.Address) uint64 {
-	// TODO: Use a function that returns only Account
-	snap, err := t.state.NewSnapshotAt(root)
+// getAccountImpl is used for fetching account state from both TxPool and JSON-RPC
+func getAccountImpl(state state.State, root types.Hash, addr types.Address) (*state.Account, error) {
+	snap, err := state.NewSnapshotAt(root)
 	if err != nil {
-		return 0
+		return nil, fmt.Errorf("unable to get snapshot for root '%s': %w", root, err)
 	}
 
 	account, err := snap.GetAccount(addr)
+	if err != nil {
+		return nil, err
+	}
+
+	if account == nil {
+		return nil, jsonrpc.ErrStateNotFound
+	}
+
+	return account, nil
+}
+
+func (t *txpoolHub) GetNonce(root types.Hash, addr types.Address) uint64 {
+	account, err := getAccountImpl(t.state, root, addr)
+
 	if err != nil {
 		return 0
 	}
@@ -313,12 +328,8 @@ func (t *txpoolHub) GetNonce(root types.Hash, addr types.Address) uint64 {
 }
 
 func (t *txpoolHub) GetBalance(root types.Hash, addr types.Address) (*big.Int, error) {
-	snap, err := t.state.NewSnapshotAt(root)
-	if err != nil {
-		return nil, fmt.Errorf("unable to get snapshot for root, %w", err)
-	}
+	account, err := getAccountImpl(t.state, root, addr)
 
-	account, err := snap.GetAccount(addr)
 	if err != nil {
 		return big.NewInt(0), err
 	}
@@ -425,32 +436,12 @@ type jsonRPCHub struct {
 	consensus.Consensus
 }
 
-// HELPER + WRAPPER METHODS //
-
 func (j *jsonRPCHub) GetPeers() int {
 	return len(j.Server.Peers())
 }
 
-func (j *jsonRPCHub) getAccountImpl(root types.Hash, addr types.Address) (*state.Account, error) {
-	snap, err := j.state.NewSnapshotAt(root)
-	if err != nil {
-		return nil, err
-	}
-
-	account, err := snap.GetAccount(addr)
-	if err != nil {
-		return nil, err
-	}
-
-	if account == nil {
-		return nil, jsonrpc.ErrStateNotFound
-	}
-
-	return account, nil
-}
-
 func (j *jsonRPCHub) GetAccount(root types.Hash, addr types.Address) (*jsonrpc.Account, error) {
-	acct, err := j.getAccountImpl(root, addr)
+	acct, err := getAccountImpl(j.state, root, addr)
 	if err != nil {
 		return nil, err
 	}
@@ -469,7 +460,7 @@ func (j *jsonRPCHub) GetForksInTime(blockNumber uint64) chain.ForksInTime {
 }
 
 func (j *jsonRPCHub) GetStorage(stateRoot types.Hash, addr types.Address, slot types.Hash) ([]byte, error) {
-	account, err := j.getAccountImpl(stateRoot, addr)
+	account, err := getAccountImpl(j.state, stateRoot, addr)
 	if err != nil {
 		return nil, err
 	}
@@ -485,7 +476,7 @@ func (j *jsonRPCHub) GetStorage(stateRoot types.Hash, addr types.Address, slot t
 }
 
 func (j *jsonRPCHub) GetCode(root types.Hash, addr types.Address) ([]byte, error) {
-	account, err := j.getAccountImpl(root, addr)
+	account, err := getAccountImpl(j.state, root, addr)
 	if err != nil {
 		return nil, err
 	}
@@ -508,7 +499,6 @@ func (j *jsonRPCHub) ApplyTxn(
 	}
 
 	transition, err := j.BeginTxn(header.StateRoot, header, blockCreator)
-
 	if err != nil {
 		return
 	}
@@ -516,6 +506,126 @@ func (j *jsonRPCHub) ApplyTxn(
 	result, err = transition.Apply(txn)
 
 	return
+}
+
+// TraceBlock traces all transactions in the given block and returns all results
+func (j *jsonRPCHub) TraceBlock(
+	block *types.Block,
+	tracer tracer.Tracer,
+) ([]interface{}, error) {
+	if block.Number() == 0 {
+		return nil, errors.New("genesis block can't have transaction")
+	}
+
+	parentHeader, ok := j.GetHeaderByHash(block.ParentHash())
+	if !ok {
+		return nil, errors.New("parent header not found")
+	}
+
+	blockCreator, err := j.GetConsensus().GetBlockCreator(block.Header)
+	if err != nil {
+		return nil, err
+	}
+
+	transition, err := j.BeginTxn(parentHeader.StateRoot, block.Header, blockCreator)
+	if err != nil {
+		return nil, err
+	}
+
+	transition.SetTracer(tracer)
+
+	results := make([]interface{}, len(block.Transactions))
+
+	for idx, tx := range block.Transactions {
+		tracer.Clear()
+
+		if _, err := transition.Apply(tx); err != nil {
+			return nil, err
+		}
+
+		if results[idx], err = tracer.GetResult(); err != nil {
+			return nil, err
+		}
+	}
+
+	return results, nil
+}
+
+// TraceTxn traces a transaction in the block, associated with the given hash
+func (j *jsonRPCHub) TraceTxn(
+	block *types.Block,
+	targetTxHash types.Hash,
+	tracer tracer.Tracer,
+) (interface{}, error) {
+	if block.Number() == 0 {
+		return nil, errors.New("genesis block can't have transaction")
+	}
+
+	parentHeader, ok := j.GetHeaderByHash(block.ParentHash())
+	if !ok {
+		return nil, errors.New("parent header not found")
+	}
+
+	blockCreator, err := j.GetConsensus().GetBlockCreator(block.Header)
+	if err != nil {
+		return nil, err
+	}
+
+	transition, err := j.BeginTxn(parentHeader.StateRoot, block.Header, blockCreator)
+	if err != nil {
+		return nil, err
+	}
+
+	var targetTx *types.Transaction
+
+	for _, tx := range block.Transactions {
+		if tx.Hash == targetTxHash {
+			targetTx = tx
+
+			break
+		}
+
+		// Execute transactions without tracer until reaching the target transaction
+		if _, err := transition.Apply(tx); err != nil {
+			return nil, err
+		}
+	}
+
+	if targetTx == nil {
+		return nil, errors.New("target tx not found")
+	}
+
+	transition.SetTracer(tracer)
+
+	if _, err := transition.Apply(targetTx); err != nil {
+		return nil, err
+	}
+
+	return tracer.GetResult()
+}
+
+func (j *jsonRPCHub) TraceCall(
+	tx *types.Transaction,
+	parentHeader *types.Header,
+	tracer tracer.Tracer,
+) (interface{}, error) {
+	blockCreator, err := j.GetConsensus().GetBlockCreator(parentHeader)
+	if err != nil {
+		return nil, err
+	}
+
+	transition, err := j.BeginTxn(parentHeader.StateRoot, parentHeader, blockCreator)
+	if err != nil {
+		return nil, err
+	}
+
+	transition.SetTracer(tracer)
+
+	if _, err := transition.Apply(tx); err != nil {
+		return nil, err
+	}
+
+	return tracer.GetResult()
 }
 
 func (j *jsonRPCHub) GetSyncProgression() *progress.Progression {

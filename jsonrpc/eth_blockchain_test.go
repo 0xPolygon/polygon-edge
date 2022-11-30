@@ -353,8 +353,12 @@ func TestEth_Call(t *testing.T) {
 	})
 }
 
-type mockBlockStore struct {
+type testStore interface {
 	ethStore
+}
+
+type mockBlockStore struct {
+	testStore
 	blocks          []*types.Block
 	topics          []types.Hash
 	pendingTxns     []*types.Transaction
