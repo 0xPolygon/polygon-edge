@@ -47,7 +47,8 @@ func TestConsensusRuntime_GetVotes(t *testing.T) {
 
 	commitment, _, _ := buildCommitmentAndStateSyncs(t, stateSyncsCount, epoch, bundleSize, 0)
 
-	quorumSize := validatorAccounts.toValidatorSetWithError(t).quorumSize
+	quorumSize := validatorAccounts.toValidatorSetWithError(t).getQuorumSize()
+
 	require.NoError(t, state.insertEpoch(epoch))
 
 	votesCount := quorumSize + 1
@@ -1980,7 +1981,7 @@ func TestConsensusRuntime_HasQuorum(t *testing.T) {
 	}
 
 	require.NoError(t, runtime.FSM())
-	proposer, err := runtime.fsm.validators.CalcProposer(0)
+	proposer, err := runtime.fsm.proposerCalculator.CalcProposer(0)
 
 	require.NoError(t, err)
 
@@ -2031,6 +2032,10 @@ func TestConsensusRuntime_HasQuorum(t *testing.T) {
 		Type: proto.MessageType_PREPARE,
 	})
 	assert.False(t, runtime.HasQuorum(lastBuildBlock.Number+1, messages, proto.MessageType_PREPARE))
+
+	// last message is MessageType_PREPREPARE - this should be allowed
+	messages[len(messages)-1].Type = proto.MessageType_PREPREPARE
+	assert.True(t, runtime.HasQuorum(lastBuildBlock.Number+1, messages, proto.MessageType_PREPARE))
 
 	//proto.MessageType_ROUND_CHANGE, proto.MessageType_COMMIT
 	for _, msgType := range []proto.MessageType{proto.MessageType_ROUND_CHANGE, proto.MessageType_COMMIT} {
