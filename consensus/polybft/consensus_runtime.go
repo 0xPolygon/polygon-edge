@@ -339,10 +339,16 @@ func (c *consensusRuntime) FSM() error {
 	pendingBlockNumber := parent.Number + 1
 	isEndOfSprint := c.isEndOfSprint(pendingBlockNumber)
 	isEndOfEpoch := c.isEndOfEpoch(pendingBlockNumber)
+	validatorsCopy := epoch.Validators.Copy()
 
-	valSet, err := NewValidatorSet(epoch.Validators, c.logger)
+	valSet, err := NewValidatorSet(validatorsCopy, c.logger)
 	if err != nil {
 		return fmt.Errorf("cannot create validator set for fsm: %w", err)
+	}
+
+	proposerCalc, err := NewProposerCalculator(validatorsCopy, valSet.GetTotalVotingPower(), c.logger)
+	if err != nil {
+		return fmt.Errorf("cannot create proposer calculator for fsm: %w", err)
 	}
 
 	iterationNumber, err := getNumberOfIteration(parent, epoch.Number, c)
@@ -351,24 +357,25 @@ func (c *consensusRuntime) FSM() error {
 	}
 
 	if iterationNumber > 0 {
-		err = valSet.IncrementProposerPriority(iterationNumber)
+		err = proposerCalc.IncrementProposerPriority(iterationNumber)
 		if err != nil {
 			return fmt.Errorf("cannot increment proposer priority in fsm: %w", err)
 		}
 	}
 
 	ff := &fsm{
-		config:            c.config.PolyBFTConfig,
-		parent:            parent,
-		backend:           c.config.blockchain,
-		polybftBackend:    c.config.polybftBackend,
-		checkpointBackend: c,
-		epochNumber:       epoch.Number,
-		blockBuilder:      blockBuilder,
-		validators:        valSet,
-		isEndOfEpoch:      isEndOfEpoch,
-		isEndOfSprint:     isEndOfSprint,
-		logger:            c.logger.Named("fsm"),
+		config:             c.config.PolyBFTConfig,
+		parent:             parent,
+		backend:            c.config.blockchain,
+		polybftBackend:     c.config.polybftBackend,
+		checkpointBackend:  c,
+		epochNumber:        epoch.Number,
+		blockBuilder:       blockBuilder,
+		validators:         valSet,
+		proposerCalculator: proposerCalc,
+		isEndOfEpoch:       isEndOfEpoch,
+		isEndOfSprint:      isEndOfSprint,
+		logger:             c.logger.Named("fsm"),
 	}
 
 	if c.IsBridgeEnabled() {
@@ -1016,7 +1023,7 @@ func (c *consensusRuntime) IsProposer(id []byte, height, round uint64) bool {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
-	nextProposer, err := c.fsm.validators.CalcProposer(round)
+	nextProposer, err := c.fsm.proposerCalculator.CalcProposer(round)
 	if err != nil {
 		c.logger.Error("cannot calculate proposer", "error", err)
 
@@ -1148,7 +1155,22 @@ func (c *consensusRuntime) HasQuorum(
 			return c.fsm.validators.HasQuorum(signers)
 		}
 
-		return c.fsm.validators.HasQuorumWithoutProposer(signers)
+		propAddress, exist := c.fsm.proposerCalculator.GetLatestProposer()
+		if !exist {
+			c.logger.Warn("HasQuorum has been called but proposer is not set")
+
+			return false
+		}
+
+		if _, ok := signers[propAddress]; ok {
+			c.logger.Warn("HasQuorum failed - proposer is among signers but it is not expected to be")
+
+			return false
+		}
+
+		signers[propAddress] = struct{}{} // add proposer manually
+
+		return c.fsm.validators.HasQuorum(signers)
 	case proto.MessageType_ROUND_CHANGE, proto.MessageType_COMMIT:
 		return c.fsm.validators.HasQuorum(signers)
 	default:
