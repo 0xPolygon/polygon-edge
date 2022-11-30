@@ -20,7 +20,7 @@ type TxDiscardJournal interface {
 	GetReason(txHash types.Hash) (*string, error)
 }
 
-// memoryJournal is an implementation of Journal and it saves data in-memory
+// memoryJournal is an implementation of TxDiscardJournal and it saves data in-memory
 type memoryTxErrorJournal struct {
 	reasons *lru.Cache
 }
