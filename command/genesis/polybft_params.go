@@ -1,10 +1,12 @@
 package genesis
 
 import (
+	"bytes"
 	"encoding/hex"
 	"fmt"
 	"math/big"
 	"path"
+	"sort"
 	"strings"
 	"time"
 
@@ -40,8 +42,6 @@ const (
 	defaultBridge                     = false
 
 	bootnodePortStart = 30301
-
-	WeiScalingFactor = 1_000_000_000_000_000_000 // 10^18
 )
 
 func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
@@ -160,7 +160,7 @@ func (p *genesisParams) getGenesisValidators(validators []GenesisTarget,
 
 			addr := types.StringToAddress(parts[0])
 
-			balance, err := getBalanceInWei(addr, allocs)
+			balance, err := chain.GetGenesisAccountBalance(addr, allocs)
 			if err != nil {
 				return nil, err
 			}
@@ -176,7 +176,7 @@ func (p *genesisParams) getGenesisValidators(validators []GenesisTarget,
 			pubKeyMarshalled := validator.Account.Bls.PublicKey().Marshal()
 			addr := types.Address(validator.Account.Ecdsa.Address())
 
-			balance, err := getBalanceInWei(addr, allocs)
+			balance, err := chain.GetGenesisAccountBalance(addr, allocs)
 			if err != nil {
 				return nil, err
 			}
@@ -190,23 +190,6 @@ func (p *genesisParams) getGenesisValidators(validators []GenesisTarget,
 	}
 
 	return result, nil
-}
-
-// getBalanceInWei returns balance for genesis account based on its address.
-// If not found in provided allocations map, 1M native tokens is returned.
-func getBalanceInWei(address types.Address, allocations map[types.Address]*chain.GenesisAccount) (*big.Int, error) {
-	if genesisAcc, ok := allocations[address]; ok {
-		return genesisAcc.Balance, nil
-	}
-
-	val := command.DefaultPremineBalance
-
-	amount, err := types.ParseUint256orHex(&val)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse amount %s: %w", val, err)
-	}
-
-	return amount, nil
 }
 
 func (p *genesisParams) generatePolyBftGenesis() error {
@@ -288,16 +271,16 @@ func generateExtraDataPolyBft(validators []*polybft.Validator, publicKeys []*bls
 		delta.Added[i] = &polybft.ValidatorMetadata{
 			Address:     validator.Address,
 			BlsKey:      publicKeys[i],
-			VotingPower: convertWeiToTokensAmount(validator.Balance).Uint64(),
+			VotingPower: chain.ConvertWeiToTokensAmount(validator.Balance).Uint64(),
 		}
 	}
 
-	extra := polybft.Extra{Validators: delta}
+	// Order validators based on its addresses
+	sort.Slice(delta.Added, func(i, j int) bool {
+		return bytes.Compare(delta.Added[i].Address[:], delta.Added[j].Address[:]) < 0
+	})
+
+	extra := polybft.Extra{Validators: delta, Checkpoint: &polybft.CheckpointData{}}
 
 	return append(make([]byte, polybft.ExtraVanity), extra.MarshalRLPTo(nil)...), nil
-}
-
-// convertWeiToTokensAmount converts provided wei balance to tokens amount
-func convertWeiToTokensAmount(weiBalance *big.Int) *big.Int {
-	return weiBalance.Div(weiBalance, big.NewInt(WeiScalingFactor))
 }

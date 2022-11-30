@@ -50,7 +50,7 @@ test-e2e:
 	go build -race -o artifacts/polygon-edge .
 	env EDGE_BINARY=${PWD}/artifacts/polygon-edge go test -v -timeout=30m ./e2e/...
 
-.PHONY: test-e2ev3
+.PHONY: test-e2e-polybft
 test-e2e-polybft:
     # We can not build with race because of a bug in boltdb dependency
 	go build -o artifacts/polygon-edge .

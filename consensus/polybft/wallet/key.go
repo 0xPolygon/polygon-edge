@@ -60,3 +60,16 @@ func RecoverAddressFromSignature(sig, msg []byte) (types.Address, error) {
 
 	return crypto.PubKeyToAddress(pub), nil
 }
+
+// ECDSASigner implements ethgo.Key interface and it is used for signing using provided ECDSA key
+type ECDSASigner struct {
+	*Key
+}
+
+func NewEcdsaSigner(ecdsaKey *Key) *ECDSASigner {
+	return &ECDSASigner{Key: ecdsaKey}
+}
+
+func (k *ECDSASigner) Sign(b []byte) ([]byte, error) {
+	return k.raw.Ecdsa.Sign(b)
+}

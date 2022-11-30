@@ -6,22 +6,27 @@ import (
 	"strconv"
 
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
+	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
 )
 
 var (
-	// currentCheckpointIDMethod is an ABI method object representation for
-	// currentCheckpointId getter function on CheckpointManager contract
-	currentCheckpointIDMethod, _ = abi.NewMethod("function currentCheckpointId() returns (uint256)")
+	// currentCheckpointBlockNumMethod is an ABI method object representation for
+	// currentCheckpointBlockNumber getter function on CheckpointManager contract
+	currentCheckpointBlockNumMethod, _ = abi.NewMethod("function currentCheckpointBlockNumber() returns (uint256)")
 
 	// submitCheckpointMethod is an ABI method object representation for
 	// submit checkpoint function on CheckpointManager contract
-	submitCheckpointMethod, _ = abi.NewMethod("function submitCheckpoint(" +
-		"uint256 chainID, bytes aggregatedSignature, bytes validatorsBitmap, " +
-		"uint256 epochNumber, uint256 blockNumber, bytes32 blockHash, uint256 blockRound," +
-		"bytes32 eventRoot, tuple(address _address, uint256[4] blsKey)[] nextValidators" + ")")
+	submitCheckpointMethod, _ = abi.NewMethod("function submit(" +
+		"uint256 chainId," +
+		"tuple(bytes32 blockHash, uint256 blockRound, bytes32 currentValidatorSetHash) checkpointMetadata," +
+		"tuple(uint256 epochNumber, uint256 blockNumber, bytes32 eventRoot) checkpoint," +
+		"uint256[2] signature," +
+		"tuple(address _address, uint256[4] blsKey, uint256 votingPower)[] newValidatorSet," +
+		"bytes bitmap)")
 
 	// frequency at which checkpoints are sent to the rootchain (in blocks count)
 	defaultCheckpointsOffset = uint64(900)
@@ -29,8 +34,10 @@ var (
 
 // checkpointManager encapsulates logic for checkpoint data submission
 type checkpointManager struct {
-	// sender address
-	sender types.Address
+	// signer is the identity of the node submitting a checkpoint
+	signer ethgo.Key
+	// signerAddress is the address of the node submitting a checkpoint
+	signerAddress types.Address
 	// blockchain is abstraction for blockchain
 	blockchain blockchainBackend
 	// consensusBackend is abstraction for polybft consensus specific functions
@@ -41,64 +48,74 @@ type checkpointManager struct {
 	checkpointsOffset uint64
 	// latestCheckpointID represents last checkpointed block number
 	latestCheckpointID uint64
+	// logger instance
+	logger hclog.Logger
 }
 
 // newCheckpointManager creates a new instance of checkpointManager
-func newCheckpointManager(sender types.Address, checkpointOffset uint64, interactor rootchainInteractor,
-	blockchain blockchainBackend, backend polybftBackend) *checkpointManager {
+func newCheckpointManager(signer ethgo.Key, checkpointOffset uint64, interactor rootchainInteractor,
+	blockchain blockchainBackend, backend polybftBackend, logger hclog.Logger) *checkpointManager {
 	r := interactor
 	if interactor == nil {
 		r = &defaultRootchainInteractor{}
 	}
 
 	return &checkpointManager{
-		sender:            sender,
+		signer:            signer,
+		signerAddress:     types.Address(signer.Address()),
 		blockchain:        blockchain,
 		consensusBackend:  backend,
 		rootchain:         r,
 		checkpointsOffset: checkpointOffset,
+		logger:            logger,
 	}
 }
 
-// getCurrentCheckpointID queries CheckpointManager smart contract and retrieves current checkpoint id
-// (the latest checkpoint block number)
-func (c checkpointManager) getCurrentCheckpointID() (uint64, error) {
-	checkpointIDMethodEncoded, err := currentCheckpointIDMethod.Encode([]interface{}{})
+// getLatestCheckpointBlock queries CheckpointManager smart contract and retrieves latest checkpoint block number
+func (c *checkpointManager) getLatestCheckpointBlock() (uint64, error) {
+	checkpointBlockNumMethodEncoded, err := currentCheckpointBlockNumMethod.Encode([]interface{}{})
 	if err != nil {
 		return 0, fmt.Errorf("failed to encode currentCheckpointId function parameters: %w", err)
 	}
 
-	currentCheckpointID, err := c.rootchain.Call(c.sender, helper.CheckpointManagerAddress, checkpointIDMethodEncoded)
+	latestCheckpointBlockRaw, err := c.rootchain.Call(
+		c.signerAddress,
+		helper.CheckpointManagerAddress,
+		checkpointBlockNumMethodEncoded)
 	if err != nil {
 		return 0, fmt.Errorf("failed to invoke currentCheckpointId function on the rootchain: %w", err)
 	}
 
-	checkpointID, err := strconv.ParseUint(currentCheckpointID, 0, 64)
+	latestCheckpointBlockNum, err := strconv.ParseUint(latestCheckpointBlockRaw, 0, 64)
 	if err != nil {
 		return 0, fmt.Errorf("failed to convert current checkpoint id '%s' to number: %w",
-			currentCheckpointID, err)
+			latestCheckpointBlockRaw, err)
 	}
 
-	return checkpointID, nil
+	return latestCheckpointBlockNum, nil
 }
 
 // submitCheckpoint sends a transaction with checkpoint data to the rootchain
-func (c checkpointManager) submitCheckpoint(latestHeader types.Header, isEndOfEpoch bool) error {
-	lastCheckpointBlockNumber, err := c.getCurrentCheckpointID()
+func (c *checkpointManager) submitCheckpoint(latestHeader types.Header, isEndOfEpoch bool) error {
+	lastCheckpointBlockNumber, err := c.getLatestCheckpointBlock()
 	if err != nil {
 		return err
 	}
 
-	nonce, err := c.rootchain.GetPendingNonce(c.sender)
+	c.logger.Debug("submitCheckpoint invoked...",
+		"latest checkpoint block", lastCheckpointBlockNumber,
+		"checkpoint block", latestHeader.Number)
+
+	nonce, err := c.rootchain.GetPendingNonce(c.signerAddress)
 	if err != nil {
 		return err
 	}
 
 	checkpointManagerAddr := ethgo.Address(helper.CheckpointManagerAddress)
 	txn := &ethgo.Transaction{
-		To: &checkpointManagerAddr,
+		To:   &checkpointManagerAddr,
+		From: ethgo.Address(c.signerAddress),
 	}
-
 	initialBlockNumber := lastCheckpointBlockNumber + 1
 
 	var (
@@ -138,19 +155,17 @@ func (c checkpointManager) submitCheckpoint(latestHeader types.Header, isEndOfEp
 		parentExtra = currentExtra
 
 		// send pending checkpoints only for epoch ending blocks
-		if parentEpochNumber == currentEpochNumber {
+		if blockNumber == 1 || parentEpochNumber == currentEpochNumber {
 			continue
 		}
 
-		err = c.encodeAndSendCheckpoint(nonce, txn, *parentHeader, *parentExtra, true)
-		if err != nil {
+		if err = c.encodeAndSendCheckpoint(nonce, txn, *parentHeader, *parentExtra, true); err != nil {
 			return err
 		}
-
 		nonce++
 	}
 
-	//we need to send checkpoint for the latest block
+	// we need to send checkpoint for the latest block
 	extra, err := GetIbftExtra(latestHeader.ExtraData)
 	if err != nil {
 		return err
@@ -163,6 +178,8 @@ func (c checkpointManager) submitCheckpoint(latestHeader types.Header, isEndOfEp
 // sends a transaction to the CheckpointManager rootchain contract
 func (c *checkpointManager) encodeAndSendCheckpoint(nonce uint64, txn *ethgo.Transaction,
 	header types.Header, extra Extra, isEndOfEpoch bool) error {
+	c.logger.Debug("send checkpoint txn...", "block number", header.Number)
+
 	nextEpochValidators := AccountSet{}
 
 	if isEndOfEpoch {
@@ -181,14 +198,16 @@ func (c *checkpointManager) encodeAndSendCheckpoint(nonce uint64, txn *ethgo.Tra
 
 	txn.Input = input
 
-	receipt, err := c.rootchain.SendTransaction(nonce, txn)
+	receipt, err := c.rootchain.SendTransaction(nonce, txn, c.signer)
 	if err != nil {
 		return err
 	}
 
 	if receipt.Status == uint64(types.ReceiptFailed) {
-		return fmt.Errorf("transaction execution failed for block %d", header.Number)
+		return fmt.Errorf("checkpoint submission transaction failed for block %d", header.Number)
 	}
+
+	c.logger.Debug("send checkpoint txn success", "block number", header.Number)
 
 	return nil
 }
@@ -196,16 +215,31 @@ func (c *checkpointManager) encodeAndSendCheckpoint(nonce uint64, txn *ethgo.Tra
 // abiEncodeCheckpointBlock encodes checkpoint data into ABI format for a given header
 func (c *checkpointManager) abiEncodeCheckpointBlock(headerNumber uint64, headerHash types.Hash, extra Extra,
 	nextValidators AccountSet) ([]byte, error) {
+	aggs, err := bls.UnmarshalSignature(extra.Committed.AggregatedSignature)
+	if err != nil {
+		return nil, err
+	}
+
+	encodedAggSigs, err := aggs.ToBigInt()
+	if err != nil {
+		return nil, err
+	}
+
 	params := map[string]interface{}{
-		"chainID":             new(big.Int).SetUint64(c.blockchain.GetChainID()),
-		"aggregatedSignature": extra.Committed.AggregatedSignature,
-		"validatorsBitmap":    extra.Committed.Bitmap,
-		"epochNumber":         new(big.Int).SetUint64(extra.Checkpoint.EpochNumber),
-		"blockNumber":         new(big.Int).SetUint64(headerNumber),
-		"blockHash":           headerHash,
-		"blockRound":          new(big.Int).SetUint64(extra.Checkpoint.BlockRound),
-		"eventRoot":           extra.Checkpoint.EventRoot.Bytes(),
-		"nextValidators":      nextValidators.AsGenericMaps(),
+		"chainId": new(big.Int).SetUint64(c.blockchain.GetChainID()),
+		"checkpointMetadata": map[string]interface{}{
+			"blockHash":               headerHash,
+			"blockRound":              new(big.Int).SetUint64(extra.Checkpoint.BlockRound),
+			"currentValidatorSetHash": extra.Checkpoint.CurrentValidatorsHash,
+		},
+		"checkpoint": map[string]interface{}{
+			"epochNumber": new(big.Int).SetUint64(extra.Checkpoint.EpochNumber),
+			"blockNumber": new(big.Int).SetUint64(headerNumber),
+			"eventRoot":   extra.Checkpoint.EventRoot,
+		},
+		"signature":       encodedAggSigs,
+		"newValidatorSet": nextValidators.AsGenericMaps(),
+		"bitmap":          extra.Committed.Bitmap,
 	}
 
 	return submitCheckpointMethod.Encode(params)
@@ -221,7 +255,7 @@ var _ rootchainInteractor = (*defaultRootchainInteractor)(nil)
 
 type rootchainInteractor interface {
 	Call(from types.Address, to types.Address, input []byte) (string, error)
-	SendTransaction(nonce uint64, transaction *ethgo.Transaction) (*ethgo.Receipt, error)
+	SendTransaction(nonce uint64, transaction *ethgo.Transaction, signer ethgo.Key) (*ethgo.Receipt, error)
 	GetPendingNonce(address types.Address) (uint64, error)
 }
 
@@ -233,8 +267,8 @@ func (d *defaultRootchainInteractor) Call(from types.Address, to types.Address, 
 }
 
 func (d *defaultRootchainInteractor) SendTransaction(nonce uint64,
-	transaction *ethgo.Transaction) (*ethgo.Receipt, error) {
-	return helper.SendTxn(nonce, transaction)
+	transaction *ethgo.Transaction, signer ethgo.Key) (*ethgo.Receipt, error) {
+	return helper.SendTxn(nonce, transaction, signer)
 }
 
 func (d *defaultRootchainInteractor) GetPendingNonce(address types.Address) (uint64, error) {
