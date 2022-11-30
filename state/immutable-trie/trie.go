@@ -333,6 +333,7 @@ func (t *Txn) writeNode(n *FullNode) *FullNode {
 }
 
 func (t *Txn) Insert(key, value []byte) {
+	fmt.Println("-insert", bytesToHexNibbles(key))
 	root := t.insert(t.root, bytesToHexNibbles(key), value)
 	if root != nil {
 		t.root = root
