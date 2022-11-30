@@ -5,6 +5,11 @@ import (
 	"github.com/0xPolygon/polygon-edge/types/buildroot"
 )
 
+const (
+	TxDiscardByExceedingBlockGasLimit = "Tx discarded by exceeding block gas limit"
+	TxDiscardByExecutionError         = "Tx discarded by execution error"
+)
+
 // BuildBlockParams are parameters passed into the BuildBlock helper method
 type BuildBlockParams struct {
 	Header   *types.Header

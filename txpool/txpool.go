@@ -52,6 +52,12 @@ var (
 	ErrMaxEnqueuedLimitReached = errors.New("maximum number of enqueued transactions reached")
 	ErrRejectFutureTx          = errors.New("rejected future tx due to low slots")
 	ErrSmartContractRestricted = errors.New("smart contract deployment restricted")
+
+	// reasons for TxDiscardJournal
+	TxDiscardByReachRecoverLimit    = "Tx discarded by reaching recover limit"
+	TxDiscardByReachSkipLimit       = "Tx discarded by reaching skip limit"
+	TxDiscardByReachTxPoolSizeLimit = "Tx discarded by reaching txpool size limit"
+	TxDiscardByReplacing            = "Tx discarded by replacing"
 )
 
 // indicates origin of a transaction
@@ -182,6 +188,8 @@ type TxPool struct {
 	// pending is the list of pending and ready transactions. This variable
 	// is accessed with atomics
 	pending int64
+
+	discardJournal TxDiscardJournal
 }
 
 // deploymentWhitelist map which contains all addresses which can deploy contracts
@@ -247,6 +255,13 @@ func NewTxPool(
 
 	// Attach the event manager
 	pool.eventManager = newEventManager(pool.logger)
+
+	var err error
+
+	pool.discardJournal, err = newMemoryTxErrorJournal()
+	if err != nil {
+		return nil, err
+	}
 
 	if network != nil {
 		// subscribe to the gossip protocol
@@ -432,7 +447,7 @@ func (p *TxPool) Pop(tx *types.Transaction) {
 
 // Drop clears the entire account associated with the given transaction
 // and reverts its next (expected) nonce.
-func (p *TxPool) Drop(tx *types.Transaction) {
+func (p *TxPool) Drop(tx *types.Transaction, reason string) {
 	// fetch associated account
 	account := p.accounts.get(tx.From)
 
@@ -477,6 +492,8 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 		"next_nonce", nextNonce,
 		"address", tx.From.String(),
 	)
+
+	p.discardJournal.logDiscardedTx(tx.Hash, reason)
 }
 
 // Demote excludes an account from being further processed during block building
@@ -490,7 +507,7 @@ func (p *TxPool) Demote(tx *types.Transaction) {
 			"addr", tx.From.String(),
 		)
 
-		p.Drop(tx)
+		p.Drop(tx, TxDiscardByReachRecoverLimit)
 
 		// reset the demotions counter
 		account.resetDemotions()
@@ -708,6 +725,7 @@ func (p *TxPool) pruneAccountsWithNonceHoles() {
 
 			p.index.remove(removed...)
 			p.gauge.decrease(slotsRequired(removed...))
+			p.logDiscardTxns(removed, TxDiscardByReachTxPoolSizeLimit)
 
 			return true
 		},
@@ -809,6 +827,7 @@ func (p *TxPool) handlePromoteRequest(req promoteRequest) {
 
 	p.index.remove(pruned...)
 	p.gauge.decrease(slotsRequired(pruned...))
+	p.logDiscardTxns(pruned, TxDiscardByReplacing)
 
 	// update metrics
 	p.updatePending(int64(len(promoted)))
@@ -904,6 +923,8 @@ func (p *TxPool) resetAccounts(stateNonces map[types.Address]uint64) {
 		)
 
 		p.updatePending(int64(-1 * len(allPrunedPromoted)))
+
+		p.logDiscardTxns(allPrunedPromoted, TxDiscardByReplacing)
 	}
 
 	if len(allPrunedEnqueued) > 0 {
@@ -913,6 +934,8 @@ func (p *TxPool) resetAccounts(stateNonces map[types.Address]uint64) {
 			proto.EventType_PRUNED_ENQUEUED,
 			toHash(allPrunedEnqueued...)...,
 		)
+
+		p.logDiscardTxns(allPrunedEnqueued, TxDiscardByReplacing)
 	}
 }
 
@@ -944,7 +967,7 @@ func (p *TxPool) updateAccountSkipsCounts(latestActiveAccounts map[types.Address
 			}
 
 			// account has been skipped too many times
-			p.Drop(firstTx)
+			p.Drop(firstTx, TxDiscardByReachSkipLimit)
 
 			account.resetSkips()
 
@@ -971,6 +994,17 @@ func (p *TxPool) createAccountOnce(newAddr types.Address) *account {
 // Length returns the total number of all promoted transactions.
 func (p *TxPool) Length() uint64 {
 	return p.accounts.promoted()
+}
+
+func (p *TxPool) GetTxDiscardReason(txHash types.Hash) (*string, error) {
+	return p.discardJournal.GetReason(txHash)
+}
+
+// logDiscardTxns records multiple discarded transactions in journal with same reason
+func (p *TxPool) logDiscardTxns(txns []*types.Transaction, reason string) {
+	for _, hash := range toHash(txns...) {
+		p.discardJournal.logDiscardedTx(hash, reason)
+	}
 }
 
 // toHash returns the hash(es) of given transaction(s)

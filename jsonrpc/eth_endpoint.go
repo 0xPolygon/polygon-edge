@@ -25,6 +25,9 @@ type ethTxPoolStore interface {
 
 	// GetPendingTx gets the pending transaction from the transaction pool, if it's present
 	GetPendingTx(txHash types.Hash) (*types.Transaction, bool)
+
+	// GetTxDiscardReason returns the reason why the Tx is discarded before including to block
+	GetTxDiscardReason(txHash types.Hash) (*string, error)
 }
 
 type Account struct {
@@ -295,7 +298,20 @@ func (e *Eth) GetTransactionByHash(hash types.Hash) (interface{}, error) {
 func (e *Eth) GetTransactionReceipt(hash types.Hash) (interface{}, error) {
 	blockHash, ok := e.store.ReadTxLookup(hash)
 	if !ok {
-		// txn not found
+		// txn is not in any block
+		reason, err := e.store.GetTxDiscardReason(hash)
+		if err != nil {
+			e.logger.Warn(
+				"failed to get the reason of tx discard: hash=%s, err=%s",
+				hash,
+				err.Error(),
+			)
+		}
+
+		if reason != nil {
+			return *reason, nil
+		}
+
 		return nil, nil
 	}
 
@@ -327,6 +343,7 @@ func (e *Eth) GetTransactionReceipt(hash types.Hash) (interface{}, error) {
 
 		return nil, nil
 	}
+
 	// find the transaction in the body
 	indx := -1
 

@@ -1408,6 +1408,8 @@ func TestPop(t *testing.T) {
 func TestDrop(t *testing.T) {
 	t.Parallel()
 
+	discardReason := "test discard"
+
 	pool, err := newTestPool()
 	assert.NoError(t, err)
 	pool.SetSigner(&mockSigner{})
@@ -1427,11 +1429,17 @@ func TestDrop(t *testing.T) {
 	// pop the tx
 	pool.Prepare()
 	tx := pool.Peek()
-	pool.Drop(tx)
+
+	pool.Drop(tx, discardReason)
 
 	assert.Equal(t, uint64(0), pool.gauge.read())
 	assert.Equal(t, uint64(0), pool.accounts.get(addr1).getNonce())
 	assert.Equal(t, uint64(0), pool.accounts.get(addr1).promoted.length())
+
+	// should record in journal
+	reason, err := pool.discardJournal.GetReason(tx.Hash)
+	assert.NoError(t, err)
+	assert.Equal(t, discardReason, *reason)
 }
 
 func TestDemote(t *testing.T) {
@@ -2428,7 +2436,7 @@ func TestRecovery(t *testing.T) {
 					case recoverable:
 						pool.Demote(tx)
 					case unrecoverable:
-						pool.Drop(tx)
+						pool.Drop(tx, "unrecoverable")
 					case ok:
 						pool.Pop(tx)
 					}

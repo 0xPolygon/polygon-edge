@@ -181,6 +181,24 @@ func TestEth_GetTransactionReceipt(t *testing.T) {
 		assert.Nil(t, res)
 	})
 
+	t.Run("returns the reason of discard", func(t *testing.T) {
+		t.Parallel()
+
+		reason := "discard by limit"
+
+		store := &mockBlockStore{
+			discardTxns: map[types.Hash]string{
+				hash1: reason,
+			},
+		}
+		eth := newTestEthEndpoint(store)
+
+		res, err := eth.GetTransactionReceipt(hash1)
+
+		assert.NoError(t, err)
+		assert.Equal(t, reason, res)
+	})
+
 	t.Run("returns correct receipt data for found transaction", func(t *testing.T) {
 		t.Parallel()
 
@@ -340,6 +358,7 @@ type mockBlockStore struct {
 	blocks          []*types.Block
 	topics          []types.Hash
 	pendingTxns     []*types.Transaction
+	discardTxns     map[types.Hash]string
 	receipts        map[types.Hash][]*types.Receipt
 	isSyncing       bool
 	averageGasPrice int64
@@ -519,6 +538,15 @@ func (m *mockBlockStore) ApplyTxn(header *types.Header, txn *types.Transaction) 
 
 func (m *mockBlockStore) SubscribeEvents() blockchain.Subscription {
 	return nil
+}
+
+func (m *mockBlockStore) GetTxDiscardReason(txHash types.Hash) (*string, error) {
+	reason, ok := m.discardTxns[txHash]
+	if !ok {
+		return nil, nil
+	}
+
+	return &reason, nil
 }
 
 func newTestBlock(number uint64, hash types.Hash) *types.Block {

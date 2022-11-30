@@ -121,7 +121,7 @@ func (d *Dev) writeTransactions(gasLimit uint64, transition transitionInterface)
 		}
 
 		if tx.ExceedsBlockGasLimit(gasLimit) {
-			d.txpool.Drop(tx)
+			d.txpool.Drop(tx, consensus.TxDiscardByExceedingBlockGasLimit)
 
 			continue
 		}
@@ -132,7 +132,7 @@ func (d *Dev) writeTransactions(gasLimit uint64, transition transitionInterface)
 			} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable { //nolint:errorlint
 				d.txpool.Demote(tx)
 			} else {
-				d.txpool.Drop(tx)
+				d.txpool.Drop(tx, fmt.Sprintf("%s:%s", consensus.TxDiscardByExecutionError, err.Error()))
 			}
 
 			continue

@@ -44,7 +44,7 @@ type txPoolInterface interface {
 	Length() uint64
 	Peek() *types.Transaction
 	Pop(tx *types.Transaction)
-	Drop(tx *types.Transaction)
+	Drop(tx *types.Transaction, reason string)
 	Demote(tx *types.Transaction)
 	ResetWithHeaders(headers ...*types.Header)
 	SetSealing(bool)

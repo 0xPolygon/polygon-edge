@@ -297,7 +297,7 @@ func (i *backendIBFT) writeTransaction(
 	}
 
 	if tx.ExceedsBlockGasLimit(gasLimit) {
-		i.txpool.Drop(tx)
+		i.txpool.Drop(tx, consensus.TxDiscardByExceedingBlockGasLimit)
 
 		if err := transition.WriteFailedReceipt(tx); err != nil {
 			i.logger.Error(
@@ -321,7 +321,7 @@ func (i *backendIBFT) writeTransaction(
 
 			return &txExeResult{tx, skip}, true
 		} else {
-			i.txpool.Drop(tx)
+			i.txpool.Drop(tx, fmt.Sprintf("%s: %s", consensus.TxDiscardByExecutionError, err.Error()))
 
 			return &txExeResult{tx, fail}, true
 		}
