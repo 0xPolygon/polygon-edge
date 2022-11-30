@@ -112,19 +112,19 @@ type Polybft struct {
 
 func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *state.Transition) error {
 	return func(transition *state.Transition) error {
-		var pbftConfig PolyBFTConfig
+		var polyBFTConfig PolyBFTConfig
 
-		customConfigJSON, err := json.Marshal(config.Params.Engine[engineName])
+		consensusConfigJSON, err := json.Marshal(config.Params.Engine[engineName])
 		if err != nil {
 			return err
 		}
 
-		err = json.Unmarshal(customConfigJSON, &pbftConfig)
+		err = json.Unmarshal(consensusConfigJSON, &polyBFTConfig)
 		if err != nil {
 			return err
 		}
 		// Initialize child validator set
-		input, err := getInitChildValidatorSetInput(pbftConfig.InitialValidatorSet, pbftConfig.Governance)
+		input, err := getInitChildValidatorSetInput(polyBFTConfig)
 		if err != nil {
 			return err
 		}
@@ -133,7 +133,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			return err
 		}
 
-		input, err = initNativeTokenMethod.Encode(
+		input, err = nativeTokenInitializer.Encode(
 			[]interface{}{helper.GetRootchainAdminAddr(), nativeTokenName, nativeTokenSymbol})
 		if err != nil {
 			return err
