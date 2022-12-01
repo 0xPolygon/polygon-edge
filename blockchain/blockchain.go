@@ -12,7 +12,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/blockchain/storage/leveldb"
 	"github.com/0xPolygon/polygon-edge/blockchain/storage/memory"
 	"github.com/0xPolygon/polygon-edge/chain"
-	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/types/buildroot"
@@ -369,47 +368,6 @@ func (b *Blockchain) GetParent(header *types.Header) (*types.Header, bool) {
 // Genesis returns the genesis block
 func (b *Blockchain) Genesis() types.Hash {
 	return b.genesis
-}
-
-// CalculateGasLimit returns the gas limit of the next block after parent
-func (b *Blockchain) CalculateGasLimit(number uint64) (uint64, error) {
-	parent, ok := b.GetHeaderByNumber(number - 1)
-	if !ok {
-		return 0, fmt.Errorf("parent of block %d not found", number)
-	}
-
-	return b.calculateGasLimit(parent.GasLimit), nil
-}
-
-// calculateGasLimit calculates gas limit in reference to the block gas target
-func (b *Blockchain) calculateGasLimit(parentGasLimit uint64) uint64 {
-	// The gas limit cannot move more than 1/1024 * parentGasLimit
-	// in either direction per block
-	blockGasTarget := b.Config().BlockGasTarget
-
-	// Check if the gas limit target has been set
-	if blockGasTarget == 0 {
-		// The gas limit target has not been set,
-		// so it should use the parent gas limit
-		return parentGasLimit
-	}
-
-	// Check if the gas limit is already at the target
-	if parentGasLimit == blockGasTarget {
-		// The gas limit is already at the target, no need to move it
-		return blockGasTarget
-	}
-
-	delta := parentGasLimit * 1 / BlockGasTargetDivisor
-	if parentGasLimit < blockGasTarget {
-		// The gas limit is lower than the gas target, so it should
-		// increase towards the target
-		return common.Min(blockGasTarget, parentGasLimit+delta)
-	}
-
-	// The gas limit is higher than the gas target, so it should
-	// decrease towards the target
-	return common.Max(blockGasTarget, common.Max(parentGasLimit-delta, 0))
 }
 
 // writeGenesis wrapper for the genesis write function
