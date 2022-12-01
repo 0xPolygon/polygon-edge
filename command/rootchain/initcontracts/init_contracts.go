@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"math/big"
 	"os"
 	"path"
 	"path/filepath"
@@ -23,6 +24,7 @@ import (
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
+	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -141,9 +143,18 @@ func getGenesisAlloc() (map[types.Address]*chain.GenesisAccount, error) {
 }
 
 func deployContracts(outputter command.OutputFormatter) error {
-	// if the bridge contract is not created, we have to deploy all the contracts
-	// fund account
-	if _, err := helper.FundAccount(helper.GetRootchainAdminAddr()); err != nil {
+	relayer, err := txrelayer.NewTxRelayer("")
+	if err != nil {
+		return err
+	}
+
+	// fund the rootchain account
+	addr := ethgo.Address(helper.GetRootchainAdminAddr())
+	txn := &ethgo.Transaction{
+		To:    &(addr),
+		Value: big.NewInt(1000000000000000000),
+	}
+	if _, err := relayer.SendTxnLocal(txn); err != nil {
 		return err
 	}
 
@@ -174,12 +185,7 @@ func deployContracts(outputter command.OutputFormatter) error {
 		},
 	}
 
-	pendingNonce, err := helper.GetPendingNonce(helper.GetRootchainAdminAddr())
-	if err != nil {
-		return err
-	}
-
-	for i, contract := range deployContracts {
+	for _, contract := range deployContracts {
 		bytecode, err := readContractBytecode(params.contractsPath, contract.path, contract.name)
 		if err != nil {
 			return err
@@ -190,7 +196,7 @@ func deployContracts(outputter command.OutputFormatter) error {
 			Input: bytecode,
 		}
 
-		receipt, err := helper.SendTxn(pendingNonce+uint64(i), txn, helper.GetRootchainAdminKey())
+		receipt, err := relayer.SendTxn(txn, helper.GetRootchainAdminKey())
 		if err != nil {
 			return err
 		}
@@ -203,9 +209,7 @@ func deployContracts(outputter command.OutputFormatter) error {
 		outputter.WriteCommandResult(newDeployContractsResult(contract.name, contract.expected, receipt.TransactionHash))
 	}
 
-	pendingNonce += uint64(len(deployContracts))
-
-	if err := initializeCheckpointManager(pendingNonce); err != nil {
+	if err := initializeCheckpointManager(relayer); err != nil {
 		return err
 	}
 
@@ -217,7 +221,7 @@ func deployContracts(outputter command.OutputFormatter) error {
 }
 
 // initializeCheckpointManager invokes initialize function on CheckpointManager smart contract
-func initializeCheckpointManager(nonce uint64) error {
+func initializeCheckpointManager(relayer *txrelayer.TxRelayer) error {
 	allocs, err := getGenesisAlloc()
 	if err != nil {
 		return err
@@ -242,7 +246,7 @@ func initializeCheckpointManager(nonce uint64) error {
 		Input: initCheckpointInput,
 	}
 
-	receipt, err := helper.SendTxn(nonce, txn, helper.GetRootchainAdminKey())
+	receipt, err := relayer.SendTxn(txn, helper.GetRootchainAdminKey())
 	if err != nil {
 		return fmt.Errorf("failed to send transaction to CheckpointManager. error: %w", err)
 	}

@@ -11,6 +11,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/contracts"
+	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -22,6 +23,8 @@ var (
 	}
 
 	syncStateAbiMethod, _ = abi.NewMethod("function syncState(address receiver, bytes data)")
+
+	jsonrpcAddr string
 )
 
 // GetCommand returns the rootchain emit command
@@ -59,6 +62,13 @@ func setFlags(cmd *cobra.Command) {
 		nil,
 		"list of amounts to fund wallets",
 	)
+
+	cmd.Flags().StringVar(
+		&jsonrpcAddr,
+		"jsonrpc",
+		"http://localhost:8545",
+		"Jsonrpc address of the rootchain",
+	)
 }
 
 func runPreRun(_ *cobra.Command, _ []string) error {
@@ -76,9 +86,9 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	pendingNonce, err := helper.GetPendingNonce(helper.GetRootchainAdminAddr())
+	relayer, err := txrelayer.NewTxRelayer(jsonrpcAddr)
 	if err != nil {
-		outputter.SetError(fmt.Errorf("could not get pending nonce: %w", err))
+		outputter.SetError(err)
 
 		return
 	}
@@ -88,7 +98,6 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	for i := range params.wallets {
 		wallet := params.wallets[i]
 		amount := params.amounts[i]
-		walletIndex := uint64(i)
 
 		g.Go(func() error {
 			select {
@@ -100,10 +109,9 @@ func runCommand(cmd *cobra.Command, _ []string) {
 					return fmt.Errorf("failed to create tx input: %w", err)
 				}
 
-				if _, err = helper.SendTxn(pendingNonce+walletIndex, txn, helper.GetRootchainAdminKey()); err != nil {
-					return fmt.Errorf("sending transaction to wallet: %s with amount: %s, failed with error: %w", wallet, amount, err)
+				if _, err = relayer.SendTxn(txn, helper.GetRootchainAdminKey()); err != nil {
+					return nil
 				}
-
 				return nil
 			}
 		})

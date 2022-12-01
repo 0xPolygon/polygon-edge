@@ -2,16 +2,20 @@ package fund
 
 import (
 	"fmt"
+	"math/big"
 
 	"github.com/spf13/cobra"
+	"github.com/umbracle/ethgo"
 
 	"github.com/0xPolygon/polygon-edge/command"
-	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
+	"github.com/0xPolygon/polygon-edge/txrelayer"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 var (
 	basicParams fundParams
 	fundNumber  int
+	jsonrpcAddr string
 )
 
 // GetCommand returns the rootchain fund command
@@ -57,6 +61,13 @@ func setFlags(cmd *cobra.Command) {
 
 	// num flag should be used with data-dir flag only so it should not be used with config flag.
 	cmd.MarkFlagsMutuallyExclusive(numFlag, configFlag)
+
+	cmd.Flags().StringVar(
+		&jsonrpcAddr,
+		"jsonrpc",
+		"http://localhost:8545",
+		"Jsonrpc address of the rootchain",
+	)
 }
 
 func runPreRun(_ *cobra.Command, _ []string) error {
@@ -69,6 +80,13 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 	paramsList := getParamsList()
 	resList := make(command.Results, len(paramsList))
+
+	relayer, err := txrelayer.NewTxRelayer(jsonrpcAddr)
+	if err != nil {
+		outputter.SetError(err)
+
+		return
+	}
 
 	for i, params := range paramsList {
 		if err := params.initSecretsManager(); err != nil {
@@ -84,7 +102,12 @@ func runCommand(cmd *cobra.Command, _ []string) {
 			return
 		}
 
-		txHash, err := helper.FundAccount(validatorAcc)
+		addr := ethgo.Address(validatorAcc)
+		txn := &ethgo.Transaction{
+			To:    &(addr),
+			Value: big.NewInt(1000000000000000000),
+		}
+		receipt, err := relayer.SendTxnLocal(txn)
 		if err != nil {
 			outputter.SetError(err)
 
@@ -93,7 +116,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 		resList[i] = &result{
 			ValidatorAddr: validatorAcc,
-			TxHash:        txHash,
+			TxHash:        types.Hash(receipt.TransactionHash),
 		}
 	}
 
