@@ -129,4 +129,4 @@ docker_manifests:
     image_templates:
       - 0xpolygon/{{ .ProjectName }}:{{ .Version }}-amd64
       - 0xpolygon/{{ .ProjectName }}:{{ .Version }}-arm64
-    skip_push: false
+    skip_push: auto
