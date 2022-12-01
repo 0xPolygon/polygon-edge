@@ -16,6 +16,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
+	"github.com/umbracle/ethgo/jsonrpc"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
@@ -40,6 +41,8 @@ var (
 		"bytes32 newDomain," +
 		// RootValidatorSet contract address
 		"tuple(address _address, uint256[4] blsKey, uint256 votingPower)[] newValidatorSet)")
+
+	jsonrpcAddr string
 )
 
 const (
@@ -85,6 +88,12 @@ func setFlags(cmd *cobra.Command) {
 		defaultGenesisPath,
 		"Genesis configuration path",
 	)
+	cmd.Flags().StringVar(
+		&jsonrpcAddr,
+		"jsonrpc",
+		"http://localhost:8545",
+		"Jsonrpc address of the rootchain",
+	)
 }
 
 func runPreRun(_ *cobra.Command, _ []string) error {
@@ -99,11 +108,17 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		Message: fmt.Sprintf("%s started...", contractsDeploymentTitle),
 	})
 
-	if ok, err := helper.ExistsCode(helper.StateSenderAddress); err != nil {
+	client, err := jsonrpc.NewClient(jsonrpcAddr)
+	if err != nil {
+		// handle
+	}
+
+	code, err := client.Eth().GetCode(ethgo.Address(helper.StateSenderAddress), ethgo.Latest)
+	if err != nil {
 		outputter.SetError(fmt.Errorf("failed to check if rootchain contracts are deployed: %w", err))
 
 		return
-	} else if ok {
+	} else if code != "0x" {
 		outputter.SetCommandResult(&messageResult{
 			Message: fmt.Sprintf("%s contracts are already deployed. Aborting.", contractsDeploymentTitle),
 		})
@@ -111,7 +126,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	if err := deployContracts(outputter); err != nil {
+	if err := deployContracts(client, outputter); err != nil {
 		outputter.SetError(fmt.Errorf("failed to deploy rootchain contracts: %w", err))
 
 		return
@@ -142,8 +157,8 @@ func getGenesisAlloc() (map[types.Address]*chain.GenesisAccount, error) {
 	return chain.Genesis.Alloc, nil
 }
 
-func deployContracts(outputter command.OutputFormatter) error {
-	relayer, err := txrelayer.NewTxRelayer("")
+func deployContracts(client *jsonrpc.Client, outputter command.OutputFormatter) error {
+	relayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(client))
 	if err != nil {
 		return err
 	}

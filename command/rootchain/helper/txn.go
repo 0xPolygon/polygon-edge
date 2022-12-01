@@ -106,20 +106,6 @@ func Call(from, to ethgo.Address, input []byte) (string, error) {
 	return provider.Eth().Call(callMsg, ethgo.Pending)
 }
 
-func ExistsCode(addr types.Address) (bool, error) {
-	provider, err := getJSONRPCClient()
-	if err != nil {
-		return false, err
-	}
-
-	code, err := provider.Eth().GetCode(ethgo.HexToAddress(addr.String()), ethgo.Latest)
-	if err != nil {
-		return false, err
-	}
-
-	return code != "0x", nil
-}
-
 func GetPendingNonce(addr types.Address) (uint64, error) {
 	provider, err := getJSONRPCClient()
 	if err != nil {

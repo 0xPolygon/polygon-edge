@@ -81,7 +81,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	paramsList := getParamsList()
 	resList := make(command.Results, len(paramsList))
 
-	relayer, err := txrelayer.NewTxRelayer(jsonrpcAddr)
+	relayer, err := txrelayer.NewTxRelayer(txrelayer.WithAddr(jsonrpcAddr))
 	if err != nil {
 		outputter.SetError(err)
 

@@ -246,7 +246,6 @@ var _ rootchainInteractor = (*defaultRootchainInteractor)(nil)
 type rootchainInteractor interface {
 	Call(from types.Address, to types.Address, input []byte) (string, error)
 	SendTransaction(nonce uint64, transaction *ethgo.Transaction, signer ethgo.Key) (*ethgo.Receipt, error)
-	GetPendingNonce(address types.Address) (uint64, error)
 }
 
 type defaultRootchainInteractor struct {
@@ -259,8 +258,4 @@ func (d *defaultRootchainInteractor) Call(from types.Address, to types.Address, 
 func (d *defaultRootchainInteractor) SendTransaction(nonce uint64,
 	transaction *ethgo.Transaction, signer ethgo.Key) (*ethgo.Receipt, error) {
 	return helper.SendTxn(nonce, transaction, signer)
-}
-
-func (d *defaultRootchainInteractor) GetPendingNonce(address types.Address) (uint64, error) {
-	return helper.GetPendingNonce(address)
 }

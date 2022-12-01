@@ -12,32 +12,37 @@ import (
 
 type RelayerOption func(*TxRelayer)
 
-func WithLocalAccount() RelayerOption {
+func WithAddr(addr string) RelayerOption {
 	return func(h *TxRelayer) {
-		h.localAcct = true
+		h.addr = addr
+	}
+}
+
+func WithClient(client *jsonrpc.Client) RelayerOption {
+	return func(h *TxRelayer) {
+		h.client = client
 	}
 }
 
 type TxRelayer struct {
+	addr   string
 	client *jsonrpc.Client
-
-	// localAcct set to true means that the relayer will use a
-	// local account from eth_accounts as the sender address
-	// This only works when running geth in development mode.
-	localAcct bool
 }
 
-func NewTxRelayer(addr string, opts ...RelayerOption) (*TxRelayer, error) {
-	client, err := jsonrpc.NewClient(addr)
-	if err != nil {
-		return nil, err
-	}
-
+func NewTxRelayer(opts ...RelayerOption) (*TxRelayer, error) {
 	t := &TxRelayer{
-		client: client,
+		addr: "localhost:8545",
 	}
 	for _, opt := range opts {
 		opt(t)
+	}
+
+	if t.client == nil {
+		client, err := jsonrpc.NewClient(t.addr)
+		if err != nil {
+			return nil, err
+		}
+		t.client = client
 	}
 	return t, nil
 }
