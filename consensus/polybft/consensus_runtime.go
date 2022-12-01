@@ -392,7 +392,9 @@ func (c *consensusRuntime) FSM() error {
 		"endOfSprint", isEndOfSprint,
 	)
 
+	c.lock.Lock()
 	c.fsm = ff
+	c.lock.Unlock()
 
 	return nil
 }
@@ -997,6 +999,9 @@ func (c *consensusRuntime) IsValidBlock(proposal []byte) bool {
 }
 
 func (c *consensusRuntime) IsValidSender(msg *proto.Message) bool {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
 	err := c.fsm.ValidateSender(msg)
 	if err != nil {
 		c.logger.Error("invalid sender", "error", err)
@@ -1008,6 +1013,9 @@ func (c *consensusRuntime) IsValidSender(msg *proto.Message) bool {
 }
 
 func (c *consensusRuntime) IsProposer(id []byte, height, round uint64) bool {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
 	nextProposer, err := c.fsm.validators.CalcProposer(round)
 	if err != nil {
 		c.logger.Error("cannot calculate proposer", "error", err)
@@ -1117,6 +1125,8 @@ func (c *consensusRuntime) HasQuorum(
 	messages []*proto.Message,
 	msgType proto.MessageType,
 ) bool {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
 	// extract the addresses of all the signers of the messages
 	ppIncluded := false
 	signers := make(map[types.Address]struct{}, len(messages))
