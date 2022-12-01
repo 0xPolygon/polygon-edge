@@ -100,21 +100,43 @@ func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
 		}
 	}
 
-	var premine []string = nil
-	if len(p.premine) > 0 {
-		premine = p.premine
-	} else if p.premineValidators != "" {
-		premine = make([]string, len(validatorsInfo))
+	var (
+		validatorPreminesMap map[types.Address]int
+		premineInfos         []*premineInfo
+	)
+
+	if p.premineValidators != "" {
+		validatorPreminesMap = make(map[types.Address]int, len(validatorsInfo))
+
 		for i, vi := range validatorsInfo {
-			premine[i] = fmt.Sprintf("%s:%s",
-				vi.Account.Ecdsa.Address().String(), p.premineValidators)
+			premineInfo, err := parsePremineInfo(fmt.Sprintf("%s:%s",
+				vi.Account.Ecdsa.Address().String(), p.premineValidators))
+			if err != nil {
+				return nil, err
+			}
+
+			premineInfos = append(premineInfos, premineInfo)
+			validatorPreminesMap[premineInfo.address] = i
+		}
+	}
+
+	if len(p.premine) > 0 {
+		for _, premine := range p.premine {
+			premineInfo, err := parsePremineInfo(premine)
+			if err != nil {
+				return nil, err
+			}
+
+			if i, ok := validatorPreminesMap[premineInfo.address]; ok {
+				premineInfos[i] = premineInfo
+			} else {
+				premineInfos = append(premineInfos, premineInfo)
+			}
 		}
 	}
 
 	// premine accounts
-	if err := fillPremineMap(allocs, premine); err != nil {
-		return nil, err
-	}
+	fillPremineMap(allocs, premineInfos)
 
 	// set initial validator set
 	genesisValidators, err := p.getGenesisValidators(validatorsInfo, allocs)
