@@ -75,18 +75,16 @@ func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
 		}
 	}
 
-	if len(p.premine) > 0 {
-		for _, premine := range p.premine {
-			premineInfo, err := parsePremineInfo(premine)
-			if err != nil {
-				return nil, err
-			}
+	for _, premine := range p.premine {
+		premineInfo, err := parsePremineInfo(premine)
+		if err != nil {
+			return nil, err
+		}
 
-			if i, ok := validatorPreminesMap[premineInfo.address]; ok {
-				premineInfos[i] = premineInfo
-			} else {
-				premineInfos = append(premineInfos, premineInfo)
-			}
+		if i, ok := validatorPreminesMap[premineInfo.address]; ok {
+			premineInfos[i] = premineInfo
+		} else {
+			premineInfos = append(premineInfos, premineInfo)
 		}
 	}
 
