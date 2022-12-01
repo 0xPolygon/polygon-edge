@@ -59,6 +59,13 @@ func setFlags(cmd *cobra.Command) {
 		nil,
 		"list of amounts to fund wallets",
 	)
+
+	cmd.Flags().StringVar(
+		&params.jsonRPCAddress,
+		jsonRPCFlag,
+		"",
+		"the JSON RPC rootchain IP address (e.g. http://127.0.0.1:8545)",
+	)
 }
 
 func runPreRun(_ *cobra.Command, _ []string) error {
@@ -76,8 +83,14 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	// TODO: Provide IP Address
-	rootchainInteractor, err := helper.NewDefaultRootchainInteractor("")
+	ipAddress, err := command.ResolveRootchainIP(params.jsonRPCAddress)
+	if err != nil {
+		outputter.SetError(err)
+
+		return
+	}
+
+	rootchainInteractor, err := helper.NewDefaultRootchainInteractor(ipAddress)
 	if err != nil {
 		outputter.SetError(fmt.Errorf("could not create rootchain interactor: %w", err))
 

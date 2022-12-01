@@ -12,6 +12,7 @@ const (
 	dataDirFlag = "data-dir"
 	configFlag  = "config"
 	numFlag     = "num"
+	jsonRPCFlag = "json-rpc"
 )
 
 var (
@@ -21,8 +22,9 @@ var (
 )
 
 type fundParams struct {
-	dataDir    string
-	configPath string
+	dataDir        string
+	configPath     string
+	jsonRPCAddress string
 
 	secretsManager secrets.SecretsManager
 	secretsConfig  *secrets.SecretsManagerConfig

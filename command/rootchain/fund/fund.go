@@ -10,8 +10,8 @@ import (
 )
 
 var (
-	basicParams fundParams
-	fundNumber  int
+	params     fundParams
+	fundNumber int
 )
 
 // GetCommand returns the rootchain fund command
@@ -30,14 +30,14 @@ func GetCommand() *cobra.Command {
 
 func setFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(
-		&basicParams.dataDir,
+		&params.dataDir,
 		dataDirFlag,
 		"",
 		"the directory for the Polygon Edge data if the local FS is used",
 	)
 
 	cmd.Flags().StringVar(
-		&basicParams.configPath,
+		&params.configPath,
 		configFlag,
 		"",
 		"the path to the SecretsManager config file, "+
@@ -51,6 +51,13 @@ func setFlags(cmd *cobra.Command) {
 		"the flag indicating the number of accounts to be funded",
 	)
 
+	cmd.Flags().StringVar(
+		&params.jsonRPCAddress,
+		jsonRPCFlag,
+		"",
+		"the JSON RPC rootchain IP address (e.g. http://127.0.0.1:8545)",
+	)
+
 	// Don't accept data-dir and config flags because they are related to different secrets managers.
 	// data-dir is about the local FS as secrets storage, config is about remote secrets manager.
 	cmd.MarkFlagsMutuallyExclusive(dataDirFlag, configFlag)
@@ -60,7 +67,7 @@ func setFlags(cmd *cobra.Command) {
 }
 
 func runPreRun(_ *cobra.Command, _ []string) error {
-	return basicParams.validateFlags()
+	return params.validateFlags()
 }
 
 func runCommand(cmd *cobra.Command, _ []string) {
@@ -70,8 +77,14 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	paramsList := getParamsList()
 	resList := make(command.Results, len(paramsList))
 
-	// TODO: Provide IP address
-	rootchainInteractor, err := helper.NewDefaultRootchainInteractor("")
+	ipAddress, err := command.ResolveRootchainIP(params.jsonRPCAddress)
+	if err != nil {
+		outputter.SetError(err)
+
+		return
+	}
+
+	rootchainInteractor, err := helper.NewDefaultRootchainInteractor(ipAddress)
 	if err != nil {
 		outputter.SetError(fmt.Errorf("failed to initialize rootchain interactor: %w", err))
 
@@ -112,14 +125,14 @@ func runCommand(cmd *cobra.Command, _ []string) {
 // This function basically copies the given initParams but updating dataDir by applying an index.
 func getParamsList() []fundParams {
 	if fundNumber == 1 {
-		return []fundParams{basicParams}
+		return []fundParams{params}
 	}
 
 	paramsList := make([]fundParams, fundNumber)
 	for i := 1; i <= fundNumber; i++ {
 		paramsList[i-1] = fundParams{
-			dataDir:    fmt.Sprintf("%s%d", basicParams.dataDir, i),
-			configPath: basicParams.configPath,
+			dataDir:    fmt.Sprintf("%s%d", params.dataDir, i),
+			configPath: params.configPath,
 		}
 	}
 

@@ -621,7 +621,7 @@ func TestConsensusRuntime_FSM_EndOfEpoch_BuildRegisterCommitment_And_Uptime(t *t
 		PolyBFTConfig: &PolyBFTConfig{
 			EpochSize:  epochSize,
 			SprintSize: sprintSize,
-			Bridge:     &BridgeConfig{},
+			Bridge:     &L1BridgeConfig{},
 		},
 		Key:        validatorAccounts.getValidator("A").Key(),
 		blockchain: blockchainMock,
@@ -683,7 +683,7 @@ func TestConsensusRuntime_FSM_EndOfEpoch_RegisterCommitmentNotFound(t *testing.T
 		PolyBFTConfig: &PolyBFTConfig{
 			EpochSize:  epochSize,
 			SprintSize: sprintSize,
-			Bridge:     &BridgeConfig{},
+			Bridge:     &L1BridgeConfig{},
 		},
 		Key:        validatorAccs.getValidator("A").Key(),
 		blockchain: blockchainMock,
@@ -768,7 +768,7 @@ func TestConsensusRuntime_FSM_EndOfEpoch_BuildRegisterCommitment_QuorumNotReache
 		PolyBFTConfig: &PolyBFTConfig{
 			EpochSize:  epochSize,
 			SprintSize: sprintSize,
-			Bridge:     &BridgeConfig{},
+			Bridge:     &L1BridgeConfig{},
 		},
 		Key:        validatorKey,
 		blockchain: blockchainMock,
@@ -802,8 +802,8 @@ func Test_NewConsensusRuntime(t *testing.T) {
 	require.NoError(t, err)
 
 	polyBftConfig := &PolyBFTConfig{
-		Bridge: &BridgeConfig{
-			BridgeAddr:      types.Address{0x13},
+		Bridge: &L1BridgeConfig{
+			StateSenderAddr: types.Address{0x13},
 			CheckpointAddr:  types.Address{0x10},
 			JSONRPCEndpoint: "testEndpoint",
 		},
@@ -830,7 +830,7 @@ func Test_NewConsensusRuntime(t *testing.T) {
 	assert.Equal(t, uint64(10), runtime.config.PolyBFTConfig.SprintSize)
 	assert.Equal(t, uint64(10), runtime.config.PolyBFTConfig.EpochSize)
 	assert.Equal(t, "0x1100000000000000000000000000000000000000", runtime.config.PolyBFTConfig.ValidatorSetAddr.String())
-	assert.Equal(t, "0x1300000000000000000000000000000000000000", runtime.config.PolyBFTConfig.Bridge.BridgeAddr.String())
+	assert.Equal(t, "0x1300000000000000000000000000000000000000", runtime.config.PolyBFTConfig.Bridge.StateSenderAddr.String())
 	assert.Equal(t, "0x1000000000000000000000000000000000000000", runtime.config.PolyBFTConfig.Bridge.CheckpointAddr.String())
 	assert.Equal(t, uint64(10), runtime.config.PolyBFTConfig.EpochSize)
 	assert.True(t, runtime.IsBridgeEnabled())
@@ -900,8 +900,8 @@ func TestConsensusRuntime_FSM_EndOfSprint_HasBundlesToExecute(t *testing.T) {
 			PolyBFTConfig: &PolyBFTConfig{
 				EpochSize:  10,
 				SprintSize: 5,
-				Bridge: &BridgeConfig{
-					BridgeAddr: types.BytesToAddress(big.NewInt(23).Bytes()),
+				Bridge: &L1BridgeConfig{
+					StateSenderAddr: types.BytesToAddress(big.NewInt(23).Bytes()),
 				},
 			},
 			Key:        validatorAccs.getValidator("A").Key(),
@@ -1208,7 +1208,7 @@ func TestConsensusRuntime_restartEpoch_FirstRestart_BuildsCommitment(t *testing.
 			BridgeTransport: transportMock,
 			Key:             localValidator.Key(),
 			PolyBFTConfig: &PolyBFTConfig{
-				Bridge: &BridgeConfig{},
+				Bridge: &L1BridgeConfig{},
 			},
 		},
 	}
@@ -1317,8 +1317,8 @@ func TestConsensusRuntime_restartEpoch_NewEpochToRun_BuildCommitment(t *testing.
 			PolyBFTConfig: &PolyBFTConfig{
 				EpochSize:  10,
 				SprintSize: 5,
-				Bridge: &BridgeConfig{
-					BridgeAddr: types.BytesToAddress(big.NewInt(23).Bytes()),
+				Bridge: &L1BridgeConfig{
+					StateSenderAddr: types.BytesToAddress(big.NewInt(23).Bytes()),
 				},
 			},
 			BridgeTransport: transportMock,
@@ -1607,7 +1607,7 @@ func TestConsensusRuntime_FSM_EndOfEpoch_OnBlockInserted(t *testing.T) {
 		PolyBFTConfig: &PolyBFTConfig{
 			EpochSize:  epochSize,
 			SprintSize: sprintSize,
-			Bridge:     &BridgeConfig{},
+			Bridge:     &L1BridgeConfig{},
 		},
 		Key:        validatorAccounts.getValidator("A").Key(),
 		blockchain: blockchainMock,

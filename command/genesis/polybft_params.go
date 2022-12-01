@@ -30,7 +30,7 @@ const (
 	sprintSizeFlag       = "sprint-size"
 	blockTimeFlag        = "block-time"
 	validatorsFlag       = "polybft-validators"
-	bridgeFlag           = "bridge"
+	bridgeFlag           = "bridge-json-rpc"
 
 	defaultEpochSize                  = uint64(10)
 	defaultSprintSize                 = uint64(5)
@@ -113,16 +113,12 @@ func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
 	}
 
 	// populate bridge configuration
-	if p.bridgeEnabled {
-		ip, err := rootchain.ReadRootchainIP()
-		if err != nil {
-			return nil, err
-		}
-
-		polyBftConfig.Bridge = &polybft.BridgeConfig{
-			BridgeAddr:      rootchain.StateSenderAddress,
+	if p.bridgeJSONRPCAddr != "" {
+		polyBftConfig.Bridge = &polybft.L1BridgeConfig{
+			// TODO: Figure out population of rootchain contracts and whether those should be part of genesis configuration
+			StateSenderAddr: rootchain.StateSenderAddress,
 			CheckpointAddr:  rootchain.CheckpointManagerAddress,
-			JSONRPCEndpoint: ip,
+			JSONRPCEndpoint: p.bridgeJSONRPCAddr,
 		}
 	}
 

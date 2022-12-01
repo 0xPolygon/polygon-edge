@@ -6,6 +6,7 @@ const (
 	contractFlag = "contract"
 	walletsFlag  = "wallets"
 	amountsFlag  = "amounts"
+	jsonRPCFlag  = "json-rpc"
 )
 
 var (
@@ -15,9 +16,10 @@ var (
 )
 
 type emitParams struct {
-	address string
-	wallets []string
-	amounts []string
+	address        string
+	wallets        []string
+	amounts        []string
+	jsonRPCAddress string
 }
 
 func (ep *emitParams) validateFlags() error {

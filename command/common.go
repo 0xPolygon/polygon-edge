@@ -2,9 +2,11 @@ package command
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 
+	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/secrets"
@@ -161,4 +163,19 @@ func getBLSPublicKeyBytesFromSecretManager(manager secrets.SecretsManager) ([]by
 	}
 
 	return pubKeyBytes, nil
+}
+
+// ResolveRootchainIP resolves rootchain JSON RPC either from the provided value or by querying local docker instance
+func ResolveRootchainIP(jsonRPCAddress string) (string, error) {
+	ipAddress := jsonRPCAddress
+	if ipAddress == "" {
+		var err error
+		ipAddress, err = helper.ReadRootchainIP()
+
+		if err != nil {
+			return "", fmt.Errorf("failed to resolve roothain IP address: %w", err)
+		}
+	}
+
+	return ipAddress, nil
 }

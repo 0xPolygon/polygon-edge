@@ -15,8 +15,8 @@ const PolyBFTConsensusName = "polybft"
 
 // PolyBFTConfig is the configuration file for the Polybft consensus protocol.
 type PolyBFTConfig struct {
-	InitialValidatorSet []*Validator  `json:"initialValidatorSet"`
-	Bridge              *BridgeConfig `json:"bridge"`
+	InitialValidatorSet []*Validator    `json:"initialValidatorSet"`
+	Bridge              *L1BridgeConfig `json:"bridge"`
 
 	ValidatorSetSize int `json:"validatorSetSize"`
 
@@ -34,7 +34,7 @@ type PolyBFTConfig struct {
 	Governance types.Address `json:"governance"`
 }
 
-// GetPolyBFTConfig unmarshals PolyBFT custom configuration from the provided chain configuration
+// GetPolyBFTConfig unmarshals PolyBFT specific configuration from the provided chain configuration
 func GetPolyBFTConfig(chainConfig *chain.Chain) (PolyBFTConfig, error) {
 	consensusConfigJSON, err := json.Marshal(chainConfig.Params.Engine[PolyBFTConsensusName])
 	if err != nil {
@@ -51,9 +51,9 @@ func GetPolyBFTConfig(chainConfig *chain.Chain) (PolyBFTConfig, error) {
 	return polyBFTConfig, nil
 }
 
-// BridgeConfig is the configuration for the bridge
-type BridgeConfig struct {
-	BridgeAddr      types.Address `json:"bridgeAddr"`
+// L1BridgeConfig is the rootchain bridge configuration
+type L1BridgeConfig struct {
+	StateSenderAddr types.Address `json:"stateSenderAddr"`
 	CheckpointAddr  types.Address `json:"checkpointAddr"`
 	JSONRPCEndpoint string        `json:"jsonRPCEndpoint"`
 }
