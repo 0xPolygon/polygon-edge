@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
 
+	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
@@ -272,7 +273,7 @@ func TestCheckpointManager_isCheckpointBlock(t *testing.T) {
 	}
 }
 
-var _ rootchainInteractor = (*dummyRootchainInteractor)(nil)
+var _ helper.RootchainInteractor = (*dummyRootchainInteractor)(nil)
 
 type dummyRootchainInteractor struct {
 	mock.Mock
@@ -294,4 +295,16 @@ func (d dummyRootchainInteractor) GetPendingNonce(address types.Address) (uint64
 	args := d.Called(address)
 
 	return args.Get(0).(uint64), args.Error(1) //nolint:forcetypeassert
+}
+
+func (d dummyRootchainInteractor) ExistsCode(contractAddr types.Address) (bool, error) {
+	args := d.Called(contractAddr)
+
+	return args.Get(0).(bool), args.Error(1) //nolint:forcetypeassert
+}
+
+func (d dummyRootchainInteractor) FundAccount(account types.Address) (types.Hash, error) {
+	args := d.Called(account)
+
+	return args.Get(0).(types.Hash), args.Error(1) //nolint:forcetypeassert
 }

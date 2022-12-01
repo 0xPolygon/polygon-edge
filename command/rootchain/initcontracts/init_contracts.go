@@ -97,7 +97,15 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		Message: fmt.Sprintf("%s started...", contractsDeploymentTitle),
 	})
 
-	if ok, err := helper.ExistsCode(helper.StateSenderAddress); err != nil {
+	// TODO: Provide IP address
+	rootchainInteractor, err := helper.NewDefaultRootchainInteractor("")
+	if err != nil {
+		outputter.SetError(fmt.Errorf("failed to initialize rootchain interactor: %w", err))
+
+		return
+	}
+
+	if ok, err := rootchainInteractor.ExistsCode(helper.StateSenderAddress); err != nil {
 		outputter.SetError(fmt.Errorf("failed to check if rootchain contracts are deployed: %w", err))
 
 		return
@@ -109,7 +117,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	if err := deployContracts(outputter); err != nil {
+	if err := deployContracts(outputter, rootchainInteractor); err != nil {
 		outputter.SetError(fmt.Errorf("failed to deploy rootchain contracts: %w", err))
 
 		return
@@ -140,10 +148,10 @@ func getGenesisAlloc() (map[types.Address]*chain.GenesisAccount, error) {
 	return chain.Genesis.Alloc, nil
 }
 
-func deployContracts(outputter command.OutputFormatter) error {
+func deployContracts(outputter command.OutputFormatter, rootchainInteractor helper.RootchainInteractor) error {
 	// if the bridge contract is not created, we have to deploy all the contracts
 	// fund account
-	if _, err := helper.FundAccount(helper.GetRootchainAdminAddr()); err != nil {
+	if _, err := rootchainInteractor.FundAccount(helper.GetRootchainAdminAddr()); err != nil {
 		return err
 	}
 
@@ -174,7 +182,7 @@ func deployContracts(outputter command.OutputFormatter) error {
 		},
 	}
 
-	pendingNonce, err := helper.GetPendingNonce(helper.GetRootchainAdminAddr())
+	pendingNonce, err := rootchainInteractor.GetPendingNonce(helper.GetRootchainAdminAddr())
 	if err != nil {
 		return err
 	}
@@ -190,7 +198,7 @@ func deployContracts(outputter command.OutputFormatter) error {
 			Input: bytecode,
 		}
 
-		receipt, err := helper.SendTxn(pendingNonce+uint64(i), txn, helper.GetRootchainAdminKey())
+		receipt, err := rootchainInteractor.SendTransaction(pendingNonce+uint64(i), txn, helper.GetRootchainAdminKey())
 		if err != nil {
 			return err
 		}
@@ -205,7 +213,7 @@ func deployContracts(outputter command.OutputFormatter) error {
 
 	pendingNonce += uint64(len(deployContracts))
 
-	if err := initializeCheckpointManager(pendingNonce); err != nil {
+	if err := initializeCheckpointManager(rootchainInteractor, pendingNonce); err != nil {
 		return err
 	}
 
@@ -217,7 +225,7 @@ func deployContracts(outputter command.OutputFormatter) error {
 }
 
 // initializeCheckpointManager invokes initialize function on CheckpointManager smart contract
-func initializeCheckpointManager(nonce uint64) error {
+func initializeCheckpointManager(rootchainInteractor helper.RootchainInteractor, nonce uint64) error {
 	allocs, err := getGenesisAlloc()
 	if err != nil {
 		return err
@@ -242,7 +250,7 @@ func initializeCheckpointManager(nonce uint64) error {
 		Input: initCheckpointInput,
 	}
 
-	receipt, err := helper.SendTxn(nonce, txn, helper.GetRootchainAdminKey())
+	receipt, err := rootchainInteractor.SendTransaction(nonce, txn, helper.GetRootchainAdminKey())
 	if err != nil {
 		return fmt.Errorf("failed to send transaction to CheckpointManager. error: %w", err)
 	}

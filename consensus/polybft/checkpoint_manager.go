@@ -43,7 +43,7 @@ type checkpointManager struct {
 	// consensusBackend is abstraction for polybft consensus specific functions
 	consensusBackend polybftBackend
 	// rootchain represents abstraction for rootchain interaction
-	rootchain rootchainInteractor
+	rootchain helper.RootchainInteractor
 	// checkpointsOffset represents offset between checkpoint blocks (applicable only for non-epoch ending blocks)
 	checkpointsOffset uint64
 	// latestCheckpointID represents last checkpointed block number
@@ -53,11 +53,11 @@ type checkpointManager struct {
 }
 
 // newCheckpointManager creates a new instance of checkpointManager
-func newCheckpointManager(signer ethgo.Key, checkpointOffset uint64, interactor rootchainInteractor,
+func newCheckpointManager(signer ethgo.Key, checkpointOffset uint64, interactor helper.RootchainInteractor,
 	blockchain blockchainBackend, backend polybftBackend, logger hclog.Logger) *checkpointManager {
 	r := interactor
 	if interactor == nil {
-		r = &defaultRootchainInteractor{}
+		r = &helper.DefaultRootchainInteractor{}
 	}
 
 	return &checkpointManager{
@@ -249,28 +249,4 @@ func (c *checkpointManager) abiEncodeCheckpointBlock(headerNumber uint64, header
 // which are offseted by predefined count of blocks
 func (c *checkpointManager) isCheckpointBlock(blockNumber uint64) bool {
 	return blockNumber == c.latestCheckpointID+c.checkpointsOffset
-}
-
-var _ rootchainInteractor = (*defaultRootchainInteractor)(nil)
-
-type rootchainInteractor interface {
-	Call(from types.Address, to types.Address, input []byte) (string, error)
-	SendTransaction(nonce uint64, transaction *ethgo.Transaction, signer ethgo.Key) (*ethgo.Receipt, error)
-	GetPendingNonce(address types.Address) (uint64, error)
-}
-
-type defaultRootchainInteractor struct {
-}
-
-func (d *defaultRootchainInteractor) Call(from types.Address, to types.Address, input []byte) (string, error) {
-	return helper.Call(ethgo.Address(from), ethgo.Address(to), input)
-}
-
-func (d *defaultRootchainInteractor) SendTransaction(nonce uint64,
-	transaction *ethgo.Transaction, signer ethgo.Key) (*ethgo.Receipt, error) {
-	return helper.SendTxn(nonce, transaction, signer)
-}
-
-func (d *defaultRootchainInteractor) GetPendingNonce(address types.Address) (uint64, error) {
-	return helper.GetPendingNonce(address)
 }

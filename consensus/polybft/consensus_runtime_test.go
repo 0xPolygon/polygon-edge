@@ -822,7 +822,8 @@ func Test_NewConsensusRuntime(t *testing.T) {
 		Key:           key,
 		blockchain:    &blockchainMock{},
 	}
-	runtime := newConsensusRuntime(hclog.NewNullLogger(), config)
+	runtime, err := newConsensusRuntime(hclog.NewNullLogger(), config)
+	require.NoError(t, err)
 
 	assert.False(t, runtime.isActiveValidator())
 	assert.Equal(t, runtime.config.DataDir, tmpDir)

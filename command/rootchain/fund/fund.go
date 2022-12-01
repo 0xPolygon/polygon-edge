@@ -70,6 +70,14 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	paramsList := getParamsList()
 	resList := make(command.Results, len(paramsList))
 
+	// TODO: Provide IP address
+	rootchainInteractor, err := helper.NewDefaultRootchainInteractor("")
+	if err != nil {
+		outputter.SetError(fmt.Errorf("failed to initialize rootchain interactor: %w", err))
+
+		return
+	}
+
 	for i, params := range paramsList {
 		if err := params.initSecretsManager(); err != nil {
 			outputter.SetError(err)
@@ -84,7 +92,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 			return
 		}
 
-		txHash, err := helper.FundAccount(validatorAcc)
+		txHash, err := rootchainInteractor.FundAccount(validatorAcc)
 		if err != nil {
 			outputter.SetError(err)
 

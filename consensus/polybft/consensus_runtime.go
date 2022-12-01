@@ -13,6 +13,7 @@ import (
 	"github.com/0xPolygon/go-ibft/messages/proto"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
+	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
@@ -125,7 +126,7 @@ type consensusRuntime struct {
 }
 
 // newConsensusRuntime creates and starts a new consensus runtime instance with event tracking
-func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) *consensusRuntime {
+func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRuntime, error) {
 	runtime := &consensusRuntime{
 		state:  config.State,
 		config: config,
@@ -133,16 +134,20 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) *consensusRuntim
 	}
 
 	if runtime.IsBridgeEnabled() {
+		rootchainInteractor, err := helper.NewDefaultRootchainInteractor(config.PolyBFTConfig.Bridge.JSONRPCEndpoint)
+		if err != nil {
+			return nil, err
+		}
 		runtime.checkpointManager = newCheckpointManager(
 			wallet.NewEcdsaSigner(config.Key),
 			defaultCheckpointsOffset,
-			&defaultRootchainInteractor{},
+			rootchainInteractor,
 			config.blockchain,
 			config.polybftBackend,
 			log.Named("checkpoint_manager"))
 	}
 
-	return runtime
+	return runtime, nil
 }
 
 // getEpoch returns current epochMetadata in a thread-safe manner.
