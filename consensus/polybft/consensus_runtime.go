@@ -138,6 +138,7 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 		if err != nil {
 			return nil, err
 		}
+
 		runtime.checkpointManager = newCheckpointManager(
 			wallet.NewEcdsaSigner(config.Key),
 			defaultCheckpointsOffset,

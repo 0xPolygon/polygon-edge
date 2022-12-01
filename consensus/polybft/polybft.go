@@ -251,6 +251,7 @@ func (p *Polybft) initRuntime() error {
 	if err != nil {
 		return err
 	}
+
 	p.runtime = runtime
 
 	return nil

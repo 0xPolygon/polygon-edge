@@ -42,6 +42,7 @@ func GetPolyBFTConfig(chainConfig *chain.Chain) (PolyBFTConfig, error) {
 	}
 
 	var polyBFTConfig PolyBFTConfig
+
 	err = json.Unmarshal(consensusConfigJSON, &polyBFTConfig)
 	if err != nil {
 		return PolyBFTConfig{}, err
