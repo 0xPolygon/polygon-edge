@@ -31,7 +31,7 @@ func TestCheckpointManager_submitCheckpoint(t *testing.T) {
 	rootchainMock.On("GetPendingNonce", mock.Anything).
 		Return(uint64(1), error(nil)).
 		Once()
-	rootchainMock.On("SendTransaction", mock.Anything, mock.Anything, mock.Anything).
+	rootchainMock.On("SendTransaction", mock.Anything, mock.Anything).
 		Return(&ethgo.Receipt{Status: uint64(types.ReceiptSuccess)}, error(nil)).
 		Times(2)
 
@@ -285,8 +285,8 @@ func (d dummyRootchainInteractor) Call(from types.Address, to types.Address, inp
 	return args.String(0), args.Error(1)
 }
 
-func (d dummyRootchainInteractor) SendTransaction(nonce uint64, transaction *ethgo.Transaction, signer ethgo.Key) (*ethgo.Receipt, error) {
-	args := d.Called(nonce, transaction, signer)
+func (d dummyRootchainInteractor) SendTransaction(transaction *ethgo.Transaction, signer ethgo.Key) (*ethgo.Receipt, error) {
+	args := d.Called(transaction, signer)
 
 	return args.Get(0).(*ethgo.Receipt), args.Error(1) //nolint:forcetypeassert
 }

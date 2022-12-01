@@ -209,9 +209,10 @@ func deployContracts(outputter command.OutputFormatter, rootchainInteractor help
 		txn := &ethgo.Transaction{
 			To:    nil, // contract deployment
 			Input: bytecode,
+			Nonce: pendingNonce + uint64(i),
 		}
 
-		receipt, err := rootchainInteractor.SendTransaction(pendingNonce+uint64(i), txn, helper.GetRootchainAdminKey())
+		receipt, err := rootchainInteractor.SendTransaction(txn, helper.GetRootchainAdminKey())
 		if err != nil {
 			return err
 		}
@@ -261,9 +262,10 @@ func initializeCheckpointManager(rootchainInteractor helper.RootchainInteractor,
 	txn := &ethgo.Transaction{
 		To:    &checkpointManagerAddress,
 		Input: initCheckpointInput,
+		Nonce: nonce,
 	}
 
-	receipt, err := rootchainInteractor.SendTransaction(nonce, txn, helper.GetRootchainAdminKey())
+	receipt, err := rootchainInteractor.SendTransaction(txn, helper.GetRootchainAdminKey())
 	if err != nil {
 		return fmt.Errorf("failed to send transaction to CheckpointManager. error: %w", err)
 	}

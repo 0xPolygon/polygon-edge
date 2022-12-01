@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/genesis"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/require"
@@ -250,7 +251,9 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		}
 
 		if cluster.Config.HasBridge {
-			args = append(args, "--bridge")
+			rootchainIP, err := command.ResolveRootchainIP("")
+			require.NoError(t, err)
+			args = append(args, "--bridge-json-rpc", rootchainIP)
 		}
 
 		validators, err := genesis.ReadValidatorsByRegexp(cluster.Config.TmpDir, cluster.Config.ValidatorPrefix)

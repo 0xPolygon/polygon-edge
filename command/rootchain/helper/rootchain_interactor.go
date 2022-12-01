@@ -3,7 +3,6 @@ package helper
 import (
 	"fmt"
 	"math/big"
-	"sync"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/types"
@@ -14,7 +13,7 @@ import (
 
 type RootchainInteractor interface {
 	Call(from types.Address, to types.Address, input []byte) (string, error)
-	SendTransaction(nonce uint64, transaction *ethgo.Transaction, signer ethgo.Key) (*ethgo.Receipt, error)
+	SendTransaction(transaction *ethgo.Transaction, signer ethgo.Key) (*ethgo.Receipt, error)
 	GetPendingNonce(address types.Address) (uint64, error)
 	ExistsCode(contractAddr types.Address) (bool, error)
 	FundAccount(account types.Address) (types.Hash, error)
@@ -24,7 +23,6 @@ var _ RootchainInteractor = (*DefaultRootchainInteractor)(nil)
 
 type DefaultRootchainInteractor struct {
 	provider *jsonrpc.Client
-	lock     sync.Mutex
 }
 
 func NewDefaultRootchainInteractor(ipAddress string) (*DefaultRootchainInteractor, error) {
@@ -37,9 +35,6 @@ func NewDefaultRootchainInteractor(ipAddress string) (*DefaultRootchainInteracto
 }
 
 func (d *DefaultRootchainInteractor) Call(from types.Address, to types.Address, input []byte) (string, error) {
-	d.lock.Lock()
-	defer d.lock.Unlock()
-
 	toAddr := ethgo.Address(to)
 	callMsg := &ethgo.CallMsg{
 		From:     ethgo.Address(from),
@@ -52,14 +47,15 @@ func (d *DefaultRootchainInteractor) Call(from types.Address, to types.Address, 
 	return d.provider.Eth().Call(callMsg, ethgo.Pending)
 }
 
-func (d *DefaultRootchainInteractor) SendTransaction(nonce uint64,
-	transaction *ethgo.Transaction, privKey ethgo.Key) (*ethgo.Receipt, error) {
-	d.lock.Lock()
-	defer d.lock.Unlock()
+func (d *DefaultRootchainInteractor) SendTransaction(txn *ethgo.Transaction,
+	privKey ethgo.Key) (*ethgo.Receipt, error) {
+	if txn.GasPrice == 0 {
+		txn.GasPrice = defaultGasPrice
+	}
 
-	transaction.GasPrice = defaultGasPrice
-	transaction.Gas = defaultGasLimit
-	transaction.Nonce = nonce
+	if txn.Gas == 0 {
+		txn.Gas = defaultGasLimit
+	}
 
 	chainID, err := d.provider.Eth().ChainID()
 	if err != nil {
@@ -67,11 +63,11 @@ func (d *DefaultRootchainInteractor) SendTransaction(nonce uint64,
 	}
 
 	signer := wallet.NewEIP155Signer(chainID.Uint64())
-	if transaction, err = signer.SignTx(transaction, privKey); err != nil {
+	if txn, err = signer.SignTx(txn, privKey); err != nil {
 		return nil, err
 	}
 
-	data, err := transaction.MarshalRLPTo(nil)
+	data, err := txn.MarshalRLPTo(nil)
 	if err != nil {
 		return nil, err
 	}
@@ -90,9 +86,6 @@ func (d *DefaultRootchainInteractor) SendTransaction(nonce uint64,
 }
 
 func (d *DefaultRootchainInteractor) GetPendingNonce(address types.Address) (uint64, error) {
-	d.lock.Lock()
-	defer d.lock.Unlock()
-
 	nonce, err := d.provider.Eth().GetNonce(ethgo.Address(address), ethgo.Pending)
 	if err != nil {
 		return 0, err
@@ -102,9 +95,6 @@ func (d *DefaultRootchainInteractor) GetPendingNonce(address types.Address) (uin
 }
 
 func (d *DefaultRootchainInteractor) ExistsCode(contractAddr types.Address) (bool, error) {
-	d.lock.Lock()
-	defer d.lock.Unlock()
-
 	code, err := d.provider.Eth().GetCode(ethgo.Address(contractAddr), ethgo.Latest)
 	if err != nil {
 		return false, err
@@ -114,9 +104,6 @@ func (d *DefaultRootchainInteractor) ExistsCode(contractAddr types.Address) (boo
 }
 
 func (d *DefaultRootchainInteractor) FundAccount(account types.Address) (types.Hash, error) {
-	d.lock.Lock()
-	defer d.lock.Unlock()
-
 	accounts, err := d.provider.Eth().Accounts()
 	if err != nil {
 		return types.Hash{}, err

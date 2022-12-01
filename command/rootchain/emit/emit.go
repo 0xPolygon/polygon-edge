@@ -116,13 +116,13 @@ func runCommand(cmd *cobra.Command, _ []string) {
 			case <-ctx.Done():
 				return ctx.Err()
 			default:
-				txn, err := createTxInput(paramsType, wallet, amount)
+				nonce := pendingNonce + walletIndex
+				txn, err := createTxInput(nonce, paramsType, wallet, amount)
 				if err != nil {
 					return fmt.Errorf("failed to create tx input: %w", err)
 				}
 
 				if _, err = rootchainInteractor.SendTransaction(
-					pendingNonce+walletIndex,
 					txn,
 					helper.GetRootchainAdminKey()); err != nil {
 					return fmt.Errorf("sending transaction to wallet: %s with amount: %s, failed with error: %w", wallet, amount, err)
@@ -146,7 +146,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	})
 }
 
-func createTxInput(paramsType string, parameters ...interface{}) (*ethgo.Transaction, error) {
+func createTxInput(nonce uint64, paramsType string, parameters ...interface{}) (*ethgo.Transaction, error) {
 	var prms []interface{}
 	prms = append(prms, parameters...)
 
@@ -165,5 +165,6 @@ func createTxInput(paramsType string, parameters ...interface{}) (*ethgo.Transac
 	return &ethgo.Transaction{
 		To:    (*ethgo.Address)(&helper.StateSenderAddress),
 		Input: input,
+		Nonce: nonce,
 	}, nil
 }
