@@ -35,7 +35,7 @@ func TestIBFTBackend_CalculateHeaderTimestamp(t *testing.T) {
 			now.Add(time.Duration(-4) * time.Second).Unix(), // 4s before
 			now,
 			3,
-			now.Add(time.Second * 1), // 1s after (next multiple)
+			roundUpTime(now, 3*time.Second),
 		},
 	}
 
