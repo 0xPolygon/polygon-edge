@@ -239,6 +239,14 @@
       "created_at": "2022-12-01T09:06:30Z",
       "repoId": 287542207,
       "pullRequestNo": 987
+    },
+    {
+      "name": "tuommaki",
+      "id": 1947505,
+      "comment_id": 1335294628,
+      "created_at": "2022-12-02T14:14:04Z",
+      "repoId": 287542207,
+      "pullRequestNo": 993
     }
   ]
 }
