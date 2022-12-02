@@ -112,7 +112,7 @@ type Polybft struct {
 
 func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *state.Transition) error {
 	return func(transition *state.Transition) error {
-		polyBFTConfig, err := GetPolyBFTConfig(config)
+		polyBFTConfig, err := getPolyBFTConfig(config)
 		if err != nil {
 			return err
 		}

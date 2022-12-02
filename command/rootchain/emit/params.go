@@ -16,10 +16,9 @@ var (
 )
 
 type emitParams struct {
-	address        string
-	wallets        []string
-	amounts        []string
-	jsonRPCAddress string
+	address string
+	wallets []string
+	amounts []string
 }
 
 func (ep *emitParams) validateFlags() error {

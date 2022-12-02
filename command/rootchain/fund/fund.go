@@ -10,8 +10,9 @@ import (
 )
 
 var (
-	params     fundParams
-	fundNumber int
+	params         fundParams
+	fundNumber     int
+	jsonRPCAddress string
 )
 
 // GetCommand returns the rootchain fund command
@@ -52,9 +53,9 @@ func setFlags(cmd *cobra.Command) {
 	)
 
 	cmd.Flags().StringVar(
-		&params.jsonRPCAddress,
+		&jsonRPCAddress,
 		jsonRPCFlag,
-		"",
+		"http://127.0.0.1:8545",
 		"the JSON RPC rootchain IP address (e.g. http://127.0.0.1:8545)",
 	)
 
@@ -77,14 +78,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	paramsList := getParamsList()
 	resList := make(command.Results, len(paramsList))
 
-	ipAddress, err := command.ResolveRootchainIP(params.jsonRPCAddress)
-	if err != nil {
-		outputter.SetError(err)
-
-		return
-	}
-
-	rootchainInteractor, err := helper.NewDefaultRootchainInteractor(ipAddress)
+	rootchainInteractor, err := helper.NewDefaultRootchainInteractor(jsonRPCAddress)
 	if err != nil {
 		outputter.SetError(fmt.Errorf("failed to initialize rootchain interactor: %w", err))
 

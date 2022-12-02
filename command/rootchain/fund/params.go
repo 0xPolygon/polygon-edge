@@ -22,9 +22,8 @@ var (
 )
 
 type fundParams struct {
-	dataDir        string
-	configPath     string
-	jsonRPCAddress string
+	dataDir    string
+	configPath string
 
 	secretsManager secrets.SecretsManager
 	secretsConfig  *secrets.SecretsManagerConfig

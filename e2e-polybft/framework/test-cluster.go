@@ -15,8 +15,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/genesis"
+	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/require"
 )
@@ -251,7 +251,7 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		}
 
 		if cluster.Config.HasBridge {
-			rootchainIP, err := command.ResolveRootchainIP("")
+			rootchainIP, err := helper.ReadRootchainIP()
 			require.NoError(t, err)
 			args = append(args, "--bridge-json-rpc", rootchainIP)
 		}

@@ -87,7 +87,7 @@ func setFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(
 		&params.jsonRPCAddress,
 		jsonRPCFlag,
-		"",
+		"http://127.0.0.1:8545",
 		"the JSON RPC rootchain IP address (e.g. http://127.0.0.1:8545)",
 	)
 }
@@ -104,14 +104,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		Message: fmt.Sprintf("%s started...", contractsDeploymentTitle),
 	})
 
-	ipAddress, err := command.ResolveRootchainIP(params.jsonRPCAddress)
-	if err != nil {
-		outputter.SetError(err)
-
-		return
-	}
-
-	rootchainInteractor, err := helper.NewDefaultRootchainInteractor(ipAddress)
+	rootchainInteractor, err := helper.NewDefaultRootchainInteractor(params.jsonRPCAddress)
 	if err != nil {
 		outputter.SetError(fmt.Errorf("failed to initialize rootchain interactor: %w", err))
 

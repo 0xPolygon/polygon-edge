@@ -17,6 +17,8 @@ import (
 var (
 	params emitParams
 
+	jsonRPCAddress string
+
 	contractsToParamTypes = map[string]string{
 		contracts.NativeTokenContract.String(): "tuple(address,uint256)",
 	}
@@ -61,9 +63,9 @@ func setFlags(cmd *cobra.Command) {
 	)
 
 	cmd.Flags().StringVar(
-		&params.jsonRPCAddress,
+		&jsonRPCAddress,
 		jsonRPCFlag,
-		"",
+		"http://127.0.0.1:8545",
 		"the JSON RPC rootchain IP address (e.g. http://127.0.0.1:8545)",
 	)
 }
@@ -83,14 +85,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	ipAddress, err := command.ResolveRootchainIP(params.jsonRPCAddress)
-	if err != nil {
-		outputter.SetError(err)
-
-		return
-	}
-
-	rootchainInteractor, err := helper.NewDefaultRootchainInteractor(ipAddress)
+	rootchainInteractor, err := helper.NewDefaultRootchainInteractor(jsonRPCAddress)
 	if err != nil {
 		outputter.SetError(fmt.Errorf("could not create rootchain interactor: %w", err))
 

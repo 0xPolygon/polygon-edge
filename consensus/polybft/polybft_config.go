@@ -34,16 +34,16 @@ type PolyBFTConfig struct {
 	Governance types.Address `json:"governance"`
 }
 
-// GetPolyBFTConfig unmarshals PolyBFT specific configuration from the provided chain configuration
-func GetPolyBFTConfig(chainConfig *chain.Chain) (PolyBFTConfig, error) {
+// getPolyBFTConfig unmarshals PolyBFT specific configuration from the provided chain configuration
+func getPolyBFTConfig(chainConfig *chain.Chain) (PolyBFTConfig, error) {
 	consensusConfigJSON, err := json.Marshal(chainConfig.Params.Engine[PolyBFTConsensusName])
 	if err != nil {
 		return PolyBFTConfig{}, err
 	}
 
 	var polyBFTConfig PolyBFTConfig
-
 	err = json.Unmarshal(consensusConfigJSON, &polyBFTConfig)
+
 	if err != nil {
 		return PolyBFTConfig{}, err
 	}
