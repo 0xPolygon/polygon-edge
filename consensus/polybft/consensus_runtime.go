@@ -13,10 +13,10 @@ import (
 	"github.com/0xPolygon/go-ibft/messages/proto"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
-	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
+	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	hcf "github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
@@ -134,7 +134,7 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 	}
 
 	if runtime.IsBridgeEnabled() {
-		rootchainInteractor, err := helper.NewDefaultRootchainInteractor(config.PolyBFTConfig.Bridge.JSONRPCEndpoint)
+		txRelayer, err := txrelayer.NewTxRelayer(config.PolyBFTConfig.Bridge.JSONRPCEndpoint)
 		if err != nil {
 			return nil, err
 		}
@@ -142,7 +142,7 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 		runtime.checkpointManager = newCheckpointManager(
 			wallet.NewEcdsaSigner(config.Key),
 			defaultCheckpointsOffset,
-			rootchainInteractor,
+			txRelayer,
 			config.blockchain,
 			config.polybftBackend,
 			log.Named("checkpoint_manager"))

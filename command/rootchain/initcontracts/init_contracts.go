@@ -15,6 +15,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
+	"github.com/umbracle/ethgo/jsonrpc"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
@@ -23,6 +24,7 @@ import (
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
+	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -83,7 +85,6 @@ func setFlags(cmd *cobra.Command) {
 		defaultGenesisPath,
 		"Genesis configuration path",
 	)
-
 	cmd.Flags().StringVar(
 		&params.jsonRPCAddress,
 		jsonRPCFlag,
@@ -104,14 +105,15 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		Message: fmt.Sprintf("%s started...", contractsDeploymentTitle),
 	})
 
-	rootchainInteractor, err := helper.NewDefaultRootchainInteractor(params.jsonRPCAddress)
+	client, err := jsonrpc.NewClient(params.jsonRPCAddress)
 	if err != nil {
-		outputter.SetError(fmt.Errorf("failed to initialize rootchain interactor: %w", err))
+		outputter.SetError(fmt.Errorf("failed to initialize JSON RPC client for provided IP address: %s: %w",
+			params.jsonRPCAddress, err))
 
 		return
 	}
 
-	if ok, err := rootchainInteractor.ExistsCode(helper.StateSenderAddress); err != nil {
+	if ok, err := helper.ContractExists(client, helper.StateSenderAddress); err != nil {
 		outputter.SetError(fmt.Errorf("failed to check if rootchain contracts are deployed: %w", err))
 
 		return
@@ -123,7 +125,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	if err := deployContracts(outputter, rootchainInteractor); err != nil {
+	if err := deployContracts(outputter); err != nil {
 		outputter.SetError(fmt.Errorf("failed to deploy rootchain contracts: %w", err))
 
 		return
@@ -154,10 +156,16 @@ func getGenesisAlloc() (map[types.Address]*chain.GenesisAccount, error) {
 	return chain.Genesis.Alloc, nil
 }
 
-func deployContracts(outputter command.OutputFormatter, rootchainInteractor helper.RootchainInteractor) error {
+func deployContracts(outputter command.OutputFormatter) error {
 	// if the bridge contract is not created, we have to deploy all the contracts
 	// fund account
-	if _, err := rootchainInteractor.FundAccount(helper.GetRootchainAdminAddr()); err != nil {
+	txRelayer, err := txrelayer.NewTxRelayer(params.jsonRPCAddress)
+	if err != nil {
+		return fmt.Errorf("failed to initialize tx relayer: %w", err)
+	}
+
+	// TODO: @Stefan-Ethernal Skip FundAccount part in follow up PR if in "dev" mode
+	if _, err := helper.FundAccount(params.jsonRPCAddress, helper.GetRootchainAdminAddr()); err != nil {
 		return err
 	}
 
@@ -188,12 +196,7 @@ func deployContracts(outputter command.OutputFormatter, rootchainInteractor help
 		},
 	}
 
-	pendingNonce, err := rootchainInteractor.GetPendingNonce(helper.GetRootchainAdminAddr())
-	if err != nil {
-		return err
-	}
-
-	for i, contract := range deployContracts {
+	for _, contract := range deployContracts {
 		bytecode, err := readContractBytecode(params.contractsPath, contract.path, contract.name)
 		if err != nil {
 			return err
@@ -202,10 +205,9 @@ func deployContracts(outputter command.OutputFormatter, rootchainInteractor help
 		txn := &ethgo.Transaction{
 			To:    nil, // contract deployment
 			Input: bytecode,
-			Nonce: pendingNonce + uint64(i),
 		}
 
-		receipt, err := rootchainInteractor.SendTransaction(txn, helper.GetRootchainAdminKey())
+		receipt, err := txRelayer.SendTransaction(txn, helper.GetRootchainAdminKey())
 		if err != nil {
 			return err
 		}
@@ -218,9 +220,7 @@ func deployContracts(outputter command.OutputFormatter, rootchainInteractor help
 		outputter.WriteCommandResult(newDeployContractsResult(contract.name, contract.expected, receipt.TransactionHash))
 	}
 
-	pendingNonce += uint64(len(deployContracts))
-
-	if err := initializeCheckpointManager(rootchainInteractor, pendingNonce); err != nil {
+	if err := initializeCheckpointManager(txRelayer); err != nil {
 		return err
 	}
 
@@ -232,7 +232,7 @@ func deployContracts(outputter command.OutputFormatter, rootchainInteractor help
 }
 
 // initializeCheckpointManager invokes initialize function on CheckpointManager smart contract
-func initializeCheckpointManager(rootchainInteractor helper.RootchainInteractor, nonce uint64) error {
+func initializeCheckpointManager(txRelayer txrelayer.TxRelayer) error {
 	allocs, err := getGenesisAlloc()
 	if err != nil {
 		return err
@@ -255,10 +255,9 @@ func initializeCheckpointManager(rootchainInteractor helper.RootchainInteractor,
 	txn := &ethgo.Transaction{
 		To:    &checkpointManagerAddress,
 		Input: initCheckpointInput,
-		Nonce: nonce,
 	}
 
-	receipt, err := rootchainInteractor.SendTransaction(txn, helper.GetRootchainAdminKey())
+	receipt, err := txRelayer.SendTransaction(txn, helper.GetRootchainAdminKey())
 	if err != nil {
 		return fmt.Errorf("failed to send transaction to CheckpointManager. error: %w", err)
 	}

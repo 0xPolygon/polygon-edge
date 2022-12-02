@@ -11,6 +11,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/contracts"
+	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -85,14 +86,14 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	rootchainInteractor, err := helper.NewDefaultRootchainInteractor(jsonRPCAddress)
+	txRelayer, err := txrelayer.NewTxRelayer(jsonRPCAddress)
 	if err != nil {
 		outputter.SetError(fmt.Errorf("could not create rootchain interactor: %w", err))
 
 		return
 	}
 
-	pendingNonce, err := rootchainInteractor.GetPendingNonce(helper.GetRootchainAdminAddr())
+	pendingNonce, err := txRelayer.GetNonce(ethgo.Address(helper.GetRootchainAdminAddr()))
 	if err != nil {
 		outputter.SetError(fmt.Errorf("could not get pending nonce: %w", err))
 
@@ -111,13 +112,12 @@ func runCommand(cmd *cobra.Command, _ []string) {
 			case <-ctx.Done():
 				return ctx.Err()
 			default:
-				nonce := pendingNonce + walletIndex
-				txn, err := createTxInput(nonce, paramsType, wallet, amount)
+				txn, err := createEmitTxn(pendingNonce+walletIndex, paramsType, wallet, amount)
 				if err != nil {
 					return fmt.Errorf("failed to create tx input: %w", err)
 				}
 
-				if _, err = rootchainInteractor.SendTransaction(
+				if _, err = txRelayer.SendTransaction(
 					txn,
 					helper.GetRootchainAdminKey()); err != nil {
 					return fmt.Errorf("sending transaction to wallet: %s with amount: %s, failed with error: %w", wallet, amount, err)
@@ -141,7 +141,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	})
 }
 
-func createTxInput(nonce uint64, paramsType string, parameters ...interface{}) (*ethgo.Transaction, error) {
+func createEmitTxn(nonce uint64, paramsType string, parameters ...interface{}) (*ethgo.Transaction, error) {
 	var prms []interface{}
 	prms = append(prms, parameters...)
 
