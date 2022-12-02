@@ -1,6 +1,7 @@
 package ibft
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"time"
@@ -152,8 +153,9 @@ func (i *backendIBFT) buildBlock(parent *types.Header) (*types.Block, error) {
 		return nil, err
 	}
 
-	// set the timestamp
-	header.Timestamp = uint64(time.Now().Unix())
+	// Set the header timestamp
+	potentialTimestamp := i.calcHeaderTimestamp(parent.Timestamp, time.Now())
+	header.Timestamp = uint64(potentialTimestamp.Unix())
 
 	parentCommittedSeals, err := i.extractParentCommittedSeals(parent)
 	if err != nil {
@@ -167,7 +169,16 @@ func (i *backendIBFT) buildBlock(parent *types.Header) (*types.Block, error) {
 		return nil, err
 	}
 
-	txs := i.writeTransactions(gasLimit, header.Number, transition)
+	// Get the block transactions
+	writeCtx, cancelFn := context.WithDeadline(context.Background(), potentialTimestamp)
+	defer cancelFn()
+
+	txs := i.writeTransactions(
+		writeCtx,
+		gasLimit,
+		header.Number,
+		transition,
+	)
 
 	if err := i.PreCommitState(header, transition); err != nil {
 		return nil, err
@@ -201,6 +212,31 @@ func (i *backendIBFT) buildBlock(parent *types.Header) (*types.Block, error) {
 	return block, nil
 }
 
+// calcHeaderTimestamp calculates the new block timestamp, based
+// on the block time and parent timestamp
+func (i *backendIBFT) calcHeaderTimestamp(parentUnix uint64, currentTime time.Time) time.Time {
+	var (
+		parentTimestamp    = time.Unix(int64(parentUnix), 0)
+		potentialTimestamp = parentTimestamp.Add(i.blockTime)
+	)
+
+	if potentialTimestamp.Before(currentTime) {
+		// The deadline for creating this next block
+		// has passed, round it to the nearest
+		// multiple of block time
+		// t........t+blockT...x (t+blockT.x; now).....t+blockT (potential)
+		potentialTimestamp = roundUpTime(currentTime, i.blockTime)
+	}
+
+	return potentialTimestamp
+}
+
+// roundUpTime rounds up the specified time to the
+// nearest higher multiple
+func roundUpTime(t time.Time, roundOn time.Duration) time.Time {
+	return t.Add(roundOn / 2).Round(roundOn)
+}
+
 type status uint8
 
 const (
@@ -220,6 +256,7 @@ type transitionInterface interface {
 }
 
 func (i *backendIBFT) writeTransactions(
+	writeCtx context.Context,
 	gasLimit,
 	blockNumber uint64,
 	transition transitionInterface,
@@ -231,8 +268,6 @@ func (i *backendIBFT) writeTransactions(
 	}
 
 	var (
-		blockTimer = time.NewTimer(i.blockTime)
-
 		successful = 0
 		failed     = 0
 		skipped    = 0
@@ -253,7 +288,7 @@ func (i *backendIBFT) writeTransactions(
 write:
 	for {
 		select {
-		case <-blockTimer.C:
+		case <-writeCtx.Done():
 			return
 		default:
 			// execute transactions one by one
@@ -282,7 +317,7 @@ write:
 	}
 
 	//	wait for the timer to expire
-	<-blockTimer.C
+	<-writeCtx.Done()
 
 	return
 }
