@@ -114,9 +114,9 @@ func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
 
 	// populate bridge configuration
 	if p.bridgeJSONRPCAddr != "" {
-		polyBftConfig.Bridge = &polybft.L1BridgeConfig{
+		polyBftConfig.Bridge = &polybft.BridgeConfig{
 			// TODO: Figure out population of rootchain contracts and whether those should be part of genesis configuration
-			StateSenderAddr: rootchain.StateSenderAddress,
+			BridgeAddr:      rootchain.StateSenderAddress,
 			CheckpointAddr:  rootchain.CheckpointManagerAddress,
 			JSONRPCEndpoint: p.bridgeJSONRPCAddr,
 		}

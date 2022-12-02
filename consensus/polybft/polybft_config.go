@@ -6,17 +6,14 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/chain"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-const PolyBFTConsensusName = "polybft"
-
 // PolyBFTConfig is the configuration file for the Polybft consensus protocol.
 type PolyBFTConfig struct {
-	InitialValidatorSet []*Validator    `json:"initialValidatorSet"`
-	Bridge              *L1BridgeConfig `json:"bridge"`
+	InitialValidatorSet []*Validator  `json:"initialValidatorSet"`
+	Bridge              *BridgeConfig `json:"bridge"`
 
 	ValidatorSetSize int `json:"validatorSetSize"`
 
@@ -34,26 +31,9 @@ type PolyBFTConfig struct {
 	Governance types.Address `json:"governance"`
 }
 
-// getPolyBFTConfig unmarshals PolyBFT specific configuration from the provided chain configuration
-func getPolyBFTConfig(chainConfig *chain.Chain) (PolyBFTConfig, error) {
-	consensusConfigJSON, err := json.Marshal(chainConfig.Params.Engine[PolyBFTConsensusName])
-	if err != nil {
-		return PolyBFTConfig{}, err
-	}
-
-	var polyBFTConfig PolyBFTConfig
-	err = json.Unmarshal(consensusConfigJSON, &polyBFTConfig)
-
-	if err != nil {
-		return PolyBFTConfig{}, err
-	}
-
-	return polyBFTConfig, nil
-}
-
-// L1BridgeConfig is the rootchain bridge configuration
-type L1BridgeConfig struct {
-	StateSenderAddr types.Address `json:"stateSenderAddr"`
+// BridgeConfig is the rootchain bridge configuration
+type BridgeConfig struct {
+	BridgeAddr      types.Address `json:"stateSenderAddr"`
 	CheckpointAddr  types.Address `json:"checkpointAddr"`
 	JSONRPCEndpoint string        `json:"jsonRPCEndpoint"`
 }

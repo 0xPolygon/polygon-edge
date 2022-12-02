@@ -1570,7 +1570,7 @@ func TestFSM_Validate_FailToVerifySignatures(t *testing.T) {
 
 	fsm := &fsm{
 		parent:                       parent,
-		config:                       &PolyBFTConfig{Bridge: &L1BridgeConfig{}},
+		config:                       &PolyBFTConfig{Bridge: &BridgeConfig{}},
 		backend:                      &blockchainMock{},
 		polybftBackend:               polybftBackendMock,
 		validators:                   validatorSet,
