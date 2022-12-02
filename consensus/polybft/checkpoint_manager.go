@@ -116,10 +116,10 @@ func (c *checkpointManager) submitCheckpoint(latestHeader types.Header, isEndOfE
 
 	if initialBlockNumber < latestHeader.Number {
 		found := false
-		parentHeader, found = c.blockchain.GetHeaderByNumber(lastCheckpointBlockNumber)
+		parentHeader, found = c.blockchain.GetHeaderByNumber(initialBlockNumber)
 
 		if !found {
-			return fmt.Errorf("block %d was not found", lastCheckpointBlockNumber)
+			return fmt.Errorf("block %d was not found", initialBlockNumber)
 		}
 
 		parentExtra, err = GetIbftExtra(parentHeader.ExtraData)
@@ -129,7 +129,7 @@ func (c *checkpointManager) submitCheckpoint(latestHeader types.Header, isEndOfE
 	}
 
 	// detect any pending (previously failed) checkpoints and send them
-	for blockNumber := initialBlockNumber; blockNumber < latestHeader.Number; blockNumber++ {
+	for blockNumber := initialBlockNumber + 1; blockNumber < latestHeader.Number; blockNumber++ {
 		currentHeader, found := c.blockchain.GetHeaderByNumber(blockNumber)
 		if !found {
 			return fmt.Errorf("block %d was not found", blockNumber)
@@ -142,17 +142,20 @@ func (c *checkpointManager) submitCheckpoint(latestHeader types.Header, isEndOfE
 
 		parentEpochNumber := parentExtra.Checkpoint.EpochNumber
 		currentEpochNumber := currentExtra.Checkpoint.EpochNumber
-		parentHeader = currentHeader
-		parentExtra = currentExtra
-
 		// send pending checkpoints only for epoch ending blocks
 		if blockNumber == 1 || parentEpochNumber == currentEpochNumber {
+			parentHeader = currentHeader
+			parentExtra = currentExtra
+
 			continue
 		}
 
 		if err = c.encodeAndSendCheckpoint(txn, *parentHeader, *parentExtra, true); err != nil {
 			return err
 		}
+
+		parentHeader = currentHeader
+		parentExtra = currentExtra
 	}
 
 	// we need to send checkpoint for the latest block
