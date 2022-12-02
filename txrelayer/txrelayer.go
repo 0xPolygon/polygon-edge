@@ -63,15 +63,6 @@ func (t *TxRelayerImpl) Call(from ethgo.Address, to ethgo.Address, input []byte)
 
 // SendTransaction signs given transaction by provided key and sends it to the blockchain
 func (t *TxRelayerImpl) SendTransaction(txn *ethgo.Transaction, key ethgo.Key) (*ethgo.Receipt, error) {
-	if txn.Nonce == 0 {
-		pendingNonce, err := t.client.Eth().GetNonce(txn.From, ethgo.Pending)
-		if err != nil {
-			return nil, err
-		}
-
-		txn.Nonce = pendingNonce
-	}
-
 	if txn.GasPrice == 0 {
 		txn.GasPrice = defaultGasPrice
 	}

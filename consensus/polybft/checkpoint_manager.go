@@ -188,6 +188,11 @@ func (c *checkpointManager) encodeAndSendCheckpoint(txn *ethgo.Transaction,
 
 	txn.Input = input
 
+	txn.Nonce, err = c.txRelayer.GetNonce(ethgo.Address(c.signerAddress))
+	if err != nil {
+		return err
+	}
+
 	receipt, err := c.txRelayer.SendTransaction(txn, c.signer)
 	if err != nil {
 		return err
