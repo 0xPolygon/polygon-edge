@@ -121,6 +121,10 @@ func TestProposerCalculator_SamePriority(t *testing.T) {
 	proposerR2, err := pc.CalcProposer(2)
 	require.NoError(t, err)
 	assert.Equal(t, types.Address{0x1}, proposerR2)
+
+	proposerR2, err = pc.CalcProposer(2) // call again same round
+	require.NoError(t, err)
+	assert.Equal(t, types.Address{0x1}, proposerR2)
 }
 
 func TestProposerCalculator_ProposerSelection1(t *testing.T) {

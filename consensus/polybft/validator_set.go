@@ -93,7 +93,7 @@ func (vs validatorSet) HasQuorum(signers map[types.Address]struct{}) bool {
 }
 
 func (vs validatorSet) Accounts() AccountSet {
-	return vs.validators // TODO: do we need copy here? I think not
+	return vs.validators
 }
 
 func (vs validatorSet) Includes(address types.Address) bool {
