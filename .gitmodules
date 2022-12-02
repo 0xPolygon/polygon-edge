@@ -6,4 +6,4 @@
 	path = core-contracts
 	url = https://github.com/0xPolygon/core-contracts
 	shallow = true
-	branch = dev-ethernal
+	branch = feat-polybft-release
