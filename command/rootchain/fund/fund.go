@@ -2,11 +2,14 @@ package fund
 
 import (
 	"fmt"
+	"math/big"
 
 	"github.com/spf13/cobra"
+	"github.com/umbracle/ethgo"
 
 	"github.com/0xPolygon/polygon-edge/command"
-	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
+	"github.com/0xPolygon/polygon-edge/txrelayer"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 var (
@@ -78,6 +81,13 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	paramsList := getParamsList()
 	resList := make(command.Results, len(paramsList))
 
+	txRelayer, err := txrelayer.NewTxRelayer(jsonRPCAddress)
+	if err != nil {
+		outputter.SetError(fmt.Errorf("failed to initialize tx relayer: %w", err))
+
+		return
+	}
+
 	for i, params := range paramsList {
 		if err := params.initSecretsManager(); err != nil {
 			outputter.SetError(err)
@@ -92,7 +102,13 @@ func runCommand(cmd *cobra.Command, _ []string) {
 			return
 		}
 
-		txHash, err := helper.FundAccount(jsonRPCAddress, validatorAcc)
+		fundAddr := ethgo.Address(validatorAcc)
+		txn := &ethgo.Transaction{
+			To:    &fundAddr,
+			Value: big.NewInt(1000000000000000000),
+		}
+
+		receipt, err := txRelayer.SendTransactionLocal(txn)
 		if err != nil {
 			outputter.SetError(err)
 
@@ -101,7 +117,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 		resList[i] = &result{
 			ValidatorAddr: validatorAcc,
-			TxHash:        txHash,
+			TxHash:        types.Hash(receipt.TransactionHash),
 		}
 	}
 

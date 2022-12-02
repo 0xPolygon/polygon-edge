@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"math/big"
 	"os"
 	"path"
 	"path/filepath"
@@ -113,11 +114,12 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	if ok, err := helper.ContractExists(client, helper.StateSenderAddress); err != nil {
+	code, err := client.Eth().GetCode(ethgo.Address(helper.StateSenderAddress), ethgo.Latest)
+	if err != nil {
 		outputter.SetError(fmt.Errorf("failed to check if rootchain contracts are deployed: %w", err))
 
 		return
-	} else if ok {
+	} else if code != "0x" {
 		outputter.SetCommandResult(&messageResult{
 			Message: fmt.Sprintf("%s contracts are already deployed. Aborting.", contractsDeploymentTitle),
 		})
@@ -158,14 +160,18 @@ func getGenesisAlloc() (map[types.Address]*chain.GenesisAccount, error) {
 
 func deployContracts(outputter command.OutputFormatter) error {
 	// if the bridge contract is not created, we have to deploy all the contracts
-	// fund account
 	txRelayer, err := txrelayer.NewTxRelayer(params.jsonRPCAddress)
 	if err != nil {
 		return fmt.Errorf("failed to initialize tx relayer: %w", err)
 	}
 
 	// TODO: @Stefan-Ethernal Skip FundAccount part in follow up PR if in "dev" mode
-	if _, err := helper.FundAccount(params.jsonRPCAddress, helper.GetRootchainAdminAddr()); err != nil {
+	// fund account
+	rootchainAdminAddr := ethgo.Address(helper.GetRootchainAdminAddr())
+	txn := &ethgo.Transaction{To: &rootchainAdminAddr, Value: big.NewInt(1000000000000000000)}
+
+	_, err = txRelayer.SendTransactionLocal(txn)
+	if err != nil {
 		return err
 	}
 

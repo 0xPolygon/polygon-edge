@@ -25,37 +25,27 @@ type TxRelayer interface {
 	// Call executes a message call immediately without creating a transaction on the blockchain
 	Call(from ethgo.Address, to ethgo.Address, input []byte) (string, error)
 	// SendTransaction signs given transaction by provided key and sends it to the blockchain
-	SendTransaction(transaction *ethgo.Transaction, key ethgo.Key) (*ethgo.Receipt, error)
+	SendTransaction(txn *ethgo.Transaction, key ethgo.Key) (*ethgo.Receipt, error)
+	// SendTransactionLocal sends non-signed transaction
+	// (this function is meant only for testing purposes and is about to be removed at some point)
+	SendTransactionLocal(txn *ethgo.Transaction) (*ethgo.Receipt, error)
 	// GetNonce queries nonce for the provided account
 	GetNonce(address ethgo.Address) (uint64, error)
 }
 
+var _ TxRelayer = (*TxRelayerImpl)(nil)
+
 type TxRelayerImpl struct {
-	client       *jsonrpc.Client
-	localAccount bool
+	client *jsonrpc.Client
 }
 
-func NewTxRelayer(ipAddr string, opts ...TxRelayerOption) (*TxRelayerImpl, error) {
+func NewTxRelayer(ipAddr string) (TxRelayer, error) {
 	client, err := jsonrpc.NewClient(ipAddr)
 	if err != nil {
 		return nil, err
 	}
 
-	t := &TxRelayerImpl{client: client}
-	for _, opt := range opts {
-		opt(t)
-	}
-
-	return t, nil
-}
-
-func NewTxRelayerWithClient(client *jsonrpc.Client, opts ...TxRelayerOption) *TxRelayerImpl {
-	t := &TxRelayerImpl{client: client}
-	for _, opt := range opts {
-		opt(t)
-	}
-
-	return t
+	return &TxRelayerImpl{client: client}, nil
 }
 
 // Call executes a message call immediately without creating a transaction on the blockchain
@@ -73,37 +63,10 @@ func (t *TxRelayerImpl) Call(from ethgo.Address, to ethgo.Address, input []byte)
 
 // SendTransaction signs given transaction by provided key and sends it to the blockchain
 func (t *TxRelayerImpl) SendTransaction(txn *ethgo.Transaction, key ethgo.Key) (*ethgo.Receipt, error) {
-	var (
-		txnHash ethgo.Hash
-		err     error
-	)
-
-	if !t.localAccount {
-		txnHash, err = t.sendSignedTransaction(txn, key)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		txnHash, err = t.sendNonSignedTransaction(txn)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return t.waitForReceipt(txnHash)
-}
-
-// GetNonce queries nonce for the provided account
-func (t *TxRelayerImpl) GetNonce(address ethgo.Address) (uint64, error) {
-	return t.client.Eth().GetNonce(address, ethgo.Pending)
-}
-
-// sendSignedTransaction sends signed transaction
-func (t *TxRelayerImpl) sendSignedTransaction(txn *ethgo.Transaction, key ethgo.Key) (ethgo.Hash, error) {
 	if txn.Nonce == 0 {
 		pendingNonce, err := t.client.Eth().GetNonce(txn.From, ethgo.Pending)
 		if err != nil {
-			return ethgo.ZeroHash, err
+			return nil, err
 		}
 
 		txn.Nonce = pendingNonce
@@ -119,41 +82,52 @@ func (t *TxRelayerImpl) sendSignedTransaction(txn *ethgo.Transaction, key ethgo.
 
 	chainID, err := t.client.Eth().ChainID()
 	if err != nil {
-		return ethgo.ZeroHash, err
+		return nil, err
 	}
 
 	signer := wallet.NewEIP155Signer(chainID.Uint64())
 	if txn, err = signer.SignTx(txn, key); err != nil {
-		return ethgo.ZeroHash, err
+		return nil, err
 	}
 
 	data, err := txn.MarshalRLPTo(nil)
 	if err != nil {
-		return ethgo.ZeroHash, err
+		return nil, err
 	}
 
-	return t.client.Eth().SendRawTransaction(data)
+	txnHash, err := t.client.Eth().SendRawTransaction(data)
+	if err != nil {
+		return nil, err
+	}
+
+	return t.waitForReceipt(txnHash)
 }
 
-// sendNonSignedTransaction sends non signed transaction, where sender is the first of available accounts.
-// It can be invoked only with enabled local account mode
-func (t *TxRelayerImpl) sendNonSignedTransaction(txn *ethgo.Transaction) (ethgo.Hash, error) {
-	if !t.localAccount {
-		return ethgo.ZeroHash, errNonSignedTxnNotSupported
-	}
-
+// SendTransactionLocal sends non-signed transaction
+// (this function is meant only for testing purposes and is about to be removed at some point)
+func (t TxRelayerImpl) SendTransactionLocal(txn *ethgo.Transaction) (*ethgo.Receipt, error) {
 	accounts, err := t.client.Eth().Accounts()
 	if err != nil {
-		return ethgo.ZeroHash, err
+		return nil, err
 	}
 
 	if len(accounts) == 0 {
-		return ethgo.ZeroHash, errNoAccounts
+		return nil, errNoAccounts
 	}
 
 	txn.From = accounts[0]
 
-	return t.client.Eth().SendTransaction(txn)
+	txnHash, err := t.client.Eth().SendTransaction(txn)
+	if err != nil {
+		return nil, err
+	}
+
+	return t.waitForReceipt(txnHash)
+}
+
+// GetNonce queries nonce for the provided account
+func (t *TxRelayerImpl) GetNonce(address ethgo.Address) (uint64, error) {
+	return t.client.Eth().GetNonce(address, ethgo.Pending)
 }
 
 func (t *TxRelayerImpl) waitForReceipt(hash ethgo.Hash) (*ethgo.Receipt, error) {
@@ -177,13 +151,5 @@ func (t *TxRelayerImpl) waitForReceipt(hash ethgo.Hash) (*ethgo.Receipt, error) 
 
 		time.Sleep(50 * time.Millisecond)
 		count++
-	}
-}
-
-type TxRelayerOption func(*TxRelayerImpl)
-
-func WithLocalAccount() TxRelayerOption {
-	return func(t *TxRelayerImpl) {
-		t.localAccount = true
 	}
 }

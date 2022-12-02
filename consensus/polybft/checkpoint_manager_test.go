@@ -290,6 +290,13 @@ func (d dummyTxRelayer) SendTransaction(transaction *ethgo.Transaction, key ethg
 	return args.Get(0).(*ethgo.Receipt), args.Error(1) //nolint:forcetypeassert
 }
 
+// SendTransactionLocal sends non-signed transaction (this is only for testing purposes)
+func (d dummyTxRelayer) SendTransactionLocal(txn *ethgo.Transaction) (*ethgo.Receipt, error) {
+	args := d.Called(txn)
+
+	return args.Get(0).(*ethgo.Receipt), args.Error(1) //nolint:forcetypeassert
+}
+
 // GetNonce queries nonce for the provided account
 func (d dummyTxRelayer) GetNonce(address ethgo.Address) (uint64, error) {
 	args := d.Called(address)

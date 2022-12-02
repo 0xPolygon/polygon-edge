@@ -2,6 +2,7 @@ package genesis
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"math/big"
 	"path"
@@ -42,11 +43,19 @@ const (
 	bootnodePortStart = 30301
 )
 
+var (
+	errNoGenesisValidators = errors.New("genesis validators aren't provided")
+)
+
 func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
 	// set initial validator set
 	genesisValidators, err := p.getGenesisValidators()
 	if err != nil {
 		return nil, err
+	}
+
+	if len(genesisValidators) == 0 {
+		return nil, errNoGenesisValidators
 	}
 
 	// deploy genesis contracts

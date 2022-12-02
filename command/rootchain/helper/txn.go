@@ -2,13 +2,10 @@ package helper
 
 import (
 	"encoding/hex"
-	"math/big"
 
 	"github.com/umbracle/ethgo"
-	"github.com/umbracle/ethgo/jsonrpc"
 	"github.com/umbracle/ethgo/wallet"
 
-	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -42,35 +39,4 @@ func GetRootchainAdminAddr() types.Address {
 
 func GetRootchainAdminKey() ethgo.Key {
 	return rootchainAdminKey
-}
-
-func ContractExists(client *jsonrpc.Client, contractAddr types.Address) (bool, error) {
-	code, err := client.Eth().GetCode(ethgo.Address(contractAddr), ethgo.Latest)
-	if err != nil {
-		return false, err
-	}
-
-	return code != "0x", nil
-}
-
-// FundAccount funds provided account.
-// Used only for testing purposes.
-func FundAccount(ipAddress string, address types.Address) (types.Hash, error) {
-	txRelayer, err := txrelayer.NewTxRelayer(ipAddress, txrelayer.WithLocalAccount())
-	if err != nil {
-		return types.ZeroHash, err
-	}
-
-	fundAddr := ethgo.Address(address)
-	txn := &ethgo.Transaction{
-		To:    &fundAddr,
-		Value: big.NewInt(1000000000000000000),
-	}
-
-	receipt, err := txRelayer.SendTransaction(txn, GetRootchainAdminKey())
-	if err != nil {
-		return types.ZeroHash, err
-	}
-
-	return types.Hash(receipt.TransactionHash), nil
 }
