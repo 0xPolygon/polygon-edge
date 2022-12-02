@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"sync"
 
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
@@ -75,8 +76,14 @@ type proposerCalculator struct {
 	// proposer of a block
 	proposer *validatorCalcMetadata
 
+	// current proposer is calculated in this round - optimization
+	round uint64
+
 	// total voting power
 	totalVotingPower int64
+
+	// rw mutex
+	lock *sync.RWMutex
 
 	// logger instance
 	logger hclog.Logger
@@ -92,6 +99,8 @@ func NewProposerCalculator(valz AccountSet, totalVotingPower int64, logger hclog
 	proposerCalc := &proposerCalculator{
 		totalVotingPower: totalVotingPower,
 		validators:       validators,
+		lock:             &sync.RWMutex{},
+		round:            uint64(math.MaxUint64),
 		logger:           logger.Named("validator_set"),
 	}
 
@@ -104,6 +113,9 @@ func NewProposerCalculator(valz AccountSet, totalVotingPower int64, logger hclog
 
 // GetLatestProposer returns address of the latest calculated proposer or false if there is no proposer
 func (pc proposerCalculator) GetLatestProposer() (types.Address, bool) {
+	pc.lock.RLock()
+	defer pc.lock.RUnlock()
+
 	if pc.proposer == nil {
 		return types.Address{}, false
 	}
@@ -113,26 +125,40 @@ func (pc proposerCalculator) GetLatestProposer() (types.Address, bool) {
 
 // CalcProposer returns proposer address or error
 func (pc *proposerCalculator) CalcProposer(round uint64) (types.Address, error) {
-	clone := pc.Copy()
-	err := clone.IncrementProposerPriority(round + 1) // if round = 0 then we need one iteration
+	// optimization -> return current proposer if already calculated for this round
+	pc.lock.RLock()
+	currentProposer := pc.proposer
+	isSameRound := round == pc.round && currentProposer != nil
+	pc.lock.RUnlock()
 
-	if err != nil {
+	if isSameRound {
+		return currentProposer.Metadata.Address, nil
+	}
+
+	clone := pc.Copy()
+
+	// if round = 0 then we need one iteration
+	if err := clone.IncrementProposerPriority(round + 1); err != nil {
 		return types.ZeroAddress, fmt.Errorf("cannot increment proposer priority: %w", err)
 	}
 
-	proposer := clone.proposer
+	var err error
+
+	proposer := clone.proposer // no need for lock here because clone is temporary copy
 	if proposer == nil {
 		// try to retrieve validator with highest priority
-		proposer, err = pc.getValWithMostPriority()
-		if err != nil {
+		if proposer, err = clone.getValWithMostPriority(); err != nil {
 			return types.ZeroAddress, err
 		}
 	}
 
 	// keep proposer in the original validator set
+	pc.lock.Lock()
 	pc.proposer = proposer
+	pc.round = round
+	pc.lock.Unlock()
 
-	return pc.proposer.Metadata.Address, nil
+	return proposer.Metadata.Address, nil
 }
 
 // IncrementProposerPriority increments ProposerPriority of each validator and
@@ -146,31 +172,28 @@ func (pc *proposerCalculator) IncrementProposerPriority(times uint64) error {
 		return fmt.Errorf("cannot call IncrementProposerPriority with non-positive times")
 	}
 
-	// Cap the difference between priorities to be proportional to 2*totalPower by
-	// re-normalizing priorities, i.e., rescale all priorities by multiplying with:
-	//  2*totalVotingPower/(maxPriority - minPriority)
-	diffMax := priorityWindowSizeFactor * pc.totalVotingPower
-
-	err := pc.rescalePriorities(diffMax)
-	if err != nil {
+	if err := pc.rescalePriorities(); err != nil {
 		return fmt.Errorf("cannot rescale priorities: %w", err)
 	}
 
-	err = pc.shiftByAvgProposerPriority()
-	if err != nil {
+	if err := pc.shiftByAvgProposerPriority(); err != nil {
 		return fmt.Errorf("cannot shift avg priorities: %w", err)
 	}
 
-	var proposer *validatorCalcMetadata
+	var (
+		proposer *validatorCalcMetadata
+		err      error
+	)
 
 	for i := uint64(0); i < times; i++ {
-		proposer, err = pc.incrementProposerPriority()
-		if err != nil {
+		if proposer, err = pc.incrementProposerPriority(); err != nil {
 			return fmt.Errorf("cannot increment proposer priority: %w", err)
 		}
 	}
 
+	pc.lock.Lock()
 	pc.proposer = proposer
+	pc.lock.Unlock()
 
 	return nil
 }
@@ -193,13 +216,11 @@ func (pc *proposerCalculator) incrementProposerPriority() (*validatorCalcMetadat
 }
 
 func (pc *proposerCalculator) updateWithChangeSet() error {
-	err := pc.rescalePriorities(priorityWindowSizeFactor * pc.totalVotingPower)
-	if err != nil {
+	if err := pc.rescalePriorities(); err != nil {
 		return fmt.Errorf("cannot rescale priorities: %w", err)
 	}
 
-	err = pc.shiftByAvgProposerPriority()
-	if err != nil {
+	if err := pc.shiftByAvgProposerPriority(); err != nil {
 		return fmt.Errorf("cannot shift proposer priorities: %w", err)
 	}
 
@@ -257,16 +278,15 @@ func (pc *proposerCalculator) computeAvgProposerPriority() (int64, error) {
 
 // rescalePriorities rescales the priorities such that the distance between the
 // maximum and minimum is smaller than `diffMax`.
-func (pc *proposerCalculator) rescalePriorities(diffMax int64) error {
+func (pc *proposerCalculator) rescalePriorities() error {
 	if pc.isNilOrEmpty() {
 		return fmt.Errorf("validator set cannot be nul or empty")
 	}
-	// NOTE: This check is merely a sanity check which could be
-	// removed if all tests would init. voting power appropriately;
-	// i.e. diffMax should always be > 0
-	if diffMax <= 0 {
-		return fmt.Errorf("difference between priorities must be positive")
-	}
+
+	// Cap the difference between priorities to be proportional to 2*totalPower by
+	// re-normalizing priorities, i.e., rescale all priorities by multiplying with:
+	// 2*totalVotingPower/(maxPriority - minPriority)
+	diffMax := priorityWindowSizeFactor * pc.totalVotingPower
 
 	// Calculating ceil(diff/diffMax):
 	// Re-normalization is performed by dividing by an integer for simplicity.
@@ -290,6 +310,11 @@ func (pc proposerCalculator) isNilOrEmpty() bool {
 
 // Copy each validator into a new ValidatorSet.
 func (pc proposerCalculator) Copy() *proposerCalculator {
+	pc.lock.RLock()
+	defer pc.lock.RUnlock()
+
+	proposer := pc.proposer
+
 	valCopy := make([]*validatorCalcMetadata, len(pc.validators))
 	for i, val := range pc.validators {
 		valCopy[i] = newValidatorCalcMetadata(val.Metadata, val.ProposerPriority)
@@ -297,8 +322,10 @@ func (pc proposerCalculator) Copy() *proposerCalculator {
 
 	return &proposerCalculator{
 		validators:       valCopy,
-		proposer:         pc.proposer,
+		proposer:         proposer,
+		lock:             &sync.RWMutex{},
 		totalVotingPower: pc.totalVotingPower,
+		round:            pc.round,
 		logger:           pc.logger,
 	}
 }
