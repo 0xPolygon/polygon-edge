@@ -86,7 +86,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	txRelayer, err := txrelayer.NewTxRelayer(jsonRPCAddress)
+	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(jsonRPCAddress))
 	if err != nil {
 		outputter.SetError(fmt.Errorf("could not create rootchain interactor: %w", err))
 

@@ -81,7 +81,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	paramsList := getParamsList()
 	resList := make(command.Results, len(paramsList))
 
-	txRelayer, err := txrelayer.NewTxRelayer(jsonRPCAddress)
+	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(jsonRPCAddress))
 	if err != nil {
 		outputter.SetError(fmt.Errorf("failed to initialize tx relayer: %w", err))
 

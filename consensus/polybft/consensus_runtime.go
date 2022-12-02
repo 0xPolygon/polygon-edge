@@ -134,7 +134,7 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 	}
 
 	if runtime.IsBridgeEnabled() {
-		txRelayer, err := txrelayer.NewTxRelayer(config.PolyBFTConfig.Bridge.JSONRPCEndpoint)
+		txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(config.PolyBFTConfig.Bridge.JSONRPCEndpoint))
 		if err != nil {
 			return nil, err
 		}

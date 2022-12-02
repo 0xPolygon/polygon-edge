@@ -36,16 +36,28 @@ type TxRelayer interface {
 var _ TxRelayer = (*TxRelayerImpl)(nil)
 
 type TxRelayerImpl struct {
-	client *jsonrpc.Client
+	ipAddress string
+	client    *jsonrpc.Client
 }
 
-func NewTxRelayer(ipAddr string) (TxRelayer, error) {
-	client, err := jsonrpc.NewClient(ipAddr)
-	if err != nil {
-		return nil, err
+func NewTxRelayer(opts ...TxRelayerOption) (TxRelayer, error) {
+	t := &TxRelayerImpl{
+		ipAddress: "http://127.0.0.1:8545",
+	}
+	for _, opt := range opts {
+		opt(t)
 	}
 
-	return &TxRelayerImpl{client: client}, nil
+	if t.client == nil {
+		client, err := jsonrpc.NewClient(t.ipAddress)
+		if err != nil {
+			return nil, err
+		}
+
+		t.client = client
+	}
+
+	return t, nil
 }
 
 // Call executes a message call immediately without creating a transaction on the blockchain
@@ -142,5 +154,19 @@ func (t *TxRelayerImpl) waitForReceipt(hash ethgo.Hash) (*ethgo.Receipt, error) 
 
 		time.Sleep(50 * time.Millisecond)
 		count++
+	}
+}
+
+type TxRelayerOption func(*TxRelayerImpl)
+
+func WithClient(client *jsonrpc.Client) TxRelayerOption {
+	return func(t *TxRelayerImpl) {
+		t.client = client
+	}
+}
+
+func WithIPAddress(ipAddress string) TxRelayerOption {
+	return func(t *TxRelayerImpl) {
+		t.ipAddress = ipAddress
 	}
 }

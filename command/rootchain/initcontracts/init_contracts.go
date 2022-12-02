@@ -160,7 +160,7 @@ func getGenesisAlloc() (map[types.Address]*chain.GenesisAccount, error) {
 
 func deployContracts(outputter command.OutputFormatter) error {
 	// if the bridge contract is not created, we have to deploy all the contracts
-	txRelayer, err := txrelayer.NewTxRelayer(params.jsonRPCAddress)
+	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(params.jsonRPCAddress))
 	if err != nil {
 		return fmt.Errorf("failed to initialize tx relayer: %w", err)
 	}
