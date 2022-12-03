@@ -296,10 +296,3 @@ func (d dummyTxRelayer) SendTransactionLocal(txn *ethgo.Transaction) (*ethgo.Rec
 
 	return args.Get(0).(*ethgo.Receipt), args.Error(1) //nolint:forcetypeassert
 }
-
-// GetNonce queries nonce for the provided account
-func (d dummyTxRelayer) GetNonce(address ethgo.Address) (uint64, error) {
-	args := d.Called(address)
-
-	return args.Get(0).(uint64), args.Error(1) //nolint:forcetypeassert
-}

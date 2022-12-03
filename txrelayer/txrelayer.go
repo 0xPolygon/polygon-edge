@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"sync"
 	"time"
 
 	"github.com/umbracle/ethgo"
@@ -29,8 +30,6 @@ type TxRelayer interface {
 	// SendTransactionLocal sends non-signed transaction
 	// (this function is meant only for testing purposes and is about to be removed at some point)
 	SendTransactionLocal(txn *ethgo.Transaction) (*ethgo.Receipt, error)
-	// GetNonce queries nonce for the provided account
-	GetNonce(address ethgo.Address) (uint64, error)
 }
 
 var _ TxRelayer = (*TxRelayerImpl)(nil)
@@ -38,6 +37,8 @@ var _ TxRelayer = (*TxRelayerImpl)(nil)
 type TxRelayerImpl struct {
 	ipAddress string
 	client    *jsonrpc.Client
+
+	lock sync.Mutex
 }
 
 func NewTxRelayer(opts ...TxRelayerOption) (TxRelayer, error) {
@@ -75,6 +76,25 @@ func (t *TxRelayerImpl) Call(from ethgo.Address, to ethgo.Address, input []byte)
 
 // SendTransaction signs given transaction by provided key and sends it to the blockchain
 func (t *TxRelayerImpl) SendTransaction(txn *ethgo.Transaction, key ethgo.Key) (*ethgo.Receipt, error) {
+	txnHash, err := t.sendTransactionLocked(txn, key)
+	if err != nil {
+		return nil, err
+	}
+
+	return t.waitForReceipt(txnHash)
+}
+
+func (t *TxRelayerImpl) sendTransactionLocked(txn *ethgo.Transaction, key ethgo.Key) (ethgo.Hash, error) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	nonce, err := t.client.Eth().GetNonce(key.Address(), ethgo.Pending)
+	if err != nil {
+		return ethgo.ZeroHash, err
+	}
+
+	txn.Nonce = nonce
+
 	if txn.GasPrice == 0 {
 		txn.GasPrice = defaultGasPrice
 	}
@@ -85,30 +105,25 @@ func (t *TxRelayerImpl) SendTransaction(txn *ethgo.Transaction, key ethgo.Key) (
 
 	chainID, err := t.client.Eth().ChainID()
 	if err != nil {
-		return nil, err
+		return ethgo.ZeroHash, err
 	}
 
 	signer := wallet.NewEIP155Signer(chainID.Uint64())
 	if txn, err = signer.SignTx(txn, key); err != nil {
-		return nil, err
+		return ethgo.ZeroHash, err
 	}
 
 	data, err := txn.MarshalRLPTo(nil)
 	if err != nil {
-		return nil, err
+		return ethgo.ZeroHash, err
 	}
 
-	txnHash, err := t.client.Eth().SendRawTransaction(data)
-	if err != nil {
-		return nil, err
-	}
-
-	return t.waitForReceipt(txnHash)
+	return t.client.Eth().SendRawTransaction(data)
 }
 
 // SendTransactionLocal sends non-signed transaction
 // (this function is meant only for testing purposes and is about to be removed at some point)
-func (t TxRelayerImpl) SendTransactionLocal(txn *ethgo.Transaction) (*ethgo.Receipt, error) {
+func (t *TxRelayerImpl) SendTransactionLocal(txn *ethgo.Transaction) (*ethgo.Receipt, error) {
 	accounts, err := t.client.Eth().Accounts()
 	if err != nil {
 		return nil, err

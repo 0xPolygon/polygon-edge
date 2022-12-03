@@ -93,26 +93,18 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	pendingNonce, err := txRelayer.GetNonce(ethgo.Address(helper.GetRootchainAdminAddr()))
-	if err != nil {
-		outputter.SetError(fmt.Errorf("could not get pending nonce: %w", err))
-
-		return
-	}
-
 	g, ctx := errgroup.WithContext(cmd.Context())
 
 	for i := range params.wallets {
 		wallet := params.wallets[i]
 		amount := params.amounts[i]
-		walletIndex := uint64(i)
 
 		g.Go(func() error {
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
 			default:
-				txn, err := createEmitTxn(pendingNonce+walletIndex, paramsType, wallet, amount)
+				txn, err := createEmitTxn(paramsType, wallet, amount)
 				if err != nil {
 					return fmt.Errorf("failed to create tx input: %w", err)
 				}
@@ -141,7 +133,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	})
 }
 
-func createEmitTxn(nonce uint64, paramsType string, parameters ...interface{}) (*ethgo.Transaction, error) {
+func createEmitTxn(paramsType string, parameters ...interface{}) (*ethgo.Transaction, error) {
 	var prms []interface{}
 	prms = append(prms, parameters...)
 
@@ -160,6 +152,5 @@ func createEmitTxn(nonce uint64, paramsType string, parameters ...interface{}) (
 	return &ethgo.Transaction{
 		To:    (*ethgo.Address)(&helper.StateSenderAddress),
 		Input: input,
-		Nonce: nonce,
 	}, nil
 }

@@ -175,11 +175,6 @@ func deployContracts(outputter command.OutputFormatter) error {
 		return err
 	}
 
-	nonce, err := txRelayer.GetNonce(ethgo.Address(helper.GetRootchainAdminAddr()))
-	if err != nil {
-		return err
-	}
-
 	deployContracts := []struct {
 		name     string
 		path     string
@@ -216,7 +211,6 @@ func deployContracts(outputter command.OutputFormatter) error {
 		txn := &ethgo.Transaction{
 			To:    nil, // contract deployment
 			Input: bytecode,
-			Nonce: nonce,
 		}
 
 		receipt, err := txRelayer.SendTransaction(txn, helper.GetRootchainAdminKey())
@@ -230,8 +224,6 @@ func deployContracts(outputter command.OutputFormatter) error {
 		}
 
 		outputter.WriteCommandResult(newDeployContractsResult(contract.name, contract.expected, receipt.TransactionHash))
-
-		nonce++
 	}
 
 	if err := initializeCheckpointManager(txRelayer); err != nil {
@@ -265,16 +257,10 @@ func initializeCheckpointManager(txRelayer txrelayer.TxRelayer) error {
 		return fmt.Errorf("failed to encode parameters for CheckpointManager.initialize. error: %w", err)
 	}
 
-	nonce, err := txRelayer.GetNonce(ethgo.Address(helper.GetRootchainAdminAddr()))
-	if err != nil {
-		return err
-	}
-
 	checkpointManagerAddress := ethgo.Address(helper.CheckpointManagerAddress)
 	txn := &ethgo.Transaction{
 		To:    &checkpointManagerAddress,
 		Input: initCheckpointInput,
-		Nonce: nonce,
 	}
 
 	receipt, err := txRelayer.SendTransaction(txn, helper.GetRootchainAdminKey())

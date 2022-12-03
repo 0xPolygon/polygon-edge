@@ -83,9 +83,6 @@ func executeStateSync(t *testing.T, client *jsonrpc.Client, txRelayer txrelayer.
 
 	t.Log(stateSyncEventsToAbiSlice(stateSyncProof.StateSync))
 
-	nonce, err := txRelayer.GetNonce(account.Address())
-	require.NoError(t, err)
-
 	// execute the state sync
 	txn := &ethgo.Transaction{
 		From:     account.Address(),
@@ -93,7 +90,6 @@ func executeStateSync(t *testing.T, client *jsonrpc.Client, txRelayer txrelayer.
 		GasPrice: 0,
 		Gas:      types.StateTransactionGasLimit,
 		Input:    input,
-		Nonce:    nonce,
 	}
 
 	receipt, err := txRelayer.SendTransaction(txn, account)
