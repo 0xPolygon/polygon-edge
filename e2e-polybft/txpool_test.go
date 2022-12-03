@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
+	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -17,23 +18,23 @@ import (
 func TestE2E_TxPool_Transfer(t *testing.T) {
 	// premine an account in the genesis file
 	sender, err := wallet.GenerateKey()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	cluster := framework.NewTestCluster(t, 5, framework.WithPremine(types.Address(sender.Address())))
 	defer cluster.Stop()
 
-	assert.NoError(t, cluster.WaitForBlock(2, 1*time.Minute))
+	require.NoError(t, cluster.WaitForBlock(2, 1*time.Minute))
 
-	client := cluster.Servers[0].JSONRPC().Eth()
+	client := cluster.Servers[0].JSONRPC()
+	ethEndpoint := client.Eth()
+	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(client))
+	require.NoError(t, err)
 
 	// send n value transfers
-	sendTransaction := func(nonce uint64, receiver ethgo.Address, value *big.Int) ethgo.Hash {
+	sendTransaction := func(nonce uint64, receiver ethgo.Address, value *big.Int) {
 		// estimate gas price
-		gasPrice, err := client.GasPrice()
-		assert.NoError(t, err)
-
-		chainID, err := client.ChainID()
-		assert.NoError(t, err)
+		gasPrice, err := ethEndpoint.GasPrice()
+		require.NoError(t, err)
 
 		// send transaction
 		rawTxn := &ethgo.Transaction{
@@ -45,17 +46,8 @@ func TestE2E_TxPool_Transfer(t *testing.T) {
 			Nonce:    nonce,
 		}
 
-		signer := wallet.NewEIP155Signer(chainID.Uint64())
-		signedTxn, err := signer.SignTx(rawTxn, sender)
-		assert.NoError(t, err)
-
-		txnRaw, err := signedTxn.MarshalRLPTo(nil)
-		assert.NoError(t, err)
-
-		hash, err := client.SendRawTransaction(txnRaw)
-		assert.NoError(t, err)
-
-		return hash
+		_, err = txRelayer.SendTransaction(rawTxn, sender)
+		require.NoError(t, err)
 	}
 
 	sendAmount := 1
@@ -85,7 +77,7 @@ func TestE2E_TxPool_Transfer(t *testing.T) {
 
 	err = cluster.WaitUntil(2*time.Minute, func() bool {
 		for _, receiver := range receivers {
-			balance, err := client.GetBalance(receiver, ethgo.Latest)
+			balance, err := ethEndpoint.GetBalance(receiver, ethgo.Latest)
 			if err != nil {
 				return true
 			}
@@ -97,13 +89,13 @@ func TestE2E_TxPool_Transfer(t *testing.T) {
 
 		return false
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 // First account send some amount to second one and then second one to third account
 func TestE2E_TxPool_Transfer_Linear(t *testing.T) {
 	premine, err := wallet.GenerateKey()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// first account should have some matics premined
 	cluster := framework.NewTestCluster(t, 5, framework.WithPremine(types.Address(premine.Address())))
@@ -119,9 +111,6 @@ func TestE2E_TxPool_Transfer_Linear(t *testing.T) {
 
 	// send n value transfers
 	sendTransaction := func(from *wallet.Key, receiver ethgo.Address, value *big.Int) {
-		chainID, err := client.ChainID()
-		require.NoError(t, err)
-
 		// send transaction
 		rawTxn := &ethgo.Transaction{
 			From:     from.Address(),
@@ -131,6 +120,9 @@ func TestE2E_TxPool_Transfer_Linear(t *testing.T) {
 			Value:    value,
 			Nonce:    0,
 		}
+
+		chainID, err := client.ChainID()
+		require.NoError(t, err)
 
 		signer := wallet.NewEIP155Signer(chainID.Uint64())
 		signedTxn, err := signer.SignTx(rawTxn, from)
@@ -150,11 +142,7 @@ func TestE2E_TxPool_Transfer_Linear(t *testing.T) {
 				return true
 			}
 
-			if balance.Cmp(big.NewInt(0)) == 0 {
-				return true
-			}
-
-			return false
+			return balance.Cmp(big.NewInt(0)) == 0
 		})
 
 		return err
@@ -176,12 +164,11 @@ func TestE2E_TxPool_Transfer_Linear(t *testing.T) {
 	// Then, the total gas cost required to make a transfer is 21k multiplied by
 	// the selected gas price.
 	gasCost := int(21000 * gasPrice)
-
 	sendAmount := 3000000
 
 	// We are going to fund the accounts in linear fashion:
-	// A (premise) -> B -> C -> D -> E
-	// At the end, all of them (except the premised) will have the same `sendAmount`
+	// A (premined account) -> B -> C -> D -> E
+	// At the end, all of them (except the premined account) will have the same `sendAmount`
 	// of balance.
 	for i := 1; i < num; i++ {
 		// we have to send enough value to account `i` so that it has enough to fund
@@ -192,12 +179,12 @@ func TestE2E_TxPool_Transfer_Linear(t *testing.T) {
 		sendTransaction(receivers[i-1], receivers[i].Address(), big.NewInt(int64(amount)))
 
 		err := waitUntilBalancesChanged(receivers[i].Address())
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	}
 
 	for i := 1; i < num; i++ {
 		balance, err := client.GetBalance(receivers[i].Address(), ethgo.Latest)
-		assert.NoError(t, err)
-		assert.Equal(t, uint64(sendAmount), balance.Uint64())
+		require.NoError(t, err)
+		require.Equal(t, uint64(sendAmount), balance.Uint64())
 	}
 }
