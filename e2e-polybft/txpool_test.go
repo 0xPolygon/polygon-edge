@@ -7,11 +7,11 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
-	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
+	"github.com/umbracle/ethgo/jsonrpc"
 	"github.com/umbracle/ethgo/wallet"
 )
 
@@ -25,30 +25,7 @@ func TestE2E_TxPool_Transfer(t *testing.T) {
 
 	require.NoError(t, cluster.WaitForBlock(2, 1*time.Minute))
 
-	client := cluster.Servers[0].JSONRPC()
-	ethEndpoint := client.Eth()
-	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(client))
-	require.NoError(t, err)
-
-	// send n value transfers
-	sendTransaction := func(nonce uint64, receiver ethgo.Address, value *big.Int) {
-		// estimate gas price
-		gasPrice, err := ethEndpoint.GasPrice()
-		require.NoError(t, err)
-
-		// send transaction
-		rawTxn := &ethgo.Transaction{
-			From:     sender.Address(),
-			To:       &receiver,
-			GasPrice: gasPrice,
-			Gas:      30000, // enough to send a transfer
-			Value:    value,
-			Nonce:    nonce,
-		}
-
-		_, err = txRelayer.SendTransaction(rawTxn, sender)
-		require.NoError(t, err)
-	}
+	client := cluster.Servers[0].JSONRPC().Eth()
 
 	sendAmount := 1
 	num := 20
@@ -57,7 +34,7 @@ func TestE2E_TxPool_Transfer(t *testing.T) {
 
 	for i := 0; i < num; i++ {
 		key, err := wallet.GenerateKey()
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		receivers = append(receivers, key.Address())
 	}
@@ -69,7 +46,18 @@ func TestE2E_TxPool_Transfer(t *testing.T) {
 		go func(i int, to ethgo.Address) {
 			defer wg.Done()
 
-			sendTransaction(uint64(i), to, big.NewInt(int64(sendAmount)))
+			gasPrice, err := client.GasPrice()
+			require.NoError(t, err)
+
+			txn := &ethgo.Transaction{
+				From:     sender.Address(),
+				To:       &to,
+				GasPrice: gasPrice,
+				Gas:      30000, // enough to send a transfer
+				Value:    big.NewInt(int64(sendAmount)),
+				Nonce:    uint64(i),
+			}
+			sendTransaction(t, client, sender, txn)
 		}(i, receivers[i])
 	}
 
@@ -77,7 +65,7 @@ func TestE2E_TxPool_Transfer(t *testing.T) {
 
 	err = cluster.WaitUntil(2*time.Minute, func() bool {
 		for _, receiver := range receivers {
-			balance, err := ethEndpoint.GetBalance(receiver, ethgo.Latest)
+			balance, err := client.GetBalance(receiver, ethgo.Latest)
 			if err != nil {
 				return true
 			}
@@ -108,32 +96,6 @@ func TestE2E_TxPool_Transfer_Linear(t *testing.T) {
 	// estimate gas price
 	gasPrice, err := client.GasPrice()
 	require.NoError(t, err)
-
-	// send n value transfers
-	sendTransaction := func(from *wallet.Key, receiver ethgo.Address, value *big.Int) {
-		// send transaction
-		rawTxn := &ethgo.Transaction{
-			From:     from.Address(),
-			To:       &receiver,
-			GasPrice: gasPrice,
-			Gas:      21000,
-			Value:    value,
-			Nonce:    0,
-		}
-
-		chainID, err := client.ChainID()
-		require.NoError(t, err)
-
-		signer := wallet.NewEIP155Signer(chainID.Uint64())
-		signedTxn, err := signer.SignTx(rawTxn, from)
-		require.NoError(t, err)
-
-		txnRaw, err := signedTxn.MarshalRLPTo(nil)
-		require.NoError(t, err)
-
-		_, err = client.SendRawTransaction(txnRaw)
-		require.NoError(t, err)
-	}
 
 	waitUntilBalancesChanged := func(acct ethgo.Address) error {
 		err := cluster.WaitUntil(30*time.Second, func() bool {
@@ -176,7 +138,15 @@ func TestE2E_TxPool_Transfer_Linear(t *testing.T) {
 		// This means that since gasCost and sendAmount are fixed, account C must receive gasCost * 2
 		// (to cover two more transfers C->D and D->E) + sendAmount * 3 (one bundle for each C,D and E).
 		amount := gasCost*(num-i-1) + sendAmount*(num-i)
-		sendTransaction(receivers[i-1], receivers[i].Address(), big.NewInt(int64(amount)))
+		recipient := receivers[i].Address()
+		txn := &ethgo.Transaction{
+			Value:    big.NewInt(int64(amount)),
+			To:       &recipient,
+			GasPrice: gasPrice,
+			Gas:      21000,
+			Nonce:    0,
+		}
+		sendTransaction(t, client, receivers[i-1], txn)
 
 		err := waitUntilBalancesChanged(receivers[i].Address())
 		require.NoError(t, err)
@@ -187,4 +157,22 @@ func TestE2E_TxPool_Transfer_Linear(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, uint64(sendAmount), balance.Uint64())
 	}
+}
+
+// sendTransaction is a helper function which signs transaction with provided private key and sends it
+func sendTransaction(t *testing.T, client *jsonrpc.Eth, sender *wallet.Key, txn *ethgo.Transaction) {
+	t.Helper()
+
+	chainID, err := client.ChainID()
+	require.NoError(t, err)
+
+	signer := wallet.NewEIP155Signer(chainID.Uint64())
+	signedTxn, err := signer.SignTx(txn, sender)
+	require.NoError(t, err)
+
+	txnRaw, err := signedTxn.MarshalRLPTo(nil)
+	require.NoError(t, err)
+
+	_, err = client.SendRawTransaction(txnRaw)
+	require.NoError(t, err)
 }
