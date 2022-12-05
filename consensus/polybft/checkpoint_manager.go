@@ -156,6 +156,8 @@ func (c *checkpointManager) submitCheckpoint(latestHeader types.Header, isEndOfE
 		parentExtra = currentExtra
 	}
 
+	// latestHeader extra could be set in the for loop above
+	// (in case there were pending checkpoint blocks)
 	if currentExtra == nil {
 		// we need to send checkpoint for the latest block
 		currentExtra, err = GetIbftExtra(latestHeader.ExtraData)

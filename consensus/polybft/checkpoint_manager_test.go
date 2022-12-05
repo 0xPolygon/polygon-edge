@@ -46,9 +46,9 @@ func TestCheckpointManager_submitCheckpoint(t *testing.T) {
 		header      *types.Header
 	)
 
-	for i := uint64(0); i < blocksCount; i++ {
-		if i%epochSize == 0 {
-			// epoch-ending block
+	for i := uint64(1); i <= blocksCount; i++ {
+		if i%epochSize == 1 {
+			// epoch-beginning block
 			checkpoint := &CheckpointData{
 				BlockRound:  0,
 				EpochNumber: epochNumber,
@@ -64,7 +64,7 @@ func TestCheckpointManager_submitCheckpoint(t *testing.T) {
 			header = header.Copy()
 		}
 
-		header.Number = i + 1
+		header.Number = i
 		header.ComputeHash()
 		headersMap.addHeader(header)
 	}
