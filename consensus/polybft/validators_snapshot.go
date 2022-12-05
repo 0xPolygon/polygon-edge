@@ -309,7 +309,7 @@ func (v *validatorsSnapshotCache) isEpochEndingBlock(blockNumber uint64, extra *
 			return true, nil
 		}
 
-		return false, nil
+		return false, err
 	}
 
 	return extra.Checkpoint.EpochNumber != nextBlockExtra.Checkpoint.EpochNumber, nil

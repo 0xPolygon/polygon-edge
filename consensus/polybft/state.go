@@ -290,8 +290,6 @@ func initMainDBBuckets(db *bolt.DB) error {
 	return err
 }
 
-const snapshotKeySeparator = "edge-snapshot-key-separator"
-
 // insertValidatorSnapshot inserts a validator snapshot for the given block to its bucket in db
 func (s *State) insertValidatorSnapshot(validatorSnapshot *validatorSnapshot) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
