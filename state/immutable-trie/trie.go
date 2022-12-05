@@ -3,6 +3,7 @@ package itrie
 import (
 	"bytes"
 	"fmt"
+	"sync"
 
 	"github.com/umbracle/fastrlp"
 	"golang.org/x/crypto/sha3"
@@ -91,6 +92,7 @@ func (f *FullNode) getEdge(idx byte) Node {
 }
 
 type Trie struct {
+	lock    sync.Mutex
 	state   *State
 	root    Node
 	epoch   uint32
@@ -99,6 +101,13 @@ type Trie struct {
 
 func NewTrie() *Trie {
 	return &Trie{}
+}
+
+func (t *Trie) setState(s1 *State) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	t.state = s1
 }
 
 func (t *Trie) Get(k []byte) ([]byte, bool) {
@@ -120,6 +129,8 @@ var accountArenaPool fastrlp.ArenaPool
 var stateArenaPool fastrlp.ArenaPool // TODO, Remove once we do update in fastrlp
 
 func (t *Trie) Commit(objs []*state.Object) (*Trie, []byte) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
 	// Create an insertion batch for all the entries
 	batch := t.storage.Batch()
 

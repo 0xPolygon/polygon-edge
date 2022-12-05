@@ -70,7 +70,7 @@ func (s *State) newTrieAt(root types.Hash) (*Trie, error) {
 			return nil, fmt.Errorf("invalid type assertion on root: %s", root)
 		}
 
-		t.state.setState(s)
+		t.setState(s)
 
 		trie, ok := tt.(*Trie)
 		if !ok {
@@ -100,23 +100,4 @@ func (s *State) newTrieAt(root types.Hash) (*Trie, error) {
 
 func (s *State) AddState(root types.Hash, t *Trie) {
 	s.cache.Add(root, t)
-}
-
-func (s *State) setState(s1 *State) {
-	m := s.m
-	m.Lock()
-	defer m.Unlock()
-
-	m1 := s1.m
-	m1.RLock()
-	defer m1.RUnlock()
-
-	*s = *s1
-}
-
-func (s *State) setForTrie(t *Trie) {
-	s.m.RLock()
-	defer s.m.RUnlock()
-
-	t.state = s
 }
