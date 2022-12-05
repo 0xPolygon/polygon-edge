@@ -6,14 +6,14 @@ import (
 	"math"
 	"math/big"
 
-	"github.com/hashicorp/go-hclog"
-
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/state/runtime/evm"
 	"github.com/0xPolygon/polygon-edge/state/runtime/precompiled"
+	"github.com/0xPolygon/polygon-edge/state/runtime/tracer"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/hashicorp/go-hclog"
 )
 
 const (
@@ -131,7 +131,7 @@ func (e *Executor) BeginTxn(
 	header *types.Header,
 	coinbaseReceiver types.Address,
 ) (*Transition, error) {
-	config := e.config.Forks.At(header.Number)
+	forkConfig := e.config.Forks.At(header.Number)
 
 	auxSnap2, err := e.state.NewSnapshotAt(parentRoot)
 	if err != nil {
@@ -140,7 +140,7 @@ func (e *Executor) BeginTxn(
 
 	newTxn := NewTxn(auxSnap2)
 
-	env2 := runtime.TxContext{
+	txCtx := runtime.TxContext{
 		Coinbase:   coinbaseReceiver,
 		Timestamp:  int64(header.Timestamp),
 		Number:     int64(header.Number),
@@ -151,13 +151,13 @@ func (e *Executor) BeginTxn(
 
 	txn := &Transition{
 		logger:   e.logger,
-		ctx:      env2,
+		ctx:      txCtx,
 		state:    newTxn,
 		snap:     auxSnap2,
 		getHash:  e.GetHash(header),
 		auxState: e.state,
-		config:   config,
-		gasPool:  uint64(env2.GasLimit),
+		config:   forkConfig,
+		gasPool:  uint64(txCtx.GasLimit),
 
 		receipts: []*types.Receipt{},
 		totalGas: 0,
@@ -328,8 +328,8 @@ func (t *Transition) Txn() *Txn {
 // Apply applies a new transaction
 func (t *Transition) Apply(msg *types.Transaction) (*runtime.ExecutionResult, error) {
 	s := t.state.Snapshot()
-	result, err := t.apply(msg)
 
+	result, err := t.apply(msg)
 	if err != nil {
 		t.state.RevertToSnapshot(s)
 	}
@@ -438,6 +438,10 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 		return nil, NewGasLimitReachedTransitionApplicationError(err)
 	}
 
+	if t.ctx.Tracer != nil {
+		t.ctx.Tracer.TxStart(msg.Gas)
+	}
+
 	// 4. there is no overflow when calculating intrinsic gas
 	intrinsicGasCost, err := TransactionGasCost(msg, t.config.Homestead, t.config.Istanbul)
 	if err != nil {
@@ -473,6 +477,10 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 
 	refund := txn.GetRefund()
 	result.UpdateGasUsed(msg.Gas, refund)
+
+	if t.ctx.Tracer != nil {
+		t.ctx.Tracer.TxEnd(result.GasLeft)
+	}
 
 	// refund the sender
 	remaining := new(big.Int).Mul(new(big.Int).SetUint64(result.GasLeft), gasPrice)
@@ -570,10 +578,16 @@ func (t *Transition) applyCall(
 		}
 	}
 
-	result := t.run(c, host)
+	var result *runtime.ExecutionResult
+
+	t.captureCallStart(c, callType)
+
+	result = t.run(c, host)
 	if result.Failed() {
 		t.state.RevertToSnapshot(snapshot)
 	}
+
+	t.captureCallEnd(c, result)
 
 	return result
 }
@@ -633,8 +647,16 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 		}
 	}
 
-	result := t.run(c, host)
+	var result *runtime.ExecutionResult
 
+	t.captureCallStart(c, evm.CREATE)
+
+	defer func() {
+		// pass result to be set later
+		t.captureCallEnd(c, result)
+	}()
+
+	result = t.run(c, host)
 	if result.Failed() {
 		t.state.RevertToSnapshot(snapshot)
 
@@ -774,6 +796,20 @@ func (t *Transition) SetCodeDirectly(addr types.Address, code []byte) error {
 	return nil
 }
 
+// SetTracer sets tracer to the context in order to enable it
+func (t *Transition) SetTracer(tracer tracer.Tracer) {
+	t.ctx.Tracer = tracer
+}
+
+// GetTracer returns a tracer in context
+func (t *Transition) GetTracer() runtime.VMTracer {
+	return t.ctx.Tracer
+}
+
+func (t *Transition) GetRefund() uint64 {
+	return t.state.GetRefund()
+}
+
 func TransactionGasCost(msg *types.Transaction, isHomestead, isIstanbul bool) (uint64, error) {
 	cost := uint64(0)
 
@@ -815,4 +851,34 @@ func TransactionGasCost(msg *types.Transaction, isHomestead, isIstanbul bool) (u
 	}
 
 	return cost, nil
+}
+
+// captureCallStart calls CallStart in Tracer if context has the tracer
+func (t *Transition) captureCallStart(c *runtime.Contract, callType runtime.CallType) {
+	if t.ctx.Tracer == nil {
+		return
+	}
+
+	t.ctx.Tracer.CallStart(
+		c.Depth,
+		c.Caller,
+		c.Address,
+		int(callType),
+		c.Gas,
+		c.Value,
+		c.Input,
+	)
+}
+
+// captureCallEnd calls CallEnd in Tracer if context has the tracer
+func (t *Transition) captureCallEnd(c *runtime.Contract, result *runtime.ExecutionResult) {
+	if t.ctx.Tracer == nil {
+		return
+	}
+
+	t.ctx.Tracer.CallEnd(
+		c.Depth,
+		result.ReturnValue,
+		result.Err,
+	)
 }

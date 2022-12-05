@@ -51,7 +51,7 @@ type mockStore struct {
 	accounts     map[types.Address]*Account
 
 	// headers is the list of historical headers
-	headers []*types.Header
+	historicalHeaders []*types.Header
 }
 
 func newMockStore() *mockStore {
@@ -66,15 +66,15 @@ func newMockStore() *mockStore {
 }
 
 func (m *mockStore) addHeader(header *types.Header) {
-	if m.headers == nil {
-		m.headers = []*types.Header{}
+	if m.historicalHeaders == nil {
+		m.historicalHeaders = []*types.Header{}
 	}
 
-	m.headers = append(m.headers, header)
+	m.historicalHeaders = append(m.historicalHeaders, header)
 }
 
 func (m *mockStore) headerLoop(cond func(h *types.Header) bool) *types.Header {
-	for _, header := range m.headers {
+	for _, header := range m.historicalHeaders {
 		if cond(header) {
 			return header
 		}
@@ -135,6 +135,14 @@ func (m *mockStore) GetReceiptsByHash(hash types.Hash) ([]*types.Receipt, error)
 
 func (m *mockStore) SubscribeEvents() blockchain.Subscription {
 	return m.subscription
+}
+
+func (m *mockStore) GetHeaderByNumber(num uint64) (*types.Header, bool) {
+	header := m.headerLoop(func(header *types.Header) bool {
+		return header.Number == num
+	})
+
+	return header, header != nil
 }
 
 func (m *mockStore) GetBlockByHash(hash types.Hash, full bool) (*types.Block, bool) {

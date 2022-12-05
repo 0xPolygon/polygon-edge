@@ -59,6 +59,7 @@ func (e *EVM) Run(c *runtime.Contract, host runtime.Host, config *chain.ForksInT
 	return &runtime.ExecutionResult{
 		ReturnValue: returnValue,
 		GasLeft:     gasLeft,
+		GasUsed:     c.Gas - gasLeft,
 		Err:         err,
 	}
 }
