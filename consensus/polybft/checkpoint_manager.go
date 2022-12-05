@@ -35,10 +35,8 @@ var (
 
 // checkpointManager encapsulates logic for checkpoint data submission
 type checkpointManager struct {
-	// signer is the identity of the node submitting a checkpoint
-	signer ethgo.Key
-	// signerAddress is the address of the node submitting a checkpoint
-	signerAddress types.Address
+	// key is the identity of the node submitting a checkpoint
+	key ethgo.Key
 	// blockchain is abstraction for blockchain
 	blockchain blockchainBackend
 	// consensusBackend is abstraction for polybft consensus specific functions
@@ -54,11 +52,10 @@ type checkpointManager struct {
 }
 
 // newCheckpointManager creates a new instance of checkpointManager
-func newCheckpointManager(signer ethgo.Key, checkpointOffset uint64, txRelayer txrelayer.TxRelayer,
+func newCheckpointManager(key ethgo.Key, checkpointOffset uint64, txRelayer txrelayer.TxRelayer,
 	blockchain blockchainBackend, backend polybftBackend, logger hclog.Logger) *checkpointManager {
 	return &checkpointManager{
-		signer:            signer,
-		signerAddress:     types.Address(signer.Address()),
+		key:               key,
 		blockchain:        blockchain,
 		consensusBackend:  backend,
 		txRelayer:         txRelayer,
@@ -75,7 +72,7 @@ func (c *checkpointManager) getLatestCheckpointBlock() (uint64, error) {
 	}
 
 	latestCheckpointBlockRaw, err := c.txRelayer.Call(
-		ethgo.Address(c.signerAddress),
+		c.key.Address(),
 		ethgo.Address(helper.CheckpointManagerAddress),
 		checkpointBlockNumMethodEncoded)
 	if err != nil {
@@ -105,7 +102,7 @@ func (c *checkpointManager) submitCheckpoint(latestHeader types.Header, isEndOfE
 	checkpointManagerAddr := ethgo.Address(helper.CheckpointManagerAddress)
 	txn := &ethgo.Transaction{
 		To:   &checkpointManagerAddr,
-		From: ethgo.Address(c.signerAddress),
+		From: c.key.Address(),
 	}
 	initialBlockNumber := lastCheckpointBlockNumber + 1
 
@@ -194,7 +191,7 @@ func (c *checkpointManager) encodeAndSendCheckpoint(txn *ethgo.Transaction,
 
 	txn.Input = input
 
-	receipt, err := c.txRelayer.SendTransaction(txn, c.signer)
+	receipt, err := c.txRelayer.SendTransaction(txn, c.key)
 	if err != nil {
 		return err
 	}

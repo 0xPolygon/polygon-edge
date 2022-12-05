@@ -75,7 +75,7 @@ func TestCheckpointManager_submitCheckpoint(t *testing.T) {
 
 	validatorAcc := validators.getValidator("A")
 	c := &checkpointManager{
-		signer:           wallet.NewEcdsaSigner(validatorAcc.Key()),
+		key:              wallet.NewEcdsaSigner(validatorAcc.Key()),
 		txRelayer:        txRelayerMock,
 		consensusBackend: backendMock,
 		blockchain:       blockchainMock,
@@ -213,6 +213,7 @@ func TestCheckpointManager_getCurrentCheckpointID(t *testing.T) {
 
 			checkpointMgr := &checkpointManager{
 				txRelayer: txRelayerMock,
+				key:       wallet.GenerateAccount().Ecdsa,
 				logger:    hclog.NewNullLogger(),
 			}
 			actualCheckpointID, err := checkpointMgr.getLatestCheckpointBlock()
