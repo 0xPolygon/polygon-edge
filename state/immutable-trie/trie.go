@@ -92,7 +92,7 @@ func (f *FullNode) getEdge(idx byte) Node {
 }
 
 type Trie struct {
-	lock    sync.Mutex
+	lock    *sync.Mutex
 	state   *State
 	root    Node
 	epoch   uint32
@@ -100,7 +100,9 @@ type Trie struct {
 }
 
 func NewTrie() *Trie {
-	return &Trie{}
+	return &Trie{
+		lock: new(sync.Mutex),
+	}
 }
 
 func (t *Trie) setState(s1 *State) {
@@ -263,7 +265,7 @@ type Txn struct {
 }
 
 func (t *Txn) Commit() *Trie {
-	return &Trie{epoch: t.epoch, root: t.root, storage: t.storage}
+	return &Trie{epoch: t.epoch, root: t.root, storage: t.storage, lock: new(sync.Mutex)}
 }
 
 func (t *Txn) Lookup(key []byte) []byte {
