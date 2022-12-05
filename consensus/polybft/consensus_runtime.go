@@ -1155,7 +1155,11 @@ func (c *consensusRuntime) HasQuorum(
 			return c.fsm.validators.HasQuorum(signers)
 		}
 
-		propAddress, exist := c.fsm.proposerCalculator.GetLatestProposer()
+		if len(messages) == 0 {
+			return false
+		}
+
+		propAddress, exist := c.fsm.proposerCalculator.GetLatestProposer(messages[0].View.Round)
 		if !exist {
 			c.logger.Warn("HasQuorum has been called but proposer is not set")
 
