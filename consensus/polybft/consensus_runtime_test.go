@@ -1945,6 +1945,8 @@ func TestConsensusRuntime_ID(t *testing.T) {
 }
 
 func TestConsensusRuntime_HasQuorum(t *testing.T) {
+	const round = 5
+
 	t.Parallel()
 
 	validatorAccounts := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
@@ -1981,7 +1983,7 @@ func TestConsensusRuntime_HasQuorum(t *testing.T) {
 	}
 
 	require.NoError(t, runtime.FSM())
-	proposer, err := runtime.fsm.proposerCalculator.CalcProposer(0)
+	proposer, err := runtime.fsm.proposerCalculator.CalcProposer(round)
 
 	require.NoError(t, err)
 
@@ -2000,6 +2002,7 @@ func TestConsensusRuntime_HasQuorum(t *testing.T) {
 	messages = append(messages, &proto.Message{
 		From: proposer.Bytes(),
 		Type: proto.MessageType_PREPREPARE,
+		View: &proto.View{Height: 1, Round: round},
 	})
 
 	assert.False(t, runtime.HasQuorum(lastBuildBlock.Number+1, nil, proto.MessageType_PREPREPARE))
@@ -2016,6 +2019,7 @@ func TestConsensusRuntime_HasQuorum(t *testing.T) {
 			messages = append(messages, &proto.Message{
 				From: address[:],
 				Type: proto.MessageType_PREPARE,
+				View: &proto.View{Height: 1, Round: round},
 			})
 		}
 	}
@@ -2030,6 +2034,7 @@ func TestConsensusRuntime_HasQuorum(t *testing.T) {
 	messages = append(messages, &proto.Message{
 		From: proposer[:],
 		Type: proto.MessageType_PREPARE,
+		View: &proto.View{Height: 1, Round: round},
 	})
 	assert.False(t, runtime.HasQuorum(lastBuildBlock.Number+1, messages, proto.MessageType_PREPARE))
 
@@ -2045,6 +2050,7 @@ func TestConsensusRuntime_HasQuorum(t *testing.T) {
 			messages = append(messages, &proto.Message{
 				From: x.Address().Bytes(),
 				Type: msgType,
+				View: &proto.View{Height: 1, Round: round},
 			})
 		}
 
@@ -2308,4 +2314,29 @@ func insertTestStateSyncEvents(t *testing.T, numberOfEvents int, startIndex uint
 	}
 
 	return stateSyncs
+}
+
+func TestConsensusRuntime_GetLatestProposer(t *testing.T) {
+	t.Parallel()
+
+	validatorSet := newTestValidators(10).getPublicIdentities()
+	proposerCalculator, err := NewProposerCalculator(validatorSet, 100, hclog.NewNullLogger())
+
+	require.NoError(t, err)
+
+	// not set
+	_, exists := proposerCalculator.GetLatestProposer(0)
+	assert.False(t, exists)
+
+	proposerCalculator.round = 0
+	proposerCalculator.proposer = proposerCalculator.validators[0]
+
+	// wrong round
+	_, exists = proposerCalculator.GetLatestProposer(1)
+	assert.False(t, exists)
+
+	// ok
+	address, exists := proposerCalculator.GetLatestProposer(0)
+	assert.True(t, exists)
+	assert.Equal(t, validatorSet[0].Address, address)
 }

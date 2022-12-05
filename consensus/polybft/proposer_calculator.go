@@ -43,7 +43,7 @@ type ProposerCalculator interface {
 	IncrementProposerPriority(times uint64) error
 
 	// GetLatestProposer returns latest calculated proposer
-	GetLatestProposer() (types.Address, bool)
+	GetLatestProposer(round uint64) (types.Address, bool)
 }
 
 type validatorCalcMetadata struct {
@@ -112,12 +112,13 @@ func NewProposerCalculator(valz AccountSet, totalVotingPower int64, logger hclog
 }
 
 // GetLatestProposer returns address of the latest calculated proposer or false if there is no proposer
-func (pc proposerCalculator) GetLatestProposer() (types.Address, bool) {
+func (pc proposerCalculator) GetLatestProposer(round uint64) (types.Address, bool) {
 	pc.lock.RLock()
 	defer pc.lock.RUnlock()
 
-	if pc.proposer == nil {
-		return types.Address{}, false
+	// round must be same as saved one and proposer must exist
+	if pc.proposer == nil || pc.round != round {
+		return types.ZeroAddress, false
 	}
 
 	return pc.proposer.Metadata.Address, true
