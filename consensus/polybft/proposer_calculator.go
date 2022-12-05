@@ -100,7 +100,7 @@ func NewProposerCalculator(valz AccountSet, totalVotingPower int64, logger hclog
 		totalVotingPower: totalVotingPower,
 		validators:       validators,
 		lock:             &sync.RWMutex{},
-		round:            uint64(math.MaxUint64),
+		round:            0,
 		logger:           logger.Named("validator_set"),
 	}
 
