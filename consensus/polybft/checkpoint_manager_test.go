@@ -15,6 +15,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
+	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -23,14 +24,11 @@ func TestCheckpointManager_submitCheckpoint(t *testing.T) {
 
 	validators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E"})
 	validatorsMetadata := validators.getPublicIdentities()
-	rootchainMock := new(dummyRootchainInteractor)
-	rootchainMock.On("Call", mock.Anything, mock.Anything, mock.Anything).
+	txRelayerMock := new(dummyTxRelayer)
+	txRelayerMock.On("Call", mock.Anything, mock.Anything, mock.Anything).
 		Return("1", error(nil)).
 		Once()
-	rootchainMock.On("GetPendingNonce", mock.Anything).
-		Return(uint64(1), error(nil)).
-		Once()
-	rootchainMock.On("SendTransaction", mock.Anything, mock.Anything, mock.Anything).
+	txRelayerMock.On("SendTransaction", mock.Anything, mock.Anything).
 		Return(&ethgo.Receipt{Status: uint64(types.ReceiptSuccess)}, error(nil)).
 		Times(2)
 
@@ -92,7 +90,7 @@ func TestCheckpointManager_submitCheckpoint(t *testing.T) {
 	validatorAcc := validators.getValidator("A")
 	c := &checkpointManager{
 		signer:           wallet.NewEcdsaSigner(validatorAcc.Key()),
-		rootchain:        rootchainMock,
+		txRelayer:        txRelayerMock,
 		consensusBackend: backendMock,
 		blockchain:       blockchainMock,
 		logger:           hclog.NewNullLogger(),
@@ -100,7 +98,7 @@ func TestCheckpointManager_submitCheckpoint(t *testing.T) {
 
 	err := c.submitCheckpoint(*latestCheckpointHeader, false)
 	require.NoError(t, err)
-	rootchainMock.AssertExpectations(t)
+	txRelayerMock.AssertExpectations(t)
 }
 
 func TestCheckpointManager_abiEncodeCheckpointBlock(t *testing.T) {
@@ -215,13 +213,13 @@ func TestCheckpointManager_getCurrentCheckpointID(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
 
-			rootchainMock := new(dummyRootchainInteractor)
+			rootchainMock := new(dummyTxRelayer)
 			rootchainMock.On("Call", mock.Anything, mock.Anything, mock.Anything).
 				Return(c.checkpointID, c.returnError).
 				Once()
 
 			checkpointMgr := &checkpointManager{
-				rootchain: rootchainMock,
+				txRelayer: rootchainMock,
 				logger:    hclog.NewNullLogger(),
 			}
 			actualCheckpointID, err := checkpointMgr.getLatestCheckpointBlock()
@@ -272,26 +270,29 @@ func TestCheckpointManager_isCheckpointBlock(t *testing.T) {
 	}
 }
 
-var _ rootchainInteractor = (*dummyRootchainInteractor)(nil)
+var _ txrelayer.TxRelayer = (*dummyTxRelayer)(nil)
 
-type dummyRootchainInteractor struct {
+type dummyTxRelayer struct {
 	mock.Mock
 }
 
-func (d dummyRootchainInteractor) Call(from types.Address, to types.Address, input []byte) (string, error) {
+// Call executes a message call immediately without creating a transaction on the blockchain
+func (d dummyTxRelayer) Call(from ethgo.Address, to ethgo.Address, input []byte) (string, error) {
 	args := d.Called(from, to, input)
 
 	return args.String(0), args.Error(1)
 }
 
-func (d dummyRootchainInteractor) SendTransaction(nonce uint64, transaction *ethgo.Transaction, signer ethgo.Key) (*ethgo.Receipt, error) {
-	args := d.Called(nonce, transaction, signer)
+// SendTransaction signs given transaction by provided key and sends it to the blockchain
+func (d dummyTxRelayer) SendTransaction(transaction *ethgo.Transaction, key ethgo.Key) (*ethgo.Receipt, error) {
+	args := d.Called(transaction, key)
 
 	return args.Get(0).(*ethgo.Receipt), args.Error(1) //nolint:forcetypeassert
 }
 
-func (d dummyRootchainInteractor) GetPendingNonce(address types.Address) (uint64, error) {
-	args := d.Called(address)
+// SendTransactionLocal sends non-signed transaction (this is only for testing purposes)
+func (d dummyTxRelayer) SendTransactionLocal(txn *ethgo.Transaction) (*ethgo.Receipt, error) {
+	args := d.Called(txn)
 
-	return args.Get(0).(uint64), args.Error(1) //nolint:forcetypeassert
+	return args.Get(0).(*ethgo.Receipt), args.Error(1) //nolint:forcetypeassert
 }

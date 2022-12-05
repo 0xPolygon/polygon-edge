@@ -31,9 +31,9 @@ type PolyBFTConfig struct {
 	Governance types.Address `json:"governance"`
 }
 
-// BridgeConfig is the configuration for the bridge
+// BridgeConfig is the rootchain bridge configuration
 type BridgeConfig struct {
-	BridgeAddr      types.Address `json:"bridgeAddr"`
+	BridgeAddr      types.Address `json:"stateSenderAddr"`
 	CheckpointAddr  types.Address `json:"checkpointAddr"`
 	JSONRPCEndpoint string        `json:"jsonRPCEndpoint"`
 }

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"math/big"
 	"os"
 	"path"
 	"path/filepath"
@@ -15,6 +16,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
+	"github.com/umbracle/ethgo/jsonrpc"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
@@ -23,6 +25,7 @@ import (
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
+	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -83,6 +86,12 @@ func setFlags(cmd *cobra.Command) {
 		defaultGenesisPath,
 		"Genesis configuration path",
 	)
+	cmd.Flags().StringVar(
+		&params.jsonRPCAddress,
+		jsonRPCFlag,
+		"http://127.0.0.1:8545",
+		"the JSON RPC rootchain IP address (e.g. http://127.0.0.1:8545)",
+	)
 }
 
 func runPreRun(_ *cobra.Command, _ []string) error {
@@ -97,11 +106,20 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		Message: fmt.Sprintf("%s started...", contractsDeploymentTitle),
 	})
 
-	if ok, err := helper.ExistsCode(helper.StateSenderAddress); err != nil {
+	client, err := jsonrpc.NewClient(params.jsonRPCAddress)
+	if err != nil {
+		outputter.SetError(fmt.Errorf("failed to initialize JSON RPC client for provided IP address: %s: %w",
+			params.jsonRPCAddress, err))
+
+		return
+	}
+
+	code, err := client.Eth().GetCode(ethgo.Address(helper.StateSenderAddress), ethgo.Latest)
+	if err != nil {
 		outputter.SetError(fmt.Errorf("failed to check if rootchain contracts are deployed: %w", err))
 
 		return
-	} else if ok {
+	} else if code != "0x" {
 		outputter.SetCommandResult(&messageResult{
 			Message: fmt.Sprintf("%s contracts are already deployed. Aborting.", contractsDeploymentTitle),
 		})
@@ -142,8 +160,18 @@ func getGenesisAlloc() (map[types.Address]*chain.GenesisAccount, error) {
 
 func deployContracts(outputter command.OutputFormatter) error {
 	// if the bridge contract is not created, we have to deploy all the contracts
+	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(params.jsonRPCAddress))
+	if err != nil {
+		return fmt.Errorf("failed to initialize tx relayer: %w", err)
+	}
+
+	// TODO: @Stefan-Ethernal Skip FundAccount part in follow up PR if in "dev" mode
 	// fund account
-	if _, err := helper.FundAccount(helper.GetRootchainAdminAddr()); err != nil {
+	rootchainAdminAddr := ethgo.Address(helper.GetRootchainAdminAddr())
+	txn := &ethgo.Transaction{To: &rootchainAdminAddr, Value: big.NewInt(1000000000000000000)}
+
+	_, err = txRelayer.SendTransactionLocal(txn)
+	if err != nil {
 		return err
 	}
 
@@ -174,12 +202,7 @@ func deployContracts(outputter command.OutputFormatter) error {
 		},
 	}
 
-	pendingNonce, err := helper.GetPendingNonce(helper.GetRootchainAdminAddr())
-	if err != nil {
-		return err
-	}
-
-	for i, contract := range deployContracts {
+	for _, contract := range deployContracts {
 		bytecode, err := readContractBytecode(params.contractsPath, contract.path, contract.name)
 		if err != nil {
 			return err
@@ -190,7 +213,7 @@ func deployContracts(outputter command.OutputFormatter) error {
 			Input: bytecode,
 		}
 
-		receipt, err := helper.SendTxn(pendingNonce+uint64(i), txn, helper.GetRootchainAdminKey())
+		receipt, err := txRelayer.SendTransaction(txn, helper.GetRootchainAdminKey())
 		if err != nil {
 			return err
 		}
@@ -203,9 +226,7 @@ func deployContracts(outputter command.OutputFormatter) error {
 		outputter.WriteCommandResult(newDeployContractsResult(contract.name, contract.expected, receipt.TransactionHash))
 	}
 
-	pendingNonce += uint64(len(deployContracts))
-
-	if err := initializeCheckpointManager(pendingNonce); err != nil {
+	if err := initializeCheckpointManager(txRelayer); err != nil {
 		return err
 	}
 
@@ -217,7 +238,7 @@ func deployContracts(outputter command.OutputFormatter) error {
 }
 
 // initializeCheckpointManager invokes initialize function on CheckpointManager smart contract
-func initializeCheckpointManager(nonce uint64) error {
+func initializeCheckpointManager(txRelayer txrelayer.TxRelayer) error {
 	allocs, err := getGenesisAlloc()
 	if err != nil {
 		return err
@@ -242,7 +263,7 @@ func initializeCheckpointManager(nonce uint64) error {
 		Input: initCheckpointInput,
 	}
 
-	receipt, err := helper.SendTxn(nonce, txn, helper.GetRootchainAdminKey())
+	receipt, err := txRelayer.SendTransaction(txn, helper.GetRootchainAdminKey())
 	if err != nil {
 		return fmt.Errorf("failed to send transaction to CheckpointManager. error: %w", err)
 	}

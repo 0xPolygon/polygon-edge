@@ -11,6 +11,7 @@ const (
 	validatorPrefixPathFlag = "validator-prefix"
 	validatorPathFlag       = "validator-path"
 	genesisPathFlag         = "genesis-path"
+	jsonRPCFlag             = "json-rpc"
 
 	defaultValidatorPrefixPath = "test-chain-"
 	defaultValidatorPath       = "./"
@@ -22,6 +23,7 @@ type initContractsParams struct {
 	validatorPrefixPath string
 	validatorPath       string
 	genesisPath         string
+	jsonRPCAddress      string
 }
 
 func (ip *initContractsParams) validateFlags() error {

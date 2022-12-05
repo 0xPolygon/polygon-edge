@@ -2,6 +2,7 @@ package genesis
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"math/big"
 	"path"
@@ -30,7 +31,7 @@ const (
 	sprintSizeFlag       = "sprint-size"
 	blockTimeFlag        = "block-time"
 	validatorsFlag       = "polybft-validators"
-	bridgeFlag           = "bridge"
+	bridgeFlag           = "bridge-json-rpc"
 
 	defaultEpochSize                  = uint64(10)
 	defaultSprintSize                 = uint64(5)
@@ -42,11 +43,19 @@ const (
 	bootnodePortStart = 30301
 )
 
+var (
+	errNoGenesisValidators = errors.New("genesis validators aren't provided")
+)
+
 func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
 	// set initial validator set
 	genesisValidators, err := p.getGenesisValidators()
 	if err != nil {
 		return nil, err
+	}
+
+	if len(genesisValidators) == 0 {
+		return nil, errNoGenesisValidators
 	}
 
 	// deploy genesis contracts
@@ -113,16 +122,12 @@ func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
 	}
 
 	// populate bridge configuration
-	if p.bridgeEnabled {
-		ip, err := rootchain.ReadRootchainIP()
-		if err != nil {
-			return nil, err
-		}
-
+	if p.bridgeJSONRPCAddr != "" {
 		polyBftConfig.Bridge = &polybft.BridgeConfig{
+			// TODO: Figure out population of rootchain contracts and whether those should be part of genesis configuration
 			BridgeAddr:      rootchain.StateSenderAddress,
 			CheckpointAddr:  rootchain.CheckpointManagerAddress,
-			JSONRPCEndpoint: ip,
+			JSONRPCEndpoint: p.bridgeJSONRPCAddr,
 		}
 	}
 

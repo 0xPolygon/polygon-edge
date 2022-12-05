@@ -16,6 +16,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
+	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	hcf "github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
@@ -125,7 +126,7 @@ type consensusRuntime struct {
 }
 
 // newConsensusRuntime creates and starts a new consensus runtime instance with event tracking
-func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) *consensusRuntime {
+func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRuntime, error) {
 	runtime := &consensusRuntime{
 		state:  config.State,
 		config: config,
@@ -133,16 +134,21 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) *consensusRuntim
 	}
 
 	if runtime.IsBridgeEnabled() {
+		txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(config.PolyBFTConfig.Bridge.JSONRPCEndpoint))
+		if err != nil {
+			return nil, err
+		}
+
 		runtime.checkpointManager = newCheckpointManager(
 			wallet.NewEcdsaSigner(config.Key),
 			defaultCheckpointsOffset,
-			&defaultRootchainInteractor{},
+			txRelayer,
 			config.blockchain,
 			config.polybftBackend,
 			log.Named("checkpoint_manager"))
 	}
 
-	return runtime
+	return runtime, nil
 }
 
 // getEpoch returns current epochMetadata in a thread-safe manner.
