@@ -290,29 +290,28 @@ func initMainDBBuckets(db *bolt.DB) error {
 	return err
 }
 
+const snapshotKeySeparator = "edge-snapshot-key-separator"
+
 // insertValidatorSnapshot inserts a validator snapshot for the given block to its bucket in db
-func (s *State) insertValidatorSnapshot(block uint64, validatorSnapshot AccountSet) error {
+func (s *State) insertValidatorSnapshot(validatorSnapshot *validatorSnapshot) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
-		raw, err := validatorSnapshot.Marshal()
+		raw, err := json.Marshal(validatorSnapshot)
 		if err != nil {
 			return err
 		}
 
-		bucket := tx.Bucket(validatorSnapshotsBucket)
-
-		return bucket.Put(itob(block), raw)
+		return tx.Bucket(validatorSnapshotsBucket).Put(itob(validatorSnapshot.Epoch), raw)
 	})
 }
 
 // getValidatorSnapshot queries the validator snapshot for given block from db
-func (s *State) getValidatorSnapshot(block uint64) (AccountSet, error) {
-	var validatorSnapshot AccountSet
+func (s *State) getValidatorSnapshot(epoch uint64) (*validatorSnapshot, error) {
+	var validatorSnapshot *validatorSnapshot
 
 	err := s.db.View(func(tx *bolt.Tx) error {
-		bucket := tx.Bucket(validatorSnapshotsBucket)
-		v := bucket.Get(itob(block))
+		v := tx.Bucket(validatorSnapshotsBucket).Get(itob(epoch))
 		if v != nil {
-			return validatorSnapshot.Unmarshal(v)
+			return json.Unmarshal(v, &validatorSnapshot)
 		}
 
 		return nil
@@ -321,7 +320,27 @@ func (s *State) getValidatorSnapshot(block uint64) (AccountSet, error) {
 	return validatorSnapshot, err
 }
 
-// list iterates through all events in events bucket in db, unmarshals them, and returns as array
+// getLastSnapshot returns the last snapshot saved in db
+// since they are stored by epoch number (uint64), they are sequentially stored,
+// so the latest epoch will be the last snapshot in db
+func (s *State) getLastSnapshot() (*validatorSnapshot, error) {
+	var snapshot *validatorSnapshot
+
+	err := s.db.View(func(tx *bolt.Tx) error {
+		c := tx.Bucket(validatorSnapshotsBucket).Cursor()
+		k, v := c.Last()
+		if k == nil {
+			// we have no snapshots in db
+			return nil
+		}
+
+		return json.Unmarshal(v, &snapshot)
+	})
+
+	return snapshot, err
+}
+
+// list iterates through all events in events bucket in db, un-marshals them, and returns as array
 func (s *State) list() ([]*types.StateSyncEvent, error) {
 	events := []*types.StateSyncEvent{}
 
@@ -705,7 +724,7 @@ func (s *State) cleanEpochsFromDB() error {
 
 // cleanValidatorSnapshotsFromDB cleans the validator snapshots bucket if a limit is reached,
 // but it leaves the latest (n) number of snapshots
-func (s *State) cleanValidatorSnapshotsFromDB(block uint64) error {
+func (s *State) cleanValidatorSnapshotsFromDB(epoch uint64) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(validatorSnapshotsBucket)
 
@@ -713,14 +732,14 @@ func (s *State) cleanValidatorSnapshotsFromDB(block uint64) error {
 		keys := make([][]byte, 0)
 		values := make([][]byte, 0)
 		for i := 0; i < numberOfSnapshotsToLeaveInDB; i++ { // exclude the last inserted we already appended
-			key := itob(block)
+			key := itob(epoch)
 			value := bucket.Get(key)
 			if value == nil {
 				continue
 			}
 			keys = append(keys, key)
 			values = append(values, value)
-			block--
+			epoch--
 		}
 
 		// removing an entire bucket is much faster than removing all keys
