@@ -306,15 +306,17 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 		return err
 	}
 
-	if len(elems) < 10 {
-		return fmt.Errorf("incorrect number of elements to decode transaction, expected 10 but found %d", len(elems))
+	if len(elems) < 9 {
+		return fmt.Errorf("incorrect number of elements to decode transaction, expected at leaset 9 but found %d", len(elems))
 	}
 
 	p.Hash(t.hash[:0], v)
 
-	txType, err := ReadRlpTxType(elems[9])
-	if err != nil {
-		return err
+	txType := LegacyTxType
+	if len(elems) >= 10 {
+		if txType, err = ReadRlpTxType(elems[9]); err != nil {
+			return err
+		}
 	}
 
 	switch txType {
