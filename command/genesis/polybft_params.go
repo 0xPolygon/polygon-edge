@@ -40,10 +40,6 @@ const (
 	defaultPolyBftValidatorPrefixPath = "test-chain-"
 	defaultBridge                     = false
 
-	nodeIDLength       = 53
-	ecdsaAddressLength = 42
-	blsKeyLength       = 2
-
 	bootnodePortStart = 30301
 )
 
@@ -182,20 +178,19 @@ func (p *genesisParams) getGenesisValidators() ([]*polybft.Validator, error) {
 			parts := strings.Split(validator, ":")
 
 			if len(parts) != 3 {
-				return nil, fmt.Errorf("expected parameter having 3 parts in the following format "+
-					"<node id>:<ECDSA address>:<public bls key>, but got %d part(s)",
+				return nil, fmt.Errorf("expected 3 parts provided in the following format <nodeId:address:blsKey>, but got %d",
 					len(parts))
 			}
 
-			if len(parts[0]) != nodeIDLength {
+			if len(parts[0]) != 53 {
 				return nil, fmt.Errorf("invalid node id: %s", parts[0])
 			}
 
-			if len(parts[1]) != ecdsaAddressLength {
+			if len(parts[1]) != 42 {
 				return nil, fmt.Errorf("invalid address: %s", parts[1])
 			}
 
-			if len(parts[2]) < blsKeyLength {
+			if len(parts[2]) < 2 {
 				return nil, fmt.Errorf("invalid bls key: %s", parts[2])
 			}
 
