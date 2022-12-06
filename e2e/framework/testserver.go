@@ -556,7 +556,7 @@ func (t *TestServer) Transfer(key *wallet.Key, to ethgo.Address, value *big.Int)
 
 	nextNonce, err := client.Eth().GetNonce(key.Address(), ethgo.Latest)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get nonce: %v", err)
+		return nil, fmt.Errorf("failed to get nonce: %w", err)
 	}
 
 	txn := &ethgo.Transaction{
@@ -569,7 +569,7 @@ func (t *TestServer) Transfer(key *wallet.Key, to ethgo.Address, value *big.Int)
 
 	chainID, err := client.Eth().ChainID()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get chain id: %v", err)
+		return nil, fmt.Errorf("failed to get chain id: %w", err)
 	}
 
 	signer := wallet.NewEIP155Signer(chainID.Uint64())
@@ -584,7 +584,7 @@ func (t *TestServer) Transfer(key *wallet.Key, to ethgo.Address, value *big.Int)
 
 	txHash, err := client.Eth().SendRawTransaction(data)
 	if err != nil {
-		return nil, fmt.Errorf("failed to send transaction: %v", err)
+		return nil, fmt.Errorf("failed to send transaction: %w", err)
 	}
 
 	ctx, cancelFn := context.WithTimeout(context.Background(), DefaultTimeout)

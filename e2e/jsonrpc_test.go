@@ -14,7 +14,6 @@ import (
 
 func TestJsonRPC(t *testing.T) {
 	// TODO: Reuse the same tests for websockets and IPC.
-
 	fund, err := wallet.GenerateKey()
 	require.NoError(t, err)
 
