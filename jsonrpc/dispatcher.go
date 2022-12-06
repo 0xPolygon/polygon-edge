@@ -82,7 +82,6 @@ func (d *Dispatcher) registerEndpoints(store JSONRPCStore) {
 	d.endpoints.Eth = &Eth{
 		d.logger,
 		store,
-		d.params.chainID,
 		d.filterManager,
 		d.params.priceLimit,
 	}
