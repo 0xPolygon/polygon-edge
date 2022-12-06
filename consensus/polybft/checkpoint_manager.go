@@ -35,10 +35,8 @@ var (
 
 // checkpointManager encapsulates logic for checkpoint data submission
 type checkpointManager struct {
-	// signer is the identity of the node submitting a checkpoint
-	signer ethgo.Key
-	// signerAddress is the address of the node submitting a checkpoint
-	signerAddress types.Address
+	// key is the identity of the node submitting a checkpoint
+	key ethgo.Key
 	// blockchain is abstraction for blockchain
 	blockchain blockchainBackend
 	// consensusBackend is abstraction for polybft consensus specific functions
@@ -54,11 +52,10 @@ type checkpointManager struct {
 }
 
 // newCheckpointManager creates a new instance of checkpointManager
-func newCheckpointManager(signer ethgo.Key, checkpointOffset uint64, txRelayer txrelayer.TxRelayer,
+func newCheckpointManager(key ethgo.Key, checkpointOffset uint64, txRelayer txrelayer.TxRelayer,
 	blockchain blockchainBackend, backend polybftBackend, logger hclog.Logger) *checkpointManager {
 	return &checkpointManager{
-		signer:            signer,
-		signerAddress:     types.Address(signer.Address()),
+		key:               key,
 		blockchain:        blockchain,
 		consensusBackend:  backend,
 		txRelayer:         txRelayer,
@@ -75,7 +72,7 @@ func (c *checkpointManager) getLatestCheckpointBlock() (uint64, error) {
 	}
 
 	latestCheckpointBlockRaw, err := c.txRelayer.Call(
-		ethgo.Address(c.signerAddress),
+		c.key.Address(),
 		ethgo.Address(helper.CheckpointManagerAddress),
 		checkpointBlockNumMethodEncoded)
 	if err != nil {
@@ -105,21 +102,22 @@ func (c *checkpointManager) submitCheckpoint(latestHeader types.Header, isEndOfE
 	checkpointManagerAddr := ethgo.Address(helper.CheckpointManagerAddress)
 	txn := &ethgo.Transaction{
 		To:   &checkpointManagerAddr,
-		From: ethgo.Address(c.signerAddress),
+		From: c.key.Address(),
 	}
 	initialBlockNumber := lastCheckpointBlockNumber + 1
 
 	var (
 		parentExtra  *Extra
 		parentHeader *types.Header
+		currentExtra *Extra
 	)
 
 	if initialBlockNumber < latestHeader.Number {
 		found := false
-		parentHeader, found = c.blockchain.GetHeaderByNumber(lastCheckpointBlockNumber)
+		parentHeader, found = c.blockchain.GetHeaderByNumber(initialBlockNumber)
 
 		if !found {
-			return fmt.Errorf("block %d was not found", lastCheckpointBlockNumber)
+			return fmt.Errorf("block %d was not found", initialBlockNumber)
 		}
 
 		parentExtra, err = GetIbftExtra(parentHeader.ExtraData)
@@ -129,39 +127,46 @@ func (c *checkpointManager) submitCheckpoint(latestHeader types.Header, isEndOfE
 	}
 
 	// detect any pending (previously failed) checkpoints and send them
-	for blockNumber := initialBlockNumber; blockNumber < latestHeader.Number; blockNumber++ {
+	for blockNumber := initialBlockNumber + 1; blockNumber <= latestHeader.Number; blockNumber++ {
 		currentHeader, found := c.blockchain.GetHeaderByNumber(blockNumber)
 		if !found {
 			return fmt.Errorf("block %d was not found", blockNumber)
 		}
 
-		currentExtra, err := GetIbftExtra(currentHeader.ExtraData)
+		currentExtra, err = GetIbftExtra(currentHeader.ExtraData)
 		if err != nil {
 			return err
 		}
 
 		parentEpochNumber := parentExtra.Checkpoint.EpochNumber
 		currentEpochNumber := currentExtra.Checkpoint.EpochNumber
-		parentHeader = currentHeader
-		parentExtra = currentExtra
-
 		// send pending checkpoints only for epoch ending blocks
 		if blockNumber == 1 || parentEpochNumber == currentEpochNumber {
+			parentHeader = currentHeader
+			parentExtra = currentExtra
+
 			continue
 		}
 
 		if err = c.encodeAndSendCheckpoint(txn, *parentHeader, *parentExtra, true); err != nil {
 			return err
 		}
+
+		parentHeader = currentHeader
+		parentExtra = currentExtra
 	}
 
-	// we need to send checkpoint for the latest block
-	extra, err := GetIbftExtra(latestHeader.ExtraData)
-	if err != nil {
-		return err
+	// latestHeader extra could be set in the for loop above
+	// (in case there were pending checkpoint blocks)
+	if currentExtra == nil {
+		// we need to send checkpoint for the latest block
+		currentExtra, err = GetIbftExtra(latestHeader.ExtraData)
+		if err != nil {
+			return err
+		}
 	}
 
-	return c.encodeAndSendCheckpoint(txn, latestHeader, *extra, isEndOfEpoch)
+	return c.encodeAndSendCheckpoint(txn, latestHeader, *currentExtra, isEndOfEpoch)
 }
 
 // encodeAndSendCheckpoint encodes checkpoint data for the given block and
@@ -188,7 +193,7 @@ func (c *checkpointManager) encodeAndSendCheckpoint(txn *ethgo.Transaction,
 
 	txn.Input = input
 
-	receipt, err := c.txRelayer.SendTransaction(txn, c.signer)
+	receipt, err := c.txRelayer.SendTransaction(txn, c.key)
 	if err != nil {
 		return err
 	}
