@@ -10,10 +10,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/0xPolygon/polygon-edge/helper/tests"
 	"github.com/0xPolygon/polygon-edge/txpool/proto"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/stretchr/testify/assert"
 )
 
 func shuffleTxPoolEvents(
@@ -141,13 +143,14 @@ func TestEventSubscription_ProcessedEvents(t *testing.T) {
 			}
 
 			wg.Wait()
+
 			eventWaitCtx, eventWaitFn := context.WithTimeout(context.Background(), time.Second*5)
 			defer eventWaitFn()
-			if _, err := tests.RetryUntilTimeout(eventWaitCtx, func() (interface{}, bool) {
+
+			_, err := tests.RetryUntilTimeout(eventWaitCtx, func() (interface{}, bool) {
 				return nil, atomic.LoadInt64(&processed) < int64(testCase.expectedProcessed)
-			}); err != nil {
-				t.Fatalf("Unable to wait for events to be processed, %v", err)
-			}
+			})
+			require.NoError(t, err)
 
 			subscription.close()
 

@@ -32,7 +32,6 @@ func GenerateKeyAndAddr(t *testing.T) (*ecdsa.PrivateKey, types.Address) {
 	t.Helper()
 
 	key, err := crypto.GenerateECDSAKey()
-
 	assert.NoError(t, err)
 
 	addr := crypto.PubKeyToAddress(&key.PublicKey)

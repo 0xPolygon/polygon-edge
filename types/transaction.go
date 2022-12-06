@@ -223,7 +223,8 @@ func (t *Transaction) Hash() Hash {
 func (t *Transaction) SetSignatureValues(v, r, s *big.Int) *Transaction {
 	newTxData := t.inner.Copy()
 	newTxData.setSignatureValues(v, r, s)
-	*t = *NewTx(newTxData)
+	*t = *NewTxWithSender(newTxData, t.from)
+	t.ComputeHash()
 
 	return t
 }

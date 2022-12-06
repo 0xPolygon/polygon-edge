@@ -12,6 +12,7 @@ import (
 	"github.com/golang/protobuf/ptypes/any"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/crypto"
@@ -118,9 +119,7 @@ func TestAddTxErrors(t *testing.T) {
 
 	setupPool := func() *TxPool {
 		pool, err := newTestPool()
-		if err != nil {
-			t.Fatalf("cannot create txpool - err: %v\n", err)
-		}
+		require.NoError(t, err)
 
 		pool.SetSigner(poolSigner)
 
@@ -129,15 +128,14 @@ func TestAddTxErrors(t *testing.T) {
 
 	signTx := func(transaction *types.Transaction) *types.Transaction {
 		signedTx, signErr := poolSigner.SignTx(transaction, defaultKey)
-		if signErr != nil {
-			t.Fatalf("Unable to sign transaction, %v", signErr)
-		}
+		require.NoError(t, signErr)
 
 		return signedTx
 	}
 
 	t.Run("ErrNegativeValue", func(t *testing.T) {
 		t.Parallel()
+
 		pool := setupPool()
 
 		txData := newTx(0, 1)
@@ -188,12 +186,10 @@ func TestAddTxErrors(t *testing.T) {
 
 		// Sign with a private key that corresponds
 		// to a different address
-		tx := signTx(types.NewTxWithSender(txData, addr1))
+		tx := signTx(types.NewTxWithSender(txData, addr2))
 
-		assert.ErrorIs(t,
-			pool.addTx(local, tx),
-			ErrInvalidSender,
-		)
+		err := pool.addTx(local, tx)
+		require.EqualError(t, err, ErrInvalidSender.Error())
 	})
 
 	t.Run("ErrUnderpriced", func(t *testing.T) {
@@ -2458,10 +2454,6 @@ func TestGetTxs(t *testing.T) {
 		eoa1 = new(eoa).create(t)
 		eoa2 = new(eoa).create(t)
 		eoa3 = new(eoa).create(t)
-
-		addr1 = eoa1.Address
-		addr2 = eoa2.Address
-		addr3 = eoa3.Address
 	)
 
 	testCases := []struct {
@@ -2473,122 +2465,124 @@ func TestGetTxs(t *testing.T) {
 		{
 			name: "get promoted txs",
 			allTxs: map[types.Address][]*types.Transaction{
-				addr1: {
-					eoa1.signTx(types.NewTxWithSender(newTx(0, 1), addr1), signerEIP155),
-					eoa1.signTx(types.NewTxWithSender(newTx(1, 1), addr1), signerEIP155),
-					eoa1.signTx(types.NewTxWithSender(newTx(2, 1), addr1), signerEIP155),
+				eoa1.Address: {
+					eoa1.signTx(types.NewTxWithSender(newTx(0, 1), eoa1.Address), signerEIP155),
+					eoa1.signTx(types.NewTxWithSender(newTx(1, 1), eoa1.Address), signerEIP155),
+					eoa1.signTx(types.NewTxWithSender(newTx(2, 1), eoa1.Address), signerEIP155),
 				},
 
-				addr2: {
-					eoa2.signTx(types.NewTxWithSender(newTx(0, 1), addr2), signerEIP155),
-					eoa2.signTx(types.NewTxWithSender(newTx(1, 1), addr2), signerEIP155),
-					eoa2.signTx(types.NewTxWithSender(newTx(2, 1), addr2), signerEIP155),
+				eoa2.Address: {
+					eoa2.signTx(types.NewTxWithSender(newTx(0, 1), eoa2.Address), signerEIP155),
+					eoa2.signTx(types.NewTxWithSender(newTx(1, 1), eoa2.Address), signerEIP155),
+					eoa2.signTx(types.NewTxWithSender(newTx(2, 1), eoa2.Address), signerEIP155),
 				},
 
-				addr3: {
-					eoa3.signTx(types.NewTxWithSender(newTx(0, 1), addr3), signerEIP155),
-					eoa3.signTx(types.NewTxWithSender(newTx(1, 1), addr3), signerEIP155),
-					eoa3.signTx(types.NewTxWithSender(newTx(2, 1), addr3), signerEIP155),
+				eoa3.Address: {
+					eoa3.signTx(types.NewTxWithSender(newTx(0, 1), eoa3.Address), signerEIP155),
+					eoa3.signTx(types.NewTxWithSender(newTx(1, 1), eoa3.Address), signerEIP155),
+					eoa3.signTx(types.NewTxWithSender(newTx(2, 1), eoa3.Address), signerEIP155),
 				},
 			},
 			expectedPromoted: map[types.Address][]*types.Transaction{
-				addr1: {
-					eoa1.signTx(types.NewTxWithSender(newTx(0, 1), addr1), signerEIP155),
-					eoa1.signTx(types.NewTxWithSender(newTx(1, 1), addr1), signerEIP155),
-					eoa1.signTx(types.NewTxWithSender(newTx(2, 1), addr1), signerEIP155),
+				eoa1.Address: {
+					eoa1.signTx(types.NewTxWithSender(newTx(0, 1), eoa1.Address), signerEIP155),
+					eoa1.signTx(types.NewTxWithSender(newTx(1, 1), eoa1.Address), signerEIP155),
+					eoa1.signTx(types.NewTxWithSender(newTx(2, 1), eoa1.Address), signerEIP155),
 				},
 
-				addr2: {
-					eoa2.signTx(types.NewTxWithSender(newTx(0, 1), addr2), signerEIP155),
-					eoa2.signTx(types.NewTxWithSender(newTx(1, 1), addr2), signerEIP155),
-					eoa2.signTx(types.NewTxWithSender(newTx(2, 1), addr2), signerEIP155),
+				eoa2.Address: {
+					eoa2.signTx(types.NewTxWithSender(newTx(0, 1), eoa2.Address), signerEIP155),
+					eoa2.signTx(types.NewTxWithSender(newTx(1, 1), eoa2.Address), signerEIP155),
+					eoa2.signTx(types.NewTxWithSender(newTx(2, 1), eoa2.Address), signerEIP155),
 				},
 
-				addr3: {
-					eoa3.signTx(types.NewTxWithSender(newTx(0, 1), addr3), signerEIP155),
-					eoa3.signTx(types.NewTxWithSender(newTx(1, 1), addr3), signerEIP155),
-					eoa3.signTx(types.NewTxWithSender(newTx(2, 1), addr3), signerEIP155),
+				eoa3.Address: {
+					eoa3.signTx(types.NewTxWithSender(newTx(0, 1), eoa3.Address), signerEIP155),
+					eoa3.signTx(types.NewTxWithSender(newTx(1, 1), eoa3.Address), signerEIP155),
+					eoa3.signTx(types.NewTxWithSender(newTx(2, 1), eoa3.Address), signerEIP155),
 				},
 			},
 		},
 		{
 			name: "get all txs",
 			allTxs: map[types.Address][]*types.Transaction{
-				addr1: {
-					eoa1.signTx(types.NewTxWithSender(newTx(0, 1), addr1), signerEIP155),
-					eoa1.signTx(types.NewTxWithSender(newTx(1, 1), addr1), signerEIP155),
-					eoa1.signTx(types.NewTxWithSender(newTx(2, 1), addr1), signerEIP155),
+				eoa1.Address: {
+					eoa1.signTx(types.NewTxWithSender(newTx(0, 1), eoa1.Address), signerEIP155),
+					eoa1.signTx(types.NewTxWithSender(newTx(1, 1), eoa1.Address), signerEIP155),
+					eoa1.signTx(types.NewTxWithSender(newTx(2, 1), eoa1.Address), signerEIP155),
 					// enqueued
-					eoa1.signTx(types.NewTxWithSender(newTx(10, 1), addr1), signerEIP155),
-					eoa1.signTx(types.NewTxWithSender(newTx(11, 1), addr1), signerEIP155),
-					eoa1.signTx(types.NewTxWithSender(newTx(12, 1), addr1), signerEIP155),
+					eoa1.signTx(types.NewTxWithSender(newTx(10, 1), eoa1.Address), signerEIP155),
+					eoa1.signTx(types.NewTxWithSender(newTx(11, 1), eoa1.Address), signerEIP155),
+					eoa1.signTx(types.NewTxWithSender(newTx(12, 1), eoa1.Address), signerEIP155),
 				},
 
-				addr2: {
-					eoa2.signTx(types.NewTxWithSender(newTx(0, 1), addr2), signerEIP155),
-					eoa2.signTx(types.NewTxWithSender(newTx(1, 1), addr2), signerEIP155),
-					eoa2.signTx(types.NewTxWithSender(newTx(2, 1), addr2), signerEIP155),
+				eoa2.Address: {
+					eoa2.signTx(types.NewTxWithSender(newTx(0, 1), eoa2.Address), signerEIP155),
+					eoa2.signTx(types.NewTxWithSender(newTx(1, 1), eoa2.Address), signerEIP155),
+					eoa2.signTx(types.NewTxWithSender(newTx(2, 1), eoa2.Address), signerEIP155),
 
 					// enqueued
-					eoa2.signTx(types.NewTxWithSender(newTx(10, 1), addr2), signerEIP155),
-					eoa2.signTx(types.NewTxWithSender(newTx(11, 1), addr2), signerEIP155),
-					eoa2.signTx(types.NewTxWithSender(newTx(12, 1), addr2), signerEIP155),
+					eoa2.signTx(types.NewTxWithSender(newTx(10, 1), eoa2.Address), signerEIP155),
+					eoa2.signTx(types.NewTxWithSender(newTx(11, 1), eoa2.Address), signerEIP155),
+					eoa2.signTx(types.NewTxWithSender(newTx(12, 1), eoa2.Address), signerEIP155),
 				},
 
-				addr3: {
-					eoa3.signTx(types.NewTxWithSender(newTx(0, 1), addr3), signerEIP155),
-					eoa3.signTx(types.NewTxWithSender(newTx(1, 1), addr3), signerEIP155),
-					eoa3.signTx(types.NewTxWithSender(newTx(2, 1), addr3), signerEIP155),
+				eoa3.Address: {
+					eoa3.signTx(types.NewTxWithSender(newTx(0, 1), eoa3.Address), signerEIP155),
+					eoa3.signTx(types.NewTxWithSender(newTx(1, 1), eoa3.Address), signerEIP155),
+					eoa3.signTx(types.NewTxWithSender(newTx(2, 1), eoa3.Address), signerEIP155),
 
 					// enqueued
-					eoa3.signTx(types.NewTxWithSender(newTx(10, 1), addr3), signerEIP155),
-					eoa3.signTx(types.NewTxWithSender(newTx(11, 1), addr3), signerEIP155),
-					eoa3.signTx(types.NewTxWithSender(newTx(12, 1), addr3), signerEIP155),
+					eoa3.signTx(types.NewTxWithSender(newTx(10, 1), eoa3.Address), signerEIP155),
+					eoa3.signTx(types.NewTxWithSender(newTx(11, 1), eoa3.Address), signerEIP155),
+					eoa3.signTx(types.NewTxWithSender(newTx(12, 1), eoa3.Address), signerEIP155),
 				},
 			},
 			expectedPromoted: map[types.Address][]*types.Transaction{
-				addr1: {
-					eoa1.signTx(types.NewTxWithSender(newTx(0, 1), addr1), signerEIP155),
-					eoa1.signTx(types.NewTxWithSender(newTx(1, 1), addr1), signerEIP155),
-					eoa1.signTx(types.NewTxWithSender(newTx(2, 1), addr1), signerEIP155),
+				eoa1.Address: {
+					eoa1.signTx(types.NewTxWithSender(newTx(0, 1), eoa1.Address), signerEIP155),
+					eoa1.signTx(types.NewTxWithSender(newTx(1, 1), eoa1.Address), signerEIP155),
+					eoa1.signTx(types.NewTxWithSender(newTx(2, 1), eoa1.Address), signerEIP155),
 				},
 
-				addr2: {
-					eoa2.signTx(types.NewTxWithSender(newTx(0, 1), addr2), signerEIP155),
-					eoa2.signTx(types.NewTxWithSender(newTx(1, 1), addr2), signerEIP155),
-					eoa2.signTx(types.NewTxWithSender(newTx(2, 1), addr2), signerEIP155),
+				eoa2.Address: {
+					eoa2.signTx(types.NewTxWithSender(newTx(0, 1), eoa2.Address), signerEIP155),
+					eoa2.signTx(types.NewTxWithSender(newTx(1, 1), eoa2.Address), signerEIP155),
+					eoa2.signTx(types.NewTxWithSender(newTx(2, 1), eoa2.Address), signerEIP155),
 				},
 
-				addr3: {
-					eoa3.signTx(types.NewTxWithSender(newTx(0, 1), addr3), signerEIP155),
-					eoa3.signTx(types.NewTxWithSender(newTx(1, 1), addr3), signerEIP155),
-					eoa3.signTx(types.NewTxWithSender(newTx(2, 1), addr3), signerEIP155),
+				eoa3.Address: {
+					eoa3.signTx(types.NewTxWithSender(newTx(0, 1), eoa3.Address), signerEIP155),
+					eoa3.signTx(types.NewTxWithSender(newTx(1, 1), eoa3.Address), signerEIP155),
+					eoa3.signTx(types.NewTxWithSender(newTx(2, 1), eoa3.Address), signerEIP155),
 				},
 			},
 			expectedEnqueued: map[types.Address][]*types.Transaction{
-				addr1: {
-					eoa1.signTx(types.NewTxWithSender(newTx(10, 1), addr1), signerEIP155),
-					eoa1.signTx(types.NewTxWithSender(newTx(11, 1), addr1), signerEIP155),
-					eoa1.signTx(types.NewTxWithSender(newTx(12, 1), addr1), signerEIP155),
+				eoa1.Address: {
+					eoa1.signTx(types.NewTxWithSender(newTx(10, 1), eoa1.Address), signerEIP155),
+					eoa1.signTx(types.NewTxWithSender(newTx(11, 1), eoa1.Address), signerEIP155),
+					eoa1.signTx(types.NewTxWithSender(newTx(12, 1), eoa1.Address), signerEIP155),
 				},
 
-				addr2: {
-					eoa2.signTx(types.NewTxWithSender(newTx(10, 1), addr2), signerEIP155),
-					eoa2.signTx(types.NewTxWithSender(newTx(11, 1), addr2), signerEIP155),
-					eoa2.signTx(types.NewTxWithSender(newTx(12, 1), addr2), signerEIP155),
+				eoa2.Address: {
+					eoa2.signTx(types.NewTxWithSender(newTx(10, 1), eoa2.Address), signerEIP155),
+					eoa2.signTx(types.NewTxWithSender(newTx(11, 1), eoa2.Address), signerEIP155),
+					eoa2.signTx(types.NewTxWithSender(newTx(12, 1), eoa2.Address), signerEIP155),
 				},
 
-				addr3: {
-					eoa3.signTx(types.NewTxWithSender(newTx(10, 1), addr3), signerEIP155),
-					eoa3.signTx(types.NewTxWithSender(newTx(11, 1), addr3), signerEIP155),
-					eoa3.signTx(types.NewTxWithSender(newTx(12, 1), addr3), signerEIP155),
+				eoa3.Address: {
+					eoa3.signTx(types.NewTxWithSender(newTx(10, 1), eoa3.Address), signerEIP155),
+					eoa3.signTx(types.NewTxWithSender(newTx(11, 1), eoa3.Address), signerEIP155),
+					eoa3.signTx(types.NewTxWithSender(newTx(12, 1), eoa3.Address), signerEIP155),
 				},
 			},
 		},
 	}
 
-	for _, test := range testCases {
+	for i, test := range testCases {
+		i := i
 		test := test
+		fmt.Println("started:", i)
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -2629,13 +2623,13 @@ func TestGetTxs(t *testing.T) {
 			for _, txs := range test.allTxs {
 				nonce := uint64(0)
 				promotable := uint64(0)
-				for _, tx := range txs {
+				for i, tx := range txs {
 					// send all txs
 					if tx.Nonce() == nonce+promotable {
 						promotable++
 					}
 
-					assert.NoError(t, pool.addTx(local, tx))
+					assert.NoError(t, pool.addTx(local, txs[i]))
 				}
 
 				expectedPromotedTx += int(promotable)
@@ -2645,7 +2639,8 @@ func TestGetTxs(t *testing.T) {
 			defer cancelFn()
 
 			// Wait for promoted transactions
-			assert.Len(t, waitForEvents(ctx, promoteSubscription, expectedPromotedTx), expectedPromotedTx)
+			events := waitForEvents(ctx, promoteSubscription, expectedPromotedTx)
+			assert.Len(t, events, expectedPromotedTx)
 
 			// Wait for enqueued transactions, if any are present
 			expectedEnqueuedTx := expectedPromotedTx - len(test.allTxs)
@@ -2654,7 +2649,8 @@ func TestGetTxs(t *testing.T) {
 				ctx, cancelFn = context.WithTimeout(context.Background(), time.Second*10)
 				defer cancelFn()
 
-				assert.Len(t, waitForEvents(ctx, enqueueSubscription, expectedEnqueuedTx), expectedEnqueuedTx)
+				events = waitForEvents(ctx, enqueueSubscription, expectedEnqueuedTx)
+				assert.Len(t, events, expectedEnqueuedTx)
 			}
 
 			allPromoted, allEnqueued := pool.GetTxs(true)
@@ -2674,8 +2670,12 @@ func TestGetTxs(t *testing.T) {
 					assert.True(t, found)
 				}
 			}
+
 		})
+		fmt.Println("all passed:", i)
 	}
+
+	t.Log("all finished")
 }
 
 func TestSetSealing(t *testing.T) {
