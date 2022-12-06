@@ -12,16 +12,16 @@ func TestEth_TxnPool_SendRawTransaction(t *testing.T) {
 	store := &mockStoreTxn{}
 	eth := newTestEthEndpoint(store)
 
-	txn := types.NewTx(&types.LegacyTx{
-		From: addr0,
-		V:    big.NewInt(1),
-	})
+	txn := types.NewTxWithSender(&types.LegacyTx{
+		V: big.NewInt(1),
+	}, addr0)
+
 	txn.ComputeHash()
 
 	data := txn.MarshalRLP()
 	_, err := eth.SendRawTransaction(data)
 	assert.NoError(t, err)
-	assert.NotEqual(t, store.txn.Hash, types.ZeroHash)
+	assert.NotEqual(t, store.txn.Hash(), types.ZeroHash)
 
 	// the hash in the txn pool should match the one we send
 	if txn.Hash() != store.txn.Hash() {
@@ -34,16 +34,15 @@ func TestEth_TxnPool_SendTransaction(t *testing.T) {
 	store.AddAccount(addr0)
 	eth := newTestEthEndpoint(store)
 
-	txToSend := types.NewTx(&types.LegacyTx{
-		From:     addr0,
+	txToSend := types.NewTxWithSender(&types.LegacyTx{
 		To:       argAddrPtr(addr0),
 		Nonce:    uint64(0),
 		GasPrice: big.NewInt(int64(1)),
-	})
+	}, addr0)
 
 	_, err := eth.SendRawTransaction(txToSend.MarshalRLP())
 	assert.NoError(t, err)
-	assert.NotEqual(t, store.txn.Hash, types.ZeroHash)
+	assert.NotEqual(t, store.txn.Hash(), types.ZeroHash)
 }
 
 type mockStoreTxn struct {

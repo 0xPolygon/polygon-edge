@@ -113,7 +113,6 @@ func TestToTransaction_Returns_V_R_S_ValuesWithoutLeading0(t *testing.T) {
 		V:        new(big.Int).SetBytes(v),
 		R:        new(big.Int).SetBytes(r),
 		S:        new(big.Int).SetBytes(s),
-		From:     types.Address{},
 	})
 
 	jsonTx := toTransaction(txn, nil, nil, nil)

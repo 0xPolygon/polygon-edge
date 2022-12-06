@@ -57,12 +57,12 @@ type TxData interface {
 
 	input() []byte
 	gas() uint64
+	setGas(gas uint64)
 	gasPrice() *big.Int
 	gasTipCap() *big.Int
 	gasFeeCap() *big.Int
 	value() *big.Int
 	nonce() uint64
-	from() Address
 	to() *Address
 
 	rawSignatureValues() (v, r, s *big.Int)
@@ -83,6 +83,15 @@ type Transaction struct {
 func NewTx(inner TxData) *Transaction {
 	tx := new(Transaction)
 	tx.setDecoded(inner.Copy(), 0)
+
+	return tx
+}
+
+// NewTxWithSender creates a new transaction with the given sender address.
+func NewTxWithSender(inner TxData, sender Address) *Transaction {
+	tx := new(Transaction)
+	tx.setDecoded(inner.Copy(), 0)
+	tx.from = sender
 
 	return tx
 }
@@ -157,6 +166,9 @@ func (t *Transaction) Type() TxType {
 
 // Gas returns the gas limit of the transaction.
 func (t *Transaction) Gas() uint64 { return t.inner.gas() }
+
+// SetGas sets the gas limit of the transaction.
+func (t *Transaction) SetGas(gas uint64) { t.inner.setGas(gas) }
 
 // GasPrice returns the gas price of the transaction.
 func (t *Transaction) GasPrice() *big.Int { return new(big.Int).Set(t.inner.gasPrice()) }

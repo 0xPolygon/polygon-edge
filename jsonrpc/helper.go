@@ -167,7 +167,7 @@ func GetNextNonce(address types.Address, number BlockNumber, store nonceGetter) 
 	return acc.Nonce, nil
 }
 
-func DecodeTxn(arg *txnArgs, store nonceGetter) (*types.LegacyTx, error) {
+func DecodeTxn(arg *txnArgs, store nonceGetter) (*types.Transaction, error) {
 	// set default values
 	if arg.From == nil {
 		arg.From = &types.ZeroAddress
@@ -209,7 +209,6 @@ func DecodeTxn(arg *txnArgs, store nonceGetter) (*types.LegacyTx, error) {
 	}
 
 	txnData := &types.LegacyTx{
-		From:     *arg.From,
 		Gas:      uint64(*arg.Gas),
 		GasPrice: new(big.Int).SetBytes(*arg.GasPrice),
 		Value:    new(big.Int).SetBytes(*arg.Value),
@@ -220,5 +219,9 @@ func DecodeTxn(arg *txnArgs, store nonceGetter) (*types.LegacyTx, error) {
 		txnData.To = arg.To
 	}
 
-	return txnData, nil
+	tx := types.NewTx(txnData)
+	tx.SetSender(*arg.From)
+	tx.ComputeHash()
+
+	return tx, nil
 }

@@ -394,17 +394,16 @@ func (e *Eth) Call(arg *txnArgs, filter BlockNumberOrHash) (interface{}, error) 
 		return nil, err
 	}
 
-	txData, err := DecodeTxn(arg, e.store)
+	tx, err := DecodeTxn(arg, e.store)
 	if err != nil {
 		return nil, err
 	}
 
 	// If the caller didn't supply the gas limit in the message, then we set it to maximum possible => block gas limit
-	if txData.Gas == 0 {
-		txData.Gas = header.GasLimit
+	if tx.Gas() == 0 {
+		tx.SetGas(header.GasLimit)
 	}
 
-	tx := types.NewTx(txData)
 	tx.ComputeHash()
 
 	// The return value of the execution is saved in the transition (returnValue field)
@@ -427,13 +426,10 @@ func (e *Eth) Call(arg *txnArgs, filter BlockNumberOrHash) (interface{}, error) 
 
 // EstimateGas estimates the gas needed to execute a transaction
 func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error) {
-	txData, err := DecodeTxn(arg, e.store)
+	tx, err := DecodeTxn(arg, e.store)
 	if err != nil {
 		return nil, err
 	}
-
-	tx := types.NewTx(txData)
-	tx.ComputeHash()
 
 	number := LatestBlockNumber
 	if rawNum != nil {
@@ -543,10 +539,10 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 	// Returns a status indicating if the transaction failed and the accompanying error
 	testTransaction := func(gas uint64, shouldOmitErr bool) (bool, error) {
 		// Create a dummy transaction with the new gas
-		txDataTest := txData.Copy()
-		txDataTest.(*types.LegacyTx).Gas = gas
+		txn := tx.Copy()
+		txn.SetGas(gas)
 
-		result, applyErr := e.store.ApplyTxn(header, types.NewTx(txDataTest))
+		result, applyErr := e.store.ApplyTxn(header, txn)
 
 		if applyErr != nil {
 			// Check the application error.

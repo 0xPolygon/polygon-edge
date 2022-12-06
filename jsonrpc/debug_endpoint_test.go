@@ -583,15 +583,14 @@ func TestTraceCall(t *testing.T) {
 			Input:    &input,
 			Nonce:    &nonce,
 		}
-		decodedTx = types.NewTx(&types.LegacyTx{
+		decodedTx = types.NewTxWithSender(&types.LegacyTx{
 			Nonce:    uint64(nonce),
 			GasPrice: new(big.Int).SetBytes([]byte(gasPrice)),
 			Gas:      uint64(gas),
 			To:       &to,
 			Value:    new(big.Int).SetBytes([]byte(value)),
 			Input:    data,
-			From:     from,
-		})
+		}, from)
 	)
 
 	decodedTx.ComputeHash()
@@ -619,7 +618,7 @@ func TestTraceCall(t *testing.T) {
 					return testHeader10, true
 				},
 				traceCallFn: func(tx *types.Transaction, header *types.Header, tracer tracer.Tracer) (interface{}, error) {
-					assert.Equal(t, decodedTx, tx)
+					assert.Equal(t, decodedTx.MarshalRLP(), tx.MarshalRLP())
 					assert.Equal(t, testHeader10, header)
 
 					return testTraceResult, nil

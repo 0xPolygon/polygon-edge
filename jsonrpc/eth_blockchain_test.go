@@ -85,7 +85,8 @@ func TestEth_Block_GetBlockTransactionCountByNumber(t *testing.T) {
 	block := newTestBlock(1, hash1)
 
 	for i := 0; i < 10; i++ {
-		block.Transactions = append(block.Transactions, types.NewTx(&types.LegacyTx{Nonce: 0, From: addr0}))
+		tx := types.NewTxWithSender(&types.LegacyTx{Nonce: 0}, addr0)
+		block.Transactions = append(block.Transactions, tx)
 	}
 	store.add(block)
 
@@ -209,7 +210,7 @@ func TestEth_GetTransactionReceipt(t *testing.T) {
 
 		//nolint:forcetypeassert
 		response := res.(*receipt)
-		assert.Equal(t, txn.Hash, response.TxHash)
+		assert.Equal(t, txn.Hash(), response.TxHash)
 		assert.Equal(t, block.Hash(), response.BlockHash)
 		assert.NotNil(t, response.Logs)
 	})

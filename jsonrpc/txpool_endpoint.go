@@ -120,7 +120,7 @@ func (t *TxPool) Inspect() (interface{}, error) {
 		for _, tx := range txs {
 			nonceStr := strconv.FormatUint(tx.Nonce(), 10)
 			pendingRPCTxs[addr.String()][nonceStr] = fmt.Sprintf(
-				"%d wei + %d gas x %d wei", tx.Value, tx.Gas, tx.GasPrice,
+				"%d wei + %d gas x %d wei", tx.Value(), tx.Gas(), tx.GasPrice(),
 			)
 		}
 	}
@@ -133,7 +133,7 @@ func (t *TxPool) Inspect() (interface{}, error) {
 		for _, tx := range txs {
 			nonceStr := strconv.FormatUint(tx.Nonce(), 10)
 			queuedRPCTxs[addr.String()][nonceStr] = fmt.Sprintf(
-				"%d wei + %d gas x %d wei", tx.Value, tx.Gas, tx.GasPrice,
+				"%d wei + %d gas x %d wei", tx.Value(), tx.Gas(), tx.GasPrice(),
 			)
 		}
 	}

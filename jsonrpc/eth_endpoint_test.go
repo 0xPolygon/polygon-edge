@@ -43,15 +43,14 @@ func TestEth_DecodeTxn(t *testing.T) {
 				Data:     nil,
 				Nonce:    toArgUint64Ptr(0),
 			},
-			res: types.NewTx(&types.LegacyTx{
-				From:     addr1,
+			res: types.NewTxWithSender(&types.LegacyTx{
 				To:       &addr2,
 				Gas:      21000,
 				GasPrice: big.NewInt(10000),
 				Value:    oneEther,
 				Input:    []byte{},
 				Nonce:    0,
-			}),
+			}, addr1),
 			err: nil,
 		},
 		{
@@ -63,15 +62,14 @@ func TestEth_DecodeTxn(t *testing.T) {
 				Value:    toArgBytesPtr(oneEther.Bytes()),
 				Data:     nil,
 			},
-			res: types.NewTx(&types.LegacyTx{
-				From:     types.ZeroAddress,
+			res: types.NewTxWithSender(&types.LegacyTx{
 				To:       &addr2,
 				Gas:      21000,
 				GasPrice: big.NewInt(10000),
 				Value:    oneEther,
 				Input:    []byte{},
 				Nonce:    0,
-			}),
+			}, types.ZeroAddress),
 			err: nil,
 		},
 		{
@@ -89,15 +87,14 @@ func TestEth_DecodeTxn(t *testing.T) {
 				Value:    toArgBytesPtr(oneEther.Bytes()),
 				Data:     nil,
 			},
-			res: types.NewTx(&types.LegacyTx{
-				From:     addr1,
+			res: types.NewTxWithSender(&types.LegacyTx{
 				To:       &addr2,
 				Gas:      21000,
 				GasPrice: big.NewInt(10000),
 				Value:    oneEther,
 				Input:    []byte{},
 				Nonce:    10,
-			}),
+			}, addr1),
 			err: nil,
 		},
 		{
@@ -110,15 +107,14 @@ func TestEth_DecodeTxn(t *testing.T) {
 				Data:     nil,
 				Nonce:    toArgUint64Ptr(1),
 			},
-			res: types.NewTx(&types.LegacyTx{
-				From:     addr1,
+			res: types.NewTxWithSender(&types.LegacyTx{
 				To:       &addr2,
 				Gas:      21000,
 				GasPrice: big.NewInt(10000),
 				Value:    new(big.Int).SetBytes([]byte{}),
 				Input:    []byte{},
 				Nonce:    1,
-			}),
+			}, addr1),
 			err: nil,
 		},
 		{
@@ -130,15 +126,14 @@ func TestEth_DecodeTxn(t *testing.T) {
 				Data:     nil,
 				Nonce:    toArgUint64Ptr(1),
 			},
-			res: types.NewTx(&types.LegacyTx{
-				From:     addr1,
+			res: types.NewTxWithSender(&types.LegacyTx{
 				To:       &addr2,
 				Gas:      0,
 				GasPrice: big.NewInt(10000),
 				Value:    new(big.Int).SetBytes([]byte{}),
 				Input:    []byte{},
 				Nonce:    1,
-			}),
+			}, addr1),
 			err: nil,
 		},
 	}
@@ -148,17 +143,18 @@ func TestEth_DecodeTxn(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			if tt.res != nil {
-				tt.res.ComputeHash()
-			}
 			store := newMockStore()
 			for addr, acc := range tt.accounts {
 				store.SetAccount(addr, acc)
 			}
 
 			res, err := DecodeTxn(tt.arg, store)
-			assert.Equal(t, tt.res, res)
-			assert.Equal(t, tt.err, err)
+			if tt.err == nil {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.res.MarshalRLP(), res.MarshalRLP())
+			} else {
+				assert.Equal(t, tt.err, err)
+			}
 		})
 	}
 }

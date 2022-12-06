@@ -57,7 +57,6 @@ func newTx(addr types.Address, nonce, slots uint64) *types.LegacyTx {
 	}
 
 	return &types.LegacyTx{
-		From:     addr,
 		Nonce:    nonce,
 		Value:    big.NewInt(1),
 		GasPrice: big.NewInt(0).SetUint64(defaultPriceLimit),

@@ -366,34 +366,34 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 		}
 
 		if !f.isEndOfSprint {
-			return fmt.Errorf("state transaction in block which should not contain it: tx = %v", tx.Hash)
+			return fmt.Errorf("state transaction in block which should not contain it: tx = %v", tx.Hash())
 		}
 
 		decodedStateTx, err := decodeStateTransaction(tx.Input()) // used to be Data
 		if err != nil {
-			return fmt.Errorf("state transaction error while decoding: tx = %v, err = %w", tx.Hash, err)
+			return fmt.Errorf("state transaction error while decoding: tx = %v, err = %w", tx.Hash(), err)
 		}
 
 		switch stateTxData := decodedStateTx.(type) {
 		case *CommitmentMessageSigned:
 			if commitmentMessageSignedExists {
-				return fmt.Errorf("only one commitment is allowed per block: %v", tx.Hash)
+				return fmt.Errorf("only one commitment is allowed per block: %v", tx.Hash())
 			}
 
 			commitmentMessageSignedExists = true
 			signers, err := f.validators.Accounts().GetFilteredValidators(stateTxData.AggSignature.Bitmap)
 
 			if err != nil {
-				return fmt.Errorf("error for state transaction while retrieving signers: tx = %v, error = %w", tx.Hash, err)
+				return fmt.Errorf("error for state transaction while retrieving signers: tx = %v, error = %w", tx.Hash(), err)
 			}
 
 			if !f.validators.HasQuorum(signers.GetAddressesAsSet()) {
-				return fmt.Errorf("quorum size not reached for state tx: %v", tx.Hash)
+				return fmt.Errorf("quorum size not reached for state tx: %v", tx.Hash())
 			}
 
 			aggs, err := bls.UnmarshalSignature(stateTxData.AggSignature.AggregatedSignature)
 			if err != nil {
-				return fmt.Errorf("error for state transaction while unmarshaling signature: tx = %v, error = %w", tx.Hash, err)
+				return fmt.Errorf("error for state transaction while unmarshaling signature: tx = %v, error = %w", tx.Hash(), err)
 			}
 
 			hash, err := stateTxData.Message.Hash()
@@ -403,7 +403,7 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 
 			verified := aggs.VerifyAggregated(signers.GetBlsKeys(), hash.Bytes())
 			if !verified {
-				return fmt.Errorf("invalid signature for tx = %v", tx.Hash)
+				return fmt.Errorf("invalid signature for tx = %v", tx.Hash())
 			}
 
 		case *BundleProof:
@@ -423,7 +423,7 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 
 					if err := commitment.Message.VerifyProof(stateTxData); err != nil {
 						return fmt.Errorf("state transaction error while validating proof: tx = %v, err = %w",
-							tx.Hash, err)
+							tx.Hash(), err)
 					}
 
 					break
@@ -432,7 +432,7 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 
 			if !isVerified {
 				return fmt.Errorf("state transaction error while validating proof. "+
-					"No appropriate commitment found to verify proof. tx = %v", tx.Hash)
+					"No appropriate commitment found to verify proof. tx = %v", tx.Hash())
 			}
 		}
 	}
@@ -604,13 +604,12 @@ func validateHeaderFields(parent *types.Header, header *types.Header) error {
 // createStateTransactionWithData creates a state transaction
 // with provided target address and inputData parameter which is ABI encoded byte array.
 func createStateTransactionWithData(target types.Address, inputData []byte) *types.Transaction {
-	tx := types.NewTx(&types.StateTx{
-		From:     contracts.SystemCaller,
+	tx := types.NewTxWithSender(&types.StateTx{
 		To:       &target,
 		Input:    inputData,
 		Gas:      types.StateTransactionGasLimit,
 		GasPrice: big.NewInt(0),
-	})
+	}, contracts.SystemCaller)
 
 	tx.ComputeHash()
 

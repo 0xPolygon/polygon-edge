@@ -156,7 +156,7 @@ func TestInspectEndpoint(t *testing.T) {
 		assert.Equal(t, 1, len(response.Queued))
 		assert.Equal(t, uint64(1), response.CurrentCapacity)
 		transactionInfo := response.Queued[testTx.From().String()]
-		assert.NotNil(t, transactionInfo)
+		assert.NotNil(t, transactionInfo, response.Queued)
 		assert.NotNil(t, transactionInfo[strconv.FormatUint(testTx.Nonce(), 10)])
 	})
 
@@ -254,18 +254,17 @@ func (s *mockTxPoolStore) GetCapacity() (uint64, uint64) {
 }
 
 func newTestTransaction(nonce uint64, from types.Address) *types.Transaction {
-	txn := types.NewTx(&types.LegacyTx{
+	txn := types.NewTxWithSender(&types.LegacyTx{
 		Nonce:    nonce,
 		GasPrice: big.NewInt(1),
 		Gas:      nonce * 100,
 		Value:    big.NewInt(200),
 		Input:    []byte{0xff},
-		From:     from,
 		To:       &addr1,
 		V:        big.NewInt(1),
 		R:        big.NewInt(1),
 		S:        big.NewInt(1),
-	})
+	}, from)
 
 	txn.ComputeHash()
 

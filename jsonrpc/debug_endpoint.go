@@ -153,15 +153,17 @@ func (d *Debug) TraceCall(
 		return nil, ErrHeaderNotFound
 	}
 
-	txData, err := DecodeTxn(arg, d.store)
+	tx, err := DecodeTxn(arg, d.store)
 	if err != nil {
 		return nil, err
 	}
 
 	// If the caller didn't supply the gas limit in the message, then we set it to maximum possible => block gas limit
-	if txData.Gas == 0 {
-		txData.Gas = header.GasLimit
+	if tx.Gas() == 0 {
+		tx.SetGas(header.GasLimit)
 	}
+
+	tx.ComputeHash()
 
 	tracer, cancel, err := newTracer(config)
 	defer cancel()
@@ -169,9 +171,6 @@ func (d *Debug) TraceCall(
 	if err != nil {
 		return nil, err
 	}
-
-	tx := types.NewTx(txData)
-	tx.ComputeHash()
 
 	return d.store.TraceCall(tx, header, tracer)
 }

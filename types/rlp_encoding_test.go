@@ -62,7 +62,7 @@ func TestRLPMarshall_And_Unmarshall_Transaction(t *testing.T) {
 	// txn.Hash = unmarshalledTxn.Hash
 	txn.ComputeHash()
 
-	if !reflect.DeepEqual(txn, unmarshalledTxn) {
+	if !reflect.DeepEqual(txn.MarshalRLP(), unmarshalledTxn.MarshalRLP()) {
 		t.Fatal("[ERROR] Unmarshalled transaction not equal to base transaction")
 	}
 }

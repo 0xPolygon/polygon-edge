@@ -9,7 +9,6 @@ type StateTx struct {
 	Nonce    uint64
 	GasPrice *big.Int
 	Gas      uint64
-	From     Address
 	To       *Address
 	Value    *big.Int
 	Input    []byte
@@ -51,12 +50,12 @@ func (t *StateTx) Copy() TxData {
 func (t *StateTx) txType() TxType      { return StateTxType }
 func (t *StateTx) input() []byte       { return t.Input }
 func (t *StateTx) gas() uint64         { return t.Gas }
+func (t *StateTx) setGas(gas uint64)   { t.Gas = gas }
 func (t *StateTx) gasPrice() *big.Int  { return t.GasPrice }
 func (t *StateTx) gasTipCap() *big.Int { return t.GasPrice }
 func (t *StateTx) gasFeeCap() *big.Int { return t.GasPrice }
 func (t *StateTx) value() *big.Int     { return t.Value }
 func (t *StateTx) nonce() uint64       { return t.Nonce }
-func (t *StateTx) from() Address       { return t.From }
 func (t *StateTx) to() *Address        { return t.To }
 
 func (t *StateTx) rawSignatureValues() (v, r, s *big.Int) {

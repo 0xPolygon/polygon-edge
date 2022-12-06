@@ -9,7 +9,6 @@ type LegacyTx struct {
 	Nonce    uint64
 	GasPrice *big.Int
 	Gas      uint64
-	From     Address
 	To       *Address
 	Value    *big.Int
 	Input    []byte
@@ -51,12 +50,12 @@ func (t *LegacyTx) Copy() TxData {
 func (t *LegacyTx) txType() TxType      { return LegacyTxType }
 func (t *LegacyTx) input() []byte       { return t.Input }
 func (t *LegacyTx) gas() uint64         { return t.Gas }
+func (t *LegacyTx) setGas(gas uint64)   { t.Gas = gas }
 func (t *LegacyTx) gasPrice() *big.Int  { return t.GasPrice }
 func (t *LegacyTx) gasTipCap() *big.Int { return t.GasPrice }
 func (t *LegacyTx) gasFeeCap() *big.Int { return t.GasPrice }
 func (t *LegacyTx) value() *big.Int     { return t.Value }
 func (t *LegacyTx) nonce() uint64       { return t.Nonce }
-func (t *LegacyTx) from() Address       { return t.From }
 func (t *LegacyTx) to() *Address        { return t.To }
 
 func (t *LegacyTx) rawSignatureValues() (v, r, s *big.Int) {

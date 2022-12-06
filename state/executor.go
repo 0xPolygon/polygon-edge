@@ -261,7 +261,7 @@ func (t *Transition) WriteFailedReceipt(txn *types.Transaction) error {
 	receipt.SetStatus(types.ReceiptFailed)
 	t.receipts = append(t.receipts, receipt)
 
-	if txn.To == nil {
+	if txn.To() == nil {
 		receipt.ContractAddress = crypto.CreateAddress(txn.From(), txn.Nonce()).Ptr()
 	}
 

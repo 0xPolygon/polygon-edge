@@ -54,7 +54,7 @@ func calcTxHash(tx *types.Transaction, chainID uint64) types.Hash {
 	v.Set(a.NewBigInt(tx.GasPrice()))
 	v.Set(a.NewUint(tx.Gas()))
 
-	if tx.To == nil {
+	if tx.To() == nil {
 		v.Set(a.NewNull())
 	} else {
 		v.Set(a.NewCopyBytes((*tx.To()).Bytes()))

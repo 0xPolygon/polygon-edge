@@ -292,7 +292,7 @@ func TestGetTxAndBlockByTxHash(t *testing.T) {
 			txHash: testTx1.Hash(),
 			store: &debugEndpointMockStore{
 				readTxLookupFn: func(hash types.Hash) (types.Hash, bool) {
-					assert.Equal(t, testTx1.Hash, hash)
+					assert.Equal(t, testTx1.Hash(), hash)
 
 					return blockWithTx.Hash(), true
 				},
@@ -311,7 +311,7 @@ func TestGetTxAndBlockByTxHash(t *testing.T) {
 			txHash: testTx1.Hash(),
 			store: &debugEndpointMockStore{
 				readTxLookupFn: func(hash types.Hash) (types.Hash, bool) {
-					assert.Equal(t, testTx1.Hash, hash)
+					assert.Equal(t, testTx1.Hash(), hash)
 
 					return types.ZeroHash, false
 				},
@@ -324,7 +324,7 @@ func TestGetTxAndBlockByTxHash(t *testing.T) {
 			txHash: testTx1.Hash(),
 			store: &debugEndpointMockStore{
 				readTxLookupFn: func(hash types.Hash) (types.Hash, bool) {
-					assert.Equal(t, testTx1.Hash, hash)
+					assert.Equal(t, testTx1.Hash(), hash)
 
 					return blockWithTx.Hash(), true
 				},
@@ -343,7 +343,7 @@ func TestGetTxAndBlockByTxHash(t *testing.T) {
 			txHash: testTx1.Hash(),
 			store: &debugEndpointMockStore{
 				readTxLookupFn: func(hash types.Hash) (types.Hash, bool) {
-					assert.Equal(t, testTx1.Hash, hash)
+					assert.Equal(t, testTx1.Hash(), hash)
 
 					return blockWithTx.Hash(), true
 				},
@@ -659,15 +659,14 @@ func TestDecodeTxn(t *testing.T) {
 				Nonce:    &nonce,
 			},
 			store: &debugEndpointMockStore{},
-			expected: types.NewTx(&types.LegacyTx{
-				From:     from,
+			expected: types.NewTxWithSender(&types.LegacyTx{
 				To:       &to,
 				Gas:      uint64(gas),
 				GasPrice: new(big.Int).SetBytes([]byte(gasPrice)),
 				Value:    new(big.Int).SetBytes([]byte(value)),
 				Input:    input,
 				Nonce:    uint64(nonce),
-			}),
+			}, from),
 			err: false,
 		},
 		{
@@ -681,15 +680,14 @@ func TestDecodeTxn(t *testing.T) {
 				Nonce:    &nonce,
 			},
 			store: &debugEndpointMockStore{},
-			expected: types.NewTx(&types.LegacyTx{
-				From:     types.ZeroAddress,
+			expected: types.NewTxWithSender(&types.LegacyTx{
 				To:       &to,
 				Gas:      uint64(gas),
 				GasPrice: new(big.Int).SetBytes([]byte(gasPrice)),
 				Value:    new(big.Int).SetBytes([]byte(value)),
 				Input:    input,
 				Nonce:    uint64(0),
-			}),
+			}, types.ZeroAddress),
 			err: false,
 		},
 		{
@@ -714,15 +712,14 @@ func TestDecodeTxn(t *testing.T) {
 					}, nil
 				},
 			},
-			expected: types.NewTx(&types.LegacyTx{
-				From:     from,
+			expected: types.NewTxWithSender(&types.LegacyTx{
 				To:       &to,
 				Gas:      uint64(gas),
 				GasPrice: new(big.Int).SetBytes([]byte(gasPrice)),
 				Value:    new(big.Int).SetBytes([]byte(value)),
 				Input:    input,
 				Nonce:    uint64(stateNonce),
-			}),
+			}, from),
 			err: false,
 		},
 		{
@@ -738,15 +735,14 @@ func TestDecodeTxn(t *testing.T) {
 				Nonce:    &nonce,
 			},
 			store: &debugEndpointMockStore{},
-			expected: types.NewTx(&types.LegacyTx{
-				From:     from,
+			expected: types.NewTxWithSender(&types.LegacyTx{
 				To:       &to,
 				Gas:      uint64(gas),
 				GasPrice: new(big.Int).SetBytes([]byte(gasPrice)),
 				Value:    new(big.Int).SetBytes([]byte(value)),
 				Input:    data,
 				Nonce:    uint64(nonce),
-			}),
+			}, from),
 			err: false,
 		},
 		{
@@ -757,15 +753,14 @@ func TestDecodeTxn(t *testing.T) {
 				Nonce: &nonce,
 			},
 			store: &debugEndpointMockStore{},
-			expected: types.NewTx(&types.LegacyTx{
-				From:     from,
+			expected: types.NewTxWithSender(&types.LegacyTx{
 				To:       &to,
 				Gas:      uint64(0),
 				GasPrice: new(big.Int),
 				Value:    new(big.Int),
 				Input:    []byte{},
 				Nonce:    uint64(nonce),
-			}),
+			}, from),
 			err: false,
 		},
 		{
@@ -813,18 +808,12 @@ func TestDecodeTxn(t *testing.T) {
 			t.Parallel()
 
 			tx, err := DecodeTxn(test.arg, test.store)
-
-			// DecodeTxn computes hash of tx
-			if !test.err {
-				test.expected.ComputeHash()
-			}
-
-			assert.Equal(t, test.expected, tx)
-
 			if test.err {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
+				test.expected.ComputeHash()
+				assert.Equal(t, test.expected.MarshalRLP(), tx.MarshalRLP())
 			}
 		})
 	}
