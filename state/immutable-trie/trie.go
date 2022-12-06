@@ -92,7 +92,7 @@ func (f *FullNode) getEdge(idx byte) Node {
 }
 
 type Trie struct {
-	lock    *sync.Mutex
+	lock    *sync.RWMutex
 	state   *State
 	root    Node
 	epoch   uint32
@@ -101,15 +101,24 @@ type Trie struct {
 
 func NewTrie() *Trie {
 	return &Trie{
-		lock: new(sync.Mutex),
+		lock: new(sync.RWMutex),
 	}
 }
 
-func (t *Trie) setState(s1 *State) {
+// setState used to set state under lock
+func (t *Trie) setState(s *State) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	t.state = s1
+	t.state = s
+}
+
+// getState returns state from the trie under read lock
+func (t *Trie) getState() *State {
+	t.lock.RLock()
+	defer t.lock.RUnlock()
+
+	return t.state
 }
 
 func (t *Trie) Get(k []byte) ([]byte, bool) {
@@ -131,8 +140,6 @@ var accountArenaPool fastrlp.ArenaPool
 var stateArenaPool fastrlp.ArenaPool // TODO, Remove once we do update in fastrlp
 
 func (t *Trie) Commit(objs []*state.Object) (*Trie, []byte) {
-	t.lock.Lock()
-	defer t.lock.Unlock()
 	// Create an insertion batch for all the entries
 	batch := t.storage.Batch()
 
@@ -157,7 +164,7 @@ func (t *Trie) Commit(objs []*state.Object) (*Trie, []byte) {
 			}
 
 			if len(obj.Storage) != 0 {
-				trie, err := t.state.newTrieAt(obj.Root)
+				trie, err := t.getState().newTrieAt(obj.Root)
 				if err != nil {
 					panic(err)
 				}
@@ -179,13 +186,13 @@ func (t *Trie) Commit(objs []*state.Object) (*Trie, []byte) {
 				accountStateTrie := localTxn.Commit()
 
 				// Add this to the cache
-				t.state.AddState(types.BytesToHash(accountStateRoot), accountStateTrie)
+				t.getState().AddState(types.BytesToHash(accountStateRoot), accountStateTrie)
 
 				account.Root = types.BytesToHash(accountStateRoot)
 			}
 
 			if obj.DirtyCode {
-				t.state.SetCode(obj.CodeHash, obj.Code)
+				t.getState().SetCode(obj.CodeHash, obj.Code)
 			}
 
 			vv := account.MarshalWith(arena)
@@ -200,13 +207,13 @@ func (t *Trie) Commit(objs []*state.Object) (*Trie, []byte) {
 
 	nTrie := tt.Commit()
 
-	nTrie.state = t.state
+	nTrie.setState(t.getState())
 	nTrie.storage = t.storage
 
 	// Write all the entries to db
 	batch.Write()
 
-	t.state.AddState(types.BytesToHash(root), nTrie)
+	t.getState().AddState(types.BytesToHash(root), nTrie)
 
 	return nTrie, root
 }
@@ -265,7 +272,7 @@ type Txn struct {
 }
 
 func (t *Txn) Commit() *Trie {
-	return &Trie{epoch: t.epoch, root: t.root, storage: t.storage, lock: new(sync.Mutex)}
+	return &Trie{epoch: t.epoch, root: t.root, storage: t.storage, lock: new(sync.RWMutex)}
 }
 
 func (t *Txn) Lookup(key []byte) []byte {
