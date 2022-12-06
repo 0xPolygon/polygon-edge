@@ -348,7 +348,7 @@ func generateStressTestTx(
 		t.Fatalf("Unable to encode inputs, %v", encodeErr)
 	}
 
-	signedTx, signErr := signer.SignTx(&types.Transaction{
+	signedTx, signErr := signer.SignTx(types.NewTx(&types.LegacyTx{
 		Nonce:    currentNonce,
 		From:     types.ZeroAddress,
 		To:       &contractAddr,
@@ -357,7 +357,7 @@ func generateStressTestTx(
 		Value:    big.NewInt(0),
 		V:        big.NewInt(1), // it is necessary to encode in rlp,
 		Input:    append(setNameMethod.ID(), encodedInput...),
-	}, senderKey)
+	}), senderKey)
 
 	if signErr != nil {
 		t.Fatalf("Unable to sign transaction, %v", signErr)

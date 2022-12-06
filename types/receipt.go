@@ -33,7 +33,7 @@ type Receipt struct {
 }
 
 func (r *Receipt) IsLegacyTx() bool {
-	return r.TransactionType == LegacyTx
+	return r.TransactionType == LegacyTxType
 }
 
 func (r *Receipt) SetStatus(s ReceiptStatus) {

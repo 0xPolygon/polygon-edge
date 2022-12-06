@@ -112,15 +112,15 @@ func Test_GetLogsForQuery(t *testing.T) {
 				Hash:   types.StringToHash(strconv.Itoa(i)),
 			},
 			Transactions: []*types.Transaction{
-				{
+				types.NewTx(&types.LegacyTx{
 					Value: big.NewInt(10),
-				},
-				{
+				}),
+				types.NewTx(&types.LegacyTx{
 					Value: big.NewInt(11),
-				},
-				{
+				}),
+				types.NewTx(&types.LegacyTx{
 					Value: big.NewInt(12),
-				},
+				}),
 			},
 		}
 	}

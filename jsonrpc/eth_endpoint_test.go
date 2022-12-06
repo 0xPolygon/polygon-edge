@@ -43,7 +43,7 @@ func TestEth_DecodeTxn(t *testing.T) {
 				Data:     nil,
 				Nonce:    toArgUint64Ptr(0),
 			},
-			res: &types.Transaction{
+			res: types.NewTx(&types.LegacyTx{
 				From:     addr1,
 				To:       &addr2,
 				Gas:      21000,
@@ -51,7 +51,7 @@ func TestEth_DecodeTxn(t *testing.T) {
 				Value:    oneEther,
 				Input:    []byte{},
 				Nonce:    0,
-			},
+			}),
 			err: nil,
 		},
 		{
@@ -63,7 +63,7 @@ func TestEth_DecodeTxn(t *testing.T) {
 				Value:    toArgBytesPtr(oneEther.Bytes()),
 				Data:     nil,
 			},
-			res: &types.Transaction{
+			res: types.NewTx(&types.LegacyTx{
 				From:     types.ZeroAddress,
 				To:       &addr2,
 				Gas:      21000,
@@ -71,7 +71,7 @@ func TestEth_DecodeTxn(t *testing.T) {
 				Value:    oneEther,
 				Input:    []byte{},
 				Nonce:    0,
-			},
+			}),
 			err: nil,
 		},
 		{
@@ -89,7 +89,7 @@ func TestEth_DecodeTxn(t *testing.T) {
 				Value:    toArgBytesPtr(oneEther.Bytes()),
 				Data:     nil,
 			},
-			res: &types.Transaction{
+			res: types.NewTx(&types.LegacyTx{
 				From:     addr1,
 				To:       &addr2,
 				Gas:      21000,
@@ -97,7 +97,7 @@ func TestEth_DecodeTxn(t *testing.T) {
 				Value:    oneEther,
 				Input:    []byte{},
 				Nonce:    10,
-			},
+			}),
 			err: nil,
 		},
 		{
@@ -110,7 +110,7 @@ func TestEth_DecodeTxn(t *testing.T) {
 				Data:     nil,
 				Nonce:    toArgUint64Ptr(1),
 			},
-			res: &types.Transaction{
+			res: types.NewTx(&types.LegacyTx{
 				From:     addr1,
 				To:       &addr2,
 				Gas:      21000,
@@ -118,7 +118,7 @@ func TestEth_DecodeTxn(t *testing.T) {
 				Value:    new(big.Int).SetBytes([]byte{}),
 				Input:    []byte{},
 				Nonce:    1,
-			},
+			}),
 			err: nil,
 		},
 		{
@@ -130,7 +130,7 @@ func TestEth_DecodeTxn(t *testing.T) {
 				Data:     nil,
 				Nonce:    toArgUint64Ptr(1),
 			},
-			res: &types.Transaction{
+			res: types.NewTx(&types.LegacyTx{
 				From:     addr1,
 				To:       &addr2,
 				Gas:      0,
@@ -138,7 +138,7 @@ func TestEth_DecodeTxn(t *testing.T) {
 				Value:    new(big.Int).SetBytes([]byte{}),
 				Input:    []byte{},
 				Nonce:    1,
-			},
+			}),
 			err: nil,
 		},
 	}

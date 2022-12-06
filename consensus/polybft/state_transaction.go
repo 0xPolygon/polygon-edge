@@ -435,7 +435,7 @@ func decodeStateTransaction(txData []byte) (StateTransactionInput, error) {
 func getCommitmentMessageSignedTx(txs []*types.Transaction) (*CommitmentMessageSigned, error) {
 	for _, tx := range txs {
 		// skip non state CommitmentMessageSigned transactions
-		if tx.Type != types.StateTx ||
+		if tx.Type() != types.StateTxType ||
 			len(tx.Input) < abiMethodIDLength ||
 			!bytes.Equal(tx.Input[:abiMethodIDLength], commitBundleABIMethod.ID()) {
 			continue

@@ -364,7 +364,7 @@ func TestPoS_UnstakeExploit(t *testing.T) {
 	clt := srv.TxnPoolOperator()
 
 	generateTx := func() *types.Transaction {
-		signedTx, signErr := signer.SignTx(&types.Transaction{
+		signedTx, signErr := signer.SignTx(types.NewTx(&types.LegacyTx{
 			Nonce:    uint64(currentNonce),
 			From:     types.ZeroAddress,
 			To:       &stakingContractAddr,
@@ -373,7 +373,7 @@ func TestPoS_UnstakeExploit(t *testing.T) {
 			Value:    big.NewInt(0),
 			V:        big.NewInt(1), // it is necessary to encode in rlp,
 			Input:    framework.MethodSig("unstake"),
-		}, senderKey)
+		}), senderKey)
 
 		if signErr != nil {
 			t.Fatalf("Unable to sign transaction, %v", signErr)
@@ -506,7 +506,7 @@ func TestPoS_StakeUnstakeExploit(t *testing.T) {
 	txpoolClient := srv.TxnPoolOperator()
 
 	generateTx := func(value *big.Int, methodName string) *types.Transaction {
-		signedTx, signErr := signer.SignTx(&types.Transaction{
+		signedTx, signErr := signer.SignTx(types.NewTx(&types.LegacyTx{
 			Nonce:    uint64(currentNonce),
 			From:     types.ZeroAddress,
 			To:       &stakingContractAddr,
@@ -515,7 +515,7 @@ func TestPoS_StakeUnstakeExploit(t *testing.T) {
 			Value:    value,
 			V:        big.NewInt(1), // it is necessary to encode in rlp
 			Input:    framework.MethodSig(methodName),
-		}, senderKey)
+		}), senderKey)
 
 		if signErr != nil {
 			t.Fatalf("Unable to sign transaction, %v", signErr)
@@ -637,7 +637,7 @@ func TestPoS_StakeUnstakeWithinSameBlock(t *testing.T) {
 	txpoolClient := srv.TxnPoolOperator()
 
 	generateTx := func(value *big.Int, methodName string) *types.Transaction {
-		signedTx, signErr := signer.SignTx(&types.Transaction{
+		signedTx, signErr := signer.SignTx(types.NewTx(&types.LegacyTx{
 			Nonce:    uint64(currentNonce),
 			From:     types.ZeroAddress,
 			To:       &stakingContractAddr,
@@ -646,7 +646,7 @@ func TestPoS_StakeUnstakeWithinSameBlock(t *testing.T) {
 			Value:    value,
 			V:        big.NewInt(1), // it is necessary to encode in rlp
 			Input:    framework.MethodSig(methodName),
-		}, senderKey)
+		}), senderKey)
 
 		if signErr != nil {
 			t.Fatalf("Unable to sign transaction, %v", signErr)

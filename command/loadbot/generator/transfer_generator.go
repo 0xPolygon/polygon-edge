@@ -32,13 +32,13 @@ func NewTransferGenerator(params *GeneratorParams) (*TransferGenerator, error) {
 }
 
 func (tg *TransferGenerator) GetExampleTransaction() (*types.Transaction, error) {
-	return tg.signer.SignTx(&types.Transaction{
+	return tg.signer.SignTx(types.NewTx(&types.LegacyTx{
 		From:     tg.params.SenderAddress,
 		To:       &tg.receiverAddress,
 		Value:    tg.params.Value,
 		GasPrice: tg.params.GasPrice,
 		V:        big.NewInt(1), // it is necessary to encode in rlp
-	}, tg.params.SenderKey)
+	}), tg.params.SenderKey)
 }
 
 func (tg *TransferGenerator) generateReceiver() error {
@@ -55,7 +55,7 @@ func (tg *TransferGenerator) generateReceiver() error {
 func (tg *TransferGenerator) GenerateTransaction() (*types.Transaction, error) {
 	newNextNonce := atomic.AddUint64(&tg.params.Nonce, 1)
 
-	txn, err := tg.signer.SignTx(&types.Transaction{
+	txn, err := tg.signer.SignTx(types.NewTx(&types.LegacyTx{
 		From:     tg.params.SenderAddress,
 		To:       &tg.receiverAddress,
 		Gas:      tg.estimatedGas,
@@ -63,7 +63,7 @@ func (tg *TransferGenerator) GenerateTransaction() (*types.Transaction, error) {
 		GasPrice: tg.params.GasPrice,
 		Nonce:    newNextNonce - 1,
 		V:        big.NewInt(1), // it is necessary to encode in rlp
-	}, tg.params.SenderKey)
+	}), tg.params.SenderKey)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign transaction: %w", err)

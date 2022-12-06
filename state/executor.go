@@ -240,20 +240,20 @@ var emptyFrom = types.Address{}
 func (t *Transition) WriteFailedReceipt(txn *types.Transaction) error {
 	signer := crypto.NewSigner(t.config, uint64(t.ctx.ChainID))
 
-	if txn.From == emptyFrom && txn.IsLegacyTx() {
+	if txn.From() == emptyFrom && txn.IsLegacyTx() {
 		// Decrypt the from address
 		from, err := signer.Sender(txn)
 		if err != nil {
 			return NewTransitionApplicationError(err, false)
 		}
 
-		txn.From = from
+		txn.SetSender(from)
 	}
 
 	receipt := &types.Receipt{
 		CumulativeGasUsed: t.totalGas,
-		TransactionType:   txn.Type,
-		TxHash:            txn.Hash,
+		TransactionType:   txn.Type(),
+		TxHash:            txn.Hash(),
 		Logs:              t.state.Logs(),
 	}
 
@@ -262,7 +262,7 @@ func (t *Transition) WriteFailedReceipt(txn *types.Transaction) error {
 	t.receipts = append(t.receipts, receipt)
 
 	if txn.To == nil {
-		receipt.ContractAddress = crypto.CreateAddress(txn.From, txn.Nonce).Ptr()
+		receipt.ContractAddress = crypto.CreateAddress(txn.From(), txn.Nonce()).Ptr()
 	}
 
 	return nil
@@ -270,16 +270,16 @@ func (t *Transition) WriteFailedReceipt(txn *types.Transaction) error {
 
 // Write writes another transaction to the executor
 func (t *Transition) Write(txn *types.Transaction) error {
-	var err error
-
-	if txn.From == emptyFrom && txn.IsLegacyTx() {
+	if txn.From() == emptyFrom && txn.IsLegacyTx() {
 		// Decrypt the from address
 		signer := crypto.NewSigner(t.config, uint64(t.ctx.ChainID))
 
-		txn.From, err = signer.Sender(txn)
+		sender, err := signer.Sender(txn)
 		if err != nil {
 			return NewTransitionApplicationError(err, false)
 		}
+
+		txn.SetSender(sender)
 	}
 
 	// Make a local copy and apply the transaction
@@ -298,8 +298,8 @@ func (t *Transition) Write(txn *types.Transaction) error {
 
 	receipt := &types.Receipt{
 		CumulativeGasUsed: t.totalGas,
-		TransactionType:   txn.Type,
-		TxHash:            txn.Hash,
+		TransactionType:   txn.Type(),
+		TxHash:            txn.Hash(),
 		GasUsed:           result.GasUsed,
 	}
 
@@ -314,7 +314,7 @@ func (t *Transition) Write(txn *types.Transaction) error {
 
 	// if the transaction created a contract, store the creation address in the receipt.
 	if msg.To == nil {
-		receipt.ContractAddress = crypto.CreateAddress(msg.From, txn.Nonce).Ptr()
+		receipt.ContractAddress = crypto.CreateAddress(msg.From(), txn.Nonce()).Ptr()
 	}
 
 	// Set the receipt logs and create a bloom for filtering
@@ -375,10 +375,10 @@ func (t *Transition) ContextPtr() *runtime.TxContext {
 
 func (t *Transition) subGasLimitPrice(msg *types.Transaction) error {
 	// deduct the upfront max gas cost
-	upfrontGasCost := new(big.Int).Set(msg.GasPrice)
-	upfrontGasCost.Mul(upfrontGasCost, new(big.Int).SetUint64(msg.Gas))
+	upfrontGasCost := new(big.Int).Set(msg.GasPrice())
+	upfrontGasCost.Mul(upfrontGasCost, new(big.Int).SetUint64(msg.Gas()))
 
-	if err := t.state.SubBalance(msg.From, upfrontGasCost); err != nil {
+	if err := t.state.SubBalance(msg.From(), upfrontGasCost); err != nil {
 		if errors.Is(err, runtime.ErrNotEnoughFunds) {
 			return ErrNotEnoughFundsForGas
 		}
@@ -390,9 +390,9 @@ func (t *Transition) subGasLimitPrice(msg *types.Transaction) error {
 }
 
 func (t *Transition) nonceCheck(msg *types.Transaction) error {
-	nonce := t.state.GetNonce(msg.From)
+	nonce := t.state.GetNonce(msg.From())
 
-	if nonce != msg.Nonce {
+	if nonce != msg.Nonce() {
 		return ErrNonceIncorrect
 	}
 
@@ -449,12 +449,12 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 	}
 
 	// the amount of gas required is available in the block
-	if err := t.subGasPool(msg.Gas); err != nil {
+	if err := t.subGasPool(msg.Gas()); err != nil {
 		return nil, NewGasLimitReachedTransitionApplicationError(err)
 	}
 
 	if t.ctx.Tracer != nil {
-		t.ctx.Tracer.TxStart(msg.Gas)
+		t.ctx.Tracer.TxStart(msg.Gas())
 	}
 
 	// 4. there is no overflow when calculating intrinsic gas
@@ -464,40 +464,40 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 	}
 
 	// the purchased gas is enough to cover intrinsic usage
-	gasLeft := msg.Gas - intrinsicGasCost
+	gasLeft := msg.Gas() - intrinsicGasCost
 	// because we are working with unsigned integers for gas, the `>` operator is used instead of the more intuitive `<`
-	if gasLeft > msg.Gas {
+	if gasLeft > msg.Gas() {
 		return nil, NewTransitionApplicationError(ErrNotEnoughIntrinsicGas, false)
 	}
 
-	gasPrice := new(big.Int).Set(msg.GasPrice)
-	value := new(big.Int).Set(msg.Value)
+	gasPrice := new(big.Int).Set(msg.GasPrice())
+	value := new(big.Int).Set(msg.Value())
 
 	// set the specific transaction fields in the context
 	t.ctx.GasPrice = types.BytesToHash(gasPrice.Bytes())
-	t.ctx.Origin = msg.From
+	t.ctx.Origin = msg.From()
 
 	var result *runtime.ExecutionResult
 	if msg.IsContractCreation() {
-		result = t.Create2(msg.From, msg.Input, value, gasLeft)
+		result = t.Create2(msg.From(), msg.Input(), value, gasLeft)
 	} else {
-		t.state.IncrNonce(msg.From)
-		result = t.Call2(msg.From, *msg.To, msg.Input, value, gasLeft)
+		t.state.IncrNonce(msg.From())
+		result = t.Call2(msg.From(), *msg.To(), msg.Input(), value, gasLeft)
 	}
 
 	refund := t.state.GetRefund()
-	result.UpdateGasUsed(msg.Gas, refund)
+	result.UpdateGasUsed(msg.Gas(), refund)
 
 	if t.ctx.Tracer != nil {
 		t.ctx.Tracer.TxEnd(result.GasLeft)
 	}
 
 	// refund the sender
-	remaining := new(big.Int).Mul(new(big.Int).SetUint64(result.GasLeft), msg.GasPrice)
-	t.state.AddBalance(msg.From, remaining)
+	remaining := new(big.Int).Mul(new(big.Int).SetUint64(result.GasLeft), msg.GasPrice())
+	t.state.AddBalance(msg.From(), remaining)
 
 	// pay the coinbase
-	coinbaseFee := new(big.Int).Mul(new(big.Int).SetUint64(result.GasUsed), msg.GasPrice)
+	coinbaseFee := new(big.Int).Mul(new(big.Int).SetUint64(result.GasUsed), msg.GasPrice())
 	t.state.AddBalance(t.ctx.Coinbase, coinbaseFee)
 
 	// return gas to the pool
@@ -831,7 +831,7 @@ func TransactionGasCost(msg *types.Transaction, isHomestead, isIstanbul bool) (u
 		cost += TxGas
 	}
 
-	payload := msg.Input
+	payload := msg.Input()
 	if len(payload) > 0 {
 		zeros := uint64(0)
 
@@ -883,28 +883,28 @@ func checkAndProcessLegacyTx(msg *types.Transaction, t *Transition) error {
 }
 
 func checkAndProcessStateTx(msg *types.Transaction, t *Transition) error {
-	if msg.GasPrice.Cmp(big.NewInt(0)) != 0 {
+	if msg.GasPrice().Cmp(big.NewInt(0)) != 0 {
 		return NewTransitionApplicationError(
 			errors.New("gasPrice of state transaction must be zero"),
 			true,
 		)
 	}
 
-	if msg.Gas != types.StateTransactionGasLimit {
+	if msg.Gas() != types.StateTransactionGasLimit {
 		return NewTransitionApplicationError(
 			fmt.Errorf("gas of state transaction must be %d", types.StateTransactionGasLimit),
 			true,
 		)
 	}
 
-	if msg.From != contracts.SystemCaller {
+	if msg.From() != contracts.SystemCaller {
 		return NewTransitionApplicationError(
 			fmt.Errorf("state transaction sender must be %v, but got %v", contracts.SystemCaller, msg.From),
 			true,
 		)
 	}
 
-	if msg.To == nil || *msg.To == types.ZeroAddress {
+	if msg.To() == nil || *msg.To() == types.ZeroAddress {
 		return NewTransitionApplicationError(
 			errors.New("to of state transaction must be specified"),
 			true,

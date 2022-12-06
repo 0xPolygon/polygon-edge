@@ -423,7 +423,7 @@ func (e *Eth) Call(arg *txnArgs, filter BlockNumberOrHash) (interface{}, error) 
 
 // EstimateGas estimates the gas needed to execute a transaction
 func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error) {
-	transaction, err := DecodeTxn(arg, e.store)
+	tx, err := DecodeTxn(arg, e.store)
 	if err != nil {
 		return nil, err
 	}
@@ -442,7 +442,7 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 	forksInTime := e.store.GetForksInTime(uint64(number))
 
 	var standardGas uint64
-	if transaction.IsContractCreation() && forksInTime.Homestead {
+	if tx.IsContractCreation() && forksInTime.Homestead {
 		standardGas = state.TxGasContractCreation
 	} else {
 		standardGas = state.TxGas
@@ -454,26 +454,26 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 	)
 
 	// If the gas limit was passed in, use it as a ceiling
-	if transaction.Gas != 0 && transaction.Gas >= standardGas {
-		highEnd = transaction.Gas
+	if tx.Gas != 0 && tx.Gas >= standardGas {
+		highEnd = tx.Gas
 	} else {
 		// If not, use the referenced block number
 		highEnd = header.GasLimit
 	}
 
-	gasPriceInt := new(big.Int).Set(transaction.GasPrice)
-	valueInt := new(big.Int).Set(transaction.Value)
+	gasPriceInt := new(big.Int).Set(tx.GasPrice)
+	valueInt := new(big.Int).Set(tx.Value)
 
 	var availableBalance *big.Int
 
 	// If the sender address is present, figure out how much available funds
 	// are we working with
-	if transaction.From != types.ZeroAddress {
+	if tx.From != types.ZeroAddress {
 		// Get the account balance
 		// If the account is not initialized yet in state,
 		// assume it's an empty account
 		accountBalance := big.NewInt(0)
-		acc, err := e.store.GetAccount(header.StateRoot, transaction.From)
+		acc, err := e.store.GetAccount(header.StateRoot, tx.From)
 
 		if err != nil && !errors.Is(err, ErrStateNotFound) {
 			// An unrelated error occurred, return it
@@ -486,7 +486,7 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 
 		availableBalance = new(big.Int).Set(accountBalance)
 
-		if transaction.Value != nil {
+		if tx.Value != nil {
 			if valueInt.Cmp(availableBalance) > 0 {
 				return 0, ErrInsufficientFunds
 			}
@@ -536,7 +536,7 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 	// Returns a status indicating if the transaction failed and the accompanying error
 	testTransaction := func(gas uint64, shouldOmitErr bool) (bool, error) {
 		// Create a dummy transaction with the new gas
-		txn := transaction.Copy()
+		txn := tx.Copy()
 		txn.Gas = gas
 
 		result, applyErr := e.store.ApplyTxn(header, txn)

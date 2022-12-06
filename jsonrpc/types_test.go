@@ -103,7 +103,7 @@ func TestToTransaction_Returns_V_R_S_ValuesWithoutLeading0(t *testing.T) {
 	v, _ := hex.DecodeHex(hexWithLeading0)
 	r, _ := hex.DecodeHex(hexWithLeading0)
 	s, _ := hex.DecodeHex(hexWithLeading0)
-	txn := types.Transaction{
+	txn := types.NewTx(&types.LegacyTx{
 		Nonce:    0,
 		GasPrice: big.NewInt(0),
 		Gas:      0,
@@ -113,11 +113,10 @@ func TestToTransaction_Returns_V_R_S_ValuesWithoutLeading0(t *testing.T) {
 		V:        new(big.Int).SetBytes(v),
 		R:        new(big.Int).SetBytes(r),
 		S:        new(big.Int).SetBytes(s),
-		Hash:     types.Hash{},
 		From:     types.Address{},
-	}
+	})
 
-	jsonTx := toTransaction(&txn, nil, nil, nil)
+	jsonTx := toTransaction(txn, nil, nil, nil)
 
 	jsonV, _ := jsonTx.V.MarshalText()
 	jsonR, _ := jsonTx.R.MarshalText()

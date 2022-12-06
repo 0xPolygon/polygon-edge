@@ -987,7 +987,7 @@ func (b *Blockchain) updateGasPriceAvgWithBlock(block *types.Block) {
 
 	gasPrices := make([]*big.Int, len(block.Transactions))
 	for i, transaction := range block.Transactions {
-		gasPrices[i] = transaction.GasPrice
+		gasPrices[i] = transaction.GasPrice()
 	}
 
 	b.updateGasPriceAvg(gasPrices)
@@ -1010,7 +1010,7 @@ func (b *Blockchain) writeBody(block *types.Block) error {
 
 	// Write txn lookups (txHash -> block)
 	for _, txn := range block.Transactions {
-		if err := b.db.WriteTxLookup(txn.Hash, block.Hash()); err != nil {
+		if err := b.db.WriteTxLookup(txn.Hash(), block.Hash()); err != nil {
 			return err
 		}
 	}
@@ -1029,7 +1029,7 @@ func (b *Blockchain) ReadTxLookup(hash types.Hash) (types.Hash, bool) {
 // return error if the invalid signature found
 func (b *Blockchain) recoverFromFieldsInBlock(block *types.Block) error {
 	for _, tx := range block.Transactions {
-		if tx.From != types.ZeroAddress || tx.IsStateTx() {
+		if tx.From() != types.ZeroAddress || tx.IsStateTx() {
 			continue
 		}
 
@@ -1038,7 +1038,7 @@ func (b *Blockchain) recoverFromFieldsInBlock(block *types.Block) error {
 			return err
 		}
 
-		tx.From = sender
+		tx.SetSender(sender)
 	}
 
 	return nil
@@ -1050,7 +1050,7 @@ func (b *Blockchain) recoverFromFieldsInTransactions(transactions []*types.Trans
 	updated := false
 
 	for _, tx := range transactions {
-		if tx.From != types.ZeroAddress || tx.IsStateTx() {
+		if tx.From() != types.ZeroAddress || tx.IsStateTx() {
 			continue
 		}
 
@@ -1061,7 +1061,7 @@ func (b *Blockchain) recoverFromFieldsInTransactions(transactions []*types.Trans
 			continue
 		}
 
-		tx.From = sender
+		tx.SetSender(sender)
 		updated = true
 	}
 

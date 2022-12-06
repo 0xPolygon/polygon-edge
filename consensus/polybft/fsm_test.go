@@ -84,12 +84,11 @@ func TestFSM_verifyValidatorsUptimeTx(t *testing.T) {
 	assert.Error(t, fsm.verifyValidatorsUptimeTx(block.Transactions))
 
 	// submit tampered validators uptime transaction to the epoch ending block
-	alteredUptimeTx := &types.Transaction{
+	alteredUptimeTx := types.NewTx(&types.StateTx{
 		To:    &fsm.config.ValidatorSetAddr,
 		Input: []byte{},
 		Gas:   0,
-		Type:  types.StateTx,
-	}
+	})
 	transactions = []*types.Transaction{alteredUptimeTx}
 	block = consensus.BuildBlock(consensus.BuildBlockParams{
 		Header: &types.Header{GasLimit: types.StateTransactionGasLimit},
@@ -110,12 +109,12 @@ func TestFSM_verifyValidatorsUptimeTx(t *testing.T) {
 	assert.Error(t, fsm.verifyValidatorsUptimeTx(block.Transactions))
 
 	// create block with dummy transaction in non-epoch ending block
-	dummyTx := &types.Transaction{
+	dummyTx := types.NewTx(&types.LegacyTx{
 		Nonce: 1,
 		Gas:   1000000,
 		To:    &types.Address{},
 		Value: big.NewInt(1),
-	}
+	})
 	transactions = []*types.Transaction{dummyTx}
 	block = consensus.BuildBlock(consensus.BuildBlockParams{
 		Header: &types.Header{GasLimit: types.StateTransactionGasLimit},
@@ -656,7 +655,7 @@ func TestFSM_VerifyStateTransactions_StateTransactionAndSprintIsFalse(t *testing
 	t.Parallel()
 
 	fsm := &fsm{config: &PolyBFTConfig{}, uptimeCounter: createTestUptimeCounter(t, nil, 10)}
-	dummyStateTx := &types.Transaction{To: &contracts.StateReceiverContract, Type: types.StateTx}
+	dummyStateTx := types.NewTx(&types.StateTx{To: &contracts.StateReceiverContract})
 	err := fsm.VerifyStateTransactions([]*types.Transaction{dummyStateTx})
 	assert.ErrorContains(t, err, "state transaction in block which should not contain")
 }

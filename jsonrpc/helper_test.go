@@ -11,9 +11,9 @@ import (
 )
 
 func createTestTransaction(hash types.Hash) *types.Transaction {
-	return &types.Transaction{
+	return types.NewTx(&types.LegacyTx{
 		Hash: hash,
-	}
+	})
 }
 
 func createTestHeader(height uint64) *types.Header {
@@ -658,7 +658,7 @@ func TestDecodeTxn(t *testing.T) {
 				Nonce:    &nonce,
 			},
 			store: &debugEndpointMockStore{},
-			expected: &types.Transaction{
+			expected: types.NewTx(&types.LegacyTx{
 				From:     from,
 				To:       &to,
 				Gas:      uint64(gas),
@@ -666,7 +666,7 @@ func TestDecodeTxn(t *testing.T) {
 				Value:    new(big.Int).SetBytes([]byte(value)),
 				Input:    input,
 				Nonce:    uint64(nonce),
-			},
+			}),
 			err: false,
 		},
 		{
@@ -680,7 +680,7 @@ func TestDecodeTxn(t *testing.T) {
 				Nonce:    &nonce,
 			},
 			store: &debugEndpointMockStore{},
-			expected: &types.Transaction{
+			expected: types.NewTx(&types.LegacyTx{
 				From:     types.ZeroAddress,
 				To:       &to,
 				Gas:      uint64(gas),
@@ -688,7 +688,7 @@ func TestDecodeTxn(t *testing.T) {
 				Value:    new(big.Int).SetBytes([]byte(value)),
 				Input:    input,
 				Nonce:    uint64(0),
-			},
+			}),
 			err: false,
 		},
 		{
@@ -713,7 +713,7 @@ func TestDecodeTxn(t *testing.T) {
 					}, nil
 				},
 			},
-			expected: &types.Transaction{
+			expected: types.NewTx(&types.LegacyTx{
 				From:     from,
 				To:       &to,
 				Gas:      uint64(gas),
@@ -721,7 +721,7 @@ func TestDecodeTxn(t *testing.T) {
 				Value:    new(big.Int).SetBytes([]byte(value)),
 				Input:    input,
 				Nonce:    uint64(stateNonce),
-			},
+			}),
 			err: false,
 		},
 		{
@@ -737,7 +737,7 @@ func TestDecodeTxn(t *testing.T) {
 				Nonce:    &nonce,
 			},
 			store: &debugEndpointMockStore{},
-			expected: &types.Transaction{
+			expected: types.NewTx(&types.LegacyTx{
 				From:     from,
 				To:       &to,
 				Gas:      uint64(gas),
@@ -745,7 +745,7 @@ func TestDecodeTxn(t *testing.T) {
 				Value:    new(big.Int).SetBytes([]byte(value)),
 				Input:    data,
 				Nonce:    uint64(nonce),
-			},
+			}),
 			err: false,
 		},
 		{
@@ -756,7 +756,7 @@ func TestDecodeTxn(t *testing.T) {
 				Nonce: &nonce,
 			},
 			store: &debugEndpointMockStore{},
-			expected: &types.Transaction{
+			expected: types.NewTx(&types.LegacyTx{
 				From:     from,
 				To:       &to,
 				Gas:      uint64(0),
@@ -764,7 +764,7 @@ func TestDecodeTxn(t *testing.T) {
 				Value:    new(big.Int),
 				Input:    []byte{},
 				Nonce:    uint64(nonce),
-			},
+			}),
 			err: false,
 		},
 		{

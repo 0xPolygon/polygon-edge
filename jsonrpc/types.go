@@ -52,17 +52,19 @@ func toTransaction(
 	blockHash *types.Hash,
 	txIndex *int,
 ) *transaction {
+	v, r, s := t.RawSignatureValues()
+
 	res := &transaction{
-		Nonce:    argUint64(t.Nonce),
-		GasPrice: argBig(*t.GasPrice),
-		Gas:      argUint64(t.Gas),
+		Nonce:    argUint64(t.Nonce()),
+		GasPrice: argBig(*t.GasPrice()),
+		Gas:      argUint64(t.Gas()),
 		To:       t.To,
-		Value:    argBig(*t.Value),
-		Input:    t.Input,
-		V:        argBig(*t.V),
-		R:        argBig(*t.R),
-		S:        argBig(*t.S),
-		Hash:     t.Hash,
+		Value:    argBig(*t.Value()),
+		Input:    t.Input(),
+		V:        argBig(*v),
+		R:        argBig(*r),
+		S:        argBig(*s),
+		Hash:     t.Hash(),
 		From:     t.From,
 	}
 
@@ -156,7 +158,7 @@ func toBlock(b *types.Block, fullTx bool) *block {
 		} else {
 			res.Transactions = append(
 				res.Transactions,
-				transactionHash(txn.Hash),
+				transactionHash(txn.Hash()),
 			)
 		}
 	}

@@ -17,13 +17,13 @@ type DeployGenerator struct {
 }
 
 func (dg *DeployGenerator) GetExampleTransaction() (*types.Transaction, error) {
-	return dg.signer.SignTx(&types.Transaction{
+	return dg.signer.SignTx(types.NewTx(&types.LegacyTx{
 		From:     dg.params.SenderAddress,
 		Value:    big.NewInt(0),
 		GasPrice: dg.params.GasPrice,
 		Input:    dg.contractBytecode,
 		V:        big.NewInt(1), // it is necessary to encode in rlp
-	}, dg.params.SenderKey)
+	}), dg.params.SenderKey)
 }
 
 func NewDeployGenerator(params *GeneratorParams) (*DeployGenerator, error) {
@@ -48,7 +48,7 @@ func NewDeployGenerator(params *GeneratorParams) (*DeployGenerator, error) {
 func (dg *DeployGenerator) GenerateTransaction() (*types.Transaction, error) {
 	newNextNonce := atomic.AddUint64(&dg.params.Nonce, 1)
 
-	txn, err := dg.signer.SignTx(&types.Transaction{
+	txn, err := dg.signer.SignTx(types.NewTx(&types.LegacyTx{
 		From:     dg.params.SenderAddress,
 		Gas:      dg.estimatedGas,
 		Value:    big.NewInt(0),
@@ -56,7 +56,7 @@ func (dg *DeployGenerator) GenerateTransaction() (*types.Transaction, error) {
 		Nonce:    newNextNonce - 1,
 		Input:    dg.contractBytecode,
 		V:        big.NewInt(1), // it is necessary to encode in rlp
-	}, dg.params.SenderKey)
+	}), dg.params.SenderKey)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign transaction: %w", err)

@@ -407,7 +407,7 @@ func (p *TxPool) Peek() *types.Transaction {
 // from that account (if any).
 func (p *TxPool) Pop(tx *types.Transaction) {
 	// fetch the associated account
-	account := p.accounts.get(tx.From)
+	account := p.accounts.get(tx.From())
 
 	account.promoted.lock(true)
 	defer account.promoted.unlock()
@@ -434,7 +434,7 @@ func (p *TxPool) Pop(tx *types.Transaction) {
 // and reverts its next (expected) nonce.
 func (p *TxPool) Drop(tx *types.Transaction) {
 	// fetch associated account
-	account := p.accounts.get(tx.From)
+	account := p.accounts.get(tx.From())
 
 	account.promoted.lock(true)
 	account.enqueued.lock(true)
@@ -457,7 +457,7 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 	}()
 
 	// rollback nonce
-	nextNonce := tx.Nonce
+	nextNonce := tx.Nonce()
 	account.setNonce(nextNonce)
 
 	// drop promoted
@@ -471,11 +471,11 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 	dropped = account.enqueued.clear()
 	clearAccountQueue(dropped)
 
-	p.eventManager.signalEvent(proto.EventType_DROPPED, tx.Hash)
+	p.eventManager.signalEvent(proto.EventType_DROPPED, tx.Hash())
 	p.logger.Debug("dropped account txs",
 		"num", droppedCount,
 		"next_nonce", nextNonce,
-		"address", tx.From.String(),
+		"address", tx.From().String(),
 	)
 }
 
@@ -483,11 +483,11 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 // due to a recoverable error. If an account has been demoted too many times (maxAccountDemotions),
 // it is Dropped instead.
 func (p *TxPool) Demote(tx *types.Transaction) {
-	account := p.accounts.get(tx.From)
+	account := p.accounts.get(tx.From())
 	if account.Demotions() >= maxAccountDemotions {
 		p.logger.Debug(
 			"Demote: threshold reached - dropping account",
-			"addr", tx.From.String(),
+			"addr", tx.From().String(),
 		)
 
 		p.Drop(tx)
@@ -500,7 +500,7 @@ func (p *TxPool) Demote(tx *types.Transaction) {
 
 	account.incrementDemotions()
 
-	p.eventManager.signalEvent(proto.EventType_DEMOTED, tx.Hash)
+	p.eventManager.signalEvent(proto.EventType_DEMOTED, tx.Hash())
 }
 
 // ResetWithHeaders processes the transactions from the new
@@ -529,7 +529,7 @@ func (p *TxPool) processEvent(event *blockchain.Event) {
 		}
 
 		for _, tx := range block.Transactions {
-			oldTxs[tx.Hash] = tx
+			oldTxs[tx.Hash()] = tx
 		}
 	}
 
@@ -553,7 +553,7 @@ func (p *TxPool) processEvent(event *blockchain.Event) {
 		for _, tx := range block.Transactions {
 			var err error
 
-			addr := tx.From
+			addr := tx.From()
 			if addr == types.ZeroAddress {
 				// From field is not set, extract the signer
 				if addr, err = p.signer.Sender(tx); err != nil {
@@ -578,7 +578,7 @@ func (p *TxPool) processEvent(event *blockchain.Event) {
 
 			// Legacy reorg logic //
 			// Update the addTxns in case of reorgs
-			delete(oldTxs, tx.Hash)
+			delete(oldTxs, tx.Hash())
 		}
 	}
 
@@ -607,7 +607,7 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 	}
 
 	// Check if the transaction has a strictly positive value
-	if tx.Value.Sign() < 0 {
+	if tx.Value().Sign() < 0 {
 		return ErrNegativeValue
 	}
 
@@ -621,18 +621,18 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 
 	// If the from field is set, check that
 	// it matches the signer
-	if tx.From != types.ZeroAddress &&
-		tx.From != from {
+	if tx.From() != types.ZeroAddress &&
+		tx.From() != from {
 		return ErrInvalidSender
 	}
 
 	// If no address was set, update it
-	if tx.From == types.ZeroAddress {
-		tx.From = from
+	if tx.From() == types.ZeroAddress {
+		tx.SetSender(from)
 	}
 
 	// Check if transaction can deploy smart contract
-	if tx.IsContractCreation() && !p.deploymentWhitelist.allowed(tx.From) {
+	if tx.IsContractCreation() && !p.deploymentWhitelist.allowed(tx.From()) {
 		return ErrSmartContractRestricted
 	}
 
@@ -645,11 +645,11 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 	stateRoot := p.store.Header().StateRoot
 
 	// Check nonce ordering
-	if p.store.GetNonce(stateRoot, tx.From) > tx.Nonce {
+	if p.store.GetNonce(stateRoot, tx.From()) > tx.Nonce() {
 		return ErrNonceTooLow
 	}
 
-	accountBalance, balanceErr := p.store.GetBalance(stateRoot, tx.From)
+	accountBalance, balanceErr := p.store.GetBalance(stateRoot, tx.From())
 	if balanceErr != nil {
 		return ErrInvalidAccountState
 	}
@@ -665,14 +665,14 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 		return err
 	}
 
-	if tx.Gas < intrinsicGas {
+	if tx.Gas() < intrinsicGas {
 		return ErrIntrinsicGas
 	}
 
 	// Grab the block gas limit for the latest block
 	latestBlockGasLimit := p.store.Header().GasLimit
 
-	if tx.Gas > latestBlockGasLimit {
+	if tx.Gas() > latestBlockGasLimit {
 		return ErrBlockLimitExceeded
 	}
 
@@ -700,7 +700,7 @@ func (p *TxPool) pruneAccountsWithNonceHoles() {
 				return true
 			}
 
-			if firstTx.Nonce == account.getNonce() {
+			if firstTx.Nonce() == account.getNonce() {
 				return true
 			}
 
@@ -721,7 +721,7 @@ func (p *TxPool) pruneAccountsWithNonceHoles() {
 func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 	p.logger.Debug("add tx",
 		"origin", origin.String(),
-		"hash", tx.Hash.String(),
+		"hash", tx.Hash().String(),
 	)
 
 	// validate incoming tx
@@ -733,8 +733,8 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 		p.signalPruning()
 
 		//	only accept transactions with expected nonce
-		if account := p.accounts.get(tx.From); account != nil &&
-			tx.Nonce > account.getNonce() {
+		if account := p.accounts.get(tx.From()); account != nil &&
+			tx.Nonce() > account.getNonce() {
 			return ErrRejectFutureTx
 		}
 	}
@@ -752,11 +752,11 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 	}
 
 	// initialize account for this address once
-	p.createAccountOnce(tx.From)
+	p.createAccountOnce(tx.From())
 
 	// send request [BLOCKING]
 	p.enqueueReqCh <- enqueueRequest{tx: tx}
-	p.eventManager.signalEvent(proto.EventType_ADDED, tx.Hash)
+	p.eventManager.signalEvent(proto.EventType_ADDED, tx.Hash())
 
 	return nil
 }
@@ -767,7 +767,7 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 // a promoteRequest is signaled.
 func (p *TxPool) handleEnqueueRequest(req enqueueRequest) {
 	tx := req.tx
-	addr := req.tx.From
+	addr := req.tx.From()
 
 	// fetch account
 	account := p.accounts.get(addr)
@@ -781,13 +781,13 @@ func (p *TxPool) handleEnqueueRequest(req enqueueRequest) {
 		return
 	}
 
-	p.logger.Debug("enqueue request", "hash", tx.Hash.String())
+	p.logger.Debug("enqueue request", "hash", tx.Hash().String())
 
 	p.gauge.increase(slotsRequired(tx))
 
-	p.eventManager.signalEvent(proto.EventType_ENQUEUED, tx.Hash)
+	p.eventManager.signalEvent(proto.EventType_ENQUEUED, tx.Hash())
 
-	if tx.Nonce > account.getNonce() {
+	if tx.Nonce() > account.getNonce() {
 		// don't signal promotion for
 		// higher nonce txs
 		return
@@ -849,12 +849,12 @@ func (p *TxPool) addGossipTx(obj interface{}, _ peer.ID) {
 	// add tx
 	if err := p.addTx(gossip, tx); err != nil {
 		if errors.Is(err, ErrAlreadyKnown) {
-			p.logger.Debug("rejecting known tx (gossip)", "hash", tx.Hash.String())
+			p.logger.Debug("rejecting known tx (gossip)", "hash", tx.Hash().String())
 
 			return
 		}
 
-		p.logger.Error("failed to add broadcast tx", "err", err, "hash", tx.Hash.String())
+		p.logger.Error("failed to add broadcast tx", "err", err, "hash", tx.Hash().String())
 	}
 }
 
@@ -976,7 +976,7 @@ func (p *TxPool) Length() uint64 {
 // toHash returns the hash(es) of given transaction(s)
 func toHash(txs ...*types.Transaction) (hashes []types.Hash) {
 	for _, tx := range txs {
-		hashes = append(hashes, tx.Hash)
+		hashes = append(hashes, tx.Hash())
 	}
 
 	return

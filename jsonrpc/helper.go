@@ -208,7 +208,7 @@ func DecodeTxn(arg *txnArgs, store nonceGetter) (*types.Transaction, error) {
 		arg.Gas = argUintPtr(0)
 	}
 
-	txn := &types.Transaction{
+	txnData := &types.LegacyTx{
 		From:     *arg.From,
 		Gas:      uint64(*arg.Gas),
 		GasPrice: new(big.Int).SetBytes(*arg.GasPrice),
@@ -217,9 +217,10 @@ func DecodeTxn(arg *txnArgs, store nonceGetter) (*types.Transaction, error) {
 		Nonce:    uint64(*arg.Nonce),
 	}
 	if arg.To != nil {
-		txn.To = arg.To
+		txnData.To = arg.To
 	}
 
+	txn := types.NewTx(txnData)
 	txn.ComputeHash()
 
 	return txn, nil

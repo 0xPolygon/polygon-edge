@@ -583,7 +583,7 @@ func TestTraceCall(t *testing.T) {
 			Input:    &input,
 			Nonce:    &nonce,
 		}
-		decodedTx = &types.Transaction{
+		decodedTx = types.NewTx(&types.LegacyTx{
 			Nonce:    uint64(nonce),
 			GasPrice: new(big.Int).SetBytes([]byte(gasPrice)),
 			Gas:      uint64(gas),
@@ -591,7 +591,7 @@ func TestTraceCall(t *testing.T) {
 			Value:    new(big.Int).SetBytes([]byte(value)),
 			Input:    data,
 			From:     from,
-		}
+		})
 	)
 
 	decodedTx.ComputeHash()

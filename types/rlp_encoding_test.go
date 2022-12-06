@@ -39,7 +39,7 @@ func TestRLPEncoding(t *testing.T) {
 
 func TestRLPMarshall_And_Unmarshall_Transaction(t *testing.T) {
 	addrTo := StringToAddress("11")
-	txn := &Transaction{
+	txn := NewTx(&LegacyTx{
 		Nonce:    0,
 		GasPrice: big.NewInt(11),
 		Gas:      11,
@@ -49,7 +49,7 @@ func TestRLPMarshall_And_Unmarshall_Transaction(t *testing.T) {
 		V:        big.NewInt(25),
 		S:        big.NewInt(26),
 		R:        big.NewInt(27),
-	}
+	})
 	unmarshalledTxn := new(Transaction)
 	marshaledRlp := txn.MarshalRLP()
 
@@ -132,25 +132,34 @@ func TestRLPUnmarshal_Header_ComputeHash(t *testing.T) {
 
 func TestRLPMarshall_And_Unmarshall_TypedTransaction(t *testing.T) {
 	addrTo := StringToAddress("11")
-	originalTx := &Transaction{
-		Nonce:    0,
-		GasPrice: big.NewInt(11),
-		Gas:      11,
-		To:       &addrTo,
-		Value:    big.NewInt(1),
-		Input:    []byte{1, 2},
-		V:        big.NewInt(25),
-		S:        big.NewInt(26),
-		R:        big.NewInt(27),
+
+	originalTxs := map[TxType]TxData{
+		StateTxType: &StateTx{
+			Nonce:    0,
+			GasPrice: big.NewInt(11),
+			Gas:      11,
+			To:       &addrTo,
+			Value:    big.NewInt(1),
+			Input:    []byte{1, 2},
+			V:        big.NewInt(25),
+			S:        big.NewInt(26),
+			R:        big.NewInt(27),
+		},
+		LegacyTxType: &LegacyTx{
+			Nonce:    0,
+			GasPrice: big.NewInt(11),
+			Gas:      11,
+			To:       &addrTo,
+			Value:    big.NewInt(1),
+			Input:    []byte{1, 2},
+			V:        big.NewInt(25),
+			S:        big.NewInt(26),
+			R:        big.NewInt(27),
+		},
 	}
 
-	txTypes := []TxType{
-		StateTx,
-		LegacyTx,
-	}
-
-	for _, v := range txTypes {
-		originalTx.Type = v
+	for tp, data := range originalTxs {
+		originalTx := NewTx(data)
 		originalTx.ComputeHash()
 
 		txRLP := originalTx.MarshalRLP()
@@ -159,6 +168,7 @@ func TestRLPMarshall_And_Unmarshall_TypedTransaction(t *testing.T) {
 		assert.NoError(t, unmarshalledTx.UnmarshalRLP(txRLP))
 
 		unmarshalledTx.ComputeHash()
-		assert.Equal(t, originalTx.Type, unmarshalledTx.Type)
+		assert.Equal(t, originalTx.inner.txType(), unmarshalledTx.inner.txType())
+		assert.Equal(t, tp, unmarshalledTx.inner.txType())
 	}
 }

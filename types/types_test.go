@@ -67,7 +67,7 @@ func TestEIP55(t *testing.T) {
 
 func TestTransactionCopy(t *testing.T) {
 	addrTo := StringToAddress("11")
-	txn := &Transaction{
+	txn := NewTx(&LegacyTx{
 		Nonce:    0,
 		GasPrice: big.NewInt(11),
 		Gas:      11,
@@ -77,7 +77,7 @@ func TestTransactionCopy(t *testing.T) {
 		V:        big.NewInt(25),
 		S:        big.NewInt(26),
 		R:        big.NewInt(27),
-	}
+	})
 	newTxn := txn.Copy()
 
 	if !reflect.DeepEqual(txn, newTxn) {

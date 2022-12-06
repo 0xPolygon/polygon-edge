@@ -295,15 +295,15 @@ type txnSender struct {
 }
 
 func (t *txnSender) sendTransaction(txn *types.Transaction) asyncTxn {
-	if txn.GasPrice == nil {
+	if txn.GasPrice() == nil {
 		txn.GasPrice = big.NewInt(defaultGasPrice)
 	}
 
-	if txn.Gas == 0 {
+	if txn.Gas() == 0 {
 		txn.Gas = defaultGasLimit
 	}
 
-	if txn.Nonce == 0 {
+	if txn.Nonce() == 0 {
 		nonce, err := t.client.Eth().GetNonce(t.account.Ecdsa.Address(), ethgo.Latest)
 		if err != nil {
 			return &asyncTxnImpl{err: err}
@@ -391,11 +391,11 @@ func stake(sender *txnSender) asyncTxn {
 		return &asyncTxnImpl{err: err}
 	}
 
-	receipt := sender.sendTransaction(&types.Transaction{
+	receipt := sender.sendTransaction(types.NewTx(&types.LegacyTx{
 		To:    &stakeManager,
 		Input: input,
 		Value: big.NewInt(1000),
-	})
+	}))
 
 	return receipt
 }
@@ -408,10 +408,10 @@ func whitelist(sender *txnSender, addr types.Address) asyncTxn {
 		return &asyncTxnImpl{err: err}
 	}
 
-	receipt := sender.sendTransaction(&types.Transaction{
+	receipt := sender.sendTransaction(types.NewTx(&types.LegacyTx{
 		To:    &stakeManager,
 		Input: input,
-	})
+	}))
 
 	return receipt
 }
@@ -419,10 +419,10 @@ func whitelist(sender *txnSender, addr types.Address) asyncTxn {
 func fund(sender *txnSender, addr types.Address) asyncTxn {
 	genesisAmount, _ := new(big.Int).SetString("1000000000000000000", 10)
 
-	receipt := sender.sendTransaction(&types.Transaction{
+	receipt := sender.sendTransaction(types.NewTx(&types.LegacyTx{
 		To:    &addr,
 		Value: genesisAmount,
-	})
+	}))
 
 	return receipt
 }
@@ -450,10 +450,10 @@ func registerValidator(sender *txnSender, account *wallet.Account) asyncTxn {
 		return &asyncTxnImpl{err: err}
 	}
 
-	return sender.sendTransaction(&types.Transaction{
+	return sender.sendTransaction(types.NewTx(&types.LegacyTx{
 		To:    &stakeManager,
 		Input: input,
-	})
+	}))
 }
 
 // NewValidator represents validator which is being registered to the chain

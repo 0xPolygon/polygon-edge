@@ -171,27 +171,28 @@ func (t *Transaction) MarshalRLPTo(dst []byte) []byte {
 func (t *Transaction) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 	vv := arena.NewArray()
 
-	vv.Set(arena.NewUint(t.Nonce))
-	vv.Set(arena.NewBigInt(t.GasPrice))
-	vv.Set(arena.NewUint(t.Gas))
+	vv.Set(arena.NewUint(t.inner.nonce()))
+	vv.Set(arena.NewBigInt(t.inner.gasPrice()))
+	vv.Set(arena.NewUint(t.inner.gas()))
 
 	// Address may be empty
-	if t.To != nil {
-		vv.Set(arena.NewBytes((*t.To).Bytes()))
+	if to := t.inner.to(); to != nil {
+		vv.Set(arena.NewBytes((*to).Bytes()))
 	} else {
 		vv.Set(arena.NewNull())
 	}
 
-	vv.Set(arena.NewBigInt(t.Value))
-	vv.Set(arena.NewCopyBytes(t.Input))
+	vv.Set(arena.NewBigInt(t.inner.value()))
+	vv.Set(arena.NewCopyBytes(t.inner.input()))
 
 	// signature values
-	vv.Set(arena.NewBigInt(t.V))
-	vv.Set(arena.NewBigInt(t.R))
-	vv.Set(arena.NewBigInt(t.S))
+	v, r, s := t.inner.rawSignatureValues()
+	vv.Set(arena.NewBigInt(v))
+	vv.Set(arena.NewBigInt(r))
+	vv.Set(arena.NewBigInt(s))
 
 	if !t.IsLegacyTx() {
-		vv.Set(arena.NewBytes([]byte{byte(t.Type)}))
+		vv.Set(arena.NewBytes([]byte{byte(t.inner.txType())}))
 	}
 
 	if t.IsStateTx() {

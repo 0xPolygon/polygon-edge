@@ -50,18 +50,18 @@ func calcTxHash(tx *types.Transaction, chainID uint64) types.Hash {
 	a := signerPool.Get()
 
 	v := a.NewArray()
-	v.Set(a.NewUint(tx.Nonce))
-	v.Set(a.NewBigInt(tx.GasPrice))
-	v.Set(a.NewUint(tx.Gas))
+	v.Set(a.NewUint(tx.Nonce()))
+	v.Set(a.NewBigInt(tx.GasPrice()))
+	v.Set(a.NewUint(tx.Gas()))
 
 	if tx.To == nil {
 		v.Set(a.NewNull())
 	} else {
-		v.Set(a.NewCopyBytes((*tx.To).Bytes()))
+		v.Set(a.NewCopyBytes((*tx.To()).Bytes()))
 	}
 
-	v.Set(a.NewBigInt(tx.Value))
-	v.Set(a.NewCopyBytes(tx.Input))
+	v.Set(a.NewBigInt(tx.Value()))
+	v.Set(a.NewCopyBytes(tx.Input()))
 
 	// EIP155
 	if chainID != 0 {
@@ -90,14 +90,16 @@ var (
 
 // Sender decodes the signature and returns the sender of the transaction
 func (f *FrontierSigner) Sender(tx *types.Transaction) (types.Address, error) {
+	v, r, s := tx.RawSignatureValues()
+
 	refV := big.NewInt(0)
-	if tx.V != nil {
-		refV.SetBytes(tx.V.Bytes())
+	if v != nil {
+		refV.SetBytes(v.Bytes())
 	}
 
 	refV.Sub(refV, big27)
 
-	sig, err := encodeSignature(tx.R, tx.S, byte(refV.Int64()))
+	sig, err := encodeSignature(r, s, byte(refV.Int64()))
 	if err != nil {
 		return types.Address{}, err
 	}
@@ -126,14 +128,16 @@ func (f *FrontierSigner) SignTx(
 		return nil, err
 	}
 
-	tx.R = new(big.Int).SetBytes(sig[:32])
-	tx.S = new(big.Int).SetBytes(sig[32:64])
-	tx.V = new(big.Int).SetBytes(f.CalculateV(sig[64]))
+	tx.SetSignatureValues(
+		new(big.Int).SetBytes(f.CalculateV(sig[64])),
+		new(big.Int).SetBytes(sig[:32]),
+		new(big.Int).SetBytes(sig[32:64]),
+	)
 
 	return tx, nil
 }
 
-// calculateV returns the V value for transactions pre EIP155
+// CalculateV returns the V value for transactions pre EIP155
 func (f *FrontierSigner) CalculateV(parity byte) []byte {
 	reference := big.NewInt(int64(parity))
 	reference.Add(reference, big27)
@@ -157,12 +161,13 @@ func (e *EIP155Signer) Hash(tx *types.Transaction) types.Hash {
 
 // Sender returns the transaction sender
 func (e *EIP155Signer) Sender(tx *types.Transaction) (types.Address, error) {
+	v, r, s := tx.RawSignatureValues()
 	protected := true
 
 	// Check if v value conforms to an earlier standard (before EIP155)
 	bigV := big.NewInt(0)
-	if tx.V != nil {
-		bigV.SetBytes(tx.V.Bytes())
+	if v != nil {
+		bigV.SetBytes(v.Bytes())
 	}
 
 	if vv := bigV.Uint64(); bits.Len(uint(vv)) <= 8 {
@@ -179,7 +184,7 @@ func (e *EIP155Signer) Sender(tx *types.Transaction) (types.Address, error) {
 	bigV.Sub(bigV, mulOperand)
 	bigV.Sub(bigV, big35)
 
-	sig, err := encodeSignature(tx.R, tx.S, byte(bigV.Int64()))
+	sig, err := encodeSignature(r, s, byte(bigV.Int64()))
 	if err != nil {
 		return types.Address{}, err
 	}
@@ -208,9 +213,11 @@ func (e *EIP155Signer) SignTx(
 		return nil, err
 	}
 
-	tx.R = new(big.Int).SetBytes(sig[:32])
-	tx.S = new(big.Int).SetBytes(sig[32:64])
-	tx.V = new(big.Int).SetBytes(e.CalculateV(sig[64]))
+	tx.SetSignatureValues(
+		new(big.Int).SetBytes(e.CalculateV(sig[64])),
+		new(big.Int).SetBytes(sig[:32]),
+		new(big.Int).SetBytes(sig[32:64]),
+	)
 
 	return tx, nil
 }

@@ -563,7 +563,7 @@ func (t *TestServer) SendRawTx(
 		return nil, err
 	}
 
-	signedTx, err := t.SignTx(&types.Transaction{
+	signedTx, err := t.SignTx(types.NewTx(&types.LegacyTx{
 		From:     tx.From,
 		GasPrice: tx.GasPrice,
 		Gas:      tx.Gas,
@@ -571,7 +571,7 @@ func (t *TestServer) SendRawTx(
 		Value:    tx.Value,
 		Input:    tx.Input,
 		Nonce:    nextNonce,
-	}, signerKey)
+	}), signerKey)
 	if err != nil {
 		return nil, err
 	}

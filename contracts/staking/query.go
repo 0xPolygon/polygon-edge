@@ -59,7 +59,7 @@ func createCallViewTx(
 	methodID []byte,
 	nonce uint64,
 ) *types.Transaction {
-	return &types.Transaction{
+	return types.NewTx(&types.LegacyTx{
 		From:     from,
 		To:       &contractAddress,
 		Input:    methodID,
@@ -67,7 +67,7 @@ func createCallViewTx(
 		Gas:      queryGasLimit,
 		Value:    big.NewInt(0),
 		GasPrice: big.NewInt(0),
-	}
+	})
 }
 
 // DecodeValidators parses contract call result and returns array of address
