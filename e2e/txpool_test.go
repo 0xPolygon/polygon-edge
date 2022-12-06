@@ -36,15 +36,14 @@ type generateTxReqParams struct {
 }
 
 func generateTx(params generateTxReqParams) *types.Transaction {
-	signedTx, signErr := signer.SignTx(types.NewTx(&types.LegacyTx{
+	signedTx, signErr := signer.SignTx(types.NewTxWithSender(&types.LegacyTx{
 		Nonce:    params.nonce,
-		From:     params.referenceAddr,
 		To:       &params.toAddress,
 		GasPrice: params.gasPrice,
 		Gas:      1000000,
 		Value:    params.value,
 		V:        big.NewInt(27), // it is necessary to encode in rlp
-	}), params.referenceKey)
+	}, params.referenceAddr), params.referenceKey)
 
 	if signErr != nil {
 		params.t.Fatalf("Unable to sign transaction, %v", signErr)
@@ -195,15 +194,14 @@ func TestTxPool_TransactionCoalescing(t *testing.T) {
 	oneEth := framework.EthToWei(1)
 
 	generateTx := func(nonce uint64) *types.Transaction {
-		signedTx, signErr := signer.SignTx(types.NewTx(&types.LegacyTx{
+		signedTx, signErr := signer.SignTx(types.NewTxWithSender(&types.LegacyTx{
 			Nonce:    nonce,
-			From:     referenceAddr,
 			To:       &toAddress,
 			GasPrice: gasPrice,
 			Gas:      1000000,
 			Value:    oneEth,
 			V:        big.NewInt(1), // it is necessary to encode in rlp
-		}), referenceKey)
+		}, referenceAddr), referenceKey)
 
 		if signErr != nil {
 			t.Fatalf("Unable to sign transaction, %v", signErr)
@@ -354,7 +352,6 @@ func TestTxPool_RecoverableError(t *testing.T) {
 			To:       &receiverAddress,
 			Value:    oneEth,
 			V:        big.NewInt(27),
-			From:     senderAddress,
 		},
 		{
 			Nonce:    1,
@@ -363,7 +360,6 @@ func TestTxPool_RecoverableError(t *testing.T) {
 			To:       &receiverAddress,
 			Value:    oneEth,
 			V:        big.NewInt(27),
-			From:     senderAddress,
 		},
 		{
 			Nonce:    2,
@@ -372,7 +368,6 @@ func TestTxPool_RecoverableError(t *testing.T) {
 			To:       &receiverAddress,
 			Value:    oneEth,
 			V:        big.NewInt(27),
-			From:     senderAddress,
 		},
 	}
 
@@ -388,7 +383,7 @@ func TestTxPool_RecoverableError(t *testing.T) {
 	hashes := make([]ethgo.Hash, 3)
 
 	for i, tx := range transactions {
-		signedTx, err := signer.SignTx(types.NewTx(tx), senderKey)
+		signedTx, err := signer.SignTx(types.NewTxWithSender(tx, senderAddress), senderKey)
 		assert.NoError(t, err)
 
 		response, err := operator.AddTxn(context.Background(), &txpoolOp.AddTxnReq{
@@ -454,15 +449,14 @@ func TestTxPool_GetPendingTx(t *testing.T) {
 	client := server.JSONRPC()
 
 	// Construct the transaction
-	signedTx, err := signer.SignTx(types.NewTx(&types.LegacyTx{
+	signedTx, err := signer.SignTx(types.NewTxWithSender(&types.LegacyTx{
 		Nonce:    0,
 		GasPrice: big.NewInt(0),
 		Gas:      framework.DefaultGasLimit - 1,
 		To:       &receiverAddress,
 		Value:    oneEth,
 		V:        big.NewInt(1),
-		From:     types.ZeroAddress,
-	}), senderKey)
+	}, types.ZeroAddress), senderKey)
 	assert.NoError(t, err, "failed to sign transaction")
 
 	// Add the transaction
