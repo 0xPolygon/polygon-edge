@@ -69,6 +69,7 @@ func TestE2E_TxPool_Transfer(t *testing.T) {
 			if err != nil {
 				return true
 			}
+
 			t.Logf("Balance %s %s", receiver, balance)
 			if balance.Uint64() != uint64(sendAmount) {
 				return true
@@ -98,7 +99,7 @@ func TestE2E_TxPool_Transfer_Linear(t *testing.T) {
 	require.NoError(t, err)
 
 	waitUntilBalancesChanged := func(acct ethgo.Address) error {
-		err := cluster.WaitUntil(30*time.Second, func() bool {
+		return cluster.WaitUntil(30*time.Second, func() bool {
 			balance, err := client.GetBalance(acct, ethgo.Latest)
 			if err != nil {
 				return true
@@ -106,8 +107,6 @@ func TestE2E_TxPool_Transfer_Linear(t *testing.T) {
 
 			return balance.Cmp(big.NewInt(0)) == 0
 		})
-
-		return err
 	}
 
 	num := 4
@@ -141,6 +140,7 @@ func TestE2E_TxPool_Transfer_Linear(t *testing.T) {
 		recipient := receivers[i].Address()
 		txn := &ethgo.Transaction{
 			Value:    big.NewInt(int64(amount)),
+			From:     receivers[i-1].Address(),
 			To:       &recipient,
 			GasPrice: gasPrice,
 			Gas:      21000,
@@ -148,7 +148,7 @@ func TestE2E_TxPool_Transfer_Linear(t *testing.T) {
 		}
 		sendTransaction(t, client, receivers[i-1], txn)
 
-		err := waitUntilBalancesChanged(receivers[i].Address())
+		err = waitUntilBalancesChanged(receivers[i].Address())
 		require.NoError(t, err)
 	}
 
