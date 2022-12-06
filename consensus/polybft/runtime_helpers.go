@@ -11,12 +11,6 @@ func isEndOfPeriod(blockNumber, periodSize uint64) bool {
 	return blockNumber%periodSize == 0
 }
 
-// getQuorumSize returns result of division of given number by two,
-// but rounded to next integer value (similar to math.Ceil function).
-func getQuorumSize(validatorsCount int) int {
-	return (validatorsCount + 1) / 2
-}
-
 // getBlockData returns block header and extra
 func getBlockData(blockNumber uint64, blockchainBackend blockchainBackend) (*types.Header, *Extra, error) {
 	blockHeader, found := blockchainBackend.GetHeaderByNumber(blockNumber)
@@ -30,4 +24,22 @@ func getBlockData(blockNumber uint64, blockchainBackend blockchainBackend) (*typ
 	}
 
 	return blockHeader, blockExtra, nil
+}
+
+// isEpochEndingBlock checks if given block is an epoch ending block
+func isEpochEndingBlock(blockNumber uint64, extra *Extra, blockchain blockchainBackend) (bool, error) {
+	if !extra.Validators.IsEmpty() {
+		// if validator set delta is not empty, the validator set was changed in this block
+		// meaning the epoch changed as well
+		return true, nil
+	}
+
+	_, nextBlockExtra, err := getBlockData(blockNumber+1, blockchain)
+	if err != nil {
+		return false, err
+	}
+
+	// validator set delta can be empty (no change in validator set happened)
+	// so we need to check if their epoch numbers are different
+	return extra.Checkpoint.EpochNumber != nextBlockExtra.Checkpoint.EpochNumber, nil
 }

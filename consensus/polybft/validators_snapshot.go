@@ -59,8 +59,11 @@ func (v *validatorsSnapshotCache) GetSnapshot(blockNumber uint64, parents []*typ
 		return nil, err
 	}
 
-	isEpochEndingBlock, err := v.isEpochEndingBlock(blockNumber, extra)
-	if err != nil {
+	isEpochEndingBlock, err := isEpochEndingBlock(blockNumber, extra, v.blockchain)
+	if err != nil && !errors.Is(err, blockchain.ErrNoBlock) {
+		// if there is no block after given block, we assume its not epoch ending block
+		// but, it's a regular use case, and we should not stop the snapshot calculation
+		// because there are cases we need the snapshot for the latest block in chain
 		return nil, err
 	}
 
@@ -84,7 +87,6 @@ func (v *validatorsSnapshotCache) GetSnapshot(blockNumber uint64, parents []*typ
 	if latestValidatorSnapshot == nil {
 		// Haven't managed to retrieve snapshot for any epoch from the cache.
 		// Build snapshot from the scratch, by applying delta from the genesis block.
-		// log.Trace("Building validators snapshot from scratch...")
 		genesisBlockSnapshot, err := v.computeSnapshot(nil, 0, parents)
 		if err != nil {
 			return nil, fmt.Errorf("failed to compute snapshot for epoch 0: %w", err)
@@ -295,22 +297,4 @@ func (v *validatorsSnapshotCache) getNextEpochEndingBlock(latestEpochEndingBlock
 	}
 
 	return blockNumber - 1, nil
-}
-
-// isEpochEndingBlock checks if given block is an epoch ending block
-func (v *validatorsSnapshotCache) isEpochEndingBlock(blockNumber uint64, extra *Extra) (bool, error) {
-	if !extra.Validators.IsEmpty() {
-		return true, nil
-	}
-
-	_, nextBlockExtra, err := getBlockData(blockNumber+1, v.blockchain)
-	if err != nil {
-		if errors.Is(err, blockchain.ErrNoBlock) {
-			return true, nil
-		}
-
-		return false, err
-	}
-
-	return extra.Checkpoint.EpochNumber != nextBlockExtra.Checkpoint.EpochNumber, nil
 }
