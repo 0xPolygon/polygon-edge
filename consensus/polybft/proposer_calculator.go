@@ -165,7 +165,7 @@ func (pc *proposerCalculator) CalcProposer(round uint64) (types.Address, error) 
 // IncrementProposerPriority increments ProposerPriority of each validator and
 // updates the proposer.
 func (pc *proposerCalculator) IncrementProposerPriority(times uint64) error {
-	if pc.isNilOrEmpty() {
+	if len(pc.validators) == 0 {
 		return fmt.Errorf("validator set cannot be nul or empty")
 	}
 
@@ -242,7 +242,7 @@ func (pc *proposerCalculator) shiftByAvgProposerPriority() error {
 }
 
 func (pc *proposerCalculator) getValWithMostPriority() (result *validatorCalcMetadata, err error) {
-	if pc.isNilOrEmpty() {
+	if len(pc.validators) == 0 {
 		return nil, fmt.Errorf("validators cannot be nil or empty")
 	}
 
@@ -258,7 +258,7 @@ func (pc *proposerCalculator) getValWithMostPriority() (result *validatorCalcMet
 }
 
 func (pc *proposerCalculator) computeAvgProposerPriority() (int64, error) {
-	if pc.isNilOrEmpty() {
+	if len(pc.validators) == 0 {
 		return 0, fmt.Errorf("validator set cannot be nul or empty")
 	}
 
@@ -280,7 +280,7 @@ func (pc *proposerCalculator) computeAvgProposerPriority() (int64, error) {
 // rescalePriorities rescales the priorities such that the distance between the
 // maximum and minimum is smaller than `diffMax`.
 func (pc *proposerCalculator) rescalePriorities() error {
-	if pc.isNilOrEmpty() {
+	if len(pc.validators) == 0 {
 		return fmt.Errorf("validator set cannot be nul or empty")
 	}
 
@@ -302,11 +302,6 @@ func (pc *proposerCalculator) rescalePriorities() error {
 	}
 
 	return nil
-}
-
-// isNilOrEmpty returns true if validator set is nil or empty.
-func (pc proposerCalculator) isNilOrEmpty() bool {
-	return len(pc.validators) == 0
 }
 
 // Copy each validator into a new ValidatorSet.
