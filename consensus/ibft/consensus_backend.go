@@ -325,7 +325,7 @@ func (i *backendIBFT) writeTransaction(
 			i.logger.Error(
 				fmt.Sprintf(
 					"unable to write failed receipt for transaction %s",
-					tx.Hash,
+					tx.Hash(),
 				),
 			)
 		}

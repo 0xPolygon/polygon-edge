@@ -559,8 +559,8 @@ func (f *fsm) verifyValidatorsUptimeTx(transactions []*types.Transaction) error 
 		if blockUptimeTx.Hash() != createdUptimeTx.Hash() {
 			return fmt.Errorf(
 				"invalid uptime transaction. Expected '%s', but got '%s' uptime transaction hash",
-				blockUptimeTx.Hash,
-				createdUptimeTx.Hash,
+				blockUptimeTx.Hash(),
+				createdUptimeTx.Hash(),
 			)
 		}
 	} else {

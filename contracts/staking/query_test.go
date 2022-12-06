@@ -144,15 +144,14 @@ func TestQueryValidators(t *testing.T) {
 			from: addr1,
 			mockArgs: &MockArgs{
 				addr: addr1,
-				tx: types.NewTx(&types.LegacyTx{
-					From:     addr1,
+				tx: types.NewTxWithSender(&types.LegacyTx{
 					To:       &AddrStakingContract,
 					Value:    big.NewInt(0),
 					Input:    method.ID(),
 					GasPrice: big.NewInt(0),
 					Gas:      100000000,
 					Nonce:    10,
-				}),
+				}, addr1),
 			},
 			mockReturns: &MockReturns{
 				nonce: 10,
@@ -170,15 +169,14 @@ func TestQueryValidators(t *testing.T) {
 			from: addr1,
 			mockArgs: &MockArgs{
 				addr: addr1,
-				tx: types.NewTx(&types.LegacyTx{
-					From:     addr1,
+				tx: types.NewTxWithSender(&types.LegacyTx{
 					To:       &AddrStakingContract,
 					Value:    big.NewInt(0),
 					Input:    method.ID(),
 					GasPrice: big.NewInt(0),
 					Gas:      queryGasLimit,
 					Nonce:    10,
-				}),
+				}, addr1),
 			},
 			mockReturns: &MockReturns{
 				nonce: 10,

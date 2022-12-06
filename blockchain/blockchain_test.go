@@ -739,7 +739,7 @@ func Test_recoverFromFieldsInBlock(t *testing.T) {
 		)
 
 		assert.Equal(t, addr1, tx1.From())
-		assert.Equal(t, types.ZeroAddress, tx1.From())
+		assert.Equal(t, types.ZeroAddress, tx2.From())
 		assert.Equal(t, types.ZeroAddress, tx3.From())
 	})
 }
@@ -818,7 +818,7 @@ func Test_recoverFromFieldsInTransactions(t *testing.T) {
 		assert.True(t, chain.recoverFromFieldsInTransactions(transactions))
 
 		assert.Equal(t, addr1, tx1.From())
-		assert.Equal(t, types.ZeroAddress, tx1.From())
+		assert.Equal(t, types.ZeroAddress, tx2.From())
 		assert.Equal(t, addr3, tx3.From())
 	})
 
