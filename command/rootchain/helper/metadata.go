@@ -2,8 +2,10 @@ package helper
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 
 	"github.com/0xPolygon/polygon-edge/types"
 	dockertypes "github.com/docker/docker/api/types"
@@ -23,6 +25,44 @@ var (
 	ErrRootchainNotFound = errors.New("rootchain not found")
 	ErrRootchainPortBind = errors.New("port 8545 is not bind with localhost")
 )
+
+// RootchainManifest holds rootchain contracts addresses
+type RootchainManifest struct {
+	StateSenderAddress       types.Address `json:"stateSenderAddress"`
+	CheckpointManagerAddress types.Address `json:"checkpointManagerAddress"`
+	BLSAddress               types.Address `json:"blsAddress"`
+	BN256G2Address           types.Address `json:"bn256G2Address"`
+}
+
+// LoadRootchainManifest deserializes RootchainManifest instance
+func LoadRootchainManifest(metadataFile string) (*RootchainManifest, error) {
+	data, err := os.ReadFile(metadataFile)
+	if err != nil {
+		return nil, err
+	}
+
+	var manifest RootchainManifest
+
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		return nil, err
+	}
+
+	return &manifest, nil
+}
+
+// Save marshals RootchainManifest instance to json and persists it to given location
+func (r *RootchainManifest) Save(manifestPath string) error {
+	data, err := json.MarshalIndent(r, "", "    ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal rootchain manifest to JSON: %w", err)
+	}
+
+	if err := os.WriteFile(manifestPath, data, os.ModePerm); err != nil {
+		return fmt.Errorf("failed to save rootchain manifest file: %w", err)
+	}
+
+	return nil
+}
 
 func GetRootchainID() (string, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv)

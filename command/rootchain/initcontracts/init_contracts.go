@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/big"
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -19,13 +18,22 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
-	"github.com/0xPolygon/polygon-edge/command/genesis"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
+)
+
+const (
+	contractsDeploymentTitle = "[ROOTCHAIN - CONTRACTS DEPLOYMENT]"
+
+	stateSenderName       = "StateSender"
+	checkpointManagerName = "CheckpointManager"
+	blsName               = "BLS"
+	bn256G2Name           = "BN256G2"
 )
 
 var (
@@ -38,12 +46,25 @@ var (
 		"address newBn256G2," +
 		// domain used for BLS signing
 		"bytes32 newDomain," +
-		// RootValidatorSet contract address
+		// rootchain validator set
 		"tuple(address _address, uint256[4] blsKey, uint256 votingPower)[] newValidatorSet)")
-)
 
-const (
-	contractsDeploymentTitle = "[ROOTCHAIN - CONTRACTS DEPLOYMENT]"
+	// metadataPopulatorMap maps rootchain contract names to callback
+	// which populates appropriate field in the RootchainMetadata
+	metadataPopulatorMap = map[string]func(*helper.RootchainManifest, types.Address){
+		stateSenderName: func(metadata *helper.RootchainManifest, addr types.Address) {
+			metadata.StateSenderAddress = addr
+		},
+		checkpointManagerName: func(metadata *helper.RootchainManifest, addr types.Address) {
+			metadata.CheckpointManagerAddress = addr
+		},
+		blsName: func(metadata *helper.RootchainManifest, addr types.Address) {
+			metadata.BLSAddress = addr
+		},
+		bn256G2Name: func(metadata *helper.RootchainManifest, addr types.Address) {
+			metadata.BN256G2Address = addr
+		},
+	}
 )
 
 // GetCommand returns the rootchain emit command
@@ -65,31 +86,28 @@ func setFlags(cmd *cobra.Command) {
 		&params.contractsPath,
 		contractsPathFlag,
 		contracts.ContractsRootFolder,
-		"Root path for the smart contracts",
+		"Root file directory containing POS smart contracts",
 	)
-	cmd.Flags().StringVar(
-		&params.validatorPath,
-		validatorPathFlag,
-		defaultValidatorPath,
-		"Validators path",
-	)
-	cmd.Flags().StringVar(
-		&params.validatorPrefixPath,
-		validatorPrefixPathFlag,
-		defaultValidatorPrefixPath,
-		"Validators prefix path",
-	)
+
 	cmd.Flags().StringVar(
 		&params.genesisPath,
 		genesisPathFlag,
 		defaultGenesisPath,
 		"Genesis configuration path",
 	)
+
+	cmd.Flags().StringVar(
+		&params.manifestPath,
+		params.manifestPath,
+		defaultManifestPath,
+		"Manifest file path, which contains rootchain metadata",
+	)
+
 	cmd.Flags().StringVar(
 		&params.jsonRPCAddress,
 		jsonRPCFlag,
 		"http://127.0.0.1:8545",
-		"the JSON RPC rootchain IP address (e.g. http://127.0.0.1:8545)",
+		"The JSON RPC rootchain IP address (e.g. http://127.0.0.1:8545)",
 	)
 }
 
@@ -126,7 +144,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	if err := deployContracts(outputter); err != nil {
+	if err := deployContracts(outputter, client); err != nil {
 		outputter.SetError(fmt.Errorf("failed to deploy rootchain contracts: %w", err))
 
 		return
@@ -138,28 +156,9 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	})
 }
 
-func getGenesisAlloc() (map[types.Address]*chain.GenesisAccount, error) {
-	genesisFile, err := os.Open(params.genesisPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open genesis config file: %w", err)
-	}
-
-	genesisRaw, err := ioutil.ReadAll(genesisFile)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read genesis config file: %w", err)
-	}
-
-	var chain *chain.Chain
-	if err := json.Unmarshal(genesisRaw, &chain); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal genesis configuration: %w", err)
-	}
-
-	return chain.Genesis.Alloc, nil
-}
-
-func deployContracts(outputter command.OutputFormatter) error {
+func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client) error {
 	// if the bridge contract is not created, we have to deploy all the contracts
-	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(params.jsonRPCAddress))
+	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(client))
 	if err != nil {
 		return fmt.Errorf("failed to initialize tx relayer: %w", err)
 	}
@@ -180,26 +179,28 @@ func deployContracts(outputter command.OutputFormatter) error {
 		expected types.Address
 	}{
 		{
-			name:     "StateSender",
+			name:     stateSenderName,
 			path:     "root/StateSender.sol",
 			expected: helper.StateSenderAddress,
 		},
 		{
-			name:     "CheckpointManager",
+			name:     checkpointManagerName,
 			path:     "root/CheckpointManager.sol",
 			expected: helper.CheckpointManagerAddress,
 		},
 		{
-			name:     "BLS",
+			name:     blsName,
 			path:     "common/BLS.sol",
 			expected: helper.BLSAddress,
 		},
 		{
-			name:     "BN256G2",
+			name:     bn256G2Name,
 			path:     "common/BN256G2.sol",
 			expected: helper.BN256G2Address,
 		},
 	}
+
+	rootchainMeta := &helper.RootchainManifest{}
 
 	for _, contract := range deployContracts {
 		bytecode, err := readContractBytecode(params.contractsPath, contract.path, contract.name)
@@ -217,12 +218,24 @@ func deployContracts(outputter command.OutputFormatter) error {
 			return err
 		}
 
-		if types.Address(receipt.ContractAddress) != contract.expected {
+		contractAddr := types.Address(receipt.ContractAddress)
+		if contractAddr != contract.expected {
 			return fmt.Errorf("wrong deployed address for contract %s: expected %s but found %s",
 				contract.name, contract.expected, receipt.ContractAddress)
 		}
 
+		populatorFn, ok := metadataPopulatorMap[contract.name]
+		if !ok {
+			return fmt.Errorf("rootchain metadata populator not registered for contract '%s'", contract.name)
+		}
+
+		populatorFn(rootchainMeta, contractAddr)
+
 		outputter.WriteCommandResult(newDeployContractsResult(contract.name, contract.expected, receipt.TransactionHash))
+	}
+
+	if err := rootchainMeta.Save(params.manifestPath); err != nil {
+		return fmt.Errorf("failed to save manifest data: %w", err)
 	}
 
 	if err := initializeCheckpointManager(txRelayer); err != nil {
@@ -238,13 +251,7 @@ func deployContracts(outputter command.OutputFormatter) error {
 
 // initializeCheckpointManager invokes initialize function on CheckpointManager smart contract
 func initializeCheckpointManager(txRelayer txrelayer.TxRelayer) error {
-	allocs, err := getGenesisAlloc()
-	if err != nil {
-		return err
-	}
-
-	validatorSetMap, err := validatorSetToABISlice(allocs)
-
+	validatorSetMap, err := validatorSetToABISlice()
 	if err != nil {
 		return fmt.Errorf("failed to convert validators to map: %w", err)
 	}
@@ -280,25 +287,26 @@ func initializeCheckpointManager(txRelayer txrelayer.TxRelayer) error {
 }
 
 // initializeCheckpointManager invokes initialize function on CheckpointManager smart contract
-func validatorSetToABISlice(allocs map[types.Address]*chain.GenesisAccount) ([]map[string]interface{}, error) {
-	validatorsInfo, err := genesis.ReadValidatorsByRegexp(params.validatorPath, params.validatorPrefixPath)
+func validatorSetToABISlice() ([]map[string]interface{}, error) {
+	chainConfig, err := chain.ImportFromFile(params.genesisPath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read genesis configuration %w", err)
 	}
 
-	validatorSetMap := make([]map[string]interface{}, len(validatorsInfo))
+	polyBFTConfig, err := polybft.GetPolyBFTConfig(chainConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal polybft config: %w", err)
+	}
 
-	sort.Slice(validatorsInfo, func(i, j int) bool {
-		return bytes.Compare(validatorsInfo[i].Address.Bytes(),
-			validatorsInfo[j].Address.Bytes()) < 0
+	genesisValidators := make([]*polybft.Validator, len(polyBFTConfig.InitialValidatorSet))
+	copy(genesisValidators, polyBFTConfig.InitialValidatorSet)
+	sort.Slice(genesisValidators, func(i, j int) bool {
+		return bytes.Compare(genesisValidators[i].Address.Bytes(), genesisValidators[j].Address.Bytes()) < 0
 	})
 
-	for i, validatorInfo := range validatorsInfo {
-		genesisBalance, err := chain.GetGenesisAccountBalance(validatorInfo.Address, allocs)
-		if err != nil {
-			return nil, err
-		}
+	validatorSetMap := make([]map[string]interface{}, len(polyBFTConfig.InitialValidatorSet))
 
+	for i, validatorInfo := range polyBFTConfig.InitialValidatorSet {
 		blsKey, err := validatorInfo.UnmarshalBLSPublicKey()
 		if err != nil {
 			return nil, err
@@ -307,7 +315,7 @@ func validatorSetToABISlice(allocs map[types.Address]*chain.GenesisAccount) ([]m
 		validatorSetMap[i] = map[string]interface{}{
 			"_address":    validatorInfo.Address,
 			"blsKey":      blsKey.ToBigInt(),
-			"votingPower": chain.ConvertWeiToTokensAmount(genesisBalance),
+			"votingPower": chain.ConvertWeiToTokensAmount(validatorInfo.Balance),
 		}
 	}
 

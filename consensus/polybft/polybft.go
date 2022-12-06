@@ -112,14 +112,7 @@ type Polybft struct {
 
 func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *state.Transition) error {
 	return func(transition *state.Transition) error {
-		consensusConfigJSON, err := json.Marshal(config.Params.Engine[engineName])
-		if err != nil {
-			return err
-		}
-
-		var polyBFTConfig PolyBFTConfig
-		err = json.Unmarshal(consensusConfigJSON, &polyBFTConfig)
-
+		polyBFTConfig, err := GetPolyBFTConfig(config)
 		if err != nil {
 			return err
 		}

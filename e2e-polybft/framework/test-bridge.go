@@ -64,9 +64,7 @@ func (t *TestBridge) deployRootchainContracts(genesisPath string) error {
 		"rootchain",
 		"init-contracts",
 		"--path", t.clusterConfig.ContractsDir,
-		"--validator-path", t.clusterConfig.TmpDir,
-		"--validator-prefix", t.clusterConfig.ValidatorPrefix,
-		"--genesis-path", genesisPath,
+		"--genesis", genesisPath,
 	}
 
 	err := runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("bridge"))

@@ -22,7 +22,7 @@ type ConsensusType string
 const (
 	DevConsensus     ConsensusType = "dev"
 	IBFTConsensus    ConsensusType = "ibft"
-	PolyBFTConsensus ConsensusType = "polybft"
+	PolyBFTConsensus ConsensusType = consensusPolyBFT.PolyBFTConsensusName
 	DummyConsensus   ConsensusType = "dummy"
 )
 

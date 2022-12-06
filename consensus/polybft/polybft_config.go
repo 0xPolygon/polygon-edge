@@ -6,9 +6,12 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/chain"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/types"
 )
+
+const PolyBFTConsensusName = "polybft"
 
 // PolyBFTConfig is the configuration file for the Polybft consensus protocol.
 type PolyBFTConfig struct {
@@ -29,6 +32,23 @@ type PolyBFTConfig struct {
 
 	// Governance is the initial governance address
 	Governance types.Address `json:"governance"`
+}
+
+// GetPolyBFTConfig deserializes provided chain config and returns PolyBFTConfig
+func GetPolyBFTConfig(chainConfig *chain.Chain) (PolyBFTConfig, error) {
+	consensusConfigJSON, err := json.Marshal(chainConfig.Params.Engine[PolyBFTConsensusName])
+	if err != nil {
+		return PolyBFTConfig{}, err
+	}
+
+	var polyBFTConfig PolyBFTConfig
+	err = json.Unmarshal(consensusConfigJSON, &polyBFTConfig)
+
+	if err != nil {
+		return PolyBFTConfig{}, err
+	}
+
+	return polyBFTConfig, nil
 }
 
 // BridgeConfig is the rootchain bridge configuration

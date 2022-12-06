@@ -178,7 +178,7 @@ func setFlags(cmd *cobra.Command) {
 			&params.validators,
 			validatorsFlag,
 			[]string{},
-			"validators defined by user throughout a parameter (format: <address>:<blskey>)",
+			"validators defined by user throughout a parameter (format: <node id>:<ECDSA address>:<public BLS key>)",
 		)
 		cmd.Flags().StringVar(
 			&params.premineValidators,
