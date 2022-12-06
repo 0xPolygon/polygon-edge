@@ -178,9 +178,10 @@ func (v *validatorsSnapshotCache) computeSnapshot(
 		return nil, fmt.Errorf("failed to decode extra from the block#%d: %w", header.Number, err)
 	}
 
-	var snapshot AccountSet
-
-	var snapshotEpoch uint64
+	var (
+		snapshot      AccountSet
+		snapshotEpoch uint64
+	)
 
 	if existingSnapshot == nil {
 		snapshot = AccountSet{}
@@ -253,19 +254,39 @@ func (v *validatorsSnapshotCache) cleanup() error {
 // getLastCachedSnapshot gets the latest snapshot cached
 // If it doesn't have snapshot cached for desired epoch, it will return the latest one it has
 func (v *validatorsSnapshotCache) getLastCachedSnapshot(currentEpoch uint64) (*validatorSnapshot, error) {
-	snapshot := v.snapshots[currentEpoch]
-	if snapshot != nil {
-		v.logger.Trace("Found snapshot in memory cache", "Epoch", currentEpoch)
-
-		return snapshot, nil
+	cachedSnapshot := v.snapshots[currentEpoch]
+	if cachedSnapshot != nil {
+		return cachedSnapshot, nil
 	}
 
-	snapshot, err := v.state.getLastSnapshot()
+	// if we do not have a snapshot in memory for given epoch, we will get the latest one we have
+	for ; currentEpoch >= 0; currentEpoch-- {
+		cachedSnapshot = v.snapshots[currentEpoch]
+		if cachedSnapshot != nil {
+			v.logger.Trace("Found snapshot in memory cache", "Epoch", currentEpoch)
+
+			break
+		}
+
+		if currentEpoch == 0 { // prevent uint64 underflow
+			break
+		}
+	}
+
+	dbSnapshot, err := v.state.getLastSnapshot()
 	if err != nil {
 		return nil, err
 	}
 
-	return snapshot, nil
+	if dbSnapshot != nil {
+		// if we do not have any snapshot in memory, or db snapshot is newer than the one in memory
+		// return the one from db
+		if cachedSnapshot == nil || dbSnapshot.Epoch > cachedSnapshot.Epoch {
+			cachedSnapshot = dbSnapshot
+		}
+	}
+
+	return cachedSnapshot, nil
 }
 
 // getNextEpochEndingBlock gets the epoch ending block of a newer epoch
