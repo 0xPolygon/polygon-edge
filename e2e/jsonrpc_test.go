@@ -134,7 +134,7 @@ func TestJsonRPC(t *testing.T) {
 		require.Equal(t, code, "0x")
 
 		// Test. Query by pending should default to latest
-		code, err = client.GetCode(codeAddr, ethgo.Latest)
+		code, err = client.GetCode(codeAddr, ethgo.Pending)
 		require.NoError(t, err)
 		require.NotEqual(t, code, "0x")
 	})
