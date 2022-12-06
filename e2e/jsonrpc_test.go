@@ -28,6 +28,7 @@ func TestJsonRPC(t *testing.T) {
 	)
 
 	ibftManager.StartServers(context.Background())
+	defer ibftManager.StopServers()
 
 	srv := ibftManager.GetServer(0)
 	client := srv.JSONRPC().Eth()
