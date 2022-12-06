@@ -2579,10 +2579,8 @@ func TestGetTxs(t *testing.T) {
 		},
 	}
 
-	for i, test := range testCases {
-		i := i
+	for _, test := range testCases {
 		test := test
-		fmt.Println("started:", i)
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -2670,12 +2668,8 @@ func TestGetTxs(t *testing.T) {
 					assert.True(t, found)
 				}
 			}
-
 		})
-		fmt.Println("all passed:", i)
 	}
-
-	t.Log("all finished")
 }
 
 func TestSetSealing(t *testing.T) {
