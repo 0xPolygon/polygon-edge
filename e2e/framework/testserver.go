@@ -44,6 +44,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/jsonrpc"
+	"github.com/umbracle/ethgo/wallet"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	empty "google.golang.org/protobuf/types/known/emptypb"
@@ -548,6 +549,48 @@ type PreparedTransaction struct {
 	To       *types.Address
 	Value    *big.Int
 	Input    []byte
+}
+
+func (t *TestServer) Transfer(key *wallet.Key, to ethgo.Address, value *big.Int) (*ethgo.Receipt, error) {
+	client := t.JSONRPC()
+
+	nextNonce, err := client.Eth().GetNonce(key.Address(), ethgo.Latest)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get nonce: %v", err)
+	}
+
+	txn := &ethgo.Transaction{
+		To:       &to,
+		Value:    value,
+		Nonce:    nextNonce,
+		GasPrice: 1048576,
+		Gas:      1000000,
+	}
+
+	chainID, err := client.Eth().ChainID()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get chain id: %v", err)
+	}
+
+	signer := wallet.NewEIP155Signer(chainID.Uint64())
+	if txn, err = signer.SignTx(txn, key); err != nil {
+		return nil, err
+	}
+
+	data, err := txn.MarshalRLPTo(nil)
+	if err != nil {
+		return nil, err
+	}
+
+	txHash, err := client.Eth().SendRawTransaction(data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send transaction: %v", err)
+	}
+
+	ctx, cancelFn := context.WithTimeout(context.Background(), DefaultTimeout)
+	defer cancelFn()
+
+	return tests.WaitForReceipt(ctx, t.JSONRPC().Eth(), txHash)
 }
 
 // SendRawTx signs the transaction with the provided private key, executes it, and returns the receipt
