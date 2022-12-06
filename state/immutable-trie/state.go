@@ -2,6 +2,7 @@ package itrie
 
 import (
 	"fmt"
+	"sync"
 
 	lru "github.com/hashicorp/golang-lru"
 
@@ -67,7 +68,7 @@ func (s *State) newTrieAt(root types.Hash) (*Trie, error) {
 			return nil, fmt.Errorf("invalid type assertion on root: %s", root)
 		}
 
-		t.state = s
+		t.setState(s)
 
 		trie, ok := tt.(*Trie)
 		if !ok {
@@ -90,6 +91,7 @@ func (s *State) newTrieAt(root types.Hash) (*Trie, error) {
 		root:    n,
 		state:   s,
 		storage: s.storage,
+		lock:    new(sync.RWMutex),
 	}
 
 	return t, nil
