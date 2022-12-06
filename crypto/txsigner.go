@@ -119,8 +119,6 @@ func (f *FrontierSigner) SignTx(
 	tx *types.Transaction,
 	privateKey *ecdsa.PrivateKey,
 ) (*types.Transaction, error) {
-	tx = tx.Copy()
-
 	h := f.Hash(tx)
 
 	sig, err := Sign(privateKey, h[:])
@@ -204,8 +202,6 @@ func (e *EIP155Signer) SignTx(
 	tx *types.Transaction,
 	privateKey *ecdsa.PrivateKey,
 ) (*types.Transaction, error) {
-	tx = tx.Copy()
-
 	h := e.Hash(tx)
 
 	sig, err := Sign(privateKey, h[:])

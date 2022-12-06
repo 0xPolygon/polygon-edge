@@ -151,69 +151,71 @@ func (t *Transaction) IsUnderpriced(priceLimit uint64) bool {
 }
 
 // Type returns the transaction type.
-func (tx *Transaction) Type() TxType {
-	return tx.inner.txType()
+func (t *Transaction) Type() TxType {
+	return t.inner.txType()
 }
 
 // Gas returns the gas limit of the transaction.
-func (tx *Transaction) Gas() uint64 { return tx.inner.gas() }
+func (t *Transaction) Gas() uint64 { return t.inner.gas() }
 
 // GasPrice returns the gas price of the transaction.
-func (tx *Transaction) GasPrice() *big.Int { return new(big.Int).Set(tx.inner.gasPrice()) }
+func (t *Transaction) GasPrice() *big.Int { return new(big.Int).Set(t.inner.gasPrice()) }
 
 // GasTipCap returns the gasTipCap per gas of the transaction.
-func (tx *Transaction) GasTipCap() *big.Int { return new(big.Int).Set(tx.inner.gasTipCap()) }
+func (t *Transaction) GasTipCap() *big.Int { return new(big.Int).Set(t.inner.gasTipCap()) }
 
 // GasFeeCap returns the fee cap per gas of the transaction.
-func (tx *Transaction) GasFeeCap() *big.Int { return new(big.Int).Set(tx.inner.gasFeeCap()) }
+func (t *Transaction) GasFeeCap() *big.Int { return new(big.Int).Set(t.inner.gasFeeCap()) }
 
 // Value returns the ether amount of the transaction.
-func (tx *Transaction) Value() *big.Int { return new(big.Int).Set(tx.inner.value()) }
+func (t *Transaction) Value() *big.Int { return new(big.Int).Set(t.inner.value()) }
 
 // Input returns the input data of the transaction.
-func (tx *Transaction) Input() []byte { return tx.inner.input() }
+func (t *Transaction) Input() []byte { return t.inner.input() }
 
 // Nonce returns the sender account nonce of the transaction.
-func (tx *Transaction) Nonce() uint64 { return tx.inner.nonce() }
+func (t *Transaction) Nonce() uint64 { return t.inner.nonce() }
 
 // To returns the recipient address of the transaction.
 // For contract-creation transactions, To returns nil.
-func (tx *Transaction) To() *Address {
-	return copyAddressPtr(tx.inner.to())
+func (t *Transaction) To() *Address {
+	return copyAddressPtr(t.inner.to())
 }
 
 // From returns the sender address of the transaction
-func (tx *Transaction) From() Address {
-	return tx.from
+func (t *Transaction) From() Address {
+	return t.from
 }
 
 // SetSender sets the given the sender address of the transaction
-func (tx *Transaction) SetSender(sender Address) {
-	tx.from = sender
+func (t *Transaction) SetSender(sender Address) {
+	t.from = sender
 }
 
 // RawSignatureValues returns the V, R, S signature values of the transaction.
 // The return values should not be modified by the caller.
-func (tx *Transaction) RawSignatureValues() (v, r, s *big.Int) {
-	return tx.inner.rawSignatureValues()
+func (t *Transaction) RawSignatureValues() (v, r, s *big.Int) {
+	return t.inner.rawSignatureValues()
 }
 
 // Hash returns the transaction hash.
-func (tx *Transaction) Hash() Hash {
-	return tx.hash
+func (t *Transaction) Hash() Hash {
+	return t.hash
 }
 
-func (tx *Transaction) SetSignatureValues(v, r, s *big.Int) {
-	tx.inner.setSignatureValues(v, r, s)
+func (t *Transaction) SetSignatureValues(v, r, s *big.Int) {
+	newTxData := t.inner.Copy()
+	newTxData.setSignatureValues(v, r, s)
+	*t = *NewTx(newTxData)
 }
 
 // setDecoded sets the inner transaction and size after decoding.
-func (tx *Transaction) setDecoded(inner TxData, size uint64) {
-	tx.inner = inner
-	tx.time = time.Now()
+func (t *Transaction) setDecoded(inner TxData, size uint64) {
+	t.inner = inner
+	t.time = time.Now()
 
 	if size > 0 {
-		tx.size.Store(size)
+		t.size.Store(size)
 	}
 }
 
