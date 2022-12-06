@@ -90,7 +90,7 @@ var (
 
 // ChainId returns the chain id of the client
 //
-// nolint:stylecheck
+//nolint:stylecheck
 func (e *Eth) ChainId() (interface{}, error) {
 	return argUintPtr(e.chainID), nil
 }
