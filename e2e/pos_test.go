@@ -364,16 +364,15 @@ func TestPoS_UnstakeExploit(t *testing.T) {
 	clt := srv.TxnPoolOperator()
 
 	generateTx := func() *types.Transaction {
-		signedTx, signErr := signer.SignTx(types.NewTx(&types.LegacyTx{
+		signedTx, signErr := signer.SignTx(types.NewTxWithSender(&types.LegacyTx{
 			Nonce:    uint64(currentNonce),
-			From:     types.ZeroAddress,
 			To:       &stakingContractAddr,
 			GasPrice: bigGasPrice,
 			Gas:      framework.DefaultGasLimit,
 			Value:    big.NewInt(0),
 			V:        big.NewInt(1), // it is necessary to encode in rlp,
 			Input:    framework.MethodSig("unstake"),
-		}), senderKey)
+		}, types.ZeroAddress), senderKey)
 
 		if signErr != nil {
 			t.Fatalf("Unable to sign transaction, %v", signErr)
@@ -506,16 +505,15 @@ func TestPoS_StakeUnstakeExploit(t *testing.T) {
 	txpoolClient := srv.TxnPoolOperator()
 
 	generateTx := func(value *big.Int, methodName string) *types.Transaction {
-		signedTx, signErr := signer.SignTx(types.NewTx(&types.LegacyTx{
+		signedTx, signErr := signer.SignTx(types.NewTxWithSender(&types.LegacyTx{
 			Nonce:    uint64(currentNonce),
-			From:     types.ZeroAddress,
 			To:       &stakingContractAddr,
 			GasPrice: bigGasPrice,
 			Gas:      framework.DefaultGasLimit,
 			Value:    value,
 			V:        big.NewInt(1), // it is necessary to encode in rlp
 			Input:    framework.MethodSig(methodName),
-		}), senderKey)
+		}, types.ZeroAddress), senderKey)
 
 		if signErr != nil {
 			t.Fatalf("Unable to sign transaction, %v", signErr)
@@ -637,16 +635,15 @@ func TestPoS_StakeUnstakeWithinSameBlock(t *testing.T) {
 	txpoolClient := srv.TxnPoolOperator()
 
 	generateTx := func(value *big.Int, methodName string) *types.Transaction {
-		signedTx, signErr := signer.SignTx(types.NewTx(&types.LegacyTx{
+		signedTx, signErr := signer.SignTx(types.NewTxWithSender(&types.LegacyTx{
 			Nonce:    uint64(currentNonce),
-			From:     types.ZeroAddress,
 			To:       &stakingContractAddr,
 			GasPrice: bigGasPrice,
 			Gas:      framework.DefaultGasLimit,
 			Value:    value,
 			V:        big.NewInt(1), // it is necessary to encode in rlp
 			Input:    framework.MethodSig(methodName),
-		}), senderKey)
+		}, types.ZeroAddress), senderKey)
 
 		if signErr != nil {
 			t.Fatalf("Unable to sign transaction, %v", signErr)

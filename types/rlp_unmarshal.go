@@ -313,6 +313,7 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 	p.Hash(t.hash[:0], v)
 
 	txType := LegacyTxType
+
 	if len(elems) >= 10 {
 		if txType, err = ReadRlpTxType(elems[9]); err != nil {
 			return err

@@ -101,15 +101,14 @@ func TestBroadcast(t *testing.T) {
 			// (https://github.com/libp2p/specs/blob/master/pubsub/gossipsub/gossipsub-v1.0.md)
 			time.Sleep(time.Second * 2)
 
-			tx, err := signer.SignTx(types.NewTx(&types.LegacyTx{
+			tx, err := signer.SignTx(types.NewTxWithSender(&types.LegacyTx{
 				Nonce:    0,
-				From:     senderAddr,
 				To:       &receiverAddr,
 				Value:    framework.EthToWei(1),
 				Gas:      1000000,
 				GasPrice: big.NewInt(10000),
 				Input:    []byte{},
-			}), senderKey)
+			}, senderAddr), senderKey)
 			if err != nil {
 				t.Fatalf("failed to sign transaction, err=%+v", err)
 			}
