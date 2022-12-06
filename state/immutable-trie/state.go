@@ -91,7 +91,7 @@ func (s *State) newTrieAt(root types.Hash) (*Trie, error) {
 		root:    n,
 		state:   s,
 		storage: s.storage,
-		lock:    new(sync.RWMutex),
+		lock:    new(sync.Mutex),
 	}
 
 	return t, nil
