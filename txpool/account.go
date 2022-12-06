@@ -220,9 +220,9 @@ func (a *account) reset(nonce uint64, promoteCh chan<- promoteRequest) (
 	// it is important to signal promotion while
 	// the locks are held to ensure no other
 	// handler will mutate the account
-	if first := a.enqueued.peek(); first != nil && first.Nonce == nonce {
+	if first := a.enqueued.peek(); first != nil && first.Nonce() == nonce {
 		// first enqueued tx is expected -> signal promotion
-		promoteCh <- promoteRequest{account: first.From}
+		promoteCh <- promoteRequest{account: first.From()}
 	}
 
 	return
@@ -238,7 +238,7 @@ func (a *account) enqueue(tx *types.Transaction) error {
 	}
 
 	// reject low nonce tx
-	if tx.Nonce < a.getNonce() {
+	if tx.Nonce() < a.getNonce() {
 		return ErrNonceTooLow
 	}
 
@@ -264,18 +264,18 @@ func (a *account) promote() (promoted []*types.Transaction, pruned []*types.Tran
 
 	// sanity check
 	currentNonce := a.getNonce()
-	if a.enqueued.length() == 0 || a.enqueued.peek().Nonce > currentNonce {
+	if a.enqueued.length() == 0 || a.enqueued.peek().Nonce() > currentNonce {
 		// nothing to promote
 		return
 	}
 
-	nextNonce := a.enqueued.peek().Nonce
+	nextNonce := a.enqueued.peek().Nonce()
 
 	// move all promotable txs (enqueued txs that are sequential in nonce)
 	// to the account's promoted queue
 	for {
 		tx := a.enqueued.peek()
-		if tx == nil || tx.Nonce != nextNonce {
+		if tx == nil || tx.Nonce() != nextNonce {
 			break
 		}
 
@@ -286,7 +286,7 @@ func (a *account) promote() (promoted []*types.Transaction, pruned []*types.Tran
 		a.promoted.push(tx)
 
 		// update counters
-		nextNonce = tx.Nonce + 1
+		nextNonce = tx.Nonce() + 1
 
 		// prune the transactions with lower nonce
 		pruned = append(pruned, a.enqueued.prune(nextNonce)...)

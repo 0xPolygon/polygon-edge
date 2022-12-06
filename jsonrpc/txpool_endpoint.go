@@ -54,14 +54,14 @@ type txpoolTransaction struct {
 
 func toTxPoolTransaction(t *types.Transaction) *txpoolTransaction {
 	return &txpoolTransaction{
-		Nonce:       argUint64(t.Nonce),
-		GasPrice:    argBig(*t.GasPrice),
-		Gas:         argUint64(t.Gas),
-		To:          t.To,
-		Value:       argBig(*t.Value),
-		Input:       t.Input,
-		Hash:        t.Hash,
-		From:        t.From,
+		Nonce:       argUint64(t.Nonce()),
+		GasPrice:    argBig(*t.GasPrice()),
+		Gas:         argUint64(t.Gas()),
+		To:          t.To(),
+		Value:       argBig(*t.Value()),
+		Input:       t.Input(),
+		Hash:        t.Hash(),
+		From:        t.From(),
 		BlockHash:   types.ZeroHash,
 		BlockNumber: nil,
 		TxIndex:     nil,
@@ -79,7 +79,7 @@ func (t *TxPool) Content() (interface{}, error) {
 		pendingRPCTxs[addr] = make(map[uint64]*txpoolTransaction, len(txs))
 
 		for _, tx := range txs {
-			nonce := tx.Nonce
+			nonce := tx.Nonce()
 			rpcTx := toTxPoolTransaction(tx)
 
 			pendingRPCTxs[addr][nonce] = rpcTx
@@ -92,7 +92,7 @@ func (t *TxPool) Content() (interface{}, error) {
 		queuedRPCTxs[addr] = make(map[uint64]*txpoolTransaction, len(txs))
 
 		for _, tx := range txs {
-			nonce := tx.Nonce
+			nonce := tx.Nonce()
 			rpcTx := toTxPoolTransaction(tx)
 
 			queuedRPCTxs[addr][nonce] = rpcTx
@@ -118,7 +118,7 @@ func (t *TxPool) Inspect() (interface{}, error) {
 		pendingRPCTxs[addr.String()] = make(map[string]string, len(txs))
 
 		for _, tx := range txs {
-			nonceStr := strconv.FormatUint(tx.Nonce, 10)
+			nonceStr := strconv.FormatUint(tx.Nonce(), 10)
 			pendingRPCTxs[addr.String()][nonceStr] = fmt.Sprintf(
 				"%d wei + %d gas x %d wei", tx.Value, tx.Gas, tx.GasPrice,
 			)
@@ -131,7 +131,7 @@ func (t *TxPool) Inspect() (interface{}, error) {
 		queuedRPCTxs[addr.String()] = make(map[string]string, len(txs))
 
 		for _, tx := range txs {
-			nonceStr := strconv.FormatUint(tx.Nonce, 10)
+			nonceStr := strconv.FormatUint(tx.Nonce(), 10)
 			queuedRPCTxs[addr.String()][nonceStr] = fmt.Sprintf(
 				"%d wei + %d gas x %d wei", tx.Value, tx.Gas, tx.GasPrice,
 			)

@@ -369,7 +369,7 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 			return fmt.Errorf("state transaction in block which should not contain it: tx = %v", tx.Hash)
 		}
 
-		decodedStateTx, err := decodeStateTransaction(tx.Input) // used to be Data
+		decodedStateTx, err := decodeStateTransaction(tx.Input()) // used to be Data
 		if err != nil {
 			return fmt.Errorf("state transaction error while decoding: tx = %v, err = %w", tx.Hash, err)
 		}
@@ -556,7 +556,7 @@ func (f *fsm) verifyValidatorsUptimeTx(transactions []*types.Transaction) error 
 			return errors.New("uptime transaction is not found in the epoch ending block")
 		}
 
-		if blockUptimeTx.Hash != createdUptimeTx.Hash {
+		if blockUptimeTx.Hash() != createdUptimeTx.Hash() {
 			return fmt.Errorf(
 				"invalid uptime transaction. Expected '%s', but got '%s' uptime transaction hash",
 				blockUptimeTx.Hash,
@@ -564,7 +564,7 @@ func (f *fsm) verifyValidatorsUptimeTx(transactions []*types.Transaction) error 
 			)
 		}
 	} else {
-		if blockUptimeTx != nil && blockUptimeTx.Hash == createdUptimeTx.Hash {
+		if blockUptimeTx != nil && blockUptimeTx.Hash() == createdUptimeTx.Hash() {
 			return errors.New("didn't expect uptime transaction in the middle of an epoch")
 		}
 	}

@@ -294,22 +294,22 @@ type txnSender struct {
 	account *wallet.Account
 }
 
-func (t *txnSender) sendTransaction(txn *types.Transaction) asyncTxn {
-	if txn.GasPrice() == nil {
-		txn.GasPrice = big.NewInt(defaultGasPrice)
+func (t *txnSender) sendTransaction(txnData *types.LegacyTx) asyncTxn {
+	if txnData.GasPrice == nil {
+		txnData.GasPrice = big.NewInt(defaultGasPrice)
 	}
 
-	if txn.Gas() == 0 {
-		txn.Gas = defaultGasLimit
+	if txnData.Gas == 0 {
+		txnData.Gas = defaultGasLimit
 	}
 
-	if txn.Nonce() == 0 {
+	if txnData.Nonce == 0 {
 		nonce, err := t.client.Eth().GetNonce(t.account.Ecdsa.Address(), ethgo.Latest)
 		if err != nil {
 			return &asyncTxnImpl{err: err}
 		}
 
-		txn.Nonce = nonce
+		txnData.Nonce = nonce
 	}
 
 	chainID, err := t.client.Eth().ChainID()
@@ -323,7 +323,7 @@ func (t *txnSender) sendTransaction(txn *types.Transaction) asyncTxn {
 	}
 
 	signer := crypto.NewEIP155Signer(chainID.Uint64())
-	signedTxn, err := signer.SignTx(txn, privateKey)
+	signedTxn, err := signer.SignTx(types.NewTx(txnData), privateKey)
 
 	if err != nil {
 		return &asyncTxnImpl{err: err}
@@ -391,11 +391,11 @@ func stake(sender *txnSender) asyncTxn {
 		return &asyncTxnImpl{err: err}
 	}
 
-	receipt := sender.sendTransaction(types.NewTx(&types.LegacyTx{
+	receipt := sender.sendTransaction(&types.LegacyTx{
 		To:    &stakeManager,
 		Input: input,
 		Value: big.NewInt(1000),
-	}))
+	})
 
 	return receipt
 }
@@ -408,10 +408,10 @@ func whitelist(sender *txnSender, addr types.Address) asyncTxn {
 		return &asyncTxnImpl{err: err}
 	}
 
-	receipt := sender.sendTransaction(types.NewTx(&types.LegacyTx{
+	receipt := sender.sendTransaction(&types.LegacyTx{
 		To:    &stakeManager,
 		Input: input,
-	}))
+	})
 
 	return receipt
 }
@@ -419,10 +419,10 @@ func whitelist(sender *txnSender, addr types.Address) asyncTxn {
 func fund(sender *txnSender, addr types.Address) asyncTxn {
 	genesisAmount, _ := new(big.Int).SetString("1000000000000000000", 10)
 
-	receipt := sender.sendTransaction(types.NewTx(&types.LegacyTx{
+	receipt := sender.sendTransaction(&types.LegacyTx{
 		To:    &addr,
 		Value: genesisAmount,
-	}))
+	})
 
 	return receipt
 }
@@ -450,10 +450,10 @@ func registerValidator(sender *txnSender, account *wallet.Account) asyncTxn {
 		return &asyncTxnImpl{err: err}
 	}
 
-	return sender.sendTransaction(types.NewTx(&types.LegacyTx{
+	return sender.sendTransaction(&types.LegacyTx{
 		To:    &stakeManager,
 		Input: input,
-	}))
+	})
 }
 
 // NewValidator represents validator which is being registered to the chain

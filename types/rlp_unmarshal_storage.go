@@ -76,7 +76,7 @@ func (t *Transaction) UnmarshalStoreRLPFrom(p *fastrlp.Parser, v *fastrlp.Value)
 		return err
 	}
 	// context part
-	if err = elems[1].GetAddr(t.From()[:]); err != nil {
+	if err = elems[1].GetAddr(t.From().Bytes()); err != nil {
 		return err
 	}
 

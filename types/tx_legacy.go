@@ -16,8 +16,8 @@ type LegacyTx struct {
 	V, R, S  *big.Int
 }
 
-// copy creates a deep copy of the transaction data and initializes all fields.
-func (tx *LegacyTx) copy() TxData {
+// Copy creates a deep copy of the transaction data and initializes all fields.
+func (tx *LegacyTx) Copy() TxData {
 	tt := new(LegacyTx)
 	*tt = *tx
 

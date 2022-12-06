@@ -656,7 +656,7 @@ func TestBlockchainWriteBody(t *testing.T) {
 		readBody, ok := chain.readBody(block.Hash())
 		assert.True(t, ok)
 
-		assert.Equal(t, addr, readBody.Transactions[0].From)
+		assert.Equal(t, addr, readBody.Transactions[0].From())
 	})
 }
 
@@ -895,7 +895,7 @@ func TestBlockchainReadBody(t *testing.T) {
 	readBody, found := b.readBody(block.Hash())
 
 	assert.True(t, found)
-	assert.Equal(t, addr, readBody.Transactions[0].From)
+	assert.Equal(t, addr, readBody.Transactions[0].From())
 }
 
 func TestCalculateGasLimit(t *testing.T) {

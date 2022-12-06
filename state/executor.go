@@ -899,7 +899,7 @@ func checkAndProcessStateTx(msg *types.Transaction, t *Transition) error {
 
 	if msg.From() != contracts.SystemCaller {
 		return NewTransitionApplicationError(
-			fmt.Errorf("state transaction sender must be %v, but got %v", contracts.SystemCaller, msg.From),
+			fmt.Errorf("state transaction sender must be %v, but got %v", contracts.SystemCaller, msg.From()),
 			true,
 		)
 	}

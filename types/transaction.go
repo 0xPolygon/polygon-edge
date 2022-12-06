@@ -53,7 +53,7 @@ func (t TxType) String() (s string) {
 
 type TxData interface {
 	txType() TxType // returns the type ID
-	copy() TxData   // creates a deep copy and initializes all fields
+	Copy() TxData   // creates a deep copy and initializes all fields
 
 	input() []byte
 	gas() uint64
@@ -82,7 +82,7 @@ type Transaction struct {
 // NewTx creates a new transaction.
 func NewTx(inner TxData) *Transaction {
 	tx := new(Transaction)
-	tx.setDecoded(inner.copy(), 0)
+	tx.setDecoded(inner.Copy(), 0)
 	return tx
 }
 
@@ -114,7 +114,7 @@ func (t *Transaction) ComputeHash() *Transaction {
 }
 
 func (t *Transaction) Copy() *Transaction {
-	return NewTx(t.inner.copy())
+	return NewTx(t.inner.Copy())
 }
 
 // Cost returns gas * gasPrice + value

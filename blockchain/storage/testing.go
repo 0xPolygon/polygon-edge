@@ -311,7 +311,7 @@ func testBody(t *testing.T, m PlaceholderStorage) {
 	}
 
 	for indx, i := range tx0 {
-		if i.Hash != tx1[indx].Hash {
+		if i.Hash() != tx1[indx].Hash() {
 			t.Fatal("tx not correct")
 		}
 	}
@@ -349,7 +349,7 @@ func testReceipts(t *testing.T, m PlaceholderStorage) {
 	r0 := &types.Receipt{
 		Root:              types.StringToHash("1"),
 		CumulativeGasUsed: 10,
-		TxHash:            txn.Hash,
+		TxHash:            txn.Hash(),
 		LogsBloom:         types.Bloom{0x1},
 		Logs: []*types.Log{
 			{
@@ -366,7 +366,7 @@ func testReceipts(t *testing.T, m PlaceholderStorage) {
 	r1 := &types.Receipt{
 		Root:              types.StringToHash("1"),
 		CumulativeGasUsed: 10,
-		TxHash:            txn.Hash,
+		TxHash:            txn.Hash(),
 		LogsBloom:         types.Bloom{0x1},
 		GasUsed:           10,
 		ContractAddress:   &types.Address{0x1},

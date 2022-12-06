@@ -16,8 +16,8 @@ type StateTx struct {
 	V, R, S  *big.Int
 }
 
-// copy creates a deep copy of the transaction data and initializes all fields.
-func (tx *StateTx) copy() TxData {
+// Copy creates a deep copy of the transaction data and initializes all fields.
+func (tx *StateTx) Copy() TxData {
 	tt := new(StateTx)
 	*tt = *tx
 

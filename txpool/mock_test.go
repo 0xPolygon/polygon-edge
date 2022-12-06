@@ -64,5 +64,5 @@ type mockSigner struct {
 }
 
 func (s *mockSigner) Sender(tx *types.Transaction) (types.Address, error) {
-	return tx.From, nil
+	return tx.From(), nil
 }

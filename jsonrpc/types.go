@@ -58,14 +58,14 @@ func toTransaction(
 		Nonce:    argUint64(t.Nonce()),
 		GasPrice: argBig(*t.GasPrice()),
 		Gas:      argUint64(t.Gas()),
-		To:       t.To,
+		To:       t.To(),
 		Value:    argBig(*t.Value()),
 		Input:    t.Input(),
 		V:        argBig(*v),
 		R:        argBig(*r),
 		S:        argBig(*s),
 		Hash:     t.Hash(),
-		From:     t.From,
+		From:     t.From(),
 	}
 
 	if blockNumber != nil {

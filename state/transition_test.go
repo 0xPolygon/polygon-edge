@@ -80,8 +80,8 @@ func TestSubGasLimitPrice(t *testing.T) {
 			if err == nil {
 				// should reduce cost for gas from balance
 				reducedAmount := new(big.Int).Mul(msg.GasPrice(), big.NewInt(int64(msg.Gas())))
-				newBalance := transition.GetBalance(msg.From)
-				diff := new(big.Int).Sub(big.NewInt(int64(tt.preState[msg.From].Balance)), newBalance)
+				newBalance := transition.GetBalance(msg.From())
+				diff := new(big.Int).Sub(big.NewInt(int64(tt.preState[msg.From()].Balance)), newBalance)
 				assert.Zero(t, diff.Cmp(reducedAmount))
 			}
 		})
