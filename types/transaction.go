@@ -123,8 +123,12 @@ func (t *Transaction) ComputeHash() *Transaction {
 	return t
 }
 
+// Copy makes a copy of the given transaction
 func (t *Transaction) Copy() *Transaction {
-	return NewTx(t.inner.Copy())
+	newTx := NewTxWithSender(t.inner.Copy(), t.from)
+	newTx = newTx.ComputeHash()
+
+	return newTx
 }
 
 // Cost returns gas * gasPrice + value

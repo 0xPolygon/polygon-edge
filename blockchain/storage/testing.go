@@ -276,8 +276,7 @@ func testBody(t *testing.T, m PlaceholderStorage) {
 		GasPrice: big.NewInt(11),
 		Input:    []byte{1, 2},
 		V:        big.NewInt(1),
-	})
-	t0.ComputeHash()
+	}).ComputeHash()
 
 	addr2 := types.StringToAddress("22")
 	t1 := types.NewTx(&types.LegacyTx{
@@ -288,8 +287,7 @@ func testBody(t *testing.T, m PlaceholderStorage) {
 		GasPrice: big.NewInt(11),
 		Input:    []byte{4, 5},
 		V:        big.NewInt(2),
-	})
-	t1.ComputeHash()
+	}).ComputeHash()
 
 	block := types.Block{
 		Header:       header,

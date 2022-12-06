@@ -198,8 +198,7 @@ func (f *fsm) stateTransactions() []*types.Transaction {
 				return nil
 			}
 
-			txns = append(txns,
-				createStateTransactionWithData(f.config.StateReceiverAddr, inputData))
+			txns = append(txns, createStateTransactionWithData(f.config.StateReceiverAddr, inputData))
 		}
 	}
 
@@ -361,7 +360,7 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 	nextStateSyncBundleIndex := f.stateSyncExecutionIndex
 
 	for _, tx := range transactions {
-		if tx.Type() != types.StateTxType {
+		if !tx.IsStateTx() {
 			continue
 		}
 
@@ -611,9 +610,7 @@ func createStateTransactionWithData(target types.Address, inputData []byte) *typ
 		GasPrice: big.NewInt(0),
 	}, contracts.SystemCaller)
 
-	tx.ComputeHash()
-
-	return tx
+	return tx.ComputeHash()
 }
 
 // getExitEventsFromReceipts parses logs from receipts to find exit events

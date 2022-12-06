@@ -219,9 +219,8 @@ func DecodeTxn(arg *txnArgs, store nonceGetter) (*types.Transaction, error) {
 		txnData.To = arg.To
 	}
 
-	tx := types.NewTx(txnData)
-	tx.SetSender(*arg.From)
-	tx.ComputeHash()
+	tx := types.NewTxWithSender(txnData, *arg.From)
+	tx = tx.ComputeHash()
 
 	return tx, nil
 }

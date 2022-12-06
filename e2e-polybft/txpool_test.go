@@ -140,7 +140,6 @@ func TestE2E_TxPool_Transfer_Linear(t *testing.T) {
 		recipient := receivers[i].Address()
 		txn := &ethgo.Transaction{
 			Value:    big.NewInt(int64(amount)),
-			From:     receivers[i-1].Address(),
 			To:       &recipient,
 			GasPrice: gasPrice,
 			Gas:      21000,
