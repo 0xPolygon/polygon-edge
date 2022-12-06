@@ -47,7 +47,7 @@ test-e2e:
     # because it will get picked up and run during e2e tests
     # and the e2e tests should error out if any kind of race is found
 	go build -race -o artifacts/polygon-edge .
-	env EDGE_BINARY=${PWD}/artifacts/polygon-edge go test -v -timeout=30m ./e2e/... -run TestJsonRPC
+	env EDGE_BINARY=${PWD}/artifacts/polygon-edge go test -v -timeout=30m ./e2e/...
 
 .PHONY: run-local
 run-local:
