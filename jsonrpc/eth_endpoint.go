@@ -79,6 +79,7 @@ type ethStore interface {
 type Eth struct {
 	logger        hclog.Logger
 	store         ethStore
+	chainID       uint64
 	filterManager *FilterManager
 	priceLimit    uint64
 }
@@ -86,6 +87,13 @@ type Eth struct {
 var (
 	ErrInsufficientFunds = errors.New("insufficient funds for execution")
 )
+
+// ChainId returns the chain id of the client
+//
+// nolint:
+func (e *Eth) ChainId() (interface{}, error) {
+	return argUintPtr(e.chainID), nil
+}
 
 func (e *Eth) Syncing() (interface{}, error) {
 	if syncProgression := e.store.GetSyncProgression(); syncProgression != nil {
