@@ -220,6 +220,7 @@ func (t *Transaction) SetSignatureValues(v, r, s *big.Int) *Transaction {
 	newTxData := t.inner.Copy()
 	newTxData.setSignatureValues(v, r, s)
 	*t = *NewTx(newTxData)
+
 	return t
 }
 
