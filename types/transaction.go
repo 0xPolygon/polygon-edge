@@ -215,10 +215,12 @@ func (t *Transaction) Hash() Hash {
 	return t.hash
 }
 
-func (t *Transaction) SetSignatureValues(v, r, s *big.Int) {
+// SetSignatureValues sets the given signature values
+func (t *Transaction) SetSignatureValues(v, r, s *big.Int) *Transaction {
 	newTxData := t.inner.Copy()
 	newTxData.setSignatureValues(v, r, s)
 	*t = *NewTx(newTxData)
+	return t
 }
 
 // setDecoded sets the inner transaction and size after decoding.
