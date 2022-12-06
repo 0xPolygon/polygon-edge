@@ -2,6 +2,7 @@ package types
 
 import (
 	"fmt"
+	"math/big"
 
 	"github.com/umbracle/fastrlp"
 )
@@ -318,7 +319,13 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 
 	switch txType {
 	case LegacyTxType:
-		lTx := NewEmptyLegacyTx()
+		lTx := &LegacyTx{
+			GasPrice: new(big.Int),
+			Value:    new(big.Int),
+			V:        new(big.Int),
+			R:        new(big.Int),
+			S:        new(big.Int),
+		}
 
 		// nonce
 		if lTx.Nonce, err = elems[0].GetUint64(); err != nil {
@@ -372,7 +379,13 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 
 		t.inner = lTx
 	case StateTxType:
-		sTx := NewEmptyStateTx()
+		sTx := &StateTx{
+			GasPrice: new(big.Int),
+			Value:    new(big.Int),
+			V:        new(big.Int),
+			R:        new(big.Int),
+			S:        new(big.Int),
+		}
 
 		// nonce
 		if sTx.Nonce, err = elems[0].GetUint64(); err != nil {
