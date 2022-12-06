@@ -104,6 +104,13 @@ func setFlags(cmd *cobra.Command) {
 	)
 
 	cmd.Flags().StringVar(
+		&params.adminKey,
+		adminKeyFlag,
+		helper.DefaultPrivateKeyRaw,
+		"Hex encoded private key of the account which deploys rootchain contracts",
+	)
+
+	cmd.Flags().StringVar(
 		&params.jsonRPCAddress,
 		jsonRPCFlag,
 		"http://127.0.0.1:8545",
@@ -144,6 +151,12 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
+	if err := helper.InitRootchainAdminKey(params.adminKey); err != nil {
+		outputter.SetError(err)
+
+		return
+	}
+
 	if err := deployContracts(outputter, client); err != nil {
 		outputter.SetError(fmt.Errorf("failed to deploy rootchain contracts: %w", err))
 
@@ -163,14 +176,18 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client) 
 		return fmt.Errorf("failed to initialize tx relayer: %w", err)
 	}
 
-	// TODO: @Stefan-Ethernal Skip FundAccount part in follow up PR if in "dev" mode
-	// fund account
-	rootchainAdminAddr := ethgo.Address(helper.GetRootchainAdminAddr())
-	txn := &ethgo.Transaction{To: &rootchainAdminAddr, Value: big.NewInt(1000000000000000000)}
+	rootchainAdminKey := helper.GetRootchainAdminKey()
+	// if admin key is not provided, then we assume we are working in dev mode
+	// and therefore use default key which needs to be funded first
+	if params.adminKey == "" {
+		// fund account
+		rootchainAdminAddr := rootchainAdminKey.Address()
+		txn := &ethgo.Transaction{To: &rootchainAdminAddr, Value: big.NewInt(1000000000000000000)}
+		_, err = txRelayer.SendTransactionLocal(txn)
 
-	_, err = txRelayer.SendTransactionLocal(txn)
-	if err != nil {
-		return err
+		if err != nil {
+			return err
+		}
 	}
 
 	deployContracts := []struct {
@@ -213,7 +230,7 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client) 
 			Input: bytecode,
 		}
 
-		receipt, err := txRelayer.SendTransaction(txn, helper.GetRootchainAdminKey())
+		receipt, err := txRelayer.SendTransaction(txn, rootchainAdminKey)
 		if err != nil {
 			return err
 		}
@@ -238,7 +255,7 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client) 
 		return fmt.Errorf("failed to save manifest data: %w", err)
 	}
 
-	if err := initializeCheckpointManager(txRelayer); err != nil {
+	if err := initializeCheckpointManager(txRelayer, rootchainAdminKey); err != nil {
 		return err
 	}
 
@@ -250,7 +267,7 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client) 
 }
 
 // initializeCheckpointManager invokes initialize function on CheckpointManager smart contract
-func initializeCheckpointManager(txRelayer txrelayer.TxRelayer) error {
+func initializeCheckpointManager(txRelayer txrelayer.TxRelayer, rootchainAdminKey ethgo.Key) error {
 	validatorSetMap, err := validatorSetToABISlice()
 	if err != nil {
 		return fmt.Errorf("failed to convert validators to map: %w", err)
@@ -274,7 +291,7 @@ func initializeCheckpointManager(txRelayer txrelayer.TxRelayer) error {
 		Input: initCheckpointInput,
 	}
 
-	receipt, err := txRelayer.SendTransaction(txn, helper.GetRootchainAdminKey())
+	receipt, err := txRelayer.SendTransaction(txn, rootchainAdminKey)
 	if err != nil {
 		return fmt.Errorf("failed to send transaction to CheckpointManager. error: %w", err)
 	}

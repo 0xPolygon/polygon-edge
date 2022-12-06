@@ -127,8 +127,14 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			return err
 		}
 
+		// TODO: @Stefan-Ethernal Get rootchain admin address from the manifest.json (provide proper path)
+		rootchainManifest, err := helper.LoadRootchainManifest("./manifest.json")
+		if err != nil {
+			return fmt.Errorf("failed loading rootchain manifest: %w", err)
+		}
+
 		input, err = nativeTokenInitializer.Encode(
-			[]interface{}{helper.GetRootchainAdminAddr(), nativeTokenName, nativeTokenSymbol})
+			[]interface{}{rootchainManifest.RootchainAdminAddress, nativeTokenName, nativeTokenSymbol})
 		if err != nil {
 			return err
 		}

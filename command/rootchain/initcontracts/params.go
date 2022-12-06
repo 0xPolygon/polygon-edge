@@ -11,6 +11,7 @@ const (
 	genesisPathFlag   = "genesis"
 	manifestPathFlag  = "manifest"
 	jsonRPCFlag       = "json-rpc"
+	adminKeyFlag      = "admin-key"
 
 	defaultGenesisPath  = "./genesis.json"
 	defaultManifestPath = "./manifest.json"
@@ -19,8 +20,9 @@ const (
 type initContractsParams struct {
 	contractsPath  string
 	genesisPath    string
-	jsonRPCAddress string
 	manifestPath   string
+	adminKey       string
+	jsonRPCAddress string
 }
 
 func (ip *initContractsParams) validateFlags() error {

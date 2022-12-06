@@ -79,6 +79,13 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
+	err := helper.InitRootchainAdminKey(helper.DefaultPrivateKeyRaw)
+	if err != nil {
+		outputter.SetError(err)
+
+		return
+	}
+
 	paramsType, exists := contractsToParamTypes[params.address]
 	if !exists {
 		outputter.SetError(fmt.Errorf("no parameter types for given contract address: %v", params.address))
