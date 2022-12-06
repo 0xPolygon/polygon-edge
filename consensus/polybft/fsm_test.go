@@ -1187,7 +1187,7 @@ func TestFSM_StateTransactionsEndOfSprint(t *testing.T) {
 	txs := f.stateTransactions()
 
 	for i, tx := range txs {
-		decodedData, err := decodeStateTransaction(tx.Input)
+		decodedData, err := decodeStateTransaction(tx.Input())
 		require.NoError(t, err)
 
 		switch stateTxData := decodedData.(type) {

@@ -24,7 +24,7 @@ func TestEth_TxnPool_SendRawTransaction(t *testing.T) {
 	assert.NotEqual(t, store.txn.Hash, types.ZeroHash)
 
 	// the hash in the txn pool should match the one we send
-	if txn.Hash != store.txn.Hash {
+	if txn.Hash() != store.txn.Hash() {
 		t.Fatal("bad")
 	}
 }

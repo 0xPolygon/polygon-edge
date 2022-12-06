@@ -10,10 +10,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func createTestTransaction(hash types.Hash) *types.Transaction {
-	return types.NewTx(&types.LegacyTx{
-		Hash: hash,
-	})
+func createTestTransaction() *types.Transaction {
+	tx := types.NewTx(&types.LegacyTx{})
+	tx = tx.ComputeHash()
+
+	return tx
 }
 
 func createTestHeader(height uint64) *types.Header {
@@ -33,8 +34,8 @@ func wrapHeaderWithTestBlock(h *types.Header) *types.Block {
 }
 
 var (
-	testTxHash1 = types.BytesToHash([]byte{1})
-	testTx1     = createTestTransaction(testTxHash1)
+	testTx1     = createTestTransaction()
+	testTxHash1 = testTx1.Hash()
 
 	testGenesisHeader = createTestHeader(0)
 	testGenesisBlock  = wrapHeaderWithTestBlock(testGenesisHeader)
@@ -288,7 +289,7 @@ func TestGetTxAndBlockByTxHash(t *testing.T) {
 	}{
 		{
 			name:   "should return tx and block",
-			txHash: testTx1.Hash,
+			txHash: testTx1.Hash(),
 			store: &debugEndpointMockStore{
 				readTxLookupFn: func(hash types.Hash) (types.Hash, bool) {
 					assert.Equal(t, testTx1.Hash, hash)
@@ -307,7 +308,7 @@ func TestGetTxAndBlockByTxHash(t *testing.T) {
 		},
 		{
 			name:   "should return nil if ReadTxLookup returns nothing",
-			txHash: testTx1.Hash,
+			txHash: testTx1.Hash(),
 			store: &debugEndpointMockStore{
 				readTxLookupFn: func(hash types.Hash) (types.Hash, bool) {
 					assert.Equal(t, testTx1.Hash, hash)
@@ -320,7 +321,7 @@ func TestGetTxAndBlockByTxHash(t *testing.T) {
 		},
 		{
 			name:   "should return nil if GetBlockByHash returns nothing",
-			txHash: testTx1.Hash,
+			txHash: testTx1.Hash(),
 			store: &debugEndpointMockStore{
 				readTxLookupFn: func(hash types.Hash) (types.Hash, bool) {
 					assert.Equal(t, testTx1.Hash, hash)
@@ -339,7 +340,7 @@ func TestGetTxAndBlockByTxHash(t *testing.T) {
 		},
 		{
 			name:   "should return nil if the block doesn't include the tx",
-			txHash: testTx1.Hash,
+			txHash: testTx1.Hash(),
 			store: &debugEndpointMockStore{
 				readTxLookupFn: func(hash types.Hash) (types.Hash, bool) {
 					assert.Equal(t, testTx1.Hash, hash)

@@ -83,6 +83,7 @@ type Transaction struct {
 func NewTx(inner TxData) *Transaction {
 	tx := new(Transaction)
 	tx.setDecoded(inner.Copy(), 0)
+
 	return tx
 }
 
@@ -210,6 +211,7 @@ func (tx *Transaction) SetSignatureValues(v, r, s *big.Int) {
 func (tx *Transaction) setDecoded(inner TxData, size uint64) {
 	tx.inner = inner
 	tx.time = time.Now()
+
 	if size > 0 {
 		tx.size.Store(size)
 	}
@@ -220,6 +222,8 @@ func copyAddressPtr(a *Address) *Address {
 	if a == nil {
 		return nil
 	}
+
 	cpy := *a
+
 	return &cpy
 }
