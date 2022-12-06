@@ -86,7 +86,7 @@ func setFlags(cmd *cobra.Command) {
 		&params.contractsPath,
 		contractsPathFlag,
 		contracts.ContractsRootFolder,
-		"Root file directory containing POS smart contracts",
+		"Root directory path containing POS smart contracts",
 	)
 
 	cmd.Flags().StringVar(
