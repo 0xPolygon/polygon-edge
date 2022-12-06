@@ -179,7 +179,7 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client) 
 	rootchainAdminKey := helper.GetRootchainAdminKey()
 	// if admin key is not provided, then we assume we are working in dev mode
 	// and therefore use default key which needs to be funded first
-	if params.adminKey == "" {
+	if params.adminKey == helper.DefaultPrivateKeyRaw {
 		// fund account
 		rootchainAdminAddr := rootchainAdminKey.Address()
 		txn := &ethgo.Transaction{To: &rootchainAdminAddr, Value: big.NewInt(1000000000000000000)}
@@ -217,7 +217,7 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client) 
 		},
 	}
 
-	rootchainMeta := &helper.RootchainManifest{}
+	rootchainMeta := &helper.RootchainManifest{RootchainAdminAddress: types.Address(rootchainAdminKey.Address())}
 
 	for _, contract := range deployContracts {
 		bytecode, err := readContractBytecode(params.contractsPath, contract.path, contract.name)
