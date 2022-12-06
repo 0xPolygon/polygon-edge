@@ -228,13 +228,13 @@ func TestEth_GetNextNonce(t *testing.T) {
 
 func newTestEthEndpoint(store testStore) *Eth {
 	return &Eth{
-		hclog.NewNullLogger(), store, 100, nil, 0,
+		hclog.NewNullLogger(), store, nil, 0,
 	}
 }
 
 func newTestEthEndpointWithPriceLimit(store testStore, priceLimit uint64) *Eth {
 	return &Eth{
-		hclog.NewNullLogger(), store, 100, nil, priceLimit,
+		hclog.NewNullLogger(), store, nil, priceLimit,
 	}
 }
 
