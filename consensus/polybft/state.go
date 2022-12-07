@@ -595,6 +595,20 @@ func (s *State) insertBundles(bundles []*BundleProof) error {
 }
 
 // getBundles gets bundles that are not executed
+func (s *State) lastBundleIndex() (res uint64, err error) {
+	err = s.db.View(func(tx *bolt.Tx) error {
+		c := tx.Bucket(bundlesBucket).Cursor()
+
+		key, _ := (c.Last())
+		res = itou(key)
+
+		return nil
+	})
+
+	return
+}
+
+// getBundles gets bundles that are not executed
 func (s *State) getBundles(stateSyncExecutionIndex, maxNumberOfBundles uint64) ([]*BundleProof, error) {
 	var bundles []*BundleProof
 

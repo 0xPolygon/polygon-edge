@@ -20,6 +20,8 @@ var (
 
 	jsonRPCAddress string
 
+	count uint64
+
 	contractsToParamTypes = map[string]string{
 		contracts.NativeTokenContract.String(): "tuple(address,uint256)",
 	}
@@ -52,15 +54,22 @@ func setFlags(cmd *cobra.Command) {
 	cmd.Flags().StringSliceVar(
 		&params.wallets,
 		walletsFlag,
-		nil,
+		[]string{ethgo.ZeroAddress.String()},
 		"list of wallet addresses",
 	)
 
 	cmd.Flags().StringSliceVar(
 		&params.amounts,
 		amountsFlag,
-		nil,
+		[]string{"0xff"},
 		"list of amounts to fund wallets",
+	)
+
+	cmd.Flags().Uint64Var(
+		&count,
+		"count",
+		1,
+		"number of items to send",
 	)
 
 	cmd.Flags().StringVar(
@@ -95,29 +104,31 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 	g, ctx := errgroup.WithContext(cmd.Context())
 
-	for i := range params.wallets {
-		wallet := params.wallets[i]
-		amount := params.amounts[i]
+	for j := uint64(0); j < count; j++ {
+		for i := range params.wallets {
+			wallet := params.wallets[i]
+			amount := params.amounts[i]
 
-		g.Go(func() error {
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			default:
-				txn, err := createEmitTxn(paramsType, wallet, amount)
-				if err != nil {
-					return fmt.Errorf("failed to create tx input: %w", err)
+			g.Go(func() error {
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				default:
+					txn, err := createEmitTxn(paramsType, wallet, amount)
+					if err != nil {
+						return fmt.Errorf("failed to create tx input: %w", err)
+					}
+
+					if _, err = txRelayer.SendTransaction(
+						txn,
+						helper.GetRootchainAdminKey()); err != nil {
+						return fmt.Errorf("sending transaction to wallet: %s with amount: %s, failed with error: %w", wallet, amount, err)
+					}
+
+					return nil
 				}
-
-				if _, err = txRelayer.SendTransaction(
-					txn,
-					helper.GetRootchainAdminKey()); err != nil {
-					return fmt.Errorf("sending transaction to wallet: %s with amount: %s, failed with error: %w", wallet, amount, err)
-				}
-
-				return nil
-			}
-		})
+			})
+		}
 	}
 
 	if err = g.Wait(); err != nil {

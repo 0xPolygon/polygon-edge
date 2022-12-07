@@ -147,6 +147,10 @@ func GetGRPCConnection(address string) (*grpc.ClientConn, error) {
 	return conn, nil
 }
 
+func GrpcClient(cmd *cobra.Command) (*grpc.ClientConn, error) {
+	return grpc.Dial(GetGRPCAddress(cmd), grpc.WithTransportCredentials(insecure.NewCredentials()))
+}
+
 // GetGRPCAddress extracts the set GRPC address
 func GetGRPCAddress(cmd *cobra.Command) string {
 	if cmd.Flags().Changed(command.GRPCAddressFlagLEGACY) {

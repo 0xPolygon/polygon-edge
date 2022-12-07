@@ -100,7 +100,7 @@ func executeStateSync(t *testing.T, client *jsonrpc.Client, txRelayer txrelayer.
 }
 
 func TestE2E_Bridge_MainWorkflow(t *testing.T) {
-	const num = 10
+	const num = 20
 
 	var (
 		accounts         = make([]ethgo.Key, num)

@@ -11,6 +11,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/proto"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
@@ -56,6 +57,8 @@ func Factory(params *consensus.Params) (consensus.Consensus, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	proto.RegisterPolybftServer(params.Grpc, &service{srv: polybft})
 
 	return polybft, nil
 }

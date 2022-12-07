@@ -15,11 +15,13 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/loadbot"
 	"github.com/0xPolygon/polygon-edge/command/monitor"
 	"github.com/0xPolygon/polygon-edge/command/peers"
+	"github.com/0xPolygon/polygon-edge/command/polybft"
 	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
 	"github.com/0xPolygon/polygon-edge/command/rootchain"
 	"github.com/0xPolygon/polygon-edge/command/secrets"
 	"github.com/0xPolygon/polygon-edge/command/server"
 	"github.com/0xPolygon/polygon-edge/command/status"
+	"github.com/0xPolygon/polygon-edge/command/tui"
 	"github.com/0xPolygon/polygon-edge/command/txpool"
 	"github.com/0xPolygon/polygon-edge/command/version"
 	"github.com/0xPolygon/polygon-edge/command/whitelist"
@@ -61,6 +63,8 @@ func (rc *RootCommand) registerSubCommands() {
 		license.GetCommand(),
 		polybftsecrets.GetCommand(),
 		e2e.GetCommand(),
+		tui.GetCommand(),
+		polybft.GetCommand(),
 	)
 }
 

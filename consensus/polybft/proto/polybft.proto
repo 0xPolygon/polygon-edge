@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+package proto;
+
+option go_package = "/consensus/polybft/proto";
+
+service Polybft {
+    rpc ConsensusSnapshot(ConsensusSnapshotRequest) returns (ConsensusSnapshotResponse);
+    rpc Bridge(BridgeRequest) returns (BridgeResponse);
+
+    rpc BridgeCall(BridgeCallRequest) returns (BridgeCallResponse);
+} 
+
+message BridgeCallRequest {
+    uint64 index = 1;
+}
+
+message BridgeCallResponse {
+    StateSync stateSync = 1;
+    string data = 2;
+}
+
+message ConsensusSnapshotRequest {
+}
+
+message ConsensusSnapshotResponse {
+    uint64 blockNumber = 1;
+    repeated Validator validators = 2;
+}
+
+message Validator {
+    string address = 1;
+    uint64 votingPower = 2;
+}
+
+message BridgeRequest {
+
+}
+
+message BridgeResponse {
+    repeated StateSync stateSyncs = 1;
+    uint64 epoch = 2;
+    uint64 nextCommittedIndex = 3;
+    uint64 nextExecutionIndex = 4;
+    uint64 lastCommittedIndex = 5;
+}
+
+message StateSync {
+    uint64 id = 1;
+    string sender = 6;
+    string target = 7;
+}

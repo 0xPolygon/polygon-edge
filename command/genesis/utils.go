@@ -134,7 +134,7 @@ func ReadValidatorsByRegexp(dir, prefix string) ([]*polybft.Validator, error) {
 	for i, file := range files {
 		path := filepath.Join(dir, file.Name())
 
-		account, nodeID, err := getSecrets(path)
+		account, nodeID, err := GetSecrets(path)
 		if err != nil {
 			return nil, err
 		}
@@ -150,7 +150,7 @@ func ReadValidatorsByRegexp(dir, prefix string) ([]*polybft.Validator, error) {
 	return validators, nil
 }
 
-func getSecrets(directory string) (*wallet.Account, string, error) {
+func GetSecrets(directory string) (*wallet.Account, string, error) {
 	baseConfig := &secrets.SecretsManagerParams{
 		Logger: hclog.NewNullLogger(),
 		Extra: map[string]interface{}{
