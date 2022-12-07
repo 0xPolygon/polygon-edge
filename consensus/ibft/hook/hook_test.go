@@ -117,7 +117,6 @@ func TestModifyHeader(t *testing.T) {
 	})
 }
 
-//nolint:dupl
 func TestVerifyHeader(t *testing.T) {
 	t.Parallel()
 
@@ -158,7 +157,6 @@ func TestVerifyHeader(t *testing.T) {
 	})
 }
 
-//nolint:dupl
 func TestVerifyBlock(t *testing.T) {
 	t.Parallel()
 
@@ -207,7 +205,6 @@ func TestVerifyBlock(t *testing.T) {
 	})
 }
 
-//nolint:dupl
 func TestProcessHeader(t *testing.T) {
 	t.Parallel()
 

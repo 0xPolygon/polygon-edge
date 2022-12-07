@@ -81,7 +81,7 @@ type Transaction struct {
 
 // NewTx creates a new transaction.
 func NewTx(inner TxData) *Transaction {
-	tx := new(Transaction)
+	tx := &Transaction{}
 	tx.setDecoded(inner.Copy(), 0)
 
 	return tx
@@ -89,9 +89,11 @@ func NewTx(inner TxData) *Transaction {
 
 // NewTxWithSender creates a new transaction with the given sender address.
 func NewTxWithSender(inner TxData, sender Address) *Transaction {
-	tx := new(Transaction)
+	tx := &Transaction{
+		from: sender,
+	}
+
 	tx.setDecoded(inner.Copy(), 0)
-	tx.from = sender
 
 	return tx
 }
@@ -125,10 +127,13 @@ func (t *Transaction) ComputeHash() *Transaction {
 
 // Copy makes a copy of the given transaction
 func (t *Transaction) Copy() *Transaction {
-	newTx := NewTxWithSender(t.inner.Copy(), t.from)
-	newTx = newTx.ComputeHash()
-
-	return newTx
+	return &Transaction{
+		inner: t.inner.Copy(),
+		time:  t.time,
+		hash:  t.hash,
+		size:  t.size,
+		from:  t.from,
+	}
 }
 
 // Cost returns gas * gasPrice + value
@@ -206,6 +211,7 @@ func (t *Transaction) From() Address {
 // SetSender sets the given the sender address of the transaction
 func (t *Transaction) SetSender(sender Address) {
 	t.from = sender
+	t.ComputeHash()
 }
 
 // RawSignatureValues returns the V, R, S signature values of the transaction.
@@ -221,9 +227,7 @@ func (t *Transaction) Hash() Hash {
 
 // SetSignatureValues sets the given signature values
 func (t *Transaction) SetSignatureValues(v, r, s *big.Int) *Transaction {
-	newTxData := t.inner.Copy()
-	newTxData.setSignatureValues(v, r, s)
-	*t = *NewTxWithSender(newTxData, t.from)
+	t.inner.setSignatureValues(v, r, s)
 	t.ComputeHash()
 
 	return t
