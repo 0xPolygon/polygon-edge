@@ -140,11 +140,12 @@ func NewServer(config *Config) (*Server, error) {
 		return nil, fmt.Errorf("failed to create data directories: %w", err)
 	}
 
-	if err := m.setupTelemetry(); err != nil {
-		return nil, err
-	}
-
 	if config.Telemetry.PrometheusAddr != nil {
+		// Only setup telemetry if `PrometheusAddr` has been configured.
+		if err := m.setupTelemetry(); err != nil {
+			return nil, err
+		}
+
 		m.prometheusServer = m.startPrometheusServer(config.Telemetry.PrometheusAddr)
 	}
 
