@@ -121,16 +121,25 @@ type consensusRuntime struct {
 	// checkpointManager represents abstraction for checkpoint submission
 	checkpointManager *checkpointManager
 
+	// proposerCalculator is the object which calculates new proposer
+	proposerCalculator ProposerCalculator
+
 	// logger instance
 	logger hcf.Logger
 }
 
 // newConsensusRuntime creates and starts a new consensus runtime instance with event tracking
 func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRuntime, error) {
+	proposerCalculator, err := NewProposerCalculatorFromState(config, log)
+	if err != nil {
+		return nil, err
+	}
+
 	runtime := &consensusRuntime{
-		state:  config.State,
-		config: config,
-		logger: log.Named("consensus_runtime"),
+		state:              config.State,
+		config:             config,
+		proposerCalculator: proposerCalculator,
+		logger:             log.Named("consensus_runtime"),
 	}
 
 	if runtime.IsBridgeEnabled() {
@@ -220,6 +229,13 @@ func (c *consensusRuntime) OnBlockInserted(block *types.Block) {
 	} else {
 		c.lock.Lock()
 		c.lastBuiltBlock = block.Header
+		proposerCalculator := c.proposerCalculator.Clone()
+		// TODO: this could be long running operation
+		if err := proposerCalculator.Update(block.Number(), c.config, c.state); err != nil {
+			c.logger.Warn("Could not update proposer calculator", "err", err)
+		}
+
+		c.proposerCalculator = proposerCalculator
 		c.lock.Unlock()
 	}
 }
@@ -325,7 +341,10 @@ func (c *consensusRuntime) populateFsmIfBridgeEnabled(
 func (c *consensusRuntime) FSM() error {
 	// figure out the parent. At this point this peer has done its best to sync up
 	// to the head of their remote peers.
+	c.lock.RLock()
 	parent, epoch := c.getLastBuiltBlockAndEpoch()
+	proposerCalc := c.proposerCalculator.Clone()
+	c.lock.RUnlock()
 
 	if !epoch.Validators.ContainsNodeID(c.config.Key.String()) {
 		return errNotAValidator
@@ -350,23 +369,6 @@ func (c *consensusRuntime) FSM() error {
 	valSet, err := NewValidatorSet(validatorsCopy, c.logger)
 	if err != nil {
 		return fmt.Errorf("cannot create validator set for fsm: %w", err)
-	}
-
-	proposerCalc, err := NewProposerCalculator(validatorsCopy, valSet.GetTotalVotingPower(), c.logger)
-	if err != nil {
-		return fmt.Errorf("cannot create proposer calculator for fsm: %w", err)
-	}
-
-	iterationNumber, err := getNumberOfIteration(parent, epoch.Number, c)
-	if err != nil {
-		return fmt.Errorf("cannot get number of iteration: %w", err)
-	}
-
-	if iterationNumber > 0 {
-		err = proposerCalc.IncrementProposerPriority(iterationNumber)
-		if err != nil {
-			return fmt.Errorf("cannot increment proposer priority in fsm: %w", err)
-		}
 	}
 
 	ff := &fsm{
@@ -410,31 +412,6 @@ func (c *consensusRuntime) FSM() error {
 	c.lock.Unlock()
 
 	return nil
-}
-
-// getNumberOfIteration returns number of iteration that are needed for the proposer calculation
-func getNumberOfIteration(parent *types.Header, epochNumber uint64, c *consensusRuntime) (uint64, error) {
-	iterationNumber := uint64(0)
-	currentHeader := parent
-	lastBlockOfPreviousEpoch := getEndEpochBlockNumber(epochNumber-1, c.config.PolyBFTConfig.EpochSize)
-
-	for currentHeader.Number > lastBlockOfPreviousEpoch {
-		blockExtra, err := GetIbftExtra(currentHeader.ExtraData)
-		if err != nil {
-			return 0, fmt.Errorf("cannot get ibft extra: %w", err)
-		}
-
-		iterationNumber += blockExtra.Checkpoint.BlockRound + 1 // because round 0 is one of the iterations
-
-		var found bool
-		currentHeader, found = c.config.blockchain.GetHeaderByNumber(currentHeader.Number - 1)
-
-		if !found {
-			return 0, fmt.Errorf("cannot get header by number: %d", currentHeader.Number)
-		}
-	}
-
-	return iterationNumber, nil
 }
 
 // restartEpoch resets the previously run epoch and moves to the next one
@@ -496,6 +473,14 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) error {
 	c.lock.Lock()
 	c.epoch = epoch
 	c.lastBuiltBlock = header
+
+	proposerCalculator := c.proposerCalculator.Clone()
+	// TODO: this could be long running operation
+	if err := proposerCalculator.Update(header.Number, c.config, c.state); err != nil {
+		c.logger.Warn("Could not update proposer calculator", "err", err)
+	}
+
+	c.proposerCalculator = proposerCalculator
 	c.lock.Unlock()
 
 	c.logger.Info(
@@ -1027,7 +1012,7 @@ func (c *consensusRuntime) IsProposer(id []byte, height, round uint64) bool {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
-	nextProposer, err := c.fsm.proposerCalculator.CalcProposer(round)
+	nextProposer, err := c.fsm.proposerCalculator.CalcProposer(round, height)
 	if err != nil {
 		c.logger.Error("cannot calculate proposer", "error", err)
 
@@ -1169,7 +1154,7 @@ func (c *consensusRuntime) HasQuorum(
 			return false
 		}
 
-		propAddress, exist := c.fsm.proposerCalculator.GetLatestProposer(messages[0].View.Round)
+		propAddress, exist := c.fsm.proposerCalculator.GetLatestProposer(messages[0].View.Round, blockNumber)
 		if !exist {
 			c.logger.Warn("HasQuorum has been called but proposer is not set")
 

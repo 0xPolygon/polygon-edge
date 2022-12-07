@@ -59,6 +59,8 @@ const (
 	stateSyncMainBundleSize = 10
 	// number of stateSyncEvents to be grouped into one StateTransaction
 	stateSyncBundleSize = 1
+	// latest proposer calculator snapshot key
+	proposerCalcSnapshotKey = 7
 )
 
 type exitEventNotFoundError struct {
@@ -242,9 +244,11 @@ var (
 	messageVotesBucket = []byte("votes")
 	// bucket to store validator snapshots
 	validatorSnapshotsBucket = []byte("validatorSnapshots")
+	// bucket to store proposer calculator snapshot
+	proposerCalcSnapshotBucket = []byte("proposerCalculatorSnapshot")
 	// array of all parent buckets
 	parentBuckets = [][]byte{syncStateEventsBucket, exitEventsBucket, commitmentsBucket, bundlesBucket,
-		epochsBucket, validatorSnapshotsBucket}
+		epochsBucket, validatorSnapshotsBucket, proposerCalcSnapshotBucket}
 	// errNotEnoughStateSyncs error message
 	errNotEnoughStateSyncs = errors.New("there is either a gap or not enough sync events")
 	// errCommitmentNotBuilt error message
@@ -838,6 +842,35 @@ func (s *State) bucketStats(bucketName []byte) *bolt.BucketStats {
 	}
 
 	return stats
+}
+
+// getProposerCalculatorSnapshot gets latest proposer calculator snapshot
+// we are keeping two snapshots just in case if latest write mess up snapshot
+func (s *State) getProposerCalculatorSnapshot() (*ProposerCalculatorSnapshot, error) {
+	var snapshot *ProposerCalculatorSnapshot
+
+	err := s.db.View(func(tx *bolt.Tx) error {
+		value := tx.Bucket(proposerCalcSnapshotBucket).Get(itob(uint64(proposerCalcSnapshotKey)))
+		if value == nil {
+			return nil
+		}
+
+		return json.Unmarshal(value, &snapshot)
+	})
+
+	return snapshot, err
+}
+
+// writeProposerCalculatorSnapshot writes proposer calculator snapshot to double buffered bucket
+func (s *State) writeProposerCalculatorSnapshot(snapshot *ProposerCalculatorSnapshot) error {
+	raw, err := json.Marshal(snapshot)
+	if err != nil {
+		return err
+	}
+
+	return s.db.Update(func(tx *bolt.Tx) error {
+		return tx.Bucket(proposerCalcSnapshotBucket).Put(itob(proposerCalcSnapshotKey), raw)
+	})
 }
 
 func itob(v uint64) []byte {
