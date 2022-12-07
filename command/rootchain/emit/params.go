@@ -7,6 +7,7 @@ const (
 	walletsFlag  = "wallets"
 	amountsFlag  = "amounts"
 	jsonRPCFlag  = "json-rpc"
+	adminKeyFlag = "admin-key"
 )
 
 var (
@@ -16,9 +17,10 @@ var (
 )
 
 type emitParams struct {
-	address string
-	wallets []string
-	amounts []string
+	address  string
+	wallets  []string
+	amounts  []string
+	adminKey string
 }
 
 func (ep *emitParams) validateFlags() error {

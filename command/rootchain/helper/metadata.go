@@ -3,10 +3,8 @@ package helper
 import (
 	"context"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 
 	"github.com/0xPolygon/polygon-edge/types"
 	dockertypes "github.com/docker/docker/api/types"
@@ -18,7 +16,7 @@ import (
 const DefaultPrivateKeyRaw = "aa75e9a7d427efc732f8e4f1a5b7646adcc61fd5bae40f80d13c8419c9f43d6d"
 
 var (
-	// TODO: @Stefan-Ethernal decouple from constants (rely on RootchainManifest instead)
+	// TODO: @Stefan-Ethernal decouple from constants (rely on genesis instead)
 
 	// StateSenderAddress is an address of StateSender.sol smart contract
 	StateSenderAddress = types.StringToAddress("0x6FE03c2768C9d800AF3Dedf1878b5687FE120a27")
@@ -36,45 +34,6 @@ var (
 	// namely it represents account which deploys rootchain smart contracts
 	rootchainAdminKey *wallet.Key
 )
-
-// RootchainManifest holds rootchain contracts addresses
-type RootchainManifest struct {
-	StateSenderAddress       types.Address `json:"stateSenderAddress"`
-	CheckpointManagerAddress types.Address `json:"checkpointManagerAddress"`
-	BLSAddress               types.Address `json:"blsAddress"`
-	BN256G2Address           types.Address `json:"bn256G2Address"`
-	RootchainAdminAddress    types.Address `json:"rootchainAdminAddress"`
-}
-
-// LoadRootchainManifest deserializes RootchainManifest instance
-func LoadRootchainManifest(metadataFile string) (*RootchainManifest, error) {
-	data, err := os.ReadFile(metadataFile)
-	if err != nil {
-		return nil, err
-	}
-
-	var manifest RootchainManifest
-
-	if err := json.Unmarshal(data, &manifest); err != nil {
-		return nil, err
-	}
-
-	return &manifest, nil
-}
-
-// Save marshals RootchainManifest instance to json and persists it to given location
-func (r *RootchainManifest) Save(manifestPath string) error {
-	data, err := json.MarshalIndent(r, "", "    ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal rootchain manifest to JSON: %w", err)
-	}
-
-	if err := os.WriteFile(manifestPath, data, os.ModePerm); err != nil {
-		return fmt.Errorf("failed to save rootchain manifest file: %w", err)
-	}
-
-	return nil
-}
 
 // InitRootchainAdminKey initializes a private key instance from provided hex encoded private key
 func InitRootchainAdminKey(rawKey string) error {

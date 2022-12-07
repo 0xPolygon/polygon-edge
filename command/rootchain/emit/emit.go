@@ -69,6 +69,13 @@ func setFlags(cmd *cobra.Command) {
 		"http://127.0.0.1:8545",
 		"the JSON RPC rootchain IP address (e.g. http://127.0.0.1:8545)",
 	)
+
+	cmd.Flags().StringVar(
+		&params.adminKey,
+		adminKeyFlag,
+		helper.DefaultPrivateKeyRaw,
+		"Hex encoded private key of the account which sends rootchain transactions",
+	)
 }
 
 func runPreRun(_ *cobra.Command, _ []string) error {
@@ -79,7 +86,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
-	err := helper.InitRootchainAdminKey(helper.DefaultPrivateKeyRaw)
+	err := helper.InitRootchainAdminKey(params.adminKey)
 	if err != nil {
 		outputter.SetError(err)
 

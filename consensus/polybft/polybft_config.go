@@ -3,7 +3,9 @@ package polybft
 import (
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"math/big"
+	"os"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/chain"
@@ -15,6 +17,10 @@ const PolyBFTConsensusName = "polybft"
 
 // PolyBFTConfig is the configuration file for the Polybft consensus protocol.
 type PolyBFTConfig struct {
+	Manifest *Manifest `json:"manifest"`
+	// TODO: @Stefan-Ethernal remove
+	// InitialValidatorSet, Bridge,
+	// ValidatorSetAddr and StateReceiverAddr
 	InitialValidatorSet []*Validator  `json:"initialValidatorSet"`
 	Bridge              *BridgeConfig `json:"bridge"`
 
@@ -62,11 +68,12 @@ func (p *PolyBFTConfig) IsBridgeEnabled() bool {
 	return p.Bridge != nil
 }
 
+// Validator represents public information about validator accounts which are the part of genesis
 type Validator struct {
 	Address types.Address `json:"address"`
 	BlsKey  string        `json:"blsKey"`
 	Balance *big.Int      `json:"balance"`
-	NodeID  string        `json:"-"`
+	NodeID  string        `json:"nodeId"`
 }
 
 type validatorRaw struct {
@@ -115,4 +122,50 @@ func (v *Validator) UnmarshalBLSPublicKey() (*bls.PublicKey, error) {
 // DebugConfig is a struct used for test configuration in init genesis
 type DebugConfig struct {
 	ValidatorSetSize uint64 `json:"validatorSetSize"`
+}
+
+// RootchainConfig contains information about rootchain contract addresses
+// as well as rootchain admin account address
+type RootchainConfig struct {
+	StateSenderAddress       types.Address `json:"stateSenderAddress"`
+	CheckpointManagerAddress types.Address `json:"checkpointManagerAddress"`
+	BLSAddress               types.Address `json:"blsAddress"`
+	BN256G2Address           types.Address `json:"bn256G2Address"`
+	AdminAddress             types.Address `json:"adminAddress"`
+}
+
+// Manifest holds metadata, such as genesis validators and rootchain configuration
+type Manifest struct {
+	GenesisValidators []*Validator     `json:"validators"`
+	RootchainConfig   *RootchainConfig `json:"rootchain"`
+}
+
+// LoadManifest deserializes Manifest instance
+func LoadManifest(metadataFile string) (*Manifest, error) {
+	data, err := os.ReadFile(metadataFile)
+	if err != nil {
+		return nil, err
+	}
+
+	var manifest Manifest
+
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		return nil, err
+	}
+
+	return &manifest, nil
+}
+
+// Save marshals RootchainManifest instance to json and persists it to given location
+func (m *Manifest) Save(manifestPath string) error {
+	data, err := json.MarshalIndent(m, "", "    ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal rootchain manifest to JSON: %w", err)
+	}
+
+	if err := os.WriteFile(manifestPath, data, os.ModePerm); err != nil {
+		return fmt.Errorf("failed to save rootchain manifest file: %w", err)
+	}
+
+	return nil
 }

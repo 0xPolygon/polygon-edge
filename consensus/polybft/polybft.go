@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/chain"
-	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
@@ -127,14 +126,17 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			return err
 		}
 
-		// TODO: @Stefan-Ethernal Get rootchain admin address from the manifest.json (provide proper path)
-		rootchainManifest, err := helper.LoadRootchainManifest("./manifest.json")
 		if err != nil {
 			return fmt.Errorf("failed loading rootchain manifest: %w", err)
 		}
 
+		rootchainAdmin := types.ZeroAddress
+		if polyBFTConfig.Manifest.RootchainConfig != nil {
+			rootchainAdmin = polyBFTConfig.Manifest.RootchainConfig.AdminAddress
+		}
+		// TODO: @Stefan-Ethernal figure out what "predicate" address in the nativeTokenInitializer represents
 		input, err = nativeTokenInitializer.Encode(
-			[]interface{}{rootchainManifest.RootchainAdminAddress, nativeTokenName, nativeTokenSymbol})
+			[]interface{}{rootchainAdmin, nativeTokenName, nativeTokenSymbol})
 		if err != nil {
 			return err
 		}

@@ -156,6 +156,7 @@ func setFlags(cmd *cobra.Command) {
 			defaultValidatorSetSize,
 			"the total number of validators",
 		)
+		// TODO: Remove
 		cmd.Flags().StringVar(
 			&params.polyBftValidatorPrefixPath,
 			polyBftValidatorPrefixPathFlag,
@@ -174,12 +175,14 @@ func setFlags(cmd *cobra.Command) {
 			defaultBlockTime,
 			"the predefined period which determines block creation frequency",
 		)
+		// TODO: Remove
 		cmd.Flags().StringArrayVar(
 			&params.validators,
 			validatorsFlag,
 			[]string{},
 			"validators defined by user throughout a parameter (format: <node id>:<ECDSA address>:<public BLS key>)",
 		)
+		// TODO: Remove
 		cmd.Flags().StringVar(
 			&params.premineValidators,
 			premineValidatorsFlag,
