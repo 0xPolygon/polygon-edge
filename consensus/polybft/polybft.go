@@ -194,7 +194,9 @@ func (p *Polybft) Initialize() error {
 	p.validatorsCache = newValidatorsSnapshotCache(p.config.Logger, stt, p.consensusConfig.EpochSize, p.blockchain)
 
 	// create runtime
-	p.initRuntime()
+	if err := p.initRuntime(); err != nil {
+		return err
+	}
 
 	p.ibft = newIBFTConsensusWrapper(p.logger, p.runtime, p)
 
@@ -241,7 +243,7 @@ func (p *Polybft) Start() error {
 }
 
 // initRuntime creates consensus runtime
-func (p *Polybft) initRuntime() {
+func (p *Polybft) initRuntime() error {
 	runtimeConfig := &runtimeConfig{
 		PolyBFTConfig:   p.consensusConfig,
 		Key:             p.key,
@@ -253,7 +255,14 @@ func (p *Polybft) initRuntime() {
 		txPool:          p.txPool,
 	}
 
-	p.runtime = newConsensusRuntime(p.logger, runtimeConfig)
+	runtime, err := newConsensusRuntime(p.logger, runtimeConfig)
+	if err != nil {
+		return err
+	}
+
+	p.runtime = runtime
+
+	return nil
 }
 
 // startRuntime starts consensus runtime
