@@ -290,7 +290,6 @@ func TestPreCommitState(t *testing.T) {
 	})
 }
 
-//nolint:dupl
 func TestPostInsertBlock(t *testing.T) {
 	t.Parallel()
 

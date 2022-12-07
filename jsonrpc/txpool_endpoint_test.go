@@ -28,7 +28,6 @@ func TestContentEndpoint(t *testing.T) {
 		assert.Equal(t, 0, len(response.Queued))
 	})
 
-	//nolint:dupl
 	t.Run("returns correct data for pending transaction", func(t *testing.T) {
 		t.Parallel()
 
@@ -58,7 +57,6 @@ func TestContentEndpoint(t *testing.T) {
 		assert.Equal(t, nil, txData.TxIndex)
 	})
 
-	//nolint:dupl
 	t.Run("returns correct data for queued transaction", func(t *testing.T) {
 		t.Parallel()
 
