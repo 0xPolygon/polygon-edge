@@ -2113,6 +2113,22 @@ func TestConsensusRuntime_BuildCommitMessage(t *testing.T) {
 	assert.Equal(t, signedMsg, runtime.BuildCommitMessage(proposalHash, view))
 }
 
+func TestConsensusRuntime_BuildPrePrepareMessage_EmptyProposal(t *testing.T) {
+	t.Parallel()
+
+	runtime := &consensusRuntime{logger: hclog.NewNullLogger()}
+
+	assert.Nil(t, runtime.BuildPrePrepareMessage(nil, &proto.RoundChangeCertificate{}, &proto.View{Height: 1, Round: 0}))
+}
+
+func TestConsensusRuntime_IsValidProposalHash_EmptyProposal(t *testing.T) {
+	t.Parallel()
+
+	runtime := &consensusRuntime{logger: hclog.NewNullLogger()}
+
+	assert.False(t, runtime.IsValidProposalHash(nil, []byte("hash")))
+}
+
 func TestConsensusRuntime_BuildPrepareMessage(t *testing.T) {
 	t.Parallel()
 
