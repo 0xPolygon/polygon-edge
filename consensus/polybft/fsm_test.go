@@ -61,7 +61,6 @@ func TestFSM_verifyValidatorsUptimeTx(t *testing.T) {
 	t.Parallel()
 
 	fsm := &fsm{
-		config:        &PolyBFTConfig{ValidatorSetAddr: contracts.ValidatorSetContract},
 		isEndOfEpoch:  true,
 		uptimeCounter: createTestUptimeCounter(t, nil, 10),
 	}
@@ -85,7 +84,7 @@ func TestFSM_verifyValidatorsUptimeTx(t *testing.T) {
 
 	// submit tampered validators uptime transaction to the epoch ending block
 	alteredUptimeTx := &types.Transaction{
-		To:    &fsm.config.ValidatorSetAddr,
+		To:    &contracts.ValidatorSetContract,
 		Input: []byte{},
 		Gas:   0,
 		Type:  types.StateTx,
@@ -355,7 +354,7 @@ func TestFSM_BuildProposal_WithUptimeTxGood(t *testing.T) {
 	blockChainMock := new(blockchainMock)
 	blockChainMock.On("GetStateProvider", mock.Anything).
 		Return(NewStateProvider(transition)).Once()
-	blockChainMock.On("GetSystemState", mock.Anything, mock.Anything).Return(systemStateMock).Once()
+	blockChainMock.On("GetSystemState", mock.Anything, mock.Anything, mock.Anything).Return(systemStateMock).Once()
 
 	checkpointBackendMock := new(checkpointBackendMock)
 	checkpointBackendMock.On("BuildEventRoot", mock.Anything, mock.Anything).Return(eventRoot, nil).Once()
@@ -473,7 +472,7 @@ func TestFSM_BuildProposal_EpochEndingBlock_ValidatorsDeltaExists(t *testing.T) 
 	blockChainMock := new(blockchainMock)
 	blockChainMock.On("GetStateProvider", mock.Anything).
 		Return(NewStateProvider(transition)).Once()
-	blockChainMock.On("GetSystemState", mock.Anything, mock.Anything).Return(systemStateMock).Once()
+	blockChainMock.On("GetSystemState", mock.Anything, mock.Anything, mock.Anything).Return(systemStateMock).Once()
 
 	checkpointBackendMock := new(checkpointBackendMock)
 	checkpointBackendMock.On("BuildEventRoot", mock.Anything, mock.Anything).Return(types.ZeroHash, nil).Once()
@@ -591,7 +590,7 @@ func TestFSM_BuildProposal_EpochEndingBlock_FailToCreateValidatorsDelta(t *testi
 	blockChainMock := new(blockchainMock)
 	blockChainMock.On("GetStateProvider", mock.Anything).
 		Return(NewStateProvider(transition)).Once()
-	blockChainMock.On("GetSystemState", mock.Anything, mock.Anything).Return(systemStateMock).Once()
+	blockChainMock.On("GetSystemState", mock.Anything, mock.Anything, mock.Anything).Return(systemStateMock).Once()
 
 	fsm := &fsm{parent: parent,
 		blockBuilder:      blockBuilderMock,
@@ -1226,7 +1225,7 @@ func TestFSM_VerifyStateTransaction_NotEndOfSprint(t *testing.T) {
 	inputData, err := bf.EncodeAbi()
 	require.NoError(t, err)
 
-	txns := []*types.Transaction{createStateTransactionWithData(f.config.StateReceiverAddr, inputData)}
+	txns := []*types.Transaction{createStateTransactionWithData(contracts.StateReceiverContract, inputData)}
 	err = f.VerifyStateTransactions(txns)
 	require.ErrorContains(t, err, "state transaction in block which should not contain it")
 }
@@ -1272,7 +1271,7 @@ func TestFSM_VerifyStateTransaction_ValidBothTypesOfStateTransactions(t *testing
 			require.NoError(t, err)
 
 			if i == 0 {
-				tx := createStateTransactionWithData(f.config.StateReceiverAddr, inputData)
+				tx := createStateTransactionWithData(contracts.StateReceiverContract, inputData)
 				txns = append(txns, tx)
 			}
 
@@ -1292,7 +1291,7 @@ func TestFSM_VerifyStateTransaction_ValidBothTypesOfStateTransactions(t *testing
 				require.NoError(t, err)
 
 				txns = append(txns,
-					createStateTransactionWithData(f.config.StateReceiverAddr, inputData))
+					createStateTransactionWithData(contracts.StateReceiverContract, inputData))
 			}
 		}
 
@@ -1313,7 +1312,7 @@ func TestFSM_VerifyStateTransaction_InvalidTypeOfStateTransactions(t *testing.T)
 
 	var txns []*types.Transaction
 	txns = append(txns,
-		createStateTransactionWithData(f.config.StateReceiverAddr, []byte{9, 3, 1, 1}))
+		createStateTransactionWithData(contracts.StateReceiverContract, []byte{9, 3, 1, 1}))
 
 	err := f.VerifyStateTransactions(txns)
 	require.ErrorContains(t, err, "state transaction error while decoding")
@@ -1344,7 +1343,7 @@ func TestFSM_VerifyStateTransaction_QuorumNotReached(t *testing.T) {
 	require.NoError(t, err)
 
 	txns = append(txns,
-		createStateTransactionWithData(f.config.StateReceiverAddr, inputData))
+		createStateTransactionWithData(contracts.StateReceiverContract, inputData))
 
 	err = f.VerifyStateTransactions(txns)
 	require.ErrorContains(t, err, "quorum size not reached for state tx")
@@ -1383,7 +1382,7 @@ func TestFSM_VerifyStateTransaction_InvalidSignature(t *testing.T) {
 	require.NoError(t, err)
 
 	txns = append(txns,
-		createStateTransactionWithData(f.config.StateReceiverAddr, inputData))
+		createStateTransactionWithData(contracts.StateReceiverContract, inputData))
 
 	err = f.VerifyStateTransactions(txns)
 	require.ErrorContains(t, err, "invalid signature for tx")
@@ -1421,7 +1420,7 @@ func TestFSM_VerifyStateTransaction_BundlesNotInSequentialOrder(t *testing.T) {
 		inputData, err := bf.EncodeAbi()
 		require.NoError(t, err)
 
-		txns[i] = createStateTransactionWithData(f.config.StateReceiverAddr, inputData)
+		txns[i] = createStateTransactionWithData(contracts.StateReceiverContract, inputData)
 	}
 
 	err = f.VerifyStateTransactions(txns)
@@ -1457,12 +1456,12 @@ func TestFSM_VerifyStateTransaction_TwoCommitmentMessages(t *testing.T) {
 	require.NoError(t, err)
 
 	txns = append(txns,
-		createStateTransactionWithData(f.config.StateReceiverAddr, inputData))
+		createStateTransactionWithData(contracts.StateReceiverContract, inputData))
 	inputData, err = cmSigned.EncodeAbi()
 	require.NoError(t, err)
 
 	txns = append(txns,
-		createStateTransactionWithData(f.config.StateReceiverAddr, inputData))
+		createStateTransactionWithData(contracts.StateReceiverContract, inputData))
 	err = f.VerifyStateTransactions(txns)
 	require.ErrorContains(t, err, "only one commitment is allowed per block")
 }
@@ -1498,7 +1497,7 @@ func TestFSM_VerifyStateTransaction_ProofError(t *testing.T) {
 
 	var txns []*types.Transaction
 	txns = append(txns,
-		createStateTransactionWithData(f.config.StateReceiverAddr, inputData))
+		createStateTransactionWithData(contracts.StateReceiverContract, inputData))
 	err = f.VerifyStateTransactions(txns)
 	require.ErrorContains(t, err, "error while validating proof")
 }
@@ -1539,7 +1538,7 @@ func TestFSM_VerifyStateTransaction_CommitmentDoesNotExist(t *testing.T) {
 
 	var txns []*types.Transaction
 	txns = append(txns,
-		createStateTransactionWithData(f.config.StateReceiverAddr, inputData))
+		createStateTransactionWithData(contracts.StateReceiverContract, inputData))
 	err = f.VerifyStateTransactions(txns)
 	require.ErrorContains(t, err, "No appropriate commitment found to verify proof")
 }

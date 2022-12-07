@@ -199,7 +199,7 @@ func (f *fsm) stateTransactions() []*types.Transaction {
 			}
 
 			txns = append(txns,
-				createStateTransactionWithData(f.config.StateReceiverAddr, inputData))
+				createStateTransactionWithData(contracts.StateReceiverContract, inputData))
 		}
 	}
 
@@ -216,7 +216,7 @@ func (f *fsm) createValidatorsUptimeTx() (*types.Transaction, error) {
 		return nil, err
 	}
 
-	return createStateTransactionWithData(f.config.ValidatorSetAddr, input), nil
+	return createStateTransactionWithData(contracts.ValidatorSetContract, input), nil
 }
 
 // ValidateCommit is used to validate that a given commit is valid
@@ -529,7 +529,7 @@ func (f *fsm) ValidatorSet() ValidatorSet {
 // getCurrentValidators queries smart contract on the given block height and returns currently active validator set
 func (f *fsm) getCurrentValidators(pendingBlockState *state.Transition) (AccountSet, error) {
 	provider := f.backend.GetStateProvider(pendingBlockState)
-	systemState := f.backend.GetSystemState(f.config, provider)
+	systemState := f.backend.GetSystemState(contracts.ValidatorSetContract, contracts.StateReceiverContract, provider)
 	newValidators, err := systemState.GetValidatorSet()
 
 	if err != nil {

@@ -26,10 +26,6 @@ type PolyBFTConfig struct {
 
 	ValidatorSetSize int `json:"validatorSetSize"`
 
-	// Address of the system contracts, as of now (testing) this is populated automatically during genesis
-	ValidatorSetAddr  types.Address `json:"validatorSetAddr"`
-	StateReceiverAddr types.Address `json:"stateReceiverAddr"`
-
 	// size of the epoch and sprint
 	EpochSize  uint64 `json:"epochSize"`
 	SprintSize uint64 `json:"sprintSize"`

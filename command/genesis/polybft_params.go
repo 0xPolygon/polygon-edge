@@ -111,12 +111,10 @@ func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
 	}
 
 	polyBftConfig := &polybft.PolyBFTConfig{
-		BlockTime:         p.blockTime,
-		EpochSize:         p.epochSize,
-		SprintSize:        p.sprintSize,
-		ValidatorSetSize:  p.validatorSetSize,
-		ValidatorSetAddr:  contracts.ValidatorSetContract,
-		StateReceiverAddr: contracts.StateReceiverContract,
+		BlockTime:        p.blockTime,
+		EpochSize:        p.epochSize,
+		SprintSize:       p.sprintSize,
+		ValidatorSetSize: p.validatorSetSize,
 		// use 1st account as governance address
 		Governance: genesisValidators[0].Address,
 	}

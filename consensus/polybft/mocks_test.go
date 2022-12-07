@@ -104,8 +104,8 @@ func (m *blockchainMock) GetHeaderByHash(hash types.Hash) (*types.Header, bool) 
 	panic("Unsupported mock for GetHeaderByHash")
 }
 
-func (m *blockchainMock) GetSystemState(config *PolyBFTConfig, provider contract.Provider) SystemState {
-	args := m.Called(config, provider)
+func (m *blockchainMock) GetSystemState(validatorSetAddr types.Address, stateReceiverAddr types.Address, provider contract.Provider) SystemState {
+	args := m.Called(validatorSetAddr, stateReceiverAddr, provider)
 
 	return args.Get(0).(SystemState) //nolint:forcetypeassert
 }

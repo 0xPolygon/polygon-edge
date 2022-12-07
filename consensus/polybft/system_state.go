@@ -47,14 +47,17 @@ type SystemStateImpl struct {
 }
 
 // NewSystemState initializes new instance of systemState which abstracts smart contracts functions
-func NewSystemState(config *PolyBFTConfig, provider contract.Provider) *SystemStateImpl {
+func NewSystemState(
+	validatorSetAddr types.Address,
+	stateReceiverAddr types.Address,
+	provider contract.Provider) *SystemStateImpl {
 	s := &SystemStateImpl{}
 	s.validatorContract = contract.NewContract(
-		ethgo.Address(config.ValidatorSetAddr),
+		ethgo.Address(validatorSetAddr),
 		stateFunctions, contract.WithProvider(provider),
 	)
 	s.sidechainBridgeContract = contract.NewContract(
-		ethgo.Address(config.StateReceiverAddr),
+		ethgo.Address(stateReceiverAddr),
 		sidechainBridgeFunctions,
 		contract.WithProvider(provider),
 	)
