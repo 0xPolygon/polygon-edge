@@ -331,6 +331,10 @@ func (t *txpoolHub) GetBalance(root types.Hash, addr types.Address) (*big.Int, e
 	account, err := getAccountImpl(t.state, root, addr)
 
 	if err != nil {
+		if errors.Is(err, jsonrpc.ErrStateNotFound) {
+			return big.NewInt(0), nil
+		}
+
 		return big.NewInt(0), err
 	}
 
