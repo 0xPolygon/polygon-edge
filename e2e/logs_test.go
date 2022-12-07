@@ -198,10 +198,7 @@ func TestFilterValue(t *testing.T) {
 		defer deployCancel()
 
 		contractAddr, err := srv.DeployContract(deployCtx, bloomFilterTestBytecode, key)
-
-		if err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(t, err)
 
 		txpoolClient := srv.TxnPoolOperator()
 		jsonRPCClient := srv.JSONRPC()
@@ -231,14 +228,9 @@ func TestFilterValue(t *testing.T) {
 			Address: filterAddresses,
 			Topics:  filterEventHashes,
 		})
-
 		assert.NoError(t, err)
 
 		castedContractAddr := types.Address(contractAddr)
-
-		if err != nil {
-			t.Fatal(err)
-		}
 
 		txn, err := tests.GenerateAddTxnReq(tests.GenerateTxReqParams{
 			Nonce:         1,
@@ -248,18 +240,13 @@ func TestFilterValue(t *testing.T) {
 			GasPrice:      big.NewInt(framework.DefaultGasPrice),
 			Input:         framework.MethodSig("TriggerMyEvent"),
 		})
-
-		if err != nil {
-			return
-		}
+		assert.NoError(t, err)
 
 		addTxnContext, cancelFn := context.WithTimeout(context.Background(), framework.DefaultTimeout)
 		defer cancelFn()
 
-		addResp, addErr := txpoolClient.AddTxn(addTxnContext, txn)
-		if addErr != nil {
-			return
-		}
+		addResp, err := txpoolClient.AddTxn(addTxnContext, txn)
+		assert.NoError(t, err)
 
 		receiptContext, cancelFn := context.WithTimeout(context.Background(), framework.DefaultTimeout)
 		defer cancelFn()
@@ -270,7 +257,6 @@ func TestFilterValue(t *testing.T) {
 		}
 
 		res, err := jsonRPCClient.Eth().GetFilterChanges(filterID)
-
 		assert.NoError(t, err)
 		assert.Len(t, res, 1)
 		assert.Equal(t, "0x000000000000000000000000000000000000000000000000000000000000002a", hex.EncodeToHex(res[0].Data))

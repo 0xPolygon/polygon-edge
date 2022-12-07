@@ -211,7 +211,6 @@ func (t *Transaction) From() Address {
 // SetSender sets the given the sender address of the transaction
 func (t *Transaction) SetSender(sender Address) {
 	t.from = sender
-	t.ComputeHash()
 }
 
 // RawSignatureValues returns the V, R, S signature values of the transaction.

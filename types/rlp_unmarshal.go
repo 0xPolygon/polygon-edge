@@ -446,10 +446,10 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 		if vv, err := v.Get(10).Bytes(); err == nil && len(vv) == AddressLength {
 			// address
 			addr := BytesToAddress(vv)
-			t.SetSender(addr)
+			t.from = addr
 		} else {
 			// reset From
-			t.SetSender(ZeroAddress)
+			t.from = ZeroAddress
 		}
 
 		t.inner = sTx
