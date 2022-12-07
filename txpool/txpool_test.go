@@ -2470,13 +2470,11 @@ func TestGetTxs(t *testing.T) {
 					eoa1.signTx(types.NewTxWithSender(newTx(1, 1), eoa1.Address), signerEIP155),
 					eoa1.signTx(types.NewTxWithSender(newTx(2, 1), eoa1.Address), signerEIP155),
 				},
-
 				eoa2.Address: {
 					eoa2.signTx(types.NewTxWithSender(newTx(0, 1), eoa2.Address), signerEIP155),
 					eoa2.signTx(types.NewTxWithSender(newTx(1, 1), eoa2.Address), signerEIP155),
 					eoa2.signTx(types.NewTxWithSender(newTx(2, 1), eoa2.Address), signerEIP155),
 				},
-
 				eoa3.Address: {
 					eoa3.signTx(types.NewTxWithSender(newTx(0, 1), eoa3.Address), signerEIP155),
 					eoa3.signTx(types.NewTxWithSender(newTx(1, 1), eoa3.Address), signerEIP155),
@@ -2489,13 +2487,11 @@ func TestGetTxs(t *testing.T) {
 					eoa1.signTx(types.NewTxWithSender(newTx(1, 1), eoa1.Address), signerEIP155),
 					eoa1.signTx(types.NewTxWithSender(newTx(2, 1), eoa1.Address), signerEIP155),
 				},
-
 				eoa2.Address: {
 					eoa2.signTx(types.NewTxWithSender(newTx(0, 1), eoa2.Address), signerEIP155),
 					eoa2.signTx(types.NewTxWithSender(newTx(1, 1), eoa2.Address), signerEIP155),
 					eoa2.signTx(types.NewTxWithSender(newTx(2, 1), eoa2.Address), signerEIP155),
 				},
-
 				eoa3.Address: {
 					eoa3.signTx(types.NewTxWithSender(newTx(0, 1), eoa3.Address), signerEIP155),
 					eoa3.signTx(types.NewTxWithSender(newTx(1, 1), eoa3.Address), signerEIP155),
@@ -2510,6 +2506,7 @@ func TestGetTxs(t *testing.T) {
 					eoa1.signTx(types.NewTxWithSender(newTx(0, 1), eoa1.Address), signerEIP155),
 					eoa1.signTx(types.NewTxWithSender(newTx(1, 1), eoa1.Address), signerEIP155),
 					eoa1.signTx(types.NewTxWithSender(newTx(2, 1), eoa1.Address), signerEIP155),
+
 					// enqueued
 					eoa1.signTx(types.NewTxWithSender(newTx(10, 1), eoa1.Address), signerEIP155),
 					eoa1.signTx(types.NewTxWithSender(newTx(11, 1), eoa1.Address), signerEIP155),
@@ -2544,13 +2541,11 @@ func TestGetTxs(t *testing.T) {
 					eoa1.signTx(types.NewTxWithSender(newTx(1, 1), eoa1.Address), signerEIP155),
 					eoa1.signTx(types.NewTxWithSender(newTx(2, 1), eoa1.Address), signerEIP155),
 				},
-
 				eoa2.Address: {
 					eoa2.signTx(types.NewTxWithSender(newTx(0, 1), eoa2.Address), signerEIP155),
 					eoa2.signTx(types.NewTxWithSender(newTx(1, 1), eoa2.Address), signerEIP155),
 					eoa2.signTx(types.NewTxWithSender(newTx(2, 1), eoa2.Address), signerEIP155),
 				},
-
 				eoa3.Address: {
 					eoa3.signTx(types.NewTxWithSender(newTx(0, 1), eoa3.Address), signerEIP155),
 					eoa3.signTx(types.NewTxWithSender(newTx(1, 1), eoa3.Address), signerEIP155),
@@ -2563,13 +2558,11 @@ func TestGetTxs(t *testing.T) {
 					eoa1.signTx(types.NewTxWithSender(newTx(11, 1), eoa1.Address), signerEIP155),
 					eoa1.signTx(types.NewTxWithSender(newTx(12, 1), eoa1.Address), signerEIP155),
 				},
-
 				eoa2.Address: {
 					eoa2.signTx(types.NewTxWithSender(newTx(10, 1), eoa2.Address), signerEIP155),
 					eoa2.signTx(types.NewTxWithSender(newTx(11, 1), eoa2.Address), signerEIP155),
 					eoa2.signTx(types.NewTxWithSender(newTx(12, 1), eoa2.Address), signerEIP155),
 				},
-
 				eoa3.Address: {
 					eoa3.signTx(types.NewTxWithSender(newTx(10, 1), eoa3.Address), signerEIP155),
 					eoa3.signTx(types.NewTxWithSender(newTx(11, 1), eoa3.Address), signerEIP155),
