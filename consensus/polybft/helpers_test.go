@@ -40,12 +40,12 @@ func createSignature(t *testing.T, accounts []*wallet.Account, hash types.Hash) 
 	return &Signature{AggregatedSignature: aggs, Bitmap: bmp}
 }
 
-func generateStateSyncEvents(t *testing.T, eventsCount int, startIdx uint64) []*StateSyncEvent {
+func generateStateSyncEvents(t *testing.T, eventsCount int, startIdx uint64) []*types.StateSyncEvent {
 	t.Helper()
 
-	stateSyncEvents := make([]*StateSyncEvent, eventsCount)
+	stateSyncEvents := make([]*types.StateSyncEvent, eventsCount)
 	for i := 0; i < eventsCount; i++ {
-		stateSyncEvents[i] = &StateSyncEvent{
+		stateSyncEvents[i] = &types.StateSyncEvent{
 			ID:     startIdx + uint64(i),
 			Sender: ethgo.Address(types.StringToAddress(fmt.Sprintf("0x5%d", i))),
 			Data:   generateRandomBytes(t),

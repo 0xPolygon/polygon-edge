@@ -913,7 +913,7 @@ func TestConsensusRuntime_FSM_EndOfSprint_HasBundlesToExecute(t *testing.T) {
 		lastBuiltBlock: lastBlock,
 	}
 
-	require.NoError(t, runtime.buildBundles(runtime.getEpoch().Commitment, commitmentMsg, fromIndex))
+	require.NoError(t, runtime.buildProofs(runtime.getEpoch().Commitment, commitmentMsg, fromIndex))
 
 	err = runtime.FSM()
 	fsm := runtime.fsm
@@ -1471,7 +1471,7 @@ func TestConsensusRuntime_validateVote_VoteSentFromUnknownValidator(t *testing.T
 		fmt.Sprintf("message is received from sender %s, which is not in current validator set", vote.From))
 }
 
-func TestConsensusRuntime_buildBundles_NoCommitment(t *testing.T) {
+func TestConsensusRuntime_buildProofs_NoCommitment(t *testing.T) {
 	t.Parallel()
 
 	state := newTestState(t)
@@ -1484,23 +1484,22 @@ func TestConsensusRuntime_buildBundles_NoCommitment(t *testing.T) {
 	}
 
 	_, epoch := runtime.getLastBuiltBlockAndEpoch()
-	assert.NoError(t, runtime.buildBundles(epoch.Commitment, commitmentMsg, 0))
+	assert.NoError(t, runtime.buildProofs(epoch.Commitment, commitmentMsg, 0))
 
-	bundles, err := state.getBundles(0, 4)
+	proof, err := state.getStateSyncProof(0)
 
 	assert.NoError(t, err)
-	assert.Nil(t, bundles)
+	assert.Nil(t, proof)
 }
 
-func TestConsensusRuntime_buildBundles(t *testing.T) {
+func TestConsensusRuntime_buildProofs(t *testing.T) {
 	t.Parallel()
 
 	const (
-		epoch                 = 0
-		bundleSize            = 5
-		fromIndex             = 0
-		toIndex               = 4
-		expectedBundlesNumber = 1
+		epoch      = 0
+		bundleSize = 5
+		fromIndex  = 0
+		toIndex    = 4
 	)
 
 	state := newTestState(t)
@@ -1532,11 +1531,15 @@ func TestConsensusRuntime_buildBundles(t *testing.T) {
 	}
 
 	_, epochData := runtime.getLastBuiltBlockAndEpoch()
-	assert.NoError(t, runtime.buildBundles(epochData.Commitment, commitmentMsg, 0))
+	assert.NoError(t, runtime.buildProofs(epochData.Commitment, commitmentMsg, 0))
 
-	bundles, err := state.getBundles(fromIndex, maxBundlesPerSprint)
-	assert.NoError(t, err)
-	assert.Equal(t, expectedBundlesNumber, len(bundles))
+	for i := fromIndex; i <= toIndex; i++ {
+		proof, err := state.getStateSyncProof(uint64(i))
+		assert.NoError(t, err)
+		assert.NotNil(t, proof)
+		assert.NotEmpty(t, proof.Proof)
+		assert.Equal(t, uint64(i), proof.StateSync.ID)
+	}
 }
 
 func TestConsensusRuntime_FSM_EndOfEpoch_OnBlockInserted(t *testing.T) {
@@ -1663,9 +1666,9 @@ func TestConsensusRuntime_FSM_EndOfEpoch_OnBlockInserted(t *testing.T) {
 	assert.Equal(t, trie.Hash(), commitmentMsgFromDB.Message.MerkleRootHash)
 	assert.NotNil(t, commitmentMsgFromDB.AggSignature)
 
-	bundles, err := state.getBundles(fromIndex, maxBundlesPerSprint)
+	proof, err := state.getStateSyncProof(fromIndex)
 	assert.NoError(t, err)
-	assert.Equal(t, 10, len(bundles[0].StateSyncs))
+	assert.Equal(t, fromIndex, proof.StateSync.ID)
 
 	systemStateMock.AssertExpectations(t)
 	blockchainMock.AssertExpectations(t)
@@ -2277,7 +2280,7 @@ func createTestExtraForAccounts(t *testing.T, validators AccountSet, b bitmap.Bi
 	return result
 }
 
-func insertTestStateSyncEvents(t *testing.T, numberOfEvents int, startIndex uint64, state *State) []*StateSyncEvent {
+func insertTestStateSyncEvents(t *testing.T, numberOfEvents int, startIndex uint64, state *State) []*types.StateSyncEvent {
 	t.Helper()
 
 	stateSyncs := generateStateSyncEvents(t, numberOfEvents, startIndex)

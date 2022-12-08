@@ -79,10 +79,10 @@ func executeStateSync(t *testing.T, client *jsonrpc.Client, account ethgo.Key, s
 
 	t.Log("State sync proofs:", stateSyncProof)
 
-	input, err := types.ExecuteBundleABIMethod.Encode([2]interface{}{stateSyncProof.Proof, stateSyncEventToAbiSlice(stateSyncProof.StateSync)})
+	input, err := types.ExecuteBundleABIMethod.Encode([2]interface{}{stateSyncProof.Proof, stateSyncProof.StateSync.ToMap()})
 	require.NoError(t, err)
 
-	t.Log(stateSyncEventToAbiSlice(stateSyncProof.StateSync))
+	t.Log(stateSyncProof.StateSync.ToMap())
 
 	nonce, err := client.Eth().GetNonce(account.Address(), ethgo.Latest)
 	require.NoError(t, err)

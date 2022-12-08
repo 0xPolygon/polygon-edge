@@ -200,7 +200,7 @@ func (c *consensusRuntime) OnBlockInserted(block *types.Block) {
 	// after the block has been written we reset the txpool so that the old transactions are removed
 	c.config.txPool.ResetWithHeaders(block.Header)
 
-	// handle commitment and bundles creation
+	// handle commitment and proofs creation
 	if err := c.createCommitment(block.Transactions); err != nil {
 		c.logger.Error("on block inserted error", "err", err)
 	}
@@ -250,7 +250,7 @@ func (c *consensusRuntime) createCommitment(txs []*types.Transaction) error {
 		return fmt.Errorf("create commitment, get next execution index error: %w", err)
 	}
 
-	if err := c.buildBundles(
+	if err := c.buildProofs(
 		epoch.Commitment, commitment.Message, nextStateSyncExecutionIdx); err != nil {
 		return fmt.Errorf("create commitment error: %w", err)
 	}
@@ -308,6 +308,14 @@ func (c *consensusRuntime) populateFsmIfBridgeEnabled(
 	if isEndOfSprint {
 		if err := c.state.cleanCommitments(nextStateSyncExecutionIdx); err != nil {
 			return fmt.Errorf("cannot clean commitments: %w", err)
+		}
+
+		nonExecutedCommitments, err := c.state.getNonExecutedCommitments(nextStateSyncExecutionIdx)
+		if err != nil {
+			return fmt.Errorf("cannot get non executed commitments: %w", err)
+		}
+		if len(nonExecutedCommitments) > 0 {
+			ff.commitmentsToVerifyBundles = nonExecutedCommitments
 		}
 	}
 
@@ -556,8 +564,8 @@ func (c *consensusRuntime) buildCommitment(epoch, fromIndex uint64) (*Commitment
 	return commitment, nil
 }
 
-// buildBundles builds bundles if there is a created commitment by the validator and inserts them into db
-func (c *consensusRuntime) buildBundles(commitment *Commitment, commitmentMsg *CommitmentMessage,
+// buildProofs builds state sync proofs if there is a created commitment by the validator and inserts them into db
+func (c *consensusRuntime) buildProofs(commitment *Commitment, commitmentMsg *CommitmentMessage,
 	stateSyncExecutionIndex uint64) error {
 	c.logger.Debug(
 		"[buildProofs] Building proofs...",
@@ -575,23 +583,20 @@ func (c *consensusRuntime) buildBundles(commitment *Commitment, commitmentMsg *C
 		return nil
 	}
 
-	var bundleProofs []*BundleProof
+	events, err := c.state.getStateSyncEventsForCommitment(commitmentMsg.FromIndex, commitmentMsg.ToIndex)
+	if err != nil {
+		return err
+	}
 
-	startBundleIdx := stateSyncExecutionIndex - commitment.FromIndex
+	stateSyncProofs := make([]*types.StateSyncProof, len(events))
 
-	for idx := startBundleIdx; idx < commitmentMsg.StateSyncCount(); idx++ {
-		p := commitment.MerkleTree.GenerateProof(idx, 0)
-		events, err := c.state.getStateSyncEventsForCommitment(commitmentMsg.FromIndex, commitmentMsg.ToIndex)
+	for i, event := range events {
+		p := commitment.MerkleTree.GenerateProof(uint64(i), 0)
 
-		if err != nil {
-			return err
+		stateSyncProofs[i] = &types.StateSyncProof{
+			Proof:     p,
+			StateSync: event,
 		}
-
-		bundleProofs = append(bundleProofs,
-			&BundleProof{
-				Proof:      p,
-				StateSyncs: events,
-			})
 	}
 
 	c.logger.Debug(
@@ -601,7 +606,7 @@ func (c *consensusRuntime) buildBundles(commitment *Commitment, commitmentMsg *C
 		"nextExecutionIndex", stateSyncExecutionIndex,
 	)
 
-	return c.state.insertBundles(bundleProofs)
+	return c.state.insertStateSyncProofs(stateSyncProofs)
 }
 
 // getAggSignatureForCommitmentMessage creates aggregated signatures for given commitment
@@ -667,13 +672,6 @@ func (c *consensusRuntime) getAggSignatureForCommitmentMessage(
 	}
 
 	return result, publicKeys, nil
-}
-
-// getStateSyncEventsForBundle gets state sync events from database for the appropriate bundle
-func (c *consensusRuntime) getStateSyncEventsForBundle(from, bundleSize uint64) ([]*StateSyncEvent, error) {
-	until := bundleSize + from - 1
-
-	return c.state.getStateSyncEventsForCommitment(from, until)
 }
 
 // startEventTracker starts the event tracker that listens to state sync events
@@ -895,27 +893,18 @@ func (c *consensusRuntime) GenerateExitProof(exitID, epoch, checkpointBlock uint
 	return tree.GenerateProofForLeaf(e, 0)
 }
 
-// GetStateSyncProof returns the proof of the bundle for the state sync
+// GetStateSyncProof returns the proof for the state sync
 func (c *consensusRuntime) GetStateSyncProof(stateSyncID uint64) (*types.StateSyncProof, error) {
-	bundlesToExecute, err := c.state.getBundles(stateSyncID, 1)
+	proof, err := c.state.getStateSyncProof(stateSyncID)
 	if err != nil {
-		return nil, fmt.Errorf("cannot get bundles: %w", err)
+		return nil, fmt.Errorf("cannot get state sync proof for StateSync id %d: %w", stateSyncID, err)
 	}
 
-	if len(bundlesToExecute) == 0 {
-		return nil, fmt.Errorf("cannot find bundle containing StateSync id %d", stateSyncID)
+	if proof == nil {
+		return nil, fmt.Errorf("cannot find state sync proof containing StateSync id %d", stateSyncID)
 	}
 
-	for _, bundle := range bundlesToExecute[0].StateSyncs {
-		if bundle.ID == stateSyncID {
-			return &types.StateSyncProof{
-				Proof:     bundlesToExecute[0].Proof,
-				StateSync: (*types.StateSyncEvent)(bundle),
-			}, nil
-		}
-	}
-
-	return nil, fmt.Errorf("cannot find StateSync with id %d", stateSyncID)
+	return proof, nil
 }
 
 // setIsActiveValidator updates the activeValidatorFlag field

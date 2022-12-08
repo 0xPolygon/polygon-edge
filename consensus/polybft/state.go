@@ -72,18 +72,14 @@ func (e *exitEventNotFoundError) Error() string {
 		e.exitID, e.checkpointBlock, e.epoch)
 }
 
-// TODO: remove and refactor to use types.StateSyncEvent
-// StateSyncEvent is a bridge event from the rootchain
-type StateSyncEvent types.StateSyncEvent
-
 // newStateSyncEvent creates an instance of pending state sync event.
 func newStateSyncEvent(
 	id uint64,
 	sender ethgo.Address,
 	target ethgo.Address,
 	data []byte,
-) *StateSyncEvent {
-	return &StateSyncEvent{
+) *types.StateSyncEvent {
+	return &types.StateSyncEvent{
 		ID:       id,
 		Sender:   sender,
 		Receiver: target,
@@ -91,11 +87,7 @@ func newStateSyncEvent(
 	}
 }
 
-func (s *StateSyncEvent) String() string {
-	return fmt.Sprintf("Id=%d, Sender=%v, Target=%v", s.ID, s.Sender, s.Receiver)
-}
-
-func decodeStateSyncEvent(log *ethgo.Log) (*StateSyncEvent, error) {
+func decodeStateSyncEvent(log *ethgo.Log) (*types.StateSyncEvent, error) {
 	raw, err := stateTransferEventABI.ParseLog(log)
 	if err != nil {
 		return nil, err
@@ -109,7 +101,7 @@ func decodeStateSyncEvent(log *ethgo.Log) (*StateSyncEvent, error) {
 		return nil, err
 	}
 
-	stateSyncEvent, ok := eventGeneric.(*StateSyncEvent)
+	stateSyncEvent, ok := eventGeneric.(*types.StateSyncEvent)
 	if !ok {
 		return nil, errors.New("failed to convert event to StateSyncEvent instance")
 	}
@@ -235,7 +227,7 @@ var (
 	// bucket to store commitments
 	commitmentsBucket = []byte("commitments")
 	// bucket to store bundles
-	bundlesBucket = []byte("bundles")
+	stateSyncProofsBucket = []byte("stateSyncProofs")
 	// bucket to store epochs and all its nested buckets (message votes and message pool events)
 	epochsBucket = []byte("epochs")
 	// bucket to store message votes (signatures)
@@ -243,7 +235,7 @@ var (
 	// bucket to store validator snapshots
 	validatorSnapshotsBucket = []byte("validatorSnapshots")
 	// array of all parent buckets
-	parentBuckets = [][]byte{syncStateEventsBucket, exitEventsBucket, commitmentsBucket, bundlesBucket,
+	parentBuckets = [][]byte{syncStateEventsBucket, exitEventsBucket, commitmentsBucket, stateSyncProofsBucket,
 		epochsBucket, validatorSnapshotsBucket}
 	// errNotEnoughStateSyncs error message
 	errNotEnoughStateSyncs = errors.New("there is either a gap or not enough sync events")
@@ -326,12 +318,12 @@ func (s *State) getValidatorSnapshot(epoch uint64) (AccountSet, error) {
 }
 
 // list iterates through all events in events bucket in db, unmarshals them, and returns as array
-func (s *State) list() ([]*StateSyncEvent, error) {
-	events := []*StateSyncEvent{}
+func (s *State) list() ([]*types.StateSyncEvent, error) {
+	events := []*types.StateSyncEvent{}
 
 	err := s.db.View(func(tx *bolt.Tx) error {
 		return tx.Bucket(syncStateEventsBucket).ForEach(func(k, v []byte) error {
-			var event *StateSyncEvent
+			var event *types.StateSyncEvent
 			if err := json.Unmarshal(v, &event); err != nil {
 				return err
 			}
@@ -448,7 +440,7 @@ func (s *State) getExitEvents(epoch uint64, filter func(exitEvent *ExitEvent) bo
 }
 
 // insertStateSyncEvent inserts a new state sync event to state event bucket in db
-func (s *State) insertStateSyncEvent(event *StateSyncEvent) error {
+func (s *State) insertStateSyncEvent(event *types.StateSyncEvent) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
 		raw, err := json.Marshal(event)
 		if err != nil {
@@ -463,8 +455,8 @@ func (s *State) insertStateSyncEvent(event *StateSyncEvent) error {
 
 // getStateSyncEventsForCommitment returns state sync events for commitment
 // if there is an event with index that can not be found in db in given range, an error is returned
-func (s *State) getStateSyncEventsForCommitment(fromIndex, toIndex uint64) ([]*StateSyncEvent, error) {
-	var events []*StateSyncEvent
+func (s *State) getStateSyncEventsForCommitment(fromIndex, toIndex uint64) ([]*types.StateSyncEvent, error) {
+	var events []*types.StateSyncEvent
 
 	err := s.db.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(syncStateEventsBucket)
@@ -474,7 +466,7 @@ func (s *State) getStateSyncEventsForCommitment(fromIndex, toIndex uint64) ([]*S
 				return errNotEnoughStateSyncs
 			}
 
-			var event *StateSyncEvent
+			var event *types.StateSyncEvent
 			if err := json.Unmarshal(v, &event); err != nil {
 				return err
 			}
@@ -542,6 +534,38 @@ func (s *State) getCommitmentMessage(toIndex uint64) (*CommitmentMessageSigned, 
 	return commitment, err
 }
 
+// getNonExecutedCommitments gets non executed commitments
+// (commitments whose toIndex is greater than or equal to startIndex)
+func (s *State) getNonExecutedCommitments(startIndex uint64) ([]*CommitmentMessageSigned, error) {
+	var commitments []*CommitmentMessageSigned
+
+	err := s.db.View(func(tx *bolt.Tx) error {
+		c := tx.Bucket(commitmentsBucket).Cursor()
+
+		for k, v := c.Last(); k != nil; k, v = c.Prev() {
+			if itou(k) < startIndex {
+				// reached a commitment that was executed
+				break
+			}
+
+			var commitment *CommitmentMessageSigned
+			if err := json.Unmarshal(v, &commitment); err != nil {
+				return err
+			}
+
+			commitments = append(commitments, commitment)
+		}
+
+		return nil
+	})
+
+	sort.Slice(commitments, func(i, j int) bool {
+		return commitments[i].Message.FromIndex < commitments[j].Message.FromIndex
+	})
+
+	return commitments, err
+}
+
 // cleanCommitments cleans all commitments that are older than the provided fromIndex, alongside their proofs
 func (s *State) cleanCommitments(stateSyncExecutionIndex uint64) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
@@ -558,15 +582,15 @@ func (s *State) cleanCommitments(stateSyncExecutionIndex uint64) error {
 			}
 		}
 
-		bundlesBucket := tx.Bucket(bundlesBucket)
-		bundlesCursor := bundlesBucket.Cursor()
-		for k, _ := bundlesCursor.First(); k != nil; k, _ = bundlesCursor.Next() {
+		ssBucket := tx.Bucket(stateSyncProofsBucket)
+		c := ssBucket.Cursor()
+		for k, _ := c.First(); k != nil; k, _ = c.Next() {
 			if itou(k) >= stateSyncExecutionIndex {
 				// reached a bundle that is not executed
 				break
 			}
 
-			if err := bundlesBucket.Delete(k); err != nil {
+			if err := ssBucket.Delete(k); err != nil {
 				return err
 			}
 		}
@@ -575,17 +599,17 @@ func (s *State) cleanCommitments(stateSyncExecutionIndex uint64) error {
 	})
 }
 
-// insertBundles inserts the provided bundles to db
-func (s *State) insertBundles(bundles []*BundleProof) error {
+// insertStateSyncProofs inserts the provided state sync proofs to db
+func (s *State) insertStateSyncProofs(stateSyncProof []*types.StateSyncProof) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
-		bundlesBucket := tx.Bucket(bundlesBucket)
-		for _, b := range bundles {
-			raw, err := json.Marshal(b)
+		bundlesBucket := tx.Bucket(stateSyncProofsBucket)
+		for _, ssp := range stateSyncProof {
+			raw, err := json.Marshal(ssp)
 			if err != nil {
 				return err
 			}
 
-			if err := bundlesBucket.Put(itob(b.ID()), raw); err != nil {
+			if err := bundlesBucket.Put(itob(ssp.StateSync.ID), raw); err != nil {
 				return err
 			}
 		}
@@ -594,29 +618,21 @@ func (s *State) insertBundles(bundles []*BundleProof) error {
 	})
 }
 
-// getBundles gets bundles that are not executed
-func (s *State) getBundles(stateSyncExecutionIndex, maxNumberOfBundles uint64) ([]*BundleProof, error) {
-	var bundles []*BundleProof
+// getStateSyncProof gets state sync proof that are not executed
+func (s *State) getStateSyncProof(stateSyncExecutionIndex uint64) (*types.StateSyncProof, error) {
+	var ssp *types.StateSyncProof
 
 	err := s.db.View(func(tx *bolt.Tx) error {
-		c := tx.Bucket(bundlesBucket).Cursor()
-		processed := uint64(0)
-		for k, v := c.First(); k != nil && processed < maxNumberOfBundles; k, v = c.Next() {
-			if itou(k) >= stateSyncExecutionIndex {
-				var bundle *BundleProof
-				if err := json.Unmarshal(v, &bundle); err != nil {
-					return err
-				}
-
-				bundles = append(bundles, bundle)
-				processed++
+		if v := tx.Bucket(stateSyncProofsBucket).Get(itob(stateSyncExecutionIndex)); v != nil {
+			if err := json.Unmarshal(v, &ssp); err != nil {
+				return err
 			}
 		}
 
 		return nil
 	})
 
-	return bundles, err
+	return ssp, err
 }
 
 // insertMessageVote inserts given vote to signatures bucket of given epoch

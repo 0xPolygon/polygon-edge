@@ -24,8 +24,17 @@ const (
 	stTypeStateSync   = "state-sync"
 )
 
-// StateTransactionType is a type, which represents state transaction type
 type StateTransactionType string
+
+// StateTransactionInput is an abstraction for different state transaction inputs
+type StateTransactionInput interface {
+	// EncodeAbi contains logic for encoding arbitrary data into ABI format
+	EncodeAbi() ([]byte, error)
+	// DecodeAbi contains logic for decoding given ABI data
+	DecodeAbi(b []byte) error
+	// Type returns type of state transaction input
+	Type() StateTransactionType
+}
 
 // StateSyncEvent is a bridge event from the rootchain
 type StateSyncEvent struct {
@@ -41,7 +50,7 @@ type StateSyncEvent struct {
 	Skip bool
 }
 
-func (sse *StateSyncEvent) ToAbiSlice() map[string]interface{} {
+func (sse *StateSyncEvent) ToMap() map[string]interface{} {
 	return map[string]interface{}{
 		"id":       sse.ID,
 		"sender":   sse.Sender,
@@ -51,6 +60,10 @@ func (sse *StateSyncEvent) ToAbiSlice() map[string]interface{} {
 	}
 }
 
+func (sse *StateSyncEvent) String() string {
+	return fmt.Sprintf("Id=%d, Sender=%v, Target=%v", sse.ID, sse.Sender, sse.Receiver)
+}
+
 type StateSyncProof struct {
 	Proof     []Hash
 	StateSync *StateSyncEvent
@@ -58,7 +71,7 @@ type StateSyncProof struct {
 
 // EncodeAbi contains logic for encoding given ABI data
 func (ssp *StateSyncProof) EncodeAbi() ([]byte, error) {
-	return ExecuteStateSyncABIMethod.Encode([2]interface{}{ssp.Proof, ssp.StateSync.ToAbiSlice()})
+	return ExecuteStateSyncABIMethod.Encode([2]interface{}{ssp.Proof, ssp.StateSync.ToMap()})
 }
 
 // DecodeAbi contains logic for decoding given ABI data

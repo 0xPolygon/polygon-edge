@@ -28,8 +28,6 @@ type blockBuilder interface {
 	Receipts() []*types.Receipt
 }
 
-const maxBundlesPerSprint = 50
-
 type fsm struct {
 	// PolyBFT consensus protocol configuration
 	config *PolyBFTConfig

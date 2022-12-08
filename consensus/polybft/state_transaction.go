@@ -12,7 +12,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/state/runtime/precompiled"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/mitchellh/mapstructure"
-	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
 )
 
@@ -41,122 +40,12 @@ var (
 	validatorsUptimeMethod, _ = abi.NewMethod("function uptime(bytes data)")
 )
 
-// StateTransactionInput is an abstraction for different state transaction inputs
-type StateTransactionInput interface {
-	// EncodeAbi contains logic for encoding arbitrary data into ABI format
-	EncodeAbi() ([]byte, error)
-	// DecodeAbi contains logic for decoding given ABI data
-	DecodeAbi(b []byte) error
-	// Type returns type of state transaction input
-	Type() types.StateTransactionType
-}
-
 const (
 	abiMethodIDLength      = 4
 	stTypeBridgeCommitment = "commitment"
 	stTypeEndEpoch         = "end-epoch"
 	stTypeBridgeBundle     = "bundle"
 )
-
-// Bundle is a type alias for slice of StateSyncEvents
-type Bundle []*StateSyncEvent
-
-var _ StateTransactionInput = &BundleProof{}
-
-// BundleProof contains the proof of a bundle
-type BundleProof struct {
-	Proof      []types.Hash
-	StateSyncs Bundle
-}
-
-// ID returns identificator of bundle proof, which correspond to its first state sync id
-func (bp *BundleProof) ID() uint64 { return bp.StateSyncs[0].ID }
-
-// EncodeAbi contains logic for encoding arbitrary data into ABI format
-func (bp *BundleProof) EncodeAbi() ([]byte, error) {
-	return executeBundleABIMethod.Encode([2]interface{}{bp.Proof, stateSyncEventsToAbiSlice(bp.StateSyncs)})
-}
-
-// DecodeAbi contains logic for decoding given ABI data
-func (bp *BundleProof) DecodeAbi(txData []byte) error {
-	if len(txData) < abiMethodIDLength {
-		return fmt.Errorf("invalid bundle data, len = %d", len(txData))
-	}
-
-	rawResult, err := executeBundleABIMethod.Inputs.Decode(txData[abiMethodIDLength:])
-	if err != nil {
-		return err
-	}
-
-	result, isOk := rawResult.(map[string]interface{})
-	if !isOk {
-		return fmt.Errorf("invalid bundle data")
-	}
-
-	stateSyncEventsEncoded, isOk := result["objs"].([]map[string]interface{})
-	if !isOk {
-		return fmt.Errorf("invalid state sync data")
-	}
-
-	proofEncoded, isOk := result["proof"].([][32]byte)
-	if !isOk {
-		return fmt.Errorf("invalid proof data")
-	}
-
-	stateSyncs := make([]*StateSyncEvent, len(stateSyncEventsEncoded))
-
-	for i, sse := range stateSyncEventsEncoded {
-		id, isOk := sse["id"].(*big.Int)
-		if !isOk {
-			return fmt.Errorf("invalid state sync event id")
-		}
-
-		senderEthgo, isOk := sse["sender"].(ethgo.Address)
-		if !isOk {
-			return fmt.Errorf("invalid state sync sender field")
-		}
-
-		receiverEthgo, isOk := sse["receiver"].(ethgo.Address)
-		if !isOk {
-			return fmt.Errorf("invalid state sync receiver field")
-		}
-
-		data, isOk := sse["data"].([]byte)
-		if !isOk {
-			return fmt.Errorf("invalid state sync data field")
-		}
-
-		skip, isOk := sse["skip"].(bool)
-		if !isOk {
-			return fmt.Errorf("invalid state sync skip field")
-		}
-
-		stateSyncs[i] = &StateSyncEvent{
-			ID:       id.Uint64(),
-			Sender:   senderEthgo,
-			Receiver: receiverEthgo,
-			Data:     data,
-			Skip:     skip,
-		}
-	}
-
-	proof := make([]types.Hash, len(proofEncoded))
-	for i := 0; i < len(proofEncoded); i++ {
-		proof[i] = types.Hash(proofEncoded[i])
-	}
-
-	*bp = BundleProof{
-		Proof:      proof,
-		StateSyncs: stateSyncs,
-	}
-
-	return nil
-}
-
-// Type returns type of state transaction input
-func (bp *BundleProof) Type() types.StateTransactionType {
-	return stTypeBridgeBundle
-}
 
 // Commitment holds merkle trie of bridge transactions accompanied by epoch number
 type Commitment struct {
@@ -168,7 +57,7 @@ type Commitment struct {
 }
 
 // NewCommitment creates a new commitment object
-func NewCommitment(epoch uint64, stateSyncEvents []*StateSyncEvent) (*Commitment, error) {
+func NewCommitment(epoch uint64, stateSyncEvents []*types.StateSyncEvent) (*Commitment, error) {
 	tree, err := createMerkleTree(stateSyncEvents)
 	if err != nil {
 		return nil, err
@@ -260,7 +149,8 @@ func (cm *CommitmentMessage) StateSyncCount() uint64 {
 	return cm.ToIndex - cm.FromIndex
 }
 
-// VerifyStateSyncProof validates given state sync proof against merkle trie root hash contained in the CommitmentMessage
+// VerifyStateSyncProof validates given state sync proof
+// against merkle trie root hash contained in the CommitmentMessage
 func (cm CommitmentMessage) VerifyStateSyncProof(stateSyncProof *types.StateSyncProof) error {
 	if stateSyncProof.StateSync == nil {
 		return errors.New("no state sync event")
@@ -274,7 +164,7 @@ func (cm CommitmentMessage) VerifyStateSyncProof(stateSyncProof *types.StateSync
 	return VerifyProof(stateSyncProof.StateSync.ID-cm.FromIndex, hash, stateSyncProof.Proof, cm.MerkleRootHash)
 }
 
-var _ StateTransactionInput = &CommitmentMessageSigned{}
+var _ types.StateTransactionInput = &CommitmentMessageSigned{}
 
 // CommitmentMessageSigned encapsulates commitment message with aggregated signatures
 type CommitmentMessageSigned struct {
@@ -402,14 +292,14 @@ func (cm *CommitmentMessageSigned) Type() types.StateTransactionType {
 	return stTypeBridgeCommitment
 }
 
-func decodeStateTransaction(txData []byte) (StateTransactionInput, error) {
+func decodeStateTransaction(txData []byte) (types.StateTransactionInput, error) {
 	if len(txData) < abiMethodIDLength {
 		return nil, fmt.Errorf("state transactions have input")
 	}
 
 	sig := txData[:abiMethodIDLength]
 
-	var obj StateTransactionInput
+	var obj types.StateTransactionInput
 
 	if bytes.Equal(sig, commitBundleABIMethod.ID()) {
 		// bridge commitment
@@ -449,7 +339,7 @@ func getCommitmentMessageSignedTx(txs []*types.Transaction) (*CommitmentMessageS
 	return nil, nil
 }
 
-func stateSyncEventsToAbiSlice(stateSyncEvents []*StateSyncEvent) []map[string]interface{} {
+func stateSyncEventsToAbiSlice(stateSyncEvents []*types.StateSyncEvent) []map[string]interface{} {
 	result := make([]map[string]interface{}, len(stateSyncEvents))
 	for i, sse := range stateSyncEvents {
 		result[i] = map[string]interface{}{
@@ -464,7 +354,7 @@ func stateSyncEventsToAbiSlice(stateSyncEvents []*StateSyncEvent) []map[string]i
 	return result
 }
 
-func stateSyncEventsToHash(stateSyncEvents []*StateSyncEvent) ([]byte, error) {
+func stateSyncEventsToHash(stateSyncEvents []*types.StateSyncEvent) ([]byte, error) {
 	stateSyncEventsForEncoding := stateSyncEventsToAbiSlice(stateSyncEvents)
 
 	stateSyncEncoded, err := stateSyncEventABIType.Encode([]interface{}{stateSyncEventsForEncoding})
@@ -475,7 +365,7 @@ func stateSyncEventsToHash(stateSyncEvents []*StateSyncEvent) ([]byte, error) {
 	return stateSyncEncoded, nil
 }
 
-func createMerkleTree(stateSyncEvents []*StateSyncEvent) (*MerkleTree, error) {
+func createMerkleTree(stateSyncEvents []*types.StateSyncEvent) (*MerkleTree, error) {
 	ssh := make([][]byte, len(stateSyncEvents))
 
 	for i, sse := range stateSyncEvents {
@@ -498,7 +388,7 @@ func createMerkleTree(stateSyncEvents []*StateSyncEvent) (*MerkleTree, error) {
 	return NewMerkleTree(ssh)
 }
 
-var _ StateTransactionInput = &CommitEpoch{}
+var _ types.StateTransactionInput = &CommitEpoch{}
 
 var (
 	commitEpochMethod, _ = abi.NewMethod("function commitEpoch(" +

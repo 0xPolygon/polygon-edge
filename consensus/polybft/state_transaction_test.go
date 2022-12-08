@@ -83,7 +83,7 @@ func TestCommitmentMessage_VerifyProof(t *testing.T) {
 		proof := commitment.MerkleTree.GenerateProof(uint64(i), 0)
 		stateSyncsProof := &types.StateSyncProof{
 			Proof:     proof,
-			StateSync: (*types.StateSyncEvent)(stateSync),
+			StateSync: stateSync,
 		}
 
 		inputData, err := stateSyncsProof.EncodeAbi()
@@ -123,7 +123,7 @@ func TestCommitmentMessage_VerifyProof_StateSyncHashNotEqualToProof(t *testing.T
 	proof := trie.GenerateProof(bundleIndex, 0)
 
 	stateSyncProof := &types.StateSyncProof{
-		StateSync: (*types.StateSyncEvent)(stateSyncs[4]),
+		StateSync: stateSyncs[4],
 		Proof:     proof,
 	}
 
@@ -137,7 +137,7 @@ func TestCommitmentMessage_VerifyProof_StateSyncHashNotEqualToProof(t *testing.T
 }
 
 func buildCommitmentAndStateSyncs(t *testing.T, stateSyncsCount int,
-	epoch, startIdx uint64) (*Commitment, *CommitmentMessage, []*StateSyncEvent) {
+	epoch, startIdx uint64) (*Commitment, *CommitmentMessage, []*types.StateSyncEvent) {
 	t.Helper()
 
 	stateSyncEvents := generateStateSyncEvents(t, stateSyncsCount, startIdx)
@@ -178,7 +178,7 @@ func TestStateTransaction_Signature(t *testing.T) {
 func TestStateTransaction_Encoding(t *testing.T) {
 	t.Parallel()
 
-	cases := []StateTransactionInput{
+	cases := []types.StateTransactionInput{
 		// empty commit epoch
 		&CommitEpoch{
 			Uptime: Uptime{
@@ -194,7 +194,7 @@ func TestStateTransaction_Encoding(t *testing.T) {
 
 		// use reflection to create another type and decode
 		val := reflect.New(reflect.TypeOf(c).Elem()).Interface()
-		obj, ok := val.(StateTransactionInput)
+		obj, ok := val.(types.StateTransactionInput)
 		assert.True(t, ok)
 
 		err = obj.DecodeAbi(res)

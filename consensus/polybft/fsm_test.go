@@ -1178,12 +1178,12 @@ func TestFSM_StateTransactionsEndOfSprint(t *testing.T) {
 		case *CommitmentMessageSigned:
 			require.Equal(t, 0, i, "failed for tx number %d", i)
 			require.Equal(t, signedCommitment, stateTxData, "failed for tx number %d", i)
-		case *BundleProof:
+		case *types.StateSyncProof:
 			require.NotEqual(t, 0, i, "failed for tx number %d", i)
 
 			for _, cm := range commitments {
-				if cm.ContainsStateSync(stateTxData.StateSyncs[0].ID) {
-					bundleIndx := stateTxData.StateSyncs[0].ID - cm.FromIndex
+				if cm.ContainsStateSync(stateTxData.StateSync.ID) {
+					bundleIndx := stateTxData.StateSync.ID - cm.FromIndex
 					require.Equal(t, uint64((i-1)%(eventsSize/bundleSize)), bundleIndx, "failed for tx number %d", i)
 				}
 			}
@@ -1194,23 +1194,13 @@ func TestFSM_StateTransactionsEndOfSprint(t *testing.T) {
 func TestFSM_VerifyStateTransaction_NotEndOfSprint(t *testing.T) {
 	t.Parallel()
 
-	cm, _, sse := buildCommitmentAndStateSyncs(t, 10, uint64(3), 2)
 	f := &fsm{
 		isEndOfSprint: false,
 		config:        &PolyBFTConfig{},
 	}
 
-	proof := cm.MerkleTree.GenerateProof(0, 0)
-
-	bf := &BundleProof{
-		Proof:      proof,
-		StateSyncs: sse[0:1],
-	}
-	inputData, err := bf.EncodeAbi()
-	require.NoError(t, err)
-
-	txns := []*types.Transaction{createStateTransactionWithData(f.config.StateReceiverAddr, inputData)}
-	err = f.VerifyStateTransactions(txns)
+	txns := []*types.Transaction{createStateTransactionWithData(f.config.StateReceiverAddr, nil)}
+	err := f.VerifyStateTransactions(txns)
 	require.ErrorContains(t, err, "state transaction in block which should not contain it")
 }
 
@@ -1220,7 +1210,7 @@ func TestFSM_VerifyStateTransaction_ValidBothTypesOfStateTransactions(t *testing
 	var (
 		commitmentMessages [2]*CommitmentMessage
 		commitments        [2]*Commitment
-		stateSyncs         [2][]*StateSyncEvent
+		stateSyncs         [2][]*types.StateSyncEvent
 		signedCommitments  [2]*CommitmentMessageSigned
 	)
 
@@ -1269,7 +1259,7 @@ func TestFSM_VerifyStateTransaction_ValidBothTypesOfStateTransactions(t *testing
 				proof := commitments[i].MerkleTree.GenerateProof(idx, 0)
 				ssp := &types.StateSyncProof{
 					Proof:     proof,
-					StateSync: (*types.StateSyncEvent)(stateSyncs[i][idx]),
+					StateSync: stateSyncs[i][idx],
 				}
 				inputData, err := ssp.EncodeAbi()
 				require.NoError(t, err)
@@ -1420,7 +1410,7 @@ func TestFSM_VerifyStateTransaction_ProofError(t *testing.T) {
 	proof := commitment.MerkleTree.GenerateProof(0, 0)
 	ssp := &types.StateSyncProof{
 		Proof:     proof,
-		StateSync: (*types.StateSyncEvent)(stateSyncs[0]),
+		StateSync: stateSyncs[0],
 	}
 	inputData, err := ssp.EncodeAbi()
 	require.NoError(t, err)
@@ -1475,7 +1465,7 @@ func TestFSM_VerifyStateTransaction_CommitmentDoesNotExist(t *testing.T) {
 	proof := commitment.MerkleTree.GenerateProof(0, 0)
 	bf := &types.StateSyncProof{
 		Proof:     proof,
-		StateSync: (*types.StateSyncEvent)(stateSyncs[0]),
+		StateSync: stateSyncs[0],
 	}
 
 	inputData, err := bf.EncodeAbi()
@@ -1578,7 +1568,7 @@ func createTestCommitment(t *testing.T, accounts []*wallet.Account) *CommitmentM
 	t.Helper()
 
 	bitmap := bitmap.Bitmap{}
-	stateSyncEvents := make([]*StateSyncEvent, len(accounts))
+	stateSyncEvents := make([]*types.StateSyncEvent, len(accounts))
 
 	for i := 0; i < len(accounts); i++ {
 		stateSyncEvents[i] = newStateSyncEvent(
