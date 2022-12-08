@@ -3,7 +3,6 @@ package txrelayer
 import (
 	"errors"
 	"fmt"
-	"math/big"
 	"sync"
 	"time"
 
@@ -64,11 +63,9 @@ func NewTxRelayer(opts ...TxRelayerOption) (TxRelayer, error) {
 // Call executes a message call immediately without creating a transaction on the blockchain
 func (t *TxRelayerImpl) Call(from ethgo.Address, to ethgo.Address, input []byte) (string, error) {
 	callMsg := &ethgo.CallMsg{
-		From:     from,
-		To:       &to,
-		Data:     input,
-		GasPrice: defaultGasPrice,
-		Gas:      big.NewInt(defaultGasLimit),
+		From: from,
+		To:   &to,
+		Data: input,
 	}
 
 	return t.client.Eth().Call(callMsg, ethgo.Pending)
