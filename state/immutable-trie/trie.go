@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/0xPolygon/polygon-edge/state"
-	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/fastrlp"
 	"golang.org/x/crypto/sha3"
+
+	"github.com/0xPolygon/polygon-edge/state"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 // Node represents a node reference
@@ -104,11 +105,17 @@ func NewTrie() *Trie {
 	}
 }
 
-// setState used to set state under lock
-func (t *Trie) setState(s *State) {
+type stateSetter func(s *State)
+
+// SetState used to set state under lock
+func (t *Trie) SetState(s *State) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
+	t.setState(s)
+}
+
+func (t *Trie) setState(s *State) {
 	t.state = s
 }
 
@@ -117,6 +124,20 @@ func (t *Trie) Get(k []byte) ([]byte, bool) {
 	res := txn.Lookup(k)
 
 	return res, res != nil
+}
+
+type stateSetterFactory func(t *Trie) stateSetter
+
+func GetSetState() func(t *Trie) stateSetter {
+	return func(t *Trie) stateSetter {
+		return t.SetState
+	}
+}
+
+func getSetState() func(t *Trie) stateSetter {
+	return func(t *Trie) stateSetter {
+		return t.setState
+	}
 }
 
 func hashit(k []byte) []byte {
@@ -158,7 +179,7 @@ func (t *Trie) Commit(objs []*state.Object) (*Trie, []byte) {
 
 			if len(obj.Storage) != 0 {
 				// do not lock state commit is under lock
-				trie, err := t.state.newTrieAt(obj.Root, false)
+				trie, err := t.state.newTrieAt(obj.Root, getSetState())
 				if err != nil {
 					panic(err)
 				}
