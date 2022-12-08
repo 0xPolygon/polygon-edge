@@ -355,7 +355,6 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 	}
 
 	commitmentMessageSignedExists := false
-	nextStateSyncBundleIndex := f.stateSyncExecutionIndex
 
 	for _, tx := range transactions {
 		if tx.Type != types.StateTx {
@@ -401,35 +400,6 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 			verified := aggs.VerifyAggregated(signers.GetBlsKeys(), hash.Bytes())
 			if !verified {
 				return fmt.Errorf("invalid signature for tx = %v", tx.Hash)
-			}
-
-		case *BundleProof:
-			// every other bundle has to be in sequential order
-			if stateTxData.ID() != nextStateSyncBundleIndex {
-				return fmt.Errorf("bundles to execute are not in sequential order "+
-					"according to state execution index from smart contract: %v", f.stateSyncExecutionIndex)
-			}
-
-			nextStateSyncBundleIndex = stateTxData.StateSyncs[len(stateTxData.StateSyncs)-1].ID + 1
-
-			isVerified := false
-
-			for _, commitment := range f.commitmentsToVerifyBundles {
-				if commitment.Message.ContainsStateSync(stateTxData.ID()) {
-					isVerified = true
-
-					if err := commitment.Message.VerifyProof(stateTxData); err != nil {
-						return fmt.Errorf("state transaction error while validating proof: tx = %v, err = %w",
-							tx.Hash, err)
-					}
-
-					break
-				}
-			}
-
-			if !isVerified {
-				return fmt.Errorf("state transaction error while validating proof. "+
-					"No appropriate commitment found to verify proof. tx = %v", tx.Hash)
 			}
 		case *types.StateSyncProof:
 			isVerified := false

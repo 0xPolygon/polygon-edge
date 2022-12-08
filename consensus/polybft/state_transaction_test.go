@@ -98,38 +98,12 @@ func TestCommitmentMessage_VerifyProof(t *testing.T) {
 	}
 }
 
-// func TestCommitmentMessage_GetFirstStateSyncIndexFromBundleIndex(t *testing.T) {
-// 	t.Parallel()
-
-// 	cases := []struct {
-// 		bundleSize    uint64
-// 		fromIndex     uint64
-// 		bundleIndex   uint64
-// 		expectedIndex uint64
-// 	}{
-// 		{5, 0, 0, 0},
-// 		{5, 5, 1, 10},
-// 		{10, 100, 3, 130},
-// 		{25, 275, 1, 300},
-// 		{3, 9, 0, 9},
-// 	}
-
-// 	for _, c := range cases {
-// 		commitment := &CommitmentMessage{
-// 			FromIndex: c.fromIndex,
-// 			// BundleSize: c.bundleSize,
-// 		}
-
-// 		assert.Equal(t, c.expectedIndex, commitment.GetFirstStateSyncIndexFromBundleIndex(c.bundleIndex))
-// 	}
-// }
-
 func TestCommitmentMessage_VerifyProof_NoStateSyncsInBundle(t *testing.T) {
 	t.Parallel()
 
 	commitment := &CommitmentMessage{FromIndex: 0, ToIndex: 4}
-	err := commitment.VerifyProof(&BundleProof{})
-	assert.ErrorContains(t, err, "no state sync events")
+	err := commitment.VerifyStateSyncProof(&types.StateSyncProof{})
+	assert.ErrorContains(t, err, "no state sync event")
 }
 
 func TestCommitmentMessage_VerifyProof_StateSyncHashNotEqualToProof(t *testing.T) {
@@ -148,19 +122,18 @@ func TestCommitmentMessage_VerifyProof_StateSyncHashNotEqualToProof(t *testing.T
 
 	proof := trie.GenerateProof(bundleIndex, 0)
 
-	bundleProof := &BundleProof{
-		StateSyncs: stateSyncs[1:],
-		Proof:      proof,
+	stateSyncProof := &types.StateSyncProof{
+		StateSync: (*types.StateSyncEvent)(stateSyncs[4]),
+		Proof:     proof,
 	}
 
 	commitment := &CommitmentMessage{
-		FromIndex: fromIndex,
-		ToIndex:   toIndex,
-		// BundleSize:     bundleSize,
+		FromIndex:      fromIndex,
+		ToIndex:        toIndex,
 		MerkleRootHash: trie.Hash(),
 	}
 
-	assert.ErrorContains(t, commitment.VerifyProof(bundleProof), "not a member of merkle tree")
+	assert.ErrorContains(t, commitment.VerifyStateSyncProof(stateSyncProof), "not a member of merkle tree")
 }
 
 func buildCommitmentAndStateSyncs(t *testing.T, stateSyncsCount int,

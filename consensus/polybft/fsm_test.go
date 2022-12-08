@@ -1183,7 +1183,7 @@ func TestFSM_StateTransactionsEndOfSprint(t *testing.T) {
 
 			for _, cm := range commitments {
 				if cm.ContainsStateSync(stateTxData.StateSyncs[0].ID) {
-					bundleIndx := cm.GetBundleIdxFromStateSyncEventIdx(stateTxData.StateSyncs[0].ID)
+					bundleIndx := stateTxData.StateSyncs[0].ID - cm.FromIndex
 					require.Equal(t, uint64((i-1)%(eventsSize/bundleSize)), bundleIndx, "failed for tx number %d", i)
 				}
 			}

@@ -239,11 +239,6 @@ func (cm *CommitmentMessage) Hash() (types.Hash, error) {
 	return crypto.Keccak256Hash(data), nil
 }
 
-// GetBundleIdxFromStateSyncEventIdx resolves bundle index based on given state sync event index
-func (cm *CommitmentMessage) GetBundleIdxFromStateSyncEventIdx(stateSyncEventIdx uint64) uint64 {
-	return (stateSyncEventIdx - cm.FromIndex)
-}
-
 // GetFirstStateSyncIndexFromBundleIndex returns first state sync index based on bundle size and given bundle index
 // (offseted by FromIndex in CommitmentMessage)
 func (cm *CommitmentMessage) GetFirstStateSyncIndexFromBundleIndex(bundleIndex uint64) uint64 {
@@ -265,23 +260,7 @@ func (cm *CommitmentMessage) StateSyncCount() uint64 {
 	return cm.ToIndex - cm.FromIndex
 }
 
-// VerifyProof validates given bundle proof against merkle trie root hash contained in the CommitmentMessage
-func (cm CommitmentMessage) VerifyProof(bundle *BundleProof) error {
-	if len(bundle.StateSyncs) == 0 {
-		return errors.New("no state sync events")
-	}
-
-	hash, err := stateSyncEventsToHash(bundle.StateSyncs)
-	if err != nil {
-		return err
-	}
-
-	bundleIndex := cm.GetBundleIdxFromStateSyncEventIdx(bundle.StateSyncs[0].ID)
-
-	return VerifyProof(bundleIndex, hash, bundle.Proof, cm.MerkleRootHash)
-}
-
-// VerifyProof validates given bundle proof against merkle trie root hash contained in the CommitmentMessage
+// VerifyStateSyncProof validates given state sync proof against merkle trie root hash contained in the CommitmentMessage
 func (cm CommitmentMessage) VerifyStateSyncProof(stateSyncProof *types.StateSyncProof) error {
 	if stateSyncProof.StateSync == nil {
 		return errors.New("no state sync event")
@@ -292,7 +271,7 @@ func (cm CommitmentMessage) VerifyStateSyncProof(stateSyncProof *types.StateSync
 		return err
 	}
 
-	return VerifyProof(stateSyncProof.StateSync.ID, hash, stateSyncProof.Proof, cm.MerkleRootHash)
+	return VerifyProof(stateSyncProof.StateSync.ID-cm.FromIndex, hash, stateSyncProof.Proof, cm.MerkleRootHash)
 }
 
 var _ StateTransactionInput = &CommitmentMessageSigned{}
