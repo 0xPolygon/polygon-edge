@@ -80,7 +80,12 @@ func (s *State) newTrieAt(root types.Hash, lockState bool) (*Trie, error) {
 			t.state = s
 		}
 
-		return t, nil
+		trie, ok := tt.(*Trie)
+		if !ok {
+			return nil, fmt.Errorf("invalid type assertion on root: %s", root)
+		}
+
+		return trie, nil
 	}
 
 	n, ok, err := GetNode(root.Bytes(), s.storage)
