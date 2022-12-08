@@ -134,8 +134,18 @@ func GetSetState() func(t *Trie) stateSetter {
 	}
 }
 
-func getSetState() func(t *Trie) stateSetter {
+// getSetState returns stateSetter which will set state under lock if root hash is different
+func getSetState(objHash types.Hash) func(t *Trie) stateSetter {
 	return func(t *Trie) stateSetter {
+		rootHash := types.EmptyRootHash
+		if t.root != nil {
+			rh, _, _ := t.hashRoot()
+			rootHash = types.BytesToHash(rh)
+		}
+
+		if objHash != rootHash {
+			return t.SetState
+		}
 		return t.setState
 	}
 }
@@ -178,8 +188,7 @@ func (t *Trie) Commit(objs []*state.Object) (*Trie, []byte) {
 			}
 
 			if len(obj.Storage) != 0 {
-				// do not lock state commit is under lock
-				trie, err := t.state.newTrieAt(obj.Root, getSetState())
+				trie, err := t.state.newTrieAt(obj.Root, getSetState(obj.Root))
 				if err != nil {
 					panic(err)
 				}
