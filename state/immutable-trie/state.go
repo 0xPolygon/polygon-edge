@@ -13,7 +13,6 @@ import (
 type State struct {
 	storage Storage
 	cache   *lru.Cache
-	m       *sync.RWMutex // use a pointer to prevent copying of the mutex in setState/setForTrie
 }
 
 func NewState(storage Storage) *State {
@@ -22,7 +21,6 @@ func NewState(storage Storage) *State {
 	s := &State{
 		storage: storage,
 		cache:   cache,
-		m:       new(sync.RWMutex),
 	}
 
 	return s
@@ -57,13 +55,13 @@ func (s *State) GetCode(hash types.Hash) ([]byte, bool) {
 	return s.storage.GetCode(hash)
 }
 
-// NewTrieAt returns trie at root and locks state on a trie level
+// NewTrieAt returns trie with root and locks state on a trie level
 func (s *State) NewTrieAt(root types.Hash) (*Trie, error) {
-	return s.newTrieAt(root, true)
+	return s.newTrieAt(root, GetSetState())
 }
 
-// newTrieAt returns trie at root and if necessary locks state on a trie level
-func (s *State) newTrieAt(root types.Hash, lockState bool) (*Trie, error) {
+// newTrieAt returns trie with root and if necessary locks state on a trie level
+func (s *State) newTrieAt(root types.Hash, setState stateSetterFactory) (*Trie, error) {
 	if root == types.EmptyRootHash {
 		// empty state
 		return s.newTrie(), nil
@@ -76,13 +74,14 @@ func (s *State) newTrieAt(root types.Hash, lockState bool) (*Trie, error) {
 			return nil, fmt.Errorf("invalid type assertion on root: %s", root)
 		}
 
-		if lockState {
-			t.setState(s)
-		} else {
-			t.state = s
+		setState(t)(s)
+
+		trie, ok := tt.(*Trie)
+		if !ok {
+			return nil, fmt.Errorf("invalid type assertion on root: %s", root)
 		}
 
-		return t, nil
+		return trie, nil
 	}
 
 	n, ok, err := GetNode(root.Bytes(), s.storage)
