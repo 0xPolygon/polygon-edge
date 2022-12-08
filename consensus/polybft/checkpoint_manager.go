@@ -5,7 +5,6 @@ import (
 	"math/big"
 	"strconv"
 
-	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -46,6 +45,8 @@ type checkpointManager struct {
 	txRelayer txrelayer.TxRelayer
 	// checkpointsOffset represents offset between checkpoint blocks (applicable only for non-epoch ending blocks)
 	checkpointsOffset uint64
+	// checkpointManagerAddr
+	checkpointManagerAddr types.Address
 	// latestCheckpointID represents last checkpointed block number
 	latestCheckpointID uint64
 	// logger instance
@@ -53,15 +54,17 @@ type checkpointManager struct {
 }
 
 // newCheckpointManager creates a new instance of checkpointManager
-func newCheckpointManager(key ethgo.Key, checkpointOffset uint64, txRelayer txrelayer.TxRelayer,
+func newCheckpointManager(key ethgo.Key, checkpointOffset uint64,
+	checkpointManagerSC types.Address, txRelayer txrelayer.TxRelayer,
 	blockchain blockchainBackend, backend polybftBackend, logger hclog.Logger) *checkpointManager {
 	return &checkpointManager{
-		key:               key,
-		blockchain:        blockchain,
-		consensusBackend:  backend,
-		txRelayer:         txRelayer,
-		checkpointsOffset: checkpointOffset,
-		logger:            logger,
+		key:                   key,
+		blockchain:            blockchain,
+		consensusBackend:      backend,
+		txRelayer:             txRelayer,
+		checkpointsOffset:     checkpointOffset,
+		checkpointManagerAddr: checkpointManagerSC,
+		logger:                logger,
 	}
 }
 
@@ -74,7 +77,7 @@ func (c *checkpointManager) getLatestCheckpointBlock() (uint64, error) {
 
 	latestCheckpointBlockRaw, err := c.txRelayer.Call(
 		c.key.Address(),
-		ethgo.Address(helper.CheckpointManagerAddress),
+		ethgo.Address(c.checkpointManagerAddr),
 		checkpointBlockNumMethodEncoded)
 	if err != nil {
 		return 0, fmt.Errorf("failed to invoke currentCheckpointId function on the rootchain: %w", err)
@@ -100,7 +103,7 @@ func (c *checkpointManager) submitCheckpoint(latestHeader types.Header, isEndOfE
 		"latest checkpoint block", lastCheckpointBlockNumber,
 		"checkpoint block", latestHeader.Number)
 
-	checkpointManagerAddr := ethgo.Address(helper.CheckpointManagerAddress)
+	checkpointManagerAddr := ethgo.Address(c.checkpointManagerAddr)
 	txn := &ethgo.Transaction{
 		To:   &checkpointManagerAddr,
 		From: c.key.Address(),

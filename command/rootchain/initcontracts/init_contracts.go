@@ -91,7 +91,7 @@ func setFlags(cmd *cobra.Command) {
 
 	cmd.Flags().StringVar(
 		&params.manifestPath,
-		params.manifestPath,
+		manifestPathFlag,
 		defaultManifestPath,
 		"Manifest file path, which contains metadata",
 	)
@@ -111,7 +111,11 @@ func setFlags(cmd *cobra.Command) {
 	)
 }
 
-func runPreRun(_ *cobra.Command, _ []string) error {
+func runPreRun(cmd *cobra.Command, _ []string) error {
+	if err := cmd.MarkFlagRequired(manifestPathFlag); err != nil {
+		return err
+	}
+
 	return params.validateFlags()
 }
 
@@ -131,24 +135,26 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	code, err := client.Eth().GetCode(ethgo.Address(helper.StateSenderAddress), ethgo.Latest)
-	if err != nil {
-		outputter.SetError(fmt.Errorf("failed to check if rootchain contracts are deployed: %w", err))
-
-		return
-	} else if code != "0x" {
-		outputter.SetCommandResult(&messageResult{
-			Message: fmt.Sprintf("%s contracts are already deployed. Aborting.", contractsDeploymentTitle),
-		})
-
-		return
-	}
-
 	manifest, err := polybft.LoadManifest(params.manifestPath)
 	if err != nil {
 		outputter.SetError(fmt.Errorf("failed to read manifest: %w", err))
 
 		return
+	}
+
+	if manifest.RootchainConfig != nil {
+		code, err := client.Eth().GetCode(ethgo.Address(manifest.RootchainConfig.StateSenderAddress), ethgo.Latest)
+		if err != nil {
+			outputter.SetError(fmt.Errorf("failed to check if rootchain contracts are deployed: %w", err))
+
+			return
+		} else if code != "0x" {
+			outputter.SetCommandResult(&messageResult{
+				Message: fmt.Sprintf("%s contracts are already deployed. Aborting.", contractsDeploymentTitle),
+			})
+
+			return
+		}
 	}
 
 	if err := helper.InitRootchainAdminKey(params.adminKey); err != nil {
@@ -191,29 +197,24 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 	}
 
 	deployContracts := []struct {
-		name     string
-		path     string
-		expected types.Address
+		name string
+		path string
 	}{
 		{
-			name:     stateSenderName,
-			path:     "root/StateSender.sol",
-			expected: helper.StateSenderAddress,
+			name: stateSenderName,
+			path: "root/StateSender.sol",
 		},
 		{
-			name:     checkpointManagerName,
-			path:     "root/CheckpointManager.sol",
-			expected: helper.CheckpointManagerAddress,
+			name: checkpointManagerName,
+			path: "root/CheckpointManager.sol",
 		},
 		{
-			name:     blsName,
-			path:     "common/BLS.sol",
-			expected: helper.BLSAddress,
+			name: blsName,
+			path: "common/BLS.sol",
 		},
 		{
-			name:     bn256G2Name,
-			path:     "common/BN256G2.sol",
-			expected: helper.BN256G2Address,
+			name: bn256G2Name,
+			path: "common/BN256G2.sol",
 		},
 	}
 
@@ -238,10 +239,6 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 		}
 
 		contractAddr := types.Address(receipt.ContractAddress)
-		if contractAddr != contract.expected {
-			return fmt.Errorf("wrong deployed address for contract %s: expected %s but found %s",
-				contract.name, contract.expected, receipt.ContractAddress)
-		}
 
 		populatorFn, ok := metadataPopulatorMap[contract.name]
 		if !ok {
@@ -250,14 +247,14 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 
 		populatorFn(manifest.RootchainConfig, contractAddr)
 
-		outputter.WriteCommandResult(newDeployContractsResult(contract.name, contract.expected, receipt.TransactionHash))
+		outputter.WriteCommandResult(newDeployContractsResult(contract.name, contractAddr, receipt.TransactionHash))
 	}
 
 	if err := manifest.Save(params.manifestPath); err != nil {
 		return fmt.Errorf("failed to save manifest data: %w", err)
 	}
 
-	if err := initializeCheckpointManager(txRelayer, rootchainAdminKey, manifest.GenesisValidators); err != nil {
+	if err := initializeCheckpointManager(txRelayer, rootchainAdminKey, manifest); err != nil {
 		return err
 	}
 
@@ -272,16 +269,16 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 func initializeCheckpointManager(
 	txRelayer txrelayer.TxRelayer,
 	rootchainAdminKey ethgo.Key,
-	validators []*polybft.Validator) error {
-	validatorSetMap, err := validatorSetToABISlice(validators)
+	manifest *polybft.Manifest) error {
+	validatorSetMap, err := validatorSetToABISlice(manifest.GenesisValidators)
 	if err != nil {
 		return fmt.Errorf("failed to convert validators to map: %w", err)
 	}
 
 	initCheckpointInput, err := initCheckpointManager.Encode(
 		[]interface{}{
-			helper.BLSAddress,
-			helper.BN256G2Address,
+			manifest.RootchainConfig.BLSAddress,
+			manifest.RootchainConfig.BN256G2Address,
 			bls.GetDomain(),
 			validatorSetMap,
 		})
@@ -290,7 +287,7 @@ func initializeCheckpointManager(
 		return fmt.Errorf("failed to encode parameters for CheckpointManager.initialize. error: %w", err)
 	}
 
-	checkpointManagerAddress := ethgo.Address(helper.CheckpointManagerAddress)
+	checkpointManagerAddress := ethgo.Address(manifest.RootchainConfig.CheckpointManagerAddress)
 	txn := &ethgo.Transaction{
 		To:    &checkpointManagerAddress,
 		Input: initCheckpointInput,
