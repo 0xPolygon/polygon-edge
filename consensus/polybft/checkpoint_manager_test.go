@@ -15,75 +15,59 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
+	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
 func TestCheckpointManager_submitCheckpoint(t *testing.T) {
 	t.Parallel()
 
+	const (
+		blocksCount = 10
+		epochSize   = 2
+	)
+
 	validators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E"})
 	validatorsMetadata := validators.getPublicIdentities()
-	rootchainMock := new(dummyRootchainInteractor)
-	rootchainMock.On("Call", mock.Anything, mock.Anything, mock.Anything).
-		Return("1", error(nil)).
+	txRelayerMock := newDummyTxRelayer(t)
+	txRelayerMock.On("Call", mock.Anything, mock.Anything, mock.Anything).
+		Return("2", error(nil)).
 		Once()
-	rootchainMock.On("GetPendingNonce", mock.Anything).
-		Return(uint64(1), error(nil)).
-		Once()
-	rootchainMock.On("SendTransaction", mock.Anything, mock.Anything, mock.Anything).
+	txRelayerMock.On("SendTransaction", mock.Anything, mock.Anything).
 		Return(&ethgo.Receipt{Status: uint64(types.ReceiptSuccess)}, error(nil)).
-		Times(2)
+		Times(4) // send transactions for checkpoint blocks: 4, 6, 8 (pending checkpoint blocks) and 10 (latest checkpoint block)
 
 	backendMock := new(polybftBackendMock)
 	backendMock.On("GetValidators", mock.Anything, mock.Anything).Return(validatorsMetadata)
 
-	checkpoint := &CheckpointData{
-		BlockRound:  1,
-		EpochNumber: 4,
-		EventRoot:   types.BytesToHash(generateRandomBytes(t)),
+	var (
+		headersMap  = &testHeadersMap{}
+		epochNumber = uint64(1)
+		header      *types.Header
+	)
+
+	for i := uint64(1); i <= blocksCount; i++ {
+		if i%epochSize == 1 {
+			// epoch-beginning block
+			checkpoint := &CheckpointData{
+				BlockRound:  0,
+				EpochNumber: epochNumber,
+				EventRoot:   types.BytesToHash(generateRandomBytes(t)),
+			}
+			extra := createTestExtraObject(validatorsMetadata, validatorsMetadata, 3, 3, 3)
+			extra.Checkpoint = checkpoint
+			header = &types.Header{
+				ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...),
+			}
+			epochNumber++
+		} else {
+			header = header.Copy()
+		}
+
+		header.Number = i
+		header.ComputeHash()
+		headersMap.addHeader(header)
 	}
-	extra := createTestExtraObject(validatorsMetadata, validatorsMetadata, 3, 3, 3)
-	extra.Checkpoint = checkpoint
-
-	latestCheckpointHeader := &types.Header{
-		Number:    4,
-		ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...)}
-	latestCheckpointHeader.ComputeHash()
-
-	checkpoint1 := checkpoint.Copy()
-	checkpoint1.EpochNumber = 1
-
-	checkpoint2 := checkpoint.Copy()
-	checkpoint2.EpochNumber = 2
-
-	checkpoint3 := checkpoint.Copy()
-	checkpoint3.EpochNumber = 3
-
-	extra = createTestExtraObject(validatorsMetadata, validatorsMetadata, 4, 4, 4)
-	extra.Checkpoint = checkpoint1
-	extra3 := createTestExtraObject(validatorsMetadata, validatorsMetadata, 4, 4, 4)
-	extra3.Checkpoint = checkpoint3
-
-	headersMap := &testHeadersMap{}
-	header1 := &types.Header{
-		Number:    1,
-		ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...),
-	}
-	header1.ComputeHash()
-
-	header2 := header1.Copy()
-	header2.Number = 2
-	header2.ComputeHash()
-
-	header3 := &types.Header{
-		Number:    3,
-		ExtraData: append(make([]byte, ExtraVanity), extra3.MarshalRLPTo(nil)...),
-	}
-	header3.ComputeHash()
-
-	headersMap.addHeader(header1)
-	headersMap.addHeader(header2)
-	headersMap.addHeader(header3)
 
 	// mock blockchain
 	blockchainMock := new(blockchainMock)
@@ -91,16 +75,23 @@ func TestCheckpointManager_submitCheckpoint(t *testing.T) {
 
 	validatorAcc := validators.getValidator("A")
 	c := &checkpointManager{
-		signer:           wallet.NewEcdsaSigner(validatorAcc.Key()),
-		rootchain:        rootchainMock,
+		key:              wallet.NewEcdsaSigner(validatorAcc.Key()),
+		txRelayer:        txRelayerMock,
 		consensusBackend: backendMock,
 		blockchain:       blockchainMock,
 		logger:           hclog.NewNullLogger(),
 	}
 
-	err := c.submitCheckpoint(*latestCheckpointHeader, false)
+	err := c.submitCheckpoint(*headersMap.getHeader(blocksCount), false)
 	require.NoError(t, err)
-	rootchainMock.AssertExpectations(t)
+	txRelayerMock.AssertExpectations(t)
+
+	// make sure that expected blocks are checkpointed (epoch-ending ones)
+	for _, checkpointBlock := range txRelayerMock.checkpointBlocks {
+		header := headersMap.getHeader(checkpointBlock)
+		require.NotNil(t, header)
+		require.True(t, isEndOfPeriod(header.Number, epochSize))
+	}
 }
 
 func TestCheckpointManager_abiEncodeCheckpointBlock(t *testing.T) {
@@ -215,13 +206,14 @@ func TestCheckpointManager_getCurrentCheckpointID(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
 
-			rootchainMock := new(dummyRootchainInteractor)
-			rootchainMock.On("Call", mock.Anything, mock.Anything, mock.Anything).
+			txRelayerMock := newDummyTxRelayer(t)
+			txRelayerMock.On("Call", mock.Anything, mock.Anything, mock.Anything).
 				Return(c.checkpointID, c.returnError).
 				Once()
 
 			checkpointMgr := &checkpointManager{
-				rootchain: rootchainMock,
+				txRelayer: txRelayerMock,
+				key:       wallet.GenerateAccount().Ecdsa,
 				logger:    hclog.NewNullLogger(),
 			}
 			actualCheckpointID, err := checkpointMgr.getLatestCheckpointBlock()
@@ -233,7 +225,7 @@ func TestCheckpointManager_getCurrentCheckpointID(t *testing.T) {
 				require.ErrorContains(t, err, c.errSubstring)
 			}
 
-			rootchainMock.AssertExpectations(t)
+			txRelayerMock.AssertExpectations(t)
 		})
 	}
 }
@@ -272,26 +264,56 @@ func TestCheckpointManager_isCheckpointBlock(t *testing.T) {
 	}
 }
 
-var _ rootchainInteractor = (*dummyRootchainInteractor)(nil)
+var _ txrelayer.TxRelayer = (*dummyTxRelayer)(nil)
 
-type dummyRootchainInteractor struct {
+type dummyTxRelayer struct {
 	mock.Mock
+
+	test             *testing.T
+	checkpointBlocks []uint64
 }
 
-func (d dummyRootchainInteractor) Call(from types.Address, to types.Address, input []byte) (string, error) {
+func newDummyTxRelayer(t *testing.T) *dummyTxRelayer {
+	t.Helper()
+
+	return &dummyTxRelayer{test: t}
+}
+
+func (d dummyTxRelayer) Call(from ethgo.Address, to ethgo.Address, input []byte) (string, error) {
 	args := d.Called(from, to, input)
 
 	return args.String(0), args.Error(1)
 }
 
-func (d dummyRootchainInteractor) SendTransaction(nonce uint64, transaction *ethgo.Transaction, signer ethgo.Key) (*ethgo.Receipt, error) {
-	args := d.Called(nonce, transaction, signer)
+func (d *dummyTxRelayer) SendTransaction(transaction *ethgo.Transaction, key ethgo.Key) (*ethgo.Receipt, error) {
+	blockNumber := getBlockNumberCheckpointSubmitInput(d.test, transaction.Input)
+	d.checkpointBlocks = append(d.checkpointBlocks, blockNumber)
+	args := d.Called(transaction, key)
 
 	return args.Get(0).(*ethgo.Receipt), args.Error(1) //nolint:forcetypeassert
 }
 
-func (d dummyRootchainInteractor) GetPendingNonce(address types.Address) (uint64, error) {
-	args := d.Called(address)
+// SendTransactionLocal sends non-signed transaction (this is only for testing purposes)
+func (d *dummyTxRelayer) SendTransactionLocal(txn *ethgo.Transaction) (*ethgo.Receipt, error) {
+	args := d.Called(txn)
 
-	return args.Get(0).(uint64), args.Error(1) //nolint:forcetypeassert
+	return args.Get(0).(*ethgo.Receipt), args.Error(1) //nolint:forcetypeassert
+}
+
+func getBlockNumberCheckpointSubmitInput(t *testing.T, input []byte) uint64 {
+	t.Helper()
+
+	decoded, err := submitCheckpointMethod.Inputs.Decode(input[4:])
+	require.NoError(t, err)
+
+	submitCheckpointInputData, ok := decoded.(map[string]interface{})
+	require.True(t, ok, "failed to type assert submitCheckpoint inputs")
+
+	checkpointData, ok := submitCheckpointInputData["checkpoint"].(map[string]interface{})
+	require.True(t, ok, "failed to type assert checkpoint tuple from submitCheckpoint inputs")
+
+	blockNumber, ok := checkpointData["blockNumber"].(*big.Int)
+	require.True(t, ok, "failed to extract block number from submit checkpoint inputs")
+
+	return blockNumber.Uint64()
 }

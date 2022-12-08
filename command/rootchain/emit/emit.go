@@ -11,11 +11,14 @@ import (
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/contracts"
+	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
 var (
 	params emitParams
+
+	jsonRPCAddress string
 
 	contractsToParamTypes = map[string]string{
 		contracts.NativeTokenContract.String(): "tuple(address,uint256)",
@@ -59,6 +62,13 @@ func setFlags(cmd *cobra.Command) {
 		nil,
 		"list of amounts to fund wallets",
 	)
+
+	cmd.Flags().StringVar(
+		&jsonRPCAddress,
+		jsonRPCFlag,
+		"http://127.0.0.1:8545",
+		"the JSON RPC rootchain IP address (e.g. http://127.0.0.1:8545)",
+	)
 }
 
 func runPreRun(_ *cobra.Command, _ []string) error {
@@ -76,9 +86,9 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	pendingNonce, err := helper.GetPendingNonce(helper.GetRootchainAdminAddr())
+	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(jsonRPCAddress))
 	if err != nil {
-		outputter.SetError(fmt.Errorf("could not get pending nonce: %w", err))
+		outputter.SetError(fmt.Errorf("could not create rootchain interactor: %w", err))
 
 		return
 	}
@@ -88,19 +98,20 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	for i := range params.wallets {
 		wallet := params.wallets[i]
 		amount := params.amounts[i]
-		walletIndex := uint64(i)
 
 		g.Go(func() error {
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
 			default:
-				txn, err := createTxInput(paramsType, wallet, amount)
+				txn, err := createEmitTxn(paramsType, wallet, amount)
 				if err != nil {
 					return fmt.Errorf("failed to create tx input: %w", err)
 				}
 
-				if _, err = helper.SendTxn(pendingNonce+walletIndex, txn, helper.GetRootchainAdminKey()); err != nil {
+				if _, err = txRelayer.SendTransaction(
+					txn,
+					helper.GetRootchainAdminKey()); err != nil {
 					return fmt.Errorf("sending transaction to wallet: %s with amount: %s, failed with error: %w", wallet, amount, err)
 				}
 
@@ -122,7 +133,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	})
 }
 
-func createTxInput(paramsType string, parameters ...interface{}) (*ethgo.Transaction, error) {
+func createEmitTxn(paramsType string, parameters ...interface{}) (*ethgo.Transaction, error) {
 	var prms []interface{}
 	prms = append(prms, parameters...)
 

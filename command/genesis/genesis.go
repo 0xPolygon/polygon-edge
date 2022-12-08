@@ -192,12 +192,13 @@ func setFlags(cmd *cobra.Command) {
 			contracts.ContractsRootFolder,
 			"the smart contracts folder",
 		)
-		cmd.Flags().BoolVar(
-			&params.bridgeEnabled,
+		cmd.Flags().StringVar(
+			&params.bridgeJSONRPCAddr,
 			bridgeFlag,
-			defaultBridge,
-			"enabling bridge, default is not enabled",
+			"",
+			"the rootchain JSON RPC IP address. If present, node is running in bridge mode.",
 		)
+		cmd.Flags().Lookup(bridgeFlag).NoOptDefVal = "http://127.0.0.1:8545"
 		cmd.MarkFlagsMutuallyExclusive(validatorsFlag, premineValidatorsFlag)
 	}
 }

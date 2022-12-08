@@ -821,7 +821,8 @@ func Test_NewConsensusRuntime(t *testing.T) {
 		Key:           key,
 		blockchain:    &blockchainMock{},
 	}
-	runtime := newConsensusRuntime(hclog.NewNullLogger(), config)
+	runtime, err := newConsensusRuntime(hclog.NewNullLogger(), config)
+	require.NoError(t, err)
 
 	assert.False(t, runtime.isActiveValidator())
 	assert.Equal(t, runtime.config.DataDir, tmpDir)
@@ -2110,6 +2111,22 @@ func TestConsensusRuntime_BuildCommitMessage(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, signedMsg, runtime.BuildCommitMessage(proposalHash, view))
+}
+
+func TestConsensusRuntime_BuildPrePrepareMessage_EmptyProposal(t *testing.T) {
+	t.Parallel()
+
+	runtime := &consensusRuntime{logger: hclog.NewNullLogger()}
+
+	assert.Nil(t, runtime.BuildPrePrepareMessage(nil, &proto.RoundChangeCertificate{}, &proto.View{Height: 1, Round: 0}))
+}
+
+func TestConsensusRuntime_IsValidProposalHash_EmptyProposal(t *testing.T) {
+	t.Parallel()
+
+	runtime := &consensusRuntime{logger: hclog.NewNullLogger()}
+
+	assert.False(t, runtime.IsValidProposalHash(nil, []byte("hash")))
 }
 
 func TestConsensusRuntime_BuildPrepareMessage(t *testing.T) {

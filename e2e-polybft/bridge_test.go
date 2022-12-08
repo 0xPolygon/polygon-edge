@@ -1,7 +1,6 @@
 package e2e
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -9,7 +8,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
-	"github.com/0xPolygon/polygon-edge/helper/tests"
+	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 
 	"github.com/stretchr/testify/assert"
@@ -69,7 +68,7 @@ func stateSyncEventToAbiSlice(stateSyncEvent types.StateSyncEvent) []map[string]
 	return result
 }
 
-func executeStateSync(t *testing.T, client *jsonrpc.Client, account ethgo.Key, stateSyncID string) {
+func executeStateSync(t *testing.T, client *jsonrpc.Client, txRelayer txrelayer.TxRelayer, account ethgo.Key, stateSyncID string) {
 	t.Helper()
 
 	// retrieve state sync proof
@@ -84,38 +83,16 @@ func executeStateSync(t *testing.T, client *jsonrpc.Client, account ethgo.Key, s
 
 	t.Log(stateSyncProof.StateSync.ToMap())
 
-	nonce, err := client.Eth().GetNonce(account.Address(), ethgo.Latest)
-	require.NoError(t, err)
-
 	// execute the state sync
-	rawTxn := &ethgo.Transaction{
+	txn := &ethgo.Transaction{
 		From:     account.Address(),
 		To:       (*ethgo.Address)(&contracts.StateReceiverContract),
 		GasPrice: 0,
 		Gas:      types.StateTransactionGasLimit,
 		Input:    input,
-		Nonce:    nonce,
 	}
 
-	chID, err := client.Eth().ChainID()
-	require.NoError(t, err)
-
-	signer := ethgow.NewEIP155Signer(chID.Uint64())
-	signedTxn, err := signer.SignTx(rawTxn, account)
-	require.NoError(t, err)
-
-	txnRaw, err := signedTxn.MarshalRLPTo(nil)
-	require.NoError(t, err)
-
-	hash, err := client.Eth().SendRawTransaction(txnRaw)
-	require.NoError(t, err)
-
-	t.Log("Waiting for receipt", hash)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-	defer cancel()
-
-	receipt, err := tests.WaitForReceipt(ctx, client.Eth(), hash)
+	receipt, err := txRelayer.SendTransaction(txn, account)
 	require.NoError(t, err)
 	require.NotNil(t, receipt)
 
@@ -157,10 +134,14 @@ func TestE2E_Bridge_MainWorkflow(t *testing.T) {
 	// wait for a few more sprints
 	require.NoError(t, cluster.WaitForBlock(30, 2*time.Minute))
 
+	client := cluster.Servers[0].JSONRPC()
+	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(client))
+	require.NoError(t, err)
+
 	// commitments should've been stored
 	// execute the state sysncs
 	for i := 0; i < num; i++ {
-		executeStateSync(t, cluster.Servers[0].JSONRPC(), accounts[i], fmt.Sprintf("%x", i+1))
+		executeStateSync(t, client, txRelayer, accounts[i], fmt.Sprintf("%x", i+1))
 	}
 
 	// the transactions are mined and there should be a success events

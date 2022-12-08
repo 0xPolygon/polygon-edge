@@ -12,6 +12,7 @@ const (
 	dataDirFlag = "data-dir"
 	configFlag  = "config"
 	numFlag     = "num"
+	jsonRPCFlag = "json-rpc"
 )
 
 var (

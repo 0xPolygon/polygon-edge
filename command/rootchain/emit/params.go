@@ -6,6 +6,7 @@ const (
 	contractFlag = "contract"
 	walletsFlag  = "wallets"
 	amountsFlag  = "amounts"
+	jsonRPCFlag  = "json-rpc"
 )
 
 var (

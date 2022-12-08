@@ -112,17 +112,18 @@ type Polybft struct {
 
 func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *state.Transition) error {
 	return func(transition *state.Transition) error {
-		var polyBFTConfig PolyBFTConfig
-
 		consensusConfigJSON, err := json.Marshal(config.Params.Engine[engineName])
 		if err != nil {
 			return err
 		}
 
+		var polyBFTConfig PolyBFTConfig
 		err = json.Unmarshal(consensusConfigJSON, &polyBFTConfig)
+
 		if err != nil {
 			return err
 		}
+
 		// Initialize child validator set
 		input, err := getInitChildValidatorSetInput(polyBFTConfig)
 		if err != nil {
@@ -241,7 +242,7 @@ func (p *Polybft) Start() error {
 }
 
 // initRuntime creates consensus runtime
-func (p *Polybft) initRuntime() {
+func (p *Polybft) initRuntime() error {
 	runtimeConfig := &runtimeConfig{
 		PolyBFTConfig:   p.consensusConfig,
 		Key:             p.key,
@@ -253,7 +254,14 @@ func (p *Polybft) initRuntime() {
 		txPool:          p.txPool,
 	}
 
-	p.runtime = newConsensusRuntime(p.logger, runtimeConfig)
+	runtime, err := newConsensusRuntime(p.logger, runtimeConfig)
+	if err != nil {
+		return err
+	}
+
+	p.runtime = runtime
+
+	return nil
 }
 
 // startRuntime starts consensus runtime
