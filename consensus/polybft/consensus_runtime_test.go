@@ -802,9 +802,8 @@ func Test_NewConsensusRuntime(t *testing.T) {
 
 	polyBftConfig := &PolyBFTConfig{
 		Bridge: &BridgeConfig{
-			BridgeAddr:      types.Address{0x13},
-			CheckpointAddr:  types.Address{0x10},
-			JSONRPCEndpoint: "testEndpoint",
+			StateSenderAddress:       types.Address{0x13},
+			CheckpointManagerAddress: types.Address{0x10},
 		},
 		EpochSize:  10,
 		SprintSize: 10,
@@ -827,8 +826,8 @@ func Test_NewConsensusRuntime(t *testing.T) {
 	assert.Equal(t, runtime.config.DataDir, tmpDir)
 	assert.Equal(t, uint64(10), runtime.config.PolyBFTConfig.SprintSize)
 	assert.Equal(t, uint64(10), runtime.config.PolyBFTConfig.EpochSize)
-	assert.Equal(t, "0x1300000000000000000000000000000000000000", runtime.config.PolyBFTConfig.Bridge.BridgeAddr.String())
-	assert.Equal(t, "0x1000000000000000000000000000000000000000", runtime.config.PolyBFTConfig.Bridge.CheckpointAddr.String())
+	assert.Equal(t, "0x1300000000000000000000000000000000000000", runtime.config.PolyBFTConfig.Bridge.StateSenderAddress.String())
+	assert.Equal(t, "0x1000000000000000000000000000000000000000", runtime.config.PolyBFTConfig.Bridge.CheckpointManagerAddress.String())
 	assert.Equal(t, uint64(10), runtime.config.PolyBFTConfig.EpochSize)
 	assert.True(t, runtime.IsBridgeEnabled())
 }
@@ -898,7 +897,7 @@ func TestConsensusRuntime_FSM_EndOfSprint_HasBundlesToExecute(t *testing.T) {
 				EpochSize:  10,
 				SprintSize: 5,
 				Bridge: &BridgeConfig{
-					BridgeAddr: types.BytesToAddress(big.NewInt(23).Bytes()),
+					StateSenderAddress: types.BytesToAddress(big.NewInt(23).Bytes()),
 				},
 			},
 			Key:        validatorAccs.getValidator("A").Key(),
@@ -1315,7 +1314,7 @@ func TestConsensusRuntime_restartEpoch_NewEpochToRun_BuildCommitment(t *testing.
 				EpochSize:  10,
 				SprintSize: 5,
 				Bridge: &BridgeConfig{
-					BridgeAddr: types.BytesToAddress(big.NewInt(23).Bytes()),
+					StateSenderAddress: types.BytesToAddress(big.NewInt(23).Bytes()),
 				},
 			},
 			BridgeTransport: transportMock,

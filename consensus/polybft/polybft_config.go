@@ -17,19 +17,22 @@ const PolyBFTConsensusName = "polybft"
 
 // PolyBFTConfig is the configuration file for the Polybft consensus protocol.
 type PolyBFTConfig struct {
-	Manifest *Manifest `json:"manifest"`
-	// TODO: @Stefan-Ethernal remove
-	// InitialValidatorSet, Bridge,
-	// ValidatorSetAddr and StateReceiverAddr
-	InitialValidatorSet []*Validator  `json:"initialValidatorSet"`
-	Bridge              *BridgeConfig `json:"bridge"`
+	// Validators are the genesis validators
+	Validators []*Validator `json:"validators"`
 
-	ValidatorSetSize int `json:"validatorSetSize"`
+	// Bridge is the rootchain bridge configuration
+	Bridge *BridgeConfig `json:"bridge"`
 
-	// size of the epoch and sprint
-	EpochSize  uint64 `json:"epochSize"`
+	// ActiveValidatorSetSize denotes how many validators are active per each epoch
+	ActiveValidatorSetSize int `json:"activeValidatorSetSize"`
+
+	// EpochSize is size of epoch
+	EpochSize uint64 `json:"epochSize"`
+
+	// SprintSize is size of sprint
 	SprintSize uint64 `json:"sprintSize"`
 
+	// BlockTime is target frequency of blocks production
 	BlockTime time.Duration `json:"blockTime"`
 
 	// Governance is the initial governance address
@@ -55,9 +58,12 @@ func GetPolyBFTConfig(chainConfig *chain.Chain) (PolyBFTConfig, error) {
 
 // BridgeConfig is the rootchain bridge configuration
 type BridgeConfig struct {
-	BridgeAddr      types.Address `json:"stateSenderAddr"`
-	CheckpointAddr  types.Address `json:"checkpointAddr"`
-	JSONRPCEndpoint string        `json:"jsonRPCEndpoint"`
+	StateSenderAddress       types.Address `json:"stateSenderAddress"`
+	CheckpointManagerAddress types.Address `json:"checkpointManagerAddress"`
+	BLSAddress               types.Address `json:"blsAddress"`
+	BN256G2Address           types.Address `json:"bn256G2Address"`
+	AdminAddress             types.Address `json:"adminAddress"`
+	JSONRPCEndpoint          string        `json:"jsonRPCEndpoint"`
 }
 
 func (p *PolyBFTConfig) IsBridgeEnabled() bool {
@@ -115,9 +121,20 @@ func (v *Validator) UnmarshalBLSPublicKey() (*bls.PublicKey, error) {
 	return bls.UnmarshalPublicKey(decoded)
 }
 
-// DebugConfig is a struct used for test configuration in init genesis
-type DebugConfig struct {
-	ValidatorSetSize uint64 `json:"validatorSetSize"`
+// ToValidatorMetadata creates ValidatorMetadata instance
+func (v *Validator) ToValidatorMetadata() (*ValidatorMetadata, error) {
+	blsKey, err := v.UnmarshalBLSPublicKey()
+	if err != nil {
+		return nil, err
+	}
+
+	metadata := &ValidatorMetadata{
+		Address:     v.Address,
+		BlsKey:      blsKey,
+		VotingPower: chain.ConvertWeiToTokensAmount(v.Balance).Uint64(),
+	}
+
+	return metadata, nil
 }
 
 // RootchainConfig contains information about rootchain contract addresses
@@ -128,6 +145,17 @@ type RootchainConfig struct {
 	BLSAddress               types.Address `json:"blsAddress"`
 	BN256G2Address           types.Address `json:"bn256G2Address"`
 	AdminAddress             types.Address `json:"adminAddress"`
+}
+
+// ToBridgeConfig creates BridgeConfig instance
+func (r *RootchainConfig) ToBridgeConfig() *BridgeConfig {
+	return &BridgeConfig{
+		StateSenderAddress:       r.StateSenderAddress,
+		CheckpointManagerAddress: r.CheckpointManagerAddress,
+		BLSAddress:               r.BLSAddress,
+		BN256G2Address:           r.BN256G2Address,
+		AdminAddress:             r.AdminAddress,
+	}
 }
 
 // Manifest holds metadata, such as genesis validators and rootchain configuration

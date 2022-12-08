@@ -40,11 +40,11 @@ var (
 )
 
 func getInitChildValidatorSetInput(polyBFTConfig PolyBFTConfig) ([]byte, error) {
-	validatorAddresses := make([]types.Address, len(polyBFTConfig.InitialValidatorSet))
-	validatorPubkeys := make([][4]*big.Int, len(polyBFTConfig.InitialValidatorSet))
-	validatorStakes := make([]*big.Int, len(polyBFTConfig.InitialValidatorSet))
+	validatorAddresses := make([]types.Address, len(polyBFTConfig.Validators))
+	validatorPubkeys := make([][4]*big.Int, len(polyBFTConfig.Validators))
+	validatorStakes := make([]*big.Int, len(polyBFTConfig.Validators))
 
-	for i, validator := range polyBFTConfig.InitialValidatorSet {
+	for i, validator := range polyBFTConfig.Validators {
 		blsKey, err := hex.DecodeString(validator.BlsKey)
 		if err != nil {
 			return nil, err

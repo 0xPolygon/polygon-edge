@@ -11,7 +11,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
@@ -66,15 +65,6 @@ func verifyGenesisExistence(genesisPath string) *GenesisGenError {
 	}
 
 	return nil
-}
-
-// fillPremineMap fills the premine map for the genesis.json file with passed in balances and accounts
-func fillPremineMap(premineMap map[types.Address]*chain.GenesisAccount, premineInfos []*premineInfo) {
-	for _, premine := range premineInfos {
-		premineMap[premine.address] = &chain.GenesisAccount{
-			Balance: premine.balance,
-		}
-	}
 }
 
 // parsePremineInfo parses provided premine information and returns premine address and premine balance

@@ -65,10 +65,10 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 
 	// create configuration
 	polyBftConfig := PolyBFTConfig{
-		InitialValidatorSet: validators.getParamValidators(),
-		EpochSize:           10,
-		SprintSize:          5,
-		ValidatorSetSize:    validatorSetSize,
+		Validators:             validators.getParamValidators(),
+		EpochSize:              10,
+		SprintSize:             5,
+		ActiveValidatorSetSize: validatorSetSize,
 	}
 
 	validatorSet := validators.getPublicIdentities()

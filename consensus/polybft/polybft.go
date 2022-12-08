@@ -131,8 +131,8 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 		}
 
 		rootchainAdmin := types.ZeroAddress
-		if polyBFTConfig.Manifest.RootchainConfig != nil {
-			rootchainAdmin = polyBFTConfig.Manifest.RootchainConfig.AdminAddress
+		if polyBFTConfig.IsBridgeEnabled() {
+			rootchainAdmin = polyBFTConfig.Bridge.AdminAddress
 		}
 		// TODO: @Stefan-Ethernal figure out what "predicate" address in the nativeTokenInitializer represents
 		input, err = nativeTokenInitializer.Encode(

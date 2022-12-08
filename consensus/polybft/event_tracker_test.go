@@ -74,8 +74,8 @@ func TestEventTracker_TrackSyncEvents(t *testing.T) {
 		dataDir:    tmpDir,
 		config: &PolyBFTConfig{
 			Bridge: &BridgeConfig{
-				JSONRPCEndpoint: server.HTTPAddr(),
-				BridgeAddr:      types.Address(addr),
+				JSONRPCEndpoint:    server.HTTPAddr(),
+				StateSenderAddress: types.Address(addr),
 			},
 		},
 	}
