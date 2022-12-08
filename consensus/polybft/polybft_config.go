@@ -73,10 +73,10 @@ func (p *PolyBFTConfig) IsBridgeEnabled() bool {
 
 // Validator represents public information about validator accounts which are the part of genesis
 type Validator struct {
-	Address types.Address `json:"address"`
-	BlsKey  string        `json:"blsKey"`
-	Balance *big.Int      `json:"balance"`
-	NodeID  string        `json:"nodeId"`
+	Address types.Address
+	BlsKey  string
+	Balance *big.Int
+	NodeID  string
 }
 
 type validatorRaw struct {
