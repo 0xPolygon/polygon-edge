@@ -163,7 +163,6 @@ func setFlags(cmd *cobra.Command) {
 			defaultValidatorSetSize,
 			"the total number of validators",
 		)
-
 		cmd.Flags().Uint64Var(
 			&params.sprintSize,
 			sprintSizeFlag,
@@ -177,7 +176,6 @@ func setFlags(cmd *cobra.Command) {
 			defaultBlockTime,
 			"the predefined period which determines block creation frequency",
 		)
-
 		cmd.Flags().StringVar(
 			&params.smartContractsRootPath,
 			smartContractsRootPathFlag,

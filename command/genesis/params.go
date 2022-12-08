@@ -28,6 +28,8 @@ const (
 	posFlag           = "pos"
 	minValidatorCount = "min-validator-count"
 	maxValidatorCount = "max-validator-count"
+
+	defaultManifestPath = "./manifest.json"
 )
 
 // Legacy flags that need to be preserved for running clients

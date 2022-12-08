@@ -28,7 +28,6 @@ const (
 	blockTimeFlag        = "block-time"
 	bridgeFlag           = "bridge-json-rpc"
 
-	defaultManifestPath     = "./manifest.json"
 	defaultEpochSize        = uint64(10)
 	defaultSprintSize       = uint64(5)
 	defaultValidatorSetSize = 100
