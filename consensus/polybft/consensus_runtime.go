@@ -321,6 +321,7 @@ func (c *consensusRuntime) populateFsmIfBridgeEnabled(
 		if err != nil {
 			return fmt.Errorf("cannot get non executed commitments: %w", err)
 		}
+
 		if len(nonExecutedCommitments) > 0 {
 			ff.commitmentsToVerifyBundles = nonExecutedCommitments
 		}
