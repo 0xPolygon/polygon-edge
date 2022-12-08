@@ -131,6 +131,8 @@ func (t *TxRelayerImpl) SendTransactionLocal(txn *ethgo.Transaction) (*ethgo.Rec
 	}
 
 	txn.From = accounts[0]
+	txn.Gas = defaultGasLimit
+	txn.GasPrice = defaultGasPrice
 
 	txnHash, err := t.client.Eth().SendTransaction(txn)
 	if err != nil {
