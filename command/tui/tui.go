@@ -166,8 +166,6 @@ type StateSync struct {
 func (s *syncTable) draw(resp *proto.BridgeResponse) {
 	stateSyncs := []*StateSync{}
 
-	resp.StateSyncs = resp.StateSyncs[:10]
-
 	for _, i := range resp.StateSyncs {
 		var status string
 		if i.Id > resp.LastCommittedIndex {

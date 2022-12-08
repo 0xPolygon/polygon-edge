@@ -76,9 +76,6 @@ func (s *service) Bridge(ctx context.Context, req *proto.BridgeRequest) (*proto.
 		return nil, err
 	}
 
-	fmt.Println("-- state syncs --")
-	fmt.Println(stateSyncs)
-
 	resp := &proto.BridgeResponse{
 		Epoch:              epoch,
 		NextCommittedIndex: nextCommittedIndex,
