@@ -45,7 +45,7 @@ type checkpointManager struct {
 	txRelayer txrelayer.TxRelayer
 	// checkpointsOffset represents offset between checkpoint blocks (applicable only for non-epoch ending blocks)
 	checkpointsOffset uint64
-	// checkpointManagerAddr
+	// checkpointManagerAddr is address of CheckpointManager smart contract
 	checkpointManagerAddr types.Address
 	// latestCheckpointID represents last checkpointed block number
 	latestCheckpointID uint64
