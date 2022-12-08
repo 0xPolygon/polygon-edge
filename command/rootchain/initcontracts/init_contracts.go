@@ -244,6 +244,7 @@ func initializeCheckpointManager(txRelayer txrelayer.TxRelayer) error {
 	}
 
 	validatorSetMap, err := validatorSetToABISlice(allocs)
+
 	if err != nil {
 		return fmt.Errorf("failed to convert validators to map: %w", err)
 	}

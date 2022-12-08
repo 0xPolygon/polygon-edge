@@ -101,6 +101,10 @@ func (t *TestBridge) Stop() {
 	t.node = nil
 }
 
+func (t *TestBridge) JSONRPCAddr() string {
+	return fmt.Sprintf("http://%s:%d", hostIP, 8545)
+}
+
 // runCommand executes command with given arguments
 func runCommand(binary string, args []string, stdout io.Writer) error {
 	var stdErr bytes.Buffer
