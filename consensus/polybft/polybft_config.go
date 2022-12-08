@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/chain"
@@ -82,10 +83,11 @@ type validatorRaw struct {
 	Address types.Address `json:"address"`
 	BlsKey  string        `json:"blsKey"`
 	Balance *string       `json:"balance"`
+	NodeID  string        `json:"nodeId"`
 }
 
 func (v *Validator) MarshalJSON() ([]byte, error) {
-	raw := &validatorRaw{Address: v.Address, BlsKey: v.BlsKey}
+	raw := &validatorRaw{Address: v.Address, BlsKey: v.BlsKey, NodeID: v.NodeID}
 	raw.Balance = types.EncodeBigInt(v.Balance)
 
 	return json.Marshal(raw)
@@ -102,6 +104,7 @@ func (v *Validator) UnmarshalJSON(data []byte) error {
 
 	v.Address = raw.Address
 	v.BlsKey = raw.BlsKey
+	v.NodeID = raw.NodeID
 	v.Balance, err = types.ParseUint256orHex(raw.Balance)
 
 	if err != nil {
@@ -187,7 +190,7 @@ func (m *Manifest) Save(manifestPath string) error {
 		return fmt.Errorf("failed to marshal rootchain manifest to JSON: %w", err)
 	}
 
-	if err := os.WriteFile(manifestPath, data, os.ModePerm); err != nil {
+	if err := os.WriteFile(filepath.Clean(manifestPath), data, os.ModePerm); err != nil {
 		return fmt.Errorf("failed to save rootchain manifest file: %w", err)
 	}
 

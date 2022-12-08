@@ -28,8 +28,6 @@ const (
 	posFlag           = "pos"
 	minValidatorCount = "min-validator-count"
 	maxValidatorCount = "max-validator-count"
-
-	defaultManifestPath = "./manifest.json"
 )
 
 // Legacy flags that need to be preserved for running clients
@@ -139,12 +137,6 @@ func (p *genesisParams) getRequiredFlags() []string {
 	if p.isIBFTConsensus() {
 		return []string{
 			command.BootnodeFlag,
-		}
-	}
-
-	if p.isPolyBFTConsensus() {
-		return []string{
-			manifestPathFlag,
 		}
 	}
 

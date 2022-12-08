@@ -22,12 +22,12 @@ import (
 const (
 	smartContractsRootPathFlag = "contracts-path"
 	manifestPathFlag           = "manifest"
+	validatorSetSizeFlag       = "validator-set-size"
+	sprintSizeFlag             = "sprint-size"
+	blockTimeFlag              = "block-time"
+	bridgeFlag                 = "bridge-json-rpc"
 
-	validatorSetSizeFlag = "validator-set-size"
-	sprintSizeFlag       = "sprint-size"
-	blockTimeFlag        = "block-time"
-	bridgeFlag           = "bridge-json-rpc"
-
+	defaultManifestPath     = "./manifest.json"
 	defaultEpochSize        = uint64(10)
 	defaultSprintSize       = uint64(5)
 	defaultValidatorSetSize = 100
@@ -141,7 +141,7 @@ func (p *genesisParams) generatePolyBftChainConfig() error {
 		validatorMetadata[i] = metadata
 
 		// set genesis validators as boot nodes if boot nodes not provided via CLI
-		if len(chainConfig.Bootnodes) == 0 {
+		if len(p.bootnodes) == 0 {
 			bootNodeMultiAddr := fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", "127.0.0.1", bootnodePortStart+i, validator.NodeID)
 			chainConfig.Bootnodes = append(chainConfig.Bootnodes, bootNodeMultiAddr)
 		}

@@ -112,10 +112,6 @@ func setFlags(cmd *cobra.Command) {
 }
 
 func runPreRun(cmd *cobra.Command, _ []string) error {
-	if err := cmd.MarkFlagRequired(manifestPathFlag); err != nil {
-		return err
-	}
-
 	return params.validateFlags()
 }
 
