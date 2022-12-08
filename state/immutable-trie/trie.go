@@ -105,11 +105,17 @@ func NewTrie() *Trie {
 	}
 }
 
-// setState used to set state under lock
-func (t *Trie) setState(s *State) {
+type stateSetter func(s *State)
+
+// SetState used to set state under lock
+func (t *Trie) SetState(s *State) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
+	t.setState(s)
+}
+
+func (t *Trie) setState(s *State) {
 	t.state = s
 }
 
@@ -118,6 +124,29 @@ func (t *Trie) Get(k []byte) ([]byte, bool) {
 	res := txn.Lookup(k)
 
 	return res, res != nil
+}
+
+type stateSetterFactory func(t *Trie) stateSetter
+
+func GetSetState() func(t *Trie) stateSetter {
+	return func(t *Trie) stateSetter {
+		return t.SetState
+	}
+}
+
+func getSetState(objHash types.Hash) func(t *Trie) stateSetter {
+	return func(t *Trie) stateSetter {
+		rootHash := types.EmptyRootHash
+		if t.root != nil {
+			rh, _, _ := t.hashRoot()
+			rootHash = types.BytesToHash(rh)
+		}
+
+		if objHash != rootHash {
+			return t.SetState
+		}
+		return t.setState
+	}
 }
 
 func hashit(k []byte) []byte {
@@ -158,7 +187,8 @@ func (t *Trie) Commit(objs []*state.Object) (*Trie, []byte) {
 			}
 
 			if len(obj.Storage) != 0 {
-				trie, err := t.state.newTrieAt(obj.Root, false)
+				// do not lock state commit is under lock
+				trie, err := t.state.newTrieAt(obj.Root, getSetState(obj.Root))
 				if err != nil {
 					panic(err)
 				}
