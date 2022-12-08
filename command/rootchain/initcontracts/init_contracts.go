@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"math/big"
 	"os"
-	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -245,6 +244,10 @@ func initializeCheckpointManager(txRelayer txrelayer.TxRelayer) error {
 	}
 
 	validatorSetMap, err := validatorSetToABISlice(allocs)
+	if err != nil {
+		return fmt.Errorf("failed to convert validators to map: %w", err)
+	}
+
 	initCheckpointInput, err := initCheckpointManager.Encode(
 		[]interface{}{
 			helper.BLSAddress,
@@ -277,7 +280,7 @@ func initializeCheckpointManager(txRelayer txrelayer.TxRelayer) error {
 
 // initializeCheckpointManager invokes initialize function on CheckpointManager smart contract
 func validatorSetToABISlice(allocs map[types.Address]*chain.GenesisAccount) ([]map[string]interface{}, error) {
-	validatorsInfo, err := genesis.ReadValidatorsByRegexp(path.Dir(params.validatorPath), params.validatorPrefixPath)
+	validatorsInfo, err := genesis.ReadValidatorsByRegexp(params.validatorPath, params.validatorPrefixPath)
 	if err != nil {
 		return nil, err
 	}

@@ -183,10 +183,10 @@ func TestE2E_CheckpointSubmission(t *testing.T) {
 	// wait for a couple of blocks
 	require.NoError(t, cluster.WaitForBlock(15, 1*time.Minute))
 
-	checkpointBlockNumInput, err := currentCheckpointBlockNumMethod.Encode([]interface{}{})
+	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(cluster.Servers[0].JSONRPC()))
 	require.NoError(t, err)
 
-	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(cluster.Servers[0].JSONRPC()))
+	checkpointBlockNumInput, err := currentCheckpointBlockNumMethod.Encode([]interface{}{})
 	require.NoError(t, err)
 
 	checkpointBlockNumRaw, err := txRelayer.Call(rootchainSender, checkpointManagerAddr, checkpointBlockNumInput)
