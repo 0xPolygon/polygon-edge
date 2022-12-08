@@ -336,9 +336,18 @@ func (p *genesisParams) initGenesisConfig() error {
 		chainConfig.Genesis.Alloc[staking.AddrStakingContract] = stakingAccount
 	}
 
-	if err := fillPremineMap(chainConfig.Genesis.Alloc, p.premine); err != nil {
-		return err
+	premineInfos := make([]*premineInfo, len(p.premine))
+
+	for i, premineRaw := range p.premine {
+		premineInfo, err := parsePremineInfo(premineRaw)
+		if err != nil {
+			return err
+		}
+
+		premineInfos[i] = premineInfo
 	}
+
+	fillPremineMap(chainConfig.Genesis.Alloc, premineInfos)
 
 	p.genesisConfig = chainConfig
 

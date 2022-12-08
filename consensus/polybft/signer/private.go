@@ -1,11 +1,10 @@
 package bls
 
 import (
+	"errors"
 	"math/big"
 
-	"errors"
-
-	bn256 "github.com/umbracle/go-eth-bn256"
+	"github.com/kilic/bn254"
 )
 
 type PrivateKey struct {
@@ -14,17 +13,26 @@ type PrivateKey struct {
 
 // PublicKey returns the public key from the PrivateKey
 func (p *PrivateKey) PublicKey() *PublicKey {
-	return &PublicKey{p: new(bn256.G2).ScalarBaseMult(p.p)}
+	g2 := bn254.NewG2()
+	public := g2.New()
+
+	g2.MulScalar(public, g2.One(), p.p)
+
+	return &PublicKey{p: public}
 }
 
 // Sign generates a simple BLS signature of the given message
 func (p *PrivateKey) Sign(message []byte) (*Signature, error) {
-	hashPoint, err := g1HashToPoint(message)
+	g := bn254.NewG1()
+
+	signature, err := g.HashToCurveFT(message, GetDomain())
 	if err != nil {
-		return &Signature{}, err
+		return nil, err
 	}
 
-	return &Signature{p: new(bn256.G1).ScalarMult(hashPoint, p.p)}, nil
+	g.MulScalar(signature, signature, p.p)
+
+	return &Signature{signature}, nil
 }
 
 // MarshalJSON marshal the key to bytes.

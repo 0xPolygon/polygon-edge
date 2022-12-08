@@ -15,12 +15,10 @@ var (
 	StateSenderAddress = types.StringToAddress("0x6FE03c2768C9d800AF3Dedf1878b5687FE120a27")
 	// CheckpointManagerAddress is an address of CheckpointManager.sol smart contract
 	CheckpointManagerAddress = types.StringToAddress("0x3d46A809D5767B81a8836f0E79145ba615A2Dd61")
-	// RootValidatorSetAddress is an address of RootValidatorSet.sol smart contract
-	RootValidatorSetAddress = types.StringToAddress("0x72E1C51FE6dABF2e3d5701170cf5aD3620E6B8ba")
 	// BLSAddress is an address of BLS.sol smart contract
-	BLSAddress = types.StringToAddress("0x436604426F31A05f905C64edc973E575BdB46471")
+	BLSAddress = types.StringToAddress("0x72E1C51FE6dABF2e3d5701170cf5aD3620E6B8ba")
 	// BN256G2Address is an address of BN256G2Address.sol smart contract
-	BN256G2Address = types.StringToAddress("0x947a581B2713F58A8145201DA41BCb6aAE90196B")
+	BN256G2Address = types.StringToAddress("0x436604426F31A05f905C64edc973E575BdB46471")
 
 	ErrRootchainNotFound = errors.New("rootchain not found")
 	ErrRootchainPortBind = errors.New("port 8545 is not bind with localhost")

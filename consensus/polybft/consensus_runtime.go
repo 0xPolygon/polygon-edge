@@ -134,11 +134,12 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) *consensusRuntim
 
 	if runtime.IsBridgeEnabled() {
 		runtime.checkpointManager = newCheckpointManager(
-			types.Address(config.Key.Address()),
+			wallet.NewEcdsaSigner(config.Key),
 			defaultCheckpointsOffset,
 			&defaultRootchainInteractor{},
 			config.blockchain,
-			config.polybftBackend)
+			config.polybftBackend,
+			log.Named("checkpoint_manager"))
 	}
 
 	return runtime
@@ -399,7 +400,9 @@ func (c *consensusRuntime) FSM() error {
 		"endOfSprint", isEndOfSprint,
 	)
 
+	c.lock.Lock()
 	c.fsm = ff
+	c.lock.Unlock()
 
 	return nil
 }
@@ -984,6 +987,9 @@ func (c *consensusRuntime) IsValidBlock(proposal []byte) bool {
 }
 
 func (c *consensusRuntime) IsValidSender(msg *proto.Message) bool {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
 	err := c.fsm.ValidateSender(msg)
 	if err != nil {
 		c.logger.Error("invalid sender", "error", err)
@@ -995,6 +1001,9 @@ func (c *consensusRuntime) IsValidSender(msg *proto.Message) bool {
 }
 
 func (c *consensusRuntime) IsProposer(id []byte, height, round uint64) bool {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
 	nextProposer, err := c.fsm.validators.CalcProposer(round)
 	if err != nil {
 		c.logger.Error("cannot calculate proposer", "error", err)
@@ -1078,7 +1087,10 @@ func (c *consensusRuntime) InsertBlock(proposal []byte, committedSeals []*messag
 				go func(header types.Header, epochNumber uint64) {
 					err := c.checkpointManager.submitCheckpoint(header, fsm.isEndOfEpoch)
 					if err != nil {
-						c.logger.Warn("failed to submit checkpoint", "epoch number", epochNumber, "error", err)
+						c.logger.Warn("failed to submit checkpoint",
+							"block", block.Header.Number,
+							"epoch number", epochNumber,
+							"error", err)
 					}
 				}(*block.Header, fsm.epochNumber)
 			}
@@ -1101,6 +1113,8 @@ func (c *consensusRuntime) HasQuorum(
 	messages []*proto.Message,
 	msgType proto.MessageType,
 ) bool {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
 	// extract the addresses of all the signers of the messages
 	ppIncluded := false
 	signers := make(map[types.Address]struct{}, len(messages))

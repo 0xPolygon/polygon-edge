@@ -408,8 +408,11 @@ func TestValidatorSetTotalVotingPowerErrorOnOverflow(t *testing.T) {
 func TestUpdatesForNewValidatorSet(t *testing.T) {
 	t.Parallel()
 
-	v1 := &ValidatorMetadata{Address: types.Address{0x1}, VotingPower: 100}
-	v2 := &ValidatorMetadata{Address: types.Address{0x2}, VotingPower: 100}
+	keys, err := bls.CreateRandomBlsKeys(2)
+	require.NoError(t, err)
+
+	v1 := &ValidatorMetadata{Address: types.Address{0x1}, BlsKey: keys[0].PublicKey(), VotingPower: 100}
+	v2 := &ValidatorMetadata{Address: types.Address{0x2}, BlsKey: keys[1].PublicKey(), VotingPower: 100}
 	accountSet := []*ValidatorMetadata{v1, v2}
 	valSet, err := NewValidatorSet(accountSet, hclog.NewNullLogger())
 	require.NoError(t, err)

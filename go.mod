@@ -68,6 +68,7 @@ require (
 )
 
 require (
+	github.com/kilic/bn254 v0.0.0-20201116081810-790649bc68fe
 	golang.org/x/sync v0.0.0-20220929204114-8fcdb60fdcc0
 	gopkg.in/DataDog/dd-trace-go.v1 v1.43.1
 )

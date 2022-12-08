@@ -376,9 +376,9 @@ var checkpointDataABIType = abi.MustNewType(`tuple(
 	bytes32 blockHash,
 	uint256 blockRound, 
 	uint256 epochNumber,
+	bytes32 eventRoot,
 	bytes32 currentValidatorsHash,
-	bytes32 nextValidatorsHash,
-	bytes32 eventRoot)`)
+	bytes32 nextValidatorsHash)`)
 
 // CheckpointData represents data needed for checkpointing mechanism
 type CheckpointData struct {
@@ -472,12 +472,12 @@ func (c *CheckpointData) Hash(chainID uint64, blockNumber uint64, blockHash type
 	checkpointMap := map[string]interface{}{
 		"chainId":               new(big.Int).SetUint64(chainID),
 		"blockNumber":           new(big.Int).SetUint64(blockNumber),
-		"blockHash":             blockHash.Bytes(),
+		"blockHash":             blockHash,
 		"blockRound":            new(big.Int).SetUint64(c.BlockRound),
 		"epochNumber":           new(big.Int).SetUint64(c.EpochNumber),
-		"currentValidatorsHash": c.CurrentValidatorsHash.Bytes(),
-		"nextValidatorsHash":    c.NextValidatorsHash.Bytes(),
-		"eventRoot":             c.EventRoot.Bytes(),
+		"eventRoot":             c.EventRoot,
+		"currentValidatorsHash": c.CurrentValidatorsHash,
+		"nextValidatorsHash":    c.NextValidatorsHash,
 	}
 
 	abiEncoded, err := checkpointDataABIType.Encode(checkpointMap)

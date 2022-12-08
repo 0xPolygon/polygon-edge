@@ -155,7 +155,7 @@ func TestE2E_Bridge_MainWorkflow(t *testing.T) {
 	)
 
 	// wait for a few more sprints
-	require.NoError(t, cluster.WaitForBlock(25, 1*time.Minute))
+	require.NoError(t, cluster.WaitForBlock(30, 2*time.Minute))
 
 	// commitments should've been stored
 	// execute the state sysncs

@@ -72,7 +72,7 @@ func TestGetNumericBlockNumber(t *testing.T) {
 		err      error
 	}{
 		{
-			name: "should return the latest block's number if latest is given",
+			name: "should return the latest block's number if it is found",
 			num:  LatestBlockNumber,
 			store: &debugEndpointMockStore{
 				headerFn: func() *types.Header {
@@ -85,7 +85,7 @@ func TestGetNumericBlockNumber(t *testing.T) {
 			err:      nil,
 		},
 		{
-			name: "should return the latest block's number if latest is given",
+			name: "should return error if the latest block's number is not found",
 			num:  LatestBlockNumber,
 			store: &debugEndpointMockStore{
 				headerFn: func() *types.Header {
@@ -103,11 +103,41 @@ func TestGetNumericBlockNumber(t *testing.T) {
 			err:      nil,
 		},
 		{
-			name:     "should return error if pending is given",
-			num:      PendingBlockNumber,
-			store:    &debugEndpointMockStore{},
+			name: "should return latest if found and pending is given",
+			num:  PendingBlockNumber,
+			store: &debugEndpointMockStore{
+				headerFn: func() *types.Header {
+					return &types.Header{
+						Number: 10,
+					}
+				},
+			},
+			expected: 10,
+			err:      nil,
+		},
+		{
+			name: "should return error if given pending and the latest block's number is not found",
+			num:  PendingBlockNumber,
+			store: &debugEndpointMockStore{
+				headerFn: func() *types.Header {
+					return nil
+				},
+			},
 			expected: 0,
-			err:      ErrPendingBlockNumber,
+			err:      ErrLatestNotFound,
+		},
+		{
+			name: "should return error for latest if not found and pending is given",
+			num:  PendingBlockNumber,
+			store: &debugEndpointMockStore{
+				headerFn: func() *types.Header {
+					return &types.Header{
+						Number: 10,
+					}
+				},
+			},
+			expected: 10,
+			err:      nil,
 		},
 		{
 			name:     "should return error if negative number is given",
@@ -187,11 +217,15 @@ func TestGetBlockHeader(t *testing.T) {
 			err:      ErrFailedFetchGenesis,
 		},
 		{
-			name:     "should return error if pending is given",
-			num:      PendingBlockNumber,
-			store:    &debugEndpointMockStore{},
-			expected: nil,
-			err:      ErrPendingBlockNumber,
+			name: "should return latest if pending is given",
+			num:  PendingBlockNumber,
+			store: &debugEndpointMockStore{
+				headerFn: func() *types.Header {
+					return testLatestHeader
+				},
+			},
+			expected: testLatestHeader,
+			err:      nil,
 		},
 		{
 			name: "should return header at arbitrary height",

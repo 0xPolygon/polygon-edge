@@ -6,36 +6,46 @@ import (
 	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/helper/common"
-	bn256 "github.com/umbracle/go-eth-bn256"
+	"github.com/kilic/bn254"
 )
 
 // PublicKey represents bls public key
 type PublicKey struct {
-	p *bn256.G2
+	p *bn254.PointG2
 }
 
 // aggregate adds the given public keys
-func (p *PublicKey) aggregate(onemore *PublicKey) *PublicKey {
-	var g2 *bn256.G2
-	if p.p == nil {
-		g2 = new(bn256.G2).Set(&zeroG2)
-	} else {
-		g2 = new(bn256.G2).Set(p.p)
+func (p *PublicKey) aggregate(next *PublicKey) *PublicKey {
+	g := bn254.NewG2()
+
+	newp := new(bn254.PointG2)
+	newp.Zero()
+
+	if p.p != nil {
+		if next.p != nil {
+			g.Add(newp, p.p, next.p)
+		} else {
+			newp.Set(p.p)
+		}
+	} else if next.p != nil {
+		newp.Set(next.p)
 	}
 
-	g2.Add(g2, onemore.p)
-
-	return &PublicKey{p: g2}
+	return &PublicKey{p: newp}
 }
 
 // Marshal marshal the key to bytes.
 func (p *PublicKey) Marshal() []byte {
-	return p.p.Marshal()
+	if p.p == nil {
+		return nil
+	}
+
+	return bn254.NewG2().ToBytes(p.p)
 }
 
 // MarshalJSON implements the json.Marshaler interface.
 func (p *PublicKey) MarshalJSON() ([]byte, error) {
-	return json.Marshal(p.p.Marshal())
+	return json.Marshal(p.Marshal())
 }
 
 // UnmarshalJSON implements the json.Marshaler interface.
@@ -63,10 +73,12 @@ func UnmarshalPublicKey(raw []byte) (*PublicKey, error) {
 		return nil, errors.New("cannot unmarshal public key from empty slice")
 	}
 
-	p := new(bn256.G2)
-	_, err := p.Unmarshal(raw)
+	p, err := bn254.NewG2().FromBytes(raw)
+	if err != nil {
+		return nil, err
+	}
 
-	return &PublicKey{p: p}, err
+	return &PublicKey{p: p}, nil
 }
 
 // ToBigInt converts public key to 4 big ints
@@ -104,10 +116,15 @@ func UnmarshalPublicKeyFromBigInt(b [4]*big.Int) (*PublicKey, error) {
 
 // aggregatePublicKeys calculates P1 + P2 + ...
 func aggregatePublicKeys(pubs []*PublicKey) *PublicKey {
-	res := *new(bn256.G2).Set(&zeroG2)
-	for i := 0; i < len(pubs); i++ {
-		res.Add(&res, pubs[i].p)
+	g, newp := bn254.NewG2(), new(bn254.PointG2)
+
+	newp.Set(g.Zero())
+
+	for _, x := range pubs {
+		if x.p != nil {
+			g.Add(newp, newp, x.p)
+		}
 	}
 
-	return &PublicKey{p: &res}
+	return &PublicKey{p: newp}
 }

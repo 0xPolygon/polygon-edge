@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/0xPolygon/polygon-edge/chain"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/state"
@@ -14,16 +15,14 @@ import (
 
 const (
 	// safe numbers for the test
-	newEpochReward   = 1
-	newMinStake      = 1
-	newMinDelegation = 1
+	epochReward   = 1
+	minStake      = 1
+	minDelegation = 1
 )
 
 var (
-	initCallStaking, _ = abi.NewMethod("function initialize(" +
-		"uint256 newEpochReward," +
-		"uint256 newMinStake," +
-		"uint256 newMinDelegation," +
+	childValidatorSetInitializer, _ = abi.NewMethod("function initialize(" +
+		"tuple(uint256 epochReward, uint256 minStake, uint256 minDelegation, uint256 epochSize) init," +
 		"address[] validatorAddresses," +
 		"uint256[4][] validatorPubkeys," +
 		"uint256[] validatorStakes," +
@@ -31,7 +30,7 @@ var (
 		"uint256[2] newMessage," +
 		"address governance)")
 
-	initNativeTokenMethod, _ = abi.NewMethod("function initialize(" +
+	nativeTokenInitializer, _ = abi.NewMethod("function initialize(" +
 		"address predicate_," +
 		"string name_," +
 		"string symbol_)")
@@ -40,12 +39,12 @@ var (
 	nativeTokenSymbol = "MATIC"
 )
 
-func getInitChildValidatorSetInput(validators []*Validator, governanceAddr types.Address) ([]byte, error) {
-	validatorAddresses := make([]types.Address, len(validators))
-	validatorPubkeys := make([][4]*big.Int, len(validators))
-	validatorStakes := make([]*big.Int, len(validators))
+func getInitChildValidatorSetInput(polyBFTConfig PolyBFTConfig) ([]byte, error) {
+	validatorAddresses := make([]types.Address, len(polyBFTConfig.InitialValidatorSet))
+	validatorPubkeys := make([][4]*big.Int, len(polyBFTConfig.InitialValidatorSet))
+	validatorStakes := make([]*big.Int, len(polyBFTConfig.InitialValidatorSet))
 
-	for i, validator := range validators {
+	for i, validator := range polyBFTConfig.InitialValidatorSet {
 		blsKey, err := hex.DecodeString(validator.BlsKey)
 		if err != nil {
 			return nil, err
@@ -60,7 +59,7 @@ func getInitChildValidatorSetInput(validators []*Validator, governanceAddr types
 
 		validatorPubkeys[i] = pubKeyBig
 		validatorAddresses[i] = validator.Address
-		validatorStakes[i] = validator.Balance
+		validatorStakes[i] = chain.ConvertWeiToTokensAmount(validator.Balance)
 	}
 
 	registerMessage, err := bls.MarshalMessageToBigInt([]byte(contracts.PolyBFTRegisterMessage))
@@ -68,17 +67,22 @@ func getInitChildValidatorSetInput(validators []*Validator, governanceAddr types
 		return nil, err
 	}
 
-	input, err := initCallStaking.Encode([]interface{}{
-		big.NewInt(newEpochReward),
-		big.NewInt(newMinStake),
-		big.NewInt(newMinDelegation),
-		validatorAddresses,
-		validatorPubkeys,
-		validatorStakes,
-		contracts.BLSContract, // address of the deployed BLS contract
-		registerMessage,
-		governanceAddr,
-	})
+	params := map[string]interface{}{
+		"init": map[string]interface{}{
+			"epochReward":   big.NewInt(epochReward),
+			"minStake":      big.NewInt(minStake),
+			"minDelegation": big.NewInt(minDelegation),
+			"epochSize":     new(big.Int).SetUint64(polyBFTConfig.EpochSize),
+		},
+		"validatorAddresses": validatorAddresses,
+		"validatorPubkeys":   validatorPubkeys,
+		"validatorStakes":    validatorStakes,
+		"newBls":             contracts.BLSContract, // address of the deployed BLS contract
+		"newMessage":         registerMessage,
+		"governance":         polyBFTConfig.Governance,
+	}
+
+	input, err := childValidatorSetInitializer.Encode(params)
 	if err != nil {
 		return nil, err
 	}

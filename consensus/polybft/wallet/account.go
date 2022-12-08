@@ -2,6 +2,7 @@ package wallet
 
 import (
 	"crypto/ecdsa"
+	"encoding/hex"
 	"fmt"
 
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
@@ -36,26 +37,31 @@ func GenerateAccount() *Account {
 // NewAccountFromSecret creates new account by using provided secretsManager
 func NewAccountFromSecret(secretsManager secrets.SecretsManager) (*Account, error) {
 	var (
-		bytes []byte
-		err   error
+		encodedKey []byte
+		err        error
 	)
 
 	// ECDSA
-	if bytes, err = secretsManager.GetSecret(secrets.ValidatorKey); err != nil {
+	if encodedKey, err = secretsManager.GetSecret(secrets.ValidatorKey); err != nil {
 		return nil, fmt.Errorf("failed to read account data: %w", err)
 	}
 
-	ecdsaKey, err := wallet.NewWalletFromPrivKey(bytes)
+	ecdsaRaw, err := hex.DecodeString(string(encodedKey))
+	if err != nil {
+		return nil, err
+	}
+
+	ecdsaKey, err := wallet.NewWalletFromPrivKey(ecdsaRaw)
 	if err != nil {
 		return nil, err
 	}
 
 	// BLS
-	if bytes, err = secretsManager.GetSecret(secrets.ValidatorBLSKey); err != nil {
+	if encodedKey, err = secretsManager.GetSecret(secrets.ValidatorBLSKey); err != nil {
 		return nil, fmt.Errorf("failed to read account data: %w", err)
 	}
 
-	blsKey, err := bls.UnmarshalPrivateKey(bytes)
+	blsKey, err := bls.UnmarshalPrivateKey(encodedKey)
 	if err != nil {
 		return nil, err
 	}
@@ -63,16 +69,19 @@ func NewAccountFromSecret(secretsManager secrets.SecretsManager) (*Account, erro
 	return &Account{Ecdsa: ecdsaKey, Bls: blsKey}, nil
 }
 
-// ToBytes serializes account to slice of bytes
+// Save persists ECDSA and BLS private keys to the SecretsManager
 func (a *Account) Save(secretsManager secrets.SecretsManager) (err error) {
-	var ecdsaRaw, blsRaw []byte
+	var (
+		ecdsaRaw []byte
+		blsRaw   []byte
+	)
 
 	// get serialized ecdsa private key
 	if ecdsaRaw, err = a.Ecdsa.MarshallPrivateKey(); err != nil {
 		return err
 	}
 
-	if err = secretsManager.SetSecret(secrets.ValidatorKey, ecdsaRaw); err != nil {
+	if err = secretsManager.SetSecret(secrets.ValidatorKey, []byte(hex.EncodeToString(ecdsaRaw))); err != nil {
 		return err
 	}
 

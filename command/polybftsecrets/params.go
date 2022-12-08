@@ -152,11 +152,11 @@ func (ip *initParams) initKeys(secretsManager secrets.SecretsManager) error {
 
 	if ip.generatesAccount {
 		if secretsManager.HasSecret(secrets.ValidatorKey) {
-			return fmt.Errorf(`secrets "%s" has been already initialized`, secrets.ValidatorKey)
+			return fmt.Errorf("secrets '%s' has been already initialized", secrets.ValidatorKey)
 		}
 
 		if secretsManager.HasSecret(secrets.ValidatorBLSKey) {
-			return fmt.Errorf(`secrets "%s" has been already initialized`, secrets.ValidatorBLSKey)
+			return fmt.Errorf("secrets '%s' has been already initialized", secrets.ValidatorBLSKey)
 		}
 
 		return wallet.GenerateAccount().Save(secretsManager)
