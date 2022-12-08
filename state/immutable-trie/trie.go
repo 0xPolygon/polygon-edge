@@ -157,7 +157,8 @@ func (t *Trie) Commit(objs []*state.Object) (*Trie, []byte) {
 			}
 
 			if len(obj.Storage) != 0 {
-				trie, err := t.state.newTrieAt(obj.Root)
+				// do not lock state commit is under lock
+				trie, err := t.state.newTrieAt(obj.Root, false)
 				if err != nil {
 					panic(err)
 				}
