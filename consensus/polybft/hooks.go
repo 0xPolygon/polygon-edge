@@ -32,3 +32,12 @@ type TaskPostEpochHook interface {
 	// is included in the chain
 	PostEpoch(*PostEpochRequest) error
 }
+
+// hooks is the list of available hooks in polybft
+type hooks struct {
+	txpool *txpoolHook
+
+	// list is an ordered list of the hooks which represents
+	// its execution priority
+	list []TaskHook
+}

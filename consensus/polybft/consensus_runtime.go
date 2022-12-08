@@ -123,6 +123,9 @@ type consensusRuntime struct {
 
 	// logger instance
 	logger hcf.Logger
+
+	// hooks is a typed reference of the hooks
+	hooks hooks
 }
 
 // newConsensusRuntime creates and starts a new consensus runtime instance with event tracking
@@ -148,7 +151,20 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 			log.Named("checkpoint_manager"))
 	}
 
+	runtime.initHooks()
+
 	return runtime, nil
+}
+
+func (c *consensusRuntime) initHooks() {
+	// initialize the hooks
+	c.hooks = hooks{
+		txpool: newTxpoolHook(c.config.txPool),
+		list:   []TaskHook{},
+	}
+
+	// create an ordered list of the hooks execution
+	c.hooks.list = append(c.hooks.list, c.hooks.txpool)
 }
 
 // getEpoch returns current epochMetadata in a thread-safe manner.
@@ -204,8 +220,18 @@ func (c *consensusRuntime) AddLog(eventLog *ethgo.Log) {
 
 // OnBlockInserted is called whenever fsm or syncer inserts new block
 func (c *consensusRuntime) OnBlockInserted(block *types.Block) {
-	// after the block has been written we reset the txpool so that the old transactions are removed
-	c.config.txPool.ResetWithHeaders(block.Header)
+	// execute post block hooks
+	postBlockReq := &PostBlockRequest{
+		Header: block.Header,
+	}
+
+	for i := 0; i < len(c.hooks.list); i++ {
+		if hook, ok := c.hooks.list[i].(TaskPostBlockHook); ok {
+			if err := hook.PostBlock(postBlockReq); err != nil {
+				c.logger.Error("Post block failed", "name", hook.Name(), "err", err)
+			}
+		}
+	}
 
 	// handle commitment and bundles creation
 	if err := c.createCommitmentAndBundles(block.Transactions); err != nil {

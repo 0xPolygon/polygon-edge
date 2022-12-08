@@ -416,9 +416,6 @@ func TestConsensusRuntime_OnBlockInserted_EndOfEpoch(t *testing.T) {
 	polybftBackendMock := new(polybftBackendMock)
 	polybftBackendMock.On("GetValidators", mock.Anything, mock.Anything).Return(validatorSet).Once()
 
-	txPool := new(txPoolMock)
-	txPool.On("ResetWithHeaders", mock.Anything).Once()
-
 	runtime := &consensusRuntime{
 		logger: hclog.NewNullLogger(),
 		state:  newTestState(t),
@@ -428,7 +425,7 @@ func TestConsensusRuntime_OnBlockInserted_EndOfEpoch(t *testing.T) {
 			},
 			blockchain:     blockchainMock,
 			polybftBackend: polybftBackendMock,
-			txPool:         txPool,
+			txPool:         new(txPoolMock),
 		},
 		epoch: &epochMetadata{
 			Number: currentEpochNumber,
@@ -457,15 +454,12 @@ func TestConsensusRuntime_OnBlockInserted_MiddleOfEpoch(t *testing.T) {
 		Header: header,
 	})
 
-	txPool := new(txPoolMock)
-	txPool.On("ResetWithHeaders", mock.Anything).Once()
-
 	runtime := &consensusRuntime{
 		lastBuiltBlock: header,
 		config: &runtimeConfig{
 			PolyBFTConfig: &PolyBFTConfig{EpochSize: epochSize},
 			blockchain:    new(blockchainMock),
-			txPool:        txPool,
+			txPool:        new(txPoolMock),
 		},
 	}
 	runtime.OnBlockInserted(builtBlock)
@@ -1568,8 +1562,6 @@ func TestConsensusRuntime_FSM_EndOfEpoch_OnBlockInserted(t *testing.T) {
 	blockchainMock.On("GetSystemState", mock.Anything, mock.Anything).Return(systemStateMock)
 	blockchainMock.On("GetHeaderByNumber", mock.Anything).Return(headerMap.getHeader)
 
-	txPool := new(txPoolMock)
-
 	state := newTestState(t)
 	require.NoError(t, state.insertEpoch(epoch))
 
@@ -1611,7 +1603,7 @@ func TestConsensusRuntime_FSM_EndOfEpoch_OnBlockInserted(t *testing.T) {
 		},
 		Key:        validatorAccounts.getValidator("A").Key(),
 		blockchain: blockchainMock,
-		txPool:     txPool,
+		txPool:     new(txPoolMock),
 	}
 
 	signer := validatorAccounts.getValidator("A").Key()
@@ -1649,14 +1641,6 @@ func TestConsensusRuntime_FSM_EndOfEpoch_OnBlockInserted(t *testing.T) {
 			tx,
 		},
 	})
-
-	txPool.On("ResetWithHeaders", mock.MatchedBy(func(i interface{}) bool {
-		ph, ok := i.([]*types.Header)
-		require.True(t, ok)
-		require.Len(t, ph, 1)
-
-		return ph[0].Number == block.Header.Number
-	})).Once()
 
 	runtime.OnBlockInserted(block)
 
