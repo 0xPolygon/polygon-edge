@@ -87,7 +87,7 @@ func (t *TestBridge) fundValidators() error {
 
 	err := runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("bridge"))
 	if err != nil {
-		return fmt.Errorf("failed to deploy rootchain contracts: %w", err)
+		return fmt.Errorf("failed to deploy fund validators: %w", err)
 	}
 
 	return nil

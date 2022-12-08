@@ -173,7 +173,7 @@ func TestE2E_Bridge_MainWorkflow(t *testing.T) {
 
 func TestE2E_CheckpointSubmission(t *testing.T) {
 	var (
-		rootchainSedner       = rootchainHelper.GetRootchainAdminKey().Address()
+		rootchainSender       = rootchainHelper.GetRootchainAdminKey().Address()
 		checkpointManagerAddr = ethgo.Address(rootchainHelper.CheckpointManagerAddress)
 	)
 
@@ -186,7 +186,10 @@ func TestE2E_CheckpointSubmission(t *testing.T) {
 	checkpointBlockNumInput, err := currentCheckpointBlockNumMethod.Encode([]interface{}{})
 	require.NoError(t, err)
 
-	checkpointBlockNumRaw, err := rootchainHelper.Call(rootchainSedner, checkpointManagerAddr, checkpointBlockNumInput)
+	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(cluster.Servers[0].JSONRPC()))
+	require.NoError(t, err)
+
+	checkpointBlockNumRaw, err := txRelayer.Call(rootchainSender, checkpointManagerAddr, checkpointBlockNumInput)
 	require.NoError(t, err)
 
 	latestCheckpointBlockNum, err := strconv.ParseUint(checkpointBlockNumRaw, 0, 64)
