@@ -57,11 +57,11 @@ func (s *State) GetCode(hash types.Hash) ([]byte, bool) {
 
 // NewTrieAt returns trie with root and locks state on a trie level
 func (s *State) NewTrieAt(root types.Hash) (*Trie, error) {
-	return s.newTrieAt(root, GetSetState())
+	return s.newTrieAt(root, SetState)
 }
 
 // newTrieAt returns trie with root and if necessary locks state on a trie level
-func (s *State) newTrieAt(root types.Hash, setState stateSetterFactory) (*Trie, error) {
+func (s *State) newTrieAt(root types.Hash, setState stateSetter) (*Trie, error) {
 	if root == types.EmptyRootHash {
 		// empty state
 		return s.newTrie(), nil
@@ -74,7 +74,7 @@ func (s *State) newTrieAt(root types.Hash, setState stateSetterFactory) (*Trie, 
 			return nil, fmt.Errorf("invalid type assertion on root: %s", root)
 		}
 
-		setState(t)(s)
+		setState(t, s)
 
 		trie, ok := tt.(*Trie)
 		if !ok {
