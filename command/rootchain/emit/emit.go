@@ -10,6 +10,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -17,8 +18,6 @@ import (
 
 var (
 	params emitParams
-
-	jsonRPCAddress string
 
 	contractsToParamTypes = map[string]string{
 		contracts.NativeTokenContract.String(): "tuple(address,uint256)",
@@ -43,6 +42,13 @@ func GetCommand() *cobra.Command {
 
 func setFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(
+		&params.manifestPath,
+		manifestPathFlag,
+		"./manifest.json",
+		"the manifest file path, which contains genesis metadata",
+	)
+
+	cmd.Flags().StringVar(
 		&params.address,
 		contractFlag,
 		contracts.NativeTokenContract.String(),
@@ -64,7 +70,7 @@ func setFlags(cmd *cobra.Command) {
 	)
 
 	cmd.Flags().StringVar(
-		&jsonRPCAddress,
+		&params.jsonRPCAddress,
 		jsonRPCFlag,
 		"http://127.0.0.1:8545",
 		"the JSON RPC rootchain IP address (e.g. http://127.0.0.1:8545)",
@@ -93,6 +99,13 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
+	manifest, err := polybft.LoadManifest(params.manifestPath)
+	if err != nil {
+		outputter.SetError(fmt.Errorf("failed to load manifest file from '%s': %w", params.manifestPath, err))
+
+		return
+	}
+
 	paramsType, exists := contractsToParamTypes[params.address]
 	if !exists {
 		outputter.SetError(fmt.Errorf("no parameter types for given contract address: %v", params.address))
@@ -100,7 +113,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(jsonRPCAddress))
+	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(params.jsonRPCAddress))
 	if err != nil {
 		outputter.SetError(fmt.Errorf("could not create rootchain interactor: %w", err))
 
@@ -118,7 +131,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 			case <-ctx.Done():
 				return ctx.Err()
 			default:
-				txn, err := createEmitTxn(paramsType, wallet, amount)
+				txn, err := createEmitTxn(manifest.RootchainConfig.StateSenderAddress, paramsType, wallet, amount)
 				if err != nil {
 					return fmt.Errorf("failed to create tx input: %w", err)
 				}
@@ -147,7 +160,10 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	})
 }
 
-func createEmitTxn(paramsType string, parameters ...interface{}) (*ethgo.Transaction, error) {
+func createEmitTxn(
+	stateSenderAddr types.Address,
+	paramsType string,
+	parameters ...interface{}) (*ethgo.Transaction, error) {
 	var prms []interface{}
 	prms = append(prms, parameters...)
 
@@ -164,7 +180,7 @@ func createEmitTxn(paramsType string, parameters ...interface{}) (*ethgo.Transac
 	}
 
 	return &ethgo.Transaction{
-		To:    (*ethgo.Address)(&helper.StateSenderAddress),
+		To:    (*ethgo.Address)(&stateSenderAddr),
 		Input: input,
 	}, nil
 }
