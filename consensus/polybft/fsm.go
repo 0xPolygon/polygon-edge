@@ -64,9 +64,6 @@ type fsm struct {
 	// proposerCommitmentToRegister is a commitment that is registered via state transaction by proposer
 	proposerCommitmentToRegister *CommitmentMessageSigned
 
-	// bundleProofs is an array of bundles to be executed on end of sprint
-	bundleProofs []*BundleProof
-
 	// commitmentsToVerifyBundles is an array of commitment messages that were not executed yet,
 	// but are used to verify any bundles if they are included in state transactions
 	commitmentsToVerifyBundles []*CommitmentMessageSigned
@@ -422,6 +419,26 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 					isVerified = true
 
 					if err := commitment.Message.VerifyProof(stateTxData); err != nil {
+						return fmt.Errorf("state transaction error while validating proof: tx = %v, err = %w",
+							tx.Hash, err)
+					}
+
+					break
+				}
+			}
+
+			if !isVerified {
+				return fmt.Errorf("state transaction error while validating proof. "+
+					"No appropriate commitment found to verify proof. tx = %v", tx.Hash)
+			}
+		case *types.StateSyncProof:
+			isVerified := false
+
+			for _, commitment := range f.commitmentsToVerifyBundles {
+				if commitment.Message.ContainsStateSync(stateTxData.StateSync.ID) {
+					isVerified = true
+
+					if err := commitment.Message.VerifyStateSyncProof(stateTxData); err != nil {
 						return fmt.Errorf("state transaction error while validating proof: tx = %v, err = %w",
 							tx.Hash, err)
 					}

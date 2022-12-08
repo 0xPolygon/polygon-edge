@@ -48,11 +48,8 @@ type StateTransactionInput interface {
 	// DecodeAbi contains logic for decoding given ABI data
 	DecodeAbi(b []byte) error
 	// Type returns type of state transaction input
-	Type() StateTransactionType
+	Type() types.StateTransactionType
 }
-
-// StateTransactionType is a type, which represents state transaction type
-type StateTransactionType string
 
 const (
 	abiMethodIDLength      = 4
@@ -157,7 +154,7 @@ func (bp *BundleProof) DecodeAbi(txData []byte) error {
 }
 
 // Type returns type of state transaction input
-func (bp *BundleProof) Type() StateTransactionType {
+func (bp *BundleProof) Type() types.StateTransactionType {
 	return stTypeBridgeBundle
 }
 
@@ -230,7 +227,7 @@ func (cm *CommitmentMessage) Hash() (types.Hash, error) {
 	commitment := map[string]interface{}{
 		"startId": cm.FromIndex,
 		"endId":   cm.ToIndex,
-		"leaves":  cm.BundlesCount(),
+		"leaves":  cm.StateSyncCount(),
 		"root":    cm.MerkleRootHash,
 	}
 
@@ -263,8 +260,8 @@ func (cm *CommitmentMessage) ContainsStateSync(stateSyncIndex uint64) bool {
 	return stateSyncIndex >= cm.FromIndex && stateSyncIndex <= cm.ToIndex
 }
 
-// BundlesCount calculates bundles count contained in given CommitmentMessge
-func (cm *CommitmentMessage) BundlesCount() uint64 {
+// StateSyncsCount calculates state syncs count contained in given CommitmentMessage
+func (cm *CommitmentMessage) StateSyncCount() uint64 {
 	return cm.ToIndex - cm.FromIndex
 }
 
@@ -312,7 +309,7 @@ func (cm *CommitmentMessageSigned) EncodeAbi() ([]byte, error) {
 	commitment := map[string]interface{}{
 		"startId": cm.Message.FromIndex,
 		"endId":   cm.Message.ToIndex,
-		"leaves":  cm.Message.BundlesCount(),
+		"leaves":  cm.Message.StateSyncCount(),
 		"root":    cm.Message.MerkleRootHash,
 	}
 
@@ -422,7 +419,7 @@ func (cm *CommitmentMessageSigned) DecodeAbi(txData []byte) error {
 }
 
 // Type returns type of state transaction input
-func (cm *CommitmentMessageSigned) Type() StateTransactionType {
+func (cm *CommitmentMessageSigned) Type() types.StateTransactionType {
 	return stTypeBridgeCommitment
 }
 
@@ -438,9 +435,9 @@ func decodeStateTransaction(txData []byte) (StateTransactionInput, error) {
 	if bytes.Equal(sig, commitBundleABIMethod.ID()) {
 		// bridge commitment
 		obj = &CommitmentMessageSigned{}
-	} else if bytes.Equal(sig, executeBundleABIMethod.ID()) {
+	} else if bytes.Equal(sig, types.ExecuteStateSyncABIMethod.ID()) {
 		// bundle proof
-		obj = &BundleProof{}
+		obj = &types.StateSyncProof{}
 	} else {
 		return nil, fmt.Errorf("unknown state transaction")
 	}
@@ -587,7 +584,7 @@ func (c *CommitEpoch) DecodeAbi(txData []byte) error {
 }
 
 // Type returns the state transaction type for given data
-func (c *CommitEpoch) Type() StateTransactionType {
+func (c *CommitEpoch) Type() types.StateTransactionType {
 	return stTypeEndEpoch
 }
 

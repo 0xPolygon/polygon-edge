@@ -77,7 +77,7 @@ func TestCommitmentMessage_VerifyProof(t *testing.T) {
 
 	const epoch, bundleSize, eventsCount = uint64(100), uint64(3), 11
 	commitment, commitmentMessage, stateSyncs := buildCommitmentAndStateSyncs(t, eventsCount, epoch, 0)
-	require.Equal(t, uint64(10), commitmentMessage.BundlesCount())
+	require.Equal(t, uint64(10), commitmentMessage.StateSyncCount())
 
 	for i, stateSync := range stateSyncs {
 		proof := commitment.MerkleTree.GenerateProof(uint64(i), 0)
@@ -86,7 +86,7 @@ func TestCommitmentMessage_VerifyProof(t *testing.T) {
 			StateSync: (*types.StateSyncEvent)(stateSync),
 		}
 
-		inputData, err := executeStateSyncABIMethod.Encode([2]interface{}{stateSyncsProof.Proof, stateSyncsProof.StateSync})
+		inputData, err := stateSyncsProof.EncodeAbi()
 		require.NoError(t, err)
 
 		executionStateSync := &types.StateSyncProof{}

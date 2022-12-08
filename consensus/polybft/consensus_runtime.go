@@ -579,7 +579,7 @@ func (c *consensusRuntime) buildBundles(commitment *Commitment, commitmentMsg *C
 
 	startBundleIdx := commitmentMsg.GetBundleIdxFromStateSyncEventIdx(stateSyncExecutionIndex)
 
-	for idx := startBundleIdx; idx < commitmentMsg.BundlesCount(); idx++ {
+	for idx := startBundleIdx; idx < commitmentMsg.StateSyncCount(); idx++ {
 		p := commitment.MerkleTree.GenerateProof(idx, 0)
 		events, err := c.state.getStateSyncEventsForCommitment(commitmentMsg.FromIndex, commitmentMsg.ToIndex)
 

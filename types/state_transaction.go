@@ -12,8 +12,20 @@ var ExecuteBundleABIMethod, _ = abi.NewMethod("function execute(" +
 	"bytes32[] proof, " +
 	"tuple(uint256 id, address sender, address receiver, bytes data, bool skip)[] objs)")
 
+var ExecuteStateSyncABIMethod, _ = abi.NewMethod("function execute(" +
+	"bytes32[] proof, " +
+	"tuple(uint256 id, address sender, address receiver, bytes data, bool skip) stateSync)")
+
 var StateSyncEventABIType = abi.MustNewType(
 	"tuple(tuple(uint256 id, address sender, address receiver, bytes data, bool skip)[])")
+
+const (
+	abiMethodIDLength = 4
+	stTypeStateSync   = "state-sync"
+)
+
+// StateTransactionType is a type, which represents state transaction type
+type StateTransactionType string
 
 // StateSyncEvent is a bridge event from the rootchain
 type StateSyncEvent struct {
@@ -29,16 +41,25 @@ type StateSyncEvent struct {
 	Skip bool
 }
 
+func (sse *StateSyncEvent) ToAbiSlice() map[string]interface{} {
+	return map[string]interface{}{
+		"id":       sse.ID,
+		"sender":   sse.Sender,
+		"receiver": sse.Receiver,
+		"data":     sse.Data,
+		"skip":     sse.Skip,
+	}
+}
+
 type StateSyncProof struct {
 	Proof     []Hash
 	StateSync *StateSyncEvent
 }
 
-var executeStateSyncABIMethod, _ = abi.NewMethod("function execute(" +
-	"bytes32[] proof, " +
-	"tuple(uint256 id, address sender, address receiver, bytes data, bool skip) stateSync)")
-
-const abiMethodIDLength = 4
+// EncodeAbi contains logic for encoding given ABI data
+func (ssp *StateSyncProof) EncodeAbi() ([]byte, error) {
+	return ExecuteStateSyncABIMethod.Encode([2]interface{}{ssp.Proof, ssp.StateSync.ToAbiSlice()})
+}
 
 // DecodeAbi contains logic for decoding given ABI data
 func (ssp *StateSyncProof) DecodeAbi(txData []byte) error {
@@ -46,7 +67,7 @@ func (ssp *StateSyncProof) DecodeAbi(txData []byte) error {
 		return fmt.Errorf("invalid bundle data, len = %d", len(txData))
 	}
 
-	rawResult, err := executeStateSyncABIMethod.Inputs.Decode(txData[abiMethodIDLength:])
+	rawResult, err := ExecuteStateSyncABIMethod.Inputs.Decode(txData[abiMethodIDLength:])
 	if err != nil {
 		return err
 	}
@@ -110,4 +131,9 @@ func (ssp *StateSyncProof) DecodeAbi(txData []byte) error {
 	}
 
 	return nil
+}
+
+// Type returns type of state transaction input
+func (ssp *StateSyncProof) Type() StateTransactionType {
+	return stTypeStateSync
 }
