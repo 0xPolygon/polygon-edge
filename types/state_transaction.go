@@ -24,18 +24,6 @@ const (
 	stTypeStateSync   = "state-sync"
 )
 
-type StateTransactionType string
-
-// StateTransactionInput is an abstraction for different state transaction inputs
-type StateTransactionInput interface {
-	// EncodeAbi contains logic for encoding arbitrary data into ABI format
-	EncodeAbi() ([]byte, error)
-	// DecodeAbi contains logic for decoding given ABI data
-	DecodeAbi(b []byte) error
-	// Type returns type of state transaction input
-	Type() StateTransactionType
-}
-
 // StateSyncEvent is a bridge event from the rootchain
 type StateSyncEvent struct {
 	// ID is the decoded 'index' field from the event
@@ -144,9 +132,4 @@ func (ssp *StateSyncProof) DecodeAbi(txData []byte) error {
 	}
 
 	return nil
-}
-
-// Type returns type of state transaction input
-func (ssp *StateSyncProof) Type() StateTransactionType {
-	return stTypeStateSync
 }

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"math"
 	"math/big"
 	"reflect"
 
@@ -22,16 +21,12 @@ var (
 	stateSyncABIType = abi.MustNewType(
 		"tuple(uint256 id, address sender, address receiver, bytes data, bool skip)")
 
-	bundleABIType = abi.MustNewType("tuple(uint256 startId, uint256 endId, uint256 leaves, bytes32 root)")
+	commitmentABIType = abi.MustNewType("tuple(uint256 startId, uint256 endId, bytes32 root)")
 
-	commitBundleABIMethod, _ = abi.NewMethod("function commit(" +
-		"tuple(uint256 startId, uint256 endId, uint256 leaves, bytes32 root) bundle," +
+	commitABIMethod, _ = abi.NewMethod("function commit(" +
+		"tuple(uint256 startId, uint256 endId, bytes32 root) commitment," +
 		"bytes signature," +
 		"bytes bitmap)")
-
-	executeBundleABIMethod, _ = abi.NewMethod("function execute(" +
-		"bytes32[] proof, " +
-		"tuple(uint256 id, address sender, address receiver, bytes data, bool skip)[] objs)")
 
 	executeStateSyncABIMethod, _ = abi.NewMethod("function execute(" +
 		"bytes32[] proof, " +
@@ -39,6 +34,18 @@ var (
 
 	validatorsUptimeMethod, _ = abi.NewMethod("function uptime(bytes data)")
 )
+
+// StateTransactionInput is an abstraction for different state transaction inputs
+type StateTransactionInput interface {
+	// EncodeAbi contains logic for encoding arbitrary data into ABI format
+	EncodeAbi() ([]byte, error)
+	// DecodeAbi contains logic for decoding given ABI data
+	DecodeAbi(b []byte) error
+	// Type returns type of state transaction input
+	Type() StateTransactionType
+}
+
+type StateTransactionType string
 
 const (
 	abiMethodIDLength      = 4
@@ -81,7 +88,7 @@ func (cm *Commitment) Hash() (types.Hash, error) {
 		"root":    cm.MerkleTree.Hash(),
 	}
 
-	data, err := bundleABIType.Encode(commitment)
+	data, err := commitmentABIType.Encode(commitment)
 	if err != nil {
 		return types.Hash{}, err
 	}
@@ -95,19 +102,16 @@ type CommitmentMessage struct {
 	FromIndex      uint64
 	ToIndex        uint64
 	Epoch          uint64
-	// BundleSize     uint64
 }
 
 // NewCommitmentMessage creates a new commitment message based on provided merkle root hash
 // where fromIndex represents an id of the first state event index in commitment
 // where toIndex represents an id of the last state event index in commitment
-// where bundleSize represents the number of bundles (leafs) in commitment
-func NewCommitmentMessage(merkleRootHash types.Hash, fromIndex, toIndex, bundleSize uint64) *CommitmentMessage {
+func NewCommitmentMessage(merkleRootHash types.Hash, fromIndex, toIndex uint64) *CommitmentMessage {
 	return &CommitmentMessage{
 		MerkleRootHash: merkleRootHash,
 		FromIndex:      fromIndex,
 		ToIndex:        toIndex,
-		// BundleSize:     bundleSize,
 	}
 }
 
@@ -116,11 +120,10 @@ func (cm *CommitmentMessage) Hash() (types.Hash, error) {
 	commitment := map[string]interface{}{
 		"startId": cm.FromIndex,
 		"endId":   cm.ToIndex,
-		"leaves":  cm.StateSyncCount(),
 		"root":    cm.MerkleRootHash,
 	}
 
-	data, err := bundleABIType.Encode(commitment)
+	data, err := commitmentABIType.Encode(commitment)
 	if err != nil {
 		return types.Hash{}, err
 	}
@@ -164,7 +167,7 @@ func (cm CommitmentMessage) VerifyStateSyncProof(stateSyncProof *types.StateSync
 	return VerifyProof(stateSyncProof.StateSync.ID-cm.FromIndex, hash, stateSyncProof.Proof, cm.MerkleRootHash)
 }
 
-var _ types.StateTransactionInput = &CommitmentMessageSigned{}
+var _ StateTransactionInput = &CommitmentMessageSigned{}
 
 // CommitmentMessageSigned encapsulates commitment message with aggregated signatures
 type CommitmentMessageSigned struct {
@@ -178,7 +181,6 @@ func (cm *CommitmentMessageSigned) EncodeAbi() ([]byte, error) {
 	commitment := map[string]interface{}{
 		"startId": cm.Message.FromIndex,
 		"endId":   cm.Message.ToIndex,
-		"leaves":  cm.Message.StateSyncCount(),
 		"root":    cm.Message.MerkleRootHash,
 	}
 
@@ -189,12 +191,12 @@ func (cm *CommitmentMessageSigned) EncodeAbi() ([]byte, error) {
 	}
 
 	data := map[string]interface{}{
-		"bundle":    commitment,
-		"signature": cm.AggSignature.AggregatedSignature,
-		"bitmap":    blsVerificationPart,
+		"commitment": commitment,
+		"signature":  cm.AggSignature.AggregatedSignature,
+		"bitmap":     blsVerificationPart,
 	}
 
-	return commitBundleABIMethod.Encode(data)
+	return commitABIMethod.Encode(data)
 }
 
 // DecodeAbi contains logic for decoding given ABI data
@@ -203,7 +205,7 @@ func (cm *CommitmentMessageSigned) DecodeAbi(txData []byte) error {
 		return fmt.Errorf("invalid bundle data, len = %d", len(txData))
 	}
 
-	rawResult, err := commitBundleABIMethod.Inputs.Decode(txData[abiMethodIDLength:])
+	rawResult, err := commitABIMethod.Inputs.Decode(txData[abiMethodIDLength:])
 	if err != nil {
 		return err
 	}
@@ -213,7 +215,7 @@ func (cm *CommitmentMessageSigned) DecodeAbi(txData []byte) error {
 		return fmt.Errorf("invalid commitment data. Could not convert decoded data to map")
 	}
 
-	commitmentPart, isOk := result["bundle"].(map[string]interface{})
+	commitmentPart, isOk := result["commitment"].(map[string]interface{})
 	if !isOk {
 		return fmt.Errorf("invalid commitment data. Could not find commitment part")
 	}
@@ -267,16 +269,8 @@ func (cm *CommitmentMessageSigned) DecodeAbi(txData []byte) error {
 
 	toIndex := toIndexPart.Uint64()
 
-	leavesPart, isOk := commitmentPart["leaves"].(*big.Int)
-	if !isOk {
-		return fmt.Errorf("invalid commitment data. Could not find endId")
-	}
-
-	leavesNum := leavesPart.Uint64()
-
 	*cm = CommitmentMessageSigned{
-		Message: NewCommitmentMessage(merkleRoot, fromIndex, toIndex,
-			uint64(math.Ceil((float64(toIndex)-float64(fromIndex)+1)/float64(leavesNum)))),
+		Message: NewCommitmentMessage(merkleRoot, fromIndex, toIndex),
 		AggSignature: Signature{
 			AggregatedSignature: aggregatedSignature,
 			Bitmap:              bitmap,
@@ -288,25 +282,22 @@ func (cm *CommitmentMessageSigned) DecodeAbi(txData []byte) error {
 }
 
 // Type returns type of state transaction input
-func (cm *CommitmentMessageSigned) Type() types.StateTransactionType {
+func (cm *CommitmentMessageSigned) Type() StateTransactionType {
 	return stTypeBridgeCommitment
 }
 
-func decodeStateTransaction(txData []byte) (types.StateTransactionInput, error) {
+func decodeStateTransaction(txData []byte) (StateTransactionInput, error) {
 	if len(txData) < abiMethodIDLength {
 		return nil, fmt.Errorf("state transactions have input")
 	}
 
 	sig := txData[:abiMethodIDLength]
 
-	var obj types.StateTransactionInput
+	var obj StateTransactionInput
 
-	if bytes.Equal(sig, commitBundleABIMethod.ID()) {
+	if bytes.Equal(sig, commitABIMethod.ID()) {
 		// bridge commitment
 		obj = &CommitmentMessageSigned{}
-	} else if bytes.Equal(sig, types.ExecuteStateSyncABIMethod.ID()) {
-		// bundle proof
-		obj = &types.StateSyncProof{}
 	} else {
 		return nil, fmt.Errorf("unknown state transaction")
 	}
@@ -323,7 +314,7 @@ func getCommitmentMessageSignedTx(txs []*types.Transaction) (*CommitmentMessageS
 		// skip non state CommitmentMessageSigned transactions
 		if tx.Type != types.StateTx ||
 			len(tx.Input) < abiMethodIDLength ||
-			!bytes.Equal(tx.Input[:abiMethodIDLength], commitBundleABIMethod.ID()) {
+			!bytes.Equal(tx.Input[:abiMethodIDLength], commitABIMethod.ID()) {
 			continue
 		}
 
@@ -388,7 +379,7 @@ func createMerkleTree(stateSyncEvents []*types.StateSyncEvent) (*MerkleTree, err
 	return NewMerkleTree(ssh)
 }
 
-var _ types.StateTransactionInput = &CommitEpoch{}
+var _ StateTransactionInput = &CommitEpoch{}
 
 var (
 	commitEpochMethod, _ = abi.NewMethod("function commitEpoch(" +
@@ -453,7 +444,7 @@ func (c *CommitEpoch) DecodeAbi(txData []byte) error {
 }
 
 // Type returns the state transaction type for given data
-func (c *CommitEpoch) Type() types.StateTransactionType {
+func (c *CommitEpoch) Type() StateTransactionType {
 	return stTypeEndEpoch
 }
 

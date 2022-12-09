@@ -27,10 +27,10 @@ func TestCommitmentMessage_Hash(t *testing.T) {
 	trie2, err := createMerkleTree(stateSyncEvents[0 : len(stateSyncEvents)-1])
 	require.NoError(t, err)
 
-	commitmentMessage1 := NewCommitmentMessage(trie1.Hash(), 2, 8, bundleSize)
-	commitmentMessage2 := NewCommitmentMessage(trie1.Hash(), 2, 8, bundleSize)
-	commitmentMessage3 := NewCommitmentMessage(trie1.Hash(), 6, 10, bundleSize)
-	commitmentMessage4 := NewCommitmentMessage(trie2.Hash(), 2, 8, bundleSize)
+	commitmentMessage1 := NewCommitmentMessage(trie1.Hash(), 2, 8)
+	commitmentMessage2 := NewCommitmentMessage(trie1.Hash(), 2, 8)
+	commitmentMessage3 := NewCommitmentMessage(trie1.Hash(), 6, 10)
+	commitmentMessage4 := NewCommitmentMessage(trie2.Hash(), 2, 8)
 
 	hash1, err := commitmentMessage1.Hash()
 	require.NoError(t, err)
@@ -150,7 +150,7 @@ func buildCommitmentAndStateSyncs(t *testing.T, stateSyncsCount int,
 
 	commitmentMsg := NewCommitmentMessage(commitment.MerkleTree.Hash(),
 		fromIndex,
-		toIndex, 0)
+		toIndex)
 
 	require.NoError(t, err)
 
@@ -178,7 +178,7 @@ func TestStateTransaction_Signature(t *testing.T) {
 func TestStateTransaction_Encoding(t *testing.T) {
 	t.Parallel()
 
-	cases := []types.StateTransactionInput{
+	cases := []StateTransactionInput{
 		// empty commit epoch
 		&CommitEpoch{
 			Uptime: Uptime{
@@ -194,7 +194,7 @@ func TestStateTransaction_Encoding(t *testing.T) {
 
 		// use reflection to create another type and decode
 		val := reflect.New(reflect.TypeOf(c).Elem()).Interface()
-		obj, ok := val.(types.StateTransactionInput)
+		obj, ok := val.(StateTransactionInput)
 		assert.True(t, ok)
 
 		err = obj.DecodeAbi(res)

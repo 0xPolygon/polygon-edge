@@ -62,13 +62,6 @@ type fsm struct {
 	// proposerCommitmentToRegister is a commitment that is registered via state transaction by proposer
 	proposerCommitmentToRegister *CommitmentMessageSigned
 
-	// commitmentsToVerifyBundles is an array of commitment messages that were not executed yet,
-	// but are used to verify any bundles if they are included in state transactions
-	commitmentsToVerifyBundles []*CommitmentMessageSigned
-
-	// stateSyncExecutionIndex is the next state sync execution index in smart contract
-	stateSyncExecutionIndex uint64
-
 	// checkpointBackend provides functions for working with checkpoints and exit events
 	checkpointBackend checkpointBackend
 
@@ -398,26 +391,6 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 			verified := aggs.VerifyAggregated(signers.GetBlsKeys(), hash.Bytes())
 			if !verified {
 				return fmt.Errorf("invalid signature for tx = %v", tx.Hash)
-			}
-		case *types.StateSyncProof:
-			isVerified := false
-
-			for _, commitment := range f.commitmentsToVerifyBundles {
-				if commitment.Message.ContainsStateSync(stateTxData.StateSync.ID) {
-					isVerified = true
-
-					if err := commitment.Message.VerifyStateSyncProof(stateTxData); err != nil {
-						return fmt.Errorf("state transaction error while validating proof: tx = %v, err = %w",
-							tx.Hash, err)
-					}
-
-					break
-				}
-			}
-
-			if !isVerified {
-				return fmt.Errorf("state transaction error while validating proof. "+
-					"No appropriate commitment found to verify proof. tx = %v", tx.Hash)
 			}
 		}
 	}

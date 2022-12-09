@@ -245,20 +245,10 @@ func (c *consensusRuntime) createCommitment(txs []*types.Transaction) error {
 
 	// TODO: keep systemState.GetNextExecutionIndex() also in cr?
 	// Maybe some immutable structure `consensusMetaData`?
-	previousBlock, epoch := c.getLastBuiltBlockAndEpoch()
-
-	systemState, err := c.getSystemState(previousBlock)
-	if err != nil {
-		return fmt.Errorf("create commitment, get system state error: %w", err)
-	}
-
-	nextStateSyncExecutionIdx, err := systemState.GetNextExecutionIndex()
-	if err != nil {
-		return fmt.Errorf("create commitment, get next execution index error: %w", err)
-	}
+	_, epoch := c.getLastBuiltBlockAndEpoch()
 
 	if err := c.buildProofs(
-		epoch.Commitment, commitment.Message, nextStateSyncExecutionIdx); err != nil {
+		epoch.Commitment, commitment.Message); err != nil {
 		return fmt.Errorf("create commitment error: %w", err)
 	}
 
@@ -276,13 +266,6 @@ func (c *consensusRuntime) populateFsmIfBridgeEnabled(
 	if err != nil {
 		return err
 	}
-
-	nextStateSyncExecutionIdx, err := systemState.GetNextExecutionIndex()
-	if err != nil {
-		return fmt.Errorf("cannot get next execution index: %w", err)
-	}
-
-	ff.stateSyncExecutionIndex = nextStateSyncExecutionIdx
 
 	nextRegisteredCommitmentIndex, err := systemState.GetNextCommittedIndex()
 	if err != nil {
@@ -310,21 +293,6 @@ func (c *consensusRuntime) populateFsmIfBridgeEnabled(
 		}
 
 		ff.proposerCommitmentToRegister = commitment
-	}
-
-	if isEndOfSprint {
-		if err := c.state.cleanCommitments(nextStateSyncExecutionIdx); err != nil {
-			return fmt.Errorf("cannot clean commitments: %w", err)
-		}
-
-		nonExecutedCommitments, err := c.state.getNonExecutedCommitments(nextStateSyncExecutionIdx)
-		if err != nil {
-			return fmt.Errorf("cannot get non executed commitments: %w", err)
-		}
-
-		if len(nonExecutedCommitments) > 0 {
-			ff.commitmentsToVerifyBundles = nonExecutedCommitments
-		}
 	}
 
 	return nil
@@ -513,7 +481,7 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) error {
 // buildCommitment builds a commitment message (if it is not already built in previous epoch)
 // for state sync events starting from given index and saves the message in database
 func (c *consensusRuntime) buildCommitment(epoch, fromIndex uint64) (*Commitment, error) {
-	toIndex := fromIndex + stateSyncMainBundleSize - 1
+	toIndex := fromIndex + stateSyncCommitmentSize - 1
 	// if it is not already built in the previous epoch
 	stateSyncEvents, err := c.state.getStateSyncEventsForCommitment(fromIndex, toIndex)
 	if err != nil {
@@ -575,13 +543,11 @@ func (c *consensusRuntime) buildCommitment(epoch, fromIndex uint64) (*Commitment
 }
 
 // buildProofs builds state sync proofs if there is a created commitment by the validator and inserts them into db
-func (c *consensusRuntime) buildProofs(commitment *Commitment, commitmentMsg *CommitmentMessage,
-	stateSyncExecutionIndex uint64) error {
+func (c *consensusRuntime) buildProofs(commitment *Commitment, commitmentMsg *CommitmentMessage) error {
 	c.logger.Debug(
 		"[buildProofs] Building proofs...",
 		"fromIndex", commitmentMsg.FromIndex,
 		"toIndex", commitmentMsg.ToIndex,
-		"nextExecutionIndex", stateSyncExecutionIndex,
 	)
 
 	if commitment == nil {
@@ -613,7 +579,6 @@ func (c *consensusRuntime) buildProofs(commitment *Commitment, commitmentMsg *Co
 		"[buildProofs] Building proofs finished.",
 		"fromIndex", commitmentMsg.FromIndex,
 		"toIndex", commitmentMsg.ToIndex,
-		"nextExecutionIndex", stateSyncExecutionIndex,
 	)
 
 	return c.state.insertStateSyncProofs(stateSyncProofs)
@@ -959,12 +924,11 @@ func (c *consensusRuntime) getCommitmentToRegister(epoch *epochMetadata,
 		return nil, errCommitmentNotBuilt
 	}
 
-	toIndex := registerCommitmentIndex + stateSyncMainBundleSize - 1
+	toIndex := registerCommitmentIndex + stateSyncCommitmentSize - 1
 	commitmentMessage := NewCommitmentMessage(
 		epoch.Commitment.MerkleTree.Hash(),
 		registerCommitmentIndex,
-		toIndex,
-		stateSyncBundleSize)
+		toIndex)
 
 	commitmentHash, err := epoch.Commitment.Hash()
 	if err != nil {

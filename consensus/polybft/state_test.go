@@ -235,14 +235,14 @@ func TestState_getStateSyncEventsForCommitment_NotEnoughEvents(t *testing.T) {
 
 	state := newTestState(t)
 
-	for i := 0; i < stateSyncMainBundleSize-2; i++ {
+	for i := 0; i < stateSyncCommitmentSize-2; i++ {
 		assert.NoError(t, state.insertStateSyncEvent(&types.StateSyncEvent{
 			ID:   uint64(i),
 			Data: []byte{1, 2},
 		}))
 	}
 
-	_, err := state.getStateSyncEventsForCommitment(0, stateSyncMainBundleSize-1)
+	_, err := state.getStateSyncEventsForCommitment(0, stateSyncCommitmentSize-1)
 	assert.ErrorIs(t, err, errNotEnoughStateSyncs)
 }
 
@@ -251,16 +251,16 @@ func TestState_getStateSyncEventsForCommitment(t *testing.T) {
 
 	state := newTestState(t)
 
-	for i := 0; i < stateSyncMainBundleSize; i++ {
+	for i := 0; i < stateSyncCommitmentSize; i++ {
 		assert.NoError(t, state.insertStateSyncEvent(&types.StateSyncEvent{
 			ID:   uint64(i),
 			Data: []byte{1, 2},
 		}))
 	}
 
-	events, err := state.getStateSyncEventsForCommitment(0, stateSyncMainBundleSize-1)
+	events, err := state.getStateSyncEventsForCommitment(0, stateSyncCommitmentSize-1)
 	assert.NoError(t, err)
-	assert.Equal(t, stateSyncMainBundleSize, len(events))
+	assert.Equal(t, stateSyncCommitmentSize, len(events))
 }
 
 func TestState_insertCommitmentMessage(t *testing.T) {
@@ -287,7 +287,7 @@ func TestState_cleanCommitments(t *testing.T) {
 		numberOfBundles     = 10
 	)
 
-	lastCommitmentToIndex := uint64(numberOfCommitments*stateSyncMainBundleSize - stateSyncMainBundleSize - 1)
+	lastCommitmentToIndex := uint64(numberOfCommitments*stateSyncCommitmentSize - stateSyncCommitmentSize - 1)
 
 	state := newTestState(t)
 	insertTestCommitments(t, state, 1, numberOfCommitments)
@@ -300,7 +300,7 @@ func TestState_cleanCommitments(t *testing.T) {
 	assert.Equal(t, lastCommitmentToIndex, commitment.Message.ToIndex)
 
 	for i := uint64(1); i < numberOfCommitments; i++ {
-		c, err := state.getCommitmentMessage(i*stateSyncMainBundleSize + lastCommitmentToIndex - 1)
+		c, err := state.getCommitmentMessage(i*stateSyncCommitmentSize + lastCommitmentToIndex - 1)
 		assert.NoError(t, err)
 		assert.Nil(t, c)
 	}
@@ -471,7 +471,7 @@ func insertTestCommitments(t *testing.T, state *State, epoch, numberOfCommitment
 	t.Helper()
 
 	for i := uint64(0); i <= numberOfCommitments; i++ {
-		commitment, err := createTestCommitmentMessage(i * stateSyncMainBundleSize)
+		commitment, err := createTestCommitmentMessage(i * stateSyncCommitmentSize)
 		require.NoError(t, err)
 		require.NoError(t, state.insertCommitmentMessage(commitment))
 	}
@@ -515,7 +515,7 @@ func createTestCommitmentMessage(fromIndex uint64) (*CommitmentMessageSigned, er
 	msg := &CommitmentMessage{
 		MerkleRootHash: tree.Hash(),
 		FromIndex:      fromIndex,
-		ToIndex:        fromIndex + stateSyncMainBundleSize - 1,
+		ToIndex:        fromIndex + stateSyncCommitmentSize - 1,
 	}
 
 	return &CommitmentMessageSigned{
