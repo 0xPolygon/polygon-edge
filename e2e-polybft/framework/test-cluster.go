@@ -289,6 +289,9 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 	if cluster.Config.HasBridge {
 		err := cluster.Bridge.deployRootchainContracts(genesisPath)
 		require.NoError(t, err)
+
+		err = cluster.Bridge.fundValidators()
+		require.NoError(t, err)
 	}
 
 	for i := 1; i <= int(cluster.Config.ValidatorSetSize); i++ {

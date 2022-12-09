@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
+	"path"
+	"strconv"
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/command/rootchain/server"
@@ -75,12 +77,32 @@ func (t *TestBridge) deployRootchainContracts(genesisPath string) error {
 	return nil
 }
 
+func (t *TestBridge) fundValidators() error {
+	args := []string{
+		"rootchain",
+		"fund",
+		"--data-dir", path.Join(t.clusterConfig.TmpDir, t.clusterConfig.ValidatorPrefix),
+		"--num", strconv.Itoa(int(t.clusterConfig.ValidatorSetSize) + t.clusterConfig.NonValidatorCount),
+	}
+
+	err := runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("bridge"))
+	if err != nil {
+		return fmt.Errorf("failed to deploy fund validators: %w", err)
+	}
+
+	return nil
+}
+
 func (t *TestBridge) Stop() {
 	if err := t.node.Stop(); err != nil {
 		t.t.Error(err)
 	}
 
 	t.node = nil
+}
+
+func (t *TestBridge) JSONRPCAddr() string {
+	return fmt.Sprintf("http://%s:%d", hostIP, 8545)
 }
 
 // runCommand executes command with given arguments
