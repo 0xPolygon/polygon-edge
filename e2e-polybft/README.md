@@ -1,7 +1,7 @@
 
 # End-to-End testing
 
-The implemented E2E tests start a local instance of V3.
+The implemented E2E tests start a local instance of Polybft consensus protocol.
 
 As such, they require the binary 'polygon-edge' to be available in the $PATH variable.
 
