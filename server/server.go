@@ -140,11 +140,12 @@ func NewServer(config *Config) (*Server, error) {
 		return nil, fmt.Errorf("failed to create data directories: %w", err)
 	}
 
-	if err := m.setupTelemetry(); err != nil {
-		return nil, err
-	}
-
 	if config.Telemetry.PrometheusAddr != nil {
+		// Only setup telemetry if `PrometheusAddr` has been configured.
+		if err := m.setupTelemetry(); err != nil {
+			return nil, err
+		}
+
 		m.prometheusServer = m.startPrometheusServer(config.Telemetry.PrometheusAddr)
 	}
 
@@ -337,6 +338,10 @@ func (t *txpoolHub) GetBalance(root types.Hash, addr types.Address) (*big.Int, e
 	account, err := getAccountImpl(t.state, root, addr)
 
 	if err != nil {
+		if errors.Is(err, jsonrpc.ErrStateNotFound) {
+			return big.NewInt(0), nil
+		}
+
 		return big.NewInt(0), err
 	}
 
