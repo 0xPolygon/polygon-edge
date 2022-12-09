@@ -134,18 +134,12 @@ func GetSetState() func(t *Trie) stateSetter {
 	}
 }
 
-// getSetState returns stateSetter which will set state under lock if root hash is different
-func getSetState(objHash types.Hash) func(t *Trie) stateSetter {
+func getSetState(objHash, rootHash types.Hash) func(t *Trie) stateSetter {
 	return func(t *Trie) stateSetter {
-		rootHash := types.EmptyRootHash
-		if t.root != nil {
-			rh, _, _ := t.hashRoot()
-			rootHash = types.BytesToHash(rh)
-		}
-
 		if objHash != rootHash {
 			return t.SetState
 		}
+
 		return t.setState
 	}
 }
@@ -188,7 +182,7 @@ func (t *Trie) Commit(objs []*state.Object) (*Trie, []byte) {
 			}
 
 			if len(obj.Storage) != 0 {
-				trie, err := t.state.newTrieAt(obj.Root, getSetState(obj.Root))
+				trie, err := t.state.newTrieAt(obj.Root, getSetState(obj.Root, t.Hash()))
 				if err != nil {
 					panic(err)
 				}
@@ -249,8 +243,7 @@ func (t *Trie) Hash() types.Hash {
 		return types.EmptyRootHash
 	}
 
-	hash, cached, _ := t.hashRoot()
-	t.root = cached
+	hash := t.hashRoot()
 
 	return types.BytesToHash(hash)
 }
@@ -274,13 +267,14 @@ func (t *Trie) TryUpdate(key, value []byte) error {
 	return nil
 }
 
-func (t *Trie) hashRoot() ([]byte, Node, error) {
+func (t *Trie) hashRoot() []byte {
 	hash, _ := t.root.Hash()
 
-	return hash, t.root, nil
+	return hash
 }
 
 func (t *Trie) Txn() *Txn {
+	// FIXME: could we copy t.root, t.storage without putting the same refs to mutexes?
 	return &Txn{root: t.root, epoch: t.epoch + 1, storage: t.storage}
 }
 
