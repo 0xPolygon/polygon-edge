@@ -5,6 +5,7 @@ set -e
 # Reset test-dirs
 rm -rf test-chain-*
 rm -f genesis.json
+rm -f manifest.json
 
 go build -o polygon-edge .
 
