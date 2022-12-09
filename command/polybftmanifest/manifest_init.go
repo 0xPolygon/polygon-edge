@@ -2,7 +2,9 @@ package polybftmanifest
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
+	"os"
 	"path"
 	"strings"
 
@@ -35,15 +37,19 @@ var (
 // GetCommand returns the rootchain emit command
 func GetCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "polybft-manifest",
-		Short: "Initializes manifest file",
-		// PreRunE: runPreRun,
-		Run: runCommand,
+		Use:     "polybft-manifest",
+		Short:   "Initializes manifest file",
+		PreRunE: runPreRun,
+		Run:     runCommand,
 	}
 
 	setFlags(cmd)
 
 	return cmd
+}
+
+func runPreRun(_ *cobra.Command, _ []string) error {
+	return params.validateFlags()
 }
 
 func setFlags(cmd *cobra.Command) {
@@ -113,6 +119,18 @@ type manifestInitParams struct {
 	validatorsPrefixPath string
 	premineValidators    string
 	validators           []string
+}
+
+func (p *manifestInitParams) validateFlags() error {
+	if _, err := os.Stat(p.validatorsPath); errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("provided validators path '%s' doesn't exist", p.validatorsPath)
+	}
+
+	if _, err := types.ParseUint256orHex(&p.premineValidators); err != nil {
+		return fmt.Errorf("invalid premine validators balance provided '%s': %w", p.premineValidators, err)
+	}
+
+	return nil
 }
 
 // getValidatorAccounts gathers validator accounts info either from CLI or from provided local storage
