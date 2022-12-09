@@ -2,12 +2,13 @@ package e2e
 
 import (
 	"fmt"
+	"path"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 
-	rootchainHelper "github.com/0xPolygon/polygon-edge/command/rootchain/helper"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
@@ -172,10 +173,7 @@ func TestE2E_Bridge_MainWorkflow(t *testing.T) {
 }
 
 func TestE2E_CheckpointSubmission(t *testing.T) {
-	var (
-		rootchainSender       = rootchainHelper.GetRootchainAdminKey().Address()
-		checkpointManagerAddr = ethgo.Address(rootchainHelper.CheckpointManagerAddress)
-	)
+	const manifestFileName = "manifest.json"
 
 	cluster := framework.NewTestCluster(t, 5, framework.WithBridge())
 	defer cluster.Stop()
@@ -189,6 +187,12 @@ func TestE2E_CheckpointSubmission(t *testing.T) {
 
 	checkpointBlockNumInput, err := currentCheckpointBlockNumMethod.Encode([]interface{}{})
 	require.NoError(t, err)
+
+	manifest, err := polybft.LoadManifest(path.Join(cluster.Config.TmpDir, manifestFileName))
+	require.NoError(t, err)
+
+	checkpointManagerAddr := ethgo.Address(manifest.RootchainConfig.CheckpointManagerAddress)
+	rootchainSender := ethgo.Address(manifest.RootchainConfig.AdminAddress)
 
 	checkpointBlockNumRaw, err := txRelayer.Call(rootchainSender, checkpointManagerAddr, checkpointBlockNumInput)
 	require.NoError(t, err)
