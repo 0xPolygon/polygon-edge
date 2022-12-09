@@ -130,9 +130,8 @@ func TestConsensusRuntime_deliverMessage_MessageWhenEpochNotStarted(t *testing.T
 	}
 	// deliverMessage should not fail, although epochMetadata is not initialized
 	// message vote should be added to the consensus runtime state.
-	msgProcessed, err := runtime.deliverMessage(createTestTransportMessage(t, hash, epoch, validators.getValidator(senderID).Key()))
+	err = runtime.deliverMessage(createTestTransportMessage(t, hash, epoch, validators.getValidator(senderID).Key()))
 	require.NoError(t, err)
-	require.True(t, msgProcessed)
 
 	// assert that no additional message signatures aren't inserted into the consensus runtime state
 	// (other than the one we have previously inserted by ourselves)
@@ -310,8 +309,7 @@ func TestConsensusRuntime_deliverMessage_EpochNotStarted(t *testing.T) {
 	}
 
 	msg := createTestTransportMessage(t, generateRandomBytes(t), 1, account.Key())
-	isProcessed, err := runtime.deliverMessage(msg)
-	assert.False(t, isProcessed)
+	err = runtime.deliverMessage(msg)
 	assert.ErrorContains(t, err, "not among the active validator set")
 
 	votes, err := state.getMessageVotes(1, msg.Hash)
@@ -347,8 +345,7 @@ func TestConsensusRuntime_deliverMessage_ForExistingEpochAndCommitmentMessage(t 
 	}
 
 	msg := createTestTransportMessage(t, generateRandomBytes(t), 1, sender)
-	isProcessed, err := runtime.deliverMessage(msg)
-	assert.True(t, isProcessed)
+	err = runtime.deliverMessage(msg)
 	assert.NoError(t, err)
 
 	votes, err := state.getMessageVotes(1, msg.Hash)
@@ -382,8 +379,7 @@ func TestConsensusRuntime_deliverMessage_SenderMessageNotInCurrentValidatorset(t
 	}
 
 	msg := createTestTransportMessage(t, generateRandomBytes(t), 1, createTestKey(t))
-	isProcessed, err := runtime.deliverMessage(msg)
-	assert.False(t, isProcessed)
+	err = runtime.deliverMessage(msg)
 	assert.Error(t, err)
 	assert.ErrorContains(t, err,
 		fmt.Sprintf("message is received from sender %s, which is not in current validator set", msg.NodeID))

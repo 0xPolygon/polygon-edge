@@ -706,22 +706,22 @@ func (c *consensusRuntime) startEventTracker() error {
 
 // deliverMessage receives the message vote from transport and inserts it in state db for given epoch.
 // It returns indicator whether message is processed successfully and error object if any.
-func (c *consensusRuntime) deliverMessage(msg *TransportMessage) (bool, error) {
+func (c *consensusRuntime) deliverMessage(msg *TransportMessage) error {
 	epoch := c.getEpoch()
 
 	if epoch == nil || msg.EpochNumber < epoch.Number {
 		// Epoch metadata is undefined
 		// or received message for some of the older epochs.
-		return false, nil
+		return nil
 	}
 
 	if !c.isActiveValidator() {
-		return false, fmt.Errorf("validator is not among the active validator set")
+		return fmt.Errorf("validator is not among the active validator set")
 	}
 
 	// check just in case
 	if epoch.Validators == nil {
-		return false, fmt.Errorf("validators are not set for the current epoch")
+		return fmt.Errorf("validators are not set for the current epoch")
 	}
 
 	msgVote := &MessageSignature{
@@ -730,12 +730,12 @@ func (c *consensusRuntime) deliverMessage(msg *TransportMessage) (bool, error) {
 	}
 
 	if err := validateVote(msgVote, epoch); err != nil {
-		return false, err
+		return err
 	}
 
 	numSignatures, err := c.state.insertMessageVote(msg.EpochNumber, msg.Hash, msgVote)
 	if err != nil {
-		return false, fmt.Errorf("error inserting message vote: %w", err)
+		return fmt.Errorf("error inserting message vote: %w", err)
 	}
 
 	c.logger.Info(
@@ -745,7 +745,7 @@ func (c *consensusRuntime) deliverMessage(msg *TransportMessage) (bool, error) {
 		"signatures", numSignatures,
 	)
 
-	return true, nil
+	return nil
 }
 
 // calculateUptime calculates uptime for blocks starting from the last built block in current epoch,
