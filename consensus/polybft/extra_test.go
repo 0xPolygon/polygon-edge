@@ -603,6 +603,32 @@ func TestValidatorSetDelta_UnmarshalRLPWith_NegativeCases(t *testing.T) {
 		delta := &ValidatorSetDelta{}
 		require.ErrorContains(t, delta.UnmarshalRLPWith(deltaMarshalled), "value is not of type bytes")
 	})
+
+	t.Run("Incorrect RLP value type for Updated field", func(t *testing.T) {
+		t.Parallel()
+
+		ar := &fastrlp.Arena{}
+		deltaMarshalled := ar.NewArray()
+		deltaMarshalled.Set(ar.NewArray())
+		deltaMarshalled.Set(ar.NewBytes([]byte{0x33}))
+		deltaMarshalled.Set(ar.NewNull())
+		delta := &ValidatorSetDelta{}
+		require.ErrorContains(t, delta.UnmarshalRLPWith(deltaMarshalled), "array expected for updated validators")
+	})
+
+	t.Run("Incorrect RLP value type for ValidatorMetadata in Updated field", func(t *testing.T) {
+		t.Parallel()
+
+		ar := &fastrlp.Arena{}
+		deltaMarshalled := ar.NewArray()
+		updatedArray := ar.NewArray()
+		updatedArray.Set(ar.NewNull())
+		deltaMarshalled.Set(ar.NewArray())
+		deltaMarshalled.Set(updatedArray)
+		deltaMarshalled.Set(ar.NewNull())
+		delta := &ValidatorSetDelta{}
+		require.ErrorContains(t, delta.UnmarshalRLPWith(deltaMarshalled), "value is not of type array")
+	})
 }
 
 func Test_GetIbftExtraClean_Fail(t *testing.T) {

@@ -242,17 +242,9 @@ func (d *ValidatorSetDelta) UnmarshalRLPWith(v *fastrlp.Value) error {
 			return fmt.Errorf("array expected for added validators")
 		}
 
-		if len(validatorsRaw) != 0 {
-			d.Added = make(AccountSet, len(validatorsRaw))
-
-			for i, validatorRaw := range validatorsRaw {
-				acc := &ValidatorMetadata{}
-				if err = acc.UnmarshalRLPWith(validatorRaw); err != nil {
-					return err
-				}
-
-				d.Added[i] = acc
-			}
+		d.Added, err = unmarshalValidators(validatorsRaw)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -263,17 +255,9 @@ func (d *ValidatorSetDelta) UnmarshalRLPWith(v *fastrlp.Value) error {
 			return fmt.Errorf("array expected for updated validators")
 		}
 
-		if len(validatorsRaw) != 0 {
-			d.Updated = make(AccountSet, len(validatorsRaw))
-
-			for i, validatorRaw := range validatorsRaw {
-				acc := &ValidatorMetadata{}
-				if err = acc.UnmarshalRLPWith(validatorRaw); err != nil {
-					return err
-				}
-
-				d.Updated[i] = acc
-			}
+		d.Updated, err = unmarshalValidators(validatorsRaw)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -288,6 +272,26 @@ func (d *ValidatorSetDelta) UnmarshalRLPWith(v *fastrlp.Value) error {
 	}
 
 	return nil
+}
+
+// unmarshalValidators unmarshals RLP encoded validators and returns AccountSet instance
+func unmarshalValidators(validatorsRaw []*fastrlp.Value) (AccountSet, error) {
+	if len(validatorsRaw) == 0 {
+		return nil, nil
+	}
+
+	validators := make(AccountSet, len(validatorsRaw))
+
+	for i, validatorRaw := range validatorsRaw {
+		acc := &ValidatorMetadata{}
+		if err := acc.UnmarshalRLPWith(validatorRaw); err != nil {
+			return nil, err
+		}
+
+		validators[i] = acc
+	}
+
+	return validators, nil
 }
 
 // IsEmpty returns indication whether delta is empty (namely added, updated slices and removed bitmap are empty)
