@@ -251,8 +251,8 @@ func (pc *proposerCalculator) Update(blockNumber uint64, config *runtimeConfig, 
 }
 
 func (pc *proposerCalculator) updateToBlock(blockNumber uint64, config *runtimeConfig) error {
-	if pc.snapshot.Height+1 != blockNumber {
-		return fmt.Errorf("proposer calculator update wrong height %d. current height = %d",
+	if pc.snapshot.Height != blockNumber {
+		return fmt.Errorf("proposer calculator update wrong block=%d, height = %d",
 			blockNumber, pc.snapshot.Height)
 	}
 
@@ -284,9 +284,12 @@ func (pc *proposerCalculator) updateToBlock(blockNumber uint64, config *runtimeC
 	// update to new validator set and center if needed
 	pc.updateValidators(newValidatorSet)
 
-	pc.snapshot.Height = blockNumber
+	pc.snapshot.Height = blockNumber + 1
 	pc.round = 0
 	pc.proposer = nil
+
+	pc.logger.Info("Finish updating proposer calculator",
+		"height", pc.snapshot.Height, "len", len(pc.snapshot.Validators))
 
 	return nil
 }
