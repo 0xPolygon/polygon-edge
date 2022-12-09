@@ -84,7 +84,7 @@ func executeStateSync(t *testing.T, client *jsonrpc.Client, txRelayer txrelayer.
 
 	t.Log("State sync proofs:", stateSyncProof)
 
-	input, err := types.ExecuteBundleABIMethod.Encode([2]interface{}{stateSyncProof.Proof, stateSyncProof.StateSync.ToMap()})
+	input, err := types.ExecuteStateSyncABIMethod.Encode([2]interface{}{stateSyncProof.Proof, stateSyncProof.StateSync.ToMap()})
 	require.NoError(t, err)
 
 	t.Log(stateSyncProof.StateSync.ToMap())

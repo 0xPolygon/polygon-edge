@@ -8,10 +8,6 @@ import (
 	"github.com/umbracle/ethgo/abi"
 )
 
-var ExecuteBundleABIMethod, _ = abi.NewMethod("function execute(" +
-	"bytes32[] proof, " +
-	"tuple(uint256 id, address sender, address receiver, bytes data, bool skip)[] objs)")
-
 var ExecuteStateSyncABIMethod, _ = abi.NewMethod("function execute(" +
 	"bytes32[] proof, " +
 	"tuple(uint256 id, address sender, address receiver, bytes data, bool skip) stateSync)")
@@ -65,7 +61,7 @@ func (ssp *StateSyncProof) EncodeAbi() ([]byte, error) {
 // DecodeAbi contains logic for decoding given ABI data
 func (ssp *StateSyncProof) DecodeAbi(txData []byte) error {
 	if len(txData) < abiMethodIDLength {
-		return fmt.Errorf("invalid bundle data, len = %d", len(txData))
+		return fmt.Errorf("invalid proof data, len = %d", len(txData))
 	}
 
 	rawResult, err := ExecuteStateSyncABIMethod.Inputs.Decode(txData[abiMethodIDLength:])
@@ -75,7 +71,7 @@ func (ssp *StateSyncProof) DecodeAbi(txData []byte) error {
 
 	result, isOk := rawResult.(map[string]interface{})
 	if !isOk {
-		return fmt.Errorf("invalid bundle data")
+		return fmt.Errorf("invalid proof data")
 	}
 
 	stateSyncEventEncoded, isOk := result["stateSync"].(map[string]interface{})

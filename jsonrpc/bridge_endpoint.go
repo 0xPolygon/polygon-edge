@@ -20,7 +20,7 @@ func (b *Bridge) GenerateExitProof(exitID, epoch, checkpointBlock argUint64) (in
 	return b.store.GenerateExitProof(uint64(exitID), uint64(epoch), uint64(checkpointBlock))
 }
 
-// GetStateSyncProof retrieves the StateSync Bundle proof
+// GetStateSyncProof retrieves the StateSync proof
 func (b *Bridge) GetStateSyncProof(stateSyncID argUint64) (interface{}, error) {
 	return b.store.GetStateSyncProof(uint64(stateSyncID))
 }
