@@ -204,14 +204,20 @@ type ValidatorSetDelta struct {
 // MarshalRLPWith marshals ValidatorSetDelta to RLP format
 func (d *ValidatorSetDelta) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 	vv := ar.NewArray()
-	validatorsRaw := ar.NewArray()
+	addedValidatorsRaw := ar.NewArray()
+	updatedValidatorsRaw := ar.NewArray()
 
 	for _, validatorAccount := range d.Added {
-		validatorsRaw.Set(validatorAccount.MarshalRLPWith(ar))
+		addedValidatorsRaw.Set(validatorAccount.MarshalRLPWith(ar))
 	}
 
-	vv.Set(validatorsRaw)              // validators
-	vv.Set(ar.NewCopyBytes(d.Removed)) // bitmap
+	for _, validatorAccount := range d.Updated {
+		updatedValidatorsRaw.Set(validatorAccount.MarshalRLPWith(ar))
+	}
+
+	vv.Set(addedValidatorsRaw)         // added
+	vv.Set(updatedValidatorsRaw)       // updated
+	vv.Set(ar.NewCopyBytes(d.Removed)) // removed
 
 	return vv
 }
@@ -225,8 +231,8 @@ func (d *ValidatorSetDelta) UnmarshalRLPWith(v *fastrlp.Value) error {
 
 	if len(elems) == 0 {
 		return nil
-	} else if num := len(elems); num != 2 {
-		return fmt.Errorf("incorrect elements count to decode validator set delta, expected 2 but found %d", num)
+	} else if num := len(elems); num != 3 {
+		return fmt.Errorf("incorrect elements count to decode validator set delta, expected 3 but found %d", num)
 	}
 
 	// Validators (added)
@@ -250,9 +256,30 @@ func (d *ValidatorSetDelta) UnmarshalRLPWith(v *fastrlp.Value) error {
 		}
 	}
 
+	// Validators (updated)
+	{
+		validatorsRaw, err := elems[1].GetElems()
+		if err != nil {
+			return fmt.Errorf("array expected for updated validators")
+		}
+
+		if len(validatorsRaw) != 0 {
+			d.Updated = make(AccountSet, len(validatorsRaw))
+
+			for i, validatorRaw := range validatorsRaw {
+				acc := &ValidatorMetadata{}
+				if err = acc.UnmarshalRLPWith(validatorRaw); err != nil {
+					return err
+				}
+
+				d.Updated[i] = acc
+			}
+		}
+	}
+
 	// Bitmap (removed)
 	{
-		dst, err := elems[1].GetBytes(nil)
+		dst, err := elems[2].GetBytes(nil)
 		if err != nil {
 			return err
 		}
@@ -281,7 +308,7 @@ func (d *ValidatorSetDelta) Copy() *ValidatorSetDelta {
 
 // fmt.Stringer interface implementation
 func (d *ValidatorSetDelta) String() string {
-	return fmt.Sprintf("Added %v Removed %v", d.Added, d.Removed)
+	return fmt.Sprintf("Added %v Removed %v Updated %v", d.Added, d.Removed, d.Updated)
 }
 
 // Signature represents aggregated signatures of signers accompanied with a bitmap
