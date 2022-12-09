@@ -81,15 +81,14 @@ type ProposerCalculator interface {
 	// CalcProposer calculates next proposer based on the passed round
 	CalcProposer(round, height uint64) (types.Address, error)
 
-	// Update updates snapshot, re-center priorities if `len(newValidatorSet)>0`
-	// and finally increments priorities `round + 1` number of times
-	Update(round, height uint64, newValidatorSet AccountSet) error
+	// Update calculator from current snapshot to block with number `blockNumber`
+	Update(blockNumber uint64, config *runtimeConfig, state *State) error
 
 	// GetLatestProposer returns latest calculated proposer
 	GetLatestProposer(round, height uint64) (types.Address, bool)
 
-	// Clone clones existing proposer calculator and also returns new snapshot
-	Clone() (ProposerCalculator, *ProposerCalculatorSnapshot)
+	// Clone clones existing proposer calculator
+	Clone() ProposerCalculator
 }
 
 func isBetterProposer(a, b *ProposerCalculatorValidator) bool {
@@ -123,7 +122,27 @@ type proposerCalculator struct {
 }
 
 // NewProposerCalculator creates a new proposer calculator object.
-func NewProposerCalculator(snapshot *ProposerCalculatorSnapshot, logger hclog.Logger) (ProposerCalculator, error) {
+func NewProposerCalculatorFromState(config *runtimeConfig, logger hclog.Logger) (*proposerCalculator, error) {
+	snapshot, err := config.State.getProposerCalculatorSnapshot()
+	if err != nil {
+		return nil, err
+	}
+
+	if snapshot == nil {
+		// pick validator set from genesis block if snapshot is not saved in db
+		genesisValidatorsSet, err := config.polybftBackend.GetValidators(0, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		snapshot = NewProposerCalculatorSnapshot(1, genesisValidatorsSet)
+	}
+
+	return NewProposerCalculator(snapshot, logger.Named("proposer_calculator"))
+}
+
+// NewProposerCalculator creates a new proposer calculator object.
+func NewProposerCalculator(snapshot *ProposerCalculatorSnapshot, logger hclog.Logger) (*proposerCalculator, error) {
 	proposerCalc := &proposerCalculator{
 		totalVotingPower: snapshot.GetTotalVotingPower(),
 		lock:             &sync.RWMutex{},
@@ -202,22 +221,70 @@ func (pc *proposerCalculator) CalcProposer(round, height uint64) (types.Address,
 	return proposer.Metadata.Address, nil
 }
 
-// Update TODO: this method is not thread safe - it is used only on temp reference from one routine
-func (pc *proposerCalculator) Update(round, height uint64, newValidatorSet AccountSet) error {
-	if pc.snapshot.Height+1 != height {
+// Update updates calculator from current snapshot to block number. Not thread safe!
+func (pc *proposerCalculator) Update(blockNumber uint64, config *runtimeConfig, state *State) error {
+	const saveEveryNIterations = 5
+
+	snapshot := pc.snapshot
+	from := snapshot.Height
+
+	for height := from; height <= blockNumber; height++ {
+		pc.updateToBlock(height, config)
+
+		// write snapshot every saveEveryNIterations iterations
+		// this way, we prevent data loss on long calculations
+		if (height-from+1)%saveEveryNIterations == 0 {
+			if err := state.writeProposerCalculatorSnapshot(snapshot); err != nil {
+				return fmt.Errorf("cannot save proposer calculator snapshot for block %d: %w", height, err)
+			}
+		}
+	}
+
+	// write snapshot if not already written
+	if (blockNumber-from+1)%saveEveryNIterations != 0 {
+		if err := state.writeProposerCalculatorSnapshot(snapshot); err != nil {
+			return fmt.Errorf("cannot save proposer calculator snapshot for block %d: %w", blockNumber, err)
+		}
+	}
+
+	return nil
+}
+
+func (pc *proposerCalculator) updateToBlock(blockNumber uint64, config *runtimeConfig) error {
+	if pc.snapshot.Height+1 != blockNumber {
 		return fmt.Errorf("proposer calculator update wrong height %d. current height = %d",
-			height, pc.snapshot.Height)
+			blockNumber, pc.snapshot.Height)
+	}
+
+	currentHeader, found := config.blockchain.GetHeaderByNumber(blockNumber)
+	if !found {
+		return fmt.Errorf("cannot get header by number: %d", blockNumber)
+	}
+
+	extra, err := GetIbftExtra(currentHeader.ExtraData)
+	if err != nil {
+		return fmt.Errorf("cannot get ibft extra for block %d: %w", blockNumber, err)
+	}
+
+	var newValidatorSet AccountSet = nil
+
+	if !extra.Validators.IsEmpty() {
+		// TODO: optimize with parents
+		newValidatorSet, err = config.polybftBackend.GetValidators(blockNumber, nil)
+		if err != nil {
+			return fmt.Errorf("cannot get ibft extra for block %d: %w", blockNumber, err)
+		}
 	}
 
 	// if round = 0 then we need one iteration
-	if err := pc.incrementProposerPriorityNTimes(round + 1); err != nil {
-		return err
+	if err := pc.incrementProposerPriorityNTimes(extra.Checkpoint.BlockRound + 1); err != nil {
+		return fmt.Errorf("failed to update calculator for block %d: %w", blockNumber, err)
 	}
 
 	// update to new validator set and center if needed
 	pc.updateValidators(newValidatorSet)
 
-	pc.snapshot.Height = height
+	pc.snapshot.Height = blockNumber
 	pc.round = 0
 	pc.proposer = nil
 
@@ -225,20 +292,17 @@ func (pc *proposerCalculator) Update(round, height uint64, newValidatorSet Accou
 }
 
 // Clone clones existing proposer calculator and also returns new snapshot
-func (pc *proposerCalculator) Clone() (ProposerCalculator, *ProposerCalculatorSnapshot) {
+func (pc *proposerCalculator) Clone() ProposerCalculator {
 	pc.lock.RLock()
 	defer pc.lock.RUnlock()
 
-	snapshot := pc.snapshot.Copy()
-	proposerCalc := &proposerCalculator{
+	return &proposerCalculator{
 		totalVotingPower: pc.totalVotingPower,
 		lock:             &sync.RWMutex{},
-		snapshot:         snapshot,
+		snapshot:         pc.snapshot.Copy(),
 		round:            0,
 		logger:           pc.logger,
 	}
-
-	return proposerCalc, snapshot
 }
 
 func (pc *proposerCalculator) incrementProposerPriorityNTimes(times uint64) error {

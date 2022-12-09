@@ -129,22 +129,7 @@ type consensusRuntime struct {
 
 // newConsensusRuntime creates and starts a new consensus runtime instance with event tracking
 func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRuntime, error) {
-	snapshot, err := config.State.getProposerCalculatorSnapshot()
-	if err != nil {
-		return nil, err
-	}
-
-	if snapshot == nil {
-		// pick validator set from genesis block if snapshot is not saved in db
-		genesisValidatorsSet, err := config.polybftBackend.GetValidators(0, nil)
-		if err != nil {
-			return nil, err
-		}
-
-		snapshot = NewProposerCalculatorSnapshot(1, genesisValidatorsSet)
-	}
-
-	proposerCalculator, err := NewProposerCalculator(snapshot, log.Named("proposer_calculator"))
+	proposerCalculator, err := NewProposerCalculatorFromState(config, log)
 	if err != nil {
 		return nil, err
 	}
@@ -238,13 +223,14 @@ func (c *consensusRuntime) OnBlockInserted(block *types.Block) {
 	} else {
 		c.lock.Lock()
 		c.lastBuiltBlock = block.Header
-		c.lock.Unlock()
-	}
+		proposerCalculator := c.proposerCalculator.Clone()
+		// TODO: this could be long running operation
+		if err := proposerCalculator.Update(block.Number(), c.config, c.state); err != nil {
+			c.logger.Warn("Could not update proposer calculator", "err", err)
+		}
 
-	// TODO: this could be long running operation
-	// if saving snapshot failed and a lot of blocks were finalized in the meantime
-	if err := c.updateProposerCalculatorToBlock(block.Number()); err != nil {
-		c.logger.Warn("Could not update proposer calculator", "err", err)
+		c.proposerCalculator = proposerCalculator
+		c.lock.Unlock()
 	}
 }
 
@@ -351,13 +337,7 @@ func (c *consensusRuntime) FSM() error {
 	// to the head of their remote peers.
 	c.lock.RLock()
 	parent, epoch := c.getLastBuiltBlockAndEpoch()
-	proposerCalc := ProposerCalculator(nil)
-
-	// TODO: just for test to pass will be changed
-	if c.proposerCalculator != nil {
-		proposerCalc, _ = c.proposerCalculator.Clone()
-	}
-
+	proposerCalc := c.proposerCalculator.Clone()
 	c.lock.RUnlock()
 
 	if !epoch.Validators.ContainsNodeID(c.config.Key.String()) {
@@ -487,6 +467,14 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) error {
 	c.lock.Lock()
 	c.epoch = epoch
 	c.lastBuiltBlock = header
+
+	proposerCalculator := c.proposerCalculator.Clone()
+	// TODO: this could be long running operation
+	if err := proposerCalculator.Update(header.Number, c.config, c.state); err != nil {
+		c.logger.Warn("Could not update proposer calculator", "err", err)
+	}
+
+	c.proposerCalculator = proposerCalculator
 	c.lock.Unlock()
 
 	c.logger.Info(
@@ -1307,68 +1295,6 @@ func (c *consensusRuntime) BuildRoundChangeMessage(
 	}
 
 	return signedMsg
-}
-
-func (c *consensusRuntime) updateProposerCalculatorToBlock(blockNumber uint64) error {
-	const saveEveryNIterations = 5
-
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-	calculator, snapshot := c.proposerCalculator.Clone()
-	from := snapshot.Height
-
-	for height := from; height <= blockNumber; height++ {
-		c.updateProposerCalculator(calculator, height)
-
-		// write snapshot every saveEveryNIterations iterations
-		// this way, we prevent data loss on long calculations
-		if (height-from+1)%saveEveryNIterations == 0 {
-			if err := c.state.writeProposerCalculatorSnapshot(snapshot); err != nil {
-				return fmt.Errorf("cannot save proposer calculator snapshot for block %d: %w", height, err)
-			}
-		}
-	}
-
-	// write snapshot if not already written
-	if (blockNumber-from+1)%saveEveryNIterations != 0 {
-		if err := c.state.writeProposerCalculatorSnapshot(snapshot); err != nil {
-			return fmt.Errorf("cannot save proposer calculator snapshot for block %d: %w", blockNumber, err)
-		}
-	}
-
-	c.proposerCalculator = calculator
-
-	return nil
-}
-
-func (c *consensusRuntime) updateProposerCalculator(calculator ProposerCalculator, blockNumber uint64) error {
-	currentHeader, found := c.config.blockchain.GetHeaderByNumber(blockNumber)
-	if !found {
-		return fmt.Errorf("cannot get header by number: %d", blockNumber)
-	}
-
-	extra, err := GetIbftExtra(currentHeader.ExtraData)
-	if err != nil {
-		return fmt.Errorf("cannot get ibft extra for block %d: %w", blockNumber, err)
-	}
-
-	var newValidatorSet AccountSet = nil
-
-	if !extra.Validators.IsEmpty() {
-		// TODO: optimize with parents
-		newValidatorSet, err = c.config.polybftBackend.GetValidators(blockNumber, nil)
-		if err != nil {
-			return fmt.Errorf("cannot get ibft extra for block %d: %w", blockNumber, err)
-		}
-	}
-
-	// update calculator
-	if err = calculator.Update(extra.Checkpoint.BlockRound, blockNumber+1, newValidatorSet); err != nil {
-		return fmt.Errorf("failed to update calculator for block %d: %w", blockNumber, err)
-	}
-
-	return nil
 }
 
 // validateVote validates if the senders address is in active validator set
