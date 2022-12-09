@@ -349,7 +349,16 @@ func (c *consensusRuntime) populateFsmIfBridgeEnabled(
 func (c *consensusRuntime) FSM() error {
 	// figure out the parent. At this point this peer has done its best to sync up
 	// to the head of their remote peers.
+	c.lock.RLock()
 	parent, epoch := c.getLastBuiltBlockAndEpoch()
+	proposerCalc := ProposerCalculator(nil)
+
+	// TODO: just for test to pass will be changed
+	if c.proposerCalculator != nil {
+		proposerCalc, _ = c.proposerCalculator.Clone()
+	}
+
+	c.lock.RUnlock()
 
 	if !epoch.Validators.ContainsNodeID(c.config.Key.String()) {
 		return errNotAValidator
@@ -377,17 +386,18 @@ func (c *consensusRuntime) FSM() error {
 	}
 
 	ff := &fsm{
-		config:            c.config.PolyBFTConfig,
-		parent:            parent,
-		backend:           c.config.blockchain,
-		polybftBackend:    c.config.polybftBackend,
-		checkpointBackend: c,
-		epochNumber:       epoch.Number,
-		blockBuilder:      blockBuilder,
-		validators:        valSet,
-		isEndOfEpoch:      isEndOfEpoch,
-		isEndOfSprint:     isEndOfSprint,
-		logger:            c.logger.Named("fsm"),
+		config:             c.config.PolyBFTConfig,
+		parent:             parent,
+		backend:            c.config.blockchain,
+		polybftBackend:     c.config.polybftBackend,
+		checkpointBackend:  c,
+		epochNumber:        epoch.Number,
+		blockBuilder:       blockBuilder,
+		validators:         valSet,
+		proposerCalculator: proposerCalc,
+		isEndOfEpoch:       isEndOfEpoch,
+		isEndOfSprint:      isEndOfSprint,
+		logger:             c.logger.Named("fsm"),
 	}
 
 	if c.IsBridgeEnabled() {
@@ -1010,7 +1020,7 @@ func (c *consensusRuntime) IsProposer(id []byte, height, round uint64) bool {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
-	nextProposer, err := c.proposerCalculator.CalcProposer(round, height)
+	nextProposer, err := c.fsm.proposerCalculator.CalcProposer(round, height)
 	if err != nil {
 		c.logger.Error("cannot calculate proposer", "error", err)
 
@@ -1146,7 +1156,7 @@ func (c *consensusRuntime) HasQuorum(
 			return false
 		}
 
-		propAddress, exist := c.proposerCalculator.GetLatestProposer(messages[0].View.Round, blockNumber)
+		propAddress, exist := c.fsm.proposerCalculator.GetLatestProposer(messages[0].View.Round, blockNumber)
 		if !exist {
 			c.logger.Warn("HasQuorum has been called but proposer is not set")
 
@@ -1305,13 +1315,7 @@ func (c *consensusRuntime) updateProposerCalculatorToBlock(blockNumber uint64) e
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	snapshot := c.proposerCalculator.GetSnapshot()
-
-	calculator, err := NewProposerCalculator(snapshot, c.logger)
-	if err != nil {
-		return err
-	}
-
+	calculator, snapshot := c.proposerCalculator.Clone()
 	from := snapshot.Height
 
 	for height := from; height <= blockNumber; height++ {

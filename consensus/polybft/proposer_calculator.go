@@ -88,8 +88,8 @@ type ProposerCalculator interface {
 	// GetLatestProposer returns latest calculated proposer
 	GetLatestProposer(round, height uint64) (types.Address, bool)
 
-	// Get current ProposerCalculatorSnapshot
-	GetSnapshot() *ProposerCalculatorSnapshot
+	// Clone clones existing proposer calculator and also returns new snapshot
+	Clone() (ProposerCalculator, *ProposerCalculatorSnapshot)
 }
 
 func isBetterProposer(a, b *ProposerCalculatorValidator) bool {
@@ -129,7 +129,7 @@ func NewProposerCalculator(snapshot *ProposerCalculatorSnapshot, logger hclog.Lo
 		lock:             &sync.RWMutex{},
 		snapshot:         snapshot,
 		round:            0,
-		logger:           logger.Named("validator_set"),
+		logger:           logger.Named("proposer_calculator"),
 	}
 
 	if err := proposerCalc.updateWithChangeSet(); err != nil {
@@ -146,8 +146,14 @@ func (pc proposerCalculator) GetLatestProposer(round, height uint64) (types.Addr
 
 	// round must be same as saved one and proposer must exist
 	if pc.proposer == nil || pc.round != round || pc.snapshot.Height != height {
+		pc.logger.Info("Get Latest proposer not found", "height", height, "round", round, "address",
+			"curr height", pc.snapshot.Height, "curr round", pc.round)
+
 		return types.ZeroAddress, false
 	}
+
+	pc.logger.Info("Get Latest proposer",
+		"height", height, "round", round, "address", "address", pc.proposer.Metadata.Address)
 
 	return pc.proposer.Metadata.Address, true
 }
@@ -191,6 +197,8 @@ func (pc *proposerCalculator) CalcProposer(round, height uint64) (types.Address,
 	pc.round = round
 	pc.lock.Unlock()
 
+	pc.logger.Info("New proposer calculated", "height", height, "round", round, "address", proposer.Metadata.Address)
+
 	return proposer.Metadata.Address, nil
 }
 
@@ -216,11 +224,21 @@ func (pc *proposerCalculator) Update(round, height uint64, newValidatorSet Accou
 	return nil
 }
 
-func (pc *proposerCalculator) GetSnapshot() *ProposerCalculatorSnapshot {
+// Clone clones existing proposer calculator and also returns new snapshot
+func (pc *proposerCalculator) Clone() (ProposerCalculator, *ProposerCalculatorSnapshot) {
 	pc.lock.RLock()
 	defer pc.lock.RUnlock()
 
-	return pc.snapshot.Copy()
+	snapshot := pc.snapshot.Copy()
+	proposerCalc := &proposerCalculator{
+		totalVotingPower: pc.totalVotingPower,
+		lock:             &sync.RWMutex{},
+		snapshot:         snapshot,
+		round:            0,
+		logger:           pc.logger,
+	}
+
+	return proposerCalc, snapshot
 }
 
 func (pc *proposerCalculator) incrementProposerPriorityNTimes(times uint64) error {

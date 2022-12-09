@@ -2073,8 +2073,8 @@ func TestConsensusRuntime_HasQuorum(t *testing.T) {
 	require.NoError(t, runtime.updateProposerCalculatorToBlock(lastBuildBlock.Number))
 
 	require.NoError(t, runtime.FSM())
-	proposer, err := runtime.proposerCalculator.CalcProposer(round, 3)
 
+	proposer, err := runtime.fsm.proposerCalculator.CalcProposer(round, 3)
 	require.NoError(t, err)
 
 	messages := make([]*proto.Message, 0, len(validatorAccounts.validators))
