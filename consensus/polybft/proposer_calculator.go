@@ -67,7 +67,7 @@ func (pcs ProposerCalculatorSnapshot) GetTotalVotingPower() int64 {
 func (pcs *ProposerCalculatorSnapshot) Copy() *ProposerCalculatorSnapshot {
 	valCopy := make([]*ProposerCalculatorValidator, len(pcs.Validators))
 	for i, val := range pcs.Validators {
-		valCopy[i] = &ProposerCalculatorValidator{Metadata: val.Metadata, ProposerPriority: val.ProposerPriority}
+		valCopy[i] = &ProposerCalculatorValidator{Metadata: val.Metadata.Copy(), ProposerPriority: val.ProposerPriority}
 	}
 
 	return &ProposerCalculatorSnapshot{
@@ -138,24 +138,18 @@ func NewProposerCalculatorFromState(config *runtimeConfig, logger hclog.Logger) 
 		snapshot = NewProposerCalculatorSnapshot(1, genesisValidatorsSet)
 	}
 
-	return NewProposerCalculator(snapshot, logger.Named("proposer_calculator"))
+	return NewProposerCalculator(snapshot, logger), nil
 }
 
 // NewProposerCalculator creates a new proposer calculator object.
-func NewProposerCalculator(snapshot *ProposerCalculatorSnapshot, logger hclog.Logger) (*proposerCalculator, error) {
-	proposerCalc := &proposerCalculator{
+func NewProposerCalculator(snapshot *ProposerCalculatorSnapshot, logger hclog.Logger) *proposerCalculator {
+	return &proposerCalculator{
 		totalVotingPower: snapshot.GetTotalVotingPower(),
 		lock:             &sync.RWMutex{},
 		snapshot:         snapshot,
 		round:            0,
 		logger:           logger.Named("proposer_calculator"),
 	}
-
-	if err := proposerCalc.updateWithChangeSet(); err != nil {
-		return nil, fmt.Errorf("cannot update changeset: %w", err)
-	}
-
-	return proposerCalc, nil
 }
 
 // GetLatestProposer returns address of the latest calculated proposer or false if there is no proposer
@@ -165,14 +159,14 @@ func (pc proposerCalculator) GetLatestProposer(round, height uint64) (types.Addr
 
 	// round must be same as saved one and proposer must exist
 	if pc.proposer == nil || pc.round != round || pc.snapshot.Height != height {
-		pc.logger.Info("Get Latest proposer not found", "height", height, "round", round, "address",
-			"curr height", pc.snapshot.Height, "curr round", pc.round)
+		pc.logger.Info("Get latest proposer not found", "height", height, "round", round,
+			"pc height", pc.snapshot.Height, "pc round", pc.round)
 
 		return types.ZeroAddress, false
 	}
 
-	pc.logger.Info("Get Latest proposer",
-		"height", height, "round", round, "address", "address", pc.proposer.Metadata.Address)
+	pc.logger.Info("Get latest proposer",
+		"height", height, "round", round, "address", pc.proposer.Metadata.Address)
 
 	return pc.proposer.Metadata.Address, true
 }
@@ -186,7 +180,8 @@ func (pc *proposerCalculator) CalcProposer(round, height uint64) (types.Address,
 	pc.lock.RUnlock()
 
 	if currentHeight != height {
-		return types.ZeroAddress, fmt.Errorf("calc proposer wrong height = %d, current height = %d", height, currentHeight)
+		return types.ZeroAddress,
+			fmt.Errorf("proposer calculator wrong height = %d, pc height = %d", height, currentHeight)
 	}
 
 	if isSameRound {
@@ -317,12 +312,8 @@ func (pc *proposerCalculator) incrementProposerPriorityNTimes(times uint64) erro
 		return fmt.Errorf("cannot call IncrementProposerPriority with non-positive times")
 	}
 
-	if err := pc.rescalePriorities(); err != nil {
-		return fmt.Errorf("cannot rescale priorities: %w", err)
-	}
-
-	if err := pc.shiftByAvgProposerPriority(); err != nil {
-		return fmt.Errorf("cannot shift avg priorities: %w", err)
+	if err := pc.updateWithChangeSet(); err != nil {
+		return err
 	}
 
 	var (
@@ -362,9 +353,9 @@ func (pc *proposerCalculator) updateValidators(newValidatorSet AccountSet) {
 		priority := int64(0)
 
 		// TODO: change priority if validator existed previous
-		// if val, exists := addressOldValidatorMap[x.Address]; exists {
-		// 	priority = val.ProposerPriority + int64(val.Metadata.VotingPower) - int64(x.VotingPower)
-		// }
+		if val, exists := addressOldValidatorMap[x.Address]; exists {
+			priority = val.ProposerPriority // + int64(val.Metadata.VotingPower) - int64(x.VotingPower)
+		}
 
 		newValidatorsCalcProposer[i] = &ProposerCalculatorValidator{
 			Metadata:         x,
