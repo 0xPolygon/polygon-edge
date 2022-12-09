@@ -15,7 +15,6 @@ func TestCommitmentMessage_Hash(t *testing.T) {
 	t.Parallel()
 
 	const (
-		bundleSize  = uint64(2)
 		eventsCount = 10
 	)
 
@@ -50,7 +49,7 @@ func TestCommitmentMessage_Hash(t *testing.T) {
 func TestCommitmentMessage_ToRegisterCommitmentInputData(t *testing.T) {
 	t.Parallel()
 
-	const epoch, bundleSize, eventsCount = uint64(100), uint64(3), 11
+	const epoch, eventsCount = uint64(100), 11
 	_, commitmentMessage, _ := buildCommitmentAndStateSyncs(t, eventsCount, epoch, uint64(2))
 	expectedSignedCommitmentMsg := &CommitmentMessageSigned{
 		Message: commitmentMessage,
@@ -75,7 +74,7 @@ func TestCommitmentMessage_ToRegisterCommitmentInputData(t *testing.T) {
 func TestCommitmentMessage_VerifyProof(t *testing.T) {
 	t.Parallel()
 
-	const epoch, bundleSize, eventsCount = uint64(100), uint64(3), 11
+	const epoch, eventsCount = uint64(100), 11
 	commitment, commitmentMessage, stateSyncs := buildCommitmentAndStateSyncs(t, eventsCount, epoch, 0)
 	require.Equal(t, uint64(10), commitmentMessage.StateSyncCount())
 
@@ -98,7 +97,7 @@ func TestCommitmentMessage_VerifyProof(t *testing.T) {
 	}
 }
 
-func TestCommitmentMessage_VerifyProof_NoStateSyncsInBundle(t *testing.T) {
+func TestCommitmentMessage_VerifyProof_NoStateSyncsInCommitment(t *testing.T) {
 	t.Parallel()
 
 	commitment := &CommitmentMessage{FromIndex: 0, ToIndex: 4}
@@ -110,17 +109,15 @@ func TestCommitmentMessage_VerifyProof_StateSyncHashNotEqualToProof(t *testing.T
 	t.Parallel()
 
 	const (
-		bundleIndex = 0
-		bundleSize  = 5
-		fromIndex   = 0
-		toIndex     = 4
+		fromIndex = 0
+		toIndex   = 4
 	)
 
 	stateSyncs := generateStateSyncEvents(t, 5, 0)
 	trie, err := createMerkleTree(stateSyncs)
 	require.NoError(t, err)
 
-	proof := trie.GenerateProof(bundleIndex, 0)
+	proof := trie.GenerateProof(0, 0)
 
 	stateSyncProof := &types.StateSyncProof{
 		StateSync: stateSyncs[4],

@@ -26,8 +26,8 @@ state sync events/
 commitments/
 |--> commitment.Message.ToIndex -> *CommitmentMessageSigned (json marshalled)
 
-bundles/
-|--> bundle.StateSyncs[0].Id -> *BundleProof (json marshalled)
+stateSyncProofs/
+|--> stateSyncProof.StateSync.Id -> *StateSyncProof (json marshalled)
 
 epochs/
 |--> epochNumber
@@ -57,8 +57,6 @@ const (
 	numberOfSnapshotsToLeaveInDB = 10
 	// number of stateSyncEvents to be processed before a commitment message can be created and gossiped
 	stateSyncCommitmentSize = 10
-	// number of stateSyncEvents to be grouped into one StateTransaction
-	// stateSyncBundleSize = 1
 )
 
 type exitEventNotFoundError struct {
@@ -226,7 +224,7 @@ var (
 	exitEventsBucket = []byte("exitEvent")
 	// bucket to store commitments
 	commitmentsBucket = []byte("commitments")
-	// bucket to store bundles
+	// bucket to store state sync proofs
 	stateSyncProofsBucket = []byte("stateSyncProofs")
 	// bucket to store epochs and all its nested buckets (message votes and message pool events)
 	epochsBucket = []byte("epochs")
@@ -534,50 +532,17 @@ func (s *State) getCommitmentMessage(toIndex uint64) (*CommitmentMessageSigned, 
 	return commitment, err
 }
 
-// cleanCommitments cleans all commitments that are older than the provided fromIndex, alongside their proofs
-func (s *State) cleanCommitments(stateSyncExecutionIndex uint64) error {
-	return s.db.Update(func(tx *bolt.Tx) error {
-		commitmentsBucket := tx.Bucket(commitmentsBucket)
-		commitmentsCursor := commitmentsBucket.Cursor()
-		for k, _ := commitmentsCursor.First(); k != nil; k, _ = commitmentsCursor.Next() {
-			if itou(k) >= stateSyncExecutionIndex {
-				// reached a commitment that is not executed
-				break
-			}
-
-			if err := commitmentsBucket.Delete(k); err != nil {
-				return err
-			}
-		}
-
-		ssBucket := tx.Bucket(stateSyncProofsBucket)
-		c := ssBucket.Cursor()
-		for k, _ := c.First(); k != nil; k, _ = c.Next() {
-			if itou(k) >= stateSyncExecutionIndex {
-				// reached a bundle that is not executed
-				break
-			}
-
-			if err := ssBucket.Delete(k); err != nil {
-				return err
-			}
-		}
-
-		return nil
-	})
-}
-
 // insertStateSyncProofs inserts the provided state sync proofs to db
 func (s *State) insertStateSyncProofs(stateSyncProof []*types.StateSyncProof) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
-		bundlesBucket := tx.Bucket(stateSyncProofsBucket)
+		bucket := tx.Bucket(stateSyncProofsBucket)
 		for _, ssp := range stateSyncProof {
 			raw, err := json.Marshal(ssp)
 			if err != nil {
 				return err
 			}
 
-			if err := bundlesBucket.Put(itob(ssp.StateSync.ID), raw); err != nil {
+			if err := bucket.Put(itob(ssp.StateSync.ID), raw); err != nil {
 				return err
 			}
 		}

@@ -1141,7 +1141,6 @@ func TestFSM_StateTransactionsEndOfSprint(t *testing.T) {
 	const (
 		commitmentsCount = 8
 		from             = 15
-		bundleSize       = 5 // 8 bundles per commitment, 5 sse per bundle
 		eventsSize       = 40
 	)
 

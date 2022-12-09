@@ -30,7 +30,6 @@ func TestConsensusRuntime_GetVotes(t *testing.T) {
 	const (
 		epoch           = uint64(1)
 		validatorsCount = 7
-		bundleSize      = 5
 		stateSyncsCount = 15
 	)
 
@@ -79,7 +78,6 @@ func TestConsensusRuntime_GetVotesError(t *testing.T) {
 		epoch           = uint64(1)
 		stateSyncsCount = 30
 		startIndex      = 0
-		bundleSize      = uint64(5)
 	)
 
 	state := newTestState(t)
@@ -832,7 +830,7 @@ func Test_NewConsensusRuntime(t *testing.T) {
 	assert.True(t, runtime.IsBridgeEnabled())
 }
 
-func TestConsensusRuntime_FSM_EndOfSprint_HasBundlesToExecute(t *testing.T) {
+func TestConsensusRuntime_FSM_EndOfSprint_HasCommitmentsToRegister(t *testing.T) {
 	t.Parallel()
 
 	const (
@@ -840,7 +838,7 @@ func TestConsensusRuntime_FSM_EndOfSprint_HasBundlesToExecute(t *testing.T) {
 		fromIndex          = uint64(5)
 		nextCommittedIndex = uint64(3)
 		stateSyncsCount    = 30
-		bundleSize         = stateSyncsCount / 3
+		commitmentSize     = stateSyncsCount / 3
 	)
 
 	state := newTestState(t)
@@ -852,7 +850,7 @@ func TestConsensusRuntime_FSM_EndOfSprint_HasBundlesToExecute(t *testing.T) {
 	commitment, err := NewCommitment(epochNumber, stateSyncs)
 	require.NoError(t, err)
 
-	commitmentMsg := NewCommitmentMessage(commitment.MerkleTree.Hash(), fromIndex, fromIndex+bundleSize)
+	commitmentMsg := NewCommitmentMessage(commitment.MerkleTree.Hash(), fromIndex, fromIndex+commitmentSize)
 	signedCommitmentMsg := &CommitmentMessageSigned{
 		Message:      commitmentMsg,
 		AggSignature: Signature{},

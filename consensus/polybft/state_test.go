@@ -279,48 +279,15 @@ func TestState_insertCommitmentMessage(t *testing.T) {
 	assert.Equal(t, commitment, commitmentFromDB)
 }
 
-func TestState_cleanCommitments(t *testing.T) {
-	t.Parallel()
-
-	const (
-		numberOfCommitments = 10
-		numberOfBundles     = 10
-	)
-
-	lastCommitmentToIndex := uint64(numberOfCommitments*stateSyncCommitmentSize - stateSyncCommitmentSize - 1)
-
-	state := newTestState(t)
-	insertTestCommitments(t, state, 1, numberOfCommitments)
-	insertTestStateSyncProofs(t, state, numberOfBundles)
-
-	assert.NoError(t, state.cleanCommitments(lastCommitmentToIndex))
-
-	commitment, err := state.getCommitmentMessage(lastCommitmentToIndex)
-	assert.NoError(t, err)
-	assert.Equal(t, lastCommitmentToIndex, commitment.Message.ToIndex)
-
-	for i := uint64(1); i < numberOfCommitments; i++ {
-		c, err := state.getCommitmentMessage(i*stateSyncCommitmentSize + lastCommitmentToIndex - 1)
-		assert.NoError(t, err)
-		assert.Nil(t, c)
-	}
-
-	bundles, err := state.getStateSyncProof(0)
-	assert.NoError(t, err)
-	assert.Nil(t, bundles)
-}
-
 func TestState_insertAndGetStateSyncProof(t *testing.T) {
 	t.Parallel()
-
-	const numberOfBundles = 10
 
 	state := newTestState(t)
 	commitment, err := createTestCommitmentMessage(0)
 	require.NoError(t, err)
 	require.NoError(t, state.insertCommitmentMessage(commitment))
 
-	insertTestStateSyncProofs(t, state, numberOfBundles)
+	insertTestStateSyncProofs(t, state, 10)
 
 	proofFromDB, err := state.getStateSyncProof(1)
 

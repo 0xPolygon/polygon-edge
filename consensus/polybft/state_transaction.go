@@ -51,7 +51,6 @@ const (
 	abiMethodIDLength      = 4
 	stTypeBridgeCommitment = "commitment"
 	stTypeEndEpoch         = "end-epoch"
-	stTypeBridgeBundle     = "bundle"
 )
 
 // Commitment holds merkle trie of bridge transactions accompanied by epoch number
@@ -131,16 +130,6 @@ func (cm *CommitmentMessage) Hash() (types.Hash, error) {
 	return crypto.Keccak256Hash(data), nil
 }
 
-// GetFirstStateSyncIndexFromBundleIndex returns first state sync index based on bundle size and given bundle index
-// (offseted by FromIndex in CommitmentMessage)
-func (cm *CommitmentMessage) GetFirstStateSyncIndexFromBundleIndex(bundleIndex uint64) uint64 {
-	if bundleIndex == 0 {
-		return cm.FromIndex
-	}
-
-	return (bundleIndex) + cm.FromIndex
-}
-
 // ContainsStateSync checks whether CommitmentMessage contains state sync event identified by index,
 // by comparing given state sync index with the bounds of CommitmentMessage
 func (cm *CommitmentMessage) ContainsStateSync(stateSyncIndex uint64) bool {
@@ -202,7 +191,7 @@ func (cm *CommitmentMessageSigned) EncodeAbi() ([]byte, error) {
 // DecodeAbi contains logic for decoding given ABI data
 func (cm *CommitmentMessageSigned) DecodeAbi(txData []byte) error {
 	if len(txData) < abiMethodIDLength {
-		return fmt.Errorf("invalid bundle data, len = %d", len(txData))
+		return fmt.Errorf("invalid commitment data, len = %d", len(txData))
 	}
 
 	rawResult, err := commitABIMethod.Inputs.Decode(txData[abiMethodIDLength:])
@@ -450,7 +439,7 @@ func (c *CommitEpoch) Type() StateTransactionType {
 
 func decodeStruct(t *abi.Type, input []byte, out interface{}) error {
 	if len(input) < abiMethodIDLength {
-		return fmt.Errorf("invalid bundle data, len = %d", len(input))
+		return fmt.Errorf("invalid commitment data, len = %d", len(input))
 	}
 
 	input = input[abiMethodIDLength:]
