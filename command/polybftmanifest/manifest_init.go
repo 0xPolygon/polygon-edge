@@ -1,6 +1,7 @@
 package polybftmanifest
 
 import (
+	"bytes"
 	"fmt"
 	"path"
 	"strings"
@@ -56,15 +57,15 @@ func setFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(
 		&params.validatorsPath,
 		validatorsPathFlag,
-		"",
-		"prefix path for polybft validator folder directory",
+		"./",
+		"root path containing polybft validators private keys",
 	)
 
 	cmd.Flags().StringVar(
 		&params.validatorsPrefixPath,
 		validatorsPrefixFlag,
 		defaultValidatorPrefixPath,
-		"prefix path for polybft validator folder directory",
+		"folder prefix names for polybft validator private keys",
 	)
 
 	cmd.Flags().StringArrayVar(
@@ -183,5 +184,10 @@ type result struct {
 }
 
 func (r *result) GetOutput() string {
-	return r.message
+	var buffer bytes.Buffer
+
+	buffer.WriteString("\n[MANIFEST INITIALIZATION SUCCESS]\n")
+	buffer.WriteString(r.message)
+
+	return buffer.String()
 }

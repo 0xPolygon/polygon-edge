@@ -18,6 +18,7 @@ else
   echo "Running with polybft consensus"
   genesis_params="--consensus polybft --validator-set-size=4 --bridge-json-rpc http://127.0.0.1:8545"
   ./polygon-edge polybft-secrets --data-dir test-chain- --num 4
+  ./polygon-edge polybft-manifest
 fi
 
 ./polygon-edge genesis $genesis_params \
