@@ -398,12 +398,23 @@ func TestConsensusRuntime_OnBlockInserted_EndOfEpoch(t *testing.T) {
 		validatorsCount = 7
 	)
 
-	header := &types.Header{Number: epochSize}
+	extra := &Extra{
+		Checkpoint: &CheckpointData{},
+	}
+	header := &types.Header{
+		Number:    epochSize,
+		ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...),
+	}
 	builtBlock := consensus.BuildBlock(consensus.BuildBlockParams{
 		Header: header,
 	})
 
 	validatorSet := newTestValidators(validatorsCount).getPublicIdentities()
+
+	snap := NewProposerCalculatorSnapshot(epochSize, validatorSet)
+	propCalculator, err := NewProposerCalculator(snap, hclog.NewNullLogger())
+
+	require.NoError(t, err)
 
 	currentEpochNumber := getEpochNumber(header.Number, epochSize)
 	newEpochNumber := currentEpochNumber + 1
@@ -417,12 +428,15 @@ func TestConsensusRuntime_OnBlockInserted_EndOfEpoch(t *testing.T) {
 	polybftBackendMock := new(polybftBackendMock)
 	polybftBackendMock.On("GetValidators", mock.Anything, mock.Anything).Return(validatorSet).Once()
 
+	blockchainMock.On("GetHeaderByNumber", mock.Anything).Return(header, true).Once()
+
 	txPool := new(txPoolMock)
 	txPool.On("ResetWithHeaders", mock.Anything).Once()
 
 	runtime := &consensusRuntime{
-		logger: hclog.NewNullLogger(),
-		state:  newTestState(t),
+		logger:             hclog.NewNullLogger(),
+		proposerCalculator: propCalculator,
+		state:              newTestState(t),
 		config: &runtimeConfig{
 			PolyBFTConfig: &PolyBFTConfig{
 				EpochSize: epochSize,
@@ -454,25 +468,48 @@ func TestConsensusRuntime_OnBlockInserted_MiddleOfEpoch(t *testing.T) {
 	)
 
 	state := newTestState(t)
+	validatorAccounts := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
+	vs := validatorAccounts.getPublicIdentities()
+	snap := NewProposerCalculatorSnapshot(blockNumber, vs)
 
-	propCalculator, err := NewProposerCalculatorFromState(state, hclog.NewNullLogger())
+	propCalculator, err := NewProposerCalculator(snap, hclog.NewNullLogger())
 	require.NoError(t, err)
 
-	header := &types.Header{Number: blockNumber}
+	polybftBackendMock := new(polybftBackendMock)
+	polybftBackendMock.On("GetValidators", mock.Anything, mock.Anything).Return(vs).Once()
+
+	extra := &Extra{
+		Checkpoint: &CheckpointData{},
+		Validators: &ValidatorSetDelta{
+			Added: vs,
+		},
+	}
+	header := &types.Header{
+		Number:    blockNumber,
+		ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...),
+	}
 	builtBlock := consensus.BuildBlock(consensus.BuildBlockParams{
 		Header: header,
 	})
+
+	blockchainMock := new(blockchainMock)
+	blockchainMock.On("GetHeaderByNumber", mock.Anything).Return(&types.Header{
+		Number:    blockNumber,
+		ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...),
+	}, true).Once()
 
 	txPool := new(txPoolMock)
 	txPool.On("ResetWithHeaders", mock.Anything).Once()
 
 	runtime := &consensusRuntime{
+		state:              state,
 		lastBuiltBlock:     header,
 		proposerCalculator: propCalculator,
 		config: &runtimeConfig{
-			PolyBFTConfig: &PolyBFTConfig{EpochSize: epochSize},
-			blockchain:    new(blockchainMock),
-			txPool:        txPool,
+			polybftBackend: polybftBackendMock,
+			PolyBFTConfig:  &PolyBFTConfig{EpochSize: epochSize},
+			blockchain:     blockchainMock,
+			txPool:         txPool,
 		},
 		logger: hclog.NewNullLogger(),
 	}
@@ -512,10 +549,6 @@ func TestConsensusRuntime_FSM_NotEndOfEpoch_NotEndOfSprint(t *testing.T) {
 	extra := &Extra{
 		Checkpoint: &CheckpointData{},
 	}
-	firstBlock := &types.Header{
-		Number:    0,
-		ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...),
-	}
 	lastBlock := &types.Header{
 		Number:    1,
 		ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...),
@@ -524,7 +557,6 @@ func TestConsensusRuntime_FSM_NotEndOfEpoch_NotEndOfSprint(t *testing.T) {
 	validators := newTestValidators(3)
 	blockchainMock := new(blockchainMock)
 	blockchainMock.On("NewBlockBuilder", mock.Anything).Return(&BlockBuilder{}, nil).Once()
-	blockchainMock.On("GetHeaderByNumber", mock.Anything).Return(firstBlock, true).Once()
 
 	runtime := &consensusRuntime{
 		logger:              hclog.NewNullLogger(),
@@ -822,9 +854,19 @@ func Test_NewConsensusRuntime(t *testing.T) {
 	}
 
 	key := createTestKey(t)
-
 	tmpDir := t.TempDir()
+	state := newTestState(t)
+
+	validatorAccounts := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
+	vs := validatorAccounts.getPublicIdentities()
+	snap := NewProposerCalculatorSnapshot(0, vs)
+	state.writeProposerCalculatorSnapshot(snap)
+
+	polybftBackendMock := new(polybftBackendMock)
+	polybftBackendMock.On("GetValidators", mock.Anything, mock.Anything).Return(vs).Once()
+
 	config := &runtimeConfig{
+		State:         state,
 		PolyBFTConfig: polyBftConfig,
 		DataDir:       tmpDir,
 		Key:           key,
@@ -1623,14 +1665,19 @@ func TestConsensusRuntime_FSM_EndOfEpoch_OnBlockInserted(t *testing.T) {
 		txPool:     txPool,
 	}
 
+	snap := NewProposerCalculatorSnapshot(lastBuiltBlock.Number-1, validators)
+	propCalculator, err := NewProposerCalculator(snap, hclog.NewNullLogger())
+	require.NoError(t, err)
+
 	signer := validatorAccounts.getValidator("A").Key()
 	runtime := &consensusRuntime{
-		logger:            hclog.NewNullLogger(),
-		state:             state,
-		epoch:             metadata,
-		config:            config,
-		lastBuiltBlock:    lastBuiltBlock,
-		checkpointManager: newCheckpointManager(wallet.NewEcdsaSigner(signer), 5, nil, nil, nil, hclog.NewNullLogger()),
+		proposerCalculator: propCalculator,
+		logger:             hclog.NewNullLogger(),
+		state:              state,
+		epoch:              metadata,
+		config:             config,
+		lastBuiltBlock:     lastBuiltBlock,
+		checkpointManager:  newCheckpointManager(wallet.NewEcdsaSigner(signer), 5, nil, nil, nil, hclog.NewNullLogger()),
 	}
 
 	err = runtime.FSM()
@@ -1993,16 +2040,17 @@ func TestConsensusRuntime_HasQuorum(t *testing.T) {
 	polybftBackendMock.On("GetValidators", mock.Anything, mock.Anything).Return(vs[:len(vs)-1]).Once()
 	polybftBackendMock.On("GetValidators", mock.Anything, mock.Anything).Return(vs).Once()
 
-	for _, extra := range extraBlocks[:len(extraBlocks)-1] {
+	for i, extra := range extraBlocks {
 		blockchainMock.On("GetHeaderByNumber", mock.Anything).Return(&types.Header{
-			Number:    0,
+			Number:    uint64(i),
 			ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...),
 		}, true).Once()
 	}
 
 	state := newTestState(t)
+	snap := NewProposerCalculatorSnapshot(0, vs[:len(vs)-2])
 
-	propCalculator, err := NewProposerCalculatorFromState(state, hclog.NewNullLogger())
+	propCalculator, err := NewProposerCalculator(snap, hclog.NewNullLogger())
 	require.NoError(t, err)
 
 	runtime := &consensusRuntime{
@@ -2022,12 +2070,10 @@ func TestConsensusRuntime_HasQuorum(t *testing.T) {
 		logger:             hclog.NewNullLogger(),
 	}
 
-	require.NoError(t, runtime.updateProposerCalculator(&types.Block{
-		Header: lastBuildBlock,
-	}))
+	require.NoError(t, runtime.updateProposerCalculatorToBlock(lastBuildBlock.Number))
 
 	require.NoError(t, runtime.FSM())
-	proposer, err := runtime.proposerCalculator.CalcProposer(round, 2)
+	proposer, err := runtime.proposerCalculator.CalcProposer(round, 3)
 
 	require.NoError(t, err)
 

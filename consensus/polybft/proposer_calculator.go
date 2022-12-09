@@ -132,10 +132,8 @@ func NewProposerCalculator(snapshot *ProposerCalculatorSnapshot, logger hclog.Lo
 		logger:           logger.Named("validator_set"),
 	}
 
-	if len(snapshot.Validators) > 0 {
-		if err := proposerCalc.updateWithChangeSet(); err != nil {
-			return nil, fmt.Errorf("cannot update changeset: %w", err)
-		}
+	if err := proposerCalc.updateWithChangeSet(); err != nil {
+		return nil, fmt.Errorf("cannot update changeset: %w", err)
 	}
 
 	return proposerCalc, nil
@@ -227,7 +225,7 @@ func (pc *proposerCalculator) GetSnapshot() *ProposerCalculatorSnapshot {
 
 func (pc *proposerCalculator) incrementProposerPriorityNTimes(times uint64) error {
 	if len(pc.snapshot.Validators) == 0 {
-		return nil
+		return fmt.Errorf("validator set cannot be nul or empty")
 	}
 
 	if times <= 0 {
