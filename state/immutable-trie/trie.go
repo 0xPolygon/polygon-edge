@@ -2,6 +2,7 @@ package itrie
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -262,7 +263,7 @@ func (t *Trie) TryUpdate(key, value []byte) error {
 
 		n, ok = tt.delete(t.root, k)
 		if !ok {
-			return fmt.Errorf("missing node")
+			return errors.New("missing node")
 		}
 	}
 
