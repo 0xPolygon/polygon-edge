@@ -14,8 +14,7 @@ builds:
     goarch:
       - amd64
     env:
-      - CC=o64-clang
-      - CXX=o64-clang++
+      - CGO_ENABLED=0
     ldflags:
       -s -w -X 'github.com/0xPolygon/polygon-edge/versioning.Version=v{{ .Version }}'
 
@@ -27,8 +26,7 @@ builds:
     goarch:
       - arm64
     env:
-      - CC=oa64-clang
-      - CXX=oa64-clang++
+      - CGO_ENABLED=0
     ldflags:
       -s -w -X 'github.com/0xPolygon/polygon-edge/versioning.Version=v{{ .Version }}'
 
@@ -40,11 +38,10 @@ builds:
     goarch:
       - amd64
     env:
-      - CC=gcc
-      - CXX=g++
+      - CGO_ENABLED=0
     ldflags:
       # We need to build a static binary because we are building in a glibc based system and running in a musl container
-      -s -w -linkmode external -extldflags "-static" -X 'github.com/0xPolygon/polygon-edge/versioning.Version=v{{ .Version }}'
+      -s -w -X 'github.com/0xPolygon/polygon-edge/versioning.Version=v{{ .Version }}'
     tags:
       - netgo
 
@@ -56,11 +53,10 @@ builds:
     goarch:
       - arm64
     env:
-      - CC=aarch64-linux-gnu-gcc
-      - CXX=aarch64-linux-gnu-g++
+      - CGO_ENABLED=0
     ldflags:
       # We need to build a static binary because we are building in a glibc based system and running in a musl container
-      -s -w -linkmode external -extldflags "-static" -X 'github.com/0xPolygon/polygon-edge/versioning.Version=v{{ .Version }}'
+      -s -w -X 'github.com/0xPolygon/polygon-edge/versioning.Version=v{{ .Version }}'
     tags:
       - netgo
 
