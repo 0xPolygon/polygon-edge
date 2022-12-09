@@ -244,38 +244,47 @@ func (t *Trie) Hash() types.Hash {
 		return types.EmptyRootHash
 	}
 
-	hash, cached, _ := t.hashRoot()
-	t.root = cached
+	hash := t.hashRoot()
 
 	return types.BytesToHash(hash)
 }
 
 func (t *Trie) TryUpdate(key, value []byte) error {
 	k := bytesToHexNibbles(key)
+	tt := t.Txn()
+
+	var n Node
 
 	if len(value) != 0 {
-		tt := t.Txn()
-		n := tt.insert(t.root, k, value)
-		t.root = n
+		n = tt.insert(t.root, k, value)
 	} else {
-		tt := t.Txn()
-		n, ok := tt.delete(t.root, k)
+		var ok bool
+
+		n, ok = tt.delete(t.root, k)
 		if !ok {
 			return fmt.Errorf("missing node")
 		}
-		t.root = n
 	}
+
+	t.root = n
 
 	return nil
 }
 
-func (t *Trie) hashRoot() ([]byte, Node, error) {
+func (t *Trie) hashRoot() []byte {
 	hash, _ := t.root.Hash()
 
-	return hash, t.root, nil
+	return hash
+}
+
+func (t *Trie) hash() types.Hash {
+	hash, _ := t.root.Hash()
+
+	return types.BytesToHash(hash)
 }
 
 func (t *Trie) Txn() *Txn {
+	// FIXME: could we copy t.root, t.storage without putting the same refs to mutexes?
 	return &Txn{root: t.root, epoch: t.epoch + 1, storage: t.storage}
 }
 
