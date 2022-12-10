@@ -47,6 +47,7 @@ builds:
       -s -w -linkmode external -extldflags "-static" -X 'github.com/0xPolygon/polygon-edge/versioning.Version=v{{ .Version }}'
     tags:
       - netgo
+      - osusergo
 
   - id: linux-arm64
     main: ./main.go
@@ -63,6 +64,7 @@ builds:
       -s -w -linkmode external -extldflags "-static" -X 'github.com/0xPolygon/polygon-edge/versioning.Version=v{{ .Version }}'
     tags:
       - netgo
+      - osusergo
 
 archives:
   -
