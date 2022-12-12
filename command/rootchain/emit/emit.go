@@ -32,7 +32,7 @@ var (
 // GetCommand returns the rootchain emit command
 func GetCommand() *cobra.Command {
 	rootchainEmitCmd := &cobra.Command{
-		Use:     "emit",
+		Use:     "emitl1",
 		Short:   "Emit an event from the bridge",
 		PreRunE: runPreRun,
 		Run:     runCommand,

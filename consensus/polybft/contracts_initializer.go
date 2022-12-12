@@ -15,7 +15,7 @@ import (
 
 const (
 	// safe numbers for the test
-	epochReward   = 1
+	epochReward   = 100000000000 // 0.0000001 in gwei
 	minStake      = 1
 	minDelegation = 1
 )

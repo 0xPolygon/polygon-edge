@@ -252,6 +252,12 @@ func (p *genesisParams) deployContracts() (map[types.Address]*chain.GenesisAccou
 			relativePath: "common/Merkle.sol",
 			address:      contracts.MerkleContract,
 		},
+		{
+			// L2 Exit contract
+			name:         "L2StateSender",
+			relativePath: "child/L2StateSender.sol",
+			address:      contracts.L2ExitContract,
+		},
 	}
 
 	allocations := make(map[types.Address]*chain.GenesisAccount, len(genesisContracts))

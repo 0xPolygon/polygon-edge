@@ -600,7 +600,9 @@ func (s *State) lastBundleIndex() (res uint64, err error) {
 		c := tx.Bucket(bundlesBucket).Cursor()
 
 		key, _ := (c.Last())
-		res = itou(key)
+		if len(key) != 0 {
+			res = itou(key)
+		}
 
 		return nil
 	})

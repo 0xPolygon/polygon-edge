@@ -16,6 +16,8 @@ var (
 	// SystemCaller is address of account, used for system calls to smart contracts
 	SystemCaller = types.StringToAddress("0xffffFFFfFFffffffffffffffFfFFFfffFFFfFFfE")
 
+	L2ExitContract = types.StringToAddress("0x2000")
+
 	// NativeTransferPrecompile is an address of native transfer precompile
 	NativeTransferPrecompile = types.StringToAddress("0x2020")
 	// BLSAggSigsVerificationPrecompile is an address of BLS aggregated signatures verificatin precompile

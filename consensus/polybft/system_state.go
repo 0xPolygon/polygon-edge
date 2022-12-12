@@ -17,7 +17,7 @@ import (
 var stateFunctions, _ = abi.NewABIFromList([]string{
 	"function currentEpochId() returns (uint256)",
 	"function getCurrentValidatorSet() returns (address[])",
-	"function getValidator(address) returns (tuple(uint256[4],uint256,uint256,uint256))",
+	"function getValidator(address) returns (tuple(uint256[4],uint256,uint256,uint256,uint256,bool))",
 })
 
 var sidechainBridgeFunctions, _ = abi.NewABIFromList([]string{

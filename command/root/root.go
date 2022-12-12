@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/0xPolygon/polygon-edge/command/backup"
+	"github.com/0xPolygon/polygon-edge/command/demo"
 	"github.com/0xPolygon/polygon-edge/command/e2e"
 	"github.com/0xPolygon/polygon-edge/command/genesis"
 	"github.com/0xPolygon/polygon-edge/command/helper"
@@ -65,6 +66,7 @@ func (rc *RootCommand) registerSubCommands() {
 		e2e.GetCommand(),
 		tui.GetCommand(),
 		polybft.GetCommand(),
+		demo.GetCommand(),
 	)
 }
 
