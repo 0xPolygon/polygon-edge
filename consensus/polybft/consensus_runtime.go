@@ -185,6 +185,7 @@ func (c *consensusRuntime) AddLog(eventLog *ethgo.Log) {
 		return
 	}
 
+	// update total state syncs metrics
 	metrics.IncrCounter([]string{"bridge", "total_state_syncs"}, 1)
 }
 
