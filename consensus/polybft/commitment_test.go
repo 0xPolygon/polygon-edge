@@ -76,7 +76,7 @@ func TestCommitmentMessage_VerifyProof(t *testing.T) {
 
 	const epoch, eventsCount = uint64(100), 11
 	commitment, commitmentMessage, stateSyncs := buildCommitmentAndStateSyncs(t, eventsCount, epoch, 0)
-	require.Equal(t, uint64(10), commitmentMessage.StateSyncCount())
+	require.Equal(t, uint64(10), commitmentMessage.ToIndex-commitment.FromIndex)
 
 	for i, stateSync := range stateSyncs {
 		proof := commitment.MerkleTree.GenerateProof(uint64(i), 0)

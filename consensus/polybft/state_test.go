@@ -449,7 +449,7 @@ func insertTestStateSyncProofs(t *testing.T, state *State, numberOfProofs uint64
 
 	ssProofs := make([]*types.StateSyncProof, numberOfProofs)
 
-	for i := uint64(1); i <= numberOfProofs; i++ {
+	for i := uint64(0); i < numberOfProofs; i++ {
 		proofs := &types.StateSyncProof{
 			Proof:     []types.Hash{types.BytesToHash(generateRandomBytes(t))},
 			StateSync: createTestStateSync(i),

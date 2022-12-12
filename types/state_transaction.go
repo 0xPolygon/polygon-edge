@@ -12,12 +12,8 @@ var ExecuteStateSyncABIMethod, _ = abi.NewMethod("function execute(" +
 	"bytes32[] proof, " +
 	"tuple(uint256 id, address sender, address receiver, bytes data, bool skip) stateSync)")
 
-var StateSyncEventABIType = abi.MustNewType(
-	"tuple(tuple(uint256 id, address sender, address receiver, bytes data, bool skip)[])")
-
 const (
 	abiMethodIDLength = 4
-	stTypeStateSync   = "state-sync"
 )
 
 // StateSyncEvent is a bridge event from the rootchain

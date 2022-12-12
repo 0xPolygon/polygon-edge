@@ -15,9 +15,6 @@ import (
 )
 
 var (
-	stateSyncEventABIType = abi.MustNewType(
-		"tuple(tuple(uint256 id, address sender, address receiver, bytes data, bool skip)[])")
-
 	stateSyncABIType = abi.MustNewType(
 		"tuple(uint256 id, address sender, address receiver, bytes data, bool skip)")
 
@@ -74,7 +71,6 @@ func NewCommitment(epoch uint64, stateSyncEvents []*types.StateSyncEvent) (*Comm
 		Epoch:      epoch,
 		FromIndex:  stateSyncEvents[0].ID,
 		ToIndex:    stateSyncEvents[len(stateSyncEvents)-1].ID,
-		LeavesNum:  uint64(len(stateSyncEvents)),
 	}, nil
 }
 
@@ -83,7 +79,6 @@ func (cm *Commitment) Hash() (types.Hash, error) {
 	commitment := map[string]interface{}{
 		"startId": cm.FromIndex,
 		"endId":   cm.ToIndex,
-		"leaves":  cm.LeavesNum,
 		"root":    cm.MerkleTree.Hash(),
 	}
 
@@ -128,17 +123,6 @@ func (cm *CommitmentMessage) Hash() (types.Hash, error) {
 	}
 
 	return crypto.Keccak256Hash(data), nil
-}
-
-// ContainsStateSync checks whether CommitmentMessage contains state sync event identified by index,
-// by comparing given state sync index with the bounds of CommitmentMessage
-func (cm *CommitmentMessage) ContainsStateSync(stateSyncIndex uint64) bool {
-	return stateSyncIndex >= cm.FromIndex && stateSyncIndex <= cm.ToIndex
-}
-
-// StateSyncsCount calculates state syncs count contained in given CommitmentMessage
-func (cm *CommitmentMessage) StateSyncCount() uint64 {
-	return cm.ToIndex - cm.FromIndex
 }
 
 // VerifyStateSyncProof validates given state sync proof
@@ -317,32 +301,6 @@ func getCommitmentMessageSignedTx(txs []*types.Transaction) (*CommitmentMessageS
 	}
 
 	return nil, nil
-}
-
-func stateSyncEventsToAbiSlice(stateSyncEvents []*types.StateSyncEvent) []map[string]interface{} {
-	result := make([]map[string]interface{}, len(stateSyncEvents))
-	for i, sse := range stateSyncEvents {
-		result[i] = map[string]interface{}{
-			"id":       sse.ID,
-			"sender":   sse.Sender,
-			"receiver": sse.Receiver,
-			"data":     sse.Data,
-			"skip":     sse.Skip,
-		}
-	}
-
-	return result
-}
-
-func stateSyncEventsToHash(stateSyncEvents []*types.StateSyncEvent) ([]byte, error) {
-	stateSyncEventsForEncoding := stateSyncEventsToAbiSlice(stateSyncEvents)
-
-	stateSyncEncoded, err := stateSyncEventABIType.Encode([]interface{}{stateSyncEventsForEncoding})
-	if err != nil {
-		return nil, err
-	}
-
-	return stateSyncEncoded, nil
 }
 
 func createMerkleTree(stateSyncEvents []*types.StateSyncEvent) (*MerkleTree, error) {

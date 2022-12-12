@@ -75,6 +75,53 @@ func TestSystemState_GetValidatorSet(t *testing.T) {
 	assert.Equal(t, uint64(10), validators[0].VotingPower)
 }
 
+func TestSystemState_GetNextCommittedIndex(t *testing.T) {
+	t.Parallel()
+
+	var sideChainBridgeABI, _ = abi.NewMethod(
+		"function setNextCommittedIndex(uint256 _index) public payable",
+	)
+
+	cc := &testutil.Contract{}
+	cc.AddCallback(func() string {
+		return `
+		uint256 public lastCommittedId;
+		
+		function setNextCommittedIndex(uint256 _index) public payable {
+			lastCommittedId = _index;
+		}`
+	})
+
+	solcContract, err := cc.Compile()
+	require.NoError(t, err)
+
+	bin, err := hex.DecodeString(solcContract.Bin)
+	require.NoError(t, err)
+
+	transition := newTestTransition(t)
+
+	// deploy a contract
+	result := transition.Create2(types.Address{}, bin, big.NewInt(0), 1000000000)
+	assert.NoError(t, result.Err)
+
+	provider := &stateProvider{
+		transition: transition,
+	}
+
+	systemState := NewSystemState(&PolyBFTConfig{StateReceiverAddr: result.Address}, provider)
+
+	expectedNextCommittedIndex := uint64(45)
+	input, err := sideChainBridgeABI.Encode([1]interface{}{expectedNextCommittedIndex})
+	assert.NoError(t, err)
+
+	_, err = provider.Call(ethgo.Address(result.Address), input, &contract.CallOpts{})
+	assert.NoError(t, err)
+
+	nextCommittedIndex, err := systemState.GetNextCommittedIndex()
+	assert.NoError(t, err)
+	assert.Equal(t, expectedNextCommittedIndex+1, nextCommittedIndex)
+}
+
 func TestSystemState_GetEpoch(t *testing.T) {
 	t.Parallel()
 
