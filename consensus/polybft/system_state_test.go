@@ -27,10 +27,12 @@ func TestSystemState_GetValidatorSet(t *testing.T) {
 		return `
 
 		struct Validator {
-			uint256[4] id;
+			uint256[4] blsKey;
 			uint256 stake;
 			uint256 totalStake;
-			uint256 data;
+			uint256 commission;
+			uint256 withdrawableRewards;
+			bool active;
 		}
 
 		function getCurrentValidatorSet() public returns (address[] memory) {
@@ -46,7 +48,7 @@ func TestSystemState_GetValidatorSet(t *testing.T) {
 				16798350082249088544573448433070681576641749462807627179536437108134609634615,
 				21427200503135995176566340351867145775962083994845221446131416289459495591422
 			];
-			return Validator(key, 10, 0, 0);
+			return Validator(key, 10, 10, 0, 0, true);
 		}
 
 		`
