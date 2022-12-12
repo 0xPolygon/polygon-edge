@@ -82,7 +82,7 @@ type Transaction struct {
 // NewTx creates a new transaction.
 func NewTx(inner TxData) *Transaction {
 	tx := &Transaction{}
-	tx.setDecoded(inner.Copy(), 0)
+	tx.setDecoded(inner.Copy())
 
 	return tx
 }
@@ -93,7 +93,7 @@ func NewTxWithSender(inner TxData, sender Address) *Transaction {
 		from: sender,
 	}
 
-	tx.setDecoded(inner.Copy(), 0)
+	tx.setDecoded(inner.Copy())
 
 	return tx
 }
@@ -233,13 +233,9 @@ func (t *Transaction) SetSignatureValues(v, r, s *big.Int) *Transaction {
 }
 
 // setDecoded sets the inner transaction and size after decoding.
-func (t *Transaction) setDecoded(inner TxData, size uint64) {
+func (t *Transaction) setDecoded(inner TxData) {
 	t.inner = inner
 	t.time = time.Now()
-
-	if size > 0 {
-		t.size.Store(size)
-	}
 }
 
 // copyAddressPtr copies an address.

@@ -150,7 +150,7 @@ func TestEventSubscription_ProcessedEvents(t *testing.T) {
 			_, err := tests.RetryUntilTimeout(eventWaitCtx, func() (interface{}, bool) {
 				return nil, atomic.LoadInt64(&processed) < int64(testCase.expectedProcessed)
 			})
-			require.NoError(t, err)
+			require.NoError(t, err, "Unable to wait for events to be processed")
 
 			subscription.close()
 

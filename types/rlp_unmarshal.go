@@ -345,16 +345,6 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 			return err
 		}
 
-		// value
-		if err = elems[4].GetBigInt(lTx.Value); err != nil {
-			return err
-		}
-
-		// input
-		if lTx.Input, err = elems[5].GetBytes(lTx.Input[:0]); err != nil {
-			return err
-		}
-
 		// to
 		if vv, _ := v.Get(3).Bytes(); len(vv) == 20 {
 			// address
@@ -363,6 +353,16 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 		} else {
 			// reset To
 			lTx.To = nil
+		}
+
+		// value
+		if err = elems[4].GetBigInt(lTx.Value); err != nil {
+			return err
+		}
+
+		// input
+		if lTx.Input, err = elems[5].GetBytes(lTx.Input[:0]); err != nil {
+			return err
 		}
 
 		// V
@@ -405,16 +405,6 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 			return err
 		}
 
-		// value
-		if err = elems[4].GetBigInt(sTx.Value); err != nil {
-			return err
-		}
-
-		// input
-		if sTx.Input, err = elems[5].GetBytes(sTx.Input[:0]); err != nil {
-			return err
-		}
-
 		// to
 		if vv, _ := v.Get(3).Bytes(); len(vv) == 20 {
 			// address
@@ -423,6 +413,16 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 		} else {
 			// reset To
 			sTx.To = nil
+		}
+
+		// value
+		if err = elems[4].GetBigInt(sTx.Value); err != nil {
+			return err
+		}
+
+		// input
+		if sTx.Input, err = elems[5].GetBytes(sTx.Input[:0]); err != nil {
+			return err
 		}
 
 		// V
