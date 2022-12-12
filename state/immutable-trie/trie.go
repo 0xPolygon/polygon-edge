@@ -242,11 +242,16 @@ type Putter interface {
 	Put(k, v []byte)
 }
 
+type Tracer interface {
+	Trace(node Node)
+}
+
 type Txn struct {
 	root    Node
 	epoch   uint32
 	storage Storage
 	batch   Putter
+	trace   Tracer
 }
 
 func (t *Txn) Commit() *Trie {
@@ -259,7 +264,11 @@ func (t *Txn) Lookup(key []byte) []byte {
 	return res
 }
 
-func (t *Txn) lookup(node interface{}, key []byte) (Node, []byte) {
+func (t *Txn) lookup(node Node, key []byte) (Node, []byte) {
+	if t.trace != nil {
+		t.trace.Trace(node)
+	}
+
 	switch n := node.(type) {
 	case nil:
 		return nil, nil
@@ -333,7 +342,6 @@ func (t *Txn) writeNode(n *FullNode) *FullNode {
 }
 
 func (t *Txn) Insert(key, value []byte) {
-	fmt.Println("-insert", bytesToHexNibbles(key))
 	root := t.insert(t.root, bytesToHexNibbles(key), value)
 	if root != nil {
 		t.root = root
