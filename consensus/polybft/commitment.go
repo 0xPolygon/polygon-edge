@@ -16,7 +16,7 @@ import (
 
 var (
 	stateSyncABIType = abi.MustNewType(
-		"tuple(uint256 id, address sender, address receiver, bytes data, bool skip)")
+		"tuple(uint256 id, address sender, address receiver, bytes data)")
 
 	commitmentABIType = abi.MustNewType("tuple(uint256 startId, uint256 endId, bytes32 root)")
 
@@ -27,7 +27,7 @@ var (
 
 	executeStateSyncABIMethod, _ = abi.NewMethod("function execute(" +
 		"bytes32[] proof, " +
-		"tuple(uint256 id, address sender, address receiver, bytes data, bool skip) stateSync)")
+		"tuple(uint256 id, address sender, address receiver, bytes data) stateSync)")
 
 	validatorsUptimeMethod, _ = abi.NewMethod("function uptime(bytes data)")
 )
