@@ -26,8 +26,6 @@ type StateSyncEvent struct {
 	Receiver ethgo.Address
 	// Data is the decoded 'data' field from the event
 	Data []byte
-	// Skip is the decoded 'skip' field from the event
-	Skip bool
 }
 
 func (sse *StateSyncEvent) ToMap() map[string]interface{} {
@@ -36,7 +34,6 @@ func (sse *StateSyncEvent) ToMap() map[string]interface{} {
 		"sender":   sse.Sender,
 		"receiver": sse.Receiver,
 		"data":     sse.Data,
-		"skip":     sse.Skip,
 	}
 }
 
@@ -100,17 +97,11 @@ func (ssp *StateSyncProof) DecodeAbi(txData []byte) error {
 		return fmt.Errorf("invalid state sync data field")
 	}
 
-	skip, isOk := stateSyncEventEncoded["skip"].(bool)
-	if !isOk {
-		return fmt.Errorf("invalid state sync skip field")
-	}
-
 	stateSync := &StateSyncEvent{
 		ID:       id.Uint64(),
 		Sender:   senderEthgo,
 		Receiver: receiverEthgo,
 		Data:     data,
-		Skip:     skip,
 	}
 
 	proof := make([]Hash, len(proofEncoded))

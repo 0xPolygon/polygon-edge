@@ -61,19 +61,6 @@ func checkLogs(
 	}
 }
 
-func stateSyncEventToAbiSlice(stateSyncEvent types.StateSyncEvent) []map[string]interface{} {
-	result := make([]map[string]interface{}, 1)
-	result[0] = map[string]interface{}{
-		"id":       stateSyncEvent.ID,
-		"sender":   stateSyncEvent.Sender,
-		"receiver": stateSyncEvent.Receiver,
-		"data":     stateSyncEvent.Data,
-		"skip":     stateSyncEvent.Skip,
-	}
-
-	return result
-}
-
 func executeStateSync(t *testing.T, client *jsonrpc.Client, txRelayer txrelayer.TxRelayer, account ethgo.Key, stateSyncID string) {
 	t.Helper()
 

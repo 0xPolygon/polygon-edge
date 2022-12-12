@@ -307,15 +307,7 @@ func createMerkleTree(stateSyncEvents []*types.StateSyncEvent) (*MerkleTree, err
 	ssh := make([][]byte, len(stateSyncEvents))
 
 	for i, sse := range stateSyncEvents {
-		t := map[string]interface{}{
-			"id":       sse.ID,
-			"sender":   sse.Sender,
-			"receiver": sse.Receiver,
-			"data":     sse.Data,
-			"skip":     sse.Skip,
-		}
-
-		data, err := stateSyncABIType.Encode(t)
+		data, err := stateSyncABIType.Encode(sse.ToMap())
 		if err != nil {
 			return nil, err
 		}
