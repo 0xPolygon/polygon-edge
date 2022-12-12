@@ -279,7 +279,7 @@ func TestState_insertCommitmentMessage(t *testing.T) {
 	assert.Equal(t, commitment, commitmentFromDB)
 }
 
-func TestState_insertAndGetStateSyncProof(t *testing.T) {
+func TestState_StateSync_insertAndGetStateSyncProof(t *testing.T) {
 	t.Parallel()
 
 	state := newTestState(t)
