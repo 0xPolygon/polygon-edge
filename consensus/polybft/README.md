@@ -7,6 +7,11 @@ It has native support for running bridge, which enables running cross-chain tran
 
 ## Setup local testing environment
 
+### Precondition
+
+Smart contracts in the `core-contracts` submodule must be compiled before running following commands.
+In order to do so, run `make compile-core-contracts`.
+
 1. Build binary
 
     ```bash
