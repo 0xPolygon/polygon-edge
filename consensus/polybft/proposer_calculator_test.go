@@ -175,29 +175,6 @@ func TestProposerCalculator_ProposerSelection1(t *testing.T) {
 	}
 }
 
-// Test that Update requires correct height
-// func TestProposerCalculator_UpdateWrongHeight(t *testing.T) {
-// 	t.Parallel()
-
-// 	validators := newTestValidatorsWithAliases([]string{"A", "B", "C"}, []uint64{1000, 300, 330})
-// 	metadata := validators.getPublicIdentities()
-
-// 	pc, err := NewProposerCalculator(NewProposerCalculatorSnapshot(0, metadata), hclog.NewNullLogger())
-// 	require.NoError(t, err)
-
-// 	proposerAddressR0, err := pc.CalcProposer(0, 0)
-// 	assert.Equal(t, metadata[0].Address, proposerAddressR0)
-
-// 	err = pc.updateToBlock(0, 0, nil)
-// 	require.Error(t, err)
-
-// 	err = pc.Update(0, 2, nil)
-// 	require.Error(t, err)
-
-// 	err = pc.Update(0, 1, nil)
-// 	require.NoError(t, err)
-// }
-
 func TestProposerCalculator_IncrementProposerPrioritySameVotingPower(t *testing.T) {
 	t.Parallel()
 
