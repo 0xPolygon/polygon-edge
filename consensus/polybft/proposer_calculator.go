@@ -2,7 +2,6 @@ package polybft
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"math"
 	"math/big"
@@ -28,15 +27,16 @@ const (
 	priorityWindowSizeFactor = 2
 )
 
-var (
-	// errInvalidTotalVotingPower is returned if the total voting power is zero
-	errInvalidTotalVotingPower = errors.New(
-		"invalid voting power configuration provided: total voting power must be greater than 0")
-)
-
 type ProposerCalculatorValidator struct {
 	Metadata         *ValidatorMetadata
 	ProposerPriority int64
+}
+
+func NewProposerCalculatorValidator(metadata *ValidatorMetadata, priority int64) *ProposerCalculatorValidator {
+	return &ProposerCalculatorValidator{
+		Metadata:         metadata,
+		ProposerPriority: priority,
+	}
 }
 
 type ProposerCalculatorSnapshot struct {
@@ -74,6 +74,15 @@ func (pcs *ProposerCalculatorSnapshot) Copy() *ProposerCalculatorSnapshot {
 		Validators: valCopy,
 		Height:     pcs.Height,
 	}
+}
+
+func (pcs *ProposerCalculatorSnapshot) toMap() map[types.Address]*ProposerCalculatorValidator {
+	validatorMap := make(map[types.Address]*ProposerCalculatorValidator)
+	for _, v := range pcs.Validators {
+		validatorMap[v.Metadata.Address] = v
+	}
+
+	return validatorMap
 }
 
 // ProposerCalculator interface of the current validator set
@@ -121,7 +130,7 @@ type proposerCalculator struct {
 	logger hclog.Logger
 }
 
-// NewProposerCalculator creates a new proposer calculator object.
+// NewProposerCalculatorFromState creates a new proposer calculator object.
 func NewProposerCalculatorFromState(config *runtimeConfig, logger hclog.Logger) (*proposerCalculator, error) {
 	snapshot, err := config.State.getProposerCalculatorSnapshot()
 	if err != nil {
@@ -312,14 +321,17 @@ func (pc *proposerCalculator) incrementProposerPriorityNTimes(times uint64) erro
 		return fmt.Errorf("cannot call IncrementProposerPriority with non-positive times")
 	}
 
-	if err := pc.updateWithChangeSet(); err != nil {
-		return err
-	}
-
 	var (
 		proposer *ProposerCalculatorValidator
 		err      error
 	)
+
+	if err := pc.rescalePriorities(); err != nil {
+		return fmt.Errorf("cannot rescale priorities: %w", err)
+	}
+	if err := pc.shiftByAvgProposerPriority(); err != nil {
+		return fmt.Errorf("cannot shift proposer priorities: %w", err)
+	}
 
 	for i := uint64(0); i < times; i++ {
 		if proposer, err = pc.incrementProposerPriority(); err != nil {
@@ -334,39 +346,50 @@ func (pc *proposerCalculator) incrementProposerPriorityNTimes(times uint64) erro
 	return nil
 }
 
-func (pc *proposerCalculator) updateValidators(newValidatorSet AccountSet) {
+func (pc *proposerCalculator) updateValidators(newValidatorSet AccountSet) error {
 	if newValidatorSet.Len() == 0 {
-		return
+		pc.logger.Info("No new validator set")
+
+		return nil
 	}
 
-	oldProposerCalcValidators := pc.snapshot.Validators
+	snapshotValidators := pc.snapshot.toMap()
+	newValidators := make([]*ProposerCalculatorValidator, len(newValidatorSet))
 
-	newValidatorsCalcProposer := make([]*ProposerCalculatorValidator, len(newValidatorSet))
-	addressOldValidatorMap := make(map[types.Address]*ProposerCalculatorValidator, len(oldProposerCalcValidators))
+	// compute total voting power of removed validators and currentValidatorSer
+	var removedValidatorsVotingPower uint64
+	var newValidatorsVotingPower uint64
 
-	for _, x := range oldProposerCalcValidators {
-		addressOldValidatorMap[x.Metadata.Address] = x
-	}
-
-	// create new validators snapshot
-	for i, x := range newValidatorSet {
-		priority := int64(0)
-
-		// TODO: change priority if validator existed previous
-		if val, exists := addressOldValidatorMap[x.Address]; exists {
-			priority = val.ProposerPriority // + int64(val.Metadata.VotingPower) - int64(x.VotingPower)
-		}
-
-		newValidatorsCalcProposer[i] = &ProposerCalculatorValidator{
-			Metadata:         x,
-			ProposerPriority: priority,
+	for address, val := range snapshotValidators {
+		if !newValidatorSet.ContainsNodeID(address.String()) {
+			removedValidatorsVotingPower += val.Metadata.VotingPower
 		}
 	}
 
-	// TODO: centering
+	for _, v := range newValidatorSet {
+		newValidatorsVotingPower += v.VotingPower
+	}
 
-	pc.snapshot.Validators = newValidatorsCalcProposer
+	tvpAfterUpdatesBeforeRemovals := newValidatorsVotingPower + removedValidatorsVotingPower
+	for i, newValidator := range newValidatorSet {
+		if val, exists := snapshotValidators[newValidator.Address]; exists {
+			// old validators have the same priority
+			newValidators[i] = NewProposerCalculatorValidator(newValidator, val.ProposerPriority)
+		} else {
+			// added validator has priority -1.125 * V
+			newValidators[i] = NewProposerCalculatorValidator(newValidator, int64(-(tvpAfterUpdatesBeforeRemovals + (tvpAfterUpdatesBeforeRemovals >> 3))))
+		}
+	}
+
+	pc.snapshot.Validators = newValidators
 	pc.totalVotingPower = pc.snapshot.GetTotalVotingPower()
+
+	// after validator set center values around 0 and scale
+	if err := pc.updateWithChangeSet(); err != nil {
+		return fmt.Errorf("cannot update validator changeset: %w", err)
+	}
+
+	return nil
 }
 
 func (pc *proposerCalculator) incrementProposerPriority() (*ProposerCalculatorValidator, error) {
@@ -387,10 +410,10 @@ func (pc *proposerCalculator) incrementProposerPriority() (*ProposerCalculatorVa
 }
 
 func (pc *proposerCalculator) updateWithChangeSet() error {
+
 	if err := pc.rescalePriorities(); err != nil {
 		return fmt.Errorf("cannot rescale priorities: %w", err)
 	}
-
 	if err := pc.shiftByAvgProposerPriority(); err != nil {
 		return fmt.Errorf("cannot shift proposer priorities: %w", err)
 	}
@@ -464,7 +487,6 @@ func (pc *proposerCalculator) rescalePriorities() error {
 	// NOTE: This may make debugging priority issues easier as well.
 	diff := computeMaxMinPriorityDiff(pc.snapshot.Validators)
 	ratio := (diff + diffMax - 1) / diffMax
-
 	if diff > diffMax {
 		for _, val := range pc.snapshot.Validators {
 			val.ProposerPriority /= ratio
