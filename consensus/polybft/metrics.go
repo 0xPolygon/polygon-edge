@@ -24,7 +24,7 @@ func updateBlockMetrics(block *types.Block, blockchain blockchainBackend) error 
 		metrics.SetGauge([]string{"block_interval"}, float32(headerTime.Sub(parentTime).Seconds()))
 	}
 
-	// update the Number of transactions in the block metric
+	// update the number of transactions in the block metric
 	metrics.SetGauge([]string{"num_txs"}, float32(len(block.Body().Transactions)))
 
 	extra, err := GetIbftExtra(block.Header.ExtraData)
