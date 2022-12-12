@@ -417,9 +417,6 @@ func TestConsensusRuntime_OnBlockInserted_EndOfEpoch(t *testing.T) {
 		},
 	})
 
-	snap := NewProposerCalculatorSnapshot(epochSize-1, validatorSet)
-	proposerCalculator := NewProposerCalculator(snap, hclog.NewNullLogger())
-
 	systemStateMock := new(systemStateMock)
 	systemStateMock.On("GetEpoch").Return(newEpochNumber).Once()
 
@@ -437,9 +434,9 @@ func TestConsensusRuntime_OnBlockInserted_EndOfEpoch(t *testing.T) {
 	txPool.On("ResetWithHeaders", mock.Anything).Once()
 
 	runtime := &consensusRuntime{
-		proposerCalculator: proposerCalculator,
-		logger:             hclog.NewNullLogger(),
-		state:              newTestState(t),
+		proposerSnapshot: NewProposerSnapshot(epochSize-1, validatorSet),
+		logger:           hclog.NewNullLogger(),
+		state:            newTestState(t),
 		config: &runtimeConfig{
 			PolyBFTConfig: &PolyBFTConfig{
 				EpochSize: epochSize,
@@ -447,6 +444,7 @@ func TestConsensusRuntime_OnBlockInserted_EndOfEpoch(t *testing.T) {
 			blockchain:     blockchainMock,
 			polybftBackend: polybftBackendMock,
 			txPool:         txPool,
+			proposerCalc:   NewProposerCalculator(hclog.NewNullLogger()),
 		},
 		epoch: &epochMetadata{
 			Number: currentEpochNumber,
@@ -475,9 +473,6 @@ func TestConsensusRuntime_OnBlockInserted_MiddleOfEpoch(t *testing.T) {
 		Header: header,
 	})
 
-	snap := NewProposerCalculatorSnapshot(blockNumber, []*ValidatorMetadata{})
-	proposerCalculator := NewProposerCalculator(snap, hclog.NewNullLogger())
-
 	blockchainMock := new(blockchainMock)
 	blockchainMock.On("GetHeaderByNumber", mock.Anything).Return(builtBlock.Header, true).Once()
 
@@ -488,13 +483,15 @@ func TestConsensusRuntime_OnBlockInserted_MiddleOfEpoch(t *testing.T) {
 	txPool.On("ResetWithHeaders", mock.Anything).Once()
 
 	runtime := &consensusRuntime{
-		lastBuiltBlock:     header,
-		state:              newTestState(t),
-		proposerCalculator: proposerCalculator,
+		logger:           hclog.NewNullLogger(),
+		lastBuiltBlock:   header,
+		state:            newTestState(t),
+		proposerSnapshot: NewProposerSnapshot(blockNumber, []*ValidatorMetadata{}),
 		config: &runtimeConfig{
 			PolyBFTConfig: &PolyBFTConfig{EpochSize: epochSize},
 			blockchain:    blockchainMock,
 			txPool:        txPool,
+			proposerCalc:  NewProposerCalculator(hclog.NewNullLogger()),
 		},
 	}
 	runtime.OnBlockInserted(builtBlock)
@@ -507,9 +504,10 @@ func TestConsensusRuntime_FSM_NotInValidatorSet(t *testing.T) {
 
 	validators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D"})
 	runtime := &consensusRuntime{
-		proposerCalculator:  NewProposerCalculator(NewProposerCalculatorSnapshot(1, nil), hclog.NewNullLogger()),
+		proposerSnapshot:    NewProposerSnapshot(1, nil),
 		activeValidatorFlag: 1,
 		config: &runtimeConfig{
+			proposerCalc: NewProposerCalculator(hclog.NewNullLogger()),
 			PolyBFTConfig: &PolyBFTConfig{
 				EpochSize: 1,
 			},
@@ -542,10 +540,11 @@ func TestConsensusRuntime_FSM_NotEndOfEpoch_NotEndOfSprint(t *testing.T) {
 	blockchainMock.On("NewBlockBuilder", mock.Anything).Return(&BlockBuilder{}, nil).Once()
 
 	runtime := &consensusRuntime{
-		proposerCalculator:  NewProposerCalculator(NewProposerCalculatorSnapshot(1, nil), hclog.NewNullLogger()),
+		proposerSnapshot:    NewProposerSnapshot(1, nil),
 		logger:              hclog.NewNullLogger(),
 		activeValidatorFlag: 1,
 		config: &runtimeConfig{
+			proposerCalc: NewProposerCalculator(hclog.NewNullLogger()),
 			PolyBFTConfig: &PolyBFTConfig{
 				EpochSize:  10,
 				SprintSize: 5,
@@ -647,17 +646,18 @@ func TestConsensusRuntime_FSM_EndOfEpoch_BuildRegisterCommitment_And_Uptime(t *t
 			SprintSize: sprintSize,
 			Bridge:     &BridgeConfig{},
 		},
-		Key:        validatorAccounts.getValidator("A").Key(),
-		blockchain: blockchainMock,
+		Key:          validatorAccounts.getValidator("A").Key(),
+		blockchain:   blockchainMock,
+		proposerCalc: NewProposerCalculator(hclog.NewNullLogger()),
 	}
 
 	runtime := &consensusRuntime{
-		proposerCalculator: NewProposerCalculator(NewProposerCalculatorSnapshot(1, nil), hclog.NewNullLogger()),
-		logger:             hclog.NewNullLogger(),
-		state:              state,
-		epoch:              metadata,
-		config:             config,
-		lastBuiltBlock:     lastBuiltBlock,
+		proposerSnapshot: NewProposerSnapshot(1, nil),
+		logger:           hclog.NewNullLogger(),
+		state:            state,
+		epoch:            metadata,
+		config:           config,
+		lastBuiltBlock:   lastBuiltBlock,
 	}
 
 	err = runtime.FSM()
@@ -710,17 +710,18 @@ func TestConsensusRuntime_FSM_EndOfEpoch_RegisterCommitmentNotFound(t *testing.T
 			SprintSize: sprintSize,
 			Bridge:     &BridgeConfig{},
 		},
-		Key:        validatorAccs.getValidator("A").Key(),
-		blockchain: blockchainMock,
+		Key:          validatorAccs.getValidator("A").Key(),
+		blockchain:   blockchainMock,
+		proposerCalc: NewProposerCalculator(hclog.NewNullLogger()),
 	}
 
 	runtime := &consensusRuntime{
-		proposerCalculator: NewProposerCalculator(NewProposerCalculatorSnapshot(1, nil), hclog.NewNullLogger()),
-		logger:             hclog.NewNullLogger(),
-		epoch:              metadata,
-		config:             config,
-		lastBuiltBlock:     lastBuiltBlock,
-		state:              newTestState(t),
+		proposerSnapshot: NewProposerSnapshot(1, nil),
+		logger:           hclog.NewNullLogger(),
+		epoch:            metadata,
+		config:           config,
+		lastBuiltBlock:   lastBuiltBlock,
+		state:            newTestState(t),
 	}
 
 	err := runtime.FSM()
@@ -796,17 +797,18 @@ func TestConsensusRuntime_FSM_EndOfEpoch_BuildRegisterCommitment_QuorumNotReache
 			SprintSize: sprintSize,
 			Bridge:     &BridgeConfig{},
 		},
-		Key:        validatorKey,
-		blockchain: blockchainMock,
+		Key:          validatorKey,
+		blockchain:   blockchainMock,
+		proposerCalc: NewProposerCalculator(hclog.NewNullLogger()),
 	}
 
 	runtime := &consensusRuntime{
-		proposerCalculator: NewProposerCalculator(NewProposerCalculatorSnapshot(1, nil), hclog.NewNullLogger()),
-		logger:             hclog.NewNullLogger(),
-		state:              state,
-		epoch:              metadata,
-		config:             config,
-		lastBuiltBlock:     lastBuiltBlock,
+		proposerSnapshot: NewProposerSnapshot(1, nil),
+		logger:           hclog.NewNullLogger(),
+		state:            state,
+		epoch:            metadata,
+		config:           config,
+		lastBuiltBlock:   lastBuiltBlock,
 	}
 
 	err = runtime.FSM()
@@ -925,11 +927,12 @@ func TestConsensusRuntime_FSM_EndOfSprint_HasBundlesToExecute(t *testing.T) {
 	}
 
 	runtime := &consensusRuntime{
-		proposerCalculator:  NewProposerCalculator(NewProposerCalculatorSnapshot(1, nil), hclog.NewNullLogger()),
+		proposerSnapshot:    NewProposerSnapshot(1, nil),
 		logger:              hclog.NewNullLogger(),
 		activeValidatorFlag: 1,
 		state:               state,
 		config: &runtimeConfig{
+			proposerCalc: NewProposerCalculator(hclog.NewNullLogger()),
 			PolyBFTConfig: &PolyBFTConfig{
 				EpochSize:  10,
 				SprintSize: 5,
@@ -1125,10 +1128,11 @@ func TestConsensusRuntime_restartEpoch_SameEpochNumberAsTheLastOne(t *testing.T)
 	blockchainMock.On("GetSystemState", mock.Anything, mock.Anything).Return(systemStateMock).Once()
 
 	runtime := &consensusRuntime{
-		proposerCalculator:  NewProposerCalculator(NewProposerCalculatorSnapshot(1, nil), hclog.NewNullLogger()),
+		proposerSnapshot:    NewProposerSnapshot(1, nil),
 		activeValidatorFlag: 1,
 		config: &runtimeConfig{
-			blockchain: blockchainMock,
+			proposerCalc: NewProposerCalculator(hclog.NewNullLogger()),
+			blockchain:   blockchainMock,
 		},
 		epoch: &epochMetadata{
 			Number:     1,
@@ -1173,11 +1177,12 @@ func TestConsensusRuntime_restartEpoch_FirstRestart_NoStateSyncEvents(t *testing
 	polybftBackendMock.On("GetValidators", mock.Anything, mock.Anything).Return(validators.getPublicIdentities()).Once()
 
 	runtime := &consensusRuntime{
-		proposerCalculator:  NewProposerCalculator(NewProposerCalculatorSnapshot(1, nil), hclog.NewNullLogger()),
+		proposerSnapshot:    NewProposerSnapshot(1, nil),
 		logger:              hclog.NewNullLogger(),
 		activeValidatorFlag: 1,
 		state:               state,
 		config: &runtimeConfig{
+			proposerCalc:   NewProposerCalculator(hclog.NewNullLogger()),
 			blockchain:     blockchainMock,
 			polybftBackend: polybftBackendMock,
 			PolyBFTConfig:  &PolyBFTConfig{},
@@ -1237,12 +1242,12 @@ func TestConsensusRuntime_restartEpoch_FirstRestart_BuildsCommitment(t *testing.
 	localValidatorID := validatorIds[rand.Intn(len(validatorIds))]
 	localValidator := validatorAccs.getValidator(localValidatorID)
 	runtime := &consensusRuntime{
-		proposerCalculator: NewProposerCalculator(
-			NewProposerCalculatorSnapshot(header.Number, validators), hclog.NewNullLogger()),
+		proposerSnapshot:    NewProposerSnapshot(header.Number, validators),
 		logger:              hclog.NewNullLogger(),
 		activeValidatorFlag: 1,
 		state:               state,
 		config: &runtimeConfig{
+			proposerCalc:    NewProposerCalculator(hclog.NewNullLogger()),
 			blockchain:      blockchainMock,
 			polybftBackend:  polybftBackendMock,
 			BridgeTransport: transportMock,
@@ -1357,12 +1362,12 @@ func TestConsensusRuntime_restartEpoch_NewEpochToRun_BuildCommitment(t *testing.
 	polybftBackendMock.On("GetValidators", mock.Anything, mock.Anything).Return(newValidatorSet).Once()
 
 	runtime := &consensusRuntime{
-		proposerCalculator: NewProposerCalculator(
-			NewProposerCalculatorSnapshot(header.Number, nil), hclog.NewNullLogger()),
+		proposerSnapshot:    NewProposerSnapshot(header.Number, nil),
 		logger:              hclog.NewNullLogger(),
 		activeValidatorFlag: 1,
 		state:               state,
 		config: &runtimeConfig{
+			proposerCalc: NewProposerCalculator(hclog.NewNullLogger()),
 			PolyBFTConfig: &PolyBFTConfig{
 				EpochSize:  10,
 				SprintSize: 5,
@@ -1659,15 +1664,15 @@ func TestConsensusRuntime_FSM_EndOfEpoch_OnBlockInserted(t *testing.T) {
 			SprintSize: sprintSize,
 			Bridge:     &BridgeConfig{},
 		},
-		Key:        validatorAccounts.getValidator("A").Key(),
-		blockchain: blockchainMock,
-		txPool:     txPool,
+		Key:          validatorAccounts.getValidator("A").Key(),
+		blockchain:   blockchainMock,
+		txPool:       txPool,
+		proposerCalc: NewProposerCalculator(hclog.NewNullLogger()),
 	}
 
 	signer := validatorAccounts.getValidator("A").Key()
 	runtime := &consensusRuntime{
-		proposerCalculator: NewProposerCalculator(
-			NewProposerCalculatorSnapshot(numOfBlock, nil), hclog.NewNullLogger()),
+		proposerSnapshot:  NewProposerSnapshot(numOfBlock, nil),
 		logger:            hclog.NewNullLogger(),
 		state:             state,
 		epoch:             metadata,
@@ -1834,15 +1839,15 @@ func TestConsensusRuntime_IsValidSender(t *testing.T) {
 			Key:           validatorAccounts.getValidator("B").Key(),
 			blockchain:    blockchainMock,
 			PolyBFTConfig: &PolyBFTConfig{EpochSize: 10, SprintSize: 5},
+			proposerCalc:  NewProposerCalculator(hclog.NewNullLogger()),
 		},
 		lastBuiltBlock: lastBuildBlock,
 		epoch: &epochMetadata{
 			Number:     1,
 			Validators: validatorAccounts.getPublicIdentities()[:len(validatorAccounts.validators)-1],
 		},
-		logger: hclog.NewNullLogger(),
-		proposerCalculator: NewProposerCalculator(
-			NewProposerCalculatorSnapshot(0, nil), hclog.NewNullLogger()),
+		logger:           hclog.NewNullLogger(),
+		proposerSnapshot: NewProposerSnapshot(0, nil),
 	}
 
 	require.NoError(t, runtime.FSM())
@@ -2024,27 +2029,29 @@ func TestConsensusRuntime_HasQuorum(t *testing.T) {
 	}, true).Once()
 
 	state := newTestState(t)
-	snap := NewProposerCalculatorSnapshot(lastBuildBlock.Number+1, validatorAccounts.getPublicIdentities())
 	runtime := &consensusRuntime{
 		state: state,
 		config: &runtimeConfig{
 			Key:           validatorAccounts.getValidator("B").Key(),
 			blockchain:    blockchainMock,
 			PolyBFTConfig: &PolyBFTConfig{EpochSize: 10, SprintSize: 5},
+			proposerCalc:  NewProposerCalculator(hclog.NewNullLogger()),
 		},
 		lastBuiltBlock: lastBuildBlock,
 		epoch: &epochMetadata{
 			Number:     1,
 			Validators: validatorAccounts.getPublicIdentities()[:len(validatorAccounts.validators)-1],
 		},
-		logger:             hclog.NewNullLogger(),
-		proposerCalculator: NewProposerCalculator(snap, hclog.NewNullLogger()),
+		logger:           hclog.NewNullLogger(),
+		proposerSnapshot: NewProposerSnapshot(lastBuildBlock.Number+1, validatorAccounts.getPublicIdentities()),
 	}
 
 	require.NoError(t, runtime.FSM())
-	proposer, err := runtime.fsm.proposerCalculator.CalcProposer(round, lastBuildBlock.Number+1)
 
+	proposer, err := runtime.config.proposerCalc.CalcProposer(runtime.proposerSnapshot, round, lastBuildBlock.Number+1)
 	require.NoError(t, err)
+
+	runtime.fsm.proposerSnapshot = runtime.proposerSnapshot
 
 	messages := make([]*proto.Message, 0, len(validatorAccounts.validators))
 

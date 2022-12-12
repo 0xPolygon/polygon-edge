@@ -846,8 +846,8 @@ func (s *State) bucketStats(bucketName []byte) *bolt.BucketStats {
 
 // getProposerCalculatorSnapshot gets latest proposer calculator snapshot
 // we are keeping two snapshots just in case if latest write mess up snapshot
-func (s *State) getProposerCalculatorSnapshot() (*ProposerCalculatorSnapshot, error) {
-	var snapshot *ProposerCalculatorSnapshot
+func (s *State) getProposerCalculatorSnapshot() (*ProposerSnapshot, error) {
+	var snapshot *ProposerSnapshot
 
 	err := s.db.View(func(tx *bolt.Tx) error {
 		value := tx.Bucket(proposerCalcSnapshotBucket).Get(itob(uint64(proposerCalcSnapshotKey)))
@@ -862,7 +862,7 @@ func (s *State) getProposerCalculatorSnapshot() (*ProposerCalculatorSnapshot, er
 }
 
 // writeProposerCalculatorSnapshot writes proposer calculator snapshot to double buffered bucket
-func (s *State) writeProposerCalculatorSnapshot(snapshot *ProposerCalculatorSnapshot) error {
+func (s *State) writeProposerCalculatorSnapshot(snapshot *ProposerSnapshot) error {
 	raw, err := json.Marshal(snapshot)
 	if err != nil {
 		return err

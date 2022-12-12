@@ -46,8 +46,8 @@ type fsm struct {
 	// validators is the list of validators for this round
 	validators ValidatorSet
 
-	// proposerCalculator is the object which calculates new proposer
-	proposerCalculator ProposerCalculator
+	// proposerSnapshot keeps information about new proposer
+	proposerSnapshot *ProposerSnapshot
 
 	// blockBuilder is the block builder for proposers
 	blockBuilder blockBuilder

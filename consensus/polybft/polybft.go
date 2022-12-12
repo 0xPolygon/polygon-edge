@@ -254,6 +254,7 @@ func (p *Polybft) initRuntime() error {
 		blockchain:      p.blockchain,
 		polybftBackend:  p,
 		txPool:          p.txPool,
+		proposerCalc:    NewProposerCalculator(p.logger),
 	}
 
 	runtime, err := newConsensusRuntime(p.logger, runtimeConfig)

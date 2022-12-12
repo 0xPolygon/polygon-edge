@@ -21,14 +21,15 @@ func TestProposerCalculator_SetIndex(t *testing.T) {
 	vs, err := validators.toValidatorSet()
 	require.NoError(t, err)
 
-	pc := NewProposerCalculator(NewProposerCalculatorSnapshot(1, metadata), hclog.NewNullLogger())
+	snapshot := NewProposerSnapshot(1, metadata)
+	pc := NewProposerCalculator(hclog.NewNullLogger())
 
 	// validate no changes to validator set positions
 	for i, v := range vs.Accounts() {
 		assert.Equal(t, metadata[i].Address, v.Address)
 	}
 
-	proposer, err := pc.CalcProposer(0, 1)
+	proposer, err := pc.CalcProposer(snapshot, 0, 1)
 	require.NoError(t, err)
 	assert.Equal(t, proposer, metadata[1].Address)
 	// validate no changes to validator set positions
@@ -46,35 +47,36 @@ func TestProposerCalculator_CalculateProposer(t *testing.T) {
 	vs, err := validators.toValidatorSet()
 	require.NoError(t, err)
 
-	pc := NewProposerCalculator(NewProposerCalculatorSnapshot(0, metadata), hclog.NewNullLogger())
+	snapshot := NewProposerSnapshot(0, metadata)
+	pc := NewProposerCalculator(hclog.NewNullLogger())
 
 	assert.Equal(t, int64(15), vs.totalVotingPower)
 
-	currProposerAddress, err := pc.CalcProposer(0, 0)
+	currProposerAddress, err := pc.CalcProposer(snapshot, 0, 0)
 	require.NoError(t, err)
 	assert.Equal(t, metadata[4].Address, currProposerAddress)
 
-	proposerAddressR1, err := pc.CalcProposer(1, 0)
+	proposerAddressR1, err := pc.CalcProposer(snapshot, 1, 0)
 	require.NoError(t, err)
 	assert.Equal(t, metadata[3].Address, proposerAddressR1)
 
-	proposerAddressR2, err := pc.CalcProposer(2, 0)
+	proposerAddressR2, err := pc.CalcProposer(snapshot, 2, 0)
 	require.NoError(t, err)
 	assert.Equal(t, metadata[2].Address, proposerAddressR2)
 
-	proposerAddressR3, err := pc.CalcProposer(3, 0)
+	proposerAddressR3, err := pc.CalcProposer(snapshot, 3, 0)
 	require.NoError(t, err)
 	assert.Equal(t, metadata[1].Address, proposerAddressR3)
 
-	proposerAddressR4, err := pc.CalcProposer(4, 0)
+	proposerAddressR4, err := pc.CalcProposer(snapshot, 4, 0)
 	require.NoError(t, err)
 	assert.Equal(t, metadata[4].Address, proposerAddressR4)
 
-	proposerAddressR5, err := pc.CalcProposer(5, 0)
+	proposerAddressR5, err := pc.CalcProposer(snapshot, 5, 0)
 	require.NoError(t, err)
 	assert.Equal(t, metadata[3].Address, proposerAddressR5)
 
-	proposerAddressR6, err := pc.CalcProposer(6, 0)
+	proposerAddressR6, err := pc.CalcProposer(snapshot, 6, 0)
 	require.NoError(t, err)
 	assert.Equal(t, metadata[0].Address, proposerAddressR6)
 }
@@ -105,21 +107,22 @@ func TestProposerCalculator_SamePriority(t *testing.T) {
 	}, hclog.NewNullLogger())
 	require.NoError(t, err)
 
-	pc := NewProposerCalculator(NewProposerCalculatorSnapshot(0, vs.Accounts()), hclog.NewNullLogger())
+	snapshot := NewProposerSnapshot(0, vs.Accounts())
+	pc := NewProposerCalculator(hclog.NewNullLogger())
 
-	proposerR0, err := pc.CalcProposer(0, 0)
+	proposerR0, err := pc.CalcProposer(snapshot, 0, 0)
 	require.NoError(t, err)
 	assert.Equal(t, types.Address{0x3}, proposerR0)
 
-	proposerR1, err := pc.CalcProposer(1, 0)
+	proposerR1, err := pc.CalcProposer(snapshot, 1, 0)
 	require.NoError(t, err)
 	assert.Equal(t, types.Address{0x2}, proposerR1)
 
-	proposerR2, err := pc.CalcProposer(2, 0)
+	proposerR2, err := pc.CalcProposer(snapshot, 2, 0)
 	require.NoError(t, err)
 	assert.Equal(t, types.Address{0x1}, proposerR2)
 
-	proposerR2, err = pc.CalcProposer(2, 0) // call again same round
+	proposerR2, err = pc.CalcProposer(snapshot, 2, 0) // call again same round
 	require.NoError(t, err)
 	assert.Equal(t, types.Address{0x1}, proposerR2)
 }
@@ -151,12 +154,13 @@ func TestProposerCalculator_ProposerSelection1(t *testing.T) {
 	}, hclog.NewNullLogger())
 	require.NoError(t, err)
 
-	pc := NewProposerCalculator(NewProposerCalculatorSnapshot(4, vset.Accounts()), hclog.NewNullLogger())
+	snapshot := NewProposerSnapshot(4, vset.Accounts())
+	pc := NewProposerCalculator(hclog.NewNullLogger())
 
 	var proposers = make([]types.Address, numberOfIteration)
 
 	for i := uint64(0); i < numberOfIteration; i++ {
-		proposers[i], err = pc.CalcProposer(i, 4)
+		proposers[i], err = pc.CalcProposer(snapshot, i, 4)
 		require.NoError(t, err)
 	}
 
@@ -201,26 +205,27 @@ func TestProposerCalculator_IncrementProposerPrioritySameVotingPower(t *testing.
 	require.NoError(t, err)
 	assert.Equal(t, int64(3), vs.totalVotingPower)
 
-	pc := NewProposerCalculator(NewProposerCalculatorSnapshot(0, vs.Accounts()), hclog.NewNullLogger())
+	snapshot := NewProposerSnapshot(0, vs.Accounts())
+	pc := NewProposerCalculator(hclog.NewNullLogger())
 
 	// when voting power is the same order is by address
-	currProposerAddress, err := pc.CalcProposer(0, 0)
+	currProposerAddress, err := pc.CalcProposer(snapshot, 0, 0)
 	require.NoError(t, err)
 	assert.Equal(t, types.Address{0x1}, currProposerAddress)
 
-	proposerAddresR1, err := pc.CalcProposer(1, 0)
+	proposerAddresR1, err := pc.CalcProposer(snapshot, 1, 0)
 	require.NoError(t, err)
 	assert.Equal(t, types.Address{0x2}, proposerAddresR1)
 
-	proposerAddressR2, err := pc.CalcProposer(2, 0)
+	proposerAddressR2, err := pc.CalcProposer(snapshot, 2, 0)
 	require.NoError(t, err)
 	assert.Equal(t, types.Address{0x3}, proposerAddressR2)
 
-	proposerAddressR3, err := pc.CalcProposer(3, 0)
+	proposerAddressR3, err := pc.CalcProposer(snapshot, 3, 0)
 	require.NoError(t, err)
 	assert.Equal(t, types.Address{0x1}, proposerAddressR3)
 
-	proposerAddressR4, err := pc.CalcProposer(4, 0)
+	proposerAddressR4, err := pc.CalcProposer(snapshot, 4, 0)
 	require.NoError(t, err)
 	assert.Equal(t, types.Address{0x2}, proposerAddressR4)
 }
@@ -355,18 +360,19 @@ func TestProposerCalculator_AveragingInIncrementProposerPriorityWithVotingPower(
 	}
 
 	for i, tc := range tcs {
-		snap := NewProposerCalculatorSnapshot(1, valz)
-		pc := NewProposerCalculator(snap, hclog.NewNullLogger())
+		snap := NewProposerSnapshot(1, valz)
+		pc := NewProposerCalculator(hclog.NewNullLogger())
 
-		require.NoError(t, pc.incrementProposerPriorityNTimes(tc.times))
+		_, err := pc.incrementProposerPriorityNTimes(snap, tc.times)
+		require.NoError(t, err)
 
-		address, _ := pc.GetLatestProposer(0, 1)
+		address, _ := pc.GetLatestProposer(snap, tc.times-1, 1)
 
-		assert.Equal(t, pc.snapshot.Validators[tc.wantProposerIndex].Metadata.Address, address,
+		assert.Equal(t, snap.Validators[tc.wantProposerIndex].Metadata.Address, address,
 			"test case: %v",
 			i)
 
-		for valIdx, val := range pc.snapshot.Validators {
+		for valIdx, val := range snap.Validators {
 			assert.Equal(t,
 				tc.wantProposerPrioritys[valIdx],
 				val.ProposerPriority,
@@ -403,18 +409,19 @@ func TestProposerCalculator_UpdatesForNewValidatorSet(t *testing.T) {
 	vs, err := NewValidatorSet(accountSet, hclog.NewNullLogger())
 	require.NoError(t, err)
 
-	pc := NewProposerCalculator(NewProposerCalculatorSnapshot(0, vs.Accounts()), hclog.NewNullLogger())
+	snapshot := NewProposerSnapshot(0, vs.Accounts())
+	pc := NewProposerCalculator(hclog.NewNullLogger())
 
-	_, err = pc.CalcProposer(1, 0)
+	_, err = pc.CalcProposer(snapshot, 1, 0)
 	require.NoError(t, err)
 
 	// verify that the capacity and length of validators is the same
-	assert.Equal(t, len(vs.Accounts()), cap(pc.snapshot.Validators))
+	assert.Equal(t, len(vs.Accounts()), cap(snapshot.Validators))
 	// verify that validator priorities are centered
-	valsCount := int64(len(pc.snapshot.Validators))
+	valsCount := int64(len(snapshot.Validators))
 
 	sum := int64(0)
-	for _, val := range pc.snapshot.Validators {
+	for _, val := range snapshot.Validators {
 		// mind overflow
 		sum = safeAddClip(sum, val.ProposerPriority)
 	}
@@ -422,7 +429,7 @@ func TestProposerCalculator_UpdatesForNewValidatorSet(t *testing.T) {
 	assert.True(t, sum < valsCount && sum > -valsCount,
 		"expected total priority in (-%d, %d). Got %d", valsCount, valsCount, sum)
 	// verify that priorities are scaled
-	dist := computeMaxMinPriorityDiff(pc.snapshot.Validators)
+	dist := computeMaxMinPriorityDiff(snapshot.Validators)
 	assert.True(t, dist <= priorityWindowSizeFactor*vs.totalVotingPower,
 		"expected priority distance < %d. Got %d", priorityWindowSizeFactor*vs.totalVotingPower, dist)
 }
@@ -436,26 +443,30 @@ func TestProposerCalculator_GetLatestProposer(t *testing.T) {
 	t.Parallel()
 
 	validatorSet := newTestValidators(count).getPublicIdentities()
-	snap := NewProposerCalculatorSnapshot(0, validatorSet)
-
-	proposerCalculator := NewProposerCalculator(snap, hclog.NewNullLogger())
+	snap := NewProposerSnapshot(0, validatorSet)
+	proposerCalculator := NewProposerCalculator(hclog.NewNullLogger())
 
 	snap.Validators[bestIdx].ProposerPriority = 1000000
 
 	// not set
-	_, exists := proposerCalculator.GetLatestProposer(0, 0)
+	_, exists := proposerCalculator.GetLatestProposer(snap, 0, 0)
 	assert.False(t, exists)
 
-	_, err := proposerCalculator.CalcProposer(0, 0)
+	_, err := proposerCalculator.CalcProposer(snap, 0, 0)
 	require.NoError(t, err)
 
 	// wrong round
-	_, exists = proposerCalculator.GetLatestProposer(1, 0)
+	_, exists = proposerCalculator.GetLatestProposer(snap, 1, 0)
+	assert.False(t, exists)
+
+	// wrong height
+	_, exists = proposerCalculator.GetLatestProposer(snap, 0, 1)
 	assert.False(t, exists)
 
 	// ok
-	address, exists := proposerCalculator.GetLatestProposer(0, 0)
+	address, exists := proposerCalculator.GetLatestProposer(snap, 0, 0)
 	assert.True(t, exists)
+
 	assert.Equal(t, validatorSet[bestIdx].Address, address)
 }
 
@@ -477,9 +488,11 @@ func TestProposerCalculator_UpdateValidators(t *testing.T) {
 	vs, err := NewValidatorSet(accountSet, hclog.NewNullLogger())
 	require.NoError(t, err)
 
-	pc := NewProposerCalculator(NewProposerCalculatorSnapshot(0, vs.Accounts()), hclog.NewNullLogger())
+	snap := NewProposerSnapshot(0, vs.Accounts())
+	pc := NewProposerCalculator(hclog.NewNullLogger())
 
-	require.NoError(t, pc.incrementProposerPriorityNTimes(7))
+	_, err = pc.incrementProposerPriorityNTimes(snap, 7)
+	require.NoError(t, err)
 
 	// update
 	u1 := &ValidatorMetadata{Address: types.Address{0x1}, BlsKey: keys[5].PublicKey(), VotingPower: 10}
@@ -490,9 +503,9 @@ func TestProposerCalculator_UpdateValidators(t *testing.T) {
 
 	newAccountSet := []*ValidatorMetadata{u1, u2, u3}
 
-	pc.updateValidators(newAccountSet)
+	pc.updateValidators(snap, newAccountSet)
 
-	for i, v := range pc.snapshot.Validators {
+	for i, v := range snap.Validators {
 		assert.Equal(t, desiredPriorities[i], v.ProposerPriority)
 	}
 }
