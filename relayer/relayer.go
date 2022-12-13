@@ -1,8 +1,8 @@
 package relayer
 
 import (
-	"encoding/binary"
 	"fmt"
+	"math/big"
 	"strconv"
 
 	"github.com/0xPolygon/polygon-edge/contracts"
@@ -76,13 +76,13 @@ func (r *Relayer) AddLog(log *ethgo.Log) {
 		}
 
 		var startID uint64
-		if sid, ok := vals["startId"].([]byte); ok {
-			startID = binary.LittleEndian.Uint64(sid)
+		if sid, ok := vals["startId"].(big.Int); ok {
+			startID = sid.Uint64()
 		}
 
 		var endID uint64
-		if eid, ok := vals["endId"].([]byte); ok {
-			endID = binary.LittleEndian.Uint64(eid)
+		if eid, ok := vals["endId"].(big.Int); ok {
+			endID = eid.Uint64()
 		}
 
 		fmt.Printf("Commit: Block %d StartID %d EndID %d\n", log.BlockNumber, startID, endID)
