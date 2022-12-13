@@ -25,10 +25,6 @@ var (
 		"bytes signature," +
 		"bytes bitmap)")
 
-	executeStateSyncABIMethod, _ = abi.NewMethod("function execute(" +
-		"bytes32[] proof, " +
-		"tuple(uint256 id, address sender, address receiver, bytes data) stateSync)")
-
 	validatorsUptimeMethod, _ = abi.NewMethod("function uptime(bytes data)")
 )
 

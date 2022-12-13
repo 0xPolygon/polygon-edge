@@ -208,7 +208,7 @@ func (c *consensusRuntime) OnBlockInserted(block *types.Block) {
 	c.config.txPool.ResetWithHeaders(block.Header)
 
 	// handle commitment and proofs creation
-	if err := c.getCommitmentFromTransaction(block.Transactions); err != nil {
+	if err := c.getCommitmentFromTransactions(block.Transactions); err != nil {
 		c.logger.Error("on block inserted error", "err", err)
 	}
 
@@ -224,9 +224,9 @@ func (c *consensusRuntime) OnBlockInserted(block *types.Block) {
 	}
 }
 
-// getCommitmentFromTransaction gets the registered commitment (if any)
+// getCommitmentFromTransactions gets the registered commitment (if any)
 // from a transaction, and builds bundles for it
-func (c *consensusRuntime) getCommitmentFromTransaction(txs []*types.Transaction) error {
+func (c *consensusRuntime) getCommitmentFromTransactions(txs []*types.Transaction) error {
 	if !c.IsBridgeEnabled() {
 		return nil
 	}
