@@ -82,7 +82,7 @@ func (s *Server) addPeerInfo(id peer.ID, direction network.Direction) bool {
 	s.updateBootnodeConnCount(id, 1)
 
 	// Update the metric stats
-	metrics.SetGauge([]string{"peers"}, float32(len(s.peers)))
+	metrics.SetGauge([]string{networkMetrics, "peers"}, float32(len(s.peers)))
 
 	return false
 }
