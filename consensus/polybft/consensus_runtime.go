@@ -1085,9 +1085,15 @@ func (c *consensusRuntime) BuildProposal(view *proto.View) []byte {
 func (c *consensusRuntime) InsertBlock(proposal []byte, committedSeals []*messages.CommittedSeal) {
 	fsm := c.fsm
 
-	block, err := fsm.Insert(proposal, committedSeals)
+	alreadyInserted, block, err := fsm.Insert(proposal, committedSeals)
 	if err != nil {
 		c.logger.Error("cannot insert proposal", "error", err)
+
+		return
+	}
+
+	if alreadyInserted {
+		c.logger.Info("cannot insert proposal it was alredy previously inserted")
 
 		return
 	}

@@ -25,8 +25,8 @@ type Blockchain interface {
 	GetBlockByNumber(uint64, bool) (*types.Block, bool)
 	// VerifyFinalizedBlock verifies finalized block
 	VerifyFinalizedBlock(*types.Block) error
-	// WriteBlock writes a given block to chain
-	WriteBlock(*types.Block, string) error
+	// WriteBlock writes a given block to chain and gives indication if the block was alredy inserted
+	WriteBlock(*types.Block, string) (bool, error)
 }
 
 type Network interface {

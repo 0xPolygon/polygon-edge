@@ -441,10 +441,10 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 }
 
 // Insert inserts the sealed proposal
-func (f *fsm) Insert(proposal []byte, committedSeals []*messages.CommittedSeal) (*types.Block, error) {
+func (f *fsm) Insert(proposal []byte, committedSeals []*messages.CommittedSeal) (bool, *types.Block, error) {
 	newBlock := &types.Block{}
 	if err := newBlock.UnmarshalRLP(proposal); err != nil {
-		return nil, fmt.Errorf("cannot unmarshal proposal: %w", err)
+		return false, nil, fmt.Errorf("cannot unmarshal proposal: %w", err)
 	}
 
 	// In this function we should try to return little to no errors since
@@ -468,12 +468,12 @@ func (f *fsm) Insert(proposal []byte, committedSeals []*messages.CommittedSeal) 
 
 		index, exists := nodeIDIndexMap[signerAddr]
 		if !exists {
-			return nil, fmt.Errorf("invalid node id = %s", signerAddr.String())
+			return false, nil, fmt.Errorf("invalid node id = %s", signerAddr.String())
 		}
 
 		s, err := bls.UnmarshalSignature(commSeal.Signature)
 		if err != nil {
-			return nil, fmt.Errorf("invalid signature = %s", commSeal.Signature)
+			return false, nil, fmt.Errorf("invalid signature = %s", commSeal.Signature)
 		}
 
 		signatures = append(signatures, s)
@@ -483,7 +483,7 @@ func (f *fsm) Insert(proposal []byte, committedSeals []*messages.CommittedSeal) 
 
 	aggregatedSignature, err := signatures.Aggregate().Marshal()
 	if err != nil {
-		return nil, fmt.Errorf("could not aggregate seals: %w", err)
+		return false, nil, fmt.Errorf("could not aggregate seals: %w", err)
 	}
 
 	// include aggregated signature of all committed seals
@@ -496,24 +496,28 @@ func (f *fsm) Insert(proposal []byte, committedSeals []*messages.CommittedSeal) 
 	// Write extar data to header
 	newBlock.Header.ExtraData = append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...)
 
-	receipts, err := f.backend.CommitBlock(newBlock)
+	alreadyInserted, receipts, err := f.backend.CommitBlock(newBlock)
 	if err != nil {
-		return nil, err
+		return false, nil, err
+	}
+
+	if alreadyInserted {
+		return true, nil, err
 	}
 
 	// commit exit events only when we finalize a block
 	events, err := getExitEventsFromReceipts(f.epochNumber, newBlock.Number(), receipts)
 	if err != nil {
-		return newBlock, err
+		return false, newBlock, err
 	}
 
 	if len(events) > 0 {
 		if err := f.checkpointBackend.InsertExitEvents(events); err != nil {
-			return nil, err
+			return false, nil, err
 		}
 	}
 
-	return newBlock, nil
+	return false, newBlock, nil
 }
 
 // Height returns the height for the current round

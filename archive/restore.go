@@ -22,7 +22,7 @@ type blockchainInterface interface {
 	Genesis() types.Hash
 	GetBlockByNumber(uint64, bool) (*types.Block, bool)
 	GetHashByNumber(uint64) types.Hash
-	WriteBlock(*types.Block, string) error
+	WriteBlock(*types.Block, string) (bool, error)
 	VerifyFinalizedBlock(*types.Block) error
 }
 
@@ -82,7 +82,7 @@ func importBlocks(chain blockchainInterface, blockStream *blockStream, progressi
 			return err
 		}
 
-		if err := chain.WriteBlock(nextBlock, restore); err != nil {
+		if _, err := chain.WriteBlock(nextBlock, restore); err != nil {
 			return err
 		}
 

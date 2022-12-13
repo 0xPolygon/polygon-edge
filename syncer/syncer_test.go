@@ -40,7 +40,7 @@ type mockBlockchain struct {
 	headerHandler               func() *types.Header
 	getBlockByNumberHandler     func(uint64, bool) (*types.Block, bool)
 	verifyFinalizedBlockHandler func(*types.Block) error
-	writeBlockHandler           func(*types.Block) error
+	writeBlockHandler           func(*types.Block) (bool, error)
 }
 
 func (m *mockBlockchain) SubscribeEvents() blockchain.Subscription {
@@ -59,7 +59,7 @@ func (m *mockBlockchain) VerifyFinalizedBlock(b *types.Block) error {
 	return m.verifyFinalizedBlockHandler(b)
 }
 
-func (m *mockBlockchain) WriteBlock(b *types.Block, s string) error {
+func (m *mockBlockchain) WriteBlock(b *types.Block, s string) (bool, error) {
 	return m.writeBlockHandler(b)
 }
 
@@ -608,11 +608,11 @@ func TestSync(t *testing.T) {
 					&mockBlockchain{
 						headerHandler:               newSimpleHeaderHandler(latestBlockNumber),
 						verifyFinalizedBlockHandler: test.createVerifyFinalizedBlockHandler(),
-						writeBlockHandler: func(b *types.Block) error {
+						writeBlockHandler: func(b *types.Block) (bool, error) {
 							syncedBlocks = append(syncedBlocks, b)
 							latestBlockNumber = b.Number()
 
-							return nil
+							return false, nil
 						},
 					},
 					time.Second,
@@ -825,14 +825,14 @@ func Test_bulkSyncWithPeer(t *testing.T) {
 					&mockBlockchain{
 						headerHandler:               newSimpleHeaderHandler(test.beginningHeight),
 						verifyFinalizedBlockHandler: test.verifyFinalizedBlockHandler,
-						writeBlockHandler: func(b *types.Block) error {
+						writeBlockHandler: func(b *types.Block) (bool, error) {
 							if err := test.writeBlockHandler(b); err != nil {
-								return err
+								return false, err
 							}
 
 							syncedBlocks = append(syncedBlocks, b)
 
-							return nil
+							return false, nil
 						},
 					},
 					test.blockTimeout,

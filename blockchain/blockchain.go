@@ -876,44 +876,45 @@ func (b *Blockchain) executeBlockTransactions(block *types.Block) (*BlockResult,
 
 // WriteBlock writes a single block to the local blockchain.
 // It doesn't do any kind of verification, only commits the block to the DB
-func (b *Blockchain) WriteBlock(block *types.Block, source string) error {
+// It returns indication if the block was already previously inserted
+func (b *Blockchain) WriteBlock(block *types.Block, source string) (bool, error) {
 	b.writeLock.Lock()
 	defer b.writeLock.Unlock()
 
 	if block.Number() <= b.Header().Number {
 		b.logger.Info("block already inserted", "block", block.Number(), "source", source)
 
-		return nil
+		return true, nil
 	}
 
 	header := block.Header
 
 	if err := b.writeBody(block); err != nil {
-		return err
+		return false, err
 	}
 
 	// Write the header to the chain
 	evnt := &Event{Source: source}
 	if err := b.writeHeaderImpl(evnt, header); err != nil {
-		return err
+		return false, err
 	}
 
 	// Fetch the block receipts
 	blockReceipts, receiptsErr := b.extractBlockReceipts(block)
 	if receiptsErr != nil {
-		return receiptsErr
+		return false, receiptsErr
 	}
 
 	// write the receipts, do it only after the header has been written.
 	// Otherwise, a client might ask for a header once the receipt is valid,
 	// but before it is written into the storage
 	if err := b.db.WriteReceipts(block.Hash(), blockReceipts); err != nil {
-		return err
+		return false, err
 	}
 
 	// update snapshot
 	if err := b.consensus.ProcessHeaders([]*types.Header{header}); err != nil {
-		return err
+		return false, err
 	}
 
 	b.dispatchEvent(evnt)
@@ -935,7 +936,7 @@ func (b *Blockchain) WriteBlock(block *types.Block, source string) error {
 
 	b.logger.Info("new block", logArgs...)
 
-	return nil
+	return false, nil
 }
 
 // GetCachedReceipts retrieves cached receipts for given headerHash

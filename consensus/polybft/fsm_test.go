@@ -188,7 +188,7 @@ func TestFSM_BuildProposal_WithExitEvents(t *testing.T) {
 
 	commitedSeals := []*messages.CommittedSeal{}
 
-	block, err := fsm.Insert(proposal, commitedSeals)
+	_, block, err := fsm.Insert(proposal, commitedSeals)
 
 	require.NoError(t, err)
 	require.Equal(t, parentBlockNumber+1, block.Number())
@@ -1063,7 +1063,7 @@ func TestFSM_Insert_Good(t *testing.T) {
 
 	proposal := buildBlock.Block.MarshalRLP()
 
-	block, err := fsm.Insert(proposal, commitedSeals)
+	_, block, err := fsm.Insert(proposal, commitedSeals)
 
 	require.NoError(t, err)
 	mBackendMock.AssertExpectations(t)
@@ -1122,7 +1122,7 @@ func TestFSM_Insert_InvalidNode(t *testing.T) {
 		{Signer: nonValidatorAccount.Address().Bytes(), Signature: nonValidatorSignature}, // this one should fail
 	}
 
-	_, err = fsm.Insert(proposal, commitedSeals)
+	_, _, err = fsm.Insert(proposal, commitedSeals)
 	assert.ErrorContains(t, err, "invalid node id")
 }
 
