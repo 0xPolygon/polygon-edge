@@ -34,10 +34,9 @@ var (
 	params = &manifestInitParams{}
 )
 
-// GetCommand returns the rootchain emit command
 func GetCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "polybft-manifest",
+		Use:     "manifest",
 		Short:   "Initializes manifest file",
 		PreRunE: runPreRun,
 		Run:     runCommand,
@@ -78,7 +77,7 @@ func setFlags(cmd *cobra.Command) {
 		&params.validators,
 		validatorsFlag,
 		[]string{},
-		"validators defined by user throughout a parameter (format: <node id>:<ECDSA address>:<public BLS key>)",
+		"validators defined by user (format: <node id>:<ECDSA address>:<public BLS key>)",
 	)
 
 	cmd.Flags().StringVar(

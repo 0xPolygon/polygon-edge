@@ -14,8 +14,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-const PolyBFTConsensusName = "polybft"
-
 // PolyBFTConfig is the configuration file for the Polybft consensus protocol.
 type PolyBFTConfig struct {
 	// Validators are the genesis validators
@@ -42,7 +40,7 @@ type PolyBFTConfig struct {
 
 // GetPolyBFTConfig deserializes provided chain config and returns PolyBFTConfig
 func GetPolyBFTConfig(chainConfig *chain.Chain) (PolyBFTConfig, error) {
-	consensusConfigJSON, err := json.Marshal(chainConfig.Params.Engine[PolyBFTConsensusName])
+	consensusConfigJSON, err := json.Marshal(chainConfig.Params.Engine["polybft"])
 	if err != nil {
 		return PolyBFTConfig{}, err
 	}

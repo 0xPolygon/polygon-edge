@@ -223,7 +223,7 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 
 	manifestPath := path.Join(tmpDir, "manifest.json")
 	// run manifest file creation
-	cluster.cmdRun("polybft-manifest",
+	cluster.cmdRun("manifest",
 		"--path", manifestPath,
 		"--validators-path", tmpDir,
 		"--validators-prefix", cluster.Config.ValidatorPrefix)
