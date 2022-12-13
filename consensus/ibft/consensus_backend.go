@@ -77,10 +77,20 @@ func (i *backendIBFT) InsertBlock(
 	// This is a safety net to help us narrow down and also recover before
 	// writing the block
 	if err := i.ValidateExtraDataFormat(newBlock.Header); err != nil {
+
+		//Format committed seals to make them more readable
+		committedSealsStr := make([]string, len(committedSealsMap))
+		for i, seal := range committedSeals {
+			committedSealsStr[i] = fmt.Sprintf("{signer=%v signature=%v}",
+				hex.EncodeToHex(seal.Signer),
+				hex.EncodeToHex(seal.Signature))
+		}
+
 		i.logger.Error("cannot write block: corrupted extra data",
 			"err", err,
-			"\n\tbefore", hex.EncodeToHex(extraDataBackup),
-			"\n\tafter", hex.EncodeToHex(header.ExtraData))
+			"before", hex.EncodeToHex(extraDataBackup),
+			"after", hex.EncodeToHex(header.ExtraData),
+			"committedSeals", committedSealsStr)
 
 		return
 	}
