@@ -247,6 +247,14 @@
       "created_at": "2022-12-02T14:14:04Z",
       "repoId": 287542207,
       "pullRequestNo": 993
+    },
+    {
+      "name": "b00ris",
+      "id": 4943570,
+      "comment_id": 1347878914,
+      "created_at": "2022-12-13T07:48:23Z",
+      "repoId": 287542207,
+      "pullRequestNo": 1025
     }
   ]
 }
