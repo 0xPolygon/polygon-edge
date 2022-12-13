@@ -634,6 +634,10 @@ func (i *backendIBFT) ValidateExtraDataFormat(header *types.Header) error {
 		header.Number,
 	)
 
+	if err != nil {
+		return err
+	}
+
 	_, err = blockSigner.GetIBFTExtra(header)
 
 	return err
