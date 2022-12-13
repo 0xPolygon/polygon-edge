@@ -187,7 +187,8 @@ func (c *consensusRuntime) AddLog(eventLog *ethgo.Log) {
 
 // OnBlockInserted is called whenever fsm or syncer inserts new block
 func (c *consensusRuntime) OnBlockInserted(block *types.Block) {
-	if err := updateBlockMetrics(block, c.config.blockchain); err != nil {
+	parentHeader, _ := c.getLastBuiltBlockAndEpoch()
+	if err := updateBlockMetrics(block, parentHeader); err != nil {
 		c.logger.Error("failed to update block metrics", "error", err)
 	}
 

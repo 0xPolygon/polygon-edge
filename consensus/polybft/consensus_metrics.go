@@ -1,7 +1,6 @@
 package polybft
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/types"
@@ -15,24 +14,18 @@ const (
 
 // updateBlockMetrics updates various metrics based on the given block
 // (such as block interval, number of transactions and block rounds metrics)
-func updateBlockMetrics(block *types.Block, blockchain blockchainBackend) error {
-	if block.Number() > 1 {
-		// retrieve parent header
-		parentHeader, parentExists := blockchain.GetHeaderByNumber(block.Number() - 1)
-		if !parentExists {
-			return fmt.Errorf("failed to retrieve block %d", block.Number()-1)
-		}
-
+func updateBlockMetrics(currentBlock *types.Block, parentHeader *types.Header) error {
+	if currentBlock.Number() > 1 {
 		parentTime := time.Unix(int64(parentHeader.Timestamp), 0)
-		headerTime := time.Unix(int64(block.Header.Timestamp), 0)
+		headerTime := time.Unix(int64(currentBlock.Header.Timestamp), 0)
 		// update the block interval metric
 		metrics.SetGauge([]string{consensusMetricsPrefix, "block_interval"}, float32(headerTime.Sub(parentTime).Seconds()))
 	}
 
 	// update the number of transactions in the block metric
-	metrics.SetGauge([]string{consensusMetricsPrefix, "num_txs"}, float32(len(block.Body().Transactions)))
+	metrics.SetGauge([]string{consensusMetricsPrefix, "num_txs"}, float32(len(currentBlock.Body().Transactions)))
 
-	extra, err := GetIbftExtra(block.Header.ExtraData)
+	extra, err := GetIbftExtra(currentBlock.Header.ExtraData)
 	if err != nil {
 		return err
 	}
