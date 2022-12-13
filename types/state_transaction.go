@@ -10,7 +10,7 @@ import (
 
 var ExecuteStateSyncABIMethod, _ = abi.NewMethod("function execute(" +
 	"bytes32[] proof, " +
-	"tuple(uint256 id, address sender, address receiver, bytes data, bool skip) stateSync)")
+	"tuple(uint256 id, address sender, address receiver, bytes data) stateSync)")
 
 const (
 	abiMethodIDLength = 4
