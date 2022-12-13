@@ -326,6 +326,13 @@ func (pc *proposerCalculator) incrementProposerPriorityNTimes(times uint64) erro
 		err      error
 	)
 
+	if err := pc.rescalePriorities(); err != nil {
+		return fmt.Errorf("cannot rescale priorities: %w", err)
+	}
+	if err := pc.shiftByAvgProposerPriority(); err != nil {
+		return fmt.Errorf("cannot shift proposer priorities: %w", err)
+	}
+
 	for i := uint64(0); i < times; i++ {
 		if proposer, err = pc.incrementProposerPriority(); err != nil {
 			return fmt.Errorf("cannot increment proposer priority: %w", err)
@@ -347,20 +354,34 @@ func (pc *proposerCalculator) updateValidators(newValidatorSet AccountSet) error
 	}
 
 	snapshotValidators := pc.snapshot.toMap()
-	newValidatorsCalcProposer := make([]*ProposerCalculatorValidator, len(newValidatorSet))
+	newValidators := make([]*ProposerCalculatorValidator, len(newValidatorSet))
 
-	// create new validators snapshot
-	for i, x := range newValidatorSet {
-		if val, exists := snapshotValidators[x.Address]; exists {
-			// updated existing validator
-			newValidatorsCalcProposer[i] = NewProposerCalculatorValidator(x, val.ProposerPriority)
-		} else {
-			// new validator
-			newValidatorsCalcProposer[i] = NewProposerCalculatorValidator(x, 0)
+	// compute total voting power of removed validators and currentValidatorSer
+	var removedValidatorsVotingPower uint64
+	var newValidatorsVotingPower uint64
+
+	for address, val := range snapshotValidators {
+		if !newValidatorSet.ContainsNodeID(address.String()) {
+			removedValidatorsVotingPower += val.Metadata.VotingPower
 		}
 	}
 
-	pc.snapshot.Validators = newValidatorsCalcProposer
+	for _, v := range newValidatorSet {
+		newValidatorsVotingPower += v.VotingPower
+	}
+
+	tvpAfterUpdatesBeforeRemovals := newValidatorsVotingPower + removedValidatorsVotingPower
+	for i, newValidator := range newValidatorSet {
+		if val, exists := snapshotValidators[newValidator.Address]; exists {
+			// old validators have the same priority
+			newValidators[i] = NewProposerCalculatorValidator(newValidator, val.ProposerPriority)
+		} else {
+			// added validator has priority -1.125 * V
+			newValidators[i] = NewProposerCalculatorValidator(newValidator, int64(-(tvpAfterUpdatesBeforeRemovals + (tvpAfterUpdatesBeforeRemovals >> 3))))
+		}
+	}
+
+	pc.snapshot.Validators = newValidators
 	pc.totalVotingPower = pc.snapshot.GetTotalVotingPower()
 
 	// after validator set center values around 0 and scale
@@ -389,10 +410,10 @@ func (pc *proposerCalculator) incrementProposerPriority() (*ProposerCalculatorVa
 }
 
 func (pc *proposerCalculator) updateWithChangeSet() error {
+
 	if err := pc.rescalePriorities(); err != nil {
 		return fmt.Errorf("cannot rescale priorities: %w", err)
 	}
-
 	if err := pc.shiftByAvgProposerPriority(); err != nil {
 		return fmt.Errorf("cannot shift proposer priorities: %w", err)
 	}
@@ -466,7 +487,6 @@ func (pc *proposerCalculator) rescalePriorities() error {
 	// NOTE: This may make debugging priority issues easier as well.
 	diff := computeMaxMinPriorityDiff(pc.snapshot.Validators)
 	ratio := (diff + diffMax - 1) / diffMax
-
 	if diff > diffMax {
 		for _, val := range pc.snapshot.Validators {
 			val.ProposerPriority /= ratio
