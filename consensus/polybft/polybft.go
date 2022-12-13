@@ -221,15 +221,15 @@ func (p *Polybft) Initialize() error {
 		if !ok {
 			return fmt.Errorf("jsonRPCAddress is not set")
 		}
-	}
 
-	p.relayer = relayer.NewRelayer(
-		p.dataDir,
-		addr,
-		ethgo.Address(p.consensusConfig.StateReceiverAddr),
-		p.logger.Named("relayer"),
-		p.key,
-	)
+		p.relayer = relayer.NewRelayer(
+			p.dataDir,
+			addr,
+			ethgo.Address(p.consensusConfig.StateReceiverAddr),
+			p.logger.Named("relayer"),
+			p.key,
+		)
+	}
 
 	return nil
 }
