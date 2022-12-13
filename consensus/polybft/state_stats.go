@@ -10,7 +10,7 @@ import (
 // startStatsReleasing starts the process that releases BoltDB stats into prometheus periodically.
 func (s *State) startStatsReleasing() {
 	const (
-		statUpdatePeriod = 5 * time.Second
+		statUpdatePeriod = 10 * time.Second
 		dbSubsystem      = "db"
 		txSubsystem      = "tx"
 		namespace        = "polybft_state"
