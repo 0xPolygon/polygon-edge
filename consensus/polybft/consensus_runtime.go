@@ -64,15 +64,6 @@ type epochMetadata struct {
 	// Number is the number of the epoch
 	Number uint64
 
-	// LastCheckpoint is the last epoch that was checkpointed, for now it is epoch-1.
-	LastCheckpoint uint64
-
-	// CheckpointProposer is the validator that has to send the checkpoint, assume it is static for now.
-	CheckpointProposer string
-
-	// Blocks is the list of blocks that we have to checkpoint in rootchain
-	Blocks []*types.Block
-
 	// Validators is the set of validators for the epoch
 	Validators AccountSet
 
@@ -457,10 +448,8 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) error {
 	}
 
 	epoch := &epochMetadata{
-		Number:         epochNumber,
-		LastCheckpoint: 0,
-		Blocks:         []*types.Block{},
-		Validators:     validatorSet,
+		Number:     epochNumber,
+		Validators: validatorSet,
 	}
 
 	if err := c.state.cleanEpochsFromDB(); err != nil {
