@@ -72,7 +72,7 @@ func (e *Executor) WriteGenesis(alloc map[types.Address]*chain.GenesisAccount) t
 	}
 
 	objs := txn.Commit(false)
-	_, root := snap.Commit(objs)
+	_, _, root := snap.Commit(objs)
 
 	return types.BytesToHash(root)
 }
@@ -300,11 +300,17 @@ func (t *Transition) Write(txn *types.Transaction) error {
 }
 
 // Commit commits the final result
-func (t *Transition) Commit() (Snapshot, types.Hash) {
-	objs := t.state.Commit(t.config.EIP155)
-	s2, root := t.snap.Commit(objs)
+func (t *Transition) Commit() (Snapshot, *types.Trace, types.Hash) {
+	// pre-commit op
+	targetAddr := types.Address{}
+	targetAddr[t.ctx.Number/20] = 1
 
-	return s2, types.BytesToHash(root)
+	t.state.AddBalance(targetAddr, big.NewInt(10))
+
+	objs := t.state.Commit(t.config.EIP155)
+	s2, traces, root := t.snap.Commit(objs)
+
+	return s2, traces, types.BytesToHash(root)
 }
 
 func (t *Transition) subGasPool(amount uint64) error {

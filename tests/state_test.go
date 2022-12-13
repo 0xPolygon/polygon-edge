@@ -71,7 +71,7 @@ func RunSpecificTest(t *testing.T, file string, c stateCase, name, fork string, 
 	txn.AddSealingReward(env.Coinbase, big.NewInt(0))
 
 	objs := txn.Commit(forks.EIP155)
-	_, root := snapshot.Commit(objs)
+	_, _, root := snapshot.Commit(objs)
 
 	if !bytes.Equal(root, p.Root.Bytes()) {
 		t.Fatalf(

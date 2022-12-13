@@ -184,7 +184,7 @@ func (i *backendIBFT) buildBlock(parent *types.Header) (*types.Block, error) {
 		return nil, err
 	}
 
-	_, root := transition.Commit()
+	_, _, root := transition.Commit()
 	header.StateRoot = root
 	header.GasUsed = transition.TotalGas()
 

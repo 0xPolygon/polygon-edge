@@ -94,6 +94,7 @@ type Trie struct {
 	root    Node
 	epoch   uint32
 	storage Storage
+	tracer  Tracer
 }
 
 func NewTrie() *Trie {
@@ -102,6 +103,8 @@ func NewTrie() *Trie {
 
 func (t *Trie) Get(k []byte) ([]byte, bool) {
 	txn := t.Txn()
+	txn.tracer = t.tracer
+
 	res := txn.Lookup(k)
 
 	return res, res != nil
@@ -251,7 +254,7 @@ type Txn struct {
 	epoch   uint32
 	storage Storage
 	batch   Putter
-	trace   Tracer
+	tracer  Tracer
 }
 
 func (t *Txn) Commit() *Trie {
@@ -265,8 +268,8 @@ func (t *Txn) Lookup(key []byte) []byte {
 }
 
 func (t *Txn) lookup(node Node, key []byte) (Node, []byte) {
-	if t.trace != nil {
-		t.trace.Trace(node)
+	if t.tracer != nil {
+		t.tracer.Trace(node)
 	}
 
 	switch n := node.(type) {
