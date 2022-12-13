@@ -626,3 +626,19 @@ func verifyProposerSeal(
 
 	return nil
 }
+
+// ValidateExtraDataFormat Verifies that extra data can be unmarshaled
+func (i *backendIBFT) ValidateExtraDataFormat(header *types.Header) error {
+	blockSigner, _, _, err := getModulesFromForkManager(
+		i.forkManager,
+		header.Number,
+	)
+
+	if err != nil {
+		return err
+	}
+
+	_, err = blockSigner.GetIBFTExtra(header)
+
+	return err
+}
