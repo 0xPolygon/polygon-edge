@@ -28,7 +28,7 @@ func newTestState(t *testing.T) *State {
 		t.Fatal(err)
 	}
 
-	state, err := newState(path.Join(dir, "my.db"), hclog.NewNullLogger())
+	state, err := newState(path.Join(dir, "my.db"), hclog.NewNullLogger(), make(chan struct{}))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -186,7 +186,7 @@ func (p *Polybft) Initialize() error {
 		return fmt.Errorf("failed to create data directory. Error: %w", err)
 	}
 
-	stt, err := newState(filepath.Join(p.dataDir, stateFileName), p.logger)
+	stt, err := newState(filepath.Join(p.dataDir, stateFileName), p.logger, p.closeCh)
 	if err != nil {
 		return fmt.Errorf("failed to create state instance. Error: %w", err)
 	}
@@ -239,7 +239,7 @@ func (p *Polybft) Start() error {
 	}
 
 	// start state DB process
-	p.state.start()
+	p.state.startStatsReleasing()
 
 	return nil
 }
@@ -380,8 +380,6 @@ func (p *Polybft) waitForNPeers() bool {
 
 // Close closes the connection
 func (p *Polybft) Close() error {
-	p.state.stop()
-
 	if p.syncer != nil {
 		if err := p.syncer.Close(); err != nil {
 			return err
