@@ -21,6 +21,8 @@ func (s *State) startStatsReleasing() {
 
 	// Initialize ticker in order to send stats once a statUpdatePeriod
 	ticker := time.NewTicker(statUpdatePeriod)
+
+	// Stop ticker (stats releasing basically) when receiving the closing signal
 	go func() {
 		<-s.close
 		ticker.Stop()
