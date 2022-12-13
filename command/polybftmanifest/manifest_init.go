@@ -37,7 +37,7 @@ var (
 func GetCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "manifest",
-		Short:   "Initializes manifest file",
+		Short:   "Initializes manifest file. It is applicable only to polybft consensus protocol.",
 		PreRunE: runPreRun,
 		Run:     runCommand,
 	}
