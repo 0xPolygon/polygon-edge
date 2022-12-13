@@ -239,7 +239,7 @@ func (p *Polybft) Start() error {
 	}
 
 	// start state DB process
-	p.state.startStatsReleasing()
+	go p.state.startStatsReleasing()
 
 	return nil
 }
