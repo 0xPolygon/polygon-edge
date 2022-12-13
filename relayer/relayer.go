@@ -75,29 +75,49 @@ func (r *Relayer) AddLog(log *ethgo.Log) {
 			panic(err)
 		}
 
-		startID := binary.LittleEndian.Uint64(vals["startId"].([]byte))
-		endID := binary.LittleEndian.Uint64(vals["endId"].([]byte))
+		var startID uint64
+		if sid, ok := vals["startId"].([]byte); ok {
+			startID = binary.LittleEndian.Uint64(sid)
+		}
+
+		var endID uint64
+		if eid, ok := vals["endId"].([]byte); ok {
+			endID = binary.LittleEndian.Uint64(eid)
+		}
 
 		fmt.Printf("Commit: Block %d StartID %d EndID %d\n", log.BlockNumber, startID, endID)
 
 		for i := startID; i < endID; i++ {
-			r.executeStateSync(strconv.Itoa(int(i)))
+			// query the state sync proof
+			stateSyncProof, err := r.queryStateSyncProof(strconv.Itoa(int(i)))
+			if err != nil {
+				r.logger.Error("Failed to query state sync proof", "err", err)
+			}
+
+			if err := r.executeStateSync(stateSyncProof); err != nil {
+				r.logger.Error("Failed to execute state sync", "err", err)
+			}
 		}
 	}
-
 }
 
-func (r *Relayer) executeStateSync(stateSyncID string) error {
+// queryStateSyncProof queries the state sync proof
+func (r *Relayer) queryStateSyncProof(stateSyncID string) (*types.StateSyncProof, error) {
 	// retrieve state sync proof
 	var stateSyncProof types.StateSyncProof
 
 	err := r.client.Call("bridge_getStateSyncProof", &stateSyncProof, stateSyncID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	r.logger.Info("state sync proof:", stateSyncProof)
+	r.logger.Debug("state sync proof:", stateSyncProof)
 
+	return &stateSyncProof, nil
+}
+
+// executeStateSync executes the state sync
+func (r *Relayer) executeStateSync(stateSyncProof *types.StateSyncProof) error {
 	input, err := types.ExecuteStateSyncABIMethod.Encode(
 		[2]interface{}{stateSyncProof.Proof, stateSyncProof.StateSync.ToMap()},
 	)
@@ -114,14 +134,7 @@ func (r *Relayer) executeStateSync(stateSyncID string) error {
 		Input:    input,
 	}
 
-	receipt, err := r.txRelayer.SendTransaction(txn, r.key)
-	if err != nil {
-		return err
-	}
+	_, err = r.txRelayer.SendTransaction(txn, r.key)
 
-	if receipt == nil {
-		return nil
-	}
-
-	return nil
+	return err
 }
