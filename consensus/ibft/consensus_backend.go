@@ -77,7 +77,6 @@ func (i *backendIBFT) InsertBlock(
 	// This is a safety net to help us narrow down and also recover before
 	// writing the block
 	if err := i.ValidateExtraDataFormat(newBlock.Header); err != nil {
-
 		//Format committed seals to make them more readable
 		committedSealsStr := make([]string, len(committedSealsMap))
 		for i, seal := range committedSeals {
