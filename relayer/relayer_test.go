@@ -23,13 +23,13 @@ func (t *txRelayerMock) Call(from ethgo.Address, to ethgo.Address, input []byte)
 func (t *txRelayerMock) SendTransaction(txn *ethgo.Transaction, key ethgo.Key) (*ethgo.Receipt, error) {
 	args := t.Called(txn, key)
 
-	return args.Get(0).(*ethgo.Receipt), args.Error(1) //nolint:forcetypeassert
+	return nil, args.Error(1)
 }
 
 func (t *txRelayerMock) SendTransactionLocal(txn *ethgo.Transaction) (*ethgo.Receipt, error) {
 	args := t.Called(txn)
 
-	return args.Get(0).(*ethgo.Receipt), args.Error(1) //nolint:forcetypeassert
+	return nil, args.Error(1)
 }
 
 func Test_executeStateSync(t *testing.T) {
