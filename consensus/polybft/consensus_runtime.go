@@ -11,7 +11,6 @@ import (
 
 	"github.com/0xPolygon/go-ibft/messages"
 	"github.com/0xPolygon/go-ibft/messages/proto"
-	"github.com/armon/go-metrics"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
@@ -184,9 +183,6 @@ func (c *consensusRuntime) AddLog(eventLog *ethgo.Log) {
 
 		return
 	}
-
-	// update total state syncs metrics
-	metrics.IncrCounter([]string{"bridge", "total_state_syncs"}, 1)
 }
 
 // OnBlockInserted is called whenever fsm or syncer inserts new block
