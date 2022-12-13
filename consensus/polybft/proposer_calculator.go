@@ -239,17 +239,18 @@ func (pc *proposerCalculator) incrementProposerPriorityNTimes(
 		return nil, fmt.Errorf("cannot call IncrementProposerPriority with non-positive times")
 	}
 
-	if err := pc.updateWithChangeSet(snapshot); err != nil {
-		return nil, err
-	}
-
 	var (
 		proposer *ProposerValidator
 		err      error
+		tvp      = snapshot.GetTotalVotingPower()
 	)
 
+	if err := pc.updateWithChangeSet(snapshot, tvp); err != nil {
+		return nil, err
+	}
+
 	for i := uint64(0); i < times; i++ {
-		if proposer, err = pc.incrementProposerPriority(snapshot); err != nil {
+		if proposer, err = pc.incrementProposerPriority(snapshot, tvp); err != nil {
 			return nil, fmt.Errorf("cannot increment proposer priority: %w", err)
 		}
 	}
@@ -295,7 +296,7 @@ func (pc *proposerCalculator) updateValidators(snapshot *ProposerSnapshot, newVa
 }
 
 func (pc *proposerCalculator) incrementProposerPriority(
-	snapshot *ProposerSnapshot) (*ProposerValidator, error) {
+	snapshot *ProposerSnapshot, totalVotingPower int64) (*ProposerValidator, error) {
 	for _, val := range snapshot.Validators {
 		// Check for overflow for sum.
 		newPrio := safeAddClip(val.ProposerPriority, int64(val.Metadata.VotingPower))
@@ -307,13 +308,13 @@ func (pc *proposerCalculator) incrementProposerPriority(
 		return nil, fmt.Errorf("cannot get validator with most priority: %w", err)
 	}
 
-	mostest.ProposerPriority = safeSubClip(mostest.ProposerPriority, snapshot.GetTotalVotingPower())
+	mostest.ProposerPriority = safeSubClip(mostest.ProposerPriority, totalVotingPower)
 
 	return mostest, nil
 }
 
-func (pc *proposerCalculator) updateWithChangeSet(snapshot *ProposerSnapshot) error {
-	if err := pc.rescalePriorities(snapshot); err != nil {
+func (pc *proposerCalculator) updateWithChangeSet(snapshot *ProposerSnapshot, totalVotingPower int64) error {
+	if err := pc.rescalePriorities(snapshot, totalVotingPower); err != nil {
 		return fmt.Errorf("cannot rescale priorities: %w", err)
 	}
 
@@ -376,7 +377,7 @@ func (pc *proposerCalculator) computeAvgProposerPriority(snapshot *ProposerSnaps
 
 // rescalePriorities rescales the priorities such that the distance between the
 // maximum and minimum is smaller than `diffMax`.
-func (pc *proposerCalculator) rescalePriorities(snapshot *ProposerSnapshot) error {
+func (pc *proposerCalculator) rescalePriorities(snapshot *ProposerSnapshot, totalVotingPower int64) error {
 	if len(snapshot.Validators) == 0 {
 		return fmt.Errorf("validator set cannot be nul or empty")
 	}
@@ -384,7 +385,7 @@ func (pc *proposerCalculator) rescalePriorities(snapshot *ProposerSnapshot) erro
 	// Cap the difference between priorities to be proportional to 2*totalPower by
 	// re-normalizing priorities, i.e., rescale all priorities by multiplying with:
 	// 2*totalVotingPower/(maxPriority - minPriority)
-	diffMax := priorityWindowSizeFactor * snapshot.GetTotalVotingPower()
+	diffMax := priorityWindowSizeFactor * totalVotingPower
 
 	// Calculating ceil(diff/diffMax):
 	// Re-normalization is performed by dividing by an integer for simplicity.
