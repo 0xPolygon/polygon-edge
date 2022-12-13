@@ -257,6 +257,7 @@ var (
 type State struct {
 	db     *bolt.DB
 	logger hclog.Logger
+	close  chan struct{}
 }
 
 func newState(path string, logger hclog.Logger) (*State, error) {
@@ -265,14 +266,14 @@ func newState(path string, logger hclog.Logger) (*State, error) {
 		return nil, err
 	}
 
-	err = initMainDBBuckets(db)
-	if err != nil {
+	if err = initMainDBBuckets(db); err != nil {
 		return nil, err
 	}
 
 	state := &State{
 		db:     db,
 		logger: logger.Named("state"),
+		close:  make(chan struct{}),
 	}
 
 	return state, nil
@@ -292,6 +293,16 @@ func initMainDBBuckets(db *bolt.DB) error {
 	})
 
 	return err
+}
+
+// start background processes of the state DB
+func (s *State) start() {
+	go s.startStatsReleasing()
+}
+
+// stop background processes of the state DB
+func (s *State) stop() {
+	close(s.close)
 }
 
 // insertValidatorSnapshot inserts a validator snapshot for the given epoch to its bucket in db
