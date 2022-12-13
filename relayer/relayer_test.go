@@ -81,7 +81,7 @@ func Test_sanitizeRPCEndpoint(t *testing.T) {
 			"http://localhost:10001",
 		},
 		{
-			"url wihout port",
+			"url without port",
 			"http://127.0.0.1",
 			"http://127.0.0.1",
 		},
