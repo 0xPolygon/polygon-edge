@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"sort"
 
+	"github.com/0xPolygon/polygon-edge/chain"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo"
@@ -100,7 +101,7 @@ func (s *SystemStateImpl) GetValidatorSet() (AccountSet, error) {
 		val := &ValidatorMetadata{
 			Address:     types.Address(addr),
 			BlsKey:      pubKey,
-			VotingPower: totalStake.Uint64(),
+			VotingPower: chain.ConvertWeiToTokensAmount(totalStake).Uint64(),
 		}
 
 		return val, nil
