@@ -212,9 +212,20 @@ func (p *Polybft) Initialize() error {
 	}
 
 	// create relayer
+	var addr string
+
+	if p.consensusConfig.IsBridgeEnabled() {
+		var ok bool
+		addr, ok = p.config.Config.Config["jsonRPCAddress"].(string)
+
+		if !ok {
+			return fmt.Errorf("jsonRPCAddress is not set")
+		}
+	}
+
 	p.relayer = relayer.NewRelayer(
 		p.dataDir,
-		"",
+		addr,
 		ethgo.Address(p.consensusConfig.StateReceiverAddr),
 		p.logger.Named("relayer"),
 		p.key,

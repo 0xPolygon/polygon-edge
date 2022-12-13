@@ -406,6 +406,8 @@ func (s *Server) setupConsensus() error {
 		engineConfig = map[string]interface{}{}
 	}
 
+	engineConfig["jsonRPCAddress"] = s.config.JSONRPC.JSONRPCAddr.String()
+
 	config := &consensus.Config{
 		Params: s.config.Chain.Params,
 		Config: engineConfig,

@@ -3,7 +3,9 @@ package relayer
 import (
 	"fmt"
 	"math/big"
+	"net"
 	"strconv"
+	"strings"
 
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
@@ -26,6 +28,19 @@ type Relayer struct {
 	key               ethgo.Key
 }
 
+func sanitizeRPCEndpoint(rpcEndpoint string) string {
+	if rpcEndpoint == "" || strings.Contains(rpcEndpoint, "0.0.0.0") {
+		_, port, err := net.SplitHostPort(rpcEndpoint)
+		if err == nil {
+			rpcEndpoint = fmt.Sprintf("http://%s:%s", "localhost", port)
+		} else {
+			rpcEndpoint = "http://localhost:8545"
+		}
+	}
+
+	return rpcEndpoint
+}
+
 func NewRelayer(
 	dataDir string,
 	rpcEndpoint string,
@@ -33,8 +48,10 @@ func NewRelayer(
 	logger hcf.Logger,
 	key ethgo.Key,
 ) *Relayer {
+	endpoint := sanitizeRPCEndpoint(rpcEndpoint)
+
 	// create the JSON RPC client
-	client, err := jsonrpc.NewClient(rpcEndpoint)
+	client, err := jsonrpc.NewClient(endpoint)
 	if err != nil {
 		logger.Error("Failed to create the JSON RPC client", "err", err)
 
@@ -85,7 +102,7 @@ func (r *Relayer) AddLog(log *ethgo.Log) {
 			endID = eid.Uint64()
 		}
 
-		fmt.Printf("Commit: Block %d StartID %d EndID %d\n", log.BlockNumber, startID, endID)
+		r.logger.Info("Commit: Block %d StartID %d EndID %d\n", log.BlockNumber, startID, endID)
 
 		for i := startID; i < endID; i++ {
 			// query the state sync proof
