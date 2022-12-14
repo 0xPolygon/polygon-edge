@@ -208,7 +208,7 @@ func (c *checkpointManager) encodeAndSendCheckpoint(txn *ethgo.Transaction,
 }
 
 // abiEncodeCheckpointBlock encodes checkpoint data into ABI format for a given header
-func (c *checkpointManager) abiEncodeCheckpointBlock(headerNumber uint64, headerHash types.Hash, extra Extra,
+func (c *checkpointManager) abiEncodeCheckpointBlock(blockNumber uint64, blockHash types.Hash, extra Extra,
 	nextValidators AccountSet) ([]byte, error) {
 	aggs, err := bls.UnmarshalSignature(extra.Committed.AggregatedSignature)
 	if err != nil {
@@ -223,13 +223,13 @@ func (c *checkpointManager) abiEncodeCheckpointBlock(headerNumber uint64, header
 	params := map[string]interface{}{
 		"chainId": new(big.Int).SetUint64(c.blockchain.GetChainID()),
 		"checkpointMetadata": map[string]interface{}{
-			"blockHash":               headerHash,
+			"blockHash":               blockHash,
 			"blockRound":              new(big.Int).SetUint64(extra.Checkpoint.BlockRound),
 			"currentValidatorSetHash": extra.Checkpoint.CurrentValidatorsHash,
 		},
 		"checkpoint": map[string]interface{}{
 			"epochNumber": new(big.Int).SetUint64(extra.Checkpoint.EpochNumber),
-			"blockNumber": new(big.Int).SetUint64(headerNumber),
+			"blockNumber": new(big.Int).SetUint64(blockNumber),
 			"eventRoot":   extra.Checkpoint.EventRoot,
 		},
 		"signature":       encodedAggSigs,

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/umbracle/ethgo"
 
 	"github.com/0xPolygon/polygon-edge/types"
 	dockertypes "github.com/docker/docker/api/types"
@@ -19,6 +20,8 @@ var (
 	BLSAddress = types.StringToAddress("0x72E1C51FE6dABF2e3d5701170cf5aD3620E6B8ba")
 	// BN256G2Address is an address of BN256G2Address.sol smart contract
 	BN256G2Address = types.StringToAddress("0x436604426F31A05f905C64edc973E575BdB46471")
+	// ExitHelperAddress is an address of ExitHelper.sol smart contract
+	ExitHelperAddress = ethgo.Address(types.StringToAddress("0x947a581B2713F58A8145201DA41BCb6aAE90196B"))
 
 	ErrRootchainNotFound = errors.New("rootchain not found")
 	ErrRootchainPortBind = errors.New("port 8545 is not bind with localhost")

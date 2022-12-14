@@ -1,4 +1,4 @@
-package polybft
+package contractsapi
 
 import (
 	"encoding/json"

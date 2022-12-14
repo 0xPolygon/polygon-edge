@@ -502,5 +502,6 @@ func (p *Polybft) PreCommitState(_ *types.Header, _ *state.Transition) error {
 
 // GetBridgeProvider returns an instance of BridgeDataProvider
 func (p *Polybft) GetBridgeProvider() consensus.BridgeDataProvider {
+	fmt.Println("GetBridgeProvider", p.runtime == nil)
 	return p.runtime
 }

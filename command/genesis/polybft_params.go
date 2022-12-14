@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"math/big"
 	"path"
 	"sort"
@@ -252,12 +253,18 @@ func (p *genesisParams) deployContracts() (map[types.Address]*chain.GenesisAccou
 			relativePath: "common/Merkle.sol",
 			address:      contracts.MerkleContract,
 		},
+		{
+			// Merkle contract
+			name:         "L2StateSender",
+			relativePath: "child/L2StateSender.sol",
+			address:      contracts.L2StateSenderContract,
+		},
 	}
 
 	allocations := make(map[types.Address]*chain.GenesisAccount, len(genesisContracts))
 
 	for _, contract := range genesisContracts {
-		artifact, err := polybft.ReadArtifact(p.smartContractsRootPath, contract.relativePath, contract.name)
+		artifact, err := contractsapi.ReadArtifact(p.smartContractsRootPath, contract.relativePath, contract.name)
 		if err != nil {
 			return nil, err
 		}
