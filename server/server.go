@@ -15,12 +15,15 @@ import (
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
+	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	configHelper "github.com/0xPolygon/polygon-edge/helper/config"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/jsonrpc"
 	"github.com/0xPolygon/polygon-edge/network"
+	"github.com/0xPolygon/polygon-edge/relayer"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/server/proto"
 	"github.com/0xPolygon/polygon-edge/state"
@@ -32,6 +35,7 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/umbracle/ethgo"
 	"google.golang.org/grpc"
 )
 
@@ -283,6 +287,13 @@ func NewServer(config *Config) (*Server, error) {
 		return nil, err
 	}
 
+	// start relayer
+	if config.Relayer {
+		if err := m.setupRelayer(); err != nil {
+			return nil, err
+		}
+	}
+
 	m.txpool.Start()
 
 	return m, nil
@@ -433,6 +444,29 @@ func (s *Server) setupConsensus() error {
 	}
 
 	s.consensus = consensus
+
+	return nil
+}
+
+// setupRelayer sets up the relayer
+func (s *Server) setupRelayer() error {
+	account, err := wallet.NewAccountFromSecret(s.secretsManager)
+	if err != nil {
+		return fmt.Errorf("failed to create account from secret: %w", err)
+	}
+
+	relayer := relayer.NewRelayer(
+		s.config.DataDir,
+		s.config.JSONRPC.JSONRPCAddr.String(),
+		ethgo.Address(contracts.StateReceiverContract),
+		s.logger.Named("relayer"),
+		wallet.NewKey(account),
+	)
+
+	// start relayer
+	if err := relayer.Start(); err != nil {
+		return fmt.Errorf("failed to start relayer: %w", err)
+	}
 
 	return nil
 }
