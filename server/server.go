@@ -406,8 +406,6 @@ func (s *Server) setupConsensus() error {
 		engineConfig = map[string]interface{}{}
 	}
 
-	engineConfig["jsonRPCAddress"] = s.config.JSONRPC.JSONRPCAddr.String()
-
 	config := &consensus.Config{
 		Params: s.config.Chain.Params,
 		Config: engineConfig,
@@ -423,6 +421,7 @@ func (s *Server) setupConsensus() error {
 			Blockchain:     s.blockchain,
 			Executor:       s.executor,
 			Grpc:           s.grpcServer,
+			JSONRPCAddr:    s.config.JSONRPC.JSONRPCAddr,
 			Logger:         s.logger,
 			SecretsManager: s.secretsManager,
 			BlockTime:      s.config.BlockTime,

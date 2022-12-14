@@ -3,6 +3,7 @@ package consensus
 import (
 	"context"
 	"log"
+	"net"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/chain"
@@ -70,6 +71,7 @@ type Params struct {
 	Blockchain     *blockchain.Blockchain
 	Executor       *state.Executor
 	Grpc           *grpc.Server
+	JSONRPCAddr    *net.TCPAddr
 	Logger         hclog.Logger
 	SecretsManager secrets.SecretsManager
 	BlockTime      uint64
