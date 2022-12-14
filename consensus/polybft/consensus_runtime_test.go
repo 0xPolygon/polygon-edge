@@ -494,8 +494,7 @@ func TestConsensusRuntime_OnBlockInserted_MiddleOfEpoch(t *testing.T) {
 			txPool:        txPool,
 			proposerCalc:  NewProposerCalculator(hclog.NewNullLogger()),
 		},
-		epoch:  &epochMetadata{Number: getEpochNumber(header.Number, epochSize)},
-		logger: hclog.NewNullLogger(),
+		epoch: &epochMetadata{Number: getEpochNumber(header.Number, epochSize)},
 	}
 	runtime.OnBlockInserted(builtBlock)
 
@@ -2111,7 +2110,7 @@ func TestConsensusRuntime_HasQuorum(t *testing.T) {
 	messages[len(messages)-1].Type = proto.MessageType_PREPREPARE
 	assert.True(t, runtime.HasQuorum(lastBuildBlock.Number+1, messages, proto.MessageType_PREPARE))
 
-	//proto.MessageType_ROUND_CHANGE, proto.MessageType_COMMIT
+	// proto.MessageType_ROUND_CHANGE, proto.MessageType_COMMIT
 	for _, msgType := range []proto.MessageType{proto.MessageType_ROUND_CHANGE, proto.MessageType_COMMIT} {
 		messages = make([]*proto.Message, 0, len(validatorAccounts.validators))
 
