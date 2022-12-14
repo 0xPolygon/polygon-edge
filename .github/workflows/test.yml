@@ -24,7 +24,8 @@ jobs:
 
       - name: Install Dependencies
         run: ./setup-ci.sh
-
+      - name: Compile core contracts
+        run: make compile-core-contracts
       - name: Run Go Test
         run: go test -coverprofile coverage.out -timeout 20m `go list ./... | grep -v e2e`
 

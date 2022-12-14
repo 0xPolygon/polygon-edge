@@ -248,7 +248,7 @@ func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
 			break
 		}
 
-		if fail > 100 {
+		if fail > 300 {
 			t.Fatal("epoch havent achieved")
 		}
 		fail++
