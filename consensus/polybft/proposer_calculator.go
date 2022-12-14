@@ -254,7 +254,7 @@ func (pc *proposerCalculator) incrementProposerPriorityNTimes(
 		tvp      = snapshot.GetTotalVotingPower()
 	)
 
-	if err := pc.updateWithChangeSet(snapshot, tvp); err != nil {
+	if err := pc.updateWithChangeSet(snapshot); err != nil {
 		return nil, err
 	}
 
@@ -323,7 +323,7 @@ func (pc *proposerCalculator) updateValidators(snapshot *ProposerSnapshot, newVa
 	snapshot.Validators = newValidators
 
 	// after validator set center values around 0 and scale
-	if err := pc.updateWithChangeSet(snapshot, snapshot.GetTotalVotingPower()); err != nil {
+	if err := pc.updateWithChangeSet(snapshot); err != nil {
 		return fmt.Errorf("cannot update validator changeset: %w", err)
 	}
 
@@ -348,8 +348,8 @@ func (pc *proposerCalculator) incrementProposerPriority(
 	return mostest, nil
 }
 
-func (pc *proposerCalculator) updateWithChangeSet(snapshot *ProposerSnapshot, totalVotingPower int64) error {
-	if err := pc.rescalePriorities(snapshot, totalVotingPower); err != nil {
+func (pc *proposerCalculator) updateWithChangeSet(snapshot *ProposerSnapshot) error {
+	if err := pc.rescalePriorities(snapshot); err != nil {
 		return fmt.Errorf("cannot rescale priorities: %w", err)
 	}
 
@@ -412,7 +412,7 @@ func (pc *proposerCalculator) computeAvgProposerPriority(snapshot *ProposerSnaps
 
 // rescalePriorities rescales the priorities such that the distance between the
 // maximum and minimum is smaller than `diffMax`.
-func (pc *proposerCalculator) rescalePriorities(snapshot *ProposerSnapshot, totalVotingPower int64) error {
+func (pc *proposerCalculator) rescalePriorities(snapshot *ProposerSnapshot) error {
 	if len(snapshot.Validators) == 0 {
 		return fmt.Errorf("validator set cannot be nul or empty")
 	}
@@ -420,7 +420,7 @@ func (pc *proposerCalculator) rescalePriorities(snapshot *ProposerSnapshot, tota
 	// Cap the difference between priorities to be proportional to 2*totalPower by
 	// re-normalizing priorities, i.e., rescale all priorities by multiplying with:
 	// 2*totalVotingPower/(maxPriority - minPriority)
-	diffMax := priorityWindowSizeFactor * totalVotingPower
+	diffMax := priorityWindowSizeFactor * snapshot.GetTotalVotingPower()
 
 	// Calculating ceil(diff/diffMax):
 	// Re-normalization is performed by dividing by an integer for simplicity.
