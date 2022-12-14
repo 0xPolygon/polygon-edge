@@ -19,10 +19,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/rootchain"
 	"github.com/0xPolygon/polygon-edge/command/secrets"
 	"github.com/0xPolygon/polygon-edge/command/server"
-	"github.com/0xPolygon/polygon-edge/command/sidechain/staking"
-	"github.com/0xPolygon/polygon-edge/command/sidechain/unstaking"
-	"github.com/0xPolygon/polygon-edge/command/sidechain/validators"
-	"github.com/0xPolygon/polygon-edge/command/sidechain/withdraw"
 	"github.com/0xPolygon/polygon-edge/command/status"
 	"github.com/0xPolygon/polygon-edge/command/txpool"
 	"github.com/0xPolygon/polygon-edge/command/version"
@@ -65,10 +61,6 @@ func (rc *RootCommand) registerSubCommands() {
 		license.GetCommand(),
 		polybftsecrets.GetCommand(),
 		e2e.GetCommand(),
-		validators.GetCommand(),
-		staking.GetCommand(),
-		unstaking.GetCommand(),
-		withdraw.GetCommand(),
 	)
 }
 
