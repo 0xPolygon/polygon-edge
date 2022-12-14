@@ -9,6 +9,7 @@ import (
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/armon/go-metrics"
 	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
@@ -202,6 +203,8 @@ func (c *checkpointManager) encodeAndSendCheckpoint(txn *ethgo.Transaction,
 		return fmt.Errorf("checkpoint submission transaction failed for block %d", header.Number)
 	}
 
+	// update checkpoint block number metrics
+	metrics.SetGauge([]string{"bridge", "checkpoint_block_number"}, float32(header.Number))
 	c.logger.Debug("send checkpoint txn success", "block number", header.Number)
 
 	return nil

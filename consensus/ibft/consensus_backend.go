@@ -10,6 +10,7 @@ import (
 	protoIBFT "github.com/0xPolygon/go-ibft/messages/proto"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
+	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -57,10 +58,39 @@ func (i *backendIBFT) InsertBlock(
 		committedSealsMap[types.BytesToAddress(cm.Signer)] = cm.Signature
 	}
 
+	// Copy extra data for debugging purposes
+	extraDataOriginal := newBlock.Header.ExtraData
+	extraDataBackup := make([]byte, len(extraDataOriginal))
+	copy(extraDataBackup, extraDataOriginal)
+
 	// Push the committed seals to the header
 	header, err := i.currentSigner.WriteCommittedSeals(newBlock.Header, committedSealsMap)
 	if err != nil {
 		i.logger.Error("cannot write committed seals", "err", err)
+
+		return
+	}
+
+	// WriteCommittedSeals alters the extra data before writing the block
+	// It doesn't handle errors while pushing changes which can result in
+	// corrupted extra data.
+	// We don't know exact circumstance of the unmarshalRLP error
+	// This is a safety net to help us narrow down and also recover before
+	// writing the block
+	if err := i.ValidateExtraDataFormat(newBlock.Header); err != nil {
+		//Format committed seals to make them more readable
+		committedSealsStr := make([]string, len(committedSealsMap))
+		for i, seal := range committedSeals {
+			committedSealsStr[i] = fmt.Sprintf("{signer=%v signature=%v}",
+				hex.EncodeToHex(seal.Signer),
+				hex.EncodeToHex(seal.Signature))
+		}
+
+		i.logger.Error("cannot write block: corrupted extra data",
+			"err", err,
+			"before", hex.EncodeToHex(extraDataBackup),
+			"after", hex.EncodeToHex(header.ExtraData),
+			"committedSeals", committedSealsStr)
 
 		return
 	}
