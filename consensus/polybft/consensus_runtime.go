@@ -145,7 +145,7 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 	}
 
 	// we need to call restart epoch on runtime to initialize epoch state
-	runtime.epoch, err = runtime.restartEpoch(runtime.lastBuiltBlock, nil)
+	runtime.epoch, err = runtime.restartEpoch(runtime.lastBuiltBlock)
 	if err != nil {
 		return nil, fmt.Errorf("consensus runtime creation - restart epoch failed: %w", err)
 	}
@@ -235,7 +235,7 @@ func (c *consensusRuntime) OnBlockInserted(block *types.Block) {
 	c.config.txPool.ResetWithHeaders(block.Header)
 
 	// handle commitment and bundles creation
-	if err := c.createCommitmentAndBundles(block.Transactions, c.lastBuiltBlock, c.epoch); err != nil {
+	if err := c.createCommitmentAndBundles(block.Transactions); err != nil {
 		c.logger.Error("on block inserted error", "err", err)
 	}
 
@@ -246,7 +246,7 @@ func (c *consensusRuntime) OnBlockInserted(block *types.Block) {
 	)
 
 	if c.isEndOfEpoch(block.Header.Number) {
-		if epoch, err = c.restartEpoch(block.Header, epoch); err != nil {
+		if epoch, err = c.restartEpoch(block.Header); err != nil {
 			c.logger.Error("failed to restart epoch after block inserted", "error", err)
 
 			return
@@ -265,8 +265,9 @@ func (c *consensusRuntime) OnBlockInserted(block *types.Block) {
 	c.proposerSnapshot = proposerSnapshot
 }
 
-func (c *consensusRuntime) createCommitmentAndBundles(
-	txs []*types.Transaction, parentBlock *types.Header, epoch *epochMetadata) error {
+func (c *consensusRuntime) createCommitmentAndBundles(txs []*types.Transaction) error {
+	parentBlock, epoch := c.lastBuiltBlock, c.epoch
+
 	if !c.IsBridgeEnabled() {
 		return nil
 	}
@@ -441,7 +442,9 @@ func (c *consensusRuntime) FSM() error {
 
 // restartEpoch resets the previously run epoch and moves to the next one
 // returns *epochMetadata different from nil if the lastEpoch is not the current one and everything was successful
-func (c *consensusRuntime) restartEpoch(header *types.Header, lastEpoch *epochMetadata) (*epochMetadata, error) {
+func (c *consensusRuntime) restartEpoch(header *types.Header) (*epochMetadata, error) {
+	lastEpoch := c.epoch
+
 	systemState, err := c.getSystemState(header)
 	if err != nil {
 		return nil, err
@@ -496,11 +499,9 @@ func (c *consensusRuntime) restartEpoch(header *types.Header, lastEpoch *epochMe
 	)
 
 	return &epochMetadata{
-		Number:         epochNumber,
-		LastCheckpoint: 0,
-		Blocks:         []*types.Block{},
-		Validators:     validatorSet,
-		Commitment:     commitment,
+		Number:     epochNumber,
+		Validators: validatorSet,
+		Commitment: commitment,
 	}, nil
 }
 

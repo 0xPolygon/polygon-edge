@@ -1147,7 +1147,7 @@ func TestConsensusRuntime_restartEpoch_SameEpochNumberAsTheLastOne(t *testing.T)
 		},
 	}
 
-	epoch, err := runtime.restartEpoch(newCurrentHeader, runtime.epoch)
+	epoch, err := runtime.restartEpoch(newCurrentHeader)
 
 	require.NoError(t, err)
 
@@ -1189,7 +1189,7 @@ func TestConsensusRuntime_restartEpoch_FirstRestart_NoStateSyncEvents(t *testing
 		},
 	}
 
-	epoch, err := runtime.restartEpoch(newCurrentHeader, nil)
+	epoch, err := runtime.restartEpoch(newCurrentHeader)
 
 	require.NoError(t, err)
 	require.Equal(t, uint64(1), epoch.Number)
@@ -1259,7 +1259,7 @@ func TestConsensusRuntime_restartEpoch_FirstRestart_BuildsCommitment(t *testing.
 		},
 	}
 
-	epochData, err := runtime.restartEpoch(header, nil)
+	epochData, err := runtime.restartEpoch(header)
 
 	require.NoError(t, err)
 	require.Equal(t, epoch, epochData.Number)
@@ -1389,7 +1389,7 @@ func TestConsensusRuntime_restartEpoch_NewEpochToRun_BuildCommitment(t *testing.
 		lastBuiltBlock: header,
 	}
 
-	epoch, err := runtime.restartEpoch(header, nil)
+	epoch, err := runtime.restartEpoch(header)
 
 	require.NoError(t, err)
 
