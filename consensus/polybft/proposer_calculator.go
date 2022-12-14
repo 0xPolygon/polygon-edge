@@ -322,7 +322,7 @@ func (pc *proposerCalculator) updateValidators(snapshot *ProposerSnapshot, newVa
 
 	snapshot.Validators = newValidators
 
-	// after validator set center values around 0 and scale
+	// after validator set changes, center values around 0 and scale
 	if err := pc.updateWithChangeSet(snapshot); err != nil {
 		return fmt.Errorf("cannot update validator changeset: %w", err)
 	}
