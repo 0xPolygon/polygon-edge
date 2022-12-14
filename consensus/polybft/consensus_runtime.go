@@ -140,7 +140,14 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 		state:            config.State,
 		config:           config,
 		proposerSnapshot: proposerSnapshot,
+		lastBuiltBlock:   config.blockchain.CurrentHeader(),
 		logger:           log.Named("consensus_runtime"),
+	}
+
+	// we need to call restart epoch on runtime to initialize epoch state
+	runtime.epoch, err = runtime.restartEpoch(runtime.lastBuiltBlock, nil)
+	if err != nil {
+		return nil, fmt.Errorf("consensus runtime creation - restart epoch failed: %w", err)
 	}
 
 	if runtime.IsBridgeEnabled() {
@@ -232,21 +239,28 @@ func (c *consensusRuntime) OnBlockInserted(block *types.Block) {
 		c.logger.Error("on block inserted error", "err", err)
 	}
 
-	if c.isEndOfEpoch(block.Header.Number) {
-		// reset the epoch. Internally it updates the parent block header.
-		if err := c.restartEpoch(block.Header); err != nil {
-			c.logger.Error("failed to restart epoch after block inserted", "error", err)
-		}
-	} else {
-		c.lastBuiltBlock = block.Header
+	var (
+		proposerSnapshot = c.proposerSnapshot.Copy()
+		epoch            = c.epoch
+		err              error
+	)
 
-		proposerSnapshot := c.proposerSnapshot.Copy()
-		if err := c.updateProposerSnapshot(proposerSnapshot, block.Number()); err != nil {
-			c.logger.Warn("Could not update proposer snapshot", "err", err)
-		}
+	if epoch, err = c.restartEpoch(block.Header, epoch); err != nil {
+		c.logger.Error("failed to restart epoch after block inserted", "error", err)
 
-		c.proposerSnapshot = proposerSnapshot
+		return
 	}
+
+	if err := c.updateProposerSnapshot(proposerSnapshot, block.Number()); err != nil {
+		c.logger.Warn("Could not update proposer calculator", "err", err)
+
+		return
+	}
+
+	// finally update runtime state (lastBuiltBlock, epoch, proposerSnapshot)
+	c.epoch = epoch
+	c.lastBuiltBlock = block.Header
+	c.proposerSnapshot = proposerSnapshot
 }
 
 func (c *consensusRuntime) createCommitmentAndBundles(
@@ -424,70 +438,53 @@ func (c *consensusRuntime) FSM() error {
 }
 
 // restartEpoch resets the previously run epoch and moves to the next one
-func (c *consensusRuntime) restartEpoch(header *types.Header) error {
+// returns *epochMetadata different from nil if the lastEpoch is not the current one and everything was successful
+func (c *consensusRuntime) restartEpoch(header *types.Header, lastEpoch *epochMetadata) (*epochMetadata, error) {
 	systemState, err := c.getSystemState(header)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	epochNumber, err := systemState.GetEpoch()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	lastEpoch := c.epoch
 	if lastEpoch != nil {
-		// Epoch might be already in memory, if its the same number do nothing.
+		// Epoch might be already in memory, if its the same number do nothing -> just return provided last one
 		// Otherwise, reset the epoch metadata and restart the async services
 		if lastEpoch.Number == epochNumber {
-			return nil
+			return lastEpoch, nil
 		}
 	}
 
 	validatorSet, err := c.config.polybftBackend.GetValidators(header.Number, nil)
 	if err != nil {
-		return err
-	}
-
-	epoch := &epochMetadata{
-		Number:         epochNumber,
-		LastCheckpoint: 0,
-		Blocks:         []*types.Block{},
-		Validators:     validatorSet,
+		return nil, err
 	}
 
 	if err := c.state.cleanEpochsFromDB(); err != nil {
 		c.logger.Error("Could not clean previous epochs from db.", "error", err)
 	}
 
-	if err := c.state.insertEpoch(epoch.Number); err != nil {
-		return fmt.Errorf("an error occurred while inserting new epoch in db. Reason: %w", err)
+	if err := c.state.insertEpoch(epochNumber); err != nil {
+		return nil, fmt.Errorf("an error occurred while inserting new epoch in db. Reason: %w", err)
 	}
+
+	var commitment *Commitment = nil
 
 	// create commitment for state sync events
 	if c.IsBridgeEnabled() {
 		nextCommittedIndex, err := systemState.GetNextCommittedIndex()
 		if err != nil {
-			return err
+			return nil, err
 		}
 
-		commitment, err := c.buildCommitment(epochNumber, nextCommittedIndex)
+		commitment, err = c.buildCommitment(epochNumber, nextCommittedIndex)
 		if err != nil {
-			return err
+			return nil, err
 		}
-
-		epoch.Commitment = commitment
 	}
-
-	c.epoch = epoch
-	c.lastBuiltBlock = header
-
-	proposerSnapshot := c.proposerSnapshot.Copy()
-	if err := c.updateProposerSnapshot(proposerSnapshot, header.Number); err != nil {
-		c.logger.Warn("Could not update proposer calculator", "err", err)
-	}
-
-	c.proposerSnapshot = proposerSnapshot
 
 	c.logger.Info(
 		"restartEpoch",
@@ -496,7 +493,13 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) error {
 		"validators", validatorSet.Len(),
 	)
 
-	return nil
+	return &epochMetadata{
+		Number:         epochNumber,
+		LastCheckpoint: 0,
+		Blocks:         []*types.Block{},
+		Validators:     validatorSet,
+		Commitment:     commitment,
+	}, nil
 }
 
 // buildCommitment builds a commitment message (if it is not already built in previous epoch)
