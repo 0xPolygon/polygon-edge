@@ -29,10 +29,6 @@ const (
 )
 
 var (
-	// state sync metrics
-	// TODO: Nemanja - accommodate bridge metrics to Edge
-	// totalStateSyncsMeter = metrics.NewRegisteredMeter("consensus/bridge/stateSyncsTotal", nil)
-
 	// errNotAValidator represents "node is not a validator" error message
 	errNotAValidator = errors.New("node is not a validator")
 	// errQuorumNotReached represents "quorum not reached for commitment message" error message
@@ -187,20 +183,21 @@ func (c *consensusRuntime) AddLog(eventLog *ethgo.Log) {
 
 		return
 	}
-	// TODO: Nemanja
-	// update metrics
-	// totalStateSyncsMeter.Mark(1)
-	return // TODO: Delete this when metrics is established. This is added just to trick linter.
 }
 
 // OnBlockInserted is called whenever fsm or syncer inserts new block
 func (c *consensusRuntime) OnBlockInserted(block *types.Block) {
+	parentHeader, _ := c.getLastBuiltBlockAndEpoch()
+	if err := updateBlockMetrics(block, parentHeader); err != nil {
+		c.logger.Error("failed to update block metrics", "error", err)
+	}
+
 	// after the block has been written we reset the txpool so that the old transactions are removed
 	c.config.txPool.ResetWithHeaders(block.Header)
 
 	// handle commitment and bundles creation
 	if err := c.createCommitmentAndBundles(block.Transactions); err != nil {
-		c.logger.Error("on block inserted error", "err", err)
+		c.logger.Error("failed to create commitments and bundles", "error", err)
 	}
 
 	if c.isEndOfEpoch(block.Header.Number) {
@@ -451,6 +448,8 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) error {
 		Number:     epochNumber,
 		Validators: validatorSet,
 	}
+
+	updateEpochMetrics(*epoch)
 
 	if err := c.state.cleanEpochsFromDB(); err != nil {
 		c.logger.Error("Could not clean previous epochs from db.", "error", err)
@@ -1093,18 +1092,16 @@ func (c *consensusRuntime) InsertBlock(proposal []byte, committedSeals []*messag
 	}
 
 	if c.IsBridgeEnabled() {
-		if fsm.isEndOfEpoch || c.checkpointManager.isCheckpointBlock(block.Header.Number) {
-			if bytes.Equal(c.config.Key.Address().Bytes(), block.Header.Miner) { // true if node is proposer
-				go func(header types.Header, epochNumber uint64) {
-					err := c.checkpointManager.submitCheckpoint(header, fsm.isEndOfEpoch)
-					if err != nil {
-						c.logger.Warn("failed to submit checkpoint",
-							"block", block.Header.Number,
-							"epoch number", epochNumber,
-							"error", err)
-					}
-				}(*block.Header, fsm.epochNumber)
-			}
+		if (fsm.isEndOfEpoch || c.checkpointManager.isCheckpointBlock(block.Header.Number)) &&
+			bytes.Equal(c.config.Key.Address().Bytes(), block.Header.Miner) {
+			go func(header types.Header, epochNumber uint64) {
+				if err := c.checkpointManager.submitCheckpoint(header, fsm.isEndOfEpoch); err != nil {
+					c.logger.Warn("failed to submit checkpoint",
+						"checkpoint block", block.Header.Number,
+						"epoch number", epochNumber,
+						"error", err)
+				}
+			}(*block.Header, fsm.epochNumber)
 
 			c.checkpointManager.latestCheckpointID = block.Number()
 		}

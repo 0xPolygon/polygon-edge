@@ -429,6 +429,7 @@ func TestConsensusRuntime_OnBlockInserted_EndOfEpoch(t *testing.T) {
 		epoch: &epochMetadata{
 			Number: currentEpochNumber,
 		},
+		lastBuiltBlock: builtBlock.Header,
 	}
 	runtime.OnBlockInserted(builtBlock)
 
@@ -463,6 +464,8 @@ func TestConsensusRuntime_OnBlockInserted_MiddleOfEpoch(t *testing.T) {
 			blockchain:    new(blockchainMock),
 			txPool:        txPool,
 		},
+		epoch:  &epochMetadata{Number: getEpochNumber(header.Number, epochSize)},
+		logger: hclog.NewNullLogger(),
 	}
 	runtime.OnBlockInserted(builtBlock)
 
