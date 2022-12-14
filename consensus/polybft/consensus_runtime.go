@@ -245,10 +245,12 @@ func (c *consensusRuntime) OnBlockInserted(block *types.Block) {
 		err              error
 	)
 
-	if epoch, err = c.restartEpoch(block.Header, epoch); err != nil {
-		c.logger.Error("failed to restart epoch after block inserted", "error", err)
+	if c.isEndOfEpoch(block.Header.Number) {
+		if epoch, err = c.restartEpoch(block.Header, epoch); err != nil {
+			c.logger.Error("failed to restart epoch after block inserted", "error", err)
 
-		return
+			return
+		}
 	}
 
 	if err := c.updateProposerSnapshot(proposerSnapshot, block.Number()); err != nil {
