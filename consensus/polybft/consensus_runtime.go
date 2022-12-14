@@ -214,11 +214,21 @@ func (c *consensusRuntime) AddLog(eventLog *ethgo.Log) {
 
 // OnBlockInserted is called whenever fsm or syncer inserts new block
 func (c *consensusRuntime) OnBlockInserted(block *types.Block) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	if c.lastBuiltBlock != nil && c.lastBuiltBlock.Number >= block.Number() {
+		c.logger.Debug("on block inserted already handled",
+			"current", c.lastBuiltBlock.Number, "block", block.Number())
+
+		return
+	}
+
 	// after the block has been written we reset the txpool so that the old transactions are removed
 	c.config.txPool.ResetWithHeaders(block.Header)
 
 	// handle commitment and bundles creation
-	if err := c.createCommitmentAndBundles(block.Transactions); err != nil {
+	if err := c.createCommitmentAndBundles(block.Transactions, c.lastBuiltBlock, c.epoch); err != nil {
 		c.logger.Error("on block inserted error", "err", err)
 	}
 
@@ -228,7 +238,6 @@ func (c *consensusRuntime) OnBlockInserted(block *types.Block) {
 			c.logger.Error("failed to restart epoch after block inserted", "error", err)
 		}
 	} else {
-		c.lock.Lock()
 		c.lastBuiltBlock = block.Header
 
 		proposerSnapshot := c.proposerSnapshot.Copy()
@@ -237,11 +246,11 @@ func (c *consensusRuntime) OnBlockInserted(block *types.Block) {
 		}
 
 		c.proposerSnapshot = proposerSnapshot
-		c.lock.Unlock()
 	}
 }
 
-func (c *consensusRuntime) createCommitmentAndBundles(txs []*types.Transaction) error {
+func (c *consensusRuntime) createCommitmentAndBundles(
+	txs []*types.Transaction, parentBlock *types.Header, epoch *epochMetadata) error {
 	if !c.IsBridgeEnabled() {
 		return nil
 	}
@@ -262,9 +271,7 @@ func (c *consensusRuntime) createCommitmentAndBundles(txs []*types.Transaction) 
 
 	// TODO: keep systemState.GetNextExecutionIndex() also in cr?
 	// Maybe some immutable structure `consensusMetaData`?
-	previousBlock, epoch := c.getLastBuiltBlockAndEpoch()
-
-	systemState, err := c.getSystemState(previousBlock)
+	systemState, err := c.getSystemState(parentBlock)
 	if err != nil {
 		return fmt.Errorf("build bundles, get system state error: %w", err)
 	}
@@ -428,7 +435,7 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) error {
 		return err
 	}
 
-	lastEpoch := c.getEpoch()
+	lastEpoch := c.epoch
 	if lastEpoch != nil {
 		// Epoch might be already in memory, if its the same number do nothing.
 		// Otherwise, reset the epoch metadata and restart the async services
@@ -472,7 +479,6 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) error {
 		epoch.Commitment = commitment
 	}
 
-	c.lock.Lock()
 	c.epoch = epoch
 	c.lastBuiltBlock = header
 
@@ -482,7 +488,6 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) error {
 	}
 
 	c.proposerSnapshot = proposerSnapshot
-	c.lock.Unlock()
 
 	c.logger.Info(
 		"restartEpoch",

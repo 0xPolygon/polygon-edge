@@ -1614,6 +1614,7 @@ func TestConsensusRuntime_FSM_EndOfEpoch_OnBlockInserted(t *testing.T) {
 	lastBuiltBlock, headerMap := createTestBlocksForUptime(t, numOfBlock, validators)
 
 	systemStateMock := new(systemStateMock)
+	systemStateMock.On("GetEpoch").Return(epoch)
 	systemStateMock.On("GetNextCommittedIndex").Return(beginStateSyncIndex, nil)
 	systemStateMock.On("GetNextExecutionIndex").Return(beginStateSyncIndex, nil)
 
@@ -1701,7 +1702,7 @@ func TestConsensusRuntime_FSM_EndOfEpoch_OnBlockInserted(t *testing.T) {
 	tx := createStateTransactionWithData(fsm.config.StateReceiverAddr, inputData)
 
 	block := consensus.BuildBlock(consensus.BuildBlockParams{
-		Header: &types.Header{Number: 1},
+		Header: &types.Header{Number: lastBuiltBlock.Number + 1},
 		Txns: []*types.Transaction{
 			tx,
 		},
