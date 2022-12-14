@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
 	"github.com/umbracle/ethgo"
 
 	"github.com/0xPolygon/polygon-edge/types"

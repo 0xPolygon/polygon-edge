@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"math/big"
 	"path"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"

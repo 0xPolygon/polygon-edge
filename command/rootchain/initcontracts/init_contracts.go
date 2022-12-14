@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"io/ioutil"
 	"math/big"
 	"os"
@@ -21,6 +19,8 @@ import (
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/genesis"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
@@ -233,6 +233,7 @@ func deployContracts(outputter command.OutputFormatter) error {
 	if err := initializeCheckpointManager(txRelayer); err != nil {
 		return err
 	}
+
 	if err := initializeExitHelper(txRelayer, ethgo.Address(helper.CheckpointManagerAddress)); err != nil {
 		return err
 	}
@@ -286,8 +287,10 @@ func initializeCheckpointManager(txRelayer txrelayer.TxRelayer) error {
 
 	return nil
 }
+
 func initializeExitHelper(txRelayer txrelayer.TxRelayer, checkpointManagerAddress ethgo.Address) error {
-	initCheckpointInput, err := contractsapi.ExitHelper.Abi.GetMethod("initialize").Encode([]interface{}{checkpointManagerAddress})
+	initCheckpointInput, err := contractsapi.ExitHelper.Abi.GetMethod("initialize").
+		Encode([]interface{}{checkpointManagerAddress})
 	if err != nil {
 		return fmt.Errorf("failed to encode parameters for CheckpointManager.initialize. error: %w", err)
 	}
@@ -317,6 +320,7 @@ func validatorSetToABISlice(allocs map[types.Address]*chain.GenesisAccount) ([]m
 	}
 
 	accSet := polybft.AccountSet{}
+
 	for _, validatorInfo := range validatorsInfo {
 		blsKey, err := validatorInfo.UnmarshalBLSPublicKey()
 		if err != nil {

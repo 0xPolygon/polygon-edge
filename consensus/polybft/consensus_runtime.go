@@ -898,7 +898,11 @@ func (c *consensusRuntime) GenerateExitProof(exitID, epoch, checkpointBlock uint
 	if err != nil {
 		return types.ExitProof{}, err
 	}
-	return types.ExitProof{proof, leafIndex}, nil
+
+	return types.ExitProof{
+		Proof:     proof,
+		LeafIndex: leafIndex,
+	}, nil
 }
 
 // GetStateSyncProof returns the proof of the bundle for the state sync
@@ -1105,9 +1109,7 @@ func (c *consensusRuntime) InsertBlock(proposal []byte, committedSeals []*messag
 		if fsm.isEndOfEpoch || c.checkpointManager.isCheckpointBlock(block.Header.Number) {
 			if bytes.Equal(c.config.Key.Address().Bytes(), block.Header.Miner) { // true if node is proposer
 				go func(header types.Header, epochNumber uint64) {
-					c.logger.Info("submit checkpoint", "header", header.Number, "eoe", fsm.isEndOfEpoch)
 					err := c.checkpointManager.submitCheckpoint(header, fsm.isEndOfEpoch)
-					c.logger.Warn("submit checkpoint succccessful")
 					if err != nil {
 						c.logger.Warn("failed to submit checkpoint",
 							"block", header.Number,

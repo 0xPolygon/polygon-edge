@@ -1,7 +1,6 @@
 package contractsapi
 
 import (
-	"fmt"
 	"path"
 	"runtime"
 )
@@ -16,15 +15,16 @@ var (
 )
 
 func init() {
-	_, filename, _, _ := runtime.Caller(0)
-	fmt.Println(filename)
+	_, filename, _, _ := runtime.Caller(0) //nolint: dogsled
 	scpath := path.Join(path.Dir(filename), "../../../core-contracts/artifacts/contracts/")
 
 	var err error
+
 	Rootchain, err = ReadArtifact(scpath, "root/CheckpointManager.sol", "CheckpointManager")
 	if err != nil {
 		panic(err)
 	}
+
 	ExitHelper, err = ReadArtifact(scpath, "root/ExitHelper.sol", "ExitHelper")
 	if err != nil {
 		panic(err)
@@ -49,5 +49,4 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-
 }

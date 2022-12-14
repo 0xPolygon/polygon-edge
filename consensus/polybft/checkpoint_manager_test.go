@@ -2,18 +2,19 @@ package polybft
 
 import (
 	"errors"
+	"math/big"
+	"strconv"
+	"testing"
+
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/state"
-	"github.com/hashicorp/go-hclog"
+	hclog "github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
-	"math/big"
-	"strconv"
-	"testing"
 
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
@@ -280,16 +281,16 @@ func TestPerformExit(t *testing.T) {
 	l1Cntract := types.Address{3}
 
 	alloc := map[types.Address]*chain.GenesisAccount{
-		senderAddress: &chain.GenesisAccount{
+		senderAddress: {
 			Balance: big.NewInt(100000000000),
 		},
-		contracts.BLSContract: &chain.GenesisAccount{
+		contracts.BLSContract: {
 			Code: contractsapi.BLS.DeployedBytecode,
 		},
-		bn256Addr: &chain.GenesisAccount{
+		bn256Addr: {
 			Code: contractsapi.BLS256.DeployedBytecode,
 		},
-		l1Cntract: &chain.GenesisAccount{
+		l1Cntract: {
 			Code: contractsapi.L1Exit.DeployedBytecode,
 		},
 	}
@@ -303,6 +304,7 @@ func TestPerformExit(t *testing.T) {
 		require.NoError(t, result.Err)
 		require.True(t, result.Succeeded())
 		require.False(t, result.Failed())
+
 		return result.ReturnValue
 	}
 
@@ -419,13 +421,17 @@ func TestPerformExit(t *testing.T) {
 
 	lastID := getField(l1Cntract, contractsapi.L1Exit, "id")
 	require.Equal(t, lastID[31], uint8(1))
+
 	lastAddr := getField(l1Cntract, contractsapi.L1Exit, "addr")
 	require.Equal(t, exits[0].Sender[:], lastAddr[12:])
+
 	lastCounter := getField(l1Cntract, contractsapi.L1Exit, "counter")
 	require.Equal(t, lastCounter[31], uint8(1))
 }
 
 func deployRootchainContract(t *testing.T, transition *state.Transition, rootchainArtifact *contractsapi.Artifact, sender types.Address, accSet AccountSet, bn256Addr types.Address) types.Address {
+	t.Helper()
+
 	result := transition.Create2(sender, rootchainArtifact.Bytecode, big.NewInt(0), 1000000000)
 	assert.NoError(t, result.Err)
 	rcAddress := result.Address
@@ -438,6 +444,7 @@ func deployRootchainContract(t *testing.T, transition *state.Transition, rootcha
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	result = transition.Call2(sender, rcAddress, init, big.NewInt(0), 1000000000)
 	require.True(t, result.Succeeded())
 	require.False(t, result.Failed())
@@ -445,6 +452,7 @@ func deployRootchainContract(t *testing.T, transition *state.Transition, rootcha
 
 	getDomain, err := rootchainArtifact.Abi.GetMethod("domain").Encode([]interface{}{})
 	require.NoError(t, err)
+
 	result = transition.Call2(sender, rcAddress, getDomain, big.NewInt(0), 1000000000)
 	require.Equal(t, result.ReturnValue, bls.GetDomain())
 
@@ -452,6 +460,8 @@ func deployRootchainContract(t *testing.T, transition *state.Transition, rootcha
 }
 
 func deployExitContract(t *testing.T, transition *state.Transition, exitHelperArtifcat *contractsapi.Artifact, sender types.Address, rootchainContractAddress types.Address) types.Address {
+	t.Helper()
+
 	result := transition.Create2(sender, exitHelperArtifcat.Bytecode, big.NewInt(0), 1000000000)
 	assert.NoError(t, result.Err)
 	ehAddress := result.Address

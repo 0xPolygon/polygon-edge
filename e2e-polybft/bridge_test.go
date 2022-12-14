@@ -4,20 +4,19 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/command/genesis"
-	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"io"
 	"math/big"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
 
-	rootchainHelper "github.com/0xPolygon/polygon-edge/command/rootchain/helper"
+	"github.com/0xPolygon/polygon-edge/command/genesis"
+	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
@@ -181,34 +180,6 @@ func TestE2E_Bridge_MainWorkflow(t *testing.T) {
 		})
 }
 
-func TestE2E_CheckpointSubmission(t *testing.T) {
-	var (
-		rootchainSender       = rootchainHelper.GetRootchainAdminKey().Address()
-		checkpointManagerAddr = ethgo.Address(rootchainHelper.CheckpointManagerAddress)
-	)
-
-	cluster := framework.NewTestCluster(t, 5, framework.WithBridge())
-	defer cluster.Stop()
-
-	// wait for a couple of blocks
-	require.NoError(t, cluster.WaitForBlock(15, 1*time.Minute))
-
-	// query rootchain for current checkpoint block
-	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Bridge.JSONRPCAddr()))
-	require.NoError(t, err)
-
-	checkpointBlockNumInput, err := currentCheckpointBlockNumMethod.Encode([]interface{}{})
-	require.NoError(t, err)
-
-	checkpointBlockNumRaw, err := txRelayer.Call(rootchainSender, checkpointManagerAddr, checkpointBlockNumInput)
-	require.NoError(t, err)
-
-	latestCheckpointBlockNum, err := strconv.ParseInt(checkpointBlockNumRaw, 0, 64)
-	require.NoError(t, err)
-
-	require.Equal(t, int64(10), latestCheckpointBlockNum)
-}
-
 func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
 	os.Setenv("E2E_TESTS", "true")
 	os.Setenv("EDGE_BINARY", "/Users/boris/GolandProjects/polygon-edge/polygon-edge")
@@ -240,9 +211,9 @@ func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
 	//todo exit contracts shouldnt be a part of core-contracts
 	receipt, err := DeployTransaction(txRelayer, helper.GetRootchainAdminKey(), contractsapi.L1Exit.Bytecode)
 	require.NoError(t, err)
+
 	l1ContractAddress := receipt.ContractAddress
 	l2StateSenderAddress := ethgo.Address(contracts.L2StateSenderContract)
-
 	checkpointManagerAddress := ethgo.Address(helper.CheckpointManagerAddress)
 
 	//Start test
@@ -251,10 +222,13 @@ func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
 	receipt, err = ABITransaction(l2Relayer, key, contractsapi.L2StateSender, l2StateSenderAddress, "syncState", l1ContractAddress, stateSenderData)
 	require.NoError(t, err)
 	require.Equal(t, receipt.Status, uint64(types.ReceiptSuccess))
+	l2SenderBlock := receipt.BlockNumber
+
 	eventData, err := contractsapi.L2StateSender.Abi.Events["L2StateSynced"].ParseLog(receipt.Logs[0])
 	require.NoError(t, err)
-	l2syncID := eventData["id"].(*big.Int)
-	l2SenderBlock := receipt.BlockNumber
+
+	l2syncID, ok := eventData["id"].(*big.Int)
+	require.True(t, ok)
 
 	l2SenderBlockData, err := cluster.Servers[0].JSONRPC().Eth().GetBlockByNumber(ethgo.BlockNumber(l2SenderBlock), true)
 	require.NoError(t, err)
@@ -267,19 +241,22 @@ func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
 
 	//wait when a new checkpoint will be accepted
 	fail := 0
-	for _ = range time.Tick(time.Second) {
-		fail++
+
+	for range time.Tick(time.Second) {
 		currentEpochString, err := ABICall(txRelayer, contractsapi.Rootchain, checkpointManagerAddress, "currentEpoch")
 		require.NoError(t, err)
+
 		currentEpoch, err := types.ParseUint64orHex(&currentEpochString)
 		require.NoError(t, err)
 
 		if currentEpoch >= extra.Checkpoint.EpochNumber {
 			break
 		}
+
 		if fail > 100 {
-			t.Fatal("epoch havent achived")
+			t.Fatal("epoch havent achieved")
 		}
+		fail++
 	}
 
 	proof, err := getExitProof(cluster.Servers[0].JSONRPCAddr(), l2syncID.Uint64(), extra.Checkpoint.EpochNumber, extra.Checkpoint.EpochNumber*10)
@@ -314,17 +291,19 @@ func getExitProof(rpcAddress string, exitID, epoch, checkpointBlock uint64) (typ
 		Jsonrpc string   `json:"jsonrpc"`
 		Method  string   `json:"method"`
 		Params  []string `json:"params"`
-		Id      int      `json:"id"`
+		ID      int      `json:"id"`
 	}{
 		"2.0",
 		"bridge_generateExitProof",
 		[]string{fmt.Sprintf("0x%x", exitID), fmt.Sprintf("0x%x", epoch), fmt.Sprintf("0x%x", checkpointBlock)},
 		1,
 	}
+
 	d, err := json.Marshal(query)
 	if err != nil {
 		return types.ExitProof{}, err
 	}
+
 	resp, err := http.Post(rpcAddress, "application/json", bytes.NewReader(d))
 	if err != nil {
 		return types.ExitProof{}, err
@@ -338,6 +317,7 @@ func getExitProof(rpcAddress string, exitID, epoch, checkpointBlock uint64) (typ
 	rspProof := struct {
 		Result types.ExitProof `json:"result"`
 	}{}
+
 	err = json.Unmarshal(s, &rspProof)
 	if err != nil {
 		return types.ExitProof{}, err
@@ -351,6 +331,7 @@ func ABICall(relayer txrelayer.TxRelayer, artifact *contractsapi.Artifact, contr
 	if err != nil {
 		return "", err
 	}
+
 	return relayer.Call(ethgo.Address(helper.GetRootchainAdminAddr()), contractAddress, input)
 }
 func ABITransaction(relayer txrelayer.TxRelayer, key ethgo.Key, artifact *contractsapi.Artifact, contractAddress ethgo.Address, method string, params ...interface{}) (*ethgo.Receipt, error) {
@@ -358,6 +339,7 @@ func ABITransaction(relayer txrelayer.TxRelayer, key ethgo.Key, artifact *contra
 	if err != nil {
 		return nil, err
 	}
+
 	return relayer.SendTransaction(&ethgo.Transaction{
 		To:    &contractAddress,
 		Input: input,
@@ -371,8 +353,10 @@ func DeployTransaction(relayer txrelayer.TxRelayer, key ethgo.Key, bytecode []by
 }
 
 func FundValidators(t *testing.T, txRelayer txrelayer.TxRelayer, validators []*polybft.Validator) {
-	for i := range validators {
-		fundAddr := ethgo.Address(validators[i].Address)
+	t.Helper()
+
+	for _, validator := range validators {
+		fundAddr := ethgo.Address(validator.Address)
 		txn := &ethgo.Transaction{
 			To:    &fundAddr,
 			Value: big.NewInt(1000000000000000000),
@@ -380,7 +364,7 @@ func FundValidators(t *testing.T, txRelayer txrelayer.TxRelayer, validators []*p
 
 		_, err := txRelayer.SendTransactionLocal(txn)
 		if err != nil {
-			t.Error(validators[i].Address, "error on funding", err)
+			t.Error(validator.Address, "error on funding", err)
 		}
 	}
 }

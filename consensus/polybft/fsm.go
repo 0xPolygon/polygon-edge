@@ -628,6 +628,10 @@ func getExitEventsFromReceipts(epoch, block uint64, receipts []*types.Receipt) (
 		}
 
 		for j := 0; j < len(receipts[i].Logs); j++ {
+			if receipts[i].Logs[j].Address != contracts.L2StateSenderContract {
+				continue
+			}
+
 			event, err := decodeExitEvent(convertLog(receipts[i].Logs[j]), epoch, block)
 			if err != nil {
 				return nil, err
