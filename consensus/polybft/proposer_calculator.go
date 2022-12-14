@@ -116,6 +116,15 @@ func (pcs *ProposerSnapshot) Copy() *ProposerSnapshot {
 	}
 }
 
+func (pcs *ProposerSnapshot) toMap() map[types.Address]*ProposerValidator {
+	validatorMap := make(map[types.Address]*ProposerValidator)
+	for _, v := range pcs.Validators {
+		validatorMap[v.Metadata.Address] = v
+	}
+
+	return validatorMap
+}
+
 // ProposerCalculator interface - proposer calculator algorithm should implement this interface
 type ProposerCalculator interface {
 	// CalcProposer calculates next proposer
@@ -261,38 +270,64 @@ func (pc *proposerCalculator) incrementProposerPriorityNTimes(
 	return proposer, nil
 }
 
-func (pc *proposerCalculator) updateValidators(snapshot *ProposerSnapshot, newValidatorSet AccountSet) {
+func (pc *proposerCalculator) updateValidators(snapshot *ProposerSnapshot, newValidatorSet AccountSet) error {
 	if newValidatorSet.Len() == 0 {
-		return
+		pc.logger.Info("No new validator set")
+
+		return nil
 	}
 
-	oldProposerCalcValidators := snapshot.Validators
+	snapshotValidators := snapshot.toMap()
+	newValidators := make([]*ProposerValidator, len(newValidatorSet))
 
-	newValidatorsCalcProposer := make([]*ProposerValidator, len(newValidatorSet))
-	addressOldValidatorMap := make(map[types.Address]*ProposerValidator, len(oldProposerCalcValidators))
+	// compute total voting power of removed validators and currentValidatorSer
+	removedValidatorsVotingPower := uint64(0)
+	newValidatorsVotingPower := uint64(0)
 
-	for _, x := range oldProposerCalcValidators {
-		addressOldValidatorMap[x.Metadata.Address] = x
-	}
-
-	// create new validators snapshot
-	for i, x := range newValidatorSet {
-		priority := int64(0)
-
-		// TODO: change priority if validator existed previous
-		if val, exists := addressOldValidatorMap[x.Address]; exists {
-			priority = val.ProposerPriority // + int64(val.Metadata.VotingPower) - int64(x.VotingPower)
-		}
-
-		newValidatorsCalcProposer[i] = &ProposerValidator{
-			Metadata:         x,
-			ProposerPriority: priority,
+	for address, val := range snapshotValidators {
+		if !newValidatorSet.ContainsNodeID(address.String()) {
+			removedValidatorsVotingPower += val.Metadata.VotingPower
 		}
 	}
 
-	// TODO: centering
+	for _, v := range newValidatorSet {
+		newValidatorsVotingPower += v.VotingPower
+	}
 
-	snapshot.Validators = newValidatorsCalcProposer
+	if newValidatorsVotingPower > uint64(maxTotalVotingPower) {
+		return fmt.Errorf(
+			"total voting power cannot be guarded to not exceed %v; got: %v",
+			maxTotalVotingPower,
+			newValidatorsVotingPower,
+		)
+	}
+
+	tvpAfterUpdatesBeforeRemovals := newValidatorsVotingPower + removedValidatorsVotingPower
+
+	for i, newValidator := range newValidatorSet {
+		if val, exists := snapshotValidators[newValidator.Address]; exists {
+			// old validators have the same priority
+			newValidators[i] = &ProposerValidator{
+				Metadata:         newValidator,
+				ProposerPriority: val.ProposerPriority,
+			}
+		} else {
+			// added validator has priority -1.125 * V
+			newValidators[i] = &ProposerValidator{
+				Metadata:         newValidator,
+				ProposerPriority: int64(-(tvpAfterUpdatesBeforeRemovals + (tvpAfterUpdatesBeforeRemovals >> 3))),
+			}
+		}
+	}
+
+	snapshot.Validators = newValidators
+
+	// after validator set center values around 0 and scale
+	if err := pc.updateWithChangeSet(snapshot, snapshot.GetTotalVotingPower()); err != nil {
+		return fmt.Errorf("cannot update validator changeset: %w", err)
+	}
+
+	return nil
 }
 
 func (pc *proposerCalculator) incrementProposerPriority(
