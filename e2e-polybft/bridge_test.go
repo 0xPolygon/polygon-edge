@@ -7,7 +7,6 @@ import (
 	"io"
 	"math/big"
 	"net/http"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -181,9 +180,6 @@ func TestE2E_Bridge_MainWorkflow(t *testing.T) {
 }
 
 func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
-	os.Setenv("E2E_TESTS", "true")
-	os.Setenv("EDGE_BINARY", "/Users/boris/GolandProjects/polygon-edge/polygon-edge")
-
 	key, err := ethgow.GenerateKey()
 	require.NoError(t, err)
 
