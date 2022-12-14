@@ -432,7 +432,6 @@ func (s *Server) setupConsensus() error {
 			Blockchain:     s.blockchain,
 			Executor:       s.executor,
 			Grpc:           s.grpcServer,
-			JSONRPCAddr:    s.config.JSONRPC.JSONRPCAddr,
 			Logger:         s.logger,
 			SecretsManager: s.secretsManager,
 			BlockTime:      s.config.BlockTime,
