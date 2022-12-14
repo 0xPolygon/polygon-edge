@@ -22,13 +22,14 @@ services:
     build:
       context: ../../
       dockerfile: docker/local/Dockerfile
-    command: ["server", "--data-dir", "/data", "--chain", "/genesis/genesis.json", "--grpc-address", "0.0.0.0:9632", "--libp2p", "0.0.0.0:1478", "--jsonrpc", "0.0.0.0:8545", "--seal"]
+    command: ["server", "--data-dir", "/data", "--chain", "/genesis/genesis.json", "--grpc-address", "0.0.0.0:9632", "--libp2p", "0.0.0.0:1478", "--jsonrpc", "0.0.0.0:8545", "--prometheus", "0.0.0.0:5001", "--seal"]
     depends_on:
       init:
         condition: service_completed_successfully
     ports:
       - '10000:9632'
       - '10002:8545'
+      - '10003:5001'
     volumes:
       - node-1:/data
       - genesis:/genesis
@@ -40,13 +41,14 @@ services:
     build:
       context: ../../
       dockerfile: docker/local/Dockerfile
-    command: ["server", "--data-dir", "/data", "--chain", "/genesis/genesis.json", "--grpc-address", "0.0.0.0:9632", "--libp2p", "0.0.0.0:1478", "--jsonrpc", "0.0.0.0:8545", "--seal"]
+    command: ["server", "--data-dir", "/data", "--chain", "/genesis/genesis.json", "--grpc-address", "0.0.0.0:9632", "--libp2p", "0.0.0.0:1478", "--jsonrpc", "0.0.0.0:8545", "--prometheus", "0.0.0.0:5001", "--seal"]
     depends_on:
       init:
         condition: service_completed_successfully
     ports:
       - '20000:9632'
       - '20002:8545'
+      - '20003:5001'
     volumes:
       - node-2:/data
       - genesis:/genesis
@@ -58,13 +60,14 @@ services:
     build:
       context: ../../
       dockerfile: docker/local/Dockerfile
-    command: ["server", "--data-dir", "/data", "--chain", "/genesis/genesis.json", "--grpc-address", "0.0.0.0:9632", "--libp2p", "0.0.0.0:1478", "--jsonrpc", "0.0.0.0:8545", "--seal"]
+    command: ["server", "--data-dir", "/data", "--chain", "/genesis/genesis.json", "--grpc-address", "0.0.0.0:9632", "--libp2p", "0.0.0.0:1478", "--jsonrpc", "0.0.0.0:8545", "--prometheus", "0.0.0.0:5001", "--seal"]
     depends_on:
       init:
         condition: service_completed_successfully
     ports:
       - '30000:9632'
       - '30002:8545'
+      - '30003:5001'
     volumes:
       - node-3:/data
       - genesis:/genesis
@@ -76,13 +79,14 @@ services:
     build:
       context: ../../
       dockerfile: docker/local/Dockerfile
-    command: ["server", "--data-dir", "/data", "--chain", "/genesis/genesis.json", "--grpc-address", "0.0.0.0:9632", "--libp2p", "0.0.0.0:1478", "--jsonrpc", "0.0.0.0:8545", "--seal"]
+    command: ["server", "--data-dir", "/data", "--chain", "/genesis/genesis.json", "--grpc-address", "0.0.0.0:9632", "--libp2p", "0.0.0.0:1478", "--jsonrpc", "0.0.0.0:8545", "--prometheus", "0.0.0.0:5001", "--seal"]
     depends_on:
       init:
         condition: service_completed_successfully
     ports:
       - '40000:9632'
       - '40002:8545'
+      - '40003:5001'
     volumes:
       - node-4:/data
       - genesis:/genesis
