@@ -59,8 +59,8 @@ const (
 	stateSyncMainBundleSize = 10
 	// number of stateSyncEvents to be grouped into one StateTransaction
 	stateSyncBundleSize = 1
-	// latest proposer calculator snapshot key
-	proposerCalcSnapshotKey = 7
+	// static key which is used to save latest proposer snapshot. It will be always one object in bucket
+	proposerSnapshotStaticKey = 7
 )
 
 type exitEventNotFoundError struct {
@@ -844,13 +844,12 @@ func (s *State) bucketStats(bucketName []byte) *bolt.BucketStats {
 	return stats
 }
 
-// getProposerCalculatorSnapshot gets latest proposer calculator snapshot
-// we are keeping two snapshots just in case if latest write mess up snapshot
-func (s *State) getProposerCalculatorSnapshot() (*ProposerSnapshot, error) {
+// getProposerSnapshot gets latest proposer snapshot
+func (s *State) getProposerSnapshot() (*ProposerSnapshot, error) {
 	var snapshot *ProposerSnapshot
 
 	err := s.db.View(func(tx *bolt.Tx) error {
-		value := tx.Bucket(proposerCalcSnapshotBucket).Get(itob(uint64(proposerCalcSnapshotKey)))
+		value := tx.Bucket(proposerCalcSnapshotBucket).Get(itob(uint64(proposerSnapshotStaticKey)))
 		if value == nil {
 			return nil
 		}
@@ -861,15 +860,15 @@ func (s *State) getProposerCalculatorSnapshot() (*ProposerSnapshot, error) {
 	return snapshot, err
 }
 
-// writeProposerCalculatorSnapshot writes proposer calculator snapshot to double buffered bucket
-func (s *State) writeProposerCalculatorSnapshot(snapshot *ProposerSnapshot) error {
+// writeProposerSnapshot writes proposer snapshot
+func (s *State) writeProposerSnapshot(snapshot *ProposerSnapshot) error {
 	raw, err := json.Marshal(snapshot)
 	if err != nil {
 		return err
 	}
 
 	return s.db.Update(func(tx *bolt.Tx) error {
-		return tx.Bucket(proposerCalcSnapshotBucket).Put(itob(proposerCalcSnapshotKey), raw)
+		return tx.Bucket(proposerCalcSnapshotBucket).Put(itob(proposerSnapshotStaticKey), raw)
 	})
 }
 

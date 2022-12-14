@@ -231,12 +231,12 @@ func (c *consensusRuntime) OnBlockInserted(block *types.Block) {
 		c.lock.Lock()
 		c.lastBuiltBlock = block.Header
 
-		proposalSnapshot := c.proposerSnapshot.Copy()
-		if err := c.updateProposerSnapshot(proposalSnapshot, block.Number()); err != nil {
-			c.logger.Warn("Could not update proposer calculator", "err", err)
+		proposerSnapshot := c.proposerSnapshot.Copy()
+		if err := c.updateProposerSnapshot(proposerSnapshot, block.Number()); err != nil {
+			c.logger.Warn("Could not update proposer snapshot", "err", err)
 		}
 
-		c.proposerSnapshot = proposalSnapshot
+		c.proposerSnapshot = proposerSnapshot
 		c.lock.Unlock()
 	}
 }
@@ -1323,12 +1323,14 @@ func (c *consensusRuntime) updateProposerSnapshot(snapshot *ProposerSnapshot, bl
 	from := snapshot.Height
 
 	for height := from; height <= blockNumber; height++ {
-		c.config.proposerCalc.Update(snapshot, height, c.config)
+		if err := c.config.proposerCalc.Update(snapshot, height, c.config); err != nil {
+			return err
+		}
 
 		// write snapshot every saveEveryNIterations iterations
 		// this way, we prevent data loss on long calculations
 		if (height-from+1)%saveEveryNIterations == 0 {
-			if err := c.state.writeProposerCalculatorSnapshot(snapshot); err != nil {
+			if err := c.state.writeProposerSnapshot(snapshot); err != nil {
 				return fmt.Errorf("cannot save proposer calculator snapshot for block %d: %w", height, err)
 			}
 		}
@@ -1336,7 +1338,7 @@ func (c *consensusRuntime) updateProposerSnapshot(snapshot *ProposerSnapshot, bl
 
 	// write snapshot if not already written
 	if (blockNumber-from+1)%saveEveryNIterations != 0 {
-		if err := c.state.writeProposerCalculatorSnapshot(snapshot); err != nil {
+		if err := c.state.writeProposerSnapshot(snapshot); err != nil {
 			return fmt.Errorf("cannot save proposer calculator snapshot for block %d: %w", blockNumber, err)
 		}
 	}

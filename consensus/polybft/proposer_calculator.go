@@ -34,7 +34,7 @@ var (
 )
 
 // Holds ValidatorMetadata together with priority
-type ProposerValidator struct {
+type PrioritizedValidator struct {
 	Metadata         *ValidatorMetadata
 	ProposerPriority int64
 }
@@ -43,13 +43,13 @@ type ProposerValidator struct {
 type ProposerSnapshot struct {
 	Height     uint64
 	Round      uint64
-	Proposer   *ProposerValidator
-	Validators []*ProposerValidator
+	Proposer   *PrioritizedValidator
+	Validators []*PrioritizedValidator
 }
 
 // NewProposerSnapshotFromState create ProposerSnapshot from state if possible or from genesis block
 func NewProposerSnapshotFromState(config *runtimeConfig, logger hclog.Logger) (*ProposerSnapshot, error) {
-	snapshot, err := config.State.getProposerCalculatorSnapshot()
+	snapshot, err := config.State.getProposerSnapshot()
 	if err != nil {
 		return nil, err
 	}
@@ -69,10 +69,10 @@ func NewProposerSnapshotFromState(config *runtimeConfig, logger hclog.Logger) (*
 
 // NewProposerSnapshot creates ProposerSnapshot with height and validators with all priorities set to zero
 func NewProposerSnapshot(height uint64, validators []*ValidatorMetadata) *ProposerSnapshot {
-	validatorsSnap := make([]*ProposerValidator, len(validators))
+	validatorsSnap := make([]*PrioritizedValidator, len(validators))
 
 	for i, x := range validators {
-		validatorsSnap[i] = &ProposerValidator{Metadata: x, ProposerPriority: int64(0)}
+		validatorsSnap[i] = &PrioritizedValidator{Metadata: x, ProposerPriority: int64(0)}
 	}
 
 	return &ProposerSnapshot{
@@ -96,12 +96,12 @@ func (pcs ProposerSnapshot) GetTotalVotingPower() int64 {
 
 // Returns copy of current ProposerSnapshot object
 func (pcs *ProposerSnapshot) Copy() *ProposerSnapshot {
-	var proposer *ProposerValidator
+	var proposer *PrioritizedValidator
 
-	valCopy := make([]*ProposerValidator, len(pcs.Validators))
+	valCopy := make([]*PrioritizedValidator, len(pcs.Validators))
 
 	for i, val := range pcs.Validators {
-		valCopy[i] = &ProposerValidator{Metadata: val.Metadata.Copy(), ProposerPriority: val.ProposerPriority}
+		valCopy[i] = &PrioritizedValidator{Metadata: val.Metadata.Copy(), ProposerPriority: val.ProposerPriority}
 
 		if pcs.Proposer != nil && pcs.Proposer.Metadata.Address == val.Metadata.Address {
 			proposer = valCopy[i]
@@ -230,7 +230,7 @@ func (pc *proposerCalculator) Update(snapshot *ProposerSnapshot, blockNumber uin
 }
 
 func (pc *proposerCalculator) incrementProposerPriorityNTimes(
-	snapshot *ProposerSnapshot, times uint64) (*ProposerValidator, error) {
+	snapshot *ProposerSnapshot, times uint64) (*PrioritizedValidator, error) {
 	if len(snapshot.Validators) == 0 {
 		return nil, fmt.Errorf("validator set cannot be nul or empty")
 	}
@@ -240,7 +240,7 @@ func (pc *proposerCalculator) incrementProposerPriorityNTimes(
 	}
 
 	var (
-		proposer *ProposerValidator
+		proposer *PrioritizedValidator
 		err      error
 		tvp      = snapshot.GetTotalVotingPower()
 	)
@@ -268,8 +268,8 @@ func (pc *proposerCalculator) updateValidators(snapshot *ProposerSnapshot, newVa
 
 	oldProposerCalcValidators := snapshot.Validators
 
-	newValidatorsCalcProposer := make([]*ProposerValidator, len(newValidatorSet))
-	addressOldValidatorMap := make(map[types.Address]*ProposerValidator, len(oldProposerCalcValidators))
+	newValidatorsCalcProposer := make([]*PrioritizedValidator, len(newValidatorSet))
+	addressOldValidatorMap := make(map[types.Address]*PrioritizedValidator, len(oldProposerCalcValidators))
 
 	for _, x := range oldProposerCalcValidators {
 		addressOldValidatorMap[x.Metadata.Address] = x
@@ -284,7 +284,7 @@ func (pc *proposerCalculator) updateValidators(snapshot *ProposerSnapshot, newVa
 			priority = val.ProposerPriority // + int64(val.Metadata.VotingPower) - int64(x.VotingPower)
 		}
 
-		newValidatorsCalcProposer[i] = &ProposerValidator{
+		newValidatorsCalcProposer[i] = &PrioritizedValidator{
 			Metadata:         x,
 			ProposerPriority: priority,
 		}
@@ -296,7 +296,7 @@ func (pc *proposerCalculator) updateValidators(snapshot *ProposerSnapshot, newVa
 }
 
 func (pc *proposerCalculator) incrementProposerPriority(
-	snapshot *ProposerSnapshot, totalVotingPower int64) (*ProposerValidator, error) {
+	snapshot *ProposerSnapshot, totalVotingPower int64) (*PrioritizedValidator, error) {
 	for _, val := range snapshot.Validators {
 		// Check for overflow for sum.
 		newPrio := safeAddClip(val.ProposerPriority, int64(val.Metadata.VotingPower))
@@ -339,7 +339,7 @@ func (pc *proposerCalculator) shiftByAvgProposerPriority(snapshot *ProposerSnaps
 }
 
 func (pc *proposerCalculator) getValWithMostPriority(
-	snapshot *ProposerSnapshot) (result *ProposerValidator, err error) {
+	snapshot *ProposerSnapshot) (result *PrioritizedValidator, err error) {
 	if len(snapshot.Validators) == 0 {
 		return nil, fmt.Errorf("validators cannot be nil or empty")
 	}
@@ -403,7 +403,7 @@ func (pc *proposerCalculator) rescalePriorities(snapshot *ProposerSnapshot, tota
 }
 
 // computeMaxMinPriorityDiff computes the difference between the max and min ProposerPriority of that set.
-func computeMaxMinPriorityDiff(validators []*ProposerValidator) int64 {
+func computeMaxMinPriorityDiff(validators []*PrioritizedValidator) int64 {
 	max := int64(math.MinInt64)
 	min := int64(math.MaxInt64)
 
@@ -426,7 +426,7 @@ func computeMaxMinPriorityDiff(validators []*ProposerValidator) int64 {
 	return diff
 }
 
-func isBetterProposer(a, b *ProposerValidator) bool {
+func isBetterProposer(a, b *PrioritizedValidator) bool {
 	if b == nil || a.ProposerPriority > b.ProposerPriority {
 		return true
 	} else if a.ProposerPriority == b.ProposerPriority {
