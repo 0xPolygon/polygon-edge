@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/umbracle/ethgo/abi"
+
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
@@ -291,13 +293,13 @@ func TestPerformExit(t *testing.T) {
 			Code: contractsapi.BLS256.DeployedBytecode,
 		},
 		l1Cntract: {
-			Code: contractsapi.L1Exit.DeployedBytecode,
+			Code: contractsapi.L11ExitDeployedBytecode,
 		},
 	}
 	transition := newTestTransition(t, alloc)
 
-	getField := func(addr types.Address, artifact *contractsapi.Artifact, function string, args ...interface{}) []byte {
-		input, err := artifact.Abi.GetMethod(function).Encode(args)
+	getField := func(addr types.Address, abi *abi.ABI, function string, args ...interface{}) []byte {
+		input, err := abi.GetMethod(function).Encode(args)
 		require.NoError(t, err)
 
 		result := transition.Call2(senderAddress, addr, input, big.NewInt(0), 1000000000)
@@ -311,7 +313,7 @@ func TestPerformExit(t *testing.T) {
 	rootchainContractAddress := deployRootchainContract(t, transition, contractsapi.Rootchain, senderAddress, accSet, bn256Addr)
 	exitHelperContractAddress := deployExitContract(t, transition, contractsapi.ExitHelper, senderAddress, rootchainContractAddress)
 
-	require.Equal(t, getField(rootchainContractAddress, contractsapi.Rootchain, "currentCheckpointBlockNumber")[31], uint8(0))
+	require.Equal(t, getField(rootchainContractAddress, contractsapi.Rootchain.Abi, "currentCheckpointBlockNumber")[31], uint8(0))
 
 	cm := checkpointManager{
 		blockchain: &blockchainMock{},
@@ -389,10 +391,10 @@ func TestPerformExit(t *testing.T) {
 	require.NoError(t, result.Err)
 	require.True(t, result.Succeeded())
 	require.False(t, result.Failed())
-	require.Equal(t, getField(rootchainContractAddress, contractsapi.Rootchain, "currentCheckpointBlockNumber")[31], uint8(1))
+	require.Equal(t, getField(rootchainContractAddress, contractsapi.Rootchain.Abi, "currentCheckpointBlockNumber")[31], uint8(1))
 
 	//check that the exit havent performed
-	res := getField(exitHelperContractAddress, contractsapi.ExitHelper, "processedExits", exits[0].ID)
+	res := getField(exitHelperContractAddress, contractsapi.ExitHelper.Abi, "processedExits", exits[0].ID)
 	require.Equal(t, int(res[31]), 0)
 
 	proofExitEvent, err := ExitEventABIType.Encode(exits[0])
@@ -416,16 +418,16 @@ func TestPerformExit(t *testing.T) {
 	require.False(t, result.Failed())
 
 	//check true
-	res = getField(exitHelperContractAddress, contractsapi.ExitHelper, "processedExits", exits[0].ID)
+	res = getField(exitHelperContractAddress, contractsapi.ExitHelper.Abi, "processedExits", exits[0].ID)
 	require.Equal(t, int(res[31]), 1)
 
-	lastID := getField(l1Cntract, contractsapi.L1Exit, "id")
+	lastID := getField(l1Cntract, contractsapi.L1ExitTestABI, "id")
 	require.Equal(t, lastID[31], uint8(1))
 
-	lastAddr := getField(l1Cntract, contractsapi.L1Exit, "addr")
+	lastAddr := getField(l1Cntract, contractsapi.L1ExitTestABI, "addr")
 	require.Equal(t, exits[0].Sender[:], lastAddr[12:])
 
-	lastCounter := getField(l1Cntract, contractsapi.L1Exit, "counter")
+	lastCounter := getField(l1Cntract, contractsapi.L1ExitTestABI, "counter")
 	require.Equal(t, lastCounter[31], uint8(1))
 }
 

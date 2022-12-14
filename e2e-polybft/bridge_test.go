@@ -208,8 +208,7 @@ func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
 	FundValidators(t, txRelayer, validators)
 
 	//deploy l1,l2, ExitHelper contracts
-	//todo exit contracts shouldnt be a part of core-contracts
-	receipt, err := DeployTransaction(txRelayer, helper.GetRootchainAdminKey(), contractsapi.L1Exit.Bytecode)
+	receipt, err := DeployTransaction(txRelayer, helper.GetRootchainAdminKey(), contractsapi.L1ExitTestBytecode)
 	require.NoError(t, err)
 
 	l1ContractAddress := receipt.ContractAddress
