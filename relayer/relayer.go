@@ -62,7 +62,7 @@ func NewRelayer(
 
 	return &Relayer{
 		dataDir:           dataDir,
-		rpcEndpoint:       rpcEndpoint,
+		rpcEndpoint:       endpoint,
 		stateReceiverAddr: stateReceiverAddr,
 		logger:            logger,
 		client:            client,
