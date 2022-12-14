@@ -6,7 +6,7 @@ services:
     build:
       context: ../../
       dockerfile: docker/local/Dockerfile
-    command: ["init"]
+    command: ["init", "${EDGE_CONSENSUS:-ibft}"]
     volumes:
       - node-1:/polygon-edge/data-1
       - node-2:/polygon-edge/data-2

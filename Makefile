@@ -58,12 +58,21 @@ test-e2e-polybft:
 
 .PHONY: run-local
 run-local:
-	$(MAKE) compile-core-contracts
 	docker-compose -f ./docker/local/docker-compose.yml up -d --build
 
 .PHONY: stop-local
 stop-local:
-	docker-compose -f ./docker/local/docker-compose.yml stop
+	EDGE_CONSENSUS=ibft docker-compose -f ./docker/local/docker-compose.yml stop
+
+.PHONY: run-local
+run-local-polybft:
+	$(MAKE) compile-core-contracts
+	EDGE_CONSENSUS=polybft docker-compose -f ./docker/local/docker-compose.yml up -d --build 
+
+.PHONY: stop-local
+stop-local-polybft:
+	EDGE_CONSENSUS=polybft docker-compose -f ./docker/local/docker-compose.yml stop
+
 
 .PHONY: compile-core-contracts
 compile-core-contracts:
