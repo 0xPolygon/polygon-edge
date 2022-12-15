@@ -176,15 +176,16 @@ func (c *consensusRuntime) getEpoch() *epochMetadata {
 	return c.epoch
 }
 
-// getLastBuiltBlockAndEpoch returns last build block and current epochMetadata in a thread-safe manner.
-func (c *consensusRuntime) getLastBuiltBlockAndEpoch() (*types.Header, *epochMetadata) {
+// getSyncData returns last build block, proposer snapshot and current epochMetadata in a thread-safe manner.
+func (c *consensusRuntime) getSyncData() (*types.Header, *epochMetadata, *ProposerSnapshot) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
 	lastBuiltBlock, epoch := new(types.Header), new(epochMetadata)
 	*lastBuiltBlock, *epoch = *c.lastBuiltBlock, *c.epoch
+	proposerSnapshot := c.proposerSnapshot.Copy()
 
-	return lastBuiltBlock, epoch
+	return lastBuiltBlock, epoch, proposerSnapshot
 }
 
 func (c *consensusRuntime) IsBridgeEnabled() bool {
@@ -364,13 +365,7 @@ func (c *consensusRuntime) populateFsmIfBridgeEnabled(
 
 // FSM creates a new instance of fsm
 func (c *consensusRuntime) FSM() error {
-	// figure out the parent. At this point this peer has done its best to sync up
-	// to the head of their remote peers.
-	c.lock.RLock()
-	proposerSnapshot := c.proposerSnapshot.Copy()
-	parent, epoch := new(types.Header), new(epochMetadata)
-	*parent, *epoch = *c.lastBuiltBlock, *c.epoch
-	c.lock.RUnlock()
+	parent, epoch, proposerSnapshot := c.getSyncData()
 
 	if !epoch.Validators.ContainsNodeID(c.config.Key.String()) {
 		return errNotAValidator
@@ -1077,7 +1072,7 @@ func (c *consensusRuntime) IsValidCommittedSeal(proposalHash []byte, committedSe
 }
 
 func (c *consensusRuntime) BuildProposal(view *proto.View) []byte {
-	lastBuiltBlock, _ := c.getLastBuiltBlockAndEpoch()
+	lastBuiltBlock, _, _ := c.getSyncData()
 
 	if lastBuiltBlock.Number+1 != view.Height {
 		c.logger.Error("unable to build block, due to lack of parent block",

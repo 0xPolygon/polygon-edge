@@ -1463,10 +1463,11 @@ func TestConsensusRuntime_calculateUptime_EpochSizeToSmall(t *testing.T) {
 		epoch: &epochMetadata{
 			Number: 0,
 		},
-		lastBuiltBlock: &types.Header{Number: 2},
+		lastBuiltBlock:   &types.Header{Number: 2},
+		proposerSnapshot: &ProposerSnapshot{},
 	}
 
-	lastBuiltBlock, epoch := consensusRuntime.getLastBuiltBlockAndEpoch()
+	lastBuiltBlock, epoch, _ := consensusRuntime.getSyncData()
 	_, err := consensusRuntime.calculateUptime(lastBuiltBlock, epoch)
 	assert.Error(t, err)
 }
@@ -1499,10 +1500,11 @@ func TestConsensusRuntime_calculateUptime_SecondEpoch(t *testing.T) {
 			Number:     1,
 			Validators: validators.getPublicIdentities(),
 		},
-		lastBuiltBlock: lastBuiltBlock,
+		lastBuiltBlock:   lastBuiltBlock,
+		proposerSnapshot: &ProposerSnapshot{},
 	}
 
-	lastBuiltBlock, epoch := consensusRuntime.getLastBuiltBlockAndEpoch()
+	lastBuiltBlock, epoch, _ := consensusRuntime.getSyncData()
 	uptime, err := consensusRuntime.calculateUptime(lastBuiltBlock, epoch)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, uptime)
@@ -1534,13 +1536,14 @@ func TestConsensusRuntime_buildBundles_NoCommitment(t *testing.T) {
 	state := newTestState(t)
 	commitmentMsg := NewCommitmentMessage(types.Hash{}, 0, 4, 5)
 	runtime := &consensusRuntime{
-		logger:         hclog.NewNullLogger(),
-		state:          state,
-		epoch:          &epochMetadata{Number: 0},
-		lastBuiltBlock: &types.Header{},
+		logger:           hclog.NewNullLogger(),
+		state:            state,
+		epoch:            &epochMetadata{Number: 0},
+		lastBuiltBlock:   &types.Header{},
+		proposerSnapshot: &ProposerSnapshot{},
 	}
 
-	_, epoch := runtime.getLastBuiltBlockAndEpoch()
+	_, epoch, _ := runtime.getSyncData()
 	assert.NoError(t, runtime.buildBundles(epoch.Commitment, commitmentMsg, 0))
 
 	bundles, err := state.getBundles(0, 4)
@@ -1585,10 +1588,11 @@ func TestConsensusRuntime_buildBundles(t *testing.T) {
 				Epoch:      epoch,
 			},
 		},
-		lastBuiltBlock: &types.Header{},
+		lastBuiltBlock:   &types.Header{},
+		proposerSnapshot: &ProposerSnapshot{},
 	}
 
-	_, epochData := runtime.getLastBuiltBlockAndEpoch()
+	_, epochData, _ := runtime.getSyncData()
 	assert.NoError(t, runtime.buildBundles(epochData.Commitment, commitmentMsg, 0))
 
 	bundles, err := state.getBundles(fromIndex, maxBundlesPerSprint)
@@ -1993,9 +1997,10 @@ func TestConsensusRuntime_IsValidProposalHash_InvalidExtra(t *testing.T) {
 
 func TestConsensusRuntime_BuildProposal_InvalidParent(t *testing.T) {
 	runtime := &consensusRuntime{
-		logger:         hclog.NewNullLogger(),
-		lastBuiltBlock: &types.Header{Number: 2},
-		epoch:          &epochMetadata{Number: 1},
+		logger:           hclog.NewNullLogger(),
+		lastBuiltBlock:   &types.Header{Number: 2},
+		epoch:            &epochMetadata{Number: 1},
+		proposerSnapshot: &ProposerSnapshot{},
 	}
 
 	require.Nil(t, runtime.BuildProposal(&proto.View{Height: 5, Round: 1}))
