@@ -385,16 +385,12 @@ func TestExtra_CreateValidatorSetDelta_Cases(t *testing.T) {
 			oldValidatorSet := vals.getPublicIdentities(localCase.oldSet...)
 			// update voting power to random value
 			maxVotingPower := big.NewInt(100)
-			var newVotingPower uint64
 			for _, name := range localCase.updated {
 				v := vals.getValidator(name)
+				vp, err := rand.Int(rand.Reader, maxVotingPower)
+				require.NoError(t, err)
 				// make sure generated voting power is different than the original one
-				for v.votingPower == newVotingPower {
-					vp, err := rand.Int(rand.Reader, maxVotingPower)
-					require.NoError(t, err)
-					newVotingPower = vp.Uint64()
-				}
-				v.votingPower = newVotingPower
+				v.votingPower += v.votingPower + vp.Uint64() + 1
 			}
 			newValidatorSet := vals.getPublicIdentities(localCase.newSet...)
 
