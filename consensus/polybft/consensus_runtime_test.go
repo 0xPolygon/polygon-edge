@@ -802,12 +802,14 @@ func Test_NewConsensusRuntime(t *testing.T) {
 
 	polyBftConfig := &PolyBFTConfig{
 		Bridge: &BridgeConfig{
-			BridgeAddr:            types.Address{0x13},
-			CheckpointManagerAddr: types.Address{0x10},
+			BridgeAddr:      types.Address{0x13},
+			CheckpointAddr:  types.Address{0x10},
+			JSONRPCEndpoint: "testEndpoint",
 		},
-		EpochSize:  10,
-		SprintSize: 10,
-		BlockTime:  2 * time.Second,
+		ValidatorSetAddr: types.Address{0x11},
+		EpochSize:        10,
+		SprintSize:       10,
+		BlockTime:        2 * time.Second,
 	}
 
 	key := createTestKey(t)
@@ -826,8 +828,9 @@ func Test_NewConsensusRuntime(t *testing.T) {
 	assert.Equal(t, runtime.config.DataDir, tmpDir)
 	assert.Equal(t, uint64(10), runtime.config.PolyBFTConfig.SprintSize)
 	assert.Equal(t, uint64(10), runtime.config.PolyBFTConfig.EpochSize)
+	assert.Equal(t, "0x1100000000000000000000000000000000000000", runtime.config.PolyBFTConfig.ValidatorSetAddr.String())
 	assert.Equal(t, "0x1300000000000000000000000000000000000000", runtime.config.PolyBFTConfig.Bridge.BridgeAddr.String())
-	assert.Equal(t, "0x1000000000000000000000000000000000000000", runtime.config.PolyBFTConfig.Bridge.CheckpointManagerAddr.String())
+	assert.Equal(t, "0x1000000000000000000000000000000000000000", runtime.config.PolyBFTConfig.Bridge.CheckpointAddr.String())
 	assert.Equal(t, uint64(10), runtime.config.PolyBFTConfig.EpochSize)
 	assert.True(t, runtime.IsBridgeEnabled())
 }
@@ -1393,7 +1396,8 @@ func TestConsensusRuntime_calculateUptime_EpochSizeToSmall(t *testing.T) {
 	t.Parallel()
 
 	config := &PolyBFTConfig{
-		EpochSize: 2,
+		ValidatorSetAddr: contracts.ValidatorSetContract,
+		EpochSize:        2,
 	}
 
 	consensusRuntime := &consensusRuntime{
@@ -1416,8 +1420,9 @@ func TestConsensusRuntime_calculateUptime_SecondEpoch(t *testing.T) {
 
 	validators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E"})
 	config := &PolyBFTConfig{
-		EpochSize:  10,
-		SprintSize: 5,
+		ValidatorSetAddr: contracts.ValidatorSetContract,
+		EpochSize:        10,
+		SprintSize:       5,
 	}
 	lastBuiltBlock, headerMap := createTestBlocksForUptime(t, 19, validators.getPublicIdentities())
 
@@ -1635,7 +1640,7 @@ func TestConsensusRuntime_FSM_EndOfEpoch_OnBlockInserted(t *testing.T) {
 	inputData, err := fsm.proposerCommitmentToRegister.EncodeAbi()
 	assert.NoError(t, err)
 
-	tx := createStateTransactionWithData(contracts.StateReceiverContract, inputData)
+	tx := createStateTransactionWithData(fsm.config.StateReceiverAddr, inputData)
 
 	block := consensus.BuildBlock(consensus.BuildBlockParams{
 		Header: &types.Header{Number: 1},

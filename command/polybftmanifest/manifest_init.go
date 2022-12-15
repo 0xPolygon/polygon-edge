@@ -63,14 +63,14 @@ func setFlags(cmd *cobra.Command) {
 		&params.validatorsPath,
 		validatorsPathFlag,
 		"./",
-		"root path containing polybft validators private keys",
+		"root path containing polybft validator keys",
 	)
 
 	cmd.Flags().StringVar(
 		&params.validatorsPrefixPath,
 		validatorsPrefixFlag,
 		defaultValidatorPrefixPath,
-		"folder prefix names for polybft validator private keys",
+		"folder prefix names for polybft validator keys",
 	)
 
 	cmd.Flags().StringArrayVar(

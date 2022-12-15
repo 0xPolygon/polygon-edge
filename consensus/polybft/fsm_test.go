@@ -647,7 +647,7 @@ func TestFSM_VerifyStateTransactions_EndOfEpochWrongValidatorsUptimeTx(t *testin
 	uptimeCounter, err := createTestUptimeCounter(t, nil, 5).EncodeAbi()
 	require.NoError(t, err)
 
-	commitEpochTx := createStateTransactionWithData(fsm.config.ValidatorSetAddr, uptimeCounter)
+	commitEpochTx := createStateTransactionWithData(contracts.ValidatorSetContract, uptimeCounter)
 	err = fsm.VerifyStateTransactions([]*types.Transaction{commitEpochTx})
 	assert.ErrorContains(t, err, "invalid uptime transaction")
 }
@@ -656,7 +656,7 @@ func TestFSM_VerifyStateTransactions_StateTransactionAndSprintIsFalse(t *testing
 	t.Parallel()
 
 	fsm := &fsm{config: &PolyBFTConfig{}, uptimeCounter: createTestUptimeCounter(t, nil, 10)}
-	dummyStateTx := &types.Transaction{To: &fsm.config.StateReceiverAddr, Type: types.StateTx}
+	dummyStateTx := &types.Transaction{To: &contracts.StateReceiverContract, Type: types.StateTx}
 	err := fsm.VerifyStateTransactions([]*types.Transaction{dummyStateTx})
 	assert.ErrorContains(t, err, "state transaction in block which should not contain")
 }

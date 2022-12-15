@@ -129,7 +129,7 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 		runtime.checkpointManager = newCheckpointManager(
 			wallet.NewEcdsaSigner(config.Key),
 			defaultCheckpointsOffset,
-			config.PolyBFTConfig.Bridge.CheckpointManagerAddr,
+			config.PolyBFTConfig.Bridge.CheckpointAddr,
 			txRelayer,
 			config.blockchain,
 			config.polybftBackend,
