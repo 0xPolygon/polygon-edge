@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
@@ -265,7 +265,7 @@ func (p *genesisParams) deployContracts() (map[types.Address]*chain.GenesisAccou
 	allocations := make(map[types.Address]*chain.GenesisAccount, len(genesisContracts))
 
 	for _, contract := range genesisContracts {
-		artifact, err := contractsapi.ReadArtifact(p.smartContractsRootPath, contract.relativePath, contract.name)
+		artifact, err := artifact.ReadArtifact(p.smartContractsRootPath, contract.relativePath, contract.name)
 		if err != nil {
 			return nil, err
 		}

@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
+
 	"github.com/umbracle/ethgo/abi"
 
 	"github.com/0xPolygon/polygon-edge/chain"
@@ -310,10 +312,10 @@ func TestPerformExit(t *testing.T) {
 		return result.ReturnValue
 	}
 
-	rootchainContractAddress := deployRootchainContract(t, transition, contractsapi.Rootchain, senderAddress, accSet, bn256Addr)
+	rootchainContractAddress := deployRootchainContract(t, transition, contractsapi.CheckpointManager, senderAddress, accSet, bn256Addr)
 	exitHelperContractAddress := deployExitContract(t, transition, contractsapi.ExitHelper, senderAddress, rootchainContractAddress)
 
-	require.Equal(t, getField(rootchainContractAddress, contractsapi.Rootchain.Abi, "currentCheckpointBlockNumber")[31], uint8(0))
+	require.Equal(t, getField(rootchainContractAddress, contractsapi.CheckpointManager.Abi, "currentCheckpointBlockNumber")[31], uint8(0))
 
 	cm := checkpointManager{
 		blockchain: &blockchainMock{},
@@ -391,7 +393,7 @@ func TestPerformExit(t *testing.T) {
 	require.NoError(t, result.Err)
 	require.True(t, result.Succeeded())
 	require.False(t, result.Failed())
-	require.Equal(t, getField(rootchainContractAddress, contractsapi.Rootchain.Abi, "currentCheckpointBlockNumber")[31], uint8(1))
+	require.Equal(t, getField(rootchainContractAddress, contractsapi.CheckpointManager.Abi, "currentCheckpointBlockNumber")[31], uint8(1))
 
 	//check that the exit havent performed
 	res := getField(exitHelperContractAddress, contractsapi.ExitHelper.Abi, "processedExits", exits[0].ID)
@@ -431,7 +433,7 @@ func TestPerformExit(t *testing.T) {
 	require.Equal(t, lastCounter[31], uint8(1))
 }
 
-func deployRootchainContract(t *testing.T, transition *state.Transition, rootchainArtifact *contractsapi.Artifact, sender types.Address, accSet AccountSet, bn256Addr types.Address) types.Address {
+func deployRootchainContract(t *testing.T, transition *state.Transition, rootchainArtifact *artifact.Artifact, sender types.Address, accSet AccountSet, bn256Addr types.Address) types.Address {
 	t.Helper()
 
 	result := transition.Create2(sender, rootchainArtifact.Bytecode, big.NewInt(0), 1000000000)
@@ -461,7 +463,7 @@ func deployRootchainContract(t *testing.T, transition *state.Transition, rootcha
 	return rcAddress
 }
 
-func deployExitContract(t *testing.T, transition *state.Transition, exitHelperArtifcat *contractsapi.Artifact, sender types.Address, rootchainContractAddress types.Address) types.Address {
+func deployExitContract(t *testing.T, transition *state.Transition, exitHelperArtifcat *artifact.Artifact, sender types.Address, rootchainContractAddress types.Address) types.Address {
 	t.Helper()
 
 	result := transition.Create2(sender, exitHelperArtifcat.Bytecode, big.NewInt(0), 1000000000)

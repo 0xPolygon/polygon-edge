@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
+
 	"github.com/0xPolygon/polygon-edge/command/genesis"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
@@ -238,7 +240,7 @@ func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
 	fail := 0
 
 	for range time.Tick(time.Second) {
-		currentEpochString, err := ABICall(txRelayer, contractsapi.Rootchain, checkpointManagerAddress, "currentEpoch")
+		currentEpochString, err := ABICall(txRelayer, contractsapi.CheckpointManager, checkpointManagerAddress, "currentEpoch")
 		require.NoError(t, err)
 
 		currentEpoch, err := types.ParseUint64orHex(&currentEpochString)
@@ -321,7 +323,7 @@ func getExitProof(rpcAddress string, exitID, epoch, checkpointBlock uint64) (typ
 	return rspProof.Result, nil
 }
 
-func ABICall(relayer txrelayer.TxRelayer, artifact *contractsapi.Artifact, contractAddress ethgo.Address, method string, params ...interface{}) (string, error) {
+func ABICall(relayer txrelayer.TxRelayer, artifact *artifact.Artifact, contractAddress ethgo.Address, method string, params ...interface{}) (string, error) {
 	input, err := artifact.Abi.GetMethod(method).Encode(params)
 	if err != nil {
 		return "", err
@@ -329,7 +331,7 @@ func ABICall(relayer txrelayer.TxRelayer, artifact *contractsapi.Artifact, contr
 
 	return relayer.Call(ethgo.Address(helper.GetRootchainAdminAddr()), contractAddress, input)
 }
-func ABITransaction(relayer txrelayer.TxRelayer, key ethgo.Key, artifact *contractsapi.Artifact, contractAddress ethgo.Address, method string, params ...interface{}) (*ethgo.Receipt, error) {
+func ABITransaction(relayer txrelayer.TxRelayer, key ethgo.Key, artifact *artifact.Artifact, contractAddress ethgo.Address, method string, params ...interface{}) (*ethgo.Receipt, error) {
 	input, err := artifact.Abi.GetMethod(method).Encode(params)
 	if err != nil {
 		return nil, err
