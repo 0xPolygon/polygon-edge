@@ -172,7 +172,7 @@ func (p *Polybft) Initialize() error {
 	}
 
 	// create bridge and consensus topics
-	if err := p.createTopics(); err != nil {
+	if err = p.createTopics(); err != nil {
 		return fmt.Errorf("cannot create topics: %w", err)
 	}
 
@@ -182,11 +182,11 @@ func (p *Polybft) Initialize() error {
 	// initialize polybft consensus data directory
 	p.dataDir = filepath.Join(p.config.Config.Path, "polybft")
 	// create the data dir if not exists
-	if err := os.MkdirAll(p.dataDir, 0750); err != nil {
+	if err = os.MkdirAll(p.dataDir, 0750); err != nil {
 		return fmt.Errorf("failed to create data directory. Error: %w", err)
 	}
 
-	stt, err := newState(filepath.Join(p.dataDir, stateFileName), p.logger)
+	stt, err := newState(filepath.Join(p.dataDir, stateFileName), p.logger, p.closeCh)
 	if err != nil {
 		return fmt.Errorf("failed to create state instance. Error: %w", err)
 	}
@@ -201,7 +201,7 @@ func (p *Polybft) Initialize() error {
 
 	p.ibft = newIBFTConsensusWrapper(p.logger, p.runtime, p)
 
-	if err := p.subscribeToIbftTopic(); err != nil {
+	if err = p.subscribeToIbftTopic(); err != nil {
 		return fmt.Errorf("topic subscription failed: %w", err)
 	}
 
@@ -234,6 +234,9 @@ func (p *Polybft) Start() error {
 	if err := p.startRuntime(); err != nil {
 		return fmt.Errorf("consensus runtime start failed: %w", err)
 	}
+
+	// start state DB process
+	go p.state.startStatsReleasing()
 
 	return nil
 }
