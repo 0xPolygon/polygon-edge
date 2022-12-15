@@ -261,22 +261,23 @@ var (
 type State struct {
 	db     *bolt.DB
 	logger hclog.Logger
+	close  chan struct{}
 }
 
-func newState(path string, logger hclog.Logger) (*State, error) {
+func newState(path string, logger hclog.Logger, closeCh chan struct{}) (*State, error) {
 	db, err := bolt.Open(path, 0666, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	err = initMainDBBuckets(db)
-	if err != nil {
+	if err = initMainDBBuckets(db); err != nil {
 		return nil, err
 	}
 
 	state := &State{
 		db:     db,
 		logger: logger.Named("state"),
+		close:  closeCh,
 	}
 
 	return state, nil
