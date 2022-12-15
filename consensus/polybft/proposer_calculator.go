@@ -116,8 +116,8 @@ func (pcs *ProposerSnapshot) Copy() *ProposerSnapshot {
 	}
 }
 
-func (pcs *ProposerSnapshot) toMap() map[types.Address]*ProposerValidator {
-	validatorMap := make(map[types.Address]*ProposerValidator)
+func (pcs *ProposerSnapshot) toMap() map[types.Address]*PrioritizedValidator {
+	validatorMap := make(map[types.Address]*PrioritizedValidator)
 	for _, v := range pcs.Validators {
 		validatorMap[v.Metadata.Address] = v
 	}
@@ -278,7 +278,7 @@ func (pc *proposerCalculator) updateValidators(snapshot *ProposerSnapshot, newVa
 	}
 
 	snapshotValidators := snapshot.toMap()
-	newValidators := make([]*ProposerValidator, len(newValidatorSet))
+	newValidators := make([]*PrioritizedValidator, len(newValidatorSet))
 
 	// compute total voting power of removed validators and currentValidatorSer
 	removedValidatorsVotingPower := uint64(0)
@@ -307,13 +307,13 @@ func (pc *proposerCalculator) updateValidators(snapshot *ProposerSnapshot, newVa
 	for i, newValidator := range newValidatorSet {
 		if val, exists := snapshotValidators[newValidator.Address]; exists {
 			// old validators have the same priority
-			newValidators[i] = &ProposerValidator{
+			newValidators[i] = &PrioritizedValidator{
 				Metadata:         newValidator,
 				ProposerPriority: val.ProposerPriority,
 			}
 		} else {
 			// added validator has priority -1.125 * V
-			newValidators[i] = &ProposerValidator{
+			newValidators[i] = &PrioritizedValidator{
 				Metadata:         newValidator,
 				ProposerPriority: int64(-(tvpAfterUpdatesBeforeRemovals + (tvpAfterUpdatesBeforeRemovals >> 3))),
 			}
