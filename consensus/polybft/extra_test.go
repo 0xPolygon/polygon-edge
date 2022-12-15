@@ -369,46 +369,47 @@ func TestExtra_CreateValidatorSetDelta_Cases(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
+		localCase := c
+		t.Run(localCase.name, func(t *testing.T) {
 			t.Parallel()
 
 			vals := newTestValidatorsWithAliases([]string{})
 
-			for _, name := range c.oldSet {
+			for _, name := range localCase.oldSet {
 				vals.create(name, 1)
 			}
-			for _, name := range c.newSet {
+			for _, name := range localCase.newSet {
 				vals.create(name, 1)
 			}
 
-			oldValidatorSet := vals.getPublicIdentities(c.oldSet...)
+			oldValidatorSet := vals.getPublicIdentities(localCase.oldSet...)
 			// update voting power to random value
 			maxVotingPower := big.NewInt(100)
-			for _, name := range c.updated {
+			for _, name := range localCase.updated {
 				v := vals.getValidator(name)
 				vp, err := rand.Int(rand.Reader, maxVotingPower)
 				require.NoError(t, err)
 				v.votingPower = vp.Uint64()
 			}
-			newValidatorSet := vals.getPublicIdentities(c.newSet...)
+			newValidatorSet := vals.getPublicIdentities(localCase.newSet...)
 
 			delta, err := createValidatorSetDelta(oldValidatorSet, newValidatorSet)
 			require.NoError(t, err)
 
 			// added validators
-			require.Len(t, delta.Added, len(c.added))
-			for i, name := range c.added {
+			require.Len(t, delta.Added, len(localCase.added))
+			for i, name := range localCase.added {
 				require.Equal(t, delta.Added[i].Address, vals.getValidator(name).Address())
 			}
 
 			// removed validators
-			for _, i := range c.removed {
+			for _, i := range localCase.removed {
 				require.True(t, delta.Removed.IsSet(i))
 			}
 
 			// updated validators
-			require.Len(t, delta.Updated, len(c.updated))
-			for i, name := range c.updated {
+			require.Len(t, delta.Updated, len(localCase.updated))
+			for i, name := range localCase.updated {
 				require.Equal(t, delta.Updated[i].Address, vals.getValidator(name).Address())
 			}
 		})
