@@ -13,7 +13,6 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
 
-	"github.com/0xPolygon/polygon-edge/command/genesis"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
@@ -200,11 +199,6 @@ func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
 	l2Relayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Servers[0].JSONRPCAddr()))
 	require.NoError(t, err)
 
-	//add balance to validators for sending checkpoints
-	validators, err := genesis.ReadValidatorsByRegexp(cluster.Config.TmpDir, cluster.Config.ValidatorPrefix)
-	require.NoError(t, err)
-	FundValidators(t, txRelayer, validators)
-
 	//deploy l1,l2, ExitHelper contracts
 	receipt, err := DeployTransaction(txRelayer, helper.GetRootchainAdminKey(), contractsapi.L1ExitTestBytecode)
 	require.NoError(t, err)
@@ -347,21 +341,4 @@ func DeployTransaction(relayer txrelayer.TxRelayer, key ethgo.Key, bytecode []by
 	return relayer.SendTransaction(&ethgo.Transaction{
 		Input: bytecode,
 	}, key)
-}
-
-func FundValidators(t *testing.T, txRelayer txrelayer.TxRelayer, validators []*polybft.Validator) {
-	t.Helper()
-
-	for _, validator := range validators {
-		fundAddr := ethgo.Address(validator.Address)
-		txn := &ethgo.Transaction{
-			To:    &fundAddr,
-			Value: big.NewInt(1000000000000000000),
-		}
-
-		_, err := txRelayer.SendTransactionLocal(txn)
-		if err != nil {
-			t.Error(validator.Address, "error on funding", err)
-		}
-	}
 }

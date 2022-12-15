@@ -1,6 +1,7 @@
 package initcontracts
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -8,7 +9,10 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
+
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
 
 	"github.com/spf13/cobra"
 	"github.com/umbracle/ethgo"
@@ -176,45 +180,40 @@ func deployContracts(outputter command.OutputFormatter) error {
 
 	deployContracts := []struct {
 		name     string
-		path     string
+		artifact *artifact.Artifact
 		expected types.Address
 	}{
 		{
 			name:     "StateSender",
-			path:     "root/StateSender.sol",
+			artifact: contractsapi.StateSender,
 			expected: helper.StateSenderAddress,
 		},
 		{
 			name:     "CheckpointManager",
-			path:     "root/CheckpointManager.sol",
+			artifact: contractsapi.CheckpointManager,
 			expected: helper.CheckpointManagerAddress,
 		},
 		{
 			name:     "BLS",
-			path:     "common/BLS.sol",
+			artifact: contractsapi.BLS,
 			expected: helper.BLSAddress,
 		},
 		{
 			name:     "BN256G2",
-			path:     "common/BN256G2.sol",
+			artifact: contractsapi.BLS256,
 			expected: helper.BN256G2Address,
 		},
 		{
 			name:     "ExitHelper",
-			path:     "root/ExitHelper.sol",
+			artifact: contractsapi.ExitHelper,
 			expected: types.Address(helper.ExitHelperAddress),
 		},
 	}
 
 	for _, contract := range deployContracts {
-		bytecode, err := readContractBytecode(params.contractsPath, contract.path, contract.name)
-		if err != nil {
-			return err
-		}
-
 		txn := &ethgo.Transaction{
 			To:    nil, // contract deployment
-			Input: bytecode,
+			Input: contract.artifact.Bytecode,
 		}
 
 		receipt, err := txRelayer.SendTransaction(txn, helper.GetRootchainAdminKey())
@@ -289,24 +288,24 @@ func initializeCheckpointManager(txRelayer txrelayer.TxRelayer) error {
 }
 
 func initializeExitHelper(txRelayer txrelayer.TxRelayer, checkpointManagerAddress ethgo.Address) error {
-	initCheckpointInput, err := contractsapi.ExitHelper.Abi.GetMethod("initialize").
+	input, err := contractsapi.ExitHelper.Abi.GetMethod("initialize").
 		Encode([]interface{}{checkpointManagerAddress})
 	if err != nil {
-		return fmt.Errorf("failed to encode parameters for CheckpointManager.initialize. error: %w", err)
+		return fmt.Errorf("failed to encode parameters for ExitHelper.initialize. error: %w", err)
 	}
 
 	txn := &ethgo.Transaction{
 		To:    &helper.ExitHelperAddress,
-		Input: initCheckpointInput,
+		Input: input,
 	}
 
 	receipt, err := txRelayer.SendTransaction(txn, helper.GetRootchainAdminKey())
 	if err != nil {
-		return fmt.Errorf("failed to send transaction to CheckpointManager. error: %w", err)
+		return fmt.Errorf("failed to send transaction to ExitHelper. error: %w", err)
 	}
 
 	if receipt.Status != uint64(types.ReceiptSuccess) {
-		return errors.New("failed to initialize CheckpointManager")
+		return errors.New("failed to initialize ExitHelper contract")
 	}
 
 	return nil
@@ -319,6 +318,11 @@ func validatorSetToABISlice(allocs map[types.Address]*chain.GenesisAccount) ([]m
 		return nil, err
 	}
 
+	sort.Slice(validatorsInfo, func(i, j int) bool {
+		return bytes.Compare(validatorsInfo[i].Address.Bytes(),
+			validatorsInfo[j].Address.Bytes()) < 0
+	})
+
 	accSet := polybft.AccountSet{}
 
 	for _, validatorInfo := range validatorsInfo {
@@ -330,7 +334,7 @@ func validatorSetToABISlice(allocs map[types.Address]*chain.GenesisAccount) ([]m
 		accSet = append(accSet, &polybft.ValidatorMetadata{
 			Address:     validatorInfo.Address,
 			BlsKey:      blsKey,
-			VotingPower: chain.ConvertWeiToTokensAmount(allocs[validatorInfo.Address].Balance).Uint64(),
+			VotingPower: allocs[validatorInfo.Address].Balance.Uint64(),
 		})
 	}
 

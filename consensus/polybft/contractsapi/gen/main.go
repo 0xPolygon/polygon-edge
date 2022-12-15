@@ -16,7 +16,7 @@ func main() {
 	scpath := path.Join(currentPath, "../../../../core-contracts/artifacts/contracts/")
 
 	f := jen.NewFile("contractsapi")
-	f.Comment("This is generated file don't change it manually")
+	f.Comment("This is generated file don't change it manually.  DO NOT EDIT.")
 
 	readContracts := []struct {
 		Path string
@@ -36,10 +36,19 @@ func main() {
 		},
 		{
 			"common/BLS.sol",
-			"BLS"},
+			"BLS",
+		},
 		{
 			"common/BN256G2.sol",
 			"BN256G2",
+		},
+		{
+			"child/StateReceiver.sol",
+			"StateReceiver",
+		},
+		{
+			"root/StateSender.sol",
+			"StateSender",
 		},
 	}
 

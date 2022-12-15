@@ -12,6 +12,8 @@ var (
 	CheckpointManager *artifact.Artifact
 	ExitHelper        *artifact.Artifact
 	L2StateSender     *artifact.Artifact
+	StateSender       *artifact.Artifact
+	StateReceiver     *artifact.Artifact
 	BLS               *artifact.Artifact
 	BLS256            *artifact.Artifact
 
@@ -45,6 +47,16 @@ func init() {
 	}
 
 	BLS256, err = artifact.DecodeArtifact([]byte(BN256G2Artifact))
+	if err != nil {
+		panic(err)
+	}
+
+	StateSender, err = artifact.DecodeArtifact([]byte(StateSenderArtifact))
+	if err != nil {
+		panic(err)
+	}
+
+	StateReceiver, err = artifact.DecodeArtifact([]byte(StateReceiverArtifact))
 	if err != nil {
 		panic(err)
 	}

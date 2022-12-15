@@ -387,9 +387,6 @@ func (s *State) getExitEvent(exitEventID, epoch uint64) (*ExitEvent, error) {
 
 		key := bytes.Join([][]byte{itob(epoch), itob(exitEventID)}, nil)
 		k, v := bucket.Cursor().Seek(key)
-		fmt.Println(k, "k")
-		fmt.Println(key, "key")
-		fmt.Println(v, "v")
 
 		if bytes.HasPrefix(k, key) == false || v == nil {
 			return &exitEventNotFoundError{

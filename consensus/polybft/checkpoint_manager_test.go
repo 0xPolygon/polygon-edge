@@ -405,7 +405,7 @@ func TestPerformExit(t *testing.T) {
 	require.NoError(t, err)
 	leafIndex, err := exitTrie.LeafIndex(proofExitEvent)
 	require.NoError(t, err)
-	t.Log("proof", proof)
+
 	ehExit, err := contractsapi.ExitHelper.Abi.GetMethod("exit").Encode([]interface{}{
 		blockNumber,
 		leafIndex,

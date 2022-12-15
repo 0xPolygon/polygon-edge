@@ -9,8 +9,8 @@ import (
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/armon/go-metrics"
-	"github.com/hashicorp/go-hclog"
+	metrics "github.com/armon/go-metrics"
+	hclog "github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
 )

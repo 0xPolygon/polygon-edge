@@ -255,7 +255,7 @@ func (p *genesisParams) deployContracts() (map[types.Address]*chain.GenesisAccou
 			address:      contracts.MerkleContract,
 		},
 		{
-			// Merkle contract
+			// L2StateSender contract
 			name:         "L2StateSender",
 			relativePath: "child/L2StateSender.sol",
 			address:      contracts.L2StateSenderContract,
