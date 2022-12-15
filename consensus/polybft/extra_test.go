@@ -390,7 +390,7 @@ func TestExtra_CreateValidatorSetDelta_Cases(t *testing.T) {
 				vp, err := rand.Int(rand.Reader, maxVotingPower)
 				require.NoError(t, err)
 				// make sure generated voting power is different than the original one
-				v.votingPower += v.votingPower + vp.Uint64() + 1
+				v.votingPower += vp.Uint64() + 1
 			}
 			newValidatorSet := vals.getPublicIdentities(c.newSet...)
 
