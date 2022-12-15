@@ -285,14 +285,14 @@ func Test_buildLogsFromReceipts(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		localTest := tt
-		t.Run(localTest.name, func(t *testing.T) {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
 			assert.EqualValuesf(t,
-				localTest.want,
-				buildLogsFromReceipts(localTest.args.entry, localTest.args.header),
-				"buildLogsFromReceipts(%v, %v)", localTest.args.entry, localTest.args.header,
+				tt.want,
+				buildLogsFromReceipts(tt.args.entry, tt.args.header),
+				"buildLogsFromReceipts(%v, %v)", tt.args.entry, tt.args.header,
 			)
 		})
 	}

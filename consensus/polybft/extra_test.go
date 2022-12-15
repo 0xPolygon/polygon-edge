@@ -369,48 +369,48 @@ func TestExtra_CreateValidatorSetDelta_Cases(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		localCase := c
-		t.Run(localCase.name, func(t *testing.T) {
+		c := c
+		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
 
 			vals := newTestValidatorsWithAliases([]string{})
 
-			for _, name := range localCase.oldSet {
+			for _, name := range c.oldSet {
 				vals.create(name, 1)
 			}
-			for _, name := range localCase.newSet {
+			for _, name := range c.newSet {
 				vals.create(name, 1)
 			}
 
-			oldValidatorSet := vals.getPublicIdentities(localCase.oldSet...)
+			oldValidatorSet := vals.getPublicIdentities(c.oldSet...)
 			// update voting power to random value
 			maxVotingPower := big.NewInt(100)
-			for _, name := range localCase.updated {
+			for _, name := range c.updated {
 				v := vals.getValidator(name)
 				vp, err := rand.Int(rand.Reader, maxVotingPower)
 				require.NoError(t, err)
 				// make sure generated voting power is different than the original one
 				v.votingPower += v.votingPower + vp.Uint64() + 1
 			}
-			newValidatorSet := vals.getPublicIdentities(localCase.newSet...)
+			newValidatorSet := vals.getPublicIdentities(c.newSet...)
 
 			delta, err := createValidatorSetDelta(oldValidatorSet, newValidatorSet)
 			require.NoError(t, err)
 
 			// added validators
-			require.Len(t, delta.Added, len(localCase.added))
-			for i, name := range localCase.added {
+			require.Len(t, delta.Added, len(c.added))
+			for i, name := range c.added {
 				require.Equal(t, delta.Added[i].Address, vals.getValidator(name).Address())
 			}
 
 			// removed validators
-			for _, i := range localCase.removed {
+			for _, i := range c.removed {
 				require.True(t, delta.Removed.IsSet(i))
 			}
 
 			// updated validators
-			require.Len(t, delta.Updated, len(localCase.updated))
-			for i, name := range localCase.updated {
+			require.Len(t, delta.Updated, len(c.updated))
+			for i, name := range c.updated {
 				require.Equal(t, delta.Updated[i].Address, vals.getValidator(name).Address())
 			}
 		})
