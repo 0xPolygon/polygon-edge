@@ -3,6 +3,8 @@ package ibft
 import (
 	"bytes"
 	"encoding/hex"
+	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/golang/protobuf/proto"
 
 	"github.com/0xPolygon/go-ibft/messages"
 	protoIBFT "github.com/0xPolygon/go-ibft/messages/proto"
@@ -134,17 +136,15 @@ func (i *backendIBFT) IsProposer(id []byte, height, round uint64) bool {
 	return types.BytesToAddress(id) == nextProposer.Addr()
 }
 
-func (i *backendIBFT) IsValidProposalHash(proposal, hash []byte) bool {
-	newBlock := &types.Block{}
-	if err := newBlock.UnmarshalRLP(proposal); err != nil {
-		i.logger.Error("unable to unmarshal proposal", "err", err)
-
+func (i *backendIBFT) IsValidProposalHash(proposal *protoIBFT.ProposedBlock, hash []byte) bool {
+	proposedBlockRaw, err := proto.Marshal(proposal)
+	if err != nil {
 		return false
 	}
 
-	blockHash := newBlock.Header.Hash.Bytes()
+	proposalHash := crypto.Keccak256(proposedBlockRaw)
 
-	return bytes.Equal(blockHash, hash)
+	return bytes.Equal(proposalHash, hash)
 }
 
 func (i *backendIBFT) IsValidCommittedSeal(

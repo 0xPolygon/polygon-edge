@@ -1,10 +1,10 @@
 package ibft
 
 import (
+	"github.com/0xPolygon/polygon-edge/crypto"
 	"google.golang.org/protobuf/proto"
 
 	protoIBFT "github.com/0xPolygon/go-ibft/messages/proto"
-	"github.com/0xPolygon/polygon-edge/types"
 )
 
 func (i *backendIBFT) signMessage(msg *protoIBFT.Message) *protoIBFT.Message {
@@ -21,16 +21,28 @@ func (i *backendIBFT) signMessage(msg *protoIBFT.Message) *protoIBFT.Message {
 }
 
 func (i *backendIBFT) BuildPrePrepareMessage(
-	proposal []byte,
+	ethereumBlock []byte,
 	certificate *protoIBFT.RoundChangeCertificate,
 	view *protoIBFT.View,
 ) *protoIBFT.Message {
-	block := &types.Block{}
-	if err := block.UnmarshalRLP(proposal); err != nil {
+	proposedBlock := &protoIBFT.ProposedBlock{
+		EthereumBlock: ethereumBlock,
+		Round:         view.Round,
+	}
+
+	proposedBlockRaw, err := proto.Marshal(proposedBlock)
+	if err != nil {
 		return nil
 	}
 
-	proposalHash := block.Hash().Bytes()
+	proposalHash := crypto.Keccak256(proposedBlockRaw)
+
+	// TODO: Double-check that even without this we are correctly validating the block elsewhere.
+	//block := &types.Block{}
+	//if err := block.UnmarshalRLP(proposal); err != nil {
+	//return nil
+	//}
+	//proposalHash := block.Hash().Bytes()
 
 	msg := &protoIBFT.Message{
 		View: view,
@@ -38,7 +50,7 @@ func (i *backendIBFT) BuildPrePrepareMessage(
 		Type: protoIBFT.MessageType_PREPREPARE,
 		Payload: &protoIBFT.Message_PreprepareData{
 			PreprepareData: &protoIBFT.PrePrepareMessage{
-				Proposal:     proposal,
+				Proposal:     proposedBlock,
 				ProposalHash: proposalHash,
 				Certificate:  certificate,
 			},

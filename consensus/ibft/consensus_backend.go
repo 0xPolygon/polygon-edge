@@ -14,7 +14,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-func (i *backendIBFT) BuildProposal(blockNumber uint64) []byte {
+func (i *backendIBFT) BuildEthereumBlock(blockNumber uint64) []byte {
 	var (
 		latestHeader      = i.blockchain.Header()
 		latestBlockNumber = latestHeader.Number
@@ -40,8 +40,11 @@ func (i *backendIBFT) BuildProposal(blockNumber uint64) []byte {
 	return block.MarshalRLP()
 }
 
+// TODO: Yoshiki please do this change, we need to make sure that on validating (when syncing) we make sure that
+// the committed seals are verifying against ProposedBlock (structure found in go-ibft/messages/proto/messages.pb.go
+// the ProposedBlock is hashed as proto.Marshal(ProposedBlock) and then keccakk hashed.
 func (i *backendIBFT) InsertBlock(
-	proposal []byte,
+	ethereumBlock []byte,
 	committedSeals []*messages.CommittedSeal,
 ) {
 	newBlock := &types.Block{}
