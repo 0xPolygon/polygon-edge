@@ -99,7 +99,7 @@ func (i *backendIBFT) BuildCommitMessage(proposalHash []byte, view *protoIBFT.Vi
 }
 
 func (i *backendIBFT) BuildRoundChangeMessage(
-	proposal []byte,
+	proposal *protoIBFT.ProposedBlock,
 	certificate *protoIBFT.PreparedCertificate,
 	view *protoIBFT.View,
 ) *protoIBFT.Message {
