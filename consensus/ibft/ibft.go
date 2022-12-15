@@ -436,6 +436,7 @@ func (i *backendIBFT) VerifyBlock(block *types.Block) error {
 	}
 
 	hashForCS, err := calcHashForCS(
+		headerSigner,
 		block,
 		extra,
 	)
@@ -458,6 +459,7 @@ func (i *backendIBFT) VerifyBlock(block *types.Block) error {
 }
 
 func calcHashForCS(
+	signer signer.Signer,
 	block *types.Block,
 	extra *signer.IstanbulExtra,
 ) ([]byte, error) {
@@ -465,10 +467,22 @@ func calcHashForCS(
 		return block.Hash().Bytes(), nil
 	}
 
+	// need to remove some fields from finalized header for hash calculation
+	originalHeader := block.Header
+
+	filteredHeader, err := signer.FilterHeaderForHash(block.Header)
+	if err != nil {
+		return nil, err
+	}
+
+	block.Header = filteredHeader
+
 	proposedBlock := &protoIBFT.ProposedBlock{
 		EthereumBlock: block.MarshalRLP(),
 		Round:         *extra.RoundNumber,
 	}
+
+	block.Header = originalHeader
 
 	proposedBlockRaw, err := protoBuf.Marshal(proposedBlock)
 	if err != nil {
@@ -625,6 +639,7 @@ func (i *backendIBFT) verifyParentCommittedSeals(
 	}
 
 	parentHash, err := calcHashForCS(
+		parentSigner,
 		parentBlock,
 		parentExtra,
 	)

@@ -69,6 +69,7 @@ type Signer interface {
 
 	// Hash of Header
 	CalculateHeaderHash(*types.Header) (types.Hash, error)
+	FilterHeaderForHash(*types.Header) (*types.Header, error)
 }
 
 // SignerImpl is an implementation that meets Signer
@@ -323,7 +324,7 @@ func (s *SignerImpl) initIbftExtra(
 
 // CalculateHeaderHash calculates header hash for IBFT Extra
 func (s *SignerImpl) CalculateHeaderHash(header *types.Header) (types.Hash, error) {
-	filteredHeader, err := s.filterHeaderForHash(header)
+	filteredHeader, err := s.FilterHeaderForHash(header)
 	if err != nil {
 		return types.ZeroHash, err
 	}
@@ -360,7 +361,7 @@ func (s *SignerImpl) GetParentCommittedSeals(header *types.Header) (Seals, error
 
 // filterHeaderForHash removes unnecessary fields from IBFT Extra of the header
 // for hash calculation
-func (s *SignerImpl) filterHeaderForHash(header *types.Header) (*types.Header, error) {
+func (s *SignerImpl) FilterHeaderForHash(header *types.Header) (*types.Header, error) {
 	clone := header.Copy()
 
 	extra, err := s.GetIBFTExtra(header)
