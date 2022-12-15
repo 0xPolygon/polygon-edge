@@ -199,7 +199,7 @@ func (f *fsm) stateTransactions() []*types.Transaction {
 			}
 
 			txns = append(txns,
-				createStateTransactionWithData(contracts.StateReceiverContract, inputData))
+				createStateTransactionWithData(f.config.StateReceiverAddr, inputData))
 		}
 	}
 
@@ -216,7 +216,7 @@ func (f *fsm) createValidatorsUptimeTx() (*types.Transaction, error) {
 		return nil, err
 	}
 
-	return createStateTransactionWithData(contracts.ValidatorSetContract, input), nil
+	return createStateTransactionWithData(f.config.ValidatorSetAddr, input), nil
 }
 
 // ValidateCommit is used to validate that a given commit is valid
