@@ -529,7 +529,7 @@ func (f *fsm) ValidatorSet() ValidatorSet {
 // getCurrentValidators queries smart contract on the given block height and returns currently active validator set
 func (f *fsm) getCurrentValidators(pendingBlockState *state.Transition) (AccountSet, error) {
 	provider := f.backend.GetStateProvider(pendingBlockState)
-	systemState := f.backend.GetSystemState(contracts.ValidatorSetContract, contracts.StateReceiverContract, provider)
+	systemState := f.backend.GetSystemState(f.config, provider)
 	newValidators, err := systemState.GetValidatorSet()
 
 	if err != nil {

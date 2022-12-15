@@ -62,14 +62,15 @@ func (p *genesisParams) generatePolyBftChainConfig() error {
 	}
 
 	polyBftConfig := &polybft.PolyBFTConfig{
-		Validators:             manifest.GenesisValidators,
-		BlockTime:              p.blockTime,
-		EpochSize:              p.epochSize,
-		SprintSize:             p.sprintSize,
-		ActiveValidatorSetSize: p.validatorSetSize,
+		InitialValidatorSet: manifest.GenesisValidators,
+		BlockTime:           p.blockTime,
+		EpochSize:           p.epochSize,
+		SprintSize:          p.sprintSize,
 		// use 1st account as governance address
-		Governance: manifest.GenesisValidators[0].Address,
-		Bridge:     bridge,
+		Governance:        manifest.GenesisValidators[0].Address,
+		Bridge:            bridge,
+		ValidatorSetAddr:  contracts.ValidatorSetContract,
+		StateReceiverAddr: contracts.StateReceiverContract,
 	}
 
 	chainConfig := &chain.Chain{

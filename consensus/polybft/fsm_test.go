@@ -354,7 +354,7 @@ func TestFSM_BuildProposal_WithUptimeTxGood(t *testing.T) {
 	blockChainMock := new(blockchainMock)
 	blockChainMock.On("GetStateProvider", mock.Anything).
 		Return(NewStateProvider(transition)).Once()
-	blockChainMock.On("GetSystemState", mock.Anything, mock.Anything, mock.Anything).Return(systemStateMock).Once()
+	blockChainMock.On("GetSystemState", mock.Anything, mock.Anything).Return(systemStateMock).Once()
 
 	checkpointBackendMock := new(checkpointBackendMock)
 	checkpointBackendMock.On("BuildEventRoot", mock.Anything, mock.Anything).Return(eventRoot, nil).Once()
@@ -472,7 +472,7 @@ func TestFSM_BuildProposal_EpochEndingBlock_ValidatorsDeltaExists(t *testing.T) 
 	blockChainMock := new(blockchainMock)
 	blockChainMock.On("GetStateProvider", mock.Anything).
 		Return(NewStateProvider(transition)).Once()
-	blockChainMock.On("GetSystemState", mock.Anything, mock.Anything, mock.Anything).Return(systemStateMock).Once()
+	blockChainMock.On("GetSystemState", mock.Anything, mock.Anything).Return(systemStateMock).Once()
 
 	checkpointBackendMock := new(checkpointBackendMock)
 	checkpointBackendMock.On("BuildEventRoot", mock.Anything, mock.Anything).Return(types.ZeroHash, nil).Once()
@@ -590,7 +590,7 @@ func TestFSM_BuildProposal_EpochEndingBlock_FailToCreateValidatorsDelta(t *testi
 	blockChainMock := new(blockchainMock)
 	blockChainMock.On("GetStateProvider", mock.Anything).
 		Return(NewStateProvider(transition)).Once()
-	blockChainMock.On("GetSystemState", mock.Anything, mock.Anything, mock.Anything).Return(systemStateMock).Once()
+	blockChainMock.On("GetSystemState", mock.Anything, mock.Anything).Return(systemStateMock).Once()
 
 	fsm := &fsm{parent: parent,
 		blockBuilder:      blockBuilderMock,

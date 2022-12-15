@@ -16,7 +16,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
-	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	hcf "github.com/hashicorp/go-hclog"
@@ -130,7 +129,7 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 		runtime.checkpointManager = newCheckpointManager(
 			wallet.NewEcdsaSigner(config.Key),
 			defaultCheckpointsOffset,
-			config.PolyBFTConfig.Bridge.CheckpointManagerAddress,
+			config.PolyBFTConfig.Bridge.CheckpointManagerAddr,
 			txRelayer,
 			config.blockchain,
 			config.polybftBackend,
@@ -947,10 +946,7 @@ func (c *consensusRuntime) getSystemState(header *types.Header) (SystemState, er
 		return nil, err
 	}
 
-	return c.config.blockchain.GetSystemState(
-		contracts.ValidatorSetContract,
-		contracts.StateReceiverContract,
-		provider), nil
+	return c.config.blockchain.GetSystemState(c.config.PolyBFTConfig, provider), nil
 }
 
 // getCommitmentToRegister gets commitments to register via state transaction

@@ -407,7 +407,7 @@ func TestConsensusRuntime_OnBlockInserted_EndOfEpoch(t *testing.T) {
 
 	blockchainMock := new(blockchainMock)
 	blockchainMock.On("GetStateProviderForBlock", mock.Anything).Return(new(stateProviderMock)).Once()
-	blockchainMock.On("GetSystemState", mock.Anything, mock.Anything, mock.Anything).Return(systemStateMock)
+	blockchainMock.On("GetSystemState", mock.Anything, mock.Anything).Return(systemStateMock)
 
 	polybftBackendMock := new(polybftBackendMock)
 	polybftBackendMock.On("GetValidators", mock.Anything, mock.Anything).Return(validatorSet).Once()
@@ -579,7 +579,7 @@ func TestConsensusRuntime_FSM_EndOfEpoch_BuildRegisterCommitment_And_Uptime(t *t
 	blockchainMock := new(blockchainMock)
 	blockchainMock.On("NewBlockBuilder", mock.Anything).Return(&BlockBuilder{}, nil).Once()
 	blockchainMock.On("GetStateProviderForBlock", mock.Anything).Return(new(stateProviderMock)).Once()
-	blockchainMock.On("GetSystemState", mock.Anything, mock.Anything, mock.Anything).Return(systemStateMock)
+	blockchainMock.On("GetSystemState", mock.Anything, mock.Anything).Return(systemStateMock)
 	blockchainMock.On("GetHeaderByNumber", mock.Anything).Return(headerMap.getHeader)
 
 	state := newTestState(t)
@@ -671,7 +671,7 @@ func TestConsensusRuntime_FSM_EndOfEpoch_RegisterCommitmentNotFound(t *testing.T
 	blockchainMock := new(blockchainMock)
 	blockchainMock.On("NewBlockBuilder", mock.Anything).Return(new(blockBuilderMock), nil).Once()
 	blockchainMock.On("GetStateProviderForBlock", mock.Anything).Return(new(stateProviderMock)).Once()
-	blockchainMock.On("GetSystemState", mock.Anything, mock.Anything, mock.Anything).Return(systemStateMock)
+	blockchainMock.On("GetSystemState", mock.Anything, mock.Anything).Return(systemStateMock)
 	blockchainMock.On("GetHeaderByNumber", mock.Anything).Return(headerMap.getHeader)
 
 	metadata := &epochMetadata{
@@ -729,7 +729,7 @@ func TestConsensusRuntime_FSM_EndOfEpoch_BuildRegisterCommitment_QuorumNotReache
 	blockchainMock := new(blockchainMock)
 	blockchainMock.On("NewBlockBuilder", mock.Anything).Return(&BlockBuilder{}, nil).Once()
 	blockchainMock.On("GetStateProviderForBlock", mock.Anything).Return(new(stateProviderMock)).Once()
-	blockchainMock.On("GetSystemState", mock.Anything, mock.Anything, mock.Anything).Return(systemStateMock)
+	blockchainMock.On("GetSystemState", mock.Anything, mock.Anything).Return(systemStateMock)
 	blockchainMock.On("GetHeaderByNumber", mock.Anything).Return(headerMap.getHeader)
 
 	state := newTestState(t)
@@ -802,8 +802,8 @@ func Test_NewConsensusRuntime(t *testing.T) {
 
 	polyBftConfig := &PolyBFTConfig{
 		Bridge: &BridgeConfig{
-			StateSenderAddress:       types.Address{0x13},
-			CheckpointManagerAddress: types.Address{0x10},
+			BridgeAddr:            types.Address{0x13},
+			CheckpointManagerAddr: types.Address{0x10},
 		},
 		EpochSize:  10,
 		SprintSize: 10,
@@ -826,8 +826,8 @@ func Test_NewConsensusRuntime(t *testing.T) {
 	assert.Equal(t, runtime.config.DataDir, tmpDir)
 	assert.Equal(t, uint64(10), runtime.config.PolyBFTConfig.SprintSize)
 	assert.Equal(t, uint64(10), runtime.config.PolyBFTConfig.EpochSize)
-	assert.Equal(t, "0x1300000000000000000000000000000000000000", runtime.config.PolyBFTConfig.Bridge.StateSenderAddress.String())
-	assert.Equal(t, "0x1000000000000000000000000000000000000000", runtime.config.PolyBFTConfig.Bridge.CheckpointManagerAddress.String())
+	assert.Equal(t, "0x1300000000000000000000000000000000000000", runtime.config.PolyBFTConfig.Bridge.BridgeAddr.String())
+	assert.Equal(t, "0x1000000000000000000000000000000000000000", runtime.config.PolyBFTConfig.Bridge.CheckpointManagerAddr.String())
 	assert.Equal(t, uint64(10), runtime.config.PolyBFTConfig.EpochSize)
 	assert.True(t, runtime.IsBridgeEnabled())
 }
@@ -879,7 +879,7 @@ func TestConsensusRuntime_FSM_EndOfSprint_HasBundlesToExecute(t *testing.T) {
 	blockchainMock := new(blockchainMock)
 	blockchainMock.On("NewBlockBuilder").Return(&BlockBuilder{}, nil).Once()
 	blockchainMock.On("GetStateProviderForBlock", mock.Anything).Return(new(stateProviderMock)).Once()
-	blockchainMock.On("GetSystemState", mock.Anything, mock.Anything, mock.Anything).Return(systemStateMock).Once()
+	blockchainMock.On("GetSystemState", mock.Anything, mock.Anything).Return(systemStateMock).Once()
 
 	for i := 0; i < int(lastBlock.Number); i++ {
 		blockchainMock.On("GetHeaderByNumber", uint64(i)).Return(&types.Header{
@@ -897,7 +897,7 @@ func TestConsensusRuntime_FSM_EndOfSprint_HasBundlesToExecute(t *testing.T) {
 				EpochSize:  10,
 				SprintSize: 5,
 				Bridge: &BridgeConfig{
-					StateSenderAddress: types.BytesToAddress(big.NewInt(23).Bytes()),
+					BridgeAddr: types.BytesToAddress(big.NewInt(23).Bytes()),
 				},
 			},
 			Key:        validatorAccs.getValidator("A").Key(),
@@ -1089,7 +1089,7 @@ func TestConsensusRuntime_restartEpoch_SameEpochNumberAsTheLastOne(t *testing.T)
 
 	blockchainMock := new(blockchainMock)
 	blockchainMock.On("GetStateProviderForBlock", mock.Anything).Return(new(stateProviderMock)).Once()
-	blockchainMock.On("GetSystemState", mock.Anything, mock.Anything, mock.Anything).Return(systemStateMock).Once()
+	blockchainMock.On("GetSystemState", mock.Anything, mock.Anything).Return(systemStateMock).Once()
 
 	runtime := &consensusRuntime{
 		activeValidatorFlag: 1,
@@ -1133,7 +1133,7 @@ func TestConsensusRuntime_restartEpoch_FirstRestart_NoStateSyncEvents(t *testing
 	validators := newTestValidators(3)
 	blockchainMock := new(blockchainMock)
 	blockchainMock.On("GetStateProviderForBlock", mock.Anything).Return(new(stateProviderMock)).Once()
-	blockchainMock.On("GetSystemState", mock.Anything, mock.Anything, mock.Anything).Return(systemStateMock).Once()
+	blockchainMock.On("GetSystemState", mock.Anything, mock.Anything).Return(systemStateMock).Once()
 
 	polybftBackendMock := new(polybftBackendMock)
 	polybftBackendMock.On("GetValidators", mock.Anything, mock.Anything).Return(validators.getPublicIdentities()).Once()
@@ -1187,7 +1187,7 @@ func TestConsensusRuntime_restartEpoch_FirstRestart_BuildsCommitment(t *testing.
 
 	blockchainMock := new(blockchainMock)
 	blockchainMock.On("GetStateProviderForBlock", mock.Anything).Return(new(stateProviderMock)).Once()
-	blockchainMock.On("GetSystemState", mock.Anything, mock.Anything, mock.Anything).Return(systemStateMock).Once()
+	blockchainMock.On("GetSystemState", mock.Anything, mock.Anything).Return(systemStateMock).Once()
 
 	polybftBackendMock := new(polybftBackendMock)
 	polybftBackendMock.On("GetValidators", mock.Anything, mock.Anything).Return(validators).Once()
@@ -1300,7 +1300,7 @@ func TestConsensusRuntime_restartEpoch_NewEpochToRun_BuildCommitment(t *testing.
 
 	blockchainMock := new(blockchainMock)
 	blockchainMock.On("GetStateProviderForBlock", mock.Anything).Return(new(stateProviderMock)).Once()
-	blockchainMock.On("GetSystemState", mock.Anything, mock.Anything, mock.Anything).Return(systemStateMock).Once()
+	blockchainMock.On("GetSystemState", mock.Anything, mock.Anything).Return(systemStateMock).Once()
 
 	polybftBackendMock := new(polybftBackendMock)
 	polybftBackendMock.On("GetValidators", mock.Anything, mock.Anything).Return(newValidatorSet).Once()
@@ -1314,7 +1314,7 @@ func TestConsensusRuntime_restartEpoch_NewEpochToRun_BuildCommitment(t *testing.
 				EpochSize:  10,
 				SprintSize: 5,
 				Bridge: &BridgeConfig{
-					StateSenderAddress: types.BytesToAddress(big.NewInt(23).Bytes()),
+					BridgeAddr: types.BytesToAddress(big.NewInt(23).Bytes()),
 				},
 			},
 			BridgeTransport: transportMock,
@@ -1559,7 +1559,7 @@ func TestConsensusRuntime_FSM_EndOfEpoch_OnBlockInserted(t *testing.T) {
 	blockchainMock := new(blockchainMock)
 	blockchainMock.On("NewBlockBuilder", mock.Anything).Return(&BlockBuilder{}, nil).Once()
 	blockchainMock.On("GetStateProviderForBlock", mock.Anything).Return(new(stateProviderMock))
-	blockchainMock.On("GetSystemState", mock.Anything, mock.Anything, mock.Anything).Return(systemStateMock)
+	blockchainMock.On("GetSystemState", mock.Anything, mock.Anything).Return(systemStateMock)
 	blockchainMock.On("GetHeaderByNumber", mock.Anything).Return(headerMap.getHeader)
 
 	txPool := new(txPoolMock)

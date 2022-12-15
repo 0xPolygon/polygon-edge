@@ -16,14 +16,11 @@ import (
 
 // PolyBFTConfig is the configuration file for the Polybft consensus protocol.
 type PolyBFTConfig struct {
-	// Validators are the genesis validators
-	Validators []*Validator `json:"validators"`
+	// InitialValidatorSet are the genesis validators
+	InitialValidatorSet []*Validator `json:"initialValidatorSet"`
 
 	// Bridge is the rootchain bridge configuration
 	Bridge *BridgeConfig `json:"bridge"`
-
-	// ActiveValidatorSetSize denotes how many validators are active per each epoch
-	ActiveValidatorSetSize int `json:"activeValidatorSetSize"`
 
 	// EpochSize is size of epoch
 	EpochSize uint64 `json:"epochSize"`
@@ -36,6 +33,11 @@ type PolyBFTConfig struct {
 
 	// Governance is the initial governance address
 	Governance types.Address `json:"governance"`
+
+	// TODO: Remove these two addresses as they are hardcoded and known in advance
+	// Address of the system contracts, as of now (testing) this is populated automatically during genesis
+	ValidatorSetAddr  types.Address `json:"validatorSetAddr"`
+	StateReceiverAddr types.Address `json:"stateReceiverAddr"`
 }
 
 // GetPolyBFTConfig deserializes provided chain config and returns PolyBFTConfig
@@ -57,12 +59,10 @@ func GetPolyBFTConfig(chainConfig *chain.Chain) (PolyBFTConfig, error) {
 
 // BridgeConfig is the rootchain bridge configuration
 type BridgeConfig struct {
-	StateSenderAddress       types.Address `json:"stateSenderAddress"`
-	CheckpointManagerAddress types.Address `json:"checkpointManagerAddress"`
-	BLSAddress               types.Address `json:"blsAddress"`
-	BN256G2Address           types.Address `json:"bn256G2Address"`
-	AdminAddress             types.Address `json:"adminAddress"`
-	JSONRPCEndpoint          string        `json:"jsonRPCEndpoint"`
+	BridgeAddr            types.Address `json:"stateSenderAddr"`
+	CheckpointManagerAddr types.Address `json:"checkpointAddr"`
+	AdminAddress          types.Address `json:"adminAddress"`
+	JSONRPCEndpoint       string        `json:"jsonRPCEndpoint"`
 }
 
 func (p *PolyBFTConfig) IsBridgeEnabled() bool {
@@ -151,11 +151,9 @@ type RootchainConfig struct {
 // ToBridgeConfig creates BridgeConfig instance
 func (r *RootchainConfig) ToBridgeConfig() *BridgeConfig {
 	return &BridgeConfig{
-		StateSenderAddress:       r.StateSenderAddress,
-		CheckpointManagerAddress: r.CheckpointManagerAddress,
-		BLSAddress:               r.BLSAddress,
-		BN256G2Address:           r.BN256G2Address,
-		AdminAddress:             r.AdminAddress,
+		BridgeAddr:            r.StateSenderAddress,
+		CheckpointManagerAddr: r.CheckpointManagerAddress,
+		AdminAddress:          r.AdminAddress,
 	}
 }
 

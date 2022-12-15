@@ -441,7 +441,7 @@ func TestExtra_InitGenesisValidatorsDelta(t *testing.T) {
 		const validatorsCount = 7
 		vals := newTestValidators(validatorsCount)
 
-		polyBftConfig := PolyBFTConfig{Validators: vals.getParamValidators()}
+		polyBftConfig := PolyBFTConfig{InitialValidatorSet: vals.getParamValidators()}
 
 		delta := &ValidatorSetDelta{
 			Added:   make(AccountSet, validatorsCount),
@@ -477,7 +477,7 @@ func TestExtra_InitGenesisValidatorsDelta(t *testing.T) {
 		t.Parallel()
 
 		validators := newTestValidators(5)
-		polyBftConfig := PolyBFTConfig{Validators: validators.getParamValidators()}
+		polyBftConfig := PolyBFTConfig{InitialValidatorSet: validators.getParamValidators()}
 
 		genesis := &chain.Genesis{
 			Config: &chain.Params{Engine: map[string]interface{}{

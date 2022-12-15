@@ -34,7 +34,7 @@ func (e *eventTracker) start() error {
 		return err
 	}
 
-	e.logger.Info("Start tracking events", "bridge", e.config.Bridge.StateSenderAddress)
+	e.logger.Info("Start tracking events", "bridge", e.config.Bridge.BridgeAddr)
 
 	tt, err := tracker.NewTracker(provider.Eth(),
 		tracker.WithBatchSize(10),
@@ -42,7 +42,7 @@ func (e *eventTracker) start() error {
 		tracker.WithFilter(&tracker.FilterConfig{
 			Async: false,
 			Address: []ethgo.Address{
-				ethgo.Address(e.config.Bridge.StateSenderAddress),
+				ethgo.Address(e.config.Bridge.BridgeAddr),
 			},
 		}),
 	)
