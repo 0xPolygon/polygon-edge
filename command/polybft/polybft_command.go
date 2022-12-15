@@ -1,4 +1,4 @@
-package test
+package polybft
 
 import (
 	"github.com/0xPolygon/polygon-edge/command/e2e"
@@ -10,12 +10,12 @@ import (
 )
 
 func GetCommand() *cobra.Command {
-	testCmd := &cobra.Command{
-		Use:   "test",
-		Short: "Test command",
+	polybftCmd := &cobra.Command{
+		Use:   "polybft",
+		Short: "Polybft command",
 	}
 
-	testCmd.AddCommand(
+	polybftCmd.AddCommand(
 		staking.GetCommand(),
 		unstaking.GetCommand(),
 		withdraw.GetCommand(),
@@ -23,5 +23,5 @@ func GetCommand() *cobra.Command {
 		e2e.GetCommand(),
 	)
 
-	return testCmd
+	return polybftCmd
 }
