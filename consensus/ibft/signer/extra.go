@@ -28,6 +28,7 @@ type IstanbulExtra struct {
 	ProposerSeal         []byte
 	CommittedSeals       Seals
 	ParentCommittedSeals Seals
+	RoundNumber          *uint64
 }
 
 type Seals interface {
@@ -62,6 +63,14 @@ func (i *IstanbulExtra) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 	// ParentCommittedSeal
 	if i.ParentCommittedSeals != nil {
 		vv.Set(i.ParentCommittedSeals.MarshalRLPWith(ar))
+	} else {
+		vv.Set(ar.NewNull())
+	}
+
+	if i.RoundNumber != nil {
+		vv.Set(ar.NewUint(*i.RoundNumber))
+	} else {
+		vv.Set(ar.NewNull())
 	}
 
 	return vv
@@ -103,6 +112,15 @@ func (i *IstanbulExtra) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) er
 		if err := i.ParentCommittedSeals.UnmarshalRLPFrom(p, elems[3]); err != nil {
 			return err
 		}
+	}
+
+	if len(elems) >= 5 {
+		round, err := elems[4].GetUint64()
+		if err != nil {
+			return err
+		}
+
+		i.RoundNumber = &round
 	}
 
 	return nil
@@ -219,9 +237,10 @@ func packProposerSealIntoExtra(
 }
 
 // packCommittedSealsIntoExtra updates only CommittedSeal field in Extra
-func packCommittedSealsIntoExtra(
+func packCommittedSealsAndRoundNumberIntoExtra(
 	extraBytes []byte,
 	committedSeal Seals,
+	roundNumber *uint64,
 ) []byte {
 	return packFieldsIntoExtra(
 		extraBytes,
@@ -242,6 +261,10 @@ func packCommittedSealsIntoExtra(
 			// ParentCommittedSeal
 			if len(oldValues) >= 4 {
 				newArrayValue.Set(oldValues[3])
+			}
+
+			if roundNumber != nil {
+				newArrayValue.Set(ar.NewUint(*roundNumber))
 			}
 
 			return nil

@@ -42,16 +42,22 @@ type Signer interface {
 	VerifyCommittedSeal(validators.Validators, types.Address, []byte, []byte) error
 
 	// CommittedSeals
-	WriteCommittedSeals(*types.Header, map[types.Address][]byte) (*types.Header, error)
-	VerifyCommittedSeals(
+	WriteCommittedSeals(
 		header *types.Header,
+		roundNumber uint64,
+		sealMap map[types.Address][]byte,
+	) (*types.Header, error)
+	VerifyCommittedSeals(
+		hash []byte,
+		committedSeals Seals,
 		validators validators.Validators,
 		quorumSize int,
 	) error
 
 	// ParentCommittedSeals
 	VerifyParentCommittedSeals(
-		parent, header *types.Header,
+		parentHash []byte,
+		header *types.Header,
 		parentValidators validators.Validators,
 		quorum int,
 		mustExist bool,
@@ -194,6 +200,7 @@ func (s *SignerImpl) VerifyCommittedSeal(
 // WriteCommittedSeals builds and writes CommittedSeals into IBFT Extra of the header
 func (s *SignerImpl) WriteCommittedSeals(
 	header *types.Header,
+	roundNumber uint64,
 	sealMap map[types.Address][]byte,
 ) (*types.Header, error) {
 	if len(sealMap) == 0 {
@@ -210,9 +217,10 @@ func (s *SignerImpl) WriteCommittedSeals(
 		return nil, err
 	}
 
-	header.ExtraData = packCommittedSealsIntoExtra(
+	header.ExtraData = packCommittedSealsAndRoundNumberIntoExtra(
 		header.ExtraData,
 		committedSeal,
+		&roundNumber,
 	)
 
 	return header, nil
@@ -220,26 +228,17 @@ func (s *SignerImpl) WriteCommittedSeals(
 
 // VerifyCommittedSeals verifies CommittedSeals in IBFT Extra of the header
 func (s *SignerImpl) VerifyCommittedSeals(
-	header *types.Header,
+	hash []byte,
+	committedSeals Seals,
 	validators validators.Validators,
 	quorumSize int,
 ) error {
-	extra, err := s.GetIBFTExtra(header)
-	if err != nil {
-		return err
-	}
-
-	hash, err := s.CalculateHeaderHash(header)
-	if err != nil {
-		return err
-	}
-
 	rawMsg := crypto.Keccak256(
 		wrapCommitHash(hash[:]),
 	)
 
 	numSeals, err := s.keyManager.VerifyCommittedSeals(
-		extra.CommittedSeals,
+		committedSeals,
 		rawMsg,
 		validators,
 	)
@@ -256,7 +255,8 @@ func (s *SignerImpl) VerifyCommittedSeals(
 
 // VerifyParentCommittedSeals verifies ParentCommittedSeals in IBFT Extra of the header
 func (s *SignerImpl) VerifyParentCommittedSeals(
-	parent, header *types.Header,
+	parentHash []byte,
+	header *types.Header,
 	parentValidators validators.Validators,
 	quorum int,
 	mustExist bool,
@@ -278,7 +278,7 @@ func (s *SignerImpl) VerifyParentCommittedSeals(
 	}
 
 	rawMsg := crypto.Keccak256(
-		wrapCommitHash(parent.Hash.Bytes()),
+		wrapCommitHash(parentHash),
 	)
 
 	numSeals, err := s.keyManager.VerifyCommittedSeals(

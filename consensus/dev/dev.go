@@ -215,7 +215,7 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 
 // REQUIRED BASE INTERFACE METHODS //
 
-func (d *Dev) VerifyHeader(header *types.Header) error {
+func (d *Dev) VerifyBlock(block *types.Block) error {
 	// All blocks are valid
 	return nil
 }

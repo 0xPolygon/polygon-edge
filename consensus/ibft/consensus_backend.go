@@ -45,10 +45,11 @@ func (i *backendIBFT) BuildEthereumBlock(blockNumber uint64) []byte {
 // the ProposedBlock is hashed as proto.Marshal(ProposedBlock) and then keccakk hashed.
 func (i *backendIBFT) InsertBlock(
 	ethereumBlock []byte,
+	roundNumber uint64,
 	committedSeals []*messages.CommittedSeal,
 ) {
 	newBlock := &types.Block{}
-	if err := newBlock.UnmarshalRLP(proposal); err != nil {
+	if err := newBlock.UnmarshalRLP(ethereumBlock); err != nil {
 		i.logger.Error("cannot unmarshal proposal", "err", err)
 
 		return
@@ -66,7 +67,7 @@ func (i *backendIBFT) InsertBlock(
 	copy(extraDataBackup, extraDataOriginal)
 
 	// Push the committed seals to the header
-	header, err := i.currentSigner.WriteCommittedSeals(newBlock.Header, committedSealsMap)
+	header, err := i.currentSigner.WriteCommittedSeals(newBlock.Header, roundNumber, committedSealsMap)
 	if err != nil {
 		i.logger.Error("cannot write committed seals", "err", err)
 

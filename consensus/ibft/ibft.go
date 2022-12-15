@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"time"
 
+	protoIBFT "github.com/0xPolygon/go-ibft/messages/proto"
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/fork"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
+	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/secrets"
@@ -20,6 +22,7 @@ import (
 	"github.com/armon/go-metrics"
 	"github.com/hashicorp/go-hclog"
 	"google.golang.org/grpc"
+	protoBuf "google.golang.org/protobuf/proto"
 )
 
 const (
@@ -396,7 +399,9 @@ func (i *backendIBFT) verifyHeaderImpl(
 }
 
 // VerifyHeader wrapper for verifying headers
-func (i *backendIBFT) VerifyHeader(header *types.Header) error {
+func (i *backendIBFT) VerifyBlock(block *types.Block) error {
+	header := block.Header
+
 	parent, ok := i.blockchain.GetHeaderByNumber(header.Number - 1)
 	if !ok {
 		return fmt.Errorf(
@@ -425,10 +430,24 @@ func (i *backendIBFT) VerifyHeader(header *types.Header) error {
 		return err
 	}
 
+	extra, err := headerSigner.GetIBFTExtra(header)
+	if err != nil {
+		return err
+	}
+
+	hashForCS, err := calcHashForCS(
+		block,
+		extra,
+	)
+	if err != nil {
+		return err
+	}
+
 	// verify the Committed Seals
 	// CommittedSeals exists only in the finalized header
 	if err := headerSigner.VerifyCommittedSeals(
-		header,
+		hashForCS,
+		extra.CommittedSeals,
 		validators,
 		i.quorumSize(header.Number)(validators),
 	); err != nil {
@@ -436,6 +455,27 @@ func (i *backendIBFT) VerifyHeader(header *types.Header) error {
 	}
 
 	return nil
+}
+
+func calcHashForCS(
+	block *types.Block,
+	extra *signer.IstanbulExtra,
+) ([]byte, error) {
+	if extra.RoundNumber == nil {
+		return block.Hash().Bytes(), nil
+	}
+
+	proposedBlock := &protoIBFT.ProposedBlock{
+		EthereumBlock: block.MarshalRLP(),
+		Round:         *extra.RoundNumber,
+	}
+
+	proposedBlockRaw, err := protoBuf.Marshal(proposedBlock)
+	if err != nil {
+		return nil, err
+	}
+
+	return crypto.Keccak256(proposedBlockRaw), nil
 }
 
 // quorumSize returns a callback that when executed on a Validators computes
@@ -570,7 +610,24 @@ func (i *backendIBFT) verifyParentCommittedSeals(
 		i.forkManager,
 		parent.Number,
 	)
+	if err != nil {
+		return err
+	}
 
+	parentBlock, ok := i.blockchain.GetBlockByHash(parent.Hash, true)
+	if !ok {
+		return fmt.Errorf("block %s not found", parent.Hash)
+	}
+
+	parentExtra, err := parentSigner.GetIBFTExtra(parent)
+	if err != nil {
+		return err
+	}
+
+	parentHash, err := calcHashForCS(
+		parentBlock,
+		parentExtra,
+	)
 	if err != nil {
 		return err
 	}
@@ -578,7 +635,7 @@ func (i *backendIBFT) verifyParentCommittedSeals(
 	// if shouldVerifyParentCommittedSeals is false, skip the verification
 	// when header doesn't have Parent Committed Seals (Backward Compatibility)
 	return parentSigner.VerifyParentCommittedSeals(
-		parent,
+		parentHash,
 		header,
 		parentValidators,
 		i.quorumSize(parent.Number)(parentValidators),
