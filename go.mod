@@ -68,6 +68,7 @@ require (
 )
 
 require (
+	github.com/dave/jennifer v1.6.0
 	github.com/kilic/bn254 v0.0.0-20201116081810-790649bc68fe
 	golang.org/x/sync v0.0.0-20220929204114-8fcdb60fdcc0
 	gopkg.in/DataDog/dd-trace-go.v1 v1.43.1
@@ -101,7 +102,6 @@ require (
 	github.com/containerd/console v1.0.1 // indirect
 	github.com/containerd/continuity v0.0.0-20191214063359-1097c8bae83b // indirect
 	github.com/coreos/go-systemd/v22 v22.3.2 // indirect
-	github.com/dave/jennifer v1.6.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/davidlazar/go-crypto v0.0.0-20200604182044-b73af7476f6c // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.1.0 // indirect

@@ -13,7 +13,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
 
-	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
+	rootchainHelper "github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 
@@ -180,6 +180,64 @@ func TestE2E_Bridge_MainWorkflow(t *testing.T) {
 		})
 }
 
+func TestE2E_CheckpointSubmission(t *testing.T) {
+	var (
+		rootchainSender       = rootchainHelper.GetRootchainAdminKey().Address()
+		checkpointManagerAddr = ethgo.Address(rootchainHelper.CheckpointManagerAddress)
+	)
+
+	// spin up a cluster with epoch size set to 5 blocks
+	cluster := framework.NewTestCluster(t, 5, framework.WithBridge(), framework.WithEpochSize(5))
+	defer cluster.Stop()
+
+	// initialize tx relayer used to query CheckpointManager smart contract
+	rootchainTxRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Bridge.JSONRPCAddr()))
+	require.NoError(t, err)
+
+	checkpointBlockNumInput, err := currentCheckpointBlockNumMethod.Encode([]interface{}{})
+	require.NoError(t, err)
+
+	testCheckpointBlockNumber := func(expectedCheckpointBlock int64) (bool, error) {
+		checkpointBlockNumRaw, err := rootchainTxRelayer.Call(rootchainSender, checkpointManagerAddr, checkpointBlockNumInput)
+		if err != nil {
+			return false, err
+		}
+
+		latestCheckpointBlock, err := types.ParseInt64orHex(&checkpointBlockNumRaw)
+		if err != nil {
+			return false, err
+		}
+
+		t.Logf("Checkpoint block: %d\n", latestCheckpointBlock)
+
+		return latestCheckpointBlock < expectedCheckpointBlock, nil
+	}
+
+	// wait for a single epoch to be checkpointed
+	require.NoError(t, cluster.WaitForBlock(7, 30*time.Second))
+
+	// checking last checkpoint block before rootchain server stop
+	err = cluster.Bridge.WaitUntil(2*time.Second, 30*time.Second, func() (bool, error) {
+		return testCheckpointBlockNumber(5)
+	})
+	require.NoError(t, err)
+
+	// stop rootchain server
+	cluster.Bridge.Stop()
+
+	// wait for a couple of epochs so that there are pending checkpoint (epoch-ending) blocks
+	require.NoError(t, cluster.WaitForBlock(21, 2*time.Minute))
+
+	// restart rootchain server
+	cluster.Bridge.Start()
+
+	// check if pending checkpoint blocks were submitted (namely the last checkpointed block must be block 20)
+	err = cluster.Bridge.WaitUntil(2*time.Second, 50*time.Second, func() (bool, error) {
+		return testCheckpointBlockNumber(20)
+	})
+	require.NoError(t, err)
+}
+
 func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
 	key, err := ethgow.GenerateKey()
 	require.NoError(t, err)
@@ -200,12 +258,12 @@ func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
 	require.NoError(t, err)
 
 	//deploy l1,l2, ExitHelper contracts
-	receipt, err := DeployTransaction(txRelayer, helper.GetRootchainAdminKey(), contractsapi.L1ExitTestBytecode)
+	receipt, err := DeployTransaction(txRelayer, rootchainHelper.GetRootchainAdminKey(), contractsapi.L1ExitTestBytecode)
 	require.NoError(t, err)
 
 	l1ContractAddress := receipt.ContractAddress
 	l2StateSenderAddress := ethgo.Address(contracts.L2StateSenderContract)
-	checkpointManagerAddress := ethgo.Address(helper.CheckpointManagerAddress)
+	checkpointManagerAddress := ethgo.Address(rootchainHelper.CheckpointManagerAddress)
 
 	//Start test
 	//send crosschain transaction on l2 and get exit id
@@ -261,7 +319,7 @@ func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	_, err = ABITransaction(txRelayer, helper.GetRootchainAdminKey(), contractsapi.ExitHelper, helper.ExitHelperAddress,
+	_, err = ABITransaction(txRelayer, rootchainHelper.GetRootchainAdminKey(), contractsapi.ExitHelper, rootchainHelper.ExitHelperAddress,
 		"exit",
 		big.NewInt(int64(extra.Checkpoint.EpochNumber*10)),
 		proof.LeafIndex,
@@ -270,7 +328,7 @@ func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	res, err := ABICall(txRelayer, contractsapi.ExitHelper, helper.ExitHelperAddress, "processedExits", big.NewInt(1))
+	res, err := ABICall(txRelayer, contractsapi.ExitHelper, rootchainHelper.ExitHelperAddress, "processedExits", big.NewInt(1))
 	require.NoError(t, err)
 	parserRes, err := types.ParseUint64orHex(&res)
 	require.NoError(t, err)
@@ -323,7 +381,7 @@ func ABICall(relayer txrelayer.TxRelayer, artifact *artifact.Artifact, contractA
 		return "", err
 	}
 
-	return relayer.Call(ethgo.Address(helper.GetRootchainAdminAddr()), contractAddress, input)
+	return relayer.Call(ethgo.Address(rootchainHelper.GetRootchainAdminAddr()), contractAddress, input)
 }
 func ABITransaction(relayer txrelayer.TxRelayer, key ethgo.Key, artifact *artifact.Artifact, contractAddress ethgo.Address, method string, params ...interface{}) (*ethgo.Receipt, error) {
 	input, err := artifact.Abi.GetMethod(method).Encode(params)
