@@ -368,7 +368,8 @@ func TestExtra_CreateValidatorSetDelta_Cases(t *testing.T) {
 		},
 	}
 
-	for _, c := range cases {
+	for _, singleCase := range cases {
+		c := singleCase
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
 

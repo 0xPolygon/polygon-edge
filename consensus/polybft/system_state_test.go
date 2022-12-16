@@ -284,7 +284,8 @@ func Test_buildLogsFromReceipts(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
+	for _, singleTest := range tests {
+		tt := singleTest
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
