@@ -12,8 +12,9 @@ import (
 )
 
 const (
-	defaultGasPrice = 1879048192 // 0x70000000
-	defaultGasLimit = 5242880    // 0x500000
+	defaultGasPrice   = 1879048192 // 0x70000000
+	defaultGasLimit   = 5242880    // 0x500000
+	DefaultRPCAddress = "http://127.0.0.1:8545"
 )
 
 var (

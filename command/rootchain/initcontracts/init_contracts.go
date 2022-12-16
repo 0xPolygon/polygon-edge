@@ -12,6 +12,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
+
 	"github.com/spf13/cobra"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
@@ -21,6 +23,8 @@ import (
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/genesis"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
@@ -88,8 +92,8 @@ func setFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(
 		&params.jsonRPCAddress,
 		jsonRPCFlag,
-		"http://127.0.0.1:8545",
-		"the JSON RPC rootchain IP address (e.g. http://127.0.0.1:8545)",
+		txrelayer.DefaultRPCAddress,
+		"the JSON RPC rootchain IP address (e.g. "+txrelayer.DefaultRPCAddress+")",
 	)
 }
 
@@ -176,40 +180,40 @@ func deployContracts(outputter command.OutputFormatter) error {
 
 	deployContracts := []struct {
 		name     string
-		path     string
+		artifact *artifact.Artifact
 		expected types.Address
 	}{
 		{
 			name:     "StateSender",
-			path:     "root/StateSender.sol",
+			artifact: contractsapi.StateSender,
 			expected: helper.StateSenderAddress,
 		},
 		{
 			name:     "CheckpointManager",
-			path:     "root/CheckpointManager.sol",
+			artifact: contractsapi.CheckpointManager,
 			expected: helper.CheckpointManagerAddress,
 		},
 		{
 			name:     "BLS",
-			path:     "common/BLS.sol",
+			artifact: contractsapi.BLS,
 			expected: helper.BLSAddress,
 		},
 		{
 			name:     "BN256G2",
-			path:     "common/BN256G2.sol",
+			artifact: contractsapi.BLS256,
 			expected: helper.BN256G2Address,
+		},
+		{
+			name:     "ExitHelper",
+			artifact: contractsapi.ExitHelper,
+			expected: types.Address(helper.ExitHelperAddress),
 		},
 	}
 
 	for _, contract := range deployContracts {
-		bytecode, err := readContractBytecode(params.contractsPath, contract.path, contract.name)
-		if err != nil {
-			return err
-		}
-
 		txn := &ethgo.Transaction{
 			To:    nil, // contract deployment
-			Input: bytecode,
+			Input: contract.artifact.Bytecode,
 		}
 
 		receipt, err := txRelayer.SendTransaction(txn, helper.GetRootchainAdminKey())
@@ -226,6 +230,10 @@ func deployContracts(outputter command.OutputFormatter) error {
 	}
 
 	if err := initializeCheckpointManager(txRelayer); err != nil {
+		return err
+	}
+
+	if err := initializeExitHelper(txRelayer, ethgo.Address(helper.CheckpointManagerAddress)); err != nil {
 		return err
 	}
 
@@ -279,6 +287,30 @@ func initializeCheckpointManager(txRelayer txrelayer.TxRelayer) error {
 	return nil
 }
 
+func initializeExitHelper(txRelayer txrelayer.TxRelayer, checkpointManagerAddress ethgo.Address) error {
+	input, err := contractsapi.ExitHelper.Abi.GetMethod("initialize").
+		Encode([]interface{}{checkpointManagerAddress})
+	if err != nil {
+		return fmt.Errorf("failed to encode parameters for ExitHelper.initialize. error: %w", err)
+	}
+
+	txn := &ethgo.Transaction{
+		To:    &helper.ExitHelperAddress,
+		Input: input,
+	}
+
+	receipt, err := txRelayer.SendTransaction(txn, helper.GetRootchainAdminKey())
+	if err != nil {
+		return fmt.Errorf("failed to send transaction to ExitHelper. error: %w", err)
+	}
+
+	if receipt.Status != uint64(types.ReceiptSuccess) {
+		return errors.New("failed to initialize ExitHelper contract")
+	}
+
+	return nil
+}
+
 // initializeCheckpointManager invokes initialize function on CheckpointManager smart contract
 func validatorSetToABISlice(allocs map[types.Address]*chain.GenesisAccount) ([]map[string]interface{}, error) {
 	validatorsInfo, err := genesis.ReadValidatorsByRegexp(params.validatorPath, params.validatorPrefixPath)
@@ -286,32 +318,27 @@ func validatorSetToABISlice(allocs map[types.Address]*chain.GenesisAccount) ([]m
 		return nil, err
 	}
 
-	validatorSetMap := make([]map[string]interface{}, len(validatorsInfo))
-
 	sort.Slice(validatorsInfo, func(i, j int) bool {
 		return bytes.Compare(validatorsInfo[i].Address.Bytes(),
 			validatorsInfo[j].Address.Bytes()) < 0
 	})
 
-	for i, validatorInfo := range validatorsInfo {
-		genesisBalance, err := chain.GetGenesisAccountBalance(validatorInfo.Address, allocs)
-		if err != nil {
-			return nil, err
-		}
+	accSet := polybft.AccountSet{}
 
+	for _, validatorInfo := range validatorsInfo {
 		blsKey, err := validatorInfo.UnmarshalBLSPublicKey()
 		if err != nil {
 			return nil, err
 		}
 
-		validatorSetMap[i] = map[string]interface{}{
-			"_address":    validatorInfo.Address,
-			"blsKey":      blsKey.ToBigInt(),
-			"votingPower": chain.ConvertWeiToTokensAmount(genesisBalance),
-		}
+		accSet = append(accSet, &polybft.ValidatorMetadata{
+			Address:     validatorInfo.Address,
+			BlsKey:      blsKey,
+			VotingPower: allocs[validatorInfo.Address].Balance.Uint64(),
+		})
 	}
 
-	return validatorSetMap, nil
+	return accSet.AsGenericMaps(), nil
 }
 
 func readContractBytecode(rootPath, contractPath, contractName string) ([]byte, error) {

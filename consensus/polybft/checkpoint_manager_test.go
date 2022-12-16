@@ -6,7 +6,16 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/hashicorp/go-hclog"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
+
+	"github.com/umbracle/ethgo/abi"
+
+	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	"github.com/0xPolygon/polygon-edge/contracts"
+	"github.com/0xPolygon/polygon-edge/state"
+	hclog "github.com/hashicorp/go-hclog"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
@@ -262,6 +271,214 @@ func TestCheckpointManager_isCheckpointBlock(t *testing.T) {
 			require.Equal(t, c.isCheckpointBlock, checkpointMgr.isCheckpointBlock(c.blockNumber))
 		})
 	}
+}
+
+func TestPerformExit(t *testing.T) {
+	t.Parallel()
+
+	//create validator set
+	currentValidators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D"}, []uint64{100, 100, 100, 100})
+	accSet := currentValidators.getPublicIdentities()
+
+	senderAddress := types.Address{1}
+	bn256Addr := types.Address{2}
+	l1Cntract := types.Address{3}
+
+	alloc := map[types.Address]*chain.GenesisAccount{
+		senderAddress: {
+			Balance: big.NewInt(100000000000),
+		},
+		contracts.BLSContract: {
+			Code: contractsapi.BLS.DeployedBytecode,
+		},
+		bn256Addr: {
+			Code: contractsapi.BLS256.DeployedBytecode,
+		},
+		l1Cntract: {
+			Code: contractsapi.L1ExitDeployedBytecode,
+		},
+	}
+	transition := newTestTransition(t, alloc)
+
+	getField := func(addr types.Address, abi *abi.ABI, function string, args ...interface{}) []byte {
+		input, err := abi.GetMethod(function).Encode(args)
+		require.NoError(t, err)
+
+		result := transition.Call2(senderAddress, addr, input, big.NewInt(0), 1000000000)
+		require.NoError(t, result.Err)
+		require.True(t, result.Succeeded())
+		require.False(t, result.Failed())
+
+		return result.ReturnValue
+	}
+
+	rootchainContractAddress := deployRootchainContract(t, transition, contractsapi.CheckpointManager, senderAddress, accSet, bn256Addr)
+	exitHelperContractAddress := deployExitContract(t, transition, contractsapi.ExitHelper, senderAddress, rootchainContractAddress)
+
+	require.Equal(t, getField(rootchainContractAddress, contractsapi.CheckpointManager.Abi, "currentCheckpointBlockNumber")[31], uint8(0))
+
+	cm := checkpointManager{
+		blockchain: &blockchainMock{},
+	}
+	accSetHash, err := accSet.Hash()
+	require.NoError(t, err)
+
+	blockHash := types.Hash{5}
+	blockNumber := uint64(1)
+	epochNumber := uint64(1)
+	blockRound := uint64(1)
+
+	exits := []*ExitEvent{
+		{
+			ID:       1,
+			Sender:   ethgo.Address{7},
+			Receiver: ethgo.Address(l1Cntract),
+			Data:     []byte{123},
+		},
+		{
+			ID:       2,
+			Sender:   ethgo.Address{7},
+			Receiver: ethgo.Address(l1Cntract),
+			Data:     []byte{21},
+		},
+	}
+	exitTrie, err := createExitTree(exits)
+	require.NoError(t, err)
+
+	eventRoot := exitTrie.Hash()
+
+	checkpointData := CheckpointData{
+		BlockRound:            blockRound,
+		EpochNumber:           epochNumber,
+		CurrentValidatorsHash: accSetHash,
+		NextValidatorsHash:    accSetHash,
+		EventRoot:             eventRoot,
+	}
+
+	checkpointHash, err := checkpointData.Hash(
+		cm.blockchain.GetChainID(),
+		blockRound,
+		blockHash)
+	require.NoError(t, err)
+
+	bmp := bitmap.Bitmap{}
+	i := uint64(0)
+	signature := &bls.Signature{}
+
+	currentValidators.iterAcct(nil, func(v *testValidator) {
+		signature = signature.Aggregate(v.mustSign(checkpointHash[:]))
+		bmp.Set(i)
+		i++
+	})
+
+	aggSignature, err := signature.Marshal()
+	require.NoError(t, err)
+
+	extra := Extra{
+		Checkpoint: &checkpointData,
+	}
+	extra.Committed = &Signature{
+		AggregatedSignature: aggSignature,
+		Bitmap:              bmp,
+	}
+
+	submitCheckpointEncoded, err := cm.abiEncodeCheckpointBlock(
+		blockNumber,
+		blockHash,
+		extra,
+		accSet)
+	require.NoError(t, err)
+
+	result := transition.Call2(senderAddress, rootchainContractAddress, submitCheckpointEncoded, big.NewInt(0), 1000000000)
+	require.NoError(t, result.Err)
+	require.True(t, result.Succeeded())
+	require.False(t, result.Failed())
+	require.Equal(t, getField(rootchainContractAddress, contractsapi.CheckpointManager.Abi, "currentCheckpointBlockNumber")[31], uint8(1))
+
+	//check that the exit havent performed
+	res := getField(exitHelperContractAddress, contractsapi.ExitHelper.Abi, "processedExits", exits[0].ID)
+	require.Equal(t, int(res[31]), 0)
+
+	proofExitEvent, err := ExitEventABIType.Encode(exits[0])
+	require.NoError(t, err)
+	proof, err := exitTrie.GenerateProofForLeaf(proofExitEvent, 0)
+	require.NoError(t, err)
+	leafIndex, err := exitTrie.LeafIndex(proofExitEvent)
+	require.NoError(t, err)
+
+	ehExit, err := contractsapi.ExitHelper.Abi.GetMethod("exit").Encode([]interface{}{
+		blockNumber,
+		leafIndex,
+		proofExitEvent,
+		proof,
+	})
+	require.NoError(t, err)
+
+	result = transition.Call2(senderAddress, exitHelperContractAddress, ehExit, big.NewInt(0), 1000000000)
+	require.NoError(t, result.Err)
+	require.True(t, result.Succeeded())
+	require.False(t, result.Failed())
+
+	//check true
+	res = getField(exitHelperContractAddress, contractsapi.ExitHelper.Abi, "processedExits", exits[0].ID)
+	require.Equal(t, int(res[31]), 1)
+
+	lastID := getField(l1Cntract, contractsapi.L1ExitTestABI, "id")
+	require.Equal(t, lastID[31], uint8(1))
+
+	lastAddr := getField(l1Cntract, contractsapi.L1ExitTestABI, "addr")
+	require.Equal(t, exits[0].Sender[:], lastAddr[12:])
+
+	lastCounter := getField(l1Cntract, contractsapi.L1ExitTestABI, "counter")
+	require.Equal(t, lastCounter[31], uint8(1))
+}
+
+func deployRootchainContract(t *testing.T, transition *state.Transition, rootchainArtifact *artifact.Artifact, sender types.Address, accSet AccountSet, bn256Addr types.Address) types.Address {
+	t.Helper()
+
+	result := transition.Create2(sender, rootchainArtifact.Bytecode, big.NewInt(0), 1000000000)
+	assert.NoError(t, result.Err)
+	rcAddress := result.Address
+
+	init, err := rootchainArtifact.Abi.GetMethod("initialize").Encode([4]interface{}{
+		contracts.BLSContract,
+		bn256Addr,
+		bls.GetDomain(),
+		accSet.AsGenericMaps()})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	result = transition.Call2(sender, rcAddress, init, big.NewInt(0), 1000000000)
+	require.True(t, result.Succeeded())
+	require.False(t, result.Failed())
+	require.NoError(t, result.Err)
+
+	getDomain, err := rootchainArtifact.Abi.GetMethod("domain").Encode([]interface{}{})
+	require.NoError(t, err)
+
+	result = transition.Call2(sender, rcAddress, getDomain, big.NewInt(0), 1000000000)
+	require.Equal(t, result.ReturnValue, bls.GetDomain())
+
+	return rcAddress
+}
+
+func deployExitContract(t *testing.T, transition *state.Transition, exitHelperArtifcat *artifact.Artifact, sender types.Address, rootchainContractAddress types.Address) types.Address {
+	t.Helper()
+
+	result := transition.Create2(sender, exitHelperArtifcat.Bytecode, big.NewInt(0), 1000000000)
+	assert.NoError(t, result.Err)
+	ehAddress := result.Address
+
+	ehInit, err := exitHelperArtifcat.Abi.GetMethod("initialize").Encode([]interface{}{ethgo.Address(rootchainContractAddress)})
+	require.NoError(t, err)
+
+	result = transition.Call2(sender, ehAddress, ehInit, big.NewInt(0), 1000000000)
+	require.NoError(t, result.Err)
+	require.True(t, result.Succeeded())
+	require.False(t, result.Failed())
+
+	return ehAddress
 }
 
 var _ txrelayer.TxRelayer = (*dummyTxRelayer)(nil)
