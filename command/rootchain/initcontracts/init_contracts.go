@@ -260,12 +260,16 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 		return err
 	}
 
+	outputter.WriteCommandResult(&messageResult{
+		Message: fmt.Sprintf("%s CheckpointManager contract is initialized", contractsDeploymentTitle),
+	})
+
 	if err := initializeExitHelper(txRelayer, rootchainConfig); err != nil {
 		return err
 	}
 
 	outputter.WriteCommandResult(&messageResult{
-		Message: fmt.Sprintf("%s CheckpointManager contract is initialized", contractsDeploymentTitle),
+		Message: fmt.Sprintf("%s ExitHelper contract is initialized", contractsDeploymentTitle),
 	})
 
 	return nil
