@@ -2,7 +2,9 @@ package e2e
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"encoding/json"
+	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/e2e/framework"
 	"github.com/0xPolygon/polygon-edge/helper/tests"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -46,11 +48,23 @@ func getTestArtifact(name string) (art *compiler.Artifact, err error) {
 	return
 }
 
+type ECDSAKey struct {
+	k *ecdsa.PrivateKey
+}
+
+func (e *ECDSAKey) Address() ethgo.Address {
+	return ethgo.Address(crypto.PubKeyToAddress(&e.k.PublicKey))
+}
+
+func (e *ECDSAKey) Sign(hash []byte) ([]byte, error) {
+	return crypto.Sign(e.k, hash)
+}
+
+var _ ethgo.Key = &ECDSAKey{}
+
 func TestBasicInvoker(t *testing.T) {
 	senderKey, senderAddr := tests.GenerateKeyAndAddr(t)
-	_, receiverAddr := tests.GenerateKeyAndAddr(t)
-
-	_ = receiverAddr
+	receiverKey, _ := tests.GenerateKeyAndAddr(t)
 
 	ibftManager := framework.NewIBFTServersManager(t,
 		1,
@@ -78,7 +92,11 @@ func TestBasicInvoker(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, invokerAddr)
 
-	invokerContract := contract.NewContract(invokerAddr, invokerAbi, contract.WithJsonRPC(srv.JSONRPC().Eth()))
+	sk := &ECDSAKey{k: senderKey}
+	invokerContract := contract.NewContract(invokerAddr, invokerAbi,
+		contract.WithJsonRPC(srv.JSONRPC().Eth()),
+		contract.WithSender(sk),
+	)
 
 	res, err := invokerContract.Call("DOMAIN_SEPARATOR", ethgo.Latest)
 	require.NoError(t, err)
@@ -133,6 +151,53 @@ func TestBasicInvoker(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, checkHash[:], th)
 
+	var is InvokerSignature
+
+	k := &ECDSAKey{k: receiverKey}
+	err = is.SignCommit(k, checkHash[:], invokerAddr)
+	require.NoError(t, err)
+
+	invokeTx, err := invokerContract.Txn("invoke", is, it)
+	require.NoError(t, err)
+
+	err = invokeTx.Do()
+	require.NoError(t, err)
+	rcpt, err := invokeTx.Wait()
+	require.NoError(t, err)
+	_ = rcpt
+
+}
+
+type InvokerSignature struct {
+	R *big.Int `abi:"r"`
+	S *big.Int `abi:"s"`
+	V bool     `abi:"v"`
+}
+
+func (is *InvokerSignature) SignCommit(key ethgo.Key, commit []byte, invokerAddr ethgo.Address) (err error) {
+	var msg [64]byte
+
+	// EIP-3074 messages are of the form
+	// keccak256(type ++ invoker ++ commit)
+	// TODO: this code will probably need to exist elsewhere - e.g. AUTH opcode
+	msg[0] = 0x03
+	copy(msg[13:33], invokerAddr.Bytes())
+	copy(msg[33:], commit)
+
+	var sig []byte
+	if sig, err = key.Sign(ethgo.Keccak256(msg[:])); err != nil {
+		return
+	}
+
+	is.R = new(big.Int).SetBytes(sig[0:32])
+	is.S = new(big.Int).SetBytes(sig[32:64])
+	if sig[64] == 0 {
+		is.V = false
+	} else {
+		is.V = true
+	}
+
+	return
 }
 
 type InvokerTransaction struct {
