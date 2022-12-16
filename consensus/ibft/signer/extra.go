@@ -231,6 +231,10 @@ func packProposerSealIntoExtra(
 				newArrayValue.Set(oldValues[3])
 			}
 
+			if len(oldValues) >= 5 {
+				newArrayValue.Set(oldValues[4])
+			}
+
 			return nil
 		},
 	)
