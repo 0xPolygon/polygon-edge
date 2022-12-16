@@ -275,12 +275,12 @@ func (p *Polybft) startRuntime() error {
 		}
 	}
 
-	go p.startPbftProcess()
+	go p.startConsensusProtocol()
 
 	return nil
 }
 
-func (p *Polybft) startPbftProcess() {
+func (p *Polybft) startConsensusProtocol() {
 	// wait to have at least n peers connected. The 2 is just an initial heuristic value
 	// Most likely we will parametrize this in the future.
 	if !p.waitForNPeers() {
