@@ -1031,6 +1031,12 @@ func (c *consensusRuntime) IsValidSender(msg *proto.Message) bool {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
+	// IsValidSender is called whenever a message is received from the peer.
+	// Since it is triggered from a separate go routine, it can happen that fsm instance is not yet initialized.
+	if c.fsm == nil {
+		return false
+	}
+
 	err := c.fsm.ValidateSender(msg)
 	if err != nil {
 		c.logger.Error("invalid sender", "error", err)
