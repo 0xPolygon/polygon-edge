@@ -74,6 +74,7 @@ type TestClusterConfig struct {
 	ValidatorPrefix   string
 	Binary            string
 	ValidatorSetSize  uint64
+	EpochSize         int
 
 	logsDirOnce sync.Once
 }
@@ -169,6 +170,11 @@ func WithBootnodeCount(cnt int) ClusterOption {
 		h.BootnodeCount = cnt
 	}
 }
+func WithEpochSize(epochSize int) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.EpochSize = epochSize
+	}
+}
 
 func isTrueEnv(e string) bool {
 	return strings.ToLower(os.Getenv(e)) == "true"
@@ -190,6 +196,7 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		WithStdout: isTrueEnv(envStdoutEnabled),
 		TmpDir:     tmpDir,
 		Binary:     resolveBinary(),
+		EpochSize:  10,
 	}
 
 	if config.ContractsDir == "" {
@@ -240,7 +247,7 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			"--consensus", "polybft",
 			"--dir", genesisPath,
 			"--contracts-path", defaultContractsPath,
-			"--epoch-size", "10",
+			"--epoch-size", strconv.Itoa(cluster.Config.EpochSize),
 			"--premine", "0x0000000000000000000000000000000000000000",
 		}
 
