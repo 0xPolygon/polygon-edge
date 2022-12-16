@@ -145,6 +145,7 @@ type RootchainConfig struct {
 	CheckpointManagerAddress types.Address `json:"checkpointManagerAddress"`
 	BLSAddress               types.Address `json:"blsAddress"`
 	BN256G2Address           types.Address `json:"bn256G2Address"`
+	ExitHelperAddress        types.Address `json:"exitHelperAddress"`
 	AdminAddress             types.Address `json:"adminAddress"`
 }
 

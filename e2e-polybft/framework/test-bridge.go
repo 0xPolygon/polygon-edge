@@ -9,6 +9,7 @@ import (
 	"path"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/0xPolygon/polygon-edge/command/rootchain/server"
 )
@@ -101,6 +102,28 @@ func (t *TestBridge) Stop() {
 
 func (t *TestBridge) JSONRPCAddr() string {
 	return fmt.Sprintf("http://%s:%d", hostIP, 8545)
+}
+
+func (t *TestBridge) WaitUntil(pollFrequency, timeout time.Duration, handler func() (bool, error)) error {
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+
+	for {
+		select {
+		case <-timer.C:
+			return fmt.Errorf("timeout")
+		case <-time.After(pollFrequency):
+		}
+
+		isConditionMet, err := handler()
+		if err != nil {
+			return err
+		}
+
+		if !isConditionMet {
+			return nil
+		}
+	}
 }
 
 // runCommand executes command with given arguments

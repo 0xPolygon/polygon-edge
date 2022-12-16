@@ -6,7 +6,7 @@ import (
 
 // bridgeStore interface provides access to the methods needed by bridge endpoint
 type bridgeStore interface {
-	GenerateExitProof(exitID, epoch, checkpointBlock uint64) ([]types.Hash, error)
+	GenerateExitProof(exitID, epoch, checkpointBlock uint64) (types.ExitProof, error)
 	GetStateSyncProof(stateSyncID uint64) (*types.StateSyncProof, error)
 }
 
