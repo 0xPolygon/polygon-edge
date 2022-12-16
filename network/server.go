@@ -38,6 +38,9 @@ const (
 	// we should have enough capacity of the queue
 	// because when queue is full, validation is throttled and new messages are dropped.
 	validateBufferSize = 1024
+
+	// networkMetrics is a prefix used for network-related metrics
+	networkMetrics = "network"
 )
 
 const (
@@ -514,7 +517,7 @@ func (s *Server) removePeerInfo(peerID peer.ID) *PeerConnInfo {
 		}
 	}
 
-	metrics.SetGauge([]string{"peers"}, float32(len(s.peers)))
+	metrics.SetGauge([]string{networkMetrics, "peers"}, float32(len(s.peers)))
 
 	return connectionInfo
 }
@@ -769,10 +772,12 @@ func (s *Server) SubscribeCh(ctx context.Context) (<-chan *peerEvent.PeerEvent, 
 func (s *Server) updateConnCountMetrics(direction network.Direction) {
 	switch direction {
 	case network.DirInbound:
-		metrics.SetGauge([]string{"inbound_connections_count"}, float32(s.connectionCounts.GetInboundConnCount()))
+		metrics.SetGauge([]string{networkMetrics, "inbound_connections_count"},
+			float32(s.connectionCounts.GetInboundConnCount()))
 
 	case network.DirOutbound:
-		metrics.SetGauge([]string{"outbound_connections_count"}, float32(s.connectionCounts.GetOutboundConnCount()))
+		metrics.SetGauge([]string{networkMetrics, "outbound_connections_count"},
+			float32(s.connectionCounts.GetOutboundConnCount()))
 	}
 }
 
@@ -780,11 +785,11 @@ func (s *Server) updateConnCountMetrics(direction network.Direction) {
 func (s *Server) updatePendingConnCountMetrics(direction network.Direction) {
 	switch direction {
 	case network.DirInbound:
-		metrics.SetGauge([]string{"pending_inbound_connections_count"},
+		metrics.SetGauge([]string{networkMetrics, "pending_inbound_connections_count"},
 			float32(s.connectionCounts.GetPendingInboundConnCount()))
 
 	case network.DirOutbound:
-		metrics.SetGauge([]string{"pending_outbound_connections_count"},
+		metrics.SetGauge([]string{networkMetrics, "pending_outbound_connections_count"},
 			float32(s.connectionCounts.GetPendingOutboundConnCount()))
 	}
 }
