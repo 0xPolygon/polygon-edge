@@ -124,7 +124,7 @@ func TestValidatorsSnapshotCache_GetSnapshot_FetchFromCache(t *testing.T) {
 
 	// Invalidate in memory cache
 	testValidatorsCache.snapshots = map[uint64]*validatorSnapshot{}
-	require.NoError(testValidatorsCache.state.removeAllValidatorSnapshots())
+	require.NoError(testValidatorsCache.state.EpochStore.removeAllValidatorSnapshots())
 	// Fetch snapshot from database
 	snapshot, err = testValidatorsCache.GetSnapshot(10, nil)
 	require.NoError(err)
@@ -172,7 +172,7 @@ func TestValidatorsSnapshotCache_Cleanup(t *testing.T) {
 
 	for i := 0; i < numberOfSnapshotsToLeaveInDB; i++ {
 		currentEpoch--
-		currentSnapshot, err := cache.state.getValidatorSnapshot(currentEpoch)
+		currentSnapshot, err := cache.state.EpochStore.getValidatorSnapshot(currentEpoch)
 		require.NoError(err, fmt.Sprintf("failed to fetch database snapshot for epoch %d", currentEpoch))
 		require.Equal(snapshot, currentSnapshot.Snapshot, fmt.Sprintf("snapshots for epoch %d are not equal", currentEpoch))
 	}
@@ -290,5 +290,5 @@ type testValidatorsCache struct {
 func (c *testValidatorsCache) cleanValidatorsCache() error {
 	c.snapshots = make(map[uint64]*validatorSnapshot)
 
-	return c.state.removeAllValidatorSnapshots()
+	return c.state.EpochStore.removeAllValidatorSnapshots()
 }

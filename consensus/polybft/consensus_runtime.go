@@ -409,11 +409,11 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) (*epochMetadata, e
 		return nil, err
 	}
 
-	if err := c.state.cleanEpochsFromDB(); err != nil {
+	if err := c.state.EpochStore.cleanEpochsFromDB(); err != nil {
 		c.logger.Error("Could not clean previous epochs from db.", "error", err)
 	}
 
-	if err := c.state.insertEpoch(epochNumber); err != nil {
+	if err := c.state.EpochStore.insertEpoch(epochNumber); err != nil {
 		return nil, fmt.Errorf("an error occurred while inserting new epoch in db. Reason: %w", err)
 	}
 

@@ -284,7 +284,7 @@ func (c *checkpointManager) PostBlock(req *PostBlockRequest) error {
 		return err
 	}
 
-	if err := c.state.insertExitEvents(events); err != nil {
+	if err := c.state.CheckpointStore.insertExitEvents(events); err != nil {
 		return err
 	}
 
@@ -307,7 +307,7 @@ func (c *checkpointManager) PostBlock(req *PostBlockRequest) error {
 
 // BuildEventRoot returns an exit event root hash for exit tree of given epoch
 func (c *checkpointManager) BuildEventRoot(epoch uint64) (types.Hash, error) {
-	exitEvents, err := c.state.getExitEventsByEpoch(epoch)
+	exitEvents, err := c.state.CheckpointStore.getExitEventsByEpoch(epoch)
 	if err != nil {
 		return types.ZeroHash, err
 	}
@@ -326,7 +326,7 @@ func (c *checkpointManager) BuildEventRoot(epoch uint64) (types.Hash, error) {
 
 // GenerateExitProof generates proof of exit
 func (c *checkpointManager) GenerateExitProof(exitID, epoch, checkpointBlock uint64) (types.Proof, error) {
-	exitEvent, err := c.state.getExitEvent(exitID, epoch)
+	exitEvent, err := c.state.CheckpointStore.getExitEvent(exitID, epoch)
 	if err != nil {
 		return types.Proof{}, err
 	}
@@ -336,7 +336,7 @@ func (c *checkpointManager) GenerateExitProof(exitID, epoch, checkpointBlock uin
 		return types.Proof{}, err
 	}
 
-	exitEvents, err := c.state.getExitEventsForProof(epoch, checkpointBlock)
+	exitEvents, err := c.state.CheckpointStore.getExitEventsForProof(epoch, checkpointBlock)
 	if err != nil {
 		return types.Proof{}, err
 	}

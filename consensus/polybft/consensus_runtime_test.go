@@ -20,7 +20,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"github.com/umbracle/ethgo"
 )
 
 func TestConsensusRuntime_isFixedSizeOfEpochMet_NotReachedEnd(t *testing.T) {
@@ -231,7 +230,7 @@ func TestConsensusRuntime_OnBlockInserted_EndOfEpoch(t *testing.T) {
 	}
 	runtime.OnBlockInserted(&types.FullBlock{Block: builtBlock})
 
-	require.True(t, runtime.state.isEpochInserted(currentEpochNumber+1))
+	require.True(t, runtime.state.EpochStore.isEpochInserted(currentEpochNumber+1))
 	require.Equal(t, newEpochNumber, runtime.epoch.Number)
 
 	blockchainMock.AssertExpectations(t)
@@ -394,7 +393,7 @@ func TestConsensusRuntime_FSM_EndOfEpoch_BuildCommitEpoch(t *testing.T) {
 	blockchainMock.On("GetHeaderByNumber", mock.Anything).Return(headerMap.getHeader)
 
 	state := newTestState(t)
-	require.NoError(t, state.insertEpoch(epoch))
+	require.NoError(t, state.EpochStore.insertEpoch(epoch))
 
 	metadata := &epochMetadata{
 		Validators:        validators,
@@ -1200,25 +1199,16 @@ func createTestExtraForAccounts(t *testing.T, epoch uint64, validators AccountSe
 	return result
 }
 
-func setupExitEventsForProofVerification(t *testing.T, state *State,
-	numOfBlocks, numOfEventsPerBlock uint64) [][]byte {
+func encodeExitEvents(t *testing.T, exitEvents []*ExitEvent) [][]byte {
 	t.Helper()
 
-	encodedEvents := make([][]byte, numOfBlocks*numOfEventsPerBlock)
-	index := uint64(0)
+	encodedEvents := make([][]byte, len(exitEvents))
 
-	for i := uint64(1); i <= numOfBlocks; i++ {
-		for j := uint64(1); j <= numOfEventsPerBlock; j++ {
-			e := &ExitEvent{index, ethgo.ZeroAddress, ethgo.ZeroAddress, []byte{0, 1}, 1, i}
-			require.NoError(t, state.insertExitEvent(e))
+	for i, e := range exitEvents {
+		encodedEvent, err := ExitEventABIType.Encode(e)
+		require.NoError(t, err)
 
-			b, err := ExitEventABIType.Encode(e)
-
-			require.NoError(t, err)
-
-			encodedEvents[index] = b
-			index++
-		}
+		encodedEvents[i] = encodedEvent
 	}
 
 	return encodedEvents

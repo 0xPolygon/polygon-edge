@@ -307,7 +307,7 @@ func TestCheckpointManager_PostBlock(t *testing.T) {
 		req.IsEpochEndingBlock = false
 		require.NoError(t, checkpointManager.PostBlock(req))
 
-		exitEvents, err := state.getExitEvents(epoch, func(exitEvent *ExitEvent) bool {
+		exitEvents, err := state.CheckpointStore.getExitEvents(epoch, func(exitEvent *ExitEvent) bool {
 			return exitEvent.BlockNumber == block
 		})
 
@@ -320,7 +320,7 @@ func TestCheckpointManager_PostBlock(t *testing.T) {
 		req.IsEpochEndingBlock = true
 		require.NoError(t, checkpointManager.PostBlock(req))
 
-		exitEvents, err := state.getExitEvents(epoch+1, func(exitEvent *ExitEvent) bool {
+		exitEvents, err := state.CheckpointStore.getExitEvents(epoch+1, func(exitEvent *ExitEvent) bool {
 			return exitEvent.BlockNumber == block
 		})
 
@@ -341,12 +341,12 @@ func TestCheckpointManager_BuildEventRoot(t *testing.T) {
 	state := newTestState(t)
 	checkpointManager := &checkpointManager{state: state}
 
-	encodedEvents := setupExitEventsForProofVerification(t, state, numOfBlocks, numOfEventsPerBlock)
+	encodedEvents := insertTestExitEvents(t, state, 1, numOfBlocks, numOfEventsPerBlock)
 
 	t.Run("Get exit event root hash", func(t *testing.T) {
 		t.Parallel()
 
-		tree, err := NewMerkleTree(encodedEvents)
+		tree, err := createExitTree(encodedEvents)
 		require.NoError(t, err)
 
 		hash, err := checkpointManager.BuildEventRoot(1)
@@ -372,11 +372,10 @@ func TestCheckpointManager_GenerateExitProof(t *testing.T) {
 	)
 
 	state := newTestState(t)
-	checkpointManager := &checkpointManager{
-		state: state,
-	}
+	checkpointManager := &checkpointManager{state: state}
 
-	encodedEvents := setupExitEventsForProofVerification(t, state, numOfBlocks, numOfEventsPerBlock)
+	exitEvents := insertTestExitEvents(t, state, 1, numOfBlocks, numOfEventsPerBlock)
+	encodedEvents := encodeExitEvents(t, exitEvents)
 	checkpointEvents := encodedEvents[:numOfEventsPerBlock]
 
 	// manually create merkle tree for a desired checkpoint to verify the generated proof
