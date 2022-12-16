@@ -226,7 +226,9 @@ func (pc *proposerCalculator) Update(snapshot *ProposerSnapshot, blockNumber uin
 	}
 
 	// update to new validator set and center if needed
-	pc.updateValidators(snapshot, newValidatorSet)
+	if err := pc.updateValidators(snapshot, newValidatorSet); err != nil {
+		return fmt.Errorf("cannot update validators: %w", err)
+	}
 
 	snapshot.Height = blockNumber + 1
 	snapshot.Round = 0
@@ -280,7 +282,7 @@ func (pc *proposerCalculator) updateValidators(snapshot *ProposerSnapshot, newVa
 	snapshotValidators := snapshot.toMap()
 	newValidators := make([]*PrioritizedValidator, len(newValidatorSet))
 
-	// compute total voting power of removed validators and currentValidatorSer
+	// compute total voting power of removed validators and current validator
 	removedValidatorsVotingPower := uint64(0)
 	newValidatorsVotingPower := uint64(0)
 
@@ -312,7 +314,7 @@ func (pc *proposerCalculator) updateValidators(snapshot *ProposerSnapshot, newVa
 				ProposerPriority: val.ProposerPriority,
 			}
 		} else {
-			// added validator has priority -1.125 * V
+			// added validator has priority = -C*totalVotingPowerBeforeRemoval (with C ~= 1.125)
 			newValidators[i] = &PrioritizedValidator{
 				Metadata:         newValidator,
 				ProposerPriority: int64(-(tvpAfterUpdatesBeforeRemovals + (tvpAfterUpdatesBeforeRemovals >> 3))),
