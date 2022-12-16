@@ -1421,3 +1421,50 @@ func to256(x *big.Int) *big.Int {
 
 	return x
 }
+
+var errOpCodeNotImplemented = errors.New("opcode not implemented")
+
+func opAuth(op OpCode) instruction {
+	return func(c *state) {
+
+		c.exit(errOpCodeNotImplemented)
+		return
+
+		authority := c.pop()
+		offset := c.pop()
+		length := c.pop()
+
+		if length.Uint64() < 4*wordSize.Uint64() {
+			//c.exit(errInvalidLength)
+			return
+		}
+
+		//memory[offset : offset+32 ] - yParity
+		//memory[offset+32 : offset+64 ] - r
+		//memory[offset+64 : offset+96 ] - s
+		//memory[offset+96 : offset+128] - commit
+
+		var next = func(from, width uint64) ([]byte, uint64) {
+			return c.memory[from : from+width], from + width
+		}
+
+		var x, y = offset.Uint64(), wordSize.Uint64()
+		var yParity, r, s, commit []byte
+
+		yParity, x = next(x, y)
+		r, x = next(x, y)
+		s, x = next(x, y)
+		commit, x = next(x, y)
+
+		fmt.Printf("authority: %v, yParity: %v, r: %v, s: %v, commit: %v\n", authority, yParity, r, s, commit)
+
+	}
+}
+
+func opAuthCall(op OpCode) instruction {
+	return func(c *state) {
+		c.exit(errOpCodeNotImplemented)
+
+		return
+	}
+}
