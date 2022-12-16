@@ -60,7 +60,8 @@ func (p *serverParams) initRawParams() error {
 
 	p.initPeerLimits()
 	p.initLogFileLocation()
-	p.initRelayer()
+
+	p.relayer = p.rawConfig.Relayer
 
 	return p.initAddresses()
 }
@@ -314,12 +315,6 @@ func (p *serverParams) initGRPCAddress() error {
 	); parseErr != nil {
 		return parseErr
 	}
-
-	return nil
-}
-
-func (p *serverParams) initRelayer() error {
-	p.relayer = p.rawConfig.Relayer
 
 	return nil
 }
