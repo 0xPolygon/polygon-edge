@@ -475,19 +475,19 @@ func calcHashForCS(
 		return nil, err
 	}
 
-	block.Header = filteredHeader
+	block.Header = filteredHeader.ComputeHash()
 
 	proposedBlock := &protoIBFT.ProposedBlock{
 		EthereumBlock: block.MarshalRLP(),
 		Round:         *extra.RoundNumber,
 	}
 
-	block.Header = originalHeader
-
 	proposedBlockRaw, err := protoBuf.Marshal(proposedBlock)
 	if err != nil {
 		return nil, err
 	}
+
+	block.Header = originalHeader
 
 	return crypto.Keccak256(proposedBlockRaw), nil
 }
@@ -633,7 +633,7 @@ func (i *backendIBFT) verifyParentCommittedSeals(
 		return fmt.Errorf("block %s not found", parent.Hash)
 	}
 
-	parentExtra, err := parentSigner.GetIBFTExtra(parent)
+	parentExtra, err := parentSigner.GetIBFTExtra(parentBlock.Header)
 	if err != nil {
 		return err
 	}

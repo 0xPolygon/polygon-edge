@@ -1,7 +1,6 @@
 package ibft
 
 import (
-	"github.com/0xPolygon/polygon-edge/crypto"
 	"google.golang.org/protobuf/proto"
 
 	protoIBFT "github.com/0xPolygon/go-ibft/messages/proto"
@@ -30,12 +29,13 @@ func (i *backendIBFT) BuildPrePrepareMessage(
 		Round:         view.Round,
 	}
 
-	proposedBlockRaw, err := proto.Marshal(proposedBlock)
+	// hash calculation begins
+	proposalHash, err := i.getProposalHashFromBlock(ethereumBlock, view.Round)
 	if err != nil {
 		return nil
 	}
 
-	proposalHash := crypto.Keccak256(proposedBlockRaw)
+	// hash calculation ends
 
 	// TODO: Double-check that even without this we are correctly validating the block elsewhere.
 	//block := &types.Block{}

@@ -147,6 +147,15 @@ func (i *IstanbulExtra) unmarshalRLPFromForParentCS(p *fastrlp.Parser, v *fastrl
 		}
 	}
 
+	if len(elems) >= 5 {
+		round, err := elems[4].GetUint64()
+		if err != nil {
+			return err
+		}
+
+		i.RoundNumber = &round
+	}
+
 	return nil
 }
 
@@ -229,10 +238,14 @@ func packProposerSealIntoExtra(
 			// ParentCommittedSeal
 			if len(oldValues) >= 4 {
 				newArrayValue.Set(oldValues[3])
+			} else {
+				newArrayValue.Set(ar.NewNull())
 			}
 
 			if len(oldValues) >= 5 {
 				newArrayValue.Set(oldValues[4])
+			} else {
+				newArrayValue.Set(ar.NewNull())
 			}
 
 			return nil
@@ -265,10 +278,14 @@ func packCommittedSealsAndRoundNumberIntoExtra(
 			// ParentCommittedSeal
 			if len(oldValues) >= 4 {
 				newArrayValue.Set(oldValues[3])
+			} else if roundNumber != nil {
+				newArrayValue.Set(ar.NewNull())
 			}
 
 			if roundNumber != nil {
 				newArrayValue.Set(ar.NewUint(*roundNumber))
+			} else {
+				newArrayValue.Set(ar.NewNull())
 			}
 
 			return nil

@@ -3,12 +3,12 @@ package ibft
 import (
 	"bytes"
 	"encoding/hex"
-	"github.com/0xPolygon/polygon-edge/crypto"
-	"github.com/golang/protobuf/proto"
 
 	"github.com/0xPolygon/go-ibft/messages"
 	protoIBFT "github.com/0xPolygon/go-ibft/messages/proto"
+	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
+	"google.golang.org/protobuf/proto"
 )
 
 // Verifier impl for go-ibft
@@ -137,14 +137,38 @@ func (i *backendIBFT) IsProposer(id []byte, height, round uint64) bool {
 }
 
 func (i *backendIBFT) IsValidProposalHash(proposal *protoIBFT.ProposedBlock, hash []byte) bool {
-	proposedBlockRaw, err := proto.Marshal(proposal)
+	proposalHash, err := i.getProposalHashFromBlock(proposal.EthereumBlock, proposal.Round)
 	if err != nil {
 		return false
 	}
 
-	proposalHash := crypto.Keccak256(proposedBlockRaw)
-
 	return bytes.Equal(proposalHash, hash)
+}
+
+func (i *backendIBFT) getProposalHashFromBlock(ethereumBlock []byte, round uint64) ([]byte, error) {
+	block := &types.Block{}
+	if err := block.UnmarshalRLP(ethereumBlock); err != nil {
+		return nil, err
+	}
+
+	filteredHeader, err := i.currentSigner.FilterHeaderForHash(block.Header)
+	if err != nil {
+		return nil, err
+	}
+
+	block.Header = filteredHeader.ComputeHash()
+
+	proposedBlockForHash := &protoIBFT.ProposedBlock{
+		EthereumBlock: block.MarshalRLP(),
+		Round:         round,
+	}
+
+	proposedBlockRaw, err := proto.Marshal(proposedBlockForHash)
+	if err != nil {
+		return nil, err
+	}
+
+	return crypto.Keccak256(proposedBlockRaw), nil
 }
 
 func (i *backendIBFT) IsValidCommittedSeal(

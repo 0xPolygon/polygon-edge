@@ -3,10 +3,10 @@ package ibft
 import (
 	"context"
 	"fmt"
-	"math"
 	"time"
 
 	"github.com/0xPolygon/go-ibft/messages"
+	"github.com/0xPolygon/go-ibft/messages/proto"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
@@ -142,7 +142,11 @@ func (i *backendIBFT) MaximumFaultyNodes() uint64 {
 	return uint64(CalcMaxFaultyNodes(i.currentValidators))
 }
 
-func (i *backendIBFT) Quorum(blockNumber uint64) uint64 {
+func (i *backendIBFT) HasQuorum(
+	blockNumber uint64,
+	messages []*proto.Message,
+	msgType proto.MessageType,
+) bool {
 	validators, err := i.forkManager.GetValidators(blockNumber)
 	if err != nil {
 		i.logger.Error(
@@ -151,13 +155,16 @@ func (i *backendIBFT) Quorum(blockNumber uint64) uint64 {
 			"err", err,
 		)
 
-		// return Math.MaxInt32 to prevent overflow when casting to int in go-ibft package
-		return math.MaxInt32
+		return false
 	}
 
-	quorumFn := i.quorumSize(blockNumber)
+	if msgType == proto.MessageType_PREPREPARE {
+		return len(messages) > 0
+	}
 
-	return uint64(quorumFn(validators))
+	quorum := i.quorumSize(blockNumber)(validators)
+
+	return len(messages) >= quorum
 }
 
 // buildBlock builds the block, based on the passed in snapshot and parent header
