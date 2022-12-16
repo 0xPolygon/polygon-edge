@@ -295,7 +295,7 @@ func TestPerformExit(t *testing.T) {
 			Code: contractsapi.BLS256.DeployedBytecode,
 		},
 		l1Cntract: {
-			Code: contractsapi.L11ExitDeployedBytecode,
+			Code: contractsapi.L1ExitDeployedBytecode,
 		},
 	}
 	transition := newTestTransition(t, alloc)
