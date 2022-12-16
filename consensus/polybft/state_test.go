@@ -450,6 +450,30 @@ func TestState_decodeExitEvent_NotAnExitEvent(t *testing.T) {
 	require.Nil(t, event)
 }
 
+func TestState_getProposerSnapshot_writeProposerSnapshot(t *testing.T) {
+	t.Parallel()
+
+	const (
+		height = uint64(100)
+		round  = uint64(5)
+	)
+
+	state := newTestState(t)
+
+	snap, err := state.getProposerSnapshot()
+
+	require.NoError(t, err)
+	require.Nil(t, snap)
+
+	require.NoError(t, state.writeProposerSnapshot(&ProposerSnapshot{Height: height, Round: round}))
+
+	snap, err = state.getProposerSnapshot()
+
+	require.NoError(t, err)
+	require.Equal(t, round, snap.Round)
+	require.Equal(t, height, snap.Height)
+}
+
 func insertTestExitEvents(t *testing.T, state *State,
 	numOfEpochs, numOfBlocksPerEpoch, numOfEventsPerBlock int) {
 	t.Helper()

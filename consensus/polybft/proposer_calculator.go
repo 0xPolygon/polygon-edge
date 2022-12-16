@@ -202,8 +202,7 @@ func (pc *proposerCalculator) Update(snapshot *ProposerSnapshot, blockNumber uin
 
 	var newValidatorSet AccountSet = nil
 
-	if !extra.Validators.IsEmpty() {
-		// TODO: optimize with parents
+	if extra.Validators != nil && !extra.Validators.IsEmpty() {
 		newValidatorSet, err = config.polybftBackend.GetValidators(blockNumber, nil)
 		if err != nil {
 			return fmt.Errorf("cannot get ibft extra for block %d: %w", blockNumber, err)

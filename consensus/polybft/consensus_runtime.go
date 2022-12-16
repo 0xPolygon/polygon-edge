@@ -332,8 +332,9 @@ func (c *consensusRuntime) FSM() error {
 	// to the head of their remote peers.
 	c.lock.RLock()
 	proposerSnapshot := c.proposerSnapshot.Copy()
-	parent, epoch := new(types.Header), new(epochMetadata)
-	*parent, *epoch = *c.lastBuiltBlock, *c.epoch
+	parent := c.lastBuiltBlock.Copy()
+	epoch := c.epoch
+	validatorsCopy := epoch.Validators.Copy()
 	c.lock.RUnlock()
 
 	if !epoch.Validators.ContainsNodeID(c.config.Key.String()) {
@@ -354,7 +355,6 @@ func (c *consensusRuntime) FSM() error {
 	pendingBlockNumber := parent.Number + 1
 	isEndOfSprint := c.isEndOfSprint(pendingBlockNumber)
 	isEndOfEpoch := c.isEndOfEpoch(pendingBlockNumber)
-	validatorsCopy := epoch.Validators.Copy()
 
 	valSet, err := NewValidatorSet(validatorsCopy, c.logger)
 	if err != nil {
