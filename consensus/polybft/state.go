@@ -38,6 +38,9 @@ validatorSnapshots/
 
 exit events/
 |--> (id+epoch+blockNumber) -> *ExitEvent (json marshalled)
+
+proposer snapshot/
+|--> staticKey - only current one snapshot is preserved -> *ProposerSnapshot (json marshalled)
 */
 
 var (
