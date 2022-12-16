@@ -228,6 +228,13 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		require.NoError(t, err)
 	}
 
+	manifestPath := path.Join(tmpDir, "manifest.json")
+	// run manifest file creation
+	cluster.cmdRun("manifest",
+		"--path", manifestPath,
+		"--validators-path", tmpDir,
+		"--validators-prefix", cluster.Config.ValidatorPrefix)
+
 	if cluster.Config.HasBridge {
 		// start bridge
 		cluster.Bridge, err = NewTestBridge(t, cluster.Config)
@@ -239,13 +246,21 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		cluster.Config.ValidatorSetSize = uint64(validatorsCount)
 	}
 
-	genesisPath := path.Join(tmpDir, "genesis.json")
+	if cluster.Config.HasBridge {
+		err := cluster.Bridge.deployRootchainContracts(manifestPath)
+		require.NoError(t, err)
+
+		err = cluster.Bridge.fundValidators()
+		require.NoError(t, err)
+	}
+
 	{
 		// run genesis configuration population
 		args := []string{
 			"genesis",
+			"--manifest", manifestPath,
 			"--consensus", "polybft",
-			"--dir", genesisPath,
+			"--dir", path.Join(tmpDir, "genesis.json"),
 			"--contracts-path", defaultContractsPath,
 			"--epoch-size", strconv.Itoa(cluster.Config.EpochSize),
 			"--premine", "0x0000000000000000000000000000000000000000",
@@ -290,14 +305,6 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 
 		// run cmd init-genesis with all the arguments
 		err = cluster.cmdRun(args...)
-		require.NoError(t, err)
-	}
-
-	if cluster.Config.HasBridge {
-		err := cluster.Bridge.deployRootchainContracts(genesisPath)
-		require.NoError(t, err)
-
-		err = cluster.Bridge.fundValidators()
 		require.NoError(t, err)
 	}
 
@@ -375,6 +382,7 @@ func (c *TestCluster) EmitTransfer(contractAddress, walletAddresses, amounts str
 
 	return c.cmdRun("rootchain",
 		"emit",
+		"--manifest", path.Join(c.Config.TmpDir, "manifest.json"),
 		"--contract", contractAddress,
 		"--wallets", walletAddresses,
 		"--amounts", amounts)
