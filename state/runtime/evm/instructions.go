@@ -4,6 +4,7 @@ package evm
 import (
 	"errors"
 	"fmt"
+	"github.com/0xPolygon/polygon-edge/helper/invoker"
 	"math/big"
 	"math/bits"
 	"sync"
@@ -1427,37 +1428,32 @@ var errOpCodeNotImplemented = errors.New("opcode not implemented")
 func opAuth(op OpCode) instruction {
 	return func(c *state) {
 
-		c.exit(errOpCodeNotImplemented)
+		commit := c.pop()
+		v := c.pop()
+		r := c.pop()
+		s := c.pop()
+
+		//fmt.Printf("commit: %v, y: %v, r: %v, s: %v\n",
+		//	hex.EncodeToHex(commit.Bytes()),
+		//	v,
+		//	hex.EncodeToHex(r.Bytes()),
+		//	hex.EncodeToHex(s.Bytes()),
+		//)
+
+		is := invoker.InvokerSignature{
+			R: r,
+			S: s,
+		}
+		is.V = v.Int64() == 1
+
+		// TODO: need to store signer address in state to be used in authCall ...?
+
+		signAddr := is.Recover(commit.Bytes(), c.msg.CodeAddress)
+		c.ret = make([]byte, 12)
+		c.ret = append(c.ret, signAddr.Bytes()...)
+
+		c.Halt()
 		return
-
-		authority := c.pop()
-		offset := c.pop()
-		length := c.pop()
-
-		if length.Uint64() < 4*wordSize.Uint64() {
-			//c.exit(errInvalidLength)
-			return
-		}
-
-		//memory[offset : offset+32 ] - yParity
-		//memory[offset+32 : offset+64 ] - r
-		//memory[offset+64 : offset+96 ] - s
-		//memory[offset+96 : offset+128] - commit
-
-		var next = func(from, width uint64) ([]byte, uint64) {
-			return c.memory[from : from+width], from + width
-		}
-
-		var x, y = offset.Uint64(), wordSize.Uint64()
-		var yParity, r, s, commit []byte
-
-		yParity, x = next(x, y)
-		r, x = next(x, y)
-		s, x = next(x, y)
-		commit, x = next(x, y)
-
-		fmt.Printf("authority: %v, yParity: %v, r: %v, s: %v, commit: %v\n", authority, yParity, r, s, commit)
-
 	}
 }
 
