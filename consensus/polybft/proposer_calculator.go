@@ -159,19 +159,7 @@ func (pcs *ProposerSnapshot) Copy() *ProposerSnapshot {
 	}
 }
 
-// ProposerCalculator interface - proposer calculator algorithm should implement this interface
-type ProposerCalculator interface {
-	// Update updates ProposerSnapshot to block with number `blockNumber`
-	Update(blockNumber uint64, config *runtimeConfig, state *State) error
-
-	// GetSnapshot returns copy of the current snapshot
-	GetSnapshot() (*ProposerSnapshot, bool)
-}
-
-// check if interface is matching implementation
-var _ ProposerCalculator = (*proposerCalculator)(nil)
-
-type proposerCalculator struct {
+type ProposerCalculator struct {
 	// current snapshot
 	snapshot *ProposerSnapshot
 
@@ -180,29 +168,29 @@ type proposerCalculator struct {
 }
 
 // NewProposerCalculator creates a new proposer calculator object
-func NewProposerCalculator(config *runtimeConfig, logger hclog.Logger) (*proposerCalculator, error) {
+func NewProposerCalculator(config *runtimeConfig, logger hclog.Logger) (*ProposerCalculator, error) {
 	snap, err := NewProposerSnapshotFromState(config, logger)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return &proposerCalculator{
+	return &ProposerCalculator{
 		snapshot: snap,
 		logger:   logger,
 	}, nil
 }
 
 // NewProposerCalculator creates a new proposer calculator object
-func NewProposerCalculatorFromSnapshot(pcs *ProposerSnapshot) *proposerCalculator {
-	return &proposerCalculator{
+func NewProposerCalculatorFromSnapshot(pcs *ProposerSnapshot) *ProposerCalculator {
+	return &ProposerCalculator{
 		snapshot: pcs.Copy(),
 		logger:   pcs.logger,
 	}
 }
 
 // Get copy of the proposers' snapshot
-func (pc *proposerCalculator) GetSnapshot() (*ProposerSnapshot, bool) {
+func (pc *ProposerCalculator) GetSnapshot() (*ProposerSnapshot, bool) {
 	if pc.snapshot == nil {
 		return nil, false
 	}
@@ -210,7 +198,7 @@ func (pc *proposerCalculator) GetSnapshot() (*ProposerSnapshot, bool) {
 	return pc.snapshot.Copy(), true
 }
 
-func (pc *proposerCalculator) Update(blockNumber uint64, config *runtimeConfig, state *State) error {
+func (pc *ProposerCalculator) Update(blockNumber uint64, config *runtimeConfig, state *State) error {
 	const saveEveryNIterations = 5
 
 	pc.logger.Info("Update proposal snapshot started", "block", blockNumber)
@@ -245,7 +233,7 @@ func (pc *proposerCalculator) Update(blockNumber uint64, config *runtimeConfig, 
 }
 
 // Updates ProposerSnapshot to block block with number `blockNumber`
-func (pc *proposerCalculator) updatePerBlock(blockNumber uint64, config *runtimeConfig) error {
+func (pc *ProposerCalculator) updatePerBlock(blockNumber uint64, config *runtimeConfig) error {
 	if pc.snapshot.Height != blockNumber {
 		return fmt.Errorf("proposer calculator update wrong block=%d, height = %d", blockNumber, pc.snapshot.Height)
 	}

@@ -108,8 +108,8 @@ type consensusRuntime struct {
 	// checkpointManager represents abstraction for checkpoint submission
 	checkpointManager *checkpointManager
 
-	// proposerCalculator is the object which calculates new proposer
-	proposerCalculator ProposerCalculator
+	// proposerCalculator is the object which manipulates with ProposerSnapshot
+	proposerCalculator *ProposerCalculator
 
 	// logger instance
 	logger hcf.Logger
