@@ -174,3 +174,11 @@ func PadLeftOrTrim(bb []byte, size int) []byte {
 
 	return tmp
 }
+
+func ExtendByteSlice(b []byte, needLen int) []byte {
+	if n := needLen - len(b); n > 0 {
+		b = append(b, make([]byte, n)...)
+	}
+
+	return b
+}
