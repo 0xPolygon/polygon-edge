@@ -7,7 +7,7 @@ type Bitmap []byte
 
 func (b *Bitmap) Set(idx uint64) {
 	index := idx / 8
-	*b = common.ExtendByteSlice(*b, int(index)+1)
+	*b = common.ExtendByteSlice(*b, int(index)+1, false)
 
 	bit := uint8(1 << (idx % 8))
 	(*b)[idx/8] |= bit

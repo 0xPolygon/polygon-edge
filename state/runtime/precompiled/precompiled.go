@@ -158,7 +158,7 @@ func (p *Precompiled) leftPad(buf []byte, n int) []byte {
 }
 
 func (p *Precompiled) get(input []byte, size int) ([]byte, []byte) {
-	p.buf = common.ExtendByteSlice(p.buf, size)
+	p.buf = common.ExtendByteSlice(p.buf, size, true)
 	n := size
 
 	if len(input) < n {

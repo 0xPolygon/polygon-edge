@@ -26,7 +26,7 @@ func (b *bitmap) reset() {
 
 func (b *bitmap) setCode(code []byte) {
 	codeSize := uint(len(code))
-	b.buf = common.ExtendByteSlice(b.buf, int(codeSize/bitmapSize+1))
+	b.buf = common.ExtendByteSlice(b.buf, int(codeSize/bitmapSize+1), true)
 
 	for i := uint(0); i < codeSize; {
 		c := code[i]

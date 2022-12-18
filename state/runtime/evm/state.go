@@ -329,7 +329,7 @@ func (c *state) allocateMemory(offset, size *big.Int) bool {
 		}
 
 		// resize the memory
-		c.memory = common.ExtendByteSlice(c.memory, int(w*32))
+		c.memory = common.ExtendByteSlice(c.memory, int(w*32), true)
 	}
 
 	return true
