@@ -45,6 +45,7 @@ type ProposerSnapshot struct {
 	Round      uint64
 	Proposer   *PrioritizedValidator
 	Validators []*PrioritizedValidator
+	logger     hclog.Logger
 }
 
 // NewProposerSnapshotFromState create ProposerSnapshot from state if possible or from genesis block
@@ -61,14 +62,14 @@ func NewProposerSnapshotFromState(config *runtimeConfig, logger hclog.Logger) (*
 			return nil, err
 		}
 
-		snapshot = NewProposerSnapshot(1, genesisValidatorsSet)
+		snapshot = NewProposerSnapshot(1, genesisValidatorsSet, logger)
 	}
 
 	return snapshot, nil
 }
 
 // NewProposerSnapshot creates ProposerSnapshot with height and validators with all priorities set to zero
-func NewProposerSnapshot(height uint64, validators []*ValidatorMetadata) *ProposerSnapshot {
+func NewProposerSnapshot(height uint64, validators []*ValidatorMetadata, logger hclog.Logger) *ProposerSnapshot {
 	validatorsSnap := make([]*PrioritizedValidator, len(validators))
 
 	for i, x := range validators {
@@ -80,7 +81,49 @@ func NewProposerSnapshot(height uint64, validators []*ValidatorMetadata) *Propos
 		Proposer:   nil,
 		Height:     height,
 		Validators: validatorsSnap,
+		logger:     logger,
 	}
+}
+
+// CalcProposer calculates next proposer
+func (pcs *ProposerSnapshot) CalcProposer(round, height uint64) (types.Address, error) {
+	if height != pcs.Height {
+		return types.ZeroAddress, fmt.Errorf("invalid height - expected %d, got %d", pcs.Height, height)
+	}
+
+	// optimization -> return current proposer if already calculated for this round
+	if pcs.Round == round && pcs.Proposer != nil {
+		return pcs.Proposer.Metadata.Address, nil
+	}
+
+	// do not change priorities on original snapshot while executing CalcProposer
+	// if round = 0 then we need one iteration
+	proposer, err := incrementProposerPriorityNTimes(pcs.Copy(), round+1)
+	if err != nil {
+		return types.ZeroAddress, err
+	}
+
+	pcs.Proposer = proposer
+	pcs.Round = round
+
+	pcs.logger.Info("New proposer calculated", "height", height, "round", round, "address", proposer.Metadata.Address)
+
+	return proposer.Metadata.Address, nil
+}
+
+// GetLatestProposer returns latest calculated proposer if any
+func (pcs *ProposerSnapshot) GetLatestProposer(round, height uint64) (types.Address, bool) {
+	// round must be same as saved one and proposer must exist
+	if pcs == nil || pcs.Proposer == nil || pcs.Round != round || pcs.Height != height {
+		pcs.logger.Info("Get latest proposer not found", "height", height, "round", round,
+			"pc height", pcs.Height, "pc round", pcs.Round)
+
+		return types.ZeroAddress, false
+	}
+
+	pcs.logger.Info("Get latest proposer", "height", height, "round", round, "address", pcs.Proposer.Metadata.Address)
+
+	return pcs.Proposer.Metadata.Address, true
 }
 
 // Gets total voting power from all the validators
@@ -118,14 +161,8 @@ func (pcs *ProposerSnapshot) Copy() *ProposerSnapshot {
 
 // ProposerCalculator interface - proposer calculator algorithm should implement this interface
 type ProposerCalculator interface {
-	// CalcProposer calculates next proposer
-	CalcProposer(round, height uint64) (types.Address, error)
-
 	// Update updates ProposerSnapshot to block with number `blockNumber`
 	Update(blockNumber uint64, config *runtimeConfig, state *State) error
-
-	// GetLatestProposer returns latest calculated proposer if any
-	GetLatestProposer(round, height uint64) (types.Address, bool)
 
 	// GetSnapshot returns copy of the current snapshot
 	GetSnapshot() (*ProposerSnapshot, bool)
@@ -157,10 +194,10 @@ func NewProposerCalculator(config *runtimeConfig, logger hclog.Logger) (*propose
 }
 
 // NewProposerCalculator creates a new proposer calculator object
-func NewProposerCalculatorFromSnapshot(pcs *ProposerSnapshot, logger hclog.Logger) *proposerCalculator {
+func NewProposerCalculatorFromSnapshot(pcs *ProposerSnapshot) *proposerCalculator {
 	return &proposerCalculator{
 		snapshot: pcs.Copy(),
-		logger:   logger,
+		logger:   pcs.logger,
 	}
 }
 
@@ -171,48 +208,6 @@ func (pc *proposerCalculator) GetSnapshot() (*ProposerSnapshot, bool) {
 	}
 
 	return pc.snapshot.Copy(), true
-}
-
-// GetLatestProposer returns latest calculated proposer if any
-func (pc *proposerCalculator) GetLatestProposer(round, height uint64) (types.Address, bool) {
-	// round must be same as saved one and proposer must exist
-	if pc.snapshot == nil || pc.snapshot.Proposer == nil || pc.snapshot.Round != round || pc.snapshot.Height != height {
-		pc.logger.Info("Get latest proposer not found", "height", height, "round", round,
-			"pc height", pc.snapshot.Height, "pc round", pc.snapshot.Round)
-
-		return types.ZeroAddress, false
-	}
-
-	pc.logger.Info("Get latest proposer",
-		"height", height, "round", round, "address", pc.snapshot.Proposer.Metadata.Address)
-
-	return pc.snapshot.Proposer.Metadata.Address, true
-}
-
-// CalcProposer calculates next proposer
-func (pc *proposerCalculator) CalcProposer(round, height uint64) (types.Address, error) {
-	if height != pc.snapshot.Height {
-		return types.ZeroAddress, fmt.Errorf("invalid height - expected %d, got %d", pc.snapshot.Height, height)
-	}
-
-	// optimization -> return current proposer if already calculated for this round
-	if pc.snapshot.Round == round && pc.snapshot.Proposer != nil {
-		return pc.snapshot.Proposer.Metadata.Address, nil
-	}
-
-	// do not change priorities on original snapshot while executing CalcProposer
-	// if round = 0 then we need one iteration
-	proposer, err := incrementProposerPriorityNTimes(pc.snapshot.Copy(), round+1)
-	if err != nil {
-		return types.ZeroAddress, err
-	}
-
-	pc.snapshot.Proposer = proposer
-	pc.snapshot.Round = round
-
-	pc.logger.Info("New proposer calculated", "height", height, "round", round, "address", proposer.Metadata.Address)
-
-	return proposer.Metadata.Address, nil
 }
 
 func (pc *proposerCalculator) Update(blockNumber uint64, config *runtimeConfig, state *State) error {

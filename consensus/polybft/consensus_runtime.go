@@ -361,18 +361,18 @@ func (c *consensusRuntime) FSM() error {
 	}
 
 	ff := &fsm{
-		config:             c.config.PolyBFTConfig,
-		parent:             parent,
-		backend:            c.config.blockchain,
-		polybftBackend:     c.config.polybftBackend,
-		checkpointBackend:  c,
-		epochNumber:        epoch.Number,
-		blockBuilder:       blockBuilder,
-		validators:         valSet,
-		isEndOfEpoch:       isEndOfEpoch,
-		isEndOfSprint:      isEndOfSprint,
-		proposerCalculator: NewProposerCalculatorFromSnapshot(proposerSnapshot, c.logger.Named("fsm_proposer_calculator")),
-		logger:             c.logger.Named("fsm"),
+		config:            c.config.PolyBFTConfig,
+		parent:            parent,
+		backend:           c.config.blockchain,
+		polybftBackend:    c.config.polybftBackend,
+		checkpointBackend: c,
+		epochNumber:       epoch.Number,
+		blockBuilder:      blockBuilder,
+		validators:        valSet,
+		isEndOfEpoch:      isEndOfEpoch,
+		isEndOfSprint:     isEndOfSprint,
+		proposerSnapshot:  proposerSnapshot,
+		logger:            c.logger.Named("fsm"),
 	}
 
 	if c.IsBridgeEnabled() {
@@ -1012,7 +1012,7 @@ func (c *consensusRuntime) IsProposer(id []byte, height, round uint64) bool {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
-	nextProposer, err := c.fsm.proposerCalculator.CalcProposer(round, height)
+	nextProposer, err := c.fsm.proposerSnapshot.CalcProposer(round, height)
 	if err != nil {
 		c.logger.Error("cannot calculate proposer", "error", err)
 
@@ -1152,7 +1152,7 @@ func (c *consensusRuntime) HasQuorum(
 			return false
 		}
 
-		propAddress, exist := c.fsm.proposerCalculator.GetLatestProposer(messages[0].View.Round, blockNumber)
+		propAddress, exist := c.fsm.proposerSnapshot.GetLatestProposer(messages[0].View.Round, blockNumber)
 		if !exist {
 			c.logger.Warn("HasQuorum has been called but proposer is not set")
 

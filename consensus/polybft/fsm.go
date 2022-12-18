@@ -47,7 +47,7 @@ type fsm struct {
 	validators ValidatorSet
 
 	// proposerSnapshot keeps information about new proposer
-	proposerCalculator ProposerCalculator
+	proposerSnapshot *ProposerSnapshot
 
 	// blockBuilder is the block builder for proposers
 	blockBuilder blockBuilder
