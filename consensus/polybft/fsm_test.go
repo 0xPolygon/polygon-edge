@@ -156,7 +156,7 @@ func TestFSM_BuildProposal_WithExitEvents(t *testing.T) {
 	for i := 0; i < numOfReceipts; i++ {
 		receipts[i] = &types.Receipt{Logs: []*types.Log{
 			{
-				Address: types.ZeroAddress,
+				Address: contracts.L2StateSenderContract,
 				Data:    encodedData,
 				Topics: []types.Hash{
 					types.Hash(exitEventABI.ID()),
@@ -226,7 +226,7 @@ func TestFSM_BuildProposal_WithExitEvents_ErrorInDecoding(t *testing.T) {
 
 	receipt := &types.Receipt{Logs: []*types.Log{
 		{
-			Address: types.ZeroAddress,
+			Address: contracts.L2StateSenderContract,
 			Data:    []byte{0, 1}, // invalid data
 			Topics: []types.Hash{
 				types.Hash(exitEventABI.ID()),

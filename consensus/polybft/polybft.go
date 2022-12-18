@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/chain"
-	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
@@ -112,14 +111,7 @@ type Polybft struct {
 
 func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *state.Transition) error {
 	return func(transition *state.Transition) error {
-		consensusConfigJSON, err := json.Marshal(config.Params.Engine[engineName])
-		if err != nil {
-			return err
-		}
-
-		var polyBFTConfig PolyBFTConfig
-		err = json.Unmarshal(consensusConfigJSON, &polyBFTConfig)
-
+		polyBFTConfig, err := GetPolyBFTConfig(config)
 		if err != nil {
 			return err
 		}
@@ -134,8 +126,17 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			return err
 		}
 
+		if err != nil {
+			return fmt.Errorf("failed loading rootchain manifest: %w", err)
+		}
+
+		rootchainAdmin := types.ZeroAddress
+		if polyBFTConfig.IsBridgeEnabled() {
+			rootchainAdmin = polyBFTConfig.Bridge.AdminAddress
+		}
+
 		input, err = nativeTokenInitializer.Encode(
-			[]interface{}{helper.GetRootchainAdminAddr(), nativeTokenName, nativeTokenSymbol})
+			[]interface{}{rootchainAdmin, nativeTokenName, nativeTokenSymbol})
 		if err != nil {
 			return err
 		}
