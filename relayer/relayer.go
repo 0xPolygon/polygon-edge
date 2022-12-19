@@ -32,9 +32,9 @@ func sanitizeRPCEndpoint(rpcEndpoint string) string {
 	if rpcEndpoint == "" || strings.Contains(rpcEndpoint, "0.0.0.0") {
 		_, port, err := net.SplitHostPort(rpcEndpoint)
 		if err == nil {
-			rpcEndpoint = fmt.Sprintf("http://%s:%s", "localhost", port)
+			rpcEndpoint = fmt.Sprintf("http://%s:%s", "127.0.0.1", port)
 		} else {
-			rpcEndpoint = "http://localhost:8545"
+			rpcEndpoint = "http://127.0.0.1:8545"
 		}
 	}
 
