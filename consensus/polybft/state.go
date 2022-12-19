@@ -48,6 +48,10 @@ var (
 	stateTransferEventABI = abi.MustNewEvent("event StateSynced(uint256 indexed id, address indexed sender, address indexed receiver, bytes data)")   //nolint:lll
 	exitEventABI          = abi.MustNewEvent("event L2StateSynced(uint256 indexed id, address indexed sender, address indexed receiver, bytes data)") //nolint:lll
 	ExitEventABIType      = abi.MustNewType("tuple(uint256 id, address sender, address receiver, bytes data)")
+
+	// proposerSnapshotKey is a static key which is used to save latest proposer snapshot.
+	// (there will always be one object in bucket)
+	proposerSnapshotKey = []byte("proposerSnapshotKey")
 )
 
 const (
@@ -62,8 +66,6 @@ const (
 	stateSyncMainBundleSize = 10
 	// number of stateSyncEvents to be grouped into one StateTransaction
 	stateSyncBundleSize = 1
-	// static key which is used to save latest proposer snapshot. It will be always one object in bucket
-	proposerSnapshotStaticKey = 7
 )
 
 type exitEventNotFoundError struct {
@@ -851,7 +853,7 @@ func (s *State) getProposerSnapshot() (*ProposerSnapshot, error) {
 	var snapshot *ProposerSnapshot
 
 	err := s.db.View(func(tx *bolt.Tx) error {
-		value := tx.Bucket(proposerCalcSnapshotBucket).Get(itob(uint64(proposerSnapshotStaticKey)))
+		value := tx.Bucket(proposerCalcSnapshotBucket).Get(proposerSnapshotKey)
 		if value == nil {
 			return nil
 		}
@@ -870,7 +872,7 @@ func (s *State) writeProposerSnapshot(snapshot *ProposerSnapshot) error {
 	}
 
 	return s.db.Update(func(tx *bolt.Tx) error {
-		return tx.Bucket(proposerCalcSnapshotBucket).Put(itob(proposerSnapshotStaticKey), raw)
+		return tx.Bucket(proposerCalcSnapshotBucket).Put(proposerSnapshotKey, raw)
 	})
 }
 
