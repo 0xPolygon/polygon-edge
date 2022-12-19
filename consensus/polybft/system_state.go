@@ -98,7 +98,7 @@ func (s *SystemStateImpl) GetValidatorSet() (AccountSet, error) {
 		val := &ValidatorMetadata{
 			Address:     types.Address(addr),
 			BlsKey:      pubKey,
-			VotingPower: totalStake.Uint64(),
+			VotingPower: new(big.Int).Set(totalStake),
 		}
 
 		return val, nil

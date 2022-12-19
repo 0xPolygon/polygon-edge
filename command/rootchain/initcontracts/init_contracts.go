@@ -8,13 +8,13 @@ import (
 	"sort"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
+	"github.com/0xPolygon/polygon-edge/helper/hex"
 
 	"github.com/spf13/cobra"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
 	"github.com/umbracle/ethgo/jsonrpc"
 
-	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
@@ -354,7 +354,7 @@ func validatorSetToABISlice(validators []*polybft.Validator) ([]map[string]inter
 		accSet[i] = &polybft.ValidatorMetadata{
 			Address:     validatorInfo.Address,
 			BlsKey:      blsKey,
-			VotingPower: chain.ConvertWeiToTokensAmount(validatorInfo.Balance).Uint64(),
+			VotingPower: new(big.Int).Set(validatorInfo.Balance),
 		}
 	}
 

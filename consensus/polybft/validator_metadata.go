@@ -23,7 +23,7 @@ var accountSetABIType = abi.MustNewType(`tuple(tuple(address _address, uint256[4
 type ValidatorMetadata struct {
 	Address     types.Address
 	BlsKey      *bls.PublicKey
-	VotingPower uint64
+	VotingPower *big.Int
 }
 
 // Equals checks ValidatorMetadata equality
@@ -32,7 +32,7 @@ func (v *ValidatorMetadata) Equals(b *ValidatorMetadata) bool {
 		return false
 	}
 
-	return v.EqualAddressAndBlsKey(b) && v.VotingPower == b.VotingPower
+	return v.EqualAddressAndBlsKey(b) && v.VotingPower.Cmp(b.VotingPower) == 0
 }
 
 // EqualAddressAndBlsKey checks ValidatorMetadata equality against Address and BlsKey fields
@@ -52,7 +52,7 @@ func (v *ValidatorMetadata) Copy() *ValidatorMetadata {
 	return &ValidatorMetadata{
 		Address:     types.BytesToAddress(v.Address[:]),
 		BlsKey:      blsKey,
-		VotingPower: v.VotingPower,
+		VotingPower: new(big.Int).Set(v.VotingPower),
 	}
 }
 
@@ -64,7 +64,7 @@ func (v *ValidatorMetadata) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 	// BlsKey
 	vv.Set(ar.NewCopyBytes(v.BlsKey.Marshal()))
 	// VotingPower
-	vv.Set(ar.NewBigInt(new(big.Int).SetUint64(v.VotingPower)))
+	vv.Set(ar.NewBigInt(v.VotingPower))
 
 	return vv
 }
@@ -109,7 +109,7 @@ func (v *ValidatorMetadata) UnmarshalRLPWith(val *fastrlp.Value) error {
 		return fmt.Errorf("expected 'Voting power' encoded as big int. Error: %w", err)
 	}
 
-	v.VotingPower = votingPower.Uint64()
+	v.VotingPower = new(big.Int).Set(votingPower)
 
 	return nil
 }
@@ -213,7 +213,7 @@ func (as AccountSet) AsGenericMaps() []map[string]interface{} {
 		accountSetMaps[i] = map[string]interface{}{
 			"_address":    v.Address,
 			"blsKey":      v.BlsKey.ToBigInt(),
-			"votingPower": new(big.Int).SetUint64(v.VotingPower),
+			"votingPower": new(big.Int).Set(v.VotingPower),
 		}
 	}
 

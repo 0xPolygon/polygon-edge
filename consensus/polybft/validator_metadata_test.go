@@ -1,6 +1,7 @@
 package polybft
 
 import (
+	"math/big"
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
@@ -21,7 +22,7 @@ func TestValidatorMetadata_Equals(t *testing.T) {
 	require.True(t, validatorAcc.Equals(v.ValidatorMetadata()))
 
 	// update voting power => validator metadata instances aren't equal
-	validatorAcc.VotingPower = 50
+	validatorAcc.VotingPower = new(big.Int).SetInt64(50)
 	require.False(t, validatorAcc.Equals(v.ValidatorMetadata()))
 }
 

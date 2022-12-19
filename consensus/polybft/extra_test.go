@@ -455,7 +455,7 @@ func TestExtra_InitGenesisValidatorsDelta(t *testing.T) {
 			delta.Added[i] = &ValidatorMetadata{
 				Address:     types.Address(validator.account.Ecdsa.Address()),
 				BlsKey:      validator.account.Bls.PublicKey(),
-				VotingPower: validator.votingPower,
+				VotingPower: new(big.Int).SetUint64(validator.votingPower),
 			}
 			i++
 		}
@@ -596,7 +596,7 @@ func TestValidatorSetDelta_UnmarshalRLPWith_NegativeCases(t *testing.T) {
 			votingPower, err := rand.Int(rand.Reader, big.NewInt(100))
 			require.NoError(t, err)
 
-			validator.VotingPower = votingPower.Uint64()
+			validator.VotingPower = new(big.Int).Set(votingPower)
 			updatedArray.Set(validator.MarshalRLPWith(ar))
 		}
 		deltaMarshalled.Set(addedArray)

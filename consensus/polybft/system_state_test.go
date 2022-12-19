@@ -74,7 +74,7 @@ func TestSystemState_GetValidatorSet(t *testing.T) {
 	validators, err := st.GetValidatorSet()
 	assert.NoError(t, err)
 	assert.Equal(t, types.Address(ethgo.HexToAddress("1")), validators[0].Address)
-	assert.Equal(t, uint64(10), validators[0].VotingPower)
+	assert.Equal(t, new(big.Int).SetUint64(10), validators[0].VotingPower)
 }
 
 func TestSystemState_GetNextCommittedIndex(t *testing.T) {

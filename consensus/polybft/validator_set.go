@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 )
@@ -43,10 +44,11 @@ func NewValidatorSet(valz AccountSet, logger hclog.Logger) (*validatorSet, error
 	totalVotingPower := int64(0)
 
 	for _, v := range valz {
-		votingPowerMap[v.Address] = int64(v.VotingPower)
+		scaledVotingPower := chain.ConvertWeiToTokensAmount(v.VotingPower).Int64()
+		votingPowerMap[v.Address] = scaledVotingPower
 
 		// mind overflow
-		totalVotingPower = safeAddClip(totalVotingPower, int64(v.VotingPower))
+		totalVotingPower = safeAddClip(totalVotingPower, scaledVotingPower)
 		if totalVotingPower > maxTotalVotingPower {
 			return nil, fmt.Errorf(
 				"total voting power cannot be guarded to not exceed %v; got: %v",

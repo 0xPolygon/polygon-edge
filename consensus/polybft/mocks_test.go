@@ -445,7 +445,7 @@ func (v *testValidator) ValidatorMetadata() *ValidatorMetadata {
 	return &ValidatorMetadata{
 		Address:     types.Address(v.account.Ecdsa.Address()),
 		BlsKey:      v.account.Bls.PublicKey(),
-		VotingPower: v.votingPower,
+		VotingPower: new(big.Int).SetUint64(v.votingPower),
 	}
 }
 

@@ -3,6 +3,7 @@ package polybft
 import (
 	"bytes"
 	"math"
+	"math/big"
 	"testing"
 
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
@@ -90,17 +91,17 @@ func TestProposerCalculator_SamePriority(t *testing.T) {
 		{
 			BlsKey:      keys[0].PublicKey(),
 			Address:     types.Address{0x1},
-			VotingPower: 1,
+			VotingPower: big.NewInt(1),
 		},
 		{
 			BlsKey:      keys[1].PublicKey(),
 			Address:     types.Address{0x2},
-			VotingPower: 2,
+			VotingPower: big.NewInt(2),
 		},
 		{
 			BlsKey:      keys[2].PublicKey(),
 			Address:     types.Address{0x3},
-			VotingPower: 3,
+			VotingPower: big.NewInt(3),
 		},
 	}, hclog.NewNullLogger())
 	require.NoError(t, err)
@@ -137,17 +138,17 @@ func TestProposerCalculator_InversePriorityOrderWithExpectedListOfSelection(t *t
 		{
 			BlsKey:      keys[0].PublicKey(),
 			Address:     types.Address{0x1},
-			VotingPower: 1000,
+			VotingPower: big.NewInt(1000),
 		},
 		{
 			BlsKey:      keys[1].PublicKey(),
 			Address:     types.Address{0x2},
-			VotingPower: 300,
+			VotingPower: big.NewInt(300),
 		},
 		{
 			BlsKey:      keys[2].PublicKey(),
 			Address:     types.Address{0x3},
-			VotingPower: 330,
+			VotingPower: big.NewInt(330),
 		},
 	}, hclog.NewNullLogger())
 	require.NoError(t, err)
@@ -187,17 +188,17 @@ func TestProposerCalculator_IncrementProposerPrioritySameVotingPower(t *testing.
 		{
 			BlsKey:      keys[0].PublicKey(),
 			Address:     types.Address{0x1},
-			VotingPower: 1,
+			VotingPower: big.NewInt(1),
 		},
 		{
 			BlsKey:      keys[1].PublicKey(),
 			Address:     types.Address{0x2},
-			VotingPower: 1,
+			VotingPower: big.NewInt(1),
 		},
 		{
 			BlsKey:      keys[2].PublicKey(),
 			Address:     types.Address{0x3},
-			VotingPower: 1,
+			VotingPower: big.NewInt(1),
 		},
 	}, hclog.NewNullLogger())
 	require.NoError(t, err)
@@ -245,17 +246,17 @@ func TestProposerCalculator_AveragingInIncrementProposerPriorityWithVotingPower(
 		{
 			BlsKey:      keys[0].PublicKey(),
 			Address:     types.Address{0x1},
-			VotingPower: uint64(vp0),
+			VotingPower: big.NewInt(vp0),
 		},
 		{
 			BlsKey:      keys[1].PublicKey(),
 			Address:     types.Address{0x2},
-			VotingPower: uint64(vp1),
+			VotingPower: big.NewInt(vp1),
 		},
 		{
 			BlsKey:      keys[2].PublicKey(),
 			Address:     types.Address{0x3},
-			VotingPower: uint64(vp2),
+			VotingPower: big.NewInt(vp2),
 		},
 	}
 
@@ -385,9 +386,9 @@ func TestProposerCalculator_TotalVotingPowerErrorOnOverflow(t *testing.T) {
 	// NewValidatorSet calls IncrementProposerPriority which calls TotalVotingPower()
 	// which should return error on overflows:
 	_, err := NewValidatorSet([]*ValidatorMetadata{
-		{Address: types.Address{0x1}, VotingPower: math.MaxInt64},
-		{Address: types.Address{0x2}, VotingPower: math.MaxInt64},
-		{Address: types.Address{0x3}, VotingPower: math.MaxInt64},
+		{Address: types.Address{0x1}, VotingPower: big.NewInt(math.MaxInt64)},
+		{Address: types.Address{0x2}, VotingPower: big.NewInt(math.MaxInt64)},
+		{Address: types.Address{0x3}, VotingPower: big.NewInt(math.MaxInt64)},
 	}, hclog.NewNullLogger())
 	require.Error(t, err)
 }
@@ -398,8 +399,8 @@ func TestProposerCalculator_UpdatesForNewValidatorSet(t *testing.T) {
 	keys, err := bls.CreateRandomBlsKeys(2)
 	require.NoError(t, err)
 
-	v1 := &ValidatorMetadata{Address: types.Address{0x1}, BlsKey: keys[0].PublicKey(), VotingPower: 100}
-	v2 := &ValidatorMetadata{Address: types.Address{0x2}, BlsKey: keys[1].PublicKey(), VotingPower: 100}
+	v1 := &ValidatorMetadata{Address: types.Address{0x1}, BlsKey: keys[0].PublicKey(), VotingPower: big.NewInt(100)}
+	v2 := &ValidatorMetadata{Address: types.Address{0x2}, BlsKey: keys[1].PublicKey(), VotingPower: big.NewInt(100)}
 
 	accountSet := []*ValidatorMetadata{v1, v2}
 	vs, err := NewValidatorSet(accountSet, hclog.NewNullLogger())
@@ -470,11 +471,11 @@ func TestProposerCalculator_UpdateValidatorsSameVpUpdatedAndNewAdded(t *testing.
 	keys, err := bls.CreateRandomBlsKeys(8)
 	require.NoError(t, err)
 
-	v1 := &ValidatorMetadata{Address: types.Address{0x1}, BlsKey: keys[0].PublicKey(), VotingPower: 100}
-	v2 := &ValidatorMetadata{Address: types.Address{0x2}, BlsKey: keys[1].PublicKey(), VotingPower: 100}
-	v3 := &ValidatorMetadata{Address: types.Address{0x3}, BlsKey: keys[2].PublicKey(), VotingPower: 100}
-	v4 := &ValidatorMetadata{Address: types.Address{0x4}, BlsKey: keys[3].PublicKey(), VotingPower: 100}
-	v5 := &ValidatorMetadata{Address: types.Address{0x5}, BlsKey: keys[4].PublicKey(), VotingPower: 100}
+	v1 := &ValidatorMetadata{Address: types.Address{0x1}, BlsKey: keys[0].PublicKey(), VotingPower: big.NewInt(100)}
+	v2 := &ValidatorMetadata{Address: types.Address{0x2}, BlsKey: keys[1].PublicKey(), VotingPower: big.NewInt(100)}
+	v3 := &ValidatorMetadata{Address: types.Address{0x3}, BlsKey: keys[2].PublicKey(), VotingPower: big.NewInt(100)}
+	v4 := &ValidatorMetadata{Address: types.Address{0x4}, BlsKey: keys[3].PublicKey(), VotingPower: big.NewInt(100)}
+	v5 := &ValidatorMetadata{Address: types.Address{0x5}, BlsKey: keys[4].PublicKey(), VotingPower: big.NewInt(100)}
 
 	vs, err := NewValidatorSet([]*ValidatorMetadata{v1, v2, v3, v4, v5}, hclog.NewNullLogger())
 	require.NoError(t, err)
