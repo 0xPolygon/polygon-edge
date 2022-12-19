@@ -116,3 +116,8 @@ func (ssp *StateSyncProof) DecodeAbi(txData []byte) error {
 
 	return nil
 }
+
+type ExitProof struct {
+	Proof     []Hash
+	LeafIndex uint64
+}

@@ -859,6 +859,17 @@ func (c *consensusRuntime) GenerateExitProof(exitID, epoch, checkpointBlock uint
 		return types.ExitProof{}, err
 	}
 
+	proof, err := tree.GenerateProofForLeaf(e, 0)
+	if err != nil {
+		return types.ExitProof{}, err
+	}
+
+	return types.ExitProof{
+		Proof:     proof,
+		LeafIndex: leafIndex,
+	}, nil
+}
+
 // GetStateSyncProof returns the proof for the state sync
 func (c *consensusRuntime) GetStateSyncProof(stateSyncID uint64) (*types.StateSyncProof, error) {
 	proof, err := c.state.getStateSyncProof(stateSyncID)
