@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/chain"
-	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
@@ -112,17 +111,11 @@ type Polybft struct {
 
 func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *state.Transition) error {
 	return func(transition *state.Transition) error {
-		var polyBFTConfig PolyBFTConfig
-
-		consensusConfigJSON, err := json.Marshal(config.Params.Engine[engineName])
+		polyBFTConfig, err := GetPolyBFTConfig(config)
 		if err != nil {
 			return err
 		}
 
-		err = json.Unmarshal(consensusConfigJSON, &polyBFTConfig)
-		if err != nil {
-			return err
-		}
 		// Initialize child validator set
 		input, err := getInitChildValidatorSetInput(polyBFTConfig)
 		if err != nil {
@@ -133,8 +126,17 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			return err
 		}
 
+		if err != nil {
+			return fmt.Errorf("failed loading rootchain manifest: %w", err)
+		}
+
+		rootchainAdmin := types.ZeroAddress
+		if polyBFTConfig.IsBridgeEnabled() {
+			rootchainAdmin = polyBFTConfig.Bridge.AdminAddress
+		}
+
 		input, err = nativeTokenInitializer.Encode(
-			[]interface{}{helper.GetRootchainAdminAddr(), nativeTokenName, nativeTokenSymbol})
+			[]interface{}{rootchainAdmin, nativeTokenName, nativeTokenSymbol})
 		if err != nil {
 			return err
 		}
@@ -171,7 +173,7 @@ func (p *Polybft) Initialize() error {
 	}
 
 	// create bridge and consensus topics
-	if err := p.createTopics(); err != nil {
+	if err = p.createTopics(); err != nil {
 		return fmt.Errorf("cannot create topics: %w", err)
 	}
 
@@ -181,11 +183,11 @@ func (p *Polybft) Initialize() error {
 	// initialize polybft consensus data directory
 	p.dataDir = filepath.Join(p.config.Config.Path, "polybft")
 	// create the data dir if not exists
-	if err := os.MkdirAll(p.dataDir, 0750); err != nil {
+	if err = os.MkdirAll(p.dataDir, 0750); err != nil {
 		return fmt.Errorf("failed to create data directory. Error: %w", err)
 	}
 
-	stt, err := newState(filepath.Join(p.dataDir, stateFileName), p.logger)
+	stt, err := newState(filepath.Join(p.dataDir, stateFileName), p.logger, p.closeCh)
 	if err != nil {
 		return fmt.Errorf("failed to create state instance. Error: %w", err)
 	}
@@ -200,7 +202,7 @@ func (p *Polybft) Initialize() error {
 
 	p.ibft = newIBFTConsensusWrapper(p.logger, p.runtime, p)
 
-	if err := p.subscribeToIbftTopic(); err != nil {
+	if err = p.subscribeToIbftTopic(); err != nil {
 		return fmt.Errorf("topic subscription failed: %w", err)
 	}
 
@@ -238,6 +240,9 @@ func (p *Polybft) Start() error {
 	if err := p.startRuntime(); err != nil {
 		return fmt.Errorf("consensus runtime start failed: %w", err)
 	}
+
+	// start state DB process
+	go p.state.startStatsReleasing()
 
 	return nil
 }

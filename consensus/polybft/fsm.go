@@ -46,8 +46,8 @@ type fsm struct {
 	// validators is the list of validators for this round
 	validators ValidatorSet
 
-	// proposerCalculator is the object which calculates new proposer
-	proposerCalculator ProposerCalculator
+	// proposerSnapshot keeps information about new proposer
+	proposerSnapshot *ProposerSnapshot
 
 	// blockBuilder is the block builder for proposers
 	blockBuilder blockBuilder
@@ -630,8 +630,12 @@ func getExitEventsFromReceipts(epoch, block uint64, receipts []*types.Receipt) (
 			continue
 		}
 
-		for j := 0; j < len(receipts[i].Logs); j++ {
-			event, err := decodeExitEvent(convertLog(receipts[i].Logs[j]), epoch, block)
+		for _, log := range receipts[i].Logs {
+			if log.Address != contracts.L2StateSenderContract {
+				continue
+			}
+
+			event, err := decodeExitEvent(convertLog(log), epoch, block)
 			if err != nil {
 				return nil, err
 			}

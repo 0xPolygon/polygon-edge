@@ -18,9 +18,6 @@ type ValidatorSet interface {
 	// Accounts returns the list of the ValidatorMetadata
 	Accounts() AccountSet
 
-	// returns total voting power of current validator set
-	GetTotalVotingPower() int64
-
 	// checks if submitted signers have reached quorum
 	HasQuorum(signers map[types.Address]struct{}) bool
 }
@@ -64,11 +61,6 @@ func NewValidatorSet(valz AccountSet, logger hclog.Logger) (*validatorSet, error
 		totalVotingPower: totalVotingPower,
 		logger:           logger.Named("validator_set"),
 	}, nil
-}
-
-// GetTotalVotingPower retrieve validator set total voting power
-func (vs validatorSet) GetTotalVotingPower() int64 {
-	return vs.totalVotingPower
 }
 
 // HasQuorum determines if there is quorum of enough signers reached,

@@ -28,7 +28,7 @@ func newTestState(t *testing.T) *State {
 		t.Fatal(err)
 	}
 
-	state, err := newState(path.Join(dir, "my.db"), hclog.NewNullLogger())
+	state, err := newState(path.Join(dir, "my.db"), hclog.NewNullLogger(), make(chan struct{}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -448,6 +448,28 @@ func TestState_decodeExitEvent_NotAnExitEvent(t *testing.T) {
 	event, err := decodeExitEvent(log, 1, 1)
 	require.NoError(t, err)
 	require.Nil(t, event)
+}
+
+func TestState_getProposerSnapshot_writeProposerSnapshot(t *testing.T) {
+	t.Parallel()
+
+	const (
+		height = uint64(100)
+		round  = uint64(5)
+	)
+
+	state := newTestState(t)
+
+	snap, err := state.getProposerSnapshot()
+	require.NoError(t, err)
+	require.Nil(t, snap)
+
+	newSnapshot := &ProposerSnapshot{Height: height, Round: round}
+	require.NoError(t, state.writeProposerSnapshot(newSnapshot))
+
+	snap, err = state.getProposerSnapshot()
+	require.NoError(t, err)
+	require.Equal(t, newSnapshot, snap)
 }
 
 func insertTestExitEvents(t *testing.T, state *State,

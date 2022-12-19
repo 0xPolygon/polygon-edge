@@ -23,7 +23,7 @@ func (s *Snapshot) GetStorage(addr types.Address, root types.Hash, rawkey types.
 	if root == emptyStateHash {
 		trie = s.state.newTrie()
 	} else {
-		trie, err = s.state.newTrieAt(root)
+		trie, err = s.state.NewTrieAt(root)
 		if err != nil {
 			return types.Hash{}
 		}

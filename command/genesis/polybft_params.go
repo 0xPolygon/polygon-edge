@@ -2,82 +2,77 @@ package genesis
 
 import (
 	"bytes"
-	"encoding/hex"
+	"errors"
 	"fmt"
 	"math/big"
-	"path"
 	"sort"
-	"strings"
 	"time"
+
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 
-	rootchain "github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
-	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/server"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
 const (
-	premineValidatorsFlag          = "premine-validators"
-	polyBftValidatorPrefixPathFlag = "validator-prefix"
-	smartContractsRootPathFlag     = "contracts-path"
+	smartContractsRootPathFlag = "contracts-path"
+	manifestPathFlag           = "manifest"
+	validatorSetSizeFlag       = "validator-set-size"
+	sprintSizeFlag             = "sprint-size"
+	blockTimeFlag              = "block-time"
+	bridgeFlag                 = "bridge-json-rpc"
 
-	validatorSetSizeFlag = "validator-set-size"
-	sprintSizeFlag       = "sprint-size"
-	blockTimeFlag        = "block-time"
-	validatorsFlag       = "polybft-validators"
-	bridgeFlag           = "bridge"
-
-	defaultEpochSize                  = uint64(10)
-	defaultSprintSize                 = uint64(5)
-	defaultValidatorSetSize           = 100
-	defaultBlockTime                  = 2 * time.Second
-	defaultPolyBftValidatorPrefixPath = "test-chain-"
-	defaultBridge                     = false
+	defaultManifestPath     = "./manifest.json"
+	defaultEpochSize        = uint64(10)
+	defaultSprintSize       = uint64(5)
+	defaultValidatorSetSize = 100
+	defaultBlockTime        = 2 * time.Second
+	defaultBridge           = false
 
 	bootnodePortStart = 30301
 )
 
-func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
-	validatorsInfo, err := ReadValidatorsByRegexp(path.Dir(p.genesisPath), p.polyBftValidatorPrefixPath)
+var (
+	errNoGenesisValidators = errors.New("genesis validators aren't provided")
+)
+
+// generatePolyBftChainConfig creates and persists polybft chain configuration to the provided file path
+func (p *genesisParams) generatePolyBftChainConfig() error {
+	// load manifest file
+	manifest, err := polybft.LoadManifest(p.manifestPath)
 	if err != nil {
-		return nil, err
+		return fmt.Errorf("failed to load manifest file from provided path '%s': %w", p.manifestPath, err)
 	}
 
-	allocs, err := p.deployContracts()
-	if err != nil {
-		return nil, err
+	if len(manifest.GenesisValidators) == 0 {
+		return errNoGenesisValidators
 	}
 
-	// use 1st account as governance address
-	governanceAccount := validatorsInfo[0].Account
+	var bridge *polybft.BridgeConfig
+
+	// populate bridge configuration
+	if p.bridgeJSONRPCAddr != "" && manifest.RootchainConfig != nil {
+		bridge = manifest.RootchainConfig.ToBridgeConfig()
+		bridge.JSONRPCEndpoint = p.bridgeJSONRPCAddr
+	}
+
 	polyBftConfig := &polybft.PolyBFTConfig{
-		BlockTime:         p.blockTime,
-		EpochSize:         p.epochSize,
-		SprintSize:        p.sprintSize,
-		ValidatorSetSize:  p.validatorSetSize,
+		InitialValidatorSet: manifest.GenesisValidators,
+		BlockTime:           p.blockTime,
+		EpochSize:           p.epochSize,
+		SprintSize:          p.sprintSize,
+		// use 1st account as governance address
+		Governance:        manifest.GenesisValidators[0].Address,
+		Bridge:            bridge,
 		ValidatorSetAddr:  contracts.ValidatorSetContract,
 		StateReceiverAddr: contracts.StateReceiverContract,
-		Governance:        types.Address(governanceAccount.Ecdsa.Address()),
-	}
-
-	if p.bridgeEnabled {
-		ip, err := rootchain.ReadRootchainIP()
-		if err != nil {
-			return nil, err
-		}
-
-		polyBftConfig.Bridge = &polybft.BridgeConfig{
-			BridgeAddr:      rootchain.StateSenderAddress,
-			CheckpointAddr:  rootchain.CheckpointManagerAddress,
-			JSONRPCEndpoint: ip,
-		}
 	}
 
 	chainConfig := &chain.Chain{
@@ -92,68 +87,72 @@ func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
 		Bootnodes: p.bootnodes,
 	}
 
-	// set generic validators as bootnodes if needed
-	if len(p.bootnodes) == 0 {
-		for i, validator := range validatorsInfo {
-			bnode := fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", "127.0.0.1", bootnodePortStart+i, validator.NodeID)
-			chainConfig.Bootnodes = append(chainConfig.Bootnodes, bnode)
-		}
+	// deploy genesis contracts
+	allocs, err := p.deployContracts()
+	if err != nil {
+		return err
 	}
 
-	var (
-		validatorPreminesMap map[types.Address]int
-		premineInfos         []*premineInfo
-	)
+	premineInfos := make([]*premineInfo, len(manifest.GenesisValidators))
+	validatorPreminesMap := make(map[types.Address]int, len(manifest.GenesisValidators))
 
-	if p.premineValidators != "" {
-		validatorPreminesMap = make(map[types.Address]int, len(validatorsInfo))
-
-		for i, vi := range validatorsInfo {
-			premineInfo, err := parsePremineInfo(fmt.Sprintf("%s:%s",
-				vi.Account.Ecdsa.Address().String(), p.premineValidators))
-			if err != nil {
-				return nil, err
-			}
-
-			premineInfos = append(premineInfos, premineInfo)
-			validatorPreminesMap[premineInfo.address] = i
-		}
+	// populate premine info for validator accounts
+	for i, validator := range manifest.GenesisValidators {
+		premineInfo := &premineInfo{address: validator.Address, balance: validator.Balance}
+		premineInfos[i] = premineInfo
+		validatorPreminesMap[premineInfo.address] = i
 	}
 
-	if len(p.premine) > 0 {
-		for _, premine := range p.premine {
-			premineInfo, err := parsePremineInfo(premine)
-			if err != nil {
-				return nil, err
-			}
+	// either premine non-validator or override validator accounts balance
+	for _, premine := range p.premine {
+		premineInfo, err := parsePremineInfo(premine)
+		if err != nil {
+			return err
+		}
 
-			if i, ok := validatorPreminesMap[premineInfo.address]; ok {
-				premineInfos[i] = premineInfo
-			} else {
-				premineInfos = append(premineInfos, premineInfo)
-			}
+		if i, ok := validatorPreminesMap[premineInfo.address]; ok {
+			premineInfos[i] = premineInfo
+		} else {
+			premineInfos = append(premineInfos, premineInfo) //nolint:makezero
 		}
 	}
 
 	// premine accounts
-	fillPremineMap(allocs, premineInfos)
-
-	// set initial validator set
-	genesisValidators, err := p.getGenesisValidators(validatorsInfo, allocs)
-	if err != nil {
-		return nil, err
+	for _, premine := range premineInfos {
+		allocs[premine.address] = &chain.GenesisAccount{
+			Balance: premine.balance,
+		}
 	}
 
-	polyBftConfig.InitialValidatorSet = genesisValidators
+	validatorMetadata := make([]*polybft.ValidatorMetadata, len(manifest.GenesisValidators))
 
-	pubKeys := make([]*bls.PublicKey, len(validatorsInfo))
-	for i, validatorInfo := range validatorsInfo {
-		pubKeys[i] = validatorInfo.Account.Bls.PublicKey()
+	for i, validator := range manifest.GenesisValidators {
+		// update balance of genesis validator, because it could be changed via premine flag
+		balance, err := chain.GetGenesisAccountBalance(validator.Address, allocs)
+		if err != nil {
+			return err
+		}
+
+		validator.Balance = balance
+
+		// create validator metadata instance
+		metadata, err := validator.ToValidatorMetadata()
+		if err != nil {
+			return err
+		}
+
+		validatorMetadata[i] = metadata
+
+		// set genesis validators as boot nodes if boot nodes not provided via CLI
+		if len(p.bootnodes) == 0 {
+			bootNodeMultiAddr := fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", "127.0.0.1", bootnodePortStart+i, validator.NodeID)
+			chainConfig.Bootnodes = append(chainConfig.Bootnodes, bootNodeMultiAddr)
+		}
 	}
 
-	genesisExtraData, err := generateExtraDataPolyBft(genesisValidators, pubKeys)
+	genesisExtraData, err := generateExtraDataPolyBft(validatorMetadata)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// populate genesis parameters
@@ -166,61 +165,7 @@ func (p *genesisParams) generatePolyBFTConfig() (*chain.Chain, error) {
 		Mixhash:    polybft.PolyBFTMixDigest,
 	}
 
-	return chainConfig, nil
-}
-
-func (p *genesisParams) getGenesisValidators(validators []GenesisTarget,
-	allocs map[types.Address]*chain.GenesisAccount) ([]*polybft.Validator, error) {
-	result := make([]*polybft.Validator, 0)
-
-	if len(p.validators) > 0 {
-		for _, validator := range p.validators {
-			parts := strings.Split(validator, ":")
-			if len(parts) != 2 || len(parts[0]) != 32 || len(parts[1]) < 2 {
-				continue
-			}
-
-			addr := types.StringToAddress(parts[0])
-
-			balance, err := chain.GetGenesisAccountBalance(addr, allocs)
-			if err != nil {
-				return nil, err
-			}
-
-			result = append(result, &polybft.Validator{
-				Address: addr,
-				BlsKey:  parts[1],
-				Balance: balance,
-			})
-		}
-	} else {
-		for _, validator := range validators {
-			pubKeyMarshalled := validator.Account.Bls.PublicKey().Marshal()
-			addr := types.Address(validator.Account.Ecdsa.Address())
-
-			balance, err := chain.GetGenesisAccountBalance(addr, allocs)
-			if err != nil {
-				return nil, err
-			}
-
-			result = append(result, &polybft.Validator{
-				Address: addr,
-				BlsKey:  hex.EncodeToString(pubKeyMarshalled),
-				Balance: balance,
-			})
-		}
-	}
-
-	return result, nil
-}
-
-func (p *genesisParams) generatePolyBftGenesis() error {
-	config, err := params.generatePolyBFTConfig()
-	if err != nil {
-		return err
-	}
-
-	return helper.WriteGenesisConfigToDisk(config, params.genesisPath)
+	return helper.WriteGenesisConfigToDisk(chainConfig, params.genesisPath)
 }
 
 func (p *genesisParams) deployContracts() (map[types.Address]*chain.GenesisAccount, error) {
@@ -259,12 +204,18 @@ func (p *genesisParams) deployContracts() (map[types.Address]*chain.GenesisAccou
 			relativePath: "common/Merkle.sol",
 			address:      contracts.MerkleContract,
 		},
+		{
+			// L2StateSender contract
+			name:         "L2StateSender",
+			relativePath: "child/L2StateSender.sol",
+			address:      contracts.L2StateSenderContract,
+		},
 	}
 
 	allocations := make(map[types.Address]*chain.GenesisAccount, len(genesisContracts))
 
 	for _, contract := range genesisContracts {
-		artifact, err := polybft.ReadArtifact(p.smartContractsRootPath, contract.relativePath, contract.name)
+		artifact, err := artifact.ReadArtifact(p.smartContractsRootPath, contract.relativePath, contract.name)
 		if err != nil {
 			return nil, err
 		}
@@ -279,22 +230,10 @@ func (p *genesisParams) deployContracts() (map[types.Address]*chain.GenesisAccou
 }
 
 // generateExtraDataPolyBft populates Extra with specific fields required for polybft consensus protocol
-func generateExtraDataPolyBft(validators []*polybft.Validator, publicKeys []*bls.PublicKey) ([]byte, error) {
-	if len(validators) != len(publicKeys) {
-		return nil, fmt.Errorf("expected same length for genesis validators and BLS public keys")
-	}
-
+func generateExtraDataPolyBft(validators []*polybft.ValidatorMetadata) ([]byte, error) {
 	delta := &polybft.ValidatorSetDelta{
-		Added:   make(polybft.AccountSet, len(validators)),
+		Added:   validators,
 		Removed: bitmap.Bitmap{},
-	}
-
-	for i, validator := range validators {
-		delta.Added[i] = &polybft.ValidatorMetadata{
-			Address:     validator.Address,
-			BlsKey:      publicKeys[i],
-			VotingPower: chain.ConvertWeiToTokensAmount(validator.Balance).Uint64(),
-		}
 	}
 
 	// Order validators based on its addresses

@@ -26,8 +26,9 @@ import (
 )
 
 const (
-	imageName       = "ethereum/client-go"
-	imageTag        = "v1.9.25"
+	gethConsoleImage = "ghcr.io/0xpolygon/go-ethereum-console:latest"
+	gethImage        = "ethereum/client-go:v1.9.25"
+
 	defaultHostIP   = "127.0.0.1"
 	defaultHostPort = "8545"
 )
@@ -58,6 +59,13 @@ func setFlags(cmd *cobra.Command) {
 		dataDirFlag,
 		"test-rootchain",
 		"target directory for the chain",
+	)
+
+	cmd.Flags().BoolVar(
+		&params.noConsole,
+		noConsole,
+		false,
+		"use the official geth image instead of the console fork",
 	)
 }
 
@@ -129,8 +137,13 @@ func runRootchain(ctx context.Context, outputter command.OutputFormatter, closeC
 		return err
 	}
 
+	image := gethConsoleImage
+	if params.noConsole {
+		image = gethImage
+	}
+
 	// try to pull the image
-	reader, err := dockerClient.ImagePull(ctx, "docker.io/"+imageName+":"+imageTag, dockertypes.ImagePullOptions{})
+	reader, err := dockerClient.ImagePull(ctx, image, dockertypes.ImagePullOptions{})
 	if err != nil {
 		return err
 	}
@@ -159,7 +172,7 @@ func runRootchain(ctx context.Context, outputter command.OutputFormatter, closeC
 	args = append(args, "--ws", "--ws.addr", "0.0.0.0")
 
 	config := &container.Config{
-		Image: imageName + ":" + imageTag,
+		Image: image,
 		Cmd:   args,
 		Labels: map[string]string{
 			"edge-type": "rootchain",
@@ -193,7 +206,6 @@ func runRootchain(ctx context.Context, outputter command.OutputFormatter, closeC
 				},
 			},
 		},
-		AutoRemove: true,
 	}
 
 	resp, err := dockerClient.ContainerCreate(ctx, config, hostConfig, nil, nil, "")

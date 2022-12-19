@@ -2,10 +2,10 @@ package polybft
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"math"
 	"math/big"
-	"sync"
 
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
@@ -27,112 +27,30 @@ const (
 	priorityWindowSizeFactor = 2
 )
 
-type ProposerCalculatorValidator struct {
+var (
+	// errInvalidTotalVotingPower is returned if the total voting power is zero
+	errInvalidTotalVotingPower = errors.New(
+		"invalid voting power configuration provided: total voting power must be greater than 0")
+)
+
+// Holds ValidatorMetadata together with priority
+type PrioritizedValidator struct {
 	Metadata         *ValidatorMetadata
 	ProposerPriority int64
 }
 
-func NewProposerCalculatorValidator(metadata *ValidatorMetadata, priority int64) *ProposerCalculatorValidator {
-	return &ProposerCalculatorValidator{
-		Metadata:         metadata,
-		ProposerPriority: priority,
-	}
-}
-
-type ProposerCalculatorSnapshot struct {
+// ProposerSnapshot represents snapshot of one proposer calculation
+type ProposerSnapshot struct {
 	Height     uint64
-	Validators []*ProposerCalculatorValidator
+	Round      uint64
+	Proposer   *PrioritizedValidator
+	Validators []*PrioritizedValidator
+	//logger     hclog.Logger
 }
 
-func NewProposerCalculatorSnapshot(height uint64, validators []*ValidatorMetadata) *ProposerCalculatorSnapshot {
-	validatorsSnap := make([]*ProposerCalculatorValidator, len(validators))
-
-	for i, x := range validators {
-		validatorsSnap[i] = &ProposerCalculatorValidator{Metadata: x, ProposerPriority: int64(0)}
-	}
-
-	return &ProposerCalculatorSnapshot{Height: height, Validators: validatorsSnap}
-}
-
-func (pcs ProposerCalculatorSnapshot) GetTotalVotingPower() int64 {
-	totalVotingPower := int64(0)
-
-	for _, v := range pcs.Validators {
-		totalVotingPower = safeAddClip(totalVotingPower, int64(v.Metadata.VotingPower))
-	}
-
-	return totalVotingPower
-}
-
-func (pcs *ProposerCalculatorSnapshot) Copy() *ProposerCalculatorSnapshot {
-	valCopy := make([]*ProposerCalculatorValidator, len(pcs.Validators))
-	for i, val := range pcs.Validators {
-		valCopy[i] = &ProposerCalculatorValidator{Metadata: val.Metadata.Copy(), ProposerPriority: val.ProposerPriority}
-	}
-
-	return &ProposerCalculatorSnapshot{
-		Validators: valCopy,
-		Height:     pcs.Height,
-	}
-}
-
-func (pcs *ProposerCalculatorSnapshot) toMap() map[types.Address]*ProposerCalculatorValidator {
-	validatorMap := make(map[types.Address]*ProposerCalculatorValidator)
-	for _, v := range pcs.Validators {
-		validatorMap[v.Metadata.Address] = v
-	}
-
-	return validatorMap
-}
-
-// ProposerCalculator interface of the current validator set
-type ProposerCalculator interface {
-	// CalcProposer calculates next proposer based on the passed round
-	CalcProposer(round, height uint64) (types.Address, error)
-
-	// Update calculator from current snapshot to block with number `blockNumber`
-	Update(blockNumber uint64, config *runtimeConfig, state *State) error
-
-	// GetLatestProposer returns latest calculated proposer
-	GetLatestProposer(round, height uint64) (types.Address, bool)
-
-	// Clone clones existing proposer calculator
-	Clone() ProposerCalculator
-}
-
-func isBetterProposer(a, b *ProposerCalculatorValidator) bool {
-	if b == nil || a.ProposerPriority > b.ProposerPriority {
-		return true
-	} else if a.ProposerPriority == b.ProposerPriority {
-		return bytes.Compare(a.Metadata.Address.Bytes(), b.Metadata.Address.Bytes()) <= 0
-	} else {
-		return false
-	}
-}
-
-type proposerCalculator struct {
-	// snapshot snapshot
-	snapshot *ProposerCalculatorSnapshot
-
-	// total voting power
-	totalVotingPower int64
-
-	// proposer calculator validator
-	proposer *ProposerCalculatorValidator
-
-	// rw mutex
-	lock *sync.RWMutex
-
-	// current round
-	round uint64
-
-	// logger instance
-	logger hclog.Logger
-}
-
-// NewProposerCalculatorFromState creates a new proposer calculator object.
-func NewProposerCalculatorFromState(config *runtimeConfig, logger hclog.Logger) (*proposerCalculator, error) {
-	snapshot, err := config.State.getProposerCalculatorSnapshot()
+// NewProposerSnapshotFromState create ProposerSnapshot from state if possible or from genesis block
+func NewProposerSnapshotFromState(config *runtimeConfig) (*ProposerSnapshot, error) {
+	snapshot, err := config.State.getProposerSnapshot()
 	if err != nil {
 		return nil, err
 	}
@@ -144,101 +62,163 @@ func NewProposerCalculatorFromState(config *runtimeConfig, logger hclog.Logger) 
 			return nil, err
 		}
 
-		snapshot = NewProposerCalculatorSnapshot(1, genesisValidatorsSet)
+		snapshot = NewProposerSnapshot(1, genesisValidatorsSet)
 	}
 
-	return NewProposerCalculator(snapshot, logger), nil
+	return snapshot, nil
 }
 
-// NewProposerCalculator creates a new proposer calculator object.
-func NewProposerCalculator(snapshot *ProposerCalculatorSnapshot, logger hclog.Logger) *proposerCalculator {
-	return &proposerCalculator{
-		totalVotingPower: snapshot.GetTotalVotingPower(),
-		lock:             &sync.RWMutex{},
-		snapshot:         snapshot,
-		round:            0,
-		logger:           logger.Named("proposer_calculator"),
+// NewProposerSnapshot creates ProposerSnapshot with height and validators with all priorities set to zero
+func NewProposerSnapshot(height uint64, validators []*ValidatorMetadata) *ProposerSnapshot {
+	validatorsSnap := make([]*PrioritizedValidator, len(validators))
+
+	for i, x := range validators {
+		validatorsSnap[i] = &PrioritizedValidator{Metadata: x, ProposerPriority: int64(0)}
+	}
+
+	return &ProposerSnapshot{
+		Round:      0,
+		Proposer:   nil,
+		Height:     height,
+		Validators: validatorsSnap,
 	}
 }
 
-// GetLatestProposer returns address of the latest calculated proposer or false if there is no proposer
-func (pc proposerCalculator) GetLatestProposer(round, height uint64) (types.Address, bool) {
-	pc.lock.RLock()
-	defer pc.lock.RUnlock()
-
-	// round must be same as saved one and proposer must exist
-	if pc.proposer == nil || pc.round != round || pc.snapshot.Height != height {
-		pc.logger.Info("Get latest proposer not found", "height", height, "round", round,
-			"pc height", pc.snapshot.Height, "pc round", pc.round)
-
-		return types.ZeroAddress, false
+// CalcProposer calculates next proposer
+func (pcs *ProposerSnapshot) CalcProposer(round, height uint64) (types.Address, error) {
+	if height != pcs.Height {
+		return types.ZeroAddress, fmt.Errorf("invalid height - expected %d, got %d", pcs.Height, height)
 	}
 
-	pc.logger.Info("Get latest proposer",
-		"height", height, "round", round, "address", pc.proposer.Metadata.Address)
-
-	return pc.proposer.Metadata.Address, true
-}
-
-// CalcProposer returns proposer address or error
-func (pc *proposerCalculator) CalcProposer(round, height uint64) (types.Address, error) {
 	// optimization -> return current proposer if already calculated for this round
-	pc.lock.RLock()
-	currentProposer, currentHeight := pc.proposer, pc.snapshot.Height
-	isSameRound := round == pc.round && currentProposer != nil
-	pc.lock.RUnlock()
-
-	if currentHeight != height {
-		return types.ZeroAddress,
-			fmt.Errorf("proposer calculator wrong height = %d, pc height = %d", height, currentHeight)
+	if pcs.Round == round && pcs.Proposer != nil {
+		return pcs.Proposer.Metadata.Address, nil
 	}
 
-	if isSameRound {
-		return currentProposer.Metadata.Address, nil
-	}
-
-	clone := pc.Copy()
-
+	// do not change priorities on original snapshot while executing CalcProposer
 	// if round = 0 then we need one iteration
-	if err := clone.incrementProposerPriorityNTimes(round + 1); err != nil {
+	proposer, err := incrementProposerPriorityNTimes(pcs.Copy(), round+1)
+	if err != nil {
 		return types.ZeroAddress, err
 	}
 
-	var err error
-
-	proposer := clone.proposer // no need for lock here because clone is temporary copy
-	if proposer == nil {
-		// try to retrieve validator with highest priority
-		if proposer, err = clone.getValWithMostPriority(); err != nil {
-			return types.ZeroAddress, err
-		}
-	}
-
-	// keep proposer in the original validator set
-	pc.lock.Lock()
-	pc.proposer = proposer
-	pc.round = round
-	pc.lock.Unlock()
-
-	pc.logger.Info("New proposer calculated", "height", height, "round", round, "address", proposer.Metadata.Address)
+	pcs.Proposer = proposer
+	pcs.Round = round
 
 	return proposer.Metadata.Address, nil
 }
 
-// Update updates calculator from current snapshot to block number. Not thread safe!
-func (pc *proposerCalculator) Update(blockNumber uint64, config *runtimeConfig, state *State) error {
+// GetLatestProposer returns latest calculated proposer if any
+func (pcs *ProposerSnapshot) GetLatestProposer(round, height uint64) (types.Address, error) {
+	// round must be same as saved one and proposer must exist
+	if pcs == nil || pcs.Proposer == nil || pcs.Round != round || pcs.Height != height {
+		return types.ZeroAddress,
+			fmt.Errorf("get latest proposer not found - height: %d, round: %d, pc height: %d, pc round: %d",
+				height, round, pcs.Height, pcs.Round)
+	}
+
+	return pcs.Proposer.Metadata.Address, nil
+}
+
+// Gets total voting power from all the validators
+func (pcs ProposerSnapshot) GetTotalVotingPower() int64 {
+	totalVotingPower := int64(0)
+
+	for _, v := range pcs.Validators {
+		totalVotingPower = safeAddClip(totalVotingPower, int64(v.Metadata.VotingPower))
+	}
+
+	return totalVotingPower
+}
+
+// Returns copy of current ProposerSnapshot object
+func (pcs *ProposerSnapshot) Copy() *ProposerSnapshot {
+	var proposer *PrioritizedValidator
+
+	valCopy := make([]*PrioritizedValidator, len(pcs.Validators))
+
+	for i, val := range pcs.Validators {
+		valCopy[i] = &PrioritizedValidator{Metadata: val.Metadata.Copy(), ProposerPriority: val.ProposerPriority}
+
+		if pcs.Proposer != nil && pcs.Proposer.Metadata.Address == val.Metadata.Address {
+			proposer = valCopy[i]
+		}
+	}
+
+	return &ProposerSnapshot{
+		Validators: valCopy,
+		Height:     pcs.Height,
+		Round:      pcs.Round,
+		Proposer:   proposer,
+	}
+}
+
+type ProposerCalculator struct {
+	// current snapshot
+	snapshot *ProposerSnapshot
+
+	// runtime configuration
+	config *runtimeConfig
+
+	// state to save snapshot
+	state *State
+
+	// logger instance
+	logger hclog.Logger
+}
+
+// NewProposerCalculator creates a new proposer calculator object
+func NewProposerCalculator(config *runtimeConfig, logger hclog.Logger) (*ProposerCalculator, error) {
+	snap, err := NewProposerSnapshotFromState(config)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &ProposerCalculator{
+		snapshot: snap,
+		config:   config,
+		state:    config.State,
+		logger:   logger,
+	}, nil
+}
+
+// NewProposerCalculator creates a new proposer calculator object
+func NewProposerCalculatorFromSnapshot(pcs *ProposerSnapshot, config *runtimeConfig,
+	logger hclog.Logger) *ProposerCalculator {
+	return &ProposerCalculator{
+		snapshot: pcs.Copy(),
+		config:   config,
+		state:    config.State,
+		logger:   logger,
+	}
+}
+
+// Get copy of the proposers' snapshot
+func (pc *ProposerCalculator) GetSnapshot() (*ProposerSnapshot, bool) {
+	if pc.snapshot == nil {
+		return nil, false
+	}
+
+	return pc.snapshot.Copy(), true
+}
+
+func (pc *ProposerCalculator) Update(blockNumber uint64) error {
 	const saveEveryNIterations = 5
 
-	snapshot := pc.snapshot
-	from := snapshot.Height
+	pc.logger.Info("Update proposal snapshot started", "block", blockNumber)
+
+	from := pc.snapshot.Height
 
 	for height := from; height <= blockNumber; height++ {
-		pc.updateToBlock(height, config)
+		if err := pc.updatePerBlock(height); err != nil {
+			return err
+		}
 
 		// write snapshot every saveEveryNIterations iterations
 		// this way, we prevent data loss on long calculations
 		if (height-from+1)%saveEveryNIterations == 0 {
-			if err := state.writeProposerCalculatorSnapshot(snapshot); err != nil {
+			if err := pc.state.writeProposerSnapshot(pc.snapshot); err != nil {
 				return fmt.Errorf("cannot save proposer calculator snapshot for block %d: %w", height, err)
 			}
 		}
@@ -246,200 +226,175 @@ func (pc *proposerCalculator) Update(blockNumber uint64, config *runtimeConfig, 
 
 	// write snapshot if not already written
 	if (blockNumber-from+1)%saveEveryNIterations != 0 {
-		if err := state.writeProposerCalculatorSnapshot(snapshot); err != nil {
+		if err := pc.state.writeProposerSnapshot(pc.snapshot); err != nil {
 			return fmt.Errorf("cannot save proposer calculator snapshot for block %d: %w", blockNumber, err)
 		}
 	}
 
+	// requires Lock
+	pc.logger.Info("Update proposal snapshot finished", "block", blockNumber)
+
 	return nil
 }
 
-func (pc *proposerCalculator) updateToBlock(blockNumber uint64, config *runtimeConfig) error {
+// Updates ProposerSnapshot to block block with number `blockNumber`
+func (pc *ProposerCalculator) updatePerBlock(blockNumber uint64) error {
 	if pc.snapshot.Height != blockNumber {
-		return fmt.Errorf("proposer calculator update wrong block=%d, height = %d",
-			blockNumber, pc.snapshot.Height)
+		return fmt.Errorf("proposer calculator update wrong block=%d, height = %d", blockNumber, pc.snapshot.Height)
 	}
 
-	currentHeader, found := config.blockchain.GetHeaderByNumber(blockNumber)
+	currentHeader, found := pc.config.blockchain.GetHeaderByNumber(blockNumber)
 	if !found {
 		return fmt.Errorf("cannot get header by number: %d", blockNumber)
 	}
 
 	extra, err := GetIbftExtra(currentHeader.ExtraData)
 	if err != nil {
-		return fmt.Errorf("cannot get ibft extra for block %d: %w", blockNumber, err)
+		return fmt.Errorf("cannot get ibft extra for block while updating proposer snapshot %d: %w", blockNumber, err)
 	}
 
 	var newValidatorSet AccountSet = nil
 
-	if !extra.Validators.IsEmpty() {
-		// TODO: optimize with parents
-		newValidatorSet, err = config.polybftBackend.GetValidators(blockNumber, nil)
+	if extra.Validators != nil && !extra.Validators.IsEmpty() {
+		newValidatorSet, err = pc.config.polybftBackend.GetValidators(blockNumber, nil)
 		if err != nil {
 			return fmt.Errorf("cannot get ibft extra for block %d: %w", blockNumber, err)
 		}
 	}
 
 	// if round = 0 then we need one iteration
-	if err := pc.incrementProposerPriorityNTimes(extra.Checkpoint.BlockRound + 1); err != nil {
+	_, err = incrementProposerPriorityNTimes(pc.snapshot, extra.Checkpoint.BlockRound+1)
+	if err != nil {
 		return fmt.Errorf("failed to update calculator for block %d: %w", blockNumber, err)
 	}
 
 	// update to new validator set and center if needed
-	pc.updateValidators(newValidatorSet)
+	updateValidators(pc.snapshot, newValidatorSet)
 
-	pc.snapshot.Height = blockNumber + 1
-	pc.round = 0
-	pc.proposer = nil
+	pc.snapshot.Height = blockNumber + 1 // snapshot (validator priorities) is prepared for the next block
+	pc.snapshot.Round = 0
+	pc.snapshot.Proposer = nil
 
-	pc.logger.Info("Finish updating proposer calculator",
-		"height", pc.snapshot.Height, "len", len(pc.snapshot.Validators))
+	pc.logger.Info("proposer calculator update has been finished", "height", blockNumber+1,
+		"len", len(pc.snapshot.Validators))
 
 	return nil
 }
 
-// Clone clones existing proposer calculator and also returns new snapshot
-func (pc *proposerCalculator) Clone() ProposerCalculator {
-	pc.lock.RLock()
-	defer pc.lock.RUnlock()
-
-	return &proposerCalculator{
-		totalVotingPower: pc.totalVotingPower,
-		lock:             &sync.RWMutex{},
-		snapshot:         pc.snapshot.Copy(),
-		round:            0,
-		logger:           pc.logger,
-	}
-}
-
-func (pc *proposerCalculator) incrementProposerPriorityNTimes(times uint64) error {
-	if len(pc.snapshot.Validators) == 0 {
-		return fmt.Errorf("validator set cannot be nul or empty")
+// algorithm functions receive snapshot and do appropriate calculations and changes
+func incrementProposerPriorityNTimes(snapshot *ProposerSnapshot, times uint64) (*PrioritizedValidator, error) {
+	if len(snapshot.Validators) == 0 {
+		return nil, fmt.Errorf("validator set cannot be nul or empty")
 	}
 
 	if times <= 0 {
-		return fmt.Errorf("cannot call IncrementProposerPriority with non-positive times")
+		return nil, fmt.Errorf("cannot call IncrementProposerPriority with non-positive times")
 	}
 
 	var (
-		proposer *ProposerCalculatorValidator
+		proposer *PrioritizedValidator
 		err      error
+		tvp      = snapshot.GetTotalVotingPower()
 	)
 
-	if err := pc.rescalePriorities(); err != nil {
-		return fmt.Errorf("cannot rescale priorities: %w", err)
-	}
-	if err := pc.shiftByAvgProposerPriority(); err != nil {
-		return fmt.Errorf("cannot shift proposer priorities: %w", err)
+	if err := updateWithChangeSet(snapshot, tvp); err != nil {
+		return nil, err
 	}
 
 	for i := uint64(0); i < times; i++ {
-		if proposer, err = pc.incrementProposerPriority(); err != nil {
-			return fmt.Errorf("cannot increment proposer priority: %w", err)
+		if proposer, err = incrementProposerPriority(snapshot, tvp); err != nil {
+			return nil, fmt.Errorf("cannot increment proposer priority: %w", err)
 		}
 	}
 
-	pc.lock.Lock()
-	pc.proposer = proposer
-	pc.lock.Unlock()
+	snapshot.Proposer = proposer
+	snapshot.Round = times - 1
 
-	return nil
+	return proposer, nil
 }
 
-func (pc *proposerCalculator) updateValidators(newValidatorSet AccountSet) error {
+func updateValidators(snapshot *ProposerSnapshot, newValidatorSet AccountSet) {
 	if newValidatorSet.Len() == 0 {
-		pc.logger.Info("No new validator set")
-
-		return nil
+		return
 	}
 
-	snapshotValidators := pc.snapshot.toMap()
-	newValidators := make([]*ProposerCalculatorValidator, len(newValidatorSet))
+	oldProposerCalcValidators := snapshot.Validators
 
-	// compute total voting power of removed validators and currentValidatorSer
-	var removedValidatorsVotingPower uint64
-	var newValidatorsVotingPower uint64
+	newValidatorsCalcProposer := make([]*PrioritizedValidator, len(newValidatorSet))
+	addressOldValidatorMap := make(map[types.Address]*PrioritizedValidator, len(oldProposerCalcValidators))
 
-	for address, val := range snapshotValidators {
-		if !newValidatorSet.ContainsNodeID(address.String()) {
-			removedValidatorsVotingPower += val.Metadata.VotingPower
+	for _, x := range oldProposerCalcValidators {
+		addressOldValidatorMap[x.Metadata.Address] = x
+	}
+
+	// create new validators snapshot
+	for i, x := range newValidatorSet {
+		priority := int64(0)
+
+		// TODO: change priority if validator existed previous
+		if val, exists := addressOldValidatorMap[x.Address]; exists {
+			priority = val.ProposerPriority // + int64(val.Metadata.VotingPower) - int64(x.VotingPower)
+		}
+
+		newValidatorsCalcProposer[i] = &PrioritizedValidator{
+			Metadata:         x,
+			ProposerPriority: priority,
 		}
 	}
 
-	for _, v := range newValidatorSet {
-		newValidatorsVotingPower += v.VotingPower
-	}
+	// TODO: centering
 
-	tvpAfterUpdatesBeforeRemovals := newValidatorsVotingPower + removedValidatorsVotingPower
-	for i, newValidator := range newValidatorSet {
-		if val, exists := snapshotValidators[newValidator.Address]; exists {
-			// old validators have the same priority
-			newValidators[i] = NewProposerCalculatorValidator(newValidator, val.ProposerPriority)
-		} else {
-			// added validator has priority -1.125 * V
-			newValidators[i] = NewProposerCalculatorValidator(newValidator, int64(-(tvpAfterUpdatesBeforeRemovals + (tvpAfterUpdatesBeforeRemovals >> 3))))
-		}
-	}
-
-	pc.snapshot.Validators = newValidators
-	pc.totalVotingPower = pc.snapshot.GetTotalVotingPower()
-
-	// after validator set center values around 0 and scale
-	if err := pc.updateWithChangeSet(); err != nil {
-		return fmt.Errorf("cannot update validator changeset: %w", err)
-	}
-
-	return nil
+	snapshot.Validators = newValidatorsCalcProposer
 }
 
-func (pc *proposerCalculator) incrementProposerPriority() (*ProposerCalculatorValidator, error) {
-	for _, val := range pc.snapshot.Validators {
+func incrementProposerPriority(snapshot *ProposerSnapshot, totalVotingPower int64) (*PrioritizedValidator, error) {
+	for _, val := range snapshot.Validators {
 		// Check for overflow for sum.
 		newPrio := safeAddClip(val.ProposerPriority, int64(val.Metadata.VotingPower))
 		val.ProposerPriority = newPrio
 	}
 	// Decrement the validator with most ProposerPriority.
-	mostest, err := pc.getValWithMostPriority()
+	mostest, err := getValWithMostPriority(snapshot)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get validator with most priority: %w", err)
 	}
 
-	mostest.ProposerPriority = safeSubClip(mostest.ProposerPriority, pc.totalVotingPower)
+	mostest.ProposerPriority = safeSubClip(mostest.ProposerPriority, totalVotingPower)
 
 	return mostest, nil
 }
 
-func (pc *proposerCalculator) updateWithChangeSet() error {
-
-	if err := pc.rescalePriorities(); err != nil {
+func updateWithChangeSet(snapshot *ProposerSnapshot, totalVotingPower int64) error {
+	if err := rescalePriorities(snapshot, totalVotingPower); err != nil {
 		return fmt.Errorf("cannot rescale priorities: %w", err)
 	}
-	if err := pc.shiftByAvgProposerPriority(); err != nil {
+
+	if err := shiftByAvgProposerPriority(snapshot); err != nil {
 		return fmt.Errorf("cannot shift proposer priorities: %w", err)
 	}
 
 	return nil
 }
 
-func (pc *proposerCalculator) shiftByAvgProposerPriority() error {
-	avgProposerPriority, err := pc.computeAvgProposerPriority()
+func shiftByAvgProposerPriority(snapshot *ProposerSnapshot) error {
+	avgProposerPriority, err := computeAvgProposerPriority(snapshot)
 	if err != nil {
 		return fmt.Errorf("cannot compute proposer priority: %w", err)
 	}
 
-	for _, val := range pc.snapshot.Validators {
+	for _, val := range snapshot.Validators {
 		val.ProposerPriority = safeSubClip(val.ProposerPriority, avgProposerPriority)
 	}
 
 	return nil
 }
 
-func (pc *proposerCalculator) getValWithMostPriority() (result *ProposerCalculatorValidator, err error) {
-	if len(pc.snapshot.Validators) == 0 {
+func getValWithMostPriority(snapshot *ProposerSnapshot) (result *PrioritizedValidator, err error) {
+	if len(snapshot.Validators) == 0 {
 		return nil, fmt.Errorf("validators cannot be nil or empty")
 	}
 
-	for _, curr := range pc.snapshot.Validators {
+	for _, curr := range snapshot.Validators {
 		// pick curr as result if it has greater priority
 		// or if it has same priority but "smaller" address
 		if isBetterProposer(curr, result) {
@@ -450,15 +405,15 @@ func (pc *proposerCalculator) getValWithMostPriority() (result *ProposerCalculat
 	return result, nil
 }
 
-func (pc *proposerCalculator) computeAvgProposerPriority() (int64, error) {
-	if len(pc.snapshot.Validators) == 0 {
+func computeAvgProposerPriority(snapshot *ProposerSnapshot) (int64, error) {
+	if len(snapshot.Validators) == 0 {
 		return 0, fmt.Errorf("validator set cannot be nul or empty")
 	}
 
-	n := int64(len(pc.snapshot.Validators))
+	n := int64(len(snapshot.Validators))
 	sum := big.NewInt(0)
 
-	for _, val := range pc.snapshot.Validators {
+	for _, val := range snapshot.Validators {
 		sum.Add(sum, big.NewInt(val.ProposerPriority))
 	}
 
@@ -472,23 +427,24 @@ func (pc *proposerCalculator) computeAvgProposerPriority() (int64, error) {
 
 // rescalePriorities rescales the priorities such that the distance between the
 // maximum and minimum is smaller than `diffMax`.
-func (pc *proposerCalculator) rescalePriorities() error {
-	if len(pc.snapshot.Validators) == 0 {
+func rescalePriorities(snapshot *ProposerSnapshot, totalVotingPower int64) error {
+	if len(snapshot.Validators) == 0 {
 		return fmt.Errorf("validator set cannot be nul or empty")
 	}
 
 	// Cap the difference between priorities to be proportional to 2*totalPower by
 	// re-normalizing priorities, i.e., rescale all priorities by multiplying with:
 	// 2*totalVotingPower/(maxPriority - minPriority)
-	diffMax := priorityWindowSizeFactor * pc.totalVotingPower
+	diffMax := priorityWindowSizeFactor * snapshot.GetTotalVotingPower()
 
 	// Calculating ceil(diff/diffMax):
 	// Re-normalization is performed by dividing by an integer for simplicity.
 	// NOTE: This may make debugging priority issues easier as well.
-	diff := computeMaxMinPriorityDiff(pc.snapshot.Validators)
+	diff := computeMaxMinPriorityDiff(snapshot.Validators)
 	ratio := (diff + diffMax - 1) / diffMax
+
 	if diff > diffMax {
-		for _, val := range pc.snapshot.Validators {
+		for _, val := range snapshot.Validators {
 			val.ProposerPriority /= ratio
 		}
 	}
@@ -496,22 +452,8 @@ func (pc *proposerCalculator) rescalePriorities() error {
 	return nil
 }
 
-// Copy each validator into a new ValidatorSet.
-func (pc proposerCalculator) Copy() *proposerCalculator {
-	pc.lock.RLock()
-	defer pc.lock.RUnlock()
-
-	return &proposerCalculator{
-		proposer:         pc.proposer,
-		lock:             &sync.RWMutex{},
-		totalVotingPower: pc.totalVotingPower,
-		snapshot:         pc.snapshot.Copy(),
-		logger:           pc.logger,
-	}
-}
-
 // computeMaxMinPriorityDiff computes the difference between the max and min ProposerPriority of that set.
-func computeMaxMinPriorityDiff(validators []*ProposerCalculatorValidator) int64 {
+func computeMaxMinPriorityDiff(validators []*PrioritizedValidator) int64 {
 	max := int64(math.MinInt64)
 	min := int64(math.MaxInt64)
 
@@ -532,4 +474,14 @@ func computeMaxMinPriorityDiff(validators []*ProposerCalculatorValidator) int64 
 	}
 
 	return diff
+}
+
+func isBetterProposer(a, b *PrioritizedValidator) bool {
+	if b == nil || a.ProposerPriority > b.ProposerPriority {
+		return true
+	} else if a.ProposerPriority == b.ProposerPriority {
+		return bytes.Compare(a.Metadata.Address.Bytes(), b.Metadata.Address.Bytes()) <= 0
+	} else {
+		return false
+	}
 }

@@ -27,10 +27,12 @@ func TestSystemState_GetValidatorSet(t *testing.T) {
 		return `
 
 		struct Validator {
-			uint256[4] id;
+			uint256[4] blsKey;
 			uint256 stake;
 			uint256 totalStake;
-			uint256 data;
+			uint256 commission;
+			uint256 withdrawableRewards;
+			bool active;
 		}
 
 		function getCurrentValidatorSet() public returns (address[] memory) {
@@ -46,7 +48,7 @@ func TestSystemState_GetValidatorSet(t *testing.T) {
 				16798350082249088544573448433070681576641749462807627179536437108134609634615,
 				21427200503135995176566340351867145775962083994845221446131416289459495591422
 			];
-			return Validator(key, 10, 0, 0);
+			return Validator(key, 10, 10, 0, 0, true);
 		}
 
 		`
@@ -58,7 +60,7 @@ func TestSystemState_GetValidatorSet(t *testing.T) {
 	bin, err := hex.DecodeString(solcContract.Bin)
 	assert.NoError(t, err)
 
-	transition := newTestTransition(t)
+	transition := newTestTransition(t, nil)
 
 	// deploy a contract
 	result := transition.Create2(types.Address{}, bin, big.NewInt(0), 1000000000)
@@ -103,7 +105,7 @@ func TestSystemState_GetNextExecutionAndCommittedIndex(t *testing.T) {
 	bin, err := hex.DecodeString(solcContract.Bin)
 	require.NoError(t, err)
 
-	transition := newTestTransition(t)
+	transition := newTestTransition(t, nil)
 
 	// deploy a contract
 	result := transition.Create2(types.Address{}, bin, big.NewInt(0), 1000000000)
@@ -164,7 +166,7 @@ func TestSystemState_GetEpoch(t *testing.T) {
 	bin, err := hex.DecodeString(solcContract.Bin)
 	require.NoError(t, err)
 
-	transition := newTestTransition(t)
+	transition := newTestTransition(t, nil)
 
 	// deploy a contract
 	result := transition.Create2(types.Address{}, bin, big.NewInt(0), 1000000000)
@@ -191,7 +193,7 @@ func TestSystemState_GetEpoch(t *testing.T) {
 func TestStateProvider_Txn_Panics(t *testing.T) {
 	t.Parallel()
 
-	transition := newTestTransition(t)
+	transition := newTestTransition(t, nil)
 
 	provider := &stateProvider{
 		transition: transition,
@@ -201,7 +203,7 @@ func TestStateProvider_Txn_Panics(t *testing.T) {
 	require.Panics(t, func() { _, _ = provider.Txn(ethgo.ZeroAddress, key, []byte{0x1}) })
 }
 
-func newTestTransition(t *testing.T) *state.Transition {
+func newTestTransition(t *testing.T, alloc map[types.Address]*chain.GenesisAccount) *state.Transition {
 	t.Helper()
 
 	st := itrie.NewState(itrie.NewMemoryStorage())
@@ -210,7 +212,7 @@ func newTestTransition(t *testing.T) *state.Transition {
 		Forks: chain.AllForksEnabled,
 	}, st, hclog.NewNullLogger())
 
-	rootHash := ex.WriteGenesis(nil)
+	rootHash := ex.WriteGenesis(alloc)
 
 	ex.GetHash = func(h *types.Header) state.GetHashByNumber {
 		return func(i uint64) types.Hash {
@@ -283,6 +285,7 @@ func Test_buildLogsFromReceipts(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 

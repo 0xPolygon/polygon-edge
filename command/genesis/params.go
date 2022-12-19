@@ -75,15 +75,12 @@ type genesisParams struct {
 	genesisConfig *chain.Chain
 
 	// PolyBFT
-	validatorSetSize int
-	sprintSize       uint64
-	blockTime        time.Duration
-	validators       []string
-
-	polyBftValidatorPrefixPath string
-	premineValidators          string
-	smartContractsRootPath     string
-	bridgeEnabled              bool
+	manifestPath           string
+	smartContractsRootPath string
+	validatorSetSize       int
+	sprintSize             uint64
+	blockTime              time.Duration
+	bridgeJSONRPCAddr      string
 }
 
 func (p *genesisParams) validateFlags() error {
@@ -336,18 +333,16 @@ func (p *genesisParams) initGenesisConfig() error {
 		chainConfig.Genesis.Alloc[staking.AddrStakingContract] = stakingAccount
 	}
 
-	premineInfos := make([]*premineInfo, len(p.premine))
-
-	for i, premineRaw := range p.premine {
+	for _, premineRaw := range p.premine {
 		premineInfo, err := parsePremineInfo(premineRaw)
 		if err != nil {
 			return err
 		}
 
-		premineInfos[i] = premineInfo
+		chainConfig.Genesis.Alloc[premineInfo.address] = &chain.GenesisAccount{
+			Balance: premineInfo.balance,
+		}
 	}
-
-	fillPremineMap(chainConfig.Genesis.Alloc, premineInfos)
 
 	p.genesisConfig = chainConfig
 

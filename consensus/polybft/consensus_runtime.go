@@ -16,6 +16,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
+	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	hcf "github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
@@ -28,10 +29,6 @@ const (
 )
 
 var (
-	// state sync metrics
-	// TODO: Nemanja - accommodate bridge metrics to Edge
-	// totalStateSyncsMeter = metrics.NewRegisteredMeter("consensus/bridge/stateSyncsTotal", nil)
-
 	// errNotAValidator represents "node is not a validator" error message
 	errNotAValidator = errors.New("node is not a validator")
 	// errQuorumNotReached represents "quorum not reached for commitment message" error message
@@ -62,15 +59,6 @@ type checkpointBackend interface {
 type epochMetadata struct {
 	// Number is the number of the epoch
 	Number uint64
-
-	// LastCheckpoint is the last epoch that was checkpointed, for now it is epoch-1.
-	LastCheckpoint uint64
-
-	// CheckpointProposer is the validator that has to send the checkpoint, assume it is static for now.
-	CheckpointProposer string
-
-	// Blocks is the list of blocks that we have to checkpoint in rootchain
-	Blocks []*types.Block
 
 	// Validators is the set of validators for the epoch
 	Validators AccountSet
@@ -120,8 +108,8 @@ type consensusRuntime struct {
 	// checkpointManager represents abstraction for checkpoint submission
 	checkpointManager *checkpointManager
 
-	// proposerCalculator is the object which calculates new proposer
-	proposerCalculator ProposerCalculator
+	// proposerCalculator is the object which manipulates with ProposerSnapshot
+	proposerCalculator *ProposerCalculator
 
 	// logger instance
 	logger hcf.Logger
@@ -129,9 +117,9 @@ type consensusRuntime struct {
 
 // newConsensusRuntime creates and starts a new consensus runtime instance with event tracking
 func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRuntime, error) {
-	proposerCalculator, err := NewProposerCalculatorFromState(config, log)
+	proposerCalculator, err := NewProposerCalculator(config, log.Named("proposer_calculator"))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create consensus runtime, error while creating proposer calculator %w", err)
 	}
 
 	runtime := &consensusRuntime{
@@ -142,10 +130,16 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 	}
 
 	if runtime.IsBridgeEnabled() {
+		txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(config.PolyBFTConfig.Bridge.JSONRPCEndpoint))
+		if err != nil {
+			return nil, err
+		}
+
 		runtime.checkpointManager = newCheckpointManager(
 			wallet.NewEcdsaSigner(config.Key),
 			defaultCheckpointsOffset,
-			&defaultRootchainInteractor{},
+			config.PolyBFTConfig.Bridge.CheckpointAddr,
+			txRelayer,
 			config.blockchain,
 			config.polybftBackend,
 			log.Named("checkpoint_manager"))
@@ -199,20 +193,21 @@ func (c *consensusRuntime) AddLog(eventLog *ethgo.Log) {
 
 		return
 	}
-	// TODO: Nemanja
-	// update metrics
-	// totalStateSyncsMeter.Mark(1)
-	return // TODO: Delete this when metrics is established. This is added just to trick linter.
 }
 
 // OnBlockInserted is called whenever fsm or syncer inserts new block
 func (c *consensusRuntime) OnBlockInserted(block *types.Block) {
+	parentHeader, _ := c.getLastBuiltBlockAndEpoch()
+	if err := updateBlockMetrics(block, parentHeader); err != nil {
+		c.logger.Error("failed to update block metrics", "error", err)
+	}
+
 	// after the block has been written we reset the txpool so that the old transactions are removed
 	c.config.txPool.ResetWithHeaders(block.Header)
 
 	// handle commitment and bundles creation
 	if err := c.createCommitmentAndBundles(block.Transactions); err != nil {
-		c.logger.Error("on block inserted error", "err", err)
+		c.logger.Error("failed to create commitments and bundles", "error", err)
 	}
 
 	if c.isEndOfEpoch(block.Header.Number) {
@@ -223,13 +218,7 @@ func (c *consensusRuntime) OnBlockInserted(block *types.Block) {
 	} else {
 		c.lock.Lock()
 		c.lastBuiltBlock = block.Header
-		proposerCalculator := c.proposerCalculator.Clone()
-		// TODO: this could be long running operation
-		if err := proposerCalculator.Update(block.Number(), c.config, c.state); err != nil {
-			c.logger.Warn("Could not update proposer calculator", "err", err)
-		}
-
-		c.proposerCalculator = proposerCalculator
+		c.proposerCalculator.Update(block.Number())
 		c.lock.Unlock()
 	}
 }
@@ -336,8 +325,15 @@ func (c *consensusRuntime) FSM() error {
 	// figure out the parent. At this point this peer has done its best to sync up
 	// to the head of their remote peers.
 	c.lock.RLock()
-	parent, epoch := c.getLastBuiltBlockAndEpoch()
-	proposerCalc := c.proposerCalculator.Clone()
+	proposerSnapshot, ok := c.proposerCalculator.GetSnapshot()
+
+	if !ok {
+		return errors.New("cannot retrieve priority snapshot for fsm")
+	}
+
+	parent := c.lastBuiltBlock.Copy()
+	epoch := c.epoch
+	validatorsCopy := epoch.Validators.Copy()
 	c.lock.RUnlock()
 
 	if !epoch.Validators.ContainsNodeID(c.config.Key.String()) {
@@ -352,13 +348,12 @@ func (c *consensusRuntime) FSM() error {
 		c.logger,
 	)
 	if err != nil {
-		return fmt.Errorf("cannot create block builder: %w", err)
+		return fmt.Errorf("cannot create block builder for fsm: %w", err)
 	}
 
 	pendingBlockNumber := parent.Number + 1
 	isEndOfSprint := c.isEndOfSprint(pendingBlockNumber)
 	isEndOfEpoch := c.isEndOfEpoch(pendingBlockNumber)
-	validatorsCopy := epoch.Validators.Copy()
 
 	valSet, err := NewValidatorSet(validatorsCopy, c.logger)
 	if err != nil {
@@ -366,18 +361,18 @@ func (c *consensusRuntime) FSM() error {
 	}
 
 	ff := &fsm{
-		config:             c.config.PolyBFTConfig,
-		parent:             parent,
-		backend:            c.config.blockchain,
-		polybftBackend:     c.config.polybftBackend,
-		checkpointBackend:  c,
-		epochNumber:        epoch.Number,
-		blockBuilder:       blockBuilder,
-		validators:         valSet,
-		proposerCalculator: proposerCalc,
-		isEndOfEpoch:       isEndOfEpoch,
-		isEndOfSprint:      isEndOfSprint,
-		logger:             c.logger.Named("fsm"),
+		config:            c.config.PolyBFTConfig,
+		parent:            parent,
+		backend:           c.config.blockchain,
+		polybftBackend:    c.config.polybftBackend,
+		checkpointBackend: c,
+		epochNumber:       epoch.Number,
+		blockBuilder:      blockBuilder,
+		validators:        valSet,
+		isEndOfEpoch:      isEndOfEpoch,
+		isEndOfSprint:     isEndOfSprint,
+		proposerSnapshot:  proposerSnapshot,
+		logger:            c.logger.Named("fsm"),
 	}
 
 	if c.IsBridgeEnabled() {
@@ -435,11 +430,11 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) error {
 	}
 
 	epoch := &epochMetadata{
-		Number:         epochNumber,
-		LastCheckpoint: 0,
-		Blocks:         []*types.Block{},
-		Validators:     validatorSet,
+		Number:     epochNumber,
+		Validators: validatorSet,
 	}
+
+	updateEpochMetrics(*epoch)
 
 	if err := c.state.cleanEpochsFromDB(); err != nil {
 		c.logger.Error("Could not clean previous epochs from db.", "error", err)
@@ -468,13 +463,11 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) error {
 	c.epoch = epoch
 	c.lastBuiltBlock = header
 
-	proposerCalculator := c.proposerCalculator.Clone()
-	// TODO: this could be long running operation
-	if err := proposerCalculator.Update(header.Number, c.config, c.state); err != nil {
+	if err := c.proposerCalculator.Update(header.Number); err != nil {
 		c.logger.Warn("Could not update proposer calculator", "err", err)
 	}
 
-	c.proposerCalculator = proposerCalculator
+	// c.proposerSnapshot = proposerSnapshot
 	c.lock.Unlock()
 
 	c.logger.Info(
@@ -572,9 +565,7 @@ func (c *consensusRuntime) buildBundles(commitment *Commitment, commitmentMsg *C
 
 	var bundleProofs []*BundleProof
 
-	startBundleIdx := commitmentMsg.GetBundleIdxFromStateSyncEventIdx(stateSyncExecutionIndex)
-
-	for idx := startBundleIdx; idx < commitmentMsg.BundlesCount(); idx++ {
+	for idx := uint64(0); idx < commitmentMsg.BundlesCount(); idx++ {
 		p := commitment.MerkleTree.GenerateProof(idx, 0)
 		events, err := c.getStateSyncEventsForBundle(commitmentMsg.GetFirstStateSyncIndexFromBundleIndex(idx),
 			commitmentMsg.BundleSize)
@@ -694,22 +685,22 @@ func (c *consensusRuntime) startEventTracker() error {
 
 // deliverMessage receives the message vote from transport and inserts it in state db for given epoch.
 // It returns indicator whether message is processed successfully and error object if any.
-func (c *consensusRuntime) deliverMessage(msg *TransportMessage) (bool, error) {
+func (c *consensusRuntime) deliverMessage(msg *TransportMessage) error {
 	epoch := c.getEpoch()
 
 	if epoch == nil || msg.EpochNumber < epoch.Number {
 		// Epoch metadata is undefined
 		// or received message for some of the older epochs.
-		return false, nil
+		return nil
 	}
 
 	if !c.isActiveValidator() {
-		return false, fmt.Errorf("validator is not among the active validator set")
+		return fmt.Errorf("validator is not among the active validator set")
 	}
 
 	// check just in case
 	if epoch.Validators == nil {
-		return false, fmt.Errorf("validators are not set for the current epoch")
+		return fmt.Errorf("validators are not set for the current epoch")
 	}
 
 	msgVote := &MessageSignature{
@@ -718,12 +709,12 @@ func (c *consensusRuntime) deliverMessage(msg *TransportMessage) (bool, error) {
 	}
 
 	if err := validateVote(msgVote, epoch); err != nil {
-		return false, err
+		return err
 	}
 
 	numSignatures, err := c.state.insertMessageVote(msg.EpochNumber, msg.Hash, msgVote)
 	if err != nil {
-		return false, fmt.Errorf("error inserting message vote: %w", err)
+		return fmt.Errorf("error inserting message vote: %w", err)
 	}
 
 	c.logger.Info(
@@ -733,7 +724,7 @@ func (c *consensusRuntime) deliverMessage(msg *TransportMessage) (bool, error) {
 		"signatures", numSignatures,
 	)
 
-	return true, nil
+	return nil
 }
 
 // calculateUptime calculates uptime for blocks starting from the last built block in current epoch,
@@ -867,28 +858,41 @@ func (c *consensusRuntime) BuildEventRoot(epoch uint64, nonCommittedExitEvents [
 }
 
 // GenerateExitProof generates proof of exit
-func (c *consensusRuntime) GenerateExitProof(exitID, epoch, checkpointBlock uint64) ([]types.Hash, error) {
-	exitEvent, err := c.state.getExitEvent(exitID, epoch, checkpointBlock)
+func (c *consensusRuntime) GenerateExitProof(exitID, epoch, checkpointBlock uint64) (types.ExitProof, error) {
+	exitEvent, err := c.state.getExitEvent(exitID, epoch)
 	if err != nil {
-		return nil, err
+		return types.ExitProof{}, err
 	}
 
-	e, err := exitEventABIType.Encode(exitEvent)
+	e, err := ExitEventABIType.Encode(exitEvent)
 	if err != nil {
-		return nil, err
+		return types.ExitProof{}, err
 	}
 
 	exitEvents, err := c.state.getExitEventsForProof(epoch, checkpointBlock)
 	if err != nil {
-		return nil, err
+		return types.ExitProof{}, err
 	}
 
 	tree, err := createExitTree(exitEvents)
 	if err != nil {
-		return nil, err
+		return types.ExitProof{}, err
 	}
 
-	return tree.GenerateProofForLeaf(e, 0)
+	leafIndex, err := tree.LeafIndex(e)
+	if err != nil {
+		return types.ExitProof{}, err
+	}
+
+	proof, err := tree.GenerateProofForLeaf(e, 0)
+	if err != nil {
+		return types.ExitProof{}, err
+	}
+
+	return types.ExitProof{
+		Proof:     proof,
+		LeafIndex: leafIndex,
+	}, nil
 }
 
 // GetStateSyncProof returns the proof of the bundle for the state sync
@@ -1008,17 +1012,25 @@ func (c *consensusRuntime) IsProposer(id []byte, height, round uint64) bool {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
-	nextProposer, err := c.fsm.proposerCalculator.CalcProposer(round, height)
+	nextProposer, err := c.fsm.proposerSnapshot.CalcProposer(round, height)
 	if err != nil {
 		c.logger.Error("cannot calculate proposer", "error", err)
 
 		return false
 	}
 
+	c.logger.Info("Proposer calculated", "height", height, "round", round, "address", nextProposer)
+
 	return bytes.Equal(id, nextProposer[:])
 }
 
 func (c *consensusRuntime) IsValidProposalHash(proposal, hash []byte) bool {
+	if len(proposal) == 0 {
+		c.logger.Error("proposal hash is not valid because proposal is empty")
+
+		return false
+	}
+
 	block := types.Block{}
 	if err := block.UnmarshalRLP(proposal); err != nil {
 		c.logger.Error("unable to unmarshal proposal", "error", err)
@@ -1086,18 +1098,16 @@ func (c *consensusRuntime) InsertBlock(proposal []byte, committedSeals []*messag
 	}
 
 	if c.IsBridgeEnabled() {
-		if fsm.isEndOfEpoch || c.checkpointManager.isCheckpointBlock(block.Header.Number) {
-			if bytes.Equal(c.config.Key.Address().Bytes(), block.Header.Miner) { // true if node is proposer
-				go func(header types.Header, epochNumber uint64) {
-					err := c.checkpointManager.submitCheckpoint(header, fsm.isEndOfEpoch)
-					if err != nil {
-						c.logger.Warn("failed to submit checkpoint",
-							"block", block.Header.Number,
-							"epoch number", epochNumber,
-							"error", err)
-					}
-				}(*block.Header, fsm.epochNumber)
-			}
+		if (fsm.isEndOfEpoch || c.checkpointManager.isCheckpointBlock(block.Header.Number)) &&
+			bytes.Equal(c.config.Key.Address().Bytes(), block.Header.Miner) {
+			go func(header types.Header, epochNumber uint64) {
+				if err := c.checkpointManager.submitCheckpoint(header, fsm.isEndOfEpoch); err != nil {
+					c.logger.Warn("failed to submit checkpoint",
+						"checkpoint block", header.Number,
+						"epoch number", epochNumber,
+						"error", err)
+				}
+			}(*block.Header, fsm.epochNumber)
 
 			c.checkpointManager.latestCheckpointID = block.Number()
 		}
@@ -1144,9 +1154,9 @@ func (c *consensusRuntime) HasQuorum(
 			return false
 		}
 
-		propAddress, exist := c.fsm.proposerCalculator.GetLatestProposer(messages[0].View.Round, blockNumber)
-		if !exist {
-			c.logger.Warn("HasQuorum has been called but proposer is not set")
+		propAddress, err := c.fsm.proposerSnapshot.GetLatestProposer(messages[0].View.Round, blockNumber)
+		if err != nil {
+			c.logger.Warn("HasQuorum has been called but proposer is not set: %w", err)
 
 			return false
 		}
@@ -1173,6 +1183,12 @@ func (c *consensusRuntime) BuildPrePrepareMessage(
 	certificate *proto.RoundChangeCertificate,
 	view *proto.View,
 ) *proto.Message {
+	if len(proposal) == 0 {
+		c.logger.Error("can not build pre-prepare message, since proposal is empty")
+
+		return nil
+	}
+
 	block := types.Block{}
 	if err := block.UnmarshalRLP(proposal); err != nil {
 		c.logger.Error(fmt.Sprintf("cannot unmarshal RLP: %s", err))
@@ -1317,7 +1333,7 @@ func createExitTree(exitEvents []*ExitEvent) (*MerkleTree, error) {
 	data := make([][]byte, numOfEvents)
 
 	for i := 0; i < numOfEvents; i++ {
-		b, err := exitEventABIType.Encode(exitEvents[i])
+		b, err := ExitEventABIType.Encode(exitEvents[i])
 		if err != nil {
 			return nil, err
 		}

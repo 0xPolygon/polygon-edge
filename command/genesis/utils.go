@@ -1,6 +1,7 @@
 package genesis
 
 import (
+	"encoding/hex"
 	"fmt"
 	"io/ioutil"
 	"math/big"
@@ -10,8 +11,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/secrets/helper"
@@ -66,15 +67,6 @@ func verifyGenesisExistence(genesisPath string) *GenesisGenError {
 	return nil
 }
 
-// fillPremineMap fills the premine map for the genesis.json file with passed in balances and accounts
-func fillPremineMap(premineMap map[types.Address]*chain.GenesisAccount, premineInfos []*premineInfo) {
-	for _, premine := range premineInfos {
-		premineMap[premine.address] = &chain.GenesisAccount{
-			Balance: premine.balance,
-		}
-	}
-}
-
 // parsePremineInfo parses provided premine information and returns premine address and premine balance
 func parsePremineInfo(premineInfoRaw string) (*premineInfo, error) {
 	address := types.ZeroAddress
@@ -96,12 +88,7 @@ func parsePremineInfo(premineInfoRaw string) (*premineInfo, error) {
 	return &premineInfo{address: address, balance: amount}, nil
 }
 
-type GenesisTarget struct {
-	Account *wallet.Account
-	NodeID  string
-}
-
-func ReadValidatorsByRegexp(dir, prefix string) ([]GenesisTarget, error) {
+func ReadValidatorsByRegexp(dir, prefix string) ([]*polybft.Validator, error) {
 	if dir == "" {
 		dir = "."
 	}
@@ -132,9 +119,9 @@ func ReadValidatorsByRegexp(dir, prefix string) ([]GenesisTarget, error) {
 		return num1 < num2
 	})
 
-	validators := make([]GenesisTarget, 0, len(files))
+	validators := make([]*polybft.Validator, len(files))
 
-	for _, file := range files {
+	for i, file := range files {
 		path := filepath.Join(dir, file.Name())
 
 		account, nodeID, err := getSecrets(path)
@@ -142,8 +129,12 @@ func ReadValidatorsByRegexp(dir, prefix string) ([]GenesisTarget, error) {
 			return nil, err
 		}
 
-		target := GenesisTarget{Account: account, NodeID: nodeID}
-		validators = append(validators, target)
+		validator := &polybft.Validator{
+			Address: types.Address(account.Ecdsa.Address()),
+			BlsKey:  hex.EncodeToString(account.Bls.PublicKey().Marshal()),
+			NodeID:  nodeID,
+		}
+		validators[i] = validator
 	}
 
 	return validators, nil
