@@ -296,7 +296,7 @@ func unmarshalValidators(validatorsRaw []*fastrlp.Value) (AccountSet, error) {
 
 // IsEmpty returns indication whether delta is empty (namely added, updated slices and removed bitmap are empty)
 func (d *ValidatorSetDelta) IsEmpty() bool {
-	return d == nil || len(d.Added) == 0 &&
+	return len(d.Added) == 0 &&
 		len(d.Updated) == 0 &&
 		d.Removed.Len() == 0
 }
