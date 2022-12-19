@@ -34,9 +34,9 @@ func (is *InvokerSignature) Recover(commit []byte, invokerAddr types.Address) (a
 
 	sig := make([]byte, 65)
 	copy(sig[32-len(is.R.Bytes()):32], is.R.Bytes())
-	copy(sig[64-len(is.R.Bytes()):64], is.S.Bytes())
+	copy(sig[64-len(is.S.Bytes()):64], is.S.Bytes())
 	if is.V {
-		sig[65] = 0x01
+		sig[64] = 0x01
 	}
 
 	if pubKey, err := crypto.RecoverPubkey(sig, eip3074Magic(commit, invokerAddr)); err == nil {

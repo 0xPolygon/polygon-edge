@@ -45,6 +45,8 @@ var (
 	errInvalidJump           = errors.New("invalid jump destination")
 	errOpCodeNotFound        = errors.New("opcode not found")
 	errReturnDataOutOfBounds = errors.New("return data out of bounds")
+
+	errNoAuthorizedAccount = errors.New("no authorized account")
 )
 
 // Instructions is the code of instructions
@@ -80,6 +82,8 @@ type state struct {
 
 	returnData []byte
 	ret        []byte
+
+	authorized *types.Address
 }
 
 func (c *state) reset() {

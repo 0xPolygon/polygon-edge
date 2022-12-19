@@ -4,7 +4,6 @@ package evm
 import (
 	"errors"
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/helper/invoker"
 	"math/big"
 	"math/bits"
 	"sync"
@@ -1131,7 +1130,7 @@ func opCall(op OpCode) instruction {
 		var callType runtime.CallType
 
 		switch op {
-		case CALL:
+		case CALL, AUTHCALL:
 			callType = runtime.Call
 
 		case CALLCODE:
@@ -1193,6 +1192,12 @@ func (c *state) buildCallContract(op OpCode) (*runtime.Contract, uint64, uint64,
 	if op == CALL || op == CALLCODE {
 		value = c.pop()
 	}
+
+	var extValue *big.Int
+	if op == AUTHCALL {
+		extValue = c.pop() // todo: propagate the extValue
+	}
+	_ = extValue // ignore for now
 
 	// input range
 	inOffset := c.pop()
@@ -1271,10 +1276,15 @@ func (c *state) buildCallContract(op OpCode) (*runtime.Contract, uint64, uint64,
 
 	parent := c
 
+	fromAddr := parent.msg.Address
+	if op == AUTHCALL {
+		fromAddr = *c.authorized
+	}
+
 	contract := runtime.NewContractCall(
 		c.msg.Depth+1,
 		parent.msg.Origin,
-		parent.msg.Address,
+		fromAddr,
 		addr,
 		value,
 		gas,
@@ -1421,46 +1431,4 @@ func to256(x *big.Int) *big.Int {
 	}
 
 	return x
-}
-
-var errOpCodeNotImplemented = errors.New("opcode not implemented")
-
-func opAuth(op OpCode) instruction {
-	return func(c *state) {
-
-		commit := c.pop()
-		v := c.pop()
-		r := c.pop()
-		s := c.pop()
-
-		//fmt.Printf("commit: %v, y: %v, r: %v, s: %v\n",
-		//	hex.EncodeToHex(commit.Bytes()),
-		//	v,
-		//	hex.EncodeToHex(r.Bytes()),
-		//	hex.EncodeToHex(s.Bytes()),
-		//)
-
-		is := invoker.InvokerSignature{
-			R: r,
-			S: s,
-		}
-		is.V = v.Int64() == 1
-
-		// TODO: need to store signer address in state to be used in authCall ...?
-
-		signAddr := is.Recover(commit.Bytes(), c.msg.CodeAddress)
-		c.ret = make([]byte, 12)
-		c.ret = append(c.ret, signAddr.Bytes()...)
-
-		c.Halt()
-		return
-	}
-}
-
-func opAuthCall(op OpCode) instruction {
-	return func(c *state) {
-		c.exit(errOpCodeNotImplemented)
-
-		return
-	}
 }

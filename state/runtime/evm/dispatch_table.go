@@ -70,7 +70,7 @@ func init() {
 	register(CREATE2, handler{opCreate(CREATE2), 4, 32000})
 
 	register(AUTH, handler{opAuth(AUTH), 4, 3100})
-	register(AUTHCALL, handler{opAuthCall(AUTHCALL), 8, 0})
+	register(AUTHCALL, handler{opCall(AUTHCALL), 8, 0})
 
 	register(CALL, handler{opCall(CALL), 7, 0})
 	register(CALLCODE, handler{opCall(CALLCODE), 7, 0})

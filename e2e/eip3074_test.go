@@ -130,8 +130,10 @@ func TestBasicInvoker(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, checkHash[:], th)
 
+	k := &testECDSAKey{k: receiverKey}
+
 	it := invoker.InvokerTransaction{
-		From:     types.Address{0xca, 0xfe, 0xba, 0xbe},
+		From:     types.Address(k.Address()),
 		Nonce:    big.NewInt(0),
 		Payloads: tps,
 	}
@@ -155,7 +157,6 @@ func TestBasicInvoker(t *testing.T) {
 
 	var is invoker.InvokerSignature
 
-	k := &testECDSAKey{k: receiverKey}
 	err = is.SignCommit(k, checkHash[:], invokerAddr)
 	require.NoError(t, err)
 
