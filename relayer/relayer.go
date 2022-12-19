@@ -102,7 +102,7 @@ func (r *Relayer) AddLog(log *ethgo.Log) {
 			endID = eid.Uint64()
 		}
 
-		r.logger.Info("Commit: Block %d StartID %d EndID %d\n", log.BlockNumber, startID, endID)
+		r.logger.Info("Commit", "Block", log.BlockNumber, "StartID", startID, "EndID", endID)
 
 		for i := startID; i < endID; i++ {
 			// query the state sync proof
