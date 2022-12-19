@@ -1,12 +1,18 @@
 package emit
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+	"os"
+)
 
 const (
-	contractFlag = "contract"
-	walletsFlag  = "wallets"
-	amountsFlag  = "amounts"
-	jsonRPCFlag  = "json-rpc"
+	manifestPathFlag = "manifest"
+	contractFlag     = "contract"
+	walletsFlag      = "wallets"
+	amountsFlag      = "amounts"
+	jsonRPCFlag      = "json-rpc"
+	adminKeyFlag     = "admin-key"
 )
 
 var (
@@ -16,12 +22,19 @@ var (
 )
 
 type emitParams struct {
-	address string
-	wallets []string
-	amounts []string
+	manifestPath   string
+	address        string
+	wallets        []string
+	amounts        []string
+	jsonRPCAddress string
+	adminKey       string
 }
 
 func (ep *emitParams) validateFlags() error {
+	if _, err := os.Stat(ep.manifestPath); errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("provided manifest path '%s' doesn't exist", ep.manifestPath)
+	}
+
 	if len(ep.wallets) == 0 {
 		return errWalletsMissing
 	}

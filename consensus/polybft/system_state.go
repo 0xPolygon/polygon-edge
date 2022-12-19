@@ -17,7 +17,8 @@ import (
 var stateFunctions, _ = abi.NewABIFromList([]string{
 	"function currentEpochId() returns (uint256)",
 	"function getCurrentValidatorSet() returns (address[])",
-	"function getValidator(address) returns (tuple(uint256[4],uint256,uint256,uint256))",
+	"function getValidator(address)" +
+		" returns (tuple(uint256[4] blsKey, uint256 stake, uint256 totalStake, uint256 withdrawableRewards, bool active))",
 })
 
 var sidechainBridgeFunctions, _ = abi.NewABIFromList([]string{
@@ -84,20 +85,20 @@ func (s *SystemStateImpl) GetValidatorSet() (AccountSet, error) {
 			return nil, fmt.Errorf("failed to decode validator data")
 		}
 
-		pubKey, err := bls.UnmarshalPublicKeyFromBigInt(output["0"].([4]*big.Int))
+		pubKey, err := bls.UnmarshalPublicKeyFromBigInt(output["blsKey"].([4]*big.Int))
 		if err != nil {
 			return nil, err
 		}
 
-		stake, ok := output["1"].(*big.Int)
+		totalStake, ok := output["totalStake"].(*big.Int)
 		if !ok {
-			return nil, fmt.Errorf("failed to decode stake")
+			return nil, fmt.Errorf("failed to decode total stake")
 		}
 
 		val := &ValidatorMetadata{
 			Address:     types.Address(addr),
 			BlsKey:      pubKey,
-			VotingPower: stake.Uint64(),
+			VotingPower: totalStake.Uint64(),
 		}
 
 		return val, nil

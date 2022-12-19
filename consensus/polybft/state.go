@@ -44,7 +44,7 @@ var (
 	// ABI
 	stateTransferEventABI = abi.MustNewEvent("event StateSynced(uint256 indexed id, address indexed sender, address indexed receiver, bytes data)")   //nolint:lll
 	exitEventABI          = abi.MustNewEvent("event L2StateSynced(uint256 indexed id, address indexed sender, address indexed receiver, bytes data)") //nolint:lll
-	exitEventABIType      = abi.MustNewType("tuple(uint256 id, address sender, address receiver, bytes data)")
+	ExitEventABIType      = abi.MustNewType("tuple(uint256 id, address sender, address receiver, bytes data)")
 )
 
 const (
@@ -60,14 +60,12 @@ const (
 )
 
 type exitEventNotFoundError struct {
-	exitID          uint64
-	epoch           uint64
-	checkpointBlock uint64
+	exitID uint64
+	epoch  uint64
 }
 
 func (e *exitEventNotFoundError) Error() string {
-	return fmt.Sprintf("could not find any exit event that has an id: %v, added in block: %v and epoch: %v",
-		e.exitID, e.checkpointBlock, e.epoch)
+	return fmt.Sprintf("could not find any exit event that has an id: %v and epoch: %v", e.exitID, e.epoch)
 }
 
 // newStateSyncEvent creates an instance of pending state sync event.
@@ -247,22 +245,23 @@ var (
 type State struct {
 	db     *bolt.DB
 	logger hclog.Logger
+	close  chan struct{}
 }
 
-func newState(path string, logger hclog.Logger) (*State, error) {
+func newState(path string, logger hclog.Logger, closeCh chan struct{}) (*State, error) {
 	db, err := bolt.Open(path, 0666, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	err = initMainDBBuckets(db)
-	if err != nil {
+	if err = initMainDBBuckets(db); err != nil {
 		return nil, err
 	}
 
 	state := &State{
 		db:     db,
 		logger: logger.Named("state"),
+		close:  closeCh,
 	}
 
 	return state, nil
@@ -370,19 +369,19 @@ func insertExitEventToBucket(bucket *bolt.Bucket, exitEvent *ExitEvent) error {
 }
 
 // getExitEvent returns exit event with given id, which happened in given epoch and given block number
-func (s *State) getExitEvent(exitEventID, epoch, checkpointBlockNumber uint64) (*ExitEvent, error) {
+func (s *State) getExitEvent(exitEventID, epoch uint64) (*ExitEvent, error) {
 	var exitEvent *ExitEvent
 
 	err := s.db.View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(exitEventsBucket)
 
-		key := bytes.Join([][]byte{itob(epoch), itob(exitEventID), itob(checkpointBlockNumber)}, nil)
-		v := bucket.Get(key)
-		if v == nil {
+		key := bytes.Join([][]byte{itob(epoch), itob(exitEventID)}, nil)
+		k, v := bucket.Cursor().Seek(key)
+
+		if bytes.HasPrefix(k, key) == false || v == nil {
 			return &exitEventNotFoundError{
-				exitID:          exitEventID,
-				checkpointBlock: checkpointBlockNumber,
-				epoch:           epoch,
+				exitID: exitEventID,
+				epoch:  epoch,
 			}
 		}
 

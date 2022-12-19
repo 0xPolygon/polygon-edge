@@ -3,11 +3,13 @@ package itrie
 import (
 	"bytes"
 	"fmt"
+	"sync"
+
+	"github.com/umbracle/fastrlp"
+	"golang.org/x/crypto/sha3"
 
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/umbracle/fastrlp"
-	"golang.org/x/crypto/sha3"
 )
 
 // Node represents a node reference
@@ -90,6 +92,7 @@ func (f *FullNode) getEdge(idx byte) Node {
 }
 
 type Trie struct {
+	lock    *sync.Mutex
 	state   *State
 	root    Node
 	epoch   uint32
@@ -97,7 +100,23 @@ type Trie struct {
 }
 
 func NewTrie() *Trie {
-	return &Trie{}
+	return &Trie{
+		lock: new(sync.Mutex),
+	}
+}
+
+type stateSetter func(s *State)
+
+// SetState used to set state under lock
+func (t *Trie) SetState(s *State) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	t.setState(s)
+}
+
+func (t *Trie) setState(s *State) {
+	t.state = s
 }
 
 func (t *Trie) Get(k []byte) ([]byte, bool) {
@@ -105,6 +124,24 @@ func (t *Trie) Get(k []byte) ([]byte, bool) {
 	res := txn.Lookup(k)
 
 	return res, res != nil
+}
+
+type stateSetterFactory func(t *Trie) stateSetter
+
+func GetSetState() func(t *Trie) stateSetter {
+	return func(t *Trie) stateSetter {
+		return t.SetState
+	}
+}
+
+func getSetState(objHash, rootHash types.Hash) func(t *Trie) stateSetter {
+	return func(t *Trie) stateSetter {
+		if objHash != rootHash {
+			return t.SetState
+		}
+
+		return t.setState
+	}
 }
 
 func hashit(k []byte) []byte {
@@ -119,6 +156,8 @@ var accountArenaPool fastrlp.ArenaPool
 var stateArenaPool fastrlp.ArenaPool // TODO, Remove once we do update in fastrlp
 
 func (t *Trie) Commit(objs []*state.Object) (*Trie, []byte) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
 	// Create an insertion batch for all the entries
 	batch := t.storage.Batch()
 
@@ -143,7 +182,7 @@ func (t *Trie) Commit(objs []*state.Object) (*Trie, []byte) {
 			}
 
 			if len(obj.Storage) != 0 {
-				trie, err := t.state.newTrieAt(obj.Root)
+				trie, err := t.state.newTrieAt(obj.Root, getSetState(obj.Root, t.Hash()))
 				if err != nil {
 					panic(err)
 				}
@@ -185,6 +224,7 @@ func (t *Trie) Commit(objs []*state.Object) (*Trie, []byte) {
 	root, _ := tt.Hash()
 
 	nTrie := tt.Commit()
+
 	nTrie.state = t.state
 	nTrie.storage = t.storage
 
@@ -203,8 +243,7 @@ func (t *Trie) Hash() types.Hash {
 		return types.EmptyRootHash
 	}
 
-	hash, cached, _ := t.hashRoot()
-	t.root = cached
+	hash := t.hashRoot()
 
 	return types.BytesToHash(hash)
 }
@@ -228,13 +267,14 @@ func (t *Trie) TryUpdate(key, value []byte) error {
 	return nil
 }
 
-func (t *Trie) hashRoot() ([]byte, Node, error) {
+func (t *Trie) hashRoot() []byte {
 	hash, _ := t.root.Hash()
 
-	return hash, t.root, nil
+	return hash
 }
 
 func (t *Trie) Txn() *Txn {
+	// FIXME: could we copy t.root, t.storage without putting the same refs to mutexes?
 	return &Txn{root: t.root, epoch: t.epoch + 1, storage: t.storage}
 }
 
@@ -250,7 +290,7 @@ type Txn struct {
 }
 
 func (t *Txn) Commit() *Trie {
-	return &Trie{epoch: t.epoch, root: t.root, storage: t.storage}
+	return &Trie{epoch: t.epoch, root: t.root, storage: t.storage, lock: new(sync.Mutex)}
 }
 
 func (t *Txn) Lookup(key []byte) []byte {

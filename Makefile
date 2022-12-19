@@ -65,7 +65,12 @@ run-local:
 stop-local:
 	docker-compose -f ./docker/local/docker-compose.yml stop
 
+.PHONY: destroy-local
+destroy-local:
+	docker-compose -f ./docker/local/docker-compose.yml down
+
 .PHONY: compile-core-contracts
 compile-core-contracts:
 	cd core-contracts && npm install && npm run compile
+	go run ./consensus/polybft/contractsapi/gen/main.go
 

@@ -128,9 +128,8 @@ func TestConsensusRuntime_deliverMessage_MessageWhenEpochNotStarted(t *testing.T
 	}
 	// deliverMessage should not fail, although epochMetadata is not initialized
 	// message vote should be added to the consensus runtime state.
-	msgProcessed, err := runtime.deliverMessage(createTestTransportMessage(t, hash, epoch, validators.getValidator(senderID).Key()))
+	err = runtime.deliverMessage(createTestTransportMessage(t, hash, epoch, validators.getValidator(senderID).Key()))
 	require.NoError(t, err)
-	require.True(t, msgProcessed)
 
 	// assert that no additional message signatures aren't inserted into the consensus runtime state
 	// (other than the one we have previously inserted by ourselves)
@@ -308,8 +307,7 @@ func TestConsensusRuntime_deliverMessage_EpochNotStarted(t *testing.T) {
 	}
 
 	msg := createTestTransportMessage(t, generateRandomBytes(t), 1, account.Key())
-	isProcessed, err := runtime.deliverMessage(msg)
-	assert.False(t, isProcessed)
+	err = runtime.deliverMessage(msg)
 	assert.ErrorContains(t, err, "not among the active validator set")
 
 	votes, err := state.getMessageVotes(1, msg.Hash)
@@ -345,8 +343,7 @@ func TestConsensusRuntime_deliverMessage_ForExistingEpochAndCommitmentMessage(t 
 	}
 
 	msg := createTestTransportMessage(t, generateRandomBytes(t), 1, sender)
-	isProcessed, err := runtime.deliverMessage(msg)
-	assert.True(t, isProcessed)
+	err = runtime.deliverMessage(msg)
 	assert.NoError(t, err)
 
 	votes, err := state.getMessageVotes(1, msg.Hash)
@@ -380,8 +377,7 @@ func TestConsensusRuntime_deliverMessage_SenderMessageNotInCurrentValidatorset(t
 	}
 
 	msg := createTestTransportMessage(t, generateRandomBytes(t), 1, createTestKey(t))
-	isProcessed, err := runtime.deliverMessage(msg)
-	assert.False(t, isProcessed)
+	err = runtime.deliverMessage(msg)
 	assert.Error(t, err)
 	assert.ErrorContains(t, err,
 		fmt.Sprintf("message is received from sender %s, which is not in current validator set", msg.NodeID))
@@ -431,6 +427,7 @@ func TestConsensusRuntime_OnBlockInserted_EndOfEpoch(t *testing.T) {
 		epoch: &epochMetadata{
 			Number: currentEpochNumber,
 		},
+		lastBuiltBlock: builtBlock.Header,
 	}
 	runtime.OnBlockInserted(builtBlock)
 
@@ -465,6 +462,8 @@ func TestConsensusRuntime_OnBlockInserted_MiddleOfEpoch(t *testing.T) {
 			blockchain:    new(blockchainMock),
 			txPool:        txPool,
 		},
+		epoch:  &epochMetadata{Number: getEpochNumber(header.Number, epochSize)},
+		logger: hclog.NewNullLogger(),
 	}
 	runtime.OnBlockInserted(builtBlock)
 
@@ -1616,7 +1615,7 @@ func TestConsensusRuntime_FSM_EndOfEpoch_OnBlockInserted(t *testing.T) {
 		epoch:             metadata,
 		config:            config,
 		lastBuiltBlock:    lastBuiltBlock,
-		checkpointManager: newCheckpointManager(wallet.NewEcdsaSigner(signer), 5, nil, nil, nil, hclog.NewNullLogger()),
+		checkpointManager: newCheckpointManager(wallet.NewEcdsaSigner(signer), 5, types.ZeroAddress, nil, nil, nil, hclog.NewNullLogger()),
 	}
 
 	err = runtime.FSM()
@@ -1731,15 +1730,15 @@ func TestConsensusRuntime_GenerateExitProof(t *testing.T) {
 	t.Run("Generate and validate exit proof", func(t *testing.T) {
 		t.Parallel()
 		// verify generated proof on desired tree
-		require.NoError(t, VerifyProof(1, encodedEvents[1], proof, tree.Hash()))
+		require.NoError(t, VerifyProof(1, encodedEvents[1], proof.Proof, tree.Hash()))
 	})
 
 	t.Run("Generate and validate exit proof - invalid proof", func(t *testing.T) {
 		t.Parallel()
 
 		// copy and make proof invalid
-		invalidProof := make([]types.Hash, len(proof))
-		copy(invalidProof, proof)
+		invalidProof := make([]types.Hash, len(proof.Proof))
+		copy(invalidProof, proof.Proof)
 		invalidProof[0][0]++
 
 		// verify generated proof on desired tree
@@ -2163,7 +2162,7 @@ func setupExitEventsForProofVerification(t *testing.T, state *State,
 			e := &ExitEvent{index, ethgo.ZeroAddress, ethgo.ZeroAddress, []byte{0, 1}, 1, i}
 			require.NoError(t, state.insertExitEvent(e))
 
-			b, err := exitEventABIType.Encode(e)
+			b, err := ExitEventABIType.Encode(e)
 
 			require.NoError(t, err)
 

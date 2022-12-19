@@ -5,11 +5,11 @@ import (
 	"math/big"
 	"strconv"
 
-	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/hashicorp/go-hclog"
+	metrics "github.com/armon/go-metrics"
+	hclog "github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
 )
@@ -45,6 +45,8 @@ type checkpointManager struct {
 	txRelayer txrelayer.TxRelayer
 	// checkpointsOffset represents offset between checkpoint blocks (applicable only for non-epoch ending blocks)
 	checkpointsOffset uint64
+	// checkpointManagerAddr is address of CheckpointManager smart contract
+	checkpointManagerAddr types.Address
 	// latestCheckpointID represents last checkpointed block number
 	latestCheckpointID uint64
 	// logger instance
@@ -52,15 +54,17 @@ type checkpointManager struct {
 }
 
 // newCheckpointManager creates a new instance of checkpointManager
-func newCheckpointManager(key ethgo.Key, checkpointOffset uint64, txRelayer txrelayer.TxRelayer,
+func newCheckpointManager(key ethgo.Key, checkpointOffset uint64,
+	checkpointManagerSC types.Address, txRelayer txrelayer.TxRelayer,
 	blockchain blockchainBackend, backend polybftBackend, logger hclog.Logger) *checkpointManager {
 	return &checkpointManager{
-		key:               key,
-		blockchain:        blockchain,
-		consensusBackend:  backend,
-		txRelayer:         txRelayer,
-		checkpointsOffset: checkpointOffset,
-		logger:            logger,
+		key:                   key,
+		blockchain:            blockchain,
+		consensusBackend:      backend,
+		txRelayer:             txRelayer,
+		checkpointsOffset:     checkpointOffset,
+		checkpointManagerAddr: checkpointManagerSC,
+		logger:                logger,
 	}
 }
 
@@ -73,7 +77,7 @@ func (c *checkpointManager) getLatestCheckpointBlock() (uint64, error) {
 
 	latestCheckpointBlockRaw, err := c.txRelayer.Call(
 		c.key.Address(),
-		ethgo.Address(helper.CheckpointManagerAddress),
+		ethgo.Address(c.checkpointManagerAddr),
 		checkpointBlockNumMethodEncoded)
 	if err != nil {
 		return 0, fmt.Errorf("failed to invoke currentCheckpointId function on the rootchain: %w", err)
@@ -99,7 +103,7 @@ func (c *checkpointManager) submitCheckpoint(latestHeader types.Header, isEndOfE
 		"latest checkpoint block", lastCheckpointBlockNumber,
 		"checkpoint block", latestHeader.Number)
 
-	checkpointManagerAddr := ethgo.Address(helper.CheckpointManagerAddress)
+	checkpointManagerAddr := ethgo.Address(c.checkpointManagerAddr)
 	txn := &ethgo.Transaction{
 		To:   &checkpointManagerAddr,
 		From: c.key.Address(),
@@ -202,13 +206,15 @@ func (c *checkpointManager) encodeAndSendCheckpoint(txn *ethgo.Transaction,
 		return fmt.Errorf("checkpoint submission transaction failed for block %d", header.Number)
 	}
 
+	// update checkpoint block number metrics
+	metrics.SetGauge([]string{"bridge", "checkpoint_block_number"}, float32(header.Number))
 	c.logger.Debug("send checkpoint txn success", "block number", header.Number)
 
 	return nil
 }
 
 // abiEncodeCheckpointBlock encodes checkpoint data into ABI format for a given header
-func (c *checkpointManager) abiEncodeCheckpointBlock(headerNumber uint64, headerHash types.Hash, extra Extra,
+func (c *checkpointManager) abiEncodeCheckpointBlock(blockNumber uint64, blockHash types.Hash, extra Extra,
 	nextValidators AccountSet) ([]byte, error) {
 	aggs, err := bls.UnmarshalSignature(extra.Committed.AggregatedSignature)
 	if err != nil {
@@ -223,13 +229,13 @@ func (c *checkpointManager) abiEncodeCheckpointBlock(headerNumber uint64, header
 	params := map[string]interface{}{
 		"chainId": new(big.Int).SetUint64(c.blockchain.GetChainID()),
 		"checkpointMetadata": map[string]interface{}{
-			"blockHash":               headerHash,
+			"blockHash":               blockHash,
 			"blockRound":              new(big.Int).SetUint64(extra.Checkpoint.BlockRound),
 			"currentValidatorSetHash": extra.Checkpoint.CurrentValidatorsHash,
 		},
 		"checkpoint": map[string]interface{}{
 			"epochNumber": new(big.Int).SetUint64(extra.Checkpoint.EpochNumber),
-			"blockNumber": new(big.Int).SetUint64(headerNumber),
+			"blockNumber": new(big.Int).SetUint64(blockNumber),
 			"eventRoot":   extra.Checkpoint.EventRoot,
 		},
 		"signature":       encodedAggSigs,

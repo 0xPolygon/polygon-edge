@@ -319,26 +319,26 @@ var _ StateTransactionInput = &CommitEpoch{}
 var (
 	commitEpochMethod, _ = abi.NewMethod("function commitEpoch(" +
 		// new epoch id
-		"uint256 epochid," +
+		"uint256 id," +
 		// Epoch
-		"tuple(uint256 startblock, uint256 endblock, bytes32 epochroot) epoch," +
+		"tuple(uint256 startBlock, uint256 endBlock, bytes32 epochRoot) epoch," +
 		// Uptime
-		"tuple(uint256 epochid,tuple(address validator,uint256 uptime)[] uptimedata,uint256 totaluptime) uptime)")
+		"tuple(uint256 epochId,tuple(address validator,uint256 signedBlocks)[] uptimeData,uint256 totalBlocks) uptime)")
 )
 
 // Epoch holds the data about epoch execution (when it started and when it ended)
 type Epoch struct {
-	StartBlock uint64     `abi:"startblock"`
-	EndBlock   uint64     `abi:"endblock"`
-	EpochRoot  types.Hash `abi:"epochroot"`
+	StartBlock uint64     `abi:"startBlock"`
+	EndBlock   uint64     `abi:"endBlock"`
+	EpochRoot  types.Hash `abi:"epochRoot"`
 }
 
 // Uptime holds the data about number of times validators sealed blocks
 // in a given epoch
 type Uptime struct {
-	EpochID     uint64            `abi:"epochid"`
-	UptimeData  []ValidatorUptime `abi:"uptimedata"`
-	TotalUptime uint64            `abi:"totaluptime"`
+	EpochID     uint64            `abi:"epochId"`
+	UptimeData  []ValidatorUptime `abi:"uptimeData"`
+	TotalUptime uint64            `abi:"totalBlocks"`
 }
 
 func (u *Uptime) addValidatorUptime(address types.Address, count uint64) {
@@ -357,13 +357,13 @@ func (u *Uptime) addValidatorUptime(address types.Address, count uint64) {
 // in a single period (epoch)
 type ValidatorUptime struct {
 	Address types.Address `abi:"validator"`
-	Count   uint64        `abi:"uptime"`
+	Count   uint64        `abi:"signedBlocks"`
 }
 
 // CommitEpoch contains data that is sent to ChildValidatorSet contract
 // to distribute rewards on the end of an epoch
 type CommitEpoch struct {
-	EpochID uint64 `abi:"epochid"`
+	EpochID uint64 `abi:"id"`
 	Epoch   Epoch  `abi:"epoch"`
 	Uptime  Uptime `abi:"uptime"`
 }

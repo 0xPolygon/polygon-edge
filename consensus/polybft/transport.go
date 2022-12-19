@@ -57,7 +57,7 @@ func (c *consensusRuntime) subscribeToBridgeTopic(topic *network.Topic) error {
 			return
 		}
 
-		if _, err := c.deliverMessage(transportMsg); err != nil {
+		if err := c.deliverMessage(transportMsg); err != nil {
 			c.logger.Warn("failed to deliver message", "error", err)
 		}
 	})

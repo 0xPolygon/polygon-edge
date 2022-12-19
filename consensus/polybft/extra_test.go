@@ -70,6 +70,7 @@ func TestExtra_Encoding(t *testing.T) {
 			&Extra{
 				Validators: &ValidatorSetDelta{
 					Added:   addedValidators,
+					Updated: addedValidators[1:],
 					Removed: removedValidators,
 				},
 				Parent:    &Signature{},
@@ -368,6 +369,7 @@ func TestExtra_CreateValidatorSetDelta_Cases(t *testing.T) {
 	}
 
 	for _, c := range cases {
+		c := c
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -387,7 +389,8 @@ func TestExtra_CreateValidatorSetDelta_Cases(t *testing.T) {
 				v := vals.getValidator(name)
 				vp, err := rand.Int(rand.Reader, maxVotingPower)
 				require.NoError(t, err)
-				v.votingPower = vp.Uint64()
+				// make sure generated voting power is different than the original one
+				v.votingPower += vp.Uint64() + 1
 			}
 			newValidatorSet := vals.getPublicIdentities(c.newSet...)
 
@@ -547,8 +550,9 @@ func TestValidatorSetDelta_UnmarshalRLPWith_NegativeCases(t *testing.T) {
 		deltaMarshalled.Set(ar.NewBytes([]byte{0x59}))
 		deltaMarshalled.Set(ar.NewBytes([]byte{0x33}))
 		deltaMarshalled.Set(ar.NewBytes([]byte{0x26}))
+		deltaMarshalled.Set(ar.NewBytes([]byte{0x74}))
 		delta := &ValidatorSetDelta{}
-		require.ErrorContains(t, delta.UnmarshalRLPWith(deltaMarshalled), "incorrect elements count to decode validator set delta, expected 2 but found 3")
+		require.ErrorContains(t, delta.UnmarshalRLPWith(deltaMarshalled), "incorrect elements count to decode validator set delta, expected 3 but found 4")
 	})
 
 	t.Run("Incorrect RLP value type for Added field", func(t *testing.T) {
@@ -558,6 +562,7 @@ func TestValidatorSetDelta_UnmarshalRLPWith_NegativeCases(t *testing.T) {
 		deltaMarshalled := ar.NewArray()
 		deltaMarshalled.Set(ar.NewBytes([]byte{0x59}))
 		deltaMarshalled.Set(ar.NewBytes([]byte{0x33}))
+		deltaMarshalled.Set(ar.NewBytes([]byte{0x27}))
 		delta := &ValidatorSetDelta{}
 		require.ErrorContains(t, delta.UnmarshalRLPWith(deltaMarshalled), "array expected for added validators")
 	})
@@ -570,6 +575,7 @@ func TestValidatorSetDelta_UnmarshalRLPWith_NegativeCases(t *testing.T) {
 		addedArray := ar.NewArray()
 		addedArray.Set(ar.NewNull())
 		deltaMarshalled.Set(addedArray)
+		deltaMarshalled.Set(ar.NewNullArray())
 		deltaMarshalled.Set(ar.NewNull())
 		delta := &ValidatorSetDelta{}
 		require.ErrorContains(t, delta.UnmarshalRLPWith(deltaMarshalled), "value is not of type array")
@@ -582,13 +588,48 @@ func TestValidatorSetDelta_UnmarshalRLPWith_NegativeCases(t *testing.T) {
 		deltaMarshalled := ar.NewArray()
 		addedValidators := newTestValidators(3).getPublicIdentities()
 		addedArray := ar.NewArray()
+		updatedArray := ar.NewArray()
 		for _, validator := range addedValidators {
 			addedArray.Set(validator.MarshalRLPWith(ar))
 		}
+		for _, validator := range addedValidators {
+			votingPower, err := rand.Int(rand.Reader, big.NewInt(100))
+			require.NoError(t, err)
+
+			validator.VotingPower = votingPower.Uint64()
+			updatedArray.Set(validator.MarshalRLPWith(ar))
+		}
 		deltaMarshalled.Set(addedArray)
+		deltaMarshalled.Set(updatedArray)
 		deltaMarshalled.Set(ar.NewNull())
 		delta := &ValidatorSetDelta{}
 		require.ErrorContains(t, delta.UnmarshalRLPWith(deltaMarshalled), "value is not of type bytes")
+	})
+
+	t.Run("Incorrect RLP value type for Updated field", func(t *testing.T) {
+		t.Parallel()
+
+		ar := &fastrlp.Arena{}
+		deltaMarshalled := ar.NewArray()
+		deltaMarshalled.Set(ar.NewArray())
+		deltaMarshalled.Set(ar.NewBytes([]byte{0x33}))
+		deltaMarshalled.Set(ar.NewNull())
+		delta := &ValidatorSetDelta{}
+		require.ErrorContains(t, delta.UnmarshalRLPWith(deltaMarshalled), "array expected for updated validators")
+	})
+
+	t.Run("Incorrect RLP value type for ValidatorMetadata in Updated field", func(t *testing.T) {
+		t.Parallel()
+
+		ar := &fastrlp.Arena{}
+		deltaMarshalled := ar.NewArray()
+		updatedArray := ar.NewArray()
+		updatedArray.Set(ar.NewNull())
+		deltaMarshalled.Set(ar.NewArray())
+		deltaMarshalled.Set(updatedArray)
+		deltaMarshalled.Set(ar.NewNull())
+		delta := &ValidatorSetDelta{}
+		require.ErrorContains(t, delta.UnmarshalRLPWith(deltaMarshalled), "value is not of type array")
 	})
 }
 

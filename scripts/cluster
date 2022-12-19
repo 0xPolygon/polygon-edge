@@ -5,6 +5,7 @@ set -e
 # Reset test-dirs
 rm -rf test-chain-*
 rm -f genesis.json
+rm -f manifest.json
 
 go build -o polygon-edge .
 
@@ -18,6 +19,7 @@ else
   echo "Running with polybft consensus"
   genesis_params="--consensus polybft --validator-set-size=4 --bridge-json-rpc http://127.0.0.1:8545"
   ./polygon-edge polybft-secrets --data-dir test-chain- --num 4
+  ./polygon-edge manifest
 fi
 
 ./polygon-edge genesis $genesis_params \
@@ -26,7 +28,7 @@ fi
   --epoch-size 10
 
 ./polygon-edge server --data-dir ./test-chain-1 --chain genesis.json --grpc-address :10000 --libp2p :30301 --jsonrpc :10002 --seal --log-level DEBUG &
-./polygon-edge server --data-dir ./test-chain-2 --chain genesis.json --grpc-address :20000 --libp2p :30302 --jsonrpc :20002 --seal &
-./polygon-edge server --data-dir ./test-chain-3 --chain genesis.json --grpc-address :30000 --libp2p :30303 --jsonrpc :30002 --seal &
-./polygon-edge server --data-dir ./test-chain-4 --chain genesis.json --grpc-address :40000 --libp2p :30304 --jsonrpc :40002 --seal &
+./polygon-edge server --data-dir ./test-chain-2 --chain genesis.json --grpc-address :20000 --libp2p :30302 --jsonrpc :20002 --seal --log-level DEBUG &
+./polygon-edge server --data-dir ./test-chain-3 --chain genesis.json --grpc-address :30000 --libp2p :30303 --jsonrpc :30002 --seal --log-level DEBUG &
+./polygon-edge server --data-dir ./test-chain-4 --chain genesis.json --grpc-address :40000 --libp2p :30304 --jsonrpc :40002 --seal --log-level DEBUG &
 wait
