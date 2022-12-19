@@ -37,7 +37,7 @@ func TestProposerCalculator_SetIndex(t *testing.T) {
 	}
 }
 
-func TestProposerCalculator_CalculateProposer(t *testing.T) {
+func TestProposerCalculator_RegularFlow(t *testing.T) {
 	t.Parallel()
 
 	validators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E"}, []uint64{1, 2, 3, 4, 5})
@@ -124,7 +124,7 @@ func TestProposerCalculator_SamePriority(t *testing.T) {
 	assert.Equal(t, types.Address{0x1}, proposerR2)
 }
 
-func TestProposerCalculator_ProposerSelection1(t *testing.T) {
+func TestProposerCalculator_InversePriorityOrderWithExpectedListOfSelection(t *testing.T) {
 	t.Parallel()
 
 	const numberOfIteration = 99
@@ -132,6 +132,7 @@ func TestProposerCalculator_ProposerSelection1(t *testing.T) {
 	keys, err := bls.CreateRandomBlsKeys(3)
 	require.NoError(t, err)
 
+	// priorities are from high to low vp in validator set
 	vset, err := NewValidatorSet([]*ValidatorMetadata{
 		{
 			BlsKey:      keys[0].PublicKey(),
@@ -160,7 +161,8 @@ func TestProposerCalculator_ProposerSelection1(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	expected := []types.Address{
+	// list of addresses in order that should be selected
+	expectedValidatorAddresses := []types.Address{
 		{0x1}, {0x3}, {0x1}, {0x2}, {0x1}, {0x1}, {0x3}, {0x1}, {0x2}, {0x1}, {0x1}, {0x3}, {0x1}, {0x1}, {0x2}, {0x1},
 		{0x3}, {0x1}, {0x1}, {0x2}, {0x1}, {0x1}, {0x3}, {0x1}, {0x2}, {0x1}, {0x1}, {0x3}, {0x1}, {0x2}, {0x1}, {0x1},
 		{0x3}, {0x1}, {0x1}, {0x2}, {0x1}, {0x3}, {0x1}, {0x1}, {0x2}, {0x1}, {0x3}, {0x1}, {0x1}, {0x2}, {0x1}, {0x3},
@@ -171,7 +173,7 @@ func TestProposerCalculator_ProposerSelection1(t *testing.T) {
 	}
 
 	for i, p := range proposers {
-		assert.True(t, bytes.Equal(expected[i].Bytes(), p.Bytes()))
+		assert.True(t, bytes.Equal(expectedValidatorAddresses[i].Bytes(), p.Bytes()))
 	}
 }
 
