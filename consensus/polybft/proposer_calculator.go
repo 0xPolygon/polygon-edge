@@ -45,7 +45,7 @@ type ProposerSnapshot struct {
 	Round      uint64
 	Proposer   *PrioritizedValidator
 	Validators []*PrioritizedValidator
-	//logger     hclog.Logger
+	// logger     hclog.Logger
 }
 
 // NewProposerSnapshotFromState create ProposerSnapshot from state if possible or from genesis block
@@ -151,6 +151,15 @@ func (pcs *ProposerSnapshot) Copy() *ProposerSnapshot {
 		Round:      pcs.Round,
 		Proposer:   proposer,
 	}
+}
+
+func (pcs *ProposerSnapshot) toMap() map[types.Address]*PrioritizedValidator {
+	validatorMap := make(map[types.Address]*PrioritizedValidator)
+	for _, v := range pcs.Validators {
+		validatorMap[v.Metadata.Address] = v
+	}
+
+	return validatorMap
 }
 
 type ProposerCalculator struct {
@@ -313,38 +322,62 @@ func incrementProposerPriorityNTimes(snapshot *ProposerSnapshot, times uint64) (
 	return proposer, nil
 }
 
-func updateValidators(snapshot *ProposerSnapshot, newValidatorSet AccountSet) {
+func updateValidators(snapshot *ProposerSnapshot, newValidatorSet AccountSet) error {
 	if newValidatorSet.Len() == 0 {
-		return
+		return nil
 	}
 
-	oldProposerCalcValidators := snapshot.Validators
+	snapshotValidators := snapshot.toMap()
+	newValidators := make([]*PrioritizedValidator, len(newValidatorSet))
 
-	newValidatorsCalcProposer := make([]*PrioritizedValidator, len(newValidatorSet))
-	addressOldValidatorMap := make(map[types.Address]*PrioritizedValidator, len(oldProposerCalcValidators))
+	// compute total voting power of removed validators and current validator
+	removedValidatorsVotingPower := uint64(0)
+	newValidatorsVotingPower := uint64(0)
 
-	for _, x := range oldProposerCalcValidators {
-		addressOldValidatorMap[x.Metadata.Address] = x
-	}
-
-	// create new validators snapshot
-	for i, x := range newValidatorSet {
-		priority := int64(0)
-
-		// TODO: change priority if validator existed previous
-		if val, exists := addressOldValidatorMap[x.Address]; exists {
-			priority = val.ProposerPriority // + int64(val.Metadata.VotingPower) - int64(x.VotingPower)
-		}
-
-		newValidatorsCalcProposer[i] = &PrioritizedValidator{
-			Metadata:         x,
-			ProposerPriority: priority,
+	for address, val := range snapshotValidators {
+		if !newValidatorSet.ContainsNodeID(address.String()) {
+			removedValidatorsVotingPower += val.Metadata.VotingPower
 		}
 	}
 
-	// TODO: centering
+	for _, v := range newValidatorSet {
+		newValidatorsVotingPower += v.VotingPower
+	}
 
-	snapshot.Validators = newValidatorsCalcProposer
+	if newValidatorsVotingPower > uint64(maxTotalVotingPower) {
+		return fmt.Errorf(
+			"total voting power cannot be guarded to not exceed %v; got: %v",
+			maxTotalVotingPower,
+			newValidatorsVotingPower,
+		)
+	}
+
+	tvpAfterUpdatesBeforeRemovals := newValidatorsVotingPower + removedValidatorsVotingPower
+
+	for i, newValidator := range newValidatorSet {
+		if val, exists := snapshotValidators[newValidator.Address]; exists {
+			// old validators have the same priority
+			newValidators[i] = &PrioritizedValidator{
+				Metadata:         newValidator,
+				ProposerPriority: val.ProposerPriority,
+			}
+		} else {
+			// added validator has priority = -C*totalVotingPowerBeforeRemoval (with C ~= 1.125)
+			newValidators[i] = &PrioritizedValidator{
+				Metadata:         newValidator,
+				ProposerPriority: int64(-(tvpAfterUpdatesBeforeRemovals + (tvpAfterUpdatesBeforeRemovals >> 3))),
+			}
+		}
+	}
+
+	snapshot.Validators = newValidators
+
+	// after validator set changes, center values around 0 and scale
+	if err := updateWithChangeSet(snapshot, snapshot.GetTotalVotingPower()); err != nil {
+		return fmt.Errorf("cannot update validator changeset: %w", err)
+	}
+
+	return nil
 }
 
 func incrementProposerPriority(snapshot *ProposerSnapshot, totalVotingPower int64) (*PrioritizedValidator, error) {
@@ -435,7 +468,7 @@ func rescalePriorities(snapshot *ProposerSnapshot, totalVotingPower int64) error
 	// Cap the difference between priorities to be proportional to 2*totalPower by
 	// re-normalizing priorities, i.e., rescale all priorities by multiplying with:
 	// 2*totalVotingPower/(maxPriority - minPriority)
-	diffMax := priorityWindowSizeFactor * snapshot.GetTotalVotingPower()
+	diffMax := priorityWindowSizeFactor * totalVotingPower
 
 	// Calculating ceil(diff/diffMax):
 	// Re-normalization is performed by dividing by an integer for simplicity.

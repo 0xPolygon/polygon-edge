@@ -479,12 +479,13 @@ func TestProposerCalculator_UpdateValidatorsSameVpUpdatedAndNewAdded(t *testing.
 	vs, err := NewValidatorSet([]*ValidatorMetadata{v1, v2, v3, v4, v5}, hclog.NewNullLogger())
 	require.NoError(t, err)
 
-	pc := NewProposerCalculator(NewProposerCalculatorSnapshot(0, vs.Accounts()), hclog.NewNullLogger())
+	snapshot := NewProposerSnapshot(0, vs.Accounts())
 
 	// iterate one cycle should bring back priority to 0
-	require.NoError(t, pc.incrementProposerPriorityNTimes(5))
+	_, err = incrementProposerPriorityNTimes(snapshot, 5)
+	require.NoError(t, err)
 
-	for _, v := range pc.snapshot.Validators {
+	for _, v := range snapshot.Validators {
 		assert.Equal(t, int64(0), v.ProposerPriority)
 	}
 
@@ -496,10 +497,8 @@ func TestProposerCalculator_UpdateValidatorsSameVpUpdatedAndNewAdded(t *testing.
 
 	newAccountSet := []*ValidatorMetadata{u1, u2, a1}
 
-	err = pc.updateValidators(newAccountSet)
-	require.NoError(t, err)
-
-	assert.Equal(t, 3, len(pc.snapshot.Validators))
+	updateValidators(snapshot, newAccountSet)
+	assert.Equal(t, 3, len(snapshot.Validators))
 
 	// removedVp := sum(v3, v4, v5) = 300
 	// newVp := sum(u1, u2, a1) = 120
@@ -509,26 +508,26 @@ func TestProposerCalculator_UpdateValidatorsSameVpUpdatedAndNewAdded(t *testing.
 	// center: avg = 236/3 = 79; priority(a1)= 236 - 79
 
 	// check voting power after update
-	assert.Equal(t, uint64(10), pc.snapshot.Validators[0].Metadata.VotingPower)
-	assert.Equal(t, uint64(10), pc.snapshot.Validators[1].Metadata.VotingPower)
-	assert.Equal(t, uint64(100), pc.snapshot.Validators[2].Metadata.VotingPower)
+	assert.Equal(t, uint64(10), snapshot.Validators[0].Metadata.VotingPower)
+	assert.Equal(t, uint64(10), snapshot.Validators[1].Metadata.VotingPower)
+	assert.Equal(t, uint64(100), snapshot.Validators[2].Metadata.VotingPower)
 	// newly added validator
-	assert.Equal(t, uint64(100), pc.snapshot.Validators[2].Metadata.VotingPower)
-	assert.Equal(t, types.Address{0x9}, pc.snapshot.Validators[2].Metadata.Address)
-	assert.Equal(t, int64(-157), pc.snapshot.Validators[2].ProposerPriority) // a1
+	assert.Equal(t, uint64(100), snapshot.Validators[2].Metadata.VotingPower)
+	assert.Equal(t, types.Address{0x9}, snapshot.Validators[2].Metadata.Address)
+	assert.Equal(t, int64(-157), snapshot.Validators[2].ProposerPriority) // a1
 	// check priority
-	assert.Equal(t, int64(79), pc.snapshot.Validators[0].ProposerPriority) // u1
-	assert.Equal(t, int64(79), pc.snapshot.Validators[1].ProposerPriority) // u2
+	assert.Equal(t, int64(79), snapshot.Validators[0].ProposerPriority) // u1
+	assert.Equal(t, int64(79), snapshot.Validators[1].ProposerPriority) // u2
 
-	err = pc.incrementProposerPriorityNTimes(1)
+	_, err = incrementProposerPriorityNTimes(snapshot, 1)
 	require.NoError(t, err)
 
 	// 79 + 10 - (100+10+10)
-	assert.Equal(t, int64(-31), pc.snapshot.Validators[0].ProposerPriority)
+	assert.Equal(t, int64(-31), snapshot.Validators[0].ProposerPriority)
 	// 79 + 10
-	assert.Equal(t, int64(89), pc.snapshot.Validators[1].ProposerPriority)
+	assert.Equal(t, int64(89), snapshot.Validators[1].ProposerPriority)
 	// -157+100
-	assert.Equal(t, int64(-57), pc.snapshot.Validators[2].ProposerPriority)
+	assert.Equal(t, int64(-57), snapshot.Validators[2].ProposerPriority)
 }
 
 func TestProposerCalculator_UpdateValidators(t *testing.T) {
@@ -544,19 +543,19 @@ func TestProposerCalculator_UpdateValidators(t *testing.T) {
 	vs, err := NewValidatorSet([]*ValidatorMetadata{v1, v2, v3}, hclog.NewNullLogger())
 	require.NoError(t, err)
 
-	pc := NewProposerCalculator(NewProposerCalculatorSnapshot(0, vs.Accounts()), hclog.NewNullLogger())
-	require.Equal(t, int64(60), pc.totalVotingPower)
+	snapshot := NewProposerSnapshot(0, vs.Accounts())
+	require.Equal(t, int64(60), snapshot.GetTotalVotingPower())
 	// 	init priority must be 0
-	require.Zero(t, pc.snapshot.Validators[0].ProposerPriority)
-	require.Zero(t, pc.snapshot.Validators[1].ProposerPriority)
-	require.Zero(t, pc.snapshot.Validators[2].ProposerPriority)
+	require.Zero(t, snapshot.Validators[0].ProposerPriority)
+	require.Zero(t, snapshot.Validators[1].ProposerPriority)
+	require.Zero(t, snapshot.Validators[2].ProposerPriority)
 	// vp must be initialized
-	require.Equal(t, uint64(10), pc.snapshot.Validators[0].Metadata.VotingPower)
-	require.Equal(t, uint64(20), pc.snapshot.Validators[1].Metadata.VotingPower)
-	require.Equal(t, uint64(30), pc.snapshot.Validators[2].Metadata.VotingPower)
+	require.Equal(t, uint64(10), snapshot.Validators[0].Metadata.VotingPower)
+	require.Equal(t, uint64(20), snapshot.Validators[1].Metadata.VotingPower)
+	require.Equal(t, uint64(30), snapshot.Validators[2].Metadata.VotingPower)
 
 	// increment once
-	err = pc.incrementProposerPriorityNTimes(1)
+	_, err = incrementProposerPriorityNTimes(snapshot, 1)
 	require.NoError(t, err)
 
 	// updated
@@ -566,19 +565,18 @@ func TestProposerCalculator_UpdateValidators(t *testing.T) {
 	// added
 	a1 := &ValidatorMetadata{Address: types.Address{0x4}, BlsKey: keys[3].PublicKey(), VotingPower: 400}
 
-	err = pc.updateValidators([]*ValidatorMetadata{u1, u2, u3, a1})
-	require.NoError(t, err)
+	updateValidators(snapshot, []*ValidatorMetadata{u1, u2, u3, a1})
 
-	require.Equal(t, 4, len(pc.snapshot.Validators))
+	require.Equal(t, 4, len(snapshot.Validators))
 	// priorities are from previous iteration
-	require.Equal(t, int64(292), pc.snapshot.Validators[0].ProposerPriority)
-	require.Equal(t, int64(302), pc.snapshot.Validators[1].ProposerPriority)
-	require.Equal(t, int64(252), pc.snapshot.Validators[2].ProposerPriority)
+	require.Equal(t, int64(292), snapshot.Validators[0].ProposerPriority)
+	require.Equal(t, int64(302), snapshot.Validators[1].ProposerPriority)
+	require.Equal(t, int64(252), snapshot.Validators[2].ProposerPriority)
 	// new added a1
-	require.Equal(t, types.Address{0x4}, pc.snapshot.Validators[3].Metadata.Address)
-	require.Equal(t, int64(-843), pc.snapshot.Validators[3].ProposerPriority)
+	require.Equal(t, types.Address{0x4}, snapshot.Validators[3].Metadata.Address)
+	require.Equal(t, int64(-843), snapshot.Validators[3].ProposerPriority)
 	// total vp is updated
-	require.Equal(t, int64(1000), pc.totalVotingPower)
+	require.Equal(t, int64(1000), snapshot.GetTotalVotingPower())
 }
 
 func TestProposerCalculator_ScaleAfterDelete(t *testing.T) {
@@ -594,40 +592,39 @@ func TestProposerCalculator_ScaleAfterDelete(t *testing.T) {
 	vs, err := NewValidatorSet([]*ValidatorMetadata{v1, v2, v3}, hclog.NewNullLogger())
 	require.NoError(t, err)
 
-	pc := NewProposerCalculator(NewProposerCalculatorSnapshot(0, vs.Accounts()), hclog.NewNullLogger())
-	assert.Equal(t, int64(80020), pc.totalVotingPower)
+	snapshot := NewProposerSnapshot(0, vs.Accounts())
+	assert.Equal(t, int64(80020), snapshot.GetTotalVotingPower())
 
-	err = pc.incrementProposerPriorityNTimes(1)
+	_, err = incrementProposerPriorityNTimes(snapshot, 1)
 	require.NoError(t, err)
 
 	// priorities are from previous iteration
-	require.Equal(t, int64(10), pc.snapshot.Validators[0].ProposerPriority)
-	require.Equal(t, int64(10), pc.snapshot.Validators[1].ProposerPriority)
-	require.Equal(t, int64(-20), pc.snapshot.Validators[2].ProposerPriority)
+	require.Equal(t, int64(10), snapshot.Validators[0].ProposerPriority)
+	require.Equal(t, int64(10), snapshot.Validators[1].ProposerPriority)
+	require.Equal(t, int64(-20), snapshot.Validators[2].ProposerPriority)
 
 	// another increment
-	err = pc.incrementProposerPriorityNTimes(4000)
+	proposer, err := incrementProposerPriorityNTimes(snapshot, 4000)
 	require.NoError(t, err)
 	// priorities are from previous iteration
-	assert.Equal(t, types.Address{0x3}, pc.proposer.Metadata.Address)
+	assert.Equal(t, types.Address{0x3}, proposer.Metadata.Address)
 
 	// 	reduce validator voting power from 8k to 1
 	u1 := &ValidatorMetadata{Address: types.Address{0x1}, BlsKey: keys[0].PublicKey(), VotingPower: 10}
 	u2 := &ValidatorMetadata{Address: types.Address{0x2}, BlsKey: keys[1].PublicKey(), VotingPower: 10}
 
-	require.Equal(t, int64(-40010), pc.snapshot.Validators[0].ProposerPriority)
-	require.Equal(t, int64(40010), pc.snapshot.Validators[1].ProposerPriority)
+	require.Equal(t, int64(-40010), snapshot.Validators[0].ProposerPriority)
+	require.Equal(t, int64(40010), snapshot.Validators[1].ProposerPriority)
 
-	err = pc.updateValidators([]*ValidatorMetadata{u1, u2})
-	require.NoError(t, err)
+	updateValidators(snapshot, []*ValidatorMetadata{u1, u2})
 
 	// maxdiff = 2*tvp = 40
 	// diff(min,max) (-40010, 40010) = 80020
 	// ratio := (diff + diffMax - 1) / diffMax; (80020 + 20 - 1)/20 = 2001
 	// priority = priority / ratio; u1 = -40010 / 4001 ~ -19; u2 = 40010 / 4001 ~ 19
-	require.Equal(t, int64(-19), pc.snapshot.Validators[0].ProposerPriority)
-	require.Equal(t, int64(19), pc.snapshot.Validators[1].ProposerPriority)
-	require.Equal(t, int64(20), pc.totalVotingPower)
+	require.Equal(t, int64(-19), snapshot.Validators[0].ProposerPriority)
+	require.Equal(t, int64(19), snapshot.Validators[1].ProposerPriority)
+	require.Equal(t, int64(20), snapshot.GetTotalVotingPower())
 }
 
 func TestProposerCalculator_ShiftAfterUpdate(t *testing.T) {
@@ -643,27 +640,26 @@ func TestProposerCalculator_ShiftAfterUpdate(t *testing.T) {
 	vs, err := NewValidatorSet([]*ValidatorMetadata{v1, v2, v3}, hclog.NewNullLogger())
 	require.NoError(t, err)
 
-	pc := NewProposerCalculator(NewProposerCalculatorSnapshot(0, vs.Accounts()), hclog.NewNullLogger())
-	assert.Equal(t, int64(100130), pc.totalVotingPower)
+	snapshot := NewProposerSnapshot(0, vs.Accounts())
+	assert.Equal(t, int64(100130), snapshot.GetTotalVotingPower())
 
-	err = pc.incrementProposerPriorityNTimes(4000)
+	_, err = incrementProposerPriorityNTimes(snapshot, 4000)
 	require.NoError(t, err)
 
 	// updates
 	u1 := &ValidatorMetadata{Address: types.Address{0x1}, BlsKey: keys[0].PublicKey(), VotingPower: 5}
 	u2 := &ValidatorMetadata{Address: types.Address{0x2}, BlsKey: keys[1].PublicKey(), VotingPower: 8}
 
-	err = pc.updateValidators([]*ValidatorMetadata{u1, u2})
-	require.NoError(t, err)
+	updateValidators(snapshot, []*ValidatorMetadata{u1, u2})
 
 	// maxdiff = 2*tvp = 26
 	// diff(min,max) (-260, 19610) = 19870
 	// ratio := (diff + diffMax - 1) / diffMax; (19870 + 26 - 1)/26 =765
 	// scale priority = priority / ratio; p1 = 0; p2 = 25
 	// shift with avg=(25+0)/2=12; p = priority - avg; u1 = -12; u2= 13
-	require.Equal(t, int64(-12), pc.snapshot.Validators[0].ProposerPriority)
-	require.Equal(t, int64(13), pc.snapshot.Validators[1].ProposerPriority)
-	require.Equal(t, int64(13), pc.totalVotingPower)
+	require.Equal(t, int64(-12), snapshot.Validators[0].ProposerPriority)
+	require.Equal(t, int64(13), snapshot.Validators[1].ProposerPriority)
+	require.Equal(t, int64(13), snapshot.GetTotalVotingPower())
 }
 
 func TestProposerCalculator_UpdateValidatorSet(t *testing.T) {
@@ -679,10 +675,10 @@ func TestProposerCalculator_UpdateValidatorSet(t *testing.T) {
 	vs, err := NewValidatorSet([]*ValidatorMetadata{v1, v2, v3}, hclog.NewNullLogger())
 	require.NoError(t, err)
 
-	pc := NewProposerCalculator(NewProposerCalculatorSnapshot(0, vs.Accounts()), hclog.NewNullLogger())
-	assert.Equal(t, int64(24), pc.totalVotingPower)
+	snapshot := NewProposerSnapshot(0, vs.Accounts())
+	assert.Equal(t, int64(24), snapshot.GetTotalVotingPower())
 
-	err = pc.incrementProposerPriorityNTimes(2)
+	_, err = incrementProposerPriorityNTimes(snapshot, 2)
 	require.NoError(t, err)
 
 	// modified validator
@@ -690,18 +686,17 @@ func TestProposerCalculator_UpdateValidatorSet(t *testing.T) {
 	// added validator
 	a1 := &ValidatorMetadata{Address: types.Address{0x4}, BlsKey: keys[1].PublicKey(), VotingPower: 8}
 
-	err = pc.updateValidators([]*ValidatorMetadata{u1, a1})
-	require.NoError(t, err)
+	updateValidators(snapshot, []*ValidatorMetadata{u1, a1})
 	// expecting 2 validators with updated voting power and total voting power
-	require.Equal(t, 2, len(pc.snapshot.Validators))
-	require.Equal(t, types.Address{0x1}, pc.snapshot.Validators[0].Metadata.Address)
-	require.Equal(t, uint64(5), pc.snapshot.Validators[0].Metadata.VotingPower)
-	require.Equal(t, int64(11), pc.snapshot.Validators[0].ProposerPriority)
+	require.Equal(t, 2, len(snapshot.Validators))
+	require.Equal(t, types.Address{0x1}, snapshot.Validators[0].Metadata.Address)
+	require.Equal(t, uint64(5), snapshot.Validators[0].Metadata.VotingPower)
+	require.Equal(t, int64(11), snapshot.Validators[0].ProposerPriority)
 
-	require.Equal(t, types.Address{0x4}, pc.snapshot.Validators[1].Metadata.Address)
-	require.Equal(t, uint64(8), pc.snapshot.Validators[1].Metadata.VotingPower)
-	require.Equal(t, int64(-10), pc.snapshot.Validators[1].ProposerPriority)
-	require.Equal(t, int64(13), pc.totalVotingPower)
+	require.Equal(t, types.Address{0x4}, snapshot.Validators[1].Metadata.Address)
+	require.Equal(t, uint64(8), snapshot.Validators[1].Metadata.VotingPower)
+	require.Equal(t, int64(-10), snapshot.Validators[1].ProposerPriority)
+	require.Equal(t, int64(13), snapshot.GetTotalVotingPower())
 }
 
 func TestProposerCalculator_AddValidator(t *testing.T) {
@@ -716,30 +711,29 @@ func TestProposerCalculator_AddValidator(t *testing.T) {
 	vs, err := NewValidatorSet([]*ValidatorMetadata{v1, v2}, hclog.NewNullLogger())
 	require.NoError(t, err)
 
-	pc := NewProposerCalculator(NewProposerCalculatorSnapshot(0, vs.Accounts()), hclog.NewNullLogger())
-	assert.Equal(t, int64(4), pc.totalVotingPower)
-	err = pc.incrementProposerPriorityNTimes(1)
+	snapshot := NewProposerSnapshot(0, vs.Accounts())
+	assert.Equal(t, int64(4), snapshot.GetTotalVotingPower())
+	proposer, err := incrementProposerPriorityNTimes(snapshot, 1)
 	require.NoError(t, err)
-	require.Equal(t, types.Address{0x1}, pc.proposer.Metadata.Address)
-	require.Equal(t, int64(-1), pc.snapshot.Validators[0].ProposerPriority)
-	require.Equal(t, int64(1), pc.snapshot.Validators[1].ProposerPriority)
+	require.Equal(t, types.Address{0x1}, proposer.Metadata.Address)
+	require.Equal(t, int64(-1), snapshot.Validators[0].ProposerPriority)
+	require.Equal(t, int64(1), snapshot.Validators[1].ProposerPriority)
 
-	err = pc.incrementProposerPriorityNTimes(1)
+	_, err = incrementProposerPriorityNTimes(snapshot, 1)
 	require.NoError(t, err)
 
-	require.Equal(t, int64(-2), pc.snapshot.Validators[0].ProposerPriority)
-	require.Equal(t, int64(2), pc.snapshot.Validators[1].ProposerPriority)
+	require.Equal(t, int64(-2), snapshot.Validators[0].ProposerPriority)
+	require.Equal(t, int64(2), snapshot.Validators[1].ProposerPriority)
 
 	a1 := &ValidatorMetadata{Address: types.Address{0x3}, BlsKey: keys[2].PublicKey(), VotingPower: 8}
 
-	err = pc.updateValidators([]*ValidatorMetadata{v1, v2, a1})
-	require.NoError(t, err)
+	updateValidators(snapshot, []*ValidatorMetadata{v1, v2, a1})
 
 	// updated vp: 8+3+1 = 12
 	// added validator priority = -1.125*8 ~ -13
 	// scaling: max(-13, 3) = 16 < 2* 12; no scaling
 	// centring: avg = (13+3+1)/3=5; v1=-2+5, v2=2+5; u3=-13+5
-	require.Equal(t, int64(3), pc.snapshot.Validators[0].ProposerPriority)
-	require.Equal(t, int64(7), pc.snapshot.Validators[1].ProposerPriority)
-	require.Equal(t, int64(-8), pc.snapshot.Validators[2].ProposerPriority)
+	require.Equal(t, int64(3), snapshot.Validators[0].ProposerPriority)
+	require.Equal(t, int64(7), snapshot.Validators[1].ProposerPriority)
+	require.Equal(t, int64(-8), snapshot.Validators[2].ProposerPriority)
 }
