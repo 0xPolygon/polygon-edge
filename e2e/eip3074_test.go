@@ -101,7 +101,7 @@ func TestBasicInvoker(t *testing.T) {
 	mockAbi, err := abi.NewABI(mockArt.Abi)
 	require.NoError(t, err)
 
-	mockAddr, err := srv.DeployContract(context.Background(), strings.TrimPrefix(invokerArt.Bin, "0x"), senderKey)
+	mockAddr, err := srv.DeployContract(context.Background(), strings.TrimPrefix(mockArt.Bin, "0x"), senderKey)
 	require.NoError(t, err)
 	require.NotNil(t, invokerAddr)
 
@@ -191,5 +191,8 @@ func TestBasicInvoker(t *testing.T) {
 
 	res, err = mockContract.Call("lastSender", ethgo.Latest)
 	require.NoError(t, err)
+	checkAddr, ok := res["0"].(ethgo.Address)
+	require.True(t, ok)
+	require.Equal(t, k.Address(), checkAddr)
 
 }
