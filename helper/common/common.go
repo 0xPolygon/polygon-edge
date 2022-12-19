@@ -175,20 +175,13 @@ func PadLeftOrTrim(bb []byte, size int) []byte {
 	return tmp
 }
 
-// ExtendByteSlice extends given byte slice by needLength parameter.
-// If trim set to true, it puts hard limit on length and capacity to needLength value.
-func ExtendByteSlice(b []byte, needLength int, trim bool) []byte {
-	if trim {
-		b = b[:cap(b)]
-	}
+// ExtendByteSlice extends given byte slice by needLength parameter and trims it
+func ExtendByteSlice(b []byte, needLength int) []byte {
+	b = b[:cap(b)]
 
 	if n := needLength - len(b); n > 0 {
 		b = append(b, make([]byte, n)...)
 	}
 
-	if trim {
-		b = b[:needLength]
-	}
-
-	return b
+	return b[:needLength]
 }

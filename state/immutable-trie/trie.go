@@ -47,7 +47,7 @@ func (c *common) Hash() ([]byte, bool) {
 
 // SetHash implements the node interface
 func (c *common) SetHash(b []byte) []byte {
-	c.hash = commonHelpers.ExtendByteSlice(c.hash, len(b), true)
+	c.hash = commonHelpers.ExtendByteSlice(c.hash, len(b))
 	copy(c.hash, b)
 
 	return c.hash
