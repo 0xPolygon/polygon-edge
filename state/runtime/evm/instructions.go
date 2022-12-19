@@ -1189,7 +1189,7 @@ func (c *state) buildCallContract(op OpCode) (*runtime.Contract, uint64, uint64,
 	addr, _ := c.popAddr()
 
 	var value *big.Int
-	if op == CALL || op == CALLCODE {
+	if op == CALL || op == CALLCODE || op == AUTHCALL {
 		value = c.pop()
 	}
 
