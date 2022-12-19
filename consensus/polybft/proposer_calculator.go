@@ -2,7 +2,6 @@ package polybft
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"math"
 	"math/big"
@@ -27,13 +26,7 @@ const (
 	priorityWindowSizeFactor = 2
 )
 
-var (
-	// errInvalidTotalVotingPower is returned if the total voting power is zero
-	errInvalidTotalVotingPower = errors.New(
-		"invalid voting power configuration provided: total voting power must be greater than 0")
-)
-
-// Holds ValidatorMetadata together with priority
+// PrioritizedValidator holds ValidatorMetadata together with priority
 type PrioritizedValidator struct {
 	Metadata         *ValidatorMetadata
 	ProposerPriority int64
@@ -45,7 +38,6 @@ type ProposerSnapshot struct {
 	Round      uint64
 	Proposer   *PrioritizedValidator
 	Validators []*PrioritizedValidator
-	// logger     hclog.Logger
 }
 
 // NewProposerSnapshotFromState create ProposerSnapshot from state if possible or from genesis block
@@ -120,7 +112,7 @@ func (pcs *ProposerSnapshot) GetLatestProposer(round, height uint64) (types.Addr
 	return pcs.Proposer.Metadata.Address, nil
 }
 
-// Gets total voting power from all the validators
+// GetTotalVotingPower returns total voting power from all the validators
 func (pcs ProposerSnapshot) GetTotalVotingPower() int64 {
 	totalVotingPower := int64(0)
 
@@ -131,7 +123,7 @@ func (pcs ProposerSnapshot) GetTotalVotingPower() int64 {
 	return totalVotingPower
 }
 
-// Returns copy of current ProposerSnapshot object
+// Copy Returns copy of current ProposerSnapshot object
 func (pcs *ProposerSnapshot) Copy() *ProposerSnapshot {
 	var proposer *PrioritizedValidator
 
@@ -278,7 +270,9 @@ func (pc *ProposerCalculator) updatePerBlock(blockNumber uint64) error {
 	}
 
 	// update to new validator set and center if needed
-	updateValidators(pc.snapshot, newValidatorSet)
+	if err = updateValidators(pc.snapshot, newValidatorSet); err != nil {
+		return fmt.Errorf("cannot update validators: %w", err)
+	}
 
 	pc.snapshot.Height = blockNumber + 1 // snapshot (validator priorities) is prepared for the next block
 	pc.snapshot.Round = 0
