@@ -1019,6 +1019,8 @@ func (c *consensusRuntime) IsProposer(id []byte, height, round uint64) bool {
 		return false
 	}
 
+	c.logger.Info("Proposer calculated", "height", height, "round", round, "address", nextProposer)
+
 	return bytes.Equal(id, nextProposer[:])
 }
 
@@ -1152,9 +1154,9 @@ func (c *consensusRuntime) HasQuorum(
 			return false
 		}
 
-		propAddress, exist := c.fsm.proposerSnapshot.GetLatestProposer(messages[0].View.Round, blockNumber)
-		if !exist {
-			c.logger.Warn("HasQuorum has been called but proposer is not set")
+		propAddress, err := c.fsm.proposerSnapshot.GetLatestProposer(messages[0].View.Round, blockNumber)
+		if err != nil {
+			c.logger.Warn("HasQuorum has been called but proposer is not set: %w", err)
 
 			return false
 		}

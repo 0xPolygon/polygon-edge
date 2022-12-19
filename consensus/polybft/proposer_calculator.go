@@ -45,11 +45,11 @@ type ProposerSnapshot struct {
 	Round      uint64
 	Proposer   *PrioritizedValidator
 	Validators []*PrioritizedValidator
-	logger     hclog.Logger
+	//logger     hclog.Logger
 }
 
 // NewProposerSnapshotFromState create ProposerSnapshot from state if possible or from genesis block
-func NewProposerSnapshotFromState(config *runtimeConfig, logger hclog.Logger) (*ProposerSnapshot, error) {
+func NewProposerSnapshotFromState(config *runtimeConfig) (*ProposerSnapshot, error) {
 	snapshot, err := config.State.getProposerSnapshot()
 	if err != nil {
 		return nil, err
@@ -62,14 +62,14 @@ func NewProposerSnapshotFromState(config *runtimeConfig, logger hclog.Logger) (*
 			return nil, err
 		}
 
-		snapshot = NewProposerSnapshot(1, genesisValidatorsSet, logger)
+		snapshot = NewProposerSnapshot(1, genesisValidatorsSet)
 	}
 
 	return snapshot, nil
 }
 
 // NewProposerSnapshot creates ProposerSnapshot with height and validators with all priorities set to zero
-func NewProposerSnapshot(height uint64, validators []*ValidatorMetadata, logger hclog.Logger) *ProposerSnapshot {
+func NewProposerSnapshot(height uint64, validators []*ValidatorMetadata) *ProposerSnapshot {
 	validatorsSnap := make([]*PrioritizedValidator, len(validators))
 
 	for i, x := range validators {
@@ -81,7 +81,6 @@ func NewProposerSnapshot(height uint64, validators []*ValidatorMetadata, logger 
 		Proposer:   nil,
 		Height:     height,
 		Validators: validatorsSnap,
-		logger:     logger,
 	}
 }
 
@@ -106,24 +105,19 @@ func (pcs *ProposerSnapshot) CalcProposer(round, height uint64) (types.Address, 
 	pcs.Proposer = proposer
 	pcs.Round = round
 
-	pcs.logger.Info("New proposer calculated", "height", height, "round", round, "address", proposer.Metadata.Address)
-
 	return proposer.Metadata.Address, nil
 }
 
 // GetLatestProposer returns latest calculated proposer if any
-func (pcs *ProposerSnapshot) GetLatestProposer(round, height uint64) (types.Address, bool) {
+func (pcs *ProposerSnapshot) GetLatestProposer(round, height uint64) (types.Address, error) {
 	// round must be same as saved one and proposer must exist
 	if pcs == nil || pcs.Proposer == nil || pcs.Round != round || pcs.Height != height {
-		pcs.logger.Info("Get latest proposer not found", "height", height, "round", round,
-			"pc height", pcs.Height, "pc round", pcs.Round)
-
-		return types.ZeroAddress, false
+		return types.ZeroAddress,
+			fmt.Errorf("get latest proposer not found - height: %d, round: %d, pc height: %d, pc round: %d",
+				height, round, pcs.Height, pcs.Round)
 	}
 
-	pcs.logger.Info("Get latest proposer", "height", height, "round", round, "address", pcs.Proposer.Metadata.Address)
-
-	return pcs.Proposer.Metadata.Address, true
+	return pcs.Proposer.Metadata.Address, nil
 }
 
 // Gets total voting power from all the validators
@@ -169,7 +163,7 @@ type ProposerCalculator struct {
 
 // NewProposerCalculator creates a new proposer calculator object
 func NewProposerCalculator(config *runtimeConfig, logger hclog.Logger) (*ProposerCalculator, error) {
-	snap, err := NewProposerSnapshotFromState(config, logger)
+	snap, err := NewProposerSnapshotFromState(config)
 
 	if err != nil {
 		return nil, err
@@ -182,10 +176,10 @@ func NewProposerCalculator(config *runtimeConfig, logger hclog.Logger) (*Propose
 }
 
 // NewProposerCalculator creates a new proposer calculator object
-func NewProposerCalculatorFromSnapshot(pcs *ProposerSnapshot) *ProposerCalculator {
+func NewProposerCalculatorFromSnapshot(pcs *ProposerSnapshot, logger hclog.Logger) *ProposerCalculator {
 	return &ProposerCalculator{
 		snapshot: pcs.Copy(),
-		logger:   pcs.logger,
+		logger:   logger,
 	}
 }
 
