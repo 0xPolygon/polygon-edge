@@ -218,7 +218,7 @@ func (c *consensusRuntime) OnBlockInserted(block *types.Block) {
 	} else {
 		c.lock.Lock()
 		c.lastBuiltBlock = block.Header
-		c.proposerCalculator.Update(block.Number(), c.config, c.state)
+		c.proposerCalculator.Update(block.Number())
 		c.lock.Unlock()
 	}
 }
@@ -463,7 +463,7 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) error {
 	c.epoch = epoch
 	c.lastBuiltBlock = header
 
-	if err := c.proposerCalculator.Update(header.Number, c.config, c.state); err != nil {
+	if err := c.proposerCalculator.Update(header.Number); err != nil {
 		c.logger.Warn("Could not update proposer calculator", "err", err)
 	}
 

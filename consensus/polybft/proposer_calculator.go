@@ -157,6 +157,12 @@ type ProposerCalculator struct {
 	// current snapshot
 	snapshot *ProposerSnapshot
 
+	// runtime configuration
+	config *runtimeConfig
+
+	// state to save snapshot
+	state *State
+
 	// logger instance
 	logger hclog.Logger
 }
@@ -171,14 +177,19 @@ func NewProposerCalculator(config *runtimeConfig, logger hclog.Logger) (*Propose
 
 	return &ProposerCalculator{
 		snapshot: snap,
+		config:   config,
+		state:    config.State,
 		logger:   logger,
 	}, nil
 }
 
 // NewProposerCalculator creates a new proposer calculator object
-func NewProposerCalculatorFromSnapshot(pcs *ProposerSnapshot, logger hclog.Logger) *ProposerCalculator {
+func NewProposerCalculatorFromSnapshot(pcs *ProposerSnapshot, config *runtimeConfig,
+	logger hclog.Logger) *ProposerCalculator {
 	return &ProposerCalculator{
 		snapshot: pcs.Copy(),
+		config:   config,
+		state:    config.State,
 		logger:   logger,
 	}
 }
@@ -192,7 +203,7 @@ func (pc *ProposerCalculator) GetSnapshot() (*ProposerSnapshot, bool) {
 	return pc.snapshot.Copy(), true
 }
 
-func (pc *ProposerCalculator) Update(blockNumber uint64, config *runtimeConfig, state *State) error {
+func (pc *ProposerCalculator) Update(blockNumber uint64) error {
 	const saveEveryNIterations = 5
 
 	pc.logger.Info("Update proposal snapshot started", "block", blockNumber)
@@ -200,14 +211,14 @@ func (pc *ProposerCalculator) Update(blockNumber uint64, config *runtimeConfig, 
 	from := pc.snapshot.Height
 
 	for height := from; height <= blockNumber; height++ {
-		if err := pc.updatePerBlock(height, config); err != nil {
+		if err := pc.updatePerBlock(height); err != nil {
 			return err
 		}
 
 		// write snapshot every saveEveryNIterations iterations
 		// this way, we prevent data loss on long calculations
 		if (height-from+1)%saveEveryNIterations == 0 {
-			if err := state.writeProposerSnapshot(pc.snapshot); err != nil {
+			if err := pc.state.writeProposerSnapshot(pc.snapshot); err != nil {
 				return fmt.Errorf("cannot save proposer calculator snapshot for block %d: %w", height, err)
 			}
 		}
@@ -215,7 +226,7 @@ func (pc *ProposerCalculator) Update(blockNumber uint64, config *runtimeConfig, 
 
 	// write snapshot if not already written
 	if (blockNumber-from+1)%saveEveryNIterations != 0 {
-		if err := state.writeProposerSnapshot(pc.snapshot); err != nil {
+		if err := pc.state.writeProposerSnapshot(pc.snapshot); err != nil {
 			return fmt.Errorf("cannot save proposer calculator snapshot for block %d: %w", blockNumber, err)
 		}
 	}
@@ -227,12 +238,12 @@ func (pc *ProposerCalculator) Update(blockNumber uint64, config *runtimeConfig, 
 }
 
 // Updates ProposerSnapshot to block block with number `blockNumber`
-func (pc *ProposerCalculator) updatePerBlock(blockNumber uint64, config *runtimeConfig) error {
+func (pc *ProposerCalculator) updatePerBlock(blockNumber uint64) error {
 	if pc.snapshot.Height != blockNumber {
 		return fmt.Errorf("proposer calculator update wrong block=%d, height = %d", blockNumber, pc.snapshot.Height)
 	}
 
-	currentHeader, found := config.blockchain.GetHeaderByNumber(blockNumber)
+	currentHeader, found := pc.config.blockchain.GetHeaderByNumber(blockNumber)
 	if !found {
 		return fmt.Errorf("cannot get header by number: %d", blockNumber)
 	}
@@ -245,7 +256,7 @@ func (pc *ProposerCalculator) updatePerBlock(blockNumber uint64, config *runtime
 	var newValidatorSet AccountSet = nil
 
 	if extra.Validators != nil && !extra.Validators.IsEmpty() {
-		newValidatorSet, err = config.polybftBackend.GetValidators(blockNumber, nil)
+		newValidatorSet, err = pc.config.polybftBackend.GetValidators(blockNumber, nil)
 		if err != nil {
 			return fmt.Errorf("cannot get ibft extra for block %d: %w", blockNumber, err)
 		}
