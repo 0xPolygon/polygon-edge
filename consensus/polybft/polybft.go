@@ -196,7 +196,9 @@ func (p *Polybft) Initialize() error {
 	p.validatorsCache = newValidatorsSnapshotCache(p.config.Logger, stt, p.consensusConfig.EpochSize, p.blockchain)
 
 	// create runtime
-	p.initRuntime()
+	if err := p.initRuntime(); err != nil {
+		return err
+	}
 
 	p.ibft = newIBFTConsensusWrapper(p.logger, p.runtime, p)
 
