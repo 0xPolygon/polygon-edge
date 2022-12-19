@@ -94,6 +94,17 @@ func TestBasicInvoker(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, invokerAddr)
 
+	mockArt, err := getTestArtifact("MockContract.json")
+	require.NoError(t, err)
+	require.True(t, len(invokerArt.Bin) > 0)
+
+	mockAbi, err := abi.NewABI(mockArt.Abi)
+	require.NoError(t, err)
+
+	mockAddr, err := srv.DeployContract(context.Background(), strings.TrimPrefix(invokerArt.Bin, "0x"), senderKey)
+	require.NoError(t, err)
+	require.NotNil(t, invokerAddr)
+
 	sk := &testECDSAKey{k: senderKey}
 	invokerContract := contract.NewContract(invokerAddr, invokerAbi,
 		contract.WithJsonRPC(srv.JSONRPC().Eth()),
@@ -106,10 +117,10 @@ func TestBasicInvoker(t *testing.T) {
 	require.True(t, ok)
 
 	tp := invoker.TransactionPayload{
-		To:       types.Address{0xde, 0xad, 0xbe, 0xef},
-		Value:    big.NewInt(1000),
-		GasLimit: big.NewInt(1000),
-		Data:     []byte{0x00, 0x01, 0x02, 0x03},
+		To:       types.Address(mockAddr),
+		Value:    big.NewInt(0),
+		GasLimit: big.NewInt(100000),
+		Data:     []byte{0xd0, 0x9d, 0xe0, 0x8a}, // const increment = "0xd09de08a";
 	}
 	res, err = invokerContract.Call("hashPayload", ethgo.Latest, &tp)
 	require.NoError(t, err)
@@ -172,6 +183,13 @@ func TestBasicInvoker(t *testing.T) {
 	require.NoError(t, err)
 	rcpt, err := invokeTx.Wait()
 	require.NoError(t, err)
-	_ = rcpt
+	require.True(t, rcpt.GasUsed > 0) // whatever ...
+
+	mockContract := contract.NewContract(mockAddr, mockAbi,
+		contract.WithJsonRPC(srv.JSONRPC().Eth()),
+	)
+
+	res, err = mockContract.Call("lastSender", ethgo.Latest)
+	require.NoError(t, err)
 
 }
