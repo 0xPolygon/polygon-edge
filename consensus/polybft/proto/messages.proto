@@ -1,9 +1,0 @@
-syntax = "proto3";
-
-package v1;
-
-option go_package = "/consensus/polybft/proto";
-
-message GossipMessage {
-  bytes data = 1;
-}

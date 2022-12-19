@@ -8,6 +8,7 @@ import (
 	"github.com/umbracle/fastrlp"
 	"golang.org/x/crypto/sha3"
 
+	commonHelpers "github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -46,7 +47,7 @@ func (c *common) Hash() ([]byte, bool) {
 
 // SetHash implements the node interface
 func (c *common) SetHash(b []byte) []byte {
-	c.hash = extendByteSlice(c.hash, len(b))
+	c.hash = commonHelpers.ExtendByteSlice(c.hash, len(b))
 	copy(c.hash, b)
 
 	return c.hash
@@ -644,13 +645,4 @@ func concat(a, b []byte) []byte {
 	copy(c[len(a):], b)
 
 	return c
-}
-
-func extendByteSlice(b []byte, needLen int) []byte {
-	b = b[:cap(b)]
-	if n := needLen - cap(b); n > 0 {
-		b = append(b, make([]byte, n)...)
-	}
-
-	return b[:needLen]
 }

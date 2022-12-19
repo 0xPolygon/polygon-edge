@@ -24,10 +24,7 @@ import (
 func TestPolybft_VerifyHeader(t *testing.T) {
 	t.Parallel()
 
-	const (
-		allValidatorsSize = 6 // overall there are 6 validators
-		validatorSetSize  = 5 // only 5 validators are active at the time
-	)
+	const validatorSetSize = 6 // overall there are 6 validators
 
 	updateHeaderExtra := func(header *types.Header,
 		validators *ValidatorSetDelta,
@@ -61,14 +58,13 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 	}
 
 	// create all valdators
-	validators := newTestValidators(allValidatorsSize)
+	validators := newTestValidators(validatorSetSize)
 
 	// create configuration
 	polyBftConfig := PolyBFTConfig{
 		InitialValidatorSet: validators.getParamValidators(),
 		EpochSize:           10,
 		SprintSize:          5,
-		ValidatorSetSize:    validatorSetSize,
 	}
 
 	validatorSet := validators.getPublicIdentities()

@@ -461,17 +461,15 @@ func TestState_getProposerSnapshot_writeProposerSnapshot(t *testing.T) {
 	state := newTestState(t)
 
 	snap, err := state.getProposerSnapshot()
-
 	require.NoError(t, err)
 	require.Nil(t, snap)
 
-	require.NoError(t, state.writeProposerSnapshot(&ProposerSnapshot{Height: height, Round: round}))
+	newSnapshot := &ProposerSnapshot{Height: height, Round: round}
+	require.NoError(t, state.writeProposerSnapshot(newSnapshot))
 
 	snap, err = state.getProposerSnapshot()
-
 	require.NoError(t, err)
-	require.Equal(t, round, snap.Round)
-	require.Equal(t, height, snap.Height)
+	require.Equal(t, newSnapshot, snap)
 }
 
 func insertTestExitEvents(t *testing.T, state *State,
