@@ -77,7 +77,6 @@ type runtimeConfig struct {
 	blockchain      blockchainBackend
 	polybftBackend  polybftBackend
 	txPool          txPoolInterface
-	proposerCalc    ProposerCalculator
 }
 
 // consensusRuntime is a struct that provides consensus runtime features like epoch, state and event management
@@ -109,8 +108,8 @@ type consensusRuntime struct {
 	// checkpointManager represents abstraction for checkpoint submission
 	checkpointManager *checkpointManager
 
-	// proposerSnapshot is the object which calculates new proposer
-	proposerSnapshot *ProposerSnapshot
+	// proposerCalculator is the object which manipulates with ProposerSnapshot
+	proposerCalculator *ProposerCalculator
 
 	// logger instance
 	logger hcf.Logger
@@ -118,9 +117,9 @@ type consensusRuntime struct {
 
 // newConsensusRuntime creates and starts a new consensus runtime instance with event tracking
 func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRuntime, error) {
-	proposerSnapshot, err := NewProposerSnapshotFromState(config, log)
+	proposerCalculator, err := NewProposerCalculator(config, log.Named("proposer_calculator"))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create consensus runtime, error while creating proposer calculator %w", err)
 	}
 
 	runtime := &consensusRuntime{
@@ -128,7 +127,9 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 		config:           config,
 		proposerSnapshot: proposerSnapshot,
 		lastBuiltBlock:   config.blockchain.CurrentHeader(),
-		logger:           log.Named("consensus_runtime"),
+		proposerCalculator: proposerCalculator,
+		logger:             log.Named("consensus_runtime"),
+
 	}
 
 	// we need to call restart epoch on runtime to initialize epoch state
@@ -146,6 +147,7 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 		runtime.checkpointManager = newCheckpointManager(
 			wallet.NewEcdsaSigner(config.Key),
 			defaultCheckpointsOffset,
+			config.PolyBFTConfig.Bridge.CheckpointAddr,
 			txRelayer,
 			config.blockchain,
 			config.polybftBackend,
@@ -241,7 +243,7 @@ func (c *consensusRuntime) OnBlockInserted(block *types.Block) {
 		}
 	}
 
-	if err := c.updateProposerSnapshot(proposerSnapshot, block.Number()); err != nil {
+	if err := c.proposerCalculator.Update(block.Number()); err != nil {
 		c.logger.Warn("Could not update proposer calculator", "err", err)
 
 		return
@@ -276,7 +278,9 @@ func (c *consensusRuntime) createCommitmentAndBundles(txs []*types.Transaction) 
 
 	// TODO: keep systemState.GetNextExecutionIndex() also in cr?
 	// Maybe some immutable structure `consensusMetaData`?
-	systemState, err := c.getSystemState(parentBlock)
+	previousBlock, epoch := c.getLastBuiltBlockAndEpoch()
+
+	systemState, err := c.getSystemState(previousBlock)
 	if err != nil {
 		return fmt.Errorf("build bundles, get system state error: %w", err)
 	}
@@ -366,7 +370,7 @@ func (c *consensusRuntime) FSM() error {
 		c.logger,
 	)
 	if err != nil {
-		return fmt.Errorf("cannot create block builder: %w", err)
+		return fmt.Errorf("cannot create block builder for fsm: %w", err)
 	}
 
 	pendingBlockNumber := parent.Number + 1
@@ -388,9 +392,9 @@ func (c *consensusRuntime) FSM() error {
 		epochNumber:       epoch.Number,
 		blockBuilder:      blockBuilder,
 		validators:        valSet,
-		proposerSnapshot:  proposerSnapshot,
 		isEndOfEpoch:      isEndOfEpoch,
 		isEndOfSprint:     isEndOfSprint,
+		proposerSnapshot:  proposerSnapshot,
 		logger:            c.logger.Named("fsm"),
 	}
 
@@ -870,28 +874,41 @@ func (c *consensusRuntime) BuildEventRoot(epoch uint64, nonCommittedExitEvents [
 }
 
 // GenerateExitProof generates proof of exit
-func (c *consensusRuntime) GenerateExitProof(exitID, epoch, checkpointBlock uint64) ([]types.Hash, error) {
-	exitEvent, err := c.state.getExitEvent(exitID, epoch, checkpointBlock)
+func (c *consensusRuntime) GenerateExitProof(exitID, epoch, checkpointBlock uint64) (types.ExitProof, error) {
+	exitEvent, err := c.state.getExitEvent(exitID, epoch)
 	if err != nil {
-		return nil, err
+		return types.ExitProof{}, err
 	}
 
-	e, err := exitEventABIType.Encode(exitEvent)
+	e, err := ExitEventABIType.Encode(exitEvent)
 	if err != nil {
-		return nil, err
+		return types.ExitProof{}, err
 	}
 
 	exitEvents, err := c.state.getExitEventsForProof(epoch, checkpointBlock)
 	if err != nil {
-		return nil, err
+		return types.ExitProof{}, err
 	}
 
 	tree, err := createExitTree(exitEvents)
 	if err != nil {
-		return nil, err
+		return types.ExitProof{}, err
 	}
 
-	return tree.GenerateProofForLeaf(e, 0)
+	leafIndex, err := tree.LeafIndex(e)
+	if err != nil {
+		return types.ExitProof{}, err
+	}
+
+	proof, err := tree.GenerateProofForLeaf(e, 0)
+	if err != nil {
+		return types.ExitProof{}, err
+	}
+
+	return types.ExitProof{
+		Proof:     proof,
+		LeafIndex: leafIndex,
+	}, nil
 }
 
 // GetStateSyncProof returns the proof of the bundle for the state sync
@@ -1011,12 +1028,14 @@ func (c *consensusRuntime) IsProposer(id []byte, height, round uint64) bool {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
-	nextProposer, err := c.config.proposerCalc.CalcProposer(c.fsm.proposerSnapshot, round, height)
+	nextProposer, err := c.fsm.proposerSnapshot.CalcProposer(round, height)
 	if err != nil {
 		c.logger.Error("cannot calculate proposer", "error", err)
 
 		return false
 	}
+
+	c.logger.Info("Proposer calculated", "height", height, "round", round, "address", nextProposer)
 
 	return bytes.Equal(id, nextProposer[:])
 }
@@ -1100,7 +1119,7 @@ func (c *consensusRuntime) InsertBlock(proposal []byte, committedSeals []*messag
 			go func(header types.Header, epochNumber uint64) {
 				if err := c.checkpointManager.submitCheckpoint(header, fsm.isEndOfEpoch); err != nil {
 					c.logger.Warn("failed to submit checkpoint",
-						"checkpoint block", block.Header.Number,
+						"checkpoint block", header.Number,
 						"epoch number", epochNumber,
 						"error", err)
 				}
@@ -1151,10 +1170,9 @@ func (c *consensusRuntime) HasQuorum(
 			return false
 		}
 
-		propAddress, exist := c.config.proposerCalc.GetLatestProposer(
-			c.fsm.proposerSnapshot, messages[0].View.Round, blockNumber)
-		if !exist {
-			c.logger.Warn("HasQuorum has been called but proposer is not set")
+		propAddress, err := c.fsm.proposerSnapshot.GetLatestProposer(messages[0].View.Round, blockNumber)
+		if err != nil {
+			c.logger.Warn("HasQuorum has been called but proposer is not set: %w", err)
 
 			return false
 		}
@@ -1311,40 +1329,6 @@ func (c *consensusRuntime) BuildRoundChangeMessage(
 	return signedMsg
 }
 
-func (c *consensusRuntime) updateProposerSnapshot(snapshot *ProposerSnapshot, blockNumber uint64) error {
-	const saveEveryNIterations = 5
-
-	c.logger.Info("Update proposal snapshot started", "block", blockNumber)
-
-	from := snapshot.Height
-
-	for height := from; height <= blockNumber; height++ {
-		if err := c.config.proposerCalc.Update(snapshot, height, c.config); err != nil {
-			return err
-		}
-
-		// write snapshot every saveEveryNIterations iterations
-		// this way, we prevent data loss on long calculations
-		if (height-from+1)%saveEveryNIterations == 0 {
-			if err := c.state.writeProposerSnapshot(snapshot); err != nil {
-				return fmt.Errorf("cannot save proposer calculator snapshot for block %d: %w", height, err)
-			}
-		}
-	}
-
-	// write snapshot if not already written
-	if (blockNumber-from+1)%saveEveryNIterations != 0 {
-		if err := c.state.writeProposerSnapshot(snapshot); err != nil {
-			return fmt.Errorf("cannot save proposer calculator snapshot for block %d: %w", blockNumber, err)
-		}
-	}
-
-	// requires Lock
-	c.logger.Info("Update proposal snapshot finished", "block", blockNumber)
-
-	return nil
-}
-
 // validateVote validates if the senders address is in active validator set
 func validateVote(vote *MessageSignature, epoch *epochMetadata) error {
 	// get senders address
@@ -1365,7 +1349,7 @@ func createExitTree(exitEvents []*ExitEvent) (*MerkleTree, error) {
 	data := make([][]byte, numOfEvents)
 
 	for i := 0; i < numOfEvents; i++ {
-		b, err := exitEventABIType.Encode(exitEvents[i])
+		b, err := ExitEventABIType.Encode(exitEvents[i])
 		if err != nil {
 			return nil, err
 		}

@@ -369,6 +369,7 @@ func TestExtra_CreateValidatorSetDelta_Cases(t *testing.T) {
 	}
 
 	for _, c := range cases {
+		c := c
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -388,7 +389,8 @@ func TestExtra_CreateValidatorSetDelta_Cases(t *testing.T) {
 				v := vals.getValidator(name)
 				vp, err := rand.Int(rand.Reader, maxVotingPower)
 				require.NoError(t, err)
-				v.votingPower = vp.Uint64()
+				// make sure generated voting power is different than the original one
+				v.votingPower += vp.Uint64() + 1
 			}
 			newValidatorSet := vals.getPublicIdentities(c.newSet...)
 
