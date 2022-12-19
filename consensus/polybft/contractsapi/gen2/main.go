@@ -190,7 +190,7 @@ func ({{.Sig}} *{{.TName}}) ParseLog(log *ethgo.Log) error {
 }
 
 func (r *render) Gen(method *abi.Method) string {
-	name := method.Name + "Method"
+	name := method.Name
 
 	res := []string{}
 	genType(name, method.Inputs, &res)

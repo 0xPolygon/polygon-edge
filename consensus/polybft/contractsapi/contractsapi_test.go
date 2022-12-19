@@ -19,7 +19,7 @@ func TestEncoding_Method(t *testing.T) {
 
 	cases := []method{
 		// empty commit
-		&CommitMethod{
+		&Commit{
 			Bundle: Bundle{
 				StartID: big.NewInt(1),
 				EndID:   big.NewInt(1),
@@ -29,7 +29,7 @@ func TestEncoding_Method(t *testing.T) {
 			Bitmap:    []byte{},
 		},
 		// empty commit epoch
-		&CommitEpochMethod{
+		&CommitEpoch{
 			ID: big.NewInt(1),
 			Epoch: Epoch{
 				StartBlock: big.NewInt(1),
