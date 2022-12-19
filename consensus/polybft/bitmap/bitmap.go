@@ -16,7 +16,7 @@ func (b *Bitmap) Len() uint64 {
 }
 
 func (b *Bitmap) IsSet(idx uint64) bool {
-	if length := b.Len(); length <= idx {
+	if b.Len() <= idx {
 		return false
 	}
 

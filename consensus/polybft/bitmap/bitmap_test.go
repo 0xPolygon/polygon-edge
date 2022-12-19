@@ -3,7 +3,7 @@ package bitmap
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestBitmap_Set(t *testing.T) {
@@ -22,7 +22,7 @@ func TestBitmap_Set(t *testing.T) {
 
 	// check if only values from data are populated
 	for _, v := range data {
-		assert.True(t, b.IsSet(uint64(v)))
+		require.True(t, b.IsSet(uint64(v)))
 	}
 
 	cntSet := 0
@@ -33,13 +33,16 @@ func TestBitmap_Set(t *testing.T) {
 		}
 	}
 
-	assert.Equal(t, len(unique), cntSet)
+	require.Equal(t, len(unique), cntSet)
 }
 
 func TestBitmap_Extend(t *testing.T) {
 	t.Parallel()
 
-	data := [][2]int{
+	data := []struct {
+		index  uint64
+		length uint64
+	}{
 		{0, 1},
 		{8, 2},
 		{15, 2},
@@ -53,8 +56,8 @@ func TestBitmap_Extend(t *testing.T) {
 	b := Bitmap{}
 
 	for _, dt := range data {
-		b.Set(uint64(dt[0]))
-		assert.True(t, b.Len() == uint64(dt[1])*8, dt[0])
-		assert.Len(t, b, dt[1])
+		b.Set(dt.index)
+		require.True(t, b.Len() == dt.length*8, "assertion failed when setting index %d", dt.index)
+		require.Len(t, b, int(dt.length))
 	}
 }
