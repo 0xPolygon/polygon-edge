@@ -67,6 +67,17 @@ type epochMetadata struct {
 	Commitment *Commitment
 }
 
+type guardedDataDTO struct {
+	// last built block header at the time of collecting data
+	lastBuiltBlock *types.Header
+
+	// epoch metadata at the time of collecting data
+	epoch *epochMetadata
+
+	// proposerSnapshot at the time of collecting data
+	proposerSnapshot *ProposerSnapshot
+}
+
 // runtimeConfig is a struct that holds configuration data for given consensus runtime
 type runtimeConfig struct {
 	PolyBFTConfig   *PolyBFTConfig
@@ -163,16 +174,26 @@ func (c *consensusRuntime) getEpoch() *epochMetadata {
 	return c.epoch
 }
 
-// getSyncData returns last build block, proposer snapshot and current epochMetadata in a thread-safe manner.
-func (c *consensusRuntime) getSyncData() (*types.Header, *epochMetadata, *ProposerSnapshot) {
+// getGuardedData returns last build block, proposer snapshot and current epochMetadata in a thread-safe manner.
+func (c *consensusRuntime) getGuardedData() (guardedDataDTO, error) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
+	sharedData := guardedDataDTO{}
+
 	lastBuiltBlock, epoch := new(types.Header), new(epochMetadata)
 	*lastBuiltBlock, *epoch = *c.lastBuiltBlock, *c.epoch
-	proposerSnapshot, _ := c.proposerCalculator.GetSnapshot()
+	proposerSnapshot, ok := c.proposerCalculator.GetSnapshot()
 
-	return lastBuiltBlock, epoch, proposerSnapshot
+	if !ok {
+		return guardedDataDTO{}, errors.New("cannot collect shared data, snapshot is empty")
+	}
+
+	sharedData.epoch = epoch
+	sharedData.lastBuiltBlock = lastBuiltBlock
+	sharedData.proposerSnapshot = proposerSnapshot
+
+	return sharedData, nil
 }
 
 func (c *consensusRuntime) IsBridgeEnabled() bool {
@@ -241,9 +262,8 @@ func (c *consensusRuntime) OnBlockInserted(block *types.Block) {
 	}
 
 	if err := c.proposerCalculator.Update(block.Number()); err != nil {
+		// do not return if prposer snapshot hasn't been inserted, next call of OnBlockInserted will catch-up
 		c.logger.Warn("Could not update proposer calculator", "err", err)
-
-		return
 	}
 
 	// finally update runtime state (lastBuiltBlock, epoch, proposerSnapshot)
@@ -350,7 +370,12 @@ func (c *consensusRuntime) populateFsmIfBridgeEnabled(
 
 // FSM creates a new instance of fsm
 func (c *consensusRuntime) FSM() error {
-	parent, epoch, proposerSnapshot := c.getSyncData()
+	sharedData, err := c.getGuardedData()
+	if err != nil {
+		return fmt.Errorf("cannot create fsm: %w", err)
+	}
+
+	parent, epoch, proposerSnapshot := sharedData.lastBuiltBlock, sharedData.epoch, sharedData.proposerSnapshot
 
 	if !epoch.Validators.ContainsNodeID(c.config.Key.String()) {
 		return errNotAValidator
@@ -1077,11 +1102,11 @@ func (c *consensusRuntime) IsValidCommittedSeal(proposalHash []byte, committedSe
 }
 
 func (c *consensusRuntime) BuildProposal(view *proto.View) []byte {
-	lastBuiltBlock, _, _ := c.getSyncData()
+	sharedData, err := c.getGuardedData()
 
-	if lastBuiltBlock.Number+1 != view.Height {
+	if sharedData.lastBuiltBlock.Number+1 != view.Height {
 		c.logger.Error("unable to build block, due to lack of parent block",
-			"last", lastBuiltBlock.Number, "num", view.Height)
+			"last", sharedData.lastBuiltBlock.Number, "num", view.Height)
 
 		return nil
 	}

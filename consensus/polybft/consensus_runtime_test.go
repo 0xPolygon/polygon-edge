@@ -1496,8 +1496,9 @@ func TestConsensusRuntime_calculateUptime_EpochSizeToSmall(t *testing.T) {
 		proposerCalculator: NewProposerCalculatorFromSnapshot(snapshot, config, hclog.NewNullLogger()),
 	}
 
-	lastBuiltBlock, epoch, _ := consensusRuntime.getSyncData()
-	_, err := consensusRuntime.calculateUptime(lastBuiltBlock, epoch)
+	guardedData, err := consensusRuntime.getGuardedData()
+	require.NoError(t, err)
+	_, err = consensusRuntime.calculateUptime(guardedData.lastBuiltBlock, guardedData.epoch)
 	assert.Error(t, err)
 }
 
@@ -1536,8 +1537,9 @@ func TestConsensusRuntime_calculateUptime_SecondEpoch(t *testing.T) {
 		proposerCalculator: NewProposerCalculatorFromSnapshot(snapshot, config, hclog.NewNullLogger()),
 	}
 
-	lastBuiltBlock, epoch, _ := consensusRuntime.getSyncData()
-	uptime, err := consensusRuntime.calculateUptime(lastBuiltBlock, epoch)
+	guardedData, err := consensusRuntime.getGuardedData()
+	require.NoError(t, err)
+	uptime, err := consensusRuntime.calculateUptime(guardedData.lastBuiltBlock, guardedData.epoch)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, uptime)
 
@@ -1581,8 +1583,9 @@ func TestConsensusRuntime_buildBundles_NoCommitment(t *testing.T) {
 		proposerCalculator: NewProposerCalculatorFromSnapshot(snapshot, config, hclog.NewNullLogger()),
 	}
 
-	_, epoch, _ := runtime.getSyncData()
-	assert.NoError(t, runtime.buildBundles(epoch.Commitment, commitmentMsg, 0))
+	guardedData, err := runtime.getGuardedData()
+	require.NoError(t, err)
+	assert.NoError(t, runtime.buildBundles(guardedData.epoch.Commitment, commitmentMsg, 0))
 
 	bundles, err := state.getBundles(0, 4)
 
@@ -1636,8 +1639,9 @@ func TestConsensusRuntime_buildBundles(t *testing.T) {
 		proposerCalculator: NewProposerCalculatorFromSnapshot(snapshot, config, hclog.NewNullLogger()),
 	}
 
-	_, epochData, _ := runtime.getSyncData()
-	assert.NoError(t, runtime.buildBundles(epochData.Commitment, commitmentMsg, 0))
+	guardedData, err := runtime.getGuardedData()
+	require.NoError(t, err)
+	assert.NoError(t, runtime.buildBundles(guardedData.epoch.Commitment, commitmentMsg, 0))
 
 	bundles, err := state.getBundles(fromIndex, maxBundlesPerSprint)
 	assert.NoError(t, err)
