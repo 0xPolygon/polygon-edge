@@ -123,13 +123,11 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 	}
 
 	runtime := &consensusRuntime{
-		state:            config.State,
-		config:           config,
-		proposerSnapshot: proposerSnapshot,
-		lastBuiltBlock:   config.blockchain.CurrentHeader(),
+		state:              config.State,
+		config:             config,
+		lastBuiltBlock:     config.blockchain.CurrentHeader(),
 		proposerCalculator: proposerCalculator,
 		logger:             log.Named("consensus_runtime"),
-
 	}
 
 	// we need to call restart epoch on runtime to initialize epoch state
@@ -172,7 +170,7 @@ func (c *consensusRuntime) getSyncData() (*types.Header, *epochMetadata, *Propos
 
 	lastBuiltBlock, epoch := new(types.Header), new(epochMetadata)
 	*lastBuiltBlock, *epoch = *c.lastBuiltBlock, *c.epoch
-	proposerSnapshot := c.proposerSnapshot.Copy()
+	proposerSnapshot, _ := c.proposerCalculator.GetSnapshot()
 
 	return lastBuiltBlock, epoch, proposerSnapshot
 }
@@ -230,9 +228,8 @@ func (c *consensusRuntime) OnBlockInserted(block *types.Block) {
 	}
 
 	var (
-		proposerSnapshot = c.proposerSnapshot.Copy()
-		epoch            = c.epoch
-		err              error
+		epoch = c.epoch
+		err   error
 	)
 
 	if c.isEndOfEpoch(block.Header.Number) {
@@ -252,7 +249,6 @@ func (c *consensusRuntime) OnBlockInserted(block *types.Block) {
 	// finally update runtime state (lastBuiltBlock, epoch, proposerSnapshot)
 	c.epoch = epoch
 	c.lastBuiltBlock = block.Header
-	c.proposerSnapshot = proposerSnapshot
 }
 
 func (c *consensusRuntime) createCommitmentAndBundles(txs []*types.Transaction) error {
@@ -278,9 +274,7 @@ func (c *consensusRuntime) createCommitmentAndBundles(txs []*types.Transaction) 
 
 	// TODO: keep systemState.GetNextExecutionIndex() also in cr?
 	// Maybe some immutable structure `consensusMetaData`?
-	previousBlock, epoch := c.getLastBuiltBlockAndEpoch()
-
-	systemState, err := c.getSystemState(previousBlock)
+	systemState, err := c.getSystemState(parentBlock)
 	if err != nil {
 		return fmt.Errorf("build bundles, get system state error: %w", err)
 	}
