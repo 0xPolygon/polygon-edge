@@ -1,12 +1,15 @@
 package polybft
 
 import (
+	"context"
 	"os"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/helper/tests"
 	"github.com/0xPolygon/polygon-edge/types"
+
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
@@ -39,7 +42,7 @@ func (m *mockEventSubscriber) len() int {
 func TestEventTracker_TrackSyncEvents(t *testing.T) {
 	t.Parallel()
 
-	server := testutil.DeployTestServer(t, nil)
+	server := tests.RunRootchain(context.Background(), "", nil)
 
 	tmpDir, err := os.MkdirTemp("/tmp", "test-event-tracker")
 	defer os.RemoveAll(tmpDir)
