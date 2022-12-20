@@ -8,7 +8,6 @@ import (
 	"sort"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/0xPolygon/go-ibft/messages"
 	"github.com/0xPolygon/go-ibft/messages/proto"
@@ -995,12 +994,6 @@ func (c *consensusRuntime) getCommitmentToRegister(epoch *epochMetadata,
 }
 
 func (c *consensusRuntime) IsValidBlock(proposal []byte) bool {
-	now := time.Now()
-	fmt.Println("=> IsValidBlock")
-	defer func() {
-		fmt.Println("<= IsValidBlock", time.Since(now))
-	}()
-
 	if err := c.fsm.Validate(proposal); err != nil {
 		c.logger.Error("failed to validate proposal", "error", err)
 
@@ -1081,12 +1074,6 @@ func (c *consensusRuntime) IsValidCommittedSeal(proposalHash []byte, committedSe
 }
 
 func (c *consensusRuntime) BuildProposal(view *proto.View) []byte {
-	now := time.Now()
-	fmt.Println("=> BUILD PROPOSAL")
-	defer func() {
-		fmt.Println("<= BUILD PROPOSAL", time.Since(now))
-	}()
-
 	lastBuiltBlock, _ := c.getLastBuiltBlockAndEpoch()
 
 	if lastBuiltBlock.Number+1 != view.Height {
@@ -1108,12 +1095,6 @@ func (c *consensusRuntime) BuildProposal(view *proto.View) []byte {
 
 // InsertBlock inserts a proposal with the specified committed seals
 func (c *consensusRuntime) InsertBlock(proposal []byte, committedSeals []*messages.CommittedSeal) {
-	now := time.Now()
-	fmt.Println("=> InsertBlock")
-	defer func() {
-		fmt.Println("<= InsertBlock", time.Since(now))
-	}()
-
 	fsm := c.fsm
 
 	block, err := fsm.Insert(proposal, committedSeals)
