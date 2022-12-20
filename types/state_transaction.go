@@ -8,9 +8,14 @@ import (
 	"github.com/umbracle/ethgo/abi"
 )
 
-var ExecuteStateSyncABIMethod, _ = abi.NewMethod("function execute(" +
-	"bytes32[] proof, " +
-	"tuple(uint256 id, address sender, address receiver, bytes data) stateSync)")
+var (
+	StateSyncABIType = abi.MustNewType(
+		"tuple(tuple(uint256 id, address sender, address receiver, bytes data))")
+
+	ExecuteStateSyncABIMethod, _ = abi.NewMethod("function execute(" +
+		"bytes32[] proof, " +
+		"tuple(uint256 id, address sender, address receiver, bytes data) stateSync)")
+)
 
 const (
 	abiMethodIDLength = 4
@@ -28,6 +33,7 @@ type StateSyncEvent struct {
 	Data []byte
 }
 
+// ToMap converts StateSyncEvent to map
 func (sse *StateSyncEvent) ToMap() map[string]interface{} {
 	return map[string]interface{}{
 		"id":       sse.ID,
@@ -35,6 +41,14 @@ func (sse *StateSyncEvent) ToMap() map[string]interface{} {
 		"receiver": sse.Receiver,
 		"data":     sse.Data,
 	}
+}
+
+// ToABI converts StateSyncEvent to ABI
+func (sse *StateSyncEvent) ToABI() ([]byte, error) {
+	ma := make([]map[string]interface{}, 1)
+	ma[0] = sse.ToMap()
+
+	return StateSyncABIType.Encode(ma)
 }
 
 func (sse *StateSyncEvent) String() string {
