@@ -44,11 +44,8 @@ func (sse *StateSyncEvent) ToMap() map[string]interface{} {
 }
 
 // ToABI converts StateSyncEvent to ABI
-func (sse *StateSyncEvent) ToABI() ([]byte, error) {
-	ma := make([]map[string]interface{}, 1)
-	ma[0] = sse.ToMap()
-
-	return StateSyncABIType.Encode(ma)
+func (sse *StateSyncEvent) EncodeAbi() ([]byte, error) {
+	return StateSyncABIType.Encode([]interface{}{sse.ToMap()})
 }
 
 func (sse *StateSyncEvent) String() string {
