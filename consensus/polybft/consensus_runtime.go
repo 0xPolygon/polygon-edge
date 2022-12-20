@@ -207,7 +207,7 @@ func (c *consensusRuntime) OnBlockInserted(block *types.Block) {
 
 	// handle commitment and proofs creation
 	if err := c.getCommitmentFromTransactions(block.Transactions); err != nil {
-		c.logger.Error("on block inserted error", "err", err)
+		c.logger.Error("failed to retrieve commitment from transactions, "err", err)
 	}
 
 	if c.isEndOfEpoch(block.Header.Number) {
@@ -248,7 +248,7 @@ func (c *consensusRuntime) getCommitmentFromTransactions(txs []*types.Transactio
 
 	if err := c.buildProofs(
 		epoch.Commitment, commitment.Message); err != nil {
-		return fmt.Errorf("create commitment error: %w", err)
+		return fmt.Errorf("build commitment proofs error: %w", err)
 	}
 
 	return nil
