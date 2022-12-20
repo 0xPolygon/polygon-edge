@@ -125,7 +125,7 @@ func (cm CommitmentMessage) VerifyStateSyncProof(stateSyncProof *types.StateSync
 		return errors.New("no state sync event")
 	}
 
-	hash, err := stateSyncProof.StateSync.ToABI()
+	hash, err := stateSyncProof.StateSync.EncodeAbi()
 	if err != nil {
 		return err
 	}
@@ -300,7 +300,7 @@ func createMerkleTree(stateSyncEvents []*types.StateSyncEvent) (*MerkleTree, err
 	ssh := make([][]byte, len(stateSyncEvents))
 
 	for i, sse := range stateSyncEvents {
-		data, err := sse.ToABI()
+		data, err := sse.EncodeAbi()
 		if err != nil {
 			return nil, err
 		}
