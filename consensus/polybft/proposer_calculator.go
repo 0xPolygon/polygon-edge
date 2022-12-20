@@ -2,7 +2,6 @@ package polybft
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"math"
 	"math/big"
@@ -27,13 +26,7 @@ const (
 	priorityWindowSizeFactor = 2
 )
 
-var (
-	// errInvalidTotalVotingPower is returned if the total voting power is zero
-	errInvalidTotalVotingPower = errors.New(
-		"invalid voting power configuration provided: total voting power must be greater than 0")
-)
-
-// Holds ValidatorMetadata together with priority
+// PrioritizedValidator holds ValidatorMetadata together with priority
 type PrioritizedValidator struct {
 	Metadata         *ValidatorMetadata
 	ProposerPriority int64
@@ -45,7 +38,6 @@ type ProposerSnapshot struct {
 	Round      uint64
 	Proposer   *PrioritizedValidator
 	Validators []*PrioritizedValidator
-	//logger     hclog.Logger
 }
 
 // NewProposerSnapshotFromState create ProposerSnapshot from state if possible or from genesis block
@@ -120,7 +112,7 @@ func (pcs *ProposerSnapshot) GetLatestProposer(round, height uint64) (types.Addr
 	return pcs.Proposer.Metadata.Address, nil
 }
 
-// Gets total voting power from all the validators
+// GetTotalVotingPower returns total voting power from all the validators
 func (pcs ProposerSnapshot) GetTotalVotingPower() int64 {
 	totalVotingPower := int64(0)
 
@@ -131,7 +123,7 @@ func (pcs ProposerSnapshot) GetTotalVotingPower() int64 {
 	return totalVotingPower
 }
 
-// Returns copy of current ProposerSnapshot object
+// Copy Returns copy of current ProposerSnapshot object
 func (pcs *ProposerSnapshot) Copy() *ProposerSnapshot {
 	var proposer *PrioritizedValidator
 
@@ -151,6 +143,15 @@ func (pcs *ProposerSnapshot) Copy() *ProposerSnapshot {
 		Round:      pcs.Round,
 		Proposer:   proposer,
 	}
+}
+
+func (pcs *ProposerSnapshot) toMap() map[types.Address]*PrioritizedValidator {
+	validatorMap := make(map[types.Address]*PrioritizedValidator)
+	for _, v := range pcs.Validators {
+		validatorMap[v.Metadata.Address] = v
+	}
+
+	return validatorMap
 }
 
 type ProposerCalculator struct {
@@ -269,7 +270,9 @@ func (pc *ProposerCalculator) updatePerBlock(blockNumber uint64) error {
 	}
 
 	// update to new validator set and center if needed
-	updateValidators(pc.snapshot, newValidatorSet)
+	if err = updateValidators(pc.snapshot, newValidatorSet); err != nil {
+		return fmt.Errorf("cannot update validators: %w", err)
+	}
 
 	pc.snapshot.Height = blockNumber + 1 // snapshot (validator priorities) is prepared for the next block
 	pc.snapshot.Round = 0
@@ -313,38 +316,62 @@ func incrementProposerPriorityNTimes(snapshot *ProposerSnapshot, times uint64) (
 	return proposer, nil
 }
 
-func updateValidators(snapshot *ProposerSnapshot, newValidatorSet AccountSet) {
+func updateValidators(snapshot *ProposerSnapshot, newValidatorSet AccountSet) error {
 	if newValidatorSet.Len() == 0 {
-		return
+		return nil
 	}
 
-	oldProposerCalcValidators := snapshot.Validators
+	snapshotValidators := snapshot.toMap()
+	newValidators := make([]*PrioritizedValidator, len(newValidatorSet))
 
-	newValidatorsCalcProposer := make([]*PrioritizedValidator, len(newValidatorSet))
-	addressOldValidatorMap := make(map[types.Address]*PrioritizedValidator, len(oldProposerCalcValidators))
+	// compute total voting power of removed validators and current validator
+	removedValidatorsVotingPower := uint64(0)
+	newValidatorsVotingPower := uint64(0)
 
-	for _, x := range oldProposerCalcValidators {
-		addressOldValidatorMap[x.Metadata.Address] = x
-	}
-
-	// create new validators snapshot
-	for i, x := range newValidatorSet {
-		priority := int64(0)
-
-		// TODO: change priority if validator existed previous
-		if val, exists := addressOldValidatorMap[x.Address]; exists {
-			priority = val.ProposerPriority // + int64(val.Metadata.VotingPower) - int64(x.VotingPower)
-		}
-
-		newValidatorsCalcProposer[i] = &PrioritizedValidator{
-			Metadata:         x,
-			ProposerPriority: priority,
+	for address, val := range snapshotValidators {
+		if !newValidatorSet.ContainsNodeID(address.String()) {
+			removedValidatorsVotingPower += val.Metadata.VotingPower
 		}
 	}
 
-	// TODO: centering
+	for _, v := range newValidatorSet {
+		newValidatorsVotingPower += v.VotingPower
+	}
 
-	snapshot.Validators = newValidatorsCalcProposer
+	if newValidatorsVotingPower > uint64(maxTotalVotingPower) {
+		return fmt.Errorf(
+			"total voting power cannot be guarded to not exceed %v; got: %v",
+			maxTotalVotingPower,
+			newValidatorsVotingPower,
+		)
+	}
+
+	tvpAfterUpdatesBeforeRemovals := newValidatorsVotingPower + removedValidatorsVotingPower
+
+	for i, newValidator := range newValidatorSet {
+		if val, exists := snapshotValidators[newValidator.Address]; exists {
+			// old validators have the same priority
+			newValidators[i] = &PrioritizedValidator{
+				Metadata:         newValidator,
+				ProposerPriority: val.ProposerPriority,
+			}
+		} else {
+			// added validator has priority = -C*totalVotingPowerBeforeRemoval (with C ~= 1.125)
+			newValidators[i] = &PrioritizedValidator{
+				Metadata:         newValidator,
+				ProposerPriority: int64(-(tvpAfterUpdatesBeforeRemovals + (tvpAfterUpdatesBeforeRemovals >> 3))),
+			}
+		}
+	}
+
+	snapshot.Validators = newValidators
+
+	// after validator set changes, center values around 0 and scale
+	if err := updateWithChangeSet(snapshot, snapshot.GetTotalVotingPower()); err != nil {
+		return fmt.Errorf("cannot update validator changeset: %w", err)
+	}
+
+	return nil
 }
 
 func incrementProposerPriority(snapshot *ProposerSnapshot, totalVotingPower int64) (*PrioritizedValidator, error) {

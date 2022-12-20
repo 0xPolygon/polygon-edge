@@ -218,11 +218,6 @@ func (p *Polybft) Start() error {
 		return fmt.Errorf("failed to start syncer. Error: %w", err)
 	}
 
-	// we need to call restart epoch on runtime to initialize epoch state
-	if err := p.runtime.restartEpoch(p.blockchain.CurrentHeader()); err != nil {
-		return fmt.Errorf("consensus runtime start - restart epoch failed: %w", err)
-	}
-
 	// start syncing
 	go func() {
 		blockHandler := func(b *types.Block) bool {
