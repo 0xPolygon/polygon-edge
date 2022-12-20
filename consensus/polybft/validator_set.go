@@ -10,6 +10,7 @@ import (
 
 // ValidatorSet interface of the current validator set
 type ValidatorSet interface {
+	// Includes check if given address is among the current validator set
 	Includes(address types.Address) bool
 
 	// Len returns the size of the validator set

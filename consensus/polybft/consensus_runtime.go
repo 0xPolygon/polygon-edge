@@ -1028,34 +1028,15 @@ func (c *consensusRuntime) IsValidBlock(proposal []byte) bool {
 }
 
 func (c *consensusRuntime) IsValidSender(msg *proto.Message) bool {
-	msgNoSig, err := msg.PayloadNoSig()
-	if err != nil {
-		c.logger.Error("IsValidSender failed", "error", err)
+	c.lock.RLock()
+	defer c.lock.RUnlock()
 
+	if c.fsm == nil {
 		return false
 	}
 
-	// recover ECDSA address
-	signerAddress, err := wallet.RecoverAddressFromSignature(msg.Signature, msgNoSig)
-	if err != nil {
-		c.logger.Error("IsValidSender failed", "error", fmt.Errorf("failed to recover address from message: %w", err))
-
-		return false
-	}
-
-	// verify that message signature and sender address match
-	if !bytes.Equal(msg.From, signerAddress.Bytes()) {
-		c.logger.Error("IsValidSender failed", "error",
-			fmt.Errorf("signer address %s doesn't match From field", signerAddress.String()))
-
-		return false
-	}
-
-	epoch := c.getEpoch()
-	// verify the sender is in the active validator set
-	if !epoch.Validators.ContainsAddress(signerAddress) {
-		c.logger.Error("IsValidSender failed", "error",
-			fmt.Errorf("signer address %s is not included in validator set", signerAddress.String()))
+	if err := c.fsm.ValidateSender(msg); err != nil {
+		c.logger.Error("invalid IBFT message received", "error", err)
 
 		return false
 	}
