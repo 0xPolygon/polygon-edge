@@ -15,6 +15,8 @@ var (
 	NativeTokenContract = types.StringToAddress("0x1010")
 	// SystemCaller is address of account, used for system calls to smart contracts
 	SystemCaller = types.StringToAddress("0xffffFFFfFFffffffffffffffFfFFFfffFFFfFFfE")
+	// L2StateSender is an address of bridge contract to the rootchain
+	L2StateSenderContract = types.StringToAddress("0x1002")
 
 	// NativeTransferPrecompile is an address of native transfer precompile
 	NativeTransferPrecompile = types.StringToAddress("0x2020")

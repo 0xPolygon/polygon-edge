@@ -5,6 +5,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/contracts"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo/abi"
@@ -157,7 +158,7 @@ func (p *Precompiled) leftPad(buf []byte, n int) []byte {
 }
 
 func (p *Precompiled) get(input []byte, size int) ([]byte, []byte) {
-	p.buf = extendByteSlice(p.buf, size)
+	p.buf = common.ExtendByteSlice(p.buf, size)
 	n := size
 
 	if len(input) < n {
@@ -185,15 +186,6 @@ func (p *Precompiled) getUint64(input []byte) (uint64, []byte) {
 	num := binary.BigEndian.Uint64(p.buf[24:32])
 
 	return num, input
-}
-
-func extendByteSlice(b []byte, needLen int) []byte {
-	b = b[:cap(b)]
-	if n := needLen - cap(b); n > 0 {
-		b = append(b, make([]byte, n)...)
-	}
-
-	return b[:needLen]
 }
 
 // abiBoolMustEncode encodes the given value using the given ABI type.

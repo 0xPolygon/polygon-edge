@@ -47,6 +47,7 @@ builds:
       -s -w -linkmode external -extldflags "-static" -X 'github.com/0xPolygon/polygon-edge/versioning.Version=v{{ .Version }}'
     tags:
       - netgo
+      - osusergo
 
   - id: linux-arm64
     main: ./main.go
@@ -63,6 +64,7 @@ builds:
       -s -w -linkmode external -extldflags "-static" -X 'github.com/0xPolygon/polygon-edge/versioning.Version=v{{ .Version }}'
     tags:
       - netgo
+      - osusergo
 
 archives:
   -
@@ -129,4 +131,4 @@ docker_manifests:
     image_templates:
       - 0xpolygon/{{ .ProjectName }}:{{ .Version }}-amd64
       - 0xpolygon/{{ .ProjectName }}:{{ .Version }}-arm64
-    skip_push: false
+    skip_push: auto

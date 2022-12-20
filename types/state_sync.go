@@ -27,3 +27,8 @@ type StateSyncProof struct {
 	Proof     []Hash
 	StateSync StateSyncEvent
 }
+
+type ExitProof struct {
+	Proof     []Hash
+	LeafIndex uint64
+}
