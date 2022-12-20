@@ -179,21 +179,20 @@ func (c *consensusRuntime) getGuardedData() (guardedDataDTO, error) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
-	sharedData := guardedDataDTO{}
-
-	lastBuiltBlock, epoch := new(types.Header), new(epochMetadata)
-	*lastBuiltBlock, *epoch = *c.lastBuiltBlock, *c.epoch
+	lastBuiltBlock := c.lastBuiltBlock.Copy()
+	epoch := new(epochMetadata)
+	*epoch = *c.epoch // shallow copy, don't need to make validators copy because AccountSet is immutable
 	proposerSnapshot, ok := c.proposerCalculator.GetSnapshot()
 
 	if !ok {
 		return guardedDataDTO{}, errors.New("cannot collect shared data, snapshot is empty")
 	}
 
-	sharedData.epoch = epoch
-	sharedData.lastBuiltBlock = lastBuiltBlock
-	sharedData.proposerSnapshot = proposerSnapshot
-
-	return sharedData, nil
+	return guardedDataDTO{
+		epoch:            epoch,
+		lastBuiltBlock:   lastBuiltBlock,
+		proposerSnapshot: proposerSnapshot,
+	}, nil
 }
 
 func (c *consensusRuntime) IsBridgeEnabled() bool {
@@ -395,9 +394,8 @@ func (c *consensusRuntime) FSM() error {
 	pendingBlockNumber := parent.Number + 1
 	isEndOfSprint := c.isEndOfSprint(pendingBlockNumber)
 	isEndOfEpoch := c.isEndOfEpoch(pendingBlockNumber)
-	validatorsCopy := epoch.Validators.Copy()
 
-	valSet, err := NewValidatorSet(validatorsCopy, c.logger)
+	valSet, err := NewValidatorSet(epoch.Validators, c.logger)
 	if err != nil {
 		return fmt.Errorf("cannot create validator set for fsm: %w", err)
 	}
@@ -470,7 +468,7 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) (*epochMetadata, e
 
 	validatorSet, err := c.config.polybftBackend.GetValidators(header.Number, nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("restart epoch - cannot get validators: %w", err)
 	}
 
 	updateEpochMetrics(epochMetadata{
