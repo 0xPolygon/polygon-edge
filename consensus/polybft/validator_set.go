@@ -60,10 +60,10 @@ func NewValidatorSet(valz AccountSet, logger hclog.Logger, opts ...validatorSetO
 
 	for _, val := range valz {
 		scaledVotingPower := val.getScaledVotingPower(valSet.votingPowerScalingFactor)
-		valSet.votingPowerMap[val.Address] = scaledVotingPower
+		valSet.votingPowerMap[val.Address] = int64(scaledVotingPower)
 
 		// mind overflow
-		valSet.totalVotingPower = safeAddClip(valSet.totalVotingPower, scaledVotingPower)
+		valSet.totalVotingPower = safeAddClip(valSet.totalVotingPower, int64(scaledVotingPower))
 		if valSet.totalVotingPower > maxTotalVotingPower {
 			return nil, fmt.Errorf(
 				"total voting power cannot be guarded to not exceed %v; got: %v",

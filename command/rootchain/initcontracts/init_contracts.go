@@ -8,7 +8,6 @@ import (
 	"sort"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
-	"github.com/0xPolygon/polygon-edge/helper/hex"
 
 	"github.com/spf13/cobra"
 	"github.com/umbracle/ethgo"

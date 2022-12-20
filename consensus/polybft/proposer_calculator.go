@@ -6,6 +6,7 @@ import (
 	"math"
 	"math/big"
 
+	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 )
@@ -117,9 +118,9 @@ func (pcs ProposerSnapshot) GetTotalVotingPower() int64 {
 	totalVotingPower := int64(0)
 
 	for _, v := range pcs.Validators {
-		// TODO: Provide scaling factor
+		// TODO: @Stefan-Ethernal Provide scaling factor
 		scaledVotingPower := v.Metadata.getScaledVotingPower(1)
-		totalVotingPower = safeAddClip(totalVotingPower, scaledVotingPower)
+		totalVotingPower = safeAddClip(totalVotingPower, int64(scaledVotingPower))
 	}
 
 	return totalVotingPower
@@ -272,7 +273,7 @@ func (pc *ProposerCalculator) updatePerBlock(blockNumber uint64) error {
 	}
 
 	// update to new validator set and center if needed
-	if err = updateValidators(pc.snapshot, newValidatorSet); err != nil {
+	if err = updateValidators(pc.snapshot, newValidatorSet, chain.WeiScalingFactor); err != nil {
 		return fmt.Errorf("cannot update validators: %w", err)
 	}
 
@@ -318,7 +319,7 @@ func incrementProposerPriorityNTimes(snapshot *ProposerSnapshot, times uint64) (
 	return proposer, nil
 }
 
-func updateValidators(snapshot *ProposerSnapshot, newValidatorSet AccountSet) error {
+func updateValidators(snapshot *ProposerSnapshot, newValidatorSet AccountSet, votingPowerScalingFactor uint64) error {
 	if newValidatorSet.Len() == 0 {
 		return nil
 	}
@@ -332,12 +333,12 @@ func updateValidators(snapshot *ProposerSnapshot, newValidatorSet AccountSet) er
 
 	for address, val := range snapshotValidators {
 		if !newValidatorSet.ContainsNodeID(address.String()) {
-			removedValidatorsVotingPower += val.Metadata.VotingPower
+			removedValidatorsVotingPower += val.Metadata.getScaledVotingPower(votingPowerScalingFactor)
 		}
 	}
 
 	for _, v := range newValidatorSet {
-		newValidatorsVotingPower += v.VotingPower
+		newValidatorsVotingPower += v.getScaledVotingPower(votingPowerScalingFactor)
 	}
 
 	if newValidatorsVotingPower > uint64(maxTotalVotingPower) {
@@ -379,7 +380,8 @@ func updateValidators(snapshot *ProposerSnapshot, newValidatorSet AccountSet) er
 func incrementProposerPriority(snapshot *ProposerSnapshot, totalVotingPower int64) (*PrioritizedValidator, error) {
 	for _, val := range snapshot.Validators {
 		// Check for overflow for sum.
-		newPrio := safeAddClip(val.ProposerPriority, val.Metadata.getScaledVotingPower(1))
+		// TODO: @Stefan-Ethernal Provide scaling factor
+		newPrio := safeAddClip(val.ProposerPriority, int64(val.Metadata.getScaledVotingPower(1)))
 		val.ProposerPriority = newPrio
 	}
 	// Decrement the validator with most ProposerPriority.
