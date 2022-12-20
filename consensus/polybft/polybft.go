@@ -202,6 +202,10 @@ func (p *Polybft) Initialize() error {
 
 	p.ibft = newIBFTConsensusWrapper(p.logger, p.runtime, p)
 
+	if err = p.subscribeToIbftTopic(); err != nil {
+		return fmt.Errorf("IBFT topic subscription failed: %w", err)
+	}
+
 	return nil
 }
 

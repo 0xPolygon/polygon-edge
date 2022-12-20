@@ -1917,6 +1917,7 @@ func TestConsensusRuntime_IsValidSender(t *testing.T) {
 	msg, err := sender.Key().SignEcdsaMessage(&proto.Message{
 		From: sender.Address().Bytes(),
 	})
+
 	require.NoError(t, err)
 
 	assert.True(t, runtime.IsValidSender(msg))
