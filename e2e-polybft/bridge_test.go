@@ -144,7 +144,7 @@ func TestE2E_Bridge_MainWorkflow(t *testing.T) {
 	require.NoError(t, err)
 
 	// commitments should've been stored
-	// execute the state sysncs
+	// execute the state syncs
 	for i := 0; i < num; i++ {
 		executeStateSync(t, client, txRelayer, accounts[i], fmt.Sprintf("%x", i+1))
 	}
