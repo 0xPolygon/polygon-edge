@@ -248,7 +248,7 @@ func (c *consensusRuntime) getCommitmentFromTransactions(txs []*types.Transactio
 
 	if err := c.buildProofs(
 		epoch.Commitment, commitment.Message); err != nil {
-		return fmt.Errorf("create commitment error: %w", err)
+		return fmt.Errorf("build commitment proofs error: %w", err)
 	}
 
 	return nil
