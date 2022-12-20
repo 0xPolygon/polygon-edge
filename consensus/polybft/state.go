@@ -560,11 +560,11 @@ func (s *State) insertStateSyncProofs(stateSyncProof []*types.StateSyncProof) er
 }
 
 // getStateSyncProof gets state sync proof that are not executed
-func (s *State) getStateSyncProof(stateSyncExecutionIndex uint64) (*types.StateSyncProof, error) {
+func (s *State) getStateSyncProof(stateSyncID uint64) (*types.StateSyncProof, error) {
 	var ssp *types.StateSyncProof
 
 	err := s.db.View(func(tx *bolt.Tx) error {
-		if v := tx.Bucket(stateSyncProofsBucket).Get(itob(stateSyncExecutionIndex)); v != nil {
+		if v := tx.Bucket(stateSyncProofsBucket).Get(itob(stateSyncID)); v != nil {
 			if err := json.Unmarshal(v, &ssp); err != nil {
 				return err
 			}
