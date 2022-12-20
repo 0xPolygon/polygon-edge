@@ -138,9 +138,6 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 		headerTime = time.Now()
 	}
 
-	fmt.Println("-- build block --")
-	fmt.Println(parentTime, f.config.BlockTime, headerTime)
-
 	currentValidatorsHash, err := f.validators.Accounts().Hash()
 	if err != nil {
 		return nil, err
