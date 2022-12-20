@@ -2,14 +2,10 @@ package initcontracts
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"math/big"
-	"path/filepath"
 	"sort"
-	"strings"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
 
@@ -25,7 +21,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/contracts"
-	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -364,30 +359,4 @@ func validatorSetToABISlice(validators []*polybft.Validator) ([]map[string]inter
 	}
 
 	return accSet.AsGenericMaps(), nil
-}
-
-func readContractBytecode(rootPath, contractPath, contractName string) ([]byte, error) {
-	_, fileName := filepath.Split(contractPath)
-
-	absolutePath, err := filepath.Abs(rootPath)
-	if err != nil {
-		return nil, err
-	}
-
-	filePath := filepath.Join(absolutePath, contractPath, strings.TrimSuffix(fileName, ".sol")+".json")
-
-	data, err := ioutil.ReadFile(filepath.Clean(filePath))
-	if err != nil {
-		return nil, err
-	}
-
-	var artifact struct {
-		Bytecode string `json:"bytecode"`
-	}
-
-	if err := json.Unmarshal(data, &artifact); err != nil {
-		return nil, err
-	}
-
-	return hex.MustDecodeHex(artifact.Bytecode), nil
 }
