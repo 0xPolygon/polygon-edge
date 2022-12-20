@@ -34,18 +34,13 @@ import (
 var (
 	stateSyncResultEvent = abi.MustNewEvent(`event StateSyncResult(
 		uint256 indexed counter,
-		uint8 indexed status,
-		bytes32 message)`)
+		bool indexed status,
+		bytes message)`)
 
 	currentCheckpointBlockNumMethod, _ = abi.NewMethod("function currentCheckpointBlockNumber() returns (uint256)")
 )
 
-type ResultEventStatus uint8
-
 const (
-	ResultEventSuccess ResultEventStatus = iota
-	ResultEventFailure
-
 	manifestFileName = "manifest.json"
 )
 
@@ -55,21 +50,20 @@ func checkLogs(
 	t *testing.T,
 	logs []*ethgo.Log,
 	expectedCount int,
-	assertFn func(i int, status ResultEventStatus) bool,
 ) {
 	t.Helper()
 	require.Len(t, logs, expectedCount)
 
-	for i, log := range logs {
+	for _, log := range logs {
 		res, err := stateSyncResultEvent.ParseLog(log)
 		assert.NoError(t, err)
 
 		t.Logf("Block Number=%d, Decoded Log=%v", log.BlockNumber, res)
 
-		status, ok := res["status"].(uint8)
+		status, ok := res["status"].(bool)
 		require.True(t, ok)
 
-		assert.True(t, assertFn(i, ResultEventStatus(status)))
+		assert.True(t, status)
 	}
 }
 
@@ -164,10 +158,7 @@ func TestE2E_Bridge_MainWorkflow(t *testing.T) {
 	require.NoError(t, err)
 
 	// Assert that all state syncs are executed successfully
-	checkLogs(t, logs, num,
-		func(_ int, status ResultEventStatus) bool {
-			return status == ResultEventSuccess
-		})
+	checkLogs(t, logs, num)
 }
 
 func TestE2E_CheckpointSubmission(t *testing.T) {
