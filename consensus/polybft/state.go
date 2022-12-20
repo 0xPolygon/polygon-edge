@@ -38,6 +38,9 @@ validatorSnapshots/
 
 exit events/
 |--> (id+epoch+blockNumber) -> *ExitEvent (json marshalled)
+
+proposer snapshot/
+|--> staticKey - only current one snapshot is preserved -> *ProposerSnapshot (json marshalled)
 */
 
 var (
@@ -45,6 +48,10 @@ var (
 	stateTransferEventABI = abi.MustNewEvent("event StateSynced(uint256 indexed id, address indexed sender, address indexed receiver, bytes data)")   //nolint:lll
 	exitEventABI          = abi.MustNewEvent("event L2StateSynced(uint256 indexed id, address indexed sender, address indexed receiver, bytes data)") //nolint:lll
 	ExitEventABIType      = abi.MustNewType("tuple(uint256 id, address sender, address receiver, bytes data)")
+
+	// proposerSnapshotKey is a static key which is used to save latest proposer snapshot.
+	// (there will always be one object in bucket)
+	proposerSnapshotKey = []byte("proposerSnapshotKey")
 )
 
 const (
@@ -230,9 +237,11 @@ var (
 	messageVotesBucket = []byte("votes")
 	// bucket to store validator snapshots
 	validatorSnapshotsBucket = []byte("validatorSnapshots")
+	// bucket to store proposer calculator snapshot
+	proposerCalcSnapshotBucket = []byte("proposerCalculatorSnapshot")
 	// array of all parent buckets
 	parentBuckets = [][]byte{syncStateEventsBucket, exitEventsBucket, commitmentsBucket, stateSyncProofsBucket,
-		epochsBucket, validatorSnapshotsBucket}
+		epochsBucket, validatorSnapshotsBucket, proposerCalcSnapshotBucket}
 	// errNotEnoughStateSyncs error message
 	errNotEnoughStateSyncs = errors.New("there is either a gap or not enough sync events")
 	// errCommitmentNotBuilt error message
@@ -786,6 +795,34 @@ func (s *State) bucketStats(bucketName []byte) *bolt.BucketStats {
 	}
 
 	return stats
+}
+
+// getProposerSnapshot gets latest proposer snapshot
+func (s *State) getProposerSnapshot() (*ProposerSnapshot, error) {
+	var snapshot *ProposerSnapshot
+
+	err := s.db.View(func(tx *bolt.Tx) error {
+		value := tx.Bucket(proposerCalcSnapshotBucket).Get(proposerSnapshotKey)
+		if value == nil {
+			return nil
+		}
+
+		return json.Unmarshal(value, &snapshot)
+	})
+
+	return snapshot, err
+}
+
+// writeProposerSnapshot writes proposer snapshot
+func (s *State) writeProposerSnapshot(snapshot *ProposerSnapshot) error {
+	raw, err := json.Marshal(snapshot)
+	if err != nil {
+		return err
+	}
+
+	return s.db.Update(func(tx *bolt.Tx) error {
+		return tx.Bucket(proposerCalcSnapshotBucket).Put(proposerSnapshotKey, raw)
+	})
 }
 
 func itob(v uint64) []byte {
