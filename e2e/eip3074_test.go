@@ -4,6 +4,12 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"encoding/json"
+	"math/big"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/e2e/framework"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
@@ -15,11 +21,6 @@ import (
 	"github.com/umbracle/ethgo/abi"
 	"github.com/umbracle/ethgo/compiler"
 	"github.com/umbracle/ethgo/contract"
-	"io/ioutil"
-	"math/big"
-	"path/filepath"
-	"strings"
-	"testing"
 )
 
 // cribbing from ethgo
@@ -31,7 +32,7 @@ type jsonArtifact struct {
 func getTestArtifact(name string) (art *compiler.Artifact, err error) {
 
 	var jsonBytes []byte
-	if jsonBytes, err = ioutil.ReadFile(filepath.Join("metadata", name)); err != nil {
+	if jsonBytes, err = os.ReadFile(filepath.Join("metadata", name)); err != nil {
 		return
 	}
 	var jart jsonArtifact
@@ -73,6 +74,7 @@ func TestBasicInvoker(t *testing.T) {
 		IBFTDirPrefix,
 		func(i int, config *framework.TestServerConfig) {
 			config.Premine(senderAddr, framework.EthToWei(10))
+			config.SetConsensus(framework.ConsensusDev)
 		},
 	)
 
@@ -120,7 +122,7 @@ func TestBasicInvoker(t *testing.T) {
 		To:       types.Address(mockAddr),
 		Value:    big.NewInt(0),
 		GasLimit: big.NewInt(100000),
-		Data:     []byte{0xd0, 0x9d, 0xe0, 0x8a}, // const increment = "0xd09de08a";
+		Data:     framework.MethodSig("increment"),
 	}
 	res, err = invokerContract.Call("hashPayload", ethgo.Latest, &tp)
 	require.NoError(t, err)

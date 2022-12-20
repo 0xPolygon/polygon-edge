@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/0xPolygon/polygon-edge/helper/invoker"
 	"github.com/0xPolygon/polygon-edge/helper/keccak"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -1410,6 +1411,38 @@ func opHalt(op OpCode) instruction {
 			c.Halt()
 		}
 	}
+}
+
+func opAuth(c *state) {
+
+	c.authorized = nil
+
+	commit := c.pop()
+	v := c.pop()
+	r := c.pop()
+	s := c.pop()
+
+	if !crypto.ValidateSignatureValues(byte(v.Uint64()), r, s) {
+		c.exit(errors.New("invalid signature values"))
+		return
+	}
+
+	is := invoker.InvokerSignature{
+		R: r,
+		S: s,
+		V: v.Int64() == 1,
+	}
+
+	signAddr := is.Recover(commit.Bytes(), c.msg.CodeAddress)
+
+	c.authorized = &signAddr
+
+	c.ret = make([]byte, 12)
+	c.ret = append(c.ret, signAddr.Bytes()...)
+
+	c.push1().SetBytes(signAddr.Bytes())
+
+	return
 }
 
 var (
