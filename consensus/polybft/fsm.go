@@ -79,6 +79,9 @@ type fsm struct {
 
 	// logger instance
 	logger hcf.Logger
+
+	// target is the block being computed
+	target *StateBlock
 }
 
 // BuildProposal builds a proposal for the current round (used if proposer)
@@ -135,6 +138,9 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 		headerTime = time.Now()
 	}
 
+	fmt.Println("-- build block --")
+	fmt.Println(parentTime, f.config.BlockTime, headerTime)
+
 	currentValidatorsHash, err := f.validators.Accounts().Hash()
 	if err != nil {
 		return nil, err
@@ -181,6 +187,8 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 	f.logger.Debug("[FSM Build Proposal]",
 		"txs", len(stateBlock.Block.Transactions),
 		"hash", checkpointHash.String())
+
+	f.target = stateBlock
 
 	return stateBlock.Block.MarshalRLP(), nil
 }
@@ -306,7 +314,8 @@ func (f *fsm) Validate(proposal []byte) error {
 		return err
 	}
 
-	if _, err = f.backend.ProcessBlock(f.parent, &block); err != nil {
+	stateBlock, err := f.backend.ProcessBlock(f.parent, &block)
+	if err != nil {
 		return err
 	}
 
@@ -316,6 +325,8 @@ func (f *fsm) Validate(proposal []byte) error {
 	}
 
 	f.logger.Debug("[FSM Validate]", "txs", len(block.Transactions), "signed hash", checkpointHash)
+
+	f.target = stateBlock
 
 	return nil
 }
@@ -442,10 +453,8 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 
 // Insert inserts the sealed proposal
 func (f *fsm) Insert(proposal []byte, committedSeals []*messages.CommittedSeal) (*types.Block, error) {
-	newBlock := &types.Block{}
-	if err := newBlock.UnmarshalRLP(proposal); err != nil {
-		return nil, fmt.Errorf("cannot unmarshal proposal: %w", err)
-	}
+	newBlock := f.target.Block
+	receipts := f.target.Receipts
 
 	// In this function we should try to return little to no errors since
 	// at this point everything we have to do is just commit something that
@@ -496,8 +505,7 @@ func (f *fsm) Insert(proposal []byte, committedSeals []*messages.CommittedSeal) 
 	// Write extar data to header
 	newBlock.Header.ExtraData = append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...)
 
-	receipts, err := f.backend.CommitBlock(newBlock)
-	if err != nil {
+	if err := f.backend.CommitBlock(&types.FullBlock{Block: newBlock, Receipts: receipts}); err != nil {
 		return nil, err
 	}
 

@@ -35,10 +35,10 @@ func (m *blockchainMock) CurrentHeader() *types.Header {
 	return args.Get(0).(*types.Header) //nolint:forcetypeassert
 }
 
-func (m *blockchainMock) CommitBlock(block *types.Block) ([]*types.Receipt, error) {
+func (m *blockchainMock) CommitBlock(block *types.FullBlock) error {
 	args := m.Called(block)
 
-	return args.Get(0).([]*types.Receipt), args.Error(1) //nolint:forcetypeassert
+	return args.Error(0) //nolint:forcetypeassert
 }
 
 func (m *blockchainMock) NewBlockBuilder(parent *types.Header, coinbase types.Address,

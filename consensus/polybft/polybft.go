@@ -345,6 +345,8 @@ func (p *Polybft) startPbftProcess() {
 			sequenceCh, stopSequence = p.ibft.runSequence(latestHeader.Number + 1)
 		}
 
+		now := time.Now()
+
 		select {
 		case <-syncerBlockCh:
 			if isValidator {
@@ -359,6 +361,8 @@ func (p *Polybft) startPbftProcess() {
 
 			return
 		}
+
+		p.logger.Debug("time to run the sequence", "seconds", time.Since(now))
 	}
 }
 
