@@ -6,7 +6,6 @@ import (
 	"math"
 	"math/big"
 
-	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 )
@@ -31,11 +30,6 @@ const (
 type PrioritizedValidator struct {
 	Metadata         *ValidatorMetadata
 	ProposerPriority int64
-}
-
-// getScaledVotingPower down-scales voting power with 10**18, which basically converts wei to tokens amount
-func (v *PrioritizedValidator) getScaledVotingPower() int64 {
-	return chain.ConvertWeiToTokensAmount(v.Metadata.VotingPower).Int64()
 }
 
 // ProposerSnapshot represents snapshot of one proposer calculation
@@ -123,7 +117,8 @@ func (pcs ProposerSnapshot) GetTotalVotingPower() int64 {
 	totalVotingPower := int64(0)
 
 	for _, v := range pcs.Validators {
-		scaledVotingPower := v.getScaledVotingPower()
+		// TODO: Provide scaling factor
+		scaledVotingPower := v.Metadata.getScaledVotingPower(1)
 		totalVotingPower = safeAddClip(totalVotingPower, scaledVotingPower)
 	}
 
@@ -384,7 +379,7 @@ func updateValidators(snapshot *ProposerSnapshot, newValidatorSet AccountSet) er
 func incrementProposerPriority(snapshot *ProposerSnapshot, totalVotingPower int64) (*PrioritizedValidator, error) {
 	for _, val := range snapshot.Validators {
 		// Check for overflow for sum.
-		newPrio := safeAddClip(val.ProposerPriority, val.getScaledVotingPower())
+		newPrio := safeAddClip(val.ProposerPriority, val.Metadata.getScaledVotingPower(1))
 		val.ProposerPriority = newPrio
 	}
 	// Decrement the validator with most ProposerPriority.

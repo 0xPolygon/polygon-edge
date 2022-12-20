@@ -231,7 +231,6 @@ func TestSignature_VerifyCommittedFields(t *testing.T) {
 		vals := newTestValidators(numValidators)
 		msgHash := types.Hash{0x1}
 
-		validatorsMetadata := vals.getPublicIdentities()
 		validatorSet, err := vals.toValidatorSet()
 		require.NoError(t, err)
 
@@ -254,7 +253,7 @@ func TestSignature_VerifyCommittedFields(t *testing.T) {
 				Bitmap:              bitmap,
 			}
 
-			err = s.VerifyCommittedFields(validatorsMetadata, msgHash)
+			err = s.VerifyCommittedFields(validatorSet, msgHash)
 			signers[val.Address()] = struct{}{}
 
 			if !validatorSet.HasQuorum(signers) {
@@ -268,11 +267,11 @@ func TestSignature_VerifyCommittedFields(t *testing.T) {
 	t.Run("Invalid bitmap provided", func(t *testing.T) {
 		t.Parallel()
 
-		validatorSet := newTestValidators(3).getPublicIdentities()
+		validatorSet := newTestValidators(3).toValidatorSetWithError(t)
 		bmp := bitmap.Bitmap{}
 
 		// Make bitmap invalid, by setting some flag larger than length of validator set to 1
-		bmp.Set(uint64(len(validatorSet) + 1))
+		bmp.Set(uint64(validatorSet.Len() + 1))
 		s := &Signature{Bitmap: bmp}
 
 		err := s.VerifyCommittedFields(validatorSet, types.Hash{0x1})
@@ -343,7 +342,9 @@ func TestExtra_VerifyCommittedFieldsRandom(t *testing.T) {
 		Bitmap:              bitmap,
 	}
 
-	err = s.VerifyCommittedFields(vals.getPublicIdentities(), msgHash)
+	valSet := vals.toValidatorSetWithError(t)
+
+	err = s.VerifyCommittedFields(valSet, msgHash)
 	assert.NoError(t, err)
 }
 

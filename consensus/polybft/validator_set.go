@@ -28,6 +28,9 @@ type validatorSet struct {
 	// validators represents current list of validators
 	validators AccountSet
 
+	// votingPowerScalingFactor represents scaling
+	votingPowerScalingFactor uint64
+
 	// votingPowerMap represents voting powers per validator address
 	votingPowerMap map[types.Address]int64
 
@@ -39,31 +42,38 @@ type validatorSet struct {
 }
 
 // NewValidatorSet creates a new validator set.
-func NewValidatorSet(valz AccountSet, logger hclog.Logger) (*validatorSet, error) {
-	votingPowerMap := make(map[types.Address]int64, valz.Len())
-	totalVotingPower := int64(0)
+func NewValidatorSet(valz AccountSet, logger hclog.Logger, opts ...validatorSetOption) (*validatorSet, error) {
+	valSet := &validatorSet{
+		validators:       valz,
+		votingPowerMap:   make(map[types.Address]int64, valz.Len()),
+		totalVotingPower: int64(0),
+		logger:           logger.Named("validator_set"),
+	}
 
-	for _, v := range valz {
-		scaledVotingPower := chain.ConvertWeiToTokensAmount(v.VotingPower).Int64()
-		votingPowerMap[v.Address] = scaledVotingPower
+	for _, opt := range opts {
+		opt(valSet)
+	}
+
+	if valSet.votingPowerScalingFactor == 0 {
+		valSet.votingPowerScalingFactor = chain.WeiScalingFactor
+	}
+
+	for _, val := range valz {
+		scaledVotingPower := val.getScaledVotingPower(valSet.votingPowerScalingFactor)
+		valSet.votingPowerMap[val.Address] = scaledVotingPower
 
 		// mind overflow
-		totalVotingPower = safeAddClip(totalVotingPower, scaledVotingPower)
-		if totalVotingPower > maxTotalVotingPower {
+		valSet.totalVotingPower = safeAddClip(valSet.totalVotingPower, scaledVotingPower)
+		if valSet.totalVotingPower > maxTotalVotingPower {
 			return nil, fmt.Errorf(
 				"total voting power cannot be guarded to not exceed %v; got: %v",
 				maxTotalVotingPower,
-				totalVotingPower,
+				valSet.totalVotingPower,
 			)
 		}
 	}
 
-	return &validatorSet{
-		validators:       valz,
-		votingPowerMap:   votingPowerMap,
-		totalVotingPower: totalVotingPower,
-		logger:           logger.Named("validator_set"),
-	}, nil
+	return valSet, nil
 }
 
 // HasQuorum determines if there is quorum of enough signers reached,
@@ -101,4 +111,12 @@ func (vs validatorSet) Len() int {
 
 func (vs validatorSet) getQuorumSize() int64 {
 	return int64(math.Ceil((2 * float64(vs.totalVotingPower)) / 3))
+}
+
+type validatorSetOption func(*validatorSet)
+
+func withScalingFactor(scalingFactor uint64) validatorSetOption {
+	return func(v *validatorSet) {
+		v.votingPowerScalingFactor = scalingFactor
+	}
 }

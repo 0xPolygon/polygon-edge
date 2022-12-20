@@ -8,7 +8,6 @@ import (
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo/abi"
 	"github.com/umbracle/fastrlp"
 )
@@ -366,19 +365,14 @@ func (s *Signature) UnmarshalRLPWith(v *fastrlp.Value) error {
 }
 
 // VerifyCommittedFields is checking for consensus proof in the header
-func (s *Signature) VerifyCommittedFields(validators AccountSet, hash types.Hash) error {
-	filtered, err := validators.GetFilteredValidators(s.Bitmap)
-	if err != nil {
-		return err
-	}
-
-	validatorSet, err := NewValidatorSet(validators, hclog.NewNullLogger())
+func (s *Signature) VerifyCommittedFields(validators ValidatorSet, hash types.Hash) error {
+	filtered, err := validators.Accounts().GetFilteredValidators(s.Bitmap)
 	if err != nil {
 		return err
 	}
 
 	signerAddresses := filtered.GetAddressesAsSet()
-	if !validatorSet.HasQuorum(signerAddresses) {
+	if !validators.HasQuorum(signerAddresses) {
 		return fmt.Errorf("quorum not reached")
 	}
 

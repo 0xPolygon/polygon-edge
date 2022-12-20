@@ -120,6 +120,11 @@ func (v *ValidatorMetadata) String() string {
 		v.Address.String(), hex.EncodeToString(v.BlsKey.Marshal()), v.VotingPower)
 }
 
+// getScaledVotingPower down-scales voting power with given scalingFactor
+func (v *ValidatorMetadata) getScaledVotingPower(scalingFactor uint64) int64 {
+	return new(big.Int).Div(v.VotingPower, new(big.Int).SetUint64(scalingFactor)).Int64()
+}
+
 // AccountSet is a type alias for slice of ValidatorMetadata instances
 type AccountSet []*ValidatorMetadata
 

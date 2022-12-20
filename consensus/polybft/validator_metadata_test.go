@@ -229,7 +229,7 @@ func TestAccountSet_ApplyDelta(t *testing.T) {
 				for validatorAlias, votingPower := range step.expected {
 					v := vals.getValidator(validatorAlias).ValidatorMetadata()
 					require.True(t, snapshot.ContainsAddress(v.Address), "validator '%s' not found in snapshot", validatorAlias)
-					require.Equal(t, votingPower, v.VotingPower)
+					require.Equal(t, new(big.Int).SetUint64(votingPower), v.VotingPower)
 				}
 			}
 		})

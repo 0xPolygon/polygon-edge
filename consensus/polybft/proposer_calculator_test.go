@@ -200,7 +200,7 @@ func TestProposerCalculator_IncrementProposerPrioritySameVotingPower(t *testing.
 			Address:     types.Address{0x3},
 			VotingPower: big.NewInt(1),
 		},
-	}, hclog.NewNullLogger())
+	}, hclog.NewNullLogger(), withScalingFactor(1))
 	require.NoError(t, err)
 	assert.Equal(t, int64(3), vs.totalVotingPower)
 
@@ -389,7 +389,7 @@ func TestProposerCalculator_TotalVotingPowerErrorOnOverflow(t *testing.T) {
 		{Address: types.Address{0x1}, VotingPower: big.NewInt(math.MaxInt64)},
 		{Address: types.Address{0x2}, VotingPower: big.NewInt(math.MaxInt64)},
 		{Address: types.Address{0x3}, VotingPower: big.NewInt(math.MaxInt64)},
-	}, hclog.NewNullLogger())
+	}, hclog.NewNullLogger(), withScalingFactor(1))
 	require.Error(t, err)
 }
 
