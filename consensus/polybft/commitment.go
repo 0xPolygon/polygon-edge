@@ -15,9 +15,6 @@ import (
 )
 
 var (
-	stateSyncABIType = abi.MustNewType(
-		"tuple(uint256 id, address sender, address receiver, bytes data)")
-
 	commitmentABIType = abi.MustNewType("tuple(uint256 startId, uint256 endId, bytes32 root)")
 
 	commitABIMethod, _ = abi.NewMethod("function commit(" +
@@ -128,7 +125,7 @@ func (cm CommitmentMessage) VerifyStateSyncProof(stateSyncProof *types.StateSync
 		return errors.New("no state sync event")
 	}
 
-	hash, err := stateSyncABIType.Encode(stateSyncProof.StateSync)
+	hash, err := stateSyncProof.StateSync.ToABI()
 	if err != nil {
 		return err
 	}
@@ -303,7 +300,7 @@ func createMerkleTree(stateSyncEvents []*types.StateSyncEvent) (*MerkleTree, err
 	ssh := make([][]byte, len(stateSyncEvents))
 
 	for i, sse := range stateSyncEvents {
-		data, err := stateSyncABIType.Encode(sse.ToMap())
+		data, err := sse.ToABI()
 		if err != nil {
 			return nil, err
 		}
