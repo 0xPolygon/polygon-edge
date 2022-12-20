@@ -464,7 +464,7 @@ func (s *State) insertStateSyncEvent(event *types.StateSyncEvent) error {
 func (s *State) getStateSyncEventsForCommitment(fromIndex, toIndex uint64) ([]*types.StateSyncEvent, error) {
 	var events []*types.StateSyncEvent
 
-	err := s.db.Update(func(tx *bolt.Tx) error {
+	err := s.db.View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(syncStateEventsBucket)
 		for i := fromIndex; i <= toIndex; i++ {
 			v := bucket.Get(itob(i))
