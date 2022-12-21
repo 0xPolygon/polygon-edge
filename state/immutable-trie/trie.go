@@ -3,13 +3,11 @@ package itrie
 import (
 	"bytes"
 	"fmt"
-	"sync"
 
 	"github.com/umbracle/fastrlp"
 	"golang.org/x/crypto/sha3"
 
 	commonHelpers "github.com/0xPolygon/polygon-edge/helper/common"
-	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -93,7 +91,6 @@ func (f *FullNode) getEdge(idx byte) Node {
 }
 
 type Trie struct {
-	lock    *sync.Mutex
 	state   *State
 	root    Node
 	epoch   uint32
@@ -101,23 +98,7 @@ type Trie struct {
 }
 
 func NewTrie() *Trie {
-	return &Trie{
-		lock: new(sync.Mutex),
-	}
-}
-
-type stateSetter func(s *State)
-
-// SetState used to set state under lock
-func (t *Trie) SetState(s *State) {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-
-	t.setState(s)
-}
-
-func (t *Trie) setState(s *State) {
-	t.state = s
+	return &Trie{}
 }
 
 func (t *Trie) Get(k []byte) ([]byte, bool) {
@@ -125,24 +106,6 @@ func (t *Trie) Get(k []byte) ([]byte, bool) {
 	res := txn.Lookup(k)
 
 	return res, res != nil
-}
-
-type stateSetterFactory func(t *Trie) stateSetter
-
-func GetSetState() func(t *Trie) stateSetter {
-	return func(t *Trie) stateSetter {
-		return t.SetState
-	}
-}
-
-func getSetState(objHash, rootHash types.Hash) func(t *Trie) stateSetter {
-	return func(t *Trie) stateSetter {
-		if objHash != rootHash {
-			return t.SetState
-		}
-
-		return t.setState
-	}
 }
 
 func hashit(k []byte) []byte {
@@ -155,87 +118,6 @@ func hashit(k []byte) []byte {
 var accountArenaPool fastrlp.ArenaPool
 
 var stateArenaPool fastrlp.ArenaPool // TODO, Remove once we do update in fastrlp
-
-func (t *Trie) Commit(objs []*state.Object) (*Trie, []byte) {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-	// Create an insertion batch for all the entries
-	batch := t.storage.Batch()
-
-	tt := t.Txn()
-	tt.batch = batch
-
-	arena := accountArenaPool.Get()
-	defer accountArenaPool.Put(arena)
-
-	ar1 := stateArenaPool.Get()
-	defer stateArenaPool.Put(ar1)
-
-	for _, obj := range objs {
-		if obj.Deleted {
-			tt.Delete(hashit(obj.Address.Bytes()))
-		} else {
-			account := state.Account{
-				Balance:  obj.Balance,
-				Nonce:    obj.Nonce,
-				CodeHash: obj.CodeHash.Bytes(),
-				Root:     obj.Root, // old root
-			}
-
-			if len(obj.Storage) != 0 {
-				trie, err := t.state.newTrieAt(obj.Root, getSetState(obj.Root, t.Hash()))
-				if err != nil {
-					panic(err)
-				}
-
-				localTxn := trie.Txn()
-				localTxn.batch = batch
-
-				for _, entry := range obj.Storage {
-					k := hashit(entry.Key)
-					if entry.Deleted {
-						localTxn.Delete(k)
-					} else {
-						vv := ar1.NewBytes(bytes.TrimLeft(entry.Val, "\x00"))
-						localTxn.Insert(k, vv.MarshalTo(nil))
-					}
-				}
-
-				accountStateRoot, _ := localTxn.Hash()
-				accountStateTrie := localTxn.Commit()
-
-				// Add this to the cache
-				t.state.AddState(types.BytesToHash(accountStateRoot), accountStateTrie)
-
-				account.Root = types.BytesToHash(accountStateRoot)
-			}
-
-			if obj.DirtyCode {
-				t.state.SetCode(obj.CodeHash, obj.Code)
-			}
-
-			vv := account.MarshalWith(arena)
-			data := vv.MarshalTo(nil)
-
-			tt.Insert(hashit(obj.Address.Bytes()), data)
-			arena.Reset()
-		}
-	}
-
-	root, _ := tt.Hash()
-
-	nTrie := tt.Commit()
-
-	nTrie.state = t.state
-	nTrie.storage = t.storage
-
-	// Write all the entries to db
-	batch.Write()
-
-	t.state.AddState(types.BytesToHash(root), nTrie)
-
-	return nTrie, root
-}
 
 // Hash returns the root hash of the trie. It does not write to the
 // database and can be used even if the trie doesn't have one.
@@ -291,7 +173,7 @@ type Txn struct {
 }
 
 func (t *Txn) Commit() *Trie {
-	return &Trie{epoch: t.epoch, root: t.root, storage: t.storage, lock: new(sync.Mutex)}
+	return &Trie{epoch: t.epoch, root: t.root, storage: t.storage}
 }
 
 func (t *Txn) Lookup(key []byte) []byte {

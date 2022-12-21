@@ -11,6 +11,7 @@ import (
 )
 
 type State struct {
+	m       *sync.RWMutex
 	storage Storage
 	cache   *lru.Cache
 }
@@ -21,17 +22,24 @@ func NewState(storage Storage) *State {
 	s := &State{
 		storage: storage,
 		cache:   cache,
+		m:       new(sync.RWMutex),
 	}
 
 	return s
 }
 
 func (s *State) NewSnapshot() state.Snapshot {
+	s.m.Lock()
+	defer s.m.Unlock()
+
 	return &Snapshot{state: s, trie: s.newTrie()}
 }
 
 func (s *State) NewSnapshotAt(root types.Hash) (state.Snapshot, error) {
-	t, err := s.NewTrieAt(root)
+	s.m.Lock()
+	defer s.m.Unlock()
+
+	t, err := s.newTrieAt(root)
 	if err != nil {
 		return nil, err
 	}
@@ -55,13 +63,8 @@ func (s *State) GetCode(hash types.Hash) ([]byte, bool) {
 	return s.storage.GetCode(hash)
 }
 
-// NewTrieAt returns trie with root and locks state on a trie level
-func (s *State) NewTrieAt(root types.Hash) (*Trie, error) {
-	return s.newTrieAt(root, GetSetState())
-}
-
 // newTrieAt returns trie with root and if necessary locks state on a trie level
-func (s *State) newTrieAt(root types.Hash, setState stateSetterFactory) (*Trie, error) {
+func (s *State) newTrieAt(root types.Hash) (*Trie, error) {
 	if root == types.EmptyRootHash {
 		// empty state
 		return s.newTrie(), nil
@@ -74,7 +77,7 @@ func (s *State) newTrieAt(root types.Hash, setState stateSetterFactory) (*Trie, 
 			return nil, fmt.Errorf("invalid type assertion on root: %s", root)
 		}
 
-		setState(t)(s)
+		t.state = s
 
 		trie, ok := tt.(*Trie)
 		if !ok {
@@ -97,7 +100,6 @@ func (s *State) newTrieAt(root types.Hash, setState stateSetterFactory) (*Trie, 
 		root:    n,
 		state:   s,
 		storage: s.storage,
-		lock:    new(sync.Mutex),
 	}
 
 	return t, nil
