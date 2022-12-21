@@ -65,6 +65,7 @@ func Test_executeStateSync(t *testing.T) {
 
 // Test sanitizeRPCEndpoint
 func Test_sanitizeRPCEndpoint(t *testing.T) {
+        t.Parallel()
 	tests := []struct {
 		name     string
 		endpoint string
