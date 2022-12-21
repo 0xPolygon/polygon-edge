@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"path"
 	"sort"
 	"sync"
 	"sync/atomic"
@@ -667,7 +668,7 @@ func (c *consensusRuntime) startEventTracker() error {
 	}
 
 	c.eventTracker = tracker.NewEventTracker(
-		c.config.DataDir,
+		path.Join(c.config.DataDir, "/deposits.db"),
 		c.config.PolyBFTConfig.Bridge.JSONRPCEndpoint,
 		ethgo.Address(c.config.PolyBFTConfig.Bridge.BridgeAddr),
 		c,

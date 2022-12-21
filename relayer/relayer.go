@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/big"
 	"net"
+	"path"
 	"strconv"
 	"strings"
 
@@ -75,7 +76,7 @@ func NewRelayer(
 
 func (r *Relayer) Start() error {
 	et := tracker.NewEventTracker(
-		r.dataDir,
+		path.Join(r.dataDir, "/relayer.db"),
 		r.rpcEndpoint,
 		r.stateReceiverAddr,
 		r,

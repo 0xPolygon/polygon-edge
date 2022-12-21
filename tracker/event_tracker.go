@@ -2,7 +2,6 @@ package tracker
 
 import (
 	"context"
-	"path/filepath"
 
 	hcf "github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
@@ -16,7 +15,7 @@ type eventSubscription interface {
 }
 
 type EventTracker struct {
-	dataDir      string
+	dbPath       string
 	rpcEndpoint  string
 	contractAddr ethgo.Address
 	subscriber   eventSubscription
@@ -24,14 +23,14 @@ type EventTracker struct {
 }
 
 func NewEventTracker(
-	dataDir string,
+	dbPath string,
 	rpcEndpoint string,
 	contractAddr ethgo.Address,
 	subscriber eventSubscription,
 	logger hcf.Logger,
 ) *EventTracker {
 	return &EventTracker{
-		dataDir:      dataDir,
+		dbPath:       dbPath,
 		rpcEndpoint:  rpcEndpoint,
 		contractAddr: contractAddr,
 		subscriber:   subscriber,
@@ -45,7 +44,7 @@ func (e *EventTracker) Start() error {
 		return err
 	}
 
-	store, err := boltdbStore.New(filepath.Join(e.dataDir, "/deposit.db"))
+	store, err := boltdbStore.New(e.dbPath)
 
 	if err != nil {
 		return err

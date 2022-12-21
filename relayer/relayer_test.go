@@ -33,6 +33,8 @@ func (t *txRelayerMock) SendTransactionLocal(txn *ethgo.Transaction) (*ethgo.Rec
 }
 
 func Test_executeStateSync(t *testing.T) {
+	t.Parallel()
+
 	txRelayer := &txRelayerMock{}
 	key, _ := wallet.GenerateKey()
 
@@ -65,7 +67,7 @@ func Test_executeStateSync(t *testing.T) {
 
 // Test sanitizeRPCEndpoint
 func Test_sanitizeRPCEndpoint(t *testing.T) {
-        t.Parallel()
+	t.Parallel()
 	tests := []struct {
 		name     string
 		endpoint string
@@ -94,7 +96,7 @@ func Test_sanitizeRPCEndpoint(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-                tt := tt
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			if got := sanitizeRPCEndpoint(tt.endpoint); got != tt.want {
 				t.Errorf("sanitizeRPCEndpoint() = %v, want %v", got, tt.want)
