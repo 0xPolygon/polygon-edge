@@ -1,29 +1,27 @@
 package bls
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/helper/common"
-	"github.com/kilic/bn254"
+	ellipticcurve "github.com/consensys/gnark-crypto/ecc/bn254"
 )
 
 // PublicKey represents bls public key
 type PublicKey struct {
-	p *bn254.PointG2
+	p *ellipticcurve.G2Affine
 }
 
 // aggregate adds the given public keys
 func (p *PublicKey) aggregate(next *PublicKey) *PublicKey {
-	g := bn254.NewG2()
-
-	newp := new(bn254.PointG2)
-	newp.Zero()
+	newp := new(ellipticcurve.G2Affine)
 
 	if p.p != nil {
 		if next.p != nil {
-			g.Add(newp, p.p, next.p)
+			newp = newp.Add(p.p, next.p)
 		} else {
 			newp.Set(p.p)
 		}
@@ -40,7 +38,13 @@ func (p *PublicKey) Marshal() []byte {
 		return nil
 	}
 
-	return bn254.NewG2().ToBytes(p.p)
+	var b bytes.Buffer
+
+	if err := ellipticcurve.NewEncoder(&b, ellipticcurve.RawEncoding()).Encode(p.p); err != nil {
+		panic(err) // TODO:
+	}
+
+	return b.Bytes()
 }
 
 // MarshalJSON implements the json.Marshaler interface.
@@ -73,22 +77,25 @@ func UnmarshalPublicKey(raw []byte) (*PublicKey, error) {
 		return nil, errors.New("cannot unmarshal public key from empty slice")
 	}
 
-	p, err := bn254.NewG2().FromBytes(raw)
-	if err != nil {
+	output := new(ellipticcurve.G2Affine)
+	decoder := ellipticcurve.NewDecoder(bytes.NewReader(raw))
+
+	if err := decoder.Decode(output); err != nil {
 		return nil, err
 	}
 
-	return &PublicKey{p: p}, nil
+	return &PublicKey{p: output}, nil
 }
 
 // ToBigInt converts public key to 4 big ints
 func (p PublicKey) ToBigInt() [4]*big.Int {
-	blsKey := p.Marshal()
+	bytes := p.Marshal()
+
 	res := [4]*big.Int{
-		new(big.Int).SetBytes(blsKey[32:64]),
-		new(big.Int).SetBytes(blsKey[0:32]),
-		new(big.Int).SetBytes(blsKey[96:128]),
-		new(big.Int).SetBytes(blsKey[64:96]),
+		new(big.Int).SetBytes(bytes[32:64]),
+		new(big.Int).SetBytes(bytes[0:32]),
+		new(big.Int).SetBytes(bytes[96:128]),
+		new(big.Int).SetBytes(bytes[64:96]),
 	}
 
 	return res
@@ -116,15 +123,13 @@ func UnmarshalPublicKeyFromBigInt(b [4]*big.Int) (*PublicKey, error) {
 
 // aggregatePublicKeys calculates P1 + P2 + ...
 func aggregatePublicKeys(pubs []*PublicKey) *PublicKey {
-	g, newp := bn254.NewG2(), new(bn254.PointG2)
-
-	newp.Set(g.Zero())
+	newp := new(ellipticcurve.G2Jac)
 
 	for _, x := range pubs {
 		if x.p != nil {
-			g.Add(newp, newp, x.p)
+			newp.AddMixed(x.p)
 		}
 	}
 
-	return &PublicKey{p: newp}
+	return &PublicKey{p: new(ellipticcurve.G2Affine).FromJacobian(newp)}
 }

@@ -18,12 +18,16 @@ func Test_VerifySignature(t *testing.T) {
 
 	validTestMsg, invalidTestMsg := testGenRandomBytes(t, messageSize), testGenRandomBytes(t, messageSize)
 
-	blsKey, _ := GenerateBlsKey()
+	blsKey, err := GenerateBlsKey()
+	require.NoError(t, err)
+
+	publicKey := blsKey.PublicKey()
+
 	signature, err := blsKey.Sign(validTestMsg)
 	require.NoError(t, err)
 
-	assert.True(t, signature.Verify(blsKey.PublicKey(), validTestMsg))
-	assert.False(t, signature.Verify(blsKey.PublicKey(), invalidTestMsg))
+	assert.True(t, signature.Verify(publicKey, validTestMsg))
+	assert.False(t, signature.Verify(publicKey, invalidTestMsg))
 }
 
 func Test_AggregatedSignatureSimple(t *testing.T) {
