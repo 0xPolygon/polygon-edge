@@ -1388,19 +1388,20 @@ func TestFSM_InsertBlock_HasEpochEndingExitEvents(t *testing.T) {
 		Header: &types.Header{Number: parentBlockNumber + 1, ParentHash: parent.Hash, ExtraData: extraBlock},
 	})
 
-	buildBlock := &types.FullBlock{Block: finalBlock}
-	mBlockBuilder := newBlockBuilderMock(buildBlock)
 	mBackendMock := &blockchainMock{}
 	receipt := &types.Receipt{
 		Logs: []*types.Log{createTestLogForExitEvent(t, exitEventID)},
 	}
 
+	buildBlock := &types.FullBlock{Block: finalBlock, Receipts: []*types.Receipt{receipt}}
+	mBlockBuilder := newBlockBuilderMock(buildBlock)
+
 	mBackendMock.On("CommitBlock", mock.MatchedBy(func(i interface{}) bool {
-		stateBlock, ok := i.(*types.Block)
+		stateBlock, ok := i.(*types.FullBlock)
 		require.True(t, ok)
 
-		return stateBlock.Number() == buildBlock.Block.Number() && stateBlock.Hash() == buildBlock.Block.Hash()
-	})).Return([]*types.Receipt{receipt}, error(nil)).Once()
+		return stateBlock.Block.Number() == buildBlock.Block.Number() && stateBlock.Block.Hash() == buildBlock.Block.Hash()
+	})).Return(error(nil)).Once()
 
 	validatorSet, err := NewValidatorSet(validatorsMetadata[0:len(validatorsMetadata)-1], hclog.NewNullLogger())
 	require.NoError(t, err)
@@ -1415,6 +1416,7 @@ func TestFSM_InsertBlock_HasEpochEndingExitEvents(t *testing.T) {
 		validators:        validatorSet,
 		isEndOfEpoch:      true,
 		epochNumber:       epoch,
+		target:            buildBlock,
 	}
 
 	// add seals for the proposed block that will get inserted
@@ -1645,11 +1647,9 @@ func createTestLogForExitEvent(t *testing.T, exitEventID uint64) *types.Log {
 	encodedData, err := someType.Encode(map[string]string{"firstName": "John", "lastName": "Doe"})
 	require.NoError(t, err)
 
-	log := &types.Log{
+	return &types.Log{
 		Address: contracts.L2StateSenderContract,
 		Topics:  topics,
 		Data:    encodedData,
 	}
-
-	return log
 }
