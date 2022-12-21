@@ -291,13 +291,8 @@ func (c *consensusRuntime) getCommitmentFromTransactions(txs []*types.Transactio
 		return fmt.Errorf("insert commitment message error: %w", err)
 	}
 
-	g, err := c.getGuardedData()
-	if err != nil {
-		return fmt.Errorf("build bundles, get guarded data error: %w", err)
-	}
-
 	if err := c.buildProofs(
-		g.epoch.Commitment, commitment.Message); err != nil {
+		c.epoch.Commitment, commitment.Message); err != nil {
 		return fmt.Errorf("build commitment proofs error: %w", err)
 	}
 
