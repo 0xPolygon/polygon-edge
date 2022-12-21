@@ -144,7 +144,7 @@ func (i *backendIBFT) MaximumFaultyNodes() uint64 {
 
 func (i *backendIBFT) HasQuorum(
 	blockNumber uint64,
-	messages []*proto.Message,
+	msgs []*proto.Message,
 	msgType proto.MessageType,
 ) bool {
 	validators, err := i.forkManager.GetValidators(blockNumber)
@@ -158,13 +158,28 @@ func (i *backendIBFT) HasQuorum(
 		return false
 	}
 
-	if msgType == proto.MessageType_PREPREPARE {
-		return len(messages) > 0
+	var (
+		numMsgs = len(msgs)
+		quorum  = i.quorumSize(blockNumber)(validators)
+	)
+
+	switch msgType {
+	case proto.MessageType_PREPREPARE:
+		return numMsgs >= 1
+	case proto.MessageType_PREPARE:
+		return numMsgs >= quorum-1
+	case proto.MessageType_COMMIT, proto.MessageType_ROUND_CHANGE:
+		return numMsgs >= quorum
 	}
 
-	quorum := i.quorumSize(blockNumber)(validators)
+	// should not reach here
+	i.logger.Warn(
+		"invalid message type when calculation quorum",
+		"height", blockNumber,
+		"messageType", msgType,
+	)
 
-	return len(messages) >= quorum
+	return false
 }
 
 // buildBlock builds the block, based on the passed in snapshot and parent header

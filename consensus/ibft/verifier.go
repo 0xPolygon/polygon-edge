@@ -6,12 +6,69 @@ import (
 
 	"github.com/0xPolygon/go-ibft/messages"
 	protoIBFT "github.com/0xPolygon/go-ibft/messages/proto"
+	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"google.golang.org/protobuf/proto"
 )
 
 // Verifier impl for go-ibft
+// calculateProposalHashFromBlockBytes is a helper method to marshal ethereum block in bytes
+// and pass to calculateProposalHash
+func (i *backendIBFT) calculateProposalHashFromBlockBytes(
+	signer signer.Signer,
+	ethereumBlockBytes []byte,
+	round *uint64,
+) (types.Hash, error) {
+	ethereumBlock := &types.Block{}
+	if err := ethereumBlock.UnmarshalRLP(ethereumBlockBytes); err != nil {
+		return types.ZeroHash, err
+	}
+
+	return i.calculateProposalHash(
+		signer,
+		ethereumBlock,
+		round,
+	)
+}
+
+// calculateProposalHash is new hash calculation for proposal in go-ibft,
+// which includes round number block is finalized at
+func (i *backendIBFT) calculateProposalHash(
+	signer signer.Signer,
+	block *types.Block,
+	round *uint64,
+) (types.Hash, error) {
+	if round == nil {
+		// legacy hash calculation
+		return block.Hash(), nil
+	}
+
+	filteredHeader, err := signer.FilterHeaderForHash(block.Header)
+	if err != nil {
+		return types.ZeroHash, err
+	}
+
+	blockForHash := &types.Block{
+		Header:       filteredHeader.ComputeHash(),
+		Transactions: block.Transactions,
+		Uncles:       block.Uncles,
+	}
+
+	proposedBlock := &protoIBFT.ProposedBlock{
+		EthereumBlock: blockForHash.MarshalRLP(),
+		Round:         *round,
+	}
+
+	proposedBlockBytes, err := proto.Marshal(proposedBlock)
+	if err != nil {
+		return types.ZeroHash, err
+	}
+
+	return types.BytesToHash(
+		crypto.Keccak256(proposedBlockBytes),
+	), nil
+}
 
 func (i *backendIBFT) IsValidBlock(proposal []byte) bool {
 	var (
@@ -137,38 +194,16 @@ func (i *backendIBFT) IsProposer(id []byte, height, round uint64) bool {
 }
 
 func (i *backendIBFT) IsValidProposalHash(proposal *protoIBFT.ProposedBlock, hash []byte) bool {
-	proposalHash, err := i.getProposalHashFromBlock(proposal.EthereumBlock, proposal.Round)
+	proposalHash, err := i.calculateProposalHashFromBlockBytes(
+		i.currentSigner,
+		proposal.EthereumBlock,
+		&proposal.Round,
+	)
 	if err != nil {
 		return false
 	}
 
-	return bytes.Equal(proposalHash, hash)
-}
-
-func (i *backendIBFT) getProposalHashFromBlock(ethereumBlock []byte, round uint64) ([]byte, error) {
-	block := &types.Block{}
-	if err := block.UnmarshalRLP(ethereumBlock); err != nil {
-		return nil, err
-	}
-
-	filteredHeader, err := i.currentSigner.FilterHeaderForHash(block.Header)
-	if err != nil {
-		return nil, err
-	}
-
-	block.Header = filteredHeader.ComputeHash()
-
-	proposedBlockForHash := &protoIBFT.ProposedBlock{
-		EthereumBlock: block.MarshalRLP(),
-		Round:         round,
-	}
-
-	proposedBlockRaw, err := proto.Marshal(proposedBlockForHash)
-	if err != nil {
-		return nil, err
-	}
-
-	return crypto.Keccak256(proposedBlockRaw), nil
+	return bytes.Equal(proposalHash.Bytes(), hash)
 }
 
 func (i *backendIBFT) IsValidCommittedSeal(
