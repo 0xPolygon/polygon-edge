@@ -168,14 +168,15 @@ func TestFSM_BuildProposal_WithExitEvents(t *testing.T) {
 		}}
 	}
 
+	stateBlock.Receipts = receipts
+
 	blockchainMock := new(blockchainMock)
-	blockchainMock.On("CommitBlock", mock.Anything).Return(receipts, nil).Once()
+	blockchainMock.On("CommitBlock", mock.Anything).Return(nil).Once()
 
 	mBlockBuilder := new(blockBuilderMock)
 	mBlockBuilder.On("Build", mock.Anything).Return(stateBlock).Once()
 	mBlockBuilder.On("Fill").Once()
 	mBlockBuilder.On("Receipts", mock.Anything).Return(receipts).Once()
-	stateBlock.Receipts = receipts
 
 	fsm := &fsm{parent: parent, blockBuilder: mBlockBuilder, config: &PolyBFTConfig{}, backend: blockchainMock,
 		validators: validators.toValidatorSetWithError(t), checkpointBackend: runtime, logger: hclog.NewNullLogger(),
@@ -953,7 +954,7 @@ func TestFSM_Validate_TimestampOlder(t *testing.T) {
 			Timestamp:  blockTime,
 			ExtraData:  parent.ExtraData,
 		}
-		stateBlock := &StateBlock{Block: consensus.BuildBlock(consensus.BuildBlockParams{Header: header})}
+		stateBlock := &types.FullBlock{Block: consensus.BuildBlock(consensus.BuildBlockParams{Header: header})}
 		fsm := &fsm{parent: parent, config: &PolyBFTConfig{}, backend: &blockchainMock{},
 			validators: validators.toValidatorSetWithError(t), logger: hclog.NewNullLogger()}
 
@@ -989,7 +990,7 @@ func TestFSM_Validate_IncorrectMixHash(t *testing.T) {
 		ExtraData:  parent.ExtraData,
 	}
 
-	buildBlock := &StateBlock{Block: consensus.BuildBlock(consensus.BuildBlockParams{Header: header})}
+	buildBlock := &types.FullBlock{Block: consensus.BuildBlock(consensus.BuildBlockParams{Header: header})}
 
 	fsm := &fsm{
 		parent:     parent,
@@ -1027,15 +1028,15 @@ func TestFSM_Insert_Good(t *testing.T) {
 		Header: &types.Header{Number: parentBlockNumber + 1, ParentHash: parent.Hash, ExtraData: extraBlock},
 	})
 
-	buildBlock := &StateBlock{Block: finalBlock}
+	buildBlock := &types.FullBlock{Block: finalBlock}
 	mBlockBuilder := newBlockBuilderMock(buildBlock)
 	mBackendMock := &blockchainMock{}
 	mBackendMock.On("CommitBlock", mock.MatchedBy(func(i interface{}) bool {
-		stateBlock, ok := i.(*types.Block)
+		stateBlock, ok := i.(*types.FullBlock)
 		require.True(t, ok)
 
-		return stateBlock.Number() == buildBlock.Block.Number() && stateBlock.Hash() == buildBlock.Block.Hash()
-	})).Return([]*types.Receipt(nil), error(nil)).Once()
+		return stateBlock.Block.Number() == buildBlock.Block.Number() && stateBlock.Block.Hash() == buildBlock.Block.Hash()
+	})).Return(error(nil)).Once()
 
 	validatorSet, err := NewValidatorSet(validatorsMetadata[0:len(validatorsMetadata)-1], hclog.NewNullLogger())
 	require.NoError(t, err)
@@ -1062,6 +1063,8 @@ func TestFSM_Insert_Good(t *testing.T) {
 	}
 
 	proposal := buildBlock.Block.MarshalRLP()
+
+	fsm.target = buildBlock
 
 	block, err := fsm.Insert(proposal, commitedSeals)
 
@@ -1091,7 +1094,7 @@ func TestFSM_Insert_InvalidNode(t *testing.T) {
 			Header: &types.Header{Number: parentBlockNumber + 1, ParentHash: parent.Hash, ExtraData: extraBlock},
 		})
 
-	buildBlock := &StateBlock{Block: finalBlock}
+	buildBlock := &types.FullBlock{Block: finalBlock, Receipts: []*types.Receipt{}}
 	mBlockBuilder := newBlockBuilderMock(buildBlock)
 
 	validatorSet, err := NewValidatorSet(validatorsMetadata[0:len(validatorsMetadata)-1], hclog.NewNullLogger())
@@ -1121,6 +1124,8 @@ func TestFSM_Insert_InvalidNode(t *testing.T) {
 		{Signer: validatorB.Address().Bytes(), Signature: sigB},
 		{Signer: nonValidatorAccount.Address().Bytes(), Signature: nonValidatorSignature}, // this one should fail
 	}
+
+	fsm.target = buildBlock
 
 	_, err = fsm.Insert(proposal, commitedSeals)
 	assert.ErrorContains(t, err, "invalid node id")
@@ -1428,7 +1433,7 @@ func TestFSM_Validate_FailToVerifySignatures(t *testing.T) {
 	polybftBackendMock.AssertExpectations(t)
 }
 
-func createDummyStateBlock(blockNumber uint64, parentHash types.Hash, extraData []byte) *StateBlock {
+func createDummyStateBlock(blockNumber uint64, parentHash types.Hash, extraData []byte) *types.FullBlock {
 	finalBlock := consensus.BuildBlock(consensus.BuildBlockParams{
 		Header: &types.Header{
 			Number:     blockNumber,
@@ -1438,7 +1443,7 @@ func createDummyStateBlock(blockNumber uint64, parentHash types.Hash, extraData 
 		},
 	})
 
-	return &StateBlock{Block: finalBlock}
+	return &types.FullBlock{Block: finalBlock}
 }
 
 func createTestExtra(
@@ -1505,7 +1510,7 @@ func createTestCommitment(t *testing.T, accounts []*wallet.Account) *CommitmentM
 	}
 }
 
-func newBlockBuilderMock(stateBlock *StateBlock) *blockBuilderMock {
+func newBlockBuilderMock(stateBlock *types.FullBlock) *blockBuilderMock {
 	mBlockBuilder := new(blockBuilderMock)
 	mBlockBuilder.On("Build", mock.Anything).Return(stateBlock).Once()
 	mBlockBuilder.On("Fill", mock.Anything).Once()

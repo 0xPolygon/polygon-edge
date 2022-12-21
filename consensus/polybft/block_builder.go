@@ -117,7 +117,7 @@ func (b *BlockBuilder) Block() *types.Block {
 }
 
 // Build creates the state and the final block
-func (b *BlockBuilder) Build(handler func(h *types.Header)) (*StateBlock, error) {
+func (b *BlockBuilder) Build(handler func(h *types.Header)) (*types.FullBlock, error) {
 	if handler != nil {
 		handler(b.header)
 	}
@@ -134,10 +134,9 @@ func (b *BlockBuilder) Build(handler func(h *types.Header)) (*StateBlock, error)
 
 	b.block.Header.ComputeHash()
 
-	return &StateBlock{
+	return &types.FullBlock{
 		Block:    b.block,
 		Receipts: b.state.Receipts(),
-		State:    b.state,
 	}, nil
 }
 
@@ -224,11 +223,4 @@ func (b *BlockBuilder) writeTxPoolTransaction(tx *types.Transaction) (bool, erro
 // GetState returns Transition reference
 func (b *BlockBuilder) GetState() *state.Transition {
 	return b.state
-}
-
-// StateBlock is a block with the full state it modifies
-type StateBlock struct {
-	Block    *types.Block
-	Receipts []*types.Receipt
-	State    *state.Transition
 }

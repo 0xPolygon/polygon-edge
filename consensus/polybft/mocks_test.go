@@ -35,10 +35,10 @@ func (m *blockchainMock) CurrentHeader() *types.Header {
 	return args.Get(0).(*types.Header) //nolint:forcetypeassert
 }
 
-func (m *blockchainMock) CommitBlock(block *types.Block) ([]*types.Receipt, error) {
+func (m *blockchainMock) CommitBlock(block *types.FullBlock) error {
 	args := m.Called(block)
 
-	return args.Get(0).([]*types.Receipt), args.Error(1) //nolint:forcetypeassert
+	return args.Error(0)
 }
 
 func (m *blockchainMock) NewBlockBuilder(parent *types.Header, coinbase types.Address,
@@ -48,10 +48,10 @@ func (m *blockchainMock) NewBlockBuilder(parent *types.Header, coinbase types.Ad
 	return args.Get(0).(blockBuilder), args.Error(1) //nolint:forcetypeassert
 }
 
-func (m *blockchainMock) ProcessBlock(parent *types.Header, block *types.Block) (*StateBlock, error) {
+func (m *blockchainMock) ProcessBlock(parent *types.Header, block *types.Block) (*types.FullBlock, error) {
 	args := m.Called(parent, block)
 
-	return args.Get(0).(*StateBlock), args.Error(1) //nolint:forcetypeassert
+	return args.Get(0).(*types.FullBlock), args.Error(1) //nolint:forcetypeassert
 }
 
 func (m *blockchainMock) GetStateProviderForBlock(block *types.Header) (contract.Provider, error) {
@@ -176,9 +176,9 @@ func (m *blockBuilderMock) Receipts() []*types.Receipt {
 	return args.Get(0).([]*types.Receipt) //nolint:forcetypeassert
 }
 
-func (m *blockBuilderMock) Build(handler func(*types.Header)) (*StateBlock, error) {
+func (m *blockBuilderMock) Build(handler func(*types.Header)) (*types.FullBlock, error) {
 	args := m.Called(handler)
-	builtBlock := args.Get(0).(*StateBlock) //nolint:forcetypeassert
+	builtBlock := args.Get(0).(*types.FullBlock) //nolint:forcetypeassert
 
 	handler(builtBlock.Block.Header)
 

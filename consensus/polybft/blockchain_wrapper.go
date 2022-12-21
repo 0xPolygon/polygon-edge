@@ -26,14 +26,14 @@ type blockchainBackend interface {
 	CurrentHeader() *types.Header
 
 	// CommitBlock commits a block to the chain.
-	CommitBlock(block *types.Block) ([]*types.Receipt, error)
+	CommitBlock(block *types.FullBlock) error
 
 	// NewBlockBuilder is a factory method that returns a block builder on top of 'parent'.
 	NewBlockBuilder(parent *types.Header, coinbase types.Address,
 		txPool txPoolInterface, blockTime time.Duration, logger hclog.Logger) (blockBuilder, error)
 
 	// ProcessBlock builds a final block from given 'block' on top of 'parent'.
-	ProcessBlock(parent *types.Header, block *types.Block) (*StateBlock, error)
+	ProcessBlock(parent *types.Header, block *types.Block) (*types.FullBlock, error)
 
 	// GetStateProviderForBlock returns a reference to make queries to the state at 'block'.
 	GetStateProviderForBlock(block *types.Header) (contract.Provider, error)
@@ -69,17 +69,16 @@ func (p *blockchainWrapper) CurrentHeader() *types.Header {
 }
 
 // CommitBlock commits a block to the chain
-func (p *blockchainWrapper) CommitBlock(block *types.Block) ([]*types.Receipt, error) {
-	err := p.blockchain.WriteBlock(block, consensusSource)
-	if err != nil {
-		return nil, err
+func (p *blockchainWrapper) CommitBlock(block *types.FullBlock) error {
+	if err := p.blockchain.WriteFullBlock(block, consensusSource); err != nil {
+		return err
 	}
 
-	return p.blockchain.GetCachedReceipts(block.Hash())
+	return nil
 }
 
 // ProcessBlock builds a final block from given 'block' on top of 'parent'
-func (p *blockchainWrapper) ProcessBlock(parent *types.Header, block *types.Block) (*StateBlock, error) {
+func (p *blockchainWrapper) ProcessBlock(parent *types.Header, block *types.Block) (*types.FullBlock, error) {
 	// TODO: Call validate block in polybft
 	header := block.Header.Copy()
 
@@ -108,10 +107,9 @@ func (p *blockchainWrapper) ProcessBlock(parent *types.Header, block *types.Bloc
 		Receipts: transition.Receipts(),
 	})
 
-	return &StateBlock{
+	return &types.FullBlock{
 		Block:    builtBlock,
 		Receipts: transition.Receipts(),
-		State:    transition,
 	}, nil
 }
 
