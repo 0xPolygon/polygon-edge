@@ -370,10 +370,7 @@ func (c *consensusRuntime) FSM() error {
 	isEndOfSprint := c.isEndOfSprint(pendingBlockNumber)
 	isEndOfEpoch := c.isEndOfEpoch(pendingBlockNumber)
 
-	valSet, err := NewValidatorSet(epoch.Validators, c.logger)
-	if err != nil {
-		return fmt.Errorf("cannot create validator set for fsm: %w", err)
-	}
+	valSet := NewValidatorSet(epoch.Validators, c.logger)
 
 	ff := &fsm{
 		config:            c.config.PolyBFTConfig,
@@ -600,10 +597,7 @@ func (c *consensusRuntime) getAggSignatureForCommitmentMessage(
 	epoch *epochMetadata,
 	commitmentHash types.Hash,
 ) (Signature, [][]byte, error) {
-	validatorSet, err := NewValidatorSet(epoch.Validators, c.logger)
-	if err != nil {
-		return Signature{}, nil, err
-	}
+	validatorSet := NewValidatorSet(epoch.Validators, c.logger)
 
 	validatorAddrToIndex := make(map[string]int, validatorSet.Len())
 	validatorsMetadata := validatorSet.Accounts()

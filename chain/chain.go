@@ -20,10 +20,6 @@ var (
 	GenesisDifficulty = big.NewInt(131072)
 )
 
-const (
-	WeiScalingFactor = uint64(1e18) // 10^18
-)
-
 // Chain is the blockchain chain configuration
 type Chain struct {
 	Name      string   `json:"name"`

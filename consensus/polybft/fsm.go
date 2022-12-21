@@ -282,10 +282,7 @@ func (f *fsm) Validate(proposal []byte) error {
 			return fmt.Errorf("failed to calculate parent block sign hash: %w", err)
 		}
 
-		validatorSet, err := NewValidatorSet(validators, f.logger)
-		if err != nil {
-			return fmt.Errorf("failed to create validator set: %w", err)
-		}
+		validatorSet := NewValidatorSet(validators, f.logger)
 
 		if err := blockExtra.Parent.VerifyCommittedFields(validatorSet, parentCheckpointHash); err != nil {
 			return fmt.Errorf(

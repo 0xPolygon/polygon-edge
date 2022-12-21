@@ -19,17 +19,19 @@ const (
 	// It could be higher, but this is sufficiently large for our purposes,
 	// and leaves room for defensive purposes.
 	maxTotalVotingPower = int64(math.MaxInt64) / 8
+)
 
+var (
 	// priorityWindowSizeFactor - is a constant that when multiplied with the
 	// total voting power gives the maximum allowed distance between validator
 	// priorities.
-	priorityWindowSizeFactor = 2
+	priorityWindowSizeFactor = big.NewInt(2)
 )
 
 // PrioritizedValidator holds ValidatorMetadata together with priority
 type PrioritizedValidator struct {
 	Metadata         *ValidatorMetadata
-	ProposerPriority int64
+	ProposerPriority *big.Int
 }
 
 // ProposerSnapshot represents snapshot of one proposer calculation
@@ -65,7 +67,7 @@ func NewProposerSnapshot(height uint64, validators []*ValidatorMetadata) *Propos
 	validatorsSnap := make([]*PrioritizedValidator, len(validators))
 
 	for i, x := range validators {
-		validatorsSnap[i] = &PrioritizedValidator{Metadata: x, ProposerPriority: int64(0)}
+		validatorsSnap[i] = &PrioritizedValidator{Metadata: x, ProposerPriority: big.NewInt(0)}
 	}
 
 	return &ProposerSnapshot{
@@ -113,13 +115,10 @@ func (pcs *ProposerSnapshot) GetLatestProposer(round, height uint64) (types.Addr
 }
 
 // GetTotalVotingPower returns total voting power from all the validators
-func (pcs ProposerSnapshot) GetTotalVotingPower() int64 {
-	totalVotingPower := int64(0)
-
+func (pcs ProposerSnapshot) GetTotalVotingPower() *big.Int {
+	totalVotingPower := big.NewInt(0)
 	for _, v := range pcs.Validators {
-		// TODO: @Stefan-Ethernal Provide scaling factor
-		scaledVotingPower := v.Metadata.getRelativeVotingPower(1)
-		totalVotingPower = safeAddClip(totalVotingPower, int64(scaledVotingPower))
+		_ = totalVotingPower.Add(totalVotingPower, v.Metadata.VotingPower)
 	}
 
 	return totalVotingPower
@@ -327,20 +326,21 @@ func updateValidators(snapshot *ProposerSnapshot, newValidatorSet AccountSet) er
 	newValidators := make([]*PrioritizedValidator, len(newValidatorSet))
 
 	// compute total voting power of removed validators and current validator
-	removedValidatorsVotingPower := uint64(0)
-	newValidatorsVotingPower := uint64(0)
+	removedValidatorsVotingPower := big.NewInt(0)
+	newValidatorsVotingPower := big.NewInt(0)
 
 	for address, val := range snapshotValidators {
 		if !newValidatorSet.ContainsNodeID(address.String()) {
-			removedValidatorsVotingPower += val.Metadata.getRelativeVotingPower(votingPowerScalingFactor)
+			_ = removedValidatorsVotingPower.Add(removedValidatorsVotingPower, val.Metadata.VotingPower)
 		}
 	}
 
 	for _, v := range newValidatorSet {
-		newValidatorsVotingPower += v.getRelativeVotingPower(votingPowerScalingFactor)
+		_ = newValidatorsVotingPower.Add(newValidatorsVotingPower, v.VotingPower)
 	}
 
-	if newValidatorsVotingPower > uint64(maxTotalVotingPower) {
+	// TODO: @Stefan-Ethernal check if still needed
+	if newValidatorsVotingPower.Cmp(big.NewInt(maxTotalVotingPower)) > 0 {
 		return fmt.Errorf(
 			"total voting power cannot be guarded to not exceed %v; got: %v",
 			maxTotalVotingPower,
@@ -348,7 +348,7 @@ func updateValidators(snapshot *ProposerSnapshot, newValidatorSet AccountSet) er
 		)
 	}
 
-	tvpAfterUpdatesBeforeRemovals := newValidatorsVotingPower + removedValidatorsVotingPower
+	tvpAfterUpdatesBeforeRemovals := new(big.Int).Add(newValidatorsVotingPower, removedValidatorsVotingPower)
 
 	for i, newValidator := range newValidatorSet {
 		if val, exists := snapshotValidators[newValidator.Address]; exists {
@@ -359,9 +359,10 @@ func updateValidators(snapshot *ProposerSnapshot, newValidatorSet AccountSet) er
 			}
 		} else {
 			// added validator has priority = -C*totalVotingPowerBeforeRemoval (with C ~= 1.125)
+			coefficient := new(big.Int).Div(tvpAfterUpdatesBeforeRemovals, big.NewInt(8))
 			newValidators[i] = &PrioritizedValidator{
 				Metadata:         newValidator,
-				ProposerPriority: int64(-(tvpAfterUpdatesBeforeRemovals + (tvpAfterUpdatesBeforeRemovals >> 3))),
+				ProposerPriority: new(big.Int).Neg(tvpAfterUpdatesBeforeRemovals.Add(tvpAfterUpdatesBeforeRemovals, coefficient)),
 			}
 		}
 	}
@@ -376,11 +377,10 @@ func updateValidators(snapshot *ProposerSnapshot, newValidatorSet AccountSet) er
 	return nil
 }
 
-func incrementProposerPriority(snapshot *ProposerSnapshot, totalVotingPower int64) (*PrioritizedValidator, error) {
+func incrementProposerPriority(snapshot *ProposerSnapshot, totalVotingPower *big.Int) (*PrioritizedValidator, error) {
 	for _, val := range snapshot.Validators {
 		// Check for overflow for sum.
-		// TODO: @Stefan-Ethernal Provide scaling factor
-		newPrio := safeAddClip(val.ProposerPriority, int64(val.Metadata.getRelativeVotingPower(1)))
+		newPrio := new(big.Int).Add(val.ProposerPriority, val.Metadata.VotingPower)
 		val.ProposerPriority = newPrio
 	}
 	// Decrement the validator with most ProposerPriority.
@@ -389,12 +389,12 @@ func incrementProposerPriority(snapshot *ProposerSnapshot, totalVotingPower int6
 		return nil, fmt.Errorf("cannot get validator with most priority: %w", err)
 	}
 
-	mostest.ProposerPriority = safeSubClip(mostest.ProposerPriority, totalVotingPower)
+	mostest.ProposerPriority = mostest.ProposerPriority.Sub(mostest.ProposerPriority, totalVotingPower)
 
 	return mostest, nil
 }
 
-func updateWithChangeSet(snapshot *ProposerSnapshot, totalVotingPower int64) error {
+func updateWithChangeSet(snapshot *ProposerSnapshot, totalVotingPower *big.Int) error {
 	if err := rescalePriorities(snapshot, totalVotingPower); err != nil {
 		return fmt.Errorf("cannot rescale priorities: %w", err)
 	}
@@ -413,7 +413,7 @@ func shiftByAvgProposerPriority(snapshot *ProposerSnapshot) error {
 	}
 
 	for _, val := range snapshot.Validators {
-		val.ProposerPriority = safeSubClip(val.ProposerPriority, avgProposerPriority)
+		_ = val.ProposerPriority.Sub(val.ProposerPriority, avgProposerPriority)
 	}
 
 	return nil
@@ -435,29 +435,24 @@ func getValWithMostPriority(snapshot *ProposerSnapshot) (result *PrioritizedVali
 	return result, nil
 }
 
-func computeAvgProposerPriority(snapshot *ProposerSnapshot) (int64, error) {
+func computeAvgProposerPriority(snapshot *ProposerSnapshot) (*big.Int, error) {
 	if len(snapshot.Validators) == 0 {
-		return 0, fmt.Errorf("validator set cannot be nul or empty")
+		return nil, fmt.Errorf("validator set cannot be nul or empty")
 	}
 
-	n := int64(len(snapshot.Validators))
+	validatorsCount := big.NewInt(int64(len(snapshot.Validators)))
 	sum := big.NewInt(0)
 
 	for _, val := range snapshot.Validators {
-		sum.Add(sum, big.NewInt(val.ProposerPriority))
+		sum = sum.Add(sum, val.ProposerPriority)
 	}
 
-	avg := sum.Div(sum, big.NewInt(n))
-	if avg.IsInt64() {
-		return avg.Int64(), nil
-	}
-
-	return 0, fmt.Errorf("cannot represent avg ProposerPriority as an int64 %v", avg)
+	return sum.Div(sum, validatorsCount), nil
 }
 
 // rescalePriorities rescales the priorities such that the distance between the
 // maximum and minimum is smaller than `diffMax`.
-func rescalePriorities(snapshot *ProposerSnapshot, totalVotingPower int64) error {
+func rescalePriorities(snapshot *ProposerSnapshot, totalVotingPower *big.Int) error {
 	if len(snapshot.Validators) == 0 {
 		return fmt.Errorf("validator set cannot be nul or empty")
 	}
@@ -465,17 +460,20 @@ func rescalePriorities(snapshot *ProposerSnapshot, totalVotingPower int64) error
 	// Cap the difference between priorities to be proportional to 2*totalPower by
 	// re-normalizing priorities, i.e., rescale all priorities by multiplying with:
 	// 2*totalVotingPower/(maxPriority - minPriority)
-	diffMax := priorityWindowSizeFactor * totalVotingPower
+	diffMax := new(big.Int).Mul(priorityWindowSizeFactor, totalVotingPower)
 
 	// Calculating ceil(diff/diffMax):
 	// Re-normalization is performed by dividing by an integer for simplicity.
 	// NOTE: This may make debugging priority issues easier as well.
 	diff := computeMaxMinPriorityDiff(snapshot.Validators)
-	ratio := (diff + diffMax - 1) / diffMax
+	ratio := new(big.Int)
+	ratio = ratio.Add(diff, diffMax).
+		Sub(ratio, big.NewInt(1)).
+		Div(ratio, diffMax)
 
-	if diff > diffMax {
+	if diff.Cmp(diffMax) > 0 {
 		for _, val := range snapshot.Validators {
-			val.ProposerPriority /= ratio
+			_ = val.ProposerPriority.Div(val.ProposerPriority, ratio)
 		}
 	}
 
@@ -483,31 +481,31 @@ func rescalePriorities(snapshot *ProposerSnapshot, totalVotingPower int64) error
 }
 
 // computeMaxMinPriorityDiff computes the difference between the max and min ProposerPriority of that set.
-func computeMaxMinPriorityDiff(validators []*PrioritizedValidator) int64 {
-	max := int64(math.MinInt64)
-	min := int64(math.MaxInt64)
+func computeMaxMinPriorityDiff(validators []*PrioritizedValidator) *big.Int {
+	max := big.NewInt(int64(math.Inf(-1)))
+	min := big.NewInt(int64(math.Inf(1)))
 
 	for _, v := range validators {
-		if v.ProposerPriority < min {
+		if v.ProposerPriority.Cmp(min) < 0 {
 			min = v.ProposerPriority
 		}
 
-		if v.ProposerPriority > max {
+		if v.ProposerPriority.Cmp(max) > 0 {
 			max = v.ProposerPriority
 		}
 	}
 
-	diff := max - min
+	diff := new(big.Int).Sub(max, min)
 
-	if diff < 0 {
-		return -diff
+	if diff.Cmp(big.NewInt(0)) < 0 {
+		return diff.Neg(diff)
 	}
 
 	return diff
 }
 
 func isBetterProposer(a, b *PrioritizedValidator) bool {
-	if b == nil || a.ProposerPriority > b.ProposerPriority {
+	if b == nil || a.ProposerPriority.Cmp(b.ProposerPriority) > 0 {
 		return true
 	} else if a.ProposerPriority == b.ProposerPriority {
 		return bytes.Compare(a.Metadata.Address.Bytes(), b.Metadata.Address.Bytes()) <= 0

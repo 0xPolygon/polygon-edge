@@ -12,8 +12,7 @@ func TestValidatorSet_HasQuorum(t *testing.T) {
 
 	// enough signers for quorum (2/3 super-majority of validators are signers)
 	validators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F", "G"})
-	vs, err := validators.toValidatorSet()
-	require.NoError(t, err)
+	vs := validators.toValidatorSet()
 
 	signers := make(map[types.Address]struct{})
 
@@ -26,7 +25,7 @@ func TestValidatorSet_HasQuorum(t *testing.T) {
 	// not enough signers for quorum (less than 2/3 super-majority of validators are signers)
 	signers = make(map[types.Address]struct{})
 
-	validators.iterAcct([]string{"A", "B", "C", "D"}, func(v *testValidator) {
+	validators.iterAcct([]string{"A", "B", "C"}, func(v *testValidator) {
 		signers[v.Address()] = struct{}{}
 	})
 	require.False(t, vs.HasQuorum(signers))

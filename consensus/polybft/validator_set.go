@@ -7,11 +7,6 @@ import (
 	"github.com/hashicorp/go-hclog"
 )
 
-const (
-	// quorumSize is defined as 67% (math.Ceil(2 * float64(100) / 3))
-	quorumSize = 67
-)
-
 // ValidatorSet interface of the current validator set
 type ValidatorSet interface {
 	// Includes check if given address is among the current validator set
@@ -32,63 +27,56 @@ type validatorSet struct {
 	validators AccountSet
 
 	// votingPowerMap represents voting powers per validator address
-	votingPowerMap map[types.Address]uint64
+	votingPowerMap map[types.Address]*big.Int
 
-	// total voting power
-	totalVotingPower int64
+	// totalVotingPower is sum of active validator set
+	totalVotingPower *big.Int
+
+	// quorumSize is 2/3 super-majority of totalVotingPower
+	quorumSize *big.Int
 
 	// logger instance
 	logger hclog.Logger
 }
 
 // NewValidatorSet creates a new validator set.
-func NewValidatorSet(valz AccountSet, logger hclog.Logger) (*validatorSet, error) {
-	valSet := &validatorSet{
+func NewValidatorSet(valz AccountSet, logger hclog.Logger) *validatorSet {
+	totalVotingPower := valz.GetTotalVotingPower()
+	quorumSize := getQuorumSize(totalVotingPower)
+
+	votingPowerMap := make(map[types.Address]*big.Int, len(valz))
+	for _, val := range valz {
+		votingPowerMap[val.Address] = val.VotingPower
+	}
+
+	return &validatorSet{
 		validators:       valz,
-		votingPowerMap:   make(map[types.Address]uint64, valz.Len()),
-		totalVotingPower: int64(0),
+		votingPowerMap:   votingPowerMap,
+		totalVotingPower: totalVotingPower,
+		quorumSize:       quorumSize,
 		logger:           logger.Named("validator_set"),
 	}
-
-	totalVotingPower := big.NewInt(0)
-	for _, val := range valz {
-		totalVotingPower = totalVotingPower.Add(totalVotingPower, val.VotingPower)
-		// valSet.votingPowerMap[val.Address] = val.VotingPower.Int64()
-
-		// // mind overflow
-		// valSet.totalVotingPower = safeAddClip(valSet.totalVotingPower, val.VotingPower.Int64())
-		// if valSet.totalVotingPower > maxTotalVotingPower {
-		// 	return nil, fmt.Errorf(
-		// 		"total voting power cannot be guarded to not exceed %v; got: %v",
-		// 		maxTotalVotingPower,
-		// 		valSet.totalVotingPower,
-		// 	)
-		// }
-	}
-
-	for _, val := range valz {
-		valSet.votingPowerMap[val.Address] = val.getRelativeVotingPower(totalVotingPower)
-	}
-
-	return valSet, nil
 }
 
 // HasQuorum determines if there is quorum of enough signers reached,
 // based on its voting power and quorum size
 func (vs validatorSet) HasQuorum(signers map[types.Address]struct{}) bool {
-	accVotingPower := uint64(0)
+	aggregateVotingPower := big.NewInt(0)
 
 	for address := range signers {
-		accVotingPower += vs.votingPowerMap[address]
+		if votingPower := vs.votingPowerMap[address]; votingPower != nil {
+			_ = aggregateVotingPower.Add(aggregateVotingPower, votingPower)
+		}
 	}
+
+	hasQuorum := aggregateVotingPower.Cmp(vs.quorumSize) >= 0
 
 	vs.logger.Debug("HasQuorum",
 		"signers", len(signers),
-		"signers voting power", accVotingPower,
-		"quorum", quorumSize,
-		"hasQuorum", accVotingPower >= quorumSize)
+		"signers voting power", aggregateVotingPower,
+		"hasQuorum", hasQuorum)
 
-	return accVotingPower >= quorumSize
+	return hasQuorum
 }
 
 func (vs validatorSet) Accounts() AccountSet {
@@ -101,4 +89,12 @@ func (vs validatorSet) Includes(address types.Address) bool {
 
 func (vs validatorSet) Len() int {
 	return vs.validators.Len()
+}
+
+// getQuorumSize calculates quorum size as 2/3 super-majority of provided total voting power
+func getQuorumSize(totalVotingPower *big.Int) *big.Int {
+	// TODO: @Stefan-Ethernal math.Ceil for big.Int?
+	quorum := new(big.Int)
+
+	return quorum.Mul(totalVotingPower, big.NewInt(2)).Div(quorum, big.NewInt(3))
 }

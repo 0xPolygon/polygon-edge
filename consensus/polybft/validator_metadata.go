@@ -120,14 +120,6 @@ func (v *ValidatorMetadata) String() string {
 		v.Address.String(), hex.EncodeToString(v.BlsKey.Marshal()), v.VotingPower)
 }
 
-// getRelativeVotingPower calculates relative voting power of validator expressed in percents
-func (v *ValidatorMetadata) getRelativeVotingPower(totalVotingPower *big.Int) uint64 {
-	relativeVotingPower := new(big.Float).Quo(new(big.Float).SetInt(v.VotingPower), new(big.Float).SetInt(totalVotingPower))
-	percentageVotingPower, _ := new(big.Float).Mul(relativeVotingPower, big.NewFloat(100)).Uint64()
-
-	return percentageVotingPower
-}
-
 // AccountSet is a type alias for slice of ValidatorMetadata instances
 type AccountSet []*ValidatorMetadata
 
@@ -318,4 +310,14 @@ func (as AccountSet) Marshal() ([]byte, error) {
 // Unmarshal unmarshals AccountSet from JSON
 func (as *AccountSet) Unmarshal(b []byte) error {
 	return json.Unmarshal(b, as)
+}
+
+// GetTotalVotingPower calculates sum of voting power for each validator in the AccountSet
+func (as *AccountSet) GetTotalVotingPower() *big.Int {
+	totalVotingPower := big.NewInt(0)
+	for _, v := range *as {
+		totalVotingPower = totalVotingPower.Add(totalVotingPower, v.VotingPower)
+	}
+
+	return totalVotingPower
 }

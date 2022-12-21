@@ -34,28 +34,27 @@ func TestConsensusRuntime_GetVotes(t *testing.T) {
 	)
 
 	validatorIds := []string{"A", "B", "C", "D", "E", "F", "G"}
-	validatorAccounts := newTestValidatorsWithAliases(validatorIds)
+	validators := newTestValidatorsWithAliases(validatorIds)
+	validatorAccs := validators.getPublicIdentities()
 	state := newTestState(t)
 	runtime := &consensusRuntime{
 		state: state,
 		epoch: &epochMetadata{
 			Number:     epoch,
-			Validators: validatorAccounts.getPublicIdentities(),
+			Validators: validatorAccs,
 		},
 	}
 
 	commitment, _, _ := buildCommitmentAndStateSyncs(t, stateSyncsCount, epoch, 0)
 
-	// quorumSize := validatorAccounts.toValidatorSetWithError(t).getQuorumSize()
-
 	require.NoError(t, state.insertEpoch(epoch))
 
-	votesCount := quorumSize + 1
+	votesCount := int(getQuorumSize(validatorAccs.GetTotalVotingPower()).Int64())
 	hash, err := commitment.Hash()
 	require.NoError(t, err)
 
-	for i := 0; i < int(votesCount); i++ {
-		validator := validatorAccounts.getValidator(validatorIds[i])
+	for i := 0; i < votesCount; i++ {
+		validator := validators.getValidator(validatorIds[i])
 		signature, err := validator.mustSign(hash.Bytes()).Marshal()
 		require.NoError(t, err)
 
@@ -69,7 +68,7 @@ func TestConsensusRuntime_GetVotes(t *testing.T) {
 
 	votes, err := runtime.state.getMessageVotes(runtime.epoch.Number, hash.Bytes())
 	require.NoError(t, err)
-	require.Len(t, votes, int(votesCount))
+	require.Len(t, votes, votesCount)
 }
 
 func TestConsensusRuntime_GetVotesError(t *testing.T) {
@@ -739,8 +738,6 @@ func TestConsensusRuntime_FSM_EndOfEpoch_RegisterCommitmentNotFound(t *testing.T
 }
 
 func TestConsensusRuntime_FSM_EndOfEpoch_BuildRegisterCommitment_QuorumNotReached(t *testing.T) {
-	t.Skip("FIX")
-
 	t.Parallel()
 
 	const (
