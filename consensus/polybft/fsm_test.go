@@ -363,7 +363,7 @@ func TestFSM_BuildProposal_EpochEndingBlock_FailedToCommitStateTx(t *testing.T) 
 	mBlockBuilder := new(blockBuilderMock)
 	mBlockBuilder.On("WriteTx", mock.Anything).Return(errors.New("error")).Once()
 
-	validatorSet, err := NewValidatorSet(validators.getPublicIdentities(), hclog.NewNullLogger(), withScalingFactor(1))
+	validatorSet, err := NewValidatorSet(validators.getPublicIdentities(), hclog.NewNullLogger())
 
 	fsm := &fsm{parent: parent, blockBuilder: mBlockBuilder, config: &PolyBFTConfig{}, backend: &blockchainMock{},
 		isEndOfEpoch:      true,
@@ -632,7 +632,7 @@ func TestFSM_VerifyStateTransactions_StateTransactionQuorumNotReached(t *testing
 		Bitmap:              []byte{},
 	}
 
-	validatorSet, err := NewValidatorSet(validators.getPublicIdentities(), hclog.NewNullLogger(), withScalingFactor(1))
+	validatorSet, err := NewValidatorSet(validators.getPublicIdentities(), hclog.NewNullLogger())
 	require.NoError(t, err)
 
 	fsm := &fsm{

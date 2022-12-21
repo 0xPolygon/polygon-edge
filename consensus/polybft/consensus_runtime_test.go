@@ -46,7 +46,7 @@ func TestConsensusRuntime_GetVotes(t *testing.T) {
 
 	commitment, _, _ := buildCommitmentAndStateSyncs(t, stateSyncsCount, epoch, 0)
 
-	quorumSize := validatorAccounts.toValidatorSetWithError(t).getQuorumSize()
+	// quorumSize := validatorAccounts.toValidatorSetWithError(t).getQuorumSize()
 
 	require.NoError(t, state.insertEpoch(epoch))
 

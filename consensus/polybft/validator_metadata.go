@@ -120,9 +120,12 @@ func (v *ValidatorMetadata) String() string {
 		v.Address.String(), hex.EncodeToString(v.BlsKey.Marshal()), v.VotingPower)
 }
 
-// getScaledVotingPower down-scales voting power with given scalingFactor
-func (v *ValidatorMetadata) getScaledVotingPower(scalingFactor uint64) uint64 {
-	return new(big.Int).Div(v.VotingPower, new(big.Int).SetUint64(scalingFactor)).Uint64()
+// getRelativeVotingPower calculates relative voting power of validator expressed in percents
+func (v *ValidatorMetadata) getRelativeVotingPower(totalVotingPower *big.Int) uint64 {
+	relativeVotingPower := new(big.Float).Quo(new(big.Float).SetInt(v.VotingPower), new(big.Float).SetInt(totalVotingPower))
+	percentageVotingPower, _ := new(big.Float).Mul(relativeVotingPower, big.NewFloat(100)).Uint64()
+
+	return percentageVotingPower
 }
 
 // AccountSet is a type alias for slice of ValidatorMetadata instances

@@ -380,13 +380,13 @@ func (v *testValidators) getValidator(alias string) *testValidator {
 }
 
 func (v *testValidators) toValidatorSet() (*validatorSet, error) {
-	return NewValidatorSet(v.getPublicIdentities(), hclog.NewNullLogger(), withScalingFactor(1))
+	return NewValidatorSet(v.getPublicIdentities(), hclog.NewNullLogger())
 }
 
 func (v *testValidators) toValidatorSetWithError(t *testing.T) *validatorSet {
 	t.Helper()
 
-	vs, err := NewValidatorSet(v.getPublicIdentities(), hclog.NewNullLogger(), withScalingFactor(1))
+	vs, err := NewValidatorSet(v.getPublicIdentities(), hclog.NewNullLogger())
 	require.NoError(t, err)
 
 	return vs

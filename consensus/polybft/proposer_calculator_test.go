@@ -200,7 +200,7 @@ func TestProposerCalculator_IncrementProposerPrioritySameVotingPower(t *testing.
 			Address:     types.Address{0x3},
 			VotingPower: big.NewInt(1),
 		},
-	}, hclog.NewNullLogger(), withScalingFactor(1))
+	}, hclog.NewNullLogger())
 	require.NoError(t, err)
 	assert.Equal(t, int64(3), vs.totalVotingPower)
 
@@ -389,7 +389,7 @@ func TestProposerCalculator_TotalVotingPowerErrorOnOverflow(t *testing.T) {
 		{Address: types.Address{0x1}, VotingPower: big.NewInt(math.MaxInt64)},
 		{Address: types.Address{0x2}, VotingPower: big.NewInt(math.MaxInt64)},
 		{Address: types.Address{0x3}, VotingPower: big.NewInt(math.MaxInt64)},
-	}, hclog.NewNullLogger(), withScalingFactor(1))
+	}, hclog.NewNullLogger())
 	require.Error(t, err)
 }
 
@@ -498,7 +498,7 @@ func TestProposerCalculator_UpdateValidatorsSameVpUpdatedAndNewAdded(t *testing.
 
 	newAccountSet := []*ValidatorMetadata{u1, u2, a1}
 
-	updateValidators(snapshot, newAccountSet, 1)
+	updateValidators(snapshot, newAccountSet)
 	assert.Equal(t, 3, len(snapshot.Validators))
 
 	// removedVp := sum(v3, v4, v5) = 300
@@ -566,7 +566,7 @@ func TestProposerCalculator_UpdateValidators(t *testing.T) {
 	// added
 	a1 := &ValidatorMetadata{Address: types.Address{0x4}, BlsKey: keys[3].PublicKey(), VotingPower: big.NewInt(400)}
 
-	updateValidators(snapshot, []*ValidatorMetadata{u1, u2, u3, a1}, 1)
+	updateValidators(snapshot, []*ValidatorMetadata{u1, u2, u3, a1})
 
 	require.Equal(t, 4, len(snapshot.Validators))
 	// priorities are from previous iteration
@@ -617,7 +617,7 @@ func TestProposerCalculator_ScaleAfterDelete(t *testing.T) {
 	require.Equal(t, int64(-40010), snapshot.Validators[0].ProposerPriority)
 	require.Equal(t, int64(40010), snapshot.Validators[1].ProposerPriority)
 
-	updateValidators(snapshot, []*ValidatorMetadata{u1, u2}, 1)
+	updateValidators(snapshot, []*ValidatorMetadata{u1, u2})
 
 	// maxdiff = 2*tvp = 40
 	// diff(min,max) (-40010, 40010) = 80020
@@ -651,7 +651,7 @@ func TestProposerCalculator_ShiftAfterUpdate(t *testing.T) {
 	u1 := &ValidatorMetadata{Address: types.Address{0x1}, BlsKey: keys[0].PublicKey(), VotingPower: big.NewInt(5)}
 	u2 := &ValidatorMetadata{Address: types.Address{0x2}, BlsKey: keys[1].PublicKey(), VotingPower: big.NewInt(8)}
 
-	updateValidators(snapshot, []*ValidatorMetadata{u1, u2}, 1)
+	updateValidators(snapshot, []*ValidatorMetadata{u1, u2})
 
 	// maxdiff = 2*tvp = 26
 	// diff(min,max) (-260, 19610) = 19870
@@ -687,7 +687,7 @@ func TestProposerCalculator_UpdateValidatorSet(t *testing.T) {
 	// added validator
 	a1 := &ValidatorMetadata{Address: types.Address{0x4}, BlsKey: keys[1].PublicKey(), VotingPower: big.NewInt(8)}
 
-	updateValidators(snapshot, []*ValidatorMetadata{u1, a1}, 1)
+	updateValidators(snapshot, []*ValidatorMetadata{u1, a1})
 	// expecting 2 validators with updated voting power and total voting power
 	require.Equal(t, 2, len(snapshot.Validators))
 	require.Equal(t, types.Address{0x1}, snapshot.Validators[0].Metadata.Address)
@@ -728,7 +728,7 @@ func TestProposerCalculator_AddValidator(t *testing.T) {
 
 	a1 := &ValidatorMetadata{Address: types.Address{0x3}, BlsKey: keys[2].PublicKey(), VotingPower: big.NewInt(8)}
 
-	updateValidators(snapshot, []*ValidatorMetadata{v1, v2, a1}, 1)
+	updateValidators(snapshot, []*ValidatorMetadata{v1, v2, a1})
 
 	// updated vp: 8+3+1 = 12
 	// added validator priority = -1.125*8 ~ -13
