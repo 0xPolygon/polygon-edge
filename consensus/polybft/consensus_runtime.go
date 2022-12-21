@@ -9,15 +9,16 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/0xPolygon/go-ibft/messages"
-	"github.com/0xPolygon/go-ibft/messages/proto"
-
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
+	"github.com/0xPolygon/polygon-edge/tracker"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
+
+	"github.com/0xPolygon/go-ibft/messages"
+	"github.com/0xPolygon/go-ibft/messages/proto"
 	hcf "github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
 )
@@ -102,7 +103,7 @@ type consensusRuntime struct {
 	fsm *fsm
 
 	// eventTracker is a reference to the log event tracker
-	eventTracker *eventTracker
+	eventTracker *tracker.EventTracker
 
 	// lock is a lock to access 'epoch' and `lastBuiltBlock`
 	lock sync.RWMutex
@@ -665,14 +666,15 @@ func (c *consensusRuntime) startEventTracker() error {
 		return nil
 	}
 
-	c.eventTracker = &eventTracker{
-		config:     c.config.PolyBFTConfig,
-		subscriber: c,
-		dataDir:    c.config.DataDir,
-		logger:     c.logger.Named("event_tracker"),
-	}
+	c.eventTracker = tracker.NewEventTracker(
+		c.config.DataDir,
+		c.config.PolyBFTConfig.Bridge.JSONRPCEndpoint,
+		ethgo.Address(c.config.PolyBFTConfig.Bridge.BridgeAddr),
+		c,
+		c.logger.Named("event_tracker"),
+	)
 
-	if err := c.eventTracker.start(); err != nil {
+	if err := c.eventTracker.Start(); err != nil {
 		return err
 	}
 

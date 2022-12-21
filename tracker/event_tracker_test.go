@@ -1,4 +1,4 @@
-package relayer
+package tracker
 
 import (
 	"os"
@@ -41,17 +41,17 @@ func TestEventTracker_TrackSyncEvents(t *testing.T) {
 
 	server := testutil.DeployTestServer(t, nil)
 
-	tmpDir, err := os.MkdirTemp("/tmp", "test-relayer-event-tracker")
+	tmpDir, err := os.MkdirTemp("/tmp", "test-event-tracker")
 	defer os.RemoveAll(tmpDir)
 	require.NoError(t, err)
 
 	cc := &testutil.Contract{}
 	cc.AddCallback(func() string {
 		return `
-			event NewBundleCommit(uint256 indexed startId, uint256 indexed endId, bytes32 root);
+			event StateSync(uint256 indexed id, address indexed target, bytes data);
 
 			function emitEvent() public payable {
-				emit NewBundleCommit(0, 10, bytes(""));
+				emit StateSync(1, msg.sender, bytes(""));
 			}
 			`
 	})
@@ -68,15 +68,15 @@ func TestEventTracker_TrackSyncEvents(t *testing.T) {
 
 	sub := &mockEventSubscriber{}
 
-	tracker := &eventTracker{
-		logger:            hclog.NewNullLogger(),
-		subscriber:        sub,
-		dataDir:           tmpDir,
-		rpcEndpoint:       server.HTTPAddr(),
-		stateReceiverAddr: addr,
+	tracker := &EventTracker{
+		logger:       hclog.NewNullLogger(),
+		subscriber:   sub,
+		dataDir:      tmpDir,
+		rpcEndpoint:  server.HTTPAddr(),
+		contractAddr: addr,
 	}
 
-	err = tracker.start()
+	err = tracker.Start()
 	require.NoError(t, err)
 
 	time.Sleep(2 * time.Second)

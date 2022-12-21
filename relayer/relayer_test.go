@@ -23,7 +23,7 @@ func (t *txRelayerMock) Call(from ethgo.Address, to ethgo.Address, input []byte)
 func (t *txRelayerMock) SendTransaction(txn *ethgo.Transaction, key ethgo.Key) (*ethgo.Receipt, error) {
 	args := t.Called(txn, key)
 
-	return nil, args.Error(1)
+	return &ethgo.Receipt{}, args.Error(1)
 }
 
 func (t *txRelayerMock) SendTransactionLocal(txn *ethgo.Transaction) (*ethgo.Receipt, error) {
@@ -78,7 +78,7 @@ func Test_sanitizeRPCEndpoint(t *testing.T) {
 		{
 			"all interfaces with port without schema",
 			"0.0.0.0:10001",
-			"http://localhost:10001",
+			"http://127.0.0.1:10001",
 		},
 		{
 			"url without port",
@@ -88,7 +88,7 @@ func Test_sanitizeRPCEndpoint(t *testing.T) {
 		{
 			"empty endpoint",
 			"",
-			"http://localhost:8545",
+			"http://127.0.0.1:8545",
 		},
 	}
 

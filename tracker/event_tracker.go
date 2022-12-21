@@ -1,4 +1,4 @@
-package polybft
+package tracker
 
 import (
 	"context"
@@ -15,15 +15,32 @@ type eventSubscription interface {
 	AddLog(log *ethgo.Log)
 }
 
-type eventTracker struct {
-	dataDir    string
-	config     *PolyBFTConfig
-	subscriber eventSubscription
-	logger     hcf.Logger
+type EventTracker struct {
+	dataDir      string
+	rpcEndpoint  string
+	contractAddr ethgo.Address
+	subscriber   eventSubscription
+	logger       hcf.Logger
 }
 
-func (e *eventTracker) start() error {
-	provider, err := jsonrpc.NewClient(e.config.Bridge.JSONRPCEndpoint)
+func NewEventTracker(
+	dataDir string,
+	rpcEndpoint string,
+	contractAddr ethgo.Address,
+	subscriber eventSubscription,
+	logger hcf.Logger,
+) *EventTracker {
+	return &EventTracker{
+		dataDir:      dataDir,
+		rpcEndpoint:  rpcEndpoint,
+		contractAddr: contractAddr,
+		subscriber:   subscriber,
+		logger:       logger,
+	}
+}
+
+func (e *EventTracker) Start() error {
+	provider, err := jsonrpc.NewClient(e.rpcEndpoint)
 	if err != nil {
 		return err
 	}
@@ -34,7 +51,7 @@ func (e *eventTracker) start() error {
 		return err
 	}
 
-	e.logger.Info("Start tracking events", "bridge", e.config.Bridge.BridgeAddr)
+	e.logger.Info("Start tracking events", "bridge", e.contractAddr)
 
 	tt, err := tracker.NewTracker(provider.Eth(),
 		tracker.WithBatchSize(10),
@@ -42,7 +59,7 @@ func (e *eventTracker) start() error {
 		tracker.WithFilter(&tracker.FilterConfig{
 			Async: false,
 			Address: []ethgo.Address{
-				ethgo.Address(e.config.Bridge.BridgeAddr),
+				e.contractAddr,
 			},
 		}),
 	)

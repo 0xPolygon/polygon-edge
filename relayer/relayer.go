@@ -8,8 +8,10 @@ import (
 	"strings"
 
 	"github.com/0xPolygon/polygon-edge/contracts"
+	"github.com/0xPolygon/polygon-edge/tracker"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
+
 	hcf "github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
@@ -72,15 +74,15 @@ func NewRelayer(
 }
 
 func (r *Relayer) Start() error {
-	et := eventTracker{
-		dataDir:           r.dataDir,
-		rpcEndpoint:       r.rpcEndpoint,
-		stateReceiverAddr: r.stateReceiverAddr,
-		subscriber:        r,
-		logger:            r.logger,
-	}
+	et := tracker.NewEventTracker(
+		r.dataDir,
+		r.rpcEndpoint,
+		r.stateReceiverAddr,
+		r,
+		r.logger,
+	)
 
-	return et.start()
+	return et.Start()
 }
 
 func (r *Relayer) AddLog(log *ethgo.Log) {
