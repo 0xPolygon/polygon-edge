@@ -277,7 +277,7 @@ type checkpointBackendMock struct {
 	mock.Mock
 }
 
-func (c *checkpointBackendMock) BuildEventRoot(epoch uint64, nonCommittedExitEvents []*ExitEvent) (types.Hash, error) {
+func (c *checkpointBackendMock) BuildEventRoot(epoch uint64) (types.Hash, error) {
 	args := c.Called()
 
 	return args.Get(0).(types.Hash), args.Error(1) //nolint:forcetypeassert

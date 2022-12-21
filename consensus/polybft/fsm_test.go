@@ -149,22 +149,9 @@ func TestFSM_BuildProposal_WithExitEvents(t *testing.T) {
 	stateBlock := createDummyStateBlock(parentBlockNumber+1, parent.Hash, extra)
 	receipts := make([]*types.Receipt, numOfReceipts)
 
-	personType := abi.MustNewType("tuple(string company, string address)")
-	encodedData, err := personType.Encode(map[string]string{"company": "Polygon", "address": "Planet Earth"})
-	require.NoError(t, err)
-
 	for i := 0; i < numOfReceipts; i++ {
 		receipts[i] = &types.Receipt{Logs: []*types.Log{
-			{
-				Address: contracts.L2StateSenderContract,
-				Data:    encodedData,
-				Topics: []types.Hash{
-					types.Hash(exitEventABI.ID()),
-					types.BytesToHash([]byte{uint8(i)}),
-					types.BytesToHash(types.StringToAddress("0x1111").Bytes()),
-					types.BytesToHash(types.StringToAddress("0x2222").Bytes()),
-				},
-			},
+			createTestLogForExitEvent(t, uint64(i)),
 		}}
 	}
 
@@ -176,7 +163,6 @@ func TestFSM_BuildProposal_WithExitEvents(t *testing.T) {
 	mBlockBuilder := new(blockBuilderMock)
 	mBlockBuilder.On("Build", mock.Anything).Return(stateBlock).Once()
 	mBlockBuilder.On("Fill").Once()
-	mBlockBuilder.On("Receipts", mock.Anything).Return(receipts).Once()
 
 	fsm := &fsm{parent: parent, blockBuilder: mBlockBuilder, config: &PolyBFTConfig{}, backend: blockchainMock,
 		validators: validators.toValidatorSetWithError(t), checkpointBackend: runtime, logger: hclog.NewNullLogger(),
@@ -201,59 +187,6 @@ func TestFSM_BuildProposal_WithExitEvents(t *testing.T) {
 
 	mBlockBuilder.AssertExpectations(t)
 	blockchainMock.AssertExpectations(t)
-}
-
-func TestFSM_BuildProposal_WithExitEvents_ErrorInDecoding(t *testing.T) {
-	t.Parallel()
-
-	const (
-		accountCount      = 5
-		committedCount    = 4
-		parentCount       = 3
-		parentBlockNumber = 1023
-		epoch             = 100
-	)
-
-	runtime := &consensusRuntime{
-		state: newTestState(t),
-	}
-
-	validators := newTestValidators(accountCount)
-	validatorSet := validators.getPublicIdentities()
-	extra := createTestExtra(validatorSet, AccountSet{}, accountCount-1, committedCount, parentCount)
-
-	parent := &types.Header{Number: parentBlockNumber, ExtraData: extra}
-	parent.ComputeHash()
-
-	receipt := &types.Receipt{Logs: []*types.Log{
-		{
-			Address: contracts.L2StateSenderContract,
-			Data:    []byte{0, 1}, // invalid data
-			Topics: []types.Hash{
-				types.Hash(exitEventABI.ID()),
-				types.BytesToHash([]byte{111}),
-				types.BytesToHash(types.StringToAddress("0x1111").Bytes()),
-				types.BytesToHash(types.StringToAddress("0x2222").Bytes()),
-			},
-		},
-	}}
-
-	mBlockBuilder := new(blockBuilderMock)
-	mBlockBuilder.On("Fill").Once()
-	mBlockBuilder.On("Receipts", mock.Anything).Return([]*types.Receipt{receipt}).Once()
-
-	fsm := &fsm{parent: parent, blockBuilder: mBlockBuilder, config: &PolyBFTConfig{}, backend: &blockchainMock{},
-		validators: validators.toValidatorSetWithError(t), checkpointBackend: runtime, logger: hclog.NewNullLogger(), epochNumber: epoch}
-
-	proposal, err := fsm.BuildProposal(0)
-	assert.Error(t, err)
-	assert.Nil(t, proposal)
-
-	events, err := runtime.state.getExitEventsByEpoch(epoch)
-	require.NoError(t, err)
-	require.Len(t, events, 0)
-
-	mBlockBuilder.AssertExpectations(t)
 }
 
 func TestFSM_BuildProposal_WithoutUptimeTxGood(t *testing.T) {
@@ -541,7 +474,6 @@ func TestFSM_BuildProposal_NonEpochEndingBlock_ValidatorsDeltaEmpty(t *testing.T
 	blockBuilderMock := &blockBuilderMock{}
 	blockBuilderMock.On("Build", mock.Anything).Return(stateBlock).Once()
 	blockBuilderMock.On("Fill").Once()
-	blockBuilderMock.On("Receipts", mock.Anything).Return([]*types.Receipt{}).Once()
 
 	checkpointBackendMock := new(checkpointBackendMock)
 	checkpointBackendMock.On("BuildEventRoot", mock.Anything, mock.Anything).Return(types.ZeroHash, nil).Once()
@@ -1433,6 +1365,105 @@ func TestFSM_Validate_FailToVerifySignatures(t *testing.T) {
 	polybftBackendMock.AssertExpectations(t)
 }
 
+func TestFSM_InsertBlock_HasEpochEndingExitEvents(t *testing.T) {
+	t.Parallel()
+
+	const (
+		accountCount      = 5
+		parentBlockNumber = uint64(9)
+		signaturesCount   = 3
+		epoch             = uint64(1)
+		exitEventID       = uint64(10)
+	)
+
+	validators := newTestValidators(accountCount)
+	allAccounts := validators.getPrivateIdentities()
+	validatorsMetadata := validators.getPublicIdentities()
+
+	// mock proposal that will get inserted
+	extraParent := createTestExtra(validatorsMetadata, AccountSet{}, len(allAccounts)-1, signaturesCount, signaturesCount)
+	parent := &types.Header{Number: parentBlockNumber, ExtraData: extraParent}
+	extraBlock := createTestExtra(validatorsMetadata, AccountSet{}, len(allAccounts)-1, signaturesCount, signaturesCount)
+	finalBlock := consensus.BuildBlock(consensus.BuildBlockParams{
+		Header: &types.Header{Number: parentBlockNumber + 1, ParentHash: parent.Hash, ExtraData: extraBlock},
+	})
+
+	buildBlock := &types.FullBlock{Block: finalBlock}
+	mBlockBuilder := newBlockBuilderMock(buildBlock)
+	mBackendMock := &blockchainMock{}
+	receipt := &types.Receipt{
+		Logs: []*types.Log{createTestLogForExitEvent(t, exitEventID)},
+	}
+
+	mBackendMock.On("CommitBlock", mock.MatchedBy(func(i interface{}) bool {
+		stateBlock, ok := i.(*types.Block)
+		require.True(t, ok)
+
+		return stateBlock.Number() == buildBlock.Block.Number() && stateBlock.Hash() == buildBlock.Block.Hash()
+	})).Return([]*types.Receipt{receipt}, error(nil)).Once()
+
+	validatorSet, err := NewValidatorSet(validatorsMetadata[0:len(validatorsMetadata)-1], hclog.NewNullLogger())
+	require.NoError(t, err)
+
+	state := newTestState(t)
+	runtime := &consensusRuntime{state: state}
+	fsm := &fsm{parent: parent,
+		blockBuilder:      mBlockBuilder,
+		config:            &PolyBFTConfig{},
+		backend:           mBackendMock,
+		checkpointBackend: runtime,
+		validators:        validatorSet,
+		isEndOfEpoch:      true,
+		epochNumber:       epoch,
+	}
+
+	// add seals for the proposed block that will get inserted
+	var commitedSeals []*messages.CommittedSeal
+
+	for i := 0; i < signaturesCount; i++ {
+		sign, err := allAccounts[i].Bls.Sign(buildBlock.Block.Hash().Bytes())
+		assert.NoError(t, err)
+		sigRaw, err := sign.Marshal()
+		assert.NoError(t, err)
+
+		commitedSeals = append(commitedSeals, &messages.CommittedSeal{
+			Signer:    validatorsMetadata[i].Address.Bytes(),
+			Signature: sigRaw,
+		})
+	}
+
+	proposal := buildBlock.Block.MarshalRLP()
+
+	// insert block
+	block, err := fsm.Insert(proposal, commitedSeals)
+
+	require.NoError(t, err)
+	mBackendMock.AssertExpectations(t)
+	assert.Equal(t, parentBlockNumber+1, block.Number())
+
+	// check that exit event was not added in current epoch
+	_, err = state.getExitEvent(exitEventID, epoch)
+	require.Error(t, err)
+
+	targetErr := &exitEventNotFoundError{}
+	require.ErrorAs(t, err, &targetErr)
+
+	// check that exit event was added in next epoch
+	exitEvent, err := state.getExitEvent(exitEventID, epoch+1)
+	require.NoError(t, err)
+	require.Equal(t, epoch+1, exitEvent.EpochNumber)
+	require.Equal(t, exitEventID, exitEvent.ID)
+	require.Equal(t, block.Header.Number, exitEvent.BlockNumber)
+
+	// check that the exit event is in exit event root for next epoch
+	exitRootHash, err := runtime.BuildEventRoot(epoch + 1)
+	require.NoError(t, err)
+
+	tree, err := createExitTree([]*ExitEvent{exitEvent})
+	require.NoError(t, err)
+	require.Equal(t, tree.Hash(), exitRootHash)
+}
+
 func createDummyStateBlock(blockNumber uint64, parentHash types.Hash, extraData []byte) *types.FullBlock {
 	finalBlock := consensus.BuildBlock(consensus.BuildBlockParams{
 		Header: &types.Header{
@@ -1514,7 +1545,6 @@ func newBlockBuilderMock(stateBlock *types.FullBlock) *blockBuilderMock {
 	mBlockBuilder := new(blockBuilderMock)
 	mBlockBuilder.On("Build", mock.Anything).Return(stateBlock).Once()
 	mBlockBuilder.On("Fill", mock.Anything).Once()
-	mBlockBuilder.On("Receipts", mock.Anything).Return([]*types.Receipt{}).Once()
 
 	return mBlockBuilder
 }
@@ -1601,4 +1631,25 @@ func generateValidatorDelta(validatorCount int, allAccounts, previousValidatorSe
 	}
 
 	return
+}
+
+func createTestLogForExitEvent(t *testing.T, exitEventID uint64) *types.Log {
+	t.Helper()
+
+	topics := make([]types.Hash, 4)
+	topics[0] = types.Hash(exitEventABI.ID())
+	topics[1] = types.BytesToHash(itob(exitEventID))
+	topics[2] = types.BytesToHash(types.StringToAddress("0x1111").Bytes())
+	topics[3] = types.BytesToHash(types.StringToAddress("0x2222").Bytes())
+	someType := abi.MustNewType("tuple(string firstName, string lastName)")
+	encodedData, err := someType.Encode(map[string]string{"firstName": "John", "lastName": "Doe"})
+	require.NoError(t, err)
+
+	log := &types.Log{
+		Address: contracts.L2StateSenderContract,
+		Topics:  topics,
+		Data:    encodedData,
+	}
+
+	return log
 }
