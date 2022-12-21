@@ -2,6 +2,7 @@ package tracker
 
 import (
 	"os"
+	"path"
 	"sync"
 	"testing"
 	"time"
@@ -71,7 +72,7 @@ func TestEventTracker_TrackSyncEvents(t *testing.T) {
 	tracker := &EventTracker{
 		logger:       hclog.NewNullLogger(),
 		subscriber:   sub,
-		dataDir:      tmpDir,
+		dbPath:       path.Join(tmpDir, "test.db"),
 		rpcEndpoint:  server.HTTPAddr(),
 		contractAddr: addr,
 	}
