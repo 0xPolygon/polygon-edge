@@ -1403,7 +1403,7 @@ func TestFSM_InsertBlock_HasEpochEndingExitEvents(t *testing.T) {
 		return stateBlock.Block.Number() == buildBlock.Block.Number() && stateBlock.Block.Hash() == buildBlock.Block.Hash()
 	})).Return(error(nil)).Once()
 
-	validatorSet, err := NewValidatorSet(validatorsMetadata[0:len(validatorsMetadata)-1], hclog.NewNullLogger())
+	validatorSet, err := NewValidatorSet(validatorsMetadata, hclog.NewNullLogger())
 	require.NoError(t, err)
 
 	state := newTestState(t)
