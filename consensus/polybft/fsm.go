@@ -23,7 +23,7 @@ type blockBuilder interface {
 	Reset() error
 	WriteTx(*types.Transaction) error
 	Fill()
-	Build(func(h *types.Header)) (*StateBlock, error)
+	Build(func(h *types.Header)) (*types.FullBlock, error)
 	GetState() *state.Transition
 	Receipts() []*types.Receipt
 }
@@ -81,7 +81,7 @@ type fsm struct {
 	logger hcf.Logger
 
 	// target is the block being computed
-	target *StateBlock
+	target *types.FullBlock
 }
 
 // BuildProposal builds a proposal for the current round (used if proposer)
