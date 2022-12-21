@@ -106,7 +106,7 @@ func (r *Relayer) AddLog(log *ethgo.Log) {
 
 		r.logger.Info("Commit", "Block", log.BlockNumber, "StartID", startID, "EndID", endID)
 
-		for i := startID; i < endID; i++ {
+		for i := startID; i <= endID; i++ {
 			// query the state sync proof
 			stateSyncProof, err := r.queryStateSyncProof(strconv.Itoa(int(i)))
 			if err != nil {
@@ -137,9 +137,7 @@ func (r *Relayer) queryStateSyncProof(stateSyncID string) (*types.StateSyncProof
 
 // executeStateSync executes the state sync
 func (r *Relayer) executeStateSync(stateSyncProof *types.StateSyncProof) error {
-	input, err := types.ExecuteStateSyncABIMethod.Encode(
-		[2]interface{}{stateSyncProof.Proof, stateSyncProof.StateSync.ToMap()},
-	)
+	input, err := stateSyncProof.EncodeAbi()
 	if err != nil {
 		return err
 	}
@@ -158,7 +156,7 @@ func (r *Relayer) executeStateSync(stateSyncProof *types.StateSyncProof) error {
 		return fmt.Errorf("failed to send state sync transaction: %w", err)
 	}
 
-	if receipt.Status == 0 {
+	if receipt.Status == uint64(types.ReceiptSuccess) {
 		return fmt.Errorf("state sync execution failed")
 	}
 
