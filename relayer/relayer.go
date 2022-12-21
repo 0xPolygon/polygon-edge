@@ -151,7 +151,14 @@ func (r *Relayer) executeStateSync(stateSyncProof *types.StateSyncProof) error {
 		Input:    input,
 	}
 
-	_, err = r.txRelayer.SendTransaction(txn, r.key)
+	receipt, err := r.txRelayer.SendTransaction(txn, r.key)
+	if err != nil {
+		return fmt.Errorf("failed to send state sync transaction: %w", err)
+	}
 
-	return err
+	if receipt.Status == 0 {
+		return fmt.Errorf("state sync execution failed")
+	}
+
+	return nil
 }
