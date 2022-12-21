@@ -32,8 +32,6 @@ type SystemState interface {
 	GetValidatorSet() (AccountSet, error)
 	// GetEpoch retrieves current epoch number from the smart contract
 	GetEpoch() (uint64, error)
-	// GetNextExecutionIndex retrieves next bridge state sync index
-	GetNextExecutionIndex() (uint64, error)
 	// GetNextCommittedIndex retrieves next committed bridge state sync index
 	GetNextCommittedIndex() (uint64, error)
 }
@@ -137,21 +135,6 @@ func (s *SystemStateImpl) GetEpoch() (uint64, error) {
 	}
 
 	return epochNumber.Uint64(), nil
-}
-
-// GetNextExecutionIndex retrieves next bridge state sync index
-func (s *SystemStateImpl) GetNextExecutionIndex() (uint64, error) {
-	rawResult, err := s.sidechainBridgeContract.Call("counter", ethgo.Latest)
-	if err != nil {
-		return 0, err
-	}
-
-	nextExecutionIndex, isOk := rawResult["0"].(*big.Int)
-	if !isOk {
-		return 0, fmt.Errorf("failed to decode next execution index")
-	}
-
-	return nextExecutionIndex.Uint64() + 1, nil
 }
 
 // GetNextCommittedIndex retrieves next committed bridge state sync index

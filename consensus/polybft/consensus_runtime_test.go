@@ -30,7 +30,6 @@ func TestConsensusRuntime_GetVotes(t *testing.T) {
 	const (
 		epoch           = uint64(1)
 		validatorsCount = 7
-		bundleSize      = 5
 		stateSyncsCount = 15
 	)
 
@@ -45,7 +44,7 @@ func TestConsensusRuntime_GetVotes(t *testing.T) {
 		},
 	}
 
-	commitment, _, _ := buildCommitmentAndStateSyncs(t, stateSyncsCount, epoch, bundleSize, 0)
+	commitment, _, _ := buildCommitmentAndStateSyncs(t, stateSyncsCount, epoch, 0)
 
 	quorumSize := validatorAccounts.toValidatorSetWithError(t).getQuorumSize()
 
@@ -80,12 +79,11 @@ func TestConsensusRuntime_GetVotesError(t *testing.T) {
 		epoch           = uint64(1)
 		stateSyncsCount = 30
 		startIndex      = 0
-		bundleSize      = uint64(5)
 	)
 
 	state := newTestState(t)
 	runtime := &consensusRuntime{state: state}
-	commitment, _, _ := buildCommitmentAndStateSyncs(t, 5, epoch, bundleSize, startIndex)
+	commitment, _, _ := buildCommitmentAndStateSyncs(t, 5, epoch, startIndex)
 	hash, err := commitment.Hash()
 	require.NoError(t, err)
 	_, err = runtime.state.getMessageVotes(epoch, hash.Bytes())
@@ -592,8 +590,8 @@ func TestConsensusRuntime_FSM_EndOfEpoch_BuildRegisterCommitment_And_Uptime(t *t
 		epoch               = 0
 		epochSize           = uint64(10)
 		sprintSize          = uint64(3)
+		commitmentSize      = 10
 		beginStateSyncIndex = uint64(0)
-		bundleSize          = stateSyncBundleSize
 		fromIndex           = uint64(0)
 		toIndex             = uint64(9)
 	)
@@ -605,7 +603,6 @@ func TestConsensusRuntime_FSM_EndOfEpoch_BuildRegisterCommitment_And_Uptime(t *t
 	lastBuiltBlock, headerMap := createTestBlocksForUptime(t, 9, validators)
 
 	systemStateMock := new(systemStateMock)
-	systemStateMock.On("GetNextExecutionIndex").Return(beginStateSyncIndex, nil).Once()
 	systemStateMock.On("GetNextCommittedIndex").Return(beginStateSyncIndex, nil).Once()
 
 	blockchainMock := new(blockchainMock)
@@ -617,12 +614,12 @@ func TestConsensusRuntime_FSM_EndOfEpoch_BuildRegisterCommitment_And_Uptime(t *t
 	state := newTestState(t)
 	require.NoError(t, state.insertEpoch(epoch))
 
-	stateSyncs := generateStateSyncEvents(t, bundleSize, 0)
+	stateSyncs := generateStateSyncEvents(t, commitmentSize, 0)
 	for _, event := range stateSyncs {
 		require.NoError(t, state.insertStateSyncEvent(event))
 	}
 
-	trie, err := createMerkleTree(stateSyncs, bundleSize)
+	trie, err := createMerkleTree(stateSyncs)
 	require.NoError(t, err)
 
 	commitment := &Commitment{MerkleTree: trie, Epoch: epoch}
@@ -678,7 +675,6 @@ func TestConsensusRuntime_FSM_EndOfEpoch_BuildRegisterCommitment_And_Uptime(t *t
 	assert.NotNil(t, fsm.proposerCommitmentToRegister)
 	assert.Equal(t, fromIndex, fsm.proposerCommitmentToRegister.Message.FromIndex)
 	assert.Equal(t, toIndex, fsm.proposerCommitmentToRegister.Message.ToIndex)
-	assert.Equal(t, uint64(bundleSize), fsm.proposerCommitmentToRegister.Message.BundleSize)
 	assert.Equal(t, trie.Hash(), fsm.proposerCommitmentToRegister.Message.MerkleRootHash)
 
 	systemStateMock.AssertExpectations(t)
@@ -699,7 +695,6 @@ func TestConsensusRuntime_FSM_EndOfEpoch_RegisterCommitmentNotFound(t *testing.T
 	lastBuiltBlock, headerMap := createTestBlocksForUptime(t, 9, validators)
 
 	systemStateMock := new(systemStateMock)
-	systemStateMock.On("GetNextExecutionIndex").Return(beginStateSyncIndex, nil).Once()
 	systemStateMock.On("GetNextCommittedIndex").Return(beginStateSyncIndex, nil).Once()
 
 	blockchainMock := new(blockchainMock)
@@ -749,9 +744,9 @@ func TestConsensusRuntime_FSM_EndOfEpoch_BuildRegisterCommitment_QuorumNotReache
 	const (
 		epoch               = 0
 		epochSize           = uint64(10)
+		commitmentSize      = 10
 		sprintSize          = uint64(5)
 		beginStateSyncIndex = uint64(0)
-		bundleSize          = stateSyncBundleSize
 	)
 
 	validatorAccs := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
@@ -759,7 +754,6 @@ func TestConsensusRuntime_FSM_EndOfEpoch_BuildRegisterCommitment_QuorumNotReache
 	lastBuiltBlock, headerMap := createTestBlocksForUptime(t, 9, validators)
 
 	systemStateMock := new(systemStateMock)
-	systemStateMock.On("GetNextExecutionIndex").Return(beginStateSyncIndex, nil).Once()
 	systemStateMock.On("GetNextCommittedIndex").Return(beginStateSyncIndex, nil).Once()
 
 	blockchainMock := new(blockchainMock)
@@ -771,12 +765,12 @@ func TestConsensusRuntime_FSM_EndOfEpoch_BuildRegisterCommitment_QuorumNotReache
 	state := newTestState(t)
 	require.NoError(t, state.insertEpoch(epoch))
 
-	stateSyncs := generateStateSyncEvents(t, bundleSize, 0)
+	stateSyncs := generateStateSyncEvents(t, commitmentSize, 0)
 	for _, event := range stateSyncs {
 		require.NoError(t, state.insertStateSyncEvent(event))
 	}
 
-	trie, err := createMerkleTree(stateSyncs, bundleSize)
+	trie, err := createMerkleTree(stateSyncs)
 	require.NoError(t, err)
 
 	commitment := &Commitment{MerkleTree: trie, Epoch: epoch}
@@ -890,7 +884,7 @@ func Test_NewConsensusRuntime(t *testing.T) {
 	polybftBackendMock.AssertExpectations(t)
 }
 
-func TestConsensusRuntime_FSM_EndOfSprint_HasBundlesToExecute(t *testing.T) {
+func TestConsensusRuntime_FSM_EndOfSprint_HasCommitmentsToRegister(t *testing.T) {
 	t.Parallel()
 
 	const (
@@ -898,7 +892,7 @@ func TestConsensusRuntime_FSM_EndOfSprint_HasBundlesToExecute(t *testing.T) {
 		fromIndex          = uint64(5)
 		nextCommittedIndex = uint64(3)
 		stateSyncsCount    = 30
-		bundleSize         = stateSyncsCount / 3
+		commitmentSize     = stateSyncsCount / 3
 	)
 
 	state := newTestState(t)
@@ -907,11 +901,10 @@ func TestConsensusRuntime_FSM_EndOfSprint_HasBundlesToExecute(t *testing.T) {
 
 	stateSyncs := insertTestStateSyncEvents(t, stateSyncsCount, fromIndex, state)
 
-	commitment, err := NewCommitment(epochNumber, fromIndex, fromIndex+bundleSize, bundleSize, stateSyncs)
+	commitment, err := NewCommitment(epochNumber, stateSyncs)
 	require.NoError(t, err)
 
-	commitmentMsg := NewCommitmentMessage(commitment.MerkleTree.Hash(), fromIndex,
-		fromIndex+bundleSize, bundleSize)
+	commitmentMsg := NewCommitmentMessage(commitment.MerkleTree.Hash(), fromIndex, fromIndex+commitmentSize)
 	signedCommitmentMsg := &CommitmentMessageSigned{
 		Message:      commitmentMsg,
 		AggSignature: Signature{},
@@ -932,7 +925,6 @@ func TestConsensusRuntime_FSM_EndOfSprint_HasBundlesToExecute(t *testing.T) {
 
 	systemStateMock := new(systemStateMock)
 	systemStateMock.On("GetNextCommittedIndex").Return(nextCommittedIndex, nil).Once()
-	systemStateMock.On("GetNextExecutionIndex").Return(uint64(stateSyncMainBundleSize), nil).Once()
 
 	blockchainMock := new(blockchainMock)
 	blockchainMock.On("NewBlockBuilder").Return(&BlockBuilder{}, nil).Once()
@@ -974,7 +966,7 @@ func TestConsensusRuntime_FSM_EndOfSprint_HasBundlesToExecute(t *testing.T) {
 		lastBuiltBlock: lastBlock,
 	}
 
-	require.NoError(t, runtime.buildBundles(runtime.getEpoch().Commitment, commitmentMsg, fromIndex))
+	require.NoError(t, runtime.buildProofs(runtime.getEpoch().Commitment, commitmentMsg))
 
 	err = runtime.FSM()
 	fsm := runtime.fsm
@@ -1297,7 +1289,7 @@ func TestConsensusRuntime_restartEpoch_FirstRestart_BuildsCommitment(t *testing.
 
 	commitmentHash, err := commitment.Hash()
 	require.NoError(t, err)
-	stateSyncsTrie, err := createMerkleTree(stateSyncs[nextCommittedIndex:nextCommittedIndex+stateSyncMainBundleSize], stateSyncBundleSize)
+	stateSyncsTrie, err := createMerkleTree(stateSyncs[nextCommittedIndex : nextCommittedIndex+stateSyncCommitmentSize])
 	require.NoError(t, err)
 	require.Equal(t, stateSyncsTrie.Hash(), commitment.MerkleTree.Hash())
 
@@ -1367,7 +1359,7 @@ func TestConsensusRuntime_restartEpoch_NewEpochToRun_BuildCommitment(t *testing.
 	}
 
 	state := newTestState(t)
-	allStateSyncs := insertTestStateSyncEvents(t, 4*stateSyncMainBundleSize, 0, state)
+	allStateSyncs := insertTestStateSyncEvents(t, 4*stateSyncCommitmentSize, 0, state)
 
 	transportMock := &transportMock{}
 	transportMock.On("Multicast", mock.Anything).Once()
@@ -1459,7 +1451,7 @@ func TestConsensusRuntime_restartEpoch_NewEpochToRun_BuildCommitment(t *testing.
 		require.NoError(t, err)
 	}
 
-	stateSyncTrie, err := createMerkleTree(allStateSyncs[nextCommittedIndex:nextCommittedIndex+stateSyncMainBundleSize], stateSyncBundleSize)
+	stateSyncTrie, err := createMerkleTree(allStateSyncs[nextCommittedIndex : nextCommittedIndex+stateSyncCommitmentSize])
 	require.NoError(t, err)
 	require.NotNil(t, stateSyncTrie)
 
@@ -1468,7 +1460,7 @@ func TestConsensusRuntime_restartEpoch_NewEpochToRun_BuildCommitment(t *testing.
 	require.NotNil(t, commitmentMsgSigned)
 	require.Equal(t, stateSyncTrie.Hash(), commitmentMsgSigned.Message.MerkleRootHash)
 	require.Equal(t, nextCommittedIndex, commitmentMsgSigned.Message.FromIndex)
-	require.Equal(t, nextCommittedIndex+stateSyncMainBundleSize-1, commitmentMsgSigned.Message.ToIndex)
+	require.Equal(t, nextCommittedIndex+stateSyncCommitmentSize-1, commitmentMsgSigned.Message.ToIndex)
 
 	transportMock.AssertExpectations(t)
 	systemStateMock.AssertExpectations(t)
@@ -1564,7 +1556,7 @@ func TestConsensusRuntime_validateVote_VoteSentFromUnknownValidator(t *testing.T
 		fmt.Sprintf("message is received from sender %s, which is not in current validator set", vote.From))
 }
 
-func TestConsensusRuntime_buildBundles_NoCommitment(t *testing.T) {
+func TestConsensusRuntime_buildProofs_NoCommitment(t *testing.T) {
 	t.Parallel()
 
 	state := newTestState(t)
@@ -1573,7 +1565,7 @@ func TestConsensusRuntime_buildBundles_NoCommitment(t *testing.T) {
 		State: state,
 	}
 
-	commitmentMsg := NewCommitmentMessage(types.Hash{}, 0, 4, 5)
+	commitmentMsg := NewCommitmentMessage(types.Hash{}, 0, 4)
 	runtime := &consensusRuntime{
 		logger:             hclog.NewNullLogger(),
 		state:              config.State,
@@ -1585,31 +1577,30 @@ func TestConsensusRuntime_buildBundles_NoCommitment(t *testing.T) {
 
 	guardedData, err := runtime.getGuardedData()
 	require.NoError(t, err)
-	assert.NoError(t, runtime.buildBundles(guardedData.epoch.Commitment, commitmentMsg, 0))
+	assert.NoError(t, runtime.buildProofs(guardedData.epoch.Commitment, commitmentMsg))
 
-	bundles, err := state.getBundles(0, 4)
+	proof, err := state.getStateSyncProof(0)
 
 	assert.NoError(t, err)
-	assert.Nil(t, bundles)
+	assert.Nil(t, proof)
 }
 
-func TestConsensusRuntime_buildBundles(t *testing.T) {
+func TestConsensusRuntime_buildProofs(t *testing.T) {
 	t.Parallel()
 
 	const (
-		epoch                 = 0
-		bundleSize            = 5
-		fromIndex             = 0
-		toIndex               = 4
-		expectedBundlesNumber = 1
+		epoch          = 0
+		commitmentSize = 5
+		fromIndex      = 0
+		toIndex        = 4
 	)
 
 	state := newTestState(t)
-	stateSyncs := insertTestStateSyncEvents(t, bundleSize, 0, state)
-	trie, err := createMerkleTree(stateSyncs, bundleSize)
+	stateSyncs := insertTestStateSyncEvents(t, commitmentSize, 0, state)
+	trie, err := createMerkleTree(stateSyncs)
 	require.NoError(t, err)
 
-	commitmentMsg := NewCommitmentMessage(trie.Hash(), fromIndex, toIndex, bundleSize)
+	commitmentMsg := NewCommitmentMessage(trie.Hash(), fromIndex, toIndex)
 	commitmentMsgSigned := &CommitmentMessageSigned{
 		Message: commitmentMsg,
 		AggSignature: Signature{
@@ -1641,11 +1632,15 @@ func TestConsensusRuntime_buildBundles(t *testing.T) {
 
 	guardedData, err := runtime.getGuardedData()
 	require.NoError(t, err)
-	assert.NoError(t, runtime.buildBundles(guardedData.epoch.Commitment, commitmentMsg, 0))
+	assert.NoError(t, runtime.buildProofs(guardedData.epoch.Commitment, commitmentMsg))
 
-	bundles, err := state.getBundles(fromIndex, maxBundlesPerSprint)
-	assert.NoError(t, err)
-	assert.Equal(t, expectedBundlesNumber, len(bundles))
+	for i := fromIndex; i <= toIndex; i++ {
+		proof, err := state.getStateSyncProof(uint64(i))
+		assert.NoError(t, err)
+		assert.NotNil(t, proof)
+		assert.NotEmpty(t, proof.Proof)
+		assert.Equal(t, uint64(i), proof.StateSync.ID)
+	}
 }
 
 func TestConsensusRuntime_FSM_EndOfEpoch_OnBlockInserted(t *testing.T) {
@@ -1669,7 +1664,7 @@ func TestConsensusRuntime_FSM_EndOfEpoch_OnBlockInserted(t *testing.T) {
 	systemStateMock := new(systemStateMock)
 	systemStateMock.On("GetEpoch").Return(epoch)
 	systemStateMock.On("GetNextCommittedIndex").Return(beginStateSyncIndex, nil)
-	systemStateMock.On("GetNextExecutionIndex").Return(beginStateSyncIndex, nil)
+	// systemStateMock.On("GetNextExecutionIndex").Return(beginStateSyncIndex, nil)
 
 	blockchainMock := new(blockchainMock)
 	blockchainMock.On("NewBlockBuilder", mock.Anything).Return(&BlockBuilder{}, nil).Once()
@@ -1685,12 +1680,12 @@ func TestConsensusRuntime_FSM_EndOfEpoch_OnBlockInserted(t *testing.T) {
 	state := newTestState(t)
 	require.NoError(t, state.insertEpoch(epoch))
 
-	stateSyncs := generateStateSyncEvents(t, stateSyncMainBundleSize, 0)
+	stateSyncs := generateStateSyncEvents(t, stateSyncCommitmentSize, 0)
 	for _, event := range stateSyncs {
 		require.NoError(t, state.insertStateSyncEvent(event))
 	}
 
-	trie, err := createMerkleTree(stateSyncs, stateSyncBundleSize)
+	trie, err := createMerkleTree(stateSyncs)
 	require.NoError(t, err)
 
 	commitment := &Commitment{MerkleTree: trie, Epoch: epoch}
@@ -1747,7 +1742,6 @@ func TestConsensusRuntime_FSM_EndOfEpoch_OnBlockInserted(t *testing.T) {
 	assert.NotNil(t, fsm.proposerCommitmentToRegister)
 	assert.Equal(t, fromIndex, fsm.proposerCommitmentToRegister.Message.FromIndex)
 	assert.Equal(t, toIndex, fsm.proposerCommitmentToRegister.Message.ToIndex)
-	assert.Equal(t, uint64(stateSyncBundleSize), fsm.proposerCommitmentToRegister.Message.BundleSize)
 	assert.Equal(t, trie.Hash(), fsm.proposerCommitmentToRegister.Message.MerkleRootHash)
 	assert.NotNil(t, fsm.proposerCommitmentToRegister.AggSignature)
 	assert.True(t, fsm.isEndOfEpoch)
@@ -1780,13 +1774,12 @@ func TestConsensusRuntime_FSM_EndOfEpoch_OnBlockInserted(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, fromIndex, commitmentMsgFromDB.Message.FromIndex)
 	assert.Equal(t, toIndex, commitmentMsgFromDB.Message.ToIndex)
-	assert.Equal(t, uint64(stateSyncBundleSize), commitmentMsgFromDB.Message.BundleSize)
 	assert.Equal(t, trie.Hash(), commitmentMsgFromDB.Message.MerkleRootHash)
 	assert.NotNil(t, commitmentMsgFromDB.AggSignature)
 
-	bundles, err := state.getBundles(fromIndex, maxBundlesPerSprint)
+	proof, err := state.getStateSyncProof(fromIndex)
 	assert.NoError(t, err)
-	assert.Equal(t, 10, len(bundles))
+	assert.Equal(t, fromIndex, proof.StateSync.ID)
 
 	systemStateMock.AssertExpectations(t)
 	blockchainMock.AssertExpectations(t)
@@ -2437,7 +2430,7 @@ func setupExitEventsForProofVerification(t *testing.T, state *State,
 	return encodedEvents
 }
 
-func insertTestStateSyncEvents(t *testing.T, numberOfEvents int, startIndex uint64, state *State) []*StateSyncEvent {
+func insertTestStateSyncEvents(t *testing.T, numberOfEvents int, startIndex uint64, state *State) []*types.StateSyncEvent {
 	t.Helper()
 
 	stateSyncs := generateStateSyncEvents(t, numberOfEvents, startIndex)

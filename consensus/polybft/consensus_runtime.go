@@ -242,9 +242,9 @@ func (c *consensusRuntime) OnBlockInserted(block *types.Block) {
 	// after the block has been written we reset the txpool so that the old transactions are removed
 	c.config.txPool.ResetWithHeaders(block.Header)
 
-	// handle commitment and bundles creation
-	if err := c.createCommitmentAndBundles(block.Transactions); err != nil {
-		c.logger.Error("failed to create commitments and bundles", "error", err)
+	// handle commitment and proofs creation
+	if err := c.getCommitmentFromTransactions(block.Transactions); err != nil {
+		c.logger.Error("failed to retrieve commitment from transactions", "err", err)
 	}
 
 	var (
@@ -270,9 +270,9 @@ func (c *consensusRuntime) OnBlockInserted(block *types.Block) {
 	c.lastBuiltBlock = block.Header
 }
 
-func (c *consensusRuntime) createCommitmentAndBundles(txs []*types.Transaction) error {
-	parentBlock, epoch := c.lastBuiltBlock, c.epoch
-
+// getCommitmentFromTransactions gets the registered commitment (if any)
+// from a transaction, and builds proofs for it
+func (c *consensusRuntime) getCommitmentFromTransactions(txs []*types.Transaction) error {
 	if !c.IsBridgeEnabled() {
 		return nil
 	}
@@ -291,21 +291,9 @@ func (c *consensusRuntime) createCommitmentAndBundles(txs []*types.Transaction) 
 		return fmt.Errorf("insert commitment message error: %w", err)
 	}
 
-	// TODO: keep systemState.GetNextExecutionIndex() also in cr?
-	// Maybe some immutable structure `consensusMetaData`?
-	systemState, err := c.getSystemState(parentBlock)
-	if err != nil {
-		return fmt.Errorf("build bundles, get system state error: %w", err)
-	}
-
-	nextStateSyncExecutionIdx, err := systemState.GetNextExecutionIndex()
-	if err != nil {
-		return fmt.Errorf("build bundles, get next execution index error: %w", err)
-	}
-
-	if err := c.buildBundles(
-		epoch.Commitment, commitment.Message, nextStateSyncExecutionIdx); err != nil {
-		return fmt.Errorf("build bundles error: %w", err)
+	if err := c.buildProofs(
+		c.epoch.Commitment, commitment.Message); err != nil {
+		return fmt.Errorf("build commitment proofs error: %w", err)
 	}
 
 	return nil
@@ -322,13 +310,6 @@ func (c *consensusRuntime) populateFsmIfBridgeEnabled(
 	if err != nil {
 		return err
 	}
-
-	nextStateSyncExecutionIdx, err := systemState.GetNextExecutionIndex()
-	if err != nil {
-		return fmt.Errorf("cannot get next execution index: %w", err)
-	}
-
-	ff.stateSyncExecutionIndex = nextStateSyncExecutionIdx
 
 	nextRegisteredCommitmentIndex, err := systemState.GetNextCommittedIndex()
 	if err != nil {
@@ -356,12 +337,6 @@ func (c *consensusRuntime) populateFsmIfBridgeEnabled(
 		}
 
 		ff.proposerCommitmentToRegister = commitment
-	}
-
-	if isEndOfSprint {
-		if err := c.state.cleanCommitments(nextStateSyncExecutionIdx); err != nil {
-			return fmt.Errorf("cannot clean commitments: %w", err)
-		}
 	}
 
 	return nil
@@ -516,7 +491,7 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) (*epochMetadata, e
 // buildCommitment builds a commitment message (if it is not already built in previous epoch)
 // for state sync events starting from given index and saves the message in database
 func (c *consensusRuntime) buildCommitment(epoch, fromIndex uint64) (*Commitment, error) {
-	toIndex := fromIndex + stateSyncMainBundleSize - 1
+	toIndex := fromIndex + stateSyncCommitmentSize - 1
 	// if it is not already built in the previous epoch
 	stateSyncEvents, err := c.state.getStateSyncEventsForCommitment(fromIndex, toIndex)
 	if err != nil {
@@ -530,7 +505,7 @@ func (c *consensusRuntime) buildCommitment(epoch, fromIndex uint64) (*Commitment
 		return nil, err
 	}
 
-	commitment, err := NewCommitment(epoch, fromIndex, toIndex, stateSyncBundleSize, stateSyncEvents)
+	commitment, err := NewCommitment(epoch, stateSyncEvents)
 	if err != nil {
 		return nil, err
 	}
@@ -577,14 +552,12 @@ func (c *consensusRuntime) buildCommitment(epoch, fromIndex uint64) (*Commitment
 	return commitment, nil
 }
 
-// buildBundles builds bundles if there is a created commitment by the validator and inserts them into db
-func (c *consensusRuntime) buildBundles(commitment *Commitment, commitmentMsg *CommitmentMessage,
-	stateSyncExecutionIndex uint64) error {
+// buildProofs builds state sync proofs if there is a created commitment by the validator and inserts them into db
+func (c *consensusRuntime) buildProofs(commitment *Commitment, commitmentMsg *CommitmentMessage) error {
 	c.logger.Debug(
 		"[buildProofs] Building proofs...",
 		"fromIndex", commitmentMsg.FromIndex,
 		"toIndex", commitmentMsg.ToIndex,
-		"nextExecutionIndex", stateSyncExecutionIndex,
 	)
 
 	if commitment == nil {
@@ -596,32 +569,29 @@ func (c *consensusRuntime) buildBundles(commitment *Commitment, commitmentMsg *C
 		return nil
 	}
 
-	var bundleProofs []*BundleProof
+	events, err := c.state.getStateSyncEventsForCommitment(commitmentMsg.FromIndex, commitmentMsg.ToIndex)
+	if err != nil {
+		return err
+	}
 
-	for idx := uint64(0); idx < commitmentMsg.BundlesCount(); idx++ {
-		p := commitment.MerkleTree.GenerateProof(idx, 0)
-		events, err := c.getStateSyncEventsForBundle(commitmentMsg.GetFirstStateSyncIndexFromBundleIndex(idx),
-			commitmentMsg.BundleSize)
+	stateSyncProofs := make([]*types.StateSyncProof, len(events))
 
-		if err != nil {
-			return err
+	for i, event := range events {
+		p := commitment.MerkleTree.GenerateProof(uint64(i), 0)
+
+		stateSyncProofs[i] = &types.StateSyncProof{
+			Proof:     p,
+			StateSync: event,
 		}
-
-		bundleProofs = append(bundleProofs,
-			&BundleProof{
-				Proof:      p,
-				StateSyncs: events,
-			})
 	}
 
 	c.logger.Debug(
 		"[buildProofs] Building proofs finished.",
 		"fromIndex", commitmentMsg.FromIndex,
 		"toIndex", commitmentMsg.ToIndex,
-		"nextExecutionIndex", stateSyncExecutionIndex,
 	)
 
-	return c.state.insertBundles(bundleProofs)
+	return c.state.insertStateSyncProofs(stateSyncProofs)
 }
 
 // getAggSignatureForCommitmentMessage creates aggregated signatures for given commitment
@@ -687,13 +657,6 @@ func (c *consensusRuntime) getAggSignatureForCommitmentMessage(
 	}
 
 	return result, publicKeys, nil
-}
-
-// getStateSyncEventsForBundle gets state sync events from database for the appropriate bundle
-func (c *consensusRuntime) getStateSyncEventsForBundle(from, bundleSize uint64) ([]*StateSyncEvent, error) {
-	until := bundleSize + from - 1
-
-	return c.state.getStateSyncEventsForCommitment(from, until)
 }
 
 // startEventTracker starts the event tracker that listens to state sync events
@@ -928,27 +891,18 @@ func (c *consensusRuntime) GenerateExitProof(exitID, epoch, checkpointBlock uint
 	}, nil
 }
 
-// GetStateSyncProof returns the proof of the bundle for the state sync
+// GetStateSyncProof returns the proof for the state sync
 func (c *consensusRuntime) GetStateSyncProof(stateSyncID uint64) (*types.StateSyncProof, error) {
-	bundlesToExecute, err := c.state.getBundles(stateSyncID, 1)
+	proof, err := c.state.getStateSyncProof(stateSyncID)
 	if err != nil {
-		return nil, fmt.Errorf("cannot get bundles: %w", err)
+		return nil, fmt.Errorf("cannot get state sync proof for StateSync id %d: %w", stateSyncID, err)
 	}
 
-	if len(bundlesToExecute) == 0 {
-		return nil, fmt.Errorf("cannot find bundle containing StateSync id %d", stateSyncID)
+	if proof == nil {
+		return nil, fmt.Errorf("cannot find state sync proof containing StateSync id %d", stateSyncID)
 	}
 
-	for _, bundle := range bundlesToExecute[0].StateSyncs {
-		if bundle.ID == stateSyncID {
-			return &types.StateSyncProof{
-				Proof:     bundlesToExecute[0].Proof,
-				StateSync: types.StateSyncEvent(*bundle),
-			}, nil
-		}
-	}
-
-	return nil, fmt.Errorf("cannot find StateSync with id %d", stateSyncID)
+	return proof, nil
 }
 
 // setIsActiveValidator updates the activeValidatorFlag field
@@ -993,12 +947,11 @@ func (c *consensusRuntime) getCommitmentToRegister(epoch *epochMetadata,
 		return nil, errCommitmentNotBuilt
 	}
 
-	toIndex := registerCommitmentIndex + stateSyncMainBundleSize - 1
+	toIndex := registerCommitmentIndex + stateSyncCommitmentSize - 1
 	commitmentMessage := NewCommitmentMessage(
 		epoch.Commitment.MerkleTree.Hash(),
 		registerCommitmentIndex,
-		toIndex,
-		stateSyncBundleSize)
+		toIndex)
 
 	commitmentHash, err := epoch.Commitment.Hash()
 	if err != nil {

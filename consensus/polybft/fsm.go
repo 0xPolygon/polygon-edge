@@ -28,8 +28,6 @@ type blockBuilder interface {
 	Receipts() []*types.Receipt
 }
 
-const maxBundlesPerSprint = 50
-
 type fsm struct {
 	// PolyBFT consensus protocol configuration
 	config *PolyBFTConfig
@@ -66,16 +64,6 @@ type fsm struct {
 
 	// proposerCommitmentToRegister is a commitment that is registered via state transaction by proposer
 	proposerCommitmentToRegister *CommitmentMessageSigned
-
-	// bundleProofs is an array of bundles to be executed on end of sprint
-	bundleProofs []*BundleProof
-
-	// commitmentsToVerifyBundles is an array of commitment messages that were not executed yet,
-	// but are used to verify any bundles if they are included in state transactions
-	commitmentsToVerifyBundles []*CommitmentMessageSigned
-
-	// stateSyncExecutionIndex is the next state sync execution index in smart contract
-	stateSyncExecutionIndex uint64
 
 	// checkpointBackend provides functions for working with checkpoints and exit events
 	checkpointBackend checkpointBackend
@@ -361,7 +349,6 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 	}
 
 	commitmentMessageSignedExists := false
-	nextStateSyncBundleIndex := f.stateSyncExecutionIndex
 
 	for _, tx := range transactions {
 		if tx.Type != types.StateTx {
@@ -407,35 +394,6 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 			verified := aggs.VerifyAggregated(signers.GetBlsKeys(), hash.Bytes())
 			if !verified {
 				return fmt.Errorf("invalid signature for tx = %v", tx.Hash)
-			}
-
-		case *BundleProof:
-			// every other bundle has to be in sequential order
-			if stateTxData.ID() != nextStateSyncBundleIndex {
-				return fmt.Errorf("bundles to execute are not in sequential order "+
-					"according to state execution index from smart contract: %v", f.stateSyncExecutionIndex)
-			}
-
-			nextStateSyncBundleIndex = stateTxData.StateSyncs[len(stateTxData.StateSyncs)-1].ID + 1
-
-			isVerified := false
-
-			for _, commitment := range f.commitmentsToVerifyBundles {
-				if commitment.Message.ContainsStateSync(stateTxData.ID()) {
-					isVerified = true
-
-					if err := commitment.Message.VerifyProof(stateTxData); err != nil {
-						return fmt.Errorf("state transaction error while validating proof: tx = %v, err = %w",
-							tx.Hash, err)
-					}
-
-					break
-				}
-			}
-
-			if !isVerified {
-				return fmt.Errorf("state transaction error while validating proof. "+
-					"No appropriate commitment found to verify proof. tx = %v", tx.Hash)
 			}
 		}
 	}

@@ -212,21 +212,6 @@ func (m *systemStateMock) GetValidatorSet() (AccountSet, error) {
 	panic("systemStateMock.GetValidatorSet doesn't support such combination of arguments")
 }
 
-func (m *systemStateMock) GetNextExecutionIndex() (uint64, error) {
-	args := m.Called()
-	if len(args) == 1 {
-		index, _ := args.Get(0).(uint64)
-
-		return index, nil
-	} else if len(args) == 2 {
-		index, _ := args.Get(0).(uint64)
-
-		return index, args.Error(1)
-	}
-
-	return 0, nil
-}
-
 func (m *systemStateMock) GetNextCommittedIndex() (uint64, error) {
 	args := m.Called()
 

@@ -83,6 +83,6 @@ type BridgeDataProvider interface {
 	// GenerateExit proof generates proof of exit for given exit event
 	GenerateExitProof(exitID, epoch, checkpointBlock uint64) (types.ExitProof, error)
 
-	// GetStateSyncProof retrieves the StateSync Bundle proof
+	// GetStateSyncProof retrieves the StateSync proof
 	GetStateSyncProof(stateSyncID uint64) (*types.StateSyncProof, error)
 }

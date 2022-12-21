@@ -77,23 +77,18 @@ func TestSystemState_GetValidatorSet(t *testing.T) {
 	assert.Equal(t, uint64(10), validators[0].VotingPower)
 }
 
-func TestSystemState_GetNextExecutionAndCommittedIndex(t *testing.T) {
+func TestSystemState_GetNextCommittedIndex(t *testing.T) {
 	t.Parallel()
 
-	var sideChainBridgeABI, _ = abi.NewABIFromList([]string{
-		"function setNextExecutionIndex(uint256 _index) public payable",
+	var sideChainBridgeABI, _ = abi.NewMethod(
 		"function setNextCommittedIndex(uint256 _index) public payable",
-	})
+	)
 
 	cc := &testutil.Contract{}
 	cc.AddCallback(func() string {
 		return `
-		uint256 public counter;
 		uint256 public lastCommittedId;
 		
-		function setNextExecutionIndex(uint256 _index) public payable {
-			counter = _index;
-		}
 		function setNextCommittedIndex(uint256 _index) public payable {
 			lastCommittedId = _index;
 		}`
@@ -116,23 +111,9 @@ func TestSystemState_GetNextExecutionAndCommittedIndex(t *testing.T) {
 	}
 
 	systemState := NewSystemState(&PolyBFTConfig{StateReceiverAddr: result.Address}, provider)
-	nextExecutionIndex, err := systemState.GetNextExecutionIndex()
-	assert.NoError(t, err)
-	assert.Equal(t, uint64(1), nextExecutionIndex)
-
-	expectedNextExecutionIndex := uint64(30)
-	input, err := sideChainBridgeABI.GetMethod("setNextExecutionIndex").Encode([1]interface{}{expectedNextExecutionIndex})
-	assert.NoError(t, err)
-
-	_, err = provider.Call(ethgo.Address(result.Address), input, &contract.CallOpts{})
-	assert.NoError(t, err)
-
-	nextExecutionIndex, err = systemState.GetNextExecutionIndex()
-	assert.NoError(t, err)
-	assert.Equal(t, expectedNextExecutionIndex+1, nextExecutionIndex)
 
 	expectedNextCommittedIndex := uint64(45)
-	input, err = sideChainBridgeABI.GetMethod("setNextCommittedIndex").Encode([1]interface{}{expectedNextCommittedIndex})
+	input, err := sideChainBridgeABI.Encode([1]interface{}{expectedNextCommittedIndex})
 	assert.NoError(t, err)
 
 	_, err = provider.Call(ethgo.Address(result.Address), input, &contract.CallOpts{})

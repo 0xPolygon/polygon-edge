@@ -34,18 +34,13 @@ import (
 var (
 	stateSyncResultEvent = abi.MustNewEvent(`event StateSyncResult(
 		uint256 indexed counter,
-		uint8 indexed status,
-		bytes32 message)`)
+		bool indexed status,
+		bytes message)`)
 
 	currentCheckpointBlockNumMethod, _ = abi.NewMethod("function currentCheckpointBlockNumber() returns (uint256)")
 )
 
-type ResultEventStatus uint8
-
 const (
-	ResultEventSuccess ResultEventStatus = iota
-	ResultEventFailure
-
 	manifestFileName = "manifest.json"
 )
 
@@ -55,35 +50,21 @@ func checkLogs(
 	t *testing.T,
 	logs []*ethgo.Log,
 	expectedCount int,
-	assertFn func(i int, status ResultEventStatus) bool,
 ) {
 	t.Helper()
 	require.Len(t, logs, expectedCount)
 
-	for i, log := range logs {
+	for _, log := range logs {
 		res, err := stateSyncResultEvent.ParseLog(log)
 		assert.NoError(t, err)
 
 		t.Logf("Block Number=%d, Decoded Log=%v", log.BlockNumber, res)
 
-		status, ok := res["status"].(uint8)
+		status, ok := res["status"].(bool)
 		require.True(t, ok)
 
-		assert.True(t, assertFn(i, ResultEventStatus(status)))
+		assert.True(t, status)
 	}
-}
-
-func stateSyncEventsToAbiSlice(stateSyncEvent types.StateSyncEvent) []map[string]interface{} {
-	result := make([]map[string]interface{}, 1)
-	result[0] = map[string]interface{}{
-		"id":       stateSyncEvent.ID,
-		"sender":   stateSyncEvent.Sender,
-		"receiver": stateSyncEvent.Receiver,
-		"data":     stateSyncEvent.Data,
-		"skip":     stateSyncEvent.Skip,
-	}
-
-	return result
 }
 
 func executeStateSync(t *testing.T, client *jsonrpc.Client, txRelayer txrelayer.TxRelayer, account ethgo.Key, stateSyncID string) {
@@ -96,10 +77,10 @@ func executeStateSync(t *testing.T, client *jsonrpc.Client, txRelayer txrelayer.
 
 	t.Log("State sync proofs:", stateSyncProof)
 
-	input, err := types.ExecuteBundleABIMethod.Encode([2]interface{}{stateSyncProof.Proof, stateSyncEventsToAbiSlice(stateSyncProof.StateSync)})
+	input, err := stateSyncProof.EncodeAbi()
 	require.NoError(t, err)
 
-	t.Log(stateSyncEventsToAbiSlice(stateSyncProof.StateSync))
+	t.Log(stateSyncProof.StateSync.ToMap())
 
 	// execute the state sync
 	txn := &ethgo.Transaction{
@@ -157,7 +138,7 @@ func TestE2E_Bridge_MainWorkflow(t *testing.T) {
 	require.NoError(t, err)
 
 	// commitments should've been stored
-	// execute the state sysncs
+	// execute the state syncs
 	for i := 0; i < num; i++ {
 		executeStateSync(t, client, txRelayer, accounts[i], fmt.Sprintf("%x", i+1))
 	}
@@ -177,10 +158,7 @@ func TestE2E_Bridge_MainWorkflow(t *testing.T) {
 	require.NoError(t, err)
 
 	// Assert that all state syncs are executed successfully
-	checkLogs(t, logs, num,
-		func(_ int, status ResultEventStatus) bool {
-			return status == ResultEventSuccess
-		})
+	checkLogs(t, logs, num)
 }
 
 func TestE2E_CheckpointSubmission(t *testing.T) {

@@ -235,14 +235,14 @@ func TestState_getStateSyncEventsForCommitment_NotEnoughEvents(t *testing.T) {
 
 	state := newTestState(t)
 
-	for i := 0; i < stateSyncMainBundleSize-2; i++ {
-		assert.NoError(t, state.insertStateSyncEvent(&StateSyncEvent{
+	for i := 0; i < stateSyncCommitmentSize-2; i++ {
+		assert.NoError(t, state.insertStateSyncEvent(&types.StateSyncEvent{
 			ID:   uint64(i),
 			Data: []byte{1, 2},
 		}))
 	}
 
-	_, err := state.getStateSyncEventsForCommitment(0, stateSyncMainBundleSize-1)
+	_, err := state.getStateSyncEventsForCommitment(0, stateSyncCommitmentSize-1)
 	assert.ErrorIs(t, err, errNotEnoughStateSyncs)
 }
 
@@ -251,16 +251,16 @@ func TestState_getStateSyncEventsForCommitment(t *testing.T) {
 
 	state := newTestState(t)
 
-	for i := 0; i < stateSyncMainBundleSize; i++ {
-		assert.NoError(t, state.insertStateSyncEvent(&StateSyncEvent{
+	for i := 0; i < stateSyncCommitmentSize; i++ {
+		assert.NoError(t, state.insertStateSyncEvent(&types.StateSyncEvent{
 			ID:   uint64(i),
 			Data: []byte{1, 2},
 		}))
 	}
 
-	events, err := state.getStateSyncEventsForCommitment(0, stateSyncMainBundleSize-1)
+	events, err := state.getStateSyncEventsForCommitment(0, stateSyncCommitmentSize-1)
 	assert.NoError(t, err)
-	assert.Equal(t, stateSyncMainBundleSize, len(events))
+	assert.Equal(t, stateSyncCommitmentSize, len(events))
 }
 
 func TestState_insertCommitmentMessage(t *testing.T) {
@@ -279,56 +279,21 @@ func TestState_insertCommitmentMessage(t *testing.T) {
 	assert.Equal(t, commitment, commitmentFromDB)
 }
 
-func TestState_cleanCommitments(t *testing.T) {
+func TestState_StateSync_insertAndGetStateSyncProof(t *testing.T) {
 	t.Parallel()
-
-	const (
-		numberOfCommitments = 10
-		numberOfBundles     = 10
-	)
-
-	lastCommitmentToIndex := uint64(numberOfCommitments*stateSyncMainBundleSize - stateSyncMainBundleSize - 1)
-
-	state := newTestState(t)
-	insertTestCommitments(t, state, 1, numberOfCommitments)
-	insertTestBundles(t, state, numberOfBundles)
-
-	assert.NoError(t, state.cleanCommitments(lastCommitmentToIndex))
-
-	commitment, err := state.getCommitmentMessage(lastCommitmentToIndex)
-	assert.NoError(t, err)
-	assert.Equal(t, lastCommitmentToIndex, commitment.Message.ToIndex)
-
-	for i := uint64(1); i < numberOfCommitments; i++ {
-		c, err := state.getCommitmentMessage(i*stateSyncMainBundleSize + lastCommitmentToIndex - 1)
-		assert.NoError(t, err)
-		assert.Nil(t, c)
-	}
-
-	bundles, err := state.getBundles(0, maxBundlesPerSprint)
-	assert.NoError(t, err)
-	assert.Nil(t, bundles)
-}
-
-func TestState_insertAndGetBundles(t *testing.T) {
-	t.Parallel()
-
-	const numberOfBundles = 10
 
 	state := newTestState(t)
 	commitment, err := createTestCommitmentMessage(0)
 	require.NoError(t, err)
 	require.NoError(t, state.insertCommitmentMessage(commitment))
 
-	insertTestBundles(t, state, numberOfBundles)
+	insertTestStateSyncProofs(t, state, 10)
 
-	bundlesFromDB, err := state.getBundles(0, maxBundlesPerSprint)
+	proofFromDB, err := state.getStateSyncProof(1)
 
 	assert.NoError(t, err)
-	assert.Equal(t, numberOfBundles, len(bundlesFromDB))
-	assert.Equal(t, uint64(0), bundlesFromDB[0].ID())
-	assert.Equal(t, stateSyncBundleSize, len(bundlesFromDB[0].StateSyncs))
-	assert.NotNil(t, bundlesFromDB[0].Proof)
+	assert.Equal(t, uint64(1), proofFromDB.StateSync.ID)
+	assert.NotNil(t, proofFromDB.Proof)
 }
 
 func TestState_Insert_And_Get_ExitEvents_PerEpoch(t *testing.T) {
@@ -495,40 +460,35 @@ func insertTestCommitments(t *testing.T, state *State, epoch, numberOfCommitment
 	t.Helper()
 
 	for i := uint64(0); i <= numberOfCommitments; i++ {
-		commitment, err := createTestCommitmentMessage(i * stateSyncMainBundleSize)
+		commitment, err := createTestCommitmentMessage(i * stateSyncCommitmentSize)
 		require.NoError(t, err)
 		require.NoError(t, state.insertCommitmentMessage(commitment))
 	}
 }
 
-func insertTestBundles(t *testing.T, state *State, numberOfBundles uint64) {
+func insertTestStateSyncProofs(t *testing.T, state *State, numberOfProofs uint64) {
 	t.Helper()
 
-	bundles := make([]*BundleProof, numberOfBundles)
+	ssProofs := make([]*types.StateSyncProof, numberOfProofs)
 
-	for i := uint64(0); i < numberOfBundles; i++ {
-		bundle := &BundleProof{
-			Proof:      []types.Hash{types.BytesToHash(generateRandomBytes(t))},
-			StateSyncs: createTestStateSyncs(stateSyncBundleSize, i*stateSyncBundleSize),
+	for i := uint64(0); i < numberOfProofs; i++ {
+		proofs := &types.StateSyncProof{
+			Proof:     []types.Hash{types.BytesToHash(generateRandomBytes(t))},
+			StateSync: createTestStateSync(i),
 		}
-		bundles[i] = bundle
+		ssProofs[i] = proofs
 	}
 
-	require.NoError(t, state.insertBundles(bundles))
+	require.NoError(t, state.insertStateSyncProofs(ssProofs))
 }
 
-func createTestStateSyncs(numberOfEvents, startIndex uint64) []*StateSyncEvent {
-	stateSyncEvents := make([]*StateSyncEvent, 0)
-	for i := startIndex; i < numberOfEvents+startIndex; i++ {
-		stateSyncEvents = append(stateSyncEvents, &StateSyncEvent{
-			ID:       i,
-			Sender:   ethgo.ZeroAddress,
-			Receiver: ethgo.ZeroAddress,
-			Data:     []byte{0, 1},
-		})
+func createTestStateSync(index uint64) *types.StateSyncEvent {
+	return &types.StateSyncEvent{
+		ID:       index,
+		Sender:   ethgo.ZeroAddress,
+		Receiver: ethgo.ZeroAddress,
+		Data:     []byte{0, 1},
 	}
-
-	return stateSyncEvents
 }
 
 func createTestCommitmentMessage(fromIndex uint64) (*CommitmentMessageSigned, error) {
@@ -544,8 +504,7 @@ func createTestCommitmentMessage(fromIndex uint64) (*CommitmentMessageSigned, er
 	msg := &CommitmentMessage{
 		MerkleRootHash: tree.Hash(),
 		FromIndex:      fromIndex,
-		ToIndex:        fromIndex + stateSyncMainBundleSize - 1,
-		BundleSize:     2,
+		ToIndex:        fromIndex + stateSyncCommitmentSize - 1,
 	}
 
 	return &CommitmentMessageSigned{
