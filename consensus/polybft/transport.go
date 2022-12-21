@@ -42,24 +42,26 @@ func (g *runtimeTransportWrapper) Multicast(msg interface{}) {
 // subscribeToBridgeTopic subscribes for bridge topic
 func (c *consensusRuntime) subscribeToBridgeTopic(topic *network.Topic) error {
 	return topic.Subscribe(func(obj interface{}, _ peer.ID) {
-		msg, ok := obj.(*polybftProto.TransportMessage)
-		if !ok {
-			c.logger.Warn("failed to deliver message, invalid msg", "obj", obj)
+		/*
+			msg, ok := obj.(*polybftProto.TransportMessage)
+			if !ok {
+				c.logger.Warn("failed to deliver message, invalid msg", "obj", obj)
 
-			return
-		}
+				return
+			}
 
-		var transportMsg *TransportMessage
+			var transportMsg *TransportMessage
 
-		if err := json.Unmarshal(msg.Data, &transportMsg); err != nil {
-			c.logger.Warn("failed to deliver message", "error", err)
+			if err := json.Unmarshal(msg.Data, &transportMsg); err != nil {
+				c.logger.Warn("failed to deliver message", "error", err)
 
-			return
-		}
+				return
+			}
 
-		if err := c.deliverMessage(transportMsg); err != nil {
-			c.logger.Warn("failed to deliver message", "error", err)
-		}
+			if err := c.deliverMessage(transportMsg); err != nil {
+				c.logger.Warn("failed to deliver message", "error", err)
+			}
+		*/
 	})
 }
 

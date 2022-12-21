@@ -268,15 +268,17 @@ func (p *Polybft) initRuntime() error {
 // startRuntime starts consensus runtime
 func (p *Polybft) startRuntime() error {
 	if p.runtime.IsBridgeEnabled() {
-		// start bridge event tracker
-		if err := p.runtime.startEventTracker(); err != nil {
-			return fmt.Errorf("starting event tracker  failed: %w", err)
-		}
+		/*
+			// start bridge event tracker
+			if err := p.runtime.startEventTracker(); err != nil {
+				return fmt.Errorf("starting event tracker  failed: %w", err)
+			}
 
-		// subscribe to bridge topic
-		if err := p.runtime.subscribeToBridgeTopic(p.bridgeTopic); err != nil {
-			return fmt.Errorf("bridge topic subscription failed: %w", err)
-		}
+			// subscribe to bridge topic
+			if err := p.runtime.subscribeToBridgeTopic(p.bridgeTopic); err != nil {
+				return fmt.Errorf("bridge topic subscription failed: %w", err)
+			}
+		*/
 	}
 
 	go p.startConsensusProtocol()
