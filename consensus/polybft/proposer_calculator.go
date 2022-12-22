@@ -106,7 +106,7 @@ func (pcs *ProposerSnapshot) GetLatestProposer(round, height uint64) (types.Addr
 func (pcs ProposerSnapshot) GetTotalVotingPower() *big.Int {
 	totalVotingPower := new(big.Int)
 	for _, v := range pcs.Validators {
-		_ = totalVotingPower.Add(totalVotingPower, v.Metadata.VotingPower)
+		totalVotingPower.Add(totalVotingPower, v.Metadata.VotingPower)
 	}
 
 	return totalVotingPower
@@ -319,12 +319,12 @@ func updateValidators(snapshot *ProposerSnapshot, newValidatorSet AccountSet) er
 
 	for address, val := range snapshotValidators {
 		if !newValidatorSet.ContainsNodeID(address.String()) {
-			_ = removedValidatorsVotingPower.Add(removedValidatorsVotingPower, val.Metadata.VotingPower)
+			removedValidatorsVotingPower.Add(removedValidatorsVotingPower, val.Metadata.VotingPower)
 		}
 	}
 
 	for _, v := range newValidatorSet {
-		_ = newValidatorsVotingPower.Add(newValidatorsVotingPower, v.VotingPower)
+		newValidatorsVotingPower.Add(newValidatorsVotingPower, v.VotingPower)
 	}
 
 	tvpAfterUpdatesBeforeRemovals := new(big.Int).Add(newValidatorsVotingPower, removedValidatorsVotingPower)
@@ -392,7 +392,7 @@ func shiftByAvgProposerPriority(snapshot *ProposerSnapshot) error {
 	}
 
 	for _, val := range snapshot.Validators {
-		_ = val.ProposerPriority.Sub(val.ProposerPriority, avgProposerPriority)
+		val.ProposerPriority.Sub(val.ProposerPriority, avgProposerPriority)
 	}
 
 	return nil
@@ -452,7 +452,7 @@ func rescalePriorities(snapshot *ProposerSnapshot, totalVotingPower *big.Int) er
 
 	if diff.Cmp(diffMax) > 0 {
 		for _, val := range snapshot.Validators {
-			_ = val.ProposerPriority.Div(val.ProposerPriority, ratio)
+			val.ProposerPriority.Quo(val.ProposerPriority, ratio)
 		}
 	}
 

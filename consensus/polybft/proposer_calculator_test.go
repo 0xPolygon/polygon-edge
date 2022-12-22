@@ -550,7 +550,6 @@ func TestProposerCalculator_UpdateValidators(t *testing.T) {
 }
 
 func TestProposerCalculator_ScaleAfterDelete(t *testing.T) {
-	t.Skip("FIX")
 	t.Parallel()
 
 	keys, err := bls.CreateRandomBlsKeys(3)
@@ -598,7 +597,6 @@ func TestProposerCalculator_ScaleAfterDelete(t *testing.T) {
 }
 
 func TestProposerCalculator_ShiftAfterUpdate(t *testing.T) {
-	t.Skip("FIX")
 	t.Parallel()
 
 	keys, err := bls.CreateRandomBlsKeys(3)
