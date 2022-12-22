@@ -1807,7 +1807,7 @@ func TestConsensusRuntime_getExitEventRootHash(t *testing.T) {
 		tree, err := NewMerkleTree(encodedEvents)
 		require.NoError(t, err)
 
-		hash, err := runtime.BuildEventRoot(1, nil)
+		hash, err := runtime.BuildEventRoot(1)
 		require.NoError(t, err)
 		require.Equal(t, tree.Hash(), hash)
 	})
@@ -1815,7 +1815,7 @@ func TestConsensusRuntime_getExitEventRootHash(t *testing.T) {
 	t.Run("Get exit event root hash - no events", func(t *testing.T) {
 		t.Parallel()
 
-		hash, err := runtime.BuildEventRoot(2, nil)
+		hash, err := runtime.BuildEventRoot(2)
 		require.NoError(t, err)
 		require.Equal(t, types.Hash{}, hash)
 	})

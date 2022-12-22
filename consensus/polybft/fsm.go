@@ -139,12 +139,7 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 		return nil, err
 	}
 
-	events, err := getExitEventsFromReceipts(f.epochNumber, parent.Number+1, f.blockBuilder.Receipts())
-	if err != nil {
-		return nil, err
-	}
-
-	eventRoot, err := f.checkpointBackend.BuildEventRoot(f.epochNumber, events)
+	eventRoot, err := f.checkpointBackend.BuildEventRoot(f.epochNumber)
 	if err != nil {
 		return nil, err
 	}
@@ -467,8 +462,15 @@ func (f *fsm) Insert(proposal []byte, committedSeals []*messages.CommittedSeal) 
 		return nil, err
 	}
 
+	epoch := f.epochNumber
+	if f.isEndOfEpoch {
+		// exit events that happened in epoch ending blocks,
+		// should be added to the tree of the next epoch
+		epoch++
+	}
+
 	// commit exit events only when we finalize a block
-	events, err := getExitEventsFromReceipts(f.epochNumber, newBlock.Number(), receipts)
+	events, err := getExitEventsFromReceipts(epoch, newBlock.Number(), receipts)
 	if err != nil {
 		return newBlock, err
 	}
