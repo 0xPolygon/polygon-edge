@@ -1,6 +1,7 @@
 package polybft
 
 import (
+	"math/big"
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/types"
@@ -25,8 +26,26 @@ func TestValidatorSet_HasQuorum(t *testing.T) {
 	// not enough signers for quorum (less than 2/3 super-majority of validators are signers)
 	signers = make(map[types.Address]struct{})
 
-	validators.iterAcct([]string{"A", "B", "C"}, func(v *testValidator) {
+	validators.iterAcct([]string{"A", "B", "C", "D"}, func(v *testValidator) {
 		signers[v.Address()] = struct{}{}
 	})
 	require.False(t, vs.HasQuorum(signers))
+}
+
+func TestValidatorSet_getQuorumSize(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		totalVotingPower   int64
+		expectedQuorumSize int64
+	}{
+		{8, 6},
+		{10, 7},
+		{11, 8},
+	}
+
+	for _, c := range cases {
+		quorumSize := getQuorumSize(big.NewInt(c.totalVotingPower))
+		require.Equal(t, c.expectedQuorumSize, quorumSize.Int64())
+	}
 }

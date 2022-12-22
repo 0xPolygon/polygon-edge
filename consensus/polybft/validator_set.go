@@ -93,8 +93,8 @@ func (vs validatorSet) Len() int {
 
 // getQuorumSize calculates quorum size as 2/3 super-majority of provided total voting power
 func getQuorumSize(totalVotingPower *big.Int) *big.Int {
-	// TODO: @Stefan-Ethernal math.Ceil for big.Int?
 	quorum := new(big.Int)
-
-	return quorum.Mul(totalVotingPower, big.NewInt(2)).Div(quorum, big.NewInt(3))
+	quorum.Mul(totalVotingPower, big.NewInt(2))
+	// divide and round up result to next bigger integer value
+	return quorum.Add(quorum, big.NewInt(3)).Sub(quorum, big.NewInt(1)).Div(quorum, big.NewInt(3))
 }
