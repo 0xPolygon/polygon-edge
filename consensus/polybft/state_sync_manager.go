@@ -318,7 +318,7 @@ type PostEpochRequest struct {
 	// after this block
 	SystemState SystemState
 
-	// ValidatorSet is the validator set for this epoch
+	// ValidatorSet is the validator set for the new epoch
 	ValidatorSet *validatorSet
 }
 

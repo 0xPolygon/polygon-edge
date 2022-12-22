@@ -180,14 +180,6 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 	return runtime, nil
 }
 
-// getEpoch returns current epochMetadata in a thread-safe manner.
-func (c *consensusRuntime) getEpoch() *epochMetadata {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
-
-	return c.epoch
-}
-
 // getGuardedData returns last build block, proposer snapshot and current epochMetadata in a thread-safe manner.
 func (c *consensusRuntime) getGuardedData() (guardedDataDTO, error) {
 	c.lock.RLock()

@@ -371,14 +371,12 @@ func TestConsensusRuntime_FSM_EndOfEpoch_BuildUptime(t *testing.T) {
 	t.Parallel()
 
 	const (
-		epoch               = 1
-		epochSize           = uint64(10)
-		firstBlockInEpoch   = uint64(1)
-		sprintSize          = uint64(3)
-		commitmentSize      = 10
-		beginStateSyncIndex = uint64(0)
-		fromIndex           = uint64(0)
-		toIndex             = uint64(9)
+		epoch             = 0
+		epochSize         = uint64(10)
+		sprintSize        = uint64(3)
+		firstBlockInEpoch = uint64(1)
+		fromIndex         = uint64(0)
+		toIndex           = uint64(9)
 	)
 
 	validatorAccounts := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
@@ -675,50 +673,6 @@ func TestConsensusRuntime_restartEpoch_SameEpochNumberAsTheLastOne(t *testing.T)
 
 	systemStateMock.AssertExpectations(t)
 	blockchainMock.AssertExpectations(t)
-}
-
-func TestConsensusRuntime_restartEpoch_FirstRestart_NoStateSyncEvents(t *testing.T) {
-	t.Parallel()
-
-	newCurrentHeader := &types.Header{Number: 0}
-	state := newTestState(t)
-
-	systemStateMock := new(systemStateMock)
-	systemStateMock.On("GetEpoch").Return(uint64(1), nil).Once()
-
-	validators := newTestValidators(3)
-	blockchainMock := new(blockchainMock)
-	blockchainMock.On("GetStateProviderForBlock", mock.Anything).Return(new(stateProviderMock)).Once()
-	blockchainMock.On("GetSystemState", mock.Anything, mock.Anything).Return(systemStateMock).Once()
-
-	polybftBackendMock := new(polybftBackendMock)
-	polybftBackendMock.On("GetValidators", mock.Anything, mock.Anything).Return(validators.getPublicIdentities()).Once()
-
-	snapshot := NewProposerSnapshot(1, nil)
-	config := &runtimeConfig{
-		blockchain:     blockchainMock,
-		polybftBackend: polybftBackendMock,
-		PolyBFTConfig:  &PolyBFTConfig{},
-	}
-	runtime := &consensusRuntime{
-		proposerCalculator:  NewProposerCalculatorFromSnapshot(snapshot, config, hclog.NewNullLogger()),
-		logger:              hclog.NewNullLogger(),
-		activeValidatorFlag: 1,
-		state:               state,
-		config:              config,
-	}
-
-	epoch, err := runtime.restartEpoch(newCurrentHeader)
-
-	require.NoError(t, err)
-	require.Equal(t, uint64(1), epoch.Number)
-	require.Equal(t, 3, len(epoch.Validators))
-	require.True(t, runtime.isActiveValidator())
-	require.True(t, state.isEpochInserted(1))
-
-	systemStateMock.AssertExpectations(t)
-	blockchainMock.AssertExpectations(t)
-	polybftBackendMock.AssertExpectations(t)
 }
 
 func TestConsensusRuntime_calculateUptime_EpochSizeToSmall(t *testing.T) {
@@ -1450,15 +1404,4 @@ func setupExitEventsForProofVerification(t *testing.T, state *State,
 	}
 
 	return encodedEvents
-}
-
-func insertTestStateSyncEvents(t *testing.T, numberOfEvents int, startIndex uint64, state *State) []*types.StateSyncEvent {
-	t.Helper()
-
-	stateSyncs := generateStateSyncEvents(t, numberOfEvents, startIndex)
-	for _, stateSync := range stateSyncs {
-		require.NoError(t, state.insertStateSyncEvent(stateSync))
-	}
-
-	return stateSyncs
 }
