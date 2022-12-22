@@ -3,22 +3,10 @@ package polybft
 import (
 	"bytes"
 	"fmt"
-	"math"
 	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
-)
-
-const (
-	// maxTotalVotingPower - the maximum allowed total voting power.
-	// It needs to be sufficiently small to, in all cases:
-	// 1. prevent clipping in incrementProposerPriority()
-	// 2. let (diff+diffMax-1) not overflow in IncrementProposerPriority()
-	// (Proof of 1 is tricky, left to the reader).
-	// It could be higher, but this is sufficiently large for our purposes,
-	// and leaves room for defensive purposes.
-	maxTotalVotingPower = int64(math.MaxInt64) / 8
 )
 
 var (
@@ -116,7 +104,7 @@ func (pcs *ProposerSnapshot) GetLatestProposer(round, height uint64) (types.Addr
 
 // GetTotalVotingPower returns total voting power from all the validators
 func (pcs ProposerSnapshot) GetTotalVotingPower() *big.Int {
-	totalVotingPower := big.NewInt(0)
+	totalVotingPower := new(big.Int)
 	for _, v := range pcs.Validators {
 		_ = totalVotingPower.Add(totalVotingPower, v.Metadata.VotingPower)
 	}
@@ -326,8 +314,8 @@ func updateValidators(snapshot *ProposerSnapshot, newValidatorSet AccountSet) er
 	newValidators := make([]*PrioritizedValidator, len(newValidatorSet))
 
 	// compute total voting power of removed validators and current validator
-	removedValidatorsVotingPower := big.NewInt(0)
-	newValidatorsVotingPower := big.NewInt(0)
+	removedValidatorsVotingPower := new(big.Int)
+	newValidatorsVotingPower := new(big.Int)
 
 	for address, val := range snapshotValidators {
 		if !newValidatorSet.ContainsNodeID(address.String()) {
@@ -337,15 +325,6 @@ func updateValidators(snapshot *ProposerSnapshot, newValidatorSet AccountSet) er
 
 	for _, v := range newValidatorSet {
 		_ = newValidatorsVotingPower.Add(newValidatorsVotingPower, v.VotingPower)
-	}
-
-	// TODO: @Stefan-Ethernal check if still needed
-	if newValidatorsVotingPower.Cmp(big.NewInt(maxTotalVotingPower)) > 0 {
-		return fmt.Errorf(
-			"total voting power cannot be guarded to not exceed %v; got: %v",
-			maxTotalVotingPower,
-			newValidatorsVotingPower,
-		)
 	}
 
 	tvpAfterUpdatesBeforeRemovals := new(big.Int).Add(newValidatorsVotingPower, removedValidatorsVotingPower)
@@ -441,7 +420,7 @@ func computeAvgProposerPriority(snapshot *ProposerSnapshot) (*big.Int, error) {
 	}
 
 	validatorsCount := big.NewInt(int64(len(snapshot.Validators)))
-	sum := big.NewInt(0)
+	sum := new(big.Int)
 
 	for _, val := range snapshot.Validators {
 		sum = sum.Add(sum, val.ProposerPriority)
