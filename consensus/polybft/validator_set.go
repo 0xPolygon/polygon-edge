@@ -96,5 +96,5 @@ func getQuorumSize(totalVotingPower *big.Int) *big.Int {
 	quorum := new(big.Int)
 	quorum.Mul(totalVotingPower, big.NewInt(2))
 	// divide and round up result to next bigger integer value
-	return quorum.Add(quorum, big.NewInt(3)).Sub(quorum, big.NewInt(1)).Div(quorum, big.NewInt(3))
+	return quorum.Add(quorum, big.NewInt(2)).Div(quorum, big.NewInt(3))
 }
