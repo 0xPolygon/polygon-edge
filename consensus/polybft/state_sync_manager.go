@@ -93,32 +93,23 @@ func (s *StateSyncManager) deliverMessage(msg *TransportMessage) error {
 	valSet := s.validatorSet
 	s.lock.Unlock()
 
-	if msg.EpochNumber < epoch {
+	if valSet == nil {
 		// Epoch metadata is undefined
+		return nil
+	}
+
+	if msg.EpochNumber < epoch {
 		// or received message for some of the older epochs.
 		return nil
 	}
 
-	if !valSet.validators.ContainsNodeID(s.key.String()) {
+	if !valSet.validators.ContainsNodeID(msg.NodeID) {
 		return fmt.Errorf("validator is not among the active validator set")
-	}
-
-	// check just in case
-	if valSet == nil {
-		return fmt.Errorf("validators are not set for the current epoch")
 	}
 
 	msgVote := &MessageSignature{
 		From:      msg.NodeID,
 		Signature: msg.Signature,
-	}
-
-	senderAddress := types.StringToAddress(msgVote.From)
-	if !valSet.validators.ContainsAddress(senderAddress) {
-		return fmt.Errorf(
-			"message is received from sender %s, which is not in current validator set",
-			msgVote.From,
-		)
 	}
 
 	numSignatures, err := s.state.insertMessageVote(msg.EpochNumber, msg.Hash, msgVote)
@@ -143,7 +134,6 @@ func (s *StateSyncManager) initTracker() error {
 	}
 
 	store, err := boltdbStore.New(filepath.Join(s.dataDir, "/deposit.db"))
-
 	if err != nil {
 		return err
 	}
@@ -180,7 +170,14 @@ func (s *StateSyncManager) initTracker() error {
 					}
 
 					for _, log := range evnt.Added {
-						s.addLog(log)
+						fmt.Println("- log -")
+						fmt.Println(log)
+
+						if stateTransferEventABI.Match(log) {
+							if err := s.addLog(log); err != nil {
+								s.logger.Error("failed to decode state sync event", "hash", log.TransactionHash, "error", err)
+							}
+						}
 					}
 				case <-tt.DoneCh:
 					s.logger.Info("Historical sync done")
@@ -192,7 +189,10 @@ func (s *StateSyncManager) initTracker() error {
 	return nil
 }
 
-func (s *StateSyncManager) addLog(eventLog *ethgo.Log) {
+func (s *StateSyncManager) addLog(eventLog *ethgo.Log) error {
+	fmt.Println("-- add log --")
+	fmt.Println(eventLog)
+
 	s.logger.Info(
 		"Add State sync event",
 		"block", eventLog.BlockNumber,
@@ -202,16 +202,17 @@ func (s *StateSyncManager) addLog(eventLog *ethgo.Log) {
 
 	event, err := decodeStateSyncEvent(eventLog)
 	if err != nil {
-		s.logger.Error("failed to decode state sync event", "hash", eventLog.TransactionHash, "error", err)
-
-		return
+		return err
 	}
+
+	fmt.Println("-- store --")
+	fmt.Println(event)
 
 	if err := s.state.insertStateSyncEvent(event); err != nil {
-		s.logger.Error("failed to insert state sync event", "hash", eventLog.TransactionHash, "error", err)
-
-		return
+		return err
 	}
+
+	return nil
 }
 
 func (s *StateSyncManager) Commitment() (*CommitmentMessageSigned, error) {

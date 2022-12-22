@@ -222,6 +222,13 @@ type TransportMessage struct {
 	EpochNumber uint64
 }
 
+func (t *TransportMessage) ToSignature() *MessageSignature {
+	return &MessageSignature{
+		Signature: t.Signature,
+		From:      t.NodeID,
+	}
+}
+
 var (
 	// bucket to store rootchain bridge events
 	syncStateEventsBucket = []byte("stateSyncEvents")

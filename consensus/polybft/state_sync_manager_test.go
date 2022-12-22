@@ -1,93 +1,39 @@
 package polybft
 
 import (
+	"fmt"
+	"math/rand"
+	"os"
 	"testing"
+	"time"
 
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/umbracle/ethgo"
+	"github.com/umbracle/ethgo/abi"
+	"github.com/umbracle/ethgo/testutil"
 )
-
-func TestConsensusRuntime_GetVotes(t *testing.T) {
-	t.Parallel()
-
-	const (
-		epoch           = uint64(1)
-		validatorsCount = 7
-		stateSyncsCount = 15
-	)
-
-	validatorIds := []string{"A", "B", "C", "D", "E", "F", "G"}
-	validatorAccounts := newTestValidatorsWithAliases(validatorIds)
-	state := newTestState(t)
-	runtime := &consensusRuntime{
-		state: state,
-		epoch: &epochMetadata{
-			Number:     epoch,
-			Validators: validatorAccounts.getPublicIdentities(),
-		},
-	}
-
-	commitment, _, _ := buildCommitmentAndStateSyncs(t, stateSyncsCount, epoch, 0)
-
-	quorumSize := validatorAccounts.toValidatorSetWithError(t).getQuorumSize()
-
-	require.NoError(t, state.insertEpoch(epoch))
-
-	votesCount := quorumSize + 1
-	hash, err := commitment.Hash()
-	require.NoError(t, err)
-
-	for i := 0; i < int(votesCount); i++ {
-		validator := validatorAccounts.getValidator(validatorIds[i])
-		signature, err := validator.mustSign(hash.Bytes()).Marshal()
-		require.NoError(t, err)
-
-		_, err = state.insertMessageVote(epoch, hash.Bytes(),
-			&MessageSignature{
-				From:      validator.Key().String(),
-				Signature: signature,
-			})
-		require.NoError(t, err)
-	}
-
-	votes, err := runtime.state.getMessageVotes(runtime.epoch.Number, hash.Bytes())
-	require.NoError(t, err)
-	require.Len(t, votes, int(votesCount))
-}
-
-func TestConsensusRuntime_GetVotesError(t *testing.T) {
-	t.Parallel()
-
-	const (
-		epoch           = uint64(1)
-		stateSyncsCount = 30
-		startIndex      = 0
-	)
-
-	state := newTestState(t)
-	runtime := &consensusRuntime{state: state}
-	commitment, _, _ := buildCommitmentAndStateSyncs(t, 5, epoch, startIndex)
-	hash, err := commitment.Hash()
-	require.NoError(t, err)
-	_, err = runtime.state.getMessageVotes(epoch, hash.Bytes())
-	assert.ErrorContains(t, err, "could not find")
-}
 
 func newTestStateSyncManager(t *testing.T, key *testValidator) *StateSyncManager {
 	t.Helper()
 
+	tmpDir, err := os.MkdirTemp("/tmp", "test-data-dir-state-sync")
+
 	state := newTestState(t)
 	require.NoError(t, state.insertEpoch(0))
 
-	s, err := NewStateSyncManager(hclog.NewNullLogger(), key.Key(), state, types.Address{}, "", "", nil)
+	s, err := NewStateSyncManager(hclog.NewNullLogger(), key.Key(), state, types.Address{}, "", tmpDir, nil)
 	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		os.RemoveAll(tmpDir)
+	})
 
 	return s
 }
 
-func TestStateSyncManager_BuildCommitment(t *testing.T) {
+func TestStateSyncManager_PostEpoch_BuildCommitment(t *testing.T) {
 	vals := newTestValidators(5)
 	s := newTestStateSyncManager(t, vals.getValidator("0"))
 
@@ -120,193 +66,157 @@ func TestStateSyncManager_BuildCommitment(t *testing.T) {
 	require.Equal(t, commitment.ToIndex, uint64(9))
 }
 
-/*
-func TestConsensusRuntime_deliverMessage_MessageWhenEpochNotStarted(t *testing.T) {
-	t.Parallel()
+func TestStateSyncManager_MessagePool_OldEpoch(t *testing.T) {
+	vals := newTestValidators(5)
 
-	const epoch = uint64(5)
+	s := newTestStateSyncManager(t, vals.getValidator("0"))
+	s.epoch = 1
 
-	validatorIds := []string{"A", "B", "C", "D", "E", "F", "G"}
-	state := newTestState(t)
-	validators := newTestValidatorsWithAliases(validatorIds)
-	localValidator := validators.getValidator("A")
-	runtime := &consensusRuntime{
-		logger:              hclog.NewNullLogger(),
-		activeValidatorFlag: 1,
-		state:               state,
-		config:              &runtimeConfig{Key: localValidator.Key()},
-		epoch: &epochMetadata{
-			Number:     epoch,
-			Validators: validators.getPublicIdentities(),
-		},
-		lastBuiltBlock: &types.Header{},
+	msg := &TransportMessage{
+		EpochNumber: 0,
 	}
-
-	// dummy hash
-	hash := crypto.Keccak256Hash(generateRandomBytes(t)).Bytes()
-
-	// insert dummy epoch to the state
-	require.NoError(t, state.insertEpoch(epoch))
-
-	// insert dummy message vote
-	_, err := runtime.state.insertMessageVote(epoch, hash,
-		createTestMessageVote(t, hash, localValidator))
+	err := s.deliverMessage(msg)
 	require.NoError(t, err)
-
-	// prevent node sender is the local node
-	senderID := ""
-	for senderID == "" || senderID == localValidator.alias {
-		senderID = validatorIds[rand.Intn(len(validatorIds))]
-	}
-	// deliverMessage should not fail, although epochMetadata is not initialized
-	// message vote should be added to the consensus runtime state.
-	err = runtime.deliverMessage(createTestTransportMessage(t, hash, epoch, validators.getValidator(senderID).Key()))
-	require.NoError(t, err)
-
-	// assert that no additional message signatures aren't inserted into the consensus runtime state
-	// (other than the one we have previously inserted by ourselves)
-	signatures, err := runtime.state.getMessageVotes(epoch, hash)
-	require.NoError(t, err)
-	require.Len(t, signatures, 2)
 }
 
-func TestConsensusRuntime_AddLog(t *testing.T) {
-	t.Parallel()
+type mockMsg struct {
+	hash  []byte
+	epoch uint64
+}
 
-	state := newTestState(t)
-	runtime := &consensusRuntime{
-		logger: hclog.NewNullLogger(),
-		state:  state,
-		config: &runtimeConfig{Key: createTestKey(t)},
+func newMockMsg() *mockMsg {
+	hash := make([]byte, 32)
+	rand.Read(hash)
+
+	return &mockMsg{hash: hash}
+}
+
+func (m *mockMsg) sign(val *testValidator) *TransportMessage {
+	signature, err := val.mustSign(m.hash).Marshal()
+	if err != nil {
+		panic(fmt.Errorf("BUG: %w", err))
 	}
-	topics := make([]ethgo.Hash, 4)
-	topics[0] = stateTransferEventABI.ID()
-	topics[1] = ethgo.BytesToHash([]byte{0x1})
-	topics[2] = ethgo.BytesToHash(runtime.config.Key.Address().Bytes())
-	topics[3] = ethgo.BytesToHash(contracts.NativeTokenContract[:])
-	personType := abi.MustNewType("tuple(string firstName, string lastName)")
-	encodedData, err := personType.Encode(map[string]string{"firstName": "John", "lastName": "Doe"})
+
+	return &TransportMessage{
+		Hash:        m.hash,
+		Signature:   signature,
+		NodeID:      val.Address().String(),
+		EpochNumber: m.epoch,
+	}
+}
+
+func TestStateSyncManager_MessagePool_SenderIsNoValidator(t *testing.T) {
+	vals := newTestValidators(5)
+
+	s := newTestStateSyncManager(t, vals.getValidator("0"))
+	s.validatorSet = vals.toValidatorSetWithError(t)
+
+	badVal := newTestValidator("a", 0)
+	msg := newMockMsg().sign(badVal)
+
+	err := s.deliverMessage(msg)
+	require.Error(t, err)
+}
+
+func TestStateSyncManager_MessagePool_SenderVotes(t *testing.T) {
+	vals := newTestValidators(5)
+
+	s := newTestStateSyncManager(t, vals.getValidator("0"))
+	s.validatorSet = vals.toValidatorSetWithError(t)
+
+	msg := newMockMsg()
+	val1signed := msg.sign(vals.getValidator("1"))
+	val2signed := msg.sign(vals.getValidator("2"))
+
+	// vote with validator 1
+	require.NoError(t, s.deliverMessage(val1signed))
+
+	votes, err := s.state.getMessageVotes(0, msg.hash)
+	require.NoError(t, err)
+	require.Len(t, votes, 1)
+
+	// vote with validator 1 again (the votes do not increase)
+	require.NoError(t, s.deliverMessage(val1signed))
+	votes, _ = s.state.getMessageVotes(0, msg.hash)
+	require.Len(t, votes, 1)
+
+	// vote with validator 2
+	require.NoError(t, s.deliverMessage(val2signed))
+	votes, _ = s.state.getMessageVotes(0, msg.hash)
+	require.Len(t, votes, 2)
+}
+
+func TestStateSyncerManager_EventTracker_AddLog(t *testing.T) {
+	vals := newTestValidators(5)
+
+	s := newTestStateSyncManager(t, vals.getValidator("0"))
+
+	// empty log which is not an state sync
+	require.Error(t, s.addLog(&ethgo.Log{}))
+
+	// log with the state sync topic but incorrect content
+	require.Error(t, s.addLog(&ethgo.Log{Topics: []ethgo.Hash{stateTransferEventABI.ID()}}))
+
+	// correct event log
+	data, err := abi.MustNewType("tuple(string a)").Encode([]string{"data"})
 	require.NoError(t, err)
 
-	log := &ethgo.Log{
-		LogIndex:        uint64(0),
-		BlockNumber:     uint64(0),
-		TransactionHash: ethgo.BytesToHash(generateRandomBytes(t)),
-		BlockHash:       ethgo.BytesToHash(generateRandomBytes(t)),
-		Address:         ethgo.ZeroAddress,
-		Topics:          topics,
-		Data:            encodedData,
+	goodLog := &ethgo.Log{
+		Topics: []ethgo.Hash{
+			stateTransferEventABI.ID(),
+			ethgo.BytesToHash([]byte{0x1}), // state sync index 1
+			ethgo.ZeroHash,
+			ethgo.ZeroHash,
+		},
+		Data: data,
 	}
-	event, err := decodeStateSyncEvent(log)
-	require.NoError(t, err)
-	runtime.AddLog(log)
+	s.addLog(goodLog)
 
-	stateSyncs, err := runtime.state.getStateSyncEventsForCommitment(1, 1)
+	stateSyncs, err := s.state.getStateSyncEventsForCommitment(1, 1)
 	require.NoError(t, err)
 	require.Len(t, stateSyncs, 1)
-	require.Equal(t, event.ID, stateSyncs[0].ID)
 }
 
-func TestConsensusRuntime_deliverMessage_EpochNotStarted(t *testing.T) {
+func TestStateSyncerManager_EventTracker_Sync(t *testing.T) {
 	t.Parallel()
 
-	state := newTestState(t)
-	err := state.insertEpoch(1)
-	assert.NoError(t, err)
+	vals := newTestValidators(5)
+	s := newTestStateSyncManager(t, vals.getValidator("0"))
 
-	// random node not among validator set
-	account := newTestValidator("A", 1)
+	server := testutil.DeployTestServer(t, nil)
 
-	runtime := &consensusRuntime{
-		logger: hclog.NewNullLogger(),
-		state:  state,
-		config: &runtimeConfig{
-			PolyBFTConfig: &PolyBFTConfig{
-				EpochSize: 1,
-			},
-			Key: account.Key(),
-		},
-		epoch: &epochMetadata{
-			Number:     1,
-			Validators: newTestValidators(5).getPublicIdentities(),
-		},
-		lastBuiltBlock: &types.Header{},
-	}
+	// TODO: Deploy local artifacts
+	cc := &testutil.Contract{}
+	cc.AddCallback(func() string {
+		return `
+			event StateSynced(uint256 indexed id, address indexed sender, address indexed receiver, bytes data);
+			uint256 indx;
 
-	msg := createTestTransportMessage(t, generateRandomBytes(t), 1, account.Key())
-	err = runtime.deliverMessage(msg)
-	assert.ErrorContains(t, err, "not among the active validator set")
+			function emitEvent() public payable {
+				emit StateSynced(indx, msg.sender, msg.sender, bytes(""));
+				indx++;
+			}
+			`
+	})
 
-	votes, err := state.getMessageVotes(1, msg.Hash)
-	assert.NoError(t, err)
-	assert.Empty(t, votes)
-}
-
-func TestConsensusRuntime_deliverMessage_ForExistingEpochAndCommitmentMessage(t *testing.T) {
-	t.Parallel()
-
-	state := newTestState(t)
-	err := state.insertEpoch(1)
+	_, addr, err := server.DeployContract(cc)
 	require.NoError(t, err)
 
-	validators := newTestValidatorsWithAliases([]string{"SENDER", "RECEIVER"})
-	validatorSet := validators.getPublicIdentities()
-	sender := validators.getValidator("SENDER").Key()
-
-	runtime := &consensusRuntime{
-		logger:              hclog.NewNullLogger(),
-		state:               state,
-		activeValidatorFlag: 1,
-		config: &runtimeConfig{
-			PolyBFTConfig: &PolyBFTConfig{
-				EpochSize: 1,
-			},
-		},
-		epoch: &epochMetadata{
-			Number:     1,
-			Validators: validatorSet,
-		},
-		lastBuiltBlock: &types.Header{},
+	// prefill with 10 events
+	for i := 0; i < 10; i++ {
+		receipt, err := server.TxnTo(addr, "emitEvent")
+		require.NoError(t, err)
+		require.Equal(t, uint64(types.ReceiptSuccess), receipt.Status)
 	}
 
-	msg := createTestTransportMessage(t, generateRandomBytes(t), 1, sender)
-	err = runtime.deliverMessage(msg)
-	assert.NoError(t, err)
+	s.bridgeAddr = types.Address(addr)
+	s.jsonrpcAddr = server.HTTPAddr()
 
-	votes, err := state.getMessageVotes(1, msg.Hash)
-	assert.NoError(t, err)
-	assert.Equal(t, 1, len(votes))
-	assert.True(t, bytes.Equal(msg.Signature, votes[0].Signature))
-}
+	require.NoError(t, s.initTracker())
 
-func TestConsensusRuntime_deliverMessage_SenderMessageNotInCurrentValidatorset(t *testing.T) {
-	t.Parallel()
+	time.Sleep(2 * time.Second)
 
-	state := newTestState(t)
-	err := state.insertEpoch(1)
+	events, err := s.state.getStateSyncEventsForCommitment(0, 9)
 	require.NoError(t, err)
-
-	validators := newTestValidators(6)
-
-	runtime := &consensusRuntime{
-		state:               state,
-		activeValidatorFlag: 1,
-		config: &runtimeConfig{
-			PolyBFTConfig: &PolyBFTConfig{
-				EpochSize: 1,
-			},
-		},
-		epoch: &epochMetadata{
-			Number:     1,
-			Validators: validators.getPublicIdentities(),
-		},
-		lastBuiltBlock: &types.Header{},
-	}
-
-	msg := createTestTransportMessage(t, generateRandomBytes(t), 1, createTestKey(t))
-	err = runtime.deliverMessage(msg)
-	assert.Error(t, err)
-	assert.ErrorContains(t, err,
-		fmt.Sprintf("message is received from sender %s, which is not in current validator set", msg.NodeID))
+	require.Len(t, events, 10)
 }
-*/

@@ -1931,9 +1931,7 @@ func TestConsensusRuntime_BuildPrepareMessage(t *testing.T) {
 	assert.Equal(t, signedMsg, runtime.BuildPrepareMessage(proposalHash, view))
 }
 
-func createTestTransportMessage(t *testing.T, hash []byte, epochNumber uint64, key *wallet.Key) *TransportMessage {
-	t.Helper()
-
+func createTestTransportMessage(hash []byte, epochNumber uint64, key *wallet.Key) *TransportMessage {
 	signature, _ := key.Sign(hash)
 
 	return &TransportMessage{
