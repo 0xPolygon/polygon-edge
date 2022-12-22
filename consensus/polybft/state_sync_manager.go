@@ -13,7 +13,6 @@ import (
 	polybftProto "github.com/0xPolygon/polygon-edge/consensus/polybft/proto"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
-	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -21,6 +20,7 @@ import (
 	"github.com/umbracle/ethgo/jsonrpc"
 	"github.com/umbracle/ethgo/tracker"
 	boltdbStore "github.com/umbracle/ethgo/tracker/store/boltdb"
+	"google.golang.org/protobuf/proto"
 )
 
 type StateSyncManager struct {
@@ -30,17 +30,23 @@ type StateSyncManager struct {
 	bridgeAddr  types.Address
 	jsonrpcAddr string
 	dataDir     string
-	topic       *network.Topic
+	topic       topic
 	key         *wallet.Key
 
 	// per epoch fields
-	commitment   *Commitment
 	lock         sync.Mutex
+	commitment   *Commitment
 	epoch        uint64
 	validatorSet *validatorSet
 }
 
-func NewStateSyncManager(logger hclog.Logger, key *wallet.Key, state *State, bridgeAddr types.Address, jsonrpcAddr string, dataDir string, topic *network.Topic) (*StateSyncManager, error) { //nolint
+// topic is an interface for a gossip p2p message
+type topic interface {
+	Publish(obj proto.Message) error
+	Subscribe(handler func(obj interface{}, from peer.ID)) error
+}
+
+func NewStateSyncManager(logger hclog.Logger, key *wallet.Key, state *State, bridgeAddr types.Address, jsonrpcAddr string, dataDir string, topic topic) (*StateSyncManager, error) { //nolint
 	s := &StateSyncManager{
 		logger:      logger.Named("state-sync"),
 		state:       state,
@@ -51,17 +57,19 @@ func NewStateSyncManager(logger hclog.Logger, key *wallet.Key, state *State, bri
 		key:         key,
 	}
 
-	/*
-		if err := s.initTracker(); err != nil {
-			return nil, err
-		}
-
-		if err := s.initTransport(); err != nil {
-			return nil, err
-		}
-	*/
-
 	return s, nil
+}
+
+func (s *StateSyncManager) init() error {
+	if err := s.initTracker(); err != nil {
+		return err
+	}
+
+	if err := s.initTransport(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (s *StateSyncManager) initTransport() error {
@@ -459,14 +467,12 @@ func (s *StateSyncManager) buildCommitment(epoch, fromIndex uint64) (*Commitment
 	}
 
 	// gossip message
-	/*
-		s.Multicast(&TransportMessage{
-			Hash:        hashBytes,
-			Signature:   signature,
-			NodeID:      s.key.String(),
-			EpochNumber: epoch,
-		})
-	*/
+	s.Multicast(&TransportMessage{
+		Hash:        hashBytes,
+		Signature:   signature,
+		NodeID:      s.key.String(),
+		EpochNumber: epoch,
+	})
 
 	s.logger.Debug(
 		"[buildCommitment] Built commitment",

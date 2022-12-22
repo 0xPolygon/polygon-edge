@@ -9,10 +9,12 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
 	"github.com/umbracle/ethgo/testutil"
+	"google.golang.org/protobuf/proto"
 )
 
 func newTestStateSyncManager(t *testing.T, key *testValidator) *StateSyncManager {
@@ -23,7 +25,9 @@ func newTestStateSyncManager(t *testing.T, key *testValidator) *StateSyncManager
 	state := newTestState(t)
 	require.NoError(t, state.insertEpoch(0))
 
-	s, err := NewStateSyncManager(hclog.NewNullLogger(), key.Key(), state, types.Address{}, "", tmpDir, nil)
+	topic := &mockTopic{}
+
+	s, err := NewStateSyncManager(hclog.NewNullLogger(), key.Key(), state, types.Address{}, "", tmpDir, topic)
 	require.NoError(t, err)
 
 	t.Cleanup(func() {
@@ -64,6 +68,9 @@ func TestStateSyncManager_PostEpoch_BuildCommitment(t *testing.T) {
 	require.Equal(t, commitment.Epoch, uint64(0))
 	require.Equal(t, commitment.FromIndex, uint64(0))
 	require.Equal(t, commitment.ToIndex, uint64(9))
+
+	// the message was sent
+	require.NotNil(t, s.topic.(*mockTopic).consume()) //nolint
 }
 
 func TestStateSyncManager_MessagePool_OldEpoch(t *testing.T) {
@@ -152,7 +159,7 @@ func TestStateSyncManager_MessagePool_SenderVotes(t *testing.T) {
 	require.Len(t, votes, 2)
 }
 
-func TestStateSyncerManager_BuildCommitment(t *testing.T) {
+func TestStateSyncManager_BuildCommitment(t *testing.T) {
 	vals := newTestValidators(5)
 
 	s := newTestStateSyncManager(t, vals.getValidator("0"))
@@ -206,7 +213,12 @@ func TestStateSyncerManager_BuildProofs(t *testing.T) {
 
 	s.commitment = commitment
 
-	mockMsg := &CommitmentMessageSigned{Message: &CommitmentMessage{}}
+	mockMsg := &CommitmentMessageSigned{
+		Message: &CommitmentMessage{
+			FromIndex: commitment.FromIndex,
+			ToIndex:   commitment.ToIndex,
+		},
+	}
 
 	txData, err := mockMsg.EncodeAbi()
 	require.NoError(t, err)
@@ -220,7 +232,11 @@ func TestStateSyncerManager_BuildProofs(t *testing.T) {
 	}
 	require.NoError(t, s.PostBlock(req))
 
-	// TODO
+	for i := uint64(0); i < 10; i++ {
+		proof, err := s.state.getStateSyncProof(i)
+		require.NoError(t, err)
+		require.NotNil(t, proof)
+	}
 }
 
 func TestStateSyncerManager_EventTracker_AddLog(t *testing.T) {
@@ -296,4 +312,28 @@ func TestStateSyncerManager_EventTracker_Sync(t *testing.T) {
 	events, err := s.state.getStateSyncEventsForCommitment(0, 9)
 	require.NoError(t, err)
 	require.Len(t, events, 10)
+}
+
+type mockTopic struct {
+	published proto.Message
+}
+
+func (m *mockTopic) consume() proto.Message {
+	msg := m.published
+
+	if m.published != nil {
+		m.published = nil
+	}
+
+	return msg
+}
+
+func (m *mockTopic) Publish(obj proto.Message) error {
+	m.published = obj
+
+	return nil
+}
+
+func (m *mockTopic) Subscribe(handler func(obj interface{}, from peer.ID)) error {
+	return nil
 }

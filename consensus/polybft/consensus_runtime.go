@@ -76,14 +76,13 @@ type guardedDataDTO struct {
 
 // runtimeConfig is a struct that holds configuration data for given consensus runtime
 type runtimeConfig struct {
-	PolyBFTConfig   *PolyBFTConfig
-	DataDir         string
-	BridgeTransport BridgeTransport
-	Key             *wallet.Key
-	State           *State
-	blockchain      blockchainBackend
-	polybftBackend  polybftBackend
-	txPool          txPoolInterface
+	PolyBFTConfig  *PolyBFTConfig
+	DataDir        string
+	Key            *wallet.Key
+	State          *State
+	blockchain     blockchainBackend
+	polybftBackend polybftBackend
+	txPool         txPoolInterface
 }
 
 // consensusRuntime is a struct that provides consensus runtime features like epoch, state and event management

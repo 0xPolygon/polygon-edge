@@ -245,14 +245,13 @@ func (p *Polybft) Start() error {
 // initRuntime creates consensus runtime
 func (p *Polybft) initRuntime() error {
 	runtimeConfig := &runtimeConfig{
-		PolyBFTConfig:   p.consensusConfig,
-		Key:             p.key,
-		DataDir:         p.dataDir,
-		BridgeTransport: &runtimeTransportWrapper{p.bridgeTopic, p.logger},
-		State:           p.state,
-		blockchain:      p.blockchain,
-		polybftBackend:  p,
-		txPool:          p.txPool,
+		PolyBFTConfig:  p.consensusConfig,
+		Key:            p.key,
+		DataDir:        p.dataDir,
+		State:          p.state,
+		blockchain:     p.blockchain,
+		polybftBackend: p,
+		txPool:         p.txPool,
 	}
 
 	runtime, err := newConsensusRuntime(p.logger, runtimeConfig)
