@@ -83,6 +83,7 @@ type runtimeConfig struct {
 	blockchain     blockchainBackend
 	polybftBackend polybftBackend
 	txPool         txPoolInterface
+	bridgeTopic    topic
 }
 
 // consensusRuntime is a struct that provides consensus runtime features like epoch, state and event management
@@ -136,13 +137,25 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 		logger:             log.Named("consensus_runtime"),
 	}
 
-	// we need to call restart epoch on runtime to initialize epoch state
-	runtime.epoch, err = runtime.restartEpoch(runtime.lastBuiltBlock)
-	if err != nil {
-		return nil, fmt.Errorf("consensus runtime creation - restart epoch failed: %w", err)
-	}
-
 	if runtime.IsBridgeEnabled() {
+		// enable state sync manager
+		runtime.stateSyncManager, err = NewStateSyncManager(
+			log, config.Key,
+			config.State,
+			config.PolyBFTConfig.StateReceiverAddr,
+			config.PolyBFTConfig.Bridge.JSONRPCEndpoint,
+			config.DataDir,
+			config.bridgeTopic,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := runtime.stateSyncManager.init(); err != nil {
+			return nil, err
+		}
+
+		// enable checkpoint manager
 		txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(config.PolyBFTConfig.Bridge.JSONRPCEndpoint))
 		if err != nil {
 			return nil, err
@@ -156,6 +169,12 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 			config.blockchain,
 			config.polybftBackend,
 			log.Named("checkpoint_manager"))
+	}
+
+	// we need to call restart epoch on runtime to initialize epoch state
+	runtime.epoch, err = runtime.restartEpoch(runtime.lastBuiltBlock)
+	if err != nil {
+		return nil, fmt.Errorf("consensus runtime creation - restart epoch failed: %w", err)
 	}
 
 	return runtime, nil

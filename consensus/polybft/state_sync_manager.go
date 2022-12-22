@@ -25,13 +25,13 @@ import (
 
 type StateSyncManager struct {
 	// configuration fields
-	logger      hclog.Logger
-	state       *State
-	bridgeAddr  types.Address
-	jsonrpcAddr string
-	dataDir     string
-	topic       topic
-	key         *wallet.Key
+	logger            hclog.Logger
+	state             *State
+	stateReceiverAddr types.Address
+	jsonrpcAddr       string
+	dataDir           string
+	topic             topic
+	key               *wallet.Key
 
 	// per epoch fields
 	lock         sync.Mutex
@@ -46,15 +46,17 @@ type topic interface {
 	Subscribe(handler func(obj interface{}, from peer.ID)) error
 }
 
-func NewStateSyncManager(logger hclog.Logger, key *wallet.Key, state *State, bridgeAddr types.Address, jsonrpcAddr string, dataDir string, topic topic) (*StateSyncManager, error) { //nolint
+func NewStateSyncManager(logger hclog.Logger, key *wallet.Key, state *State,
+	stateReceiverAddr types.Address, jsonrpcAddr string, dataDir string, topic topic) (*StateSyncManager, error) {
 	s := &StateSyncManager{
-		logger:      logger.Named("state-sync"),
-		state:       state,
-		bridgeAddr:  bridgeAddr,
-		jsonrpcAddr: jsonrpcAddr,
-		dataDir:     dataDir,
-		topic:       topic,
-		key:         key,
+		logger:            logger.Named("state-sync"),
+		state:             state,
+		stateReceiverAddr: stateReceiverAddr,
+		jsonrpcAddr:       jsonrpcAddr,
+		dataDir:           dataDir,
+		topic:             topic,
+		key:               key,
+		lock:              sync.Mutex{},
 	}
 
 	return s, nil
@@ -146,7 +148,7 @@ func (s *StateSyncManager) initTracker() error {
 		return err
 	}
 
-	s.logger.Info("Start tracking events", "bridge", s.bridgeAddr)
+	s.logger.Info("Start tracking events", "bridge", s.stateReceiverAddr)
 
 	tt, err := tracker.NewTracker(provider.Eth(),
 		tracker.WithBatchSize(10),
@@ -154,7 +156,7 @@ func (s *StateSyncManager) initTracker() error {
 		tracker.WithFilter(&tracker.FilterConfig{
 			Async: false,
 			Address: []ethgo.Address{
-				ethgo.Address(s.bridgeAddr),
+				ethgo.Address(s.stateReceiverAddr),
 			},
 		}),
 	)
@@ -198,9 +200,6 @@ func (s *StateSyncManager) initTracker() error {
 }
 
 func (s *StateSyncManager) addLog(eventLog *ethgo.Log) error {
-	fmt.Println("-- add log --")
-	fmt.Println(eventLog)
-
 	s.logger.Info(
 		"Add State sync event",
 		"block", eventLog.BlockNumber,
@@ -212,9 +211,6 @@ func (s *StateSyncManager) addLog(eventLog *ethgo.Log) error {
 	if err != nil {
 		return err
 	}
-
-	fmt.Println("-- store --")
-	fmt.Println(event)
 
 	if err := s.state.insertStateSyncEvent(event); err != nil {
 		return err

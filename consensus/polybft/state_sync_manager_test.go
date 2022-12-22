@@ -302,7 +302,7 @@ func TestStateSyncerManager_EventTracker_Sync(t *testing.T) {
 		require.Equal(t, uint64(types.ReceiptSuccess), receipt.Status)
 	}
 
-	s.bridgeAddr = types.Address(addr)
+	s.stateReceiverAddr = types.Address(addr)
 	s.jsonrpcAddr = server.HTTPAddr()
 
 	require.NoError(t, s.initTracker())

@@ -367,7 +367,7 @@ func TestConsensusRuntime_FSM_NotEndOfEpoch_NotEndOfSprint(t *testing.T) {
 	blockchainMock.AssertExpectations(t)
 }
 
-func TestConsensusRuntime_FSM_EndOfEpoch_BuildRegisterCommitment_And_Uptime(t *testing.T) {
+func TestConsensusRuntime_FSM_EndOfEpoch_BuildUptime(t *testing.T) {
 	t.Parallel()
 
 	const (
@@ -386,13 +386,8 @@ func TestConsensusRuntime_FSM_EndOfEpoch_BuildRegisterCommitment_And_Uptime(t *t
 
 	lastBuiltBlock, headerMap := createTestBlocks(t, 9, epochSize, validators)
 
-	systemStateMock := new(systemStateMock)
-	systemStateMock.On("GetNextCommittedIndex").Return(beginStateSyncIndex, nil).Once()
-
 	blockchainMock := new(blockchainMock)
 	blockchainMock.On("NewBlockBuilder", mock.Anything).Return(&BlockBuilder{}, nil).Once()
-	blockchainMock.On("GetStateProviderForBlock", mock.Anything).Return(new(stateProviderMock)).Once()
-	blockchainMock.On("GetSystemState", mock.Anything, mock.Anything).Return(systemStateMock)
 	blockchainMock.On("GetHeaderByNumber", mock.Anything).Return(headerMap.getHeader)
 
 	state := newTestState(t)
@@ -408,7 +403,6 @@ func TestConsensusRuntime_FSM_EndOfEpoch_BuildRegisterCommitment_And_Uptime(t *t
 		PolyBFTConfig: &PolyBFTConfig{
 			EpochSize:  epochSize,
 			SprintSize: sprintSize,
-			Bridge:     &BridgeConfig{},
 		},
 		Key:        validatorAccounts.getValidator("A").Key(),
 		blockchain: blockchainMock,
@@ -431,72 +425,8 @@ func TestConsensusRuntime_FSM_EndOfEpoch_BuildRegisterCommitment_And_Uptime(t *t
 	assert.True(t, fsm.isEndOfEpoch)
 	assert.NotNil(t, fsm.uptimeCounter)
 	assert.NotEmpty(t, fsm.uptimeCounter)
-	assert.NotNil(t, fsm.proposerCommitmentToRegister)
-	assert.Equal(t, fromIndex, fsm.proposerCommitmentToRegister.Message.FromIndex)
-	assert.Equal(t, toIndex, fsm.proposerCommitmentToRegister.Message.ToIndex)
 
-	systemStateMock.AssertExpectations(t)
 	blockchainMock.AssertExpectations(t)
-}
-
-func TestConsensusRuntime_FSM_EndOfEpoch_RegisterCommitmentNotFound(t *testing.T) {
-	t.Parallel()
-
-	const (
-		epochSize           = uint64(10)
-		sprintSize          = uint64(5)
-		beginStateSyncIndex = uint64(5)
-	)
-
-	validatorAccs := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
-	validators := validatorAccs.getPublicIdentities()
-	lastBuiltBlock, headerMap := createTestBlocks(t, 9, epochSize, validators)
-
-	systemStateMock := new(systemStateMock)
-	systemStateMock.On("GetNextCommittedIndex").Return(beginStateSyncIndex, nil).Once()
-
-	blockchainMock := new(blockchainMock)
-	blockchainMock.On("NewBlockBuilder", mock.Anything).Return(new(blockBuilderMock), nil).Once()
-	blockchainMock.On("GetStateProviderForBlock", mock.Anything).Return(new(stateProviderMock)).Once()
-	blockchainMock.On("GetSystemState", mock.Anything, mock.Anything).Return(systemStateMock)
-	blockchainMock.On("GetHeaderByNumber", mock.Anything).Return(headerMap.getHeader)
-
-	epoch := getEpochNumber(t, lastBuiltBlock.Number, epochSize)
-	metadata := &epochMetadata{
-		Validators:        validators,
-		Number:            epoch,
-		FirstBlockInEpoch: epoch*epochSize - epochSize + 1,
-	}
-
-	config := &runtimeConfig{
-		PolyBFTConfig: &PolyBFTConfig{
-			EpochSize:  epochSize,
-			SprintSize: sprintSize,
-			Bridge:     &BridgeConfig{},
-		},
-		Key:        validatorAccs.getValidator("A").Key(),
-		blockchain: blockchainMock,
-	}
-
-	snapshot := NewProposerSnapshot(1, nil)
-	runtime := &consensusRuntime{
-		proposerCalculator: NewProposerCalculatorFromSnapshot(snapshot, config, hclog.NewNullLogger()),
-		logger:             hclog.NewNullLogger(),
-		epoch:              metadata,
-		config:             config,
-		lastBuiltBlock:     lastBuiltBlock,
-		state:              newTestState(t),
-	}
-
-	err := runtime.FSM()
-	fsm := runtime.fsm
-
-	require.NoError(t, err)
-	require.NotNil(t, fsm)
-	require.Nil(t, fsm.proposerCommitmentToRegister)
-	require.True(t, fsm.isEndOfEpoch)
-	require.NotNil(t, fsm.uptimeCounter)
-	require.NotEmpty(t, fsm.uptimeCounter)
 }
 
 func Test_NewConsensusRuntime(t *testing.T) {
@@ -540,6 +470,7 @@ func Test_NewConsensusRuntime(t *testing.T) {
 		DataDir:        tmpDir,
 		Key:            createTestKey(t),
 		blockchain:     blockchainMock,
+		bridgeTopic:    &mockTopic{},
 	}
 	runtime, err := newConsensusRuntime(hclog.NewNullLogger(), config)
 	require.NoError(t, err)
