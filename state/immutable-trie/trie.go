@@ -91,17 +91,16 @@ func (f *FullNode) getEdge(idx byte) Node {
 }
 
 type Trie struct {
-	root    Node
-	epoch   uint32
-	storage Storage
+	root  Node
+	epoch uint32
 }
 
 func NewTrie() *Trie {
 	return &Trie{}
 }
 
-func (t *Trie) Get(k []byte) ([]byte, bool) {
-	txn := t.Txn()
+func (t *Trie) Get(k []byte, storage Storage) ([]byte, bool) {
+	txn := t.Txn(storage)
 	res := txn.Lookup(k)
 
 	return res, res != nil
@@ -130,33 +129,14 @@ func (t *Trie) Hash() types.Hash {
 	return types.BytesToHash(hash)
 }
 
-func (t *Trie) TryUpdate(key, value []byte) error {
-	k := bytesToHexNibbles(key)
-
-	if len(value) != 0 {
-		tt := t.Txn()
-		n := tt.insert(t.root, k, value)
-		t.root = n
-	} else {
-		tt := t.Txn()
-		n, ok := tt.delete(t.root, k)
-		if !ok {
-			return fmt.Errorf("missing node")
-		}
-		t.root = n
-	}
-
-	return nil
-}
-
 func (t *Trie) hashRoot() []byte {
 	hash, _ := t.root.Hash()
 
 	return hash
 }
 
-func (t *Trie) Txn() *Txn {
-	return &Txn{root: t.root, epoch: t.epoch + 1, storage: t.storage}
+func (t *Trie) Txn(storage Storage) *Txn {
+	return &Txn{root: t.root, epoch: t.epoch + 1, storage: storage}
 }
 
 type Putter interface {
@@ -171,7 +151,7 @@ type Txn struct {
 }
 
 func (t *Txn) Commit() *Trie {
-	return &Trie{epoch: t.epoch, root: t.root, storage: t.storage}
+	return &Trie{epoch: t.epoch, root: t.root}
 }
 
 func (t *Txn) Lookup(key []byte) []byte {

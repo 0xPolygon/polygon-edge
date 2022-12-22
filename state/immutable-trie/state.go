@@ -39,10 +39,7 @@ func (s *State) NewSnapshotAt(root types.Hash) (state.Snapshot, error) {
 }
 
 func (s *State) newTrie() *Trie {
-	t := NewTrie()
-	t.storage = s.storage
-
-	return t
+	return NewTrie()
 }
 
 func (s *State) SetCode(hash types.Hash, code []byte) {
@@ -80,8 +77,7 @@ func (s *State) newTrieAt(root types.Hash) (*Trie, error) {
 	}
 
 	t := &Trie{
-		root:    n,
-		storage: s.storage,
+		root: n,
 	}
 
 	return t, nil

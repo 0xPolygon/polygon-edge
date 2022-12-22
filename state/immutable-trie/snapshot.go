@@ -33,7 +33,7 @@ func (s *Snapshot) GetStorage(addr types.Address, root types.Hash, rawkey types.
 
 	key := crypto.Keccak256(rawkey.Bytes())
 
-	val, ok := trie.Get(key)
+	val, ok := trie.Get(key, s.state.storage)
 	if !ok {
 		return types.Hash{}
 	}
@@ -56,7 +56,7 @@ func (s *Snapshot) GetStorage(addr types.Address, root types.Hash, rawkey types.
 func (s *Snapshot) GetAccount(addr types.Address) (*state.Account, error) {
 	key := crypto.Keccak256(addr.Bytes())
 
-	data, ok := s.trie.Get(key)
+	data, ok := s.trie.Get(key, s.state.storage)
 	if !ok {
 		return nil, nil
 	}
@@ -74,9 +74,9 @@ func (s *Snapshot) GetCode(hash types.Hash) ([]byte, bool) {
 }
 
 func (s *Snapshot) Commit(objs []*state.Object) (state.Snapshot, []byte) {
-	batch := s.trie.storage.Batch()
+	batch := s.state.storage.Batch()
 
-	tt := s.trie.Txn()
+	tt := s.trie.Txn(s.state.storage)
 	tt.batch = batch
 
 	arena := accountArenaPool.Get()
@@ -102,7 +102,7 @@ func (s *Snapshot) Commit(objs []*state.Object) (state.Snapshot, []byte) {
 					panic(err)
 				}
 
-				localTxn := trie.Txn()
+				localTxn := trie.Txn(s.state.storage)
 				localTxn.batch = batch
 
 				for _, entry := range obj.Storage {
@@ -139,8 +139,6 @@ func (s *Snapshot) Commit(objs []*state.Object) (state.Snapshot, []byte) {
 	root, _ := tt.Hash()
 
 	nTrie := tt.Commit()
-
-	nTrie.storage = s.trie.storage
 
 	// Write all the entries to db
 	batch.Write()
