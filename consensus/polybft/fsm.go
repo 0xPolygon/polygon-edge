@@ -328,7 +328,7 @@ func (f *fsm) ValidateSender(msg *proto.Message) error {
 
 	signerAddress, err := wallet.RecoverAddressFromSignature(msg.Signature, msgNoSig)
 	if err != nil {
-		return fmt.Errorf("failed to ecrecover message: %w", err)
+		return fmt.Errorf("failed to recover address from signature: %w", err)
 	}
 
 	// verify the signature came from the sender

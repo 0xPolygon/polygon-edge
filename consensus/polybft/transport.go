@@ -66,7 +66,6 @@ func (c *consensusRuntime) subscribeToBridgeTopic(topic *network.Topic) error {
 // subscribeToIbftTopic subscribes to ibft topic
 func (p *Polybft) subscribeToIbftTopic() error {
 	return p.consensusTopic.Subscribe(func(obj interface{}, _ peer.ID) {
-		// this check is from ibft impl
 		if !p.runtime.isActiveValidator() {
 			return
 		}

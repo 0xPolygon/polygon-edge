@@ -984,9 +984,14 @@ func (c *consensusRuntime) IsValidSender(msg *proto.Message) bool {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
-	err := c.fsm.ValidateSender(msg)
-	if err != nil {
-		c.logger.Error("invalid sender", "error", err)
+	if c.fsm == nil {
+		c.logger.Warn("unable to validate IBFT message sender, because FSM is not initialized")
+
+		return false
+	}
+
+	if err := c.fsm.ValidateSender(msg); err != nil {
+		c.logger.Error("invalid IBFT message received", "error", err)
 
 		return false
 	}

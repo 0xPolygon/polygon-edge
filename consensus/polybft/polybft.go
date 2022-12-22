@@ -203,7 +203,7 @@ func (p *Polybft) Initialize() error {
 	p.ibft = newIBFTConsensusWrapper(p.logger, p.runtime, p)
 
 	if err = p.subscribeToIbftTopic(); err != nil {
-		return fmt.Errorf("topic subscription failed: %w", err)
+		return fmt.Errorf("IBFT topic subscription failed: %w", err)
 	}
 
 	return nil
@@ -231,7 +231,7 @@ func (p *Polybft) Start() error {
 		}
 	}()
 
-	// start pbft process
+	// start consensus runtime
 	if err := p.startRuntime(); err != nil {
 		return fmt.Errorf("consensus runtime start failed: %w", err)
 	}
@@ -279,12 +279,12 @@ func (p *Polybft) startRuntime() error {
 		}
 	}
 
-	go p.startPbftProcess()
+	go p.startConsensusProtocol()
 
 	return nil
 }
 
-func (p *Polybft) startPbftProcess() {
+func (p *Polybft) startConsensusProtocol() {
 	// wait to have at least n peers connected. The 2 is just an initial heuristic value
 	// Most likely we will parametrize this in the future.
 	if !p.waitForNPeers() {

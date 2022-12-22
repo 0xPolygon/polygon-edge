@@ -51,11 +51,11 @@ func (k *Key) SignEcdsaMessage(msg *proto.Message) (*proto.Message, error) {
 	return msg, nil
 }
 
-// recoverAddressFromSignature recovers signer address from the given digest and signature
+// RecoverAddressFromSignature recovers signer address from the given digest and signature
 func RecoverAddressFromSignature(sig, msg []byte) (types.Address, error) {
 	pub, err := crypto.RecoverPubkey(sig, msg)
 	if err != nil {
-		return types.Address{}, fmt.Errorf("cannot recover addrese from signature: %w", err)
+		return types.Address{}, fmt.Errorf("cannot recover address from signature: %w", err)
 	}
 
 	return crypto.PubKeyToAddress(pub), nil
