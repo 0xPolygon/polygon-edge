@@ -140,7 +140,6 @@ func (s *Snapshot) Commit(objs []*state.Object) (state.Snapshot, []byte) {
 
 	nTrie := tt.Commit()
 
-	// nTrie.state = s.trie.state
 	nTrie.storage = s.trie.storage
 
 	// Write all the entries to db

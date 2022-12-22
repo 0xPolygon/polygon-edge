@@ -156,7 +156,6 @@ func (t *Trie) hashRoot() []byte {
 }
 
 func (t *Trie) Txn() *Txn {
-	// FIXME: could we copy t.root, t.storage without putting the same refs to mutexes?
 	return &Txn{root: t.root, epoch: t.epoch + 1, storage: t.storage}
 }
 
