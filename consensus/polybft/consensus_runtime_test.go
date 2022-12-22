@@ -1531,9 +1531,12 @@ func TestConsensusRuntime_calculateUptime_SecondEpoch(t *testing.T) {
 
 	guardedData, err := consensusRuntime.getGuardedData()
 	require.NoError(t, err)
-	uptime, err := consensusRuntime.calculateUptime(guardedData.lastBuiltBlock, guardedData.epoch)
-	assert.NoError(t, err)
-	assert.NotEmpty(t, uptime)
+	epochInfo, err := consensusRuntime.calculateUptime(guardedData.lastBuiltBlock, guardedData.epoch)
+	require.NoError(t, err)
+	require.NotEmpty(t, epochInfo)
+	require.Equal(t, config.PolyBFTConfig.EpochSize, epochInfo.Uptime.TotalBlocks)
+	require.Equal(t, uint64(1), epochInfo.Epoch.StartBlock)
+	require.Equal(t, uint64(10), epochInfo.Epoch.EndBlock)
 
 	blockchainMock.AssertExpectations(t)
 	polybftBackendMock.AssertExpectations(t)
