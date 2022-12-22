@@ -218,7 +218,6 @@ func TestProposerCalculator_IncrementProposerPrioritySameVotingPower(t *testing.
 }
 
 func TestProposerCalculator_AveragingInIncrementProposerPriorityWithVotingPower(t *testing.T) {
-	t.Skip("FIX")
 	t.Parallel()
 
 	keys, err := bls.CreateRandomBlsKeys(3)
@@ -361,8 +360,8 @@ func TestProposerCalculator_AveragingInIncrementProposerPriorityWithVotingPower(
 
 		for valIdx, val := range snap.Validators {
 			assert.Equal(t,
-				big.NewInt(tc.expectedProposerPriority[valIdx]),
-				val.ProposerPriority,
+				tc.expectedProposerPriority[valIdx],
+				val.ProposerPriority.Int64(),
 				"test case: %v, validator: %v",
 				i,
 				valIdx)
@@ -438,7 +437,6 @@ func TestProposerCalculator_GetLatestProposer(t *testing.T) {
 }
 
 func TestProposerCalculator_UpdateValidatorsSameVpUpdatedAndNewAdded(t *testing.T) {
-	t.Skip("FIX")
 	t.Parallel()
 
 	keys, err := bls.CreateRandomBlsKeys(8)
@@ -504,7 +502,6 @@ func TestProposerCalculator_UpdateValidatorsSameVpUpdatedAndNewAdded(t *testing.
 }
 
 func TestProposerCalculator_UpdateValidators(t *testing.T) {
-	t.Skip("FIX")
 	t.Parallel()
 
 	keys, err := bls.CreateRandomBlsKeys(4)
@@ -636,7 +633,6 @@ func TestProposerCalculator_ShiftAfterUpdate(t *testing.T) {
 }
 
 func TestProposerCalculator_UpdateValidatorSet(t *testing.T) {
-	t.Skip("FIX")
 	t.Parallel()
 
 	keys, err := bls.CreateRandomBlsKeys(3)
@@ -673,7 +669,6 @@ func TestProposerCalculator_UpdateValidatorSet(t *testing.T) {
 }
 
 func TestProposerCalculator_AddValidator(t *testing.T) {
-	t.Skip("FIX")
 	t.Parallel()
 
 	keys, err := bls.CreateRandomBlsKeys(3)
