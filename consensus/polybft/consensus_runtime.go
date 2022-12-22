@@ -1140,7 +1140,7 @@ func (c *consensusRuntime) HasQuorum(
 
 		propAddress, err := c.fsm.proposerSnapshot.GetLatestProposer(messages[0].View.Round, blockNumber)
 		if err != nil {
-			c.logger.Warn("HasQuorum has been called but proposer is not set: %w", err)
+			c.logger.Warn("HasQuorum has been called but proposer is not set", "error", err)
 
 			return false
 		}
