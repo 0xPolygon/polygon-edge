@@ -216,6 +216,10 @@ func (s *StateSyncManager) addLog(eventLog *ethgo.Log) error {
 }
 
 func (s *StateSyncManager) Commitment() (*CommitmentMessageSigned, error) {
+	if s.commitment == nil {
+		return nil, nil
+	}
+
 	commitment := s.commitment
 
 	commitmentMessage := NewCommitmentMessage(
@@ -366,6 +370,7 @@ func (s *StateSyncManager) getCommitmentFromTransactions(txs []*types.Transactio
 	}
 
 	if s.commitment != nil {
+		// TODO: We have to build the proofs for a commitment that arrives
 		if err := s.buildProofs(s.commitment, commitment.Message); err != nil {
 			return fmt.Errorf("build commitment proofs error: %w", err)
 		}

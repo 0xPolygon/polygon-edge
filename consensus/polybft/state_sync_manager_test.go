@@ -91,6 +91,12 @@ func newMockMsg() *mockMsg {
 	return &mockMsg{hash: hash}
 }
 
+func (m *mockMsg) WithHash(hash []byte) *mockMsg {
+	m.hash = hash
+
+	return m
+}
+
 func (m *mockMsg) sign(val *testValidator) *TransportMessage {
 	signature, err := val.mustSign(m.hash).Marshal()
 	if err != nil {
@@ -144,6 +150,77 @@ func TestStateSyncManager_MessagePool_SenderVotes(t *testing.T) {
 	require.NoError(t, s.deliverMessage(val2signed))
 	votes, _ = s.state.getMessageVotes(0, msg.hash)
 	require.Len(t, votes, 2)
+}
+
+func TestStateSyncerManager_BuildCommitment(t *testing.T) {
+	vals := newTestValidators(5)
+
+	s := newTestStateSyncManager(t, vals.getValidator("0"))
+	s.validatorSet = vals.toValidatorSetWithError(t)
+
+	// commitment is empty
+	commitment, err := s.Commitment()
+	require.NoError(t, err)
+	require.Nil(t, commitment)
+
+	tree, err := NewMerkleTree([][]byte{{0x1}})
+	require.NoError(t, err)
+
+	s.commitment = &Commitment{
+		MerkleTree: tree,
+	}
+
+	hash, err := s.commitment.Hash()
+	require.NoError(t, err)
+
+	msg := newMockMsg().WithHash(hash.Bytes())
+
+	// validators 0 and 1 vote for the proposal, there is not enough
+	// voting power for the proposal
+	require.NoError(t, s.deliverMessage(msg.sign(vals.getValidator("0"))))
+	require.NoError(t, s.deliverMessage(msg.sign(vals.getValidator("1"))))
+
+	_, err = s.Commitment()
+	require.Error(t, err)
+
+	// validator 2 and 3 vote for the proposal, there is enough voting power now
+	require.NoError(t, s.deliverMessage(msg.sign(vals.getValidator("2"))))
+	require.NoError(t, s.deliverMessage(msg.sign(vals.getValidator("3"))))
+
+	commitment, err = s.Commitment()
+	require.NoError(t, err)
+	require.NotNil(t, commitment)
+}
+
+func TestStateSyncerManager_BuildProofs(t *testing.T) {
+	vals := newTestValidators(5)
+
+	s := newTestStateSyncManager(t, vals.getValidator("0"))
+
+	for _, evnt := range generateStateSyncEvents(t, 20, 0) {
+		require.NoError(t, s.state.insertStateSyncEvent(evnt))
+	}
+
+	commitment, err := s.buildCommitment(0, 0)
+	require.NoError(t, err)
+
+	s.commitment = commitment
+
+	mockMsg := &CommitmentMessageSigned{Message: &CommitmentMessage{}}
+
+	txData, err := mockMsg.EncodeAbi()
+	require.NoError(t, err)
+
+	tx := createStateTransactionWithData(types.Address{}, txData)
+
+	req := &PostBlockRequest{
+		Block: &types.Block{
+			Transactions: []*types.Transaction{tx},
+		},
+	}
+	require.NoError(t, s.PostBlock(req))
+
+	// TODO
 }
 
 func TestStateSyncerManager_EventTracker_AddLog(t *testing.T) {

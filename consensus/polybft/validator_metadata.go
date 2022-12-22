@@ -177,9 +177,7 @@ func (as AccountSet) ContainsAddress(address types.Address) bool {
 // Index returns index of the given ValidatorMetadata, identified by address within the AccountSet.
 // If given ValidatorMetadata is not present, it returns -1.
 func (as AccountSet) Index(addr types.Address) int {
-	fmt.Println("aaaaa", addr)
 	for indx, validator := range as {
-		fmt.Println("=>", validator.Address, addr)
 		if validator.Address == addr {
 			return indx
 		}
