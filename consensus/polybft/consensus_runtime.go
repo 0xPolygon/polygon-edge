@@ -727,6 +727,7 @@ func (c *consensusRuntime) deliverMessage(msg *TransportMessage) error {
 // and ending at the last block of previous epoch
 func (c *consensusRuntime) calculateUptime(currentBlock *types.Header, epoch *epochMetadata) (*CommitEpoch, error) {
 	uptimeCounter := map[types.Address]uint64{}
+	totalBlocks := uint64(0)
 
 	if c.config.PolyBFTConfig.EpochSize < (uptimeLookbackSize + 1) {
 		// this means that epoch size must at least be 3 blocks,
@@ -746,6 +747,8 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header, epoch *ep
 			return err
 		}
 
+		totalBlocks++
+
 		for _, a := range signers.GetAddresses() {
 			uptimeCounter[a]++
 		}
@@ -761,13 +764,11 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header, epoch *ep
 
 	blockHeader := currentBlock
 	blockExists := false
-	totalBlocks := uint64(0)
 
 	for blockHeader.Number > firstBlockInEpoch {
 		if err := calculateUptimeForBlock(blockHeader, epoch.Validators); err != nil {
 			return nil, err
 		}
-		totalBlocks++
 
 		blockHeader, blockExists = c.config.blockchain.GetHeaderByNumber(blockHeader.Number - 1)
 		if !blockExists {
@@ -788,7 +789,6 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header, epoch *ep
 			if err := calculateUptimeForBlock(blockHeader, validators); err != nil {
 				return nil, err
 			}
-			totalBlocks++
 
 			blockHeader, blockExists = c.config.blockchain.GetHeaderByNumber(blockHeader.Number - 1)
 			if !blockExists {
