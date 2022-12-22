@@ -91,7 +91,6 @@ func (f *FullNode) getEdge(idx byte) Node {
 }
 
 type Trie struct {
-	state   *State
 	root    Node
 	epoch   uint32
 	storage Storage

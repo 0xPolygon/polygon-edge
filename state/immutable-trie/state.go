@@ -2,7 +2,6 @@ package itrie
 
 import (
 	"fmt"
-	"sync"
 
 	lru "github.com/hashicorp/golang-lru"
 
@@ -11,7 +10,6 @@ import (
 )
 
 type State struct {
-	m       *sync.RWMutex
 	storage Storage
 	cache   *lru.Cache
 }
@@ -22,23 +20,16 @@ func NewState(storage Storage) *State {
 	s := &State{
 		storage: storage,
 		cache:   cache,
-		m:       new(sync.RWMutex),
 	}
 
 	return s
 }
 
 func (s *State) NewSnapshot() state.Snapshot {
-	s.m.Lock()
-	defer s.m.Unlock()
-
 	return &Snapshot{state: s, trie: s.newTrie()}
 }
 
 func (s *State) NewSnapshotAt(root types.Hash) (state.Snapshot, error) {
-	s.m.Lock()
-	defer s.m.Unlock()
-
 	t, err := s.newTrieAt(root)
 	if err != nil {
 		return nil, err
@@ -49,7 +40,6 @@ func (s *State) NewSnapshotAt(root types.Hash) (state.Snapshot, error) {
 
 func (s *State) newTrie() *Trie {
 	t := NewTrie()
-	t.state = s
 	t.storage = s.storage
 
 	return t
@@ -77,14 +67,7 @@ func (s *State) newTrieAt(root types.Hash) (*Trie, error) {
 			return nil, fmt.Errorf("invalid type assertion on root: %s", root)
 		}
 
-		t.state = s
-
-		trie, ok := tt.(*Trie)
-		if !ok {
-			return nil, fmt.Errorf("invalid type assertion on root: %s", root)
-		}
-
-		return trie, nil
+		return t, nil
 	}
 
 	n, ok, err := GetNode(root.Bytes(), s.storage)
@@ -98,7 +81,6 @@ func (s *State) newTrieAt(root types.Hash) (*Trie, error) {
 
 	t := &Trie{
 		root:    n,
-		state:   s,
 		storage: s.storage,
 	}
 
