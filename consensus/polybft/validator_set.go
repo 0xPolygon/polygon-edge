@@ -3,6 +3,7 @@ package polybft
 import (
 	"math/big"
 
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 )
@@ -95,6 +96,6 @@ func (vs validatorSet) Len() int {
 func getQuorumSize(totalVotingPower *big.Int) *big.Int {
 	quorum := new(big.Int)
 	quorum.Mul(totalVotingPower, big.NewInt(2))
-	// divide and round up result to next bigger integer value
-	return quorum.Add(quorum, big.NewInt(2)).Div(quorum, big.NewInt(3))
+
+	return common.BigIntDivCeil(quorum, big.NewInt(3))
 }

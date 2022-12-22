@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 )
@@ -445,10 +446,7 @@ func rescalePriorities(snapshot *ProposerSnapshot, totalVotingPower *big.Int) er
 	// Re-normalization is performed by dividing by an integer for simplicity.
 	// NOTE: This may make debugging priority issues easier as well.
 	diff := computeMaxMinPriorityDiff(snapshot.Validators)
-	ratio := new(big.Int)
-	ratio = ratio.Add(diff, diffMax).
-		Sub(ratio, big.NewInt(1)).
-		Div(ratio, diffMax)
+	ratio := common.BigIntDivCeil(diff, diffMax)
 
 	if diff.Cmp(diffMax) > 0 {
 		for _, val := range snapshot.Validators {

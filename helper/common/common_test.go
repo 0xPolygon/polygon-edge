@@ -1,6 +1,7 @@
 package common
 
 import (
+	"math/big"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -37,5 +38,25 @@ func Test_ExtendByteSlice(t *testing.T) {
 				require.Equal(t, originalSlice, newSlice[:c.length])
 			}
 		})
+	}
+}
+
+func Test_BigIntDivCeil(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		a      int64
+		b      int64
+		result int64
+	}{
+		{a: 10, b: 3, result: 4},
+		{a: 13, b: 6, result: 3},
+		{a: -1, b: 3, result: 0},
+		{a: -20, b: 3, result: -6},
+		{a: -15, b: 3, result: -5},
+	}
+
+	for _, c := range cases {
+		require.Equal(t, c.result, BigIntDivCeil(big.NewInt(c.a), big.NewInt(c.b)).Int64())
 	}
 }

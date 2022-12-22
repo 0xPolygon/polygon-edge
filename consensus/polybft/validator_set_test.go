@@ -39,9 +39,11 @@ func TestValidatorSet_getQuorumSize(t *testing.T) {
 		totalVotingPower   int64
 		expectedQuorumSize int64
 	}{
-		{8, 6},
 		{10, 7},
-		{11, 8},
+		{12, 8},
+		{13, 9},
+		{50, 34},
+		{100, 67},
 	}
 
 	for _, c := range cases {
