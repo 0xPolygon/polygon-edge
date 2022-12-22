@@ -368,7 +368,7 @@ func incrementProposerPriority(snapshot *ProposerSnapshot, totalVotingPower *big
 		return nil, fmt.Errorf("cannot get validator with most priority: %w", err)
 	}
 
-	mostest.ProposerPriority = mostest.ProposerPriority.Sub(mostest.ProposerPriority, totalVotingPower)
+	mostest.ProposerPriority.Sub(mostest.ProposerPriority, totalVotingPower)
 
 	return mostest, nil
 }

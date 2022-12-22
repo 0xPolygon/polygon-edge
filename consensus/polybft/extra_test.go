@@ -11,6 +11,7 @@ import (
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/fastrlp"
@@ -228,14 +229,15 @@ func TestSignature_VerifyCommittedFields(t *testing.T) {
 		t.Parallel()
 
 		numValidators := 100
-		vals := newTestValidators(numValidators)
 		msgHash := types.Hash{0x1}
 
+		vals := newTestValidators(numValidators)
+		validatorsMetadata := vals.getPublicIdentities()
 		validatorSet := vals.toValidatorSet()
 
 		var signatures bls.Signatures
 		bitmap := bitmap.Bitmap{}
-		signers := make(map[types.Address]struct{}, validatorSet.Len())
+		signers := make(map[types.Address]struct{}, len(validatorsMetadata))
 
 		for i, val := range vals.getValidators() {
 			bitmap.Set(uint64(i))
@@ -252,7 +254,7 @@ func TestSignature_VerifyCommittedFields(t *testing.T) {
 				Bitmap:              bitmap,
 			}
 
-			err = s.VerifyCommittedFields(validatorSet, msgHash)
+			err = s.VerifyCommittedFields(validatorsMetadata, msgHash, hclog.NewNullLogger())
 			signers[val.Address()] = struct{}{}
 
 			if !validatorSet.HasQuorum(signers) {
@@ -266,14 +268,14 @@ func TestSignature_VerifyCommittedFields(t *testing.T) {
 	t.Run("Invalid bitmap provided", func(t *testing.T) {
 		t.Parallel()
 
-		validatorSet := newTestValidators(3).toValidatorSet()
+		validatorSet := newTestValidators(3).getPublicIdentities()
 		bmp := bitmap.Bitmap{}
 
 		// Make bitmap invalid, by setting some flag larger than length of validator set to 1
 		bmp.Set(uint64(validatorSet.Len() + 1))
 		s := &Signature{Bitmap: bmp}
 
-		err := s.VerifyCommittedFields(validatorSet, types.Hash{0x1})
+		err := s.VerifyCommittedFields(validatorSet, types.Hash{0x1}, hclog.NewNullLogger())
 		require.Error(t, err)
 	})
 }
@@ -341,9 +343,7 @@ func TestExtra_VerifyCommittedFieldsRandom(t *testing.T) {
 		Bitmap:              bitmap,
 	}
 
-	valSet := vals.toValidatorSet()
-
-	err = s.VerifyCommittedFields(valSet, msgHash)
+	err = s.VerifyCommittedFields(vals.getPublicIdentities(), msgHash, hclog.NewNullLogger())
 	assert.NoError(t, err)
 }
 

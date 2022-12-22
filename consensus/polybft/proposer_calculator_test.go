@@ -250,9 +250,9 @@ func TestProposerCalculator_AveragingInIncrementProposerPriorityWithVotingPower(
 	}
 
 	tcs := []struct {
-		expectedProposerPriority []int64
-		times                    uint64
-		wantProposerIndex        int64
+		wantProposerPriority []int64
+		times                uint64
+		wantProposerIndex    int64
 	}{
 
 		0: {
@@ -360,7 +360,7 @@ func TestProposerCalculator_AveragingInIncrementProposerPriorityWithVotingPower(
 
 		for valIdx, val := range snap.Validators {
 			assert.Equal(t,
-				tc.expectedProposerPriority[valIdx],
+				tc.wantProposerPriority[valIdx],
 				val.ProposerPriority.Int64(),
 				"test case: %v, validator: %v",
 				i,
@@ -399,6 +399,11 @@ func TestProposerCalculator_UpdatesForNewValidatorSet(t *testing.T) {
 
 	assert.True(t, sum.Cmp(big.NewInt(valsCount)) < 0 && sum.Cmp(big.NewInt(-valsCount)) > 0,
 		"expected total priority in (-%d, %d). Got %d", valsCount, valsCount, sum)
+
+	// verify that priorities are scaled
+	diff := computeMaxMinPriorityDiff(snapshot.Validators)
+	diffMax := new(big.Int).Mul(priorityWindowSizeFactor, vs.totalVotingPower)
+	assert.True(t, diff.Cmp(diffMax) <= 0, "expected priority distance < %d. Got %d", diffMax, diff)
 }
 
 func TestProposerCalculator_GetLatestProposer(t *testing.T) {
@@ -516,9 +521,9 @@ func TestProposerCalculator_UpdateValidators(t *testing.T) {
 	snapshot := NewProposerSnapshot(0, vs.Accounts())
 	require.Equal(t, big.NewInt(60), snapshot.GetTotalVotingPower())
 	// 	init priority must be 0
-	require.True(t, snapshot.Validators[0].ProposerPriority.Cmp(big.NewInt(0)) == 0)
-	require.True(t, snapshot.Validators[1].ProposerPriority.Cmp(big.NewInt(0)) == 0)
-	require.True(t, snapshot.Validators[2].ProposerPriority.Cmp(big.NewInt(0)) == 0)
+	require.Zero(t, snapshot.Validators[0].ProposerPriority.Int64())
+	require.Zero(t, snapshot.Validators[1].ProposerPriority.Int64())
+	require.Zero(t, snapshot.Validators[2].ProposerPriority.Int64())
 	// vp must be initialized
 	require.Equal(t, big.NewInt(10), snapshot.Validators[0].Metadata.VotingPower)
 	require.Equal(t, big.NewInt(20), snapshot.Validators[1].Metadata.VotingPower)

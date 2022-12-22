@@ -444,9 +444,7 @@ func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, parents []*type
 		return fmt.Errorf("failed to calculate sign hash: %w", err)
 	}
 
-	validatorSet := NewValidatorSet(validators, p.logger)
-
-	if err := extra.Committed.VerifyCommittedFields(validatorSet, checkpointHash); err != nil {
+	if err := extra.Committed.VerifyCommittedFields(validators, checkpointHash, p.logger); err != nil {
 		return fmt.Errorf("failed to verify signatures for block %d. Signed hash %v: %w",
 			blockNumber, checkpointHash, err)
 	}
@@ -477,9 +475,7 @@ func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, parents []*type
 			return fmt.Errorf("failed to calculate parent block sign hash: %w", err)
 		}
 
-		parentValidatorSet := NewValidatorSet(parentValidators, p.logger)
-
-		if err := extra.Parent.VerifyCommittedFields(parentValidatorSet, parentCheckpointHash); err != nil {
+		if err := extra.Parent.VerifyCommittedFields(parentValidators, parentCheckpointHash, p.logger); err != nil {
 			return fmt.Errorf("failed to verify signatures for parent of block %d. Signed hash: %v: %w",
 				blockNumber, parentCheckpointHash, err)
 		}

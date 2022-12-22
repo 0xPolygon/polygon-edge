@@ -1172,7 +1172,7 @@ func TestFSM_VerifyStateTransaction_ValidBothTypesOfStateTransactions(t *testing
 	}
 
 	assert.NoError(t, executeForValidators("A", "B", "C", "D"))
-	assert.ErrorContains(t, executeForValidators("A", "B"), "quorum size not reached for state tx")
+	assert.ErrorContains(t, executeForValidators("A", "B", "C"), "quorum size not reached for state tx")
 }
 
 func TestFSM_VerifyStateTransaction_InvalidTypeOfStateTransactions(t *testing.T) {
