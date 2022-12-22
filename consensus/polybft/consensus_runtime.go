@@ -760,17 +760,17 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header, epoch *ep
 	endBlock := getEndEpochBlockNumber(epoch.Number, c.config.PolyBFTConfig.EpochSize)
 
 	blockHeader := currentBlock
-	validators := epoch.Validators
-
-	var found bool
+	blockExists := false
+	totalBlocks := uint64(0)
 
 	for blockHeader.Number > firstBlockInEpoch {
-		if err := calculateUptimeForBlock(blockHeader, validators); err != nil {
+		if err := calculateUptimeForBlock(blockHeader, epoch.Validators); err != nil {
 			return nil, err
 		}
+		totalBlocks++
 
-		blockHeader, found = c.config.blockchain.GetHeaderByNumber(blockHeader.Number - 1)
-		if !found {
+		blockHeader, blockExists = c.config.blockchain.GetHeaderByNumber(blockHeader.Number - 1)
+		if !blockExists {
 			return nil, blockchain.ErrNoBlock
 		}
 	}
@@ -788,17 +788,19 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header, epoch *ep
 			if err := calculateUptimeForBlock(blockHeader, validators); err != nil {
 				return nil, err
 			}
+			totalBlocks++
 
-			blockHeader, found = c.config.blockchain.GetHeaderByNumber(blockHeader.Number - 1)
-			if !found {
+			blockHeader, blockExists = c.config.blockchain.GetHeaderByNumber(blockHeader.Number - 1)
+			if !blockExists {
 				return nil, blockchain.ErrNoBlock
 			}
 		}
 	}
 
-	epochID := epoch.Number
-
-	uptime := Uptime{EpochID: epochID}
+	uptime := Uptime{
+		EpochID:     epoch.Number,
+		TotalBlocks: totalBlocks,
+	}
 
 	// include the data in the uptime counter in a deterministic way
 	addrSet := []types.Address{}
@@ -816,7 +818,7 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header, epoch *ep
 	}
 
 	commitEpoch := &CommitEpoch{
-		EpochID: epochID,
+		EpochID: epoch.Number,
 		Epoch: Epoch{
 			StartBlock: startBlock,
 			EndBlock:   endBlock,

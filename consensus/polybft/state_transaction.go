@@ -335,7 +335,7 @@ type Epoch struct {
 type Uptime struct {
 	EpochID     uint64            `abi:"epochId"`
 	UptimeData  []ValidatorUptime `abi:"uptimeData"`
-	TotalUptime uint64            `abi:"totalBlocks"`
+	TotalBlocks uint64            `abi:"totalBlocks"`
 }
 
 func (u *Uptime) addValidatorUptime(address types.Address, count uint64) {
@@ -343,7 +343,6 @@ func (u *Uptime) addValidatorUptime(address types.Address, count uint64) {
 		u.UptimeData = []ValidatorUptime{}
 	}
 
-	u.TotalUptime += count
 	u.UptimeData = append(u.UptimeData, ValidatorUptime{
 		Address: address,
 		Count:   count,
