@@ -1,7 +1,9 @@
 package signer
 
 import (
+	"errors"
 	"fmt"
+	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
@@ -20,6 +22,8 @@ var (
 	IstanbulExtraSeal = 65
 
 	zeroBytes = make([]byte, 32)
+
+	ErrRoundNumberOverflow = errors.New("round number is out of range for 64bit")
 )
 
 // IstanbulExtra defines the structure of the extra field for Istanbul
@@ -36,6 +40,23 @@ type Seals interface {
 	Num() int
 	MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value
 	UnmarshalRLPFrom(*fastrlp.Parser, *fastrlp.Value) error
+}
+
+func parseRoundNumber(v *fastrlp.Value) (*uint64, error) {
+	roundBytes := v.Raw()
+	if len(roundBytes) > 0 {
+		bigRound := new(big.Int).SetBytes(roundBytes)
+
+		if !bigRound.IsUint64() {
+			return nil, ErrRoundNumberOverflow
+		}
+
+		round := bigRound.Uint64()
+
+		return &round, nil
+	}
+
+	return nil, nil
 }
 
 // MarshalRLPTo defines the marshal function wrapper for IstanbulExtra
@@ -63,14 +84,12 @@ func (i *IstanbulExtra) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 	// ParentCommittedSeal
 	if i.ParentCommittedSeals != nil {
 		vv.Set(i.ParentCommittedSeals.MarshalRLPWith(ar))
-	} else {
+	} else if i.RoundNumber != nil {
 		vv.Set(ar.NewNull())
 	}
 
 	if i.RoundNumber != nil {
 		vv.Set(ar.NewUint(*i.RoundNumber))
-	} else {
-		vv.Set(ar.NewNull())
 	}
 
 	return vv
@@ -115,12 +134,12 @@ func (i *IstanbulExtra) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) er
 	}
 
 	if len(elems) >= 5 {
-		round, err := elems[4].GetUint64()
+		roundNumber, err := parseRoundNumber(elems[4])
 		if err != nil {
 			return err
 		}
 
-		i.RoundNumber = &round
+		i.RoundNumber = roundNumber
 	}
 
 	return nil
@@ -148,12 +167,12 @@ func (i *IstanbulExtra) unmarshalRLPFromForParentCS(p *fastrlp.Parser, v *fastrl
 	}
 
 	if len(elems) >= 5 {
-		round, err := elems[4].GetUint64()
+		roundNumber, err := parseRoundNumber(elems[4])
 		if err != nil {
 			return err
 		}
 
-		i.RoundNumber = &round
+		i.RoundNumber = roundNumber
 	}
 
 	return nil
@@ -238,14 +257,10 @@ func packProposerSealIntoExtra(
 			// ParentCommittedSeal
 			if len(oldValues) >= 4 {
 				newArrayValue.Set(oldValues[3])
-			} else {
-				newArrayValue.Set(ar.NewNull())
 			}
 
 			if len(oldValues) >= 5 {
 				newArrayValue.Set(oldValues[4])
-			} else {
-				newArrayValue.Set(ar.NewNull())
 			}
 
 			return nil
@@ -253,7 +268,7 @@ func packProposerSealIntoExtra(
 	)
 }
 
-// packCommittedSealsIntoExtra updates only CommittedSeal field in Extra
+// packCommittedSealsAndRoundNumberIntoExtra updates only CommittedSeal field in Extra
 func packCommittedSealsAndRoundNumberIntoExtra(
 	extraBytes []byte,
 	committedSeal Seals,
@@ -284,8 +299,6 @@ func packCommittedSealsAndRoundNumberIntoExtra(
 
 			if roundNumber != nil {
 				newArrayValue.Set(ar.NewUint(*roundNumber))
-			} else {
-				newArrayValue.Set(ar.NewNull())
 			}
 
 			return nil
