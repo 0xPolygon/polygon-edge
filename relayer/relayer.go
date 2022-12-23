@@ -62,6 +62,9 @@ func NewRelayer(
 	}
 
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(client))
+	if err != nil {
+		logger.Error("Failed to create the tx relayer", "err", err)
+	}
 
 	return &Relayer{
 		dataDir:           dataDir,
