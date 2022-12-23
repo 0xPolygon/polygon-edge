@@ -115,6 +115,8 @@ func (r *Relayer) AddLog(log *ethgo.Log) {
 			stateSyncProof, err := r.queryStateSyncProof(strconv.Itoa(int(i)))
 			if err != nil {
 				r.logger.Error("Failed to query state sync proof", "err", err)
+
+				continue
 			}
 
 			if err := r.executeStateSync(stateSyncProof); err != nil {
