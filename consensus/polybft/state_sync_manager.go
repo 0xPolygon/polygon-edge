@@ -180,9 +180,6 @@ func (s *StateSyncManager) initTracker() error {
 					}
 
 					for _, log := range evnt.Added {
-						fmt.Println("- log -")
-						fmt.Println(log)
-
 						if stateTransferEventABI.Match(log) {
 							if err := s.addLog(log); err != nil {
 								s.logger.Error("failed to decode state sync event", "hash", log.TransactionHash, "error", err)
