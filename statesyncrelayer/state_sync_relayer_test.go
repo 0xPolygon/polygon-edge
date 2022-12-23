@@ -1,4 +1,4 @@
-package relayer
+package statesyncrelayer
 
 import (
 	"testing"
@@ -38,7 +38,7 @@ func Test_executeStateSync(t *testing.T) {
 	txRelayer := &txRelayerMock{}
 	key, _ := wallet.GenerateKey()
 
-	r := &Relayer{
+	r := &StateSyncRelayer{
 		txRelayer: txRelayer,
 		key:       key,
 	}

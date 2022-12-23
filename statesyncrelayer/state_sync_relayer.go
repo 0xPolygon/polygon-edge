@@ -1,4 +1,4 @@
-package relayer
+package statesyncrelayer
 
 import (
 	"fmt"
@@ -21,7 +21,7 @@ import (
 
 var commitEvent = abi.MustNewEvent(`event NewBundleCommit(uint256 startId, uint256 endId, bytes32 root)`)
 
-type Relayer struct {
+type StateSyncRelayer struct {
 	dataDir           string
 	rpcEndpoint       string
 	stateReceiverAddr ethgo.Address
@@ -50,7 +50,7 @@ func NewRelayer(
 	stateReceiverAddr ethgo.Address,
 	logger hcf.Logger,
 	key ethgo.Key,
-) *Relayer {
+) *StateSyncRelayer {
 	endpoint := sanitizeRPCEndpoint(rpcEndpoint)
 
 	// create the JSON RPC client
@@ -66,7 +66,7 @@ func NewRelayer(
 		logger.Error("Failed to create the tx relayer", "err", err)
 	}
 
-	return &Relayer{
+	return &StateSyncRelayer{
 		dataDir:           dataDir,
 		rpcEndpoint:       endpoint,
 		stateReceiverAddr: stateReceiverAddr,
@@ -77,7 +77,7 @@ func NewRelayer(
 	}
 }
 
-func (r *Relayer) Start() error {
+func (r *StateSyncRelayer) Start() error {
 	et := tracker.NewEventTracker(
 		path.Join(r.dataDir, "/relayer.db"),
 		r.rpcEndpoint,
@@ -89,7 +89,7 @@ func (r *Relayer) Start() error {
 	return et.Start()
 }
 
-func (r *Relayer) AddLog(log *ethgo.Log) {
+func (r *StateSyncRelayer) AddLog(log *ethgo.Log) {
 	r.logger.Info("Received a log", "log", log)
 
 	if commitEvent.Match(log) {
@@ -127,7 +127,7 @@ func (r *Relayer) AddLog(log *ethgo.Log) {
 }
 
 // queryStateSyncProof queries the state sync proof
-func (r *Relayer) queryStateSyncProof(stateSyncID string) (*types.StateSyncProof, error) {
+func (r *StateSyncRelayer) queryStateSyncProof(stateSyncID string) (*types.StateSyncProof, error) {
 	// retrieve state sync proof
 	var stateSyncProof types.StateSyncProof
 
@@ -142,7 +142,7 @@ func (r *Relayer) queryStateSyncProof(stateSyncID string) (*types.StateSyncProof
 }
 
 // executeStateSync executes the state sync
-func (r *Relayer) executeStateSync(stateSyncProof *types.StateSyncProof) error {
+func (r *StateSyncRelayer) executeStateSync(stateSyncProof *types.StateSyncProof) error {
 	input, err := stateSyncProof.EncodeAbi()
 	if err != nil {
 		return err
