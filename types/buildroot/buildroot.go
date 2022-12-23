@@ -95,7 +95,7 @@ var numArenaPool fastrlp.ArenaPool
 
 func deriveSlow(num int, h func(indx int) []byte) []byte {
 	t := itrie.NewTrie()
-	txn := t.Txn()
+	txn := t.Txn(nil)
 
 	ar := numArenaPool.Get()
 	for i := 0; i < num; i++ {

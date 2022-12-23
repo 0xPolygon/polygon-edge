@@ -2,7 +2,6 @@ package itrie
 
 import (
 	"fmt"
-	"sync"
 
 	lru "github.com/hashicorp/golang-lru"
 
@@ -31,7 +30,7 @@ func (s *State) NewSnapshot() state.Snapshot {
 }
 
 func (s *State) NewSnapshotAt(root types.Hash) (state.Snapshot, error) {
-	t, err := s.NewTrieAt(root)
+	t, err := s.newTrieAt(root)
 	if err != nil {
 		return nil, err
 	}
@@ -40,11 +39,7 @@ func (s *State) NewSnapshotAt(root types.Hash) (state.Snapshot, error) {
 }
 
 func (s *State) newTrie() *Trie {
-	t := NewTrie()
-	t.state = s
-	t.storage = s.storage
-
-	return t
+	return NewTrie()
 }
 
 func (s *State) SetCode(hash types.Hash, code []byte) {
@@ -55,13 +50,8 @@ func (s *State) GetCode(hash types.Hash) ([]byte, bool) {
 	return s.storage.GetCode(hash)
 }
 
-// NewTrieAt returns trie with root and locks state on a trie level
-func (s *State) NewTrieAt(root types.Hash) (*Trie, error) {
-	return s.newTrieAt(root, GetSetState())
-}
-
 // newTrieAt returns trie with root and if necessary locks state on a trie level
-func (s *State) newTrieAt(root types.Hash, setState stateSetterFactory) (*Trie, error) {
+func (s *State) newTrieAt(root types.Hash) (*Trie, error) {
 	if root == types.EmptyRootHash {
 		// empty state
 		return s.newTrie(), nil
@@ -74,14 +64,7 @@ func (s *State) newTrieAt(root types.Hash, setState stateSetterFactory) (*Trie, 
 			return nil, fmt.Errorf("invalid type assertion on root: %s", root)
 		}
 
-		setState(t)(s)
-
-		trie, ok := tt.(*Trie)
-		if !ok {
-			return nil, fmt.Errorf("invalid type assertion on root: %s", root)
-		}
-
-		return trie, nil
+		return t, nil
 	}
 
 	n, ok, err := GetNode(root.Bytes(), s.storage)
@@ -94,10 +77,7 @@ func (s *State) newTrieAt(root types.Hash, setState stateSetterFactory) (*Trie, 
 	}
 
 	t := &Trie{
-		root:    n,
-		state:   s,
-		storage: s.storage,
-		lock:    new(sync.Mutex),
+		root: n,
 	}
 
 	return t, nil
