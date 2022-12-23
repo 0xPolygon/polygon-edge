@@ -3,7 +3,6 @@
 ## Prerequisites
 * [Docker Desktop](https://www.docker.com/products/docker-desktop/) - Docker 17.12.0+
 * [Docker compose 2+](https://github.com/docker/compose/releases/tag/v2.14.1)
-* [Make](https://www.gnu.org/software/make/) - if using `make` commands
 
 ### `polybft` consensus
 When deploying with `polybft` consensus, there are some additional dependencies:
@@ -11,16 +10,16 @@ When deploying with `polybft` consensus, there are some additional dependencies:
 * [go 1.18.x](https://go.dev/dl/)
 
 ## Local development
-Running `polygon-edge` local cluster with docker can be done very easily by using provided `Makefile`
+Running `polygon-edge` local cluster with docker can be done very easily by using provided `scripts` folder
 or by running `docker-compose` manually.
 
-### Using `make`
+### Using provided `scripts` folder
 ***All commands need to be run from the repo root / root folder.***
 
-* `make run-local` - deploy environment with `ibft` consensus
-* `make run-local-polybft` - deploy environment with `polybft` consensus
-* `make stop-local` - stop containers
-* `make destroy-local` - destroy environment (delete containers and volumes)
+* `scripts/cluster ibft --docker` - deploy environment with `ibft` consensus
+* `scripts/cluster polybft --docker` - deploy environment with `polybft` consensus
+* `scripts/cluster {ibft or polybft} --docker stop` - stop containers
+* `scripts/cluster {ibft or polybft}--docker destroy` - destroy environment (delete containers and volumes)
 
 ### Using `docker-compose`
 ***All commands need to be run from the repo root / root folder.***
