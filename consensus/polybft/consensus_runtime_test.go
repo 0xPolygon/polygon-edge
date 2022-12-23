@@ -1481,7 +1481,7 @@ func TestConsensusRuntime_calculateUptime_EpochSizeToSmall(t *testing.T) {
 	}
 
 	epochInfo, err := consensusRuntime.calculateUptime(consensusRuntime.lastBuiltBlock, consensusRuntime.epoch)
-	require.ErrorIs(t, err, errEpochTooSmal)
+	require.ErrorIs(t, err, errEpochTooSmall)
 	require.Nil(t, epochInfo)
 }
 
