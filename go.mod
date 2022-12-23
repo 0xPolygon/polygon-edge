@@ -3,7 +3,7 @@ module github.com/0xPolygon/polygon-edge
 go 1.18
 
 require (
-	github.com/btcsuite/btcd v0.22.1
+	github.com/btcsuite/btcd v0.23.3
 	github.com/containerd/cgroups v1.0.4 // indirect
 	github.com/elastic/gosigar v0.14.2 // indirect
 	github.com/golang/protobuf v1.5.2
@@ -49,7 +49,7 @@ require (
 	github.com/klauspost/compress v1.15.5 // indirect
 	github.com/mattn/go-colorable v0.1.12 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
-	github.com/umbracle/ethgo v0.1.4-0.20221117101647-b81ef2f07953
+	github.com/umbracle/ethgo v0.1.4-0.20221223131700-5ca52a6c1ca8
 	github.com/valyala/fastjson v1.6.3 // indirect
 	go.uber.org/zap v1.22.0 // indirect
 	golang.org/x/sys v0.0.0-20220811171246-fbc7d0a398ab // indirect
@@ -193,7 +193,7 @@ require (
 	golang.org/x/net v0.0.0-20221012135044-0b7e1fb9d458 // indirect
 	golang.org/x/oauth2 v0.0.0-20221006150949-b44042a4b9c1 // indirect
 	golang.org/x/sync v0.0.0-20220929204114-8fcdb60fdcc0 // indirect
-	golang.org/x/text v0.3.8 // indirect
+	golang.org/x/text v0.5.0 // indirect
 	golang.org/x/time v0.0.0-20220411224347-583f2d630306 // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
 	google.golang.org/api v0.99.0 // indirect
