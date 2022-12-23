@@ -1,7 +1,8 @@
-package polybft
+package tracker
 
 import (
 	"os"
+	"path"
 	"sync"
 	"testing"
 	"time"
@@ -68,19 +69,15 @@ func TestEventTracker_TrackSyncEvents(t *testing.T) {
 
 	sub := &mockEventSubscriber{}
 
-	tracker := &eventTracker{
-		logger:     hclog.NewNullLogger(),
-		subscriber: sub,
-		dataDir:    tmpDir,
-		config: &PolyBFTConfig{
-			Bridge: &BridgeConfig{
-				JSONRPCEndpoint: server.HTTPAddr(),
-				BridgeAddr:      types.Address(addr),
-			},
-		},
+	tracker := &EventTracker{
+		logger:       hclog.NewNullLogger(),
+		subscriber:   sub,
+		dbPath:       path.Join(tmpDir, "test.db"),
+		rpcEndpoint:  server.HTTPAddr(),
+		contractAddr: addr,
 	}
 
-	err = tracker.start()
+	err = tracker.Start()
 	require.NoError(t, err)
 
 	time.Sleep(2 * time.Second)

@@ -1,8 +1,7 @@
-package polybft
+package tracker
 
 import (
 	"context"
-	"path/filepath"
 
 	hcf "github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
@@ -15,26 +14,43 @@ type eventSubscription interface {
 	AddLog(log *ethgo.Log)
 }
 
-type eventTracker struct {
-	dataDir    string
-	config     *PolyBFTConfig
-	subscriber eventSubscription
-	logger     hcf.Logger
+type EventTracker struct {
+	dbPath       string
+	rpcEndpoint  string
+	contractAddr ethgo.Address
+	subscriber   eventSubscription
+	logger       hcf.Logger
 }
 
-func (e *eventTracker) start() error {
-	provider, err := jsonrpc.NewClient(e.config.Bridge.JSONRPCEndpoint)
+func NewEventTracker(
+	dbPath string,
+	rpcEndpoint string,
+	contractAddr ethgo.Address,
+	subscriber eventSubscription,
+	logger hcf.Logger,
+) *EventTracker {
+	return &EventTracker{
+		dbPath:       dbPath,
+		rpcEndpoint:  rpcEndpoint,
+		contractAddr: contractAddr,
+		subscriber:   subscriber,
+		logger:       logger,
+	}
+}
+
+func (e *EventTracker) Start() error {
+	provider, err := jsonrpc.NewClient(e.rpcEndpoint)
 	if err != nil {
 		return err
 	}
 
-	store, err := boltdbStore.New(filepath.Join(e.dataDir, "/deposit.db"))
+	store, err := boltdbStore.New(e.dbPath)
 
 	if err != nil {
 		return err
 	}
 
-	e.logger.Info("Start tracking events", "bridge", e.config.Bridge.BridgeAddr)
+	e.logger.Info("Start tracking events", "contract address", e.contractAddr)
 
 	tt, err := tracker.NewTracker(provider.Eth(),
 		tracker.WithBatchSize(10),
@@ -42,7 +58,7 @@ func (e *eventTracker) start() error {
 		tracker.WithFilter(&tracker.FilterConfig{
 			Async: false,
 			Address: []ethgo.Address{
-				ethgo.Address(e.config.Bridge.BridgeAddr),
+				e.contractAddr,
 			},
 		}),
 	)
