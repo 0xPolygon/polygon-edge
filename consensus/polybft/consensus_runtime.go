@@ -33,6 +33,8 @@ var (
 	errNotAValidator = errors.New("node is not a validator")
 	// errQuorumNotReached represents "quorum not reached for commitment message" error message
 	errQuorumNotReached = errors.New("quorum not reached for commitment message")
+	// errEpochToSmall is error message denoting that epoch doesn't contain enough blocks
+	errEpochTooSmal = errors.New("epoch size not large enough to calculate uptime")
 )
 
 // txPoolInterface is an abstraction of transaction pool
@@ -733,7 +735,7 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header, epoch *ep
 		// this means that epoch size must at least be 3 blocks,
 		// since we are not calculating uptime for lastBlockInEpoch and lastBlockInEpoch-1
 		// they will be included in the uptime calculation of next epoch
-		return nil, errors.New("epoch size not large enough to calculate uptime")
+		return nil, errEpochTooSmal
 	}
 
 	calculateUptimeForBlock := func(header *types.Header, validators AccountSet) error {

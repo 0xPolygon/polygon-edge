@@ -1471,27 +1471,18 @@ func TestConsensusRuntime_restartEpoch_NewEpochToRun_BuildCommitment(t *testing.
 func TestConsensusRuntime_calculateUptime_EpochSizeToSmall(t *testing.T) {
 	t.Parallel()
 
-	header := &types.Header{Number: 2}
-	snapshot := NewProposerSnapshot(header.Number, nil)
 	config := &runtimeConfig{
-		PolyBFTConfig: &PolyBFTConfig{
-			ValidatorSetAddr: contracts.ValidatorSetContract,
-			EpochSize:        2,
-		},
+		PolyBFTConfig: &PolyBFTConfig{EpochSize: 2},
 	}
 	consensusRuntime := &consensusRuntime{
-		config: config,
-		epoch: &epochMetadata{
-			Number: 0,
-		},
-		lastBuiltBlock:     header,
-		proposerCalculator: NewProposerCalculatorFromSnapshot(snapshot, config, hclog.NewNullLogger()),
+		config:         config,
+		epoch:          &epochMetadata{},
+		lastBuiltBlock: &types.Header{Number: 2},
 	}
 
-	guardedData, err := consensusRuntime.getGuardedData()
-	require.NoError(t, err)
-	_, err = consensusRuntime.calculateUptime(guardedData.lastBuiltBlock, guardedData.epoch)
-	assert.Error(t, err)
+	epochInfo, err := consensusRuntime.calculateUptime(consensusRuntime.lastBuiltBlock, consensusRuntime.epoch)
+	require.ErrorIs(t, err, errEpochTooSmal)
+	require.Nil(t, epochInfo)
 }
 
 func TestConsensusRuntime_calculateUptime_SecondEpoch(t *testing.T) {
@@ -1507,33 +1498,24 @@ func TestConsensusRuntime_calculateUptime_SecondEpoch(t *testing.T) {
 	polybftBackendMock.On("GetValidators", mock.Anything, mock.Anything).Return(validators.getPublicIdentities()).Twice()
 
 	config := &runtimeConfig{
-		PolyBFTConfig: &PolyBFTConfig{
-			ValidatorSetAddr: contracts.ValidatorSetContract,
-			EpochSize:        10,
-			SprintSize:       5,
-		},
+		PolyBFTConfig:  &PolyBFTConfig{EpochSize: 10},
 		blockchain:     blockchainMock,
 		polybftBackend: polybftBackendMock,
 		Key:            validators.getValidator("A").Key(),
 	}
 
-	snapshot := NewProposerSnapshot(lastBuiltBlock.Number, validators.getPublicIdentities())
 	consensusRuntime := &consensusRuntime{
 		config: config,
 		epoch: &epochMetadata{
 			Number:     1,
 			Validators: validators.getPublicIdentities(),
 		},
-
-		lastBuiltBlock:     lastBuiltBlock,
-		proposerCalculator: NewProposerCalculatorFromSnapshot(snapshot, config, hclog.NewNullLogger()),
+		lastBuiltBlock: lastBuiltBlock,
 	}
 
-	guardedData, err := consensusRuntime.getGuardedData()
+	epochInfo, err := consensusRuntime.calculateUptime(consensusRuntime.lastBuiltBlock, consensusRuntime.epoch)
 	require.NoError(t, err)
-	epochInfo, err := consensusRuntime.calculateUptime(guardedData.lastBuiltBlock, guardedData.epoch)
-	require.NoError(t, err)
-	require.NotEmpty(t, epochInfo)
+	require.NotNil(t, epochInfo)
 	require.Equal(t, config.PolyBFTConfig.EpochSize, epochInfo.Uptime.TotalBlocks)
 	require.Equal(t, uint64(1), epochInfo.Epoch.StartBlock)
 	require.Equal(t, uint64(10), epochInfo.Epoch.EndBlock)
