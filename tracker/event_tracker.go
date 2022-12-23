@@ -50,7 +50,7 @@ func (e *EventTracker) Start() error {
 		return err
 	}
 
-	e.logger.Info("Start tracking events", "bridge", e.contractAddr)
+	e.logger.Info("Start tracking events", "contract address", e.contractAddr)
 
 	tt, err := tracker.NewTracker(provider.Eth(),
 		tracker.WithBatchSize(10),
