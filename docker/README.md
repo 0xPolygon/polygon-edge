@@ -38,7 +38,7 @@ or by running `docker-compose` manually.
 * `docker-compose -f ./docker/local/docker-compose.yml stop` - stop containers
 * `docker-compose -f ./docker/local/docker-compose.yml down -v` - destroy environment
 
-## Customisation
+## Customization
 Use `docker/local/polygon-edge.sh` script to customize chain parameters.    
 All parameters can be defined at the very beginning of the script, in the `CHAIN_CUSTOM_OPTIONS` variable.   
 It already has some default parameters, which can be easily modified. 
