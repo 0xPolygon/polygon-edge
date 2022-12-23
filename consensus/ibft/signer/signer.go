@@ -48,7 +48,7 @@ type Signer interface {
 		sealMap map[types.Address][]byte,
 	) (*types.Header, error)
 	VerifyCommittedSeals(
-		hash types.Hash,
+		hash []byte,
 		committedSeals Seals,
 		validators validators.Validators,
 		quorumSize int,
@@ -56,7 +56,7 @@ type Signer interface {
 
 	// ParentCommittedSeals
 	VerifyParentCommittedSeals(
-		parentHash types.Hash,
+		parentHash []byte,
 		header *types.Header,
 		parentValidators validators.Validators,
 		quorum int,
@@ -229,7 +229,7 @@ func (s *SignerImpl) WriteCommittedSeals(
 
 // VerifyCommittedSeals verifies CommittedSeals in IBFT Extra of the header
 func (s *SignerImpl) VerifyCommittedSeals(
-	hash types.Hash,
+	hash []byte,
 	committedSeals Seals,
 	validators validators.Validators,
 	quorumSize int,
@@ -256,7 +256,7 @@ func (s *SignerImpl) VerifyCommittedSeals(
 
 // VerifyParentCommittedSeals verifies ParentCommittedSeals in IBFT Extra of the header
 func (s *SignerImpl) VerifyParentCommittedSeals(
-	parentHash types.Hash,
+	parentHash []byte,
 	header *types.Header,
 	parentValidators validators.Validators,
 	quorum int,
@@ -279,7 +279,7 @@ func (s *SignerImpl) VerifyParentCommittedSeals(
 	}
 
 	rawMsg := crypto.Keccak256(
-		wrapCommitHash(parentHash[:]),
+		wrapCommitHash(parentHash),
 	)
 
 	numSeals, err := s.keyManager.VerifyCommittedSeals(

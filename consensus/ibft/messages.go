@@ -24,15 +24,25 @@ func (i *backendIBFT) BuildPrePrepareMessage(
 	certificate *protoIBFT.RoundChangeCertificate,
 	view *protoIBFT.View,
 ) *protoIBFT.Message {
+	proposedBlock := &protoIBFT.ProposedBlock{
+		EthereumBlock: ethereumBlock,
+		Round:         view.Round,
+	}
+
 	// hash calculation begins
-	proposalHash, err := i.calculateProposalHashFromBlockBytes(
-		i.currentSigner,
-		ethereumBlock,
-		&view.Round,
-	)
+	proposalHash, err := i.getProposalHashFromBlock(ethereumBlock, view.Round)
 	if err != nil {
 		return nil
 	}
+
+	// hash calculation ends
+
+	// TODO: Double-check that even without this we are correctly validating the block elsewhere.
+	//block := &types.Block{}
+	//if err := block.UnmarshalRLP(proposal); err != nil {
+	//return nil
+	//}
+	//proposalHash := block.Hash().Bytes()
 
 	msg := &protoIBFT.Message{
 		View: view,
@@ -40,11 +50,8 @@ func (i *backendIBFT) BuildPrePrepareMessage(
 		Type: protoIBFT.MessageType_PREPREPARE,
 		Payload: &protoIBFT.Message_PreprepareData{
 			PreprepareData: &protoIBFT.PrePrepareMessage{
-				Proposal: &protoIBFT.ProposedBlock{
-					EthereumBlock: ethereumBlock,
-					Round:         view.Round,
-				},
-				ProposalHash: proposalHash.Bytes(),
+				Proposal:     proposedBlock,
+				ProposalHash: proposalHash,
 				Certificate:  certificate,
 			},
 		},
