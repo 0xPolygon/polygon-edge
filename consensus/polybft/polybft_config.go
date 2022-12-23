@@ -132,7 +132,7 @@ func (v *Validator) ToValidatorMetadata() (*ValidatorMetadata, error) {
 	metadata := &ValidatorMetadata{
 		Address:     v.Address,
 		BlsKey:      blsKey,
-		VotingPower: chain.ConvertWeiToTokensAmount(v.Balance).Uint64(),
+		VotingPower: new(big.Int).Set(v.Balance),
 	}
 
 	return metadata, nil

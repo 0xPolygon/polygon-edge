@@ -1,9 +1,9 @@
 package polybft
 
 import (
-	"fmt"
-	"math"
+	"math/big"
 
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 )
@@ -28,61 +28,56 @@ type validatorSet struct {
 	validators AccountSet
 
 	// votingPowerMap represents voting powers per validator address
-	votingPowerMap map[types.Address]int64
+	votingPowerMap map[types.Address]*big.Int
 
-	// total voting power
-	totalVotingPower int64
+	// totalVotingPower is sum of active validator set
+	totalVotingPower *big.Int
+
+	// quorumSize is 2/3 super-majority of totalVotingPower
+	quorumSize *big.Int
 
 	// logger instance
 	logger hclog.Logger
 }
 
 // NewValidatorSet creates a new validator set.
-func NewValidatorSet(valz AccountSet, logger hclog.Logger) (*validatorSet, error) {
-	votingPowerMap := make(map[types.Address]int64, valz.Len())
-	totalVotingPower := int64(0)
+func NewValidatorSet(valz AccountSet, logger hclog.Logger) *validatorSet {
+	totalVotingPower := valz.GetTotalVotingPower()
+	quorumSize := getQuorumSize(totalVotingPower)
 
-	for _, v := range valz {
-		votingPowerMap[v.Address] = int64(v.VotingPower)
-
-		// mind overflow
-		totalVotingPower = safeAddClip(totalVotingPower, int64(v.VotingPower))
-		if totalVotingPower > maxTotalVotingPower {
-			return nil, fmt.Errorf(
-				"total voting power cannot be guarded to not exceed %v; got: %v",
-				maxTotalVotingPower,
-				totalVotingPower,
-			)
-		}
+	votingPowerMap := make(map[types.Address]*big.Int, len(valz))
+	for _, val := range valz {
+		votingPowerMap[val.Address] = val.VotingPower
 	}
 
 	return &validatorSet{
 		validators:       valz,
 		votingPowerMap:   votingPowerMap,
 		totalVotingPower: totalVotingPower,
+		quorumSize:       quorumSize,
 		logger:           logger.Named("validator_set"),
-	}, nil
+	}
 }
 
 // HasQuorum determines if there is quorum of enough signers reached,
 // based on its voting power and quorum size
 func (vs validatorSet) HasQuorum(signers map[types.Address]struct{}) bool {
-	accVotingPower := int64(0)
+	aggregateVotingPower := big.NewInt(0)
 
 	for address := range signers {
-		value := vs.votingPowerMap[address] // will be 0 if signer does not exist
-		accVotingPower = safeAddClip(accVotingPower, value)
+		if votingPower := vs.votingPowerMap[address]; votingPower != nil {
+			_ = aggregateVotingPower.Add(aggregateVotingPower, votingPower)
+		}
 	}
 
-	quorumSize := vs.getQuorumSize()
+	hasQuorum := aggregateVotingPower.Cmp(vs.quorumSize) >= 0
 
 	vs.logger.Debug("HasQuorum",
-		"signers cnt", len(signers),
-		"signers voting power", accVotingPower,
-		"quorum", quorumSize,
-		"hasQuorum", accVotingPower >= quorumSize)
+		"signers", len(signers),
+		"signers voting power", aggregateVotingPower,
+		"hasQuorum", hasQuorum)
 
-	return accVotingPower >= quorumSize
+	return hasQuorum
 }
 
 func (vs validatorSet) Accounts() AccountSet {
@@ -97,6 +92,10 @@ func (vs validatorSet) Len() int {
 	return vs.validators.Len()
 }
 
-func (vs validatorSet) getQuorumSize() int64 {
-	return int64(math.Ceil((2 * float64(vs.totalVotingPower)) / 3))
+// getQuorumSize calculates quorum size as 2/3 super-majority of provided total voting power
+func getQuorumSize(totalVotingPower *big.Int) *big.Int {
+	quorum := new(big.Int)
+	quorum.Mul(totalVotingPower, big.NewInt(2))
+
+	return common.BigIntDivCeil(quorum, big.NewInt(3))
 }

@@ -14,7 +14,6 @@ import (
 	"github.com/umbracle/ethgo/abi"
 	"github.com/umbracle/ethgo/jsonrpc"
 
-	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
@@ -335,7 +334,8 @@ func initializeExitHelper(txRelayer txrelayer.TxRelayer, rootchainConfig *polybf
 	return nil
 }
 
-// initializeCheckpointManager invokes initialize function on CheckpointManager smart contract
+// validatorSetToABISlice converts given validators to generic map
+// which is used for ABI encoding validator set being sent to the rootchain contract
 func validatorSetToABISlice(validators []*polybft.Validator) ([]map[string]interface{}, error) {
 	genesisValidators := make([]*polybft.Validator, len(validators))
 	copy(genesisValidators, validators)
@@ -354,7 +354,7 @@ func validatorSetToABISlice(validators []*polybft.Validator) ([]map[string]inter
 		accSet[i] = &polybft.ValidatorMetadata{
 			Address:     validatorInfo.Address,
 			BlsKey:      blsKey,
-			VotingPower: chain.ConvertWeiToTokensAmount(validatorInfo.Balance).Uint64(),
+			VotingPower: new(big.Int).Set(validatorInfo.Balance),
 		}
 	}
 

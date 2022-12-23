@@ -1,6 +1,7 @@
 package polybft
 
 import (
+	"math/big"
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
@@ -21,7 +22,7 @@ func TestValidatorMetadata_Equals(t *testing.T) {
 	require.True(t, validatorAcc.Equals(v.ValidatorMetadata()))
 
 	// update voting power => validator metadata instances aren't equal
-	validatorAcc.VotingPower = 50
+	validatorAcc.VotingPower = new(big.Int).SetInt64(50)
 	require.False(t, validatorAcc.Equals(v.ValidatorMetadata()))
 }
 
@@ -228,7 +229,7 @@ func TestAccountSet_ApplyDelta(t *testing.T) {
 				for validatorAlias, votingPower := range step.expected {
 					v := vals.getValidator(validatorAlias).ValidatorMetadata()
 					require.True(t, snapshot.ContainsAddress(v.Address), "validator '%s' not found in snapshot", validatorAlias)
-					require.Equal(t, votingPower, v.VotingPower)
+					require.Equal(t, new(big.Int).SetUint64(votingPower), v.VotingPower)
 				}
 			}
 		})

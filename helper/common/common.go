@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"math/big"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -184,4 +185,14 @@ func ExtendByteSlice(b []byte, needLength int) []byte {
 	}
 
 	return b[:needLength]
+}
+
+// BigIntDivCeil performs integer division and rounds given result to next bigger integer number
+// It is calculated using this formula result = (a + b - 1) / b
+func BigIntDivCeil(a, b *big.Int) *big.Int {
+	result := new(big.Int)
+
+	return result.Add(a, b).
+		Sub(result, big.NewInt(1)).
+		Div(result, b)
 }
