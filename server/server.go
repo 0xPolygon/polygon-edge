@@ -23,13 +23,13 @@ import (
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/jsonrpc"
 	"github.com/0xPolygon/polygon-edge/network"
-	"github.com/0xPolygon/polygon-edge/relayer"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/server/proto"
 	"github.com/0xPolygon/polygon-edge/state"
 	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/state/runtime/tracer"
+	"github.com/0xPolygon/polygon-edge/statesyncrelayer"
 	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
@@ -454,7 +454,7 @@ func (s *Server) setupRelayer() error {
 		return fmt.Errorf("failed to create account from secret: %w", err)
 	}
 
-	relayer := relayer.NewRelayer(
+	relayer := statesyncrelayer.NewRelayer(
 		s.config.DataDir,
 		s.config.JSONRPC.JSONRPCAddr.String(),
 		ethgo.Address(contracts.StateReceiverContract),
