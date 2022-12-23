@@ -33,6 +33,8 @@ var (
 	errNotAValidator = errors.New("node is not a validator")
 	// errQuorumNotReached represents "quorum not reached for commitment message" error message
 	errQuorumNotReached = errors.New("quorum not reached for commitment message")
+	// errEpochToSmall is error message denoting that epoch doesn't contain enough blocks
+	errEpochTooSmall = errors.New("epoch size not large enough to calculate uptime")
 )
 
 // txPoolInterface is an abstraction of transaction pool
@@ -727,12 +729,13 @@ func (c *consensusRuntime) deliverMessage(msg *TransportMessage) error {
 // and ending at the last block of previous epoch
 func (c *consensusRuntime) calculateUptime(currentBlock *types.Header, epoch *epochMetadata) (*CommitEpoch, error) {
 	uptimeCounter := map[types.Address]uint64{}
+	totalBlocks := uint64(0)
 
 	if c.config.PolyBFTConfig.EpochSize < (uptimeLookbackSize + 1) {
 		// this means that epoch size must at least be 3 blocks,
 		// since we are not calculating uptime for lastBlockInEpoch and lastBlockInEpoch-1
 		// they will be included in the uptime calculation of next epoch
-		return nil, errors.New("epoch size not large enough to calculate uptime")
+		return nil, errEpochTooSmall
 	}
 
 	calculateUptimeForBlock := func(header *types.Header, validators AccountSet) error {
@@ -745,6 +748,8 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header, epoch *ep
 		if err != nil {
 			return err
 		}
+
+		totalBlocks++
 
 		for _, a := range signers.GetAddresses() {
 			uptimeCounter[a]++
@@ -760,17 +765,15 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header, epoch *ep
 	endBlock := getEndEpochBlockNumber(epoch.Number, c.config.PolyBFTConfig.EpochSize)
 
 	blockHeader := currentBlock
-	validators := epoch.Validators
-
-	var found bool
+	blockExists := false
 
 	for blockHeader.Number > firstBlockInEpoch {
-		if err := calculateUptimeForBlock(blockHeader, validators); err != nil {
+		if err := calculateUptimeForBlock(blockHeader, epoch.Validators); err != nil {
 			return nil, err
 		}
 
-		blockHeader, found = c.config.blockchain.GetHeaderByNumber(blockHeader.Number - 1)
-		if !found {
+		blockHeader, blockExists = c.config.blockchain.GetHeaderByNumber(blockHeader.Number - 1)
+		if !blockExists {
 			return nil, blockchain.ErrNoBlock
 		}
 	}
@@ -789,16 +792,17 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header, epoch *ep
 				return nil, err
 			}
 
-			blockHeader, found = c.config.blockchain.GetHeaderByNumber(blockHeader.Number - 1)
-			if !found {
+			blockHeader, blockExists = c.config.blockchain.GetHeaderByNumber(blockHeader.Number - 1)
+			if !blockExists {
 				return nil, blockchain.ErrNoBlock
 			}
 		}
 	}
 
-	epochID := epoch.Number
-
-	uptime := Uptime{EpochID: epochID}
+	uptime := Uptime{
+		EpochID:     epoch.Number,
+		TotalBlocks: totalBlocks,
+	}
 
 	// include the data in the uptime counter in a deterministic way
 	addrSet := []types.Address{}
@@ -816,7 +820,7 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header, epoch *ep
 	}
 
 	commitEpoch := &CommitEpoch{
-		EpochID: epochID,
+		EpochID: epoch.Number,
 		Epoch: Epoch{
 			StartBlock: startBlock,
 			EndBlock:   endBlock,
