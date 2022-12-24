@@ -401,7 +401,10 @@ func ABITransaction(relayer txrelayer.TxRelayer, key ethgo.Key, artifact *artifa
 func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
 	const finalBlockNumber = 20
 
-	cluster := framework.NewTestCluster(t, 5, framework.WithBridge(), framework.WithEpochSize(5), framework.WithEpochReward(10))
+	cluster := framework.NewTestCluster(t, 5,
+		framework.WithBridge(),
+		framework.WithEpochSize(5),
+		framework.WithEpochReward(1000))
 
 	// load manifest file
 	manifest, err := polybft.LoadManifest(path.Join(cluster.Config.TmpDir, manifestFileName))
