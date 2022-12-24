@@ -35,6 +35,7 @@ const (
 	defaultValidatorSetSize = 100
 	defaultBlockTime        = 2 * time.Second
 	defaultBridge           = false
+	defaultEpochReward      = 1
 
 	bootnodePortStart = 30301
 )

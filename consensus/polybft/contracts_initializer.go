@@ -14,7 +14,6 @@ import (
 
 const (
 	// safe numbers for the test
-	EpochReward   = 1
 	minStake      = 1
 	minDelegation = 1
 )
