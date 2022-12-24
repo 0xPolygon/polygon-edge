@@ -12,12 +12,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/consensus/polybft"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
-
+	"github.com/0xPolygon/polygon-edge/command/genesis"
 	rootchainHelper "github.com/0xPolygon/polygon-edge/command/rootchain/helper"
+	"github.com/0xPolygon/polygon-edge/command/sidechain"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
-
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
@@ -36,8 +36,6 @@ var (
 		uint256 indexed counter,
 		bool indexed status,
 		bytes message)`)
-
-	currentCheckpointBlockNumMethod, _ = abi.NewMethod("function currentCheckpointBlockNumber() returns (uint256)")
 )
 
 const (
@@ -167,10 +165,7 @@ func TestE2E_CheckpointSubmission(t *testing.T) {
 	defer cluster.Stop()
 
 	// initialize tx relayer used to query CheckpointManager smart contract
-	rootchainTxRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Bridge.JSONRPCAddr()))
-	require.NoError(t, err)
-
-	checkpointBlockNumInput, err := currentCheckpointBlockNumMethod.Encode([]interface{}{})
+	l1Relayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Bridge.JSONRPCAddr()))
 	require.NoError(t, err)
 
 	manifest, err := polybft.LoadManifest(path.Join(cluster.Config.TmpDir, manifestFileName))
@@ -179,20 +174,15 @@ func TestE2E_CheckpointSubmission(t *testing.T) {
 	checkpointManagerAddr := ethgo.Address(manifest.RootchainConfig.CheckpointManagerAddress)
 	rootchainSender := ethgo.Address(manifest.RootchainConfig.AdminAddress)
 
-	testCheckpointBlockNumber := func(expectedCheckpointBlock int64) (bool, error) {
-		checkpointBlockNumRaw, err := rootchainTxRelayer.Call(rootchainSender, checkpointManagerAddr, checkpointBlockNumInput)
+	testCheckpointBlockNumber := func(expectedCheckpointBlock uint64) (bool, error) {
+		actualCheckpointBlock, err := getCheckpointBlockNumber(l1Relayer, checkpointManagerAddr, rootchainSender)
 		if err != nil {
 			return false, err
 		}
 
-		latestCheckpointBlock, err := types.ParseInt64orHex(&checkpointBlockNumRaw)
-		if err != nil {
-			return false, err
-		}
+		t.Logf("Checkpoint block: %d\n", actualCheckpointBlock)
 
-		t.Logf("Checkpoint block: %d\n", latestCheckpointBlock)
-
-		return latestCheckpointBlock < expectedCheckpointBlock, nil
+		return actualCheckpointBlock < expectedCheckpointBlock, nil
 	}
 
 	// wait for a single epoch to be checkpointed
@@ -218,6 +208,22 @@ func TestE2E_CheckpointSubmission(t *testing.T) {
 		return testCheckpointBlockNumber(20)
 	})
 	require.NoError(t, err)
+}
+
+// getCheckpointBlockNumber gets current checkpoint block number from checkpoint manager smart contract
+func getCheckpointBlockNumber(l1Relayer txrelayer.TxRelayer, checkpointManagerAddr, sender ethgo.Address) (uint64, error) {
+	checkpointBlockNumRaw, err := ABICall(l1Relayer, contractsapi.CheckpointManager,
+		checkpointManagerAddr, sender, "currentCheckpointBlockNumber")
+	if err != nil {
+		return 0, err
+	}
+
+	actualCheckpointBlock, err := types.ParseUint64orHex(&checkpointBlockNumRaw)
+	if err != nil {
+		return 0, err
+	}
+
+	return actualCheckpointBlock, nil
 }
 
 func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
@@ -370,6 +376,7 @@ func getExitProof(rpcAddress string, exitID, epoch, checkpointBlock uint64) (typ
 	return rspProof.Result, nil
 }
 
+// TODO: Remove this to some separate file, containing helper functions?
 func ABICall(relayer txrelayer.TxRelayer, artifact *artifact.Artifact, contractAddress ethgo.Address, senderAddr ethgo.Address, method string, params ...interface{}) (string, error) {
 	input, err := artifact.Abi.GetMethod(method).Encode(params)
 	if err != nil {
@@ -389,4 +396,75 @@ func ABITransaction(relayer txrelayer.TxRelayer, key ethgo.Key, artifact *artifa
 		To:    &contractAddress,
 		Input: input,
 	}, key)
+}
+
+func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
+	const finalBlockNumber = 20
+
+	cluster := framework.NewTestCluster(t, 5, framework.WithBridge(), framework.WithEpochSize(5), framework.WithEpochReward(10))
+
+	// load manifest file
+	manifest, err := polybft.LoadManifest(path.Join(cluster.Config.TmpDir, manifestFileName))
+	require.NoError(t, err)
+
+	checkpointManagerAddr := ethgo.Address(manifest.RootchainConfig.CheckpointManagerAddress)
+	rootchainSender := ethgo.Address(manifest.RootchainConfig.AdminAddress)
+
+	validatorSecretFiles, err := genesis.GetValidatorKeyFiles(cluster.Config.TmpDir, cluster.Config.ValidatorPrefix)
+	require.NoError(t, err)
+
+	validatorAcc, err := sidechain.GetAccountFromDir(path.Join(cluster.Config.TmpDir, validatorSecretFiles[0]))
+	require.NoError(t, err)
+
+	targetServer := cluster.Servers[0]
+	validatorAddr := validatorAcc.Ecdsa.Address()
+
+	// L2 Tx relayer (for sending stake transaction and querying validator)
+	l2Relayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(targetServer.JSONRPCAddr()))
+	require.NoError(t, err)
+
+	// L1 Tx relayer (for querying checkpoints)
+	l1Relayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Bridge.JSONRPCAddr()))
+	require.NoError(t, err)
+
+	// waiting two epochs, so that some rewards get accumulated
+	require.NoError(t, cluster.WaitForBlock(10, 1*time.Minute))
+
+	// query validator info
+	validatorInfo, err := sidechain.GetValidatorInfo(validatorAddr, l2Relayer)
+	require.NoError(t, err)
+
+	rewards := validatorInfo["withdrawableRewards"].(*big.Int).Uint64() //nolint:forcetypeassert
+	totalStakeBefore := validatorInfo["totalStake"].(*big.Int).Uint64() //nolint:forcetypeassert
+
+	t.Logf("Voting power (before re-stake) %d\n", totalStakeBefore)
+
+	// stake rewards
+	require.NoError(t, targetServer.Stake(rewards))
+
+	// wait a two more epochs, so that stake is registered and two more checkpoints are sent.
+	// Blocks are still produced, although voting power is slightly changed.
+	require.NoError(t, cluster.WaitForBlock(finalBlockNumber, 1*time.Minute))
+
+	validatorInfo, err = sidechain.GetValidatorInfo(validatorAddr, l2Relayer)
+	require.NoError(t, err)
+
+	totalStakeAfter := validatorInfo["totalStake"].(*big.Int).Uint64() //nolint:forcetypeassert
+
+	t.Logf("Voting power (after re-stake) %d\n", totalStakeAfter)
+
+	// assert that total stake has increased by staked amount
+	require.Equal(t, rewards+totalStakeBefore, totalStakeAfter)
+
+	// assert that block 20 gets checkpointed
+	require.NoError(t, cluster.Bridge.WaitUntil(time.Second, time.Minute, func() (bool, error) {
+		actualCheckpointBlock, err := getCheckpointBlockNumber(l1Relayer, checkpointManagerAddr, rootchainSender)
+		if err != nil {
+			return false, err
+		}
+
+		t.Logf("Checkpoint block: %d\n", actualCheckpointBlock)
+
+		return actualCheckpointBlock < finalBlockNumber, nil
+	}))
 }

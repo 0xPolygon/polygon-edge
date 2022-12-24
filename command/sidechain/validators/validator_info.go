@@ -7,21 +7,12 @@ import (
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	sidechainHelper "github.com/0xPolygon/polygon-edge/command/sidechain"
-	"github.com/0xPolygon/polygon-edge/contracts"
-	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/spf13/cobra"
-	"github.com/umbracle/ethgo"
-	"github.com/umbracle/ethgo/abi"
 )
 
 var (
-	params          validatorInfoParams
-	getValidatorABI = abi.MustNewMethod("function getValidator(address)" +
-		" returns (tuple(uint256[4] blsKey, uint256 stake, uint256 totalStake," +
-		"uint256 commission, uint256 withdrawableRewards, bool active))")
-	validatorABI = abi.MustNewType("tuple(uint256[4] blsKey, uint256 stake, uint256 totalStake," +
-		"uint256 commission, uint256 withdrawableRewards, bool active)")
+	params validatorInfoParams
 )
 
 func GetCommand() *cobra.Command {
@@ -67,38 +58,20 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	encode, err := getValidatorABI.Encode([]interface{}{validatorAccount.Ecdsa.Address()})
-	if err != nil {
-		return err
-	}
+	validatorAddr := validatorAccount.Ecdsa.Address()
 
-	response, err := txRelayer.Call(ethgo.Address(contracts.SystemCaller),
-		ethgo.Address(contracts.ValidatorSetContract), encode)
+	responseMap, err := sidechainHelper.GetValidatorInfo(validatorAddr, txRelayer)
 	if err != nil {
-		return err
-	}
-
-	byteResponse, err := hex.DecodeHex(response)
-	if err != nil {
-		return fmt.Errorf("unable to decode hex response, %w", err)
-	}
-
-	decoded, err := validatorABI.Decode(byteResponse)
-	if err != nil {
-		return err
-	}
-
-	decodedMap, ok := decoded.(map[string]interface{})
-	if !ok {
-		return fmt.Errorf("could not convert decoded result to map")
+		return fmt.Errorf("failed to get validator info for %s: %w", validatorAddr, err)
 	}
 
 	outputter.WriteCommandResult(&validatorsInfoResult{
 		address:             validatorAccount.Ecdsa.Address().String(),
-		stake:               decodedMap["stake"].(*big.Int).Uint64(),               //nolint:forcetypeassert
-		totalStake:          decodedMap["totalStake"].(*big.Int).Uint64(),          //nolint:forcetypeassert
-		commission:          decodedMap["commission"].(*big.Int).Uint64(),          //nolint:forcetypeassert
-		withdrawableRewards: decodedMap["withdrawableRewards"].(*big.Int).Uint64(), //nolint:forcetypeassert
+		stake:               responseMap["stake"].(*big.Int).Uint64(),               //nolint:forcetypeassert
+		totalStake:          responseMap["totalStake"].(*big.Int).Uint64(),          //nolint:forcetypeassert
+		commission:          responseMap["commission"].(*big.Int).Uint64(),          //nolint:forcetypeassert
+		withdrawableRewards: responseMap["withdrawableRewards"].(*big.Int).Uint64(), //nolint:forcetypeassert
+		active:              responseMap["active"].(bool),                           //nolint:forcetypeassert
 	})
 
 	return nil

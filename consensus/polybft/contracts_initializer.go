@@ -14,7 +14,7 @@ import (
 
 const (
 	// safe numbers for the test
-	epochReward   = 1
+	EpochReward   = 1
 	minStake      = 1
 	minDelegation = 1
 )
@@ -68,7 +68,7 @@ func getInitChildValidatorSetInput(polyBFTConfig PolyBFTConfig) ([]byte, error) 
 
 	params := map[string]interface{}{
 		"init": map[string]interface{}{
-			"epochReward":   big.NewInt(epochReward),
+			"epochReward":   new(big.Int).SetUint64(polyBFTConfig.EpochReward),
 			"minStake":      big.NewInt(minStake),
 			"minDelegation": big.NewInt(minDelegation),
 			"epochSize":     new(big.Int).SetUint64(polyBFTConfig.EpochSize),

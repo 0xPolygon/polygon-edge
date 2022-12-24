@@ -68,6 +68,7 @@ func (p *genesisParams) generatePolyBftChainConfig() error {
 		BlockTime:           p.blockTime,
 		EpochSize:           p.epochSize,
 		SprintSize:          p.sprintSize,
+		EpochReward:         p.epochReward,
 		// use 1st account as governance address
 		Governance:        manifest.GenesisValidators[0].Address,
 		Bridge:            bridge,

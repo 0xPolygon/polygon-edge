@@ -1069,7 +1069,7 @@ func (c *consensusRuntime) BuildProposal(view *proto.View) []byte {
 
 	proposal, err := c.fsm.BuildProposal(view.Round)
 	if err != nil {
-		c.logger.Info("Unable to create porposal", "blockNumber", view.Height, "error", err)
+		c.logger.Info("Unable to create proposal", "blockNumber", view.Height, "error", err)
 
 		return nil
 	}
