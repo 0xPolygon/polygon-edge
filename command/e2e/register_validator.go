@@ -32,6 +32,7 @@ func GetCommand() *cobra.Command {
 	}
 
 	helper.RegisterGRPCAddressFlag(registerCmd)
+	helper.RegisterJSONRPCFlag(registerCmd)
 	setFlags(registerCmd)
 
 	return registerCmd
@@ -52,7 +53,9 @@ func setFlags(cmd *cobra.Command) {
 	)
 }
 
-func runPreRun(_ *cobra.Command, _ []string) error {
+func runPreRun(cmd *cobra.Command, _ []string) error {
+	params.jsonRPCAddr = helper.GetJSONRPCAddress(cmd)
+
 	return params.validateFlags()
 }
 
@@ -67,7 +70,10 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	existingValidatorSender := newTxnSender(existingValidatorAccount)
+	existingValidatorSender, err := newTxnSender(existingValidatorAccount)
+	if err != nil {
+		return err
+	}
 
 	secretsManager, err = secretsHelper.SetupLocalSecretsManager(params.newValidatorDataDir)
 	if err != nil {
@@ -79,7 +85,10 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	newValidatorSender := newTxnSender(newValidatorAccount)
+	newValidatorSender, err := newTxnSender(newValidatorAccount)
+	if err != nil {
+		return err
+	}
 
 	var validator *NewValidator
 
@@ -365,25 +374,30 @@ func (t *txnSender) waitForReceipt(hash ethgo.Hash) (*ethgo.Receipt, error) {
 	return nil, fmt.Errorf("timeout")
 }
 
-func newDemoClient() *jsonrpc.Client {
-	client, err := jsonrpc.NewClient("http://localhost:9545")
+func newDemoClient() (*jsonrpc.Client, error) {
+	client, err := jsonrpc.NewClient(params.jsonRPCAddr)
 	if err != nil {
-		panic("cannot connect with jsonrpc")
+		return nil, fmt.Errorf("cannot connect with jsonrpc: %w", err)
 	}
 
-	return client
+	return client, err
 }
 
-func newTxnSender(sender *wallet.Account) *txnSender {
+func newTxnSender(sender *wallet.Account) (*txnSender, error) {
+	client, err := newDemoClient()
+	if err != nil {
+		return nil, err
+	}
+
 	return &txnSender{
 		account: sender,
-		client:  newDemoClient(),
-	}
+		client:  client,
+	}, nil
 }
 
 func stake(sender *txnSender) asyncTxn {
 	if stakeFn == nil {
-		panic("failed to create method")
+		return &asyncTxnImpl{err: errors.New("failed to create stake ABI function")}
 	}
 
 	input, err := stakeFn.Encode([]interface{}{})
@@ -401,6 +415,10 @@ func stake(sender *txnSender) asyncTxn {
 }
 
 func whitelist(sender *txnSender, addr types.Address) asyncTxn {
+	if whitelistFn == nil {
+		return &asyncTxnImpl{err: errors.New("failed to create whitelist ABI function")}
+	}
+
 	input, err := whitelistFn.Encode([]interface{}{
 		[]types.Address{addr},
 	})
@@ -429,7 +447,7 @@ func fund(sender *txnSender, addr types.Address) asyncTxn {
 
 func registerValidator(sender *txnSender, account *wallet.Account) asyncTxn {
 	if registerFn == nil {
-		return &asyncTxnImpl{err: errors.New("failed to create method")}
+		return &asyncTxnImpl{err: errors.New("failed to create register ABI function")}
 	}
 
 	signature, err := account.Bls.Sign([]byte(contracts.PolyBFTRegisterMessage))
