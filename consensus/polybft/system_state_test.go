@@ -181,7 +181,9 @@ func TestStateProvider_Txn_Panics(t *testing.T) {
 	}
 
 	key := createTestKey(t)
-	require.Panics(t, func() { _, _ = provider.Txn(ethgo.ZeroAddress, key, []byte{0x1}) })
+	txn, err := provider.Txn(ethgo.ZeroAddress, key, []byte{0x1})
+	require.Nil(t, txn)
+	require.ErrorIs(t, err, errSendTxnUnsupported)
 }
 
 func newTestTransition(t *testing.T, alloc map[types.Address]*chain.GenesisAccount) *state.Transition {
