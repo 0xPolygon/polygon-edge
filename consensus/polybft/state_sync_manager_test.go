@@ -27,7 +27,15 @@ func newTestStateSyncManager(t *testing.T, key *testValidator) *StateSyncManager
 
 	topic := &mockTopic{}
 
-	s, err := NewStateSyncManager(hclog.NewNullLogger(), key.Key(), state, types.Address{}, "", tmpDir, topic)
+	s, err := NewStateSyncManager(hclog.NewNullLogger(), state,
+		&stateSyncConfig{
+			stateSenderAddr: types.Address{},
+			jsonrpcAddr:     "",
+			dataDir:         tmpDir,
+			topic:           topic,
+			key:             key.Key(),
+		})
+
 	require.NoError(t, err)
 
 	t.Cleanup(func() {
@@ -70,7 +78,7 @@ func TestStateSyncManager_PostEpoch_BuildCommitment(t *testing.T) {
 	require.Equal(t, commitment.ToIndex, uint64(9))
 
 	// the message was sent
-	require.NotNil(t, s.topic.(*mockTopic).consume()) //nolint
+	require.NotNil(t, s.config.topic.(*mockTopic).consume()) //nolint
 }
 
 func TestStateSyncManager_MessagePool_OldEpoch(t *testing.T) {
@@ -82,7 +90,7 @@ func TestStateSyncManager_MessagePool_OldEpoch(t *testing.T) {
 	msg := &TransportMessage{
 		EpochNumber: 0,
 	}
-	err := s.deliverMessage(msg)
+	err := s.saveVote(msg)
 	require.NoError(t, err)
 }
 
@@ -122,12 +130,12 @@ func TestStateSyncManager_MessagePool_SenderIsNoValidator(t *testing.T) {
 	vals := newTestValidators(5)
 
 	s := newTestStateSyncManager(t, vals.getValidator("0"))
-	s.validatorSet = vals.toValidatorSetWithError(t)
+	s.validatorSet = vals.toValidatorSet()
 
 	badVal := newTestValidator("a", 0)
 	msg := newMockMsg().sign(badVal)
 
-	err := s.deliverMessage(msg)
+	err := s.saveVote(msg)
 	require.Error(t, err)
 }
 
@@ -135,26 +143,26 @@ func TestStateSyncManager_MessagePool_SenderVotes(t *testing.T) {
 	vals := newTestValidators(5)
 
 	s := newTestStateSyncManager(t, vals.getValidator("0"))
-	s.validatorSet = vals.toValidatorSetWithError(t)
+	s.validatorSet = vals.toValidatorSet()
 
 	msg := newMockMsg()
 	val1signed := msg.sign(vals.getValidator("1"))
 	val2signed := msg.sign(vals.getValidator("2"))
 
 	// vote with validator 1
-	require.NoError(t, s.deliverMessage(val1signed))
+	require.NoError(t, s.saveVote(val1signed))
 
 	votes, err := s.state.getMessageVotes(0, msg.hash)
 	require.NoError(t, err)
 	require.Len(t, votes, 1)
 
 	// vote with validator 1 again (the votes do not increase)
-	require.NoError(t, s.deliverMessage(val1signed))
+	require.NoError(t, s.saveVote(val1signed))
 	votes, _ = s.state.getMessageVotes(0, msg.hash)
 	require.Len(t, votes, 1)
 
 	// vote with validator 2
-	require.NoError(t, s.deliverMessage(val2signed))
+	require.NoError(t, s.saveVote(val2signed))
 	votes, _ = s.state.getMessageVotes(0, msg.hash)
 	require.Len(t, votes, 2)
 }
@@ -163,7 +171,7 @@ func TestStateSyncManager_BuildCommitment(t *testing.T) {
 	vals := newTestValidators(5)
 
 	s := newTestStateSyncManager(t, vals.getValidator("0"))
-	s.validatorSet = vals.toValidatorSetWithError(t)
+	s.validatorSet = vals.toValidatorSet()
 
 	// commitment is empty
 	commitment, err := s.Commitment()
@@ -184,15 +192,16 @@ func TestStateSyncManager_BuildCommitment(t *testing.T) {
 
 	// validators 0 and 1 vote for the proposal, there is not enough
 	// voting power for the proposal
-	require.NoError(t, s.deliverMessage(msg.sign(vals.getValidator("0"))))
-	require.NoError(t, s.deliverMessage(msg.sign(vals.getValidator("1"))))
+	require.NoError(t, s.saveVote(msg.sign(vals.getValidator("0"))))
+	require.NoError(t, s.saveVote(msg.sign(vals.getValidator("1"))))
 
-	_, err = s.Commitment()
-	require.Error(t, err)
+	commitment, err = s.Commitment()
+	require.NoError(t, err) // there is no error if quorum is not met, since its a valid case
+	require.Nil(t, commitment)
 
 	// validator 2 and 3 vote for the proposal, there is enough voting power now
-	require.NoError(t, s.deliverMessage(msg.sign(vals.getValidator("2"))))
-	require.NoError(t, s.deliverMessage(msg.sign(vals.getValidator("3"))))
+	require.NoError(t, s.saveVote(msg.sign(vals.getValidator("2"))))
+	require.NoError(t, s.saveVote(msg.sign(vals.getValidator("3"))))
 
 	commitment, err = s.Commitment()
 	require.NoError(t, err)
@@ -245,10 +254,18 @@ func TestStateSyncerManager_EventTracker_AddLog(t *testing.T) {
 	s := newTestStateSyncManager(t, vals.getValidator("0"))
 
 	// empty log which is not an state sync
-	require.Error(t, s.addLog(&ethgo.Log{}))
+	s.AddLog(&ethgo.Log{})
+	stateSyncs, err := s.state.list()
+
+	require.NoError(t, err)
+	require.Len(t, stateSyncs, 0)
 
 	// log with the state sync topic but incorrect content
-	require.Error(t, s.addLog(&ethgo.Log{Topics: []ethgo.Hash{stateTransferEventABI.ID()}}))
+	s.AddLog(&ethgo.Log{Topics: []ethgo.Hash{stateTransferEventABI.ID()}})
+	stateSyncs, err = s.state.list()
+
+	require.NoError(t, err)
+	require.Len(t, stateSyncs, 0)
 
 	// correct event log
 	data, err := abi.MustNewType("tuple(string a)").Encode([]string{"data"})
@@ -263,9 +280,10 @@ func TestStateSyncerManager_EventTracker_AddLog(t *testing.T) {
 		},
 		Data: data,
 	}
-	s.addLog(goodLog)
 
-	stateSyncs, err := s.state.getStateSyncEventsForCommitment(1, 1)
+	s.AddLog(goodLog)
+
+	stateSyncs, err = s.state.getStateSyncEventsForCommitment(1, 1)
 	require.NoError(t, err)
 	require.Len(t, stateSyncs, 1)
 }
@@ -302,8 +320,8 @@ func TestStateSyncerManager_EventTracker_Sync(t *testing.T) {
 		require.Equal(t, uint64(types.ReceiptSuccess), receipt.Status)
 	}
 
-	s.stateReceiverAddr = types.Address(addr)
-	s.jsonrpcAddr = server.HTTPAddr()
+	s.config.stateSenderAddr = types.Address(addr)
+	s.config.jsonrpcAddr = server.HTTPAddr()
 
 	require.NoError(t, s.initTracker())
 

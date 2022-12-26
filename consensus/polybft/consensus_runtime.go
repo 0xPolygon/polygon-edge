@@ -140,13 +140,17 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 	if runtime.IsBridgeEnabled() {
 		// enable state sync manager
 		runtime.stateSyncManager, err = NewStateSyncManager(
-			log, config.Key,
+			log,
 			config.State,
-			config.PolyBFTConfig.StateReceiverAddr,
-			config.PolyBFTConfig.Bridge.JSONRPCEndpoint,
-			config.DataDir,
-			config.bridgeTopic,
+			&stateSyncConfig{
+				key:             config.Key,
+				stateSenderAddr: config.PolyBFTConfig.Bridge.BridgeAddr,
+				jsonrpcAddr:     config.PolyBFTConfig.Bridge.JSONRPCEndpoint,
+				dataDir:         config.DataDir,
+				topic:           config.bridgeTopic,
+			},
 		)
+
 		if err != nil {
 			return nil, err
 		}
@@ -391,17 +395,13 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) (*epochMetadata, e
 		"firstBlockInEpoch", firstBlockInEpoch,
 	)
 
-	valSet, err := NewValidatorSet(validatorSet, c.logger)
-	if err != nil {
-		return nil, err
-	}
-
 	reqObj := &PostEpochRequest{
 		BlockNumber:  header.Number,
 		SystemState:  systemState,
-		Epoch:        epochNumber,
-		ValidatorSet: valSet,
+		NewEpochID:   epochNumber,
+		ValidatorSet: NewValidatorSet(validatorSet, c.logger),
 	}
+
 	if c.IsBridgeEnabled() {
 		if err := c.stateSyncManager.PostEpoch(reqObj); err != nil {
 			return nil, err
