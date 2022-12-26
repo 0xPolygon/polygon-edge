@@ -32,7 +32,6 @@ func GetCommand() *cobra.Command {
 	}
 
 	helper.RegisterGRPCAddressFlag(registerCmd)
-	helper.RegisterJSONRPCFlag(registerCmd)
 	setFlags(registerCmd)
 
 	return registerCmd
@@ -53,9 +52,7 @@ func setFlags(cmd *cobra.Command) {
 	)
 }
 
-func runPreRun(cmd *cobra.Command, _ []string) error {
-	params.jsonRPCAddr = helper.GetJSONRPCAddress(cmd)
-
+func runPreRun(_ *cobra.Command, _ []string) error {
 	return params.validateFlags()
 }
 
@@ -375,7 +372,7 @@ func (t *txnSender) waitForReceipt(hash ethgo.Hash) (*ethgo.Receipt, error) {
 }
 
 func newDemoClient() (*jsonrpc.Client, error) {
-	client, err := jsonrpc.NewClient(params.jsonRPCAddr)
+	client, err := jsonrpc.NewClient("http://localhost:9545")
 	if err != nil {
 		return nil, fmt.Errorf("cannot connect with jsonrpc: %w", err)
 	}

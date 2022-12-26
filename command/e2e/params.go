@@ -14,7 +14,6 @@ const (
 type registerParams struct {
 	newValidatorDataDir         string
 	registratorValidatorDataDir string
-	jsonRPCAddr                 string
 }
 
 func (rp *registerParams) validateFlags() error {
