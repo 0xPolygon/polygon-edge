@@ -5,13 +5,11 @@ import (
 	"fmt"
 	"time"
 
-	protoIBFT "github.com/0xPolygon/go-ibft/messages/proto"
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/fork"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
-	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/secrets"
@@ -22,7 +20,6 @@ import (
 	"github.com/armon/go-metrics"
 	"github.com/hashicorp/go-hclog"
 	"google.golang.org/grpc"
-	protoBuf "google.golang.org/protobuf/proto"
 )
 
 const (
@@ -435,10 +432,9 @@ func (i *backendIBFT) VerifyBlock(block *types.Block) error {
 		return err
 	}
 
-	hashForCS, err := calcHashForCS(
-		headerSigner,
+	hashForCS, err := i.getProposalHashFromBlock(
 		block,
-		extra,
+		extra.RoundNumber,
 	)
 	if err != nil {
 		return err
@@ -456,40 +452,6 @@ func (i *backendIBFT) VerifyBlock(block *types.Block) error {
 	}
 
 	return nil
-}
-
-func calcHashForCS(
-	signer signer.Signer,
-	block *types.Block,
-	extra *signer.IstanbulExtra,
-) ([]byte, error) {
-	if extra.RoundNumber == nil {
-		return block.Hash().Bytes(), nil
-	}
-
-	// need to remove some fields from finalized header for hash calculation
-	originalHeader := block.Header
-
-	filteredHeader, err := signer.FilterHeaderForHash(block.Header)
-	if err != nil {
-		return nil, err
-	}
-
-	block.Header = filteredHeader.ComputeHash()
-
-	proposedBlock := &protoIBFT.ProposedBlock{
-		EthereumBlock: block.MarshalRLP(),
-		Round:         *extra.RoundNumber,
-	}
-
-	proposedBlockRaw, err := protoBuf.Marshal(proposedBlock)
-	if err != nil {
-		return nil, err
-	}
-
-	block.Header = originalHeader
-
-	return crypto.Keccak256(proposedBlockRaw), nil
 }
 
 // quorumSize returns a callback that when executed on a Validators computes
@@ -638,10 +600,9 @@ func (i *backendIBFT) verifyParentCommittedSeals(
 		return err
 	}
 
-	parentHash, err := calcHashForCS(
-		parentSigner,
+	parentHash, err := i.getProposalHashFromBlock(
 		parentBlock,
-		parentExtra,
+		parentExtra.RoundNumber,
 	)
 	if err != nil {
 		return err

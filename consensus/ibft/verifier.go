@@ -137,38 +137,12 @@ func (i *backendIBFT) IsProposer(id []byte, height, round uint64) bool {
 }
 
 func (i *backendIBFT) IsValidProposalHash(proposal *protoIBFT.ProposedBlock, hash []byte) bool {
-	proposalHash, err := i.getProposalHashFromBlock(proposal.EthereumBlock, proposal.Round)
+	proposalHash, err := i.getProposalHashFromBlockBytes(proposal.EthereumBlock, &proposal.Round)
 	if err != nil {
 		return false
 	}
 
-	return bytes.Equal(proposalHash, hash)
-}
-
-func (i *backendIBFT) getProposalHashFromBlock(ethereumBlock []byte, round uint64) ([]byte, error) {
-	block := &types.Block{}
-	if err := block.UnmarshalRLP(ethereumBlock); err != nil {
-		return nil, err
-	}
-
-	filteredHeader, err := i.currentSigner.FilterHeaderForHash(block.Header)
-	if err != nil {
-		return nil, err
-	}
-
-	block.Header = filteredHeader.ComputeHash()
-
-	proposedBlockForHash := &protoIBFT.ProposedBlock{
-		EthereumBlock: block.MarshalRLP(),
-		Round:         round,
-	}
-
-	proposedBlockRaw, err := proto.Marshal(proposedBlockForHash)
-	if err != nil {
-		return nil, err
-	}
-
-	return crypto.Keccak256(proposedBlockRaw), nil
+	return bytes.Equal(proposalHash.Bytes(), hash)
 }
 
 func (i *backendIBFT) IsValidCommittedSeal(
@@ -207,4 +181,44 @@ func (i *backendIBFT) extractProposer(header *types.Header) (types.Address, erro
 	}
 
 	return proposer, nil
+}
+
+func (i *backendIBFT) getProposalHashFromBlockBytes(ethereumBlock []byte, round *uint64) (types.Hash, error) {
+	block := &types.Block{}
+	if err := block.UnmarshalRLP(ethereumBlock); err != nil {
+		return types.ZeroHash, err
+	}
+
+	return i.getProposalHashFromBlock(block, round)
+}
+
+func (i *backendIBFT) getProposalHashFromBlock(ethereumBlock *types.Block, round *uint64) (types.Hash, error) {
+	if round == nil {
+		return ethereumBlock.Hash(), nil
+	}
+
+	filteredHeader, err := i.currentSigner.FilterHeaderForHash(ethereumBlock.Header)
+	if err != nil {
+		return types.ZeroHash, err
+	}
+
+	marshalBlock := &types.Block{
+		Header:       filteredHeader,
+		Transactions: ethereumBlock.Transactions,
+		Uncles:       ethereumBlock.Uncles,
+	}
+
+	proposedBlockForHash := &protoIBFT.ProposedBlock{
+		EthereumBlock: marshalBlock.MarshalRLP(),
+		Round:         *round,
+	}
+
+	proposedBlockRaw, err := proto.Marshal(proposedBlockForHash)
+	if err != nil {
+		return types.ZeroHash, err
+	}
+
+	return types.BytesToHash(
+		crypto.Keccak256(proposedBlockRaw),
+	), nil
 }

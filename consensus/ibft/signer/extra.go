@@ -3,7 +3,6 @@ package signer
 import (
 	"errors"
 	"fmt"
-	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
@@ -43,20 +42,12 @@ type Seals interface {
 }
 
 func parseRoundNumber(v *fastrlp.Value) (*uint64, error) {
-	roundBytes := v.Raw()
-	if len(roundBytes) > 0 {
-		bigRound := new(big.Int).SetBytes(roundBytes)
-
-		if !bigRound.IsUint64() {
-			return nil, ErrRoundNumberOverflow
-		}
-
-		round := bigRound.Uint64()
-
-		return &round, nil
+	n, err := v.GetUint64()
+	if err != nil {
+		return nil, err
 	}
 
-	return nil, nil
+	return &n, nil
 }
 
 // MarshalRLPTo defines the marshal function wrapper for IstanbulExtra

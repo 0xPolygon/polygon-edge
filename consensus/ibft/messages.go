@@ -30,19 +30,10 @@ func (i *backendIBFT) BuildPrePrepareMessage(
 	}
 
 	// hash calculation begins
-	proposalHash, err := i.getProposalHashFromBlock(ethereumBlock, view.Round)
+	proposalHash, err := i.getProposalHashFromBlockBytes(ethereumBlock, &view.Round)
 	if err != nil {
 		return nil
 	}
-
-	// hash calculation ends
-
-	// TODO: Double-check that even without this we are correctly validating the block elsewhere.
-	//block := &types.Block{}
-	//if err := block.UnmarshalRLP(proposal); err != nil {
-	//return nil
-	//}
-	//proposalHash := block.Hash().Bytes()
 
 	msg := &protoIBFT.Message{
 		View: view,
@@ -51,7 +42,7 @@ func (i *backendIBFT) BuildPrePrepareMessage(
 		Payload: &protoIBFT.Message_PreprepareData{
 			PreprepareData: &protoIBFT.PrePrepareMessage{
 				Proposal:     proposedBlock,
-				ProposalHash: proposalHash,
+				ProposalHash: proposalHash.Bytes(),
 				Certificate:  certificate,
 			},
 		},
