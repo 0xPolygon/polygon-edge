@@ -158,13 +158,18 @@ func (i *backendIBFT) HasQuorum(
 		return false
 	}
 
-	if msgType == proto.MessageType_PREPREPARE {
-		return len(messages) > 0
-	}
-
 	quorum := i.quorumSize(blockNumber)(validators)
 
-	return len(messages) >= quorum
+	switch msgType {
+	case proto.MessageType_PREPREPARE:
+		return len(messages) > 0
+	case proto.MessageType_PREPARE:
+		return len(messages) >= quorum-1
+	case proto.MessageType_COMMIT, proto.MessageType_ROUND_CHANGE:
+		return len(messages) >= quorum
+	default:
+		return false
+	}
 }
 
 // buildBlock builds the block, based on the passed in snapshot and parent header
