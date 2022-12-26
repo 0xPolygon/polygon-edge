@@ -227,7 +227,7 @@ func (p *Polybft) Start() error {
 		}
 
 		if err := p.syncer.Sync(blockHandler); err != nil {
-			panic(fmt.Errorf("failed to sync blocks. Error: %w", err))
+			p.logger.Error("blocks synchronization failed", "error", err)
 		}
 	}()
 
