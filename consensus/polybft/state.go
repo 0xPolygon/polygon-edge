@@ -246,8 +246,6 @@ var (
 	errNotEnoughStateSyncs = errors.New("there is either a gap or not enough sync events")
 	// errCommitmentNotBuilt error message
 	errCommitmentNotBuilt = errors.New("there is no built commitment to register")
-	// errNotAnExitEvent error message
-	errNotAnExitEvent = errors.New("log not an exit event")
 )
 
 // State represents a persistence layer which persists consensus data off-chain
