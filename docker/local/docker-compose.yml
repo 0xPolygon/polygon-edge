@@ -6,23 +6,18 @@ services:
     build:
       context: ../../
       dockerfile: docker/local/Dockerfile
-    command: ["init"]
+    command: ["init", "${EDGE_CONSENSUS:-ibft}"]
     volumes:
-      - node-1:/polygon-edge/data-1
-      - node-2:/polygon-edge/data-2
-      - node-3:/polygon-edge/data-3
-      - node-4:/polygon-edge/data-4
-      - genesis:/genesis
+      - data:/data
     networks:
       - polygon-edge-docker
   
   ## RUN NODES
-  ## Nodes must have the same names as folders in genesis-legde
   node-1:
     build:
       context: ../../
       dockerfile: docker/local/Dockerfile
-    command: ["server", "--data-dir", "/data", "--chain", "/genesis/genesis.json", "--grpc-address", "0.0.0.0:9632", "--libp2p", "0.0.0.0:1478", "--jsonrpc", "0.0.0.0:8545", "--seal"]
+    command: ["server", "--data-dir", "/data/data-1", "--chain", "/data/genesis.json", "--grpc-address", "0.0.0.0:9632", "--libp2p", "0.0.0.0:1478", "--jsonrpc", "0.0.0.0:8545", "--log-level", "DEBUG"]
     depends_on:
       init:
         condition: service_completed_successfully
@@ -30,8 +25,7 @@ services:
       - '10000:9632'
       - '10002:8545'
     volumes:
-      - node-1:/data
-      - genesis:/genesis
+      - data:/data
     networks:
       - polygon-edge-docker
     restart: on-failure
@@ -40,7 +34,7 @@ services:
     build:
       context: ../../
       dockerfile: docker/local/Dockerfile
-    command: ["server", "--data-dir", "/data", "--chain", "/genesis/genesis.json", "--grpc-address", "0.0.0.0:9632", "--libp2p", "0.0.0.0:1478", "--jsonrpc", "0.0.0.0:8545", "--seal"]
+    command: ["server", "--data-dir", "/data/data-2", "--chain", "/data/genesis.json", "--grpc-address", "0.0.0.0:9632", "--libp2p", "0.0.0.0:1478", "--jsonrpc", "0.0.0.0:8545", "--log-level", "DEBUG"]
     depends_on:
       init:
         condition: service_completed_successfully
@@ -48,8 +42,7 @@ services:
       - '20000:9632'
       - '20002:8545'
     volumes:
-      - node-2:/data
-      - genesis:/genesis
+      - data:/data
     networks:
       - polygon-edge-docker
     restart: on-failure
@@ -58,7 +51,7 @@ services:
     build:
       context: ../../
       dockerfile: docker/local/Dockerfile
-    command: ["server", "--data-dir", "/data", "--chain", "/genesis/genesis.json", "--grpc-address", "0.0.0.0:9632", "--libp2p", "0.0.0.0:1478", "--jsonrpc", "0.0.0.0:8545", "--seal"]
+    command: ["server", "--data-dir", "/data/data-3", "--chain", "/data/genesis.json", "--grpc-address", "0.0.0.0:9632", "--libp2p", "0.0.0.0:1478", "--jsonrpc", "0.0.0.0:8545", "--log-level", "DEBUG"]
     depends_on:
       init:
         condition: service_completed_successfully
@@ -66,8 +59,7 @@ services:
       - '30000:9632'
       - '30002:8545'
     volumes:
-      - node-3:/data
-      - genesis:/genesis
+      - data:/data
     networks:
       - polygon-edge-docker
     restart: on-failure
@@ -76,7 +68,7 @@ services:
     build:
       context: ../../
       dockerfile: docker/local/Dockerfile
-    command: ["server", "--data-dir", "/data", "--chain", "/genesis/genesis.json", "--grpc-address", "0.0.0.0:9632", "--libp2p", "0.0.0.0:1478", "--jsonrpc", "0.0.0.0:8545", "--seal"]
+    command: ["server", "--data-dir", "/data/data-4", "--chain", "/data/genesis.json", "--grpc-address", "0.0.0.0:9632", "--libp2p", "0.0.0.0:1478", "--jsonrpc", "0.0.0.0:8545", "--log-level", "DEBUG"]
     depends_on:
       init:
         condition: service_completed_successfully
@@ -84,8 +76,7 @@ services:
       - '40000:9632'
       - '40002:8545'
     volumes:
-      - node-4:/data
-      - genesis:/genesis
+      - data:/data
     networks:
       - polygon-edge-docker
     restart: on-failure
@@ -96,8 +87,5 @@ networks:
     name: polygon-edge-docker
 
 volumes:
-  node-1:
-  node-2:
-  node-3:
-  node-4:
+  data:
   genesis:

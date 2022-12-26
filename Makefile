@@ -56,19 +56,6 @@ test-e2e-polybft:
 	go build -o artifacts/polygon-edge .
 	env EDGE_BINARY=${PWD}/artifacts/polygon-edge E2E_TESTS=true E2E_LOGS=true go test -v -timeout=30m ./e2e-polybft/...
 
-.PHONY: run-local
-run-local:
-	$(MAKE) compile-core-contracts
-	docker-compose -f ./docker/local/docker-compose.yml up -d --build
-
-.PHONY: stop-local
-stop-local:
-	docker-compose -f ./docker/local/docker-compose.yml stop
-
-.PHONY: destroy-local
-destroy-local:
-	docker-compose -f ./docker/local/docker-compose.yml down
-
 .PHONY: compile-core-contracts
 compile-core-contracts:
 	cd core-contracts && npm install && npm run compile
