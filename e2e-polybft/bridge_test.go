@@ -398,8 +398,17 @@ func ABITransaction(relayer txrelayer.TxRelayer, key ethgo.Key, artifact *artifa
 	}, key)
 }
 
+type validatorInfo struct {
+	address    ethgo.Address
+	rewards    *big.Int
+	totalStake *big.Int
+}
+
 func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
-	const finalBlockNumber = 20
+	const (
+		finalBlockNumber   = 20
+		votingPowerChanges = 3
+	)
 
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithBridge(),
@@ -411,19 +420,21 @@ func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
 	require.NoError(t, err)
 
 	checkpointManagerAddr := ethgo.Address(manifest.RootchainConfig.CheckpointManagerAddress)
-	rootchainSender := ethgo.Address(manifest.RootchainConfig.AdminAddress)
 
 	validatorSecretFiles, err := genesis.GetValidatorKeyFiles(cluster.Config.TmpDir, cluster.Config.ValidatorPrefix)
 	require.NoError(t, err)
 
-	validatorAcc, err := sidechain.GetAccountFromDir(path.Join(cluster.Config.TmpDir, validatorSecretFiles[0]))
-	require.NoError(t, err)
+	votingPowerChangeValidators := make([]ethgo.Address, votingPowerChanges)
 
-	targetServer := cluster.Servers[0]
-	validatorAddr := validatorAcc.Ecdsa.Address()
+	for i := 0; i < votingPowerChanges; i++ {
+		validator, err := sidechain.GetAccountFromDir(path.Join(cluster.Config.TmpDir, validatorSecretFiles[i]))
+		require.NoError(t, err)
+
+		votingPowerChangeValidators[i] = validator.Ecdsa.Address()
+	}
 
 	// L2 Tx relayer (for sending stake transaction and querying validator)
-	l2Relayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(targetServer.JSONRPCAddr()))
+	l2Relayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Servers[0].JSONRPCAddr()))
 	require.NoError(t, err)
 
 	// L1 Tx relayer (for querying checkpoints)
@@ -433,41 +444,56 @@ func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
 	// waiting two epochs, so that some rewards get accumulated
 	require.NoError(t, cluster.WaitForBlock(10, 1*time.Minute))
 
-	// query validator info
-	validatorInfo, err := sidechain.GetValidatorInfo(validatorAddr, l2Relayer)
-	require.NoError(t, err)
+	queryValidators := func(handler func(idx int, validatorInfo *validatorInfo)) {
+		for i, validatorAddr := range votingPowerChangeValidators {
+			// query validator info
+			validatorInfoRaw, err := sidechain.GetValidatorInfo(validatorAddr, l2Relayer)
+			require.NoError(t, err)
 
-	rewards := validatorInfo["withdrawableRewards"].(*big.Int).Uint64() //nolint:forcetypeassert
-	totalStakeBefore := validatorInfo["totalStake"].(*big.Int).Uint64() //nolint:forcetypeassert
+			rewards := validatorInfoRaw["withdrawableRewards"].(*big.Int) //nolint:forcetypeassert
+			totalStake := validatorInfoRaw["totalStake"].(*big.Int)       //nolint:forcetypeassert
 
-	t.Logf("Voting power (before re-stake) %d\n", totalStakeBefore)
+			handler(i, &validatorInfo{address: validatorAddr, rewards: rewards, totalStake: totalStake})
+		}
+	}
 
-	// stake rewards
-	require.NoError(t, targetServer.Stake(rewards))
+	originalValidatorStorage := make(map[ethgo.Address]*validatorInfo, votingPowerChanges)
+
+	queryValidators(func(idx int, validator *validatorInfo) {
+		t.Logf("[Validator#%d] Voting power (original)=%d, rewards=%d\n",
+			idx+1, validator.totalStake, validator.rewards)
+
+		originalValidatorStorage[validator.address] = validator
+
+		// stake rewards
+		require.NoError(t, cluster.Servers[idx].Stake(validator.rewards.Uint64()))
+	})
 
 	// wait a two more epochs, so that stake is registered and two more checkpoints are sent.
 	// Blocks are still produced, although voting power is slightly changed.
 	require.NoError(t, cluster.WaitForBlock(finalBlockNumber, 1*time.Minute))
 
-	validatorInfo, err = sidechain.GetValidatorInfo(validatorAddr, l2Relayer)
-	require.NoError(t, err)
+	queryValidators(func(idx int, validator *validatorInfo) {
+		t.Logf("[Validator#%d] Voting power (after stake)=%d\n", idx+1, validator.totalStake)
 
-	totalStakeAfter := validatorInfo["totalStake"].(*big.Int).Uint64() //nolint:forcetypeassert
+		previousValidatorInfo := originalValidatorStorage[validator.address]
+		stakedAmount := new(big.Int).Add(previousValidatorInfo.rewards, previousValidatorInfo.totalStake)
 
-	t.Logf("Voting power (after re-stake) %d\n", totalStakeAfter)
+		// assert that total stake has increased by staked amount
+		require.Equal(t, stakedAmount, validator.totalStake)
+	})
 
-	// assert that total stake has increased by staked amount
-	require.Equal(t, rewards+totalStakeBefore, totalStakeAfter)
-
+	l1Sender := ethgo.Address(manifest.RootchainConfig.AdminAddress)
 	// assert that block 20 gets checkpointed
 	require.NoError(t, cluster.Bridge.WaitUntil(time.Second, time.Minute, func() (bool, error) {
-		actualCheckpointBlock, err := getCheckpointBlockNumber(l1Relayer, checkpointManagerAddr, rootchainSender)
+		actualCheckpointBlock, err := getCheckpointBlockNumber(l1Relayer, checkpointManagerAddr, l1Sender)
 		if err != nil {
 			return false, err
 		}
 
 		t.Logf("Checkpoint block: %d\n", actualCheckpointBlock)
 
+		// waiting until condition is true (namely when block 20 gets checkpointed)
 		return actualCheckpointBlock < finalBlockNumber, nil
 	}))
 }
