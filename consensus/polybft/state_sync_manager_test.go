@@ -17,7 +17,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func newTestStateSyncManager(t *testing.T, key *testValidator) *StateSyncManager {
+func newTestStateSyncManager(t *testing.T, key *testValidator) *stateSyncManager {
 	t.Helper()
 
 	tmpDir, err := os.MkdirTemp("/tmp", "test-data-dir-state-sync")

@@ -20,6 +20,24 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+// StateSyncManager is an interface that defines functions for state sync workflow
+type StateSyncManager interface {
+	Init() error
+	Commitment() (*CommitmentMessageSigned, error)
+	PostBlock(req *PostBlockRequest) error
+	PostEpoch(req *PostEpochRequest) error
+}
+
+var _ StateSyncManager = (*dummyStateSyncManager)(nil)
+
+// dummyStateSyncManager is used when bridge is not enabled
+type dummyStateSyncManager struct{}
+
+func (n *dummyStateSyncManager) Init() error                                   { return nil }
+func (n *dummyStateSyncManager) Commitment() (*CommitmentMessageSigned, error) { return nil, nil }
+func (n *dummyStateSyncManager) PostBlock(req *PostBlockRequest) error         { return nil }
+func (n *dummyStateSyncManager) PostEpoch(req *PostEpochRequest) error         { return nil }
+
 // stateSyncConfig holds the configuration data of state sync manager
 type stateSyncConfig struct {
 	stateSenderAddr types.Address
@@ -29,9 +47,11 @@ type stateSyncConfig struct {
 	key             *wallet.Key
 }
 
-// StateSyncManager is a struct that manages the workflow of
+var _ StateSyncManager = (*stateSyncManager)(nil)
+
+// stateSyncManager is a struct that manages the workflow of
 // saving and querying state sync events, and creating, and submitting new commitments
-type StateSyncManager struct {
+type stateSyncManager struct {
 	logger hclog.Logger
 	state  *State
 
@@ -51,8 +71,8 @@ type topic interface {
 }
 
 // NewStateSyncManager creates a new instance of state sync manager
-func NewStateSyncManager(logger hclog.Logger, state *State, config *stateSyncConfig) (*StateSyncManager, error) {
-	s := &StateSyncManager{
+func NewStateSyncManager(logger hclog.Logger, state *State, config *stateSyncConfig) (*stateSyncManager, error) {
+	s := &stateSyncManager{
 		logger: logger.Named("state-sync"),
 		state:  state,
 		config: config,
@@ -62,8 +82,8 @@ func NewStateSyncManager(logger hclog.Logger, state *State, config *stateSyncCon
 	return s, nil
 }
 
-// init subscribes to bridge topics (getting votes) and start the event tracker routine
-func (s *StateSyncManager) init() error {
+// Init subscribes to bridge topics (getting votes) and start the event tracker routine
+func (s *stateSyncManager) Init() error {
 	if err := s.initTracker(); err != nil {
 		return fmt.Errorf("failed to init event tracker. Error: %w", err)
 	}
@@ -76,7 +96,7 @@ func (s *StateSyncManager) init() error {
 }
 
 // initTracker starts a new event tracker (to receive new state sync events)
-func (s *StateSyncManager) initTracker() error {
+func (s *stateSyncManager) initTracker() error {
 	tracker := tracker.NewEventTracker(
 		path.Join(s.config.dataDir, "/deposit.db"),
 		s.config.jsonrpcAddr,
@@ -88,7 +108,7 @@ func (s *StateSyncManager) initTracker() error {
 }
 
 // initTransport subscribes to bridge topics (getting votes for commitments)
-func (s *StateSyncManager) initTransport() error {
+func (s *stateSyncManager) initTransport() error {
 	return s.config.topic.Subscribe(func(obj interface{}, _ peer.ID) {
 		msg, ok := obj.(*polybftProto.TransportMessage)
 		if !ok {
@@ -112,7 +132,7 @@ func (s *StateSyncManager) initTransport() error {
 }
 
 // saveVote saves the gotten vote to boltDb for later quorum check and signature aggregation
-func (s *StateSyncManager) saveVote(msg *TransportMessage) error {
+func (s *stateSyncManager) saveVote(msg *TransportMessage) error {
 	s.lock.Lock()
 	epoch := s.epoch
 	valSet := s.validatorSet
@@ -148,7 +168,7 @@ func (s *StateSyncManager) saveVote(msg *TransportMessage) error {
 }
 
 // AddLog saves the received log from event tracker if it matches a state sync event ABI
-func (s *StateSyncManager) AddLog(eventLog *ethgo.Log) {
+func (s *stateSyncManager) AddLog(eventLog *ethgo.Log) {
 	if !stateTransferEventABI.Match(eventLog) {
 		return
 	}
@@ -175,7 +195,7 @@ func (s *StateSyncManager) AddLog(eventLog *ethgo.Log) {
 }
 
 // Commitment returns a commitment to be submitted if there is a pending commitment with quorum
-func (s *StateSyncManager) Commitment() (*CommitmentMessageSigned, error) {
+func (s *stateSyncManager) Commitment() (*CommitmentMessageSigned, error) {
 	if s.commitment == nil {
 		return nil, nil
 	}
@@ -212,7 +232,7 @@ func (s *StateSyncManager) Commitment() (*CommitmentMessageSigned, error) {
 
 // getAggSignatureForCommitmentMessage checks if pending commitment has quorum,
 // and if it does, aggregates the signatures
-func (s *StateSyncManager) getAggSignatureForCommitmentMessage(commitment *Commitment) (Signature, [][]byte, error) {
+func (s *stateSyncManager) getAggSignatureForCommitmentMessage(commitment *Commitment) (Signature, [][]byte, error) {
 	validatorSet := s.validatorSet
 
 	validatorAddrToIndex := make(map[string]int, validatorSet.Len())
@@ -291,7 +311,7 @@ type PostEpochRequest struct {
 
 // PostEpoch notifies the state sync manager that an epoch has changed,
 // so that it can discard any previous epoch commitments, and build a new one (since validator set changed)
-func (s *StateSyncManager) PostEpoch(req *PostEpochRequest) error {
+func (s *stateSyncManager) PostEpoch(req *PostEpochRequest) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -320,7 +340,7 @@ type PostBlockRequest struct {
 
 // PostBlock notifies state sync manager that a block was finalized,
 // so that it can build state sync proofs if a block has a commitment submission transaction
-func (s *StateSyncManager) PostBlock(req *PostBlockRequest) error {
+func (s *stateSyncManager) PostBlock(req *PostBlockRequest) error {
 	commitment, err := getCommitmentMessageSignedTx(req.Block.Transactions)
 	if err != nil {
 		return err
@@ -345,7 +365,7 @@ func (s *StateSyncManager) PostBlock(req *PostBlockRequest) error {
 }
 
 // buildProofs builds state sync proofs for the submitted commitment and saves them in boltDb for later execution
-func (s *StateSyncManager) buildProofs(commitmentMsg *CommitmentMessage) error {
+func (s *stateSyncManager) buildProofs(commitmentMsg *CommitmentMessage) error {
 	s.logger.Debug(
 		"[buildProofs] Building proofs for commitment...",
 		"fromIndex", commitmentMsg.FromIndex,
@@ -383,7 +403,7 @@ func (s *StateSyncManager) buildProofs(commitmentMsg *CommitmentMessage) error {
 }
 
 // buildCommitment builds a new commitment, signs it and gossips its vote for it
-func (s *StateSyncManager) buildCommitment(epoch, fromIndex uint64) (*Commitment, error) {
+func (s *stateSyncManager) buildCommitment(epoch, fromIndex uint64) (*Commitment, error) {
 	toIndex := fromIndex + stateSyncCommitmentSize - 1
 
 	// if it is not already built in the previous epoch
@@ -448,7 +468,7 @@ func (s *StateSyncManager) buildCommitment(epoch, fromIndex uint64) (*Commitment
 }
 
 // Multicast publishes given message to the rest of the network
-func (s *StateSyncManager) Multicast(msg interface{}) {
+func (s *stateSyncManager) Multicast(msg interface{}) {
 	data, err := json.Marshal(msg)
 	if err != nil {
 		s.logger.Warn("failed to marshal bridge message", "err", err)

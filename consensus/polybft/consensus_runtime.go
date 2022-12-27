@@ -116,7 +116,7 @@ type consensusRuntime struct {
 	proposerCalculator *ProposerCalculator
 
 	// manager for state sync bridge transactions
-	stateSyncManager *StateSyncManager
+	stateSyncManager StateSyncManager
 
 	// logger instance
 	logger hcf.Logger
@@ -135,6 +135,7 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 		lastBuiltBlock:     config.blockchain.CurrentHeader(),
 		proposerCalculator: proposerCalculator,
 		logger:             log.Named("consensus_runtime"),
+		stateSyncManager:   &dummyStateSyncManager{},
 	}
 
 	if runtime.IsBridgeEnabled() {
@@ -155,7 +156,7 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 			return nil, err
 		}
 
-		if err := runtime.stateSyncManager.init(); err != nil {
+		if err := runtime.stateSyncManager.Init(); err != nil {
 			return nil, err
 		}
 
@@ -228,11 +229,9 @@ func (c *consensusRuntime) OnBlockInserted(block *types.Block) {
 	// after the block has been written we reset the txpool so that the old transactions are removed
 	c.config.txPool.ResetWithHeaders(block.Header)
 
-	if c.IsBridgeEnabled() {
-		// handle commitment and proofs creation
-		if err := c.stateSyncManager.PostBlock(&PostBlockRequest{Block: block}); err != nil {
-			c.logger.Error("failed to post block state sync", "err", err)
-		}
+	// handle commitment and proofs creation
+	if err := c.stateSyncManager.PostBlock(&PostBlockRequest{Block: block}); err != nil {
+		c.logger.Error("failed to post block state sync", "err", err)
 	}
 
 	var (
@@ -308,14 +307,12 @@ func (c *consensusRuntime) FSM() error {
 		logger:            c.logger.Named("fsm"),
 	}
 
-	if c.IsBridgeEnabled() {
-		commitment, err := c.stateSyncManager.Commitment()
-		if err != nil {
-			return err
-		}
-
-		ff.proposerCommitmentToRegister = commitment
+	commitment, err := c.stateSyncManager.Commitment()
+	if err != nil {
+		return err
 	}
+
+	ff.proposerCommitmentToRegister = commitment
 
 	if isEndOfEpoch {
 		ff.uptimeCounter, err = c.calculateUptime(parent, epoch)
@@ -392,17 +389,15 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) (*epochMetadata, e
 		"firstBlockInEpoch", firstBlockInEpoch,
 	)
 
-	if c.IsBridgeEnabled() {
-		reqObj := &PostEpochRequest{
-			BlockNumber:  header.Number,
-			SystemState:  systemState,
-			NewEpochID:   epochNumber,
-			ValidatorSet: NewValidatorSet(validatorSet, c.logger),
-		}
+	reqObj := &PostEpochRequest{
+		BlockNumber:  header.Number,
+		SystemState:  systemState,
+		NewEpochID:   epochNumber,
+		ValidatorSet: NewValidatorSet(validatorSet, c.logger),
+	}
 
-		if err := c.stateSyncManager.PostEpoch(reqObj); err != nil {
-			return nil, err
-		}
+	if err := c.stateSyncManager.PostEpoch(reqObj); err != nil {
+		return nil, err
 	}
 
 	return &epochMetadata{
