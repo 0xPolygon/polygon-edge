@@ -13,7 +13,7 @@ import (
 
 // Verifier impl for go-ibft
 
-func (i *backendIBFT) IsValidBlock(proposal []byte) bool {
+func (i *backendIBFT) IsValidProposal(proposal []byte) bool {
 	var (
 		latestHeader      = i.blockchain.Header()
 		latestBlockNumber = latestHeader.Number
@@ -22,7 +22,7 @@ func (i *backendIBFT) IsValidBlock(proposal []byte) bool {
 
 	// retrieve the newBlock proposal
 	if err := newBlock.UnmarshalRLP(proposal); err != nil {
-		i.logger.Error("IsValidBlock: fail to unmarshal block", "err", err)
+		i.logger.Error("IsValidProposal: fail to unmarshal block", "err", err)
 
 		return false
 	}
