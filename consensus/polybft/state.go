@@ -443,16 +443,23 @@ func (s *State) insertStateSyncEvent(event *types.StateSyncEvent) error {
 }
 
 // getStateSyncEventsForCommitment returns state sync events for commitment
-// if there is an event with index that can not be found in db in given range, an error is returned
-func (s *State) getStateSyncEventsForCommitment(fromIndex, toIndex uint64) ([]*types.StateSyncEvent, error) {
+// based on the getAll flag, the function will try to get all events in range, and if it fails,
+// it will either return an error, or return all the events it can without returning an error
+func (s *State) getStateSyncEventsForCommitment(fromIndex, toIndex uint64,
+	getAll bool) ([]*types.StateSyncEvent, error) {
 	var events []*types.StateSyncEvent
+
+	var notEnoughEventsErr error
+	if getAll {
+		notEnoughEventsErr = errNotEnoughStateSyncs
+	}
 
 	err := s.db.View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(syncStateEventsBucket)
 		for i := fromIndex; i <= toIndex; i++ {
 			v := bucket.Get(itob(i))
 			if v == nil {
-				return errNotEnoughStateSyncs
+				return notEnoughEventsErr
 			}
 
 			var event *types.StateSyncEvent

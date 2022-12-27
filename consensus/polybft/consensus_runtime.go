@@ -242,11 +242,6 @@ func (c *consensusRuntime) OnBlockInserted(block *types.Block) {
 	// after the block has been written we reset the txpool so that the old transactions are removed
 	c.config.txPool.ResetWithHeaders(block.Header)
 
-	// handle commitment and proofs creation
-	if err := c.stateSyncManager.PostBlock(&PostBlockRequest{Block: block}); err != nil {
-		c.logger.Error("failed to post block state sync", "err", err)
-	}
-
 	var (
 		epoch = c.epoch
 		err   error
@@ -259,6 +254,11 @@ func (c *consensusRuntime) OnBlockInserted(block *types.Block) {
 			c.logger.Error("failed to restart epoch after block inserted", "error", err)
 
 			return
+		}
+	} else {
+		// handle commitment and proofs creation
+		if err := c.stateSyncManager.PostBlock(&PostBlockRequest{Block: block}); err != nil {
+			c.logger.Error("failed to post block state sync", "err", err)
 		}
 	}
 
@@ -320,12 +320,14 @@ func (c *consensusRuntime) FSM() error {
 		logger:            c.logger.Named("fsm"),
 	}
 
-	commitment, err := c.stateSyncManager.Commitment()
-	if err != nil {
-		return err
-	}
+	if isEndOfSprint {
+		commitment, err := c.stateSyncManager.Commitment()
+		if err != nil {
+			return err
+		}
 
-	ff.proposerCommitmentToRegister = commitment
+		ff.proposerCommitmentToRegister = commitment
+	}
 
 	if isEndOfEpoch {
 		ff.uptimeCounter, err = c.calculateUptime(parent, epoch)
@@ -403,7 +405,6 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) (*epochMetadata, e
 	)
 
 	reqObj := &PostEpochRequest{
-		BlockNumber:  header.Number,
 		SystemState:  systemState,
 		NewEpochID:   epochNumber,
 		ValidatorSet: NewValidatorSet(validatorSet, c.logger),

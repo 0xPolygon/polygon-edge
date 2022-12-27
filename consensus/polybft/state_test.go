@@ -114,7 +114,7 @@ func TestState_Insert_And_Cleanup(t *testing.T) {
 	state := newTestState(t)
 	hash1 := []byte{1, 2}
 
-	for i := uint64(1); i < 1001; i++ {
+	for i := uint64(1); i <= 500; i++ {
 		epoch := i
 		err := state.insertEpoch(epoch)
 
@@ -127,9 +127,9 @@ func TestState_Insert_And_Cleanup(t *testing.T) {
 	}
 
 	// BucketN returns number of all buckets inside root bucket (including nested buckets) + the root itself
-	// Since we inserted 1000 epochs we expect to have 2000 buckets inside epochs root bucket
-	// (1000 buckets for epochs + each epoch has 1 nested bucket for message votes)
-	assert.Equal(t, 2000, state.epochsDBStats().BucketN-1)
+	// Since we inserted 500 epochs we expect to have 1000 buckets inside epochs root bucket
+	// (500 buckets for epochs + each epoch has 1 nested bucket for message votes)
+	assert.Equal(t, 1000, state.epochsDBStats().BucketN-1)
 
 	err := state.cleanEpochsFromDB()
 	assert.NoError(t, err)
@@ -140,7 +140,7 @@ func TestState_Insert_And_Cleanup(t *testing.T) {
 	votes, _ := state.getMessageVotes(1, hash1)
 	assert.Nil(t, votes)
 
-	for i := uint64(1001); i < 2001; i++ {
+	for i := uint64(501); i <= 1000; i++ {
 		epoch := i
 		err := state.insertEpoch(epoch)
 		assert.NoError(t, err)
@@ -151,9 +151,9 @@ func TestState_Insert_And_Cleanup(t *testing.T) {
 		})
 	}
 
-	assert.Equal(t, 2000, state.epochsDBStats().BucketN-1)
+	assert.Equal(t, 1000, state.epochsDBStats().BucketN-1)
 
-	votes, _ = state.getMessageVotes(2000, hash1)
+	votes, _ = state.getMessageVotes(1000, hash1)
 	assert.Equal(t, 1, len(votes))
 }
 
@@ -283,7 +283,7 @@ func TestState_getStateSyncEventsForCommitment_NotEnoughEvents(t *testing.T) {
 		}))
 	}
 
-	_, err := state.getStateSyncEventsForCommitment(0, stateSyncCommitmentSize-1)
+	_, err := state.getStateSyncEventsForCommitment(0, stateSyncCommitmentSize-1, true)
 	assert.ErrorIs(t, err, errNotEnoughStateSyncs)
 }
 
@@ -299,9 +299,36 @@ func TestState_getStateSyncEventsForCommitment(t *testing.T) {
 		}))
 	}
 
-	events, err := state.getStateSyncEventsForCommitment(0, stateSyncCommitmentSize-1)
-	assert.NoError(t, err)
-	assert.Equal(t, stateSyncCommitmentSize, len(events))
+	t.Run("Return all - forced. Enough events", func(t *testing.T) {
+		t.Parallel()
+
+		events, err := state.getStateSyncEventsForCommitment(0, stateSyncCommitmentSize-1, true)
+		require.NoError(t, err)
+		require.Equal(t, stateSyncCommitmentSize, len(events))
+	})
+
+	t.Run("Return all - forced. Not enough events", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := state.getStateSyncEventsForCommitment(0, stateSyncCommitmentSize+1, true)
+		require.ErrorIs(t, err, errNotEnoughStateSyncs)
+	})
+
+	t.Run("Return all you can. Enough events", func(t *testing.T) {
+		t.Parallel()
+
+		events, err := state.getStateSyncEventsForCommitment(0, stateSyncCommitmentSize-1, false)
+		assert.NoError(t, err)
+		assert.Equal(t, stateSyncCommitmentSize, len(events))
+	})
+
+	t.Run("Return all you can. Not enough events", func(t *testing.T) {
+		t.Parallel()
+
+		events, err := state.getStateSyncEventsForCommitment(0, stateSyncCommitmentSize+1, false)
+		assert.NoError(t, err)
+		assert.Equal(t, stateSyncCommitmentSize, len(events))
+	})
 }
 
 func TestState_insertCommitmentMessage(t *testing.T) {

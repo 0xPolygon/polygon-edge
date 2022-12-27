@@ -25,6 +25,8 @@ import (
 const (
 	// number of stateSyncEvents to be processed before a commitment message can be created and gossiped
 	stateSyncCommitmentSize = 10
+	minCommitmentSize       = 2
+	maxCommitmentSize       = 10
 )
 
 // StateSyncManager is an interface that defines functions for state sync workflow
@@ -68,10 +70,11 @@ type stateSyncManager struct {
 	closeCh chan struct{}
 
 	// per epoch fields
-	lock         sync.Mutex
-	commitment   *Commitment
-	epoch        uint64
-	validatorSet *validatorSet
+	lock               sync.RWMutex
+	pendingCommitments []*Commitment
+	validatorSet       *validatorSet
+	epoch              uint64
+	nextCommittedIndex uint64
 }
 
 // topic is an interface for p2p message gossiping
@@ -86,7 +89,7 @@ func NewStateSyncManager(logger hclog.Logger, state *State, config *stateSyncCon
 		logger: logger.Named("state-sync"),
 		state:  state,
 		config: config,
-		lock:   sync.Mutex{},
+		lock:   sync.RWMutex{},
 	}
 
 	return s, nil
@@ -154,10 +157,10 @@ func (s *stateSyncManager) initTransport() error {
 
 // saveVote saves the gotten vote to boltDb for later quorum check and signature aggregation
 func (s *stateSyncManager) saveVote(msg *TransportMessage) error {
-	s.lock.Lock()
+	s.lock.RLock()
 	epoch := s.epoch
 	valSet := s.validatorSet
-	s.lock.Unlock()
+	s.lock.RUnlock()
 
 	if valSet == nil || msg.EpochNumber < epoch {
 		// Epoch metadata is undefined or received message for some of the older epochs
@@ -213,42 +216,48 @@ func (s *stateSyncManager) AddLog(eventLog *ethgo.Log) {
 
 		return
 	}
+
+	if err := s.buildCommitment(); err != nil {
+		s.logger.Error("could not build a commitment on arrival of new state sync", "err", err)
+	}
 }
 
 // Commitment returns a commitment to be submitted if there is a pending commitment with quorum
 func (s *stateSyncManager) Commitment() (*CommitmentMessageSigned, error) {
-	if s.commitment == nil {
-		return nil, nil
-	}
+	s.lock.RLock()
+	defer s.lock.RUnlock()
 
-	commitment := s.commitment
+	var largestCommitment *CommitmentMessageSigned
 
-	commitmentMessage := NewCommitmentMessage(
-		commitment.MerkleTree.Hash(),
-		commitment.FromIndex,
-		commitment.ToIndex)
+	// we start from the end, since last pending commitment is the largest one
+	for i := len(s.pendingCommitments) - 1; i >= 0; i-- {
+		commitment := s.pendingCommitments[i]
+		aggregatedSignature, publicKeys, err := s.getAggSignatureForCommitmentMessage(commitment)
 
-	aggregatedSignature, publicKeys, err := s.getAggSignatureForCommitmentMessage(commitment)
-	if err != nil {
-		if errors.Is(err, errQuorumNotReached) {
-			// a valid case, commitment has no quorum, we should not return an error
-			s.logger.Debug("can not submit a commitment, quorum not reached",
-				"from", commitmentMessage.FromIndex,
-				"to", commitmentMessage.ToIndex)
+		if err != nil {
+			if errors.Is(err, errQuorumNotReached) {
+				// a valid case, commitment has no quorum, we should not return an error
+				s.logger.Debug("can not submit a commitment, quorum not reached",
+					"from", commitment.FromIndex,
+					"to", commitment.ToIndex)
 
-			return nil, nil
+				continue
+			}
+
+			return nil, err
 		}
 
-		return nil, err
+		largestCommitment = &CommitmentMessageSigned{
+			Message: NewCommitmentMessage(
+				commitment.MerkleTree.Hash(),
+				commitment.FromIndex,
+				commitment.ToIndex),
+			AggSignature: aggregatedSignature,
+			PublicKeys:   publicKeys,
+		}
 	}
 
-	msg := &CommitmentMessageSigned{
-		Message:      commitmentMessage,
-		AggSignature: aggregatedSignature,
-		PublicKeys:   publicKeys,
-	}
-
-	return msg, nil
+	return largestCommitment, nil
 }
 
 // getAggSignatureForCommitmentMessage checks if pending commitment has quorum,
@@ -316,9 +325,6 @@ func (s *stateSyncManager) getAggSignatureForCommitmentMessage(commitment *Commi
 }
 
 type PostEpochRequest struct {
-	// BlockNumber is the number of the block being executed
-	BlockNumber uint64
-
 	// NewEpochID is the id of the new epoch
 	NewEpochID uint64
 
@@ -334,7 +340,10 @@ type PostEpochRequest struct {
 // so that it can discard any previous epoch commitments, and build a new one (since validator set changed)
 func (s *stateSyncManager) PostEpoch(req *PostEpochRequest) error {
 	s.lock.Lock()
-	defer s.lock.Unlock()
+
+	s.pendingCommitments = nil
+	s.validatorSet = req.ValidatorSet
+	s.epoch = req.NewEpochID
 
 	// build a new commitment at the end of the epoch
 	nextCommittedIndex, err := req.SystemState.GetNextCommittedIndex()
@@ -342,16 +351,11 @@ func (s *stateSyncManager) PostEpoch(req *PostEpochRequest) error {
 		return err
 	}
 
-	commitment, err := s.buildCommitment(req.NewEpochID, nextCommittedIndex)
-	if err != nil {
-		return err
-	}
+	s.nextCommittedIndex = nextCommittedIndex
 
-	s.commitment = commitment
-	s.validatorSet = req.ValidatorSet
-	s.epoch = req.NewEpochID
+	s.lock.Unlock()
 
-	return nil
+	return s.buildCommitment()
 }
 
 type PostBlockRequest struct {
@@ -376,11 +380,16 @@ func (s *stateSyncManager) PostBlock(req *PostBlockRequest) error {
 		return fmt.Errorf("insert commitment message error: %w", err)
 	}
 
-	// commitment was submitted, so discard what we have in memory, so we can build a new one
-	s.commitment = nil
 	if err := s.buildProofs(commitment.Message); err != nil {
 		return fmt.Errorf("build commitment proofs error: %w", err)
 	}
+
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	// update the nextCommittedIndex since a commitment was submitted
+	s.nextCommittedIndex = commitment.Message.ToIndex + 1
+	// commitment was submitted, so discard what we have in memory, so we can build a new one
+	s.pendingCommitments = nil
 
 	return nil
 }
@@ -393,7 +402,7 @@ func (s *stateSyncManager) buildProofs(commitmentMsg *CommitmentMessage) error {
 		"toIndex", commitmentMsg.ToIndex,
 	)
 
-	events, err := s.state.getStateSyncEventsForCommitment(commitmentMsg.FromIndex, commitmentMsg.ToIndex)
+	events, err := s.state.getStateSyncEventsForCommitment(commitmentMsg.FromIndex, commitmentMsg.ToIndex, true)
 	if err != nil {
 		return err
 	}
@@ -424,38 +433,49 @@ func (s *stateSyncManager) buildProofs(commitmentMsg *CommitmentMessage) error {
 }
 
 // buildCommitment builds a new commitment, signs it and gossips its vote for it
-func (s *stateSyncManager) buildCommitment(epoch, fromIndex uint64) (*Commitment, error) {
-	toIndex := fromIndex + stateSyncCommitmentSize - 1
+func (s *stateSyncManager) buildCommitment() error {
+	s.lock.RLock()
 
-	// if it is not already built in the previous epoch
-	stateSyncEvents, err := s.state.getStateSyncEventsForCommitment(fromIndex, toIndex)
+	epoch := s.epoch
+	fromIndex := s.nextCommittedIndex
+
+	var largestPendingCommitment *Commitment
+	if len(s.pendingCommitments) > 0 {
+		largestPendingCommitment = s.pendingCommitments[len(s.pendingCommitments)-1]
+	}
+
+	s.lock.RUnlock()
+
+	stateSyncEvents, err := s.state.getStateSyncEventsForCommitment(fromIndex, fromIndex+maxCommitmentSize-1, false)
 	if err != nil {
-		if errors.Is(err, errNotEnoughStateSyncs) {
-			s.logger.Debug("[buildCommitment] Not enough state syncs to build a commitment",
-				"epoch", epoch, "from state sync index", fromIndex)
+		return fmt.Errorf("failed to get state sync events for commitment. Error: %w", err)
+	}
 
-			// this is a valid case, there is not enough state syncs
-			return nil, nil
-		}
+	if len(stateSyncEvents) < minCommitmentSize {
+		// there is not enough state sync events to build at least the minimum commitment
+		return nil
+	}
 
-		return nil, err
+	if largestPendingCommitment != nil && largestPendingCommitment.ToIndex >= stateSyncEvents[len(stateSyncEvents)-1].ID {
+		// already built a commitment of this size which is pending to be submitted
+		return nil
 	}
 
 	commitment, err := NewCommitment(epoch, stateSyncEvents)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	hash, err := commitment.Hash()
 	if err != nil {
-		return nil, err
+		return fmt.Errorf("failed to generate hash for commitment. Error: %w", err)
 	}
 
 	hashBytes := hash.Bytes()
 
 	signature, err := s.config.key.Sign(hashBytes)
 	if err != nil {
-		return nil, fmt.Errorf("failed to sign commitment message. Error: %w", err)
+		return fmt.Errorf("failed to sign commitment message. Error: %w", err)
 	}
 
 	sig := &MessageSignature{
@@ -464,7 +484,7 @@ func (s *stateSyncManager) buildCommitment(epoch, fromIndex uint64) (*Commitment
 	}
 
 	if _, err = s.state.insertMessageVote(epoch, hashBytes, sig); err != nil {
-		return nil, fmt.Errorf(
+		return fmt.Errorf(
 			"failed to insert signature for hash=%v to the state. Error: %w",
 			hex.EncodeToString(hashBytes),
 			err,
@@ -485,7 +505,12 @@ func (s *stateSyncManager) buildCommitment(epoch, fromIndex uint64) (*Commitment
 		"to", commitment.ToIndex,
 	)
 
-	return commitment, nil
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	s.pendingCommitments = append(s.pendingCommitments, commitment)
+
+	return nil
 }
 
 // Multicast publishes given message to the rest of the network
