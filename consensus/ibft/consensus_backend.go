@@ -40,9 +40,7 @@ func (i *backendIBFT) BuildProposal(blockNumber uint64) []byte {
 	return block.MarshalRLP()
 }
 
-// TODO: Yoshiki please do this change, we need to make sure that on validating (when syncing) we make sure that
-// the committed seals are verifying against ProposedBlock (structure found in go-ibft/messages/proto/messages.pb.go
-// the ProposedBlock is hashed as proto.Marshal(ProposedBlock) and then keccakk hashed.
+// InsertProposal inserts a proposal of which the consensus has been got
 func (i *backendIBFT) InsertProposal(
 	proposal *proto.Proposal,
 	committedSeals []*messages.CommittedSeal,
