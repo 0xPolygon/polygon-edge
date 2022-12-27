@@ -275,8 +275,6 @@ func packCommittedSealsAndRoundNumberIntoExtra(
 			// ParentCommittedSeal
 			if len(oldValues) >= 4 {
 				newArrayValue.Set(oldValues[3])
-			} else if roundNumber != nil {
-				newArrayValue.Set(ar.NewNull())
 			}
 
 			if roundNumber != nil {
