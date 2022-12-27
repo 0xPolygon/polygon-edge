@@ -155,16 +155,16 @@ func (s *StateSyncManager) saveVote(msg *TransportMessage) error {
 
 // AddLog saves the received log from event tracker if it matches a state sync event ABI
 func (s *StateSyncManager) AddLog(eventLog *ethgo.Log) {
+	if !stateTransferEventABI.Match(eventLog) {
+		return
+	}
+
 	s.logger.Info(
 		"Add State sync event",
 		"block", eventLog.BlockNumber,
 		"hash", eventLog.TransactionHash,
 		"index", eventLog.LogIndex,
 	)
-
-	if !stateTransferEventABI.Match(eventLog) {
-		return
-	}
 
 	event, err := decodeStateSyncEvent(eventLog)
 	if err != nil {
