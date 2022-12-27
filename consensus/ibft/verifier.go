@@ -136,8 +136,8 @@ func (i *backendIBFT) IsProposer(id []byte, height, round uint64) bool {
 	return types.BytesToAddress(id) == nextProposer.Addr()
 }
 
-func (i *backendIBFT) IsValidProposalHash(proposal *protoIBFT.ProposedBlock, hash []byte) bool {
-	proposalHash, err := i.getProposalHashFromBlockBytes(proposal.EthereumBlock, &proposal.Round)
+func (i *backendIBFT) IsValidProposalHash(proposal *protoIBFT.Proposal, hash []byte) bool {
+	proposalHash, err := i.getProposalHashFromBlockBytes(proposal.RawProposal, &proposal.Round)
 	if err != nil {
 		return false
 	}
@@ -208,9 +208,9 @@ func (i *backendIBFT) getProposalHashFromBlock(ethereumBlock *types.Block, round
 		Uncles:       ethereumBlock.Uncles,
 	}
 
-	proposedBlockForHash := &protoIBFT.ProposedBlock{
-		EthereumBlock: marshalBlock.MarshalRLP(),
-		Round:         *round,
+	proposedBlockForHash := &protoIBFT.Proposal{
+		RawProposal: marshalBlock.MarshalRLP(),
+		Round:       *round,
 	}
 
 	proposedBlockRaw, err := proto.Marshal(proposedBlockForHash)
