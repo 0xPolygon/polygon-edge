@@ -35,7 +35,8 @@ func TestPublic_UnmarshalPublicKeyFromBigInt(t *testing.T) {
 	pub2, err := UnmarshalPublicKeyFromBigInt(pub.ToBigInt())
 	require.NoError(t, err)
 
-	require.Equal(t, pub, pub2)
+	assert.Equal(t, pub, pub2)
+	assert.Equal(t, pub.ToBigInt(), pub2.ToBigInt())
 }
 
 func TestPublic_MarshalUnmarshalJSON(t *testing.T) {
@@ -52,5 +53,10 @@ func TestPublic_MarshalUnmarshalJSON(t *testing.T) {
 
 	err = newPubKey.UnmarshalJSON(marshaledPubKey)
 	require.NoError(t, err)
-	require.Equal(t, pubKey, newPubKey)
+
+	dt, err := newPubKey.MarshalJSON()
+	require.NoError(t, err)
+
+	assert.Equal(t, pubKey, newPubKey)
+	require.Equal(t, marshaledPubKey, dt)
 }

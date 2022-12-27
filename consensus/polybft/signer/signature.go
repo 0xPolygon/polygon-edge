@@ -3,28 +3,29 @@ package bls
 import (
 	"errors"
 	"math/big"
-
-	"github.com/kilic/bn254"
 )
 
 // Signature represents bls signature which is point on the curve
 type Signature struct {
-	p *bn254.PointG1
+	p *G1
 }
 
 // Verify checks the BLS signature of the message against the public key of its signer
 func (s *Signature) Verify(publicKey *PublicKey, message []byte) bool {
-	e := bn254.NewEngine()
-	messagePoint, err := e.G1.HashToCurveFT(message, GetDomain())
-
+	messagePoint, err := HashToG1(message)
 	if err != nil {
 		return false
 	}
 
-	e.AddPair(messagePoint, publicKey.p)
-	e.AddPairInv(s.p, e.G2.One())
+	e1, e2 := new(GT), new(GT)
 
-	return e.Check()
+	G1Neg(messagePoint, messagePoint)
+	PrecomputedMillerLoop(e1, s.p, GetCoef())
+	MillerLoop(e2, messagePoint, publicKey.p)
+	GTMul(e1, e1, e2)
+	FinalExp(e1, e1)
+
+	return e1.IsOne()
 }
 
 // VerifyAggregated checks the BLS signature of the message against the aggregated public keys of its signers
@@ -36,19 +37,16 @@ func (s *Signature) VerifyAggregated(publicKeys []*PublicKey, msg []byte) bool {
 
 // Aggregate adds the given signatures
 func (s *Signature) Aggregate(next *Signature) *Signature {
-	g := bn254.NewG1()
-
-	newp := new(bn254.PointG1)
-	newp.Zero()
+	newp := new(G1)
 
 	if s.p != nil {
 		if next.p != nil {
-			g.Add(newp, s.p, next.p)
+			G1Add(newp, s.p, next.p)
 		} else {
-			newp.Set(s.p)
+			G1Add(newp, newp, s.p)
 		}
 	} else if next.p != nil {
-		newp.Set(next.p)
+		G1Add(newp, newp, next.p)
 	}
 
 	return &Signature{p: newp}
@@ -60,7 +58,7 @@ func (s *Signature) Marshal() ([]byte, error) {
 		return nil, errors.New("cannot marshal empty signature")
 	}
 
-	return bn254.NewG1().ToBytes(s.p), nil
+	return G1ToBytes(s.p), nil
 }
 
 // UnmarshalSignature reads the signature from the given byte array
@@ -69,27 +67,22 @@ func UnmarshalSignature(raw []byte) (*Signature, error) {
 		return nil, errors.New("cannot unmarshal signature from empty slice")
 	}
 
-	p, err := bn254.NewG1().FromBytes(raw)
+	bigInts, err := BytesToBigInt2(raw)
 	if err != nil {
 		return nil, err
 	}
 
-	return &Signature{p: p}, nil
+	g1, err := G1FromBigInt(bigInts)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Signature{p: g1}, nil
 }
 
 // ToBigInt marshalls signature (which is point) to 2 big ints - one for each coordinate
 func (s Signature) ToBigInt() ([2]*big.Int, error) {
-	sig, err := s.Marshal()
-	if err != nil {
-		return [2]*big.Int{}, err
-	}
-
-	res := [2]*big.Int{
-		new(big.Int).SetBytes(sig[0:32]),
-		new(big.Int).SetBytes(sig[32:64]),
-	}
-
-	return res, nil
+	return G1ToBigInt(s.p), nil
 }
 
 // Signatures is a slice of signatures
@@ -97,13 +90,11 @@ type Signatures []*Signature
 
 // Aggregate sums the given array of signatures
 func (s Signatures) Aggregate() *Signature {
-	g, newp := bn254.NewG1(), new(bn254.PointG1)
-
-	newp.Set(g.Zero())
+	newp := new(G1)
 
 	for _, x := range s {
 		if x.p != nil {
-			g.Add(newp, newp, x.p)
+			G1Add(newp, newp, x.p)
 		}
 	}
 

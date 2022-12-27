@@ -2,52 +2,67 @@ package bls
 
 import (
 	"errors"
-	"math/big"
+)
 
-	"github.com/kilic/bn254"
+var (
+	errEmptyKeyMarshalling = errors.New("cannot marshal empty private key")
+	errPrivateKeyGenerator = errors.New("error generating private key")
 )
 
 type PrivateKey struct {
-	p *big.Int
+	p *Fr
 }
 
 // PublicKey returns the public key from the PrivateKey
 func (p *PrivateKey) PublicKey() *PublicKey {
-	g2 := bn254.NewG2()
-	public := g2.New()
+	public := new(G2)
 
-	g2.MulScalar(public, g2.One(), p.p)
+	G2Mul(public, ellipticCurveG2, p.p)
 
 	return &PublicKey{p: public}
 }
 
-// Sign generates a simple BLS signature of the given message
+// Sign generates a signature of the given message
 func (p *PrivateKey) Sign(message []byte) (*Signature, error) {
-	g := bn254.NewG1()
-
-	signature, err := g.HashToCurveFT(message, GetDomain())
+	messagePoint, err := HashToG1(message)
 	if err != nil {
 		return nil, err
 	}
 
-	g.MulScalar(signature, signature, p.p)
+	g1 := new(G1)
 
-	return &Signature{signature}, nil
+	G1Mul(g1, messagePoint, p.p)
+
+	return &Signature{p: g1}, nil
 }
 
 // MarshalJSON marshal the key to bytes.
 func (p *PrivateKey) MarshalJSON() ([]byte, error) {
 	if p.p == nil {
-		return nil, errors.New("cannot marshal empty private key")
+		return nil, errEmptyKeyMarshalling
 	}
 
-	return p.p.MarshalJSON()
+	return p.p.Serialize(), nil
 }
 
 // UnmarshalPrivateKey reads the private key from the given byte array
 func UnmarshalPrivateKey(data []byte) (*PrivateKey, error) {
-	p := new(big.Int)
-	err := p.UnmarshalJSON(data)
+	p := new(Fr)
 
-	return &PrivateKey{p: p}, err
+	if err := p.Deserialize(data); err != nil {
+		return nil, err
+	}
+
+	return &PrivateKey{p: p}, nil
+}
+
+// GenerateBlsKey creates a random private and its corresponding public keys
+func GenerateBlsKey() (*PrivateKey, error) {
+	p := new(Fr)
+
+	if !p.SetByCSPRNG() {
+		return nil, errPrivateKeyGenerator
+	}
+
+	return &PrivateKey{p: p}, nil
 }
