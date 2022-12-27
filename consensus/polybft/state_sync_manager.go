@@ -32,7 +32,6 @@ type stateSyncConfig struct {
 // StateSyncManager is a struct that manages the workflow of
 // saving and querying state sync events, and creating, and submitting new commitments
 type StateSyncManager struct {
-	// configuration fields
 	logger hclog.Logger
 	state  *State
 
@@ -45,7 +44,7 @@ type StateSyncManager struct {
 	validatorSet *validatorSet
 }
 
-// topic is an interface for a gossip p2p message
+// topic is an interface for p2p message gossiping
 type topic interface {
 	Publish(obj proto.Message) error
 	Subscribe(handler func(obj interface{}, from peer.ID)) error
@@ -66,11 +65,11 @@ func NewStateSyncManager(logger hclog.Logger, state *State, config *stateSyncCon
 // init subscribes to bridge topics (getting votes) and start the event tracker routine
 func (s *StateSyncManager) init() error {
 	if err := s.initTracker(); err != nil {
-		return err
+		return fmt.Errorf("failed to init event tracker. Error: %w", err)
 	}
 
 	if err := s.initTransport(); err != nil {
-		return err
+		return fmt.Errorf("failed to initialize state sync transport layer. Error: %w", err)
 	}
 
 	return nil
@@ -119,17 +118,12 @@ func (s *StateSyncManager) saveVote(msg *TransportMessage) error {
 	valSet := s.validatorSet
 	s.lock.Unlock()
 
-	if valSet == nil {
-		// Epoch metadata is undefined
+	if valSet == nil || msg.EpochNumber < epoch {
+		// Epoch metadata is undefined or received message for some of the older epochs
 		return nil
 	}
 
-	if msg.EpochNumber < epoch {
-		// or received message for some of the older epochs.
-		return nil
-	}
-
-	if !valSet.validators.ContainsNodeID(msg.NodeID) {
+	if !valSet.Includes(types.StringToAddress(msg.NodeID)) {
 		return fmt.Errorf("validator is not among the active validator set")
 	}
 
