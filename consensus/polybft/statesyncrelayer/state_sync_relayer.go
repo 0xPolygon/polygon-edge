@@ -1,6 +1,7 @@
 package statesyncrelayer
 
 import (
+	"context"
 	"fmt"
 	"math/big"
 	"net"
@@ -86,7 +87,7 @@ func (r *StateSyncRelayer) Start() error {
 		r.logger,
 	)
 
-	return et.Start()
+	return et.Start(context.Background())
 }
 
 func (r *StateSyncRelayer) AddLog(log *ethgo.Log) {

@@ -2,6 +2,7 @@
 package polybft
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -109,6 +110,10 @@ type Polybft struct {
 
 	// tx pool as interface
 	txPool txPoolInterface
+
+	// ctx is used to signal child goroutines to stop
+	ctx      context.Context
+	cancelFn context.CancelFunc
 }
 
 func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *state.Transition) error {
@@ -156,6 +161,10 @@ func (p *Polybft) Initialize() error {
 	if err != nil {
 		return fmt.Errorf("failed to read account data. Error: %w", err)
 	}
+
+	ctx, cancelFn := context.WithCancel(context.Background())
+	p.ctx = ctx
+	p.cancelFn = cancelFn
 
 	// set key
 	p.key = wallet.NewKey(account)
@@ -258,7 +267,7 @@ func (p *Polybft) initRuntime() error {
 		bridgeTopic:    p.bridgeTopic,
 	}
 
-	runtime, err := newConsensusRuntime(p.logger, runtimeConfig)
+	runtime, err := newConsensusRuntime(p.ctx, p.logger, runtimeConfig)
 	if err != nil {
 		return err
 	}
@@ -380,6 +389,7 @@ func (p *Polybft) Close() error {
 	}
 
 	close(p.closeCh)
+	p.cancelFn()
 
 	return nil
 }

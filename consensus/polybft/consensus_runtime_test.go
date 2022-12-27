@@ -1,6 +1,7 @@
 package polybft
 
 import (
+	"context"
 	"fmt"
 	"math/big"
 	"math/rand"
@@ -473,7 +474,7 @@ func Test_NewConsensusRuntime(t *testing.T) {
 		blockchain:     blockchainMock,
 		bridgeTopic:    &mockTopic{},
 	}
-	runtime, err := newConsensusRuntime(hclog.NewNullLogger(), config)
+	runtime, err := newConsensusRuntime(context.Background(), hclog.NewNullLogger(), config)
 	require.NoError(t, err)
 
 	assert.False(t, runtime.isActiveValidator())

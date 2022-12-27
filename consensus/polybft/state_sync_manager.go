@@ -1,6 +1,7 @@
 package polybft
 
 import (
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -51,6 +52,7 @@ type stateSyncConfig struct {
 	dataDir         string
 	topic           topic
 	key             *wallet.Key
+	ctx             context.Context
 }
 
 var _ StateSyncManager = (*stateSyncManager)(nil)
@@ -110,7 +112,7 @@ func (s *stateSyncManager) initTracker() error {
 		s,
 		s.logger)
 
-	return tracker.Start()
+	return tracker.Start(s.config.ctx)
 }
 
 // initTransport subscribes to bridge topics (getting votes for commitments)

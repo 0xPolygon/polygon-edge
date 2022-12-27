@@ -2,6 +2,7 @@ package polybft
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"sort"
@@ -118,10 +119,13 @@ type consensusRuntime struct {
 
 	// logger instance
 	logger hcf.Logger
+
+	// ctx is a context instance used for goroutines shutdown
+	ctx context.Context
 }
 
 // newConsensusRuntime creates and starts a new consensus runtime instance with event tracking
-func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRuntime, error) {
+func newConsensusRuntime(ctx context.Context, log hcf.Logger, config *runtimeConfig) (*consensusRuntime, error) {
 	proposerCalculator, err := NewProposerCalculator(config, log.Named("proposer_calculator"))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create consensus runtime, error while creating proposer calculator %w", err)
@@ -132,6 +136,7 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 		config:             config,
 		lastBuiltBlock:     config.blockchain.CurrentHeader(),
 		proposerCalculator: proposerCalculator,
+		ctx:                ctx,
 		logger:             log.Named("consensus_runtime"),
 	}
 
@@ -178,6 +183,7 @@ func (c *consensusRuntime) initStateSyncManager(log hcf.Logger) error {
 				jsonrpcAddr:     c.config.PolyBFTConfig.Bridge.JSONRPCEndpoint,
 				dataDir:         c.config.DataDir,
 				topic:           c.config.bridgeTopic,
+				ctx:             c.ctx,
 			},
 		)
 

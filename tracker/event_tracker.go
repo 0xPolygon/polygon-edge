@@ -38,7 +38,7 @@ func NewEventTracker(
 	}
 }
 
-func (e *EventTracker) Start() error {
+func (e *EventTracker) Start(ctx context.Context) error {
 	provider, err := jsonrpc.NewClient(e.rpcEndpoint)
 	if err != nil {
 		return err
@@ -67,28 +67,30 @@ func (e *EventTracker) Start() error {
 	}
 
 	go func() {
-		go func() {
-			if err := tt.Sync(context.Background()); err != nil {
-				e.logger.Error("Event tracker", "failed to sync", err)
-			}
-		}()
+		if err := tt.Sync(ctx); err != nil {
+			e.logger.Error("Event tracker", "failed to sync", err)
+		}
+	}()
 
-		go func() {
-			for {
-				select {
-				case evnt := <-tt.EventCh:
-					if len(evnt.Removed) != 0 {
-						panic("this will not happen anymore after tracker v2")
-					}
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
 
-					for _, log := range evnt.Added {
-						e.subscriber.AddLog(log)
-					}
-				case <-tt.DoneCh:
-					e.logger.Info("Historical sync done")
+			case evnt := <-tt.EventCh:
+				if len(evnt.Removed) != 0 {
+					panic("this will not happen anymore after tracker v2")
 				}
+
+				for _, log := range evnt.Added {
+					e.subscriber.AddLog(log)
+				}
+
+			case <-tt.DoneCh:
+				e.logger.Info("Historical sync done")
 			}
-		}()
+		}
 	}()
 
 	return nil

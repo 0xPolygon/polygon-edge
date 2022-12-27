@@ -1,6 +1,7 @@
 package polybft
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"time"
@@ -181,9 +182,13 @@ func TestPolybft_Close(t *testing.T) {
 	syncer := &syncerMock{}
 	syncer.On("Close", mock.Anything).Return(error(nil)).Once()
 
+	ctx, cancelFn := context.WithCancel(context.Background())
+
 	polybft := Polybft{
-		closeCh: make(chan struct{}),
-		syncer:  syncer,
+		closeCh:  make(chan struct{}),
+		syncer:   syncer,
+		ctx:      ctx,
+		cancelFn: cancelFn,
 	}
 
 	assert.NoError(t, polybft.Close())
