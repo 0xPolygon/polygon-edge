@@ -30,6 +30,47 @@ jobs:
     secrets:
       GH_TOKEN_CLONE_PRIVATE: ${{ secrets.GH_TOKEN_CLONE_PRIVATE }}
 
+  container_image_build:
+    name: Build/Push Container Image
+    runs-on: ubuntu-latest
+    environment: devnet-ephemeral
+    needs: build
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Download Polygon Edge Artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: polygon-edge
+      - run: tar -xvzf polygon-edge.tar.gz
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build, tag, and push docker image to Amazon ECR
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          REPOSITORY: library/polygon-edge
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $REGISTRY/$REPOSITORY:devnet-ephemeral -t $REGISTRY/$REPOSITORY:$IMAGE_TAG -f Dockerfile.release .
+          docker push $REGISTRY/$REPOSITORY:$IMAGE_TAG
+          docker push $REGISTRY/$REPOSITORY:devnet-ephemeral
+
   deploy_eph_devnet:
     name: Deploy Ephemeral DevNet
     needs: build

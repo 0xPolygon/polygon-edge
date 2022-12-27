@@ -9,7 +9,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/command/ibft"
 	"github.com/0xPolygon/polygon-edge/command/license"
-	"github.com/0xPolygon/polygon-edge/command/loadbot"
 	"github.com/0xPolygon/polygon-edge/command/monitor"
 	"github.com/0xPolygon/polygon-edge/command/peers"
 	"github.com/0xPolygon/polygon-edge/command/secrets"
@@ -47,7 +46,6 @@ func (rc *RootCommand) registerSubCommands() {
 		secrets.GetCommand(),
 		peers.GetCommand(),
 		monitor.GetCommand(),
-		loadbot.GetCommand(),
 		ibft.GetCommand(),
 		backup.GetCommand(),
 		genesis.GetCommand(),
