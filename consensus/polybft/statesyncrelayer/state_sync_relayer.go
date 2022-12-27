@@ -30,6 +30,7 @@ type StateSyncRelayer struct {
 	client            *jsonrpc.Client
 	txRelayer         txrelayer.TxRelayer
 	key               ethgo.Key
+	cancelFn          context.CancelFunc
 }
 
 func sanitizeRPCEndpoint(rpcEndpoint string) string {
@@ -87,7 +88,14 @@ func (r *StateSyncRelayer) Start() error {
 		r.logger,
 	)
 
-	return et.Start(context.Background())
+	ctx, cancelFn := context.WithCancel(context.Background())
+	r.cancelFn = cancelFn
+
+	return et.Start(ctx)
+}
+
+func (r *StateSyncRelayer) Stop() {
+	r.cancelFn()
 }
 
 func (r *StateSyncRelayer) AddLog(log *ethgo.Log) {
