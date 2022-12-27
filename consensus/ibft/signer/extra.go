@@ -125,12 +125,12 @@ func (i *IstanbulExtra) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) er
 	}
 
 	if len(elems) >= 5 {
-		roundNumber, err := parseRoundNumber(elems[4])
+		rn, err := elems[4].GetUint64()
 		if err != nil {
 			return err
 		}
 
-		i.RoundNumber = roundNumber
+		i.RoundNumber = &rn
 	}
 
 	return nil
@@ -155,15 +155,6 @@ func (i *IstanbulExtra) unmarshalRLPFromForParentCS(p *fastrlp.Parser, v *fastrl
 		if err := i.ParentCommittedSeals.UnmarshalRLPFrom(p, elems[3]); err != nil {
 			return err
 		}
-	}
-
-	if len(elems) >= 5 {
-		roundNumber, err := parseRoundNumber(elems[4])
-		if err != nil {
-			return err
-		}
-
-		i.RoundNumber = roundNumber
 	}
 
 	return nil
