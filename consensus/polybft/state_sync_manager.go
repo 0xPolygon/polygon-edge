@@ -229,6 +229,8 @@ func (s *stateSyncManager) Commitment() (*CommitmentMessageSigned, error) {
 
 	var largestCommitment *CommitmentMessageSigned
 
+	s.logger.Info("Getting commitment to submit...", "pendingCommitments", len(s.pendingCommitments))
+
 	// we start from the end, since last pending commitment is the largest one
 	for i := len(s.pendingCommitments) - 1; i >= 0; i-- {
 		commitment := s.pendingCommitments[i]
@@ -255,7 +257,11 @@ func (s *stateSyncManager) Commitment() (*CommitmentMessageSigned, error) {
 			AggSignature: aggregatedSignature,
 			PublicKeys:   publicKeys,
 		}
+
+		break
 	}
+
+	s.logger.Info("Getting commitment to submit finished.", "isNil", largestCommitment == nil)
 
 	return largestCommitment, nil
 }
