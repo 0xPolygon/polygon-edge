@@ -225,7 +225,7 @@ func TestConsensusRuntime_OnBlockInserted_EndOfEpoch(t *testing.T) {
 			FirstBlockInEpoch: header.Number - epochSize + 1,
 		},
 		lastBuiltBlock:   &types.Header{Number: header.Number - 1},
-		stateSyncManager: &nilStateSyncManager{},
+		stateSyncManager: &dummyStateSyncManager{},
 	}
 	runtime.OnBlockInserted(builtBlock)
 
@@ -349,7 +349,7 @@ func TestConsensusRuntime_FSM_NotEndOfEpoch_NotEndOfSprint(t *testing.T) {
 		},
 		lastBuiltBlock:   lastBlock,
 		state:            newTestState(t),
-		stateSyncManager: &nilStateSyncManager{},
+		stateSyncManager: &dummyStateSyncManager{},
 	}
 
 	err := runtime.FSM()
@@ -416,7 +416,7 @@ func TestConsensusRuntime_FSM_EndOfEpoch_BuildUptime(t *testing.T) {
 		epoch:              metadata,
 		config:             config,
 		lastBuiltBlock:     lastBuiltBlock,
-		stateSyncManager:   &nilStateSyncManager{},
+		stateSyncManager:   &dummyStateSyncManager{},
 	}
 
 	err := runtime.FSM()
@@ -487,150 +487,6 @@ func Test_NewConsensusRuntime(t *testing.T) {
 	systemStateMock.AssertExpectations(t)
 	blockchainMock.AssertExpectations(t)
 	polybftBackendMock.AssertExpectations(t)
-}
-
-func TestConsensusRuntime_IsEndOfPeriod(t *testing.T) {
-	t.Parallel()
-
-	// // Helper function which enables us to make assertions on expected period event (begin/end of sprint/epoch)
-	assertPeriodEvent := func(
-		cases []struct {
-			blockNumber         uint64
-			expectedPeriodEvent bool
-		},
-		checkPeriodEvent func(blockNumber uint64) bool,
-		outcomeName string,
-		runtime *consensusRuntime) {
-		for _, c := range cases {
-			runtime.lastBuiltBlock.Number = c.blockNumber
-			periodEvent := checkPeriodEvent(c.blockNumber)
-			assert.True(t,
-				periodEvent == c.expectedPeriodEvent,
-				fmt.Sprintf(
-					"Unexpected %v for block %d. Expected: %v, got: %v",
-					outcomeName,
-					c.blockNumber,
-					c.expectedPeriodEvent,
-					periodEvent),
-			)
-		}
-	}
-
-	config := &runtimeConfig{PolyBFTConfig: &PolyBFTConfig{SprintSize: 5, EpochSize: 10}}
-	runtime := &consensusRuntime{
-		config:         config,
-		epoch:          &epochMetadata{},
-		lastBuiltBlock: &types.Header{},
-	}
-
-	var epochCases = []struct {
-		blockNumber         uint64
-		expectedPeriodEvent bool
-	}{
-		{0, false},
-		{4, false},
-		{8, false},
-		{9, true},
-		{19, true},
-		{20, false},
-	}
-
-	assertPeriodEvent(
-		epochCases,
-		func(blockNum uint64) bool {
-			return runtime.isEndOfEpoch(blockNum + 1)
-		},
-		"end of epoch",
-		runtime,
-	)
-
-	var sprintCases = []struct {
-		blockNumber         uint64
-		expectedPeriodEvent bool
-	}{
-		{0, false},
-		{4, true},
-		{8, false},
-		{9, true},
-		{19, true},
-		{20, false},
-	}
-
-	assertPeriodEvent(
-		sprintCases,
-		func(blockNum uint64) bool {
-			return runtime.isEndOfSprint(blockNum + 1)
-		},
-		"end of sprint",
-		runtime,
-	)
-}
-
-func TestConsensusRuntime_GetEpochNumber(t *testing.T) {
-	t.Parallel()
-
-	var cases = []struct {
-		blockNumber         uint64
-		epochSize           uint64
-		expectedEpochNumber uint64
-	}{
-		{1, 10, 1},
-		{10, 10, 1},
-		{11, 10, 2},
-		{21, 10, 3},
-
-		{0, 23, 0},
-		{43, 35, 2},
-		{48, 49, 1},
-	}
-
-	for _, c := range cases {
-		assert.Equal(t, c.expectedEpochNumber, getEpochNumber(c.blockNumber, c.epochSize))
-	}
-}
-
-func TestConsensusRuntime_GetEndEpochBlockNumber(t *testing.T) {
-	t.Parallel()
-
-	var cases = []struct {
-		epochNumber   uint64
-		epochSize     uint64
-		endEpochBlock uint64
-	}{
-		{0, 10, 0},
-		{10, 0, 0},
-		{1, 10, 10},
-		{10, 10, 100},
-		{5, 15, 75},
-	}
-
-	for _, c := range cases {
-		assert.Equal(t, c.endEpochBlock, getEndEpochBlockNumber(c.epochNumber, c.epochSize))
-	}
-}
-
-func TestConsensusRuntime_calculateFirstBlockOfPeriod(t *testing.T) {
-	t.Parallel()
-
-	var cases = []struct {
-		blockNumber    uint64
-		periodSize     uint64
-		expectedResult uint64
-	}{
-		{1, 10, 1},
-		{11, 10, 11},
-		{12, 10, 11},
-		{144, 12, 133},
-		{5, 10, 1},
-		{95, 100, 1},
-		{195, 100, 101},
-		{20, 10, 11},
-	}
-
-	for _, c := range cases {
-		actual := calculateFirstBlockOfPeriod(c.blockNumber, c.periodSize)
-		assert.Equal(t, c.expectedResult, actual, fmt.Sprintf("Expected: %v. Actual: %v", c.expectedResult, actual))
-	}
 }
 
 func TestConsensusRuntime_restartEpoch_SameEpochNumberAsTheLastOne(t *testing.T) {
@@ -882,7 +738,7 @@ func TestConsensusRuntime_IsValidSender(t *testing.T) {
 		},
 		logger:             hclog.NewNullLogger(),
 		proposerCalculator: NewProposerCalculatorFromSnapshot(snapshot, config, hclog.NewNullLogger()),
-		stateSyncManager:   &nilStateSyncManager{},
+		stateSyncManager:   &dummyStateSyncManager{},
 	}
 
 	require.NoError(t, runtime.FSM())
@@ -1084,7 +940,7 @@ func TestConsensusRuntime_HasQuorum(t *testing.T) {
 		},
 		logger:             hclog.NewNullLogger(),
 		proposerCalculator: NewProposerCalculatorFromSnapshot(snapshot, config, hclog.NewNullLogger()),
-		stateSyncManager:   &nilStateSyncManager{},
+		stateSyncManager:   &dummyStateSyncManager{},
 	}
 
 	require.NoError(t, runtime.FSM())

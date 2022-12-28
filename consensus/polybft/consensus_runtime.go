@@ -135,31 +135,13 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 		lastBuiltBlock:     config.blockchain.CurrentHeader(),
 		proposerCalculator: proposerCalculator,
 		logger:             log.Named("consensus_runtime"),
-		stateSyncManager:   &nilStateSyncManager{},
+	}
+
+	if err := runtime.initStateSyncManager(log); err != nil {
+		return nil, err
 	}
 
 	if runtime.IsBridgeEnabled() {
-		// enable state sync manager
-		runtime.stateSyncManager, err = NewStateSyncManager(
-			log,
-			config.State,
-			&stateSyncConfig{
-				key:             config.Key,
-				stateSenderAddr: config.PolyBFTConfig.Bridge.BridgeAddr,
-				jsonrpcAddr:     config.PolyBFTConfig.Bridge.JSONRPCEndpoint,
-				dataDir:         config.DataDir,
-				topic:           config.bridgeTopic,
-			},
-		)
-
-		if err != nil {
-			return nil, err
-		}
-
-		if err := runtime.stateSyncManager.Init(); err != nil {
-			return nil, err
-		}
-
 		// enable checkpoint manager
 		txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(config.PolyBFTConfig.Bridge.JSONRPCEndpoint))
 		if err != nil {
@@ -183,6 +165,34 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 	}
 
 	return runtime, nil
+}
+
+// initStateSyncManager initializes state sync manager
+// if bridge is not enabled, then a dummy state sync manager will be used
+func (c *consensusRuntime) initStateSyncManager(log hcf.Logger) error {
+	if c.IsBridgeEnabled() {
+		stateSyncManager, err := NewStateSyncManager(
+			log,
+			c.config.State,
+			&stateSyncConfig{
+				key:             c.config.Key,
+				stateSenderAddr: c.config.PolyBFTConfig.Bridge.BridgeAddr,
+				jsonrpcAddr:     c.config.PolyBFTConfig.Bridge.JSONRPCEndpoint,
+				dataDir:         c.config.DataDir,
+				topic:           c.config.bridgeTopic,
+			},
+		)
+
+		if err != nil {
+			return err
+		}
+
+		c.stateSyncManager = stateSyncManager
+	} else {
+		c.stateSyncManager = &dummyStateSyncManager{}
+	}
+
+	return c.stateSyncManager.Init()
 }
 
 // getGuardedData returns last build block, proposer snapshot and current epochMetadata in a thread-safe manner.

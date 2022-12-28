@@ -34,15 +34,15 @@ type StateSyncManager interface {
 	PostEpoch(req *PostEpochRequest) error
 }
 
-var _ StateSyncManager = (*nilStateSyncManager)(nil)
+var _ StateSyncManager = (*dummyStateSyncManager)(nil)
 
-// nilStateSyncManager is used when bridge is not enabled
-type nilStateSyncManager struct{}
+// dummyStateSyncManager is used when bridge is not enabled
+type dummyStateSyncManager struct{}
 
-func (n *nilStateSyncManager) Init() error                                   { return nil }
-func (n *nilStateSyncManager) Commitment() (*CommitmentMessageSigned, error) { return nil, nil }
-func (n *nilStateSyncManager) PostBlock(req *PostBlockRequest) error         { return nil }
-func (n *nilStateSyncManager) PostEpoch(req *PostEpochRequest) error         { return nil }
+func (n *dummyStateSyncManager) Init() error                                   { return nil }
+func (n *dummyStateSyncManager) Commitment() (*CommitmentMessageSigned, error) { return nil, nil }
+func (n *dummyStateSyncManager) PostBlock(req *PostBlockRequest) error         { return nil }
+func (n *dummyStateSyncManager) PostEpoch(req *PostEpochRequest) error         { return nil }
 
 // stateSyncConfig holds the configuration data of state sync manager
 type stateSyncConfig struct {
