@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/big"
 	"path"
 	"sync"
 
@@ -20,6 +21,11 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+const (
+	// number of stateSyncEvents to be processed before a commitment message can be created and gossiped
+	stateSyncCommitmentSize = 10
+)
+
 // StateSyncManager is an interface that defines functions for state sync workflow
 type StateSyncManager interface {
 	Init() error
@@ -28,15 +34,15 @@ type StateSyncManager interface {
 	PostEpoch(req *PostEpochRequest) error
 }
 
-var _ StateSyncManager = (*dummyStateSyncManager)(nil)
+var _ StateSyncManager = (*nilStateSyncManager)(nil)
 
-// dummyStateSyncManager is used when bridge is not enabled
-type dummyStateSyncManager struct{}
+// nilStateSyncManager is used when bridge is not enabled
+type nilStateSyncManager struct{}
 
-func (n *dummyStateSyncManager) Init() error                                   { return nil }
-func (n *dummyStateSyncManager) Commitment() (*CommitmentMessageSigned, error) { return nil, nil }
-func (n *dummyStateSyncManager) PostBlock(req *PostBlockRequest) error         { return nil }
-func (n *dummyStateSyncManager) PostEpoch(req *PostEpochRequest) error         { return nil }
+func (n *nilStateSyncManager) Init() error                                   { return nil }
+func (n *nilStateSyncManager) Commitment() (*CommitmentMessageSigned, error) { return nil, nil }
+func (n *nilStateSyncManager) PostBlock(req *PostBlockRequest) error         { return nil }
+func (n *nilStateSyncManager) PostEpoch(req *PostEpochRequest) error         { return nil }
 
 // stateSyncConfig holds the configuration data of state sync manager
 type stateSyncConfig struct {
@@ -480,4 +486,41 @@ func (s *stateSyncManager) Multicast(msg interface{}) {
 	if err != nil {
 		s.logger.Warn("failed to gossip bridge message", "err", err)
 	}
+}
+
+// newStateSyncEvent creates an instance of pending state sync event.
+func newStateSyncEvent(
+	id uint64,
+	sender ethgo.Address,
+	target ethgo.Address,
+	data []byte,
+) *types.StateSyncEvent {
+	return &types.StateSyncEvent{
+		ID:       id,
+		Sender:   sender,
+		Receiver: target,
+		Data:     data,
+	}
+}
+
+func decodeStateSyncEvent(log *ethgo.Log) (*types.StateSyncEvent, error) {
+	raw, err := stateTransferEventABI.ParseLog(log)
+	if err != nil {
+		return nil, err
+	}
+
+	eventGeneric, err := decodeEventData(raw, log,
+		func(id *big.Int, sender, receiver ethgo.Address, data []byte) interface{} {
+			return newStateSyncEvent(id.Uint64(), sender, receiver, data)
+		})
+	if err != nil {
+		return nil, err
+	}
+
+	stateSyncEvent, ok := eventGeneric.(*types.StateSyncEvent)
+	if !ok {
+		return nil, errors.New("failed to convert event to StateSyncEvent instance")
+	}
+
+	return stateSyncEvent, nil
 }

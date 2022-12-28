@@ -135,7 +135,7 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 		lastBuiltBlock:     config.blockchain.CurrentHeader(),
 		proposerCalculator: proposerCalculator,
 		logger:             log.Named("consensus_runtime"),
-		stateSyncManager:   &dummyStateSyncManager{},
+		stateSyncManager:   &nilStateSyncManager{},
 	}
 
 	if runtime.IsBridgeEnabled() {

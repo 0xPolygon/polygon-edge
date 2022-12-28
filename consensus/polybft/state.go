@@ -60,10 +60,8 @@ const (
 	validatorSnapshotLimit = 100
 	// numberOfSnapshotsToLeaveInMemory defines a number of validator snapshots to leave in memory
 	numberOfSnapshotsToLeaveInMemory = 12
-	// numberOfSnapshotsToLeaveInMemory defines a number of validator snapshots to leave in db
+	// numberOfSnapshotsToLeaveInDB defines a number of validator snapshots to leave in db
 	numberOfSnapshotsToLeaveInDB = 20
-	// number of stateSyncEvents to be processed before a commitment message can be created and gossiped
-	stateSyncCommitmentSize = 10
 )
 
 type exitEventNotFoundError struct {
@@ -73,43 +71,6 @@ type exitEventNotFoundError struct {
 
 func (e *exitEventNotFoundError) Error() string {
 	return fmt.Sprintf("could not find any exit event that has an id: %v and epoch: %v", e.exitID, e.epoch)
-}
-
-// newStateSyncEvent creates an instance of pending state sync event.
-func newStateSyncEvent(
-	id uint64,
-	sender ethgo.Address,
-	target ethgo.Address,
-	data []byte,
-) *types.StateSyncEvent {
-	return &types.StateSyncEvent{
-		ID:       id,
-		Sender:   sender,
-		Receiver: target,
-		Data:     data,
-	}
-}
-
-func decodeStateSyncEvent(log *ethgo.Log) (*types.StateSyncEvent, error) {
-	raw, err := stateTransferEventABI.ParseLog(log)
-	if err != nil {
-		return nil, err
-	}
-
-	eventGeneric, err := decodeEventData(raw, log,
-		func(id *big.Int, sender, receiver ethgo.Address, data []byte) interface{} {
-			return newStateSyncEvent(id.Uint64(), sender, receiver, data)
-		})
-	if err != nil {
-		return nil, err
-	}
-
-	stateSyncEvent, ok := eventGeneric.(*types.StateSyncEvent)
-	if !ok {
-		return nil, errors.New("failed to convert event to StateSyncEvent instance")
-	}
-
-	return stateSyncEvent, nil
 }
 
 func decodeExitEvent(log *ethgo.Log, epoch, block uint64) (*ExitEvent, error) {

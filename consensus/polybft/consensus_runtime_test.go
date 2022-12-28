@@ -225,7 +225,7 @@ func TestConsensusRuntime_OnBlockInserted_EndOfEpoch(t *testing.T) {
 			FirstBlockInEpoch: header.Number - epochSize + 1,
 		},
 		lastBuiltBlock:   &types.Header{Number: header.Number - 1},
-		stateSyncManager: &dummyStateSyncManager{},
+		stateSyncManager: &nilStateSyncManager{},
 	}
 	runtime.OnBlockInserted(builtBlock)
 
@@ -349,7 +349,7 @@ func TestConsensusRuntime_FSM_NotEndOfEpoch_NotEndOfSprint(t *testing.T) {
 		},
 		lastBuiltBlock:   lastBlock,
 		state:            newTestState(t),
-		stateSyncManager: &dummyStateSyncManager{},
+		stateSyncManager: &nilStateSyncManager{},
 	}
 
 	err := runtime.FSM()
@@ -416,7 +416,7 @@ func TestConsensusRuntime_FSM_EndOfEpoch_BuildUptime(t *testing.T) {
 		epoch:              metadata,
 		config:             config,
 		lastBuiltBlock:     lastBuiltBlock,
-		stateSyncManager:   &dummyStateSyncManager{},
+		stateSyncManager:   &nilStateSyncManager{},
 	}
 
 	err := runtime.FSM()
@@ -882,7 +882,7 @@ func TestConsensusRuntime_IsValidSender(t *testing.T) {
 		},
 		logger:             hclog.NewNullLogger(),
 		proposerCalculator: NewProposerCalculatorFromSnapshot(snapshot, config, hclog.NewNullLogger()),
-		stateSyncManager:   &dummyStateSyncManager{},
+		stateSyncManager:   &nilStateSyncManager{},
 	}
 
 	require.NoError(t, runtime.FSM())
@@ -1084,7 +1084,7 @@ func TestConsensusRuntime_HasQuorum(t *testing.T) {
 		},
 		logger:             hclog.NewNullLogger(),
 		proposerCalculator: NewProposerCalculatorFromSnapshot(snapshot, config, hclog.NewNullLogger()),
-		stateSyncManager:   &dummyStateSyncManager{},
+		stateSyncManager:   &nilStateSyncManager{},
 	}
 
 	require.NoError(t, runtime.FSM())
