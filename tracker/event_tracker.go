@@ -34,7 +34,7 @@ func NewEventTracker(
 		rpcEndpoint:  rpcEndpoint,
 		contractAddr: contractAddr,
 		subscriber:   subscriber,
-		logger:       logger,
+		logger:       logger.Named("event_tracker"),
 	}
 }
 
@@ -68,7 +68,7 @@ func (e *EventTracker) Start(ctx context.Context) error {
 
 	go func() {
 		if err := tt.Sync(ctx); err != nil {
-			e.logger.Error("Event tracker", "failed to sync", err)
+			e.logger.Error("failed to sync", "error", err)
 		}
 	}()
 
@@ -88,7 +88,7 @@ func (e *EventTracker) Start(ctx context.Context) error {
 				}
 
 			case <-tt.DoneCh:
-				e.logger.Info("Historical sync done")
+				e.logger.Info("historical sync done")
 			}
 		}
 	}()
