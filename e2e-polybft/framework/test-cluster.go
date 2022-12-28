@@ -78,7 +78,6 @@ type TestClusterConfig struct {
 	Binary            string
 	ValidatorSetSize  uint64
 	EpochSize         int
-	SprintSize        int
 	EpochReward       int
 
 	logsDirOnce sync.Once
@@ -188,12 +187,6 @@ func WithEpochSize(epochSize int) ClusterOption {
 	}
 }
 
-func WithSprintSize(sprintSize int) ClusterOption {
-	return func(h *TestClusterConfig) {
-		h.SprintSize = sprintSize
-	}
-}
-
 func WithEpochReward(epochReward int) ClusterOption {
 	return func(h *TestClusterConfig) {
 		h.EpochReward = epochReward
@@ -299,7 +292,6 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			"--block-gas-limit", strconv.FormatUint(cluster.Config.BlockGasLimit, 10),
 			"--epoch-size", strconv.Itoa(cluster.Config.EpochSize),
 			"--epoch-reward", strconv.Itoa(cluster.Config.EpochReward),
-			"--sprint-size", strconv.Itoa(cluster.Config.SprintSize),
 			"--premine", "0x0000000000000000000000000000000000000000",
 		}
 

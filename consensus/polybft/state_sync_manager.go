@@ -23,10 +23,10 @@ import (
 )
 
 const (
-	// number of stateSyncEvents to be processed before a commitment message can be created and gossiped
-	stateSyncCommitmentSize = 10
-	minCommitmentSize       = 2
-	maxCommitmentSize       = 10
+	// maximum number of stateSyncEvents that a commitment can have
+	maxCommitmentSize = 10
+	// minimum number of stateSyncEvents that a commitment can have
+	minCommitmentSize = 2
 )
 
 // StateSyncManager is an interface that defines functions for state sync workflow

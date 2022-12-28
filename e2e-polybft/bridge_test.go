@@ -7,9 +7,7 @@ import (
 	"io"
 	"math/big"
 	"net/http"
-	"os"
 	"path"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -33,20 +31,6 @@ import (
 	"github.com/umbracle/ethgo/jsonrpc"
 	ethgow "github.com/umbracle/ethgo/wallet"
 )
-
-func init() {
-	wd, err := os.Getwd()
-	if err != nil {
-		return
-	}
-
-	parent := filepath.Dir(wd)
-	wd = filepath.Join(parent, "/artifacts/polygon-edge")
-	os.Setenv("EDGE_BINARY", wd)
-	os.Setenv("E2E_TESTS", "true")
-	os.Setenv("E2E_LOGS", "true")
-	os.Setenv("E2E_LOG_LEVEL", "debug")
-}
 
 var (
 	stateSyncResultEvent = abi.MustNewEvent(`event StateSyncResult(
@@ -146,7 +130,7 @@ func TestE2E_Bridge_MainWorkflow(t *testing.T) {
 	)
 
 	// wait for a few more sprints
-	require.NoError(t, cluster.WaitForBlock(30, 2*time.Minute))
+	require.NoError(t, cluster.WaitForBlock(20, 2*time.Minute))
 
 	client := cluster.Servers[0].JSONRPC()
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(client))

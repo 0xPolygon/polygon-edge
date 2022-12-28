@@ -247,6 +247,11 @@ func (c *consensusRuntime) OnBlockInserted(block *types.Block) {
 		err   error
 	)
 
+	// handle commitment and proofs creation
+	if err := c.stateSyncManager.PostBlock(&PostBlockRequest{Block: block}); err != nil {
+		c.logger.Error("failed to post block state sync", "err", err)
+	}
+
 	// TODO - this condition will need to be changed to recognize that either slashing happened
 	// or epoch reached its fixed size
 	if c.isFixedSizeOfEpochMet(block.Header.Number, c.epoch) {
@@ -254,11 +259,6 @@ func (c *consensusRuntime) OnBlockInserted(block *types.Block) {
 			c.logger.Error("failed to restart epoch after block inserted", "error", err)
 
 			return
-		}
-	} else {
-		// handle commitment and proofs creation
-		if err := c.stateSyncManager.PostBlock(&PostBlockRequest{Block: block}); err != nil {
-			c.logger.Error("failed to post block state sync", "err", err)
 		}
 	}
 
