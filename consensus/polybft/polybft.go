@@ -41,11 +41,14 @@ func Factory(params *consensus.Params) (consensus.Consensus, error) {
 
 	setupHeaderHashFunc()
 
+	ctx, cancelFn := context.WithCancel(context.Background())
+
 	polybft := &Polybft{
-		config:  params,
-		closeCh: make(chan struct{}),
-		logger:  logger,
-		txPool:  params.TxPool,
+		config:   params,
+		ctx:      ctx,
+		cancelFn: cancelFn,
+		logger:   logger,
+		txPool:   params.TxPool,
 	}
 
 	// initialize polybft consensus config
@@ -63,8 +66,9 @@ func Factory(params *consensus.Params) (consensus.Consensus, error) {
 }
 
 type Polybft struct {
-	// close closes all the pbft consensus
-	closeCh chan struct{}
+	// ctx and cancelFn are used to terminate child go routines
+	ctx      context.Context
+	cancelFn context.CancelFunc
 
 	// ibft is the ibft engine
 	ibft *IBFTConsensusWrapper
@@ -110,10 +114,6 @@ type Polybft struct {
 
 	// tx pool as interface
 	txPool txPoolInterface
-
-	// ctx is used to signal child goroutines to stop
-	ctx      context.Context
-	cancelFn context.CancelFunc
 }
 
 func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *state.Transition) error {
@@ -162,10 +162,6 @@ func (p *Polybft) Initialize() error {
 		return fmt.Errorf("failed to read account data. Error: %w", err)
 	}
 
-	ctx, cancelFn := context.WithCancel(context.Background())
-	p.ctx = ctx
-	p.cancelFn = cancelFn
-
 	// set key
 	p.key = wallet.NewKey(account)
 
@@ -198,7 +194,7 @@ func (p *Polybft) Initialize() error {
 		return fmt.Errorf("failed to create data directory. Error: %w", err)
 	}
 
-	stt, err := newState(filepath.Join(p.dataDir, stateFileName), p.logger, p.closeCh)
+	stt, err := newState(filepath.Join(p.dataDir, stateFileName), p.logger, p.ctx)
 	if err != nil {
 		return fmt.Errorf("failed to create state instance. Error: %w", err)
 	}
@@ -301,7 +297,7 @@ func (p *Polybft) startConsensusProtocol() {
 
 		for {
 			select {
-			case <-p.closeCh:
+			case <-p.ctx.Done():
 				return
 			case ev := <-eventCh:
 				// The blockchain notification system can eventually deliver
@@ -352,7 +348,7 @@ func (p *Polybft) startConsensusProtocol() {
 				p.logger.Info("canceled sequence", "sequence", latestHeader.Number+1)
 			}
 		case <-sequenceCh:
-		case <-p.closeCh:
+		case <-p.ctx.Done():
 			if isValidator {
 				stopSequence()
 			}
@@ -367,7 +363,7 @@ func (p *Polybft) startConsensusProtocol() {
 func (p *Polybft) waitForNPeers() bool {
 	for {
 		select {
-		case <-p.closeCh:
+		case <-p.ctx.Done():
 			return false
 		case <-time.After(2 * time.Second):
 		}
@@ -388,7 +384,6 @@ func (p *Polybft) Close() error {
 		}
 	}
 
-	close(p.closeCh)
 	p.cancelFn()
 
 	return nil

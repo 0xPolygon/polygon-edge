@@ -24,7 +24,7 @@ func (s *State) startStatsReleasing() {
 
 	// Stop ticker (stats releasing basically) when receiving the closing signal
 	go func() {
-		<-s.close
+		<-s.ctx.Done()
 		ticker.Stop()
 	}()
 

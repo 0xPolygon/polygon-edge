@@ -111,7 +111,6 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 
 	// create polybft with appropriate mocks
 	polybft := &Polybft{
-		closeCh:         make(chan struct{}),
 		logger:          hclog.NewNullLogger(),
 		consensusConfig: &polyBftConfig,
 		blockchain:      blockchainMock,
@@ -183,9 +182,9 @@ func TestPolybft_Close(t *testing.T) {
 	syncer.On("Close", mock.Anything).Return(error(nil)).Once()
 
 	ctx, cancelFn := context.WithCancel(context.Background())
+	defer cancelFn()
 
 	polybft := Polybft{
-		closeCh:  make(chan struct{}),
 		syncer:   syncer,
 		ctx:      ctx,
 		cancelFn: cancelFn,
@@ -193,19 +192,21 @@ func TestPolybft_Close(t *testing.T) {
 
 	assert.NoError(t, polybft.Close())
 
-	<-polybft.closeCh
+	<-polybft.ctx.Done()
 
 	syncer.AssertExpectations(t)
 
+	ctx, cancelFn = context.WithCancel(context.Background())
+	defer cancelFn()
+
+	polybft.ctx = ctx
 	errExpected := errors.New("something")
 	syncer.On("Close", mock.Anything).Return(errExpected).Once()
-
-	polybft.closeCh = make(chan struct{})
 
 	assert.Error(t, errExpected, polybft.Close())
 
 	select {
-	case <-polybft.closeCh:
+	case <-polybft.ctx.Done():
 		assert.Fail(t, "channel closing is invoked")
 	case <-time.After(time.Millisecond * 100):
 	}
