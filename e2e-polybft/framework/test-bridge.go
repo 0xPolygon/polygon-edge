@@ -1,11 +1,7 @@
 package framework
 
 import (
-	"bytes"
-	"errors"
 	"fmt"
-	"io"
-	"os/exec"
 	"path"
 	"strconv"
 	"testing"
@@ -124,23 +120,4 @@ func (t *TestBridge) WaitUntil(pollFrequency, timeout time.Duration, handler fun
 			return nil
 		}
 	}
-}
-
-// runCommand executes command with given arguments
-func runCommand(binary string, args []string, stdout io.Writer) error {
-	var stdErr bytes.Buffer
-
-	cmd := exec.Command(binary, args...)
-	cmd.Stderr = &stdErr
-	cmd.Stdout = stdout
-
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("%w: %s", err, stdErr.String())
-	}
-
-	if stdErr.Len() > 0 {
-		return errors.New(stdErr.String())
-	}
-
-	return nil
 }

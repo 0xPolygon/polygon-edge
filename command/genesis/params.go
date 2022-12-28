@@ -24,6 +24,7 @@ const (
 	premineFlag       = "premine"
 	chainIDFlag       = "chain-id"
 	epochSizeFlag     = "epoch-size"
+	epochRewardFlag   = "epoch-reward"
 	blockGasLimitFlag = "block-gas-limit"
 	posFlag           = "pos"
 	minValidatorCount = "min-validator-count"
@@ -56,8 +57,9 @@ type genesisParams struct {
 
 	ibftValidatorsRaw []string
 
-	chainID       uint64
-	epochSize     uint64
+	chainID   uint64
+	epochSize uint64
+
 	blockGasLimit uint64
 	isPos         bool
 
@@ -81,6 +83,7 @@ type genesisParams struct {
 	sprintSize             uint64
 	blockTime              time.Duration
 	bridgeJSONRPCAddr      string
+	epochReward            uint64
 }
 
 func (p *genesisParams) validateFlags() error {

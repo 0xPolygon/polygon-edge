@@ -3,6 +3,7 @@ package framework
 import (
 	"fmt"
 	"io/ioutil"
+	"strconv"
 	"sync/atomic"
 	"testing"
 
@@ -146,4 +147,16 @@ func (t *TestServer) Stop() {
 	}
 
 	t.node = nil
+}
+
+// Stake stakes given amount to validator account encapsulated by given server instance
+func (t *TestServer) Stake(amount uint64) error {
+	args := []string{"polybft", "stake",
+		"--account", t.config.DataDir,
+		"--jsonrpc", t.JSONRPCAddr(),
+		"--amount", strconv.FormatUint(amount, 10),
+		"--self",
+	}
+
+	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("stake"))
 }

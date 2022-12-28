@@ -192,6 +192,13 @@ func setFlags(cmd *cobra.Command) {
 			"the rootchain JSON RPC IP address. If present, node is running in bridge mode.",
 		)
 
+		cmd.Flags().Uint64Var(
+			&params.epochReward,
+			epochRewardFlag,
+			defaultEpochReward,
+			"reward size for block sealing",
+		)
+
 		cmd.Flags().Lookup(bridgeFlag).NoOptDefVal = "http://127.0.0.1:8545"
 	}
 }

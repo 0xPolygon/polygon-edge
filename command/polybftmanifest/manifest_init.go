@@ -178,7 +178,7 @@ func (p *manifestInitParams) getValidatorAccounts() ([]*polybft.Validator, error
 		validatorsPath = path.Dir(p.manifestPath)
 	}
 
-	validators, err := genesis.ReadValidatorsByRegexp(validatorsPath, p.validatorsPrefixPath)
+	validators, err := genesis.ReadValidatorsByPrefix(validatorsPath, p.validatorsPrefixPath)
 	if err != nil {
 		return nil, err
 	}

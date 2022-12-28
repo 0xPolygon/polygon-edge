@@ -23,6 +23,7 @@ type validatorsInfoResult struct {
 	totalStake          uint64
 	commission          uint64
 	withdrawableRewards uint64
+	active              bool
 }
 
 func (vr validatorsInfoResult) GetOutput() string {
@@ -32,10 +33,11 @@ func (vr validatorsInfoResult) GetOutput() string {
 
 	vals := make([]string, 0, 5)
 	vals = append(vals, fmt.Sprintf("Validator Address|%s", vr.address))
-	vals = append(vals, fmt.Sprintf("Active Stake|%v", vr.stake))
+	vals = append(vals, fmt.Sprintf("Self Stake|%v", vr.stake))
 	vals = append(vals, fmt.Sprintf("Total Stake|%v", vr.totalStake))
 	vals = append(vals, fmt.Sprintf("Withdrawable Rewards|%v", vr.withdrawableRewards))
 	vals = append(vals, fmt.Sprintf("Commission|%v", vr.commission))
+	vals = append(vals, fmt.Sprintf("Is Active|%v", vr.active))
 
 	buffer.WriteString(helper.FormatKV(vals))
 	buffer.WriteString("\n")

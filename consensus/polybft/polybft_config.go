@@ -25,6 +25,9 @@ type PolyBFTConfig struct {
 	// EpochSize is size of epoch
 	EpochSize uint64 `json:"epochSize"`
 
+	// EpochReward is assigned to validators for blocks sealing
+	EpochReward uint64 `json:"epochReward"`
+
 	// SprintSize is size of sprint
 	SprintSize uint64 `json:"sprintSize"`
 

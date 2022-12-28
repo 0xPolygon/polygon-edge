@@ -504,6 +504,19 @@ func (f *fsm) getCurrentValidators(pendingBlockState *state.Transition) (Account
 		return nil, fmt.Errorf("failed to retrieve validator set for current block: %w", err)
 	}
 
+	if f.logger.IsDebug() {
+		var buf bytes.Buffer
+		for i, validator := range newValidators {
+			buf.WriteString(fmt.Sprintf("Address:%s Voting power:%d", validator.Address, validator.VotingPower))
+
+			if i != len(newValidators)-1 {
+				buf.WriteString("\n")
+			}
+		}
+
+		f.logger.Debug("getCurrentValidators", "Validator set", buf.String())
+	}
+
 	return newValidators, nil
 }
 
