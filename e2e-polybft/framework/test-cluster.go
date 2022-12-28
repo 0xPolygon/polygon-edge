@@ -228,11 +228,8 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 	}
 
 	{
-		// run init account
-		err = cluster.cmdRun("polybft-secrets",
-			"--data-dir", path.Join(tmpDir, cluster.Config.ValidatorPrefix),
-			"--num", strconv.Itoa(validatorsCount),
-		)
+		// run init accounts
+		err = cluster.InitSecrets(cluster.Config.ValidatorPrefix, validatorsCount)
 		require.NoError(t, err)
 	}
 
@@ -318,18 +315,18 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 	}
 
 	for i := 1; i <= int(cluster.Config.ValidatorSetSize); i++ {
-		cluster.initTestServer(t, i, true)
+		cluster.InitTestServer(t, i, true)
 	}
 
 	for i := 1; i <= cluster.Config.NonValidatorCount; i++ {
 		offsetIndex := i + int(cluster.Config.ValidatorSetSize)
-		cluster.initTestServer(t, offsetIndex, false)
+		cluster.InitTestServer(t, offsetIndex, false)
 	}
 
 	return cluster
 }
 
-func (c *TestCluster) initTestServer(t *testing.T, i int, isValidator bool) {
+func (c *TestCluster) InitTestServer(t *testing.T, i int, isValidator bool) {
 	t.Helper()
 
 	logLevel := os.Getenv(envLogLevel)
@@ -501,4 +498,16 @@ func runCommand(binary string, args []string, stdout io.Writer) error {
 	}
 
 	return nil
+}
+
+// InitSecrets initializes account(s) secrets with given prefix.
+// (secrets are being stored in the temp directory created by given e2e test execution)
+func (c *TestCluster) InitSecrets(prefix string, count int) error {
+	args := []string{
+		"polybft-secrets",
+		"--data-dir", path.Join(c.Config.TmpDir, prefix),
+		"--num", strconv.Itoa(count),
+	}
+
+	return runCommand(c.Config.Binary, args, c.Config.GetStdout("polybft-secrets"))
 }

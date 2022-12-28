@@ -31,7 +31,6 @@ func GetCommand() *cobra.Command {
 		RunE:    runCommand,
 	}
 
-	helper.RegisterGRPCAddressFlag(registerCmd)
 	setFlags(registerCmd)
 
 	return registerCmd
@@ -50,9 +49,14 @@ func setFlags(cmd *cobra.Command) {
 		"",
 		"the directory path where registrator validator key is stored",
 	)
+
+	helper.RegisterGRPCAddressFlag(cmd)
+	helper.RegisterJSONRPCFlag(cmd)
 }
 
-func runPreRun(_ *cobra.Command, _ []string) error {
+func runPreRun(cmd *cobra.Command, _ []string) error {
+	params.jsonRPCAddr = helper.GetJSONRPCAddress(cmd)
+
 	return params.validateFlags()
 }
 
@@ -372,7 +376,7 @@ func (t *txnSender) waitForReceipt(hash ethgo.Hash) (*ethgo.Receipt, error) {
 }
 
 func newDemoClient() (*jsonrpc.Client, error) {
-	client, err := jsonrpc.NewClient("http://localhost:9545")
+	client, err := jsonrpc.NewClient(params.jsonRPCAddr)
 	if err != nil {
 		return nil, fmt.Errorf("cannot connect with jsonrpc: %w", err)
 	}

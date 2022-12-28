@@ -18,8 +18,7 @@ const (
 )
 
 var (
-	errNoAccounts               = errors.New("no accounts registered")
-	errNonSignedTxnNotSupported = errors.New("sending non signed transactions supported only for local account mode")
+	errNoAccounts = errors.New("no accounts registered")
 )
 
 type TxRelayer interface {

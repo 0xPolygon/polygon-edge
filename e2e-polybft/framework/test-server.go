@@ -3,6 +3,7 @@ package framework
 import (
 	"fmt"
 	"io/ioutil"
+	"path"
 	"strconv"
 	"sync/atomic"
 	"testing"
@@ -151,7 +152,9 @@ func (t *TestServer) Stop() {
 
 // Stake stakes given amount to validator account encapsulated by given server instance
 func (t *TestServer) Stake(amount uint64) error {
-	args := []string{"polybft", "stake",
+	args := []string{
+		"polybft",
+		"stake",
 		"--account", t.config.DataDir,
 		"--jsonrpc", t.JSONRPCAddr(),
 		"--amount", strconv.FormatUint(amount, 10),
@@ -159,4 +162,17 @@ func (t *TestServer) Stake(amount uint64) error {
 	}
 
 	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("stake"))
+}
+
+// RegisterValidator is a wrapper function which registers new validator
+func (t *TestServer) RegisterValidator(validatorSuffix uint64) error {
+	args := []string{
+		"polybft",
+		"register-validator",
+		"--data-dir", path.Join(t.clusterConfig.TmpDir, fmt.Sprint("test-chain-", validatorSuffix)),
+		"--registrator-data-dir", path.Join(t.clusterConfig.TmpDir, "test-chain-1"),
+		"--jsonrpc", t.JSONRPCAddr(),
+	}
+
+	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("register-validator"))
 }
