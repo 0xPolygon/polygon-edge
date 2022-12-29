@@ -283,6 +283,8 @@ func (v *validatorsSnapshotCache) getLastCachedSnapshot(currentEpoch uint64) (*v
 		// return the one from db
 		if cachedSnapshot == nil || dbSnapshot.Epoch > cachedSnapshot.Epoch {
 			cachedSnapshot = dbSnapshot
+			// save it in cache as well, since it doesn't exist
+			v.snapshots[dbSnapshot.Epoch] = dbSnapshot.copy()
 		}
 	}
 
