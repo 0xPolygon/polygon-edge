@@ -449,17 +449,16 @@ func (s *State) getStateSyncEventsForCommitment(fromIndex, toIndex uint64,
 	getAll bool) ([]*types.StateSyncEvent, error) {
 	var events []*types.StateSyncEvent
 
-	var notEnoughEventsErr error
-	if getAll {
-		notEnoughEventsErr = errNotEnoughStateSyncs
-	}
-
 	err := s.db.View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(syncStateEventsBucket)
 		for i := fromIndex; i <= toIndex; i++ {
 			v := bucket.Get(itob(i))
 			if v == nil {
-				return notEnoughEventsErr
+				if getAll {
+					return errNotEnoughStateSyncs
+				}
+
+				return nil
 			}
 
 			var event *types.StateSyncEvent

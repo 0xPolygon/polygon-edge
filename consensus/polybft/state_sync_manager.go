@@ -445,13 +445,6 @@ func (s *stateSyncManager) buildCommitment() error {
 	epoch := s.epoch
 	fromIndex := s.nextCommittedIndex
 
-	var largestPendingCommitment *Commitment
-	if len(s.pendingCommitments) > 0 {
-		largestPendingCommitment = s.pendingCommitments[len(s.pendingCommitments)-1]
-	}
-
-	s.lock.RUnlock()
-
 	stateSyncEvents, err := s.state.getStateSyncEventsForCommitment(fromIndex, fromIndex+maxCommitmentSize-1, false)
 	if err != nil {
 		return fmt.Errorf("failed to get state sync events for commitment. Error: %w", err)
@@ -462,10 +455,13 @@ func (s *stateSyncManager) buildCommitment() error {
 		return nil
 	}
 
-	if largestPendingCommitment != nil && largestPendingCommitment.ToIndex >= stateSyncEvents[len(stateSyncEvents)-1].ID {
+	if len(s.pendingCommitments) > 0 &&
+		s.pendingCommitments[len(s.pendingCommitments)-1].ToIndex >= stateSyncEvents[len(stateSyncEvents)-1].ID {
 		// already built a commitment of this size which is pending to be submitted
 		return nil
 	}
+
+	s.lock.RUnlock()
 
 	commitment, err := NewCommitment(epoch, stateSyncEvents)
 	if err != nil {
