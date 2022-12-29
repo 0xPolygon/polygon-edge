@@ -1,6 +1,7 @@
 package polybft
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 	"time"
@@ -18,6 +19,10 @@ import (
 
 const (
 	consensusSource = "consensus"
+)
+
+var (
+	errSendTxnUnsupported = errors.New("system state does not support send transactions")
 )
 
 // blockchain is an interface that wraps the methods called on blockchain
@@ -196,5 +201,5 @@ func (s *stateProvider) Call(addr ethgo.Address, input []byte, opts *contract.Ca
 // Txn is part of the contract.Provider interface to make Ethereum transactions. We disable this function
 // since the system state does not make any transaction
 func (s *stateProvider) Txn(ethgo.Address, ethgo.Key, []byte) (contract.Txn, error) {
-	panic("we do not make transaction in system state")
+	panic(errSendTxnUnsupported)
 }

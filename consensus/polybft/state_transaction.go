@@ -21,8 +21,6 @@ var (
 		"tuple(uint256 startId, uint256 endId, bytes32 root) commitment," +
 		"bytes signature," +
 		"bytes bitmap)")
-
-	validatorsUptimeMethod, _ = abi.NewMethod("function uptime(bytes data)")
 )
 
 // StateTransactionInput is an abstraction for different state transaction inputs

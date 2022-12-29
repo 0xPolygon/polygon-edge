@@ -171,7 +171,7 @@ func TestSystemState_GetEpoch(t *testing.T) {
 	require.Equal(t, expectedEpoch, epoch)
 }
 
-func TestStateProvider_Txn_Panics(t *testing.T) {
+func TestStateProvider_Txn_NotSupported(t *testing.T) {
 	t.Parallel()
 
 	transition := newTestTransition(t, nil)
@@ -180,8 +180,8 @@ func TestStateProvider_Txn_Panics(t *testing.T) {
 		transition: transition,
 	}
 
-	key := createTestKey(t)
-	require.Panics(t, func() { _, _ = provider.Txn(ethgo.ZeroAddress, key, []byte{0x1}) })
+	require.PanicsWithError(t, errSendTxnUnsupported.Error(),
+		func() { _, _ = provider.Txn(ethgo.ZeroAddress, createTestKey(t), []byte{0x1}) })
 }
 
 func newTestTransition(t *testing.T, alloc map[types.Address]*chain.GenesisAccount) *state.Transition {
