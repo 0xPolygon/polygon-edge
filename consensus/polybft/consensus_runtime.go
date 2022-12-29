@@ -492,6 +492,7 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) (*epochMetadata, e
 		"block number", header.Number,
 		"epoch", epochNumber,
 		"validators", validatorSet.Len(),
+		"firstBlockInEpoch", firstBlockInEpoch,
 	)
 
 	return &epochMetadata{
@@ -1310,6 +1311,11 @@ func (c *consensusRuntime) getFirstBlockOfEpoch(epochNumber uint64, latestHeader
 	blockExtra, err := GetIbftExtra(latestHeader.ExtraData)
 	if err != nil {
 		return 0, err
+	}
+
+	if epochNumber != blockExtra.Checkpoint.EpochNumber {
+		// its a regular epoch ending. No out of sync happened
+		return latestHeader.Number + 1, nil
 	}
 
 	// node was out of sync, so we need to figure out what was the first block of the given epoch

@@ -1136,7 +1136,7 @@ func TestConsensusRuntime_restartEpoch_FirstRestart_BuildsCommitment(t *testing.
 	validatorAccs := newTestValidatorsWithAliases(validatorIds)
 	validators := validatorAccs.getPublicIdentities()
 
-	header, headerMap := createTestBlocks(t, epochSize, epochSize, validators)
+	header, _ := createTestBlocks(t, epochSize, epochSize, validators)
 
 	transportMock := new(transportMock)
 	transportMock.On("Multicast", mock.Anything).Once()
@@ -1148,7 +1148,6 @@ func TestConsensusRuntime_restartEpoch_FirstRestart_BuildsCommitment(t *testing.
 	blockchainMock := new(blockchainMock)
 	blockchainMock.On("GetStateProviderForBlock", mock.Anything).Return(new(stateProviderMock)).Once()
 	blockchainMock.On("GetSystemState", mock.Anything, mock.Anything).Return(systemStateMock).Once()
-	blockchainMock.On("GetHeaderByNumber", mock.Anything).Return(headerMap.getHeader)
 
 	polybftBackendMock := new(polybftBackendMock)
 	polybftBackendMock.On("GetValidators", mock.Anything, mock.Anything).Return(validators).Once()
