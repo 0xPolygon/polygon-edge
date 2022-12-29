@@ -9,6 +9,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/genesis"
 	"github.com/0xPolygon/polygon-edge/command/sidechain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
+	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -98,51 +99,65 @@ func TestE2E_Consensus_Bulk_Drop(t *testing.T) {
 }
 
 func TestE2E_Consensus_RegisterValidator(t *testing.T) {
-	const validatorSize = 5
+	const (
+		validatorSize       = 5
+		newValidatorSecrets = "test-chain-6"
+	)
 
 	cluster := framework.NewTestCluster(t, validatorSize,
 		framework.WithEpochSize(5),
 		framework.WithEpochReward(1000))
 
-	require.NoError(t, cluster.InitSecrets("test-chain-6", 1))
+	srv := cluster.Servers[0]
 
-	require.NoError(t, cluster.WaitForBlock(1, 10*time.Second))
+	// create new account
+	require.NoError(t, cluster.InitSecrets(newValidatorSecrets, 1))
 
-	require.NoError(t, cluster.Servers[0].RegisterValidator(6))
-
+	// assert that account is created
 	validators, err := genesis.GetValidatorKeyFiles(cluster.Config.TmpDir, cluster.Config.ValidatorPrefix)
 	require.NoError(t, err)
-
 	require.Equal(t, validatorSize+1, len(validators))
 
-	cluster.WaitForBlock(16, 1*time.Minute)
+	// wait for consensus to start
+	require.NoError(t, cluster.WaitForBlock(1, 10*time.Second))
 
-	l2Relayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Servers[0].JSONRPCAddr()))
+	// register new validator
+	require.NoError(t, srv.RegisterValidator(newValidatorSecrets))
+
+	// wait for two epochs so that stake gets settled
+	cluster.WaitForBlock(11, 1*time.Minute)
+
+	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(srv.JSONRPCAddr()))
 	require.NoError(t, err)
 
-	validatorAccount, err := sidechain.GetAccountFromDir(path.Join(cluster.Config.TmpDir, validators[len(validators)-1]))
+	newValidatorAcc, err := sidechain.GetAccountFromDir(path.Join(cluster.Config.TmpDir, validators[len(validators)-1]))
 	require.NoError(t, err)
 
-	senderValidator, err := sidechain.GetAccountFromDir(path.Join(cluster.Config.TmpDir, validators[0]))
+	validatorInfoRaw, err := sidechain.GetValidatorInfo(newValidatorAcc.Ecdsa.Address(), txRelayer)
 	require.NoError(t, err)
 
-	validatorInfoRaw, err := sidechain.GetValidatorInfo(validatorAccount.Ecdsa.Address(), l2Relayer)
+	// cluster.WaitForBlock(20, 1*time.Minute)
+	require.Equal(t, uint64(1000), validatorInfoRaw["totalStake"].(*big.Int).Uint64()) //nolint:forcetypeassert
+
+	block, err := srv.JSONRPC().Eth().GetBlockByNumber(ethgo.Latest, false)
 	require.NoError(t, err)
 
-	cluster.WaitForBlock(20, 1*time.Minute)
-	require.Equal(t, uint64(1000), validatorInfoRaw["totalStake"].(*big.Int).Uint64())
-
-	l2SenderBlockData, err := cluster.Servers[0].JSONRPC().Eth().GetBlockByNumber(ethgo.Latest, false)
-	require.NoError(t, err)
-
-	extra, err := polybft.GetIbftExtra(l2SenderBlockData.ExtraData)
+	extra, err := polybft.GetIbftExtra(block.ExtraData)
 	require.NoError(t, err)
 	require.NotNil(t, extra.Checkpoint)
 
-	accountSet, err := getValidators(l2Relayer, senderValidator.Ecdsa.Address())
+	systemState := polybft.NewSystemState(
+		&polybft.PolyBFTConfig{
+			StateReceiverAddr: contracts.StateReceiverContract,
+			ValidatorSetAddr:  contracts.ValidatorSetContract},
+		&e2eStateProvider{txRelayer: txRelayer})
+
+	accountSet, err := systemState.GetValidatorSet()
 	require.NoError(t, err)
 
-	require.Equal(t, accountSet.ContainsAddress(types.Address(validatorAccount.Ecdsa.Address())), true)
+	t.Logf("validators: %v\n", accountSet)
+
+	require.Equal(t, accountSet.ContainsAddress(types.Address(newValidatorAcc.Ecdsa.Address())), true)
 
 	accHash, err := accountSet.Hash()
 	require.NoError(t, err)
@@ -151,9 +166,9 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 
 	cluster.InitTestServer(t, 6, true)
 
-	cluster.WaitForBlock(100, 2*time.Minute)
+	cluster.WaitForBlock(30, 2*time.Minute)
 
-	validatorInfoRaw, err = sidechain.GetValidatorInfo(validatorAccount.Ecdsa.Address(), l2Relayer)
+	validatorInfoRaw, err = sidechain.GetValidatorInfo(newValidatorAcc.Ecdsa.Address(), txRelayer)
 	// t.Log("Stake:", validatorInfoRaw["stake"].(*big.Int), "Total stake:", validatorInfoRaw["totalStake"].(*big.Int), "Reward:", validatorInfoRaw["withdrawableRewards"].(*big.Int))
 	require.NoError(t, err)
 }

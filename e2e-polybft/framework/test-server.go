@@ -165,11 +165,11 @@ func (t *TestServer) Stake(amount uint64) error {
 }
 
 // RegisterValidator is a wrapper function which registers new validator
-func (t *TestServer) RegisterValidator(validatorSuffix uint64) error {
+func (t *TestServer) RegisterValidator(validatorSecrets string) error {
 	args := []string{
 		"polybft",
 		"register-validator",
-		"--data-dir", path.Join(t.clusterConfig.TmpDir, fmt.Sprint("test-chain-", validatorSuffix)),
+		"--data-dir", path.Join(t.clusterConfig.TmpDir, validatorSecrets),
 		"--registrator-data-dir", path.Join(t.clusterConfig.TmpDir, "test-chain-1"),
 		"--jsonrpc", t.JSONRPCAddr(),
 	}
