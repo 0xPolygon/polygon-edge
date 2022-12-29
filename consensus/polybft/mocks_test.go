@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"time"
 
+	bls "github.com/0xPolygon/bnsnark1/core"
 	"github.com/0xPolygon/polygon-edge/blockchain"
-	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/helper/progress"

@@ -8,7 +8,7 @@ import (
 	"math/big"
 	"reflect"
 
-	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
+	bls "github.com/0xPolygon/bnsnark1/core"
 	"github.com/0xPolygon/polygon-edge/crypto"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"

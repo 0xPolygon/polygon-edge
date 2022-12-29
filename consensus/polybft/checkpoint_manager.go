@@ -5,7 +5,7 @@ import (
 	"math/big"
 	"strconv"
 
-	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
+	bls "github.com/0xPolygon/bnsnark1/core"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	metrics "github.com/armon/go-metrics"

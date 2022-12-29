@@ -4,7 +4,3 @@ coverage:
       default:
         target: auto
         threshold: 0%
-
-ignore:
-  - "consensus/polybft/signer/mcl.go"    # ignore mcl.go file    
-  - "consensus/polybft/signer/mcl/**/*"  # ignore all files in mcl directory

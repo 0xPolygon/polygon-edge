@@ -7,3 +7,6 @@
 	url = https://github.com/0xPolygon/core-contracts
 	shallow = true
 	branch = feat-polybft-release
+[submodule "mcl"]
+	path = mcl
+	url = https://github.com/herumi/mcl
