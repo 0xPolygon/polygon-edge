@@ -79,3 +79,9 @@ func getEpochNumber(t *testing.T, blockNumber, epochSize uint64) uint64 {
 
 	return blockNumber/epochSize + 1
 }
+
+// isEndOfPeriod checks if an end of a period (either it be sprint or epoch)
+// is reached with the current block (the parent block of the current fsm iteration)
+func isEndOfPeriod(blockNumber, periodSize uint64) bool {
+	return blockNumber%periodSize == 0
+}

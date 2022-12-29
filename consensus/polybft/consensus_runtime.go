@@ -260,7 +260,7 @@ func (c *consensusRuntime) OnBlockInserted(block *types.Block) {
 
 	// TODO - this condition will need to be changed to recognize that either slashing happened
 	// or epoch reached its fixed size
-	if c.isFixedSizeOfEpochMet(block.Header.Number) {
+	if c.isFixedSizeOfEpochMet(block.Header.Number, c.epoch) {
 		if epoch, err = c.restartEpoch(block.Header); err != nil {
 			c.logger.Error("failed to restart epoch after block inserted", "error", err)
 
@@ -269,7 +269,7 @@ func (c *consensusRuntime) OnBlockInserted(block *types.Block) {
 	}
 
 	if err := c.proposerCalculator.Update(block.Number()); err != nil {
-		// do not return if prposer snapshot hasn't been inserted, next call of OnBlockInserted will catch-up
+		// do not return if proposer snapshot hasn't been inserted, next call of OnBlockInserted will catch-up
 		c.logger.Warn("Could not update proposer calculator", "err", err)
 	}
 
@@ -378,8 +378,8 @@ func (c *consensusRuntime) FSM() error {
 	slash := false
 
 	pendingBlockNumber := parent.Number + 1
-	isEndOfSprint := slash || c.isFixedSizeOfSprintMet(pendingBlockNumber)
-	isEndOfEpoch := slash || c.isFixedSizeOfEpochMet(pendingBlockNumber)
+	isEndOfSprint := slash || c.isFixedSizeOfSprintMet(pendingBlockNumber, epoch)
+	isEndOfEpoch := slash || c.isFixedSizeOfEpochMet(pendingBlockNumber, epoch)
 
 	valSet := NewValidatorSet(epoch.Validators, c.logger)
 
@@ -914,16 +914,12 @@ func (c *consensusRuntime) isActiveValidator() bool {
 
 // isFixedSizeOfEpochMet checks if epoch reached its end that was configured by its default size
 // this is only true if no slashing occurred in the given epoch
-func (c *consensusRuntime) isFixedSizeOfEpochMet(blockNumber uint64) bool {
-	epoch := c.getEpoch()
-
+func (c *consensusRuntime) isFixedSizeOfEpochMet(blockNumber uint64, epoch *epochMetadata) bool {
 	return epoch.FirstBlockInEpoch+c.config.PolyBFTConfig.EpochSize-1 == blockNumber
 }
 
 // isFixedSizeOfSprintMet checks if an end of an sprint is reached with the current block
-func (c *consensusRuntime) isFixedSizeOfSprintMet(blockNumber uint64) bool {
-	epoch := c.getEpoch()
-
+func (c *consensusRuntime) isFixedSizeOfSprintMet(blockNumber uint64, epoch *epochMetadata) bool {
 	return (blockNumber-epoch.FirstBlockInEpoch+1)%c.config.PolyBFTConfig.SprintSize == 0
 }
 
@@ -1314,11 +1310,6 @@ func (c *consensusRuntime) getFirstBlockOfEpoch(epochNumber uint64, latestHeader
 	blockExtra, err := GetIbftExtra(latestHeader.ExtraData)
 	if err != nil {
 		return 0, err
-	}
-
-	if epochNumber != blockExtra.Checkpoint.EpochNumber {
-		// its a regular epoch ending. No out of sync happened
-		return latestHeader.Number + 1, nil
 	}
 
 	// node was out of sync, so we need to figure out what was the first block of the given epoch
