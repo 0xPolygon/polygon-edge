@@ -180,9 +180,8 @@ func TestStateProvider_Txn_NotSupported(t *testing.T) {
 		transition: transition,
 	}
 
-	txn, err := provider.Txn(ethgo.ZeroAddress, createTestKey(t), []byte{0x1})
-	require.Nil(t, txn)
-	require.ErrorIs(t, err, errSendTxnUnsupported)
+	require.PanicsWithError(t, errSendTxnUnsupported.Error(),
+		func() { _, _ = provider.Txn(ethgo.ZeroAddress, createTestKey(t), []byte{0x1}) })
 }
 
 func newTestTransition(t *testing.T, alloc map[types.Address]*chain.GenesisAccount) *state.Transition {
