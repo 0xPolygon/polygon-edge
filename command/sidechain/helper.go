@@ -3,6 +3,7 @@ package sidechain
 import (
 	"errors"
 	"fmt"
+	"math/big"
 	"os"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
@@ -11,7 +12,9 @@ import (
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	secretsHelper "github.com/0xPolygon/polygon-edge/secrets/helper"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo"
+	"github.com/umbracle/ethgo/abi"
 )
 
 const (
@@ -20,6 +23,11 @@ const (
 	AmountFlag     = "amount"
 
 	DefaultGasPrice = 1879048192 // 0x70000000
+)
+
+var (
+	getDelegatorRewardMethod, _ = abi.NewMethod(
+		"getDelegatorReward(address validator, address delegator) returns (uint256)")
 )
 
 func CheckIfDirectoryExist(dir string) error {
@@ -75,4 +83,26 @@ func GetValidatorInfo(validatorAddr ethgo.Address, txRelayer txrelayer.TxRelayer
 	}
 
 	return decodedValidatorInfoMap, nil
+}
+
+// GetDelegatorReward queries delegator reward for given validator and delegator addresses
+func GetDelegatorReward(validatorAddr ethgo.Address, delegatorAddr ethgo.Address,
+	txRelayer txrelayer.TxRelayer) (*big.Int, error) {
+	input, err := getDelegatorRewardMethod.Encode([]interface{}{validatorAddr, delegatorAddr})
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode input parameters for getDelegatorReward fn: %w", err)
+	}
+
+	response, err := txRelayer.Call(ethgo.Address(contracts.SystemCaller),
+		ethgo.Address(contracts.ValidatorSetContract), input)
+	if err != nil {
+		return nil, err
+	}
+
+	delegatorReward, err := types.ParseUint256orHex(&response)
+	if err != nil {
+		return nil, fmt.Errorf("unable to decode hex response, %w", err)
+	}
+
+	return delegatorReward, nil
 }
