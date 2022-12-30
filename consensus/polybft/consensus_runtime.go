@@ -498,7 +498,7 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header, epoch *ep
 		},
 		Uptime: uptime,
 	}
-	c.logger.Debug(fmt.Sprintf("Commit epoch: %+v", commitEpoch.Uptime))
+
 	return commitEpoch, nil
 }
 
