@@ -28,8 +28,6 @@ var (
 	errNotAValidator = errors.New("node is not a validator")
 	// errQuorumNotReached represents "quorum not reached for commitment message" error message
 	errQuorumNotReached = errors.New("quorum not reached for commitment message")
-	// errEpochToSmall is error message denoting that epoch doesn't contain enough blocks
-	errEpochTooSmall = errors.New("epoch size not large enough to calculate uptime")
 )
 
 // txPoolInterface is an abstraction of transaction pool

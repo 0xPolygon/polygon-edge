@@ -534,23 +534,6 @@ func TestConsensusRuntime_restartEpoch_SameEpochNumberAsTheLastOne(t *testing.T)
 	blockchainMock.AssertExpectations(t)
 }
 
-func TestConsensusRuntime_calculateUptime_EpochSizeToSmall(t *testing.T) {
-	t.Parallel()
-
-	config := &runtimeConfig{
-		PolyBFTConfig: &PolyBFTConfig{EpochSize: 2},
-	}
-	consensusRuntime := &consensusRuntime{
-		config:         config,
-		epoch:          &epochMetadata{},
-		lastBuiltBlock: &types.Header{Number: 2},
-	}
-
-	epochInfo, err := consensusRuntime.calculateUptime(consensusRuntime.lastBuiltBlock, consensusRuntime.epoch)
-	require.ErrorIs(t, err, errEpochTooSmall)
-	require.Nil(t, epochInfo)
-}
-
 func TestConsensusRuntime_calculateUptime_SecondEpoch(t *testing.T) {
 	t.Parallel()
 
