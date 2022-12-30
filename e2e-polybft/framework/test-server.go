@@ -164,7 +164,7 @@ func (t *TestServer) Stake(amount uint64) error {
 	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("stake"))
 }
 
-// RegisterValidator is a wrapper function which registers new validator with given balance
+// RegisterValidator is a wrapper function which registers new validator with given balance and stake
 func (t *TestServer) RegisterValidator(secrets string, balance string, stake string) error {
 	args := []string{
 		"polybft",
