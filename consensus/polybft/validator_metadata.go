@@ -1,6 +1,7 @@
 package polybft
 
 import (
+	"bytes"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -116,12 +117,23 @@ func (v *ValidatorMetadata) UnmarshalRLPWith(val *fastrlp.Value) error {
 
 // fmt.Stringer implementation
 func (v *ValidatorMetadata) String() string {
-	return fmt.Sprintf("Address=%v; BLS Key=%v; Voting Power=%d",
-		v.Address.String(), hex.EncodeToString(v.BlsKey.Marshal()), v.VotingPower)
+	return fmt.Sprintf("Address=%v; Voting Power=%d; BLS Key=%v;",
+		v.Address.String(), v.VotingPower, hex.EncodeToString(v.BlsKey.Marshal()))
 }
 
 // AccountSet is a type alias for slice of ValidatorMetadata instances
 type AccountSet []*ValidatorMetadata
+
+// fmt.Stringer implementation
+func (as AccountSet) String() string {
+	var buf bytes.Buffer
+	for _, v := range as {
+		buf.WriteString(v.String())
+		buf.WriteString("\n")
+	}
+
+	return buf.String()
+}
 
 // GetAddresses aggregates addresses for given AccountSet
 func (as AccountSet) GetAddresses() []types.Address {
