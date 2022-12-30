@@ -102,7 +102,7 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	const (
 		validatorSize       = 5
 		newValidatorSecrets = "test-chain-6"
-		premineBalance      = "0x1A784379D99DB42000000" // 2M native tokens (so that we have enough funds to fund new validator)
+		premineBalance      = "0x1A784379D99DB42000000" // 2M native tokens (so that we have enough balance to fund new validator)
 	)
 
 	newValidatorStakeRaw := "0x152D02C7E14AF6800000"   // 100k native tokens
@@ -114,9 +114,7 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 		framework.WithEpochSize(5),
 		framework.WithEpochReward(1000),
 		framework.WithPremineValidators(premineBalance))
-
 	srv := cluster.Servers[0]
-
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(srv.JSONRPCAddr()))
 	require.NoError(t, err)
 
@@ -146,45 +144,47 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	// start new validator
 	cluster.InitTestServer(t, 6, true)
 
-	// query validators
-	validators, err := systemState.GetValidatorSet()
-	require.NoError(t, err)
-
 	// assert that validators hash is correct
 	block, err := srv.JSONRPC().Eth().GetBlockByNumber(ethgo.Latest, false)
 	require.NoError(t, err)
-
 	t.Logf("Block Number=%d\n", block.Number)
 
 	extra, err := polybft.GetIbftExtra(block.ExtraData)
 	require.NoError(t, err)
 	require.NotNil(t, extra.Checkpoint)
 
+	// query validators
+	validators, err := systemState.GetValidatorSet()
+	require.NoError(t, err)
+
 	// assert that correct validators hash gets submitted
 	validatorsHash, err := validators.Hash()
 	require.NoError(t, err)
 	require.Equal(t, extra.Checkpoint.NextValidatorsHash, validatorsHash)
 
-	newValidatorAcc, err := sidechain.GetAccountFromDir(path.Join(cluster.Config.TmpDir, validatorSecrets[len(validatorSecrets)-1]))
+	newValidatorAcc, err := sidechain.GetAccountFromDir(path.Join(cluster.Config.TmpDir, newValidatorSecrets))
 	require.NoError(t, err)
 
 	// assert that new validator is among validator set
 	require.True(t, validators.ContainsAddress(types.Address(newValidatorAcc.Ecdsa.Address())))
 
+	// query registered validator
 	newValidatorInfo, err := sidechain.GetValidatorInfo(newValidatorAcc.Ecdsa.Address(), txRelayer)
 	require.NoError(t, err)
 
-	// assert new validator's stake
+	// assert registered validator's stake
 	stake := newValidatorInfo["totalStake"].(*big.Int) //nolint:forcetypeassert
 	t.Logf("New validator stake=%s\n", stake.String())
 	require.Equal(t, newValidatorStake, stake)
 
-	// wait 3 more epochs, so that rewards get accumulated to the new validators account
+	// wait 3 more epochs, so that rewards get accumulated to the registered validator account
 	cluster.WaitForBlock(20, 2*time.Minute)
 
+	// query registered validator
 	newValidatorInfo, err = sidechain.GetValidatorInfo(newValidatorAcc.Ecdsa.Address(), txRelayer)
 	require.NoError(t, err)
 
+	// assert registered validator's rewards
 	rewards := newValidatorInfo["withdrawableRewards"].(*big.Int) //nolint:forcetypeassert
 	t.Logf("New validator rewards=%s\n", rewards)
 	require.True(t, rewards.Cmp(big.NewInt(0)) > 0)
