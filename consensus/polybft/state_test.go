@@ -160,7 +160,11 @@ func TestState_Insert_And_Cleanup(t *testing.T) {
 func TestState_insertAndGetValidatorSnapshot(t *testing.T) {
 	t.Parallel()
 
-	epoch := uint64(1)
+	const (
+		epoch            = uint64(1)
+		epochEndingBlock = uint64(100)
+	)
+
 	state := newTestState(t)
 	keys, err := bls.CreateRandomBlsKeys(3)
 
@@ -172,22 +176,57 @@ func TestState_insertAndGetValidatorSnapshot(t *testing.T) {
 		&ValidatorMetadata{Address: types.BytesToAddress([]byte{0x37}), BlsKey: keys[2].PublicKey()},
 	}
 
-	assert.NoError(t, state.insertValidatorSnapshot(epoch, snapshot))
+	assert.NoError(t, state.insertValidatorSnapshot(&validatorSnapshot{epoch, epochEndingBlock, snapshot}))
 
 	snapshotFromDB, err := state.getValidatorSnapshot(epoch)
 
 	assert.NoError(t, err)
-	assert.Equal(t, snapshot.Len(), snapshotFromDB.Len())
+	assert.Equal(t, snapshot.Len(), snapshotFromDB.Snapshot.Len())
+	assert.Equal(t, epoch, snapshotFromDB.Epoch)
+	assert.Equal(t, epochEndingBlock, snapshotFromDB.EpochEndingBlock)
 
 	for i, v := range snapshot {
-		assert.Equal(t, v.Address, snapshotFromDB[i].Address)
-		assert.Equal(t, v.BlsKey, snapshotFromDB[i].BlsKey)
+		assert.Equal(t, v.Address, snapshotFromDB.Snapshot[i].Address)
+		assert.Equal(t, v.BlsKey, snapshotFromDB.Snapshot[i].BlsKey)
 	}
+}
+
+func TestState_getLastSnapshot(t *testing.T) {
+	t.Parallel()
+
+	const (
+		lastEpoch          = uint64(10)
+		fixedEpochSize     = uint64(10)
+		numberOfValidators = 3
+	)
+
+	state := newTestState(t)
+
+	for i := uint64(1); i <= lastEpoch; i++ {
+		keys, err := bls.CreateRandomBlsKeys(numberOfValidators)
+
+		require.NoError(t, err)
+
+		var snapshot AccountSet
+		for j := 0; j < numberOfValidators; j++ {
+			snapshot = append(snapshot, &ValidatorMetadata{Address: types.BytesToAddress(generateRandomBytes(t)), BlsKey: keys[j].PublicKey()})
+		}
+
+		require.NoError(t, state.insertValidatorSnapshot(&validatorSnapshot{i, i * fixedEpochSize, snapshot}))
+	}
+
+	snapshotFromDB, err := state.getLastSnapshot()
+
+	assert.NoError(t, err)
+	assert.Equal(t, numberOfValidators, snapshotFromDB.Snapshot.Len())
+	assert.Equal(t, lastEpoch, snapshotFromDB.Epoch)
+	assert.Equal(t, lastEpoch*fixedEpochSize, snapshotFromDB.EpochEndingBlock)
 }
 
 func TestState_cleanValidatorSnapshotsFromDb(t *testing.T) {
 	t.Parallel()
 
+	fixedEpochSize := uint64(10)
 	state := newTestState(t)
 	keys, err := bls.CreateRandomBlsKeys(3)
 	require.NoError(t, err)
@@ -202,17 +241,19 @@ func TestState_cleanValidatorSnapshotsFromDb(t *testing.T) {
 	// add a couple of more snapshots above limit just to make sure we reached it
 	for i := 1; i <= validatorSnapshotLimit+2; i++ {
 		epoch = uint64(i)
-		assert.NoError(t, state.insertValidatorSnapshot(epoch, snapshot))
+		assert.NoError(t, state.insertValidatorSnapshot(&validatorSnapshot{epoch, epoch * fixedEpochSize, snapshot}))
 	}
 
 	snapshotFromDB, err := state.getValidatorSnapshot(epoch)
 
 	assert.NoError(t, err)
-	assert.Equal(t, snapshot.Len(), snapshotFromDB.Len())
+	assert.Equal(t, snapshot.Len(), snapshotFromDB.Snapshot.Len())
+	assert.Equal(t, epoch, snapshotFromDB.Epoch)
+	assert.Equal(t, epoch*fixedEpochSize, snapshotFromDB.EpochEndingBlock)
 
 	for i, v := range snapshot {
-		assert.Equal(t, v.Address, snapshotFromDB[i].Address)
-		assert.Equal(t, v.BlsKey, snapshotFromDB[i].BlsKey)
+		assert.Equal(t, v.Address, snapshotFromDB.Snapshot[i].Address)
+		assert.Equal(t, v.BlsKey, snapshotFromDB.Snapshot[i].BlsKey)
 	}
 
 	assert.NoError(t, state.cleanValidatorSnapshotsFromDB(epoch))

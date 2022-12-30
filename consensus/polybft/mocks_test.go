@@ -68,17 +68,22 @@ func (m *blockchainMock) GetStateProvider(transition *state.Transition) contract
 
 func (m *blockchainMock) GetHeaderByNumber(number uint64) (*types.Header, bool) {
 	args := m.Called(number)
-	header, ok := args.Get(0).(*types.Header)
 
-	if ok {
-		return header, true
-	}
+	if len(args) == 1 {
+		header, ok := args.Get(0).(*types.Header)
 
-	getHeaderCallback, ok := args.Get(0).(func(number uint64) *types.Header)
-	if ok {
-		h := getHeaderCallback(number)
+		if ok {
+			return header, true
+		}
 
-		return h, h != nil
+		getHeaderCallback, ok := args.Get(0).(func(number uint64) *types.Header)
+		if ok {
+			h := getHeaderCallback(number)
+
+			return h, h != nil
+		}
+	} else if len(args) == 2 {
+		return args.Get(0).(*types.Header), args.Get(1).(bool) //nolint:forcetypeassert
 	}
 
 	panic("Unsupported mock for GetHeaderByNumber")

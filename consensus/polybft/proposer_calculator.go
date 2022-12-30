@@ -234,14 +234,9 @@ func (pc *ProposerCalculator) updatePerBlock(blockNumber uint64) error {
 		return fmt.Errorf("proposer calculator update wrong block=%d, height = %d", blockNumber, pc.snapshot.Height)
 	}
 
-	currentHeader, found := pc.config.blockchain.GetHeaderByNumber(blockNumber)
-	if !found {
-		return fmt.Errorf("cannot get header by number: %d", blockNumber)
-	}
-
-	extra, err := GetIbftExtra(currentHeader.ExtraData)
+	_, extra, err := getBlockData(blockNumber, pc.config.blockchain)
 	if err != nil {
-		return fmt.Errorf("cannot get ibft extra for block while updating proposer snapshot %d: %w", blockNumber, err)
+		return fmt.Errorf("cannot get block header and extra while updating proposer snapshot %d: %w", blockNumber, err)
 	}
 
 	var newValidatorSet AccountSet = nil
@@ -249,7 +244,7 @@ func (pc *ProposerCalculator) updatePerBlock(blockNumber uint64) error {
 	if extra.Validators != nil && !extra.Validators.IsEmpty() {
 		newValidatorSet, err = pc.config.polybftBackend.GetValidators(blockNumber, nil)
 		if err != nil {
-			return fmt.Errorf("cannot get ibft extra for block %d: %w", blockNumber, err)
+			return fmt.Errorf("cannot get validators for block %d: %w", blockNumber, err)
 		}
 	}
 
