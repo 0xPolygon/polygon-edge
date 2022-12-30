@@ -229,8 +229,6 @@ func (s *stateSyncManager) Commitment() (*CommitmentMessageSigned, error) {
 
 	var largestCommitment *CommitmentMessageSigned
 
-	s.logger.Info("Getting commitment to submit...", "pendingCommitments", len(s.pendingCommitments))
-
 	// we start from the end, since last pending commitment is the largest one
 	for i := len(s.pendingCommitments) - 1; i >= 0; i-- {
 		commitment := s.pendingCommitments[i]
@@ -260,8 +258,6 @@ func (s *stateSyncManager) Commitment() (*CommitmentMessageSigned, error) {
 
 		break
 	}
-
-	s.logger.Info("Getting commitment to submit finished.", "isNil", largestCommitment == nil)
 
 	return largestCommitment, nil
 }
@@ -440,7 +436,8 @@ func (s *stateSyncManager) buildProofs(commitmentMsg *CommitmentMessage) error {
 
 // buildCommitment builds a new commitment, signs it and gossips its vote for it
 func (s *stateSyncManager) buildCommitment() error {
-	s.lock.RLock()
+	s.lock.Lock()
+	defer s.lock.Unlock()
 
 	epoch := s.epoch
 	fromIndex := s.nextCommittedIndex
@@ -460,8 +457,6 @@ func (s *stateSyncManager) buildCommitment() error {
 		// already built a commitment of this size which is pending to be submitted
 		return nil
 	}
-
-	s.lock.RUnlock()
 
 	commitment, err := NewCommitment(epoch, stateSyncEvents)
 	if err != nil {
@@ -506,9 +501,6 @@ func (s *stateSyncManager) buildCommitment() error {
 		"from", commitment.FromIndex,
 		"to", commitment.ToIndex,
 	)
-
-	s.lock.Lock()
-	defer s.lock.Unlock()
 
 	s.pendingCommitments = append(s.pendingCommitments, commitment)
 
