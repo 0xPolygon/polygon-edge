@@ -164,14 +164,16 @@ func (t *TestServer) Stake(amount uint64) error {
 	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("stake"))
 }
 
-// RegisterValidator is a wrapper function which registers new validator
-func (t *TestServer) RegisterValidator(validatorSecrets string) error {
+// RegisterValidator is a wrapper function which registers new validator with given balance
+func (t *TestServer) RegisterValidator(secrets string, balance string, stake string) error {
 	args := []string{
 		"polybft",
 		"register-validator",
-		"--data-dir", path.Join(t.clusterConfig.TmpDir, validatorSecrets),
+		"--data-dir", path.Join(t.clusterConfig.TmpDir, secrets),
 		"--registrator-data-dir", path.Join(t.clusterConfig.TmpDir, "test-chain-1"),
 		"--jsonrpc", t.JSONRPCAddr(),
+		"--balance", balance,
+		"--stake", stake,
 	}
 
 	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("register-validator"))

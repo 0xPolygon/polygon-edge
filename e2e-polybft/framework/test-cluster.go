@@ -63,6 +63,7 @@ type TestClusterConfig struct {
 
 	Name              string
 	Premine           []types.Address
+	PremineValidators string
 	HasBridge         bool
 	BootnodeCount     int
 	NonValidatorCount int
@@ -70,6 +71,7 @@ type TestClusterConfig struct {
 	WithStdout        bool
 	LogsDir           string
 	TmpDir            string
+	BlockGasLimit     uint64
 	ContractsDir      string
 	ValidatorPrefix   string
 	Binary            string
@@ -148,6 +150,12 @@ func WithPremine(addresses ...types.Address) ClusterOption {
 	}
 }
 
+func WithPremineValidators(premineBalance string) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.PremineValidators = premineBalance
+	}
+}
+
 func WithBridge() ClusterOption {
 	return func(h *TestClusterConfig) {
 		h.HasBridge = true
@@ -183,6 +191,12 @@ func WithEpochReward(epochReward int) ClusterOption {
 	}
 }
 
+func WithBlockGasLimit(blockGasLimit uint64) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.BlockGasLimit = blockGasLimit
+	}
+}
+
 func isTrueEnv(e string) bool {
 	return strings.ToLower(os.Getenv(e)) == "true"
 }
@@ -198,13 +212,14 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 	require.NoError(t, err)
 
 	config := &TestClusterConfig{
-		t:           t,
-		WithLogs:    isTrueEnv(envLogsEnabled),
-		WithStdout:  isTrueEnv(envStdoutEnabled),
-		TmpDir:      tmpDir,
-		Binary:      resolveBinary(),
-		EpochSize:   10,
-		EpochReward: 1,
+		t:             t,
+		WithLogs:      isTrueEnv(envLogsEnabled),
+		WithStdout:    isTrueEnv(envStdoutEnabled),
+		TmpDir:        tmpDir,
+		Binary:        resolveBinary(),
+		EpochSize:     10,
+		EpochReward:   1,
+		BlockGasLimit: 1e7, // 10M
 	}
 
 	if config.ContractsDir == "" {
@@ -238,7 +253,8 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 	cluster.cmdRun("manifest",
 		"--path", manifestPath,
 		"--validators-path", tmpDir,
-		"--validators-prefix", cluster.Config.ValidatorPrefix)
+		"--validators-prefix", cluster.Config.ValidatorPrefix,
+		"--premine-validators", cluster.Config.PremineValidators)
 
 	if cluster.Config.HasBridge {
 		// start bridge
@@ -267,6 +283,7 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			"--consensus", "polybft",
 			"--dir", path.Join(tmpDir, "genesis.json"),
 			"--contracts-path", defaultContractsPath,
+			"--block-gas-limit", strconv.FormatUint(cluster.Config.BlockGasLimit, 10),
 			"--epoch-size", strconv.Itoa(cluster.Config.EpochSize),
 			"--epoch-reward", strconv.Itoa(cluster.Config.EpochReward),
 			"--premine", "0x0000000000000000000000000000000000000000",
@@ -287,9 +304,11 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		validators, err := genesis.ReadValidatorsByPrefix(cluster.Config.TmpDir, cluster.Config.ValidatorPrefix)
 		require.NoError(t, err)
 
-		// premine all the validators by default
-		for _, validator := range validators {
-			args = append(args, "--premine", validator.Address.String())
+		if cluster.Config.PremineValidators == "" {
+			// premine all the validators by default
+			for _, validator := range validators {
+				args = append(args, "--premine", validator.Address.String())
+			}
 		}
 
 		if cluster.Config.BootnodeCount > 0 {
@@ -490,6 +509,10 @@ func runCommand(binary string, args []string, stdout io.Writer) error {
 	cmd.Stdout = stdout
 
 	if err := cmd.Run(); err != nil {
+		if stdErr.Len() > 0 {
+			return fmt.Errorf("failed to execute command: %s", stdErr.String())
+		}
+
 		return fmt.Errorf("failed to execute command: %w", err)
 	}
 

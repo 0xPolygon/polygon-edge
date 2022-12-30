@@ -38,11 +38,13 @@ func ParseUint256orHex(val *string) (*big.Int, error) {
 		base = 16
 	}
 
-	b, ok := new(big.Int).SetString(str, base)
-
-	if !ok {
-		return nil, fmt.Errorf("could not parse")
+	floatValue, _, err := big.ParseFloat(str, base, 0, big.ToNearestEven)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse: %w", err)
 	}
+
+	b := new(big.Int)
+	b, _ = floatValue.Int(b)
 
 	return b, nil
 }
