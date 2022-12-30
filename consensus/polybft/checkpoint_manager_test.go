@@ -113,7 +113,7 @@ func TestCheckpointManager_abiEncodeCheckpointBlock(t *testing.T) {
 	header := &types.Header{Number: 50}
 	checkpoint := &CheckpointData{
 		BlockRound:  1,
-		EpochNumber: getEpochNumber(header.Number, epochSize),
+		EpochNumber: getEpochNumber(t, header.Number, epochSize),
 		EventRoot:   types.BytesToHash(generateRandomBytes(t)),
 	}
 

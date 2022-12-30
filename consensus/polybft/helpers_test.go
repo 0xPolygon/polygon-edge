@@ -65,3 +65,17 @@ func generateRandomBytes(t *testing.T) (result []byte) {
 
 	return
 }
+
+// getEpochNumber returns epoch number for given blockNumber and epochSize.
+// Epoch number is derived as a result of division of block number and epoch size.
+// Since epoch number is 1-based (0 block represents special case zero epoch),
+// we are incrementing result by one for non epoch-ending blocks.
+func getEpochNumber(t *testing.T, blockNumber, epochSize uint64) uint64 {
+	t.Helper()
+
+	if isEndOfPeriod(blockNumber, epochSize) {
+		return blockNumber / epochSize
+	}
+
+	return blockNumber/epochSize + 1
+}

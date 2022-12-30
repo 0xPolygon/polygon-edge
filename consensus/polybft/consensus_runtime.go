@@ -10,7 +10,6 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
@@ -63,6 +62,8 @@ type checkpointBackend interface {
 type epochMetadata struct {
 	// Number is the number of the epoch
 	Number uint64
+
+	FirstBlockInEpoch uint64
 
 	// Validators is the set of validators for the epoch
 	Validators AccountSet
@@ -256,7 +257,9 @@ func (c *consensusRuntime) OnBlockInserted(block *types.Block) {
 		err   error
 	)
 
-	if c.isEndOfEpoch(block.Header.Number) {
+	// TODO - this condition will need to be changed to recognize that either slashing happened
+	// or epoch reached its fixed size
+	if c.isFixedSizeOfEpochMet(block.Header.Number, c.epoch) {
 		if epoch, err = c.restartEpoch(block.Header); err != nil {
 			c.logger.Error("failed to restart epoch after block inserted", "error", err)
 
@@ -265,7 +268,7 @@ func (c *consensusRuntime) OnBlockInserted(block *types.Block) {
 	}
 
 	if err := c.proposerCalculator.Update(block.Number()); err != nil {
-		// do not return if prposer snapshot hasn't been inserted, next call of OnBlockInserted will catch-up
+		// do not return if proposer snapshot hasn't been inserted, next call of OnBlockInserted will catch-up
 		c.logger.Warn("Could not update proposer calculator", "err", err)
 	}
 
@@ -370,9 +373,12 @@ func (c *consensusRuntime) FSM() error {
 		return fmt.Errorf("cannot create block builder for fsm: %w", err)
 	}
 
+	// TODO - recognize slashing occurred
+	slash := false
+
 	pendingBlockNumber := parent.Number + 1
-	isEndOfSprint := c.isEndOfSprint(pendingBlockNumber)
-	isEndOfEpoch := c.isEndOfEpoch(pendingBlockNumber)
+	isEndOfSprint := slash || c.isFixedSizeOfSprintMet(pendingBlockNumber, epoch)
+	isEndOfEpoch := slash || c.isFixedSizeOfEpochMet(pendingBlockNumber, epoch)
 
 	valSet := NewValidatorSet(epoch.Validators, c.logger)
 
@@ -452,6 +458,11 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) (*epochMetadata, e
 		Validators: validatorSet,
 	})
 
+	firstBlockInEpoch, err := c.getFirstBlockOfEpoch(epochNumber, header)
+	if err != nil {
+		return nil, err
+	}
+
 	if err := c.state.cleanEpochsFromDB(); err != nil {
 		c.logger.Error("Could not clean previous epochs from db.", "error", err)
 	}
@@ -480,12 +491,14 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) (*epochMetadata, e
 		"block number", header.Number,
 		"epoch", epochNumber,
 		"validators", validatorSet.Len(),
+		"firstBlockInEpoch", firstBlockInEpoch,
 	)
 
 	return &epochMetadata{
-		Number:     epochNumber,
-		Validators: validatorSet,
-		Commitment: commitment,
+		Number:            epochNumber,
+		Validators:        validatorSet,
+		Commitment:        commitment,
+		FirstBlockInEpoch: firstBlockInEpoch,
 	}, nil
 }
 
@@ -726,21 +739,11 @@ func (c *consensusRuntime) deliverMessage(msg *TransportMessage) error {
 // and ending at the last block of previous epoch
 func (c *consensusRuntime) calculateUptime(currentBlock *types.Header, epoch *epochMetadata) (*CommitEpoch, error) {
 	uptimeCounter := map[types.Address]uint64{}
+	blockHeader := currentBlock
+	epochID := epoch.Number
 	totalBlocks := uint64(0)
 
-	if c.config.PolyBFTConfig.EpochSize < (uptimeLookbackSize + 1) {
-		// this means that epoch size must at least be 3 blocks,
-		// since we are not calculating uptime for lastBlockInEpoch and lastBlockInEpoch-1
-		// they will be included in the uptime calculation of next epoch
-		return nil, errEpochTooSmall
-	}
-
-	calculateUptimeForBlock := func(header *types.Header, validators AccountSet) error {
-		blockExtra, err := GetIbftExtra(header.ExtraData)
-		if err != nil {
-			return err
-		}
-
+	getSealersForBlock := func(blockExtra *Extra, validators AccountSet) error {
 		signers, err := validators.GetFilteredValidators(blockExtra.Parent.Bitmap)
 		if err != nil {
 			return err
@@ -755,49 +758,39 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header, epoch *ep
 		return nil
 	}
 
-	firstBlockInEpoch := calculateFirstBlockOfPeriod(currentBlock.Number, c.config.PolyBFTConfig.EpochSize)
-	lastBlockInPreviousEpoch := firstBlockInEpoch - 1
+	blockExtra, err := GetIbftExtra(currentBlock.ExtraData)
+	if err != nil {
+		return nil, err
+	}
 
-	startBlock := (epoch.Number * c.config.PolyBFTConfig.EpochSize) - c.config.PolyBFTConfig.EpochSize + 1
-	endBlock := getEndEpochBlockNumber(epoch.Number, c.config.PolyBFTConfig.EpochSize)
-
-	blockHeader := currentBlock
-	blockExists := false
-
-	for blockHeader.Number > firstBlockInEpoch {
-		if err := calculateUptimeForBlock(blockHeader, epoch.Validators); err != nil {
+	// calculate uptime for current epoch
+	for blockHeader.Number > epoch.FirstBlockInEpoch {
+		if err := getSealersForBlock(blockExtra, epoch.Validators); err != nil {
 			return nil, err
 		}
 
-		blockHeader, blockExists = c.config.blockchain.GetHeaderByNumber(blockHeader.Number - 1)
-		if !blockExists {
-			return nil, blockchain.ErrNoBlock
-		}
+		blockHeader, blockExtra, err = getBlockData(blockHeader.Number-1, c.config.blockchain)
 	}
 
-	// since we need to calculate uptime for the last block of the previous epoch,
-	// we need to get the validators for the that epoch from the smart contract
-	// this is something that should probably be optimized
-	if lastBlockInPreviousEpoch > 0 { // do not calculate anything for genesis block
+	// calculate uptime for blocks from previous epoch that were not processed in previous uptime
+	// since we can not calculate uptime for the last block in epoch (because of parent signatures)
+	if blockHeader.Number > uptimeLookbackSize {
 		for i := 0; i < uptimeLookbackSize; i++ {
 			validators, err := c.config.polybftBackend.GetValidators(blockHeader.Number-2, nil)
 			if err != nil {
 				return nil, err
 			}
 
-			if err := calculateUptimeForBlock(blockHeader, validators); err != nil {
+			if err := getSealersForBlock(blockExtra, validators); err != nil {
 				return nil, err
 			}
 
-			blockHeader, blockExists = c.config.blockchain.GetHeaderByNumber(blockHeader.Number - 1)
-			if !blockExists {
-				return nil, blockchain.ErrNoBlock
-			}
+			blockHeader, blockExtra, err = getBlockData(blockHeader.Number-1, c.config.blockchain)
 		}
 	}
 
 	uptime := Uptime{
-		EpochID:     epoch.Number,
+		EpochID:     epochID,
 		TotalBlocks: totalBlocks,
 	}
 
@@ -819,8 +812,8 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header, epoch *ep
 	commitEpoch := &CommitEpoch{
 		EpochID: epoch.Number,
 		Epoch: Epoch{
-			StartBlock: startBlock,
-			EndBlock:   endBlock,
+			StartBlock: epoch.FirstBlockInEpoch,
+			EndBlock:   currentBlock.Number + 1,
 			EpochRoot:  types.Hash{},
 		},
 		Uptime: uptime,
@@ -919,14 +912,15 @@ func (c *consensusRuntime) isActiveValidator() bool {
 	return atomic.LoadUint32(&c.activeValidatorFlag) == 1
 }
 
-// isEndOfEpoch checks if an end of an epoch is reached with the current block
-func (c *consensusRuntime) isEndOfEpoch(blockNumber uint64) bool {
-	return isEndOfPeriod(blockNumber, c.config.PolyBFTConfig.EpochSize)
+// isFixedSizeOfEpochMet checks if epoch reached its end that was configured by its default size
+// this is only true if no slashing occurred in the given epoch
+func (c *consensusRuntime) isFixedSizeOfEpochMet(blockNumber uint64, epoch *epochMetadata) bool {
+	return epoch.FirstBlockInEpoch+c.config.PolyBFTConfig.EpochSize-1 == blockNumber
 }
 
-// isEndOfSprint checks if an end of an sprint is reached with the current block
-func (c *consensusRuntime) isEndOfSprint(blockNumber uint64) bool {
-	return isEndOfPeriod(blockNumber, c.config.PolyBFTConfig.SprintSize)
+// isFixedSizeOfSprintMet checks if an end of an sprint is reached with the current block
+func (c *consensusRuntime) isFixedSizeOfSprintMet(blockNumber uint64, epoch *epochMetadata) bool {
+	return (blockNumber-epoch.FirstBlockInEpoch+1)%c.config.PolyBFTConfig.SprintSize == 0
 }
 
 // getSystemState builds SystemState instance for the most current block header
@@ -1304,6 +1298,42 @@ func (c *consensusRuntime) BuildRoundChangeMessage(
 	return signedMsg
 }
 
+// getFirstBlockOfEpoch returns the first block of epoch in which provided header resides
+func (c *consensusRuntime) getFirstBlockOfEpoch(epochNumber uint64, latestHeader *types.Header) (uint64, error) {
+	if latestHeader.Number == 0 {
+		// if we are starting the chain, we know that the first block is block 1
+		return 1, nil
+	}
+
+	blockHeader := latestHeader
+
+	blockExtra, err := GetIbftExtra(latestHeader.ExtraData)
+	if err != nil {
+		return 0, err
+	}
+
+	if epochNumber != blockExtra.Checkpoint.EpochNumber {
+		// its a regular epoch ending. No out of sync happened
+		return latestHeader.Number + 1, nil
+	}
+
+	// node was out of sync, so we need to figure out what was the first block of the given epoch
+	epoch := blockExtra.Checkpoint.EpochNumber
+
+	var firstBlockInEpoch uint64
+
+	for blockExtra.Checkpoint.EpochNumber == epoch {
+		firstBlockInEpoch = blockHeader.Number
+		blockHeader, blockExtra, err = getBlockData(blockHeader.Number-1, c.config.blockchain)
+
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	return firstBlockInEpoch, nil
+}
+
 // validateVote validates if the senders address is in active validator set
 func validateVote(vote *MessageSignature, epoch *epochMetadata) error {
 	// get senders address
@@ -1333,4 +1363,19 @@ func createExitTree(exitEvents []*ExitEvent) (*MerkleTree, error) {
 	}
 
 	return NewMerkleTree(data)
+}
+
+// getSealersForBlock checks who sealed a given block and updates the counter
+func getSealersForBlock(sealersCounter map[types.Address]uint64,
+	blockExtra *Extra, validators AccountSet) error {
+	signers, err := validators.GetFilteredValidators(blockExtra.Parent.Bitmap)
+	if err != nil {
+		return err
+	}
+
+	for _, a := range signers.GetAddresses() {
+		sealersCounter[a]++
+	}
+
+	return nil
 }
