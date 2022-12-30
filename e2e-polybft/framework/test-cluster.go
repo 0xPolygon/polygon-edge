@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/genesis"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -212,14 +213,15 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 	require.NoError(t, err)
 
 	config := &TestClusterConfig{
-		t:             t,
-		WithLogs:      isTrueEnv(envLogsEnabled),
-		WithStdout:    isTrueEnv(envStdoutEnabled),
-		TmpDir:        tmpDir,
-		Binary:        resolveBinary(),
-		EpochSize:     10,
-		EpochReward:   1,
-		BlockGasLimit: 1e7, // 10M
+		t:                 t,
+		WithLogs:          isTrueEnv(envLogsEnabled),
+		WithStdout:        isTrueEnv(envStdoutEnabled),
+		TmpDir:            tmpDir,
+		Binary:            resolveBinary(),
+		EpochSize:         10,
+		EpochReward:       1,
+		BlockGasLimit:     1e7, // 10M
+		PremineValidators: command.DefaultPremineBalance,
 	}
 
 	if config.ContractsDir == "" {
@@ -249,12 +251,15 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 	}
 
 	manifestPath := path.Join(tmpDir, "manifest.json")
-	// run manifest file creation
-	cluster.cmdRun("manifest",
+	args := []string{
+		"manifest",
 		"--path", manifestPath,
 		"--validators-path", tmpDir,
 		"--validators-prefix", cluster.Config.ValidatorPrefix,
-		"--premine-validators", cluster.Config.PremineValidators)
+		"--premine-validators", cluster.Config.PremineValidators,
+	}
+	// run manifest file creation
+	require.NoError(t, cluster.cmdRun(args...))
 
 	if cluster.Config.HasBridge {
 		// start bridge
@@ -303,13 +308,6 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 
 		validators, err := genesis.ReadValidatorsByPrefix(cluster.Config.TmpDir, cluster.Config.ValidatorPrefix)
 		require.NoError(t, err)
-
-		if cluster.Config.PremineValidators == "" {
-			// premine all the validators by default
-			for _, validator := range validators {
-				args = append(args, "--premine", validator.Address.String())
-			}
-		}
 
 		if cluster.Config.BootnodeCount > 0 {
 			cnt := cluster.Config.BootnodeCount

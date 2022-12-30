@@ -102,12 +102,11 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	const (
 		validatorSize       = 5
 		newValidatorSecrets = "test-chain-6"
-		// 2M native tokens (so that we have enough funds to fund new validator)
-		premineBalance = "2e24"
+		premineBalance      = "0x1A784379D99DB42000000" // 2M native tokens (so that we have enough funds to fund new validator)
 	)
 
-	newValidatorStakeRaw := "1e23"
-	newValidatorBalanceRaw := "1e24" // 1M native tokens
+	newValidatorStakeRaw := "0x152D02C7E14AF6800000"   // 100k native tokens
+	newValidatorBalanceRaw := "0xD3C21BCECCEDA1000000" // 1M native tokens
 	newValidatorStake, err := types.ParseUint256orHex(&newValidatorStakeRaw)
 	require.NoError(t, err)
 

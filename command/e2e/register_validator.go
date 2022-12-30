@@ -22,8 +22,8 @@ import (
 )
 
 const (
-	defaultBalance = "1e24"
-	defaultStake   = "1e20"
+	defaultBalance = "0xD3C21BCECCEDA1000000" // 1e24
+	defaultStake   = "0x56BC75E2D63100000"    // 1e20
 )
 
 var params registerParams
