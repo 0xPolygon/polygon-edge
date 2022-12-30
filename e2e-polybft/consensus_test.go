@@ -189,3 +189,45 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	t.Logf("New validator rewards=%s\n", rewards)
 	require.True(t, rewards.Cmp(big.NewInt(0)) > 0)
 }
+
+func TestE2E_Consensus_AddDelegation_Undelegation(t *testing.T) {
+	const (
+		delegatorSecrets = "test-chain-6"
+		validatorSecrets = "test-chain-1"
+	)
+
+	cluster := framework.NewTestCluster(t, 5, framework.WithEpochReward(1000))
+	require.NoError(t, cluster.InitSecrets(delegatorSecrets, 1))
+	srv := cluster.Servers[0]
+
+	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(srv.JSONRPCAddr()))
+	require.NoError(t, err)
+
+	cluster.WaitForBlock(1, 10*time.Second)
+
+	delegatorAcc, err := sidechain.GetAccountFromDir(path.Join(cluster.Config.TmpDir, delegatorSecrets))
+	require.NoError(t, err)
+
+	validatorAcc, err := sidechain.GetAccountFromDir(path.Join(cluster.Config.TmpDir, validatorSecrets))
+	require.NoError(t, err)
+
+	delegatorAddr := delegatorAcc.Ecdsa.Address()
+	receipt, err := txRelayer.SendTransaction(&ethgo.Transaction{
+		From:  validatorAcc.Ecdsa.Address(),
+		To:    &delegatorAddr,
+		Value: big.NewInt(1000),
+	}, validatorAcc.Ecdsa)
+	require.NoError(t, err)
+	require.Equal(t, types.ReceiptSuccess, receipt.Status)
+
+	// cluster.WaitForBlock(15, 1*time.Minute)
+
+	validatorInfoRaw, err := sidechain.GetValidatorInfo(delegatorAddr, txRelayer)
+	require.NoError(t, err)
+
+	t.Log("Stake:", validatorInfoRaw["stake"].(*big.Int), "Total stake:", validatorInfoRaw["totalStake"].(*big.Int), "Reward:", validatorInfoRaw["withdrawableRewards"].(*big.Int))
+
+	require.NoError(t, srv.Delegate(700, path.Join(cluster.Config.TmpDir, delegatorSecrets), validatorAcc.Ecdsa.Address()))
+
+	cluster.WaitForBlock(30, 2*time.Minute)
+}
