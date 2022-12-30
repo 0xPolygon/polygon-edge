@@ -35,10 +35,10 @@ func TestValidatorsSnapshotCache_GetSnapshot_Build(t *testing.T) {
 
 	headersMap := &testHeadersMap{headersByNumber: make(map[uint64]*types.Header)}
 	createHeaders := func(fromBlock, toBlock uint64, oldValidators, newValidators AccountSet) {
-		headersMap.addHeader(createValidatorDeltaHeader(fromBlock, oldValidators, newValidators))
+		headersMap.addHeader(createValidatorDeltaHeader(t, fromBlock, oldValidators, newValidators))
 
 		for i := fromBlock + 1; i <= toBlock; i++ {
-			headersMap.addHeader(createValidatorDeltaHeader(i, nil, nil))
+			headersMap.addHeader(createValidatorDeltaHeader(t, i, nil, nil))
 		}
 	}
 
@@ -245,8 +245,8 @@ func TestValidatorsSnapshotCache_ComputeSnapshot_ApplyDeltaFail(t *testing.T) {
 
 	allValidators := newTestValidators(totalValidators).getPublicIdentities()
 	headersMap := &testHeadersMap{}
-	headersMap.addHeader(createValidatorDeltaHeader(0, nil, allValidators[:validatorSetSize]))
-	headersMap.addHeader(createValidatorDeltaHeader(1*epochSize, nil, allValidators[:validatorSetSize]))
+	headersMap.addHeader(createValidatorDeltaHeader(t, 0, nil, allValidators[:validatorSetSize]))
+	headersMap.addHeader(createValidatorDeltaHeader(t, 1*epochSize, nil, allValidators[:validatorSetSize]))
 
 	blockchainMock := new(blockchainMock)
 	blockchainMock.On("GetHeaderByNumber", mock.Anything).Return(headersMap.getHeader)
@@ -260,7 +260,9 @@ func TestValidatorsSnapshotCache_ComputeSnapshot_ApplyDeltaFail(t *testing.T) {
 	assertions.ErrorContains(err, "failed to apply delta to the validators snapshot, block#10")
 }
 
-func createValidatorDeltaHeader(number uint64, oldValidatorSet, newValidatorSet AccountSet) *types.Header {
+func createValidatorDeltaHeader(t *testing.T, number uint64, oldValidatorSet, newValidatorSet AccountSet) *types.Header {
+	t.Helper()
+
 	delta, _ := createValidatorSetDelta(oldValidatorSet, newValidatorSet)
 	extra := &Extra{Validators: delta}
 
