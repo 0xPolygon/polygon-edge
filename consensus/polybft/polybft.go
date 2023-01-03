@@ -245,14 +245,14 @@ func (p *Polybft) Start() error {
 // initRuntime creates consensus runtime
 func (p *Polybft) initRuntime() error {
 	runtimeConfig := &runtimeConfig{
-		PolyBFTConfig:   p.consensusConfig,
-		Key:             p.key,
-		DataDir:         p.dataDir,
-		BridgeTransport: &runtimeTransportWrapper{p.bridgeTopic, p.logger},
-		State:           p.state,
-		blockchain:      p.blockchain,
-		polybftBackend:  p,
-		txPool:          p.txPool,
+		PolyBFTConfig:  p.consensusConfig,
+		Key:            p.key,
+		DataDir:        p.dataDir,
+		State:          p.state,
+		blockchain:     p.blockchain,
+		polybftBackend: p,
+		txPool:         p.txPool,
+		bridgeTopic:    p.bridgeTopic,
 	}
 
 	runtime, err := newConsensusRuntime(p.logger, runtimeConfig)
@@ -267,18 +267,6 @@ func (p *Polybft) initRuntime() error {
 
 // startRuntime starts consensus runtime
 func (p *Polybft) startRuntime() error {
-	if p.runtime.IsBridgeEnabled() {
-		// start bridge event tracker
-		if err := p.runtime.startEventTracker(); err != nil {
-			return fmt.Errorf("starting event tracker  failed: %w", err)
-		}
-
-		// subscribe to bridge topic
-		if err := p.runtime.subscribeToBridgeTopic(p.bridgeTopic); err != nil {
-			return fmt.Errorf("bridge topic subscription failed: %w", err)
-		}
-	}
-
 	go p.startConsensusProtocol()
 
 	return nil

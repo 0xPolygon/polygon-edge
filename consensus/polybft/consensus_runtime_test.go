@@ -1,7 +1,6 @@
 package polybft
 
 import (
-	"bytes"
 	"fmt"
 	"math/big"
 	"math/rand"
@@ -21,159 +20,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
-	"github.com/umbracle/ethgo/abi"
 )
-
-func TestConsensusRuntime_GetVotes(t *testing.T) {
-	t.Parallel()
-
-	const (
-		epoch           = uint64(1)
-		validatorsCount = 7
-		stateSyncsCount = 15
-	)
-
-	validatorIds := []string{"A", "B", "C", "D", "E", "F", "G"}
-	validators := newTestValidatorsWithAliases(validatorIds)
-	validatorAccs := validators.getPublicIdentities()
-	state := newTestState(t)
-	runtime := &consensusRuntime{
-		state: state,
-		epoch: &epochMetadata{
-			Number:     epoch,
-			Validators: validatorAccs,
-		},
-	}
-
-	commitment, _, _ := buildCommitmentAndStateSyncs(t, stateSyncsCount, epoch, 0)
-
-	require.NoError(t, state.insertEpoch(epoch))
-
-	votesCount := int(getQuorumSize(validatorAccs.GetTotalVotingPower()).Int64())
-	hash, err := commitment.Hash()
-	require.NoError(t, err)
-
-	for i := 0; i < votesCount; i++ {
-		validator := validators.getValidator(validatorIds[i])
-		signature, err := validator.mustSign(hash.Bytes()).Marshal()
-		require.NoError(t, err)
-
-		_, err = state.insertMessageVote(epoch, hash.Bytes(),
-			&MessageSignature{
-				From:      validator.Key().String(),
-				Signature: signature,
-			})
-		require.NoError(t, err)
-	}
-
-	votes, err := runtime.state.getMessageVotes(runtime.epoch.Number, hash.Bytes())
-	require.NoError(t, err)
-	require.Len(t, votes, votesCount)
-}
-
-func TestConsensusRuntime_GetVotesError(t *testing.T) {
-	t.Parallel()
-
-	const (
-		epoch           = uint64(1)
-		stateSyncsCount = 30
-		startIndex      = 0
-	)
-
-	state := newTestState(t)
-	runtime := &consensusRuntime{state: state}
-	commitment, _, _ := buildCommitmentAndStateSyncs(t, 5, epoch, startIndex)
-	hash, err := commitment.Hash()
-	require.NoError(t, err)
-	_, err = runtime.state.getMessageVotes(epoch, hash.Bytes())
-	assert.ErrorContains(t, err, "could not find")
-}
-
-func TestConsensusRuntime_deliverMessage_MessageWhenEpochNotStarted(t *testing.T) {
-	t.Parallel()
-
-	const epoch = uint64(5)
-
-	validatorIds := []string{"A", "B", "C", "D", "E", "F", "G"}
-	state := newTestState(t)
-	validators := newTestValidatorsWithAliases(validatorIds)
-	localValidator := validators.getValidator("A")
-	runtime := &consensusRuntime{
-		logger:              hclog.NewNullLogger(),
-		activeValidatorFlag: 1,
-		state:               state,
-		config:              &runtimeConfig{Key: localValidator.Key()},
-		epoch: &epochMetadata{
-			Number:     epoch,
-			Validators: validators.getPublicIdentities(),
-		},
-		lastBuiltBlock: &types.Header{},
-	}
-
-	// dummy hash
-	hash := crypto.Keccak256Hash(generateRandomBytes(t)).Bytes()
-
-	// insert dummy epoch to the state
-	require.NoError(t, state.insertEpoch(epoch))
-
-	// insert dummy message vote
-	_, err := runtime.state.insertMessageVote(epoch, hash,
-		createTestMessageVote(t, hash, localValidator))
-	require.NoError(t, err)
-
-	// prevent node sender is the local node
-	senderID := ""
-	for senderID == "" || senderID == localValidator.alias {
-		senderID = validatorIds[rand.Intn(len(validatorIds))]
-	}
-	// deliverMessage should not fail, although epochMetadata is not initialized
-	// message vote should be added to the consensus runtime state.
-	err = runtime.deliverMessage(createTestTransportMessage(t, hash, epoch, validators.getValidator(senderID).Key()))
-	require.NoError(t, err)
-
-	// assert that no additional message signatures aren't inserted into the consensus runtime state
-	// (other than the one we have previously inserted by ourselves)
-	signatures, err := runtime.state.getMessageVotes(epoch, hash)
-	require.NoError(t, err)
-	require.Len(t, signatures, 2)
-}
-
-func TestConsensusRuntime_AddLog(t *testing.T) {
-	t.Parallel()
-
-	state := newTestState(t)
-	runtime := &consensusRuntime{
-		logger: hclog.NewNullLogger(),
-		state:  state,
-		config: &runtimeConfig{Key: createTestKey(t)},
-	}
-	topics := make([]ethgo.Hash, 4)
-	topics[0] = stateTransferEventABI.ID()
-	topics[1] = ethgo.BytesToHash([]byte{0x1})
-	topics[2] = ethgo.BytesToHash(runtime.config.Key.Address().Bytes())
-	topics[3] = ethgo.BytesToHash(contracts.NativeTokenContract[:])
-	personType := abi.MustNewType("tuple(string firstName, string lastName)")
-	encodedData, err := personType.Encode(map[string]string{"firstName": "John", "lastName": "Doe"})
-	require.NoError(t, err)
-
-	log := &ethgo.Log{
-		LogIndex:        uint64(0),
-		BlockNumber:     uint64(0),
-		TransactionHash: ethgo.BytesToHash(generateRandomBytes(t)),
-		BlockHash:       ethgo.BytesToHash(generateRandomBytes(t)),
-		Address:         ethgo.ZeroAddress,
-		Topics:          topics,
-		Data:            encodedData,
-	}
-	event, err := decodeStateSyncEvent(log)
-	require.NoError(t, err)
-	runtime.AddLog(log)
-
-	stateSyncs, err := runtime.state.getStateSyncEventsForCommitment(1, 1)
-	require.NoError(t, err)
-	require.Len(t, stateSyncs, 1)
-	require.Equal(t, event.ID, stateSyncs[0].ID)
-}
 
 func TestConsensusRuntime_isFixedSizeOfEpochMet_NotReachedEnd(t *testing.T) {
 	t.Parallel()
@@ -328,109 +175,6 @@ func TestConsensusRuntime_isFixedSizeOfSprintMet_ReachedEnd(t *testing.T) {
 	}
 }
 
-func TestConsensusRuntime_deliverMessage_EpochNotStarted(t *testing.T) {
-	t.Parallel()
-
-	state := newTestState(t)
-	err := state.insertEpoch(1)
-	assert.NoError(t, err)
-
-	// random node not among validator set
-	account := newTestValidator("A", 1)
-
-	runtime := &consensusRuntime{
-		logger: hclog.NewNullLogger(),
-		state:  state,
-		config: &runtimeConfig{
-			PolyBFTConfig: &PolyBFTConfig{
-				EpochSize: 1,
-			},
-			Key: account.Key(),
-		},
-		epoch: &epochMetadata{
-			Number:     1,
-			Validators: newTestValidators(5).getPublicIdentities(),
-		},
-		lastBuiltBlock: &types.Header{},
-	}
-
-	msg := createTestTransportMessage(t, generateRandomBytes(t), 1, account.Key())
-	err = runtime.deliverMessage(msg)
-	assert.ErrorContains(t, err, "not among the active validator set")
-
-	votes, err := state.getMessageVotes(1, msg.Hash)
-	assert.NoError(t, err)
-	assert.Empty(t, votes)
-}
-
-func TestConsensusRuntime_deliverMessage_ForExistingEpochAndCommitmentMessage(t *testing.T) {
-	t.Parallel()
-
-	state := newTestState(t)
-	err := state.insertEpoch(1)
-	require.NoError(t, err)
-
-	validators := newTestValidatorsWithAliases([]string{"SENDER", "RECEIVER"})
-	validatorSet := validators.getPublicIdentities()
-	sender := validators.getValidator("SENDER").Key()
-
-	runtime := &consensusRuntime{
-		logger:              hclog.NewNullLogger(),
-		state:               state,
-		activeValidatorFlag: 1,
-		config: &runtimeConfig{
-			PolyBFTConfig: &PolyBFTConfig{
-				EpochSize: 1,
-			},
-		},
-		epoch: &epochMetadata{
-			Number:     1,
-			Validators: validatorSet,
-		},
-		lastBuiltBlock: &types.Header{},
-	}
-
-	msg := createTestTransportMessage(t, generateRandomBytes(t), 1, sender)
-	err = runtime.deliverMessage(msg)
-	assert.NoError(t, err)
-
-	votes, err := state.getMessageVotes(1, msg.Hash)
-	assert.NoError(t, err)
-	assert.Equal(t, 1, len(votes))
-	assert.True(t, bytes.Equal(msg.Signature, votes[0].Signature))
-}
-
-func TestConsensusRuntime_deliverMessage_SenderMessageNotInCurrentValidatorset(t *testing.T) {
-	t.Parallel()
-
-	state := newTestState(t)
-	err := state.insertEpoch(1)
-	require.NoError(t, err)
-
-	validators := newTestValidators(6)
-
-	runtime := &consensusRuntime{
-		state:               state,
-		activeValidatorFlag: 1,
-		config: &runtimeConfig{
-			PolyBFTConfig: &PolyBFTConfig{
-				EpochSize: 1,
-			},
-		},
-		epoch: &epochMetadata{
-			Number:     1,
-			Validators: validators.getPublicIdentities(),
-		},
-		lastBuiltBlock: &types.Header{},
-	}
-
-	msg := createTestTransportMessage(t, generateRandomBytes(t), 1, createTestKey(t))
-	err = runtime.deliverMessage(msg)
-	assert.Error(t, err)
-	assert.ErrorContains(t, err,
-		fmt.Sprintf("message is received from sender %s, which is not in current validator set", msg.NodeID))
-}
-
 func TestConsensusRuntime_OnBlockInserted_EndOfEpoch(t *testing.T) {
 	t.Parallel()
 
@@ -480,7 +224,8 @@ func TestConsensusRuntime_OnBlockInserted_EndOfEpoch(t *testing.T) {
 			Number:            currentEpochNumber,
 			FirstBlockInEpoch: header.Number - epochSize + 1,
 		},
-		lastBuiltBlock: &types.Header{Number: header.Number - 1},
+		lastBuiltBlock:   &types.Header{Number: header.Number - 1},
+		stateSyncManager: &dummyStateSyncManager{},
 	}
 	runtime.OnBlockInserted(builtBlock)
 
@@ -602,8 +347,9 @@ func TestConsensusRuntime_FSM_NotEndOfEpoch_NotEndOfSprint(t *testing.T) {
 			Validators:        validators.getPublicIdentities(),
 			FirstBlockInEpoch: 1,
 		},
-		lastBuiltBlock: lastBlock,
-		state:          newTestState(t),
+		lastBuiltBlock:   lastBlock,
+		state:            newTestState(t),
+		stateSyncManager: &dummyStateSyncManager{},
 	}
 
 	err := runtime.FSM()
@@ -623,75 +369,40 @@ func TestConsensusRuntime_FSM_NotEndOfEpoch_NotEndOfSprint(t *testing.T) {
 	blockchainMock.AssertExpectations(t)
 }
 
-func TestConsensusRuntime_FSM_EndOfEpoch_BuildRegisterCommitment_And_Uptime(t *testing.T) {
+func TestConsensusRuntime_FSM_EndOfEpoch_BuildUptime(t *testing.T) {
 	t.Parallel()
 
 	const (
-		epoch               = 1
-		epochSize           = uint64(10)
-		firstBlockInEpoch   = uint64(1)
-		sprintSize          = uint64(3)
-		commitmentSize      = 10
-		beginStateSyncIndex = uint64(0)
-		fromIndex           = uint64(0)
-		toIndex             = uint64(9)
+		epoch             = 0
+		epochSize         = uint64(10)
+		sprintSize        = uint64(3)
+		firstBlockInEpoch = uint64(1)
+		fromIndex         = uint64(0)
+		toIndex           = uint64(9)
 	)
 
 	validatorAccounts := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
 	validators := validatorAccounts.getPublicIdentities()
-	accounts := validatorAccounts.getPrivateIdentities()
 
 	lastBuiltBlock, headerMap := createTestBlocks(t, 9, epochSize, validators)
 
-	systemStateMock := new(systemStateMock)
-	systemStateMock.On("GetNextCommittedIndex").Return(beginStateSyncIndex, nil).Once()
-
 	blockchainMock := new(blockchainMock)
 	blockchainMock.On("NewBlockBuilder", mock.Anything).Return(&BlockBuilder{}, nil).Once()
-	blockchainMock.On("GetStateProviderForBlock", mock.Anything).Return(new(stateProviderMock)).Once()
-	blockchainMock.On("GetSystemState", mock.Anything, mock.Anything).Return(systemStateMock)
 	blockchainMock.On("GetHeaderByNumber", mock.Anything).Return(headerMap.getHeader)
 
 	state := newTestState(t)
 	require.NoError(t, state.insertEpoch(epoch))
 
-	stateSyncs := generateStateSyncEvents(t, commitmentSize, 0)
-	for _, event := range stateSyncs {
-		require.NoError(t, state.insertStateSyncEvent(event))
-	}
-
-	trie, err := createMerkleTree(stateSyncs)
-	require.NoError(t, err)
-
-	commitment := &Commitment{MerkleTree: trie, Epoch: epoch}
-
-	hash, err := commitment.Hash()
-	require.NoError(t, err)
-
-	for _, a := range accounts {
-		signature, err := a.Bls.Sign(hash.Bytes())
-		require.NoError(t, err)
-		signatureRaw, err := signature.Marshal()
-		require.NoError(t, err)
-		_, err = state.insertMessageVote(epoch, hash.Bytes(), &MessageSignature{
-			From:      a.Ecdsa.Address().String(),
-			Signature: signatureRaw,
-		})
-		require.NoError(t, err)
-	}
-
 	metadata := &epochMetadata{
 		Validators:        validators,
 		Number:            epoch,
 		FirstBlockInEpoch: firstBlockInEpoch,
-		Commitment:        commitment,
 	}
 
 	config := &runtimeConfig{
 		PolyBFTConfig: &PolyBFTConfig{
 			EpochSize:  epochSize,
 			SprintSize: sprintSize,
-			Bridge:     &BridgeConfig{},
 		},
 		Key:        validatorAccounts.getValidator("A").Key(),
 		blockchain: blockchainMock,
@@ -705,170 +416,17 @@ func TestConsensusRuntime_FSM_EndOfEpoch_BuildRegisterCommitment_And_Uptime(t *t
 		epoch:              metadata,
 		config:             config,
 		lastBuiltBlock:     lastBuiltBlock,
-	}
-
-	err = runtime.FSM()
-	fsm := runtime.fsm
-
-	assert.NoError(t, err)
-	assert.True(t, fsm.isEndOfEpoch)
-	assert.NotNil(t, fsm.uptimeCounter)
-	assert.NotEmpty(t, fsm.uptimeCounter)
-	assert.NotNil(t, fsm.proposerCommitmentToRegister)
-	assert.Equal(t, fromIndex, fsm.proposerCommitmentToRegister.Message.FromIndex)
-	assert.Equal(t, toIndex, fsm.proposerCommitmentToRegister.Message.ToIndex)
-	assert.Equal(t, trie.Hash(), fsm.proposerCommitmentToRegister.Message.MerkleRootHash)
-
-	systemStateMock.AssertExpectations(t)
-	blockchainMock.AssertExpectations(t)
-}
-
-func TestConsensusRuntime_FSM_EndOfEpoch_RegisterCommitmentNotFound(t *testing.T) {
-	t.Parallel()
-
-	const (
-		epochSize           = uint64(10)
-		sprintSize          = uint64(5)
-		beginStateSyncIndex = uint64(5)
-	)
-
-	validatorAccs := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
-	validators := validatorAccs.getPublicIdentities()
-	lastBuiltBlock, headerMap := createTestBlocks(t, 9, epochSize, validators)
-
-	systemStateMock := new(systemStateMock)
-	systemStateMock.On("GetNextCommittedIndex").Return(beginStateSyncIndex, nil).Once()
-
-	blockchainMock := new(blockchainMock)
-	blockchainMock.On("NewBlockBuilder", mock.Anything).Return(new(blockBuilderMock), nil).Once()
-	blockchainMock.On("GetStateProviderForBlock", mock.Anything).Return(new(stateProviderMock)).Once()
-	blockchainMock.On("GetSystemState", mock.Anything, mock.Anything).Return(systemStateMock)
-	blockchainMock.On("GetHeaderByNumber", mock.Anything).Return(headerMap.getHeader)
-
-	epoch := getEpochNumber(t, lastBuiltBlock.Number, epochSize)
-	metadata := &epochMetadata{
-		Validators:        validators,
-		Number:            epoch,
-		FirstBlockInEpoch: epoch*epochSize - epochSize + 1,
-	}
-
-	config := &runtimeConfig{
-		PolyBFTConfig: &PolyBFTConfig{
-			EpochSize:  epochSize,
-			SprintSize: sprintSize,
-			Bridge:     &BridgeConfig{},
-		},
-		Key:        validatorAccs.getValidator("A").Key(),
-		blockchain: blockchainMock,
-	}
-
-	snapshot := NewProposerSnapshot(1, nil)
-	runtime := &consensusRuntime{
-		proposerCalculator: NewProposerCalculatorFromSnapshot(snapshot, config, hclog.NewNullLogger()),
-		logger:             hclog.NewNullLogger(),
-		epoch:              metadata,
-		config:             config,
-		lastBuiltBlock:     lastBuiltBlock,
-		state:              newTestState(t),
+		stateSyncManager:   &dummyStateSyncManager{},
 	}
 
 	err := runtime.FSM()
 	fsm := runtime.fsm
 
-	require.NoError(t, err)
-	require.NotNil(t, fsm)
-	require.Nil(t, fsm.proposerCommitmentToRegister)
-	require.True(t, fsm.isEndOfEpoch)
-	require.NotNil(t, fsm.uptimeCounter)
-	require.NotEmpty(t, fsm.uptimeCounter)
-}
-
-func TestConsensusRuntime_FSM_EndOfEpoch_BuildRegisterCommitment_QuorumNotReached(t *testing.T) {
-	t.Parallel()
-
-	const (
-		epoch               = 1
-		epochSize           = uint64(10)
-		firstBlockInEpoch   = uint64(1)
-		sprintSize          = uint64(5)
-		beginStateSyncIndex = uint64(0)
-	)
-
-	validatorAccs := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
-	validators := validatorAccs.getPublicIdentities()
-	lastBuiltBlock, headerMap := createTestBlocks(t, 9, epochSize, validators)
-
-	systemStateMock := new(systemStateMock)
-	systemStateMock.On("GetNextCommittedIndex").Return(beginStateSyncIndex, nil).Once()
-
-	blockchainMock := new(blockchainMock)
-	blockchainMock.On("NewBlockBuilder", mock.Anything).Return(&BlockBuilder{}, nil).Once()
-	blockchainMock.On("GetStateProviderForBlock", mock.Anything).Return(new(stateProviderMock)).Once()
-	blockchainMock.On("GetSystemState", mock.Anything, mock.Anything).Return(systemStateMock)
-	blockchainMock.On("GetHeaderByNumber", mock.Anything).Return(headerMap.getHeader)
-
-	state := newTestState(t)
-	require.NoError(t, state.insertEpoch(epoch))
-
-	stateSyncs := generateStateSyncEvents(t, 10, 0)
-	for _, event := range stateSyncs {
-		require.NoError(t, state.insertStateSyncEvent(event))
-	}
-
-	trie, err := createMerkleTree(stateSyncs)
-	require.NoError(t, err)
-
-	commitment := &Commitment{MerkleTree: trie, Epoch: epoch}
-
-	hash, err := commitment.Hash()
-	require.NoError(t, err)
-
-	validatorKey := validatorAccs.getValidator("C").Key()
-	signature, err := validatorKey.Sign(hash.Bytes())
-	require.NoError(t, err)
-	_, err = state.insertMessageVote(epoch, hash.Bytes(), &MessageSignature{
-		From:      validators[0].Address.String(),
-		Signature: signature,
-	})
-	require.NoError(t, err)
-
-	metadata := &epochMetadata{
-		Validators:        validators,
-		Number:            epoch,
-		FirstBlockInEpoch: firstBlockInEpoch,
-		Commitment:        commitment,
-	}
-
-	config := &runtimeConfig{
-		PolyBFTConfig: &PolyBFTConfig{
-			EpochSize:  epochSize,
-			SprintSize: sprintSize,
-			Bridge:     &BridgeConfig{},
-		},
-		Key:        validatorKey,
-		blockchain: blockchainMock,
-	}
-
-	snapshot := NewProposerSnapshot(1, nil)
-	runtime := &consensusRuntime{
-		proposerCalculator: NewProposerCalculatorFromSnapshot(snapshot, config, hclog.NewNullLogger()),
-		logger:             hclog.NewNullLogger(),
-		state:              state,
-		epoch:              metadata,
-		config:             config,
-		lastBuiltBlock:     lastBuiltBlock,
-	}
-
-	err = runtime.FSM()
-	fsm := runtime.fsm
-
 	assert.NoError(t, err)
-	assert.Nil(t, fsm.proposerCommitmentToRegister)
 	assert.True(t, fsm.isEndOfEpoch)
 	assert.NotNil(t, fsm.uptimeCounter)
 	assert.NotEmpty(t, fsm.uptimeCounter)
 
-	systemStateMock.AssertExpectations(t)
 	blockchainMock.AssertExpectations(t)
 }
 
@@ -913,6 +471,7 @@ func Test_NewConsensusRuntime(t *testing.T) {
 		DataDir:        tmpDir,
 		Key:            createTestKey(t),
 		blockchain:     blockchainMock,
+		bridgeTopic:    &mockTopic{},
 	}
 	runtime, err := newConsensusRuntime(hclog.NewNullLogger(), config)
 	require.NoError(t, err)
@@ -928,107 +487,6 @@ func Test_NewConsensusRuntime(t *testing.T) {
 	systemStateMock.AssertExpectations(t)
 	blockchainMock.AssertExpectations(t)
 	polybftBackendMock.AssertExpectations(t)
-}
-
-func TestConsensusRuntime_FSM_EndOfSprint_HasCommitmentsToRegister(t *testing.T) {
-	t.Parallel()
-
-	const (
-		epochNumber        = uint64(2)
-		firstBlockInEpoch  = uint64(21)
-		fromIndex          = uint64(5)
-		nextCommittedIndex = uint64(3)
-		stateSyncsCount    = 30
-		commitmentSize     = stateSyncsCount / 3
-	)
-
-	state := newTestState(t)
-	err := state.insertEpoch(epochNumber)
-	require.NoError(t, err)
-
-	stateSyncs := insertTestStateSyncEvents(t, stateSyncsCount, fromIndex, state)
-
-	commitment, err := NewCommitment(epochNumber, stateSyncs)
-	require.NoError(t, err)
-
-	commitmentMsg := NewCommitmentMessage(commitment.MerkleTree.Hash(), fromIndex, fromIndex+commitmentSize)
-	signedCommitmentMsg := &CommitmentMessageSigned{
-		Message:      commitmentMsg,
-		AggSignature: Signature{},
-	}
-	require.NoError(t, state.insertCommitmentMessage(signedCommitmentMsg))
-
-	validatorAccs := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F", "G"})
-	validatorSet := validatorAccs.getPublicIdentities()
-
-	extra := &Extra{
-		Checkpoint: &CheckpointData{},
-	}
-
-	lastBlock := &types.Header{
-		Number:    24,
-		ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...),
-	}
-
-	systemStateMock := new(systemStateMock)
-	systemStateMock.On("GetNextCommittedIndex").Return(nextCommittedIndex, nil).Once()
-
-	blockchainMock := new(blockchainMock)
-	blockchainMock.On("NewBlockBuilder").Return(&BlockBuilder{}, nil).Once()
-	blockchainMock.On("GetStateProviderForBlock", mock.Anything).Return(new(stateProviderMock)).Once()
-	blockchainMock.On("GetSystemState", mock.Anything, mock.Anything).Return(systemStateMock).Once()
-
-	for i := 0; i < int(lastBlock.Number); i++ {
-		blockchainMock.On("GetHeaderByNumber", uint64(i)).Return(&types.Header{
-			Number:    uint64(i),
-			ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...),
-		}, true).Maybe()
-	}
-
-	snapshot := NewProposerSnapshot(1, nil)
-	config := &runtimeConfig{
-		PolyBFTConfig: &PolyBFTConfig{
-			EpochSize:  10,
-			SprintSize: 5,
-			Bridge: &BridgeConfig{
-				BridgeAddr: types.BytesToAddress(big.NewInt(23).Bytes()),
-			},
-		},
-		State:      state,
-		Key:        validatorAccs.getValidator("A").Key(),
-		blockchain: blockchainMock,
-	}
-
-	runtime := &consensusRuntime{
-		proposerCalculator:  NewProposerCalculatorFromSnapshot(snapshot, config, hclog.NewNullLogger()),
-		logger:              hclog.NewNullLogger(),
-		activeValidatorFlag: 1,
-		state:               config.State,
-		config:              config,
-		epoch: &epochMetadata{
-			Number:            epochNumber,
-			FirstBlockInEpoch: firstBlockInEpoch,
-			Validators:        validatorSet,
-			Commitment:        commitment,
-		},
-		lastBuiltBlock: lastBlock,
-	}
-
-	require.NoError(t, runtime.buildProofs(runtime.getEpoch().Commitment, commitmentMsg))
-
-	err = runtime.FSM()
-	fsm := runtime.fsm
-
-	require.NoError(t, err)
-
-	// check if it is end of sprint
-	require.True(t, fsm.isEndOfSprint)
-
-	// check if commitment message to execute is attached to fsm
-	require.Nil(t, fsm.proposerCommitmentToRegister)
-
-	systemStateMock.AssertExpectations(t)
-	blockchainMock.AssertExpectations(t)
 }
 
 func TestConsensusRuntime_restartEpoch_SameEpochNumberAsTheLastOne(t *testing.T) {
@@ -1074,293 +532,6 @@ func TestConsensusRuntime_restartEpoch_SameEpochNumberAsTheLastOne(t *testing.T)
 
 	systemStateMock.AssertExpectations(t)
 	blockchainMock.AssertExpectations(t)
-}
-
-func TestConsensusRuntime_restartEpoch_FirstRestart_NoStateSyncEvents(t *testing.T) {
-	t.Parallel()
-
-	newCurrentHeader := &types.Header{Number: 0}
-	state := newTestState(t)
-
-	systemStateMock := new(systemStateMock)
-	systemStateMock.On("GetEpoch").Return(uint64(1), nil).Once()
-
-	validators := newTestValidators(3)
-	blockchainMock := new(blockchainMock)
-	blockchainMock.On("GetStateProviderForBlock", mock.Anything).Return(new(stateProviderMock)).Once()
-	blockchainMock.On("GetSystemState", mock.Anything, mock.Anything).Return(systemStateMock).Once()
-
-	polybftBackendMock := new(polybftBackendMock)
-	polybftBackendMock.On("GetValidators", mock.Anything, mock.Anything).Return(validators.getPublicIdentities()).Once()
-
-	snapshot := NewProposerSnapshot(1, nil)
-	config := &runtimeConfig{
-		blockchain:     blockchainMock,
-		polybftBackend: polybftBackendMock,
-		PolyBFTConfig:  &PolyBFTConfig{},
-	}
-	runtime := &consensusRuntime{
-		proposerCalculator:  NewProposerCalculatorFromSnapshot(snapshot, config, hclog.NewNullLogger()),
-		logger:              hclog.NewNullLogger(),
-		activeValidatorFlag: 1,
-		state:               state,
-		config:              config,
-	}
-
-	epoch, err := runtime.restartEpoch(newCurrentHeader)
-
-	require.NoError(t, err)
-	require.Equal(t, uint64(1), epoch.Number)
-	require.Equal(t, 3, len(epoch.Validators))
-	require.True(t, runtime.isActiveValidator())
-	require.True(t, state.isEpochInserted(1))
-
-	systemStateMock.AssertExpectations(t)
-	blockchainMock.AssertExpectations(t)
-	polybftBackendMock.AssertExpectations(t)
-}
-
-func TestConsensusRuntime_restartEpoch_FirstRestart_BuildsCommitment(t *testing.T) {
-	t.Parallel()
-
-	const (
-		newEpoch           = uint64(2)
-		epochSize          = uint64(10)
-		nextCommittedIndex = uint64(10)
-		stateSyncsCount    = 20
-	)
-
-	state := newTestState(t)
-	stateSyncs := insertTestStateSyncEvents(t, stateSyncsCount, 0, state)
-	validatorIds := []string{"A", "B", "C", "D", "E", "F"}
-	validatorAccs := newTestValidatorsWithAliases(validatorIds)
-	validators := validatorAccs.getPublicIdentities()
-
-	header, _ := createTestBlocks(t, epochSize, epochSize, validators)
-
-	transportMock := new(transportMock)
-	transportMock.On("Multicast", mock.Anything).Once()
-
-	systemStateMock := new(systemStateMock)
-	systemStateMock.On("GetNextCommittedIndex").Return(nextCommittedIndex, nil).Once()
-	systemStateMock.On("GetEpoch").Return(newEpoch, nil).Once()
-
-	blockchainMock := new(blockchainMock)
-	blockchainMock.On("GetStateProviderForBlock", mock.Anything).Return(new(stateProviderMock)).Once()
-	blockchainMock.On("GetSystemState", mock.Anything, mock.Anything).Return(systemStateMock).Once()
-
-	polybftBackendMock := new(polybftBackendMock)
-	polybftBackendMock.On("GetValidators", mock.Anything, mock.Anything).Return(validators).Once()
-
-	localValidatorID := validatorIds[rand.Intn(len(validatorIds))]
-	localValidator := validatorAccs.getValidator(localValidatorID)
-
-	snapshot := NewProposerSnapshot(header.Number, validators)
-	config := &runtimeConfig{
-		blockchain:      blockchainMock,
-		polybftBackend:  polybftBackendMock,
-		BridgeTransport: transportMock,
-		Key:             localValidator.Key(),
-		PolyBFTConfig: &PolyBFTConfig{
-			Bridge: &BridgeConfig{},
-		},
-		State: state,
-	}
-	runtime := &consensusRuntime{
-		proposerCalculator:  NewProposerCalculatorFromSnapshot(snapshot, config, hclog.NewNullLogger()),
-		logger:              hclog.NewNullLogger(),
-		activeValidatorFlag: 1,
-		state:               config.State,
-		config:              config,
-	}
-
-	epochData, err := runtime.restartEpoch(header)
-
-	require.NoError(t, err)
-	require.Equal(t, newEpoch, epochData.Number)
-	require.Equal(t, len(validatorIds), len(epochData.Validators))
-	require.True(t, runtime.isActiveValidator())
-	require.True(t, state.isEpochInserted(newEpoch))
-
-	commitment := epochData.Commitment
-	require.NotNil(t, commitment)
-	require.Equal(t, newEpoch, commitment.Epoch)
-
-	commitmentHash, err := commitment.Hash()
-	require.NoError(t, err)
-	stateSyncsTrie, err := createMerkleTree(stateSyncs[nextCommittedIndex : nextCommittedIndex+stateSyncCommitmentSize])
-	require.NoError(t, err)
-	require.Equal(t, stateSyncsTrie.Hash(), commitment.MerkleTree.Hash())
-
-	votes, err := state.getMessageVotes(newEpoch, commitmentHash.Bytes())
-	require.NoError(t, err)
-	require.Equal(t, 1, len(votes))
-	require.Equal(t, localValidator.Key().String(), votes[0].From)
-
-	signature, err := localValidator.mustSign(commitmentHash.Bytes()).Marshal()
-	require.NoError(t, err)
-	require.Equal(t, signature, votes[0].Signature)
-
-	for _, validator := range validatorAccs.validators {
-		if localValidator.Key().String() == validator.Key().String() {
-			continue
-		}
-
-		signature, err := validator.mustSign(commitmentHash.Bytes()).Marshal()
-		require.NoError(t, err)
-
-		_, err = state.insertMessageVote(epochData.Number, commitmentHash.Bytes(),
-			&MessageSignature{
-				From:      validator.Key().String(),
-				Signature: signature,
-			})
-		require.NoError(t, err)
-	}
-
-	commitmentMsgSigned, err := runtime.getCommitmentToRegister(epochData, nextCommittedIndex)
-	require.NoError(t, err)
-	require.NotNil(t, commitmentMsgSigned)
-	require.Equal(t, nextCommittedIndex, commitmentMsgSigned.Message.FromIndex)
-
-	transportMock.AssertExpectations(t)
-	systemStateMock.AssertExpectations(t)
-	blockchainMock.AssertExpectations(t)
-	polybftBackendMock.AssertExpectations(t)
-}
-
-func TestConsensusRuntime_restartEpoch_NewEpochToRun_BuildCommitment(t *testing.T) {
-	t.Parallel()
-
-	const (
-		blockNumber        = 11
-		epochSize          = 10
-		nextCommittedIndex = uint64(10)
-		oldEpoch           = uint64(1)
-		newEpoch           = oldEpoch + 1
-		validatorsCount    = 6
-	)
-
-	// create originalValidators
-	originalValidatorIds := []string{"A", "B", "C", "D", "E", "F"}
-	originalValidators := newTestValidatorsWithAliases(originalValidatorIds)
-	oldValidatorSet := originalValidators.getPublicIdentities()
-
-	// remove first validator and add a new one to the end
-	newValidatorSet := make(AccountSet, validatorsCount)
-	for i := 1; i < len(oldValidatorSet); i++ {
-		newValidatorSet[i-1] = oldValidatorSet[i].Copy()
-	}
-
-	newValidatorSet[validatorsCount-1] = newTestValidator("G", 1).ValidatorMetadata()
-
-	header, headerMap := createTestBlocks(t, blockNumber, epochSize, oldValidatorSet)
-
-	state := newTestState(t)
-	allStateSyncs := insertTestStateSyncEvents(t, 4*stateSyncCommitmentSize, 0, state)
-
-	transportMock := &transportMock{}
-	transportMock.On("Multicast", mock.Anything).Once()
-
-	systemStateMock := new(systemStateMock)
-	systemStateMock.On("GetNextCommittedIndex").Return(nextCommittedIndex, nil).Once()
-	systemStateMock.On("GetEpoch").Return(newEpoch, nil).Once()
-
-	blockchainMock := new(blockchainMock)
-	blockchainMock.On("GetStateProviderForBlock", mock.Anything).Return(new(stateProviderMock)).Once()
-	blockchainMock.On("GetSystemState", mock.Anything, mock.Anything).Return(systemStateMock).Once()
-	blockchainMock.On("GetHeaderByNumber", mock.Anything).Return(headerMap.getHeader)
-
-	polybftBackendMock := new(polybftBackendMock)
-	polybftBackendMock.On("GetValidators", mock.Anything, mock.Anything).Return(newValidatorSet).Once()
-
-	snapshot := NewProposerSnapshot(header.Number, nil)
-	config := &runtimeConfig{
-		PolyBFTConfig: &PolyBFTConfig{
-			EpochSize:  10,
-			SprintSize: 5,
-			Bridge: &BridgeConfig{
-				BridgeAddr: types.BytesToAddress(big.NewInt(23).Bytes()),
-			},
-		},
-		BridgeTransport: transportMock,
-		Key:             originalValidators.getValidator("A").Key(),
-		blockchain:      blockchainMock,
-		polybftBackend:  polybftBackendMock,
-	}
-	runtime := &consensusRuntime{
-		proposerCalculator:  NewProposerCalculatorFromSnapshot(snapshot, config, hclog.NewNullLogger()),
-		logger:              hclog.NewNullLogger(),
-		activeValidatorFlag: 1,
-		state:               state,
-		config:              config,
-		epoch: &epochMetadata{
-			Number:            oldEpoch,
-			Validators:        originalValidators.getPublicIdentities(),
-			FirstBlockInEpoch: 1,
-		},
-		lastBuiltBlock: header,
-	}
-
-	epoch, err := runtime.restartEpoch(header)
-
-	require.NoError(t, err)
-
-	// check new epoch number
-	assert.Equal(t, newEpoch, epoch.Number)
-
-	// check new epoch number
-	assert.Equal(t, header.Number, runtime.lastBuiltBlock.Number)
-
-	// check if it is validator
-	assert.True(t, runtime.isActiveValidator())
-
-	// check if new epoch is inserted
-	assert.True(t, state.isEpochInserted(newEpoch))
-
-	// check if new epoch is created
-	assert.NotNil(t, runtime.epoch)
-
-	// check new validators
-	assert.Equal(t, len(originalValidatorIds), len(epoch.Validators))
-
-	for _, a := range newValidatorSet.GetAddresses() {
-		assert.True(t, epoch.Validators.ContainsAddress(a))
-	}
-
-	commitment := epoch.Commitment
-	require.NotNil(t, commitment)
-	require.Equal(t, newEpoch, commitment.Epoch)
-
-	commitmentHash, err := commitment.Hash()
-	require.NoError(t, err)
-
-	for _, validatorID := range originalValidatorIds {
-		validator := originalValidators.getValidator(validatorID)
-		signature, err := validator.mustSign(commitmentHash.Bytes()).Marshal()
-		require.NoError(t, err)
-		_, err = state.insertMessageVote(epoch.Number, commitmentHash.Bytes(),
-			&MessageSignature{
-				From:      validator.Key().String(),
-				Signature: signature,
-			})
-		require.NoError(t, err)
-	}
-
-	stateSyncTrie, err := createMerkleTree(allStateSyncs[nextCommittedIndex : nextCommittedIndex+stateSyncCommitmentSize])
-	require.NoError(t, err)
-	require.NotNil(t, stateSyncTrie)
-
-	commitmentMsgSigned, err := runtime.getCommitmentToRegister(epoch, nextCommittedIndex)
-	require.NoError(t, err)
-	require.NotNil(t, commitmentMsgSigned)
-	require.Equal(t, stateSyncTrie.Hash(), commitmentMsgSigned.Message.MerkleRootHash)
-	require.Equal(t, nextCommittedIndex, commitmentMsgSigned.Message.FromIndex)
-	require.Equal(t, nextCommittedIndex+stateSyncCommitmentSize-1, commitmentMsgSigned.Message.ToIndex)
-
-	transportMock.AssertExpectations(t)
-	systemStateMock.AssertExpectations(t)
-	blockchainMock.AssertExpectations(t)
-	polybftBackendMock.AssertExpectations(t)
 }
 
 func TestConsensusRuntime_calculateUptime_SecondEpoch(t *testing.T) {
@@ -1432,239 +603,6 @@ func TestConsensusRuntime_validateVote_VoteSentFromUnknownValidator(t *testing.T
 		Signature: signature}
 	assert.ErrorContains(t, validateVote(vote, epoch),
 		fmt.Sprintf("message is received from sender %s, which is not in current validator set", vote.From))
-}
-
-func TestConsensusRuntime_buildProofs_NoCommitment(t *testing.T) {
-	t.Parallel()
-
-	state := newTestState(t)
-	snapshot := NewProposerSnapshot(1, nil)
-	config := &runtimeConfig{
-		State: state,
-	}
-
-	commitmentMsg := NewCommitmentMessage(types.Hash{}, 0, 4)
-	runtime := &consensusRuntime{
-		logger:             hclog.NewNullLogger(),
-		state:              config.State,
-		epoch:              &epochMetadata{Number: 0},
-		lastBuiltBlock:     &types.Header{},
-		config:             config,
-		proposerCalculator: NewProposerCalculatorFromSnapshot(snapshot, config, hclog.NewNullLogger()),
-	}
-
-	guardedData, err := runtime.getGuardedData()
-	require.NoError(t, err)
-	assert.NoError(t, runtime.buildProofs(guardedData.epoch.Commitment, commitmentMsg))
-
-	proof, err := state.getStateSyncProof(0)
-
-	assert.NoError(t, err)
-	assert.Nil(t, proof)
-}
-
-func TestConsensusRuntime_buildProofs(t *testing.T) {
-	t.Parallel()
-
-	const (
-		epoch                 = 1
-		bundleSize            = 5
-		fromIndex             = 0
-		toIndex               = 4
-		expectedBundlesNumber = 1
-	)
-
-	state := newTestState(t)
-	stateSyncs := insertTestStateSyncEvents(t, bundleSize, 0, state)
-	trie, err := createMerkleTree(stateSyncs)
-	require.NoError(t, err)
-
-	commitmentMsg := NewCommitmentMessage(trie.Hash(), fromIndex, toIndex)
-	commitmentMsgSigned := &CommitmentMessageSigned{
-		Message: commitmentMsg,
-		AggSignature: Signature{
-			Bitmap:              []byte{5, 1},
-			AggregatedSignature: []byte{1, 1},
-		},
-	}
-	require.NoError(t, state.insertCommitmentMessage(commitmentMsgSigned))
-
-	snapshot := NewProposerSnapshot(1, nil)
-	config := &runtimeConfig{
-		State: state,
-	}
-
-	runtime := &consensusRuntime{
-		logger: hclog.NewNullLogger(),
-		state:  config.State,
-		epoch: &epochMetadata{
-			Number: epoch,
-			Commitment: &Commitment{
-				MerkleTree: trie,
-				Epoch:      epoch,
-			},
-		},
-		lastBuiltBlock:     &types.Header{},
-		config:             config,
-		proposerCalculator: NewProposerCalculatorFromSnapshot(snapshot, config, hclog.NewNullLogger()),
-	}
-
-	guardedData, err := runtime.getGuardedData()
-	require.NoError(t, err)
-	assert.NoError(t, runtime.buildProofs(guardedData.epoch.Commitment, commitmentMsg))
-
-	for i := fromIndex; i <= toIndex; i++ {
-		proof, err := state.getStateSyncProof(uint64(i))
-		assert.NoError(t, err)
-		assert.NotNil(t, proof)
-		assert.NotEmpty(t, proof.Proof)
-		assert.Equal(t, uint64(i), proof.StateSync.ID)
-	}
-}
-
-func TestConsensusRuntime_FSM_EndOfEpoch_OnBlockInserted(t *testing.T) {
-	t.Parallel()
-
-	const (
-		epoch               = 1
-		epochSize           = uint64(10)
-		firstBlockInEpoch   = uint64(1)
-		sprintSize          = uint64(5)
-		beginStateSyncIndex = uint64(0)
-		fromIndex           = uint64(0)
-		toIndex             = uint64(9)
-		numOfBlock          = uint64(9)
-	)
-
-	validatorAccounts := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E"})
-	signingAccounts := validatorAccounts.getPrivateIdentities()
-	validators := validatorAccounts.getPublicIdentities()
-	lastBuiltBlock, headerMap := createTestBlocks(t, 9, epochSize, validators)
-
-	systemStateMock := new(systemStateMock)
-	systemStateMock.On("GetEpoch").Return(epoch)
-	systemStateMock.On("GetNextCommittedIndex").Return(beginStateSyncIndex, nil)
-	// systemStateMock.On("GetNextExecutionIndex").Return(beginStateSyncIndex, nil)
-
-	blockchainMock := new(blockchainMock)
-	blockchainMock.On("NewBlockBuilder", mock.Anything).Return(&BlockBuilder{}, nil).Once()
-	blockchainMock.On("GetStateProviderForBlock", mock.Anything).Return(new(stateProviderMock))
-	blockchainMock.On("GetSystemState", mock.Anything, mock.Anything).Return(systemStateMock)
-	blockchainMock.On("GetHeaderByNumber", mock.Anything).Return(headerMap.getHeader)
-
-	polybftBackendMock := new(polybftBackendMock)
-	polybftBackendMock.On("GetValidators", mock.Anything, mock.Anything).Return(validators).Once()
-
-	txPool := new(txPoolMock)
-
-	state := newTestState(t)
-	require.NoError(t, state.insertEpoch(epoch))
-
-	stateSyncs := generateStateSyncEvents(t, stateSyncCommitmentSize, 0)
-	for _, event := range stateSyncs {
-		require.NoError(t, state.insertStateSyncEvent(event))
-	}
-
-	trie, err := createMerkleTree(stateSyncs)
-	require.NoError(t, err)
-
-	commitment := &Commitment{MerkleTree: trie, Epoch: epoch}
-	hash, err := commitment.Hash()
-	require.NoError(t, err)
-
-	for _, a := range signingAccounts {
-		signature, err := a.Bls.Sign(hash.Bytes())
-		require.NoError(t, err)
-		signatureRaw, err := signature.Marshal()
-		require.NoError(t, err)
-		_, err = state.insertMessageVote(epoch, hash.Bytes(), &MessageSignature{
-			From:      a.Ecdsa.Address().String(),
-			Signature: signatureRaw,
-		})
-		require.NoError(t, err)
-	}
-
-	metadata := &epochMetadata{
-		Validators:        validators,
-		Number:            epoch,
-		FirstBlockInEpoch: firstBlockInEpoch,
-		Commitment:        commitment,
-	}
-
-	config := &runtimeConfig{
-		PolyBFTConfig: &PolyBFTConfig{
-			EpochSize:  epochSize,
-			SprintSize: sprintSize,
-			Bridge:     &BridgeConfig{},
-		},
-		polybftBackend: polybftBackendMock,
-		Key:            validatorAccounts.getValidator("A").Key(),
-		blockchain:     blockchainMock,
-		txPool:         txPool,
-		State:          state,
-	}
-
-	signer := validatorAccounts.getValidator("A").Key()
-	snapshot := NewProposerSnapshot(numOfBlock, nil)
-	runtime := &consensusRuntime{
-		proposerCalculator: NewProposerCalculatorFromSnapshot(snapshot, config, hclog.NewNullLogger()),
-		logger:             hclog.NewNullLogger(),
-		state:              config.State,
-		epoch:              metadata,
-		config:             config,
-		lastBuiltBlock:     lastBuiltBlock,
-		checkpointManager:  newCheckpointManager(wallet.NewEcdsaSigner(signer), 5, types.ZeroAddress, nil, nil, nil, hclog.NewNullLogger()),
-	}
-
-	err = runtime.FSM()
-	fsm := runtime.fsm
-
-	assert.NoError(t, err)
-	assert.NotNil(t, fsm.proposerCommitmentToRegister)
-	assert.Equal(t, fromIndex, fsm.proposerCommitmentToRegister.Message.FromIndex)
-	assert.Equal(t, toIndex, fsm.proposerCommitmentToRegister.Message.ToIndex)
-	assert.Equal(t, trie.Hash(), fsm.proposerCommitmentToRegister.Message.MerkleRootHash)
-	assert.NotNil(t, fsm.proposerCommitmentToRegister.AggSignature)
-	assert.True(t, fsm.isEndOfEpoch)
-	assert.NotNil(t, fsm.uptimeCounter)
-	assert.NotEmpty(t, fsm.uptimeCounter)
-
-	inputData, err := fsm.proposerCommitmentToRegister.EncodeAbi()
-	assert.NoError(t, err)
-
-	tx := createStateTransactionWithData(fsm.config.StateReceiverAddr, inputData)
-
-	block := consensus.BuildBlock(consensus.BuildBlockParams{
-		Header: &types.Header{Number: lastBuiltBlock.Number + 1},
-		Txns: []*types.Transaction{
-			tx,
-		},
-	})
-
-	txPool.On("ResetWithHeaders", mock.MatchedBy(func(i interface{}) bool {
-		ph, ok := i.([]*types.Header)
-		require.True(t, ok)
-		require.Len(t, ph, 1)
-
-		return ph[0].Number == block.Header.Number
-	})).Once()
-
-	runtime.OnBlockInserted(block)
-
-	commitmentMsgFromDB, err := state.getCommitmentMessage(toIndex)
-	assert.NoError(t, err)
-	assert.Equal(t, fromIndex, commitmentMsgFromDB.Message.FromIndex)
-	assert.Equal(t, toIndex, commitmentMsgFromDB.Message.ToIndex)
-	assert.Equal(t, trie.Hash(), commitmentMsgFromDB.Message.MerkleRootHash)
-	assert.NotNil(t, commitmentMsgFromDB.AggSignature)
-
-	proof, err := state.getStateSyncProof(fromIndex)
-	assert.NoError(t, err)
-	assert.Equal(t, fromIndex, proof.StateSync.ID)
-
-	systemStateMock.AssertExpectations(t)
-	blockchainMock.AssertExpectations(t)
-	polybftBackendMock.AssertExpectations(t)
 }
 
 func TestConsensusRuntime_getExitEventRootHash(t *testing.T) {
@@ -1783,6 +721,7 @@ func TestConsensusRuntime_IsValidSender(t *testing.T) {
 		},
 		logger:             hclog.NewNullLogger(),
 		proposerCalculator: NewProposerCalculatorFromSnapshot(snapshot, config, hclog.NewNullLogger()),
+		stateSyncManager:   &dummyStateSyncManager{},
 	}
 
 	require.NoError(t, runtime.FSM())
@@ -1984,6 +923,7 @@ func TestConsensusRuntime_HasQuorum(t *testing.T) {
 		},
 		logger:             hclog.NewNullLogger(),
 		proposerCalculator: NewProposerCalculatorFromSnapshot(snapshot, config, hclog.NewNullLogger()),
+		stateSyncManager:   &dummyStateSyncManager{},
 	}
 
 	require.NoError(t, runtime.FSM())
@@ -2171,9 +1111,7 @@ func TestConsensusRuntime_BuildPrepareMessage(t *testing.T) {
 	assert.Equal(t, signedMsg, runtime.BuildPrepareMessage(proposalHash, view))
 }
 
-func createTestTransportMessage(t *testing.T, hash []byte, epochNumber uint64, key *wallet.Key) *TransportMessage {
-	t.Helper()
-
+func createTestTransportMessage(hash []byte, epochNumber uint64, key *wallet.Key) *TransportMessage {
 	signature, _ := key.Sign(hash)
 
 	return &TransportMessage{
@@ -2310,15 +1248,4 @@ func setupExitEventsForProofVerification(t *testing.T, state *State,
 	}
 
 	return encodedEvents
-}
-
-func insertTestStateSyncEvents(t *testing.T, numberOfEvents int, startIndex uint64, state *State) []*types.StateSyncEvent {
-	t.Helper()
-
-	stateSyncs := generateStateSyncEvents(t, numberOfEvents, startIndex)
-	for _, stateSync := range stateSyncs {
-		require.NoError(t, state.insertStateSyncEvent(stateSync))
-	}
-
-	return stateSyncs
 }

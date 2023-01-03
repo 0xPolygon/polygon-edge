@@ -47,7 +47,6 @@ type Commitment struct {
 	Epoch      uint64
 	FromIndex  uint64
 	ToIndex    uint64
-	LeavesNum  uint64
 }
 
 // NewCommitment creates a new commitment object
