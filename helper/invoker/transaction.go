@@ -2,12 +2,13 @@ package invoker
 
 import (
 	"fmt"
+	"math/big"
+
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
-	"math/big"
 )
 
 type InvokerSignature struct {
@@ -66,7 +67,11 @@ func (is *InvokerSignature) SignCommit(key ethgo.Key, commit []byte, invokerAddr
 type InvokerTransaction struct {
 	From     types.Address        `abi:"from"`
 	Nonce    *big.Int             `abi:"nonce"`
-	Payloads []TransactionPayload `abi:"payloads"`
+	Payloads []TransactionPayload `abi:"payloads"` // should this be an array of pointers?
+}
+
+func (it *InvokerTransaction) ComputeHash() *InvokerTransaction {
+	return it
 }
 
 // return keccak256(abi.encode(TRANSACTION_TYPE, transaction.from, transaction.nonce, hashPayloads(transaction.payloads)));
@@ -80,7 +85,7 @@ type encTransaction struct {
 
 var transactionType = ethgo.Keccak256([]byte("Transaction(address from,uint256 nonce,TransactionPayload[] payloads)TransactionPayload(address to,uint256 value,uint256 gasLimit,bytes data)"))
 
-func (it InvokerTransaction) InvokerCommit(domainSeparator []byte) (c []byte, err error) {
+func (it *InvokerTransaction) InvokerCommit(domainSeparator []byte) (c []byte, err error) {
 	values := []byte{0x19, 0x01}
 	values = append(values, domainSeparator...)
 	if c, err = it.InvokerHash(); err != nil {
@@ -91,7 +96,7 @@ func (it InvokerTransaction) InvokerCommit(domainSeparator []byte) (c []byte, er
 	return
 }
 
-func (it InvokerTransaction) InvokerHash() (h []byte, err error) {
+func (it *InvokerTransaction) InvokerHash() (h []byte, err error) {
 
 	var t *abi.Type
 	if t, err = abi.NewType("tuple(bytes32 typeHash, address from, uint256 nonce, bytes32 payloadsHash)"); err != nil {
@@ -156,7 +161,7 @@ type encPayload struct {
 // from AccountAbstractionInvoker.sol: TRANSACTION_PAYLOAD_TYPE
 var transactionPayloadType = ethgo.Keccak256([]byte("TransactionPayload(address to,uint256 value,uint256 gasLimit,bytes data)"))
 
-func (tp TransactionPayload) InvokerHash() (h []byte, err error) {
+func (tp *TransactionPayload) InvokerHash() (h []byte, err error) {
 
 	var t *abi.Type
 	if t, err = abi.NewType("tuple(bytes32 typeHash, address to, uint256 value, uint256 gasLimit, bytes32 dataHash)"); err != nil {
