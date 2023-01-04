@@ -224,7 +224,7 @@ func (c *state) Run() ([]byte, error) {
 
 	for !c.stop {
 		op, ok = c.CurrentOpCode()
-		gasCopy := c.gas
+		gasCopy, ipCopy := c.gas, uint64(c.ip)
 
 		c.captureState(int(op))
 
@@ -258,10 +258,10 @@ func (c *state) Run() ([]byte, error) {
 			break
 		}
 
-		c.captureSuccessfulExecution(op.String(), gasCopy, gasCopy-c.gas)
-
 		// execute the instruction
 		inst.inst(c)
+
+		c.captureSuccessfulExecution(op.String(), ipCopy, gasCopy, gasCopy-c.gas)
 
 		// check if stack size exceeds the max size
 		if c.sp > stackSize {
@@ -402,6 +402,7 @@ func (c *state) captureState(opCode int) {
 
 func (c *state) captureSuccessfulExecution(
 	opCode string,
+	ip uint64,
 	gas uint64,
 	consumedGas uint64,
 ) {
@@ -413,7 +414,7 @@ func (c *state) captureSuccessfulExecution(
 
 	tracer.ExecuteState(
 		c.msg.Address,
-		uint64(c.ip),
+		ip,
 		opCode,
 		gas,
 		consumedGas,
