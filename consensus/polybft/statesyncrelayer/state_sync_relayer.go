@@ -19,7 +19,7 @@ import (
 	"github.com/umbracle/ethgo/jsonrpc"
 )
 
-var commitEvent = abi.MustNewEvent(`event NewBundleCommit(uint256 startId, uint256 endId, bytes32 root)`)
+var commitEvent = abi.MustNewEvent(`event NewCommitment(uint256 startId, uint256 endId, bytes32 root)`)
 
 type StateSyncRelayer struct {
 	dataDir           string
