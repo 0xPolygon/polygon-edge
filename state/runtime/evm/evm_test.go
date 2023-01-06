@@ -324,7 +324,7 @@ func TestRunWithTracer(t *testing.T) {
 						"ip":              uint64(0),
 						"opcode":          opCodeToString[POP],
 						"availableGas":    uint64(5000),
-						"cost":            uint64(0),
+						"cost":            uint64(2),
 						"lastReturnData":  []byte{},
 						"depth":           1,
 						"err":             errStackUnderflow,
