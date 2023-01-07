@@ -232,25 +232,48 @@ func TestE2E_Consensus_Delegation_Undelegation(t *testing.T) {
 	}, validatorAcc.Ecdsa)
 	require.NoError(t, err)
 	require.Equal(t, uint64(types.ReceiptSuccess), receipt.Status)
-	t.Logf("Block number=%d\n", receipt.BlockNumber)
 
-	delegatorBalance, err := srv.JSONRPC().Eth().GetBalance(delegatorAddr, ethgo.Latest)
-	require.NoError(t, err)
+	queryDelegator := func(blockNum uint64) (balance *big.Int, reward *big.Int) {
+		var err error
+		balance, err = srv.JSONRPC().Eth().GetBalance(delegatorAddr, ethgo.Latest)
+		require.NoError(t, err)
+		t.Logf("Delegator balance (block %d)=%s\n", blockNum, balance)
+
+		reward, err = sidechain.GetDelegatorReward(validatorAddr, delegatorAddr, txRelayer)
+		require.NoError(t, err)
+		t.Logf("Delegator reward (block %d)=%s\n", blockNum, reward)
+
+		return
+	}
+
+	delegatorBalance, _ := queryDelegator(5)
 	require.Equal(t, fundAmount, delegatorBalance)
-	t.Logf("Delegator balance=%s\n", delegatorBalance)
 
 	// delegate 10 native tokens
 	delegationAmount := uint64(1e19)
-	require.NoError(t, srv.Delegate(delegationAmount, path.Join(cluster.Config.TmpDir, delegatorSecrets), validatorAddr))
+	delegatorSecretsPath := path.Join(cluster.Config.TmpDir, delegatorSecrets)
+	require.NoError(t, srv.Delegate(delegationAmount, delegatorSecretsPath, validatorAddr))
 
 	// wait for 2 epochs to accumulate delegator rewards
-	cluster.WaitForBlock(10, 2*time.Minute)
+	cluster.WaitForBlock(10, 1*time.Minute)
 
 	// query delegator rewards
-	delegatorReward, err := sidechain.GetDelegatorReward(validatorAddr, delegatorAddr, txRelayer)
-	require.NoError(t, err)
-	// there should be at least 100 weis delegator rewards accumulated
+	_, delegatorReward := queryDelegator(10)
+	// there should be at least 160 weis delegator rewards accumulated
 	// (at least 80 weis per epoch is accumulated if validator signs only single block)
-	require.Greater(t, delegatorReward.Uint64(), uint64(100))
-	t.Logf("Delegator reward=%s\n", delegatorReward)
+	require.Greater(t, delegatorReward.Uint64(), uint64(160))
+
+	// undelegate rewards
+	require.NoError(t, srv.Undelegate(delegatorReward.Uint64(), delegatorSecretsPath, validatorAddr))
+	queryDelegator(10)
+
+	// withdraw available rewards
+	require.NoError(t, srv.Withdraw(delegatorSecretsPath, delegatorAddr))
+	queryDelegator(10)
+
+	// wait for single epoch to process withdrawal
+	cluster.WaitForBlock(15, 1*time.Minute)
+
+	_, delegatorReward = queryDelegator(15)
+	require.Equal(t, big.NewInt(0), delegatorReward)
 }
