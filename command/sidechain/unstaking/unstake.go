@@ -44,7 +44,7 @@ func setFlags(cmd *cobra.Command) {
 		&params.accountDir,
 		sidechainHelper.AccountDirFlag,
 		"",
-		"the directory path where validator key is stored",
+		"the directory path with sender account secrets",
 	)
 
 	cmd.Flags().BoolVar(
@@ -99,8 +99,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 			return err
 		}
 	} else {
-		undelegateToAddress := types.StringToAddress(params.undelegateAddress)
-		encoded, err = undelegateABI.Encode([]interface{}{ethgo.Address(undelegateToAddress), params.amount})
+		encoded, err = undelegateABI.Encode([]interface{}{ethgo.HexToAddress(params.undelegateAddress), params.amount})
 		if err != nil {
 			return err
 		}
