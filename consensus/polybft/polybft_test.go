@@ -207,7 +207,7 @@ func TestPolybft_Close(t *testing.T) {
 
 	select {
 	case <-polybft.ctx.Done():
-		assert.Fail(t, "channel closing is invoked")
+		assert.Fail(t, "context done")
 	case <-time.After(time.Millisecond * 100):
 	}
 
