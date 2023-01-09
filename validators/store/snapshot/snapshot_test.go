@@ -470,6 +470,7 @@ func TestSnapshotValidatorStore_initialize(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -648,6 +649,7 @@ func TestSnapshotValidatorStoreGetValidators(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -706,6 +708,7 @@ func TestSnapshotValidatorStoreVotes(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -840,6 +843,7 @@ func TestSnapshotValidatorStoreUpdateValidatorSet(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -1031,6 +1035,7 @@ func TestSnapshotValidatorStoreModifyHeader(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -1091,6 +1096,7 @@ func TestSnapshotValidatorStoreVerifyHeader(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -1303,6 +1309,7 @@ func TestSnapshotValidatorStoreProcessHeadersInRange(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -1614,6 +1621,7 @@ func TestSnapshotValidatorStoreProcessHeader(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -1781,7 +1789,6 @@ func TestSnapshotValidatorStorePropose(t *testing.T) {
 
 	for _, test := range tests {
 		test := test
-
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -1869,6 +1876,7 @@ func TestSnapshotValidatorStore_addCandidate(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -1992,7 +2000,6 @@ func TestSnapshotValidatorStore_addHeaderSnap(t *testing.T) {
 
 	for _, test := range tests {
 		test := test
-
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -2272,7 +2279,6 @@ func TestSnapshotValidatorStore_saveSnapshotIfChanged(t *testing.T) {
 
 	for _, test := range tests {
 		test := test
-
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -2359,7 +2365,6 @@ func TestSnapshotValidatorStore_resetSnapshot(t *testing.T) {
 
 	for _, test := range tests {
 		test := test
-
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -2428,7 +2433,6 @@ func TestSnapshotValidatorStore_removeLowerSnapshots(t *testing.T) {
 
 	for _, test := range tests {
 		test := test
-
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -2724,7 +2728,6 @@ func Test_validatorToMiner(t *testing.T) {
 
 	for _, test := range tests {
 		test := test
-
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -2780,7 +2783,6 @@ func Test_minerToValidator(t *testing.T) {
 
 	for _, test := range tests {
 		test := test
-
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
