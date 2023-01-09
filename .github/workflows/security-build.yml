@@ -1,8 +1,8 @@
 name: Security Build
 on:
   push:
-    branches:
-      - develop # or the name of your main branch
+    # branches:
+    #   - develop # or the name of your main branch
   workflow_dispatch: {}
 
 jobs:
