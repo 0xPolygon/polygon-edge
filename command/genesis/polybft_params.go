@@ -46,7 +46,6 @@ var (
 
 // generatePolyBftChainConfig creates and persists polybft chain configuration to the provided file path
 func (p *genesisParams) generatePolyBftChainConfig() error {
-	fmt.Println(polybft.DisclaimerMessage)
 	// load manifest file
 	manifest, err := polybft.LoadManifest(p.manifestPath)
 	if err != nil {

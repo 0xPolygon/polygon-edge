@@ -11,6 +11,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/ibft"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/fork"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/contracts/staking"
 	stakingHelper "github.com/0xPolygon/polygon-edge/helper/staking"
 	"github.com/0xPolygon/polygon-edge/server"
@@ -374,6 +375,6 @@ func (p *genesisParams) predeployStakingSC() (*chain.GenesisAccount, error) {
 
 func (p *genesisParams) getResult() command.CommandResult {
 	return &GenesisResult{
-		Message: fmt.Sprintf("Genesis written to %s\n", p.genesisPath),
+		Message: fmt.Sprintf("%s\nGenesis written to %s\n", polybft.DisclaimerMessage, p.genesisPath),
 	}
 }

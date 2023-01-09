@@ -213,7 +213,7 @@ func (p *Polybft) Initialize() error {
 
 // Start starts the consensus and servers
 func (p *Polybft) Start() error {
-	fmt.Println(DisclaimerMessage)
+	p.logger.Warn(DisclaimerMessage)
 	p.logger.Info("starting polybft consensus", "signer", p.key.String())
 
 	// start syncer (also initializes peer map)
